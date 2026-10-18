@@ -76,7 +76,7 @@ def approve(
 ) -> int:
     """未承認の提案をまとめてユーザに見せ、承認されたら承認済みチケットを置く。
 
-    エージェントではなくユーザが端末から打つ経路。提案を書き直す方法は用意しない。
+    エージェントではなくユーザが端末から打つ経路。承認は提案の中身を書き換えない。
     チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
     承認したユーザが承認したものの作者になる。
 
@@ -84,7 +84,8 @@ def approve(
     子は親の部分集合なので、新たに書けるようになる領域は親の分だけ。
 
     親の改版（計画の変更）も一緒に承認の対象に入る。承認済みチケットは動かないのが原則で、改版はその
-    唯一の例外。変えられるのは `plan` と `feedback` だけ。
+    唯一の例外。変えられるのは `plan`・`feedback`・`phases:`・範囲。
+    範囲を変える改版は、作業中の子が居ないときだけ通る。
 
     `only` は承認の対象を識別子で絞る（`ccnavi --agree <識別子>...`）。VS Code 拡張の
     ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
@@ -334,7 +335,7 @@ def verify(
     else:
         stdout.write(verdict.text)
         if branches:
-            stdout.write("\n既にあるブランチと同じ名前の親（warn。承認は止めない）:\n")
+            stdout.write("\n既にあるブランチと同じ名前の親（warn）:\n")
             for line in branches:
                 stdout.write(f"  - {line}\n")
     return modes.EXIT_OK if verdict.ok else modes.EXIT_ANSWER_NO

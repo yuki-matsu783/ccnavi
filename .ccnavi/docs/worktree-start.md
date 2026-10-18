@@ -29,7 +29,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   出力の先頭は`対象リポジトリ: <owner/repo>（<プロジェクト名>）`。意図したリポジトリかをここで確かめる。`--title`を付けても、ホストが読めるかぎりissueの存在は確かめる（存在しない番号では何も作らない。APIが一時的に失敗して読めなかったときは、`--slug`があれば仮の題で進む。MCPで代行するときは、案内の手順でissueの実在も確かめる。issueなしで始めるなら`ccnavi-ticket.sh next-id`で識別子を決め、`ccnavi ticket new`で提案を作る）。
 
   途中で失敗して打ち直しても、完了済みの処理（ブランチ・ワークツリー・push・MR）をスキップし、未完了の処理から再開する。
-  依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す。止めはしない
+  依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す
 - 識別子はブランチ名の`/`を`-`に置き換えたもの（`feature/123-login`は`feature-123-login`）。ワークツリーは`.claude/worktrees/<識別子>`に、
   `worktree add .claude/worktrees/<識別子> <ブランチ>`でそのブランチを直接チェックアウトする。識別子の名前のブランチは作らない。
   変換は`ccnavi_branch_to_id`（sh）・`ticket_ids.branch_to_id`（Python）・拡張の`branchToId`（TS）に同じものがあり、
@@ -72,7 +72,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   `/`を`-`に置き換えたもの（`feature-123-login`）で、提案の`ticket:`にそれを書き、`mr: <番号>`も書く。
   提案にブランチ名を書く欄は無い（`branch:`の欄があればエラー）。ccnaviは親のブランチ名を、
   親のワークツリーのHEADから読む。HEADのブランチ名を変換した識別子がフォルダ名と合わないと、取り込み・早送りの対象にならない。
-  識別子のブランチは作らないので、ブランチを移す手順（`switch`）は要らない。子のブランチは子の識別子で、起点は親のブランチ
+  子のブランチは子の識別子で、起点は親のブランチ
   （`-b <子> feature/123-login`）。`ccnavi-sync.sh`の引数は識別子
   - 子のワークツリーは、VS Code拡張で承認したときに親のブランチから自動で切る（親のワークツリーが在り、子のものがまだ無いとき）。
     拡張は承認のJSONの`worktrees`の`create`だけを`ccnavi-git.sh worktree add <行き先> -b <子> <base>`で作る。作れなかった子は、

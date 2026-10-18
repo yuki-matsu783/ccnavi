@@ -45,7 +45,7 @@ export type Action =
   | { readonly kind: "approve" }
   /**
    * レビューの対応。画面は 1 つのメニューボタンにして、中に「対応方針を決める」と「レビュー済み連絡」を並べる。
-   * 項目は指摘の有無で無効にしない（判定は `decide` と `confirm` が持つ）
+   * 項目は常に有効（判定は `decide` と `confirm` が持つ）
    */
   | { readonly kind: "review"; readonly parent: string; readonly phase: number };
 
@@ -180,7 +180,7 @@ export interface Board {
   readonly archivedParents: readonly ParentOption[];
   readonly problems: readonly string[];
   readonly pendingApproval: readonly string[];
-  /** 置き場のカードの数（アーカイブは数えない） */
+  /** 置き場のカードの数 */
   readonly totalCount: number;
   readonly remainingCount: number;
   readonly issueCount: number;

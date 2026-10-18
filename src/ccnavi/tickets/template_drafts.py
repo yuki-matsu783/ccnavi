@@ -2,7 +2,7 @@
 
 読む側（`plan_templates`）が持つのは効力のある置き場（共通とレイヤー）だけ。ここは効力の無い
 下書きを扱う。下書きの置き場は、ほかの保護対象と同じ `wip/handoff/<取り込み先の相対パス>`
-（`handoff`）で、取り込みも `ccnavi user handoff` が行う（テンプレート専用の取り込みは無い）。
+（`handoff`）で、取り込みも `ccnavi user handoff` が行う。
 
 ## 下書きを作る（`make`）
 
@@ -14,9 +14,9 @@
   フィードバック計画の項は全体計画の項数を引いて直す。全体計画の `after` はそのまま。承認済みの
   親の計画の順序は承認が確かめているので、並べ替え（`plan_order.renumber`）は要らず、引き算だけで足りる
 - 子のフローは、全体計画の n 番目の項の子（`phase` が n）のうち、フローを持つ最初の 1 本を写す。
-  フィードバック計画の子のフローは写さない（テンプレートの `flows` は全体計画の添字で指す）
-- 固有名の一般化は機械ではしない。親の題から入れる `description` と `when` の両方に `TODO` の印を
-  付ける。直すのはエージェント。印が残っていれば検査が warn で言う
+  写すのは全体計画の子のフローだけ（テンプレートの `flows` は全体計画の添字で指す）
+- 固有名の一般化はエージェントが直す。親の題から入れる `description` と `when` の両方に
+  `TODO` の印を付ける。印が残っていれば検査が warn で言う
 - 取り込み先に同名のテンプレートが既にあれば、上書きになる下書きを作らずに断る（直すときは
   `ccnavi-stage.sh` で既存を写して編集する）。同名の下書きがあれば上書きせず断る。親が `ready` で
   閉じて退避済み（`logs/archive/`）なら、そこからは読まないと言って断る
@@ -126,7 +126,7 @@ def scan(conf: settings.Settings, root: str, candidates: dict | None = None) -> 
     検査は取り込み先のレイヤーのフェーズ定義（共通は共通だけ、ほかは共通 + レイヤー）で行う。
     同じ中身の下書きが
     複数のツリーに在れば（親のブランチに乗ったものが子のワークツリーにも checkout される）、
-    最初の 1 本にまとめる。効力のある置き場（`plan_templates.scan`）は読まない。
+    最初の 1 本にまとめる。
     """
     if candidates is None:
         candidates = flow.catalog(root)
@@ -499,7 +499,7 @@ def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
     出すのは、完了した親（`done/`）が計画を持ち、その識別子の下書き（親のツリーの
     `wip/handoff/` の `<識別子>.yml`）がまだ無く、同じ計画の形のテンプレートが取り込まれて
     いないときだけ。`ready` で閉じると材料（`done/` と `flows/`）は退避されて拾えなくなるので、
-    `ready` の前に出す。何も書かず、読めなければ出さない。
+    `ready` の前に出す。読めなければ出さない。
     """
     found, children, _ = _find_parent(conf, root, parent)
     if found is None:

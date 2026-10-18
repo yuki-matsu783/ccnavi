@@ -23,7 +23,7 @@
 - 承認の事実をモデルに伝える文を組む（`agree_screen.approved_text`。拡張が `--agree --yes` の
   `prompt` で渡す）
 
-判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（承認で正とするのは置き場）。置き場を手で
+判定は承認済みチケットだけを読み、承認コマンドを通ったかどうかは判定の材料にしない（承認で正とするのは置き場）。置き場を手で
 動かす進め方もあるので、判定の側で要る構造の検査は approval の `blocking_problems` に置いてある。
 """
 
@@ -232,7 +232,7 @@ class Verdict:
 
 def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは言い換えるだけ。"""
-    head = "承認の可否（確かめるだけ。承認済みチケットは置かない）\n"
+    head = "承認の可否（確かめるだけ）\n"
     # 読めなかったものは、承認されない枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
     # 1 件も無い）が「読めないのは自分が書いた 1 本」である見込みのいちばん高い枝で、
     # そこで出さないと、置いたばかりのユーザに「todo/ に置け」とだけ言うことになる。
@@ -438,14 +438,21 @@ def _apply_steps(
                         f"ccnavi: {t.ticket}: {removing.replace('{reason}', failed)}",
                         stream=fsio.STREAM_ERR,
                     )
+                scope_changed = approval.scope_signature(t) != approval.scope_signature(
+                    cand.current
+                )
                 if cand.plans_feedback:
                     what = "フィードバック計画"
                 elif approval.plan_signature(t, "plan") != approval.plan_signature(
                     cand.current, "plan"
                 ):
                     what = "全体計画"
-                else:
+                elif approval.phases_signature(t) != approval.phases_signature(cand.current):
                     what = "固定する定義（phases:）"
+                else:
+                    what = ""
+                if scope_changed:
+                    what = f"{what}・範囲" if what else "範囲"
                 stage.line(f"  {t.ticket} の{what}を改版した")
                 if cand.plans_feedback:
                     # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
@@ -507,9 +514,9 @@ def waiting(
 
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
     無いもの。閉じたものは対象外で、再開はユーザが承認済みチケットを戻す。
-    改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画か写し（`phases:`）がそれと
-    違うもの（`approval.plan_differs`。計画は定義・`review`・推移的な待ちの並びで、写しは定義を
-    読んだ形で比べる）。待ち方は計画から
+    改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画・写し（`phases:`）・範囲が
+    それと違うもの（`approval.plan_differs`。計画は定義・`review`・推移的な待ちの並びで、写しは定義を
+    読んだ形で比べ、範囲は項の集合で比べる）。待ち方は計画から
     決まるので、待ち方だけの改版は無い。
     `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     """

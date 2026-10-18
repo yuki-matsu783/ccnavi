@@ -458,7 +458,7 @@ export interface FileAddition {
 
 /**
  * 親のブランチへ 1 コミットで書く。`expectedHeadOid` が先頭と違えば GitHub が断るので、
- * そのまま競合の検出になる（Git Data API + PATCH refs は使わない）。答えは新しいコミットの sha。
+ * そのまま競合の検出になる。答えは新しいコミットの sha。
  */
 export async function createCommit(
   client: Client,

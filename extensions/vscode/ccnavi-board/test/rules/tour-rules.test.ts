@@ -44,7 +44,7 @@ test("CB-T407 ルールの案内の scene は、見本にあるタブ・行の i
   const ids = new Set([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => rule.id));
   for (const course of loadTour("rules").courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目`;
+      const at = `${course.id} の ${index + 1} 番目の手順`;
       const scene = step.scene;
       assert.ok(scene.tab === undefined || ["rules", "judge", "hooks"].includes(String(scene.tab)), `${at}: tab`);
       for (const id of String(scene.open ?? "").split(",").filter((item) => item.trim() !== "")) {
@@ -93,14 +93,14 @@ function knownTarget(target: string, ids: ReadonlySet<string>): boolean {
   return ids.has(rule[1]) || FIELDS.some((field) => rule[1].endsWith(`-${field}`) && ids.has(rule[1].slice(0, -field.length - 1)));
 }
 
-test("CB-T520 ルールの案内は、使い方ごとの案内が 4〜9 段で、指す先が知っている印（見本の行 id と欄を含む）だけ", () => {
+test("CB-T520 ルールの案内は、使い方ごとの案内が 4〜9 手順で、指す先が知っている印（見本の行 id と欄を含む）だけ", () => {
   const ids = new Set([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => rule.id));
   const courses = loadTour("rules").courses;
   assert.ok(courses.length >= 9, "ユースケースが足りない");
   for (const course of courses.slice(1)) {
-    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 段`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
     for (const [index, step] of course.steps.entries()) {
-      assert.ok(knownTarget(step.target, ids), `${course.id} の ${index + 1} 段目: 指す先 ${step.target} を画面は付けない`);
+      assert.ok(knownTarget(step.target, ids), `${course.id} の ${index + 1} 番目の手順: 指す先 ${step.target} を画面は付けない`);
     }
   }
 });

@@ -11,7 +11,7 @@
  * 5. 親子のチケットごとに、参照の閉包の足りないブランチを読み足し、Python に承認待ちを出させる。
  *    判定の入力は統合先・`P`・閉包の `P_X` だけ。表示用のブランチは入れない
  * 6. 依頼済みでまだレビュー済みでないフェーズがあれば、MR のスレッドとレビューを読んで、Python の
- *    `confirm` に通るかを聞く（書かない）
+ *    `confirm` に通るかを聞く
  *
  * blob は sha で引き、キャッシュ（IndexedDB）にあれば読まない。判定はここでは出さない。
  */
@@ -141,7 +141,7 @@ export class Reader {
       } else if (obj.type === "blob") {
         wanted.push({ path: p, sha: obj.oid });
       } else {
-        // GitLab は tree の sha でなく、コミットとパスで引く（GitHub は後ろの 2 つを使わない）
+        // GitLab は tree の sha でなく、コミットとパスで引く
         const entries = await this.call<TreeEntry[]>("tree", obj.oid, head, p);
         for (const e of entries) {
           // シンボリックリンクは中身（指す先のパス）をファイルとして読まない。Python が「決まらない」にする

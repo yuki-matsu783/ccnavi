@@ -195,8 +195,8 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     problems.extend(_catch_all_deny_problems(rule, name))
 
     # once の文は文脈ごとに 1 度しか積まれず、every > 1 は刻んだ回にしか積まれないので、
-    # どちらも広さを報告しない。読めない every は 1（毎回渡る）になっているので、この式は
-    # 読めない every を見逃さない（rules.readable_every）。
+    # どちらも広さの報告から外す。読めない every は 1（毎回渡る）になっているので、この式は
+    # 読めない every も拾う（rules.readable_every）。
     if (
         (rule.additional_context or rule.additional_context_file)
         and rule.decision == rules.ALLOW
@@ -369,9 +369,8 @@ def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
     除いたものは止めないので、「丸ごと止める」とは言わず、除いたもの以外を止めると言う。
 
     組み合わせ条件（when）の全体が何にでも当たる形は _when_problems が言う。
-    `{!root}` を組み立てられずに止める側へ倒した deny は、書いた式ではなく
-    倒した式を持つので見ない（読み込みが別に言う）。
-    ask と allow は見ない（allow の広さは _broad が言う）。
+    対象は deny で、ただし `{!root}` を組み立てられずに止める側へ倒した deny は、
+    読み込みが別に言う。allow の広さは _broad が言う。
     """
     if rule.decision != rules.DENY or rule.when is not None or rule.degraded_message:
         return []
@@ -520,8 +519,7 @@ def _broad(rule: rules.Rule) -> str:
 
     additionalContext は当たった回ごとにモデルへ渡るので、広い allow に書くと
     ls のたびに同じ文が積まれる。「広い」の判定は 2 つで、どちらも書き方から
-    機械的に言えるものに限る。当たる頻度は記録を見ないと分からないので、
-    ここでは扱わない。
+    機械的に言えるものに限る。当たる頻度は記録を見ないと分からない。
 
     1. 何にでも当たる。翻訳後の式が、当てる語を含まない文字列にも当たる。
        組み合わせ条件（when）は、書き方から何にでも当たると言えるとき（_constant）
@@ -576,7 +574,7 @@ def _inert(match: str) -> list[str]:
     for want in match.split("|"):
         tool = want.strip()
         if not tool or tool == rules.STOP_MATCH:
-            # ターンの終わりに当てる名前。当てる先は判定ではなく events.stop_rules_nudge が持つ。
+            # ターンの終わりに当てる名前。当てる先は events.stop_rules_nudge が持つ。
             continue
         probe = hookio.Input(tool_name=tool, tool_input=probe_input)
         if not subjects.subject_of(probe):

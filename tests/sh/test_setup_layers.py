@@ -82,7 +82,7 @@ class SetupTest(unittest.TestCase):
         write(binary, "#!/bin/sh\nexit 0\n")
         os.chmod(binary, 0o755)
         # 置き場の名前になる目印と、hook が起動する振り分けの sh。sh は `.ccnavi/scripts/` に置き、
-        # 実行ファイルは隣ではなく `../bin/<os>-<arch>/` に探す。
+        # 実行ファイルは `../bin/<os>-<arch>/` に探す。
         write(os.path.join(src, "dist", "ccnavi.target"), platformtag.host_target() + "\n")
         os.makedirs(os.path.join(src, ".ccnavi", "scripts"))
         shutil.copy(LAUNCHER, os.path.join(src, ".ccnavi", "scripts", "ccnavi-launcher.sh"))

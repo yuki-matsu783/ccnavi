@@ -113,7 +113,7 @@ export async function openHandoff(key: string = MAIN_TREE_KEY): Promise<void> {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 選んだ対象や開いた行を持つので、タブを裏に回しても捨てない。
+    // 選んだ対象や開いた行を持つので、タブを非表示にしても捨てない。
     retainContextWhenHidden: true,
   });
   showLoading(panel, titleOf(key), SCREEN, keyLabel(key));
@@ -185,9 +185,9 @@ function registerPanelHandlers(current: PanelState): void {
     void handleMessage(current, asMessage(message));
   });
 
-  // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
-  // 食い違っている。どちらが正しくても困らないよう、表に戻ったところで、いま出すべき知らせを送り直す。
-  // 中身（`data`）は送らない。送ると、裏で選んでいた内容がここで消える。
+  // 保持する画面は非表示でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
+  // 記述が一致していない。どちらが正しくても困らないよう、再表示されたところで、いま出すべき知らせを送り直す。
+  // 中身（`data`）は送らない。送ると、非表示の間に選んでいた内容がここで消える。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;

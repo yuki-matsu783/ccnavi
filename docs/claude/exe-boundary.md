@@ -25,7 +25,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   - `ccnavi_is_ident`・`ccnavi_is_branch`・`ccnavi_branch_ok`（sh）は、実行ファイルの`id_problem`・`branch_problem`の
     ASCIIで見分けられる分だけの複製。字の種類・NFC・長さは見ないので、名前を受け入れる入口は実行ファイルの
     `worktree id`に聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す
-- P13の例外: 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の中の可否の判定（`integrate-ticket`、統合先と消えた親のブランチへの
+- P13の例外: 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の中の可否の判定（`integrate-ticket`（結び付くかは実行ファイルの`tree bound`に聞く。Stopの促しと同じ判定）、統合先と消えた親のブランチへの
   pushの拒否、親のワークツリーでの`checkout`・`switch`の行き先の確認）と、`integrate`・`integrate-done`の状態操作はshに置く。条件は3つで、
   生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
   （設計 9.2）。この3つを満たさない判定はshに足さない
@@ -35,7 +35,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   満たさないが、同じ関門を共有しないと消えた親のブランチを作り直せてしまうため、関門だけを例外に入れる。関門の材料のうちチケットの中身
   （着手済み＝承認済みの親チケットの`started_at`・`.requested`・退避の有無）は実行ファイルの`tree parent`に聞き、shは自分で読まない。承認済みというだけでは形跡にしない。関門が`ls-remote`を打つのはshの側
   （ネットワークはshの仕事）。この2経路にほかの判定は足さない
-- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`write-and-push family`・`sync retired`・
+- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`write-and-push family`・`sync retired`・
   `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
   （止める側の検査は止める向き、ツリーを動かす側は動かさない向き）。`tree parent`の答えの`approved`・`started`などの行が無い（旧い実行ファイル）ときは
   `unknown`として読む

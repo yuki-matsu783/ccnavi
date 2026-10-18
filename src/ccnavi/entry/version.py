@@ -53,10 +53,12 @@ VERSION = "0.1.0"
 # 14: C1 を write-and-push に改名した。sh が呼ぶサブコマンドが
 # `c1 family|sort|merge|merge-blame` から `write-and-push …` に変わり、答えの頭の行も
 # `c1 1` から `write-and-push 1` に変わった。
-# 15: ユーザだけが打つ操作を `user <操作>`（agree・reviewed・close-early・prune・handoff）に集め、
+# 15: `integrate` がチケットに結び付くかの判定を、実行ファイルの `tree bound` に聞くようにした。
+# sh が呼ぶサブコマンドが増え、sh は答えの頭の行 `tree 1` が無ければ断る向きに倒す。
+# 16: ユーザだけが打つ操作を `user <操作>`（agree・reviewed・close-early・prune・handoff）に集め、
 # sh を ccnavi-user-*.sh に分けた。`user` の外の形は断るので、旧い sh は新しい実行ファイルで
 # 動かない。
-COMPAT = 15
+COMPAT = 16
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 実行ファイルが持つ振る舞い。オプションや JSON の欄の有無を `flags` から読めないものを足す。

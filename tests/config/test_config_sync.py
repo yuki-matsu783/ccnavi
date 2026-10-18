@@ -415,6 +415,18 @@ class ConfigMirrorTest(ConfigUnionHarness):
         refused = self.ccnavi("--config-synced", "i0001", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
 
+    def test_a_common_rule_using_root_is_mirrored(self):
+        """2: `{root}` を使う共通ルールがあっても、親の着手が通りミラーされる。"""
+        rooted = {"id": "workspace-root", "match": "Write|Edit", "regex": "^{root}[\\\\/]"}
+        write(self.rules, json.dumps(dict(COMMON_RULES, allow=[rooted])))
+
+        tree, _ = self.start_parent()
+
+        self.assertEqual(
+            json.loads(read(mirror_of(tree, "rules.yml"))),
+            dict(COMMON_RULES, allow=[rooted]),
+        )
+
     def test_a_common_layer_the_mirror_cannot_hold_stops_the_start(self):
         """3: ミラーとして読めない共通レイヤーは写さず、着手しない。"""
         write(self.risk, "version: 1\nfactors: [\n")

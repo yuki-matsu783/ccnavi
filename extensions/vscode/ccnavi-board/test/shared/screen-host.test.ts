@@ -49,19 +49,19 @@ test("CB-T144 組み上がったら中身だけを送る。入れ物は入れ直
   assert.deepEqual(spy.pages, ["あ"], "入れ直すと画面が作り直され、開いている中身も状態も飛ぶ");
 });
 
-test("CB-T145 裏に回ったら入れ物ごと入れ直す。表に戻っても、組み上がるまでは送らない", () => {
+test("CB-T145 非表示になったら入れ物ごと入れ直す。再表示されても、組み上がるまでは送らない", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
   host.ready();
-  // 裏へ。画面は捨てられる
+  // 非表示にする。画面は捨てられる
   spy.visible = false;
   host.hidden();
   assert.equal(host.live, false);
   assert.equal(host.send("い"), "rebuilt", "戻った瞬間に新しい中身が出るよう、入れておく");
   assert.deepEqual(spy.pages, ["あ", "い"]);
   assert.deepEqual(spy.posted, []);
-  // 表へ。VS Code が入れてある HTML から作り直す間は送らない
+  // 再表示する。VS Code が入れてある HTML から作り直す間は送らない
   spy.visible = true;
   assert.equal(host.live, false);
   assert.equal(host.send("う"), "deferred");
@@ -82,19 +82,19 @@ test("CB-T146 1 度きりのメッセージは、届いたときだけ真を返�
   host.ready();
   assert.equal(host.post({ type: "filter" }), true);
   assert.deepEqual(spy.posted, [{ type: "filter" }]);
-  // 裏に回った画面には届かない
+  // 非表示になった画面には届かない
   spy.visible = false;
   host.hidden();
   assert.equal(host.post({ type: "filter" }), false);
   assert.deepEqual(spy.posted, [{ type: "filter" }]);
 });
 
-test("CB-T147 裏にいる画面からの ready は、捨てられた画面が残したものとして捨てる", () => {
+test("CB-T147 非表示になっている画面からの ready は、捨てられた画面が残したものとして捨てる", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
-  // 画面が ready を送った直後にユーザがタブを裏へ回すと、裏に回ったことが先に届くことがある。
-  // これを真に受けると、表に戻ったとき「組み上がっている」と誤って送ってしまう
+  // 画面が ready を送った直後にユーザがタブを非表示にすると、非表示になったことが先に届くことがある。
+  // これを真に受けると、再表示されたとき「組み上がっている」と誤って送ってしまう
   spy.visible = false;
   host.ready();
   spy.visible = true;
@@ -118,14 +118,14 @@ test("CB-T148 入れ物に埋めて渡すものは、入れ直す道のときだ
   assert.deepEqual(spy.posted, [{ type: "data", data: "素" }], "送る道では素のまま。埋めたほうは使わない");
 });
 
-test("CB-T149 裏に回ったと教えられたら、そのあいだ何も呼ばれなくても送らない", () => {
+test("CB-T149 非表示になったと教えられたら、そのあいだ何も呼ばれなくても送らない", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
   host.ready();
   assert.equal(host.live, true);
-  // 裏へ回って表へ戻るまでの間、この段取りは 1 度も呼ばれない（実機の onDidChangeViewState がその形）。
-  // 知らされていなければ、表裏を自分で読んでも行って戻ったことに気づけない
+  // 非表示になって再表示されるまでの間、この段取りは 1 度も呼ばれない（実機の onDidChangeViewState がその形）。
+  // 知らされていなければ、表示の有無を自分で読んでも行って戻ったことに気づけない
   spy.visible = false;
   host.hidden();
   spy.visible = true;
@@ -137,21 +137,21 @@ test("CB-T149 裏に回ったと教えられたら、そのあいだ何も呼ば
   assert.equal(host.send("い"), "posted");
 });
 
-test("CB-T150 教えてもらえなくても、表裏が変わっていれば気づく", () => {
+test("CB-T150 教えてもらえなくても、表示の有無が変わっていれば気づく", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
   host.ready();
-  // 裏に回ったことが知らされない場合。裏にいる間に 1 度でも触れば、そこで気づく
+  // 非表示になったことが知らされない場合。非表示の間に 1 度でも触れば、そこで気づく
   spy.visible = false;
-  assert.equal(host.post({ type: "filter" }), false, "裏の画面には届かない");
+  assert.equal(host.post({ type: "filter" }), false, "非表示の画面には届かない");
   spy.visible = true;
   assert.equal(host.live, false, "戻ってきた画面は作り直されている");
   assert.equal(host.send("い"), "deferred");
   assert.deepEqual(spy.posted, []);
 });
 
-// ---- 保持する画面（retainContextWhenHidden: true）。裏に回っても画面が捨てられないので段取りが変わる
+// ---- 保持する画面（retainContextWhenHidden: true）。非表示になっても画面が捨てられないので段取りが変わる
 
 test("CB-T151 保持する画面は入れ物を 1 度しか入れない。2 枚目からは中身だけ送る", () => {
   const spy = surface();
@@ -169,22 +169,22 @@ test("CB-T151 保持する画面は入れ物を 1 度しか入れない。2 枚�
   assert.deepEqual(spy.posted, [{ type: "data", data: "い" }]);
 });
 
-test("CB-T152 保持する画面は裏に回っても入れ直さず、裏にいる間も送れる", () => {
+test("CB-T152 保持する画面は非表示になっても入れ直さず、非表示の間も送れる", () => {
   const spy = surface();
   const host = retainedHost<string>(spy, (data) => data);
   host.send("あ");
   host.ready();
-  // 裏へ。VS Code は画面を捨てないので、送ったものは届く
+  // 非表示にする。VS Code は画面を捨てないので、送ったものは届く
   spy.visible = false;
   host.hidden();
   assert.equal(host.live, true);
-  assert.equal(host.send("い"), "posted", "入れ直すと、裏で打ちかけていた編集が消える");
+  assert.equal(host.send("い"), "posted", "入れ直すと、非表示の間に打ちかけていた編集が消える");
   assert.deepEqual(spy.pages, ["あ"]);
   assert.deepEqual(spy.posted, [{ type: "data", data: "い" }]);
-  // 1 度きりのメッセージ（lock・changed）も裏のまま届く
+  // 1 度きりのメッセージ（lock・changed）も非表示のまま届く
   assert.equal(host.post({ type: "lock" }), true);
   spy.visible = true;
-  assert.equal(host.send("う"), "posted", "表に戻っても作り直されていないので、そのまま送れる");
+  assert.equal(host.send("う"), "posted", "再表示されても作り直されていないので、そのまま送れる");
   assert.deepEqual(spy.pages, ["あ"]);
 });
 

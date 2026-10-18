@@ -12,8 +12,8 @@ import type { Moved } from "../../core/board-moved.js";
 import type { BoardData, ToBoard } from "../../core/board-view.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { OVERLAY_NAMES, parseBoardSample, type OverlayName } from "../../core/tour-board.js";
-import { applyAppearance } from "../appearance.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { useHostMessages } from "../useHostMessages.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import boardTour from "../tours/board.yml";
 import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
@@ -31,7 +31,7 @@ const MIN_WIDTH = 220;
 const TOUR = tourOf(boardTour);
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -65,7 +65,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   boardRef.current = board;
   // 初回の案内はボードが出てから始める。承認のオーバーレイが出ている間は、その下を指しても見えないので待つ
   /**
-   * 案内の段ごとの画面の様子（絞り込み・畳んだ列・出すオーバーレイ）。見本の上だけに効き、実際の絞り込みや
+   * 案内の手順ごとの画面の様子（絞り込み・畳んだ列・出すオーバーレイ）。見本の上だけに働き、実際の絞り込みや
    * 畳んだ列（`view`）には触れないので、閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -100,34 +100,24 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     }
   };
 
-  useEffect(() => {
-    /** 拡張ホストが指す絞り込み。候補に無ければ何もしない（いまの絞り込みを外さない） */
-    const pickProject = (value: string): void => {
-      if (!projectOptions(boardRef.current).includes(value)) {
-        return;
-      }
-      setView((now) => ({ ...now, project: value }));
-    };
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToBoard>;
-      if (message.type === "data" && message.data !== undefined) {
-        // 中身だけ。開いた直後の絞り込みは 1 枚目の HTML に埋まっていて、2 枚目からは filter で届く
-        setData(message.data);
-        setRefreshing(false);
-      } else if (message.type === "filter" && typeof message.project === "string") {
-        pickProject(message.project);
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
-      }
-    };
-    window.addEventListener("message", onMessage);
-    // 組み上がったと伝える。裏に回って捨てられた画面は、表に戻ると拡張ホストが入れてある HTML から
-    // 作り直される。その HTML は少し古いことがあるので、いまの中身をもらい直す
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-  }, [requestTour]);
+  // 拡張ホストが指定した絞り込み。候補に無ければ何もしない（いまの絞り込みを外さない）
+  const pickProject = (value: string): void => {
+    if (!projectOptions(boardRef.current).includes(value)) {
+      return;
+    }
+    setView((now) => ({ ...now, project: value }));
+  };
+  useHostMessages<ToBoard>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      // 中身だけ。開いた直後の絞り込みは 1 枚目の HTML に埋まっていて、2 枚目以降は filter のメッセージで届く
+      setData(message.data);
+      setRefreshing(false);
+    } else if (message.type === "filter" && typeof message.project === "string") {
+      pickProject(message.project);
+    } else if (message.type === "tour") {
+      requestTour();
+    }
+  }, () => post({ type: "ready" }));
 
   // 覚えていた値が候補に無ければ（その親が消えた等）「すべて」のまま。覚え直すのも、外した後の値
   const project = projectOptions(board).includes(view.project) ? view.project : EMPTY.project;
@@ -214,7 +204,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
       ) : (
         <>
           {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
-          <header className="toolbar">
+          <ScreenHeader courses={courses} onPick={tour.start}>
             <div className="summary" data-tour="summary">
               {shown.pendingApproval.length > 0 ? <span className="pending warn">承認待ち {shown.pendingApproval.length} 件</span> : null}
               {shown.issueCount > 0 ? <span className="issues warn">不備 {shown.issueCount} 件</span> : null}
@@ -296,8 +286,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 承認待ち {visiblePending.length} 件を承認
               </button>
             </div>
-            <TourButton courses={courses} onPick={tour.start} />
-          </header>
+          </ScreenHeader>
           {(sample === undefined ? board?.problems.length ?? 0 : 0) > 0 ? (
             <ul className="problems">
               {(board?.problems ?? []).map((problem, i) => (

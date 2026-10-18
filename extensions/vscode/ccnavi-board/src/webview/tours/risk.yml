@@ -3,7 +3,7 @@
 #   risks    見本の配点。risks.yml と同じ書き方（levels と factors）
 #   builtin  配点のファイルが無いときに画面が見せる組み込みの配点（src/core/risk-doc.ts の BUILTIN_RISK_TEXT と同じ値）
 #   sums     「統合結果」の見本。実行ファイルが出す結果の形（共通の設定 + 1 つの設定の和）
-# `scene:` は段ごとの画面の様子。段ごとに全部を書く（前の段を引き継がない）。
+# `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
 #   open     開く項目の id（, で区切って複数。指す先 factor-* は、開いた最初の項目に付く）
 #   find     絞り込みの欄に入れる文字
 #   blank    欄を空にして見せる境目（medium / high / critical）。空の欄には組み込みの値を薄く出す

@@ -25,7 +25,7 @@
  * 保存が通ったあと、同じ中身の下書きだけを消す。依頼のボタン（`request`）は着手の前だけ拡張ホストが言葉を渡す。
  *
  * 案内（`tours/flow.yml`）。 案内の間は、実際のフローではなく案内用の見本（`core/tour-flow.ts`）を描く。見本の上の様子
- * （どの見本か・選ぶノード・未保存か・差分や下書きを出すか）は段ごとの `scene` が決め、画面の state には入れない。
+ * （どの見本か・選ぶノード・未保存か・差分や下書きを出すか）は手順ごとの `scene` が決め、画面の state には入れない。
  * 実際の編集内容・履歴・選択・保存・下書きには触れず、案内の間は編集・保存・拡張ホストへの送信（`post.ts` の `muteForTour`）が動かない。
  * 閉じたら実際の表示に戻る。
  */
@@ -58,8 +58,8 @@ import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHist
 import { lockedReason, OPEN_LOCK, type FlowChecks, type FlowData, type FlowLock, type FlowOffer, type FlowPage, type FlowProposal, type ToFlow } from "../../core/flow-view.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseFlowSample, sceneOf } from "../../core/tour-flow.js";
-import { applyAppearance } from "../appearance.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { useHostMessages } from "../useHostMessages.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { graphMaximized } from "../shared/Maximize.js";
 import { mergeState, readState } from "../vscode.js";
 import { Canvas, type Selection } from "./Canvas.js";
@@ -183,7 +183,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [minimap, setMinimap] = useState(minimapShown);
   const [folded, setFolded] = useState<Readonly<Record<Side, boolean>>>(() => ({ palette: sideFolded("palette"), side: sideFolded("side") }));
   const toggleSide = (side: Side): void => {
-    // 案内の間は畳んだ欄も開いて見せる（畳み直さない）。覚えている状態も変えない
+    // 案内の間は畳んだ欄も開いて見せる。覚えている状態も変えない
     if (tour.touring) {
       return;
     }
@@ -207,7 +207,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const checkedDoc = useRef<FlowDoc | undefined>(pageOf(initial)?.checks === undefined ? undefined : pageOf(initial)?.doc);
   const pendingDoc = useRef<FlowDoc | undefined>(undefined);
   const checkSeq = useRef(0);
-  // 外で変わった知らせを受けているか。拡張ホストはタブを表に戻すたびに送り直すので、最初の 1 回だけ履歴を空にする
+  // 外で変わった知らせを受けているか。拡張ホストはタブを再表示するたびに送り直すので、最初の 1 回だけ履歴を空にする
   const changedSeen = useRef(false);
   // エージェントの下書き。依頼のボタンの言葉、「提案あり」、開いた下書き、依頼の文、取り込んだ下書きのハッシュ
   const [request, setRequest] = useState<string | undefined>(() => pageOf(initial)?.request);
@@ -232,7 +232,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     },
   });
   const sc = sceneOf(SAMPLE, scene);
-  // 段の様子が替わるたびに新しい値にする（図は替わったときだけ、そのノードを選び直す）
+  // 手順の様子が替わるたびに新しい値にする（図は替わったときだけ、そのノードを選び直す）
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const tourFocus = useMemo(() => ({ ids: sc.picked }), [scene]);
 
@@ -240,91 +240,83 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const fold = { palette: folded.palette && !tour.touring, side: folded.side && !tour.touring };
   const requestTour = tour.request;
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToFlow> & { data?: FlowData; lock?: FlowLock; message?: string; value?: unknown };
-      if (message.type === "data" && message.data !== undefined) {
-        const next = message.data;
-        const page = pageOf(next);
-        setData(next);
-        setBase(page?.doc);
-        setDoc(page?.draft ?? page?.doc);
+  useHostMessages<ToFlow>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      const next = message.data;
+      const page = pageOf(next);
+      setData(next);
+      setBase(page?.doc);
+      setDoc(page?.draft ?? page?.doc);
+      setHistory(emptyHistory());
+      setBusy(false);
+      setStatus(undefined);
+      setChanged(false);
+      changedSeen.current = false;
+      setSelected(undefined);
+      setPicked([]);
+      setFocus({ ids: [] });
+      setReview(undefined);
+      setReviewSave(page?.reviewSave === true);
+      setLock(page?.lock ?? NO_LOCK);
+      // 頼んでいた確認の答えは捨てる（番号を進める）
+      checkSeq.current += 1;
+      checkedDoc.current = page?.checks === undefined ? undefined : page.doc;
+      pendingDoc.current = undefined;
+      setChecks(page?.checks);
+      setChecking(false);
+      setCheckError(undefined);
+      setRequest(page?.request);
+      setOffer(page?.offer);
+      setProposal(undefined);
+      setRequestText(undefined);
+      imported.current = undefined;
+    } else if (message.type === "offer") {
+      const answer = message as { request?: string; offer?: FlowOffer };
+      setRequest(answer.request);
+      setOffer(answer.offer);
+    } else if (message.type === "proposal") {
+      const answer = message as { proposal?: FlowProposal; error?: string };
+      // 閉じたあとに届いた答えは捨てる
+      setProposal((now) =>
+        now === undefined ? now : answer.proposal !== undefined ? { kind: "ready", proposal: answer.proposal } : { kind: "error", error: String(answer.error ?? "") },
+      );
+    } else if (message.type === "requestText") {
+      setRequestText(String((message as { prompt?: unknown }).prompt ?? ""));
+    } else if (message.type === "failed") {
+      setBusy(false);
+      setStatus({ text: String(message.message ?? ""), error: true });
+    } else if (message.type === "lock" && message.lock !== undefined) {
+      setLock(message.lock);
+    } else if (message.type === "changed") {
+      // 外で変わった。いまの編集は残すが、戻す先はもう読み込んだ中身と合わないので履歴は空にする。
+      // 送り直し（タブを再表示した）では空にし直さない（その後に積んだ履歴を消さない）
+      if (!changedSeen.current) {
+        changedSeen.current = true;
+        setChanged(true);
         setHistory(emptyHistory());
-        setBusy(false);
-        setStatus(undefined);
-        setChanged(false);
-        changedSeen.current = false;
-        setSelected(undefined);
-        setPicked([]);
-        setFocus({ ids: [] });
-        setReview(undefined);
-        setReviewSave(page?.reviewSave === true);
-        setLock(page?.lock ?? NO_LOCK);
-        // 頼んでいた確認の答えは捨てる（番号を進める）
-        checkSeq.current += 1;
-        checkedDoc.current = page?.checks === undefined ? undefined : page.doc;
-        pendingDoc.current = undefined;
-        setChecks(page?.checks);
-        setChecking(false);
-        setCheckError(undefined);
-        setRequest(page?.request);
-        setOffer(page?.offer);
-        setProposal(undefined);
-        setRequestText(undefined);
-        imported.current = undefined;
-      } else if (message.type === "offer") {
-        const answer = message as { request?: string; offer?: FlowOffer };
-        setRequest(answer.request);
-        setOffer(answer.offer);
-      } else if (message.type === "proposal") {
-        const answer = message as { proposal?: FlowProposal; error?: string };
-        // 閉じたあとに届いた答えは捨てる
-        setProposal((now) =>
-          now === undefined ? now : answer.proposal !== undefined ? { kind: "ready", proposal: answer.proposal } : { kind: "error", error: String(answer.error ?? "") },
-        );
-      } else if (message.type === "requestText") {
-        setRequestText(String((message as { prompt?: unknown }).prompt ?? ""));
-      } else if (message.type === "failed") {
-        setBusy(false);
-        setStatus({ text: String(message.message ?? ""), error: true });
-      } else if (message.type === "lock" && message.lock !== undefined) {
-        setLock(message.lock);
-      } else if (message.type === "changed") {
-        // 外で変わった。いまの編集は残すが、戻す先はもう読み込んだ中身と合わないので履歴は空にする。
-        // 送り直し（タブを表に戻した）では空にし直さない（その後に積んだ履歴を消さない）
-        if (!changedSeen.current) {
-          changedSeen.current = true;
-          setChanged(true);
-          setHistory(emptyHistory());
-        }
-      } else if (message.type === "cancelled") {
-        setBusy(false);
-        setStatus(undefined);
-      } else if (message.type === "checked") {
-        const answer = message as { seq?: unknown; checks?: FlowChecks; error?: string };
-        const asked = pendingDoc.current;
-        if (answer.seq !== checkSeq.current || asked === undefined) {
-          return;
-        }
-        pendingDoc.current = undefined;
-        checkedDoc.current = asked;
-        setChecking(false);
-        if (answer.checks !== undefined) {
-          setChecks(answer.checks);
-          setCheckError(undefined);
-        } else {
-          setCheckError(String(answer.error ?? ""));
-        }
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
       }
-    };
-    window.addEventListener("message", onMessage);
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-  }, [requestTour]);
+    } else if (message.type === "cancelled") {
+      setBusy(false);
+      setStatus(undefined);
+    } else if (message.type === "checked") {
+      const answer = message as { seq?: unknown; checks?: FlowChecks; error?: string };
+      const asked = pendingDoc.current;
+      if (answer.seq !== checkSeq.current || asked === undefined) {
+        return;
+      }
+      pendingDoc.current = undefined;
+      checkedDoc.current = asked;
+      setChecking(false);
+      if (answer.checks !== undefined) {
+        setChecks(answer.checks);
+        setCheckError(undefined);
+      } else {
+        setCheckError(String(answer.error ?? ""));
+      }
+    } else if (message.type === "tour") {
+      requestTour();
+    }
+  }, () => post({ type: "ready" }));
 
   const dirty = useMemo(() => doc !== undefined && base !== undefined && !sameFlow(doc, base), [doc, base]);
 
@@ -629,7 +621,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   onKey.current = (event: KeyboardEvent): void => {
-    // 案内の間は、案内が受ける（Esc・矢印・Tab）。裏の編集（Ctrl+Z など）は動かさない
+    // 案内の間は、案内が受ける（Esc・矢印・Tab）。背後の編集（Ctrl+Z など）は動かさない
     if (tour.touring) {
       return;
     }
@@ -637,6 +629,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     if (graphMaximized()) {
       return;
     }
+    // 提案・依頼文・保存前の確認の Esc は、この keydown が受ける（Ctrl+Z などと同じ分岐に並ぶため `useEscape` へ移していない）。
+    // `useEscape` は window の捕捉段階で止めるので、全画面表示の図や案内の吹き出しが手前に出ている間は、ここへ届かない
     if (proposal !== undefined || requestText !== undefined) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -724,7 +718,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           </button>
         </div>
       )}
-      <header className="toolbar">
+      <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary">
           <span className="flow-ticket">
             <strong>{shownPage.ticket}</strong> {shownPage.title}
@@ -790,8 +784,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             保存
           </button>
         </div>
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
+      </ScreenHeader>
       {shownNotices.length + (shownChecks?.warns.length ?? 0) > 0 && (
         <ul className="problems" id="flow-notices" data-tour="notices">
           {shownNotices.map((notice) => (

@@ -3,7 +3,7 @@
  *
  * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
- * 判定はしない。 「判定」も「期待する判定を一括で確かめる」も、編集中の内容を拡張ホストへ渡し、
+ * 「判定」も「期待する判定を一括で確かめる」も、編集中の内容を拡張ホストへ渡し、
  * 実行ファイルが返した結果を出すだけ。
  *
  * 中身（`data`）が届いたら、編集中のルールはその中身で置き換える。 届くのは編集を捨ててよい
@@ -16,8 +16,9 @@ import type { Lock } from "../../core/lock.js";
 import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
-import { applyAppearance } from "../appearance.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
+import { useHostMessages } from "../useHostMessages.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseRulesSample } from "../../core/tour-rules.js";
 import rulesTour from "../tours/rules.yml";
@@ -58,7 +59,7 @@ const SAMPLE_DRAFT: Draft = draftOf(SAMPLE.sections, ((): (() => string) => {
 })());
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -126,7 +127,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const page = pageOf(data);
 
   /**
-   * 案内の間は見本を描き、段ごとの様子（開く行・タブ・選ぶ点など）は `scene` に入れる。実際のタブや開いた行は動かさないので、
+   * 案内の間は見本を描き、手順ごとの様子（開く行・タブ・選ぶ点など）は `scene` に入れる。実際のタブや開いた行は動かさないので、
    * 閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -187,70 +188,59 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     return () => element.removeEventListener("change", onCommit);
   }, []);
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToRules> & Record<string, unknown>;
-      if (message.type === "data" && message.data !== undefined) {
-        const next = message.data as RulesData;
-        setData(next);
-        setEditing(editingOf(next, nextKey));
-        setTransient(new Set());
-        setHits(new Set());
-        setMoreOpen(new Map());
-        setDirty(false);
-        setBusy(false);
-        setStatus(undefined);
-        setChanged(false);
-        setLock(pageOf(next)?.lock ?? NO_LOCK);
-        if (next.kind === "loading") {
-          // 別の対象へ切り替わった。前の対象のルールで出した判定を、いまのルールの結果として残さない
-          setJudged(undefined);
-          setChecked(undefined);
-          setSuggested(undefined);
-        }
-      } else if (message.type === "judged") {
-        const result = message.result as Judged["result"];
-        setBusy(false);
-        setStatus(undefined);
-        setJudged({ result, hooks: (message.hooks ?? []) as Judged["hooks"] });
-        unfoldHits(result.rules.map((rule) => rule.id));
-        showTab("judge");
-      } else if (message.type === "expectationsChecked") {
-        setBusy(false);
-        setStatus(undefined);
-        setChecked(message.result as ExpectationsJson);
-        showTab("judge");
-      } else if (message.type === "suggested") {
-        setBusy(false);
-        setStatus(undefined);
-        setSuggested(message.result as SuggestJson);
-        showTab("judge");
-      } else if (message.type === "failed") {
-        setBusy(false);
-        setStatus({ text: String(message.message ?? ""), error: true });
-      } else if (message.type === "lock" && message.lock !== undefined) {
-        setLock(message.lock as Lock);
-      } else if (message.type === "changed") {
-        setChanged(true);
-      } else if (message.type === "cancelled") {
-        // 「破棄して読み直す？」をやめた。止めたボタンを戻す
-        setBusy(false);
-        setStatus(undefined);
-      } else if (message.type === "picked") {
-        pick(String(message.key), message.field as FileField, String(message.path));
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
+  useHostMessages<ToRules>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      const next = message.data as RulesData;
+      setData(next);
+      setEditing(editingOf(next, nextKey));
+      setTransient(new Set());
+      setHits(new Set());
+      setMoreOpen(new Map());
+      setDirty(false);
+      setBusy(false);
+      setStatus(undefined);
+      setChanged(false);
+      setLock(pageOf(next)?.lock ?? NO_LOCK);
+      if (next.kind === "loading") {
+        // 別の対象へ切り替わった。前の対象のルールで出た判定を、いまのルールの結果として残さない
+        setJudged(undefined);
+        setChecked(undefined);
+        setSuggested(undefined);
       }
-    };
-    window.addEventListener("message", onMessage);
-    // 組み上がったと伝える。拡張ホストはここで中身を渡し直す
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-    // 受け取る側は 1 度だけ張る。中身は setState の更新関数で今の値から作る
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nextKey]);
+    } else if (message.type === "judged") {
+      const result = message.result as Judged["result"];
+      setBusy(false);
+      setStatus(undefined);
+      setJudged({ result, hooks: (message.hooks ?? []) as Judged["hooks"] });
+      unfoldHits(result.rules.map((rule) => rule.id));
+      showTab("judge");
+    } else if (message.type === "expectationsChecked") {
+      setBusy(false);
+      setStatus(undefined);
+      setChecked(message.result as ExpectationsJson);
+      showTab("judge");
+    } else if (message.type === "suggested") {
+      setBusy(false);
+      setStatus(undefined);
+      setSuggested(message.result as SuggestJson);
+      showTab("judge");
+    } else if (message.type === "failed") {
+      setBusy(false);
+      setStatus({ text: String(message.message ?? ""), error: true });
+    } else if (message.type === "lock" && message.lock !== undefined) {
+      setLock(message.lock as Lock);
+    } else if (message.type === "changed") {
+      setChanged(true);
+    } else if (message.type === "cancelled") {
+      // 「破棄して読み直す？」の確認をやめたので、止めていたボタンを戻す
+      setBusy(false);
+      setStatus(undefined);
+    } else if (message.type === "picked") {
+      pick(String(message.key), message.field as FileField, String(message.path));
+    } else if (message.type === "tour") {
+      requestTour();
+    }
+  }, () => post({ type: "ready" }));
 
   // 選択肢は、その欄と選択肢の外を押したとき、または Esc で閉じる
   useEffect(() => {
@@ -260,18 +250,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         setPickerKey(undefined);
       }
     };
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        setPickerKey(undefined);
-      }
-    };
     document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("mousedown", onDown);
   }, []);
+  useEscape(pickerKey !== undefined, ESCAPE_LAYER.popup, () => setPickerKey(undefined));
 
   /**
    * 判定で当たった行を、折りたたんであってもその場だけ開く。見えないところで光っても分からないので、
@@ -459,7 +441,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const sceneOpen = new Set(sceneList(scene.open));
   const shownTab: TabName = touring ? (scene.tab === "judge" || scene.tab === "hooks" ? scene.tab : "rules") : tab;
   const shownDraft = touring ? SAMPLE_DRAFT : draft;
-  // 畳んだタイプの中は指しても見えない（0×0 を照らす）。案内の間は、段の `fold` が名指ししたタイプだけを畳む（見出しを指す段でだけ使う）
+  // 畳んだタイプの中は指しても見えない（0×0 の枠を強調することになる）。案内の間は、手順の `fold` が名指ししたタイプだけを畳む（見出しを指す手順でだけ使う）
   const shownFolded: ReadonlySet<Section> = touring ? new Set(SECTIONS.filter((section) => sceneList(scene.fold).includes(section))) : folded;
   const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
   const sceneJudge = typeof scene.judge === "string" ? SAMPLE.judges[scene.judge] : undefined;
@@ -501,7 +483,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </button>
       </div>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
-      <header className="toolbar">
+      <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary" data-tour="target">
           <TargetSelect
             target={touring ? undefined : page?.target}
@@ -539,8 +521,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             保存
           </button>
         </div>
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
+      </ScreenHeader>
       <p id="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
         {shownLock.reason}
       </p>

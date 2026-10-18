@@ -24,11 +24,11 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 
 ### 7.2 保護領域と違反
 
-保護領域は別に宣言しない。そのツリーのルールのうち、`match` に `Write` `Edit` `NotebookEdit` の
+そのツリーのルールのうち、`match` に `Write` `Edit` `NotebookEdit` の
 どれかを含む `deny` / `ask` が、そのまま「この場所に書かせない」の宣言になる。
 変更の実パスがそれに当たれば違反（`POST_VIOLATION`）。そうでなく、ワークツリーに結び付くチケットの
 範囲の外（チケットの `deny` の項を含む）なら、ルールの `allow` に当たっていても `POST_TICKET_SCOPE`（9.5）。
-記録と state の置き場（`logs/decisions.jsonl`、`logs/state/` の下）は除く。ローテートした記録は除かない。
+記録と state の置き場（`logs/decisions.jsonl`、`logs/state/` の下）は除く。
 
 チケットの置き場（`wip/proposals/`、`.ccnavi/approved/`）に現れた変更は、ccnavi のサブコマンド
 （`ticket start` / `finish` / `cancel` と `review request` / `confirm` / `ready`）が書いたと内容から読めるぶんだけ除く。
@@ -42,7 +42,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 | `finish` / `cancel` の移動 | 正規化した内容が同じチケットが `doing/` か `review/` から消え、`review/` か `done/` に現れた組。両側とも 1 件ずつのときだけ |
 
 範囲・親・フェーズ・本文が変わったチケット、既に値のあるスクリプトの欄（`base_sha` など）の書き換え、新しく現れた
-承認済みチケット、消えただけのチケットは報告する。コミット済みの版を読めなかったものは外さない。
+承認済みチケット、消えただけのチケットは報告する。コミット済みの版を読めなかったものも報告に残す。
 
 見分けるのは未コミットの側だけ。ターンの終わりにコミット済みのぶんを数えるところ（`_committed_findings`）は、置き場ごと外す。
 
@@ -55,7 +55,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 | 索引に足された状態で現れた | `<git> restore --staged -- <path> && rm -- <path>` |
 
 `<git>` は、ワークスペースルートに git のラッパー（`.ccnavi/scripts/ccnavi-git.sh`）があればその実パス（`sh <ルート>/.ccnavi/scripts/ccnavi-git.sh`）、
-無ければ `git` を案内せず、ユーザに頼む文にする（生の git は組み込みでいつも止まるため）。ラッパーは `rm -f` と
+無ければ、ユーザに頼む文にする（生の git は組み込みでいつも止まるため）。ラッパーは `rm -f` と
 `clean` を通さないので、現れたものは索引から外してシェルの `rm` で消す形にする。
 
 このイベントにツール呼び出しを取り消す手段は無い。`enable` では終了コード 2 と標準エラーで
@@ -66,7 +66,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 
 セッションの開始（SessionStart の startup）で、全ツリーの変更を基準として記録する（`state/<セッション>.reported.json`）。基準が取れなかったときは、初回の実行後チェックが同じ記録を取る。そのうえで `POST_PREEXISTING`
 として 1 度だけ伝え、戻すなと明示し、自動復元の対象からも外す。以降に新しく現れたものだけを
-原因付きで差し戻す。既知の変更は繰り返さない。同じ場所でも「中身が変わった」の次に「消えた」が
+原因付きで差し戻す。同じ場所でも「中身が変わった」の次に「消えた」が
 来れば、別の出来事としてもう一度言う。
 
 記録の `code` は文面の先頭の行と同じ材料から書く。差し戻した回は件の code のうち強いほう（`POST_VIOLATION` が
@@ -78,9 +78,8 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 `UserPromptSubmit` で、そのとき保護領域にある変更と、ツリーごとの HEAD を
 `state/<セッション>.turn.json` に記録する。`Stop` で、その基準に無い違反だけを `systemMessage` で
 ユーザへ報告し、戻す手順を 1 件ずつ添える。記録した HEAD からの差分も見るので、保護領域を汚してからコミットしたぶんも出る。
-数えるのはそのツリーが積んだコミットだけ（`--first-parent --no-merges`）で、`merge <統合先>` が
-持ち込んだぶんは数えない。基準を持たないツリー（ターンの途中で切ったもの）は、記録済みの他のツリーの HEAD との分岐点（merge-base）から数える。分岐点も取れないものは数えず、数えていないことを 1 行で言う。
-コミットに入ったぶんは戻す手順を持たない（履歴は書き換えない）。チケットの置き場は外す。
+数えるのはそのツリーが積んだコミットだけ（`--first-parent --no-merges`）。基準を持たないツリー（ターンの途中で切ったもの）は、記録済みの他のツリーの HEAD との分岐点（merge-base）から数える。分岐点も取れないものは数えず、数えていないことを 1 行で言う。
+チケットの置き場は外す。
 戻さない。`enable` と `dry-run` で同じように報告する（`disable` はイベントそのものが走らず、
 記録に `mode-disabled` が残る）。基準が無ければ何も報告せず、記録に `no-turn-baseline` を残す（REQ-PST-06、REQ-PST-07）。
 
@@ -114,8 +113,8 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 （報告する範囲 `post_findings._guarding` より戻す範囲 `post._restorable` が狭い）。中身が変わった・
 消えたものは `git restore --staged --worktree`、現れたものは消さずに
 `state/aside/<日時>/<path>` へ退避し、退避先を報告に載せる（索引にあれば先に `git rm --cached`）。
-`dry-run` は戻さず、報告に `would-restore` の行を足す。`disable` は戻さず、その行も出さない。
-戻す先はコミット済みの内容なので、保護領域を汚した未コミットの変更は失われる。戻せたものは記録に入れない。
+`dry-run` は戻す代わりに、報告に `would-restore` の行を足す。`disable` は戻さず、その行も出さない。
+戻す先はコミット済みの内容なので、保護領域を汚した未コミットの変更は失われる。
 戻さなかったもの（`ask` と範囲外）は記録に入るので、呼び出しごとの報告はセッションで 1 度きりになり、その後は
 ターンの終わりの報告でユーザに見せる。
 

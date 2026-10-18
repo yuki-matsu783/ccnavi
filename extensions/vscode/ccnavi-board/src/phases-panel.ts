@@ -111,7 +111,7 @@ interface PanelState {
   /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
   error?: string;
   lock: Lock;
-  /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
+  /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。再表示されたときに送り直す */
   changedPending: boolean;
   wroteAt: number;
   /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
@@ -198,7 +198,7 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 編集の途中を持つので、タブを裏に回しても捨てない。
+    // 編集の途中を持つので、タブを非表示にしても捨てない。
     retainContextWhenHidden: true,
   });
   showLoading(panel, titleOf(target), SCREEN, whatOf(target));
@@ -225,7 +225,7 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
 
 /**
  * 開いているタブの対象を入れ替える。未保存の変更があれば、破棄して切り替えるかを先に聞く。
- * やめたら何もしない（タブは前面に出たまま、前の対象と編集が残る）。
+ * やめたらタブは前面に出たまま、前の対象と編集が残る。
  *
  * 読み終えるまでは前の対象の中身を消して「読み込み中」を見せ、操作も受けない（`loaded` を空にする）。
  * 前の対象の保存が往復の途中なら、`stale` が捨てる。
@@ -344,12 +344,12 @@ function registerPanelHandlers(current: PanelState): void {
     void handleMessage(current, asMessage(message));
   });
 
-  // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
-  // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
-  // どちらが正しくても困らないよう、表に戻ったところで、いま出すべき知らせを送り直す。
-  // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
+  // 保持する画面は非表示でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
+  // 記述が一致していない（`retainContextWhenHidden` の側は「非表示の画面には送れない」と言う）。
+  // どちらが正しくても困らないよう、再表示されたところで、いま出すべき知らせを送り直す。
+  // 中身（`data`）は送らない。送ると、非表示の間に打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが届いていなかったらここでしか拾えない。
+  // 保持する画面は作り直されないので、非表示の間の切り替えが届いていなかったらここでしか気づけない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -540,13 +540,13 @@ function redraw(current: PanelState): void {
 
 /**
  * フェーズ管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
- * 入れ物は 1 度しか入らないので、表裏は渡さない（保持する画面は裏でも生きている）。
+ * 入れ物は 1 度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
 function phasesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<PhasesData> {
   if (panel.options.retainContextWhenHidden !== true) {
-    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
+    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
     // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
     diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "phases", retainContextWhenHidden: false });
   }
@@ -610,7 +610,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   return true;
 }
 
-/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに捨てられる（裏に回っていても届く） */
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに捨てられる（非表示になっていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToPhases);
 }

@@ -62,7 +62,7 @@ class StaleProposalTest(PhaseHarness):
         lines = self.lint_lines("i0001")
         self.assertTrue(
             any(
-                "計画の違う提案" in line
+                "計画・写し・範囲の違う提案" in line
                 and ".claude/worktrees/i0001-01-07/wip/proposals/todo/i0001.md" in line
                 and "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き" in line
                 for line in lines
@@ -100,7 +100,7 @@ class StaleProposalTest(PhaseHarness):
         lines = self.lint_lines("i0001")
         self.assertTrue(
             any(
-                "計画の違う提案" in line
+                "計画・写し・範囲の違う提案" in line
                 and "wip/proposals/todo/i0001.md" in line
                 and "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き" in line
                 for line in lines
@@ -218,7 +218,7 @@ class StaleProposalTest(PhaseHarness):
         self.assertEqual(self.pending(), ["i0001"])
         lines = self.lint_lines("i0001-01-07/wip/proposals/todo/i0001.md")
         self.assertEqual(len(lines), 1, lines)
-        self.assertIn("計画の違う提案", lines[0])
+        self.assertIn("計画・写し・範囲の違う提案", lines[0])
 
 
 class ImportedFamilyTest(AuthorityHarness):
@@ -263,7 +263,7 @@ class AuthorityTest(unittest.TestCase):
     def test_approved_copies_alone_decide(self):
         approved = [_t("", "doing")]
         stale = [_t("i0001", ticket_model.TODO)]
-        # 親のツリーのコピーが無ければ決めない（元ツリーのコピーで代用しない）
+        # 親のツリーのコピーが無ければ決めない
         self.assertIsNone(ticket_fold.authority(approved))
         self.assertEqual(ticket_fold.fold(stale, approved), stale)
         self.assertEqual([t.tree for t in approval._authoritative(approved, approved)], [""])

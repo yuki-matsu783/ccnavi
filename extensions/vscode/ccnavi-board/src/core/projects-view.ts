@@ -3,7 +3,7 @@
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。拡張ホストが渡すのは
  * 「いま何を見せるか」（`ProjectsData`）だけで、カードとメニューの DOM は画面が作る。
- * 画面が返すのはユーザが押した操作（`ProjectsMessage`）だけで、clone も書き込みもしない。
+ * 画面が返すのはユーザが押した操作（`ProjectsMessage`）だけ。
  *
  * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
  * 片方だけが持てるものを置くとバンドルできなくなる。
@@ -78,7 +78,7 @@ export type ProjectsData =
  * 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ）。
  *
  * `failed` / `info` / `cloned` は clone の欄の下に出す一言で、画面が覚える。生きている画面にしか
- * 届かない（裏に回っていれば失われる）が、操作の結果をその場で言うだけのものなので持ち越さない。
+ * 届かない（非表示になっていれば失われる）が、操作の結果をその場で言うだけのものなので持ち越さない。
  * `cloned` のときだけ、画面は打ち込んだ URL と名前を消す。
  */
 export type ToProjects =
@@ -92,7 +92,7 @@ export type ToProjects =
 
 /** 画面 → 拡張ホスト。受け側（projects-panel の `asMessage`）が形を確かめてから使う */
 export type ProjectsMessage =
-  /** 画面が組み上がった。裏に回って作り直された画面が、いまの中身をもらい直すために送る */
+  /** 画面が組み上がった。非表示になって作り直された画面が、いまの中身をもらい直すために送る */
   | { readonly type: "ready" }
   | { readonly type: "refresh" }
   | { readonly type: "fixIgnore" }

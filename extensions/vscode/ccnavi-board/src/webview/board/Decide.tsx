@@ -8,6 +8,7 @@
 import { useState, type JSX } from "react";
 
 import { DECIDE_CHOICES, DECIDE_LABELS, type DecideChoice, type DecidePreview } from "../../core/decidemodel.js";
+import { DialogActions } from "../shared/Dialog.js";
 import { post } from "./post.js";
 
 export function DecideBody({
@@ -77,7 +78,7 @@ export function DecideBody({
           ))}
         </ol>
       )}
-      <div className="approval-actions">
+      <DialogActions className="approval-actions">
         <button
           type="button"
           className="action primary"
@@ -97,7 +98,7 @@ export function DecideBody({
         >
           キャンセル
         </button>
-      </div>
+      </DialogActions>
     </>
   );
 }

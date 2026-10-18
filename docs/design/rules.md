@@ -71,7 +71,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 組み立てられなかったルールは強い側を採る。`deny` と `ask` は `match` の全部に当たる式を持たせて止め、`allow` はどれにも
 当てない（REQ-RUL-10）。書いた文面は残し、止められた側へ返す説明は別の欄に持つ。
 
-`except` は「本体に当たっても除くもの」のリスト（REQ-RUL-11）。先読みを受け付けないので、「A だが B は除く」を
+`except` は「本体に当たっても除くもの」のリスト（REQ-RUL-11）。「A だが B は除く」を
 1 本の regex で書くと 1 文字ずつの場合分けになる。それを本体と除くものの 2 つに分けて書くための欄である。
 
 ```yaml
@@ -91,7 +91,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | `match` | 見方は変わらない。除くのは対象の文字列だけ |
 | 書式の誤り | 空のリスト、`null`、マッピングでない要素、`glob` と `regex` の両方・どちらも無い要素、知らないキー。ルールごと読み込まずに error |
 | 何にでも当たる要素 | `--lint` が warn。ルールがどの呼び出しにも当たらなくなる |
-| `{!root}` を組み立てられない要素 | error。`deny` / `ask` はその要素を外して使う（当たる範囲が広がり、止める側に外れる）。`allow` はルールごと使わない。本体を組み立てられなかった `deny` / `ask` は `except` を付けずに全部止める |
+| `{!root}` を組み立てられない要素 | error。`deny` / `ask` はその要素を外して使う（当たる範囲が広がり、止める側に外れる）。`allow` はルールごと外す。本体を組み立てられなかった `deny` / `ask` は `except` を付けずに全部止める |
 | レイヤーの重複 | `except` も比べる。除くものだけが違う 2 本は別の定義として両方使う |
 
 `when` は本体を組み合わせ条件で書く欄（REQ-RUL-12）。ルールは `glob` / `regex` / `when` のちょうど 1 つを持つ。
@@ -117,7 +117,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | `except` との併用 | 書ける。意味は `all: [when, not: {any: except}]` |
 | 上限 | 入れ子 8 段（最上位のノードが 1 段目）、ノード 64 個。判定は呼び出しのたびに組み合わせ条件をたどるので、重くならないように頭打ちにする |
 | 書式の誤り | 知らないキー、キーが 0 個・2 個以上のノード、空のリスト、型の違う値（個別条件が空・文字列でない、`all` / `any` がリストでない、`not` がマッピングでない）、上限を超えた組み合わせ条件、`glob` / `regex` と並べた `when`。ルールごと読み込まずに error で、位置を `when.any[1].not` の形で名指しする |
-| `{!root}` を組み立てられない個別条件 | error。`deny` / `ask` はルール全体を `match` の全部に当てて止め（`except` も付けない）、`allow` はルールごと使わない。個別条件だけ外す形は、`not` の下か上かで当たる範囲が広がるか狭まるかが変わり、向きが定まらないので採らない |
+| `{!root}` を組み立てられない個別条件 | error。`deny` / `ask` はルール全体を `match` の全部に当てて止め（`except` も付けない）、`allow` はルールごと外す。個別条件だけを外すと、`not` の下か上かで当たる範囲が広がるか狭まるかが変わり、向きが定まらないので、ルール全体で扱う |
 | `--lint` | 同じ個別条件を肯定と否定で並べた `all` / `any`（`all: [A, not: A]` は何にも当たらず、`any: [A, not: A]` は何にでも当たる）を warn。同じ演算子の入れ子は開いて見る。何にでも当たる・何にも当たらないノード（`not` の下が何にでも当たる個別条件だけ、`any` の中に何にでも当たる個別条件など）を warn。`Bash` / `PowerShell` の `deny` / `ask` で `not` を含む組み合わせ条件を warn（除く語をコマンドのどこかに足すだけで外れる） |
 | レイヤーの重複 | 個別条件の式と組み方の両方を比べる。`glob` で書いた 1 本と、同じ個別条件 1 つだけの `when` の 1 本は別の定義として扱う |
 | 一覧と記録 | `--explain` は 1 行（`when: any(glob '*.pem', …)`）で出し、個別条件が 3 つ以上なら続けて字下げで出す。`--test --json` などのルールの欄は `kind: when` と、書いた形の `when` を持つ |
@@ -171,16 +171,14 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 常に当たる土台の deny で、glob の文字列一致ではなく regex で書く。glob（`*rm -rf *`・`*git push*`）は表記違いに外れるため。
 
 - git は、サブコマンドの前に挟むグローバルオプション（`-C <path>`・`-c <k=v>`・`--git-dir[=]<dir>`・`--work-tree[=]<dir>`・`--no-pager` など）を
-  読み飛ばしてから `push` / `reset` を見る。値を取るオプションは値を最後まで読むので（`git -C gitx push` の `gitx` も 1 つの値。読みで空白が 2 字続く空の値 `git -C '' push` は空の値として読む）、`git -c push.default=current status` の値の `push` は
-  サブコマンドに読まない。`push` の後ろは空白・区切り・末尾だけを見る。`reset` は後ろのどこかに `--hard`（略した `--har` も）があれば止める。`--` の後ろはパスなので見ない（`git reset -- --hard`）。
+  読み飛ばしてから `push` / `reset` を見る。値を取るオプションは値を最後まで読むので（`git -C gitx push` の `gitx` も 1 つの値。読みで空白が 2 字続く空の値 `git -C '' push` は空の値として読む）、`git -c push.default=current status` の値の `push` も値として読む。`push` の後ろは空白・区切り・末尾だけを見る。`reset` は後ろのどこかに `--hard`（略した `--har` も）があれば止める。`--` の後ろはパスなので見ない（`git reset -- --hard`）。
   サブコマンドを直接起こす `git-push` / `git-reset`（パス付きの `/usr/lib/git-core/git-push`、`.exe` 付き）も同じ 1 本で止める。
-  `legit push` のような語と、`git commit -m push` のように値の位置にある語は当てない
 - rm は、再帰（`-r` `-R` `--recursive`）と強制（`-f` `--force`）の組を、まとめた形（`-rf` `-fr` `-Rfv`）・分けた形（`-r -f`）・順序・
-  長い形（略した形も）を問わずに止める。片方だけ（`rm -r`・`rm -f`）は当てない。`--` の後ろはオペランドなので選択肢に読まない（`rm -f -- -r`）。共通レイヤーの見本の `recursive-delete` も同じ式
+  長い形（略した形も）を問わずに止める。共通レイヤーの見本の `recursive-delete` も同じ式
 - どの式も、照合の時間が入力の長さにほぼ比例する形で書く（所有的な繰り返しとアトミックグループ。先読みは使わない）。判定の期限は
   ルールの合間でしか確かめないので、1 本の照合が後戻りで長引くと hook の timeout に達し、呼び出しは止められずに通る。
   rm と reset は、後の始まりで当たるなら最初の始まりでも当たるので、コマンドの中で最初の `rm` / `reset` に決めて 1 度だけ読む。
-  git のオプションは、中に git の始まりを持たない語だけを読み、`git -c git -c …` のような並びで読み直しを積もらせない
+  git のオプションは、中に git の始まりを持たない語だけを読む
 
 `.git` の中への書き込みの 2 本（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`）も、既定のときに限らず常に当たる土台の deny。
 参照・索引・設定・hook を git を通さずに書き換えると、履歴や作業中の変更を失い、hook なら以後の git の操作のたびに任意のコマンドが走る。
@@ -203,7 +201,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   - `xargs` は、前のコマンドが `.git` を名指しし、`xargs` が書き込む動詞（上の動詞と `cp` `ln` `install`）を走らせる形を止める。
     `grep -rl x .git | xargs rm` のように、`.git` の中を探して外のファイルを消す形も止まる
 - git のラッパーの中で行う `.git` への書き込み（統合の片付けなど）は、外側のコマンド文字列に `.git` が出ないので当たらない
-- リダイレクトの行き先は `>` をまたがずに読むので、読み切れなかった生の文字列でも照合が長さに比例して終わる。`>` の個数の上限（8.2）の対象に入れない
+- リダイレクトの行き先は `>` をまたがずに読むので、読み切れなかった生の文字列でも照合が長さに比例して終わる
 - `cd .git` のあとの相対パスへの書き込みは、同じコマンドの中なら止める（`cd .git && echo x > config`・`cd .git && find . -delete`）。
   `cd` で移った先から見たパス（`shellread` の moved）にも当てるため
 - 止めないもの。守る場所の検出と同じく、形の分かる書き込みだけを見る
@@ -211,7 +209,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   - `cd` が別の Bash の呼び出しにまたがる形（`cd .git/hooks` のあと、別の呼び出しで `echo x > pre-commit`）。判定はセッションの cwd を見ない
   - インタプリタ（`python -c` など）の中の書き込み
   - 変数・コマンド置換・グロブで書いたパス（`$h/pre-commit`、`$(… --git-path hooks)/x`、`.gi?/config`）。`shellread` は変数の値も展開の結果も知らない
-  - 上に無い書き込みの動詞（`touch` `chmod` `mkdir` `perl -pi` `rsync` `tar` `curl -o` `awk -i inplace`）。足すと読むだけの形の誤検知が増えるため、今は足さない
+  - 上に無い書き込みの動詞（`touch` `chmod` `mkdir` `perl -pi` `rsync` `tar` `curl -o` `awk -i inplace`）は未実装。足すと読むだけの形の誤検知が増えるため
   - 親から始める `find`（`find . -name index.lock -delete`）。開始点が `.git` の形だけを見る
   - Windows の別名（8.3 形式の `GIT~1`、`.git::$INDEX_ALLOCATION`）。解決済みのパスでも別名のまま残る
 
@@ -221,5 +219,5 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 衝突の解決に要る `add`・`restore --ours` / `--theirs`・`merge-file -p` を通すので、直す道は残る（REQ-PRE-06）。
 
 既定にはプロジェクトの `allow` が無いので、読み取り以外はほぼ確認になる。
-自身のレイヤーかプロジェクトのレイヤーが読めないときは、既定を使わない。そのレイヤーを空として扱い、Bash の和からも
+自身のレイヤーかプロジェクトのレイヤーが読めないときは、そのレイヤーを空として扱い、Bash の和からも
 外し、外したことを記録と診断で示す（11.4）。

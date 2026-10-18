@@ -58,7 +58,7 @@ class FamilyTest(AuthorityHarness):
         self.assertNotIn("tree", answer)
 
     def test_a_family_is_a_target_when_the_tree_has_origin(self):
-        # 対象かは親のワークツリーがあり、origin があるかで決まる（取り込みの記録は無い）
+        # 対象かは親のワークツリーがあり、origin があるかで決まる
         git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
         answer = self.ask("i0001-01-01")
         self.assertEqual(answer["target"], "yes")
@@ -301,7 +301,7 @@ class HumanEntryGuardTest(AuthorityHarness):
                 ),
             )
             self.assertEqual("deny", self.decision(result), command + result.stdout)
-        # 依頼・確認・Draft 外しはエージェントの経路のまま（止めない）。
+        # 依頼・確認・Draft 外しはエージェントの経路のまま。
         allowed = self.ccnavi(
             "--guard-ticket-approval",
             "enable",
@@ -324,7 +324,7 @@ class RecordTreeReviewTest(PhaseHarness):
     """実際の実行ファイルで、`--record-tree` 付きの依頼・行き先・Draft 外しが置き場だけを書く。
 
     PhaseHarness は state の置き場を `--state` で動かしている（上書きした置き場）。下書きはそこへ
-    書かれ、一覧にも置き場の外にも数えない。
+    書かれる。
     """
 
     WRITERS = ("requested", "confirm", "ready")
@@ -397,7 +397,7 @@ class RecordTreeReviewTest(PhaseHarness):
 
 
 class ChooseTest(PhaseHarness):
-    """対話の decide の前半（`--choose-out`）: 選んで書くだけで、置き場に何も置かない。"""
+    """対話の decide の前半（`--choose-out`）: 選んで書くだけ。"""
 
     def test_choose_writes_only_the_choices(self):
         self.family(plan=["design"])

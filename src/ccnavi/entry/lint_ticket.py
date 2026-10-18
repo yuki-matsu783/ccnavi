@@ -406,7 +406,7 @@ def _proposal_problems(
                     f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
                     f"{current.state or ticket_model.DOING}/）なのに todo/ にも在る"
                     f"（{_rel(root, t.path)}）。"
-                    "計画の改版でなければ todo/ の側を削除してください",
+                    "改版（計画・写し・範囲）でなければ todo/ の側を削除してください",
                 )
             )
             continue
@@ -586,7 +586,7 @@ def _stray_claude_dirs(root: str, worktree_names: set[str]) -> list[str]:
     """リポジトリの中で `.claude/` を持つ、ワークツリーでもワークスペースルートでもない
     ディレクトリ。
 
-    浅くしか見ない。2 段まで。深くたどると大きなリポジトリで検証が待たされる。
+    見るのは 2 段まで。深くたどると大きなリポジトリで検証が待たされる。
     """
     found = []
     skip = {".git", ".claude", "node_modules", ".venv", "dist", "build"}

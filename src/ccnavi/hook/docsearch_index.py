@@ -37,7 +37,7 @@ NOT_ADDED = ""
 HEAD_LIMIT = 64 * 1024
 # 最初に読む長さ。frontmatter が無いか、ここで閉じていれば続きは読まない。
 FIRST_READ = 4 * 1024
-# これより大きい ccnavi-index.jsonl は読まない（ccnavi のものとみなさず、触らない）。
+# これより大きい ccnavi-index.jsonl は ccnavi のものとみなさず、読み書きしない。
 INDEX_FILE_LIMIT = 16 * 1024 * 1024
 # git に与える時間。ls-files と check-ignore の 1 回ずつ。
 GIT_TIMEOUT_SECONDS = 10.0
@@ -281,7 +281,7 @@ def _dumps(row: Any) -> str:
 
 
 def _deep(value: Any) -> bool:
-    """入れ子が MAX_DEPTH より深いか。再帰しない。"""
+    """入れ子が MAX_DEPTH より深いか。"""
     stack = [(value, 1)]
     while stack:
         item, depth = stack.pop()

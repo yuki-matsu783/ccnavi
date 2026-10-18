@@ -140,7 +140,7 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 開いたテンプレートの行や本文を持つので、タブを裏に回しても捨てない。
+    // 開いたテンプレートの行や本文を持つので、タブを非表示にしても捨てない。
     retainContextWhenHidden: true,
   });
   showLoading(panel, titleOf(target), SCREEN, whatOf(target));
@@ -211,10 +211,10 @@ function registerPanelHandlers(current: PanelState): void {
     void handleMessage(current, asMessage(message));
   });
 
-  // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
-  // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
-  // どちらが正しくても困らないよう、表に戻ったところで、いま出すべき知らせを送り直す。
-  // 中身（`data`）は送らない。送ると、裏で開いていた行がここで閉じる。
+  // 保持する画面は非表示でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
+  // 記述が一致していない（`retainContextWhenHidden` の側は「非表示の画面には送れない」と言う）。
+  // どちらが正しくても困らないよう、再表示されたところで、いま出すべき知らせを送り直す。
+  // 中身（`data`）は送らない。送ると、非表示の間に開いていた行がここで閉じる。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -343,13 +343,13 @@ function redraw(current: PanelState): void {
 
 /**
  * テンプレート管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
- * 入れ物は 1 度しか入らないので、表裏は渡さない（保持する画面は裏でも生きている）。
+ * 入れ物は 1 度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
 function templatesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<TemplatesData> {
   if (panel.options.retainContextWhenHidden !== true) {
-    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
+    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
     // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
     diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "templates", retainContextWhenHidden: false });
   }

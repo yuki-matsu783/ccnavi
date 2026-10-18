@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import { isEmptyDiff, type ConnectionChange, type FlowDiff, type NodeChange } from "../../core/flow-diff.js";
+import { Dialog, DialogActions } from "../shared/Dialog.js";
 
 function Items({ title, kind, items }: { readonly title: string; readonly kind: string; readonly items: readonly (NodeChange | ConnectionChange)[] }): JSX.Element | null {
   if (items.length === 0) {
@@ -45,40 +46,38 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
     confirm.current?.focus();
   }, []);
   return (
-    <div className="review-backdrop">
-      <section className="review" id="save-review" data-tour="review" role="dialog" aria-modal="true" aria-labelledby="save-review-title">
-        <h2 id="save-review-title">保存前の変更内容を確認</h2>
-        <p className="dim small">読み込んだ時点からの変更です。</p>
-        {isEmptyDiff(diff) && (
-          <p id="review-order-only">順序だけが変わりました（ノードと線の中身は同じで、ファイルへの保存順が変わります）。</p>
-        )}
-        {diff.meta.length > 0 && (
-          <>
-            <h3>フロー</h3>
-            <ul className="review-list" data-kind="meta">
-              <li>{diff.meta.join("・")}</li>
-            </ul>
-          </>
-        )}
-        <Items title="追加したノード" kind="added-nodes" items={diff.addedNodes} />
-        <Items title="削除したノード" kind="removed-nodes" items={diff.removedNodes} />
-        <Items title="変更したノード" kind="changed-nodes" items={diff.changedNodes} />
-        <Items title="追加した接続" kind="added-connections" items={diff.addedConnections} />
-        <Items title="削除した接続" kind="removed-connections" items={diff.removedConnections} />
-        <Items title="変更した接続" kind="changed-connections" items={diff.changedConnections} />
-        <label className="review-skip" data-tour="review-skip">
-          <input type="checkbox" className="f-review-skip" checked={skip} onChange={(event) => setSkip(event.target.checked)} />
-          次回から保存前の確認を省略（設定 ccnaviBoard.flowSaveReview で再び有効にできます）
-        </label>
-        <div className="review-actions">
-          <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>
-            キャンセル
-          </button>
-          <button type="button" className="action primary" data-action="confirm-save" ref={confirm} onClick={() => onConfirm(skip)}>
-            保存する
-          </button>
-        </div>
-      </section>
-    </div>
+    <Dialog titleId="save-review-title" backdropClass="review-backdrop" cardClass="review" id="save-review" tour="review">
+      <h2 id="save-review-title">保存前の変更内容を確認</h2>
+      <p className="dim small">読み込んだ時点からの変更です。</p>
+      {isEmptyDiff(diff) && (
+        <p id="review-order-only">順序だけが変わりました（ノードと線の中身は同じで、ファイルへの保存順が変わります）。</p>
+      )}
+      {diff.meta.length > 0 && (
+        <>
+          <h3>フロー</h3>
+          <ul className="review-list" data-kind="meta">
+            <li>{diff.meta.join("・")}</li>
+          </ul>
+        </>
+      )}
+      <Items title="追加したノード" kind="added-nodes" items={diff.addedNodes} />
+      <Items title="削除したノード" kind="removed-nodes" items={diff.removedNodes} />
+      <Items title="変更したノード" kind="changed-nodes" items={diff.changedNodes} />
+      <Items title="追加した接続" kind="added-connections" items={diff.addedConnections} />
+      <Items title="削除した接続" kind="removed-connections" items={diff.removedConnections} />
+      <Items title="変更した接続" kind="changed-connections" items={diff.changedConnections} />
+      <label className="review-skip" data-tour="review-skip">
+        <input type="checkbox" className="f-review-skip" checked={skip} onChange={(event) => setSkip(event.target.checked)} />
+        次回から保存前の確認を省略（設定 ccnaviBoard.flowSaveReview で再び有効にできます）
+      </label>
+      <DialogActions className="review-actions">
+        <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>
+          キャンセル
+        </button>
+        <button type="button" className="action primary" data-action="confirm-save" ref={confirm} onClick={() => onConfirm(skip)}>
+          保存する
+        </button>
+      </DialogActions>
+    </Dialog>
   );
 }

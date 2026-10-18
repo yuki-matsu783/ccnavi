@@ -3,7 +3,7 @@
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。
  * 拡張ホストが渡すのは「いま何を見せるか」（`BoardData`）だけで、列やカードの DOM は画面が作る。
- * 画面が返すのはユーザが押した操作（`BoardMessage`）だけで、判定も実行ファイルの呼び出しもしない。
+ * 画面が返すのはユーザが押した操作（`BoardMessage`）だけ。
  *
  * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
  * 片方だけが持てるものを置くとバンドルできなくなる。
@@ -92,7 +92,7 @@ export type BoardData =
       readonly approval?: ApprovalOverlay;
       /**
        * 前の読み直しから動いたカード（`board-moved.ts`）。決めるのも覚えるのも拡張ホストで、
-       * オーバーレイと同じ理由（画面は裏に回ると捨てられる）。画面は渡された分に動いた表示を出すだけ
+       * オーバーレイと同じ理由（画面は非表示になると捨てられる）。画面は渡された分に動いた表示を出すだけ
        */
       readonly moved?: readonly Moved[];
       /**
@@ -126,7 +126,7 @@ export type ToBoard =
 
 /** 画面 → 拡張ホスト。受け側（board-panel の `asMessage`）が形を確かめてから使う */
 export type BoardMessage =
-  /** 画面が組み上がった。裏に回って作り直された画面が、いまの中身をもらい直すために送る */
+  /** 画面が組み上がった。非表示になって作り直された画面が、いまの中身をもらい直すために送る */
   | { readonly type: "ready" }
   | { readonly type: "open"; readonly filePath: string }
   | { readonly type: "refresh" }

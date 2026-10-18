@@ -2,7 +2,7 @@
  * テンプレート管理画面が読む実行ファイルの答えの読み取り（`--templates --json`・`--templates --show <名前> --json`）。
  * 形の契約は `templates-view.ts`、見本は `tests/fixtures/templates-json.json`。
  *
- * 読むだけで判定はしない（有効か・捨てた理由は実行ファイルが決めて答える）。読み方は `planordermodel.ts` と
+ * 読むだけ（有効か・捨てた理由は実行ファイルが決めて答える）。読み方は `planordermodel.ts` と
  * `lintmodel.ts` に揃える。答えの版が違えば解釈せず、版の違いを伝える。VS Code の API も DOM も node も読まない。
  */
 import type {

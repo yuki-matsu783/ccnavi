@@ -3,7 +3,7 @@
 #   templates  見本の層（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（捨てた理由。あれば「使われない」）・text（本文）
 #   drafts     見本の下書き。name・description・problems・plan・feedback・flows
 #   sums       「統合結果」の見本。実行ファイルが出す索引の形（共通の設定 + 1 つの設定の和）
-# `scene:` は段ごとの画面の様子。段ごとに全部を書く（前の段を引き継がない）。
+# `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
 #   open     開くテンプレートの名前（, で区切って複数）
 #   body     true なら、開いたテンプレートに見本の本文を出す
 #   draft    開く下書きの名前（, で区切って複数）

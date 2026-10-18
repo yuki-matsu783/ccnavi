@@ -37,7 +37,7 @@ def approved_text(
     lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
     for t in tickets:
         if t.ticket in revisions:
-            where = "親の改版。計画が新しくなった"
+            where = "親の改版。計画・写し・範囲のどれかが新しくなった"
         elif t.is_child:
             where = f"親 {t.parent}、フェーズ {t.phase}"
         else:
@@ -135,7 +135,7 @@ def screen(
 ) -> str:
     """承認を求める画面を組む。
 
-    frontmatter の全文は見せない。ユーザに見せるのは「何が新たに書けるようになるか」
+    ユーザに見せるのは「何が新たに書けるようになるか」
     「子が編集可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く。
 
@@ -148,6 +148,7 @@ def screen(
         cand_types = cand.types
         if cand.is_revision and cand.current is not None:
             lines += ["", f"== {t.ticket}: {t.title}  親の改版"]
+            lines += _scope_diff_lines(cand.current, t)
             lines += _plan_diff_lines(cand.current, t, cand_types)
             lines += _copy_diff_lines(cand.current, t)
             for note in cand.notes:
@@ -199,7 +200,7 @@ def screen(
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
         if cand.overflow:
-            # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に影響しない記述の
+            # 範囲のすぐ下に置く。判定では止まる。判定に影響しない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
             # 「編集対象」と「書き込めない」は意図して分けてある。 前半はチケットが宣言した側、
             # 後半は実際の書き込みが止まる側の話で、どちらか一方の語に揃えると、宣言と実行の
@@ -323,13 +324,56 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
             lines.append(f"    {pt.title} / {ident}  " + "、".join(parts))
     unused = [ident for ident in types if ident not in numbers]
     if unused:
-        lines.append("■ 使われていない定義（phases: にあるが、どの項も使わない。判定は読まない）")
+        lines.append("■ 使われていない定義（phases: にあるが、どの項も使わない）")
         lines += [f"    {types[ident].title} / {ident}" for ident in unused]
     left = [pt for ident, pt in (config or {}).items() if ident not in types]
     if left:
         lines.append("■ この親では使わない定義（phases.yml にあるが phases: にない）")
         lines.append("    使わない: " + "、".join(f"{pt.title} / {pt.id}" for pt in left))
     return lines
+
+
+def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:
+    """改版の範囲の差分。足した項・外した項を、deny / ask / allow ごとに並べる。
+
+    旧い範囲は承認のあとに上書きされ、ccnavi の側には残らない。承認する人が、
+    新たに書けるようになる範囲と書けなくなる範囲を、ここで見られるようにする。
+    """
+    lines: list[str] = []
+    for name in rules.SECTIONS:
+        before = _scope_items(current, name)
+        after = _scope_items(revised, name)
+        lines += [f"    {name} 追加: {_shown(i)}" for i in after if i not in before]
+        lines += [f"    {name} 削除: {_shown(i)}" for i in before if i not in after]
+    if not lines:
+        return []
+    return [
+        "■ 範囲の差分（改版で親に固定する範囲）",
+        "    allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、"
+        "deny はこのチケットでも編集できない場所。承認すると、旧い範囲は上書きされる",
+        *lines,
+        "    作業中の子は居ない（居れば改版は通らない）。新しい範囲の子は、新しい子として提案する。"
+        "狭めた場合、完了済み・レビュー待ちの子の範囲が親の外に出ることがあるが、"
+        "書き込みは親の範囲で切り詰められる",
+    ]
+
+
+def _scope_items(t: ticket_model.Ticket, name: str) -> list[tuple[str, str]]:
+    """差分で比べる項。`(種別, 式)` の組で、同じ項の重複は 1 つにまとめる。
+
+    glob `src/app` と regex `src/app` は文字列が同じでも当たる範囲が違う（regex は先頭一致で、
+    `src/application.py` にも当たる）。文字列だけで比べると、署名が違うのに差分が空になり、
+    承認する人には範囲の広がりが見えなくなる。種別を組に入れて比べ、表示のときだけ書き分ける。
+    """
+    items = [
+        ("regex", e.regex) if e.regex else ("glob", e.glob) for e in t.entries if e.decision == name
+    ]
+    return list(dict.fromkeys(items))
+
+
+def _shown(item: tuple[str, str]) -> str:
+    kind, expr = item
+    return f"regex({expr})" if kind == "regex" else expr
 
 
 def _copy_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:

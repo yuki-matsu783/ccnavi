@@ -8,7 +8,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
 
 # ワークツリーで作業する
 
-ワークツリーを切る前後の決まり。issue・MRを指定されたときは[worktree-start.md](worktree-start.md)、`<統合先>`への取り込みは[worktree-merge.md](worktree-merge.md)、片付けは[worktree-cleanup.md](worktree-cleanup.md)を読む。
+ワークツリーを切る前後の決まり。issue・MRを指定されたときは[worktree-start.md](worktree-start.md)、`<統合先>`への取り込みは[worktree-merge.md](worktree-merge.md)、片付けは[worktree-cleanup.md](worktree-cleanup.md)を読む。チケット作業（親と子）の手順は[ticket-flow.md](ticket-flow.md)、直接作業の手順は[direct-flow.md](direct-flow.md)にあり、どちらもステップごとの一覧と図で示す。
 
 ## 基本
 
@@ -108,7 +108,10 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   親と子のチケットの承認・状態の操作（`start`・`finish`・取り消し・記録・レビューのマーカー）・実行前の判定も止まる
 - 子の成果は、メインが打つ子の`finish`が親のブランチへ合流してpushする（手順は[worktree-merge.md](worktree-merge.md)）。
   サブエージェントは子のワークツリーで実装して手元でコミットするだけで、親のワークツリーにはmerge・commit・書き込みをしない
-  （hookが止める）。子のワークツリーでのコミットと、衝突を解くために子のワークツリーで親のブランチをmergeすることはできる
+  （hookが止める）。
+- 親のワークツリーへのWrite / Edit / NotebookEditは、メインセッションも置き場（`wip/proposals/`・`wip/handoff/`・`wip/eli5/`・承認済みの置き場）の外では止まる（`DENY_TICKET_PARENT`）。
+  親の範囲の中でも同じで、範囲を広げても通らない。親自身の作業（`plan: [quick-work]` など）も、子チケットを起こして子のワークツリーで行う。
+  親かどうかは、承認済みの索引とそのワークツリー自身のチケット（`parent:` が無い）のどちらかが言えば親とする。子のワークツリーでのコミットと、衝突を解くために子のワークツリーで親のブランチをmergeすることはできる
 
 ## 直接作業のワークツリーの名前
 
@@ -116,7 +119,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   - 先頭の語は `CCNAVI_BRANCH_PREFIXES` の既定（`feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs`）から選ぶ
   - 番号は issue があればその番号、無ければ `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-ticket.sh next-id` の通し番号
   - 例: `feature-341-direct-branch-name`（issue #341 の作業）、`chore-12-cleanup`（通し番号 12）
-- 形に合わない名前でも拒否はしない。`ccnavi-worktree.sh` は切ったあとに、`--lint` と同じ文面の warn を 1 行出す（判定は `ccnavi worktree name <名前>` が持つ。sh は形を判定しない）。`--lint` も同じ warn を名指しする
+- 形に合わない名前は、切ったあとに `ccnavi-worktree.sh` が `--lint` と同じ文面の warn を 1 行出す（判定は `ccnavi worktree name <名前>` が持つ）。`--lint` も同じ warn を名指しする
 - 既にある直接作業のワークツリーとブランチの名前は変えない。この形は新しく切るものから当てる
 
 ## 直接作業からチケット作業に移るとき

@@ -190,7 +190,7 @@ class StopNudgeTest(TicketTest):
         self.commit_work(tree)
         self.assert_quiet(self.stop(tree, event="SubagentStop", agent_id="a1"))
 
-    # ---- 同じ HEAD では 1 回だけ（stop_hook_active に頼らない）
+    # ---- 同じ HEAD では 1 回だけ
 
     def test_the_same_head_is_asked_once_per_session_and_again_after_a_new_commit(self):
         self.family()

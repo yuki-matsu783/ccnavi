@@ -1,7 +1,7 @@
 /**
  * 計画編集画面の案内（`src/webview/tours/workflow.yml`）を happy-dom で動かす。
  *
- * 案内の間、画面は今の計画ではなく見本の答え（実行ファイルの答えの形。`core/tour-workflow.ts`）を描く。段ごとの様子
+ * 案内の間、画面は今の計画ではなく見本の答え（実行ファイルの答えの形。`core/tour-workflow.ts`）を描く。手順ごとの様子
  * （描く答え・開く確かめ・選ぶ項）は `scene` が決め、指す先は `data-tour` の印。実際の答え・未保存の線・置き場所・確かめと、
  * 拡張ホストへの送信（線の頼み・保存・再読込・取り込む）には触れない。
  *
@@ -32,11 +32,11 @@ async function startCourse(dom: DomPage, id: string): Promise<void> {
   await dom.settle();
 }
 
-/** 案内の段を順に進め、各段で `check` を呼ぶ。最後の段の「完了」で閉じる */
+/** 案内の手順を順に進め、各手順で `check` を呼ぶ。最後の手順の「完了」で閉じる */
 async function walk(dom: DomPage, id: string, check: (index: number, at: string) => void | Promise<void>): Promise<void> {
   for (const [index, step] of course(id).steps.entries()) {
     await dom.settle();
-    const at = `${id} の ${index + 1} 段目（${step.title}）`;
+    const at = `${id} の ${index + 1} 番目の手順（${step.title}）`;
     assert.equal(dom.one("#tour-title").textContent, step.title, at);
     await check(index, at);
     dom.click(dom.one('[data-action="tour-next"]'));
@@ -98,7 +98,7 @@ test("CB-D280 「?」は案内の一覧を開き、基本の案内が先頭に�
   }
 });
 
-test("CB-D281 全ユースケースの全段で、指す先が画面にあり吹き出しが中ほどへ逃げない。見本を描き、実際の計画を出さない。最後の段で閉じる", async () => {
+test("CB-D281 全ユースケースの全手順で、指す先が画面にあり吹き出しが中ほどに出ない。見本を描き、実際の計画を出さない。最後の手順で閉じる", async () => {
   for (const c of def.courses) {
     // 実際の親は i0001。見本は sample-a なので、どちらを描いているかが見分けられる
     const dom = await openWorkflow();
@@ -118,7 +118,7 @@ test("CB-D281 全ユースケースの全段で、指す先が画面にあり吹
         assert.ok(dom.all(".plan-graph").length >= 1 && dom.all(".plan-graph").every((g) => g.getAttribute("data-ticket") === "sample-a"), `${at}: 見本の図でない`);
         assert.ok(dom.all(".plan-graph .react-flow__edge").length > 0, `${at}: 線が描かれていない`);
       });
-      assert.equal(dom.all(".tour").length, 0, `${c.id}: 最後の段で閉じない`);
+      assert.equal(dom.all(".tour").length, 0, `${c.id}: 最後の手順で閉じない`);
       assert.equal(dom.all(".tour-sample, .workflow-review").length, 0, `${c.id}: 閉じたのに見本が残った`);
       assert.ok(dom.all(".plan-graph").every((g) => g.getAttribute("data-ticket") === "i0001"), `${c.id}: 閉じたあと実際の計画に戻らない`);
       assert.deepEqual(sentSince(dom, from), ["tourDone"], `${c.id}: 案内の間に拡張ホストへ余計な送信をした`);
@@ -146,7 +146,7 @@ test("CB-D282 案内の間は、実際の答え・未保存の線・保存の確
 
     await startCourse(dom, "renumber");
     await walk(dom, "renumber", (index, at) => {
-      // 見本の案内は、実際の答えの未保存とは別に、見本の答えから決める（最初の段は開いたとき＝未保存でない）
+      // 見本の案内は、実際の答えの未保存とは別に、見本の答えから決める（最初の手順は開いたとき＝未保存でない）
       const sampleDirty = !dom.one("#dirty").classList.contains("hidden");
       assert.equal(sampleDirty, index > 0 && index < 7, at);
     });
@@ -201,7 +201,7 @@ test("CB-D283 案内の間は、線を引く・削除する・保存・再読込
   }
 });
 
-test("CB-D284 ノード・線・× を指す案内は、指す先の項の番号と線を実際の図の要素に付け、枠で囲う。項を選ぶ段は詳細の欄を開く", async () => {
+test("CB-D284 ノード・線・× を指す案内は、指す先の項の番号と線を実際の図の要素に付け、枠で囲う。項を選ぶ手順は詳細の欄を開く", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "parallel");
@@ -224,7 +224,7 @@ test("CB-D284 ノード・線・× を指す案内は、指す先の項の番号
     });
     assert.ok(seen.some((t) => t.startsWith("node-")) && seen.some((t) => t.startsWith("edge-")) && seen.some((t) => t.startsWith("cut-")), seen.join());
 
-    // 項を選ぶ段（renumber の 4 段目）: 詳細の欄に、提案での番号と振り直した番号を並べる
+    // 項を選ぶ手順（renumber の 4 番目の手順）: 詳細の欄に、提案での番号と振り直した番号を並べる
     await startCourse(dom, "renumber");
     for (let i = 0; i < 3; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
@@ -242,7 +242,7 @@ test("CB-D284 ノード・線・× を指す案内は、指す先の項の番号
   }
 });
 
-test("CB-D285 段ごとの答えで図を描き直す。線が増える・消える。点の置き場所は引く前のままで、並べ直した段だけ組み直す", async () => {
+test("CB-D285 手順ごとの答えで図を描き直す。線が増える・消える。点の置き場所は引く前のままで、並べ直した手順だけ組み直す", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "parallel");
@@ -257,19 +257,19 @@ test("CB-D285 段ごとの答えで図を描き直す。線が増える・消え
     });
     assert.ok(!kept[0].includes("after-2-4") && kept[2].includes("after-2-4"), "合流の線が増えない");
     assert.ok(kept[3].includes("after-2-4") && !kept[3].includes("after-1-3"), "1 → 3 が先に出ている");
-    assert.ok(kept[4].includes("after-1-3") && kept[4].includes("after-2-3"), "1 → 3 を追加した段");
-    assert.ok(!kept[5].includes("after-2-3") && kept[5].includes("after-1-3"), "2 → 3 を削除した段");
-    // 一直線の置き場所のまま（2 と 3 は別の列）。並べ直した段（5）だけ、2 と 3 が同じ列に並ぶ
+    assert.ok(kept[4].includes("after-1-3") && kept[4].includes("after-2-3"), "1 → 3 を追加した手順");
+    assert.ok(!kept[5].includes("after-2-3") && kept[5].includes("after-1-3"), "2 → 3 を削除した手順");
+    // 一直線の置き場所のまま（2 と 3 は別の列）。並べ直した手順（5）だけ、2 と 3 が同じ列に並ぶ
     assert.notEqual(xs[4][0], xs[4][1], "並べ直す前に 2 と 3 が並んだ（置き場所を動かした）");
-    assert.equal(xs[5][0], xs[5][1], "並べ直した段で 2 と 3 が並ばない");
-    // 先に消した形（最後の段）は、終端に届かない項があり、図の下に error が出る
+    assert.equal(xs[5][0], xs[5][1], "並べ直した手順で 2 と 3 が並ばない");
+    // 先に消した形（最後の手順）は、終端に届かない項があり、図の下に error が出る
     assert.match(notes, /最後の項/);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D286 保存の確認の段は見本の確認を開き、焦点は案内の吹き出しに残す。番号と子の提案を並べ、閉じると確認も消える", async () => {
+test("CB-D286 保存の確認の手順は見本の確認を開き、焦点は案内の吹き出しに残す。番号と子の提案を並べ、閉じると確認も消える", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "renumber");
@@ -302,7 +302,7 @@ test("CB-D286 保存の確認の段は見本の確認を開き、焦点は案内
   }
 });
 
-test("CB-D287 外で変わった提案の案内は、帯と差分（開いたときの答えとの違い）を出す。編集を続けるは差分を閉じ、承認待ちから無くなった段は読むだけにする", async () => {
+test("CB-D287 外で変わった提案の案内は、帯と差分（開いたときの答えとの違い）を出す。編集を続けるは差分を閉じ、承認待ちから無くなった手順は読むだけにする", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "external");

@@ -6,12 +6,12 @@
  * 取り込めるか・取り込めない理由は `core/handoffmodel.ts` の判断をそのまま使う。
  * 取り込む手順（見るだけをもう一度呼んで `expect` を取る、錠を取り直す）は拡張ホストが持つ（`core/handoff-import.ts`）。
  */
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useRef, useState, type JSX } from "react";
 
 import type { HandoffData, HandoffMessage, HandoffOutcome, HandoffPage, ToHandoff } from "../../core/handoff-view.js";
 import { LOCKED_KINDS, blockReason, reconcileSelection, selectablePaths } from "../../core/handoffmodel.js";
 import type { Lock } from "../../core/lock.js";
-import { applyAppearance } from "../appearance.js";
+import { useHostMessages } from "../useHostMessages.js";
 import { Entry, type TerminalState } from "./Entry.js";
 import { post } from "./post.js";
 import { Result } from "./Result.js";
@@ -38,61 +38,51 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
   const [outcome, setOutcome] = useState<HandoffOutcome | undefined>(undefined);
   /** 端末で打つコマンドの案内（パス → 答え）。読み直すと古くなるので捨てる */
   const [terminals, setTerminals] = useState<Readonly<Record<string, TerminalState>>>({});
-  /** 届いたメッセージの中で「いまの一覧」を見るための ref（listener は最初の描画の値を持つため） */
+  /** 届いたメッセージの中で「いまの一覧」を見るための ref（setState の更新関数の中から読むため） */
   const pageOfRef = useRef<HandoffPage | undefined>(pageOf(data));
   pageOfRef.current = pageOf(data);
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToHandoff>;
-      if (message.type === "data" && message.data !== undefined) {
-        const next = message.data;
-        const page = pageOf(next);
-        setData(next);
-        setBusy(false);
-        setConfirming(false);
-        setTerminals({});
-        if (page === undefined) {
-          setSelected(new Map());
-          return;
-        }
-        setLock(page.lock);
-        setSelected((now) => reconcileSelection(now, page.list.entries, page.lock));
-      } else if (message.type === "lock" && message.lock !== undefined) {
-        const next = message.lock;
-        setLock(next);
-        // 錠が掛かった種類の選択は外す（取り込む直前にも取り直すが、選んだままにしない）
-        setSelected((now) => {
-          const kept = new Map(now);
-          for (const path of now.keys()) {
-            const entries = pageOfRef.current?.list.entries ?? [];
-            const entry = entries.find((e) => e.path === path);
-            if (entry === undefined || blockReason(entry, next) !== "") {
-              kept.delete(path);
-            }
-          }
-          return kept;
-        });
-      } else if (message.type === "cancelled") {
-        setBusy(false);
-        setConfirming(false);
-      } else if (message.type === "imported" && message.result !== undefined && message.paths !== undefined) {
-        setBusy(false);
-        setConfirming(false);
-        setOutcome({ paths: message.paths, result: message.result });
-      } else if (message.type === "terminal" && message.path !== undefined) {
-        const path = message.path;
-        setTerminals((now) => ({ ...now, [path]: { command: String(message.command ?? ""), error: String(message.error ?? "") } }));
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
+  useHostMessages<ToHandoff>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      const next = message.data;
+      const page = pageOf(next);
+      setData(next);
+      setBusy(false);
+      setConfirming(false);
+      setTerminals({});
+      if (page === undefined) {
+        setSelected(new Map());
+        return;
       }
-    };
-    window.addEventListener("message", onMessage);
-    // 組み上がったと伝える。裏に回って捨てられた画面は、表に戻ると拡張ホストが入れてある HTML から作り直される。
-    // その HTML は少し古いことがあるので、いまの中身をもらい直す
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
+      setLock(page.lock);
+      setSelected((now) => reconcileSelection(now, page.list.entries, page.lock));
+    } else if (message.type === "lock" && message.lock !== undefined) {
+      const next = message.lock;
+      setLock(next);
+      // 錠が掛かった種類の選択は外す（取り込む直前にも取り直すが、選んだままにしない）
+      setSelected((now) => {
+        const kept = new Map(now);
+        for (const path of now.keys()) {
+          const entries = pageOfRef.current?.list.entries ?? [];
+          const entry = entries.find((e) => e.path === path);
+          if (entry === undefined || blockReason(entry, next) !== "") {
+            kept.delete(path);
+          }
+        }
+        return kept;
+      });
+    } else if (message.type === "cancelled") {
+      setBusy(false);
+      setConfirming(false);
+    } else if (message.type === "imported" && message.result !== undefined && message.paths !== undefined) {
+      setBusy(false);
+      setConfirming(false);
+      setOutcome({ paths: message.paths, result: message.result });
+    } else if (message.type === "terminal" && message.path !== undefined) {
+      const path = message.path;
+      setTerminals((now) => ({ ...now, [path]: { command: String(message.command ?? ""), error: String(message.error ?? "") } }));
+    }
+  }, () => post({ type: "ready" }));
 
   const act = (message: HandoffMessage): void => post(message);
 

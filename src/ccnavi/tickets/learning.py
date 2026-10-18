@@ -2,7 +2,7 @@
 設計は docs/design/tickets/learning-wiki.md
 
 子を閉じる前に、その子の気づきの記録が在り、追跡されているかを見る。記録は雛形と気づきを書く
-操作（`ticket learn`）が書き、判定記録の要約は読むだけで直さない。
+操作（`ticket learn`）が書き、判定記録の要約は読むだけ。
 """
 
 from __future__ import annotations
@@ -465,7 +465,7 @@ def run(
             "（気づきを書いて git add と git commit をする。"
             "無ければ learnings: none のまま）\n"
         )
-        stdout.write(f"要約: {digest_rel(ident)}（git add と git commit をする。直さない）\n")
+        stdout.write(f"要約: {digest_rel(ident)}（git add と git commit をする）\n")
         return 0
 
     msg = validate(note, target, signal)

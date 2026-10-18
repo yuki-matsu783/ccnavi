@@ -34,7 +34,7 @@ def mark_imported(
     ** 外すと「在る」ことで止まっていたもの（承認待ちの
     重複、開いた子のある親を閉じない）が通るようになる。理由を足すだけで、チケットが親のワークツリーにだけある
     親子のチケットには理由は付かない。すでに理由（`mark_blocked`）が
-    あれば、理由を連ねる（前の理由を消さない）。
+    あれば、理由を連ねる。
     """
     fams = fams or standing.Families(conf, root)
     for t in kept:
@@ -164,7 +164,7 @@ def misplaced_home_text(root: str, family: str, shown: str) -> str:
     """承認済みチケットが親のワークツリーに無いときの理由と直し方。
 
     `home_problem` と ready が同じ文を出す。`ccnavi-user-push-approved.sh` と `ccnavi-sync.sh` は、
-    ツリーごとの置き場を送る・親のブランチを取り込むだけで、ツリーの間でチケットを動かさない。
+    ツリーごとの置き場を送る・親のブランチを取り込むだけで、ツリーの間でチケットを動かさないので、
     承認済みチケットは手で動かさず、承認し直す。
     """
     worktree_sh = settings.script_command(root, "ccnavi-worktree.sh")
@@ -432,7 +432,7 @@ def _loop_back(origin: str, first: str, pool: dict[str, list[ticket_model.Ticket
 def unmet_predecessors(
     t: ticket_model.Ticket, pool: dict[str, list[ticket_model.Ticket]]
 ) -> list[Predecessor]:
-    """満たしていない先行。子だけが先行を持つ（親の `predecessors` は読まない）。"""
+    """満たしていない先行。子だけが先行を持つ。"""
     if not t.is_child:
         return []
     return [p for p in predecessor_states(t, pool) if not p.met]

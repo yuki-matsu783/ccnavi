@@ -16,7 +16,7 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 | 共通レイヤーのルール / フェーズ定義 / リスクの配点 | `.ccnavi/config/common/{rules,phases,risks}.yml`（置き場は固定） | ワークスペース |
 | ルールの期待する判定 | `.ccnavi/config/common/rule-expectations.yml` | ワークスペース |
 | 共通の作業・レビュー計画のテンプレート | `.ccnavi/config/common/templates/<名前>.yml`（置き場は固定。9.15。`*/.ccnavi/*` の一般の保護で守る） | ワークスペース |
-| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/`（親の着手でワークスペースルートの `.ccnavi/config/common/` から配る。11.12。誰も編集しない） | プロジェクト |
+| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/`（親の着手でワークスペースルートの `.ccnavi/config/common/` から配る。11.12） | プロジェクト |
 | ワークスペース自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース |
 | プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | プロジェクト |
 | 自身・プロジェクトのレイヤーのテンプレート | `<ツリー>/.ccnavi/config/project/templates/<名前>.yml`（9.15。共通のテンプレートと同じく一般の保護で守る） | そのツリーのリポジトリ |
@@ -46,26 +46,24 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 導入スクリプトのひな形は、共通レイヤーにルールと配点とどのプロジェクトでも使えるフェーズ定義を置く。レイアウトに依存するフェーズ定義（自身のレイヤーの `phases.yml`）は配らず、ユーザが書く。既にあれば触らない（11.9）。
 自身のレイヤーの `.ccnavi/config/project/` もユーザの持ち物で、エージェントの Write / Edit は通らない（チケットの `allow` に `.ccnavi/*` があっても組み込みの deny が優先される）。
 
-**共通レイヤーのミラー。** プロジェクトの `.ccnavi/config/common/` は、ワークスペースルートの共通レイヤーの写しで、誰も編集しない（11.12）。
-ワークスペースの中では読まない。ワークスペースの中で共通レイヤーとして読むのは、ワークスペースルートの `.ccnavi/config/common/` だけ。
+**共通レイヤーのミラー。** プロジェクトの `.ccnavi/config/common/` は、ワークスペースルートの共通レイヤーの写し（11.12）。
+ワークスペースの中で共通レイヤーとして読むのは、ワークスペースルートの `.ccnavi/config/common/` だけ。
 プロジェクトだけを clone したときは、そのプロジェクトがルートになるので、`.ccnavi/config/common/`（ミラー）が共通レイヤー、`.ccnavi/config/project/` が自身のレイヤーとして読まれる。
 どちらの場合も「共通 + 1 レイヤー」の和になる（11.4）。
 
 置き場を動かす環境変数は無い。ccnavi ディレクトリは git プロジェクトルートの直下の `.ccnavi` で、自身のレイヤーとプロジェクトのレイヤーに同じ名前が使われる。
 `config/` と `scripts/` と 3 本のファイル名は固定。プロジェクトの `config/project/` と混ぜないのは、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。
 
-読むのは常に元リポジトリに checkout されている版（ブランチは問わない）。ワークツリーの中の `.ccnavi/` は、ワークスペースから切ったものも含めて読まない（REQ-MLT-04）。
+読むのは常に元リポジトリに checkout されている版（ブランチは問わない。REQ-MLT-04）。
 
 **ファイルが無いのは「設定が無い」正常。** common だけ、config だけ、両方無し、のどれでも動く。ルール・リスクの配点・フェーズ定義のすべてで
-「無い = 空」に揃える。無いことは記録の `fallback` に残さず、`--lint` と診断にも不備として出さない。
-不正なとき（読めない・error）だけ、そのファイルは空として扱い、記録の `fallback` にレイヤーの名前を残し、`--lint` が error で言う。
+「無い = 空」に揃える。不正なとき（読めない・error）だけ、そのファイルは空として扱い、記録の `fallback` にレイヤーの名前を残し、`--lint` が error で言う。
 土台の deny（取り返しの付かない操作の止め。`rm -rf`・`git push`・`git reset --hard`・認証情報の置き場。5.6）は、共通レイヤーと config の有無・状態によらず常に有効で、common と config のルールは、その上に足す。
 土台の deny と、`.ccnavi/` などを守る `builtin:guard-*`（Write / Edit・シェルの設定保護。8.2）は別で、`builtin:guard-*` は組み込みの既定を使っている間（共通レイヤーのルールが不正な間）は外す。
 common と config の両方が無ければ、ルールは組み込みの既定だけで判定する。
 
 共通レイヤーのルール（`.ccnavi/config/common/rules.yml`）自身が破損して読めないときは、組み込みの既定を使い（REQ-PRE-06）、自身のレイヤーとプロジェクトのレイヤーは足さない。
 共通レイヤーのルールが「無い」ときは、これと違って組み込みの既定へは戻らず、空として config のレイヤーだけを土台の deny の上に足す。
-これは以前の「共通レイヤーに無ければ組み込みの既定に戻し、`fallback` を記録する」からの変更点。
 
 プロジェクトの git に入るのは、ccnavi ディレクトリ（`config/project/` の 3 本、ミラーの `config/common/`、配点のスクリプト）と、提案・承認済みチケット・フェーズのマーカー。
 A が承認して B の機械で作業する流れでは、これらを共有する（9.2）。feature ブランチに乗り、squash merge で 1 コミットにまとめられる。

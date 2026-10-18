@@ -41,7 +41,7 @@ test("CB-T573 案内の定義は、基本の案内が先頭で、指す先は画
   const sums = new Set(sample.page.data.sums.map((s) => s.name));
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目`;
+      const at = `${course.id} の ${index + 1} 番目の手順`;
       assert.ok(step.target === "" || TARGETS.includes(step.target), `${at}: 知らない指す先 ${step.target}`);
       for (const name of String(step.scene.open ?? "").split(",").filter((n) => n !== "")) {
         assert.ok(names.has(name.trim()), `${at}: open ${name} が見本にありません`);

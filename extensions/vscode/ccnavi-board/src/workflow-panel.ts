@@ -7,8 +7,7 @@
  * 同じで、違いは 3 つ。
  *
  * 1. 取り込む段が無い。開いたときの提案の中身（`--plan-order <親> --json` の答え）がそのまま初期値
- * 2. 書くのは拡張ではなく実行ファイル（`--plan-order <親> --order <JSON> --expect <ハッシュ> --write`）。
- *    拡張はファイルを書かない
+ * 2. 書くのは実行ファイル（`--plan-order <親> --order <JSON> --expect <ハッシュ> --write`）
  * 3. 保存先はエージェントも書ける提案（親の提案と、番号の変わる項を指す子の提案）。なので開いたときのハッシュ
  *    （`source_sha`）を `--expect` に渡し、外で変わっていれば実行ファイルが何も書かない
  *
@@ -27,7 +26,6 @@
  * **未保存のまま閉じたとき。** フロー編集と同じく、閉じるのは止められない（`onDidDispose` は閉じた後）。未保存の間は
  * タブの題の頭に「●」を付け、画面が送ってくる線の写し（`draft`）を覚える。閉じた後に未保存だったら「開き直して戻す」
  * 「破棄する」を聞く。戻すのは、提案のハッシュが閉じた時点から変わっていないときだけ（変わっていれば戻せないと言う）。
- * 直すのは順序だけなので、フロー編集の「YAML で開く」は持たない。
  *
  * **ボードの承認との結び付き。** タブの未保存と、最後に保存したときのハッシュ（`source_sha`）を帳面
  * （`core/workflow-tabs.ts`）に書く。ボードは、未保存のタブがある親を含む一覧の承認を打たず、承認の一覧の
@@ -93,7 +91,7 @@ interface PanelState {
   /** 開き直したときに戻す線。最初の読み込みで確かめて `shownDraft` に移す */
   restore?: Restore;
   shownDraft?: PlanOrder;
-  /** 外で変わったときの今の答え。表に戻ったとき・作り直したときに知らせ直す */
+  /** 外で変わったときの今の答え。再表示されたとき・作り直したときに知らせ直す */
   changed?: PlanOrderAnswer;
   /** 提案が承認待ちから無くなった理由 */
   gone?: string;
@@ -152,7 +150,7 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 線の引き直しの途中を持つので、タブを裏に回しても捨てない
+    // 線の引き直しの途中を持つので、タブを非表示にしても捨てない
     retainContextWhenHidden: true,
   });
   showLoading(panel, workflowTitle(ticket), SCREEN, `${ticket} の計画編集`);
@@ -187,7 +185,7 @@ function registerPanelHandlers(current: PanelState): void {
   panel.webview.onDidReceiveMessage((message: unknown) => {
     void handleMessage(current, asWorkflowMessage(message));
   });
-  // フロー編集と同じ。表に戻ったら、いま出すべき知らせと見た目を送り直す（中身は送らない）
+  // フロー編集と同じ。再表示されたら、いま出すべき知らせと見た目を送り直す（中身は送らない）
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -223,7 +221,7 @@ function registerPanelHandlers(current: PanelState): void {
   }
 }
 
-/** 外で変わった・無くなったの知らせを画面に送る（作り直した画面と、表に戻った画面へ） */
+/** 外で変わった・無くなったの知らせを画面に送る（作り直した画面と、再表示された画面へ） */
 function postNotices(current: PanelState): void {
   if (current.gone !== undefined) {
     current.host.post({ type: "gone", reason: current.gone } satisfies ToWorkflow);
@@ -489,7 +487,7 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
 }
 
 /**
- * 画面が変えた線で実行ファイルに振り直させ、答えを返す（書きはしない）。答えのハッシュが開いたときと違えば、
+ * 画面が変えた線で実行ファイルに振り直させ、答えを返す。答えのハッシュが開いたときと違えば、
  * 外で変わっているので、その知らせも出す
  */
 async function answer(current: PanelState, seq: number, order: PlanOrder): Promise<void> {

@@ -51,7 +51,7 @@ UTF-8（BOM は 1 つ外す）で、例外は外に出さない。
 ## 下書き（溜める側）
 
 エージェントは下書きだけを書ける。置き場はほかの保護対象と同じ `wip/handoff/<取り込み先の
-相対パス>`（`handoff`）。下書きに効力は無い（`scan` も `--templates` の統合結果も読まない）。
+相対パス>`（`handoff`）。下書きに効力は無い。
 下書きの作成と検査は `template_drafts`、取り込みは `handoff`（`ccnavi user handoff`）。
 
 ## 往復

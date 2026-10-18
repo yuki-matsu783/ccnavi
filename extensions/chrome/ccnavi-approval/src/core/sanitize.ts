@@ -6,7 +6,7 @@
  * （`innerHTML` に文字列を戻さない）。
  *
  * - リンクは `http:`・`https:`・`mailto:` だけ。ほかの表記（`javascript:`・`data:`・相対）は href を外す
- * - 画像・SVG・MathML・フォーム・style は出さない。画像は外への通信（読んだことの漏れ）になるため
+ * - 画像・SVG・MathML・フォーム・style は出さない。画像は外への通信になり、読んだことが外へ伝わるため
  * - リンクは新しいタブで開き、`noopener noreferrer` を付ける
  * - 中身を隠す書き方は通さない（承認者に見えないまま承認させない）。
  *   `hidden`・`class`・`style`・`id`・`color` などの属性と、`font`・`details`・`summary` などの要素は除く。

@@ -1,6 +1,6 @@
 """コマンドの語の見分け。コマンド名・実行役のコマンド・オプションの幅・リダイレクト・演算子。
 
-語の並びを見るだけで、原文の走査も cd の追跡もしない。shellread から分けた。shellread を読まない。
+語の並びを見るだけにする。shellread から分けた。
 """
 
 from __future__ import annotations
@@ -150,7 +150,7 @@ _RUNNERS: dict[str, tuple[frozenset[str], int]] = {
 # コマンドの前に `名前=値` を並べてよい実行役のコマンド。
 _TAKES_ASSIGNMENTS = frozenset({"env", "sudo"})
 
-# `command -v jq` はコマンドを探すだけで、実行しない。
+# `command -v jq` はコマンドを探すだけ。
 _LOOKUP_ONLY = {"command": frozenset("vV")}
 
 # コマンド名を探すときに飛ばす代入。配列の要素（`a[1]=x`）と足し込み（`x+=1`）も代入。

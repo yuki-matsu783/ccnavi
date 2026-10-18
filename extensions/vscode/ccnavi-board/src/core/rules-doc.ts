@@ -6,7 +6,7 @@
  * だけを差し替える。ルールの入れ替え・タイプの移動は、元のノードをそのまま別のリストへ
  * 移すので、そのルールに付いていたコメントも一緒に動く。
  *
- * ここはルールの意味（当たる・当たらない）には触れない。判定は実行ファイルの仕事。
+ * ルールの意味（当たる・当たらない）の判定は実行ファイルの仕事。
  */
 import { isMap, isNode, isScalar, isSeq, Pair, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Node } from "yaml";
 
@@ -328,7 +328,7 @@ function restoreBlocks(output: string, placed: readonly YAMLMap[], keeps: readon
 
 /**
  * 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符・折り返し）を残す。
- * `except:` は画面で編集しないので書かない。元のノードを使い回すので、書いてあればそのまま残る。
+ * `except:` は画面で編集しないので、元のノードを使い回し、書いてあればそのまま残る。
  */
 function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
   setText(doc, node, "id", form.id, Scalar.PLAIN);
@@ -404,7 +404,7 @@ function writeWhen(doc: Document, node: YAMLMap, tree: CondNode, movingExcept: b
 /**
  * glob / regex 1 つ（と `except:`）のルールの元のノードを、「組み合わせ条件に変換」した形に組む。
  * 個別条件は元のペアの値（行末のコメント付き）をそのまま持ち、キーの前のコメントは個別条件の前へ移す。
- * `except:` の各要素はノードごと移す（`movingExcept` のときだけ。消さない except は動かさない）
+ * `except:` の各要素はノードごと移す（`movingExcept` のときだけ）
  */
 function convertedFrom(node: YAMLMap, movingExcept: boolean): YAMLMap | undefined {
   const body = node.items.find((p) => isScalar(p.key) && (p.key.value === "glob" || p.key.value === "regex") && isScalar(p.value));

@@ -161,7 +161,7 @@ def _unreadable_closed(conf: settings.Settings, root: str, tree_root: str) -> li
     """親のワークツリーの閉じた承認済みチケットのうち、読めないもの（理由の文）。
 
     読めない閉じた子は子の一覧に入らない。そのまま退避へ進むと、ワークツリーとブランチの
-    片付けから黙って漏れる。
+    片付けの対象から、知らないうちに外れる。
     """
     if tree_root:
         return [
@@ -188,7 +188,7 @@ def note(
     止まった）の一覧には足し、同じ子は今回の値で置き換える。新しい `mr` が空なら前の回の値を保つ。
 
     書かずに理由を返すのは、記録の置き場が無いとき、前の回の記録が壊れているとき（上書きすると
-    子の一覧と MR を失う）、読めない閉じたチケットがあるとき（子の一覧から漏れる）。呼び手
+    子の一覧と MR を失う）、読めない閉じたチケットがあるとき（子の一覧に入らない）。呼び手
     （`ready`）は、理由があれば退避へ進まずに止める。
     """
     path = record_path(conf, parent)
@@ -203,7 +203,7 @@ def note(
     unread = _unreadable_closed(conf, root, tree_root)
     if unread:
         return (
-            "読めない閉じたチケットがあり、片付ける子の一覧から漏れる"
+            "読めない閉じたチケットがあり、片付ける子の一覧に入らない"
             f"（{'; '.join(unread[:3])}）。直してから打ち直す"
         )
     children = {
@@ -290,7 +290,7 @@ def entries(conf: settings.Settings) -> list[Entry]:
 
     数えるのは、ファイル名の幹と JSON の `parent` が一致するものだけ（記録を手で置き換えて、
     別の親を指させない）。読めない・`mr` が無い・ブランチが空白を含むものは `incomplete`
-    で、列挙できない理由を言う。自動では何も消さない。
+    で、列挙できない理由を言う。
     """
     directory = os.path.dirname(record_path(conf, "x")) if conf.state else ""
     try:
@@ -739,7 +739,7 @@ def run_merged(
     parent_path = tree.worktree_path(root, family)
     on_disk = os.path.lexists(parent_path)
     # ワークツリーが在るなら、その HEAD が記録のブランチか確かめる。`worktrees.drop` が見るのは
-    # 未コミットと ignored だけで、HEAD が push 済みか・MR に含まれるかは見ない。
+    # 未コミットと ignored だけ。HEAD が push 済みか・MR に含まれるかはここで確かめる。
     blocker = _parent_head_blocker(parent_path, branch, bool(tip)) if on_disk else ""
     if not blocker and tip:
         blocker = _merged_blocker(repo, branch, tip, head_sha)

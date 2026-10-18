@@ -43,7 +43,7 @@ ccnavi_branch_ok() {
 
 # ワークツリーの HEAD が指すブランチ名。<ワークツリー> <識別子>
 #
-# 識別子からブランチ名は逆算しない。HEAD のブランチ名を変換（ccnavi_branch_to_id。/ を - に置き換え）
+# HEAD のブランチ名を変換（ccnavi_branch_to_id。/ を - に置き換え）
 # したものがフォルダ名の識別子と一致し、ブランチ名として受けてよいときだけ出す。
 # ワークツリーが無い・ブランチの外（detached HEAD）なら 1、一致しない・使えない名前なら 2。
 # git は読み取りの 1 回だけ。
@@ -80,7 +80,7 @@ ccnavi_ask() {
 # -<2 桁>・字の種類・NFC）・ccnavi_id_direct（直接作業や子のワークツリーとして使えない理由。64 文字・字の種類・NFC）・
 # ccnavi_id_child（子の識別子の形なら yes）に入れる。sh は字の種類と NFC と文字数を自分で確かめない
 # （`ccnavi_is_ident` と `ccnavi_is_branch` は ASCII の外のバイトを通す。`${#x}` は dash ではバイト数になる）。
-# 実行ファイルが無い・答えないなら 1（呼ぶ側は「確かめられない」として止める。誤判定する代わりの判定はしない）。
+# 実行ファイルが無い・答えないなら 1（呼ぶ側は「確かめられない」として止める）。
 ccnavi_id_ask() {
 	ccnavi_ia_out=$(ccnavi_ask "$1" worktree id "$2") || ccnavi_ia_out=""
 	ccnavi_id_ident=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^id //p' | head -n 1)
@@ -144,7 +144,7 @@ ccnavi_record_write() {
 #
 # `origin/HEAD` は clone のときに置かれる。`git init` してから `remote add` した手元や、
 # 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側を使う。
-# どちらも無ければ「分からない」。当てずっぽうで別のブランチを宣言しない。
+# どちらも無ければ「分からない」。
 # ネットワークには出ない（手元の ref だけを読む）。
 ccnavi_default_branch() {
 	ccnavi_db_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
@@ -221,7 +221,7 @@ ccnavi_parent_tree() {
 # 入れる変数は、どれも yes / no / unreadable / unknown のどれか（unknown は、実行ファイルが無い・答えない・
 # 古くてその行を知らない）。
 #   ccnavi_pi_parent     そのツリーが親のワークツリーか
-#   ccnavi_pi_approved   親のワークツリーの承認済み（approved/ の doing か done）に親チケットがある（提案は数えない）
+#   ccnavi_pi_approved   親のワークツリーの承認済み（approved/ の doing か done）に親チケットがある（見るのは承認済みのチケットだけ）
 #   ccnavi_pi_requested  承認済みの phases/<名前>/ に <N>.requested が 1 つ以上ある
 #   ccnavi_pi_archived   手元の退避（ready 済み）に親がある
 #   ccnavi_pi_started    承認済みの親チケットの started_at が空でない（着手は push してから完了する）
@@ -345,7 +345,7 @@ ccnavi_push_gate() {
 # 認証を尋ねさせず（GIT_TERMINAL_PROMPT=0・GCM_INTERACTIVE=never、ssh は BatchMode）、<秒> で切る。
 # ssh の BatchMode は、ユーザが GIT_SSH_COMMAND・GIT_SSH・core.sshCommand を持っていればそちらを尊重する。
 # タイムアウト監視の出力は捨てる（つないだままだと、監視の sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
-# 戻り値は git のもの（切ったときは 0 でない）。標準出力は捨てないので、呼ぶ側がリダイレクトする。
+# 戻り値は git のもの（切ったときは 0 でない）。標準出力は、呼ぶ側がリダイレクトする。
 ccnavi_git_timed() {
 	ccnavi_gt_limit="$1"
 	ccnavi_gt_err="$2"

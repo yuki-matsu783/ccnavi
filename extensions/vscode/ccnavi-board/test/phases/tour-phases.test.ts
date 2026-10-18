@@ -108,7 +108,7 @@ test("CB-T464 フェーズの案内の scene は、見本にある設定・定�
   const flags = ["dirty", "locked", "error", "changed", "help"];
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目`;
+      const at = `${course.id} の ${index + 1} 番目の手順`;
       const scene = step.scene;
       for (const key of Object.keys(scene)) {
         assert.ok(known.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
@@ -132,7 +132,7 @@ test("CB-T464 フェーズの案内の scene は、見本にある設定・定�
   }
 });
 
-test("CB-T465 フェーズの案内は、基本の案内の題と順序を保ち、ユースケースは「〜したいとき」の 4〜9 段で、指す先は画面にある印だけを使う", () => {
+test("CB-T465 フェーズの案内は、基本の案内の題と順序を保ち、ユースケースは「〜したいとき」の 4〜9 手順で、指す先は画面にある印だけを使う", () => {
   assert.equal(def.courses[0].id, INTRO_ID);
   assert.deepEqual(
     def.courses[0].steps.map((step) => step.title),
@@ -143,7 +143,7 @@ test("CB-T465 フェーズの案内は、基本の案内の題と順序を保ち
   assert.ok(useCases.length >= 3 && useCases.length <= 6, `ユースケースが ${useCases.length} 本`);
   for (const course of useCases) {
     assert.match(course.title, /とき$/, `${course.id}: 題は利用者の目的（〜したいとき）で切る`);
-    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 段`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
   }
   for (const course of def.courses) {
     for (const step of course.steps) {
@@ -152,10 +152,10 @@ test("CB-T465 フェーズの案内は、基本の案内の題と順序を保ち
   }
 });
 
-test("CB-T466 定義の中を指す段は開いた定義を持ち、補足の欄・ヘルプ・作業中・検証の文・外の変更・未保存を指す段は、それが出る scene を持つ", () => {
+test("CB-T466 定義の中を指す手順は開いた定義を持ち、補足の欄・ヘルプ・作業中・検証の文・外の変更・未保存を指す手順は、それが出る scene を持つ", () => {
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目（${step.target}）`;
+      const at = `${course.id} の ${index + 1} 番目の手順（${step.target}）`;
       const scene = step.scene as Record<string, unknown>;
       if (INSIDE.includes(step.target)) {
         assert.ok(scene.open !== undefined || scene.add !== undefined, `${at}: 定義が開いていない`);

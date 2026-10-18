@@ -12,9 +12,9 @@ import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
 import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskMessage, type RiskPage, type ToRisk } from "../../core/risk-view.js";
-import { applyAppearance } from "../appearance.js";
+import { useHostMessages } from "../useHostMessages.js";
 import { TargetSelect } from "../TargetSelect.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseRiskSample } from "../../core/tour-risk.js";
 import { defaultSum } from "../../core/sums.js";
@@ -45,7 +45,7 @@ const SAMPLE_DRAFT = sampleDraft(SAMPLE.page);
 const SAMPLE_MISSING_DRAFT = sampleDraft(SAMPLE.missing);
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -91,7 +91,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const { draft, open } = editing;
   const page = pageOf(data);
   /**
-   * 案内の間は見本を描き、段ごとの様子（開く項目・絞り込み・統合結果など）は `scene` に入れる。実際の編集中の配点や開いた行は動かさないので、
+   * 案内の間は見本を描き、手順ごとの様子（開く項目・絞り込み・統合結果など）は `scene` に入れる。実際の編集中の配点や開いた行は動かさないので、
    * 閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -123,40 +123,31 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     }
   }, [dirty]);
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToRisk> & { data?: RiskData; lock?: Lock; message?: string; value?: unknown };
-      if (message.type === "data" && message.data !== undefined) {
-        const next = message.data;
-        setData(next);
-        setEditing(editingOf(next, nextKey));
-        setDirty(false);
-        setBusy(false);
-        setStatus(undefined);
-        setChanged(false);
-        setLock(pageOf(next)?.lock ?? NO_LOCK);
-      } else if (message.type === "failed") {
-        setBusy(false);
-        setStatus({ text: String(message.message ?? ""), error: true });
-      } else if (message.type === "lock" && message.lock !== undefined) {
-        setLock(message.lock);
-      } else if (message.type === "changed") {
-        setChanged(true);
-      } else if (message.type === "cancelled") {
-        // 「破棄して読み直す？」をやめた。止めた欄を戻す
-        setBusy(false);
-        setStatus(undefined);
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
-      }
-    };
-    window.addEventListener("message", onMessage);
-    // 組み上がったと伝える。拡張ホストはここで中身を渡し直す
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-  }, [nextKey, requestTour]);
+  useHostMessages<ToRisk>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      const next = message.data;
+      setData(next);
+      setEditing(editingOf(next, nextKey));
+      setDirty(false);
+      setBusy(false);
+      setStatus(undefined);
+      setChanged(false);
+      setLock(pageOf(next)?.lock ?? NO_LOCK);
+    } else if (message.type === "failed") {
+      setBusy(false);
+      setStatus({ text: String(message.message ?? ""), error: true });
+    } else if (message.type === "lock" && message.lock !== undefined) {
+      setLock(message.lock);
+    } else if (message.type === "changed") {
+      setChanged(true);
+    } else if (message.type === "cancelled") {
+      // 「破棄して読み直す？」の確認をやめたので、止めていた欄を戻す
+      setBusy(false);
+      setStatus(undefined);
+    } else if (message.type === "tour") {
+      requestTour();
+    }
+  }, () => post({ type: "ready" }));
 
   // 足した行の id へ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
@@ -305,7 +296,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           更新
         </button>
       </div>
-      <header className="toolbar">
+      <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary">
           <TargetSelect
             target={touring ? undefined : page?.target}
@@ -346,8 +337,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             保存
           </button>
         </div>
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
+      </ScreenHeader>
       <p id="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
         {shownLock.reason}
       </p>

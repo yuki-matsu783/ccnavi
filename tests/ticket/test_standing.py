@@ -105,7 +105,7 @@ class ParentTreeTest(AuthorityHarness):
         os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02-02.md"))
         copies, _ = approval.scan(self.conf(), self.root)
         after = {t.ticket: t.blocked for t in copies}
-        # リストは変えない（除かない）。理由だけが足される。
+        # 理由だけが足される。
         self.assertIn("i0001-02-02", after)
         self.assertIn("ワークツリーの外", after["i0001-02-02"])
         self.assertEqual("", after["i0001-01-01"])
@@ -403,7 +403,7 @@ class UnreadableChildTest(AuthorityHarness):
         self.start_second_child()
         self.corrupt()
         self.assertNotEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
-        self.assertNotEqual("deny", self.decision(self.write_to(self.parent_tree, "wip/x")))
+        self.assertNotEqual("deny", self.decision(self.write_to(self.parent_tree, "wip/handoff/x")))
         check = self.ccnavi("sync", "check", "i0001")
         self.assertEqual(1, check.returncode, check.stdout + check.stderr)
         self.assertIn("i0001-01-02.md", check.stdout)

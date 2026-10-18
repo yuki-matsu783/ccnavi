@@ -70,8 +70,8 @@ interface PanelState {
    */
   approval: ApprovalState;
   /**
-   * 前の読み直しから動いたカード。画面ではなくここが持つ。 画面は裏に回ると捨てられ、
-   * 表に戻ると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
+   * 前の読み直しから動いたカード。画面ではなくここが持つ。画面は非表示になると捨てられ、
+   * 再表示されると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
    * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
    */
   moved: MovedState;
@@ -145,7 +145,7 @@ export async function openBoard(project?: string): Promise<void> {
     retainContextWhenHidden: false,
   });
   if (panel.options.retainContextWhenHidden !== false) {
-    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、裏に回っても画面が捨てられず、表裏の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
+    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が捨てられず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
     diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: true });
   }
   showLoading(panel, TITLE, SCREEN, "チケット");
@@ -187,7 +187,7 @@ function registerPanelHandlers(current: PanelState): void {
     const becameVisible = panel.visible && !current.wasVisible;
     current.wasVisible = panel.visible;
     if (!panel.visible) {
-      // `retainContextWhenHidden` は偽なので、裏に回った画面は捨てられる。表に戻ると
+      // `retainContextWhenHidden` は偽なので、非表示になった画面は捨てられる。再表示されると
       // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
       current.host.hidden();
     }
@@ -373,7 +373,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       // 作り直している間に見送った更新（send）も、絞り込みも、ここで届く
       current.host.ready();
       redraw(current);
-      // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
+      // 非表示の間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
       // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
       postAppearance(current.host);
       // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。

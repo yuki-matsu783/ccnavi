@@ -1,6 +1,6 @@
 /**
  * ローカルの git を読み取り専用で起こす。プロジェクト管理画面が origin を読むためだけに使う。
- * ネットワークには出ない（`remote get-url` はローカルの設定を読むだけ）。
+ * `remote get-url` はローカルの設定を読むだけ。
  * Node の子プロセスを使うが VS Code には依存しない。
  */
 import { execFile } from "node:child_process";

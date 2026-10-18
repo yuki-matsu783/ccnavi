@@ -2,7 +2,7 @@
  * テンプレート管理画面の案内の見本（`webview/tours/templates.yml` の `sample:`）を、画面が描く形にする。
  *
  * 見本は実行ファイルの JSON（`--templates --json`）より小さい書き方で YAML に書き、ここで `TemplatesPage`（画面が描く形）にする。
- * 案内の間に描くだけで、読み取りにも取り込みにも使わない。有効か・捨てた理由・取り込めるかは見本に書いた値をそのまま使い、判定しない。
+ * 案内の間に描くだけ。有効か・捨てた理由・取り込めるかは見本に書いた値をそのまま使う。
  */
 import type { DraftEntry, FlowSummary, PlanItem, ProblemSeverity, Sum, SumRow, TemplateEntry, TemplateProblem, TemplatesPage } from "./templates-view.js";
 

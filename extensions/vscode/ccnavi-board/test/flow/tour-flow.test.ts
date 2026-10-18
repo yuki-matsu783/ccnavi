@@ -184,7 +184,7 @@ const STATIC_TARGETS = new Set([
 ]);
 const PALETTE_TARGETS = new Set(["start", "end", "prompt", "sub-agent", "ask", "if-else", "switch", "loop", "skill"]);
 
-test("CB-T488 フローの案内は、基本の案内が先頭で、使い方ごとの案内が 5〜8 本あり、どれも 4〜10 段で、題が重ならない", () => {
+test("CB-T488 フローの案内は、基本の案内が先頭で、使い方ごとの案内が 5〜8 本あり、どれも 4〜10 手順で、題が重ならない", () => {
   assert.equal(tour.courses[0].id, INTRO_ID);
   assert.deepEqual(
     tour.courses[0].steps.map((step) => step.title),
@@ -193,16 +193,16 @@ test("CB-T488 フローの案内は、基本の案内が先頭で、使い方ご
   const uses = tour.courses.slice(1);
   assert.ok(uses.length >= 5 && uses.length <= 8, `使い方ごとの案内が ${uses.length} 本`);
   for (const course of uses) {
-    assert.ok(course.steps.length >= 4 && course.steps.length <= 10, `${course.id}: ${course.steps.length} 段`);
-    assert.equal(new Set(course.steps.map((step) => step.title)).size, course.steps.length, `${course.id}: 段の題が重なっている`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= 10, `${course.id}: ${course.steps.length} 手順`);
+    assert.equal(new Set(course.steps.map((step) => step.title)).size, course.steps.length, `${course.id}: 手順の題が重なっている`);
   }
   assert.ok(tour.courses[0].steps.length <= 6, "基本の案内は今くらいの量");
 });
 
-test("CB-T489 フローの案内の scene は、見本にある名前・ノード・線だけを指し、指す先（target）はその段の見本に在る", () => {
+test("CB-T489 フローの案内の scene は、見本にある名前・ノード・線だけを指し、指す先（target）はその手順の見本に在る", () => {
   for (const course of tour.courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+      const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
       assert.equal(sceneProblem(sample, step.scene), undefined, at);
       const scene = sceneOf(sample, step.scene);
       const doc: FlowDoc = scene.flow.doc;

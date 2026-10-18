@@ -3,7 +3,7 @@
  * 「この N 件を承認する」「やめる」。本文は実行ファイルが組んだものをそのまま出し、項目には分けない。
  *
  * 計画を持つ親が一覧にあれば、本文の上にその計画の図を読むだけで出す（`PlanGraph`。中身は preview の
- * `plans` で、承認する提案そのものの順序）。図は判定をせず、実行ファイルの答えを描くだけ。図は親ごとにまとめ、
+ * `plans` で、承認する提案そのものの順序）。図は実行ファイルの答えを描くだけ。図は親ごとにまとめ、
  * その前に順序を直す計画編集タブへの入口（「計画を編集」）を置く。押すと拡張ホストがオーバーレイを
  * 閉じてからタブを開く（タブで保存すると、この一覧はもう承認できないため）。
  *
@@ -16,6 +16,8 @@ import { Fragment, useEffect, useRef, type JSX } from "react";
 
 import { unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
+import { Dialog, DialogActions } from "../shared/Dialog.js";
+import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import { DecideBody } from "./Decide.js";
 import { post } from "./post.js";
@@ -32,25 +34,12 @@ export function Approval({ overlay, unsaved = [] }: { readonly overlay: Approval
     }
   }, [overlay.kind]);
   // Esc でやめる。承認している最中と、行き先を置いている最中は閉じない
-  useEffect(() => {
-    if (overlay.kind === "approving" || overlay.kind === "deciding") {
-      return undefined;
-    }
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        post({ type: "approveCancel" });
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [overlay.kind]);
+  useEscape(overlay.kind !== "approving" && overlay.kind !== "deciding", ESCAPE_LAYER.overlay, () => post({ type: "approveCancel" }));
 
   return (
-    <div className="approval-backdrop" data-approval={overlay.kind}>
-      <section className="approval" role="dialog" aria-modal="true" aria-labelledby="approval-title" ref={box}>
-        <Inner overlay={overlay} unsaved={unsaved} />
-      </section>
-    </div>
+    <Dialog titleId="approval-title" backdropClass="approval-backdrop" cardClass="approval" backdropData={{ "data-approval": overlay.kind }} cardRef={box}>
+      <Inner overlay={overlay} unsaved={unsaved} />
+    </Dialog>
   );
 }
 
@@ -60,18 +49,18 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
       return (
         <>
           <p className="approval-note">承認待ちの内容を読み込み中…</p>
-          <div className="approval-actions">
+          <DialogActions className="approval-actions">
             <Cancel label="キャンセル" />
-          </div>
+          </DialogActions>
         </>
       );
     case "error":
       return (
         <>
           <p className="approval-note error">{overlay.error}</p>
-          <div className="approval-actions">
+          <DialogActions className="approval-actions">
             <Cancel label="閉じる" />
-          </div>
+          </DialogActions>
         </>
       );
     case "preview":
@@ -103,18 +92,18 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
       return (
         <>
           <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）指摘を読み込み中…</p>
-          <div className="approval-actions">
+          <DialogActions className="approval-actions">
             <Cancel label="キャンセル" />
-          </div>
+          </DialogActions>
         </>
       );
     case "reviewedLoading":
       return (
         <>
           <p className="approval-note">フェーズ {overlay.phase} の未解決の指摘を確認し、エージェントへの通知文を作成しています…</p>
-          <div className="approval-actions">
+          <DialogActions className="approval-actions">
             <Cancel label="キャンセル" />
-          </div>
+          </DialogActions>
         </>
       );
     case "decidePreview":
@@ -159,7 +148,7 @@ function Body({
               <tr key={b.ticket}>
                 <td className="approval-id">{b.ticket}</td>
                 <td>{b.title}</td>
-                <td>{b.revision ? "親（計画の改訂）" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`}</td>
+                <td>{b.revision ? "親（改版）" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`}</td>
               </tr>
             ))}
           </tbody>
@@ -230,7 +219,7 @@ function Body({
           {blockedText}
         </p>
       )}
-      <div className="approval-actions">
+      <DialogActions className="approval-actions">
         {count === 0 ? null : (
           <button
             type="button"
@@ -246,7 +235,7 @@ function Body({
           </button>
         )}
         <Cancel label="キャンセル" disabled={approving} />
-      </div>
+      </DialogActions>
     </>
   );
 }
@@ -291,7 +280,7 @@ function BodyText({ text }: { readonly text: string }): JSX.Element {
 /** 承認の文とレビュー済みの連絡は、同じ 2 ボタンで渡す。文は拡張ホストが持っている分を使う */
 function HandOver(): JSX.Element {
   return (
-    <div className="approval-actions" data-tour="approval-handover">
+    <DialogActions className="approval-actions" tour="approval-handover">
       <button type="button" className="action primary" data-action="prompt-copy" onClick={() => post({ type: "promptCopy" })}>
         コピー
       </button>
@@ -299,7 +288,7 @@ function HandOver(): JSX.Element {
         新しいセッションで開く
       </button>
       <Cancel label="閉じる" />
-    </div>
+    </DialogActions>
   );
 }
 

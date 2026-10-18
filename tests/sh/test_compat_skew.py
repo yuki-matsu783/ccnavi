@@ -189,7 +189,7 @@ class CompatAgreesTest(unittest.TestCase):
 
     def test_v10_the_board_reading_attention_from_the_executable_raised_the_compat_to_7(self):
         """V10 ボードの JSON のチケットが `issues` と `attention` を持ち、拡張はそれを読むだけに
-        なった（自分では組み直さない）。なので 7 以上。
+        なった。そのため版は 7 以上。
 
         欄を足しただけだが、古い実行ファイルの答えでは拡張の「要対応のみ」が空になり、不備も
         出ない。知らないうちに空になるより食い違いとして知らせる。
@@ -259,14 +259,23 @@ class CompatAgreesTest(unittest.TestCase):
         self.assertGreaterEqual(version.COMPAT, 13)
         self.assertEqual(sh_compat(), version.COMPAT)
 
-    def test_v16_the_user_entry_raised_the_compat_to_15(self):
-        """V16 ユーザだけが打つ操作を、実行ファイルの `user <操作>` と ccnavi-user-*.sh に分けた。
+    def test_v16_integrate_tree_bound_raised_the_compat_to_15(self):
+        """V16 `integrate` がチケットに結び付くかの判定を、sh が自分で置き場を読まずに実行ファイルの
+        `tree bound` に聞くようになった。旧い実行ファイルはサブコマンドを知らず頭の行を返さない
+        ので、新しい sh は断る向きに倒す。食い違いとして知らせる。なので 15 以上。
+        """
+        self.assertGreaterEqual(version.COMPAT, 15)
+        self.assertEqual(sh_compat(), version.COMPAT)
+
+    def test_v17_the_user_entry_raised_the_compat_to_16(self):
+        """V17 ユーザだけが打つ操作を、実行ファイルの `user <操作>` と ccnavi-user-*.sh に分けた。
 
         新しい実行ファイルは、`user` の外のユーザ専用のオプション（`--agree`・`--reviewed --yes`
         など）を断る。古い sh（ccnavi-agree.sh など）は断られるので、食い違いとして知らせ、
-        sh の配り直しを言う。なので 15 以上。
+        sh の配り直しを言う。なので 16 以上。
         """
-        self.assertGreaterEqual(version.COMPAT, 15)
+        self.assertGreaterEqual(version.COMPAT, 16)
+        self.assertEqual(sh_compat(), version.COMPAT)
 
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")

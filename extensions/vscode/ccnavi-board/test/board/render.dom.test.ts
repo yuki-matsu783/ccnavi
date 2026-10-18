@@ -63,13 +63,16 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.ok(text(page, ".approval-rejected").includes("i0001-05-05"));
     assert.ok(text(page, ".approval-rejected").includes("計画にありません"));
     assert.equal(page.all(".approval-problems").length, 0);
+    // 承認の操作の列は共通の Dialog 部品の列に含まれる
+    assert.ok(page.all(".approval .overlay-actions.approval-actions").length > 0);
   } finally {
     await page.close();
   }
   // 狭い幅でも表は枠に収め（識別子だけは折らない）、ボタンの行は折り返す
   assert.match(css(), /\.approval-batch th, \.approval-batch td \{[^}]*overflow-wrap: anywhere; \}/);
   assert.match(css(), /\.approval-id \{[^}]*white-space: nowrap; \}/);
-  assert.match(css(), /\.approval-actions \{ display: flex; flex-wrap: wrap;/);
+  // 操作の列は共通の Dialog 部品（Dialog.css）が持つ。承認のボタンもその列に含まれる
+  assert.match(css(), /\.overlay-actions \{ display: flex; flex-wrap: wrap;/);
   // 本文に何が書かれていても、文字として出すだけ。
   const spiked = await openBoard(fixture(), { approval: { kind: "preview", preview: { ...preview, text: "<script>alert(1)</script>" } } });
   try {
@@ -327,7 +330,7 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
   // 最後の列の取っ手は内側に置き、ボードを常に横へ流さない
   assert.match(css(), /\.column:last-child \.resizer \{ right: 0; \}/);
   // 絞り込みの select は最長の選択肢の幅に広がらず、ページを横に流さない
-  assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: 320px;/);
+  assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: var\(--w-field\);/);
   // カードの不備の小さい字の指定は、ツールバーの「不備 N 件」には当てない
   assert.doesNotMatch(css(), /(^|\})\s*\.issues \{/);
   assert.match(css(), /\.card \.issues \{/);

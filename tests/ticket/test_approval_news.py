@@ -143,9 +143,10 @@ class ApprovalToldTest(PhaseHarness):
         result = self.event(
             "PreToolUse", tool="Write", file_path=os.path.join(self.parent_tree, "src", "x.py")
         )
-        if result.stdout.strip():
-            out = json.loads(result.stdout)["hookSpecificOutput"]
-            self.assertNotEqual(out.get("permissionDecision"), "deny")
+        # 親のワークツリーは置き場の外に書けない。判定は承認の後も同じ形で返る。
+        out = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual(out.get("permissionDecision"), "deny")
+        self.assertIn("DENY_TICKET_PARENT", out.get("permissionDecisionReason", ""))
 
     # ---- 3. 記録を書かない
 

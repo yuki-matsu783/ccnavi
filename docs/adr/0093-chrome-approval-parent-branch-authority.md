@@ -107,7 +107,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
   `ops.py:339,395,707`、`diagnose.py:645,992`、`flow.py:1360`、`lint.py:910` にもある
 - 本物とする側の推定は `approval._authoritative` の `at_home`（`approval.py:275`）で、ツリー名と親の識別子を比べる
 - `ccnavi-git.sh` は「ディレクトリ名 = ブランチ名 = 識別子」を強制していない（`worktree)` の節は行き先の置き場しか見ない）
-- `ccnavi-git.sh branch` の拒否には漏れがある:
+- `ccnavi-git.sh branch` の拒否に入っていない形がある:
   - 短いオプションの検査 `*f* | *m* | *u*`（`ccnavi-git.sh:186-188`）は大文字小文字を区別するので、`-M`（強制の改名）は通る
   - 長いオプションは `--move` を拒否する（`:178`）が、使い方の文（`:82`）は「`-M` 不可」と書いていて、実装と食い違う
   - `-D` は `*D*` で拒否（`:183-185`）、`-m` は拒否
@@ -146,7 +146,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 8. **リポジトリをまたぐ issue**: `issue:` に `owner/repo#N` を許す。識別子はフォールバックと同じくユーザが付け、マージリクエストの本文は `Closes owner/repo#N`
 9. **一致の検査は新規の提案のときだけ**。承認後は識別子を優先し、`issue:` の書き換えは既に改版で許していない（`approval.py:2279`）
 10. **ハードに拒否する場所（`ccnavi-git.sh`）**: 段階 0 の lint の warn（2・3・5・6）とは別に、次を `ccnavi-git.sh` で拒否する。
-    - 段階 0: `branch` の漏れを直す。短いオプションの検査に `*M*` を足し（`-C` の強制コピーも同じ検査で見る）、`-M`・`-rM`・`--move` の回帰試験を足す。
+    - 段階 0: `branch` の拒否に入っていない形を直す。短いオプションの検査に `*M*` を足し（`-C` の強制コピーも同じ検査で見る）、`-M`・`-rM`・`--move` の回帰試験を足す。
       `fetch`・`pull` の引数で `:` か `+` を含むもの（refspec）を拒否する。文面は「取ってくるのはブランチ名だけ。手元の ref は `ccnavi-sync.sh` が進める」
     - 段階 2b（`ccnavi-sync.sh` と同時。D36）: `worktree add` で「行き先のディレクトリ名 = 新しいブランチ名（`-b`）」を求める。
       `--detach`・`-f`/`--force`・`-B`（今は `ccnavi-git.sh:247` で通している）、`checkout -B`/`switch -C`、親のワークツリーで別のブランチへ移る形を拒否する。
@@ -501,7 +501,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 
 #### fsio の「この実行で書いたパス」の記録レイヤー
 
-「書いたパス」の一覧をコアの `Changes`（6.2）だけから取ると漏れます。コアの外で書いている箇所があるためです:
+「書いたパス」の一覧をコアの `Changes`（6.2）だけから取ると足りなくなります。コアの外で書いている箇所があるためです:
 `ops.start`・`finish`・`cancel`、`approval_ops.followup`（`approval_ops.py:286-372`）、`configsync.apply`（`configsync.py:159`）、
 フローのハッシュ `flow.record_digest`（`flow.py:964-`）、リスクの記録 `phases/<親>/<子>.risk.json`（`approval.py:914`）。
 
@@ -1094,7 +1094,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | sh | `ccnavi-common.sh` | 取り込み・ロック（D32）・write-and-push のコミット・push・失敗したときに届いたかの確認・戻しの共通の関数 |
 | sh | `ccnavi-ticket.sh`・`ccnavi-review.sh` | 対象の親子のチケットで write-and-push を回す。`confirm` の `--actor`。ユーザの入口 `chat`・`config-synced`・`close-early` と最後の承認の push |
 | sh | `ccnavi-push-approved.sh` | 4.6: 親子のチケットを引数で取る、ロック（入れ子を許す）、取り込んでから送る、`commit --only`、GitLab の `seq`、push が失敗したときに届いたかの確認 |
-| sh | `ccnavi-git.sh` | 段階 0: `branch` の `*M*` の漏れ（と使い方の文との食い違い）、`fetch`・`pull` の refspec（`:`・`+`）、置き場に当たる `checkout <ref> <パス>`・`restore --source`・`--ours/--theirs`。段階 2b: `worktree add` の名前、`--detach/-f/-B`・`checkout -B`/`switch -C` の拒否と `:99`・`:607` の文面、取り込み状態が `gone` の `P` への push の拒否、push が通ったら親子のチケットの取り込み状態を作る |
+| sh | `ccnavi-git.sh` | 段階 0: `branch` の `*M*` を拒否していなかったこと（と使い方の文との食い違い）、`fetch`・`pull` の refspec（`:`・`+`）、置き場に当たる `checkout <ref> <パス>`・`restore --source`・`--ours/--theirs`。段階 2b: `worktree add` の名前、`--detach/-f/-B`・`checkout -B`/`switch -C` の拒否と `:99`・`:607` の文面、取り込み状態が `gone` の `P` への push の拒否、push が通ったら親子のチケットの取り込み状態を作る |
 | sh | `ccnavi-fetch.sh` | 早送りだけ（対象の見分け、ロックを試すだけ、45 秒の枠）。「ref が無い」で落ちた fetch を `failed` に入れない。merge・消えたかの確かめ・取り込み状態は持たない |
 | sh | `ccnavi-approve.sh` | 端末のユーザの承認を消すなら削除。deny（`phase.py:105-113`）の対象から外す。残す間は改修した承認の pushを呼ぶ |
 | 拡張 | `vscode-extension/ccnavi-board` | 承認は未決（10.3 の 2）。呼び名に `withdrawn`・`chrome`。フローの保存の後に承認の pushを送る |

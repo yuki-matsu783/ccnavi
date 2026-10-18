@@ -6,14 +6,14 @@
  * 読むだけの画面で、下書きの取り込みと編集は「取り込み待ち」の画面が受け持つ。ここにあるのは、そこへ進む入口だけ。
  * 案内の間は見本（`core/tour-templates.ts`）を描き、実際の中身・開閉には触れない。
  */
-import { useEffect, useState, type JSX } from "react";
+import { useState, type JSX } from "react";
 
 import { defaultSum } from "../../core/sums.js";
 import type { TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseTemplatesSample } from "../../core/tour-templates.js";
-import { applyAppearance } from "../appearance.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { useHostMessages } from "../useHostMessages.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import templatesTour from "../tours/templates.yml";
 import { TargetSelect } from "../TargetSelect.js";
 import { Draft } from "./Draft.js";
@@ -28,7 +28,7 @@ const TOUR = tourOf(templatesTour);
 const SAMPLE = parseTemplatesSample(TOUR.sample);
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -66,28 +66,18 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     }
   };
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToTemplates>;
-      if (message.type === "data" && message.data !== undefined) {
-        setData(message.data);
-        setBusy(false);
-        setDetails({});
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "detail" && message.name !== undefined && message.layer !== undefined) {
-        const key = `${message.layer}/${message.name}`;
-        setDetails((now) => ({ ...now, [key]: { detail: message.template ?? undefined, error: String(message.error ?? "") } }));
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
-      }
-    };
-    window.addEventListener("message", onMessage);
-    // 組み上がったと伝える。裏に回って捨てられた画面は、表に戻ると拡張ホストが入れてある HTML から作り直される。
-    // その HTML は少し古いことがあるので、いまの中身をもらい直す
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-  }, [requestTour]);
+  useHostMessages<ToTemplates>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      setData(message.data);
+      setBusy(false);
+      setDetails({});
+    } else if (message.type === "tour") {
+      requestTour();
+    } else if (message.type === "detail" && message.name !== undefined && message.layer !== undefined) {
+      const key = `${message.layer}/${message.name}`;
+      setDetails((now) => ({ ...now, [key]: { detail: message.template ?? undefined, error: String(message.error ?? "") } }));
+    }
+  }, () => post({ type: "ready" }));
 
   if (data.kind === "loading") {
     return (
@@ -191,7 +181,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         </div>
       ))}
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
-      <header className="toolbar">
+      <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary" data-tour="target">
           <TargetSelect target={touring ? undefined : page.target} targets={touring ? undefined : page.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
           <span className="path" title={touring ? "" : page.root}>
@@ -203,8 +193,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
             更新
           </button>
         </div>
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
+      </ScreenHeader>
       <p className="count" id="counts" data-tour="summary">
         <span>テンプレート {shownTemplates.length} 件</span>・<span>下書き {page.data.drafts.length} 件</span>・<span>error {page.data.errors}</span>・<span>warn {page.data.warns}</span>・<span>info {page.data.infos}</span>
       </p>

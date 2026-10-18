@@ -54,7 +54,7 @@ export function approveArgs(
 }
 
 /**
- * `--plan-order <親> --json [--order <JSON>]`。計画編集タブが計画の図を読む（何も書かない）。
+ * `--plan-order <親> --json [--order <JSON>]`。計画編集タブが計画の図を読む。
  * `order` は元の番号（いま提案に書いてある番号）での直接の先行で、線を変えたときだけ付ける（空なら提案のまま）。
  * 番号の振り直しと順序の検査は実行ファイルが答える
  */
@@ -63,12 +63,12 @@ export function planOrderArgs(parent: string, order?: Readonly<Record<string, un
   return order === undefined || Object.keys(order).length === 0 ? base : [...base, "--order", JSON.stringify(order)];
 }
 
-/** `--templates --json --layer <名前>`。テンプレート管理画面が一覧を読む（何も書かない）。`--root` は `run()` が付ける */
+/** `--templates --json --layer <名前>`。テンプレート管理画面が一覧を読む。`--root` は `run()` が付ける */
 export function templatesArgs(layer: string): readonly string[] {
   return ["--templates", "--json", "--layer", layer];
 }
 
-/** `--templates --show <名前> --layer <名前> --json`。1 件の本文を読む（何も書かない） */
+/** `--templates --show <名前> --layer <名前> --json`。1 件の本文を読む */
 export function templatesShowArgs(name: string, layer: string): readonly string[] {
   return ["--templates", "--show", name, "--layer", layer, "--json"];
 }
@@ -81,7 +81,7 @@ export function templatesDraftArgs(parent: string): readonly string[] {
 }
 
 /**
- * `user handoff [<パス>…] --json`。`wip/handoff/` に置いた下書きの一覧を見る（`--yes` を付けない。何も書かない）。
+ * `user handoff [<パス>…] --json`。`wip/handoff/` に置いた下書きの一覧を見る（`--yes` を付けない）。
  * パスは `--root` で指したツリーからの相対（`/` 区切り）。パスを渡すと、そのパスが選んだ対象になり、
  * 答えの `expect` はその集合のハッシュになる。パスを省くと、許可リストに当たり unchanged でないもの全部が対象。
  * `--root` は `run()` が付ける。
@@ -116,7 +116,7 @@ export const USER_DECIDE_SCRIPT = ".ccnavi/scripts/ccnavi-user-decide.sh";
 export const GIT_SCRIPT = ".ccnavi/scripts/ccnavi-git.sh";
 
 /**
- * `ccnavi-review.sh decide <N> --preview`。残った指摘とダイジェストを JSON で見る（何も置かない）。
+ * `ccnavi-review.sh decide <N> --preview`。残った指摘とダイジェストを JSON で見る。
  * sh は実行した場所を親のワークツリーとして実行ファイルに渡すので、子プロセスの cwd を親のワークツリーにする。
  * `.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから切ったワークツリーには届かないので、
  * sh はワークスペースルートからのパスで書く（呼ぶ側が `REVIEW_SCRIPT` を root に足す）
@@ -167,7 +167,7 @@ export function scriptCommand(root: string, name: string): string {
  * 未解決の指摘の有無は、ボードが押したときに `decide <N> --preview` で読んで文に書く（`unresolved`。読めなければ `undefined` で、有無は言わない）。
  * 判定は `confirm` が持ち、文はエージェントへの手がかりでしかない。
  * 未解決が残っていれば `confirm` が一覧と次の方法（解決してもらう・同じフェーズに子を足す・ユーザが decide で決める）を
- * 返すので、文はそれに従うことだけを言い、方法を先取りしない。
+ * 返すので、文はそれに従うことだけを言う。
  */
 export function reviewedPrompt(
   root: string,

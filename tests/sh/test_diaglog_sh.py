@@ -302,7 +302,7 @@ class ShLoggerTest(_Workspace):
         self.assertEqual((0, "abc"), (result.returncode, result.stdout))
 
     def test_a_given_root_is_used_without_searching(self):
-        # ccnavi-common.sh を持たない場所でも、渡されたルートに書く（探し直さない）。
+        # ccnavi-common.sh を持たない場所でも、渡されたルートに書く。
         other = tempfile.mkdtemp(prefix="ccnavi-diaglog-root-")
         self.addCleanup(shutil.rmtree, other, ignore_errors=True)
         self.run_sh(f"ccnavi_log_root={shlex.quote(other)}\nlog_info x")

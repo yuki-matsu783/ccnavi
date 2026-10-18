@@ -12,7 +12,7 @@ keywords: [要件, REQ-EXT, 拡張, VS Code, Chrome, 互換, COMPAT, CCNAVI_COMP
 
 ccnavi を読む拡張は 2 つある。VS Code 拡張「ccnavi ボード」（`extensions/vscode/ccnavi-board/`）は実行ファイルと sh を
 子プロセスで起動し、JSON を読み、ワークスペースのファイルを直接読み書きする。Chrome 拡張「ccnavi 承認ボード」
-（`extensions/chrome/ccnavi-approval/`）は実行ファイルを起動せず、ccnavi のソースを同梱して Pyodide の上で import し、
+（`extensions/chrome/ccnavi-approval/`）は、ccnavi のソースを同梱して Pyodide の上で import し、
 Python の関数を直接呼ぶ。
 
 この節には、ccnavi が拡張に約束することだけを書く。拡張が画面でどうふるまうかは、各拡張の要件書
@@ -43,7 +43,7 @@ VS Code 拡張が決める。ccnavi が約束するのは置き場と名前と `
 REQ-EXT-03 の UTF-8 は、実行ファイルの入口（`hookio.rebind_streams`）が標準入出力を張り直して守る。VS Code 拡張は
 念のため `PYTHONUTF8=1`・`PYTHONIOENCODING=utf-8` も渡す。
 
-REQ-EXT-05 の 3 か所は `tests/sh/test_compat_skew.py` が突き合わせる。Chrome 拡張は互換の版を自分のソースに持たず、
+REQ-EXT-05 の 3 か所は `tests/sh/test_compat_skew.py` が突き合わせる。Chrome 拡張は、互換の版を
 組み立てのときに REQ-EXT-06 の行から埋め込む。版の JSON の形と、食い違ったときの直し方は README「[版の JSON](../../README.md#版の-json)」にある。
 
 REQ-EXT-07 の文言は、`--version` を知らない古い実行ファイルを VS Code 拡張が見分けるのに使う。新しいフラグを知っているかは

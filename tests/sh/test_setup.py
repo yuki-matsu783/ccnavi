@@ -467,7 +467,7 @@ class WritesTheExpectedShape(SetupTest):
     def test_writes_the_paths_ccnavi_reads(self):
         """env の値そのものを見る。存在するだけでは、取り違えを見つけられない。
 
-        置き場を動かす 6 つは書かない（置き場は固定）ので、ここでは見ない。書かないことは
+        置き場は固定なので、置き場を動かす 6 つを書かないことは
         `DoesNotWriteThePlaceVariables` が見る。
         """
         self.run_setup("--mode", "enable")
@@ -609,8 +609,6 @@ class TellsAboutAProjectsCollision(SetupTest):
 
     sh と `--lint` が同じ文面を持つので、`--lint` の先頭の句がこちらの出力にも入っていることを
     ここで確かめて、ずれを捕まえる。
-
-    実装前は赤。赤の理由は、導入スクリプトにまだこの知らせが無いこと。
     """
 
     def git(self, *args):

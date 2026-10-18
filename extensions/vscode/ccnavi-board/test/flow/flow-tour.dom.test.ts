@@ -1,6 +1,6 @@
 /**
  * フロー編集画面の案内。「?」の一覧・案内の間の見本・実際の編集に触れないこと・閉じたら戻ることを、happy-dom で見る。
- * 指す先（`data-tour`）が全段で画面にあることは、ルール管理の案内（`rules.dom.test.ts` の CB-D193）と同じ形で確かめる。
+ * 指す先（`data-tour`）が全手順で画面にあることは、ルール管理の案内（`rules.dom.test.ts` の CB-D193）と同じ形で確かめる。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -24,7 +24,7 @@ async function start(dom: DomPage, course: string): Promise<void> {
   await dom.settle();
 }
 
-/** 案内を最後まで進める。段ごとに `each` を呼ぶ（段の画面が整うのを待ってから） */
+/** 案内を最後まで進める。手順ごとに `each` を呼ぶ（手順の画面が整うのを待ってから） */
 async function walk(dom: DomPage, each: (index: number) => void): Promise<void> {
   let index = 0;
   while (dom.all(".tour").length > 0) {
@@ -80,7 +80,7 @@ test("CB-D261 基本の案内は、今の題と順序のまま（部品箱・図
   }
 });
 
-test("CB-D262 全部の案内の全部の段で、指す先が画面にあり（吹き出しが中ほどへ逃げない）、見本の図が描かれ、実際のフローは出ない。余計な送信もありません", async () => {
+test("CB-D262 全部の案内の全部の手順で、指す先が画面にあり（吹き出しが中ほどに出ない）、見本の図が描かれ、実際のフローは出ない。余計な送信もありません", async () => {
   for (const course of tour.courses) {
     const dom = await openFlow();
     try {
@@ -88,11 +88,11 @@ test("CB-D262 全部の案内の全部の段で、指す先が画面にあり（
       await start(dom, course.id);
       await walk(dom, (index) => {
         const step = course.steps[index];
-        const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
         assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
-        // 実際のフロー（bareFlow の start / end だけ）ではなく、段の見本を描く
+        // 実際のフロー（bareFlow の start / end だけ）ではなく、手順の見本を描く
         const scene = sceneOf(sample, step.scene);
         const doc = scene.flow.doc;
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
@@ -104,7 +104,7 @@ test("CB-D262 全部の案内の全部の段で、指す先が画面にあり（
           assert.notEqual((node as unknown as { style: { visibility: string } }).style.visibility, "hidden", `${at}: 測れていない点がある`);
         }
       });
-      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の段で閉じない`);
+      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の手順で閉じない`);
       // 閉じたら実際のフローへ戻る。送ったのは tourDone だけ（dirty・draft・check・save・request などを送らない）
       assert.deepEqual(nodeIds(dom).sort(), ["end", "start"], `${course.id}: 閉じたあと実際のフローに戻らない`);
       assert.equal(dom.all(".banner.tour-sample").length, 0);
@@ -157,7 +157,7 @@ test("CB-D264 実際に編集中の内容は、案内の間は出ず、閉じた
     const before = dom.posted.length;
     await start(dom, "intro");
     await dom.settle();
-    // 案内の間は、編集中の内容でなく見本。未保存の印も見本の scene（基本の案内の 1 段目は未保存でない）
+    // 案内の間は、編集中の内容でなく見本。未保存の印も見本の scene（基本の案内の 1 番目の手順は未保存でない）
     assert.ok(!nodeIds(dom).includes("prompt-1"));
     assert.equal(dom.all("#dirty:not(.hidden)").length, 0);
     dom.click(dom.one('[data-action="tour-skip"]'));
@@ -264,7 +264,7 @@ test("CB-D267 差分の一覧は見本どうしの差分で、変えた中身が
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    // 3 段目（変更の一覧）
+    // 3 番目の手順（変更の一覧）
     await dom.settle();
     assert.ok(dom.all('#save-review [data-kind="added-nodes"] li').length >= 1);
     assert.ok(dom.all('#save-review [data-kind="changed-nodes"] li').length >= 1);
@@ -338,7 +338,7 @@ test("CB-D269 読み込み中に頼まれた案内はフローが出てから始
   }
 });
 
-test("CB-D270 実際のフローが着手中（錠）でも、案内は見本を動く状態で出し、閉じたら錠の帯が戻る。見本の「着手中」の段では見本の錠の文を出す", async () => {
+test("CB-D270 実際のフローが着手中（錠）でも、案内は見本を動く状態で出し、閉じたら錠の帯が戻る。見本の「着手中」の手順では見本の錠の文を出す", async () => {
   const dom = await openFlow({ lock: { locked: true, reason: lockedReason("i0001-01-01") } });
   try {
     assert.equal(dom.all("#lock").length, 1);

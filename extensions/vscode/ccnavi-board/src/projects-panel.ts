@@ -61,7 +61,7 @@ interface PanelState {
   error?: string;
   loading: boolean;
   again: boolean;
-  /** 直前に見た表裏。表へ戻ったら読み直す（裏にいる間の変化は監視が拾っても渡せていない） */
+  /** 直前に見た表示の有無。再表示されたら読み直す（非表示の間の変化は監視が検知しても渡せていない） */
   wasVisible: boolean;
 }
 
@@ -79,7 +79,7 @@ export async function openProjects(): Promise<void> {
     return;
   }
   if (state !== undefined) {
-    // `reveal` の前に表へ出たことにする。`wasVisible` を真にせずに出すと、下の `update()` と
+    // `reveal` の前に表示されたことにする。`wasVisible` を真にせずに出すと、下の `update()` と
     // `onDidChangeViewState` の `becameVisible` からの `update()` で、実行ファイルを 2 度起こす
     state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
@@ -106,7 +106,7 @@ export async function openProjects(): Promise<void> {
     retainContextWhenHidden: false,
   });
   if (panel.options.retainContextWhenHidden !== false) {
-    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、裏に回っても画面が捨てられず、表裏の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
+    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が捨てられず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
     diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: true });
   }
   showLoading(panel, TITLE, SCREEN, "プロジェクト");
@@ -231,7 +231,7 @@ function registerPanelHandlers(current: PanelState): void {
     const becameVisible = panel.visible && !current.wasVisible;
     current.wasVisible = panel.visible;
     if (!panel.visible) {
-      // `retainContextWhenHidden` は偽なので、裏に回った画面は捨てられる。表に戻ると
+      // `retainContextWhenHidden` は偽なので、非表示になった画面は捨てられる。再表示されると
       // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
       current.host.hidden();
     }
@@ -391,7 +391,7 @@ function projectsHost(panel: vscode.WebviewPanel): ScreenHost<ProjectsData> {
 }
 
 /**
- * 操作の結果の一言。生きている画面にしか届かない（作り直している最中と裏にいる間は届かない）。
+ * 操作の結果の一言。生きている画面にしか届かない（作り直している最中と非表示の間は届かない）。
  * その場で言うだけのものなので、持ち越さずに捨てる。
  */
 function fail(current: PanelState, message: string): void {
@@ -413,7 +413,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     // 作り直している間に見送った更新（send）も、ここで届く
     current.host.ready();
     redraw(current);
-    // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
+    // 非表示の間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
     // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す

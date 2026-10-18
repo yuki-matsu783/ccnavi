@@ -1,12 +1,12 @@
 /*
  * 組み合わせ条件の図（`When.tsx`）。React Flow の色は `--xy-*` の変数で持っているので、`--vscode-*` に置き換える
- * （フェーズの図 `phases/Graph.css` と同じ書き方。打ち消さず、変数を置き換える）。
+ * （フェーズの図 `shared/PlanGraph.css` と同じ書き方。打ち消さず、変数を置き換える）。
  */
-.cond { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cond { display: flex; flex-direction: column; gap: var(--gap-3); min-width: 0; }
 .cond-canvas {
   height: 260px;
   border: 1px solid var(--vscode-panel-border);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .cond-canvas .react-flow {
@@ -31,10 +31,10 @@
 }
 .cond-canvas .react-flow__node-cond { width: 180px; font-size: var(--vscode-font-size); }
 .cond-node {
-  display: flex; gap: 6px; align-items: baseline; padding: 4px 7px;
+  display: flex; gap: var(--gap-3); align-items: baseline; padding: 4px 7px;
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
-  border-radius: 3px; cursor: pointer; overflow: hidden;
+  border-radius: var(--radius-sm); cursor: pointer; overflow: hidden;
 }
 .cond-node:hover { background: var(--vscode-list-hoverBackground); outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); }
 /* 選んだ点は縁を太く。色だけに頼らない */
@@ -45,12 +45,12 @@
 .cond-node.broken { border-color: var(--vscode-editorError-foreground, var(--vscode-errorForeground)); }
 .cond-op { font-family: var(--vscode-editor-font-family); font-weight: 600; flex: none; }
 .cond-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vscode-descriptionForeground); }
-.cond-label.mono { font-family: var(--vscode-editor-font-family); font-size: .92em; color: var(--vscode-foreground); }
-.cond-inspector { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.cond-inspector > .inline { flex: 1 1 320px; }
-.cond-inspector .buttons { display: flex; gap: 4px; }
+.cond-label.mono { font-family: var(--vscode-editor-font-family); font-size: var(--font-md); color: var(--vscode-foreground); }
+.cond-inspector { display: flex; flex-wrap: wrap; gap: var(--gap-3); align-items: center; }
+.cond-inspector > .inline { flex: 1 1 var(--w-grow); }
+.cond-inspector .buttons { display: flex; gap: var(--gap-2); }
 .cond-inspector .buttons button.action, .cond-add button.action { margin-left: 0; }
-.cond-add { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.cond-add { display: inline-flex; flex-wrap: wrap; gap: var(--gap-2); align-items: center; }
 .cond-add .dim, .cond-inspector .dim { color: var(--vscode-descriptionForeground); }
 .cond-invalid { color: var(--error-text); overflow-wrap: anywhere; }
 .cond-problems { margin: 0; padding-left: 18px; color: var(--error-text); }

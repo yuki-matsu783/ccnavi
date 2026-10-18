@@ -2,7 +2,7 @@
  * ルール管理画面の骨組み（`App.tsx`）。タブとその中身、タイプごとの節、判定を試す欄、そして 2 つのタブが
  * 共有する表（期待する判定の一括確認と hook の一覧）。1 件の行は `Rule.css`、判定の結果は `Judge.css`。
  */
-.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 10px; }
+.tabs { display: flex; gap: var(--gap-1); border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 10px; }
 .tab {
   background: none; border: none; border-bottom: 2px solid transparent; color: var(--vscode-descriptionForeground);
   padding: 6px 12px; cursor: pointer; font: inherit;
@@ -12,8 +12,8 @@
 .pane.active { display: block; }
 button.action.small { margin-left: auto; }
 .rule-section { margin-bottom: 14px; }
-.rule-section h2 { margin: 0 0 4px; font-size: 1em; display: flex; gap: 8px; align-items: center; }
-.section-name { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; font-size: .85em; font-family: var(--vscode-editor-font-family); }
+.rule-section h2 { margin: 0 0 4px; font-size: 1em; display: flex; gap: var(--gap-4); align-items: center; }
+.section-name { font-weight: 700; padding: 0 8px; border-radius: var(--radius-pill); border: 1px solid currentColor; font-size: var(--font-sm); font-family: var(--vscode-editor-font-family); }
 .section-name.deny { color: var(--error-text); }
 .section-name.ask { color: var(--warn-text); }
 .section-name.allow { color: var(--ok-text); }
@@ -21,11 +21,11 @@ button.action.small { margin-left: auto; }
 .rule-section.folded .list { display: none; }
 /* 絞り込み中は畳んだタイプの中も見せる（矢印も開いた向きにする） */
 .finding .rule-section.folded .list { display: block; }
-.judge-form { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 10px; }
-.judge-form label { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
-.judge-form .grow { flex: 1 1 320px; }
+.judge-form { display: flex; flex-wrap: wrap; gap: var(--gap-4) var(--gap-5); align-items: center; margin-bottom: 10px; }
+.judge-form label { display: flex; gap: var(--gap-3); align-items: center; color: var(--vscode-descriptionForeground); }
+.judge-form .grow { flex: 1 1 var(--w-grow); }
 .judge-form .grow input { flex: 1; }
-table { border-collapse: collapse; width: 100%; font-size: .95em; }
+table { border-collapse: collapse; width: 100%; font-size: var(--font-lg); }
 /* 表は入れ物の中で横へ送る。狭い画面でも表の外（ページ全体）は横に流れない */
 .table-scroll { overflow-x: auto; }
 /* 表の幅の下限。これより狭い画面では入れ物の中で横へ送る（縮めると日本語の列が 1 文字ずつ折れる） */
@@ -40,4 +40,4 @@ td.cmd { min-width: 12em; }
 td.why { min-width: 10em; }
 tr.ng td { color: var(--error-text); }
 tr.skipped td { color: var(--warn-text); }
-.expectations-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.expectations-head { display: flex; gap: var(--gap-4); align-items: center; margin-bottom: 8px; flex-wrap: wrap; }

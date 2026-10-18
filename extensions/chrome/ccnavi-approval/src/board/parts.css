@@ -9,6 +9,6 @@ main .notice.error { color: var(--error-text); white-space: pre-wrap; }
 main .notice.ok { color: var(--ok-text); }
 .badge {
   display: inline-block; margin-left: 6px; vertical-align: 1px;
-  font-size: .82em; font-weight: 400; padding: 0 6px; border-radius: .8em;
+  font-size: var(--font-xs); font-weight: 400; padding: 0 6px; border-radius: var(--radius-chip);
   border: 1px solid currentColor; color: var(--vscode-descriptionForeground);
 }

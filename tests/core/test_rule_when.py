@@ -726,7 +726,7 @@ class CommonCredentialsTest(unittest.TestCase):
             "C:\\repo\\.env.template",
             "/repo/x.env",
             # 書き直す前の regex と同じく `.envrc` は当てない
-            # （Read / Write / Edit は組み込みが止める。NotebookEdit は見ない）
+            # （Read / Write / Edit は組み込みが止める）
             "/repo/.envrc",
             "/repo/README.md",
         ):

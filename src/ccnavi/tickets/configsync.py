@@ -5,12 +5,12 @@
 共通レイヤーの中身を、親のワークツリーにあるプロジェクトの `.ccnavi/config/common/` へ写す。
 プロジェクトの `.ccnavi/config/project/` には触れない。
 
-- 共通レイヤーが無い、または空なら、何も配らず、ミラーも消さない（着手は止めない）
+- 共通レイヤーが無い、または空なら、何も配らず、ミラーは残す
 - 写すのは `rules.yml`・`phases.yml`・`risks.yml`・`rule-expectations.yml` と、配点の
   `script:` が指す `.ccnavi/config/common/scripts/` の下と、作業・レビュー計画のテンプレート
   （`.ccnavi/config/common/templates/*.yml`）。中身の違うものだけ上書きし、
   共通レイヤーから無くなったファイルはミラーからも消す。ミラーは共通レイヤーの写しで誰も編集しないので、失うものは無い
-- `script:` の値は書き換えない。ミラーの置き場も `.ccnavi/config/common/scripts/` で、共通レイヤーと
+- `script:` の値はそのまま写す。ミラーの置き場も `.ccnavi/config/common/scripts/` で、共通レイヤーと
   同じ表記のまま指せる
 - 写す前に、ミラーとして（単体 clone では共通レイヤーとして）読めるかを確かめる。error が
   あれば何も写さず、着手しない。ただしテンプレートは別で、error のある 1 本は飛ばし、置き場が
@@ -94,7 +94,7 @@ def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
     for kind in settings.LAYER_KINDS:
         name = settings.LAYER_FILE_NAMES[kind]
         if name in out:
-            why = _unreadable_as_common(kind, out[name])
+            why = _unreadable_as_common(kind, out[name], root)
             if why:
                 return {}, f"共通レイヤーの {name} を、ミラーとして読めない: {why}"
     for rel in _script_values(risk_raw):
@@ -110,10 +110,8 @@ def _templates(conf: settings.Settings, root: str) -> dict[str, bytes]:
     """共通レイヤーの作業・レビュー計画のテンプレート。ミラーの置き場からの相対 → 中身。
 
     置き場（`templates/`）が無いのは正常で、何も返さない。置き場そのものが読めない（リンクなど）
-    ときも、理由は返さずテンプレートを 1 本も写さない（ほかの設定のミラーと着手は止めない。
-    置き場がリンクなのは、dotfiles 管理などで起こりうる）。error のあるテンプレートは 1 本ずつ
-    写さずに飛ばす（使えないテンプレートのために着手を止めない。`--lint` が error で知らせる）。
-    warn は止めない。
+    ときも、理由は返さずテンプレートを 1 本も写さない（置き場がリンクなのは、dotfiles 管理などで
+    起こりうる）。error のあるテンプレートは 1 本ずつ飛ばす（`--lint` が error で知らせる）。
     """
     read = plan_templates.read_layer(
         plan_templates.LAYER_COMMON, root, settings.common_templates_dir(conf, root)
@@ -140,7 +138,7 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Chang
         return [], why
     if not wanted:
         # 共通レイヤーが無い、または空。「設定が無い」正常で、配るものが無い。ミラーは消さない
-        # （共通を消し忘れた・取り違えたときに、ミラーを全部失わないため）。着手は止めない。
+        # （共通を消し忘れた・取り違えたときに、ミラーを全部失わないため）。
         return [], ""
     base = mirror_dir(conf, tree_root)
     if not _inside(tree_root, base) or _linked(tree_root, base):
@@ -270,7 +268,7 @@ def _script_values(raw: bytes) -> list[str]:
     return found
 
 
-def _unreadable_as_common(kind: str, content: bytes) -> str:
+def _unreadable_as_common(kind: str, content: bytes, root: str) -> str:
     """ミラーとして（単体 clone では共通レイヤーとして）読めないなら、その理由。"""
     try:
         text = content.decode("utf-8")
@@ -294,7 +292,7 @@ def _unreadable_as_common(kind: str, content: bytes) -> str:
         return "YAML として読めない"
     if not isinstance(data, dict):
         return "マッピングではない"
-    _, problems = rules.parse(data)
+    _, problems = rules.parse(data, root)
     errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]
     return "; ".join(p.detail for p in errors)
 

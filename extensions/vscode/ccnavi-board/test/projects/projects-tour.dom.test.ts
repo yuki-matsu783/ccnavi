@@ -34,21 +34,21 @@ test("CB-D321 プロジェクト管理画面に「?」があり、初回の案�
   }
 });
 
-test("CB-D322 全案内の全段で、指す先が画面に 1 つあり、吹き出しが中ほどへ逃げない。案内の間は操作を送らない", async () => {
+test("CB-D322 全案内の全手順で、指す先が画面に 1 つあり、吹き出しが中ほどに出ない。案内の間は操作を送らない", async () => {
   for (const course of def.courses) {
     const dom = await openProjects([row(), row({ name: "app", rel: "projects/app" })], { ignored: false });
     try {
       await startCourse(dom, course.id);
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が画面に 1 つではない`);
         assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         dom.click(dom.one('[data-action="tour-next"]'));
       }
       await dom.settle();
-      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の段で閉じない`);
+      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の手順で閉じない`);
     } finally {
       await dom.close();
     }

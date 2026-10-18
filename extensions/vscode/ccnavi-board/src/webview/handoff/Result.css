@@ -1,7 +1,7 @@
 /*
  * 取り込みの結果（`Result.tsx`）。取り込めた対象、消した下書き、残した下書きと理由を縦に並べる。
  */
-.result { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: 4px; }
+.result { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-md); }
 .result.failed { border-color: var(--vscode-editorError-foreground); }
 .result h3 { margin: 0 0 4px; font-size: 1em; }
 .result ul { margin: 0 0 8px; padding-left: 20px; font-family: var(--vscode-editor-font-family); overflow-wrap: anywhere; }

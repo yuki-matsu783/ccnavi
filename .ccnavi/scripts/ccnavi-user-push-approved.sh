@@ -7,10 +7,10 @@
 #   sh .ccnavi/scripts/ccnavi-user-push-approved.sh [<親>...]
 #   sh .ccnavi/scripts/ccnavi-user-push-approved.sh --path <パス> [--path <パス>...]
 #
-# 承認はしない。承認済みチケットは置かれただけでは他の機械に届かないので、置いたあとに
+# 承認済みチケットは置かれただけでは他の機械に届かないので、置いたあとに
 # コミットして push するのがこの sh。端末の承認（ccnavi-user-agree.sh）、ボードの承認とフローの保存
 # （端末に送った 1 行）、ユーザの判断（ccnavi-user-close-early.sh）が、それぞれ最後にこの sh を呼ぶ。
-# ユーザの判断を溜めずにその場で送るため。送れなければ次の write-and-push が止まり、この sh の打ち直しを案内する。
+# ユーザの判断を溜めずにその場で送るためで、送れなければ次の write-and-push が止まり、この sh の打ち直しを案内する。
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
 # 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）のワークツリーは、
@@ -31,17 +31,16 @@
 # 見ない（子のワークツリーの置き場に変更があっても、失敗に数えない）。<親> とは一緒に使えない。
 #
 # 数えるツリーは、ワークスペース、projects の下、.claude/worktrees の下。
-# 置き場は .ccnavi/approved（どの置き場も固定）。承認は提案を
-# wip/proposals の todo/ から動かす（コピーは作らない）ので、
-# そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）はコミットしない。
+# 置き場は .ccnavi/approved（どの置き場も固定）。承認では提案を
+# wip/proposals の todo/ から動かすので、
+# そこで追跡されていたファイルの削除も同じコミットに入れる。
 # 同じく、ボードのフロー編集画面が取り込んだ下書き（wip/proposals の flows/）を
 # フローの保存のあとに消す。旧い版が置いた templates/ の下書き（追跡されていたもの）の削除も同じに拾う。
 # 追跡されていた下書きの削除だけをコミットする。`ccnavi user handoff` の下書き（wip/handoff/）は
 # 追跡しないので、ここでは扱わない。
-# 未追跡の下書きと、書き直されて残っている下書きはコミットしない。`ccnavi write-and-push sort` の置き場には加えず、
 # 消えたものだけをここで拾う。
 #
-# - コミットはパスを限る。`-a` も `add -A` も使わない。他人の書きかけをコミットしない
+# - コミットはパスを限る（他人の書きかけを巻き込まないため）
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
 #   1 件ずつも。辿るとワークスペースの外のリポジトリにコミットして push する
 # - ブランチの上に居ない（detached）ツリーは名指しして処理しない。失敗には数えない
@@ -271,7 +270,7 @@ carry_family() {
 			git -C "$cf_tree" add -A -- ":(literal)$cf_path" 2>/dev/null || :
 		done <"$ccnavi_wap_tmp/carry"
 		sed 's/^/:(literal)/' "$ccnavi_wap_tmp/carry" | tr '\n' '\000' >"$ccnavi_wap_tmp/pathspec"
-		# write-and-push と同じく、ユーザの hook は実行せず、署名などで止まらないようタイムアウトで切る。
+		# write-and-push と同じく、署名などで止まらないようタイムアウトで切る。
 		if ! ccnavi_git_timed "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_wap_tmp/err" "$cf_tree" \
 			commit --quiet --only --no-verify -m "ccnavi: 承認済みチケットを更新" \
 			--pathspec-from-file="$ccnavi_wap_tmp/pathspec" --pathspec-file-nul >"$ccnavi_wap_tmp/out"; then

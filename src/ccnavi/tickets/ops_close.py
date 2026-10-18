@@ -3,7 +3,7 @@
 置き場を全部引いて 1 つに決める（`find`）、取り込み済みの親子のチケットが決まらない・閉じて
 いるときに止める（`family_stopped`）、子の着手の前（親の着手・先行）と終了の前（親を閉じられる・
 成果物が揃う）の検査。`close_problems` は `review ready` と Stop の促しも同じ条件で使う。
-ここは置き場を読むだけで動かさない。
+ここは置き場を読む。
 """
 
 from __future__ import annotations
@@ -95,8 +95,7 @@ def _undecided(
     home = hits[0].parent or hits[0].ticket
     stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つに決まるまで動かさない\n")
     stderr.write(
-        f"  正は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
-        "上のチケットだけ。ほかのツリー上のチケットは読まない\n"
+        f"  正は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）上のチケットだけ\n"
     )
     st = approval_checks.family_standing(conf, root, hits[0]) if conf is not None else None
     if st is not None and st.stop:
@@ -338,7 +337,7 @@ def deliverables_missing(
 ) -> bool:
     """フェーズの最後の子を閉じる前に、定義の成果物が揃っているか。
 
-    在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
+    在って追跡されていることだけを見る。空でも在ることは分かるので、
     「調査したことにする」は防げる。
     """
     if not found.is_child or found.phase is None:

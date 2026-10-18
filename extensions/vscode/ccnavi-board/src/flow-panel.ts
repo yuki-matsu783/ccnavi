@@ -36,7 +36,7 @@
  * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言って YAML で開く。
  *
  * エージェントの下書き。 置き場は実行ファイルに聞く（`tickets[].flow.draft`）。下書きが在り、中身が
- * いまのフローと違えば（`sameFlowIgnoringLayout` が偽。位置とグループ化は見ない）「提案あり」を出す。開くと下書きを読んだバイトのまま `--lint --json --flow` に
+ * いまのフローと違えば（`sameFlowIgnoringLayout` が偽）「提案あり」を出す。開くと下書きを読んだバイトのまま `--lint --json --flow` に
  * 掛け、error なら取り込めないと言う。通れば画面が文の前後まで見せる差分を出し、「取り込む」で編集中の内容に入れる
  * （書かない。保存はいつもの経路）。保存が成功したら、下書きの中身が取り込んだときのハッシュと同じときだけ消し
  * （`core/flow-write.ts` の `removeDraftFile`）、保存のあとの知らせに名前を出す。依頼のボタン（着手の前だけ）は
@@ -217,7 +217,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 編集の途中を持つので、タブを裏に回しても捨てない
+    // 編集の途中を持つので、タブを非表示にしても捨てない
     retainContextWhenHidden: true,
   });
   showLoading(panel, titleOf(ticket), SCREEN, `${ticket} のフロー`);
@@ -382,7 +382,7 @@ function registerPanelHandlers(current: PanelState): void {
   panel.webview.onDidReceiveMessage((message: unknown) => {
     void handleMessage(current, asFlowMessage(message));
   });
-  // フェーズ管理と同じ。表に戻ったら、いま出すべき知らせと見た目を送り直す（中身は送らない）
+  // フェーズ管理と同じ。再表示されたら、いま出すべき知らせと見た目を送り直す（中身は送らない）
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -474,7 +474,7 @@ function watchFile(current: PanelState): void {
   watcher.onDidChange(changed);
   watcher.onDidDelete(changed);
   current.fileWatchers.push(watcher);
-  // 下書きはエージェントが書く。動いたら「提案あり」を出し直す（編集は捨てない）。置き場のディレクトリ（`flows/`）は
+  // 下書きはエージェントが書く。動いたら「提案あり」を出し直す。置き場のディレクトリ（`flows/`）は
   // 開いた時点で無いことが多いので、在るツリーのルートからの相対パスで見張る（後から作られても届く）
   const draft = loaded.target.flow.draft;
   if (draft !== null) {
@@ -621,7 +621,7 @@ function redraw(current: PanelState): void {
 
 function flowHost(panel: vscode.WebviewPanel, root: string): ScreenHost<FlowData> {
   if (panel.options.retainContextWhenHidden !== true) {
-    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
+    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
     // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
     diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "flow", retainContextWhenHidden: false });
   }

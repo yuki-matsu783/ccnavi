@@ -653,7 +653,7 @@ test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り
       await dom.settle();
     }
     assert.deepEqual(titles, ["3 つのタブ", "ルール", "絞り込み", "判定を試す", "hook", "保存", "案内"]);
-    // 案内は見本の上のタブを動かす。最後の 2 段は「ルール」のタブで保存と案内の入口を指す
+    // 案内は見本の上のタブを動かす。最後の 2 手順は「ルール」のタブで保存と案内の入口を指す
     assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-judge", "tab-hooks", "tab-rules", "tab-rules"]);
     assert.ok(dom.one("#tab-hooks").classList.contains("active"), "実際のタブが動いた");
     assert.equal((dom.state() as { tab?: string }).tab, "hooks");
@@ -687,7 +687,7 @@ test("CB-D192 「?」は案内の一覧を開き、選んだ案内だけが始�
   }
 });
 
-test("CB-D193 使い方ごとの案内は、全部の段で指す先が画面にあり、実際のルールではなく見本を描く。実際の編集は動かない", async () => {
+test("CB-D193 使い方ごとの案内は、全部の手順で指す先が画面にあり、実際のルールではなく見本を描く。実際の編集は動かない", async () => {
   const def = loadTour("rules");
   for (const course of def.courses) {
     const dom = await openRules({}, undefined, { measure: true });
@@ -712,7 +712,7 @@ test("CB-D193 使い方ごとの案内は、全部の段で指す先が画面に
         dom.click(dom.one('[data-action="tour-next"]'));
         await dom.settle();
       }
-      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の段で閉じない`);
+      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の手順で閉じない`);
       assert.deepEqual(dom.all(".rule").map((row) => row.getAttribute("data-id")), ["git-push", "no-rm", "deps"], "閉じたあと実際のルールに戻らない");
       assert.equal(dom.all("#dirty:not(.hidden)").length, 0, "案内が未保存にした");
       assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), []);
@@ -722,7 +722,7 @@ test("CB-D193 使い方ごとの案内は、全部の段で指す先が画面に
   }
 });
 
-test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を出し、段の scene が選ぶ点を替える", async () => {
+test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を出し、手順の scene が選ぶ点を替える", async () => {
   const dom = await openRules({}, undefined, { measure: true });
   try {
     dom.click(dom.one('[data-action="tour"]'));
@@ -740,7 +740,7 @@ test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    // 行を開く前（1 段目）は閉じていて、開いてからは図の点を段ごとに替える
+    // 行を開く前（1 番目の手順）は閉じていて、開いてからは図の点を手順ごとに替える
     assert.equal(open[0], "0");
     assert.equal(open[1], "1");
     assert.deepEqual(picked.slice(2, 5), ["r.0", "r.1.0", "r.1"]);
@@ -1218,7 +1218,7 @@ deny:
   }
 });
 
-/** 案内が今いる段（0 始まり）。`startCourse` で 0 に戻し、`toStep` で進めたり戻したりする */
+/** 案内が今いる手順（0 始まり）。`startCourse` で 0 に戻し、`toStep` で進めたり戻したりする */
 const position = new WeakMap<DomPage, number>();
 
 /** 「?」の一覧から使い方ごとの案内を始める */
@@ -1230,7 +1230,7 @@ async function startCourse(dom: DomPage, id: string): Promise<void> {
   position.set(dom, 0);
 }
 
-/** 案内の n 段目（0 始まり）へ移る。吹き出しの題が、定義の段の題と同じであることも見る */
+/** 案内の n 番目の手順（0 始まり）へ移る。吹き出しの題が、定義の手順の題と同じであることも見る */
 async function toStep(dom: DomPage, id: string, index: number): Promise<void> {
   const steps = loadTour("rules").courses.find((course) => course.id === id)!.steps;
   let at = position.get(dom) ?? 0;
@@ -1264,7 +1264,7 @@ test("CB-D300 ユースケースの一覧は、基本の案内の後ろに、追
   }
 });
 
-test("CB-D301 案内の間の統合結果は見本を出し、段の scene が枠を開いて統合結果を替える。閉じたあとは実際の統合結果に戻り、案内で選んだものを持ち越さない", async () => {
+test("CB-D301 案内の間の統合結果は見本を出し、手順の scene が枠を開いて統合結果を替える。閉じたあとは実際の統合結果に戻り、案内で選んだものを持ち越さない", async () => {
   const sums = rulesSums(sumsBoard());
   const dom = await openRules({ target: { kind: "project", name: "lib" }, sums }, undefined, { measure: true });
   try {
@@ -1317,7 +1317,7 @@ test("CB-D302 絞り込みと畳みの案内は、scene の find で件数を「
   }
 });
 
-test("CB-D303 保存前の検証エラーの案内は、その段にだけ見本の報告を下の欄に出し、前後の段と閉じたあとには残さない。実際の操作の一言も出さない", async () => {
+test("CB-D303 保存前の検証エラーの案内は、その手順にだけ見本の報告を下の欄に出し、前後の手順と閉じたあとには残さない。実際の操作の一言も出さない", async () => {
   const dom = await openRules({}, undefined, { measure: true });
   try {
     await startCourse(dom, "save-error");
@@ -1339,7 +1339,7 @@ test("CB-D303 保存前の検証エラーの案内は、その段にだけ見本
   }
 });
 
-test("CB-D304 一括確認と候補の案内は、その段から結果を出す。食い違う行に印があり、閉じたあとは結果が残らない", async () => {
+test("CB-D304 一括確認と候補の案内は、その手順から結果を出す。一致しない行に印があり、閉じたあとは結果が残らない", async () => {
   const dom = await openRules({}, undefined, { measure: true });
   try {
     await startCourse(dom, "check-expectations");

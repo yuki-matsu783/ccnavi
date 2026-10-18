@@ -72,7 +72,7 @@ export type WorkflowMessage =
    * `dirty` で、ボードの承認を止めるかを `dirty || checking` で決める（答えを待つ間に承認が通らないように）
    */
   | { readonly type: "dirty"; readonly dirty: boolean; readonly checking: boolean }
-  /** 線を変えた。この先行で実行ファイルに振り直させる（書きはしない）。答えは `answer` */
+  /** 線を変えた。この先行で実行ファイルに振り直させる。答えは `answer` */
   | { readonly type: "order"; readonly seq: number; readonly order: PlanOrder }
   /** 「この順序に決める」。`expect` は開いたときの `source_sha` */
   | { readonly type: "save"; readonly order: PlanOrder; readonly expect: string }
@@ -153,7 +153,7 @@ export interface ParentNow {
 }
 
 /**
- * 提案が承認待ちから無くなった理由。まだ承認待ちなら undefined（何も言わない）。`revision` は開いたときの答えが
+ * 提案が承認待ちから無くなった理由。まだ承認待ちなら undefined。`revision` は開いたときの答えが
  * 改版か（承認済みの親に対する提案）。改版は承認されても取り下げられても承認済みチケットが残るので、言い切らない。
  * `now` が undefined なら、ボードにその親が無い（取り下げ・削除）
  */

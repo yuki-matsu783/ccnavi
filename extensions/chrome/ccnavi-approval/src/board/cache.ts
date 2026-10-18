@@ -1,6 +1,6 @@
 /**
  * blob のキャッシュ。ボードを開くたびに読むのを tree だけにするため、blob を sha で引いて IndexedDB に残す。
- * sha が同じなら中身は同じなので、失効を持たない。
+ * sha が同じなら中身は同じなので、残したものをそのまま使う。
  * IndexedDB が使えなければキャッシュせずに読む（毎回取る）。
  */
 import type { BlobCache } from "../core/snapshot.js";

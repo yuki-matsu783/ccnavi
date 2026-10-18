@@ -15,7 +15,7 @@ import type { ApprovalOverlay } from "./board-view.js";
 import { parseDecidePreview } from "./decidemodel.js";
 import { BOARD_VERSION, parseBoardJson, type ProposalState } from "./model.js";
 
-/** 段の `scene.overlay` が指せるオーバーレイ */
+/** 手順の `scene.overlay` が指せるオーバーレイ */
 export const OVERLAY_NAMES = ["approval", "done", "decide", "reviewed"] as const;
 export type OverlayName = (typeof OVERLAY_NAMES)[number];
 

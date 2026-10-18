@@ -12,19 +12,18 @@
  * 共通の設定の定義と表示名が重なる定義も止める（重なると、この設定の定義が 1 つも使われない）。
  * 止めるのはこの 2 つだけで、書式の検証と、共通の設定と同じ id の中身の比べは保存のときに実行ファイル（`--lint`）へ渡す。
  *
- * 共通の設定の定義は、開いている設定の定義に足されて判定に使われる。編集はせず、出どころが分かるように別の欄に
+ * 共通の設定の定義は、開いている設定の定義に足されて判定に使われる。出どころが分かるように別の欄に
  * 読み取り専用で並べる（`PhasesPage.common`。実行ファイルの統合結果のうち出どころが共通のもの）。
  *
- * **図と、全体計画の待ち方（`order`）の選択は持たない。** 順序（どのフェーズがどれを待つか）はフェーズ定義では
- * なく親チケットの計画の項の `after` で決める。
+ * 順序（どのフェーズがどれを待つか）はフェーズ定義ではなく親チケットの計画の項の `after` で決める。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
 import type { CommonPhase, PhaseForm, PhasesData, PhasesMessage, PhasesPage, ToPhases } from "../../core/phases-view.js";
-import { applyAppearance } from "../appearance.js";
+import { useHostMessages } from "../useHostMessages.js";
 import { Phase } from "./Phase.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parsePhasesSample, parsePhasesTexts } from "../../core/tour-phases.js";
 import phasesTour from "../tours/phases.yml";
@@ -57,7 +56,7 @@ const ADDED_KEY = "s-add";
 const ADDED_BLANK = emptyPhase();
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): ReadonlySet<string> {
   return new Set(typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : []);
 }
@@ -106,7 +105,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const { draft, open, more } = editing;
   const page = pageOf(data);
   /**
-   * 案内の間は見本を描き、段ごとの様子（開く定義・絞り込み・設定の切り替えなど）は `scene` に入れる。実際の編集中の定義や開いた行は
+   * 案内の間は見本を描き、手順ごとの様子（開く定義・絞り込み・設定の切り替えなど）は `scene` に入れる。実際の編集中の定義や開いた行は
    * 動かさないので、閉じたあとに戻すものは無い。
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -125,39 +124,31 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     }
   };
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToPhases> & { data?: PhasesData; lock?: Lock; message?: string; value?: unknown };
-      if (message.type === "data" && message.data !== undefined) {
-        const next = message.data;
-        setData(next);
-        setEditing(editingOf(next, nextKey));
-        setDirty(false);
-        setBusy(false);
-        setStatus(undefined);
-        setChanged(false);
-        setLock(pageOf(next)?.lock ?? NO_LOCK);
-      } else if (message.type === "failed") {
-        setBusy(false);
-        setStatus({ text: String(message.message ?? ""), error: true });
-      } else if (message.type === "lock" && message.lock !== undefined) {
-        setLock(message.lock);
-      } else if (message.type === "changed") {
-        setChanged(true);
-      } else if (message.type === "cancelled") {
-        // 「破棄して読み直す？」をやめた。止めた欄を戻す
-        setBusy(false);
-        setStatus(undefined);
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
-      }
-    };
-    window.addEventListener("message", onMessage);
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-  }, [nextKey, requestTour]);
+  useHostMessages<ToPhases>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      const next = message.data;
+      setData(next);
+      setEditing(editingOf(next, nextKey));
+      setDirty(false);
+      setBusy(false);
+      setStatus(undefined);
+      setChanged(false);
+      setLock(pageOf(next)?.lock ?? NO_LOCK);
+    } else if (message.type === "failed") {
+      setBusy(false);
+      setStatus({ text: String(message.message ?? ""), error: true });
+    } else if (message.type === "lock" && message.lock !== undefined) {
+      setLock(message.lock);
+    } else if (message.type === "changed") {
+      setChanged(true);
+    } else if (message.type === "cancelled") {
+      // 「破棄して読み直す？」の確認をやめたので、止めていた欄を戻す
+      setBusy(false);
+      setStatus(undefined);
+    } else if (message.type === "tour") {
+      requestTour();
+    }
+  }, () => post({ type: "ready" }));
 
   // 足した行の id へ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
@@ -355,7 +346,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           更新
         </button>
       </div>
-      <header className="toolbar">
+      <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary">
           <span data-tour="target">
             <TargetSelect target={shownPage?.target} targets={shownPage?.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
@@ -393,8 +384,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             保存
           </button>
         </div>
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
+      </ScreenHeader>
       <p id="lock" data-tour="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
         {shownLock.reason}
       </p>

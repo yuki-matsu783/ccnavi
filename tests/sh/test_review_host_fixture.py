@@ -693,8 +693,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
     def request_on(self, branch="", **extra):
         """request を打つ。branch を渡すとそのブランチへ移ってから（場面の MR は i0001 だけ）。
 
-        マージリクエストを作る要求（POST .../merge_requests）が出たら、この試験の curl が書き留める
-        （作らない決まりなので、書き留めるものは無いはず）。返すのは結果と、書き留めたファイル。
+        マージリクエストを作る要求（POST .../merge_requests）が出たら、この試験の curl が
+        書き留める。返すのは結果と、書き留めたファイル。
         """
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)

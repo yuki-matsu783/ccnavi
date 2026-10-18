@@ -256,7 +256,7 @@ export type ToFlow =
   | { readonly type: "tour" }
   /** 頼まれた確かめ（`check`）の答え。`seq` は頼んだときの番号。確かめられなければ `error` */
   | { readonly type: "checked"; readonly seq: number; readonly checks?: FlowChecks; readonly error?: string }
-  /** 下書きか錠が動いた。依頼のボタンの言葉と「提案あり」を出し直す（編集は捨てない） */
+  /** 下書きか錠が動いた。依頼のボタンの言葉と「提案あり」を出し直す */
   | { readonly type: "offer"; readonly request?: string; readonly offer?: FlowOffer }
   /** 開いた下書き（`openProposal` の答え）。取り込めなければ `error` */
   | { readonly type: "proposal"; readonly proposal?: FlowProposal; readonly error?: string }

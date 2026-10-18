@@ -7,7 +7,7 @@
  * 実行ファイル（`--lint --json --flow`）が言うこと（`checks`）も、同じ形（`FlowChecks`）で YAML に書く。画面は判定し直さず、そのまま描く。
  *
  * 案内の間は、この見本だけを描く。実際の編集内容・履歴・選択・保存・エージェントの下書きには触れない。
- * 段ごとの様子（`scene`）の読み方もここに置く（`sceneOf`）。鍵の一覧は `flow.yml` の頭に書いてある。
+ * 手順ごとの様子（`scene`）の読み方もここに置く（`sceneOf`）。鍵の一覧は `flow.yml` の頭に書いてある。
  */
 import { asFlowDoc, connectionId, connectionsOf, isGroup, type FlowDoc } from "./flow-doc.js";
 import { flowRequestPrompt, type FlowChecks, type FlowOffer, type FlowProposal } from "./flow-view.js";
@@ -33,7 +33,7 @@ export interface FlowSample {
   /** 依頼のボタンの言葉 */
   readonly request: string;
   readonly flows: Readonly<Record<string, SampleFlow>>;
-  /** 既定の見本の名前（`scene.doc` を書かない段） */
+  /** 既定の見本の名前（`scene.doc` を書かない手順） */
   readonly main: string;
   readonly offer: FlowOffer;
   /** エージェントの下書き。中身は `flows` の 1 本 */
@@ -141,7 +141,7 @@ export function parseFlowSample(raw: unknown): FlowSample {
   };
 }
 
-// ---- 段ごとの様子（scene）
+// ---- 手順ごとの様子（scene）
 
 /** 図の外から見た「いま選んでいるもの」。`webview/flow/Canvas.tsx` の `Selection` と同じ形 */
 export type SceneSelect = { readonly kind: "node"; readonly id: string } | { readonly kind: "edge"; readonly index: number };
@@ -150,7 +150,7 @@ export type SceneSelect = { readonly kind: "node"; readonly id: string } | { rea
 export const SCENE_KEYS = ["doc", "select", "pick", "base", "dirty", "history", "clip", "minimap", "lock", "changed", "offer", "review", "proposal", "requestText", "checking"] as const;
 const FLAG_KEYS = ["dirty", "history", "clip", "minimap", "lock", "changed", "offer", "review", "proposal", "requestText", "checking"] as const;
 
-/** 段の `scene` を、画面が描く値にしたもの */
+/** 手順の `scene` を、画面が描く値にしたもの */
 export interface FlowScene {
   /** 描く見本の名前 */
   readonly name: string;
@@ -217,7 +217,7 @@ export function sceneOf(sample: FlowSample, scene: Scene): FlowScene {
   };
 }
 
-/** 画面が読めない `scene`（知らない鍵・見本に無い名前や id・型違い）の理由。読めれば undefined。テストが全段に当てる */
+/** 画面が読めない `scene`（知らない鍵・見本に無い名前や id・型違い）の理由。読めれば undefined。テストが全手順で確かめる */
 export function sceneProblem(sample: FlowSample, scene: Scene): string | undefined {
   for (const key of Object.keys(scene)) {
     if (!(SCENE_KEYS as readonly string[]).includes(key)) {

@@ -206,7 +206,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     top.items.unshift(doc.createPair("version", PHASES_VERSION));
   }
 
-  // ファイルの頭の order は読まない欄。書き足しも書き換えもしない（あればそのまま残る）。
+  // ファイルの頭の order は読まない欄で、あればそのまま残る。
 
   // phases。元の組を先に全部拾っておき、編集したリストへ移す。
   // `origin` は読み込んだときの生の位置。中身が対応表でない組は画面に載らず、保存で消える（苦情で言ってある）。

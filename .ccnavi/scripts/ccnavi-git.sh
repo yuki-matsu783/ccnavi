@@ -164,7 +164,7 @@ esac
 #
 # `-c diff.external=<コマンド>` は分類上ただの `git diff` のまま任意コマンドを
 # 実行する。危ない設定名 (diff.external / core.pager / core.sshCommand ...) を
-# 列挙して拒否するやり方は、漏れた名前が読み取り専用のまま通るので採らない。値を見ずに
+# 列挙して拒否するやり方は、列挙から抜けた名前が読み取り専用のまま通るので採らない。値を見ずに
 # 形を拒否する。`-C <パス>` と `--git-dir` も、判定の起点が動くので同じ扱い。
 case "$1" in
 -*) reject global-option "サブコマンドより前のオプション ($1) は受け取りません。$SELF <サブコマンド> ... の形で書き直してください。設定の一時上書きが必要なら、その理由をユーザに伝えてください。" ;;
@@ -447,7 +447,7 @@ store_hit() {
 # `.claude`・`.git` を直に、または 1 つ下に持つディレクトリ）。`:` で始まる pathspec と、グロブの前に固定の
 # ディレクトリが無い指定は、どこに当たるかを決められないので当たるとみなす。大文字小文字はそろえる。
 #
-# 承認済みチケットの置き場（`.ccnavi/approved/` の下）はここでは見ない。レビュー済みのマーカーを消す
+# レビュー済みのマーカーを消す
 # `rm` はユーザが端末で打つ手順で、過去の中身に戻す形は store_hit が止める。エージェントの呼び出しは
 # hook が止める（DENY_WRAPPER_CORE_PATH）。
 core_hit() {
@@ -635,9 +635,6 @@ wt_fresh() {
 #                             ワークツリー・ブランチ・記録を片付ける。途中で止まっても打ち直せば続きから進む
 #
 # 記録は統合先のツリーの git ディレクトリの ccnavi-integrate/<名前>/ に置く。作業ツリーを汚さず、status にも出ない。
-ig_projects=projects        # 固定
-ig_approved=.ccnavi/approved # 固定
-ig_proposals=wip/proposals   # 固定
 
 # 名前を確かめる。<名前>
 ig_name() {
@@ -718,48 +715,29 @@ ig_wt_branch() {
 
 # チケットに結び付く名前なら 0（理由を ig_why に入れる）。<名前>
 #
-# 親のワークツリー（ccnavi_parent_tree）のほか、どのツリー（ワークスペースルート・projects/ の下・
-# .claude/worktrees/ の下）の置き場にでも同じ名前の承認済みチケットか提案があれば、子のものも含めて当たる。
-# 広めに当てて断る向き。
+# 判定は実行ファイル（`tree bound <ツリー> <名前>`）に聞く。sh はチケットの置き場を自分で読まない。
+# 実行ファイルは Stop の促しと同じ判定（`bound_reason`）で答える。材料は次の 3 つ。
+#   - どのツリー（ワークスペースルート・projects/ の下・.claude/worktrees/ の下）の置き場にも、
+#     同じ名前の承認済みチケットか提案がない（子のものも含む）
+#   - 手元の退避（ready 済み）に、同じ名前の親がない
+#   - origin に同名のブランチがある親のワークツリーではない
+# 広めに当てて断る向き。答えを得られないときも、断る向きに倒す。
 ig_bound() {
 	ig_why=""
-	ig_pt_rc=0
-	ccnavi_parent_tree "$ig_wt" "$1" || ig_pt_rc=$?
-	case "$ig_pt_rc" in
-	0)
-		ig_why="親チケットか提案のあるワークツリー"
+	ig_bo_out=$(ccnavi_ask "$WS" tree bound "$ig_wt" "$1") || ig_bo_out=""
+	if [ "$(printf '%s\n' "$ig_bo_out" | head -n 1)" != "tree 1" ]; then
+		ig_why="チケットに結び付くかを実行ファイルに確かめられない"
+		return 0
+	fi
+	case "$(printf '%s\n' "$ig_bo_out" | sed -n 's/^bound //p' | head -n 1)" in
+	yes)
+		ig_why=$(printf '%s\n' "$ig_bo_out" | sed -n 's/^why //p' | head -n 1)
 		return 0
 		;;
-	2)
-		# 決められないときは、断る向きに倒す。
-		ig_why="親チケットか提案があるかを実行ファイルに確かめられないワークツリー"
-		return 0
-		;;
+	no) return 1 ;;
 	esac
-	for ig_tree in "$WS" "$WS/$ig_projects"/* "$WS"/.claude/worktrees/*; do
-		[ -d "$ig_tree" ] || continue
-		for ig_f in "$ig_tree/$ig_approved/doing/$1.md" "$ig_tree/$ig_approved/done/$1.md" \
-			"$ig_tree/$ig_proposals/todo/$1.md" "$ig_tree/$ig_proposals/review/$1.md"; do
-			if [ -f "$ig_f" ]; then
-				ig_why="チケットか提案（${ig_f#"$WS"/}）がある"
-				return 0
-			fi
-		done
-	done
-	# チケットや提案がまだ無い間（ccnavi-start.sh の直後）の親も断る。ccnavi-start.sh は親のブランチを
-	# origin へ送ってから始めるので、親のワークツリー（.claude/worktrees/<識別子>で、HEAD のブランチが
-	# 同じ識別子になるもの）のブランチが origin に在れば、チケットに結び付くワークツリーとみなす。
-	# 直接作業のワークツリーも名前の形は同じなので、origin に在るかが見分けになる（直接作業のブランチは
-	# 送らず、統合先へ直接取り込む）。
-	ig_id=$(ccnavi_branch_to_id "$1")
-	for ig_cand in "$1" "$ig_id"; do
-		ig_hb=$(ccnavi_head_branch "$WS/.claude/worktrees/$ig_cand" "$ig_cand" 2>/dev/null) || continue
-		if git -C "$WS/.claude/worktrees/$ig_cand" show-ref --verify --quiet "refs/remotes/origin/$ig_hb" 2>/dev/null; then
-			ig_why="親のブランチ（origin/${ig_hb}）のワークツリー（.claude/worktrees/${ig_cand}）がある"
-			return 0
-		fi
-	done
-	return 1
+	ig_why="チケットに結び付くかを実行ファイルに確かめられない"
+	return 0
 }
 
 # merge-tree --write-tree（git 2.38 から）が使えるなら 0。
@@ -1015,8 +993,8 @@ ig_stop() {
 # 中身が統合先に入りきったことを確かめてから、ワークツリー・ブランチ・記録を消す。
 # 片付けの前に、取り込みの記録を ccnavi-integrate-done/<名前> へ写して残す。ターンの終わりの実行後チェックが、
 # このターンのコミットのうち integrate の squash を見分けるのに使う（ワークツリーもブランチも消えた後なので）。
-# 実行後チェックは中身を信用せず git で確かめる（コミットの親とツリー、merge-tree の結果）。写せなくても片付けは
-# 止めない（ターンの終わりに報告が出るだけ）。古い写しは 7 日で消す。
+# 実行後チェックは git で確かめる（コミットの親とツリー、merge-tree の結果）。写せなくても片付けは
+# 進む（ターンの終わりに報告が出る）。古い写しは 7 日で消す。
 ig_keep_done() {
 	ig_ddir="${ig_gdir}-done"
 	mkdir -p "$ig_ddir" 2>/dev/null || return 0
@@ -1401,7 +1379,7 @@ worktree)
 				reject worktree-detach "worktree add $wt_dest $wt_base の $wt_base は手元のブランチでも origin/$wt_base でもないので、ブランチの外（detached HEAD）にワークツリーを作ります。新しく切るなら $SELF worktree add $wt_dest -b $wt_base <起点> にしてください。"
 			fi
 			# 既にあるブランチをそのまま出す形は、親のワークツリーを作る形でもある。識別子が親に使えるか
-			# （58 文字以内・末尾が -<2 桁> でない・字の種類・NFC）を実行ファイルに聞く（sh は字数と字の種類を見分けない）。
+			# （58 文字以内・末尾が -<2 桁> でない・字の種類・NFC）を実行ファイルに聞く（字数と字の種類は実行ファイルが見分ける）。
 			# 子の識別子の形（<親>-<2 桁>-<2 桁>）は子のワークツリーを出し直す形なので、64 文字と字だけを見る。
 			ccnavi_id_ask "$WS" "$wt_base" ||
 				reject worktree-id-unchecked "worktree add $wt_dest $wt_base で、$wt_base から作る識別子が使えるかを確かめられません（ccnavi の実行ファイルが答えない）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
@@ -1459,7 +1437,7 @@ add)
 rm)
 	# 消す側だが、消えるのは git が中身を持っているファイルだけ。git rm は
 	# 索引や HEAD と食い違うファイルを既定で拒む。`rm -rf` の代わりとして
-	# rules.yml が名指しで勧める経路なので、勧めた先が通らない形にはしない。
+	# rules.yml が名指しで勧める経路なので、勧めた先が通る形にする。
 	#
 	# 通さないのは -f（略した --forc と、まとめた -rf も）。それを付けると、コミットしていない変更ごと消える。
 	# git が守っている線がそこなので、こちらで引く線も同じ場所にする。

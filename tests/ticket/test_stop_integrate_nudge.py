@@ -136,6 +136,14 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         write(os.path.join(self.root, "wip", "proposals", "todo", "scratch.md"), "---\n---\n")
         self.assert_not_asked(self.stop(path))
 
+    def test_a_worktree_whose_branch_is_on_origin_is_not_asked(self):
+        """origin に在るブランチのワークツリーは、`integrate` が断る（親のブランチとみなす）ので、
+        促さない。促したのに `integrate` が断る食い違いを作らない。"""
+        path = self.direct(commit=True)
+        self.asked(self.stop(path))
+        git(self.root, "update-ref", "refs/remotes/origin/scratch", "scratch")
+        self.assert_not_asked(self.stop(path, session="s2"))
+
     def test_a_branch_that_is_not_the_name_is_not_asked(self):
         path = self.direct(commit=True)
         git(path, "switch", "--quiet", "-c", "other")

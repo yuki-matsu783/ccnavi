@@ -212,7 +212,7 @@ find_mr() {
 		api GET "repos/$path/pulls?state=open&head=$(ccnavi_host_encode "$owner:$branch")" |
 			"$JQ" '.[0] // empty | {number: .number, url: .html_url, source: .head.ref, target: .base.ref, draft: (.draft // false)}'
 	else
-		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
+		# このプロジェクトのブランチから出た MR だけ。
 		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても目的のものを外さない）
 		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の URL を見直してください）。"
 		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$(ccnavi_host_encode "$branch")") ||
@@ -298,7 +298,7 @@ refetch() {
 	mv -f "$result.re" "$result"
 }
 
-# ---- トークンの持ち主（レビュー済みマーカーの actor。記録だけで、判定には使わない）。引けなければ空で、止めない。
+# ---- トークンの持ち主（レビュー済みマーカーの actor。記録に使う）。引けなければ空。
 #
 # gh / glab はその道具が認証したアカウント、curl はトークンの持ち主。GitHub は GET /user の login、
 # GitLab は username。GitHub Actions の GITHUB_TOKEN のように持ち主の無いトークンは 403 で空になる。
