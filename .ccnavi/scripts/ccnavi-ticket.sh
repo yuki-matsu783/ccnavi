@@ -31,7 +31,7 @@
 # .ccnavi/approved/done/。ユーザが動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
 # wip/proposals/ へ。エージェントの側を動かすのはこのスクリプトだけで、直接ファイルを
 # 作ったり動かしたりするのは ccnavi が止める。
-# サブエージェントからの start・finish・cancel・record-risk は ccnavi の hook が止める（判定がサブエージェントの
+# サブエージェントからの start・finish・cancel・propose・record-risk は ccnavi の hook が止める（判定がサブエージェントの
 # 呼び出しを見分ける。実行ファイルとこのスクリプトは呼び手を知らない）。status は止めない。
 #
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
