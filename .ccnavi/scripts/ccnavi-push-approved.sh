@@ -12,12 +12,13 @@
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、この sh の打ち直しを案内する。
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
-# 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。マージリクエストで見るフェーズが無いものを除く）のワークツリーは、
+# 取り込み済みの親子のチケット（origin があり、C1 の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）のワークツリーは、
 # C1 と同じ手順でコミットして push する。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
 # 手順は、ロック（C1 の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
 # 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ と templates/ の下書き）を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
 # push が失敗してもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`c1 family`）に聞く。
-# 答えない実行ファイルで親子のチケットの取り込み状態があれば、コミットせずに止める。
+# 取り込みの後、push の前に、親のブランチがリモートから消えていないかを push の関門（ccnavi_push_gate）で確かめる。
+# 消えていれば（確かめられないときも）コミットも push もせずに止める。親でないツリーの push の前にも同じ関門を通す。
 #
 # <親> を並べると、その親子のチケットだけをコミットして push する。取り込み済みでない親子のチケットは
 # コミットしない（今のまま、ユーザがコミットする）。省けば今どおり、置き場に変更のあるツリー全部。
@@ -225,7 +226,7 @@ unsent_paths() {
 
 # 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_c1_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 失敗した
 #
-# 取り込み状態の鍵とロックは識別子（ccnavi_c1_family_id）、ref・push・ls-remote と取り込み状態の branch は
+# ロックは識別子（ccnavi_c1_family_id）、ref・push・ls-remote は
 # 親のブランチ名（ccnavi_c1_branch。親のワークツリーの HEAD から読む）。
 carry_family() {
 	cf_p="$ccnavi_c1_family_id"
@@ -252,9 +253,16 @@ carry_family() {
 	cf_rc=0
 	sh "$(dirname "$0")/ccnavi-sync.sh" "$cf_p" </dev/null >"$ccnavi_c1_tmp/sync" 2>&1 || cf_rc=$?
 	sed 's/^/  /' "$ccnavi_c1_tmp/sync" >&2
-	cf_record=$(ccnavi_family_record "$root" "$ccnavi_c1_repo" "$cf_p")
-	if [ "$cf_rc" -ne 0 ] || [ "$(ccnavi_record_get "$cf_record" state)" != present ]; then
+	if [ "$cf_rc" -ne 0 ]; then
 		printf 'ccnavi-push-approved: %s を取り込めなかった（上の ccnavi-sync.sh の文面）。ユーザの判断はまだ送っていない。直してから再実行してください。\n' "$cf_p" >&2
+		ccnavi_lock_drop
+		return 1
+	fi
+	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push の関門。C1・ccnavi-git.sh push と同じ）。
+	cf_rc=0
+	ccnavi_push_gate "$cf_tree" "$cf_b" "$cf_p" "$root" "$(ccnavi_c1_number "${CCNAVI_C1_TIMEOUT:-}" 60)" || cf_rc=$?
+	if [ "$cf_rc" -ne 0 ]; then
+		printf 'ccnavi-push-approved: %s。ユーザの判断はまだ送っていない。\n' "$ccnavi_pg_why" >&2
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -290,8 +298,6 @@ carry_family() {
 		{ ccnavi_git_timed "$cf_timeout" "$ccnavi_c1_tmp/ls-err" "$cf_tree" \
 			ls-remote origin "refs/heads/$cf_b" >"$ccnavi_c1_tmp/ls" &&
 			grep -F -x -q -- "$cf_head${tab}refs/heads/$cf_b" "$ccnavi_c1_tmp/ls"; }; then
-		ccnavi_record_write "$cf_record" remote origin branch "$cf_b" sha "$cf_head" \
-			fetched_at "$(ccnavi_record_get "$cf_record" fetched_at)" state present reason "" || :
 		printf '承認済みチケットを取り込んだうえで、ブランチ %s にpushしました。\n' "$cf_b"
 		ccnavi_lock_drop
 		return 0
@@ -486,12 +492,23 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 		;;
 	esac
 	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も送らない。名前は ccnavi-fetch.sh・
-	# ccnavi-git.sh と同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 → origin/HEAD →
+	# ccnavi-git.sh と同じ順（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env → origin/HEAD →
 	# origin/main・master）で、そのツリーが属するリポジトリについて決める。決まらなければ固定のリストだけ。
 	integ=$(ccnavi_integration "$tree" "$root") || integ=""
 	if [ -n "$integ" ] && [ "$branch" = "$integ" ]; then
 		printf 'ccnavi-push-approved: %s では保護対象の統合先 %s を使用しているため、pushしません。送るかどうかはユーザが決めます。\n' \
 			"$name" "$branch" >&2
+		continue
+	fi
+
+	# 親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る（push の関門）。
+	# 親でないツリー・初回の push は関門が通す。
+	gate_rc=0
+	ccnavi_push_gate "$tree" "$branch" "$name" "$root" "$(ccnavi_c1_number "${CCNAVI_C1_TIMEOUT:-}" 60)" || gate_rc=$?
+	if [ "$gate_rc" -ne 0 ]; then
+		printf 'ccnavi-push-approved: %s。コミットはローカルに残っている。\n' "$ccnavi_pg_why" >&2
+		unsent_paths "$tree" "$branch"
+		printf 'fail\n' >>"$state"
 		continue
 	fi
 

@@ -690,32 +690,6 @@ def integration_local(root: str) -> str:
     return "" if ("\n" in value or "\r" in value) else value.strip()
 
 
-def integration_recorded(state: str) -> str:
-    """`ccnavi-sync.sh` が統合先の取り込み結果に書いた統合先の名前。
-
-    `<state の置き場>/sync/self/integration/head` の `branch` の行（1 行 1 項目）。
-    取り込み結果が無い・読めない・途中にシンボリックリンクがあるときは空（既定の予約だけになる）。
-    環境変数は読まない。取り込み結果の中のリンクは辿らない（コピーするときに除いてあり、
-    読む側でも辿らない決まり）。
-    """
-    if not state:
-        return ""
-    path = state
-    for part in ("sync", "self", "integration", "head"):
-        path = os.path.join(path, part)
-        if os.path.islink(path):
-            return ""
-    try:
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                key, _, value = line.rstrip("\r\n").partition(" ")
-                if key == "branch":
-                    return value.strip()
-    except (OSError, UnicodeDecodeError):
-        return ""
-    return ""
-
-
 class HookView(NamedTuple):
     """Claude Code が起こした hook に渡るはずの値（解決する前の生の値）。"""
 

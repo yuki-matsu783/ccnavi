@@ -6,7 +6,7 @@
 #
 # 親子のチケットについて、チケットの状態を書く一連の操作を 1 つの操作にまとめる。親子のチケットは
 # 親のブランチ 1 本に対応する。ここで対象にするのは、親のワークツリーがあり、origin があり、HEAD の確認に通る
-# 親子のチケット。取り込み状態（記録）が無くても、取り込み（4）が作る。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
+# 親子のチケット。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
 #
 #   ccnavi_c1_family <識別子>   親子のチケットと、C1 の対象か（ccnavi_c1_target に yes / no / stop）
 #   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
@@ -50,7 +50,7 @@
 ccnavi_c1_target=""
 ccnavi_c1_why=""
 ccnavi_c1_family_id=""
-# 親のブランチ名。ref・push・ls-remote・取り込み状態の `branch` はこれを使う。
+# 親のブランチ名。ref・push・ls-remote はこれを使う。
 ccnavi_c1_branch=""
 ccnavi_c1_repo=""
 ccnavi_c1_tree=""
@@ -247,7 +247,7 @@ ccnavi_c1_prepare() {
 		if [ -s "$ccnavi_c1_tmp/b" ]; then
 			ccnavi_c1_commit "$ccnavi_c1_tmp/b" "ccnavi: $ccnavi_c1_family_id の hook のマーカーをコミットする" || return 1
 		fi
-		# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。統合先の取り込み結果も同じ回で書く。
+		# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。
 		ccnavi_cp_rc=0
 		sh "$ccnavi_c1_sh/ccnavi-sync.sh" "$ccnavi_c1_family_id" </dev/null >"$ccnavi_c1_tmp/sync" 2>&1 || ccnavi_cp_rc=$?
 		sed "s/^/  /" "$ccnavi_c1_tmp/sync" >&2
@@ -260,10 +260,13 @@ ccnavi_c1_prepare() {
 			ccnavi_c1_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も反映していません。接続と、上に出た原因を直してから再実行してください"
 			return 1
 		fi
-		ccnavi_cp_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
-		ccnavi_cp_state=$(ccnavi_record_get "$ccnavi_cp_record" state)
-		if [ "$ccnavi_cp_state" != present ]; then
-			ccnavi_c1_say "取り込みの後、親子のチケットの取り込み状態が ${ccnavi_cp_state:-（無い）} になった。何も反映していません（上の ccnavi-sync.sh の文面）"
+		# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push の関門。3 経路で同じ）。
+		ccnavi_cp_gate=0
+		ccnavi_push_gate "$ccnavi_c1_tree" "$ccnavi_c1_branch" "$ccnavi_c1_family_id" "$ccnavi_c1_root" \
+			"$(ccnavi_c1_number "${CCNAVI_C1_TIMEOUT:-}" 60)" || ccnavi_cp_gate=$?
+		if [ "$ccnavi_cp_gate" -ne 0 ]; then
+			ccnavi_c1_say "${ccnavi_pg_why}。何も反映していません"
+			log_info C1 で止めた -- "family=$ccnavi_c1_family_id" "reason=push-gate" "gate=$ccnavi_cp_gate"
 			return 1
 		fi
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める。
@@ -649,14 +652,8 @@ ccnavi_c1_undo() {
 	return 0
 }
 
-# 送れた。親子のチケットの取り込み状態の sha を書き換える（state はそのまま present）。<送った先頭>
+# 送れた。<送った先頭>
 ccnavi_c1_sent() {
-	ccnavi_cn_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
-	if [ "$(ccnavi_record_get "$ccnavi_cn_record" state)" = present ]; then
-		ccnavi_record_write "$ccnavi_cn_record" remote origin branch "$ccnavi_c1_branch" sha "$1" \
-			fetched_at "$(ccnavi_record_get "$ccnavi_cn_record" fetched_at)" state present reason "" ||
-			ccnavi_c1_say "親子のチケットの取り込み状態（${ccnavi_cn_record}）を保存できませんでした。"
-	fi
 	ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のチケットの状態を送った（$(printf '%.12s' "$1")）"
 	log_info C1 で送った -- "family=$ccnavi_c1_family_id"
 }

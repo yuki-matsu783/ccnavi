@@ -103,10 +103,3 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 /* カードが狭いと 2 つ目のボタンは次の行へ回す。1 つでも幅に収まらなければボタンの中で折り返す */
 .card-actions > button.action { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 
-/* このPCでは未準備の親（親のワークツリーが無い）。ボードの上に並べる */
-.unprepared { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.unprepared-card { border: 1px solid var(--vscode-editorWarning-foreground, #cca700); border-radius: 4px; padding: 8px 10px; max-width: 420px; }
-.unprepared-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
-.unprepared-family, .unprepared-project { font-family: var(--vscode-editor-font-family, monospace); font-size: .9em; }
-.unprepared-facts { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0; font-size: .9em; opacity: .85; }
-.unprepared-reason, .unprepared-hint { margin: 4px 0; font-size: .88em; overflow-wrap: anywhere; }

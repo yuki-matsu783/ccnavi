@@ -15,7 +15,7 @@ from . import (
     approval_ops,
     phase,
     phasetypes,
-    syncstate,
+    standing,
     ticket_ids,
     ticket_model,
     workflow,
@@ -89,9 +89,9 @@ def candidates(
     cache: dict[str, dict | None] = {}
     # 先行を引く対応表。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_model.Ticket]] | None = None
-    # 親子のチケットの立ち位置と統合先の取り込み結果。
-    # 1 回の承認で 1 度ずつだけ読む。
-    fams = syncstate.Families(conf, root)
+    # 親子のチケットの立ち位置。
+    # 1 回の承認で 1 度だけ読む。
+    fams = standing.Families(conf, root)
 
     def config_for(t: ticket_model.Ticket) -> dict | None:
         name = project_of(t, pool)
@@ -143,7 +143,6 @@ def candidates(
         complaints += approval_checks.place_problems(root, conf, t)
         complaints += approval_checks.family_problems(conf, root, t, fams)
         complaints += approval_checks.mr_problems(t)
-        complaints += approval_checks.integration_problems(conf, root, t, fams)
         complaints += approval_checks.branch_problems(
             conf, root, t, fams, list(approved) + list(pending) + list(revisions)
         )
@@ -754,4 +753,4 @@ def own_branch(root: str, conf: settings.Settings, t) -> str:
     here = tree.tree_of(root, t.path, conf.projects)
     if here is None or here.is_main or here.name != t.ticket:
         return ""
-    return syncstate.head_branch(here.root, t.ticket)
+    return standing.head_branch(here.root, t.ticket)

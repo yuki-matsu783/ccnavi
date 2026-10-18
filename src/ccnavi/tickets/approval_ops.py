@@ -172,7 +172,7 @@ def next_child_id(conf: settings.Settings, root: str, parent_id: str, phase_no: 
     2 桁に収まらなければ識別子を組めないので ValueError（呼び手は何も書かずに止まる）。
 
     手元の退避（`logs/archive/`）にある子も数える（閉じた子の連番を使い回さない）。退避の子は
-    親の識別子を大文字小文字を区別せずに比べる（`integration_problems` と同じ見方）。
+    親の識別子を大文字小文字を区別せずに比べる（`approval_checks.branch_problems` と同じ見方）。
     """
     top = ticket_ids.MAX_CHILD_NUMBER
     if not 0 <= phase_no <= top:

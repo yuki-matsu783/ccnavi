@@ -225,9 +225,9 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
 }
 
 /**
- * 親カードの出どころ（issue・MR・ブランチ名）と、リモートとの差（未送信・遅れ・最終同期）。
+ * 親カードの出どころ（issue・MR・ブランチ名）と、リモートとの差（未送信・遅れ）。
  * 値は実行ファイルの JSON（`remote`・`mr`・`issue`・`branch`）のとおりで、ここで計算し直さない。
- * 最終同期が無いときは「リモート未確認」と言う。差は最後に取ってきた origin との差で、古いかもしれない。
+ * 差は最後に取ってきた origin との差で、古いかもしれない。
  */
 function Origin({ card }: { readonly card: Card }): JSX.Element | null {
   const origin = originItems(card);

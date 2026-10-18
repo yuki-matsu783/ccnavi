@@ -118,26 +118,11 @@ export interface PredecessorUnmetJson {
 /**
  * 親のワークツリーのリモートとの差（`ccnavi --explain --json` の `remote`）。最後に取ってきた origin との差で、
  * ネットワークには出ない。`ahead`（未送信）と `behind`（遅れ）は、リモート追跡の ref が無い・読めないと null。
- * `fetched_at` は最終同期（UNIX 秒）で、0 は一度も取り込んでいない（リモート未確認）。
  */
 export interface RemoteJson {
   readonly branch: string;
   readonly ahead: number | null;
   readonly behind: number | null;
-  readonly fetched_at: number;
-  readonly mr: number | null;
-}
-
-/**
- * このPCでは未準備の親（`ccnavi --explain --json` の `unprepared`）。取り込み状態の記録（キャッシュ）だけがあり、
- * 親のワークツリーが無い。`branch` と `mr` は記録の控え（無ければ空と null）、`reason` は止まった理由。
- */
-export interface UnpreparedJson {
-  readonly family: string;
-  readonly project: string;
-  readonly branch: string;
-  readonly mr: number | null;
-  readonly reason: string;
 }
 
 export interface TicketJson {
@@ -374,8 +359,6 @@ export interface BoardJson {
   readonly parents: readonly ParentJson[];
   /** 手元の退避にある閉じたチケット（表示用）。任意の欄で、この欄を出さない古い実行ファイルでは空か無し */
   readonly archived?: readonly ArchivedTicketJson[];
-  /** このPCでは未準備の親。この欄を出さない古い実行ファイルでは空か無し */
-  readonly unprepared?: readonly UnpreparedJson[];
 }
 
 export type ParseResult =
@@ -426,7 +409,6 @@ export function parseBoardJson(text: string): ParseResult {
       tickets: list(raw.tickets).filter(isRecord).map(ticket),
       parents: list(raw.parents).filter(isRecord).map(parent),
       archived: list(raw.archived).filter(isRecord).map(archived),
-      unprepared: list(raw.unprepared).filter(isRecord).map(unprepared),
     },
   };
 }
@@ -493,23 +475,11 @@ function sum(raw: Record<string, unknown>): SumJson {
   };
 }
 
-function unprepared(raw: Record<string, unknown>): UnpreparedJson {
-  return {
-    family: str(raw.family),
-    project: str(raw.project),
-    branch: str(raw.branch),
-    mr: num(raw.mr),
-    reason: str(raw.reason),
-  };
-}
-
 function remote(raw: Record<string, unknown>): RemoteJson {
   return {
     branch: str(raw.branch),
     ahead: num(raw.ahead),
     behind: num(raw.behind),
-    fetched_at: num(raw.fetched_at) ?? 0,
-    mr: num(raw.mr),
   };
 }
 

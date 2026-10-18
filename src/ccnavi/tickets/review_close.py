@@ -28,7 +28,7 @@ from . import (
     retire,
     review,
     review_host,
-    syncstate,
+    standing,
     ticket_model,
     ticket_places,
 )
@@ -123,7 +123,7 @@ def ready(
     ):
         return 1
     # 閉じた親子のチケットを手元の退避へ移す。条件は確かめてあり、今回の親は done/ にある。
-    return _archive_closed(stdout, stderr, root, conf, parent, where, path)
+    return _archive_closed(stdout, stderr, root, conf, parent, where, path, result.mr.number)
 
 
 def _archive_closed(
@@ -134,6 +134,7 @@ def _archive_closed(
     parent: ticket_model.Ticket,
     where: str,
     path: str,
+    mr: int | None = None,
 ) -> int:
     """閉じた親子のチケットを退避へ移し、下書きのパスと退避したツリーを出す。
 
@@ -150,11 +151,16 @@ def _archive_closed(
     parents = sorted(
         set(archive.closed_parents(where)) | set(archive.archived_parents(root, parent.project))
     )
-    # 閉じた子のチケットは退避へ移って見えなくなるので、親を閉じた後に片付ける子の一覧を先に書く
-    # （ワークツリーとブランチの片付け。`retire.py`）。書けなくても ready は止めない。
-    noted = retire.note(root, conf, parent.ticket, parent.project, tree_root)
+    # 閉じた子のチケットは退避へ移って見えなくなるので、親を閉じた後の片付けの記録（子の一覧と
+    # MR の番号。`retire.py`）を先に書く。親のワークツリーを片付けた後の列挙元になるので、
+    # 書けなければ退避へ進まずに止める（記録が無いと片付け待ちの親を見失う）。打ち直せる。
+    noted = retire.note(root, conf, parent.ticket, parent.project, tree_root, mr)
     if noted:
-        stderr.write(f"ccnavi: 注意: {noted}。子のワークツリーとブランチは手で片付ける\n")
+        stderr.write(
+            f"ccnavi: 親を閉じた後の片付けの記録を書けないので止めました: {noted}。"
+            "直してから ready を打ち直してください\n"
+        )
+        return 1
     todo = archive.plan(where, parents, root, parent.project)
     _, failed = archive.move(root, parent.project, where, todo, parent.ticket, tree_root)
     if failed:
@@ -186,7 +192,7 @@ def _archive_place_problem(
     if (
         home is not None
         and not home.is_main
-        and syncstate.same_tree(os.path.realpath(home.root), os.path.realpath(expected))
+        and standing.same_tree(os.path.realpath(home.root), os.path.realpath(expected))
     ):
         return ""
     shown = home.name if home is not None and home.name else "ワークスペースルート"
@@ -270,7 +276,8 @@ def _ready_again(
         for p in problems:
             stderr.write(f"  - {p}\n")
         return 1
-    if review._result_with_mr(stderr, result_path) is None:
+    result = review._result_with_mr(stderr, result_path)
+    if result is None:
         return 1
     if not conf.state:
         stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所がありません。\n")
@@ -289,7 +296,7 @@ def _ready_again(
         stderr.write(f"ccnavi: {failed}\n")
         return 1
     # 前の回が途中で止まっていれば、残りをここで移す（移すものが無ければ何もしない）。
-    return _archive_closed(stdout, stderr, root, conf, parent, where, path)
+    return _archive_closed(stdout, stderr, root, conf, parent, where, path, result.mr.number)
 
 
 def close_early(

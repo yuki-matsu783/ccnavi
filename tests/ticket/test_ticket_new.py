@@ -68,18 +68,13 @@ class TicketNewTest(TicketNewTestBase):
         verify = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
 
-    def test_the_mr_comes_from_the_flag_or_the_cached_record(self):
+    def test_the_mr_comes_from_the_flag_only(self):
         self.assertEqual(self.new("--mr", "5").returncode, 0)
         self.assertEqual(front_of(self.written())["mr"], 5)
         os.remove(self.todo)
-        # 指定が無ければ、`ccnavi-start.sh` が取り込み状態に保存した番号を使う
+        # 指定が無ければ書かない（承認は mr: が無いことで止まる）。取り込みの記録からは引かない
         record = os.path.join(self.state, "sync", "self", "families", IDENT)
         write(record, f"remote origin\nbranch {IDENT}\nsha 0\nfetched_at 1\nstate present\nmr 7\n")
-        self.assertEqual(self.new().returncode, 0)
-        self.assertEqual(front_of(self.written())["mr"], 7)
-        os.remove(self.todo)
-        os.remove(record)
-        # 番号が無ければ書かない（承認は mr: が無いことで止まる）
         self.assertEqual(self.new().returncode, 0)
         self.assertNotIn("mr", front_of(self.written()))
 

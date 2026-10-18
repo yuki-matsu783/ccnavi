@@ -11,8 +11,8 @@ cwd のツリーが次を全部満たすとき。
 
 - `.claude/worktrees/<名前>` のワークツリーで、今のブランチが名前と同じ
 - チケットに結び付かない。材料は `ccnavi-git.sh integrate` の `ig_bound` と同じ
-  （全ツリーの承認済みチケット・提案の `<名前>.md`、手元の退避、親子の取り込み状態）。
-  読めない取り込み状態があれば結び付くものとして扱う（促さない側）
+  （全ツリーの承認済みチケット・提案の `<名前>.md`、手元の退避）。親のブランチのワークツリーは、
+  ブランチ名が名前と違う（`/` を含む）ので、上の条件で外れている
 - 作業が残っている。ワークツリーに未コミットの変更がある（追跡していないファイルも数える）か、
   統合先に入っていないコミットがある
 - `integrate <名前>` の記録が無い。統合先のツリーの git ディレクトリの `ccnavi-integrate/<名前>/` も
@@ -20,10 +20,10 @@ cwd のツリーが次を全部満たすとき。
 
 ## 統合先
 
-`ccnavi_integration`（`ccnavi-common-state.sh`）の順（環境変数、取り込み結果、既定ブランチ）に、
-hook が設定から読む 2 つを環境変数の次に足したもの。環境変数 `CCNAVI_INTEGRATION_BRANCH`、
-`.claude/settings.local.json` の `env`、`--integration-branch`（この 2 つは sh 側には無い）、
-`ccnavi-sync.sh` の取り込み結果、`origin/HEAD`、`origin/main`・`origin/master`。
+`ccnavi_integration`（`ccnavi-common-state.sh`）の順（環境変数、`settings.local.json` の統合先、
+既定ブランチ）に、hook が設定から読む `--integration-branch` を足したもの。環境変数
+`CCNAVI_INTEGRATION_BRANCH`、`.claude/settings.local.json` の `env`、`--integration-branch`
+（sh 側には無い）、`origin/HEAD`、`origin/main`・`origin/master`。
 決まらなければ `integrate` が断るので、
 促さずに理由を言う。
 
@@ -47,7 +47,7 @@ import os
 from dataclasses import dataclass
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import archive, ops_close, ops_stop, syncstate, ticket_model
+from . import archive, ops_close, ops_stop, ticket_model
 
 # Stop で直接作業の `integrate` を促すときの理由コード。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。
@@ -128,7 +128,7 @@ def direct_at_stop(root: str, conf: settings.Settings, cwd: str) -> Direct | Non
     found = Direct(here.name, here.root, head, dirty, ahead, integration)
     if not integration:
         found.blocked = (
-            "統合先の名前が決まりません（CCNAVI_INTEGRATION_BRANCH・ccnavi-sync.sh の取り込み結果・"
+            "統合先の名前が決まりません（CCNAVI_INTEGRATION_BRANCH・"
             "origin/HEAD のどれもありません）。統合先をユーザに確かめ、CCNAVI_INTEGRATION_BRANCH に"
             "入れてもらってください"
         )
@@ -162,11 +162,12 @@ def _integrable_name(name: str) -> bool:
 
 
 def integration_name(root: str, conf: settings.Settings, owner: str, project: str) -> str:
-    """そのリポジトリの統合先の名前。決まらなければ空。
+    """そのリポジトリ（`owner` はそのチェックアウト）の統合先の名前。決まらなければ空。
 
-    環境変数、`settings.local.json` の `env`・`--integration-branch`（この 2 つは
-    `ccnavi_integration` には無い）、取り込み結果（`ccnavi-sync.sh`）、`origin/HEAD`、
-    `origin/main`・`origin/master` の順。
+    環境変数、`settings.local.json` の `env`、`--integration-branch`（これだけ
+    `ccnavi_integration` には無い）、`origin/HEAD`、`origin/main`・`origin/master` の順。
+    統合先の解決は、hook・`--lint`・レイヤーの比べ方がこの関数を共通に使う。
+    `project` は呼び手の互換のために残した引数で、使わない。
     """
     for name in (
         os.environ.get(settings.INTEGRATION_ENV, ""),
@@ -175,9 +176,6 @@ def integration_name(root: str, conf: settings.Settings, owner: str, project: st
     ):
         if name and name.strip():
             return name.strip()
-    integ = syncstate.integration(conf.state, syncstate.repo_key(project))
-    if integ is not None and not integ.broken and integ.branch.strip():
-        return integ.branch.strip()
     head = tree.origin_head(owner)
     if head:
         return head
@@ -209,18 +207,7 @@ def _bound_to_ticket(root: str, conf: settings.Settings, here: tree.Tree) -> boo
         ):
             if os.path.isfile(os.path.join(base, state, f"{name}.md")):
                 return True
-    if archive.archived_fields(root, here.project, name) is not None:
-        return True
-    repo = syncstate.repo_key(here.project)
-    if syncstate.family(conf.state, repo, name) is not None:
-        return True
-    for fam_repo, fam_name in syncstate.family_names(conf.state):
-        if fam_repo != repo:
-            continue
-        fam = syncstate.family(conf.state, fam_repo, fam_name)
-        if fam is not None and (fam.broken or (fam.branch or fam.name) == name):
-            return True
-    return False
+    return archive.archived_fields(root, here.project, name) is not None
 
 
 def _dirty(worktree: str) -> bool | None:

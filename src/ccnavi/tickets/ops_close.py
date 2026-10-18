@@ -19,7 +19,7 @@ from . import (
     approval_ops,
     phase,
     phasetypes,
-    syncstate,
+    standing,
     ticket_model,
 )
 from . import ticket as ticket_mod
@@ -90,7 +90,7 @@ def _undecided(
     「1 つにしてから」だけだと、どのツリー上のチケットも追跡されたファイルなので、受け取った側に
     できることが読めない。正とする側の決まり方（親のツリー）と、この場面で
     それが決まらない理由を名指しする。正とする側は親のブランチ（親のワークツリー）に決まって
-    いるので、立ち位置から引いた解き方（`syncstate.guidance`）を出す。
+    いるので、立ち位置から引いた解き方（`standing.guidance`）を出す。
     """
     home = hits[0].parent or hits[0].ticket
     stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つに決まるまで動かさない\n")
@@ -100,7 +100,7 @@ def _undecided(
     )
     st = approval_checks.family_standing(conf, root, hits[0]) if conf is not None else None
     if st is not None and st.stop:
-        for line in syncstate.guidance(root, st):
+        for line in standing.guidance(root, st):
             stderr.write(f"  {line}\n")
         return
     stderr.write(
@@ -153,19 +153,19 @@ def misplaced_home(
 def family_stopped(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
-    """親子のチケットが決まらない（親のワークツリーが無いなど）・閉じているなら、言って True。
+    """親子のチケットが決まらない（親のワークツリーが無いなど）なら、言って True。
 
     その親子のチケットの状態の操作（着手・終了・取り消し・記録・レビューのマーカー）は止める。引いたチケットが
     親のワークツリーの外にしか無いとき（元ツリーに未コミットで残ったチケットなど）も、信頼しないチケットを
-    動かさないように止める。取り込み状態の無い親子のチケットには何も言わない（今の動きのまま）。
+    動かさないように止める。
     """
     st = approval_checks.family_standing(conf, root, found)
     if st.stop:
         stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この親子のチケットの状態は動かさない\n")
-        for line in syncstate.guidance(root, st):
+        for line in standing.guidance(root, st):
             stderr.write(f"  {line}\n")
         return True
-    if st.home is not None and not syncstate.same_tree(found.tree_root, st.home.root):
+    if st.home is not None and not standing.same_tree(found.tree_root, st.home.root):
         stderr.write(
             f"ccnavi: {found.ticket}: チケットが親のブランチ {st.family} のワークツリーの外"
             f"（{found.tree or 'ワークスペースルート'}）にしか無い。"

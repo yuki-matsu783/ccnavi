@@ -22,7 +22,6 @@ from unittest import mock
 
 from ccnavi.tickets import c1, ticket_fields
 from tests.ticket.test_phases import PhaseHarness
-from tests.ticket.test_sync_authority import record_text
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, parent_text
 
@@ -42,13 +41,6 @@ class TicketStatusTest(PhaseHarness):
         text = text or parent_text(ident, ["research"])
         write(os.path.join(self.approved, "doing", ident + ".md"), text)
         return text
-
-    def imported(self, state, reason=""):
-        """取り込み状態（`ccnavi-sync.sh` が書く親子のチケットの記録）を置く。"""
-        write(
-            os.path.join(self.state, "sync", "self", "families", "i0001"),
-            record_text("i0001", state, reason),
-        )
 
     def c1_target(self, ident):
         """本物の C1 の見分け（`ccnavi c1 family`）の答え。"""
@@ -92,8 +84,7 @@ class TicketStatusTest(PhaseHarness):
     def test_an_uncommitted_ticket_of_a_c1_family_waits_for_the_user(self):
         # マージリクエストを持つフェーズ（design）を含める。持たない親子は C1 の対象外。
         self.by_hand(text=parent_text("i0001", ["research", "design"]))
-        # C1 の対象にする: 取り込み状態が present で、親のワークツリーがあり、origin がある。
-        self.imported("present")
+        # C1 の対象にする: 親のワークツリーがあり、origin がある。
         git(self.parent_tree, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
         self.assertEqual(self.c1_target("i0001"), "yes")
         mine = self.block(self.said("i0001"), "i0001")
@@ -103,9 +94,9 @@ class TicketStatusTest(PhaseHarness):
 
     def test_a_family_c1_stops_names_the_reason_and_does_not_say_go(self):
         # ここだけは C1 の見分けを差し替える。本物の状態で「C1 が止める」を作ると、
-        # 取り込み状態の側（親のワークツリーが無い・別のブランチに居る・gone など）が先に
+        # 立ち位置の側（親のワークツリーが無い・別のブランチに居るなど）が先に
         # 止まる理由を持ち、status はそちらを言ってこの行を出さない（同じ理由を 2 度言わない）。
-        # 取り込み状態が止めずに C1 だけが止める本物の形は、親のワークツリーのパスに改行が
+        # 立ち位置が止めずに C1 だけが止める本物の形は、親のワークツリーのパスに改行が
         # ある場合だけで、Windows ではそのパスを作れない。
         self.by_hand(text=parent_text("i0001", ["research", "design"]))
         stop = (c1.TARGET_STOP, "親のワークツリーが決まらない", None)

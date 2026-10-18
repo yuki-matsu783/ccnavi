@@ -131,6 +131,18 @@ class Workspace(unittest.TestCase):
             'case " $* " in\n'
             f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
             "*\" c1 family \"*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;\n"
+            # 統合先（settings.local.json の env）。STUB_INTEGRATION があれば答える。
+            '*" sync paths "*) printf \'integration %s\\n\' "${STUB_INTEGRATION:-}"; exit 0 ;;\n'
+            # 親か・承認済みか（push の関門が聞く）。STUB_PARENT があるときだけ答える。
+            # STUB_PARENT=old は、新しい行（approved など）を知らない旧い実行ファイル。
+            '*" tree parent "*)\n'
+            '  [ -n "${STUB_PARENT:-}" ] || exit 0\n'
+            "  [ \"$STUB_PARENT\" = no ] && { printf 'tree 1\\nparent no\\n'; exit 0; }\n"
+            "  printf 'tree 1\\nparent yes\\n'\n"
+            '  [ "$STUB_PARENT" = old ] && exit 0\n'
+            "  printf 'approved %s\\nrequested %s\\narchived %s\\nmr -\\n' "
+            '"${STUB_APPROVED:-no}" "${STUB_REQUESTED:-no}" "${STUB_ARCHIVED:-no}"\n'
+            "  exit 0 ;;\n"
             "esac\nexit 0\n",
         )
         os.chmod(self.c1_stub, os.stat(self.c1_stub).st_mode | stat.S_IXUSR | stat.S_IXGRP)
@@ -368,19 +380,27 @@ class PushApprovedTest(Workspace):
         self.place(tree)
         self.assertNotPushed(self.push(), tree, "develop-v1.0.0")
 
-    def test_the_environment_and_the_record_name_the_integration(self):
+    def test_the_environment_and_settings_local_json_name_the_integration(self):
         tree = self.worktree("develop-v1.0.0")
         self.place(tree)
         env = self.env(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
         self.assertNotPushed(self.push(env=env), tree, "develop-v1.0.0")
 
+        # settings.local.json の env（`sync paths` が運ぶ）。統合先のコピーは読まない。
         other = self.worktree("release-2")
         self.place(other)
         write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
             "remote origin\nbranch release-2\nsource default\n",
         )
-        self.assertNotPushed(self.push(), other, "release-2")
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("統合先 release-2", result.stderr)
+
+        third = self.worktree("release-3")
+        self.place(third)
+        env = self.env(STUB_INTEGRATION="release-3")
+        self.assertNotPushed(self.push(env=env), third, "release-3")
 
     def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
         """統合先が決まらない（origin/HEAD も origin/main・master も無い）なら今までどおり送る。"""
@@ -391,27 +411,22 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.remote_head("develop-v1.0.0"), self.head(tree))
 
     def test_a_project_is_judged_by_its_own_integration(self):
-        """projects/<名前>/ のツリーは、そのプロジェクトの統合先で判定する。"""
+        """projects/<名前>/ のツリーは、そのプロジェクトの origin で統合先を決める。
+        settings.local.json の統合先は、ワークスペース全体のものとして同じ名前で効く。"""
         project = os.path.join(self.ws, "projects", "app")
         remote = self.repository(project, "develop-v1.0.0")
         self.place(project)
-        # ワークスペースの統合先が同じ名前でも、プロジェクトの統合先は別
-        # （取り込み結果が無く origin も空）。
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "branch develop-v1.0.0\n",
-        )
+        # ワークスペース自身の origin/HEAD が同じ名前でも、プロジェクトの統合先は別（origin も空）。
+        ref = "refs/remotes/origin/develop-v1.0.0"
+        git(self.ws, "update-ref", ref, "HEAD")
+        git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
         result = self.push()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.head_of(remote, "develop-v1.0.0"), self.head(project))
 
         write(os.path.join(project, *APPROVED.split("/"), "i0002.md"), "approved\n")
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "app", "integration", "head"),
-            "branch develop-v1.0.0\n",
-        )
         before = self.head_of(remote, "develop-v1.0.0")
-        result = self.push()
+        result = self.push(env=self.env(STUB_INTEGRATION="develop-v1.0.0"))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("統合先 develop-v1.0.0", result.stderr)
         self.assertEqual(self.head_of(remote, "develop-v1.0.0"), before)
@@ -428,6 +443,89 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertEqual(self.dirty(tree, APPROVED), "")
         self.assertIn("i0001", result.stderr)
+
+    # ---- 親のブランチの push の関門（ccnavi_push_gate）。取り込み状態は見ない。
+    # 実行ファイルの代役が `tree parent` に答える（STUB_PARENT）。答えなければ参照だけで決める。
+
+    def sent_parent(self, name="i0001", approved="yes", **extra):
+        """送ったことのある親のワークツリー。ホストがブランチを消した（参照だけが残る）形にする。
+
+        返すのは、ツリーと、関門に聞かれる実行ファイルの答えを入れた環境。
+        """
+        tree = self.worktree(name)
+        git(tree, "push", "-q", "-u", "origin", name)
+        git(self._tmp.name, "--git-dir", self.remote, "update-ref", "-d", f"refs/heads/{name}")
+        self.place(tree)
+        env = self.env(STUB_PARENT="1", STUB_APPROVED=approved, **extra)
+        return tree, env
+
+    def test_a_parent_gone_from_the_remote_is_committed_but_not_pushed(self):
+        tree, env = self.sent_parent()
+        result = self.push(env=env)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertEqual(self.remote_head("i0001"), "")
+        self.assertIn("親のブランチ i0001 がリモートに無い", result.stderr)
+        self.assertIn("ccnavi-sync.sh i0001", result.stderr)
+        self.assertIn("コミットはローカルに残っている", result.stderr)
+        # ユーザが端末で元の名前に戻せば、打ち直して送れる。
+        git(tree, "push", "-q", "origin", "i0001")
+        write(os.path.join(tree, *APPROVED.split("/"), "i0002.md"), "approved\n")
+        result = self.push(env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    def test_an_approved_parent_without_a_reference_is_still_guarded(self):
+        # fetch.prune で参照が消えても、承認済みの親チケットがあれば、作り直さない。
+        tree, env = self.sent_parent()
+        git(self.ws, "update-ref", "-d", "refs/remotes/origin/i0001")
+        result = self.push(env=env)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head("i0001"), "")
+        self.assertIn("リモートに無い", result.stderr)
+
+    def test_a_request_marker_or_an_archive_also_counts_as_having_been_sent(self):
+        for key in ("STUB_REQUESTED", "STUB_ARCHIVED"):
+            with self.subTest(key=key):
+                tree, env = self.sent_parent(name=f"i0001-{key[5:9].lower()}", approved="no")
+                git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{os.path.basename(tree)}")
+                env[key] = "yes"
+                result = self.push(env=env)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("リモートに無い", result.stderr)
+
+    def test_the_first_push_of_a_parent_never_sent_passes(self):
+        # 形跡が無く、承認済みの親チケットも依頼も退避も無い。最初の push として通す。
+        tree = self.worktree("i0001")
+        self.place(tree)
+        env = self.env(STUB_PARENT="1", STUB_APPROVED="no")
+        result = self.push(env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    def test_an_old_executable_without_the_new_rows_is_judged_by_the_reference_alone(self):
+        tree = self.worktree("i0001")
+        self.place(tree)
+        env = self.env(STUB_PARENT="old")
+        result = self.push(env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    def test_a_remote_that_cannot_be_asked_is_refused(self):
+        tree, env = self.sent_parent()
+        git(self.ws, "remote", "set-url", "origin", os.path.join(self._tmp.name, "missing.git"))
+        result = self.push(env=env)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("リモートにあるかを確かめられない", result.stderr)
+        self.assertEqual(self.subject(tree), MESSAGE)
+
+    def test_a_tree_that_is_not_a_parent_is_not_gated(self):
+        # 実行ファイルが親でないと答えれば、参照が残っていてもリモートに無い名前を送る。
+        tree, env = self.sent_parent()
+        env["STUB_PARENT"] = "no"
+        result = self.push(env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
 
     # ---- 21. detached
 

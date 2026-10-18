@@ -320,6 +320,21 @@ class IntegrateTest(unittest.TestCase):
         self.assertIn("マージリクエスト", r.stderr)
         self.assertEqual("", self.status())
 
+    def test_a_parent_started_but_not_yet_proposed_is_refused(self):
+        """`ccnavi-start.sh` は親のブランチを origin へ送ってから始める。チケットも提案も
+        まだ無い間も、origin に在る親のワークツリーのブランチは、統合先へ直接取り込まない
+        （取り込み状態は持たない）。直接作業のブランチは送らないので、同じ形でも origin に
+        無ければ取り込める。"""
+        self.work_in_branch()
+        git(self.ws, "update-ref", "refs/remotes/origin/wt", "wt")
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r, 2)
+        self.assertIn("マージリクエスト", r.stderr)
+        self.assertIn("origin/wt", r.stderr)
+        self.assertEqual("", self.status())
+        git(self.ws, "update-ref", "-d", "refs/remotes/origin/wt")
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+
     def test_source_worktree_with_uncommitted_changes_is_refused(self):
         self.work_in_branch()
         write(os.path.join(self.wt, "half.txt"), "wip\n")

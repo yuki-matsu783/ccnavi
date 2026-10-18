@@ -226,7 +226,7 @@ class StartShTest(unittest.TestCase):
         ]
 
     def record(self, ident):
-        """取り込み記録（logs/state/sync/self/families/<識別子>）を鍵と値の辞書で返す。無ければ空。"""
+        """旧い取り込み記録（logs/state/sync/self/families/<識別子>）の中身。作らないことを確かめる。"""
         path = os.path.join(self.ws, "logs", "state", "sync", "self", "families", ident)
         if not os.path.exists(path):
             return {}
@@ -297,9 +297,8 @@ class StartShTest(unittest.TestCase):
             "--plan quick-work --scope '<触るファイルの glob>' --issue 152 --mr 7", nexts[0]
         )
         self.assertIn("直接実装に切り替えず、ユーザに報告して止まる", done.stdout)
-        # 取り込み記録に MR の番号を保存する（ブランチ名に / が無いので、識別子もブランチ名と同じ）
-        self.assertEqual(self.record(BRANCH).get("mr"), "7")
-        self.assertEqual(self.record(BRANCH).get("branch"), BRANCH)
+        # MR の番号は手元に保存しない（親チケットの mr 欄が持つ。取り込み状態は作らない）
+        self.assertEqual(self.record(BRANCH), {})
 
     def test_second_run_continues_without_duplicates(self):
         self.github_new()
@@ -329,7 +328,7 @@ class StartShTest(unittest.TestCase):
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
-        self.assertEqual(self.record("fix-152-other").get("mr"), "3")
+        self.assertEqual(self.record("fix-152-other"), {})
         self.assertEqual(self.posts(), [])
         self.assertEqual(self.fields(done.stdout)["ブランチ"], "fix-152-other")
 
@@ -660,8 +659,7 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(sorted(self.local_branches()), ["main", "topic/x"])
         self.assertNotIn("switch", done.stdout)
         self.assertIn("識別子: topic-x", done.stdout)
-        self.assertEqual(self.record("topic-x").get("mr"), "5")
-        self.assertEqual(self.record("topic-x").get("branch"), "topic/x")
+        self.assertEqual(self.record("topic-x"), {})
 
     # ---- 6. 既存の MR を採用するときの確認
 
@@ -968,7 +966,7 @@ class StartShGitLabTest(StartShTest):
         done = self.run_sh("--mr", "9")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(git(self.wt("topic-x"), "rev-parse", "--abbrev-ref", "HEAD"), "topic/x")
-        self.assertEqual(self.record("topic-x").get("mr"), "9")
+        self.assertEqual(self.record("topic-x"), {})
 
     def test_gitlab_fork_mr_is_refused(self):
         mr = {

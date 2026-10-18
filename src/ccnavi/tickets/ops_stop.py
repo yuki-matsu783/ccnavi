@@ -13,7 +13,7 @@ import os
 from dataclasses import dataclass
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import approval, approval_checks, ops_close, syncstate, ticket_model
+from . import approval, approval_checks, ops_close, standing, ticket_model
 
 # Stop で `finish` の打ち忘れを促すときの理由コード。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。
@@ -65,7 +65,7 @@ def unfinished_at_stop(
     if rc != 0 or out.strip():
         return None
     parent_branch = (
-        syncstate.Families(conf, root).branch(bound.parent, bound.project) if bound.is_child else ""
+        standing.Families(conf, root).branch(bound.parent, bound.project) if bound.is_child else ""
     )
     ahead = _own_commits(here.root, bound, parent_branch)
     head = worktree_head_sha(here.root)

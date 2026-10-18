@@ -226,27 +226,6 @@ class RequestNudgeTest(base.StopNudgeTest):
         )
         self.assert_not_asked(self.stop(self.parent_tree))
 
-    def gone_record(self, repo):
-        """取り込み記録を gone で残す（ブランチが消えたと見た記録）。"""
-        write(
-            os.path.join(self.state, "sync", repo, "families", "i0001"),
-            "remote origin\nbranch i0001\nsha 0\nfetched_at 1\nstate gone\nreason x\n",
-        )
-
-    def test_a_record_of_the_same_id_in_another_repo_does_not_break_the_stop(self):
-        """別のリポジトリに同じ識別子の記録が残っていても、親のリポジトリで引くので促せる。
-
-        リポジトリを渡さずに引くと、2 つのリポジトリで見つかって決まらず、
-        Stop の後続ごと飛んでいた。
-        """
-        self.family()
-        self.close_children()
-        self.gone_record("web")
-        result = self.stop(self.parent_tree)
-        self.assertNotIn("internal-error", result.stdout)
-        reason = self.asked(result)
-        self.assertIn("子 i0001-01-01 が親のブランチに合流済みと確かめられません", reason)
-
     def test_a_parent_whose_worktree_is_not_settled_is_left_out_and_the_rule_still_runs(self):
         """親のワークツリーが決まらない親は促さない。Stop のルールは続けて動く。"""
         with open(self.rules, encoding="utf-8") as f:
@@ -256,7 +235,8 @@ class RequestNudgeTest(base.StopNudgeTest):
         write(self.rules, json.dumps(body))
         self.family()
         self.close_children()
-        self.gone_record("self")
+        # 親のワークツリーの HEAD がブランチ名と合わず、親のワークツリーが決まらない形にする。
+        git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         self.assert_not_asked(self.stop(self.root))  # ルールの 1 回目（渡さない回）
         result = self.stop(self.parent_tree)
         self.assertNotIn("internal-error", result.stdout)

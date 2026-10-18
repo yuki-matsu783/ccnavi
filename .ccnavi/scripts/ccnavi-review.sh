@@ -45,7 +45,7 @@
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
 # 道具は起動時に絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
-# 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
+# 取り込み済みの親子のチケット（origin があり、C1 の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
 # request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
 # （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット → 取り込み → 未送信の確かめを済ませてから
@@ -343,7 +343,7 @@ project_id() {
 
 default_branch() {
 	# 統合先。ccnavi-fetch.sh がワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH →
-	# ccnavi-sync.sh の取り込み結果 → origin/HEAD → origin/main・master。ccnavi-common-state.sh の ccnavi_integration）で、
+	# settings.local.json の env → origin/HEAD → origin/main・master。ccnavi-common-state.sh の ccnavi_integration）で、
 	# cwd のツリーが属するリポジトリについて決める。どれも決まらなければ main。
 	db_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	db_name=$(ccnavi_integration "${db_tree:-.}" "$root") || db_name=""

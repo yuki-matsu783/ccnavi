@@ -10,7 +10,6 @@ import {
   planOrderArgs,
   planOrderWriteArgs,
   previewArgs,
-  prepareCommand,
   pushApprovedCommand,
   reviewedPrompt,
   scriptCommand,
@@ -108,14 +107,6 @@ test("CB-T19b 承認の push の sh は、ワークスペースルートから�
   );
 });
 
-test("CB-T583 「準備する」は ccnavi-start.sh --mr <番号> を絶対パスで送る。プロジェクトの親はそのプロジェクトに cd してから", () => {
-  assert.equal(prepareCommand("/ws", 12), "sh /ws/.ccnavi/scripts/ccnavi-start.sh --mr 12");
-  assert.equal(prepareCommand("C:\\Users\\x\\ws", 3), "sh C:/Users/x/ws/.ccnavi/scripts/ccnavi-start.sh --mr 3");
-  assert.equal(
-    prepareCommand("/ws", 5, "lib"),
-    "cd '/ws/projects/lib' && sh /ws/.ccnavi/scripts/ccnavi-start.sh --mr 5",
-  );
-});
 
 test("CB-T287 C1 の対象かは c1 family の target で読む。頭の c1 1 がなければ空、CR は除く", () => {
   assert.equal(c1TargetOf("c1 1\nfamily i0001\ntarget yes\ntree /ws/x y\n"), "yes");

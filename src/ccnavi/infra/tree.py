@@ -40,6 +40,9 @@ WORKTREES_DIR = os.path.join(".claude", "worktrees")
 # ワークスペースルートの名前。空文字。チケットは持たない。
 MAIN = ""
 
+# 手元の状態（退避・退役の記録・ロック）をリポジトリごとに分ける名前の、ワークスペース自身の分。
+SELF = "self"
+
 # ツリーの種類。ワークスペースルート、プロジェクト（`projects/` の直下にある別の
 # リポジトリ）、ワークツリー。プロジェクトはワークスペースの git には入らず、自分の git を持つ。
 KIND_MAIN = "main"
@@ -65,6 +68,16 @@ class Tree:
     def is_main(self) -> bool:
         """チケットを持たないツリーか。ワークスペースルートとプロジェクトがこれ。"""
         return self.kind != KIND_WORKTREE
+
+
+def repo_key(project: str) -> str:
+    """手元の状態を分ける名前。ワークスペース自身は `self`、プロジェクトはその名前。"""
+    return project or SELF
+
+
+def project_of_key(repo: str) -> str:
+    """`repo_key` の名前から、プロジェクトの名前（ワークスペース自身なら空）。"""
+    return "" if repo == SELF else repo
 
 
 def main_tree(root: str) -> Tree:

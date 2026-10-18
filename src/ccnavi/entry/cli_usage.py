@@ -363,9 +363,10 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
          phases: を補完します。quick-work のような scope: inherit のタイプは、それ自体では
          何も集めないため、--scope を指定してください。--mr N は親のブランチのマージ
          リクエストの番号（ccnavi-start.sh が出す。親の提案の mr: に書く）で、省くと
-         取り込み状態に保存された番号を使います。phases.yml がない場合、子のidを
-         指定した場合、または allow が空になる場合は停止します。allow の項が計画のどの
-         フェーズの範囲とも重ならないときは、停止せず「承認しても書けない」と警告します
+         mr: を書かずに雛形を作ります（承認の前に書き足してください）。phases.yml が
+         ない場合、子のidを指定した場合、または allow が空になる場合は停止します。
+         allow の項が計画のどのフェーズの範囲とも重ならないときは、停止せず
+         「承認しても書けない」と警告します
          （scope: inherit のタイプが計画にあれば警告しません）。
          ccnavi-ticket.sh を経由せず、直接実行します）
     ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
@@ -398,6 +399,10 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
         （そのファミリーのワークツリーのうち、まだ残っているものを一覧表示します。削除はしません。
          対象は、チケットを保持する親と異なる名前のワークツリーと、クローズ済みの子のワークツリーで
          未保存の下書きがあるものです。該当がなければ何も表示しません）
+    ccnavi worktree retire --abandon <parent>
+        （放棄した親（MR をマージせずに閉じた親）の片付けの記録 state/retire/<parent>.json を
+         消します。親のワークツリーが残っている間は断ります。ユーザーが端末で打ちます。
+         エージェントからは打てません）
     ccnavi worktree retire <parent> [--cwd <dir>]
         （ready が Draft を外した後に、親を閉じる片付けを行います。閉じた子のワークツリーと、
          子の手元のブランチ（合流した子: 先頭が merged_sha と同じで、それが push 済みの親に含まれる
@@ -416,7 +421,8 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
          （origin/<branch>）と <sha>（MR の先頭）の両方に含まれるときだけ削除します。
          エージェントからは打てません。
          1 行ずつ報告し、最後に
-         "record yes|no"（取り込み記録を消してよいか）を出力します。ネットワークには出ません）
+         "record yes|no"（片付けが済んだか）を出力します。済んだときは retire/<parent>.json も
+         消します。ネットワークには出ません）
     ccnavi worktree name <name>
         （直接作業するワークツリーの名前が <prefix>-<number>-<slug> の形式でない場合に、
          "warn: ..." を1行表示します。形式どおりなら何も表示しません。拒否はしません）
@@ -426,14 +432,26 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
          env に書かれた統合先ブランチです。統合先ブランチについては、環境変数を読みません）
     ccnavi sync check <parent> [<repo>]
         （ccnavi-sync.sh が <parent> を取り込んだ後に使用します。ファミリーの承認済みチケットと
-         その権限を再判定します。"check 1" の行に続いて、"<severity> <detail>" を1行ずつ出力します。
-         エラーによってファミリーが停止する場合は、終了コード1になります）
-    ccnavi sync closed <parent> <repo> <integration> <tree>
-        （ccnavi-sync.sh 用。"closed 1" の行に続いて、"integration yes|no"（統合先ブランチの
-         done/ に同じ親があるか）を出力します。読み取り専用で、git show はローカルで実行されます）
+         その権限を再判定します。"check 1" の行に続いて、"error <detail>" か "warn <detail>" を
+         1行ずつ出力します（warn には、手元のレイヤーが取得済みの origin/<統合先> のレイヤーと
+         違うことを含みます。git show でローカルの参照を読むだけで、ネットワークには出ません）。
+         error がある場合は終了コード1になります）
+    ccnavi sync retired
+        （ccnavi-sync.sh 用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
+         （state/retire/<parent>.json）を "retired <parent> <self|project> <mr|-> <branch|->" の
+         形で1行ずつ出力します。読めない記録や mr の無い記録は "incomplete <parent> <理由>"
+         です。ネットワークにも git にも触れません）
+    ccnavi sync migrate
+        （ccnavi-sync.sh 用。冪等です。旧い取り込み状態（state/sync/<repo>/families/<parent>）の
+         mr と branch を state/retire/<parent>.json に移し、旧い記録と integration/ を消します。
+         "migrate 1" の行に続いて、"moved|kept <parent> <repo>"、"dropped|skipped <parent> <repo>
+         <理由>"、"removed integration <repo>" を出力します。ネットワークにも git にも触れません）
     ccnavi tree parent <tree> <name>
         （スクリプト用。"tree 1" の行に続いて、"parent yes|no|unreadable"（そのツリーが
-         親のチケットまたは提案 <name> を保持しているか）を出力します。スクリプト自身は
+         親のチケットまたは提案 <name> を保持しているか）、"approved yes|no|unreadable"
+         （承認済みの親チケットがあるか。提案は数えません）、"requested yes|no"
+         （.requested のマーカーがあるか）、"archived yes|no"（手元の退避に親があるか）、
+         "mr <番号>|-"（親チケットの mr:）を出力します。スクリプト自身は
          チケットのYAMLを読み込みません）
     ccnavi worktree id <branch>
         （スクリプト用。"id <識別子>"（ブランチ名の / を - に置き換えたもの）に続いて、
