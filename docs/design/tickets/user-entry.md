@@ -62,6 +62,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 | `ccnavi-user-close-early.sh` | `ccnavi-review.sh close-early` |
 | `ccnavi-user-decide.sh` | `ccnavi-review.sh decide` の書く側 |
 | `ccnavi-user-clean-branch.sh` | `ccnavi-clean.sh --branch` |
+| `ccnavi-user-lib-review.sh` | （新規。`decide` と `close-early` が読む、ユーザの判断をホストに書く部品。単独では打たない） |
 
 `ccnavi-review.sh decide <N> --preview`（一覧を見るだけ）は `ccnavi-review.sh` に残る。書く処理（返信・解決・マーカーを置く呼び出し）は
 `ccnavi-user-*.sh` の中だけに置き、共通のファイルには読む側と、エージェントも使うホスト API の関数だけを置く。

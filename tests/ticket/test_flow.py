@@ -695,7 +695,7 @@ class FlowHarness(PhaseHarness):
     """親 1 本（research）と、フローを持つ子 1 本。親の範囲に承認済みの領域は入らない。
 
     フローはユーザが承認のあとに親のツリーの `.ccnavi/approved/flows/<子>.yml` に保存して
-    コミットする（ボードと `ccnavi-push-approved.sh` の進め方）。
+    コミットする（ボードと `ccnavi-user-push-approved.sh` の進め方）。
     """
 
     def setUp(self):

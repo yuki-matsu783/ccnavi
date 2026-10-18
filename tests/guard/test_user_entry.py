@@ -193,7 +193,7 @@ class ExecutableTest(unittest.TestCase):
     def test_user_prune_needs_a_terminal(self):
         result = run_ccnavi(["user", "prune"])
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--prune はユーザーがターミナルから実行する必要があります", result.stderr)
+        self.assertIn("user prune はユーザーがターミナルから実行する必要があります", result.stderr)
 
 
 class HookTest(HookCase):

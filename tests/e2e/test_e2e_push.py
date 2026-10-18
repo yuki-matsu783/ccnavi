@@ -8,11 +8,11 @@
    `ccnavi-git.sh` でコミットし、親のブランチをリモートへ push する（承認の前から親のブランチは
    リモートにある）。`ccnavi-sync.sh` で取り込むと、実行ファイルの
    `--agree --preview --json` が承認待ちに数える
-2. 端末の無い `ccnavi-agree.sh` は承認の壁で止まり、何も置かず何も送らない
-3. `ccnavi-agree.sh` で承認する。承認済みチケットが `doing/` に置かれ、
-   `ccnavi-push-approved.sh` が置き場（と消えた提案）だけをコミットして push する。
+2. 端末の無い `ccnavi-user-agree.sh` は承認の壁で止まり、何も置かず何も送らない
+3. `ccnavi-user-agree.sh` で承認する。承認済みチケットが `doing/` に置かれ、
+   `ccnavi-user-push-approved.sh` が置き場（と消えた提案）だけをコミットして push する。
    同じツリーの書きかけはコミットしない。別の機械（clone）から承認済みチケットが読める
-4. コミットするものが無ければ `ccnavi-push-approved.sh` は 0 で
+4. コミットするものが無ければ `ccnavi-user-push-approved.sh` は 0 で
    「コミットして push する承認済みチケットは無い。」と言う
 5. `ccnavi-ticket.sh start` が承認済みチケットに着手の欄を書き、自分でコミットして push する
 
@@ -179,17 +179,18 @@ class ApproveAndPushTest(unittest.TestCase):
         write(os.path.join(self.tree, "src", "draft.py"), "x\n")
 
         # 2. 端末が無いと承認の壁で止まる。承認済みチケットも、コミットも、push も出ない。
-        walled = self.run_sh("ccnavi-agree.sh", stdin="y\n")
+        walled = self.run_sh("ccnavi-user-agree.sh", stdin="y\n")
         self.assertEqual(1, walled.returncode, walled.stdout + walled.stderr)
         self.assertIn("ターミナル", walled.stderr)
         self.assertFalse(os.path.exists(self.approved_copy()))
         self.assertEqual(proposed, out(self.tree, "rev-parse", "HEAD"))
         self.assertEqual(proposed, self.remote_head())
 
-        # 3. 承認。実行ファイルが doing/ に置き、ccnavi-push-approved.sh がコミットして push する。
+        # 3. 承認。実行ファイルが doing/ に置き、ccnavi-user-push-approved.sh が
+        # コミットして push する。
         approved = self.ok(
             self.run_sh(
-                "ccnavi-agree.sh", stdin="y\n", env={"CCNAVI_GUARD_TICKET_APPROVAL": "disable"}
+                "ccnavi-user-agree.sh", stdin="y\n", env={"CCNAVI_GUARD_TICKET_APPROVAL": "disable"}
             )
         )
         self.assertIn("承認した", approved.stdout)
@@ -220,7 +221,7 @@ class ApproveAndPushTest(unittest.TestCase):
 
         # 4. もうコミットするものは無い。コミットもリモートも動かない。
         pushed = self.remote_head()
-        idle = self.ok(self.run_sh("ccnavi-push-approved.sh", cwd=self.tree))
+        idle = self.ok(self.run_sh("ccnavi-user-push-approved.sh", cwd=self.tree))
         self.assertIn(NOTHING, idle.stdout)
         self.assertEqual(pushed, out(self.tree, "rev-parse", "HEAD"))
         self.assertEqual(pushed, self.remote_head())

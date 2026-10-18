@@ -2,7 +2,7 @@
 type: design
 title: 9.19 保護対象の変更の取り込み（handoff）
 description: エージェントが書けない保護対象の変更を、wip/handoff/ の下書きから ccnavi user handoff で取り込む一本の手順。種類の表（許可リスト）・取り込みの安全・端末要求とボードの経路・ready の止め・検査の共有
-tags: [design-doc, ticket, approval, selfguard, templates]
+tags: [design-doc, ticket, approval, selfguard]
 keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可リスト, 種類の表, expect, conflict, ボード, テンプレート, ready]
 ---
 

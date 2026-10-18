@@ -267,7 +267,8 @@ def decide_before(
                 root=root,
             )
 
-    # 記録と state を消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
+    # 記録と state を消す `ccnavi user prune`（内部は `--prune`。`--preview` の無い形）は、
+    # チケット制御に依らず止める
     # （phase_forms.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の
     # 置き場をシェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
     if (
@@ -331,7 +332,7 @@ def decide_before(
                 conf=conf,
                 root=root,
             )
-        # 2 段目の無いユーザの入口（`ccnavi-sync.sh`・`ccnavi-review.sh decide`・実行ファイルの
+        # 2 段目の無いユーザの入口（`ccnavi-review.sh decide`・実行ファイルの `user` の入口と
         # `--yes`）は、引数を変数・置換・glob で組み立てると表記の検査から外れる。読めなければ止める
         # （phase_forms.hidden_user_entry、ADR-0122）。
         entry, found = phase_forms.hidden_user_entry(
@@ -1225,7 +1226,7 @@ def ticket_verdict(
             "This path is outside the work area the ticket for this worktree declares. Do the "
             "work inside that area, or, if the task genuinely needs this path, tell the parent "
             "so it can propose a ticket that covers it and ask the user to agree to it (from the "
-            "ccnavi board in VS Code or Chrome, with 'ccnavi --agree' in a terminal, or by "
+            "ccnavi board in VS Code or Chrome, with 'ccnavi user agree' in a terminal, or by "
             "moving the proposal file from todo/ to doing/). "
             "Editing a proposal alone changes nothing."
         )

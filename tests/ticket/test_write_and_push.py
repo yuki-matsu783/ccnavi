@@ -17,7 +17,7 @@ tests/sh/test_write_and_push_sh.py が見る。
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
    （一覧は書く。着手で configsync がミラーした `.ccnavi/config/common/` は例外で、
    tests/config/test_config_sync.py が見る）
-4. ユーザの判断の入口の sh（`ccnavi-review.sh close-early`）は
+4. ユーザの判断の入口の sh（`ccnavi-user-close-early.sh`）は
    エージェントから止める
 """
 

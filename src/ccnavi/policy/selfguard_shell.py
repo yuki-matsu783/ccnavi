@@ -271,7 +271,8 @@ def copy_last_place(clause: str) -> str:
 # `logs/` は記録と state の置き場（`logs/decisions.jsonl` と `logs/state/`）。どちらも判定が読むので
 # 名前を絞って守る。ローテートした記録（`logs/decisions.<日時>.jsonl`、prune）も同じ形で守る。
 # 判定は読まないが、「記録が無い = 動かなかった」を読む元で、シェルから消せると自分の呼び出しの
-# 記録を消せる。消すのはセッションの開始と、端末から打つ `ccnavi --prune` だけ。
+# 記録を消せる。消すのはセッションの開始と、端末から打つ `ccnavi user prune`
+# （内部は `--prune`）だけ。
 # `logs/` の下の git のラッパースクリプトの記録は、消しても判定に影響しないので守らない。
 _PLACES = (
     r"\.claude(?:[\\/](hooks" + _END + r"|settings[\w.-]*\.json)|[\\/]?" + _TERM + r")",

@@ -3,7 +3,7 @@
 hook の止め（`phase_forms`）と、実行ファイルの端末要求（`entry/cli*.py`）は、操作を足すたびに
 別々の正規表現やオプションの一覧を直していた。この表が正本になり、`phase_forms` が正規表現と
 オプションの一覧をここから組み立て、実行ファイルは `terminal()` で、端末を求めるときに表示する
-オプション名を引く。操作を足す・外すときは、この表の行を直す。
+操作の名前（`user agree` の形）を引く。操作を足す・外すときは、この表の行を直す。
 
 表は 4 つ。
 
@@ -36,7 +36,7 @@ class Op:
     id: str
     # 文面と、表の読み手のための短い名前。
     what: str
-    # 実行ファイルが標準入力に端末を求める操作の、標準エラーに出すオプションの表示名。
+    # 実行ファイルが標準入力に端末を求める操作の、標準エラーに出す表示名（`user <操作>` の形）。
     # 空なら求めない。
     terminal: str = ""
 
@@ -87,10 +87,10 @@ class Sub:
 
 
 OPS: tuple[Op, ...] = (
-    Op("approve", "承認", terminal="--agree"),
+    Op("approve", "承認", terminal="user agree"),
     Op("push-approved", "承認済みチケットのコミットと push"),
-    Op("reviewed", "レビュー済みの記録", terminal="--reviewed"),
-    Op("close-early", "早めに閉じる", terminal="--close-early"),
+    Op("reviewed", "レビュー済みの記録", terminal="user reviewed"),
+    Op("close-early", "早めに閉じる", terminal="user close-early"),
     Op("decide", "残った指摘の対応方針（ボードの経路）"),
     Op("confirm-yes", "ボードで押した操作の確定（--yes）"),
     Op("tidy", "親を閉じたときの片付け"),
@@ -99,7 +99,7 @@ OPS: tuple[Op, ...] = (
     # 前の形（テンプレート専用の取り込み・改名・移動・削除・下書きの保存）。
     # 今の実行ファイルには無い。
     Op("template", "テンプレートの取り込み・改名・移動・削除・下書きの保存（前の形）"),
-    Op("prune", "記録と state の削除", terminal="--prune"),
+    Op("prune", "記録と state の削除", terminal="user prune"),
     Op("state-direct", "チケットの状態とレビューの操作を実行ファイルで直に呼ぶ形"),
     Op("guard-off", "端末要求を切る設定"),
 )

@@ -47,6 +47,7 @@ ROOT_OF_CCNAVI = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh")
+CLOSE_EARLY_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-close-early.sh")
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
 GITLAB = os.environ.get("CCNAVI_PROBE_GITLAB", "http://localhost:8929").rstrip("/")
@@ -716,7 +717,7 @@ def main() -> int:
             {"body": "残る指摘"},
             tag="discussion-create-3",
         )
-        wrapped = sh(REVIEW_SH, parent2, "close-early", "--reason", "実測はここまで", stdin="y\n")
+        wrapped = sh(CLOSE_EARLY_SH, parent2, "--reason", "実測はここまで", stdin="y\n")
         say("close-early:\n" + redact(wrapped.stdout + wrapped.stderr))
         record("close-early が通る", wrapped.returncode == 0)
         _, issues = api(

@@ -336,7 +336,8 @@ def _prune(
 def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:
     """ユーザの判断の経路が、端末の前のユーザから打たれているか。
 
-    `--agree` と `--reviewed` と `--close-early` はユーザの合意そのもの。エージェントが
+    `user agree`・`user reviewed`・`user close-early`（内部は `--agree` 等）は
+    ユーザの合意そのもの。エージェントが
     Bash から打てばその合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん手間の少ない証拠になる。
     CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。

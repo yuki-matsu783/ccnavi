@@ -348,7 +348,8 @@ _EXE_DIAGNOSES = frozenset(
 EXE_OPTIONS = frozenset(
     {
         "--abandon", "--accept-check", "--accept-done", "--accept-plan",
-        "--accept-unresolved", "--actor", "--agent-id", "--agree", "--all", "--approved", "--body-file",
+        "--accept-unresolved", "--actor", "--agent-id", "--agree", "--all", "--approved",
+        "--body-file",
         "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
         "--expect",
         "--explain", "--fill-phases", "--flow", "--format", "--guard-core-files",
@@ -865,7 +866,7 @@ def _previewed(text: str, cuts: set[int], start: int, end: int) -> bool:
 def prune_message() -> str:
     """`--prune` で止めた文。"""
     return (
-        "記録と state を削除する 'ccnavi --prune' は、ユーザが端末から実行するものです。記録は"
+        "記録と state を削除する 'ccnavi user prune' は、ユーザが端末から実行するものです。記録は"
         "「ccnavi が何を判定したか」を後から確かめるための材料なので、"
         "エージェントからは消しません。"
         "何が消える対象かを見るだけなら 'ccnavi --prune --preview' は通ります。"
@@ -941,13 +942,13 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "もユーザが実行します。"
             "放棄した親の片付けの記録を消す 'ccnavi worktree retire --abandon <親>' と、"
             "ユーザの判断の入口"
-            f"（'{settings.script_command(root, 'ccnavi-review.sh')} "
-            "close-early'）もユーザが実行します。"
+            f"（'{settings.script_command(root, 'ccnavi-user-close-early.sh')}'）"
+            "もユーザが実行します。"
             "保護対象の下書き（wip/handoff/）の取り込み（'ccnavi user handoff'。"
             "見るだけの形も含む）も、ユーザが実行します。"
             "親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・"
             "'ccnavi worktree branch'・"
-            f"'{settings.script_command(root, 'ccnavi-clean.sh')} --branch'）は、"
+            f"'{settings.script_command(root, 'ccnavi-user-clean-branch.sh')}'）は、"
             "ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。"
             "残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです"
             "（案内されたコマンドをユーザに見せて、打ってもらってください）。"

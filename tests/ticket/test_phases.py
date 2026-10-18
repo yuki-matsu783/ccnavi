@@ -124,7 +124,7 @@ class PhaseHarness(unittest.TestCase):
         """承認して、承認済みチケットを親のブランチに乗せる。
 
         承認済みチケットは親のツリーに置かれるので、コミットするまでワークツリーは汚れたまま。
-        本番で `ccnavi-agree.sh` がやることを、テストでも同じ順でたどる。
+        本番で `ccnavi-user-agree.sh` がやることを、テストでも同じ順でたどる。
         """
         result = self.ccnavi("user", "agree", stdin="y\n")
         if os.path.isdir(self.approved):

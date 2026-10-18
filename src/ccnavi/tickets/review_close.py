@@ -90,7 +90,7 @@ def ready(
         stderr.write(
             "全部片付けてから再実行してください。"
             "まだ残るものを承知で早めに閉じるなら、ユーザが端末で "
-            f"'{settings.script_command(root, 'ccnavi-review.sh')} close-early --reason <理由>' "
+            f"'{settings.script_command(root, 'ccnavi-user-close-early.sh')} --reason <理由>' "
             "を実行します。\n"
         )
         return 1
@@ -345,7 +345,7 @@ def close_early(
     作業中の子がいる間は打てない。早めに閉じるのは、手が止まっているときだけ。
     """
     if not reason.strip():
-        stderr.write("ccnavi: --close-early には --reason <理由> が必要です。\n")
+        stderr.write("ccnavi: user close-early には --reason <理由> が必要です。\n")
         return 1
     parent = review._parent(stderr, root, conf, cwd)
     if parent is None:

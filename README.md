@@ -537,7 +537,7 @@ sh と同じ順で `.ccnavi/bin/<os>-<arch>/` の実行ファイルを自分で�
 | `.ccnavi/config/common/rules.yml` | 同じパス |
 | `.ccnavi/config/common/risks.yml` | 同じパス |
 | `.ccnavi/config/common/phases.yml` | 同じパス |
-| `.ccnavi/scripts/ccnavi-{ticket,review,git,common,fetch,sync,clean,branches,start}.sh`、`ccnavi-user-{agree,push-approved,decide,close-early,clean-branch}.sh`、`ccnavi-common-{state,lock,write-and-push,host,log}.sh`、`ccnavi-clean.js` | 同じパス |
+| `.ccnavi/scripts/ccnavi-{ticket,review,git,common,fetch,sync,clean,branches,start,stage,worktree,launcher}.sh`、`ccnavi-user-{agree,push-approved,decide,close-early,clean-branch,lib-review}.sh`、`ccnavi-common-{state,lock,write-and-push,host,log,review}.sh`、`ccnavi-clean.js` | 同じパス |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | 同じパス。配ったあと実行ビットを付ける |
 
 ルールと配点とフェーズ定義のひな形は、共通レイヤー（`.ccnavi/config/common/`）へ配る。共通レイヤーの `phases.yml` には、
@@ -2847,7 +2847,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ## 版の JSON
 
 ```sh
-ccnavi --version          # 1 行 1 項目（`compat: 2` など。sh が読む）
+ccnavi --version          # 1 行 1 項目（`compat: 15` など。sh が読む）
 ccnavi --version --json
 ```
 
@@ -2855,7 +2855,7 @@ ccnavi --version --json
 `.ccnavi/scripts/` の sh で、どちらも起動のときに互換の版を自分のものと比べる。
 
 ```json
-{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 1,
+{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 15,
  "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}
 ```

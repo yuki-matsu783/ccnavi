@@ -216,7 +216,7 @@ class TicketTest(unittest.TestCase):
         """承認して、承認済みチケットを親のブランチに乗せる。
 
         承認済みチケットは親のツリーに置かれ、コミットして初めて子のワークツリーへ渡る。
-        本番で `ccnavi-agree.sh` がやることを、テストでも同じ順でたどる。
+        本番で `ccnavi-user-agree.sh` がやることを、テストでも同じ順でたどる。
         """
         result = self.ccnavi("user", "agree", stdin=answer + "\n")
         if os.path.isdir(self.approved):
@@ -1057,7 +1057,7 @@ class TicketTest(unittest.TestCase):
         refused = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01-01 の親 i0001 がまだ承認されていない（todo/）", refused.stderr)
-        self.assertIn("--agree", refused.stderr)
+        self.assertIn("user agree", refused.stderr)
 
     def test_a_child_without_any_parent_at_all_is_named(self):
         """親の提案がどこにも無い子は、親が無いと言って止めること。
