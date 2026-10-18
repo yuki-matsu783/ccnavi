@@ -89,12 +89,12 @@ test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っ
   assert.ok(card("sample-e").issues.length === 1 && !card("sample-e").worktreeExists && card("sample-e").copyStatus === "open");
   // 先行待ち
   assert.deepEqual(card("sample-b-03-01").predecessorsUnmet.map((p) => p.ticket), ["sample-b-02-01"]);
-  // 取り消し（理由は履歴に残る）とアーカイブ
-  assert.ok(card("sample-f").cancelledAt !== "" && card("sample-f").history.some((h) => h.kind === "cancelled" && h.reason !== ""));
+  // 取り消しとアーカイブ
+  assert.ok(card("sample-f").cancelledAt !== "");
   assert.equal(card("sample-g").column, "archived");
   // フェーズが進んだ親: 終了・進行中・未着手
   assert.deepEqual(card("sample-b").phases.map((p) => p.state), ["ended", "active", "planned"]);
-  assert.ok(card("sample-b").stage !== "" && card("sample-b").history.length > 0);
+  assert.ok(card("sample-b").stage !== "");
   // フロー: 作成・着手中の閲覧・終了済みの閲覧
   assert.equal(card("sample-a-01-01").flow?.exists, false);
   assert.equal(card("sample-a-01-01").flow?.locked, false);
@@ -181,7 +181,7 @@ test("CB-T425 ボードの案内の scene は、見本にある絞り込み・�
 const FIXED_TARGETS = new Set([
   "summary", "filter-project", "filter-parent", "filter-attention", "filter-archived", "refresh", "approve", "tour", "board",
   "badge-copy", "badge-hold", "badge-blocked", "badge-preds", "badge-worktree", "badge-risk", "badge-seen",
-  "approve-one", "review-menu", "mr", "phases", "history", "issues", "moved", "flow-create", "flow-edit", "flow-locked", "workflow-button",
+  "approve-one", "review-menu", "mr", "phases", "issues", "moved", "flow-create", "flow-edit", "flow-locked", "workflow-button",
   "approval-batch", "approval-plan", "approve-confirm", "approval-prompt", "approval-handover", "edit-workflow", "decide-threads", "decide-confirm",
 ]);
 

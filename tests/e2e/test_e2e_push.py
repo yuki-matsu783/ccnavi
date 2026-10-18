@@ -201,12 +201,9 @@ class ApproveAndPushTest(unittest.TestCase):
             out(self.tree, "log", "-1", "--format=%s"),
             approved.stdout + approved.stderr,
         )
-        # コミットしたのは置き場と、承認の記録（events/）と、承認で todo/ から消えた提案だけ。
-        events = ".ccnavi/approved/events"
+        # コミットしたのは置き場と、承認で todo/ から消えた提案だけ。
         self.assertEqual(
-            sorted(
-                [f"{APPROVED}/{TICKET}.md", f"{events}/{TICKET}.jsonl", f"{PROPOSAL}/{TICKET}.md"]
-            ),
+            sorted([f"{APPROVED}/{TICKET}.md", f"{PROPOSAL}/{TICKET}.md"]),
             self.committed(),
         )
         self.assertEqual(proposed, out(self.tree, "rev-parse", "HEAD~1"))
@@ -234,9 +231,7 @@ class ApproveAndPushTest(unittest.TestCase):
         started = self.read(self.approved_copy())
         self.assertNotIn('started_at: ""', started)
         self.assertIn(pushed, started, "基準点が承認のコミットになっていない")
-        self.assertEqual(
-            sorted([f"{APPROVED}/{TICKET}.md", f"{events}/{TICKET}.jsonl"]), self.committed()
-        )
+        self.assertEqual([f"{APPROVED}/{TICKET}.md"], self.committed())
         self.assertEqual(pushed, out(self.tree, "rev-parse", "HEAD~1"))
         self.assertEqual(out(self.tree, "rev-parse", "HEAD"), self.remote_head())
         later = self.clone("machine-b-later")

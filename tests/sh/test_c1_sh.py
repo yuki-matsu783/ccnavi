@@ -11,7 +11,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 
 見るのは次のとおり。
 
-1. 順序: hook のマーカーと状態の履歴を先にコミット → 取り込み → 書く →
+1. 順序: hook のマーカーを先にコミット → 取り込み → 書く →
    書いたパスだけ commit --only → push。
    統合先の取り込み結果も同じ回で書く
 2. ロック: 他の操作が持っていれば何も書かずに止まる。C1 から起こす sync・承認の push は入れ子で通る
@@ -23,7 +23,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
    プロジェクトのレイヤーへ写したものは例外。tests/ticket/test_swap_points.py と
    tests/config/ が見る）
-8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
+8. hook の書きかけ（pending・skipped）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める
 9. ユーザの判断の入口（ccnavi-review.sh close-early など）は、取り込み済みの親子のチケットなら
    承認の push を自動で呼ぶ
@@ -32,7 +32,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
     （コミットも push もしない）
 11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、失敗してもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
-    書いて送ったものが、経路・時刻・拡張の版のほかは同じ
+    書いて送ったものが、経路・時刻のほかは同じ
 
 `CCNAVI_SH_DIR` があれば、`.ccnavi/scripts/` の `.sh` を写したあと、その上に `CCNAVI_SH_DIR` の
 `.sh` を重ねる。写す前の版（`wip/design/scripts/` など）を確かめるときに使う。写す版は一部の sh
@@ -352,7 +352,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), head)
         self.assertEqual(
             self.committed(),
-            [f"{APPROVED}/doing/{PARENT}.md", f"{APPROVED}/events/{PARENT}.jsonl"],
+            [f"{APPROVED}/doing/{PARENT}.md"],
         )
         self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} に着手"])
         self.assertEqual(self.dirty(), "")
@@ -385,24 +385,18 @@ class C1TicketTest(C1Harness):
 
     # ---- 8. hook の書きかけ（b）は先にコミットする。ユーザの判断（c）と知らない変更（d）は止める
 
-    def test_hook_marks_and_events_are_committed_before_the_take_in(self):
+    def test_hook_marks_are_committed_before_the_take_in(self):
         pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
-        events = os.path.join(self.tree, *APPROVED.split("/"), "events", PARENT + ".jsonl")
-        with open(events, "a", encoding="utf-8", newline="\n") as f:
-            row = {"at": "t", "ticket": PARENT, "kind": "phase-mark", "phase": 1, "mark": "pending"}
-            f.write(json.dumps(row) + "\n")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(
             self.subjects(2),
             [
                 f"ccnavi: {PARENT} に着手",
-                f"ccnavi: {PARENT} の hook のマーカーと状態の履歴をコミットする",
+                f"ccnavi: {PARENT} の hook のマーカーをコミットする",
             ],
         )
-        self.assertEqual(
-            self.committed("HEAD~1"), sorted([pending, f"{APPROVED}/events/{PARENT}.jsonl"])
-        )
+        self.assertEqual(self.committed("HEAD~1"), [pending])
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
 
@@ -493,16 +487,11 @@ class C1TicketTest(C1Harness):
         self.assertEqual(len(parents), 3)  # 取り込みの merge
 
     def test_a_conflicting_take_in_writes_nothing(self):
-        events = f"{APPROVED}/events/{PARENT}.jsonl"
-        local = json.dumps({"at": "l", "ticket": PARENT, "kind": "phase-mark"}) + "\n"
-        with open(os.path.join(self.tree, events), "a", encoding="utf-8", newline="\n") as f:
-            f.write(local)
-        git(self.tree, "commit", "-q", "-am", "hook")
-        with open(os.path.join(self.tree, events), encoding="utf-8") as f:
-            base = f.read()[: -len(local)]
-        self.remote_commit(
-            events, base + json.dumps({"at": "r", "ticket": PARENT, "kind": "x"}) + "\n"
-        )
+        pending = f"{APPROVED}/phases/{PARENT}/1.pending"
+        self.mark(1, "pending", {"review": "mr", "at": "l"})
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "hook")
+        self.remote_commit(pending, json.dumps({"review": "mr", "at": "r"}))
         head = self.sha(self.tree, "HEAD")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -717,36 +706,6 @@ class C1TicketTest(C1Harness):
         self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
         self.assertIn("C1 の対象", refused.stderr)
         self.assertEqual(self.dirty(), "")
-
-    # ---- 改行（autocrlf）と偽の状態の履歴
-
-    def test_autocrlf_hook_events_are_carried(self):
-        git(self.ws, "config", "core.autocrlf", "true")
-        events = f"{APPROVED}/events/{PARENT}.jsonl"
-        path = os.path.join(self.tree, *events.split("/"))
-        os.remove(path)
-        git(self.tree, "checkout", "--", events)
-        with open(path, "rb") as f:
-            self.assertIn(b"\r\n", f.read())
-        row = {"at": "t", "ticket": PARENT, "kind": "phase-mark", "phase": 1, "mark": "pending"}
-        with open(path, "ab") as f:
-            f.write(json.dumps(row).encode() + b"\n")
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(
-            f"ccnavi: {PARENT} の hook のマーカーと状態の履歴をコミットする", self.subjects(2)
-        )
-
-    def test_a_forged_event_line_stops(self):
-        events = f"{APPROVED}/events/{PARENT}.jsonl"
-        with open(os.path.join(self.tree, events), "a", encoding="utf-8", newline="\n") as f:
-            f.write(json.dumps({"at": "t", "ticket": PARENT, "kind": "approved"}) + "\n")
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("ユーザの判断が未送信", result.stderr)
-        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
-
-    # ---- ロック（同じ機械で持ち主が生きていれば、10 分を過ぎても強制取得しない）
 
     def test_a_long_lock_of_a_live_owner_is_not_taken(self):
         os.makedirs(self.lock_dir())
@@ -2014,7 +1973,7 @@ class C1HostTest(C1HostHarness):
 
     def test_ready_commits_and_pushes_the_archive_removals_before_undrafting(self):
         """ready の退避（閉じたチケットの削除）は、C1 がコミットして push してから Draft を外す。"""
-        old = f"{APPROVED}/events/old.jsonl"
+        old = f"{APPROVED}/phases/old/closed.json"
         write(os.path.join(self.tree, *old.split("/")), "{}\n")
         git(self.tree, "add", old)
         git(self.tree, "commit", "-q", "-m", "old")
@@ -2198,7 +2157,6 @@ class C1HostTest(C1HostHarness):
         )
         write(os.path.join(self.tree, APPROVED, "done", "old.md"), old)
         write(os.path.join(self.tree, APPROVED, "phases", "old", "closed.json"), "{}\n")
-        write(os.path.join(self.tree, APPROVED, "events", "old.jsonl"), '{"a": 1}\n')
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "退避の途中")
         git(self.tree, "push", "-q", "origin", PARENT)
@@ -2222,13 +2180,11 @@ class C1HostTest(C1HostHarness):
         self.assertIn("push が通らなかった", ready.stderr)
         self.assertIn("Draft を解除した", ready.stdout)
         self.carried(f"{APPROVED}/done/old.md")
-        for rel in ("done/old.md", "phases/old/closed.json", "events/old.jsonl"):
+        for rel in ("done/old.md", "phases/old/closed.json"):
             self.assertEqual(
                 git(self.tree, "ls-tree", "HEAD", "--", f"{APPROVED}/{rel}").stdout, ""
             )
             self.assertTrue(os.path.isfile(os.path.join(archive_base, *rel.split("/"))), rel)
-        with open(os.path.join(archive_base, "events", "old.jsonl"), encoding="utf-8") as f:
-            self.assertEqual(f.read().count('"archived"'), 1)
 
     def test_a_request_is_not_posted_twice_across_runs(self):
         """投稿の後に失敗した依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
@@ -2298,7 +2254,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
     （`--record-tree` が無い）。そこで C1 と同じ手順
     （`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
     回し、同じ状態から Chrome の入口が出す書くものと、C1 が親のブランチへ書いて送ったものを比べる。
-    違ってよいのは経路（`via`）と時刻（`at`）と拡張の版だけ。アカウント（`actor`）は、手元は sh が
+    違ってよいのは経路（`via`）と時刻（`at`）だけ。アカウント（`actor`）は、手元は sh が
     トークンの持ち主を引いたもの、Chrome は PAT の持ち主で、同じ見本なので同じになる。
     """
 
@@ -2386,7 +2342,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
             "family": PARENT,
             "phase": 1,
             "stamp": "2026-09-29T12:00:00+0900",
-            "actor": {"account": "octo-reviewer", "version": "9.9.9"},
+            "actor": {"account": "octo-reviewer"},
             "result": copy,
             "compare": {"base": recorded["head"], "head": head, "files": files},
             "snapshot": {
@@ -2408,11 +2364,8 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
 
     @staticmethod
     def normalized(path, text):
-        """経路・時刻・拡張の版を除く（違ってよいもの）。"""
-        drop = ("via", "at", "version")
-        if path.endswith(".jsonl"):
-            rows = [json.loads(line) for line in text.splitlines() if line.strip()]
-            return [{k: v for k, v in r.items() if k not in drop} for r in rows]
+        """経路・時刻を除く（違ってよいもの）。"""
+        drop = ("via", "at")
         if path.endswith((".reviewed", ".json")):
             return {k: v for k, v in json.loads(text).items() if k not in drop}
         return text

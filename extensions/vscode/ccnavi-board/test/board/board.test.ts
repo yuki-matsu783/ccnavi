@@ -376,23 +376,6 @@ test("CB-T139 止まっていないチケットは今までどおり、不備も
   }
 });
 
-test("CB-T260 履歴はカードへそのまま渡り、列・注意・バッジの材料にはならない", () => {
-  // 履歴は補助の記録で、状態の正は置き場。履歴が「取り消し」と言っていても、列は置き場で決まる。
-  const base = fixture();
-  const child = base.tickets.find((t) => t.ticket === "i0001-02-02")!;
-  const history = [
-    { at: "2026-09-26T09:00:00Z", kind: "cancelled", from: "doing", to: "done", via: "cli", phase: null, mark: "", reason: "試し" },
-  ];
-  const withHistory: TicketJson = { ...child, history };
-  const before = cardsOf(buildBoard(base)).get("i0001-02-02")!;
-  const after = cardsOf(buildBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-02-02" ? withHistory : t)) })).get("i0001-02-02")!;
-  assert.deepEqual(after.history, history);
-  assert.equal(after.column, before.column);
-  assert.equal(after.attention, before.attention);
-  assert.deepEqual(after.issues, before.issues);
-  assert.equal(after.cancelledAt, before.cancelledAt);
-});
-
 test("CB-T263 先行待ちはカードへそのまま渡り、列と要対応は変えない", () => {
   // 判定（先行が done/ に在って取り消しでないか）は実行ファイルが出す。ボードは先行の置き場から組み直さない。
   const base = fixture();
@@ -428,12 +411,10 @@ function archivedJson(ticket: string, parent = ""): ArchivedTicketJson {
     title: `退避した ${ticket}`,
     project: "",
     path: `/ws/logs/archive/self/done/${ticket}.md`,
-    approved_at: "2026-01-01T00:00:00+09:00",
     started_at: "",
     completed_at: "2026-01-02T00:00:00+09:00",
     cancelled_at: "",
     cancel_reason: "",
-    history: [{ at: "2026-01-03T00:00:00Z", kind: "archived", from: "done", to: "archive", via: "cli", phase: null, mark: "", reason: "" }],
   };
 }
 
@@ -447,7 +428,6 @@ test("CB-T301 退避のチケットはアーカイブの列に並び、操作も
   assert.equal(parent.copyStatus, "archived");
   assert.equal(parent.attention, false);
   assert.deepEqual(parent.actions, []);
-  assert.equal(parent.history.at(-1)?.kind, "archived");
   assert.equal(archived.cards[1].family, "old");
   assert.equal(board.archivedCount, 2);
   assert.equal(board.totalCount, buildBoard(base).totalCount);

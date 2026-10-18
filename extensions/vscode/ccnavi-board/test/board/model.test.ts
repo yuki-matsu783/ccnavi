@@ -143,33 +143,6 @@ test("CB-T140 blocked は欄がなければ空。古い実行ファイルの出�
   assert.equal(parsed.board.tickets[1].blocked, "");
 });
 
-test("CB-T259 history は実行ファイルの履歴をそのまま使う。欄がなければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
-  // 欄が無いのは、この欄より前の実行ファイルの出力。空なら履歴を出さない。
-  const base = JSON.parse(fixtureText()) as Record<string, unknown>;
-  const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
-  tickets[0].history = [
-    { at: "2026-09-26T09:00:00Z", ticket: "i0001", kind: "approved", from: "todo", to: "doing", via: "board" },
-    { at: "2026-09-26T09:05:00Z", ticket: "i0001", kind: "phase-mark", from: null, to: null, via: "hook", phase: 1, mark: "pending" },
-    "壊れた行",
-  ];
-  delete tickets[1].history;
-
-  const parsed = parseBoardJson(JSON.stringify({ ...base, tickets }));
-  assert.equal(parsed.ok, true);
-  if (!parsed.ok) {
-    return;
-  }
-  const [approved, mark] = parsed.board.tickets[0].history;
-  assert.equal(parsed.board.tickets[0].history.length, 2);
-  assert.deepEqual(approved, { at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" });
-  // 置き場が動かないもの（マーカー）は from / to が null。空の表記にして、フェーズとマーカーの種類を持つ
-  assert.equal(mark.from, "");
-  assert.equal(mark.to, "");
-  assert.equal(mark.phase, 1);
-  assert.equal(mark.mark, "pending");
-  assert.deepEqual(parsed.board.tickets[1].history, []);
-});
-
 test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま使う。欄がなければ空（満たしている扱い）", () => {
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
@@ -190,7 +163,7 @@ test("CB-T303 archived は実行ファイルの退避の欄を写す。欄がな
     JSON.stringify({
       ...base,
       archived: [
-        { ticket: "old", title: "古い親", path: "/ws/logs/archive/self/done/old.md", history: [{ at: "t", kind: "archived", from: "done", to: "archive", via: "cli" }] },
+        { ticket: "old", title: "古い親", path: "/ws/logs/archive/self/done/old.md" },
         "壊れた行",
       ],
     }),
@@ -205,7 +178,6 @@ test("CB-T303 archived は実行ファイルの退避の欄を写す。欄がな
   assert.equal(old.parent, "");
   assert.equal(old.phase, null);
   assert.equal(old.path, "/ws/logs/archive/self/done/old.md");
-  assert.equal(old.history[0].kind, "archived");
   // この欄を出さない古い実行ファイル
   const { archived: _dropped, ...older } = base;
   const parsedOlder = parseBoardJson(JSON.stringify(older));

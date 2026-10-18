@@ -1480,7 +1480,7 @@ class TicketTest(unittest.TestCase):
         with open(followup, encoding="utf-8") as f:
             text = f.read()
         self.assertIn("phase: 1", text)
-        # 続きの子の目印はトップレベルの欄。承認の記録は書かない（時刻は状態の履歴の `raised`）。
+        # 続きの子の目印はトップレベルの欄。承認の記録は書かない。
         self.assertIn("followup_of:\n- i0001-01-01\n- i0001-01-02\n", text)
         self.assertNotIn("ccnavi_approved:", text)
         self.assertIn("u1", text)

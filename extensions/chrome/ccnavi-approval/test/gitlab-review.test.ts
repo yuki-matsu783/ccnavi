@@ -8,7 +8,7 @@
  * - service worker: 読み取りも登録したリポジトリだけ。「始める」は統合先の先頭で閉じた識別子と互換の版を確かめ直す
  * - GitLab の compare は、折りたたまれた・大きすぎる・時間切れ・上限に近い一覧を読めないとする
  * - GitLab の tree と discussions のページの上限、429 と 403、転送を追わない、シンボリックリンク
- * - 元に戻すコミットはバイト列のまま戻す（BOM も）
+ * - 元に戻すコミットはバイト列のまま戻す（CRLF も）
  * - 「要確認」の親子のチケットには、そのブラウザで書くボタンを出さない
  *
  * 最新のレビューで足したもの: 確かめが失敗したら要確認、元に戻す前の 412 で元に戻し直す、別の線に移ったら
@@ -49,7 +49,6 @@ const TOKENS = new Map([
 const TODO = "wip/proposals/todo/i0001.md";
 const CHILD = "wip/proposals/todo/i0001-01-01.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
-const EVENTS = ".ccnavi/approved/events/i0001.jsonl";
 
 function glDeps(mock: MockGitHub, host = "gitlab.com", now: () => Date = () => new Date(NOW)): WriteDeps {
   const stats = newStats();
@@ -255,17 +254,17 @@ test("CX-T170 GitLab のシンボリックリンク（mode 120000）はパスで
   assert.match(fam?.result?.undecided ?? "", /シンボリックリンク/);
 });
 
-test("CX-T171 元に戻すコミットはバイト列のまま戻す（BOM も失わない）", async () => {
+test("CX-T171 元に戻すコミットはバイト列のまま戻す（CRLF も失わない）", async () => {
   const f = parentOnly();
-  const original = '﻿{"at": "2026-09-01T00:00:00Z", "ticket": "i0001", "kind": "note"}\n';
-  f.i0001.files[EVENTS] = original;
+  const original = f.i0001.files[TODO].replace(/\n/g, "\r\n");
+  f.i0001.files[TODO] = original;
   const mock = new MockGitLab(f);
   const { d, shown } = await start(mock);
   mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "changed", JSON.stringify(out));
   assert.equal(mock.glCommits.length, 2);
-  assert.equal(mock.files("i0001")[EVENTS], original);
+  assert.equal(mock.files("i0001")[TODO], original);
 });
 
 test("CX-T172 「要確認」の親子のチケットには、そのブラウザで承認・取り下げ・レビュー済みのボタンを出さず、ほかの承認者には見えないと言う", async () => {
@@ -366,25 +365,23 @@ test("CX-T177 GitLab の update には、読んだ先頭でそのファイルを
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
   assert.equal((await approveFamily(GITLAB_REPO, "i0001", shown, d)).kind, "written");
   const approval = mock.head("i0001") as string;
-  // 取り下げは events を書き換える（update）。その last_commit_id は承認コミット（読んだ先頭でそのファイルを最後に変えた）
-  const back = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", "", glDeps(mock));
+  // 取り下げは doing/ を消す（delete）。その last_commit_id は承認コミット（読んだ先頭でそのファイルを最後に変えた）
+  const back = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", glDeps(mock));
   assert.equal(back.kind, "written", JSON.stringify(back));
-  const update = mock.glCommits[1].actions.find((a) => a.action === "update");
-  assert.deepEqual([update?.file_path, update?.last_commit_id], [EVENTS, approval]);
   const deleted = mock.glCommits[1].actions.find((a) => a.action === "delete");
   assert.deepEqual([deleted?.file_path, deleted?.last_commit_id], [DOING, approval]);
 
-  // 書く直前に、書き換える events を別の書き手が変える: GitLab が 400 で断り、そのコミットは何も書かない
+  // 書く直前に、消す doing/ を別の書き手が変える: GitLab が 400 で断り、そのコミットは何も書かない
   const race = new MockGitLab(parentOnly());
   const rd = glDeps(race);
   assert.equal((await approveFamily(GITLAB_REPO, "i0001", shownOf(await collectRepo(GITLAB_REPO, rd), "i0001"), rd)).kind, "written");
-  const line = '{"at": "2026-09-30T00:00:00Z", "ticket": "i0001", "kind": "note", "by": "別の書き手"}\n';
-  race.beforeCommit = (b) => void race.push(b, { [EVENTS]: `${race.files(b)[EVENTS]}${line}` }, "別の書き手の events");
-  const raced = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", "", glDeps(race));
+  const line = "別の書き手の行\n";
+  race.beforeCommit = (b) => void race.push(b, { [DOING]: `${race.files(b)[DOING]}${line}` }, "別の書き手の doing");
+  const raced = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", glDeps(race));
   assert.equal(race.glCommits[1].result, "error");
-  assert.equal(race.glCommits[1].actions.find((a) => a.action === "update")?.last_commit_id, race.glCommits[0].oid);
-  // 読み直して書いたとしても、別の書き手の行は残る（上書きしない）
-  assert.ok(race.files("i0001")[EVENTS].includes(line), JSON.stringify(raced));
+  assert.equal(race.glCommits[1].actions.find((a) => a.action === "delete")?.last_commit_id, race.glCommits[0].oid);
+  // 読み直して判定し直しても、別の書き手の行は残る（上書きしない。承認後に変わった承認済みチケットは取り下げない）
+  assert.ok(race.files("i0001")[DOING].includes(line), JSON.stringify(raced));
 });
 
 test("CX-T178 GitLab の開いた MR は全ページを読んでからこのプロジェクトのものに絞る（1 ページ目がフォークで埋まっても外さない）。Approve の数もフォークを数えない", async () => {

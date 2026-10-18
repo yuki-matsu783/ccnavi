@@ -133,12 +133,8 @@ class ChromeProjectTest(unittest.TestCase):
         paths = {r["path"]: r for r in body["changes"]["web-i0012"]}
         self.assertEqual(paths["wip/proposals/todo/web-i0012.md"]["op"], "delete")
         copy = paths[".ccnavi/approved/doing/web-i0012.md"]["content"]
-        # 承認は提案の中身を変えない。出所（ブランチ名）は状態の履歴に残る。
+        # 承認は提案の中身を変えない。
         self.assertNotIn("ccnavi_approved", copy)
-        events = paths[".ccnavi/approved/events/web-i0012.jsonl"]["content"]
-        self.assertIn('"tree": "web-i0012"', events)
-        self.assertIn('"via": "chrome"', events)
-        self.assertIn('"actor": "lab-approver"', events)
 
     def test_the_project_layer_is_the_integration_config_as_it_is(self):
         place = self.chrome._placement()

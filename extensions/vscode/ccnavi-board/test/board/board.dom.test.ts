@@ -604,26 +604,6 @@ test("CB-D105 案内の最中にボードが再読み込みできなくなった
   }
 });
 
-test("CB-D123 履歴を開け閉めしてもカードの提案は開かない。カードの他の場所を押せば開く", async () => {
-  const base = fixture();
-  const history = [{ at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" }];
-  const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-01-01" ? { ...t, history } : t)) });
-  try {
-    const before = page.posted.length;
-    page.click(page.one('.card[data-id="i0001-01-01"] details.history summary'));
-    await page.settle();
-    assert.equal(page.posted.length, before);
-    page.click(page.one('.card[data-id="i0001-01-01"] .history-text'));
-    await page.settle();
-    assert.equal(page.posted.length, before);
-    page.click(page.one('.card[data-id="i0001-01-01"] .title'));
-    await page.settle();
-    assert.equal(page.posted.at(-1)?.type, "open");
-  } finally {
-    await page.close();
-  }
-});
-
 test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れていて、入れるとアーカイブの列と退避のカードが出る。state に残る", async () => {
   const archived = {
     ticket: "old",
@@ -632,12 +612,10 @@ test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れ
     title: "退避した親",
     project: "",
     path: "/ws/logs/archive/self/done/old.md",
-    approved_at: "",
     started_at: "",
     completed_at: "",
     cancelled_at: "",
     cancel_reason: "",
-    history: [],
   };
   const json = { ...fixture(), archived: [archived] };
   // ボードの横幅を偽る（happy-dom は測らない）。送ったかは scrollLeft で見る
@@ -691,12 +669,10 @@ test("CB-D145 退避のチケットしかないボードで表示を入れても
     title: "退避した親",
     project: "",
     path: "/ws/logs/archive/self/done/old.md",
-    approved_at: "",
     started_at: "",
     completed_at: "",
     cancelled_at: "",
     cancel_reason: "",
-    history: [],
   };
   const page = await openBoard({ ...fixture(), tickets: [], parents: [], pending_approval: [], archived: [archived] }, { state: { archived: true } });
   try {
@@ -723,12 +699,10 @@ test("CB-D146 アーカイブの表示を入れると、親の絞り込みに退
     title: "退避した親",
     project: "",
     path: "/ws/logs/archive/self/done/old.md",
-    approved_at: "",
     started_at: "",
     completed_at: "",
     cancelled_at: "",
     cancel_reason: "",
-    history: [],
   };
   const json = { ...fixture(), archived: [archived] };
   const off = await openBoard(json, { state: { parent: "old" } });

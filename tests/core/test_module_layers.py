@@ -145,7 +145,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.flow_text",
                 "tickets.flow_shape",
                 "tickets.flow_render",
-                "tickets.history",
+                "tickets.via",
                 "tickets.review_host",
                 "tickets.risk",
                 "tickets.syncstate",

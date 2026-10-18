@@ -872,56 +872,6 @@ test("CB-T142 見た目の切り替えは body のクラスだけを変更する
   }
 });
 
-test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新しい順に時刻・何が動いたか・経路が並ぶ。履歴がないカードには出さない", async () => {
-  const base = fixture();
-  const child = base.tickets.find((t) => t.ticket === "i0001-02-02")!;
-  const parent = base.tickets.find((t) => t.ticket === "i0001")!;
-  const entries = [
-    { at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" },
-    { at: "2026-09-26T09:10:00Z", kind: "started", from: "doing", to: "doing", via: "cli", phase: null, mark: "", reason: "" },
-    { at: "2026-09-26T10:00:00Z", kind: "cancelled", from: "doing", to: "done", via: "cli", phase: null, mark: "", reason: "要らなくなった" },
-  ];
-  const marks = [
-    { at: "2026-09-26T11:00:00Z", kind: "phase-mark", from: "", to: "", via: "hook", phase: 1, mark: "pending" },
-    { at: "2026-09-26T11:05:00Z", kind: "parent-mark", from: "", to: "", via: "cli", phase: null, mark: "ready" },
-    { at: "2026-09-26T11:06:00Z", kind: "phase-reopened", from: "", to: "", via: "terminal", phase: 2, mark: "" },
-  ].map((e) => ({ reason: "", ...e }));
-  const page = await openBoard({
-    ...base,
-    tickets: [
-      { ...parent, history: marks },
-      { ...child, history: entries },
-    ],
-  });
-  try {
-    const details = page.one('.card[data-id="i0001-02-02"] details.history');
-    assert.equal(details.hasAttribute("open"), false);
-    assert.equal(text(page, '.card[data-id="i0001-02-02"] details.history summary'), "履歴（3 件）");
-    assert.deepEqual(texts(page, '.card[data-id="i0001-02-02"] .history-text'), [
-      "取り消し（作業中 → 完了）: 要らなくなった",
-      "着手",
-      "承認（承認待ち → 作業中）",
-    ]);
-    assert.deepEqual(texts(page, '.card[data-id="i0001-02-02"] .history-at'), ["2026-09-26 10:00 UTC", "2026-09-26 09:10 UTC", "2026-09-26 09:00 UTC"]);
-    // cli は「sh から来た」までしか言えない（ユーザがターミナルで同じ sh を打っても cli）ので、誰が打ったかは言わない
-    assert.deepEqual(texts(page, '.card[data-id="i0001-02-02"] .history-via'), ["sh（ccnavi-ticket.sh など）", "sh（ccnavi-ticket.sh など）", "ボード"]);
-    assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-text'), [
-      "フェーズ 2: フェーズを再開（子チケット追加に伴うマーカー解除）",
-      "Draft を解除した",
-      "フェーズ 1: エージェントに終了を通知済み",
-    ]);
-    assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-via'), ["ターミナル", "sh（ccnavi-ticket.sh など）", "hook"]);
-  } finally {
-    await page.close();
-  }
-  const empty = await openBoard({ ...base, tickets: base.tickets.map((t) => ({ ...t, history: [] })) });
-  try {
-    assert.equal(empty.all("details.history").length, 0);
-  } finally {
-    await empty.close();
-  }
-});
-
 test("CB-T264 先行を満たしていないカードに「先行待ち（先行の識別子）」のバッジ。どの先行が何の状態かは tooltip に実行ファイルの言葉で出す", async () => {
   const base = fixture();
   const unmet = [

@@ -1,10 +1,9 @@
 """手で動かした承認に仕込まれた着手の欄。
 
 承認はチケットの中身を変えないので、提案の段階で書いた `base_sha`・`started_at` は手で動かした
-承認ではそのまま承認済みチケットに入る。`--lint` は、着手の欄があるのに状態の履歴に `started` の行が
-無いものと、着手済みで `base_sha` がワークツリーの HEAD の祖先でないものを warn にする。`start` では
-止めない（両方仕込めば「着手済み」で先に返り、`base_sha` だけなら判定が `blocked` で止め、`start` は
-基準点を HEAD で書き直す）。判定にも入れない。
+承認ではそのまま承認済みチケットに入る。`--lint` は、着手済みで `base_sha` がワークツリーの HEAD の
+祖先でないものを warn にする。`start` では止めない（`base_sha` だけなら判定が `blocked` で止め、
+`start` は基準点を HEAD で書き直す）。判定にも入れない。
 """
 
 from __future__ import annotations
@@ -14,7 +13,6 @@ import os
 
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
-from tests.ticketsample import child_text
 
 
 class PlantedBaseTest(PhaseHarness):
@@ -25,20 +23,6 @@ class PlantedBaseTest(PhaseHarness):
             for p in lint["problems"]
             if p["detail"].startswith(f"{ident}: ") and "started" in p["detail"]
         ]
-
-    def test_lint_warns_about_start_fields_without_a_started_row(self):
-        self.family(plan=["research"])
-        self.start_parent()
-        self.commit_parent("start")
-        self.assertEqual(self.lint_says("i0001"), [])
-        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
-        child = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
-        child = child.replace('started_at: ""', 'started_at: "2026-09-01T00:00:00+0900"')
-        child = child.replace('base_sha: ""', f'base_sha: "{head}"')
-        write(os.path.join(self.approved, "doing", "i0001-01-01.md"), child)
-        self.commit_parent("moved by hand with start fields")
-        said = self.lint_says("i0001-01-01")
-        self.assertEqual([p["severity"] for p in said], ["warn"], said)
 
     def test_lint_warns_when_the_base_sha_is_off_the_worktree_history(self):
         self.family(plan=["research"])
