@@ -8,7 +8,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
 
 # ワークツリーで作業する
 
-ワークツリーを切る前後の決まり。issue・MRを指定されたときは[worktree-start.md](worktree-start.md)、`<統合先>`への取り込みは[worktree-merge.md](worktree-merge.md)、片付けは[worktree-cleanup.md](worktree-cleanup.md)を読む。チケット作業（親と子）の手順は、ステップごとの一覧と図を[ticket-flow.md](ticket-flow.md)にまとめている。
+ワークツリーを切る前後の決まり。issue・MRを指定されたときは[worktree-start.md](worktree-start.md)、`<統合先>`への取り込みは[worktree-merge.md](worktree-merge.md)、片付けは[worktree-cleanup.md](worktree-cleanup.md)を読む。チケット作業（親と子）の手順は[ticket-flow.md](ticket-flow.md)、直接作業の手順は[direct-flow.md](direct-flow.md)に、ステップごとの一覧と図でまとめている。
 
 ## 基本
 
