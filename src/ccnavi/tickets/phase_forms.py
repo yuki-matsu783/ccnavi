@@ -13,8 +13,8 @@ from ..infra import settings, shellread, shellread_words
 from ..policy import rules, selfguard_shell
 from . import user_only
 
-# 何がユーザ専用かは `user_only` の表が正本。この module はその表から正規表現と旗の一覧を組み立て、
-# コマンド行に当てる。操作を足す・外すときは表の行を直し、ここの正規表現は直さない。
+# 何がユーザ専用かは `user_only` の表が正本。この module はその表から正規表現とオプションの一覧を
+# 組み立て、コマンド行に当てる。操作を足す・外すときは表の行を直し、ここの正規表現は直さない。
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
 # コマンドの位置で `sh` から呼ぶ形だけ。名前がどこかに含まれるだけでは通さない。
@@ -80,8 +80,8 @@ _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard_shell._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 #
-# 実行ファイルを直に呼ぶ形の旗とサブコマンドは、表（user_only.FLAGS・SUBS）から組み立てる。
-# 旗ごとの理由（テンプレートの取り込みを下見も含めて止める理由、親を閉じたときの片付けを
+# 実行ファイルを直に呼ぶ形のオプションとサブコマンドは、表（user_only.FLAGS・SUBS）から組み立てる。
+# オプションごとの理由（テンプレートの取り込みを下見も含めて止める理由、親を閉じたときの片付けを
 # エージェントに打たせない理由）は、表の行のコメントにある。
 _CLI_FORMS = user_only.cli_forms(_NOT_PREVIEW)
 CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
@@ -118,8 +118,9 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 #    端末要求を外す（テストと CI のため）。切れなければ、端末を持たないエージェントは実行ファイルの
 #    側で止まる
 # 2. ボードの経路の形。`--yes`（承認と残った指摘）は端末を求めないので、ここが唯一の保護になる。
-#    `--agree` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組、
-#    `--templates` と `--import` と `--yes` の組（テンプレートの取り込み。
+#    `--agree` / `--reviewed` と `--yes` の組み合わせ、
+#    sh の `--choices` と `--digest` の組み合わせ、
+#    `--templates` と `--import` と `--yes` の組み合わせ（テンプレートの取り込み。
 #    ボードの画面だけが `--via board` で呼ぶ）
 #
 # 実行ファイルを呼ぶ表記は追い切れない（`uv run -m ccnavi`、名前を変えたコピー、
@@ -138,7 +139,7 @@ _GUARD_MENTION = re.compile(rf"(?<![A-Za-z0-9_]){_GUARD_NAME}(?![A-Za-z0-9_])", 
 _GUARD_FLAG = re.compile(
     r"--guard-ticket-approval(?:\s*=\s*|\s+)(?!enable(?![\w-]))", re.IGNORECASE
 )
-# ボードの経路の旗の組。組の中身と並びは表（user_only.BOARD_COMBOS）にある。
+# ボードの経路のオプションの組み合わせ。組み合わせの中身と並びは表（user_only.BOARD_COMBOS）にある。
 _BOARD_COMBOS = user_only.board_combos()
 # 表示・検索・閲覧だけをする道具。コマンドを実行する機能か変数に書く機能を持つもの（`sed` の `e`、
 # `awk` の `system()`、`git` の別名、`xargs`、`find -exec`、`printf -v`）は入れない。
@@ -199,7 +200,8 @@ def _commit_messages(subject: str) -> list[str]:
 
 
 def human_path_form(subject: str) -> tuple[str, str]:
-    """hook のほかに保護が無いユーザの判断の形があれば（種類, 見つけた文字列）。無ければ空の組。
+    """hook のほかに保護が無いユーザの判断の形があれば（種類, 見つけた文字列）。
+    無ければ空の文字列 2 つ。
 
     種類は `guard-off`（端末要求を切る）か `board`（ボードの経路）。
     """
@@ -264,9 +266,10 @@ def guard_off_message(found: str) -> str:
 #   なりうる語があれば止める。文字どおりの `--preview` があれば通す
 #   （sh が `--choices` と一緒に断る）
 # - 実行ファイル（launcher を含む）の `--agree` / `--reviewed` と `--yes`: 端末を求めない。
-#   承認の旗と `--yes` がどちらも文字か展開でそろいうるときと、端末要求を切る
-#   `--guard-ticket-approval` になりうる語があるときに止める。展開を含む語より前に、診断の旗
-#   （`--docs`・`--test` など）か実行ファイルの知らない旗があれば通す（承認の経路に進まない）。
+#   承認のオプションと `--yes` がどちらも文字か展開でそろいうるときと、端末要求を切る
+#   `--guard-ticket-approval` になりうる語があるときに止める。展開を含む語より前に、診断のオプション
+#   （`--docs`・`--test` など）か実行ファイルの知らないオプションがあれば通す
+#   （承認の経路に進まない）。
 #   文字どおりの `--agree --preview` も通す（`--yes` が来ても実行ファイルが断る）
 #
 # 展開と glob は、引用されていない部分と二重引用符の中（glob は引用されていない部分）だけで
@@ -303,7 +306,8 @@ _IMPORT_FLAGS = user_only.names("template-write")
 _GUARD_FLAGS = user_only.names("guard")
 _FORGET_FLAGS = user_only.names("forget", where="ccnavi-sync")
 _CHOICES_FLAGS = user_only.names("choices", where="ccnavi-review")
-# 実行ファイルの診断の旗。どれも承認の経路（`--agree` / `--reviewed` / `--close-early`）より前に
+# 実行ファイルの診断のオプション。どれも承認の経路
+# （`--agree` / `--reviewed` / `--close-early`）より前に
 # 分かれて、承認を行わない（cli._parsed の振り分けの順）。
 _EXE_DIAGNOSES = frozenset(
     {
@@ -318,9 +322,9 @@ _EXE_DIAGNOSES = frozenset(
         "-h",
     }
 )
-# 実行ファイルが受ける旗（`ccnavi --version --json` の flags と、短い形の `-h` `-r`）。
-# ここに無い旗（`--list` など）は実行ファイルが使い方の誤りとして断り、何も動かさない。
-# 旗を足したらここにも足す（tests/ticket/test_ticket.py が flags と比べる）。
+# 実行ファイルが受けるオプション（`ccnavi --version --json` の flags と、短い形の `-h` `-r`）。
+# ここに無いオプション（`--list` など）は実行ファイルが使い方の誤りとして断り、何も動かさない。
+# オプションを足したらここにも足す（tests/ticket/test_ticket.py が flags と比べる）。
 EXE_OPTIONS = frozenset(
     {
         "--accept-check", "--accept-done", "--accept-plan",
@@ -477,7 +481,8 @@ def _at_command_position(words: list[str], i: int) -> bool:
 def _hidden_args(kind: str, args: list[str]) -> str:
     """入口の引数のうち、止める理由になる語。無ければ空。
 
-    文字として並んだ `--choices` と `--digest` の組は human_path_form が先に止める。文字として
+    文字として並んだ `--choices` と `--digest` の組み合わせは human_path_form が先に止める。
+    文字として
     並んだ `--forget` はここでも返す（`busybox sh` や `sh < x` を前に置くと script 節から外れる）。
     """
     args = _drop_redirects(args)
@@ -498,7 +503,7 @@ def _hidden_args(kind: str, args: list[str]) -> str:
         return ""
     if not any(_is_open(a) for a in args):
         return ""
-    # 展開を含む語より前の、文字どおりの旗（`--` の後は旗ではない）。
+    # 展開を含む語より前の、文字どおりのオプション（`--` の後はオプションではない）。
     head: list[str] = []
     for arg in args:
         if _is_open(arg) or arg == "--":
@@ -513,7 +518,8 @@ def _hidden_args(kind: str, args: list[str]) -> str:
     guard = [a for a in opened if _could_be(a, _GUARD_FLAGS)]
     if guard:
         return guard[0]
-    # テンプレートの取り込み（`--import` と `--yes`）も、承認と同じく組で読めない形にして隠せる。
+    # テンプレートの取り込み（`--import` と `--yes`）も、承認と同じく、
+    # 組み合わせを読めない形にして隠せる。
     if any(_could_be(a, _APPROVAL_FLAGS + _IMPORT_FLAGS) for a in args) and any(
         _could_be(a, _YES_FLAGS) for a in args
     ):
@@ -567,7 +573,7 @@ def hidden_user_entry(
 ) -> tuple[str, str]:
     """ユーザが端末で打つ入口に、読み切れない引数を渡す形があれば（入口, 見つけた語）。
 
-    無ければ空の組。
+    無ければ空の組み合わせ。
 
     inner は shellread が作る、実行役のコマンドを外した層の（実行役の名前, 層）。`sh -c '…'` の中や
     `xargs` が実行するコマンドがここに並ぶ。組み込みの script 節（`_SCRIPT_FORMS`）が当たる形は、
@@ -696,9 +702,10 @@ _ENTRY_REASONS = {
         "一覧を見るだけなら decide <N> --preview は通ります。",
     ),
     "ccnavi": (
-        "承認の旗（--agree / --reviewed）と --yes、または端末要求を切る "
+        "承認のオプション（--agree / --reviewed）と --yes、または端末要求を切る "
         "--guard-ticket-approval になりうる",
-        "診断（--docs・--test・--lint・--explain など）は、その旗を展開を含む語より前に書けば"
+        "診断（--docs・--test・--lint・--explain など）は、そのオプションを"
+        "展開を含む語より前に書けば"
         "通ります。承認待ちを見るだけなら --agree --preview も通ります。",
     ),
 }
@@ -758,7 +765,7 @@ RECORDS_PRUNE_RULE_ID = "builtin:guard-records-prune"
 
 
 def _unquoted_marks(subject: str) -> tuple[str, set[int]]:
-    """引用符とバックスラッシュを除いた文字列と、除いた場所（除いた後の位置）の組。"""
+    """引用符とバックスラッシュを除いた文字列と、除いた場所（除いた後の位置）の組み合わせ。"""
     text = subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
     out: list[str] = []
     cuts: set[int] = set()
@@ -840,7 +847,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     削除せずに残した取り込み状態を消すと、決まらないで止めていた親子のチケット（gone など）が、
     取り込み状態の無いものに戻り、動けるようになる。
 
-    ボードの経路の形（`--yes` の組、sh の `--choices` と `--digest`）と、端末要求を切る形は、
+    ボードの経路の形（`--yes` の組み合わせ、sh の `--choices` と `--digest`）と、
+    端末要求を切る形は、
     ここではなく `human_path_form` が止める。実行ファイルのパスに頼らず見るため。
     """
     names = [r"ccnavi(\.exe)?"]

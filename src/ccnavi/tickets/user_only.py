@@ -1,20 +1,21 @@
 """ユーザだけが打つ操作の表。何をユーザ専用にしているかを、ここ 1 か所に宣言する。
 
 hook の止め（`phase_forms`）と、実行ファイルの端末要求（`entry/cli*.py`）は、操作を足すたびに
-別々の正規表現や旗の一覧を直していた。この表が正本になり、`phase_forms` が正規表現と旗の
-一覧をここから組み立て、実行ファイルは `terminal()` で端末要求の旗の表示名を引く。
-操作を足す・外すときは、この表の行を直す。
+別々の正規表現やオプションの一覧を直していた。この表が正本になり、`phase_forms` が正規表現と
+オプションの一覧をここから組み立て、実行ファイルは `terminal()` で、端末を求めるときに表示する
+オプション名を引く。操作を足す・外すときは、この表の行を直す。
 
 表は 4 つ。
 
 - `OPS`: 操作。何をする操作か（`what`）と、実行ファイルが端末の前のユーザを求めるときの
-  旗の表示名（`terminal`）を持つ
-- `FLAGS`: 旗。実行ファイル（`where` が空）か sh スクリプト（`where` がスクリプトの名前）の旗。
-  どの止めに入るか（`cli`・`script`）と、旗の群（`groups`）を持つ
+  オプションの表示名（`terminal`）を持つ
+- `FLAGS`: オプション。実行ファイル（`where` が空）か sh スクリプト（`where` がスクリプトの名前）の
+  オプションで、どの止めに入るか（`cli`・`script`）と、所属するグループ（`groups`）を持つ
 - `SCRIPTS`・`SUBS`: コマンドの位置で止める sh スクリプトと、実行ファイルのサブコマンド
-- `BOARD_COMBOS`: ボードで押した操作用の旗の組。コマンド行に全部並んだら止める
+- `BOARD_COMBOS`: ボードで押した操作用のオプションの組み合わせ。コマンド行に全部並んだら止める
 
-群（`groups`）は、旗を束ねて組を作るための名前。ボードの組と、引数を読み切れない形の判定が使う。
+グループ（`groups`）は、オプションを束ねて組み合わせを作るための名前。ボードの組み合わせと、
+引数を読み切れない形の判定が使う。
 
 このモジュールは ccnavi のほかのモジュールを読まない。正規表現の文字列を作るだけで、
 コマンドもチケットも読まない。
@@ -33,21 +34,22 @@ class Op:
     id: str
     # 文面と、表の読み手のための短い名前。
     what: str
-    # 実行ファイルが標準入力に端末を求める操作の、標準エラーに出す旗の表示名。空なら求めない。
+    # 実行ファイルが標準入力に端末を求める操作の、標準エラーに出すオプションの表示名。
+    # 空なら求めない。
     terminal: str = ""
 
 
 @dataclass(frozen=True)
 class Flag:
-    """旗 1 つ。"""
+    """オプション 1 つ。"""
 
     name: str
     op: str
-    # 空なら実行ファイルの旗。sh スクリプトの旗ならスクリプトの名前（拡張子なし）。
+    # 空なら実行ファイルのオプション。sh スクリプトのオプションならスクリプトの名前（拡張子なし）。
     where: str = ""
-    # 実行ファイルを直に呼ぶ形（`launcher … <旗>`）として止める。
+    # 実行ファイルを直に呼ぶ形（`launcher … <オプション>`）として止める。
     cli: bool = True
-    # sh スクリプトの旗として、そのスクリプトの呼び出しを止める。
+    # sh スクリプトのオプションとして、そのスクリプトの呼び出しを止める。
     script: bool = False
     # `--preview` を単独の語として隣に置いた形は、見るだけなので通す。
     preview_exempt: bool = False
@@ -119,7 +121,7 @@ FLAGS: tuple[Flag, ...] = (
     Flag("--save-draft", "template", groups=("edit", "save-draft", "template-write")),
     # 下書きの置き場の中だけを消すので、`--yes` の付かない下見は止めない。
     Flag("--delete-draft", "template", cli=False, groups=("edit", "template-write")),
-    # 単独では止めない。ボードの組の相手になるだけ。
+    # 単独では止めない。ボードの組み合わせの相手になるだけ。
     Flag("--templates", "template", cli=False, groups=("templates",)),
     Flag("--guard-ticket-approval", "guard-off", cli=False, groups=("guard",)),
     Flag("--choices", "decide", where=_REVIEW, cli=False, groups=("choices",)),
@@ -160,8 +162,8 @@ SUBS: tuple[Sub, ...] = (
     Sub(("worktree",), ("retire", "branch"), "tidy"),
 )
 
-# ボードで押した操作用の旗の組。群の名前を並べる。全部の群から 1 つずつがコマンド行に
-# 並んだら止める。並びの順に見て、最初に揃った組で文面を決める。
+# ボードで押した操作用のオプションの組み合わせ。グループの名前を並べる。全部のグループから
+# 1 つずつがコマンド行に並んだら止める。並びの順に見て、最初に揃った組み合わせで文面を決める。
 BOARD_COMBOS: tuple[tuple[str, ...], ...] = (
     ("approval", "yes"),
     ("templates", "import", "yes"),
@@ -172,7 +174,7 @@ BOARD_COMBOS: tuple[tuple[str, ...], ...] = (
 
 # エージェントが sh で打てるスクリプト。止めている間でも通す（phase_forms.exempt）。
 AGENT_SCRIPTS: tuple[str, ...] = ("ticket", "review", "git")
-# サブエージェントに許さない副命令。AGENT_SCRIPTS の sh に付けた形。メインは打てる。
+# サブエージェントに許さないサブコマンド。AGENT_SCRIPTS の sh に付けた形。メインは打てる。
 SUBAGENT_FORBIDDEN: tuple[str, ...] = (
     "start",
     "finish",
@@ -197,7 +199,7 @@ def op(op_id: str) -> Op:
 
 
 def terminal(op_id: str) -> str:
-    """実行ファイルが端末を求める操作の、標準エラーに出す旗の表示名。"""
+    """実行ファイルが端末を求める操作の、標準エラーに出すオプションの表示名。"""
     shown = op(op_id).terminal
     if not shown:
         raise KeyError(f"{op_id} は端末を求める操作ではない")
@@ -205,18 +207,18 @@ def terminal(op_id: str) -> str:
 
 
 def names(*groups: str, where: str | None = "") -> tuple[str, ...]:
-    """群のどれかに入る旗の名前を、表の順に。
+    """グループのどれかに入るオプションの名前を、表の順に。
 
-    `where` は旗の置き場。空は実行ファイル、スクリプトの名前はそのスクリプト、None はどこでも。
-    群に旗が 1 つも無いのは表の書き間違いなので、空では返さず KeyError にする（空の旗で
-    組を作ると、何にでも当たる正規表現になる）。
+    `where` はオプションの置き場。空は実行ファイル、スクリプトの名前はそのスクリプト、
+    None はどこでも。グループにオプションが 1 つも無いのは表の書き間違いなので、空では返さず
+    KeyError にする（空のオプションで組み合わせを作ると、何にでも当たる正規表現になる）。
     """
     found: list[str] = []
     for row in FLAGS:
         if where in (None, row.where) and set(groups) & set(row.groups) and row.name not in found:
             found.append(row.name)
     if not found:
-        raise KeyError(f"旗が無い群: {groups} (where={where!r})")
+        raise KeyError(f"オプションが無いグループ: {groups} (where={where!r})")
     return tuple(found)
 
 
@@ -225,10 +227,13 @@ def _alt(words: tuple[str, ...]) -> str:
 
 
 def cli_forms(not_preview: str) -> str:
-    """実行ファイルを直に呼ぶ形のうち、旗とサブコマンドの部分（`launcher` の後ろに続ける正規表現）。
+    """実行ファイルを直に呼ぶ形のうち、オプションとサブコマンドの部分。
+
+    `launcher` の後ろに続ける正規表現。
 
     `not_preview` は、`--preview` が単独の語として隣に無いことを言う後読みの断片。
-    `preview_exempt` の旗にだけ付ける。承認を行う `--yes` は独立した旗で、必ず当てる。
+    `preview_exempt` のオプションにだけ付ける。承認を行う `--yes` は独立したオプションで、
+    必ず当てる。
     """
     parts: list[str] = []
     exempt = [r.name for r in FLAGS if r.cli and r.preview_exempt and not r.where]
@@ -242,13 +247,14 @@ def cli_forms(not_preview: str) -> str:
         else:
             parts.append(rf"{re.escape(row.name)}\b")
     for sub in SUBS:
-        # 副命令の前の `--`（`ticket -- finish`）は、実行ファイルが選択肢の終わりとして読み飛ばす。
+        # サブコマンドの前の `--`（`ticket -- finish`）は、実行ファイルがオプションの終わりとして
+        # 読み飛ばす。
         parts.append(rf"\b(?:{'|'.join(sub.groups)})\s+(?:--\s+)?(?:{'|'.join(sub.names)})\b")
     return "(?:" + "|".join(parts) + ")"
 
 
 def script_forms() -> str:
-    """コマンドの位置で sh スクリプトを止める正規表現（選択肢は大小を区別しない前提）。"""
+    """コマンドの位置で sh スクリプトを止める正規表現（オプションは大小を区別しない前提）。"""
     head = r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*"
     parts: list[str] = []
     for script in SCRIPTS:
@@ -273,7 +279,7 @@ def _word(words: tuple[str, ...]) -> re.Pattern[str]:
 
 
 def board_combos() -> tuple[tuple[re.Pattern[str], ...], ...]:
-    """ボードの組を、群ごとの正規表現にしたもの。"""
+    """ボードの組み合わせを、グループごとの正規表現にしたもの。"""
     return tuple(
         tuple(_word(names(group, where=None)) for group in combo) for combo in BOARD_COMBOS
     )
@@ -285,7 +291,7 @@ def agent_script_forms() -> str:
 
 
 def subagent_forbidden_forms() -> str:
-    """サブエージェントに許さない副命令の正規表現（コマンドの先頭の `sh` に固定）。"""
+    """サブエージェントに許さないサブコマンドの正規表現（コマンドの先頭の `sh` に固定）。"""
     return (
         r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*"
         + agent_script_forms()
