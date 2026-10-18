@@ -101,7 +101,7 @@ class SetupTest(unittest.TestCase):
             "ccnavi-git.sh",
             "ccnavi-common-state.sh",
             "ccnavi-common-lock.sh",
-            "ccnavi-common-c1.sh",
+            "ccnavi-common-write-and-push.sh",
             "ccnavi-common-host.sh",
             "ccnavi-common-log.sh",
             "ccnavi-common.sh",

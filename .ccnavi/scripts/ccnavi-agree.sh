@@ -84,8 +84,8 @@ report=$(mktemp "${TMPDIR:-/tmp}/ccnavi-agree.XXXXXX") || {
 	exit 2
 }
 # この承認が書いた・消したパスの一覧（1 行 1 つ、ワークスペースルートからの相対）。実行ファイルの
-# `--record-writes` は、書き出し先を state の置き場の c1/ の下に限るので、そこに作る。
-written_dir="$(ccnavi_state "$root")/c1"
+# `--record-writes` は、書き出し先を state の置き場の write-and-push/ の下に限るので、そこに作る。
+written_dir="$(ccnavi_state "$root")/write-and-push"
 mkdir -p "$written_dir" 2>/dev/null || :
 written="$written_dir/agree.$$"
 rm -f "$written"

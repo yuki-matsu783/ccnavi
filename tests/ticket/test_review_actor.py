@@ -304,9 +304,9 @@ class ReviewRuleTest(ActorHarness):
         # 欄の行のほかは変わっていない
         self.assertEqual(1, self.doing_text().count("mr: 7"))
 
-    def test_the_mr_write_is_in_the_c1_write_list(self):
-        # C1 は書いたパスの一覧のパスだけをコミットする。`mr:` の書き足しも一覧に入る
-        state = os.path.join(self.root, "logs", "state", "c1", "demo")
+    def test_the_mr_write_is_in_the_write_and_push_write_list(self):
+        # write-and-push は書いたパスの一覧のパスだけをコミットする。`mr:` の書き足しも一覧に入る
+        state = os.path.join(self.root, "logs", "state", "write-and-push", "demo")
         os.makedirs(state, exist_ok=True)
         listing = os.path.join(state, "writes.txt")
         done = self.request_posted(

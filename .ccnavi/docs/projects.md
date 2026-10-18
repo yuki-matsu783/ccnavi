@@ -61,7 +61,7 @@ statusが言うとおりユーザに`ccnavi-push-approved.sh <親>`を打って�
 
 ## チケットの置き場の移り方
 
-チケットは1つのファイルで、`wip/proposals/todo/`（承認待ち）→`.ccnavi/approved/doing/`（ユーザが承認）→
+チケットは1つのファイルで、`wip/proposals/todo/`（承認待ち。エージェントが`ccnavi-ticket.sh propose`で親のブランチへ送る）→`.ccnavi/approved/doing/`（ユーザが承認）→
 `wip/proposals/review/`（`ticket finish`。レビューが要るとき）→`.ccnavi/approved/done/`（ユーザがレビュー）の順に
 移る。`.ccnavi/approved/`へ移すのはユーザ、`wip/proposals/`へ移すのはエージェントで、
 エージェントは`ccnavi-ticket.sh`を使う。レビューで残った指摘は、ユーザが`decide`で指摘ごとに扱いを決める。`decide`はボードの「決める」か端末から使う。

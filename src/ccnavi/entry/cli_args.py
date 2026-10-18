@@ -349,7 +349,8 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     return False
 
 
-# `c1 sort` の版。sha か `refs/remotes/origin/<親のブランチ>` の形だけ（git の引数として読まれる
+# `write-and-push sort` の版。sha か `refs/remotes/origin/<親のブランチ>` の形だけ（git
+# の引数として読まれる
 # 文字列を入れない）。親のブランチは識別子か、親チケットの `branch:` に書ける名前。
 _SHA = re.compile(r"[0-9a-f]{7,64}")
 _ORIGIN_REF = "refs/remotes/origin/"

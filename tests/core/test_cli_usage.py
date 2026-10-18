@@ -37,8 +37,8 @@ class CliUsageTest(unittest.TestCase):
         self.assertEqual(missing, [], "ヘルプに書いていないフラグ")
 
     def test_every_subcommand_is_in_the_help(self):
-        pairs = set(re.findall(r'\["([a-z0-9]+)", "([a-z-]+)"\]', _read(CLI)))
-        self.assertIn(("c1", "family"), pairs)
+        pairs = set(re.findall(r'\["([a-z0-9-]+)", "([a-z-]+)"\]', _read(CLI)))
+        self.assertIn(("write-and-push", "family"), pairs)
         missing = sorted(f"{a} {b}" for a, b in pairs if f"ccnavi {a} {b}" not in cli_usage.USAGE)
         self.assertEqual(missing, [], "ヘルプに書いていない副命令")
         # `worktree <verb>` は cli_ops が見る。使い方の誤りの文面に並べた形を拾う

@@ -40,7 +40,7 @@ import {
 } from "./core/approvemodel.js";
 import {
   approveArgs,
-  c1TargetOf,
+  writeAndPushTargetOf,
   decideArgs,
   decidePreviewArgs,
   GIT_SCRIPT,
@@ -600,16 +600,16 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
 }
 
 /**
- * 親子のチケットが C1 の対象か（`ccnavi c1 family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
+ * 親子のチケットが write-and-push の対象か（`ccnavi write-and-push family <親>` の `target`。`yes` / `no` / `stop`）。答えなければ空文字。
  * フローの保存の後、承認の push を送るかを決めるのに使う。
  */
-export async function runC1Target(root: string, setting: string, parent: string): Promise<string> {
+export async function runWriteAndPushTarget(root: string, setting: string, parent: string): Promise<string> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return "";
   }
-  const ran = await run(launcher, root, ["c1", "family", parent], EXPLAIN_TIMEOUT_MS);
-  return ran.code === 0 ? c1TargetOf(ran.stdout) : "";
+  const ran = await run(launcher, root, ["write-and-push", "family", parent], EXPLAIN_TIMEOUT_MS);
+  return ran.code === 0 ? writeAndPushTargetOf(ran.stdout) : "";
 }
 
 /** 計画編集タブの 2 本が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */

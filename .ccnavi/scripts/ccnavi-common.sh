@@ -27,7 +27,7 @@
 #                           親ブランチの push の関門（ccnavi_push_gate）、
 #                           タイムアウト監視つきの git（ccnavi_git_timed・ccnavi_git_refusal）
 #   ccnavi-common-lock.sh   親子のチケットのロック（ccnavi_lock_take・ccnavi_lock_drop など）
-#   ccnavi-common-c1.sh     C1。チケットの状態を書く一連の操作を 1 つにまとめる（ccnavi_c1_*）
+#   ccnavi-common-write-and-push.sh     write-and-push。チケットの状態を書く一連の操作を 1 つにまとめる（ccnavi_wap_*）
 #   ccnavi-common-host.sh   ホスト（GitHub / GitLab）への接続（ccnavi_host_*）
 #   ccnavi-common-log.sh    診断ログの 4 つ（log_debug / log_info / log_warn / log_error）。標準出力にも
 #                           標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
@@ -39,7 +39,7 @@
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときと、データの形（待ち方の置き場・取り下げの条件など）が
 # 変わるとき（上げ方は src/ccnavi/entry/version.py の説明）。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=13
+CCNAVI_COMPAT=14
 
 # 相対パスを絶対に直す。
 #
@@ -348,7 +348,7 @@ ccnavi_is_ident() {
 
 # 親のブランチ名として受けてよい書き方なら 0。<語>
 #
-# 実行ファイルの `ticket_ids.branch_problem` の複製（ASCII で見分けられる分だけ）。C1 の対象決めなど、呼ぶたびに
+# 実行ファイルの `ticket_ids.branch_problem` の複製（ASCII で見分けられる分だけ）。write-and-push の対象決めなど、呼ぶたびに
 # 実行ファイルを起こせない所で使う。字の種類・NFC・長さは見ないので、名前を受け入れる入口（ccnavi-start.sh・
 # ccnavi-worktree.sh・ccnavi-git.sh の worktree add）は実行ファイルに聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す。
 #
@@ -393,7 +393,7 @@ ccnavi_branch_to_id() {
 # 環境変数からは受け取らない。置き場を外から差し替えられると、保護していない場所の sh を
 # 保護済み sh の中で走らせられるため。
 ccnavi_lib_dir=$(dirname "$0")
-for ccnavi_lib_part in state lock c1 host log; do
+for ccnavi_lib_part in state lock write-and-push host log; do
 	[ -f "$ccnavi_lib_dir/ccnavi-common-$ccnavi_lib_part.sh" ] || {
 		printf 'ccnavi: 共通部の部品 %s が見つかりません。scripts/ccnavi-setup.sh --force で配り直してください\n' "$ccnavi_lib_dir/ccnavi-common-$ccnavi_lib_part.sh" >&2
 		exit 1

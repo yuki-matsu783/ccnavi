@@ -271,7 +271,7 @@ ccnavi_parent_info() {
 # 形跡は、手元の `refs/remotes/origin/<ブランチ>`（`branch.<ブランチ>.remote` は使わない。origin/main から切った
 # だけの未 push の親でも設定されるため）か、実行ファイルが答える .requested・退避・着手済み（started_at）
 # （fetch.prune で参照が消えても残る）。承認済みというだけでは形跡にしない（直接作業で提案を書き、同名のワークツリーを
-# 切って承認し、最初の push を打つ流れが、初回の push として通らなくなる）。着手（ticket start）は C1 で push して
+# 切って承認し、最初の push を打つ流れが、初回の push として通らなくなる）。着手（ticket start）は write-and-push で push して
 # から完了するので、started_at があれば一度は push している。push の関門（ccnavi_push_gate）と ccnavi-sync.sh の
 # 「消えた親」の判定が同じ述語を使う。
 ccnavi_parent_trace() {

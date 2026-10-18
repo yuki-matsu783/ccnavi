@@ -46,7 +46,7 @@ NOTHING = "コミットして push する承認済みチケットはありませ
 STUB = """#!/bin/sh
 case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
-*" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
+*" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 esac
 [ -z "${STUB_ARGS:-}" ] || printf '%s\\n' "$@" > "$STUB_ARGS"
 # 実行ファイルは書き込みに入ると、書けたパスの一覧を --placed-out のファイルへ書く。
@@ -124,13 +124,15 @@ class Workspace(unittest.TestCase):
         self.remote = os.path.join(self._tmp.name, "origin.git")
         git(self._tmp.name, "init", "-q", "--bare", self.remote)
         git(self.ws, "remote", "add", "origin", self.remote)
-        # C1 の対象かを答えるだけの実行ファイルの代役（いつも対象外。ここで見るのは対象外の道）
-        self.c1_stub = write(
-            os.path.join(self._tmp.name, "c1-bin", "ccnavi"),
+        # write-and-push の対象かを答えるだけの実行ファイルの代役（いつも対象外。
+        # ここで見るのは対象外の道）
+        self.write_and_push_stub = write(
+            os.path.join(self._tmp.name, "write-and-push-bin", "ccnavi"),
             "#!/bin/sh\n"
             'case " $* " in\n'
             f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
-            "*\" c1 family \"*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;\n"
+            '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
+            "no\\n'; exit 0 ;;\n"
             # 統合先（settings.local.json の env）。STUB_INTEGRATION があれば答える。
             '*" sync paths "*) printf \'integration %s\\n\' "${STUB_INTEGRATION:-}"; exit 0 ;;\n'
             # 親か・承認済みか（push の関門が聞く）。STUB_PARENT があるときだけ答える。
@@ -146,7 +148,10 @@ class Workspace(unittest.TestCase):
             "  exit 0 ;;\n"
             "esac\nexit 0\n",
         )
-        os.chmod(self.c1_stub, os.stat(self.c1_stub).st_mode | stat.S_IXUSR | stat.S_IXGRP)
+        os.chmod(
+            self.write_and_push_stub,
+            os.stat(self.write_and_push_stub).st_mode | stat.S_IXUSR | stat.S_IXGRP,
+        )
 
     # ---- 道具
 
@@ -163,7 +168,7 @@ class Workspace(unittest.TestCase):
 
     def env(self, **extra):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        env["CCNAVI_BIN_PATH"] = posix(self.c1_stub)
+        env["CCNAVI_BIN_PATH"] = posix(self.write_and_push_stub)
         env.update(extra)
         return env
 
