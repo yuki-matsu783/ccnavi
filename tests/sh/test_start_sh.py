@@ -16,9 +16,9 @@ gh / glab は使えない代役にして、curl とトークンの経路に切�
 5. GitLab の経路
 6. 既存の MR を採用するときの確認（open・フォーク・マージ先・保護されたブランチ・
    識別子・識別子の重なり・マージ済みの MR）
-7. ワークツリーはブランチを直接チェックアウトする（識別子のブランチを残さない）。
+7. ワークツリーはブランチを直接チェックアウトする。
    毎回 fetch して早送りする
-8. MR の番号は手元に保存しない（親チケットの `mr:` が持つ）
+8. MR の番号は親チケットの `mr:` が持つ
 """
 
 from __future__ import annotations
@@ -297,7 +297,7 @@ class StartShTest(unittest.TestCase):
             "--plan quick-work --scope '<触るファイルの glob>' --issue 152 --mr 7", nexts[0]
         )
         self.assertIn("直接実装に切り替えず、ユーザに報告して止まる", done.stdout)
-        # MR の番号は手元に保存しない（親チケットの mr 欄が持つ。取り込み状態は作らない）
+        # MR の番号は親チケットの mr 欄が持つ（手元の記録は空のまま）
         self.assertEqual(self.record(BRANCH), {})
 
     def test_second_run_continues_without_duplicates(self):
@@ -512,7 +512,7 @@ class StartShTest(unittest.TestCase):
             self.assertIn(word, done.stdout)
         self.assertIn(BRANCH, self.remote_branches())
         self.assertTrue(os.path.isdir(self.wt(BRANCH)))
-        # 打ち直し: MR が無くホストが答えるなら、続きの MR 作成から進む（初期コミットは重ねない）
+        # 打ち直し: MR が無くホストが答えるなら、続きの MR 作成から進む
         self.github_new()
         again = self.run_sh("--issue", "152")
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)

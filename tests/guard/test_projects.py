@@ -458,7 +458,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         # 承認の画面は、書き込みが向かうリポジトリをユーザに見せる
         self.assertIn("■ プロジェクト: lib", approved.stdout)
-        # 承認は `project:` を書き足さない（中身を変えない）。承認済みチケットのプロジェクトも
+        # 承認は `project:` を書き足さない。承認済みチケットのプロジェクトも
         # 置き場（ツリー）から決まる
         for name in ("i0007", "i0007-01-01"):
             with open(self.approved_path("doing", name + ".md"), encoding="utf-8") as f:
@@ -675,7 +675,6 @@ class ProjectsTest(unittest.TestCase):
     def test_an_empty_projects_env_still_counts_the_projects(self):
         # A3（置き場の固定）。`CCNAVI_PROJECTS=""` は「プロジェクトを数えない」と読まれていた。
         # 6 つの env を廃止したので、空文字を入れても `projects/` の下は数えられる。
-        # 実装前は赤。赤の理由は、まだ `CCNAVI_PROJECTS` の空文字を読んでいること。
         env = {"CCNAVI_PROJECTS": ""}
         denied = self.hook(
             "Write", self.ws, env=env, file_path=os.path.join(self.app, "schema", "x.sql")

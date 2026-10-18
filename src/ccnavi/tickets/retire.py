@@ -290,7 +290,7 @@ def entries(conf: settings.Settings) -> list[Entry]:
 
     数えるのは、ファイル名の幹と JSON の `parent` が一致するものだけ（記録を手で置き換えて、
     別の親を指させない）。読めない・`mr` が無い・ブランチが空白を含むものは `incomplete`
-    で、列挙できない理由を言う。自動では何も消さない。
+    で、列挙できない理由を言う。
     """
     directory = os.path.dirname(record_path(conf, "x")) if conf.state else ""
     try:
@@ -739,7 +739,7 @@ def run_merged(
     parent_path = tree.worktree_path(root, family)
     on_disk = os.path.lexists(parent_path)
     # ワークツリーが在るなら、その HEAD が記録のブランチか確かめる。`worktrees.drop` が見るのは
-    # 未コミットと ignored だけで、HEAD が push 済みか・MR に含まれるかは見ない。
+    # 未コミットと ignored だけ。HEAD が push 済みか・MR に含まれるかはここで確かめる。
     blocker = _parent_head_blocker(parent_path, branch, bool(tip)) if on_disk else ""
     if not blocker and tip:
         blocker = _merged_blocker(repo, branch, tip, head_sha)

@@ -600,7 +600,7 @@ class WriterFailureTest(CoreHarness):
         self.assertTrue(os.path.exists(outside))
 
     def test_a_move_whose_target_appeared_stops(self):
-        """並べた後に行き先が置かれていたら、動かさずに止める（上書きしない）。"""
+        """並べた後に行き先が置かれていたら、動かさずに止める。"""
         self.family(plan=["design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()

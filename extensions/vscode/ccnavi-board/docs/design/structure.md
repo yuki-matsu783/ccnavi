@@ -194,8 +194,8 @@ src/
     rules/App.tsx     帯・ツールバー・3 つのタブ（ルール・判定を試す・hook）と、拡張ホストからのメッセージの受け
     rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの選択肢と、ファイルを選ぶ欄。「組み合わせ条件に変換」）
     rules/When.tsx    組み合わせ条件（when）の図（React Flow）と、選んだノードの操作の欄・誤りの一覧
-    rules/Judge.tsx   判定の結果とサンプルの一括判定の表。ここは判定せず、実行ファイルが返した判定を読むだけ
-    rules/Hooks.tsx   hook の一覧（表示するだけで書き換えない）
+    rules/Judge.tsx   判定の結果とサンプルの一括判定の表。実行ファイルが返した判定を読むだけ
+    rules/Hooks.tsx   hook の一覧（表示するだけ）
     rules/state.ts    編集中のルール（行ごとの鍵）・開いている行（id で保持する）・開いているタブ
     rules/text.ts     要約の文・絞り込みが当てる文字列・件数の出し方
 media/

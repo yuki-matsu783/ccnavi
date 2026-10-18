@@ -60,7 +60,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 行ごとに自分のコードを載せ、答えの `code` は最初の理由のものにする。
 Chrome 拡張の入口（`py/ccnavi_chrome.py`）が返す承認（`plan`）・取り下げ（`withdraw`）・レビュー済み（`confirm`）の
 JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`・`mismatch` と同じく、無いときは `null`）。拡張は
-分岐をこの鍵で決め、文面の言い回しを読まない。ボードの取り下げ候補（`withdrawable`）の `problems` にも、押した後の
+分岐をこの鍵で決める。ボードの取り下げ候補（`withdrawable`）の `problems` にも、押した後の
 答えと同じ表記で `[<コード>]` を載せる。承認コミットを引けないときに拡張が足す理由も、同じ場合に `withdraw` が返す
 `[CORE_WITHDRAW_NO_PRIOR]` を頭に付ける。
 

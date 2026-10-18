@@ -314,7 +314,7 @@ class ReadyArchivesTest(ReadyHarness):
         self.assertEqual(read_json(os.path.join(base, "phases", "i0001", "ready.json"))["mr"], 7)
         self.assertTrue(os.path.isfile(os.path.join(base, "phases", "old", "closed.json")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "phases", "i0001")))
-        # git の上では削除だけ（退避は logs/ の下で追跡しない）
+        # git の上では削除だけ
         status = git(self.parent_tree, "status", "--porcelain").splitlines()
         self.assertTrue(status)
         self.assertTrue(all(line.startswith(" D ") for line in status), status)

@@ -209,7 +209,7 @@ def after_last_review(root: str, conf: settings.Settings, parent_id: str) -> str
 def reviewable(snapshot: core_base.Snapshot, parent_id: str) -> list[dict]:
     """依頼済みで、まだレビュー済みでないフェーズ。Chrome のボードが出す候補。
 
-    並べるだけで、通るかは見ない（通るかは `confirm` がホストから取得した結果で決める）。
+    並べるだけ（通るかは `confirm` がホストから取得した結果で決める）。
     答えは `{phase, mr, host, children}` のリスト。`mr` と `host` は依頼のマーカーの値。
     """
     parent = _open_parent(snapshot.root, snapshot.conf, parent_id)

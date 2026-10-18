@@ -1,7 +1,7 @@
 """レイヤーのずれの warn（`lint_layers.layer_drift`）。
 
 手元のレイヤーを、取得済みの `refs/remotes/origin/<統合先>` の同じパスと `git show` で比べる。
-違えば warn で、停止にはしない。`origin/<統合先>` が手元に無ければ `layer_drift` は黙り、
+違えば warn を出す。`origin/<統合先>` が手元に無ければ `layer_drift` は黙り、
 `--lint`（`lint_layers._sync`）は比べられなかったことを info 1 行で言う。
 """
 

@@ -6,8 +6,6 @@
  * バンドルするのは `scripts/bundle-webview.js`（出口は `out/webview/phases.css`）。拡張ホストはそれを読んで
  * `<style nonce>` に流し込む（`src/core/phases-render.ts`）。
  *
- * 図は持たない（順序はフェーズ定義ではなく親チケットの計画で決めるので、定義どうしの関係の図は外した）。
- * なので React Flow の CSS（`@xyflow/react`）も読まない。
  */
 @import "@ccnavi/shared/styles/button.css";
 @import "../styles/appearance.css";

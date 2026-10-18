@@ -854,7 +854,6 @@ class PhaseTest(PhaseHarness):
         head = git(self.parent_tree, "rev-parse", "HEAD").strip()
         # write-and-push と同じく書いたパスを集めて打つ。wip/ の削除は write-and-push
         # がコミットしてよいもの
-        # （置き場の外でも止めない）
         listed = os.path.join(self.root, "logs", "state", "write-and-push", "ready.writes")
         passed = self.ccnavi(
             "--record-writes",

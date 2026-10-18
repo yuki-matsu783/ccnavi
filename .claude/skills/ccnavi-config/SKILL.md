@@ -77,7 +77,7 @@ ccnavi --explain --log "" --state ""
   記述を warn で名指しする。3 本まとめて見る。error があれば終了コード 1
 - `--test-expectations` は期待する判定をぜんぶ判定に掛け、置いたタイプ（`deny` / `ask` / `allow`）と
   違う判定になったものを並べる
-- `--explain` はいま効いているルールと承認済みのチケットの範囲を並べる。判定はしない
+- `--explain` はいま効いているルールと承認済みのチケットの範囲を並べる
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
 `--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `builtin:guard-raw-git` に当たる）。

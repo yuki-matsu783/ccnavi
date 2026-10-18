@@ -3,12 +3,12 @@ type: guide
 title: 工程スキルが育つ流れ
 description: 工程スキルの reference が、振り返りで拾った知識から wiki・候補・承認・反映・配布までどう育つかの全体像
 tags: [skills, docs-search]
-keywords: [工程スキル, reference, 育つ, 全体像, 振り返り, wiki, skill-improve, 候補, common, project, designing, testing, debugging, reviewing]
+keywords: [工程スキル, reference, 育つ, 全体像, 振り返り, wiki, skill-improve, 候補, common, project, process-design, process-research, process-implement, process-test, process-debug, process-review, process-release]
 ---
 
 # 工程スキルが育つ流れ
 
-工程スキル（`designing` `investigating` `testing` `debugging` `reviewing` `releasing`）の SKILL.md は薄い入口に保ち、育つのは `references/` の側。
+工程スキル（`process-design` `process-research` `process-implement` `process-test` `process-debug` `process-review` `process-release`）の SKILL.md は薄い入口に保ち、育つのは `references/` の側。
 スキルの `name` と `description` は常に文脈に入るため、増やすのは reference だけにして、必要なときに `ccnavi --docs` で引く。
 
 ```

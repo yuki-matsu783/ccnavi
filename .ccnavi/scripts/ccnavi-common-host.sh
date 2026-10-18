@@ -20,10 +20,10 @@
 #   ccnavi_host_encode <文字列> クエリの値に入れる文字列（ブランチ名など）のパーセントエンコード
 #   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
 #
-# 失敗したときの文面は呼ぶ側が決める（ここは標準エラーに何も書かない）。ccnavi_host_api が失敗したら、
+# 失敗したときの文面は呼ぶ側が決める。ccnavi_host_api が失敗したら、
 # ccnavi_h_on_fail に名前を入れた関数を `<METHOD> <path> <ホストの返事>` で呼んで 1 を返す。
 # ccnavi_h_tmp は gh / glab の標準エラーを一時に受ける置き場（無ければ TMPDIR）、ccnavi_h_max_time は
-# curl の 1 回の時間の上限（秒。応答しないホストで止まり続けないように。gh / glab は道具に任せる）。
+# curl の 1 回の時間の上限（秒。応答しないホストで止まり続けないように）。
 
 ccnavi_h_on_fail=""
 ccnavi_h_tmp=""

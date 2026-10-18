@@ -3,7 +3,6 @@
  *
  * `--agree --preview --json` が承認待ちの一覧を見せ、`--agree --yes <識別子,…> --json` が承認する。
  * 拡張は一覧の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
- * 承認の対象を自分で組み直したり、提案を読んだりはしない。
  */
 
 export const APPROVE_VERSION = 1;
@@ -110,7 +109,7 @@ export function unsavedText(parents: readonly string[]): string {
 
 /**
  * タブで保存したあとに提案が変わった親（識別子の順）。タブが最後に保存したときの `source_sha`（`saved`）と、一覧の
- * 計画の `source_sha` が違う親。保存していない親は見ない。承認は止めない（図は今の提案をそのまま出している）
+ * 計画の `source_sha` が違う親。承認は止めない（図は今の提案をそのまま出している）
  */
 export function changedSinceSave(preview: ApprovePreview, saved: Readonly<Record<string, string>>): string[] {
   const out = new Set<string>();

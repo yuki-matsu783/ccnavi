@@ -49,8 +49,7 @@ export interface Snapshot {
   readonly project?: string;
   readonly workspace?: Workspace;
   /**
-   * 親子のチケットの識別子 → 親のブランチ名。閉包の先行の親子のチケットを読みに行くブランチの見当で、
-   * 判定には使わない（読んだブランチの親チケットが宣言しなければ Python は使わない）
+   * 親子のチケットの識別子 → 親のブランチ名。閉包の先行の親子のチケットを読みに行くブランチの見当に使う
    */
   readonly hints?: Readonly<Record<string, string>>;
 }

@@ -2,8 +2,8 @@
  * 「判定を試す」の結果。1 件の判定（`judged`）と、期待する判定の一括確認（`expectationsChecked`）、記録から起こした
  * ルールの候補（`suggested`）。
  *
- * ここは判定しない。 出すのは実行ファイル（`--test --json` / `--test-expectations --json` /
- * `--suggest --json`）が返した形をそのまま読んだものだけで、当たる・当たらないの理屈は持たない。
+ * ここで出すのは、実行ファイル（`--test --json` / `--test-expectations --json` /
+ * `--suggest --json`）が返した形をそのまま読んだものだけ。
  * 候補もルールに足さない。下書きを見せるだけで、置くのはユーザ。
  */
 import { Fragment, type JSX } from "react";

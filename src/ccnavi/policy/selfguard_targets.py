@@ -1,6 +1,6 @@
 """守る対象の一覧。設定ファイル・層の 3 本・実行ファイルと、ワークツリー側の写しを集める。
 
-パスを解いて並べるだけで、バックアップも復元もしない。selfguard から分けた。selfguard を読まない。
+パスを解いて並べる。selfguard から分けた。
 """
 
 from __future__ import annotations

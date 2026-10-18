@@ -17,8 +17,6 @@
 - `--explain --json` の `settings`（提案・承認済みチケット・プロジェクトの置き場）
 - 同じ JSON の `layers`（プロジェクトのレイヤーを読む先。`CCNAVI_PROJECT_HOME` が効くとここが動く）
 - hook を数回動かして、記録と控えが `<root>/logs/` に書かれ、よその場所には何も書かれないこと
-
-実装前は赤になる。赤の理由は「まだ 6 つの env（と上書き設定ファイルのキー）を読んでいる」こと。
 """
 
 from __future__ import annotations

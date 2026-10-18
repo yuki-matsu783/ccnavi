@@ -12,7 +12,7 @@
 //   node scripts/test-groups.js --all                    全部
 //   node scripts/test-groups.js rules shared             名指し
 //   node scripts/test-groups.js --for src/core/hooks.ts  触ったファイルから決める
-//   node scripts/test-groups.js --plan --for <パス>...    何を回すかだけ出す（走らせない）
+//   node scripts/test-groups.js --plan --for <パス>...    何を回すかだけ出す
 //   node scripts/test-groups.js --dom --all              画面（*.dom.test.js）だけ
 //
 // `--plan` は node_modules が無くても動く。読むのはソースの文字だけで、

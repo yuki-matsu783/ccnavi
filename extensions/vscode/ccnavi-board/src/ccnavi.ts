@@ -11,7 +11,7 @@
  * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。計画編集タブが読む）と
  * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`（その保存。提案を書き換えるのは実行ファイル）と、
  * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、
- * `--templates --import <下書き> --to … --json`（取り込みの下見。何も書かない）と
+ * `--templates --import <下書き> --to … --json`（取り込みの下見）と
  * `--templates --import <下書き> --to … --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ）。
  * 編集（保存・削除・改名・移動）も同じ 2 段で、下見は `--templates --save-draft … --json` などの `--json`、実行は `--yes --expect <ハッシュ> --via board --json`。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
@@ -107,7 +107,7 @@ const MAX_OUTPUT = 32 * 1024 * 1024;
  */
 const APPROVE_TIMEOUT_MS = 60_000;
 
-/** 子のワークツリー 1 本を作る（`git worktree add` の局所の操作だけ。ネットワークには出ない） */
+/** 子のワークツリー 1 本を作る（`git worktree add` の局所の操作だけ） */
 const WORKTREE_TIMEOUT_MS = 60_000;
 
 /**
@@ -513,7 +513,7 @@ export async function runLint(
 
 /**
  * 実運用の設定をそのまま検証し、苦情を JSON で受ける（README「lint の JSON」）。
- * 差し替えは無し。プロジェクト管理画面が、置き場とプロジェクトごとの warn を拾うために呼ぶ。
+ * プロジェクト管理画面が、置き場とプロジェクトごとの warn を拾うために呼ぶ。
  * error があると終了コードが 1 になるが、それは JSON の中身で分かるので失敗にしない。
  */
 /** 出力の最初の空でない行。画面の 1 行に収める用途で、全量は要らない */
