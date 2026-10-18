@@ -115,7 +115,7 @@ def check(
     ツリーごとに git を起こし、そのツリーのルールで見る。
 
     places はチケットの置き場（提案と承認済みチケット）。そこに現れた変更のうち、
-    ccnavi の副命令が書いたと内容から読めるものを外す（`_script_writes`）。
+    ccnavi のサブコマンドが書いたと内容から読めるものを外す（`_script_writes`）。
     """
     if payload.tool_name in READ_ONLY_TOOLS:
         record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE

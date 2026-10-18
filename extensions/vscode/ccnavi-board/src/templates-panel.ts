@@ -64,7 +64,7 @@ interface Loaded {
   readonly projectLocks: Record<string, Lock>;
   /** 取り込み先に選べる層の名前（`data.layers` の name のうち common 以外） */
   readonly importLayers: readonly string[];
-  /** 編集の旗を実行ファイルが持つか。持たなければ理由（画面の編集の欄を無効にする） */
+  /** 編集のオプションを実行ファイルが持つか。持たなければ理由（画面の編集の欄を無効にする） */
   readonly edit: { readonly enabled: boolean; readonly reason: string };
   /** 上部に出す注意。今は空のまま渡す（画面の欄を残すため） */
   readonly notices: readonly string[];
@@ -286,7 +286,7 @@ async function readPage(root: string, target: TemplatesTarget): Promise<Loaded> 
   }
   const { lock, projectLocks } = locksOf(board.board);
   const importLayers = result.value.layers.map((l) => l.name).filter((n) => n !== "common");
-  // 編集の旗は取り込みとは別に確かめる。持たない古い実行ファイルでは、編集の欄だけを無効にする
+  // 編集のオプションは取り込みとは別に確かめる。持たない古い実行ファイルでは、編集の欄だけを無効にする
   const editReason = await checkTemplatesEdit(root, binSetting());
   const edit = { enabled: editReason === undefined, reason: editReason ?? "" };
   return { target, data: result.value, targets, lock, projectLocks, importLayers, edit, notices: [] };

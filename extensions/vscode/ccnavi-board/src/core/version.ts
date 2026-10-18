@@ -29,7 +29,7 @@ export interface VersionInfo {
   readonly built: boolean;
   readonly compat: number;
   readonly flags: readonly string[];
-  /** 旗から読めない振る舞い（JSON の欄の有無など）。`features` を持たない古い実行ファイルは空 */
+  /** オプションから読めない振る舞い（JSON の欄の有無など）。`features` を持たない古い実行ファイルは空 */
   readonly features: readonly string[];
 }
 

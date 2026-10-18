@@ -6,7 +6,7 @@ run は終了コードを返す。自分で終了しないので、道具ぜん�
 ここに置くのは引数の解釈と振り分けだけ。hook のイベントごとの手順は events、
 実行前チェックは judge、判定につける文面は reasons、モードと終了コードは modes に
 ある。チケットとレビューの操作（`ticket ...` / `review ...`）は `cli_ops.operate` が
-ops / review へ渡す。`--help` の本文は `cli_usage`、旗の読み分けは `cli_args` に分けてある。
+ops / review へ渡す。`--help` の本文は `cli_usage`、オプションの読み分けは `cli_args` に分けてある。
 どれも cli を読まない。
 """
 
@@ -73,7 +73,8 @@ def _take_test_words(argv: list[str]) -> tuple[list[str], list[str] | None]:
 
     返すのは残りの語と、抜いた 2 語（無ければ None）。
 
-    `nargs=2` は版で扱いが違い、3.12 は 2 語の中の旗の名前（`--test Bash --permission-mode auto
+    `nargs=2` は版で扱いが違い、3.12 は 2 語の中のオプションの名前（`--test Bash
+    --permission-mode auto
     ls`）を語として取らずに argparse の誤りで抜けてしまい、`_test_usage` の案内まで届かない。
     続く 2 語をそのまま取れば、版に依らず同じ形で `_test_usage` が読める。2 語に満たないときと
     `--` の後ろにあるときは、そのまま argparse に任せる。
@@ -91,7 +92,8 @@ def _take_test_words(argv: list[str]) -> tuple[list[str], list[str] | None]:
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。
 
-    マーカーに書く経路（via）はここで決まる。既定はエージェントが sh から打つ副命令（`cli`）で、
+    マーカーに書く経路（via）はここで決まる。既定はエージェントが sh から打つサブコマンド（`cli`）
+    で、
     ユーザの判断の経路（端末・ボード）と hook は枝の中で差し替える。
     """
     with via.session(via.VIA_CLI):
@@ -129,8 +131,8 @@ def _test_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> st
 
     - `--permission-mode` / `--agent-id` は `--test` の payload の欄で、ほかの経路
       （`--lint`・`--explain`・`--docs` など）には読む先が無い
-    - `--test` は TOOL と SUBJECT の 2 語を取る。その間に旗を置くと（`--test Bash
-      --permission-mode auto '<cmd>'`）、旗の名前が SUBJECT になり、後ろの語は余る
+    - `--test` は TOOL と SUBJECT の 2 語を取る。その間にオプションを置くと（`--test Bash
+      --permission-mode auto '<cmd>'`）、オプションの名前が SUBJECT になり、後ろの語は余る
     - 余った語（`--test Bash ls extra` の `extra`）
     """
     if args.test is None:
@@ -142,8 +144,8 @@ def _test_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> st
     for word in args.test:
         if word.partition("=")[0] in known:
             return (
-                f"--test の TOOL と SUBJECT に旗（{word}）が入った。旗は --test <TOOL> <SUBJECT> の"
-                "前か後ろに置く"
+                f"--test の TOOL と SUBJECT にオプション（{word}）が入った。"
+                "オプションは --test <TOOL> <SUBJECT> の前か後ろに置く"
             )
     if args.command:
         return f"--test は TOOL と SUBJECT の 2 語だけを取る（余った語: {' '.join(args.command)}）"
@@ -321,7 +323,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # `ticket new --scope <glob>`（繰り返せる）。今回の作業の範囲。`inherit` の型の許可を作る。
     parser.add_argument("--scope", action="append", default=[])
     # `ticket new <識別子> --template <名前> [--layer <名前>]`。計画と子のフローの下書きを
-    # テンプレートから作る（`--plan` の代わり。`--templates`（一覧）とは別の旗）。
+    # テンプレートから作る（`--plan` の代わり。`--templates`（一覧）とは別のオプション）。
     parser.add_argument("--template", default="")
     # `ticket new --template` が、テンプレートのフィードバック計画も書く（既定は書かない）。
     parser.add_argument("--with-feedback", action="store_true")
@@ -661,7 +663,7 @@ def _parsed(
     # レイヤーの置き場（中身の 3 本と、レイヤーを探す先の 2 本）と、記録・state・
     # 承認済みチケット・提案の置き場（`--log` / `--state` / `--approved` / `--tickets`）の
     # 差し替えは診断の経路でだけ使われる。
-    # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
+    # hook からの判定にも、チケットとレビューのサブコマンドにも差し替えの手段を残すと、
     # 設定を保存せずに緩める経路になるので、そこでは無視する。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
     # 指しても実運用に漏れない。

@@ -1,4 +1,4 @@
-"""チケットとレビューの副命令（`ticket` / `review` / `c1` など）を ops・review へ渡す。
+"""チケットとレビューのサブコマンド（`ticket` / `review` / `c1` など）を ops・review へ渡す。
 
 `sync` の問い合わせ（`sync paths` / `sync check`）もここで答える。
 
@@ -456,7 +456,7 @@ _ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
 
 
 # `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが
-# 知らない副命令を断った、など）と読み、親子のチケットを止めない（検査の error と分ける）。
+# 知らないサブコマンドを断った、など）と読み、親子のチケットを止めない（検査の error と分ける）。
 SYNC_CHECK_HEAD = "check 1"
 _SHA = re.compile(r"[0-9a-f]{7,64}")
 _GIT_TIMEOUT = 20.0

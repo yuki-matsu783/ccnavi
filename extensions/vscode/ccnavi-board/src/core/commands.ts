@@ -108,7 +108,7 @@ export function templatesImportYesArgs(request: ImportRequest, expect: string): 
   return [...templatesImportBase(request), "--yes", "--expect", expect, "--via", "board", "--json"];
 }
 
-/** 編集の引数のうち `--json` の前まで。旗の組み合わせは src/ccnavi/entry/cli_templates.py の `_edit_problem` が決める。下見と実行で共有する */
+/** 編集の引数のうち `--json` の前まで。オプションの組み合わせは src/ccnavi/entry/cli_templates.py の `_edit_problem` が決める。下見と実行で共有する */
 function templatesEditBase(request: EditRequest, bodyFile: string): string[] {
   const layer = request.on === "project" ? ["--layer", request.layer] : [];
   switch (request.op) {
@@ -297,7 +297,7 @@ export function c1TargetOf(stdout: string): string {
  * ワークスペースの設定は同じオプションに名前 `self` で渡す。実行ファイルはレイヤー（layer）の名前で差し替えを引き、
  * `self` という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）でだけ有効で、
- * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
+ * hook からの判定にもチケットとレビューのサブコマンドにも届かない（実行ファイルが診断以外では断る）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */
 export type RulesOverride =

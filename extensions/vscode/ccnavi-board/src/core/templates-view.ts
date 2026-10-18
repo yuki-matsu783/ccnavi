@@ -202,7 +202,7 @@ export interface ImportRequest {
   readonly replace: boolean;
 }
 
-// ---- 編集（`--templates --save-draft` などの旗。取り込みと同じく下見と実行の2段）
+// ---- 編集（`--templates --save-draft` などのオプション。取り込みと同じく下見と実行の2段）
 
 /** 編集の種類 */
 export type EditOp = "save" | "delete-draft" | "rename" | "move" | "delete";
@@ -268,7 +268,7 @@ export interface TemplatesPage {
   readonly projectLocks: Readonly<Record<string, Lock>>;
   /** 取り込み先に選べる層の名前（`data.layers` の name のうち common 以外） */
   readonly importLayers: readonly string[];
-  /** 編集の旗を実行ファイルが持つか。持たなければ理由 */
+  /** 編集のオプションを実行ファイルが持つか。持たなければ理由 */
   readonly edit: { readonly enabled: boolean; readonly reason: string };
   readonly notices: readonly string[];
 }

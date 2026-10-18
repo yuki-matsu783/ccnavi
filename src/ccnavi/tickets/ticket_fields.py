@@ -133,9 +133,9 @@ def script_fields_set(text: str) -> tuple[str, ...]:
     """その版が既に値を持っている、スクリプトの欄。
 
     正規化した内容を照合する側が「除いてよい欄」を決めるのに使う（`post_findings._script_writes`）。
-    除いてよいのは、コミット済みの版がまだ持っていない欄だけ。 副命令はどれも
+    除いてよいのは、コミット済みの版がまだ持っていない欄だけ。 サブコマンドはどれも
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
-    それは副命令が書いたものではない。
+    それはサブコマンドが書いたものではない。
 
     とくに `base_sha` は着手の基準点で、親の自分のコミットの数え（`ops_stop._own_commits`）が使う。
     子の範囲検査（`phase_scope.scope_findings`）と実績リスク（`risk.measure`）は、親のワークツリーの
@@ -190,7 +190,7 @@ def _has_value(raw: str) -> bool:
 def script_shape(text: str, drop: tuple[str, ...] = ticket_model.SCRIPT_FIELDS) -> str | None:
     """frontmatter を持つチケットなら、`drop` の欄を除いて正規化した内容を返す。無ければ None。
 
-    実行後チェックが「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
+    実行後チェックが「この変更は ccnavi のサブコマンドが書いたぶんか」を、台帳ではなく内容で
     答えるのに使う（`post_findings._script_writes`）。台帳を持たないのは、承認とマーカーが親の
     ブランチに乗って別の機械へ届くため。台帳はワークスペース側にあって git に入らないので、
     clone した続きでは 1 件も残っていない。内容で見るなら、どの機械でも同じ答えになる。

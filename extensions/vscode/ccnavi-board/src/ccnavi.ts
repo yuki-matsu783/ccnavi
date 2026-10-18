@@ -707,7 +707,7 @@ export async function checkTemplates(root: string, setting: string): Promise<str
   return missingFlags(probe, TEMPLATES_FLAGS, "テンプレート管理画面", hasSource(root));
 }
 
-/** 実行ファイルが編集の旗と機能を知っているかを聞く。知っていれば undefined、知らなければ理由（編集の欄を無効にする理由） */
+/** 実行ファイルが編集のオプションと機能を知っているかを聞く。知っていれば undefined、知らなければ理由（編集の欄を無効にする理由） */
 export async function checkTemplatesEdit(root: string, setting: string): Promise<string | undefined> {
   const probe = await probeVersion(root, setting);
   if (probe === undefined) {

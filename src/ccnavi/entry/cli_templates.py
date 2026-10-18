@@ -36,10 +36,11 @@ from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN
 from ..tickets import flow, plan_templates, template_drafts, template_edit
 from . import cli_args
 
-# 値なしで渡された `--yes`。取り込みと編集の旗だけが読む（ほかの経路の `--yes` は識別子を取る）。
+# 値なしで渡された `--yes`。取り込みと編集のオプションだけが読む（ほかの経路の `--yes`
+# は識別子を取る）。
 BARE_YES = "\x00bare"
 
-# 編集の旗（旗, 引数の属性, op）。1 度に 1 つだけ渡す。
+# 編集のオプション（オプション, 引数の属性, op）。1 度に 1 つだけ渡す。
 EDIT_FLAGS = (
     ("--save-draft", "save_draft", template_edit.OP_SAVE),
     ("--delete-draft", "delete_draft", template_edit.OP_DELETE_DRAFT),
@@ -50,7 +51,7 @@ EDIT_FLAGS = (
 
 
 def edit_op(args) -> tuple[str, str, str]:
-    """渡された編集の旗 (旗, 名前, op)。無ければ ("", "", "")。"""
+    """渡された編集のオプション (オプション, 名前, op)。無ければ ("", "", "")。"""
     for flag, attr, op in EDIT_FLAGS:
         value = getattr(args, attr)
         if value is not None:
@@ -59,7 +60,7 @@ def edit_op(args) -> tuple[str, str, str]:
 
 
 def editing(args) -> bool:
-    """取り込み（--import）か編集の旗が渡されたか。値なしの --yes を読む形。"""
+    """取り込み（--import）か編集のオプションが渡されたか。値なしの --yes を読む形。"""
     return args.import_ is not None or bool(edit_op(args)[0])
 
 
@@ -89,7 +90,9 @@ def asked(args: argparse.Namespace) -> bool:
 
 
 def _edit_problem(args: argparse.Namespace) -> str | None:
-    """編集の旗（保存・削除・改名・移動）の組み合わせの誤り。編集の旗が無ければ None。
+    """編集のオプション（保存・削除・改名・移動）の組み合わせの誤り。
+
+    編集のオプションが無ければ None。
 
     正しければ空文字。
     """
@@ -112,7 +115,7 @@ def _edit_problem(args: argparse.Namespace) -> str | None:
         if not args.body_file:
             return "--save-draft には --body-file <ファイル> を付ける"
         if args.new_name or args.on or args.to or args.to_layer or args.layer or args.replace:
-            return "--save-draft に使えない旗がある（--body-file だけ）"
+            return "--save-draft に使えないオプションがある（--body-file だけ）"
     elif op == template_edit.OP_DELETE_DRAFT:
         if (
             args.body_file
@@ -123,14 +126,14 @@ def _edit_problem(args: argparse.Namespace) -> str | None:
             or args.layer
             or args.replace
         ):
-            return "--delete-draft に使えない旗がある"
+            return "--delete-draft に使えないオプションがある"
     elif op == template_edit.OP_RENAME:
         if args.on not in ("draft", "common", "project"):
             return "--rename-template には --on draft か common か project を付ける"
         if not args.new_name.strip():
             return "--rename-template には --new-name を付ける"
         if args.body_file or args.to or args.to_layer or args.replace:
-            return "--rename-template に使えない旗がある"
+            return "--rename-template に使えないオプションがある"
         if args.layer and args.on != template_edit.ON_PROJECT:
             return "--layer は --on project のときだけ使う"
     elif op == template_edit.OP_MOVE:
@@ -143,14 +146,14 @@ def _edit_problem(args: argparse.Namespace) -> str | None:
         if args.to_layer and args.to != template_drafts.TO_PROJECT:
             return "--to-layer は --to project のときだけ使う"
         if args.body_file or args.new_name or args.replace:
-            return "--move-template に使えない旗がある"
+            return "--move-template に使えないオプションがある"
     elif op == template_edit.OP_DELETE:
         if args.on not in (template_edit.ON_COMMON, template_edit.ON_PROJECT):
             return "--delete-template には --on common か project を付ける"
         if args.layer and args.on != template_edit.ON_PROJECT:
             return "--layer は --on project のときだけ使う"
         if args.body_file or args.new_name or args.to or args.to_layer or args.replace:
-            return "--delete-template に使えない旗がある"
+            return "--delete-template に使えないオプションがある"
     if args.yes not in ("", BARE_YES):
         return f"--yes に値は付けない（{flag} --yes --expect <ハッシュ>）"
     if args.yes and args.expect is None:
@@ -237,7 +240,7 @@ def usage_problem(args: argparse.Namespace) -> str:
         return ""
     if args.docs:
         return "--templates は --docs と一緒に使えない"
-    # 値なしの `--yes` は `--import` と編集の旗が読む。ほかの経路のフラグとは並べられない。
+    # 値なしの `--yes` は `--import` と編集のオプションが読む。ほかの経路のフラグとは並べられない。
     probe = argparse.Namespace(**vars(args))
     if editing(args):
         probe.yes = ""
@@ -592,7 +595,7 @@ def _edit_text(
 
 
 def _edit_tokens(flag: str, plan: template_edit.EditPlan, args: argparse.Namespace) -> str:
-    """下見の答えを書き込みの形に直した旗の並び（`--yes --expect` の前まで）。"""
+    """下見の答えを書き込みの形に直したオプションの並び（`--yes --expect` の前まで）。"""
     tokens = [flag, plan.name]
     if plan.op == template_edit.OP_SAVE:
         tokens += ["--body-file", args.body_file]
