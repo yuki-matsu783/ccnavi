@@ -38,7 +38,7 @@ keywords: [フェーズ管理, フェーズ, フェーズ定義, 計画, 全体�
   番号の子が全部閉じた = フェーズが終わった
         │
         ├─ review: none ─→ skipped（止めない。次へ進む）
-        └─ review: mr ──→ pending ─→ request ─→ requested ─→ confirm / decide ─→ reviewed
+        └─ review: mr ──→ pending ─→ request ─→ requested ─→ confirm / decide / Chrome のレビュー済み ─→ reviewed
 ```
 
 - 順序を決めるのは計画の項の `after` だけ。定義は順序を持たない。待ち方は承認済みチケットの計画から

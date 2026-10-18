@@ -1546,9 +1546,9 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 | 置き場 | 意味 | 動かすもの |
 |---|---|---|
 | `wip/proposals/todo/` | 承認待ち | 親が書く。作成と編集は自由 |
-| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `ccnavi --agree`（ユーザ）、ボード。続きの子をユーザが起こすときも直にここ |
+| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `ccnavi --agree`（ユーザ）、ボード、置き場のファイルの移動。続きの子をユーザが起こすときも直にここ |
 | `wip/proposals/review/` | 作業が終わり、ユーザのレビューを待つ | `sh .ccnavi/scripts/ccnavi-ticket.sh finish <識別子>`（フェーズがレビュー要のとき） |
-| `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm` / `decide`、`ccnavi --reviewed`、`close-early`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
+| `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm` / `decide`、`ccnavi --reviewed`、Chrome 拡張のレビュー済み、`close-early`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
 
 - `.ccnavi/approved/` へ動かすのはユーザ、`wip/proposals/` へ動かすのはエージェント
 - `review/` への直接の作成・移動は誰がやっても止まる（`builtin:ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリを守る組み込みのルールが止める
@@ -1750,7 +1750,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 承認したことは、拡張が渡す文と `ccnavi-ticket.sh status` で伝わる。hook は承認を伝えない。拡張は承認の文
 （`--agree --yes` の `prompt`）をオーバーレイの 2 ボタン（コピー、新しいセッションで開く）から渡せる。端末・GitLab や GitHub の画面・Chrome 拡張で
 承認したときは、ユーザがそのあとセッションに一言送る。ユーザがレビューを終えたことは、VS Code のボードの「レビュー済み連絡」が
-「親のワークツリーで `ccnavi-review.sh confirm --phase <N>` を打て」の文を同じ 2 ボタンで渡す。マーカーを置くのはその `confirm`。
+「親のワークツリーで `ccnavi-review.sh confirm --phase <N>` を打て」の文を同じ 2 ボタンで渡す。マーカーを置くのはその `confirm`。Chrome 拡張のレビュー済みや端末の `decide` で済ませたときも、ユーザがそのあとセッションに一言送り、エージェントは `status` で確かめる。
 
 **承認済みチケットの状態は `status` で聞く。** ファイルや `git status` を読んで推測せず、ccnavi に聞く。
 
@@ -1840,7 +1840,7 @@ jq -r 'select(.rules[0]? == "builtin:ticket-scope" and (.rules | length) > 1) | 
 |---|---|---|
 | 返す文 | すべての子が合流済みと確かめ、`request` でレビューを頼み、ターンを終えてユーザを待て | レビューを省略して次のフェーズへ進める |
 | HITL ポイント | 来る。レビュー済みのマーカーまで止まる | 来ない。省略のマーカーを残す |
-| 先へ進める者 | `ccnavi-review.sh confirm` / `decide` | — |
+| 先へ進める者 | `ccnavi-review.sh confirm` / `decide`、Chrome 拡張のレビュー済み | — |
 | `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | `finish` の時点で `done/` へ |
 
 止めている間、その親の cwd からの `Agent` と Bash を止める（`DENY_PHASE_REVIEW`）。通すのは `ccnavi-ticket.sh` `ccnavi-review.sh`

@@ -22,7 +22,7 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
   todo ─────────────────→ doing ───────────────────────────→ review
   (wip/proposals)      (.ccnavi/approved)                (wip/proposals)
                             │                                  │
-                            │ finish（レビュー不要）／cancel    │ confirm / decide / --reviewed / close-early
+                            │ finish（レビュー不要）／cancel    │ confirm / decide / --reviewed / close-early / Chrome のレビュー済み
                             ▼                                  ▼
                           done ←───────────────────────────────┘
                      (.ccnavi/approved)

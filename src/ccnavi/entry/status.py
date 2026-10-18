@@ -248,7 +248,8 @@ class _Family:
                     nxt
                     or "フェーズを読めないので、レビューを依頼済みかを言えない。ユーザに回るのは、"
                     "親が合流・ELI5 を済ませて ccnavi-review.sh request で依頼した後"
-                    "（依頼済みなら、ユーザが confirm / decide で done/ へ動かすのを待つ）"
+                    "（依頼済みなら、ユーザが confirm / decide か Chrome 拡張のレビュー済みで "
+                    "done/ へ動かすのを待つ）"
                     + PARENT_ONLY
                 )
             )
