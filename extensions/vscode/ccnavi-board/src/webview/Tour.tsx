@@ -367,7 +367,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   useEffect(() => () => focusBefore?.focus?.(), [focusBefore]);
 
   // Esc でやめる。→ で次へ、← で前へ（端の手順ではどちらも何もしない。→ で最後の手順を閉じると、読み終える前に消えてしまう）。
-  // Tab は吹き出しのボタンの中だけを巡る（非表示の画面の「保存」などへ焦点を移さない）
+  // Tab は吹き出しのボタンの中だけを巡る（覆いの背後の画面の「保存」などへ焦点を移さない）
   const count = steps.length;
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -376,7 +376,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         return;
       }
       if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-        // 既定の動き（非表示の画面の横スクロール）を止める
+        // 既定の動き（覆いの背後の画面の横スクロール）を止める
         event.preventDefault();
         event.stopPropagation();
         const step = event.key === "ArrowRight" ? 1 : -1;

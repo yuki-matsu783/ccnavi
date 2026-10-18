@@ -41,55 +41,55 @@ export function Review({ ticket, answer, onConfirm, onCancel, focus = true }: Re
   const moved = renumbered(answer);
   return (
     <Dialog titleId="save-review-title" backdropClass="workflow-review-backdrop" cardClass="workflow-review" id="save-review">
-        <h2 id="save-review-title">この順序に決める</h2>
-        <p className="dim small">ccnavi が {ticket} の提案の計画（plan: / feedback:）と、番号の変わる項を指す子の提案を変更します。承認はしません。</p>
-        <div data-tour="review-numbers">
-          <h3>番号が変わる項（{moved.length}）</h3>
-          {moved.length === 0 ? (
-            <p className="dim small">番号は変わりません（待ちだけが変わります）。</p>
-          ) : (
-            <ul id="review-numbers">
-              {moved.map((item) => (
-                <li key={`${item.part}-${item.from}`}>
-                  {item.title}: {item.from} → {item.number}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div data-tour="review-children">
-          <h3>付け替える子の提案（{answer.children.length}）</h3>
-          {answer.children.length === 0 ? (
-            <p className="dim small">付け替える子の提案はありません。</p>
-          ) : (
-            <ul id="review-children">
-              {answer.children.map((child) => (
-                <li key={child.ticket}>{childText(child)}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-        {answer.mismatched.length > 0 && (
-          <>
-            <h3>計画と食い違う子の提案（変更しません）</h3>
-            <ul id="review-mismatched">
-              {answer.mismatched.map((m) => (
-                <li key={m.ticket}>{m.text}</li>
-              ))}
-            </ul>
-          </>
+      <h2 id="save-review-title">この順序に決める</h2>
+      <p className="dim small">ccnavi が {ticket} の提案の計画（plan: / feedback:）と、番号の変わる項を指す子の提案を変更します。承認はしません。</p>
+      <div data-tour="review-numbers">
+        <h3>番号が変わる項（{moved.length}）</h3>
+        {moved.length === 0 ? (
+          <p className="dim small">番号は変わりません（待ちだけが変わります）。</p>
+        ) : (
+          <ul id="review-numbers">
+            {moved.map((item) => (
+              <li key={`${item.part}-${item.from}`}>
+                {item.title}: {item.from} → {item.number}
+              </li>
+            ))}
+          </ul>
         )}
-        <p className="small" data-tour="review-note">
-          計画の値の中のコメントは消えます（値の外のコメントは残ります）。変更した提案はコミットされないまま承認されるので、承認したあとは取り下げられません（取り消して出し直します）。保存したら、承認はボードから開き直してください。
-        </p>
-        <DialogActions className="workflow-review-actions">
-          <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>
-            キャンセル
-          </button>
-          <button type="button" className="action primary" data-action="confirm-save" ref={confirm} onClick={onConfirm}>
-            保存する
-          </button>
-        </DialogActions>
+      </div>
+      <div data-tour="review-children">
+        <h3>付け替える子の提案（{answer.children.length}）</h3>
+        {answer.children.length === 0 ? (
+          <p className="dim small">付け替える子の提案はありません。</p>
+        ) : (
+          <ul id="review-children">
+            {answer.children.map((child) => (
+              <li key={child.ticket}>{childText(child)}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {answer.mismatched.length > 0 && (
+        <>
+          <h3>計画と食い違う子の提案（変更しません）</h3>
+          <ul id="review-mismatched">
+            {answer.mismatched.map((m) => (
+              <li key={m.ticket}>{m.text}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="small" data-tour="review-note">
+        計画の値の中のコメントは消えます（値の外のコメントは残ります）。変更した提案はコミットされないまま承認されるので、承認したあとは取り下げられません（取り消して出し直します）。保存したら、承認はボードから開き直してください。
+      </p>
+      <DialogActions className="workflow-review-actions">
+        <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>
+          キャンセル
+        </button>
+        <button type="button" className="action primary" data-action="confirm-save" ref={confirm} onClick={onConfirm}>
+          保存する
+        </button>
+      </DialogActions>
     </Dialog>
   );
 }

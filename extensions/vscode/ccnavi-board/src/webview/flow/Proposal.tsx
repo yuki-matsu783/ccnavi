@@ -88,48 +88,48 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
   const blocked = lock.locked || diff?.problem !== undefined;
   return (
     <Dialog titleId="proposal-review-title" backdropClass="review-backdrop" cardClass="review proposal" id="proposal-review" tour="proposal">
-        <h2 id="proposal-review-title">エージェントの提案を確認する</h2>
-        {view.kind === "loading" && <p className="dim">下書きを ccnavi で確認しています…</p>}
-        {view.kind === "error" && (
-          <p className="proposal-error" id="proposal-error">
-            {view.error}
+      <h2 id="proposal-review-title">エージェントの提案を確認する</h2>
+      {view.kind === "loading" && <p className="dim">下書きを ccnavi で確認しています…</p>}
+      {view.kind === "error" && (
+        <p className="proposal-error" id="proposal-error">
+          {view.error}
+        </p>
+      )}
+      {view.kind === "ready" && (
+        <>
+          <p className="dim small">
+            下書き {view.proposal.draftPath} と、いまのフローとの違いです。フローの文は担当のサブエージェントへの案内になります。
+            外部の道具を使わせる指示などが紛れていないか、文を読んでから取り込んでください。
           </p>
-        )}
-        {view.kind === "ready" && (
-          <>
-            <p className="dim small">
-              下書き {view.proposal.draftPath} と、いまのフローとの違いです。フローの文は担当のサブエージェントへの案内になります。
-              外部の道具を使わせる指示などが紛れていないか、文を読んでから取り込んでください。
+          {diff?.problem !== undefined && (
+            <p className="proposal-error" id="proposal-problem">
+              取り込めません: {diff.problem}。下の全体の JSON を確認し、エディタで直すか、エージェントに下書きの作り直しを依頼してください。
             </p>
-            {diff?.problem !== undefined && (
-              <p className="proposal-error" id="proposal-problem">
-                取り込めません: {diff.problem}。下の全体の JSON を確認し、エディタで直すか、エージェントに下書きの作り直しを依頼してください。
-              </p>
-            )}
-            {changes.length === 0 && <p id="proposal-order-only">並び順だけが違います（ノードと線の中身は同じです）。</p>}
-            <ul className="proposal-list">
-              {changes.map((change, index) => (
-                <Change key={index} change={change} />
-              ))}
-            </ul>
-            {lock.locked && <p className="proposal-locked">着手中のため取り込めません。{lock.reason}</p>}
-            {!lock.locked && dirty && (
-              <p className="proposal-dirty" id="proposal-dirty">
-                未保存の変更があります。取り込むと、編集中の内容は下書きの中身に置き換わります（元に戻すで戻せます）。
-              </p>
-            )}
-          </>
-        )}
-        <DialogActions className="review-actions">
-          <button type="button" className="action" data-action="cancel-proposal" ref={cancel} onClick={onCancel}>
-            閉じる
-          </button>
-          {view.kind === "ready" && (
-            <button type="button" className="action primary" data-action="import-proposal" data-tour="proposal-import" disabled={blocked} onClick={() => onImport(view.proposal)}>
-              {dirty ? "未保存の変更を破棄して取り込む" : "取り込む"}
-            </button>
           )}
-        </DialogActions>
+          {changes.length === 0 && <p id="proposal-order-only">並び順だけが違います（ノードと線の中身は同じです）。</p>}
+          <ul className="proposal-list">
+            {changes.map((change, index) => (
+              <Change key={index} change={change} />
+            ))}
+          </ul>
+          {lock.locked && <p className="proposal-locked">着手中のため取り込めません。{lock.reason}</p>}
+          {!lock.locked && dirty && (
+            <p className="proposal-dirty" id="proposal-dirty">
+              未保存の変更があります。取り込むと、編集中の内容は下書きの中身に置き換わります（元に戻すで戻せます）。
+            </p>
+          )}
+        </>
+      )}
+      <DialogActions className="review-actions">
+        <button type="button" className="action" data-action="cancel-proposal" ref={cancel} onClick={onCancel}>
+          閉じる
+        </button>
+        {view.kind === "ready" && (
+          <button type="button" className="action primary" data-action="import-proposal" data-tour="proposal-import" disabled={blocked} onClick={() => onImport(view.proposal)}>
+            {dirty ? "未保存の変更を破棄して取り込む" : "取り込む"}
+          </button>
+        )}
+      </DialogActions>
     </Dialog>
   );
 }
@@ -142,23 +142,23 @@ export function RequestText({ prompt, onClose }: { readonly prompt: string; read
   }, []);
   return (
     <Dialog titleId="request-text-title" backdropClass="review-backdrop" cardClass="review" id="request-text" tour="request-text">
-        <h2 id="request-text-title">エージェントへの依頼文</h2>
-        <p className="dim small">
-          コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントは下書きのみを作成します。
-          取り込むかどうかは、この画面で差分を確認して判断してください。
-        </p>
-        <pre className="request-prompt">{prompt}</pre>
-        <DialogActions className="review-actions">
-          <button type="button" className="action primary" data-action="request-copy" ref={copy} onClick={() => post({ type: "requestCopy" })}>
-            コピー
-          </button>
-          <button type="button" className="action" data-action="request-open" onClick={() => post({ type: "requestOpen" })}>
-            新しいセッションで開く
-          </button>
-          <button type="button" className="action" data-action="request-close" onClick={onClose}>
-            閉じる
-          </button>
-        </DialogActions>
+      <h2 id="request-text-title">エージェントへの依頼文</h2>
+      <p className="dim small">
+        コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントは下書きのみを作成します。
+        取り込むかどうかは、この画面で差分を確認して判断してください。
+      </p>
+      <pre className="request-prompt">{prompt}</pre>
+      <DialogActions className="review-actions">
+        <button type="button" className="action primary" data-action="request-copy" ref={copy} onClick={() => post({ type: "requestCopy" })}>
+          コピー
+        </button>
+        <button type="button" className="action" data-action="request-open" onClick={() => post({ type: "requestOpen" })}>
+          新しいセッションで開く
+        </button>
+        <button type="button" className="action" data-action="request-close" onClick={onClose}>
+          閉じる
+        </button>
+      </DialogActions>
     </Dialog>
   );
 }

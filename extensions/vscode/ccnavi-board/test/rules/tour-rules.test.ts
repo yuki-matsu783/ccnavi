@@ -100,7 +100,7 @@ test("CB-T520 ルールの案内は、使い方ごとの案内が 4〜9 手順�
   for (const course of courses.slice(1)) {
     assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
     for (const [index, step] of course.steps.entries()) {
-      assert.ok(knownTarget(step.target, ids), `${course.id} の ${index + 1} 手順目: 指す先 ${step.target} を画面は付けない`);
+      assert.ok(knownTarget(step.target, ids), `${course.id} の ${index + 1} 番目の手順: 指す先 ${step.target} を画面は付けない`);
     }
   }
 });

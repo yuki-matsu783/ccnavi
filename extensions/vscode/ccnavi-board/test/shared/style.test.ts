@@ -232,6 +232,8 @@ test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の変�
   // 画面全体で比べる値は下から foot < toolbar < overlay < graph-max < tour
   const order = ["foot", "toolbar", "overlay", "graph-max", "tour"].map(level);
   assert.ok(order.every((n, i) => !Number.isNaN(n) && (i === 0 || order[i - 1] < n)), `値の大小が崩れている: ${order.join(",")}`);
+  // 部品の中の値は、脚注より上、ツールバーより下（本文の一覧がスクロールでツールバーの上に出ないように）
+  assert.ok(level("inline") < level("foot") && level("foot") < level("popover") && level("popover") < level("toolbar"), "inline < foot < popover < toolbar が崩れている");
   const files: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -252,8 +254,14 @@ test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の変�
     [/(?<![\w-])(?:row-|column-)?gap:\s*\d/, "gap（--gap-*）"],
     [/box-shadow:\s*[^;]*rgba\(0, 0, 0, \.35\)/, "ポップアップの影（--shadow-popup）"],
   ];
+  assert.ok(files.length > 50, `検査する CSS が少なすぎる（${files.length} 本）。置き場が動いて空振りしていないか`);
+  const defined = new Set([...page.matchAll(/(--(?:z|radius|font|gap|shadow)-[a-z0-9-]+):/g)].map((m) => m[1]));
   for (const file of files) {
     if (file.endsWith("appearance.css")) continue;
+    // 使っている変数は page.css の :root に定義がある（未定義だと値が無効になり、黙って既定の見た目に戻る）
+    for (const used of fs.readFileSync(file, "utf8").matchAll(/var\((--(?:z|radius|font|gap|shadow)-[a-z0-9-]+)/g)) {
+      assert.ok(defined.has(used[1]), `${path.basename(file)} が定義の無い ${used[1]} を使っている`);
+    }
     let bare = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     if (file === PAGE_CSS) bare = bare.replace(/:root \{[^}]*\}/, "");
     for (const [pattern, what] of raw) {
