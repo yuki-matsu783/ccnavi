@@ -1381,6 +1381,105 @@ class TidyAfterFinishTest(WriteAndPushHarness):
         self.assertEqual(git(self.ws, "branch", "--list", CHILD).stdout.strip(), CHILD)
 
 
+class ProposeTest(WriteAndPushHarness):
+    """`ccnavi-ticket.sh propose`: 承認待ちの提案と子のフローの下書きを親のブランチへ送る。"""
+
+    TODO = "wip/proposals/todo"
+    FLOWS = "wip/proposals/flows"
+
+    def put(self, rel, text="x\n"):
+        write(os.path.join(self.tree, *rel.split("/")), text)
+        return rel
+
+    def test_new_proposals_are_committed_and_pushed(self):
+        todo = self.put(f"{self.TODO}/{PARENT}.md")
+        child = self.put(f"{self.TODO}/{CHILD}.md")
+        flow = self.put(f"{self.FLOWS}/{CHILD}.yml")
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        head = self.sha(self.tree, "HEAD")
+        self.assertNotEqual(head, before)
+        self.assertEqual(self.remote_sha(), head)
+        self.assertEqual(self.committed(), sorted([todo, child, flow]))
+        self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} の提案を送る"])
+        self.assertEqual(self.dirty(), "")
+        self.assertIn(f"提案: {todo}", result.stdout)
+        self.assertEqual(
+            [line for line in result.stdout.splitlines() if line.startswith("次: ")],
+            ["次: ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない"],
+        )
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def test_other_families_and_template_drafts_stay_out(self):
+        mine = self.put(f"{self.TODO}/{PARENT}.md")
+        other = self.put(f"{self.TODO}/i0002.md")
+        sibling = self.put(f"{self.TODO}/{PARENT}x.md")
+        draft = self.put("wip/proposals/templates/login.yml")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), [mine])
+        status = self.dirty()
+        for rel in (other, sibling, draft):
+            self.assertIn(f"?? {rel}", status)
+
+    def test_a_child_id_sends_the_whole_family(self):
+        todo = self.put(f"{self.TODO}/{PARENT}.md")
+        result = self.ticket("propose", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), [todo])
+
+    def test_an_edited_tracked_proposal_is_sent(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
+        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.put(rel, "v2\n")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), [rel])
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    def test_an_unchanged_proposal_sends_only_the_unpushed_commit(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.md")
+        git(self.tree, "add", "--", rel)
+        git(self.tree, "commit", "-q", "-m", "propose by hand")
+        before = self.sha(self.tree, "HEAD")
+        self.assertNotEqual(self.remote_sha(), before)
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(self.remote_sha(), before)
+
+    def test_no_proposal_stops_without_changing_anything(self):
+        before = self.remote_sha()
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("送る提案がありません", result.stderr)
+        self.assertEqual(self.remote_sha(), before)
+        self.assertEqual(self.dirty(), "")
+
+    def test_it_reads_only_the_parent_worktree(self):
+        # ワークスペースルートに写しがあっても、親のワークツリーに無ければ送らない。
+        write(os.path.join(self.ws, "wip", "proposals", "todo", PARENT + ".md"), "x\n")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("送る提案がありません", result.stderr)
+
+    def test_the_executable_alone_is_refused_for_a_pushed_family(self):
+        self.put(f"{self.TODO}/{PARENT}.md")
+        result = self.exe("ticket", "propose", PARENT)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ccnavi-ticket.sh", result.stderr)
+
+    def test_a_blocking_user_decision_stops_before_sending(self):
+        # 未送信のユーザの判断（review/ から done/ への移動など）があれば、提案も送らない。
+        self.put(f"{self.TODO}/{PARENT}.md")
+        write(os.path.join(self.tree, *APPROVED.split("/"), "done", "zzz.md"), "x\n")
+        before = self.remote_sha()
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.remote_sha(), before)
+
+
 class PlacesAreNotReadTest(WriteAndPushHarness):
     """控えの置き場を動かす環境変数は読まない（置き場は固定。A9）。
 

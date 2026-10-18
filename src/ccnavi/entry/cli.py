@@ -557,6 +557,13 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
         base, (conf.tickets or settings.DEFAULT_TICKETS).replace("/", os.sep), "review"
     )
     places = [cli_args._real(approved), cli_args._real(review_dir)]
+    if list(args.command[:2]) == ["ticket", "propose"]:
+        # 提案を送る操作だけは、承認待ちの提案（todo/）と子のフローの下書き（flows/）も
+        # 置き場に数える。
+        tickets_dir = (conf.tickets or settings.DEFAULT_TICKETS).replace("/", os.sep)
+        places += [
+            cli_args._real(os.path.join(base, tickets_dir, name)) for name in ("todo", "flows")
+        ]
     starting = list(args.command[:2]) == ["ticket", "start"]
     readying = list(args.command[:2]) == ["review", "ready"]
     found = []

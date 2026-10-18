@@ -348,6 +348,10 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
         （start は、基点を .ccnavi/approved/doing/<id>.md に書き込みます。finish は、
          フェーズがレビュー対象の場合は wip/proposals/review/ に、それ以外は
          .ccnavi/approved/done/ に移動します。cancel は .ccnavi/approved/done/ に移動します）
+    ccnavi ticket propose <id>
+        （親子の承認待ちの提案 wip/proposals/todo/ と子のフローの下書き wip/proposals/flows/ を、
+         書いたパスの一覧に載せます。載せるだけで、コミットと push は
+         ccnavi-ticket.sh propose が write-and-push の手順で行います）
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   （定性的なリスク）
     ccnavi ticket learn [<id>] [--note <text> [--target <kind>] [--signal <kind>]]
         （学習記録の雛形と判定ログのダイジェストを wip/handoff/learnings/<id>.* に書き込みます。

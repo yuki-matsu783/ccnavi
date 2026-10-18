@@ -933,6 +933,7 @@ class TicketTest(unittest.TestCase):
             "env sh .ccnavi/scripts/ccnavi-ticket.sh start x",
             "command sh .ccnavi/scripts/ccnavi-ticket.sh start x",
             "/bin/sh .ccnavi/scripts/ccnavi-ticket.sh finish x",
+            "sh .ccnavi/scripts/ccnavi-ticket.sh propose x",
             "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh request --phase 1'",
         ):
             with self.subTest(command=command):

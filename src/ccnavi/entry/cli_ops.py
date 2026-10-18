@@ -21,6 +21,7 @@ from ..tickets import (
     next_id,
     ops,
     phase,
+    propose,
     retire,
     review,
     review_close,
@@ -44,7 +45,7 @@ def operate(
 ) -> int:
     """チケットの状態とレビューの操作を振り分ける。
 
-    `ticket start|finish|cancel <識別子>`、`ticket new <識別子> ...`（親の提案の雛形）、
+    `ticket start|finish|cancel|propose <識別子>`、`ticket new <識別子> ...`（親の提案の雛形）、
     `review prepare|requested|confirm`、それに
     ユーザが打つ `--reviewed` と `--close-early`。どれも payload を読まず、判定も記録もしない。
     リモートから取得した結果は `--result <json>` で受け取る。exe はネットワークに出ない。
@@ -192,6 +193,10 @@ def operate(
     elif kind == "ticket" and verb == "next-id":
         # ticket next-id [<先頭の語> <slug>]。読むだけ。issue の無い親の識別子の番号を答える。
         code = next_id.run(stdout, stderr, root, conf, words[2:])
+    elif kind == "ticket" and verb == "propose" and target:
+        # ticket propose <識別子>。親子の提案（todo/ と flows/）を、書いたパスの一覧に載せるだけ。
+        # コミットと push は sh（ccnavi-ticket.sh propose）が write-and-push の手順で行う。
+        code = propose.run(stdout, stderr, root, conf, target)
     elif kind == "ticket" and verb in ("start", "finish", "cancel") and target:
         if verb == "start":
             code = ops.start(stdout, stderr, root, conf, target)
@@ -371,7 +376,7 @@ def _write_and_push_bypass(
     """write-and-push を通らずに、取り込み済みの親子のチケットの状態を書こうとしているなら、
     その親の識別子。無ければ空。
 
-    状態の操作（`ticket start|finish|cancel`、`review requested|confirm|ready`、残った指摘の
+    状態の操作（`ticket start|finish|cancel|propose`、`review requested|confirm|ready`、残った指摘の
     行き先の `--reviewed N --accept-unresolved`）は、write-and-push の対象の親子のチケットでは sh が
     `--record-tree` を付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで
     write-and-push を通っていない。
@@ -382,7 +387,17 @@ def _write_and_push_bypass(
         return ""
     words = list(args.command)
     family_id = ""
-    if len(words) >= 3 and words[0] == "ticket" and words[1] in ("start", "finish", "cancel"):
+    if (
+        len(words) >= 3
+        and words[0] == "ticket"
+        and words[1]
+        in (
+            "start",
+            "finish",
+            "cancel",
+            "propose",
+        )
+    ):
         family_id = write_and_push.family_of(words[2])
     elif (
         len(words) >= 2 and words[0] == "review" and words[1] in ("requested", "confirm", "ready")
