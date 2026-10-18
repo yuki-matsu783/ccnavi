@@ -29,7 +29,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   出力の先頭は`対象リポジトリ: <owner/repo>（<プロジェクト名>）`。意図したリポジトリかをここで確かめる。`--title`を付けても、ホストが読めるかぎりissueの存在は確かめる（存在しない番号では何も作らない。APIが一時的に失敗して読めなかったときは、`--slug`があれば仮の題で進む。MCPで代行するときは、案内の手順でissueの実在も確かめる。issueなしで始めるなら`ccnavi-ticket.sh next-id`で識別子を決め、`ccnavi ticket new`で提案を作る）。
 
   途中で失敗して打ち直しても、完了済みの処理（ブランチ・ワークツリー・push・MR）をスキップし、未完了の処理から再開する。
-  依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す。止めはしない
+  依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す
 - 識別子はブランチ名の`/`を`-`に置き換えたもの（`feature/123-login`は`feature-123-login`）。ワークツリーは`.claude/worktrees/<識別子>`に、
   `worktree add .claude/worktrees/<識別子> <ブランチ>`でそのブランチを直接チェックアウトする。識別子の名前のブランチは作らない。
   変換は`ccnavi_branch_to_id`（sh）・`ticket_ids.branch_to_id`（Python）・拡張の`branchToId`（TS）に同じものがあり、
