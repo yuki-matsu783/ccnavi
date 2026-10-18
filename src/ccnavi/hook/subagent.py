@@ -294,7 +294,9 @@ def _judge_stop(
 #   同じファイルを書き換えて取り合うことは無い
 # - 中身は 1 行目に `session <セッション>`、2 行目に開始時刻（エポック秒）。
 #   セッションの識別子は名前に入れるとき字を置き換えるので、別のセッションの名前と前置きが
-#   重なりうる。どのセッションの印かは 1 行目の完全一致で決める（`_read_mark` と同じ）
+#   重なりうる。どのセッションの印かは 1 行目の完全一致で決める（`_read_mark` と同じ）。
+#   編集するサブエージェントだけが 3 行目以降に `tree <種類> <名前>` と `type <agent_type>` を
+#   持つ（同じ作業ツリーの案内に使う。`_shared_note`）。無い印は案内の相手に数えない
 # - `agent_id` が payload に無い始まり・終わりは、鍵が決まらないので印を置かず、外しもしない。
 #   その体は「実行中」と数えられず、委任して待つ回でも促しが出うる
 # - 入れ子の体（孫）も、同じセッションで自分の `agent_id` の印を持つ。1 体でも残っていれば実行中
@@ -343,7 +345,10 @@ def _note_running(
         == agentkind.EDIT
     )
     if editing and here is not None:
-        lines += [f"{_TREE}{here.kind} {here.name}", f"{_TYPE}{_one_line(payload.agent_type)}"]
+        lines += [
+            f"{_TREE}{here.kind} {_one_line(here.name)}",
+            f"{_TYPE}{_one_line(payload.agent_type)}",
+        ]
     path = _running_path(conf.state, payload.session_id, payload.agent_id)
     failed = fsio.write_text_atomic(path, _mark_text(payload.session_id, lines))
     if failed:
