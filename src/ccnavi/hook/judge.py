@@ -704,11 +704,10 @@ def decide_before(
                 # 「ルールは通したのにチケットが止めた」回を記録から数えられるようにする。
                 # チケット自体が信頼できずに止めた回（DENY_TICKET_BLOCKED）は範囲を当てて
                 # いないので、範囲の名前（TICKET_RULE）と分ける。
-                decided_by = (
-                    reasons.TICKET_BLOCKED_RULE
-                    if code == reasons.CODE_TICKET_BLOCKED
-                    else reasons.TICKET_RULE
-                )
+                decided_by = {
+                    reasons.CODE_TICKET_BLOCKED: reasons.TICKET_BLOCKED_RULE,
+                    reasons.CODE_TICKET_PARENT: reasons.TICKET_PARENT_RULE,
+                }.get(code, reasons.TICKET_RULE)
                 record.rules = [decided_by, *record.rules]
                 record.source = ""
 
@@ -1162,6 +1161,35 @@ def ticket_verdict(
     rel = tree.relative(t, full)
     if ticket_places.is_unscoped(rel, conf.tickets, conf.approved):
         return "", "", "", ""
+    # 親のワークツリーは作業の場ではない。成果は子のワークツリーで作り、子の finish が親へ合流
+    # する。親の範囲は子の上限として働くだけで、親のワークツリーへの直接の書き込みを通す根拠に
+    # ならない。置き場（上の `is_unscoped`）だけが書ける。親かどうかは、索引と、ワークツリー自身の
+    # チケット（`wrapguard.ticket_role`。サブエージェントの禁止と同じ引き方）のどちらかが親と
+    # 言えば親とする。食い違うときは止める側に倒す。
+    # チケット自体が信頼できないとき（`blocked`）は、下の範囲の判定が DENY_TICKET_BLOCKED で止める。
+    is_parent = not ticket.is_child or (
+        wrapguard.ticket_role(conf, root, t.name)[0] == wrapguard.ROLE_PARENT
+    )
+    if is_parent and not ticket.blocked:
+        return (
+            rules.DENY,
+            "\n".join(
+                [
+                    f"[ccnavi] {reasons.CODE_TICKET_PARENT} (source: {ticket.path})",
+                    f"subject: {full}",
+                    f"ticket: {ticket.ticket} ({ticket.title}), worktree {t.name}",
+                    "This is the parent ticket's worktree. Work is not written here: only the "
+                    "draft and proposal places (wip/proposals/, wip/handoff/, wip/eli5/) are "
+                    "writable. Widening the parent's scope does not help. Propose a child "
+                    "ticket for the phase (ccnavi-ticket.sh propose), have the user agree to it, "
+                    "start it, and do the work in the child's worktree; the child's finish merges "
+                    "it into the parent. If the parent has no child for this phase yet, "
+                    "create one first.",
+                ]
+            ),
+            "",
+            reasons.CODE_TICKET_PARENT,
+        )
     parent = index.get(ticket.parent) if ticket.is_child else None
     # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は開かない（承認のあとに直しても
     # 進行中の親の子の範囲は変わらない）。写しに定義が無い親は判定の側の検査で止まり、

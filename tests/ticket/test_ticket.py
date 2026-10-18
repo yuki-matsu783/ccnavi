@@ -232,10 +232,12 @@ class TicketTest(unittest.TestCase):
         if started.returncode != 0:
             self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
 
-    def family(self, review=(True, False), plan=1):
+    def family(
+        self, review=(True, False), plan=1, allow=("src/*", "wip/*"), child_allow=("src/a/*",)
+    ):
         """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子のワークツリーを作って着手する。"""
-        self.propose("i0001", allow=("src/*", "wip/*"), plan=plan)
-        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",), review=review[0])
+        self.propose("i0001", allow=allow, plan=plan)
+        self.propose("i0001-01-01", parent="i0001", phase=1, allow=child_allow, review=review[0])
         self.propose("i0001-01-02", parent="i0001", phase=1, allow=("src/b/*",), review=review[1])
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
@@ -275,15 +277,19 @@ class TicketTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
         self.assertIn("i0001-01-01", self.reason(outside))
 
-        # 親のツリーは親の範囲で判定される。
-        parent_ok = self.hook(
-            "PreToolUse", "Write", child, file_path=os.path.join(self.parent_tree, "src", "z.py")
+        # 親のツリーは、親の範囲の中でも置き場の外を止める（作業の場ではない）。
+        for rel in (("src", "z.py"), ("docs", "z.md")):
+            parent_out = self.hook(
+                "PreToolUse", "Write", child, file_path=os.path.join(self.parent_tree, *rel)
+            )
+            self.assertIn("DENY_TICKET_PARENT", self.reason(parent_out))
+        parent_place = self.hook(
+            "PreToolUse",
+            "Write",
+            child,
+            file_path=os.path.join(self.parent_tree, "wip", "handoff", "z.md"),
         )
-        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(parent_ok))
-        parent_out = self.hook(
-            "PreToolUse", "Write", child, file_path=os.path.join(self.parent_tree, "docs", "z.md")
-        )
-        self.assertIn("DENY_TICKET_SCOPE", self.reason(parent_out))
+        self.assertNotIn("DENY_TICKET", self.reason(parent_place))
 
         # main はチケットを持たない。ルールだけで判定される。
         main = self.hook(
@@ -299,24 +305,20 @@ class TicketTest(unittest.TestCase):
         `README.md` と書いた範囲に永久に当たらなかった。`Dockerfile` や
         `src/Components/*` も同じ。実物の GitLab で流れを通したときに出た。
         """
-        self.propose("i0001", allow=("src/*", "README.md", "docs/Design/*"))
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "ticket")
-        self.assertEqual(self.approve().returncode, 0)
+        self.family(
+            allow=("src/*", "README.md", "docs/Design/*"),
+            child_allow=("README.md", "docs/Design/*"),
+        )
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         for name in ("README.md", "docs/Design/plan.md"):
             hit = self.hook(
                 "PreToolUse",
                 "Write",
-                self.parent_tree,
-                file_path=os.path.join(self.parent_tree, *name.split("/")),
+                child,
+                file_path=os.path.join(child, *name.split("/")),
             )
             self.assertNotIn("DENY_TICKET_SCOPE", self.reason(hit), name)
-        outside = self.hook(
-            "PreToolUse",
-            "Write",
-            self.parent_tree,
-            file_path=os.path.join(self.parent_tree, "NOTES.md"),
-        )
+        outside = self.hook("PreToolUse", "Write", child, file_path=os.path.join(child, "NOTES.md"))
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_scope_ignores_case_on_every_machine(self):
@@ -327,23 +329,24 @@ class TicketTest(unittest.TestCase):
         食い違う。範囲はユーザが宣言する意図なので、機械の都合ではなく書かれたパスの意味で
         読む（`_fold` と `_entries` の re.IGNORECASE）。
         """
-        self.propose("i0001", allow=("src/*", "README.md", "docs/Design/*"))
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "ticket")
-        self.assertEqual(self.approve().returncode, 0)
+        self.family(
+            allow=("src/*", "README.md", "docs/Design/*"),
+            child_allow=("README.md", "docs/Design/*"),
+        )
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         hit = self.hook(
             "PreToolUse",
             "Write",
-            self.parent_tree,
-            file_path=os.path.join(self.parent_tree, "docs", "design", "plan.md"),
+            child,
+            file_path=os.path.join(child, "docs", "design", "plan.md"),
         )
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(hit))
         # 揃えるのは表記の大小だけ。別の場所は別の場所のまま止める。
         outside = self.hook(
             "PreToolUse",
             "Write",
-            self.parent_tree,
-            file_path=os.path.join(self.parent_tree, "docs", "designs", "plan.md"),
+            child,
+            file_path=os.path.join(child, "docs", "designs", "plan.md"),
         )
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
@@ -520,22 +523,16 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001", allow=("src/*",))
         self.hand_move("i0001")
 
-        inside = self.hook(
-            "PreToolUse",
-            "Write",
-            self.parent_tree,
-            file_path=os.path.join(self.parent_tree, "src", "x.py"),
-        )
-        self.assertNotIn("DENY_TICKET", self.reason(inside), self.reason(inside))
-
-        # 範囲は有効。外は今までどおり止まる。
-        outside = self.hook(
-            "PreToolUse",
-            "Write",
-            self.parent_tree,
-            file_path=os.path.join(self.parent_tree, "docs", "x.md"),
-        )
-        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+        # 置き場を動かしただけで承認として効く。親のツリーは範囲の中でも外でも置き場の外を
+        # 止める（チケットが読めて効いている印は、DENY_TICKET_BLOCKED でなく DENY_TICKET_PARENT）。
+        for rel in (("src", "x.py"), ("docs", "x.md")):
+            refused = self.hook(
+                "PreToolUse",
+                "Write",
+                self.parent_tree,
+                file_path=os.path.join(self.parent_tree, *rel),
+            )
+            self.assertIn("DENY_TICKET_PARENT", self.reason(refused), self.reason(refused))
 
     def test_a_child_moved_without_its_parent_cannot_write_anywhere(self):
         # 親を動かさずに子だけ動かすと、子の範囲をどの親で切り詰めるかが決まらない。
@@ -625,7 +622,7 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             file_path=os.path.join(self.parent_tree, "src", "x.py"),
         )
-        self.assertNotIn("DENY_TICKET", self.reason(result), self.reason(result))
+        self.assertNotIn("DENY_TICKET_BLOCKED", self.reason(result), self.reason(result))
         lint = self.ccnavi("--lint", "--json")
         found = [
             p

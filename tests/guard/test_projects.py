@@ -417,11 +417,24 @@ class ProjectsTest(unittest.TestCase):
         """
         write(
             self.proposal_file(self.lib, "i0009"),
-            ticket_text("i0009", allow=("skills/deploy/*",)),
+            ticket_text("i0009", allow=("skills/*",)),
+        )
+        write(
+            self.proposal_file(self.lib, "i0009-01-01"),
+            ticket_text("i0009-01-01", parent="i0009", allow=("skills/deploy/*",)),
         )
         approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        tree = self.worktree(self.lib, "i0009")
+        # 親のワークツリーは、範囲の中でも置き場以外に書けない。
+        home = self.worktree(self.lib, "i0009")
+        refused = self.hook(
+            "Write", self.ws, file_path=os.path.join(home, "skills", "deploy", "SKILL.md")
+        )
+        self.assertEqual(self.decision(refused), "deny", refused.stdout + refused.stderr)
+        self.assertIn("DENY_TICKET_PARENT", self.reason(refused))
+        self.assertEqual(self.last_record()["code"], "DENY_TICKET_PARENT")
+        self.assertEqual(self.last_record()["rules"], ["builtin:ticket-parent"])
+        tree = self.worktree(self.lib, "i0009-01-01")
         skill = os.path.join(tree, "skills", "deploy", "SKILL.md")
         allowed = self.hook("Write", self.ws, file_path=skill)
         self.assertNotEqual(self.decision(allowed), "deny", allowed.stdout + allowed.stderr)
@@ -436,6 +449,29 @@ class ProjectsTest(unittest.TestCase):
             done = self.hook("Write", self.ws, file_path=os.path.join(loose, *rel))
             self.assertEqual(done.returncode, 0, done.stderr)
             self.assertEqual(self.decision(done), "ask", done.stdout)
+
+    def test_the_parent_worktree_takes_only_the_places(self):
+        """親のワークツリーに書けるのは置き場だけ。実装は子のワークツリーで書く。
+
+        親の範囲の中でも、置き場の外は止める。止める理由は範囲の外ではなく、親が作業の場では
+        ないこと（DENY_TICKET_PARENT）。範囲を広げても通らないので、案内は子を起こす手を言う。
+        """
+        self.family_in_lib("i0007")
+        approved = self.ccnavi("--agree", stdin="y\n")
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        home = self.worktree(self.lib, "i0007")
+        for rel in (("src", "a", "a.py"), ("docs", "x.md"), ("wip", "design", "d.md")):
+            refused = self.hook("Write", self.ws, file_path=os.path.join(home, *rel))
+            self.assertEqual(self.decision(refused), "deny", refused.stdout + refused.stderr)
+            self.assertIn("DENY_TICKET_PARENT", self.reason(refused))
+            self.assertIn("child", self.reason(refused))
+        for rel in (("wip", "handoff", "a.md"), ("wip", "proposals", "todo", "i0099.md")):
+            placed = self.hook("Write", self.ws, file_path=os.path.join(home, *rel))
+            self.assertNotIn("DENY_TICKET_PARENT", self.reason(placed))
+        # 子のワークツリーは、いつもどおり子の範囲で判定する。
+        child = self.worktree(self.lib, "i0007-01-01")
+        inside = self.hook("Write", self.ws, file_path=os.path.join(child, "src", "a", "a.py"))
+        self.assertNotIn("DENY", self.reason(inside))
 
     # ---- 4b. プロジェクトを決めるのは提案を置いた場所
 
@@ -580,12 +616,14 @@ class ProjectsTest(unittest.TestCase):
         tree = self.worktree(self.lib, "i0007")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
-        target = os.path.join(tree, "src", "a.py")
+        # 親のワークツリーに書けるのは置き場だけ（実装は子のワークツリーで書く）。
+        target = os.path.join(tree, "wip", "handoff", "a.py")
         before = self.hook("Write", self.ws, file_path=target)
         self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)
         # 親のワークツリーの HEAD がブランチ名と合わなくなれば、決まらない。
         git(tree, "checkout", "--quiet", "-b", "elsewhere")
-        denied = self.hook("Write", self.ws, file_path=target)
+        # 親のワークツリーは範囲の中でも置き場以外に書けない。決まらなくなっても止まる側は同じ。
+        denied = self.hook("Write", self.ws, file_path=os.path.join(tree, "src", "a.py"))
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
         cancelled = self.ccnavi("ticket", "cancel", "i0007", "--reason", "やめる")
         self.assertNotEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)

@@ -718,7 +718,9 @@ class Eli5Place(Workspace):
                         )
                     result = self.write_hook(tree, rel)
                     want = "allow" if exempt else "deny"
-                    code = "" if exempt else "DENY_TICKET_SCOPE"
+                    # 親のワークツリーは置き場の外をすべて止める（作業の場ではない）。
+                    outside = "DENY_TICKET_PARENT" if name == "親" else "DENY_TICKET_SCOPE"
+                    code = "" if exempt else outside
                     self.assertEqual(self.decision(result), want, self.reason(result))
                     self.assertEqual(self.last_record().get("code", ""), code)
 
@@ -730,7 +732,8 @@ class Eli5Place(Workspace):
                 with self.subTest(tree=name, path=rel):
                     result = self.write_hook(tree, rel)
                     self.assertEqual(self.decision(result), "deny", self.reason(result))
-                    self.assertEqual(self.last_record().get("code", ""), "DENY_TICKET_SCOPE")
+                    want = "DENY_TICKET_PARENT" if name == "親" else "DENY_TICKET_SCOPE"
+                    self.assertEqual(self.last_record().get("code", ""), want)
         reported = self.after_shell(self.child, "wip\\eli5\\evil.py", session="e-bs")
         self.assertIn("POST_TICKET_SCOPE", reported.stderr)
         for rel in self.BACKSLASHED:
