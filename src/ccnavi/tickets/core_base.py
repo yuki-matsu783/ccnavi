@@ -14,7 +14,7 @@
 - Changes: 書き込みを値として並べたもの（`plan`）。書くときの失敗の仕方（止める・言って続ける）
   もつけてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを
   1 コミットにする
-- Writer(FS): `write_fs` が Changes をディスクに書く。fsio を通るので、C1 の記録層
+- Writer(FS): `write_fs` が Changes をディスクに書く。fsio を通るので、write-and-push の記録層
   （`fsio.recording`）がそのまま使われる
 - Clock: 時刻は `Snapshot.stamp`（空なら今）。plan の間は `fsio.clock` で固定し、承認の
   記録に同じ時刻を書く

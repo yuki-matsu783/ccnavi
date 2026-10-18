@@ -200,6 +200,7 @@ class StatePruneTest(_Base):
             _write(os.path.join(self.state, f"nudged-{s}.json"), age_days=age),
             _write(os.path.join(self.state, f"denied-{s}.json"), age_days=age),
             _write(os.path.join(self.state, f"once-{s}-main.json"), age_days=age),
+            _write(os.path.join(self.state, f"once-{s}-peers-agent-1.json"), age_days=age),
             _write(os.path.join(self.state, f"failstreak-{s}-main.json"), age_days=age),
             _write(os.path.join(self.state, f"subagent-{s}-guard-records.bounced"), age_days=age),
             _write(os.path.join(self.state, f"subagent-{s}-agent-1.running"), age_days=age),

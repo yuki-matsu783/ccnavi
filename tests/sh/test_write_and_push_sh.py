@@ -1,6 +1,6 @@
-"""C1 の受入テスト。
+"""write-and-push の受入テスト。
 
-C1 は、取り込み済みの親子のチケットで状態を書く操作を
+write-and-push は、取り込み済みの親子のチケットで状態を書く操作を
 「ロック → 取り込み → 書く → コミット → push」の 1 操作にし、push が通るまで完了にしない形。
 Chrome が未 push の古い状態で判定しないようにする。
 
@@ -13,9 +13,9 @@ ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.s
 見るのは次のとおり。
 
 1. 順序: hook のマーカーを先にコミット → 取り込み → 書く →
-   書いたパスだけ commit --only → push。
-   統合先の取り込み結果も同じ回で書く
-2. ロック: 他の操作が持っていれば何も書かずに止まる。C1 から起こす sync・承認の push は入れ子で通る
+   書いたパスだけ commit --only → push
+2. ロック: 他の操作が持っていれば何も書かずに止まる。write-and-push から起こす sync・承認の push
+は入れ子で通る
 3. 競合: リモートが進んでいれば取り込んでから書く。衝突したら取りやめて何も書かない
 4. 途中の操作（merge など）があれば始めない
 5. 戻し: push が通らなければ、自分のコミットを比較つきで戻し、書いたパスの中身も戻して
@@ -28,11 +28,11 @@ ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.s
    ユーザの判断（c）と知らない変更（d）は止める
 9. ユーザの判断の入口（ccnavi-user-close-early.sh など）は、取り込み済みの親子のチケットなら
    承認の push を自動で呼ぶ
-10. 取り込み状態の無い親子のチケット・origin の無いリポジトリ・
+10. origin の無いリポジトリ・
     マージリクエストで見るフェーズが無い親子のチケットは今のまま
     （コミットも push もしない）
 11. 承認の push（ccnavi-user-push-approved.sh <親>）は取り込んでから送り、失敗してもコミットを残す
-12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
+12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、write-and-push の confirm が
     書いて送ったものが、経路・時刻のほかは同じ
 
 `CCNAVI_SH_DIR` があれば、`.ccnavi/scripts/` の `.sh` を写したあと、その上に `CCNAVI_SH_DIR` の
@@ -141,15 +141,13 @@ def executable(path, text):
 
 
 @unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
-class C1Harness(unittest.TestCase):
+class WriteAndPushHarness(unittest.TestCase):
     """ワークスペース（main）、bare のリモート、親のワークツリー .claude/worktrees/i0001。
 
-    親は承認済み（計画は mr で見る 1 フェーズ、子 1 つ）で、送ってあり、取り込み済み
-    （取り込み状態が present）。
+    親は承認済み（計画は mr で見る 1 フェーズ、子 1 つ）で、送ってある。
     """
 
     plan = ("design",)
-    imported = True
 
     @classmethod
     def setUpClass(cls):
@@ -202,13 +200,9 @@ class C1Harness(unittest.TestCase):
             EXE.format(root=ROOT, python=sys.executable),
         )
         self.state = os.path.join(self.ws, "logs", "state")
-        self.record = os.path.join(self.state, "sync", "self", "families", PARENT)
         self.tree = self.parent_tree()
         self.approve_family()
         git(self.tree, "push", "-q", "-u", "origin", PARENT)
-        if self.imported:
-            self.write_present_record()
-            self.assertEqual(fields(self.record)["state"], "present")
 
     # ---- 道具
 
@@ -240,8 +234,6 @@ class C1Harness(unittest.TestCase):
         env.update(
             {
                 "CCNAVI_BIN_PATH": self.bin,
-                "CCNAVI_SYNC_RETRIES": "0",
-                "CCNAVI_SYNC_RETRY_WAIT": "0",
                 "CCNAVI_LOCK_WAIT": "2",
             }
         )
@@ -274,14 +266,6 @@ class C1Harness(unittest.TestCase):
 
     def sync(self, *args):
         return self.sh("ccnavi-sync.sh", *args)
-
-    def write_present_record(self):
-        # ccnavi-sync.sh が親の取り込み状態（state present）を書く形を、直接書く。
-        write(
-            self.record,
-            f"remote origin\nbranch {PARENT}\nsha {self.sha(self.tree, 'HEAD')}\n"
-            f"fetched_at {int(time.time())}\nstate present\n",
-        )
 
     def ticket(self, *args, **extra):
         return self.sh("ccnavi-ticket.sh", *args, **extra)
@@ -355,7 +339,7 @@ class C1Harness(unittest.TestCase):
         return tree
 
 
-class C1TicketTest(C1Harness):
+class WriteAndPushTicketTest(WriteAndPushHarness):
     # ---- 1. 順序と、書いたパスだけのコミット
 
     def test_start_commits_only_what_it_wrote_and_pushes(self):
@@ -372,13 +356,8 @@ class C1TicketTest(C1Harness):
         )
         self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} に着手"])
         self.assertEqual(self.dirty(), "")
-        record = fields(self.record)
-        self.assertEqual(record["state"], "present")
-        self.assertEqual(record["sha"], head)
-        # 統合先の取り込み結果も同じ回で書く
-        # （2c の相談: 送った直後に取り込み結果が無く承認が止まる件）。
-        head_file = os.path.join(self.state, "sync", "self", "integration", "head")
-        self.assertTrue(os.path.isfile(head_file))
+        # 親子ごとの取り込み状態も、統合先のコピーも書かない。
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         self.assertFalse(os.path.exists(self.lock_dir()))
 
     def test_other_staged_changes_stay_out_of_the_commit(self):
@@ -481,14 +460,16 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.sha(self.tree, "HEAD~1"), remote)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    def test_a_take_in_that_blocks_the_family_writes_nothing(self):
-        """取り込みの後の検査で親子のチケットが止まれば（blocked）、何も書かない。入れ子のロックで書ける。"""
+    def test_a_take_in_that_finds_an_error_writes_nothing(self):
+        """取り込みの後の検査が error を言えば（ccnavi-sync.sh が 1 で終わる）、何も書かずに止める。
+        状態は書かない。入れ子のロックで検査できる。"""
         rel = f"{APPROVED}/doing/i0001-01-02.md"
         self.remote_commit(rel, "---\nticket: i0001-01-02\n---\n")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("blocked", result.stderr)
-        self.assertEqual(fields(self.record)["state"], "blocked")
+        self.assertIn("取り込みの後の検査で止める理由がある", result.stderr)
+        self.assertIn("取り込めなかった", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
         self.assertFalse(os.path.exists(self.lock_dir()))
 
@@ -586,7 +567,6 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
         self.assertEqual(self.read(self.copy(PARENT)), copy)
         self.assertEqual(self.dirty(), "")
-        self.assertEqual(fields(self.record)["state"], "present")
 
     def test_a_moved_head_is_not_undone(self):
         """戻すのは先頭が自分のコミットのときだけ（比較つきの update-ref）。"""
@@ -641,24 +621,26 @@ class C1TicketTest(C1Harness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("届いていた", result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-        self.assertEqual(fields(self.record)["sha"], self.sha(self.tree, "HEAD"))
 
     def test_a_delivered_push_whose_check_also_failed_is_not_written_twice(self):
         """push の応答も ls-remote も失敗したが届いていた。
 
         戻して取り込み直すと自分のコミットが戻るので、書き直さずに成功で終える。
+        push の関門の ls-remote（push の前）は数えない。push のあとの 1 回目だけ失敗させる。
         """
         count = os.path.join(self._base, "ls-count")
         write(count, "0\n")
+        pushed = os.path.join(self._base, "pushed")
         shim = os.path.join(self._base, "shim2")
         executable(
             os.path.join(shim, "git"),
             "#!/bin/sh\n"
             'for a in "$@"; do\n'
             '  if [ "$a" = push ]; then\n'
+            f"    : > '{pushed}'\n"
             f"    '{GIT}' \"$@\" >/dev/null 2>&1; echo 'fatal: hung up' >&2; exit 128\n"
             "  fi\n"
-            f'  if [ "$a" = refs/heads/{PARENT} ]; then\n'
+            f"  if [ \"$a\" = refs/heads/{PARENT} ] && [ -e '{pushed}' ]; then\n"
             f"    n=$(cat '{count}'); echo $((n + 1)) > '{count}'\n"
             "    if [ \"$n\" = 0 ]; then echo 'fatal: unable to access' >&2; exit 128; fi\n"
             "  fi\n"
@@ -695,7 +677,7 @@ class C1TicketTest(C1Harness):
         signer = executable(os.path.join(self._base, "slow-gpg"), "#!/bin/sh\nsleep 30\n")
         git(self.ws, "config", "commit.gpgsign", "true")
         git(self.ws, "config", "gpg.program", signer)
-        result = self.ticket("start", PARENT, CCNAVI_C1_COMMIT_TIMEOUT="2")
+        result = self.ticket("start", PARENT, CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT="2")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("制限時間", result.stderr)
         self.assertEqual(self.dirty(), "")
@@ -709,18 +691,18 @@ class C1TicketTest(C1Harness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    # ---- C1 を飛ばさせない
+    # ---- write-and-push を飛ばさせない
 
-    def test_a_double_dash_does_not_slip_past_c1(self):
+    def test_a_double_dash_does_not_slip_past_write_and_push(self):
         result = self.ticket("start", "--", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} に着手"])
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    def test_the_executable_refuses_a_state_operation_without_c1(self):
+    def test_the_executable_refuses_a_state_operation_without_write_and_push(self):
         refused = self.exe("ticket", "start", PARENT)
         self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
-        self.assertIn("C1 の対象", refused.stderr)
+        self.assertIn("write-and-push の対象", refused.stderr)
         self.assertEqual(self.dirty(), "")
 
     def test_a_long_lock_of_a_live_owner_is_not_taken(self):
@@ -781,17 +763,49 @@ class C1TicketTest(C1Harness):
 
     # ---- 止める親子のチケット
 
-    def test_a_gone_family_is_refused_before_any_network(self):
-        with open(self.record, encoding="utf-8") as f:
-            text = f.read()
-        write(self.record, text.replace("state present", "state gone"))
+    def test_a_parent_gone_from_the_remote_stops_at_the_take_in(self):
+        """リモートから消えた親（マージされていない）は、取り込み（ccnavi-sync.sh）が終了コード 1 で
+        止める。何も書かない。"""
+        write(
+            os.path.join(self.scripts, "ccnavi-review.sh"),
+            '#!/bin/sh\n[ "$1" = merged ] && echo none\nexit 0\n',
+        )
+        git(self.ws, "--git-dir", self.remote, "update-ref", "-d", f"refs/heads/{PARENT}")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("書かずに止めた", result.stderr)
-        self.assertIn("ccnavi-sync.sh", result.stderr)
+        self.assertIn("取り込めなかった", result.stderr)
+        self.assertIn("戻し方 1", result.stderr)
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+        self.assertEqual(self.remote_sha(), "")
 
-    def test_record_risk_is_not_c1_and_rides_on_the_finish(self):
+    def test_a_parent_gone_from_the_remote_is_refused_by_the_push_gate(self):
+        """取り込みが通っても（代役が 0 で終わる）、リモートに無い親のブランチは作り直さない。
+        write-and-push の push の前の関門が止める。"""
+        write(os.path.join(self.scripts, "ccnavi-sync.sh"), "#!/bin/sh\nexit 0\n")
+        git(self.ws, "--git-dir", self.remote, "update-ref", "-d", f"refs/heads/{PARENT}")
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(f"親のブランチ {PARENT} がリモートに無い", result.stderr)
+        self.assertIn("何も反映していません", result.stderr)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
+        self.assertEqual(self.remote_sha(), "")
+
+    def test_a_take_in_that_tidied_the_parent_away_writes_nothing(self):
+        """取り込み（ccnavi-sync.sh）が、マージ済みの親のワークツリーを片付けて 0 で終わっても、
+        存在しないツリーには書かずに止まる。"""
+        write(
+            os.path.join(self.scripts, "ccnavi-sync.sh"),
+            f'#!/bin/sh\ngit -C "{self.ws}" worktree remove --force "{self.tree}"\nexit 0\n',
+        )
+        before = self.remote_sha()
+        result = self.ticket("start", PARENT)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("閉じた（マージ済み）か、ワークツリーが無い", result.stderr)
+        self.assertIn("何も反映していません", result.stderr)
+        self.assertFalse(os.path.exists(self.tree))
+        self.assertEqual(self.remote_sha(), before)
+
+    def test_record_risk_is_not_write_and_push_and_rides_on_the_finish(self):
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
         tree = self.child_tree()
         self.assertEqual(self.ticket("start", CHILD).returncode, 0)
@@ -803,7 +817,8 @@ class C1TicketTest(C1Harness):
             self.tree, *APPROVED.split("/"), "phases", PARENT, f"{CHILD}.judge.json"
         )
         write(judge, json.dumps({"x": {"hit": False, "reason": "r", "head": "h", "at": "t"}}))
-        # 記録（judge.json）が未コミットでも、finish の C1 は止めずにコミットして push する。
+        # 記録（judge.json）が未コミットでも、finish の write-and-push は止めずにコミットして push
+        # する。
         result = self.ticket("finish", CHILD)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotEqual(self.sha(self.tree, "HEAD"), head)
@@ -815,7 +830,7 @@ class C1TicketTest(C1Harness):
 CHILD_B = f"{PARENT}-01-02"
 
 
-class C1MergeTest(C1Harness):
+class WriteAndPushMergeTest(WriteAndPushHarness):
     """子の finish は、親のブランチへ合流してから push する（合流と状態は 1 つのマージコミット）。
 
     1. 合流・完了の記録・子の merged_sha が 1 つのマージコミットになり、push される
@@ -846,8 +861,6 @@ class C1MergeTest(C1Harness):
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "approve b")
         git(self.tree, "push", "-q", "origin", PARENT)
-        if self.imported:
-            self.write_present_record()
 
     def work(self, tree, rel, text, message="work"):
         write(os.path.join(tree, *rel.split("/")), text)
@@ -892,7 +905,6 @@ class C1MergeTest(C1Harness):
         self.assertIn(f"wip/proposals/review/{CHILD}.md", changed)
         review = self.read(os.path.join(self.tree, "wip", "proposals", "review", CHILD + ".md"))
         self.assertIn(f'merged_sha: "{child_head}"', review)
-        self.assertEqual(fields(self.record)["sha"], head)
         # 子の先頭は親の先頭の祖先
         self.assertEqual(
             git(
@@ -918,14 +930,12 @@ class C1MergeTest(C1Harness):
 
     # ---- 2. 別の PC の子 2
 
-    def test_a_second_child_on_a_pc_without_a_record_sees_the_first_and_reaches_the_request(self):
+    def test_a_second_child_sees_the_first_and_reaches_the_request(self):
         self.start_parent()
         self.approve_second_child()
         first = self.start_child()
         first_head = self.work(first, "wip/design/a.md", "a\n")
         self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
-        # 記録の無い PC B のつもり
-        os.remove(self.record)
         second = self.start_child(CHILD_B)
         self.assertTrue(os.path.isfile(os.path.join(second, "wip", "design", "a.md")))
         second_head = self.work(second, "wip/design/b.md", "b\n")
@@ -1339,10 +1349,10 @@ class C1MergeTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
 
-class TidyAfterFinishTest(C1Harness):
+class TidyAfterFinishTest(WriteAndPushHarness):
     """finish が通ったら、sh が実行ファイルに `worktree tidy <識別子>` を頼む。
 
-    C1 なら送った後に頼む。
+    write-and-push なら送った後に頼む。
     """
 
     def test_finish_asks_the_exe_to_tidy_after_sending(self):
@@ -1387,7 +1397,156 @@ class TidyAfterFinishTest(C1Harness):
         self.assertEqual(git(self.ws, "branch", "--list", CHILD).stdout.strip(), CHILD)
 
 
-class PlacesAreNotReadTest(C1Harness):
+class ProposeTest(WriteAndPushHarness):
+    """`ccnavi-ticket.sh propose`: 承認待ちの提案と子のフローの下書きを親のブランチへ送る。"""
+
+    TODO = "wip/proposals/todo"
+    FLOWS = "wip/proposals/flows"
+
+    def put(self, rel, text="x\n"):
+        write(os.path.join(self.tree, *rel.split("/")), text)
+        return rel
+
+    def test_new_proposals_are_committed_and_pushed(self):
+        todo = self.put(f"{self.TODO}/{PARENT}.md")
+        child = self.put(f"{self.TODO}/{CHILD}.md")
+        flow = self.put(f"{self.FLOWS}/{CHILD}.yml")
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        head = self.sha(self.tree, "HEAD")
+        self.assertNotEqual(head, before)
+        self.assertEqual(self.remote_sha(), head)
+        self.assertEqual(self.committed(), sorted([todo, child, flow]))
+        self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} の提案を送る"])
+        self.assertEqual(self.dirty(), "")
+        self.assertIn(f"提案: {todo}", result.stdout)
+        self.assertEqual(
+            [line for line in result.stdout.splitlines() if line.startswith("次: ")],
+            ["次: ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない"],
+        )
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def test_other_families_and_template_drafts_stay_out(self):
+        mine = self.put(f"{self.TODO}/{PARENT}.md")
+        other = self.put(f"{self.TODO}/i0002.md")
+        sibling = self.put(f"{self.TODO}/{PARENT}x.md")
+        draft = self.put("wip/proposals/templates/login.yml")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), [mine])
+        status = self.dirty()
+        for rel in (other, sibling, draft):
+            self.assertIn(f"?? {rel}", status)
+
+    def test_a_child_id_sends_the_whole_family(self):
+        todo = self.put(f"{self.TODO}/{PARENT}.md")
+        result = self.ticket("propose", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), [todo])
+
+    def test_an_edited_tracked_proposal_is_sent(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
+        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.put(rel, "v2\n")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), [rel])
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    def test_an_unchanged_proposal_sends_only_the_unpushed_commit(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.md")
+        git(self.tree, "add", "--", rel)
+        git(self.tree, "commit", "-q", "-m", "propose by hand")
+        before = self.sha(self.tree, "HEAD")
+        self.assertNotEqual(self.remote_sha(), before)
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(self.remote_sha(), before)
+
+    def reject_pushes(self):
+        """リモートの push をすべて断る（pre-receive が 1 で終わる）。"""
+        hook = os.path.join(self.remote, "hooks", "pre-receive")
+        write(hook, "#!/bin/sh\nexit 1\n")
+        os.chmod(hook, 0o755)
+
+    def test_a_rejected_push_keeps_the_proposals_the_user_wrote(self):
+        """送れなかったときに戻すのは自分のコミットだけ。書いた提案は作業ツリーに残る。"""
+        new = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
+        flow = self.put(f"{self.FLOWS}/{CHILD}.yml", "flow\n")
+        self.reject_pushes()
+        before = self.sha(self.tree, "HEAD")
+        remote_before = self.remote_sha()
+        result = self.ticket("propose", PARENT)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(self.remote_sha(), remote_before)
+        for rel, text in ((new, "v1\n"), (flow, "flow\n")):
+            self.assertEqual(self.read(os.path.join(self.tree, rel)), text)
+        self.assertNotIn("次: ", result.stdout)
+
+    def test_a_rejected_push_keeps_an_edit_of_a_sent_proposal(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
+        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.put(rel, "v2 precious edit\n")
+        self.reject_pushes()
+        result = self.ticket("propose", PARENT)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read(os.path.join(self.tree, rel)), "v2 precious edit\n")
+        self.assertNotIn("次: ", result.stdout)
+
+    def test_unpushed_code_is_not_sent_along_with_the_proposal(self):
+        self.put("src/secret.py", "x = 1\n")
+        git(self.tree, "add", "--", "src/secret.py")
+        git(self.tree, "commit", "-q", "-m", "wip code")
+        self.put(f"{self.TODO}/{PARENT}.md")
+        before = self.remote_sha()
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("src/secret.py", result.stderr)
+        self.assertEqual(self.remote_sha(), before)
+        self.assertIn(f"?? {self.TODO}/{PARENT}.md", self.dirty())
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def test_the_extension_is_compared_without_case(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.MD")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), [rel])
+
+    def test_no_proposal_stops_without_changing_anything(self):
+        before = self.remote_sha()
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("送る提案がありません", result.stderr)
+        self.assertEqual(self.remote_sha(), before)
+        self.assertEqual(self.dirty(), "")
+
+    def test_it_reads_only_the_parent_worktree(self):
+        # ワークスペースルートに写しがあっても、親のワークツリーに無ければ送らない。
+        write(os.path.join(self.ws, "wip", "proposals", "todo", PARENT + ".md"), "x\n")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("送る提案がありません", result.stderr)
+
+    def test_the_executable_alone_is_refused_for_a_pushed_family(self):
+        self.put(f"{self.TODO}/{PARENT}.md")
+        result = self.exe("ticket", "propose", PARENT)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ccnavi-ticket.sh", result.stderr)
+
+    def test_a_blocking_user_decision_stops_before_sending(self):
+        # 未送信のユーザの判断（review/ から done/ への移動など）があれば、提案も送らない。
+        self.put(f"{self.TODO}/{PARENT}.md")
+        write(os.path.join(self.tree, *APPROVED.split("/"), "done", "zzz.md"), "x\n")
+        before = self.remote_sha()
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.remote_sha(), before)
+
+
+class PlacesAreNotReadTest(WriteAndPushHarness):
     """控えの置き場を動かす環境変数は読まない（置き場は固定。A9）。
 
     `.ccnavi/scripts/` が写す版（i0064-10）になる前は失敗する。写す前の sh（`ccnavi-common.sh` の
@@ -1404,7 +1563,7 @@ class PlacesAreNotReadTest(C1Harness):
             f"{host} {live_sh_pid(self)} {now} {live_sh_pid(self)}-{now} {system}\n",
         )
 
-    def test_the_state_variable_does_not_move_the_lock_or_the_record(self):
+    def test_the_state_variable_does_not_move_the_lock(self):
         outside = os.path.join(self._base, "elsewhere-state")
         # 既定の置き場（logs/state/locks/...）のロックを持たれていれば、env を入れても止まる。
         self.hold_lock()
@@ -1413,17 +1572,16 @@ class PlacesAreNotReadTest(C1Harness):
         self.assertIn("ロックを他の操作が持っている", held.stderr)
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
         shutil.rmtree(self.lock_dir())
-        # ロックが空けば、既定の置き場でロックを取り、家族の控えを既定の置き場に書いて送る。
+        # ロックが空けば、既定の置き場でロックを取って送る。
         result = self.ticket("start", PARENT, CCNAVI_STATE=outside)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         head = self.sha(self.tree, "HEAD")
         self.assertEqual(self.remote_sha(), head)
-        self.assertEqual(fields(self.record)["sha"], head)
         self.assertFalse(os.path.exists(self.lock_dir()))
         self.assertFalse(os.path.exists(outside), "CCNAVI_STATE を読んでいる")
 
 
-class C1ChildWorktreeTest(C1Harness):
+class WriteAndPushChildWorktreeTest(WriteAndPushHarness):
     """子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチから作る。
 
     別のPCで承認された子でも、どのPCでも同じ場所に作る。
@@ -1475,17 +1633,16 @@ class C1ChildWorktreeTest(C1Harness):
         self.assertFalse(os.path.exists(self.child_path()))
 
 
-class C1NotImportedTest(C1Harness):
-    """10. 取り込み記録の無い PC でも、着手は C1 で取り込み・コミット・push まで行う。
+class WriteAndPushNoStateTest(WriteAndPushHarness):
+    """10. 親子ごとの取り込み状態を持たなくても、着手は write-and-push
+    で取り込み・コミット・push まで行う。
 
-    取り込み記録（キャッシュ）は C1 の対象を決めない。親のワークツリーがあり、origin があり、
-    HEAD の確認に通れば対象で、記録は C1 の取り込みが作る。
+    write-and-push の対象は、親のワークツリーがあり、origin があり、HEAD の確認に通るもの。
+    取り込み状態は、どの PC でも作らない。
     """
 
-    imported = False
-
-    def test_start_fetches_commits_and_pushes_without_a_record(self):
-        self.assertFalse(os.path.exists(self.record))
+    def test_start_fetches_commits_and_pushes_without_any_state(self):
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         head = self.sha(self.tree, "HEAD")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1493,17 +1650,13 @@ class C1NotImportedTest(C1Harness):
         self.assertNotEqual(after, head)
         self.assertEqual(self.remote_sha(), after)
         self.assertEqual(self.dirty(), "")
-        # 取り込みが記録（キャッシュ）を作る
-        self.assertEqual(fields(self.record)["state"], "present")
-        self.assertEqual(fields(self.record)["sha"], after)
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
-    def test_finish_pushes_without_a_record_too(self):
+    def test_finish_pushes_without_any_state_too(self):
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
         child_tree = self.child_tree()
         started = self.ticket("start", CHILD)
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        # 記録を消した別の PC のつもり
-        os.remove(self.record)
         write(os.path.join(child_tree, "wip", "design", "a.md"), "a\n")
         git(child_tree, "add", "-A")
         git(child_tree, "commit", "-q", "-m", "work")
@@ -1512,13 +1665,9 @@ class C1NotImportedTest(C1Harness):
         result = self.ticket("finish", CHILD)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-        self.assertEqual(fields(self.record)["state"], "present")
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
-    def test_origin_less_family_with_a_record_is_not_c1(self):
-        write(
-            self.record,
-            f"remote origin\nbranch {PARENT}\nsha x\nfetched_at 1\nstate present\nreason \n",
-        )
+    def test_origin_less_family_is_not_write_and_push(self):
         git(self.ws, "remote", "remove", "origin")
         head = self.sha(self.tree, "HEAD")
         result = self.ticket("start", PARENT)
@@ -1527,8 +1676,9 @@ class C1NotImportedTest(C1Harness):
         self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
 
 
-class C1WithoutMrTest(C1Harness):
-    """10. マージリクエストで見るフェーズが無い親子のチケットも C1 の対象（外した条件）。"""
+class WriteAndPushWithoutMrTest(WriteAndPushHarness):
+    """10. マージリクエストで見るフェーズが無い親子のチケットも write-and-push
+    の対象（外した条件）。"""
 
     plan = ("research",)
 
@@ -1539,7 +1689,7 @@ class C1WithoutMrTest(C1Harness):
         after = self.sha(self.tree, "HEAD")
         self.assertNotEqual(after, head)
         self.assertEqual(self.remote_sha(), after)
-        family = self.exe("c1", "family", PARENT)
+        family = self.exe("write-and-push", "family", PARENT)
         self.assertIn("target yes", family.stdout)
 
 
@@ -1559,7 +1709,7 @@ class PhaseOne:
         self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
 
 
-class C1HumanTest(PhaseOne, C1Harness):
+class WriteAndPushHumanTest(PhaseOne, WriteAndPushHarness):
     """9. ユーザの判断の入口は、取り込み済みの親子のチケットなら承認の push を自動で呼ぶ。
 
     11. 承認の push。
@@ -1604,7 +1754,8 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("コミットはローカルに残っています", result.stderr)
         self.assertIn(rel, self.committed())
-        # 次の C1 は未送信のユーザの判断を見つけて止まり、承認の push を打ち直すよう言う。
+        # 次の write-and-push は未送信のユーザの判断を見つけて止まり、承認の push
+        # を打ち直すよう言う。
         os.remove(os.path.join(self.remote, "hooks", "pre-receive"))
         stopped = self.ticket("start", PARENT)
         self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
@@ -1643,7 +1794,8 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(git(self.tree, "diff", "--cached", "--name-only").stdout, "")
 
     def test_push_approved_carries_a_removed_template_draft_with_the_flow(self):
-        """取り込んで消えたテンプレートの下書きも、フローの下書きと同じ形で運ぶ（C1 の手順）。"""
+        """取り込んで消えたテンプレートの下書きも、フローの下書きと同じ形で運ぶ（write-and-push
+        の手順）。"""
         drafts = "wip/proposals/templates"
         taken = f"{drafts}/feature.yml"
         rewritten = f"{drafts}/research.yml"
@@ -1665,7 +1817,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertIn(rewritten, left)
         self.assertNotIn(taken, left)
 
-    def test_push_approved_without_names_carries_the_family_through_c1(self):
+    def test_push_approved_without_names_carries_the_family_through_write_and_push(self):
         rel = f"{APPROVED}/flows/{CHILD}.yml"
         write(os.path.join(self.tree, rel), "steps: []\n")
         self.remote_commit("src/remote.py", "y = 2\n")
@@ -1678,7 +1830,7 @@ class C1HumanTest(PhaseOne, C1Harness):
 # 実行ファイルの半分の代役。残った指摘の行き先（`user reviewed ... --yes`）だけを代わりに書き
 # （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
 # 答えの JSON と下書きを書く）、
-# 残り（`c1 family`・`c1 sort`・`sync paths` など）は実際のものに渡す。
+# 残り（`write-and-push family`・`write-and-push sort`・`sync paths` など）は実際のものに渡す。
 HALF = """#!/bin/sh
 case " $* " in
 *" --accept-plan "*)
@@ -1734,8 +1886,8 @@ exec '{git}' "$@"
 
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
-class C1ReviewTest(C1Harness):
-    """レビューの状態を書く sh も C1 で回す（ccnavi-user-decide.sh を代表に見る）。"""
+class WriteAndPushReviewTest(WriteAndPushHarness):
+    """レビューの状態を書く sh も write-and-push で回す（ccnavi-user-decide.sh を代表に見る）。"""
 
     def setUp(self):
         super().setUp()
@@ -1803,8 +1955,8 @@ class C1ReviewTest(C1Harness):
         self.assertEqual(self.sha(self.tree, "HEAD"), head)
 
 
-# 実行ファイルの代役（ホストに触るサブコマンドの試験用）。状態を書くサブコマンドだけを代わりに書き
-# （親のワークツリーにマーカーを置き、書いたパスの一覧を出す）、`c1`・`sync` などは
+# 実行ファイルの代役（ホストに触る副命令の試験用）。状態を書く副命令だけを代わりに書き
+# （親のワークツリーにマーカーを置き、書いたパスの一覧を出す）、`write-and-push`・`sync` などは
 # 実際のものに渡す。
 # HALF_FAIL にファイル名があれば、`review requested` を最初の 1 回だけ失敗させる（打ち直しの試験）。
 HOST_HALF = """#!/bin/sh
@@ -1929,7 +2081,7 @@ class Host(__import__("http.server").server.BaseHTTPRequestHandler):
 
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
-class C1HostHarness(C1Harness):
+class WriteAndPushHostHarness(WriteAndPushHarness):
     """ホストの代役（GitLab）と実行ファイルの代役を用意する道具。試験は持たない。"""
 
     def setUp(self):
@@ -1969,8 +2121,8 @@ class C1HostHarness(C1Harness):
 
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
-class C1HostTest(C1HostHarness):
-    """ホストに触るサブコマンド（request・confirm・ready）と、ユーザ専用の decide・close-early。"""
+class WriteAndPushHostTest(WriteAndPushHostHarness):
+    """ホストに触る副命令（request・confirm・ready）と、ユーザ専用の decide・close-early。"""
 
     def test_request_confirm_and_ready_are_carried(self):
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
@@ -2017,7 +2169,8 @@ class C1HostTest(C1HostHarness):
         self.assertTrue(os.path.isdir(self.tree))
 
     def test_ready_commits_and_pushes_the_archive_removals_before_undrafting(self):
-        """ready の退避（閉じたチケットの削除）は、C1 がコミットして push してから Draft を外す。"""
+        """ready の退避（閉じたチケットの削除）は、write-and-push がコミットして push してから
+        Draft を外す。"""
         old = f"{APPROVED}/phases/old/closed.json"
         write(os.path.join(self.tree, *old.split("/")), "{}\n")
         git(self.tree, "add", old)
@@ -2096,7 +2249,7 @@ class C1HostTest(C1HostHarness):
 
     def test_ready_from_outside_by_a_relative_script_path(self):
         """ワークスペースルートから相対パス（`sh .ccnavi/scripts/ccnavi-review.sh`）で打っても、
-        親のワークツリーへ移った後に C1 の取り込み（ccnavi-sync.sh）を見失わない。
+        親のワークツリーへ移った後に write-and-push の取り込み（ccnavi-sync.sh）を見失わない。
 
         親のワークツリーにはスクリプトの写しを置かない（相対パスがそこで解かれると、見失うか、
         ワークツリーの古い写しを使う）。
@@ -2148,7 +2301,8 @@ class C1HostTest(C1HostHarness):
         self.assertTrue(os.path.isdir(self.tree))
 
     def test_ready_commits_the_wip_removals_and_names_them(self):
-        """ready が消した wip/ の追跡済みのファイルは、C1 が退避と一緒にコミットして push する。
+        """ready が消した wip/ の追跡済みのファイルは、write-and-push
+        が退避と一緒にコミットして push する。
         消したものと、戻せる版（消す前の HEAD）を出す。"""
         self.eli5()
         head = self.sha(self.tree, "HEAD")
@@ -2181,9 +2335,10 @@ class C1HostTest(C1HostHarness):
         self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", ELI5).stdout, "")
 
     def test_the_real_ready_moves_the_rest_again_after_a_failed_push(self):
-        """実際の実行ファイルの ready（退避を始めた後の打ち直し）を C1 の中で通す。
+        """実際の実行ファイルの ready（退避を始めた後の打ち直し）を write-and-push の中で通す。
 
-        1 回目の push をリモートが断る → C1 が戻す → 取り込みからやり直して残りを移し、送ってから
+        1 回目の push をリモートが断る → write-and-push が戻す → 取り込みからやり直して残りを移し、
+        送ってから
         Draft を外す。
         """
         archive_base = os.path.join(self.ws, "logs", "archive", "self")
@@ -2249,8 +2404,9 @@ class C1HostTest(C1HostHarness):
         self.assertEqual(len(Host.notes), 1)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
 
-    def test_terminal_decide_chooses_outside_c1_and_writes_inside(self):
-        """端末の decide は、選ぶのを C1 の外で済ませ、C1 の中では --yes で書くだけ。"""
+    def test_terminal_decide_chooses_outside_write_and_push_and_writes_inside(self):
+        """端末の decide は、選ぶのを write-and-push の外で済ませ、write-and-push の中では
+        --yes で書くだけ。"""
         chooser = executable(
             os.path.join(self._base, "bin", "chooser"),
             "#!/bin/sh\n"
@@ -2260,7 +2416,7 @@ class C1HostTest(C1HostHarness):
             f"  [ -d '{self.lock_dir()}' ] && echo LOCKED-WHILE-CHOOSING >&2\n"
             '  printf \'{"choices": {"u1": "keep"}, "digest": "d0"}\' >"$out"\n'
             "  exit 0 ;;\n"
-            # 受け入れる指摘の計画を立てる --yes は C1 の外で走り、何も置かない。
+            # 受け入れる指摘の計画を立てる --yes は write-and-push の外で走り、何も置かない。
             # 受け入れる指摘は無いという計画を返す（実物は依頼の記録を読むので、ここでは使わない）
             '*" --accept-plan "*)\n'
             '  prev=""; for a in "$@"; do\n'
@@ -2292,13 +2448,14 @@ class C1HostTest(C1HostHarness):
 
 
 @unittest.skipIf(shutil.which("jq") is None, "jq が必要です")
-class C1ChromeConfirmTest(PhaseOne, C1Harness):
+class WriteAndPushChromeConfirmTest(PhaseOne, WriteAndPushHarness):
     """Chrome のレビュー済みと手元の confirm の突き合わせ。
 
-    取り込み済みの親子のチケットでは、手元の CLI を直に打つと C1 に断られる
-    （`--record-tree` が無い）。そこで C1 と同じ手順
+    取り込み済みの親子のチケットでは、手元の CLI を直に打つと write-and-push に断られる
+    （`--record-tree` が無い）。そこで write-and-push と同じ手順
     （`ccnavi-review.sh request` と `confirm`。GitHub の代役は録った見本）で手元を
-    回し、同じ状態から Chrome の入口が出す書くものと、C1 が親のブランチへ書いて送ったものを比べる。
+    回し、同じ状態から Chrome の入口が出す書くものと、write-and-push
+    が親のブランチへ書いて送ったものを比べる。
     違ってよいのは経路（`via`）と時刻（`at`）だけ。アカウント（`actor`）は、手元は sh が
     トークンの持ち主を引いたもの、Chrome は PAT の持ち主で、同じ見本なので同じになる。
     """
@@ -2424,7 +2581,8 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         return body
 
     def same_refusal(self, scene):
-        """Chrome が通さない理由が、C1 で回した手元の confirm の標準エラーにそのまま出る。"""
+        """Chrome が通さない理由が、write-and-push で回した手元の confirm
+        の標準エラーにそのまま出る。"""
         answer = self.chrome_request(scene)
         self.assertIsNone(answer["changes"], scene)
         self.assertTrue(answer["problems"], scene)
@@ -2450,17 +2608,20 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         for scene in ("changes-requested", "cr-commented", "pending"):
             self.assertIn("変更要求のレビューが立っている", said[scene], scene)
 
-    def test_chrome_writes_what_c1_writes_and_sends(self):
+    def test_chrome_writes_what_write_and_push_writes_and_sends(self):
         body = self.request()
 
         answer = self.chrome_request()
         self.assertEqual(answer["problems"], [])
         rows = answer["changes"][PARENT]
 
-        # 手元を直に打つと C1 に断られる（だから C1 の手順で回す）。文面まで見る
+        # 手元を直に打つと write-and-push に断られる（だから write-and-push の手順で回す）。
+        # 文面まで見る
         direct = self.exe("--cwd", self.tree, "review", "confirm", "--phase", "1", "--result", body)
         self.assertNotEqual(direct.returncode, 0)
-        self.assertIn(f"親子のチケット {PARENT} は取り込み済み（C1 の対象）", direct.stderr)
+        self.assertIn(
+            f"親子のチケット {PARENT} は取り込み済み（write-and-push の対象）", direct.stderr
+        )
         self.assertIn("何も反映せずに中止しました。", direct.stderr)
 
         before = self.sha(self.tree, "HEAD")

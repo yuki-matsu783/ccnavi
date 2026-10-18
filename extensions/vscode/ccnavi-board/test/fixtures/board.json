@@ -332,9 +332,7 @@
    "remote": {
     "branch": "i0001",
     "ahead": null,
-    "behind": null,
-    "fetched_at": 0,
-    "mr": null
+    "behind": null
    },
    "predecessors": [],
    "predecessors_unmet": [],
@@ -780,6 +778,5 @@
    ]
   }
  ],
- "archived": [],
- "unprepared": []
+ "archived": []
 }

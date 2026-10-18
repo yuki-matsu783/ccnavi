@@ -1,12 +1,12 @@
-"""C1 の finish が、子を親のブランチへ合流する前に sh が聞くこと。
+"""write-and-push の finish が、子を親のブランチへ合流する前に sh が聞くこと。
 
 子の `finish` は、取り込み済みの親では、親のワークツリーで子のブランチを合流し（`merge --no-ff
 --no-commit`）、完了の記録と一緒に 1 つのマージコミットにして push する。git を動かすのは sh
-（`ccnavi-common-c1.sh`）で、実行ファイルはネットワークに出ず、コミットもしない。ここが答えるのは
+（`ccnavi-common-write-and-push.sh`）で、実行ファイルはネットワークに出ず、コミットもしない。ここが答えるのは
 合流してよいかの判定と、衝突したときに誰のワークツリーで解くかの案内だけ。どちらも 1 行 1 項目
 （`<鍵> <値>`。sh は jq を使わない）。
 
-- `ccnavi c1 merge <子>`: 合流の前の検査
+- `ccnavi write-and-push merge <子>`: 合流の前の検査
   - `skip <理由>`: 合流しない（親の finish、作業中でない子など）。sh は `ticket finish` へ進み、
     止めるべきことはそちらが言う
   - `stop <理由>` と続く `hint <案内>`: 何も変えずに止める
@@ -17,7 +17,8 @@
     ある、範囲（子・親・フェーズ定義）の外のパスがある、子が変えたパスが親のワークツリーに
     無視されたファイルとしてある（merge が黙って上書きし、戻すと消える）、合流を戻せない形の
     変更（改行を含むパス・大文字小文字だけが違うパス・submodule の追加と削除）がある、のどれか
-- `ccnavi c1 merge-blame <子> <パス>...`: 衝突したパスを、先に親へ合流した別の子の変更から探す。
+- `ccnavi write-and-push merge-blame <子> <パス>...`: 衝突したパスを、
+先に親へ合流した別の子の変更から探す。
   `other <子> <パス>` を 1 パス 1 行で（パスの空白はそのまま、改行は `\\n`）。
   見つからなければ何も出さない
 
@@ -35,11 +36,11 @@ from ..policy import rules
 from . import (
     approval,
     approval_checks,
-    c1,
     ops_close,
     phase_scope,
     ticket_model,
     ticket_places,
+    write_and_push,
 )
 
 _TIMEOUT = 20.0
@@ -70,9 +71,9 @@ def _say(stdout: TextIO, key: str, text: str) -> None:
 
 
 def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
-    """`ccnavi c1 merge <子>`。合流の前の検査。"""
-    stdout.write(c1.HEAD + "\n")
-    parent_id = c1.family_of(ident)
+    """`ccnavi write-and-push merge <子>`。合流の前の検査。"""
+    stdout.write(write_and_push.HEAD + "\n")
+    parent_id = write_and_push.family_of(ident)
     if parent_id == ident:
         _say(stdout, "skip", "親は合流しない")
         return 0
@@ -284,7 +285,7 @@ _GITLINK = "160000"
 def _unrestorable(child_tree: str, base: str, head: str) -> tuple[list[str], str]:
     """`base..head` のうち、push が通らなかったときに sh が親のワークツリーを戻せない変更。
 
-    sh の戻し（`ccnavi_c1_undo`）はパスを 1 行 1 件で扱い、無いパスは `rm -f` で消す。
+    sh の戻し（`ccnavi_wap_undo`）はパスを 1 行 1 件で扱い、無いパスは `rm -f` で消す。
     - 改行を含むパスは行が割れて、戻すパスを取り違える
     - 大文字小文字だけが違うパス（大文字小文字だけの改名など）は、大文字小文字を区別しない
       ファイルシステム（Windows・macOS の既定）で、片方を消すともう片方の中身まで消える
@@ -325,9 +326,10 @@ def _same(a: str, b: str) -> bool:
 
 
 def blame(stdout: TextIO, conf: settings.Settings, root: str, ident: str, paths: list[str]) -> int:
-    """`ccnavi c1 merge-blame <子> <パス>...`。衝突したパスを持ち込んだ、先に合流した別の子。"""
-    stdout.write(c1.HEAD + "\n")
-    parent_id = c1.family_of(ident)
+    """`ccnavi write-and-push merge-blame <子> <パス>...`。衝突したパスを持ち込んだ、
+    先に合流した別の子。"""
+    stdout.write(write_and_push.HEAD + "\n")
+    parent_id = write_and_push.family_of(ident)
     parent_tree = tree.worktree_path(root, parent_id)
     child_tree = tree.worktree_path(root, ident)
     parent_head = gitstate.head(parent_tree)

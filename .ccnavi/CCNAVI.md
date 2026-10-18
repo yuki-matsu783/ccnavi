@@ -37,13 +37,13 @@
 
 | 読むとき | 開くファイル |
 |---|---|
-| ワークツリーを切る、他セッションの変更の影響を受けた、親の正本・未準備・`mr:` を確かめる | `.ccnavi/docs/worktree.md` |
+| ワークツリーを切る、他セッションの変更の影響を受けた、親の正本・親のワークツリーが無いとき・`mr:` を確かめる | `.ccnavi/docs/worktree.md` |
 | issue・MR を指定して作業を頼まれた | `.ccnavi/docs/worktree-start.md` |
 | `<統合先>` に取り込む、子の finish で親へ合流する・衝突を解く、マージリクエストに出す | `.ccnavi/docs/worktree-merge.md` |
 | ワークツリーや子のブランチを片付ける、親を閉じたあとの片付け | `.ccnavi/docs/worktree-cleanup.md` |
 | 下書きや使い捨てのファイルを置く | `.ccnavi/docs/scratchpad.md` |
 | `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `.ccnavi/docs/projects.md` |
-| 提案を書く、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `.ccnavi/docs/decisions.md` |
+| 提案を書く、承認・レビュー済みをユーザに頼む、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `.ccnavi/docs/decisions.md` |
 | 親の提案を始める、完了した親の計画とフローを次に使い回したい、親が閉じるときにテンプレートの案内が出た | `.ccnavi/docs/templates.md` |
 | 用語（ワークスペースルート・統合先ブランチなど）を確かめる | `.ccnavi/docs/terms.md` |
 | `.ccnavi/CCNAVI.md` の条件や差し込みを書く・直す | `.ccnavi/docs/ccnavi-md.md` |
@@ -63,11 +63,11 @@
   このワークスペースはチケット制御を使っている。進め方は 2 つ。
 
   - 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体ルールだけ。
-  - チケット作業（設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る）: {{tickets_dir}}/todo/ に提案を書いて承認を受ける。承認されると提案は {{approved_dir}}/doing/ へ動く。以後の操作は {{ticket_sh}} を通す（使い方は --help）。
+  - チケット作業（設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る）: {{tickets_dir}}/todo/ に提案を書き、{{ticket_sh}} propose <識別子> で親のブランチへ送って承認を受ける（別のPCでも承認できる）。承認されると提案は {{approved_dir}}/doing/ へ動く。以後の操作は {{ticket_sh}} を通す（使い方は --help）。
 
   どちらで進めるか迷ったら、ユーザに聞く。ただし issue・MR を指定された実装は、直接作業にせずチケット作業で進める（ホストで作られたものを途中から頼まれた場合も同じ）。詰まったら直接実装に切り替えず、ユーザに報告して止まる。
 
-  作業中の正本は親のブランチを checkout した親のワークツリー（名前はブランチ名の `/` を `-` にしたもの）。ワークツリーが無い・HEAD が違うPCでは操作が止まるので、案内の `ccnavi-start.sh` で準備する。開始時に出る作業中の親の一覧で「リモート未確認」の親は、{{ticket_sh}} status で突き合わせる。親の提案には `mr:` を必ず書く。詳細は `.ccnavi/docs/worktree.md`。
+  作業中の正本は親のブランチを checkout した親のワークツリー（名前はブランチ名の `/` を `-` にしたもの）。ワークツリーが無い・HEAD が違うPCでは操作が止まるので、案内の `ccnavi-start.sh` で準備する。親の提案には `mr:` を必ず書く。詳細は `.ccnavi/docs/worktree.md`。
   <!-- ccnavi:if dry_run -->
     （現状: {{mode_env}}=dry-run。deny にヒットしても止まらない。通ったことを許可と読まず、表示された案内に次からは従う）
   <!-- ccnavi:endif -->

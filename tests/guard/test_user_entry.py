@@ -285,7 +285,7 @@ class HookTest(HookCase):
             "ccnavi --agree --preview --verify",
             "ccnavi --prune --preview",
             "grep -rn 'user agree' docs",
-            "cat docs/adr/0142-user-only-entries-are-separate.md",
+            "cat docs/adr/0143-user-only-entries-are-separate.md",
             "ccnavi --lint",
             "ccnavi --templates --json",
             "ccnavi --templates --draft i0001",

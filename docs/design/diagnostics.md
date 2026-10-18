@@ -39,7 +39,7 @@ state も内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 診断の外に渡すと、レイヤーの置き場のフラグと同じく外し、同じ文面を標準エラーに出す。`.ccnavi/scripts/` の sh
 （`ccnavi-ticket.sh` / `ccnavi-review.sh`）は受け取った引数を `"$@"` で実行ファイルへそのまま渡すので、診断の外で効くと、
 エージェントが記録を止めた形（`--log ""`）や、承認済みチケット・提案の置き場を差し替えた形でサブコマンドを動かせる（P2・P6）。
-C1 の書いたパスの一覧（`--record-writes`）も、診断の外では `--state` を見ずに既定の state の置き場だけを一覧から外す。
+write-and-push の書いたパスの一覧（`--record-writes`）も、診断の外では `--state` を見ずに既定の state の置き場だけを一覧から外す。
 
 **互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
 `EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh は実行ファイルを起動する前に、拡張は起動のときに `--version` を読んで
@@ -73,7 +73,7 @@ JSON の形は README の「試験の JSON」「lint の JSON」「ボードの 
 残った指摘の対応方針（`decide`）も拡張の中で決める。オーバーレイが `ccnavi-review.sh decide <N> --preview` で
 指摘とダイジェストを見せ、ユーザが指摘ごとに選んで押したら `ccnavi-user-decide.sh <N> --choices … --digest …` を子プロセスで打つ
 （形は README「残った指摘の JSON」）。`close-early` はボードに置かない。「レビュー済み連絡」は、承認の文と
-同じ経路（コピー / 新しいセッションで開く）で文を渡すだけで、拡張はマーカーを置かず実行ファイルも起動しない。
+同じ経路（コピー / 新しいセッションで開く）で文を渡すだけで、拡張はマーカーを置かない。押したときに未解決の指摘の有無を文に入れるため `decide <N> --preview` で読むが、置く操作はしない。
 `confirm` を打つのは文を受けた親（9.8、単体の `sh …ccnavi-review.sh`）。依頼のマーカーが持つマージリクエストの
 URL はリンクとして出すが、その先の状態は見に行かない。
 
@@ -104,7 +104,7 @@ error がある間は配点もフェーズ定義も保存できない。
   承認の JSON と残った指摘の JSON は `ensure_ascii=False` で書く
 - 古い実行ファイルの見分け: argparse の苦情（`unrecognized arguments: --version`）を拡張が読む。
   `parse_args` の `SystemExit` は捕まえて終了コード 1 にする
-- `ccnavi c1 family <親>` の答え（1 行目 `c1 1`、`target yes|no|stop`）は、sh（C1）だけでなく拡張も読む。
+- `ccnavi write-and-push family <親>` の答え（1 行目 `write-and-push 1`、`target yes|no|stop`）は、sh（write-and-push）だけでなく拡張も読む。
   フローを保存した後に承認の push を送るかを、これで決める
 - 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・Python・拡張の 3 つの logger で揃える（`docs/claude/logging.md`）。
   `tests/core/test_diaglog.py` が 3 つの行を突き合わせる

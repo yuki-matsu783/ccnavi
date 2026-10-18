@@ -7,7 +7,7 @@ keywords: [識別子, ブランチ名, feature, hotfix, 先頭の語, CCNAVI_BRA
 ---
 # ADR-0102: 親の識別子を <先頭の語>-<番号>-<slug> にし、日本語の字を使えるようにする
 
-状態: 採用（1〜5 章。5 章の `branch:` キーは 2026-10-04 に実装）
+状態: 採用（1〜5 章。5 章の `branch:` キーは 2026-10-04 に実装。取り込み状態の鍵や `syncstate` で引く処理への言及は、取り込み状態をやめた ADR-0142 が改める）
 
 改訂（2026-10-14）: 5 章の `branch:` キーと承認後の `switch` の手順は、ADR-0136 が置き換えた。親の識別子はブランチ名の `/` を `-` に置き換えたもので、`branch:` があればエラーになる。
 
@@ -88,13 +88,13 @@ issue のタイトルは誰でも書けるので、Chrome 拡張の service work
 `LC_ALL=C tr -d 'A-Za-z0-9._\200-\377-'` で消し、何も残らなければ通す（`ccnavi-review.sh` の eli5 の検査と同じ方法。
 末尾の改行が `$( )` で落ちないよう番兵の `/` を足して比べる）。ASCII の外のバイトは通し、字の種類（全角記号・NFD）は
 実行ファイルが確かめる（2 段目の確認。ADR-0093 の判定は実行ファイルが持つ）。`ccnavi-push-approved.sh`・`ccnavi-sync.sh`・
-`ccnavi-review.sh config-synced`・`ccnavi-ticket.sh` の C1 の識別子の検査をこれに置き換えた。
+`ccnavi-review.sh config-synced`・`ccnavi-ticket.sh` の write-and-push の識別子の検査をこれに置き換えた。
 
 ### 3.2 git の非 ASCII の扱い（確かめたこと）
 
 - `git status --porcelain`・`diff --name-only`・`ls-files`・`log --name-only` は、既定（`core.quotePath=true`）で日本語のパスを
   `"\347\265\261…"` と引用する。ccnavi がパスを読み戻す箇所は、Python も sh も `-z` か `-c core.quotePath=false` で読んでいた
-  （`gitstate`・`review`・`phase`・`risk`・`c1`・`configsync`、sh の `carry_paths`・`ccnavi_c1_*`・`ccnavi-sync.sh` の `ls-tree`）。
+  （`gitstate`・`review`・`phase`・`risk`・`write-and-push`・`configsync`、sh の `carry_paths`・`ccnavi_wap_*`・`ccnavi-sync.sh` の `ls-tree`）。
   `-z` の無い `status --porcelain` は、空かどうかだけを見る箇所（`ops._unfinished`・`ccnavi-fetch.sh`・`ccnavi-push-approved.sh`）だけ
 - `git worktree list --porcelain`、`rev-parse --abbrev-ref HEAD`、`for-each-ref` の refname は引用されない（git 2.43 で確かめた）
 - ブランチ名は git の ref の規則で日本語を使える。GitHub・GitLab の API に渡すブランチ名は、拡張が `encodeURIComponent` で包んでいた
@@ -128,7 +128,7 @@ branch: feature/123-login
 1. **同じ親子のチケットを名乗るブランチが 1 本でなければ、どれを本物とするか決まらないとして止める**（厳しくする向き。判定は緩めない）
 2. `ccnavi-git.sh` の push の節（取り込み状態をチェックアウト中のブランチ名で引いている箇所など）も、この作業で直す。
    統合先への push の拒否（`ccnavi_integration`）は壊さない
-3. sh が識別子とブランチ名の対応を知る手段は、実行ファイルの `ccnavi c1 family <識別子>` の答えに足した `branch <名前>`。
+3. sh が識別子とブランチ名の対応を知る手段は、実行ファイルの `ccnavi write-and-push family <識別子>` の答えに足した `branch <名前>`。
    `ccnavi-sync.sh` の引数は識別子。取り込み状態の鍵は識別子のまま（`/` を state の置き場のパスに入れない）。互換の版
    `CCNAVI_COMPAT` を上げる（統合先で ADR-0101 が子の形の変更で 3 から 4 に上げていたので、取り込むときに 5 にした）。
    Chrome 拡張も「親子のチケット = ブランチ名」の前提を直し、`branch:` を読む
@@ -186,7 +186,7 @@ ADR-0093 の 3.1 は、案 N3（`branch:` キー）を「キーを書き換え�
 | **名乗るブランチが 1 本でなければ止める**（ユーザの決定 1）。手元は同じリポジトリのツリー（ワークスペースルート・プロジェクト・ワークツリー）のうち、HEAD のブランチをそのツリーの親チケットが名乗るもの（`Families.claims`）。Chrome は読んだブランチ（表示用の候補と、判定の入力）のうち、その親子のチケットを名乗るもの（`_ident_branches`）。`branch:` の親子のチケットでは識別子と同じ名前のブランチも読みに行く（`rivals`） | 別のブランチ B2 に `ticket: X`・`branch: B2` のチケットを置いて親子のチケットを 2 つにする。誰でも親子のチケットを止められるが、今もブランチ X を消せば止まるので同じ程度 |
 | **取り込み状態が親のブランチ名を持つ。** 取り込み状態の `branch` と親チケットが名乗る名前が違えば止める（`Families._standing`、`ccnavi-sync.sh`）。書き直すのは、承認済みの `branch:` のブランチへ移って push したときだけ（5.2 の 4） | 取り込んだ後に本物とする側を別のブランチへ動かす。戻すにはユーザが `--forget` で取り込み状態を消す |
 | **承認で決まる。** 提案の `branch:` は使わず、承認済みチケットの `branch:` だけを使う。承認画面に出し、ダイジェスト（チケットの全文）に入る。改版で `branch:` を変えられない（`agree_candidates.revision_problems`）。承認済みチケットの置き場はエージェントが書けない（自己防衛） | 提案を書き換えるだけで既存のブランチを取り出す・移る・送る・取り込みの本物とする側にする。見せた後・承認の後の書き換え |
-| **使える名前だけを渡す。** 実行ファイルは承認済みの `branch:` も `ticket_ids.branch_problem` と統合先の名前（`Families.integration_names`）で確かめ直し、通らなければ `c1 family` が `branch` の行を出さず `branch_refused` で理由を言い、立ち位置も止める。sh（worktree add・checkout・sync・C1・push の取り込み状態）は `branch` の行が無ければ識別子の外へ動かさずに止める | 手で書いたチケットの `origin/main`・統合先の名前 |
+| **使える名前だけを渡す。** 実行ファイルは承認済みの `branch:` も `ticket_ids.branch_problem` と統合先の名前（`Families.integration_names`）で確かめ直し、通らなければ `write-and-push family` が `branch` の行を出さず `branch_refused` で理由を言い、立ち位置も止める。sh（worktree add・checkout・sync・write-and-push・push の取り込み状態）は `branch` の行が無ければ識別子の外へ動かさずに止める | 手で書いたチケットの `origin/main`・統合先の名前 |
 | **2 つの親子のチケットが同じブランチを名乗らない。** 承認で、親のブランチ名が同じリポジトリの開いた別のチケットの親のブランチ名か識別子と同じなら、両方とも承認しない（`approval.branch_problems`）。sh は同じブランチを名乗る取り込み状態が 2 つ以上なら push・移るを止める（`ccnavi_family_record_of_branch` が全部を出す） | 親子のチケット B の `branch:` を親子のチケット A の識別子にして、A のブランチを B の本物とする側にする |
 
 手元の判定は git を起こさないので、ホストのブランチ（手元にワークツリーの無いもの）は見ない。手元が見ない分は、取り込み
@@ -215,7 +215,7 @@ ADR-0093 の 3.1 は、案 N3（`branch:` キー）を「キーを書き換え�
 
 ### 5.4 sh が親のブランチ名を知る手段
 
-sh はチケットを読まない（ADR-0093 の D33）。`ccnavi c1 family <識別子>` の答えに `branch <名前>` を足した
+sh はチケットを読まない（ADR-0093 の D33）。`ccnavi write-and-push family <識別子>` の答えに `branch <名前>` を足した
 （`syncstate.Families.branch_any`）。名前は親のワークツリーの承認済みの親チケット、取り込み状態の `branch`、ほかのツリーの
 承認済みの親チケット、識別子の順に探す（提案は見ない）。使えない名前なら `branch` の行の代わりに `branch_refused <理由>` を出す。
 `ccnavi_family_branch` は実行ファイルが無ければ 1、名前が使えない・答えないなら 2 を返し、`ccnavi-git.sh` は 1 なら識別子と
@@ -223,7 +223,7 @@ sh はチケットを読まない（ADR-0093 の D33）。`ccnavi c1 family <識
 
 | sh | 使い方 |
 |---|---|
-| `ccnavi-common.sh` | `ccnavi_family_branch <ws> <識別子>`（実行ファイルに聞く。聞けなければ 1）、`ccnavi_family_record_of_branch <ws> <リポジトリ> <ブランチ>`（取り込み状態を `branch` の行で探す）、C1 の `ccnavi_c1_branch` |
+| `ccnavi-common.sh` | `ccnavi_family_branch <ws> <識別子>`（実行ファイルに聞く。聞けなければ 1）、`ccnavi_family_record_of_branch <ws> <リポジトリ> <ブランチ>`（取り込み状態を `branch` の行で探す）、write-and-push の `ccnavi_wap_branch` |
 | `ccnavi-fetch.sh` | セッションの頭で待たせないよう実行ファイルは起こさず、取り込み状態の `branch` を読む |
 
 実行ファイルが無い（ソースも無い）ワークスペースでは、`ccnavi-sync.sh` は識別子をブランチ名とする（前の動き）。
@@ -241,7 +241,7 @@ sh はチケットを読まない（ADR-0093 の D33）。`ccnavi c1 family <識
 | 承認 | `agree_candidates.revision_problems` | 改版で `branch:` を変えさせない |
 | 承認 | `approval.branch_problems` | 統合先の名前（`origin/HEAD` を含む）に当たる `branch:` と、2 つの親子のチケットが同じブランチを名乗る形を断る |
 | lint | `lint._parent_trees_off_branch` | 親のワークツリーが親のブランチの上に居るかを `Families.branch` で見る |
-| 実行ファイル | `c1.family`・`cli` の `c1 sort` の版の検査 | 答えに `branch`（使えなければ `branch_refused`）を足す。`c1 sort` の版に `refs/remotes/origin/<親のブランチ>` を受ける |
+| 実行ファイル | `write_and_push.family`・`cli` の `write-and-push sort` の版の検査 | 答えに `branch`（使えなければ `branch_refused`）を足す。`write-and-push sort` の版に `refs/remotes/origin/<親のブランチ>` を受ける |
 | 実行ファイル | `ops_stop._own_commits`（ADR-0087 の終える促しの取り込み元） | 子なら親のブランチ（`Families.branch`）の先を除く |
 | 実行ファイル | `ops.start` の案内、`review._followup_next` | ワークツリーを作る案内と子の起点に親のブランチ名を使う |
 | 取り込み状態 | `ccnavi_family_record`・`syncstate.family` | 鍵は識別子のまま、中の `branch` に親のブランチ名を書く（前の取り込み状態は識別子を書いている） |
@@ -249,10 +249,10 @@ sh はチケットを読まない（ADR-0093 の D33）。`ccnavi c1 family <識
 | `ccnavi-git.sh` | checkout・switch の節 | 親のワークツリーで許す移り先は親のブランチ（承認済みの `branch:` の値）だけ。識別子のブランチの上から承認済みの `branch:` のブランチへ移るのは `co_carry`（5.2 の 3）。移った後は識別子のブランチへも戻れない |
 | `ccnavi-git.sh` | push の節 | 消えた親子のチケットの検査は取り込み状態を `branch` の行で探す。最初の push の取り込み状態はワークツリーの名前（識別子）を鍵に、居るブランチが親のブランチのときだけ作る。子のワークツリーの見分けと統合先への push の拒否は変えない |
 | `ccnavi-sync.sh` | 引数・親子のチケットの集め方・取り込み・消えたかの確かめ・取り込み状態 | 引数は識別子。親のブランチ名が決まらなければ（引数なしでも）止めたと言って失敗に数える。移った後まだ送っていない親子のチケットは取り込みの後の検査をしない。ref（`refs/remotes/origin/<B>`）・`ls-remote` の一覧・fetch・merge の文・取り込み状態の `branch`・戻し方の案内は親のブランチ名、取り込み状態の鍵とロックは識別子 |
-| `ccnavi-common.sh` | C1（`ccnavi_c1_prepare`・`ccnavi_c1_write`・`ccnavi_c1_undo`・`ccnavi_c1_sent`） | 未送信の比べ（`origin/<B>`）・push・`ls-remote`・`update-ref`・取り込み状態の `branch` は `ccnavi_c1_branch` |
-| `ccnavi-push-approved.sh` | 親のワークツリーの見分け、`carry_family` | ワークツリーの名前（識別子）で `c1 family` を聞く。送る ref は親のブランチ名 |
+| `ccnavi-common.sh` | write-and-push（`ccnavi_wap_prepare`・`ccnavi_wap_write`・`ccnavi_wap_undo`・`ccnavi_wap_sent`） | 未送信の比べ（`origin/<B>`）・push・`ls-remote`・`update-ref`・取り込み状態の `branch` は `ccnavi_wap_branch` |
+| `ccnavi-push-approved.sh` | 親のワークツリーの見分け、`carry_family` | ワークツリーの名前（識別子）で `write-and-push family` を聞く。送る ref は親のブランチ名 |
 | `ccnavi-fetch.sh` | 早送りの対象と ref | 取り込み状態の `branch` を親のブランチとして、居るブランチと比べ、`origin/<B>` に早送りする |
-| `ccnavi-review.sh` | MR の元ブランチ、C1、下書きの名前 | MR は居るブランチ（親のブランチ）で探して作る（前のまま）。C1 の親子のチケットと下書きの名前（実行ファイルと揃える）は親のワークツリーの名前（識別子） |
+| `ccnavi-review.sh` | MR の元ブランチ、write-and-push、下書きの名前 | MR は居るブランチ（親のブランチ）で探して作る（前のまま）。write-and-push の親子のチケットと下書きの名前（実行ファイルと揃える）は親のワークツリーの名前（識別子） |
 | Chrome（Python） | `_op_families`・`_closure`・`_build`・`records`・`_op_board`・`_family_tree`・`_op_confirm` | 要求の `family` はブランチ名のまま、親子のチケットの識別子は名乗る親チケットで決める（`_family_ident`。承認前の提案は識別子で名乗る `_claimed`）。仮のツリーは `.claude/worktrees/<識別子>` で HEAD は親のブランチ、取り込み状態は識別子の鍵に `branch`。名乗るブランチが 2 本以上なら、判定する親子のチケットでも閉包の先行の親子のチケット（`ambiguous`）でも止める。ホストに無い親子のチケットの識別子が識別子の形でなければ取り込み状態を書かずに止める |
 | Chrome（TS） | `snapshot.ts`・`py.ts`・`render.ts` | 親子のチケットの一覧の `family`（識別子）・`conflict`、閉包の `idents`・`rivals`、先行の親子のチケットを読みに行く見当の `hints`。見出しに識別子も出す |
 
@@ -264,9 +264,9 @@ sh はチケットを読まない（ADR-0093 の D33）。`ccnavi c1 family <識
 
 `tests/sh/test_branch_field_sh.py`（一時のリポジトリで `/` を含むブランチの承認 → 移る → 着手 → push → 取り込み → 終える、
 承認前に送った取り込み状態の書き直し、承認後に新しいブランチを切る形、承認前・使えない `branch:` を worktree add・checkout・
-sync・c1 family・push が使わないこと、名乗るブランチが 2 本、取り込み状態の `branch` の食い違い、消えた親子のチケットと 2 つの取り込み状態への push）、
+sync・write-and-push family・push が使わないこと、名乗るブランチが 2 本、取り込み状態の `branch` の食い違い、消えた親子のチケットと 2 つの取り込み状態への push）、
 `tests/ticket/test_branch_field.py`（字と形と git の表記、子のキー、承認画面と JSON、改版、統合先の名前（`origin/HEAD`）、
-2 つの親子のチケットの同じブランチ、lint、`c1 family`、Chrome の入口と先行の親子のチケット）、
+2 つの親子のチケットの同じブランチ、lint、`write-and-push family`、Chrome の入口と先行の親子のチケット）、
 `tests/sh/test_ident_sh.py` の `ccnavi_is_branch`。拡張は `test/board.test.ts` の CX-T180（`/` を含むブランチの親子のチケットと、
 同じ親子のチケットを名乗るブランチが 2 本のとき）。
 

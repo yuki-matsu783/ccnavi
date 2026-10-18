@@ -77,6 +77,8 @@ _SESSION_ONLY = (
     re.compile(r"^denied-(?P<s>.+)\.json$"),  # repeat._path
     re.compile(r"^stop-(?P<s>.+)\.json$"),  # ctxfile.stop_path
     re.compile(r"^(?P<s>.+)\.turn\.json$"),  # post._turn_path
+    re.compile(r"^(?P<s>.+)\.accepted\.json$"),  # post._accepted_path
+    re.compile(r"^busy-(?P<s>.+)\.json$"),  # busy._path
 )
 # 名前の後ろにセッション以外の鍵が `-` で続く記録。セッションにも `-` が入るので、
 # 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。

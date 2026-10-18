@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 
 from ccnavi.entry import lint, version
 from ccnavi.infra import settings
@@ -203,9 +202,6 @@ class ReviewableTest(ActorHarness):
             board["reviewable"],
             [{"phase": 1, "mr": 7, "host": "fixture", "children": ["i0001-01-01"]}],
         )
-        # ボードの要求は取り込み状態相当を手元にもコピーする（手元は C1 の対象になり、直打ちの
-        # confirm を断る）。ここでは手元のマーカーを置くためだけに取り込み状態を外す
-        shutil.rmtree(os.path.join(self.state, "sync"))
         self.assertEqual(self.confirm_as(fixture).returncode, 0)
         self.commit_parent("reviewed")
         board = self.ask_chrome(self.chrome_request("board", "i0001"))
@@ -308,9 +304,9 @@ class ReviewRuleTest(ActorHarness):
         # 欄の行のほかは変わっていない
         self.assertEqual(1, self.doing_text().count("mr: 7"))
 
-    def test_the_mr_write_is_in_the_c1_write_list(self):
-        # C1 は書いたパスの一覧のパスだけをコミットする。`mr:` の書き足しも一覧に入る
-        state = os.path.join(self.root, "logs", "state", "c1", "demo")
+    def test_the_mr_write_is_in_the_write_and_push_write_list(self):
+        # write-and-push は書いたパスの一覧のパスだけをコミットする。`mr:` の書き足しも一覧に入る
+        state = os.path.join(self.root, "logs", "state", "write-and-push", "demo")
         os.makedirs(state, exist_ok=True)
         listing = os.path.join(state, "writes.txt")
         done = self.request_posted(

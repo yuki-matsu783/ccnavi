@@ -12,11 +12,11 @@
 #   review_exe              実行ファイル（関数 ccnavi）。見つからなければ 1
 #   review_host             origin からホストと道具を決める（kind・host・path・JQ・transport など）。branch・family も
 #   review_begin            受け付けたことを診断ログに残し、取ってきた結果の置き場（result）を決める
-#   review_c1               C1 の支度（ccnavi_c1_*・c1_on）
+#   review_wap              write-and-push の支度（ccnavi_wap_*・wap_on）
 #
 # 置くのは、ホストを読む関数（api・pages・find_mr・threads・reviews・fetch_all・refetch・account）と、
-# エージェントも使う書く関数（comment。ccnavi-review.sh の request・comment が投稿に使う）と、C1 を回す関数
-# （c1_start・c1_ccnavi）だけ。ユーザの判断を書く処理（指摘のスレッドへの返信と解決、issue を作る、
+# エージェントも使う書く関数（comment。ccnavi-review.sh の request・comment が投稿に使う）と、write-and-push を回す関数
+# （wap_start・wap_ccnavi）だけ。ユーザの判断を書く処理（指摘のスレッドへの返信と解決、issue を作る、
 # ユーザの判断を承認の push で送る）はここに置かない。ユーザ専用の sh（ccnavi-user-*.sh）の中だけに置く。
 # 共通のファイルに置くと、`sh -c '. …common….sh; 関数'` の形で、ユーザ専用の sh の名前を出さずに
 # 呼べてしまうため（hook はユーザ専用の sh を名前で止める）。
@@ -155,7 +155,7 @@ review_host() {
 	branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	# 親の識別子。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名
 	# の / を - に置き換えたもの（ブランチ名とは違うことがある）。マージリクエストは居るブランチ（branch）で探して作り、
-	# C1 の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
+	# write-and-push の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
 	family="$branch"
 	review_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	if [ -n "$review_top" ]; then
@@ -388,42 +388,42 @@ review_begin() {
 	result="$state/review-result-$$.json"
 }
 
-# ---- C1。取り込み済みの親子のチケットで、状態を書く実行ファイルの呼び出しを 1 つの操作にまとめる。
-c1_on=no
-review_c1() {
-	ccnavi_c1_root="$root"
-	ccnavi_c1_sh="$script_dir"
+# ---- write-and-push。取り込み済みの親子のチケットで、状態を書く実行ファイルの呼び出しを 1 つの操作にまとめる。
+wap_on=no
+review_wap() {
+	ccnavi_wap_root="$root"
+	ccnavi_wap_sh="$script_dir"
 	# 実行ファイルの起こし方は review_exe が決めた ccnavi（--cwd と互換の版の確かめつき）。
-	ccnavi_c1_exe() { ccnavi "$@"; }
-	ccnavi_c1_label="$review_label"
+	ccnavi_wap_exe() { ccnavi "$@"; }
+	ccnavi_wap_label="$review_label"
 }
 
-# C1 を始める（1〜5）。<識別子>。対象でなければ何もしない（今の手元の動き）。止める理由があれば抜ける。
-c1_start() {
-	ccnavi_c1_family "$1"
-	case "$ccnavi_c1_target" in
+# write-and-push を始める（1〜5）。<識別子>。対象でなければ何もしない（今の手元の動き）。止める理由があれば抜ける。
+wap_start() {
+	ccnavi_wap_family "$1"
+	case "$ccnavi_wap_target" in
 	stop)
-		ccnavi_c1_refuse
+		ccnavi_wap_refuse
 		exit 1
 		;;
 	yes)
-		ccnavi_c1_begin || exit 1
-		c1_on=yes
+		ccnavi_wap_begin || exit 1
+		wap_on=yes
 		;;
 	esac
 	return 0
 }
 
-# 状態を書く実行ファイルの 1 回。C1 の中なら書いたパスだけをコミットして送る（6〜11）。
-# <文> -- <実行ファイルの引数>...。ccnavi_c1_capture に書き先があれば標準出力をそこへ書く。
-c1_ccnavi() {
-	c1_words="$1"
+# 状態を書く実行ファイルの 1 回。write-and-push の中なら書いたパスだけをコミットして送る（6〜11）。
+# <文> -- <実行ファイルの引数>...。ccnavi_wap_capture に書き先があれば標準出力をそこへ書く。
+wap_ccnavi() {
+	wap_words="$1"
 	shift
 	[ "${1:-}" = "--" ] && shift
-	if [ "$c1_on" = yes ]; then
-		ccnavi_c1_write "ccnavi: ${c1_words}" -- "$@"
-	elif [ -n "$ccnavi_c1_capture" ]; then
-		ccnavi "$@" >"$ccnavi_c1_capture"
+	if [ "$wap_on" = yes ]; then
+		ccnavi_wap_write "ccnavi: ${wap_words}" -- "$@"
+	elif [ -n "$ccnavi_wap_capture" ]; then
+		ccnavi "$@" >"$ccnavi_wap_capture"
 	else
 		ccnavi "$@"
 	fi

@@ -569,9 +569,10 @@ class ProjectsTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(lib_approved, "done", "i0007.md")))
 
     def test_an_undecided_project_family_stops_the_hook_and_the_state(self):
-        """取り込み済みのプロジェクトの親子のチケットも止まる。
+        """プロジェクトの親子のチケットも、親のワークツリーが決まらなければ止まる。
 
-        取り込み状態は sync/<プロジェクト>/ に置く。
+        親のワークツリーはプロジェクトのリポジトリから切る（ワークスペースの同名の
+        ワークツリーとは別）。
         """
         write(
             self.proposal_file(self.lib, "i0007"),
@@ -584,19 +585,13 @@ class ProjectsTest(unittest.TestCase):
         target = os.path.join(tree, "src", "a.py")
         before = self.hook("Write", self.ws, file_path=target)
         self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)
-        # ワークスペースの取り込み状態に同じ名前があっても、
-        # プロジェクトの親子のチケットには当たらない。
-        record = "remote origin\nbranch i0007\nsha 0\nfetched_at 1\nstate {}\nreason \n"
-        write(os.path.join(self.state, "sync", "self", "families", "i0007"), record.format("gone"))
-        write(os.path.join(self.state, "sync", "lib", "integration", "head"), "branch main\n")
-        still = self.hook("Write", self.ws, file_path=target)
-        self.assertNotEqual(self.decision(still), "deny", still.stdout + still.stderr)
-        write(os.path.join(self.state, "sync", "lib", "families", "i0007"), record.format("gone"))
+        # 親のワークツリーの HEAD がブランチ名と合わなくなれば、決まらない。
+        git(tree, "checkout", "--quiet", "-b", "elsewhere")
         denied = self.hook("Write", self.ws, file_path=target)
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
         cancelled = self.ccnavi("ticket", "cancel", "i0007", "--reason", "やめる")
         self.assertNotEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
-        self.assertIn("gone", cancelled.stderr)
+        self.assertIn("合わない", cancelled.stderr)
 
     # ---- 5. 実行後チェックはツリーごと
 

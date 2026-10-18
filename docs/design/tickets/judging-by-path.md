@@ -109,7 +109,7 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 
 サブエージェント（`agent_id` 付き）からの `ccnavi-ticket.sh` / `ccnavi-review.sh` の操作と
 `ccnavi-git.sh push` は、ルールより先に `DENY_SUBAGENT_TICKET_OP` で止める。シェルから実行ファイルを
-`user` の入口（`ccnavi user …`）付き、または状態とレビューを動かすサブコマンド（`ticket start|finish|cancel|record-risk`、
+`user` の入口（`ccnavi user …`）付き、または状態とレビューを動かすサブコマンド（`ticket start|finish|cancel|propose|record-risk`、
 `review prepare|requested|confirm|ready`）付きで直接打つ形は、素性によらず
 `DENY_TICKET_APPROVAL_CLI` で止める。`ccnavi-user-*.sh` は引数に依らず、名前がコマンド行のどこにあっても同じ理由コードで止める。
 大文字小文字によらない。止めは `user_only.py` の表から作る（9.18）。旧い形（`--agree` / `--reviewed` / `--close-early` 付き、
@@ -138,9 +138,8 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 
 | 入口 | 止める形 |
 |---|---|
-| `ccnavi-sync.sh`（旧い形。新しい `ccnavi-user-forget.sh` は名前で止める） | 1 つ目の引数（空に展開しうる語は飛ばす）が `--forget` になりうる。文字の `--forget` を `busybox sh` や `sh < x` の後ろに置いた形も。`--preview $X` のように文字どおりの語が先頭なら止めない（sh が断る） |
 | `ccnavi-review.sh decide`（旧い形。サブコマンドが展開で `decide` になりうる形を含む。新しい `ccnavi-user-decide.sh` は名前で止める） | `--choices` になりうる展開を含む語がある。文字どおりの `--preview` があれば止めない（sh が `--choices` と一緒に受けない） |
-| 実行ファイル（`ccnavi`・`ccnavi.exe`・`python -m ccnavi`・`ccnavi-launcher.sh`・設定の実行ファイルの名前） | 展開を含む語があり、`user` の入口になりうる、または承認のオプション（`--agree` / `--approve` / `--reviewed`）と `--yes` が文字か展開でどちらもそろいうる。または `--guard-ticket-approval` になりうる。展開を含む語より前（`--` の前）に診断のオプション（`--docs`・`--test`・`--lint`・`--explain`・`--suggest`・`--version`・`--help`）か実行ファイルの知らないオプションがある形と、文字どおりの `--agree --preview` は止めない |
+| 実行ファイル（`ccnavi`・`ccnavi.exe`・`python -m ccnavi`・`ccnavi-launcher.sh`・設定の実行ファイルの名前） | 展開を含む語があり、`user` の入口になりうる、または承認のオプション（`--agree` / `--approve` / `--reviewed`）と `--yes` が文字か展開でどちらもそろいうる。`worktree retire --abandon`（放棄した親の片付けの記録を消す操作）または `--guard-ticket-approval` になりうる。展開を含む語より前（`--` の前）に診断のオプション（`--docs`・`--test`・`--lint`・`--explain`・`--suggest`・`--version`・`--help`）か実行ファイルの知らないオプションがある形と、文字どおりの `--agree --preview` は止めない |
 
 - 入口はコマンドの位置で探す。前に置けるのはシェル・`busybox`・`.`・シェルの選択肢・リダイレクト・代入だけで、
   `env`・`sh -c`・`find -exec`・`xargs` の中は shellread が外した層で見る。`git log --grep ccnavi-sync.sh` のように
@@ -148,7 +147,7 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 - 入口の前置きには `uv run`・`uvx`・`pipx run` も入る（間の選択肢と値は読み分けない）
 - 引数がコマンド行に無い形は、入口の名前が出た時点で止める。`xargs` が入口を実行する形、入口を `<` で読ませる形
 - 標準入力から読むシェル（パイプの先の `sh`・`bash`、`sh -s`、`sh /dev/stdin`、ヒアドキュメント、ヒアストリング。シェルのオプションは、`--norc` のような長いオプションと、値を取るオプション（`--rcfile <値>`・`-o pipefail`・`-O extglob`）を読み飛ばす。前に置いた `env`・`command`・`exec` も外して見る。`-c` は文字列を実行するので数えない）があるときは、
-  コマンド行の文字列の中で入口の名前が実行される語として現れれば止める（`echo "sh …ccnavi-user-forget.sh i1" | sh`）。流し込む文字列の中は語として読めないので、
+  コマンド行の文字列の中で入口の名前が実行される語として現れれば止める（`echo "ccnavi worktree retire --abandon i1" | sh`）。流し込む文字列の中は語として読めないので、
   コマンドの切れ目と引用符で切り、前置き・代入・選択肢を飛ばした頭の語を見る。パスの一部（`cd /home/user/ccnavi`）・コメント・
   シェルの引数（`sh -s -- ccnavi`）として出るだけの名前は数えない。sh の入口はファイルとして渡すだけで中身が流れ込むので、語として出れば数える
 - 走査が止まる形（バッククォート）は生の文字列の語で探し、位置は見ない

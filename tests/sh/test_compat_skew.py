@@ -61,7 +61,9 @@ def extension_compat() -> int:
     path = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "src", "core", "version.ts")
     with open(path, encoding="utf-8") as f:
         found = re.search(r"^export const EXTENSION_COMPAT = ([0-9]+);$", f.read(), re.MULTILINE)
-    assert found is not None, "src/core/version.ts に EXTENSION_COMPAT が無い"
+    assert found is not None, (
+        "extensions/vscode/ccnavi-board/src/core/version.ts に EXTENSION_COMPAT が無い"
+    )
     return int(found.group(1))
 
 
@@ -195,7 +197,8 @@ class CompatAgreesTest(unittest.TestCase):
         self.assertGreaterEqual(version.COMPAT, 7)
 
     def test_v11_ready_removing_wip_raised_the_compat_to_8(self):
-        """V11 `review ready` が `wip/` の追跡済みのファイルを消すようになった。C1 の外では sh が
+        """V11 `review ready` が `wip/` の追跡済みのファイルを消すようになった。write-and-push
+        の外では sh が
         その削除の未コミットを確かめてから Draft を外す。なので 8 以上。
 
         確かめを持たない古い sh（互換 7）と新しい実行ファイルを組み合わせると、`wip/` の削除が
@@ -242,19 +245,33 @@ class CompatAgreesTest(unittest.TestCase):
         self.assertIn("--accept-plan", flags)
         self.assertIn("--accept-done", flags)
 
-    def test_v15_the_user_entry_raised_the_compat_to_13(self):
-        """V15 ユーザだけが打つ操作を、実行ファイルの `user <操作>` と ccnavi-user-*.sh に分けた。
+    def test_v15_dropping_the_sync_records_raised_the_compat_to_13(self):
+        """V15 親子ごとの取り込み状態（`sync/<リポジトリ>/families/<P>`）と統合先のコピー
+        （`integration/`）を廃止した。新しい sh は、実行ファイルの新しい副命令
+        （`tree parent` の追加の行 `approved`・`requested`・`archived`・`mr`、`sync retired`、
+        `sync migrate`）を呼ぶ。Chrome と手元の判定の規則も変わった。なので 13 以上。
+
+        旧い sh（互換 12）は取り込み状態の `present` を前提に write-and-push と承認の push
+        を止める。
+        組み合わせると、新しい実行ファイルは記録を書かないので、旧い sh が止まる。
+        食い違いとして知らせる。sh の版と実行ファイルの版は揃える。
+        """
+        self.assertGreaterEqual(version.COMPAT, 13)
+        self.assertEqual(sh_compat(), version.COMPAT)
+
+    def test_v16_the_user_entry_raised_the_compat_to_15(self):
+        """V16 ユーザだけが打つ操作を、実行ファイルの `user <操作>` と ccnavi-user-*.sh に分けた。
 
         新しい実行ファイルは、`user` の外のユーザ専用のオプション（`--agree`・`--reviewed --yes`
         など）を断る。古い sh（ccnavi-agree.sh など）は断られるので、食い違いとして知らせ、
-        sh の配り直しを言う。なので 13 以上。
+        sh の配り直しを言う。なので 15 以上。
         """
-        self.assertGreaterEqual(version.COMPAT, 13)
+        self.assertGreaterEqual(version.COMPAT, 15)
 
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")
 class TicketStatusPassTest(unittest.TestCase):
-    """`ccnavi-ticket.sh status` は親を省いても実行ファイルへ渡す（C1 を通らない）。"""
+    """`ccnavi-ticket.sh status` は親を省いても実行ファイルへ渡す（write-and-push を通らない）。"""
 
     def setUp(self):
         self.ws = tempfile.mkdtemp(prefix="ccnavi-status-")

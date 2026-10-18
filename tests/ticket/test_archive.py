@@ -2,7 +2,8 @@
 
 - 退避の構成と移し方（archive.py）
 - `ready` が条件を確かめてから退避し、打ち直しても通ること
-- C1 の見分け（`c1.classify_all`）と実行後チェック（`post_findings._script_writes`）が、
+- write-and-push の見分け（`write_and_push.classify_all`）
+と実行後チェック（`post_findings._script_writes`）が、
   退避の削除だけを ccnavi の書き込みとして外すこと
 - 閉じた識別子の使い回し・子の連番・先行を引く対応表が退避を見ること
 - ボードの JSON に退避のチケットが載ること（判定には混ぜない）
@@ -22,8 +23,7 @@ from ccnavi.tickets import (
     approval_checks,
     approval_ops,
     archive,
-    c1,
-    ticket_model,
+    write_and_push,
 )
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness
@@ -155,7 +155,7 @@ class ArchiveModuleTest(ArchiveTreeHarness):
         self.assertTrue(os.path.isfile(os.path.join(self.approved, "done", "old.md")))
 
     def test_move_again_replaces_a_different_mark(self):
-        """C1 が push できずに戻した後の打ち直しでは、マーカーだけが前の回と違う。
+        """write-and-push が push できずに戻した後の打ち直しでは、マーカーだけが前の回と違う。
 
         マーカーは置き換えて進む。
         """
@@ -198,15 +198,6 @@ class ChecksHarness(unittest.TestCase):
 class ArchiveChecksTest(ChecksHarness):
     """閉じた識別子の使い回し・子の連番・先行を引く対応表が退避を見る。"""
 
-    def test_the_archive_is_not_a_ground_for_a_reused_identifier(self):
-        """閉じた識別子の使い回しは、退避からは調べない（ホストの MR で調べる）。"""
-        t, _ = ticket_mod.parse(closed_text("i0001"))
-        t.state = ticket_model.TODO
-        self.assertEqual(approval_checks.integration_problems(self.conf, self.root, t), [])
-        self.assertEqual(approval_checks.integration_closed(self.conf, self.root, [t]), set())
-        fresh, _ = ticket_mod.parse(closed_text("i0002"))
-        self.assertEqual(approval_checks.integration_problems(self.conf, self.root, fresh), [])
-
     def test_the_next_child_skips_the_archived_numbers(self):
         self.assertEqual(
             approval_ops.next_child_id(self.conf, self.root, "i0001", 1), "i0001-01-04"
@@ -220,7 +211,7 @@ class ArchiveChecksTest(ChecksHarness):
         return t
 
     def states(self, root, t):
-        """承認・lint と同じ引き方（対応表 → 取り込みで読み直す）で、先行の状態。"""
+        """承認・lint と同じ引き方（対応表 → 親のブランチで読み直す）で、先行の状態。"""
         conf, _ = settings.load(root)
         pool = approval_checks.predecessor_pool_of([t], [], [], [])
         approval_checks.align_imported(conf, root, pool)
@@ -235,32 +226,13 @@ class ArchiveChecksTest(ChecksHarness):
         return root
 
     def test_a_predecessor_in_the_archive_is_not_read_and_pcs_agree(self):
-        """手元の退避にだけある先行は閉じたと読まない。退避の無い PC と同じ答えになる。"""
+        """手元の退避にだけある先行は閉じたと読まない。退避の無い PC と同じ答えになる。
+
+        閉じて片付いた親子のチケットの先行は、どの PC でも同じく「どの置き場にも無い」になる。
+        """
         t = self.follower()
         self.assertEqual(self.states(self.root, t), [approval_checks.PRED_MISSING])
         self.assertEqual(self.states(self.other_pc(), t), [approval_checks.PRED_MISSING])
-
-    def test_a_predecessor_in_the_integration_done_is_met_on_every_pc(self):
-        t = self.follower()
-        for root in (self.root, self.other_pc()):
-            conf, _ = settings.load(root)
-            mirror = os.path.join(conf.state, "sync", "self", "integration")
-            write(os.path.join(mirror, "head"), "branch main\nsha x\nsource default\n")
-            write(
-                os.path.join(mirror, ".ccnavi", "approved", "done", "i0001-01-03.md"),
-                closed_text("i0001-01-03", "i0001"),
-            )
-            self.assertEqual(self.states(root, t), [approval_checks.PRED_DONE], root)
-
-    def test_a_predecessor_of_a_family_the_sync_closed_is_met_on_every_pc(self):
-        t = self.follower()
-        for root in (self.root, self.other_pc()):
-            conf, _ = settings.load(root)
-            write(
-                os.path.join(conf.state, "sync", "self", "families", "i0001"),
-                "remote origin\nbranch i0001\nsha x\nfetched_at 1\nstate closed\nreason r\n",
-            )
-            self.assertEqual(self.states(root, t), [approval_checks.PRED_DONE], root)
 
 
 class ReadyHarness(PhaseHarness):
@@ -312,7 +284,7 @@ class ReadyHarness(PhaseHarness):
         places = (".ccnavi/approved", "wip/proposals/review")
         return {
             rel: kind
-            for kind, rel, _ in c1.classify_all(
+            for kind, rel, _ in write_and_push.classify_all(
                 self.parent_tree,
                 places,
                 "i0001",
@@ -369,7 +341,7 @@ class ReadyArchivesTest(ReadyHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertFalse(os.path.exists(os.path.join(self.root, "logs", "archive")))
 
-    def test_c1_and_the_post_check_count_only_the_archive_removals(self):
+    def test_write_and_push_and_the_post_check_count_only_the_archive_removals(self):
         fixture = self.closable()
         # 退避と関係の無い削除も 1 つ混ぜる（開いた親の書きかけ）
         write(os.path.join(self.approved, "events", "stray.jsonl"), "{}\n")
@@ -383,27 +355,29 @@ class ReadyArchivesTest(ReadyHarness):
         base = archive.base_dir(self.root, "")
         sorted_out = {
             rel: kind
-            for kind, rel, _ in c1.classify_all(
+            for kind, rel, _ in write_and_push.classify_all(
                 self.parent_tree, places, "i0001", changed, "", (self.root, "")
             )
         }
-        self.assertEqual(sorted_out[".ccnavi/approved/done/i0001.md"], c1.KIND_B)
-        self.assertEqual(sorted_out[".ccnavi/approved/done/old-01-01.md"], c1.KIND_B)
-        self.assertEqual(sorted_out[".ccnavi/approved/phases/i0001/closed.json"], c1.KIND_B)
-        self.assertEqual(sorted_out[".ccnavi/approved/events/stray.jsonl"], c1.KIND_C)
+        self.assertEqual(sorted_out[".ccnavi/approved/done/i0001.md"], write_and_push.KIND_B)
+        self.assertEqual(sorted_out[".ccnavi/approved/done/old-01-01.md"], write_and_push.KIND_B)
+        self.assertEqual(
+            sorted_out[".ccnavi/approved/phases/i0001/closed.json"], write_and_push.KIND_B
+        )
+        self.assertEqual(sorted_out[".ccnavi/approved/events/stray.jsonl"], write_and_push.KIND_C)
         # 退避の置き場を渡さなければ、前のとおり ccnavi の書き込みとは見分けない（止める）
-        plain = c1.classify_all(self.parent_tree, places, "i0001", changed, "", None)
-        self.assertNotIn(c1.KIND_B, {kind for kind, _, _ in plain})
+        plain = write_and_push.classify_all(self.parent_tree, places, "i0001", changed, "", None)
+        self.assertNotIn(write_and_push.KIND_B, {kind for kind, _, _ in plain})
         # 退避したコピーが違えば (b) にしない
         write(os.path.join(base, "done", "old-01-01.md"), "書き換えた\n")
         again = {
             rel: kind
-            for kind, rel, _ in c1.classify_all(
+            for kind, rel, _ in write_and_push.classify_all(
                 self.parent_tree, places, "i0001", changed, "", (self.root, "")
             )
         }
-        self.assertEqual(again[".ccnavi/approved/done/old-01-01.md"], c1.KIND_D)
-        self.assertEqual(again[".ccnavi/approved/done/i0001.md"], c1.KIND_B)
+        self.assertEqual(again[".ccnavi/approved/done/old-01-01.md"], write_and_push.KIND_D)
+        self.assertEqual(again[".ccnavi/approved/done/i0001.md"], write_and_push.KIND_B)
 
     def test_the_post_check_does_not_report_the_archive_removals(self):
         fixture = self.closable()
@@ -456,12 +430,12 @@ class ReviewFindingsTest(ReadyHarness):
             self.assertFalse(os.path.exists(os.path.join(self.approved, *rel.split("/"))), rel)
             self.assertTrue(os.path.isfile(os.path.join(base, *rel.split("/"))), rel)
 
-    def test_4_committed_removals_are_carried_by_c1(self):
+    def test_4_committed_removals_are_carried_by_write_and_push(self):
         fixture = self.closable()
         self.assertEqual(self.ready(fixture).returncode, 0)
         kinds = self.sorted_kinds()
-        self.assertEqual(kinds[".ccnavi/approved/done/i0001.md"], c1.KIND_B)
-        self.assertEqual(kinds[".ccnavi/approved/done/i0001-01-01.md"], c1.KIND_B)
+        self.assertEqual(kinds[".ccnavi/approved/done/i0001.md"], write_and_push.KIND_B)
+        self.assertEqual(kinds[".ccnavi/approved/done/i0001-01-01.md"], write_and_push.KIND_B)
         # コミットしたあとの未送信の確かめ（since）でも (b)
         self.commit_parent("退避")
         changed = sorted(
@@ -472,16 +446,16 @@ class ReviewFindingsTest(ReadyHarness):
             if p
         )
         kinds = self.sorted_kinds(changed, "HEAD~1")
-        self.assertEqual(kinds[".ccnavi/approved/done/i0001.md"], c1.KIND_B)
+        self.assertEqual(kinds[".ccnavi/approved/done/i0001.md"], write_and_push.KIND_B)
 
-    def test_4_committed_legacy_events_are_carried_by_c1(self):
+    def test_4_committed_legacy_events_are_carried_by_write_and_push(self):
         fixture = self.closable()
         write(os.path.join(self.approved, "events", "i0001.jsonl"), '{"a": 1}\n')
         self.commit_parent("legacy events")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         self.assertEqual(self.ready(fixture).returncode, 0)
         kinds = self.sorted_kinds()
-        self.assertEqual(kinds[".ccnavi/approved/events/i0001.jsonl"], c1.KIND_B)
+        self.assertEqual(kinds[".ccnavi/approved/events/i0001.jsonl"], write_and_push.KIND_B)
 
     def test_5_a_removal_outside_ready_is_not_carried(self):
         self.family(plan=["design"])
@@ -492,10 +466,10 @@ class ReviewFindingsTest(ReadyHarness):
         write(os.path.join(base, "done", "old.md"), closed_text("old"))
         os.remove(os.path.join(self.approved, "done", "old.md"))
         kinds = self.sorted_kinds()
-        self.assertNotEqual(kinds[".ccnavi/approved/done/old.md"], c1.KIND_B)
+        self.assertNotEqual(kinds[".ccnavi/approved/done/old.md"], write_and_push.KIND_B)
 
     @unittest.skipIf(os.name == "nt", "シンボリックリンクを作れないことがある")
-    def test_6_a_linked_logs_dir_is_not_trusted_by_c1(self):
+    def test_6_a_linked_logs_dir_is_not_trusted_by_write_and_push(self):
         fixture = self.closable()
         self.assertEqual(self.ready(fixture).returncode, 0)
         logs = os.path.join(self.root, "logs")
@@ -503,7 +477,7 @@ class ReviewFindingsTest(ReadyHarness):
         os.rename(logs, moved)
         os.symlink(moved, logs)
         kinds = self.sorted_kinds()
-        self.assertNotIn(c1.KIND_B, set(kinds.values()))
+        self.assertNotIn(write_and_push.KIND_B, set(kinds.values()))
 
 
 class ArchiveModuleReviewTest(ArchiveTreeHarness):
@@ -542,15 +516,12 @@ class ArchiveModuleReviewTest(ArchiveTreeHarness):
 
 
 class ArchivedStandingTest(ChecksHarness):
-    """取り込みの立ち位置: 手元の退避からは閉じたと推定しない。"""
+    """親子のチケットの立ち位置: 手元の退避からは閉じたと推定しない。"""
 
-    def test_an_archived_family_without_its_tree_is_not_closed(self):
-        from ccnavi.tickets import syncstate
+    def test_an_archived_family_without_its_tree_is_undecided(self):
+        from ccnavi.tickets import standing
 
-        record = os.path.join(self.conf.state, "sync", "self", "families", "i0001")
-        write(record, "remote origin\nbranch i0001\nsha x\nfetched_at 1\nstate present\nreason \n")
-        st = syncstate.standing(self.conf, self.root, "i0001")
-        self.assertFalse(st.closed)
+        st = standing.standing(self.conf, self.root, "i0001")
         self.assertIn("ワークツリー", st.stop)
 
     def test_lookups_stay_in_the_same_repository(self):
@@ -573,12 +544,14 @@ class SecondReviewTest(ReadyHarness):
         git(self.parent_tree, "checkout", "HEAD~1", "--", ".ccnavi/approved/done/old.md")
         git(self.parent_tree, "commit", "--quiet", "-m", "戻った")
         os.remove(os.path.join(self.approved, "done", "old.md"))
-        self.assertNotEqual(self.sorted_kinds()[".ccnavi/approved/done/old.md"], c1.KIND_B)
+        self.assertNotEqual(
+            self.sorted_kinds()[".ccnavi/approved/done/old.md"], write_and_push.KIND_B
+        )
 
     def test_2_the_mark_only_counts_the_four_places(self):
         write(os.path.join(archive.base_dir(self.root, ""), "other", "x.md"), "x")
         self.assertFalse(
-            c1.archived_removal("other/x.md", None, b"x", {"other/x.md"}, self.root, "")
+            write_and_push.archived_removal("other/x.md", None, b"x", {"other/x.md"}, self.root, "")
         )
 
     def test_3_ready_again_needs_the_merge_request_to_be_a_draft(self):
@@ -644,16 +617,7 @@ class SecondReviewModuleTest(ArchiveTreeHarness):
 
 
 class SecondReviewChecksTest(ChecksHarness):
-    """2 回目のレビューの指摘の再現（判定・取り込み状態）。"""
-
-    def test_4_the_archive_does_not_override_a_gone_family(self):
-        from ccnavi.tickets import syncstate
-
-        record = os.path.join(self.conf.state, "sync", "self", "families", "i0001")
-        write(record, "remote origin\nbranch i0001\nsha x\nfetched_at 1\nstate gone\nreason \n")
-        st = syncstate.standing(self.conf, self.root, "i0001")
-        self.assertFalse(st.closed)
-        self.assertIn("gone", st.stop)
+    """2 回目のレビューの指摘の再現（判定）。"""
 
     def test_5_ready_does_not_archive_from_the_workspace_root(self):
         from ccnavi.tickets import review_close
@@ -672,10 +636,6 @@ class SecondReviewChecksTest(ChecksHarness):
         self.assertNotIn("other", archive.ids(self.root, ""))
 
     def test_6_other_letter_case_is_still_found_in_the_archive(self):
-        t, _ = ticket_mod.parse(closed_text("I0001"))
-        t.state = ticket_model.TODO
-        self.assertEqual(approval_checks.integration_problems(self.conf, self.root, t), [])
-        self.assertEqual(approval_checks.integration_closed(self.conf, self.root, [t]), set())
         self.assertIsNotNone(archive.archived_fields(self.root, "", "I0001"))
         self.assertEqual(
             approval_ops.next_child_id(self.conf, self.root, "I0001", 1), "I0001-01-04"
@@ -725,9 +685,6 @@ class PhaseChildIdsChecksTest(ChecksHarness):
         self.assertEqual(
             approval_ops.next_child_id(self.conf, self.root, "i0001", 3), "i0001-03-01"
         )
-        t, _ = ticket_mod.parse(closed_text("i0001-02-07", "i0001", 2))
-        t.state = ticket_model.TODO
-        self.assertEqual(approval_checks.integration_problems(self.conf, self.root, t), [])
 
 
 if __name__ == "__main__":

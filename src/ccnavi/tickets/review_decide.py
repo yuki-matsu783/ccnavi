@@ -23,7 +23,7 @@ from . import (
     phase,
     review,
     review_host,
-    syncstate,
+    standing,
     ticket_model,
     via,
 )
@@ -88,7 +88,7 @@ def _followup_next(root: str, parent: ticket_model.Ticket, ident: str) -> str:
     """続きの子を起こしたあと、エージェントが打つ 2 手。"""
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    base = syncstate.head_branch(tree.worktree_path(root, parent.ticket), parent.ticket)
+    base = standing.head_branch(tree.worktree_path(root, parent.ticket), parent.ticket)
     return (
         f"エージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
         f"{base or '<親のブランチ>'}' でワークツリーを切り、'{ticket_sh} start {ident}' で"
@@ -214,7 +214,9 @@ def reviewed(
     accept_unresolved: bool,
     result_path: str,
 ) -> int:
-    """ユーザが端末で打つ。残った指摘を見せ、1 件ずつ行き先を選ばせる。変更要求は通せない。
+    """ユーザが端末か VS Code のボードで行う。
+
+    残った指摘を見せ、1 件ずつ行き先を選ばせる。変更要求は通せない。
 
     選んだ結果は `apply_decision` が置き、MR に書き込むコメントと issue の下書きを state の置き場に
     書き出す。sh がそれを投稿する。
@@ -262,8 +264,8 @@ def choose(
 
     残った指摘を見せて 1 件ずつ選ばせ、
     選択とダイジェストを `{"choices": …, "digest": …}` で書くだけ。
-    何も置かない。置くのは sh が C1 の中で `--yes <選択> --digest <ダイジェスト>` で打つ
-    （選ぶのを C1 のロックの外で済ませ、ロックを持ったままユーザを待たない）。
+    何も置かない。置くのは sh が write-and-push の中で `--yes <選択> --digest <ダイジェスト>` で打つ
+    （選ぶのを write-and-push のロックの外で済ませ、ロックを持ったままユーザを待たない）。
     """
     d = _decision(stderr, root, conf, cwd, phase_no, result_path)
     if d is None:

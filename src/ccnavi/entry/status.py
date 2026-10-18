@@ -13,7 +13,7 @@
   サブエージェントかを知らないので出力を分けず、状態を動かすコマンドの行には「親（メインエージェント）
   だけが実行する」と書く
 - 未コミットの承認済みチケットは運ばない。運ぶのはユーザ（`ccnavi-user-push-approved.sh`）で、
-  エージェントが運ぶコマンドは出さない。取り込み済みの親子（C1 の対象）では、運ぶまで
+  エージェントが運ぶコマンドは出さない。取り込み済みの親子（write-and-push の対象）では、運ぶまで
   `start` が止まることを言う
 """
 
@@ -28,12 +28,12 @@ from ..tickets import (
     approval,
     approval_checks,
     approval_times,
-    c1,
     ops_stop,
     overview,
     phase,
-    syncstate,
+    standing,
     ticket_model,
+    write_and_push,
 )
 
 TIMEOUT_SECONDS = 10.0
@@ -133,11 +133,11 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         return 0
 
     pool = approval_checks.predecessor_pool_of(doing, review, closed, proposals)
-    # 承認と lint と同じ引き方にする（閉じた別の親子の先行は統合先の done/ と取り込み状態で読む）。
+    # 承認と lint と同じ引き方にする。
     approval_checks.align_imported(conf, root, pool)
     times = approval_times.approved_times(conf, doing + review + closed)
     files = _file_states(root, [h for e in entries.values() for h in e.hits])
-    fams = syncstate.Families(conf, root)
+    fams = standing.Families(conf, root)
     sync = settings.script_command(root, "ccnavi-sync.sh")
     stdout.write(
         "ccnavi: チケットの状態。手元の置き場・git だけを読む"
@@ -158,7 +158,6 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         )
         ctx = _Family(root, conf, name, entries, pool, times, files, fams, raw)
         stdout.write(f"\n== 親子 {name}\n")
-        stdout.write(f"最終取り込み: {_synced(conf, name, entries)}\n")
         row = rows.get(name)
         if row is not None and not family:
             for child, state in overview.child_states(root, row, doing, review):
@@ -167,18 +166,6 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
             for line in ctx.describe(e, e.ident in revisions):
                 stdout.write(line + "\n")
     return 0
-
-
-def _synced(conf: settings.Settings, name: str, entries: dict[str, Entry]) -> str:
-    """この親の最終取り込みの時刻。取り込み状態が無ければ「リモート未確認」。"""
-    e = entries.get(name)
-    project = e.t.project if e is not None and e.hits else ""
-    record = overview.record_of(conf, name, project)
-    fetched = int(record.fetched_at) if record and record.fetched_at else 0
-    text = overview.sync_label(fetched)
-    if fetched:
-        return text
-    return f"{text}（一度も取り込んでいない。ccnavi-sync.sh で取り込むと時刻が付く）"
 
 
 class _Family:
@@ -190,16 +177,17 @@ class _Family:
         self.fams = fams
         # `run` の頭で読んだ置き場。status は置き場を動かさないので、子ごとに読み直さずに渡す。
         self.raw = raw
-        self._c1: tuple[str, str] | None = None
+        self._write_and_push: tuple[str, str] | None = None
         self.ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
         self.push_sh = settings.script_command(root, "ccnavi-user-push-approved.sh")
 
-    def c1_target(self) -> tuple[str, str]:
-        """この親子が C1 の対象か（`ccnavi c1 family` と同じ `c1.target`）と理由。1 度だけ引く。"""
-        if self._c1 is None:
-            verdict, why, _ = c1.target(self.conf, self.root, self.name)
-            self._c1 = (verdict, why)
-        return self._c1
+    def write_and_push_target(self) -> tuple[str, str]:
+        """この親子が write-and-push の対象か（`ccnavi write-and-push family` と同じ
+        `write_and_push.target`）と理由。1 度だけ引く。"""
+        if self._write_and_push is None:
+            verdict, why, _ = write_and_push.target(self.conf, self.root, self.name)
+            self._write_and_push = (verdict, why)
+        return self._write_and_push
 
     def describe(self, e: Entry, revision: bool) -> list[str]:
         t = e.t
@@ -223,8 +211,8 @@ class _Family:
         if t.state == ticket_model.TODO:
             lines.append(f"    置き場のファイル: {file_state.label()}")
             lines.append(
-                "    次の操作: ユーザの承認を待つ（ボード、端末の ccnavi-user-agree.sh、"
-                "GitHub の画面で doing/ へ動かす、のどれか）"
+                "    次の操作: ユーザの承認を待つ（VS Code のボード、Chrome のボード、端末の "
+                "ccnavi-user-agree.sh、GitLab や GitHub の画面などで doing/ へ動かす、のどれか）"
             )
             return lines
         when = self.times.get(t.path)
@@ -261,7 +249,8 @@ class _Family:
                     nxt
                     or "フェーズを読めないので、レビューを依頼済みかを言えない。ユーザに回るのは、"
                     "親が合流・ELI5 を済ませて ccnavi-review.sh request で依頼した後"
-                    "（依頼済みなら、ユーザが confirm / decide で done/ へ動かすのを待つ）"
+                    "（依頼済みなら、ユーザが confirm / decide か Chrome 拡張のレビュー済みで "
+                    "done/ へ動かすのを待つ）"
                     + PARENT_ONLY
                 )
             )
@@ -275,15 +264,17 @@ class _Family:
         st = approval_checks.family_standing(self.conf, self.root, t, self.fams)
         if st.stop:
             stops.append(f"{st.stop}（この親子のチケットの状態は動かさない）")
-            stops += syncstate.guidance(self.root, st)
+            stops += standing.guidance(self.root, st)
         if t.blocked:
             stops.append(t.blocked)
         uncommitted = file_state.kind == FILE_UNCOMMITTED
-        verdict, why = self.c1_target()
-        if verdict == c1.TARGET_STOP and not st.stop:
-            # C1 の sh（ccnavi-ticket.sh）が状態の操作を断る。
-            stops.append(f"C1 では状態の操作を実行できません: {why or '理由が分からない'}")
-        carried = uncommitted and verdict == c1.TARGET_YES
+        verdict, why = self.write_and_push_target()
+        if verdict == write_and_push.TARGET_STOP and not st.stop:
+            # write-and-push の sh（ccnavi-ticket.sh）が状態の操作を断る。
+            stops.append(
+                f"write-and-push では状態の操作を実行できません: {why or '理由が分からない'}"
+            )
+        carried = uncommitted and verdict == write_and_push.TARGET_YES
         if not t.started_at:
             for p in approval_checks.unmet_predecessors(t, self.pool):
                 stops.append(f"先行チケット {p.ticket} が開始条件を満たしていません（{p.label}）")
@@ -292,7 +283,8 @@ class _Family:
                 stops.append(parent_why)
             if carried:
                 stops.append(
-                    "取り込み済みの親子（C1 の対象）で、承認済みチケットが親のブランチに"
+                    "取り込み済みの親子（write-and-push の対象）で、"
+                    "承認済みチケットが親のブランチに"
                     "未コミット。ユーザがコミットして push するまで start は実行できません"
                 )
         # 基準点が HEAD の祖先でないのは warn。`start` は止めない（基準点を HEAD で書き直す）。
@@ -319,9 +311,10 @@ class _Family:
         if stops:
             nexts.append("止まっている原因を解消する（ユーザに確かめる）")
         elif not t.started_at:
-            if uncommitted and verdict == c1.TARGET_NO:
+            if uncommitted and verdict == write_and_push.TARGET_NO:
                 nexts.append(
-                    "コミットと push を待たずに start へ進んでよい（この親子は C1 の対象ではない）"
+                    "コミットと push を待たずに start へ進んでよい（この親子は write-and-push "
+                    "の対象ではない）"
                 )
             nexts += self._start_lines(t)
         elif t.is_child:

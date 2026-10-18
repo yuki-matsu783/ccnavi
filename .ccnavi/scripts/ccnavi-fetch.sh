@@ -7,8 +7,8 @@
 # push されて届く。取ってこないと、B の機械は古い版で判定する。承認したのに
 # 範囲が反映されない、レビュー済みなのに止まったまま、という形になる。
 #
-# 2 つめはワークツリーの起点になる統合先（CCNAVI_INTEGRATION_BRANCH、無ければ ccnavi-sync.sh が
-# 統合先の取り込み結果に書いた名前、無ければデフォルトブランチ＝`origin/HEAD` が指すもの。多くは `main`）。親のワークツリーは `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で
+# 2 つめはワークツリーの起点になる統合先（CCNAVI_INTEGRATION_BRANCH、無ければ settings.local.json の
+# env に書かれた名前、無ければデフォルトブランチ＝`origin/HEAD` が指すもの。多くは `main`）。親のワークツリーは `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で
 # 切り、起点は `<統合先>` の HEAD になる。手元の `main` が古いと、そこから切るブランチも古いコミットから
 # 始まる。統合先に取り込むときに fast-forward が通らず、承認済みチケットも古い版で判定することになる。
 #
@@ -35,14 +35,13 @@
 # 「取ってこられなかった」に戻るだけ。
 #
 # 親子のチケットは早送りだけ。親のワークツリー（`.claude/worktrees/<P>` で、親チケットか
-# 提案があり、HEAD のブランチ名の `/` を `-` に置き換えたものがディレクトリ名になっている。取り込み状態の
-# 有無は問わない）は、ロックを 1 回だけ試し
+# 提案があり、HEAD のブランチ名の `/` を `-` に置き換えたものがディレクトリ名になっている）は、ロックを 1 回だけ試し
 # （取れなければ早送りしない。待たない）、`origin/<親のブランチ>` の祖先なら `merge --ff-only` する。
 # 親のブランチ名は親のワークツリーの HEAD から読む（セッションの頭で待たせないよう、ブランチ名のためには
 # 実行ファイルを起こさない）。親チケットか提案があるかだけは実行ファイル（`tree parent`）に聞く。聞くのは親のブランチに居る
 # ツリーだけで、答えが得られなければ（実行ファイルが無い・入れ替え中）早送りしない。書きかけとの重なりは
 # git に任せ、拒まれたら重なったパスを言う。分かれていれば merge はせず「取り込みが要る」と 1 行言う。
-# 取り込み（merge）・消えたかの確かめ・取り込み状態の書き出しは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
+# 取り込み（merge）・消えたかの確かめは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
 # 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの fetch と早送りはせずに名指しする。
 # fetch 1 回のタイムアウトも枠の残りより長くしない（hook の上限は 60 秒）。
 #
@@ -164,7 +163,7 @@ ccnavi_fetch_or_note() {
 # ワークツリーの起点にするブランチ、つまり統合先の名前を出す。
 #
 # 環境変数 CCNAVI_INTEGRATION_BRANCH（SessionStart には settings.local.json の env も渡る）、
-# 無ければ ccnavi-sync.sh が統合先の取り込み結果（sync/<リポジトリ>/integration/head）に書いた名前、
+# 無ければ settings.local.json の env に書かれた名前（実行ファイルの `sync paths` が答える）、
 # 無ければホストのデフォルトブランチ（`origin/HEAD`、無ければ `origin/main`・`origin/master`）。
 # 決め方は ccnavi-git.sh の push の拒否・ccnavi-review.sh のマージリクエストの宛先と揃えるため、
 # ccnavi-common-state.sh の ccnavi_integration に 1 つだけ置いてある。
@@ -207,7 +206,7 @@ ccnavi_fetch_seen() {
 # そのツリーが、親子のチケットの親のワークツリーか。<ツリー> <名前> <ブランチ>
 #
 # `.claude/worktrees/` の直下で、親チケットか提案があり、居るブランチ名を変換（/ を - に置き換え）した
-# 識別子がディレクトリ名と同じ。取り込み状態（記録）の有無は問わない。当たらないツリーは今までどおり
+# 識別子がディレクトリ名と同じ。当たらないツリーは今までどおり
 # （未コミットがあれば進めない）。他セッションのワークツリーを動かさないため、条件は全部満たすときだけ。
 ccnavi_fetch_family() {
 	case "$1" in
@@ -229,7 +228,7 @@ ccnavi_fetch_family() {
 ccnavi_fetch_forward() {
 	ccnavi_fw_key=$(ccnavi_repo_key "$1" "$root")
 	ccnavi_fetch_or_note "$1" "$3" \
-		"${2}: リモートを取ってこられなかった。手元の版で判定する" \
+		"${2}: リモートを取ってこられなかった。ローカルの版で判定する" \
 		"${2}: 親のブランチ ${3} をリモートから取ってこられなかった（リモートにありません）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめてください" ||
 		return 0
 	ccnavi_fw_now=$(date +%s)
@@ -245,7 +244,7 @@ ccnavi_fetch_forward() {
 	git -C "$1" merge-base --is-ancestor "$ccnavi_fw_remote" "$ccnavi_fw_local" 2>/dev/null && return 0
 	if ! git -C "$1" merge-base --is-ancestor "$ccnavi_fw_local" "$ccnavi_fw_remote" 2>/dev/null; then
 		# 分岐か、浅い clone で履歴が足りないだけかは見分けない。見るのは一致しているかどうかだけ。
-		printf '%s: リモートの最新と一致しないので、取り込みが必要です（手元 %s、リモート %s。浅い clone なら git fetch --unshallow。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
+		printf '%s: リモートの最新と一致しないので、取り込みが必要です（ローカル %s、リモート %s。浅い clone なら git fetch --unshallow。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
 			"$2" "$(git -C "$1" rev-parse --short "$ccnavi_fw_local")" \
 			"$(git -C "$1" rev-parse --short "$ccnavi_fw_remote")" "$root" "$2"
 		return 0
@@ -257,7 +256,7 @@ ccnavi_fetch_forward() {
 	fi
 	ccnavi_fw_behind=$(git -C "$1" rev-list --count "$ccnavi_fw_local..$ccnavi_fw_remote" 2>/dev/null || echo '?')
 	if LC_ALL=C git -C "$1" merge --ff-only --quiet "$ccnavi_fw_remote" </dev/null >/dev/null 2>"$scratch/ff"; then
-		printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$2" "$ccnavi_fw_behind" "$3"
+		printf '%s: 親ブランチ %s を %s コミット進めた\n' "$2" "$3" "$ccnavi_fw_behind"
 	else
 		printf '%s: 早送りできなかった。%s（取り込みは sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
 			"$2" "$(ccnavi_git_refusal "$scratch/ff")" "$root" "$2"
@@ -304,28 +303,40 @@ report=$(
 		[ -d "$tree/$approved" ] || continue
 		git -C "$tree" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || continue
 		ccnavi_fetch_or_note "$tree" "$branch" \
-			"${name}: リモートを取ってこられなかった。手元の版で判定する" \
-			"${name}: ${branch} がリモートに無いので取ってこられなかった。手元の版で判定する" || continue
+			"${name}: リモートを取ってこられなかった。ローカルの版で判定する" \
+			"${name}: ${branch} がリモートに無いので取ってこられなかった。ローカルの版で判定する" || continue
 		behind=$(git -C "$tree" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
 		[ "$behind" = "0" ] && continue
 
 		dirty=$(git -C "$tree" status --porcelain --untracked-files=no 2>/dev/null || :)
 		if [ -n "$dirty" ]; then
-			printf '%s: リモートが %s 件先に進んでいるが、未コミットの変更があるので進めない\n' \
+			printf '%s: リモートが %s コミット先に進んでいるが、未コミットの変更があるので進めない\n' \
 				"$name" "$behind"
 			continue
 		fi
 		if git -C "$tree" merge --ff-only --quiet "@{u}" 2>/dev/null; then
-			printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
+			printf '%s: 親ブランチ %s を %s コミット進めた\n' "$name" "$branch" "$behind"
 		else
 			# 分岐か、浅い clone で履歴が足りないだけかは見分けない。見るのは一致しているかどうかだけ。
-			printf '%s: %s がリモートの最新と一致しないので進めない（手元 %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新してもらってください（浅いなら git fetch --unshallow）\n' \
+			printf '%s: %s がリモートの最新と一致しないので進めない（ローカル %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新してもらってください（浅いなら git fetch --unshallow）\n' \
 				"$name" "$branch" "$(git -C "$tree" rev-parse --short HEAD)" \
 				"$(git -C "$tree" rev-parse --short "@{u}")"
 		fi
 	done
 
-	# 第 2 周。リポジトリごとに、ワークツリーの起点になるデフォルトブランチを進める。
+	# 第 2 周の前に、統合先の名前（settings.local.json の env）を実行ファイルに 1 回だけ聞いて控える。
+	# リポジトリごとの `$( )` の中で聞くと、控えが親に戻らず、環境変数が無いときは毎回実行ファイルを起こす。
+	# 控えはここ（`$( )` の外）で作り、第 2 周のサブシェルが引き継ぐ。時間の枠を過ぎていれば、実行ファイルは起こさず空を控える。
+	if [ -z "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
+		if [ "$(ccnavi_fetch_left)" -gt 0 ]; then
+			ccnavi_integration_local "$root" >/dev/null 2>&1 || :
+		else
+			ccnavi_il_val=""
+			ccnavi_il_root="$root"
+		fi
+	fi
+
+	# 第 2 周。リポジトリごとに、ワークツリーの起点になる統合先ブランチを進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue
 		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
@@ -340,8 +351,8 @@ report=$(
 		fi
 
 		ccnavi_fetch_or_note "$repo" "$default" \
-			"${name}: ワークツリーの起点になる ${default} を取ってこられなかった。手元の版から切ることになる" \
-			"${name}: ワークツリーの起点になる ${default}（統合先）がリモートにありません。CCNAVI_INTEGRATION_BRANCH を確かめてください" ||
+			"${name}: 統合先ブランチ ${default} を取ってこられなかった。ローカルの版から切ることになる" \
+			"${name}: 統合先ブランチ ${default} がリモートにありません。CCNAVI_INTEGRATION_BRANCH を確かめてください" ||
 			continue
 
 		old=$(git -C "$repo" rev-parse --verify --quiet "refs/heads/$default" 2>/dev/null || :)
@@ -349,8 +360,8 @@ report=$(
 			# 手元に無い。無いままでは `worktree add ... <統合先>` の起点に指せない。
 			git -C "$repo" update-ref -m ccnavi-fetch "refs/heads/$default" "$ref" 2>/dev/null || continue
 			git -C "$repo" branch --quiet --set-upstream-to "origin/$default" "$default" >/dev/null 2>&1 || :
-			printf '%s: ワークツリーの起点になる %s が手元に無かったので、リモートの版で作った\n' \
-				"$name" "$default"
+			printf '%s: ローカルに統合先ブランチ %s が無かったので、origin/%s から作った\n' \
+				"$name" "$default" "$default"
 			continue
 		fi
 
@@ -360,7 +371,7 @@ report=$(
 		if [ "$ahead" != "0" ]; then
 			# 進められない理由（本当の分岐か、浅い clone で履歴が足りないだけか）は見分けない。
 			# 見るのは、手元の版がリモートの最新と一致しているかどうかだけ。
-			printf '%s: ワークツリーの起点になる %s がリモートの最新と一致しない（手元 %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新してもらってください（浅いなら git fetch --unshallow）\n' \
+			printf '%s: ローカルの統合先ブランチ %s がリモートの最新と一致しない（ローカル %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新を頼んでください（浅いなら git fetch --unshallow）\n' \
 				"$name" "$default" "$(git -C "$repo" rev-parse --short "refs/heads/$default")" \
 				"$(git -C "$repo" rev-parse --short "$ref")"
 			continue
@@ -369,27 +380,27 @@ report=$(
 		if [ -n "$here" ]; then
 			dirty=$(git -C "$here" status --porcelain --untracked-files=no 2>/dev/null || :)
 			if [ -n "$dirty" ]; then
-				printf '%s: ワークツリーの起点になる %s がリモートより %s 件古いが、未コミットの変更があるので進めない\n' \
+				printf '%s: ローカルの統合先ブランチ %s がリモートより %s コミット古いが、未コミットの変更があるので進めない\n' \
 					"$name" "$default" "$behind"
 				continue
 			fi
 			git -C "$here" merge --ff-only --quiet "$ref" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。ユーザに合流させてもらってください\n' \
+				printf '%s: ローカルの統合先ブランチ %s を進められなかった。ユーザに合流を頼んでください\n' \
 					"$name" "$default"
 				continue
 			}
 		else
 			git -C "$repo" update-ref -m ccnavi-fetch "refs/heads/$default" "$ref" "$old" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。ユーザに合流させてもらってください\n' \
+				printf '%s: ローカルの統合先ブランチ %s を進められなかった。ユーザに合流を頼んでください\n' \
 					"$name" "$default"
 				continue
 			}
 		fi
-		printf '%s: ワークツリーの起点になる %s を %s 件分だけ新しくした\n' "$name" "$default" "$behind"
+		printf '%s: 統合先ブランチ %s を %s コミット進めた\n' "$name" "$default" "$behind"
 	done
 )
 
 [ -n "$report" ] || exit 0
-printf '[ccnavi] 承認済みチケットとマーカーは親ブランチに含まれて届き、ワークツリーの起点はデフォルトブランチになる。セッションの開始時に取ってきた結果:\n'
+printf '[ccnavi] セッション開始時に、統合先ブランチと親ブランチをリモートの最新に合わせようとした結果です。\n'
 printf '%s\n' "$report"
 exit 0

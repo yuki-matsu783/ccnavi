@@ -6,7 +6,7 @@ tags: [rules, approval, selfguard, templates]
 keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, 差し替え, user, 拡張, 共通化, 許可リスト]
 ---
 
-# ADR-0143: 保護対象の変更は、すべて handoff を通して取り込む
+# ADR-0144: 保護対象の変更は、すべて handoff を通して取り込む
 
 状態: 提案
 
@@ -82,7 +82,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 | ボードに、テンプレート専用の取り込み・編集の画面の代わりに、handoff の一覧の画面（`template`・`layer-config`・`docs` の種類）を置く。一覧は `user handoff --json`（見るだけ）で作り、取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。テンプレートの画面は、一覧・検索・表示だけにする。`defense` は一覧に出し、「端末で取り込む」ことと打つコマンドを案内する | 拡張も、同じ 1 つのコマンドを呼ぶだけ | テンプレートの画面だけ残す。拡張が直接書く |
 | `user_only.py` の表に `handoff` の操作と `--handoff` を足し、テンプレートの書き込みの操作を実行ファイルの `user` から外す。外したオプションは `legacy`（今の実行ファイルは受け付けないが、古い実行ファイルが手元に残るときのため、hook は止め続ける）にする。ボードの組み合わせの語のグループ（`user-board-verb`）に `handoff` を足し、旧い `templates` の組み合わせは `legacy` のグループで残す | 表を正本のままにする | 外したオプションの止めも消す |
 | エージェントが `wip/handoff/` の下の写しを編集できるよう、名指しのツール（Write / Edit）の保護に例外を入れる。対象は、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下だけ。組み込みの `guard-project-home` と、リポジトリのルール `guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` に入れる。`..` の段・リンク・ハードリンクのあるパス、`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。シェルからの書き込みの保護は変えない | `ccnavi-stage.sh` は写しを元と同じ相対パスに置く。パスに `.ccnavi/` や `.claude/` が入るので、保護の glob に当たり、エージェントが写しを編集できなかった（この手順が一般の保護対象では最初から成り立っていなかった）。写しはユーザが取り込むまで効力が無い | 例外を入れず、ユーザが写しを編集する |
-| 互換の版は、ADR-0142 と同じ 13 のまま（同じ版で出す）。`features` から `templates.edit`・`board.template-draft` を外し、`handoff` を足す | まだ出ていない版の中の変更なので、二重に上げない | 14 に上げる |
+| 互換の版は、ADR-0143 と同じ 15 のまま（同じ版で出す）。`features` から `templates.edit`・`board.template-draft` を外し、`handoff` を足す | まだ出ていない版の中の変更なので、二重に上げない | 14 に上げる |
 | ボードの rules・phases・risks の画面は、今は拡張が直接書く。この ADR では変えない | 範囲を広げすぎない。画面を handoff に寄せるかは別に決める | 同時に直す |
 
 ## 得たもの・失ったもの
@@ -102,7 +102,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 ## 他の ADR との関係
 
 - ADR-0130（作業・レビュー計画のテンプレート）と ADR-0134（ボードからのテンプレートの編集）の、取り込みと編集の手順を置き換える。テンプレートの形・検査・一覧・使う側は変わらない
-- ADR-0142（ユーザ専用の入口の分離）の対象のうち、`templates` の書き込みを `handoff` に置き換える
+- ADR-0143（ユーザ専用の入口の分離）の対象のうち、`templates` の書き込みを `handoff` に置き換える
 
 ## 実装の段階
 

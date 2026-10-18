@@ -11,7 +11,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 ### 9.18 ユーザ専用の入口
 
 ユーザだけが打つ操作（承認・レビュー済みの記録・早めに閉じる・記録の削除・保護対象の取り込み（handoff）・承認済みチケットの push・
-取り込み状態の削除・残った指摘の対応方針・子のブランチの削除）が、どの入口にあるかと、hook と実行ファイルがそれをどう止めるかを書く。
+残った指摘の対応方針・子のブランチの削除）が、どの入口にあるかと、hook と実行ファイルがそれをどう止めるかを書く。
 止める判定の細部は [9.5](judging-by-path.md)、承認の手順は [9.4](approval.md)、端末要求は 9.4、`handoff` の中身は [9.19](handoff.md)。
 
 #### 表が正本
@@ -59,7 +59,6 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 |---|---|
 | `ccnavi-user-agree.sh` | `ccnavi-agree.sh` |
 | `ccnavi-user-push-approved.sh` | `ccnavi-push-approved.sh` |
-| `ccnavi-user-forget.sh` | `ccnavi-sync.sh --forget` |
 | `ccnavi-user-close-early.sh` | `ccnavi-review.sh close-early` |
 | `ccnavi-user-decide.sh` | `ccnavi-review.sh decide` の書く側 |
 | `ccnavi-user-clean-branch.sh` | `ccnavi-clean.sh --branch` |
@@ -81,7 +80,7 @@ argparse が読んだ後、`entry` が空（`user` の外）で、`user_only.ref
 `unless` の条件に当たる形（`--agree --preview`、`--prune --preview`、`--reviewed … --preview`）は断らない。`--handoff` は `--yes` の有無によらず断る。
 断りの文は、対応する `user` の形（`ccnavi user agree` など）と、見るだけの形があればそれを案内する。
 
-`--version --json` は互換の版（`compat`）13 を返し、`features` に `user-entry` と `handoff` を持つ。
+`--version --json` は互換の版（`compat`）15 を返し、`features` に `user-entry` と `handoff` を持つ。
 
 #### hook の止め
 
@@ -91,7 +90,7 @@ hook の止めは表から作る。ユーザ専用の入口の止めは `DENY_TI
 |---|---|
 | `user` の入口 | 実行ファイルの呼び出しで、`WRAPPER_OPTIONS` を読み飛ばした後の最初の語が `user`（`user_entry_forms`）。`--` を挟んだ形も止める。変数・glob・コマンド置換で `user` になりうる語も止める（`hidden_user_entry`）。`prune` は別の deny（`prune_form`）が止める |
 | `ccnavi-user-*.sh` | コマンド行のどこに名前が出ても止める（`user_script_pattern`。`human_path_form`）。引数に依らない。表示・検索・閲覧の道具だけが並ぶ行は通す |
-| 旧い形 | 旧いオプション（`--agree`・`--reviewed`・`--close-early` など。実行ファイルから外したテンプレート専用のオプション `--import`・`--save-draft`・`--delete-draft`・`--rename-template`・`--move-template`・`--delete-template` も、古い実行ファイルが手元に残るときのために止め続ける）、旧い sh の名前（`ccnavi-agree.sh`・`ccnavi-push-approved.sh`・`ccnavi-approve.sh`）、旧い sh の中のユーザ専用のモード（`ccnavi-sync.sh --forget`・`ccnavi-review.sh close-early`・`ccnavi-clean.sh --branch`）。古い実行ファイルと sh が手元に残るときのために残る |
+| 旧い形 | 旧いオプション（`--agree`・`--reviewed`・`--close-early` など。実行ファイルから外したテンプレート専用のオプション `--import`・`--save-draft`・`--delete-draft`・`--rename-template`・`--move-template`・`--delete-template` も、古い実行ファイルが手元に残るときのために止め続ける）、旧い sh の名前（`ccnavi-agree.sh`・`ccnavi-push-approved.sh`・`ccnavi-approve.sh`）、旧い sh の中のユーザ専用のモード（`ccnavi-review.sh close-early`・`ccnavi-clean.sh --branch`）。古い実行ファイルと sh が手元に残るときのために残る |
 | 名前に依らない文字列検査 | 端末を求めない操作（`user agree`・`user reviewed`・`user handoff` と `--yes` の組、`--choices` と `--digest` の組、`--via board`、旧い形の組）と、端末要求を切る形（`CCNAVI_GUARD_TICKET_APPROVAL`・`--guard-ticket-approval`）。名前を変えたコピー・`python -c`・`awk` の `system()` でも止まる |
 | sh から呼ぶだけの操作 | `SUBS` の `ticket start/finish/…`・`review confirm/…`・`sync tidy`・`worktree retire/branch` を実行ファイルで直に打つ形 |
 

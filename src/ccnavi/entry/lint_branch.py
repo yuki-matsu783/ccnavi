@@ -39,8 +39,8 @@ def _branch_name_problems(
       途中（`<親>-<フェーズ>`）と紛れる
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
-    `integration` はその時点の統合先の名前で、`--integration-branch` が無ければ `ccnavi-sync.sh` が
-    取り込み結果に書いた名前。どちらも無ければ固定のリストだけを見る。
+    `integration` はその時点の統合先の名前（`ops_stop_integrate.integration_name`）。
+    決まらなければ固定のリストだけを見る。
     """
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)

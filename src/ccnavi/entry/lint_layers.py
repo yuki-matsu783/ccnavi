@@ -1,7 +1,7 @@
 """`--lint` のうち、設定のレイヤーをまたぐ検査。
 
 旧い置き場に設定が残っていないか、ワークツリーの ccnavi ディレクトリに元リポジトリに無いファイルが
-無いか、取り込み状態と統合先のレイヤーが手元のレイヤーと食い違っていないかを見る。
+無いか、取得済みの `origin/<統合先>` のレイヤーが手元のレイヤーと食い違っていないかを見る。
 1 つのレイヤーの 1 本ずつの検査（ルールの読み・phases / risk の合成）は
 `tickets.config_check` にあり、保護対象の下書きの取り込み（`user handoff`）も同じものを呼ぶ。
 """
@@ -10,9 +10,17 @@ from __future__ import annotations
 
 import os
 
-from ..infra import fsio, pathcase, settings, tree
-from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import approval, archive, config_check, syncstate, ticket_model
+from ..infra import fsio, gitcmd, pathcase, settings, tree
+from ..policy import ruleload
+from ..policy.rules import SEVERITY_INFO, SEVERITY_WARN, Problem
+from ..tickets import (
+    approval,
+    archive,
+    config_check,
+    ops_stop_integrate,
+    standing,
+    ticket_model,
+)
 from ..tickets import ticket as ticket_mod
 
 # 苦情の出どころの表記。VS Code 拡張がこの前置きでプロジェクトを引く。
@@ -100,53 +108,28 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _sync(conf: settings.Settings, root: str) -> list[Problem]:
-    """取り込み状態と、取り込み済みの親子のチケットで正とする側（親のブランチ上のチケットだけを正とする）。
+    """親のワークツリーの置き場の検査と、レイヤーのずれ（`--lint` 用）。
 
     - 親のワークツリー（名前が親の識別子）なのに HEAD が別のブランチ: warn（移行の検査）
-    - 親子のチケットの取り込み状態が不正である・gone・blocked、
-      `present` なのに親のワークツリーが無い: error（その親子のチケットは決まらないので、
-      承認も状態の操作も止まる）。閉じた親子のチケットは、
-      親のワークツリーが残っていれば info（片付けてよい）、
-      片付いていれば何も言わない（削除せずに残す取り込み状態）
-    - 統合先の取り込み結果が不正である・無い・読めない: error（識別子の再利用を確かめられない）
-    - 作業ツリーのレイヤーと統合先の取り込み結果のレイヤーが違う: warn
-
-    親のワークツリーの外にしか無いチケット（移行の検査）は、チケットの `blocked` として
-    `_copy_problems` が error で言う。取り込み状態の無い親子のチケットには、
-    最初の 1 つのほかは何も言わない。
+    - 手元のレイヤーが `origin/<統合先>` のレイヤーと違う: warn（`layer_drift`）。
+      `origin/<統合先>` が手元に無いリポジトリは、比べられなかったことを info 1 行で言う
     """
     problems = _parent_trees_off_branch(conf, root)
-    fams = syncstate.Families(conf, root)
-    if not fams.active:
-        return problems
-    for repo, name in syncstate.family_names(conf.state):
-        st = fams.standing(name, syncstate.project_of_key(repo))
-        where = f"(sync/{repo}/{name})"
-        hint = " / ".join(syncstate.guidance(root, st))
-        if st.closed:
-            if st.home is not None:
-                problems.append(Problem(SEVERITY_INFO, where, f"{st.stop}。{hint}"))
-        elif st.stop:
-            problems.append(Problem(SEVERITY_ERROR, where, f"{st.stop}。{hint}"))
-    for repo in syncstate.repos(conf.state):
-        integ = fams.integration(repo)
-        if integ is None:
-            continue
-        where = f"(sync/{repo}/integration)"
-        if integ.broken:
-            problems.append(
-                Problem(
-                    SEVERITY_ERROR,
-                    where,
-                    f"統合先の取り込み結果を読めない（{integ.broken}）。クローズ済みの識別子の再利用を確かめられない"
-                    "ので、このリポジトリの新規の提案は承認しない。オンラインで"
-                    f" '{settings.script_command(root, 'ccnavi-sync.sh')}' を再実行してください",
-                )
+    unchecked: list[str] = []
+    for project in _repos(conf):
+        found, checked = _drift(conf, root, project)
+        problems.extend(found)
+        if not checked:
+            unchecked.append(tree.repo_key(project))
+    if unchecked:
+        problems.append(
+            Problem(
+                SEVERITY_INFO,
+                "(layers)",
+                "統合先のブランチ（origin/<統合先>）が手元に無く、レイヤーのずれを確かめていない"
+                f"（{', '.join(unchecked)}）。取得すると確かめる",
             )
-            continue
-        home = root if repo == syncstate.SELF else tree.project_root(conf.projects, repo)
-        if home and os.path.isdir(home):
-            problems.extend(_layer_drift(conf, integ, home, where))
+        )
     return problems
 
 
@@ -159,7 +142,7 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
         if not _holds_parent(conf, work, root):
             continue
         branch = tree.branch_of(work.root)
-        if branch and syncstate.head_branch(work.root, work.name):
+        if branch and standing.head_branch(work.root, work.name):
             continue
         problems.append(
             Problem(
@@ -226,33 +209,58 @@ def _read_plain(path: str) -> bytes | None:
         return None
 
 
-def _layer_drift(
-    conf: settings.Settings, integ: syncstate.Integration, home: str, where: str
-) -> list[Problem]:
-    """作業ツリーのレイヤーと、統合先の取り込み結果のレイヤー（同じパス）が違うか。
+def _repos(conf: settings.Settings) -> list[str]:
+    """レイヤーを比べるリポジトリ（ワークスペース自身 `""` と、プロジェクト）。"""
+    return ["", *[p.name for p in tree.projects(conf.projects)]]
 
-    手元の判定は作業ツリーのレイヤーを読み、統合先の取り込み結果へは切り替えない（統合先のレイヤーが作業ツリーより
-    緩いときに通るものが増えるため）。違いは、
-    統合先に入るまで他の機械と Chrome の判定に使われないという知らせ。
+
+def layer_drift(conf: settings.Settings, root: str, project: str) -> list[Problem]:
+    """手元のレイヤーが `origin/<統合先>` のレイヤー（同じパス）と違う、という warn。
+
+    `project` は空ならワークスペース自身。`origin/<統合先>` が手元に無ければ黙る
+    （`--lint` はそれを `_sync` が info で言う）。`--lint` と `sync check` が使う。
     """
+    return _drift(conf, root, project)[0]
+
+
+def _drift(conf: settings.Settings, root: str, project: str) -> tuple[list[Problem], bool]:
+    """`layer_drift` の本体。`(warn, 済んだか)`。
+
+    済んでいないのは、origin を持つのに `origin/<統合先>` が手元に無いとき（取得すれば比べられる）。
+    origin を持たないリポジトリは、比べる相手が無いので済んだ扱い（黙る）。
+
+    手元の判定は元リポジトリのチェックアウトのレイヤーを読み、統合先へは切り替えない
+    （統合先のレイヤーが緩いときに通るものが増えるため）。違いは、統合先に入るまで他の機械と
+    Chrome の判定に使われないという知らせ。読むのは取得済みの `refs/remotes/origin/<統合先>`
+    だけで、ネットワークには出ない。
+    """
+    home = tree.project_root(conf.projects, project) if project else root
+    if not home or not os.path.isdir(home):
+        return [], True
+    branch = ops_stop_integrate.integration_name(root, conf, home, project)
+    ref = f"refs/remotes/origin/{branch}" if branch else ""
+    if (
+        not ref
+        or not gitcmd.run(home, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"]).ok
+    ):
+        # origin が無いリポジトリ（git でない、リモートを持たない）は、取得で解けないので言わない。
+        return [], not gitcmd.run(home, ["remote", "get-url", "origin"]).ok
     home_rel = fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
     rels = [rel for _, rel in _layer_files(conf, home_rel)]
-    if integ.repo == syncstate.SELF:
+    if not project:
         rels = [_common_rel(kind) for kind in settings.LAYER_KINDS] + rels
+    where = layer_where(project or ruleload.LAYER_SELF)
     problems: list[Problem] = []
     for rel in rels:
-        snapshot, why = integ.file(rel)
-        if why:
-            problems.append(
-                Problem(SEVERITY_ERROR, where, f"統合先の取り込み結果を読めない（{why}）")
-            )
+        remote, read = gitcmd.blob(home, ref, rel)
+        if not read:
             continue
         local = _read_plain(os.path.join(home, *rel.split("/")))
-        if _same_text(local, snapshot):
+        if _same_text(local, remote):
             continue
         if local is None:
             how = "作業ツリーにありません。"
-        elif snapshot is None:
+        elif remote is None:
             how = "統合先にありません。"
         else:
             how = "中身が違う"
@@ -260,12 +268,12 @@ def _layer_drift(
             Problem(
                 SEVERITY_WARN,
                 where,
-                f"作業ツリーの {rel} が統合先（{integ.branch or '?'}）の取り込み結果と違う"
-                f"（{how}）。"
-                "統合先に取り込まれるまで、他の機械と Chrome の判定には使われない",
+                f"作業ツリーの {rel} が統合先（origin/{branch}）と違う（{how}）。"
+                "統合先に取り込まれるまで、他の機械と Chrome の判定には使われない。"
+                f"手元の origin/{branch} が古いだけなら、先に取得（fetch）してから見直す",
             )
         )
-    return problems
+    return problems, True
 
 
 def _files_under(base: str) -> list[str]:

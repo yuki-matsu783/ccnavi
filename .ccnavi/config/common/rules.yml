@@ -180,13 +180,13 @@ deny:
     match: Write|Edit|NotebookEdit
     glob: "*/.ccnavi/approved/*"
     message: >-
-      承認済みチケットです。承認はユーザが VS Code のボード（端末なら
-      'ccnavi --agree'）で行います。
+      承認済みチケットです。承認はユーザが VS Code のボード・Chrome のボード・
+      端末の 'ccnavi --agree'・置き場のファイルの移動のどれかで行います。
       承認が済んだかどうかは 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh status' で確かめてください。
       置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。
       作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh finish <識別子>' で
       レビュー待ち（wip/proposals/review/）へ動かしてください。
-      範囲を変えたいなら wip/proposals/todo/ に新しい提案を書いて承認を依頼してください。
+      範囲を変えたいなら wip/proposals/todo/ に新しい提案を書き、{root}/.ccnavi/scripts/ccnavi-ticket.sh propose <識別子> で送ってから承認を依頼してください。
 
   # hook の登録と個人の上書き。ワークスペースルートの側は workspace-root が先に当たるが、
   # ワークツリー側の設定は統合で統合先へ入る道を持つので、そちらも名前で止める。

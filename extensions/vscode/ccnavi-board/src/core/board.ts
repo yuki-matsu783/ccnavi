@@ -129,8 +129,7 @@ export interface Card {
   /** 親だけ。元になった issue の番号（親チケットの `issue:`）。無ければ null */
   readonly issueNumber: number | null;
   /**
-   * 親だけ。親を載せる MR の番号。親チケットの `mr:` を先に、無ければ取り込み状態の番号
-   * （`ccnavi-start.sh` が保存する）。フェーズの依頼のマーカーから引く `mrNumber` とは別の値
+   * 親だけ。親を載せる MR の番号（親チケットの `mr:`）。フェーズの依頼のマーカーから引く `mrNumber` とは別の値
    */
   readonly parentMr: number | null;
   /** 親だけ。親のブランチ名（ワークツリーが今いるブランチを先に、無ければ親チケットの値）。子は空 */
@@ -172,19 +171,8 @@ export interface ParentOption {
   readonly title: string;
 }
 
-/** このPCでは未準備の親（実行ファイルの `unprepared` のまま。親のワークツリーが無く、チケットは出ない） */
-export interface Unprepared {
-  readonly family: string;
-  readonly project: string;
-  readonly branch: string;
-  readonly mr: number | null;
-  readonly reason: string;
-}
-
 export interface Board {
   readonly columns: readonly BoardColumn[];
-  /** 親のワークツリーが無いPCで出す「このPCでは未準備」のカード。「準備する」は `ccnavi-start.sh --mr <mr>` を呼ぶ */
-  readonly unprepared: readonly Unprepared[];
   readonly projects: readonly string[];
   /** 親の絞り込みの候補。識別子順 */
   readonly parents: readonly ParentOption[];
@@ -221,7 +209,6 @@ export function buildBoard(json: BoardJson): Board {
   });
   return {
     columns,
-    unprepared: (json.unprepared ?? []).map((u) => ({ ...u })),
     projects: json.projects,
     parents: cards.filter((card) => card.isParent && card.column !== "archived").map((card) => ({ id: card.id, title: card.title })),
     archivedParents: cards.filter((card) => card.isParent && card.column === "archived").map((card) => ({ id: card.id, title: card.title })),
@@ -318,7 +305,7 @@ function toCard(
     mrUrl: mr.url,
     mrNumber: mr.number,
     issueNumber: isParent ? t.issue : null,
-    parentMr: isParent ? (t.mr ?? t.remote?.mr ?? null) : null,
+    parentMr: isParent ? t.mr : null,
     branch: isParent ? (t.remote?.branch || t.branch) : "",
     remote: isParent ? t.remote : null,
     attention: t.attention,
@@ -525,9 +512,4 @@ export function templateDraftCardOf(board: Board, ticket: string): Card | undefi
 /** 親の識別子とフェーズの番号から、そのフェーズ行。無ければ undefined */
 export function phaseChipOf(board: Board, parent: string, phase: number): PhaseChip | undefined {
   return parentCardOf(board, parent)?.phases.find((p) => p.number === phase);
-}
-
-/** 「準備する」を押された親が、いまのボードの未準備の一覧に在るものか。画面が言った識別子をそのまま信頼しない */
-export function unpreparedOf(board: Board, family: string, project: string): Unprepared | undefined {
-  return board.unprepared.find((u) => u.family === family && u.project === project);
 }

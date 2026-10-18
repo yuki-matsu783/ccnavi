@@ -78,7 +78,7 @@ HOOK_TIMEOUT=10
 # 気づかないうちに行われなくなる。何が行われなくなるかは README「設定」の表にある。
 EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure Stop SubagentStart SubagentStop"
 # セッションの開始時に、承認済みチケットとマーカー（親ブランチに含まれて届く）と、ワークツリーの
-# 起点になるデフォルトブランチを取得する sh。本体とは別の 1 行として SessionStart に登録する。
+# 起点になる統合先ブランチを取得する sh。本体とは別の 1 行として SessionStart に登録する。
 # 取得しないと、別の機械で承認したものが反映されず、古い main からブランチを切ることになる。
 # 通信するので、要らないプロジェクトは --no-fetch で外す。上限は、sh の中の
 # タイムアウト監視（1 回 15 秒）が重なっても収まる長さにしてある。
@@ -128,7 +128,7 @@ DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # 配布元に置き場が無い、または該当するスキルが 1 つも無いのは正常で、何も言わずに飛ばす。
 DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分の入口。入口は同じディレクトリの部品
-# ccnavi-common-{state,lock,c1,host,log}.sh を読む。どちらも配らないと、配布先で 3 本とも
+# ccnavi-common-{state,lock,write-and-push,host,log}.sh を読む。どちらも配らないと、配布先で 3 本とも
 # 起動時にエラーで止まる。部品は入口より先に配る。途中で失敗したときに、部品を読む新しい入口だけが
 # あって部品が無い状態を作らないため。ccnavi-common-review.sh は、ccnavi-review.sh とユーザ専用のレビューの sh が
 # 読む、ホストのマージリクエストを読む側の部品（入口は読まない）。
@@ -136,12 +136,12 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-user-push-approved.sh は、ボードが承認のあとに端末へ送る 1 行の中身。
 # 配らないと、配布先のボードは承認済みチケットをコミットして push できない。
 # ccnavi-user-agree.sh は端末から承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
-# 配らないと、案内どおりに実行しても動かない。ccnavi-user-forget.sh・ccnavi-user-decide.sh・
-# ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、取り込み状態の削除・残った指摘の対応方針・
+# 配らないと、案内どおりに実行しても動かない。ccnavi-user-decide.sh・
+# ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、残った指摘の対応方針・
 # 早めに閉じる判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、
 # ユーザの判断をホストに書く部品（読む 2 本より先に配る）。
 # ccnavi-fetch.sh はセッション開始時に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh はユーザが実行する
-# 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、取り込み状態の書き出し）。
+# 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、片付けの記録の読み出し）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを片付ける前に生成物を消すもの。Windows では
 # node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して js を渡す。
@@ -155,7 +155,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-c1.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-forget.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 # 前の版が配った、今は配らない旧い名前の sh。ユーザだけが打つ sh を ccnavi-user-*.sh に改名したので、
 # 旧い名前のまま配布先に残ると、新しい実行ファイルに断られる（`user` の外のユーザ専用のオプション）うえ、

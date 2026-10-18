@@ -7,13 +7,13 @@ hook はその名前で止めるので、名前と置き場の決まりが崩れ
 1. 書く処理（返信・解決・issue を作る・ユーザの判断を承認の push で送る）は
    `ccnavi-user-*.sh` の中だけにあり、エージェントも読む共通部（`ccnavi-common*.sh`）は持たない。
    共通部に置くと `sh -c '. …common….sh; 関数'` の形で、ユーザ専用の sh の名前を出さずに呼べる
-2. 実行ファイルを起こす `ccnavi_c1_exe` の定義は共通部の 1 か所（と、レビューの共通部の包み）だけ
+2. 実行ファイルを起こす `ccnavi_wap_exe` の定義は共通部の 1 か所（と、レビューの共通部の包み）だけ
 3. もとの sh に残した旧い入口は、何も動かさずに終了コード 2 で新しい sh を案内する
 4. どの `ccnavi-user-*.sh` も単体で起動でき（`-h`）、hook の名前の止めに当たる。
    旧い名前の sh は置き場に無い
 
-旧い入口と新しい sh の中身の動きは、それぞれの sh の試験（test_review_decide・test_c1_sh・
-test_sync_sh・test_clean_sh・test_push_approved_sh）が見る。
+旧い入口と新しい sh の中身の動きは、それぞれの sh の試験
+（test_review_decide・test_write_and_push_sh・test_sync_sh・test_clean_sh・test_push_approved_sh）が見る。
 """
 
 from __future__ import annotations
@@ -74,7 +74,6 @@ class PlacementTest(unittest.TestCase):
         for want in (
             "ccnavi-user-agree.sh",
             "ccnavi-user-push-approved.sh",
-            "ccnavi-user-forget.sh",
             "ccnavi-user-decide.sh",
             "ccnavi-user-close-early.sh",
             "ccnavi-user-clean-branch.sh",
@@ -117,14 +116,14 @@ class PlacementTest(unittest.TestCase):
                     self.assertIsNone(start.search(code(read(name))), name)
 
     def test_the_executable_runner_is_defined_once(self):
-        """`ccnavi_c1_exe` の定義は ccnavi-common-c1.sh（起こし方）と ccnavi-common-review.sh
-        （レビューの sh の --cwd つきの包み）だけ。各 sh に写さない。"""
+        """`ccnavi_wap_exe` の定義は ccnavi-common-write-and-push.sh（起こし方）と
+        ccnavi-common-review.sh（レビューの sh の --cwd つきの包み）だけ。各 sh に写さない。"""
         where = sorted(
             name
             for name in os.listdir(SH_DIR)
-            if name.endswith(".sh") and "ccnavi_c1_exe" in defined(name)
+            if name.endswith(".sh") and "ccnavi_wap_exe" in defined(name)
         )
-        self.assertEqual(where, ["ccnavi-common-c1.sh", "ccnavi-common-review.sh"])
+        self.assertEqual(where, ["ccnavi-common-review.sh", "ccnavi-common-write-and-push.sh"])
 
     def test_the_old_names_are_gone(self):
         for name in OLD_NAMES:
@@ -210,7 +209,6 @@ class EntryTest(unittest.TestCase):
                 ("decide", "1", "--choices", "{}", "--digest", "d"),
                 "ccnavi-user-decide.sh",
             ),
-            ("ccnavi-sync.sh", ("--forget", "i0001"), "ccnavi-user-forget.sh"),
             ("ccnavi-clean.sh", ("--branch", "i0001-01-01"), "ccnavi-user-clean-branch.sh"),
             (
                 "ccnavi-clean.sh",

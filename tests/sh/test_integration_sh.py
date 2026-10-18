@@ -2,11 +2,13 @@
 
 ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への push の拒否）・
 ccnavi-review.sh（マージリクエストの宛先）が同じ関数を読む。順は
-CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果（sync/<リポジトリ>/integration/head）→
-origin/HEAD → origin/main・origin/master。どれも無ければ「分からない」（終了コード 1）。
+CCNAVI_INTEGRATION_BRANCH → `.claude/settings.local.json` の env（実行ファイルの `sync paths` の
+`integration` 行が運ぶ。`ccnavi_integration_local`）→ origin/HEAD → origin/main・origin/master。
+どれも無ければ「分からない」（終了コード 1）。統合先のコピー（sync/<リポジトリ>/integration/）は
+もう読まない。
 
 使い捨てのワークスペースを組み、ccnavi-common.sh を読む sh から関数を呼んで、標準出力と
-終了コードだけを見る。
+終了コードだけを見る。実行ファイルは、`sync paths` の答えを決めた代役の sh に差し替える。
 """
 
 from __future__ import annotations
@@ -56,15 +58,30 @@ class IntegrationTest(unittest.TestCase):
         for name in common_sh():
             shutil.copy(os.path.join(SH_SCRIPTS, name), scripts)
         seed(self.ws)
+        self.asked = os.path.join(self.ws, "asked.log")
 
-    def integration(self, tree, **env):
+    def exe(self, integration):
+        """`sync paths` に答える実行ファイルの代役。呼ばれるたびに 1 行を記録する。"""
+        path = os.path.join(self.ws, "fake-ccnavi")
+        write(
+            path,
+            "#!/bin/sh\n"
+            f'echo "$*" >>"{self.asked}"\n'
+            'case "$*" in *"sync paths"*)\n'
+            "  printf 'approved .ccnavi/approved\\n'\n"
+            f"  printf 'integration %s\\n' '{integration}' ;;\n"
+            "esac\n",
+        )
+        os.chmod(path, 0o755)
+        return path
+
+    def run_sh(self, script, tree, **env):
         full = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         full.update(env)
         # `$0` に入口のパスを渡す。保護済み sh と同じく、部品は `$0` のディレクトリから読む。
-        script = '. "$0"\nccnavi_integration "$2" "$1"\n'
         common = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-common.sh")
         return subprocess.run(
-            [SHELL, "-c", script, common, self.ws, tree],
+            [SHELL, "-c", f'. "$0"\n{script}', common, self.ws, tree],
             cwd=tree,
             env=full,
             capture_output=True,
@@ -72,16 +89,13 @@ class IntegrationTest(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def integration(self, tree, **env):
+        return self.run_sh('ccnavi_integration "$2" "$1"\n', tree, **env)
+
     def assertIntegration(self, expected, tree=None, **env):
         result = self.integration(tree or self.ws, **env)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(expected, result.stdout.strip())
-
-    def record(self, repo_key, branch):
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", repo_key, "integration", "head"),
-            f"remote origin\nbranch {branch}\nsource default\n",
-        )
 
     def test_nothing_known_is_exit_1(self):
         """origin/HEAD も origin/main・master も無ければ当てずっぽうで宣言しない。"""
@@ -103,51 +117,69 @@ class IntegrationTest(unittest.TestCase):
         git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", head)
         self.assertIntegration("develop-v1.0.0")
 
-    def test_the_sync_record_wins_over_origin_head(self):
+    def test_the_local_setting_wins_over_origin_head(self):
+        """settings.local.json の統合先（`sync paths` が運ぶ）が origin/HEAD より先。"""
         git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
         remote_ref(self.ws, "main")
-        self.record("self", "develop-v1.0.0")
-        self.assertIntegration("develop-v1.0.0")
+        self.assertIntegration("develop-v1.0.0", CCNAVI_BIN_PATH=self.exe("develop-v1.0.0"))
 
-    def test_the_environment_wins_over_the_record(self):
-        self.record("self", "develop-v1.0.0")
-        self.assertIntegration("trunk", CCNAVI_INTEGRATION_BRANCH="trunk")
-
-    def test_the_record_does_not_follow_ccnavi_state(self):
-        """置き場の env は読まない。取り込み結果は既定の `logs/state/` から読む。
-
-        `CCNAVI_STATE` が読まれれば、env が指す置き場の develop-v2 が答えになって失敗する。
-        """
-        write(
-            os.path.join(self.ws, "elsewhere", "sync", "self", "integration", "head"),
-            "branch develop-v2\n",
+    def test_the_environment_wins_over_the_local_setting(self):
+        self.assertIntegration(
+            "trunk",
+            CCNAVI_BIN_PATH=self.exe("develop-v1.0.0"),
+            CCNAVI_INTEGRATION_BRANCH="trunk",
         )
-        self.record("self", "develop-v1.0.0")
-        self.assertIntegration("develop-v1.0.0", CCNAVI_STATE="elsewhere")
+        # 環境変数があれば、実行ファイルには聞かない。
+        self.assertFalse(os.path.exists(self.asked))
 
-    def test_a_worktree_reads_the_record_of_its_repository(self):
+    def test_an_empty_answer_falls_back_to_the_default_branch(self):
+        remote_ref(self.ws, "main")
+        self.assertIntegration("main", CCNAVI_BIN_PATH=self.exe(""))
+
+    def test_no_executable_falls_back_to_the_default_branch(self):
+        remote_ref(self.ws, "main")
+        self.assertIntegration("main", CCNAVI_BIN_PATH=os.path.join(self.ws, "nowhere"))
+
+    def test_the_old_integration_copy_is_not_read(self):
+        """統合先のコピー（sync/<リポジトリ>/integration/head）が残っていても読まない。"""
+        git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        remote_ref(self.ws, "main")
+        write(
+            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
+            "remote origin\nbranch develop-v1.0.0\nsource default\n",
+        )
+        self.assertIntegration("main")
+
+    def test_a_worktree_and_a_project_read_the_workspace_setting(self):
+        """settings.local.json はワークスペースのもの。ワークツリーもプロジェクトも同じ答えを得る。
+        プロジェクトの origin は、設定が無いときだけ使う。"""
         tree = os.path.join(self.ws, ".claude", "worktrees", "i0001")
         git(self.ws, "worktree", "add", "-q", tree, "-b", "i0001")
-        self.record("self", "develop-v1.0.0")
-        self.assertIntegration("develop-v1.0.0", tree)
-
-    def test_a_project_reads_its_own_record_and_refs(self):
-        """プロジェクトは自分の取り込み結果と origin を読み、ワークスペースのものは読まない。"""
         project = os.path.join(self.ws, "projects", "app")
         seed(project)
-        self.record("self", "develop-v1.0.0")
-        result = self.integration(project)
-        self.assertEqual(1, result.returncode, result.stdout)
-
         remote_ref(project, "main")
+        # 設定が無ければ、それぞれの origin から。ワークツリーは元リポジトリの参照を読む。
         self.assertIntegration("main", project)
+        remote_ref(self.ws, "trunk")
+        git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
+        self.assertIntegration("trunk", tree)
+        # 設定があれば、どれも設定の名前。
+        exe = self.exe("release-2")
+        self.assertIntegration("release-2", tree, CCNAVI_BIN_PATH=exe)
+        self.assertIntegration("release-2", project, CCNAVI_BIN_PATH=exe)
 
-        self.record("app", "release-2")
-        self.assertIntegration("release-2", project)
-
-        tree = os.path.join(self.ws, ".claude", "worktrees", "i0002")
-        git(project, "worktree", "add", "-q", tree, "-b", "i0002")
-        self.assertIntegration("release-2", tree)
+    def test_the_executable_is_asked_once_outside_a_substitution(self):
+        """`$( )` の外で続けて呼べば、実行ファイルには 1 回しか聞かない。"""
+        result = self.run_sh(
+            'ccnavi_integration_local "$1" >/dev/null || :\n'
+            'ccnavi_integration_local "$1" >/dev/null || :\n'
+            'ccnavi_integration "$2" "$1" >/dev/null\n',
+            self.ws,
+            CCNAVI_BIN_PATH=self.exe("develop-v1.0.0"),
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        with open(self.asked, encoding="utf-8") as f:
+            self.assertEqual(1, len(f.read().splitlines()))
 
 
 if __name__ == "__main__":

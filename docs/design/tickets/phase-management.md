@@ -38,7 +38,7 @@ keywords: [フェーズ管理, フェーズ, フェーズ定義, 計画, 全体�
   番号の子が全部閉じた = フェーズが終わった
         │
         ├─ review: none ─→ skipped（止めない。次へ進む）
-        └─ review: mr ──→ pending ─→ request ─→ requested ─→ confirm / decide ─→ reviewed
+        └─ review: mr ──→ pending ─→ request ─→ requested ─→ confirm / decide / Chrome のレビュー済み ─→ reviewed
 ```
 
 - 順序を決めるのは計画の項の `after` だけ。定義は順序を持たない。待ち方は承認済みチケットの計画から
@@ -60,7 +60,7 @@ keywords: [フェーズ管理, フェーズ, フェーズ定義, 計画, 全体�
 | 全体計画待ち | 計画が承認されていない | ユーザ（`user agree`） |
 | 作業中 | 作業中の子がいる | エージェント |
 | レビュー準備中 | フェーズが終わり、依頼を出していない | エージェント（合流済みの確認・push・`request`） |
-| レビュー待ち | 依頼を出した。`reviewed` が無い | ユーザ（`confirm` / `decide`） |
+| レビュー待ち | 依頼を出した。`reviewed` が無い | ユーザ（`confirm` / `decide` / Chrome 拡張のレビュー済み） |
 | フィードバック計画待ち | 全体計画が終わり、`feedback` が承認されていない | エージェントが出し、ユーザが `user agree` |
 | フィードバック対応中 | フィードバック計画の子が作業中 | エージェント |
 | 閉じられる | 全フェーズが閉じ、`feedback` が承認済み | エージェント（`finish` → push → `ready`） |

@@ -4,7 +4,8 @@ HEAD から読む。
 
 使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-git.sh・ccnavi-sync.sh・
 ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルはこのツリーのソースを
-`python -m ccnavi` で起こす（tests/sh/test_c1_sh.py と同じ形）。ユーザが既に作ったブランチ
+`python -m ccnavi` で起こす（tests/sh/test_write_and_push_sh.py と同じ形）。
+ユーザが既に作ったブランチ
 `feature/123-login` を、`.claude/worktrees/feature-123-login` が直接チェックアウトする。
 
 見るのは次のとおり。
@@ -12,14 +13,15 @@ ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは�
 1. `worktree add` は、行き先の名前がブランチ名の `/` を `-` に置き換えたものになる形だけを通す。
    識別子のブランチは作らず、移る手順（`switch`）も無い
 2. 承認画面にブランチの行は出ず、既存のブランチとぶつかる warn も出ない
-3. 最初の push が取り込み状態を識別子の鍵で作り、中の `branch`（キャッシュ）に親のブランチ名を書く
-4. 取り込み（ccnavi-sync.sh <識別子>）・着手と終える（C1）・セッションの頭の早送り
+3. 最初の push は取り込み状態を作らない（親子ごとの取り込み状態は持たない）
+4. 取り込み（ccnavi-sync.sh <識別子>）・着手と終える（write-and-push）・セッションの頭の早送り
    （ccnavi-fetch.sh）が、HEAD から読んだ親のブランチ名の ref を使う
 5. 親のワークツリーでは、今のブランチと、変換するとその識別子になるブランチのほかへ移れない
 6. 子のワークツリーからは送れない（子のブランチは子の識別子）
-7. HEAD が合わない・取り込み状態の `branch` が食い違う・`branch:` の欄が残る（エラー）場合の動き。
-   取り込み状態の `branch` はキャッシュで、判定に使わず、送るか取り込むと書き直る
-8. 消えた（取り込み状態が gone の）親のブランチへは送れない
+7. HEAD が合わない・`branch:` の欄が残る（エラー）場合の動き。旧い取り込み状態が残っていても
+   判定に使わない
+8. リモートから消えた親のブランチへは、記録が無くても送れない（push の関門）。一度も送っていない
+   親の最初の push は通す
 """
 
 from __future__ import annotations
@@ -91,11 +93,6 @@ def git(cwd, *args, check=True):
     return done
 
 
-def fields(path):
-    with open(path, encoding="utf-8") as f:
-        return dict((line.rstrip("\n").split(" ", 1) + [""])[:2] for line in f if line.strip())
-
-
 def with_branch(text, branch):
     """親の提案の frontmatter に古い `branch:` を足す。"""
     head, rest = text.split("\n", 3)[:3], text.split("\n", 3)[3]
@@ -132,7 +129,6 @@ class ParentBranchShTest(unittest.TestCase):
         write(self.bin, EXE.format(src=SRC, python=sys.executable))
         os.chmod(self.bin, os.stat(self.bin).st_mode | stat.S_IXUSR | stat.S_IXGRP)
         self.state = os.path.join(self.ws, "logs", "state")
-        self.record = os.path.join(self.state, "sync", "self", "families", PARENT)
         self.tree = os.path.join(self.ws, ".claude", "worktrees", PARENT)
         # ユーザが既に作って送ってあるブランチ（`/` を含む）。
         self.remote_commit("src/login.py", "print('login')\n", branch=BRANCH, start="main")
@@ -147,8 +143,6 @@ class ParentBranchShTest(unittest.TestCase):
         env.update(
             {
                 "CCNAVI_BIN_PATH": self.bin,
-                "CCNAVI_SYNC_RETRIES": "0",
-                "CCNAVI_SYNC_RETRY_WAIT": "0",
                 "CCNAVI_LOCK_WAIT": "2",
             }
         )
@@ -193,6 +187,10 @@ class ParentBranchShTest(unittest.TestCase):
     def remote_sha(self, branch=BRANCH):
         done = git(self.ws, "ls-remote", "origin", f"refs/heads/{branch}")
         return done.stdout.split("\t")[0] if done.stdout else ""
+
+    def delete_remote_branch(self, branch=BRANCH):
+        """ホストがブランチを消した（他の機械・マージ後の削除）ように見せる。"""
+        git(self.pusher(), "push", "-q", "origin", "--delete", branch)
 
     def pusher(self):
         path = os.path.join(self._tmp.name, "pusher")
@@ -286,7 +284,7 @@ class ParentBranchShTest(unittest.TestCase):
         self.assertEqual(self.sha(self.ws, f"refs/heads/{PARENT}"), "")
 
         # 2. 親のブランチ名は HEAD から読む。承認画面にブランチの行は出ず、ぶつかりの warn も出ない
-        family = self.ok(self.exe("c1", "family", PARENT))
+        family = self.ok(self.exe("write-and-push", "family", PARENT))
         self.assertIn(f"branch {BRANCH}\n", family.stdout)
         verify = self.exe("--agree", "--preview", "--verify", "--json")
         body = json.loads(verify.stdout)
@@ -299,22 +297,20 @@ class ParentBranchShTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(self.tree, "src", "login.py")))
         self.assertEqual(git(self.tree, "status", "--porcelain").stdout, "")
 
-        # 3. 最初の push が取り込み状態を識別子の鍵で作り、中の branch に親のブランチ名を書く
+        # 3. 最初の push は、リモートにブランチが在るので関門を通る。取り込み状態は作らない
         pushed = self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
-        self.assertIn("取り込み状態を作った", pushed.stdout)
-        record = fields(self.record)
-        self.assertEqual((record["branch"], record["state"]), (BRANCH, "present"))
+        self.assertNotIn("取り込み状態", pushed.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-        family = self.ok(self.exe("c1", "family", PARENT))
+        family = self.ok(self.exe("write-and-push", "family", PARENT))
         self.assertIn("target yes\n", family.stdout)
 
-        # 4. 取り込みと着手（C1 は親のブランチ名へ送る）
+        # 4. 取り込みと着手（write-and-push は親のブランチ名へ送る）
         synced = self.ok(self.sh("ccnavi-sync.sh", PARENT))
         self.assertIn("リモートと同じ", synced.stdout)
         started = self.ok(self.sh("ccnavi-ticket.sh", "start", PARENT))
         self.assertIn("に着手した", started.stdout)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-        self.assertEqual(fields(self.record)["sha"], self.sha(self.tree, "HEAD"))
         self.assertEqual(self.remote_sha(PARENT), "")
 
         # 5. 親のワークツリーでは、今のブランチのほかへ移れない。今のブランチへは移れる
@@ -355,10 +351,9 @@ class ParentBranchShTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(self.tree, "wip", "note-1.md")))
         remote = self.remote_commit("wip/note-2.md", "2\n")
         fetched = self.ok(self.sh("ccnavi-fetch.sh"))
-        self.assertIn(
-            f"{PARENT}: 承認済みチケットとマーカーを 1 件分だけ新しくした", fetched.stdout
-        )
+        self.assertIn(f"{PARENT}: 親ブランチ {BRANCH} を 1 コミット進めた", fetched.stdout)
         self.assertEqual(self.sha(self.tree, "HEAD"), remote)
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
         lint = self.exe("--lint")
         self.assertNotIn("の上にある", lint.stdout + lint.stderr)
@@ -379,45 +374,41 @@ class ParentBranchShTest(unittest.TestCase):
         self.assertEqual(self.head_branch(tree), "hotfix/45")
         self.assertEqual(self.sha(self.ws, "refs/heads/hotfix-45"), "")
 
-    def test_a_record_made_before_the_ticket_does_not_stop_the_approval(self):
-        """`ccnavi-start.sh` はチケットの前に、取り込み記録（present・mr 付き）を作って
-        ccnavi-sync.sh を打つ。チケットが無いので取り込まれないが、統合先の取り込み結果は書かれ、
-        最初の承認（--agree）の前に ccnavi-sync.sh を打ち直さなくても通る。"""
+    def test_a_parent_worktree_before_the_ticket_does_not_stop_the_approval(self):
+        """`ccnavi-start.sh` はチケットの前に ccnavi-sync.sh を打つ。チケットが無いので取り込まない
+        （終了コード 1）が、最初の承認（--agree）の前に ccnavi-sync.sh を打ち直さなくても通る。
+        取り込み状態も統合先のコピーも作らない。"""
         self.ok(self.sh("ccnavi-git.sh", "fetch", "origin", BRANCH))
         self.ok(self.sh("ccnavi-git.sh", "worktree", "add", f".claude/worktrees/{PARENT}", BRANCH))
-        sha = self.sha(self.tree, "HEAD")
-        write(
-            self.record,
-            f"remote origin\nbranch {BRANCH}\nsha {sha}\nfetched_at 1\nstate present\n"
-            "reason \nmr 7\n",
-        )
         synced = self.sh("ccnavi-sync.sh", PARENT)
         self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
         self.assertIn("親チケットも提案もありません", synced.stdout)
-        self.assertTrue(
-            os.path.isfile(os.path.join(self.state, "sync", "self", "integration", "head"))
-        )
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         self.propose()
         verify = self.exe("--agree", "--preview", "--verify", "--json")
         body = json.loads(verify.stdout)
         self.assertTrue(body["verify"]["ok"], body)
         self.approve()
         self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
-        record = fields(self.record)
-        self.assertEqual((record["state"], record["mr"]), ("present", "7"))
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
-    # ---- 取り込み状態はキャッシュ
+    # ---- 旧い取り込み状態が残っていても判定に使わない
 
-    def test_a_record_pinned_to_another_branch_is_only_a_cache(self):
+    def test_a_leftover_legacy_record_does_not_change_the_answer(self):
+        """旧い取り込み状態（branch が別のブランチ）が残っていても、判定には使わない。
+        親のブランチ名は HEAD から読む。先頭の `sync migrate` が旧い記録を捨てる。"""
         self.imported_family()
-        with open(self.record, encoding="utf-8") as f:
-            text = f.read()
-        write(self.record, text.replace(f"branch {BRANCH}", "branch feature/other"))
-        family = self.ok(self.exe("c1", "family", PARENT))
+        record = os.path.join(self.state, "sync", "self", "families", PARENT)
+        write(
+            record,
+            "remote origin\nbranch feature/other\nsha 0\nfetched_at 1\nstate gone\nreason \n",
+        )
+        family = self.ok(self.exe("write-and-push", "family", PARENT))
         self.assertIn("target yes\n", family.stdout)
         self.assertIn(f"branch {BRANCH}\n", family.stdout)
         self.ok(self.sh("ccnavi-sync.sh", PARENT))
-        self.assertEqual(fields(self.record)["branch"], BRANCH)
+        self.assertFalse(os.path.exists(record))
+        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
 
     def test_a_left_over_branch_field_is_an_error(self):
         self.add_parent_tree()
@@ -425,18 +416,12 @@ class ParentBranchShTest(unittest.TestCase):
         lint = self.exe("--lint")
         self.assertIn("`branch` は使えない欄", lint.stdout)
 
-    def test_two_records_naming_one_branch_do_not_stop_the_push(self):
-        self.imported_family()
-        other = os.path.join(self.state, "sync", "self", "families", "feature-9-other")
-        write(other, f"remote origin\nbranch {BRANCH}\nstate present\nreason \n")
-        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
-
     # ---- HEAD が合わない
 
     def test_a_head_off_the_converted_name_stops_the_family(self):
         self.imported_family()
         git(self.tree, "checkout", "-q", "-b", "elsewhere")
-        family = self.ok(self.exe("c1", "family", PARENT))
+        family = self.ok(self.exe("write-and-push", "family", PARENT))
         self.assertIn("target stop\n", family.stdout)
         self.assertIn("branch_refused ", family.stdout)
         self.assertNotIn("\nbranch ", family.stdout)
@@ -459,15 +444,68 @@ class ParentBranchShTest(unittest.TestCase):
     # ---- 止める形
 
     def test_a_gone_parent_branch_cannot_be_pushed(self):
+        """リモートから消えた親のブランチへは、記録が無くても送れない（push の関門）。
+        ユーザが元の名前で戻せば、また送れる。"""
         self.imported_family()
-        with open(self.record, encoding="utf-8") as f:
-            text = f.read()
-        write(self.record, text.replace("state present", "state gone"))
+        self.delete_remote_branch()
         refused = self.refused(
             self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree)
         )
-        self.assertIn(f"親子のチケット {PARENT} の取り込み状態が gone", refused.stderr)
+        self.assertIn(f"親のブランチ {BRANCH} がリモートに無い", refused.stderr)
         self.assertIn(f"ccnavi-sync.sh {PARENT}", refused.stderr)
+        self.assertEqual(self.remote_sha(), "")
+        # 診断は ccnavi-sync.sh が出す（MR の答えは代役。マージされていない）。
+        write(
+            os.path.join(self.scripts, "ccnavi-review.sh"),
+            '#!/bin/sh\n[ "$1" = merged ] && echo none\nexit 0\n',
+        )
+        synced = self.sh("ccnavi-sync.sh", PARENT)
+        self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
+        self.assertIn("戻し方 1", synced.stdout)
+        # ユーザが端末で、生の git で元の名前に戻す。
+        git(self.tree, "push", "-q", "origin", BRANCH)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
+
+    def test_a_branch_never_pushed_is_pushed_once(self):
+        """一度も送っていない親（参照も承認済みチケットも依頼も無い）は、最初の push を通す。"""
+        self.ok(self.sh("ccnavi-git.sh", "fetch", "origin", BRANCH))
+        self.ok(self.sh("ccnavi-git.sh", "worktree", "add", f".claude/worktrees/{PARENT}", BRANCH))
+        self.propose()
+        self.delete_remote_branch()
+        git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{BRANCH}")
+        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    def test_an_approved_parent_never_started_is_pushed_once_without_a_reference(self):
+        """承認しただけで一度も送っていない親（着手していない）は、参照もリモートのブランチも無くても、
+        最初の push を通す。"""
+        self.add_parent_tree()
+        self.approve()
+        self.delete_remote_branch()
+        git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{BRANCH}")
+        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    def test_a_started_parent_whose_reference_was_pruned_is_still_guarded(self):
+        """fetch.prune で参照（origin/ブランチ）が消えても、着手済み（started_at あり）の親は、
+        リモートに無いブランチを作り直さない。"""
+        self.imported_family()
+        copy = os.path.join(self.tree, APPROVED, "doing", PARENT + ".md")
+        # 承認済みのコピーは、着手前は `started_at: ""` を持つ。着手済みの値に書き換える。
+        with open(copy, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn('started_at: ""', text)
+        write(copy, text.replace('started_at: ""', "started_at: 2026-10-18T00:00:00Z", 1))
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "start")
+        self.delete_remote_branch()
+        git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{BRANCH}")
+        refused = self.refused(
+            self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree)
+        )
+        self.assertIn(f"親のブランチ {BRANCH} がリモートに無い", refused.stderr)
+        self.assertEqual(self.remote_sha(), "")
 
 
 if __name__ == "__main__":

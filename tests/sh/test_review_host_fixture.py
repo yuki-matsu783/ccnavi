@@ -80,7 +80,7 @@ case " $* " in
   printf '{{"compat": {compat}, "flags": ["--accept-unresolved", "--actor", "--via"]}}\\n'
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
-*" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
+*" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 esac
 prev=""
 for a in "$@"; do
@@ -385,7 +385,8 @@ class HostFixtureTest(unittest.TestCase):
             'case " $* " in\n'
             f'*" --version --json "*) {answer} ;;\n'
             f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
-            "*\" c1 family \"*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;\n"
+            '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
+            "no\\n'; exit 0 ;;\n"
             "esac\n"
             'for a in "$@"; do case "$a" in --actor*|--via*)\n'
             f'  case " {known} " in *" ${{a%%=*}} "*) ;;\n'
@@ -644,8 +645,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
             'case " $* " in *" --version "*) printf \'compat: %s\\n\' '
             + str(version.COMPAT)
             + "; exit 0 ;; esac\n"
-            + 'case " $* " in *" c1 family "*)'
-            + " printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
+            + 'case " $* " in *" write-and-push family "*)'
+            + " printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
             f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'
             f"  printf '<!-- ccnavi:request i0001:1 key=k -->\\n依頼\\n' >'{out}/body.md'\n"
@@ -745,13 +746,14 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertIn("マージ先（main）が統合先（trunk）ではない", done.stderr)
         self.assertFalse(os.path.exists(sent))
 
-    def test_request_compares_with_the_recorded_integration(self):
-        """統合先は fetch と同じ順で決める。取り込み結果が develop なら main の MR は止まる。"""
+    def test_request_compares_with_the_configured_integration(self):
+        """統合先は fetch と同じ順で決める。環境変数が develop なら main の MR は止まる。
+        統合先のコピー（sync/<リポジトリ>/integration/head）は読まない。"""
         write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch develop-v1.0.0\nsource default\n",
+            "remote origin\nbranch trunk-v2\nsource default\n",
         )
-        done, _ = self.request_on()
+        done, _ = self.request_on(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("統合先（develop-v1.0.0）", done.stderr)
 

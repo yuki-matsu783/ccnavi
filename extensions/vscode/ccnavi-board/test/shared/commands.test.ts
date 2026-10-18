@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as commands from "../../src/core/commands.js";
 import {
   approveArgs,
-  c1TargetOf,
+  writeAndPushTargetOf,
   decideArgs,
   decidePreviewArgs,
   PUSH_APPROVED_SCRIPT,
@@ -13,7 +13,6 @@ import {
   planOrderArgs,
   planOrderWriteArgs,
   previewArgs,
-  prepareCommand,
   pushApprovedCommand,
   reviewedPrompt,
   scriptCommand,
@@ -120,20 +119,12 @@ test("CB-T19b 承認の push の sh は、ワークスペースルートから�
   );
 });
 
-test("CB-T583 「準備する」は ccnavi-start.sh --mr <番号> を絶対パスで送る。プロジェクトの親はそのプロジェクトに cd してから", () => {
-  assert.equal(prepareCommand("/ws", 12), "sh /ws/.ccnavi/scripts/ccnavi-start.sh --mr 12");
-  assert.equal(prepareCommand("C:\\Users\\x\\ws", 3), "sh C:/Users/x/ws/.ccnavi/scripts/ccnavi-start.sh --mr 3");
-  assert.equal(
-    prepareCommand("/ws", 5, "lib"),
-    "cd '/ws/projects/lib' && sh /ws/.ccnavi/scripts/ccnavi-start.sh --mr 5",
-  );
-});
 
-test("CB-T287 C1 の対象かは c1 family の target で読む。頭の c1 1 がなければ空、CR は除く", () => {
-  assert.equal(c1TargetOf("c1 1\nfamily i0001\ntarget yes\ntree /ws/x y\n"), "yes");
-  assert.equal(c1TargetOf("c1 1\r\nfamily i0001\r\ntarget no\r\n"), "no");
-  assert.equal(c1TargetOf("usage: ccnavi ...\n"), "");
-  assert.equal(c1TargetOf("c1 1\nfamily i0001\n"), "");
+test("CB-T287 write-and-push の対象かは write-and-push family の target で読む。頭の write-and-push 1 がなければ空、CR は除く", () => {
+  assert.equal(writeAndPushTargetOf("write-and-push 1\nfamily i0001\ntarget yes\ntree /ws/x y\n"), "yes");
+  assert.equal(writeAndPushTargetOf("write-and-push 1\r\nfamily i0001\r\ntarget no\r\n"), "no");
+  assert.equal(writeAndPushTargetOf("usage: ccnavi ...\n"), "");
+  assert.equal(writeAndPushTargetOf("write-and-push 1\nfamily i0001\n"), "");
 });
 
 test("CB-T19c 文面の sh のパスは実行ファイルの script_command と同じ引用の規則。空白や記号があるときだけ引用する（root を解くのは呼び手）", () => {

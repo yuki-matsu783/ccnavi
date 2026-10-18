@@ -28,7 +28,7 @@ from . import (
     retire,
     review,
     review_host,
-    syncstate,
+    standing,
     ticket_model,
     ticket_places,
 )
@@ -58,7 +58,8 @@ def ready(
     条件を確かめてマーカーを置いたあと、親のツリーの承認済みの領域から、閉じた親（今回の親と、統合先に
     たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`flows/` を
     手元の `logs/archive/` へ退避し、`wip/` の追跡済みのファイルを消す（`review.remove_wip`）。
-    git の上では削除になり、C1 がコミットして push してから sh が Draft を外す。squash で
+    git の上では削除になり、write-and-push がコミットして push してから sh が Draft を外す。squash
+    で
     マージすると、既定のブランチにチケットは残らない。
     退避した後に打ち直したとき（親が退避にだけある）は、条件の確かめのうちワークツリーの側
     （未コミット・push 済み）だけを見て、下書きを書き直し、前の回が途中で止まった残りを移す。
@@ -123,7 +124,7 @@ def ready(
     ):
         return 1
     # 閉じた親子のチケットを手元の退避へ移す。条件は確かめてあり、今回の親は done/ にある。
-    return _archive_closed(stdout, stderr, root, conf, parent, where, path)
+    return _archive_closed(stdout, stderr, root, conf, parent, where, path, result.mr.number)
 
 
 def _archive_closed(
@@ -134,6 +135,7 @@ def _archive_closed(
     parent: ticket_model.Ticket,
     where: str,
     path: str,
+    mr: int | None = None,
 ) -> int:
     """閉じた親子のチケットを退避へ移し、下書きのパスと退避したツリーを出す。
 
@@ -150,11 +152,16 @@ def _archive_closed(
     parents = sorted(
         set(archive.closed_parents(where)) | set(archive.archived_parents(root, parent.project))
     )
-    # 閉じた子のチケットは退避へ移って見えなくなるので、親を閉じた後に片付ける子の一覧を先に書く
-    # （ワークツリーとブランチの片付け。`retire.py`）。書けなくても ready は止めない。
-    noted = retire.note(root, conf, parent.ticket, parent.project, tree_root)
+    # 閉じた子のチケットは退避へ移って見えなくなるので、親を閉じた後の片付けの記録（子の一覧と
+    # MR の番号。`retire.py`）を先に書く。親のワークツリーを片付けた後の列挙元になるので、
+    # 書けなければ退避へ進まずに止める（記録が無いと片付け待ちの親を見失う）。打ち直せる。
+    noted = retire.note(root, conf, parent.ticket, parent.project, tree_root, mr)
     if noted:
-        stderr.write(f"ccnavi: 注意: {noted}。子のワークツリーとブランチは手で片付ける\n")
+        stderr.write(
+            f"ccnavi: 親を閉じた後の片付けの記録を書けないので止めました: {noted}。"
+            "直してから ready を打ち直してください\n"
+        )
+        return 1
     todo = archive.plan(where, parents, root, parent.project)
     _, failed = archive.move(root, parent.project, where, todo, parent.ticket, tree_root)
     if failed:
@@ -162,7 +169,8 @@ def _archive_closed(
             f"ccnavi: クローズ済みのチケットを logs/archive/ へ退避できなかった: {failed}\n"
         )
         return 1
-    # 途中の作業の置き場（wip/）の追跡済みのファイルも、同じ流れで消す（C1 が一緒にコミットする）。
+    # 途中の作業の置き場（wip/）の追跡済みのファイルも、同じ流れで消す（write-and-push
+    # が一緒にコミットする）。
     removed, head, failed = review.remove_wip(tree_root) if tree_root else ([], "", "")
     if failed:
         stderr.write(f"ccnavi: `{ticket_places.WIP_ROOT}/` を片付けられなかった: {failed}\n")
@@ -186,7 +194,7 @@ def _archive_place_problem(
     if (
         home is not None
         and not home.is_main
-        and syncstate.same_tree(os.path.realpath(home.root), os.path.realpath(expected))
+        and standing.same_tree(os.path.realpath(home.root), os.path.realpath(expected))
     ):
         return ""
     shown = home.name if home is not None and home.name else "ワークスペースルート"
@@ -270,7 +278,8 @@ def _ready_again(
         for p in problems:
             stderr.write(f"  - {p}\n")
         return 1
-    if review._result_with_mr(stderr, result_path) is None:
+    result = review._result_with_mr(stderr, result_path)
+    if result is None:
         return 1
     if not conf.state:
         stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所がありません。\n")
@@ -289,7 +298,7 @@ def _ready_again(
         stderr.write(f"ccnavi: {failed}\n")
         return 1
     # 前の回が途中で止まっていれば、残りをここで移す（移すものが無ければ何もしない）。
-    return _archive_closed(stdout, stderr, root, conf, parent, where, path)
+    return _archive_closed(stdout, stderr, root, conf, parent, where, path, result.mr.number)
 
 
 def close_early(

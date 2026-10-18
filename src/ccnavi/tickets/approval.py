@@ -68,7 +68,7 @@ from ..policy import rules
 from . import (
     approval_checks,
     phasetypes,
-    syncstate,
+    standing,
     ticket_fold,
     ticket_model,
     workflow,
@@ -472,16 +472,16 @@ def revision_elsewhere_text(
     root: str,
     t: ticket_model.Ticket,
     where: str,
-    fams: syncstate.Families | None = None,
+    fams: standing.Families | None = None,
 ) -> str:
     """正とするツリーの外に在る計画の違う版の案内。ファイルの場所と、改版を書く置き場を名指しする。
 
     場所はどちらもワークスペースルートからのパスで出す（ツリーの名前ではなく、
     `.claude/worktrees/<親>` や `projects/<名前>`）。`--lint` と `--agree`（`--verify` も）が
-    同じ文面を出す。取り込み済みの親子のチケットでは、親子のチケットが決まらない・閉じているなら止まった理由と
+    同じ文面を出す。取り込み済みの親子のチケットでは、親子のチケットが決まらないなら止まった理由と
     手順（`family_stop_text`。`family_problems` と同じ文面）を足す。決まっていれば、正とする
     ツリーが親のワークツリー（`family_problems` が言う書く場所と同じ）なので、場所は繰り返さず
-    push してから頼むことだけを足す。
+    承認を頼む前に `propose` で親のブランチへ送る手順だけを足す。
     """
     rel = os.path.relpath(t.path, root).replace(os.sep, "/")
     place = tree_path(conf, root, where, t.project)
@@ -490,12 +490,13 @@ def revision_elsewhere_text(
         f"{t.ticket} の計画の違う提案が {rel} に在るが、正とするツリー（{place}）の外なので"
         f"承認の対象にならない。改版なら {place} の {todo} に書き、古い版なら削除してください"
     )
-    fams = fams or syncstate.Families(conf, root)
+    fams = fams or standing.Families(conf, root)
     st = approval_checks.family_standing(conf, root, t, fams)
     if st.stop:
         text += "。親子のチケットが止まっている: " + approval_checks.family_stop_text(root, st)
     elif st.home is not None:
-        text += "。書いたら push してから承認を頼んでください"
+        propose = f"{settings.script_command(root, 'ccnavi-ticket.sh')} propose {t.ticket}"
+        text += f"。書いたら '{propose}' で親のブランチへ送ってから承認を頼んでください"
     return text
 
 
@@ -581,11 +582,11 @@ def home_dir(
     止まっているときは `NoParentWorktree`（ほかのツリーのコピーで代用しない）。
 
     `project` はチケットのリポジトリ（ワークスペース自身なら空）。分からなければ None で、
-    取り込み状態か同じ名前のワークツリーのあるリポジトリを全部探す（同じ識別子が 2 つの
+    同じ名前の親のワークツリーのあるリポジトリを全部探す（同じ識別子が 2 つの
     リポジトリにあれば決めない）。`fallback_root` は使わない（互換のために引数だけ残す）。
     """
     home = parent or ticket_id
-    st = syncstate.standing_any(conf, root, home, project)
+    st = standing.standing_any(conf, root, home, project)
     if st.home is None or st.stop:
         raise NoParentWorktree(
             st.stop or f"親のワークツリー（.claude/worktrees/{home}）がありません"
@@ -603,9 +604,9 @@ def home_dir_read(
     """`home_dir` の読む側。親のワークツリーが決まらないときは、存在しない置き場のパスを返す。
 
     読む側（マーカー・記録）は、親のワークツリーが決まらなければ「何も無い」と読む。
-    決まらないのは、親のワークツリーが無い・HEAD のブランチが違う・途中の操作がある・
-    取り込みで止めた（gone・blocked）・閉じた、のどれでも同じ。フォルダが実在しても
-    （別のブランチを checkout したままなど）、その中のマーカーは読まない。
+    決まらないのは、親のワークツリーが無い・HEAD のブランチが違う・途中の操作がある、
+    のどれでも同じ。フォルダが実在しても（別のブランチを checkout したままなど）、
+    その中のマーカーは読まない。
     ほかのツリーのコピーでは代用しない。書く側は `home_dir` を使う（決まらなければ止まる）。
     返したパスへは書かない（書くとそこに置き場ができる）。
     """

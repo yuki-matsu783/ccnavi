@@ -27,7 +27,7 @@
 # （review/ の変更や、前の失敗で残ったファイル）は巻き込まない。push が失敗しても承認自体は 0 で終わる（コミットは残り、打ち直せば送れる）。
 #
 # 統合先が保護ブランチ（main / master / develop / release / release/*）であるか、そのリポジトリの
-# 統合先ブランチ（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 → origin/HEAD）上にいるときは
+# 統合先ブランチ（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env → origin/HEAD）上にいるときは
 # push しない。そこへ直接送るかどうかはユーザが判断するため、ブランチ名を示して停止する。
 #
 # エージェントからは hook が止める（ccnavi-user- で始まる sh の名前と、実行ファイルの `user` の入口）。
@@ -86,8 +86,8 @@ report=$(mktemp "${TMPDIR:-/tmp}/ccnavi-user-agree.XXXXXX") || {
 	exit 2
 }
 # この承認が書いた・消したパスの一覧（1 行 1 つ、ワークスペースルートからの相対）。実行ファイルの
-# `--record-writes` は、書き出し先を state の置き場の c1/ の下に限るので、そこに作る。
-written_dir="$(ccnavi_state "$root")/c1"
+# `--record-writes` は、書き出し先を state の置き場の write-and-push/ の下に限るので、そこに作る。
+written_dir="$(ccnavi_state "$root")/write-and-push"
 mkdir -p "$written_dir" 2>/dev/null || :
 written="$written_dir/agree.$$"
 rm -f "$written"
@@ -96,12 +96,12 @@ trap 'rm -f "$report" "$written"; exit 130' INT TERM HUP
 
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 # `set --` の右の "$@" は置き換える前の引数（並べた識別子）に展開される。
-# 起こし方（実行ファイルか、ソースと uv か）は ccnavi-common-c1.sh の ccnavi_c1_use_exe が決める。
-if ccnavi_c1_use_exe "$root"; then
-	if [ -n "$ccnavi_c1_bin" ]; then
-		skew=$(ccnavi_compat_skew "$root" "$ccnavi_c1_bin") || printf 'ccnavi-user-agree: %s\n' "$skew" >&2
+# 起こし方（実行ファイルか、ソースと uv か）は ccnavi-common-write-and-push.sh の ccnavi_wap_use_exe が決める。
+if ccnavi_wap_use_exe "$root"; then
+	if [ -n "$ccnavi_wap_bin" ]; then
+		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-user-agree: %s\n' "$skew" >&2
 	fi
-	set -- ccnavi_c1_exe --record-writes "$written" user agree --placed-out "$report" "$@"
+	set -- ccnavi_wap_exe --record-writes "$written" user agree --placed-out "$report" "$@"
 else
 	printf 'ccnavi-user-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2

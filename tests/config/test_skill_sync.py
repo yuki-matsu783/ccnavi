@@ -147,7 +147,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(sources, {})
         self.assertIn("シンボリックリンク", why)
 
-    def test_the_start_c1_carries_the_copied_skills(self):
+    def test_the_start_write_and_push_carries_the_copied_skills(self):
         """1: 書いたパスの一覧(基点は親のワークツリー)で、写した工程スキルは外でも通す"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         write(self.source("process-test", "references", "common", "unit", "basics.md"), "# 基本\n")
@@ -160,11 +160,7 @@ class SkillSyncTest(ConfigUnionHarness):
         )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        write(
-            os.path.join(self.state, "sync", "lib", "families", "i0001"),
-            "remote origin\nbranch i0001\nsha 0\nfetched_at 1\nstate present\nreason \n",
-        )
-        target = os.path.join(self.ws, "logs", "state", "c1", "lib", "i0001.t.writes")
+        target = os.path.join(self.ws, "logs", "state", "write-and-push", "lib", "i0001.t.writes")
         started = self.ccnavi(
             "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"
         )
@@ -272,7 +268,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(read(os.path.join(out, "project", "own.md")), "プロジェクト固有\n")
         self.assertIn("削除した", started.stdout)
 
-    def test_the_start_c1_carries_the_deletions(self):
+    def test_the_start_write_and_push_carries_the_deletions(self):
         """1: 消した分も、書いたパスの一覧で置き場の外でも通す"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         gone = os.path.join(self.lib, "skills", "process-test", "references", "common", "gone.md")
@@ -287,11 +283,7 @@ class SkillSyncTest(ConfigUnionHarness):
             ),
         )
         self.assertEqual(self.approve().returncode, 0)
-        write(
-            os.path.join(self.state, "sync", "lib", "families", "i0001"),
-            "remote origin\nbranch i0001\nsha 0\nfetched_at 1\nstate present\nreason \n",
-        )
-        target = os.path.join(self.ws, "logs", "state", "c1", "lib", "i0001.t.writes")
+        target = os.path.join(self.ws, "logs", "state", "write-and-push", "lib", "i0001.t.writes")
         started = self.ccnavi(
             "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"
         )

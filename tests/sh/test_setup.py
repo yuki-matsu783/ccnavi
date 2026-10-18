@@ -116,7 +116,7 @@ DEPLOY_SCRIPTS = (
     *GATE_SCRIPTS,
     "ccnavi-common-state.sh",
     "ccnavi-common-lock.sh",
-    "ccnavi-common-c1.sh",
+    "ccnavi-common-write-and-push.sh",
     "ccnavi-common-host.sh",
     "ccnavi-common-log.sh",
     "ccnavi-common-review.sh",
@@ -124,7 +124,6 @@ DEPLOY_SCRIPTS = (
     "ccnavi-user-lib-review.sh",
     "ccnavi-user-push-approved.sh",
     "ccnavi-user-agree.sh",
-    "ccnavi-user-forget.sh",
     "ccnavi-user-decide.sh",
     "ccnavi-user-close-early.sh",
     "ccnavi-user-clean-branch.sh",
@@ -172,12 +171,12 @@ NO_TEMPLATES_FILES = [
             "ccnavi-branches.sh",
             "ccnavi-clean.js",
             "ccnavi-clean.sh",
-            "ccnavi-common-c1.sh",
             "ccnavi-common-host.sh",
             "ccnavi-common-lock.sh",
             "ccnavi-common-log.sh",
             "ccnavi-common-review.sh",
             "ccnavi-common-state.sh",
+            "ccnavi-common-write-and-push.sh",
             "ccnavi-common.sh",
             "ccnavi-fetch.sh",
             "ccnavi-git.sh",
@@ -191,7 +190,6 @@ NO_TEMPLATES_FILES = [
             "ccnavi-user-clean-branch.sh",
             "ccnavi-user-close-early.sh",
             "ccnavi-user-decide.sh",
-            "ccnavi-user-forget.sh",
             "ccnavi-user-lib-review.sh",
             "ccnavi-user-push-approved.sh",
             "ccnavi-worktree.sh",
@@ -237,7 +235,7 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-git.sh
   .ccnavi/scripts/ccnavi-common-state.sh
   .ccnavi/scripts/ccnavi-common-lock.sh
-  .ccnavi/scripts/ccnavi-common-c1.sh
+  .ccnavi/scripts/ccnavi-common-write-and-push.sh
   .ccnavi/scripts/ccnavi-common-host.sh
   .ccnavi/scripts/ccnavi-common-log.sh
   .ccnavi/scripts/ccnavi-common-review.sh
@@ -245,7 +243,6 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-user-lib-review.sh
   .ccnavi/scripts/ccnavi-user-push-approved.sh
   .ccnavi/scripts/ccnavi-user-agree.sh
-  .ccnavi/scripts/ccnavi-user-forget.sh
   .ccnavi/scripts/ccnavi-user-decide.sh
   .ccnavi/scripts/ccnavi-user-close-early.sh
   .ccnavi/scripts/ccnavi-user-clean-branch.sh

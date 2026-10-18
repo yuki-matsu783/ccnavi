@@ -1,6 +1,6 @@
 # ccnavi-common-lock.sh  ccnavi-common.sh が読む部品。単体では読まない（読み方は ccnavi-common.sh の冒頭）。
 #
-# 親子のチケットのロック。置き場は ccnavi-common-state.sh の「取り込み状態とロック」。
+# 親子のチケットのロック。置き場は ccnavi-common-state.sh の「state の置き場とロック」。
 
 # ロック。<ワークスペースルート> <リポジトリ> <P> <待つ秒>
 #
@@ -220,8 +220,8 @@ ccnavi_lock_drop() {
 		ccnavi_lock_dir=""
 	fi
 	if [ -n "$ccnavi_lock_set_held" ]; then
-		# 入れ子の中で別のロック（統合先の取り込み結果のロックなど）を取ったときは、外側から渡された値に戻す。
-		# 消したままにすると、外側（C1）が持つ親子のチケットのロックを、この sh の後の段が入れ子と読めない。
+		# 入れ子の中で別のロック（親のワークツリーを使う別の操作のロックなど）を取ったときは、外側から渡された値に戻す。
+		# 消したままにすると、外側（write-and-push）が持つ親子のチケットのロックを、この sh の後の段が入れ子と読めない。
 		if [ -n "$ccnavi_lock_prev_set" ]; then
 			CCNAVI_LOCK_HELD="$ccnavi_lock_prev_held"
 			export CCNAVI_LOCK_HELD

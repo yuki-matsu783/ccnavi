@@ -76,7 +76,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 テンプレート管理の画面は一覧・検索・表示だけで、書かない。ボードの rules・phases・risks の画面は、拡張が直接書くまま。
 
 **表と互換。** `user_only.py` の表が `handoff` の操作と `--handoff` を持つ。テンプレート専用の書き込みのオプション（`--import` など）は実行ファイルが受け付けず、
-表では `legacy`（古い実行ファイルが手元に残るときのために、hook は止め続ける）。互換の版（`compat`）は 13 のまま。`--version --json` の `features` に `handoff` を持つ。
+表では `legacy`（古い実行ファイルが手元に残るときのために、hook は止め続ける）。互換の版（`compat`）は 15 のまま。`--version --json` の `features` に `handoff` を持つ。
 
 #### `--draft` と `ready`
 

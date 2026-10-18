@@ -37,7 +37,7 @@ from ..tickets import (
     flow_render,
     flow_shape,
     flow_text,
-    syncstate,
+    standing,
     ticket_model,
 )
 from . import (
@@ -515,14 +515,15 @@ def family_check(
 ) -> list[Problem]:
     """取り込みの後の検査（`ccnavi sync check <P> [<リポジトリ>]`）。
 
-    この親子のチケットの承認済みチケットを取り込みのあとに判定し直し、正とする側の検査（親のワークツリーの外のチケット・
-    決まらない）とあわせて、止める理由（error）を返す。レイヤーの食い違いは warn で返す。
-    error があれば sh が親子のチケットの取り込み状態を `blocked` にする。
-    `repo` は取り込み状態の名前（`self` かプロジェクト名）で、sh が渡す。
-    無ければ取り込み状態のあるリポジトリを全部探す。
+    この親子のチケットの承認済みチケットを取り込みのあとに判定し直し、
+    正とする側の検査（親のワークツリーの外のチケット・決まらない）とあわせて、
+    止める理由（error）を返す。手元のレイヤーが `origin/<統合先>` と違うことは warn で返す
+    （`origin/<統合先>` が手元に無ければ黙る）。何も書かない（error の扱いは sh が決める）。
+    `repo` は `self` かプロジェクト名で、sh が渡す。
+    無ければ同じ名前の親のワークツリーのあるリポジトリを全部探す。
     """
-    fams = syncstate.Families(conf, root)
-    project = None if repo is None else syncstate.project_of_key(repo)
+    fams = standing.Families(conf, root)
+    project = None if repo is None else tree.project_of_key(repo)
     st = fams.standing_any(family, project)
     raw = approval.read_raw(conf, root)
     copies, _ = approval.scan(conf, root, raw=raw)
@@ -530,7 +531,7 @@ def family_check(
     review, _ = approval.scan_review(conf, root, raw=raw)
 
     def ours(t: ticket_model.Ticket) -> bool:
-        return (t.parent or t.ticket) == family and syncstate.repo_key(t.project) == st.repo
+        return (t.parent or t.ticket) == family and tree.repo_key(t.project) == st.repo
 
     mine = [t for t in copies if ours(t)]
     index = approval_checks.by_id(copies)
@@ -550,7 +551,8 @@ def family_check(
     for t in review:
         if ours(t) and t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
-    where = f"(sync/{st.repo}/{family})"
-    if st.stop and not st.closed:
+    where = f"(family/{st.repo}/{family})"
+    if st.stop:
         problems.append(Problem(SEVERITY_ERROR, where, st.stop))
+    problems.extend(lint_layers.layer_drift(conf, root, tree.project_of_key(st.repo)))
     return problems

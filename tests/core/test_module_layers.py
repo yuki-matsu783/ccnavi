@@ -73,7 +73,7 @@ PACKAGES: tuple[tuple[str, str], ...] = (
     (
         "tickets",
         "チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、"
-        "承認・取り下げ・レビュー済みの判定のコア（core）、C1 の見分け、フェーズ、操作",
+        "承認・取り下げ・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、操作",
     ),
     ("hook", "hook の判定と、その文面・実行後の監視・イベント"),
     ("entry", "入口。CLI・診断・lint・提案・版"),
@@ -116,12 +116,14 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "最下段だけを読む。git の状態・ルール・動作モード・記録の 1 行と後始末・拒否の数え",
         frozenset(
             {
+                "hook.agentkind",
                 "infra.gitstate",
                 "infra.shellread",
                 "infra.shellread_cd",
                 "infra.modes",
                 "policy.rules",
                 "records.audit",
+                "records.busy",
                 "records.diaglog",
                 "records.failstreak",
                 "records.prune",
@@ -142,6 +144,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "policy.selfguard_targets",
                 "policy.selfguard_shell",
                 "tickets.archive",
+                "tickets.donecopy",
+                "tickets.legacy_sync",
                 "tickets.flow",
                 "tickets.flow_text",
                 "tickets.flow_shape",
@@ -149,7 +153,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.via",
                 "tickets.review_host",
                 "tickets.risk",
-                "tickets.syncstate",
+                "tickets.standing",
                 "tickets.ticket",
                 "tickets.ticket_fields",
                 "tickets.ticket_fold",
@@ -219,8 +223,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "判定と、チケット・レビューを動かす操作",
         frozenset(
             {
-                "tickets.c1",
-                "tickets.c1_merge",
+                "tickets.write_and_push",
+                "tickets.write_and_push_merge",
                 "tickets.core",
                 "tickets.core_approve",
                 "tickets.core_base",
@@ -228,6 +232,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.core_withdraw",
                 "hook.judge",
                 "tickets.next_id",
+                "tickets.propose",
                 "tickets.ops",
                 "tickets.ops_close",
                 "tickets.ops_plan",

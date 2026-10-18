@@ -34,7 +34,7 @@ from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
 from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
 from ccnavi.tickets import ticket as ticket_mod
-from tests import ROOT, c1flag, common_path, userform
+from tests import ROOT, common_path, userform, write_and_push_flag
 from tests.inproc import run_ccnavi
 from tests.ticketsample import RULES, plain_parent, record_merge, write_plain_phases
 
@@ -140,7 +140,7 @@ class TicketTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
-        args = self.as_c1(args)
+        args = self.as_write_and_push(args)
         return run_ccnavi(
             userform.place(
                 [
@@ -162,9 +162,10 @@ class TicketTest(unittest.TestCase):
             env=environment,
         )
 
-    def as_c1(self, args):
-        """sh を通さない呼び出しに、C1 の印を付ける（`tests/c1flag.py`）。"""
-        return c1flag.as_c1(self.root, self.state, self.parent_tree, args)
+    def as_write_and_push(self, args):
+        """sh を通さない呼び出しに、write-and-push
+        の印を付ける（`tests/write_and_push_flag.py`）。"""
+        return write_and_push_flag.as_write_and_push(self.root, self.state, self.parent_tree, args)
 
     def hook(
         self,
@@ -934,6 +935,7 @@ class TicketTest(unittest.TestCase):
             "env sh .ccnavi/scripts/ccnavi-ticket.sh start x",
             "command sh .ccnavi/scripts/ccnavi-ticket.sh start x",
             "/bin/sh .ccnavi/scripts/ccnavi-ticket.sh finish x",
+            "sh .ccnavi/scripts/ccnavi-ticket.sh propose x",
             "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh request --phase 1'",
         ):
             with self.subTest(command=command):
@@ -2489,8 +2491,9 @@ class TicketTest(unittest.TestCase):
     def test_user_entries_with_unreadable_arguments_are_denied(self):
         """2 段目の無いユーザの入口は、引数を読み切れなければ止める（ADR-0122）。
 
-        `ccnavi-sync.sh`（`--forget`）・`ccnavi-review.sh decide`（`--choices`）・実行ファイルの
-        `--yes` は端末を求めない。引数を変数・置換・glob で組み立てると表記の検査から外れる。
+        `ccnavi-review.sh decide`（`--choices`）・実行ファイルの`--yes` と
+        `worktree retire --abandon` は端末を求めない。
+        引数を変数・置換・glob で組み立てると表記の検査から外れる。
         """
         self.family()
         sync = ".ccnavi/scripts/ccnavi-sync.sh"
@@ -2506,20 +2509,19 @@ class TicketTest(unittest.TestCase):
             f"sh {review} decide 1 --cho`echo i`ces j --digest d",
             f'sh -c "sh {review} decide 1 --cho\\${{X}}ices j --digest d"',
             f"xargs -a args.txt sh {review} decide 1",
-            # --forget を変数・glob で組み立てる、前に置いたもので位置の表記から外す
-            f"F=--for; sh {sync} ${{F}}get P1",
-            f"sh {sync} --for${{X}}get P1",
-            f"sh {sync} --f* P1",
-            f"sh {sync} --?orget P1",
-            f"sh -x -e {sync} --for${{X}}get P1",
-            f"bash -c 'sh {sync} --for${{X}}get P1'",
-            f"env sh {sync} --for$(echo g)et P1",
-            f"printf '%s\\n' --forget P1 | xargs sh {sync}",
-            f"sh < /dev/null {sync} --forget P1",
-            f"busybox sh {sync} --forget P1",
-            f"sh -s --forget P1 < {sync}",
-            f"cat {sync} | sh -s --forget P1",
-            f"find . -name x -exec sh {sync} {{}} \\;",
+            # worktree retire --abandon を変数・glob で組み立てる
+            "A=--aban; ccnavi worktree retire ${A}don P1",
+            "ccnavi worktree retire --aban${X} P1",
+            "ccnavi worktree retire --a* P1",
+            "ccnavi worktree retire --?bandon P1",
+            "ccnavi worktree $V --abandon P1",
+            "ccnavi worktree re* --abandon P1",
+            "ccnavi worktree re${X} --abandon P1",
+            f"{launcher} worktree $V --abandon P1",
+            "env ccnavi worktree $V --abandon P1",
+            "bash -c 'ccnavi worktree $V --abandon P1'",
+            "printf '%s\\n' --abandon P1 | xargs ccnavi worktree retire",
+            "xargs -a args.txt ccnavi worktree",
             # 実行ファイルの --agree / --reviewed と --yes を組み立てる
             "ccnavi --agr${X}ee --y${X}es i1 --digest d",
             "ccnavi --agr*ee --y* i1 --digest d",
@@ -2546,14 +2548,18 @@ class TicketTest(unittest.TestCase):
             f"sh {review} decide 1",
             f"sh {review} decide 1 --preview --json",
             f'sh {review} request 1 --eli5 "$F"',
-            f"grep -n -- '--forget' {sync}",
-            f"echo sh {sync} --for${{X}}get",
-            "sh .ccnavi/scripts/ccnavi-git.sh log --grep 'ccnavi-sync.sh --forget'",
+            "grep -n -- '--abandon' src/ccnavi/tickets/retire.py",
+            "echo ccnavi worktree $V --abandon",
+            "ccnavi worktree drop P1",
+            "ccnavi worktree tidy P1 --phase 2",
+            "ccnavi sync retired",
+            "ccnavi sync migrate",
+            "sh .ccnavi/scripts/ccnavi-git.sh log --grep 'worktree retire --abandon'",
             "sh .ccnavi/scripts/ccnavi-git.sh log --grep ccnavi-sync.sh --oneline",
             "ccnavi --agree --preview --json",
             f"{launcher} --docs worktree",
             "ls /home/user | xargs grep -l ccnavi",
-            f'sh .ccnavi/scripts/ccnavi-git.sh commit -m "fix: {sync} --for${{X}}get"',
+            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "fix: worktree retire --aban${X}"',
         ):
             result = self.hook(
                 "PreToolUse",
@@ -2568,14 +2574,24 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command=f'sh {sync} "$P"',
+            command=f'sh {review} decide 3 "$C"',
             guard_ticket_approval="enable",
         )
         self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
         self.assertIn("そのまま書いて", self.reason(result))
+        # 放棄した親の記録を消す操作を組み立てうる形は、その操作を名指しして止める。
+        result = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="ccnavi worktree $V --abandon P1",
+            guard_ticket_approval="enable",
+        )
+        self.assertIn("worktree retire --abandon", self.reason(result))
+        self.assertNotIn("--forget", self.reason(result))
         # 保護そのものを切っていれば当てない。
         result = self.hook(
-            "PreToolUse", "Bash", self.parent_tree, command=f"sh {sync} --for${{X}}get P1"
+            "PreToolUse", "Bash", self.parent_tree, command="ccnavi worktree $V --abandon P1"
         )
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
 
@@ -2632,33 +2648,31 @@ class TicketTest(unittest.TestCase):
             )
             self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
         for command in (
-            f'echo "sh {sync} --forget i1" | sh',
+            'echo "ccnavi worktree retire --abandon i1" | sh',
             f"printf 'sh {review} decide 3 --choices x' | bash",
-            f'echo "sh {sync} --forget P" | sh -s',
-            f"cat {sync} | sh /dev/stdin --forget P",
+            'echo "ccnavi worktree retire --abandon P" | sh -s',
+            f"cat {launcher} | sh /dev/stdin worktree retire --abandon P",
             'echo "ccnavi --agree --yes i1 --digest d" | sh',
-            f"sh <<EOF\nsh {sync} --forget i1\nEOF",
-            f'sh <<< "sh {sync} --forget i1"',
+            "sh <<EOF\nccnavi worktree retire --abandon i1\nEOF",
+            'sh <<< "ccnavi worktree retire --abandon i1"',
             "bash <<< 'ccnavi --agree --yes i1'",
             "ccnavi --preview $X",
             "ccnavi $X --docs",
             "ccnavi -- --docs $X",
             "ccnavi $X --agree --preview",
-            f"sh {sync} $E --forget P",
+            "ccnavi worktree $E --abandon P",
             f"sh {review} decide 1 $X",
             # Python のツールの実行役（uv run・uvx）越しも入口として読む。
             "uv run ccnavi --agree 3 $Y",
             "uvx ccnavi --agree 3 $Y",
-            f"uv run sh {sync} --forget P",
+            "uv run ccnavi worktree $E --abandon P",
             # 二重引用と引用なしの展開は、sh 越しでも止める。
-            f'sh {sync} "$X"',
             f'sh {review} decide 3 "$C"',
-            f"sh -c 'sh {sync} $X'",
-            # 長いオプション・値を取るオプションを前に置いたシェルと、`env`・`command`
-            # 越しのシェルも
+            f"sh -c 'sh {review} decide 3 $X'",
+            # 長い旗・値を取る旗を前に置いたシェルと、`env`・`command` 越しのシェルも
             # 標準入力から読む。
             *(
-                f'echo "sh {sync} --forget i1" | {sh}'
+                f'echo "ccnavi worktree retire --abandon i1" | {sh}'
                 for sh in (
                     "bash --norc",
                     "bash --posix",
@@ -2699,7 +2713,7 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command=f'echo "sh {sync} --forget i1" | sh',
+            command='echo "ccnavi worktree retire --abandon i1" | sh',
             guard_ticket_approval="enable",
         )
         self.assertIn("標準入力から読むシェル", self.reason(result))

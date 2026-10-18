@@ -30,13 +30,13 @@ from ..records import audit, diaglog
 from ..tickets import (
     approval,
     branchfind,
-    c1,
-    c1_merge,
     core,
     review,
     skillsync,
     user_only,
     via,
+    write_and_push,
+    write_and_push_merge,
 )
 from . import (
     cli_args,
@@ -89,6 +89,25 @@ def _take_test_words(argv: list[str]) -> tuple[list[str], list[str] | None]:
     if len(words) < 2:
         return argv, None
     return [*argv[:at], *argv[at + 3 :]], words
+
+
+def _help_of_test(argv: list[str]) -> list[str]:
+    """`--test ... --help` を、`--help test`（test の節）の形にする。
+
+    `--test` は続く 2 語を取るので、`--test --help` は語が足りず argparse の誤りで落ち、
+    `--help` に届かない。`--help` があるときだけ、`--test` と続く語（旗でないもの）を外して
+    話題の語 `test` に置き換える。
+    """
+    end = argv.index("--") if "--" in argv else len(argv)
+    if "--test" not in argv[:end] or not {"-h", "--help"} & set(argv[:end]):
+        return argv
+    at = argv.index("--test")
+    words = []
+    for word in argv[at + 1 : at + 3]:
+        if word.startswith("-"):
+            break
+        words.append(word)
+    return [*argv[:at], *argv[at + 1 + len(words) :], "test"]
 
 
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
@@ -310,6 +329,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
     parser.add_argument("--phase", type=int, default=None)
+    # `worktree retire --abandon <親>`。放棄した親の片付けの記録を消す（ユーザが端末で打つ）。
+    parser.add_argument("--abandon", default=None, metavar="PARENT")
     parser.add_argument("--body-file", default="")
     parser.add_argument("--reason", default="")
     # `ticket new` の引数。題・計画の型（カンマ区切り）・issue の番号。
@@ -335,18 +356,21 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # ユーザの判断はフラグで受ける。
     parser.add_argument("--close-early", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
+    # `--help --all` が全文を出す（既定は話題の一覧）。
+    parser.add_argument("--all", action="store_true")
     # 版・組み立ての元のコミット・受け付けるフラグ・互換の版を言う。拡張と sh が起動のときに読む。
     parser.add_argument("--version", action="store_true")
     # この実行で書いた・消したパスを、state の置き場の下のファイルに 1 行 1 つで書き出す
-    # （fsio の記録層が記録する）。C1 の sh が渡し、一覧のパスだけをコミットする。
+    # （fsio の記録層が記録する）。write-and-push の sh が渡し、一覧のパスだけをコミットする。
     parser.add_argument("--record-writes", default="")
-    # 一覧の基点（C1 の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
+    # 一覧の基点（write-and-push の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
     # 置き場の外に書いたら error
     # （例外は `start` の中で configsync が写したミラーと、skillsync が写した工程スキルだけ）。
     parser.add_argument("--record-tree", default="")
     # 対話の decide の前半。選択とダイジェストをこのファイルに書くだけで、
     # 何も置かない（state の置き場の
-    # 下だけ）。ユーザが選ぶのを C1 のロックの外で済ませ、ロックを持ったままユーザを待たないため。
+    # 下だけ）。ユーザが選ぶのを write-and-push のロックの外で済ませ、
+    # ロックを持ったままユーザを待たないため。
     parser.add_argument("--choose-out", default="")
     # 受け入れの計画。decide の `--yes` と `--close-early` で、受け入れる指摘と返信の本文を
     # このファイルに書くだけで、何も置かない（state の置き場の下だけ）。sh がこれで返信と解決を
@@ -372,12 +396,17 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # `user handoff --yes` の board 経路（`--expect` と `--json` と組む）でも受け付ける。
     parser.add_argument("--via", default="")
     try:
-        rest, test_words = _take_test_words(_json_out_of_test(argv))
+        rest, test_words = _take_test_words(_json_out_of_test(_help_of_test(argv)))
         args = parser.parse_args(rest)
     except SystemExit:
         return EXIT_ERROR
     if test_words is not None and args.test is None:
         args.test = test_words
+    if args.help:
+        # 話題の一覧か節だけを出す。全文は `--all` で、読む量が多い。ヘルプは何も動かさないので、
+        # ユーザ専用のオプションと一緒でも（`--help --prune`）断らずに節を出す。
+        stderr.write(cli_args.help_text(args))
+        return EXIT_ERROR
     # ユーザ専用のオプションは、`user` の入口の外では断る。見るだけの形
     # （`--agree --preview` など）は通す。
     if entry is None:
@@ -385,8 +414,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if refused_here:
             stderr.write(f"ccnavi: {refused_here}\n")
             return EXIT_BLOCK
-    if args.help:
-        stderr.write(cli_usage.USAGE)
+    if args.all:
+        stderr.write("ccnavi: --all は --help と一緒にだけ指定できます（全文を出す）。\n")
         return EXIT_ERROR
     refused = _test_usage(parser, args)
     if refused:
@@ -424,7 +453,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         stderr.write(f"ccnavi: --via に渡せるのは {via.VIA_TERMINAL} か {via.VIA_BOARD}\n")
         return EXIT_ERROR
     # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
-    # --yes はボードの押した選択と、C1 の中の端末の decide（選ぶのを先に済ませた形）の両方が通る
+    # --yes はボードの押した選択と、write-and-push の中の端末の decide（選ぶのを先に済ませた形）
+    # の両方が通る
     if args.via == via.VIA_BOARD and not args.yes and not args.handoff:
         stderr.write(
             "ccnavi: --via board は --yes（ボードで押した選択）と一緒に指定してください。\n"
@@ -444,22 +474,25 @@ def _recorded_run(
 ) -> int:
     """`--record-writes <ファイル>` つきの 1 回。書いたパスを集め、終わったら書き出す。
 
-    書き出す先は、ワークスペースルートの既定の state の置き場（`logs/state`）の下の `c1/`
+    書き出す先は、ワークスペースルートの既定の state の置き場（`logs/state`）の下の
+    `write-and-push/`
     だけ。`--state` の上書きは見ない（上書きで置き場を動かせば、
     どこへでも書ける経路になる）。行き先・置き場・ルートは行き着く先（リンクを解いたパス、
-    大文字小文字をそろえたもの）で比べ、`c1/` までの途中にリンクがあれば断る。書き出しは
+    大文字小文字をそろえたもの）で比べ、`write-and-push/` までの途中にリンクがあれば断る。書き出しは
     同じディレクトリの一時ファイルから `os.replace` で置き換えるので、行き先にリンクが
     あってもその先は開かない（リンクの行き先は書き換えない。Windows でも同じ）。
 
     一覧の形は 1 行 1 つ、ワークスペースルートからの相対（区切りは "/"）。ルートの外と、
     別のドライブ（Windows）は絶対パスのまま。既定の state の置き場の下（リポジトリに入らない）と
-    一覧のファイル自身は載せない。上書きした state の置き場への書き込みは載る（C1 が
-    「置き場の外」として止める側）。置き場の外が入っていたら止めるのは C1 で、
+    一覧のファイル自身は載せない。上書きした state の置き場への書き込みは載る（write-and-push が
+    「置き場の外」として止める側）。置き場の外が入っていたら止めるのは write-and-push で、
     ここは集めて書くだけ。
 
-    終了コード: コマンドが失敗しても、そこまでに書いたパスで一覧を書く（C1 は失敗した回も
+    終了コード: コマンドが失敗しても、そこまでに書いたパスで一覧を書く（write-and-push
+    は失敗した回も
     戻すのに一覧を使う）。一覧を書けなければ、コマンドの結果に依らず 1 で終わる
-    （C1 はそれを「書いたものが分からない」として扱う）。行き先が断られたときはコマンドを
+    （write-and-push はそれを「書いたものが分からない」として扱う）。
+    行き先が断られたときはコマンドを
     走らせずに 1 で終わる。
     """
     wrapper = argparse.Namespace(**vars(args))
@@ -468,7 +501,7 @@ def _recorded_run(
     root = wrapper.root if wrapper.root is not None else default_root()
     real_root = cli_args._real(root)
     state = os.path.join(real_root, settings.DEFAULT_STATE)
-    place = os.path.join(state, "c1")
+    place = os.path.join(state, "write-and-push")
     given = os.path.abspath(args.record_writes)
     target = os.path.join(cli_args._real(os.path.dirname(given)), os.path.basename(given))
     refused = _record_place_problem(place, target, args.record_writes)
@@ -524,18 +557,17 @@ def _recorded_run(
         outside = _outside_places(root, args, base, reals)
         if outside:
             stderr.write(
-                "ccnavi: C1 がコミットするのは状態だけで、置き場の外に書き込みがあった（"
-                + ", ".join(outside)
-                + "）。コミットしない\n"
+                "ccnavi: write-and-push がコミットするのは状態だけで、"
+                "置き場の外に書き込みがあった（" + ", ".join(outside) + "）。コミットしない\n"
             )
             return code if code != EXIT_OK else EXIT_ERROR
     return code
 
 
 def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[str]) -> list[str]:
-    """一覧のうち、C1 の置き場（承認済み・レビュー待ち）の外のもの。
+    """一覧のうち、write-and-push の置き場（承認済み・レビュー待ち）の外のもの。
 
-    C1 がコミットするのは状態だけ。
+    write-and-push がコミットするのは状態だけ。
 
     例外は 2 つ。`ticket start` の中で configsync がミラーしたプロジェクトの
     `.ccnavi/config/common/`と skillsync が写した工程スキルの `skills/<工程>/`
@@ -550,6 +582,13 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
         base, (conf.tickets or settings.DEFAULT_TICKETS).replace("/", os.sep), "review"
     )
     places = [cli_args._real(approved), cli_args._real(review_dir)]
+    if list(args.command[:2]) == ["ticket", "propose"]:
+        # 提案を送る操作だけは、承認待ちの提案（todo/）と子のフローの下書き（flows/）も
+        # 置き場に数える。
+        tickets_dir = (conf.tickets or settings.DEFAULT_TICKETS).replace("/", os.sep)
+        places += [
+            cli_args._real(os.path.join(base, tickets_dir, name)) for name in ("todo", "flows")
+        ]
     starting = list(args.command[:2]) == ["ticket", "start"]
     readying = list(args.command[:2]) == ["review", "ready"]
     found = []
@@ -572,7 +611,8 @@ def _ready_removed_wip(real: str, base: str) -> bool:
     """`review ready` が消した途中の作業の置き場（`wip/`）の下のファイルか。
 
     `ready` が消すものを選ぶのと同じ判定（`review.in_wip`。大文字小文字と `\\` の区切りを
-    問わない）を、C1 のツリー（`base`）からの相対に当てる。通すのは、そのツリーの中で、今は無い
+    問わない）を、write-and-push のツリー（`base`）からの相対に当てる。通すのは、そのツリーの中で、
+    今は無い
     （消した）ものだけ。ツリーの外・`..` を含む相対・今も在るものは通さない。
     """
     if os.path.lexists(real) or not cli_args._inside(real, base) or cli_args._same(real, base):
@@ -590,7 +630,7 @@ def _ready_removed_wip(real: str, base: str) -> bool:
 def _record_place_problem(place: str, target: str, given: str) -> str:
     """書き出し先が `place` の下でない・途中にリンクがある理由。よければ空文字。"""
     if os.path.lexists(place) and os.path.islink(place):
-        return "c1 がシンボリックリンク"
+        return "write-and-push がシンボリックリンク"
     if not cli_args._inside(target, place) or cli_args._same(target, place):
         return f"{given} は置き場の外"
     if os.path.islink(target):
@@ -877,8 +917,14 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if cli_ops.sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
-    # 取り込みの後の検査（正とする側とレイヤーの食い違い）。
-    # error があれば sh が親子のチケットの取り込みを止める。
+    # 親を閉じた後の片付けの列挙元（`retire/<親>.json`）と、旧い取り込み状態の 1 回限りの移行。
+    # どちらもネットワークにも git にも触れず、チケット制御の有無に依らない。
+    if list(args.command) == ["sync", "retired"]:
+        return EXIT_OK if cli_ops.sync_retired(stdout, conf) == 0 else EXIT_ERROR
+    if list(args.command) == ["sync", "migrate"]:
+        return EXIT_OK if cli_ops.sync_migrate(stdout, conf, root) == 0 else EXIT_ERROR
+    # 取り込みの後の検査（正とする側と、手元と統合先のレイヤーの食い違い）。
+    # error があれば sh が親子のチケットの取り込みを止める。warn は表示するだけ。
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
         repo = args.command[3] if len(args.command) == 4 else None
         code = cli_ops.sync_check(stdout, stderr, root, conf, args.command[2], repo)
@@ -893,33 +939,37 @@ def _parsed(
             stdout, stderr, root, conf, args.cwd or os.getcwd(), *args.command[2:]
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
-    if len(args.command) == 6 and list(args.command[:2]) == ["sync", "closed"]:
-        code = sh_ask.sync_closed(stdout, stderr, root, conf, *args.command[2:])
-        return EXIT_OK if code == 0 else EXIT_ERROR
-    # C1（取り込み済みの親子のチケットの状態の操作を、取り込み・書く・コミット・push の 1 操作に
+    # write-and-push（取り込み済みの親子のチケットの状態の操作を、取り込み・書く・コミット・push の
+    # 1 操作に
     # する sh）が聞くこと。読むだけで、何も書かない。
-    if len(args.command) == 3 and list(args.command[:2]) == ["c1", "family"]:
+    if len(args.command) == 3 and list(args.command[:2]) == ["write-and-push", "family"]:
         if not cli_ops._FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
             stderr.write(
-                f"ccnavi: c1 family の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+                f"ccnavi: write-and-push family の {args.command[2]!r} "
+                "は有効な識別子の形式ではありません。\n"
             )
             return EXIT_ERROR
-        return EXIT_OK if c1.family(stdout, conf, root, args.command[2]) == 0 else EXIT_ERROR
-    if len(args.command) in (3, 4) and list(args.command[:2]) == ["c1", "sort"]:
+        return (
+            EXIT_OK
+            if write_and_push.family(stdout, conf, root, args.command[2]) == 0
+            else EXIT_ERROR
+        )
+    if len(args.command) in (3, 4) and list(args.command[:2]) == ["write-and-push", "sort"]:
         since = args.command[3] if len(args.command) == 4 else ""
         if not cli_ops._FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
             stderr.write(
-                f"ccnavi: c1 sort の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+                f"ccnavi: write-and-push sort の {args.command[2]!r} "
+                "は有効な識別子の形式ではありません。\n"
             )
             return EXIT_ERROR
         if since and not cli_args._revision_ok(since):
-            stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")
+            stderr.write(f"ccnavi: write-and-push sort の版 {since!r} は読めない\n")
             return EXIT_ERROR
-        code = c1.sort(stdout, stderr, conf, root, args.command[2], since)
+        code = write_and_push.sort(stdout, stderr, conf, root, args.command[2], since)
         return EXIT_OK if code == 0 else EXIT_ERROR
     if len(args.command) >= 3 and list(args.command[:2]) in (
-        ["c1", "merge"],
-        ["c1", "merge-blame"],
+        ["write-and-push", "merge"],
+        ["write-and-push", "merge-blame"],
     ):
         verb = args.command[1]
         if (
@@ -928,14 +978,19 @@ def _parsed(
             or (verb == "merge" and len(args.command) != 3)
         ):
             stderr.write(
-                f"ccnavi: c1 {verb} の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+                f"ccnavi: write-and-push {verb} の {args.command[2]!r} "
+                "は有効な識別子の形式ではありません。\n"
             )
             return EXIT_ERROR
         if verb == "merge":
             return (
-                EXIT_OK if c1_merge.plan(stdout, conf, root, args.command[2]) == 0 else EXIT_ERROR
+                EXIT_OK
+                if write_and_push_merge.plan(stdout, conf, root, args.command[2]) == 0
+                else EXIT_ERROR
             )
-        code = c1_merge.blame(stdout, conf, root, args.command[2], list(args.command[3:]))
+        code = write_and_push_merge.blame(
+            stdout, conf, root, args.command[2], list(args.command[3:])
+        )
         return EXIT_OK if code == 0 else EXIT_ERROR
 
     # issue・MR に紐づくブランチを探す。`ccnavi-branches.sh` が呼ぶ。
@@ -1090,7 +1145,7 @@ def _hook_steps(
         payload = hookio.decode(stdin)
     except hookio.NoPayload:
         # hook ではなく端末の前のユーザ。何も判定していないので何も記録しない。
-        stderr.write(cli_usage.USAGE)
+        stderr.write(cli_usage.OVERVIEW)
         return EXIT_ERROR
     except hookio.Unusable as exc:
         stderr.write(

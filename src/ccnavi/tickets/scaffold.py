@@ -57,7 +57,7 @@ from . import (
     phasetypes,
     plan_phases,
     plan_templates,
-    syncstate,
+    standing,
     template_use,
     ticket_ids,
     ticket_model,
@@ -285,18 +285,12 @@ def run(
             f"先に '{start_sh} --mr <MR の番号>'（MR が無ければ '--issue <issue の番号>'）で、"
             "親のブランチを直接チェックアウトした親のワークツリーを作り、その中から実行します"
         )
-    if not syncstate.head_branch(where.root, ident):
+    if not standing.head_branch(where.root, ident):
         return refuse(
             f"親のワークツリー（.claude/worktrees/{ident}）の HEAD のブランチ名の `/` を `-` に"
             f"置き換えたものが {ident} になっていない。親のブランチ名は MR のブランチ"
             "（`ccnavi-start.sh` が出す）で、ワークツリーはそのブランチを直接チェックアウトする"
         )
-    if mr is None:
-        # `ccnavi-start.sh` が取り込み状態（キャッシュ）に保存した MR の番号があれば使う
-        record = syncstate.family(conf.state, syncstate.repo_key(where.project), ident)
-        if record is not None and record.mr.isdigit() and int(record.mr) > 0:
-            mr = int(record.mr)
-
     types = phasetypes.load_types(conf, root, where.project)
     if types is None:
         return refuse(
@@ -416,6 +410,8 @@ def run(
         f"次: {path} に rationale と本文を書き、allow を実際の作業に合わせて絞る・足す。{tail}"
         f"書けたら '{launcher} --lint' で確かめ、"
         f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {ident}' で"
+        "提案を親のブランチへ送り、"
         "承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない\n"
     )
     stdout.write(

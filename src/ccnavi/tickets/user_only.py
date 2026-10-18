@@ -93,7 +93,6 @@ OPS: tuple[Op, ...] = (
     Op("close-early", "早めに閉じる", terminal="--close-early"),
     Op("decide", "残った指摘の対応方針（ボードの経路）"),
     Op("confirm-yes", "ボードで押した操作の確定（--yes）"),
-    Op("forget", "親子チケットの取り込み状態の削除"),
     Op("tidy", "親を閉じたときの片付け"),
     Op("clean-branch", "残った子のブランチの削除"),
     Op("handoff", "保護対象の下書きの取り込み", terminal="user handoff --yes"),
@@ -106,7 +105,6 @@ OPS: tuple[Op, ...] = (
 )
 
 _REVIEW = "ccnavi-review"
-_SYNC = "ccnavi-sync"
 _CLEAN = "ccnavi-clean"
 
 FLAGS: tuple[Flag, ...] = (
@@ -170,9 +168,11 @@ FLAGS: tuple[Flag, ...] = (
     # 単独では止めない（一覧・検索・表示は今もある）。前の形のボードの組み合わせの相手になるだけ。
     Flag("--templates", "template", cli=False, groups=("templates",)),
     Flag("--guard-ticket-approval", "guard-off", cli=False, groups=("guard",)),
+    # 放棄した親の片付けの記録を消す `worktree retire --abandon`。文字どおりの `worktree retire` は
+    # SUBS が止める。ここは、引数を読み切れない形の判定（phase_forms._abandon_word）が使う。
+    Flag("--abandon", "tidy", cli=False, groups=("abandon",)),
     Flag("--choices", "decide", where=_REVIEW, cli=False, groups=("choices",)),
     Flag("--digest", "decide", where=_REVIEW, cli=False, groups=("digest",)),
-    Flag("--forget", "forget", where=_SYNC, cli=False, script=True, groups=("forget",)),
     Flag("--branch", "clean-branch", where=_CLEAN, cli=False, script=True),
     Flag("--confirmed", "clean-branch", where=_CLEAN, cli=False, script=True),
 )
@@ -181,10 +181,6 @@ SCRIPTS: tuple[Script, ...] = (
     # `ccnavi-approve.sh` は `ccnavi-agree.sh` の前の名前。古いコピーが残っていても止める。
     Script(("ccnavi-agree", "ccnavi-approve"), "approve"),
     Script(("ccnavi-push-approved",), "push-approved"),
-    # 親子のチケットの削除せずに残した取り込み状態を消す、ユーザが打つスクリプト。消すと、
-    # 止めていた親子のチケットが取り込み状態の無いものとして今の手元の動きに戻るので、
-    # 打つのはユーザ。
-    Script((_SYNC,), "forget"),
     # ユーザの判断に使うスクリプト。中で `--close-early` を起こし、最後に承認の push を呼ぶ。
     Script((_REVIEW,), "close-early", subcommand="close-early"),
     # 親を閉じたときに残した子のブランチを消す入口（中身は実行ファイルの `worktree branch`）。
@@ -196,7 +192,17 @@ SCRIPTS: tuple[Script, ...] = (
 SUBS: tuple[Sub, ...] = (
     Sub(
         ("ticket", "review"),
-        ("start", "finish", "cancel", "record-risk", "prepare", "requested", "confirm", "ready"),
+        (
+            "start",
+            "finish",
+            "cancel",
+            "propose",
+            "record-risk",
+            "prepare",
+            "requested",
+            "confirm",
+            "ready",
+        ),
         "state-direct",
     ),
     # 親を閉じたときの片付け。ブランチを `branch -D` で消すので、エージェント（メインも
@@ -270,6 +276,7 @@ SUBAGENT_FORBIDDEN: tuple[str, ...] = (
     "start",
     "finish",
     "cancel",
+    "propose",
     "record-risk",
     "request",
     "confirm",

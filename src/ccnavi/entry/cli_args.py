@@ -22,6 +22,7 @@ from ..tickets import (
     ticket_ids,
     user_only,
 )
+from . import cli_usage
 
 # フラグで上書きする設定の欄と、空文字を「指定した」と読むかどうか。
 # 空文字を受ける欄は、既定が None のフラグで受け渡す。「記録しない」「state の置き場を持たない」を
@@ -208,6 +209,7 @@ _NOT_WITH_DOCS = (
     "--result",
     "--tickets",
     "--phase",
+    "--abandon",
     "--body-file",
     "--reason",
     "--note",
@@ -356,7 +358,8 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     return False
 
 
-# `c1 sort` の版。sha か `refs/remotes/origin/<親のブランチ>` の形だけ（git の引数として読まれる
+# `write-and-push sort` の版。sha か `refs/remotes/origin/<親のブランチ>` の形だけ（git
+# の引数として読まれる
 # 文字列を入れない）。親のブランチは識別子か、親チケットの `branch:` に書ける名前。
 _SHA = re.compile(r"[0-9a-f]{7,64}")
 _ORIGIN_REF = "refs/remotes/origin/"
@@ -378,3 +381,53 @@ def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
         log.write(record)
     except OSError as exc:
         stderr.write(f"ccnavi: ログを保存できませんでした：{exc}\n")
+
+
+# `--help` の話題を決める旗。先頭から順に見て、最初に当たったものを使う。
+_HELP_FLAGS = (
+    ("version", lambda a: a.version),
+    ("lint", lambda a: a.lint),
+    ("test", lambda a: a.test is not None or bool(a.test_expectations)),
+    ("explain", lambda a: a.explain),
+    ("docs", lambda a: a.docs),
+    ("templates", lambda a: a.templates),
+    ("logs", lambda a: a.prune or a.suggest),
+    ("agree", lambda a: a.agree or a.plan_order is not None or a.fill_phases),
+    (
+        "scripts",
+        lambda a: (
+            a.reviewed is not None
+            or a.close_early
+            or any(
+                getattr(a, flag)
+                for flag in (
+                    "record_writes",
+                    "placed_out",
+                    "choose_out",
+                    "accept_plan",
+                    "accept_check",
+                    "accept_done",
+                    "no_issue",
+                    "via",
+                )
+            )
+        ),
+    ),
+)
+
+
+def help_text(args: argparse.Namespace) -> str:
+    """`--help` の本文を返す。`--all` なら全文。話題の旗か語（`--help docs`・`ticket --help`）が
+    あればその節、なければ話題の一覧を返す。"""
+    if args.all:
+        return cli_usage.USAGE
+    for name, given in _HELP_FLAGS:
+        if given(args):
+            return cli_usage.topic(name)
+    if not args.command:
+        return cli_usage.OVERVIEW
+    word = cli_usage.TOPIC_WORDS.get(args.command[0])
+    if word:
+        return cli_usage.topic(word)
+    unknown = f"ccnavi: 話題 '{args.command[0]}' はありません。話題は次のとおりです。"
+    return f"{unknown}\n\n{cli_usage.OVERVIEW}"

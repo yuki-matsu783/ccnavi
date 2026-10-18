@@ -11,7 +11,7 @@
 # ccnavi-review.sh ready（外す経路は 1 本）。未解決の指摘は受け入れる。スレッドに返信を残して解決するのはここ
 # （実行ファイルはネットワークに出ない）で、置く前に済ませる。
 # 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push
-# （ccnavi-user-push-approved.sh <親>）で送る。ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、
+# （ccnavi-user-push-approved.sh <親>）で送る。ユーザの判断を溜めずにその場で送るためで、送れなければ次の write-and-push が止まり、
 # 承認の push の打ち直しを案内する。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。
@@ -67,24 +67,24 @@ review_host
 review_begin "$args_n"
 # 抜けるときに exe に渡した JSON を消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
 # rm が失敗しても、`set -e` がその失敗の値で抜けて元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
-trap 'review_exit=$?; ccnavi_c1_end; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
-trap 'ccnavi_c1_end; exit 130' INT TERM HUP
+trap 'review_exit=$?; ccnavi_wap_end; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
-review_c1
+review_wap
 
 # ユーザの判断をコミットして push する。取り込み済みの親子のチケットだけ、承認の push を <親> で呼ぶ。それ以外は今のまま何もしない。
 carry_human() {
-	ccnavi_c1_family "$1"
-	case "$ccnavi_c1_target" in
+	ccnavi_wap_family "$1"
+	case "$ccnavi_wap_target" in
 	yes)
-		sh "$ccnavi_c1_sh/ccnavi-user-push-approved.sh" "$ccnavi_c1_family_id" || {
+		sh "$ccnavi_wap_sh/ccnavi-user-push-approved.sh" "$ccnavi_wap_family_id" || {
 			printf '%s: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-user-push-approved.sh %s をユーザが再実行します（送るまで、この親子のチケットの状態の操作は止まる）\n' \
-				"$review_label" "$ccnavi_c1_sh" "$ccnavi_c1_family_id" >&2
+				"$review_label" "$ccnavi_wap_sh" "$ccnavi_wap_family_id" >&2
 			return 1
 		}
 		;;
 	stop)
-		ccnavi_c1_refuse
+		ccnavi_wap_refuse
 		return 1
 		;;
 	esac

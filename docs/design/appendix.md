@@ -28,7 +28,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_TICKET_FLOW_LOCKED` | 着手中の子のフロー（承認済みの領域の `flows/<子>.yml`。ハードリンクの別名も）に書こうとした。ルールより先に止める（9.3.1） |
 | `NOTICE_TICKET_FLOW_CHANGED` | 着手中の子のフローが、着手のときに記録したハッシュから変わっている。`SubagentStart` / `SubagentStop` が知らせるだけで、止めない（9.3.1） |
 | `DENY_RECORDS_PRUNE` | 記録と state を消す `ccnavi user prune`（旧い形の `ccnavi --prune`。`--preview` なしのもの）をシェルから打った。チケット制御に依らない |
-| `DENY_TICKET_APPROVAL_CLI` | 実行ファイルの `user` の入口（旧い形の承認用のオプション付きを含む）か `ccnavi-user-*.sh` を打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も。端末を求めない入口に、止める操作（`user agree` などと `--yes`・`ccnavi-user-forget.sh`・`ccnavi-user-decide.sh`・旧い形の `--forget`・`decide --choices`・`--guard-ticket-approval`）を組み立てうる読み切れない引数（変数・置換・glob・`xargs`）を渡した形と、標準入力から読むシェルに入口の名前を含む文字列を流す形も（9.5、9.18） |
+| `DENY_TICKET_APPROVAL_CLI` | 実行ファイルの `user` の入口（旧い形の承認用のオプション付きを含む）か `ccnavi-user-*.sh` を打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も。端末を求めない入口に、止める操作（`user agree` などと `--yes`・`ccnavi-user-decide.sh`・`worktree retire --abandon`・`decide --choices`・`--guard-ticket-approval`）を組み立てうる読み切れない引数（変数・置換・glob・`xargs`）を渡した形と、標準入力から読むシェルに入口の名前を含む文字列を流す形も（9.5、9.18） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
 | `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く、基準点より先に自分のコミットがある。同じ HEAD では 1 回だけ止めて `finish` か続ける理由を促す（9.6）。記録の `decision` は `nudge` |
 | `NUDGE_TICKET_REQUEST` | メインエージェントの `Stop` で、承認済みの親に作業中の子が残っているか、子が全部閉じたのにレビューを要するフェーズの `requested` が無い。同じ状態では 1 回だけ止めて、次の一手（`finish`・合流・ELI5・`request`）を促す（9.6）。`finish` の促しと重なった回は出ない。実行中のサブエージェントが居る間は出ない（9.12）。記録の `decision` は `nudge` |
@@ -43,7 +43,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `CORE_CONFIRM_MOVED` / `CORE_CONFIRM_RESULT_MISMATCH` / `CORE_CONFIRM_REVIEW_OPEN` | レビュー済みが通らなかった。依頼の後にユーザが見るものが動いた / 取得した結果が依頼したマージリクエストと照合できない / 変更要求のレビューか未解決のスレッドが残っている |
 | `CORE_WITHDRAW_NO_IDS` / `CORE_WITHDRAW_NOT_OPEN` / `CORE_WITHDRAW_OTHER_BRANCH` / `CORE_WITHDRAW_BLOCKED` / `CORE_WITHDRAW_FOLLOWUP` / `CORE_WITHDRAW_STARTED` | 承認の取り下げが通らなかった。識別子が無い / 作業中（`doing/`）に無い / 親のブランチの `doing/` に無い / 承認済みチケット自体が信頼できない / 続きの子で戻す提案が無い / 着手済み |
 | `CORE_WITHDRAW_HAS_CHILDREN` / `CORE_WITHDRAW_MARKERS` / `CORE_WITHDRAW_TODO_EXISTS` / `CORE_WITHDRAW_NO_PRIOR` / `CORE_WITHDRAW_CHANGED` | 承認の取り下げが通らなかった。子の承認済みチケットか子の提案がある / フェーズのマーカーがある（読めないときも） / 戻す先に同じ識別子の提案がある / 承認コミットの親に提案が無い / 承認のあとに中身が変わった |
-| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi --agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた提案ファイルのバイト列が今と違う（この2つは「内容が更新されました」で、最新を表示し直す） / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認・取り下げと同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`core_approve.refusal_code` で 1 か所で決める） |
+| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi user agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた提案ファイルのバイト列が今と違う（この2つは「内容が更新されました」で、最新を表示し直す） / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認・取り下げと同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`core_approve.refusal_code` で 1 か所で決める） |
 | `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書が付けないとする md（`README.md`・`CLAUDE.md` と、`.ccnavi/docs/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/handoff/`・`.claude/skills/yomiyasu/**`）には出さない。案内しても記録（`decisions.jsonl`）の `code` には残らない |
 | `NOTICE_PROPOSAL_PARENT_KEY` / `NOTICE_PROPOSAL_PARENT_FIELDS` | `PostToolUse`。Write で新しく作った提案（`wip/proposals/todo/` の直下の md）の書式の誤り。識別子が子の形でないのに `parent:` がある（`parent:` と `phase:` を消すよう言う）/ `parent:` の無い親に `mr:`・`plan:`・`phases:` が欠けている（欠けた欄を名指しし、`ccnavi ticket new` の雛形を勧める）。止めずに `additionalContext` で案内する。Edit・上書きでは出さない。案内しても記録の `code` には残らない |
 
@@ -107,6 +107,7 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | `shlex` は語の途中の `#` をどう読むか | コメントの始まりにする（`echo a#b c` → `echo a`）。bash は `a#b c` と出す |
 | `shlex` は行継続を知っているか | 知らない。`\` と改行をトークンの中に残す |
 | `SubagentStart` の `additionalContext` がサブエージェントに届くか | 未実測。届かなければ、サブエージェント内の最初の `PreToolUse` で渡す形に変える |
+| `SubagentStart` の payload に `tools` が来るか | 未実測。来れば編集するサブエージェントかの見分けに使い、来なければ `.claude/agents` の定義と組み込みの一覧で見分ける（`hook/agentkind.py`）。同じ作業ツリーの案内（9.12）も、上の行のとおり `additionalContext` が届くことを前提にする |
 | `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd` | 未実測。止めるかどうかは cwd で親を引くので、受け取る cwd によって止まるかどうかが分かれる |
 
 ### 入れ子のサブエージェント（Claude Code 2.1.282）
@@ -120,9 +121,9 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | 上限に達したサブエージェントに Agent ツールはあるか | 無い（実測）。遅延ツールの一覧にも出ない。起動を待ってハングすることはなく、普通に終わる |
 | 孫は Agent ツールを持てるか | 持てる（実測、上限 3） |
 | 孫の `PreToolUse` に `agent_id` が付くか | 付く（実測）。孫の Bash にも `DENY_SUBAGENT_TICKET_OP` が当たった |
-| 深さ 1 のサブエージェントに `agent_id` が届くか | 届く（実測。`logs/state/approved-<セッション>-<agent_id>.json` のファイル名で確かめた） |
+| 深さ 1 のサブエージェントに `agent_id` が届くか | 届く（実測。`logs/state/subagent-<セッション>-<agent_id>.running` のファイル名で確かめた） |
 | `SubagentStart` / `SubagentStop` は孫でも来るか | 子・孫それぞれで来る（実測） |
-| `logs/decisions.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`decisions.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/approved-<セッション>-<agent_id>.json` |
+| `logs/decisions.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`decisions.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/subagent-<セッション>-<agent_id>.running` |
 | サブエージェントの `cwd` | 文書: メインの `cwd`（`cd` は持ち越さない）。孫の `cwd` も親のワークツリーになる |
 | 親の `agent_id` や深さは hook の入力にあるか | 文書: 無い |
 | 起動側は子の終了を待つか | 文書: 非対話 / SDK では待たない |

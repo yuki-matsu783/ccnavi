@@ -9,14 +9,13 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes, runChildWorktreeAdd, runDecidePreview, runDecideYes, runTemplateDraft } from "./ccnavi.js";
-import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, templateDraftCardOf, todoParentsOf, unpreparedOf, workflowCardOf, type Board } from "./core/board.js";
+import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, templateDraftCardOf, todoParentsOf, workflowCardOf, type Board } from "./core/board.js";
 import { flowTicketOf } from "./core/flow-view.js";
 import { screens } from "./core/screens.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
 import {
   gitScriptCommand,
   PUSH_APPROVED_SCRIPT,
-  prepareCommand,
   pushApprovedCommand,
   type Launcher,
 } from "./core/commands.js";
@@ -419,16 +418,6 @@ function handleMessage(message: BoardMessage | undefined): void {
     case "promptOpen":
       dispatch(current, { kind: "handOver", how: message.type });
       return;
-    case "prepare": {
-      // 画面が言った親をそのまま信頼せず、いまのボードの未準備の一覧に在るものだけを扱う。
-      // MR の番号が控えに無ければ（null）ボタンは出ないが、念のためここでも断る
-      const target = current.board === undefined ? undefined : unpreparedOf(current.board, message.family, message.project);
-      if (target === undefined || target.mr === null) {
-        return;
-      }
-      runInTerminal(root, prepareCommand(root, target.mr, target.project));
-      return;
-    }
     case "decide":
       // 残った指摘の行き先を決めるオーバーレイを開く。sh が指摘を取ってきて、ユーザが指摘ごとに選ぶ。
       // ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める
@@ -717,7 +706,6 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   promptOpen: true,
   decide: true,
   decideConfirm: true,
-  prepare: true,
   reviewed: true,
   flow: true,
   editWorkflow: true,
@@ -768,10 +756,6 @@ function asMessage(message: unknown): BoardMessage | undefined {
         : undefined;
     case "open":
       return typeof m.filePath === "string" ? { type: "open", filePath: m.filePath } : undefined;
-    case "prepare":
-      return typeof m.family === "string" && typeof m.project === "string"
-        ? { type: "prepare", family: m.family, project: m.project }
-        : undefined;
     case "decideConfirm":
       // 値が文字列でない選択は捨てる。行き先が見せた指摘の全部に付いているかは遷移の側が見る
       return typeof m.choices === "object" &&

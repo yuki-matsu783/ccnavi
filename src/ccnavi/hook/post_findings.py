@@ -13,11 +13,11 @@ from ..infra import fsio, gitcmd, gitstate, tree
 from ..policy import rules
 from ..tickets import (
     archive,
-    c1,
     phase_scope,
     ticket_fields,
     ticket_model,
     ticket_places,
+    write_and_push,
 )
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -279,8 +279,8 @@ def _script_writes(
 
     * `ready` の退避（`tickets/archive.py`）が消したもの。閉じた親の `done/` の親子のチケット・
       `phases/<親>/`・`flows/` の削除で、ready のマーカーに載り、消えた中身が
-      ワークスペースの `logs/archive/` のコピーと同じもの（見分けは C1 と同じ
-      `c1.archived_removal`）。`root`（ワークスペースルート）が空なら外さない
+      ワークスペースの `logs/archive/` のコピーと同じもの（見分けは write-and-push と同じ
+      `write_and_push.archived_removal`）。`root`（ワークスペースルート）が空なら外さない
 
     範囲や親やフェーズや本文が変わったチケット、新しく現れた承認済みチケット、消えただけの
     チケットは外さず、今までどおり報告する。承認済みチケットの frontmatter はそのワークツリーの
@@ -636,7 +636,8 @@ def _archived_removals(
     where: tree.Tree,
     root: str,
 ) -> set[str]:
-    """`ready` の退避が消したと読める削除の実パス（`c1.archived_removal`。ready のマーカーに載り、
+    """`ready` の退避が消したと読める削除の実パス（`write_and_push.archived_removal`。ready
+    のマーカーに載り、
     中身が退避したコピーと同じもの）。"""
     if not root or not approved_rel:
         return set()
@@ -655,7 +656,7 @@ def _archived_removals(
         if not readable or before is None:
             continue
         inside = rel[len(approved) + 1 :]
-        if c1.archived_removal(inside, None, before, ready, root, where.project):
+        if write_and_push.archived_removal(inside, None, before, ready, root, where.project):
             out.add(change.full)
     return out
 

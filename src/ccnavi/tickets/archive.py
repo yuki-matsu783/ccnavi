@@ -2,7 +2,8 @@
 
 `ccnavi-review.sh ready` が Draft を外す直前に、親のツリーの承認済みの領域から、閉じた親
 （`done/` に在る親。今回の親と、統合先にたまっていた過去の親）のファイルを手元の退避の置き場へ移す。
-移すのは次の 4 つで、親のツリーの git の上では削除になる。削除は C1 がコミットして push してから
+移すのは次の 4 つで、親のツリーの git の上では削除になる。削除は write-and-push がコミットして push
+してから
 Draft を外すので、squash でマージすると既定のブランチにはチケットが残らない。
 
 - `done/` の親と子のチケット
@@ -11,7 +12,7 @@ Draft を外すので、squash でマージすると既定のブランチには�
 - `flows/` の子のフロー
 
 置き場はワークスペースルートの `logs/archive/<リポジトリ>/` で、`<リポジトリ>` は
-ワークスペース自身なら `self`、プロジェクトならその名前（取り込み状態と同じ分け方）。
+ワークスペース自身なら `self`、プロジェクトならその名前（`tree.repo_key`）。
 その下は承認済みの領域と同じ構成
 （`done/<識別子>.md`・`phases/<親>/...`・`flows/<子>.yml`）にする。
 `logs/` は git が追跡しないので、退避は手元の機械にだけ残る。
@@ -24,7 +25,8 @@ Draft を外すので、squash でマージすると既定のブランチには�
 - `ready` の途中の打ち直しで、前の回が移し残したものを拾う（`plan`）
 - ボードの表示と、親のワークツリーの見分け（`ccnavi_parent_tree`。`ready` から
   親のワークツリーを片付けるまでの間）
-- C1 の見分けと実行後チェック。ready のマーカー（`ready/<親>.json`）に載っている削除だけを
+- write-and-push の見分けと実行後チェック。ready のマーカー（`ready/<親>.json`）
+に載っている削除だけを
   ccnavi の書き込みと読む
 
 退避の置き場は手元にしか無いので、別の機械ではこれらに使えない（ユーザが受け入れた）。
@@ -42,8 +44,8 @@ import re
 import stat
 from dataclasses import dataclass, field
 
-from ..infra import fsio, gitcmd, pathcase
-from . import syncstate, ticket_ids, ticket_model
+from ..infra import fsio, gitcmd, pathcase, tree
+from . import donecopy, ticket_ids, ticket_model
 from . import ticket as ticket_mod
 
 # ワークスペースルートからの退避の置き場。`logs/` は .gitignore に入っている。
@@ -64,7 +66,7 @@ def top(root: str) -> str:
 
 def base_dir(root: str, project: str) -> str:
     """そのリポジトリの退避の置き場（承認済みの領域と同じ構成を持つ）。"""
-    return os.path.join(top(root), syncstate.repo_key(project))
+    return os.path.join(top(root), tree.repo_key(project))
 
 
 def is_archived_path(root: str, path: str) -> bool:
@@ -119,7 +121,7 @@ def _done_dir(root: str, repo: str) -> str:
 
 def ids(root: str, project: str | None = None) -> set[str]:
     """退避の `done/` にある識別子（ファイル名から）。`project` が None なら全リポジトリ。"""
-    repos = _repo_names(root) if project is None else [syncstate.repo_key(project)]
+    repos = _repo_names(root) if project is None else [tree.repo_key(project)]
     out: set[str] = set()
     for repo in repos:
         directory = _done_dir(root, repo)
@@ -138,7 +140,7 @@ def find(root: str, ident: str, project: str | None = None) -> list[ticket_model
     if not ticket_ids.is_valid_id(ident):
         return []
     out = []
-    repos = _repo_names(root) if project is None else [syncstate.repo_key(project)]
+    repos = _repo_names(root) if project is None else [tree.repo_key(project)]
     for repo in repos:
         directory = _done_dir(root, repo)
         if not directory:
@@ -180,20 +182,20 @@ def _load(path: str, ident: str, repo: str) -> ticket_model.Ticket | None:
     if t is None or t.ticket != ident:
         return None
     t.state = ticket_model.CANCELLED if t.cancelled_at else ticket_model.DONE
-    t.project = syncstate.project_of_key(repo)
+    t.project = tree.project_of_key(repo)
     t.tree, t.tree_root = "", ""
     return t
 
 
 def archived_parent(root: str, project: str, ident: str) -> ticket_model.Ticket | None:
     """退避にある親（識別子が同じで、子でない）。無ければ None。"""
-    directory = _done_dir(root, syncstate.repo_key(project))
+    directory = _done_dir(root, tree.repo_key(project))
     if not directory:
         return None
     path = os.path.join(directory, f"{ident}.md")
     if not _regular(path):
         return None
-    t = _load(path, ident, syncstate.repo_key(project))
+    t = _load(path, ident, tree.repo_key(project))
     return t if t is not None and not t.parent else None
 
 
@@ -218,31 +220,39 @@ def _regular_md(directory: str) -> list[str]:
     ]
 
 
-def _fields(data: bytes | None) -> syncstate.DoneCopy | None:
+def _fields(data: bytes | None) -> donecopy.DoneCopy | None:
     """チケットの識別子・親・着手と取り消しの欄（チケットとしての検査は掛けない）。"""
     if data is None:
         return None
     try:
-        return syncstate._copy_fields(data.decode("utf-8"))
+        return donecopy.copy_fields(data.decode("utf-8"))
     except UnicodeDecodeError:
         return None
 
 
-def archived_fields(root: str, project: str, ident: str) -> syncstate.DoneCopy | None:
+def archived_name(root: str, project: str, ident: str) -> str | None:
+    """退避の `done/` にある、その識別子のファイルの実際の綴り（幹）。無ければ None。
+
+    大文字小文字だけが違う識別子も同じものとして引く。
+    """
+    if not ticket_ids.is_valid_id(ident):
+        return None
+    if archived_bytes(root, project, f"{ticket_model.DONE}/{ident}.md") is not None:
+        return ident
+    directory = _done_dir(root, tree.repo_key(project))
+    folded = [i for i in (_regular_md(directory) if directory else []) if same_id(i, ident)]
+    return folded[0] if folded else None
+
+
+def archived_fields(root: str, project: str, ident: str) -> donecopy.DoneCopy | None:
     """退避の `done/<識別子>.md` の識別子・親・着手と取り消しの欄。無い・読めない・リンクなら None。
 
     大文字小文字だけが違う識別子も同じものとして引く（区別しないファイルシステムでは、ブランチと
     ワークツリーの名前がぶつかるため。使い回しの検査を緩めない向き）。
     """
-    if not ticket_ids.is_valid_id(ident):
+    name = archived_name(root, project, ident)
+    if name is None:
         return None
-    name = ident
-    if archived_bytes(root, project, f"{ticket_model.DONE}/{ident}.md") is None:
-        directory = _done_dir(root, syncstate.repo_key(project))
-        folded = [i for i in (_regular_md(directory) if directory else []) if same_id(i, ident)]
-        if not folded:
-            return None
-        name = folded[0]
     copy = _fields(archived_bytes(root, project, f"{ticket_model.DONE}/{name}.md"))
     # 区別しないファイルシステムでは、`I0001.md` で `i0001.md` が直に読める（folded を通らない）。
     # 区別するファイルシステムと同じ答えにするため、ここも大文字小文字を問わず突き合わせる。
@@ -271,7 +281,7 @@ class Plan:
     files: list[str] = field(default_factory=list)
 
 
-def _done_copies(approved_dir: str) -> dict[str, syncstate.DoneCopy]:
+def _done_copies(approved_dir: str) -> dict[str, donecopy.DoneCopy]:
     """`done/` のふつうのファイルの、識別子 → 欄。読めない・名前と違うものは除く。"""
     directory = os.path.join(approved_dir, ticket_model.DONE)
     out = {}
@@ -290,7 +300,7 @@ def closed_parents(approved_dir: str) -> list[str]:
 def archived_parents(root: str, project: str) -> list[str]:
     """手元の退避の `done/` に在る親（`parent:` を持たないチケット）。"""
     out = []
-    directory = _done_dir(root, syncstate.repo_key(project))
+    directory = _done_dir(root, tree.repo_key(project))
     for ident in _regular_md(directory) if directory else []:
         copy = archived_fields(root, project, ident)
         if copy is not None and not copy.parent:
@@ -321,7 +331,7 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
                 family.add(p)
     children = {i for i, copy in done.items() if copy.parent in family}
     if root:
-        directory = _done_dir(root, syncstate.repo_key(project))
+        directory = _done_dir(root, tree.repo_key(project))
         for ident in _regular_md(directory) if directory else []:
             held = archived_fields(root, project, ident)
             if held is not None and held.parent in family:
@@ -408,7 +418,7 @@ def archived_bytes(root: str, project: str, rel: str) -> bytes | None:
     """退避にあるファイルの中身。無い・読めない・途中（`logs` を含む）にリンクがあれば None。"""
     if any(p in ("", ".", "..") for p in rel.split("/")):
         return None
-    parts = (*ARCHIVE_DIR.split(os.sep), syncstate.repo_key(project), *rel.split("/"))
+    parts = (*ARCHIVE_DIR.split(os.sep), tree.repo_key(project), *rel.split("/"))
     if not root or _linked(root, parts) is not False:
         return None
     path = os.path.join(root, *parts)
@@ -424,7 +434,8 @@ def archived_bytes(root: str, project: str, rel: str) -> bytes | None:
 
 # ---- ready が退避したマーカー（どの親のワークツリーから、どのファイルを移したか）
 #
-# C1 の見分けと実行後チェックは、ready の流れで消したものだけを ccnavi の書き込みとして外す。
+# write-and-push の見分けと実行後チェックは、ready の流れで消したものだけを ccnavi
+# の書き込みとして外す。
 # 「退避に同じ中身がある」だけで外すと、ready を経ない削除も気づかないうちにコミットされる。
 # ready のマーカーは退避の置き場の `ready/<親>.json` で、`logs/archive/` は記録の保護が
 # エージェントの書き込みを止める。
@@ -484,7 +495,7 @@ def ready_files(root: str, project: str, tree_root: str, head: str) -> set[str]:
     """
     if not root or not head:
         return set()
-    if _linked(root, (*ARCHIVE_DIR.split(os.sep), syncstate.repo_key(project), READY_DIR)):
+    if _linked(root, (*ARCHIVE_DIR.split(os.sep), tree.repo_key(project), READY_DIR)):
         return set()
     key = _tree_key(tree_root)
     out: set[str] = set()
@@ -537,17 +548,18 @@ def move(
     """`todo` のファイルを退避へ移す。移した相対パスのリストと、止まった理由（無ければ空）。
 
     1 本ずつ、退避の側へ一時ファイルから書いて読み戻して確かめ、それから元を消す（元の消去は
-    fsio を通すので、C1 の一覧に載る）。退避の側の書き込みは一覧に載せない（`logs/` は
+    fsio を通すので、write-and-push の一覧に載る）。退避の側の書き込みは一覧に載せない（`logs/` は
     リポジトリに入らない）。退避の置き場の途中（`logs` から行き先のディレクトリまで）にリンクが
     あれば書かずに止める。
 
     行き先にコピーが既に在るとき、ツリーの中身をコピーしたものと読めれば（前の回の残り）コピーせずに元だけ
     消す。違えば、チケット（`done/`）なら上書きせずに止め（閉じた記録を書き換えない）、マーカー・
-    旧版の events/・フローなら今の中身で置き換える（push が通らずに C1 が戻した後の打ち直し）。
+    旧版の events/・フローなら今の中身で置き換える（push が通らずに write-and-push
+    が戻した後の打ち直し）。
 
     `ready_parent` と `tree_root` を渡せば、消す前に ready のマーカー（`ready/<親>.json`）へ移す
     ファイルを足す。途中で止まっても、そこまでに移した分は戻さない（元は git に残っていて、
-    C1 が戻す）。
+    write-and-push が戻す）。
     """
     base = base_dir(root, project)
     if _linked(root, tuple(os.path.relpath(base, root).split(os.sep))):
@@ -590,7 +602,7 @@ def move(
 
 def _safe_dir(root: str, project: str, rel: str) -> str:
     """行き先のディレクトリを、ルートから 1 段ずつ確かめながら作る。リンクがあれば理由を返す。"""
-    parts = [*ARCHIVE_DIR.split(os.sep), syncstate.repo_key(project), *rel.split("/")[:-1]]
+    parts = [*ARCHIVE_DIR.split(os.sep), tree.repo_key(project), *rel.split("/")[:-1]]
     path = root
     for part in parts:
         path = os.path.join(path, part)
@@ -616,7 +628,8 @@ def _safe_dir(root: str, project: str, rel: str) -> str:
 def _write(root: str, project: str, rel: str, data: bytes) -> str:
     """退避の側の 1 本を書く。同じディレクトリの一時ファイルから os.replace し、読み戻して確かめる。
 
-    C1 の一覧には載せない（リポジトリの外）。途中にリンクがあれば書かない。書けなかったときは
+    write-and-push の一覧には載せない（リポジトリの外）。途中にリンクがあれば書かない。
+    書けなかったときは
     理由を返す（一時ファイルは消す。半端なファイルを行き先に残さない）。
     """
     if any(p in ("", ".", "..") for p in rel.split("/")):

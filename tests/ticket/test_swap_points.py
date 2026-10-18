@@ -29,7 +29,6 @@ import contextlib
 import io
 import json
 import os
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -190,28 +189,7 @@ class CoreHarness(PhaseHarness):
             },
             **extra,
         }
-        if op != "confirm":
-            # レビュー済みは手元の CLI の confirm と比べる。
-            # 取り込み状態があると手元は C1 の対象の親子のチケットとして
-            # sh を通さない書き込みを断るので、取り込み状態は
-            # Chrome の側だけに組む。
-            self.mirror_records(chrome, request)
         return request
-
-    def mirror_records(self, chrome, request):
-        """Chrome の入口が仮のツリーに組む取り込み状態相当を、手元の state の置き場にも書く。
-
-        手元も同じ取り込み状態で判定する（取り込み済みの親子のチケットとして読む）ので、画面の本文とダイジェスト（判定が読んだ中身。
-        取り込み状態を含む）が Chrome と同じになる。
-        """
-        snap = request["snapshot"]
-        place = _place_of(chrome)
-        closure = chrome._closure(snap, place, request["family"])
-        shutil.rmtree(os.path.join(self.state, "sync"), ignore_errors=True)
-        for rel, text in chrome.records(
-            snap, place, closure["families"], closure["idents"]
-        ).items():
-            write(os.path.join(self.state, *rel.split("/")), text)
 
     def ask_chrome(self, request):
         root = os.path.join(self.root, "memfs")
@@ -821,10 +799,8 @@ class CoreChromeTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.commit_parent()
         # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの承認済みチケットを読む
-        # （取り込み状態の無い親子のチケット）ので、残すと手元だけが子のツリーの古い承認済み
-        # チケットを読み、判定が読んだ中身（read_set）
-        # で作るダイジェストが Chrome（統合先と P だけを読む）と
-        # 食い違う。
+        # ので、残すと手元だけが子のツリーの古い承認済みチケットを読み、判定が読んだ中身
+        # （read_set）で作るダイジェストが Chrome（統合先と P だけを読む）と食い違う。
         git(
             self.root,
             "worktree",
@@ -1508,7 +1484,7 @@ class RecordWritesTest(CoreHarness):
     """`--record-writes`: この実行で書いたパスの一覧が、git status の変化と一致する。"""
 
     def place(self, root=None):
-        return os.path.join(root or self.root, "logs", "state", "c1")
+        return os.path.join(root or self.root, "logs", "state", "write-and-push")
 
     def record(self, *args, stdin="", target=None):
         target = target or os.path.join(self.place(), "self", "i0001.t.writes")
@@ -1560,7 +1536,8 @@ class RecordWritesTest(CoreHarness):
         self.assertTrue(listed)
 
     def test_a_failed_command_still_writes_its_list(self):
-        """コマンドが失敗しても一覧は書く（C1 が戻すのに使う）。終了コードはコマンドのもの。"""
+        """コマンドが失敗しても一覧は書く（write-and-push が戻すのに使う）。
+        終了コードはコマンドのもの。"""
         result, listed = self.record("ticket", "start", "nope")
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(os.path.exists(os.path.join(self.place(), "self", "i0001.t.writes")))
@@ -1589,10 +1566,10 @@ class RecordWritesTest(CoreHarness):
         self.assertFalse(os.path.exists(outside))
         # `--state` で置き場を動かしても、`CCNAVI_STATE` を入れても、書き出し先は動かない。
         moved = os.path.join(self.root, "wip")
-        self.refused(os.path.join(moved, "c1", "list.txt"), "--state", moved)
+        self.refused(os.path.join(moved, "write-and-push", "list.txt"), "--state", moved)
         with mock.patch.dict(os.environ, {"CCNAVI_STATE": moved}):
-            self.refused(os.path.join(moved, "c1", "list.txt"))
-        self.assertFalse(os.path.exists(os.path.join(moved, "c1")))
+            self.refused(os.path.join(moved, "write-and-push", "list.txt"))
+        self.assertFalse(os.path.exists(os.path.join(moved, "write-and-push")))
 
     @requires_symlink
     def test_links_under_the_place_are_not_followed(self):
@@ -1619,7 +1596,7 @@ class RecordWritesTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
-        target = os.path.join(linked, "logs", "state", "c1", "self", "l.writes")
+        target = os.path.join(linked, "logs", "state", "write-and-push", "self", "l.writes")
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         from tests.inproc import run_ccnavi
@@ -1664,7 +1641,7 @@ class RecordWritesTest(CoreHarness):
         # 素の書き込みを許す所と理由。
         allowed = {
             # 実行後チェックが範囲の外の変更を脇へ退ける（`gitstate.restore`）。状態の操作では
-            # なく、C1 の書いたパスの一覧に載せるものでもない。
+            # なく、write-and-push の書いたパスの一覧に載せるものでもない。
             ("gitstate", "shutil.move(source, target)"),
         }
         names = ("tickets.approval", "tickets.agree", "tickets.via", "tickets.configsync")

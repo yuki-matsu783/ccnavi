@@ -7,7 +7,7 @@ keywords: [predecessors, 先行, 依存, チケット, 承認, done, 検証]
 ---
 # ADR-0088: 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ
 
-状態: 採用（続きの子の目印 `followup_of` の置き場は ADR-0104 が改める。本文の `--reviewed --chat` は当時の記述で、ADR-0132 が廃止した）
+状態: 採用（続きの子の目印 `followup_of` の置き場は ADR-0104 が改める。本文の `--reviewed --chat` は当時の記述で、ADR-0132 が廃止した。追記: 閉じた別の親子の子を先行に持つと、どの置き場にも無いので `PRED_MISSING` になる。取り込み状態の `closed` で満たす道は、ADR-0142 が廃止した）
 
 ## 状況
 

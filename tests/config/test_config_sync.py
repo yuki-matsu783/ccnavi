@@ -123,8 +123,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
         marks = self.approved_path("phases", "i0001", "config-sync.json", project="lib")
         self.assertFalse(os.path.exists(marks))
 
-    def test_the_start_c1_carries_the_mirror(self):
-        """C1 の書いたパスの一覧（基点は親のワークツリー）で、ミラーの書き込みは外でも通す。"""
+    def test_the_start_write_and_push_carries_the_mirror(self):
+        """write-and-push の書いたパスの一覧（基点は親のワークツリー）で、
+        ミラーの書き込みは外でも通す。"""
         self.add_script()
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         text = ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE)
@@ -134,11 +135,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        write(
-            os.path.join(self.state, "sync", "lib", "families", "i0001"),
-            "remote origin\nbranch i0001\nsha 0\nfetched_at 1\nstate present\nreason \n",
-        )
-        target = os.path.join(self.ws, "logs", "state", "c1", "lib", "i0001.t.writes")
+        target = os.path.join(self.ws, "logs", "state", "write-and-push", "lib", "i0001.t.writes")
         started = self.ccnavi(
             "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"
         )

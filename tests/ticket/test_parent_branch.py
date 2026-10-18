@@ -10,7 +10,7 @@
 4. 識別子が大文字小文字だけ違う親は承認しない
 5. lint: 親のワークツリーの HEAD を変換した識別子がフォルダ名と合わなければ warn。既存のブランチを
    採用した親（親のワークツリーが在り、HEAD が合う）には名前の形式の warn を出さない
-6. `c1 family` の `branch` は親のワークツリーの HEAD から読む。読めない・合わないときは
+6. `write-and-push family` の `branch` は親のワークツリーの HEAD から読む。読めない・合わないときは
    `branch_refused`
 7. Chrome の入口: ブランチ名を変換した識別子の親チケットがそのブランチの上にあれば親子のチケットで、
    書くものはそのブランチだけ。同じ識別子になる別のブランチに親チケットがあれば、先行の親子のチケット
@@ -271,20 +271,20 @@ class ParentBranchTest(unittest.TestCase):
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertNotIn(f"{ident}: 親の識別子は", lint.stdout)
 
-    def test_c1_family_reads_the_branch_from_head(self):
+    def test_write_and_push_family_reads_the_branch_from_head(self):
         self.parent_tree()
         self.propose()
         self.approve()
-        done = self.ccnavi("c1", "family", PARENT)
+        done = self.ccnavi("write-and-push", "family", PARENT)
         self.assertIn(f"branch {BRANCH}\n", done.stdout)
 
-    def test_c1_family_refuses_without_a_matching_head(self):
-        done = self.ccnavi("c1", "family", "feature-99-none")
+    def test_write_and_push_family_refuses_without_a_matching_head(self):
+        done = self.ccnavi("write-and-push", "family", "feature-99-none")
         self.assertIn("branch_refused ", done.stdout)
         self.assertNotIn("\nbranch ", done.stdout)
         self.parent_tree()
         git(self.tree, "checkout", "-q", "-b", "elsewhere")
-        done = self.ccnavi("c1", "family", PARENT)
+        done = self.ccnavi("write-and-push", "family", PARENT)
         self.assertIn("branch_refused ", done.stdout)
         self.assertNotIn("\nbranch ", done.stdout)
 

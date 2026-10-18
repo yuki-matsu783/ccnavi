@@ -16,8 +16,8 @@
 #   返信か解決ができなければ、何も置かずに止まる）
 # → issue に回す分があればここが issue を作り、決めた内容をコメントに書き出す
 #
-# 取り込み済みの親子のチケットでは、置く呼び出しを C1 で回す（ccnavi-common-c1.sh）。端末で選ぶ形は、選ぶのを
-# C1 の外で先に済ませる（ロックを持ったままユーザを待たない）。
+# 取り込み済みの親子のチケットでは、置く呼び出しを write-and-push で回す（ccnavi-common-write-and-push.sh）。端末で選ぶ形は、選ぶのを
+# write-and-push の外で先に済ませる（ロックを持ったままユーザを待たない）。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。
 # 終了コード: 0 成功 / 1 前提の未充足（置けなかった） / 2 引数か環境の誤り
@@ -134,10 +134,10 @@ post_decision() {
 review_begin "$args_n"
 # 抜けるときに exe に渡した JSON を消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
 # rm が失敗しても、`set -e` がその失敗の値で抜けて元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
-trap 'review_exit=$?; ccnavi_c1_end; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
-trap 'ccnavi_c1_end; exit 130' INT TERM HUP
+trap 'review_exit=$?; ccnavi_wap_end; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
-review_c1
+review_wap
 
 # マーカーに残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
 # ロックを取る前に引く。引けなければ渡さず、マーカーは前と同じ。
@@ -151,23 +151,23 @@ if exe_knows --actor && exe_knows --via; then
 		decide_who="--actor=$decide_actor --via=$decide_via"
 	fi
 fi
-# 端末で選ぶ形は、選ぶのを C1 の外で先に済ませる（ロックを持ったままユーザを待たない）ので、ここでは始めない。
-[ -z "$choices" ] || c1_start "$family"
+# 端末で選ぶ形は、選ぶのを write-and-push の外で先に済ませる（ロックを持ったままユーザを待たない）ので、ここでは始めない。
+[ -z "$choices" ] || wap_start "$family"
 fetch_all >"$result"
 if [ -n "$choices" ]; then
 	# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
 	tell_skew
 	# 受け入れる指摘（対応しない・issue に回す）には、置く前に返信を残して解決する。できなければここで止める。
 	accept_before_place "$choices" "$digest"
-	ccnavi_c1_capture="$state/review-decide-$$.out"
+	ccnavi_wap_capture="$state/review-decide-$$.out"
 	decide_rc=0
 	# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-	c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
+	wap_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
 		user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 		decide_rc=$?
-	out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
-	rm -f "$ccnavi_c1_capture"
-	ccnavi_c1_capture=""
+	out=$(cat "$ccnavi_wap_capture" 2>/dev/null || :)
+	rm -f "$ccnavi_wap_capture"
+	ccnavi_wap_capture=""
 	[ "$decide_rc" -eq 0 ] || {
 		printf '%s\n' "$out"
 		exit 1
@@ -176,10 +176,10 @@ if [ -n "$choices" ]; then
 	printf '%s' "$out" | "$JQ" -c --arg u "$issue_url" --arg w "$post_warning" '. + {issue_url: $u, warning: $w}'
 	exit 0
 fi
-ccnavi_c1_family "$family"
-case "$ccnavi_c1_target" in
+ccnavi_wap_family "$family"
+case "$ccnavi_wap_target" in
 stop)
-	ccnavi_c1_refuse
+	ccnavi_wap_refuse
 	exit 1
 	;;
 esac
@@ -194,29 +194,29 @@ choices=$("$JQ" -c '.choices' "$chosen") && digest=$("$JQ" -r '.digest' "$chosen
 	fail decide-choose-unreadable "選んだものを読めない（${chosen}）。" 1
 }
 rm -f "$chosen"
-# 2. ホストに触る前に、ローカルで失敗しうること（C1 のロック・ツリーの確認）を済ませ、結果を取り直す。
+# 2. ホストに触る前に、ローカルで失敗しうること（write-and-push のロック・ツリーの確認）を済ませ、結果を取り直す。
 #    選んでいる間に指摘が変われば、取り直した結果とのダイジェストの照合で止まる。
-case "$ccnavi_c1_target" in
+case "$ccnavi_wap_target" in
 yes)
-	ccnavi_c1_begin || exit 1
-	c1_on=yes
+	ccnavi_wap_begin || exit 1
+	wap_on=yes
 	;;
 esac
 refetch
 # 3. 受け入れる指摘（対応しない・issue に回す）に返信を残して解決する。できなければ、何も置かずに止める。
 accept_before_place "$choices" "$digest"
 # 4. 選んだものを置く（`--yes`。取り直した結果で、見せた指摘とダイジェストが同じときだけ）。
-case "$ccnavi_c1_target" in
+case "$ccnavi_wap_target" in
 yes)
-	ccnavi_c1_capture="$state/review-decide-$$.out"
+	ccnavi_wap_capture="$state/review-decide-$$.out"
 	decide_rc=0
 	# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-	c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
+	wap_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
 		user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 		decide_rc=$?
-	out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
-	rm -f "$ccnavi_c1_capture"
-	ccnavi_c1_capture=""
+	out=$(cat "$ccnavi_wap_capture" 2>/dev/null || :)
+	rm -f "$ccnavi_wap_capture"
+	ccnavi_wap_capture=""
 	if [ "$decide_rc" -ne 0 ]; then
 		[ -z "$out" ] || printf '%s\n' "$out"
 		exit 1

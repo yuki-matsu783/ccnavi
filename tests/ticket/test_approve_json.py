@@ -28,7 +28,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.entry import cli
-from tests import c1flag
+from tests import write_and_push_flag
 from tests.ticket.test_board import _portable
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
@@ -81,7 +81,7 @@ class ApproveJsonTest(PhaseHarness):
                     edit()
                 return answers[len(asked) - 1] + "\n" if len(asked) <= len(answers) else ""
 
-        argv = c1flag.as_c1(
+        argv = write_and_push_flag.as_write_and_push(
             self.root,
             self.state,
             self.parent_tree,
@@ -551,7 +551,7 @@ class ApproveJsonTest(PhaseHarness):
 
     def yes_in_process(self, tickets, digest):
         """`--agree --yes … --json` を同じプロセスで動かす（途中に差し替えを挟むため）。"""
-        argv = c1flag.as_c1(
+        argv = write_and_push_flag.as_write_and_push(
             self.root,
             self.state,
             self.parent_tree,

@@ -20,6 +20,8 @@ POST_TOOL_USE = "PostToolUse"
 POST_TOOL_USE_FAILURE = "PostToolUseFailure"
 SESSION_START = "SessionStart"
 USER_PROMPT_SUBMIT = "UserPromptSubmit"
+# バックグラウンド作業の完了通知が UserPromptSubmit の prompt として届くときの先頭に付く文字列。
+TASK_NOTIFICATION = "<task-notification>"
 STOP = "Stop"
 # サブエージェントの開始と終了。開始は止められないイベントで、返せるのは文だけ。
 # 終了は Stop と同じで、exit 2 が「続けさせる」を意味する。
@@ -91,6 +93,9 @@ class Input:
     # 許さない操作を見分けるときと、差し戻しの回数を数えるときだけ。
     agent_id: str = ""
     agent_type: str = ""
+    # SubagentStart に tools が来るかは実機で確かめていない。来ていれば、編集するサブエージェント
+    # かの見分けに使う（hook/agentkind）。文字列のリスト以外は無いものとして読む。
+    tools: list[str] | None = None
     # tool_response は PostToolUse にだけ来る。Agent の起動の後には agentId が入る。
     tool_response: dict[str, Any] = field(default_factory=dict)
     # error と is_interrupt は PostToolUseFailure にだけ来る。error は失敗の文（形はツール次第）、
@@ -107,11 +112,32 @@ class Input:
     # prompt は UserPromptSubmit にだけ来る。ユーザの依頼文で、issue・MR の指定を探すのに読む
     # （tickets.branchfind）。記録にも診断ログにも書かない。
     prompt: str = ""
+    # busy は Stop にだけ来る。エージェントが動かしているバックグラウンド作業
+    # （`background_tasks`）か、予約した繰り返し（`session_crons`）が残っているとき真。
+    # そのターンの終わりのあとにも、エージェントの手が作業ツリーに届きうる。
+    busy: bool = False
+
+    def from_background_task(self) -> bool:
+        """この UserPromptSubmit が、ユーザの発言ではなくバックグラウンド作業の完了通知か。
+
+        完了通知は、ユーザが何も打たなくても UserPromptSubmit を起こす。そのとき prompt は
+        `<task-notification>` で始まる（実機で確かめた）。ユーザの手による変更を受け入れる
+        処理は、この通知では行わない。バックグラウンドのプロセスが書いた変更を、ユーザの変更として
+        受け入れてしまうため。
+        """
+        return TASK_NOTIFICATION in self.prompt
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
         value = self.tool_input.get(name)
         return value if isinstance(value, str) else ""
+
+
+def _text_list(value: Any) -> list[str] | None:
+    """文字列だけのリストならそのまま、それ以外は None（欄が無いのと同じに読む）。"""
+    if isinstance(value, list) and all(isinstance(v, str) for v in value):
+        return list(value)
+    return None
 
 
 def decode(stream: TextIO) -> Input:
@@ -158,12 +184,19 @@ def decode(stream: TextIO) -> Input:
         tool_use_id=data.get("tool_use_id") or "",
         agent_id=str(data.get("agent_id") or ""),
         agent_type=str(data.get("agent_type") or ""),
+        tools=_text_list(data.get("tools")),
         error=data.get("error") if isinstance(data.get("error"), str) else "",
         is_interrupt=data.get("is_interrupt") is True,
         stop_hook_active=data.get("stop_hook_active") is True,
         source=str(data.get("source") or ""),
         prompt=data.get("prompt") if isinstance(data.get("prompt"), str) else "",
+        busy=_has_items(data.get("background_tasks")) or _has_items(data.get("session_crons")),
     )
+
+
+def _has_items(value: Any) -> bool:
+    """空でないリストか。欄が無い・形が違うときは偽（無いものとして読む）。"""
+    return isinstance(value, list) and len(value) > 0
 
 
 def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "") -> None:
