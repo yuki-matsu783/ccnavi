@@ -17,9 +17,9 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 
 | 対象 | 何が懸かっているか | バックアップを取る時点 |
 |---|---|---|
-| `.claude/settings.json` / `.claude/settings.local.json` | hook の登録そのもの | ツール実行前 |
-| 共通レイヤーのファイル（`.ccnavi/config/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前 |
-| 自身のレイヤーと各プロジェクトのレイヤーの `.ccnavi/config/project/{rules,phases,risks}.yml` | 同上 | ツール実行前 |
+| `.claude/settings.json` / `.claude/settings.local.json` | hook の登録そのもの | ツール実行前と、ユーザの発言 |
+| 共通レイヤーのファイル（`.ccnavi/config/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前と、ユーザの発言 |
+| 自身のレイヤーと各プロジェクトのレイヤーの `.ccnavi/config/project/{rules,phases,risks}.yml` | 同上 | ツール実行前と、ユーザの発言 |
 | `CCNAVI_BIN_PATH` が指すファイル（振り分けの sh）と、sh がこの機械で起動する実行ファイル | 判定器の実体 | セッション開始 |
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/`）は、この表に足さない。`*/.ccnavi/*` の一般の保護で止める。
@@ -153,6 +153,11 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 大きさか更新時刻が変わっていれば新しい版を基準に取り込み、消えていれば参照を捨てて `.absent` を置く（また置かれたら、
 次の実行前で新しい版を基準にする）。`dry-run` でも取り直す。バックアップを取り直すだけで、戻さない。
 `SessionStart` では小さい対象のバックアップを取らない。最初の発言までの変更を戻す根拠が無いため、最初の発言で取る。
+この受け入れは `UserPromptSubmit` の登録が前提で、登録が無いと、ターンの間に消えた設定ファイルは次の実行前に
+前回のバックアップから戻る（`PreToolUse` の登録が無いのと同じく、`--lint` がまだ言わない）。
+
+ユーザが消した実行ファイルを受け入れたあと、ツール呼び出しの中でまた現れたときは、設定ファイルの「無かったところに
+現れた」と同じく、言うだけで消さない。次の実行前に新しい版として基準に入る。
 
 バックグラウンド作業の完了通知も `UserPromptSubmit` を起こす（`prompt` が `<task-notification>` で始まる）。その間に動いた
 プロセスの変更は、ユーザの変更と区別できないので、通知では取り直さない。ユーザが通知の合間に発言した場合は区別できず、
@@ -162,7 +167,7 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 `Write` / `Edit` / `NotebookEdit` でそのファイルを書いたときに限る。判断は実行前の中身で行う。シェルからの書き込み、
 他の設定ファイル、ワークツリー側の設定は戻す。戻さなかったことは `left-as-repair` として報告し、直した中身をユーザが確かめるよう促す。
 
-実行ファイルは `SessionStart` で 1 度だけバックアップする。バックアップするのは `CCNAVI_BIN_PATH` が指す sh（バックアップの鍵 `bin`）と、
+実行ファイルは `SessionStart` でバックアップする（ツール呼び出しの外で変わったら、次の発言か実行前に取り直す）。バックアップするのは `CCNAVI_BIN_PATH` が指す sh（バックアップの鍵 `bin`）と、
 sh がこの機械で起動する実体（`bin-launched`）の 2 つ。実体は `platformtag.launched_executable` が sh と同じ順で探し、
 名前が `ccnavi-launcher.sh` なら `../bin/`、それ以外は隣を見る（8.2 と同じ条件）。見つからなければ足さない。
 実体は中身のハッシュで名前を付けて `state/selfguard/store/` へ 1 本だけ置き、セッションの側は参照（ハッシュ・大きさ・更新時刻）だけ
