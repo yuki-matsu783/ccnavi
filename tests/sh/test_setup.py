@@ -567,6 +567,7 @@ class DoesNotWriteThePlaceVariables(SetupTest):
     """置き場を動かす 6 つの env は書かない（置き場は固定。設計 §5、A7）。
 
     `env` は導入スクリプトが持つ欄で、読まれない語を混ぜない（共通レイヤーの 3 本と同じ理由）。
+    導入済みの env からの除去はしない（旧版の配布先が無いため）。
     """
 
     def written(self, *args):
