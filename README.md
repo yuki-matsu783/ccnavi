@@ -481,7 +481,8 @@ hook からの判定と `ticket` / `review` などの副命令に渡すと無視
 `env` には相対パスを書く。値の変更はセッションを開き直すまで反映されない。
 
 ワークスペースルートは `CLAUDE_PROJECT_DIR`、無ければ作業ディレクトリから親へ辿って
-`.claude` を探して決める。
+`.claude` を探して決める。ワークツリー（`.claude/worktrees/<名前>`）は自分も `.claude` を
+持つが、ワークスペースルートとは数えず飛ばして親へ辿る。
 
 ### 実行ファイルとルールを配る
 
@@ -1791,9 +1792,9 @@ jq -r 'select(.rules[0]? == "builtin:ticket-scope" and (.rules | length) > 1) | 
 範囲の外として扱わない場所。
 
 - 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）。`review/` と承認済みチケットは組み込みの deny が止める
-- 下書きの置き場。ツリーのルート直下の `wip/handoff/` の下で、大文字小文字を区別する。追跡される置き場なので、
+- 下書きの置き場。ツリーのルート直下の `wip/handoff/` の下で、大文字小文字は区別しない。追跡される置き場なので、
   実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/handoffX/` や `scratchpad/` は外さない
-- ELI5 の HTML の置き場。ワークツリーのルートからの `wip/eli5/` の下で、大文字小文字を区別する。追跡される置き場なので、
+- ELI5 の HTML の置き場。ワークツリーのルートからの `wip/eli5/` の下で、大文字小文字は区別しない。追跡される置き場なので、
   実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/` のほかの場所や `wip/eli5x/` は外さない。
   チケットの `deny` と全面停止（`LIMIT_BLOCKED`）より先に適用される
 - どの置き場も `\` を `/` に直さずに見る。`wip\eli5\x.py` や `wip\proposals\todo\x.py` という名前の 1 ファイル（Linux / macOS で作れる）は
@@ -2712,7 +2713,7 @@ ccnavi --explain --json
 | `scattered[]` | どれが正か決まらない、チケットがある場所の全部。`{tree, state, path}`。決まっていれば空。正とする側のツリー（親のツリー → 元ツリーの順）で絞り込んでも 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR を出す条件と同じ。`seen_in` の数は食い違いを意味しない |
 | `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, lock_kind, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）、`lock_kind` はその種類（`doing` は着手中、`review` はレビュー中、止めていなければ null。種類の欄が無い古い実行ファイルでは出ない）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked}`。`path` が指すのは正とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、ボードはパスを組まずにこれを読み、いまのフローと違えば「提案あり」を出す。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
-| `history[]` | 状態の履歴の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.ndjson`（正とする側のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled` / `archived`（置き場が動いたもの。`archived` は `ready` が退避したことを示し、`to` は `archive`）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の履歴に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（ユーザが端末で）/ `board`（ボード）/ `hook` / `chrome`（Chrome 拡張）。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。補助で、状態は置き場の欄で決まる。履歴が無ければ空。読めない行があれば飛ばして `problems[]` で知らせる |
+| `history[]` | 状態の履歴の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.jsonl`（正とする側のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled` / `archived`（置き場が動いたもの。`archived` は `ready` が退避したことを示し、`to` は `archive`）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の履歴に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（ユーザが端末で）/ `board`（ボード）/ `hook` / `chrome`（Chrome 拡張）。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。補助で、状態は置き場の欄で決まる。履歴が無ければ空。読めない行があれば飛ばして `problems[]` で知らせる |
 | `issues[]` | 読み手が気づくべき不備の文。この順に入る。`blocked` が空でなければ `書き込みが止まっています: <blocked>`、提案が無く `copy.status` が `open` でも `closed` でもなければ `提案が見つかりません（承認済みチケットだけがあります）`、子で親の識別子のチケットが `tickets[]` に無ければ `親 <親> が見つかりません`。無ければ空。ボードはこれをそのまま出し、自分では組み直さない |
 | `attention` | ユーザが動く必要があるか。真になるのは、`pending_approval` に入っている、子で自分のフェーズが `gate_closed` か `review_waiting`、未着手・作業中（提案が無く `closed` のもの以外）なのにワークツリーが無い、自分の `risk` の水準が HIGH 以上、`scattered[]` が空でない、`issues[]` が空でない、親でフェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates` のとき（`src/ccnavi/entry/diagnose_board.py` の `_mark_attention`）。ボードの「要対応のみ」はこれで絞るだけ |
 

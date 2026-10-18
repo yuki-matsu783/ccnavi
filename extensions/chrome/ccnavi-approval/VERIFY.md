@@ -173,7 +173,7 @@
 
 | # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
-| W1 | 着手前の新規の承認に「承認を取り下げる」を押す | 1 コミットで `doing/` が消え、承認コミットの親にあった提案のバイト列が `todo/` に戻る。`events/<識別子>.ndjson` に `withdrawn` の行（`actor` が PAT の持ち主、`via: chrome`） | コミットの sha、戻った提案と元の提案の差分 |
+| W1 | 着手前の新規の承認に「承認を取り下げる」を押す | 1 コミットで `doing/` が消え、承認コミットの親にあった提案のバイト列が `todo/` に戻る。`events/<識別子>.jsonl` に `withdrawn` の行（`actor` が PAT の持ち主、`via: chrome`） | コミットの sha、戻った提案と元の提案の差分 |
 | W2 | 取り下げた後に承認し直し、もう一度取り下げる | 新しい方の承認コミットを選ぶ | コミット |
 | W3 | 承認を別の枝で行って merge で `i0001` に入れる（手元の端末の承認を merge する、など）| 取り下げのボタンが出ない（`GET /commits?sha=&path=` が merge コミットを返すか・飛ばすかに依らず同じ答え） | `GET /commits?sha=<P>&path=<doing のパス>` の応答に merge コミットが入るか |
 | W4 | 着手の後にボードを開く | 取り下げが出ず、`ccnavi-ticket.sh cancel` を案内する | 画面の文面 |
@@ -204,7 +204,7 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 | # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
 | L1 | 承認を押す | `POST repository/commits` で 1 コミット。答えの `parent_ids[0]` が読んだ先頭 | 応答の `parent_ids` |
-| L2 | 本体の書き込みで同じファイルを競合させる（下の「同じファイルを競合させる手順」の A か B。対象は承認で書き換わる `events/<識別子>.ndjson` など update になるファイル） | `last_commit_id` が合わず 400 になり書かない。拡張は読み直して再試行し、3 周で書けなければユーザの対応に切り替える | 400 の応答本文、`repository/files/:path?ref=<sha>` の `last_commit_id` |
+| L2 | 本体の書き込みで同じファイルを競合させる（下の「同じファイルを競合させる手順」の A か B。対象は承認で書き換わる `events/<識別子>.jsonl` など update になるファイル） | `last_commit_id` が合わず 400 になり書かない。拡張は読み直して再試行し、3 周で書けなければユーザの対応に切り替える | 400 の応答本文、`repository/files/:path?ref=<sha>` の `last_commit_id` |
 | L3 | 元に戻すコミットで同じファイルを競合させる（L11 で元に戻すコミットの `POST repository/commits` が出るときに、下の手順 A で止めて、同じファイルへ手元から push する） | 元に戻すコミットは自分のコミットを `last_commit_id` に付けるので 400 になり、他人の変更を消さない。親子のチケットが「要確認」で出て、「確かめた」を押すまでそのブラウザから書かない | 400 の応答本文、push したコミットが残っていること |
 | L11 | 別のファイルへの書き込みが間に入るよう、2 つのブラウザで別の子の承認と取り下げを同時に押す | 事後確認で判定し直し、書くものが違えば元に戻すコミットが積まれる。収まらなければ親子のチケットが「確認が必要」で表示される | 両方の画面の文面、積まれたコミットの順序 |
 | L12 | MR を出したブランチを消した後に `GET projects/:id/repository/commits/refs/merge-requests/<N>/head`（または `git ls-remote origin 'refs/merge-requests/*'`）を見る | ブランチ消去後も残るか（どちらでも拡張の答えは変わらない。`seq` の前提の確認） | 応答 |
@@ -222,7 +222,7 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 - **A（ブレークポイント）**: `chrome://extensions` の拡張の「service worker」から開発者ツールを開き、Sources で `background.js` の
   `repository/commits` への POST の直前（`createCommit` の中の `post(` の行）にブレークポイントを置きます（minify されているので、
   Network の Initiator から辿るか、「Pretty print」で `repository/commits` を探します）。ボードで操作を押し、止まったら手元の clone から
-  同じファイル（例 `.ccnavi/approved/events/<識別子>.ndjson` に 1 行足す）をコミットして親のブランチへ push し、再開します
+  同じファイル（例 `.ccnavi/approved/events/<識別子>.jsonl` に 1 行足す）をコミットして親のブランチへ push し、再開します
 - **B（curl で直接）**: `repository/files/<符号化したパス>?ref=<親のブランチ>` で今の `last_commit_id` を記録し、手元から同じファイルを変えて push した後、
   記録した古い値を付けて直接 POST します。
 

@@ -23,7 +23,7 @@ from typing import Any
 
 import yaml
 
-from ..infra import gitcmd
+from ..infra import gitcmd, pathcase
 from ..tickets import flow
 
 INDEX_NAME = "ccnavi-index.jsonl"
@@ -467,7 +467,7 @@ class _Writer:
 def _under(path: str, base_real: str) -> bool:
     """path の実体が base_real 自身かその下か。"""
     try:
-        real = os.path.normcase(os.path.realpath(path))
+        real = pathcase.fold(os.path.realpath(path))
         return os.path.commonpath([real, base_real]) == base_real
     except (OSError, ValueError):
         return False
@@ -545,7 +545,7 @@ def build(
     if tmp_dir:
         _sweep(tmp_dir)
     writer = _Writer(base, tmp_dir, deadline) if tmp_dir else None
-    base_real = os.path.normcase(os.path.realpath(base))
+    base_real = pathcase.fold(os.path.realpath(base))
 
     dirs: list[_Dir] = []
     for directory in sorted(by_dir):

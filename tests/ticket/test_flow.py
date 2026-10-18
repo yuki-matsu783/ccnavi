@@ -29,7 +29,7 @@ from unittest import mock
 
 import yaml
 
-from ccnavi.infra import settings, yamlread
+from ccnavi.infra import pathcase, settings, yamlread
 from ccnavi.tickets import flow, flow_render, flow_shape, flow_text, ticket, ticket_model
 from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness
@@ -907,7 +907,7 @@ class FlowLockTest(FlowHarness):
         child_tree = self.run_child(CHILD)
         result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         text = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
-        self.assertIn(os.path.normcase(self.flow_path), os.path.normcase(text))
+        self.assertIn(pathcase.fold(self.flow_path), pathcase.fold(text))
         self.assertIn("作業の前に読み、その順に進めてください", text)
         self.assertNotIn("ロック", text)
         self.assertIn(flow.FENCE_OPEN, text)

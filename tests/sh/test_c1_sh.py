@@ -51,6 +51,7 @@ import tempfile
 import time
 import unittest
 
+from ccnavi.infra import pathcase
 from tests import ROOT, can_pass_argument, common_path, config_path, live_sh_pid, requires_symlink
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
@@ -351,7 +352,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), head)
         self.assertEqual(
             self.committed(),
-            [f"{APPROVED}/doing/{PARENT}.md", f"{APPROVED}/events/{PARENT}.ndjson"],
+            [f"{APPROVED}/doing/{PARENT}.md", f"{APPROVED}/events/{PARENT}.jsonl"],
         )
         self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} に着手"])
         self.assertEqual(self.dirty(), "")
@@ -386,7 +387,7 @@ class C1TicketTest(C1Harness):
 
     def test_hook_marks_and_events_are_committed_before_the_take_in(self):
         pending = self.mark(1, "pending", {"review": "mr", "at": "2026-09-29T00:00:00+0900"})
-        events = os.path.join(self.tree, *APPROVED.split("/"), "events", PARENT + ".ndjson")
+        events = os.path.join(self.tree, *APPROVED.split("/"), "events", PARENT + ".jsonl")
         with open(events, "a", encoding="utf-8", newline="\n") as f:
             row = {"at": "t", "ticket": PARENT, "kind": "phase-mark", "phase": 1, "mark": "pending"}
             f.write(json.dumps(row) + "\n")
@@ -400,7 +401,7 @@ class C1TicketTest(C1Harness):
             ],
         )
         self.assertEqual(
-            self.committed("HEAD~1"), sorted([pending, f"{APPROVED}/events/{PARENT}.ndjson"])
+            self.committed("HEAD~1"), sorted([pending, f"{APPROVED}/events/{PARENT}.jsonl"])
         )
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
@@ -492,7 +493,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(len(parents), 3)  # 取り込みの merge
 
     def test_a_conflicting_take_in_writes_nothing(self):
-        events = f"{APPROVED}/events/{PARENT}.ndjson"
+        events = f"{APPROVED}/events/{PARENT}.jsonl"
         local = json.dumps({"at": "l", "ticket": PARENT, "kind": "phase-mark"}) + "\n"
         with open(os.path.join(self.tree, events), "a", encoding="utf-8", newline="\n") as f:
             f.write(local)
@@ -721,7 +722,7 @@ class C1TicketTest(C1Harness):
 
     def test_autocrlf_hook_events_are_carried(self):
         git(self.ws, "config", "core.autocrlf", "true")
-        events = f"{APPROVED}/events/{PARENT}.ndjson"
+        events = f"{APPROVED}/events/{PARENT}.jsonl"
         path = os.path.join(self.tree, *events.split("/"))
         os.remove(path)
         git(self.tree, "checkout", "--", events)
@@ -737,7 +738,7 @@ class C1TicketTest(C1Harness):
         )
 
     def test_a_forged_event_line_stops(self):
-        events = f"{APPROVED}/events/{PARENT}.ndjson"
+        events = f"{APPROVED}/events/{PARENT}.jsonl"
         with open(os.path.join(self.tree, events), "a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps({"at": "t", "ticket": PARENT, "kind": "approved"}) + "\n")
         result = self.ticket("start", PARENT)
@@ -2013,7 +2014,7 @@ class C1HostTest(C1HostHarness):
 
     def test_ready_commits_and_pushes_the_archive_removals_before_undrafting(self):
         """ready の退避（閉じたチケットの削除）は、C1 がコミットして push してから Draft を外す。"""
-        old = f"{APPROVED}/events/old.ndjson"
+        old = f"{APPROVED}/events/old.jsonl"
         write(os.path.join(self.tree, *old.split("/")), "{}\n")
         git(self.tree, "add", old)
         git(self.tree, "commit", "-q", "-m", "old")
@@ -2197,7 +2198,7 @@ class C1HostTest(C1HostHarness):
         )
         write(os.path.join(self.tree, APPROVED, "done", "old.md"), old)
         write(os.path.join(self.tree, APPROVED, "phases", "old", "closed.json"), "{}\n")
-        write(os.path.join(self.tree, APPROVED, "events", "old.ndjson"), '{"a": 1}\n')
+        write(os.path.join(self.tree, APPROVED, "events", "old.jsonl"), '{"a": 1}\n')
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "退避の途中")
         git(self.tree, "push", "-q", "origin", PARENT)
@@ -2205,7 +2206,7 @@ class C1HostTest(C1HostHarness):
         write(
             os.path.join(archive_base, "ready", f"{PARENT}.json"),
             json.dumps(
-                {"parent": PARENT, "tree": os.path.normcase(os.path.realpath(self.tree)),
+                {"parent": PARENT, "tree": pathcase.fold(os.path.realpath(self.tree)),
                  "head": head, "files": []}
             ),
         )  # fmt: skip
@@ -2221,12 +2222,12 @@ class C1HostTest(C1HostHarness):
         self.assertIn("push が通らなかった", ready.stderr)
         self.assertIn("Draft を解除した", ready.stdout)
         self.carried(f"{APPROVED}/done/old.md")
-        for rel in ("done/old.md", "phases/old/closed.json", "events/old.ndjson"):
+        for rel in ("done/old.md", "phases/old/closed.json", "events/old.jsonl"):
             self.assertEqual(
                 git(self.tree, "ls-tree", "HEAD", "--", f"{APPROVED}/{rel}").stdout, ""
             )
             self.assertTrue(os.path.isfile(os.path.join(archive_base, *rel.split("/"))), rel)
-        with open(os.path.join(archive_base, "events", "old.ndjson"), encoding="utf-8") as f:
+        with open(os.path.join(archive_base, "events", "old.jsonl"), encoding="utf-8") as f:
             self.assertEqual(f.read().count('"archived"'), 1)
 
     def test_a_request_is_not_posted_twice_across_runs(self):
@@ -2409,7 +2410,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
     def normalized(path, text):
         """経路・時刻・拡張の版を除く（違ってよいもの）。"""
         drop = ("via", "at", "version")
-        if path.endswith(".ndjson"):
+        if path.endswith(".jsonl"):
             rows = [json.loads(line) for line in text.splitlines() if line.strip()]
             return [{k: v for k, v in r.items() if k not in drop} for r in rows]
         if path.endswith((".reviewed", ".json")):

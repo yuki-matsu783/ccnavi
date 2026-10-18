@@ -17,7 +17,7 @@
   - 版が無ければ未コミットの変更（取り込みの前にコミットする分）、版があれば `<版>..HEAD` で
     コミットに入った変更（取り込みの後に未送信を確かめる分）
   - (b) ccnavi が書いたと内容で分かるもの。hook のフェーズの終わりの告知が置く、その親子のチケットの
-    `phases/<親>/<N>.pending`・`.skipped` と、そのマーカーの履歴（`events/<親>.ndjson` の
+    `phases/<親>/<N>.pending`・`.skipped` と、そのマーカーの履歴（`events/<親>.jsonl` の
     `phase-mark` の行）の追記だけ（台帳は持たない）。`reviewed` は入れない。
     もう 1 つは `ready` の退避（archive.py）が消したもの。ready のマーカー
     （`logs/archive/<リポジトリ>/ready/<親>.json`。このツリーから移したファイルの一覧）に載っている削除で、消えた中身が
@@ -335,7 +335,7 @@ def _hook_mark(parts: list[str], parent: str, now: bytes | None, before: bytes |
 
 
 def _appended_rows(parts: list[str], now: bytes | None, before: bytes | None) -> list | None:
-    """`events/<名前>.ndjson` の追記の行（JSON）。追記でなければ None。読めなければ _Unreadable。
+    """`events/<名前>.jsonl` の追記の行（JSON）。追記でなければ None。読めなければ _Unreadable。
 
     変更前が在り、変更前（改行を LF に揃えたもの）が前置きで、足した部分が改行で終わるときだけ。
     新しい履歴のファイルは追記と読まない。

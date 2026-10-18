@@ -40,7 +40,7 @@ def load_tests(loader, tests, pattern):
 
 class HistoryTest(TicketTest):
     def lines(self, ticket_id, tree=None):
-        path = os.path.join(tree or self.approved, "events", ticket_id + ".ndjson")
+        path = os.path.join(tree or self.approved, "events", ticket_id + ".jsonl")
         if not os.path.exists(path):
             return []
         with open(path, encoding="utf-8") as f:
@@ -174,7 +174,7 @@ class HistoryTest(TicketTest):
         entry = next(t for t in board["tickets"] if t["ticket"] == "i0001-01-01")
         self.assertEqual([e["kind"] for e in entry["history"]], ["approved", "started"])
         # 上限を超えたら新しい側だけ。
-        path = os.path.join(self.approved, "events", "i0001-01-01.ndjson")
+        path = os.path.join(self.approved, "events", "i0001-01-01.jsonl")
         with open(path, "a", encoding="utf-8", newline="\n") as f:
             for i in range(history.BOARD_LIMIT + 5):
                 f.write(json.dumps({"at": "x", "kind": f"k{i}", "from": None, "to": None}) + "\n")
@@ -206,7 +206,7 @@ class HistoryTest(TicketTest):
     def test_the_log_is_only_appended(self):
         """既に在る行は書き換えない。手で書いた行も残る。"""
         self.family_without_starting()
-        path = os.path.join(self.approved, "events", "i0001.ndjson")
+        path = os.path.join(self.approved, "events", "i0001.jsonl")
         before = read_text(path)
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         after = read_text(path)
@@ -266,7 +266,7 @@ class PhaseHistoryTest(PhaseHarness):
     """計画を持つ親で動く履歴（改版・続きの子・親のマーカー・早めに閉じる操作）を固定する。"""
 
     def lines(self, ticket_id):
-        path = os.path.join(self.approved, "events", ticket_id + ".ndjson")
+        path = os.path.join(self.approved, "events", ticket_id + ".jsonl")
         if not os.path.exists(path):
             return []
         with open(path, encoding="utf-8") as f:

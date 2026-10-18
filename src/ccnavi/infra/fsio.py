@@ -25,6 +25,8 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
+from . import pathcase
+
 # ファイル名に混ぜられない字。セッションやエージェントの識別子をそのまま名前に
 # するので、区切り文字が混じった値でファイルを別の場所へ書かせない。
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
@@ -1005,7 +1007,7 @@ def _staged(path: str) -> tuple[bool, bytes | None]:
 
 
 def _key(path: str) -> str:
-    return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+    return pathcase.fold(os.path.normpath(os.path.abspath(path)))
 
 
 def _disk_bytes(path: str) -> bytes | None:

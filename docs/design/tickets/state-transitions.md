@@ -36,7 +36,7 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | `todo` → `doing` | `ccnavi --agree`（ユーザ）、ボード、Chrome 拡張 | 9.4。同じ識別子がどの置き場にも無い | ―（中身は変えない。待ち方は書かない。承認済みチケットの計画から都度計算する） |
 | `todo` → `doing`（手で） | ユーザが hook の外で動かす | 無し。動かせること自体が条件（その置き場にエージェントは書けない）。承認の検査は判定が当てる | ― |
 | `todo`（改版）→ 消える | `ccnavi --agree`（ユーザ） | 同じ識別子が `doing/` にあり、計画だけが違う。`doing/` の側の計画を差し替える | `plan` / `feedback`（項の `after` ごと） |
-| `doing` のまま | `ccnavi-ticket.sh start` | 着手の欄が空。`.claude/worktrees/<識別子>/` がワークツリーとして在り、元リポジトリが承認済みチケットの `project` と合い、表記が大文字小文字まで同じ。子なら親が `doing/` に在って着手済みで、先行が全部 `done/` に在って取り消しでない | `started_at`、`base_sha`（そのワークツリーの HEAD） |
+| `doing` のまま | `ccnavi-ticket.sh start` | 着手の欄が空。`.claude/worktrees/<識別子>/` がワークツリーとして在り、元リポジトリが承認済みチケットの `project` と合い。子なら親が `doing/` に在って着手済みで、先行が全部 `done/` に在って取り消しでない | `started_at`、`base_sha`（そのワークツリーの HEAD） |
 | `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。フェーズ定義の成果物が在り、定性のリスク判定が揃っている（9.9） | `completed_at` |
 | `doing` → `done` | `ccnavi-ticket.sh finish` | 着手済み。子ならフェーズがレビュー不要。親なら開いている子が無く、レビューで止まっておらず、計画があればフィードバック計画が承認済みで全フェーズが終わっている（早めに閉じていれば子だけ） | `completed_at` |
 | `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`close-early`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
@@ -58,7 +58,7 @@ warn で言う（判定と `start` は止めない）。マーカーを消すか
 （機構は消さない）。親を閉じても子の承認済みチケットは閉じない。
 
 **状態の履歴。** 実行ファイルが上の表の遷移とマーカーの遷移を動かすたびに、承認済みの領域の
-`events/<識別子>.ndjson` へ 1 行 1 JSON を追記する（`at` は UTC の ISO 8601、`kind`、元と先の置き場 `from` / `to`、
+`events/<識別子>.jsonl` へ 1 行 1 JSON を追記する（`at` は UTC の ISO 8601、`kind`、元と先の置き場 `from` / `to`、
 経路 `via` = `cli` / `terminal` / `board` / `hook`）。マーカーの履歴の行は親のファイルに `phase-mark` / `phase-reopened` /
 `parent-mark` で残り、`from` / `to` は `null`。書くのは動かす操作の最下段（`approval_ops.admit` など）で、書けなくても
 状態の操作は止めず、`ccnavi: 警告: …` を標準エラーに出す（入口の `cli.run` が起動を抜けるときにまとめて出す）。

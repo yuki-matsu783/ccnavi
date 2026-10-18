@@ -321,13 +321,13 @@ encoded_path() {
 find_mr() {
 	if [ "$kind" = github ]; then
 		owner="${path%%/*}"
-		api GET "repos/$path/pulls?state=open&head=$owner:$branch" |
+		api GET "repos/$path/pulls?state=open&head=$(ccnavi_host_encode "$owner:$branch")" |
 			"$JQ" '.[0] // empty | {number: .number, url: .html_url, source: .head.ref, target: .base.ref, draft: (.draft // false)}'
 	else
 		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
 		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても目的のものを外さない）
 		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の URL を見直してください）。"
-		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
+		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$(ccnavi_host_encode "$branch")") ||
 			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
 		printf '%s' "$mrs" |
 			"$JQ" --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url, source: .source_branch, target: .target_branch, draft: (.draft // .work_in_progress // false)}'
@@ -868,7 +868,7 @@ merged)
 				exit 3
 			}
 		else
-			answer=$(api GET "repos/$path/pulls?state=closed&head=$owner:$branch") || {
+			answer=$(api GET "repos/$path/pulls?state=closed&head=$(ccnavi_host_encode "$owner:$branch")") || {
 				printf 'unknown\n'
 				exit 3
 			}
@@ -893,7 +893,7 @@ merged)
 			}
 		else
 			# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない）
-			answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
+			answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$(ccnavi_host_encode "$branch")") || {
 				printf 'unknown\n'
 				exit 3
 			}

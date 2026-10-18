@@ -47,7 +47,7 @@ keywords: [子チケット, 識別子, フェーズ番号, 連番, 採番, next_
   `phase:` は ccnavi と同じ読み方で読み、読めない子があれば止まる
 - フェーズ番号はそれぞれの `phase:`。同じ親・同じフェーズの子は旧い連番の順に並べ、そのフェーズに既にある新しい形の子の
   続きから振る（`i0055-02` → `i0055-02-01`、`i0055-03` → `i0055-02-02`）
-- ファイル名、`ticket:`・`predecessors:`、`phases/<親>/<子>.risk.json`・`.judge.json`、`events/<子>.ndjson`、
+- ファイル名、`ticket:`・`predecessors:`、`phases/<親>/<子>.risk.json`・`.judge.json`、`events/<子>.jsonl`、
   本文中の言及を一緒に変える。承認したときに提案が在った場所の記録（`ccnavi_approved.source_path`）は過去の事実なので
   変えない。大文字小文字だけが違う綴りは人が書いた文の一部として変えず、一覧に出す
 - チケットの無い記録 `phases/i0054/i0054-01.risk.json`・`i0054-02.risk.json` は、フェーズが分からず新しい名前を決められない

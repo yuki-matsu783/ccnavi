@@ -33,7 +33,7 @@ from __future__ import annotations
 import os
 import re
 
-from ..infra import settings, shellread, shellread_words, tree
+from ..infra import pathcase, settings, shellread, shellread_words, tree
 from ..tickets import ticket_places
 from . import wrapguard
 
@@ -287,7 +287,9 @@ def _check_code(
         return _short(code), name, KIND_CODE
     if base is not None:
         place = wrapguard.worktree_name(root, base)
-        if place in parents and not _unscoped(conf, root, place, base):
+        if pathcase.fold(place) in {pathcase.fold(p) for p in parents} and not _unscoped(
+            conf, root, place, base
+        ):
             return _short(code), place, KIND_CODE
     return "", "", ""
 
@@ -333,18 +335,19 @@ def _check_target(
             return target, "?", KIND_WRITE
         word = os.path.join(base, word)
     name = wrapguard.worktree_name(root, word)
-    if name not in parents or _unscoped(conf, root, name, word):
+    if pathcase.fold(name) not in {pathcase.fold(p) for p in parents} or _unscoped(
+        conf, root, name, word
+    ):
         return "", "", ""
     return target, name, KIND_WRITE
 
 
 def _unscoped(conf: settings.Settings, root: str, name: str, path: str) -> bool:
     """下書き・提案・ELI5・承認済みの置き場か（Write と同じく、置き場ごとの保護に任せる）。"""
-    top = tree._canonical(os.path.join(root, tree.WORKTREES_DIR, name))
-    full = tree._canonical(path)
-    if full == top:
+    rest = tree.parts_under(os.path.join(root, tree.WORKTREES_DIR, name), path)
+    if not rest:
         return False
-    rel = os.path.relpath(full, top).replace(os.sep, "/")
+    rel = "/".join(rest)
     return ticket_places.is_unscoped(rel, conf.tickets, conf.approved)
 
 

@@ -22,6 +22,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from ccnavi.infra import pathcase
 from tests.inproc import run_ccnavi
 
 # 承認済みチケット 1 枚。`ccnavi_approved` が無いと承認済みチケットとして読まれない。
@@ -390,7 +391,7 @@ class ProjectsCollisionTest(unittest.TestCase):
         real = os.path.relpath
 
         def relpath(path, *args, **kwargs):
-            if os.path.normcase(os.fspath(path)) == os.path.normcase(elsewhere):
+            if pathcase.fold(os.fspath(path)) == pathcase.fold(elsewhere):
                 raise ValueError("path is on mount 'D:', start on mount 'C:'")
             return real(path, *args, **kwargs)
 

@@ -13,7 +13,7 @@ Draft を外すので、squash でマージすると既定のブランチには�
 置き場はワークスペースルートの `logs/archive/<リポジトリ>/` で、`<リポジトリ>` は
 ワークスペース自身なら `self`、プロジェクトならその名前（取り込み状態と同じ分け方）。
 その下は承認済みの領域と同じ構成
-（`done/<識別子>.md`・`phases/<親>/...`・`events/<識別子>.ndjson`・`flows/<子>.yml`）にする。
+（`done/<識別子>.md`・`phases/<親>/...`・`events/<識別子>.jsonl`・`flows/<子>.yml`）にする。
 `logs/` は git が追跡しないので、退避は手元の機械にだけ残る。
 
 退避はバックアップで、閉じたかの判定には使わない。閉じたかは MR がマージ済みかで決める
@@ -42,7 +42,7 @@ import re
 import stat
 from dataclasses import dataclass, field
 
-from ..infra import fsio, gitcmd
+from ..infra import fsio, gitcmd, pathcase
 from . import history, syncstate, ticket_ids, ticket_model
 from . import ticket as ticket_mod
 
@@ -72,8 +72,8 @@ def is_archived_path(root: str, path: str) -> bool:
     """パスが退避の置き場の下か。"""
     if not root or not path:
         return False
-    here = os.path.normcase(os.path.abspath(top(root)))
-    there = os.path.normcase(os.path.abspath(path))
+    here = pathcase.fold(os.path.abspath(top(root)))
+    there = pathcase.fold(os.path.abspath(path))
     return there.startswith(here + os.sep)
 
 
@@ -485,7 +485,7 @@ READY_DIR = "ready"
 
 
 def _tree_key(tree_root: str) -> str:
-    return os.path.normcase(os.path.realpath(tree_root)) if tree_root else ""
+    return pathcase.fold(os.path.realpath(tree_root)) if tree_root else ""
 
 
 # ready のマーカーに載せてよいのは、承認済みの領域のこの 4 つの下だけ。

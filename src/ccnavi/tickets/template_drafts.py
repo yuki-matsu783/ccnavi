@@ -40,7 +40,7 @@ import difflib
 import os
 from dataclasses import dataclass, field
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, pathcase, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import approval, archive, flow, plan_templates, ticket_ids, ticket_model
@@ -480,9 +480,9 @@ def locate(conf: settings.Settings, root: str, ref: str) -> tuple[Draft | None, 
     found = scan(conf, root).drafts
     suffix = plan_templates.SUFFIX
     if "/" in ref or os.sep in ref or "\\" in ref:
-        wanted = os.path.normcase(os.path.abspath(ref))
+        wanted = pathcase.fold(os.path.abspath(ref))
         for draft in found:
-            if os.path.normcase(os.path.abspath(draft.path)) == wanted:
+            if pathcase.fold(os.path.abspath(draft.path)) == wanted:
                 return draft, ""
         place = plan_templates.draft_dir_rel(conf)
         return None, f"{ref} は下書きの置き場（{place}/）の下の {suffix} ではない"

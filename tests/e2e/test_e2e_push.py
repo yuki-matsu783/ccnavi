@@ -205,7 +205,7 @@ class ApproveAndPushTest(unittest.TestCase):
         events = ".ccnavi/approved/events"
         self.assertEqual(
             sorted(
-                [f"{APPROVED}/{TICKET}.md", f"{events}/{TICKET}.ndjson", f"{PROPOSAL}/{TICKET}.md"]
+                [f"{APPROVED}/{TICKET}.md", f"{events}/{TICKET}.jsonl", f"{PROPOSAL}/{TICKET}.md"]
             ),
             self.committed(),
         )
@@ -235,7 +235,7 @@ class ApproveAndPushTest(unittest.TestCase):
         self.assertNotIn('started_at: ""', started)
         self.assertIn(pushed, started, "基準点が承認のコミットになっていない")
         self.assertEqual(
-            sorted([f"{APPROVED}/{TICKET}.md", f"{events}/{TICKET}.ndjson"]), self.committed()
+            sorted([f"{APPROVED}/{TICKET}.md", f"{events}/{TICKET}.jsonl"]), self.committed()
         )
         self.assertEqual(pushed, out(self.tree, "rev-parse", "HEAD~1"))
         self.assertEqual(out(self.tree, "rev-parse", "HEAD"), self.remote_head())

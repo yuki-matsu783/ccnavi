@@ -79,8 +79,8 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
         message=message,
         decision=rules.DENY,
     )
-    # 大文字小文字を区別しない機械では `DONE/` も同じ場所。区別する機械で余分に
-    # 当たっても、状態の名前を大文字で書く正当な用事は無い。
+    # `DONE/` も同じ場所として当てる（どの機械でも区別しない）。状態の名前を大文字で書く
+    # 正当な用事は無い。
     write_rule.compiled = re.compile(place, re.IGNORECASE)
     # シェルの側は前の区切りを求めない。コマンドの引数は空白で区切られていて、
     # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無いパス
@@ -204,7 +204,7 @@ def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
     ツリー（ワークツリー・プロジェクト）はどれもワークスペースルートの下
     なので、ルートの下に限れば正しい置き場は全部入り、外は入らない。
 
-    大文字小文字は区別しない機械では `TODO/` も同じ場所。`guard_rules` と揃える。
+    `TODO/` も同じ場所（大文字小文字はどの機械でも区別しない）。`guard_rules` と揃える。
     """
     place = (
         rf"^{rules.root_pattern(root)}[\\/][^\x00]*{_place(tickets_rel)}"

@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from typing import TextIO
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, pathcase, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..tickets import approval, archive, phase, risk, syncstate, ticket_model
@@ -154,7 +154,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("/", os.sep)
     for work in tree.worktrees(root, conf.projects):
         origin = tree.project_root(conf.projects, work.project) if work.project else root
-        approved = os.path.normcase(os.path.normpath(settings.approved_dir(conf, work.root)))
+        approved = pathcase.fold(os.path.normpath(settings.approved_dir(conf, work.root)))
         for rel in _files_under(os.path.join(work.root, home)):
             if os.path.exists(os.path.join(origin, home, rel.replace("/", os.sep))):
                 continue
@@ -162,7 +162,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
                 # プロジェクトのワークツリーの `.ccnavi/config/common/` は、親の着手がミラーした
                 # 共通レイヤー。ワークスペースの中では読まれないので、言わない。
                 continue
-            where = os.path.normcase(
+            where = pathcase.fold(
                 os.path.normpath(os.path.join(work.root, home, rel.replace("/", os.sep)))
             )
             if where.startswith(approved + os.sep):

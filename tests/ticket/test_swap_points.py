@@ -36,7 +36,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.entry import lint, version
-from ccnavi.infra import fsio, settings
+from ccnavi.infra import fsio, pathcase, settings
 from ccnavi.infra import tree as tree_mod
 from ccnavi.tickets import approval, approval_ops, core, core_base, history, ticket_model
 from tests import config_path, requires_symlink
@@ -322,7 +322,7 @@ class SourceBranchTest(CoreHarness):
 
     @staticmethod
     def approved_tree(rows):
-        events = next(r for r in rows if r["path"].endswith("events/i0001.ndjson"))
+        events = next(r for r in rows if r["path"].endswith("events/i0001.jsonl"))
         found = [json.loads(line) for line in events["content"].decode().splitlines()]
         return [r.get("tree") for r in found if r.get("kind") == history.KIND_APPROVED]
 
@@ -374,8 +374,8 @@ class PlanWriterTest(CoreHarness):
             [
                 ("create", ".ccnavi/approved/doing/i0001-01-01.md"),
                 ("create", ".ccnavi/approved/doing/i0001.md"),
-                ("create", ".ccnavi/approved/events/i0001-01-01.ndjson"),
-                ("create", ".ccnavi/approved/events/i0001.ndjson"),
+                ("create", ".ccnavi/approved/events/i0001-01-01.jsonl"),
+                ("create", ".ccnavi/approved/events/i0001.jsonl"),
                 # 待ち方は書かない（承認済みチケットの計画から都度計算する）
                 ("delete", "wip/proposals/todo/i0001-01-01.md"),
                 ("delete", "wip/proposals/todo/i0001.md"),
@@ -430,7 +430,7 @@ def durable_writes():
     real = fsio._replace_durably
 
     def record(path, content):
-        seen.append(os.path.normcase(os.path.abspath(path)))
+        seen.append(pathcase.fold(os.path.abspath(path)))
         return real(path, content)
 
     with mock.patch.object(fsio, "_replace_durably", record):
@@ -438,7 +438,7 @@ def durable_writes():
 
 
 def _norm(path: str) -> str:
-    return os.path.normcase(os.path.abspath(path))
+    return pathcase.fold(os.path.abspath(path))
 
 
 class DurableWiringTest(CoreHarness):
@@ -498,7 +498,7 @@ class DurableWiringTest(CoreHarness):
             )
         self.assertEqual(failed, "")
         written = [
-            p for p in seen if p.endswith(os.path.normcase(os.path.join("doing", ident + ".md")))
+            p for p in seen if p.endswith(pathcase.fold(os.path.join("doing", ident + ".md")))
         ]
         self.assertEqual(len(written), 1, seen)
         self.assertTrue(os.path.exists(written[0]))
@@ -598,7 +598,7 @@ class WriterFailureTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         changes = self.planned()
-        with self.failing("append", lambda path, data: path.endswith(".ndjson")):
+        with self.failing("append", lambda path, data: path.endswith(".jsonl")):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
         self.assertIn("ccnavi: 警告: i0001 の履歴（approved）を", err)
@@ -702,7 +702,7 @@ def _normalized(changes):
             content = row.get("content")
             if isinstance(content, str):
                 content = row["content"] = content.replace("\r\n", "\n")
-            if content is not None and row["path"].endswith(".ndjson"):
+            if content is not None and row["path"].endswith(".jsonl"):
                 lines = [json.loads(line) for line in content.splitlines() if line]
                 for line in lines:
                     line.pop("via", None)
@@ -1047,7 +1047,7 @@ class CoreChromeTest(CoreHarness):
         event = [
             json.loads(line)
             for row in answer["changes"]["i0001"]
-            if row["path"].endswith(".ndjson")
+            if row["path"].endswith(".jsonl")
             for line in row["content"].splitlines()
         ][-1]
         self.assertEqual(event["via"], history.VIA_CHROME)

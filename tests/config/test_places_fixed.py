@@ -30,6 +30,7 @@ import subprocess
 import tempfile
 import unittest
 
+from ccnavi.infra import pathcase
 from tests.inproc import run_ccnavi
 
 # hook を動かす順。UserPromptSubmit と PostToolUse が控えを書く。
@@ -59,7 +60,7 @@ def write(path, text):
 
 def same(path):
     """綴りの区切りと大文字小文字の違いを畳む。Windows の `/` と `\\` を同じに読む。"""
-    return os.path.normcase(os.path.normpath(path))
+    return pathcase.fold(os.path.normpath(path))
 
 
 class PlacesHarness(unittest.TestCase):
