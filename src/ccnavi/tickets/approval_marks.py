@@ -19,7 +19,6 @@ import os
 from dataclasses import dataclass, field
 
 from ..infra import fsio
-from . import history
 
 PHASES_DIR = "phases"
 
@@ -43,14 +42,9 @@ def read_mark(approved_dir: str, parent: str, phase: int, kind: str) -> dict | N
 def write_mark(approved_dir: str, parent: str, phase: int, kind: str, data: dict) -> str:
     payload = dict(data)
     payload.setdefault("at", now())
-    failed = _write(
+    return _write(
         mark_path(approved_dir, parent, phase, kind), json.dumps(payload, ensure_ascii=False)
     )
-    if not failed:
-        history.note(
-            approved_dir, parent, history.KIND_PHASE_MARK, None, None, phase=phase, mark=kind
-        )
-    return failed
 
 
 @dataclass
@@ -81,10 +75,9 @@ def clear_marks(
     reviewed を消せなければ止める（`failed`）。残ればフェーズは済んだまま読まれ、足した子を
     見ないまま先へ進めてしまう（判定を厳しくする向き）。ほかの種類は
     消せなくても止めず、残っていて判定に使われると言う（`warnings`）。
-    履歴（phase-reopened の `cleared`）には実際に消せた種類だけを書く。
 
     書き込みを溜める段（承認の plan）では、消す書き込みに同じ扱いをつけ、
-    履歴と見せる行は Writer(FS) が書けた種類で書く（`fsio.Call`）。
+    見せる行は Writer(FS) が書けた種類で書く（`fsio.Call`）。
     `announce` は消せた種類から見せる行を作る関数。
     """
     stage = fsio.current_stage()
@@ -96,24 +89,9 @@ def clear_marks(
             with fsio.policy(group=group, tag=kind, **_clear_policy(path, phase, kind)):
                 fsio.unlink(path)
         kinds = [k for k in MARKS if k in present]
-        if kinds:
-            # 見え方（Changes）には全部消えた後の履歴を載せる。ディスクへは Call が書く。
-            with fsio.view_only():
-                _note_reopened(approved_dir, parent, phase, kinds)
-
-        # 履歴の時刻と経路は並べたときのもの（書く時に時計を読み直すと、Changes と食い違う）。
-        at, via = fsio.stamp(), history.via()
 
         def run(done: set[str]) -> list[str]:
             cleared = [k for k in MARKS if k in done]
-            if cleared:
-                before = history.via()
-                history.set_via(via)
-                try:
-                    with fsio.clock(at):
-                        _note_reopened(approved_dir, parent, phase, cleared)
-                finally:
-                    history.set_via(before)
             return announce(cleared) if announce is not None and cleared else []
 
         planned = announce(kinds) if announce is not None and kinds else []
@@ -134,8 +112,6 @@ def clear_marks(
             break
         warnings.append(text)
     cleared = [k for k in MARKS if k in cleared]
-    if cleared:
-        _note_reopened(approved_dir, parent, phase, cleared)
     return Cleared(cleared, failed, warnings)
 
 
@@ -159,18 +135,6 @@ def _clear_policy(path: str, phase: int, kind: str) -> dict:
     }
 
 
-def _note_reopened(approved_dir: str, parent: str, phase: int, cleared: list[str]) -> None:
-    history.note(
-        approved_dir,
-        parent,
-        history.KIND_PHASE_REOPENED,
-        None,
-        None,
-        phase=phase,
-        cleared=cleared,
-    )
-
-
 # 親ごとのマーカー。フェーズの番号に付かないもの。
 #   ready.json   Draft を外した（外してよいと確かめた）。「マージに進んでよい」の合図
 #   close-early.json  ユーザが「キリの良いところまでやった」と早めに閉じた。残りは別の issue へ
@@ -191,20 +155,13 @@ def read_parent_mark(approved_dir: str, parent: str, name: str) -> dict | None:
     return fsio.read_dict(parent_mark_path(approved_dir, parent, name))
 
 
-# 親のマーカーのうち、状態の履歴（history）に残すもの。親の閉じ方と Draft を外したこと。
-PARENT_MARKS_IN_HISTORY = (PARENT_MARK_READY, PARENT_MARK_CLOSE_EARLY, PARENT_MARK_CLOSED)
-
-
 def write_parent_mark(approved_dir: str, parent: str, name: str, data: dict) -> str:
     payload = dict(data)
     payload.setdefault("at", now())
-    failed = _write(
+    return _write(
         parent_mark_path(approved_dir, parent, name),
         json.dumps(payload, ensure_ascii=False, indent=1),
     )
-    if not failed and name in PARENT_MARKS_IN_HISTORY:
-        history.note(approved_dir, parent, history.KIND_PARENT_MARK, None, None, mark=name)
-    return failed
 
 
 # 子ごとの記録。実績のリスク（閉じるときに数えた点）と、定性項目の判定。

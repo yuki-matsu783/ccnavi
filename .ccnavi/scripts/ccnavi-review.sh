@@ -48,7 +48,7 @@
 # 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
 # request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
 # （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
-# ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット → 取り込み → 未送信の確かめを済ませてから
+# ロック → 途中の操作の確認 → hook のマーカーを先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
 # ユーザの判断（close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
 # 承認の push（ccnavi-push-approved.sh <親>）を呼んで送る。
@@ -1164,7 +1164,7 @@ decide)
 		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡してください。" 2
 	fi
 	# マーカーに残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
-	# ロックを取る前に引く。引けなければ渡さず、マーカーも状態の履歴も前と同じ。見るだけの --preview は引かない。
+	# ロックを取る前に引く。引けなければ渡さず、マーカーは前と同じ。見るだけの --preview は引かない。
 	# 経路は、ボードの押した選択（--choices）なら board、端末で選ぶ形なら terminal。
 	decide_who=""
 	if [ "$preview" -eq 0 ] && exe_knows --actor && exe_knows --via; then
@@ -1271,7 +1271,7 @@ decide)
 	;;
 ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
-	# 閉じた親子のチケット（done/ の親子・phases/<親>/・events/・flows/）を手元の logs/archive/ へ
+	# 閉じた親子のチケット（done/ の親子・phases/<親>/・flows/・残っていれば旧版の events/）を手元の logs/archive/ へ
 	# 退避する（git の上では削除）。C1 の中なら、その削除をコミットして push してから、ここが外して
 	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
 	c1_start "$family"

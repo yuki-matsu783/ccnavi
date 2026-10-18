@@ -16,7 +16,7 @@
 #   ヘッダ     summary / filter-project / filter-parent / filter-attention / filter-archived / refresh / approve / tour
 #   ボード     board / column-<列> / card-<識別子>
 #   カード内   badge-<種類>（copy hold blocked preds worktree risk seen）/ approve-one / review-menu / mr / phases /
-#              history / issues / moved / flow-<状態>（create edit locked）/ workflow-button
+#              issues / moved / flow-<状態>（create edit locked）/ workflow-button
 #   承認の画面 approval-batch / approval-plan / approve-confirm / approval-prompt / approval-handover / edit-workflow /
 #              decide-threads / decide-confirm
 screen: board
@@ -51,9 +51,6 @@ sample:
         worktree: { exists: true, path: /ws/.claude/worktrees/sample-b }
         started_at: "2026-09-26T09:30:00+0900"
         human_review: { required: true, reason: 設計のレビューが必要 }
-        history:
-          - { at: "2026-09-26T00:00:00Z", kind: approved, from: todo, to: doing, via: board }
-          - { at: "2026-09-26T00:30:00Z", kind: started, via: cli }
       - ticket: sample-b-01-01
         parent: sample-b
         phase: 1
@@ -64,9 +61,6 @@ sample:
         completed_at: "2026-09-27T18:00:00+0900"
         risk: { points: 0, level: LOW }
         flow: { path: /ws/.claude/worktrees/sample-b/.ccnavi/approved/flows/sample-b-01-01.yml, rel: .ccnavi/approved/flows/sample-b-01-01.yml, tree: /ws/.claude/worktrees/sample-b, exists: true, linked: false, locked: false }
-        history:
-          - { at: "2026-09-26T00:00:00Z", kind: approved, from: todo, to: doing, via: board }
-          - { at: "2026-09-27T09:00:00Z", kind: finished, from: doing, to: done, via: cli }
       - ticket: sample-b-02-01
         parent: sample-b
         phase: 2
@@ -77,9 +71,6 @@ sample:
         started_at: "2026-09-28T10:00:00+0900"
         in_progress: true
         flow: { path: /ws/.claude/worktrees/sample-b/.ccnavi/approved/flows/sample-b-02-01.yml, rel: .ccnavi/approved/flows/sample-b-02-01.yml, tree: /ws/.claude/worktrees/sample-b, exists: false, linked: false, locked: true, lock_kind: doing }
-        history:
-          - { at: "2026-09-28T00:00:00Z", kind: approved, from: todo, to: doing, via: board }
-          - { at: "2026-09-28T01:00:00Z", kind: started, via: cli }
       - ticket: sample-b-03-01
         parent: sample-b
         phase: 3
@@ -128,9 +119,6 @@ sample:
         worktree: { exists: false, path: /ws/.claude/worktrees/sample-f }
         cancelled_at: "2026-09-12T10:00:00+0900"
         cancel_reason: 要件が変わり、移行が不要になった
-        history:
-          - { at: "2026-09-10T00:00:00Z", kind: approved, from: todo, to: doing, via: board }
-          - { at: "2026-09-12T01:00:00Z", kind: cancelled, from: doing, to: done, via: cli, reason: 要件が変わり、移行が不要になった }
     parents:
       - ticket: sample-b
         stage: 作業中（2（設計））
@@ -163,11 +151,7 @@ sample:
       - ticket: sample-g
         title: "（見本）古い設定ファイルを整理する"
         path: /ws/logs/archive/sample/done/sample-g.md
-        approved_at: "2026-08-01T09:00:00+0900"
         completed_at: "2026-08-05T18:00:00+0900"
-        history:
-          - { at: "2026-08-01T00:00:00Z", kind: approved, from: todo, to: doing, via: board }
-          - { at: "2026-08-05T09:00:00Z", kind: settled, from: doing, to: done, via: cli }
   # 前の更新から列が変わったカード（動いた表示）
   moved:
     - { id: sample-b-02-01, from: todo, to: doing }
@@ -354,7 +338,7 @@ courses:
 
   - id: progress
     title: 親チケットの進み具合を確認したいとき
-    summary: フェーズ一覧の読み方、動いた表示、履歴、列の畳み方
+    summary: フェーズ一覧の読み方、動いた表示、列の畳み方
     steps:
       - target: card-sample-b
         title: 親のカード
@@ -365,9 +349,6 @@ courses:
       - target: moved
         title: 動いた表示
         body: 更新したとき、前回から列が変わったカードに「未着手 → 作業中」のような帯が付きます。次にどれかのカードの列が変わるまで残ります。
-      - target: history
-        title: 履歴
-        body: 「履歴」を開くと、承認・着手・終了・取り消しなどが新しい順に並びます。補助の記録で、列やバッジは置き場から決まります。開いてもカードの提案は開きません。
       - target: column-done
         title: 列を畳む
         body: 見出しを押すと列を畳めます。右端をドラッグすると幅を変えられ、ダブルクリックで元に戻ります。畳んだ列と幅は、画面を開き直しても残ります。
@@ -406,7 +387,7 @@ courses:
         body: 終わったチケットが並びます。フェーズのレビューが済むまでは、完了のカードにも「レビュー待ち」が付くことがあります。
       - target: card-sample-f
         title: 取り消し
-        body: 取り消したチケットは、完了と同じ置き場に残り、取り消しの列に並びます。理由は、カードの「履歴」を開くと読めます。
+        body: 取り消したチケットは、完了と同じ置き場に残り、取り消しの列に並びます。理由はカードに出ます。
       - target: filter-archived
         title: アーカイブを表示する
         body: 入れると、右端に「アーカイブ」の列が追加されます。親のレビューが済んで Draft を解除したときに、ローカルの logs/archive/ に移動した、クローズ済みのチケットです。初期状態では表示せず、集計にも数えません。

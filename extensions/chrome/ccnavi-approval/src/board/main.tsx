@@ -38,7 +38,6 @@ const controller = createBoardController({
   storage: chrome.storage.local,
   openOptions: () => chrome.runtime.openOptionsPage(),
   confirm: (message) => window.confirm(message),
-  prompt: (message, value) => window.prompt(message, value),
   startWorker,
   blobCache,
   now: () => new Date(),

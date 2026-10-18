@@ -4,7 +4,6 @@
  */
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
-import type { HistoryEntryJson } from "../../core/model.js";
 
 export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "レビュー待ち", closed: "クローズ", archived: "アーカイブ済み" } as const;
 
@@ -191,77 +190,6 @@ export function approvalBody(text: string): BodyLine[] {
     out.push({ line, note: "" });
   }
   return out;
-}
-
-/** 履歴の置き場の呼び名。列の名前ではなく置き場の名前で言う（`review` は作業中の列にいる） */
-const PLACE_LABELS: Readonly<Record<string, string>> = {
-  todo: "承認待ち",
-  doing: "作業中",
-  review: "レビュー待ち",
-  done: "完了",
-  archive: "アーカイブ",
-};
-
-/** 履歴の種類の呼び名。知らない種類は表記のまま出す */
-const HISTORY_KIND_LABELS: Readonly<Record<string, string>> = {
-  approved: "承認",
-  revised: "計画の改版",
-  raised: "追加対応用の子チケットを作成",
-  started: "着手",
-  finished: "作業終了",
-  cancelled: "取り消し",
-  settled: "レビュー完了・クローズ",
-  withdrawn: "承認の取り下げ",
-  archived: "アーカイブへ退避",
-  "phase-reopened": "フェーズを再開（子チケット追加に伴うマーカー解除）",
-};
-
-/** 親のマーカーの呼び名 */
-const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
-  ready: "Draft を解除した",
-  "close-early": "途中でクローズ",
-  closed: "親をクローズした",
-};
-
-/**
- * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（ユーザがターミナルで同じ sh を打っても `cli`）ので、
- * 誰が打ったかは断定しない
- */
-export const VIA_LABELS: Readonly<Record<string, string>> = {
-  cli: "sh（ccnavi-ticket.sh など）",
-  terminal: "ターミナル",
-  board: "ボード",
-  hook: "hook",
-  chrome: "Chrome 拡張",
-};
-
-/**
- * 履歴の 1 行の本文。「承認（承認待ち → 作業中）」「フェーズ 1: レビュー依頼済み」「取り消し（作業中 → 完了）: 理由」。
- * 実行ファイルが書いた履歴を言い換えるだけで、ここから状態を組み直さない
- */
-export function historyText(e: HistoryEntryJson): string {
-  const phase = e.phase === null ? "" : `フェーズ ${e.phase}: `;
-  if (e.kind === "phase-mark") {
-    return `${phase}${MARK_LABELS[e.mark] ?? e.mark}`;
-  }
-  if (e.kind === "parent-mark") {
-    return PARENT_MARK_LABELS[e.mark] ?? e.mark;
-  }
-  const label = HISTORY_KIND_LABELS[e.kind] ?? e.kind;
-  const move =
-    e.from !== "" && e.to !== "" && e.from !== e.to
-      ? `（${PLACE_LABELS[e.from] ?? e.from} → ${PLACE_LABELS[e.to] ?? e.to}）`
-      : e.from === "" && e.to !== ""
-        ? `（→ ${PLACE_LABELS[e.to] ?? e.to}）`
-        : "";
-  const reason = e.reason !== "" ? `: ${e.reason}` : "";
-  return `${e.kind === "phase-reopened" ? phase : ""}${label}${move}${reason}`;
-}
-
-/** 履歴の時刻。UTC の ISO 8601 を「2026-09-26 09:00 UTC」に。読めない表記はそのまま */
-export function historyAt(at: string): string {
-  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?Z$/.exec(at);
-  return m === null ? at : `${m[1]} ${m[2]} UTC`;
 }
 
 /**

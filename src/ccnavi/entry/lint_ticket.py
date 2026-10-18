@@ -16,7 +16,6 @@ from ..tickets import (
     agree_candidates,
     approval,
     approval_checks,
-    history,
     ops_stop,
     phase,
     review_host,
@@ -57,9 +56,8 @@ def _copy_problems(
       止めないため、判定も止めない
     - 作業中の子のフェーズに reviewed のマーカーが残っている形（再開）も warn。マーカーを
       消すかはユーザが決めるので、判定も止めず、機構は消さない
-    - 着手済みのチケットで、状態の履歴に着手の行が無いことと、基準点（`base_sha`）がワークツリーの
-      HEAD の祖先でないことは warn。提案の段階で書かれた着手の欄かもしれないが、履歴は ccnavi の外で
-      動かした分を持たず、判定は git を読まないので止めない
+    - 着手済みのチケットで、基準点（`base_sha`）がワークツリーの HEAD の祖先でないことは warn。
+      提案の段階で書かれた着手の欄かもしれないが、判定は git を読まないので止めない
 
     `raw` は呼び手が `approval.read_raw` で読んだ置き場。フェーズの順序（`phase.order_problems`）
     を子ごとに見るときに、置き場を読み直さないために渡す。
@@ -85,9 +83,6 @@ def _copy_problems(
         review_left = phase.resumed_review(root, conf, t, raw)
         if review_left:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {review_left}"))
-        unrecorded = _start_unrecorded(conf, t)
-        if unrecorded:
-            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
         off = ops_stop.base_off_head(root, conf, t) if t.started_at else ""
         if off:
             # 判定には入れない（判定は git を読まない）。`start` も止めない（通れば基準点を
@@ -119,29 +114,6 @@ def _copy_problems(
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
     return problems
-
-
-def _start_unrecorded(conf: settings.Settings, t) -> str:
-    """着手の欄があるのに、状態の履歴に `started` の行が無いときの文。あれば空。
-
-    着手の欄（`started_at`・`base_sha`）は `ticket start` だけが書き、書くときに履歴にも残す。
-    承認はチケットの中身を変えないので、提案の段階で書かれた欄は、手で動かした承認では
-    そのまま承認済みチケットに入り、中身だけでは道具が書いたものと見分けられない。
-    履歴は ccnavi の外で動かした分を持たないので、無いことだけでは止めない
-    （warn。判定にも入れない）。
-    """
-    if not t.started_at or not t.tree_root:
-        return ""
-    where = settings.approved_dir(conf, t.tree_root)
-    entries, why = history.read(where, t.ticket, limit=0)
-    if why or any(e.get("kind") == history.KIND_STARTED for e in entries):
-        return ""
-    return (
-        "着手の欄（started_at）があるのに、状態の履歴に着手（started）の行がありません。"
-        "ccnavi-ticket.sh start を通さずに書かれた欄かもしれない"
-        "（提案の段階で書いて手で動かした承認など）。"
-        "ユーザに started_at と base_sha を確かめてもらってください"
-    )
 
 
 def _types_resolver(conf: settings.Settings, root: str):

@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import io
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
@@ -19,13 +18,13 @@ from . import (
     approval_checks,
     approval_marks,
     core_base,
-    history,
     ops,
     ops_close,
     phase,
     review,
     ticket_model,
     ticket_places,
+    via,
 )
 
 # レビュー済み（`confirm`）が通らなかった根拠の種別。付録 A の `CORE_CONFIRM_*`。
@@ -76,7 +75,7 @@ def confirm(
             [f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子がありません。"],
         )
     if approval_marks.MARK_REVIEWED in ph.marks:
-        # 重ね打ちでマーカーと履歴を書き直さない（`_already_requested` と同じ文面の形）
+        # 重ね打ちでマーカーを書き直さない（`_already_requested` と同じ文面の形）
         return core_base.refused(
             CODE_CONFIRM_ALREADY_REVIEWED, [f"ccnavi: フェーズ {phase_no} はレビュー済み"]
         )
@@ -101,14 +100,12 @@ def confirm(
     if problems:
         return core_base.refused(CODE_CONFIRM_REVIEW_OPEN, problems)
     stamp = snapshot.stamp or fsio.stamp()
-    notes = io.StringIO()
-    # 履歴の経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形。アカウントと
-    # 拡張の版も履歴に足す（分かるときだけ。手元で引けなかったときは前と同じ中身）。
+    # 経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形。
     actor = snapshot.actor
     with (
         fsio.staging() as stage,
         fsio.clock(stamp),
-        history.session(actor.via or history.via(), notes, actor.account, actor.version),
+        via.session(actor.via or via.via(), actor.account),
     ):
         stopped = review.settle_and_mark(
             stage,
@@ -117,10 +114,6 @@ def confirm(
             parent,
             ph,
             core_base.reviewed_mark(result.mr.number, [], snapshot.actor),
-        )
-    if notes.getvalue():
-        return core_base.refused(
-            core_base.CODE_HISTORY_UNWRITABLE, core_base.unwritten(notes.getvalue())
         )
     return core_base.Checked([], core_base.Changes(agree.Planned(stage, stopped), root, conf))
 
@@ -147,7 +140,7 @@ def confirm_local(
 
     `actor` は `ccnavi-review.sh` がトークンの持ち主を引いて `--actor` で渡すアカウント。
     あればマーカーに `actor` と `via: cli` を書く。空（引けなかった）
-    ならマーカーも履歴も前と同じ。
+    ならマーカーは前と同じ。
     """
     found = review._parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
@@ -167,7 +160,7 @@ def confirm_local(
             result = review._result(stderr, result_path)
             if result is None:
                 return 1
-    who = core_base.Actor(actor, history.VIA_CLI) if actor else core_base.Actor()
+    who = core_base.Actor(actor, via.VIA_CLI) if actor else core_base.Actor()
     checked = confirm(
         core_base.read_fs(conf, root, actor=who), parent.ticket, phase_no, result, moved
     )

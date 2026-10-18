@@ -20,7 +20,6 @@ from ..tickets import (
     approval_times,
     archive,
     flow,
-    history,
     overview,
     phase,
     risk,
@@ -80,7 +79,7 @@ def board(
     }
     if not conf.tickets_enabled:
         problems.append(f"{settings.TICKET_CONTROL_ENV}=disable。チケット制御を使っていない")
-        payload["archived"] = _archived_records(root, set(), problems)
+        payload["archived"] = _archived_records(root, set())
         return payload
 
     everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
@@ -140,7 +139,7 @@ def board(
         for tid, hits in grouped.items()
     }
 
-    # 承認の時刻。履歴か git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
+    # 承認の時刻。git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
     times = approval_times.approved_times(
         conf, [t for t in (*open_index.values(), *closed_index.values()) if t is not None]
     )
@@ -170,7 +169,7 @@ def board(
     # 不備と要対応は全チケットと親が揃ってから決める（親が在るか、親のフェーズの状態を見る）。
     _mark_attention(payload)
     payload["archived"] = _archived_records(
-        root, {(t["project"], t["ticket"]) for t in payload["tickets"]}, problems
+        root, {(t["project"], t["ticket"]) for t in payload["tickets"]}
     )
     payload["unprepared"] = _unprepared_records(conf, root)
     return payload
@@ -202,15 +201,12 @@ def _unprepared_records(conf: settings.Settings, root: str) -> list[dict]:
     return out
 
 
-def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]) -> list[dict]:
+def _archived_records(root: str, skip: set[tuple[str, str]]) -> list[dict]:
     """手元の退避にある閉じたチケット（表示用）。`skip` の（プロジェクト, 識別子）は出さない。"""
     out = []
     for t in archive.closed_tickets(root):
         if (t.project, t.ticket) in skip:
             continue
-        entries, unreadable = history.read(archive.base_dir(root, t.project), t.ticket)
-        if unreadable:
-            problems.append(f"{t.ticket} の履歴（退避）: {unreadable}")
         out.append(
             {
                 "ticket": t.ticket,
@@ -219,17 +215,12 @@ def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]
                 "title": t.title,
                 "project": t.project,
                 "path": t.path,
-                # 承認は欄を書かない。退避した状態の履歴の承認の時刻。
-                "approved_at": approval_times.history_time(
-                    archive.base_dir(root, t.project), t.ticket
-                ),
                 "started_at": t.started_at,
                 "completed_at": t.completed_at,
                 # finish が親のブランチへ合流した子の先頭（表示だけ。閉じた子の「合流」を出す）
                 "merged_sha": t.merged_sha,
                 "cancelled_at": t.cancelled_at,
                 "cancel_reason": t.cancel_reason,
-                "history": entries,
             }
         )
     return out
@@ -522,8 +513,8 @@ def _ticket_record(
             {
                 "status": status,
                 # 承認の時刻（`approval_times.approved_times`）。`approved_from` はどこから引いたか:
-                # history（状態の履歴）/ commit（doing/ に足したコミット）/
-                # uncommitted（履歴もコミットも無い。手で置いてまだコミットしていない）/
+                # commit（doing/ に足したコミット）/
+                # uncommitted（コミットが無い。手で置いてまだコミットしていない）/
                 # 空（分からない）。uncommitted と空のとき approved_at は空。
                 "approved_at": times.get(copy.path, approval_times.ApprovedTime()).at,
                 "approved_from": times.get(copy.path, approval_times.ApprovedTime()).source,
@@ -563,15 +554,9 @@ def _ticket_record(
         "flow": flow.info(conf, root, copy if copy is not None else source),
         "risk": None,
         "judge": None,
-        # 状態が動いた履歴の新しい側。追記するだけの補助で、状態の正は上の置き場の欄。
-        "history": [],
     }
-    where = approval.home_dir_read(conf, root, ticket_id, source.parent, project=source.project)
-    entries, unreadable = history.read(where, ticket_id)
-    record["history"] = entries
-    if unreadable:
-        problems.append(f"{ticket_id} の履歴: {unreadable}")
     if source.parent:
+        where = approval.home_dir_read(conf, root, ticket_id, source.parent, project=source.project)
         record["risk"] = approval_marks.read_child_record(
             where, source.parent, ticket_id, approval_marks.CHILD_RECORD_RISK
         )

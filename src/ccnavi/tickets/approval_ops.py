@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import os
+import sys
+from typing import TextIO
 
 from ..infra import fsio, settings
 from ..policy import rules
@@ -18,7 +20,6 @@ from . import (
     approval_checks,
     approval_marks,
     archive,
-    history,
     ticket_fields,
     ticket_ids,
     ticket_model,
@@ -26,7 +27,7 @@ from . import (
 from . import ticket as ticket_mod
 
 
-def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> str:
+def admit(approved_dir: str, ticket: ticket_model.Ticket) -> str:
     """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
 
     中身は変えない。 照合に使ったバイト列（`Ticket.source`）を、そのまま `doing/` に
@@ -35,7 +36,7 @@ def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> s
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
 
     計画を持つ親でも、待ち方は書かない。待ち方は承認済みチケットの計画から都度計算する
-    （`approval.load_copy`）。`source_tree` は提案が乗っていたブランチの名前で、状態の履歴に残す。
+    （`approval.load_copy`）。
     """
     target = approval.copy_path(approved_dir, ticket.ticket)
     failed = changed_since_read(ticket)
@@ -60,14 +61,6 @@ def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> s
     if failed:
         fsio.remove(target)
         return f"提案を todo/ から動かせない ({failed})"
-    history.note(
-        approved_dir,
-        ticket.ticket,
-        history.KIND_APPROVED,
-        ticket_model.TODO,
-        ticket_model.DOING,
-        tree=source_tree,
-    )
     return ""
 
 
@@ -169,14 +162,6 @@ def settle_review(
         if failed:
             return moved, failed
         moved.append(t.ticket)
-        history.note(
-            where,
-            t.ticket,
-            history.KIND_SETTLED,
-            ticket_model.REVIEW,
-            ticket_model.DONE,
-            phase=t.phase,
-        )
     return moved, ""
 
 
@@ -305,7 +290,7 @@ def _followup_ticket(
             front[name] = entries
     front.update({"started_at": "", "completed_at": "", "base_sha": "", "merged_sha": ""})
     # 続きの子の目印。提案を経ずにここで作るチケットなので、作るときに書く（承認で中身を
-    # 変えることには当たらない）。時刻は状態の履歴の `raised` に残る。
+    # 変えることには当たらない）。
     front[approval.FOLLOWUP_KEY] = [c.ticket for c in children]
     body = ["", "## 引き継ぐ指摘", ""]
     body += [f"- {item}" for item in items] or ["（指摘の一覧はありません）"]
@@ -355,6 +340,7 @@ def followup(
     phase_no: int,
     children: list[ticket_model.Ticket],
     items: list[str],
+    stderr: TextIO | None = None,
 ) -> tuple[str, str]:
     """レビューで残った指摘の続きの子を、ユーザの判断で `doing/` に直に起こす。
 
@@ -375,18 +361,9 @@ def followup(
     failed = approval_marks.write_ticket(approval.copy_path(where, ident), ticket_mod.render(t))
     if failed:
         return ident, failed
-    history.note(
-        where,
-        ident,
-        history.KIND_RAISED,
-        None,
-        ticket_model.DOING,
-        phase=phase_no,
-        followup_of=[c.ticket for c in children],
-    )
     cleared = approval_marks.clear_marks(where, parent.ticket, phase_no)
     for warning in cleared.warnings:
-        history.failed_to_write(warning)
+        (stderr or sys.stderr).write(f"ccnavi: 警告: {warning}\n")
     if cleared.failed:
         return ident, cleared.failed
     return ident, ""

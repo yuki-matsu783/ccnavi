@@ -56,7 +56,7 @@ def ready(
     マージそのものはユーザが行う。
 
     条件を確かめてマーカーを置いたあと、親のツリーの承認済みの領域から、閉じた親（今回の親と、統合先に
-    たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`events/`・`flows/` を
+    たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`flows/` を
     手元の `logs/archive/` へ退避し、`wip/` の追跡済みのファイルを消す（`review.remove_wip`）。
     git の上では削除になり、C1 がコミットして push してから sh が Draft を外す。squash で
     マージすると、既定のブランチにチケットは残らない。
@@ -204,7 +204,7 @@ def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> t
         f"`{ticket_places.WIP_ROOT}/` の追跡済みのファイルは ready が削除しました（履歴から戻せる）"
         "。"
         "クローズ済みのチケットとその記録"
-        f"（`{conf.approved}/` の done/・phases/・events/・flows/）は手元の `logs/archive/` へ"
+        f"（`{conf.approved}/` の done/・phases/・flows/）は手元の `logs/archive/` へ"
         "退避し、このブランチからは削除してある。マージするかどうかはユーザが決める。"
         "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
     )

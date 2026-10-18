@@ -425,7 +425,7 @@ def _apply_steps(
                     conf, root, t.ticket, t.parent, t.tree_root, project=t.project
                 )
                 with fsio.policy(places=t.ticket):
-                    failed = agree_digest.revise_copy(where, cand.current, t, cand.plans_feedback)
+                    failed = agree_digest.revise_copy(where, cand.current, t)
                 if failed:
                     return t.ticket, failed
                 removing = "改版の提案を todo/ から削除できない ({reason})"
@@ -467,7 +467,7 @@ def _apply_steps(
             where = approval.home_dir(
                 conf, root, t.ticket, t.parent, t.tree_root, project=t.project
             )
-            failed = approval_ops.admit(where, t, approval.source_branch(t))
+            failed = approval_ops.admit(where, t)
             if failed:
                 return t.ticket, failed
             # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは

@@ -13,7 +13,6 @@ from . import (
     agree_candidates,
     approval,
     approval_marks,
-    history,
     ticket_model,
 )
 from . import ticket as ticket_mod
@@ -51,30 +50,17 @@ def revise_copy(
     approved_dir: str,
     current: ticket_model.Ticket,
     revised: ticket_model.Ticket,
-    feedback_planned: bool,
 ) -> str:
     """承認済みチケットの計画を差し替える。
 
     範囲と本文はそのまま（差し替えるのは計画と `phases:`。`revised_front`）。改版の時刻は
-    チケットに書かない（状態の履歴の `revised` に残る。フィードバック計画の改版は
-    `feedback: true` を添える）。待ち方は書かない（承認済みチケットの
-    計画から都度計算する）。
+    チケットに書かない。待ち方は書かない（承認済みチケットの計画から都度計算する）。
     """
     current.raw = revised_front(current, revised)
     failed = approval_marks.write_ticket(
         approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
     )
-    if failed:
-        return failed
-    history.note(
-        approved_dir,
-        current.ticket,
-        history.KIND_REVISED,
-        ticket_model.DOING,
-        ticket_model.DOING,
-        feedback=True if feedback_planned else None,
-    )
-    return ""
+    return failed
 
 
 def revised_front(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> dict:

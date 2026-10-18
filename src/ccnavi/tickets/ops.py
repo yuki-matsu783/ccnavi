@@ -31,7 +31,6 @@ from . import (
     approval_ops,
     configsync,
     flow,
-    history,
     learning,
     ops_close,
     ops_plan,
@@ -119,14 +118,6 @@ def start(
     if failed:
         stderr.write(f"ccnavi: {ticket_id} に着手の欄を保存できませんでした: {failed}\n")
         return 1
-    history.note(
-        os.path.dirname(os.path.dirname(found.path)),
-        found.ticket,
-        history.KIND_STARTED,
-        ticket_model.DOING,
-        ticket_model.DOING,
-        base_sha=sha,
-    )
     stdout.write(
         f"OK: {found.ticket} に着手した（{fields['started_at']} / 基準点 {sha[:12]}）。"
         f"置き場は {ticket_model.DOING}/ のまま\n"
@@ -407,7 +398,7 @@ def _close_parent(
         f"'{ready_command(root, found.ticket)}' で Draft を解除してください"
         "（「マージに進んでよい」の合図）。"
         "ready は Draft を解除する前に、クローズ済みのチケットとその記録"
-        f"（`{conf.approved}/` の done/・phases/・events/・flows/）を手元の logs/archive/ へ移し、"
+        f"（`{conf.approved}/` の done/・phases/・flows/）を手元の logs/archive/ へ移し、"
         f"`{wip}/` の追跡済みのファイルを削除して、その削除をコミットして push する"
         f"（`{wip}/` に未追跡のファイルがあれば削除せずに止まる。削除したものは履歴から戻せる）。"
         "Draft を解除したあと、ready は親のワークツリーを削除します（親のワークツリーの外から"
@@ -651,15 +642,6 @@ def _move(
     if failed:
         stderr.write(f"ccnavi: {found.ticket}: {failed}\n")
         return 1
-    cancelled = bool(fields.get("cancelled_at"))
-    history.note(
-        where,
-        found.ticket,
-        history.KIND_CANCELLED if cancelled else history.KIND_FINISHED,
-        ticket_model.DOING,
-        state,
-        reason=fields.get("cancel_reason") if cancelled else None,
-    )
     stdout.write(f"OK: {found.ticket} を {place} へ動かした（{said}）\n")
     if state == ticket_model.REVIEW:
         # 依頼の前に「ユーザのレビューを待つ」と言わない。次に誰が何をするかを、
@@ -675,7 +657,7 @@ def _move(
             )
             + "\n"
         )
-    elif state == ticket_model.DONE and found.is_child and not cancelled:
+    elif state == ticket_model.DONE and found.is_child and not fields.get("cancelled_at"):
         # 次の一手は status が計算する。ここで決め打ちしない
         stdout.write(
             f"次: '{settings.script_command(root, 'ccnavi-ticket.sh')} status {found.parent}' で、"

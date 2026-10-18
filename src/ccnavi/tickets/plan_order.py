@@ -52,7 +52,6 @@ from . import (
     approval_checks,
     approval_marks,
     flow,
-    history,
     phasetypes,
     ticket_ids,
     ticket_model,
@@ -520,7 +519,6 @@ def _child_problems(source: Source, changes: list[ChildChange]) -> list[str]:
         for ident in sorted(names):
             paths = [
                 os.path.join(place, flow.FLOWS_DIR, ident + flow.SUFFIX),
-                history.path(place, ident),
             ] + [os.path.join(marks, n) for n in listed if n.startswith(ident + ".")]
             for path in paths:
                 if path and fsio.lexists(path):

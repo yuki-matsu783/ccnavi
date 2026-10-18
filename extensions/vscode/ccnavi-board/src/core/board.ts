@@ -13,7 +13,6 @@ import type {
   BoardJson,
   CopyStatus,
   FlowJson,
-  HistoryEntryJson,
   ParentJson,
   PredecessorUnmetJson,
   PhaseJson,
@@ -155,11 +154,6 @@ export interface Card {
   readonly workflow: boolean;
   /** 親のカードの「下書きを作る」（完了した計画付きの親から、テンプレートの下書きを作る）を出すか。実行ファイルの `template_draft` のまま */
   readonly templateDraft: boolean;
-  /**
-   * 状態の履歴の新しい側（古い順）。補助の記録で、列やバッジはここから組まない。
-   * カードの折りたためる「履歴」に並べるだけ
-   */
-  readonly history: readonly HistoryEntryJson[];
   /**
    * 満たしていない先行。空でなければ、承認も着手も止まる。実行ファイルの答えをそのまま持ち、
    * カードの「先行待ち」のバッジに使う
@@ -331,7 +325,6 @@ function toCard(
     flow: isParent ? null : flowOf(t.flow, column),
     workflow: isParent && t.proposal?.state === "todo" && t.proposal.has_plan === true,
     templateDraft: isParent && t.template_draft,
-    history: t.history,
     predecessorsUnmet: t.predecessors_unmet,
   };
 }
@@ -355,7 +348,7 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     family: isParent ? a.ticket : a.parent,
     openPath: a.path,
     copyStatus: "archived",
-    approvedAt: a.approved_at,
+    approvedAt: "",
     reviewRequired: false,
     reviewReason: "",
     worktreeExists: false,
@@ -391,7 +384,6 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     flow: null,
     workflow: false,
     templateDraft: false,
-    history: a.history,
     predecessorsUnmet: [],
   };
 }

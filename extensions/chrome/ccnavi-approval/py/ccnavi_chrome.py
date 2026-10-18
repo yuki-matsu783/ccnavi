@@ -87,12 +87,12 @@ from ccnavi.entry import cli, lint, version
 from ccnavi.infra import fsio, settings
 from ccnavi.tickets import (
     core,
-    history,
     review,
     review_host,
     syncstate,
     ticket_ids,
     ticket_model,
+    via,
 )
 from ccnavi.tickets import ticket as ticket_mod
 
@@ -925,18 +925,6 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
     return snap, place, family, closure
 
 
-def _unwritten(root: str, notes: str) -> None:
-    """並べる段で状態の履歴を書けないと分かったら、
-    書くものを出さずに止める（`core.withdraw` と揃える）。"""
-    lines = [
-        _relative(root, line.replace("ccnavi: 警告: ", "ccnavi: ", 1))
-        for line in notes.splitlines()
-        if line
-    ]
-    if lines:
-        raise Refused("\n".join(lines))
-
-
 def _writable(snap: dict, family: str) -> None:
     """書く操作の前に、書けない理由があれば受けない（`_write_refusal`）。"""
     why = _write_refusal(snap, family)
@@ -980,11 +968,7 @@ def _core_snapshot(req: dict, root: str) -> core.Snapshot:
         conf,
         root,
         _stamp(req),
-        core.Actor(
-            str(actor.get("account") or ""),
-            history.VIA_CHROME,
-            str(actor.get("version") or ""),
-        ),
+        core.Actor(str(actor.get("account") or ""), via.VIA_CHROME),
     )
 
 
@@ -1034,16 +1018,14 @@ def _op_plan(req: dict, root: str) -> dict:
             raise Refused("shown は見せた識別子のリスト（ids）とダイジェスト（digest）")
         shown_ids, shown_digest = ids, digest
     _writable(snap, family)
-    notes = io.StringIO()
     with _environ():
         snapshot = _core_snapshot(req, root)
         actor = snapshot.actor
-        with history.session(actor.via or history.VIA_CHROME, notes, actor.account, actor.version):
+        with via.session(actor.via or via.VIA_CHROME, actor.account):
             verdict = core.judge_approval(snapshot, only, shown_ids, shown_digest)
             refused = verdict.gathered.refused
             ready = verdict.batch and not refused and verdict.mismatch is None
             changes = core.plan(snapshot, verdict) if ready else None
-    _unwritten(root, notes.getvalue())
     body = _changes(root, changes)
     _one_branch(body, family)
     return {
@@ -1073,12 +1055,9 @@ def _op_withdraw(req: dict, root: str) -> dict:
         raise Refused("ids は識別子のリスト")
     if not isinstance(prior, dict) or not all(isinstance(v, str) for v in prior.values()):
         raise Refused("prior は識別子ごとの本文")
-    reason = req.get("reason") if isinstance(req.get("reason"), str) else ""
     with _environ():
         snapshot = _core_snapshot(req, root)
-        checked = core.withdraw(
-            snapshot, ids, {k: v.encode("utf-8") for k, v in prior.items()}, reason
-        )
+        checked = core.withdraw(snapshot, ids, {k: v.encode("utf-8") for k, v in prior.items()})
     body = _changes(root, checked.changes)
     _one_branch(body, family)
     return {
