@@ -101,13 +101,12 @@ def is_handoff_place(rel: str) -> bool:
     （`phase_scope.scope_findings`）も、ここを明示的に外す。外さないと、実行前に通った書き込みが
     コミットのあとで範囲の外として報告される。
 
-    名前の大文字小文字は区別する。`ready` の前提（`git ls-files -- wip`）も区別して
-    `wip/` を見るので、区別しない側に広げない。`wip/handoffX/` や、`scratchpad` という
-    名前のファイルは置き場ではない。
+    名前の大文字小文字は区別しない（`WIP/Handoff/` も同じ置き場。`ready` の片付けも同じ見方）。
+    `wip/handoffX/` や、`scratchpad` という名前のファイルは置き場ではない。
 
     `\\` は `/` に直さない（`is_eli5_place` と同じ理由。`wip\\handoff\\x.py` は置き場ではない）。
     """
-    return rel.startswith(HANDOFF + "/")
+    return rel.casefold().startswith(HANDOFF + "/")
 
 
 # ELI5 の HTML の置き場。依頼につける、変更をやさしく説明した HTML を置く。マージリクエストの
@@ -133,15 +132,14 @@ def is_eli5_place(rel: str) -> bool:
     （`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）も、ここを明示的に外す。外さないと、
     実行前に通った書き込みがコミットのあとで範囲の外として報告される。
 
-    名前の大文字小文字は区別する。依頼の検査（`ccnavi-review.sh`）と `ready` の前提
-    （`git ls-files -- wip`）も区別して `wip/` を見るので、区別しない側に広げない。
+    名前の大文字小文字は区別しない（`WIP/ELI5/` も同じ置き場。`ready` の片付けも同じ見方）。
 
     `\\` は `/` に直さない。呼び手のパスは `tree.relative`（`os.sep` を `/` に直したもの）か
     git が出したパスで、どちらも区切りは `/`。直すと Linux / macOS で `wip\\eli5\\evil.py` という
     名前のファイル 1 個が置き場に
     見え、範囲の判定から外れ、しかも `ready` の片付け（`git ls-files -- wip`）の対象にもならない。
     """
-    return rel.startswith(ELI5 + "/")
+    return rel.casefold().startswith(ELI5 + "/")
 
 
 def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:

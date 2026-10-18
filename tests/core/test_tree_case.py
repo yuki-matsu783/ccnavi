@@ -46,6 +46,23 @@ class TreeCaseTest(unittest.TestCase):
         )
         self.assertEqual(tree.worktree_path(self.root, "i0002"), os.path.join(base, "i0002"))
 
+    def test_lookup_は綴りまで同じキーを先に返す(self) -> None:
+        index = {"I0001-01-01": "A", "i0001-01-01": "B"}
+        self.assertEqual(tree.lookup(index, "i0001-01-01"), "B")
+
+    def test_parts_under_はルートが_の時も使える(self) -> None:
+        self.assertEqual(tree.parts_under(os.sep, os.path.join(os.sep, "etc", "x")), ["etc", "x"])
+
+    def test_owner_は大文字を含むルートでも所有ツリーを返す(self) -> None:
+        from ccnavi.tickets import core_base
+
+        upper = os.path.join(self.root, "Work")
+        os.makedirs(upper)
+        main = tree.main_tree(upper)
+        owner = core_base._owner([main], os.path.join(upper, "a.md"))
+        self.assertIsNotNone(owner)
+        self.assertEqual(owner.root, main.root)
+
 
 if __name__ == "__main__":
     unittest.main()

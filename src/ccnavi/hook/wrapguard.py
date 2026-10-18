@@ -606,9 +606,9 @@ def _holds_core(conf: settings.Settings, root: str, full: str) -> bool:
         if not anchor:
             continue
         for a in {os.path.abspath(anchor), os.path.realpath(anchor)}:
-            a = pathcase.fold(a).lower()
+            a = pathcase.fold(a)
             for f in forms:
-                f = f.lower().rstrip(os.sep) or os.sep
+                f = f.rstrip(os.sep) or os.sep
                 if a == f or a.startswith(f.rstrip(os.sep) + os.sep):
                     return True
     if not os.path.isdir(full):

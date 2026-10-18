@@ -621,7 +621,8 @@ class HandoffPlace(Workspace):
             False,
             "ワークツリー直下の旧置き場（ルート直下のものとは別）。普通の作業対象",
         ),
-        ("WIP/scratchpad/a.md", False, "表記は区別する"),
+        ("WIP/scratchpad/a.md", False, "wip/ の下の scratchpad は置き場ではない"),
+        ("WIP/Handoff/a.md", True, "表記は区別しない"),
     )
 
     def setUp(self):
@@ -691,7 +692,7 @@ class Eli5Place(Workspace):
         ("wip/design/plan.md", False, "wip/ のほかの場所には広げない"),
         ("wip/tmp/eli5.html", False, "旧方式の置き場は外さない"),
         ("docs/wip/eli5/a.html", False, "ルートの直下の wip/ だけ"),
-        ("WIP/eli5/a.html", False, "表記は区別する。依頼の検査と ready も区別する"),
+        ("WIP/ELI5/a.html", True, "表記は区別しない"),
     )
     # 名前に `\` を含む 1 ファイル。Linux / macOS では作れ、`/` に直して見ると置き場に見える。
     # 置き場の判定は `\` を `/` に読み替えない

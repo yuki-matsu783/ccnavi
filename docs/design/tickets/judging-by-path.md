@@ -92,7 +92,7 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 下書きの置き場と同じく追跡される置き場なので、実行前チェック（`ticket_places.is_unscoped`）に加えて、実行後チェック
 （`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）でも外す。親のツリーでも子のツリーでも同じ。
 外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所・`wip/eli5x/`・`docs/wip/eli5/`・同じ名前のファイルは外さない。
-大文字小文字は区別し、`\` は `/` に直さずに見る（`wip\eli5\x.py` という名前の 1 ファイルは置き場ではない）。
+大文字小文字は区別せず、`\` は `/` に直さずに見る（`wip\eli5\x.py` という名前の 1 ファイルは置き場ではない）。
 `tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket_places._under`）と
 下書きの置き場（`ticket_places.is_handoff_place`）も、同じく `\` を直さずに見る。名前は設定で動かさない。
 `wip/` は `ready` の前に丸ごと消すので、ここに置いたものは squash した成果物に残らない。`ready` の前提は大文字小文字を区別せず、

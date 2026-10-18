@@ -217,7 +217,8 @@ def _owner(trees: list[tree.Tree], path: str) -> tree.Tree | None:
     target = pathcase.fold(os.path.realpath(os.path.dirname(path)))
     best = None
     for t in trees:
-        if (target == t.root or target.startswith(t.root + os.sep)) and (
+        base = pathcase.fold(t.root)
+        if (target == base or target.startswith(base + os.sep)) and (
             best is None or len(t.root) > len(best.root)
         ):
             best = t

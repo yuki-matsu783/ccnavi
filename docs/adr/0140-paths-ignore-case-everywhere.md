@@ -24,7 +24,8 @@ Linux で区別し、Windows と macOS の既定では区別しないので、�
 - 比べるときはどの機械でも区別しない。比べる鍵は`infra/pathcase.fold()`に一本化する（`normcase`の後に`casefold`）
 - 鍵はファイルを開く表記には使わない。表記は元のまま使い、比べて残りを取り出すときは`tree.parts_under()`を使う
 - `CASE_INSENSITIVE`と、表記まで同じであることを求める`exact_name`をやめる。`worktree_path()`は在るディレクトリの実際の表記で返す
-- 例外: git が追跡する綴りに依る名前（状態のディレクトリ、`wip/`の置き場、ブランチ名）は、git が区別するので綴りまで求める
+- `wip/`の置き場（`wip/handoff/` `wip/eli5/`）も区別しない。範囲の除外も`ready`の片付けも同じ見方にそろえる
+- 例外: git が追跡する綴りに依る名前（状態のディレクトリ、ブランチ名、`.gitignore`の`/scratchpad`）は、git が区別するので綴りまで求める
 
 ## 理由
 

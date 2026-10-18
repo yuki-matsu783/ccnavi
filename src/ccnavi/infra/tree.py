@@ -258,8 +258,8 @@ def parts_under(base: str, full: str) -> list[str] | None:
     `full` のまま。小文字にしたパスから作ると、チケットが `README.md` と書いた範囲に
     `readme.md` を当てることになって、永久に当たらない。
     """
-    base_parts = _resolved(base).split(os.sep)
-    parts = _resolved(full).split(os.sep)
+    base_parts = _resolved(base).rstrip(os.sep).split(os.sep)
+    parts = _resolved(full).rstrip(os.sep).split(os.sep)
     if len(parts) < len(base_parts):
         return None
     for want, got in zip(base_parts, parts, strict=False):
@@ -428,7 +428,13 @@ def nfc(name: str) -> str:
 
 
 def lookup(index: dict, name: str):
-    """ワークツリーの名前で承認済みチケットを引く。大文字小文字はどの機械でも区別しない。"""
+    """ワークツリーの名前で承認済みチケットを引く。大文字小文字はどの機械でも区別しない。
+
+    綴りまで同じものがあればそれを返す（大小だけ違うキーが並んでいても誤って結び付けない）。
+    """
+    found = index.get(name)
+    if found is not None:
+        return found
     folded = pathcase.fold(name)
     for key, value in index.items():
         if pathcase.fold(key) == folded:
