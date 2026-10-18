@@ -381,7 +381,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if test_words is not None and args.test is None:
         args.test = test_words
     if args.help:
-        stderr.write(cli_usage.USAGE)
+        # `--docs --help` は索引の引き方の節だけ。全文は読む量が多い。
+        stderr.write(cli_usage.DOCS_USAGE if args.docs else cli_usage.USAGE)
         return EXIT_ERROR
     refused = _test_usage(parser, args)
     if refused:

@@ -381,7 +381,7 @@ def guide_lines(conf: settings.Settings, root: str, lead: str) -> list[str]:
         f"{lead} '{command} --docs --keyword <語>' で"
         " frontmatter の索引を引いてください"
         "（--keyword のほかに --type・--tag・--path・--text でも絞れる。"
-        f"絞り方の一覧は '{command} --help' で確かめる。"
+        f"絞り方の一覧は '{command} --docs --help' で確かめる。"
         "ワークスペースとプロジェクトを横断し、パスはワークスペースルートから）。"
         "grep は本文中の文字列を探すときか、0 件だったときに使ってください。"
     )

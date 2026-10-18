@@ -47,6 +47,13 @@ class CliUsageTest(unittest.TestCase):
         missing = sorted(v for v in verbs if f"ccnavi worktree {v} " not in cli_usage.USAGE)
         self.assertEqual(missing, [], "ヘルプに書いていない worktree の副命令")
 
+    def test_docs_help_is_only_the_docs_section(self):
+        for listed in ("--keyword", "--text", "--sort", "--format", "--no-refresh"):
+            self.assertIn(listed, cli_usage.DOCS_USAGE)
+        for other in ("--templates", "--agree", "--lint", "ccnavi ticket"):
+            self.assertNotIn(other, cli_usage.DOCS_USAGE)
+        self.assertIn(cli_usage.DOCS_USAGE, cli_usage.USAGE)
+
 
 if __name__ == "__main__":
     unittest.main()

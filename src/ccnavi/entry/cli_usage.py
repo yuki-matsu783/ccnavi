@@ -5,7 +5,7 @@ cli から分けた。cli を読まない。
 
 from __future__ import annotations
 
-USAGE = """ccnaviはエージェントのツール呼び出しを制御し、より安全な操作へ誘導します。
+_BEFORE_DOCS = """ccnaviはエージェントのツール呼び出しを制御し、より安全な操作へ誘導します。
 
 通常はフックとして実行します。標準入力からフックのJSONデータを1件読み込み、
 処理結果を標準出力に出力します。
@@ -58,7 +58,10 @@ Code拡張機能は、フローを開く前や保存する前に、編集中の�
 
     ccnavi --lint --json --flow /tmp/flow.yml
 
-本文中の行ではなく、ドキュメントの性質でマークダウン文書を探すには、
+"""
+
+# `ccnavi --docs --help` はこの節だけを出す。`--help` の全文にも同じものが入る。
+DOCS_USAGE = """本文中の行ではなく、ドキュメントの性質でマークダウン文書を探すには、
 ワークスペースとそのプロジェクトのfrontmatter索引を検索します（パスはワークスペースルートからの相対パスです。
 例: projects/lib/docs/x）。
 
@@ -84,7 +87,9 @@ ccnavi-index.jsonl を最新の状態に更新します。更新するのは、g
 README.md（「ドキュメントの索引」）に記載しています。これらのフィルターは --docs 専用です。
 ほかの実行で指定すると、終了コード1で停止します。他の実行用のフラグを --docs
 に指定した場合も同様に停止します。
+"""
 
+_AFTER_DOCS = """
 作業・レビュー計画のテンプレートを一覧・検索・参照するには、
 次のコマンドを実行します（計画と子フローを1ファイルにまとめたもので、
 .ccnavi/config/common/templates/ と .ccnavi/config/project/templates/ に置かれます。
@@ -497,3 +502,5 @@ ccnavi自身は、リモートに接続しません。スクリプトがマー�
 `ccnavi --close-early --reason <why> --result <json>` を実行した後、
 マージリクエストのDraftを解除し、残った項目を新しいissueとして登録します。
 """
+
+USAGE = _BEFORE_DOCS + DOCS_USAGE + _AFTER_DOCS
