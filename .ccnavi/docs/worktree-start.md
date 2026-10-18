@@ -59,7 +59,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   同じコマンドを打ち直す。段は3つある
   - 既存のMRを確かめる段: `mcp__github__search_pull_requests`で探す。見つかれば候補としてユーザに聞く。無いと確かめたら`--mcp-checked`を付けて打ち直す
   - issueの題を読む段（slugが決められないとき）: `mcp__github__issue_read`で題を読み、`--slug <語> --title '<題>'`を付けて打ち直す
-  - MRを作る手順（ブランチ・ワークツリー・pushは済んでいる）: `mcp__github__create_pull_request`を、案内の値（`head`はブランチ名、`base`は統合先、
+  - MRを作る段（ブランチ・ワークツリー・pushは済んでいる）: `mcp__github__create_pull_request`を、案内の値（`head`はブランチ名、`base`は統合先、
     `title`、`body`は`Closes #<番号>`、`draft: true`）で呼ぶ。作れたら、案内のコマンド（`--mcp-checked`は外してある。付けたままだと、MCPで作ったMRを見ずに止まり続ける）を打ち直すと、続きからワークツリーのパスが出る
   GitLabにはMCPの案内が無い。届かない理由と手で打つ手順が出るので、glabの認証か`GITLAB_TOKEN`をユーザに頼んで打ち直す。
   gitのpushが通らないときは、従来どおり`ccnavi-git.sh`の拒否の出力に従う
