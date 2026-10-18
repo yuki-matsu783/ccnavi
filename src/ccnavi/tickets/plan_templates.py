@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import json
 import os
 import re
 import stat
@@ -595,9 +596,14 @@ def _composed(template: Template, ptypes: dict) -> str:
     return f"{ticket_model.FENCE}\n{body}{ticket_model.FENCE}\n"
 
 
-def _plan_problems(
+def _plan_config(
     template: Template, types: dict[str, phasetypes.PhaseType] | None
-) -> list[Problem]:
+) -> tuple[dict, dict[str, phasetypes.PhaseType], dict[str, phasetypes.PhaseType], list[Problem]]:
+    """順序の検査に使う定義。(合成する親の `phases:`, 検査の定義, 仮の定義, 定義が無い苦情)。
+
+    定義に無い型は、順序の検査用に仮の定義へ置き換える（kind は置き場に合わせる）。
+    定義が無いことは warn で別に言う。
+    """
     name = template.name
     known = _definitions(types)
     found: list[Problem] = []
@@ -614,8 +620,6 @@ def _plan_problems(
             if real is not None:
                 ptypes[item.type] = phasetypes.as_copy(real)
                 continue
-            # 定義に無い型は、順序の検査用に仮の定義へ置き換える（kind は置き場に合わせる）。
-            # 定義が無いことは warn で別に言う。
             pt = phasetypes.PhaseType(
                 id=item.type, title=f"(定義なし) {item.type}", kind=kind, review="mr"
             )
@@ -638,10 +642,17 @@ def _plan_problems(
                 "フェーズ定義（phases.yml）が無いので、型が在るか・kind が合うかは確かめていない",
             )
         )
+    return ptypes, {**known, **placeholders}, placeholders, found
+
+
+def _plan_problems(
+    template: Template, types: dict[str, phasetypes.PhaseType] | None
+) -> list[Problem]:
+    name = template.name
+    ptypes, config, _, found = _plan_config(template, types)
     parsed, notes = ticket.parse(_composed(template, ptypes))
     if parsed is None:
         return found + [Problem(p.severity, name, p.detail) for p in notes]
-    config = {**known, **placeholders}
     structural = workflow.problems(parsed, None)
     seen = {p.detail for p in structural}
     found.extend(Problem(SEVERITY_ERROR, name, p.detail) for p in structural)
@@ -651,6 +662,103 @@ def _plan_problems(
         seen.add(p.detail)
         # 定義に左右される食い違いは warn にとどめる。
         found.append(Problem(SEVERITY_WARN, name, p.detail))
+    return found
+
+
+def graph(
+    template: Template, types: dict[str, phasetypes.PhaseType] | None, sha: str = ""
+) -> list[dict]:
+    """計画の図の中身。`plan_order.plans` と同じ形（`ApprovePlan`）で、計画ごとに 1 件。
+
+    番号は全体計画が 1..n、フィードバック計画はその続き。`after` はその番号で書く。
+    合成できない（`after` が読めないなど）ときは、項と `after` を Template から直接組み、
+    `loose` と `ready` は空にして、理由を `problems` に入れる。
+    """
+    ptypes, config, _, _ = _plan_config(template, types)
+    parsed, _ = ticket.parse(_composed(template, ptypes))
+    wf = None
+    if parsed is not None and not any(
+        p.severity == SEVERITY_ERROR for p in _order_errors(template)
+    ):
+        wf = workflow.compute(parsed)
+    planned = len(template.plan)
+    loose = workflow.loose(parsed, wf) if parsed is not None and wf is not None else []
+    ready = workflow.ready(parsed, wf) if parsed is not None and wf is not None else []
+    out = []
+    for key, first, items in (
+        ("plan", 1, template.plan),
+        ("feedback", planned + 1, template.feedback),
+    ):
+        if not items:
+            continue
+        numbers = range(first, first + len(items))
+        offset = first - 1
+        after = {
+            str(n): sorted({m + offset for m in item.after})
+            for n, item in zip(numbers, items, strict=True)
+            if item.after
+        }
+        rows = []
+        for n, item in zip(numbers, items, strict=True):
+            pt = config.get(item.type)
+            review = (
+                ticket_model.PLAN_REVIEW_MR
+                if item.review == ticket_model.PLAN_REVIEW_MR
+                else (pt.review if pt is not None else "")
+            )
+            rows.append(
+                {
+                    "number": n,
+                    "from": n,
+                    "type": item.type,
+                    "title": pt.title if pt is not None and pt.title else item.type,
+                    "review": review,
+                    "deferred": item.review == ticket_model.PLAN_REVIEW_DEFER,
+                    "review_at": wf.review_at.get(n) if wf is not None else None,
+                    "locked": False,
+                }
+            )
+        errors = [p.detail for p in _order_errors(template) if p.detail.startswith(f"`{key}[")]
+        if wf is not None and parsed is not None:
+            errors += [
+                str(p) for p in workflow.problems(parsed, None, key) if p.severity == SEVERITY_ERROR
+            ]
+        out.append(
+            {
+                "ticket": template.name,
+                "part": key,
+                "source_sha": sha,
+                "items": rows,
+                "after": after,
+                "proposed": after,
+                "current": None,
+                "loose": [n for n in loose if n in numbers],
+                "ready": [n for n in ready if n in numbers],
+                "problems": errors,
+            }
+        )
+    return out
+
+
+def _order_errors(template: Template) -> list[Problem]:
+    """`after` の範囲と `review` の値の誤り（`check` の最初の段と同じ）。"""
+    found: list[Problem] = []
+    for key, items in (("plan", template.plan), ("feedback", template.feedback)):
+        for i, item in enumerate(items, start=1):
+            for value in item.after:
+                if value < 1 or value >= i:
+                    found.append(
+                        Problem(
+                            SEVERITY_ERROR,
+                            template.name,
+                            f"`{key}[{i}]` の `after` の {value} は読めない"
+                            f"（{key} の中の添字で、自分（{i}）より小さい 1 以上の数だけを指せる）",
+                        )
+                    )
+            if item.review and item.review not in ticket_model.PLAN_REVIEWS:
+                found.append(
+                    Problem(SEVERITY_ERROR, template.name, f"`{key}[{i}]` の `review` は読めない")
+                )
     return found
 
 
@@ -1051,6 +1159,57 @@ def as_json(
         "warns": sum(1 for _, p in problems_of(scan_) if p.severity == SEVERITY_WARN),
         "infos": sum(1 for _, p in problems_of(scan_) if p.severity == SEVERITY_INFO),
     }
+
+
+def check_file(conf: settings.Settings, root: str, path: str, layer: str = LAYER_SELF) -> dict:
+    """任意のパスのテンプレートを検査した答え（`--templates --check-file`）。書かない。
+
+    名前の期待値はファイル名から拡張子を除いたもの。`data` は読んだ中身の写し（読めなければ
+    null）で、
+    呼び手が「書こうとした中身を実行ファイルがそのまま読んだか」を見るのに使う。
+    `types` はこのレイヤーで使えるフェーズ定義（共通 + レイヤー）。
+    """
+    base = os.path.basename(path)
+    stem = base[: -len(SUFFIX)] if base.endswith(SUFFIX) else base
+    types = types_for(conf, root, layer)
+    answer: dict = {
+        "version": JSON_VERSION,
+        "ok": True,
+        "layer": layer,
+        "name": stem,
+        "sha": "",
+        "valid": False,
+        "problems": [],
+        "data": None,
+        "plans": [],
+        "types": [
+            {"id": t.id, "title": t.title, "kind": t.kind, "review": t.review}
+            for _, t in sorted((types or {}).items())
+        ],
+    }
+    raw, why = flow.read_bytes(path)
+    if raw is None:
+        answer["problems"] = [_problem_json(Problem(SEVERITY_ERROR, stem, why))]
+        return answer
+    answer["sha"] = digest(raw)
+    found: list[Problem] = []
+    if not NAME_RE.match(stem) or len(stem) > NAME_LIMIT:
+        found.append(
+            Problem(
+                SEVERITY_ERROR,
+                stem,
+                f"ファイル名 `{_line(base)}` は名前に使えない（英数字で始め、英数字と `._-` だけ）",
+            )
+        )
+    template, notes = parse_template(raw, stem)
+    found.extend(notes)
+    if template is not None:
+        found.extend(check(template, types))
+        answer["valid"] = True
+        answer["data"] = json.loads(json.dumps(template.as_data(), default=str))
+        answer["plans"] = graph(template, types, answer["sha"])
+    answer["problems"] = [_problem_json(p) for p in found]
+    return answer
 
 
 def find(scan_: Scan, layer: str, name: str) -> Entry | None:

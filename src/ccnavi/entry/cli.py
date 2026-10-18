@@ -315,6 +315,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--templates", action="store_true")
     parser.add_argument("--show", default=None, metavar="NAME")
     parser.add_argument("--layer", default="")
+    # 任意のパスのテンプレートを検査する（`--templates --check-file <パス>`）。読むだけ。
+    # 保存の前の検査に使う。
+    parser.add_argument("--check-file", default=None, metavar="PATH")
     # テンプレートの下書き。`--draft <親>` は完了した親から下書きを `wip/handoff/` に作る。効力が
     # 無いのでエージェントが打ってよい。`--name` は下書きの名前、`--to common|project` と
     # `--layer` は取り込み先。取り込みは `user handoff`（テンプレート専用の取り込みは無い）。
