@@ -5,7 +5,7 @@
  * 拡張ホストが渡すのは「いま何を見せるか」（`WorkflowData`）だけで、画面が返すのはユーザが押した操作
  * （`WorkflowMessage`）だけ。
  *
- * **画面は判定しない。番号も振り直さない。** 線を変えるたびに、画面は元の番号（いま提案に書いてある番号）での
+ * **判定と番号の振り直しは実行ファイルがする。** 線を変えるたびに、画面は元の番号（いま提案に書いてある番号）での
  * 直接の先行（`PlanOrder`。`--order` の形）を組んで拡張ホストに頼み（`order`）、拡張ホストが
  * `ccnavi --plan-order <親> --json --order <JSON>` の答えを返す（`answer`）。振り直した番号・順序の検査
  * （`problems`）・終端に当たらない項（`loose`）・書けるか（`writable`）はその答えのまま描く。断られた線
@@ -72,7 +72,7 @@ export type WorkflowMessage =
    * `dirty` で、ボードの承認を止めるかを `dirty || checking` で決める（答えを待つ間に承認が通らないように）
    */
   | { readonly type: "dirty"; readonly dirty: boolean; readonly checking: boolean }
-  /** 線を変えた。この先行で実行ファイルに振り直させる（書きはしない）。答えは `answer` */
+  /** 線を変えた。この先行で実行ファイルに振り直させる。答えは `answer` */
   | { readonly type: "order"; readonly seq: number; readonly order: PlanOrder }
   /** 「この順序に決める」。`expect` は開いたときの `source_sha` */
   | { readonly type: "save"; readonly order: PlanOrder; readonly expect: string }
@@ -153,7 +153,7 @@ export interface ParentNow {
 }
 
 /**
- * 提案が承認待ちから無くなった理由。まだ承認待ちなら undefined（何も言わない）。`revision` は開いたときの答えが
+ * 提案が承認待ちから無くなった理由。まだ承認待ちなら undefined。`revision` は開いたときの答えが
  * 改版か（承認済みの親に対する提案）。改版は承認されても取り下げられても承認済みチケットが残るので、言い切らない。
  * `now` が undefined なら、ボードにその親が無い（取り下げ・削除）
  */

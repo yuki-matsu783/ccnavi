@@ -317,7 +317,7 @@ export type TemplatesMessage =
   | { readonly type: "switchTarget"; readonly kind: string; readonly name: string }
   /** 1 件の本文を読む */
   | { readonly type: "showTemplate"; readonly name: string; readonly layer: string }
-  /** 取り込みの下見を頼む（何も書かない） */
+  /** 取り込みの下見を頼む */
   | { readonly type: "previewImport"; readonly request: ImportRequest }
   /** 取り込みを実行する。`expect` は見せた下書きの sha */
   | { readonly type: "importYes"; readonly request: ImportRequest; readonly expect: string }

@@ -123,7 +123,7 @@ export function parsePlanOrder(text: string): PlanOrderParse {
 
 /**
  * 保存（`--write --json`）の答えを、パネルが読む形にしたもの。`changed` は開いたときのハッシュ（`--expect`）が
- * 今の中身と違った（外で変わった。何も書いていない）。`refused` は書かなかった（順序の検査・改版の錠・子の付け替え
+ * 今の中身と違った（外で変わった）。`refused` は書かなかった（順序の検査・改版の錠・子の付け替え
  * など。理由は実行ファイルの標準エラー）。`unchanged` は振り直しても変わらず、書くものが無かった
  */
 export type PlanOrderWrite =

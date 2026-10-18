@@ -280,7 +280,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     }
   }
 
-  /** 書く前に、ホストの Approve が外れうることを読む（止めはしない。ccnavi はホストの Approve を読まないので、外れても流れは止まらない） */
+  /** 書く前に、ホストの Approve が外れうることを読む */
   async function approvalWarning(deps: WriteDeps, repo: RepoConfig, family: string): Promise<string> {
     try {
       const prs = (await deps.call("pullApprovals", [repo.owner, repo.repo, family])) as { number: number }[];

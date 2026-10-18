@@ -15,7 +15,7 @@ out="$(cd "$here/../../.." && pwd)/dist"
 mkdir -p "$out"
 target="$out/ccnavi-board-$version.vsix"
 
-# --no-dependencies: 実行時の依存が無いので node_modules を見に行かない（pnpm の配置も読まない）。
+# --no-dependencies: 実行時の依存が無いので node_modules を見に行かない。
 # --skip-license / --allow-missing-repository: ローカル配布なので Marketplace 向けの確認は要らない。
 # --no-rewrite-relative-links: ローカル配布なので README の相対リンクを書き換えず、リポジトリ URL もリポジトリに残さない。
 pnpm exec vsce package --no-dependencies --skip-license --allow-missing-repository --no-rewrite-relative-links -o "$target"

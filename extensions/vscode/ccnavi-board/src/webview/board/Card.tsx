@@ -425,9 +425,8 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
 }
 
 /**
- * 「レビューの対応」。本体を押すとメニューが開くだけで、何も実行しない。項目は固定の 2 つで、前回の選択は覚えない。
- * 項目は指摘の有無で無効にしない（判定は `decide` と `confirm` が持つ）。メニュー外のクリックで閉じる。
- * 矢印キーと Esc は扱わない。
+ * 「レビューの対応」。本体を押すとメニューが開く。項目は固定の 2 つ。
+ * 項目は常に有効（判定は `decide` と `confirm` が持つ）。メニュー外のクリックで閉じる。
  */
 function ReviewMenu({ parent, phase }: { readonly parent: string; readonly phase: number }): JSX.Element {
   const [open, setOpen] = useState(false);
