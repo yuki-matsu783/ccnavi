@@ -743,7 +743,7 @@ next_ticket_lines() {
 	nt_scope=$(sh_quote "<触るファイルの glob>")
 	printf '次: ワークツリーの中で sh %s/ccnavi-launcher.sh ticket new %s --title %s --plan quick-work --scope %s%s%s で提案を作る。作れたら、承認をユーザに頼んで返事を待つ\n' \
 		"$scripts" "$nt_id" "$nt_title" "$nt_scope" "$nt_issue" "$nt_mr"
-	printf '案内: 小さい作業（1〜2 ファイル）は quick-work。大きい作業は --plan を design,implement のように変える（型と範囲は .ccnavi/config/common/phases.yml）。提案は手で書かず、承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる\n'
+	printf '案内: 設計判断が要らない作業は、範囲が複数のディレクトリや文書・設定にまたがっても quick-work。大きい作業は --plan を design,implement のように変える（型と範囲は .ccnavi/config/common/phases.yml）。提案は手で書かず、承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる\n'
 }
 
 # 既存の MR を採用してよいか確かめる。引っかかったら止める。<ブランチ> <MR の JSON>
