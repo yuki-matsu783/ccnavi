@@ -1217,8 +1217,9 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
 class ParentPushGateTest(GitWrapperTest):
     """親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る（push の関門）。
 
-    「一度は送った形跡」は `refs/remotes/origin/<ブランチ>` と、
-    実行ファイルが答える着手済み（承認済みの親チケットの started_at）・依頼のマーカー・手元の退避。
+    「一度は送った形跡」は、`refs/remotes/origin/<ブランチ>` と、
+    実行ファイルが答える着手済み（承認済みの親チケットの started_at）・依頼のマーカー・
+    手元の退避で見る。
     形跡があるのにリモートに無ければ拒否し（改名・消し間違い・捨てた親子のチケットを、確かめずに作り直さない）、
     形跡が無ければ初回の push として通す。承認済みというだけでは形跡にしない
     （承認して最初に打つ push が通る）。確かめられないとき（ls-remote の失敗）は拒否する。

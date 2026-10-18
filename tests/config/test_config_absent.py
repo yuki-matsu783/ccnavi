@@ -639,7 +639,7 @@ class BuiltinGitWordingTest(unittest.TestCase):
         self.assertIn("ユーザに削除を頼んでください", texts["builtin:recursive-delete"])
         self.assertIn("ユーザに確認してください", texts["builtin:git-reset-hard"])
         self.assertIn("ユーザに頼んでください", texts[builtin.CONFIG_VIA_BASH_RULE_ID])
-        # ユーザに頼む文になる。
+        # 案内はユーザに頼む文になる。
 
 
 class AbsentRiskTest(ConfigUnionHarness):

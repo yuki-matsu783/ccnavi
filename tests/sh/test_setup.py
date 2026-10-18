@@ -451,7 +451,7 @@ class WritesTheExpectedShape(SetupTest):
     def test_writes_the_paths_ccnavi_reads(self):
         """env の値そのものを見る。存在するだけでは、取り違えを見つけられない。
 
-        置き場は固定で、置き場を動かす 6 つの扱いは
+        置き場は固定なので、置き場を動かす 6 つを書かないことは
         `DoesNotWriteThePlaceVariables` が見る。
         """
         self.run_setup("--mode", "enable")

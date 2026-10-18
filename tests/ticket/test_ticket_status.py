@@ -185,7 +185,7 @@ class TicketStatusTest(PhaseHarness):
         write(path, text.replace('base_sha: ""', f'base_sha: "{stray}"', 1))
         self.commit_parent("planted")
         mine = self.block(self.said("i0001"), "i0001")
-        # 基準点が HEAD の祖先でないのは warn。started_at の無い base_sha は
+        # 基準点が HEAD の祖先でないときは warn を出す。started_at の無い base_sha は
         # 判定が blocked で止めるので、止まっている理由はそちらで出る。
         self.assertIn("注意: 基準点", mine)
         self.assertIn("HEAD の祖先でない", mine)

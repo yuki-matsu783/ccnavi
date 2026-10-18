@@ -28,7 +28,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 9. ユーザの判断の入口（ccnavi-review.sh close-early など）は、取り込み済みの親子のチケットなら
    承認の push を自動で呼ぶ
 10. origin の無いリポジトリ・
-    マージリクエストで見るフェーズが無い親子のチケットは今のまま
+    マージリクエストで見るフェーズが無い親子のチケットは今のまま変えない。
 11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、失敗してもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、write-and-push の confirm が
     書いて送ったものが、経路・時刻のほかは同じ

@@ -187,7 +187,7 @@ class CompatAgreesTest(unittest.TestCase):
 
     def test_v10_the_board_reading_attention_from_the_executable_raised_the_compat_to_7(self):
         """V10 ボードの JSON のチケットが `issues` と `attention` を持ち、拡張はそれを読むだけに
-        なった。なので 7 以上。
+        なった。そのため版は 7 以上。
 
         欄を足しただけだが、古い実行ファイルの答えでは拡張の「要対応のみ」が空になり、不備も
         出ない。知らないうちに空になるより食い違いとして知らせる。
