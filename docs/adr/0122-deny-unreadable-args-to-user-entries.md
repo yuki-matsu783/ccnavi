@@ -8,7 +8,7 @@ keywords: [端末, 入口, 変数, glob, xargs, busybox, forget, decide, choices
 
 # ADR-0122: 2 段目の無いユーザの入口は、引数を読み切れなければ止める
 
-状態: 採用
+状態: 採用（`ccnavi-sync.sh --forget` は ADR-0142 が廃止し、放棄した親の記録を消す `ccnavi worktree retire --abandon <親>` に置き換えた。止める対象は `--forget` から `--abandon` に移り、実行ファイルの `worktree retire` の形の読み切れない引数として止める）
 
 ## 状況
 
