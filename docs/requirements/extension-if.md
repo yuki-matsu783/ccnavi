@@ -64,7 +64,7 @@ sh は `<ワークスペースルート>/.ccnavi/scripts/` のものを絶対パ
 | REQ-EXT-17 | 事象 | `--lint` か `--lint --json` を求められたとき、ccnavi は、error があれば 1、無ければ 0 で終わること。`--rules`・`--risk`・`--phases`・`--project-rules-file`・`--project-phases-file`・`--project-risk-file` の差し替えを、hook と同じ読み手で検証すること。`--json` の苦情は `{severity, where, detail}` で、置き場の苦情は `where` を `(projects)`・`(projects/<名前>)` にすること。`--flow <パス>` を足したときは、そのフローを `SubagentStart` と同じ読み手で読み、読めた中身を `flow` に載せ、苦情の場所を `(flow)` にすること（REQ-DIA-04・REQ-DIA-08） |
 | REQ-EXT-18 | 事象 | `--suggest --json` を求められたとき、ccnavi は、記録からルールの候補を JSON で返し、何も書かずに 0 で終わること |
 | REQ-EXT-19 | 事象 | `ccnavi c1 family <親>` を求められたとき、ccnavi は、何も書かずに、1 行目に `c1 1`、続けて `<鍵> <値>` の行（`target yes`・`target no`・`target stop` を含む）を返して 0 で終わること。識別子の形でない値には 1 で終わること |
-| REQ-EXT-20 | 事象 | `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-push-approved.sh [<親>...]` をユーザが打ったとき、ccnavi は、承認済みチケットの置き場の変更をコミットし、保護されたブランチでなければ push すること。親を並べたときは、その親子のチケットのうち取り込み済みのものだけを送ること（REQ-APV-10）。`--path <パス>` を並べたときは、置き場の変更のうちそのパスだけを送ること |
+| REQ-EXT-20 | 事象 | `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-push-approved.sh [<親>...]` をユーザが打ったとき、ccnavi は、承認済みチケットの置き場の変更をコミットし、保護されたブランチでなければ push すること。親を並べたときは、その親子のチケットだけを送り、親のブランチがリモートに無ければ送らないこと（REQ-APV-10）。`--path <パス>` を並べたときは、置き場の変更のうちそのパスだけを送ること |
 | REQ-EXT-21 | 状態 | フェーズをレビューで止めている間も、ccnavi は、親のワークツリーで単体で打った `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-review.sh confirm --phase <N>` を通すこと。sh のパスは realpath で解いたワークスペースルートから `/` 区切りで書き、空白やシェルの記号を含むときだけ引用する形（`settings.script_command`）を通すこと |
 | REQ-EXT-22 | 常時 | ccnavi は、VS Code 拡張が直接読み書きするファイルを次の場所に置くこと。提案はワークスペース・プロジェクト・ワークツリーの `wip/proposals/`、承認済みチケットとマーカーは同じツリーの `.ccnavi/approved/`、閉じたチケットの退避は `logs/archive/`、共通レイヤーは `.ccnavi/config/common/` の `rules.yml`・`risks.yml`・`phases.yml`・`rule-expectations.yml`。自身のレイヤーとプロジェクトのレイヤーのパスは `--explain --json` の `layers[]` で示すこと |
 | REQ-EXT-23 | 常時 | ccnavi は、チケット制御の宣言 `CCNAVI_TICKET_CONTROL`（`.claude/settings.json` か `.claude/settings.local.json` の env に書き、Claude Code がプロセスに渡すもの）を `enable` と `disable` の 2 値で読み、読めない値は `enable` として扱うこと。`--explain --json` の `settings.ticket_control` には、解決した値を必ず `enable` か `disable` で載せること（REQ-DIA-07）。そのとき値は、プロセスの環境の上にワークスペースルートの `.claude/settings.json`・`.claude/settings.local.json` の env をこの順で重ねて解決し、ボードの中身も同じ値で組むこと |
@@ -97,7 +97,7 @@ Pyodide のメモリ上のファイルシステムに組んだ仮のツリーを
 | REQ-EXT-29 | 事象 | `core.judge_approval(snapshot, only, shown_ids, shown_digest)` を呼ばれたとき、ccnavi は、`--agree --preview --json` と同じ関数で承認の対象・画面の本文・ダイジェストを出すこと。見せた識別子（`shown_ids`）とダイジェスト（`shown_digest`、提案の識別子の一覧と各提案ファイルのバイト列全体から作る。大文字小文字は問わない）が渡されたときは今のものと比べ、どちらかが違えば `mismatch`（`{expected, current, digest: {expected, current}}`）を返すこと。絞り（`only`）が通らないときは、絞らない一覧を今の一覧として比べること |
 | REQ-EXT-30 | 常時 | ccnavi は、`core.plan`・`core.withdraw`・`core.confirm` で、書くものを値（`Changes`）で返すだけにし、ディスクにもホストにも書かないこと。`withdraw` と `confirm` は、通らなければ `changes` を `None` にして理由を `problems` で返すこと。`Changes.per_branch()` はブランチごとに `{op: create\|update\|delete, path, content}`（`path` はツリーからの相対、`content` はバイト列）を返すこと |
 | REQ-EXT-31 | 常時 | ccnavi は、`Snapshot.stamp` が渡されたとき、書くものの時刻（マーカー・承認の記録）をその時刻に固定し、同じ入力から手元と同じバイト列を出すこと。`core.withdraw` と `core.confirm` は、`Snapshot.actor`（`Actor(account, via)`）のアカウントと経路をレビュー済みのマーカーに書くこと。`core.plan` が書くマーカーの経路とアカウントは、呼び手が `via.session` で渡すこと（Chrome 拡張は経路に `chrome` を渡す） |
-| REQ-EXT-32 | 常時 | ccnavi は、手元と同じ形に組んだ仮のツリー（ワークスペースルートに統合先、`.claude/worktrees/<識別子>` に親子のチケット、`projects/<名前>` にプロジェクトの統合先、取り込み状態は `logs/state/sync/self/` と `logs/state/sync/<名前>/`）を、手元と同じ関数で読むこと。ワークツリーの見分けとブランチ名は `.git` のファイル（`HEAD`・`gitdir:`）から読むこと。git を起こせない場（`sys.platform` が `emscripten`）では、承認の時刻のように git に頼る表示の値を分からないとして空にすること |
+| REQ-EXT-32 | 常時 | ccnavi は、手元と同じ形に組んだ仮のツリー（ワークスペースルートに統合先、`.claude/worktrees/<識別子>` に親子のチケット、`projects/<名前>` にプロジェクトの統合先）を、手元と同じ関数で読むこと。ワークツリーの見分けとブランチ名は `.git` のファイル（`HEAD`・`gitdir:`）から読むこと。git を起こせない場（`sys.platform` が `emscripten`）では、承認の時刻のように git に頼る表示の値を分からないとして空にすること |
 
 Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 
@@ -112,7 +112,6 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 | `ccnavi.tickets.via` | `session(via, actor="")`・`VIA_CHROME` |
 | `ccnavi.tickets.review_host` | `Result.from_data(data)`（戻り値の `error`） |
 | `ccnavi.tickets.review` | `_is_sha(value)` |
-| `ccnavi.tickets.syncstate` | `SELF` |
 | `ccnavi.tickets.ticket` | `TODO`・`DOING`・`DONE`・`STATES`・`ID_CHARS`・`RESERVED_BRANCH_IDS`・`DEFAULT_ISSUE_PREFIX`・`Ticket`（`ticket`・`title`・`body`・`is_child`・`predecessors`）・`parse(text)`・`load(path)`・`is_valid_id(text)`・`is_valid_name(text)`・`child_pattern()`・`branch_name(t)`・`branch_name_problems(t, integration="", serial=0, prefixes=…)`・`branch_problem(name)`・`issue_identifier(number, title="", project="", prefix="feature")` |
 
 REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が名前を直に引くため。改名すると、同梱の版を組み立て直すまで

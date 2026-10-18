@@ -212,6 +212,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0140](0140-paths-ignore-case-everywhere.md) | パスと名前の大文字小文字は、どの機械でも区別せず同じものとして扱い、両立させない |
 | [0141](0141-drop-the-state-history.md) | 状態の履歴（`events/<識別子>.jsonl`）をやめ、状態は置き場とマーカーだけで持つ（0086 を置き換える） |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
+| [0142](0142-drop-sync-records.md) | 取り込み状態（sync/）を廃止し、親ブランチの状態だけで判定する |
 
 ### 複数のリポジトリと VS Code 拡張
 

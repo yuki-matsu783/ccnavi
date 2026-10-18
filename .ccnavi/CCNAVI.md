@@ -37,7 +37,7 @@
 
 | 読むとき | 開くファイル |
 |---|---|
-| ワークツリーを切る、他セッションの変更の影響を受けた、親の正本・未準備・`mr:` を確かめる | `.ccnavi/docs/worktree.md` |
+| ワークツリーを切る、他セッションの変更の影響を受けた、親の正本・親のワークツリーが無いとき・`mr:` を確かめる | `.ccnavi/docs/worktree.md` |
 | issue・MR を指定して作業を頼まれた | `.ccnavi/docs/worktree-start.md` |
 | `<統合先>` に取り込む、子の finish で親へ合流する・衝突を解く、マージリクエストに出す | `.ccnavi/docs/worktree-merge.md` |
 | ワークツリーや子のブランチを片付ける、親を閉じたあとの片付け | `.ccnavi/docs/worktree-cleanup.md` |
