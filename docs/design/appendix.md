@@ -121,9 +121,9 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | 上限に達したサブエージェントに Agent ツールはあるか | 無い（実測）。遅延ツールの一覧にも出ない。起動を待ってハングすることはなく、普通に終わる |
 | 孫は Agent ツールを持てるか | 持てる（実測、上限 3） |
 | 孫の `PreToolUse` に `agent_id` が付くか | 付く（実測）。孫の Bash にも `DENY_SUBAGENT_TICKET_OP` が当たった |
-| 深さ 1 のサブエージェントに `agent_id` が届くか | 届く（実測。`logs/state/approved-<セッション>-<agent_id>.json` のファイル名で確かめた） |
+| 深さ 1 のサブエージェントに `agent_id` が届くか | 届く（実測。`logs/state/subagent-<セッション>-<agent_id>.running` のファイル名で確かめた） |
 | `SubagentStart` / `SubagentStop` は孫でも来るか | 子・孫それぞれで来る（実測） |
-| `logs/decisions.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`decisions.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/approved-<セッション>-<agent_id>.json` |
+| `logs/decisions.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`decisions.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/subagent-<セッション>-<agent_id>.running` |
 | サブエージェントの `cwd` | 文書: メインの `cwd`（`cd` は持ち越さない）。孫の `cwd` も親のワークツリーになる |
 | 親の `agent_id` や深さは hook の入力にあるか | 文書: 無い |
 | 起動側は子の終了を待つか | 文書: 非対話 / SDK では待たない |

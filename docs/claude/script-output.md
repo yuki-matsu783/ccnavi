@@ -40,7 +40,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 
 - 状態を報告するだけで、次の一手がユーザの判断になるとき（例: `integrate-done` のあと、取り込んだコミットをリモートへ送るか）
 - 何も動かなかったときは何も出さない、と決めているとき（`ccnavi-fetch.sh`）
-- ユーザが端末で打つスクリプト（`ccnavi-agree.sh`、`ccnavi-push-approved.sh`）。エージェントへの通知は、承認後のhookの文が受け持つ
+- ユーザが端末で打つスクリプト（`ccnavi-agree.sh`、`ccnavi-push-approved.sh`）。エージェントへの通知は、拡張が渡す承認の文（`--agree --yes` の `prompt`）と `ccnavi-ticket.sh status` が受け持つ
 - 共通関数（`ccnavi-common*.sh`）。止める理由ごとに次が違うので、呼び出し元で出す
 - `ccnavi-clean.sh` の dry-run。node があると `exec` で `ccnavi-clean.js` に代わり、出力はそちらが出す。shから行を足せない
 
