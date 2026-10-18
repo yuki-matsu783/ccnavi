@@ -218,7 +218,7 @@ allow:
     glob: "*/.claude/worktrees/*"
 
   # スキルの振り返り（.ccnavi/docs/skill-review.md）。ターンの終わり 10 回に 1 度、止めて手順を渡す。
-  # Stop はツールではなくメインエージェントのターンの終わり。文を渡すためだけに allow に置く。
+  # Stop はツールではなくメインエージェントのターンの終わり。許可の意味は持たない。文を渡すためだけに allow に置く。
   # finish の促しが出る回・連鎖の 2 回目・サブエージェントでは止めず、数えもしない。
   - id: skill-review-every-10
     match: Stop
