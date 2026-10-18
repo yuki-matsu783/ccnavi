@@ -31,7 +31,7 @@ def arguments(rules_path: str = RULES) -> list[str]:
 
     `--root` は区切りを `/` に揃えて渡す。期待する判定の `/repo` は `--root` のパスにそのまま
     置き換わるので、Windows の `\\` が残ると Bash の期待する判定でエスケープとして読まれる。
-    ccnavi の側はルートを realpath と normcase で解いてから使うので、`C:/...` でも同じ場所になる。
+    ccnavi の側はルートを realpath と pathcase.fold で解いてから使うので、`C:/...` でも同じ場所になる。
     """
     return [
         "--root",

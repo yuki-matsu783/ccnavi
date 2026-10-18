@@ -36,7 +36,7 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, pathcase, settings, tree
 from . import (
     agree,
     agree_candidates,
@@ -214,7 +214,7 @@ class Changes:
 
 
 def _owner(trees: list[tree.Tree], path: str) -> tree.Tree | None:
-    target = os.path.normcase(os.path.realpath(os.path.dirname(path)))
+    target = pathcase.fold(os.path.realpath(os.path.dirname(path)))
     best = None
     for t in trees:
         if (target == t.root or target.startswith(t.root + os.sep)) and (

@@ -33,7 +33,7 @@ from __future__ import annotations
 import os
 import re
 
-from ..infra import settings, shellread, shellread_words, tree
+from ..infra import pathcase, settings, shellread, shellread_words, tree
 from ..policy import selfguard_shell
 from ..tickets import ticket_model
 
@@ -601,12 +601,12 @@ def _holds_core(conf: settings.Settings, root: str, full: str) -> bool:
         conf.state,
         *selfguard_shell.common_layer_files(conf),
     ]
-    forms = {os.path.normcase(os.path.abspath(full)), os.path.normcase(os.path.realpath(full))}
+    forms = {pathcase.fold(os.path.abspath(full)), pathcase.fold(os.path.realpath(full))}
     for anchor in anchors:
         if not anchor:
             continue
         for a in {os.path.abspath(anchor), os.path.realpath(anchor)}:
-            a = os.path.normcase(a).lower()
+            a = pathcase.fold(a).lower()
             for f in forms:
                 f = f.lower().rstrip(os.sep) or os.sep
                 if a == f or a.startswith(f.rstrip(os.sep) + os.sep):
@@ -682,11 +682,8 @@ def worktree_name(root: str, place: str) -> str:
     git に登録されているかは問わない（sh の検査と同じ広さ）。symlink は実際のパスに直して
     比べる。論理のパスと実際のパスを混ぜると、`/tmp` → `/private/tmp` のような場所で外れる。
     """
-    base = tree._canonical(os.path.join(root, tree.WORKTREES_DIR))
-    target = tree._canonical(place)
-    if not target.startswith(base + os.sep):
-        return ""
-    return target[len(base) + 1 :].split(os.sep, 1)[0]
+    rest = tree.parts_under(os.path.join(root, tree.WORKTREES_DIR), place)
+    return rest[0] if rest else ""
 
 
 ROLE_CHILD = "child"

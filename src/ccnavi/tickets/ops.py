@@ -99,11 +99,11 @@ def start(
     # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと食い違う。
     owner = tree.project_root(conf.projects, found.project) or root
     worktree = tree.worktree_path(root, ticket_id)
-    if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
+    if not tree.is_worktree_of(owner, worktree):
         stderr.write(
             f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
             "元リポジトリが承認済みチケットの project"
-            f"（{found.project or 'ワークスペース'}）と違う（大文字小文字まで同じ表記であること）。"
+            f"（{found.project or 'ワークスペース'}）と違う。"
             f"{_create_words(root, found, worktree)}\n"
         )
         return 1

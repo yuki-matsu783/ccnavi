@@ -25,7 +25,7 @@ import os
 import re
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, pathcase, settings, tree
 from ..tickets import approval, archive, syncstate, ticket_ids, ticket_model
 from ..tickets import ticket as ticket_mod
 
@@ -68,8 +68,8 @@ def _projects_dir(root: str, conf: settings.Settings) -> str:
 
 
 def _under_worktrees(root: str, path: str) -> bool:
-    base = os.path.normcase(os.path.normpath(os.path.join(root, tree.WORKTREES_DIR)))
-    full = os.path.normcase(os.path.normpath(os.path.abspath(path)))
+    base = pathcase.fold(os.path.normpath(os.path.join(root, tree.WORKTREES_DIR)))
+    full = pathcase.fold(os.path.normpath(os.path.abspath(path)))
     return full.startswith(base + os.sep)
 
 

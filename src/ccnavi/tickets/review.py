@@ -47,7 +47,7 @@ import os
 import re
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, pathcase, settings, tree
 from . import (
     approval,
     approval_checks,
@@ -663,8 +663,8 @@ def _escapes(tree_root: str, rel: str) -> bool:
         here = os.path.join(here, part)
         if os.path.islink(here) or _junction(here):
             return True
-    top = os.path.normcase(os.path.realpath(tree_root))
-    parent = os.path.normcase(os.path.realpath(os.path.dirname(os.path.join(tree_root, *parts))))
+    top = pathcase.fold(os.path.realpath(tree_root))
+    parent = pathcase.fold(os.path.realpath(os.path.dirname(os.path.join(tree_root, *parts))))
     return parent != top and not parent.startswith(top + os.sep)
 
 

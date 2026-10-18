@@ -48,7 +48,7 @@ import stat
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import gitcmd, settings, tree
+from ..infra import gitcmd, pathcase, settings, tree
 from . import approval, approval_checks, phase, ticket_ids, ticket_model
 from . import ticket as ticket_mod
 
@@ -470,7 +470,7 @@ def _canonical(path: str) -> str:
         resolved = os.path.realpath(path)
     except OSError:
         resolved = os.path.abspath(path)
-    return os.path.normcase(os.path.normpath(resolved))
+    return pathcase.fold(os.path.normpath(resolved))
 
 
 def _is_junction(path: str) -> bool:

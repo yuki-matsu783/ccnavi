@@ -10,7 +10,7 @@ import io
 import os
 from typing import TextIO
 
-from ..infra import modes, settings, tree
+from ..infra import modes, pathcase, settings, tree
 from ..policy import ruleload, rules, selfguard
 from ..tickets import (
     agree,
@@ -389,7 +389,7 @@ def _one_per_file(found: list[ticket_model.Ticket]) -> list[ticket_model.Ticket]
     kept: list[ticket_model.Ticket] = []
     seen: set[tuple[str, str]] = set()
     for t in found:
-        key = (t.tree, os.path.normcase(os.path.abspath(t.path)))
+        key = (t.tree, pathcase.fold(os.path.abspath(t.path)))
         if key in seen:
             continue
         seen.add(key)

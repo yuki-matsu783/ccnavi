@@ -31,13 +31,20 @@ class TreeCaseTest(unittest.TestCase):
         self.assertEqual(tree.relative(self.main, full), "README.md")
         self.assertEqual(tree.relative(self.main, swapped), "")
 
-    def test_lookup_は完全一致を先に取り無ければ表記違いを許す(self) -> None:
+    def test_lookup_は表記違いを同じ名前として引く(self) -> None:
         index = {"I0001-01-01": "a", "i0002-01-01": "b"}
         self.assertEqual(tree.lookup(index, "I0001-01-01"), "a")
         self.assertEqual(tree.lookup(index, "i0001-01-01"), "a")
         self.assertEqual(tree.lookup(index, "I0002-01-01"), "b")
         self.assertIsNone(tree.lookup(index, "i0003-01-01"))
-        self.assertEqual(tree.lookup({"X": 1, "x": 2}, "x"), 2)
+
+    def test_worktree_path_は在るディレクトリの表記で返す(self) -> None:
+        base = os.path.join(self.root, tree.WORKTREES_DIR)
+        os.makedirs(os.path.join(base, "I0001-01-01"))
+        self.assertEqual(
+            tree.worktree_path(self.root, "i0001-01-01"), os.path.join(base, "I0001-01-01")
+        )
+        self.assertEqual(tree.worktree_path(self.root, "i0002"), os.path.join(base, "i0002"))
 
 
 if __name__ == "__main__":

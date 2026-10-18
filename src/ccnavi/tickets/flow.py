@@ -99,7 +99,7 @@ import stat
 
 import yaml
 
-from ..infra import fsio, settings, tree, yamlread
+from ..infra import fsio, pathcase, settings, tree, yamlread
 from ..records import diaglog
 from . import flow_render, flow_shape, flow_text, ticket_model
 
@@ -215,9 +215,9 @@ def linked(tree_root: str, path: str) -> bool:
     （外を指している）リンクと同じに扱う。
     """
     try:
-        base = os.path.normcase(os.path.realpath(tree_root))
+        base = pathcase.fold(os.path.realpath(tree_root))
         current = os.path.abspath(path)
-        while os.path.normcase(os.path.realpath(current)) != base or os.path.islink(current):
+        while pathcase.fold(os.path.realpath(current)) != base or os.path.islink(current):
             if os.path.islink(current):
                 return True
             parent = os.path.dirname(current)

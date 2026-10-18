@@ -9,7 +9,7 @@ import os
 import re
 from collections.abc import Callable
 
-from ..infra import platformtag, settings, shellread, tree
+from ..infra import pathcase, platformtag, settings, shellread, tree
 from ..records import diaglog
 from . import rules, selfguard_targets
 
@@ -519,10 +519,10 @@ def handoff_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None
     # 守る場所なら、置き場の中へ写すことが守る場所へ書くことになる。
     if os.path.realpath(spelled) != spelled:
         return None
-    pad = os.path.normcase(spelled)
+    pad = pathcase.fold(spelled)
 
     def inside(path: str) -> bool:
-        real = os.path.normcase(os.path.realpath(path))
+        real = pathcase.fold(os.path.realpath(path))
         if not (real == pad or real.startswith(pad + os.sep)):
             return False
         # 既にあるファイルがほかの名前とつながっている（ハードリンク）なら、上書きはつながった先も

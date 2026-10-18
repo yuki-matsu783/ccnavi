@@ -347,7 +347,7 @@ class _Family:
         owner = tree.project_root(self.conf.projects, t.project) or self.root
         worktree = tree.worktree_path(self.root, t.ticket)
         out = []
-        if not (tree.is_worktree_of(owner, worktree) and tree.exact_name(self.root, t.ticket)):
+        if not tree.is_worktree_of(owner, worktree):
             if t.is_child:
                 git = settings.script_command(self.root, "ccnavi-git.sh")
                 where = f"projects/{t.project} の中で " if t.project else ""
