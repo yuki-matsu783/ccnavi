@@ -350,7 +350,11 @@ ccnavi_wap_unstage() {
 
 # 書いた一覧のうち、この実行で書いたパスの作業ツリーの中身を <版> に戻す（無ければ消す）。<一覧> <版>
 # record-risk の記録など、この実行の前から未コミットだったもの（keep）は触らない。
+# ccnavi_wap_keep_worktree が空でなければ何も戻さない。呼ぶ側が書いたものではなく、利用者の書いた入力
+# （propose の提案）を一覧に載せている操作で使う。戻すと、送れなかったときに提案そのものが消える。
+ccnavi_wap_keep_worktree=""
 ccnavi_wap_restore_written() {
+	[ -z "$ccnavi_wap_keep_worktree" ] || return 0
 	while IFS= read -r ccnavi_cr_path; do
 		[ -n "$ccnavi_cr_path" ] || continue
 		case "$ccnavi_cr_path" in

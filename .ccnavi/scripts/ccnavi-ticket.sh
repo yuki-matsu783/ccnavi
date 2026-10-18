@@ -14,6 +14,8 @@
 # 親のブランチへコミットして push する。別のPCで承認して作業に入るために、承認を頼む前に打つ。
 # 提案を書く親のワークツリーで足りる（親子の識別子を渡す）。送るのは親子の提案だけで、ほかの親子や
 # テンプレートの下書きは送らない。サブエージェントからは打てない。
+# 親のブランチに未 push のコード（承認済みの置き場と提案の置き場の外）の変更があれば、一緒に公開しないよう止める。
+# 送れなかったときも、書いた提案は作業ツリーに残す（戻すのは自分のコミットだけ）。
 #
 # record-risk は、実績のリスクの定性項目（risks.yml の `judge:`）の判定を記録する。判断するのは
 # サブエージェント、記録するのは親。判定が揃うまで、その子は finish で閉じられない。
@@ -81,7 +83,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
 
   propose      承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を親のブランチへ
                コミットして push する。別のPCで承認できるように、承認を頼む前に打つ（親のワークツリーが必要です）。
-               変わっていない提案は、未 push のコミットがあればそれだけを送る
+               変わっていない提案は、未 push のコミットがあればそれだけを送る。未 push のコードの変更があれば止まる
   start        .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
                ワークツリー .claude/worktrees/<識別子> が必要です。承認済みチケットは置き場を移らない
   finish       doing/ -> wip/proposals/review/（フェーズがレビュー必須）か .ccnavi/approved/done/（不要）。
@@ -197,6 +199,34 @@ tidy_after() {
 	ccnavi_wap_exe --cwd "$here" worktree tidy "$ta_id" || :
 }
 
+# propose の前に、親のブランチに未 push のコード（承認済みの置き場と提案の置き場の外）の変更が無いかを見る。
+# propose は親のブランチを push するので、提案を送るつもりで、設計途中のコードまで公開しないため。
+# git の状態だけを見た判定で、ccnavi の状態を読んで止める判定ではない。
+# 親のブランチのリモート追跡が無ければ（まだ一度も送っていない）見ない。
+propose_guard() {
+	pg_ref="refs/remotes/origin/$ccnavi_wap_branch"
+	git -C "$ccnavi_wap_tree" rev-parse --verify -q "$pg_ref" >/dev/null 2>&1 || return 0
+	pg_known="${ccnavi_wap_review%/*}"
+	git -C "$ccnavi_wap_tree" diff --name-only --no-renames -z "$pg_ref" HEAD 2>/dev/null |
+		tr '\000' '\n' >"$ccnavi_wap_tmp/pg-paths" || :
+	pg_other=""
+	pg_count=0
+	while IFS= read -r pg_path; do
+		[ -n "$pg_path" ] || continue
+		case "$pg_path" in
+		"$ccnavi_wap_approved"/* | "$pg_known"/*) ;;
+		*)
+			pg_count=$((pg_count + 1))
+			[ "$pg_count" -gt 3 ] || pg_other="$pg_other $pg_path"
+			;;
+		esac
+	done <"$ccnavi_wap_tmp/pg-paths"
+	[ "$pg_count" -gt 0 ] || return 0
+	ccnavi_wap_say "親のブランチに未 push のコードの変更が${pg_count}件ある（${pg_other# }${pg_other:+ }など）。propose は提案だけを送るので、止めた。コードは先に送るか、手元の変更を整理してから再実行してください（何も反映していません）"
+	log_info 提案を送らずに止めた -- "family=$ccnavi_wap_family_id" "reason=unpushed-code"
+	return 1
+}
+
 # 子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチ（write-and-push の親のワークツリーの HEAD）から作る。
 # 別のPCで承認された子でも、どのPCでも同じ場所に作る。ネットワークには出ない（git の局所の操作だけ）。
 # 子のブランチ（子の識別子の名前）が手元に残っていれば、親の先頭が含むものだけ親の先頭に揃えて使う
@@ -269,6 +299,14 @@ start | finish | cancel | propose)
 		fi
 		if [ "$1" = start ] && [ "$wap_id" != "$ccnavi_wap_family_id" ]; then
 			ensure_child_worktree || exit 1
+		fi
+		if [ "$1" = propose ]; then
+			# 失敗しても、利用者が書いた提案は作業ツリーに残す（戻すのは自分のコミットだけ）。
+			ccnavi_wap_keep_worktree=yes
+			propose_guard || {
+				ccnavi_wap_end
+				exit 1
+			}
 		fi
 		wap_rc=0
 		ccnavi_wap_write "ccnavi: ${wap_words}" -- ticket "$@" || wap_rc=$?

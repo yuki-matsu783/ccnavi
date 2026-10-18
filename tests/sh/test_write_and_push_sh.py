@@ -1449,6 +1449,56 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
         self.assertEqual(self.remote_sha(), before)
 
+    def reject_pushes(self):
+        """リモートの push をすべて断る（pre-receive が 1 で終わる）。"""
+        hook = os.path.join(self.remote, "hooks", "pre-receive")
+        write(hook, "#!/bin/sh\nexit 1\n")
+        os.chmod(hook, 0o755)
+
+    def test_a_rejected_push_keeps_the_proposals_the_user_wrote(self):
+        """送れなかったときに戻すのは自分のコミットだけ。書いた提案は作業ツリーに残る。"""
+        new = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
+        flow = self.put(f"{self.FLOWS}/{CHILD}.yml", "flow\n")
+        self.reject_pushes()
+        before = self.sha(self.tree, "HEAD")
+        remote_before = self.remote_sha()
+        result = self.ticket("propose", PARENT)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(self.remote_sha(), remote_before)
+        for rel, text in ((new, "v1\n"), (flow, "flow\n")):
+            self.assertEqual(self.read(os.path.join(self.tree, rel)), text)
+        self.assertNotIn("次: ", result.stdout)
+
+    def test_a_rejected_push_keeps_an_edit_of_a_sent_proposal(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
+        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.put(rel, "v2 precious edit\n")
+        self.reject_pushes()
+        result = self.ticket("propose", PARENT)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read(os.path.join(self.tree, rel)), "v2 precious edit\n")
+        self.assertNotIn("次: ", result.stdout)
+
+    def test_unpushed_code_is_not_sent_along_with_the_proposal(self):
+        self.put("src/secret.py", "x = 1\n")
+        git(self.tree, "add", "--", "src/secret.py")
+        git(self.tree, "commit", "-q", "-m", "wip code")
+        self.put(f"{self.TODO}/{PARENT}.md")
+        before = self.remote_sha()
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("src/secret.py", result.stderr)
+        self.assertEqual(self.remote_sha(), before)
+        self.assertIn(f"?? {self.TODO}/{PARENT}.md", self.dirty())
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def test_the_extension_is_compared_without_case(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.MD")
+        result = self.ticket("propose", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(), [rel])
+
     def test_no_proposal_stops_without_changing_anything(self):
         before = self.remote_sha()
         result = self.ticket("propose", PARENT)

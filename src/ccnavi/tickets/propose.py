@@ -52,7 +52,7 @@ def _candidates(base: str, tickets: str, parent: str) -> list[str]:
             continue
         for name in names:
             stem, ext = os.path.splitext(name)
-            if ext not in suffixes or not _belongs(stem, parent):
+            if pathcase.fold(ext) not in suffixes or not _belongs(stem, parent):
                 continue
             path = os.path.join(directory, name)
             if os.path.isfile(path) and not os.path.islink(path):
