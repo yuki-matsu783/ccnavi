@@ -1,0 +1,26 @@
+/*
+ * 対象 1 件（`Entry.tsx`）。見出しは選択の欄・パス・札を 1 行に流し、狭い幅では折り返す。
+ * 開いた本体（差分・指摘・端末の案内）は縦に並べる（list.css の `.row-body` は格子なので、ここで上書きする）。
+ */
+.row.entry > .row-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-2) var(--gap-4); }
+.row.entry > .row-head:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.entry-path { font-weight: 600; overflow-wrap: anywhere; }
+.entry-pick { margin: 0; }
+.entry-reason { margin: 0; padding: 0 8px 6px 36px; overflow-wrap: anywhere; }
+.row.open > .entry-body.row-body { display: block; padding: 8px 10px 10px 36px; overflow-wrap: anywhere; }
+.entry-notes { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: var(--gap-2); }
+.entry-notes li { padding: 2px 8px; border-left: 3px solid currentColor; overflow-wrap: anywhere; }
+.entry-notes li.sev-error { color: var(--error-text); }
+.entry-notes li.sev-warn { color: var(--warn-text); }
+.entry-notes .sev-label { font-family: var(--vscode-editor-font-family); font-weight: 600; }
+.entry-diff, .entry-command {
+  margin: 0 0 10px; padding: 6px 8px; max-height: 480px; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-md);
+  font-family: var(--vscode-editor-font-family); font-size: var(--font-md);
+}
+.entry-diff-head { font-size: var(--font-md); font-weight: 400; color: var(--vscode-descriptionForeground); margin: 0 0 4px; }
+@media (max-width: 520px) {
+  .row.open > .entry-body.row-body { padding: 8px 14px 10px 14px; }
+  .entry-reason { padding-left: 14px; }
+}

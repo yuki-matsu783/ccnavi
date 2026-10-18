@@ -806,7 +806,7 @@ def decide_after(
         scope=scope,
         payload=payload,
         record=record,
-        # チケットの置き場。そこに現れた変更のうち、ccnavi の副命令が書いたと内容から
+        # チケットの置き場。そこに現れた変更のうち、ccnavi のサブコマンドが書いたと内容から
         # 読めるものを外す。チケット制御を切ったワークスペースでも渡すのは、
         # `_committed_findings` が置き場を外すのと同じ理由。判定の有無で、外れたり
         # 外れなかったりさせない。

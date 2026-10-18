@@ -40,7 +40,7 @@ keywords: [複数人, 別PC, 別セッション, 引き継ぎ, 同期, fetch, sy
 | セッション開始 | `ccnavi-fetch.sh` が親のブランチと統合先を取り、早送りだけで進める。届かなければ止めず、手元の版で判定して「リモート未確認」と示す。fetch 1 回の期限は `CCNAVI_FETCH_TIMEOUT`（既定 15 秒） | hook（SessionStart） |
 | 別 PC で親を始める | `ccnavi-start.sh --mr <番号>` か `--issue <番号>`。origin から取って早送りし、最後に `ccnavi-sync.sh <識別子>` を打つ | ユーザ |
 | 親が分かれた | `ccnavi-sync.sh [<親>]` が取り込む。衝突したら自分が始めた merge だけ取りやめる。取り込み後に判定し直し、error があれば表示して終了コード 1 にする | ユーザ |
-| 親のブランチへの push | 親のワークツリーのブランチは、push の前に共通の push の関門（`ccnavi_push_gate`）を通す。リモートから消えた親のブランチを作り直す形を止める。`ccnavi-git.sh push`・write-and-push・`ccnavi-push-approved.sh` の 3 経路が同じ関門を使う（9.2） | `ticket` / `review` の sh |
+| 親のブランチへの push | 親のワークツリーのブランチは、push の前に共通の push の関門（`ccnavi_push_gate`）を通す。リモートから消えた親のブランチを作り直す形を止める。`ccnavi-git.sh push`・write-and-push・`ccnavi-user-push-approved.sh` の 3 経路が同じ関門を使う（9.2） | `ticket` / `review` の sh |
 | 状態を書く操作 | write-and-push（`ccnavi-common-write-and-push.sh`）が、ロック → 取り込み → 書く → コミット → push → 届いたかの確認の順で進める。push が通らなければ戻して取り込み直し、1 回だけやり直す。再び通らなければ戻して `ccnavi-sync.sh` を案内して終わる | `ticket` / `review` の sh |
 | 提案を送る | `ccnavi-ticket.sh propose <識別子>` が、親のワークツリーの承認待ちの提案（`wip/proposals/todo/`）と子のフローの下書き（`wip/proposals/flows/`）を、write-and-push の手順（ロック → 取り込み → コミット → push）で親のブランチへ送る。書き終えた提案を、別 PC で承認できるようにする。サブエージェントは打てない | メインエージェント |
 | 子の着手 | `ticket start` が、取り込み直後の親のブランチから子のワークツリーを作る | メインエージェント |
@@ -60,7 +60,7 @@ keywords: [複数人, 別PC, 別セッション, 引き継ぎ, 同期, fetch, sy
 | 入口 | 動くところ | 書くもの | 作業者側への反映 |
 |---|---|---|---|
 | Chrome 拡張 | 承認者のブラウザ。トークンだけで、同梱の ccnavi（Pyodide）が同じ判定のコアを呼ぶ | 親のブランチへ 1 コミット（承認・取り下げ・レビュー済み・「始める」）。GitHub は `expectedHeadOid` で書く時点の先頭を確かめ、GitLab は Commits API でファイル単位の確認をする。保護されたブランチと統合先へは書かない | 次の `fetch` / `sync` |
-| VS Code のボード | ユーザの VS Code。拡張が ccnavi の実行ファイルを子プロセスで呼ぶ | 承認は `--agree --yes`。端末の入力は要らない。エージェントが同じ形を打つことは組み込みの deny（`builtin:guard-ticket-approval`）が止める | 同じ PC の作業ツリー。承認後の push は統合ターミナルへ送る |
+| VS Code のボード | ユーザの VS Code。拡張が ccnavi の実行ファイルを子プロセスで呼ぶ | 承認は `user agree --yes`。端末の入力は要らない。エージェントが同じ形を打つことは組み込みの deny（`builtin:guard-ticket-approval`）が止める | 同じ PC の作業ツリー。承認後の push は統合ターミナルへ送る |
 
 拡張は表示と書き込みの入口である（P10）。
 

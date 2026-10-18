@@ -13,8 +13,8 @@ import unittest
 
 import yaml
 
-from ccnavi.entry import lint_rules, suggest
-from ccnavi.policy import ruleload, rules
+from ccnavi.entry import suggest
+from ccnavi.policy import rule_lint, ruleload, rules
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -359,7 +359,7 @@ class LintTest(unittest.TestCase):
                 f,
                 allow_unicode=True,
             )
-        return lint_rules._rules(path, self.root)
+        return rule_lint.file_problems(path, self.root)
 
     def details(self, problems: list, severity: str) -> list[str]:
         return [f"{p.rule} {p.detail}" for p in problems if p.severity == severity]

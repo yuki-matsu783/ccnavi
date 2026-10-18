@@ -1,8 +1,8 @@
 """`ccnavi --help` の本文。
 
-`--help` だけなら話題の一覧（`OVERVIEW`）を出す。`ccnavi --docs --help` のように話題の旗か副命令に
-`--help` を付けると、その話題の節（`TOPICS`）だけを出す。全文は `--help --all`（`USAGE`）。
-読む量を知りたい話題の分だけに抑えるため。
+`--help` だけなら話題の一覧（`OVERVIEW`）を出す。`ccnavi --docs --help` のように
+話題のオプションかサブコマンドに `--help` を付けると、その話題の節（`TOPICS`）だけを出す。
+全文は `--help --all`（`USAGE`）。読む量を、必要な話題の分だけに抑えるため。
 
 cli から分けた。cli を読まない。
 """
@@ -16,7 +16,7 @@ _VERSION = """\
 
 バージョン、ビルド元のコミット（ソースから実行した場合は "unknown"）、.ccnavi/scripts/
 のスクリプトとVS Code拡張機能が自身の値と照合する互換バージョン、
-受け付けるすべてのフラグを出力します。ペイロードも設定も読み込みません。--json の形式は
+受け付けるすべてのオプションを出力します。ペイロードも設定も読み込みません。--json の形式は
 README.md（「版の JSON」）に記載しています。
 """
 
@@ -46,13 +46,13 @@ Code拡張機能は、フローを開く前や保存する前に、編集中の�
 
     ccnavi --lint --json --flow /tmp/flow.yml
 
-共通レイヤーの旗（--rules・--phases・--risk・--projects など）は
+共通レイヤーのオプション（--rules・--phases・--risk・--projects など）は
 ccnavi --help scripts に書いてあります。
 """
 
 _TEST = """\
 プロジェクトのルールを保存前に試験または検証するには、
-編集中のファイルをプロジェクト名とともに渡します。このフラグは --test、--test-expectations、
+編集中のファイルをプロジェクト名とともに渡します。このオプションは --test、--test-expectations、
 --lint、--explain 専用です。それ以外（フックの呼び出し、
 チケットやレビューのサブコマンド）では無視され、その旨が標準エラー出力に表示されます。
 
@@ -137,30 +137,24 @@ README.md（「作業・レビュー計画のテンプレート」）に記載�
 でも同じ検査を報告します。
 
 テンプレートは2段階で収集します。エージェントは --draft を実行できます。
-完了済みの親チケット（done/ にあるもの）の計画と子フローを、wip/proposals/templates/NAME.yml
-に下書きとしてコピーします。下書きは効力を持たず、上書きもされません。--import
-はユーザーだけが実行します。--yes を指定しない場合は何も書き込まず、検査結果と、
-取り込み先の同名テンプレートとの差分を表示します。--yes と、--expect
-に下書きのハッシュを指定した場合は書き込み、下書きが変更されていなければ下書きを削除します。
+完了済みの親チケット（done/ にあるもの）の計画と子フローを、親のツリーの
+wip/handoff/<取り込み先の相対パス> に下書きとしてコピーします（--to の既定は project で、
+取り込み先は .ccnavi/config/project/templates/NAME.yml。--to common なら
+.ccnavi/config/common/templates/NAME.yml、--layer PROJECT なら
+projects/PROJECT/.ccnavi/config/project/templates/NAME.yml）。下書きは効力を持たず、
+上書きもされません。取り込み先に同名のテンプレートが既にある場合も作りません。
 
-    ccnavi --templates --draft PARENT [--name NAME] [--json]
-    ccnavi --templates --import DRAFT --to common|project [--layer NAME]
-                       [--replace] [--yes --expect HASH] [--json]
+    ccnavi --templates --draft PARENT [--name NAME] [--to common|project] [--layer NAME] [--json]
 
-下書きと収集済みのテンプレートは編集もできます。--yes を指定しない場合は何も書き込まず、
-変更内容を表示します。--yes と、--expect に対象のハッシュを指定した場合は書き込みます。--yes
-はユーザーだけが実行します。--save-draft、--rename-template、--move-template、--delete-template
-はユーザー専用です（エージェントは実行できず、プレビューも実行できません。エージェントは Write
-で下書きを編集します）。--delete-draft のプレビューは、エージェントも実行できます。
+下書きの取り込みは、ほかの保護対象（rules.yml・docs・hook など）と同じく、ユーザーが
+ccnavi user handoff で行います（見るだけの形も含めてユーザー専用です。実行ファイルは内部で
+--handoff に読み替えます。--handoff を直接渡すと断ります）。テンプレートの
+改名・移動・削除は、ユーザーがファイルを直接操作します。
 
-    ccnavi --templates --save-draft NAME --body-file FILE [--yes --expect HASH] [--json]
-    ccnavi --templates --delete-draft NAME [--yes --expect HASH] [--json]
-    ccnavi --templates --rename-template NAME --new-name NEW --on draft|common|project
-                       [--layer NAME] [--yes --expect HASH] [--json]
-    ccnavi --templates --move-template NAME --on common|project [--layer NAME]
-                       --to common|project [--to-layer NAME] [--yes --expect HASH] [--json]
-    ccnavi --templates --delete-template NAME --on common|project [--layer NAME]
-                       [--yes --expect HASH] [--json]
+    ccnavi user handoff [PATH...] [--json]
+        （見るだけ。PATH はツリーからの相対パスで、省くと下書き全部）
+    ccnavi user handoff [PATH...] --yes --expect HASH [--via board] [--json]
+        （取り込みます。--via board はボードの経路で、--json と一緒に使います）
 
 収集済みのテンプレートは、親の提案を開始するときに使用されます。
 エージェントも実行できます（フローの下書きも効力を持ちません）。
@@ -189,10 +183,12 @@ _LOGS = """\
 判定ログをローテーションし、古いログや終了したセッションの状態データを削除するには、
 次のコマンドを実行してください（SessionStartでも自動的に同じ処理が行われます）。
 
-    ccnavi --prune [--preview]
+    ccnavi user prune
+    ccnavi --prune --preview
 
---preview を指定すると、移動予定の項目のみを表示し、実際の変更は行いません。
-指定しない場合、--prune はターミナルから実行する必要があります。
+ユーザーがターミナルから user prune を打ちます（実行ファイルは内部で --prune に読み替えます。
+--prune を user の外で渡すと断ります）。--preview を指定すると、移動予定の項目のみを表示し、
+実際の変更は行いません（エージェントも実行できます）。
 
 判定ログ（logs/decisions.jsonl と、ローテーション済みの
 decisions.*.jsonl）からルールの候補を作成するには、次のコマンドを実行します。
@@ -210,10 +206,14 @@ Code拡張機能がこれを読み込みます。
 _AGREE = """\
 承認待ちのチケットを確認し、提案された作業範囲を承認するには、次のコマンドを実行してください。
 
-    ccnavi --agree
-    ccnavi --agree i0002 i0002-01-01
+    ccnavi user agree
+    ccnavi user agree i0002 i0002-01-01
         （指定したチケットのみ。例: 絞り込んだボードから実行する場合。
          idはすべてのフラグの後ろに指定します）
+
+承認はユーザー専用で、ユーザーがターミナルから user agree を打ちます（実行ファイルは内部で
+--agree に読み替えます。--agree を user の外で渡すと断ります。見るだけの --agree --preview は
+エージェントも実行できます）。
 
 すべてのワークツリーの wip/proposals/todo/ をスキャンし、各チケットが書き込み可能にする範囲と、
 人によるレビューが必要かどうかを表示します。そのうえで、承認したチケットを
@@ -298,7 +298,7 @@ Codeのワークフロータブがこれを実行します。エージェント�
 VS Codeのボード拡張機能は、オーバーレイから承認します。
 
     ccnavi --agree --preview --json [<id>...]  （一括処理の内容を表示します。何も配置しません）
-    ccnavi --agree --yes <id,id,...> --digest <hex> --json [<id>...]
+    ccnavi user agree --yes <id,id,...> --digest <hex> --json [<id>...]
         （表示された内容そのものを承認します。--digest はプレビューの `digest`
          （提案の識別子の一覧と各提案ファイルのバイト列全体のダイジェスト）で、
          末尾のidは同じ絞り込みです）
@@ -307,7 +307,7 @@ VS Codeのボード拡張機能は、オーバーレイから承認します。
 バイト列（本文・改行・BOM を含む）が変更された場合や、--digest が指定されていない場合は、
 「内容が更新された」ことを終了コード 1 と `mismatch`（--json のとき）で返します。
 呼び出し側は最新を表示し直し、もう一度承認してもらいます。
-ターミナルでの --agree も、y の入力の後にこの照合をして、違えば最新を表示し直して確認し直します。
+ターミナルでの user agree も、y の入力の後にこの照合をして、違えば最新を表示し直して確認し直します。
 フックは、承認をモデルに通知しません。拡張機能は、--yes が出力するものと同じテキストを `prompt`
 でモデルに渡します。それ以外の場合、親エージェントは `ccnavi ticket status [<parent>]`
 で確認します。
@@ -380,7 +380,7 @@ _SCRIPTS = """\
     --record-writes <file> [--record-tree <dir>]
         （この実行で書いた・消したパスを、logs/state/write-and-push/ の下の <file> に1行1つで
          書き出します。--record-tree を渡すと一覧はそのツリーからの相対になり、
-         置き場の外に書いたらエラーになります。write-and-push と ccnavi-agree.sh が使います）
+         置き場の外に書いたらエラーになります。write-and-push と ccnavi-user-agree.sh が使います）
     --placed-out <file>
         （--agree 専用。実際に書けた承認済みチケットのパスなどを JSON で書き出します）
     --choose-out <file>
@@ -398,7 +398,7 @@ _SCRIPTS = """\
     --no-issue
         （--close-early 用。受け入れた指摘への返信に、issue に回すと書かないようにします）
     --via terminal|board
-        （decide が書くレビュー済みの印と、--templates --import --yes の経路）
+        （decide が書くレビュー済みの印と、user handoff --yes の経路。handoff は board だけ）
 
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
@@ -427,7 +427,7 @@ _SCRIPTS = """\
          子の手元のブランチ（合流した子: 先頭が merged_sha と同じで、それが push 済みの親に含まれる
          場合のみ）、親のワークツリーを削除します。取り消した子のブランチは一覧表示のみで、
          ユーザーが確認した後に、ユーザーが ! を付けて
-         ccnavi-clean.sh --branch <name> --confirmed を打って削除します。
+         ccnavi-user-clean-branch.sh <name> --confirmed を打って削除します。
          ccnavi-review.sh ready が中で呼びます。エージェントからは打てません。
          未コミットの変更や、git が無視しているファイルがあるワークツリーは理由を出して残します）
     ccnavi worktree branch <name> [confirmed]
@@ -504,23 +504,27 @@ ccnavi自身は、リモートに接続しません。スクリプトがマー�
 未解決のレビュースレッドは、人が親のワークツリーの端末から、次のコマンドで受け入れます
 （VS Code のボードの「決める」も、同じ判定を通ります）。
 
-    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh decide N
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-decide.sh N
 
 （スクリプトはワークスペースにのみ存在するため、プロジェクトから作成したワークツリーからは、
 相対パスで到達できません）
 
 このコマンドはスレッドを取得し、次を実行します。
 
-    ccnavi --reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
+    ccnavi user reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
         [--actor=<account> --via=terminal|board]
         （スクリプトは、読み取れる場合はトークンの所有者を渡します。レビュー済みの印には、
          アカウントと実行方法が記録されます。渡さなかった場合、印はこれまでどおりです）
 
+実行ファイルは user reviewed を内部で --reviewed に読み替えます。--reviewed を user の外で
+渡すと断ります。見るだけの --reviewed N --accept-unresolved --preview は
+ccnavi-review.sh decide N --preview が呼び、エージェントも実行できます。
+
 人が親を早期にクローズする（「今のところ十分」とする）には、次を実行します。
 
-    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh close-early --reason <why>
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-close-early.sh --reason <why>
 
-`ccnavi --close-early --reason <why> --result <json>` を実行した後、
+`ccnavi user close-early --reason <why> --result <json>` を実行した後、
 マージリクエストのDraftを解除し、残った項目を新しいissueとして登録します。
 """
 
@@ -532,18 +536,19 @@ TOPICS = (
     ("explain", "ccnavi --explain", "チケットとその置き場を、機械が読める形で一覧する", _EXPLAIN),
     ("docs", "ccnavi --docs", "md の frontmatter の索引を引く", _DOCS),
     ("templates", "ccnavi --templates", "作業・レビュー計画のテンプレートを扱う", _TEMPLATES),
-    ("logs", "ccnavi --prune / --suggest", "判定ログを整理し、ルールの候補を作る", _LOGS),
-    ("agree", "ccnavi --agree / --plan-order", "提案の承認と、計画の順序", _AGREE),
+    ("logs", "ccnavi user prune / --suggest", "判定ログを整理し、ルールの候補を作る", _LOGS),
+    ("agree", "ccnavi user agree / --plan-order", "提案の承認と、計画の順序", _AGREE),
     ("ticket", "ccnavi ticket", "チケットの開始・終了・状態・雛形", _TICKET),
     (
         "scripts",
         "ccnavi review|worktree|sync ほか",
-        "スクリプトが呼ぶ副命令と内部フラグ",
+        "スクリプトが呼ぶサブコマンドと内部オプション",
         _SCRIPTS,
     ),
 )
 
-# `--help <語>` と `ccnavi <語> --help` で話題を選ぶ語。話題名のほか、スクリプト用の副命令も含む。
+# `--help <語>` と `ccnavi <語> --help` で話題を選ぶ語。
+# 話題名のほか、スクリプト用のサブコマンドも含む。
 TOPIC_WORDS = {
     **{name: name for name, *_ in TOPICS},
     **{
@@ -572,7 +577,7 @@ _HOW_WIDTH = 34
 OVERVIEW = (
     _INTRO
     + """
-話題ごとの使い方は、話題の旗か副命令に --help を付けると出ます
+話題ごとの使い方は、話題のオプションかサブコマンドに --help を付けると出ます
 （例: ccnavi --docs --help、ccnavi ticket --help）。ccnavi --help <話題> でも同じです。
 全文は ccnavi --help --all で出ます。
 

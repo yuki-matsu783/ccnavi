@@ -1,9 +1,9 @@
 ---
 type: guide
 title: 作業・レビュー計画のテンプレート
-description: 完了した親の計画と子のフローをテンプレートに溜める手順と、テンプレートから親の提案を始める手順
+description: 完了した親の計画と子のフローをテンプレートに溜める手順（下書きは wip/handoff/、取り込みは user handoff）と、テンプレートから親の提案を始める手順
 tags: [ticket, templates]
-keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedback, フロー, 下書き, 取り込み, --templates, --draft, --import, --save-draft, --delete-draft, --rename-template, --move-template, --delete-template, ticket new, 再利用, wip/proposals/templates]
+keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedback, フロー, 下書き, 取り込み, --templates, --draft, user handoff, handoff, wip/handoff, ticket new, 再利用]
 ---
 
 # 作業・レビュー計画のテンプレート
@@ -14,11 +14,11 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 
 | 置き場 | 中身 | 書けるのは |
 |---|---|---|
-| `.ccnavi/config/common/templates/<名前>.yml` | 共通。配布先にも届く | ユーザ |
-| `.ccnavi/config/project/templates/<名前>.yml` | そのプロジェクトだけ | ユーザ |
-| `wip/proposals/templates/<名前>.yml` | 下書き。効力は無い | エージェント |
+| `.ccnavi/config/common/templates/<名前>.yml` | 共通。配布先にも届く | ユーザ（取り込み） |
+| `.ccnavi/config/project/templates/<名前>.yml` | そのプロジェクトだけ | ユーザ（取り込み） |
+| `wip/handoff/` の下の同じ相対パス | 下書き。効力は無い | エージェント |
 
-エージェントは `.ccnavi/` の下に書けない。溜めるときは下書きを書き、ユーザが取り込む。フローの文は子への案内文になるので、ユーザが差分を読んでから効かせる。
+エージェントは `.ccnavi/` の下に書けない。溜めるときは `wip/handoff/` に下書きを書き、ユーザが `ccnavi user handoff` で取り込む。フローの文は子への案内文になるので、ユーザが差分を読んでから効かせる。
 
 共通とプロジェクトに同名があり、中身が違うときは error になり、プロジェクト側は使われない。
 
@@ -33,36 +33,28 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 
 ## 溜める
 
+テンプレートの取り込み・編集は、ほかの保護対象と同じ handoff の手順に一本化している（[scratchpad.md](scratchpad.md)）。
+
 1. 計画を持つ親が閉じるときに、ccnavi が案内を 1 行出す。`ready` の前に `ccnavi --templates --draft <親>` で下書きを作る。`ready` を打つと下書きの材料が退避されて拾えなくなる
-2. 下書きの `description` と `when` に `TODO` の印が付く。固有名を一般化し、効かなかった手順を削り、印を消す。直すのはエージェントでよい
-3. ユーザが `ccnavi --templates --import <名前> --to common|project` で取り込む。`--yes` なしだと何も書かず、検査と差分（既存があれば文の前後まで）を見せる。読んだうえで、表示された `--expect <ハッシュ>` を付けて `--yes` で書く
-4. 取り込んだ下書きは消える。消したことを `ccnavi-push-approved.sh` がコミットする
+2. 下書きは `wip/handoff/` の下の、取り込み先と同じ相対パス（既定は `wip/handoff/.ccnavi/config/project/templates/<名前>.yml`）に書かれる。`description` と `when` に `TODO` の印が付くので、固有名を一般化し、効かなかった手順を削り、印を消す。直すのはエージェントでよい（Write で直接編集する）
+3. ユーザが `ccnavi user handoff [<相対パス>…]` で見る。何も書かず、検査と差分（既存があれば文の前後まで）と `--expect` のハッシュを見せる。読んだうえで、`--yes --expect <ハッシュ>` を付けて取り込む
+4. 取り込んだ下書きは消える
 
-`--import` のフラグ。
-
-- `--to common|project`: 取り込み先。`common` は共通（ワークスペースルートでだけ書ける）、`project` はプロジェクトの層
-- `--layer <名前>`: `--to project` のときに、取り込み先のプロジェクトのレイヤーを選ぶ（省けば自身のレイヤー）。`--to common` とは一緒に使えない。`--templates` の一覧・`--show` でも、統合結果の相手のレイヤーを選ぶ
-- `--replace`: 同名の取り込み済みを改訂する。差分を見せたうえで置き換える。共通とレイヤーに中身の違う同名を作る取り込みは断る
-
-`--draft` のフラグ。
+`--draft` の主なオプションは次のとおりです。
 
 - `--name <名前>`: 下書きの名前。既定は親の識別子。日本語など名前に使えない識別子の親では、`--name` で英数字の名前を付ける（英数字で始め、英数字と `.` `_` `-` だけ）
+- `--to common|project`: 取り込み先。`common` は共通（他のプロジェクトへ配られる。ワークスペースルートのツリーでだけ書ける）、`project` はプロジェクトの層。既定は `project`
+- `--layer <名前>`: `--to project` のときに、取り込み先のプロジェクトのレイヤーを選ぶ（省けば自身のレイヤー）。`--templates` の一覧・`--show` でも、統合結果の相手のレイヤーを選ぶ
+
+取り込み先に同名のテンプレートが既にあるときは、`--draft` は断る。同名の下書きがあるときも上書きしない。既存のテンプレートを直すときは、`ccnavi-stage.sh <パス>` で既存のファイルを `wip/handoff/` に写して編集する。
 
 下書きの検査は、`description` と `when` の `TODO` の印の残りを warn で言う。制御文字・書式文字（右から左への上書き、幅ゼロの文字、復帰など）を含む下書きは error で、取り込めない。取り込みの下見は、そうした文字を `\uXXXX` に直して見せる。
 
-**未追跡の下書きは `ready` を止める。** 下書きは `wip/` の未追跡のファイルで、親の `ready` は未追跡のファイルを名指しして止める。`--draft` を打ったら、取り込むか、`ready` の前に下書きを消す（またはコミットする）。
+**未取り込みの下書きは `ready` を止める。** 取り込み先と中身が違う下書きが `wip/handoff/` に残っていると、親の `ready` が止まる。`--draft` を打ったら、取り込むか、`ready` の前に下書きを消す。
 
-`--import` の `--yes` で書くのは、端末の前のユーザが打つ。エージェントには、hook の止めと、書くときに標準入力が端末かを確かめる実行時の確認の 2 つが掛かる。下見（`--yes` なし）は端末でなくても動く。エージェントは `--import` を打てない。
+`user handoff` はユーザ専用で、見るだけの形もエージェントは打てない。`--yes` で書くのは、端末の前のユーザ。エージェントの下書きの手直しは、`wip/handoff/` への Write でよい。
 
-**下書きの手直しと整理。** 下書きには効力が無いので、エージェントは下書きを Write で直接編集してよい。`--save-draft`（下書きの保存）はユーザ専用で、エージェントは打てない。`--delete-draft` は、`--yes` を付けない下見ならエージェントも打てる。取り込み済みの改名・移動・削除（`--rename-template`・`--move-template`・`--delete-template`）はユーザ専用で、エージェントは下見も打てない。ユーザは画面（ボードのテンプレート管理）か、これらの旗で行う。作業中のチケットがあるあいだは、取り込み済みの改名・移動・削除は止まる。
-
-ユーザが改名する例。1 行目で下見し、出たハッシュを 3 行目の `<ハッシュ>` に入れて書く。
-
-```
-ccnavi --templates --rename-template <名前> --new-name <新名> --on project --layer <プロジェクト名>
-# 上の下見で出たハッシュを下の <ハッシュ> に入れる
-ccnavi --templates --rename-template <名前> --new-name <新名> --on project --layer <プロジェクト名> --yes --expect <ハッシュ>
-```
+**改名・移動・削除。** 取り込み済みのテンプレートの改名・移動・削除は、実行ファイルでできない。ユーザがファイルを直接操作する。
 
 ## 使う
 
@@ -77,4 +69,4 @@ ccnavi --templates --rename-template <名前> --new-name <新名> --on project -
 
 ## 古くなったテンプレート
 
-種類の定義が変わると、テンプレートが定義と食い違う。`--lint` は warn にとどめ、使うときの承認で error になる。直すときは、下書きを作り直して `--import --replace` で差し替える。
+種類の定義が変わると、テンプレートが定義と食い違う。`--lint` は warn にとどめ、使うときの承認で error になる。直すときは、`ccnavi-stage.sh` で既存のファイルを `wip/handoff/` に写して編集し、ユーザが `ccnavi user handoff` で取り込む。

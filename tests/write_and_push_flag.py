@@ -29,7 +29,9 @@ def as_write_and_push(root: str, state: str, parent_tree: str, args) -> tuple:
             ("review", "confirm"),
             ("review", "ready"),
         )
-    ) or ("--reviewed" in args and "--accept-unresolved" in args and "--preview" not in args)
+    ) or (
+        ("user", "reviewed") in pairs and "--accept-unresolved" in args and "--preview" not in args
+    )
     if not is_state_op or "--record-tree" in args:
         return tuple(args)
     origin = subprocess.run(

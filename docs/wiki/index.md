@@ -3,12 +3,12 @@ title: スキル wiki の索引
 type: learning-wiki
 description: スキルの振り返りで溜めたパターンの一覧。1 パターン 1 行
 tags: [skills, feedback]
-keywords: [wiki, パターン, 索引, fixtures, 改名, JSON, キー, 旗, ccnavi-git.sh, 相対パス, probe, 診断, 用語, 既存の失敗]
+keywords: [wiki, パターン, 索引, fixtures, 改名, JSON, キー, オプション, ccnavi-git.sh, 相対パス, probe, 診断, 用語, 既存の失敗]
 ---
 
 # パターンの一覧
 
-- [external-name-fixtures](patterns/external-name-fixtures.md): 外に見える名前（`--json` のキー・CLI の旗）を改めると、拡張の fixtures を読む別言語側のテストが落ちる。原因は fixtures が旧名のままのため。回すグループを `core` と `guard` にし、fixtures を持つフェーズで直す
+- [external-name-fixtures](patterns/external-name-fixtures.md): 外に見える名前（`--json` のキー・CLI のオプション）を改めると、拡張の fixtures を読む別言語側のテストが落ちる。原因は fixtures が旧名のままのため。回すグループを `core` と `guard` にし、fixtures を持つフェーズで直す
 - [ccnavi-git-relative-path](patterns/ccnavi-git-relative-path.md): ワークツリーから相対パスで ccnavi-git.sh を呼ぶと届かない。原因は cwd が最上段とは限らず、スキルの記述が拒否の案内と食い違うため。絶対パスを直書きし、コマンド名を変数に入れない
 - [test-run-known-failure](patterns/test-run-known-failure.md): 既知の失敗があると `python -m tests` が途中で止まり、bench は数分かかり、レビュー準備中は全件を回せない。グループごとに discover し、全件は finish の前に回す
 - [stale-manual-probe](patterns/stale-manual-probe.md): 手動の probe は仕様変更で静かに古くなり、偽陽性で PASS する。回す前に前提を確かめ、止まった理由まで見る

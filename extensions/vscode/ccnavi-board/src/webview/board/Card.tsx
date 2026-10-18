@@ -393,7 +393,7 @@ function TemplateDraftButton({ id }: { readonly id: string }): JSX.Element {
       className="action"
       data-action="template-draft"
       data-ticket={id}
-      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力はなく、テンプレート管理画面で取り込むまで使われません。親を ready でクローズする前に作ってください"
+      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力はなく、取り込み待ち画面で取り込むまで使われません。親を ready でクローズする前に作ってください"
       onClick={() => post({ type: "templateDraft", ticket: id })}
     >
       テンプレートの下書きを作る
@@ -413,7 +413,7 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           data-action="approve-one"
           data-tour="approve-one"
           data-ticket={id}
-          title={`このチケットだけを承認します（ccnavi --agree ${id}）。まとめて承認するなら上部のボタンを使ってください`}
+          title={`このチケットだけを承認します（ccnavi user agree ${id}）。まとめて承認するなら上部のボタンを使ってください`}
           onClick={() => post({ type: "approve", tickets: [id], filtered: true })}
         >
           この 1 件を承認

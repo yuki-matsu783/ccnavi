@@ -66,6 +66,6 @@ keywords: [レビュー, chat, マージリクエスト, mr, review, フェー�
   後者はユーザが決められる
 - **計画の項（`plan:` の `review:`）でも `chat` を書けるようにする。** 項は `mr` に強めるだけ、
   という不変条件を崩す。緩める手段は種類（ユーザが持つ設定）の側にだけ置く
-- **`chat` 用の副命令（`ccnavi review chat <N>`）を足す。** `DENY_TICKET_APPROVAL_CLI` の
+- **`chat` 用のサブコマンド（`ccnavi review chat <N>`）を足す。** `DENY_TICKET_APPROVAL_CLI` の
   一覧に足し忘れると、エージェントが自分で先へ進められる。既にある `--reviewed` に
   フラグを足すほうが穴を開けない

@@ -6,7 +6,7 @@
   （`#152`、`issue 152`、`.../issues/152`、`!5`、`MR 5`、`.../pull/5` など）を見つけ、着手の前に
   紐づくブランチを探してユーザに確かめる指示を `additionalContext` で足す。指示を足すだけで、
   作業は止めない（ユーザの決定）
-- `report`: `ccnavi-branches.sh` が呼ぶ副命令
+- `report`: `ccnavi-branches.sh` が呼ぶサブコマンド
   （`ccnavi branches <issue|mr> <番号> --result <json>`）。手元の候補（名前に番号を含む
   ブランチ・ワークツリー・`issue:` を持つチケット）を集め、sh がホストから取ってきた結果
   （`--result`）と合わせて 1 候補 1 行か JSON で出す
@@ -283,7 +283,7 @@ def _start_lines(root: str, refs: list[Ref]) -> list[str]:
     return lines
 
 
-# ---- 副命令 `ccnavi branches <issue|mr> <番号> --result <json>`
+# ---- サブコマンド `ccnavi branches <issue|mr> <番号> --result <json>`
 
 
 @dataclass

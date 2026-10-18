@@ -274,7 +274,7 @@ def feedback_notes(parent: ticket_model.Ticket) -> list[str]:
     notes: list[str] = []
     if not parent.feedback:
         notes.append("対応なし。見たうえで対応しない、という記録になる")
-        notes.append("別に追うものは issue に回したか（ccnavi-review.sh decide）")
+        notes.append("別に追うものは issue に回したか（ccnavi-user-decide.sh）")
     return notes
 
 
@@ -509,7 +509,7 @@ def revision_problems(
             elsewhere = (
                 "残りは新しい親チケットの提案として wip/proposals/todo/ に書いてください"
                 if phase.without_mr(root, conf, current.ticket)
-                else "残りは別 issue に回してください（ccnavi-review.sh decide）"
+                else "残りは別 issue に回してください（ccnavi-user-decide.sh）"
             )
             problems.append(
                 rules.Problem(

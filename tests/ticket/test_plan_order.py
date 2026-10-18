@@ -320,7 +320,7 @@ class PlanOrderJsonTest(PlanOrderHarness):
             (("--plan-order", "i0001", "--fill-phases", "--json"), "--fill-phases"),
             (("--order", "{}", "--json"), "--plan-order"),
             (("--write",), "--plan-order"),
-            (("--agree", "--plan-order", "i0001", "--json"), "--agree"),
+            (("user", "agree", "--plan-order", "i0001", "--json"), "--agree"),
         ):
             with self.subTest(args=args):
                 result = self.ccnavi(*args)
@@ -462,11 +462,11 @@ class PlanOrderWriteTest(PlanOrderHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         written = self.read()
         self.commit_parent("reorder")
-        stale = self.ccnavi("--agree", "--yes", "i0001", "--digest", old, "--json")
+        stale = self.ccnavi("user", "agree", "--yes", "i0001", "--digest", old, "--json")
         self.assertEqual(stale.returncode, 1, stale.stdout + stale.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         fresh = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
-        done = self.ccnavi("--agree", "--yes", "i0001", "--digest", fresh, "--json")
+        done = self.ccnavi("user", "agree", "--yes", "i0001", "--digest", fresh, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             self.assertEqual(f.read(), written)

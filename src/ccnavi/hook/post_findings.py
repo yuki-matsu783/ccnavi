@@ -149,14 +149,14 @@ class ScopeGuard:
                 + overflow
                 + "Send the output inside the parent's area, or, if the task genuinely needs "
                 "this path, tell the parent so it can propose a ticket whose parent covers it "
-                "and ask the user to run 'ccnavi --agree'."
+                "and ask the user to run 'ccnavi user agree'."
             )
         else:
             message = (
                 f"This path is outside the work area that ticket {ticket.ticket} declares "
                 f"({area}) for worktree {t.name}. Send the output inside that area, or, if the "
                 "task genuinely needs this path, tell the parent so it can propose a ticket that "
-                "covers it and ask the user to run 'ccnavi --agree'."
+                "covers it and ask the user to run 'ccnavi user agree'."
             )
         rule = rules.Rule(id=TICKET_SCOPE_RULE, message=message)
         # 出所はその承認済みチケット自身の場所。承認済みチケットはツリーごとに在るので、
@@ -204,7 +204,7 @@ def _findings(
     ccnavi 自身が書く場所は先に除く。除かないと、記録を 1 行足すたびに
     自分がその記録を違反として報告し、その報告がまた記録を 1 行増やす。
 
-    チケットの置き場に現れた変更も、ccnavi の副命令が書いたと内容から読めるぶんだけ
+    チケットの置き場に現れた変更も、ccnavi のサブコマンドが書いたと内容から読めるぶんだけ
     除く（`_script_writes`）。除かないと、`ticket start` が着手の時刻を書くたび、
     `review request` がマーカーを置くたびに、ccnavi 自身の書き込みが
     「エージェントによる書き換え」として報告され、戻す設定では戻されて手順が進まない。
@@ -256,7 +256,7 @@ def _script_writes(
     where: tree.Tree,
     root: str = "",
 ) -> set[str]:
-    """チケットの置き場の変更のうち、ccnavi の副命令が書いたと読めるものの実パス。
+    """チケットの置き場の変更のうち、ccnavi のサブコマンドが書いたと読めるものの実パス。
 
     `ticket start` / `finish` / `cancel` と `review request` / `confirm` / `ready` は、
     承認済みチケットとマーカーを書く。書いた先は `deny` と宣言された場所なので、外さないと
@@ -313,8 +313,8 @@ def _script_writes(
             # 読めないものは外さない。読めないことは「変わっていない」ではない。
             continue
         now = fsio.read_text(change.full, errors="replace")
-        # 省いてよいのは、コミット済みの版がまだ持っていない欄だけ。副命令はどれも
-        # 1 度しか書かないので、既に値がある欄が変わったのなら副命令が書いたものではない
+        # 省いてよいのは、コミット済みの版がまだ持っていない欄だけ。サブコマンドはどれも
+        # 1 度しか書かないので、既に値がある欄が変わったのならサブコマンドが書いたものではない
         # （`ticket_fields.script_fields_set`）。
         drop = _droppable(before)
         # `mr:` が空から整数になっただけの変更も、ccnavi の書き足しとして省いて比べる

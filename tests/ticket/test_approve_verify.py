@@ -172,7 +172,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertIn("broken.md", result.stdout)
         self.assertIn("承認を依頼してよい", result.stdout)
         # 同じ状態で実際の承認も通る。確かめと承認の答えが分かれないことが要点。
-        approved = self.ccnavi("--agree", stdin="y\n")
+        approved = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
@@ -182,7 +182,7 @@ class ApproveVerifyTest(PhaseHarness):
         使い方の誤りは 1。答えの「いいえ」（3）とは分ける。読む側が取り違えると、
         直すものが無いのに提案を直しに行く。
         """
-        result = self.ccnavi("--agree", "--verify")
+        result = self.ccnavi("user", "agree", "--verify")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertNotEqual(result.returncode, ANSWER_NO)
         self.assertIn("--preview", result.stderr)

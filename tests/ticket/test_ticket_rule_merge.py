@@ -31,7 +31,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_path
+from tests import ROOT, common_path, userform
 from tests.inproc import run_ccnavi
 from tests.ticketsample import plain_parent, write_plain_phases
 
@@ -190,17 +190,19 @@ class Workspace(unittest.TestCase):
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         return run_ccnavi(
-            [
-                "--root",
-                self.root,
-                "--guard-core-files",
-                core,
-                "--restore-if-deny",
-                restore,
-                "--guard-ticket-approval",
-                "disable",
-                *args,
-            ],
+            userform.place(
+                [
+                    "--root",
+                    self.root,
+                    "--guard-core-files",
+                    core,
+                    "--restore-if-deny",
+                    restore,
+                    "--guard-ticket-approval",
+                    "disable",
+                ],
+                args,
+            ),
             input=stdin,
             cwd=ROOT,
             env=environment,
@@ -276,7 +278,7 @@ class Workspace(unittest.TestCase):
         )
 
     def approve(self):
-        result = self.ccnavi("--agree", stdin="y\n")
+        result = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")

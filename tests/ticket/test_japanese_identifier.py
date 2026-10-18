@@ -20,7 +20,7 @@ import tempfile
 import unicodedata
 import unittest
 
-from tests import ROOT, common_path
+from tests import ROOT, common_path, userform
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import git, ticket_text, write
 from tests.ticketsample import RULES, write_plain_phases
@@ -54,17 +54,19 @@ class JapaneseIdentifierTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return run_ccnavi(
-            [
-                "--root",
-                self.root,
-                "--guard-core-files",
-                "disable",
-                "--restore-if-deny",
-                "disable",
-                "--guard-ticket-approval",
-                "disable",
-                *args,
-            ],
+            userform.place(
+                [
+                    "--root",
+                    self.root,
+                    "--guard-core-files",
+                    "disable",
+                    "--restore-if-deny",
+                    "disable",
+                    "--guard-ticket-approval",
+                    "disable",
+                ],
+                args,
+            ),
             input=stdin,
             cwd=ROOT,
             env=environment,
@@ -102,7 +104,7 @@ class JapaneseIdentifierTest(unittest.TestCase):
         self.assertNotIn("識別子に使えない文字", lint.stdout + lint.stderr)
 
         # 2. 承認と着手
-        result = self.ccnavi("--agree", stdin="y\n")
+        result = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", PARENT + ".md")))
         git(self.parent_tree, "add", "-A")

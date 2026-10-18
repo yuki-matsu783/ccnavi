@@ -21,7 +21,7 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
   todo ─────────────────→ doing ───────────────────────────→ review
   (wip/proposals)      (.ccnavi/approved)                (wip/proposals)
                             │                                  │
-                            │ finish（レビュー不要）／cancel    │ confirm / decide / --reviewed / close-early / Chrome のレビュー済み
+                            │ finish（レビュー不要）／cancel    │ confirm / decide / user reviewed / close-early / Chrome のレビュー済み
                             ▼                                  ▼
                           done ←───────────────────────────────┘
                      (.ccnavi/approved)
@@ -32,14 +32,14 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | 遷移 | 動かす者 | 条件 | 書く欄 |
 |---|---|---|---|
 | 無し → `todo` | 親が `Write` / `Edit` で作る | 無し | ― |
-| `todo` → `doing` | `ccnavi --agree`（ユーザ）、ボード、Chrome 拡張 | 9.4。同じ識別子がどの置き場にも無い | ―（中身は変えない。待ち方は承認済みチケットの計画から都度計算する） |
+| `todo` → `doing` | `ccnavi user agree`（ユーザ）、ボード、Chrome 拡張 | 9.4。同じ識別子がどの置き場にも無い | ―（中身は変えない。待ち方は承認済みチケットの計画から都度計算する） |
 | `todo` → `doing`（手で） | ユーザが hook の外で動かす | 無し。動かせること自体が条件（その置き場にエージェントは書けない）。承認の検査は判定が当てる | ― |
-| `todo`（改版）→ 消える | `ccnavi --agree`（ユーザ） | 同じ識別子が `doing/` にあり、計画・`phases:`・範囲のどれかが違う。`doing/` の側の計画・写し・範囲を差し替える | `plan` / `feedback`（項の `after` ごと）・`phases:`・`allow` / `ask` / `deny` |
+| `todo`（改版）→ 消える | `ccnavi user agree`（ユーザ） | 同じ識別子が `doing/` にあり、計画・`phases:`・範囲のどれかが違う。`doing/` の側の計画・写し・範囲を差し替える | `plan` / `feedback`（項の `after` ごと）・`phases:`・`allow` / `ask` / `deny` |
 | `doing` のまま | `ccnavi-ticket.sh start` | 着手の欄が空。`.claude/worktrees/<識別子>/` がワークツリーとして在り、元リポジトリが承認済みチケットの `project` と合い。子なら親が `doing/` に在って着手済みで、先行が全部 `done/` に在って取り消しでない | `started_at`、`base_sha`（そのワークツリーの HEAD） |
 | `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。フェーズ定義の成果物が在り、定性のリスク判定が揃っている（9.9） | `completed_at` |
 | `doing` → `done` | `ccnavi-ticket.sh finish` | 着手済み。子ならフェーズがレビュー不要。親なら開いている子が無く、レビューで止まっておらず、計画があればフィードバック計画が承認済みで全フェーズが終わっている（早めに閉じていれば子だけ） | `completed_at` |
-| `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`close-early`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
-| `review` → `done` | `ccnavi-review.sh confirm` / `decide`、`ccnavi --reviewed`、Chrome 拡張のレビュー済み、`close-early`、フィードバック計画の承認 | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |
+| `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`ccnavi-user-close-early.sh`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
+| `review` → `done` | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh`、フィードバック計画の承認 | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |
 | 無し → `doing`（続きの子） | ユーザが `decide` で選ぶ | レビューで指摘が残った（9.10）。同じフェーズの番号、範囲は見た子の和 | `followup_of`（トップレベルの欄。ccnavi が新しく作るチケットに書く） |
 | `doing` → `todo`（取り下げ） | Chrome 拡張（ユーザ） | 着手前の新規の承認。`doing/` の中身が承認コミットの親の提案とバイト単位で同じ。子もマーカーも無く、続きの子でない。承認の前に計画編集タブ（`--plan-order --write`）か `--fill-phases` で書き換えた提案は、書き換えがコミットされないまま承認されるので取り下げられない。違いが `plan:` / `feedback:` / `phases:`（子は `phase:` か `predecessors:`）の値だけなら、文面が `ccnavi-ticket.sh cancel` で取り消して出し直すよう案内する。識別子と `phase:` を付け替えた子は、承認コミットの親に同じ識別子の提案が無いので、案内は出ずに止まる | ―（承認コミットの親の提案のバイト列を戻す） |
 | `done` → `doing` | ユーザが hook の外で動かす | エージェントは `Write` でもシェルでも止まる。再開の意図がレビューのやり直しなら、そのフェーズのマーカーも手で消す | ― |
@@ -90,7 +90,7 @@ warn で言う。マーカーを消すかは、レビューをやり直すかど
 呼び名を「レビュー準備中」から「レビュー待ち」へ変えるだけ。9.8）。
 
 ```
-    無し ──終わった ∧ mr で見る──→ pending ──request──→ requested ──confirm / --reviewed──→ reviewed
+    無し ──終わった ∧ mr で見る──→ pending ──request──→ requested ──confirm / user reviewed──→ reviewed
      │
      └────終わった ∧ レビュー不要──→ skipped
 
@@ -101,24 +101,24 @@ warn で言う。マーカーを消すかは、レビューをやり直すかど
 |---|---|---|
 | 無し → `pending` | `PostToolUse` の告知（cwd が親のワークツリー） | 終わっていて、マーカーが 1 つも無く、レビュー要。文を 1 度だけ返す |
 | 無し → `skipped` | 同上 | 終わっていて、マーカーが 1 つも無く、レビュー不要（または延期） |
-| 任意 → `skipped` | `ccnavi-review.sh close-early`（ユーザ） | 終わっていないフェーズのうち、レビュー待ちか閉じた子が居るもの(未着手の子を取り消すと終わるもの)に置く。手を付けていないフェーズには置かず、issue に書き出す（9.11） |
+| 任意 → `skipped` | `ccnavi-user-close-early.sh`（ユーザ） | 終わっていないフェーズのうち、レビュー待ちか閉じた子が居るもの(未着手の子を取り消すと終わるもの)に置く。手を付けていないフェーズには置かず、issue に書き出す（9.11） |
 | 任意 → `requested` | `ccnavi-review.sh request`（親） | 9.10 の前提と ELI5 の HTML（`--eli5`。`wip/` の下にコミット済み）。`pending` は要らない |
-| `requested` → `reviewed` | `ccnavi-review.sh confirm`（ユーザが端末で打つか、VS Code のボードの連絡を受けた親が打つ）、`ccnavi-review.sh decide`（ユーザ）、Chrome 拡張のレビュー済み、フィードバック計画の承認、`close-early` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
-| 任意 → 無し | `ccnavi --agree` で同じ番号の子が承認された | 4 種を全部消す |
+| `requested` → `reviewed` | `ccnavi-review.sh confirm`（ユーザが端末で打つか、VS Code のボードの連絡を受けた親が打つ）、`ccnavi-user-decide.sh`（ユーザ）、Chrome 拡張のレビュー済み、フィードバック計画の承認、`ccnavi-user-close-early.sh` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
+| 任意 → 無し | `ccnavi user agree` で同じ番号の子が承認された | 4 種を全部消す |
 
 マーカーはユーザが子を再開しても残る。再開は想定しない運用で、された場合は `--lint` と
 `ticket status` が、作業中の子のフェーズに `reviewed` が残っていると warn で言う（閉じ直したときにレビューが要らないフェーズ、つまりフェーズ定義が `review: none` で、再開された子も
 `human_review` を求めていないフェーズは言わない）。再開の意図がレビューのやり直しなら、そのフェーズのマーカーを人が手で消す
 （マーカーがあるツリー、つまり `approval.home_dir` が決めるツリーで `ccnavi-git.sh rm .ccnavi/approved/phases/<親>/<N>.reviewed`
 を打ち、削除をコミットする。write-and-push の対象（親のワークツリーがあり、origin があり、HEAD の確認に通る）で、マージリクエストで見るフェーズがある親子なら、
-`ccnavi-push-approved.sh <親>` が取り込んでからコミットして送る。それ以外の親子では、名指しの
-`ccnavi-push-approved.sh <親>` は「ここではコミットも push もしない」と出して終わるので、ユーザが自分でコミットする。
-引数なしの `ccnavi-push-approved.sh` は、置き場に変更のあるツリーを全部コミットする）。
+`ccnavi-user-push-approved.sh <親>` が取り込んでからコミットして送る。それ以外の親子では、名指しの
+`ccnavi-user-push-approved.sh <親>` は「ここではコミットも push もしない」と出して終わるので、ユーザが自分でコミットする。
+引数なしの `ccnavi-user-push-approved.sh` は、置き場に変更のあるツリーを全部コミットする）。
 警告文は、そのツリーをワークスペースルートからの相対で言う。
 マーカーが未コミットのときは `git rm` が拒む（一度もコミットしていなければ「どのファイルにも当たらない」、
 コミット後に書き換えていれば「手元の変更がある」）。`-f` は `ccnavi-git.sh` が通さないので、先に
-`ccnavi-push-approved.sh <親>` でコミットしてから `rm` するか、ファイルを直接消す（消したことは次の
-`ccnavi-push-approved.sh <親>` がコミットする。一度もコミットしていなければ消すだけで済む）。続きの作業だけなら、残してよい。
+`ccnavi-user-push-approved.sh <親>` でコミットしてから `rm` するか、ファイルを直接消す（消したことは次の
+`ccnavi-user-push-approved.sh <親>` がコミットする。一度もコミットしていなければ消すだけで済む）。続きの作業だけなら、残してよい。
 延期したフェーズ N の子を再開したときも警告する。ただし、引き受けた側 M（ゲートと同じく、承認済みの親の計画から計算した待ち方で引く。`N.skipped` の `deferred_to` ではない。
 改版で引き受け手が動くと `deferred_to` は古くなる）に `reviewed` が
 残っているときだけ。M のレビューが見たのは再開前の作業だけで、再開後の作業は誰のレビューも通らないため。M がまだレビュー前なら、これからのレビューが再開後の作業も覆うので言わない。M がレビュー不要なら、ゲートが `reviewed` を見ないので言わない。消すのは M の `reviewed` で、`N.skipped` は消さない（手順は上と同じ）。
@@ -132,4 +132,4 @@ warn で言う。マーカーを消すかは、レビューをやり直すかど
 | HITL ポイント | チケットの置き場、マーカー | cwd のワークツリーと同じ識別子の `doing/` の親 → その子の置き場で「終わった」→ マーカー |
 | レビューの依頼の前提 | チケットの置き場、マーカー | 終わっている、`requested` が無い、ほか git の条件 |
 | `SubagentStart` の一覧 | チケットの置き場、ワークツリー | cwd のワークツリーが親ならその親の `doing/` の子、子ならその子 |
-| `--agree` の承認待ち | チケットの置き場 | `todo/` に在って同じ識別子がどの置き場にも無い提案と、親の改版 |
+| `user agree` の承認待ち | チケットの置き場 | `todo/` に在って同じ識別子がどの置き場にも無い提案と、親の改版 |

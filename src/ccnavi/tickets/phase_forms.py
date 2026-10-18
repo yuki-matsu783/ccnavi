@@ -11,11 +11,15 @@ import re
 
 from ..infra import settings, shellread, shellread_words
 from ..policy import rules, selfguard_shell
+from . import user_only
+
+# 何がユーザ専用かは `user_only` の表が正本。この module はその表から正規表現とオプションの一覧を
+# 組み立て、コマンド行に当てる。操作を足す・外すときは表の行を直し、ここの正規表現は直さない。
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
 # コマンドの位置で `sh` から呼ぶ形だけ。名前がどこかに含まれるだけでは通さない。
 # 連結されたコマンドが 1 つでもこの形でなければ止める。
-_EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
+_EXEMPT_COMMAND = re.compile(rf"^(sh|bash)\s+\S*{user_only.agent_script_forms()}(\s|$)")
 # 止めたときの文に添える、通る形の案内。案内どおりの 1 本に `cd … &&` や `| tail` を
 # 付けると、連結の全部が上の形でないので止まる。文が「何を打つか」だけを言うと、
 # 付け足した形で打って止まり、案内と拒否が食い違って見える。
@@ -35,9 +39,7 @@ TURN_DEFINED = "ターン（ユーザが指示を出してから Claude が応�
 # サブエージェントが親のツリーへ cd して打てばラッパースクリプトは通すので、
 # サブエージェントかどうかで止めるレイヤーをここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
-    r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|finish|cancel|propose|record-risk|request|confirm|comment|decide|ready|close-early"
-    r"|push)\b",
+    user_only.subagent_forbidden_forms(),
     # 名前の大小は問わない（`CCNAVI-TICKET.SH`）。大小を区別しないファイルシステムでは
     # 同じ sh が走る。
     re.IGNORECASE,
@@ -78,27 +80,10 @@ _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard_shell._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 #
-# `--import` はテンプレートの下書きを取り込む形（`ccnavi --templates --import`）。取り込みはユーザが
-# 差分を読んで決めるので、下見だけの形（`--yes` なし）も含めてエージェントには打たせない。
-# 下書きを作る `--draft` は効力が無いので止めない。
-# `--rename-template`・`--move-template`・`--delete-template` も同じ。`--save-draft` も止める
-# （`--body-file` に任意のパスを渡して、読んだ中身を下見の出力に出せるため。下書きの編集は Write
-# でできる）。`--delete-draft` は下書きの置き場の中だけを消すので、
-# `--yes` の付かない下見は止めない。
-_CLI_FORMS = (
-    rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--import\b"
-    r"|--(?:rename|move|delete)-template\b|--save-draft\b"
-    # 副命令の前の `--`（`ticket -- finish`）は、実行ファイルが選択肢の終わりとして読み飛ばすので
-    # 同じ操作になる。
-    r"|\b(ticket|review)\s+(--\s+)?"
-    r"(start|finish|cancel|propose|record-risk|prepare|requested|confirm|ready)\b"
-    # 親を閉じたときの片付け。ブランチを `branch -D` で消すので、エージェント（メインも
-    # サブエージェントも）には直に打たせない。呼ぶのは sh（`ccnavi-review.sh ready` の
-    # `worktree retire`、`ccnavi-sync.sh` の `sync tidy`）の中か、ユーザが `!` を付けて
-    # 打つときだけ。sh の中の呼び出しは hook を通らない。取り消した子のブランチを消す
-    # `worktree branch … confirmed` は、ユーザが確認したことをユーザ自身が打つことで担保する。
-    r"|\bsync\s+(--\s+)?tidy\b|\bworktree\s+(--\s+)?(retire|branch)\b)"
-)
+# 実行ファイルを直に呼ぶ形のオプションとサブコマンドは、表（user_only.FLAGS・SUBS）から組み立てる。
+# オプションごとの理由（テンプレートの取り込みを下見も含めて止める理由、親を閉じたときの片付けを
+# エージェントに打たせない理由）は、表の行のコメントにある。
+_CLI_FORMS = user_only.cli_forms(_NOT_PREVIEW)
 CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
 TICKET_APPROVAL_RULE_ID = "builtin:guard-ticket-approval"
 
@@ -133,9 +118,10 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 #    端末要求を外す（テストと CI のため）。切れなければ、端末を持たないエージェントは実行ファイルの
 #    側で止まる
 # 2. ボードの経路の形。`--yes`（承認と残った指摘）は端末を求めないので、ここが唯一の保護になる。
-#    `--agree` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組、
-#    `--templates` と `--import` と `--yes` の組（テンプレートの取り込み。
-#    ボードの画面だけが `--via board` で呼ぶ）
+#    `--agree` / `--reviewed` と `--yes` の組み合わせ、
+#    sh の `--choices` と `--digest` の組み合わせ、
+#    `user handoff` と `--yes` の組み合わせ（保護対象の下書きの取り込み。
+#    ボードの画面だけが `--via board` で呼ぶ）、前の形の `--templates` と `--import` と `--yes`
 #
 # 実行ファイルを呼ぶ表記は追い切れない（`uv run -m ccnavi`、名前を変えたコピー、
 # `awk` の `system()`、`python -c` に引数のリストで渡す形）。だからコマンドの位置は見ず、
@@ -150,38 +136,28 @@ _GUARD_READ = re.compile(
     re.IGNORECASE,
 )
 _GUARD_MENTION = re.compile(rf"(?<![A-Za-z0-9_]){_GUARD_NAME}(?![A-Za-z0-9_])", re.IGNORECASE)
+# `CCNAVI_` で始まる名前の途中に展開が混じる形（`env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable`・
+# `export "CCNAVI_GUARD_`printf TICKET`_APPROVAL=disable"`）。実行の時点で端末要求を切る変数の
+# 名前になりうるので、名前を文字どおりに書いた形（_GUARD_MENTION）と同じに止める。前が `$`・`{` の
+# 形（`$CCNAVI_ROOT$X`・`${CCNAVI_X}`）は変数を読むだけなので数えない。
+_GUARD_EXPANDED_NAME = re.compile(r"(?<![A-Za-z0-9_${])CCNAVI_[A-Za-z0-9_]*[$`]", re.IGNORECASE)
+# 展開（`$`・バッククォート）を含む `--` で始まる語（`--y${X}es`・`--y$(echo es)`）。
+# `user` の語が同じコマンド行にあれば、入口を読めない呼び方（名前を変えたコピーなど）でも止める。
+# 入口の表記の検査（launcher）と組み合わせの検査（BOARD_COMBOS）は、展開で組み立てた語を
+# 文字として読めないため。暫定の止めで、`user` と関係の無い語の展開まで止める側に広がる。
+_EXPANDED_OPTION = re.compile(r"(?<![^\s\x00;&|(])--[^\s\x00;&|]*[$`]")
+# 単独の語の `user`（`user.email` や `--user` は数えない）。
+_USER_ALONE = re.compile(
+    rf"(?<![^\s\x00;&|(=]){user_only.USER_WORD}(?![^\s\x00;&|)])", re.IGNORECASE
+)
 _GUARD_FLAG = re.compile(
     r"--guard-ticket-approval(?:\s*=\s*|\s+)(?!enable(?![\w-]))", re.IGNORECASE
 )
-_BOARD_FORMS = (
-    re.compile(r"(?<![\w-])--(?:agree|approve|reviewed)(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
-)
-_IMPORT_FORMS = (
-    re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--import(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
-)
-# テンプレートの編集（保存・下書きの削除・改名・移動・削除）を `--yes` で書く形。
-# 取り込みと同じく launcher の書き方に依らず止める
-_EDIT_FORMS = (
-    re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
-    re.compile(
-        r"(?<![\w-])--(?:save-draft|delete-draft|rename-template|move-template|delete-template)(?![\w-])",
-        re.IGNORECASE,
-    ),
-    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
-)
-# `--save-draft` は下見でも `--body-file` の中身を出力に出す。
-# launcher の書き方に依らず、`--yes` が無くても止める
-_SAVE_DRAFT_FORMS = (
-    re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--save-draft(?![\w-])", re.IGNORECASE),
-)
-_DECIDE_FORMS = (
-    re.compile(r"(?<![\w-])--choices(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--digest(?![\w-])", re.IGNORECASE),
-)
+# ボードの経路のオプションの組み合わせ。組み合わせの中身と並びは表（user_only.BOARD_COMBOS）にある。
+_BOARD_COMBOS = user_only.board_combos()
+# ユーザ専用の sh（`ccnavi-user-*.sh`）の名前。名前を変えたコピーでも、コマンド行に名前が
+# 出れば止める。
+_USER_SCRIPT = user_only.user_script_pattern()
 # 表示・検索・閲覧だけをする道具。コマンドを実行する機能か変数に書く機能を持つもの（`sed` の `e`、
 # `awk` の `system()`、`git` の別名、`xargs`、`find -exec`、`printf -v`）は入れない。
 _READERS = frozenset(
@@ -191,10 +167,15 @@ _SEGMENT = re.compile(r"[;&|\n]+")
 _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
 
 
-def _dequoted(subject: str) -> str:
-    """引用符とバックスラッシュを除いた文字列。分け書き（`--y""es`）と引用を同じに読む。"""
+def _dequoted(subject: str, *, keep_ticks: bool = False) -> str:
+    """引用符とバックスラッシュを除いた文字列。分け書き（`--y""es`）と引用を同じに読む。
+
+    `keep_ticks` なら、バッククォート（コマンド置換）は残す。展開の有無を見る検査が使う。
+    """
     return re.sub(
-        r"['\"`\\]", "", subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
+        r"['\"\\]" if keep_ticks else r"['\"`\\]",
+        "",
+        subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " "),
     )
 
 
@@ -241,38 +222,68 @@ def _commit_messages(subject: str) -> list[str]:
 
 
 def human_path_form(subject: str) -> tuple[str, str]:
-    """hook のほかに保護が無いユーザの判断の形があれば（種類, 見つけた文字列）。無ければ空の組。
+    """hook のほかに保護が無いユーザの判断の形があれば（種類, 見つけた文字列）。
+    無ければ空の文字列 2 つ。
 
-    種類は `guard-off`（端末要求を切る）か `board`（ボードの経路）。
+    種類は `guard-off`（端末要求を切る）・`user-script`（ユーザ専用の sh）・
+    `board`（ボードの経路）・`expanded`（`user` の語と、展開を含む `--` の語が並ぶ）。
     """
     text = _dequoted(subject)
+    ticked = _dequoted(subject, keep_ticks=True)
     for message in _commit_messages(subject):
         text = text.replace(_dequoted(message), " ", 1)
+        ticked = ticked.replace(_dequoted(message, keep_ticks=True), " ", 1)
     if _only_readers(text):
         return "", ""
     unread = _GUARD_READ.sub("", text)
     mention = _GUARD_MENTION.search(unread)
     if mention:
         return "guard-off", mention.group(0)
+    expanded_name = _GUARD_EXPANDED_NAME.search(ticked)
+    if expanded_name:
+        return "guard-off", expanded_name.group(0)
     flag = _GUARD_FLAG.search(text)
     if flag:
         return "guard-off", flag.group(0).strip()
-    for pair in (_BOARD_FORMS, _IMPORT_FORMS, _EDIT_FORMS, _SAVE_DRAFT_FORMS, _DECIDE_FORMS):
-        found = [rx.search(text) for rx in pair]
+    script = _USER_SCRIPT.search(text)
+    if script:
+        return "user-script", script.group(0)
+    for combo in _BOARD_COMBOS:
+        found = [rx.search(text) for rx in combo]
         if all(found):
             return "board", " … ".join(m.group(0) for m in found if m)
+    option = _EXPANDED_OPTION.search(ticked)
+    if option and _USER_ALONE.search(ticked):
+        word = ticked[option.start() :].split(None, 1)[0]
+        return "expanded", word
     return "", ""
+
+
+def expanded_option_message(found: str) -> str:
+    """`user` の語と、展開を含む `--` の語が並ぶ形で止めた文。"""
+    return (
+        f"コマンド行に `user` の語と、変数やコマンド置換を含むオプションの語（{found}）が"
+        "並んでいます。ユーザ専用の入口（ccnavi user <操作>）の `--yes` などを、"
+        "実行の時点で組み立てられる形なので、"
+        "何を実行するかを確かめられず止めました。オプションは変数や置換で組み立てず、"
+        "そのまま書いてください（値が必要なら先に読み、次の手に書きます）。"
+        "ユーザ専用の操作は、ユーザが端末かボードで実行します。"
+    )
 
 
 def board_form_message(found: str) -> str:
     """ボードの経路の形で止めた文。"""
     # 取り込みの形は、承認と残った指摘の対応方針の文に当たらない。
+    lowered = found.casefold()
     decided = (
-        "テンプレートの取り込みは、ユーザが画面か端末で下書きの差分を読んでから決めます。"
-        if "--import" in found
-        else "テンプレートの下書きの保存は、ユーザが実行します"
+        "保護対象の下書きの取り込み（`ccnavi user handoff`）は、ユーザがボードか端末で"
+        "下書きの差分を読んでから決めます。"
+        if "handoff" in lowered or "--import" in lowered or "templates" in lowered
+        else "`--via board` は、ボードの画面から押した操作を拡張が実行するときだけ付ける印です。"
+        if lowered.startswith("--via")
+        else "下書きの保存は、ユーザが実行する前の形です"
         "（`--body-file` の中身が出力に出るため）。下書きは Write で直接編集してください。"
-        if "--save-draft" in found
+        if "--save-draft" in lowered
         else "承認はユーザが端末・ボード・置き場のファイルの移動で行い、"
         "残った指摘の対応方針はユーザが VS Code のボードか端末で決めます。"
     )
@@ -280,6 +291,17 @@ def board_form_message(found: str) -> str:
         f"コマンド行に、ボード経由の操作用の形（{found}）が含まれています。この形はユーザがボードの"
         "オーバーレイで押したものを拡張が実行するためのもので、端末での確かめが無いので、エージェントが"
         f"実行した場合はここで止めます。{decided}"
+        "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
+    )
+
+
+def user_script_message(found: str) -> str:
+    """ユーザ専用の sh の名前（`ccnavi-user-*.sh`）で止めた文。"""
+    return (
+        f"コマンド行に、ユーザ専用の sh の名前（{found}）が含まれています。"
+        "ccnavi-user- で始まる sh は、承認・レビュー済み・早めに閉じる・"
+        "残った子のブランチの削除など、ユーザが端末で決める操作です。"
+        "エージェントは実行しません。必要なら、理由を添えてユーザに依頼してください。"
         "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
@@ -305,9 +327,10 @@ def guard_off_message(found: str) -> str:
 #   なりうる語があれば止める。文字どおりの `--preview` があれば通す
 #   （sh が `--choices` と一緒に断る）
 # - 実行ファイル（launcher を含む）の `--agree` / `--reviewed` と `--yes`: 端末を求めない。
-#   承認の旗と `--yes` がどちらも文字か展開でそろいうるときと、端末要求を切る
-#   `--guard-ticket-approval` になりうる語があるときに止める。展開を含む語より前に、診断の旗
-#   （`--docs`・`--test` など）か実行ファイルの知らない旗があれば通す（承認の経路に進まない）。
+#   承認のオプションと `--yes` がどちらも文字か展開でそろいうるときと、端末要求を切る
+#   `--guard-ticket-approval` になりうる語があるときに止める。展開を含む語より前に、診断のオプション
+#   （`--docs`・`--test` など）か実行ファイルの知らないオプションがあれば通す
+#   （承認の経路に進まない）。
 #   文字どおりの `--agree --preview` も通す（`--yes` が来ても実行ファイルが断る）
 #
 # 展開と glob は、引用されていない部分と二重引用符の中（glob は引用されていない部分）だけで
@@ -327,9 +350,9 @@ _ENTRY_EXE = frozenset({"ccnavi", "ccnavi.exe", "ccnavi.__main__", "ccnavi-launc
 _ENTRY_PREFIX = frozenset(
     {"sh", "bash", "dash", "zsh", "ksh", "ash", "busybox", ".", "source", "exec", "command"}
 )
-# 後ろの語を実行する、Python のツールの実行役（`uv run`・`uvx`・`pipx run`）。間に置いた
-# 選択肢と値は読み分けず、後ろに入口の名前があればコマンドの位置とみなす。
-_TOOL_RUNNERS = frozenset({"uv", "uvx", "pipx"})
+# 後ろの語を実行する、Python のツールの実行役（`uv run`・`uvx`・`pipx run`・`poetry run`・
+# `pipenv run`）。間に置いた選択肢と値は読み分けず、後ろに入口の名前があればコマンドの位置とみなす。
+_TOOL_RUNNERS = frozenset({"uv", "uvx", "pipx", "poetry", "pipenv"})
 _STDIN_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "ash"})
 _FEEDERS = frozenset({"xargs", "parallel"})
 # 展開・置換・glob・find -exec の置き場。どれもシェルか実行役が実行の時点で値を決める。
@@ -337,20 +360,17 @@ _OPEN = re.compile(r"[$`*?\[]|\{\}")
 _OPEN_PART = re.compile(
     r"\$\{[^}]*\}?|\$\([^)]*\)?|\$[A-Za-z0-9_@*#?$!-]*|`[^`]*`?|\[[^\]]*\]?|\{\}|[*?]"
 )
-_APPROVAL_FLAGS = ("--agree", "--approve", "--reviewed")
-_YES_FLAGS = ("--yes",)
-_IMPORT_FLAGS = (
-    "--import",
-    "--save-draft",
-    "--delete-draft",
-    "--rename-template",
-    "--move-template",
-    "--delete-template",
-)
-_GUARD_FLAGS = ("--guard-ticket-approval",)
-_ABANDON_FLAGS = ("--abandon",)
-_CHOICES_FLAGS = ("--choices",)
-# 実行ファイルの診断の旗。どれも承認の経路（`--agree` / `--reviewed` / `--close-early`）より前に
+_APPROVAL_FLAGS = user_only.names("approval")
+_YES_FLAGS = user_only.names("yes")
+_IMPORT_FLAGS = user_only.names("template-write", "handoff")
+# 今の実行ファイルは受け付けない前の形のオプション。古い実行ファイルが手元に残れば読まれるので、
+# 「実行ファイルの知らないオプション」には数えない（止める側に倒す）。
+_LEGACY_OPTIONS = frozenset(user_only.legacy_names())
+_GUARD_FLAGS = user_only.names("guard")
+_ABANDON_FLAGS = user_only.names("abandon")
+_CHOICES_FLAGS = user_only.names("choices", where="ccnavi-review")
+# 実行ファイルの診断のオプション。どれも承認の経路
+# （`--agree` / `--reviewed` / `--close-early`）より前に
 # 分かれて、承認を行わない（cli._parsed の振り分けの順）。
 _EXE_DIAGNOSES = frozenset(
     {
@@ -365,17 +385,18 @@ _EXE_DIAGNOSES = frozenset(
         "-h",
     }
 )
-# 実行ファイルが受ける旗（`ccnavi --version --json` の flags と、短い形の `-h` `-r`）。
-# ここに無い旗（`--list` など）は実行ファイルが使い方の誤りとして断り、何も動かさない。
-# 旗を足したらここにも足す（tests/ticket/test_ticket.py が flags と比べる）。
+# 実行ファイルが受けるオプション（`ccnavi --version --json` の flags と、短い形の `-h` `-r`）。
+# ここに無いオプション（`--list` など）は実行ファイルが使い方の誤りとして断り、何も動かさない。
+# オプションを足したらここにも足す（tests/ticket/test_ticket.py が flags と比べる）。
 EXE_OPTIONS = frozenset(
     {
         "--abandon", "--accept-check", "--accept-done", "--accept-plan",
-        "--accept-unresolved", "--actor", "--agent-id", "--agree", "--approved", "--body-file",
+        "--accept-unresolved", "--actor", "--agent-id", "--agree", "--all", "--approved",
+        "--body-file",
         "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
         "--expect",
         "--explain", "--fill-phases", "--flow", "--format", "--guard-core-files",
-        "--guard-ticket-approval", "--help", "--import", "--integration-branch", "--issue",
+        "--guard-ticket-approval", "--handoff", "--help", "--integration-branch", "--issue",
         "--json",
         "--keyword", "--layer", "--limit", "--lint", "--log", "--mode", "--mr", "--name",
         "--no-issue",
@@ -385,7 +406,7 @@ EXE_OPTIONS = frozenset(
         "--permission-mode", "--phase", "--phases", "--placed-out", "--plan", "--plan-order",
         "--preview",
         "--project-home", "--project-phases-file", "--project-risk-file", "--project-rules-file",
-        "--projects", "--prune", "--reason", "--record-tree", "--record-writes", "--replace",
+        "--projects", "--prune", "--reason", "--record-tree", "--record-writes",
         "--restore-if-deny", "--result", "--reverse", "--reviewed", "--risk", "--root", "--rules",
         "--scope", "--show", "--signal", "--since", "--sort", "--state", "--suggest", "--tag",
         "--target",
@@ -395,8 +416,6 @@ EXE_OPTIONS = frozenset(
         "--text", "--ticket-control", "--tickets", "--title", "--to", "--type", "--until",
         "--verify",
         "--version", "--via", "--with-feedback", "--write", "--yes", "-h", "-r",
-        "--save-draft", "--delete-draft", "--rename-template", "--move-template",
-        "--delete-template", "--new-name", "--on", "--to-layer",
     }
 )  # fmt: skip
 # 単引用符の中と、glob を引用した文字。文字どおりの値として読むため、
@@ -516,10 +535,24 @@ def _at_command_position(words: list[str], i: int) -> bool:
     return j == i
 
 
+def _first_after_wrapper_options(args: list[str]) -> str:
+    """ラッパーが先に付ける値つきのオプション（`--root X` など）を読み飛ばした後の最初の語。"""
+    at = 0
+    while at < len(args):
+        word = args[at]
+        if word in user_only.WRAPPER_OPTIONS:
+            at += 2
+        elif word.partition("=")[0] in user_only.WRAPPER_OPTIONS and "=" in word:
+            at += 1
+        else:
+            break
+    return args[at] if at < len(args) else ""
+
+
 def _hidden_args(kind: str, args: list[str]) -> str:
     """入口の引数のうち、止める理由になる語。無ければ空。
 
-    文字として並んだ `--choices` と `--digest` の組は human_path_form が先に止める。文字として
+    文字として並んだ `--choices` と `--digest` の組み合わせは human_path_form が先に止める。
     """
     args = _drop_redirects(args)
     if kind == _ENTRY_REVIEW:
@@ -531,14 +564,18 @@ def _hidden_args(kind: str, args: list[str]) -> str:
         return ""
     if not any(_is_open(a) for a in args):
         return ""
-    # 展開を含む語より前の、文字どおりの旗（`--` の後は旗ではない）。
+    # ラッパーのオプションを読み飛ばした後の最初の語が、`user` になりうるか。
+    first = _first_after_wrapper_options(args)
+    if first and _is_open(first) and _could_be(first, (user_only.USER_WORD,)):
+        return first
+    # 展開を含む語より前の、文字どおりのオプション（`--` の後はオプションではない）。
     head: list[str] = []
     for arg in args:
         if _is_open(arg) or arg == "--":
             break
         head.append(arg)
     flags = {a.partition("=")[0] for a in head if a.startswith("-") and a != "-"}
-    if flags & _EXE_DIAGNOSES or flags - EXE_OPTIONS:
+    if flags & _EXE_DIAGNOSES or flags - EXE_OPTIONS - _LEGACY_OPTIONS:
         return ""
     if {"--agree", "--preview"} <= flags:
         return ""
@@ -549,7 +586,8 @@ def _hidden_args(kind: str, args: list[str]) -> str:
     abandon = _abandon_word(args, opened)
     if abandon:
         return abandon
-    # テンプレートの取り込み（`--import` と `--yes`）も、承認と同じく組で読めない形にして隠せる。
+    # 下書きの取り込み（`--handoff` と、前の形の `--import` と、`--yes`）も、承認と同じく、
+    # 組み合わせを読めない形にして隠せる。
     if any(_could_be(a, _APPROVAL_FLAGS + _IMPORT_FLAGS) for a in args) and any(
         _could_be(a, _YES_FLAGS) for a in args
     ):
@@ -560,7 +598,7 @@ def _hidden_args(kind: str, args: list[str]) -> str:
 def _abandon_word(args: list[str], opened: list[str]) -> str:
     """`worktree retire --abandon`（放棄した親の記録を消す操作）を組み立てうる語。無ければ空。
 
-    文字どおりの `worktree retire` は `_CLI_FORMS` が止める。ここは、副命令の `retire` か
+    文字どおりの `worktree retire` は `_CLI_FORMS` が止める。ここは、サブコマンドの `retire` か
     `--abandon` を変数・glob で組み立てて外す形を止める。
     """
     if "worktree" not in args:
@@ -620,7 +658,7 @@ def hidden_user_entry(
 ) -> tuple[str, str]:
     """ユーザが端末で打つ入口に、読み切れない引数を渡す形があれば（入口, 見つけた語）。
 
-    無ければ空の組。
+    無ければ空の組み合わせ。
 
     inner は shellread が作る、実行役のコマンドを外した層の（実行役の名前, 層）。`sh -c '…'` の中や
     `xargs` が実行するコマンドがここに並ぶ。組み込みの script 節（`_SCRIPT_FORMS`）が当たる形は、
@@ -706,14 +744,21 @@ def _executed_entry(words: list[str], bin_base: str) -> str:
         if shellread_words._ASSIGNMENT_WORD.match(word):
             k += 1
             continue
-        if base in _TOOL_RUNNERS or (base == "run" and k and _base_name(words[k - 1]) == "pipx"):
+        if base in _TOOL_RUNNERS or (
+            base == "run" and k and _base_name(words[k - 1]) in _TOOL_RUNNERS
+        ):
             k += 1
             continue
         if base in _STDIN_SHELLS:
             shell = True
             k += 1
             continue
-        if base in _EXEC_PREFIX or base == "-m" or base.startswith("python"):
+        if (
+            base in _EXEC_PREFIX
+            or base == "-m"
+            or base.startswith("python")
+            or base in ("py", "py.exe")
+        ):
             k += 1
             continue
         if word[:1] in ("-", "+"):
@@ -740,9 +785,11 @@ _ENTRY_REASONS = {
         "一覧を見るだけなら decide <N> --preview は通ります。",
     ),
     "ccnavi": (
-        "承認の旗（--agree / --reviewed）と --yes、放棄した親の記録を消す "
-        "worktree retire --abandon、または端末要求を切る --guard-ticket-approval になりうる",
-        "診断（--docs・--test・--lint・--explain など）は、その旗を展開を含む語より前に書けば"
+        "ユーザ専用の入口 user、承認のオプション（--agree / --reviewed）と --yes、"
+        "放棄した親の記録を消す worktree retire --abandon、"
+        "または端末要求を切る --guard-ticket-approval になりうる",
+        "診断（--docs・--test・--lint・--explain など）は、そのオプションを"
+        "展開を含む語より前に書けば"
         "通ります。承認待ちを見るだけなら --agree --preview も通ります。",
     ),
 }
@@ -787,7 +834,8 @@ def hidden_entry_message(entry: str, found: str) -> str:
 # 免除しない。免除をコマンドの中のどこかの `--preview` にすると、
 # `bash -c "ccnavi --prune" x --preview` のように、実行役の引数に置いた `--preview` で免除が
 # 成立する。
-_PRUNE_WORD = re.compile(r"(?<!\S)--prune(?!\S)")
+_PRUNE_FLAG = user_only.names("prune")[0]
+_PRUNE_WORD = re.compile(rf"(?<!\S){re.escape(_PRUNE_FLAG)}(?!\S)")
 _PREVIEW_AFTER = re.compile(r"[ \t]+--preview(?![^\s;&|])")
 _PREVIEW_BEFORE = re.compile(r"(?<!\S)--preview[ \t]+$")
 _PRUNE_SEGMENT = re.compile(r"[^;&|\n]+")
@@ -796,7 +844,7 @@ RECORDS_PRUNE_RULE_ID = "builtin:guard-records-prune"
 
 
 def _unquoted_marks(subject: str) -> tuple[str, set[int]]:
-    """引用符とバックスラッシュを除いた文字列と、除いた場所（除いた後の位置）の組。"""
+    """引用符とバックスラッシュを除いた文字列と、除いた場所（除いた後の位置）の組み合わせ。"""
     text = subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
     out: list[str] = []
     cuts: set[int] = set()
@@ -820,7 +868,7 @@ def _prune_names(bin_path: str) -> re.Pattern[str]:
 def prune_form(subject: str, bin_path: str = "") -> str:
     """記録を消す `ccnavi --prune`（`--preview` の無い形）があれば、見つけた文字列。無ければ空。"""
     text, cuts = _unquoted_marks(subject)
-    if "--prune" not in text or _only_readers(text):
+    if _PRUNE_FLAG not in text or _only_readers(text):
         return ""
     names = _prune_names(bin_path)
     for segment in _PRUNE_SEGMENT.finditer(text):
@@ -829,7 +877,27 @@ def prune_form(subject: str, bin_path: str = "") -> str:
             continue
         for word in _PRUNE_WORD.finditer(text, segment.start() + name.end(), segment.end()):
             if not _previewed(text, cuts, word.start(), word.end()):
-                return "--prune"
+                return _PRUNE_FLAG
+    return ""
+
+
+# `ccnavi user prune`。入口の位置の規則は他の `user` の操作と同じで、止める設定だけが違う。
+_USER_PRUNE = re.compile(user_only.user_verb_forms("prune"), re.IGNORECASE)
+
+
+def user_prune_form(subject: str, bin_path: str = "") -> str:
+    """`ccnavi user prune` があれば、見つけた文字列。無ければ空。"""
+    text, _ = _unquoted_marks(subject)
+    if "prune" not in text.casefold() or _only_readers(text):
+        return ""
+    names = _prune_names(bin_path)
+    for segment in _PRUNE_SEGMENT.finditer(text):
+        name = names.search(segment.group(0))
+        if not name:
+            continue
+        found = _USER_PRUNE.match(segment.group(0), name.end())
+        if found:
+            return found.group(0).strip()
     return ""
 
 
@@ -848,7 +916,7 @@ def _previewed(text: str, cuts: set[int], start: int, end: int) -> bool:
 def prune_message() -> str:
     """`--prune` で止めた文。"""
     return (
-        "記録と state を削除する 'ccnavi --prune' は、ユーザが端末から実行するものです。記録は"
+        "記録と state を削除する 'ccnavi user prune' は、ユーザが端末から実行するものです。記録は"
         "「ccnavi が何を判定したか」を後から確かめるための材料なので、"
         "エージェントからは消しません。"
         "何が消える対象かを見るだけなら 'ccnavi --prune --preview' は通ります。"
@@ -856,55 +924,71 @@ def prune_message() -> str:
     )
 
 
+# Python から実行ファイルの中身を走らせる表記（ticket_approval_rule の launcher）。
+# - 実行役: `uv run`・`poetry run`・`pipenv run`。間に置いた選択肢と値は読み分けない
+# - インタプリタ: `python`・`python3.12`・`py`（Windows の起動役）と `.exe`
+# - インタプリタの選択肢: `-u`・`-I`・`-OO`・`-3`・`-W x`・`-Wx`・`-X utf8`・`-Xutf8`
+# - 入口: `-m ccnavi`・`-mccnavi`・`-um ccnavi`・`-m ccnavi.__main__`・配布物の入口 `main.py`
+# 拾いきれない表記（`python -c`・名前を変えたコピー）は、human_path_form と hidden_user_entry が
+# 名前に依らない検査で見る。
+_PY_RUNNER = r"(?:\S*[\\/])?(?:uv|poetry|pipenv)(?:\.exe)?\s+run\b(?:\s+[^\s\x00;&|]+)*?"
+_PY_INTERPRETER = r"(?:\S*[\\/])?(?:py|python[\w.]*)(?:\.exe)?"
+_PY_OPTIONS = r"(?:\s+(?:-[WX]\s*[^\s\x00;&|-]\S*|-[A-Za-z0-9.]+))*?"
+_PY_END = r"(?=[\s\x00;&|]|$)"
+_PY_ENTRY = (
+    rf"(?:\s+-[A-Za-z]*m\s*ccnavi(?:\.__main__)?{_PY_END}"
+    rf"|\s+(?:\S*[\\/])?main\.py{_PY_END})"
+)
+
 # 承認の sh・放棄した親の記録を消す入口（worktree retire --abandon）・ユーザの判断の入口の sh を、
 # コマンドの位置の表記で止める節。
 # ticket_approval_rule が使い、hidden_user_entry は同じ形をこの節に任せる（文面を 1 つにするため）。
-_SCRIPT_FORMS = (
-    # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る。
-    # `ccnavi-approve.sh` は `ccnavi-agree.sh` の前の名前。古いコピーが残っていても止める。
-    r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(agree|approve|push-approved)\.sh\b"
-    # ユーザの判断に使うスクリプト。中で
-    # `--close-early` を起こし、最後に承認の push を呼ぶ。打つのはユーザ。
-    r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
-    r"(close-early)\b"
-    # 親を閉じたときに残した子のブランチを消す入口（中身は実行ファイルの `worktree branch`）。
-    # ユーザが `!` を付けて打つ。`--confirmed` を単なる語としてエージェントが添えて、
-    # 取り消した子のブランチを確認なしで消せないようにする。
-    r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-clean\.sh\s[^\x00]*--(branch|confirmed)\b"
-)
+# `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る。
+# 対象のスクリプトは表（user_only.SCRIPTS）にある。
+_SCRIPT_FORMS = user_only.script_forms()
 
 
 def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルをユーザの判断の経路に使う形を止めるルール。
 
-    承認のスクリプト（`ccnavi-agree.sh`）も同じ形で止める。中身は `--agree` の
+    承認のスクリプト（`ccnavi-user-agree.sh`）も同じ形で止める。中身は `--agree` の
     呼び出しと承認済みチケットの push で、打つのは端末に座っているユーザ。
     実行ファイルの側は標準入力が端末であることを求めるので、hook から呼んでも通らないが、
     文字列で止めておけば「なぜ通らないのか」が当たったルールの id で分かる。
 
-    承認の push（`ccnavi-push-approved.sh`）も止める。コミットして push することは
+    承認の push（`ccnavi-user-push-approved.sh`）も止める。コミットして push することは
     合意そのものではないが、push は外へ出す操作で、その時機を決めるのはユーザ。
 
     放棄した親の片付けの記録を消す `ccnavi worktree retire --abandon <親>` も止める
     （`worktree retire` の形が止める）。消すと、`ccnavi-sync.sh` が知らせていた片付け待ちの親が
     見えなくなるので、打つのはユーザ。
 
-    ボードの経路の形（`--yes` の組、sh の `--choices` と `--digest`）と、端末要求を切る形は、
+    ボードの経路の形（`--yes` の組み合わせ、sh の `--choices` と `--digest`）と、
+    端末要求を切る形は、
     ここではなく `human_path_form` が止める。実行ファイルのパスに頼らず見るため。
     """
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard_shell.binary_clause(bin_path)
     if clause:
         names.append(clause)
-    launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
+    # 実行ファイルを直に呼ぶ形と、起動の sh（`sh .ccnavi/scripts/ccnavi-launcher.sh …`）。
+    names.append(r"ccnavi-launcher\.sh")
+    launcher = (
+        rf"({_PY_RUNNER}{_PY_OPTIONS}{_PY_ENTRY}"
+        rf"|(?:{_PY_RUNNER}\s+)?{_PY_INTERPRETER}{_PY_OPTIONS}{_PY_ENTRY}"
+        rf"|(?:{_PY_RUNNER}\s+)?((sh|bash)(\s+-\S+)*\s+)?(\S*[\\/])?(" + "|".join(names) + "))"
+    )
     script = _SCRIPT_FORMS
     # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは名前の大小を
     # 区別しないので、`SH .ccnavi/scripts/CCNAVI-AGREE.sh` や `CCNAVI.EXE --agree` でも
     # 同じものが走る。区別すると表記を変えるだけで外せる。引数の形（_CLI_FORMS）まで
     # 広がるが、実行ファイルの引数は大小を区別するので、広がるのは止める側だけ
     # （`--PREVIEW` で免除の形になっても、実行ファイルがその引数を受け付けない）。
+    # `ccnavi user <操作>` は、ユーザ専用の入口。`prune` は別の deny（prune_form）が止める。
+    user_entry = user_only.user_entry_forms(excluding="prune")
     expression = (
         rf"(?i)(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}"
+        rf"|(^|\x00|[;&|]\s*)(&\s*)?{launcher}{user_entry}"
         rf"|{script}"
     )
     rule = rules.Rule(
@@ -917,21 +1001,21 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' と "
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認はユーザが VS Code のボード・Chrome のボード・"
-            f"'{settings.script_command(root, 'ccnavi-agree.sh')}'・"
+            f"'{settings.script_command(root, 'ccnavi-user-agree.sh')}'・"
             "置き場のファイルの移動のどれかで、"
             "残った指摘の対応方針はユーザが VS Code のボードか端末で決めます。"
             "承認済みチケットのコミットと push"
-            f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）"
+            f"（'{settings.script_command(root, 'ccnavi-user-push-approved.sh')}'）"
             "もユーザが実行します。"
             "放棄した親の片付けの記録を消す 'ccnavi worktree retire --abandon <親>' と、"
             "ユーザの判断の入口"
-            f"（'{settings.script_command(root, 'ccnavi-review.sh')} "
-            "close-early'）もユーザが実行します。"
-            "テンプレートの取り込み（'ccnavi --templates --import'）・"
-            "取り込み済みの改名/移動/削除・下書きの保存も、ユーザが実行します。"
+            f"（'{settings.script_command(root, 'ccnavi-user-close-early.sh')}'）"
+            "もユーザが実行します。"
+            "保護対象の下書き（wip/handoff/）の取り込み（'ccnavi user handoff'。"
+            "見るだけの形も含む）も、ユーザが実行します。"
             "親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・"
             "'ccnavi worktree branch'・"
-            f"'{settings.script_command(root, 'ccnavi-clean.sh')} --branch'）は、"
+            f"'{settings.script_command(root, 'ccnavi-user-clean-branch.sh')}'）は、"
             "ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。"
             "残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです"
             "（案内されたコマンドをユーザに見せて、打ってもらってください）。"
@@ -940,6 +1024,10 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "承認が済んだかどうかは "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} status' で確かめます。"
             "置き場のファイルを自分で探さず、承認を頼み直す前に status を実行してください。"
+            "ユーザ専用の操作は 'ccnavi user <操作>'（agree・reviewed・close-early・prune・"
+            "handoff）にまとめてあり、エージェントは実行しません。"
+            "下書きの状態を見るだけなら "
+            f"'{settings.script_command(root, 'ccnavi-stage.sh')} --commands <パス>' を使います。"
             "承認待ちの一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
         ),
         decision=rules.DENY,

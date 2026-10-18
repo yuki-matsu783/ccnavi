@@ -18,9 +18,9 @@ keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, te
 | 段階 | 何が起きるか | 誰が | 使うもの |
 |---|---|---|---|
 | きっかけ | 通したくなかった操作が通った、止めすぎた、`UNDECLARED` が多い、記録で同じ呼び出しが何度も止まった | ユーザが気づく。記録からは ccnavi が候補を出す | `ccnavi --suggest`、`--explain`、記録（`decisions.jsonl`） |
-| 下書き | 本物の全文を写して 1 件足す。期待する判定も 1 行足す（止めたくないものも一緒に） | エージェント | `/ccnavi-config`、置き場は `wip/handoff/` |
+| 下書き | 本物の全文を写して 1 件足す。期待する判定も 1 行足す（止めたくないものも一緒に） | エージェント | `/ccnavi-config`、置き場は `wip/handoff/`（`ccnavi-stage.sh` で写す） |
 | 検証 | 防御を消す記述が無いか、当たるかどうかを機械に聞く。目で判定を真似しない | エージェント | `ccnavi --lint`、`--test-expectations`、`scripts/check_rules.py` |
-| 承認 | 何をなぜ変えるかと一緒に渡し、ユーザが差分を読んで置く | ユーザ | `ccnavi-stage.sh --commands` が出す mv |
+| 承認 | 何をなぜ変えるかと一緒に渡し、ユーザが差分を読んで置く | ユーザ | `ccnavi user handoff` |
 | 効く | 次の判定から効く。`dry-run` の間は止めず「enable なら止めていた」を伝えるだけ | ccnavi | `CCNAVI_MODE` |
 | 配る | 共通レイヤーのルールは、親の着手でプロジェクトの `.ccnavi/config/common/` へミラーされる | ccnavi | 親の `ticket start` |
 

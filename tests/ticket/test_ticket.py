@@ -34,7 +34,7 @@ from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
 from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
 from ccnavi.tickets import ticket as ticket_mod
-from tests import ROOT, common_path, write_and_push_flag
+from tests import ROOT, common_path, userform, write_and_push_flag
 from tests.inproc import run_ccnavi
 from tests.ticketsample import RULES, plain_parent, record_merge, write_plain_phases
 
@@ -142,19 +142,21 @@ class TicketTest(unittest.TestCase):
         environment.update(env or {})
         args = self.as_write_and_push(args)
         return run_ccnavi(
-            [
-                "--root",
-                self.root,
-                "--guard-core-files",
-                "disable",
-                "--restore-if-deny",
-                "disable",
-                # ユーザの判断の経路の端末要求は切る。テストは端末を持たない。
-                # 経路そのものの検査は、個別に enable を渡す。
-                "--guard-ticket-approval",
-                "disable",
-                *args,
-            ],
+            userform.place(
+                [
+                    "--root",
+                    self.root,
+                    "--guard-core-files",
+                    "disable",
+                    "--restore-if-deny",
+                    "disable",
+                    # ユーザの判断の経路の端末要求は切る。テストは端末を持たない。
+                    # 経路そのものの検査は、個別に enable を渡す。
+                    "--guard-ticket-approval",
+                    "disable",
+                ],
+                args,
+            ),
             input=stdin,
             cwd=ROOT,
             env=environment,
@@ -214,9 +216,9 @@ class TicketTest(unittest.TestCase):
         """承認して、承認済みチケットを親のブランチに乗せる。
 
         承認済みチケットは親のツリーに置かれ、コミットして初めて子のワークツリーへ渡る。
-        本番で `ccnavi-agree.sh` がやることを、テストでも同じ順でたどる。
+        本番で `ccnavi-user-agree.sh` がやることを、テストでも同じ順でたどる。
         """
-        result = self.ccnavi("--agree", stdin=answer + "\n")
+        result = self.ccnavi("user", "agree", stdin=answer + "\n")
         if os.path.isdir(self.approved):
             git(self.parent_tree, "add", "-A")
             git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
@@ -440,7 +442,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         other = self.worktree("i0002", "main")
         self.propose("i0002", tree=other, allow=("docs/*",))
-        result = self.ccnavi("--agree", "i0001", "i0001-01-01", stdin="y\n")
+        result = self.ccnavi("user", "agree", "i0001", "i0001-01-01", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認待ち 3 件のうち、指定の 2 件", result.stdout)
         self.assertNotIn("i0002", result.stdout.split("チケットの承認リクエスト")[1])
@@ -459,7 +461,7 @@ class TicketTest(unittest.TestCase):
     def test_listed_child_without_its_pending_parent_is_refused(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
-        result = self.ccnavi("--agree", "i0001-01-01", stdin="y\n")
+        result = self.ccnavi("user", "agree", "i0001-01-01", stdin="y\n")
         self.assertEqual(result.returncode, 1)
         self.assertIn("親 i0001 が承認されていない", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
@@ -468,13 +470,13 @@ class TicketTest(unittest.TestCase):
     def test_listed_id_with_nothing_pending_is_refused_too(self):
         # 承認待ちが空でも、識別子を並べたなら「無い」は失敗。
         # 終了コードが他の承認待ちの有無で変わらない
-        result = self.ccnavi("--agree", "i0001", stdin="y\n")
+        result = self.ccnavi("user", "agree", "i0001", stdin="y\n")
         self.assertEqual(result.returncode, 1)
         self.assertIn("承認待ちに無い: i0001", result.stderr)
 
     def test_listed_id_that_is_not_pending_approves_nothing(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        result = self.ccnavi("--agree", "i0001", "i0009", stdin="y\n")
+        result = self.ccnavi("user", "agree", "i0001", "i0009", stdin="y\n")
         self.assertEqual(result.returncode, 1)
         self.assertIn("承認待ちに無い: i0009", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
@@ -1052,7 +1054,7 @@ class TicketTest(unittest.TestCase):
         refused = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01-01 の親 i0001 がまだ承認されていない（todo/）", refused.stderr)
-        self.assertIn("--agree", refused.stderr)
+        self.assertIn("user agree", refused.stderr)
 
     def test_a_child_without_any_parent_at_all_is_named(self):
         """親の提案がどこにも無い子は、親が無いと言って止めること。
@@ -1416,7 +1418,8 @@ class TicketTest(unittest.TestCase):
         refused = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",
@@ -1431,7 +1434,8 @@ class TicketTest(unittest.TestCase):
         accepted = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",
@@ -1465,7 +1469,8 @@ class TicketTest(unittest.TestCase):
         chosen = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",
@@ -1529,7 +1534,8 @@ class TicketTest(unittest.TestCase):
         return self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",
@@ -2436,7 +2442,7 @@ class TicketTest(unittest.TestCase):
             "/tmp/x --reviewed 1 --accept-unresolved --yes j --digest d --json",
             "./copy --yes i0001 --agree --digest d",
             # 敵対的レビューで止められずに通った形。読み取り用の道具に似た名前、
-            # 文字列を実行する道具、引数のリスト、変数に入れた副命令、分け書き
+            # 文字列を実行する道具、引数のリスト、変数に入れたサブコマンド、分け書き
             "/tmp/cat.bin --reviewed 1 --accept-unresolved --yes j --digest d",
             "awk 'BEGIN{system(\"ccnavi --agree --yes a --digest X\")}'",
             "awk 'BEGIN{system(\"sh .ccnavi/scripts/ccnavi-review.sh decide 3 --choices X "
@@ -2589,7 +2595,7 @@ class TicketTest(unittest.TestCase):
     def test_user_entries_stop_only_forms_that_can_build_the_operation(self):
         """ユーザの入口は、止める操作を組み立てうるときだけ止める（ADR-0122）。
 
-        読むだけの形（`--preview`、診断の旗が展開より前にある形）・リダイレクトの行き先・
+        読むだけの形（`--preview`、診断のオプションが展開より前にある形）・リダイレクトの行き先・
         単引用符の中の文字どおりの値は通す。標準入力から読むシェルへ流し込む文字列に
         入口の名前があれば止める。
         """
@@ -2676,7 +2682,8 @@ class TicketTest(unittest.TestCase):
                     "command sh",
                 )
             ),
-            # 実行ファイルが受ける旗（main の `ticket new` が足した旗を含む）の後ろの展開。
+            # 実行ファイルが受けるオプション（main の `ticket new` が足したオプションを含む）
+            # の後ろの展開。
             "ccnavi --title t $A",
             "ccnavi --plan p $A",
             "ccnavi --issue 1 $A",
@@ -2709,7 +2716,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("標準入力から読むシェル", self.reason(result))
 
     def test_executable_options_list_matches_the_parser(self):
-        """入口の止めが知っている実行ファイルの旗は、実行ファイルが受ける旗と同じ。"""
+        """入口の止めが知っている実行ファイルのオプションは、実行ファイルが受けるオプションと同じ。"""
         out = io.StringIO()
         cli.run(io.StringIO(), out, io.StringIO(), ["--version", "--json"])
         flags = set(json.loads(out.getvalue())["flags"]) | {"-h", "-r"}
@@ -2813,14 +2820,15 @@ class TicketTest(unittest.TestCase):
 
     def test_approve_and_reviewed_need_a_terminal_unless_disabled(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        refused = self.ccnavi("--agree", "--guard-ticket-approval", "enable", stdin="y\n")
+        refused = self.ccnavi("user", "agree", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         refused = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--guard-ticket-approval",
             "enable",
@@ -2965,7 +2973,8 @@ class TicketTest(unittest.TestCase):
         return self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",
@@ -3314,7 +3323,8 @@ class TicketTest(unittest.TestCase):
         accepted = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",
@@ -3347,7 +3357,8 @@ class TicketTest(unittest.TestCase):
         accepted = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",

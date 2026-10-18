@@ -30,7 +30,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 範囲の外（チケットの `deny` の項を含む）なら、ルールの `allow` に当たっていても `POST_TICKET_SCOPE`（9.5）。
 記録と state の置き場（`logs/decisions.jsonl`、`logs/state/` の下）は除く。
 
-チケットの置き場（`wip/proposals/`、`.ccnavi/approved/`）に現れた変更は、ccnavi の副命令
+チケットの置き場（`wip/proposals/`、`.ccnavi/approved/`）に現れた変更は、ccnavi のサブコマンド
 （`ticket start` / `finish` / `cancel` と `review request` / `confirm` / `ready`）が書いたと内容から読めるぶんだけ除く。
 見るのはコミット済みの版との差で、除くのは次の 3 つ。
 

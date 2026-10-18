@@ -108,16 +108,17 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 
 サブエージェント（`agent_id` 付き）からの `ccnavi-ticket.sh` / `ccnavi-review.sh` の操作と
 `ccnavi-git.sh push` は、ルールより先に `DENY_SUBAGENT_TICKET_OP` で止める。シェルから実行ファイルを
-`--agree` / `--reviewed` / `--close-early` 付き、または状態とレビューを動かす副命令（`ticket start|finish|cancel|propose|record-risk`、
+`user` の入口（`ccnavi user …`）付き、または状態とレビューを動かすサブコマンド（`ticket start|finish|cancel|propose|record-risk`、
 `review prepare|requested|confirm|ready`）付きで直接打つ形は、素性によらず
-`DENY_TICKET_APPROVAL_CLI` で止める。`ccnavi-agree.sh` と `ccnavi-push-approved.sh` を
-`sh` / `bash` で打つ形も同じ理由コードで止める。大文字小文字によらない。
+`DENY_TICKET_APPROVAL_CLI` で止める。`ccnavi-user-*.sh` は引数に依らず、名前がコマンド行のどこにあっても同じ理由コードで止める。
+大文字小文字によらない。止めは `user_only.py` の表から作る（9.18）。旧い形（`--agree` / `--reviewed` / `--close-early` 付き、
+`ccnavi-agree.sh`・`ccnavi-push-approved.sh` など）も止める。
 `comment` / `fetch` / `origin` は sh だけの仕事なので当てていない。
 **hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`phase_forms.human_path_form`）。
 
-- ボードの経路。`--agree` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組。`--yes` の経路は
-  端末を求めないので、ここが唯一の保護になる。`decide <N>` と `--preview` は通す（前者は
-  実行ファイルが端末を求め、後者は何も置かない）
+- ボードの経路。`user agree` / `user reviewed` / `user handoff` と `--yes` の組（旧い形の `--agree` / `--reviewed` と `--yes` の組も）、
+  sh の `--choices` と `--digest` の組。`--yes` の経路は端末を求めないので、ここが唯一の保護になる。
+  `ccnavi-review.sh decide <N> --preview` と `--agree --preview` は通す（何も置かない）
 - 端末要求を切る形。実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で端末要求を
   外す（テストと CI のため）。変数は、読むだけの形（`$X`・`${X}`・`$env:X`）以外で名前が現れたら止める。フラグは、
   `enable` 以外の値を渡したら止める。切れなければ、端末を持たないエージェントは実行ファイルの側で止まる
@@ -136,21 +137,21 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 
 | 入口 | 止める形 |
 |---|---|
-| `ccnavi-review.sh decide`（副命令が展開で `decide` になりうる形を含む） | `--choices` になりうる展開を含む語がある。文字どおりの `--preview` があれば止めない（sh が `--choices` と一緒に受けない） |
-| 実行ファイル（`ccnavi`・`ccnavi.exe`・`python -m ccnavi`・`ccnavi-launcher.sh`・設定の実行ファイルの名前） | 展開を含む語があり、承認の旗（`--agree` / `--approve` / `--reviewed`）と `--yes` が文字か展開でどちらもそろいうる。`worktree retire --abandon`（放棄した親の片付けの記録を消す操作）または `--guard-ticket-approval` を組み立てうる。展開を含む語より前（`--` の前）に診断の旗（`--docs`・`--test`・`--lint`・`--explain`・`--suggest`・`--version`・`--help`）か実行ファイルの知らない旗がある形と、文字どおりの `--agree --preview` は止めない |
+| `ccnavi-review.sh decide`（旧い形。サブコマンドが展開で `decide` になりうる形を含む。新しい `ccnavi-user-decide.sh` は名前で止める） | `--choices` になりうる展開を含む語がある。文字どおりの `--preview` があれば止めない（sh が `--choices` と一緒に受けない） |
+| 実行ファイル（`ccnavi`・`ccnavi.exe`・`python -m ccnavi`・`ccnavi-launcher.sh`・設定の実行ファイルの名前） | 展開を含む語があり、`user` の入口になりうる、または承認のオプション（`--agree` / `--approve` / `--reviewed`）と `--yes` が文字か展開でどちらもそろいうる。`worktree retire --abandon`（放棄した親の片付けの記録を消す操作）または `--guard-ticket-approval` になりうる。展開を含む語より前（`--` の前）に診断のオプション（`--docs`・`--test`・`--lint`・`--explain`・`--suggest`・`--version`・`--help`）か実行ファイルの知らないオプションがある形と、文字どおりの `--agree --preview` は止めない |
 
 - 入口はコマンドの位置で探す。前に置けるのはシェル・`busybox`・`.`・シェルの選択肢・リダイレクト・代入だけで、
   `env`・`sh -c`・`find -exec`・`xargs` の中は shellread が外した層で見る。`git log --grep ccnavi-sync.sh` のように
   文字列として出るだけの形と、表示・検索の道具だけのコマンドには当たらない
 - 入口の前置きには `uv run`・`uvx`・`pipx run` も入る
 - 引数がコマンド行に無い形は、入口の名前が出た時点で止める。`xargs` が入口を実行する形、入口を `<` で読ませる形
-- 標準入力から読むシェル（パイプの先の `sh`・`bash`、`sh -s`、`sh /dev/stdin`、ヒアドキュメント、ヒアストリング。シェルの旗は、`--norc` のような長い旗と、値を取る旗（`--rcfile <値>`・`-o pipefail`・`-O extglob`）を読み飛ばす。前に置いた `env`・`command`・`exec` も外して見る。`-c` は文字列を実行するので数えない）があるときは、
+- 標準入力から読むシェル（パイプの先の `sh`・`bash`、`sh -s`、`sh /dev/stdin`、ヒアドキュメント、ヒアストリング。シェルのオプションは、`--norc` のような長いオプションと、値を取るオプション（`--rcfile <値>`・`-o pipefail`・`-O extglob`）を読み飛ばす。前に置いた `env`・`command`・`exec` も外して見る。`-c` は文字列を実行するので数えない）があるときは、
   コマンド行の文字列の中で入口の名前が実行される語として現れれば止める（`echo "ccnavi worktree retire --abandon i1" | sh`）。流し込む文字列の中は語として読めないので、
   コマンドの切れ目と引用符で切り、前置き・代入・選択肢を飛ばした頭の語を見る。パスの一部（`cd /home/user/ccnavi`）・コメント・
   シェルの引数（`sh -s -- ccnavi`）として出るだけの名前は数えない。sh の入口はファイルとして渡すだけで中身が流れ込むので、語として出れば数える
 - 走査が止まる形（バッククォート）は生の文字列の語で探す
-- 実行ファイルが知っている旗の一覧（`phase_forms.EXE_OPTIONS`）は、`ccnavi --version --json` の `flags` とテストで比べる
-- 止めた文は、止めた語が何になりうるかと、通る形（識別子をそのまま書く・`decide <N> --preview`・診断の旗を前に置く・
+- 実行ファイルが知っているオプションの一覧（`phase_forms.EXE_OPTIONS`）は、`ccnavi --version --json` の `flags` とテストで比べる
+- 止めた文は、止めた語が何になりうるかと、通る形（識別子をそのまま書く・`ccnavi-review.sh decide <N> --preview`・診断のオプションを前に置く・
   `--agree --preview`）を言う。値を変数で渡す形のうち、組み立てうるもの（`ccnavi-sync.sh "$P"`）は止まる
 
 **これで止められないもの。** 表記を組み立てて隠す形（base64、文字の連結）、ファイルに書いたスクリプトを別の
@@ -159,4 +160,4 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 
 どちらも実行役のコマンド越し（`env`・`sudo`・`sh -c`・`source`・`find -exec`）に打った形を、中で実行される
 コマンドで止める（6.3.1）。実行ファイルのパスには `selfguard_shell.binary_clause`（8.2）が入るので、
-`sh .ccnavi/bin/<os>-<arch>/ccnavi --agree …` も同じルールで止まる。
+`sh .ccnavi/bin/<os>-<arch>/ccnavi user agree …` も同じルールで止まる。

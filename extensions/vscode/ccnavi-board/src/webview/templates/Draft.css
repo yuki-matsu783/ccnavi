@@ -4,7 +4,6 @@
 .row.draft > .row-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-2) var(--gap-4); }
 .row.draft > .row-head:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .row.draft .tpl-name { font-weight: 600; overflow-wrap: anywhere; }
-.row.draft > .row-head > .import-open { margin-left: auto; }
 .row.open > .draft-body.row-body { display: block; padding: 8px 10px 10px 36px; overflow-wrap: anywhere; }
 @media (max-width: 520px) {
   .row.open > .draft-body.row-body { padding: 8px 14px 10px 14px; }

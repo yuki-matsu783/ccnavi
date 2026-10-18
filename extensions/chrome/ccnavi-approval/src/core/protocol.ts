@@ -123,7 +123,6 @@ export interface TokenStatus {
 }
 
 const TOKEN = /^[A-Za-z0-9_\-.]{8,255}$/;
-/** 書く先にしない名前（`ccnavi-push-approved.sh` の一覧と同じ）。大文字小文字をそろえて比べる */
 /** 1 コミットで書くファイルの上限と、1 ファイルの大きさの上限（base64 の字数） */
 const MAX_FILES = 200;
 const MAX_CONTENTS = 4 * 1024 * 1024;

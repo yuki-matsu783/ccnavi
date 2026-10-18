@@ -9,10 +9,10 @@
 
 - 読むだけで、何も書かない。ネットワークにも出ない。push 済みかは手元のリモート追跡の ref で
   見るので、古いかもしれないことを出力に添える
-- サブエージェントも打てる（hook が止める副命令の一覧に入れていない）。実行ファイルは呼び手が
+- サブエージェントも打てる（hook が止めるサブコマンドの一覧に入れていない）。実行ファイルは呼び手が
   サブエージェントかを知らないので出力を分けず、状態を動かすコマンドの行には「親（メインエージェント）
   だけが実行する」と書く
-- 未コミットの承認済みチケットは運ばない。運ぶのはユーザ（`ccnavi-push-approved.sh`）で、
+- 未コミットの承認済みチケットは運ばない。運ぶのはユーザ（`ccnavi-user-push-approved.sh`）で、
   エージェントが運ぶコマンドは出さない。取り込み済みの親子（write-and-push の対象）では、運ぶまで
   `start` が止まることを言う
 """
@@ -179,7 +179,7 @@ class _Family:
         self.raw = raw
         self._write_and_push: tuple[str, str] | None = None
         self.ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-        self.push_sh = settings.script_command(root, "ccnavi-push-approved.sh")
+        self.push_sh = settings.script_command(root, "ccnavi-user-push-approved.sh")
 
     def write_and_push_target(self) -> tuple[str, str]:
         """この親子が write-and-push の対象か（`ccnavi write-and-push family` と同じ
@@ -212,7 +212,7 @@ class _Family:
             lines.append(f"    置き場のファイル: {file_state.label()}")
             lines.append(
                 "    次の操作: ユーザの承認を待つ（VS Code のボード、Chrome のボード、端末の "
-                "ccnavi-agree.sh、GitLab や GitHub の画面などで doing/ へ動かす、のどれか）"
+                "ccnavi-user-agree.sh、GitLab や GitHub の画面などで doing/ へ動かす、のどれか）"
             )
             return lines
         when = self.times.get(t.path)

@@ -29,7 +29,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_path
+from tests import ROOT, common_path, userform
 from tests.inproc import run_ccnavi
 from tests.ticketsample import plain_parent, write_plain_phases
 
@@ -210,17 +210,19 @@ class ProjectsTest(unittest.TestCase):
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         return run_ccnavi(
-            [
-                "--root",
-                self.ws,
-                "--guard-core-files",
-                "disable",
-                "--restore-if-deny",
-                "disable",
-                "--guard-ticket-approval",
-                "disable",
-                *args,
-            ],
+            userform.place(
+                [
+                    "--root",
+                    self.ws,
+                    "--guard-core-files",
+                    "disable",
+                    "--restore-if-deny",
+                    "disable",
+                    "--guard-ticket-approval",
+                    "disable",
+                ],
+                args,
+            ),
             input=stdin,
             cwd=ROOT,
             env=environment,
@@ -370,7 +372,7 @@ class ProjectsTest(unittest.TestCase):
         # 置き場がプロジェクトを決めるので、frontmatter の project は書かなくてよい。
         self.family_in_lib("i0007")
         self.family_in_lib("i0008")
-        approved = self.ccnavi("--agree", stdin="y\n")
+        approved = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
         # 子のワークツリーを別のプロジェクト（app）から切ってしまった
@@ -399,7 +401,7 @@ class ProjectsTest(unittest.TestCase):
         大文字小文字はどの機械でも区別しないので、Linux でもそのまま走る。
         """
         self.family_in_lib("i0007")
-        approved = self.ccnavi("--agree", stdin="y\n")
+        approved = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
         wrong = self.worktree(self.app, "I0007-01-01")
@@ -423,7 +425,7 @@ class ProjectsTest(unittest.TestCase):
             self.proposal_file(self.lib, "i0009-01-01"),
             ticket_text("i0009-01-01", parent="i0009", allow=("skills/deploy/*",)),
         )
-        approved = self.ccnavi("--agree", stdin="y\n")
+        approved = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         # 親のワークツリーは、範囲の中でも置き場以外に書けない。
         home = self.worktree(self.lib, "i0009")
@@ -490,7 +492,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(found, {"i0007": "lib", "i0007-01-01": "lib"})
         self.assertEqual(board["pending_approval"], ["i0007", "i0007-01-01"])
 
-        approved = self.ccnavi("--agree", stdin="y\n")
+        approved = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         # 承認の画面は、書き込みが向かうリポジトリをユーザに見せる
         self.assertIn("■ プロジェクト: lib", approved.stdout)
@@ -508,7 +510,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.ws, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", project="lib", allow=("src/*",)),
         )
-        result = self.ccnavi("--agree", stdin="y\n")
+        result = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場（ワークスペース）と違う", result.stderr)
         self.assertIn("wip/proposals/ に置いて", result.stderr)
@@ -523,7 +525,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(self.app, "wip", "proposals", "todo", "i0007-01-01.md"),
             ticket_text("i0007-01-01", parent="i0007", allow=("src/a/*",)),
         )
-        result = self.ccnavi("--agree", stdin="y\n")
+        result = self.ccnavi("user", "agree", stdin="y\n")
         # 承認の対象の一部（子）が失敗したので、通ったぶん（親）を置いてから
         # 4 で終わる（何も置かない失敗の 1 とは分ける）。
         self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
@@ -543,7 +545,7 @@ class ProjectsTest(unittest.TestCase):
             os.path.join(tree, "wip", "proposals", "todo", "i0010.md"),
             ticket_text("i0010", allow=("src/*",), plan=1),
         )
-        approved = self.ccnavi("--agree", stdin="y\n")
+        approved = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertNotIn("の中に提案がある", approved.stderr)
         self.assertIn("■ プロジェクト: lib", approved.stdout)
@@ -592,7 +594,7 @@ class ProjectsTest(unittest.TestCase):
             self.proposal_file(self.lib, "i0007"),
             ticket_text("i0007", allow=("src/*",)),
         )
-        self.assertEqual(self.ccnavi("--agree", stdin="y\n").returncode, 0)
+        self.assertEqual(self.ccnavi("user", "agree", stdin="y\n").returncode, 0)
         # 承認はプロジェクトの todo/ からプロジェクトの doing/ へ動かす。取り消すと done/ へ。
         # 置き場はプロジェクトの git が持つ。
         lib_approved = os.path.join(self.worktree(self.lib, "i0007"), ".ccnavi", "approved")
@@ -612,7 +614,7 @@ class ProjectsTest(unittest.TestCase):
             self.proposal_file(self.lib, "i0007"),
             ticket_text("i0007", allow=("src/*",)),
         )
-        self.assertEqual(self.ccnavi("--agree", stdin="y\n").returncode, 0)
+        self.assertEqual(self.ccnavi("user", "agree", stdin="y\n").returncode, 0)
         tree = self.worktree(self.lib, "i0007")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "--allow-empty", "-m", "approve")

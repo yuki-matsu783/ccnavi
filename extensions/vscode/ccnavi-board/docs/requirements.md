@@ -3,12 +3,12 @@ title: ccnavi ボードの要件
 type: requirements
 description: VS Code 拡張 ccnavi ボードが外から見てどうふるまうかの概要と、画面ごとの詳細への案内
 tags: [design-doc, extension, board]
-keywords: [要件, VS Code 拡張, ボード, チケット管理, ルール管理, リスク管理, フェーズ管理, テンプレート管理, プロジェクト管理, フロー編集, サイドパネル, コマンド]
+keywords: [要件, VS Code 拡張, ボード, チケット管理, ルール管理, リスク管理, フェーズ管理, テンプレート管理, 取り込み待ち, プロジェクト管理, フロー編集, サイドパネル, コマンド]
 ---
 
 # ccnavi ボードの要件
 
-VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを書く。入口はサイドパネルとコマンドパレットで、チケット管理（ボード）・ルール管理・リスク管理・フェーズ管理・テンプレート管理・プロジェクト管理の 6 画面と、ボードの子のカードから開くフロー編集画面がある。使い方と組み立ては [README](../README.md)、作りは [design.md](design.md) にある。
+VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを書く。入口はサイドパネルとコマンドパレットで、チケット管理（ボード）・ルール管理・リスク管理・フェーズ管理・テンプレート管理・取り込み待ち・プロジェクト管理の 7 画面と、ボードの子のカードから開くフロー編集画面がある。使い方と組み立ては [README](../README.md)、作りは [design.md](design.md) にある。
 
 拡張と ccnavi 本体の間の取り決め（拡張が呼ぶコマンド、読む JSON の形、互換の版）は本体側に書く。本体の [要件 2.13 拡張との取り決め](../../../../docs/requirements/extension-if.md)（REQ-EXT）と [設計](../../../../docs/design.md) を見る。拡張自身の要件のうち、本体の要件から切り出したものには REQ-VSC の ID を振ってある。
 
@@ -24,7 +24,8 @@ VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを�
 | ルール管理画面（`rules.yml` の編集・判定を試す・hook の一覧） | [requirements/rules.md](requirements/rules.md) |
 | リスク管理画面（`risks.yml` の配点の編集） | [requirements/risk.md](requirements/risk.md) |
 | フェーズ管理画面（`phases.yml` の定義の編集） | [requirements/phases.md](requirements/phases.md) |
-| テンプレート管理画面（作業・レビュー計画のテンプレートの一覧・本文、下書きの取り込み） | [requirements/templates.md](requirements/templates.md) |
+| テンプレート管理画面（作業・レビュー計画のテンプレートと下書きの一覧・本文。読むだけ） | [requirements/templates.md](requirements/templates.md) |
+| 取り込み待ち画面（`wip/handoff/` の下書きの差分を読んで取り込む。作業中の錠・防御の端末の案内） | [requirements/handoff.md](requirements/handoff.md) |
 
 ## 用語と参照
 

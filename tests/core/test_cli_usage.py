@@ -1,7 +1,7 @@
 """`ccnavi --help` の全文（`cli_usage.USAGE`）に、引数解析（`cli.py`）の受け付けるものが
 すべて書かれていることを確かめる。
 
-フラグは `cli.py` の `add_argument` から、副命令は `cli.py` と `cli_ops.py` が見る語の組から
+フラグは `cli.py` の `add_argument` から、サブコマンドは `cli.py` と `cli_ops.py` が見る語の組から
 拾い、本文に出てくるかを確かめる。解析にだけ足してヘルプに書き忘れると、ここで落ちる。
 """
 
@@ -41,12 +41,12 @@ class CliUsageTest(unittest.TestCase):
         pairs = set(re.findall(r'\["([a-z0-9-]+)", "([a-z-]+)"\]', _read(CLI)))
         self.assertIn(("write-and-push", "family"), pairs)
         missing = sorted(f"{a} {b}" for a, b in pairs if f"ccnavi {a} {b}" not in cli_usage.USAGE)
-        self.assertEqual(missing, [], "ヘルプに書いていない副命令")
+        self.assertEqual(missing, [], "ヘルプに書いていないサブコマンド")
         # `worktree <verb>` は cli_ops が見る。使い方の誤りの文面に並べた形を拾う
         verbs = set(re.findall(r"worktree ([a-z-]+) <", _read(CLI_OPS)))
         self.assertIn("issue-id", verbs)
         missing = sorted(v for v in verbs if f"ccnavi worktree {v} " not in cli_usage.USAGE)
-        self.assertEqual(missing, [], "ヘルプに書いていない worktree の副命令")
+        self.assertEqual(missing, [], "ヘルプに書いていない worktree のサブコマンド")
 
     def test_every_topic_is_listed_in_the_overview(self):
         for name, _, summary, _ in cli_usage.TOPICS:
@@ -62,7 +62,7 @@ class CliUsageTest(unittest.TestCase):
     def test_a_topic_holds_only_its_own_commands(self):
         own = {
             "docs": ("--text", "--sort", "--format", "--no-refresh"),
-            "templates": ("--draft", "--save-draft", "ticket new ID --title"),
+            "templates": ("--draft", "ticket new ID --title"),
             "agree": ("--plan-order", "--fill-phases", "--digest"),
             "ticket": ("ticket record-risk", "ticket learn", "ticket next-id"),
             "scripts": ("ccnavi write-and-push family", "ccnavi worktree tidy", "--record-writes"),

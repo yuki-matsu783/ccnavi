@@ -305,7 +305,8 @@ class PredecessorTest(TicketTest):
         chosen = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",
@@ -367,7 +368,7 @@ class PredecessorTest(TicketTest):
         # 書き込み先を読めないコマンド（sed -i）は何も言われずに通ることはない。
         # 聞ける者が居る権限モードでは Claude Code がユーザに聞き（ccnavi は判定を出さない）、
         # 居なければ ccnavi が断る（judge.undeclared_verdict）。
-        # 書かれても実行後チェックが書き換えとして言う。副命令が書く欄のほかが変わった内容に
+        # 書かれても実行後チェックが書き換えとして言う。サブコマンドが書く欄のほかが変わった内容に
         # なるため。
         sed = "sed -i 's/predecessors.*//' .ccnavi/approved/doing/i0001-01-03.md"
         self.assertIn(bash(sed), ("", "ask", "deny"))

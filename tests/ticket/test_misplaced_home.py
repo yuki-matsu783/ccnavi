@@ -35,7 +35,7 @@ class MisplacedHomeTest(PhaseHarness):
         stray = self.stray_tree()
         self.propose("i0003", parent_text("i0003", ["research"]), tree=stray)
         self.commit_in(stray, "propose i0003")
-        result = self.ccnavi("--agree", stdin="y\n")
+        result = self.ccnavi("user", "agree", stdin="y\n")
         said = result.stdout + result.stderr
         self.assertEqual(result.returncode, 1, said)
         self.assertIn("提案 i0003 を識別子と違う名前のワークツリー skill-proposals", said)
@@ -49,7 +49,7 @@ class MisplacedHomeTest(PhaseHarness):
         own = self.worktree("i0003", "main")
         self.propose("i0003", parent_text("i0003", ["research"]), tree=own)
         self.commit_in(own, "propose i0003")
-        result = self.ccnavi("--agree", stdin="y\n")
+        result = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(
             os.path.exists(os.path.join(own, ".ccnavi", "approved", "doing", "i0003.md"))
@@ -62,7 +62,7 @@ class MisplacedHomeTest(PhaseHarness):
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/design/*",)), tree=stray
         )
         self.commit_in(stray, "propose child")
-        result = self.ccnavi("--agree", stdin="y\n")
+        result = self.ccnavi("user", "agree", stdin="y\n")
         said = result.stdout + result.stderr
         self.assertEqual(result.returncode, 1, said)
         self.assertIn("子の提案 i0001-01-01 を識別子と違う名前のワークツリー skill-proposals", said)
@@ -118,4 +118,4 @@ class MisplacedHomeTest(PhaseHarness):
         self.assertIn("ccnavi-worktree.sh i0001", text)
         self.assertIn("承認を取り直してもらう", text)
         self.assertIn("手で動かさない", text)
-        self.assertIn("ccnavi-push-approved.sh と ccnavi-sync.sh", text)
+        self.assertIn("ccnavi-user-push-approved.sh と ccnavi-sync.sh", text)

@@ -134,8 +134,8 @@ Bash のコマンドに現れるパスはコマンド文字列として見る。
 
 層の作り方（`shellread`）: `read()` は、コマンドごとに実行役のコマンドを 1 枚ずつ外した層を、外側から内側の順に
 並べて返す。`Reading.unwrapped` が層を `\x00` でつないだもの、`Reading.runners` が層ごとの実行役のコマンドの名前で、
-同じ順序。元の形は含めず、途中の層は残す（`env sh .ccnavi/scripts/ccnavi-agree.sh` からは
-`sh .ccnavi/scripts/ccnavi-agree.sh` と `.ccnavi/scripts/ccnavi-agree.sh` の 2 層）。層は元の形と同じ規則で組み直す
+同じ順序。元の形は含めず、途中の層は残す（`env sh .ccnavi/scripts/ccnavi-user-agree.sh` からは
+`sh .ccnavi/scripts/ccnavi-user-agree.sh` と `.ccnavi/scripts/ccnavi-user-agree.sh` の 2 層）。層は元の形と同じ規則で組み直す
 （語の中の空白は `\x01`、語の中の演算子の文字は `\x01` で挟む）。
 
 | 形 | 中で実行されるコマンド | その中をさらに外すか |

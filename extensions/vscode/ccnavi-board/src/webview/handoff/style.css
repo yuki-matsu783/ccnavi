@@ -1,0 +1,15 @@
+/*
+ * 取り込み待ち画面の CSS。**画面（React）と同じ置き場にあり、部品 1 つに CSS 1 本**
+ * （`Entry.tsx` なら `Entry.css`）。ここはそれらをバンドルする入口で、`@import` を並べるだけ。部品を足したら、
+ * 同じ名前の CSS を足してここに 1 行足す。
+ *
+ * バンドルするのは `scripts/bundle-webview.js`（出口は `out/webview/handoff.css`）。拡張ホストはそれを読んで
+ * `<style nonce>` に流し込む（`src/core/handoff-render.ts`）。
+ */
+@import "@ccnavi/shared/styles/button.css";
+@import "../styles/appearance.css";
+@import "@ccnavi/shared/styles/page.css";
+@import "@ccnavi/shared/styles/list.css";
+@import "./App.css";
+@import "./Entry.css";
+@import "./Result.css";

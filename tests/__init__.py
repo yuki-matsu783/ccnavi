@@ -28,7 +28,7 @@ _tempfile.tempdir = os.path.realpath(_tempfile.gettempdir())
 
 # 共通レイヤーの 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
-# hook の判定とチケット・レビューの副命令には届かない。
+# hook の判定とチケット・レビューのサブコマンドには届かない。
 #
 # パスは実行ファイルから引く。テスト側にもう 1 つパスを持つと、既定が動いたときに
 # 2 つが気づかないうちに食い違う。既定のパスそのものは tests/config/test_common_layer_place.py が

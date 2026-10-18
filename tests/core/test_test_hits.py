@@ -276,10 +276,13 @@ class TestHitsTest(unittest.TestCase):
                     self.assertIn(f"{flag} は --test でだけ使える", done.stderr)
 
     def test_flags_between_tool_and_subject_and_extra_words_are_refused(self):
-        """旗を TOOL と SUBJECT の間に置いた形と、余った語は、黙って捨てずに断る。"""
+        """オプションを TOOL と SUBJECT の間に置いた形と、余った語は、黙って捨てずに断る。"""
         for argv, said in (
-            (("--test", "Bash", "--permission-mode", "auto", "ls"), "旗（--permission-mode）"),
-            (("--test", "--agent-id", "a1", "ls"), "旗（--agent-id）"),
+            (
+                ("--test", "Bash", "--permission-mode", "auto", "ls"),
+                "オプション（--permission-mode）",
+            ),
+            (("--test", "--agent-id", "a1", "ls"), "オプション（--agent-id）"),
             (("--test", "Bash", "ls", "extra"), "余った語: extra"),
         ):
             with self.subTest(argv=argv):

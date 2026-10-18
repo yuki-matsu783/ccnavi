@@ -32,7 +32,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, phasecopy
+from tests import ROOT, phasecopy, userform
 from tests.inproc import run_ccnavi
 
 # 共通レイヤー。どのツリーにも当てたい deny と、ワークスペースの allow。
@@ -498,7 +498,7 @@ class ConfigUnionHarness(unittest.TestCase):
         レイヤーの置き場はフラグで渡さない。共通レイヤーの 3 本
         （`--rules` / `--phases` / `--risk`）も、
         レイヤーを探す先の 2 本（`--projects` / `--project-home`）も、診断（`--lint` / `--test` /
-        `--explain`）でだけ有効で、hook の判定とチケットの副命令では無視する。
+        `--explain`）でだけ有効で、hook の判定とチケットのサブコマンドでは無視する。
         土台は `--root` の下の既定の置き場に置くので、渡す必要も無い。
 
         差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。
@@ -509,17 +509,19 @@ class ConfigUnionHarness(unittest.TestCase):
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         return run_ccnavi(
-            [
-                "--root",
-                self.ws,
-                "--guard-core-files",
-                guard,
-                "--restore-if-deny",
-                "disable",
-                "--guard-ticket-approval",
-                "disable",
-                *args,
-            ],
+            userform.place(
+                [
+                    "--root",
+                    self.ws,
+                    "--guard-core-files",
+                    guard,
+                    "--restore-if-deny",
+                    "disable",
+                    "--guard-ticket-approval",
+                    "disable",
+                ],
+                args,
+            ),
             input=stdin,
             cwd=ROOT,
             env=environment,
@@ -540,7 +542,7 @@ class ConfigUnionHarness(unittest.TestCase):
     def approve(self):
         """承認して、承認済みチケットを各ワークツリーにコミットする（本番は write-and-push
         が行う）。"""
-        done = self.ccnavi("--agree", stdin="y\n")
+        done = self.ccnavi("user", "agree", stdin="y\n")
         wt = os.path.join(self.ws, ".claude", "worktrees")
         if os.path.isdir(wt):
             for name in sorted(os.listdir(wt)):

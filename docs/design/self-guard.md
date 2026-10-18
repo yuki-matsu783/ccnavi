@@ -24,12 +24,14 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/`）は、この表に足さない。`*/.ccnavi/*` の一般の保護で止める。
 
+名指しのツール（Write / Edit）の保護には、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下を除く例外がある。守る場所の写し（`wip/handoff/.ccnavi/scripts/x.sh` など）は、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。例外が効くのは、`..` の段が無く、リンクを解いた実パスが綴りと同じで、既にあるファイルがハードリンクでつながっていないとき。`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。組み込みの保護（`builtin:guard-project-home`。`selfguard_shell.handoff_write_exempt`）と、リポジトリのルール（`guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` の `except`）が同じ範囲を除く。リポジトリのルールの `except` は式なのでファイルを見ず、ハードリンクの写しも除いてしまう。そこで、置き場の中のリンクを通る対象・ハードリンクでつながった対象・`..` を含む対象への書き込みは、組み込みの `builtin:guard-handoff-links`（`selfguard_shell.handoff_link_target`）が別に止める。置き場の中にリンクを作るシェルの形も `builtin:guard-handoff-ln` が止める（8.2）。シェルからの書き込みの保護は、ほかは変えない。
+
 上のうち追跡されているものは、その元リポジトリから切ったワークツリー側の設定も対象に入る（11.6）。
 hook スクリプトと保護済みスクリプトはここに無く、ルールの `deny` で止めている。ccnavi ディレクトリの下のスクリプトも無く、組み込みの `deny` で止める。
 
 ### 8.2 止める側
 
-`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 5 本を挿す。
+`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す。
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
@@ -38,12 +40,14 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 | `builtin:guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
 | `builtin:guard-common-layer` | 共通レイヤーの 3 本の置き場が決まっているとき（11.6） | 同上 |
 | `builtin:guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
+| `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていない写しと置き場の外には当たらない |
+| `builtin:guard-handoff-ln` | ワークスペースルートが決まっているとき | Bash で、リンクを作るコマンド（`ln`・`link`・`cp -l` / `-s` / `--link` / `--symbolic-link`）があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中の形。行き先は読み分けない（止める側に倒す） |
 
-同じ設定が有効な間、`ccnavi --prune`（`--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
+同じ設定が有効な間、`ccnavi user prune`（旧い形は `ccnavi --prune` の `--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
 擬似端末（`script -qc`）を使えば満たせてしまい、チケット制御を切ったワークスペースでは端末要求を切る変数も止まらないため。
-見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と単独の語の `--prune` が並べば止める。
-免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ形だけ。
+見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と `user prune`（`user` の次の語が `prune`）か単独の語の `--prune` が並べば止める。
+免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ旧い形だけ（`user prune` に免除は無い）。
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
 
@@ -116,7 +120,7 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 | 対象を読み切れない形。変数・置換で組み立てたパス、居場所の読めない `cd` / `pushd` の後の相対パス、走査が読み切れないコマンド行 | 共通ルールの allow（`*ccnavi-git.sh*`）が生の文字列に当たるので、ここで止めないと確認に落ちずに通る（ADR-0121 の追記） |
 | 承認済みチケットの置き場（`.ccnavi/approved/` とその下） | 置き場を動かすのはユーザと ccnavi のスクリプト。文面は「ユーザに依頼する」。レビュー済みのマーカーを消す `rm` はユーザが端末で打つ手順なので、sh は通す |
 | レビュー待ちの置き場（`wip/proposals/review/` とその下。提案の置き場の設定に従う）と、置き場に何かがある間のその親（`wip/`・`wip/proposals/`） | 承認済みチケットの置き場と同じ扱い。文面は「レビュー待ちの提案を外すのはユーザに依頼する」。sh は `rm` を通し、過去の中身に戻す形は前からの置き場の検査が止める。空の置き場の親を消す形（親を閉じた後の案内の `rm -r wip`）は通す。親を過去の中身に戻す形（`restore --source <ref> wip`・`checkout <ref> -- wip`）は空でも当てる（ADR-0121 の追記） |
-| ラッパーの名前があるのに、副命令が文字どおりの語でない形（`$S`・`$(echo rm)`・`r?`）、標準入力から読むシェル（`bash --norc`・`--rcfile <値>`・`-o pipefail`・`-O extglob` のような旗を前に置いた形と、`env sh`・`command sh` を含む）に流す文字列の中の名前、走査が読み切れず名前の直後に文字どおりの副命令が無い形（`… \| xargs sh …ccnavi-git.sh`） | 共通ルールの allow（`*ccnavi-git.sh*`）は名前があるだけで当たるので、読めない形を確認に落とせない（ADR-0121 の再レビューの追記。`CDPATH`・別の言語の中・`xargs` の値・旗の変数は限界として 12.1 に書く） |
+| ラッパーの名前があるのに、サブコマンドが文字どおりの語でない形（`$S`・`$(echo rm)`・`r?`）、標準入力から読むシェル（`bash --norc`・`--rcfile <値>`・`-o pipefail`・`-O extglob` のようなオプションを前に置いた形と、`env sh`・`command sh` を含む）に流す文字列の中の名前、走査が読み切れず名前の直後に文字どおりのサブコマンドが無い形（`… \| xargs sh …ccnavi-git.sh`） | 共通ルールの allow（`*ccnavi-git.sh*`）は名前があるだけで当たるので、読めない形を確認に落とせない（ADR-0121 の再レビューの追記。`CDPATH`・別の言語の中・`xargs` の値・オプションの変数は限界として 12.1 に書く） |
 | `checkout -- <パス>`（起点の無い、索引の中身に戻す形） | sh はこの形を通さない。文面は sh と同じく `restore <パス>` を名指しで使うよう案内する |
 
 通すのは、索引の中身に戻す `restore`（`--staged`、衝突を解く `--ours` / `--theirs`）と、何も消さない `rm -n` / `--dry-run`（後ろに `--no-dry-run` があれば、git と同じく消す形として見る）。
@@ -125,7 +129,7 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 ラッパーも同じ場所の検査（`core_hit`）を 2 重目に持つ。見るのは既定の置き場の名前だけで、動かした置き場は hook が見る。
 記録の置き場（`logs/`）はワークスペースルートの下だけに当てる。承認済みチケットの置き場は `core_hit` では見ず、過去の中身に戻す形を
 前からの置き場の検査（`restore-store-source`・`checkout-store`）が止める。`rm -n` / `--dry-run` は通す。
-見る副命令は `rm`・`restore`・`checkout` だけ（`stash` と `merge` は作業ツリーの変更を退避・取り込むだけで、守る場所を自分では過去の中身にしないため）。
+見るサブコマンドは `rm`・`restore`・`checkout` だけ（`stash` と `merge` は作業ツリーの変更を退避・取り込むだけで、守る場所を自分では過去の中身にしないため）。
 
 保護済みの sh の前に置く環境変数（`DENY_SCRIPT_ENV_OVERRIDE`）: 保護済みの sh（`ccnavi-*.sh`）は、
 ワークスペースルート・承認済みチケットの置き場・実行ファイルを環境変数から読む。そのため、`CCNAVI_GUARD_CORE_FILES` が有効な間は、保護済みの sh を呼ぶ

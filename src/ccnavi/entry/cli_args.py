@@ -1,4 +1,7 @@
-"""引数の読み分け。設定を上書きする旗・診断だけの旗・`--docs` と並べられない旗と、パスの見分け。
+"""引数の読み分け。
+
+設定を上書きするオプション・診断だけのオプション・`--docs` と並べられないオプションと、
+パスの見分け。
 
 cli から分けた。cli を読まない。
 """
@@ -17,6 +20,7 @@ from ..policy import selfguard
 from ..records import audit, prune
 from ..tickets import (
     ticket_ids,
+    user_only,
 )
 from . import cli_usage
 
@@ -57,7 +61,7 @@ LAYER_OVERRIDES = (
 # 別の場所へ逃がしたりでき、`--approved` / `--tickets` は承認済みチケットと提案の置き場を
 # 差し替えられる。sh（`ccnavi-ticket.sh` / `ccnavi-review.sh`）は受け取った引数を `"$@"` で
 # そのまま渡すので、診断の外で受けると、エージェントが記録を消した形や置き場を差し替えた形で
-# チケットとレビューの副命令を動かせる。
+# チケットとレビューのサブコマンドを動かせる。
 PLACE_OVERRIDES = (
     ("--log", "log", None),
     ("--state", "state", None),
@@ -182,10 +186,14 @@ DOCS_FLAGS = (
     ("--no-refresh", "no_refresh", False),
 )
 DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
+# 値なしで渡された `--yes`。取り込み（`user handoff --yes`）だけが読む（ほかの経路の `--yes` は
+# 識別子を取る）。
+BARE_YES = "\x00bare"
 # `--docs` と一緒に使えないフラグ。ほかの経路と、その経路でだけ読むもの。何も出さずに無視すると、
 # 打ったユーザは反映されたと思う。
 _NOT_WITH_DOCS = (
     "--lint",
+    "--handoff",
     "--test",
     "--test-expectations",
     "--explain",
@@ -315,7 +323,7 @@ def _prune(
     Bash から打てると、しきい値の環境変数を 0 に近づけて前に並べるだけで、自分の呼び出しの
     記録を消せる。
     """
-    if not preview and not _from_terminal(stdin, conf, stderr, "--prune"):
+    if not preview and not _from_terminal(stdin, conf, stderr, user_only.terminal("prune")):
         return EXIT_ERROR
     report = prune.run(root, conf.log, conf.state, dry_run=preview)
     for line in prune.lines(report, preview):
@@ -328,7 +336,8 @@ def _prune(
 def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:
     """ユーザの判断の経路が、端末の前のユーザから打たれているか。
 
-    `--agree` と `--reviewed` と `--close-early` はユーザの合意そのもの。エージェントが
+    `user agree`・`user reviewed`・`user close-early`（内部は `--agree` 等）は
+    ユーザの合意そのもの。エージェントが
     Bash から打てばその合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん手間の少ない証拠になる。
     CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。
@@ -375,7 +384,7 @@ def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
         stderr.write(f"ccnavi: ログを保存できませんでした：{exc}\n")
 
 
-# `--help` の話題を決める旗。先頭から順に見て、最初に当たったものを使う。
+# `--help` の話題を決めるオプション。先頭から順に見て、最初に当たったものを使う。
 _HELP_FLAGS = (
     ("version", lambda a: a.version),
     ("lint", lambda a: a.lint),
@@ -409,8 +418,9 @@ _HELP_FLAGS = (
 
 
 def help_text(args: argparse.Namespace) -> str:
-    """`--help` の本文を返す。`--all` なら全文。話題の旗か語（`--help docs`・`ticket --help`）が
-    あればその節、なければ話題の一覧を返す。"""
+    """`--help` の本文を返す。`--all` なら全文。
+    話題のオプションか語（`--help docs`・`ticket --help`）があれば、その節を返す。
+    なければ話題の一覧を返す。"""
     if args.all:
         return cli_usage.USAGE
     for name, given in _HELP_FLAGS:

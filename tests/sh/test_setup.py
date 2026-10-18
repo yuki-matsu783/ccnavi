@@ -19,6 +19,7 @@ import subprocess
 import tempfile
 import unittest
 
+from ccnavi.tickets import user_only
 from tests import ROOT
 
 SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
@@ -108,9 +109,9 @@ FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（入口の ccnavi-common.sh と部品 5 本）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で失敗する。
-# 承認済みチケットをコミットして push する sh（ccnavi-push-approved.sh）も配る。
+# 承認済みチケットをコミットして push する sh（ccnavi-user-push-approved.sh）も配る。
 # ボードは承認のあとこれを端末に送るので、配らないと配布先のボードは
-# 承認の push ができない（設計 approve-carry 1.5）。
+# 承認の push ができない（設計 approve-carry 1.5）。ユーザだけが打つ sh は ccnavi-user-*.sh。
 DEPLOY_SCRIPTS = (
     *GATE_SCRIPTS,
     "ccnavi-common-state.sh",
@@ -118,9 +119,14 @@ DEPLOY_SCRIPTS = (
     "ccnavi-common-write-and-push.sh",
     "ccnavi-common-host.sh",
     "ccnavi-common-log.sh",
+    "ccnavi-common-review.sh",
     "ccnavi-common.sh",
-    "ccnavi-push-approved.sh",
-    "ccnavi-agree.sh",
+    "ccnavi-user-lib-review.sh",
+    "ccnavi-user-push-approved.sh",
+    "ccnavi-user-agree.sh",
+    "ccnavi-user-decide.sh",
+    "ccnavi-user-close-early.sh",
+    "ccnavi-user-clean-branch.sh",
     "ccnavi-fetch.sh",
     "ccnavi-sync.sh",
     "ccnavi-clean.sh",
@@ -162,25 +168,30 @@ NO_TEMPLATES_FILES = [
     *(
         f".ccnavi/scripts/{name}"
         for name in (
-            "ccnavi-agree.sh",
             "ccnavi-branches.sh",
             "ccnavi-clean.js",
             "ccnavi-clean.sh",
             "ccnavi-common-host.sh",
             "ccnavi-common-lock.sh",
             "ccnavi-common-log.sh",
+            "ccnavi-common-review.sh",
             "ccnavi-common-state.sh",
             "ccnavi-common-write-and-push.sh",
             "ccnavi-common.sh",
             "ccnavi-fetch.sh",
             "ccnavi-git.sh",
             "ccnavi-launcher.sh",
-            "ccnavi-push-approved.sh",
             "ccnavi-review.sh",
             "ccnavi-stage.sh",
             "ccnavi-start.sh",
             "ccnavi-sync.sh",
             "ccnavi-ticket.sh",
+            "ccnavi-user-agree.sh",
+            "ccnavi-user-clean-branch.sh",
+            "ccnavi-user-close-early.sh",
+            "ccnavi-user-decide.sh",
+            "ccnavi-user-lib-review.sh",
+            "ccnavi-user-push-approved.sh",
             "ccnavi-worktree.sh",
         )
     ),
@@ -227,9 +238,14 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-common-write-and-push.sh
   .ccnavi/scripts/ccnavi-common-host.sh
   .ccnavi/scripts/ccnavi-common-log.sh
+  .ccnavi/scripts/ccnavi-common-review.sh
   .ccnavi/scripts/ccnavi-common.sh
-  .ccnavi/scripts/ccnavi-push-approved.sh
-  .ccnavi/scripts/ccnavi-agree.sh
+  .ccnavi/scripts/ccnavi-user-lib-review.sh
+  .ccnavi/scripts/ccnavi-user-push-approved.sh
+  .ccnavi/scripts/ccnavi-user-agree.sh
+  .ccnavi/scripts/ccnavi-user-decide.sh
+  .ccnavi/scripts/ccnavi-user-close-early.sh
+  .ccnavi/scripts/ccnavi-user-clean-branch.sh
   .ccnavi/scripts/ccnavi-fetch.sh
   .ccnavi/scripts/ccnavi-sync.sh
   .ccnavi/scripts/ccnavi-clean.sh
@@ -1698,20 +1714,147 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 self.assertIn("--bin は使えないオプションです", result.stderr)
                 self.assertEqual(os.listdir(self.dir), [".git"])
 
+    # ---- 旧い名前の sh（ユーザ専用の sh を ccnavi-user-*.sh に改名した前の名前）
+
+    def put_legacy(self, *legacy):
+        """配布先に、前の版が配った旧い名前の sh を置く。"""
+        for name in legacy:
+            path = self.deployed(".ccnavi", "scripts", name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(f"# 前の版の {name}\n")
+
+    def test_old_names_are_kept_and_reported_without_force(self):
+        """--force なしでは配布先にあるものに触らない。旧い名前の sh も残し、残っていると言う。"""
+        src = self.make_source()
+        self.put_legacy("ccnavi-agree.sh", "ccnavi-push-approved.sh")
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        kept = section(result.stdout, "配布先に残っている旧い名前の sh")
+        for name in ("ccnavi-agree.sh", "ccnavi-push-approved.sh"):
+            with self.subTest(name=name):
+                self.assertTrue(names(kept, f".ccnavi/scripts/{name}"), result.stdout)
+                self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
+        self.assertIn(
+            "--force",
+            "\n".join(
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("配布先に残っている旧い名前")
+            ),
+        )
+        # 新しい名前の sh は配る
+        self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", "ccnavi-user-agree.sh")))
+        # --check は揃っていないと数える
+        checked = self.run_setup("--mode", "enable", "--deploy", src, "--check")
+        self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
+        self.assertTrue(
+            names(
+                section(checked.stdout, "配布先に残っている旧い名前の sh"),
+                ".ccnavi/scripts/ccnavi-agree.sh",
+            )
+        )
+
+    def test_force_removes_the_old_names(self):
+        """--force なら、配る sh を入れ替えたうえで旧い名前の sh を消し、消したと言う。"""
+        src = self.make_source()
+        self.put_legacy("ccnavi-agree.sh", "ccnavi-approve.sh", "ccnavi-push-approved.sh")
+        result = self.run_setup("--mode", "enable", "--deploy", src, "--force")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        gone = section(result.stdout, "消した旧い名前の sh")
+        for name in ("ccnavi-agree.sh", "ccnavi-approve.sh", "ccnavi-push-approved.sh"):
+            with self.subTest(name=name):
+                self.assertTrue(names(gone, f".ccnavi/scripts/{name}"), result.stdout)
+                self.assertFalse(os.path.exists(self.deployed(".ccnavi", "scripts", name)))
+        for name in DEPLOY_SCRIPTS:
+            self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)), name)
+        # 消したあとは揃っている（旧い名前は残っていない）
+        checked = self.run_setup("--mode", "enable", "--deploy", src, "--check")
+        self.assertNotIn("旧い名前", checked.stdout)
+
+    def test_check_with_force_lists_what_it_would_remove(self):
+        src = self.make_source()
+        self.put_legacy("ccnavi-agree.sh")
+        result = self.run_setup("--mode", "enable", "--deploy", src, "--force", "--check")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertTrue(
+            names(section(result.stdout, "消す旧い名前の sh"), ".ccnavi/scripts/ccnavi-agree.sh")
+        )
+        self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh")))
+
+    def test_an_old_name_that_is_a_link_loses_only_the_link(self):
+        """リンクはリンクだけを消す。辿った先は消さない。"""
+        src = self.make_source()
+        outside = os.path.join(self.dir, "keep.sh")
+        with open(outside, "w", encoding="utf-8") as f:
+            f.write("keep\n")
+        link = self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh")
+        os.makedirs(os.path.dirname(link), exist_ok=True)
+        try:
+            os.symlink(outside, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+        result = self.run_setup("--mode", "enable", "--deploy", src, "--force")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(os.path.lexists(link))
+        self.assertTrue(os.path.isfile(outside))
+
+    def test_an_old_name_that_is_a_directory_is_left_alone(self):
+        src = self.make_source()
+        os.makedirs(self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh", "x"))
+        result = self.run_setup("--mode", "enable", "--deploy", src, "--force")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.isdir(self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh")))
+        self.assertTrue(
+            names(
+                section(result.stdout, "旧い名前の sh の場所にディレクトリがある"),
+                ".ccnavi/scripts/ccnavi-agree.sh",
+            )
+        )
+
+    def test_the_old_names_match_the_table(self):
+        """setup が消す旧い名前は、表（user_only.SCRIPTS）のスクリプトごと止める行の名前と同じ。"""
+        with open(SCRIPT, encoding="utf-8") as f:
+            found = re.search(r'^LEGACY_SCRIPTS="([^"]*)"$', f.read(), re.MULTILINE)
+        self.assertIsNotNone(found)
+        wanted = {
+            f"{name}.sh"
+            for row in user_only.SCRIPTS
+            if not row.subcommand
+            and not any(flag.script and flag.where in row.names for flag in user_only.FLAGS)
+            for name in row.names
+        }
+        self.assertEqual(set(found.group(1).split()), wanted)
+        # 旧い名前は、今配るものには入らない
+        self.assertFalse(wanted & set(DEPLOY_SCRIPTS))
+
+    def test_the_deployed_list_matches_the_scripts_in_the_tree(self):
+        """配る sh の一覧（DEPLOY_SCRIPTS）は、このツリーの .ccnavi/scripts/ の sh と同じ。"""
+        with open(SCRIPT, encoding="utf-8") as f:
+            found = re.search(r'^DEPLOY_SCRIPTS="([^"]*)"$', f.read(), re.MULTILINE)
+        self.assertIsNotNone(found)
+        here = {
+            name
+            for name in os.listdir(os.path.join(ROOT, ".ccnavi", "scripts"))
+            if name.endswith((".sh", ".js"))
+        }
+        self.assertEqual(set(found.group(1).split()), here)
+        self.assertEqual(set(found.group(1).split()), {*DEPLOY_SCRIPTS, LAUNCHER_NAME})
+
     def test_names_the_push_script_when_the_source_lacks_it(self):
-        """15. 配布元に ccnavi-push-approved.sh が無ければ、最後の「まだ無いもの」に挙げる。
+        """15. 配布元に ccnavi-user-push-approved.sh が無ければ、最後の「まだ無いもの」に挙げる。
 
         ボードは承認のあとこの sh を端末に送る。配れなかったことが最後の一覧に出ないと、
         配布先で承認の push ができない理由をユーザが読み取れない。
         """
         src = self.make_source()
-        os.remove(os.path.join(src, ".ccnavi", "scripts", "ccnavi-push-approved.sh"))
+        os.remove(os.path.join(src, ".ccnavi", "scripts", "ccnavi-user-push-approved.sh"))
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertIn("まだ無いもの", result.stdout, result.stdout + result.stderr)
         missing = result.stdout.split("まだ無いもの", 1)[1]
-        self.assertIn("ccnavi-push-approved.sh", missing)
+        self.assertIn("ccnavi-user-push-approved.sh", missing)
         self.assertFalse(
-            os.path.exists(self.deployed(".ccnavi", "scripts", "ccnavi-push-approved.sh"))
+            os.path.exists(self.deployed(".ccnavi", "scripts", "ccnavi-user-push-approved.sh"))
         )
         # 他の sh は配ったので、一覧には出ない。
         self.assertNotIn("ccnavi-ticket.sh", missing)

@@ -16,7 +16,7 @@ Chrome 拡張は組み立てのときにここの値を埋め込む。
 データの形（承認済みの置き場に置くものの並び、待ち方の読み方、取り下げの条件など）が変わるときも
 上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が新しい形のデータを読むと、
 フラグが同じでも読み違える（計画の項の `after` を知らない実行ファイルは待ち方を一直線と読む）。
-sh が古い実行ファイルの知らない副命令を呼ぶようになったときも同じ。
+sh が古い実行ファイルの知らないサブコマンドを呼ぶようになったときも同じ。
 
 フラグを足すだけ、JSON の欄を足すだけで、データの形も変わらないなら上げない。足したものが
 在るかは `flags` を見れば分かる。
@@ -48,18 +48,28 @@ from ..tickets import phasetypes, risk, ticket_model
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"
 # 実行ファイルと sh・拡張の契約の版。上げ方は冒頭の説明のとおり。
-# 13: 新しい sh が実行ファイルの新しい副命令（`tree parent` の追加行、`sync retired`、
+# 13: 新しい sh が実行ファイルの新しいサブコマンド（`tree parent` の追加行、`sync retired`、
 # `sync migrate`）を呼ぶ。Chrome と手元の判定の規則が変わる（取り込み状態を読まない）。
-# 14: C1 を write-and-push に改名した。sh が呼ぶ副命令が `c1 family|sort|merge|merge-blame` から
-# `write-and-push …` に変わり、答えの頭の行も `c1 1` から `write-and-push 1` に変わった。
+# 14: C1 を write-and-push に改名した。sh が呼ぶサブコマンドが
+# `c1 family|sort|merge|merge-blame` から `write-and-push …` に変わり、答えの頭の行も
+# `c1 1` から `write-and-push 1` に変わった。
 # 15: `integrate` がチケットに結び付くかの判定を、実行ファイルの `tree bound` に聞くようにした。
-# sh が呼ぶ副命令が増え、sh は答えの頭の行 `tree 1` が無ければ断る向きに倒す。
-COMPAT = 15
+# sh が呼ぶサブコマンドが増え、sh は答えの頭の行 `tree 1` が無ければ断る向きに倒す。
+# 16: ユーザだけが打つ操作を `user <操作>`（agree・reviewed・close-early・prune・handoff）に集め、
+# sh を ccnavi-user-*.sh に分けた。`user` の外の形は断るので、旧い sh は新しい実行ファイルで
+# 動かない。
+COMPAT = 16
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
-# 実行ファイルが持つ振る舞い。旗や JSON の欄の有無を `flags` から読めないものを足す。
+# 実行ファイルが持つ振る舞い。オプションや JSON の欄の有無を `flags` から読めないものを足す。
 # 足すだけなら COMPAT は上げない。
-FEATURES: tuple[str, ...] = ("templates.edit", "templates.draft-text", "board.template-draft")
+FEATURES: tuple[str, ...] = (
+    "templates.draft-text",
+    "user-entry",
+    # 保護対象の下書きの取り込み（`ccnavi user handoff`）。テンプレート専用の取り込み・編集
+    # （前の `templates.edit`・`board.template-draft`）の代わり。
+    "handoff",
+)
 # 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"
 # build.py が組み立てのときに書く部品の名前。パッケージの外に置くので、ソースで動かしている

@@ -26,6 +26,9 @@ import unittest
 from tests import ROOT
 
 SCRIPT = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-review.sh")
+# `api_failed` の置き場。ccnavi-review.sh とユーザ専用のレビューの sh が共有する、
+# ホストを読む側の部品。
+SHARED = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common-review.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
 CURL = shutil.which("curl")
@@ -43,7 +46,7 @@ MUST_NAME = (
 
 
 def script_text():
-    with open(SCRIPT, encoding="utf-8") as f:
+    with open(SHARED, encoding="utf-8") as f:
         return f.read()
 
 

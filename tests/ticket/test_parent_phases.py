@@ -554,7 +554,7 @@ class FillPhasesTest(PhaseHarness):
         unknown = self.fill("i0002")
         self.assertNotEqual(unknown.returncode, 0)
         self.assertIn("i0002", unknown.stderr)
-        with_agree = self.ccnavi("--agree", "--plan-order", "i0001", "--fill-phases")
+        with_agree = self.ccnavi("user", "agree", "--plan-order", "i0001", "--fill-phases")
         self.assertNotEqual(with_agree.returncode, 0)
         self.assertIn("--agree", with_agree.stderr)
         self.assertNotIn("phases:", self.read())

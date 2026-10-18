@@ -293,9 +293,9 @@ _STDIN_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "ash"})
 _STDIN_SCRIPTS = frozenset({"-", "/dev/stdin", "/dev/fd/0", "/proc/self/fd/0"})
 # 標準入力から読むシェルの前に置ける語（`… | env sh`・`… | command bash`）。
 _STDIN_HEADS = frozenset({"busybox", "env", "command", "exec"})
-# その前置きの旗で、次の語を値に取るもの。
+# その前置きのオプションで、次の語を値に取るもの。
 _STDIN_HEAD_VALUES = frozenset({"-u", "--unset", "-C", "--chdir", "-a"})
-# シェルの長い旗で、次の語を値に取るもの。
+# シェルの長いオプションで、次の語を値に取るもの。
 _STDIN_SHELL_LONG_VALUES = frozenset({"--rcfile", "--init-file"})
 
 
@@ -307,8 +307,10 @@ def reads_stdin(words: list[str]) -> bool:
     """標準入力からスクリプトを読むシェルか。
 
     `sh`・`sh -s …`・`sh < x`・`busybox sh`・`sh /dev/stdin`。前に置いた `env`・`command`・
-    `exec`（と代入・それらの旗）は外して見る。シェルの旗は、`--norc` のような長い旗、
-    値を取る旗（`--rcfile <値>`・`-o pipefail`・`-O extglob`・`-euo pipefail`）を読み飛ばす。
+    `exec`（と代入・それらのオプション）は外して見る。シェルのオプションは、`--norc`
+    のような長いオプション、
+    値を取るオプション（`--rcfile <値>`・`-o pipefail`・`-O extglob`・`-euo pipefail`）
+    を読み飛ばす。
     `-c` は文字列を実行するので読まない。
 
     ユーザの入口の止め（phase_forms）と、ラッパーの自己防衛（wrapguard）が使う。
@@ -343,7 +345,9 @@ def reads_stdin(words: list[str]) -> bool:
 
 
 def _stdin_heads(rest: list[str]) -> list[str]:
-    """シェルの前に置いた `busybox`・`env`・`command`・`exec` と、その旗・代入を外した残り。"""
+    """シェルの前に置いた `busybox`・`env`・`command`・`exec` と、
+    そのオプション・代入を外した残り。
+    """
     while rest:
         name = _stdin_base(rest[0])
         if name not in _STDIN_HEADS:

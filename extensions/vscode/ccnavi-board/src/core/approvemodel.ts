@@ -1,7 +1,7 @@
 /**
  * 承認の JSON の形（実行ファイルとの契約）と読み取り。README「承認の JSON」。
  *
- * `--agree --preview --json` が承認待ちの一覧を見せ、`--agree --yes <識別子,…> --json` が承認する。
+ * `--agree --preview --json` が承認待ちの一覧を見せ、`user agree --yes <識別子,…> --json` が承認する。
  * 拡張は一覧の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
  */
 
@@ -79,7 +79,7 @@ export interface ApprovePreview {
   readonly version: number;
   readonly root: string;
   readonly generated_at: string;
-  /** `--agree` が承認する対象。空なら承認待ちが無い */
+  /** `user agree` が承認する対象。空なら承認待ちが無い */
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
@@ -193,7 +193,7 @@ export interface ApproveMismatch {
 }
 
 /**
- * `--agree --yes` の答えを、呼ぶ側が読む形にしたもの。`partial`（途中で止まった）は、置けたぶんが
+ * `user agree --yes` の答えを、呼ぶ側が読む形にしたもの。`partial`（途中で止まった）は、置けたぶんが
  * あればコミット・pushを送るため、文面にせず遷移の側へ渡す（`approval-machine.ts` の `answered`）。
  * 承認のオーバーレイの遷移が入力として受けるので、契約の側に置く
  */
@@ -244,7 +244,7 @@ export function partialMessage(partial: ApprovePartial, carried = false): string
       ? "承認済みになったチケットはありません"
       : `書けた承認済みチケット（${placed.length} 件）: ${written}。${failed}${sent}`;
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
-  return `ccnavi --agree --yes が${where === "" ? "" : ` ${where}`}止まりました: ${reason}。${what}${done}`;
+  return `ccnavi user agree --yes が${where === "" ? "" : ` ${where}`}止まりました: ${reason}。${what}${done}`;
 }
 
 export type ResultParse =

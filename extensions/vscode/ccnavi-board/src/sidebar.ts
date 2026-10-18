@@ -1,5 +1,5 @@
 /**
- * アクティビティバーの ccnavi から開くサイドパネル。並ぶのは画面の入口 6 つで、どれも Webview パネルを開く。
+ * アクティビティバーの ccnavi から開くサイドパネル。並ぶのは画面の入口 7 つで、どれも Webview パネルを開く。
  * 「チケット管理」「リスク管理」「フェーズ管理」「テンプレート管理」は、チケット制御（CCNAVI_TICKET_CONTROL）が
  * disable のワークスペースでは出さない。配点は子チケットを閉じるときに、フェーズ定義は親の
  * 計画と子の範囲にしか読まれないので、disable の間はどちらも何も動かさない。使われない設定の
@@ -56,10 +56,17 @@ const ENTRIES: readonly Entry[] = [
   },
   {
     label: "テンプレート管理",
-    description: "作業・レビュー計画のテンプレートの一覧、下書きの取り込み",
+    description: "作業・レビュー計画のテンプレートと下書きの一覧（読むだけ）",
     command: "ccnaviBoard.openTemplates",
     icon: "files",
     needsTickets: true,
+  },
+  {
+    label: "取り込み待ち",
+    description: "wip/handoff/ に置いた下書き（テンプレート・設定・docs）の差分を読んで取り込む",
+    command: "ccnaviBoard.openHandoff",
+    icon: "inbox",
+    needsTickets: false,
   },
   {
     label: "チケット管理",

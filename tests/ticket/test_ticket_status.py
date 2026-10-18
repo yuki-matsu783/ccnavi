@@ -71,7 +71,7 @@ class TicketStatusTest(PhaseHarness):
         self.assertIn("承認: 未コミット（手で置いた）", mine)
         self.assertIn("着手: 未着手", mine)
         self.assertIn("置き場のファイル: 未コミット", mine)
-        self.assertIn("ccnavi-push-approved.sh i0001", mine)
+        self.assertIn("ccnavi-user-push-approved.sh i0001", mine)
         self.assertIn("エージェントはコミットも push もしない", mine)
         self.assertIn("start へ進んでよい", mine)
         self.assertIn("ccnavi-ticket.sh start i0001", mine)
@@ -131,7 +131,7 @@ class TicketStatusTest(PhaseHarness):
         self.start_parent()
         mine = self.block(self.said("i0001"), "i0001")
         self.assertIn("未コミットの変更がある", mine)
-        self.assertNotIn("ccnavi-push-approved.sh", mine)
+        self.assertNotIn("ccnavi-user-push-approved.sh", mine)
 
     # ---- 2. 未 push・push 済み
 

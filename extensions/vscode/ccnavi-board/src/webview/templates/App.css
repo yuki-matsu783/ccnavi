@@ -10,4 +10,4 @@ section { margin-bottom: 18px; }
 .tag.warn { color: var(--warn-text); border-color: currentColor; }
 .status { margin: 8px 0 0; padding: 6px 10px; border-radius: var(--radius-md); border: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
 .status.failed { border-color: var(--vscode-editorError-foreground); color: var(--error-text); }
-.foot .status { display: inline-block; margin: 0 0 4px; }
+.handoff-link { margin: 4px 0 10px; }

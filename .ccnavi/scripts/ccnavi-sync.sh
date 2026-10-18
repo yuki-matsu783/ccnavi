@@ -863,7 +863,7 @@ check_family() {
 	run_ccnavi sync check "$1" "$2" >"$scratch/check-raw" 2>"$scratch/check-err" || cf_rc=$?
 	tr -d '\r' <"$scratch/check-raw" >"$scratch/check"
 	if [ "$(head -n 1 "$scratch/check" 2>/dev/null)" != "check 1" ]; then
-		# 検査を実行できなかった（古い実行ファイルが副命令を知らない、失敗した）。検査の error ではない
+		# 検査を実行できなかった（古い実行ファイルがサブコマンドを知らない、失敗した）。検査の error ではない
 		# ので親子のチケットは止めない。この検査が入る前と同じ動き。
 		printf '%s: 注意: 取り込みの後の検査を実行できなかった（%s）。実行ファイルを新しくして再実行してください\n' \
 			"$1" "$(head -n 1 "$scratch/check-err" 2>/dev/null)"

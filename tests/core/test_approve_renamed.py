@@ -32,7 +32,7 @@ class ApproveRenamedTest(unittest.TestCase):
                 result = run_ccnavi(argv, input="", cwd=ROOT)
                 self.assertEqual(2, result.returncode)
                 self.assertIn("--agree に改名しました。", result.stderr)
-                self.assertIn("ccnavi-agree.sh", result.stderr)
+                self.assertIn("ccnavi-user-agree.sh", result.stderr)
                 self.assertEqual("", result.stdout)
 
     def test_runs_nothing_of_the_approval(self):

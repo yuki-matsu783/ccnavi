@@ -17,7 +17,7 @@
 - 子のブランチ（手元）を消す。条件は子の種類で分ける
   - 合流した子: ブランチの先頭が合流した sha（`merged_sha`）と同じで、その sha が push 済みの
     親の先頭（`refs/remotes/origin/<親のブランチ>`）の祖先であること
-  - 取り消した子: ユーザに一覧を見せ、ユーザが `!` を付けて `ccnavi-clean.sh --branch <名前>
+  - 取り消した子: ユーザに一覧を見せ、ユーザが `!` を付けて `ccnavi-user-clean-branch.sh <名前>
     --confirmed` を打ったときだけ（エージェントからは hook が止める）。確認なしでは消さない。
     消す前に、記録の子が実際にその親の子か（チケットの `parent:`）を確かめ直す。
     親に無いコミットの数を添える
@@ -509,7 +509,7 @@ def _say(stdout: TextIO, outcome: Outcome) -> None:
 
 
 def _clean_script(root: str) -> str:
-    return settings.script_command(root, "ccnavi-clean.sh")
+    return settings.script_command(root, "ccnavi-user-clean-branch.sh")
 
 
 def _confirm_command(root: str, name: str) -> str:
@@ -517,7 +517,7 @@ def _confirm_command(root: str, name: str) -> str:
 
     エージェントからは hook が止める。ユーザが確認したことを、ユーザ自身が打つことで担保する。
     """
-    return f"{_clean_script(root)} --branch {name} --confirmed"
+    return f"{_clean_script(root)} {name} --confirmed"
 
 
 def _parent_of(root: str, conf: settings.Settings, project: str, ident: str) -> str:

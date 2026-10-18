@@ -36,7 +36,11 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-SCRIPTS = ("ccnavi-sync.sh", *common_sh(SH_DIR), "ccnavi-git.sh")
+SCRIPTS = (
+    "ccnavi-sync.sh",
+    *common_sh(SH_DIR),
+    "ccnavi-git.sh",
+)
 CONFIG = (
     ("user.email", "t@example.invalid"),
     ("user.name", "t"),
@@ -219,8 +223,8 @@ class SyncHarness(unittest.TestCase):
         env.update(extra)
         return env
 
-    def sync(self, *args, shell=None, **extra):
-        script = os.path.join(self.scripts, "ccnavi-sync.sh")
+    def sync(self, *args, shell=None, name="ccnavi-sync.sh", **extra):
+        script = os.path.join(self.scripts, name)
         return subprocess.run(
             [shell or SHELL, script, *args],
             cwd=self.ws,

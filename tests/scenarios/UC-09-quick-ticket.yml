@@ -7,7 +7,7 @@ model: haiku
 budget_usd: 3.0
 
 # 設計に触れる・ユーザのレビューが要る作業は、提案を書いて承認を受ける（docs/design/tickets/phases.md の「小さい作業」）。
-# 承認（`ccnavi --agree`）とマージリクエストのレビュー（ホスト上）は人間しかできないので、そこで止める。
+# 承認（`ccnavi user agree`）とマージリクエストのレビュー（ホスト上）は人間しかできないので、そこで止める。
 # 親は `plan: [quick]` の 1 項だけ、子は `phase: 1`。範囲は親の範囲そのまま。
 steps:
   - prompt: >-
@@ -16,7 +16,7 @@ steps:
       実装はまだしないで。
   - human: true
     instruction: >-
-      ワークスペースルートで `ccnavi --agree <親の識別子> <子の識別子>` を打つ（識別子は 1 つ目の step の報告にある）。
+      ワークスペースルートで `ccnavi user agree <親の識別子> <子の識別子>` を打つ（識別子は 1 つ目の step の報告にある）。
     check:
       - 承認画面に、親の範囲（README.md）と、リスクの見立て（LOW）が出ている
       - 「新たに書ける領域」に README.md 以外が無い

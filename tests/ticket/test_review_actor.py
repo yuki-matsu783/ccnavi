@@ -398,7 +398,8 @@ class DecideActorTest(ActorHarness):
         preview = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--preview",
@@ -411,7 +412,8 @@ class DecideActorTest(ActorHarness):
         return self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--yes",
@@ -462,7 +464,8 @@ class DecideActorTest(ActorHarness):
         preview = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--preview",
@@ -480,7 +483,8 @@ class DecideActorTest(ActorHarness):
         done = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",

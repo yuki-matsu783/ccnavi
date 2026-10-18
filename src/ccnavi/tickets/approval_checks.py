@@ -163,7 +163,7 @@ def branch_problems(
 def misplaced_home_text(root: str, family: str, shown: str) -> str:
     """承認済みチケットが親のワークツリーに無いときの理由と直し方。
 
-    `home_problem` と ready が同じ文を出す。`ccnavi-push-approved.sh` と `ccnavi-sync.sh` は、
+    `home_problem` と ready が同じ文を出す。`ccnavi-user-push-approved.sh` と `ccnavi-sync.sh` は、
     ツリーごとの置き場を送る・親のブランチを取り込むだけで、ツリーの間でチケットを動かさないので、
     承認済みチケットは手で動かさず、承認し直す。
     """
@@ -179,7 +179,7 @@ def misplaced_home_text(root: str, family: str, shown: str) -> str:
         "親のワークツリーの同じ相対位置に移す "
         "3) ユーザに承認を取り直してもらう（承認済みチケットが親のワークツリーに置かれる） "
         f"4) {shown} に残った {family} の承認済みチケットの片付けをユーザに聞く。"
-        "ccnavi-push-approved.sh と ccnavi-sync.sh は各ツリーの置き場を送る・取り込むだけで、"
+        "ccnavi-user-push-approved.sh と ccnavi-sync.sh は各ツリーの置き場を送る・取り込むだけで、"
         "ツリーの間でチケットを動かさない"
     )
 

@@ -51,7 +51,7 @@ keywords: [共通レイヤー, 置き場, .ccnavi/config/common, 環境変数, �
 
 ただし「診断のためのフラグ」と呼ぶのは正確ではない。`--project-rules-file` /
 `--project-phases-file` は診断の経路（`--lint` / `--test` / `--explain`）でなければ拒む
-（`cli.py` の `diagnosing`）が、この 3 本にその制限は無く、`ticket` / `review` の副命令でも
+（`cli.py` の `diagnosing`）が、この 3 本にその制限は無く、`ticket` / `review` のサブコマンドでも
 そのまま使える。`.ccnavi/scripts/` の sh は受け取った引数を `"$@"` で実行ファイルへそのまま渡す
 ので、エージェントが `ccnavi-ticket.sh done <子> --risk <別の配点>` と打てば、実績リスクの
 採点を別の配点で行える。記録（`.risk.json` の `source`、フェーズのマーカー）はレイヤーの名前しか

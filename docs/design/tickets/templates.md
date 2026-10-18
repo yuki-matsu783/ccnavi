@@ -1,7 +1,7 @@
 ---
 type: design
 title: 9.15 作業・レビュー計画のテンプレート
-description: 計画（plan / feedback）と子のフローを 1 ファイルにまとめたテンプレートの置き場・2 層の統合結果・検査・--templates の答えと、溜める側（下書き・取り込み）・使う側（ticket new --template）・案内と配布の設計
+description: 計画（plan / feedback）と子のフローを 1 ファイルにまとめたテンプレートの置き場・2 層の統合結果・検査・--templates の答えと、溜める側（下書き。取り込みは 9.19）・使う側（ticket new --template）・案内と配布の設計
 tags: [design-doc, ticket, phase]
 keywords: [テンプレート, 作業・レビュー計画, plan, feedback, フロー, --templates, 2層, 衝突, 検査, 往復, sha]
 ---
@@ -11,7 +11,7 @@ keywords: [テンプレート, 作業・レビュー計画, plan, feedback, フ�
 ### 9.15 作業・レビュー計画のテンプレート
 
 完了した作業の計画とフローを次の作業で使い回すための設計。ここにあるのは、読む側（読み込み・2 層の統合結果・検査・
-`ccnavi --templates` の答え・`--lint` への出方）と、溜める側（下書きの作成、ユーザの取り込み、取り込んで消えた下書きのコミット）、
+`ccnavi --templates` の答え・`--lint` への出方）と、溜める側（下書きの作成。取り込みは [9.19](handoff.md)）、
 使う側（`ticket new --template`）、案内と配布（親の `finish` の案内、共通レイヤーのミラー、導入 sh）まで。用語は CONTEXT.md の「作業・レビュー計画」に従う。
 
 **何か。** 1 つの親の作業・レビュー計画（全体計画 `plan:` とフィードバック計画 `feedback:` の項と `after`）と、
@@ -42,7 +42,7 @@ keywords: [テンプレート, 作業・レビュー計画, plan, feedback, フ�
 
 **往復。** `Template.as_data` と `plan_templates.dump` は、読んだ中身をそのまま書き戻せる形にする。読んだものを書いて読み直すと
 同じ `Template` になり、`dump` の結果も変わらない（`- design` と `- {type: design}` のような書き方の違い、コメント、キーの順は
-保たない）。後の段階の保存・取り込み・削除が同じモデルを書き戻す。
+保たない）。取り込み（9.19）の検査が同じモデルを読む。
 
 書き出しは `plan_templates.to_yaml` の 1 か所（テンプレート・フローの下書き・検査が合成する提案の 3 つが使う。日本語はそのまま、
 キーの順は渡したまま、行は折らない）。改行を含む文字列は literal block（`|`）で書き、長い複数行のプロンプトを読める形にする。
@@ -68,13 +68,13 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 レイヤーのテンプレートは共通 + レイヤーの定義で検査する（`--templates` の一覧は、選んだレイヤーの統合結果の定義で検査し直す）。
 
 **`--templates`。** `cli_templates` が引数を受ける。一覧・`--keyword`（`name`・`description`・`when` の部分一致。語を重ねるとどれか）・
-`--show <名前>`・`--layer`・`--json`。`--layer` は統合結果の相手のレイヤー（既定は自身）で、一覧と `--show` のほか、`--import`（`--to project` の取り込み先）と
+`--show <名前>`・`--layer`・`--json`。`--layer` は統合結果の相手のレイヤー（既定は自身）で、一覧と `--show` のほか、`--draft`（`--to project` の取り込み先）と
 `ticket new --template`（テンプレートを引くレイヤー）にもある。読むだけなのでエージェントが打ってよい。失敗（`--show` の無い名前、不明な `--layer`）は、
-`--json` なら `--draft`・`--import` と同じく `{version, ok: false, error}` を標準出力に出す（終了コードは 1）。`--docs` の絞り込みのうち `--keyword` だけを共有し、
+`--json` なら `--draft` と同じく `{version, ok: false, error}` を標準出力に出す（終了コードは 1）。`--docs` の絞り込みのうち `--keyword` だけを共有し、
 ほかは `--docs` でだけ使えるまま断る。`--docs` や、判定・チケットの経路のフラグとは並べられない。答えの形は README の
 「作業・レビュー計画のテンプレート」と `tests/fixtures/templates-json.json`。画面は判定を自分で出さず、この答えをそのまま描く。
 
-答えには、各テンプレートの名前・層・置き場の相対パス・中身のハッシュ（保存の `--expect` に使う。`--plan-order` の `source_sha` と同じ流儀）・
+答えには、各テンプレートの名前・層・置き場の相対パス・中身のハッシュ（`--plan-order` の `source_sha` と同じ流儀）・
 説明・いつ使うか・計画の項（計画の中の添字と、提案に写したときの番号つき）・フローの要約・統合結果で使われるか（`effective`）と
 捨てた理由（`dropped`）・書き込めるか（`writable`）・検査の結果（`severity` と `detail`）を入れる。層ごとの生の中身（`layers`）、
 選んだレイヤーの統合結果（`templates`）、全レイヤーの統合結果の索引（`sums`）の 3 つを返し、統合結果だけでなく、
@@ -85,9 +85,8 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 ミラーへの配布は「案内と配布」の節のとおり。
 
 `drafts[]` には下書きの本文そのまま（`text`）を足す（`--show --json` の `template.text` と同じ読み方）。`--version --json` は `features`
-（文字列の配列: `templates.edit`・`templates.draft-text`・`board.template-draft`）を足し、旗から読めない振る舞いを古い実行ファイルと見分ける。
-`features` を足しても互換の版（COMPAT）は上げない。ボードの JSON（`--explain --json`）のチケットは `template_draft`（真偽）を持ち、完了した（`done/` の）
-計画付きの親（取り消し以外）だけ真。親のカードは、これが真のときだけ「テンプレートの下書きを作る」ボタンを出し、押すと `--templates --draft <親> --json` を呼ぶ。
+（文字列の配列。テンプレートに関わるのは `templates.draft-text`、取り込みの `handoff`）を足し、オプションから読めない振る舞いを古い実行ファイルと見分ける。
+`features` を足しても互換の版（COMPAT）は上げない。
 
 **`--lint`。** `lint_templates` が `plan_templates.scan` の苦情を `(templates)`（共通）・`(templates/<レイヤー>)` の場所で出す。
 置き場の無いワークスペースでは何も言わない。読むのは設定の置き場だけなので、走査に写し（`copies`）を
@@ -96,17 +95,23 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 #### 溜める側
 
 完了した親から下書きを作り、ユーザが差分を読んで取り込む。下書きにも取り込みにも判定の変更は無い（判定・組み込みの保護・
-`rules.yml` はそのまま）。下書きの置き場は提案の置き場の下で範囲外なので、エージェントは今のまま書ける。取り込み先は
-`.ccnavi/config/` の下で、組み込みの保護が既にエージェントの書き込みを止める。
+`rules.yml` はそのまま）。テンプレート専用の取り込み・編集の処理は無い。取り込みは、ほかの保護対象と同じ `ccnavi user handoff`
+（[9.19](handoff.md)）で、テンプレートはその種類の表の `template` の行にあたる。実行ファイルに残るテンプレートの操作は、
+一覧・検索・表示（`--templates`・`--keyword`・`--show`・`--layer`・`--json`）と `--draft` だけで、改名・移動・削除は無い（ユーザがファイルを直接操作する）。
 
-**下書きの置き場。** `<提案の置き場>/templates/<名前>.yml`（既定は `wip/proposals/templates/`。プロジェクトのツリーならそのプロジェクトの
-`wip/proposals/templates/`）。`plan_templates.draft_dir_rel` / `draft_rel` / `draft_dir` / `draft_file` が、子のフローの下書き
-（`flow.draft_rel` / `draft_file`）と同じ形で置き場を返す。下書きに効力は無い。
-下書きを読む口は `template_drafts.scan` で、全ツリー（ワークスペース・プロジェクト・ワークツリー）の置き場を読み、そのツリーのレイヤー
-（`self` かプロジェクト名）のフェーズ定義で検査する。同じ中身の下書きが複数のツリーに在れば（親のブランチに乗った下書きは子のワークツリーにも
-checkout される）1 本にまとめ、ほかのツリーを `also_in` に持つ。
+**下書きの置き場。** 取り込み先と同じ相対パスで `wip/handoff/` の下に置く。
 
-**`--templates --draft <親> [--name <名前>]`。** エージェントが打ってよい（効力が無いので `_CLI_FORMS` には足さない）。
+| `--to` | 下書きのパス（そのツリーの下） |
+|---|---|
+| `project`（既定） | `wip/handoff/.ccnavi/config/project/templates/<名前>.yml` |
+| `common` | `wip/handoff/.ccnavi/config/common/templates/<名前>.yml` |
+| `project` と `--layer <プロジェクト>` | `wip/handoff/projects/<プロジェクト>/.ccnavi/config/project/templates/<名前>.yml` |
+
+`plan_templates.draft_rel` / `draft_dir_rel` / `draft_dir` / `draft_file` が、この相対パスを返す。下書きに効力は無い。
+`plan_templates.scan` も `--templates` の統合結果も読まない。下書きを読む口は `template_drafts.scan` で、ツリーの `wip/handoff/` のうち
+`template` の種類に当たるものを読み、そのツリーのレイヤー（`self` かプロジェクト名）のフェーズ定義で検査する。
+
+**`--templates --draft <親> [--name <名前>] [--to common|project] [--layer <名前>]`。** エージェントが打ってよい（効力が無いので `_CLI_FORMS` には足さない）。
 
 | 段 | 内容 |
 |---|---|
@@ -114,60 +119,19 @@ checkout される）1 本にまとめ、ほかのツリーを `also_in` に持�
 | `after` の正規化 | 親の計画の `after` は全体計画の続きの絶対番号。全体計画はそのまま、フィードバック計画は全体計画の項数を引いて計画の中の添字にする。承認が順序を確かめた計画の引き算だけなので、並べ替え（`plan_order.renumber`）は使わない。計画の中の項を指さない `after`（引いて 1 未満、または自分以降を指すもの）は落として知らせる。検査が合成する提案（`_composed`）は逆の統合結果をするので、往復で絶対番号に戻る |
 | フロー | 全体計画の n 番目の項の子（`phase` が n で `done/` に在る）のうち、フローを持つ最初の 1 本（識別子順）を `flows[n]` に写す。読めないフローは写さずに知らせる。ほかの子にもフローがあれば知らせる。フィードバック計画の子のフローは写さない（`flows` は全体計画の添字で指すため） |
 | 固有名 | 機械では一般化しない。`description` を `TODO 一般化する: <親の題>`、`when` を `TODO 一般化する: 「<親の題>」と同じ形の作業をするとき` にする（どちらにも `TODO` の印）。`description` か `when` に `TODO` が残っていると、検査（`plan_templates.check`）が warn で言う。エージェントが直す |
-| 未追跡の下書きは `ready` を止める | 下書きは `wip/` の未追跡のファイル。親の `ready` は `wip/` の未追跡のファイルを名指しして止める（`review._merge_problems`。未追跡は履歴から戻せず、消せないため）。`--draft` を打ったら、取り込むか、`ready` の前に下書きを消す（またはコミットする）。`--draft` の出力の次の手と、親の `finish` の案内にこのことを書く |
+| 取り込み先の同名 | 取り込み先（`--to` と `--layer` で決まるパス）に同名のテンプレートが既にあれば、上書きになる下書きを作らず断る。既存を直すときは `ccnavi-stage.sh` で既存を写して編集する |
 | 書く | `fsio.write_new_durable`（一時ファイル → fsync → 差し替え。在れば書かない）。同名の下書きは上書きせず error。置き場の途中にリンクがあれば書かない。名前の既定は親の識別子で、`NAME_RE` に合わなければ `--name` を求める |
 
-**`--templates --import <下書きの名前かパス> --to common|project [--layer <名前>] [--replace] [--yes --expect <ハッシュ>]`。** ユーザ専用で、
-`phase_forms._CLI_FORMS` に `--import` を足してエージェントが打てないようにした（下見も含めて止める。`--yes` は既に入っていた）。
-値なしの `--yes` は `--import` だけが読み（`cli_templates.BARE_YES`）、ほかの経路は今までどおり識別子を求める。
-隠した引数の検査（`hidden_user_entry`）も `--import` と `--yes` の組を承認の組と同じに扱う。
+**`ready` の止め。** 許可リストに当たる未取り込みの下書き（取り込み先と中身が違うもの）が `wip/handoff/` に残っていると、親の `ready` は
+名指しして止める（`review._merge_problems`。止めの定義は 9.19）。`--draft` の出力の次の手と、親の `finish` の案内にこのことを書く。
 
-| 段 | 内容 |
-|---|---|
-| 下書きを探す | 名前なら全ツリーの置き場から探し、中身の違う同名が複数あればパスで指させる。パスは下書きの置き場の下の `.yml` だけ受ける |
-| 下見（`template_drafts.prepare`） | 何も書かない。下書きを取り込み先の定義（共通は共通だけ、`project` は共通 + レイヤー）で検査し直す。error があれば取り込めない。warn は見せるだけ。同名が取り込み先に在れば `--replace` が要る。共通とレイヤーに同名で中身が違うものが並ぶ取り込みは、統合結果がレイヤーの側を使わない error にするので断る（全欄が同じなら info） |
-| 差分 | 同名があれば取り込み先のいまの文面と下書きの `difflib.unified_diff`（前後 3 行つき）。同名が無ければ本文を全部見せる。フローの文は案内文になるので、ユーザが読むことが歯止め。続けて打つ形（ハッシュ入り）を出す |
-| 書く（`commit`） | `--yes` と `--expect` が揃い、`--expect` が下書きの今の中身（検査したバイト列）のハッシュと同じときだけ。中身は書き換えずそのまま書く。新規は `write_new_durable`、置き換えは `write_bytes_atomic`（どちらも一時ファイル → fsync → 差し替え）。取り込み先がリンク・ハードリンク・ふつうのファイルでない、または置き場の途中にリンクがあれば書かない。書いたあとに読み直してハッシュを確かめる |
-| 下書きを消す | 書けたあと、下書きを読み直して取り込んだときの中身（ハッシュ）と同じときだけ消す。違えば消さずにそう言う。読めない（リンク・ハードリンクなど）も消さない |
-| `--json` | 下見と結果。`ok`・`draft`・`target`・`errors[]`・`infos[]`・`problems[]`・`diff[]`・`new_text`（新規取り込みの本文。同名が無くても入る。制御文字・書式文字は `\uXXXX` に直してある）・`written`・`removed`・`kept` |
-
-`--yes` で書くときは、端末の前のユーザが打つ。止めるのは 2 つ: hook の止め（`_CLI_FORMS`。文字列の照合なので、`uv run --project …`・`python -u -m ccnavi`・
-`env uv run …`・Write で作った sh の中に書く形などは読み切れず、すり抜けうる）と、実行時の確認（`--import` で `--yes` を付けて書くとき、
-`cli_args._from_terminal` が標準入力が端末かを確かめ、端末でなければ書かず終了コード 1。`CCNAVI_GUARD_TICKET_APPROVAL=disable` で切れる既存の流儀）。
-下見（`--yes` なし）は端末なしで通る。`--expect`（下書きのハッシュ）は、見せた下書きだけを書くための別の歯止め。
-テンプレート管理画面（拡張）が `--yes` つきで呼ぶ道は `--via board` を付けて、承認（`--agree --yes <識別子> --digest <ダイジェスト>`）と同じ水準のガードに置き換える。
-この経路だけ実行時の端末の確認を免除し、止めるのは hook の止め（`_CLI_FORMS`）と、見せた下書きとの一致（`--expect`）の 2 つになる。
-`--via board` は `--import --yes --expect <ハッシュ> --json` と一緒に使うときだけ通り、ほかの組み合わせは断る。
-画面からの取り込みは作業中のチケットがあると止まる（共通とワークスペースの設定は、どのツリーの作業中のチケットでも止める。プロジェクトの設定は、そのプロジェクトの作業中のチケットだけで止める）。
-ボードのカードからテンプレート管理画面を開く入口と、親から下書きを作る入口は作らない（実行ファイルのボード JSON に「この親から下書きを作れる」欄が無いため）。
-複雑な操作による迂回（launcher の正規表現が見ない書き方、sh の中に書く形、`python -c` から呼ぶ形）は、防ぎきれない設計の限界として受け入れる。
-hook の照合の穴（launcher の正規表現が python と `-m` の間、`uv run` と python の間の旗を許さない）は、`--agree`・`--reviewed`・`--close-early` にも
-効く前からの穴。取り込みの `--yes` は、承認と同じく、launcher の書き方に依らない 2 段目（`human_path_form`。`--templates` と `--import` と `--yes` の組）でも止める。
-launcher の正規表現だけに頼る穴は、この 2 段目を持たない形（`--close-early` など）に残る。穴ごとに regex を足し続けず、足すなら承認と取り込みの両方に効く形で別に決める。
-取り込みの下見は、制御文字・書式文字を `\uXXXX` に直して見せる（差分の行・新規の本文・苦情の文面）。書く中身（バイト列）は変えない。
-そうした文字を含む下書きは、検査が error にして取り込めない。
-
-**`--templates` の一覧。** 下書きがあれば最後に `下書き: N 件（wip/proposals/templates/）` を 1 行出す。`--json` は `drafts[]` を足す。
-1 件は `name`・`tree`・`path`・`sha`・`text`・`valid`・`importable`・`checked_with`
+**`--templates` の一覧。** 下書きがあれば最後に `下書き: N 件（wip/handoff/）` を 1 行出す。`--json` は `drafts[]` を足す。
+`wip/handoff/` の `template` の種類の下書きを返す。1 件は `name`・`tree`・`path`・`sha`・`text`・`valid`・`importable`・`checked_with`
 （検査に使ったフェーズ定義の層。`templates[].layer`＝ファイルが在る層とは意味が違うので名前を分けた）・
 `exists_in`（同名のテンプレートが在るレイヤー）・`also_in`（`tree` と同じ表記で、ワークスペースルートは空。人間向けの言い方は text 出力の側で作る）・`description`・`when`・`plan`・`feedback`・`flows`・`problems`。
 
 **`--lint`。** 下書きの苦情は `(template-drafts)` の場所で、error を warn に下げて出す（効力が無い）。深刻度は warn と info だけ。
-
-**編集（保存・改名・移動・削除）。** 旗は `--save-draft <名前> --body-file <ファイル>`（下書きの本文を置き換える）、`--delete-draft <名前>`（下書きを消す）、
-`--rename-template <名前> --new-name <新名> --on draft|common|project [--layer <層>]`（改名。`name:` も書き換え、行き先に同名があれば断る）、
-`--move-template <名前> --on common|project [--layer <層>] --to common|project [--to-layer <層>]`（層の間の移動。中身は変えず、行き先の定義で検査し、
-error があれば断る。行き先に同名があれば断る）、`--delete-template <名前> --on common|project [--layer <層>]`（取り込み済みを消す。下書きには触らず、
-ほかの層に同名があれば info で知らせる）。どれも `--yes` なしは下見で、何も書かずに差分・検査・主語のハッシュを返す。`--yes --expect <主語のハッシュ>` が
-揃ったときだけ書き、書く直前にも読み直して比べる。端末の確認は `--import` と同じ（標準入力が端末か。画面の子プロセスは `--via board` で免除）。
-保存は、`name:` を変える本文、UTF-8 でない本文、制御文字や書式文字を含む本文、上限（256KiB）を超える本文を断る。検査に error があっても書く（下書きに効力は無い）。
-エージェントが打てるのは `--delete-draft` の下見だけで、`--save-draft`・`--rename-template`・`--move-template`・`--delete-template` は下見も打てない（`phase_forms._CLI_FORMS`）。`--save-draft` を打たせないのは、`--body-file` に任意のパスを渡すと、読んだ中身が下見の出力（差分・本文）に出るため。エージェントは下書きを Write で直接編集する。
-`template_edit.prepare` が下見（主語の探索・検査・差分）、`template_edit.commit` が `--expect` の照合と書く処理を担う。主語の探索と
-衝突の判定（`template_drafts.collide`）は取り込みと共有する。`--json` の答えは `template_edit.plan_json`。
-
-**取り込んで消えた下書きのコミット。** `ccnavi-push-approved.sh` は `ls-files --deleted` で追跡されていて消えた `todo/` の提案と `flows/` の下書きを
-コミットする。`templates/` も同じ形で足した（write-and-push の手順の `carry_paths` と、そうでないツリーのコミットの 2 か所）。既存の挙動は変わらない。承認済みチケットの置き場に
-変更が無いツリーは見ないままなので、下書きの削除だけではコミットされず、次に置き場に変更があったときに一緒に入る（フローの下書きと同じ）。
+検査の置き場は `wip/handoff/` で、`lint_templates` が読む。
 
 #### 使う側
 
@@ -175,7 +139,7 @@ error があれば断る。行き先に同名があれば断る）、`--delete-t
 [--layer <名前>] [--with-feedback] [--issue N]`（`tickets/scaffold.py` の `--plan` の足場と同じ入口。`--plan` とは併用できない）。判定・組み込みの保護・
 `rules.yml` は変えない。`ticket new` は元から `phase_forms._CLI_FORMS` に無く、書くのは `todo/` の提案と下書きの置き場だけなので、
 エージェントが打ってよい。`ccnavi-ticket.sh` は `new` を通さず（実行ファイルを直接打つ）、`--template` のために sh を直す必要は無い。
-`--template` と `--with-feedback` は実行ファイルの新しい旗なので `EXE_OPTIONS` に足した。`ticket new` では `--layer` をテンプレートを引くレイヤーとして読む。
+`--template` と `--with-feedback` は実行ファイルの新しいオプションなので `EXE_OPTIONS` に足した。`ticket new` では `--layer` をテンプレートを引くレイヤーとして読む。
 
 **フィードバック計画は既定では書かない。** フィードバック計画は、全体計画の最後のレビューを見て、改版で 1 回だけ足す決まり。最初の提案に `feedback:` を入れると、
 `agree_candidates` の改版の検査が「フィードバック計画を立てたあとは全体計画を変えられない」「フィードバック計画は 1 回だけ」で拒み、承認後に全体計画を改版できなくなる。
@@ -216,7 +180,7 @@ warn（`TODO` の残りなど）、次の手（rationale・固有名を直す、
 | 条件 | 見方 |
 |---|---|
 | 親が計画を持つ | `_find_parent` が完了した親（`done/`）を引ける。計画が無い・取り消した親は引けず、出さない |
-| その親の識別子の下書きが無い | 親のワークツリーの `wip/proposals/templates/<親>.yml`。在れば作り済みなので出さない |
+| その親の識別子の下書きが無い | 親のワークツリーの `wip/handoff/` の下の、`--draft` が書く名前が親の識別子の下書き。在れば作り済みなので出さない |
 | 同じ計画の形のテンプレートが取り込まれていない | 共通とレイヤーの全テンプレートの `plan`・`feedback`（`type`・`review`・`after`）を、`--draft` が作る中身と比べる。フローの文は比べない（下書きの一般化で直るため。比べると、取り込んだ直後でも同じに読めない）。読めないテンプレートも計画の形が読めれば数える |
 
 案内は、`ready` の案内（Draft を外す手順）の後ろに足す。マージリクエストで見るフェーズが無い親（統合先に取り込むところまでの案内。`ready` が無い）と、

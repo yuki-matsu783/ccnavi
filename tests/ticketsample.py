@@ -19,6 +19,8 @@ RULES = {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
             "glob": "*/.ccnavi/*",
+            # 守る場所の写しを置く wip/handoff/ の中は、本物のルールと同じく除く
+            "except": [{"regex": r"[\\/]wip[\\/]handoff[\\/]"}],
             "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。",
         }
     ],

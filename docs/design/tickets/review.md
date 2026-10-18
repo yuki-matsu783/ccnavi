@@ -27,10 +27,11 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 |---|---|
 | `request --phase <N> --body-file <文> --eli5 <HTML>` | sh が `--eli5` を確かめる → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
 | `confirm --phase <N>` | sh がスレッドとレビューを取ってくる → `review confirm` |
-| `decide <N>` | ユーザが打つ。sh が取ってくる → `--reviewed N --accept-unresolved` → sh が投稿 |
+| `decide <N> --preview` | 一覧とダイジェストを見るだけ（`--reviewed N --accept-unresolved --preview`）。書く側は `ccnavi-user-decide.sh <N>`（下の行） |
+| `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿 |
 | `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらず、レビューの状態も変えない |
 | `ready` | `review ready`（条件を確かめ、マーカーを置き、閉じた親子のチケットを `logs/archive/` へ退避する。`wip/` の追跡済みのファイルを消す。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`、続けて消したものがあれば `wip-from <消す前の HEAD>` と `wip <パス>`）→ write-and-push が退避と `wip/` の削除をコミットして push する（write-and-push の外なら、sh が 2 行目のツリーの置き場と `wip/` に未コミットの変更が無いことを確かめ、あれば止める）→ sh が Draft を外し、コメントを投稿する → sh が実行ファイルの `worktree drop <親>` で親のワークツリーを消す（cwd が中なら消さず、外から打つ 1 本を出す）。`--parent <親>` なら親のワークツリーの外から打てる（sh が親のワークツリーへ移って同じ段を回し、消す前に打った場所へ戻る） |
-| `close-early --reason <理由> [--no-issue]` | ユーザが端末で打つ。`--close-early` → sh が残りを issue に書き出し、コメントを投稿する |
+| `ccnavi-user-close-early.sh --reason <理由> [--no-issue]` | ユーザが端末で打つ。`ccnavi-review.sh` には無い。`user close-early` → sh が残りを issue に書き出し、コメントを投稿する |
 | `fetch` / `origin` | 取得した JSON を標準出力へ / origin をどう読んだか |
 
 **`request` の段**。次の順に進む。
@@ -71,8 +72,8 @@ Chrome 拡張のレビュー済み（マーカーと `done/` への移動を親�
 `done/` へ動いた子のワークツリーを消す（未コミットがあるもの・cwd が中のものは消さずに言う）。
 Chrome 拡張のレビュー済みと `decide` のワークツリーは、親の `finish` の片付けが消す。
 
-**`decide` の段**。ユーザがボードの「決める」か端末で打つ。sh がスレッドとレビューを取ってきて、実行ファイルを
-`--reviewed N --accept-unresolved` で呼ぶ。実行ファイルは残っているスレッドを 1 件ずつ見せ、ユーザに対応方針を
+**`decide` の段**（`ccnavi-user-decide.sh`）。ユーザがボードの「決める」か端末で打つ。sh がスレッドとレビューを取ってきて、実行ファイルを
+`user reviewed N --accept-unresolved` で呼ぶ。実行ファイルは残っているスレッドを 1 件ずつ見せ、ユーザに対応方針を
 選ばせる。方針は次の 3 つ。
 
 - 対応しない。受け入れる（スレッドに返信を残して解決する。下の「受け入れの返信と解決」）
@@ -108,7 +109,7 @@ Chrome 拡張のレビュー済みと `decide` のワークツリーは、親の
 ADR に書いた（レビュー待ちの返信が公開されない場合、同時に `decide` を打つ場合）。
 
 ボードも同じ道を通る。ボードは `--preview` で一覧とダイジェストを受け取り、ユーザが選んだものを
-`--choices <JSON> --digest <ダイジェスト>` で渡す。この道でも、sh は上の順で実行ファイルを `--yes` 付きで呼び、実行ファイルは
+`ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>` で渡す。この道でも、sh は上の順で実行ファイルを `--yes` 付きで呼び、実行ファイルは
 見せたダイジェストと今のダイジェストが一致するときだけ置く。
 
 sh がトークンの持ち主を引けたら `--actor=<名前> --via=<terminal|board>` で渡し、`reviewed` のマーカーに
@@ -136,8 +137,8 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
 有効にする。同じ親に 2 度打っても通る。退避を始めた後の打ち直しは、ready のマーカーが今のツリーのもので、`ready.json` のマージリクエストの
 番号が今回と同じときだけ、ワークツリーの側の条件だけを見て残りを移す。マージするのはユーザ。
 
-**`close-early` の段**。ユーザが端末で打つ。sh は実行ファイルを `--close-early` で呼び、そのあと残りを issue に書き出して、
-コメントを投稿する。`--close-early` は、変更要求のレビューがあれば拒む。無ければ残りを見せて y/N を聞く。
+**`close-early` の段**（`ccnavi-user-close-early.sh`）。ユーザが端末で打つ。sh は実行ファイルを `user close-early` で呼び、そのあと残りを issue に書き出して、
+コメントを投稿する。`user close-early` は、変更要求のレビューがあれば拒む。無ければ残りを見せて y/N を聞く。
 未解決のスレッドの返信と解決を置く前に済ませるため、3 回に分けて呼ぶ（間で sh が結果を取り直す）。
 1 回目（`--accept-plan`）は y/N を聞いて計画だけを書く。2 回目（`--accept-check`）は、y/N を答えている間に
 未解決の指摘が変わっていないかだけを確かめる（変わっていればホストに触れずに止まる）。sh が返信と解決を済ませたあと、

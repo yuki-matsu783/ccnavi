@@ -56,6 +56,7 @@ ROOT_OF_CCNAVI = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh")
+CLOSE_EARLY_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-close-early.sh")
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
 REPO = os.environ.get("CCNAVI_PROBE_REPO", "yuki-matsu783/test-repo")
@@ -589,7 +590,7 @@ def main() -> int:
         title="b を書く",
     )
     commit_all(parent_tree, "tickets")
-    approved = exe("--agree", stdin="y\n")
+    approved = exe("user", "agree", stdin="y\n")
     record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
 
     # 子より先に親に着手する（親が doing/ に無いと子は始められない）
@@ -1015,7 +1016,7 @@ def main() -> int:
     )
     write(os.path.join(parent2, "src", "c.py"), "print('c')\n")
     commit_all(parent2, "tickets")
-    approved = exe("--agree", stdin="y\n")
+    approved = exe("user", "agree", stdin="y\n")
     record("--agree（i0002）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
     pushed2 = sh(GIT_SH, parent2, "push", "-u", "origin", "i0002")
     if pushed2.returncode == 0:
@@ -1045,7 +1046,7 @@ def main() -> int:
             },
             tag="review-create-3",
         )
-        wrapped = sh(REVIEW_SH, parent2, "close-early", "--reason", "実測はここまで", stdin="y\n")
+        wrapped = sh(CLOSE_EARLY_SH, parent2, "--reason", "実測はここまで", stdin="y\n")
         say("close-early:\n" + redact(wrapped.stdout + wrapped.stderr))
         record("close-early が通る", wrapped.returncode == 0)
         # 作った issue は出力の「残りを #N に書き出した」から引く

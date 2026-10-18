@@ -702,7 +702,7 @@ def showcase(root: str) -> None:
         template("lib", "  - research\n", "lib の調べもの"),
     )
     # 下書き（効力は無い）。TODO の残り・同名の既存・読めないもの。
-    drafts = os.path.join(root, "wip", "proposals", "templates") + "/"
+    drafts = os.path.join(root, "wip", "handoff", ".ccnavi", "config", "project", "templates") + "/"
     write(
         drafts + "login.yml",
         FEATURE.replace("feature", "login").replace("機能を設計から", "TODO ログインを設計から"),
@@ -711,7 +711,9 @@ def showcase(root: str) -> None:
     write(drafts + "broken.yml", "name: [\n")
     # 同じ中身の下書きがもう 1 つのツリー（lib）にもある（also_in に値が入る）。
     write(
-        os.path.join(root, "projects", "lib", "wip", "proposals", "templates", "login.yml"),
+        os.path.join(
+            root, "projects", "lib", "wip", "handoff", ".ccnavi/config/project/templates/login.yml"
+        ),
         FEATURE.replace("feature", "login").replace("機能を設計から", "TODO ログインを設計から"),
     )
 

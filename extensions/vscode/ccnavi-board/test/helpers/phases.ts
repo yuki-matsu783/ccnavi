@@ -28,7 +28,7 @@ export const NONCE = "TEST-NONCE-123";
 export const SAMPLE_PHASES_TEXT = `# フェーズ定義。ユーザが持つ設定で、エージェントは変更しない。
 #
 # 親チケットの \`plan:\` に、ここで定義したものの名前を並べる。それが全体計画で、
-# \`ccnavi --agree\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
+# \`ccnavi user agree\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
 # \`kind: feedback\` の定義を並べて改版を出す（対応が無くても \`[]\` で出す）。
 #
 # 順序（どのフェーズがどれを待つか）はここには書かない。計画の項に \`after\` で先行を書き、

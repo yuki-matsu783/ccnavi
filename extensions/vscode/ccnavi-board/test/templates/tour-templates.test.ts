@@ -13,9 +13,9 @@ const def = loadTour("templates");
 const sample = parseTemplatesSample(def.sample);
 
 /** 画面が `data-tour` で持つ指す先の印 */
-const TARGETS = ["summary", "target", "refresh", "list", "template", "drafts", "draft", "draft-import", "import-form", "import-preview", "sum", "sum-pick", "sum-count", "sum-table", "tour"];
+const TARGETS = ["summary", "target", "refresh", "list", "template", "drafts", "draft", "handoff", "sum", "sum-pick", "sum-count", "sum-table", "tour"];
 
-test("CB-T572 テンプレートの見本は、self の層のテンプレート・下書き・統合結果・本文・プレビューに読める", () => {
+test("CB-T572 テンプレートの見本は、self の層のテンプレート・下書き・統合結果・本文に読める", () => {
   const data = sample.page.data;
   assert.equal(data.layers.length, 1);
   assert.equal(data.layers[0].name, "self");
@@ -26,14 +26,12 @@ test("CB-T572 テンプレートの見本は、self の層のテンプレート�
   const research = data.layers[0].templates[1];
   assert.equal(research.dropped?.reason, "conflict");
   assert.equal(research.usable, false);
-  assert.deepEqual(data.drafts.map((d) => `${d.name}/${d.importable}`), ["login/true", "broken/false"]);
+  assert.deepEqual(data.drafts.map((d) => `${d.name}/${d.problems.map((p) => p.severity).join("+")}`), ["login/warn", "broken/error"]);
   assert.deepEqual(data.sums.map((s) => s.name), ["self", "lib"]);
   assert.equal(data.errors, 1);
   assert.equal(data.warns, 1);
   assert.ok(sample.texts.feature.includes("name: feature"));
-  assert.equal(sample.preview.draft?.name, "login");
-  assert.equal(sample.preview.target, ".ccnavi/config/common/templates/login.yml");
-  assert.equal(sample.page.lock.locked, false);
+  assert.equal(sample.page.handoff.enabled, false, "案内の間は取り込み待ちを開かない");
 });
 
 test("CB-T573 案内の定義は、基本の案内が先頭で、指す先は画面の印だけ。scene は見本にある名前を指す", () => {
@@ -51,14 +49,8 @@ test("CB-T573 案内の定義は、基本の案内が先頭で、指す先は画
       for (const name of String(step.scene.draft ?? "").split(",").filter((n) => n !== "")) {
         assert.ok(drafts.has(name.trim()), `${at}: draft ${name} が見本にありません`);
       }
-      if (step.scene.import !== undefined) {
-        assert.ok(drafts.has(String(step.scene.import)), `${at}: import ${step.scene.import} が見本にありません`);
-      }
       if (step.scene.sum !== undefined) {
         assert.ok(sums.has(String(step.scene.sum)), `${at}: sum ${step.scene.sum} が見本にありません`);
-      }
-      if (step.scene.preview === true) {
-        assert.ok(step.scene.import !== undefined, `${at}: preview には import が必要です`);
       }
     }
   }

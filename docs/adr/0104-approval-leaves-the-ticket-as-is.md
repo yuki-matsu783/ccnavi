@@ -1,7 +1,7 @@
 ---
 type: adr
 title: 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す
-description: 承認で承認済みチケットに欄を書き足すのをやめ、手で動かした承認と ccnavi の承認を同じ中身にする。欄が担っていた取り下げ・閉じたかの照合・承認の時刻・待ち方の固定は、置き場・着手の欄・状態の履歴と git・マーカーの置き場で代え、状態を聞く副命令 status を足し、hook が承認を伝える経路を外す
+description: 承認で承認済みチケットに欄を書き足すのをやめ、手で動かした承認と ccnavi の承認を同じ中身にする。欄が担っていた取り下げ・閉じたかの照合・承認の時刻・待ち方の固定は、置き場・着手の欄・状態の履歴と git・マーカーの置き場で代え、状態を聞くサブコマンド status を足し、hook が承認を伝える経路を外す
 tags: [approval, ticket, records, state]
 keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, followup_of, workflow, 取り下げ, base_sha, completed_at, 状態の履歴, status, ccnavi-ticket.sh, 承認の知らせ, agree.news, 未コミット, ccnavi-push-approved.sh, COMPAT, 指紋]
 ---
@@ -91,14 +91,14 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | `workflow.yml` の扱いをマーカーに揃える。`ccnavi-push-approved.sh` は承認済みの置き場をまるごと add するので足すものは無い。Chrome 拡張は親のブランチの承認済みの置き場をまるごと読み、書くのは実行ファイルのコアが並べたものなので、足すものは無い見込み（実装で確かめる）。指紋は判定が読んだものを `read_set` で覆うので、読めば入る。**write-and-push（`tickets/write_and_push.py`）には足す。** 今の `_human` は `phases/<親>/` の下で決まった名前（`close-early.json`・`config-sync.json`・受け入れたスレッド）と番号のマーカーだけをユーザの判断の形と見て、ほかは「見分けられないもの」（d）として止める。`phases/<親>/workflow.yml` をユーザの判断（`--agree`）が書く形として (c) に足す | `flows/` に置く。承認済みの置き場の直下に新しい置き場を作る | `flows/` は子のフローの置き場で、役目が違う。新しい置き場を作ると、運ぶ・取り込む・読む経路のすべてに足すことになる |
 | 古い `workflow:` 欄を読むのは、`ccnavi_approved` を持つ古い承認済みチケットだけにする。それ以外（提案、新しい形の承認済みチケット）に `workflow:` があれば、`--lint`・判定・`--agree` で error にする。**同じ日に改めた**: 古い形でも、欄の待ち方は今の `phases.yml` から計算した待ち方と同じときだけ採り、違えば一直線で読む（下の「残る弱点」） | どれでも欄を読む | 新しい形では待ち方はファイルにしか無い。欄を読むと、手で書いた `workflow:` が承認済みの待ち方として効く。提案に書いた欄は今も `--agree` が error にしている（`agree_candidates._workflow_field`）が、判定と手で動かした承認には当たっていない |
 
-### 状態を聞く副命令
+### 状態を聞くサブコマンド
 
 | 決めたこと | 採らなかった側 | なぜ |
 |---|---|---|
 | `ccnavi-ticket.sh status [<親>]` を足す。親を渡せばその親子、渡さなければ全部の、各チケットについて次を ccnavi が判断して出す: 置き場とツリー、承認の時刻（上の順）、着手しているか、置き場のファイルが未コミットか・コミット済みで未 push か、止まっている理由（`blocked`・先行・親が未着手・待ち方の固定が無い）、次の一手 | エージェントにファイルと `git status` を読ませて推測させる | 推測が今回の読み違えを生んだ。「欄が無い」「未コミット」の意味は ccnavi が知っていて、ccnavi が言えば読み違えない |
 | 未コミットの承認済みチケットには、未コミットであることと「ユーザに `ccnavi-push-approved.sh <親>` を打ってもらう」ことを出す。エージェントは運ばない。そのうえで status は、その親子が write-and-push の対象か（`ccnavi write-and-push family <親>` と同じ `target`）を見て、対象なら「ユーザが `ccnavi-push-approved.sh <親>` で運ぶまで `start` は止まる」と、対象でなければ「`start` へ進んでよい」と言う | エージェントが `ccnavi-git.sh` で親のブランチへコミットして送る。write-and-push の対象かを見ずに「進んでよい」と言う | 承認で中身を変えないと、「手で置いた」と「`--agree` が置いてまだ運んでいない」がバイト単位で同じで見分けられない。エージェントが保護をすり抜けて置いたものまで、status が運ぶ道具になる。判定は未コミットの承認済みチケットも読むので、write-and-push の対象でなければ運ばなくても `start` へ進める。取り込み済みの親子（write-and-push の対象）では、`start` の write-and-push が親のワークツリーの未コミットの `doing/` の追加を「ユーザが運ぶもの」(c) と分けて止める（`tickets/write_and_push.py` の冒頭の説明と `_human`）。GitHub の画面だけのユーザでは承認は最初からコミットとして届くので、未コミットは起きない。運ぶのはユーザという設計 9.4 と ADR-0043 は変えない |
 | status は読むだけで、ネットワークに出ない（取り込みはしない）。push 済みかは手元のリモート追跡の ref で見る。古いかもしれないことを出力に添え、最新にしたければ `ccnavi-sync.sh` を先に打つよう言う | 打つたびに取ってくる | 実行ファイルはネットワークに出ない（設計 P11） |
-| status はサブエージェントにも許す。実行ファイルは呼び手がサブエージェントかを知らない（sh に `agent_id` は渡らない）ので、出力を分けず、状態を動かす・運ぶコマンドを出す行には「親（メインエージェント）だけが実行する」と書く | サブエージェント向けに出力を分ける。サブエージェントには許さない | 分けるには sh か hook から呼び手を渡す経路が要る。サブエージェントの `start` などは今も hook が止める（`phase_forms._FORBIDDEN_COMMAND` に副命令の名前を並べている。`status` は並べない）ので、行を読んで打っても止まる |
+| status はサブエージェントにも許す。実行ファイルは呼び手がサブエージェントかを知らない（sh に `agent_id` は渡らない）ので、出力を分けず、状態を動かす・運ぶコマンドを出す行には「親（メインエージェント）だけが実行する」と書く | サブエージェント向けに出力を分ける。サブエージェントには許さない | 分けるには sh か hook から呼び手を渡す経路が要る。サブエージェントの `start` などは今も hook が止める（`phase_forms._FORBIDDEN_COMMAND` にサブコマンドの名前を並べている。`status` は並べない）ので、行を読んで打っても止まる |
 | CLAUDE.md の詳細の表と `.ccnavi/docs/projects.md` に「承認済みチケットの状態を確かめるとき（着手の前、引き継ぎを読んだあと、承認の有無に迷ったとき）は、ファイルを読んで推測せず status を打つ」と書く | hook で毎回案内する | 下の「採らなかった案」 |
 
 ### 承認の知らせを外す
@@ -122,7 +122,7 @@ sh で止める変更は、この ADR ではしない。
    sh の書き換えは人の手で入れる
 2. 実行ファイルを `build.py` で組み直す。組み直すまでは、sh（`ccnavi-common.sh` の `ccnavi_compat_skew`、
    `ccnavi-ticket.sh` は 91 行付近で呼ぶ）が食い違いを標準エラーに 1 行出して、そのまま古い実行ファイルを呼ぶ。
-   `status` は古い実行ファイルが知らないので argparse の苦情で落ちる。ほかの副命令は古い実行ファイルの動きのまま進む
+   `status` は古い実行ファイルが知らないので argparse の苦情で落ちる。ほかのサブコマンドは古い実行ファイルの動きのまま進む
    （古い実行ファイルは承認で欄を書き、待ち方を承認済みチケットに書く）
 3. VS Code 拡張を入れ直す。入れ直すまでは、古い拡張が起動のときに食い違いを知らせるだけで、止めはしない
    （`extensions/vscode/ccnavi-board/src/version-check.ts`）
@@ -197,7 +197,7 @@ sh で止める変更は、この ADR ではしない。
 - コードの注記: `tickets/ops.py` 4 行の「サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）」は
   事実でない。止めているのは hook の判定（`hook/judge.py` が `phase_forms.forbidden` で `DENY_SUBAGENT_TICKET_OP`）で、
   `cli.py` は `agent_id` を見ていない。`ccnavi-ticket.sh` 17 行の同じ趣旨の注記も同様
-- 保護された sh: `ccnavi-ticket.sh` は通す副命令の一覧（`start | finish | cancel | record-risk`）に `status` を足し、
+- 保護された sh: `ccnavi-ticket.sh` は通すサブコマンドの一覧（`start | finish | cancel | record-risk`）に `status` を足し、
   引数の数の検査（`[ "$#" -ge 2 ]`）を `status` だけ 1 個で通すように直す。`ccnavi-sync.sh` は `closed_in_integration` を
   上の順の照合に替え、`sed` を frontmatter の行頭に限る
 - テスト（`ccnavi_approved` を前提にしているもの）: `tests/sh/test_push_approved_sh.py`・`tests/sh/test_sync_sh.py`・
@@ -265,4 +265,4 @@ sh で止める変更は、この ADR ではしない。
 - 欄を承認で書き続け、手で動かした承認には「欄が無いのは正常」と文書で案内する。読み違えを読む側の注意で防ぐ形で、
   今回それが効かなかった
 - 手で置かれて未コミットの承認を、エージェントが `ccnavi-git.sh` で親のブランチへコミットして送る。一度は採ったが撤回した。
-  理由は「状態を聞く副命令」の表のとおり
+  理由は「状態を聞くサブコマンド」の表のとおり

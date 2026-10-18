@@ -19,7 +19,7 @@ export const VERSION_SCHEMA = 1;
  * 拡張が頼る実行ファイルの契約の版。src/ccnavi/entry/version.py の COMPAT、ccnavi-common.sh の CCNAVI_COMPAT と揃える
  * （tests/sh/test_compat_skew.py が 3 か所を見比べる）。上げ方は src/ccnavi/entry/version.py の説明のとおり
  */
-export const EXTENSION_COMPAT = 15;
+export const EXTENSION_COMPAT = 16;
 
 export interface VersionInfo {
   readonly schema: number;
@@ -29,7 +29,7 @@ export interface VersionInfo {
   readonly built: boolean;
   readonly compat: number;
   readonly flags: readonly string[];
-  /** 旗から読めない振る舞い（JSON の欄の有無など）。`features` を持たない古い実行ファイルは空 */
+  /** オプションから読めない振る舞い（JSON の欄の有無など）。`features` を持たない古い実行ファイルは空 */
   readonly features: readonly string[];
 }
 

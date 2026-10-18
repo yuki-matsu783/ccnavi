@@ -21,6 +21,7 @@ from ..policy import (
     selfguard,
     selfguard_shell,
     selfguard_targets,
+    subjects,
 )
 from ..records import audit, failstreak, repeat
 from ..tickets import (
@@ -71,39 +72,11 @@ HANDOVER = "(handover)"
 # 実行後チェックが作業ツリーの実物を見て拾う。
 SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# サブエージェントの起動ツール。レビューが済むまで止める対象で、対象の文字列を持たないので
-# 見出しだけを subject にする。
-AGENT_TOOL = "Agent"
-
-# ツールごとに、ルールを当てる欄。ここに無いツールは対象を持たず、判定に届かない
-# まま通る。名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を
-# 除いたものに揃えてある。WebSearch は指定子を持たないので載せない。順序は画面の
-# 候補の順になる。
-#
-# 対象を差し込む側（試験の diagnose と lint の probe）はこの表を読む。欄の名前を
-# subject_of の中にだけ持つと、ツールを足したときにそちらが気づかないうちに古くなる。
-SUBJECT_FIELDS: dict[str, str] = {
-    "Bash": "command",
-    "PowerShell": "command",
-    "Read": "file_path",
-    "Grep": "path",
-    "Glob": "path",
-    "Edit": "file_path",
-    "Write": "file_path",
-    "NotebookEdit": "notebook_path",
-    "Skill": "skill",
-    AGENT_TOOL: "description",
-    "WebFetch": "url",
-}
-
-# 行き着く先まで解いてから当てるツール（パスを対象にするもの）。行き先のレイヤーを選ぶ一覧と
-# 同じものを使う。
-# 別に持つと、判定はパスに当てるのにレイヤーは共通レイヤーだけ、という食い違いが起きる。
-PATH_TOOLS = ruleload.PATH_TOOLS
-
-# 探す場所を省略できるツール。省略は「いま居る場所」の意味なので、cwd を対象にする。
-# 空のままにすると、場所を書かない呼び出しがどのルールにも当たらずに通る。
-SEARCH_TOOLS = ("Grep", "Glob")
+# ルールを当てる欄の表と選び方は `policy.subjects` にある（ルールファイルの検査も同じ表を読む）。
+AGENT_TOOL = subjects.AGENT_TOOL
+SUBJECT_FIELDS = subjects.SUBJECT_FIELDS
+PATH_TOOLS = subjects.PATH_TOOLS
+SEARCH_TOOLS = subjects.SEARCH_TOOLS
 
 # シェルから書き込む形を止める組み込みの保護。どれも書き込む動詞の式
 # （selfguard_shell._WRITE_VERBS）を持ち、生の文字列では `>` の個数に対して 2 乗で遅くなる。
@@ -294,14 +267,17 @@ def decide_before(
                 root=root,
             )
 
-    # 記録と state を消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
+    # 記録と state を消す `ccnavi user prune`（内部は `--prune`。`--preview` の無い形）は、
+    # チケット制御に依らず止める
     # （phase_forms.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の
     # 置き場をシェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
     if (
         payload.tool_name in phase_forms.SHELL_TOOLS
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        found = phase_forms.prune_form(record.subject, conf.bin)
+        found = phase_forms.prune_form(record.subject, conf.bin) or phase_forms.user_prune_form(
+            record.subject, conf.bin
+        )
         if found:
             record.code = phase_forms.CODE_RECORDS_PRUNE
             record.rules = [phase_forms.RECORDS_PRUNE_RULE_ID]
@@ -348,13 +324,17 @@ def decide_before(
                         display_subject,
                         phase_forms.guard_off_message(found)
                         if kind == "guard-off"
+                        else phase_forms.user_script_message(found)
+                        if kind == "user-script"
+                        else phase_forms.expanded_option_message(found)
+                        if kind == "expanded"
                         else phase_forms.board_form_message(found),
                     )
                 ],
                 conf=conf,
                 root=root,
             )
-        # 2 段目の無いユーザの入口（`ccnavi-sync.sh`・`ccnavi-review.sh decide`・実行ファイルの
+        # 2 段目の無いユーザの入口（`ccnavi-review.sh decide`・実行ファイルの `user` の入口と
         # `--yes`）は、引数を変数・置換・glob で組み立てると表記の検査から外れる。読めなければ止める
         # （phase_forms.hidden_user_entry、ADR-0122）。
         entry, found = phase_forms.hidden_user_entry(
@@ -935,23 +915,8 @@ def fail_streak_hint(conf: settings.Settings, root: str, record: audit.Record) -
 
 
 def subject_of(payload: hookio.Input) -> str:
-    """このツールでルールを当てる欄を選ぶ。欄は SUBJECT_FIELDS が持つ。"""
-    tool = payload.tool_name
-    field = SUBJECT_FIELDS.get(tool)
-    if field is None:
-        return ""
-    if tool == AGENT_TOOL:
-        # 起動には対象の文字列が無い。レビューが済むまで止める対象なので、見出しを subject に
-        # して判定に入れる。
-        return payload.field_value(field) or payload.field_value("prompt") or "(agent)"
-    value = payload.field_value(field)
-    if tool == "NotebookEdit":
-        value = value or payload.field_value("file_path")
-    if tool in SEARCH_TOOLS:
-        value = value or "."
-    if tool in PATH_TOOLS:
-        return fsio.full_path(value, payload.cwd)
-    return value
+    """このツールでルールを当てる欄を選ぶ（`policy.subjects.subject_of`）。"""
+    return subjects.subject_of(payload)
 
 
 def screen(
@@ -1293,7 +1258,7 @@ def ticket_verdict(
             "This path is outside the work area the ticket for this worktree declares. Do the "
             "work inside that area, or, if the task genuinely needs this path, tell the parent "
             "so it can propose a ticket that covers it and ask the user to agree to it (from the "
-            "ccnavi board in VS Code or Chrome, with 'ccnavi --agree' in a terminal, or by "
+            "ccnavi board in VS Code or Chrome, with 'ccnavi user agree' in a terminal, or by "
             "moving the proposal file from todo/ to doing/). "
             "Editing a proposal alone changes nothing."
         )

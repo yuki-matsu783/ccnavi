@@ -129,7 +129,7 @@ export type ApprovalInput =
   /** 一覧の図の「計画を編集」を押した。オーバーレイを閉じてから、その親のタブを開く */
   | { readonly kind: "editWorkflow"; readonly ticket: string }
   /**
-   * 承認（`--agree --yes`）の結果が返った。食い違い（`mismatch`）もここに入る。
+   * 承認（`user agree --yes`）の結果が返った。食い違い（`mismatch`）もここに入る。
    * `carrier` は承認の push の sh が置いてあるか（呼ぶ側が見て渡す）
    */
   | { readonly kind: "approved"; readonly outcome: ApproveOutcome; readonly carrier: boolean }
@@ -172,7 +172,7 @@ export type ApprovalInput =
 export type ApprovalEffect =
   /** 承認待ちの一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
   | { readonly kind: "loadPreview"; readonly only: readonly string[] }
-  /** 承認を打つ（`--agree --yes … --digest …`）。返ったら `approved` で戻す */
+  /** 承認を打つ（`user agree --yes … --digest …`）。返ったら `approved` で戻す */
   | {
       readonly kind: "approve";
       readonly tickets: readonly string[];
@@ -188,7 +188,7 @@ export type ApprovalEffect =
   | { readonly kind: "loadDecide"; readonly tree: string; readonly phase: number }
   /** 連絡の文のために残った指摘を読む（`decide <N> --preview`）。返ったら `reviewedChecked` で戻す */
   | { readonly kind: "loadReviewed"; readonly tree: string; readonly phase: number }
-  /** 行き先を置く（`decide <N> --choices … --digest …`）。返ったら `decided` で戻す */
+  /** 行き先を置く（`ccnavi-user-decide.sh decide <N> --choices … --digest …`）。返ったら `decided` で戻す */
   | {
       readonly kind: "decide";
       readonly tree: string;

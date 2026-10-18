@@ -55,7 +55,9 @@ class ApprovalToldTest(PhaseHarness):
         # 渡さない `--yes` は承認しない。
         shown = self.ccnavi("--agree", "--preview", "--json")
         digest = json.loads(shown.stdout)["digest"]
-        result = self.ccnavi("--agree", "--yes", ",".join(tickets), "--digest", digest, "--json")
+        result = self.ccnavi(
+            "user", "agree", "--yes", ",".join(tickets), "--digest", digest, "--json"
+        )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)["prompt"]
 

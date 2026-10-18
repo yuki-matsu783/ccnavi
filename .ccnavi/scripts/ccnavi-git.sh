@@ -187,7 +187,7 @@ for arg in ${1+"$@"}; do
 		reject moved-root "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
 		;;
 	--?*)
-		# 略した表記（`--outp=x`・`--upload-p=...`）。parse-options を使う副命令は長いオプションの
+		# 略した表記（`--outp=x`・`--upload-p=...`）。parse-options を使うサブコマンドは長いオプションの
 		# 略を受けるので、止める名前の頭に当たる表記も止める。
 		# `--text`（diff の正式な名前）だけは textconv の頭でも通す。
 		gl_name="${arg#--}"
@@ -339,7 +339,7 @@ opt_walk() {
 	return 0
 }
 
-# 許可リストを空に戻す。副命令ごとに必要なものだけ入れる。
+# 許可リストを空に戻す。サブコマンドごとに必要なものだけ入れる。
 ow_spec() {
 	ow_flags=" $1 "
 	ow_values=" $2 "
@@ -1888,7 +1888,7 @@ push)
 			;;
 		esac
 	done
-	# リモートから消えた親のブランチへは送らない（push の関門。write-and-push・ccnavi-push-approved.sh と同じ）。
+	# リモートから消えた親のブランチへは送らない（push の関門。write-and-push・ccnavi-user-push-approved.sh と同じ）。
 	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子のチケット）を確かめないまま親子のチケットが
 	# 動き出す。送り先が origin のときだけ見る。送り先は git と同じ順で解く: 引数のリモート →
 	# branch.<b>.pushRemote → remote.pushDefault → branch.<b>.remote → origin。
@@ -1911,7 +1911,7 @@ push)
 		case "$push_top" in
 		"$push_root"/.claude/worktrees/*)
 			push_gate_rc=0
-			# 秒数は write-and-push・ccnavi-push-approved.sh と同じ既定（60 秒。CCNAVI_WRITE_AND_PUSH_TIMEOUT で変えられる）。
+			# 秒数は write-and-push・ccnavi-user-push-approved.sh と同じ既定（60 秒。CCNAVI_WRITE_AND_PUSH_TIMEOUT で変えられる）。
 			case "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" in
 			'' | *[!0-9]*) push_gate_secs=60 ;;
 			*) push_gate_secs="$CCNAVI_WRITE_AND_PUSH_TIMEOUT" ;;

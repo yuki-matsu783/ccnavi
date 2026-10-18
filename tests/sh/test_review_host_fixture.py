@@ -57,6 +57,22 @@ def skip_if_too_big_for_argument(test: unittest.TestCase, scene_dir: str) -> Non
         test.skipTest(f"{size} 字の引数を jq に渡せない（引数の上限）")
 
 
+# 写す sh。decide の置く形は、ユーザ専用の ccnavi-user-decide.sh（共有の部品を読む）に移った。
+REVIEW_SH = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")
+
+
+def script_and_args(ws: str, args) -> list[str]:
+    """打つ sh のパスと引数。`decide <N>` の置く形（--preview 無し）は ccnavi-user-decide.sh へ。
+
+    ccnavi-review.sh の decide は、見るだけの --preview だけを受ける。試験は前の形で書き、ここで
+    振り分ける（どちらの sh がホストに同じ形で聞くかを、同じ場面で見るため）。
+    """
+    scripts = os.path.join(ws, ".ccnavi", "scripts")
+    if args and args[0] == "decide" and "--preview" not in args:
+        return [os.path.join(scripts, "ccnavi-user-decide.sh"), *args[1:]]
+    return [os.path.join(scripts, "ccnavi-review.sh"), *args]
+
+
 # 実行ファイルの代役。受けた引数を 1 行ずつ書き残し、何も書かずに 0 で終わる。
 STUB = """#!/bin/sh
 case " $* " in
@@ -120,7 +136,7 @@ class HostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", *common_sh()):
+        for name in (*REVIEW_SH, *common_sh()):
             shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)
@@ -151,7 +167,7 @@ class HostFixtureTest(unittest.TestCase):
             }
         )
         return subprocess.run(
-            [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh"), *args],
+            [SHELL, *script_and_args(self.ws, args)],
             cwd=self.ws,
             env=env,
             capture_output=True,
@@ -327,6 +343,9 @@ class HostFixtureTest(unittest.TestCase):
                 self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
                 passed = self.passed()
                 self.assertIn("--accept-unresolved", passed)
+                # 書く形は実行ファイルのユーザ専用の入口（`user reviewed <N>`）で呼ぶ
+                self.assertEqual(passed[passed.index("user") + 1], "reviewed")
+                self.assertNotIn("--reviewed", passed)
                 self.assertIn("--actor=octo-reviewer", passed)
                 self.assertIn(f"--via={via}", passed)
 
@@ -498,7 +517,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", *common_sh()):
+        for name in (*REVIEW_SH, *common_sh()):
             shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)
@@ -528,7 +547,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             }
         )
         return subprocess.run(
-            [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh"), *args],
+            [SHELL, *script_and_args(self.ws, args)],
             cwd=self.ws,
             env=env,
             capture_output=True,

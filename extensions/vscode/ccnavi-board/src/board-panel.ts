@@ -597,6 +597,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     case "decide": {
       const outcome = await runDecideYes(
         root,
+        binSetting(),
         scriptShell(),
         effect.tree,
         effect.phase,
@@ -671,7 +672,7 @@ async function showTicketPreview(filePath: string): Promise<void> {
 
 /**
  * 完了した親から、テンプレートの下書きを作る（`ccnavi --templates --draft`）。下書きは効力が無く、書くだけなので
- * ユーザの許可は取らない。作れたら知らせ、そこからテンプレート管理画面を開けるようにする。
+ * ユーザの許可は取らない。作れたら知らせ、そこから取り込み待ち画面を開けるようにする。
  */
 async function makeTemplateDraft(current: PanelState, ticket: string): Promise<void> {
   const result = await runTemplateDraft(current.folder.uri.fsPath, binSetting(), ticket);
@@ -679,13 +680,13 @@ async function makeTemplateDraft(current: PanelState, ticket: string): Promise<v
     void vscode.window.showErrorMessage(`テンプレートの下書きを作れませんでした: ${result.error}`);
     return;
   }
-  const open = "テンプレート管理を開く";
+  const open = "取り込み待ちを開く";
   const picked = await vscode.window.showInformationMessage(
-    `テンプレートの下書きを作りました: ${result.value.path}。効力は無く、テンプレート管理画面で内容を直して取り込むまで使われません。`,
+    `テンプレートの下書きを作りました: ${result.value.path}。効力は無く、取り込み待ち画面で差分を読んで取り込むまで使われません。`,
     open,
   );
   if (picked === open) {
-    await vscode.commands.executeCommand("ccnaviBoard.openTemplates");
+    await vscode.commands.executeCommand("ccnaviBoard.openHandoff");
   }
 }
 

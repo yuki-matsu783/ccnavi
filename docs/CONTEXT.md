@@ -128,7 +128,7 @@ Bash のコマンドを、実際に実行される部分まで読み切れなか
 
 **承認の push**:
 承認済みチケットの置き場（とマーカー）だけをコミットし、保護ブランチでなければ push すること。
-`ccnavi-push-approved.sh` と、`ccnavi-ticket.sh`・`ccnavi-review.sh` の最後に呼ぶ共通の関数が行う。
+`ccnavi-user-push-approved.sh` と、`ccnavi-ticket.sh`・`ccnavi-review.sh` の最後に呼ぶ共通の関数が行う。
 旧称: 運ぶ（「運ぶ処理」は「承認の push」1 つにまとめる）
 
 **ダイジェスト**:
@@ -240,18 +240,18 @@ learning-wiki の 1 ページ。気づきを統合した、失敗や有効だっ
 
 **取り込み状態**（廃止）:
 かつて、取り込み（`ccnavi-sync.sh`）でリモートから何を取り込んだかを state の置き場に残していたもの
-（親子のチケットごとの `sync/<リポジトリ>/families/<P>` と、統合先の `integration/`）。ADR-0142 が廃止した。
+（親子のチケットごとの `sync/<リポジトリ>/families/<P>` と、統合先の `integration/`）。廃止した。
 親のブランチがリモートから消えたかは push の関門が、閉じたかは MR がマージ済みかが決める。
 「取り込み済みの親子のチケット」という呼び方も使わない。旧い記録は `ccnavi sync migrate` が `retire/<親>.json` に移す。
 使わない言い方: 取り込み状態、取り込み結果、統合先の控え、家族の控え
 
 **write-and-push**:
-親のワークツリーがあり、origin があり、HEAD の確認に通る親子のチケットで、状態を書く操作（`start`・`finish`・マーカーを置く副命令など）を、
+親のワークツリーがあり、origin があり、HEAD の確認に通る親子のチケットで、状態を書く操作（`start`・`finish`・マーカーを置くサブコマンドなど）を、
 ロック → 置き場の未コミットの変更を見分けてコミット → 取り込み → 書く → 書いたパスだけをコミット → push、の 1 操作にする仕組み。
 push が通るまで操作を完了にしない。Chrome 拡張は親のブランチを読むので、手元にだけある未送信の状態を溜めないため。
 origin が無い親のワークツリーは push せず、手元に書くだけで終わる。親のブランチがリモートから消えていれば、push の前に共通の push の関門
 （`ccnavi_push_gate`）が止める。対象かどうかと断る理由は `ccnavi write-and-push family <親>` で引ける（`target`）。
-副命令名・モジュール名・環境変数（`write-and-push`、`CCNAVI_WRITE_AND_PUSH_*`）もこの語を使う。sh の関数と変数の接頭辞は `ccnavi_wap_`（write-and-push の頭文字）。
+サブコマンド名・モジュール名・環境変数（`write-and-push`、`CCNAVI_WRITE_AND_PUSH_*`）もこの語を使う。sh の関数と変数の接頭辞は `ccnavi_wap_`（write-and-push の頭文字）。
 旧称: C1（未送信の状態を溜めない方法を比べたときの案の記号。C2・C3 と並べた中から採った案に付けていた）
 C2・C3 は、同じ問題に対して検討した別の案の記号で、用語ではない（比べた案の表で write-and-push の隣に並ぶ）。C2 は未送信を表すマーカーを親のブランチに置いて Chrome の側を止める案、
 C3 は取り込みのときに判定し直すだけの案。取り込みでの判定し直しは write-and-push と併せて行う。

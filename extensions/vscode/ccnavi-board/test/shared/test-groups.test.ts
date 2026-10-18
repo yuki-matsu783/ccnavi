@@ -23,7 +23,7 @@ function plan(...paths: string[]): { groups: string[]; compile: boolean; webview
 
 test("CB-T394 shared の CSS を直すと、@ccnavi/shared を @import する画面のグループとコンパイル・画面の型の検査が回る。どの画面も読まないもの（browser-theme.css）は shared グループだけ", () => {
   const page = plan(path.join(SHARED, "page.css"));
-  assert.deepEqual(page.groups, ["board", "flow", "phases", "projects", "risk", "rules", "shared", "templates", "workflow"]);
+  assert.deepEqual(page.groups, ["board", "flow", "handoff", "phases", "projects", "risk", "rules", "shared", "templates", "workflow"]);
   assert.ok(page.compile && page.webview);
   // 区切りがバックスラッシュで来る形（Windows）も同じ
   assert.deepEqual(plan(path.join(SHARED, "page.css").replace(/\//g, "\\")), page);

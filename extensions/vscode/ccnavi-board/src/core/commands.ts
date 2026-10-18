@@ -2,19 +2,18 @@
  * ユーザの判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の配列。
  *
  * 承認と残った指摘の行き先は、ボードのオーバーレイでユーザが押したものを、拡張が子プロセスで打つ
- * （`--agree --yes <識別子,…>`、`ccnavi-review.sh decide <N> --choices …`）。ターミナルの壁は無く、
+ * （`user agree --yes <識別子,…>`、`ccnavi-user-decide.sh decide <N> --choices …`）。ターミナルの壁は無く、
  * 代わりに「見せたものと今のものが同じ」ことを実行ファイルがダイジェストで求める。エージェントが Bash で
  * 同じ形を打つ経路は、実行ファイルの組み込みの deny が止める。`close-early` はターミナル（tty）から打つもので、
  * ボードには置かない。
  *
- * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）は
+ * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-user-push-approved.sh`）は
  * ターミナルに Enter まで送る。承認と同時にターミナルで走り、ユーザはターミナルでその結果を見る。
  */
 import * as path from "node:path";
-import type { EditRequest, ImportRequest } from "./templates-view.js";
 
 /** 承認の push の sh の、ワークスペースルートからのパス */
-export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-push-approved.sh";
+export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-user-push-approved.sh";
 
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
 export type Launcher =
@@ -40,7 +39,7 @@ export function previewArgs(tickets: readonly string[] = []): readonly string[] 
 }
 
 /**
- * `--agree --yes <識別子,…> --digest <ダイジェスト> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
+ * `user agree --yes <識別子,…> --digest <ダイジェスト> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
  * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せたダイジェスト（提案の識別子の一覧と各提案ファイルのバイト列全体。preview の `digest`）、
  * `only` はそのとき preview に渡した絞り。
  * 絞りを渡さないと、実行ファイルは「絞らないときの対象」と見せた識別子を比べるので、
@@ -51,7 +50,7 @@ export function approveArgs(
   digest: string,
   only: readonly string[] = [],
 ): readonly string[] {
-  return ["--agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
+  return ["user", "agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
 /**
@@ -74,24 +73,6 @@ export function templatesShowArgs(name: string, layer: string): readonly string[
   return ["--templates", "--show", name, "--layer", layer, "--json"];
 }
 
-/** 取り込みの引数のうち `--json` の前まで。下見と実行で共有する */
-function templatesImportBase(request: ImportRequest): string[] {
-  return [
-    "--templates",
-    "--import",
-    request.draft,
-    "--to",
-    request.to,
-    ...(request.to === "project" ? ["--layer", request.layer] : []),
-    ...(request.replace ? ["--replace"] : []),
-  ];
-}
-
-/** `--templates --import <下書き> --to … [--layer <名前>] [--replace] --json`。取り込みの下見（`--yes` を付けない） */
-export function templatesImportArgs(request: ImportRequest): readonly string[] {
-  return [...templatesImportBase(request), "--json"];
-}
-
 /**
  * `--templates --draft <親> --json`。完了した親から下書きを作る（効力の無い下書きを書くだけ）。`--root` は `run()` が付ける
  */
@@ -100,42 +81,22 @@ export function templatesDraftArgs(parent: string): readonly string[] {
 }
 
 /**
- * `--templates --import <下書き> --to … [--layer <名前>] [--replace] --yes --expect <sha> --via board --json`。
- * 取り込みの実行。`expect` は見せた下書きの sha で、変わっていれば実行ファイルは何も書かない。
- * `--via board` で、ボードから来た実行だと実行ファイルに伝える
+ * `user handoff [<パス>…] --json`。`wip/handoff/` に置いた下書きの一覧を見る（`--yes` を付けない）。
+ * パスは `--root` で指したツリーからの相対（`/` 区切り）。パスを渡すと、そのパスが選んだ対象になり、
+ * 答えの `expect` はその集合のハッシュになる。パスを省くと、許可リストに当たり unchanged でないもの全部が対象。
+ * `--root` は `run()` が付ける。
  */
-export function templatesImportYesArgs(request: ImportRequest, expect: string): readonly string[] {
-  return [...templatesImportBase(request), "--yes", "--expect", expect, "--via", "board", "--json"];
+export function handoffArgs(paths: readonly string[] = []): readonly string[] {
+  return ["user", "handoff", ...paths, "--json"];
 }
 
-/** 編集の引数のうち `--json` の前まで。旗の組み合わせは src/ccnavi/entry/cli_templates.py の `_edit_problem` が決める。下見と実行で共有する */
-function templatesEditBase(request: EditRequest, bodyFile: string): string[] {
-  const layer = request.on === "project" ? ["--layer", request.layer] : [];
-  switch (request.op) {
-    case "save":
-      return ["--templates", "--save-draft", request.name, "--body-file", bodyFile];
-    case "delete-draft":
-      return ["--templates", "--delete-draft", request.name];
-    case "rename":
-      return ["--templates", "--rename-template", request.name, "--on", request.on, ...layer, "--new-name", request.newName];
-    case "move":
-      return [
-        "--templates", "--move-template", request.name, "--on", request.on, ...layer,
-        "--to", request.to, ...(request.to === "project" ? ["--to-layer", request.toLayer] : []),
-      ];
-    case "delete":
-      return ["--templates", "--delete-template", request.name, "--on", request.on, ...layer];
-  }
-}
-
-/** 編集の下見（`--yes` を付けない）。`bodyFile` は save のときだけ使う本文の一時ファイル */
-export function templatesEditArgs(request: EditRequest, bodyFile: string): readonly string[] {
-  return [...templatesEditBase(request, bodyFile), "--json"];
-}
-
-/** 編集の実行。`expect` は下見で見せた主語のハッシュ。`--via board` でボードから来た実行だと実行ファイルに伝える */
-export function templatesEditYesArgs(request: EditRequest, bodyFile: string, expect: string): readonly string[] {
-  return [...templatesEditBase(request, bodyFile), "--yes", "--expect", expect, "--via", "board", "--json"];
+/**
+ * `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。取り込みの実行。
+ * `expect` は、同じパスを指して見るだけを呼んだ答えの `expect`。変わっていれば実行ファイルは何も書かない。
+ * `--via board` で、ボードから来た実行だと実行ファイルに伝える（`defense` の種類はこの経路では断られる）
+ */
+export function handoffYesArgs(paths: readonly string[], expect: string): readonly string[] {
+  return ["user", "handoff", ...paths, "--yes", "--expect", expect, "--via", "board", "--json"];
 }
 
 /**
@@ -149,6 +110,8 @@ export function planOrderWriteArgs(parent: string, order: Readonly<Record<string
 
 /** レビューの sh の、ワークスペースルートからのパス */
 export const REVIEW_SCRIPT = ".ccnavi/scripts/ccnavi-review.sh";
+/** 残った指摘の対応方針を書く側の sh（ユーザ専用）の、ワークスペースルートからのパス。読む側（`decide <N> --preview`）は REVIEW_SCRIPT に残る */
+export const USER_DECIDE_SCRIPT = ".ccnavi/scripts/ccnavi-user-decide.sh";
 /** 子のワークツリーを承認の後に作る sh（`worktree add` を通す）。承認の文面と失敗の案内も同じ呼び方を使う */
 export const GIT_SCRIPT = ".ccnavi/scripts/ccnavi-git.sh";
 
@@ -163,7 +126,7 @@ export function decidePreviewArgs(phase: number): readonly string[] {
 }
 
 /**
- * `ccnavi-review.sh decide <N> --choices <JSON> --digest <ダイジェスト>`。ユーザがオーバーレイで選んだ行き先を置く。
+ * `ccnavi-user-decide.sh decide <N> --choices <JSON> --digest <ダイジェスト>`。ユーザがオーバーレイで選んだ行き先を置く。
  * ダイジェストは見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
  * エージェントがこの形を打つと、組み込みの deny（builtin:guard-ticket-approval）が止める
  */
@@ -248,7 +211,7 @@ export function gitScriptCommand(root: string): string {
 }
 
 /**
- * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
+ * `ccnavi-user-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
  * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
  * `parents` を渡すとその親子のチケットだけをコミットして push する（取り込み済みのものだけが送られ、
  * そうでないものは今どおりユーザがコミットする）。
@@ -284,7 +247,7 @@ export function writeAndPushTargetOf(stdout: string): string {
  * ワークスペースの設定は同じオプションに名前 `self` で渡す。実行ファイルはレイヤー（layer）の名前で差し替えを引き、
  * `self` という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）でだけ有効で、
- * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
+ * hook からの判定にもチケットとレビューのサブコマンドにも届かない（実行ファイルが診断以外では断る）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */
 export type RulesOverride =

@@ -152,7 +152,9 @@ class CancelledChildTest(RetireHarness):
         self.assertIn("- i0001-01-09", done.stdout)
         # 確認はユーザが自分で打つコマンドとしてだけ取れる（エージェントからは hook が止める）。
         self.assertIn("! を付けて打つ", done.stdout)
-        self.assertRegex(done.stdout, r"! sh \S*ccnavi-clean\.sh --branch i0001-01-09 --confirmed")
+        self.assertRegex(
+            done.stdout, r"! sh \S*ccnavi-user-clean-branch\.sh i0001-01-09 --confirmed"
+        )
         self.assertIn("i0001-01-09", self.branches())
         # 合流した子と親のワークツリーは片付く
         self.assertNotIn(CHILD, self.branches())

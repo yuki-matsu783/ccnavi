@@ -677,7 +677,7 @@ test("CB-T173 承認できたら渡す文を見せ、承認の push の sh を�
   assert.deepEqual(kinds(noScript.effects), ["warn", "refresh"], "端末には送らず、何をすればよいかを言う");
   assert.match(
     noScript.effects[0]?.kind === "warn" ? noScript.effects[0].text : "",
-    /ccnavi-push-approved\.sh がないので/,
+    /ccnavi-user-push-approved\.sh がないので/,
   );
 
   const zero = approvalStep(approving, {

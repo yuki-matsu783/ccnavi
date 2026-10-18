@@ -4,7 +4,7 @@ import * as path from "node:path";
 import type { TargetOption } from "../../src/core/targets.js";
 import { parseTemplates, type TemplatesParse } from "../../src/core/templatesmodel.js";
 import { renderTemplatesPage, type RenderOptions } from "../../src/core/templates-render.js";
-import type { EditAnswer, ImportAnswer, TemplatesData, TemplatesJson, TemplatesPage } from "../../src/core/templates-view.js";
+import type { TemplatesData, TemplatesJson, TemplatesPage } from "../../src/core/templates-view.js";
 import { screenScript, screenStyle } from "./bundle.js";
 import { loadPage, type DomPage } from "./dom.js";
 
@@ -47,10 +47,7 @@ export function page(overrides: Partial<TemplatesPage> = {}): TemplatesPage {
       { kind: "self", name: "", label: "ワークスペース" },
     ],
     data: fixtureJson(),
-    lock: { locked: false, reason: "", doing: [] },
-    projectLocks: {},
-    importLayers: ["self", "lib"],
-    edit: { enabled: true, reason: "" },
+    handoff: { enabled: true, reason: "" },
     notices: [],
     ...overrides,
   };
@@ -66,54 +63,6 @@ export async function openPage(data: TemplatesData, initialState?: unknown): Pro
 /** 見本の画面を開く。差し替えたいところだけ渡す */
 export async function openTemplates(overrides: Partial<TemplatesPage> = {}, initialState?: unknown): Promise<DomPage> {
   return openPage({ kind: "page", page: page(overrides) }, initialState);
-}
-
-/** 取り込みの下見の答えの見本（書く先に同名が無い、問題の無い答え）。差し替えたいところだけ渡す */
-export function answer(overrides: Partial<ImportAnswer> = {}): ImportAnswer {
-  return {
-    ok: true,
-    draft: { name: "login", tree: "", path: "login.yml", sha: "a".repeat(64) },
-    to: "common",
-    layer: "",
-    target: ".ccnavi/config/common/templates/login.yml",
-    exists: false,
-    replace: false,
-    errors: [],
-    infos: [],
-    problems: [],
-    diff: [],
-    new_text: "name: login\n",
-    written: false,
-    removed: false,
-    kept: "",
-    ...overrides,
-  };
-}
-
-/** 編集の下見と実行の答えの見本（書いていない、問題の無い答え）。差し替えたいところだけ渡す */
-export function editAnswer(overrides: Partial<EditAnswer> = {}): EditAnswer {
-  return {
-    ok: true,
-    op: "save",
-    name: "login",
-    on: "draft",
-    layer: "",
-    new_name: "",
-    to: "",
-    to_layer: "",
-    source: "wip/proposals/templates/login.yml",
-    target: "wip/proposals/templates/login.yml",
-    sha: "c".repeat(64),
-    errors: [],
-    infos: [],
-    problems: [],
-    diff: [],
-    new_text: "",
-    written: false,
-    removed: false,
-    new_sha: "",
-    ...overrides,
-  };
 }
 
 /** 対象の一覧の 1 件（テストで対象の選択欄を見るとき） */

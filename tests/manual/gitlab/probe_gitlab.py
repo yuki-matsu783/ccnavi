@@ -47,6 +47,7 @@ ROOT_OF_CCNAVI = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh")
+CLOSE_EARLY_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-close-early.sh")
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
 GITLAB = os.environ.get("CCNAVI_PROBE_GITLAB", "http://localhost:8929").rstrip("/")
@@ -423,7 +424,7 @@ def main() -> int:
         title="b を書く",
     )
     commit_all(parent_tree, "tickets")
-    approved = exe("--agree", stdin="y\n")
+    approved = exe("user", "agree", stdin="y\n")
     record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
 
     for child in ("i0001-01-01", "i0001-01-02"):
@@ -697,7 +698,7 @@ def main() -> int:
         title="c を書く",
     )
     commit_all(parent2, "tickets")
-    approved = exe("--agree", stdin="y\n")
+    approved = exe("user", "agree", stdin="y\n")
     record("--agree（i0002）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
     record("i0002 の push", sh(GIT_SH, parent2, "push", "-u", "origin", "i0002").returncode == 0)
     status, mr2 = api(
@@ -716,7 +717,7 @@ def main() -> int:
             {"body": "残る指摘"},
             tag="discussion-create-3",
         )
-        wrapped = sh(REVIEW_SH, parent2, "close-early", "--reason", "実測はここまで", stdin="y\n")
+        wrapped = sh(CLOSE_EARLY_SH, parent2, "--reason", "実測はここまで", stdin="y\n")
         say("close-early:\n" + redact(wrapped.stdout + wrapped.stderr))
         record("close-early が通る", wrapped.returncode == 0)
         _, issues = api(

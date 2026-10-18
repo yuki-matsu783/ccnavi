@@ -150,9 +150,9 @@ def check_child_push(
     return "", "", ""
 
 
-# サブエージェントが親のワークツリーで打てないラッパーの副命令。親のワークツリーの作業ツリー・
-# 索引・ブランチの先頭を動かすもの。読む副命令（status・log・diff など）は止めない。
-# 合流・コミット・push はメインが finish で行う。履歴を書き換える副命令（cherry-pick・revert・
+# サブエージェントが親のワークツリーで打てないラッパーのサブコマンド。親のワークツリーの作業ツリー・
+# 索引・ブランチの先頭を動かすもの。読むサブコマンド（status・log・diff など）は止めない。
+# 合流・コミット・push はメインが finish で行う。履歴を書き換えるサブコマンド（cherry-pick・revert・
 # rebase など）はラッパーも通さないが、ここでも名指しして止める
 # （ラッパーの許可が広がっても、親のワークツリーには届かない）。
 _PARENT_WRITES = frozenset(
@@ -184,12 +184,12 @@ def check_parent_tree_git(
     conf: settings.Settings, root: str, cwd: str, subject: str, degraded: str
 ) -> tuple[str, str]:
     """サブエージェントの `ccnavi-git.sh` が親のワークツリーを書き換える形なら
-    （副命令, 親のワークツリーの名前）。
+    （サブコマンド, 親のワークツリーの名前）。
 
     居場所は payload の cwd から `cd` と実行役の行き先（`env -C`・`sudo -D`）を追った先
     （子のワークツリーでのコミットと、子のワークツリーで
     親のブランチを取り込む merge は通す）。居場所を追えない形（`cd` の行き先に変数・置換がある、
-    読み切れないコマンド行）で書き換える副命令を打つ形は、どのツリーに当たるかが決まらないので
+    読み切れないコマンド行）で書き換えるサブコマンドを打つ形は、どのツリーに当たるかが決まらないので
     止める（名前は `?`）。
     """
     if _GIT_SCRIPT not in subject.lower():
@@ -269,7 +269,7 @@ def parent_write_message(what: str, name: str, kind: str = "write") -> str:
     )
 
 
-# ラッパーの副命令のうち、行き先のファイルを消す・別のコミットの中身に戻すもの。
+# ラッパーのサブコマンドのうち、行き先のファイルを消す・別のコミットの中身に戻すもの。
 # `restore` は `--source` を付けた形だけ（付けない形は索引の中身に戻すだけで、衝突を解く
 # `--ours` / `--theirs` もこちら）。`checkout` は 2 つ目からの語がパス（`checkout <ref> <パス>`）。
 # `mv` はラッパーが通さないが、通すようになっても同じ場所を守るよう数えておく。
@@ -298,9 +298,9 @@ CORE_UNREAD = "unread"
 CORE_INDEX = "index"
 # 引数の中で、シェルが実行の時点で値を決める書き方（変数・置換）。
 _EXPANDS = re.compile(r"[$`]")
-# 副命令の語に現れてはいけない文字（展開・置換・glob）。
+# サブコマンドの語に現れてはいけない文字（展開・置換・glob）。
 _OPEN_SUB = re.compile(r"[$`*?\[]")
-# 走査が読み切れなかったときに、生の文字列でラッパーの名前の後ろの副命令を読む。
+# 走査が読み切れなかったときに、生の文字列でラッパーの名前の後ろのサブコマンドを読む。
 _DEGRADED_NAME = re.compile(r"ccnavi-git\.sh['\"]?", re.IGNORECASE)
 _DEGRADED_SUB = re.compile(r"[ \t]+([A-Za-z][\w-]*)(?=[\s'\";&|)]|$)")
 
@@ -309,7 +309,7 @@ def check_core_paths(
     conf: settings.Settings, root: str, cwd: str, subject: str, degraded: str
 ) -> tuple[str, str, str]:
     """`ccnavi-git.sh` で自己防衛の対象を消す・別のコミットの中身に戻す形なら
-    （副命令, 当たった語, 理由の種類）。
+    （サブコマンド, 当たった語, 理由の種類）。
 
     当たるとみなすのは次のどれか。
 
@@ -351,7 +351,8 @@ def check_core_paths(
             continue
         args = call[1]
         if args and _OPEN_SUB.search(args[0]):
-            # 副命令が文字どおりの語でない（変数・置換・glob）。どの副命令が走るかを読めない。
+            # サブコマンドが文字どおりの語でない（変数・置換・glob）。
+            # どのサブコマンドが走るかを読めない。
             return args[0], args[0], CORE_UNREAD
         if not args or args[0] not in _CORE_SUBS:
             continue
@@ -378,8 +379,8 @@ def check_core_paths(
 
 
 def _degraded_core(subject: str) -> tuple[str, str, str]:
-    """走査が読み切れないコマンド行。ラッパーの名前の後ろに文字どおりの副命令が無いか、
-    消す・戻す副命令があれば当たる（`… | xargs sh …ccnavi-git.sh`・`sh -c '… rm …'`）。"""
+    """走査が読み切れないコマンド行。ラッパーの名前の後ろに文字どおりのサブコマンドが無いか、
+    消す・戻すサブコマンドがあれば当たる（`… | xargs sh …ccnavi-git.sh`・`sh -c '… rm …'`）。"""
     for name in _DEGRADED_NAME.finditer(subject):
         sub = _DEGRADED_SUB.match(subject, name.end())
         if not sub:
@@ -391,7 +392,7 @@ def _degraded_core(subject: str) -> tuple[str, str, str]:
 
 def _fed_to_stdin(places: list) -> tuple[str, str, str] | None:
     """標準入力から読むシェルがあり、呼び出しの語でない語にラッパーの名前があれば当たる
-    （`echo '…ccnavi-git.sh rm …' | sh`）。流し込む文字列の中は、副命令も対象も読めない。"""
+    （`echo '…ccnavi-git.sh rm …' | sh`）。流し込む文字列の中は、サブコマンドも対象も読めない。"""
     mention = ""
     stdin = False
     for words, _ in places:
@@ -415,14 +416,15 @@ def _long_option(arg: str, full: str, least: int) -> bool:
 
 
 def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
-    """副命令の引数から、消す・戻す先のパスの語（, 読めない指定があればその語,
+    """サブコマンドの引数から、消す・戻す先のパスの語（, 読めない指定があればその語,
     索引の中身に戻す `checkout -- <パス>` か）。
 
     `restore` は `--source` が無ければ何も返さない。`checkout` は `--` より前の最初の語（行き先か
     起点）を除く。`rm` は `-n` / `--dry-run` があれば（後ろに `--no-dry-run` が無ければ）何も
     返さない。長いオプションは、git が受ける
     省略形（`--sou=` など）も同じに読む。パスに変数・置換があれば、その語を読めない指定として
-    返す。旗を変数で書く形（`restore $O HEAD~1 <パス>`）は見ない（ADR-0121 の限界。sh が止める）。
+    返す。オプションを変数で書く形（`restore $O HEAD~1 <パス>`）は見ない（ADR-0121 の限界。sh
+    が止める）。
     """
     longs, shorts = _VALUE_LONGS[sub], _VALUE_SHORTS[sub]
     positional: list[str] = []
@@ -653,13 +655,13 @@ def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> s
     if kind == CORE_UNREAD:
         call = f"{_GIT_SCRIPT} の呼び出し" if sub == "?" else f"{_GIT_SCRIPT} {sub}"
         return (
-            f"{call}（{word}）を読み切れません。副命令や対象を変数・置換・glob で書いた形、"
+            f"{call}（{word}）を読み切れません。サブコマンドや対象を変数・置換・glob で書いた形、"
             "標準入力から読むシェルや xargs に渡した文字列の中の呼び出し、"
             '居場所を読めない cd（cd "$D"・pushd）の後の相対パスは、'
             "ccnavi 自身を守る場所（hook の登録・ルールとフェーズの設定・"
             "保護済みのスクリプト・実行ファイル・判定の記録）と承認済みチケットの置き場に"
-            "当たるかを確かめられないので止めました。ラッパーは副命令と対象をそのまま書いて、"
-            f"直接呼んでください（'{git_sh} <副命令> <パス>'。値は先に読んでから書きます）。"
+            "当たるかを確かめられないので止めました。ラッパーはサブコマンドと対象をそのまま書いて、"
+            f"直接呼んでください（'{git_sh} <サブコマンド> <パス>'。値は先に読んでから書きます）。"
         )
     return (
         f"{_GIT_SCRIPT} {sub} が、ccnavi 自身を守る場所（{word}）を削除するか、別のコミットの中身に"

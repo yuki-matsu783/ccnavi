@@ -98,7 +98,7 @@ def approve(
 
     `placed_out` があれば、書き込みに入ったあと、実際に書けた承認済みチケットのパスと、
     書けなかったもの・書かなかったものを JSON で書き出す（`placed_report`）。呼び手
-    （`ccnavi-agree.sh`）が、書けた分だけをコミット・push し、残りを名指しするため。
+    （`ccnavi-user-agree.sh`）が、書けた分だけをコミット・push し、残りを名指しするため。
     """
     snapshot = core_base.read_fs(conf, root)
     verdict = core_base.judge_approval(snapshot, only)
@@ -175,7 +175,7 @@ def write_recorded(
     """並べた書き込みを書き（`core_base.write_fs`）、実際に書けた・消せたパスも返す。
 
     パスはワークスペースルートからの相対（区切りは "/"）。承認済みチケット・マーカーと、
-    承認で消した提案が入る。ルートの外は入れない。`ccnavi-push-approved.sh --path` に渡すと、
+    承認で消した提案が入る。ルートの外は入れない。`ccnavi-user-push-approved.sh --path` に渡すと、
     この承認で書いたものだけをコミットして push する（同じ置き場のほかの変更を巻き込まない）。
     """
     with fsio.recording() as written:
@@ -443,7 +443,7 @@ def approve_yes(
                     # 実際に書けた承認済みチケットのパス（`placed` の識別子の分）
                     "paths": copy_paths(conf, root, gathered.batch, applied.placed),
                     # この承認で書いた・消したパス（ワークスペースルートからの相対）。拡張は
-                    # これだけを `ccnavi-push-approved.sh --path` でコミット・push させる。
+                    # これだけを `ccnavi-user-push-approved.sh --path` でコミット・push させる。
                     "written": written,
                     "ticket": applied.stopped_at,
                     "reason": applied.reason,

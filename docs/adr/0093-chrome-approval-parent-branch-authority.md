@@ -1361,7 +1361,7 @@ ADR に無かった判断:
 
 - 置き場のパスと settings.local.json の統合先の値は、実行ファイルの `ccnavi sync paths`（1 行 1 項目）で sh に渡す。実行ファイルが無ければ環境変数のパスを使う。統合先の名前は環境変数が settings.local.json より先
 - `--integration-branch` を今渡す呼び手は無い（2c で sync の lint がこれを渡す）
-- マージリクエストの確認は `ccnavi-review.sh merged`（新しい副命令。実行ファイルを起こさない）で行い、答えが `merged <番号>` のときだけ「反映待ち」にする
+- マージリクエストの確認は `ccnavi-review.sh merged`（新しいサブコマンド。実行ファイルを起こさない）で行い、答えが `merged <番号>` のときだけ「反映待ち」にする
 - 「3 回まで 5 秒おき」は最初の確かめの後の確かめ直しの回数と読んだ。試験のために `CCNAVI_SYNC_RETRIES`・`CCNAVI_SYNC_RETRY_WAIT`・`CCNAVI_FETCH_BUDGET` で変えられる（既定は ADR の値）
 - `ccnavi-sync.sh` が扱うのは親のワークツリーだけ。ほかのブランチには `merge <リモート>/<ブランチ>` を案内する
 - 早送りや merge が止まったときも、取り込み状態は `present`（リモートにあること）で書く
@@ -1383,7 +1383,7 @@ ADR に無かった判断:
 
 | # | 何 | 直し方 |
 |---|---|---|
-| 1（重大） | `ccnavi-git.sh` の `checkout`・`switch`・`branch`・`pull` などが、長いオプションの略（`switch --force-c`・`checkout --det`・`--orph=`・`--for`・`switch --discard-ch`・`branch --mov`・`pull --rebas`）と値をまとめた短いオプション（`checkout -bnew`・`-qbnew`・`switch -cbar`）で抜けた | 決定 A: `branch`・`checkout`・`switch`・`fetch`・`pull`・`merge`・`commit`・`rm`・`restore`・`cat-file`・`worktree`（list・prune・remove）を許可リストで読む（`opt_walk`）。長いオプションは一覧にそのままの表記であるものだけ通し、略は断る。まとめた短いオプションは 1 字ずつ読み、値を取る字（`b`・`B`・`c`・`C`・`m`・`s` など）の後ろは値とする。止める名前は一覧に入れた上で名前を見て止める。読むだけの副命令も、止める長いオプション（`--output`・`--upload-pack`・`--exec`・`--textconv` など）の頭に当たる略を止め、`grep -O`（`--open-files-in-pager`）を止め、`cat-file` は許可リストにした。`pull --rebase` と `commit --amend` も止める（履歴の書き換え）。親のワークツリーでは、語が無い・自分のブランチ・`HEAD`・`checkout <ref> <パス>` のほかは通さない |
+| 1（重大） | `ccnavi-git.sh` の `checkout`・`switch`・`branch`・`pull` などが、長いオプションの略（`switch --force-c`・`checkout --det`・`--orph=`・`--for`・`switch --discard-ch`・`branch --mov`・`pull --rebas`）と値をまとめた短いオプション（`checkout -bnew`・`-qbnew`・`switch -cbar`）で抜けた | 決定 A: `branch`・`checkout`・`switch`・`fetch`・`pull`・`merge`・`commit`・`rm`・`restore`・`cat-file`・`worktree`（list・prune・remove）を許可リストで読む（`opt_walk`）。長いオプションは一覧にそのままの表記であるものだけ通し、略は断る。まとめた短いオプションは 1 字ずつ読み、値を取る字（`b`・`B`・`c`・`C`・`m`・`s` など）の後ろは値とする。止める名前は一覧に入れた上で名前を見て止める。読むだけのサブコマンドも、止める長いオプション（`--output`・`--upload-pack`・`--exec`・`--textconv` など）の頭に当たる略を止め、`grep -O`（`--open-files-in-pager`）を止め、`cat-file` は許可リストにした。`pull --rebase` と `commit --amend` も止める（履歴の書き換え）。親のワークツリーでは、語が無い・自分のブランチ・`HEAD`・`checkout <ref> <パス>` のほかは通さない |
 | 2（重大） | 取り込み状態の無い親子のチケットが閉じていても「まだ送っていない」になった | 取り込み状態の有無より先に統合先で閉じているかを見る。取り込み状態が無くても `origin/<P>` か追跡の設定があれば「push した形跡あり」として 3.6 の確かめをし、消えていても gone は書かずに止める（決定 B5。取り込み状態の無い親子のチケットは今のまま） |
 | 3（重大） | ロックの強制取得の仕方に ABA と二重の `mv` があった | 4.3 の「強制取得の仕方」のとおり、`<ロック>.steal` のロックで強制取得の操作を 1 つにし、古いと判断したときに読んだ行と比べ、戻す前に元の名前が空いているかを見る。取った側も `owner` を書けたかを読み返す |
 | 4（重大） | `ccnavi-sync.sh` がユーザ自身の途中の merge を取りやめた | 途中の操作（`MERGE_HEAD`・`CHERRY_PICK_HEAD`・`REVERT_HEAD`・`sequencer`・`rebase-merge`・`rebase-apply`。`rev-parse --git-path` で引く）があれば何もせず止める。`merge --abort` は、この sh が始めた merge のときだけ |
@@ -1428,7 +1428,7 @@ ADR に無かった判断:
 
 #### 11.4.1 段階 2b で触った保護の対象
 
-`.ccnavi/scripts/` の `ccnavi-git.sh`・`ccnavi-fetch.sh`・`ccnavi-common.sh`・`ccnavi-review.sh`（`merged` の副命令）と、新しい `ccnavi-sync.sh`。
+`.ccnavi/scripts/` の `ccnavi-git.sh`・`ccnavi-fetch.sh`・`ccnavi-common.sh`・`ccnavi-review.sh`（`merged` のサブコマンド）と、新しい `ccnavi-sync.sh`。
 ユーザの承認を得て直接直した。11.4.2 のレビューの直しでも同じ 5 本を直した。
 
 ### 11.5 段階 2c で入れたもの（2026-09-29）

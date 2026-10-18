@@ -107,6 +107,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.tree",
                 "infra.yamlread",
                 "records.redact",
+                "tickets.user_only",
             }
         ),
     ),
@@ -175,6 +176,9 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "hook.projskills",
                 "hook.proposalhint",
                 "policy.ruleload",
+                "policy.rule_lint",
+                "policy.subjects",
+                "tickets.config_check",
                 "tickets.phasetypes",
                 "tickets.workflow",
             }
@@ -208,8 +212,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.scaffold",
                 "tickets.session_rejects",
                 "tickets.template_drafts",
+                "tickets.handoff",
                 "tickets.learning",
-                "tickets.template_edit",
                 "tickets.template_use",
             }
         ),
@@ -267,9 +271,9 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.lint_layers",
                 "entry.lint_places",
                 "entry.lint_project",
-                "entry.lint_rules",
                 "entry.cli_plan",
                 "entry.cli_templates",
+                "entry.cli_handoff",
                 "entry.lint_templates",
                 "entry.sh_ask",
                 "entry.status",

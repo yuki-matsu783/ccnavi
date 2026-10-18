@@ -51,8 +51,9 @@ MODE_ENV = "CCNAVI_MODE"
 RESTORE_IF_DENY_ENV = "CCNAVI_RESTORE_IF_DENY"
 GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # GUARD_TICKET_APPROVAL_ENV は、チケットの承認の経路を守るか。enable（既定）なら、
-# シェルから ccnavi の実行ファイルに `--agree` `--reviewed` `--close-early` `ticket` `review` を
-# 付けた呼び出しを止め、この 3 つのフラグは標準入力が端末でなければ拒む。
+# シェルから、ユーザ専用の入口（`ccnavi user <操作>` と `ccnavi-user-*.sh`）と、実行ファイルへの
+# `ticket` `review` の呼び出しを止め、`user` の入口は標準入力が端末でなければ拒む。
+# ユーザ専用の操作の表は tickets/user_only.py にある（ADR-0143）。
 # テストは disable にする。
 #
 # 守る対象で名前を付ける。

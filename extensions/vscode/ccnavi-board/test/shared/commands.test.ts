@@ -6,6 +6,9 @@ import {
   writeAndPushTargetOf,
   decideArgs,
   decidePreviewArgs,
+  PUSH_APPROVED_SCRIPT,
+  REVIEW_SCRIPT,
+  USER_DECIDE_SCRIPT,
   overrideArgs,
   planOrderArgs,
   planOrderWriteArgs,
@@ -26,14 +29,15 @@ test("CB-T17 単引用符で囲み、中の単引用符を割る", () => {
 test("CB-T18 承認は子プロセスの引数で、preview は見るだけ、yes は見せた識別子をそのまま返す", () => {
   assert.deepEqual(previewArgs(), ["--agree", "--preview", "--json"]);
   assert.deepEqual(approveArgs(["i0001", "i0001-01-01"], "ab12"), [
-    "--agree",
+    "user",
+    "agree",
     "--yes",
     "i0001,i0001-01-01",
     "--digest",
     "ab12",
     "--json",
   ]);
-  // ターミナルに `--agree` を送る経路は消した。y/N をターミナルで押す形には戻さない。
+  // ターミナルに `user agree` を送る経路は消した。y/N をターミナルで押す形には戻さない。
   assert.equal((commands as Record<string, unknown>).approveCommand, undefined);
 });
 
@@ -51,7 +55,8 @@ test("CB-T18b preview に識別子を並べると、その分だけが対象に�
 test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて渡す", () => {
   // 絞り込み中。見せたのは 1 件で、絞りも同じ 1 件。
   assert.deepEqual(approveArgs(["i0002"], "ab12", ["i0002"]), [
-    "--agree",
+    "user",
+    "agree",
     "--yes",
     "i0002",
     "--digest",
@@ -61,13 +66,20 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
   ]);
   // 絞り込み無し。絞りは空で、実行ファイルは絞らないときの対象と見せた識別子を比べる。
   assert.deepEqual(approveArgs(["i0002", "i0002-01-01"], "ab12"), [
-    "--agree",
+    "user",
+    "agree",
     "--yes",
     "i0002,i0002-01-01",
     "--digest",
     "ab12",
     "--json",
   ]);
+});
+
+test("CB-T19a ユーザ専用の sh の名前。書く側は ccnavi-user-decide.sh で、読む側は ccnavi-review.sh に残る", () => {
+  assert.equal(PUSH_APPROVED_SCRIPT, ".ccnavi/scripts/ccnavi-user-push-approved.sh");
+  assert.equal(USER_DECIDE_SCRIPT, ".ccnavi/scripts/ccnavi-user-decide.sh");
+  assert.equal(REVIEW_SCRIPT, ".ccnavi/scripts/ccnavi-review.sh");
 });
 
 test("CB-T19 decide の引数。一覧は --preview、選んだ対応方針は JSON と見せたダイジェストで渡す", () => {
@@ -84,26 +96,26 @@ test("CB-T19 decide の引数。一覧は --preview、選んだ対応方針は J
 
 test("CB-T19b 承認の push の sh は、ワークスペースルートからの絶対パスで送る", () => {
   // 絶対パスなので、前のコマンドが別の場所へ cd したターミナルでも届く。
-  assert.equal(pushApprovedCommand("/ws"), "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh'");
+  assert.equal(pushApprovedCommand("/ws"), "sh '/ws/.ccnavi/scripts/ccnavi-user-push-approved.sh'");
   // Windows の区切りは "/" に直す（Git Bash が読める形）。
   assert.equal(
     pushApprovedCommand("C:\\Users\\x\\ws"),
-    "sh 'C:/Users/x/ws/.ccnavi/scripts/ccnavi-push-approved.sh'",
+    "sh 'C:/Users/x/ws/.ccnavi/scripts/ccnavi-user-push-approved.sh'",
   );
   // 単引用符を含むパスは分けて囲む。
   assert.equal(
     pushApprovedCommand("/tmp/it's ws"),
-    `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
+    `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-user-push-approved.sh'`,
   );
   // 親を並べると、その親子のチケットだけをコミットして push する（フローの保存の後）。
   assert.equal(
     pushApprovedCommand("/ws", ["i0001"]),
-    "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' 'i0001'",
+    "sh '/ws/.ccnavi/scripts/ccnavi-user-push-approved.sh' 'i0001'",
   );
   // 承認が書いた・消したパスを並べると、そのパスだけをコミットして push する（承認の後）。
   assert.equal(
     pushApprovedCommand("/ws", [], [".claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md", "a b/x's.md"]),
-    "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' --path '.claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md' --path 'a b/x'\\''s.md'",
+    "sh '/ws/.ccnavi/scripts/ccnavi-user-push-approved.sh' --path '.claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md' --path 'a b/x'\\''s.md'",
   );
 });
 

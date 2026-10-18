@@ -116,7 +116,7 @@ def check(
     ツリーごとに git を起こし、そのツリーのルールで見る。
 
     places はチケットの置き場（提案と承認済みチケット）。そこに現れた変更のうち、
-    ccnavi の副命令が書いたと内容から読めるものを外す（`_script_writes`）。
+    ccnavi のサブコマンドが書いたと内容から読めるものを外す（`_script_writes`）。
     """
     if payload.tool_name in READ_ONLY_TOOLS:
         record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE
@@ -334,7 +334,7 @@ def _committed_findings(
     分岐点（`gitstate.fork_base`）を基準にする。それも取れないものは飛ばす。
 
     チケットの置き場は外す。承認はユーザが提案を `.ccnavi/approved/` へ動かして
-    コミットする進め方で（`ccnavi-push-approved.sh`）、その置き場は `deny` でもある。
+    コミットする進め方で（`ccnavi-user-push-approved.sh`）、その置き場は `deny` でもある。
     外さないと、ユーザが承認するたびに、その操作が違反としてターンの報告に並ぶ。
     置き場のパスは `places` で受け取る。チケット制御を切ったワークスペースでも
     承認のコミットは在りうるので、`scope` の有無で外れたり外れなかったりさせない。

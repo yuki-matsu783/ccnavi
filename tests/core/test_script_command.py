@@ -81,7 +81,7 @@ class ScriptCommandTest(unittest.TestCase):
             self.assertTrue(phase_forms.forbidden(f"{review} ready"))
             self.assertTrue(phase_forms.forbidden(f"{ticket} finish i0001-01-01"))
             rule = phase_forms.ticket_approval_rule("", root)
-            approve = settings.script_command(root, "ccnavi-agree.sh")
+            approve = settings.script_command(root, "ccnavi-user-agree.sh")
             self.assertIsNotNone(rule.compiled.search(approve))
             self.assertIn(approve, rule.message)
             self.assertNotIn("sh .ccnavi/scripts/", rule.message)

@@ -13,15 +13,15 @@ keywords: [置き場, 提案, 承認済みチケット, マーカー, wip/propos
 | 何 | 場所 | 誰が書く | git |
 |---|---|---|---|
 | 提案（親も子も） | `wip/proposals/<状態>/<識別子>.md`（ツリーのルートからの相対）。状態は `todo`（承認待ち）と `review`（レビュー待ち）の 2 つの置き場。プロジェクト向けはそのプロジェクトの側に置く（11 章） | `todo/` は親が書く。`review/` へ動かすのは `ccnavi-ticket.sh finish` だけ | それを持つリポジトリにコミット |
-| 承認済みチケット | 親チケットのツリーの `.ccnavi/approved/<状態>/<識別子>.md`（ツリーのルートからの相対）。状態は `doing`（作業中。判定が読むのはここだけ）と `done`（閉じた。取り消しは `cancelled_at` を持つ） | `doing/` へは承認（`ccnavi --agree`、ボード、Chrome 拡張、置き場のファイルの移動。ユーザ）と、ユーザが `decide` で起こす続きの子。`done/` へはユーザのレビュー（`confirm` / `decide` / `--reviewed` / Chrome 拡張のレビュー済み / `close-early`）、レビュー不要の `finish`、`cancel`。コミットと push は `ccnavi-push-approved.sh`（9.4） | 親のブランチにコミット |
-| フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi --reviewed` | 親のブランチにコミット |
+| 承認済みチケット | 親チケットのツリーの `.ccnavi/approved/<状態>/<識別子>.md`（ツリーのルートからの相対）。状態は `doing`（作業中。判定が読むのはここだけ）と `done`（閉じた。取り消しは `cancelled_at` を持つ） | `doing/` へは承認（`ccnavi user agree`、ボード、Chrome 拡張、置き場のファイルの移動。ユーザ）と、ユーザが `decide` で起こす続きの子。`done/` へはユーザのレビュー（`confirm` / `ccnavi-user-decide.sh` / `user reviewed` / Chrome 拡張のレビュー済み / `ccnavi-user-close-early.sh`）、レビュー不要の `finish`、`cancel`。コミットと push は `ccnavi-user-push-approved.sh`（9.4） | 親のブランチにコミット |
+| フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi user reviewed` | 親のブランチにコミット |
 | 親のマーカー | 同 `phases/<親>/ready.json` / `close-early.json` / `closed.json` | レビューのスクリプト、`ticket finish <親>`、ユーザ | 親のブランチにコミット。`ready` は Draft を外す前に、閉じた親子のチケットと一緒にワークスペースの `logs/archive/<リポジトリ>/phases/<親>/` へ退避する（ブランチでは他の機械へ届かなくなる） |
 | 閉じたチケットの退避 | ワークスペースの `logs/archive/<リポジトリ>/`（承認済みの領域と同じ構成）と、ready のマーカー `ready/<親>.json` | `ccnavi-review.sh ready`（実行ファイルの `review ready`）だけ。エージェントの書き込みは記録の保護が止める | 入れない（`logs/` は git が追跡しない） |
 | 子の記録 | 同 `phases/<親>/<子>.risk.json` / `.judge.json` / `.flow.json`（着手のときのフローのハッシュ。9.3.1） | `ticket finish` / `ticket record-risk` / `ticket start` | 親のブランチにコミット |
 | 気づきの記録 | 子（と親）のワークツリーの `wip/handoff/learnings/<識別子>.md` と `.digest.json`（9.16）。直接作業は `docs/wiki/inbox/`、ルートは `wip/handoff/inbox/` | `ticket learn`、子のセッション | 子の合流で親のブランチへ届く。`wip/handoff/` の分は統合で外れる |
-| 子のフロー | 同 `flows/<子>.yml`（9.3.1） | ユーザ（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごとコミットして push する） |
-| 子のフローの下書き | フローと同じツリーの `wip/proposals/flows/<子>.yml`（9.3.1。効力は無い） | 頼まれたエージェント。ユーザがフロー編集画面で取り込み、保存が成功したら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-push-approved.sh` がフローと一緒にコミットして push する |
-| テンプレートの下書き | 提案の置き場の `wip/proposals/templates/<名前>.yml`（そのツリーの。プロジェクトのツリーならそのプロジェクトの下。9.15。効力は無い） | 頼まれたエージェント（`ccnavi --templates --draft <親>` か直接）。ユーザが `ccnavi --templates --import` で取り込み、書けたら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-push-approved.sh` が承認済みチケットの置き場の変更と一緒にコミットして push する |
+| 子のフロー | 同 `flows/<子>.yml`（9.3.1） | ユーザ（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-user-push-approved.sh` が置き場ごとコミットして push する） |
+| 子のフローの下書き | フローと同じツリーの `wip/proposals/flows/<子>.yml`（9.3.1。効力は無い） | 頼まれたエージェント。ユーザがフロー編集画面で取り込み、保存が成功したら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-user-push-approved.sh` がフローと一緒にコミットして push する |
+| テンプレートの下書き | `wip/handoff/` の下の、取り込み先と同じ相対パス（例: `wip/handoff/.ccnavi/config/project/templates/<名前>.yml`。そのツリーの。プロジェクトのツリーならそのプロジェクトの下。9.15、9.19。効力は無い） | 頼まれたエージェント（`ccnavi --templates --draft <親>` か直接）。ユーザが `ccnavi user handoff` で取り込み、書けたら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んだ結果は、そのツリーのブランチの変更として残る |
 | ワークツリー | `.claude/worktrees/<識別子>/` | 親が git のラッパースクリプトで切る | 管理外 |
 
 状態は置き場で表す。チケットは 1 本のファイルで、2 つの置き場を行き来する。ユーザが動かす
@@ -52,7 +52,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 置き場はこの 2 つに固定で、環境変数では動かない。sh と VS Code 拡張も同じパスを見る。
 
 **承認済みチケットは git で共有する。** 承認した機械と作業する機械が違っても承認が届くよう、承認済み
-チケットもマーカーも親チケットのブランチに乗せ、`ccnavi-push-approved.sh` がコミットして push する（9.4）。
+チケットもマーカーも親チケットのブランチに乗せ、`ccnavi-user-push-approved.sh` がコミットして push する（9.4）。
 受け取る側では、セッションの最初に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、ワークツリーの
 起点になる統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ `.claude/settings.local.json` の `env`、無ければデフォルトブランチ＝
 `origin/HEAD` が指すもの）も、チェックアウトされていなければ `update-ref` で
@@ -85,8 +85,8 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 止める側の検査は止める向きに（`integrate` は断り、checkout は親のワークツリーとして狭める）、ツリーを動かす側
 （`ccnavi-fetch.sh` の早送り、`ccnavi-sync.sh` の取り込み）は動かさない向きに倒す。
 
-push の関門（`ccnavi_push_gate`、`ccnavi-common-state.sh`）も同じ例外に入る（ADR-0142）。範囲は `ccnavi-git.sh` の中に限らず、
-write-and-push（`ccnavi_wap_prepare`）と `ccnavi-push-approved.sh` の push の前も含める。この 3 経路はどれも素の push を打つので、
+push の関門（`ccnavi_push_gate`、`ccnavi-common-state.sh`）も同じ例外に入る。範囲は `ccnavi-git.sh` の中に限らず、
+write-and-push（`ccnavi_wap_prepare`）と `ccnavi-user-push-approved.sh` の push の前も含める。この 3 経路はどれも素の push を打つので、
 ここを通さないと、消えた親のブランチを作り直してしまう。対象は親のワークツリーのブランチだけ（通常のブランチと子の push には掛けない）。
 形跡（`refs/remotes/origin/<B>`、または着手済み（承認済みの親チケットの `started_at`）・`.requested`・退避）があれば `ls-remote`（60 秒）でリモートにあるかを聞き、
 無ければ拒否、失敗・時間切れは確かめられない（拒否側）。形跡が無く、着手も依頼も退避も無ければ初回の push として通す。

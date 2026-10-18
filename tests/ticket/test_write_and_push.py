@@ -17,7 +17,7 @@ tests/sh/test_write_and_push_sh.py が見る。
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
    （一覧は書く。着手で configsync がミラーした `.ccnavi/config/common/` は例外で、
    tests/config/test_config_sync.py が見る）
-4. ユーザの判断の入口の sh（`ccnavi-review.sh close-early`）は
+4. ユーザの判断の入口の sh（`ccnavi-user-close-early.sh`）は
    エージェントから止める
 """
 
@@ -264,7 +264,7 @@ class RecordTreeTest(AuthorityHarness):
         self.commit_parent("propose")
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
         result, listed = self.run_recorded(
-            "--agree", "--yes", "i0001-01-02", "--digest", preview["digest"], "--json"
+            "user", "agree", "--yes", "i0001-01-02", "--digest", preview["digest"], "--json"
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場の外に書き込みがあった", result.stderr)
@@ -334,7 +334,9 @@ class RecordTreeReviewTest(PhaseHarness):
         self.recorded = []
 
     def ccnavi(self, *args, stdin=""):
-        writes = any(a in args for a in self.WRITERS) or ("--yes" in args and "--reviewed" in args)
+        writes = any(a in args for a in self.WRITERS) or (
+            "--yes" in args and "user" in args and "reviewed" in args
+        )
         if not writes:
             return super().ccnavi(*args, stdin=stdin)
         target = os.path.join(self.root, "logs", "state", "write-and-push", "self", "r.writes")
@@ -368,12 +370,12 @@ class RecordTreeReviewTest(PhaseHarness):
         requested = self.request(fixture, 1)
         self.assertEqual(requested.returncode, 0, requested.stderr)
         shown = super().ccnavi(
-            "--cwd", self.parent_tree, "--reviewed", "1", "--accept-unresolved",
+            "--cwd", self.parent_tree, "user", "reviewed", "1", "--accept-unresolved",
             "--preview", "--json", "--result", fixture,
         )  # fmt: skip
         digest = json.loads(shown.stdout)["digest"]
         decided = self.ccnavi(
-            "--cwd", self.parent_tree, "--reviewed", "1", "--accept-unresolved",
+            "--cwd", self.parent_tree, "user", "reviewed", "1", "--accept-unresolved",
             "--yes", "{}", "--digest", digest, "--json", "--result", fixture,
         )  # fmt: skip
         self.assertEqual(decided.returncode, 0, decided.stdout + decided.stderr)
@@ -416,7 +418,7 @@ class ChooseTest(PhaseHarness):
         write(fixture, json.dumps(data))
         out = os.path.join(self.state, "choose.json")
         chosen = self.ccnavi(
-            "--cwd", self.parent_tree, "--reviewed", "1", "--accept-unresolved",
+            "--cwd", self.parent_tree, "user", "reviewed", "1", "--accept-unresolved",
             "--choose-out", out, "--result", fixture, stdin="k\n",
         )  # fmt: skip
         self.assertEqual(chosen.returncode, 0, chosen.stdout + chosen.stderr)
@@ -425,12 +427,12 @@ class ChooseTest(PhaseHarness):
         status = git(self.parent_tree, "status", "--porcelain")
         self.assertEqual(status.strip(), "")
         outside = self.ccnavi(
-            "--cwd", self.parent_tree, "--reviewed", "1", "--accept-unresolved",
+            "--cwd", self.parent_tree, "user", "reviewed", "1", "--accept-unresolved",
             "--choose-out", os.path.join(self.root, "x.json"), "--result", fixture, stdin="k\n",
         )  # fmt: skip
         self.assertEqual(outside.returncode, 1)
         done = self.ccnavi(
-            "--cwd", self.parent_tree, "--reviewed", "1", "--accept-unresolved",
+            "--cwd", self.parent_tree, "user", "reviewed", "1", "--accept-unresolved",
             "--yes", json.dumps(answer["choices"]), "--digest", answer["digest"],
             "--json", "--result", fixture,
         )  # fmt: skip
@@ -458,7 +460,7 @@ class BypassTest(AuthorityHarness):
         for args in (
             ("review", "confirm", "--phase", "1", "--result", fixture),
             ("review", "ready", "--result", fixture),
-            ("--reviewed", "1", "--accept-unresolved", "--result", fixture),
+            ("user", "reviewed", "1", "--accept-unresolved", "--result", fixture),
         ):
             result = self.ccnavi("--cwd", self.parent_tree, *args)
             self.assertEqual(result.returncode, 1, args)

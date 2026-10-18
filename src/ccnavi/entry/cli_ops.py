@@ -1,4 +1,5 @@
-"""チケットとレビューの副命令（`ticket` / `review` / `write_and_push` など）を ops・review へ渡す。
+"""チケットとレビューのサブコマンド（`ticket` / `review` / `write_and_push` など）を
+ops・review へ渡す。
 
 `sync` の問い合わせ（`sync paths` / `sync check` / `sync retired` / `sync migrate`）もここで答える。
 
@@ -28,6 +29,7 @@ from ..tickets import (
     review_decide,
     scaffold,
     ticket_ids,
+    user_only,
     via,
     worktrees,
     write_and_push,
@@ -80,7 +82,7 @@ def operate(
             )
             return EXIT_ERROR
         # ユーザの判断。`--agree` / `--reviewed` と同じく端末を求める。
-        if not cli_args._from_terminal(stdin, conf, stderr, "--close-early"):
+        if not cli_args._from_terminal(stdin, conf, stderr, user_only.terminal("close-early")):
             return EXIT_ERROR
         via.set_via(via.VIA_TERMINAL)
         for flag, path in (
@@ -587,7 +589,7 @@ _ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
 
 
 # `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが
-# 知らない副命令を断った、など）と読み、親子のチケットを止めない（検査の error と分ける）。
+# 知らないサブコマンドを断った、など）と読み、親子のチケットを止めない（検査の error と分ける）。
 SYNC_CHECK_HEAD = "check 1"
 _SHA = re.compile(r"[0-9a-f]{7,64}")
 _GIT_TIMEOUT = 20.0
