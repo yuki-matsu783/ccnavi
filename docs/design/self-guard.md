@@ -71,7 +71,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat rules.yml` も `git add <パス>` も通る）。
 
-下書きの置き場（ワークスペースルートの `wip/handoff/`）へ写す cp は、行き先の最後の語に守る名前があっても
+下書きの置き場（ワークスペースルートの `wip/handoff/`。ワークツリーの中の `wip/handoff/` は含まない。`ccnavi-stage.sh` は sh の中で写すので、この例外には頼らない）へ写す cp は、行き先の最後の語に守る名前があっても
 `builtin:guard-setting-files` から外す（`selfguard_shell.handoff_copy_exempt`）。守る場所を直すときは、置き場へ写して
 写しを直すため（`cp .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh`）。式は先読みを使えないので（5.1）、
 外すかどうかは式の外で、行き先を実際のパスに解いて決める。外すのは次をすべて満たすときだけ。

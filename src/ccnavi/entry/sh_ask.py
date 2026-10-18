@@ -18,6 +18,10 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   `mr`（親チケットの `mr:` 欄）。
   旧い実行ファイルはこの 5 行を返さない（sh は `approved` が無ければ `unknown` と読む）
 
+- `ccnavi tree bound <ツリー> <名前>`: その名前の直接作業のワークツリーが、チケットに結び付くか
+  （`ccnavi-git.sh integrate` が断る条件。Stop の促しと同じ判定）。`bound yes|no` に続けて、
+  結び付くなら `why <理由>`。判定は `ops_stop_integrate.bound_reason`。
+
 git はローカルの読み取りだけ。ネットワークには出ない。
 """
 
@@ -28,7 +32,15 @@ import re
 from typing import TextIO
 
 from ..infra import fsio, pathcase, settings, tree
-from ..tickets import approval, approval_marks, archive, donecopy, ticket_ids, ticket_model
+from ..tickets import (
+    approval,
+    approval_marks,
+    archive,
+    donecopy,
+    ops_stop_integrate,
+    ticket_ids,
+    ticket_model,
+)
 from ..tickets import ticket as ticket_mod
 
 # 答えの頭の行。
@@ -116,6 +128,29 @@ def parent_tree(
     stdout.write(f"archived {archived}\n")
     stdout.write(f"started {started}\n")
     stdout.write(f"mr {mr or '-'}\n")
+    return 0
+
+
+def bound_tree(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, path: str, name: str
+) -> int:
+    """`ccnavi tree bound <ツリー> <名前>`。
+
+    頭に `tree 1`、続けて `bound yes|no`、結び付くなら `why <理由>`。
+
+    `ccnavi-git.sh integrate` が、直接作業のワークツリーを取り込んでよいかを決めるために聞く。
+    sh はチケットの置き場を自分で読まない。
+    """
+    if not _ident_ok(stderr, "tree bound", "名前", name):
+        return 1
+    if not path or not os.path.isdir(path):
+        stderr.write(f"ccnavi: tree bound のツリー {path!r} が見つかりません。\n")
+        return 1
+    why = ops_stop_integrate.bound_reason(root, conf, _tree_of(root, conf, path, name))
+    stdout.write(TREE_HEAD + "\n")
+    stdout.write(f"bound {YES if why else NO}\n")
+    if why:
+        stdout.write(f"why {why}\n")
     return 0
 
 

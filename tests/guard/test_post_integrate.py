@@ -394,6 +394,13 @@ class IntegratedCommitsTest(unittest.TestCase):
         write(self.repo, ".ccnavi/approved/doing/feat.md", "---\nticket: feat\n---\n")
         self.assertEqual(self.paths(), set())
 
+    def test_name_on_origin_is_reported(self):
+        # origin に同名のブランチが在る名前は、`integrate` が断る（親のブランチ）。片付けの後で
+        # ワークツリーが無くても、手元の参照で見分けて、偽の記録で外させない。
+        self.done()
+        git(self.repo, "update-ref", "refs/remotes/origin/feat", "HEAD")
+        self.assertEqual(self.paths(), set())
+
     def test_squash_before_the_turn_is_not_counted(self):
         # ターンの基準より前のコミットは数えない（gitstate.committed と同じ範囲）。
         self.done()

@@ -635,9 +635,6 @@ wt_fresh() {
 #                             ワークツリー・ブランチ・記録を片付ける。途中で止まっても打ち直せば続きから進む
 #
 # 記録は統合先のツリーの git ディレクトリの ccnavi-integrate/<名前>/ に置く。作業ツリーを汚さず、status にも出ない。
-ig_projects=projects        # 固定
-ig_approved=.ccnavi/approved # 固定
-ig_proposals=wip/proposals   # 固定
 
 # 名前を確かめる。<名前>
 ig_name() {
@@ -718,48 +715,29 @@ ig_wt_branch() {
 
 # チケットに結び付く名前なら 0（理由を ig_why に入れる）。<名前>
 #
-# 親のワークツリー（ccnavi_parent_tree）のほか、どのツリー（ワークスペースルート・projects/ の下・
-# .claude/worktrees/ の下）の置き場にでも同じ名前の承認済みチケットか提案があれば、子のものも含めて当たる。
-# 広めに当てて断る向き。
+# 判定は実行ファイル（`tree bound <ツリー> <名前>`）に聞く。sh はチケットの置き場を自分で読まない。
+# 実行ファイルは Stop の促しと同じ判定（`bound_reason`）で答える。材料は次の 3 つ。
+#   - どのツリー（ワークスペースルート・projects/ の下・.claude/worktrees/ の下）の置き場にも、
+#     同じ名前の承認済みチケットか提案がない（子のものも含む）
+#   - 手元の退避（ready 済み）に、同じ名前の親がない
+#   - origin に同名のブランチがある親のワークツリーではない
+# 広めに当てて断る向き。答えを得られないときも、断る向きに倒す。
 ig_bound() {
 	ig_why=""
-	ig_pt_rc=0
-	ccnavi_parent_tree "$ig_wt" "$1" || ig_pt_rc=$?
-	case "$ig_pt_rc" in
-	0)
-		ig_why="親チケットか提案のあるワークツリー"
+	ig_bo_out=$(ccnavi_ask "$WS" tree bound "$ig_wt" "$1") || ig_bo_out=""
+	if [ "$(printf '%s\n' "$ig_bo_out" | head -n 1)" != "tree 1" ]; then
+		ig_why="チケットに結び付くかを実行ファイルに確かめられない"
+		return 0
+	fi
+	case "$(printf '%s\n' "$ig_bo_out" | sed -n 's/^bound //p' | head -n 1)" in
+	yes)
+		ig_why=$(printf '%s\n' "$ig_bo_out" | sed -n 's/^why //p' | head -n 1)
 		return 0
 		;;
-	2)
-		# 決められないときは、断る向きに倒す。
-		ig_why="親チケットか提案があるかを実行ファイルに確かめられないワークツリー"
-		return 0
-		;;
+	no) return 1 ;;
 	esac
-	for ig_tree in "$WS" "$WS/$ig_projects"/* "$WS"/.claude/worktrees/*; do
-		[ -d "$ig_tree" ] || continue
-		for ig_f in "$ig_tree/$ig_approved/doing/$1.md" "$ig_tree/$ig_approved/done/$1.md" \
-			"$ig_tree/$ig_proposals/todo/$1.md" "$ig_tree/$ig_proposals/review/$1.md"; do
-			if [ -f "$ig_f" ]; then
-				ig_why="チケットか提案（${ig_f#"$WS"/}）がある"
-				return 0
-			fi
-		done
-	done
-	# チケットや提案がまだ無い間（ccnavi-start.sh の直後）の親も断る。ccnavi-start.sh は親のブランチを
-	# origin へ送ってから始めるので、親のワークツリー（.claude/worktrees/<識別子>で、HEAD のブランチが
-	# 同じ識別子になるもの）のブランチが origin に在れば、チケットに結び付くワークツリーとみなす。
-	# 直接作業のワークツリーも名前の形は同じなので、origin に在るかが見分けになる（直接作業のブランチは
-	# 送らず、統合先へ直接取り込む）。
-	ig_id=$(ccnavi_branch_to_id "$1")
-	for ig_cand in "$1" "$ig_id"; do
-		ig_hb=$(ccnavi_head_branch "$WS/.claude/worktrees/$ig_cand" "$ig_cand" 2>/dev/null) || continue
-		if git -C "$WS/.claude/worktrees/$ig_cand" show-ref --verify --quiet "refs/remotes/origin/$ig_hb" 2>/dev/null; then
-			ig_why="親のブランチ（origin/${ig_hb}）のワークツリー（.claude/worktrees/${ig_cand}）がある"
-			return 0
-		fi
-	done
-	return 1
+	ig_why="チケットに結び付くかを実行ファイルに確かめられない"
+	return 0
 }
 
 # merge-tree --write-tree（git 2.38 から）が使えるなら 0。

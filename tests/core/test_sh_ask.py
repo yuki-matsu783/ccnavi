@@ -59,6 +59,66 @@ class Harness(unittest.TestCase):
         return dict((line.split(" ", 1) + [""])[:2] for line in out[1:])
 
 
+class TreeBoundTest(Harness):
+    """`ccnavi tree bound`。`ccnavi-git.sh integrate` が断る条件（Stop の促しと同じ判定）。"""
+
+    def setUp(self):
+        super().setUp()
+        git(self.ws, "init", "-q", "-b", "main")
+        git(self.ws, "commit", "-q", "--allow-empty", "-m", "init")
+        git(self.ws, "worktree", "add", "-q", "-b", "p0001", self.tree)
+
+    def bound(self):
+        return self.answer("tree 1", "tree", "bound", self.tree, "p0001")
+
+    def test_nothing_ties_the_name_to_a_ticket(self):
+        self.assertEqual({"bound": "no"}, self.bound())
+
+    def test_a_ticket_or_proposal_of_the_same_name_binds(self):
+        for rel in (
+            f"{APPROVED}/doing/p0001.md",
+            f"{APPROVED}/done/p0001.md",
+            f"{PROPOSALS}/todo/p0001.md",
+            f"{PROPOSALS}/review/p0001.md",
+        ):
+            path = os.path.join(self.ws, *rel.split("/"))
+            write(path, front(ticket="p0001"))
+            out = self.bound()
+            self.assertEqual("yes", out["bound"], rel)
+            self.assertIn(rel, out["why"])
+            os.remove(path)
+        self.assertEqual("no", self.bound()["bound"])
+
+    def test_unregistered_directories_are_searched_too(self):
+        """外れたワークツリーの残骸や、git リポジトリでないプロジェクトの置き場でも断る。"""
+        for rel in (
+            f".claude/worktrees/stale/{APPROVED}/doing/p0001.md",
+            f"projects/pp/{APPROVED}/doing/p0001.md",
+        ):
+            path = os.path.join(self.ws, *rel.split("/"))
+            write(path, front(ticket="p0001"))
+            out = self.bound()
+            self.assertEqual("yes", out["bound"], rel)
+            self.assertIn(rel, out["why"])
+            os.remove(path)
+
+    def test_the_file_name_is_compared_ignoring_case(self):
+        write(os.path.join(self.ws, *f"{APPROVED}/doing/P0001.md".split("/")), front(ticket="p"))
+        self.assertEqual("yes", self.bound()["bound"])
+
+    def test_a_branch_on_origin_binds(self):
+        git(self.ws, "update-ref", "refs/remotes/origin/p0001", "p0001")
+        out = self.bound()
+        self.assertEqual("yes", out["bound"])
+        self.assertIn("origin/p0001", out["why"])
+
+    def test_a_bad_name_or_tree_is_refused(self):
+        self.assertEqual(1, self.ask("tree", "bound", self.tree, "../x").returncode)
+        self.assertEqual(
+            1, self.ask("tree", "bound", os.path.join(self.ws, "none"), "p0001").returncode
+        )
+
+
 class TreeParentTest(Harness):
     def parent(self, name="p0001", tree=None):
         return self.answer("tree 1", "tree", "parent", tree or self.tree, name)["parent"]
