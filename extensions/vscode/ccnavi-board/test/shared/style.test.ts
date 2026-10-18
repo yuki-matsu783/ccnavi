@@ -290,7 +290,8 @@ test("CB-T397 畳んだ部品箱と右の欄は、中身のボタンの display 
 test("CB-T439 欄の幅の上限と基準幅は page.css で定めた名前（--w-*）を使い、画面の CSS に 320px・360px を直書きしない", () => {
   const page = fs.readFileSync(path.join(SHARED_STYLES, "page.css"), "utf8");
   assert.match(page, /:root \{ --w-field: 320px; --w-field-wide: 360px; --w-grow: 320px; \}/);
-  const files = [...cssFiles(), ...fs.readdirSync(SHARED_STYLES).filter((n) => n.endsWith(".css")).map((n) => path.join(SHARED_STYLES, n))];
+  const CHROME_SRC = path.join(SHARED_STYLES, "..", "..", "chrome", "ccnavi-approval", "src");
+  const files = [...cssFiles(), ...cssFiles(CHROME_SRC), ...fs.readdirSync(SHARED_STYLES).filter((n) => n.endsWith(".css")).map((n) => path.join(SHARED_STYLES, n))];
   const loose: string[] = [];
   for (const file of files) {
     const text = fs.readFileSync(file, "utf8");
