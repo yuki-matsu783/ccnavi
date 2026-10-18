@@ -439,7 +439,7 @@ CHECK_SECONDS = 2.0
 def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
     """Write で新しく作った md に frontmatter か `type` が無ければ、1 度だけ案内を返す。
 
-    判定は変えない（止めない・差し戻さない）。案内を出すのは次をすべて満たすときだけ。
+    判定は変えない。案内を出すのは次をすべて満たすときだけ。
 
     - Write で新しく作った（`tool_response.type` が `create`）。既にある md の Edit・上書きでは
       出さない。意図して frontmatter を持たない md（README.md・CLAUDE.md、取り込んだ資料）を

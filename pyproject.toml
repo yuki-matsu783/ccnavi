@@ -32,12 +32,11 @@ dev = ["pyinstaller>=6.10", "ruff>=0.6"]
 # 残ったディレクトリは次の `test-py.sh` を「tests を読めない」で落とすので、実害が続く。
 #
 # 複製にするとワークツリーごとに実体が分かれ、他所のテストに巻き込まれなくなる。
-# 代償は数 MB の重複と、初回の作成が少し遅いことだけ。自分のテストが走っている間に
-# 自分のワークツリーを消せないのは変わらない（そこは順番を守る話）。
+# 代償は数 MB の重複と、初回の作成が少し遅いことだけ。
 link-mode = "copy"
 
 [tool.hatch.build.targets.wheel]
-# 配るのは ccnavi パッケージだけ。tests/・scripts/・extensions/・main.py・build.py は入れない。
+# 配るのは ccnavi パッケージだけ。
 # src レイアウト。import 名は ccnavi のまま。
 packages = ["src/ccnavi"]
 

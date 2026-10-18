@@ -262,7 +262,7 @@ def choose(
 
     残った指摘を見せて 1 件ずつ選ばせ、
     選択とダイジェストを `{"choices": …, "digest": …}` で書くだけ。
-    何も置かない。置くのは sh が write-and-push の中で `--yes <選択> --digest <ダイジェスト>` で打つ
+    置くのは sh が write-and-push の中で `--yes <選択> --digest <ダイジェスト>` で打つ
     （選ぶのを write-and-push のロックの外で済ませ、ロックを持ったままユーザを待たない）。
     """
     d = _decision(stderr, root, conf, cwd, phase_no, result_path)
