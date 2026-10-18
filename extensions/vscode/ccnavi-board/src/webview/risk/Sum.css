@@ -1,12 +1,12 @@
 /*
  * 「統合結果」（`Sum.tsx`）。読み取り専用の枠と表。
  */
-.sum { margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 6px 10px; }
+.sum { margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 6px 10px; }
 .sum > summary { cursor: pointer; color: var(--vscode-descriptionForeground); }
-.sum-pick { display: flex; gap: 6px; align-items: center; margin: 0 0 8px; color: var(--vscode-descriptionForeground); }
-.sum-levels { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+.sum-pick { display: flex; gap: var(--gap-3); align-items: center; margin: 0 0 8px; color: var(--vscode-descriptionForeground); }
+.sum-levels { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-6); align-items: baseline; }
 .sum-level { font-variant-numeric: tabular-nums; }
-table.sum-table { border-collapse: collapse; width: 100%; font-size: .95em; }
+table.sum-table { border-collapse: collapse; width: 100%; font-size: var(--font-lg); }
 /* 表は入れ物の中で横へ送る。狭い画面でも表の外（ページ全体）は横に流れない */
 .sum .table-scroll { overflow-x: auto; }
 .sum .table-scroll > table { min-width: 32em; }

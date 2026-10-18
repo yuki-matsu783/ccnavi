@@ -2,10 +2,10 @@
  * リスク管理画面の骨組み（`App.tsx`）。境目の点の枠と、その中の欄。1 件の行は `Factor.css`。
  */
 button.action.small { margin-left: auto; }
-.block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
+.block { border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 8px 10px; margin-bottom: 10px; }
 /* 見出しの横の説明は長いので、入らなければ次の行へ回す（回さないと見出しが 2〜3 文字ずつ折れる） */
-.block h2 { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; }
-.levels { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
-.levels .field { display: flex; flex-direction: row; gap: 6px; align-items: center; }
+.block h2 { display: flex; flex-wrap: wrap; gap: var(--gap-1) var(--gap-4); align-items: center; }
+.levels { display: flex; flex-wrap: wrap; gap: var(--gap-4) var(--gap-7); align-items: center; }
+.levels .field { display: flex; flex-direction: row; gap: var(--gap-3); align-items: center; }
 .levels .field > .cap { text-align: left; }
 .levels .field > input { width: 90px; }

@@ -226,7 +226,7 @@ test("CB-T582 図の枠は重なりを枠の中に閉じ込め、ツールバー
   assert.match(fs.readFileSync(PAGE_CSS, "utf8"), /\.toolbar \{ top: 0; z-index: var\(--z-toolbar\);/, "ツールバーが重なりの単位（z-index）を持たない");
 });
 
-test("CB-T583 z-index は page.css の段（--z-*）で書き、画面の CSS に数値を直書きしない。段の並びは決めたとおり", () => {
+test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の段で書き、画面の CSS に数値を直書きしない。z-index の段の並びは決めたとおり", () => {
   const page = fs.readFileSync(PAGE_CSS, "utf8");
   const level = (name: string): number => Number(new RegExp(`--z-${name}: (\\d+);`).exec(page)?.[1] ?? Number.NaN);
   // 画面全体で比べる段は下から foot < toolbar < overlay < graph-max < tour
@@ -241,9 +241,23 @@ test("CB-T583 z-index は page.css の段（--z-*）で書き、画面の CSS �
     }
   };
   walk(WEBVIEW_SRC);
+  // 画面と共通の部品（ボタン・一覧）。配色の変数だけを定める appearance.css と、段を定める page.css の :root は対象外
+  files.push(path.join(path.dirname(PAGE_CSS), "button.css"), path.join(path.dirname(PAGE_CSS), "list.css"), PAGE_CSS);
+  // 数値で書いてよいのは 0・1em（等倍）・px の文字（アイコンの大きさ）だけ
+  const raw: [RegExp, string][] = [
+    [/z-index:\s*-?\d/, "z-index（--z-*）"],
+    [/border-radius:\s*[1-9]\d*px/, "border-radius（--radius-*）"],
+    [/font-size:\s*(?!1em\b)\d*\.?\d+em/, "font-size（--font-*）"],
+    [/(?<![\w-])(?:row-|column-)?gap:\s*\d/, "gap（--gap-*）"],
+    [/box-shadow:\s*[^;]*rgba\(0, 0, 0, \.35\)/, "ポップアップの影（--shadow-popup）"],
+  ];
   for (const file of files) {
-    const bare = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-    assert.doesNotMatch(bare, /z-index:\s*-?\d/, `${path.relative(WEBVIEW_SRC, file)} が z-index を数値で直書きしている（--z-* を使う）`);
+    if (file.endsWith("appearance.css")) continue;
+    let bare = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    if (file === PAGE_CSS) bare = bare.replace(/:root \{[^}]*\}/, "");
+    for (const [pattern, what] of raw) {
+      assert.doesNotMatch(bare, pattern, `${path.basename(file)} が ${what} を数値で直書きしている`);
+    }
   }
 });
 

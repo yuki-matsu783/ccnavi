@@ -6,6 +6,7 @@
 import { useEffect, useRef, type JSX } from "react";
 
 import type { PlanOrderAnswer, PlanOrderChild } from "../../core/planordermodel.js";
+import { Dialog, DialogActions } from "../shared/Dialog.js";
 import { renumbered } from "../../core/workflow-view.js";
 
 /** 子 1 本の付け替えの 1 行。「i0001-02-01 → i0001-03-01（phase: 2 → 3）」。`predecessors` を直すなら添える */
@@ -39,8 +40,7 @@ export function Review({ ticket, answer, onConfirm, onCancel, focus = true }: Re
   }, [focus]);
   const moved = renumbered(answer);
   return (
-    <div className="workflow-review-backdrop">
-      <section className="workflow-review" id="save-review" role="dialog" aria-modal="true" aria-labelledby="save-review-title">
+    <Dialog titleId="save-review-title" backdropClass="workflow-review-backdrop" cardClass="workflow-review" id="save-review">
         <h2 id="save-review-title">この順序に決める</h2>
         <p className="dim small">ccnavi が {ticket} の提案の計画（plan: / feedback:）と、番号の変わる項を指す子の提案を変更します。承認はしません。</p>
         <div data-tour="review-numbers">
@@ -82,15 +82,14 @@ export function Review({ ticket, answer, onConfirm, onCancel, focus = true }: Re
         <p className="small" data-tour="review-note">
           計画の値の中のコメントは消えます（値の外のコメントは残ります）。変更した提案はコミットされないまま承認されるので、承認したあとは取り下げられません（取り消して出し直します）。保存したら、承認はボードから開き直してください。
         </p>
-        <div className="workflow-review-actions">
+        <DialogActions className="workflow-review-actions">
           <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>
             キャンセル
           </button>
           <button type="button" className="action primary" data-action="confirm-save" ref={confirm} onClick={onConfirm}>
             保存する
           </button>
-        </div>
-      </section>
-    </div>
+        </DialogActions>
+    </Dialog>
   );
 }

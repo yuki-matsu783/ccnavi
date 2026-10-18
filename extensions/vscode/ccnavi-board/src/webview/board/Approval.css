@@ -1,21 +1,8 @@
 /*
- * 承認のオーバーレイ（`Approval.tsx`）。画面を覆う幕と、その上の 1 枚。
+ * 承認のオーバーレイ（`Approval.tsx`）。幕と 1 枚の作りは `shared/Dialog.css`。ここは幅と中身。
  */
-.approval-backdrop {
-  position: fixed; inset: 0; z-index: var(--z-overlay);
-  background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
-  display: flex; align-items: center; justify-content: center; padding: 16px;
-}
-.approval {
-  width: min(920px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box;
-  padding: 14px 16px; border-radius: 6px;
-  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
-  box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
-}
-.approval h2 { margin: 0 0 8px; font-size: 1.1em; }
-.approval h3 { margin: 12px 0 4px; font-size: .95em; color: var(--vscode-descriptionForeground); }
-.approval-batch { border-collapse: collapse; width: 100%; font-size: .9em; margin-bottom: 8px; }
+.approval { --overlay-w: 920px; }
+.approval-batch { border-collapse: collapse; width: 100%; font-size: var(--font-md); margin-bottom: 8px; }
 /* 狭い幅では題名や場所の長い語を折り、表を枠の幅に収める（伸びると右の「場所」の列が隠れる）。識別子だけは折らない */
 .approval-batch th, .approval-batch td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; overflow-wrap: anywhere; }
 .approval-id { font-family: var(--vscode-editor-font-family); white-space: nowrap; }
@@ -23,7 +10,7 @@
   position: relative;
   margin: 0; padding: 8px; max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
   font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size);
-  background: var(--vscode-textCodeBlock-background); border: 1px solid var(--vscode-panel-border); border-radius: 4px;
+  background: var(--vscode-textCodeBlock-background); border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-md);
 }
 /* 説明を畳んだ見出し。ホバーで出ることを点線で知らせる */
 .approval-head { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
@@ -32,7 +19,7 @@
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
-.approval-rejected, .approval-problems { margin: 0; padding-left: 18px; font-size: .88em; color: var(--board-warn-text); }
+.approval-rejected, .approval-problems { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--board-warn-text); }
 .approval-rejected li, .approval-problems li { overflow-wrap: anywhere; }
 .approval-note { margin: 4px 0 8px; }
 .approval-note.warn { color: var(--board-warn-text); }
@@ -40,13 +27,12 @@
 /* 計画の図を親ごとにまとめた塊。注意と「計画を編集」を、その親の図の前に置く */
 .plan-family + .plan-family { margin-top: 12px; }
 .plan-family-actions { display: flex; justify-content: flex-end; margin: 4px 0; }
-.approval-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: flex-end; }
 
 /* 残った指摘の行き先（`Decide.tsx`）。指摘 1 件ずつに場所・要旨・行き先の選択を並べる */
 .decide-threads { margin: 0; padding-left: 22px; }
 .decide-thread { padding: 6px 0; border-bottom: 1px solid var(--vscode-panel-border); }
-.decide-where { display: flex; gap: 8px; flex-wrap: wrap; font-size: .9em; }
+.decide-where { display: flex; gap: var(--gap-4); flex-wrap: wrap; font-size: var(--font-md); }
 .decide-url { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
 .decide-body { margin: 2px 0 4px; overflow-wrap: anywhere; }
-.decide-choices { display: flex; gap: 12px; flex-wrap: wrap; font-size: .9em; }
-.decide-choices label { display: inline-flex; gap: 4px; align-items: center; }
+.decide-choices { display: flex; gap: var(--gap-5); flex-wrap: wrap; font-size: var(--font-md); }
+.decide-choices label { display: inline-flex; gap: var(--gap-2); align-items: center; }

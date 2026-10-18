@@ -9,7 +9,7 @@
 .plan-graph-canvas {
   height: 240px;
   border: 1px solid var(--vscode-panel-border);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .plan-graph .react-flow {
@@ -36,21 +36,21 @@
 }
 /* 点の大きさ。`core/plan-graph.ts` の COLUMN（列の間隔）に収まる幅 */
 .plan-graph .react-flow__node-planItem { width: 160px; font-size: var(--vscode-font-size); }
-.plan-graph .react-flow__node-planEnd { font-size: .85em; }
+.plan-graph .react-flow__node-planEnd { font-size: var(--font-sm); }
 .plan-node {
-  display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 6px;
+  display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--gap-1) var(--gap-3);
   padding: 5px 8px;
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
   border-left: 4px solid var(--vscode-focusBorder);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: var(--vscode-foreground);
   text-align: left;
 }
 .plan-node-number { font-weight: 600; font-family: var(--vscode-editor-font-family); }
 .plan-node-title { font-weight: 600; overflow-wrap: anywhere; }
-.plan-node-tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 6px; font-size: .8em; color: var(--vscode-descriptionForeground); }
-.plan-node-tags .tag { border: 1px solid var(--vscode-panel-border); border-radius: 2px; padding: 0 3px; }
+.plan-node-tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--gap-1) var(--gap-3); font-size: var(--font-xs); color: var(--vscode-descriptionForeground); }
+.plan-node-tags .tag { border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-sm); padding: 0 3px; }
 /* 見る場所が none の項は、縁を細くして「ユーザが見ない」を示す */
 .plan-node:has(.tag[data-review="none"]) { border-left-color: var(--vscode-descriptionForeground); border-left-style: dashed; }
 /* 終端に当たらない項（実行ファイルの loose）。縁を注意の色にする。文字は普通の色のまま */
@@ -60,7 +60,7 @@
 .plan-node-tags .tag.locked { border-style: dotted; }
 /* start と end の仮の点。名前だけの小さな丸い札 */
 .plan-end {
-  padding: 3px 10px; border-radius: 999px;
+  padding: 3px 10px; border-radius: var(--radius-pill);
   border: 1px dashed var(--vscode-descriptionForeground);
   background: var(--vscode-editor-background);
   color: var(--vscode-descriptionForeground);
@@ -72,14 +72,14 @@
 .plan-graph .react-flow__edge.loose path { stroke: var(--vscode-editorWarning-foreground); }
 .plan-graph .react-flow__handle { width: 6px; height: 6px; }
 /* 図の下の一言。注意の行は左に注意の色の縁を付ける（文字の色は変えない） */
-.plan-graph-notes { margin: 4px 0 0; padding: 0; list-style: none; font-size: .9em; }
+.plan-graph-notes { margin: 4px 0 0; padding: 0; list-style: none; font-size: var(--font-md); }
 .plan-graph-note { padding: 1px 0 1px 8px; border-left: 3px solid transparent; overflow-wrap: anywhere; }
 .plan-graph-note.warn { border-left-color: var(--vscode-editorWarning-foreground); }
 /* 消せる線の真ん中の ×（計画編集タブだけ）。フロー編集の × と同じ形。線を選ばせないので、いつも出す */
 .plan-edge-tools { position: absolute; pointer-events: all; }
 .plan-remove {
   width: 18px; height: 18px; padding: 0; line-height: 16px; font-size: 12px;
-  border-radius: 50%; cursor: pointer;
+  border-radius: var(--radius-round); cursor: pointer;
   border: 1px solid var(--vscode-panel-border);
   background: var(--vscode-editor-background);
   color: var(--vscode-foreground);
@@ -89,18 +89,18 @@
   border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-focusBorder));
 }
 /* 項の詳細（計画編集タブ）。図の右に置き、畳むと細い帯になる。狭いときは図の下に回す */
-.plan-graph-body { display: flex; gap: 8px; align-items: stretch; }
+.plan-graph-body { display: flex; gap: var(--gap-4); align-items: stretch; }
 .plan-graph-body .plan-graph-canvas { flex: 1 1 0; min-width: 0; }
 .plan-detail {
   flex: 0 0 260px; min-width: 0; box-sizing: border-box;
-  border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 6px 8px;
-  display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow: auto;
+  border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 6px 8px;
+  display: flex; flex-direction: column; gap: var(--gap-3); max-height: 360px; overflow: auto;
 }
 .plan-graph-body[data-folded="1"] .plan-detail { flex-basis: auto; padding: 4px; }
 .plan-detail-toggle { margin-left: 0; align-self: flex-start; white-space: nowrap; }
-.plan-detail-list { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.plan-detail-list { margin: 0; display: flex; flex-direction: column; gap: var(--gap-2); }
 .plan-detail-row { display: flex; flex-direction: column; }
-.plan-detail-row dt { font-size: .85em; color: var(--vscode-descriptionForeground); }
+.plan-detail-row dt { font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
 .plan-detail-row dd { margin: 0; overflow-wrap: anywhere; }
 .plan-detail-empty { margin: 0; }
 .plan-node[data-picked="1"] { outline: 2px solid var(--vscode-focusBorder); }

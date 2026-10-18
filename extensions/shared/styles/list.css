@@ -4,15 +4,15 @@
  * 行の見出し（.row-head）の列の幅は画面ごとに決める。欄名は欄の左に置き、欄と欄名は親の格子に並ぶ
  * （.field は display: contents）。出番の少ない欄は details.more に畳み、値があるときだけ開いて出す。
  */
-.list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
+.list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); }
 .list:empty { display: none; }
 .row { border-top: 1px solid var(--vscode-panel-border); }
 .row:first-child { border-top: 0; }
-.row:first-child > .row-head { border-radius: 4px 4px 0 0; }
+.row:first-child > .row-head { border-radius: var(--radius-md) var(--radius-md) 0 0; }
 .row:last-child > .row-body, .row:last-child:not(.open) > .row-head { border-radius: 0 0 4px 4px; }
 /* 絞り込みで隠す。開いている行は打っている途中で消えないよう隠さない */
 .row.hidden-by-find:not(.open) { display: none; }
-.row-head { display: grid; gap: 10px; align-items: center; padding: 5px 8px; cursor: pointer; }
+.row-head { display: grid; gap: var(--gap-4); align-items: center; padding: 5px 8px; cursor: pointer; }
 .row-head:hover { background: var(--vscode-list-hoverBackground); outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
 .row.open .row-head { background: var(--vscode-editorWidget-background); }
 /* 開いている行は左に縁を付ける。HC は contrastActiveBorder、他は focusBorder */
@@ -25,18 +25,18 @@
 .sum { display: contents; }
 .sum .sum-id { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sum .dim { color: var(--vscode-descriptionForeground); }
-.sum .mono { font-family: var(--vscode-editor-font-family); font-size: .92em; }
+.sum .mono { font-family: var(--vscode-editor-font-family); font-size: var(--font-md); }
 .sum .clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sum .sum-note { color: var(--vscode-descriptionForeground); margin-left: 10px; }
-.sum .sum-flag { width: 8px; height: 8px; border-radius: 50%; justify-self: center; }
+.sum .sum-flag { width: 8px; height: 8px; border-radius: var(--radius-round); justify-self: center; }
 .sum .sum-flag.on { background: var(--vscode-charts-blue); }
-.sum .tag { font-size: .85em; padding: 0 7px; border-radius: 999px; border: 1px solid currentColor; font-family: var(--vscode-editor-font-family); justify-self: start; }
+.sum .tag { font-size: var(--font-sm); padding: 0 7px; border-radius: var(--radius-pill); border: 1px solid currentColor; font-family: var(--vscode-editor-font-family); justify-self: start; }
 .row-body {
-  display: none; padding: 4px 10px 10px 36px; gap: 6px 12px; align-items: center;
+  display: none; padding: 4px 10px 10px 36px; gap: var(--gap-3) var(--gap-5); align-items: center;
   grid-template-columns: 150px minmax(0, 1fr); background: var(--vscode-editorWidget-background);
 }
 .row.open .row-body { display: grid; }
-.row-body .buttons { grid-column: 1 / -1; display: flex; gap: 4px; justify-content: flex-end; padding-top: 4px; }
+.row-body .buttons { grid-column: 1 / -1; display: flex; gap: var(--gap-2); justify-content: flex-end; padding-top: 4px; }
 /* 行末のボタンは右端に詰める。`button.action.small` の `margin-left: auto`（見出しの「＋ 追加」向け）を
    打ち消すためのもので、**`.action` まで書いて詳細度で勝たせる**。同じ詳細度だと、どちらが先に
    バンドルされたかで見た目が変わる（CSS の `@import` は先頭に集まるので、順序は入口の 1 行で動く） */
@@ -44,13 +44,13 @@
 .row-body .wide { grid-column: 1 / -1; }
 .row-body textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; }
 .field { display: contents; }
-.field > .cap { color: var(--vscode-descriptionForeground); text-align: right; font-size: .95em; overflow-wrap: anywhere; }
+.field > .cap { color: var(--vscode-descriptionForeground); text-align: right; font-size: var(--font-lg); overflow-wrap: anywhere; }
 .field > input, .field > select, .field > textarea, .field > .inline, .field > .picker, .field > .with-button { width: 100%; box-sizing: border-box; margin: 0; min-width: 0; }
 .field > input.narrow, .field > select.narrow { max-width: 260px; }
 /* 選択欄は一番長い選択肢の幅に合わせ、欄の幅を超えない。3 画面で同じ決め方にして、説明付きの長い選択肢も切らない */
 .field > select { width: auto; max-width: 100%; justify-self: start; }
 .field > input.num { max-width: 90px; }
-.inline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.inline { display: flex; flex-wrap: wrap; gap: var(--gap-3); align-items: center; }
 .inline > input { flex: 1; min-width: 80px; }
 .inline > input.num { flex: 0 0 90px; min-width: 0; }
 .inline > .cap { color: var(--vscode-descriptionForeground); }
@@ -60,8 +60,8 @@ details.more > summary::-webkit-details-marker { display: none; }
 details.more > summary::before { content: "▸ "; }
 details.more[open] > summary::before { content: "▾ "; }
 details.more > summary b { font-weight: 500; color: var(--vscode-editor-foreground); }
-details.more > .sub { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 12px; align-items: center; padding-top: 4px; }
-.find { display: flex; gap: 12px; align-items: center; margin: 0 0 10px; flex-wrap: wrap; }
+details.more > .sub { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: var(--gap-3) var(--gap-5); align-items: center; padding-top: 4px; }
+.find { display: flex; gap: var(--gap-5); align-items: center; margin: 0 0 10px; flex-wrap: wrap; }
 .find input { width: 320px; max-width: 100%; }
 .find .hint { margin: 0; }
 /*
@@ -69,8 +69,8 @@ details.more > .sub { display: grid; grid-template-columns: 150px minmax(0, 1fr)
  * パターンや条件の列が 0 幅に潰れないようにする（2 段目へ回す列は画面ごとの CSS が決める）
  */
 @media (max-width: 520px) {
-  .row-body { padding-left: 14px; grid-template-columns: minmax(0, 1fr); gap: 2px 12px; }
-  details.more > .sub { grid-template-columns: minmax(0, 1fr); gap: 2px 12px; }
+  .row-body { padding-left: 14px; grid-template-columns: minmax(0, 1fr); gap: var(--gap-1) var(--gap-5); }
+  details.more > .sub { grid-template-columns: minmax(0, 1fr); gap: var(--gap-1) var(--gap-5); }
   .field > .cap { text-align: left; margin-top: 4px; }
-  .row-head { row-gap: 2px; }
+  .row-head { row-gap: var(--gap-1); }
 }

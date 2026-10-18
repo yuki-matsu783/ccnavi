@@ -1,8 +1,8 @@
 /*
  * 取り込みの欄（`ImportForm.tsx`）。下書きの見出しの直下に出す。狭い幅では欄を折り返す。
  */
-.import-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 10px 36px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: 4px; }
-.import-form label { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.import-form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-3) var(--gap-6); margin: 0 0 10px 36px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-md); }
+.import-form label { display: inline-flex; align-items: center; gap: var(--gap-3); flex-wrap: wrap; }
 .import-form input[type="checkbox"] { margin: 0; }
 @media (max-width: 520px) {
   .import-form { margin: 0 0 10px 14px; padding: 8px 14px; }

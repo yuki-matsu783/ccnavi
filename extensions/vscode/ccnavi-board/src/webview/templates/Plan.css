@@ -2,7 +2,7 @@
  * 計画の表（`Plan.tsx`）。狭い幅で表がはみ出すときは外側の div を横に送る。
  */
 .tpl-plan-wrap { overflow-x: auto; margin: 0 0 10px; }
-.tpl-plan { border-collapse: collapse; min-width: 100%; font-size: .92em; }
+.tpl-plan { border-collapse: collapse; min-width: 100%; font-size: var(--font-md); }
 .tpl-plan caption { text-align: left; font-weight: 600; padding: 0 0 4px; }
 .tpl-plan th, .tpl-plan td { padding: 2px 12px 2px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
 .tpl-plan th { color: var(--vscode-descriptionForeground); font-weight: 400; }

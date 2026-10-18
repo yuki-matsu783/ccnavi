@@ -16,6 +16,7 @@
 @import "@ccnavi/shared/styles/button.css";
 @import "../styles/appearance.css";
 @import "@ccnavi/shared/styles/page.css";
+@import "../shared/Dialog.css";
 @import "./App.css";
 @import "./Card.css";
 @import "./Approval.css";

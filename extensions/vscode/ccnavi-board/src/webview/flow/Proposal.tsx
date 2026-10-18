@@ -13,6 +13,7 @@ import { useEffect, useRef, type JSX } from "react";
 import { textDiff, type TextChange, type ValueKind } from "../../core/flow-diff.js";
 import type { FlowDoc } from "../../core/flow-doc.js";
 import type { FlowLock, FlowProposal } from "../../core/flow-view.js";
+import { Dialog, DialogActions } from "../shared/Dialog.js";
 import { post } from "./post.js";
 
 const KIND_TITLES: Readonly<Record<TextChange["kind"], string>> = {
@@ -86,8 +87,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
   // 欄ごとに分けて見せられなかった下書きは取り込ませない（読めていないものを入れない）
   const blocked = lock.locked || diff?.problem !== undefined;
   return (
-    <div className="review-backdrop">
-      <section className="review proposal" id="proposal-review" data-tour="proposal" role="dialog" aria-modal="true" aria-labelledby="proposal-review-title">
+    <Dialog titleId="proposal-review-title" backdropClass="review-backdrop" cardClass="review proposal" id="proposal-review" tour="proposal">
         <h2 id="proposal-review-title">エージェントの提案を確認する</h2>
         {view.kind === "loading" && <p className="dim">下書きを ccnavi で確認しています…</p>}
         {view.kind === "error" && (
@@ -120,7 +120,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
             )}
           </>
         )}
-        <div className="review-actions">
+        <DialogActions className="review-actions">
           <button type="button" className="action" data-action="cancel-proposal" ref={cancel} onClick={onCancel}>
             閉じる
           </button>
@@ -129,9 +129,8 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
               {dirty ? "未保存の変更を破棄して取り込む" : "取り込む"}
             </button>
           )}
-        </div>
-      </section>
-    </div>
+        </DialogActions>
+    </Dialog>
   );
 }
 
@@ -142,15 +141,14 @@ export function RequestText({ prompt, onClose }: { readonly prompt: string; read
     copy.current?.focus();
   }, []);
   return (
-    <div className="review-backdrop">
-      <section className="review" id="request-text" data-tour="request-text" role="dialog" aria-modal="true" aria-labelledby="request-text-title">
+    <Dialog titleId="request-text-title" backdropClass="review-backdrop" cardClass="review" id="request-text" tour="request-text">
         <h2 id="request-text-title">エージェントへの依頼文</h2>
         <p className="dim small">
           コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントは下書きのみを作成します。
           取り込むかどうかは、この画面で差分を確認して判断してください。
         </p>
         <pre className="request-prompt">{prompt}</pre>
-        <div className="review-actions">
+        <DialogActions className="review-actions">
           <button type="button" className="action primary" data-action="request-copy" ref={copy} onClick={() => post({ type: "requestCopy" })}>
             コピー
           </button>
@@ -160,8 +158,7 @@ export function RequestText({ prompt, onClose }: { readonly prompt: string; read
           <button type="button" className="action" data-action="request-close" onClick={onClose}>
             閉じる
           </button>
-        </div>
-      </section>
-    </div>
+        </DialogActions>
+    </Dialog>
   );
 }
