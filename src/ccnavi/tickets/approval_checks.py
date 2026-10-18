@@ -164,7 +164,7 @@ def misplaced_home_text(root: str, family: str, shown: str) -> str:
     """承認済みチケットが親のワークツリーに無いときの理由と直し方。
 
     `home_problem` と ready が同じ文を出す。`ccnavi-push-approved.sh` と `ccnavi-sync.sh` は、
-    ツリーごとの置き場を送る・親のブランチを取り込む。
+    ツリーごとの置き場を送る・親のブランチを取り込むだけで、ツリーの間でチケットを動かさないので、
     承認済みチケットは手で動かさず、承認し直す。
     """
     worktree_sh = settings.script_command(root, "ccnavi-worktree.sh")

@@ -221,7 +221,7 @@ ccnavi_parent_tree() {
 # 入れる変数は、どれも yes / no / unreadable / unknown のどれか（unknown は、実行ファイルが無い・答えない・
 # 古くてその行を知らない）。
 #   ccnavi_pi_parent     そのツリーが親のワークツリーか
-#   ccnavi_pi_approved   親のワークツリーの承認済み（approved/ の doing か done）に親チケットがある
+#   ccnavi_pi_approved   親のワークツリーの承認済み（approved/ の doing か done）に親チケットがある（見るのは承認済みのチケットだけ）
 #   ccnavi_pi_requested  承認済みの phases/<名前>/ に <N>.requested が 1 つ以上ある
 #   ccnavi_pi_archived   手元の退避（ready 済み）に親がある
 #   ccnavi_pi_started    承認済みの親チケットの started_at が空でない（着手は push してから完了する）
@@ -293,6 +293,7 @@ ccnavi_parent_trace() {
 # 形跡は 2 つ。手元の `refs/remotes/origin/<ブランチ>`（`branch.<ブランチ>.remote` は使わない。origin/main から
 # 切っただけの未 push の親でも設定されるため）と、実行ファイルが答える .requested・退避・着手済み
 # （fetch.prune で参照が消えても残る）。どちらかがあれば `ls-remote` で在るかを聞く。聞けない・時間切れは 2。
+# 承認済みというだけでは形跡にしない（承認して最初に打つ push が、初回として通る）。
 # 形跡が無ければ、最初の push として通す。ただし承認済みチケットを読めない（unreadable）ときは、
 # 着手済みかを確かめられないので 2。実行ファイルが無い・古くて新しい行を知らないときは、参照の形跡だけで決める。
 ccnavi_push_gate() {

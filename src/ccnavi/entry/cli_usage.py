@@ -345,7 +345,7 @@ _TICKET = """\
          allow の項が計画のどのフェーズの範囲とも重ならないときは、停止せず
          「承認しても書けない」と警告します
          （scope: inherit のタイプが計画にあれば警告しません）。
-         ccnavi を直接実行します）
+         ccnavi を直接実行します（sh のラッパーは使いません））
     ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
                            [--with-feedback] [--issue N]
         （上と同じですが、計画と子フローの下書きは --plan の代わりにテンプレートから取得します。

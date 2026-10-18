@@ -115,6 +115,8 @@ def structure_problems(data) -> list[str]:
     見るのは、線の `from` / `to` が無いノードを指す、`start` から届かないノード、`start` に入る線、
     `end` から出る線、分岐・問いの出口に線が無い、`end` が無い、`start` が無い、`loop` の上限の
     回数と出口、`loop` を通らない巡回。グループは外す（手順ではない）。
+    見るのは最上位の `nodes` の手順だけ。サブフロー（`subAgentFlows`）の中は
+    `name_problems` だけが見る。
 
     出口は画面（`flow-doc.ts` の `portsOf`）と同じに読む。複数選択（`multiSelect: true`）の問いは
     選択肢ごとに出口を分けず、`output` の 1 本だけ。グループへ出る線も、出る側の出口は使っている。

@@ -2,7 +2,8 @@
  * Markdown の描画。
  *
  * チケットの本文はエージェントや他の人が書ける、攻撃者が制御しうる入力として扱う。
- * Markdown を HTML に変えた後に DOMPurify で消毒し、文字列ではなく DOM の断片で返す。
+ * Markdown を HTML に変えた後に DOMPurify で消毒し、文字列ではなく DOM の断片で返す
+ * （`innerHTML` に文字列を戻さない）。
  *
  * - リンクは `http:`・`https:`・`mailto:` だけ。ほかの表記（`javascript:`・`data:`・相対）は href を外す
  * - 画像・SVG・MathML・フォーム・style は出さない。画像は外への通信（読んだことの漏れ）になるため

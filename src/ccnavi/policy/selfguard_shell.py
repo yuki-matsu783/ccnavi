@@ -218,8 +218,8 @@ def holder_regex(directory: str, names: str, *, named_only: bool = False) -> str
     あるときだけ当たる（上の _HOLD_NAME の説明）。行き先は _COPY_LAST / _COPY_TARGET と同じく、
     `-t` の値か、選択肢でない最後の引数。
 
-    named_only を立てると、元の側に names の語があるときだけ当たる。
-    常に当たる土台（`.git` の 1 本）で使う。
+    named_only を立てると、元の側に names の語があるときだけ当たる（名前の決まらない語と、
+    行き先をディレクトリと見ない選択肢には当たらない）。常に当たる土台（`.git` の 1 本）で使う。
     土台は保護を切った設定でも当たるので、`cp ../src/*.py .` のような日常の写しを、守るものと
     関係の無い文面で止めないため。
     """

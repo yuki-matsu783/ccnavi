@@ -140,7 +140,8 @@ def script_fields_set(text: str) -> tuple[str, ...]:
     とくに `base_sha` は着手の基準点で、親の自分のコミットの数え（`ops_stop._own_commits`）が使う。
     子の範囲検査（`phase_scope.scope_findings`）と実績リスク（`risk.measure`）は、親のワークツリーの
     HEAD との共通の祖先（`gitstate.child_base`）から数える。
-    それでもスクリプトだけが書く欄で、書き換えられると着手の記録が偽物になる。除く欄を「いつでも」にすると、その
+    ただし `base_sha` はスクリプトだけが書く欄で、
+    書き換えられると着手の記録が偽物になる。除く欄を「いつでも」にすると、その
     書き換えが実行後チェックからも消える。
     """
     lines = text.splitlines()

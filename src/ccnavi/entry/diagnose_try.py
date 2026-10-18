@@ -194,6 +194,7 @@ def _try_stop(conf: settings.Settings, root: str, out: dict) -> dict:
     ターンの終わりに当てるのは、共通レイヤーと自身のレイヤーの `allow` で、
     `every` が 2 以上のものだけ
     （`ruleload.stop_rules`）。使われるものがあれば `allow`、無ければ判定に入らない（`skip`）。
+    試しで記録を変えない（数えは進めない）。
     """
     picked = ruleload.stop_rules(conf, root)
     out["verdict"] = audit.ALLOW if picked else audit.SKIP

@@ -170,8 +170,9 @@ def base_off_head(root: str, conf: settings.Settings, t: ticket_model.Ticket) ->
 
     着手の欄はスクリプトだけが書く。承認はチケットの中身を変えないので、手で動かした承認では
     提案の段階で書かれた基準点がそのまま入りうる。`--lint` と `ccnavi ticket status` が warn で
-    言う。`start` は基準点を HEAD で書き直す（`started_at` も仕込まれていれば
-    「着手済み」で先に返り、`base_sha` だけなら判定が `blocked` で止める）。ワークツリーが無い・
+    言う。`start` は、`started_at` が無ければ基準点を HEAD で書き直す
+    （`started_at` も仕込まれていれば「着手済み」で先に返り、`base_sha` だけなら判定が
+    `blocked` で止める）。ワークツリーが無い・
     HEAD を読めないときは確かめられないので空を返す（言わない）。判定には入れない
     （判定は git を読まない）。
     """

@@ -546,8 +546,8 @@ def subset_problems(child: ticket_model.Ticket, parent: ticket_model.Ticket) -> 
     `src/components/*` の前置は `src/components/`、`*` の前置は空文字で、
     空文字を中と言える親は `*` を持つ親だけになる。
 
-    超えていても承認は止めない（warn）。判定が親の範囲で切り詰めるので、承認で止める
-    理由が無い。承認の画面は「チケットで編集対象としているが、書き込めない場所」として別の見出しで見せる。
+    超えていれば warn で言う。判定が親の範囲で切り詰める。
+    承認の画面は「チケットで編集対象としているが、書き込めない場所」として別の見出しで見せる。
     """
     problems = []
     for entry in child.entries:

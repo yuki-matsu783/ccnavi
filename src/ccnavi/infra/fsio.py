@@ -801,7 +801,10 @@ class Policy:
 
 
 def failure_text(policy: Policy, reason: str) -> str:
-    """書けなかった知らせの本文。`{reason}` だけを差し込む。"""
+    """書けなかった知らせの本文。`{reason}` だけを差し込む。
+
+    文面の `{` `}` はそのまま出す（`str.format` ではなく `str.replace` で埋める）。
+    """
     return policy.prefix + policy.message.replace("{reason}", reason)
 
 

@@ -31,7 +31,7 @@
   - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の write-and-push
   がコミットする。
     未コミットのときだけ）
-  - `skip` は書きかけの一時ファイル
+  - `skip` は書きかけの一時ファイル。分類にも数えず、コミットの対象にもしない
 
 git はローカルの読み取りだけ（`status`・`diff`・`ls-tree`・`cat-file`・`config`）。遅延取得は
 止める（`gitcmd`）。

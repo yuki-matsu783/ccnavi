@@ -1,6 +1,6 @@
 /**
  * Markdown の本文（`div.markdown`）。marked と DOMPurify（`src/core/sanitize.ts`）で消毒した DocumentFragment を、
- * ref で要素に差し込む。
+ * ref で要素に差し込む。HTML の文字列には戻さない（`dangerouslySetInnerHTML` は使わない。sanitize.ts の決まり）。
  * 中身は React の子にしないので、React は描き直しで中を触らない。本文か描き手が変わったときだけ差し替える。
  */
 import { useCallback, useContext, type JSX } from "react";

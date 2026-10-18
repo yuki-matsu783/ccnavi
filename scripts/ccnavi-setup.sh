@@ -9,7 +9,7 @@
 #                            CCNAVI_TICKET_CONTROL。チケット制御を使うか。既定は enable
 #   --deploy <ccnavi の根>   配布元。既定はこのスクリプトが入っている ccnavi の根
 #   --no-deploy              配布物を置かず、settings.json だけを書く
-#   --all                    受け付けるだけで、今は書き出しを変えない
+#   --all                    受け付けるが、今は足すものが無い（置き場の env は廃止した）
 #   --force                  明示した --mode / --ticket-control で、既にある値を置き換える。
 #                            配るときも、配布先に既にあるものを入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
@@ -189,7 +189,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             使うか。全体ルールだけで足りるプロジェクトは disable。既定は enable
   --deploy <ccnavi の根>    配布元。既定はこのスクリプトが入っている ccnavi の根
   --no-deploy               配布物を置かず、settings.json だけを書く
-  --all                     受け付けるだけで、今は書き出しを変えない
+  --all                     受け付けるが、今は足すものが無い（置き場の env は廃止した）
   --force                   明示した --mode / --ticket-control で、既にある値を置き換える。
                             配るときも、配布先に既にあるものを入れ替える
   --check                   書かずに、揃っていないところだけを並べる
