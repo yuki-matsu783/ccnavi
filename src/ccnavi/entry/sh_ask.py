@@ -12,7 +12,7 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   `ready` の後は手元の退避（`logs/archive/<リポジトリ>/done/`）の親も数える
   （ツリーが `.claude/worktrees/` の下のときだけ）。
   続けて、push の関門（sh）が「初回の push か、消えた親ブランチの再作成か」を見分ける材料を返す。
-  `approved`（承認済みの親チケットが在るか。提案は数えない）・`requested`（`.requested` の
+  `approved`（承認済みの親チケットが在るか）・`requested`（`.requested` の
   マーカーが在るか）・`archived`（手元の退避に親が在るか）・`started`（承認済みの親チケットの
   `started_at` が空でないか。着手は push してから完了するので、着手済みなら一度は push した）・
   `mr`（親チケットの `mr:` 欄）。

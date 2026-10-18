@@ -10,7 +10,7 @@
   決まらない。その親子のチケットの承認も状態の操作も止める
 - それ以外で親のワークツリーがある: 親のブランチ上のチケットだけが正
 
-親のブランチがリモートから消えたことは、ここでは見ない（push の関門が止める）。
+親のブランチがリモートから消えたことは、push の関門が止める。
 """
 
 from __future__ import annotations
@@ -37,8 +37,7 @@ class Standing:
     （読めなければ空）。
     `home` は親のワークツリー（`.claude/worktrees/<P>` で、HEAD のブランチ名を変換したものが
     フォルダ名と一致するもの）。
-    `branch` は親のブランチ名。ワークツリーの HEAD から読んだもので、読めなければ空
-    （識別子からの逆算はしない）。
+    `branch` は親のブランチ名。ワークツリーの HEAD から読んだもので、読めなければ空。
     """
 
     family: str
@@ -112,8 +111,8 @@ class Families:
 
     def home_tree(self, family_id: str, project: str) -> tree.Tree | None:
         """親のワークツリー。名前が親の識別子で、元が同じリポジトリで、
-        HEAD のブランチ名を変換したものが名前と一致するもの。無ければ None。ファイルだけを読む
-        （git は起こさない）。"""
+        HEAD のブランチ名を変換したものが名前と一致するもの。無ければ None。
+        ファイルだけを読む。"""
         work = self._named_tree(family_id, project)
         if work is not None and head_branch(work.root, family_id):
             return work
@@ -121,9 +120,7 @@ class Families:
 
     def branch(self, family_id: str, project: str = "") -> str:
         """親のブランチ名。親のワークツリー（`.claude/worktrees/<P>`）の HEAD から読む。
-        読めない・変換した識別子が名前と合わないときは空。ファイルだけを読む（git は起こさない）。
-
-        識別子から逆算しない。
+        読めない・変換した識別子が名前と合わないときは空。ファイルだけを読む。
         """
         home = self.home_tree(family_id, project)
         return head_branch(home.root, family_id) if home is not None else ""

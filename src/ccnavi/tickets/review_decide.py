@@ -329,7 +329,7 @@ def decide_preview(
     phase_no: int,
     result_path: str,
 ) -> int:
-    """残った指摘を見せるだけ（`--reviewed N --accept-unresolved --preview --json`）。何も置かない。
+    """残った指摘を見せる（`--reviewed N --accept-unresolved --preview --json`）。
 
     ボードのオーバーレイが読む。適用はこの `digest` を `--digest` で返したときだけ通る。
     """

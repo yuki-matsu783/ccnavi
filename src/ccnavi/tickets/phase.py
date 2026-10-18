@@ -462,7 +462,7 @@ def announce(
 ) -> str:
     """終わったばかりのフェーズについて 1 度だけ言う文。無ければ空文字。
 
-    `raw` は `phases_of` と同じ。ここが書くのはマーカーだけで、置き場のチケットは動かさない。
+    `raw` は `phases_of` と同じ。ここが書くのはマーカーだけ。
     """
     texts = []
     # マーカーを書くので、置き場は書く側の決め方で引く。決まらなければ何も言わない
@@ -472,7 +472,7 @@ def announce(
     except approval.NoParentWorktree:
         return ""
     phases = phases_of(root, conf, parent.ticket, raw=raw)
-    # マーカーの `source` を決めるためだけに読む。判定は写しを読み、ここで読んだ定義は使わない。
+    # マーカーの `source` を決めるためだけに読む。判定は写しを読む。
     # 読むのはマーカーを置くフェーズがあるときだけ。
     common: dict[str, phasetypes.PhaseType] | None = None
     if any(p.ended and not p.marks and not p.deferred for p in phases):
@@ -567,7 +567,7 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
             )
         return "計画のフェーズは全部終わりました。親チケットを閉じられます。"
     # 並行して始められるものを全部挙げる。番号が前でも、まだ子の無い枝は拾う。
-    # 待ちが済んでいない番号は案内しない。
+    # 待ちが済んだ番号だけ案内する。
     ready = [p for p in phases if not p.tickets and waits_done(parent, phases, p.number)]
     if not ready:
         return "次に始められるフェーズは、待っているフェーズが済むまでありません。"
@@ -610,7 +610,7 @@ def reopen_impact(root: str, conf: settings.Settings, parent_id: str, number: in
     """フェーズを開き直したとき、後続の着手済み・レビュー済みのフェーズを挙げて方針を促す行。
 
     開き直しで消えるのはそのフェーズのマーカーだけ。実装中の子を止めるか・受入テストを作り直すか・
-    どの工程を再レビューするかは、ユーザが決める。自動で取り消すことはしない。
+    どの工程を再レビューするかは、ユーザが決める。
     """
     touched = downstream_touched(root, conf, parent_id, number)
     if not touched:
@@ -733,12 +733,11 @@ def resumed_review(
 
     運用の基本は、閉じたチケットを戻さず新しいチケットを作り直すこと。ユーザが `done/` から
     `doing/` へ手で戻す再開は想定しておらず、されるとそのフェーズの `reviewed` が残って、
-    もう一度 `finish` しても止まらず、レビューの告知も出ない。機構はマーカーを消さない
-    （消すかはレビューをやり直すかどうかで、ユーザが決める）。判定も `start` も止めず、
-    `--lint` と `status` がこの文を warn で言う。
+    もう一度 `finish` しても止まらず、レビューの告知も出ない。マーカーを消すかは
+    レビューをやり直すかどうかで、ユーザが決める。`--lint` と `status` がこの文を warn で言う。
 
     延期したフェーズの子は、引き受けた側（`review_at`）の `reviewed` が残っているときに言う
-    （消すのはその引き受けた側のマーカー。延期の `skipped` は消さない）。引き受けた側がまだ
+    （消すのはその引き受けた側のマーカー）。引き受けた側がまだ
     レビュー前なら、これからのレビューが再開後の作業も覆うので言わない。
     閉じ直したときにレビューが要らないフェーズ（定義が `review: none` で、この子も
     `human_review` を求めていない）と、レビューが要らない引き受け手は、マーカーが残っていても

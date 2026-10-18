@@ -1,7 +1,6 @@
 """レイヤーごとの設定の読み出しと、ルールの書き方の整形。
 
 `--explain`（diagnose_explain）、ボード（diagnose_board）、試験（diagnose_try）が共有する。
-合成はしない。
 """
 
 from __future__ import annotations
@@ -33,14 +32,14 @@ def layer_config(conf: settings.Settings, root: str, name: str, kind: str) -> st
 
 
 def written(entry) -> str:
-    """範囲の 1 件を、書かれた表記で出す。翻訳後の式ではなく、ユーザが書いたほう。"""
+    """範囲の 1 件を、書かれた表記で出す。ユーザが書いたほう。"""
     return entry.glob or entry.regex
 
 
 def layer_phase_types(path: str) -> tuple[list, str]:
     """そのレイヤーのフェーズ定義と、読めなかった理由。無いレイヤーは空。
 
-    合成はしない。ここで出すのは「どのレイヤーに何が書いてあるか」で、共通レイヤーも同じ読み方を
+    ここで出すのは「どのレイヤーに何が書いてあるか」で、共通レイヤーも同じ読み方を
     する。判定が使う和（共通レイヤー + 親の `project:` が指すレイヤー）は `phasetypes.layer_types`
     が組む。定義は順序を持たない（順序は親の計画の項の `after`）。
     """
@@ -59,7 +58,7 @@ def layer_phase_set(path: str) -> tuple[phasetypes.PhaseTypes | None, str]:
 
 
 def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str]:
-    """そのレイヤーのリスクの項目と、読めなかった理由。無いレイヤーは空（組み込みには戻さない）。
+    """そのレイヤーのリスクの項目と、読めなかった理由。無いレイヤーは空。
 
     `script:` に書けるパスはレイヤーごとに違うので、読み方もレイヤーごとに分ける。
     """

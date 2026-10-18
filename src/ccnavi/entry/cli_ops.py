@@ -46,8 +46,8 @@ def operate(
 
     `ticket start|finish|cancel <識別子>`、`ticket new <識別子> ...`（親の提案の雛形）、
     `review prepare|requested|confirm`、それに
-    ユーザが打つ `--reviewed` と `--close-early`。どれも payload を読まず、判定も記録もしない。
-    リモートから取得した結果は `--result <json>` で受け取る。exe はネットワークに出ない。
+    ユーザが打つ `--reviewed` と `--close-early`。
+    リモートから取得した結果は `--result <json>` で受け取る。
     """
     cwd = args.cwd or os.getcwd()
     words = list(args.command)
@@ -295,13 +295,13 @@ def _worktree(
         code = retire.run_abandon(stdout, stderr, root, conf, args.abandon)
         return EXIT_OK if code == 0 else EXIT_ERROR
     if verb == "name" and len(words) == 3:
-        # 直接作業の名前の形を言う（warn の 1 行。拒否はしない）。sh の作成の後に呼ぶ。
+        # 直接作業の名前の形を言う（warn の 1 行）。sh の作成の後に呼ぶ。
         text = ticket_ids.direct_name_warning(words[2], conf.branch_prefixes)
         if text:
             stdout.write(f"warn: {text}\n")
         return EXIT_OK
     if verb == "id" and len(words) == 3:
-        # ブランチ名から識別子を作り、使えるかを言う（sh は字の種類・NFC・長さを判定しない）。
+        # ブランチ名から識別子を作り、使えるかを言う（字の種類・NFC・長さはここで判定する）。
         for line in ticket_ids.id_answer(words[2]):
             stdout.write(line + "\n")
         return EXIT_OK

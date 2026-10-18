@@ -25,7 +25,7 @@
 #            HEAD に入って push されていれば、マージリクエストの差分に載る。ここは拡張子・在ること・
 #            中身があること・wip/eli5/ の下にあること・名前の字・HEAD で普通のファイル（100644）として
 #            HEAD と同じ中身でコミット済みであることを確かめ、
-#            実行ファイルには渡さない。crit は起動しない（待ち続けるため）。投稿が済んだら、ユーザが打つ
+#            実行ファイルには渡さない。投稿が済んだら、ユーザが打つ
 #            `crit review <パス>` と `crit push <番号>` を標準出力に出す。crit push で送られた指摘は
 #            マージリクエストの行のスレッドになり、confirm が未解決として数え、decide で選べる。
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
@@ -73,7 +73,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
                                                   wip/eli5/phase-<N>.html）に置いてコミットし、push しておく（マージリクエストの
                                                   差分に載せる）。相対パスは実行した場所から。投稿が済むと、ユーザが実行する
                                                   crit review <パス> と crit push <番号> を出す
-  confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（依頼の時刻では絞らない）
+  confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で実行します。--preview は一覧を JSON で見るだけ）
   ready        [--parent <親>]                    閉じられて push 済みなら、クローズ済みのチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを削除して削除を push し、Draft を解除する（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを削除します（中から実行したときは消さず、外から実行する 1 本を出す）。--parent なら親のワークツリーの外から実行できる
@@ -324,7 +324,7 @@ find_mr() {
 		api GET "repos/$path/pulls?state=open&head=$(ccnavi_host_encode "$owner:$branch")" |
 			"$JQ" '.[0] // empty | {number: .number, url: .html_url, source: .head.ref, target: .base.ref, draft: (.draft // false)}'
 	else
-		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
+		# このプロジェクトのブランチから出た MR だけ。
 		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても目的のものを外さない）
 		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の URL を見直してください）。"
 		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$(ccnavi_host_encode "$branch")") ||
@@ -675,7 +675,7 @@ post_decision() {
 	fi
 }
 
-# ---- トークンの持ち主（レビュー済みマーカーの actor。記録だけで、判定には使わない）。引けなければ空で、止めない。
+# ---- トークンの持ち主（レビュー済みマーカーの actor。記録に使う）。引けなければ空。
 #
 # gh / glab はその道具が認証したアカウント、curl はトークンの持ち主。GitHub は GET /user の login、
 # GitLab は username。GitHub Actions の GITHUB_TOKEN のように持ち主の無いトークンは 403 で空になる。
@@ -850,7 +850,7 @@ merged)
 	#                               分からなければそれぞれ空）
 	#   none                        終了コード 0（マージ済みの MR が無いと分かった）
 	#   unknown                     終了コード 3（API が失敗した・答えを読めなかった）。道具やトークンが無ければ、
-	#                               上の道具の選び方が 2 で止める（none は出さない）
+	#                               上の道具の選び方が 2 で止める
 	merged_number="${1:-}"
 	case "$merged_number" in
 	*[!0-9]*) fail merged-number "merged の MR の番号 (${merged_number}) は数字で渡してください。" 2 ;;
@@ -1086,14 +1086,14 @@ ${eli5_how}"
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
 	c1_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
-	# 段 4: crit の案内。crit はユーザの手元で打つ道具で、ここからは起動しない（待ち続けるため）。
+	# 段 4: crit の案内。crit はユーザの手元で打つ道具。
 	# crit push は crit の作業場所（打った場所）からの相対で行を送るので、ワークツリーのルートで打たせる。
 	# crit・gh・glab が PATH に無くても止めない。案内だけ出す。
 	# ツリーの絶対パスはユーザの置き場なので字を絞れない。いつも '…' で包み、中の ' は '\'' に置き換える
 	# （打ったユーザのシェルで 1 語のまま、展開されない）。相対パスは上で字を絞ってあるので包まない。
 	eli5_shown="'$(printf '%s' "$eli5_top" | sed "s/'/'\\\\''/g")'"
 	eli5_rel_shown="$eli5_rel"
-	printf 'ELI5 を見る: ユーザが端末で cd %s してから crit review %s を実行し、ソースの行に付けた指摘を crit push %s でマージリクエストに送る（描画は crit %s で見られるが、そこで付けたピンは送られない。このスクリプトは crit を起動しない）\n' \
+	printf 'ELI5 を見る: ユーザが端末で cd %s してから crit review %s を実行し、ソースの行に付けた指摘を crit push %s でマージリクエストに送る（描画は crit %s で見られるが、そこで付けたピンは送られない）\n' \
 		"$eli5_shown" "$eli5_rel_shown" "$number" "$eli5_rel_shown"
 	command -v crit >/dev/null 2>&1 ||
 		printf '（この環境の PATH に crit はありません。ユーザの手元の端末で実行します）\n'
@@ -1347,7 +1347,7 @@ close-early)
 	fetch_all >"$result"
 	# exe はユーザに残りを見せて y/N を取るので、標準出力は端末のまま。下書きは state の
 	# 置き場の決まった名前で拾う（親の識別子。ブランチ名と違うことがある）。
-	# 未解決の指摘は受け入れる。スレッドに返信を残して解決するのはここ（実行ファイルはネットワークに出ない）で、
+	# 未解決の指摘は受け入れる。スレッドに返信を残して解決するのはここで、
 	# 置く前に済ませる。3 回に分けて打つ。
 	#   1 回目: 残りを見せて y/N を聞き、y なら計画を書くだけ（--accept-plan）
 	#   2 回目: 結果を取り直し、y/N の間に未解決の指摘が変わっていないかだけを確かめる（--accept-check）

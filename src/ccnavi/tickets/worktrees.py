@@ -24,7 +24,7 @@ C1 の中では書いたものが push の失敗で戻ることがあるので�
 
 消し方は、生成物（`node_modules` など。`ccnavi-clean.js` と同じ名前）を先に消してから
 `git worktree remove`（`--force` なし）。Windows で深い `node_modules` が `worktree remove` を
-途中で止めるのを防ぐ。ブランチは `drop` では消さない。親を閉じたときのブランチの片付けは
+途中で止めるのを防ぐ。親を閉じたときのブランチの片付けは
 `retire.py`（条件を確かめてから消す）。
 
 消さないとき（何も消さずに理由を言う）:

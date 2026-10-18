@@ -100,8 +100,7 @@ def unsent_of(path: str, branch: str) -> str:
 
     手元のリモート追跡の ref と比べる（ネットワークには出ない）。
     ref が無ければ、一度も送っていない。
-    承認済みチケットの未コミットは、ここでは数えない
-    （`ticket status` が置き場のファイルごとに言う）。
+    承認済みチケットの未コミットは、`ticket status` が置き場のファイルごとに言う。
     """
     if not branch:
         return ""
@@ -207,7 +206,7 @@ def child_state(path: str, branch: str, parent_path: str) -> str:
 def session_text(conf: settings.Settings, root: str) -> str:
     """セッション開始で渡す、このPCの作業中の親の一覧。無ければ空。
 
-    読めなくても開始は止めない（例外は呼ぶ側が握る）。
+    例外は呼ぶ側が握る。
     """
     if not conf.tickets_enabled:
         return ""

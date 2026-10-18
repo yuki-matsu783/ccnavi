@@ -189,12 +189,11 @@ def try_one(
 
 
 def _try_stop(conf: settings.Settings, root: str, out: dict) -> dict:
-    """`Stop`（ターンの終わり）の試し。判定ではなく、使われるルールを並べる。
+    """`Stop`（ターンの終わり）の試し。使われるルールを並べる。
 
     ターンの終わりに当てるのは、共通レイヤーと自身のレイヤーの `allow` で、
     `every` が 2 以上のものだけ
     （`ruleload.stop_rules`）。使われるものがあれば `allow`、無ければ判定に入らない（`skip`）。
-    `deny` / `ask` にはならない。数えは見ない（試しで記録を進めない）。
     """
     picked = ruleload.stop_rules(conf, root)
     out["verdict"] = audit.ALLOW if picked else audit.SKIP

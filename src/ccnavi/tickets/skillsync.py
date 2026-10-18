@@ -74,7 +74,7 @@ def _process_flag(raw: bytes) -> bool:
 def is_shared(parts: list[str]) -> bool:
     """工程スキルのディレクトリからの相対（"/" で割ったもの）が、写す対象の形か。
 
-    `SKILL.md` と、`references/common/` の下の `.md`。`references/` のそれ以外は写さない。
+    `SKILL.md` と、`references/common/` の下の `.md`。
     """
     if parts == [SKILL_FILE]:
         return True
@@ -198,8 +198,7 @@ def _common_of(target: str) -> str:
 def describe(project: str, changes: list[configsync.Change]) -> list[str]:
     """着手の出力に足す行。"""
     lines = [
-        f"共通の工程スキルとプロジェクト {project} の skills/ が違っていたので、"
-        "共通の中身に揃えた（references/project/ などプロジェクト固有のファイルには触れていない）:"
+        f"共通の工程スキルとプロジェクト {project} の skills/ が違っていたので、共通の中身に揃えた:"
     ]
     for c in changes:
         state = "削除した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")

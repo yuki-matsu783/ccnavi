@@ -131,7 +131,7 @@ def has_form(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> bool:
 def direct_name_warning(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> str:
     """直接作業のワークツリーの名前が形に合わないときの案内（1 行）。合えば空。
 
-    `--lint` の warn と、`ccnavi-worktree.sh` が切ったあとに出す案内が同じ文面を使う。拒否はしない。
+    `--lint` の warn と、`ccnavi-worktree.sh` が切ったあとに出す案内が同じ文面を使う。
     """
     if has_form(name, prefixes):
         return ""
@@ -271,8 +271,7 @@ def id_answer(branch: str) -> list[str]:
 
 
 # 親の識別子は、親のブランチ名の `/` を `-` に置き換えたもの（`branch_to_id`）。新しく切る親の
-# 識別子を、ブランチ名として安全で、統合先と紛れない形にそろえる。いまは `--lint` の warn だけで、
-# 承認は止めない。
+# 識別子を、ブランチ名として安全で、統合先と紛れない形にそろえる。いまは `--lint` の warn だけ。
 #
 # 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じリスト）。
 # 大文字小文字を区別せずに比べる。`release/*` は識別子に `/` を書けないので、
@@ -355,7 +354,7 @@ def branch_name_problems(
     ccnavi の通し番号、親は `-<2 桁>` で終わらない（`-<2 桁>-<2 桁>` で終われば子の識別子そのもの、
     `-<2 桁>` だけでも子の識別子の途中の `<親>-<フェーズ番号>` と紛れる）。
 
-    見るのは識別子と `issue:` だけで、ファイルも git も読まない。返すのはユーザに見せる文で、
+    見るのは識別子と `issue:` だけ。返すのはユーザに見せる文で、
     深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子、子の形に当たる親の識別子、
     番号の重なりは、他のチケットと並べて見るので `lint` の側で数える。
 

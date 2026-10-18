@@ -214,7 +214,7 @@ def _note_mr(
     """親の承認済みチケットの `mr:` が空なら、この MR の番号を書き足す。
 
     書くのは空のときだけ。同じ値なら何もせず、違う値なら上書きせず警告する。
-    書き足しは失敗してもレビューの依頼を止めない（マーカーは置けている）。
+    書き足しに失敗してもレビューの依頼は進む（マーカーは置けている）。
     書いたパスは `fsio` が記録するので、C1 のコミットに入る。
     """
     path = approval.copy_path(
@@ -250,8 +250,8 @@ def reviewed_mark(
     （Chrome は `via: chrome`。手元の `confirm` は `--actor` があるときだけ `actor` と `via: cli` を
     渡し、無ければマーカーは前と同じバイト列）。`stamp` が空なら `at` を
     書かず、`approval_marks.write_mark` が今の時刻を入れる。
-    `accepted` 欄は受け入れた指摘の鍵の記録で、判定には使わない（受け入れた指摘はホストで
-    解決済みにしてあり、確認はホストの状態だけを数える）。
+    `accepted` 欄は受け入れた指摘の鍵の記録。受け入れた指摘はホストで解決済みにしてあるので、
+    確認はホストの状態だけを数える。
     """
     mark: dict = {"mr": mr, "accepted": list(accepted)}
     if account:
@@ -492,7 +492,7 @@ def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
 
 
 def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) -> bool:
-    """ワークツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
+    """ワークツリーに、ccnavi 自身の置き場を除いた未コミットの変更があるか。
 
     承認済みチケットとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
@@ -546,7 +546,7 @@ def wip_tracked(tree_root: str) -> list[str] | None:
 
 
 def _wip_untracked(tree_root: str) -> list[str] | None:
-    """`wip` の下の未追跡のファイル（無視したものは数えない）。読めなければ None。"""
+    """`wip` の下の未追跡のファイル（無視したものを除く）。読めなければ None。"""
     rc, out = _git(tree_root, ["ls-files", "-z", "--others", "--exclude-standard"])
     if rc != 0:
         return None

@@ -55,7 +55,7 @@ GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # 付けた呼び出しを止め、この 3 つのフラグは標準入力が端末でなければ拒む。
 # テストは disable にする。
 #
-# 守る手段（CLI から打つ形）ではなく守る対象で名前を付ける。
+# 守る対象で名前を付ける。
 # 切りたいユーザが何を切ることになるのかを、名前から読めるようにする。
 GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 # GUARD_UNWATCHED_ENV は、ユーザにも classifier にも確認できないモード
@@ -139,11 +139,11 @@ DEFAULT_RULES = os.path.join(".ccnavi", "config", "common", "rules.yml")
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join("logs", "state")
 # 提案は各作業ツリーの `wip/proposals/` に置く。ユーザが読み、ユーザが承認するものなので、
-# ガードの設定をまとめてある場所ではなく、目に入る場所に出しておく。
+# 目に入る場所に出しておく。
 # 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_TICKETS = "wip/proposals"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
-# 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
+# 別の保護を足さずに済む。ツリーごとに置くのは、
 # 承認をプロジェクトの git で共有するため。承認したユーザの機械にだけ在る形だと、A が承認して
 # B の機械で作業する流れが成り立たない。区切りは "/" で持ち、ツリーの
 # ルートに継ぎ足すときに os の区切りへ直す。
@@ -317,7 +317,7 @@ def approved_dir(conf: Settings, tree_root: str) -> str:
 
     承認済みチケットとマーカーはそのツリーの git が追跡し、
     親チケットのブランチに乗って他の機械へ届く。
-    だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
+    だから置き場はツリーごとに解く。
     """
     return os.path.join(tree_root, (conf.approved or DEFAULT_APPROVED).replace("/", os.sep))
 
@@ -445,7 +445,7 @@ class Settings:
     def tickets_enabled(self) -> bool:
         """チケット制御が有効か。
 
-        判定・実行後チェック・診断はこれで分岐する。approved の真偽で分岐しない。
+        判定・実行後チェック・診断はこれで分岐する。
         解決前（空）は enable と同じに読む。読めない値は解決で enable になるので、
         ここで disable と読めるのは disable と書かれたときだけになる。
         """
@@ -500,7 +500,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     # 置き場（共通レイヤーの 3 本、記録・state・提案・承認済みチケット・プロジェクト・ccnavi
     # ディレクトリ）はこの表に無い。env でも上書き設定ファイルでも動かず、既定のまま。
     # 動かせるのはフラグだけで、そちらは cli_args._override が重ねる。
-    # 残る `bin` は置き場ではなく、hook が起動する実行ファイルの指定で、既定を持たない。
+    # 残る `bin` は hook が起動する実行ファイルの指定で、既定を持たない。
     overrides = (("bin", BIN_ENV, _resolve_bin),)
     for name, env, read in overrides:
         if os.environ.get(env):
@@ -512,7 +512,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
 
     # ccnavi 自身を触っている場合。ここでファイルを読むと、編集が次のセッション
     # ではなく次のツール呼び出しから反映される。道具を自分自身に当てて試すには
-    # これが要る。開発のための便宜であって境界ではない。反映されるのはここだけで、
+    # これが要る。開発のための便宜である。反映されるのはここだけで、
     # このファイルに `disable` と書いてもモードの解決で無視され、判定は止まらない。
     conf, problems = _read_local(root)
     if conf is None:
@@ -547,7 +547,7 @@ def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> st
 
     `--project-rules-file` / `--project-phases-file` / `--project-risk-file` で名前が差し替えられて
     いれば、その種類のそのパス。差し替えは診断のためのもので、守る対象（selfguard）は
-    差し替えを見ない `layer_real_path` を使う。
+    `layer_real_path` を使う。
     """
     swaps = {
         KIND_RULES: conf.project_rules_files,
@@ -562,7 +562,7 @@ def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> st
 
 
 def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
-    """レイヤーの設定ファイルが本来ある場所。差し替えを見ない。"""
+    """レイヤーの設定ファイルが本来ある場所。差し替え前の場所を返す。"""
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
     return os.path.join(home_root, home, LAYER_CONFIG_DIR, LAYER_FILE_NAMES[kind])
 
@@ -707,9 +707,9 @@ def hook_view(root: str) -> HookView:
     その上で hook を起こす。VS Code 拡張のように別のプロセスから実行ファイルを起こすと、
     その `env` は渡らない。ボード（`--explain --json`）が「判定がいまどう動くか」を答えるために、
     プロセスの環境の上にワークスペースルートの 2 本の `env` を同じ順で重ねる。
-    ホームの設定（`~/.claude/settings.json`）は読まない。実行ファイルはワークスペースの外を見ない。
+    読むのはワークスペースの設定だけ。
 
-    hook の判定はこれを使わない。判定はプロセスに渡った環境だけを読む（`load`）。
+    判定はプロセスに渡った環境だけを読む（`load`）。
     値が文字列でない・ファイルが読めないときは、その段を飛ばす。
     """
     values = {name: os.environ.get(name, "") for name in (MODE_ENV, TICKET_CONTROL_ENV)}

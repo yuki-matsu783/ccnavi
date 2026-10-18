@@ -622,7 +622,7 @@ class Rule:
         return not any(e.compiled is not None and e.compiled.search(subject) for e in self.excepts)
 
     def body_hits(self, subject: str) -> bool:
-        """本体（glob / regex / when）だけで当たるか。except は見ない。"""
+        """本体（glob / regex / when）だけで当たるか。"""
         if self.compiled is not None:
             return self.compiled.search(subject) is not None
         return self.when is not None and self.when.hits(subject)
@@ -674,7 +674,7 @@ class RuleSet:
 def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
     """ルールファイルを読んで組み立てる。root は `{root}` の置き換え先。
 
-    解釈できないルールは、何も言わずに無視するのではなく、除外して名指しで報告する。
+    解釈できないルールは、除外して名指しで報告する。
     何も言われずに消えたルールは、誰も気づかないガードの穴になるから。
     組み立てられたルールはそのまま返すので、1 件の不備がガード全体を止めない。
 

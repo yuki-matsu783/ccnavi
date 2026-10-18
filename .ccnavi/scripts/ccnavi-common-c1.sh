@@ -31,11 +31,11 @@
 # 文面はすべて標準エラーへ出す（ボードは標準出力の JSON を読むため）。実行ファイルの標準出力は
 # そのまま通す。ccnavi_c1_capture に書き先を入れると、そこへ書く。
 #
-# 実行ファイルはネットワークに出ずコミットもしない。見分けと書いたパスの一覧は実行ファイルが
+# 見分けと書いたパスの一覧は実行ファイルが
 # 出し（`c1 family`・`c1 sort`・`--record-writes`）、取り込み（ccnavi-sync.sh を入れ子のロックで起こす）・
-# コミット（`commit --only`。ほかのステージ済みの変更を巻き込まない）・push・届いたかの確かめ・戻し（比較つきの update-ref。reset は
-# 使わない）はここが持つ。git は ccnavi-git.sh を通らずに直に呼ぶ。ccnavi-git.sh はエージェントの入口の
-# 保護で、ここの戻し（`restore --source` など）には当てない。
+# コミット（`commit --only`。書いたパスだけを入れる）・push・届いたかの確かめ・戻し（比較つきの update-ref）
+# はここが持つ。git は ccnavi-git.sh を通らずに直に呼ぶ（ccnavi-git.sh はエージェントの入口の
+# 保護）。
 #
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_C1_TIMEOUT（push・ls-remote 1 回の
 #   タイムアウトの秒、既定 60）/ CCNAVI_C1_COMMIT_TIMEOUT（コミット 1 回のタイムアウトの秒、既定 60）
@@ -325,7 +325,7 @@ ccnavi_c1_commit() {
 		return 1
 	fi
 	[ -s "$ccnavi_c1_tmp/status" ] || return 0
-	# ユーザの hook は実行しない。署名などで尋ねて止まらないよう、タイムアウトで切る。
+	# 署名などで尋ねて止まらないよう、タイムアウトで切る。
 	if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$ccnavi_c1_tree" \
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_c1_tmp/pathspec" --pathspec-file-nul >"$ccnavi_c1_tmp/out"; then
@@ -410,7 +410,7 @@ ccnavi_c1_merge_plan() {
 	return 0
 }
 
-# 親のワークツリーに子の先頭を入れる（コミットしない）。<元の先頭> <書いたパスの一覧>。0 で入れた（か、入れるものが無い）。
+# 親のワークツリーに子の先頭を入れる。<元の先頭> <書いたパスの一覧>。0 で入れた（か、入れるものが無い）。
 # 1 は何も変えずに止めた（衝突など。merge は取りやめた）。
 ccnavi_c1_merge_begin() {
 	[ -n "$ccnavi_c1_merge_sha" ] || return 0
@@ -545,7 +545,7 @@ ccnavi_c1_write() {
 			ccnavi_c1_say "親のワークツリーの先頭を読めない。何も反映していません"
 			return 1
 		}
-		# 6b. 合流（子の finish）。親のワークツリーに子の先頭を入れる（コミットしない）。
+		# 6b. 合流（子の finish）。親のワークツリーに子の先頭を入れる。
 		ccnavi_c1_merge_begin "$ccnavi_cw_h0" "$ccnavi_cw_list" || return 1
 		# 7. 書く。
 		ccnavi_cw_rc=0
@@ -556,7 +556,7 @@ ccnavi_c1_write() {
 			return 1
 		fi
 		if [ "$ccnavi_cw_rc" -ne 0 ]; then
-			# 失敗した回は、ここまでに書いたもの（合流を含む）を戻す（コミットしない）。
+			# 失敗した回は、ここまでに書いたもの（合流を含む）を戻す。
 			ccnavi_c1_unmerge "$ccnavi_cw_h0" "$ccnavi_cw_list" || :
 			ccnavi_c1_restore_written "$ccnavi_cw_list" "$ccnavi_cw_h0"
 			rm -f "$ccnavi_cw_list"

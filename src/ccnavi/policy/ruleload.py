@@ -72,7 +72,7 @@ def read_common(
 ) -> rules.RuleSet:
     """共通レイヤーのルールファイルだけを読む。組み込みの deny の土台は足さない。
 
-    ファイルが無いのは「設定が無い」正常で、空として扱う（記録の `fallback` に残さない）。
+    ファイルが無いのは「設定が無い」正常で、空として扱う。
     読めなければ組み込みの既定に戻る。「設定が読めない」は「判断できない」
     ではなく「設定が破損している」。拒否にすると、破損したファイルを直すための
     呼び出しまで止まって回復できなくなる。既定モードが block なので、
@@ -324,7 +324,7 @@ class LayerView:
     rule_set: rules.RuleSet
     # unreadable は読めなかった理由。空なら読めた（無いレイヤーも空として読めた扱い）。
     unreadable: str = ""
-    # missing はファイルが無いこと。不備ではないので、診断は数えるだけで報告しない。
+    # missing はファイルが無いこと。不備ではないので、診断は数えるだけ。
     missing: bool = False
     # problems はレイヤーをまたいだ苦情（重複の info、同 id の warn）。
     problems: list[Problem] = field(default_factory=list)
@@ -380,7 +380,7 @@ def sum_view(stderr: TextIO, conf: settings.Settings, root: str, layer: Layer) -
     `survey` は全レイヤーを順に重ねる（先のレイヤーと全欄が同じ定義は後ろを捨てる）ので、
     後ろのプロジェクトの欄は、他のレイヤーの定義に引かれて欠ける。
     ここは「共通 + そのレイヤー」だけで重ね、パスを持つツールの判定と同じ和を返す。
-    返す `rule_set` は共通レイヤーを含む和で、組み込みの deny の土台は含まない。
+    返す `rule_set` は共通レイヤーを含む和。
     """
     record = audit.Record()
     common = read_common(stderr, conf, record, root)
@@ -413,8 +413,8 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
     `selfguard_targets.targets` が `rules_path` で受け取っているので、ここから重ねると同じファイルが
     2 度並ぶ。
 
-    自身のレイヤーとプロジェクトのレイヤーは 3 本とも返す。差し替え（`--project-rules-file`）は
-    見ない。あれは診断のためのもので、守る対象は本来の置き場のほうになる。
+    自身のレイヤーとプロジェクトのレイヤーは 3 本とも返す。守る対象は本来の置き場で、
+    差し替え（`--project-rules-file`）は診断のためのもの。
 
     種別（`settings.ORIGIN_*`）をつける。受け取る側はバックアップの key と、戻す先の git を
     ここから決める。名札の表記では決められない。`projects/common/` の名札は

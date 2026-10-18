@@ -1,13 +1,12 @@
 """標準入出力とコマンドラインを 1 つの判定に繋ぐ。
 
-run は終了コードを返す。自分で終了しないので、道具ぜんぶを別プロセス無しで
+run は終了コードを返す。終了を呼び手に任せるので、道具ぜんぶを別プロセス無しで
 テストから動かせる。
 
 ここに置くのは引数の解釈と振り分けだけ。hook のイベントごとの手順は events、
 実行前チェックは judge、判定につける文面は reasons、モードと終了コードは modes に
 ある。チケットとレビューの操作（`ticket ...` / `review ...`）は `cli_ops.operate` が
 ops / review へ渡す。`--help` の本文は `cli_usage`、旗の読み分けは `cli_args` に分けてある。
-どれも cli を読まない。
 """
 
 from __future__ import annotations
@@ -209,7 +208,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 承認の対象の一覧を見るだけ（承認済みチケットを置かない）。
     # VS Code の拡張がオーバーレイに出すために打つ。
     parser.add_argument("--preview", action="store_true")
-    # 承認できる状態かを確かめるだけ（`--preview` と一緒に使う）。承認済みチケットは置かず、
+    # 承認できる状態かを確かめるだけ（`--preview` と一緒に使う）。
     # 通るかどうかを終了コードで返す。エージェントがユーザに承認を頼む前に打つ。
     parser.add_argument("--verify", action="store_true")
     # 親の提案の計画を書き換える補助（`--agree` の外の独立したフラグ。エージェントも打ってよい）。
@@ -359,8 +358,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （何も書かない）。`--no-issue` は返信の文言のため（残りを issue に書き出さない）。
     parser.add_argument("--accept-check", default="")
     parser.add_argument("--no-issue", action="store_true")
-    # 統合先の名前。リポジトリには置かず、手元では環境変数 `CCNAVI_INTEGRATION_BRANCH`（未設定なら
-    # ホストのデフォルトブランチ）で決まる。実行ファイルは環境変数を読まず、sh が決めて渡す。
+    # 統合先の名前。手元では環境変数 `CCNAVI_INTEGRATION_BRANCH`（未設定なら
+    # ホストのデフォルトブランチ）で決まる。sh が決めて渡す。
     # いまは `--lint` の識別子の予約（統合先と同じ名前の識別子を使わせない）が読む。
     parser.add_argument("--integration-branch", default="")
     # レビュー済みのマーカーに入れるアカウント（押したユーザではなくトークンの持ち主）。
@@ -409,7 +408,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         )
         return EXIT_ERROR
     # 取り込みを書く形（`--templates --import --yes`）は、拡張の子プロセスから board で呼ぶ。
-    # `--actor` は読まない。`--expect` と `--json` が揃ったときだけ通す。
+    # `--expect` と `--json` が揃ったときだけ通す。
     if args.templates and cli_templates.editing(args) and args.yes:
         if args.via and args.via != via.VIA_BOARD:
             stderr.write("ccnavi: --via は --import --yes では board だけ渡せる\n")
@@ -630,7 +629,7 @@ def _parsed(
     parser: argparse.ArgumentParser,
     args: argparse.Namespace,
 ) -> int:
-    # 設定もワークスペースも読まない。フラグは上の定義から引くので、足したものはそのまま並ぶ。
+    # 版だけを出す。フラグは上の定義から引くので、足したものはそのまま並ぶ。
     if args.version:
         return version.report(stdout, parser, args.json)
     if not cli_args._one_wrapper_flag_each(stderr, args):
@@ -696,14 +695,14 @@ def _parsed(
         selfguard.GATE_SETTINGS,
     )
 
-    # ドキュメントの索引を引く経路。payload を読まず、判定も記録もしない。
+    # ドキュメントの索引を引く経路。
     # 絞り込みのフラグは `--docs` でだけ読む。ほかの経路で渡されたら止める。このフラグが
     # 無かったころは argparse が知らないフラグとして止めていたので、無視して先へ進めると
     # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
     # 差し替えで、無視しても何も動かないので無視するだけにしている）。
     if args.templates:
-        # 取り込みを書くとき（`--import --yes`）は、hook の文字列照合だけを歯止めにせず、
-        # 実行時にも端末の前のユーザが打ったことを確かめる。下見（`--yes` なし）は求めない。
+        # 取り込みを書くとき（`--import --yes`）は、実行時にも
+        # 端末の前のユーザが打ったことを確かめる。
         # 承認（--agree --yes）と同じく、拡張の子プロセスは端末を持たないので、端末の確認の代わりに
         # --expect の一致と hook の止めに置く。
         if cli_templates.editing(args) and args.yes:
@@ -740,7 +739,7 @@ def _parsed(
 
     conf.integration_branch = args.integration_branch.strip()
 
-    # フローの確かめは `--lint` だけが読む。判定にも採点にも影響しないが、ほかの差し替えと同じく
+    # フローの確かめは `--lint` だけが読む。ほかの差し替えと同じく
     # 診断の外では無視して言う。診断でも `--lint` でなければ読む先が無いので、そう言って無視する。
     if args.flow:
         if not diagnosing:
@@ -825,8 +824,8 @@ def _parsed(
         )
 
     # 承認の経路。ユーザが端末から打つもので、payload を読まないのでここで分かれる。
-    # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
-    # 判断ではなく、これから判定に使われる範囲についての合意になる。
+    # 判定を 1 度も通らないのも分ける理由で、承認は、これから判定に使われる
+    # 範囲についての合意になる。
     if args.agree:
         if not conf.tickets_enabled:
             stderr.write(
@@ -896,7 +895,7 @@ def _parsed(
         repo = args.command[3] if len(args.command) == 4 else None
         code = cli_ops.sync_check(stdout, stderr, root, conf, args.command[2], repo)
         return EXIT_OK if code == 0 else EXIT_ERROR
-    # sh がチケットについて聞くこと（sh はチケットの YAML を読まない）。読むだけで、何も書かない。
+    # sh がチケットについて聞くこと。
     # 答えはチケット制御の有無に依らない（sh の前の見方がそうだった）。
     if len(args.command) == 4 and list(args.command[:2]) == ["tree", "parent"]:
         code = sh_ask.parent_tree(stdout, stderr, root, conf, args.command[2], args.command[3])
@@ -949,8 +948,7 @@ def _parsed(
         return EXIT_OK if code == 0 else EXIT_ERROR
 
     # issue・MR に紐づくブランチを探す。`ccnavi-branches.sh` が呼ぶ。
-    # 読むだけで、何も書かない。
-    # ホストの結果は sh が取ってきて `--result` で渡す（実行ファイルはネットワークに出ない）。
+    # ホストの結果は sh が取ってきて `--result` で渡す。
     if len(args.command) == 3 and args.command[0] == "branches":
         cwd = args.cwd or os.getcwd()
         code = branchfind.report(
@@ -1098,7 +1096,7 @@ def _hook_steps(
     try:
         payload = hookio.decode(stdin)
     except hookio.NoPayload:
-        # hook ではなく端末の前のユーザ。何も判定していないので何も記録しない。
+        # hook ではなく端末の前のユーザ。使い方を出す。
         stderr.write(cli_usage.USAGE)
         return EXIT_ERROR
     except hookio.Unusable as exc:

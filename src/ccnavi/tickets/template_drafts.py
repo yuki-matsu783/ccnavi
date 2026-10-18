@@ -13,9 +13,9 @@
   フィードバック計画の項は全体計画の項数を引いて直す。全体計画の `after` はそのまま。承認済みの
   親の計画の順序は承認が確かめているので、並べ替え（`plan_order.renumber`）は要らず、引き算だけで足りる
 - 子のフローは、全体計画の n 番目の項の子（`phase` が n）のうち、フローを持つ最初の 1 本を写す。
-  フィードバック計画の子のフローは写さない（テンプレートの `flows` は全体計画の添字で指す）
-- 固有名の一般化は機械ではしない。親の題から入れる `description` と `when` の両方に `TODO` の印を
-  付ける。直すのはエージェント。印が残っていれば検査が warn で言う
+  写すのは全体計画の子のフローだけ（テンプレートの `flows` は全体計画の添字で指す）
+- 固有名の一般化はエージェントが直す。親の題から入れる `description` と `when` の両方に
+  `TODO` の印を付ける。印が残っていれば検査が warn で言う
 - 同名の下書きがあれば上書きせず断る。親が `ready` で閉じて退避済み（`logs/archive/`）なら、
   そこからは読まないと言って断る
 
@@ -24,7 +24,7 @@
 ユーザだけが打つ。`prepare` は何も書かず、下書きを検査して取り込み先との差分を作る。`commit` は
 `--yes` と、見せた下書きのハッシュ（`--expect`）が揃ったときだけ書く。
 
-- 下書きの中身は検査に通した読み取りのバイト列をそのまま書く（書き換えない）。書く前に
+- 下書きの中身は検査に通した読み取りのバイト列をそのまま書く。書く前に
   `--expect` と、検査したバイト列のハッシュが同じことを確かめる
 - 同名が取り込み先に在れば `--replace` が要る。共通とレイヤーに同名で中身が違うものが並ぶと、
   統合結果がレイヤーの側を使わない error にするので、そうなる取り込みは断る
@@ -120,7 +120,7 @@ def scan(conf: settings.Settings, root: str, candidates: dict | None = None) -> 
 
     検査はそのツリーのレイヤーのフェーズ定義（共通 + レイヤー）で行う。同じ中身の下書きが
     複数のツリーに在れば（親のブランチに乗ったものが子のワークツリーにも checkout される）、
-    最初の 1 本にまとめる。効力のある置き場（`plan_templates.scan`）は読まない。
+    最初の 1 本にまとめる。
     """
     known = [view.name for view in ruleload.layers(conf, root)]
     if candidates is None:
@@ -165,7 +165,7 @@ def _item_names(scanned: plan_templates.Scan, name: str) -> list[str]:
 
 
 def draft_json(draft: Draft, scanned: plan_templates.Scan) -> dict:
-    """画面（将来のボードのテンプレート管理画面）が取り込みを出せる 1 本分の答え。
+    """画面（ボードのテンプレート管理画面）が取り込みを出せる 1 本分の答え。
 
     `text` は読んだ下書きの本文そのまま（編集画面が元の本文を取るため。reveal はしない）。
     `importable` は読めて error が無いこと。`exists_in` は同じ名前のテンプレートが在るレイヤー
@@ -415,7 +415,7 @@ def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
 
     出すのは、完了した親（`done/`）が計画を持ち、その識別子の下書きがまだ無く、同じ計画の形の
     テンプレートが取り込まれていないときだけ。`ready` で閉じると材料（`done/` と `flows/`）は
-    退避されて拾えなくなるので、`ready` の前に出す。何も書かず、読めなければ出さない。
+    退避されて拾えなくなるので、`ready` の前に出す。読めなければ出さない。
     """
     found, children, _ = _find_parent(conf, root, parent)
     if found is None:

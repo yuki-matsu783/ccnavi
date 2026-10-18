@@ -27,8 +27,8 @@
 経路になる。その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
 `blocking_problems` が判定の側で当てる。
 
-承認はチケットの中身を変えない。 提案のバイト列をそのまま `doing/` へ動かし、欄を書き足さない
-（改行も BOM も変えない）。どの経路で承認しても承認済みチケットは提案とバイト単位で同じになり、
+承認はチケットの中身を変えない。 提案のバイト列（改行も BOM も）をそのまま `doing/` へ動かす。
+どの経路で承認しても承認済みチケットは提案とバイト単位で同じになり、
 欄の有無から「承認が途中で止まった」と読み違える形が無くなる。
 
 ## チケットは 1 本のファイルで、コピーを持たない
@@ -181,7 +181,7 @@ def load_copy(path: str, require_record: bool = False) -> tuple[ticket_model.Tic
 
     計画を持つ親には、計画の項の `after` から計算した待ち方（`workflow.compute`）と、親に固定した
     フェーズ定義（`phases:` を読んだもの。`phasetypes.types_of`）を入れる。
-    チケットの中の `workflow:` 欄は読まない（あれば `blocking_problems` が止める）。
+    チケットの中に `workflow:` 欄があれば `blocking_problems` が止める。
     """
     ticket, problems = ticket_mod.load(path)
     if ticket is None:
@@ -424,8 +424,8 @@ def revision_elsewhere(t: ticket_model.Ticket, current: ticket_model.Ticket | No
 def plan_signature(t: ticket_model.Ticket, part: str) -> tuple | None:
     """計画の比べる形。項ごとの「定義・`review`・推移的に辿った待ち（`workflow.compute`）」の並び。
 
-    `after` の書き方そのもの（`PlanItem.__eq__` も `after` を見ない）は比べない。`after: [2]` と、
-    `--explain` の「待つ: 1, 2」を写した `after: [1, 2]` は同じ待ちなので、違いにしない。
+    `after` の書き方が違っても待ちが同じなら違いにしない（`PlanItem.__eq__` も `after` を見ない）。
+    `after: [2]` と、`--explain` の「待つ: 1, 2」を写した `after: [1, 2]` は同じ待ち。
     `part` は `plan` か `feedback`。フィードバック計画が無い（None）ことと空（`[]`）は分ける。
     """
     if part == "feedback" and t.feedback is None:
