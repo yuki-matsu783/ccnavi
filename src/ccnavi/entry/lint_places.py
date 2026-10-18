@@ -98,7 +98,7 @@ def _misplaced_worktrees(project: tree.Tree, where: str) -> list[Problem]:
     ワークツリーはワークスペースの `.claude/worktrees/` に置く。プロジェクトの中のものは
     承認の走査（`tree.worktrees`）の対象外で、そこに書いた提案は「承認待ちに無い」になる。
     ワークスペースの ccnavi が古く、プロジェクトの `ccnavi-common.sh` の写しをルートと取り違えて
-    着手すると、この形になる。原因の修正はしない（検出だけ）。
+    着手すると、この形になる。検出だけを行う。
     """
     base = os.path.join(project.root, ".claude", "worktrees")
     try:
@@ -133,7 +133,7 @@ def _projects_rel(conf: settings.Settings, root: str) -> str:
     """プロジェクトの置き場の、ワークスペースルートからの相対（"/" 区切り）。
 
     置き場は既定の `projects` に固定。診断のフラグで空やワークスペースの外を
-    指されたときは空を返し、索引は見ない（ワークスペースの git の話ではなくなる）。
+    指されたときは空を返す（ワークスペースの git の話ではなくなる）。
     """
     if not conf.projects:
         return ""

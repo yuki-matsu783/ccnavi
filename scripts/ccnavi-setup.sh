@@ -9,7 +9,7 @@
 #                            CCNAVI_TICKET_CONTROL。チケット制御を使うか。既定は enable
 #   --deploy <ccnavi の根>   配布元。既定はこのスクリプトが入っている ccnavi の根
 #   --no-deploy              配布物を置かず、settings.json だけを書く
-#   --all                    既定値を持つ env も明示して書く（今は足すものが無い。置き場は固定）
+#   --all                    受け付けるが、今は足すものが無い（置き場の env は廃止した）
 #   --force                  明示した --mode / --ticket-control で、既にある値を置き換える。
 #                            配るときも、配布先に既にあるものを入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
@@ -20,7 +20,7 @@
 # 触らない。ccnavi と関係のない hook や設定はそのまま残す。
 #
 # 入れ終わったところで、ワークスペースの git の索引に projects/ の下が載っていないかを見て、
-# 載っていれば --lint と同じ文面で知らせる（止めない。索引も変えない）。
+# 載っていれば --lint と同じ文面で知らせる。
 #
 # .claude/settings.json と一緒に .vscode/settings.json も確かめる。ccnavi は .claude/worktrees/
 # の中で作業させるので、VS Code にそこを表示させる 1 行が無いと、エディタには main の
@@ -189,8 +189,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             使うか。全体ルールだけで足りるプロジェクトは disable。既定は enable
   --deploy <ccnavi の根>    配布元。既定はこのスクリプトが入っている ccnavi の根
   --no-deploy               配布物を置かず、settings.json だけを書く
-  --all                     既定値を持つ env も明示して書く。置き場の env は廃止したので、
-                            今は足すものが無い
+  --all                     受け付けるが、今は足すものが無い（置き場の env は廃止した）
   --force                   明示した --mode / --ticket-control で、既にある値を置き換える。
                             配るときも、配布先に既にあるものを入れ替える
   --check                   書かずに、揃っていないところだけを並べる
@@ -982,8 +981,8 @@ ignore_logs_negated=""
 ignore_scratch_negated=""
 # ユーザが ccnavi-index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
 ignore_index_negated=""
-# .gitignore の行を、比べやすい形で出す。CRLF の `\r` と行末の空白を取り除く（git も行末の
-# 空白は読まない）。ファイルが無ければ何も出さない。
+# .gitignore の行を、比べやすい形で出す。CRLF の `\r` と行末の空白を取り除く。
+# ファイルが無ければ出力は空。
 gitignore_lines() {
 	if [ -f "$root/.gitignore" ]; then
 		sed 's/[[:space:]]*$//' "$root/.gitignore"
@@ -1605,7 +1604,7 @@ fi
 # 挙げる。配布がうまくいっていれば、普通はここで何も出ない。出たときは、配布を切ったか、
 # 配布元に無かったか、配布先に別のものが既にあって配っていないか、のどれか。
 #
-# ここでは取得も生成もしない。実行ファイルは、振り分けの sh と同じ順で、
+# 実行ファイルは、振り分けの sh と同じ順で、
 # この機械で動くものの置き場を探す。
 missing_parts=""
 note_missing() {

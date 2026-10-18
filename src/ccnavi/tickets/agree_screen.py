@@ -135,7 +135,7 @@ def screen(
 ) -> str:
     """承認を求める画面を組む。
 
-    frontmatter の全文は見せない。ユーザに見せるのは「何が新たに書けるようになるか」
+    ユーザに見せるのは「何が新たに書けるようになるか」
     「子が編集可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く。
 
@@ -200,7 +200,7 @@ def screen(
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
         if cand.overflow:
-            # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に影響しない記述の
+            # 範囲のすぐ下に置く。判定では止まる。判定に影響しない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
             # 「編集対象」と「書き込めない」は意図して分けてある。 前半はチケットが宣言した側、
             # 後半は実際の書き込みが止まる側の話で、どちらか一方の語に揃えると、宣言と実行の
@@ -324,7 +324,7 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
             lines.append(f"    {pt.title} / {ident}  " + "、".join(parts))
     unused = [ident for ident in types if ident not in numbers]
     if unused:
-        lines.append("■ 使われていない定義（phases: にあるが、どの項も使わない。判定は読まない）")
+        lines.append("■ 使われていない定義（phases: にあるが、どの項も使わない）")
         lines += [f"    {types[ident].title} / {ident}" for ident in unused]
     left = [pt for ident, pt in (config or {}).items() if ident not in types]
     if left:

@@ -17,7 +17,7 @@ Draft を外すので、squash でマージすると既定のブランチには�
 （`done/<識別子>.md`・`phases/<親>/...`・`flows/<子>.yml`）にする。
 `logs/` は git が追跡しないので、退避は手元の機械にだけ残る。
 
-退避はバックアップで、閉じたかの判定には使わない。閉じたかは MR がマージ済みかで決める
+退避はバックアップ。閉じたかは MR がマージ済みかで決める
 （`ccnavi-sync.sh` がホストに聞く）。読むのは次のところだけ。
 
 - 子の連番（`approval_ops.next_child_id`）。退避にある識別子は使い済みとして数える
@@ -155,7 +155,7 @@ def find(root: str, ident: str, project: str | None = None) -> list[ticket_model
 
 
 def closed_tickets(root: str) -> list[ticket_model.Ticket]:
-    """退避にある閉じたチケットの全部（ボードの表示用。判定には混ぜない）。"""
+    """退避にある閉じたチケットの全部（ボードの表示用）。"""
     out = []
     for repo in _repo_names(root):
         directory = _done_dir(root, repo)

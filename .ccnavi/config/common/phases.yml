@@ -76,7 +76,7 @@ phases:
 
   # 学びの蓄積（docs/design/tickets/learning-wiki.md）。親のフィードバック計画に置く。
   # 子の気づきの記録（wip/handoff/learnings/）と受信箱（docs/wiki/inbox/）を learning-wiki に統合する。
-  # wiki の共有ファイル（index.md・log.md・impact.md）を直すのはこの子だけ。
+  # wiki の共有ファイル（index.md・log.md・skill-impact.md）を直すのはこの子だけ。
   learning-consolidate:
     kind: feedback
     title: 学びの統合

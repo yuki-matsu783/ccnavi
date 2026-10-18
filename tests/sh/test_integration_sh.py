@@ -44,7 +44,7 @@ def seed(repo):
 
 
 def remote_ref(repo, name):
-    """origin/<名前> を手元に置く（取ってきた後の形。ネットワークには出ない）。"""
+    """origin/<名前> を手元に置く（取ってきた後の形）。"""
     git(repo, "update-ref", f"refs/remotes/origin/{name}", "HEAD")
 
 

@@ -6,8 +6,6 @@
 
 診断のフラグ `--log ""` / `--state ""` は残る（テスト 20 本以上がこれで置き場を指している）。
 ここはフラグを渡さずに起動する。
-
-実装前は赤。赤の理由は「まだ `CCNAVI_LOG` / `CCNAVI_STATE` の空文字を読んでいる」こと。
 """
 
 from __future__ import annotations

@@ -23,7 +23,7 @@ keywords: [issue, MR, ブランチ, ccnavi-branches.sh, 着手]
 `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞いて返事を待つ。4（ホストに届かない）は出力の案内どおり MCP で代行し、
 同じコマンドを打ち直す。1・2 は出力の理由をユーザに伝える、という文を `additionalContext` で渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの
 絶対パス）。
-dry-run でも渡す。判定は返さない。
+dry-run でも渡す。
 
 **`ccnavi-branches.sh (--issue N | --mr N) [--json]`。** cwd のリポジトリ（ワークスペース・`projects/<名前>`・そのワークツリー）
 について探す。読むだけ。

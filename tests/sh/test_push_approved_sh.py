@@ -450,7 +450,7 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.dirty(tree, APPROVED), "")
         self.assertIn("i0001", result.stderr)
 
-    # ---- 親のブランチの push の関門（ccnavi_push_gate）。取り込み状態は見ない。
+    # ---- 親のブランチの push の関門（ccnavi_push_gate）。
     # 実行ファイルの代役が `tree parent` に答える（STUB_PARENT）。答えなければ参照だけで決める。
 
     def sent_parent(self, name="i0001", started="yes", **extra):

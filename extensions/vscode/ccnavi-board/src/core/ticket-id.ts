@@ -16,7 +16,7 @@ export function isTicketId(value: unknown): value is string {
  *
  * Python（`ticket_ids.branch_to_id`）・sh（`ccnavi_branch_to_id`）と同じ変換で、
  * `tests/fixtures/branch-to-id.json` の同じ表で一致を確かめる。ワークツリーは `.claude/worktrees/<識別子>` に
- * ブランチを直接チェックアウトする（識別子の名前のブランチは作らない）。
+ * 作り、そこでブランチを直接チェックアウトする。
  */
 export function branchToId(branch: string): string {
   return branch.replace(/\//g, "-");

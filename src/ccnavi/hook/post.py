@@ -44,6 +44,7 @@
 from __future__ import annotations
 
 import functools
+import hashlib
 import os
 import time
 from collections.abc import Callable
@@ -152,6 +153,22 @@ def check(
 
     fresh = [f for f in found if f.key() not in reported]
     known = [f for f in found if f.key() in reported]
+    # ユーザの発言で受け入れた変更（`at_prompt`）のうえに、そのあと中身が変わったもの。鍵は
+    # 種類とパスだけなので、受け入れたファイルへの以降の書き込みが全部「すでに知っている変更」に
+    # なってしまう。受け入れたときの指紋と違えば、新しい変更として扱う。ただし戻さない。戻す先の
+    # コミット済みの内容は、ユーザが受け入れさせた編集より古く、戻すとその編集まで消えるため。
+    shadowed: set[str] = set()
+    accepted = _load_accepted(state_dir, payload.session_id)
+    if accepted:
+        for f in known:
+            if f.key() in accepted and _fingerprint(f) != accepted[f.key()]:
+                shadowed.add(f.key())
+        fresh += [f for f in known if f.key() in shadowed]
+        known = [f for f in known if f.key() not in shadowed]
+        if shadowed:
+            # 同じ変更を呼び出しのたびに言わない。言ったぶんは今の指紋を受け入れ済みに直す。
+            accepted.update({f.key(): _fingerprint(f) for f in fresh if f.key() in shadowed})
+            _save_accepted(stderr, state_dir, payload.session_id, accepted)
     # 基準が無いセッションでは、今そこに在るものは直前の実行の結果ではない。
     # 記録を取るだけにして、原因を付けずに 1 度だけ伝える。
     # 基準が在るなら、起動時に在ったものが、まだ伝えられていない分に当たる。
@@ -174,7 +191,11 @@ def check(
     # 取り違えないようにする。
     if restore == selfguard.ENABLE:
         for w, top, _ in read:
-            here = [f for f in fresh if f.tree_name == w.tree.name and _restorable(f)]
+            here = [
+                f
+                for f in fresh
+                if f.tree_name == w.tree.name and _restorable(f) and f.key() not in shadowed
+            ]
             if not here:
                 continue
             tried = True
@@ -187,7 +208,11 @@ def check(
     # 何が戻るのかを本番の前に見せることがそのまま安全の余裕になる。
     # 予行で言うのも、本番で戻すのと同じ集合に限る。戻さない 1 件に「本番なら
     # 戻していた」と書くと、設定を enable にしたときに起きることを読み違えさせる。
-    would = {f.key() for f in fresh if _restorable(f)} if restore == selfguard.DRY_RUN else set()
+    would = (
+        {f.key() for f in fresh if _restorable(f) and f.key() not in shadowed}
+        if restore == selfguard.DRY_RUN
+        else set()
+    )
 
     _save_reported(
         stderr,
@@ -240,8 +265,9 @@ def check(
             payload,
             restored.get(f.key()),
             f.key() in would,
-            not_restored=gated and not _restorable(f),
+            not_restored=gated and (not _restorable(f) or f.key() in shadowed),
             git=git,
+            shadowed=f.key() in shadowed,
         )
         for f in fresh
     ]
@@ -306,7 +332,6 @@ def _committed_findings(
     見るのは、ターンの始まりに記録した HEAD からの差分（`gitstate.committed`）。
     記録を持たないツリー（ターンの途中で切られた）は、記録済みの他のツリーとの
     分岐点（`gitstate.fork_base`）を基準にする。それも取れないものは飛ばす。
-    数えていない期間を、数えたことにしない。
 
     チケットの置き場は外す。承認はユーザが提案を `.ccnavi/approved/` へ動かして
     コミットする進め方で（`ccnavi-push-approved.sh`）、その置き場は `deny` でもある。
@@ -314,7 +339,7 @@ def _committed_findings(
     置き場のパスは `places` で受け取る。チケット制御を切ったワークスペースでも
     承認のコミットは在りうるので、`scope` の有無で外れたり外れなかったりさせない。
 
-    2 つめに返すのは、数えなかったツリーの名前。何も出さずに飛ばすことはしない。基準が
+    2 つめに返すのは、数えなかったツリーの名前。基準が
     無いのは、ターンの途中で切られたツリー（プロンプトのときに無かった）か、
     そのとき HEAD を読めなかったツリーで、分岐点も取れないものがここに当たる。
     「変わっていない」ではないので、そのことを言わないと、見ていない期間が
@@ -406,7 +431,7 @@ def at_stop(
     if not known_baseline:
         # ターンの始まりを見ていない。ここで今そこに在るものを全部並べると、
         # ユーザの書きかけも他のセッションが置いたものも、このターンの成果として
-        # 報告することになる。見えていない期間を、見えたことにしない。
+        # 報告することになる。
         record.decision, record.reason = audit.SKIP, REASON_NO_TURN_BASELINE
         return ""
 
@@ -614,6 +639,49 @@ def _reported_path(state_dir: str, session: str) -> str:
     return os.path.join(state_dir, f"{name}.reported.json")
 
 
+def _accepted_path(state_dir: str, session: str) -> str:
+    """ユーザの発言で受け入れた変更の、受け入れたときの指紋の置き場。
+
+    報告済みの記録（`_reported_path`）とは別に持つ。あちらは鍵の集合で、切らずに増やす。
+    こちらは鍵ごとに指紋を持ち、発言のたびに更新する。
+    """
+    name = fsio.safe_name(session) or "unknown"
+    return os.path.join(state_dir, f"{name}.accepted.json")
+
+
+def _load_accepted(state_dir: str, session: str) -> dict[str, str]:
+    """{鍵: 指紋}。無い・読めないなら空（受け入れた変更が無いのと同じに読む）。"""
+    if not state_dir:
+        return {}
+    data = fsio.read_dict(_accepted_path(state_dir, session)) or {}
+    return {k: v for k, v in data.items() if isinstance(k, str) and isinstance(v, str)}
+
+
+def _save_accepted(stderr: TextIO, state_dir: str, session: str, accepted: dict[str, str]) -> None:
+    if not state_dir:
+        return
+    failed = fsio.write_json_atomic(
+        _accepted_path(state_dir, session), dict(sorted(accepted.items()))
+    )
+    if failed:
+        stderr.write(f"ccnavi: 受け入れた変更の記録を保存できませんでした: {failed}\n")
+
+
+def _fingerprint(finding: post_findings.Finding) -> str:
+    """変更されたファイルの中身の指紋。消えているか読めないときは `-`。
+
+    受け入れたあとにエージェントが同じファイルを書き換えたかを、鍵（種類とパス）とは別に見分ける。
+    """
+    digest = hashlib.sha256()
+    try:
+        with open(finding.change.full, "rb") as f:
+            while chunk := f.read(1024 * 1024):
+                digest.update(chunk)
+    except OSError:
+        return "-"
+    return digest.hexdigest()
+
+
 def _legacy_reported_path(state_dir: str, session: str) -> str:
     name = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"{name}.json")
@@ -641,6 +709,7 @@ def at_prompt(
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
     root: str = "",
+    accept: bool = False,
 ) -> None:
     """ターンの始まり。いま保護領域に在る変更を記録して、このターンの基準にする。
 
@@ -651,6 +720,13 @@ def at_prompt(
 
     基準を取るのはターンが始まるときで、そこが「エージェントがまだ何もして
     いない時点」になる。以降に現れたものだけが、このターンで起きたこと。
+
+    accept は、ユーザの発言で始まるターンのとき真。今そこにある変更を報告済みの記録にも足し、
+    次の実行後チェックが「この呼び出しが起こした変更」として戻さないようにする。足さないと、
+    セッションの途中でユーザが `deny` の場所を直した分が、次のツール呼び出しで新しい変更に
+    見えて、コミット済みの内容へ戻される。記録は起動時の基準（`capture_baseline`）が
+    取れているセッションにだけ足す。基準が無いセッションの今の変更は、初回の実行後チェックが
+    原因を付けずに伝える。
     """
     read = _read_all(stderr, watched, record)
     if not read:
@@ -675,6 +751,19 @@ def at_prompt(
     record.decision, record.enforced = audit.ALLOW, True
     if found:
         record.detail = f"turn baseline {len(found)}"
+    if accept and found:
+        reported, baseline, announced = _load_reported(stderr, state_dir, payload.session_id)
+        if baseline:
+            _save_reported(
+                stderr,
+                state_dir,
+                payload.session_id,
+                reported | {f.key() for f in found},
+                announced=announced,
+            )
+            accepted = _load_accepted(state_dir, payload.session_id)
+            accepted.update({f.key(): _fingerprint(f) for f in found})
+            _save_accepted(stderr, state_dir, payload.session_id, accepted)
 
 
 def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool, dict]:
@@ -683,8 +772,7 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     持っていないなら、ターンの始まりを見ていない。登録されていないか、
     そのイベントで読めなかったか。そこで「全部このターンの成果」として
     報告すると、前から在ったものまで並ぶので、そのときは何も言わない。
-    見えていない期間を、見えたことにしない。`heads` を持たない記録（破損したもの）も、
-    記録が無いときと同じく基準なしとして扱う。
+    `heads` を持たない記録（破損したもの）も、記録が無いときと同じく基準なしとして扱う。
     """
     if not state_dir:
         return set(), False, {}

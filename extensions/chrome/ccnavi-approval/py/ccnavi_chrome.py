@@ -353,8 +353,7 @@ def _ambiguous_problem(closure: dict) -> str:
 
 
 def _hints(req: dict) -> dict[str, str]:
-    """要求か snapshot の `hints`（識別子 → 親のブランチ名）。読むブランチの見当にだけ使う
-    （判定には使わない。読んだブランチが宣言しなければ使わない）。"""
+    """要求か snapshot の `hints`（識別子 → 親のブランチ名）。読むブランチの見当にだけ使う。"""
     snap = req.get("snapshot")
     raw = req.get("hints")
     if raw is None and isinstance(snap, dict):
@@ -384,7 +383,7 @@ def _op_families(req: dict, root: str) -> dict:
     置き換えた）識別子の親の提案か承認済みのチケットがある。閉じた親（`done/`）しか無い
     ブランチは数えない。答えの `name` はブランチ名、`family` は親子のチケットの識別子。
     同じ識別子の親チケットを持つブランチが候補に 2 本以上あるときは `conflict` に止める理由を
-    入れる（拡張はその親子のチケットを判定しない）。
+    入れる。
     """
     snap = _snapshot(req)
     place = _placement()
@@ -449,7 +448,7 @@ def _closure(snap: dict, place: dict, family: str, hints: dict[str, str] | None 
     `families` は親のブランチ名のリスト（先頭が `family`）、`idents` はブランチ名 →
     親子のチケットの識別子、`rivals` は親子のチケットの識別子と同じ名前のブランチ
     （`/` を含むブランチの親子のチケットで、同じ識別子になる別のブランチが無いかを確かめるために
-    読む。判定の入力には入れない）。"""
+    読む）。"""
     closed = _closed(snap, place)
     absent = set(snap.get("absent") or [])
     owners = _ident_branches(snap, place)

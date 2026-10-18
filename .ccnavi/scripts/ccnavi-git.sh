@@ -447,7 +447,7 @@ store_hit() {
 # `.claude`・`.git` を直に、または 1 つ下に持つディレクトリ）。`:` で始まる pathspec と、グロブの前に固定の
 # ディレクトリが無い指定は、どこに当たるかを決められないので当たるとみなす。大文字小文字はそろえる。
 #
-# 承認済みチケットの置き場（`.ccnavi/approved/` の下）はここでは見ない。レビュー済みのマーカーを消す
+# レビュー済みのマーカーを消す
 # `rm` はユーザが端末で打つ手順で、過去の中身に戻す形は store_hit が止める。エージェントの呼び出しは
 # hook が止める（DENY_WRAPPER_CORE_PATH）。
 core_hit() {
@@ -1015,8 +1015,8 @@ ig_stop() {
 # 中身が統合先に入りきったことを確かめてから、ワークツリー・ブランチ・記録を消す。
 # 片付けの前に、取り込みの記録を ccnavi-integrate-done/<名前> へ写して残す。ターンの終わりの実行後チェックが、
 # このターンのコミットのうち integrate の squash を見分けるのに使う（ワークツリーもブランチも消えた後なので）。
-# 実行後チェックは中身を信用せず git で確かめる（コミットの親とツリー、merge-tree の結果）。写せなくても片付けは
-# 止めない（ターンの終わりに報告が出るだけ）。古い写しは 7 日で消す。
+# 実行後チェックは git で確かめる（コミットの親とツリー、merge-tree の結果）。写せなくても片付けは
+# 進む（ターンの終わりに報告が出る）。古い写しは 7 日で消す。
 ig_keep_done() {
 	ig_ddir="${ig_gdir}-done"
 	mkdir -p "$ig_ddir" 2>/dev/null || return 0
@@ -1401,7 +1401,7 @@ worktree)
 				reject worktree-detach "worktree add $wt_dest $wt_base の $wt_base は手元のブランチでも origin/$wt_base でもないので、ブランチの外（detached HEAD）にワークツリーを作ります。新しく切るなら $SELF worktree add $wt_dest -b $wt_base <起点> にしてください。"
 			fi
 			# 既にあるブランチをそのまま出す形は、親のワークツリーを作る形でもある。識別子が親に使えるか
-			# （58 文字以内・末尾が -<2 桁> でない・字の種類・NFC）を実行ファイルに聞く（sh は字数と字の種類を見分けない）。
+			# （58 文字以内・末尾が -<2 桁> でない・字の種類・NFC）を実行ファイルに聞く（字数と字の種類は実行ファイルが見分ける）。
 			# 子の識別子の形（<親>-<2 桁>-<2 桁>）は子のワークツリーを出し直す形なので、64 文字と字だけを見る。
 			ccnavi_id_ask "$WS" "$wt_base" ||
 				reject worktree-id-unchecked "worktree add $wt_dest $wt_base で、$wt_base から作る識別子が使えるかを確かめられません（ccnavi の実行ファイルが答えない）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
@@ -1459,7 +1459,7 @@ add)
 rm)
 	# 消す側だが、消えるのは git が中身を持っているファイルだけ。git rm は
 	# 索引や HEAD と食い違うファイルを既定で拒む。`rm -rf` の代わりとして
-	# rules.yml が名指しで勧める経路なので、勧めた先が通らない形にはしない。
+	# rules.yml が名指しで勧める経路なので、勧めた先が通る形にする。
 	#
 	# 通さないのは -f（略した --forc と、まとめた -rf も）。それを付けると、コミットしていない変更ごと消える。
 	# git が守っている線がそこなので、こちらで引く線も同じ場所にする。
@@ -2072,7 +2072,7 @@ if [ "$status" -eq 0 ]; then
 	printf 'ok  git %s  %s  log=%s\n' "$sub" "$summary" "$logrel"
 	body | head -n "$MAX_LINES"
 	if [ "$lines" -gt "$MAX_LINES" ]; then
-		printf '... 残り %d 行は %s にある\n' "$((lines - MAX_LINES))" "$logrel"
+		printf '... 残り %d 行は %s にある（全文は Read ツールでこのファイルを読む）\n' "$((lines - MAX_LINES))" "$logrel"
 	fi
 	if [ "$sub" = worktree ] && [ -n "$wt_fresh_warn" ]; then
 		printf '警告: %s\n' "$wt_fresh_warn"

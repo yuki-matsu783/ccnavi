@@ -76,7 +76,7 @@ def approve(
 ) -> int:
     """未承認の提案をまとめてユーザに見せ、承認されたら承認済みチケットを置く。
 
-    エージェントではなくユーザが端末から打つ経路。提案を書き直す方法は用意しない。
+    エージェントではなくユーザが端末から打つ経路。承認は提案の中身を書き換えない。
     チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
     承認したユーザが承認したものの作者になる。
 
@@ -335,7 +335,7 @@ def verify(
     else:
         stdout.write(verdict.text)
         if branches:
-            stdout.write("\n既にあるブランチと同じ名前の親（warn。承認は止めない）:\n")
+            stdout.write("\n既にあるブランチと同じ名前の親（warn）:\n")
             for line in branches:
                 stdout.write(f"  - {line}\n")
     return modes.EXIT_OK if verdict.ok else modes.EXIT_ANSWER_NO

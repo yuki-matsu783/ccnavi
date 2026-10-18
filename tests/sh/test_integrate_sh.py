@@ -322,9 +322,8 @@ class IntegrateTest(unittest.TestCase):
 
     def test_a_parent_started_but_not_yet_proposed_is_refused(self):
         """`ccnavi-start.sh` は親のブランチを origin へ送ってから始める。チケットも提案も
-        まだ無い間も、origin に在る親のワークツリーのブランチは、統合先へ直接取り込まない
-        （取り込み状態は持たない）。直接作業のブランチは送らないので、同じ形でも origin に
-        無ければ取り込める。"""
+        まだ無い間も、origin に在る親のワークツリーのブランチは、統合先へ直接取り込まない。
+        直接作業のブランチは送らないので、同じ形でも origin に無ければ取り込める。"""
         self.work_in_branch()
         git(self.ws, "update-ref", "refs/remotes/origin/wt", "wt")
         r = self.run_git_sh("integrate", "wt")

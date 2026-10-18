@@ -1,6 +1,5 @@
 /**
  * テンプレート管理画面に出す言葉。判定は実行ファイルの答えが決めていて、ここは答えの値を読みやすい言葉に直すだけ。
- * 拡張が有効かどうかや捨てた理由を自分で判定することはしない。
  */
 import type { PlanItem, ProblemSeverity, FlowSummary, TemplateLayer, TemplateProblem } from "../../core/templates-view.js";
 

@@ -211,7 +211,7 @@ def _local_settings(root: str) -> list[Problem]:
 def _bin_path(root: str, declared: object) -> list[Problem]:
     """`.claude/settings.json` の env の実行ファイルのパスを見る。
 
-    プロセスの環境ではなく設定ファイルを読む。hook が起動するのは、ここに書いたパス
+    設定ファイルを読む。hook が起動するのは、ここに書いたパス
     （`"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"`）だから。
 
     - 指す先が在るのに実行できなければ error。hook は sh を直に起動するので 126 で起動せず、

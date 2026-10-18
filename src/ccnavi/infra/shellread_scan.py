@@ -1,6 +1,6 @@
 """原文の走査。引用の状態を持ったまま、置換・ヒアドキュメント・コメント・改行を片付ける。
 
-語の分割の前の段で、shlex が見ないものをここで読む。shellread から分けた。shellread を読まない。
+語の分割の前の段で、shlex が見ないものをここで読む。shellread から分けた。
 """
 
 from __future__ import annotations
@@ -555,7 +555,7 @@ class _Scanner:
                 self.i = len(s) if j < 0 else end + 1
 
     def body(self, text: str, collect: bool) -> None:
-        """区切りを引用しない本文から、置換の中身だけを拾う。本文の文字は外側に出さない。"""
+        """区切りを引用しない本文から、置換の中身だけを拾う。"""
         if not collect:
             return
         inner = _Scanner(text)

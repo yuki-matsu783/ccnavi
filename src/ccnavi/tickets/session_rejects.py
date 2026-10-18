@@ -233,7 +233,7 @@ def notice(conf: settings.Settings, root: str, cwd: str, deadline: float | None 
 
     cwd のツリーに結び付く承認済みチケットだけを見る。ワークスペースルート（チケットを持たない
     ツリー）からは、開いているチケットのうち却下のあるものの件数を 1 行で言う。
-    何が起きてもセッションの開始は止めない（失敗したら何も言わない）。
+    失敗したら何も言わず、セッションの開始は進める。
     """
     try:
         here = tree.tree_of(root, cwd or root, conf.projects)

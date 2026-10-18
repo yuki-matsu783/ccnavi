@@ -7,7 +7,7 @@
  *
  * GitLab の Commits API には「先頭がこの sha のときだけ」の指定が無い。書く直前に先頭を読み、違えば書かずに
  * 「動いた」（409）で返す。それでも間に入った書き込みは防げないので、答えにコミットの親（`parent_ids[0]`）を返し、
- * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、元に戻す。ccnavi の書き込みどうしの競合を捕まえる seq ファイルは、実際の GitLab で確かめるまで書かない。
+ * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、元に戻す。ccnavi の書き込みどうしの競合の検出は、実際の GitLab で確かめるまで未実装。
  *
  * MR のスレッドとレビュー（`reviewCopy`）は、手元の `ccnavi-review.sh` の `find_mr`・`threads`・`reviews`
  * （GitLab の枝）と同じ問い合わせ・同じページの切り方・同じ欄の省き方（jq の `//`・`tostring`、型は jq と同じく
@@ -15,7 +15,7 @@
  *
  * 書き込みの update・delete には `last_commit_id`（そのファイルを最後に変えたコミット）を付け、
  * 同じファイルを他人が変えていれば GitLab が断る（ファイル単位の比較つきの書き込み）。MR は同じプロジェクトから
- * 出たもの（`source_project_id`）だけを拾う（フォークの MR を拾わない）。転送は追わない（`redirect: "error"`）。
+ * 出たもの（`source_project_id`）だけを拾う。転送は追わない（`redirect: "error"`）。
  */
 import type { Host } from "./hosts.js";
 import {

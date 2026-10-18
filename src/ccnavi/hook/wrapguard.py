@@ -106,7 +106,7 @@ def check_env(subject: str, degraded: str) -> tuple[str, list[str]]:
     コマンド行のどこで置いても数える。前置きの代入（`X=… sh …`）、`env X=…`、`export X=…`、
     すでに書き出してある変数への素の代入（`X=…; sh …`。settings.json の env が書き出した変数は
     代入だけで sh に届く）、`unset X`・`env -u X`。読み切れない形は、allow が当たらずに
-    確認になるので、ここでは見ない。
+    確認になる。
     """
     if degraded:
         return "", []

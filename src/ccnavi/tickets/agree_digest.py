@@ -68,7 +68,8 @@ def revise_copy(
 def revised_front(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> dict:
     """改版で書く frontmatter。承認済みチケットの計画・`phases:`・範囲を差し替えたもの。
 
-    `current` は書き換えない。承認画面の「`phases:` の差分」も同じものから組むので、
+    `current` は変更せず、`raw` を写した辞書を返す。
+    承認画面の「`phases:` の差分」も、この結果と同じものから組むので、
     画面に出した中身と書く中身が食い違わない。項の `after` も書く（`PlanItem.as_raw`）。
     `phases:`（計画が使う定義の写し）は提案の値に差し替える。差し替えないと
     改版で足した項（フィードバック計画の立案は必ず改版）が `phases:` に無い定義名を使うことになり、

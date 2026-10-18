@@ -246,7 +246,7 @@ class SyncHarness(unittest.TestCase):
         return path
 
     def legacy_record(self, state="gone", mr="42", branch=PARENT, name=PARENT, repo="self"):
-        """旧い取り込み状態（`sync/<repo>/families/<P>`。今は誰も書かない）を置く。"""
+        """旧い取り込み状態（`sync/<repo>/families/<P>`）を置く。"""
         path = os.path.join(self.state, "sync", repo, "families", name)
         write(
             path,
@@ -615,7 +615,7 @@ class SyncTest(SyncHarness):
                 self.assertNotIn("戻し方", done.stdout)
 
     def test_a_restored_branch_is_taken_in_again(self):
-        # 消えた親のブランチをユーザが戻せば、次の sync は普通に取り込む（何も書き換えない）。
+        # 消えた親のブランチをユーザが戻せば、次の sync は普通に取り込む。
         self.review_says("none")
         self.delete_remote_branch(PARENT)
         self.assertEqual(1, self.sync(PARENT).returncode)

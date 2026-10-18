@@ -586,7 +586,7 @@ def _stray_claude_dirs(root: str, worktree_names: set[str]) -> list[str]:
     """リポジトリの中で `.claude/` を持つ、ワークツリーでもワークスペースルートでもない
     ディレクトリ。
 
-    浅くしか見ない。2 段まで。深くたどると大きなリポジトリで検証が待たされる。
+    見るのは 2 段まで。深くたどると大きなリポジトリで検証が待たされる。
     """
     found = []
     skip = {".git", ".claude", "node_modules", ".venv", "dist", "build"}

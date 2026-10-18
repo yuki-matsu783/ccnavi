@@ -88,7 +88,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     states = "|".join(ticket_model.GUARDED_STATES)
     review = _place(tickets_rel) + rf"[\\/]({states})"
     loose = review + r"([\\/]|\s|$)"
-    # コピーする動詞は行き先だけで当てる。置き場から外へコピーする読み向きの cp は止めない。行き先の
+    # コピーする動詞は行き先だけで当てる。置き場から外へコピーする読み向きの cp は通す。行き先の
     # 読み方（`-t` の値か、選択肢でない最後の引数）は組み込みの保護と同じ部品を使う。
     # ここで別に書くと、
     # `cp -t <置き場> <提案>` のように片方だけが読む書き方が通る。
@@ -184,7 +184,7 @@ def propose_notice(
 
     1 つの文脈（セッション、サブエージェントなら 1 回の起動）で最初の 1 回だけ渡る。
     数えは `ctxfile` の記録を、ルールと同じ形で使う（この 1 本は表に入れないので、
-    判定には一切現れない）。2 本目からは何も渡さない。提案を 1 本書くたびに同じ文を積むと、
+    判定には一切現れない）。提案を 1 本書くたびに同じ文を積むと、
     長いセッションではそれだけでコンテキストを使ってしまう。
     """
     if payload.tool_name not in ticket_model.WRITE_TOOLS or not subject:
