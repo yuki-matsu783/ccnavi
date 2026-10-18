@@ -11,7 +11,7 @@ keywords: [設計, 構成, ファイル, src, core, webview, test, fixtures, テ
 ```
 src/
   extension.ts        画面の入口の登録（core/screens.ts の帳面）、コマンド登録とサイドパネルの登録（vscode に依存する）
-  sidebar.ts          左端のアイコンから開くサイドパネルの 7 つの入口。チケット制御が disable なら 3 つ（プロジェクト管理・ルール管理・取り込み待ち）。見た目はタイトルバーの配色のアイコンで、今の値を見出しの横に出す（vscode に依存する）
+  sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口（取り込み待ちは並べない）。チケット制御が disable なら 2 つ（プロジェクト管理・ルール管理）。見た目はタイトルバーの配色のアイコンで、今の値を見出しの横に出す（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に反映する。変化を監視する（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）
   rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
