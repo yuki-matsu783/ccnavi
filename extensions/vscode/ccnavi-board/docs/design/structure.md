@@ -98,7 +98,7 @@ src/
     workflow/tour-marks.ts 案内の間だけ、計画の図の中の項・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
     flow/post.ts の muteForTour は、案内の間に tourDone 以外を拡張ホストへ送らない。board/post.ts の mutePosts も同じ
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
-    styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する
+    styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する。欄の幅の名前（--w-field・--w-field-wide・--w-grow）は page.css の :root にあり、画面の CSS は 320px・360px を直書きせずそれを参照する（CB-T439 が検査する）
     board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
     board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）
     board/Card.css    Card.tsx の CSS（カード 1 枚）

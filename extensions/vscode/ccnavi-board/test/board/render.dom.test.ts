@@ -327,7 +327,7 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
   // 最後の列の取っ手は内側に置き、ボードを常に横へ流さない
   assert.match(css(), /\.column:last-child \.resizer \{ right: 0; \}/);
   // 絞り込みの select は最長の選択肢の幅に広がらず、ページを横に流さない
-  assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: 320px;/);
+  assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: var\(--w-field\);/);
   // カードの不備の小さい字の指定は、ツールバーの「不備 N 件」には当てない
   assert.doesNotMatch(css(), /(^|\})\s*\.issues \{/);
   assert.match(css(), /\.card \.issues \{/);

@@ -16,7 +16,7 @@
 select.f-section { max-width: 120px; }
 /* 押すと選択肢が出る欄。欄そのものは普通のテキスト入力で、手でも書ける。 */
 .picker { position: relative; }
-.picker > input { width: 100%; box-sizing: border-box; max-width: 360px; }
+.picker > input { width: 100%; box-sizing: border-box; max-width: var(--w-field-wide); }
 .picker > .menu { display: none; }
 .picker.open > .menu {
   display: flex; flex-direction: column; gap: 2px; position: absolute; z-index: 5; top: 100%; left: 0; min-width: 100%;
