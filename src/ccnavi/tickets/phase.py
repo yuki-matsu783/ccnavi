@@ -678,7 +678,8 @@ def review_next(
         lead = f"フェーズ {ph.label} のレビューは {owner.label} と一緒に見る計画。"
     if approval_marks.MARK_REVIEWED in owner.marks:
         return (
-            f"{lead}フェーズ {owner.label} はレビュー済み。ユーザの操作（confirm / decide）で "
+            f"{lead}フェーズ {owner.label} はレビュー済み。"
+            "ユーザの操作（confirm / decide、Chrome 拡張のレビュー済み）で "
             f"{conf.approved}/{ticket_model.DONE}/ へ動く"
         )
     request = (
@@ -694,7 +695,7 @@ def review_next(
             ) + _AFTER_REQUEST.format(done=f"{conf.approved}/{ticket_model.DONE}/")
         return (
             f"{lead}フェーズ {owner.label} は依頼済み（{LABEL_WAITING}）。ユーザのレビューを待つ"
-            "（ユーザが confirm / decide で done/ へ動かす）"
+            "（ユーザが confirm / decide か Chrome 拡張のレビュー済みで done/ へ動かす）"
         )
     if not ph.ended or not owner.ended:
         left = "このフェーズ" if owner is ph else f"フェーズ {owner.label}"
@@ -712,7 +713,10 @@ def review_next(
 
 # 依頼の前の文の結び。依頼の後に誰が done/ へ動かすか
 # （依頼済み・レビュー済みの文はそれぞれ言っている）。
-_AFTER_REQUEST = "。依頼の後、ユーザがレビューを終えて confirm / decide を実行すると {done} へ動く"
+_AFTER_REQUEST = (
+    "。依頼の後、ユーザがレビューを終えて confirm / decide か "
+    "Chrome 拡張のレビュー済みを実行すると {done} へ動く"
+)
 
 
 def _later(a: str, b: str) -> bool:
