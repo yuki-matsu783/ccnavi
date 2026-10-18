@@ -58,6 +58,8 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY G
 SELF="sh $0"
 # 取り込みの sh。リモートに合わせる経路はここへ案内する。
 SYNC="sh $(dirname "$0")/ccnavi-sync.sh"
+# 捨てた親子のチケットの取り込み状態を消す、ユーザ専用の sh。エージェントには打たせず、ユーザに頼む形で案内する。
+FORGET="sh $(dirname "$0")/ccnavi-user-forget.sh"
 # 親のワークツリーを作る入口。既にあるブランチを親にする経路はここへ案内する。
 START="sh $(dirname "$0")/ccnavi-start.sh"
 
@@ -186,7 +188,7 @@ for arg in ${1+"$@"}; do
 		reject moved-root "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
 		;;
 	--?*)
-		# 略した表記（`--outp=x`・`--upload-p=...`）。parse-options を使う副命令は長いオプションの
+		# 略した表記（`--outp=x`・`--upload-p=...`）。parse-options を使うサブコマンドは長いオプションの
 		# 略を受けるので、止める名前の頭に当たる表記も止める。
 		# `--text`（diff の正式な名前）だけは textconv の頭でも通す。
 		gl_name="${arg#--}"
@@ -338,7 +340,7 @@ opt_walk() {
 	return 0
 }
 
-# 許可リストを空に戻す。副命令ごとに必要なものだけ入れる。
+# 許可リストを空に戻す。サブコマンドごとに必要なものだけ入れる。
 ow_spec() {
 	ow_flags=" $1 "
 	ow_values=" $2 "
@@ -1882,7 +1884,7 @@ push)
 	[ -f "$push_record" ] || push_record=""
 	if [ -n "$push_record" ] && [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
 		push_family="${push_record##*/}"
-		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（親子のチケット $push_family の取り込み状態が gone）。普通の push で作り直すと、消えた理由を確かめないまま親子のチケットが動き出すので使用できません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_family が出します）、戻した後に $SYNC $push_family を再実行すると送れます。親子のチケットを捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_family で取り込み状態を削除します（エージェントは実行しません）。"
+		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（親子のチケット $push_family の取り込み状態が gone）。普通の push で作り直すと、消えた理由を確かめないまま親子のチケットが動き出すので使用できません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_family が出します）、戻した後に $SYNC $push_family を再実行すると送れます。親子のチケットを捨てたなら親のワークツリーを片付け、ユーザが $FORGET $push_family で取り込み状態を削除します（エージェントは実行しません）。"
 	fi
 	push_seen_remote=""
 	for arg in ${1+"$@"}; do

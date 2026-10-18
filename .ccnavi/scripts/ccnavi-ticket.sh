@@ -83,8 +83,8 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
   record-risk  定性のリスク項目の判定を記録する（親が実行します。判断はサブエージェント）
   learn        子の気づきの記録の雛形と判定記録の要約を書く（--note なしの形）、または気づき 1 件を記録（直接作業では受信箱）に追加します（--note）。
 
-  レビュー待ち（review/）から done/ へ動かすのはユーザ（ccnavi-review.sh confirm / decide、
-  ccnavi --reviewed）。
+  レビュー待ち（review/）から done/ へ動かすのはユーザ（ccnavi-review.sh confirm、ccnavi-user-decide.sh、
+  ccnavi user reviewed）。
 
   提案の plan に書くフェーズ定義は、共通の .ccnavi/config/common/phases.yml と、親の project: が
   指す config の phases.yml の和から選ぶ（自身のレイヤーは .ccnavi/config/project/phases.yml、
@@ -135,11 +135,10 @@ root=$(ccnavi_workspace) || {
 }
 
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
-if bin=$(ccnavi_bin "$root"); then
-	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
-	ccnavi_c1_exe() { "$bin" --root "$root" "$@"; }
-elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	ccnavi_c1_exe() { (cd "$root" && uv run python -m ccnavi --root "$root" "$@"); }
+if ccnavi_c1_use_exe "$root"; then
+	if [ -n "$ccnavi_c1_bin" ]; then
+		skew=$(ccnavi_compat_skew "$root" "$ccnavi_c1_bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
+	fi
 else
 	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
@@ -148,7 +147,7 @@ fi
 here="$(pwd -W 2>/dev/null || pwd)"
 
 # 識別子を実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を読み飛ばした最初の語。
-# 副命令（1 つ目の語）は読まない。
+# サブコマンド（1 つ目の語）は読まない。
 ticket_id() {
 	ti_id=""
 	ti_skip=""

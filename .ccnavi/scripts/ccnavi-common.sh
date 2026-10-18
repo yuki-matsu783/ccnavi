@@ -33,12 +33,17 @@
 #                           決まりは ccnavi のリポジトリの docs/claude/logging.md
 #
 # 部品が 1 本でも欠けていれば、標準エラーに配り直しを言って 1 で終わる。
+#
+# ccnavi-common-review.sh（ホストのマージリクエストを読む側）は、ここでは読まない。ホストの道具が要るので、
+# レビューの sh（ccnavi-review.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.sh）がこのファイルの後に自分で読む。
+# 共通部（ccnavi-common*.sh）には、読む側とエージェントも使う関数だけを置く。ユーザの判断を書く処理は
+# ユーザ専用の sh（ccnavi-user-*.sh）の中だけに置く。
 
 # この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの src/ccnavi/entry/version.py の COMPAT、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときと、データの形（待ち方の置き場・取り下げの条件など）が
 # 変わるとき（上げ方は src/ccnavi/entry/version.py の説明）。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=12
+CCNAVI_COMPAT=13
 
 # 相対パスを絶対に直す。
 #
@@ -203,14 +208,17 @@ ccnavi_bin() {
 # 止めるか通すかは実行ファイルと hook が判定する。
 #
 # `--version` を知らない古い実行ファイルは互換の版を答えないので、古い版として知らせる。
-# 直し方は、ccnavi のリポジトリ（build.py とソースがある）なら組み立て直し、配布先なら配り直し。
+# 直し方は、ccnavi のリポジトリ（build.py とソースがある）なら組み立て直し、配布先なら実行ファイルと sh の配り直し
+# （scripts/ccnavi-setup.sh --force）。
 ccnavi_compat_skew() {
 	ccnavi_cs_out=$("$2" --version </dev/null 2>/dev/null) || ccnavi_cs_out=""
 	ccnavi_cs_have=$(printf '%s\n' "$ccnavi_cs_out" | sed -n 's/^compat:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' | head -n 1)
 	if [ -f "$1/build.py" ] && [ -f "$1/src/ccnavi/__main__.py" ]; then
 		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
 	else
-		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
+		# sh が古いと、新しい実行ファイルは旧い形の呼び出し（ユーザ専用の操作を `user` の外で使う形）を断る。
+		# 配り直しは sh も入れ替え、旧い名前の sh（ccnavi-agree.sh など。今は ccnavi-user-*.sh）を消す。
+		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください（sh の再配布で、ユーザが打つ sh は ccnavi-user-*.sh に入れ替わり、旧い名前の sh は消えます）"
 	fi
 	if [ -z "$ccnavi_cs_have" ]; then
 		printf '実行ファイル %s は --version で互換の版を返しません（古い版です）。%s。\n' "$2" "$ccnavi_cs_fix"
@@ -392,6 +400,18 @@ ccnavi_branch_to_id() {
 # 環境変数からは受け取らない。置き場を外から差し替えられると、保護していない場所の sh を
 # 保護済み sh の中で走らせられるため。
 ccnavi_lib_dir=$(dirname "$0")
+
+# 部品のうち、ここでは読まず呼ぶ側が読むもの（ccnavi-common-review.sh など）を読む。<ファイル名>
+# 置き場は上の部品と同じ（呼んだ sh のディレクトリ）。無ければ配り直しを言って 1 で終わる
+# （読めないまま `.` に進むと、シェルの生のエラーだけが出る）。
+ccnavi_load() {
+	[ -f "$ccnavi_lib_dir/$1" ] || {
+		printf 'ccnavi: 共通部の部品 %s が見つかりません。scripts/ccnavi-setup.sh --force で配り直してください\n' "$ccnavi_lib_dir/$1" >&2
+		exit 1
+	}
+	. "$ccnavi_lib_dir/$1"
+}
+
 for ccnavi_lib_part in state lock c1 host log; do
 	[ -f "$ccnavi_lib_dir/ccnavi-common-$ccnavi_lib_part.sh" ] || {
 		printf 'ccnavi: 共通部の部品 %s が見つかりません。scripts/ccnavi-setup.sh --force で配り直してください\n' "$ccnavi_lib_dir/ccnavi-common-$ccnavi_lib_part.sh" >&2

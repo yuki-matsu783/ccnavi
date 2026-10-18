@@ -2,7 +2,6 @@
 # ccnavi-sync 親のブランチをリモートから取り込み、親子のチケットの取り込み状態と統合先の取り込み結果を書く。
 #
 #   sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
-#   sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...   （ユーザが打つ。親子のチケットの取り込み状態を消す）
 #
 # ユーザが打つ（ボードのボタン、「承認した」と言われたエージェント）。セッションの頭の
 # ccnavi-fetch.sh は早送りしかしないので、分かれた親子のチケットを取り込むのと、親のブランチが
@@ -18,9 +17,9 @@
 #
 # 親子のチケットの取り込み状態は、親のワークツリーを片付けても消さない。消すと、決まらないで止めていた
 # 親子のチケット（gone など）が取り込み状態の無いものに戻り、止めが外れるため。消すのは、MR がマージされて
-# 手元を片付けたとき（下の手元の片付け）と、ユーザが打つ `--forget <P>`（親のワークツリーを片付けた後に限る。
-# ネットワークは使わない）だけ。
-# エージェントからは組み込みの deny（builtin:guard-ticket-approval）が止める。
+# 手元を片付けたとき（下の手元の片付け）と、ユーザが打つ ccnavi-user-forget.sh <P>（親のワークツリーを片付けた後に限る。
+# ネットワークは使わない）だけ。前はこの sh の `--forget` だったが、ユーザだけが打つ操作は ccnavi-user-*.sh に
+# 分けたので、`--forget` は何もせずに終了コード 2 で新しい sh を案内する（古い手順書や古い拡張から来たとき用）。
 #
 # リポジトリ（ワークスペース自身と、親子のチケットの元のプロジェクト）ごとに 1 回、次の順に行う。
 #
@@ -90,7 +89,6 @@ set -eu
 usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
-sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...
 
   親チケット <P>（識別子。省けば .claude/worktrees/ の下の親のワークツリー全部）の親のブランチ
   （親のワークツリーの HEAD のブランチ。/ を - に置き換えたものが <P>）をリモートから取り込み、
@@ -101,27 +99,22 @@ sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...
   （未 push のコミットや未コミットの変更があれば消さずに理由を言う）。それ以外では、取り込み状態は親のワークツリーを
   片付けても消えない（削除せずに残す）。
 
-  --forget <P>...  ユーザが実行します。捨てた親子のチケットの取り込み状態を削除します（親のワークツリーを片付けた後だけ）。
-                   削除すると、その名前で切り直した親子のチケットは取り込み状態の無いものとして扱われる。
+  捨てた親子のチケットの取り込み状態を削除するのは、ユーザが実行する ccnavi-user-forget.sh <P>...。
 
   統合先: CCNAVI_INTEGRATION_BRANCH（環境変数か .claude/settings.local.json の env）、
           空ならホストのデフォルトブランチ
 USAGE
 }
 
-forget=no
 case "${1:-}" in
 -h | --help | help)
 	usage
 	exit 0
 	;;
 --forget)
-	forget=yes
-	shift
-	if [ "$#" -eq 0 ]; then
-		printf 'ccnavi-sync: --forget には親の識別子が要ります。\n' >&2
-		exit 2
-	fi
+	# 取り込み状態を消すのはユーザ専用の sh に移した。何も動かさずに案内する。
+	printf 'ccnavi-sync: --forget は ccnavi-user-forget.sh に移りました。何もしていません。取り込み状態を削除するなら、ユーザが sh %s/ccnavi-user-forget.sh <P>... を実行します（エージェントは実行しません）。\n' "$(dirname "$0")" >&2
+	exit 2
 	;;
 -*)
 	printf 'ccnavi-sync: %s は受けません。\n' "$1" >&2
@@ -181,52 +174,7 @@ cleanup() {
 trap 'cleanup' EXIT
 trap 'cleanup; exit 130' INT TERM HUP
 
-log_info 受け付けた -- "args=$#" "forget=$forget"
-
-# ---- ユーザが打つ --forget（親子のチケットの取り込み状態を消す）。ネットワークも実行ファイルも使わない。
-
-if [ "$forget" = yes ]; then
-	forget_rc=0
-	for want in "$@"; do
-		if [ -e "$root/.claude/worktrees/$want" ] || [ -L "$root/.claude/worktrees/$want" ]; then
-			printf '%s: 親のワークツリー（.claude/worktrees/%s）がまだある。取り込み状態を削除するのは捨てた親子のチケットだけ。先に片付けてから実行してください（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）\n' \
-				"$want" "$want" "$here_sh" "$want"
-			forget_rc=1
-			continue
-		fi
-		fg_found=no
-		for fg_record in "$state"/sync/*/families/"$want"; do
-			[ -e "$fg_record" ] || [ -L "$fg_record" ] || continue
-			fg_key="${fg_record%/families/*}"
-			fg_key="${fg_key##*/}"
-			if [ -L "$state/sync/$fg_key" ] || [ -L "$state/sync/$fg_key/families" ]; then
-				printf '%s: 取り込み状態の置き場（sync/%s）がシンボリックリンク。辿らないので削除しません。ユーザが中身を確かめる\n' "$want" "$fg_key"
-				forget_rc=1
-				continue
-			fi
-			fg_found=yes
-			fg_lock_rc=0
-			ccnavi_lock_take "$root" "$fg_key" "$want" "$lock_wait" || fg_lock_rc=$?
-			if [ "$fg_lock_rc" -ne 0 ]; then
-				printf '%s: 他の操作がロックを持っている。終わってから再実行してください\n' "$want"
-				forget_rc=1
-				continue
-			fi
-			fg_state=$(ccnavi_record_get "$fg_record" state)
-			if rm -f "$fg_record"; then
-				printf '%s: 親子のチケットの取り込み状態（sync/%s/families/%s。state %s）を削除しました。この名前の親子のチケットは取り込み状態の無いものとして扱われる\n' \
-					"$want" "$fg_key" "$want" "${fg_state:-?}"
-				log_info 親子のチケットの取り込み状態を削除した -- "family=$want" "repo=$fg_key" "state=$fg_state"
-			else
-				printf '%s: 親子のチケットの取り込み状態（sync/%s/families/%s）を削除できませんでした。\n' "$want" "$fg_key" "$want"
-				forget_rc=1
-			fi
-			ccnavi_lock_drop
-		done
-		[ "$fg_found" = yes ] || printf '%s: 親子のチケットの取り込み状態はありません（削除するものはありません）\n' "$want"
-	done
-	exit "$forget_rc"
-fi
+log_info 受け付けた -- "args=$#"
 
 # `git rev-parse --git-path <名前>` をツリーからのパスにする（ワークツリーでは git ディレクトリが別）。
 git_path() {
@@ -544,7 +492,7 @@ if [ "$#" -gt 0 ]; then
 			fail_note
 			# 親子のチケットは取り込まないが、そのリポジトリの統合先の取り込み結果は書く。取り込み記録が
 			# （ccnavi-start.sh が MR の番号を保存して）チケットより先にあると、統合先の取り込み結果が
-			# 無いままでは最初の承認（--agree）が止まる。
+			# 無いままでは最初の承認（ccnavi user agree）が止まる。
 			nt_key=$(ccnavi_repo_key "$tree" "$root")
 			grep -F -x -q -- "$nt_key" "$scratch/repos" 2>/dev/null || printf '%s\n' "$nt_key" >>"$scratch/repos"
 			continue
@@ -752,7 +700,7 @@ merged_present() {
 # でなく、親のワークツリーの親チケットと同じ親と言える親チケットがあれば yes。同じ親かは、スクリプトだけが
 # 書く欄を base_sha → started_at → cancelled_at の順に見て、最初に両方が値を持つ欄が同じかで決める
 # （同じ識別子の古い親子のチケットを、今のものと読まない）。手元の退避（logs/archive/）からは推定しない。
-# 実行ファイルが無い・答えない（古くて副命令を知らない）ときは閉じていない側に倒す（止めて戻し方を出す）。
+# 実行ファイルが無い・答えない（古くてサブコマンドを知らない）ときは閉じていない側に倒す（止めて戻し方を出す）。
 closed_in_integration() {
 	[ -n "$info_from" ] || return 1
 	cb_out=$(run_ccnavi sync closed "$P" "$key" "$integ" "$tree" 2>/dev/null | tr -d '\r') || cb_out=""
@@ -922,7 +870,7 @@ sync_absent() {
 	fi
 	printf '  戻し方 1（改名・消し間違い）: 元の名前 %s でブランチを作り直す。端末なら git push origin %s:refs/heads/%s（取り込み状態にある、最後に取り込んだか送った %s の先頭）、GitHub ならマージリクエストの画面の「Restore branch」、GitLab ならマージリクエストの refs/merge-requests/<番号>/head から %s を作る。戻したら sh %s/ccnavi-sync.sh %s を再実行します。\n' \
 		"$B" "${kept_sha:-<最後に取り込んだ sha>}" "$B" "$B" "$B" "$here_sh" "$P"
-	printf '  戻し方 2（親子のチケットを捨てた）: 親のワークツリーを片付け（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）、ユーザが sh %s/ccnavi-sync.sh --forget %s を実行すると親子のチケットの取り込み状態が消える（同じ名前で切り直せる。エージェントは実行しません）\n' \
+	printf '  戻し方 2（親子のチケットを捨てた）: 親のワークツリーを片付け（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）、ユーザが sh %s/ccnavi-user-forget.sh %s を実行すると親子のチケットの取り込み状態が消える（同じ名前で切り直せる。エージェントは実行しません）\n' \
 		"$here_sh" "$P" "$here_sh" "$P"
 	fail_note
 	return 0
@@ -1019,7 +967,7 @@ check_family() {
 	run_ccnavi sync check "$1" "$2" >"$scratch/check-raw" 2>"$scratch/check-err" || cf_rc=$?
 	tr -d '\r' <"$scratch/check-raw" >"$scratch/check"
 	if [ "$(head -n 1 "$scratch/check" 2>/dev/null)" != "check 1" ]; then
-		# 検査を実行できなかった（古い実行ファイルが副命令を知らない、失敗した）。検査の error ではない
+		# 検査を実行できなかった（古い実行ファイルがサブコマンドを知らない、失敗した）。検査の error ではない
 		# ので親子のチケットは止めない。この検査が入る前と同じ動き。
 		printf '%s: 注意: 取り込みの後の検査を実行できなかった（%s）。親子のチケットは止めていない。実行ファイルを新しくして再実行してください\n' \
 			"$1" "$(head -n 1 "$scratch/check-err" 2>/dev/null)"

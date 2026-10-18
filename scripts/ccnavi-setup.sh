@@ -130,11 +130,16 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分の入口。入口は同じディレクトリの部品
 # ccnavi-common-{state,lock,c1,host,log}.sh を読む。どちらも配らないと、配布先で 3 本とも
 # 起動時にエラーで止まる。部品は入口より先に配る。途中で失敗したときに、部品を読む新しい入口だけが
-# あって部品が無い状態を作らないため。
-# ccnavi-push-approved.sh は、ボードが承認のあとに端末へ送る 1 行の中身。
+# あって部品が無い状態を作らないため。ccnavi-common-review.sh は、ccnavi-review.sh とユーザ専用のレビューの sh が
+# 読む、ホストのマージリクエストを読む側の部品（入口は読まない）。
+# ccnavi-user-*.sh は、ユーザだけが端末で打つ sh（エージェントからは hook が名前で止める）。
+# ccnavi-user-push-approved.sh は、ボードが承認のあとに端末へ送る 1 行の中身。
 # 配らないと、配布先のボードは承認済みチケットをコミットして push できない。
-# ccnavi-agree.sh は端末から承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
-# 配らないと、案内どおりに実行しても動かない。
+# ccnavi-user-agree.sh は端末から承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
+# 配らないと、案内どおりに実行しても動かない。ccnavi-user-forget.sh・ccnavi-user-decide.sh・
+# ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、取り込み状態の削除・残った指摘の対応方針・
+# 早めに閉じる判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、
+# ユーザの判断をホストに書く部品（読む 2 本より先に配る）。
 # ccnavi-fetch.sh はセッション開始時に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh はユーザが実行する
 # 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、取り込み状態の書き出し）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
@@ -150,8 +155,15 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-c1.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-c1.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-forget.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
+# 前の版が配った、今は配らない旧い名前の sh。ユーザだけが打つ sh を ccnavi-user-*.sh に改名したので、
+# 旧い名前のまま配布先に残ると、新しい実行ファイルに断られる（`user` の外のユーザ専用のオプション）うえ、
+# 手順書の古い名前で打てるように見える。配布先にあれば消す。消すのは --force のときだけで、ほかの配るものと
+# 同じく、--force なしでは配布先にあるものに触らない（残っていることを報告し、--check は揃っていないと数える）。
+# 一覧は src/ccnavi/tickets/user_only.py の SCRIPTS のうち、スクリプトごと止める行（サブコマンドもオプションも
+# 持たない行）の名前。食い違いは tests/sh/test_setup.py が見る。
+LEGACY_SCRIPTS="ccnavi-agree.sh ccnavi-approve.sh ccnavi-push-approved.sh"
 
 mode="$DEFAULT_MODE"
 # 明示されたかどうかを別の変数で持つ。--force で置き換えてよいのは、ユーザがこの実行で
@@ -468,6 +480,9 @@ ccnavi_md_verdict=""
 risk_verdict=""
 common_phases_verdict=""
 scripts_todo=""
+legacy_todo=""
+legacy_kept=""
+legacy_blocked=""
 docs_todo=""
 templates_todo=""
 templates_skipped=""
@@ -730,6 +745,21 @@ if [ -n "$deploy" ]; then
 		esac
 		if [ "$name" = "$LAUNCHER_NAME" ]; then
 			launcher_verdict="$script_verdict"
+		fi
+	done
+	# 旧い名前の sh。配布先にあれば、--force なら消し、なければ残して報告する。リンクはリンクだけを消す
+	# （辿った先は消さない）。ディレクトリは消さない。
+	for name in $LEGACY_SCRIPTS; do
+		legacy_path="$root/$DEPLOY_SCRIPT_DIR/$name"
+		[ -e "$legacy_path" ] || [ -L "$legacy_path" ] || continue
+		if [ -d "$legacy_path" ] && [ ! -L "$legacy_path" ]; then
+			legacy_blocked="$legacy_blocked$DEPLOY_SCRIPT_DIR/$name
+"
+		elif [ "$force" = yes ]; then
+			legacy_todo="$legacy_todo $name"
+		else
+			legacy_kept="$legacy_kept$DEPLOY_SCRIPT_DIR/$name
+"
 		fi
 	done
 fi
@@ -1154,6 +1184,20 @@ report_deploy() {
 		printf '配布元に無くて配れないもの:\n'
 		printf '%s' "$deploy_absent" | sed 's/^/  /'
 	fi
+	if [ -n "$legacy_todo" ]; then
+		printf '%s:\n' "$5"
+		for legacy_name in $legacy_todo; do
+			printf '  %s/%s\n' "$DEPLOY_SCRIPT_DIR" "$legacy_name"
+		done
+	fi
+	if [ -n "$legacy_kept" ]; then
+		printf '配布先に残っている旧い名前の sh（ユーザ専用の sh は ccnavi-user-*.sh に改名した。消すなら --force）:\n'
+		printf '%s' "$legacy_kept" | sed 's/^/  /'
+	fi
+	if [ -n "$legacy_blocked" ]; then
+		printf '旧い名前の sh の場所にディレクトリがあるので消していないもの（中身を確かめて手で片付けてください）:\n'
+		printf '%s' "$legacy_blocked" | sed 's/^/  /'
+	fi
 	if [ -n "$templates_skipped" ]; then
 		printf '名前に使えない文字があるので配っていないテンプレート（英数字で始め、英数字と . _ - だけ）:\n'
 		printf '%s' "$templates_skipped" | sed 's/^/  /'
@@ -1200,7 +1244,7 @@ report_deploy() {
 launcher_mode_failed=""
 
 report_deploy_plan() {
-	report_deploy '配る' '入れ替える' '.gitignore に足す' '実行ビットを付ける'
+	report_deploy '配る' '入れ替える' '.gitignore に足す' '実行ビットを付ける' '消す旧い名前の sh（ユーザ専用の sh は ccnavi-user-*.sh に改名した）'
 }
 
 # 揃っているかを判定する。値の違いと、別の表記での登録も「揃っていない」に数える。
@@ -1218,6 +1262,10 @@ fi
 # 履歴に入る。
 if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$deploy_absent" ] ||
 	[ -n "$ignore_todo" ] || [ -n "$launcher_mode_todo" ]; then
+	settled=no
+fi
+# 旧い名前の sh が配布先に残っているのも数える（新しい実行ファイルに断られる sh が残っている）。
+if [ -n "$legacy_todo" ] || [ -n "$legacy_kept" ] || [ -n "$legacy_blocked" ]; then
 	settled=no
 fi
 # 既定でないパスも「揃っていない」に数える。
@@ -1373,7 +1421,7 @@ if [ -n "$missing_vscode" ]; then
 fi
 deploy_work=no
 if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$ignore_todo" ] ||
-	[ -n "$launcher_mode_todo" ]; then
+	[ -n "$launcher_mode_todo" ] || [ -n "$legacy_todo" ]; then
 	deploy_work=yes
 fi
 
@@ -1558,6 +1606,16 @@ if [ "$deploy_work" = yes ]; then
 			chmod +x "$root/$BIN_PATH" 2>/dev/null || true
 		fi
 	done
+	# 旧い名前の sh を消す（--force のときだけ。上で決めた）。新しい名前の sh を配った後に消すので、途中で失敗しても
+	# 両方とも無い状態にはならない。消せなかったものは報告する。
+	legacy_failed=""
+	for name in $legacy_todo; do
+		rm -f "$root/$DEPLOY_SCRIPT_DIR/$name" 2>/dev/null || :
+		if [ -e "$root/$DEPLOY_SCRIPT_DIR/$name" ] || [ -L "$root/$DEPLOY_SCRIPT_DIR/$name" ]; then
+			legacy_failed="$legacy_failed$DEPLOY_SCRIPT_DIR/$name
+"
+		fi
+	done
 	# 配らなかった回でも、実行ビットが外れた sh には付け直す。付けられなかったときは報告する。
 	if [ -n "$launcher_mode_todo" ]; then
 		chmod +x "$root/$BIN_PATH" 2>/dev/null || true
@@ -1595,7 +1653,11 @@ if [ "$deploy_work" = yes ]; then
 	append_ignore "$LOGS_IGNORE_HEADER" "$ignore_logs_todo"
 fi
 
-report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'
+report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた' '消した旧い名前の sh（ユーザ専用の sh は ccnavi-user-*.sh に改名した）'
+if [ -n "${legacy_failed:-}" ]; then
+	printf '消せなかった旧い名前の sh（手で消してください）:\n'
+	printf '%s' "$legacy_failed" | sed 's/^/  /'
+fi
 if [ -n "$launcher_mode_failed" ]; then
 	printf '実行ビットを付けられなかった振り分けの sh（hook が起動しません。chmod +x で付けてください）:\n'
 	printf '%s' "$launcher_mode_failed" | sed 's/^/  /'
@@ -1641,11 +1703,17 @@ for name in $DEPLOY_SCRIPTS; do
 		"$LAUNCHER_NAME")
 			why="hook が起動する振り分けの sh"
 			;;
-		ccnavi-push-approved.sh)
+		ccnavi-user-push-approved.sh)
 			why="承認のあとにボードが端末で実行する、承認済みチケットのコミットと push"
 			;;
-		ccnavi-agree.sh)
+		ccnavi-user-agree.sh)
 			why="端末から承認するための sh"
+			;;
+		ccnavi-user-lib-review.sh)
+			why="ユーザ専用のレビューの sh が読む部品"
+			;;
+		ccnavi-user-*.sh)
+			why="ユーザが端末で実行する操作の sh"
 			;;
 		ccnavi-fetch.sh)
 			why="セッション開始時の取り込み"

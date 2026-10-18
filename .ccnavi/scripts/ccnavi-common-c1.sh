@@ -6,7 +6,7 @@
 #
 # 親子のチケットについて、チケットの状態を書く一連の操作を 1 つの操作にまとめる。親子のチケットは
 # 親のブランチ 1 本に対応する。ここで対象にするのは、親のワークツリーがあり、origin があり、HEAD の確認に通る
-# 親子のチケット。取り込み状態（記録）が無くても、取り込み（4）が作る。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
+# 親子のチケット。取り込み状態（記録）が無くても、取り込み（4）が作る。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-user-decide.sh など）は次の順に関数を呼ぶ。
 #
 #   ccnavi_c1_family <識別子>   親子のチケットと、C1 の対象か（ccnavi_c1_target に yes / no / stop）
 #   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
@@ -26,7 +26,8 @@
 # 呼ぶ側が先に決めるもの。
 #   ccnavi_c1_root   ワークスペースルート
 #   ccnavi_c1_label  文面の頭（ccnavi-ticket など）
-#   ccnavi_c1_exe    関数。実行ファイルを `--root <ルート>` つきで起こし、引数を渡す
+#   ccnavi_c1_exe    関数。実行ファイルを `--root <ルート>` つきで起こし、引数を渡す。
+#                    実行ファイルの探し方がほかの sh と同じでよければ、ccnavi_c1_use_exe <ルート> で決める
 #
 # 文面はすべて標準エラーへ出す（ボードは標準出力の JSON を読むため）。実行ファイルの標準出力は
 # そのまま通す。ccnavi_c1_capture に書き先を入れると、そこへ書く。
@@ -82,6 +83,32 @@ ccnavi_c1_number() {
 	'' | *[!0-9]*) printf '%s\n' "$2" ;;
 	*) printf '%s\n' "$1" ;;
 	esac
+}
+
+# ccnavi_c1_exe を決める。<ワークスペースルート>
+#
+# 実行ファイル（ccnavi_bin）があればそれを、無ければソース（ccnavi のリポジトリの src/ と uv）を
+# `--root <ルート>` つきで起こす。どちらも無ければ、ccnavi_c1_exe は 1 を返すだけの関数にして 1 を返す
+# （止めるかどうかと文面は呼ぶ側が決める）。見つけた実行ファイルのパスは ccnavi_c1_bin に入れる
+# （ソースで動かすときは空。互換の版を比べるのは実行ファイルのときだけ）。
+# 各 sh が同じ定義を写して持たないように、ここに 1 つだけ置く。
+ccnavi_c1_bin=""
+ccnavi_c1_exe_root=""
+ccnavi_c1_use_exe() {
+	ccnavi_c1_exe_root="$1"
+	if ccnavi_c1_bin=$(ccnavi_bin "$1"); then
+		ccnavi_c1_exe() { "$ccnavi_c1_bin" --root "$ccnavi_c1_exe_root" "$@"; }
+		return 0
+	fi
+	ccnavi_c1_bin=""
+	if [ -f "$1/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+		# ソースで動かすときは、ワークスペースルートで uv を起こす（uv はプロジェクトを cwd から探す）。
+		# サブシェルで cd するので、呼ぶ側の cwd は動かない。
+		ccnavi_c1_exe() { (cd "$ccnavi_c1_exe_root" && uv run --quiet python -m ccnavi --root "$ccnavi_c1_exe_root" "$@"); }
+		return 0
+	fi
+	ccnavi_c1_exe() { return 1; }
+	return 1
 }
 
 # 親子のチケットと、C1 の対象か。<識別子>
@@ -240,7 +267,7 @@ ccnavi_c1_prepare() {
 		# 3. C1 の外の変更を見分け、(b) を取り込みの前にコミットする。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/sort" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/sort" "ユーザの判断が未送信" \
-			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが実行します。何も反映していません" \
+			"。承認の push（sh $ccnavi_c1_sh/ccnavi-user-push-approved.sh ${ccnavi_c1_family_id}）をユーザが実行します。何も反映していません" \
 			"置き場に ccnavi が把握していない変更があります" "。ユーザが確かめてください。何も反映していません" || return 1
 		sed -n 's/^keep //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/keep"
 		sed -n 's/^b //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/b"
@@ -269,9 +296,9 @@ ccnavi_c1_prepare() {
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_branch" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
-			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが実行します。何も反映していません" \
+			"。承認の push（sh $ccnavi_c1_sh/ccnavi-user-push-approved.sh ${ccnavi_c1_family_id}）をユーザが実行します。何も反映していません" \
 			"置き場に ccnavi が把握していない未送信のコミットがあります" \
-			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了されて残ったものなら、中身を確かめてから承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、ユーザがそのコミットを取り除く。何も反映していません" || return 1
+			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了されて残ったものなら、中身を確かめてから承認の push（sh $ccnavi_c1_sh/ccnavi-user-push-approved.sh ${ccnavi_c1_family_id}）で送るか、ユーザがそのコミットを取り除く。何も反映していません" || return 1
 		return 0
 	done
 }
