@@ -1,5 +1,5 @@
 /*
- * 保存の前の確かめ（`Review.tsx`）。幕と 1 枚の作りは `shared/Dialog.css`。ここは中身。
+ * 保存の前の確かめ（`Review.tsx`）。背景と本体の作りは `shared/Dialog.css`。ここは中身。
  */
 .workflow-review ul { margin: 0; padding-left: 18px; font-size: var(--font-md); }
 .workflow-review li { overflow-wrap: anywhere; }

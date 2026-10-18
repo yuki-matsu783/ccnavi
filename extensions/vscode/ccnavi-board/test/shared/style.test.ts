@@ -24,7 +24,7 @@ import { flowHtml, page as flowPage } from "../helpers/flow.js";
 import { workflowHtml, workflowPage } from "../helpers/workflow.js";
 import { page as templatesPage, templatesHtml } from "../helpers/templates.js";
 
-/** 6 画面が共有する骨組みの CSS（重なり順の段もここ） */
+/** 6 画面が共有する骨組みの CSS（重なり順の値もここ） */
 const PAGE_CSS = path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "styles", "page.css");
 
 /** 画面の名前と、その 1 枚。中身は画面（React）が組み、CSS と body だけを拡張が入れる */
@@ -220,18 +220,18 @@ test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画
   }
 });
 
-test("CB-T582 図の枠は重なりを枠の中に閉じ込め、ツールバーから開く案内の一覧が拡大ボタンの裏に回らない", () => {
+test("CB-T582 図の枠の z-index は枠の内側だけで有効で、ツールバーから開く案内の一覧が拡大ボタンの下に隠れない", () => {
   const css = fs.readFileSync(path.join(WEBVIEW_SRC, "shared", "Maximize.css"), "utf8");
   assert.match(css, /\.graph-max \{[^}]*isolation: isolate;/, ".graph-max が isolation: isolate を持たない");
   assert.match(fs.readFileSync(PAGE_CSS, "utf8"), /\.toolbar \{ top: 0; z-index: var\(--z-toolbar\);/, "ツールバーが重なりの単位（z-index）を持たない");
 });
 
-test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の段で書き、画面の CSS に数値を直書きしない。z-index の段の並びは決めたとおり", () => {
+test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の変数で書き、画面の CSS に数値を直書きしない。z-index の値の大小は決めたとおり", () => {
   const page = fs.readFileSync(PAGE_CSS, "utf8");
   const level = (name: string): number => Number(new RegExp(`--z-${name}: (\\d+);`).exec(page)?.[1] ?? Number.NaN);
-  // 画面全体で比べる段は下から foot < toolbar < overlay < graph-max < tour
+  // 画面全体で比べる値は下から foot < toolbar < overlay < graph-max < tour
   const order = ["foot", "toolbar", "overlay", "graph-max", "tour"].map(level);
-  assert.ok(order.every((n, i) => !Number.isNaN(n) && (i === 0 || order[i - 1] < n)), `段の並びが崩れている: ${order.join(",")}`);
+  assert.ok(order.every((n, i) => !Number.isNaN(n) && (i === 0 || order[i - 1] < n)), `値の大小が崩れている: ${order.join(",")}`);
   const files: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -241,7 +241,7 @@ test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の段�
     }
   };
   walk(WEBVIEW_SRC);
-  // 画面と共通の部品（ボタン・一覧）。配色の変数だけを定める appearance.css と、段を定める page.css の :root は対象外
+  // 画面と共通の部品（ボタン・一覧）。配色の変数だけを定める appearance.css と、値を定める page.css の :root は対象外
   files.push(path.join(path.dirname(PAGE_CSS), "button.css"), path.join(path.dirname(PAGE_CSS), "list.css"), PAGE_CSS);
   // 数値で書いてよいのは 0・1em（等倍）・px の文字（アイコンの大きさ）だけ
   const raw: [RegExp, string][] = [

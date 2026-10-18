@@ -11,13 +11,13 @@
  */
 
 /*
- * 重なり順（z-index）の段。画面の CSS に数値を直書きせず、必ずこの名前で書く（直書きの検査は test/shared/style.test.ts）。
- * 画面全体で比べる段は下から --z-foot < --z-toolbar < --z-overlay < --z-graph-max < --z-tour。--z-inline と --z-popover は部品の中だけの段。
+ * 重なり順（z-index）の値。画面の CSS に数値を直書きせず、必ずこの名前で書く（直書きの検査は test/shared/style.test.ts）。
+ * 画面全体で比べる値は下から --z-foot < --z-toolbar < --z-overlay < --z-graph-max < --z-tour。--z-inline と --z-popover は部品の中だけの値。
  * - inline: 列の取っ手・ノードの削除ボタンなど、すぐ隣の部品の上に出るだけのもの
- * - popover: 親の重なりの単位（ツールバー・図の枠）の中で開く一覧・ボタン。中の数値は外へ漏れないので、
- *   外との前後は親の段で決まる（図の枠は isolation で、ツールバーは sticky の z-index で単位になる）
- * - foot / toolbar: 画面の上下に貼り付く帯。ツールバーは脚注より上（中から下へ開く一覧が脚注の裏に回らないように）
- * - overlay: 承認・保存前の確かめの幕　graph-max: 全画面の図　tour: ガイドツアー（何より手前）
+ * - popover: 親の重なりの単位（ツールバー・図の枠）の中で開く一覧・ボタン。中の数値は外へ及ばないので、
+ *   外との前後は親の値で決まる（図の枠は isolation で、ツールバーは sticky の z-index で単位になる）
+ * - foot / toolbar: 画面の上下に貼り付く帯。ツールバーは脚注より上（中から下へ開く一覧が脚注の下に隠れないように）
+ * - overlay: 承認・保存前の確かめのオーバーレイ　graph-max: 全画面の図　tour: ガイドツアー（何より手前）
  */
 :root {
   --z-inline: 1;
@@ -28,8 +28,8 @@
   --z-graph-max: 100;
   --z-tour: 1000;
 
-  /* 角丸・文字サイズ・すき間・影の段。画面の CSS に数値を直書きせず、この名前で書く（直書きの検査は test/shared/style.test.ts）。
-     近い値は段に寄せてある（角丸 1〜3px は sm、5〜8px は lg、文字 .82em は xs、.88em は sm、.92em は md、1.05em は title、すき間は 3px→4px・5px→6px・10px→8px・14px→16px・20px→24px） */
+  /* 角丸・文字サイズ・すき間・影の値。画面の CSS に数値を直書きせず、この名前で書く（直書きの検査は test/shared/style.test.ts）。
+     近い値は最も近い値にそろえてある（角丸 1〜3px は sm、5〜8px は lg、文字 .82em は xs、.88em は sm、.92em は md、1.05em は title、すき間は 3px→4px・5px→6px・10px→8px・14px→16px・20px→24px） */
   --radius-sm: 3px;
   --radius-md: 4px;
   --radius-lg: 6px;
@@ -76,8 +76,8 @@ code { font-family: var(--vscode-editor-font-family); font-size: var(--font-lg);
 .toolbar { display: flex; flex-wrap: wrap; gap: var(--gap-5) var(--gap-7); align-items: center; padding: 0 4px 10px; }
 /* ツールバー（保存などのボタン）と脚注（保存の結果・エラー）は、本文をスクロールしても画面の上下に
    残す。どちらも #root の直下にあり、本文と同じ入れ物の中で貼り付く。本文が裏を通るので背景を塗る。
-   z-index の段は冒頭の --z-* を使う（列の取っ手より上、承認の幕・全画面の図・ツアーより下）。
-   ツールバーは脚注より上（5）に置く。案内の一覧などツールバーの中から下へ開くメニューが脚注の裏に回らないように */
+   z-index の値は冒頭の --z-* を使う（列の取っ手より上、承認のオーバーレイ・全画面の図・ツアーより下）。
+   ツールバーは脚注より上（5）に置く。案内の一覧などツールバーの中から下へ開くメニューが脚注の下に隠れないように */
 .toolbar, .foot { position: sticky; z-index: var(--z-foot); background: var(--vscode-editor-background); }
 .toolbar { top: 0; z-index: var(--z-toolbar); padding-top: 6px; }
 .summary { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-6); align-items: baseline; }

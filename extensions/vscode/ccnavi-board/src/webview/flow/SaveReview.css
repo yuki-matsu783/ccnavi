@@ -1,5 +1,5 @@
 /*
- * 保存の前の差分の一覧（`SaveReview.tsx`）。幕と 1 枚の作りは `shared/Dialog.css`。ここは中身。
+ * 保存の前の差分の一覧（`SaveReview.tsx`）。背景と本体の作りは `shared/Dialog.css`。ここは中身。
  */
 .review-list { margin: 0; padding-left: 18px; font-size: var(--font-md); }
 .review-list li { overflow-wrap: anywhere; }

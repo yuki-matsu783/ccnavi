@@ -1,5 +1,5 @@
 /*
- * 承認のオーバーレイ（`Approval.tsx`）。幕と 1 枚の作りは `shared/Dialog.css`。ここは幅と中身。
+ * 承認のオーバーレイ（`Approval.tsx`）。背景と本体の作りは `shared/Dialog.css`。ここは幅と中身。
  */
 .approval { --overlay-w: 920px; }
 .approval-batch { border-collapse: collapse; width: 100%; font-size: var(--font-md); margin-bottom: 8px; }

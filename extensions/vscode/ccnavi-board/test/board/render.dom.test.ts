@@ -63,7 +63,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.ok(text(page, ".approval-rejected").includes("i0001-05-05"));
     assert.ok(text(page, ".approval-rejected").includes("計画にありません"));
     assert.equal(page.all(".approval-problems").length, 0);
-    // 承認の操作の列は共通の幕の部品の列に載る
+    // 承認の操作の列は共通の Dialog 部品の列に含まれる
     assert.ok(page.all(".approval .overlay-actions.approval-actions").length > 0);
   } finally {
     await page.close();
@@ -71,7 +71,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   // 狭い幅でも表は枠に収め（識別子だけは折らない）、ボタンの行は折り返す
   assert.match(css(), /\.approval-batch th, \.approval-batch td \{[^}]*overflow-wrap: anywhere; \}/);
   assert.match(css(), /\.approval-id \{[^}]*white-space: nowrap; \}/);
-  // 操作の列は共通の幕の部品（Dialog.css）が持つ。承認のボタンもその列に載る
+  // 操作の列は共通の Dialog 部品（Dialog.css）が持つ。承認のボタンもその列に含まれる
   assert.match(css(), /\.overlay-actions \{ display: flex; flex-wrap: wrap;/);
   // 本文に何が書かれていても、文字として出すだけ。
   const spiked = await openBoard(fixture(), { approval: { kind: "preview", preview: { ...preview, text: "<script>alert(1)</script>" } } });
