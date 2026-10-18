@@ -287,14 +287,14 @@ test("CB-T397 畳んだ部品箱と右の欄は、中身のボタンの display 
   assert.match(css, /\.flow-palette\[data-folded="1"\] > :not\(\.flow-fold\)[^{]*\{\s*display: none !important;?\s*\}/);
 });
 
-test("CB-T439 欄の幅の上限と基準幅は page.css の名前（--w-*）を通し、画面の CSS に 320px・360px を直書きしない", () => {
+test("CB-T439 欄の幅の上限と基準幅は page.css で定めた名前（--w-*）を使い、画面の CSS に 320px・360px を直書きしない", () => {
   const page = fs.readFileSync(path.join(SHARED_STYLES, "page.css"), "utf8");
   assert.match(page, /:root \{ --w-field: 320px; --w-field-wide: 360px; --w-grow: 320px; \}/);
   const files = [...cssFiles(), ...fs.readdirSync(SHARED_STYLES).filter((n) => n.endsWith(".css")).map((n) => path.join(SHARED_STYLES, n))];
   const loose: string[] = [];
   for (const file of files) {
     const text = fs.readFileSync(file, "utf8");
-    // 名前を定義する行とコメントは除き、width / max-width / flex の値に 320・360px が残っていないか見る
+    // 名前を定義する行とコメントを除き、width / max-width / flex の値に 320px・360px が残っていないかを見る
     const code = text.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !l.includes("--w-field: 320px"));
     code.forEach((line, i) => {
       if (/(?<![-\w])(?:width|max-width|flex)\s*:[^;}]*\b(?:320|360)px/.test(line) && !/(?:min|max)-height/.test(line)) {
