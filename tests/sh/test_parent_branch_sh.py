@@ -485,6 +485,7 @@ class ParentBranchShTest(unittest.TestCase):
         git(self.tree, "commit", "-q", "-m", "start")
         self.delete_remote_branch()
         git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{BRANCH}")
+        print("DBG", self.exe("tree", "parent", self.tree, PARENT).stdout, text[:200], flush=True)
         refused = self.refused(
             self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree)
         )
