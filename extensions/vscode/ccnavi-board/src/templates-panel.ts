@@ -456,7 +456,7 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     }
     case "openHandoff": {
       // プロジェクトの設定を見ているときは、そのプロジェクトのツリーの下書きを見る。それ以外はワークスペース
-      await openHandoffFrom(current.loaded?.handoff, current.target);
+      await openHandoffFrom(current.loaded?.handoff, current.loaded?.target ?? current.target);
       return;
     }
   }

@@ -685,7 +685,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     }
     case "openHandoff": {
       // 設定のプロジェクトに合わせて、そのプロジェクトのツリーの下書きを開く
-      await openHandoffFrom(current.loaded?.handoff, current.target);
+      await openHandoffFrom(current.loaded?.handoff, current.loaded?.target ?? current.target);
       return;
     }
     case "switchTarget": {
