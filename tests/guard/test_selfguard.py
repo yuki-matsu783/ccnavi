@@ -258,7 +258,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual({path: os.stat(path).st_mtime_ns for path in files}, before)
 
-    def test_変わった設定は次の実行前でバックアップが新しくなる(self):
+    def test_変わった設定は次の実行前にバックアップし直す(self):
         self.run_hook("PreToolUse")
         edited = json.dumps(RULES | {"version": 1, "ask": []})
         write(self.rules, edited)
@@ -1484,7 +1484,7 @@ class SelfGuardTest(unittest.TestCase):
 
     # ユーザの発言までの変更は受け入れる
 
-    def test_最初のツール呼び出しの前に消された設定ファイルは戻さない(self):
+    def test_セッション開始から最初の発言までに消された設定ファイルは戻さない(self):
         self.run_hook("SessionStart")
         os.remove(self.rules)
 
@@ -1494,7 +1494,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertFalse(os.path.exists(self.rules), "ユーザが消したものを戻さない")
 
-    def test_ターンの間にユーザが消した設定ファイルは次の発言のあとは戻さない(self):
+    def test_ユーザが消した設定ファイルは次の発言のあとも戻さない(self):
         self.run_hook("SessionStart")
         self.run_hook("UserPromptSubmit", prompt="一つ目")
         self.run_hook("PreToolUse")
@@ -1571,7 +1571,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("restored", result.stdout)
 
     def test_ユーザが消した実行ファイルがツール呼び出しの中で現れたら言うが消さない(self):
-        # 設定ファイルの「無かったところに現れた」と同じ扱い。差し替えを見逃さないよう言い、
+        # 設定ファイルの「無かったところに現れた」と同じ扱い。差し替えを見逃さないように知らせ、
         # 次の実行前に新しい版として基準に入る。
         path = self.binary()
         self.run_hook("SessionStart", bin=path)

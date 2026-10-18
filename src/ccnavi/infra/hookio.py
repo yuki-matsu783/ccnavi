@@ -20,7 +20,7 @@ POST_TOOL_USE = "PostToolUse"
 POST_TOOL_USE_FAILURE = "PostToolUseFailure"
 SESSION_START = "SessionStart"
 USER_PROMPT_SUBMIT = "UserPromptSubmit"
-# バックグラウンド作業の完了通知が UserPromptSubmit の prompt として届くときの先頭の語。
+# バックグラウンド作業の完了通知が UserPromptSubmit の prompt として届くときの先頭に付く文字列。
 TASK_NOTIFICATION = "<task-notification>"
 STOP = "Stop"
 # サブエージェントの開始と終了。開始は止められないイベントで、返せるのは文だけ。

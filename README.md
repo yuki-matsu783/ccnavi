@@ -1442,11 +1442,11 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 | 対象 | 何が懸かっているか | バックアップを取る時点 |
 |---|---|---|
-| `.claude/settings.json` | hook の登録そのもの | ツール実行前と、ユーザの発言 |
-| `.claude/settings.local.json` | 同上。個人の上書き | ツール実行前と、ユーザの発言 |
-| 共通レイヤーのファイル（`.ccnavi/config/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前と、ユーザの発言 |
-| `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml`（自身のレイヤーの 3 本） | 同上 | ツール実行前と、ユーザの発言 |
-| `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml`（各プロジェクトのレイヤーの 3 本） | 同上 | ツール実行前と、ユーザの発言 |
+| `.claude/settings.json` | hook の登録そのもの | ツール実行前と、ユーザの発言時 |
+| `.claude/settings.local.json` | 同上。個人の上書き | ツール実行前と、ユーザの発言時 |
+| 共通レイヤーのファイル（`.ccnavi/config/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前と、ユーザの発言時 |
+| `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml`（自身のレイヤーの 3 本） | 同上 | ツール実行前と、ユーザの発言時 |
+| `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml`（各プロジェクトのレイヤーの 3 本） | 同上 | ツール実行前と、ユーザの発言時 |
 | `CCNAVI_BIN_PATH` が指すファイル（既定の配置では振り分けの sh） | 判定器の実体 | セッション開始 |
 | それが振り分けの sh（名前が `ccnavi-launcher.sh`）なら、1 つ上の `bin/<os>-<arch>/` にあるこの機械の実行ファイル | 同上。hook が実際に走らせるもの | セッション開始 |
 
