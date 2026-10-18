@@ -81,7 +81,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
 
   propose      承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を親のブランチへ
                コミットして push する。別のPCで承認できるように、承認を頼む前に打つ（親のワークツリーが必要です）。
-               変えていない提案は、未 push のコミットがあればそれだけを送る
+               変わっていない提案は、未 push のコミットがあればそれだけを送る
   start        .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
                ワークツリー .claude/worktrees/<識別子> が必要です。承認済みチケットは置き場を移らない
   finish       doing/ -> wip/proposals/review/（フェーズがレビュー必須）か .ccnavi/approved/done/（不要）。

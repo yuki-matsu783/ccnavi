@@ -481,7 +481,7 @@ def revision_elsewhere_text(
     同じ文面を出す。取り込み済みの親子のチケットでは、親子のチケットが決まらないなら止まった理由と
     手順（`family_stop_text`。`family_problems` と同じ文面）を足す。決まっていれば、正とする
     ツリーが親のワークツリー（`family_problems` が言う書く場所と同じ）なので、場所は繰り返さず
-    `propose` で親のブランチへ送ってから頼むことだけを足す。
+    承認を頼む前に `propose` で親のブランチへ送る手順だけを足す。
     """
     rel = os.path.relpath(t.path, root).replace(os.sep, "/")
     place = tree_path(conf, root, where, t.project)
