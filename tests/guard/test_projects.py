@@ -675,9 +675,8 @@ class ProjectsTest(unittest.TestCase):
         out = result.stdout + result.stderr
         self.assertIn("projects/ がワークスペースの git で無視されていない", out)
         self.assertIn("(projects/app)", out)
+        # `.claude/` を持つだけのプロジェクトには苦情を出さない
         self.assertNotIn("(projects/lib)", out)
-        # `.claude/` を持つこと自体は言わない
-        self.assertNotIn(".claude/ を持つ", out)
 
         # `--explain` はレイヤーごとに並べる。読めないレイヤーはその位置で言う。
         explained = self.ccnavi("--explain")

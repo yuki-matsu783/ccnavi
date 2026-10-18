@@ -2581,7 +2581,6 @@ error 3 件、warn 1 件、info 0 件
 | warn | ワークツリー側に置かれた承認済みチケット（読まれない） |
 | warn | 承認済みチケットはあるがワークツリーが無い（範囲が適用されない） |
 | warn | リモートの種類に合うトークン（`GITHUB_TOKEN` / `GITLAB_TOKEN`）が無い、`origin` が無い |
-| warn | ワークツリーでもワークスペースルートでもないのに `.claude/` を持つディレクトリがある |
 
 **取り込みと正とする側**。取り込みの状態（旧 `logs/state/sync/`）は持たないので、親のワークツリーとチケットの置き場、取得済みの `origin/<統合先>` だけを見る。
 
@@ -2602,7 +2601,7 @@ error 3 件、warn 1 件、info 0 件
 | warn | ワークスペースの git の索引に、`projects/` の下の入れ子のリポジトリ（gitlink）だけが載っている（載せ忘れ）。`.gitignore` に入れる前に `git add` したものとみて、索引から外して `.gitignore` に `/projects/` を足すよう案内する |
 | warn | `projects/` がワークスペースの `.gitignore` に入っていない。上の 2 つのどちらかが出るときは出さない（同じ原因で、`.gitignore` に入れる案内が誤りか、先に索引から外さないと効かないため） |
 | error | 予約名（`common` / `self`。大文字小文字は問わない）のプロジェクトがある |
-| warn | プロジェクトが `.claude/` を持っている |
+| warn | プロジェクトの中にワークツリー（`.claude/worktrees/`）がある。ワークツリーはワークスペースの `.claude/worktrees/` に置く。ここのものは承認の走査の対象外で、書いた提案は承認待ちに並ばない。ワークスペースの ccnavi が古い可能性があるので、`scripts/ccnavi-setup.sh --force` で配り直し、このワークツリーはユーザに伝えて片付ける |
 
 ## lint の JSON
 

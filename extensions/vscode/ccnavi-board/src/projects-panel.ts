@@ -8,7 +8,7 @@
  *
  * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
  * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
- * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
+ * `.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
  * そのルールファイルの場所は layers（レイヤー）の答えを使い、`.ccnavi` から自分で組まない（組み方を実行ファイルとずらさない）。
  *
  * clone は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
@@ -263,7 +263,6 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
     `${rel}/*/.git/config`,
     `${rel}/*/.git/worktrees/*`,
     ...(layerDir === "" ? [] : [`${rel}/*/${layerDir}/*`, `${layerDir}/*`]),
-    `${rel}/*/.claude`,
     ".gitignore",
     ".claude/settings.json",
   ];
