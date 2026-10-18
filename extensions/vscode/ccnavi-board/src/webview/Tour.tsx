@@ -401,7 +401,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, count]);
+  }, [count]);
 
   const last = index === steps.length - 1;
   const width = Math.min(BUBBLE_WIDTH, window.innerWidth - 24);

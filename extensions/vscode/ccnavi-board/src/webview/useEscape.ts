@@ -27,7 +27,8 @@ const entries = new Set<Entry>();
 let counter = 0;
 
 function onKey(event: KeyboardEvent): void {
-  if (event.key !== "Escape") {
+  // 日本語入力の変換中の Esc は、変換を取り消すためのもの。面は閉じない
+  if (event.key !== "Escape" || event.isComposing) {
     return;
   }
   let top: Entry | undefined;
@@ -48,6 +49,7 @@ function onKey(event: KeyboardEvent): void {
 
 /**
  * Esc で閉じる面の共通の入口。`active` の間だけ受け、重なっているときは最も手前の面だけが受ける。
+ * 受けた Esc は止める（背後の keydown には届かない。面の中で Esc を別の意味に使うときは注意）。
  * handler は毎回の描画で差し替わってよい。
  */
 export function useEscape(active: boolean, layer: number, handler: () => void): void {
