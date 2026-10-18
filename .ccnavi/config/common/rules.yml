@@ -170,8 +170,8 @@ deny:
     match: Write|Edit|NotebookEdit
     glob: "*/.ccnavi/approved/*"
     message: >-
-      承認済みチケットです。承認はユーザが VS Code のボード（端末なら
-      'ccnavi --agree'）で行います。
+      承認済みチケットです。承認はユーザが VS Code のボード・Chrome のボード・
+      端末の 'ccnavi --agree'・置き場のファイルの移動のどれかで行います。
       承認が済んだかどうかは 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh status' で確かめてください。
       置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。
       作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh finish <識別子>' で

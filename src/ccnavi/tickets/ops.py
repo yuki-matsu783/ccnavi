@@ -652,7 +652,8 @@ def _move(
             (
                 phase.review_next(root, conf, moved)
                 or "まだレビュー準備中。親がレビューを依頼するまで、ユーザには回らない。"
-                "依頼の後、ユーザがレビューを終えて confirm / decide / --reviewed を実行すると "
+                "依頼の後、ユーザがレビューを終えて confirm / decide / --reviewed か "
+                "Chrome 拡張のレビュー済みを実行すると "
                 f"{conf.approved}/{ticket_model.DONE}/ へ動く"
             )
             + "\n"

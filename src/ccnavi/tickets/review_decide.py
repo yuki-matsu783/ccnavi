@@ -214,7 +214,9 @@ def reviewed(
     accept_unresolved: bool,
     result_path: str,
 ) -> int:
-    """ユーザが端末で打つ。残った指摘を見せ、1 件ずつ行き先を選ばせる。変更要求は通せない。
+    """ユーザが端末か VS Code のボードで行う。
+
+    残った指摘を見せ、1 件ずつ行き先を選ばせる。変更要求は通せない。
 
     選んだ結果は `apply_decision` が置き、MR に書き込むコメントと issue の下書きを state の置き場に
     書き出す。sh がそれを投稿する。
