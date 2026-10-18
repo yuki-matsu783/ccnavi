@@ -115,6 +115,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "最下段だけを読む。git の状態・ルール・動作モード・記録の 1 行と後始末・拒否の数え",
         frozenset(
             {
+                "hook.agentkind",
                 "infra.gitstate",
                 "infra.shellread",
                 "infra.shellread_cd",

@@ -12,13 +12,13 @@ import os
 import time
 from typing import TextIO
 
-from ..infra import fsio, hookio, modes, settings, tree
+from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
-from ..policy import rules
+from ..policy import ctxfile, rules
 from ..records import audit
 from ..tickets import approval, approval_checks, flow, phase, phase_scope, phasetypes, ticket_model
 from ..tickets import ticket as ticket_mod
-from . import judge, post, post_findings, projskills, reasons
+from . import agentkind, judge, post, post_findings, projskills, reasons
 
 # サブエージェントには Stop の振り返り（`match: Stop` のルールの文）が届かないので、
 # 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（.ccnavi/docs/skill-review.md）。
@@ -49,16 +49,18 @@ def at_start(
     子の範囲を案内し、調査役がどこで作業すればよいか分からなくなる（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
-    _note_running(stderr, conf, payload)
+    t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
+    # 同じ作業ツリーで動く別の編集するサブエージェントの案内。ワークスペースルートからの起動
+    # （チケットの無いツリー）でも渡すので、子チケットの一覧に至る前の return より先に組む。
+    shared = _note_running(stderr, conf, root, payload, t)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（本文は要るときに
     # 自分で開く）。
     # 子チケットの一覧が無い起動（チケット制御が無い、チケットの無いツリー）でも渡す。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     # 振り返りの候補は、止められないサブエージェントには報告で返してもらう。
-    skills = f"{skills}\n\n{CANDIDATE_NOTE}" if skills else CANDIDATE_NOTE
+    skills = "\n\n".join(part for part in (skills, shared, CANDIDATE_NOTE) if part)
     if not conf.tickets_enabled:
         return _say(stdout, skills)
-    t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return _say(stdout, skills)
     # 正とする側（親のツリー）のチケットを読む。着手で書かれる基準点は親のツリーの
@@ -292,7 +294,9 @@ def _judge_stop(
 #   同じファイルを書き換えて取り合うことは無い
 # - 中身は 1 行目に `session <セッション>`、2 行目に開始時刻（エポック秒）。
 #   セッションの識別子は名前に入れるとき字を置き換えるので、別のセッションの名前と前置きが
-#   重なりうる。どのセッションの印かは 1 行目の完全一致で決める（`_read_mark` と同じ）
+#   重なりうる。どのセッションの印かは 1 行目の完全一致で決める（`_read_mark` と同じ）。
+#   編集するサブエージェントだけが 3 行目以降に `tree <種類> <名前>` と `type <agent_type>` を
+#   持つ（同じ作業ツリーの案内に使う。`_shared_note`）。無い印は案内の相手に数えない
 # - `agent_id` が payload に無い始まり・終わりは、鍵が決まらないので印を置かず、外しもしない。
 #   その体は「実行中」と数えられず、委任して待つ回でも促しが出うる
 # - 入れ子の体（孫）も、同じセッションで自分の `agent_id` の印を持つ。1 体でも残っていれば実行中
@@ -315,17 +319,105 @@ def _running_path(state_dir: str, session: str, who: str) -> str:
     return _bounce_path(state_dir, session, who)[: -len(".bounced")] + RUNNING_SUFFIX
 
 
-def _note_running(stderr: TextIO, conf: settings.Settings, payload: hookio.Input) -> None:
-    """SubagentStart で、この体が実行中だと印を置く。置けなくても始まりは止めない。
+def _note_running(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    here: tree.Tree | None,
+) -> str:
+    """SubagentStart で、このサブエージェントが実行中だと印を置く。置けなくても始まりは止めない。
 
-    チケット制御が無ければ、促しも無いので置かない。
+    チケット制御が無ければ、促しも無いので置かない。返すのは、同じ作業ツリーで動く別の
+    編集するサブエージェントへの案内（無ければ空）。
+
+    印の 3 行目以降は、編集するサブエージェントだけが書く（`tree <種類> <名前>` と
+    `type <agent_type>`）。無い印は、案内の相手に数えない。
+    同時に起動した相手が書きかけの印を読まないよう、途中の状態が見えない書き方で置く。置いてから
+    相手を探すので、同時に起動した 2 つのうち、後から探すほうは先に置かれた印を見つける。
     """
     if not conf.tickets_enabled or not conf.state or not payload.agent_id:
-        return
-    text = _mark_text(payload.session_id, [str(int(time.time()))])
-    failed = fsio.write_text(_running_path(conf.state, payload.session_id, payload.agent_id), text)
+        return ""
+    lines = [str(int(time.time()))]
+    editing = (
+        here is not None
+        and agentkind.kind_of([here.root, root], payload.agent_type, payload.tools)
+        == agentkind.EDIT
+    )
+    if editing and here is not None:
+        lines += [
+            f"{_TREE}{here.kind} {_flat(here.name)}",
+            f"{_TYPE}{_flat(payload.agent_type)}",
+        ]
+    path = _running_path(conf.state, payload.session_id, payload.agent_id)
+    failed = fsio.write_text_atomic(path, _mark_text(payload.session_id, lines))
     if failed:
         stderr.write(f"ccnavi: 実行中のサブエージェントの印を保存できませんでした: {failed}\n")
+    if not editing or here is None:
+        return ""
+    return _shared_note(stderr, conf, payload, here)
+
+
+_TREE = "tree "
+_TYPE = "type "
+
+
+def _shared_note(
+    stderr: TextIO, conf: settings.Settings, payload: hookio.Input, here: tree.Tree
+) -> str:
+    """同じ作業ツリーで実行中の、別の編集するサブエージェントへの案内。まだ案内していない相手がいなければ空。
+
+    相手は同じセッションの印のうち、自分の鍵ではなく、作業ツリーが同じ（名前は大文字小文字を
+    区別せず比べる）で、開始から `RUNNING_MAX_SECONDS` を過ぎていないもの。同じ相手への案内を
+    1 回に抑えるため、案内した相手の鍵を覚える（再開で `SubagentStart` がまた走っても、
+    同じ相手には出さない）。覚えられないときは案内する側に倒す。読めない印は数えない。
+    """
+    marks = _session_marks(conf.state, payload.session_id, RUNNING_SUFFIX)
+    if not marks:
+        return ""
+    me = fsio.safe_name(payload.agent_id) or "unknown"
+    want = f"{here.kind} {pathcase.fold(here.name)}"
+    now = time.time()
+    peers: dict[str, str] = {}
+    for key, path in marks:
+        if key == me:
+            continue
+        text = fsio.read_text(path, errors="replace")
+        lines = text.splitlines() if text is not None else []
+        if not lines or lines[0] != _MARK_SESSION + _one_line(payload.session_id):
+            continue
+        started = _started_at(lines)
+        if started is None or now - started > RUNNING_MAX_SECONDS:
+            continue
+        tree_line = next((x[len(_TREE) :] for x in lines[2:] if x.startswith(_TREE)), None)
+        if tree_line is None:
+            continue
+        kind, _, name = tree_line.partition(" ")
+        if f"{kind} {pathcase.fold(name)}" != want:
+            continue
+        peers[key] = next((x[len(_TYPE) :] for x in lines[2:] if x.startswith(_TYPE)), "")
+    if not peers:
+        return ""
+    told = ctxfile.told_peers(stderr, conf.state, payload.session_id, payload.agent_id)
+    fresh = {k: v for k, v in peers.items() if told is None or k not in told}
+    if not fresh:
+        return ""
+    ctxfile.remember_peers(
+        stderr, conf.state, payload.session_id, payload.agent_id, (told or set()) | set(fresh)
+    )
+    counts: dict[str, int] = {}
+    for kind_name in fresh.values():
+        label = kind_name or "種類不明"
+        counts[label] = counts.get(label, 0) + 1
+    who = "、".join(f"{label} {n} 件" for label, n in sorted(counts.items()))
+    where = here.name or "ワークスペースルート"
+    return (
+        f"[ccnavi] 起動時の作業ディレクトリと同じ作業ツリー（{where}）で、別の編集する"
+        f"サブエージェントが動いています（{who}）。並行して編集するときは、別のワークツリーを切る"
+        "決まりです（.ccnavi/docs/decisions.md）。同じ作業ツリーで続けるなら、触るファイルの"
+        "持ち主を分け、他のサブエージェントの未コミットの変更には触れないでください。"
+        "別のワークツリーで作業している場合や、親から委任された子の場合は、対応は不要です。"
+    )
 
 
 def _forget_running(conf: settings.Settings, payload: hookio.Input) -> None:
@@ -382,6 +474,14 @@ def _started_at(lines: list[str]) -> float | None:
         return float(lines[1])
     except (IndexError, ValueError):
         return None
+
+
+def _flat(text: str) -> str:
+    """`splitlines` が行の区切りとみなす文字（改行、垂直タブ、改ページなど）を空白に替える。
+
+    印は `splitlines` で読むので、区切りが残ると 1 行の値が途中で切れ、相手を見つけ損ねる。
+    """
+    return " ".join(text.splitlines())
 
 
 def _one_line(session: str) -> str:
