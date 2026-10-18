@@ -579,10 +579,10 @@ def _same_but_handoff(top: str, left: str, right: str) -> bool:
 def _ticket_bound(top: str, name: str) -> bool:
     """その名前のチケットが承認済みか提案として在るか、origin に同名のブランチが在るか。
 
-    `integrate` が断る「チケットに結び付く」判定（`ops_stop_integrate.bound_reason`）の見方のうち、
-    このツリーとワークツリーの置き場にある同名のチケットと、手元の `origin/<名前>` の参照を見る
-    （片付けの後はワークツリーが無いので、親のブランチのワークツリーは参照で見分ける）。
-    手元の退避は見ない。チケットに結び付くブランチの squash を、記録を偽造して外させないため。
+    `integrate` が断る「チケットに結び付く」判定（`ops_stop_integrate.bound_reason`）のうち、
+    このツリーとワークツリーの置き場にある同名のチケットと、手元の `origin/<名前>` の参照を見る。
+    片付けの後はワークツリーが無いので、親のブランチのワークツリーは参照で見分ける。
+    手元の退避は見ない。記録を偽造して、チケットに結び付くブランチの squash を外させないため。
     """
     for place in (
         ".ccnavi/approved/doing",
