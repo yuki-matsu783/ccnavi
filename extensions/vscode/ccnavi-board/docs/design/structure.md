@@ -18,6 +18,7 @@ src/
   risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通の設定の定義（読み取り専用。共通の設定を開いているときは並べない）と、共通の設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
   templates-panel.ts  テンプレート管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。読み直し・本文の取り出しの受け付けと、ファイルの監視、「取り込み待ちを開く」の受け渡し（実行ファイルの答えを並べるだけで、判定も書き込みもしない。一覧・検索・表示だけ）。vscode に依存する
+  handoff-entry.ts    各画面（ルール・リスク・フェーズ・テンプレート管理）の「取り込み待ちを開く」の拡張ホスト側の共通部分（開けるかの確認と、見ている対象に合わせたツリーで開く）。実行ファイルを呼ぶので単体テストの対象外
   handoff-panel.ts    取り込み待ち画面の Webview パネル（1 枚。見るツリー（ワークスペース・プロジェクト・ワークツリー）を切り替える）。user handoff --json の一覧の受け渡しと、取り込みの受け付け（手順は core/handoff-import.ts に分けてあり、ここは実行ファイルの呼び出しを渡すだけ）、端末の案内、下書きと取り込み先のファイルの監視、作業中の錠の取り直し。ボードのカードの下書きの通知からも開く（vscode に依存する）
   flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。ボードのカードから開く）。置き場と錠を実行ファイルに聞き、保存を受け付ける。エージェントの下書きの「提案あり」・取り込み・保存のあとの削除と、依頼の文もここ（vscode に依存する）
   workflow-panel.ts   計画編集タブの Webview パネル（親の提案ごとに 1 枚。識別子を渡すコマンドと、ボードの親の提案のカードの「計画編集」、承認のオーバーレイの「計画を編集」から開く）。線を変えるたびの --plan-order --json --order と、保存の --plan-order --write --expect を実行ファイルに打たせる（拡張はファイルを書かない）。提案の監視（外で変わった・承認待ちから無くなった）、未保存の「●」と閉じた後の聞き方、初回の案内もここ。未保存と、保存したあとのハッシュ（source_sha）を帳面（core/workflow-tabs.ts）に書く（vscode に依存する）
@@ -56,6 +57,7 @@ src/
     templates-view.ts テンプレート管理の拡張ホストと画面の契約（見せる形 TemplatesPage / TemplatesData、答えの形 TemplatesJson、押した操作 TemplatesMessage。読むだけ）
     templates-render.ts テンプレート管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     templatesmodel.ts `--templates` の答え（一覧・層ごとの中身・統合結果・下書き・本文）の読み取り。判定はしない。答えの版が違えば解釈せず伝える
+    handoff-entry.ts  各画面の「取り込み待ちを開く」の契約（開けるか HandoffEntry・メッセージ openHandoff・開くツリーの鍵）。VS Code にも node にも触れない
     handoff-view.ts   取り込み待ちの拡張ホストと画面の契約（答えの形 HandoffList / HandoffEntry / HandoffResult、見せる形 HandoffPage / HandoffData、押した操作 HandoffMessage）
     handoffmodel.ts   user handoff --json の答え（見るだけ・取り込み）の読み取りと、画面の判断（取り込めるか・取り込めない理由・作業中の錠の掛かり方（template と layer-config）・端末のコマンド・読み直しのあとの選択・見るツリー）。VS Code にも node にも触れない
     handoff-import.ts 取り込みの手順（錠を取り直す → 選んだパスを指して見るだけをもう一度呼び expect を取る → entry_sha を見せたものと比べる → 取り込む）と defense の端末の案内。実行ファイルの呼び出しは HandoffDeps として受け取る（試験で差し替える）
@@ -101,7 +103,7 @@ src/
     useEscape.ts      Esc で閉じる面の入口。重なっているときは最も手前の面（ESCAPE_LAYER。CSS の z-index と同じ順）だけが受ける
     tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・題・本文・scene）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
     Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある 8 画面で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。ツールバーは ScreenHeader が組み、? を最後の子に置くのでどの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）。画面全体を覆う `role="dialog"` は Dialog.tsx を使わず、指す先の枠の影で暗くする作りを別に持つ
-    TargetSelect.tsx  ルール管理・フェーズ管理・テンプレート管理の、設定の対象を切り替える欄
+    TargetSelect.tsx  ルール管理・リスク管理・フェーズ管理・テンプレート管理の、設定の対象を切り替える欄
     workflow/tour-marks.ts 案内の間だけ、計画の図の中の項・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
     flow/post.ts の muteForTour は、案内の間に tourDone 以外を拡張ホストへ送らない。board/post.ts の mutePosts も同じ
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
@@ -147,7 +149,7 @@ src/
     phases/state.ts   編集中の定義（行ごとの鍵）・開いている行（id で保持する）・id の重なり
     phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉
     templates/style.css テンプレート管理画面の CSS の入口
-    templates/App.css   App.tsx の CSS（枠・札・「取り込み待ちを開く」の配置）
+    templates/App.css   App.tsx の CSS（枠・札・「取り込み待ちを開く」の段落の余白）
     templates/Template.css Template.tsx の CSS（テンプレート 1 件の行）
     templates/Draft.css Draft.tsx の CSS（下書き 1 件）
     templates/Sum.css   Sum.tsx の CSS（統合結果の枠と表）
@@ -155,7 +157,7 @@ src/
     templates/Problems.css Problems.tsx の CSS（苦情の一覧）
     templates/post.ts   テンプレート管理の送り口。契約に無いものは型で止まる
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
-    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・統合結果の枠、「取り込み待ちを開く」、拡張ホストからのメッセージの受け。案内の間は見本を描く
+    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
     templates/Sum.tsx   統合結果の枠（読み取り専用。実行ファイルの索引を、統合結果を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
     templates/Template.tsx テンプレート 1 件（札・計画・フロー・本文）
     templates/Draft.tsx 下書き 1 件（読むだけ。札と指摘・計画。取り込みは取り込み待ち画面）
@@ -192,6 +194,7 @@ src/
     workflow/Review.tsx 保存の前の確かめ（番号の変わる項・付け替える子の提案・計画と食い違う子）
     shared/Dialog.tsx  画面を覆うオーバーレイの部品（背景と本体と操作の列）。承認・保存前の確かめ・エージェントの提案の確認が使う。幅は旧クラス側の `--overlay-w` で決める
     shared/Dialog.css  Dialog.tsx の CSS（背景・本体・見出し・操作の列）
+    shared/HandoffLink.tsx 「取り込み待ちを開く」のボタン（ルール・リスク・フェーズ・テンプレート管理が置く。開けない理由も出す）
     shared/Maximize.tsx 図を全画面で出す部品（useMaximize・MaximizeButton・RefitOnChange）
     shared/Maximize.css Maximize.tsx の CSS。図の枠は isolation で内側の z-index を外へ及ぼさない
     shared/PlanGraph.css PlanGraph.tsx の CSS（図・点・仮の線・注意の色。React Flow の色を --vscode-* に置き換える）
@@ -229,6 +232,7 @@ test/
   helpers/risk.ts     リスク管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/phases.ts   フェーズ管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/templates.ts テンプレート管理画面（React）をバンドルしたものごと happy-dom で開く
+  helpers/handoff-link.ts 「取り込み待ちを開く」の確かめ（3 画面のテストが共有する）
   helpers/handoff.ts  取り込み待ち画面（React）をバンドルしたものごと happy-dom で開く。種類と状態を 1 本ずつ並べた対象の見本も持つ
   helpers/rules.ts    ルール管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/flow.ts     フロー編集画面（React）をバンドルしたものごと happy-dom で開く（図を描くので大きさの偽物を入れる）。フローの見本も持つ
