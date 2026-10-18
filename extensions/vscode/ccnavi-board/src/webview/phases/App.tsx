@@ -21,9 +21,9 @@ import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
 import type { CommonPhase, PhaseForm, PhasesData, PhasesMessage, PhasesPage, ToPhases } from "../../core/phases-view.js";
-import { applyAppearance } from "../appearance.js";
+import { useHostMessages } from "../useHostMessages.js";
 import { Phase } from "./Phase.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parsePhasesSample, parsePhasesTexts } from "../../core/tour-phases.js";
 import phasesTour from "../tours/phases.yml";
@@ -124,39 +124,31 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     }
   };
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToPhases> & { data?: PhasesData; lock?: Lock; message?: string; value?: unknown };
-      if (message.type === "data" && message.data !== undefined) {
-        const next = message.data;
-        setData(next);
-        setEditing(editingOf(next, nextKey));
-        setDirty(false);
-        setBusy(false);
-        setStatus(undefined);
-        setChanged(false);
-        setLock(pageOf(next)?.lock ?? NO_LOCK);
-      } else if (message.type === "failed") {
-        setBusy(false);
-        setStatus({ text: String(message.message ?? ""), error: true });
-      } else if (message.type === "lock" && message.lock !== undefined) {
-        setLock(message.lock);
-      } else if (message.type === "changed") {
-        setChanged(true);
-      } else if (message.type === "cancelled") {
-        // 「破棄して読み直す？」をやめた。止めた欄を戻す
-        setBusy(false);
-        setStatus(undefined);
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
-      }
-    };
-    window.addEventListener("message", onMessage);
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-  }, [nextKey, requestTour]);
+  useHostMessages<ToPhases>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      const next = message.data;
+      setData(next);
+      setEditing(editingOf(next, nextKey));
+      setDirty(false);
+      setBusy(false);
+      setStatus(undefined);
+      setChanged(false);
+      setLock(pageOf(next)?.lock ?? NO_LOCK);
+    } else if (message.type === "failed") {
+      setBusy(false);
+      setStatus({ text: String(message.message ?? ""), error: true });
+    } else if (message.type === "lock" && message.lock !== undefined) {
+      setLock(message.lock);
+    } else if (message.type === "changed") {
+      setChanged(true);
+    } else if (message.type === "cancelled") {
+      // 「破棄して読み直す？」の確認をやめたので、止めていた欄を戻す
+      setBusy(false);
+      setStatus(undefined);
+    } else if (message.type === "tour") {
+      requestTour();
+    }
+  }, () => post({ type: "ready" }));
 
   // 足した行の id へ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
@@ -354,7 +346,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           更新
         </button>
       </div>
-      <header className="toolbar">
+      <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary">
           <span data-tour="target">
             <TargetSelect target={shownPage?.target} targets={shownPage?.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
@@ -392,8 +384,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             保存
           </button>
         </div>
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
+      </ScreenHeader>
       <p id="lock" data-tour="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
         {shownLock.reason}
       </p>

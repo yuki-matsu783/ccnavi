@@ -94,7 +94,7 @@ def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
     for kind in settings.LAYER_KINDS:
         name = settings.LAYER_FILE_NAMES[kind]
         if name in out:
-            why = _unreadable_as_common(kind, out[name])
+            why = _unreadable_as_common(kind, out[name], root)
             if why:
                 return {}, f"共通レイヤーの {name} を、ミラーとして読めない: {why}"
     for rel in _script_values(risk_raw):
@@ -268,7 +268,7 @@ def _script_values(raw: bytes) -> list[str]:
     return found
 
 
-def _unreadable_as_common(kind: str, content: bytes) -> str:
+def _unreadable_as_common(kind: str, content: bytes, root: str) -> str:
     """ミラーとして（単体 clone では共通レイヤーとして）読めないなら、その理由。"""
     try:
         text = content.decode("utf-8")
@@ -292,7 +292,7 @@ def _unreadable_as_common(kind: str, content: bytes) -> str:
         return "YAML として読めない"
     if not isinstance(data, dict):
         return "マッピングではない"
-    _, problems = rules.parse(data)
+    _, problems = rules.parse(data, root)
     errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]
     return "; ".join(p.detail for p in errors)
 

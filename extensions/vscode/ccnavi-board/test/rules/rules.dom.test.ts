@@ -740,7 +740,7 @@ test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    // 行を開く前（1 段目）は閉じていて、開いてからは図の点を段ごとに替える
+    // 行を開く前（1 番目の手順）は閉じていて、開いてからは図の点を手順ごとに替える
     assert.equal(open[0], "0");
     assert.equal(open[1], "1");
     assert.deepEqual(picked.slice(2, 5), ["r.0", "r.1.0", "r.1"]);

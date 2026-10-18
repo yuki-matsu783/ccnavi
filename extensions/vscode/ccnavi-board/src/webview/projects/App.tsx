@@ -8,8 +8,8 @@ import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
 import { tourOf } from "../../core/tour-def.js";
-import { applyAppearance } from "../appearance.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { useHostMessages } from "../useHostMessages.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import projectsTour from "../tours/projects.yml";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
@@ -50,34 +50,24 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
     saveClone(next);
   };
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToProjects>;
-      if (message.type === "data" && message.data !== undefined) {
-        setData(message.data);
-        // 一覧が新しくなったので、それを見て言った失敗はもう今のことではない
-        setStatus((now) => (now?.kind === "failed" ? undefined : now));
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "failed") {
-        setStatus({ kind: "failed", message: String(message.message ?? "") });
-      } else if (message.type === "info") {
-        setStatus({ kind: "info", message: String(message.message ?? "") });
-      } else if (message.type === "cloned") {
-        // clone をターミナルへ送った。同じものをもう一度送らないよう、打ち込んだ URL と名前を消す
-        setClone(EMPTY);
-        saveClone(EMPTY);
-        setStatus({ kind: "info", message: String(message.message ?? "") });
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
-      }
-    };
-    window.addEventListener("message", onMessage);
-    // 組み上がったと伝える。非表示になって捨てられた画面は、再表示されると拡張ホストが入れてある HTML から
-    // 作り直される。その HTML は少し古いことがあるので、いまの中身をもらい直す
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-  }, [requestTour]);
+  useHostMessages<ToProjects>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      setData(message.data);
+      // 一覧が新しくなったので、古い一覧を見て出た失敗は、もう今の状態ではない
+      setStatus((now) => (now?.kind === "failed" ? undefined : now));
+    } else if (message.type === "tour") {
+      requestTour();
+    } else if (message.type === "failed") {
+      setStatus({ kind: "failed", message: String(message.message ?? "") });
+    } else if (message.type === "info") {
+      setStatus({ kind: "info", message: String(message.message ?? "") });
+    } else if (message.type === "cloned") {
+      // clone をターミナルへ送った。同じものをもう一度送らないよう、打ち込んだ URL と名前を消す
+      setClone(EMPTY);
+      saveClone(EMPTY);
+      setStatus({ kind: "info", message: String(message.message ?? "") });
+    }
+  }, () => post({ type: "ready" }));
 
   if (data.kind === "error") {
     return (
@@ -93,7 +83,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   const courses = coursesOf(TOUR, () => undefined);
   return (
     <>
-      <header className="toolbar">
+      <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary" data-tour="summary">
           <span>プロジェクト {rows.length} 件</span>
           <span className="path" title={page.projectsDir}>
@@ -105,8 +95,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             更新
           </button>
         </div>
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
+      </ScreenHeader>
       <Banners page={page} act={act} />
       <section className="clone" data-tour="clone">
         <h2>リポジトリを clone する</h2>

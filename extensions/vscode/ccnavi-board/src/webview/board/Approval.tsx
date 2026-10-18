@@ -17,6 +17,7 @@ import { Fragment, useEffect, useRef, type JSX } from "react";
 import { unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
 import { Dialog, DialogActions } from "../shared/Dialog.js";
+import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import { DecideBody } from "./Decide.js";
 import { post } from "./post.js";
@@ -33,18 +34,7 @@ export function Approval({ overlay, unsaved = [] }: { readonly overlay: Approval
     }
   }, [overlay.kind]);
   // Esc でやめる。承認している最中と、行き先を置いている最中は閉じない
-  useEffect(() => {
-    if (overlay.kind === "approving" || overlay.kind === "deciding") {
-      return undefined;
-    }
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        post({ type: "approveCancel" });
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [overlay.kind]);
+  useEscape(overlay.kind !== "approving" && overlay.kind !== "deciding", ESCAPE_LAYER.overlay, () => post({ type: "approveCancel" }));
 
   return (
     <Dialog titleId="approval-title" backdropClass="approval-backdrop" cardClass="approval" backdropData={{ "data-approval": overlay.kind }} cardRef={box}>
@@ -158,7 +148,7 @@ function Body({
               <tr key={b.ticket}>
                 <td className="approval-id">{b.ticket}</td>
                 <td>{b.title}</td>
-                <td>{b.revision ? "親（計画の改訂）" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`}</td>
+                <td>{b.revision ? "親（改版）" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`}</td>
               </tr>
             ))}
           </tbody>

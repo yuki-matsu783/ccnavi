@@ -438,14 +438,21 @@ def _apply_steps(
                         f"ccnavi: {t.ticket}: {removing.replace('{reason}', failed)}",
                         stream=fsio.STREAM_ERR,
                     )
+                scope_changed = approval.scope_signature(t) != approval.scope_signature(
+                    cand.current
+                )
                 if cand.plans_feedback:
                     what = "フィードバック計画"
                 elif approval.plan_signature(t, "plan") != approval.plan_signature(
                     cand.current, "plan"
                 ):
                     what = "全体計画"
-                else:
+                elif approval.phases_signature(t) != approval.phases_signature(cand.current):
                     what = "固定する定義（phases:）"
+                else:
+                    what = ""
+                if scope_changed:
+                    what = f"{what}・範囲" if what else "範囲"
                 stage.line(f"  {t.ticket} の{what}を改版した")
                 if cand.plans_feedback:
                     # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
@@ -507,9 +514,9 @@ def waiting(
 
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
     無いもの。閉じたものは対象外で、再開はユーザが承認済みチケットを戻す。
-    改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画か写し（`phases:`）がそれと
-    違うもの（`approval.plan_differs`。計画は定義・`review`・推移的な待ちの並びで、写しは定義を
-    読んだ形で比べる）。待ち方は計画から
+    改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画・写し（`phases:`）・範囲が
+    それと違うもの（`approval.plan_differs`。計画は定義・`review`・推移的な待ちの並びで、写しは定義を
+    読んだ形で比べ、範囲は項の集合で比べる）。待ち方は計画から
     決まるので、待ち方だけの改版は無い。
     `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     """

@@ -47,7 +47,7 @@
 .cond-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vscode-descriptionForeground); }
 .cond-label.mono { font-family: var(--vscode-editor-font-family); font-size: var(--font-md); color: var(--vscode-foreground); }
 .cond-inspector { display: flex; flex-wrap: wrap; gap: var(--gap-3); align-items: center; }
-.cond-inspector > .inline { flex: 1 1 320px; }
+.cond-inspector > .inline { flex: 1 1 var(--w-grow); }
 .cond-inspector .buttons { display: flex; gap: var(--gap-2); }
 .cond-inspector .buttons button.action, .cond-add button.action { margin-left: 0; }
 .cond-add { display: inline-flex; flex-wrap: wrap; gap: var(--gap-2); align-items: center; }

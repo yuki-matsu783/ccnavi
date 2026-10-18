@@ -62,7 +62,7 @@ details.more[open] > summary::before { content: "▾ "; }
 details.more > summary b { font-weight: 500; color: var(--vscode-editor-foreground); }
 details.more > .sub { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: var(--gap-3) var(--gap-5); align-items: center; padding-top: 4px; }
 .find { display: flex; gap: var(--gap-5); align-items: center; margin: 0 0 10px; flex-wrap: wrap; }
-.find input { width: 320px; max-width: 100%; }
+.find input { width: var(--w-field); max-width: 100%; }
 .find .hint { margin: 0; }
 /*
  * 狭い幅（パネルを細くしたとき）。欄名を欄の上に置いて 1 列にし、左の余白も詰める。行の見出しは 2 段にして、

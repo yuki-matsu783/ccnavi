@@ -91,14 +91,16 @@ src/
   webview/            画面（React）。DOM を触る側で、vscode も node も import しない。tsconfig.webview.json で型を見る
     vscode.ts         acquireVsCodeApi の窓口。画面ごとの契約に依存しない（送り口は poster<M>() で作る）
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
-    appearance.ts     見た目の切り替え（body のクラスの書き換え）。6 画面で 1 本
+    appearance.ts     見た目の切り替え（body のクラスの書き換え）。8 画面で 1 本
+    useHostMessages.ts 拡張ホストからのメッセージの受信（見た目はここで受ける）と、組み上がったときの ready。8 画面で 1 本
+    useEscape.ts      Esc で閉じる面の入口。重なっているときは最も手前の面（ESCAPE_LAYER。CSS の z-index と同じ順）だけが受ける
     tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・題・本文・scene）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
-    Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある画面（ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集）で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。どの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）。画面全体を覆う `role="dialog"` は Dialog.tsx を使わず、指す先の枠の影で暗くする作りを別に持つ
+    Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある 8 画面で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。ツールバーは ScreenHeader が組み、? を最後の子に置くのでどの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）。画面全体を覆う `role="dialog"` は Dialog.tsx を使わず、指す先の枠の影で暗くする作りを別に持つ
     TargetSelect.tsx  ルール管理・フェーズ管理・テンプレート管理の、設定の対象を切り替える欄
     workflow/tour-marks.ts 案内の間だけ、計画の図の中の項・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
     flow/post.ts の muteForTour は、案内の間に tourDone 以外を拡張ホストへ送らない。board/post.ts の mutePosts も同じ
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
-    styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する
+    styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する。欄の幅の名前（--w-field・--w-field-wide・--w-grow）は page.css の :root にあり、画面の CSS は 320px・360px を直書きせずそれを参照する（CB-T439 が検査する）
     （CSS の値）重なり順（--z-*）・角丸（--radius-*）・文字サイズ（--font-*）・すき間（--gap-*）・影（--shadow-popup）は page.css の :root で定め、画面の CSS には数値を直書きしない。直書きは test/shared/style.test.ts の CB-T583 が見つける（Chrome 拡張の CSS も対象。見つけるのは z-index・px の角丸・em の文字サイズ・gap の数値・影の rgba で、`font:` の省略形、rem、TSX のインライン style は見ない）
     board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
     board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）

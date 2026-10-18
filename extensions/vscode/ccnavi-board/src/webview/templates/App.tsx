@@ -13,8 +13,8 @@ import { editLockReason } from "../../core/templates-lock.js";
 import type { DraftEntry, EditAnswer, EditOp, EditRequest, TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseTemplatesSample } from "../../core/tour-templates.js";
-import { applyAppearance } from "../appearance.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { useHostMessages } from "../useHostMessages.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import templatesTour from "../tours/templates.yml";
 import { TargetSelect } from "../TargetSelect.js";
 import { Draft } from "./Draft.js";
@@ -130,108 +130,98 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     }
   }, [dirty]);
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToTemplates>;
-      if (message.type === "data" && message.data !== undefined) {
-        const next = message.data;
-        setData(next);
-        setChanged(false);
-        setBusy(false);
-        setStatus(undefined);
-        setLock(pageOf(next)?.lock ?? NO_LOCK);
-        setProjectLocks(pageOf(next)?.projectLocks ?? {});
-        setDetails({});
-        // 読み直しで取り込みの途中は破棄する（古い下書きの答えを見せないため）
-        setImporting(undefined);
-        setPreview(undefined);
+  useHostMessages<ToTemplates>((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      const next = message.data;
+      setData(next);
+      setChanged(false);
+      setBusy(false);
+      setStatus(undefined);
+      setLock(pageOf(next)?.lock ?? NO_LOCK);
+      setProjectLocks(pageOf(next)?.projectLocks ?? {});
+      setDetails({});
+      // 読み直しで取り込みの途中は破棄する（古い下書きの答えを見せないため）
+      setImporting(undefined);
+      setPreview(undefined);
+      setImportBusy(false);
+      // 読み直しで編集の途中も捨てる（古い行の答えを見せないため）
+      setEditing(undefined);
+    } else if (message.type === "failed") {
+      setBusy(false);
+      setStatus({ text: String(message.message ?? ""), error: true });
+    } else if (message.type === "lock" && message.lock !== undefined) {
+      setLock(message.lock);
+      setProjectLocks(message.projectLocks ?? {});
+    } else if (message.type === "changed") {
+      setChanged(true);
+    } else if (message.type === "cancelled") {
+      // 頼んだやりとりが起きなかったので、止めていた欄を戻す
+      setBusy(false);
+      setStatus(undefined);
+    } else if (message.type === "tour") {
+      requestTour();
+    } else if (message.type === "detail" && message.name !== undefined && message.layer !== undefined) {
+      const key = `${message.layer}/${message.name}`;
+      setDetails((now) => ({ ...now, [key]: { detail: message.template ?? undefined, error: String(message.error ?? "") } }));
+    } else if (message.type === "preview" && message.request !== undefined) {
+      // 頼んだ下見と、いまの欄の要求が同じときだけ受ける。違えば古い往復なので捨てる
+      const current = importingRef.current;
+      if (current !== undefined && sameRequest(requestOf(current), message.request)) {
+        setPreview({ request: message.request, answer: message.answer ?? null, error: String(message.error ?? "") });
         setImportBusy(false);
-        // 読み直しで編集の途中も捨てる（古い行の答えを見せないため）
-        setEditing(undefined);
-      } else if (message.type === "failed") {
-        setBusy(false);
-        setStatus({ text: String(message.message ?? ""), error: true });
-      } else if (message.type === "lock" && message.lock !== undefined) {
-        setLock(message.lock);
-        setProjectLocks(message.projectLocks ?? {});
-      } else if (message.type === "changed") {
-        setChanged(true);
-      } else if (message.type === "cancelled") {
-        // 頼んだ往復が起きなかった。止めた欄を戻す
-        setBusy(false);
-        setStatus(undefined);
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "detail" && message.name !== undefined && message.layer !== undefined) {
-        const key = `${message.layer}/${message.name}`;
-        setDetails((now) => ({ ...now, [key]: { detail: message.template ?? undefined, error: String(message.error ?? "") } }));
-      } else if (message.type === "preview" && message.request !== undefined) {
-        // 頼んだ下見と、いまの欄の要求が同じときだけ受ける。違えば古い往復なので捨てる
-        const current = importingRef.current;
-        if (current !== undefined && sameRequest(requestOf(current), message.request)) {
-          setPreview({ request: message.request, answer: message.answer ?? null, error: String(message.error ?? "") });
-          setImportBusy(false);
-        }
-      } else if (message.type === "imported" && message.request !== undefined) {
-        setImportBusy(false);
-        const error = String(message.error ?? "");
-        const answer = message.answer ?? null;
-        const current = importingRef.current;
-        const mine = current !== undefined && sameRequest(requestOf(current), message.request);
-        if (error !== "") {
-          // 書けなかった。プレビューは残して、理由を見せる
-          setStatus({ text: error, error: true });
-        } else if (answer !== null && answer.written) {
-          const kept = answer.removed ? "。下書きを削除しました" : answer.kept !== "" ? `。下書き: ${answer.kept}` : "";
-          setStatus({ text: `取り込みました: ${answer.target}${kept}`, error: false });
-          setPreview(undefined);
-          setImporting(undefined);
-        } else if (answer !== null && mine) {
-          // 書かずに返った（問題で取り込めない）。答えを下見に入れ替えて見せる
-          setPreview({ request: message.request, answer, error: "" });
-          setStatus({ text: "取り込めませんでした", error: true });
-        }
-      } else if (message.type === "editPreview" && message.request !== undefined) {
-        // 頼んだ下見と、いまの欄の要求が同じときだけ受ける。違えば古い往復なので捨てる
-        const current = editingRef.current;
-        if (current !== undefined && sameEditRequest(current.state.request, message.request)) {
-          setEditing({ key: current.key, state: { ...current.state, answer: message.answer ?? null, error: String(message.error ?? ""), busy: false } });
-        }
-      } else if (message.type === "edited" && message.request !== undefined) {
-        const current = editingRef.current;
-        const mine = current !== undefined && sameEditRequest(current.state.request, message.request);
-        const error = String(message.error ?? "");
-        const answer = message.answer ?? null;
-        if (error !== "") {
-          // 書けなかった。欄は残して、理由を見せる
-          setStatus({ text: error, error: true });
-          if (mine && current !== undefined) {
-            setEditing({ key: current.key, state: { ...current.state, busy: false } });
-          }
-        } else if (answer !== null && answer.ok && (answer.written || answer.removed)) {
-          setStatus({ text: doneText(message.request, answer), error: false });
-          setEditing(undefined);
-        } else if (answer !== null && !answer.ok && (answer.written || answer.removed)) {
-          // 途中で失敗した（新しい側は書けたが元を消せなかった、など）。欄は残し、ファイルの状態を読み直して確かめてもらう
-          setStatus({ text: `途中で失敗しました: ${answer.errors.join(" / ") || "理由は不明です"}。一覧を再読み込みして、ファイルの状態を確認してください`, error: true });
-          if (mine && current !== undefined) {
-            setEditing({ key: current.key, state: { ...current.state, answer, error: "", busy: false } });
-          }
-        } else if (mine && current !== undefined) {
-          // 書かずに返った（問題で実行できない）。答えを下見に入れ替えて見せる
-          setEditing({ key: current.key, state: { ...current.state, answer, error: "", busy: false } });
-          setStatus({ text: "実行できませんでした", error: true });
-        }
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
       }
-    };
-    window.addEventListener("message", onMessage);
-    // 組み上がったと伝える。非表示になって捨てられた画面は、再表示されると拡張ホストが入れてある HTML から作り直される。
-    // その HTML は少し古いことがあるので、いまの中身をもらい直す
-    post({ type: "ready" });
-    return () => window.removeEventListener("message", onMessage);
-  }, [requestTour]);
+    } else if (message.type === "imported" && message.request !== undefined) {
+      setImportBusy(false);
+      const error = String(message.error ?? "");
+      const answer = message.answer ?? null;
+      const current = importingRef.current;
+      const mine = current !== undefined && sameRequest(requestOf(current), message.request);
+      if (error !== "") {
+        // 書けなかった。プレビューは残して、理由を見せる
+        setStatus({ text: error, error: true });
+      } else if (answer !== null && answer.written) {
+        const kept = answer.removed ? "。下書きを削除しました" : answer.kept !== "" ? `。下書き: ${answer.kept}` : "";
+        setStatus({ text: `取り込みました: ${answer.target}${kept}`, error: false });
+        setPreview(undefined);
+        setImporting(undefined);
+      } else if (answer !== null && mine) {
+        // 書かずに返った（問題で取り込めない）。答えを下見に入れ替えて見せる
+        setPreview({ request: message.request, answer, error: "" });
+        setStatus({ text: "取り込めませんでした", error: true });
+      }
+    } else if (message.type === "editPreview" && message.request !== undefined) {
+      // 頼んだ下見と、いまの欄の要求が同じときだけ受ける。違えば古い往復なので捨てる
+      const current = editingRef.current;
+      if (current !== undefined && sameEditRequest(current.state.request, message.request)) {
+        setEditing({ key: current.key, state: { ...current.state, answer: message.answer ?? null, error: String(message.error ?? ""), busy: false } });
+      }
+    } else if (message.type === "edited" && message.request !== undefined) {
+      const current = editingRef.current;
+      const mine = current !== undefined && sameEditRequest(current.state.request, message.request);
+      const error = String(message.error ?? "");
+      const answer = message.answer ?? null;
+      if (error !== "") {
+        // 書けなかった。欄は残して、理由を見せる
+        setStatus({ text: error, error: true });
+        if (mine && current !== undefined) {
+          setEditing({ key: current.key, state: { ...current.state, busy: false } });
+        }
+      } else if (answer !== null && answer.ok && (answer.written || answer.removed)) {
+        setStatus({ text: doneText(message.request, answer), error: false });
+        setEditing(undefined);
+      } else if (answer !== null && !answer.ok && (answer.written || answer.removed)) {
+        // 途中で失敗した（新しい側は書けたが元を消せなかった、など）。欄は残し、ファイルの状態を読み直して確かめてもらう
+        setStatus({ text: `途中で失敗しました: ${answer.errors.join(" / ") || "理由は不明です"}。一覧を再読み込みして、ファイルの状態を確認してください`, error: true });
+        if (mine && current !== undefined) {
+          setEditing({ key: current.key, state: { ...current.state, answer, error: "", busy: false } });
+        }
+      } else if (mine && current !== undefined) {
+        // 書かずに返った（問題で実行できない）。答えを下見に入れ替えて見せる
+        setEditing({ key: current.key, state: { ...current.state, answer, error: "", busy: false } });
+        setStatus({ text: "実行できませんでした", error: true });
+      }
+    }
+  }, () => post({ type: "ready" }));
 
   if (data.kind === "loading") {
     return (
@@ -490,7 +480,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         </button>
       </div>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
-      <header className="toolbar">
+      <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary" data-tour="target">
           <TargetSelect target={touring ? undefined : page.target} targets={touring ? undefined : page.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
           <span className="path" title={touring ? "" : page.root}>
@@ -505,8 +495,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
             更新
           </button>
         </div>
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
+      </ScreenHeader>
       <p id="lock" data-banner="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
         {shownLock.locked ? `取り込みと編集は止めています: ${shownLock.reason}` : ""}
       </p>

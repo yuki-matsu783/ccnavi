@@ -328,7 +328,7 @@ test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後ま�
     await dom.send({ type: "tour" });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
-    // 1 段目で、順序は親チケットの計画で決めることを言う
+    // 1 番目の手順で、順序は親チケットの計画で決めることを言う
     assert.match(dom.one(".tour-bubble").textContent ?? "", /順序（どのフェーズがどれを待つか）は、親チケットの計画の項の after で決めます/);
     const titles = [dom.one("#tour-title").textContent];
     for (let i = 0; i < 4; i += 1) {
@@ -343,7 +343,7 @@ test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後ま�
       }
     }
     assert.deepEqual(titles, ["フェーズ定義", "補足", "保存", "ヘルプ", "案内"]);
-    // 最後の段は「完了」。やめる × はどの段でも右上に出す
+    // 最後の手順は「完了」。やめる × はどの手順でも右上に出す
     assert.equal(dom.one('[data-action="tour-next"]').textContent, "完了");
     assert.equal(dom.one('.tour-bubble > [data-action="tour-skip"]').textContent?.trim(), "×");
     dom.click(dom.one('[data-action="tour-next"]'));
@@ -366,7 +366,7 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
     await dom.settle();
     dom.click(dom.one('[data-action="tour-next"]'));
     await dom.settle();
-    // 2 段目：×・戻る・次へ
+    // 2 番目の手順：×・戻る・次へ
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
     dom.key("Tab");
     await dom.settle();
@@ -421,7 +421,7 @@ test("CB-D147 案内は → で次の手順へ、← で前の手順へ動く。
       dom.key("ArrowRight");
       await dom.settle();
     }
-    // 最後の段で → を押しても閉じない
+    // 最後の手順で → を押しても閉じない
     assert.equal(dom.one("#tour-title").textContent, "案内");
     assert.equal(dom.all(".tour").length, 1);
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 0);

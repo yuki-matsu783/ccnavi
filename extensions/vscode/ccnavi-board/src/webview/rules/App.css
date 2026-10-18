@@ -23,7 +23,7 @@ button.action.small { margin-left: auto; }
 .finding .rule-section.folded .list { display: block; }
 .judge-form { display: flex; flex-wrap: wrap; gap: var(--gap-4) var(--gap-5); align-items: center; margin-bottom: 10px; }
 .judge-form label { display: flex; gap: var(--gap-3); align-items: center; color: var(--vscode-descriptionForeground); }
-.judge-form .grow { flex: 1 1 320px; }
+.judge-form .grow { flex: 1 1 var(--w-grow); }
 .judge-form .grow input { flex: 1; }
 table { border-collapse: collapse; width: 100%; font-size: var(--font-lg); }
 /* 表は入れ物の中で横へ送る。狭い画面でも表の外（ページ全体）は横に流れない */

@@ -1631,7 +1631,7 @@ base_sha: ""
 ### 効くのは承認したものだけ
 
 判定が読むのは `.ccnavi/approved/doing/` の承認済みチケットで、`wip/proposals/todo/` の提案ではない。承認のあとに同じ識別子の
-提案を書いても範囲は適用されない（親の計画の改版だけが承認の対象に入る）。承認の詳細は [設計 9.4](docs/design/tickets/approval.md)。
+提案を書いても範囲は適用されない（親の改版〔計画・`phases:`・範囲〕だけが承認の対象に入る）。承認の詳細は [設計 9.4](docs/design/tickets/approval.md)。
 
 ```sh
 ccnavi --agree
@@ -1935,7 +1935,7 @@ feedback:                              # フィードバック計画。レビュ
   足した親の改版の承認（全体計画の最後のレビューが済んでから 1 回だけ。指摘が無くても `feedback: []` で出す）
 - **順序は承認で止まる。** N 番目の子は、N 番目が待つ番号が全部閉じてレビュー（延期でなければ）が済むまで承認されない。
   フェーズには必ず子が 1 本以上あり、親は計画・依頼だけをする（合流は子の `finish`）
-- **改版**で変えられるのは `plan`・`feedback`・`phases:` だけ。錠は番号ごとで、子が承認された番号の項は定義・`review`・番号・待ちを
+- **改版**で変えられるのは `plan`・`feedback`・`phases:`・範囲（`allow`・`ask`・`deny`）だけ。範囲を変える改版は、作業中（`doing/`）の子が居ないときだけ通る。錠は番号ごとで、子が承認された番号の項は定義・`review`・番号・待ちを
   変えられず、その番号が使う定義の写しも変えられない。フィードバック計画を立てたあと（と立てる改版）は全体計画を変えられない。
   `feedback` の承認後は新しいフィードバック作業フェーズを足せないが、その中で子を足すのは何度でもできる。残る指摘はユーザが `decide` で issue に回す
 - **改版は正とするツリー（承認済みチケットが在るツリー。親のワークツリー `.claude/worktrees/<親>` に在ればそこ、無ければ元ツリー）の
@@ -1944,7 +1944,7 @@ feedback:                              # フィードバック計画。レビュ
   場所と書く置き場を名指しする
 - **改版の提案では、承認済みチケットを写したときに入る `started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at`・`cancel_reason` を空にする。**
   承認はチケットの中身を変えないので、提案にスクリプトだけが書く欄の値があると `--agree` と `--lint` が error にする。
-  改版は承認済みチケットの側の値を残し、計画と `phases:` だけを差し替える。続きの子の目印 `followup_of` も提案に書けば error になるので消す
+  改版は承認済みチケットの側の値を残し、計画・`phases:`・範囲だけを差し替える（旧い範囲は上書きされ、git の履歴にだけ残る）。続きの子の目印 `followup_of` も提案に書けば error になるので消す
 - レビュー待ちで止めるのは親ごとなので、どれかの枝がレビューを待つ間は別の枝にも子を起こせない
 
 `--explain` と `SubagentStart` はフェーズを「3: 実装とテスト」のように示す。親の局面（作業中・レビュー待ち・フィードバック計画待ち・
@@ -3418,7 +3418,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
 | `.ccnavi/scripts/ccnavi-worktree.sh` | 作業用のワークツリーを統合先から切る。`fetch`・遅れの確認・起点の選択（遅れていれば `origin/<統合先>` から `--no-track`）・`worktree add` を `ccnavi-git.sh` 経由で順に打つ。ワークツリーが既にあればパスを出すだけ。手元の統合先が `origin` と分岐している（先行も遅れもある）ときは、切らずに終了コード 1 で止まり、先に手元の統合先を揃えるよう案内する（`--from-origin` で警告つきで `origin/<統合先>` から切れる）。`fetch` が届かないときは何も切らず終了コード 4 で止まり、直して打ち直す手と `--offline`（手元の統合先から切る）を案内する |
-| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層）へ `cp` する。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
+| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層）へ `cp` する（cwd が `.claude/worktrees/<名前>` の中ならそのワークツリーの `wip/handoff/`）。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |

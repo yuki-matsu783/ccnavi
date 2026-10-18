@@ -10,8 +10,9 @@
  * 出して文だけを見せる。手順ごとの `before` は、指す先を出すための下ごしらえ（一覧と図の切り替え、
  * 行を開く）。下ごしらえで描き直しが起きるので、測るのは次の刻みまで待つ。
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
+import { ESCAPE_LAYER, useEscape } from "./useEscape.js";
 import { INTRO_ID, type Scene, type TourDef } from "../core/tour-def.js";
 import { placeBubble, type Rect } from "../core/tour-place.js";
 
@@ -105,7 +106,20 @@ export function boxOf(el: Element): Rect {
 const BUBBLE_WIDTH = 340;
 
 /**
- * 案内を選び直す「?」。案内のある画面はどれもツールバーの最後の子に置くと、`Tour.css` がヘッダの右上の同じ位置に
+ * ツールバー（`<header className="toolbar">`）。左に画面ごとの中身（`children`）、右端に「?」（`TourButton`）を置く。
+ * 「?」がツールバーの最後の子であることは変えない
+ */
+export function ScreenHeader({ courses, onPick, children }: { readonly courses: readonly TourCourse[]; readonly onPick: (course: string) => void; readonly children: ReactNode }): JSX.Element {
+  return (
+    <header className="toolbar">
+      {children}
+      <TourButton courses={courses} onPick={onPick} />
+    </header>
+  );
+}
+
+/**
+ * 案内を選び直す「?」。案内のある画面は、どれも `ScreenHeader` の最後の子として置く。`Tour.css` がヘッダの右上の同じ位置に
  * 小さく固定する（画面ごとにボタンの列へ混ぜると、置き場所がばらつき、ボードでは操作の邪魔になった）。
  *
  * 押すと案内の一覧（基本の案内と、使い方ごとの案内）が下に開き、選んだ 1 本が始まる。案内が 1 本だけの画面は、一覧を挟まずに始める。
@@ -127,21 +141,14 @@ export function TourButton({ courses, onPick }: { readonly courses: readonly Tou
         setOpen(false);
       }
     };
-    // Esc は一覧を閉じて「?」へ焦点を戻す（body に落とさない）。ほかの Esc（選択肢を閉じる）には任せず、ここで受けたら止める
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        setOpen(false);
-        button.current?.focus();
-      }
-    };
     document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey, true);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey, true);
-    };
+    return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
+  // Esc は一覧を閉じて「?」へ焦点を戻す
+  useEscape(open, ESCAPE_LAYER.tourMenu, () => {
+    setOpen(false);
+    button.current?.focus();
+  });
 
   // 開いたら先頭の案内へ焦点を移す（キーボードで選べる）
   useEffect(() => {
@@ -369,12 +376,9 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   // Esc でやめる。→ で次へ、← で前へ（端の手順ではどちらも何もしない。→ で最後の手順を閉じると、読み終える前に消えてしまう）。
   // Tab は吹き出しのボタンの中だけを巡る（覆いの背後の画面の「保存」などへ焦点を移さない）
   const count = steps.length;
+  useEscape(true, ESCAPE_LAYER.tour, onClose);
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        onClose();
-        return;
-      }
       if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
         // 既定の動き（覆いの背後の画面の横スクロール）を止める
         event.preventDefault();
@@ -397,7 +401,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, count]);
+  }, [count]);
 
   const last = index === steps.length - 1;
   const width = Math.min(BUBBLE_WIDTH, window.innerWidth - 24);
