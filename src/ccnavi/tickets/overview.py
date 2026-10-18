@@ -1,27 +1,22 @@
 """このPCで作業中の親の一覧（セッション開始の表示と `ticket status` の頭）。
 
-親 1 本を 1 行で言う。親・ブランチ・MR・次の子・最終取り込み時刻・未送信の有無。
+親 1 本を 1 行で言う。親・ブランチ・MR・次の子・未送信の有無。
 `ticket status`（引数なし）はさらに、親ごとに子のワークツリーの状態
 （合流済み・未合流・未コミットあり）を言う。
 
-読むのは手元のファイルと git の ref だけで、ネットワークには出ない。「最終取り込み」は
-`ccnavi-sync.sh` が取り込み状態に書いた時刻で、取り込み状態が無い親は「リモート未確認」と言う
-（一度もリモートと突き合わせていない）。MR の番号は親チケットの `mr:`、無ければ取り込み状態の `mr`
-（`ccnavi-start.sh` が保存する）。
+読むのは手元のファイルと git の ref だけで、ネットワークには出ない。MR の番号は親チケットの `mr:`。
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime
 
 from ..infra import gitcmd, settings, tree
-from . import approval, approval_checks, syncstate, ticket_model
+from . import approval, approval_checks, ticket_model
 
 TIMEOUT_SECONDS = 5.0
 
-UNCHECKED = "リモート未確認"
 NO_BRANCH = "（ブランチの外）"
 
 CHILD_MERGED = "合流済み"
@@ -38,28 +33,8 @@ class Row:
     branch: str
     mr: str = ""
     next_child: str = ""
-    fetched_at: int = 0
     unsent: str = ""
     project: str = ""
-
-    def synced(self) -> str:
-        return sync_label(self.fetched_at)
-
-
-def sync_label(fetched_at: int) -> str:
-    """最終取り込みの時刻（現地時刻）。取り込み状態が無ければ「リモート未確認」。"""
-    if not fetched_at:
-        return UNCHECKED
-    try:
-        return datetime.fromtimestamp(fetched_at).astimezone().strftime("%Y-%m-%d %H:%M")
-    except (OverflowError, OSError, ValueError):
-        return UNCHECKED
-
-
-def record_of(conf: settings.Settings, ident: str, project: str = "") -> syncstate.Family | None:
-    """この親の取り込み状態。無い・読めなければ None。"""
-    found = syncstate.family(conf.state, syncstate.repo_key(project), ident)
-    return found if found is not None and not found.broken else None
 
 
 def collect(
@@ -79,7 +54,7 @@ def collect(
         if not t.is_child and t.state == ticket_model.TODO:
             parents.setdefault(t.ticket, t)
     pool = approval_checks.predecessor_pool_of(doing, review, closed, proposals)
-    # 承認と lint と同じ引き方にする（閉じた別の親子の先行は統合先の done/ と取り込み状態で読む）。
+    # 承認と lint と同じ引き方にする。
     approval_checks.align_imported(conf, root, pool)
     rows = []
     for ident in sorted(parents):
@@ -88,17 +63,13 @@ def collect(
             continue
         parent = parents[ident]
         branch = tree.branch_of(path) or ""
-        record = record_of(conf, ident, parent.project)
-        mr = str(parent.mr) if parent.mr else (record.mr if record else "")
-        fetched = int(record.fetched_at) if record and record.fetched_at else 0
         rows.append(
             Row(
                 ident=ident,
                 path=path,
                 branch=branch,
-                mr=mr,
+                mr=str(parent.mr) if parent.mr else "",
                 next_child=next_child(ident, doing, pool),
-                fetched_at=fetched,
                 unsent=unsent_of(path, branch),
                 project=parent.project,
             )
@@ -166,26 +137,20 @@ def divergence(path: str, branch: str) -> tuple[int, int] | None:
     return int(parts[0]), int(parts[1])
 
 
-def remote_info(
-    conf: settings.Settings, ident: str, path: str, project: str = ""
-) -> dict[str, object]:
+def remote_info(path: str) -> dict[str, object]:
     """ボードの親のカードに出す、リモートとの差（`ccnavi --explain --json` の `remote`）。
 
     `branch` は親のワークツリーが今いるブランチ。
     `ahead` は未送信のコミット数、`behind` は遅れ（取り込んでいないコミット数）。
     どちらも最後に取ってきた origin との差で、読めなければ null。
-    `fetched_at` は最終同期（UNIX 秒。取り込み状態が無ければ 0 で「リモート未確認」）。
-    `mr` は取り込み状態の MR の番号（親チケットの `mr:` はボードが別に持つ）。
+    MR の番号は親チケットの `mr:`（ボードが別に持つ）。
     """
     branch = tree.branch_of(path) or ""
-    record = record_of(conf, ident, project)
     diff = divergence(path, branch)
     return {
         "branch": branch,
         "ahead": diff[0] if diff else None,
         "behind": diff[1] if diff else None,
-        "fetched_at": int(record.fetched_at) if record and record.fetched_at else 0,
-        "mr": int(record.mr) if record and record.mr else None,
     }
 
 
@@ -196,7 +161,6 @@ def line(row: Row) -> str:
         f"  ブランチ {row.branch or NO_BRANCH}"
         f"  MR {'!' + row.mr if row.mr else 'なし'}"
         f"  次の子 {row.next_child or 'なし'}"
-        f"  最終取り込み {row.synced()}"
         f"  未送信 {row.unsent + 'あり' if row.unsent else 'なし'}"
     )
 
@@ -257,7 +221,4 @@ def session_text(conf: settings.Settings, root: str) -> str:
         return ""
     lines = ["[ccnavi] このPCで作業中の親:"]
     lines += [line(r) for r in rows]
-    if any(r.fetched_at == 0 for r in rows):
-        sync = settings.script_command(root, "ccnavi-sync.sh")
-        lines.append(f"（リモート未確認の親は '{sync} <親>' で取り込むと最終取り込みの時刻が付く）")
     return "\n".join(lines)

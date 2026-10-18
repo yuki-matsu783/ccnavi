@@ -26,7 +26,7 @@ import os
 
 from ccnavi.tickets import c1
 from tests.ticket.test_phases import PhaseHarness
-from tests.ticket.test_sync_authority import AuthorityHarness
+from tests.ticket.test_standing import AuthorityHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, parent_text
 
@@ -53,8 +53,8 @@ class FamilyTest(AuthorityHarness):
         self.assertIn("origin がありません", answer["why"])
         self.assertNotIn("tree", answer)
 
-    def test_no_record_is_still_a_target_when_the_tree_has_origin(self):
-        # 取り込み状態（記録）は対象かの判定に使わない。親のワークツリーがあり、origin があればよい
+    def test_a_family_is_a_target_when_the_tree_has_origin(self):
+        # 対象かは親のワークツリーがあり、origin があるかで決まる（取り込みの記録は無い）
         git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
         answer = self.ask("i0001-01-01")
         self.assertEqual(answer["target"], "yes")
@@ -69,8 +69,7 @@ class FamilyTest(AuthorityHarness):
         self.assertIn("親のワークツリー", answer["why"])
         self.assertNotIn("tree", answer)
 
-    def test_a_present_family_is_a_target_with_its_tree(self):
-        self.record("present")
+    def test_a_family_is_a_target_with_its_tree(self):
         git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
         answer = self.ask("i0001-01-01")
         self.assertEqual(answer["target"], "yes")
@@ -78,15 +77,17 @@ class FamilyTest(AuthorityHarness):
         self.assertEqual(os.path.realpath(answer["tree"]), os.path.realpath(self.parent_tree))
         self.assertEqual(answer["approved"], APPROVED)
         self.assertEqual(answer["review"], "wip/proposals/review")
-        self.assertEqual(answer["state"], "present")
+        self.assertNotIn("state", answer)
 
-    def test_a_gone_family_stops_with_hints(self):
-        self.record("gone")
+    def test_a_parent_tree_on_another_branch_stops_with_hints(self):
+        git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
+        git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         result = self.ccnavi("c1", "family", "i0001")
         answer = lines(result.stdout)
         self.assertEqual(answer["target"], "stop")
-        self.assertIn("gone", answer["why"])
+        self.assertIn("合わない", answer["why"])
         self.assertIn("hint ", result.stdout)
+        self.assertNotIn("--forget", result.stdout)
 
     def test_a_bad_id_is_refused(self):
         result = self.ccnavi("c1", "family", "../x")
@@ -109,7 +110,6 @@ class WithoutMrFamilyTest(AuthorityHarness):
 class SortTest(AuthorityHarness):
     def setUp(self):
         super().setUp()
-        self.record("present")
         self.commit_parent("settle")
 
     def sort(self, since=""):
@@ -279,7 +279,7 @@ class HumanEntryGuardTest(AuthorityHarness):
             "sh .ccnavi/scripts/ccnavi-review.sh close-early --reason r",
             # シェルに選択肢を付けた形も同じ
             "sh -x .ccnavi/scripts/ccnavi-push-approved.sh",
-            "sh -x .ccnavi/scripts/ccnavi-sync.sh --forget i0001",
+            "ccnavi worktree retire --abandon i0001",
         ):
             result = self.ccnavi(
                 "--guard-ticket-approval",
@@ -442,7 +442,6 @@ class BypassTest(AuthorityHarness):
 
     def setUp(self):
         super().setUp()
-        self.record("present")
         git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
 
     def test_state_operations_without_record_tree_are_refused(self):

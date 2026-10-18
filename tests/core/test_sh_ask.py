@@ -1,6 +1,6 @@
-"""`ccnavi tree parent` と `ccnavi sync closed` の約束。
+"""`ccnavi tree parent` の約束。
 
-sh はチケットの YAML を自分で読まず、この 2 つに聞く。答えは頭の行のあとに 1 行 1 項目
+sh はチケットの YAML を自分で読まず、これに聞く。答えは頭の行のあとに 1 行 1 項目
 （`<鍵> <値>`）。読むだけで、何も書かない。
 """
 
@@ -133,69 +133,121 @@ class TreeParentTest(Harness):
         self.assertEqual("", result.stdout)
 
 
-class SyncClosedTest(Harness):
-    def setUp(self):
-        super().setUp()
-        git(self.tree, "init", "-q", "-b", "p0001")
-        git(self.tree, "commit", "-q", "--allow-empty", "-m", "init")
+class TreeParentGateFactsTest(Harness):
+    """push の関門が聞く 4 行（approved・requested・archived・mr）。"""
 
-    def closed(self):
-        return self.answer("closed 1", "sync", "closed", "p0001", "self", "main", self.tree)
+    def facts(self, name="p0001"):
+        return self.answer("tree 1", "tree", "parent", self.tree, name)
 
-    def integrate(self, text):
-        # 統合先（refs/remotes/origin/main）の done/ に親チケットを置く。
-        other = os.path.join(self.ws, "other")
-        os.makedirs(other)
-        git(other, "init", "-q", "-b", "main")
-        write(os.path.join(other, APPROVED, "done", "p0001.md"), text)
-        git(other, "add", "-A")
-        git(other, "commit", "-q", "-m", "done")
-        git(self.tree, "fetch", "-q", other, "main:refs/remotes/origin/main")
+    def test_the_lines_come_in_a_fixed_order(self):
+        out = self.ask("tree", "parent", self.tree, "p0001").stdout.splitlines()
+        self.assertEqual(
+            ["tree 1", "parent no", "approved no", "requested no", "archived no", "mr -"], out
+        )
 
-    def mine(self, **fields):
-        write(os.path.join(self.tree, APPROVED, "doing", "p0001.md"), front(**fields))
+    def test_nothing_says_no_everywhere(self):
+        self.assertEqual(
+            {
+                "parent": "no",
+                "approved": "no",
+                "requested": "no",
+                "archived": "no",
+                "mr": "-",
+            },
+            self.facts(),
+        )
 
-    def test_nothing_is_not_closed(self):
-        self.assertEqual({"integration": "no"}, self.closed())
+    def test_approved_counts_doing_and_done_but_not_proposals(self):
+        for rel in (f"{APPROVED}/doing", f"{APPROVED}/done"):
+            with self.subTest(rel=rel):
+                path = os.path.join(self.tree, rel, "p0001.md")
+                write(path, front(ticket="p0001"))
+                self.assertEqual("yes", self.facts()["approved"])
+                os.remove(path)
+        for rel in (f"{PROPOSALS}/todo", f"{PROPOSALS}/review"):
+            with self.subTest(rel=rel):
+                path = os.path.join(self.tree, rel, "p0001.md")
+                write(path, front(ticket="p0001"))
+                found = self.facts()
+                self.assertEqual("yes", found["parent"])
+                self.assertEqual("no", found["approved"])
+                os.remove(path)
 
-    def test_the_same_parent_in_the_integration_is_closed(self):
-        self.mine(ticket="p0001", base_sha="abc")
-        self.integrate(front(ticket="p0001", base_sha="abc"))
-        self.assertEqual("yes", self.closed()["integration"])
+    def test_an_approved_child_is_not_an_approved_parent(self):
+        write(
+            os.path.join(self.tree, APPROVED, "doing", "p0001.md"),
+            front(ticket="p0001", parent="x"),
+        )
+        self.assertEqual("no", self.facts()["approved"])
 
-    def test_another_parent_of_the_same_id_is_not_closed(self):
-        self.mine(ticket="p0001", base_sha="abc")
-        self.integrate(front(ticket="p0001", base_sha="def"))
-        self.assertEqual("no", self.closed()["integration"])
+    def test_unreadable_frontmatter_is_unreadable_for_approved_too(self):
+        write(
+            os.path.join(self.tree, APPROVED, "doing", "p0001.md"),
+            "---\nticket: [p0001\n---\n",
+        )
+        found = self.facts()
+        self.assertEqual("unreadable", found["parent"])
+        self.assertEqual("unreadable", found["approved"])
 
-    def test_no_parent_in_the_tree_is_not_closed(self):
-        self.integrate(front(ticket="p0001", base_sha="abc"))
-        self.assertEqual("no", self.closed()["integration"])
+    def test_requested_needs_a_requested_marker(self):
+        marks = os.path.join(self.tree, APPROVED, "phases", "p0001")
+        write(os.path.join(marks, "1.reviewed"), "{}\n")
+        write(os.path.join(marks, "x.requested"), "{}\n")
+        self.assertEqual("no", self.facts()["requested"])
+        write(os.path.join(marks, "2.requested"), "{}\n")
+        self.assertEqual("yes", self.facts()["requested"])
 
-    def test_a_child_in_the_integration_is_not_closed(self):
-        self.mine(ticket="p0001", base_sha="abc")
-        self.integrate(front(ticket="p0001", parent="x", base_sha="abc"))
-        self.assertEqual("no", self.closed()["integration"])
+    def test_a_marker_of_another_parent_does_not_count(self):
+        write(os.path.join(self.tree, APPROVED, "phases", "p0002", "1.requested"), "{}\n")
+        self.assertEqual("no", self.facts()["requested"])
 
-    def test_the_archive_is_not_a_ground_for_closed(self):
+    def test_archived_is_the_local_archive_of_a_parent(self):
+        archive = os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md")
+        write(archive, front(ticket="p0001", parent="x"))
+        self.assertEqual("no", self.facts()["archived"])
+        write(archive, front(ticket="p0001"))
+        found = self.facts()
+        self.assertEqual("yes", found["archived"])
+        self.assertEqual("yes", found["parent"])
+
+    def test_the_archive_is_not_read_outside_the_worktrees(self):
+        outside = os.path.join(self.ws, "elsewhere")
+        os.makedirs(outside)
         write(
             os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md"),
-            front(ticket="p0001", base_sha="abc"),
+            front(ticket="p0001"),
         )
-        self.assertEqual({"integration": "no"}, self.closed())
+        found = self.answer("tree 1", "tree", "parent", outside, "p0001")
+        self.assertEqual("no", found["archived"])
 
-    def test_bad_words_are_refused(self):
-        for words in (
-            ("../x", "self", "main", self.tree),
-            ("p0001", "../x", "main", self.tree),
-            ("p0001", "self", "-x", self.tree),
-            ("p0001", "self", "a..b", self.tree),
-            ("p0001", "self", "main", os.path.join(self.ws, "nowhere")),
-        ):
-            with self.subTest(words=words):
-                result = self.ask("sync", "closed", *words)
-                self.assertNotEqual(0, result.returncode)
-                self.assertEqual("", result.stdout)
+    def test_mr_is_the_mr_field_of_the_approved_parent(self):
+        write(os.path.join(self.tree, APPROVED, "doing", "p0001.md"), front(ticket="p0001", mr=430))
+        self.assertEqual("430", self.facts()["mr"])
+
+    def test_a_bad_mr_is_a_dash(self):
+        for value in ("0", "-3", "abc", "[1]", '""'):
+            with self.subTest(value=value):
+                write(
+                    os.path.join(self.tree, APPROVED, "doing", "p0001.md"),
+                    front(ticket="p0001", mr=value),
+                )
+                self.assertEqual("-", self.facts()["mr"])
+
+    def test_mr_of_a_proposal_is_not_used(self):
+        write(os.path.join(self.tree, PROPOSALS, "todo", "p0001.md"), front(ticket="p0001", mr=5))
+        self.assertEqual("-", self.facts()["mr"])
+
+    def test_mr_comes_from_the_archive_after_ready(self):
+        write(
+            os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md"),
+            front(ticket="p0001", mr=77),
+        )
+        self.assertEqual("77", self.facts()["mr"])
+
+    def test_the_old_closed_answer_is_gone(self):
+        result = self.ask("sync", "closed", "p0001", "self", "main", self.tree)
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual("", result.stdout)
 
 
 if __name__ == "__main__":

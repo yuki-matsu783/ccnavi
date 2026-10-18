@@ -37,25 +37,6 @@ class BoardTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)
 
-    def test_unprepared_lists_a_record_without_the_parent_worktree(self):
-        """記録（キャッシュ）だけがあり、親のワークツリーが無い親は「未準備」に出す。
-
-        ほかのツリーのコピーで代用しないので、チケットは tickets[] に出ない。ワークツリーのある親
-        （記録の有無を問わない）と、閉じた親は出さない。
-        """
-        record = "remote origin\nbranch feature/99-x\nsha 0\nfetched_at 1\nstate present\nmr 12\n"
-        base = os.path.join(self.state, "sync", "self", "families")
-        write(os.path.join(base, "feature-99-x"), record)
-        write(os.path.join(base, "i0001"), record.replace("feature/99-x", "i0001"))
-        payload = self.board()
-        found = payload["unprepared"]
-        self.assertEqual([u["family"] for u in found], ["feature-99-x"])
-        self.assertEqual(found[0]["branch"], "feature/99-x")
-        self.assertEqual(found[0]["mr"], 12)
-        self.assertEqual(found[0]["project"], "")
-        self.assertIn("親のワークツリー", found[0]["reason"])
-        self.assertNotIn("feature-99-x", [t["ticket"] for t in payload["tickets"]])
-
     def scene(self):
         """親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、
         同じフェーズに未承認の子が 1 枚ある。その子は着手済みの子のワークツリーにも入っている。"""

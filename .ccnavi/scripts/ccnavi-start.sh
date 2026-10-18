@@ -466,7 +466,7 @@ stop_host() {
 	exit "$EXIT_HOST"
 }
 
-# ---- 統合先。worktree.md の決め方（CCNAVI_INTEGRATION_BRANCH → 取り込み状態 → origin/HEAD → origin/main・master）。
+# ---- 統合先。worktree.md の決め方（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env → origin/HEAD → origin/main・master）。
 integration=$(ccnavi_integration "$top" "$root") || integration=""
 [ -n "$integration" ] ||
 	fail no-integration "統合先のブランチを決められません（CCNAVI_INTEGRATION_BRANCH も origin/HEAD も origin/main・master もありません）。CCNAVI_INTEGRATION_BRANCH に統合先の名前を渡してください。"
@@ -637,29 +637,6 @@ ensure_mr() {
 	log_info MR を作った -- "branch=$em_branch"
 }
 
-# 取り込み記録に MR の番号を保存する。<ブランチ> <MR の番号か空>
-#
-# 記録は ccnavi-sync.sh が書く親子のチケットの取り込み状態（鍵は識別子）。まだ無ければ、いま origin に
-# 合わせた状態（present）で作る。ccnavi-sync.sh が書き直しても mr は残る（ccnavi_record_write が引き継ぐ）。
-record_mr() {
-	rm_branch="$1"
-	rm_num="$2"
-	[ -n "$rm_num" ] || return 0
-	rm_id=$(ccnavi_branch_to_id "$rm_branch")
-	rm_file=$(ccnavi_family_record "$root" "$(ccnavi_repo_key "$top" "$root")" "$rm_id")
-	if [ -f "$rm_file" ]; then
-		ccnavi_record_put "$rm_file" mr "$rm_num" ||
-			printf 'ccnavi-start: 案内: 取り込み記録（%s）に MR の番号を保存できなかった\n' "$rm_file"
-	else
-		rm_sha=$(git -C "$wt" rev-parse --verify --quiet "refs/remotes/origin/$rm_branch" 2>/dev/null || :)
-		[ -n "$rm_sha" ] || return 0
-		ccnavi_record_write "$rm_file" remote origin branch "$rm_branch" sha "$rm_sha" \
-			fetched_at "$(date +%s)" state present reason "" mr "$rm_num" ||
-			printf 'ccnavi-start: 案内: 取り込み記録（%s）を保存できなかった\n' "$rm_file"
-	fi
-	log_info 取り込み記録に MR を保存 -- "id=$rm_id" "mr=$rm_num"
-}
-
 # 最後に ccnavi-sync.sh <識別子> を打つ。親チケットも提案もまだ無いと取り込まれないが、止めない。<ブランチ>
 sync_note=""
 # ccnavi-sync.sh が「親チケットも提案もありません」で取り込まなかったとき 1 にする。report が提案を作る次の一手を出す
@@ -695,9 +672,8 @@ run_sync() {
 	fi
 }
 
-# 取り込み記録に MR を保存し、ccnavi-sync.sh を打つ。<ブランチ> <MR の番号か空>
+# ccnavi-sync.sh を打つ。MR の番号は親チケットの mr 欄が持つので、ここでは保存しない。<ブランチ> <MR の番号か空>
 finish_up() {
-	record_mr "$1" "$2"
 	run_sync "$1"
 }
 

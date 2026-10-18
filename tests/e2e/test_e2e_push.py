@@ -6,7 +6,7 @@
 
 1. ワークツリーを `ccnavi-git.sh worktree add` で切り、提案（`wip/proposals/todo/`）を書いて
    `ccnavi-git.sh` でコミットし、親のブランチをリモートへ push する（承認の前から親のブランチは
-   リモートにある）。`ccnavi-sync.sh` で統合先を取り込むと、実行ファイルの
+   リモートにある）。`ccnavi-sync.sh` で取り込むと、実行ファイルの
    `--agree --preview --json` が承認待ちに数える
 2. 端末の無い `ccnavi-agree.sh` は承認の壁で止まり、何も置かず何も送らない
 3. `ccnavi-agree.sh` で承認する。承認済みチケットが `doing/` に置かれ、
@@ -168,7 +168,7 @@ class ApproveAndPushTest(unittest.TestCase):
         # 親のブランチは承認の前にリモートへ送ってある（MR の元ブランチ）。承認済みチケットは、
         # リモートにある親のブランチに取り込んでから送る
         self.ok(self.run_sh("ccnavi-git.sh", "push", "-u", "origin", TICKET, cwd=self.tree))
-        # 承認は統合先の取り込み結果で、閉じた識別子の再利用を確かめる。先に取り込んでおく
+        # 統合先を取り込んでおく（取り込みの後の検査も通ることを見る）
         self.ok(self.run_sh("ccnavi-sync.sh"))
         preview = self.binary("--agree", "--preview", "--json")
         self.ok(preview)

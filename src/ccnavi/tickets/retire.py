@@ -33,7 +33,7 @@
   MR の先頭は sh が渡す値なので、それだけでは信じない。
   どちらかが手元に無ければ、含まれるか確かめられないので消さない
 - 残っていた子のブランチは、MR の先頭を基準に片付け 1 と同じ条件で消す
-- すべて片付いたら `record yes` を言う。sh はそれを見て、その親の取り込み記録を消す
+- すべて片付いたら、親の片付けの記録（`retire/<親>.json`）を消し、`record yes` を言う
 
 ブランチを消す権限はエージェントに開けない（`git branch -D` は組み込みで止まる）。条件の確認は
 ここで行い、消すのもここだけ。ネットワークには出ない。git はローカルの操作（`rev-parse`・
@@ -48,7 +48,7 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import approval, archive, worktrees
+from . import approval, archive, ticket_ids, worktrees
 
 STATE_DIR = "retire"
 KIND_MERGED = "merged"
@@ -110,15 +110,79 @@ def read_record(conf: settings.Settings, parent: str) -> dict:
     return data if failed is None and isinstance(data, dict) else {}
 
 
-def note(root: str, conf: settings.Settings, parent: str, project: str, tree_root: str) -> str:
-    """`ready` が子のチケットを退避へ移す前に、片付ける子の一覧を書く。失敗した理由（無ければ空）。
+def _held_record(path: str) -> tuple[dict, str]:
+    """前の回の記録と、読めなかった理由。無いのは普通なので `({}, "")`。
 
-    前の回（途中で止まった）の一覧には足す。同じ子は今回の値で置き換える。
+    あるのに読めない（壊れている・辞書でない）ものは、上書きすると前の回の子の一覧と MR の
+    番号を失うので、呼び手は書かずに止める。
+    """
+    data, failed = fsio.read_json(path)
+    if failed is not None:
+        if isinstance(failed, FileNotFoundError):
+            return {}, ""
+        return {}, f"{failed}"
+    if not isinstance(data, dict):
+        return {}, "JSON の辞書ではない"
+    return data, ""
+
+
+def _mr_text(value: object) -> str:
+    """MR の番号。正の整数だけ数える（無い・形が違うなら空）。"""
+    if isinstance(value, bool) or value is None:
+        return ""
+    text = str(value).strip()
+    return text if text.isascii() and text.isdigit() and int(text) > 0 else ""
+
+
+def _unreadable_closed(conf: settings.Settings, root: str, tree_root: str) -> list[str]:
+    """親のワークツリーの閉じた承認済みチケットのうち、読めないもの（理由の文）。
+
+    読めない閉じた子は子の一覧に入らない。そのまま退避へ進むと、ワークツリーとブランチの
+    片付けから黙って漏れる。
+    """
+    if tree_root:
+        return [
+            text
+            for path, text in approval.unreadable_copies(conf, tree_root)
+            if approval.DONE_DIR in (path, os.path.basename(os.path.dirname(path)))
+            or os.path.basename(path) == approval.DONE_DIR
+        ]
+    return approval.scan_all(conf, root, closed=True)[1]
+
+
+def note(
+    root: str,
+    conf: settings.Settings,
+    parent: str,
+    project: str,
+    tree_root: str,
+    mr: object = None,
+) -> str:
+    """`ready` が子のチケットを退避へ移す前に、片付けの記録を書く。失敗した理由（無ければ空）。
+
+    記録は `retire/<親>.json`（親、リポジトリ、ブランチ、MR の番号、閉じた子の一覧）。
+    親のワークツリーを片付けた後に、`sync retired` がこれを列挙元にする。前の回（途中で
+    止まった）の一覧には足し、同じ子は今回の値で置き換える。新しい `mr` が空なら前の回の値を保つ。
+
+    書かずに理由を返すのは、記録の置き場が無いとき、前の回の記録が壊れているとき（上書きすると
+    子の一覧と MR を失う）、読めない閉じたチケットがあるとき（子の一覧から漏れる）。呼び手
+    （`ready`）は、理由があれば退避へ進まずに止める。
     """
     path = record_path(conf, parent)
     if not path:
-        return "state の置き場が空なので、片付ける子の一覧を書けない"
-    held = read_record(conf, parent)
+        return "state の置き場が空なので、片付けの記録を書けない"
+    held, broken = _held_record(path)
+    if broken:
+        return (
+            f"既存の片付けの記録 {path} を読めない（{broken}）。"
+            "上書きしないので、直すか消してから打ち直す"
+        )
+    unread = _unreadable_closed(conf, root, tree_root)
+    if unread:
+        return (
+            "読めない閉じたチケットがあり、片付ける子の一覧から漏れる"
+            f"（{'; '.join(unread[:3])}）。直してから打ち直す"
+        )
     children = {c["ticket"]: c for c in held.get("children", []) if isinstance(c, dict)}
     for c in _closed_children(root, conf, parent):
         children[c.ticket] = {
@@ -128,15 +192,146 @@ def note(root: str, conf: settings.Settings, parent: str, project: str, tree_roo
             "project": c.project,
         }
     branch = (tree.branch_of(tree_root) if tree_root else "") or held.get("branch", "")
-    data = {
+    data: dict = {
         "parent": parent,
         "project": project,
         "branch": branch,
         "children": [children[k] for k in sorted(children)],
     }
+    kept = _mr_text(mr) or _mr_text(held.get("mr"))
+    if kept:
+        data["mr"] = int(kept)
     text = json.dumps(data, ensure_ascii=False, indent=1) + "\n"
-    failed = fsio.write_text(path, text, newline="\n")
-    return f"片付ける子の一覧を書けない（{path}: {failed}）" if failed else ""
+    failed = fsio.write_text_atomic(path, text, newline="\n")
+    return f"片付けの記録を書けない（{path}: {failed}）" if failed else ""
+
+
+@dataclass
+class Merged:
+    """`merge_legacy` の結果。`status` は `moved`（書いた・足した）か `kept`（そのまま）。"""
+
+    status: str = ""
+    failed: str = ""
+
+
+def merge_legacy(
+    conf: settings.Settings, parent: str, project: str, branch: str, mr: str
+) -> Merged:
+    """旧い取り込み状態の `mr` と `branch` を `retire/<親>.json` に写す（`sync migrate` が使う）。
+
+    記録が無ければ新しく書く。既にあれば、そちらを尊重して、空の `mr` と `branch` だけを足す
+    （足すものが無ければ `kept`）。既存の記録が壊れているときは書かず、理由を返す。
+    """
+    path = record_path(conf, parent)
+    if not path:
+        return Merged(failed="state の置き場が空なので、片付けの記録を書けない")
+    held, broken = _held_record(path)
+    if broken:
+        return Merged(failed=f"既存の片付けの記録を読めない（{broken}）。上書きしない")
+    present = os.path.lexists(path)
+    if present and str(held.get("parent") or "") != parent:
+        return Merged(failed="既存の片付けの記録の parent が親と合わない。上書きしない")
+    data = dict(held) if present else {"parent": parent, "project": project, "children": []}
+    changed = not present
+    if not _mr_text(data.get("mr")) and _mr_text(mr):
+        data["mr"] = int(_mr_text(mr))
+        changed = True
+    if not str(data.get("branch") or "") and branch:
+        data["branch"] = branch
+        changed = True
+    data.setdefault("branch", "")
+    if not changed:
+        return Merged("kept")
+    text = json.dumps(data, ensure_ascii=False, indent=1) + "\n"
+    failed = fsio.write_text_atomic(path, text, newline="\n")
+    return (
+        Merged(failed=f"片付けの記録を書けない（{path}: {failed}）") if failed else Merged("moved")
+    )
+
+
+@dataclass
+class Entry:
+    """`sync retired` の 1 件。`incomplete` が空でなければ、列挙できない理由（他の欄は空）。"""
+
+    parent: str
+    repo: str = ""
+    mr: str = ""
+    branch: str = ""
+    incomplete: str = ""
+
+
+def entries(conf: settings.Settings) -> list[Entry]:
+    """片付けの記録（`retire/*.json`）の列挙。読むだけで、ネットワークにも git にも触れない。
+
+    数えるのは、ファイル名の幹と JSON の `parent` が一致するものだけ（記録を手で置き換えて、
+    別の親を指させない）。読めない・`mr` が無い・ブランチが空白を含むものは `incomplete`
+    で、列挙できない理由を言う。自動では何も消さない。
+    """
+    directory = os.path.dirname(record_path(conf, "x")) if conf.state else ""
+    try:
+        names = sorted(os.listdir(directory)) if directory else []
+    except OSError:
+        return []
+    out: list[Entry] = []
+    for name in names:
+        if not name.endswith(".json") or ".tmp." in name:
+            continue
+        stem = name[: -len(".json")]
+        path = os.path.join(directory, name)
+        if os.path.islink(path) or not os.path.isfile(path) or not ticket_ids.is_valid_id(stem):
+            continue
+        data, failed = fsio.read_json(path)
+        if failed is not None or not isinstance(data, dict):
+            reason = f"{failed}" if failed is not None else "JSON の辞書ではない"
+            out.append(Entry(stem, incomplete=f"記録を読めない（{reason}）"))
+            continue
+        if str(data.get("parent") or "") != stem:
+            continue
+        project = str(data.get("project") or "")
+        branch = str(data.get("branch") or "")
+        mr = _mr_text(data.get("mr"))
+        if not mr:
+            out.append(Entry(stem, incomplete="記録に MR の番号（mr）が無い"))
+        elif _spaced(project) or _spaced(branch):
+            out.append(Entry(stem, incomplete="記録のリポジトリかブランチが空白を含む"))
+        else:
+            out.append(Entry(stem, tree.repo_key(project), mr, branch))
+    return out
+
+
+def _spaced(text: str) -> bool:
+    return any(ch.isspace() for ch in text)
+
+
+def run_abandon(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, parent: str
+) -> int:
+    """`worktree retire --abandon <親>`。放棄した親（MR をマージせずに閉じた親）の記録を消す。
+
+    記録を消すと、`ccnavi-sync.sh` はその親を片付け待ちとして知らせなくなる。親のワークツリーが
+    残っている間は、まだ放棄していないとみなして断る（ワークツリーを片付けてから打つ）。
+    ユーザが端末で打つ。
+    """
+    path = record_path(conf, parent)
+    if not path:
+        stderr.write("ccnavi: state の置き場が空なので、片付けの記録を消せません\n")
+        return 1
+    where = tree.worktree_path(root, parent)
+    if os.path.lexists(where):
+        stderr.write(
+            f"ccnavi: 親 {parent} のワークツリー（{where}）が残っているので、記録は消しません。"
+            "放棄するなら、先にワークツリーを片付けてください\n"
+        )
+        return 1
+    if not os.path.lexists(path):
+        stderr.write(f"ccnavi: 親 {parent} の片付けの記録はありません\n")
+        return 1
+    failed = fsio.unlink(path)
+    if failed:
+        stderr.write(f"ccnavi: 片付けの記録を消せませんでした（{path}: {failed}）\n")
+        return 1
+    stdout.write(f"親 {parent} の片付けの記録を消しました。ブランチは残っています\n")
+    return 0
 
 
 def _children_from(record: dict) -> list[Child]:
@@ -430,6 +625,35 @@ def run_branch(
 # ---- MR がマージされたと分かった後（片付け 2）
 
 
+def _merged_blocker(repo: str, branch: str, tip: str, head_sha: str) -> str:
+    """親のブランチを消してはいけない理由。消してよければ空。
+
+    手元の先頭が push 済み（`refs/remotes/origin/<ブランチ>`）に含まれることも確かめる。
+    MR の先頭は呼び手（sh）が渡す値で、ブランチ自身の先頭を渡せば必ず「含まれる」になる。
+    ネットワークには出ず、手元の remote-tracking ref で見る。無ければ消さない。
+    """
+    pushed = _commit(repo, f"refs/remotes/origin/{branch}")
+    if not pushed:
+        return (
+            f"push 済みの先頭（origin/{branch}）が手元に無く、未 push のコミットが無いか"
+            "確かめられない"
+        )
+    if not _is_ancestor(repo, tip, pushed):
+        return (
+            f"手元の先頭 {tip[:12]} が、push 済みの先頭（origin/{branch}）{pushed[:12]} に"
+            "含まれない（未 push のコミットがある）"
+        )
+    merged_head = _commit(repo, head_sha)
+    if not merged_head:
+        return f"マージされた MR の先頭 {head_sha[:12]} が手元に無く、含まれるか確かめられない"
+    if not _is_ancestor(repo, tip, merged_head):
+        return (
+            f"手元の先頭 {tip[:12]} が、マージされた MR の先頭 {merged_head[:12]} に含まれない"
+            "（未 push のコミットがある）"
+        )
+    return ""
+
+
 def run_merged(
     stdout: TextIO,
     stderr: TextIO,
@@ -444,53 +668,33 @@ def run_merged(
     """`sync tidy <親> <リポジトリ> <ブランチ> <sha>`。マージ済みの MR の先頭 sha を基準に片付ける。
 
     1 行ずつ言う。最後の行は `record yes|no`。親のワークツリーも親のブランチも残っていなければ yes
-    （sh がその親の取り込み記録を消す）。
+    （親の片付けの記録 `retire/<親>.json` を消した、または元から無い）。
+
+    順は、ブランチの確認、ワークツリーの削除、ブランチの削除。同じ名前のブランチを作り直して
+    使っている親のワークツリー（MR の先頭に含まれない先頭を持つ）を、先に消さないため。
+    ブランチが確認を通らなければ、ワークツリーも消さない。
     """
     repo = repo_dir(root, conf, project)
     clean = True
-    if not _drop_worktree(
-        stdout, root, family, cwd, "。ブランチは MR の先頭に含まれるか確かめて片付ける"
-    ):
-        clean = False
     tip = _tip(repo, branch)
-    if tip:
-        merged_head = _commit(repo, head_sha)
-        # 手元の先頭が push 済み（`refs/remotes/origin/<ブランチ>`）に含まれることも確かめる。
-        # MR の先頭は呼び手（sh）が渡す値で、ブランチ自身の先頭を渡せば必ず「含まれる」になる。
-        # ネットワークには出ず、手元の remote-tracking ref で見る。無ければ消さない。
-        pushed = _commit(repo, f"refs/remotes/origin/{branch}")
-        if not pushed:
-            outcome = _keep(
-                repo,
-                branch,
-                f"push 済みの先頭（origin/{branch}）が手元に無く、未 push のコミットが無いか"
-                "確かめられない",
-            )
-        elif not _is_ancestor(repo, tip, pushed):
-            outcome = _keep(
-                repo,
-                branch,
-                f"手元の先頭 {tip[:12]} が、push 済みの先頭（origin/{branch}）{pushed[:12]} に"
-                "含まれない（未 push のコミットがある）",
-            )
-        elif not merged_head:
-            outcome = _keep(
-                repo,
-                branch,
-                f"マージされた MR の先頭 {head_sha[:12]} が手元に無く、含まれるか確かめられない",
-            )
-        elif not _is_ancestor(repo, tip, merged_head):
-            outcome = _keep(
-                repo,
-                branch,
-                f"手元の先頭 {tip[:12]} が、マージされた MR の先頭 {merged_head[:12]} に含まれない"
-                "（未 push のコミットがある）",
-            )
-        else:
-            outcome = _drop_branch(repo, branch, tip, "MR がマージ済みで、先頭が MR に含まれる")
+    blocker = _merged_blocker(repo, branch, tip, head_sha) if tip else ""
+    if blocker:
+        outcome = _keep(repo, branch, blocker)
+        stdout.write(
+            f"親 {family} のワークツリーは、ブランチが片付けの条件を満たさないので消しません\n"
+        )
         _say(stdout, outcome)
-        if outcome.status != DELETED:
+        clean = False
+    else:
+        if not _drop_worktree(
+            stdout, root, family, cwd, "。ブランチは MR の先頭に含まれるか確かめて片付ける"
+        ):
             clean = False
+        if tip:
+            outcome = _drop_branch(repo, branch, tip, "MR がマージ済みで、先頭が MR に含まれる")
+            _say(stdout, outcome)
+            if outcome.status != DELETED:
+                clean = False
     held = read_record(conf, family)
     asking: list[Outcome] = []
     for child in _children_from(held):

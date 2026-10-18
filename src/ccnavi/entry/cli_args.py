@@ -200,6 +200,7 @@ _NOT_WITH_DOCS = (
     "--result",
     "--tickets",
     "--phase",
+    "--abandon",
     "--body-file",
     "--reason",
     "--note",

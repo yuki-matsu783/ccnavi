@@ -23,7 +23,6 @@ from ccnavi.tickets import (
     approval_ops,
     archive,
     c1,
-    ticket_model,
 )
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness
@@ -198,15 +197,6 @@ class ChecksHarness(unittest.TestCase):
 class ArchiveChecksTest(ChecksHarness):
     """閉じた識別子の使い回し・子の連番・先行を引く対応表が退避を見る。"""
 
-    def test_the_archive_is_not_a_ground_for_a_reused_identifier(self):
-        """閉じた識別子の使い回しは、退避からは調べない（ホストの MR で調べる）。"""
-        t, _ = ticket_mod.parse(closed_text("i0001"))
-        t.state = ticket_model.TODO
-        self.assertEqual(approval_checks.integration_problems(self.conf, self.root, t), [])
-        self.assertEqual(approval_checks.integration_closed(self.conf, self.root, [t]), set())
-        fresh, _ = ticket_mod.parse(closed_text("i0002"))
-        self.assertEqual(approval_checks.integration_problems(self.conf, self.root, fresh), [])
-
     def test_the_next_child_skips_the_archived_numbers(self):
         self.assertEqual(
             approval_ops.next_child_id(self.conf, self.root, "i0001", 1), "i0001-01-04"
@@ -220,7 +210,7 @@ class ArchiveChecksTest(ChecksHarness):
         return t
 
     def states(self, root, t):
-        """承認・lint と同じ引き方（対応表 → 取り込みで読み直す）で、先行の状態。"""
+        """承認・lint と同じ引き方（対応表 → 親のブランチで読み直す）で、先行の状態。"""
         conf, _ = settings.load(root)
         pool = approval_checks.predecessor_pool_of([t], [], [], [])
         approval_checks.align_imported(conf, root, pool)
@@ -235,32 +225,13 @@ class ArchiveChecksTest(ChecksHarness):
         return root
 
     def test_a_predecessor_in_the_archive_is_not_read_and_pcs_agree(self):
-        """手元の退避にだけある先行は閉じたと読まない。退避の無い PC と同じ答えになる。"""
+        """手元の退避にだけある先行は閉じたと読まない。退避の無い PC と同じ答えになる。
+
+        閉じて片付いた親子のチケットの先行は、どの PC でも同じく「どの置き場にも無い」になる。
+        """
         t = self.follower()
         self.assertEqual(self.states(self.root, t), [approval_checks.PRED_MISSING])
         self.assertEqual(self.states(self.other_pc(), t), [approval_checks.PRED_MISSING])
-
-    def test_a_predecessor_in_the_integration_done_is_met_on_every_pc(self):
-        t = self.follower()
-        for root in (self.root, self.other_pc()):
-            conf, _ = settings.load(root)
-            mirror = os.path.join(conf.state, "sync", "self", "integration")
-            write(os.path.join(mirror, "head"), "branch main\nsha x\nsource default\n")
-            write(
-                os.path.join(mirror, ".ccnavi", "approved", "done", "i0001-01-03.md"),
-                closed_text("i0001-01-03", "i0001"),
-            )
-            self.assertEqual(self.states(root, t), [approval_checks.PRED_DONE], root)
-
-    def test_a_predecessor_of_a_family_the_sync_closed_is_met_on_every_pc(self):
-        t = self.follower()
-        for root in (self.root, self.other_pc()):
-            conf, _ = settings.load(root)
-            write(
-                os.path.join(conf.state, "sync", "self", "families", "i0001"),
-                "remote origin\nbranch i0001\nsha x\nfetched_at 1\nstate closed\nreason r\n",
-            )
-            self.assertEqual(self.states(root, t), [approval_checks.PRED_DONE], root)
 
 
 class ReadyHarness(PhaseHarness):
@@ -542,15 +513,12 @@ class ArchiveModuleReviewTest(ArchiveTreeHarness):
 
 
 class ArchivedStandingTest(ChecksHarness):
-    """取り込みの立ち位置: 手元の退避からは閉じたと推定しない。"""
+    """親子のチケットの立ち位置: 手元の退避からは閉じたと推定しない。"""
 
-    def test_an_archived_family_without_its_tree_is_not_closed(self):
-        from ccnavi.tickets import syncstate
+    def test_an_archived_family_without_its_tree_is_undecided(self):
+        from ccnavi.tickets import standing
 
-        record = os.path.join(self.conf.state, "sync", "self", "families", "i0001")
-        write(record, "remote origin\nbranch i0001\nsha x\nfetched_at 1\nstate present\nreason \n")
-        st = syncstate.standing(self.conf, self.root, "i0001")
-        self.assertFalse(st.closed)
+        st = standing.standing(self.conf, self.root, "i0001")
         self.assertIn("ワークツリー", st.stop)
 
     def test_lookups_stay_in_the_same_repository(self):
@@ -644,16 +612,7 @@ class SecondReviewModuleTest(ArchiveTreeHarness):
 
 
 class SecondReviewChecksTest(ChecksHarness):
-    """2 回目のレビューの指摘の再現（判定・取り込み状態）。"""
-
-    def test_4_the_archive_does_not_override_a_gone_family(self):
-        from ccnavi.tickets import syncstate
-
-        record = os.path.join(self.conf.state, "sync", "self", "families", "i0001")
-        write(record, "remote origin\nbranch i0001\nsha x\nfetched_at 1\nstate gone\nreason \n")
-        st = syncstate.standing(self.conf, self.root, "i0001")
-        self.assertFalse(st.closed)
-        self.assertIn("gone", st.stop)
+    """2 回目のレビューの指摘の再現（判定）。"""
 
     def test_5_ready_does_not_archive_from_the_workspace_root(self):
         from ccnavi.tickets import review_close
@@ -672,10 +631,6 @@ class SecondReviewChecksTest(ChecksHarness):
         self.assertNotIn("other", archive.ids(self.root, ""))
 
     def test_6_other_letter_case_is_still_found_in_the_archive(self):
-        t, _ = ticket_mod.parse(closed_text("I0001"))
-        t.state = ticket_model.TODO
-        self.assertEqual(approval_checks.integration_problems(self.conf, self.root, t), [])
-        self.assertEqual(approval_checks.integration_closed(self.conf, self.root, [t]), set())
         self.assertIsNotNone(archive.archived_fields(self.root, "", "I0001"))
         self.assertEqual(
             approval_ops.next_child_id(self.conf, self.root, "I0001", 1), "I0001-01-04"
@@ -725,9 +680,6 @@ class PhaseChildIdsChecksTest(ChecksHarness):
         self.assertEqual(
             approval_ops.next_child_id(self.conf, self.root, "i0001", 3), "i0001-03-01"
         )
-        t, _ = ticket_mod.parse(closed_text("i0001-02-07", "i0001", 2))
-        t.state = ticket_model.TODO
-        self.assertEqual(approval_checks.integration_problems(self.conf, self.root, t), [])
 
 
 if __name__ == "__main__":

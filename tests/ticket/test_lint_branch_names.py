@@ -394,37 +394,35 @@ class LintBranchNamesTest(unittest.TestCase):
         self.propose("trunk")
         reserved = [line for line in self.lint() if "統合先" in line]
         self.assertEqual([], reserved)
-        # 環境変数は読まない（sh が決めて --integration-branch で渡す）。
-        lines = self.lint(env={"CCNAVI_INTEGRATION_BRANCH": "trunk"})
-        self.assertEqual([], [line for line in lines if "統合先" in line])
         lines = [line for line in self.lint("--integration-branch", "trunk") if "統合先" in line]
         self.assertEqual(1, len(lines), lines)
         self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
 
-    def test_the_name_ccnavi_sync_recorded_is_reserved(self):
-        # --integration-branch が無ければ、
-        # ccnavi-sync.sh が取り込み結果に書いた名前を読む。
+    def test_the_environment_and_the_local_settings_reserve_the_name_too(self):
+        # 統合先の解決は hook や sh と同じ順（環境変数、settings.local.json の env、
+        # --integration-branch、origin/HEAD）。
+        self.propose("trunk")
+        lines = [
+            line
+            for line in self.lint(env={"CCNAVI_INTEGRATION_BRANCH": "trunk"})
+            if "統合先" in line
+        ]
+        self.assertEqual(1, len(lines), lines)
+        write(
+            os.path.join(self.ws, ".claude", "settings.local.json"),
+            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "trunk"}}\n',
+        )
+        lines = [line for line in self.lint() if "統合先" in line]
+        self.assertEqual(1, len(lines), lines)
+        self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
+
+    def test_a_record_of_the_old_sync_is_not_read(self):
+        # 取り込み状態（sync/<リポジトリ>/integration/head）は廃止した。残っていても読まない。
         self.propose("trunk")
         write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
             "remote origin\nbranch trunk\nsource default\nsha x\nfetched_at 1\n",
         )
-        lines = [line for line in self.lint() if "統合先" in line]
-        self.assertEqual(1, len(lines), lines)
-        self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
-        # 渡された名前が先。
-        lines = self.lint("--integration-branch", "main-line")
-        self.assertEqual([], [line for line in lines if "統合先" in line])
-
-    def test_a_linked_record_is_not_followed(self):
-        self.propose("trunk")
-        real = write(os.path.join(self.ws, "elsewhere", "head"), "branch trunk\n")
-        place = os.path.join(self.ws, "logs", "state", "sync", "self", "integration")
-        os.makedirs(place)
-        try:
-            os.symlink(real, os.path.join(place, "head"))
-        except (OSError, NotImplementedError):
-            self.skipTest("リンクを作れない")
         self.assertEqual([], [line for line in self.lint() if "統合先" in line])
 
     def test_approved_and_closed_ids_are_left_alone(self):

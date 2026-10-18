@@ -3,7 +3,7 @@
 表は `tests/fixtures/branch-to-id.json`。
 
 Python（`ticket_ids.branch_to_id`）・TS（拡張の `branchToId`）も同じ表を読む。
-ワークツリーの HEAD の照合（`ccnavi_head_branch` と `syncstate.head_branch`）と、同じ識別子になる
+ワークツリーの HEAD の照合（`ccnavi_head_branch` と `standing.head_branch`）と、同じ識別子になる
 別のブランチの見つけ方（`ccnavi_id_clash`。英字の大文字小文字は区別しない）もここで確かめる。
 """
 
@@ -17,7 +17,7 @@ import tempfile
 import unicodedata
 import unittest
 
-from ccnavi.tickets import syncstate
+from ccnavi.tickets import standing
 from tests import ROOT
 
 COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
@@ -78,7 +78,7 @@ class BranchToIdShTest(unittest.TestCase):
                 if head != branch:
                     # macOS の git（core.precomposeunicode）は NFD の名前を NFC に直して作る
                     self.skipTest("この環境の git は NFD のブランチ名を作れない")
-                py = syncstate.head_branch(tree, ident)
+                py = standing.head_branch(tree, ident)
                 self.assertEqual(bool(py), same, branch)
                 for shell in SHELLS:
                     with self.subTest(shell=shell, branch=branch):

@@ -136,12 +136,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         write(os.path.join(self.root, "wip", "proposals", "todo", "scratch.md"), "---\n---\n")
         self.assert_not_asked(self.stop(path))
 
-    def test_a_worktree_with_a_family_record_is_not_asked(self):
-        path = self.direct(commit=True)
-        record = os.path.join(self.state, "sync", "self", "families", "scratch")
-        write(record, "state merged\nbranch scratch\n")
-        self.assert_not_asked(self.stop(path))
-
     def test_a_branch_that_is_not_the_name_is_not_asked(self):
         path = self.direct(commit=True)
         git(path, "switch", "--quiet", "-c", "other")

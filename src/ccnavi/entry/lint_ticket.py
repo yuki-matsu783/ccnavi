@@ -17,9 +17,10 @@ from ..tickets import (
     approval,
     approval_checks,
     ops_stop,
+    ops_stop_integrate,
     phase,
     review_host,
-    syncstate,
+    standing,
     ticket_fold,
     ticket_model,
 )
@@ -195,14 +196,10 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     }
     preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals)
     approval_checks.align_imported(conf, root, preds)
-    # 統合先の done/ で閉じた識別子も閉じたものに数える（開いた親子のチケットでも統合先の
-    # done/ は常に読む）。承認の対象から外れる（`agree.waiting`）ので、何も言わずに済ませず
-    # 名指しする。
-    done |= approval_checks.integration_closed(conf, root, proposals)
     problems.extend(
         _proposal_problems(proposals, copies, index, closed, done, repo_of, preds, root=root)
     )
-    integration = conf.integration_branch or settings.integration_recorded(conf.state)
+    integration = ops_stop_integrate.integration_name(root, conf, root, "")
     problems.extend(lint_branch._place_problems(root, proposals, copies, closed, review, repo_of))
     problems.extend(
         lint_branch._branch_name_problems(
@@ -250,7 +247,7 @@ def _adopted_parents(root: str, proposals: list) -> frozenset:
     return frozenset(
         t.ticket
         for t in proposals
-        if not t.is_child and syncstate.head_branch(tree.worktree_path(root, t.ticket), t.ticket)
+        if not t.is_child and standing.head_branch(tree.worktree_path(root, t.ticket), t.ticket)
     )
 
 

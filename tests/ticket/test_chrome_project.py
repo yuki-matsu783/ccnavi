@@ -1,6 +1,6 @@
 """Chrome の入口のプロジェクトのリポジトリと「始める」の受入テスト。
 
-見るのは 5 つ。
+見るのは 4 つ。
 
 1. プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）
 の親子のチケットを、
@@ -9,11 +9,10 @@
 2. プロジェクトのレイヤーは、プロジェクトの統合先の `.ccnavi/config/project/` をそのまま使う。
    共通レイヤーはワークスペースの統合先の `.ccnavi/config/common/` だけで、プロジェクトの
    `.ccnavi/config/common/`（親の着手が配るミラー）は読まない。親のブランチの上のレイヤーも読まない
-3. 取り込み状態はワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
-4. 「始める」: issue の番号から識別子（`feature-12-<slug>`、プロジェクトのリポジトリなら
+3. 「始める」: issue の番号から識別子（`feature-12-<slug>`、プロジェクトのリポジトリなら
    `feature-12-web-<slug>`）を決め、統合先の `done/` にある・同じ名前のブランチがある・
    開いた親子のチケットに同じ識別子がある・互換の版が違う、のどれでも始められない
-5. プロジェクト名が予約の名前（`common`・`self`）や識別子の形でなければ受けない
+4. プロジェクト名が予約の名前（`common`・`self`）や識別子の形でなければ受けない
 """
 
 from __future__ import annotations
@@ -200,31 +199,6 @@ class ChromeProjectTest(unittest.TestCase):
         board = self.ask("board", branches=bare, ws=common)
         self.assertNotIn("error", board, board)
         self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01-01"])
-
-    def test_records_are_kept_apart_for_the_workspace_and_the_project(self):
-        place = self.chrome._placement()
-        snap = {
-            "integration": {"name": "trunk", "source": "setting", "head": HEAD},
-            "branches": {
-                "trunk": project_integration(
-                    **{".ccnavi/approved/done/web-i0001.md": "x\n", "README.md": "r\n"}
-                ),
-                "web-i0012": {"head": HEAD, "files": family_files()},
-            },
-            "absent": ["web-i0009"],
-            "project": "web",
-            "workspace": workspace(),
-        }
-        records = self.chrome.records(snap, place, ["web-i0012", "web-i0009"])
-        self.assertIn("branch trunk", records["sync/web/integration/head"])
-        self.assertIn("branch main", records["sync/self/integration/head"])
-        self.assertIn("sync/web/integration/.ccnavi/approved/done/web-i0001.md", records)
-        self.assertIn("sync/self/integration/.ccnavi/config/common/rules.yml", records)
-        self.assertIn("sync/web/integration/.ccnavi/config/project/phases.yml", records)
-        self.assertNotIn("sync/web/integration/README.md", records)
-        self.assertIn("state present", records["sync/web/families/web-i0012"])
-        self.assertIn("state gone", records["sync/web/families/web-i0009"])
-        self.assertFalse(any(k.startswith("sync/self/families/") for k in records))
 
     def test_a_reserved_or_malformed_project_name_is_refused(self):
         for name in ("common", "Self", "../x", "a b"):

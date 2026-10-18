@@ -310,6 +310,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
     parser.add_argument("--phase", type=int, default=None)
+    # `worktree retire --abandon <親>`。放棄した親の片付けの記録を消す（ユーザが端末で打つ）。
+    parser.add_argument("--abandon", default=None, metavar="PARENT")
     parser.add_argument("--body-file", default="")
     parser.add_argument("--reason", default="")
     # `ticket new` の引数。題・計画の型（カンマ区切り）・issue の番号。
@@ -882,8 +884,14 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if cli_ops.sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
-    # 取り込みの後の検査（正とする側とレイヤーの食い違い）。
-    # error があれば sh が親子のチケットの取り込みを止める。
+    # 親を閉じた後の片付けの列挙元（`retire/<親>.json`）と、旧い取り込み状態の 1 回限りの移行。
+    # どちらもネットワークにも git にも触れず、チケット制御の有無に依らない。
+    if list(args.command) == ["sync", "retired"]:
+        return EXIT_OK if cli_ops.sync_retired(stdout, conf) == 0 else EXIT_ERROR
+    if list(args.command) == ["sync", "migrate"]:
+        return EXIT_OK if cli_ops.sync_migrate(stdout, conf, root) == 0 else EXIT_ERROR
+    # 取り込みの後の検査（正とする側と、手元と統合先のレイヤーの食い違い）。
+    # error があれば sh が親子のチケットの取り込みを止める。warn は表示するだけ。
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
         repo = args.command[3] if len(args.command) == 4 else None
         code = cli_ops.sync_check(stdout, stderr, root, conf, args.command[2], repo)
@@ -897,9 +905,6 @@ def _parsed(
         code = cli_ops.sync_tidy(
             stdout, stderr, root, conf, args.cwd or os.getcwd(), *args.command[2:]
         )
-        return EXIT_OK if code == 0 else EXIT_ERROR
-    if len(args.command) == 6 and list(args.command[:2]) == ["sync", "closed"]:
-        code = sh_ask.sync_closed(stdout, stderr, root, conf, *args.command[2:])
         return EXIT_OK if code == 0 else EXIT_ERROR
     # C1（取り込み済みの親子のチケットの状態の操作を、取り込み・書く・コミット・push の 1 操作に
     # する sh）が聞くこと。読むだけで、何も書かない。

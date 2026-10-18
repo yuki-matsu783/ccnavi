@@ -23,7 +23,8 @@
 # 残りの関数は、同じディレクトリの部品 5 本に分けてあり、このファイルの最後で読む。
 # 部品は単体では読まない。呼ぶ側は今までどおりこのファイルだけを読む。
 #
-#   ccnavi-common-state.sh  取り込み状態と統合先（ccnavi_state・ccnavi_integration・ccnavi_parent_tree など）と、
+#   ccnavi-common-state.sh  state の置き場と統合先（ccnavi_state・ccnavi_integration・ccnavi_parent_tree など）、
+#                           親ブランチの push の関門（ccnavi_push_gate）、
 #                           タイムアウト監視つきの git（ccnavi_git_timed・ccnavi_git_refusal）
 #   ccnavi-common-lock.sh   親子のチケットのロック（ccnavi_lock_take・ccnavi_lock_drop など）
 #   ccnavi-common-c1.sh     C1。チケットの状態を書く一連の操作を 1 つにまとめる（ccnavi_c1_*）
@@ -38,7 +39,7 @@
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
 # sh を直さないと動かない形に変えたときと、データの形（待ち方の置き場・取り下げの条件など）が
 # 変わるとき（上げ方は src/ccnavi/entry/version.py の説明）。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=12
+CCNAVI_COMPAT=13
 
 # 相対パスを絶対に直す。
 #

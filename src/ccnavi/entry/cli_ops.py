@@ -1,6 +1,6 @@
 """チケットとレビューの副命令（`ticket` / `review` / `c1` など）を ops・review へ渡す。
 
-`sync` の問い合わせ（`sync paths` / `sync check`）もここで答える。
+`sync` の問い合わせ（`sync paths` / `sync check` / `sync retired` / `sync migrate`）もここで答える。
 
 cli から分けた。cli を読まない。
 """
@@ -12,12 +12,13 @@ import os
 import re
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, settings
+from ..infra import fsio, gitcmd, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
     c1,
     core,
     learning,
+    legacy_sync,
     next_id,
     ops,
     phase,
@@ -283,6 +284,16 @@ def _worktree(
     消させない）。
     """
     verb = words[1] if len(words) > 1 else ""
+    if args.abandon is not None:
+        # 放棄した親の片付けの記録を消す。ユーザが端末で打つ（hook がエージェントからは止める）。
+        if words != ["worktree", "retire"] or not ticket_ids.is_valid_id(args.abandon):
+            stderr.write(
+                "ccnavi: worktree retire --abandon <親> の形で指定してください"
+                "（親は有効な識別子）。\n"
+            )
+            return EXIT_ERROR
+        code = retire.run_abandon(stdout, stderr, root, conf, args.abandon)
+        return EXIT_OK if code == 0 else EXIT_ERROR
     if verb == "name" and len(words) == 3:
         # 直接作業の名前の形を言う（warn の 1 行。拒否はしない）。sh の作成の後に呼ぶ。
         text = ticket_ids.direct_name_warning(words[2], conf.branch_prefixes)
@@ -322,6 +333,7 @@ def _worktree(
         stderr.write(
             "ccnavi: worktree drop <名前> か worktree tidy <親> [--phase <N>]"
             " か worktree remaining <親> か worktree retire <親>"
+            " か worktree retire --abandon <親>"
             " か worktree branch <名前> [confirmed]"
             " か worktree name <名前> か worktree id <ブランチ>"
             " か worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <題>\n"
@@ -406,6 +418,103 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
     return 0
 
 
+SYNC_RETIRED_HEAD = "retired 1"
+SYNC_MIGRATE_HEAD = "migrate 1"
+
+
+def _one_line(text: str) -> str:
+    return " ".join(text.split())
+
+
+def sync_retired(stdout: TextIO, conf: settings.Settings) -> int:
+    """`ccnavi-sync.sh` が、親を閉じた後の片付けの列挙元を聞く。頭に `retired 1`、続けて 1 行 1 件。
+
+    ```
+    retired <親> <self|プロジェクト名> <MR の番号|-> <ブランチ|->
+    incomplete <親> <理由>
+    ```
+
+    列挙元は `state/retire/<親>.json`（`ready` が書く）。読めない・`mr` が無いものは `incomplete`
+    で、sh は一覧の案内だけを出し、自動では片付けない。ネットワークにも git にも触れない。
+    """
+    stdout.write(SYNC_RETIRED_HEAD + "\n")
+    for e in retire.entries(conf):
+        if e.incomplete:
+            stdout.write(f"incomplete {e.parent} {_one_line(e.incomplete)}\n")
+        else:
+            stdout.write(f"retired {e.parent} {e.repo} {e.mr or '-'} {e.branch or '-'}\n")
+    return 0
+
+
+def sync_migrate(stdout: TextIO, conf: settings.Settings, root: str) -> int:
+    """旧い取り込み状態（`sync/<repo>/families/<親>`・`integration/`）の 1 回限りの移行。冪等。
+
+    ```
+    migrate 1
+    moved <親> <repo>          retire/<親>.json を新規に書いた、または不足分（mr・branch）を足した
+    kept <親> <repo>           retire/<親>.json が既にあり、そちらを尊重した
+    dropped <親> <repo> <理由>  親のワークツリーが在る、または mr も branch も無い。旧い記録を消した
+    skipped <親> <repo> <理由>  リンクなど。消さない
+    removed integration <repo> sync/<repo>/integration/ を消した
+    ```
+
+    親のワークツリーが無い旧い記録だけを `retire/<親>.json` に移す。取り込みの状態（gone や
+    blocked など）は捨てる。リンクは辿らない。ネットワークにも git にも触れない。
+    """
+    stdout.write(SYNC_MIGRATE_HEAD + "\n")
+    if not conf.state:
+        return 0
+    for fam in legacy_sync.read_families(conf.state):
+        _migrate_one(stdout, conf, root, fam)
+    for repo in legacy_sync.integration_repos(conf.state):
+        if not _REPO_NAME.fullmatch(repo):
+            stdout.write(f"skipped integration {_one_line(repo)} リポジトリの名前の形が違う\n")
+            continue
+        removed, why = legacy_sync.remove_integration(conf.state, repo)
+        if why:
+            stdout.write(f"skipped integration {repo} {_one_line(why)}\n")
+        elif removed:
+            stdout.write(f"removed integration {repo}\n")
+    return 0
+
+
+def _migrate_one(
+    stdout: TextIO, conf: settings.Settings, root: str, fam: legacy_sync.LegacyFamily
+) -> None:
+    name = fam.name or "-"
+    repo = fam.repo if _REPO_NAME.fullmatch(fam.repo) else "-"
+    if fam.skipped or not fam.name:
+        stdout.write(f"skipped {name} {repo} {_one_line(fam.skipped or '名前が空')}\n")
+        return
+    if repo == "-" or not _FAMILY.fullmatch(fam.name) or ".." in fam.name:
+        stdout.write(f"skipped {name} {repo} 名前の形が違う\n")
+        return
+    if os.path.lexists(tree.worktree_path(root, fam.name)):
+        gone = legacy_sync.remove_family(conf.state, fam.repo, fam.name)
+        _migrate_dropped(stdout, fam, gone, "親のワークツリーが在る")
+        return
+    if not fam.mr and not fam.branch:
+        gone = legacy_sync.remove_family(conf.state, fam.repo, fam.name)
+        _migrate_dropped(stdout, fam, gone, "mr も branch も無い")
+        return
+    result = retire.merge_legacy(conf, fam.name, tree.project_of_key(fam.repo), fam.branch, fam.mr)
+    if result.failed:
+        stdout.write(f"skipped {fam.name} {fam.repo} {_one_line(result.failed)}\n")
+        return
+    stdout.write(f"{result.status} {fam.name} {fam.repo}\n")
+    if not legacy_sync.remove_family(conf.state, fam.repo, fam.name):
+        stdout.write(f"skipped {fam.name} {fam.repo} 旧い記録を消せない\n")
+
+
+def _migrate_dropped(
+    stdout: TextIO, fam: legacy_sync.LegacyFamily, removed: bool, why: str
+) -> None:
+    if removed:
+        stdout.write(f"dropped {fam.name} {fam.repo} {why}\n")
+    else:
+        stdout.write(f"skipped {fam.name} {fam.repo} {why}。旧い記録を消せない\n")
+
+
 def _in_state(conf: settings.Settings, path: str) -> bool:
     """出力先が state の置き場の下か（`--choose-out` と同じ確かめ方）。"""
     return cli_args._inside(cli_args._real(os.path.abspath(path)), cli_args._real(conf.state))
@@ -449,7 +558,7 @@ class _Family:
 
 
 _FAMILY = _Family()
-# リポジトリの取り込み状態を分ける名前（`self` かプロジェクト名）。ASCII の 1 語。
+# リポジトリの名前（`self` かプロジェクト名）。ASCII の 1 語。
 _REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
 _ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
@@ -512,9 +621,9 @@ def sync_check(
 ) -> int:
     """`ccnavi-sync.sh` が取り込みの後に打つ検査。頭に `check 1`、続けて 1 行 1 件。
 
-    error が 1 つでもあれば 1。sh は最初の error の中身を親子のチケットの取り込み状態の
-    `reason` に書いて `blocked` にする。
-    `repo` は取り込み状態の名前（`self` かプロジェクト名）。ネットワークにも git にも触らない。
+    行は `error <detail>` か `warn <detail>`。error が 1 つでもあれば 1（sh が表示して失敗にする）。
+    warn は表示するだけで、レイヤーのずれ（手元と取得済みの `origin/<統合先>`）を含む。
+    `repo` は `self` かプロジェクト名。ネットワークには出ない（git はローカルの参照を読むだけ）。
     """
     for name, value, pattern in (
         ("識別子", family, _FAMILY),

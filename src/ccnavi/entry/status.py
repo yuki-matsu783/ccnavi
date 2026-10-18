@@ -32,7 +32,7 @@ from ..tickets import (
     ops_stop,
     overview,
     phase,
-    syncstate,
+    standing,
     ticket_model,
 )
 
@@ -133,11 +133,11 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         return 0
 
     pool = approval_checks.predecessor_pool_of(doing, review, closed, proposals)
-    # 承認と lint と同じ引き方にする（閉じた別の親子の先行は統合先の done/ と取り込み状態で読む）。
+    # 承認と lint と同じ引き方にする。
     approval_checks.align_imported(conf, root, pool)
     times = approval_times.approved_times(conf, doing + review + closed)
     files = _file_states(root, [h for e in entries.values() for h in e.hits])
-    fams = syncstate.Families(conf, root)
+    fams = standing.Families(conf, root)
     sync = settings.script_command(root, "ccnavi-sync.sh")
     stdout.write(
         "ccnavi: チケットの状態。手元の置き場・git だけを読む"
@@ -158,7 +158,6 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         )
         ctx = _Family(root, conf, name, entries, pool, times, files, fams, raw)
         stdout.write(f"\n== 親子 {name}\n")
-        stdout.write(f"最終取り込み: {_synced(conf, name, entries)}\n")
         row = rows.get(name)
         if row is not None and not family:
             for child, state in overview.child_states(root, row, doing, review):
@@ -167,18 +166,6 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
             for line in ctx.describe(e, e.ident in revisions):
                 stdout.write(line + "\n")
     return 0
-
-
-def _synced(conf: settings.Settings, name: str, entries: dict[str, Entry]) -> str:
-    """この親の最終取り込みの時刻。取り込み状態が無ければ「リモート未確認」。"""
-    e = entries.get(name)
-    project = e.t.project if e is not None and e.hits else ""
-    record = overview.record_of(conf, name, project)
-    fetched = int(record.fetched_at) if record and record.fetched_at else 0
-    text = overview.sync_label(fetched)
-    if fetched:
-        return text
-    return f"{text}（一度も取り込んでいない。ccnavi-sync.sh で取り込むと時刻が付く）"
 
 
 class _Family:
@@ -275,7 +262,7 @@ class _Family:
         st = approval_checks.family_standing(self.conf, self.root, t, self.fams)
         if st.stop:
             stops.append(f"{st.stop}（この親子のチケットの状態は動かさない）")
-            stops += syncstate.guidance(self.root, st)
+            stops += standing.guidance(self.root, st)
         if t.blocked:
             stops.append(t.blocked)
         uncommitted = file_state.kind == FILE_UNCOMMITTED
