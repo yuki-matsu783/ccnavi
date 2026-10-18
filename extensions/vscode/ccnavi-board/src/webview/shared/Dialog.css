@@ -1,6 +1,6 @@
 /*
  * 画面を覆う背景と、その上の本体（`Dialog.tsx`）。承認・保存前の確かめ・エージェントの提案の確認が共通で使う。
- * 幅は各画面の旧クラス（`.approval` など）が `--overlay-w` で決める。インラインの style は CSP に止められるので使わない。
+ * 幅は各画面の旧クラス（`.approval` など）が `--overlay-w` で決める。インラインの style は CSP で拒否されるので使わない。
  */
 .overlay-backdrop {
   position: fixed; inset: 0; z-index: var(--z-overlay);

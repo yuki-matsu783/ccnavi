@@ -459,7 +459,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const sceneOpen = new Set(sceneList(scene.open));
   const shownTab: TabName = touring ? (scene.tab === "judge" || scene.tab === "hooks" ? scene.tab : "rules") : tab;
   const shownDraft = touring ? SAMPLE_DRAFT : draft;
-  // 畳んだタイプの中は指しても見えない（0×0 を照らす）。案内の間は、手順の `fold` が名指ししたタイプだけを畳む（見出しを指す手順でだけ使う）
+  // 畳んだタイプの中は指しても見えない（0×0 の枠を強調することになる）。案内の間は、手順の `fold` が名指ししたタイプだけを畳む（見出しを指す手順でだけ使う）
   const shownFolded: ReadonlySet<Section> = touring ? new Set(SECTIONS.filter((section) => sceneList(scene.fold).includes(section))) : folded;
   const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
   const sceneJudge = typeof scene.judge === "string" ? SAMPLE.judges[scene.judge] : undefined;

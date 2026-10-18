@@ -311,7 +311,7 @@ test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答�
         const shown = sample.answers[String(scene.answer ?? "open")].answer;
         assert.ok(typeof scene.pick === "number" && shown.plans.some((plan) => plan.items.some((item) => item.number === scene.pick)), `${at}: pick の項が答えにありません`);
       }
-      // 指す先は、その手順の見本に出る印だけ（出ないものを指すと、吹き出しが中ほどへ逃げる）
+      // 指す先は、その手順の見本に出る印だけ（出ないものを指すと、吹き出しが中ほどに出る）
       assert.ok(step.target !== "", `${at}: 指す先がありません`);
       assert.ok(targetsOf(scene).has(step.target), `${at}: 指す先 ${step.target} はこの手順の見本に出ない`);
       steps += 1;

@@ -50,7 +50,7 @@ test("CB-D200 「?」は案内の一覧を開き、基本の案内が先頭で�
   }
 });
 
-test("CB-D201 全部の案内の全部の手順で、指す先が画面にあり吹き出しが中ほどへ逃げず、見本だけを描く。最後の手順のあとで閉じる", async () => {
+test("CB-D201 全部の案内の全部の手順で、指す先が画面にあり吹き出しが中ほどに出ず、見本だけを描く。最後の手順のあとで閉じる", async () => {
   for (const course of def.courses) {
     const dom = await openBoard(fixture(), { measure: true });
     try {

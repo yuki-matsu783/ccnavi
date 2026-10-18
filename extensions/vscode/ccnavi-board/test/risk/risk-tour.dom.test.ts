@@ -75,7 +75,7 @@ test("CB-D220 「?」は案内の一覧を開き、選んだ案内だけが始�
   }
 });
 
-test("CB-D221 全ユースケースの全手順で、指す先が画面にあり、吹き出しが中ほどへ逃げない。見本を描き、閉じたら実際の配点に戻る", async () => {
+test("CB-D221 全ユースケースの全手順で、指す先が画面にあり、吹き出しが中ほどに出ない。見本を描き、閉じたら実際の配点に戻る", async () => {
   const sums = riskSums(sumsBoard());
   for (const course of def.courses) {
     const dom = await openRisk({ sums });

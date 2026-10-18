@@ -258,7 +258,7 @@ test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の変�
   const defined = new Set([...page.matchAll(/(--(?:z|radius|font|gap|shadow)-[a-z0-9-]+):/g)].map((m) => m[1]));
   for (const file of files) {
     if (file.endsWith("appearance.css")) continue;
-    // 使っている変数は page.css の :root に定義がある（未定義だと値が無効になり、黙って既定の見た目に戻る）
+    // 使っている変数は page.css の :root に定義がある（未定義だと値が無効になり、気づかないうちに既定の見た目に戻る）
     for (const used of fs.readFileSync(file, "utf8").matchAll(/var\((--(?:z|radius|font|gap|shadow)-[a-z0-9-]+)/g)) {
       assert.ok(defined.has(used[1]), `${path.basename(file)} が定義の無い ${used[1]} を使っている`);
     }

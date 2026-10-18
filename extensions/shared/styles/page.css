@@ -18,7 +18,7 @@
  * - popover: 親の重なりの単位（ツールバー・図の枠）の中で開く一覧・ボタン。中の数値は外へ及ばないので、
  *   外との前後は親の値で決まる（図の枠は isolation で、ツールバーは sticky の z-index で単位になる）
  * - foot / toolbar: 画面の上下に貼り付く帯。ツールバーは脚注より上（中から下へ開く一覧が脚注の下に隠れないように）
- * - overlay: 承認・保存前の確かめのオーバーレイ　graph-max: 全画面の図　tour: ガイドツアー（何より手前）
+ * - overlay: 承認・保存前の確かめのオーバーレイ　graph-max: 全画面の図　tour: ガイドツアー（最前面）
  */
 :root {
   --z-inline: 1;
@@ -78,7 +78,7 @@ code { font-family: var(--vscode-editor-font-family); font-size: var(--font-lg);
 .dim { color: var(--vscode-descriptionForeground); }
 .toolbar { display: flex; flex-wrap: wrap; gap: var(--gap-5) var(--gap-7); align-items: center; padding: 0 4px 10px; }
 /* ツールバー（保存などのボタン）と脚注（保存の結果・エラー）は、本文をスクロールしても画面の上下に
-   残す。どちらも #root の直下にあり、本文と同じ入れ物の中で貼り付く。本文が下を通るので背景を塗る。
+   残す。どちらも #root の直下にあり、本文と同じ入れ物の中で貼り付く。本文がその下をスクロールするので背景を塗る。
    z-index の値は冒頭の --z-* を使う（列の取っ手より上、承認のオーバーレイ・全画面の図・ツアーより下）。
    ツールバーは脚注より上、部品の中から開く一覧（--z-popover）よりも上に置く。案内の一覧などツールバーの中から下へ開くメニューが脚注の下に隠れず、
    本文の一覧がスクロールでツールバーの上に出ることもないようにする */

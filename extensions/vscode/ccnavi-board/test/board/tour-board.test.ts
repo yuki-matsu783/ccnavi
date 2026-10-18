@@ -190,7 +190,7 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
       const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
-      assert.ok(step.target !== "", `${at}: 指す先がない（吹き出しが中ほどへ逃げる）`);
+      assert.ok(step.target !== "", `${at}: 指す先がない（吹き出しが中ほどに出る）`);
       if (step.target.startsWith("card-")) {
         assert.ok(cards.some((c) => `card-${c.id}` === step.target), `${at}: ${step.target} のカードが見本にありません`);
       } else if (step.target.startsWith("column-")) {
