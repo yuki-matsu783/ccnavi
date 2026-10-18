@@ -24,6 +24,7 @@ def _violation(
     would_restore: bool = False,
     not_restored: bool = False,
     git: str | None = None,
+    shadowed: bool = False,
 ) -> str:
     """1 件を、それだけで読んで成立する差し戻しの文に組む。
 
@@ -39,6 +40,10 @@ def _violation(
     とき（`ask` と、承認済みチケットの範囲外。`_restorable`）。手順だけを渡すと、
     受け取ったエージェントには「自分で戻せ」としか読めない。`ask` のルールは
     文面を持てない（lint が禁じる）ので、ここで言わないと誰も言わない。
+
+    shadowed は、ユーザの発言で受け入れた変更のうえに、そのあと中身が変わったもの。戻す先の
+    コミット済みの内容は、ユーザの編集より古いので、戻すとその編集まで消える。だから戻さない。
+    `not_restored` の理由の文を、これ用に差し替える。
     """
     change, group = finding.change, finding.group
     lines = [
@@ -55,9 +60,15 @@ def _violation(
             lines.append(
                 "not-restored: "
                 + (
-                    "the ticket's work area is not a rule-file `deny`"
-                    if finding.code == post_findings.CODE_TICKET_SCOPE
-                    else "this place is declared `ask`, not `deny`"
+                    "this path already held a change the user made, and the call above "
+                    "changed it again. The committed content is older than the user's edit, "
+                    "so putting it back would erase that edit"
+                    if shadowed
+                    else (
+                        "the ticket's work area is not a rule-file `deny`"
+                        if finding.code == post_findings.CODE_TICKET_SCOPE
+                        else "this place is declared `ask`, not `deny`"
+                    )
                 )
                 + ", so ccnavi left the change as it is. A person decides whether it stays: "
                 "say what wrote it instead of undoing it yourself."

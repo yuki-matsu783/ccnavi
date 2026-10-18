@@ -1263,7 +1263,8 @@ def ticket_verdict(
             "This path is outside the work area the ticket for this worktree declares. Do the "
             "work inside that area, or, if the task genuinely needs this path, tell the parent "
             "so it can propose a ticket that covers it and ask the user to agree to it (from the "
-            "ccnavi board in VS Code, or 'ccnavi --agree' in a terminal). "
+            "ccnavi board in VS Code or Chrome, with 'ccnavi --agree' in a terminal, or by "
+            "moving the proposal file from todo/ to doing/). "
             "Editing a proposal alone changes nothing."
         )
     return (

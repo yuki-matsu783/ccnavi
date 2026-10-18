@@ -273,7 +273,8 @@ def board_form_message(found: str) -> str:
         else "テンプレートの下書きの保存は、ユーザが実行します"
         "（`--body-file` の中身が出力に出るため）。下書きは Write で直接編集してください。"
         if "--save-draft" in found
-        else "承認と残った指摘の対応方針は、ユーザがボードか端末で決めます。"
+        else "承認はユーザが端末・ボード・置き場のファイルの移動で行い、"
+        "残った指摘の対応方針はユーザが VS Code のボードか端末で決めます。"
     )
     return (
         f"コマンド行に、ボード経由の操作用の形（{found}）が含まれています。この形はユーザがボードの"
@@ -288,9 +289,10 @@ def guard_off_message(found: str) -> str:
     return (
         f"ユーザの判断の経路（承認・レビュー済み・早めに閉じる操作）で、端末からの入力を求めないようにする形（{found}）を、"
         "コマンド行に書いています。この変数とフラグは、テストや CI が端末を使わずに実行ファイルを"
-        "実行するためのもので、エージェントが置くものではありません。承認・レビュー済み・早めに閉じる操作はユーザが"
-        "端末かボードで行います。この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを"
-        "使ってください。"
+        "実行するためのもので、エージェントが置くものではありません。"
+        "承認はユーザが端末・ボード・置き場のファイルの移動で、レビュー済みはユーザが端末かボードで、"
+        "早めに閉じる操作はユーザが端末で行います。"
+        "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
 
@@ -914,9 +916,10 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "直接実行するものではありません。状態の移動とレビューは "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' と "
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
-            "使い、承認はユーザが VS Code のボードか "
-            f"'{settings.script_command(root, 'ccnavi-agree.sh')}' で、"
-            "残った指摘の対応方針はユーザがボードか端末で決めます。"
+            "使い、承認はユーザが VS Code のボード・Chrome のボード・"
+            f"'{settings.script_command(root, 'ccnavi-agree.sh')}'・"
+            "置き場のファイルの移動のどれかで、"
+            "残った指摘の対応方針はユーザが VS Code のボードか端末で決めます。"
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）"
             "もユーザが実行します。"

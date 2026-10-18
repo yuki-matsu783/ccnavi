@@ -35,6 +35,13 @@ upstream の `skills/yomiyasu/` から次をそのまま写した。
   このリポジトリでは `.claude/skills/yomiyasu`。python3 が無い環境（Windows など）では
   `uv run --python 3.12 python .claude/skills/yomiyasu/scripts/yomiyasu_lint.py <対象ファイル>` で回す（`.claude/hooks/lint-py.sh` と同じ版の固定）
 - ruff にこのディレクトリのファイルを直接渡すと `exclude` が効かない。`--force-exclude` を付ける。`ruff check .` なら効く
+- SKILL.md の Step 0（編集対象を `wip/handoff/` に cp する）は、保護対象のファイルを直すときの手順。
+  保護対象ではない通常のファイル（`src/`・`tests/`・`docs/`・`README.md` など）を、ユーザが直接直すよう
+  頼んだときは省いて、そのファイルを直接直す。直したあとに元との差分（`ccnavi-git.sh diff`）で意味が
+  変わっていないかを見る点は同じ。vendored で SKILL.md を書き換えないので、ここに書く
+- Python のコメント・docstring・テスト名を直すときは、行の長さが表示幅 100（ruff の E501。全角は 2、
+  半角は 1 と数える）を超えないかを先に見る。言い換えると長くなりやすく、直したあとの `ruff check` で止まる。
+  SKILL.md の Step 3 のリンターは日本語の文体を見るもので、行の長さは見ない
 - 頭に frontmatter の `type` を足していない。vendored で中身を書き換えないため（`.ccnavi/docs/frontmatter.md` の「対象外」）。
   使う範囲の決まり（明示的に頼まれたときだけ、エージェント向けの文書には当てない）は
   [`.ccnavi/docs/skill-review.md`](../../../.ccnavi/docs/skill-review.md) の「どこに足すか」にある

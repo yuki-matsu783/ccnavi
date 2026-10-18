@@ -20,6 +20,8 @@ POST_TOOL_USE = "PostToolUse"
 POST_TOOL_USE_FAILURE = "PostToolUseFailure"
 SESSION_START = "SessionStart"
 USER_PROMPT_SUBMIT = "UserPromptSubmit"
+# バックグラウンド作業の完了通知が UserPromptSubmit の prompt として届くときの先頭に付く文字列。
+TASK_NOTIFICATION = "<task-notification>"
 STOP = "Stop"
 # サブエージェントの開始と終了。開始は止められないイベントで、返せるのは文だけ。
 # 終了は Stop と同じで、exit 2 が「続けさせる」を意味する。
@@ -110,6 +112,20 @@ class Input:
     # prompt は UserPromptSubmit にだけ来る。ユーザの依頼文で、issue・MR の指定を探すのに読む
     # （tickets.branchfind）。記録にも診断ログにも書かない。
     prompt: str = ""
+    # busy は Stop にだけ来る。エージェントが動かしているバックグラウンド作業
+    # （`background_tasks`）か、予約した繰り返し（`session_crons`）が残っているとき真。
+    # そのターンの終わりのあとにも、エージェントの手が作業ツリーに届きうる。
+    busy: bool = False
+
+    def from_background_task(self) -> bool:
+        """この UserPromptSubmit が、ユーザの発言ではなくバックグラウンド作業の完了通知か。
+
+        完了通知は、ユーザが何も打たなくても UserPromptSubmit を起こす。そのとき prompt は
+        `<task-notification>` で始まる（実機で確かめた）。ユーザの手による変更を受け入れる
+        処理は、この通知では行わない。バックグラウンドのプロセスが書いた変更を、ユーザの変更として
+        受け入れてしまうため。
+        """
+        return TASK_NOTIFICATION in self.prompt
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
@@ -174,7 +190,13 @@ def decode(stream: TextIO) -> Input:
         stop_hook_active=data.get("stop_hook_active") is True,
         source=str(data.get("source") or ""),
         prompt=data.get("prompt") if isinstance(data.get("prompt"), str) else "",
+        busy=_has_items(data.get("background_tasks")) or _has_items(data.get("session_crons")),
     )
+
+
+def _has_items(value: Any) -> bool:
+    """空でないリストか。欄が無い・形が違うときは偽（無いものとして読む）。"""
+    return isinstance(value, list) and len(value) > 0
 
 
 def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "") -> None:
