@@ -23,7 +23,8 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | `--agree` / `--reviewed` / `ticket …` / `review …` | チケット制御の操作。ユーザが端末で打つか、ボードの子プロセスか保護済みスクリプトが呼ぶ（9 章） |
 
 ワークスペースルートは `--root` → 環境変数 `CLAUDE_PROJECT_DIR` → 作業ディレクトリから上へ辿って
-`.claude/` を持つ最初のディレクトリ、の順で決める。
+`.claude/` を持つ最初のディレクトリ、の順で決める。ただし `.claude/worktrees/<名前>` の位置の
+ディレクトリ（ワークツリー）は `.claude/` を持っていても飛ばす。
 
 配布物は PyInstaller の onedir。実行時の依存は PyYAML 1 本で、読むのは `safe_load` に限る。
 常駐はせず、呼び出しごとに起動して終わる。
