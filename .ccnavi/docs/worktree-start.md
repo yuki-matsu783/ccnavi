@@ -50,7 +50,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   出力の「必須」の行にある`mr: <番号>`を、親の提案のfrontmatterに必ず書く（`ccnavi ticket new ... --mr <番号>`が書く。書いてないと承認と`--lint`が止める）
 - issue・MRを指定された作業は、直接作業にせずチケット作業で進める（ユーザがホストで作ったものを途中から頼まれた場合も同じ）。
   親チケットも提案も無いワークツリーでは、出力に「次:」の行が出る。識別子・題・`--issue`・`--mr`を埋めた`ccnavi ticket new`なので、
-  `--scope`の`<触るファイルの glob>`だけを実際のパスに直して、ワークツリーの中で打つ。小さい作業（1〜2ファイル）は`--plan quick-work`で足りる。
+  `--scope`の`<触るファイルの glob>`だけを実際のパスに直して、ワークツリーの中で打つ。設計判断が要らない作業は、範囲が複数のディレクトリや文書・設定にまたがっても`--plan quick-work`で足りる。
   大きい作業は`--plan`を`design,implement`のように変える（型と範囲は`.ccnavi/config/common/phases.yml`）。
   提案は手で書かない。承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる。
   チケットが既にあるワークツリーでは、「次:」の行が`ccnavi-ticket.sh status <識別子>`を勧める。行頭の語は[terms.md](terms.md)

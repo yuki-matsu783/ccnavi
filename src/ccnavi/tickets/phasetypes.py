@@ -401,6 +401,61 @@ def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
     return problems
 
 
+def _probe(entry) -> str:
+    return entry.prefix() + "x" if entry.glob != entry.prefix() else entry.glob
+
+
+def _norm_prefix(entry) -> str:
+    return entry.prefix().replace("\\", "/").lower()
+
+
+def _overlaps(entry, pt: PhaseType) -> bool:
+    """親の `allow` の 1 項と定義の範囲が重なり得るか。
+
+    言うのは「明らかに無関係」のときだけ（偽陽性を出すより黙る）。字義どおりの前置のどちらかが
+    もう片方の前置になっていれば重なり得るとみなす（`*.md` や `**/*.py` のように前置が空か
+    ワイルドカードが後ろに続く項は、パスを 1 つに決められないため）。
+    """
+    if pt.decide(_probe(entry)) == rules.ALLOW:
+        return True
+    mine = _norm_prefix(entry)
+    for own in pt.scope or []:
+        theirs = _norm_prefix(own)
+        if mine.startswith(theirs) or theirs.startswith(mine):
+            return True
+    return False
+
+
+def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
+    """親の `allow`（ask を含む。deny は除く）のうち、計画のどの定義とも重ならない項を名指しする。
+
+    承認しても、その範囲には子が書けない（子 ⊆ 定義の上限）。承認と着手のあとの子の提案ではじめて
+    気づくので、親を作るときと承認の確認（`--verify`）で言う。計画に `scope: inherit` の定義が
+    あれば上限が無いので、何も言わない。warn で、承認は止めない。
+    """
+    # 見るのは plan の項の定義だけ。feedback の定義は多くが `inherit` で、混ぜると警告が効かなくなる
+    defs = types_of(parent)
+    types = [defs[item.type] for item in parent.plan if item.type in defs]
+    if not types or any(pt.inherits_scope for pt in types):
+        return []
+    problems: list[Problem] = []
+    for entry in parent.entries:
+        if entry.decision == rules.DENY or entry.regex:
+            continue
+        if not any(_overlaps(entry, pt) for pt in types):
+            titles = ", ".join(f"{pt.title} / {pt.id}" for pt in types)
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    parent.ticket,
+                    f"`{entry.glob}` は計画のどの定義（{titles}）の範囲とも重ならない。"
+                    "子は書けない。計画に範囲を持つ定義を足すか、`scope: inherit` の定義"
+                    "（`quick-work` など。範囲は親の allow そのまま）に切り替える",
+                )
+            )
+    return problems
+
+
 # ---- 親に固定する定義（親の `phases:`）
 #
 # 計画を持つ親は、計画（`plan:` / `feedback:`）が使う定義**だけ**の写しを frontmatter の

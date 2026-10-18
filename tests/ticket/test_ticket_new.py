@@ -237,6 +237,30 @@ class TicketNewScopeTest(TicketNewTestBase):
         globs = [e["glob"] for e in front_of(self.written())["allow"]]
         self.assertEqual(globs, ["src/*", "tests/*", "docs/a.md"])
 
+    def test_scope_beyond_the_phase_limit_is_said_at_creation_and_by_verify(self):
+        result = self.new("--scope", "docs/**", "--mr", "5", plan="implement")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("承認しても書けない: `docs/**`", result.stdout)
+        self.assertIn("quick-work", result.stdout)
+        self.assertIn("案内: 承認しても書けない", result.stdout)
+        self.assertNotIn("`src/*` は計画", result.stdout)
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-qm", "proposal")
+        verify = self.ccnavi("--agree", "--preview", "--verify", "--cwd", self.tree)
+        self.assertIn("承認しても書けない: `docs/**`", verify.stdout + verify.stderr)
+
+    def test_scope_inside_the_phase_limit_or_with_quick_work_is_not_flagged(self):
+        result = self.new("--scope", "src/a.py", plan="implement")
+        self.assertNotIn("承認しても書けない", result.stdout)
+        os.remove(self.todo)
+        result = self.new("--scope", "docs/**", plan="quick-work")
+        self.assertNotIn("承認しても書けない", result.stdout)
+        # パスを 1 つに決められない glob（前置が空か、ワイルドカードが後ろに続く）は言わない
+        for glob in ("**/*.py", "*.md", "src/**/*.py"):
+            os.remove(self.todo)
+            result = self.new("--scope", glob, plan="implement")
+            self.assertNotIn("承認しても書けない", result.stdout, glob)
+
     def test_a_placeholder_from_a_guidance_line_is_refused(self):
         # 案内の行の仮の値（`<触るファイルの glob>`・`<題>`）をそのまま打つと、
         # 実在しない glob や題の提案ができて承認まで通る。作らずに断る

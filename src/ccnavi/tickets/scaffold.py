@@ -19,6 +19,8 @@
 - `--scope <glob>`（繰り返せる）は今回の作業の範囲。型の `scope` を集めたものに足して
   `allow` に書く。ワークツリーのルートからの相対の glob だけ（絶対パスと `..` は断る）
 - 既にある提案・承認済みチケットは上書きしない
+- 書いたあと、`allow` の項が計画のどの定義の `scope` とも重ならないときは、「承認しても書けない」と
+  警告する（子は書けない）。止めない。計画に `scope: inherit` の定義があれば上限が無いので言わない
 - 書いたあとに `plan_phases.fill` で `phases:`（定義の写し）を差し込む。無いと `--agree` が落ちる
 
 ## テンプレートから作る（`--template <名前> [--layer <名前>]`）
@@ -380,6 +382,9 @@ def run(
         fsio.remove(path)
         return refuse(f"phases: を差し込めなかった（{done.why}）")
 
+    # 写しを差し込んだあとの提案を読み直して、allow が定義の上限を超えていないかを見る
+    filled, _ = ticket_mod.load(path)
+    over = phasetypes.parent_scope_problems(filled) if filled is not None else []
     written: list[str] = []
     if used is not None:
         # 承認の検査（定義の kind と置き場、順序）を、書いた提案に当てる。通らなければ書き戻す。
@@ -402,6 +407,8 @@ def run(
     stdout.write("allow（phases.yml の scope を集めた）:\n")
     for glob in allow:
         stdout.write(f"  {ALLOW_MATCH} {glob}\n")
+    for p in over:
+        stdout.write(f"案内: 承認しても書けない: {p.detail}\n")
     tail = "並行させたい項は after を直す。" if used is None else "計画の項と文の固有名を直す。"
     # ccnavi を PATH に持たない環境でも、そのまま打てるように、起動の sh 経由で書く
     launcher = settings.script_command(root, "ccnavi-launcher.sh")

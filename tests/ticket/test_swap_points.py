@@ -833,7 +833,8 @@ class CoreChromeTest(CoreHarness):
         return answer
 
     def test_approve_new(self):
-        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        # 親の allow は計画の範囲と重なる形にする（重ならない親の警告は子の超過と混ざる）
+        self.propose("i0001", parent_text("i0001", ["research", "design"], allow=("wip/*",)))
         self.propose(
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
         )
