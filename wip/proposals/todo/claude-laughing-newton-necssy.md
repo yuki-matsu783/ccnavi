@@ -1,6 +1,7 @@
 ---
 version: 1
 ticket: claude-laughing-newton-necssy
+mr: 430
 title: "取り込み状態（sync/）を廃止し、親ブランチの状態だけで判定する"
 phases:
   research:
@@ -240,6 +241,5 @@ research → design → acceptance → implement-ccnavi → staging → docs の
 
 ## 未解決
 
-- `mr:`（必須）はまだ書いていない。この作業を載せる MR の番号が決まったら足してから承認を頼む。
 - `.ccnavi/scripts/` の sh を直す子は、保護対象のため staging の項で扱う（`implement-ccnavi` の範囲 `.ccnavi/*` は sh には効かない）。
 - 識別子の番号 `1` は通し番号（`ticket next-id` の答え）。issue があるなら付け替える。
