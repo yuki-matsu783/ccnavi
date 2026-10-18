@@ -91,6 +91,9 @@ class Input:
     # 許さない操作を見分けるときと、差し戻しの回数を数えるときだけ。
     agent_id: str = ""
     agent_type: str = ""
+    # SubagentStart に tools が来るかは実機で確かめていない。来ていれば、編集するサブエージェント
+    # かの見分けに使う（hook/agentkind）。文字列のリスト以外は無いものとして読む。
+    tools: list[str] | None = None
     # tool_response は PostToolUse にだけ来る。Agent の起動の後には agentId が入る。
     tool_response: dict[str, Any] = field(default_factory=dict)
     # error と is_interrupt は PostToolUseFailure にだけ来る。error は失敗の文（形はツール次第）、
@@ -112,6 +115,13 @@ class Input:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
         value = self.tool_input.get(name)
         return value if isinstance(value, str) else ""
+
+
+def _text_list(value: Any) -> list[str] | None:
+    """文字列だけのリストならそのまま、それ以外は None（欄が無いのと同じに読む）。"""
+    if isinstance(value, list) and all(isinstance(v, str) for v in value):
+        return list(value)
+    return None
 
 
 def decode(stream: TextIO) -> Input:
@@ -158,6 +168,7 @@ def decode(stream: TextIO) -> Input:
         tool_use_id=data.get("tool_use_id") or "",
         agent_id=str(data.get("agent_id") or ""),
         agent_type=str(data.get("agent_type") or ""),
+        tools=_text_list(data.get("tools")),
         error=data.get("error") if isinstance(data.get("error"), str) else "",
         is_interrupt=data.get("is_interrupt") is True,
         stop_hook_active=data.get("stop_hook_active") is True,

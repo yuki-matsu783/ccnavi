@@ -107,6 +107,7 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | `shlex` は語の途中の `#` をどう読むか | コメントの始まりにする（`echo a#b c` → `echo a`）。bash は `a#b c` と出す |
 | `shlex` は行継続を知っているか | 知らない。`\` と改行をトークンの中に残す |
 | `SubagentStart` の `additionalContext` がサブエージェントに届くか | 未実測。届かなければ、サブエージェント内の最初の `PreToolUse` で渡す形に変える |
+| `SubagentStart` の payload に `tools` が来るか | 未実測。来れば編集するサブエージェントかの見分けに使い、来なければ `.claude/agents` の定義と組み込みの一覧で見分ける（`hook/agentkind.py`）。同じ作業ツリーの案内（9.12）も、上の行のとおり `additionalContext` が届くことを前提にする |
 | `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd` | 未実測。止めるかどうかは cwd で親を引くので、受け取る cwd によって止まるかどうかが分かれる |
 
 ### 入れ子のサブエージェント（Claude Code 2.1.282）
