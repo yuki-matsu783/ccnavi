@@ -88,6 +88,25 @@ def _take_test_words(argv: list[str]) -> tuple[list[str], list[str] | None]:
     return [*argv[:at], *argv[at + 3 :]], words
 
 
+def _help_of_test(argv: list[str]) -> list[str]:
+    """`--test ... --help` を、`--help test`（test の節）の形にする。
+
+    `--test` は続く 2 語を取るので、`--test --help` は語が足りず argparse の誤りで落ち、
+    `--help` に届かない。`--help` があるときだけ、`--test` と続く語（旗でないもの）を外して
+    話題の語 `test` に置き換える。
+    """
+    end = argv.index("--") if "--" in argv else len(argv)
+    if "--test" not in argv[:end] or not {"-h", "--help"} & set(argv[:end]):
+        return argv
+    at = argv.index("--test")
+    words = []
+    for word in argv[at + 1 : at + 3]:
+        if word.startswith("-"):
+            break
+        words.append(word)
+    return [*argv[:at], *argv[at + 1 + len(words) :], "test"]
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。
 
@@ -377,7 +396,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # `--templates --import --yes` の board 経路（`--expect` と `--json` と組む）でも受け付ける。
     parser.add_argument("--via", default="")
     try:
-        rest, test_words = _take_test_words(_json_out_of_test(argv))
+        rest, test_words = _take_test_words(_json_out_of_test(_help_of_test(argv)))
         args = parser.parse_args(rest)
     except SystemExit:
         return EXIT_ERROR
@@ -386,6 +405,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.help:
         # 話題の一覧か節だけを出す。全文は `--all` で、読む量が多い。
         stderr.write(cli_args.help_text(args))
+        return EXIT_ERROR
+    if args.all:
+        stderr.write("ccnavi: --all は --help と一緒にだけ指定できます（全文を出す）。\n")
         return EXIT_ERROR
     refused = _test_usage(parser, args)
     if refused:

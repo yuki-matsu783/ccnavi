@@ -11,7 +11,7 @@ import os
 import re
 import unittest
 
-from ccnavi.entry import cli_usage
+from ccnavi.entry import cli_args, cli_usage
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -91,7 +91,42 @@ class CliUsageTest(unittest.TestCase):
         self.assertEqual(helped("ticket", "--help"), cli_usage.topic("ticket"))
         self.assertEqual(helped("--help", "docs"), cli_usage.topic("docs"))
         self.assertEqual(helped("worktree", "--help"), cli_usage.topic("scripts"))
-        self.assertEqual(helped("--help", "nothing"), cli_usage.OVERVIEW)
+        self.assertEqual(helped("--lint", "--help"), cli_usage.topic("lint"))
+        self.assertEqual(helped("--version", "--help"), cli_usage.topic("version"))
+        self.assertEqual(helped("--explain", "--help"), cli_usage.topic("explain"))
+        self.assertEqual(helped("--templates", "--help"), cli_usage.topic("templates"))
+        self.assertEqual(helped("--help", "--via", "board"), cli_usage.topic("scripts"))
+        self.assertEqual(helped("--help", "--close-early"), cli_usage.topic("scripts"))
+        self.assertEqual(helped("-h", "--suggest"), cli_usage.topic("logs"))
+        for word in ("review", "sync", "tree", "write-and-push", "branches"):
+            self.assertEqual(helped(word, "--help"), cli_usage.topic("scripts"), word)
+        # 旗の優先は TOPICS ではなく _HELP_FLAGS の順（上が勝つ）。
+        self.assertEqual(helped("--help", "--templates", "--docs"), cli_usage.topic("docs"))
+
+    def test_help_of_test_is_reachable_though_test_takes_two_words(self):
+        for args in (
+            ("--test", "--help"),
+            ("--test", "Bash", "--help"),
+            ("--test", "Bash", "ls", "--help"),
+            ("--help", "--test"),
+        ):
+            with self.subTest(args=args):
+                done = run_ccnavi(list(args), cwd=ROOT)
+                self.assertEqual(done.stderr, cli_usage.topic("test"))
+
+    def test_an_unknown_word_says_so_before_the_overview(self):
+        done = run_ccnavi(["--help", "nothing"], cwd=ROOT)
+        self.assertTrue(done.stderr.startswith("ccnavi: 話題 'nothing' はありません"), done.stderr)
+        self.assertTrue(done.stderr.endswith(cli_usage.OVERVIEW))
+
+    def test_all_is_refused_without_help(self):
+        done = run_ccnavi(["--docs", "--all"], cwd=ROOT)
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("--all は --help と一緒にだけ", done.stderr)
+
+    def test_every_help_flag_topic_exists(self):
+        names = {name for name, *_ in cli_usage.TOPICS}
+        self.assertEqual({name for name, _ in cli_args._HELP_FLAGS} - names, set())
 
 
 if __name__ == "__main__":

@@ -45,6 +45,9 @@ SubagentStartが使用するものと同じ読み込み処理・同じ検証を�
 Code拡張機能は、フローを開く前や保存する前に、編集中の内容をこの方法で渡します）。
 
     ccnavi --lint --json --flow /tmp/flow.yml
+
+共通レイヤーの旗（--rules・--phases・--risk・--projects など）は
+ccnavi --help scripts に書いてあります。
 """
 
 _TEST = """\

@@ -416,5 +416,10 @@ def help_text(args: argparse.Namespace) -> str:
     for name, given in _HELP_FLAGS:
         if given(args):
             return cli_usage.topic(name)
-    word = cli_usage.TOPIC_WORDS.get(args.command[0]) if args.command else None
-    return cli_usage.topic(word) if word else cli_usage.OVERVIEW
+    if not args.command:
+        return cli_usage.OVERVIEW
+    word = cli_usage.TOPIC_WORDS.get(args.command[0])
+    if word:
+        return cli_usage.topic(word)
+    unknown = f"ccnavi: 話題 '{args.command[0]}' はありません。話題は次のとおりです。"
+    return f"{unknown}\n\n{cli_usage.OVERVIEW}"
