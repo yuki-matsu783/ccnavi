@@ -39,8 +39,9 @@ import {
   type WorkflowData,
   type WorkflowPage,
 } from "../../core/workflow-view.js";
-import { applyAppearance } from "../appearance.js";
-import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
+import { useHostMessages } from "../useHostMessages.js";
+import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import workflowTour from "../tours/workflow.yml";
 import { post } from "./post.js";
@@ -139,73 +140,69 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     post({ type: "order", seq: seq.current, order });
   }, []);
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as { type?: unknown; [key: string]: unknown };
-      if (message.type === "data" && message.data !== undefined) {
-        const next = message.data as WorkflowData;
-        const page = pageOf(next);
-        seq.current += 1;
-        setData(next);
-        setAnswer(page?.answer);
-        setLayouts(layoutsOf(page?.answer));
-        setFit((n) => n + 1);
-        setPending(false);
-        setBusy(false);
-        setStatus(undefined);
-        setChanged(undefined);
-        setShowDiff(false);
-        setGone(undefined);
-        setReview(false);
-        if (page?.draft !== undefined) {
-          ask(page.draft);
-        }
-      } else if (message.type === "answer") {
-        if (message.seq !== seq.current) {
-          return;
-        }
-        setPending(false);
-        const got = message.answer as PlanOrderAnswer | undefined;
-        if (got === undefined) {
-          setStatus({ text: `順序を確認できませんでした。線は引く前のままです: ${String(message.error ?? "")}`, error: true });
-        } else if (got.refused.length > 0) {
-          setStatus({ text: refusedText(got.refused), error: true });
-        } else {
-          setAnswer(got);
-          setStatus(undefined);
-        }
-      } else if (message.type === "failed") {
-        setBusy(false);
-        setStatus({ text: String(message.message ?? ""), error: true });
-      } else if (message.type === "cancelled") {
-        setBusy(false);
-        setStatus(undefined);
-      } else if (message.type === "changed" && message.answer !== undefined) {
-        setBusy(false);
-        setChanged(message.answer as PlanOrderAnswer);
-        setShowDiff(true);
-      } else if (message.type === "gone") {
-        setBusy(false);
-        setPending(false);
-        seq.current += 1;
-        setReview(false);
-        setGone(String(message.reason ?? ""));
-      } else if (message.type === "tour") {
-        requestTour();
-      } else if (message.type === "appearance") {
-        applyAppearance(message.value);
+  useHostMessages((message) => {
+    if (message.type === "data" && message.data !== undefined) {
+      const next = message.data as WorkflowData;
+      const page = pageOf(next);
+      seq.current += 1;
+      setData(next);
+      setAnswer(page?.answer);
+      setLayouts(layoutsOf(page?.answer));
+      setFit((n) => n + 1);
+      setPending(false);
+      setBusy(false);
+      setStatus(undefined);
+      setChanged(undefined);
+      setShowDiff(false);
+      setGone(undefined);
+      setReview(false);
+      if (page?.draft !== undefined) {
+        ask(page.draft);
       }
-    };
-    window.addEventListener("message", onMessage);
-    post({ type: "ready" });
-    // 最初の中身に戻す線があれば、開いてすぐその線で答えを頼む
+    } else if (message.type === "answer") {
+      if (message.seq !== seq.current) {
+        return;
+      }
+      setPending(false);
+      const got = message.answer as PlanOrderAnswer | undefined;
+      if (got === undefined) {
+        setStatus({ text: `順序を確認できませんでした。線は引く前のままです: ${String(message.error ?? "")}`, error: true });
+      } else if (got.refused.length > 0) {
+        setStatus({ text: refusedText(got.refused), error: true });
+      } else {
+        setAnswer(got);
+        setStatus(undefined);
+      }
+    } else if (message.type === "failed") {
+      setBusy(false);
+      setStatus({ text: String(message.message ?? ""), error: true });
+    } else if (message.type === "cancelled") {
+      setBusy(false);
+      setStatus(undefined);
+    } else if (message.type === "changed" && message.answer !== undefined) {
+      setBusy(false);
+      setChanged(message.answer as PlanOrderAnswer);
+      setShowDiff(true);
+    } else if (message.type === "gone") {
+      setBusy(false);
+      setPending(false);
+      seq.current += 1;
+      setReview(false);
+      setGone(String(message.reason ?? ""));
+    } else if (message.type === "tour") {
+      requestTour();
+    }
+  }, () => post({ type: "ready" }));
+
+  // 最初の中身に戻す線があれば、開いてすぐその線で答えを頼む
+  useEffect(() => {
     const draft = pageOf(initial)?.draft;
     if (draft !== undefined) {
       ask(draft);
     }
-    return () => window.removeEventListener("message", onMessage);
-    // 最初の 1 回だけ（`ask` と `requestTour` は変わらない）。中身が入れ替わったときの頼み直しは "data" の受けがする
-  }, [ask, requestTour]);
+    // 最初の 1 回だけ（`ask` は変わらない）。中身が入れ替わったときの頼み直しは、"data" の受信側が行う
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const dirty = useMemo(() => answer !== undefined && isDirty(answer), [answer]);
 
@@ -237,19 +234,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     return () => clearTimeout(timer);
   }, [answer, dirty]);
 
-  useEffect(() => {
-    if (!review) {
-      return;
-    }
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setReview(false);
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [review]);
+  useEscape(review, ESCAPE_LAYER.overlay, () => setReview(false));
 
   if (data.kind === "loading") {
     return (
@@ -424,7 +409,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
           )}
         </section>
       )}
-      <header className="toolbar">
+      <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary" data-tour="summary">
           <span className="workflow-ticket">
             <strong>{shownTicket}</strong> の作業・レビュー計画の順序
@@ -468,8 +453,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             この順序に決める
           </button>
         </div>
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
+      </ScreenHeader>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">
         項の右の点から別の項の左の点へドラッグすると、線の先の項が元の項を待ちます（逆向きでも引けます）。線の真ん中の × で待たなくなります。線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。

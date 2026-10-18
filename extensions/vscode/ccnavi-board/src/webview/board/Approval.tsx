@@ -16,6 +16,7 @@ import { Fragment, useEffect, useRef, type JSX } from "react";
 
 import { unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
+import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import { DecideBody } from "./Decide.js";
 import { post } from "./post.js";
@@ -32,18 +33,7 @@ export function Approval({ overlay, unsaved = [] }: { readonly overlay: Approval
     }
   }, [overlay.kind]);
   // Esc でやめる。承認している最中と、行き先を置いている最中は閉じない
-  useEffect(() => {
-    if (overlay.kind === "approving" || overlay.kind === "deciding") {
-      return undefined;
-    }
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        post({ type: "approveCancel" });
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [overlay.kind]);
+  useEscape(overlay.kind !== "approving" && overlay.kind !== "deciding", ESCAPE_LAYER.overlay, () => post({ type: "approveCancel" }));
 
   return (
     <div className="approval-backdrop" data-approval={overlay.kind}>
