@@ -217,7 +217,7 @@ export function sceneOf(sample: FlowSample, scene: Scene): FlowScene {
   };
 }
 
-/** 画面が読めない `scene`（知らない鍵・見本に無い名前や id・型違い）の理由。読めれば undefined。テストが全手順に当てる */
+/** 画面が読めない `scene`（知らない鍵・見本に無い名前や id・型違い）の理由。読めれば undefined。テストが全手順で確かめる */
 export function sceneProblem(sample: FlowSample, scene: Scene): string | undefined {
   for (const key of Object.keys(scene)) {
     if (!(SCENE_KEYS as readonly string[]).includes(key)) {

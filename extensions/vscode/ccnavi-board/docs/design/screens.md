@@ -51,7 +51,7 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 
 返る形（`ScreenHost<D>`）と呼び方（`send` / `post` / `ready` / `hidden`）は同じ。取り違えても型では止まらない（保持する画面に `screenHost` を使うと打ちかけが消え、逆だと中身が古いまま更新されない）。保持する画面のパネルは、`ScreenHost` を返す関数（`rulesHost`・`riskHost`・`phasesHost`・`templatesHost`・`flowHost`・`workflowHost`）で `retainedHost` の形に合わせる。この関数は `panel.options.retainContextWhenHidden` を見て、偽なら診断ログに残す。
 
-保持する画面には、再表示されたところで知らせ（`lock`・`changed`）と見た目を送り直す。非表示の画面に届くかどうかについて、VS Code の型定義の記述が食い違っているため。中身（`data`）は送り直さない。
+保持する画面には、再表示されたところで知らせ（`lock`・`changed`）と見た目を送り直す。非表示の画面に届くかどうかについて、VS Code の型定義の記述が一致していないため。中身（`data`）は送り直さない。
 
 保持する画面に中身（`data`）を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存や作成が通って中身が入れ替わった）。監視がファイルの変化に気づいても中身は渡さず、帯（`changed`）を出してユーザに決めてもらう。
 

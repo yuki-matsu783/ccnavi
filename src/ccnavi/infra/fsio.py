@@ -683,7 +683,7 @@ def load_source(path: str) -> tuple[bytes, str]:
 # `remove`・`unlink`・`move`・`write_new`・`append`・`replace_bytes`）は、書けたときに
 # 行き先を記録する。記録するのは `recording` の中だけ。write-and-push は sh から
 # `--record-writes <ファイル>` を渡し、この一覧のパスだけをコミットする。
-# 一覧に載っていない場所があると、書いたのにコミットされない状態が残るので、置き場を書くコードは
+# 一覧に入っていない場所があると、書いたのにコミットされない状態が残るので、置き場を書くコードは
 # ここの関数だけを通す（素の `open`・`os.remove` を使わない）。
 
 _RECORDERS: list[dict[str, None]] = []

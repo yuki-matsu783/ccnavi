@@ -61,7 +61,7 @@ interface PanelState {
   error?: string;
   loading: boolean;
   again: boolean;
-  /** 直前に見た表示の有無。再表示されたら読み直す（非表示の間の変化は監視が拾っても渡せていない） */
+  /** 直前に見た表示の有無。再表示されたら読み直す（非表示の間の変化は監視が検知しても渡せていない） */
   wasVisible: boolean;
 }
 

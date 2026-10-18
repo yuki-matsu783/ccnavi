@@ -70,7 +70,7 @@ interface PanelState {
    */
   approval: ApprovalState;
   /**
-   * 前の読み直しから動いたカード。画面ではなくここが持つ。 画面は非表示になると捨てられ、
+   * 前の読み直しから動いたカード。画面ではなくここが持つ。画面は非表示になると捨てられ、
    * 再表示されると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
    * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
    */

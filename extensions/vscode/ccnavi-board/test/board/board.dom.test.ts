@@ -239,7 +239,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     // 指定されたプロジェクトのカードだけが残る
     assert.ok(!page.one('.card[data-id="i0002"]').classList.contains("hidden"));
     assert.ok(page.one('.card[data-id="i0001"]').classList.contains("hidden"));
-    // ユーザが触らなくても覚える。非表示になって作り直されたときに絞りが戻ってしまわないように
+    // ユーザが触らなくても記録しておく。非表示になって作り直されたときに絞りが戻ってしまわないように
     assert.equal((page.state() as { project: string }).project, "lib");
     await page.send({ type: "filter", project: "app" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");

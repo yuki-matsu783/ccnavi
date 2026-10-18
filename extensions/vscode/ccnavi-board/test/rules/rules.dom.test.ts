@@ -1339,7 +1339,7 @@ test("CB-D303 保存前の検証エラーの案内は、その手順にだけ見
   }
 });
 
-test("CB-D304 一括確認と候補の案内は、その手順から結果を出す。食い違う行に印があり、閉じたあとは結果が残らない", async () => {
+test("CB-D304 一括確認と候補の案内は、その手順から結果を出す。一致しない行に印があり、閉じたあとは結果が残らない", async () => {
   const dom = await openRules({}, undefined, { measure: true });
   try {
     await startCourse(dom, "check-expectations");

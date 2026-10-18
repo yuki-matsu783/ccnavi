@@ -10,7 +10,7 @@
  * | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost` | 画面は捨てられる。入れ物ごと入れ直す |
  * | `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集） | `retainedHost` | 画面は生きている。何もしない |
  *
- * 取り違えるとどちらの向きでも不具合が出る。保持する画面に `screenHost` を当てると、非表示の間の
+ * 取り違えるとどちらの向きでも不具合が出る。保持する画面で `screenHost` を使うと、非表示の間の
  * 入れ直しでユーザが打ちかけていた内容が消える。保持しない画面に `retainedHost` を当てると、
  * 捨てられた画面へ送り続けて中身が古いまま止まる。
  *
@@ -29,7 +29,7 @@
  * `rebuilt` なら入れ物に埋めて渡り、`posted` なら `post` が真を返したときだけ渡っている。
  * 渡る前に消さないこと。 消してから失敗すると二度と届かない。
  *
- * 画面の生死は 2 つで見る。非表示になったことは `hidden()` で教えてもらい、加えて呼ばれるたびに
+ * 画面の生死は 2 つで判断する。非表示になったことは `hidden()` で教えてもらい、加えて呼ばれるたびに
  * `surface.visible` も読む。片方だけでは足りない。
  *
  * - 自分で読むだけだと、非表示になって再表示されるまでの間に 1 度も呼ばれなければ、行って戻ったことに
@@ -45,7 +45,7 @@ export interface Surface {
    * 表示されているか。`retainContextWhenHidden` が偽の画面は、非表示になると捨てられる。
    * 捨てられた画面に送っても誰にも届かない。
    *
-   * `retainedHost` は読まない。 保持する画面は非表示でも生きていて、`postMessage` も届くため
+   * `retainedHost` は読まない。保持する画面は非表示でも生きていて、`postMessage` も届くため
    */
   readonly visible: boolean;
   /** 入れ物ごと入れ直す（画面は作り直される） */
@@ -54,7 +54,7 @@ export interface Surface {
 }
 
 /**
- * 保持する画面（`retainedHost`）が使う窓口。表示の有無（`visible`）は要らない。 非表示でも生きていて、
+ * 保持する画面（`retainedHost`）が使う窓口。表示の有無（`visible`）は要らない。非表示でも生きていて、
  * 読まないものを実装させると、これをコピーして作った次の画面にも使われないゲッターが残り続ける
  */
 export type RetainedSurface = Omit<Surface, "visible">;
@@ -183,7 +183,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  *
  * - 入れ物（HTML）は 1 度しか入れない。 入れ直すと画面は作り直され、ユーザが打ちかけていた
  *   内容が消える。2 枚目からは必ず `postMessage`（`posted`）で渡す
- * - 表示の有無を見ない。 非表示でも `postMessage` は届く（`postMessage` の文書が「live な画面には届く。
+ * - 表示の有無を見ない。非表示でも `postMessage` は届く（`postMessage` の文書が「live な画面には届く。
  *   保持する画面は非表示でも live」と言う）。見て組み上がっていないものとして扱うと、非表示の間の `lock` や `changed` の知らせが失われる。
  *   ただし VS Code の文書は同じ型定義の中で食い違っている（`retainContextWhenHidden` の側は
  *   「非表示になった画面にはメッセージを送れない」と言う）。どちらが正しくても正しく動くよう、呼ぶ側は

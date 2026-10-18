@@ -203,7 +203,7 @@ class WordSepTest(_Readable, unittest.TestCase):
             'cat "<" <<EOF\nx\nEOF': f"cat {WORD_SEP}<{WORD_SEP} << EOF",
             # `$'<'` も引用として同じに読む。
             "echo $'<' > f": f"echo {WORD_SEP}<{WORD_SEP} > f",
-            # 入力に混ざった身代わりの文字は、空白として読まれる（出力に出ない）。
+            # 入力に入り込んだ身代わりの文字は、空白として読まれる（出力に出ない）。
             'echo "\x02" > f': f"echo {WORD_SEP} > f",
             "echo \x02>f": "echo > f",
             # 引用の中の `>` と、語の中の `>` は同じ形に読む。

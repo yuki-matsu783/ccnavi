@@ -161,7 +161,7 @@ def _unreadable_closed(conf: settings.Settings, root: str, tree_root: str) -> li
     """親のワークツリーの閉じた承認済みチケットのうち、読めないもの（理由の文）。
 
     読めない閉じた子は子の一覧に入らない。そのまま退避へ進むと、ワークツリーとブランチの
-    片付けの対象から、気づかないうちに外れる。
+    片付けの対象から、知らないうちに外れる。
     """
     if tree_root:
         return [

@@ -288,7 +288,7 @@ function targetsOf(scene: Record<string, string | number | boolean>): Set<string
   return out;
 }
 
-test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答えの名前・項の番号だけを指す。綴り違いが既定の画面へ黙って戻らない。指す先は、その手順の見本に出る", () => {
+test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答えの名前・項の番号だけを指す。綴り違いで既定の画面へ戻ってしまわない。指す先は、その手順の見本に出る", () => {
   const known = ["answer", "refused", "checking", "changed", "diff", "gone", "review", "pick", "tidy"];
   let steps = 0;
   for (const course of tour.courses) {

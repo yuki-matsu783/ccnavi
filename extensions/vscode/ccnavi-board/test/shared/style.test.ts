@@ -5,7 +5,7 @@
  *
  * ここで見るのは 3 つ。骨組み（共通の部品 `extensions/shared/styles/page.css`）が 6 画面とも 1 か所から来ていること、
  * ハイコントラストのテーマ向けの書き方が残っていること、そして置いた CSS がすべてバンドルに入って
- * いること（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
+ * いること（`@import` を書き忘れると、見た目だけが知らないうちに欠ける）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

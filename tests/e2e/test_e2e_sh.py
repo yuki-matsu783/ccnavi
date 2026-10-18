@@ -409,7 +409,7 @@ class CredentialTest(WorkspaceTest):
 
         「消えているつもりで残っている」形は、パスを見比べると見落とす。
         origin を読む処理まで届いたことも確かめる。届く前に失敗した実行を
-        「外に出なかった」と数えると、穴が開いたままテストが通る。
+        「外に出なかった」と数えると、検査の漏れが残ったままテストが通る。
         """
         assertGotPastTheRoot(self, result)
         blob = (result.stdout or "") + (result.stderr or "")

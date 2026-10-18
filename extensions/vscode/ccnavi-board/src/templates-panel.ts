@@ -300,7 +300,7 @@ function registerPanelHandlers(current: PanelState): void {
   });
 
   // 保持する画面は非表示でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
-  // 食い違っている（`retainContextWhenHidden` の側は「非表示の画面には送れない」と言う）。
+  // 記述が一致していない（`retainContextWhenHidden` の側は「非表示の画面には送れない」と言う）。
   // どちらが正しくても困らないよう、再表示されたところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、非表示の間に打っていた編集がここで消える。
   panel.onDidChangeViewState(() => {

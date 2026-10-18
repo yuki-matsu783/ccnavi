@@ -44,7 +44,7 @@ export interface TourCourse {
 /** 基本の案内の鍵。初回に自動で出る案内で、メニューの先頭に出る */
 export const INTRO_COURSE = INTRO_ID;
 
-/** 指す先の印の選択子。`target` が空の手順は、どこにも当たらない選択子にして吹き出しを中ほどに出す */
+/** 指す先の印の選択子。`target` が空の手順は、どこにも一致しない選択子にして吹き出しを中ほどに出す */
 export function targetSelector(target: string): string {
   return target === "" ? "[data-tour-none]" : `[data-tour="${target}"]`;
 }
