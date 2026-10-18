@@ -23,7 +23,7 @@ import traceback
 from typing import TextIO
 
 from ..hook import events, judge, reasons, subagent
-from ..infra import fsio, hookio, modes, settings
+from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog
@@ -1238,7 +1238,7 @@ def _internal_error(
 
 
 def default_root() -> str:
-    """ワークスペースルート、つまり .claude を持つディレクトリを見つける。
+    """ワークスペースルート、つまり .claude を持つディレクトリを見つける。ワークツリーは除く。
 
     ここでは作業ディレクトリそのものに頼ってはいけない。hook は自分が走る
     ディレクトリを選べないから。代わりに上へ辿るので、ワークスペースの中の
@@ -1253,15 +1253,29 @@ def default_root() -> str:
     return found if found else "."
 
 
+def _is_worktree_dir(directory: str) -> bool:
+    """`<ワークスペースルート>/.claude/worktrees/<名前>` の位置にあるディレクトリか。
+
+    大文字小文字は、どの機械でも区別しない。Windows で clone したワークツリーは
+    表記が変わることがあり、機械ごとに判定が割れると Windows でだけ失敗するため。
+    """
+    holder = pathcase.fold(os.path.dirname(directory))
+    return holder.endswith(os.sep + pathcase.fold(tree.WORKTREES_DIR))
+
+
 def _find_project_root() -> str:
     """作業ディレクトリからファイルシステムのルートまで上って .claude を探す。
-    バージョン管理が自分のルートを見つけるのと同じやり方。"""
+    バージョン管理が自分のルートを見つけるのと同じやり方。
+
+    ワークツリー（`<ワークスペースルート>/.claude/worktrees/<名前>`）は `.claude` を追跡して
+    いて自分も `.claude` を持つ。そこで止まるとワークスペースルートを取り違えるので、
+    その位置のディレクトリは飛ばして親のワークスペースルートまで上る。"""
     try:
         directory = os.getcwd()
     except OSError:
         return ""
     while True:
-        if os.path.isdir(os.path.join(directory, ".claude")):
+        if os.path.isdir(os.path.join(directory, ".claude")) and not _is_worktree_dir(directory):
             return directory
         parent = os.path.dirname(directory)
         if parent == directory:

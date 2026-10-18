@@ -31,7 +31,7 @@ from dataclasses import dataclass
 
 import yaml
 
-from ..infra import fsio, settings, tree, yamlread
+from ..infra import fsio, pathcase, settings, tree, yamlread
 from ..policy import rules
 from . import approval, approval_checks, flow, phasetypes, plan_templates, risk
 
@@ -221,7 +221,7 @@ def is_synced_write(
 
     読めないものは外さない。
     """
-    where = tree.tree_of(root, _key(path), conf.projects)
+    where = tree.tree_of(root, path, conf.projects)
     if where is None or not where.project or where.is_main:
         return False
     rel = _rel(where.root, path)
@@ -369,7 +369,7 @@ def _inside(tree_root: str, target: str) -> bool:
 
 
 def _key(path: str) -> str:
-    return os.path.normcase(os.path.realpath(path))
+    return pathcase.fold(os.path.realpath(path))
 
 
 def _same(a: bytes, b: bytes) -> bool:

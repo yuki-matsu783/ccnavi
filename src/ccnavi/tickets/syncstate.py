@@ -58,7 +58,7 @@ import stat
 import time
 from dataclasses import dataclass
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, pathcase, settings, tree
 from . import ticket as ticket_mod
 from . import ticket_ids, ticket_model
 
@@ -505,7 +505,7 @@ class Families:
         )
 
     def home_tree(self, family_id: str, project: str) -> tree.Tree | None:
-        """親のワークツリー。名前（大文字小文字まで）が親の識別子で、元が同じリポジトリで、
+        """親のワークツリー。名前が親の識別子で、元が同じリポジトリで、
         HEAD のブランチ名を変換したものが名前と一致するもの。無ければ None。ファイルだけを読む
         （git は起こさない）。"""
         work = self._named_tree(family_id, project)
@@ -533,10 +533,8 @@ class Families:
         return [tree.main_tree(self.root), *tree.projects(self.conf.projects), *self.worktrees()]
 
     def _named_tree(self, family_id: str, project: str) -> tree.Tree | None:
-        if not tree.exact_name(self.root, family_id):
-            return None
         for work in self.worktrees():
-            if work.name == family_id and work.project == project:
+            if pathcase.fold(work.name) == pathcase.fold(family_id) and work.project == project:
                 return work
         return None
 
@@ -658,7 +656,7 @@ def same_tree(a: str, b: str) -> bool:
     return (
         bool(a)
         and bool(b)
-        and os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+        and pathcase.fold(os.path.normpath(a)) == pathcase.fold(os.path.normpath(b))
     )
 
 

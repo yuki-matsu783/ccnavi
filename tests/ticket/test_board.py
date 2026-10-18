@@ -604,7 +604,7 @@ def _portable(value, root: str):
     if isinstance(value, list):
         return [_portable(v, root) for v in value]
     if isinstance(value, str):
-        # ワークツリーの根は normcase 済み（Windows では小文字）で出るので、表記を問わず置き換える。
+        # ワークツリーの根の表記は機械で変わりうる（Windows は小文字）ので、表記を問わず置き換える。
         # ccnavi は根を行き着く先まで解いたパスで出す（macOS の /var → /private/var）。
         # 解いたパスを先に置き換える。後にすると、中に含まれる元のパスだけが先に
         # 置き換わって `/private<root>` が残る。

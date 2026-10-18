@@ -51,6 +51,7 @@ import tempfile
 import time
 import unittest
 
+from ccnavi.infra import pathcase
 from tests import ROOT, can_pass_argument, common_path, config_path, live_sh_pid, requires_symlink
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
@@ -2205,7 +2206,7 @@ class C1HostTest(C1HostHarness):
         write(
             os.path.join(archive_base, "ready", f"{PARENT}.json"),
             json.dumps(
-                {"parent": PARENT, "tree": os.path.normcase(os.path.realpath(self.tree)),
+                {"parent": PARENT, "tree": pathcase.fold(os.path.realpath(self.tree)),
                  "head": head, "files": []}
             ),
         )  # fmt: skip

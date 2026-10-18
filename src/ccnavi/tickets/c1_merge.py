@@ -30,7 +30,7 @@ import io
 import os
 from typing import TextIO
 
-from ..infra import gitcmd, gitstate, settings, tree
+from ..infra import gitcmd, gitstate, pathcase, settings, tree
 from ..policy import rules
 from . import (
     approval,
@@ -321,7 +321,7 @@ def _unrestorable(child_tree: str, base: str, head: str) -> tuple[list[str], str
 
 
 def _same(a: str, b: str) -> bool:
-    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+    return pathcase.fold(os.path.realpath(a)) == pathcase.fold(os.path.realpath(b))
 
 
 def blame(stdout: TextIO, conf: settings.Settings, root: str, ident: str, paths: list[str]) -> int:

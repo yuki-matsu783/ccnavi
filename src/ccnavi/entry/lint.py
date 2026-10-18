@@ -26,7 +26,7 @@ from dataclasses import replace
 from typing import TextIO
 
 from ..hook import ccnavimd, judge
-from ..infra import modes, settings, tree
+from ..infra import modes, pathcase, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
@@ -374,9 +374,7 @@ def check(
 def _named_rules(conf: settings.Settings, root: str) -> bool:
     """共通レイヤーのルールの置き場が、既定の場所ではなくフラグ（`--rules`）で名指しされたものか。"""
     default = os.path.join(root, settings.DEFAULT_RULES)
-    return os.path.normcase(os.path.abspath(conf.rules)) != os.path.normcase(
-        os.path.abspath(default)
-    )
+    return pathcase.fold(os.path.abspath(conf.rules)) != pathcase.fold(os.path.abspath(default))
 
 
 # sh が互換の版を宣言する場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、

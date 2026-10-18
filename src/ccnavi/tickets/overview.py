@@ -84,7 +84,7 @@ def collect(
     rows = []
     for ident in sorted(parents):
         path = tree.worktree_path(root, ident)
-        if not tree.exact_name(root, ident) or not os.path.isdir(path):
+        if not os.path.isdir(path):
             continue
         parent = parents[ident]
         branch = tree.branch_of(path) or ""
@@ -222,7 +222,7 @@ def child_states(
             continue
         seen.add(t.ticket)
         path = tree.worktree_path(root, t.ticket)
-        if not tree.exact_name(root, t.ticket) or not os.path.isdir(path):
+        if not os.path.isdir(path):
             continue
         out.append((t.ticket, child_state(path, tree.branch_of(path) or t.ticket, row.path)))
     return out

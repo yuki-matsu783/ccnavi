@@ -356,9 +356,8 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ワークツリー", result.stderr)
 
-    @unittest.skipUnless(os.path.normcase("A") == "a", "大文字小文字を区別する機械")
     def test_worktree_name_case_does_not_drop_the_ticket(self):
-        """区別しない機械で表記違いで切ったワークツリーでも、判定は承認済みチケットで行う。
+        """表記違いで切ったワークツリーでも（どの機械でも区別しない）、判定は承認済みチケットで行う。
 
         案内（SubagentStart）は表記の違いを吸収するのに判定だけ厳密だと、
         「有効」と言われながら権限モード任せになる（敵対的レビューで実際に確かめた）。

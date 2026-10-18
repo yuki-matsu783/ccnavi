@@ -36,7 +36,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.entry import lint, version
-from ccnavi.infra import fsio, settings
+from ccnavi.infra import fsio, pathcase, settings
 from ccnavi.infra import tree as tree_mod
 from ccnavi.tickets import approval, approval_ops, core, core_base, history, ticket_model
 from tests import config_path, requires_symlink
@@ -430,7 +430,7 @@ def durable_writes():
     real = fsio._replace_durably
 
     def record(path, content):
-        seen.append(os.path.normcase(os.path.abspath(path)))
+        seen.append(pathcase.fold(os.path.abspath(path)))
         return real(path, content)
 
     with mock.patch.object(fsio, "_replace_durably", record):
@@ -438,7 +438,7 @@ def durable_writes():
 
 
 def _norm(path: str) -> str:
-    return os.path.normcase(os.path.abspath(path))
+    return pathcase.fold(os.path.abspath(path))
 
 
 class DurableWiringTest(CoreHarness):
@@ -498,7 +498,7 @@ class DurableWiringTest(CoreHarness):
             )
         self.assertEqual(failed, "")
         written = [
-            p for p in seen if p.endswith(os.path.normcase(os.path.join("doing", ident + ".md")))
+            p for p in seen if p.endswith(pathcase.fold(os.path.join("doing", ident + ".md")))
         ]
         self.assertEqual(len(written), 1, seen)
         self.assertTrue(os.path.exists(written[0]))

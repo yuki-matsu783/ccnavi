@@ -18,7 +18,7 @@ import threading
 import time
 import unittest
 
-from ccnavi.infra import settings
+from ccnavi.infra import pathcase, settings
 from ccnavi.tickets import (
     approval,
     approval_checks,
@@ -362,8 +362,8 @@ class PresentTest(AuthorityHarness):
         write(os.path.join(self.root, ".ccnavi", "approved", "done", "i0001.md"), "x\n")
         where = approval.home_dir(self.conf(), self.root, "i0001", "")
         self.assertEqual(
-            os.path.normcase(os.path.join(self.parent_tree, ".ccnavi", "approved")),
-            os.path.normcase(where),
+            pathcase.fold(os.path.join(self.parent_tree, ".ccnavi", "approved")),
+            pathcase.fold(where),
         )
 
 

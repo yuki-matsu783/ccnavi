@@ -31,6 +31,8 @@ import os
 import unicodedata
 from dataclasses import dataclass
 
+from . import pathcase
+
 # ワークツリーの置き場。CLAUDE.md の運用と対になる。ワークスペースルートの中に置くのは、
 # セッションの道具と権限がそこまで届くようにするため。
 WORKTREES_DIR = os.path.join(".claude", "worktrees")
@@ -66,7 +68,7 @@ class Tree:
 
 
 def main_tree(root: str) -> Tree:
-    return Tree(MAIN, _canonical(root))
+    return Tree(MAIN, _resolved(root))
 
 
 def projects(projects_dir: str) -> list[Tree]:
@@ -85,7 +87,7 @@ def projects(projects_dir: str) -> list[Tree]:
     for name in names:
         candidate = os.path.join(projects_dir, name)
         if os.path.isdir(candidate) and os.path.exists(os.path.join(candidate, ".git")):
-            found.append(Tree(name, _canonical(candidate), project=name, kind=KIND_PROJECT))
+            found.append(Tree(name, _resolved(candidate), project=name, kind=KIND_PROJECT))
     return found
 
 
@@ -111,7 +113,7 @@ def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
         owner = owner_of(candidate, owners)
         if owner is not None:
             found.append(
-                Tree(nfc(name), _canonical(candidate), project=owner.project, kind=KIND_WORKTREE)
+                Tree(nfc(name), _resolved(candidate), project=owner.project, kind=KIND_WORKTREE)
             )
     return found
 
@@ -219,10 +221,8 @@ def is_worktree_of(root: str, candidate: str) -> bool:
     gitdir = line[len("gitdir:") :].strip()
     if not os.path.isabs(gitdir):
         gitdir = os.path.join(candidate, gitdir)
-    gitdir = _canonical(gitdir)
-
-    registry = _canonical(os.path.join(root, ".git", "worktrees"))
-    if not gitdir.startswith(registry + os.sep):
+    registry = _key(os.path.join(root, ".git", "worktrees"))
+    if not _key(gitdir).startswith(registry + os.sep):
         return False
 
     try:
@@ -230,7 +230,7 @@ def is_worktree_of(root: str, candidate: str) -> bool:
             back = f.read().strip()
     except OSError:
         return False
-    return _canonical(back) == _canonical(gitfile)
+    return _key(back) == _key(gitfile)
 
 
 def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
@@ -241,27 +241,41 @@ def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
     """
     if not full:
         return None
-    target = _canonical(full)
+    target = _key(full)
     best: Tree | None = None
     for tree in all_trees(root, projects_dir):
-        inside = target == tree.root or target.startswith(tree.root + os.sep)
+        base = pathcase.fold(tree.root)
+        inside = target == base or target.startswith(base + os.sep)
         if inside and (best is None or len(tree.root) > len(best.root)):
             best = tree
     return best
 
 
+def parts_under(base: str, full: str) -> list[str] | None:
+    """`full` が `base` の下（か同じ）なら、`base` からの残りの名前を並べて返す。外なら None。
+
+    突き合わせは、どの機械でも大文字小文字を区別しない（`pathcase.fold`）。返す名前の表記は
+    `full` のまま。小文字にしたパスから作ると、チケットが `README.md` と書いた範囲に
+    `readme.md` を当てることになって、永久に当たらない。
+    """
+    base_parts = _resolved(base).rstrip(os.sep).split(os.sep)
+    parts = _resolved(full).rstrip(os.sep).split(os.sep)
+    if len(parts) < len(base_parts):
+        return None
+    for want, got in zip(base_parts, parts, strict=False):
+        if pathcase.fold(want) != pathcase.fold(got):
+            return None
+    return parts[len(base_parts) :]
+
+
 def relative(tree: Tree, full: str) -> str:
     """作業ツリーのルートからの相対。区切りは "/"。ルートそのものなら空文字。
 
-    表記の大文字小文字は元のまま返す。normcase を掛けたパスから作ると、
-    区別しない機械（Windows）では全部が小文字になり、チケットが `README.md` と
-    書いた範囲に `readme.md` を当てることになって、永久に当たらない。
-    `os.path.relpath` は比較にだけ normcase を使い、返すパスは元のままなので、
-    根（normcase 済み）と突き合わせても大文字小文字は保たれる。
+    ルートの外なら `..` で辿る形を返す。
     """
-    target = _canonical(full)
-    if target == tree.root:
-        return ""
+    rest = parts_under(tree.root, full)
+    if rest is not None:
+        return "/".join(rest)
     return os.path.relpath(_resolved(full), tree.root).replace(os.sep, "/")
 
 
@@ -387,20 +401,21 @@ def branch_of(tree_root: str) -> str | None:
 
 
 def worktree_path(root: str, name: str) -> str:
-    """この名前のワークツリーが置かれるはずの場所。在るかどうかは見ない。"""
-    return os.path.join(root, WORKTREES_DIR, name)
+    """この名前のワークツリーが置かれる場所。
 
-
-def exact_name(root: str, name: str) -> bool:
-    """この名前のワークツリーが、表記の大文字小文字までそのままで在るか。
-
-    大文字小文字を区別しない機械では `I0001-01-02` というディレクトリが `i0001-01-02` として
-    開けてしまう。名前が識別子だと言う以上、表記まで同じであることを求める。
+    大文字小文字だけが違う名前は同じ場所として扱うので、在るときはディレクトリの実際の表記で返す。
+    無いときは与えた名前のまま組む（在るかどうかは見ない）。
     """
+    base = os.path.join(root, WORKTREES_DIR)
     try:
-        return nfc(name) in {nfc(n) for n in os.listdir(os.path.join(root, WORKTREES_DIR))}
+        existing = os.listdir(base)
     except OSError:
-        return False
+        existing = []
+    folded = pathcase.fold(nfc(name))
+    for entry in sorted(existing):
+        if pathcase.fold(nfc(entry)) == folded:
+            return os.path.join(base, entry)
+    return os.path.join(base, name)
 
 
 def nfc(name: str) -> str:
@@ -412,18 +427,17 @@ def nfc(name: str) -> str:
     return unicodedata.normalize("NFC", name)
 
 
-# 大文字小文字を区別しない機械かどうか。承認済みチケットの索引を引くときに、ワークツリーの
-# 名前の表記が違っても同じ識別子として結び付けるのは、この機械だけ。
-CASE_INSENSITIVE = os.path.normcase("A") == "a"
-
-
 def lookup(index: dict, name: str):
-    """ワークツリーの名前で承認済みチケットを引く。区別しない機械では表記の違いを許す。"""
+    """ワークツリーの名前で承認済みチケットを引く。大文字小文字はどの機械でも区別しない。
+
+    綴りまで同じものがあればそれを返す（大小だけ違うキーが並んでいても誤って結び付けない）。
+    """
     found = index.get(name)
-    if found is not None or not CASE_INSENSITIVE:
+    if found is not None:
         return found
+    folded = pathcase.fold(name)
     for key, value in index.items():
-        if key.lower() == name.lower():
+        if pathcase.fold(key) == folded:
             return value
     return None
 
@@ -437,6 +451,6 @@ def _resolved(path: str) -> str:
     return os.path.normpath(resolved)
 
 
-def _canonical(path: str) -> str:
-    """同じ場所が同じ表記になる形。大文字小文字は区別しない機械のために normcase。"""
-    return os.path.normcase(_resolved(path))
+def _key(path: str) -> str:
+    """同じ場所かを比べるための鍵。大文字小文字はどの機械でも区別しない（`pathcase.fold`）。"""
+    return pathcase.fold(_resolved(path))

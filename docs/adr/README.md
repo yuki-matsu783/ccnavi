@@ -209,6 +209,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0137](0137-merge-child-at-finish.md) | 子の成果の合流を finish で行い、状態と 1 つのマージコミットにして push する |
 | [0138](0138-tidy-up-when-parent-closes.md) | 親を閉じるときの片付けを ccnavi が行い、消すのは成果が失われないと確かめられたものだけにする |
 | [0139](0139-accept-by-resolving-the-thread.md) | 受け入れた未解決スレッドは記録ファイルに持たず、ホストのスレッドに返信を残して解決する（0030・0081 の `accepted.json` への記録を置き換える） |
+| [0140](0140-paths-ignore-case-everywhere.md) | パスと名前の大文字小文字は、どの機械でも区別せず同じものとして扱い、両立させない |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
 
 ### 複数のリポジトリと VS Code 拡張

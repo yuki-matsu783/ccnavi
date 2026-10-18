@@ -11,7 +11,7 @@ import re
 from typing import TextIO
 
 from ..hook import docsearch, docsearch_query
-from ..infra import fsio, settings
+from ..infra import fsio, pathcase, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, prune
@@ -152,7 +152,7 @@ def _real(path: str) -> str:
 
 
 def _same(a: str, b: str) -> bool:
-    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+    return pathcase.fold(os.path.normpath(a)) == pathcase.fold(os.path.normpath(b))
 
 
 def _inside(path: str, base: str) -> bool:
@@ -160,8 +160,8 @@ def _inside(path: str, base: str) -> bool:
 
     どちらも行き着く先のパスで渡す。大文字小文字は区別しない。
     """
-    path = os.path.normcase(os.path.normpath(path))
-    base = os.path.normcase(os.path.normpath(base))
+    path = pathcase.fold(os.path.normpath(path))
+    base = pathcase.fold(os.path.normpath(base))
     return path == base or path.startswith(base.rstrip(os.sep) + os.sep)
 
 

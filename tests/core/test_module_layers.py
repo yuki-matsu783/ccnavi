@@ -99,6 +99,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.gitcmd",
                 "infra.globmatch",
                 "infra.hookio",
+                "infra.pathcase",
                 "infra.platformtag",
                 "infra.settings",
                 "infra.shellread_scan",

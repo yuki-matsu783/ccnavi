@@ -25,7 +25,7 @@ from unittest import mock
 
 import yaml
 
-from ccnavi.infra import settings
+from ccnavi.infra import pathcase, settings
 from ccnavi.tickets import approval_marks, flow, flow_render, flow_text
 from tests.ticket.test_flow import (
     CHILD,
@@ -404,7 +404,7 @@ class FlowParentBriefingTest(PhaseHarness):
         self.assertNotIn(flow.FENCE_OPEN, text)
         self.assertNotIn("[askUserQuestion]", text)
         for path in paths:
-            self.assertIn(os.path.normcase(f"フロー: {path}"), os.path.normcase(text))
+            self.assertIn(pathcase.fold(f"フロー: {path}"), pathcase.fold(text))
         self.assertIn(
             "自分の担当の子チケットのフローだけを読んで従ってください。他の子のフローには従わない",
             text,
