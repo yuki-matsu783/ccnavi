@@ -1262,8 +1262,9 @@ class PlacesAreNotReadTest(SyncHarness):
     def test_the_fallback_without_an_answer_uses_the_defaults(self):
         """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。
 
-        `sync paths` だけを空で返し、ほか（`c1 family` の `branch` の行）は実際のものに答えさせる。
-        `c1 family` まで空だと、sh は親のブランチ名を知らずに取り込みを止める。
+        `sync paths` だけを空で返し、ほか（`write-and-push family` の `branch` の行）
+        は実際のものに答えさせる。
+        `write-and-push family` まで空だと、sh は親のブランチ名を知らずに取り込みを止める。
         """
         self.arrange()
         body = (

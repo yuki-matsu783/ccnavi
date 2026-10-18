@@ -115,7 +115,7 @@ DEPLOY_SCRIPTS = (
     *GATE_SCRIPTS,
     "ccnavi-common-state.sh",
     "ccnavi-common-lock.sh",
-    "ccnavi-common-c1.sh",
+    "ccnavi-common-write-and-push.sh",
     "ccnavi-common-host.sh",
     "ccnavi-common-log.sh",
     "ccnavi-common.sh",
@@ -166,11 +166,11 @@ NO_TEMPLATES_FILES = [
             "ccnavi-branches.sh",
             "ccnavi-clean.js",
             "ccnavi-clean.sh",
-            "ccnavi-common-c1.sh",
             "ccnavi-common-host.sh",
             "ccnavi-common-lock.sh",
             "ccnavi-common-log.sh",
             "ccnavi-common-state.sh",
+            "ccnavi-common-write-and-push.sh",
             "ccnavi-common.sh",
             "ccnavi-fetch.sh",
             "ccnavi-git.sh",
@@ -224,7 +224,7 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-git.sh
   .ccnavi/scripts/ccnavi-common-state.sh
   .ccnavi/scripts/ccnavi-common-lock.sh
-  .ccnavi/scripts/ccnavi-common-c1.sh
+  .ccnavi/scripts/ccnavi-common-write-and-push.sh
   .ccnavi/scripts/ccnavi-common-host.sh
   .ccnavi/scripts/ccnavi-common-log.sh
   .ccnavi/scripts/ccnavi-common.sh

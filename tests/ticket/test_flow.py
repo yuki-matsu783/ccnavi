@@ -191,7 +191,7 @@ class FlowRenderTest(unittest.TestCase):
                 {"id": "e", "type": "end", "name": "終了"},
             ],
             "connections": [
-                {"id": "c1", "from": "s", "to": "p", "fromPort": "output"},
+                {"id": "write-and-push", "from": "s", "to": "p", "fromPort": "output"},
                 {"id": "c2", "from": "p", "to": "e", "fromPort": "output"},
                 # グループに繋がる線は辿らない（番号を振らないので行き先にも出ない）
                 {"id": "c3", "from": "e", "to": "g", "fromPort": "output"},
@@ -534,7 +534,7 @@ LOOP_NODE_FLOW = {
         {"id": "e", "type": "end", "name": "終了", "data": {"label": "終了"}},
     ],
     "connections": [
-        {"id": "c1", "from": "s", "to": "p"},
+        {"id": "write-and-push", "from": "s", "to": "p"},
         {"id": "c2", "from": "p", "to": "l"},
         {"id": "c3", "from": "l", "to": "p", "fromPort": "body"},
         {"id": "c4", "from": "l", "to": "e", "fromPort": "done"},

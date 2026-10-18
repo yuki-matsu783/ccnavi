@@ -211,7 +211,8 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
     （`a.json` なら `.a.<一意>.part.json`）。固定の名前にすると、同時に書く 2 つが同じ
     一時ファイルを取り合い、片方の書きかけをもう片方が差し替えることになる。直そうとした
     問題が形を変えて戻るので、ここは一意でなければならない。先頭の `.` と `.part` は、
-    承認済みの置き場に異常終了して残ったものを `ccnavi-push-approved.sh` と C1 のコミットが
+    承認済みの置き場に異常終了して残ったものを `ccnavi-push-approved.sh` と write-and-push
+    のコミットが
     運ばないため（どちらも `.<名前>.part*` の形を除く）。元の名前と拡張子を残すのは、
     異常終了して残った一時ファイルを、本番と同じ名前の条件（`ctxfile.forget` と `prune` は
     先頭の `.` を外してから当てる。`temp_origin`）で掃除できるようにするため。
@@ -676,11 +677,11 @@ def load_source(path: str) -> tuple[bytes, str]:
     return content, _decode(content)
 
 
-# ---- この実行で書いたパスの記録（C1 がこの一覧のパスだけをコミットする）
+# ---- この実行で書いたパスの記録（write-and-push がこの一覧のパスだけをコミットする）
 #
 # 書き込みの関数（`write_text`・`write_text_atomic`・`write_bytes`・`write_json_atomic`・
 # `remove`・`unlink`・`move`・`write_new`・`append`・`replace_bytes`）は、書けたときに
-# 行き先を記録する。記録するのは `recording` の中だけ。C1 は sh から
+# 行き先を記録する。記録するのは `recording` の中だけ。write-and-push は sh から
 # `--record-writes <ファイル>` を渡し、この一覧のパスだけをコミットする。
 # 一覧に漏れがあると、書いたのにコミットされない状態が残るので、置き場を書くコードは
 # ここの関数だけを通す（素の `open`・`os.remove` を使わない）。
@@ -723,7 +724,7 @@ def note_input(path: str) -> None:
     """読んだ入力を、書いたものと同じく一覧に載せる（在るときだけ）。
 
     record-risk の記録（`<子>.judge.json`）は自分ではコミットせず、
-    それを読む `finish` の C1 がコミットして push する。
+    それを読む `finish` の write-and-push がコミットして push する。
     """
     if _RECORDERS and os.path.lexists(path) and not os.path.islink(path):
         _record(path)
@@ -733,7 +734,7 @@ def note_removed(path: str) -> None:
     """もう無いパスを、消したものとして一覧に載せる（無いときだけ）。
 
     `ready` が `wip/` を片付けるとき、作業ツリーから先に消えていた追跡済みのファイルの削除も
-    C1 のコミットに含めるため。
+    write-and-push のコミットに含めるため。
     """
     if _RECORDERS and not os.path.lexists(path):
         _record(path)

@@ -58,7 +58,8 @@ def ready(
     条件を確かめてマーカーを置いたあと、親のツリーの承認済みの領域から、閉じた親（今回の親と、統合先に
     たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`flows/` を
     手元の `logs/archive/` へ退避し、`wip/` の追跡済みのファイルを消す（`review.remove_wip`）。
-    git の上では削除になり、C1 がコミットして push してから sh が Draft を外す。squash で
+    git の上では削除になり、write-and-push がコミットして push してから sh が Draft を外す。squash
+    で
     マージすると、既定のブランチにチケットは残らない。
     退避した後に打ち直したとき（親が退避にだけある）は、条件の確かめのうちワークツリーの側
     （未コミット・push 済み）だけを見て、下書きを書き直し、前の回が途中で止まった残りを移す。
@@ -168,7 +169,8 @@ def _archive_closed(
             f"ccnavi: クローズ済みのチケットを logs/archive/ へ退避できなかった: {failed}\n"
         )
         return 1
-    # 途中の作業の置き場（wip/）の追跡済みのファイルも、同じ流れで消す（C1 が一緒にコミットする）。
+    # 途中の作業の置き場（wip/）の追跡済みのファイルも、同じ流れで消す（write-and-push
+    # が一緒にコミットする）。
     removed, head, failed = review.remove_wip(tree_root) if tree_root else ([], "", "")
     if failed:
         stderr.write(f"ccnavi: `{ticket_places.WIP_ROOT}/` を片付けられなかった: {failed}\n")

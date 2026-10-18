@@ -176,7 +176,7 @@ deny:
       置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。
       作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh finish <識別子>' で
       レビュー待ち（wip/proposals/review/）へ動かしてください。
-      範囲を変えたいなら wip/proposals/todo/ に新しい提案を書いて承認を依頼してください。
+      範囲を変えたいなら wip/proposals/todo/ に新しい提案を書き、{root}/.ccnavi/scripts/ccnavi-ticket.sh propose <識別子> で送ってから承認を依頼してください。
 
   # hook の登録と個人の上書き。ワークスペースルートの側は workspace-root が先に当たるが、
   # ワークツリー側の設定は統合で統合先へ入る道を持つので、そちらも名前で止める。

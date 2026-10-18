@@ -64,7 +64,7 @@ case " $* " in
   printf '{{"compat": {compat}, "flags": ["--accept-unresolved", "--actor", "--via"]}}\\n'
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
-*" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
+*" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 esac
 prev=""
 for a in "$@"; do
@@ -366,7 +366,8 @@ class HostFixtureTest(unittest.TestCase):
             'case " $* " in\n'
             f'*" --version --json "*) {answer} ;;\n'
             f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
-            "*\" c1 family \"*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;\n"
+            '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
+            "no\\n'; exit 0 ;;\n"
             "esac\n"
             'for a in "$@"; do case "$a" in --actor*|--via*)\n'
             f'  case " {known} " in *" ${{a%%=*}} "*) ;;\n'
@@ -625,8 +626,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
             'case " $* " in *" --version "*) printf \'compat: %s\\n\' '
             + str(version.COMPAT)
             + "; exit 0 ;; esac\n"
-            + 'case " $* " in *" c1 family "*)'
-            + " printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
+            + 'case " $* " in *" write-and-push family "*)'
+            + " printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
             f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'
             f"  printf '<!-- ccnavi:request i0001:1 key=k -->\\n依頼\\n' >'{out}/body.md'\n"

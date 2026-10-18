@@ -318,6 +318,10 @@ _TICKET = """\
         （start は、基点を .ccnavi/approved/doing/<id>.md に書き込みます。finish は、
          フェーズがレビュー対象の場合は wip/proposals/review/ に、それ以外は
          .ccnavi/approved/done/ に移動します。cancel は .ccnavi/approved/done/ に移動します）
+    ccnavi ticket propose <id>
+        （親子の承認待ちの提案 wip/proposals/todo/ と子のフローの下書き wip/proposals/flows/ を、
+         書いたパスの一覧に載せます。載せるだけで、コミットと push は
+         ccnavi-ticket.sh propose が write-and-push の手順で行います）
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   （定性的なリスク）
     ccnavi ticket learn [<id>] [--note <text> [--target <kind>] [--signal <kind>]]
         （学習記録の雛形と判定ログのダイジェストを wip/handoff/learnings/<id>.* に書き込みます。
@@ -371,9 +375,9 @@ _SCRIPTS = """\
 .ccnavi/scripts/ のスクリプトが付けるフラグは次のとおりです。
 
     --record-writes <file> [--record-tree <dir>]
-        （この実行で書いた・消したパスを、logs/state/c1/ の下の <file> に1行1つで
+        （この実行で書いた・消したパスを、logs/state/write-and-push/ の下の <file> に1行1つで
          書き出します。--record-tree を渡すと一覧はそのツリーからの相対になり、
-         置き場の外に書いたらエラーになります。C1 と ccnavi-agree.sh が使います）
+         置き場の外に書いたらエラーになります。write-and-push と ccnavi-agree.sh が使います）
     --placed-out <file>
         （--agree 専用。実際に書けた承認済みチケットのパスなどを JSON で書き出します）
     --choose-out <file>
@@ -473,15 +477,17 @@ _SCRIPTS = """\
     ccnavi worktree issue-id <number> <prefix> [<project>] --title <title>
         （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" を
          出力します。Chrome 拡張の「始める」と同じ作り方です）
-    ccnavi c1 family <id>
-        （C1 用。"c1 1" の行に続いて、親子のチケット・リポジトリ・C1 の対象か
+    ccnavi write-and-push family <id>
+        （write-and-push 用。"write-and-push 1" の行に続いて、
+        親子のチケット・リポジトリ・write-and-push の対象か
          （target yes|no|stop）・親のワークツリーとブランチなどを1行ずつ出力します。読み取り専用）
-    ccnavi c1 sort <parent> [<rev>]
-        （C1 用。置き場の変更をコミットしてよいものと止めるものに分けて1行ずつ出力します）
-    ccnavi c1 merge <child>
-        （C1 用。finish が子を親のブランチへ合流する前の検査）
-    ccnavi c1 merge-blame <child> <path>...
-        （C1 用。合流で衝突したパスを持ち込んだ、先に合流した別の子を出力します）
+    ccnavi write-and-push sort <parent> [<rev>]
+        （write-and-push 用。
+        置き場の変更をコミットしてよいものと止めるものに分けて1行ずつ出力します）
+    ccnavi write-and-push merge <child>
+        （write-and-push 用。finish が子を親のブランチへ合流する前の検査）
+    ccnavi write-and-push merge-blame <child> <path>...
+        （write-and-push 用。合流で衝突したパスを持ち込んだ、先に合流した別の子を出力します）
     ccnavi branches issue|mr <number> [--result <json>] [--json]
         （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。読み取り専用）
 
@@ -523,7 +529,7 @@ TOPICS = (
     ("ticket", "ccnavi ticket", "チケットの開始・終了・状態・雛形", _TICKET),
     (
         "scripts",
-        "ccnavi review|worktree|sync|c1 ...",
+        "ccnavi review|worktree|sync ほか",
         "スクリプトが呼ぶ副命令と内部フラグ",
         _SCRIPTS,
     ),
@@ -532,7 +538,10 @@ TOPICS = (
 # `--help <語>` と `ccnavi <語> --help` で話題に当てる語。話題の名前のほかに、スクリプト用の副命令。
 TOPIC_WORDS = {
     **{name: name for name, *_ in TOPICS},
-    **{verb: "scripts" for verb in ("review", "worktree", "sync", "tree", "c1", "branches")},
+    **{
+        verb: "scripts"
+        for verb in ("review", "worktree", "sync", "tree", "write-and-push", "branches")
+    },
 }
 
 _INTRO = """\

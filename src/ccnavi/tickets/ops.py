@@ -317,7 +317,7 @@ def _merging_head(root: str, found: ticket_model.Ticket) -> str:
     """親のワークツリーが合流している子の先頭（`MERGE_HEAD`）。合流の途中でなければ空。
 
     `MERGE_HEAD` が子のブランチの先頭か、その祖先のときだけ採る。親のワークツリーで
-    別のものを合流している途中（C1 の外の手作業）を、この子の合流と取り違えないため。
+    別のものを合流している途中（write-and-push の外の手作業）を、この子の合流と取り違えないため。
     """
     if not found.is_child:
         return ""
@@ -562,8 +562,8 @@ def _score_child(
         )
         or {}
     )
-    # record-risk の記録は C1 にしない。この終了が読んだ入力として一覧に載せ、
-    # この C1 でコミットする。
+    # record-risk の記録は write-and-push にしない。この終了が読んだ入力として一覧に載せ、
+    # この write-and-push でコミットする。
     fsio.note_input(
         approval_marks.child_record_path(
             where, found.parent, found.ticket, approval_marks.CHILD_RECORD_JUDGE
