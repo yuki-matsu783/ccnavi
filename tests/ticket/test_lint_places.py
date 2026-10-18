@@ -284,7 +284,7 @@ class ProjectsCollisionTest(unittest.TestCase):
         self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
 
     def test_the_other_project_checks_still_run_beside_the_collision(self):
-        """予約名とワークツリーの誤配置の検査（各プロジェクトごと）は、ぶつかりがあっても出す。"""
+        """予約名とワークツリーの誤配置の検査（各プロジェクトごと）は、衝突があっても出す。"""
         self.track()
         lib = self.project("lib")
         os.makedirs(os.path.join(lib, ".claude", "worktrees", "feature-1-memo"))

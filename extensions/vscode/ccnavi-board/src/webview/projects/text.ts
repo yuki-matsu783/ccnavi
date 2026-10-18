@@ -1,5 +1,5 @@
 /**
- * カードに出す言葉。検証の指摘は実行ファイル（`--lint --json`）が言ったもの。
+ * カードに出す言葉。検証の指摘は実行ファイル（`--lint --json`）が出したもの。
  */
 import type { LintProblem } from "../../core/lintmodel.js";
 
