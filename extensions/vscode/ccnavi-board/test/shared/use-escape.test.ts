@@ -30,7 +30,7 @@ async function withDom(run: (press: () => void) => Promise<void>): Promise<void>
   }
 }
 
-test("CB-T582 Esc は重なった面のうち最も手前の 1 枚だけが受け、手前が閉じると次の面が受ける", async () => {
+test("CB-T1139 Esc は重なった面のうち最も手前の 1 枚だけが受け、手前が閉じると次の面が受ける", async () => {
   await withDom(async (press) => {
     const log: string[] = [];
     const root = createRoot(document.getElementById("root") as HTMLElement);
@@ -54,7 +54,7 @@ test("CB-T582 Esc は重なった面のうち最も手前の 1 枚だけが受�
   });
 });
 
-test("CB-T583 変換中の Esc は面を閉じない", async () => {
+test("CB-T1140 変換中の Esc は面を閉じない", async () => {
   await withDom(async () => {
     const log: string[] = [];
     const root = createRoot(document.getElementById("root") as HTMLElement);
