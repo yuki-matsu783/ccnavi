@@ -457,6 +457,10 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
          （.requested のマーカーがあるか）、"archived yes|no"（手元の退避に親があるか）、
          "mr <番号>|-"（親チケットの mr:）を出力します。スクリプト自身は
          チケットのYAMLを読み込みません）
+    ccnavi tree bound <tree> <name>
+        （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"bound yes|no"（その名前の
+         ワークツリーがチケットに結び付くか。結び付くと integrate は断ります）、結び付くなら
+         "why <理由>" を出力します。Stop の促しと同じ判定です）
     ccnavi worktree id <branch>
         （スクリプト用。"id <識別子>"（ブランチ名の / を - に置き換えたもの）に続いて、
          親に採用できなければ "problem <理由>"（58文字以内・末尾が -2桁でない・字の種類・NFC）、
