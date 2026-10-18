@@ -217,6 +217,14 @@ test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画
   }
 });
 
+test("CB-T582 図の枠は重なりを枠の中に閉じ込め、ツールバーから開く案内の一覧が拡大ボタンの裏に回らない", () => {
+  const css = fs.readFileSync(path.join(WEBVIEW_SRC, "shared", "Maximize.css"), "utf8");
+  assert.match(css, /\.graph-max \{[^}]*isolation: isolate;/, ".graph-max が isolation: isolate を持たない");
+  // ツールバー（5）の中の一覧は、枠の外では枠より手前でなければならない（枠の中の z-index は外へ漏れない）
+  const toolbar = /\.toolbar \{ top: 0; z-index: (\d+);/.exec(fs.readFileSync(path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "styles", "page.css"), "utf8"));
+  assert.ok(toolbar !== null && Number(toolbar[1]) > 0, "ツールバーの z-index が見つからない");
+});
+
 /** WCAG の相対輝度によるコントラスト比（0〜255 の 3 つ組どうし） */
 function contrastRatio(a: readonly number[], b: readonly number[]): number {
   const lum = (rgb: readonly number[]): number => {

@@ -1,7 +1,9 @@
 /*
  * 図の全画面（`Maximize.tsx`）。出している間は図の枠が画面全体を覆い、ほかの表示は隠れる。
  */
-.graph-max { position: relative; }
+/* isolation: 枠の中の z-index（拡大ボタンの 5・React Flow の層）を枠の中に閉じ込める。閉じ込めないと、
+   ツールバー（5）の中から開く案内の一覧が、後ろの DOM にある拡大ボタンの裏に回る */
+.graph-max { position: relative; isolation: isolate; }
 body .graph-max.is-max {
   position: fixed; inset: 0; z-index: 100;
   width: auto; height: auto; max-height: none; min-height: 0; margin: 0;
