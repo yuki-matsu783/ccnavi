@@ -1,6 +1,6 @@
 ---
 version: 1
-ticket: feature-1-drop-sync-records
+ticket: claude-laughing-newton-necssy
 title: "取り込み状態（sync/）を廃止し、親ブランチの状態だけで判定する"
 phases:
   research:
