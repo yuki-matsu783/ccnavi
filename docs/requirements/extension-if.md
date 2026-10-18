@@ -33,7 +33,7 @@ JSON の欄の細かい形は README の各 JSON の節と [設計 10](../design
 | REQ-EXT-07 | 異常時 | 知らないオプションを渡されたなら、ccnavi は、何もせずに argparse の文言（`ccnavi: error: unrecognized arguments: <オプション>`）を標準エラーに出し、終了コード 1 で終わること |
 | REQ-EXT-08 | 常時 | ccnavi は、使い方の誤りと読めない設定を、`ccnavi:` で始まる標準エラーの文と終了コード 1 で示すこと。終了コード 2 は hook の拒否と前の名前（`--approve`）の案内に、3 は確かめの「いいえ」（REQ-APV-13）に使い、1 と分けること |
 | REQ-EXT-09 | 常時 | ccnavi は、診断ログをワークスペースルートの `logs/diag/<出どころ>.log` に、sh・Python・拡張（TS）で同じ行の形（`<時刻> <レベル 5 字> <出どころ>[<pid>] <本文> <key=value>…`）で書くこと。出すレベルは `CCNAVI_LOG_LEVEL`（読めない値は `INFO`）で決め、新しいファイルは 0600 で作り、`logs`・`logs/diag`・書き込み先がシンボリックリンクなら書かないこと。片付け（`--prune` とセッションの開始）は、拡張が書いたものを含めて `logs/diag/*.log` を同じしきい値でローテートし、消すこと |
-| REQ-EXT-10 | 常時 | ccnavi は、時刻を次の形で書くこと。マーカーと記録の時刻は現地時刻とオフセット（`YYYY-MM-DDThh:mm:ss+hhmm`。`fsio.stamp`）、状態の履歴の `at` は UTC（`YYYY-MM-DDThh:mm:ssZ`）、診断ログは現地時刻とコロン付きのオフセット（`+hh:mm`）。時刻を固定する `fsio.clock` は `fsio.stamp` の形でない値を受けないこと |
+| REQ-EXT-10 | 常時 | ccnavi は、時刻を次の形で書くこと。マーカーと記録の時刻は現地時刻とオフセット（`YYYY-MM-DDThh:mm:ss+hhmm`。`fsio.stamp`）、診断ログは現地時刻とコロン付きのオフセット（`+hh:mm`）。時刻を固定する `fsio.clock` は `fsio.stamp` の形でない値を受けないこと |
 | REQ-EXT-11 | 常時 | ccnavi は、置き場（提案 `wip/proposals/`、承認済みチケット `.ccnavi/approved/`、共通レイヤー `.ccnavi/config/common/`、記録と state `logs/`、プロジェクト `projects/`、自身のレイヤーとプロジェクトのレイヤー `.ccnavi/config/project/`）を既定のパスに固定し、環境変数でも上書き設定ファイルでも動かさないこと。別の場所を指せるのは診断のフラグだけとすること |
 
 REQ-EXT-01 の探す順（拡張の設定 → `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi` → 振り分けの sh → ソースなら `uv run python -m ccnavi`）は
@@ -96,7 +96,7 @@ Pyodide のメモリ上のファイルシステムに組んだ仮のツリーを
 | REQ-EXT-28 | 事象 | `cli.run(stdin, stdout, stderr, argv)` を呼ばれたとき、ccnavi は、渡された標準入力・標準出力・標準エラーに書き、終了コードを返すこと（引数の読み違いの苦情だけは argparse がプロセスの標準エラーに書く）。判定の設定として読む環境変数は、名前が `CCNAVI_` で始まるものと `CLAUDE_PROJECT_DIR` に限ること |
 | REQ-EXT-29 | 事象 | `core.judge_approval(snapshot, only, shown_ids, shown_digest)` を呼ばれたとき、ccnavi は、`--agree --preview --json` と同じ関数で承認の対象・画面の本文・ダイジェストを出すこと。見せた識別子（`shown_ids`）とダイジェスト（`shown_digest`、提案の識別子の一覧と各提案ファイルのバイト列全体から作る。大文字小文字は問わない）が渡されたときは今のものと比べ、どちらかが違えば `mismatch`（`{expected, current, digest: {expected, current}}`）を返すこと。絞り（`only`）が通らないときは、絞らない一覧を今の一覧として比べること |
 | REQ-EXT-30 | 常時 | ccnavi は、`core.plan`・`core.withdraw`・`core.confirm` で、書くものを値（`Changes`）で返すだけにし、ディスクにもホストにも書かないこと。`withdraw` と `confirm` は、通らなければ `changes` を `None` にして理由を `problems` で返すこと。`Changes.per_branch()` はブランチごとに `{op: create\|update\|delete, path, content}`（`path` はツリーからの相対、`content` はバイト列）を返すこと |
-| REQ-EXT-31 | 常時 | ccnavi は、`Snapshot.stamp` が渡されたとき、書くものの時刻（マーカー・承認の記録・状態の履歴）をその時刻に固定し、同じ入力から手元と同じバイト列を出すこと。`core.withdraw` と `core.confirm` は、`Snapshot.actor`（`Actor(account, via, version)`）の経路・アカウント・拡張の版を状態の履歴に、アカウントと経路をレビュー済みのマーカーに書くこと。`core.plan` の状態の履歴の経路とアカウントは、呼び手が `history.session` で渡すこと（Chrome 拡張は経路に `chrome` を渡す） |
+| REQ-EXT-31 | 常時 | ccnavi は、`Snapshot.stamp` が渡されたとき、書くものの時刻（マーカー・承認の記録）をその時刻に固定し、同じ入力から手元と同じバイト列を出すこと。`core.withdraw` と `core.confirm` は、`Snapshot.actor`（`Actor(account, via)`）のアカウントと経路をレビュー済みのマーカーに書くこと。`core.plan` が書くマーカーの経路とアカウントは、呼び手が `via.session` で渡すこと（Chrome 拡張は経路に `chrome` を渡す） |
 | REQ-EXT-32 | 常時 | ccnavi は、手元と同じ形に組んだ仮のツリー（ワークスペースルートに統合先、`.claude/worktrees/<識別子>` に親子のチケット、`projects/<名前>` にプロジェクトの統合先、取り込み状態は `logs/state/sync/self/` と `logs/state/sync/<名前>/`）を、手元と同じ関数で読むこと。ワークツリーの見分けとブランチ名は `.git` のファイル（`HEAD`・`gitdir:`）から読むこと。git を起こせない場（`sys.platform` が `emscripten`）では、承認の時刻のように git に頼る表示の値を分からないとして空にすること |
 
 Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
@@ -109,7 +109,7 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 | `ccnavi.entry.version` | `VERSION`・`COMPAT` |
 | `ccnavi.infra.fsio` | `clock(fixed)`・`stamp()` |
 | `ccnavi.infra.settings` | `DEFAULT_TICKETS`・`DEFAULT_APPROVED`・`DEFAULT_STATE`・`DEFAULT_PROJECTS`・`DEFAULT_PROJECT_HOME`・`DEFAULT_BRANCH_PREFIXES`・`LAYER_CONFIG_DIR`・`LAYER_FILE_NAMES`・`load(root)`・`is_branch_prefix(word)`・`is_reserved_layer_name(name)` |
-| `ccnavi.tickets.history` | `session(via, stderr, actor="", version="")`・`VIA_CHROME` |
+| `ccnavi.tickets.via` | `session(via, actor="")`・`VIA_CHROME` |
 | `ccnavi.tickets.review_host` | `Result.from_data(data)`（戻り値の `error`） |
 | `ccnavi.tickets.review` | `_is_sha(value)` |
 | `ccnavi.tickets.syncstate` | `SELF` |
