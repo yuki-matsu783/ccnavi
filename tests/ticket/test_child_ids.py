@@ -6,7 +6,7 @@
 2. 識別子の中のフェーズ番号と `phase:` が食い違えば error で読まない
 3. 旧い形（`<親>-<2 桁>`）の子は error で読まない
 4. 続きの子の採番（`next_child_id`）は、親とフェーズごとに最大の連番 + 1
-5. 識別子だけから親を割り出す `family_of`（hook の C1 と Chrome の入口）が同じ答えを出す
+5. 識別子だけから親を割り出す `family_of`（hook の write-and-push と Chrome の入口）が同じ答えを出す
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import tempfile
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import approval_ops, c1, ticket_ids, ticket_model
+from ccnavi.tickets import approval_ops, ticket_ids, ticket_model, write_and_push
 from ccnavi.tickets import ticket as ticket_mod
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -144,7 +144,7 @@ class FamilyOfTest(unittest.TestCase):
     def test_the_hook_strips_two_steps(self):
         for ident, family in self.CASES:
             with self.subTest(ident=ident):
-                self.assertEqual(c1.family_of(ident), family)
+                self.assertEqual(write_and_push.family_of(ident), family)
 
     def test_the_chrome_entry_gives_the_same_answer(self):
         path = os.path.join(

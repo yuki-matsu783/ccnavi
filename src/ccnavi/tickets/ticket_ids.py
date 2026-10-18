@@ -295,7 +295,7 @@ _REF_PREFIXES = ("refs", "heads", "remotes", "tags", "origin", "upstream", "head
 
 
 def branch_problem(name: str) -> str:
-    """親のブランチ名として使えない理由。使えれば空。（`c1 sort` の版の検査などが使う）
+    """親のブランチ名として使えない理由。使えれば空。（`write-and-push sort` の版の検査などが使う）
 
     字は識別子の字に `/` を足したものだけ（`_BRANCH`）。そのうえで
     `git check-ref-format --branch` の形の規則（`..`・`//`・`.` で始まる階層・`.lock` で終わる階層

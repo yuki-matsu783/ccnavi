@@ -36,7 +36,7 @@ TURN_DEFINED = "ターン（ユーザが指示を出してから Claude が応�
 # サブエージェントかどうかで止めるレイヤーをここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early"
+    r"(start|finish|cancel|propose|record-risk|request|confirm|comment|decide|ready|close-early"
     r"|push)\b",
     # 名前の大小は問わない（`CCNAVI-TICKET.SH`）。大小を区別しないファイルシステムでは
     # 同じ sh が走る。
@@ -91,7 +91,7 @@ _CLI_FORMS = (
     # 副命令の前の `--`（`ticket -- finish`）は、実行ファイルが選択肢の終わりとして読み飛ばすので
     # 同じ操作になる。
     r"|\b(ticket|review)\s+(--\s+)?"
-    r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b"
+    r"(start|finish|cancel|propose|record-risk|prepare|requested|confirm|ready)\b"
     # 親を閉じたときの片付け。ブランチを `branch -D` で消すので、エージェント（メインも
     # サブエージェントも）には直に打たせない。呼ぶのは sh（`ccnavi-review.sh ready` の
     # `worktree retire`、`ccnavi-sync.sh` の `sync tidy`）の中か、ユーザが `!` を付けて

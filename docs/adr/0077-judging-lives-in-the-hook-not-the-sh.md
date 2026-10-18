@@ -8,7 +8,7 @@ keywords: [判定, hook, sh, 子ワークツリー, push, 環境変数, 検査]
 
 # ADR-0077: 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする
 
-状態: 採用（sh の中の判定の例外のうち、push の関門は ADR-0118 の例外を C1 と `ccnavi-push-approved.sh` の push の前まで広げた。ADR-0142 が改める）
+状態: 採用（sh の中の判定の例外のうち、push の関門は ADR-0118 の例外を write-and-push と `ccnavi-push-approved.sh` の push の前まで広げた。ADR-0142 が改める）
 
 追記（2026-10-11）: チケット制御が有効な間は生の git を組み込みで止め、git の入口を `ccnavi-git.sh` の 1 本に寄せた（ADR-0114）。生の git を組み込みで止め、入口を ccnavi-git.sh 1 本に寄せたので、そのラッパーの中の可否の判定は一次の判定として sh に置いてよい例外になる。例外の書き方は別の ADR で決める。
 

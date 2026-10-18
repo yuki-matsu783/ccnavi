@@ -30,12 +30,12 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
   （設計 9.2）。この3つを満たさない判定はshに足さない
 - P13の例外の範囲は、親のブランチの共通のpush関門（`ccnavi_push_gate`。`ccnavi-common-state.sh`）にも広げる（ADR-0142）。
-  関門を通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、C1（`ccnavi-common-c1.sh`の`ccnavi_c1_prepare`）、
+  関門を通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、
   `ccnavi-push-approved.sh`の3つで、後ろの2つは素の`git push`を打つ。この2つはラッパーを通らないので「ラッパーが許可リストで読むこと」を
   満たさないが、同じ関門を共有しないと消えた親のブランチを作り直せてしまうため、関門だけを例外に入れる。関門の材料のうちチケットの中身
   （着手済み＝承認済みの親チケットの`started_at`・`.requested`・退避の有無）は実行ファイルの`tree parent`に聞き、shは自分で読まない。承認済みというだけでは形跡にしない。関門が`ls-remote`を打つのはshの側
   （ネットワークはshの仕事）。この2経路にほかの判定は足さない
-- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルの副命令（`tree parent`・`c1 family`・`sync retired`・
+- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルの副命令（`tree parent`・`write-and-push family`・`sync retired`・
   `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
   （止める側の検査は止める向き、ツリーを動かす側は動かさない向き）。`tree parent`の答えの`approved`・`started`などの行が無い（旧い実行ファイル）ときは
   `unknown`として読む
@@ -54,7 +54,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   | `ccnavi-fetch.sh` | 常に 0（取ってこられないことは失敗ではない） | — |
 
 - 実行ファイルの標準出力をshが読む約束もある。`review ready`は1行目にコメントの下書きのパス、2行目に`tree <退避したツリーのルート>`を出し、
-  `wip/`から消したものがあれば続けて`wip-from <消す前のHEAD>`と`wip <パス>`（1行1本）を出す。shはC1の中でこの削除を
+  `wip/`から消したものがあれば続けて`wip-from <消す前のHEAD>`と`wip <パス>`（1行1本）を出す。shはwrite-and-pushの中でこの削除を
   コミットして送ってからDraftを外す（設計 9.10）。ファイルを`logs/archive/`へ動かすのと`wip/`の追跡済みのファイルを消すのは実行ファイルで、
   ネットワーク（push・Draftを外す・コメント）はshが受け持つ
 - 親を閉じたときのブランチの片付けも実行ファイルが行う（`worktree retire <親>`・`worktree branch <名前> [confirmed]`・
@@ -66,4 +66,4 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   放棄した親の記録は`worktree retire --abandon <親>`（ユーザだけ）で消す。旧い取り込み状態は`sync migrate`（冪等）が`retire/`へ移す
 - ワークツリーの片付け（`worktree drop <名前>`・`worktree tidy <親>`）も実行ファイルが行う。消すかどうかの判断（cwdが中か、未コミットが
   あるか、gitのワークツリーか）と、生成物の掃除・`git worktree remove`はローカルの操作で、ネットワークには出ない。
-  shは状態を書く操作（C1ならpushまで）が済んでから呼ぶ。`ready`ではDraftを外したあとの最後に呼ぶ
+  shは状態を書く操作（write-and-pushならpushまで）が済んでから呼ぶ。`ready`ではDraftを外したあとの最後に呼ぶ

@@ -80,7 +80,7 @@ def family_problems(
     """親子のチケットの提案を承認しない理由。
 
     親子のチケットが決まらない（親のワークツリーが無いなど）・閉じているなら承認しない。提案は親のブランチの上で書き、
-    push してから承認を頼む決まりなので、
+    `ccnavi-ticket.sh propose` で送ってから承認を頼む決まりなので、
     親のワークツリーの外にある提案も承認しない。
     """
     fams = fams or standing.Families(conf, root)
@@ -95,8 +95,9 @@ def family_problems(
                 f"提案が親のブランチ {st.branch_name} のワークツリーの外"
                 f"（{t.tree or 'ワークスペースルート'}）にある。"
                 "親子のチケットの提案は"
-                f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
-                "承認を頼んでください",
+                f"親のワークツリー（.claude/worktrees/{st.family}）で書き、"
+                f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {st.family}' で"
+                "親のブランチへ送ってから承認を頼んでください",
             )
         ]
     return []

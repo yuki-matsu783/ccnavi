@@ -1,4 +1,4 @@
-"""チケットとレビューの副命令（`ticket` / `review` / `c1` など）を ops・review へ渡す。
+"""チケットとレビューの副命令（`ticket` / `review` / `write_and_push` など）を ops・review へ渡す。
 
 `sync` の問い合わせ（`sync paths` / `sync check` / `sync retired` / `sync migrate`）もここで答える。
 
@@ -15,13 +15,13 @@ from typing import TextIO
 from ..infra import fsio, gitcmd, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
-    c1,
     core,
     learning,
     legacy_sync,
     next_id,
     ops,
     phase,
+    propose,
     retire,
     review,
     review_close,
@@ -30,6 +30,7 @@ from ..tickets import (
     ticket_ids,
     via,
     worktrees,
+    write_and_push,
 )
 from . import cli_args, cli_usage, lint, status
 
@@ -44,7 +45,7 @@ def operate(
 ) -> int:
     """チケットの状態とレビューの操作を振り分ける。
 
-    `ticket start|finish|cancel <識別子>`、`ticket new <識別子> ...`（親の提案の雛形）、
+    `ticket start|finish|cancel|propose <識別子>`、`ticket new <識別子> ...`（親の提案の雛形）、
     `review prepare|requested|confirm`、それに
     ユーザが打つ `--reviewed` と `--close-early`。どれも payload を読まず、判定も記録もしない。
     リモートから取得した結果は `--result <json>` で受け取る。exe はネットワークに出ない。
@@ -60,13 +61,15 @@ def operate(
             f"ccnavi: チケット制御が無効になっています（{settings.TICKET_CONTROL_ENV}）。\n"
         )
         return EXIT_ERROR
-    bypass = _c1_bypass(root, conf, args, cwd)
+    bypass = _write_and_push_bypass(root, conf, args, cwd)
     if bypass:
         stderr.write(
-            f"ccnavi: 親子のチケット {bypass} は取り込み済み（C1 の対象）。状態の操作は "
+            f"ccnavi: 親子のチケット {bypass} は取り込み済み（write-and-push の対象）。"
+            "状態の操作は "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' か "
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' から実行してください。"
-            "C1 を通らない書き込みは親のブランチへ送られないので、何も反映せずに中止しました。\n"
+            "write-and-push を通らない書き込みは親のブランチへ送られないので、"
+            "何も反映せずに中止しました。\n"
         )
         return EXIT_ERROR
     if args.close_early:
@@ -145,7 +148,7 @@ def operate(
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.choose_out:
         # 対話の decide の前半（ロックを持ったままユーザを待たないため分ける）。ユーザが端末で選び、
-        # 選択とダイジェストを state の置き場に書くだけ。置くのは sh が C1 の中で
+        # 選択とダイジェストを state の置き場に書くだけ。置くのは sh が write-and-push の中で
         # `--yes <選択> --digest <ダイジェスト>` で打つ。
         if not cli_args._inside(
             cli_args._real(os.path.abspath(args.choose_out)), cli_args._real(conf.state)
@@ -184,10 +187,16 @@ def operate(
         if len(words) > 3:
             stderr.write("ccnavi: ticket status に指定できる親チケットは1件のみです。\n")
         else:
-            code = status.run(stdout, stderr, root, conf, c1.family_of(target) if target else "")
+            code = status.run(
+                stdout, stderr, root, conf, write_and_push.family_of(target) if target else ""
+            )
     elif kind == "ticket" and verb == "next-id":
         # ticket next-id [<先頭の語> <slug>]。読むだけ。issue の無い親の識別子の番号を答える。
         code = next_id.run(stdout, stderr, root, conf, words[2:])
+    elif kind == "ticket" and verb == "propose" and target:
+        # ticket propose <識別子>。親子の提案（todo/ と flows/）を、書いたパスの一覧に載せるだけ。
+        # コミットと push は sh（ccnavi-ticket.sh propose）が write-and-push の手順で行う。
+        code = propose.run(stdout, stderr, root, conf, target)
     elif kind == "ticket" and verb in ("start", "finish", "cancel") and target:
         if verb == "start":
             code = ops.start(stdout, stderr, root, conf, target)
@@ -265,7 +274,8 @@ def operate(
         else:
             code = review_close.ready(stdout, stderr, root, conf, cwd, args.result)
     else:
-        stderr.write(cli_usage.USAGE)
+        word = cli_usage.TOPIC_WORDS.get(kind)
+        stderr.write(cli_usage.topic(word) if word else cli_usage.OVERVIEW)
     return EXIT_OK if code == 0 else EXIT_ERROR
 
 
@@ -361,14 +371,16 @@ def _worktree(
     return EXIT_OK if code == 0 else EXIT_ERROR
 
 
-def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd) -> str:
-    """C1 を通らずに、取り込み済みの親子のチケットの状態を書こうとしているなら、
+def _write_and_push_bypass(
+    root: str, conf: settings.Settings, args: argparse.Namespace, cwd
+) -> str:
+    """write-and-push を通らずに、取り込み済みの親子のチケットの状態を書こうとしているなら、
     その親の識別子。無ければ空。
 
-    状態の操作（`ticket start|finish|cancel`、`review requested|confirm|ready`、残った指摘の
-    行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の親子のチケットでは sh が
+    状態の操作（`ticket start|finish|cancel|propose`、`review requested|confirm|ready`、残った指摘の
+    行き先の `--reviewed N --accept-unresolved`）は、write-and-push の対象の親子のチケットでは sh が
     `--record-tree` を付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで
-    C1 を通っていない。
+    write-and-push を通っていない。
     ユーザの判断の操作（`--close-early`）と、
     書かない形（`--preview`・`--choose-out`・`--accept-plan`・`review prepare`）は見ない。
     """
@@ -376,8 +388,18 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
         return ""
     words = list(args.command)
     family_id = ""
-    if len(words) >= 3 and words[0] == "ticket" and words[1] in ("start", "finish", "cancel"):
-        family_id = c1.family_of(words[2])
+    if (
+        len(words) >= 3
+        and words[0] == "ticket"
+        and words[1]
+        in (
+            "start",
+            "finish",
+            "cancel",
+            "propose",
+        )
+    ):
+        family_id = write_and_push.family_of(words[2])
     elif (
         len(words) >= 2 and words[0] == "review" and words[1] in ("requested", "confirm", "ready")
     ) or (
@@ -393,8 +415,8 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
             family_id = parent.parent or parent.ticket
     if not family_id or not _FAMILY.fullmatch(family_id):
         return ""
-    verdict, _, _ = c1.target(conf, root, family_id)
-    return family_id if verdict == c1.TARGET_YES else ""
+    verdict, _, _ = write_and_push.target(conf, root, family_id)
+    return family_id if verdict == write_and_push.TARGET_YES else ""
 
 
 def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:

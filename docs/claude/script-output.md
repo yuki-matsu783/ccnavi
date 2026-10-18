@@ -40,7 +40,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 
 - 状態を報告するだけで、次の一手がユーザの判断になるとき（例: `integrate-done` のあと、取り込んだコミットをリモートへ送るか）
 - 何も動かなかったときは何も出さない、と決めているとき（`ccnavi-fetch.sh`）
-- ユーザが端末で打つスクリプト（`ccnavi-agree.sh`、`ccnavi-push-approved.sh`）。エージェントへの通知は、承認後のhookの文が受け持つ
+- ユーザが端末で打つスクリプト（`ccnavi-agree.sh`、`ccnavi-push-approved.sh`）。エージェントへの通知は、拡張が渡す承認の文（`--agree --yes` の `prompt`）と `ccnavi-ticket.sh status` が受け持つ
 - 共通関数（`ccnavi-common*.sh`）。止める理由ごとに次が違うので、呼び出し元で出す
 - `ccnavi-clean.sh` の dry-run。node があると `exec` で `ccnavi-clean.js` に代わり、出力はそちらが出す。shから行を足せない
 
@@ -67,7 +67,8 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 | `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
 | `ccnavi-stage.sh` | 下書きを編集し、`--commands` を打つ。mv が出たらユーザに案内する | `ccnavi-stage.sh` |
 | `ccnavi-review.sh` の早めに閉じた | 親に閉じて片付け、`ready` を打たせる | `ccnavi-review.sh` |
-| `ccnavi ticket new` の成功 | 提案を書き、`--lint` と `--agree --preview --verify` を通し、ユーザに承認を頼む | `tickets/scaffold.py` |
+| `ccnavi ticket new` の成功 | 提案を書き、`--lint` と `--agree --preview --verify` を通し、`ccnavi-ticket.sh propose` で親のブランチへ送り、ユーザに承認を頼む | `tickets/scaffold.py` |
+| `ccnavi-ticket.sh propose` の成功 | ユーザに承認を頼んで返事を待つ | `ccnavi-ticket.sh` |
 | `ccnavi --agree --preview --verify` | 通れば承認を頼む。通らなければ提案を直して打ち直す | `tickets/agree.py` |
 | 承認後の通知 | 親の `start`、子の `start` | `tickets/agree_screen.py` |
 | `ccnavi-ticket.sh start`（子） | サブエージェントに実装を任せ、終わったら `finish` | `tickets/ops.py` |
