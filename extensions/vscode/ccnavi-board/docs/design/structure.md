@@ -17,7 +17,7 @@ src/
   rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通の設定の定義（読み取り専用。共通の設定を開いているときは並べない）と、共通の設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
-  templates-panel.ts  テンプレート管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。読み直し・本文の取り出しの受け付けと、ファイルの監視、「取り込み待ちを開く」の受け渡し（実行ファイルの答えを並べるだけで、判定も書き込みもしない。一覧・検索・表示だけ）。vscode に依存する
+  templates-panel.ts  テンプレート管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。読み直し・本文の取り出しの受け付けと、ファイルの監視、「取り込み待ちを開く」の受け渡し、編集（実行ファイルに読ませる `--templates --check-file`、作業中の錠の取り直し、保存。書くのは保存のときだけで、判定は実行ファイルの答えのまま）。vscode に依存する
   handoff-panel.ts    取り込み待ち画面の Webview パネル（1 枚。見るツリー（ワークスペース・プロジェクト・ワークツリー）を切り替える）。user handoff --json の一覧の受け渡しと、取り込みの受け付け（手順は core/handoff-import.ts に分けてあり、ここは実行ファイルの呼び出しを渡すだけ）、端末の案内、下書きと取り込み先のファイルの監視、作業中の錠の取り直し。ボードのカードの下書きの通知からも開く（vscode に依存する）
   flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。ボードのカードから開く）。置き場と錠を実行ファイルに聞き、保存を受け付ける。エージェントの下書きの「提案あり」・取り込み・保存のあとの削除と、依頼の文もここ（vscode に依存する）
   workflow-panel.ts   計画編集タブの Webview パネル（親の提案ごとに 1 枚。識別子を渡すコマンドと、ボードの親の提案のカードの「計画編集」、承認のオーバーレイの「計画を編集」から開く）。線を変えるたびの --plan-order --json --order と、保存の --plan-order --write --expect を実行ファイルに打たせる（拡張はファイルを書かない）。提案の監視（外で変わった・承認待ちから無くなった）、未保存の「●」と閉じた後の聞き方、初回の案内もここ。未保存と、保存したあとのハッシュ（source_sha）を帳面（core/workflow-tabs.ts）に書く（vscode に依存する）
@@ -53,9 +53,10 @@ src/
     phases-view.ts    フェーズ管理の拡張ホストと画面の契約（定義の形 PhasesForm、見せる形 PhasesPage / PhasesData、押した操作 PhasesMessage）
     phases-render.ts  フェーズ管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す。読まない順序の欄は名指しするだけで、書き戻しで手を付けない）
-    templates-view.ts テンプレート管理の拡張ホストと画面の契約（見せる形 TemplatesPage / TemplatesData、答えの形 TemplatesJson、押した操作 TemplatesMessage。読むだけ）
+    templates-view.ts テンプレート管理の拡張ホストと画面の契約（見せる形 TemplatesPage / TemplatesData、答えの形 TemplatesJson、押した操作 TemplatesMessage、編集の答え TemplateCheck / EditOpened）
     templates-render.ts テンプレート管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    templatesmodel.ts `--templates` の答え（一覧・層ごとの中身・統合結果・下書き・本文）の読み取り。判定はしない。答えの版が違えば解釈せず伝える
+    templatesmodel.ts `--templates` の答え（一覧・層ごとの中身・統合結果・下書き・本文・編集中の 1 本の検査）の読み取り。判定はしない。答えの版が違えば解釈せず伝える
+    template-edit.ts  テンプレートの編集の手元の写し（EditTemplate）と編集の関数（項の追加・削除・並べ替え・線・フロー。先行が小さい添字になるよう振り直す）、書き出しと見比べ。vscode も DOM も node も入れない
     handoff-view.ts   取り込み待ちの拡張ホストと画面の契約（答えの形 HandoffList / HandoffEntry / HandoffResult、見せる形 HandoffPage / HandoffData、押した操作 HandoffMessage）
     handoffmodel.ts   user handoff --json の答え（見るだけ・取り込み）の読み取りと、画面の判断（取り込めるか・取り込めない理由・作業中の錠の掛かり方（template と layer-config）・端末のコマンド・読み直しのあとの選択・見るツリー）。VS Code にも node にも触れない
     handoff-import.ts 取り込みの手順（錠を取り直す → 選んだパスを指して見るだけをもう一度呼び expect を取る → entry_sha を見せたものと比べる → 取り込む）と defense の端末の案内。実行ファイルの呼び出しは HandoffDeps として受け取る（試験で差し替える）
@@ -68,7 +69,7 @@ src/
     flow-render.ts    フロー編集の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     flow-lint.ts      フローの本文を呼ぶたびに別の名前の一時ファイルに書いて実行ファイル（--lint --json --flow）に確かめさせ、(flow) の error を理由にする。通れば実行ファイルが読んだ中身（flow.data）と、(flow) の warn（パスを直したもの）・渡る手順（rendered）・候補（candidates）を返す
     flow-match.ts     画面の中身と実行ファイルが読んだ中身（flow.data）の見比べ（整数と浮動小数の揃え方、食い違った場所と両者の値の言い方）
-    flow-history.ts   フロー編集の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
+    flow-history.ts   フロー編集（とテンプレートの編集）の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
     tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。手順は target・題・本文・scene）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
@@ -152,12 +153,16 @@ src/
     templates/Draft.css Draft.tsx の CSS（下書き 1 件）
     templates/Sum.css   Sum.tsx の CSS（統合結果の枠と表）
     templates/Plan.css  Plan.tsx の CSS（計画の表）
+    templates/Edit.css  Edit.tsx・PlanEdit.tsx・FlowEdit.tsx の CSS（編集欄）。図の見た目は shared/PlanGraph.css と flow/ の CSS を取り込む
     templates/Problems.css Problems.tsx の CSS（苦情の一覧）
     templates/post.ts   テンプレート管理の送り口。契約に無いものは型で止まる
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
     templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・統合結果の枠、「取り込み待ちを開く」、拡張ホストからのメッセージの受け。案内の間は見本を描く
     templates/Sum.tsx   統合結果の枠（読み取り専用。実行ファイルの索引を、統合結果を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
-    templates/Template.tsx テンプレート 1 件（札・計画・フロー・本文）
+    templates/Template.tsx テンプレート 1 件（札・計画・フロー・本文・「編集」）
+    templates/Edit.tsx  編集欄（説明・使う場面・計画・フロー、元に戻す、保存、作業中の錠の帯、未保存の確認。直すたびに実行ファイルに読ませる）
+    templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。種類・レビューの選択、並べ替え、削除、追加）
+    templates/FlowEdit.tsx 編集欄の子のフロー 1 本（フロー編集画面の図と右の欄を使い、部品箱でノードを足す）
     templates/Draft.tsx 下書き 1 件（読むだけ。札と指摘・計画。取り込みは取り込み待ち画面）
     templates/Plan.tsx  計画の表（番号・種類・レビュー・待つ項）
     templates/Problems.tsx 苦情の一覧（深刻度は色と文字の両方で出す）
@@ -240,7 +245,7 @@ test/
   rules/              ルール管理（rules-doc, rules-when, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
-  templates/          テンプレート管理（templates-model・templates-args・templates-render の単体テストと、画面を動かす templates.dom・templates-tour.dom、案内の見本の tour-templates。読むだけの画面なので、取り込み・編集の試験は持たない）
+  templates/          テンプレート管理（templates-model・templates-args・templates-render・template-edit の単体テストと、画面を動かす templates.dom・templates-edit.dom（編集欄）・templates-tour.dom、案内の見本の tour-templates。下書きの取り込みは持たない）
   handoff/            取り込み待ち（handoffmodel の読み取りと判断、handoff-args、取り込みの手順 handoff-import（実行ファイルを差し替えて、expect の取り方・錠・defense の案内を見る）、handoff-render の単体テストと、画面を動かす handoff.dom）
   projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
   flow/               フロー編集（flow-doc, flow-view, flow-lint, flow-match, flow-write と、書き出しを PyYAML で読み戻す flow-pyyaml（リポジトリのルートで uv run python か python3 を起動する。起動できなければ飛ばす）、画面を動かす flow.dom、線を引ける先・コピー・貼り付け・履歴・差分の flow-edit-ops、元に戻す・コピー・ミニマップ・保存前の確かめを画面で動かす flow-edit.dom、ボードのカードのボタンを動かす flow-card.dom、エージェントの下書きの取り込みと依頼のボタンを動かす flow-proposal.dom）
