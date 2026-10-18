@@ -1,22 +1,22 @@
-"""ユーザだけが打つ操作の表。何をユーザ専用にしているかを、ここ 1 か所に宣言する。
+"""ユーザだけが打つ操作の表。どの操作をユーザ専用にするかを、ここ 1 か所に宣言する。
 
-hook の止め（`phase_forms`）と、実行ファイルの端末要求（`entry/cli*.py`）は、操作を足すたびに
-別々の正規表現やオプションの一覧を直していた。この表が正本になり、`phase_forms` が正規表現と
+hook の止め（`phase_forms`）と、実行ファイルの端末要求（`entry/cli*.py`）は、以前は操作を足すたびに
+別々の正規表現やオプションの一覧を直していた。今は、この表を正本にする。`phase_forms` が正規表現と
 オプションの一覧をここから組み立て、実行ファイルは `terminal()` で、端末を求めるときに表示する
 操作の名前（`user agree` の形）を引く。操作を足す・外すときは、この表の行を直す。
 
 表は 4 つ。
 
-- `OPS`: 操作。何をする操作か（`what`）と、実行ファイルが端末の前のユーザを求めるときの
-  オプションの表示名（`terminal`）を持つ
+- `OPS`: 操作。何をする操作か（`what`）と、実行ファイルが端末の前のユーザを求めるときに
+  表示するコマンド名（`terminal`）を持つ
 - `FLAGS`: オプション。実行ファイル（`where` が空）か sh スクリプト（`where` がスクリプトの名前）の
   オプションで、どの止めに入るか（`cli`・`script`）と、所属するグループ（`groups`）を持つ。
-  `legacy` の行は、今の実行ファイルはもう受け付けないが、古い実行ファイルが手元に残っていれば
+  `legacy` の行は、今の実行ファイルではもう受け付けないが、古い実行ファイルが手元に残っていれば
   通ってしまう形。hook は止め続ける
 - `SCRIPTS`・`SUBS`: コマンドの位置で止める sh スクリプトと、実行ファイルのサブコマンド
 - `BOARD_COMBOS`: ボードで押した操作用のオプションの組み合わせ。コマンド行に全部並んだら止める
 
-グループ（`groups`）は、オプションを束ねて組み合わせを作るための名前。ボードの組み合わせと、
+グループ（`groups`）は、オプションをまとめて組み合わせを作るための名前。ボードの組み合わせと、
 引数を読み切れない形の判定が使う。
 
 このモジュールは ccnavi のほかのモジュールを読まない。正規表現の文字列を作るだけで、
@@ -181,10 +181,10 @@ SCRIPTS: tuple[Script, ...] = (
     # `ccnavi-approve.sh` は `ccnavi-agree.sh` の前の名前。古いコピーが残っていても止める。
     Script(("ccnavi-agree", "ccnavi-approve"), "approve"),
     Script(("ccnavi-push-approved",), "push-approved"),
-    # ユーザの判断に使うスクリプト。中で `--close-early` を起こし、最後に承認の push を呼ぶ。
+    # ユーザの判断に使うスクリプト。中で `--close-early` を呼び、最後に承認の push を呼ぶ。
     Script((_REVIEW,), "close-early", subcommand="close-early"),
     # 親を閉じたときに残した子のブランチを消す入口（中身は実行ファイルの `worktree branch`）。
-    # ユーザが `!` を付けて打つ。`--confirmed` を単なる語としてエージェントが添えて、
+    # ユーザが `!` を付けて打つ。エージェントが `--confirmed` を単なる語として添えても、
     # 取り消した子のブランチを確認なしで消せないようにする。
     Script((_CLEAN,), "clean-branch"),
 )
@@ -209,14 +209,14 @@ SUBS: tuple[Sub, ...] = (
     # サブエージェントも）には直に打たせない。呼ぶのは sh（`ccnavi-review.sh ready` の
     # `worktree retire`、`ccnavi-sync.sh` の `sync tidy`）の中か、ユーザが `!` を付けて
     # 打つときだけ。sh の中の呼び出しは hook を通らない。取り消した子のブランチを消す
-    # `worktree branch … confirmed` は、ユーザが確認したことをユーザ自身が打つことで担保する。
+    # `worktree branch … confirmed` は、ユーザが確かめたことをユーザ自身が打つことで守る。
     Sub(("sync",), ("tidy",), "tidy"),
     Sub(("worktree",), ("retire", "branch"), "tidy"),
 )
 
-# ボードで押した操作用のオプションの組み合わせ。グループの名前を並べる。全部のグループから
+# ボードで押した操作の、オプションの組み合わせ。グループの名前を並べ、どのグループからも
 # 1 つずつがコマンド行に並んだら止める。並びの順に見て、最初に揃った組み合わせで文面を決める。
-# 名前に依らず（名前を変えたコピーも）止める。端末を求めない経路は、これが唯一の防御になる。
+# 名前に依らず止めるので、名前を変えたコピーも止まる。端末を求めない経路は、これが唯一の防御になる。
 BOARD_COMBOS: tuple[tuple[str, ...], ...] = (
     ("approval", "yes"),
     ("user", "user-board-verb", "yes"),
@@ -257,8 +257,8 @@ USER_WORD = "user"
 # 後の最初の語。実行ファイルの読み飛ばしと hook の正規表現の両方がこの一覧から作る。
 WRAPPER_OPTIONS: tuple[str, ...] = ("--root", "--cwd", "--record-writes", "--record-tree")
 
-# 語のグループ。オプションではない語（`user agree --yes` の `user` と `agree`）を、ボードの
-# 組み合わせに使うためのもの。
+# 語のグループ。オプションではない語（`user agree --yes` の `user` と `agree`）を、
+# ボードの組み合わせに使うためのグループ。
 WORD_GROUPS: dict[str, tuple[str, ...]] = {
     "user": (USER_WORD,),
     # 端末を求めない経路（`--yes`）を持つ操作。`templates` は前の形（古い実行ファイルのため）。
@@ -269,9 +269,10 @@ WORD_GROUPS: dict[str, tuple[str, ...]] = {
 # （phase_forms.human_path_form）。
 USER_SCRIPT_PREFIX = "ccnavi-user-"
 
-# エージェントが sh で打てるスクリプト。止めている間でも通す（phase_forms.exempt）。
+# エージェントが sh で打てるスクリプト。止めている間も通す（phase_forms.exempt）。
 AGENT_SCRIPTS: tuple[str, ...] = ("ticket", "review", "git")
-# サブエージェントに許さないサブコマンド。AGENT_SCRIPTS の sh に付けた形。メインは打てる。
+# サブエージェントには許さないサブコマンド（AGENT_SCRIPTS の sh の形）。
+# メインのエージェントは打てる。
 SUBAGENT_FORBIDDEN: tuple[str, ...] = (
     "start",
     "finish",
@@ -297,7 +298,7 @@ def op(op_id: str) -> Op:
 
 
 def terminal(op_id: str) -> str:
-    """実行ファイルが端末を求める操作の、標準エラーに出すオプションの表示名。"""
+    """実行ファイルが端末を求める操作の、標準エラーに出す表示名（`user agree` の形）。"""
     shown = op(op_id).terminal
     if not shown:
         raise KeyError(f"{op_id} は端末を求める操作ではない")
@@ -305,11 +306,11 @@ def terminal(op_id: str) -> str:
 
 
 def names(*groups: str, where: str | None = "") -> tuple[str, ...]:
-    """グループのどれかに入るオプションの名前を、表の順に。
+    """いずれかのグループに入るオプションの名前を、表の順に返す。
 
     `where` はオプションの置き場。空は実行ファイル、スクリプトの名前はそのスクリプト、
     None はどこでも。グループにオプションが 1 つも無いのは表の書き間違いなので、空では返さず
-    KeyError にする（空のオプションで組み合わせを作ると、何にでも当たる正規表現になる）。
+    KeyError にする。空のまま組み合わせを作ると、何にでも当たる正規表現になるため。
     """
     found: list[str] = []
     for group in groups:
@@ -467,7 +468,7 @@ def refused(args: object) -> str:
         if forms:
             text = f"{name} はユーザ専用です。ユーザが `ccnavi user {forms[0]}` の形で打ちます。"
             if row.unless == "preview":
-                text += f"見るだけなら {name} --preview です。"
+                text += f"見るだけなら {name} --preview を使います。"
             return text
         return f"{name} はユーザ専用です（`ccnavi user` の操作と一緒に、ユーザが打ちます）。"
     return ""

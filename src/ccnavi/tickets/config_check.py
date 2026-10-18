@@ -66,7 +66,7 @@ def common_phases(conf: settings.Settings) -> list[Problem]:
 def common_risk(conf: settings.Settings, root: str) -> list[Problem]:
     """共通レイヤーのリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
-    `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重いほうに
+    `script:` が指す先があることも見る。走らせるときは「測れなかった」で重いほうに
     なるが、そこで気づくのは子を閉じる時点になる。
     """
     if not conf.risk:

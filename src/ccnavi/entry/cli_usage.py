@@ -1,8 +1,8 @@
 """`ccnavi --help` の本文。
 
-`--help` だけなら話題の一覧（`OVERVIEW`）を出す。`ccnavi --docs --help` のように話題の旗か副命令に
-`--help` を付けると、その話題の節（`TOPICS`）だけを出す。全文は `--help --all`（`USAGE`）。
-読む量を知りたい話題の分だけに抑えるため。
+`--help` だけなら話題の一覧（`OVERVIEW`）を出す。`ccnavi --docs --help` のように
+話題のオプションかサブコマンドに `--help` を付けると、その話題の節（`TOPICS`）だけを出す。
+全文は `--help --all`（`USAGE`）。読む量を、必要な話題の分だけに抑えるため。
 
 cli から分けた。cli を読まない。
 """
@@ -16,7 +16,7 @@ _VERSION = """\
 
 バージョン、ビルド元のコミット（ソースから実行した場合は "unknown"）、.ccnavi/scripts/
 のスクリプトとVS Code拡張機能が自身の値と照合する互換バージョン、
-受け付けるすべてのフラグを出力します。ペイロードも設定も読み込みません。--json の形式は
+受け付けるすべてのオプションを出力します。ペイロードも設定も読み込みません。--json の形式は
 README.md（「版の JSON」）に記載しています。
 """
 
@@ -46,13 +46,13 @@ Code拡張機能は、フローを開く前や保存する前に、編集中の�
 
     ccnavi --lint --json --flow /tmp/flow.yml
 
-共通レイヤーの旗（--rules・--phases・--risk・--projects など）は
+共通レイヤーのオプション（--rules・--phases・--risk・--projects など）は
 ccnavi --help scripts に書いてあります。
 """
 
 _TEST = """\
 プロジェクトのルールを保存前に試験または検証するには、
-編集中のファイルをプロジェクト名とともに渡します。このフラグは --test、--test-expectations、
+編集中のファイルをプロジェクト名とともに渡します。このオプションは --test、--test-expectations、
 --lint、--explain 専用です。それ以外（フックの呼び出し、
 チケットやレビューのサブコマンド）では無視され、その旨が標準エラー出力に表示されます。
 
@@ -538,12 +538,13 @@ TOPICS = (
     (
         "scripts",
         "ccnavi review|worktree|sync ほか",
-        "スクリプトが呼ぶ副命令と内部フラグ",
+        "スクリプトが呼ぶサブコマンドと内部オプション",
         _SCRIPTS,
     ),
 )
 
-# `--help <語>` と `ccnavi <語> --help` で話題を選ぶ語。話題名のほか、スクリプト用の副命令も含む。
+# `--help <語>` と `ccnavi <語> --help` で話題を選ぶ語。
+# 話題名のほか、スクリプト用のサブコマンドも含む。
 TOPIC_WORDS = {
     **{name: name for name, *_ in TOPICS},
     **{
@@ -572,7 +573,7 @@ _HOW_WIDTH = 34
 OVERVIEW = (
     _INTRO
     + """
-話題ごとの使い方は、話題の旗か副命令に --help を付けると出ます
+話題ごとの使い方は、話題のオプションかサブコマンドに --help を付けると出ます
 （例: ccnavi --docs --help、ccnavi ticket --help）。ccnavi --help <話題> でも同じです。
 全文は ccnavi --help --all で出ます。
 

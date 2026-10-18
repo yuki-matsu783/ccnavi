@@ -20,16 +20,16 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 
 | 表 | 持つもの |
 |---|---|
-| `OPS` | 操作。何をする操作か（`what`）と、実行ファイルが端末を求めるときに標準エラーへ出すオプションの表示名（`terminal`） |
+| `OPS` | 操作。何をする操作か（`what`）と、実行ファイルが端末を求めるときに標準エラーへ出す表示名（`terminal`。`user agree` の形） |
 | `FLAGS` | 実行ファイル（`where` が空）と sh スクリプトのオプション。どの止めに入るか（`cli`・`script`）、所属するグループ、`user` の外で断るか（`gated`）、断らない条件（`unless`。`preview` は `--preview` と一緒のとき、`no-yes` は `--yes` が無いとき） |
 | `SCRIPTS` | コマンドの位置で止める sh。前の名前が残っていれば並べる |
 | `SUBS` | 実行ファイルを直に呼ぶ形のサブコマンド（`ticket`・`review`・`sync`・`worktree`） |
-| `BOARD_COMBOS` | ボードで押した操作用のオプションの組み合わせ。全部のグループから 1 つずつがコマンド行に並んだら止める。語のグループ `user-board-verb` に `handoff` を含み、旧い `templates` の組み合わせは `legacy` のグループに残す |
+| `BOARD_COMBOS` | ボードで押した操作の、オプションの組み合わせ。どのグループからも 1 つずつがコマンド行に並んだら止める。語のグループ `user-board-verb` に `handoff` を含み、旧い `templates` の組み合わせは `legacy` のグループに残す |
 | `VERBS` | `ccnavi user <操作>` の読み替え。操作の語、読み替えた先の内部のオプション、値を取るか |
 | `WRAPPER_OPTIONS` | sh と拡張が先に付ける値つきのオプション（`--root`・`--cwd`・`--record-writes`・`--record-tree`） |
 
 表から作られるもの: hook の正規表現とオプションの一覧（`phase_forms`）、実行ファイルの読み替えと断り（`rewrite`・`refused`）、
-端末要求のオプションの表示名（`terminal`）。操作を足すときは、この表の行を直す。
+端末要求のときの表示名（`terminal`）。操作を足すときは、この表の行を直す。
 
 実行ファイルを通さず sh が呼ぶだけの操作（`ticket start/finish/cancel/record-risk/prepare/requested/confirm/ready`、`review confirm`、
 `sync tidy`、`worktree retire/branch`）は `ccnavi user` に入れず、`SUBS` に置く。
@@ -62,7 +62,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 | `ccnavi-user-close-early.sh` | `ccnavi-review.sh close-early` |
 | `ccnavi-user-decide.sh` | `ccnavi-review.sh decide` の書く側 |
 | `ccnavi-user-clean-branch.sh` | `ccnavi-clean.sh --branch` |
-| `ccnavi-user-lib-review.sh` | （新規。`decide` と `close-early` が読む、ユーザの判断をホストに書く部品。単独では打たない） |
+| `ccnavi-user-lib-review.sh` | （新規。`decide` と `close-early` が呼ぶ部品で、ユーザの判断をホストに書く。単独では打たない） |
 
 `ccnavi-review.sh decide <N> --preview`（一覧を見るだけ）は `ccnavi-review.sh` に残る。書く処理（返信・解決・マーカーを置く呼び出し）は
 `ccnavi-user-*.sh` の中だけに置き、共通のファイルには読む側と、エージェントも使うホスト API の関数だけを置く。
@@ -95,8 +95,8 @@ hook の止めは表から作る。ユーザ専用の入口の止めは `DENY_TI
 | 名前に依らない文字列検査 | 端末を求めない操作（`user agree`・`user reviewed`・`user handoff` と `--yes` の組、`--choices` と `--digest` の組、`--via board`、旧い形の組）と、端末要求を切る形（`CCNAVI_GUARD_TICKET_APPROVAL`・`--guard-ticket-approval`）。名前を変えたコピー・`python -c`・`awk` の `system()` でも止まる |
 | sh から呼ぶだけの操作 | `SUBS` の `ticket start/finish/…`・`review confirm/…`・`sync tidy`・`worktree retire/branch` を実行ファイルで直に打つ形 |
 
-エージェントが sh で打てるのは `ccnavi-ticket.sh`・`ccnavi-review.sh`・`ccnavi-git.sh`（`AGENT_SCRIPTS`）で、サブエージェントにはさらに
-`SUBAGENT_FORBIDDEN` のサブコマンドが閉じる。`ccnavi user --help` も `user` の入口なので止まる。
+エージェントが sh で打てるのは `ccnavi-ticket.sh`・`ccnavi-review.sh`・`ccnavi-git.sh`（`AGENT_SCRIPTS`）で、サブエージェントは
+さらに `SUBAGENT_FORBIDDEN` のサブコマンドを打てない。`ccnavi user --help` も `user` の入口なので止まる。
 
 hook は擬似端末を作る実行役（`script`・`tmux`・`screen`・`expect`）越しの呼び出しを読めない。
 

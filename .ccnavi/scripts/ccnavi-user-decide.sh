@@ -62,7 +62,7 @@ digest=""
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 	--preview)
-		fail decide-preview "一覧を見るだけの --preview は ccnavi-review.sh decide <N> --preview です（何も置かない）。" 2
+		fail decide-preview "一覧を見るだけなら ccnavi-review.sh decide <N> --preview を使ってください（何も置きません）。" 2
 		;;
 	--json) shift ;;
 	--choices | --digest)
@@ -70,7 +70,7 @@ while [ "$#" -gt 0 ]; do
 		if [ "$1" = --choices ]; then choices="$2"; else digest="$2"; fi
 		shift 2
 		;;
-	*) fail decide-bad-option "$1 は受けない。" 2 ;;
+	*) fail decide-bad-option "$1 は受け付けません。" 2 ;;
 	esac
 done
 if [ -n "$choices" ] || [ -n "$digest" ]; then
@@ -191,7 +191,7 @@ ccnavi user reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$
 }
 choices=$("$JQ" -c '.choices' "$chosen") && digest=$("$JQ" -r '.digest' "$chosen") || {
 	rm -f "$chosen"
-	fail decide-choose-unreadable "選んだものを読めない（${chosen}）。" 1
+	fail decide-choose-unreadable "選んだものを読めません（${chosen}）。" 1
 }
 rm -f "$chosen"
 # 2. ホストに触る前に、ローカルで失敗しうること（write-and-push のロック・ツリーの確認）を済ませ、結果を取り直す。

@@ -239,7 +239,7 @@ def walk(tree_root: str) -> tuple[list[Found], int, str]:
     if not os.path.lexists(base):
         return [], 0, ""
     if flow.linked(tree_root, base) or not os.path.isdir(base):
-        return [], 0, f"{HANDOFF_REL}/ がリンクか、ディレクトリではないので読まない"
+        return [], 0, f"{HANDOFF_REL}/ がリンクか、ディレクトリではないので読めない"
     found: list[Found] = []
     ignored = 0
     for parent, dirs, files in os.walk(base, followlinks=False):
@@ -264,7 +264,7 @@ def walk(tree_root: str) -> tuple[list[Found], int, str]:
 
 
 def spelled(tree_root: str, rel: str) -> tuple[str, str]:
-    """取り込み先の絶対パスを、在るディレクトリとファイルの実際の表記で組む。(パス, 断る理由)。
+    """取り込み先の絶対パスを、あるディレクトリとファイルの実際の表記で組む。(パス, 断る理由)。
 
     大文字小文字・NFC/NFD だけが違う名前は同じものとして扱う。同じ形に揃う名前が 2 つ並んで
     いれば、どちらか決められないので断る。
@@ -459,7 +459,7 @@ def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
         entry.errors.append("パスの要素に `.git` で始まるものがある。git の置き場には取り込めない")
     raw, why = flow.read_bytes(entry.draft, root)
     if raw is None:
-        entry.errors.append(f"下書きを読まない（{why}）")
+        entry.errors.append(f"下書きを読めない（{why}）")
     else:
         entry.raw = raw
         if b"\x00" in raw:
@@ -481,7 +481,7 @@ def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
     if os.path.lexists(target):
         current, why = flow.read_bytes(target, root)
         if current is None:
-            entry.errors.append(f"取り込み先を書き換えない（{why}）")
+            entry.errors.append(f"取り込み先には書かない（{why}）")
             return
         entry.current = current
     elif not entry.kind.new:
@@ -492,7 +492,7 @@ def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
         entry.has_orig = True
         orig, why = flow.read_bytes(entry.orig_path, root)
         if orig is None:
-            entry.errors.append(f"写した時点の元（{ORIG_SUFFIX}）を読まない（{why}）")
+            entry.errors.append(f"写した時点の元（{ORIG_SUFFIX}）を読めない（{why}）")
             return
         entry.orig = orig
         if entry.current != orig:
@@ -606,7 +606,7 @@ def _check_template(
 ) -> None:
     read = plan_templates.read_entry(entry.layer or settings.LAYER_SELF, root, entry.draft)
     if read.raw != entry.raw:
-        entry.errors.append("下書きが読んでいるあいだに書き換わった。もう一度見る")
+        entry.errors.append("下書きを読んでいるあいだに書き換わりました。もう一度見てください")
         return
     _said(entry, read.notes)
     template = read.template
@@ -664,14 +664,14 @@ def _template_collisions(
         for layer, rel, text in rivals:
             if text != mine:
                 entry.errors.append(
-                    f"{layer} に同名で中身の違う {rel} が在る。共通へ取り込むと {layer} の側が"
+                    f"{layer} に同名で中身の違う {rel} がある。共通へ取り込むと {layer} の側が"
                     f"使われなくなる。先に {layer} の側を直す"
                 )
         return
     rival = others.get((settings.LAYER_COMMON, name))
     if rival is not None and rival[1] != mine:
         entry.errors.append(
-            f"共通に同名で中身の違う {rival[0]} が在る。取り込んでも {entry.layer} の側は"
+            f"共通に同名で中身の違う {rival[0]} がある。取り込んでも {entry.layer} の側は"
             "使われない。別の名前にする"
         )
 
@@ -816,7 +816,10 @@ def apply(plan: Plan, expect: str, via_board: bool = False) -> Applied:
     if not plan.ok:
         return Applied(False, not_ok_reason(plan))
     if not expect:
-        return Applied(False, "--yes には --expect <ハッシュ>（見るだけの形が見せる）を付ける")
+        return Applied(
+            False,
+            "--yes には --expect <ハッシュ>（見るだけの形が示す値）を付けてください",
+        )
     if expect != plan.expect:
         return Applied(
             False,
@@ -854,7 +857,7 @@ def _write_one(root: str, entry: Entry) -> str:
     if os.path.lexists(entry.target):
         now, why = flow.read_bytes(entry.target, root)
         if now is None:
-            return f"{entry.rel}: 取り込み先を書き換えない（{why}）"
+            return f"{entry.rel}: 取り込み先には書かない（{why}）"
     else:
         now = None
     if _sha(now) != _sha(entry.current):
@@ -892,7 +895,7 @@ def _clean_draft(root: str, entry: Entry, done: Applied) -> None:
     """下書きの今のバイト列が取り込んだものと同じときだけ、下書きと `.orig` を消す。"""
     now, why = flow.read_bytes(entry.draft, root)
     if now is None:
-        done.kept_drafts.append((entry.draft_rel, f"下書きを読まないので消していない（{why}）"))
+        done.kept_drafts.append((entry.draft_rel, f"下書きを読めなかったので消していない（{why}）"))
         return
     if now != entry.raw:
         done.kept_drafts.append(

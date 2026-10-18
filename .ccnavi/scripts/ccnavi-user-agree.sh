@@ -158,7 +158,7 @@ if [ "$push_rc" -ne 0 ]; then
 fi
 
 if [ "$approve_rc" -ne 0 ]; then
-	printf 'ccnavi-user-agree: 承認の一部だけが通った。置かれた承認済みチケットは、上の結果のとおりコミット・push を試した。通らなかった分は原因を直して、もう一度承認してください。\n' >&2
+	printf 'ccnavi-user-agree: 承認の一部だけが通りました。置かれた承認済みチケットは、上の結果のとおりコミット・push を試しています。通らなかった分は原因を直して、もう一度承認してください。\n' >&2
 	exit 1
 fi
 exit 0

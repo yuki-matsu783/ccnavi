@@ -78,7 +78,7 @@ carry_human() {
 	case "$ccnavi_wap_target" in
 	yes)
 		sh "$ccnavi_wap_sh/ccnavi-user-push-approved.sh" "$ccnavi_wap_family_id" || {
-			printf '%s: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-user-push-approved.sh %s をユーザが再実行します（送るまで、この親子のチケットの状態の操作は止まる）\n' \
+			printf '%s: ユーザの判断は置いたが送れなかった。接続を戻してから、sh %s/ccnavi-user-push-approved.sh %s をユーザが再実行してください（送るまで、この親子のチケットの状態の操作は止まります）\n' \
 				"$review_label" "$ccnavi_wap_sh" "$ccnavi_wap_family_id" >&2
 			return 1
 		}
@@ -129,4 +129,4 @@ fi
 # 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
 carry_human "$family" || exit 1
 printf 'OK: 早めに閉じた（%s）\n' "$url"
-printf '次: 親に、閉じて片付けて push し、ready を打たせる。マージはユーザが行う\n'
+printf '次: 親で、閉じた子を片付けて push し、ready を実行させる。マージはユーザが行う\n'

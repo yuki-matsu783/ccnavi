@@ -121,7 +121,7 @@ export async function terminalGuide(deps: Pick<HandoffDeps, "view">, shown: Hand
     return { command: "", error: `一覧にない対象です: ${path}` };
   }
   if (entry.board) {
-    return { command: "", error: "この対象はボードから取り込めます" };
+    return { command: "", error: "この対象はボードから取り込めます（端末のコマンドは出しません）" };
   }
   const state = entry.state;
   if (state !== "new" && state !== "changed") {

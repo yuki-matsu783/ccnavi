@@ -65,7 +65,7 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 | `docs` | `.ccnavi/docs/**/*.md`・`.ccnavi/CCNAVI.md`・`.claude/skills/**/*.md` | できない | 可 |
 | `defense` | `.ccnavi/scripts/**/*.sh`・`.claude/hooks/**`・`.claude/settings*.json` | できない | 不可（端末のユーザだけ） |
 
-写したあとに取り込み先が変わった下書き（conflict）や、検査に通らない下書きが1つでもあると、その回は何も取り込まれない。取り込むと下書きは消える。端末の前のユーザは、`ccnavi-stage.sh --commands`が出す`mv`の代わりに`user handoff`を使える。
+写したあとに取り込み先が変わった下書き（conflict）や、検査に通らない下書きが1つでもあると、そのときは何も取り込まれない。取り込むと下書きは消える。端末の前のユーザは、`ccnavi-stage.sh --commands`が出す`mv`の代わりに`user handoff`を使える。
 
 - 対話セッション: 下書きの相対パスを挙げて、`ccnavi user handoff`での取り込みをユーザに案内し、ターンを終える
 - 非対話セッション: `wip/handoff/`の編集済みファイルをpushして、ユーザに確認と取り込みを頼み、ターンを終える

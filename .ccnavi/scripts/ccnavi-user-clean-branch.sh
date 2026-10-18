@@ -4,12 +4,12 @@
 #   sh .ccnavi/scripts/ccnavi-user-clean-branch.sh <子の識別子> [--confirmed]
 #
 # 前は `ccnavi-clean.sh --branch <子の識別子> [--confirmed]` だった。ユーザだけが打つ sh は ccnavi-user-*.sh に
-# 分けてあり、エージェントからは hook が名前で止める（--confirmed を単なる語としてエージェントが添えて、
+# 分けてあり、エージェントからは hook が名前で止める（エージェントが --confirmed を単なる語として添えても、
 # 取り消した子のブランチを確認なしで消せないようにする）。
 #
 # 中身は実行ファイルの `worktree branch <名前> [confirmed]`。親を閉じたときに ccnavi が片付ける子として記録した
-# 手元のブランチだけを消す。合流した子は、ブランチの先頭が合流した先頭と同じで、それが push 済みの親に含まれる
-# ときだけ消える。取り消した子は --confirmed（ユーザが消してよいと言った）が要る。記録に無いブランチと、
+# 手元のブランチだけを消す。合流した子は、ブランチの先頭が合流した先頭と同じで、その先頭が push 済みの親に
+# 含まれるときだけ消える。取り消した子は --confirmed（ユーザが消してよいと言ったこと）が要る。記録に無いブランチと、
 # チケットの parent: で記録の親の子と確かめられないブランチは消さない。条件の確認も削除も実行ファイルが行う。
 # `git branch -D` を直に打たせないための入口。
 #
@@ -43,7 +43,7 @@ for arg in "$@"; do
 		confirmed=1
 		;;
 	-*)
-		printf 'ccnavi-user-clean-branch: %s は使用できません。使えるのは --confirmed だけです。\n' "$arg" >&2
+		printf 'ccnavi-user-clean-branch: %s は受け付けません。使えるのは --confirmed だけです。\n' "$arg" >&2
 		exit 2
 		;;
 	*)

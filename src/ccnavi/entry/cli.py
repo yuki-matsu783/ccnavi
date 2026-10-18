@@ -95,7 +95,7 @@ def _help_of_test(argv: list[str]) -> list[str]:
     """`--test ... --help` を、`--help test`（test の節）の形にする。
 
     `--test` は続く 2 語を取るので、`--test --help` は語が足りず argparse の誤りで落ち、
-    `--help` に届かない。`--help` があるときだけ、`--test` と続く語（旗でないもの）を外して
+    `--help` に届かない。`--help` があるときだけ、`--test` と続く語（オプションでないもの）を外して
     話題の語 `test` に置き換える。
     """
     end = argv.index("--") if "--" in argv else len(argv)

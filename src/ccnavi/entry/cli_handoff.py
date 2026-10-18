@@ -50,13 +50,13 @@ def usage_problem(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         if action.dest in _WITH_HANDOFF or not action.option_strings:
             continue
         if getattr(args, action.dest, action.default) != action.default:
-            return f"{action.option_strings[-1]} は user handoff と一緒に使えない"
+            return f"{action.option_strings[-1]} は user handoff と一緒には使えません"
     if args.yes not in ("", cli_args.BARE_YES):
-        return "--yes に値は付けない（user handoff <パス>… --yes --expect <ハッシュ>）"
+        return "--yes には値を付けられません（user handoff <パス>… --yes --expect <ハッシュ>）"
     if args.expect is not None and not args.yes:
-        return "--expect は --yes と一緒に使う"
+        return "--expect は --yes と一緒に指定してください"
     if args.via and args.via != via.VIA_BOARD:
-        return "--via は board だけ渡せる"
+        return "--via に渡せるのは board だけです"
     if args.via and (not args.yes or args.expect is None or not args.json):
         return "--via board は --yes --expect <ハッシュ> --json と一緒に指定してください"
     return ""
@@ -129,8 +129,9 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> 
             stdout.write(f"    warn  {line}\n")
         if entry.conflict:
             stdout.write(
-                f"    conflict 写した時点の元（{handoff.ORIG_SUFFIX}）と今の取り込み先が違う。"
-                "下書きに今の取り込み先の変更を入れて、下書きと .orig を作り直す\n"
+                f"    conflict 写したあとに取り込み先が変わりました"
+                f"（写した時点の元は {handoff.ORIG_SUFFIX}）。"
+                "下書きに今の取り込み先の変更を入れてから、下書きと .orig を作り直してください\n"
             )
         if entry.selected and entry.diff:
             for line in entry.diff.split("\n"):
@@ -143,8 +144,8 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> 
         return
     if not plan.ok:
         stdout.write(
-            "選んだ対象に error か conflict があるので、取り込めません。"
-            "直すか、パスを選び直します。何も反映していません。\n"
+            "選んだ対象に error か conflict があるため、取り込めません。"
+            "直すか、パスを選び直してください。何も反映していません。\n"
         )
         return
     paths = " ".join(e.rel for e in chosen) if wanted else ""
@@ -153,7 +154,7 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> 
     stdout.write(f"  {command}--yes --expect {plan.expect}\n")
     if any(not e.kind.board for e in chosen):
         stdout.write(
-            "  （defense の種類が含まれるので、ボードからは取り込めません。端末で実行します）\n"
+            "  （defense の種類を含むため、ボードからは取り込めません。端末で実行してください）\n"
         )
 
 

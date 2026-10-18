@@ -8,15 +8,15 @@
 #   sh .ccnavi/scripts/ccnavi-user-push-approved.sh --path <パス> [--path <パス>...]
 #
 # 承認はしない。承認済みチケットは置かれただけでは他の機械に届かないので、置いたあとに
-# コミットして push するのがこの sh。端末の承認は ccnavi-user-agree.sh が、ボードの承認とフローの保存は端末に送った 1 行が、
-# ユーザの判断の入口（ccnavi-user-close-early.sh）が、それぞれ最後にこの sh を呼ぶ。
-# ユーザの判断を溜めずにその場で送るためで、送れなければ次の write-and-push が止まり、この sh の打ち直しを案内する。
+# コミットして push するのがこの sh。端末の承認（ccnavi-user-agree.sh）、ボードの承認とフローの保存
+# （端末に送った 1 行）、ユーザの判断（ccnavi-user-close-early.sh）が、それぞれ最後にこの sh を呼ぶ。
+# ユーザの判断を溜めずにその場で送るため。送れなければ次の write-and-push が止まり、この sh の打ち直しを案内する。
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
 # 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）のワークツリーは、
 # write-and-push と同じ手順でコミットして push する。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
 # 手順は、ロック（write-and-push の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
-# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ と templates/ の下書き）を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
+# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き（と旧い templates/ の下書き））を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
 # push が失敗してもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`write-and-push family`）に聞く。
 # 取り込みの後、push の前に、親のブランチがリモートから消えていないかを push の関門（ccnavi_push_gate）で確かめる。
 # 消えていれば（確かめられないときも）コミットも push もせずに止める。親でないツリーの push の前にも同じ関門を通す。
@@ -35,9 +35,10 @@
 # wip/proposals の todo/ から動かす（コピーは作らない）ので、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）はコミットしない。
 # 同じく、ボードのフロー編集画面が取り込んだ下書き（wip/proposals の flows/）を
-# フローの保存のあとに消し、`ccnavi user handoff` が取り込んだテンプレートの下書き
-# （wip/proposals の templates/）を取り込みのあとに消すので、追跡されていた下書きの削除だけをコミットする。
-# 未追跡の下書きと、書き直された下書き（消えていない）はコミットしない。`ccnavi write-and-push sort` の置き場には足さず、
+# フローの保存のあとに消す。旧い版が置いた templates/ の下書き（追跡されていたもの）の削除も同じに拾う。
+# 追跡されていた下書きの削除だけをコミットする。`ccnavi user handoff` の下書き（wip/handoff/）は
+# 追跡しないので、ここでは扱わない。
+# 未追跡の下書きと、書き直されて残っている下書きはコミットしない。`ccnavi write-and-push sort` の置き場には加えず、
 # 消えたものだけをここで拾う。
 #
 # - コミットはパスを限る。`-a` も `add -A` も使わない。他人の書きかけをコミットしない
@@ -232,7 +233,7 @@ carry_family() {
 	ccnavi_lock_take "$root" "$ccnavi_wap_repo" "$cf_p" "$(ccnavi_wap_number "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
 	if [ "$cf_rc" -ne 0 ]; then
 		if ccnavi_lock_long "$(ccnavi_state "$root")/locks/$ccnavi_wap_repo/$cf_p"; then
-			printf 'ccnavi-user-push-approved: %s のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので強制取得しない。終わるのを待つか、持ち主をユーザが確かめてください。%s\n' \
+			printf 'ccnavi-user-push-approved: %s のロックが 10 分を超えて取られたままです。持ち主はまだ動いているため、強制取得はしません。終わるのを待つか、持ち主をユーザが確かめてください。%s\n' \
 				"$cf_p" "$(ccnavi_lock_describe "$(ccnavi_state "$root")/locks/$ccnavi_wap_repo/$cf_p")" >&2
 		else
 			printf 'ccnavi-user-push-approved: %s のロックを他の操作が持っている。終わってから再実行してください。\n' "$cf_p" >&2
@@ -250,7 +251,7 @@ carry_family() {
 	sh "$(dirname "$0")/ccnavi-sync.sh" "$cf_p" </dev/null >"$ccnavi_wap_tmp/sync" 2>&1 || cf_rc=$?
 	sed 's/^/  /' "$ccnavi_wap_tmp/sync" >&2
 	if [ "$cf_rc" -ne 0 ]; then
-		printf 'ccnavi-user-push-approved: %s を取り込めなかった（上の ccnavi-sync.sh の文面）。ユーザの判断はまだ送っていない。直してから再実行してください。\n' "$cf_p" >&2
+		printf 'ccnavi-user-push-approved: %s を取り込めなかった（上の ccnavi-sync.sh の文面）。ユーザの判断はまだ送っていません。直してから再実行してください。\n' "$cf_p" >&2
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -258,7 +259,7 @@ carry_family() {
 	cf_rc=0
 	ccnavi_push_gate "$cf_tree" "$cf_b" "$cf_p" "$root" "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || cf_rc=$?
 	if [ "$cf_rc" -ne 0 ]; then
-		printf 'ccnavi-user-push-approved: %s。ユーザの判断はまだ送っていない。\n' "$ccnavi_pg_why" >&2
+		printf 'ccnavi-user-push-approved: %s。ユーザの判断はまだ送っていません。\n' "$ccnavi_pg_why" >&2
 		ccnavi_lock_drop
 		return 1
 	fi

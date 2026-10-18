@@ -384,7 +384,7 @@ def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
         stderr.write(f"ccnavi: ログを保存できませんでした：{exc}\n")
 
 
-# `--help` の話題を決める旗。先頭から順に見て、最初に当たったものを使う。
+# `--help` の話題を決めるオプション。先頭から順に見て、最初に当たったものを使う。
 _HELP_FLAGS = (
     ("version", lambda a: a.version),
     ("lint", lambda a: a.lint),
@@ -418,8 +418,9 @@ _HELP_FLAGS = (
 
 
 def help_text(args: argparse.Namespace) -> str:
-    """`--help` の本文を返す。`--all` なら全文。話題の旗か語（`--help docs`・`ticket --help`）が
-    あればその節、なければ話題の一覧を返す。"""
+    """`--help` の本文を返す。`--all` なら全文。
+    話題のオプションか語（`--help docs`・`ticket --help`）があれば、その節を返す。
+    なければ話題の一覧を返す。"""
     if args.all:
         return cli_usage.USAGE
     for name, given in _HELP_FLAGS:
