@@ -102,7 +102,7 @@ def _diagnosing(args: argparse.Namespace) -> bool:
     """診断の経路か。置き場を動かすフラグはここでだけ効く。
 
     診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
-    指しても実運用に漏れない。
+    指しても実運用に影響しない。
     """
     return bool(
         args.lint

@@ -218,7 +218,7 @@ test("CB-D45 再読み込みできなかった画面でも、承認のオーバ�
   }
 });
 
-test("CB-D47 裏から表に戻って作り直された画面は、いまの中身を拡張ホストに頼む", async () => {
+test("CB-D47 非表示から再表示されて作り直された画面は、いまの中身を拡張ホストに頼む", async () => {
   const page = await openBoard();
   try {
     assert.deepEqual(page.posted[0], { type: "ready" });
@@ -239,7 +239,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     // 指定されたプロジェクトのカードだけが残る
     assert.ok(!page.one('.card[data-id="i0002"]').classList.contains("hidden"));
     assert.ok(page.one('.card[data-id="i0001"]').classList.contains("hidden"));
-    // ユーザが触らなくても覚える。裏に回って作り直されたときに絞りが戻ってしまわないように
+    // ユーザが触らなくても覚える。非表示になって作り直されたときに絞りが戻ってしまわないように
     assert.equal((page.state() as { project: string }).project, "lib");
     await page.send({ type: "filter", project: "app" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
@@ -448,7 +448,7 @@ test("CB-D82b 新規起票のカードは「新規起票」と言う", async () 
   }
 });
 
-/** 吹き出しの案内を最後まで進め、段の題を順に返す。閉じたあとの画面を見るのは呼ぶ側 */
+/** 吹き出しの案内を最後まで進め、手順の題を順に返す。閉じたあとの画面を見るのは呼ぶ側 */
 async function walkTour(dom: DomPage): Promise<string[]> {
   const titles: string[] = [];
   for (let i = 0; i < 20 && dom.all(".tour").length > 0; i += 1) {
@@ -473,7 +473,7 @@ test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後�
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
-    // 「?」は案内の一覧を開き、基本の案内を選ぶと最初の段から始まる
+    // 「?」は案内の一覧を開き、基本の案内を選ぶと最初の手順から始まる
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
@@ -499,7 +499,7 @@ test("CB-D96 チケットが 1 枚もないボードでは、案内の間だけ�
     assert.equal(dom.all(".tour-sample").length, 1, "見本だと分かる帯がありません");
     assert.ok(dom.all(".card").length > 0, "見本のカードがありません");
     assert.ok(dom.all('.card[data-attention="1"]').length > 0);
-    // カードの段は見本のカードを指す（中ほどに出す文だけの吹き出しにならない）
+    // カードの手順は見本のカードを指す（中ほどに出す文だけの吹き出しにならない）
     while (dom.one("#tour-title").textContent !== "カード") {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();

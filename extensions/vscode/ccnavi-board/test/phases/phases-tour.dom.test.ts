@@ -49,7 +49,7 @@ async function next(dom: DomPage): Promise<void> {
   await dom.settle();
 }
 
-/** 案内を始めて、n 段目（0 始まり）まで進める */
+/** 案内を始めて、n 番目の手順（0 始まり）まで進める */
 async function goto(dom: DomPage, id: string, index: number): Promise<void> {
   await startCourse(dom, id);
   for (let i = 0; i < index; i += 1) {
@@ -96,7 +96,7 @@ test("CB-D240 「?」は案内の一覧を開き、選んだ案内だけが始�
   }
 });
 
-test("CB-D241 全ユースケースの全段で、指す先が画面に 1 つあり、吹き出しが中ほどへ逃げない。見本だけを描き、閉じたら実際の定義に戻る", async () => {
+test("CB-D241 全ユースケースの全手順で、指す先が画面に 1 つあり、吹き出しが中ほどへ逃げない。見本だけを描き、閉じたら実際の定義に戻る", async () => {
   for (const course of def.courses) {
     const dom = await openReal();
     try {
@@ -104,7 +104,7 @@ test("CB-D241 全ユースケースの全段で、指す先が画面に 1 つあ
       await startCourse(dom, course.id);
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が画面に 1 つではない`);
         assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
@@ -117,7 +117,7 @@ test("CB-D241 全ユースケースの全段で、指す先が画面に 1 つあ
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
         await next(dom);
       }
-      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の段で閉じない`);
+      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の手順で閉じない`);
       assert.deepEqual(ids(dom), REAL_IDS, "閉じたあと実際の定義に戻らない");
       assert.equal(dom.all(".banner.tour-sample").length, 0);
       assert.equal(dom.all("#dirty:not(.hidden)").length, 0, "案内が未保存にした");
@@ -197,33 +197,33 @@ test("CB-D242 案内の間は、画面の編集・ボタン・設定の切り替
   }
 });
 
-test("CB-D243 段の scene が画面の様子を替える（開く定義・補足・絞り込み・追加した行）。scene は次の段へ引き継がない", async () => {
+test("CB-D243 手順の scene が画面の様子を替える（開く定義・補足・絞り込み・追加した行）。scene は次の手順へ引き継がない", async () => {
   // 開く定義と補足。phase-* の印は開いた最初の定義にだけ付く
   let dom = await openReal();
   try {
     await goto(dom, "guide-agent", 0);
     assert.equal(dom.all(".phase.open").length, 1);
     assert.equal(dom.one(".phase.open .sum-id").textContent, "acceptance");
-    assert.ok(!dom.one(".phase.open details.more").hasAttribute("open"), "補足を開く scene がない段では畳む");
+    assert.ok(!dom.one(".phase.open details.more").hasAttribute("open"), "補足を開く scene がない手順では畳む");
     await next(dom);
     assert.ok(dom.one(".phase.open details.more").hasAttribute("open"));
     assert.equal(dom.one<HTMLInputElement>('[data-tour="phase-agent"] input').value, "acceptance-tester");
     await next(dom);
     assert.match(dom.one<HTMLInputElement>('[data-tour="phase-when"] input').value, /実装より先に書く/);
-    // 絞り込み。開いた定義も補足も、次の段へ引き継がない
+    // 絞り込み。開いた定義も補足も、次の手順へ引き継がない
     await next(dom);
     assert.equal(dom.one<HTMLInputElement>("#find").value, "実装より先");
     assert.equal(dom.all(".phase:not(.hidden-by-find)").length, 1);
     assert.equal(dom.one("#phase-count").textContent, "1 / 6");
-    assert.equal(dom.all(".phase.open").length, 0, "段をまたいで開いた定義が残った");
+    assert.equal(dom.all(".phase.open").length, 0, "手順をまたいで開いた定義が残った");
     await next(dom);
-    assert.equal(dom.all(".phase.hidden-by-find").length, 0, "段をまたいで絞り込みが残った");
+    assert.equal(dom.all(".phase.hidden-by-find").length, 0, "手順をまたいで絞り込みが残った");
     assert.equal(dom.one("#phase-count").textContent, "6");
     // ヘルプの説明
     assert.equal(dom.all("#help").length, 1);
     assert.equal(dom.one('[data-tour="help-panel"]').id, "help");
     await next(dom);
-    assert.equal(dom.all("#help").length, 0, "段をまたいでヘルプが残った");
+    assert.equal(dom.all("#help").length, 0, "手順をまたいでヘルプが残った");
   } finally {
     await dom.close();
   }
@@ -264,7 +264,7 @@ test("CB-D243 段の scene が画面の様子を替える（開く定義・補�
     assert.match(dom.one("#status").textContent ?? "", /design-feedback は feedback なので review は mr/);
     assert.ok(dom.one(".foot").classList.contains("error"));
     await next(dom);
-    assert.equal(dom.one("#status").textContent, "", "段をまたいで検証の文が残った");
+    assert.equal(dom.one("#status").textContent, "", "手順をまたいで検証の文が残った");
     assert.match(dom.one("#lock").textContent ?? "", /作業中のチケットがあります/);
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
     assert.equal(dom.one<HTMLButtonElement>("#save").disabled, true, "作業中は保存できない");
@@ -273,7 +273,7 @@ test("CB-D243 段の scene が画面の様子を替える（開く定義・補�
     assert.ok(!dom.one("#changed").classList.contains("hidden"));
     assert.equal(dom.one<HTMLButtonElement>("#save").disabled, true);
     await next(dom);
-    assert.ok(dom.one("#changed").classList.contains("hidden"), "段をまたいで外の変更の帯が残った");
+    assert.ok(dom.one("#changed").classList.contains("hidden"), "手順をまたいで外の変更の帯が残った");
   } finally {
     await dom.close();
   }
@@ -287,7 +287,7 @@ test("CB-D244 設定の切り替えの案内は、見本のプロジェクトの
   try {
     assert.equal(dom.one<HTMLSelectElement>("select#target").value, "project:web");
     await goto(dom, "project", 0);
-    // 1 段目はワークスペースの見本。欄の選択肢は見本のもの
+    // 1 番目の手順はワークスペースの見本。欄の選択肢は見本のもの
     assert.equal(dom.one<HTMLSelectElement>("select#target").value, "self:");
     assert.deepEqual(
       dom.all<HTMLElement>("select#target option").map((option) => option.textContent),

@@ -303,7 +303,7 @@ test("CB-D178 並べ直すと、今の線で置き場所を組み直す（番号
   }
 });
 
-/** 吹き出しの案内を最後まで進め、段の題と、指す先が見つかったか（中ほどに出す文だけの吹き出しでないか）を順に返す */
+/** 吹き出しの案内を最後まで進め、手順の題と、指す先が見つかったか（中ほどに出す文だけの吹き出しでないか）を順に返す */
 async function walkTour(dom: DomPage): Promise<string[]> {
   const titles: string[] = [];
   for (let i = 0; i < 20 && dom.all(".tour").length > 0; i += 1) {
@@ -327,7 +327,7 @@ test("CB-D182 拡張ホストが頼んだらタブの案内を出し、最後ま
     assert.deepEqual(await walkTour(dom), ["図", "直す手段", "この順序に決める", "承認との関係", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
-    // 「?」は案内の一覧を開き、基本の案内を選ぶと最初の段から始まる
+    // 「?」は案内の一覧を開き、基本の案内を選ぶと最初の手順から始まる
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));

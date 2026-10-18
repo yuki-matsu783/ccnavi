@@ -45,7 +45,7 @@ const SAMPLE_DRAFT = sampleDraft(SAMPLE.page);
 const SAMPLE_MISSING_DRAFT = sampleDraft(SAMPLE.missing);
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -91,7 +91,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const { draft, open } = editing;
   const page = pageOf(data);
   /**
-   * 案内の間は見本を描き、段ごとの様子（開く項目・絞り込み・統合結果など）は `scene` に入れる。実際の編集中の配点や開いた行は動かさないので、
+   * 案内の間は見本を描き、手順ごとの様子（開く項目・絞り込み・統合結果など）は `scene` に入れる。実際の編集中の配点や開いた行は動かさないので、
    * 閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);

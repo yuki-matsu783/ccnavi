@@ -17,7 +17,7 @@ import { parseExpectationsJson, parseTestJson, type ExpectationsJson, type TestJ
 export interface RulesSample {
   readonly sections: Sections;
   readonly hooks: readonly HookEntry[];
-  /** 名前（段の scene の `judge`）で引く判定の結果 */
+  /** 名前（手順の scene の `judge`）で引く判定の結果 */
   readonly judges: Readonly<Record<string, TestJson>>;
   readonly checked: ExpectationsJson | undefined;
   readonly suggested: SuggestJson | undefined;

@@ -151,7 +151,7 @@ test("CB-T425 ボードの案内の scene は、見本にある絞り込み・�
   const states = new Set(COLUMNS.map((c) => c.state));
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目`;
+      const at = `${course.id} の ${index + 1} 番目の手順`;
       const scene = step.scene;
       for (const key of Object.keys(scene)) {
         assert.ok(SCENE_KEYS.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
@@ -189,7 +189,7 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   const states = new Set(COLUMNS.map((c) => c.state as string));
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+      const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
       assert.ok(step.target !== "", `${at}: 指す先がない（吹き出しが中ほどへ逃げる）`);
       if (step.target.startsWith("card-")) {
         assert.ok(cards.some((c) => `card-${c.id}` === step.target), `${at}: ${step.target} のカードが見本にありません`);
@@ -206,7 +206,7 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 
-test("CB-T427 使い方ごとの案内は 1 本 4〜9 段で、「〜したいとき」の題と 1 行の説明を持つ。案内の鍵は重ならない", () => {
+test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順で、「〜したいとき」の題と 1 行の説明を持つ。案内の鍵は重ならない", () => {
   const useCases = def.courses.slice(1);
   assert.ok(useCases.length >= 3 && useCases.length <= 8);
   assert.deepEqual(
@@ -214,7 +214,7 @@ test("CB-T427 使い方ごとの案内は 1 本 4〜9 段で、「〜したい�
     ["approve", "review", "attention", "progress", "filter", "closed", "flow"],
   );
   for (const course of useCases) {
-    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 段`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
     assert.match(course.title, /たいとき$/, `${course.id}: 利用者の目的の題でない`);
     assert.ok(course.summary.length > 0 && course.summary.length <= 60, `${course.id}: 説明が長い`);
   }

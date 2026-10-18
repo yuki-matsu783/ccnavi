@@ -36,7 +36,7 @@ async function next(dom: DomPage): Promise<void> {
   await dom.settle();
 }
 
-/** 案内を始めて、n 段目（0 始まり）まで進める */
+/** 案内を始めて、n 番目の手順（0 始まり）まで進める */
 async function goto(dom: DomPage, id: string, index: number): Promise<void> {
   await startCourse(dom, id);
   for (let i = 0; i < index; i += 1) {
@@ -75,7 +75,7 @@ test("CB-D220 「?」は案内の一覧を開き、選んだ案内だけが始�
   }
 });
 
-test("CB-D221 全ユースケースの全段で、指す先が画面にあり、吹き出しが中ほどへ逃げない。見本を描き、閉じたら実際の配点に戻る", async () => {
+test("CB-D221 全ユースケースの全手順で、指す先が画面にあり、吹き出しが中ほどへ逃げない。見本を描き、閉じたら実際の配点に戻る", async () => {
   const sums = riskSums(sumsBoard());
   for (const course of def.courses) {
     const dom = await openRisk({ sums });
@@ -84,7 +84,7 @@ test("CB-D221 全ユースケースの全段で、指す先が画面にあり、
       await startCourse(dom, course.id);
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         if (step.target !== "") {
           assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
@@ -100,7 +100,7 @@ test("CB-D221 全ユースケースの全段で、指す先が画面にあり、
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
         await next(dom);
       }
-      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の段で閉じない`);
+      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の手順で閉じない`);
       assert.deepEqual(factorIds(dom), REAL_IDS, "閉じたあと実際の配点に戻らない");
       assert.equal(dom.all(".banner.tour-sample").length, 0);
       assert.equal(dom.all("#dirty:not(.hidden)").length, 0, "案内が未保存にした");
@@ -153,7 +153,7 @@ test("CB-D222 案内の間は、画面の編集・ボタン・拡張ホストへ
   }
 });
 
-test("CB-D223 段の scene が画面の様子を替える（境目を空にする・開く項目・絞り込み）。scene は次の段へ引き継がない", async () => {
+test("CB-D223 手順の scene が画面の様子を替える（境目を空にする・開く項目・絞り込み）。scene は次の手順へ引き継がない", async () => {
   const sums = riskSums(sumsBoard());
 
   // 境目を空にして、組み込みの値を薄く出す
@@ -163,7 +163,7 @@ test("CB-D223 段の scene が画面の様子を替える（境目を空にす�
     assert.deepEqual(levelsOf(dom), ["20", "40", ""]);
     assert.equal(dom.all<HTMLInputElement>("input.f-level")[2].placeholder, "既定 70");
     await next(dom);
-    assert.deepEqual(levelsOf(dom), ["20", "40", "70"], "段をまたいで空が残った");
+    assert.deepEqual(levelsOf(dom), ["20", "40", "70"], "手順をまたいで空が残った");
   } finally {
     await dom.close();
   }
@@ -194,7 +194,7 @@ test("CB-D223 段の scene が画面の様子を替える（境目を空にす�
     assert.equal(dom.all(".factor:not(.hidden-by-find)").length, 1);
     assert.equal(dom.one("#factor-count").textContent, "1 / 5");
     await next(dom);
-    assert.equal(dom.all(".factor.hidden-by-find").length, 0, "段をまたいで絞り込みが残った");
+    assert.equal(dom.all(".factor.hidden-by-find").length, 0, "手順をまたいで絞り込みが残った");
     assert.equal(dom.one("#factor-count").textContent, "5");
   } finally {
     await dom.close();
@@ -218,7 +218,7 @@ test("CB-D224 ファイルがない状態の案内は、組み込みの配点を
     await next(dom);
     await next(dom);
     await next(dom);
-    assert.equal(dom.all(".banner.missing").length, 0, "最後の段でファイルがある状態に戻らない");
+    assert.equal(dom.all(".banner.missing").length, 0, "最後の手順でファイルがある状態に戻らない");
     assert.ok(dom.all<HTMLInputElement>("input.f-level").every((el) => !el.disabled));
   } finally {
     await dom.close();
@@ -242,7 +242,7 @@ test("CB-D225 統合結果の案内は、枠を開いて見本の統合結果を
     assert.ok(dom.one(".sum-table").textContent?.includes("lib:big-diff"));
     assert.ok(!dom.one(".sum-table").textContent?.includes("schema"), "実際の統合結果が出ている");
     await next(dom);
-    assert.equal(dom.all("details#sum[open]").length, 0, "統合結果に関わらない段で枠が開いたまま");
+    assert.equal(dom.all("details#sum[open]").length, 0, "統合結果に関わらない手順で枠が開いたまま");
     await next(dom);
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib");

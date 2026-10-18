@@ -5,12 +5,12 @@
  * パネルが 1 行で選ぶ（`screenHost` か `retainedHost`）。返る形（`ScreenHost`）は同じなので、
  * 呼ぶ側の書き方は変わらない。
  *
- * | パネル | 使うもの | 裏に回ったとき |
+ * | パネル | 使うもの | 非表示になったとき |
  * |---|---|---|
  * | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost` | 画面は捨てられる。入れ物ごと入れ直す |
  * | `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集） | `retainedHost` | 画面は生きている。何もしない |
  *
- * 取り違えるとどちらの向きでも不具合が出る。保持する画面に `screenHost` を当てると、裏にいる間の
+ * 取り違えるとどちらの向きでも不具合が出る。保持する画面に `screenHost` を当てると、非表示の間の
  * 入れ直しでユーザが打ちかけていた内容が消える。保持しない画面に `retainedHost` を当てると、
  * 捨てられた画面へ送り続けて中身が古いまま止まる。
  *
@@ -22,17 +22,17 @@
  * |---|---|
  * | 組み上がっている | `posted`。`postMessage` で中身だけ渡し、画面は要るところだけ描き直す |
  * | 作り直している最中 | `deferred`。渡さない。 受け取る側（`message` のリスナ）はまだ無く、送っても失われる |
- * | 裏に回っている / まだ 1 枚も入れていない | `rebuilt`。入れ物ごと入れ直す。表に戻ると VS Code はこれから作り直す |
+ * | 非表示になっている / まだ 1 枚も入れていない | `rebuilt`。入れ物ごと入れ直す。再表示されると VS Code はこれから作り直す |
  *
  * `deferred` になったものは捨てられる。画面が組み上がると `ready` が届くので、受けた側がそこで
  * 渡し直す（board-panel の `ready` → `redraw`）。1 度きりの指示（「このプロジェクトで絞って開く」）は、
  * `rebuilt` なら入れ物に埋めて渡り、`posted` なら `post` が真を返したときだけ渡っている。
  * 渡る前に消さないこと。 消してから失敗すると二度と届かない。
  *
- * 画面の生死は 2 つで見る。裏に回ったことは `hidden()` で教えてもらい、加えて呼ばれるたびに
+ * 画面の生死は 2 つで見る。非表示になったことは `hidden()` で教えてもらい、加えて呼ばれるたびに
  * `surface.visible` も読む。片方だけでは足りない。
  *
- * - 自分で読むだけだと、裏へ回って表へ戻るまでの間に 1 度も呼ばれなければ、行って戻ったことに
+ * - 自分で読むだけだと、非表示になって再表示されるまでの間に 1 度も呼ばれなければ、行って戻ったことに
  *   気づけない（実機はその形。`onDidChangeViewState` のあいだ、この段取りは呼ばれない）
  * - 教えてもらうだけだと、教え忘れたときに、送ってはいけない画面へそのまま送ることになる
  *
@@ -42,10 +42,10 @@
 /** 拡張ホストが持つ Webview の窓口。パネルをこの形に合わせて渡す */
 export interface Surface {
   /**
-   * 表に出ているか。`retainContextWhenHidden` が偽の画面は、裏に回ると捨てられる。
+   * 表示されているか。`retainContextWhenHidden` が偽の画面は、非表示になると捨てられる。
    * 捨てられた画面に送っても誰にも届かない。
    *
-   * `retainedHost` は読まない。 保持する画面は裏でも生きていて、`postMessage` も届くため
+   * `retainedHost` は読まない。 保持する画面は非表示でも生きていて、`postMessage` も届くため
    */
   readonly visible: boolean;
   /** 入れ物ごと入れ直す（画面は作り直される） */
@@ -54,7 +54,7 @@ export interface Surface {
 }
 
 /**
- * 保持する画面（`retainedHost`）が使う窓口。表裏（`visible`）は要らない。 裏でも生きていて、
+ * 保持する画面（`retainedHost`）が使う窓口。表示の有無（`visible`）は要らない。 非表示でも生きていて、
  * 読まないものを実装させると、これをコピーして作った次の画面にも使われないゲッターが残り続ける
  */
 export type RetainedSurface = Omit<Surface, "visible">;
@@ -64,8 +64,8 @@ export type Delivery = "posted" | "deferred" | "rebuilt";
 
 export interface ScreenHost<D> {
   /**
-   * いま `postMessage` が届く。`screenHost` は「1 枚入っていて、表に出ていて、組み上がっている」、
-   * `retainedHost` は「1 枚入っていて、組み上がっている」（表裏は見ない）
+   * いま `postMessage` が届く。`screenHost` は「1 枚入っていて、表示されていて、組み上がっている」、
+   * `retainedHost` は「1 枚入っていて、組み上がっている」（表示の有無は見ない）
    */
   readonly live: boolean;
   /**
@@ -80,7 +80,7 @@ export interface ScreenHost<D> {
   /** 画面から `ready` が届いた。呼んだ側は、続けて中身を渡し直す */
   ready(): void;
   /**
-   * 裏に回った（`onDidChangeViewState`）。`screenHost` は画面が捨てられているので、組み上がって
+   * 非表示になった（`onDidChangeViewState`）。`screenHost` は画面が捨てられているので、組み上がって
    * いないものとして扱う（行って戻るまでこの段取りが 1 度も呼ばれないと自分では気づけないので、ここで
    * 教えてもらう）。`retainedHost` は画面が生きているので何もしない
    */
@@ -115,8 +115,8 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
   let seen = surface.visible;
 
   /**
-   * 呼ばれるたびに表裏を見て、前と違えば組み上がっていないものとして扱う。どちらの向きでも、
-   * そのとき生きていた画面は捨てられている（裏へ = 捨てられる、表へ = 入れてある HTML から
+   * 呼ばれるたびに表示の有無を見て、前と違えば組み上がっていないものとして扱う。どちらの向きでも、
+   * そのとき生きていた画面は捨てられている（非表示 = 捨てられる、再表示 = 入れてある HTML から
    * 作り直される）。`hidden()` の取りこぼしを拾うためのもので、これだけには頼れない
    * （行って戻るまで呼ばれなければ、違いが見えない）。
    */
@@ -159,9 +159,9 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
     },
     ready(): void {
       sync();
-      // 裏にいる画面は `ready` を送らない。届いたなら、それは捨てられた画面が残していったもの。
+      // 非表示になっている画面は `ready` を送らない。届いたなら、それは捨てられた画面が残していったもの。
       // これを真に受けると、作り直し中の画面へ送って失うことになる。
-      // （`live` と `post` も表に出ていることを見るので、ここは二重の確認。単体では外から観測できない）
+      // （`live` と `post` も表示されていることを見るので、ここは二重の確認。単体では外から観測できない）
       if (!seen) {
         return;
       }
@@ -178,16 +178,16 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  * 保持する画面（`retainContextWhenHidden: true`）に中身を渡す段取り。ルール管理・リスク管理・
  * フェーズ管理・テンプレート管理・フロー編集・計画編集が使う。返る形は `screenHost` と同じなので、パネルは作るところの 1 行だけが違う。
  *
- * 保持する画面は裏に回っても捨てられない。VS Code は DOM も Webview の中の状態もそのまま持ち、
- * 表に戻しても作り直さない。だから、この段取りが `screenHost` と違うのは次の 3 つ。
+ * 保持する画面は非表示になっても捨てられない。VS Code は DOM も Webview の中の状態もそのまま持ち、
+ * 再表示しても作り直さない。だから、この段取りが `screenHost` と違うのは次の 3 つ。
  *
  * - 入れ物（HTML）は 1 度しか入れない。 入れ直すと画面は作り直され、ユーザが打ちかけていた
  *   内容が消える。2 枚目からは必ず `postMessage`（`posted`）で渡す
- * - 表裏を見ない。 裏でも `postMessage` は届く（`postMessage` の文書が「live な画面には届く。
- *   保持する画面は裏でも live」と言う）。見て組み上がっていないものとして扱うと、裏にいる間の `lock` や `changed` の知らせが失われる。
+ * - 表示の有無を見ない。 非表示でも `postMessage` は届く（`postMessage` の文書が「live な画面には届く。
+ *   保持する画面は非表示でも live」と言う）。見て組み上がっていないものとして扱うと、非表示の間の `lock` や `changed` の知らせが失われる。
  *   ただし VS Code の文書は同じ型定義の中で食い違っている（`retainContextWhenHidden` の側は
- *   「裏に回った画面にはメッセージを送れない」と言う）。どちらが正しくても正しく動くよう、呼ぶ側は
- *   表に戻ったときに、いま出すべき知らせ（`lock`・`changed`）と見た目（`appearance`）を送り直す
+ *   「非表示になった画面にはメッセージを送れない」と言う）。どちらが正しくても正しく動くよう、呼ぶ側は
+ *   再表示されたときに、いま出すべき知らせ（`lock`・`changed`）と見た目（`appearance`）を送り直す
  *   （rules-panel / risk-panel / phases-panel / templates-panel / flow-panel / workflow-panel）
  * - `hidden()` は何もしない。 教えてもらっても、捨てられていないので扱いを変えるものが無い
  *

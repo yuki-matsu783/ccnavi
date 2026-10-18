@@ -28,7 +28,7 @@ _state: dict = {"via": VIA_CLI, "actor": ""}
 def session(via: str, actor: str = "") -> Iterator[None]:
     """1 回の起動の間、経路とアカウントを覚える。抜けるときに前の値へ戻す。
 
-    テストは同じプロセスで何度も起動するので、前の起動の値が次へ漏れないようにする。
+    テストは同じプロセスで何度も起動するので、前の起動の値が次へ引き継がれないようにする。
     """
     before = dict(_state)
     _state["via"] = via

@@ -533,7 +533,7 @@ class StartShTest(unittest.TestCase):
         self.fail(f"{marker} の行が無い: {out}")
 
     def test_rerun_after_mcp_made_the_mr_follows_the_guided_commands(self):
-        # 案内どおりの流れ。search 段 → --mcp-checked で打ち直す → create 段
+        # 案内どおりの流れ。search 手順 → --mcp-checked で打ち直す → create 手順
         # → MCP で PR を作った想定 → 案内のコマンドを打ち直す
         search = self.run_sh("--issue", "152", "--slug", "login", token=False)
         self.assertEqual(search.returncode, 4, search.stdout + search.stderr)

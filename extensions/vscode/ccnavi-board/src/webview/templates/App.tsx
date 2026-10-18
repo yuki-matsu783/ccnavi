@@ -32,7 +32,7 @@ const TOUR = tourOf(templatesTour);
 const SAMPLE = parseTemplatesSample(TOUR.sample);
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -227,7 +227,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       }
     };
     window.addEventListener("message", onMessage);
-    // 組み上がったと伝える。裏に回って捨てられた画面は、表に戻ると拡張ホストが入れてある HTML から作り直される。
+    // 組み上がったと伝える。非表示になって捨てられた画面は、再表示されると拡張ホストが入れてある HTML から作り直される。
     // その HTML は少し古いことがあるので、いまの中身をもらい直す
     post({ type: "ready" });
     return () => window.removeEventListener("message", onMessage);

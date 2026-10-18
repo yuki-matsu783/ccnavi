@@ -169,7 +169,7 @@ test("CX-T226 書く操作の最中は、欄のボタン（button.action）を�
   pressed.length = 0;
   const all = { board: board(), attention: { i0002: "競合が残った" }, issues: undefined };
   const f = await mount({ sections: sections(all), state: "done" });
-  // 欄のボタンはすべて action（押せなくする対象から漏れるボタンが無い）
+  // 欄のボタンはすべて action（押せなくする対象に入っていないボタンが無い）
   assert.equal(actionButtons().length, doc.querySelectorAll("main button").length);
   assert.deepEqual(
     actionButtons().map((b) => b.dataset.action),

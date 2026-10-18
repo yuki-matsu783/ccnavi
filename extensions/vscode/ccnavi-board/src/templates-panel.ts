@@ -87,7 +87,7 @@ interface PanelState {
   error?: string;
   lock: Lock;
   projectLocks: Record<string, Lock>;
-  /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
+  /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。再表示されたときに送り直す */
   changedPending: boolean;
   /** 自分が書いた時刻。この直後の監視の反応は、外で変わったものとして扱わない */
   wroteAt: number;
@@ -182,7 +182,7 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 下書きの取り込みの下見や、開いている本文を持つので、タブを裏に回しても捨てない。
+    // 下書きの取り込みの下見や、開いている本文を持つので、タブを非表示にしても捨てない。
     retainContextWhenHidden: true,
   });
   showLoading(panel, titleOf(target), SCREEN, whatOf(target));
@@ -299,10 +299,10 @@ function registerPanelHandlers(current: PanelState): void {
     void handleMessage(current, asMessage(message));
   });
 
-  // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
-  // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
-  // どちらが正しくても困らないよう、表に戻ったところで、いま出すべき知らせを送り直す。
-  // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
+  // 保持する画面は非表示でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
+  // 食い違っている（`retainContextWhenHidden` の側は「非表示の画面には送れない」と言う）。
+  // どちらが正しくても困らないよう、再表示されたところで、いま出すべき知らせを送り直す。
+  // 中身（`data`）は送らない。送ると、非表示の間に打っていた編集がここで消える。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -503,13 +503,13 @@ function redraw(current: PanelState): void {
 
 /**
  * テンプレート管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
- * 入れ物は 1 度しか入らないので、表裏は渡さない（保持する画面は裏でも生きている）。
+ * 入れ物は 1 度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
 function templatesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<TemplatesData> {
   if (panel.options.retainContextWhenHidden !== true) {
-    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
+    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
     // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
     diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "templates", retainContextWhenHidden: false });
   }

@@ -57,7 +57,7 @@ const ADDED_KEY = "s-add";
 const ADDED_BLANK = emptyPhase();
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): ReadonlySet<string> {
   return new Set(typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : []);
 }
@@ -106,7 +106,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const { draft, open, more } = editing;
   const page = pageOf(data);
   /**
-   * 案内の間は見本を描き、段ごとの様子（開く定義・絞り込み・設定の切り替えなど）は `scene` に入れる。実際の編集中の定義や開いた行は
+   * 案内の間は見本を描き、手順ごとの様子（開く定義・絞り込み・設定の切り替えなど）は `scene` に入れる。実際の編集中の定義や開いた行は
    * 動かさないので、閉じたあとに戻すものは無い。
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);

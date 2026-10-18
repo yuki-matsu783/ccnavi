@@ -321,7 +321,7 @@ test("CB-D86 図・一覧と図の切り替え・全体計画の待ち方の選�
   }
 });
 
-test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後まで進めると閉じて tourDone を返す。案内の間は見本を描き、閉じたら実際の定義に戻る。図・関係の欄・待ち方の段はありません", async () => {
+test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後まで進めると閉じて tourDone を返す。案内の間は見本を描き、閉じたら実際の定義に戻る。図・関係の欄・待ち方の手順はありません", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
@@ -336,7 +336,7 @@ test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後ま�
       await dom.settle();
       titles.push(dom.one("#tour-title").textContent);
       if (i === 0) {
-        // 補足の段で、見本の行（research）と、その補足が開いている。実際の定義の行（p1…）は描かない
+        // 補足の手順で、見本の行（research）と、その補足が開いている。実際の定義の行（p1…）は描かない
         assert.ok(dom.one(`${rowSelector("s1")} details.more`).hasAttribute("open"));
         assert.ok(dom.one(rowSelector("s1")).classList.contains("open"));
         assert.equal(dom.all(rowSelector("p1")).length, 0, "実際の定義が出ている");
@@ -402,7 +402,7 @@ test("CB-D91 案内は Esc か × でやめられ、やめても tourDone を返
   }
 });
 
-test("CB-D147 案内は → で次の段へ、← で前の段へ動く。端の段ではどちらも何もしない", async () => {
+test("CB-D147 案内は → で次の手順へ、← で前の手順へ動く。端の手順ではどちらも何もしない", async () => {
   const dom = await openPhases();
   try {
     await dom.send({ type: "tour" });

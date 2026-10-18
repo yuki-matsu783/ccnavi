@@ -31,7 +31,7 @@ const MIN_WIDTH = 220;
 const TOUR = tourOf(boardTour);
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }
@@ -65,7 +65,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   boardRef.current = board;
   // 初回の案内はボードが出てから始める。承認のオーバーレイが出ている間は、その下を指しても見えないので待つ
   /**
-   * 案内の段ごとの画面の様子（絞り込み・畳んだ列・出すオーバーレイ）。見本の上だけに効き、実際の絞り込みや
+   * 案内の手順ごとの画面の様子（絞り込み・畳んだ列・出すオーバーレイ）。見本の上だけに効き、実際の絞り込みや
    * 畳んだ列（`view`）には触れないので、閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -123,7 +123,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
       }
     };
     window.addEventListener("message", onMessage);
-    // 組み上がったと伝える。裏に回って捨てられた画面は、表に戻ると拡張ホストが入れてある HTML から
+    // 組み上がったと伝える。非表示になって捨てられた画面は、再表示されると拡張ホストが入れてある HTML から
     // 作り直される。その HTML は少し古いことがあるので、いまの中身をもらい直す
     post({ type: "ready" });
     return () => window.removeEventListener("message", onMessage);

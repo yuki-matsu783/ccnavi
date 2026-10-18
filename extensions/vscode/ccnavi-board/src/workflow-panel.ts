@@ -93,7 +93,7 @@ interface PanelState {
   /** 開き直したときに戻す線。最初の読み込みで確かめて `shownDraft` に移す */
   restore?: Restore;
   shownDraft?: PlanOrder;
-  /** 外で変わったときの今の答え。表に戻ったとき・作り直したときに知らせ直す */
+  /** 外で変わったときの今の答え。再表示されたとき・作り直したときに知らせ直す */
   changed?: PlanOrderAnswer;
   /** 提案が承認待ちから無くなった理由 */
   gone?: string;
@@ -152,7 +152,7 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 線の引き直しの途中を持つので、タブを裏に回しても捨てない
+    // 線の引き直しの途中を持つので、タブを非表示にしても捨てない
     retainContextWhenHidden: true,
   });
   showLoading(panel, workflowTitle(ticket), SCREEN, `${ticket} の計画編集`);
@@ -187,7 +187,7 @@ function registerPanelHandlers(current: PanelState): void {
   panel.webview.onDidReceiveMessage((message: unknown) => {
     void handleMessage(current, asWorkflowMessage(message));
   });
-  // フロー編集と同じ。表に戻ったら、いま出すべき知らせと見た目を送り直す（中身は送らない）
+  // フロー編集と同じ。再表示されたら、いま出すべき知らせと見た目を送り直す（中身は送らない）
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -223,7 +223,7 @@ function registerPanelHandlers(current: PanelState): void {
   }
 }
 
-/** 外で変わった・無くなったの知らせを画面に送る（作り直した画面と、表に戻った画面へ） */
+/** 外で変わった・無くなったの知らせを画面に送る（作り直した画面と、再表示された画面へ） */
 function postNotices(current: PanelState): void {
   if (current.gone !== undefined) {
     current.host.post({ type: "gone", reason: current.gone } satisfies ToWorkflow);

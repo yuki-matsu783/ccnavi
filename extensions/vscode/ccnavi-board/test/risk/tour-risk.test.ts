@@ -98,7 +98,7 @@ test("CB-T443 リスクの案内の scene は、見本にある項目の id・�
   const known = ["open", "find", "blank", "missing", "sum"];
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目`;
+      const at = `${course.id} の ${index + 1} 番目の手順`;
       const scene = step.scene;
       for (const id of String(scene.open ?? "").split(",").filter((item) => item.trim() !== "")) {
         assert.ok(ids.has(id.trim()), `${at}: open の ${id} が見本にありません`);
@@ -114,7 +114,7 @@ test("CB-T443 リスクの案内の scene は、見本にある項目の id・�
   }
 });
 
-test("CB-T444 リスクの案内は、基本の案内の題と順序を保ち、ユースケースは「〜したいとき」の 4〜9 段で、指す先は画面にある印だけを使う", () => {
+test("CB-T444 リスクの案内は、基本の案内の題と順序を保ち、ユースケースは「〜したいとき」の 4〜9 手順で、指す先は画面にある印だけを使う", () => {
   assert.equal(def.courses[0].id, INTRO_ID);
   assert.deepEqual(
     def.courses[0].steps.map((step) => step.title),
@@ -125,7 +125,7 @@ test("CB-T444 リスクの案内は、基本の案内の題と順序を保ち、
   assert.ok(useCases.length >= 3 && useCases.length <= 6, `ユースケースが ${useCases.length} 本`);
   for (const course of useCases) {
     assert.match(course.title, /とき$/, `${course.id}: 題は利用者の目的（〜したいとき）で切る`);
-    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 段`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
   }
   for (const course of def.courses) {
     for (const step of course.steps) {
@@ -134,12 +134,12 @@ test("CB-T444 リスクの案内は、基本の案内の題と順序を保ち、
   }
 });
 
-test("CB-T445 項目の中を指す段は、その項目の加点条件に出る欄を指し、ファイルがない状態の段だけが帯と「作る」を指す", () => {
+test("CB-T445 項目の中を指す手順は、その項目の加点条件に出る欄を指し、ファイルがない状態の手順だけが帯と「作る」を指す", () => {
   const forms = new Map(sample.page.model.form.factors.map((factor) => [factor.id, factor]));
   const counting = ["lines_over", "files_over", "deleted_over"];
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目（${step.target}）`;
+      const at = `${course.id} の ${index + 1} 番目の手順（${step.target}）`;
       if (step.target.startsWith("factor-") && step.target !== "factor-count") {
         const open = String(step.scene.open ?? "").split(",")[0].trim();
         assert.ok(forms.has(open), `${at}: 指す項目が開かれていない`);
