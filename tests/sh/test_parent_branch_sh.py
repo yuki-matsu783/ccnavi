@@ -478,14 +478,15 @@ class ParentBranchShTest(unittest.TestCase):
         リモートに無いブランチを作り直さない。"""
         self.imported_family()
         copy = os.path.join(self.tree, APPROVED, "doing", PARENT + ".md")
+        # 承認済みのコピーは、着手前は `started_at: ""` を持つ。着手済みの値に書き換える。
         with open(copy, encoding="utf-8") as f:
             text = f.read()
-        write(copy, text.replace("---\n", "---\nstarted_at: 2026-10-18T00:00:00Z\n", 1))
+        self.assertIn('started_at: ""', text)
+        write(copy, text.replace('started_at: ""', "started_at: 2026-10-18T00:00:00Z", 1))
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "start")
         self.delete_remote_branch()
         git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{BRANCH}")
-        print("DBG", self.exe("tree", "parent", self.tree, PARENT).stdout, text[:200], flush=True)
         refused = self.refused(
             self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree)
         )
