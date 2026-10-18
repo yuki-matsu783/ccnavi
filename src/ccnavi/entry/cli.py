@@ -23,7 +23,7 @@ import traceback
 from typing import TextIO
 
 from ..hook import events, judge, reasons, subagent
-from ..infra import fsio, hookio, modes, settings
+from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog
@@ -1238,7 +1238,7 @@ def _internal_error(
 
 
 def default_root() -> str:
-    """ワークスペースルート、つまり .claude を持つディレクトリ（ワークツリーの位置のものを除く）を見つける。
+    """ワークスペースルート、つまり .claude を持つディレクトリを見つける。ワークツリーは除く。
 
     ここでは作業ディレクトリそのものに頼ってはいけない。hook は自分が走る
     ディレクトリを選べないから。代わりに上へ辿るので、ワークスペースの中の
@@ -1254,12 +1254,12 @@ def default_root() -> str:
 
 
 def _is_worktree_dir(directory: str) -> bool:
-    """`.../.claude/worktrees/<名前>` の位置にあるディレクトリか。"""
-    holder = os.path.dirname(directory)
-    return (
-        os.path.basename(holder) == "worktrees"
-        and os.path.basename(os.path.dirname(holder)) == ".claude"
-    )
+    """`<ワークスペースルート>/.claude/worktrees/<名前>` の位置にあるディレクトリか。
+
+    大文字小文字の扱いは tree と同じ。区別しない機械（Windows）でだけ区別しない（normcase）。
+    """
+    holder = os.path.normcase(os.path.dirname(directory))
+    return holder.endswith(os.sep + os.path.normcase(tree.WORKTREES_DIR))
 
 
 def _find_project_root() -> str:

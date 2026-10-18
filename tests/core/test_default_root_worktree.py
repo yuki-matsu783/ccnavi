@@ -32,6 +32,12 @@ class DefaultRootWorktreeTest(unittest.TestCase):
             finally:
                 os.chdir(old)
 
+    def test_大文字小文字は_tree_と同じ扱い(self) -> None:
+        upper = os.path.join("ws", ".CLAUDE", "WORKTREES", "x")
+        self.assertEqual(cli._is_worktree_dir(upper), os.path.normcase("A") == "a")
+        self.assertTrue(cli._is_worktree_dir(os.path.join("ws", ".claude", "worktrees", "x")))
+        self.assertFalse(cli._is_worktree_dir(os.path.join("ws", "x")))
+
 
 if __name__ == "__main__":
     unittest.main()
