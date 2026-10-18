@@ -246,7 +246,7 @@ def _judge_stop(
     who = payload.agent_id or (t.name if t is not None else "")
     if unchecked:
         # 範囲を確かめられなかった子がある。通した回と記録で見分けられるよう、範囲外が他に
-        # 見つからなければ判定に至らなかった回にし、どの子かを detail に残す。止めはしない。
+        # 見つからなければ判定に至らなかった回にし、どの子かを detail に残す。
         # 読めないのは子の作業のせいとは限らず、差し戻しても子には直せないことがある。
         # この出力は親に届かないので、親の `Agent` の PostToolUse で 1 行言うための印を置く。
         record.detail = "unchecked: " + ", ".join(unchecked)

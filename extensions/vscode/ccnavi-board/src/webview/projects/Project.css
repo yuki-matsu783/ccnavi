@@ -1,6 +1,6 @@
 /*
  * プロジェクト 1 件のカード（`Project.tsx`）。見出しとバッジ、項目の格子、行末のボタンの帯、
- * 設定の検証の一覧。メニューそのものは `Menu.css`。
+ * 設定の検証の一覧。
  */
 .project {
   border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 8px 10px;

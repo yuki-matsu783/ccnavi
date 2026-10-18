@@ -105,7 +105,7 @@ class ParentTreeTest(AuthorityHarness):
         os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02-02.md"))
         copies, _ = approval.scan(self.conf(), self.root)
         after = {t.ticket: t.blocked for t in copies}
-        # リストは変えない（除かない）。理由だけが足される。
+        # 理由だけが足される。
         self.assertIn("i0001-02-02", after)
         self.assertIn("ワークツリーの外", after["i0001-02-02"])
         self.assertEqual("", after["i0001-01-01"])

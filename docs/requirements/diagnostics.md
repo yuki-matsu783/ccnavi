@@ -24,6 +24,6 @@ keywords: [要件, REQ-DIA, 診断, コマンド, 直接起動, 試験, 検証, 
 
 診断コマンドは hook から呼ばれず、ユーザが端末から打つ。REQ-DIA-06、REQ-DIA-02 の JSON 版
 （`--test --json` / `--test-expectations --json`）、REQ-DIA-08 は VS Code の拡張（`extensions/vscode/ccnavi-board/`）も読む。
-拡張は判定の答えを自前で出し直さず、実行ファイルが出したものを並べる。
+拡張は実行ファイルが出した判定の答えを並べる。
 
 REQ-DIA-03 が無いと、報告するだけのモードや試験の結果が、判定を適用するモードの保証にならない。

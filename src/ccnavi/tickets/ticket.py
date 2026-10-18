@@ -97,7 +97,7 @@ _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 def _plan(
     name: str, key: str, raw, start: int = 1
 ) -> tuple[list[ticket_model.PlanItem] | None, list[Problem]]:
-    """計画のリストを読む。定義が在るかはここでは見ない（定義を読むのは承認の側）。
+    """計画のリストを読む。定義が在るかを確かめるのは承認の側。
 
     `start` はこの計画の最初の番号（全体計画は 1、フィードバック計画は全体計画の続き）。
     項の `after` は `_after` が読む。`after` の形の誤りと最後の項の延期では読み込みを落とさない
@@ -391,8 +391,9 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
             ticket.plan = items
         else:
             ticket.feedback = items
-    # `workflow:` の欄は読まない。待ち方は計画の `after` から計算する（`workflow.compute`）。
-    # 欄があれば `--agree`・`--lint`・判定が error にする（手で書いた欄が効くと読ませない）。
+    # 待ち方は計画の `after` から計算する（`workflow.compute`）。
+    # `workflow:` の欄があれば `--agree`・`--lint`・判定が error にする
+    # （手で書いた欄が効くと読ませない）。
 
     # 親の `phases:`（計画が使うフェーズ定義の写し）は生の値だけを持つ。定義に読むのは
     # `phasetypes.types_of`（compose 層）で、形の誤りも子に書いた `phases:` も、ここでは
@@ -545,8 +546,8 @@ def subset_problems(child: ticket_model.Ticket, parent: ticket_model.Ticket) -> 
     `src/components/*` の前置は `src/components/`、`*` の前置は空文字で、
     空文字を中と言える親は `*` を持つ親だけになる。
 
-    超えていても承認は止めない（warn）。判定が親の範囲で切り詰めるので、承認で止める
-    理由が無い。承認の画面は「チケットで編集対象としているが、書き込めない場所」として別の見出しで見せる。
+    超えていれば warn で言う。判定が親の範囲で切り詰める。
+    承認の画面は「チケットで編集対象としているが、書き込めない場所」として別の見出しで見せる。
     """
     problems = []
     for entry in child.entries:
@@ -602,7 +603,6 @@ def scan(
     承認済みチケットが `finish` で動いてきたもので、`completed_at` を持つ（approval.scan_review）。
     置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けの提案はその
     プロジェクトのツリー（か、そこから切ったワークツリー）にある。
-    ワークスペースの `wip/<名前>/proposals/` は読まない。
     同じ識別子が複数のツリーにあれば、正とするツリーの側だけを残す。
 
     `approved` は、まとめる前の承認済みチケット（作業中・レビュー待ち・閉じた）の全部。

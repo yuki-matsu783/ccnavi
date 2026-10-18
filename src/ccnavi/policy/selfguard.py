@@ -34,7 +34,7 @@ rules.yml は何を止めるかを、phases.yml はレビューが要るかを�
 ## `.ccnavi/scripts/` はコアに入れない
 
 ccnavi ディレクトリの下には、配点が呼ぶスクリプトも入る。そちらはコアにしない。スクリプトは
-risks.yml から `script:` で参照されて初めて使われ、参照が無ければ何もしない。その
+risks.yml から `script:` で参照されて初めて使われる。その
 risks.yml がここで守られているので、新しい参照を足すことはできない。残る経路は
 「既に参照されているスクリプトの中身を書き換える」だけで、そこは組み込みの deny
 （`*/.ccnavi/*`、add_rules）とルール由来の保護に任せる。止まり、止めきれなくても戻る。
@@ -161,6 +161,10 @@ REF_SUFFIX = ".ref"
 # 中断して翌日に開き直した形までは拾える幅にしてある。
 KEEP_DAYS = 3
 
+# 変わっていないバックアップの更新時刻を新しくする間隔（秒）。書き直さない代わりに、
+# 掃除が動いているセッションを古いと読んで消さないよう、`KEEP_DAYS` より十分短くしておく。
+REFRESH_SECONDS = 86400
+
 # 実体をコピーするときの一時名。コピーの途中で中断されたものを、次のセッションが
 # 中身の揃ったバックアップとして拾わないように、名前を分けてから置き換える。
 _PART_SUFFIX = ".part"
@@ -175,6 +179,7 @@ ACTION_FAILED = "failed"  # 戻そうとして駄目だった
 ACTION_WOULD = "would-restore"  # dry-run。戻す代わりに言うだけ
 ACTION_LEFT = "left-as-repair"  # 読めないルールファイルへの修復なので戻さなかった
 ACTION_REBASED = "rebased"  # 大きい対象が変わったので、新しい版を基準に取り直した
+ACTION_ACCEPTED = "accepted"  # ユーザの発言で、消えたことを受け入れた
 
 # 共通レイヤーのルールファイルに付けるバックアップの key（_places）。
 COMMON_RULES_KEY = "rules"
@@ -251,6 +256,9 @@ def before(
             # 大きい対象は、呼び出しのたびにコピーも読みもしない（数十 MB を毎回扱うと、
             # 判定より重くなる）。大きさと更新時刻が変わったときだけ、新しい版を基準に
             # 取り直す。ツールを呼ぶ前に、ccnavi の外で再ビルドされていた場合もここで取り直す。
+            # 参照は書き直さないので、掃除（`sweep`）に古いと読まれないよう、
+            # 更新時刻だけを新しくする。
+            _refresh(_ref_path(state_dir, session, target))
             if setting == ENABLE:
                 outcome = _rebase_if_changed(state_dir, session, target)
                 if outcome is not None:
@@ -269,7 +277,9 @@ def before(
             continue
 
         if _absent_noted(state_dir, session, target):
-            # 最初から無いと分かっている。何も言わない。
+            # 最初から無いと分かっている。何も言わない。印の更新時刻だけ新しくする。
+            # 全部の対象に印が付いたセッションが、掃除に古いと読まれないように。
+            _refresh(_absent_path(state_dir, session, target))
             continue
 
         saved = _read_backup(state_dir, session, target)
@@ -348,7 +358,7 @@ def after(
                 # 「無いものが無いまま」を異常として扱わない。
                 continue
             if _absent_noted(state_dir, session, target):
-                # 無かったところに現れた。消しはしない。ユーザが置くこともある
+                # 無かったところに現れた。ユーザが置くこともある
                 # ファイルで、消すほうが取り返しが付かない。言うだけにする。
                 outcomes.append(
                     Outcome(
@@ -380,6 +390,63 @@ def after(
     # 何も起きていない回は除く。ACTION_KEPT はここまでの経路で「調べたが
     # 変わっていなかった」を伝えるための値で、報告に出す用件ではない。
     return [o for o in outcomes if o.action != ACTION_KEPT]
+
+
+def accept(
+    setting: str,
+    state_dir: str,
+    session: str,
+    root: str,
+    found: list[selfguard_targets.Target],
+) -> list[Outcome]:
+    """ユーザが発言したとき。前のターンの終わりからここまでの変更を、ユーザの手によるものとして受け入れる。
+
+    ターンの間にユーザが設定ファイルを直したり消したりしても、次のツール呼び出しで戻さないために、
+    今の状態を基準に取り直す。実行前の `before` は、直されたものは受け入れるが、消されたものは戻す。
+    消えたものを受け入れるのはここだけで、バックアップを捨てて `.absent` のマーカーを置く。
+
+    バックアップを取り直すだけで、戻さない。`dry-run` でも取り直す（`at_start` と同じ理由）。
+    実行ファイルは、開始で基準を取ったものだけ、変わっていれば取り直す。開始で取れなかったもの
+    （登録が無い、取るのに失敗した）は、ここでも取らない。
+    バックグラウンド作業の完了通知では呼ばない（`hookio.Input.from_background_task`）。
+    通知の間に動いたプロセスが書いた変更は、ユーザの変更と区別できないので、受け入れずに次の照合に任せる。
+    """
+    if setting == DISABLE or not state_dir:
+        return []
+
+    # 受け入れた消えたことと取り直しは、記録の `guarded` に残す（呼び手）。黙って受け入れると、
+    # ユーザの正規の削除と、見逃した削除を、記録から区別できない。
+    outcomes = []
+    for target in found:
+        if target.heavy:
+            if os.path.lexists(target.path):
+                outcome = _rebase_if_changed(state_dir, session, target)
+                if outcome is not None:
+                    outcomes.append(outcome)
+            elif _parse_ref(_read(_ref_path(state_dir, session, target))) is not None:
+                fsio.remove(_ref_path(state_dir, session, target))
+                _note_absent(state_dir, session, target)
+                outcomes.append(Outcome(target, ACTION_ACCEPTED, "消えたことを受け入れた"))
+            continue
+
+        content = _read(target.path)
+        if content is None:
+            if os.path.lexists(target.path):
+                # 在るのに読めない（権限、一時的な入出力の失敗、壊れたシンボリックリンク）。
+                # 消えたことにはしない。バックアップを捨てると、あとで本当に消されても戻せなくなる。
+                continue
+            if _read_backup(state_dir, session, target) is not None:
+                outcomes.append(Outcome(target, ACTION_ACCEPTED, "消えたことを受け入れた"))
+            fsio.remove(_backup_path(state_dir, session, target))
+            _note_absent(state_dir, session, target)
+            continue
+        _clear_absent(state_dir, session, target)
+        failed = _write_backup(state_dir, session, target, content)
+        if failed:
+            outcomes.append(
+                Outcome(target, ACTION_FAILED, f"バックアップを保存できませんでした: {failed}")
+            )
+    return outcomes
 
 
 def _left_as_repair(
@@ -417,16 +484,16 @@ def at_start(
     root: str,
     found: list[selfguard_targets.Target],
 ) -> list[Outcome]:
-    """セッションが始まったとき。対象をすべてバックアップする。
+    """セッションが始まったとき。大きい対象をバックアップする。
 
-    大きい対象をバックアップするのはここだけ。実行ファイルがこれにあたり、ツール呼び出しの
-    たびに数十 MB をコピーするわけにはいかないので、コピーするのはセッションに 1 度。そのあいだに
-    ツール呼び出しの外で作り直されたものは、次の実行前の照合で新しい版として基準に取り込む。
-    ツール呼び出しの中で変わったものは、実行後に、その直前の版へ戻す。
+    大きい対象は、実行ファイルがこれにあたり、ツール呼び出しのたびに数十MBをコピーするわけには
+    いかないので、開始で 1 度コピーする。そのあいだにツール呼び出しの外で作り直されたものは、
+    次の発言（`accept`）か実行前（`before`）の照合で新しい版として基準に取り込む（そのときだけ
+    コピーし直す）。ツール呼び出しの中で変わったものは、実行後に、その直前の版へ戻す。
 
-    小さいほうも一緒にバックアップする。実行前のバックアップが始まるのは最初のツール呼び出しからで、
-    それより前に設定ファイルを消されると、バックアップを持たないまま実行後チェックに入る。
-    セッションの開始そのものが、いちばん早く取れる断面になる。
+    小さいほうは取らない。最初の発言で `accept` が取る。開始から最初のツール呼び出しまでの間、
+    エージェントは何も実行していないので、その間に設定ファイルが消えていても、ユーザの手による削除なので、
+    戻す根拠が無い。
 
     バックアップするだけで、戻さない。`dry-run` でもバックアップするのは、
     バックアップすることが誰の書きかけも消さない側の操作だから。ここを `enable` に限ると、
@@ -457,20 +524,9 @@ def at_start(
             failed = _save_heavy(state_dir, session, target)
             if failed:
                 outcomes.append(Outcome(target, ACTION_FAILED, f"バックアップを取れない: {failed}"))
-            continue
-
-        content = _read(target.path)
-        if content is None:
-            # 最初から無い。`settings.local.json` を置いていない形がこれで、
-            # 異常ではない。無いことのマーカーは実行前の側が残す。開始の時点では
-            # まだ「消された」と「置いていない」を見分ける手がかりが無い。
-            continue
-        _clear_absent(state_dir, session, target)
-        failed = _write_backup(state_dir, session, target, content)
-        if failed:
-            outcomes.append(
-                Outcome(target, ACTION_FAILED, f"バックアップを保存できませんでした: {failed}")
-            )
+        # 小さい対象はここで取らない。最初の発言（UserPromptSubmit）で `accept` が取る。
+        # 開始から最初の発言までは、エージェントが何も実行しない。その間に起きる変更は、
+        # ユーザの手による編集か削除なので、バックアップから戻す根拠が無い。
     return outcomes
 
 
@@ -643,6 +699,17 @@ def _check_heavy(
     """
     ref = _parse_ref(_read(_ref_path(state_dir, session, target)))
     if ref is None:
+        # ユーザが消したものを受け入れた（`accept`）あとで、この呼び出しの中で現れた。
+        # 設定ファイルの「無かったところに現れた」（`after`）と同じく、言うだけで消さない。
+        # 次の実行前に新しい版として基準に入る。判定器の実体が差し替わっていないかを、
+        # ユーザが見る機会を残す。
+        if _absent_noted(state_dir, session, target) and os.path.exists(target.path):
+            return Outcome(
+                target,
+                ACTION_MISSING,
+                "ユーザが消したあとに、実行ファイルが現れた。判定器が差し替わっているかもしれないので、"
+                "中身をユーザに見てもらってください",
+            )
         return None
     digest, size, mtime = ref
     if _same_shape(target.path, size, mtime):
@@ -704,6 +771,11 @@ def _rebase_if_changed(
     """
     ref = _parse_ref(_read(_ref_path(state_dir, session, target)))
     if ref is None:
+        # ユーザが消したものを受け入れた（`accept`）あと、また置かれた。新しい版を基準にする。
+        # 参照が無いままだと、このセッションの残りで実行ファイルを守れなくなる。
+        if _absent_noted(state_dir, session, target) and os.path.exists(target.path):
+            _clear_absent(state_dir, session, target)
+            return _rebase_heavy(state_dir, session, target)
         return None
     _, size, mtime = ref
     if _same_shape(target.path, size, mtime) or not os.path.exists(target.path):
@@ -961,7 +1033,28 @@ def _read_backup(state_dir: str, session: str, target: selfguard_targets.Target)
 def _write_backup(
     state_dir: str, session: str, target: selfguard_targets.Target, content: bytes
 ) -> str:
-    return _write(_backup_path(state_dir, session, target), content)
+    """バックアップを取る。既にあって中身が同じなら書かない。
+
+    呼び出しのたびに取るので、変わっていない対象を毎回書き直すのは無駄になる。
+    ただし掃除（`sweep`）は更新時刻で生きているセッションを見分けるため、書かない代わりに
+    古くなったときだけ更新時刻を新しくする。何日も続くセッションのバックアップが、
+    他のセッションの開始で消されないように。
+    """
+    path = _backup_path(state_dir, session, target)
+    if _read(path) == content:
+        _refresh(path)
+        return ""
+    return _write(path, content)
+
+
+def _refresh(path: str) -> None:
+    """更新時刻が `REFRESH_SECONDS` より古ければ新しくする。中身には触らない。"""
+    now = time.time()
+    try:
+        if now - os.stat(path).st_mtime > REFRESH_SECONDS:
+            os.utime(path, (now, now))
+    except OSError:
+        pass
 
 
 def _read(path: str) -> bytes | None:

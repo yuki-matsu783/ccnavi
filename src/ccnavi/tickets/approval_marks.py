@@ -5,9 +5,8 @@
 親ごとのマーカー（ready・close-early・closed）、子ごとの記録（実績のリスクと定性項目の判定）も
 同じ置き場にある。approval から分けた。
 
-ユーザが受け入れた未解決スレッドは、ここには記録しない。ホスト側で返信を残して解決する
-（`review_decide`・`review_close`）。以前の版が置いた `phases/<親>/accepted.json` が
-親に残っていても読まない。
+ユーザが受け入れた未解決スレッドは、ホスト側で返信を残して解決する
+（`review_decide`・`review_close`）。
 
 ファイル名とマーカーの JSON の形は sh と拡張も読む。値と形を変えない。
 """

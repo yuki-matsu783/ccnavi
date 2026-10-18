@@ -293,7 +293,7 @@ def relative(tree: Tree, full: str) -> str:
 
 
 def git_dir(tree_root: str) -> str | None:
-    """このツリーの git ディレクトリ。分からなければ None。ファイルだけを読む（git は起こさない）。
+    """このツリーの git ディレクトリ。分からなければ None。ファイルだけを読む。
 
     `.git` がディレクトリならそれ、ファイル（`gitdir: <場所>`、相対ならツリーから）ならその場所。
     """
@@ -329,7 +329,7 @@ def origin_head(repo_root: str) -> str:
     """そのリポジトリの `origin/HEAD` が指すブランチ名（`refs/remotes/origin/HEAD` の中身）。
     無ければ空。
 
-    ファイルだけを読む（git は起こさない）。`ccnavi_default_branch` が `symbolic-ref`
+    ファイルだけを読む。`ccnavi_default_branch` が `symbolic-ref`
     で読むものと同じ。
     """
     gitdir = git_dir(repo_root)
@@ -386,7 +386,7 @@ BUSY_MARKS = (
 def busy_of(tree_root: str) -> str:
     """このツリーで途中の操作（merge・cherry-pick・revert・rebase）があればその目印の名前。無ければ空。
 
-    ファイルだけを見る（git は起こさない）。
+    ファイルだけを見る。
     """
     gitdir = git_dir(tree_root)
     if gitdir is None:
@@ -417,7 +417,7 @@ def worktree_path(root: str, name: str) -> str:
     """この名前のワークツリーが置かれる場所。
 
     大文字小文字だけが違う名前は同じ場所として扱うので、在るときはディレクトリの実際の表記で返す。
-    無いときは与えた名前のまま組む（在るかどうかは見ない）。
+    無いときは与えた名前のまま組む。
     """
     base = os.path.join(root, WORKTREES_DIR)
     try:

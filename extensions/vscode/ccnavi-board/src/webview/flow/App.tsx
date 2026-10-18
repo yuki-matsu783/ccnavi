@@ -183,7 +183,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [minimap, setMinimap] = useState(minimapShown);
   const [folded, setFolded] = useState<Readonly<Record<Side, boolean>>>(() => ({ palette: sideFolded("palette"), side: sideFolded("side") }));
   const toggleSide = (side: Side): void => {
-    // 案内の間は畳んだ欄も開いて見せる（畳み直さない）。覚えている状態も変えない
+    // 案内の間は畳んだ欄も開いて見せる。覚えている状態も変えない
     if (tour.touring) {
       return;
     }

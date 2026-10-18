@@ -36,7 +36,7 @@
  * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言って YAML で開く。
  *
  * エージェントの下書き。 置き場は実行ファイルに聞く（`tickets[].flow.draft`）。下書きが在り、中身が
- * いまのフローと違えば（`sameFlowIgnoringLayout` が偽。位置とグループ化は見ない）「提案あり」を出す。開くと下書きを読んだバイトのまま `--lint --json --flow` に
+ * いまのフローと違えば（`sameFlowIgnoringLayout` が偽）「提案あり」を出す。開くと下書きを読んだバイトのまま `--lint --json --flow` に
  * 掛け、error なら取り込めないと言う。通れば画面が文の前後まで見せる差分を出し、「取り込む」で編集中の内容に入れる
  * （書かない。保存はいつもの経路）。保存が成功したら、下書きの中身が取り込んだときのハッシュと同じときだけ消し
  * （`core/flow-write.ts` の `removeDraftFile`）、保存のあとの知らせに名前を出す。依頼のボタン（着手の前だけ）は
@@ -474,7 +474,7 @@ function watchFile(current: PanelState): void {
   watcher.onDidChange(changed);
   watcher.onDidDelete(changed);
   current.fileWatchers.push(watcher);
-  // 下書きはエージェントが書く。動いたら「提案あり」を出し直す（編集は捨てない）。置き場のディレクトリ（`flows/`）は
+  // 下書きはエージェントが書く。動いたら「提案あり」を出し直す。置き場のディレクトリ（`flows/`）は
   // 開いた時点で無いことが多いので、在るツリーのルートからの相対パスで見張る（後から作られても届く）
   const draft = loaded.target.flow.draft;
   if (draft !== null) {

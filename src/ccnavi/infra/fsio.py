@@ -334,7 +334,7 @@ def write_bytes_atomic(path: str, content: bytes) -> str:
       （`.md` だけを読む）が拾わないため。元の拡張子で終わらせると、`doing/` の残骸が
       識別子とファイル名の違うチケットとして読まれる
 
-    中身は変えない（改行も BOM も解釈しない）。権限は `write_text_atomic` と同じく引き継ぐ。
+    中身は変えない（改行も BOM もそのまま）。権限は `write_text_atomic` と同じく引き継ぐ。
     """
     if _STAGE["current"] is not None:
         return _stage_put(Op(OP_BYTES_ATOMIC, path, bytes(content)))
@@ -723,7 +723,7 @@ def _record(path: str) -> None:
 def note_input(path: str) -> None:
     """読んだ入力を、書いたものと同じく一覧に載せる（在るときだけ）。
 
-    record-risk の記録（`<子>.judge.json`）は自分ではコミットせず、
+    record-risk の記録（`<子>.judge.json`）は、
     それを読む `finish` の write-and-push がコミットして push する。
     """
     if _RECORDERS and os.path.lexists(path) and not os.path.islink(path):
@@ -801,7 +801,10 @@ class Policy:
 
 
 def failure_text(policy: Policy, reason: str) -> str:
-    """書けなかった知らせの本文。`{reason}` だけを差し込む（文面の `{` `}` は解釈しない）。"""
+    """書けなかった知らせの本文。`{reason}` だけを差し込む。
+
+    文面の `{` `}` はそのまま出す（`str.format` ではなく `str.replace` で埋める）。
+    """
     return policy.prefix + policy.message.replace("{reason}", reason)
 
 

@@ -375,7 +375,7 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_model.Entry], l
 def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
     """子の範囲が定義の上限を超えている項を名指しする。子 ⊆ 定義。
 
-    超えていても承認は止めない（warn）。判定が定義の上限でも切り詰める（phase_scope.scope_verdict）。
+    超えていれば warn で言う。判定が定義の上限でも切り詰める（phase_scope.scope_verdict）。
     """
     if pt.inherits_scope:
         return []
@@ -431,7 +431,7 @@ def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
 
     承認しても、その範囲には子が書けない（子 ⊆ 定義の上限）。承認と着手のあとの子の提案ではじめて
     気づくので、親を作るときと承認の確認（`--verify`）で言う。計画に `scope: inherit` の定義が
-    あれば上限が無いので、何も言わない。warn で、承認は止めない。
+    あれば上限が無いので、何も言わない。それ以外は warn で言う。
     """
     # 見るのは plan の項の定義だけ。feedback の定義は多くが `inherit` で、混ぜると警告が効かなくなる
     defs = types_of(parent)
@@ -618,8 +618,7 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     name,
-                    f"`phases:` の `{ident}` はどの項も使っていない（判定は読まない。"
-                    f"消し忘れなら {fill} で外す）",
+                    f"`phases:` の `{ident}` はどの項も使っていない（消し忘れなら {fill} で外す）",
                 )
             )
     return found

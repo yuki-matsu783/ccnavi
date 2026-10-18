@@ -28,8 +28,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 9. ユーザの判断の入口（ccnavi-review.sh close-early など）は、取り込み済みの親子のチケットなら
    承認の push を自動で呼ぶ
 10. origin の無いリポジトリ・
-    マージリクエストで見るフェーズが無い親子のチケットは今のまま
-    （コミットも push もしない）
+    マージリクエストで見るフェーズが無い親子のチケットは今のまま変えない。
 11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、失敗してもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、write-and-push の confirm が
     書いて送ったものが、経路・時刻のほかは同じ
@@ -1369,7 +1368,7 @@ class TidyAfterFinishTest(WriteAndPushHarness):
         self.assertTrue(os.path.isdir(tree))
 
     def test_cancel_drops_the_cancelled_childs_worktree(self):
-        """取り消した子は作業中でないので、送った後にそのワークツリーを消す（ブランチは残す）。"""
+        """取り消した子は作業中でないので、送った後にそのワークツリーを消す。"""
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
         tree = self.child_tree()
         self.assertEqual(self.ticket("start", CHILD).returncode, 0)
@@ -2112,7 +2111,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         with open(log, encoding="utf-8") as f:
             logged = f.read()
         self.assertIn(f"worktree retire {PARENT}", logged)
-        # retire の後に、残っているワークツリーの一覧を頼む（出すだけで消さない）
+        # retire の後に、残っているワークツリーの一覧を頼む
         self.assertLess(
             logged.index(f"worktree retire {PARENT}"), logged.index(f"worktree remaining {PARENT}")
         )

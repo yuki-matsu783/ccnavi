@@ -210,7 +210,7 @@ def errors(parent: ticket_model.Ticket) -> list[rules.Problem]:
 
     計画の順序（`problems`）に、親の写し（`phases:`）の誤り（`phasetypes.copy_problems`。写しが
     無い、項の定義が写しに無い、定義の形・`kind`）を足す。引き受け手のレビューは写しの定義で見る。
-    読むのはチケットだけで、`phases.yml` は読まない。子に書いた `phases:` もここで言う。
+    読むのはチケットだけ。子に書いた `phases:` もここで言う。
     """
     found = phasetypes.copy_problems(parent) + problems(parent, phasetypes.types_of(parent))
     return [p for p in found if p.severity == rules.SEVERITY_ERROR]

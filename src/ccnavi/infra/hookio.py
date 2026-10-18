@@ -20,6 +20,8 @@ POST_TOOL_USE = "PostToolUse"
 POST_TOOL_USE_FAILURE = "PostToolUseFailure"
 SESSION_START = "SessionStart"
 USER_PROMPT_SUBMIT = "UserPromptSubmit"
+# バックグラウンド作業の完了通知が UserPromptSubmit の prompt として届くときの先頭に付く文字列。
+TASK_NOTIFICATION = "<task-notification>"
 STOP = "Stop"
 # サブエージェントの開始と終了。開始は止められないイベントで、返せるのは文だけ。
 # 終了は Stop と同じで、exit 2 が「続けさせる」を意味する。
@@ -110,6 +112,20 @@ class Input:
     # prompt は UserPromptSubmit にだけ来る。ユーザの依頼文で、issue・MR の指定を探すのに読む
     # （tickets.branchfind）。記録にも診断ログにも書かない。
     prompt: str = ""
+    # busy は Stop にだけ来る。エージェントが動かしているバックグラウンド作業
+    # （`background_tasks`）か、予約した繰り返し（`session_crons`）が残っているとき真。
+    # そのターンの終わりのあとにも、エージェントの手が作業ツリーに届きうる。
+    busy: bool = False
+
+    def from_background_task(self) -> bool:
+        """この UserPromptSubmit が、ユーザの発言ではなくバックグラウンド作業の完了通知か。
+
+        完了通知は、ユーザが何も打たなくても UserPromptSubmit を起こす。そのとき prompt は
+        `<task-notification>` で始まる（実機で確かめた）。ユーザの手による変更を受け入れる
+        処理は、この通知では行わない。バックグラウンドのプロセスが書いた変更を、ユーザの変更として
+        受け入れてしまうため。
+        """
+        return TASK_NOTIFICATION in self.prompt
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
@@ -174,7 +190,13 @@ def decode(stream: TextIO) -> Input:
         stop_hook_active=data.get("stop_hook_active") is True,
         source=str(data.get("source") or ""),
         prompt=data.get("prompt") if isinstance(data.get("prompt"), str) else "",
+        busy=_has_items(data.get("background_tasks")) or _has_items(data.get("session_crons")),
     )
+
+
+def _has_items(value: Any) -> bool:
+    """空でないリストか。欄が無い・形が違うときは偽（無いものとして読む）。"""
+    return isinstance(value, list) and len(value) > 0
 
 
 def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "") -> None:
@@ -221,11 +243,10 @@ def write_system_message(stream: TextIO, text: str) -> None:
 
     `additionalContext` との違いは宛先。あちらはモデルが読み、これは
     トランスクリプトに出てユーザが読む。ターンの終わりに「宣言した保護領域が
-    こう変わっている」と言う相手は、次の一手を打つエージェントではなく、
-    それを見ているユーザになる。エージェントには実行後チェックが呼び出しごとに
-    返しているので、同じことを 2 度モデルへ送らない。
+    こう変わっている」と言う相手は、それを見ているユーザになる。
+    エージェントには実行後チェックが呼び出しごとに返しているので、同じことを 2 度モデルへ送らない。
 
-    このキーは hookSpecificOutput の中ではなく、応答の一番外に置く。
+    このキーは応答の一番外に置く。
     """
     stream.write(json.dumps({"systemMessage": text}, ensure_ascii=False))
     stream.write("\n")
@@ -234,9 +255,9 @@ def write_system_message(stream: TextIO, text: str) -> None:
 def write_stop_block(stream: TextIO, reason: str, system: str = "") -> None:
     """Stop を止めて、モデルに続けさせる。`reason` はモデルが読む次の一手。
 
-    Stop の応答は `hookSpecificOutput` ではなく一番外の `decision` / `reason` で返す。exit 2 と
-    標準エラーの経路は使わない。同じ Stop でユーザへの報告（`systemMessage`）も返したいので、1 つの
-    JSON にまとめる（exit 2 だと標準出力の JSON は読まれない）。空の `system` は鍵ごと出さない。
+    Stop の応答は一番外の `decision` / `reason` で返す。同じ Stop でユーザへの報告
+    （`systemMessage`）も返したいので、1 つの JSON にまとめる（exit 2 だと標準出力の JSON は
+    読まれない）。空の `system` は鍵ごと出さない。
     """
     body: dict[str, Any] = {"decision": "block", "reason": reason}
     if system:

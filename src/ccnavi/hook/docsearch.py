@@ -24,7 +24,7 @@
   `{"concept_id":…,"directory":…,"frontmatter":{…}|null,"mtime":"YYYY-MM-DDTHH:MM:SS"}`。
   `concept_id` はツリーのルートからの相対パスから `.md` を除いたもの。ルート直下の
   `directory` は `.`
-- `concept_id` と `mtime` が既存の行と同じなら、その行を使い回す（読み直さない）。
+- `concept_id` と `mtime` が既存の行と同じなら、その行を使い回す。
   書くのは一時ファイルに書いて置き換える形で、中身が同じなら書かない。一時ファイルは
   git のディレクトリ（`.git/`）の中に排他で作る（作業ツリーの `git status` に出さない）。
   `.git` が別のファイルシステムなら、そのディレクトリの下の `.ccnavi-tmp-*/ccnavi-index.jsonl`
@@ -34,7 +34,7 @@
   いないファイルを置くと、`git status`・実行後チェック・`worktree remove` のどれにも出る。
   md を持つディレクトリのどれでも無視されていないツリーは、書く前に、そのツリーのルートの
   `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して確かめ直す（ワークスペースも
-  プロジェクトも同じ。ファイルが無ければ作る。既存の行は変えない）。足したことは
+  プロジェクトも同じ。ファイルが無ければ作る）。足したことは
   SessionStart の案内と標準エラーで名指しする（未コミットの差分が残るため）。`!` で
   ccnavi-index.jsonl を否定する行があれば（ユーザが追跡している）足さない。足せなかった・
   足しても無視されないツリーだけが索引の対象外になり、引かない（案内と標準エラーで名指しする）。
@@ -439,7 +439,7 @@ CHECK_SECONDS = 2.0
 def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
     """Write で新しく作った md に frontmatter か `type` が無ければ、1 度だけ案内を返す。
 
-    判定は変えない（止めない・差し戻さない）。案内を出すのは次をすべて満たすときだけ。
+    判定は変えない。案内を出すのは次をすべて満たすときだけ。
 
     - Write で新しく作った（`tool_response.type` が `create`）。既にある md の Edit・上書きでは
       出さない。意図して frontmatter を持たない md（README.md・CLAUDE.md、取り込んだ資料）を

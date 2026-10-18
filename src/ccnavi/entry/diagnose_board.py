@@ -136,7 +136,7 @@ def board(
         for tid, hits in grouped.items()
     }
 
-    # 承認の時刻。git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
+    # 承認の時刻。git から引く。git はツリーごとに 1 回まで。
     times = approval_times.approved_times(
         conf, [t for t in (*open_index.values(), *closed_index.values()) if t is not None]
     )
@@ -201,8 +201,8 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
     順序は 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）。
 
     rules は重複を捨てたあとの、そのレイヤーから実際に判定へ入ったぶん。phases と risk は
-    そのレイヤーのファイルに書いてあるぶんで、合成はしない（合成の結果は `sums` と親のフェーズの
-    側に出る）。読めないレイヤーは `unreadable` に理由が入り、中身は空になる。
+    そのレイヤーのファイルに書いてあるぶんで、合成の結果は `sums` と親のフェーズの
+    側に出る。読めないレイヤーは `unreadable` に理由が入り、中身は空になる。
     """
     said = stderr if stderr is not None else io.StringIO()
     out = []
@@ -537,7 +537,7 @@ def _ticket_record(
 def _mark_attention(payload: dict) -> None:
     """各チケットに `issues`（不備の文）と `attention`（ユーザが動く必要があるか）を足す。
 
-    ボードはこの 2 つを読むだけで、組み直さない（判定と同じ答えを 2 か所で出さない）。
+    ボードはこの 2 つを読むだけにする（判定と同じ答えを 2 か所で出さないため）。
     `issues` はこの順に並ぶ。
 
     1. `blocked` が空でない: `書き込みが止まっています: <blocked>`

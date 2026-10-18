@@ -272,7 +272,7 @@ fi
 choose_base
 diverged_guard
 
-# ---- origin に同じ名前・同じ識別子になるブランチがあれば止める（fetch が通ったときだけ見る。届かないときは見られない）。
+# ---- origin に同じ名前・同じ識別子になるブランチがあれば止める（fetch が通ったときだけ見る）。
 remote_note=""
 if [ -z "$fetch_note" ]; then
 	remote_err="$root/logs/state/worktree-ls-remote-err-$$"
@@ -333,7 +333,7 @@ printf 'ブランチ: %s（起点 %s%s）\n' "$name" "$base" "${track:+、$track
 [ -z "$fetch_note" ] || printf '案内: %s\n' "$fetch_note"
 [ -z "$diverged_note" ] || printf '案内: %s\n' "$diverged_note"
 [ -z "$remote_note" ] || printf '案内: %s\n' "$remote_note"
-# 直接作業の名前の形は実行ファイルに聞く（sh は形を判定しない）。取れなければ案内は出さない。拒否はしない。
+# 直接作業の名前の形は実行ファイルに聞く。取れなければ案内は出さない。
 name_note=""
 if name_bin=$(ccnavi_bin "$root"); then
 	name_note=$("$name_bin" --root "$root" worktree name "$name" 2>/dev/null </dev/null) || name_note=""

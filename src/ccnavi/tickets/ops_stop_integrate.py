@@ -367,7 +367,7 @@ def integrate_nudge(root: str, found: Direct) -> str:
 
 
 def blocked_notice(found: Direct) -> str:
-    """促せないときにユーザへ言う文（`systemMessage`。止めない）。"""
+    """促せないときにユーザへ言う文（`systemMessage`）。"""
     return (
         f"[ccnavi] 直接作業 {found.name} は {_left(found)}があり、integrate の記録もありませんが、"
         f"今は取り込みを促せません。{found.blocked}"

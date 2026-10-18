@@ -211,8 +211,8 @@ class _Family:
         if t.state == ticket_model.TODO:
             lines.append(f"    置き場のファイル: {file_state.label()}")
             lines.append(
-                "    次の操作: ユーザの承認を待つ（ボード、端末の ccnavi-agree.sh、"
-                "GitHub の画面で doing/ へ動かす、のどれか）"
+                "    次の操作: ユーザの承認を待つ（VS Code のボード、Chrome のボード、端末の "
+                "ccnavi-agree.sh、GitLab や GitHub の画面などで doing/ へ動かす、のどれか）"
             )
             return lines
         when = self.times.get(t.path)
@@ -249,7 +249,8 @@ class _Family:
                     nxt
                     or "フェーズを読めないので、レビューを依頼済みかを言えない。ユーザに回るのは、"
                     "親が合流・ELI5 を済ませて ccnavi-review.sh request で依頼した後"
-                    "（依頼済みなら、ユーザが confirm / decide で done/ へ動かすのを待つ）"
+                    "（依頼済みなら、ユーザが confirm / decide か Chrome 拡張のレビュー済みで "
+                    "done/ へ動かすのを待つ）"
                     + PARENT_ONLY
                 )
             )

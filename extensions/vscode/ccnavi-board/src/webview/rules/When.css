@@ -1,6 +1,6 @@
 /*
  * 組み合わせ条件の図（`When.tsx`）。React Flow の色は `--xy-*` の変数で持っているので、`--vscode-*` に置き換える
- * （フェーズの図 `phases/Graph.css` と同じ書き方。打ち消さず、変数を置き換える）。
+ * （フェーズの図 `shared/PlanGraph.css` と同じ書き方。打ち消さず、変数を置き換える）。
  */
 .cond { display: flex; flex-direction: column; gap: var(--gap-3); min-width: 0; }
 .cond-canvas {

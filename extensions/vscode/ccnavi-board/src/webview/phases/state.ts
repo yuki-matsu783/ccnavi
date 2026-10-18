@@ -93,7 +93,7 @@ export interface CommonClash {
 /**
  * 共通の設定の定義との重なり。表示名は空なら id を使う（実行ファイルと同じ）。前後の空白は除いて見る。
  * id が空の行は数えない（打っている途中の行を重なりとして赤くしない）。
- * 同じ id の中身が同じかは画面では決めない（共通の定義は全欄を持たないので、実行ファイルの `--lint` に任せる）。
+ * 同じ id の中身が同じかは、実行ファイルの `--lint` に任せる（共通の定義は全欄を持たない）。
  */
 export function commonClashes(draft: Draft, common: readonly CommonPhase[]): CommonClash {
   const ids = new Set(common.map((c) => c.id));

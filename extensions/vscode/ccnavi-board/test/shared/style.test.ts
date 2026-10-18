@@ -212,7 +212,7 @@ test("CB-T168 部品の CSS には、同じ名前の部品がある（部品を�
 });
 
 test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画面のほか全部）でヘッダの右上に同じ形で固定し、右端はその幅だけ空ける", () => {
-  // プロジェクト管理画面は案内を持たない（2026-10-05 に外した）
+  // プロジェクト管理画面は、この検査から除く
   for (const name of screenNames().filter((n) => n !== "projects")) {
     const style = flatStyle(`<style nonce="x">\n${screenStyle(name)}\n</style>`);
     assert.match(style, /\.toolbar > \.tour-button \{[^}]*position: absolute;[^}]*top: 8px;[^}]*right: 4px;[^}]*width: 22px;/, `${name} の ? が右上に固定されていない`);

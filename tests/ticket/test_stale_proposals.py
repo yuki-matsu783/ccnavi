@@ -263,7 +263,7 @@ class AuthorityTest(unittest.TestCase):
     def test_approved_copies_alone_decide(self):
         approved = [_t("", "doing")]
         stale = [_t("i0001", ticket_model.TODO)]
-        # 親のツリーのコピーが無ければ決めない（元ツリーのコピーで代用しない）
+        # 親のツリーのコピーが無ければ決めない
         self.assertIsNone(ticket_fold.authority(approved))
         self.assertEqual(ticket_fold.fold(stale, approved), stale)
         self.assertEqual([t.tree for t in approval._authoritative(approved, approved)], [""])

@@ -2,7 +2,7 @@
 
 ccnavi のチケットが、どのワークツリーでどこまで進んでいるかをカンバンで見る。
 
-この拡張はチケットの状態を見て、承認などの人間の操作を受ける入口で、判定はしない。作業中のエージェントのセッションへ文を送り込む手段は持たない（ccnavi の README「複数人・別 PC・別セッションで進める」）。
+この拡張はチケットの状態を見て、承認などの人間の操作を受ける入口で、判定は実行ファイルがする。作業中のエージェントのセッションへ文を送り込む手段は持たない（ccnavi の README「複数人・別 PC・別セッションで進める」）。
 
 この拡張が何をするか（画面ごとのふるまい）は [docs/requirements.md](docs/requirements.md)、作り（構成・画面の段取り・テストの ID）は [docs/design.md](docs/design.md) に書いてある。この README には、必要なもの・組み立てと導入・動かし方・手動確認の手順だけを書く。
 
@@ -43,8 +43,8 @@ pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / t
 pnpm test:templates # テンプレート管理だけ（templates）
 pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
 pnpm test:for src/core/rules-doc.ts   # 触ったファイルが関わる領域だけ
-pnpm test:plan src/core/rules-doc.ts  # 何を回すかだけ出す（走らせない）
-pnpm run package   # scripts/package.sh: install → compile → vsce package（テストは回さない）
+pnpm test:plan src/core/rules-doc.ts  # 何を回すかだけ出す
+pnpm run package   # scripts/package.sh: install → compile → vsce package
 ```
 
 `pnpm run package` は `dist/ccnavi-board-<version>.vsix`（リポジトリの `dist/`、gitignore 済み）に出力する。`<version>` は `package.json` の `version` の値。出来上がったパスは package の最後にも表示される。Marketplace には出さない。入れるには次を打つ。

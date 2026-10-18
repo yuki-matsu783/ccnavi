@@ -33,7 +33,7 @@ class Candidate:
 
     ticket: ticket_model.Ticket
     complaints: list[rules.Problem] = field(default_factory=list)
-    # 範囲の超過（親の範囲・定義の上限を超えた項、regex の項）。承認は止めず、判定が
+    # 範囲の超過（親の範囲・定義の上限を超えた項、regex の項）。判定が
     # 切り詰める。判定に影響する（止まる）ので、判定に影響しない記述の注意（complaints の warn）
     # とは分けて持つ。
     overflow: list[rules.Problem] = field(default_factory=list)
@@ -299,8 +299,8 @@ def plan_problems(
     problems = list(phasetypes.copy_problems(t))
     if not t.has_plan:
         if not t.is_child and not approved and held is None:
-            # 改版（held あり）の親は着手済みなので言わない。承認は止めない
-            # （止まるのは `ticket start`）。承認依頼の前に気づけるよう、先に言う
+            # 改版（held あり）の親は着手済みなので言わない。止まるのは `ticket start` で、
+            # 承認依頼の前に気づけるよう、先に言う
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_WARN,
@@ -344,7 +344,7 @@ def copy_config_problems(
     成果物を改版で変えないため。
 
     `approved` なら承認済みチケットの食い違いとして warn で言う（`--lint`）。進行中の親には
-    効かない（判定は写しを読む）ので、止めない。
+    効かない（判定は写しを読む）。
     """
     if not phasetypes.has_copy(t) or not t.has_plan:
         return []
@@ -656,8 +656,8 @@ def validate(
     """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。
 
     返すのは 2 つのリスト。1 つめはチケットの形の苦情で、error があれば承認しない。
-    2 つめは範囲の超過（親の範囲・定義の上限を超えた項、regex の項）で、承認は止めない。
-    判定が親と定義の上限で切り詰めるので、承認で止める理由が無い。
+    2 つめは範囲の超過（親の範囲・定義の上限を超えた項、regex の項）で、
+    判定が親と定義の上限で切り詰める。
 
     形の検査を error に残すのは、まとめて 1 度で見せて直させるため。判定の側も同じ
     検査を当てる（`blocking_problems`）ので「判定では補えない」わけではないが、
@@ -714,7 +714,7 @@ def existing_branch_warnings(
     """新規の提案（親）の識別子になるブランチ（`/` を `-` に置き換えて識別子と一致するもの）が、
     手元か origin に既にあるときの文。
 
-    `--lint` と `--agree --preview --verify` が warn として出す。承認は止めない。
+    `--lint` と `--agree --preview --verify` が warn として出す。
     提案がそのブランチの上で書かれている（`.claude/worktrees/<識別子>` がそのブランチを
     チェックアウトしていて、提案がその中にある）ときは、そのブランチが親のブランチなので言わない。
     """

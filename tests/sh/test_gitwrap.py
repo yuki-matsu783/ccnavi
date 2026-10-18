@@ -1217,8 +1217,9 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
 class ParentPushGateTest(GitWrapperTest):
     """親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る（push の関門）。
 
-    取り込み状態（記録）は見ない。「一度は送った形跡」は `refs/remotes/origin/<ブランチ>` と、
-    実行ファイルが答える着手済み（承認済みの親チケットの started_at）・依頼のマーカー・手元の退避。
+    「一度は送った形跡」は、`refs/remotes/origin/<ブランチ>` と、
+    実行ファイルが答える着手済み（承認済みの親チケットの started_at）・依頼のマーカー・
+    手元の退避で見る。
     形跡があるのにリモートに無ければ拒否し（改名・消し間違い・捨てた親子のチケットを、確かめずに作り直さない）、
     形跡が無ければ初回の push として通す。承認済みというだけでは形跡にしない
     （承認して最初に打つ push が通る）。確かめられないとき（ls-remote の失敗）は拒否する。
@@ -1231,7 +1232,7 @@ class ParentPushGateTest(GitWrapperTest):
         git(self.dir, "remote", "add", "origin", self.bare)
         self.tree = os.path.join(self.dir, ".claude", "worktrees", "i0001")
         git(self.dir, "worktree", "add", "-q", self.tree, "-b", "i0001")
-        # 提案だけの親（承認済みの親チケットは数えない）。
+        # 提案だけの親。
         self.proposal = os.path.join(self.tree, "wip", "proposals", "todo", "i0001.md")
         write_text(self.proposal, "---\nversion: 1\nticket: i0001\n---\n")
         git(self.tree, "add", "wip/proposals/todo/i0001.md")

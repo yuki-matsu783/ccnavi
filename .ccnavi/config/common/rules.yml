@@ -170,8 +170,8 @@ deny:
     match: Write|Edit|NotebookEdit
     glob: "*/.ccnavi/approved/*"
     message: >-
-      承認済みチケットです。承認はユーザが VS Code のボード（端末なら
-      'ccnavi --agree'）で行います。
+      承認済みチケットです。承認はユーザが VS Code のボード・Chrome のボード・
+      端末の 'ccnavi --agree'・置き場のファイルの移動のどれかで行います。
       承認が済んだかどうかは 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh status' で確かめてください。
       置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。
       作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh finish <識別子>' で
@@ -196,7 +196,7 @@ ask:
       実行時の依存が変わる場所です。増やす 1 本は、ガード自身が点検できない供給網の
       1 本になります。何を足すのか、外せない理由は何かを言ってください。
 
-  # 外から取ってくるコマンド。止めはしないが、行き先を 2 つに分ける。
+  # 外から取ってくるコマンド。行き先を 2 つに分ける。
   # 調査で一度きりなら WebFetch ツール、何度も叩くなら .ccnavi/scripts/ の sh。
   - id: prefer-webfetch
     match: Bash
@@ -218,7 +218,7 @@ allow:
     glob: "*/.claude/worktrees/*"
 
   # スキルの振り返り（.ccnavi/docs/skill-review.md）。ターンの終わり 10 回に 1 度、止めて手順を渡す。
-  # Stop はツールではなくメインエージェントのターンの終わり。何も許可しない。文を渡すためだけに allow に置く。
+  # Stop はツールではなくメインエージェントのターンの終わり。許可の意味は持たない。文を渡すためだけに allow に置く。
   # finish の促しが出る回・連鎖の 2 回目・サブエージェントでは止めず、数えもしない。
   - id: skill-review-every-10
     match: Stop

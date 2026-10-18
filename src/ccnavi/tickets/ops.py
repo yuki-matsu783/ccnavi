@@ -7,7 +7,7 @@
 やることは置き場を動かして欄を書くことだけ（状態は置き場が表す）。`start` は置き場を動かさず
 `doing/` の欄を書く。`finish` は `doing/` から `wip/proposals/review/`（レビュー要）か
 `.ccnavi/approved/done/`（不要）へ、`cancel` は `doing/` から `done/` へ動かす。
-ワークツリーはここでは消さない。子のワークツリーは、`confirm` が子を `done/` へ動かしたあとと、
+子のワークツリーは、`confirm` が子を `done/` へ動かしたあとと、
 親の `finish` のあとに sh が `worktree tidy` で消す（worktrees.py）。finish の前にワークツリーを
 消すと base_sha の検査ができなくなり、レビュー待ちの間に見返す場所も無くなる（そこで積んだ
 コミットは親へ合流しないので、差し戻しは同じフェーズに子を足して直す）。
@@ -67,7 +67,7 @@ def ready_command(root: str, parent_id: str) -> str:
 def start(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> int:
-    """`doing/` の承認済みチケットに、着手の時刻と基準点を書く。置き場は動かない。"""
+    """`doing/` の承認済みチケットに、着手の時刻と基準点を書く。"""
     found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
@@ -124,7 +124,7 @@ def start(
     )
     if found.is_child:
         # 着手のときのフローのハッシュを記録する。SubagentStart / SubagentStop が、着手のあとに
-        # 書き換わったら知らせる（止めない）。
+        # 書き換わったら知らせる。
         started = replace(found, started_at=fields["started_at"])
         where, failed = flow.record_digest(conf, root, started)
         if failed:
@@ -189,7 +189,7 @@ def _sync_skills(
     found: ticket_model.Ticket,
     worktree: str,
 ) -> list[str] | None:
-    """共通の工程スキルをプロジェクトの `skills/` へ写す。消さない。"""
+    """共通の工程スキルをプロジェクトの `skills/` へ写す。"""
     changes, why = skillsync.plan(root, worktree)
     if why:
         stderr.write(f"ccnavi: {found.ticket} の工程スキルを写せない: {why}\n")
@@ -230,7 +230,7 @@ def _sync_common(
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = [
         f"共通レイヤーとプロジェクト {found.project} のミラー（.ccnavi/config/common/）が違っていたので、"  # noqa: E501
-        "共通レイヤーの中身に揃えた（プロジェクトの .ccnavi/config/project/ には触れていない）:"
+        "共通レイヤーの中身に揃えた:"
     ]
     for c in changes:
         state = "削除した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")
@@ -289,8 +289,7 @@ def _merged_sha(root: str, found: ticket_model.Ticket) -> str:
     """この finish で親のブランチに入る子の先頭。入らない（合流していない）なら空。
 
     親のワークツリーが合流の途中なら、その `MERGE_HEAD`（finish の検査が読んだ子の先頭）が
-    このコミットで入る先頭（`_merging_head`）。検査のあとに子が積んだコミットは合流に載らないので、
-    子のいまの先頭とは比べない。
+    このコミットで入る先頭（`_merging_head`）。検査のあとに子が積んだコミットは合流に載らない。
     合流の途中でなくても、子の先頭が親の先頭の祖先なら（子が先に親へ入っている）その先頭。
     どちらでもなければ、親のブランチに入らない子なので書かない（レビュー依頼の前提が言う）。
     """
@@ -336,7 +335,7 @@ def _merging_head(root: str, found: ticket_model.Ticket) -> str:
 
 
 def _needs_review(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
-    """この子を閉じたとき、ユーザが見る対象になるか。親は見ない。
+    """この子を閉じたとき、ユーザが見る対象になるか。
 
     フェーズの「見る場所」を、この子を閉じたものとして数え直す。延期したフェーズの子も
     レビュー待ちに置く。見るのは次にレビューがあるフェーズの番だが、ユーザが見るまでは
@@ -363,7 +362,7 @@ def _close_parent(
     閉じた事実の残る先がここしか無い。
 
     案内は進め方で分かれる。マージリクエストがあるなら Draft を外す合図まで、
-    無いなら統合先に取り込むところまで。ccnavi はどちらでもマージしない。
+    無いなら統合先に取り込むところまで。
     Draft を外す `ready` は、閉じたチケットとその記録を手元の `logs/archive/` へ退避してから外す
     （`review_close.ready`・archive.py）。この記録（`closed.json`）も一緒に退避される。
     """
@@ -535,7 +534,7 @@ def _score_child(
 ) -> list[str] | None:
     """子の実績のリスクを数えて記録する。閉じられなければ None。
 
-    返すのは、閉じたあとに出す行（点と内訳）。親は数えない。
+    返すのは、閉じたあとに出す行（点と内訳）。
     """
     if not found.is_child:
         return []
@@ -562,7 +561,7 @@ def _score_child(
         )
         or {}
     )
-    # record-risk の記録は write-and-push にしない。この終了が読んだ入力として一覧に載せ、
+    # record-risk の記録は、この終了が読んだ入力として一覧に載せ、
     # この write-and-push でコミットする。
     fsio.note_input(
         approval_marks.child_record_path(
@@ -647,18 +646,19 @@ def _move(
         # 依頼の前に「ユーザのレビューを待つ」と言わない。次に誰が何をするかを、
         # 依頼の有無で言い分ける（phase.review_next）。
         moved = replace(found, completed_at=fields.get("completed_at", ""))
-        # 誰がいつ done/ へ動かすかは review_next の文が言う（重ねて言わない）。
+        # 誰がいつ done/ へ動かすかは review_next の文が言う。
         stdout.write(
             (
                 phase.review_next(root, conf, moved)
                 or "まだレビュー準備中。親がレビューを依頼するまで、ユーザには回らない。"
-                "依頼の後、ユーザがレビューを終えて confirm / decide / --reviewed を実行すると "
+                "依頼の後、ユーザがレビューを終えて confirm / decide / --reviewed か "
+                "Chrome 拡張のレビュー済みを実行すると "
                 f"{conf.approved}/{ticket_model.DONE}/ へ動く"
             )
             + "\n"
         )
     elif state == ticket_model.DONE and found.is_child and not fields.get("cancelled_at"):
-        # 次の一手は status が計算する。ここで決め打ちしない
+        # 次の一手は status が計算する
         stdout.write(
             f"次: '{settings.script_command(root, 'ccnavi-ticket.sh')} status {found.parent}' で、"
             "親の次の一手を確かめる\n"

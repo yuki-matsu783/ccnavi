@@ -118,7 +118,7 @@ deny:
     why: Windows の区切りでも同じ。環境名付きも .env のうち
   - tool: Bash
     subject: "cat /repo/.env.example.bak"
-    why: 見本の名前で終わらない形は除かない（見本を写した中身かもしれない）
+    why: 見本の名前で終わらない形も対象に入れる（見本を写した中身かもしれない）
   - tool: Read
     subject: "/repo/.env.example"
     why: >-
@@ -352,7 +352,7 @@ allow:
     subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/y -b y main"
     why: >-
       通す。ccnavi-git-worktree-add が、先に fetch して遅れを確かめる案内をセッションに一度だけ添える
-      （止めない。遅れの判定で止めるのは ccnavi-git.sh の中。hook は git もネットワークも起こさない）
+      （遅れの判定で止めるのは ccnavi-git.sh の中）
   - tool: Bash
     subject: "grep -n TODO src/ccnavi/cli.py"
     why: 読むだけ。prefer-read-grep が当てて通す
