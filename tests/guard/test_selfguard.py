@@ -119,6 +119,7 @@ class SelfGuardTest(unittest.TestCase):
         bin="",
         permission_mode="",
         extra_env=None,
+        prompt=None,
         **tool_input,
     ):
         body = {
@@ -127,6 +128,9 @@ class SelfGuardTest(unittest.TestCase):
             "tool_input": tool_input or {"command": "ls"},
             "session_id": session,
         }
+        # UserPromptSubmit だけが prompt を持つ。
+        if prompt is not None:
+            body["prompt"] = prompt
         if permission_mode:
             body["permission_mode"] = permission_mode
         payload = json.dumps(body)
@@ -1463,13 +1467,131 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(self.store(), ["MZ fake executable\n"])
 
-    def test_セッション開始では設定ファイルもバックアップする(self):
-        # 実行前のバックアップが始まるのは最初のツール呼び出しから。それより前に
-        # 設定ファイルを消されると、バックアップを持たないまま実行後チェックに入る。
+    def test_セッション開始では設定ファイルをバックアップしない(self):
+        # 開始から最初の発言までは、エージェントが何も実行しない。その間の変更は
+        # ユーザの手によるものなので、戻す根拠になるバックアップを取らない。
         self.run_hook("SessionStart")
+
+        self.assertFalse(os.path.exists(os.path.join(self.state, "selfguard", "s1", "rules")))
+
+    def test_最初の発言で設定ファイルをバックアップする(self):
+        self.run_hook("SessionStart")
+
+        self.run_hook("UserPromptSubmit", prompt="お願いします")
 
         saved = os.path.join(self.state, "selfguard", "s1", "rules")
         self.assertEqual(read(saved), read(self.rules))
+
+    # ユーザの発言までの変更は受け入れる
+
+    def test_最初のツール呼び出しの前に消された設定ファイルは戻さない(self):
+        self.run_hook("SessionStart")
+        os.remove(self.rules)
+
+        self.run_hook("UserPromptSubmit", prompt="お願いします")
+        self.run_hook("PreToolUse")
+        self.run_hook("PostToolUse")
+
+        self.assertFalse(os.path.exists(self.rules), "ユーザが消したものを戻さない")
+
+    def test_ターンの間にユーザが消した設定ファイルは次の発言のあとは戻さない(self):
+        self.run_hook("SessionStart")
+        self.run_hook("UserPromptSubmit", prompt="一つ目")
+        self.run_hook("PreToolUse")
+        self.run_hook("PostToolUse")
+        os.remove(self.rules)
+
+        self.run_hook("UserPromptSubmit", prompt="二つ目")
+        self.run_hook("PreToolUse")
+        self.run_hook("PostToolUse")
+
+        self.assertFalse(os.path.exists(self.rules))
+
+    def test_ユーザが消したあとまた置いた設定ファイルは守る(self):
+        self.run_hook("SessionStart")
+        self.run_hook("UserPromptSubmit", prompt="一つ目")
+        os.remove(self.rules)
+        self.run_hook("UserPromptSubmit", prompt="二つ目")
+        edited = json.dumps(RULES | {"version": 1, "ask": []})
+        write(self.rules, edited)
+        self.run_hook("PreToolUse")
+        write(self.rules, "{}")
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(self.rules)), json.loads(edited))
+
+    def test_バックグラウンドの完了通知では消された設定ファイルを受け入れない(self):
+        self.run_hook("SessionStart")
+        self.run_hook("UserPromptSubmit", prompt="一つ目")
+        self.run_hook("PreToolUse")
+        os.remove(self.rules)
+
+        self.run_hook(
+            "UserPromptSubmit",
+            prompt="<task-notification>\n<status>completed</status>\n</task-notification>",
+        )
+        self.run_hook("PreToolUse")
+
+        self.assertTrue(os.path.exists(self.rules), "プロセスが消したものはユーザの削除ではない")
+
+    def test_ユーザが変えた設定ファイルは次のツール呼び出しで戻さない(self):
+        self.run_hook("SessionStart")
+        self.run_hook("UserPromptSubmit", prompt="一つ目")
+        edited = json.dumps(RULES | {"version": 1, "ask": []})
+        write(self.rules, edited)
+
+        self.run_hook("UserPromptSubmit", prompt="二つ目")
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(self.rules)), json.loads(edited))
+
+    def test_ターンの間にユーザが消した実行ファイルは戻さない(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        os.remove(path)
+
+        self.run_hook("UserPromptSubmit", bin=path, prompt="お願いします")
+        self.run_hook("PostToolUse", bin=path)
+
+        self.assertFalse(os.path.exists(path), "ユーザが消したものを戻さない")
+
+    def test_ユーザが消したあとまた置いた実行ファイルは新しい版として守る(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        os.remove(path)
+        self.run_hook("UserPromptSubmit", bin=path, prompt="お願いします")
+        write(path, "MZ rebuilt\n")
+
+        self.run_hook("PreToolUse", bin=path)
+        write(path, "MZ tampered, longer\n")
+        result = self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "MZ rebuilt\n")
+        self.assertIn("restored", result.stdout)
+
+    def test_バックグラウンドの完了通知では消された実行ファイルを受け入れない(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        os.remove(path)
+
+        self.run_hook(
+            "UserPromptSubmit", bin=path, prompt="<task-notification>\n</task-notification>"
+        )
+        self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "MZ fake executable\n")
+
+    def test_ユーザの発言で再ビルドした実行ファイルを基準にし_dry_run_でも取り直す(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        write(path, "MZ rebuilt\n")
+
+        self.run_hook("UserPromptSubmit", bin=path, prompt="お願いします", setting="dry-run")
+        result = self.run_hook("PostToolUse", bin=path, setting="dry-run")
+
+        self.assertIn("MZ rebuilt\n", self.store())
+        self.assertNotIn("would-restore", result.stdout, "取り直したので、変わったと言わない")
 
     # バックアップを溜めない
 
@@ -1484,11 +1606,12 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_古いバックアップはセッション開始で消える(self):
         self.run_hook("SessionStart", session="old")
+        self.run_hook("UserPromptSubmit", session="old", prompt="お願いします")
         self.backdate(os.path.join(self.state, "selfguard", "old"))
 
         self.run_hook("SessionStart", session="s1")
 
-        self.assertEqual(self.sessions(), ["s1"])
+        self.assertNotIn("old", self.sessions())
 
     def test_動いているセッションのバックアップは巻き添えにしない(self):
         # 実行前のバックアップは呼び出しのたびに書き直される。日付で切るのは
@@ -1502,6 +1625,7 @@ class SelfGuardTest(unittest.TestCase):
     def test_自分のバックアップは日付を見ずに残る(self):
         # 時計がずれている環境で、自分が戻す先を自分で消さないこと。
         self.run_hook("SessionStart", session="s1")
+        self.run_hook("UserPromptSubmit", session="s1", prompt="お願いします")
         self.backdate(os.path.join(self.state, "selfguard", "s1"))
 
         self.run_hook("SessionStart", session="s1")

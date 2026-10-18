@@ -77,7 +77,7 @@ def decide(
     if payload.event == hookio.SESSION_START:
         return decide_at_start(stdout, stderr, mode, conf, root, payload, record, deadline)
     if payload.event == hookio.USER_PROMPT_SUBMIT:
-        return decide_at_prompt(stdout, stderr, conf, root, payload, record)
+        return decide_at_prompt(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.STOP:
         return decide_at_stop(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_START:
@@ -174,6 +174,7 @@ def scope_guard(
 def decide_at_prompt(
     stdout: TextIO,
     stderr: TextIO,
+    mode: str,
     conf: settings.Settings,
     root: str,
     payload: hookio.Input,
@@ -195,7 +196,21 @@ def decide_at_prompt(
     足すだけで、作業は止めない。
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）に渡す。
+
+    ユーザの発言なら、前のターンの終わりからここまでの変更を、ユーザの手によるものとして
+    受け入れる。ccnavi 自身の設定ファイルのバックアップを今の状態に取り直し（`selfguard.accept`）、
+    `deny` と宣言された場所の今の変更を報告済みの記録に足す（`post.at_prompt`）。どちらも、
+    次のツール呼び出しがユーザの編集や削除を、その呼び出しが起こした変更として戻さないため。
+    バックグラウンド作業の完了通知（`from_background_task`）も UserPromptSubmit を起こすが、
+    その間に動いたプロセスの変更はユーザの変更と区別できないので、受け入れない。ターンの基準は
+    通知でも取り直す。
     """
+    by_user = not payload.from_background_task()
+    guard = (
+        judge.guard_setting_files(mode, conf, root, payload, record, selfguard.accept)
+        if by_user
+        else ""
+    )
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     watched, scope = watch_context(stderr, conf, root, record, raw)
     post.at_prompt(
@@ -209,10 +224,12 @@ def decide_at_prompt(
         (conf.tickets, conf.approved),
         functools.partial(skillsync.is_synced_write, conf, root),
         root,
+        accept=by_user,
     )
     hint = branchfind.prompt_context(
         conf, root, payload.prompt, payload.cwd, payload.session_id, stderr
     )
+    hint = "\n\n".join(p for p in (guard, hint) if p)
     # バックグラウンドのサブエージェントが範囲を確かめられないまま終わり、そのあと親が
     # ツールを使わずにターンを終えたなら、印はここまで残っている。次の依頼の前に言う。
     unchecked = subagent.unchecked_scope(conf.state, payload) if conf.tickets_enabled else ""

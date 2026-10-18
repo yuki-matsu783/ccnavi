@@ -20,6 +20,8 @@ POST_TOOL_USE = "PostToolUse"
 POST_TOOL_USE_FAILURE = "PostToolUseFailure"
 SESSION_START = "SessionStart"
 USER_PROMPT_SUBMIT = "UserPromptSubmit"
+# バックグラウンド作業の完了通知が UserPromptSubmit の prompt として届くときの先頭の語。
+TASK_NOTIFICATION = "<task-notification>"
 STOP = "Stop"
 # サブエージェントの開始と終了。開始は止められないイベントで、返せるのは文だけ。
 # 終了は Stop と同じで、exit 2 が「続けさせる」を意味する。
@@ -110,6 +112,16 @@ class Input:
     # prompt は UserPromptSubmit にだけ来る。ユーザの依頼文で、issue・MR の指定を探すのに読む
     # （tickets.branchfind）。記録にも診断ログにも書かない。
     prompt: str = ""
+
+    def from_background_task(self) -> bool:
+        """この UserPromptSubmit が、ユーザの発言ではなくバックグラウンド作業の完了通知か。
+
+        完了通知は、ユーザが何も打たなくても UserPromptSubmit を起こす。そのとき prompt は
+        `<task-notification>` で始まる（実機で確かめた）。ユーザの手による変更を受け入れる
+        処理は、この通知では行わない。バックグラウンドのプロセスが書いた変更を、ユーザの変更として
+        受け入れてしまうため。
+        """
+        return self.prompt.lstrip().startswith(TASK_NOTIFICATION)
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""

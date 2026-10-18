@@ -641,6 +641,7 @@ def at_prompt(
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
     root: str = "",
+    accept: bool = False,
 ) -> None:
     """ターンの始まり。いま保護領域に在る変更を記録して、このターンの基準にする。
 
@@ -651,6 +652,13 @@ def at_prompt(
 
     基準を取るのはターンが始まるときで、そこが「エージェントがまだ何もして
     いない時点」になる。以降に現れたものだけが、このターンで起きたこと。
+
+    accept は、ユーザの発言で始まるターンのとき真。今そこにある変更を報告済みの記録にも足し、
+    次の実行後チェックが「この呼び出しが起こした変更」として戻さないようにする。足さないと、
+    セッションの途中でユーザが `deny` の場所を直したぶんが、次のツール呼び出しで新しい変更に
+    見えて、コミット済みの内容へ戻される。記録は起動時の基準（`capture_baseline`）が
+    取れているセッションにだけ足す。基準が無いセッションの今の変更は、初回の実行後チェックが
+    原因を付けずに伝える。
     """
     read = _read_all(stderr, watched, record)
     if not read:
@@ -675,6 +683,16 @@ def at_prompt(
     record.decision, record.enforced = audit.ALLOW, True
     if found:
         record.detail = f"turn baseline {len(found)}"
+    if accept and found:
+        reported, baseline, announced = _load_reported(stderr, state_dir, payload.session_id)
+        if baseline:
+            _save_reported(
+                stderr,
+                state_dir,
+                payload.session_id,
+                reported | {f.key() for f in found},
+                announced=announced,
+            )
 
 
 def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool, dict]:
