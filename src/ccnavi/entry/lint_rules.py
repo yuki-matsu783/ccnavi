@@ -370,7 +370,7 @@ def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
     除いたものは止めないので、「丸ごと止める」とは言わず、除いたもの以外を止めると言う。
 
     組み合わせ条件（when）の全体が何にでも当たる形は _when_problems が言う。
-    対象は deny で、`{!root}` を組み立てられずに止める側へ倒した deny は
+    対象は deny で、ただし `{!root}` を組み立てられずに止める側へ倒した deny は、
     読み込みが別に言う。allow の広さは _broad が言う。
     """
     if rule.decision != rules.DENY or rule.when is not None or rule.degraded_message:

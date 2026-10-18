@@ -45,7 +45,7 @@ function findTargets(top) {
 		try {
 			entries = fs.readdirSync(dir, { withFileTypes: true });
 		} catch {
-			continue; // 読めないディレクトリは飛ばす（消す対象は絞られる側に倒れる）
+			continue; // 読めないディレクトリは飛ばす（消す対象を増やさない方を選ぶ）
 		}
 		const hasPackageJson = entries.some((e) => e.isFile() && e.name === "package.json");
 		for (const e of entries) {

@@ -206,7 +206,7 @@ def child_state(path: str, branch: str, parent_path: str) -> str:
 def session_text(conf: settings.Settings, root: str) -> str:
     """セッション開始で渡す、このPCの作業中の親の一覧。無ければ空。
 
-    例外は呼ぶ側が握る。
+    例外は呼ぶ側が握り、セッションの開始は止めない。
     """
     if not conf.tickets_enabled:
         return ""

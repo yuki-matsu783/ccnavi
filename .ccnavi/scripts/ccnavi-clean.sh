@@ -194,7 +194,7 @@ clean_with_sh() {
 '
 	# find の出力は行で読む。名前に改行があると行の切れ目を取り違え、名前の途中から
 	# 始まる行がワークツリーの外（`../` で始まるパス）を指しかねない。1 つでもあれば
-	# 何も消さない。調べるのは消す対象の外だけ（中の node_modules などは丸ごと消す）。
+	# 何も消さない。調べるのは消す対象の外だけ（中の node_modules などは中身ごと消す）。
 	cw_odd=$(cd "$cw_top" && {
 		find . -name .git -prune \
 			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) -prune \

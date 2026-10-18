@@ -431,7 +431,7 @@ def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
 
     承認しても、その範囲には子が書けない（子 ⊆ 定義の上限）。承認と着手のあとの子の提案ではじめて
     気づくので、親を作るときと承認の確認（`--verify`）で言う。計画に `scope: inherit` の定義が
-    あれば上限が無いので、何も言わない。warn で言う。
+    あれば上限が無いので、何も言わない。それ以外は warn で言う。
     """
     # 見るのは plan の項の定義だけ。feedback の定義は多くが `inherit` で、混ぜると警告が効かなくなる
     defs = types_of(parent)

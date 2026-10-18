@@ -280,7 +280,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     }
   }
 
-  /** 書く前に、ホストの Approve が外れうることを読む */
+  /** 書く前に、ホストの Approve が外れうるかを確かめる */
   async function approvalWarning(deps: WriteDeps, repo: RepoConfig, family: string): Promise<string> {
     try {
       const prs = (await deps.call("pullApprovals", [repo.owner, repo.repo, family])) as { number: number }[];

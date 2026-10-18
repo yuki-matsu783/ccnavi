@@ -776,7 +776,7 @@ def _parsed(
 
     conf.integration_branch = args.integration_branch.strip()
 
-    # フローの確かめは `--lint` だけが読む。ほかの差し替えと同じく
+    # フローの確かめは `--lint` だけが読む。ほかの差し替えと同じく、
     # 診断の外では無視して言う。診断でも `--lint` でなければ読む先が無いので、そう言って無視する。
     if args.flow:
         if not diagnosing:
