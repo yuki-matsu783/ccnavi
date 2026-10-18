@@ -212,6 +212,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0140](0140-paths-ignore-case-everywhere.md) | パスと名前の大文字小文字は、どの機械でも区別せず同じものとして扱い、両立させない |
 | [0141](0141-drop-the-state-history.md) | 状態の履歴（`events/<識別子>.jsonl`）をやめ、状態は置き場とマーカーだけで持つ（0086 を置き換える） |
 | [0142](0142-user-only-entries-are-separate.md) | ユーザ専用の操作を、実行ファイルの `user` 入口と `ccnavi-user-*.sh` に分け、定義を表 1 つにして hook の止めをそこから作る（提案） |
+| [0143](0143-protected-files-change-through-handoff.md) | 保護対象の変更は、テンプレート専用の手順をやめ、wip/handoff/ に置いた下書きを `ccnavi user handoff` で取り込む一本の手順にそろえる（提案） |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
 
 ### 複数のリポジトリと VS Code 拡張

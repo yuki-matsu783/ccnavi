@@ -128,7 +128,7 @@ Bash のコマンドを、実際に実行される部分まで読み切れなか
 
 **承認の push**:
 承認済みチケットの置き場（とマーカー）だけをコミットし、保護ブランチでなければ push すること。
-`ccnavi-push-approved.sh` と、`ccnavi-ticket.sh`・`ccnavi-review.sh` の最後に呼ぶ共通の関数が行う。
+`ccnavi-user-push-approved.sh` と、`ccnavi-ticket.sh`・`ccnavi-review.sh` の最後に呼ぶ共通の関数が行う。
 旧称: 運ぶ（「運ぶ処理」は「承認の push」1 つにまとめる）
 
 **ダイジェスト**:

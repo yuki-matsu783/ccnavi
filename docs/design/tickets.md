@@ -19,7 +19,7 @@ REQ-APV、REQ-RSK。用語は CONTEXT.md。
 全体ルールは全プロジェクトが使う。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・
 サブエージェントの制限・状態とレビューの操作）まで使うかは `CCNAVI_TICKET_CONTROL`
 （`enable` / `disable`、既定 `enable`）で決める。`disable` のとき、判定・実行後チェック・診断はチケットを
-一切見ず、`--agree` と `ticket` / `review` のサブコマンドは止まり、VS Code 拡張は「チケット管理」の
+一切見ず、`user agree` と `ticket` / `review` のサブコマンドは止まり、VS Code 拡張は「チケット管理」の
 入口を出さない。承認済みチケットの置き場を空にすることでは切り替わらない。
 
 生の git は組み込みの deny（`builtin:guard-raw-git`）でいつも止め、git の入口をこのラッパー 1 本に寄せる（REQ-TKT-55）。ラッパーの中には、承認済みチケットの
@@ -53,7 +53,7 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 |---|---|---|
 | 9.2 | [tickets/places.md](tickets/places.md) | 提案・承認済みチケット・マーカーの置き場と、誰が書くか |
 | 9.3 | [tickets/proposal-format.md](tickets/proposal-format.md) | 提案の frontmatter と本文の書式 |
-| 9.4 | [tickets/approval.md](tickets/approval.md) | `ccnavi --agree` による承認の対象と手順 |
+| 9.4 | [tickets/approval.md](tickets/approval.md) | `ccnavi user agree` による承認の対象と手順 |
 | 9.5 | [tickets/judging-by-path.md](tickets/judging-by-path.md) | 書き込みの行き先のワークツリーから承認済みチケットを選んで判定する |
 | 9.6 | [tickets/state-transitions.md](tickets/state-transitions.md) | チケットの置き場とマーカーの状態遷移 |
 | 9.7 | [tickets/phases.md](tickets/phases.md) | phases.yml のフェーズ定義と、親の計画 |
@@ -66,4 +66,6 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 | 9.14 | [tickets/phase-management.md](tickets/phase-management.md) | フェーズ管理の全体像。定義・計画・待ち方・レビュー・局面をつなぐ入口 |
 | 9.15 | [tickets/templates.md](tickets/templates.md) | 作業・レビュー計画のテンプレート。置き場・2 層の統合結果・検査・`--templates` |
 | 9.16 | [tickets/learning-wiki.md](tickets/learning-wiki.md) | 学びの蓄積。子の気づきを learning-wiki に溜め、反映先への提案として育てる流れ（一部実装済み） |
+| 9.18 | [tickets/user-entry.md](tickets/user-entry.md) | ユーザ専用の入口。`ccnavi user`・`ccnavi-user-*.sh`・hook の止め・実行ファイルの読み替えと断り・端末要求を、表 1 つ（`user_only.py`）から作る仕組み |
 | 9.17 | [tickets/sharing.md](tickets/sharing.md) | 複数人・別 PC・別セッションでの作業。共有するもの・同期の手順・承認者の操作の入口・保証しないこと |
+| 9.19 | [tickets/handoff.md](tickets/handoff.md) | 保護対象の変更の取り込み。`wip/handoff/` の下書きを `ccnavi user handoff` で取り込む手順・種類の表・取り込みの安全・端末要求とボードの経路 |

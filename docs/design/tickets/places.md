@@ -13,15 +13,15 @@ keywords: [置き場, 提案, 承認済みチケット, マーカー, wip/propos
 | 何 | 場所 | 誰が書く | git |
 |---|---|---|---|
 | 提案（親も子も） | `wip/proposals/<状態>/<識別子>.md`（ツリーのルートからの相対）。状態は `todo`（承認待ち）と `review`（レビュー待ち）の 2 つの置き場。プロジェクト向けはそのプロジェクトの側に置く（11 章） | `todo/` は親が書く。`review/` へ動かすのは `ccnavi-ticket.sh finish` だけ | それを持つリポジトリにコミット |
-| 承認済みチケット | 親チケットのツリーの `.ccnavi/approved/<状態>/<識別子>.md`（ツリーのルートからの相対）。状態は `doing`（作業中。判定が読むのはここだけ）と `done`（閉じた。取り消しは `cancelled_at` を持つ） | `doing/` へは `ccnavi --agree`（ユーザ）と、ユーザが `decide` で起こす続きの子。`done/` へはユーザのレビュー（`confirm` / `decide` / `--reviewed` / `close-early`）、レビュー不要の `finish`、`cancel`。コミットと push は `ccnavi-push-approved.sh`（9.4） | 親のブランチにコミット |
-| フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi --reviewed` | 親のブランチにコミット |
+| 承認済みチケット | 親チケットのツリーの `.ccnavi/approved/<状態>/<識別子>.md`（ツリーのルートからの相対）。状態は `doing`（作業中。判定が読むのはここだけ）と `done`（閉じた。取り消しは `cancelled_at` を持つ） | `doing/` へは `ccnavi user agree`（ユーザ）と、ユーザが `decide` で起こす続きの子。`done/` へはユーザのレビュー（`confirm` / `ccnavi-user-decide.sh` / `user reviewed` / `ccnavi-user-close-early.sh`）、レビュー不要の `finish`、`cancel`。コミットと push は `ccnavi-user-push-approved.sh`（9.4） | 親のブランチにコミット |
+| フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi user reviewed` | 親のブランチにコミット |
 | 親のマーカー | 同 `phases/<親>/ready.json` / `close-early.json` / `closed.json` | レビューのスクリプト、`ticket finish <親>`、ユーザ | 親のブランチにコミット。`ready` は Draft を外す前に、閉じた親子のチケットと一緒にワークスペースの `logs/archive/<リポジトリ>/phases/<親>/` へ退避する（ブランチでは他の機械へ届かなくなる） |
 | 閉じたチケットの退避 | ワークスペースの `logs/archive/<リポジトリ>/`（承認済みの領域と同じ構成）と、ready のマーカー `ready/<親>.json` | `ccnavi-review.sh ready`（実行ファイルの `review ready`）だけ。エージェントの書き込みは記録の保護が止める | 入れない（`logs/` は git が追跡しない） |
 | 子の記録 | 同 `phases/<親>/<子>.risk.json` / `.judge.json` / `.flow.json`（着手のときのフローのハッシュ。9.3.1） | `ticket finish` / `ticket record-risk` / `ticket start` | 親のブランチにコミット |
 | 気づきの記録 | 子（と親）のワークツリーの `wip/handoff/learnings/<識別子>.md` と `.digest.json`（9.16）。直接作業は `docs/wiki/inbox/`、ルートは `wip/handoff/inbox/` | `ticket learn`、子のセッション | 子の合流で親のブランチへ届く。`wip/handoff/` の分は統合で外れる |
-| 子のフロー | 同 `flows/<子>.yml`（9.3.1） | ユーザ（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごとコミットして push する） |
-| 子のフローの下書き | フローと同じツリーの `wip/proposals/flows/<子>.yml`（9.3.1。効力は無い） | 頼まれたエージェント。ユーザがフロー編集画面で取り込み、保存が成功したら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-push-approved.sh` がフローと一緒にコミットして push する |
-| テンプレートの下書き | 提案の置き場の `wip/proposals/templates/<名前>.yml`（そのツリーの。プロジェクトのツリーならそのプロジェクトの下。9.15。効力は無い） | 頼まれたエージェント（`ccnavi --templates --draft <親>` か直接）。ユーザが `ccnavi --templates --import` で取り込み、書けたら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-push-approved.sh` が承認済みチケットの置き場の変更と一緒にコミットして push する |
+| 子のフロー | 同 `flows/<子>.yml`（9.3.1） | ユーザ（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-user-push-approved.sh` が置き場ごとコミットして push する） |
+| 子のフローの下書き | フローと同じツリーの `wip/proposals/flows/<子>.yml`（9.3.1。効力は無い） | 頼まれたエージェント。ユーザがフロー編集画面で取り込み、保存が成功したら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-user-push-approved.sh` がフローと一緒にコミットして push する |
+| テンプレートの下書き | `wip/handoff/` の下の、取り込み先と同じ相対パス（例: `wip/handoff/.ccnavi/config/project/templates/<名前>.yml`。そのツリーの。プロジェクトのツリーならそのプロジェクトの下。9.15、9.19。効力は無い） | 頼まれたエージェント（`ccnavi --templates --draft <親>` か直接）。ユーザが `ccnavi user handoff` で取り込み、書けたら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んだ結果は、そのツリーのブランチの変更として残る |
 | ワークツリー | `.claude/worktrees/<識別子>/` | 親が git のラッパースクリプトで切る | 管理外 |
 
 状態は置き場で表す。チケットは 1 本のファイルで、2 つの置き場を行き来する。ユーザが動かす
@@ -52,7 +52,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 置き場はこの 2 つに固定で、環境変数では動かない。sh と VS Code 拡張も同じパスを見る。
 
 **承認済みチケットは git で共有する。** 承認した機械と作業する機械が違っても承認が届くよう、承認済み
-チケットもマーカーも親チケットのブランチに乗せ、`ccnavi-push-approved.sh` がコミットして push する（9.4）。
+チケットもマーカーも親チケットのブランチに乗せ、`ccnavi-user-push-approved.sh` がコミットして push する（9.4）。
 受け取る側では、セッションの最初に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、ワークツリーの
 起点になる統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ `ccnavi-sync.sh` の取り込み結果、無ければデフォルトブランチ＝
 `origin/HEAD` が指すもの）も、チェックアウトされていなければ `update-ref` で
@@ -99,7 +99,7 @@ MR の番号はキャッシュ。判定、C1 の対象、早送りの対象に�
   `ccnavi-sync.sh` がホストに聞いて、親の片付けまで行う（9.11）。取り込み状態の `closed` や手元の退避（`logs/archive/`）からは
   推定しない。Python（`syncstate`）と `ccnavi-sync.sh` は同じ順で見る
 - 親子のチケットの取り込み状態は、親のワークツリーを片付けても消えず、止めは外れない。MR がマージされて手元を片付けたときに消える。
-  捨てた親子のチケットの取り込み状態は、片付けた後にユーザが `ccnavi-sync.sh --forget <P>` で消す（エージェントの Bash は組み込みの
+  捨てた親子のチケットの取り込み状態は、片付けた後にユーザが `ccnavi-user-forget.sh <P>` で消す（エージェントの Bash は組み込みの
   deny が止める）
 - 親のワークツリー以外にあるチケット（ワークスペースルートや子のワークツリーに残った古いコピー、元ツリーに未コミットで残った
   チケットなど）は、`--lint` の診断にだけ使い、正としては扱わない。承認も、親のワークツリーの上の提案だけを対象にする

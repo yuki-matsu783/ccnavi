@@ -24,6 +24,8 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/`）は、この表に足さない。`*/.ccnavi/*` の一般の保護で止める。
 
+名指しのツール（Write / Edit）の保護には、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下を除く例外がある。守る場所の写し（`wip/handoff/.ccnavi/scripts/x.sh` など）は、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。例外が効くのは、`..` の段が無く、リンクを解いた実パスが綴りと同じで、既にあるファイルがハードリンクでつながっていないとき。`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。組み込みの保護（`builtin:guard-project-home`。`selfguard_shell.handoff_write_exempt`）と、リポジトリのルール（`guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` の `except`）が同じ範囲を除く。シェルからの書き込みの保護は変えない。
+
 上のうち追跡されているものは、その元リポジトリから切ったワークツリー側の設定も対象に入る（11.6）。
 hook スクリプトと保護済みスクリプトはここに無く、ルールの `deny` で止めている。ccnavi ディレクトリの下のスクリプトも無く、組み込みの `deny` で止める。
 
@@ -39,11 +41,11 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 | `builtin:guard-common-layer` | 共通レイヤーの 3 本の置き場が決まっているとき（11.6） | 同上 |
 | `builtin:guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
 
-同じ設定が有効な間、`ccnavi --prune`（`--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
+同じ設定が有効な間、`ccnavi user prune`（旧い形は `ccnavi --prune` の `--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
 擬似端末（`script -qc`）を使えば満たせてしまい、チケット制御を切ったワークスペースでは端末要求を切る変数も止まらないため。
-見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と単独の語の `--prune` が並べば止める。
-免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ形だけ。
+見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と `user prune`（`user` の次の語が `prune`）か単独の語の `--prune` が並べば止める。
+免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ旧い形だけ（`user prune` に免除は無い）。
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
 
