@@ -336,8 +336,8 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
 def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:
     """改版の範囲の差分。足した項・外した項を、deny / ask / allow ごとに並べる。
 
-    旧い範囲は承認のあとに上書きされ、ccnavi の側には残らない。承認する側が、何が新たに
-    書けるようになり、何が書けなくなるかをここで見られるようにする。
+    旧い範囲は承認のあとに上書きされ、ccnavi の側には残らない。承認する人が、
+    新たに書けるようになる範囲と書けなくなる範囲を、ここで見られるようにする。
     """
     lines: list[str] = []
     for name in rules.SECTIONS:
@@ -362,8 +362,8 @@ def _scope_shown(t: ticket_model.Ticket, name: str) -> list[str]:
     """差分に出す項。`regex` は前置を付けて glob と区別する。
 
     glob `src/app` と regex `src/app` は文字列が同じでも当たる範囲が違う（regex は先頭一致で、
-    `src/application.py` にも当たる）。署名が違うのに差分が空になる画面は、承認する人から
-    範囲の広がりを隠す。
+    `src/application.py` にも当たる）。署名が違うのに差分が空になると、承認する人には
+    範囲の広がりが見えなくなる。
     """
     return [f"regex:{e.regex}" if e.regex else e.glob for e in t.entries if e.decision == name]
 

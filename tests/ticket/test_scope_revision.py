@@ -204,7 +204,7 @@ class ScopeRevisionFlowTest(PhaseHarness):
         self.assertIn("allow 削除: tests/*", result.stdout)
 
     def test_a_stale_copy_in_a_child_worktree_does_not_count_after_cancel(self):
-        """取り消したあとも子のワークツリーには切った時点の doing/ のコピーが残る。"""
+        """取り消したあとも子のワークツリーには切り出した時点の doing/ のコピーが残る。"""
         self.family(plan=self.PLAN)
         self.propose(
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)

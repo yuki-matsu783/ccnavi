@@ -573,7 +573,7 @@ def open_children(conf: settings.Settings, root: str, parent_id: str) -> list[st
     親の範囲が変わっても動かす先が無いため。
     """
     # `all_tickets` は子のワークツリーに checkout されたままの古い版も拾う。親のツリーで
-    # 取り消したあとも `doing/` のコピーが残るので、数えると取り消しても改版が通らない。
+    # 取り消したあとも `doing/` のコピーが残るので、数えると、取り消しても改版が通らなくなる。
     # 判定と同じく、正とするツリーの側だけを数える（`approval.scan`）。
     opened, _ = approval.scan(conf, root)
     return sorted(

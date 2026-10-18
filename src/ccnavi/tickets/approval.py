@@ -414,7 +414,7 @@ def _same_todo(t: ticket_model.Ticket, u: ticket_model.Ticket) -> bool:
 
 
 def revision_elsewhere(t: ticket_model.Ticket, current: ticket_model.Ticket | None) -> bool:
-    """正とするツリーの外の `todo/` の提案が、計画・写し・範囲の違う親の版か。
+    """正とするツリーの外の `todo/` にある提案が、計画・写し・範囲の違う親の版かどうか。
 
     場所違いの改版か、巻き戻しの元。
 
@@ -457,7 +457,7 @@ def phases_signature(t: ticket_model.Ticket) -> tuple | None:
 
 
 def scope_signature(t: ticket_model.Ticket) -> tuple:
-    """チケットの範囲（deny / ask / allow の項）の比べる形。書く順の違いは違いにしない。"""
+    """チケットの範囲（deny / ask / allow の項）を比べる形。項の並び順の違いは区別しない。"""
     return tuple(sorted((e.decision, e.glob, e.regex) for e in t.entries))
 
 
