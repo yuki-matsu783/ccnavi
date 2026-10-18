@@ -2,8 +2,9 @@
 
 見るのは 7 つ。
 
-1. 取り込み状態相当: ホストに無く統合先でも閉じていない親子のチケットは `gone` で組み、
-   その親子のチケットは決まらない。判定の入力に読めない（バイナリの）ファイルがあれば止める
+1. 親のワークツリー相当: ホストに無い親子のチケットは仮のワークツリーが組まれず、その親子の
+   チケットは「親のワークツリーがありません」で決まらない。判定の入力に読めない
+   （バイナリの）ファイルがあれば止める
 2. 版ずれ: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan・withdraw）を
    受けない
 3. 見せた一覧とダイジェスト: 違えば書くものを出さない
@@ -77,7 +78,7 @@ class ChromeWriteHarness(CoreHarness):
 
 
 class RecordsTest(ChromeWriteHarness):
-    def test_an_absent_family_is_gone_and_its_stale_copy_is_undecided(self):
+    def test_an_absent_family_stops_and_its_stale_copy_is_undecided(self):
         """P の上に古いチケット（閉じた i0009-01-01）があっても、
         i0009 がホストに無ければ決まらない。"""
         self.family(plan=["research"])
@@ -92,22 +93,33 @@ class RecordsTest(ChromeWriteHarness):
         self.commit_parent()
         request = self.chrome_request("plan", "i0001")
         request["snapshot"]["absent"] = ["i0009"]
-        self.mirror_records(load_chrome(), request)
         body = self.answer(request)
         self.assertNotIn("error", body, body)
         self.assertEqual(body["identifiers"], [])
         rejected = {r["ticket"]: r["problems"] for r in body["rejected"]}
         self.assertTrue(
-            any("i0009" in p and "gone" in p for p in rejected["i0001-01-01"]), rejected
+            any(
+                "i0009" in p and "親のワークツリー（.claude/worktrees/i0009）がありません" in p
+                for p in rejected["i0001-01-01"]
+            ),
+            rejected,
         )
-        records = load_chrome().records(
-            request["snapshot"], load_chrome()._placement(), ["i0001", "i0009"]
-        )
-        self.assertIn("state gone", records["sync/self/families/i0009"])
-        self.assertIn("state present", records["sync/self/families/i0001"])
-        # 先頭の sha は取り込み状態に書かない（ダイジェストが関係の無い push で変わらないように。
-        # 6.2）
-        self.assertTrue(all("sha" not in text for text in records.values() if "\n" in text))
+
+    def test_a_requested_family_missing_from_the_snapshot_is_refused(self):
+        """要求した親子のブランチ自体が snapshot の branches に無ければ、偽のツリーを組まずに断る。
+
+        記録（gone）を足さなくても、拡張の側で止まる。ホストに無いと分かっていても同じ。
+        """
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        for absent in ([], ["i0003"]):
+            request = self.chrome_request("plan", "i0003")
+            request["snapshot"]["absent"] = absent
+            for op in ("board", "plan"):
+                with self.subTest(op=op, absent=absent):
+                    body = self.answer({**request, "op": op})
+                    self.assertIn("family のブランチが snapshot にありません", body["error"])
+                    self.assertNotIn("identifiers", body)
 
     def test_an_unreadable_input_stops_the_board_and_the_plan(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
@@ -200,7 +212,7 @@ class WrittenCopyTest(ChromeWriteHarness):
         body = self.plan()
         self.assertEqual(body["identifiers"], ["i0001", "i0001-01-01"])
         self.apply(body["changes"]["i0001"], self.parent_tree)
-        # 手元の取り込み状態は Chrome と同じ（取り込み済みの親子のチケット）。
+        # 手元の判定は Chrome と同じ仮のツリーを読む。
         # 判定し直し（C3）で error が出ない
         self.assertEqual(lint.family_check(self.conf(), self.root, "i0001", "self"), [])
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)

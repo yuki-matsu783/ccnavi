@@ -15,18 +15,15 @@
 ボードの答えの `reviewable` が候補のフェーズで、ホストからスレッドとレビューを取得した結果は
 拡張が組んで `result` で渡す。
 
-仮のツリーには、手元の取り込み状態に当たるもの（`logs/state/sync/self/`。統合先の取り込み結果
-である `done/`・レイヤー・設定のコピーと、閉包の親子のチケットの取り込み状態）も組む。
-手元と同じ判定のコードが、これを取り込み済みの親子のチケットとして読む。
+取り込み状態（`logs/state/sync/`）は組まない。手元と同じ判定のコードが、仮のツリーの
+ワークツリーとチケットだけから親子を読む。ホストに親のブランチが無ければ、そのワークツリーは
+組まれず、判定が「親のワークツリーがありません」で止める。
 
-- ホストに在る親子のチケット（`P` と閉包の `P_X`）は `present`
-- ホストに無く、統合先の `done/` でも閉じていない親子のチケットは `gone`。親チケットのブランチが無く
-  統合先でも閉じていなければ、新規の承認として通すと改版の制約を迂回できるので「決まらない」で止める
 - 判定の入力に読めない（バイナリの）ファイルがあれば、何も判定せず「決まらない」で止める
   （取っていないファイルと同じく、無いとも空とも読ませない）
 
 書く操作（`plan`・`withdraw`）は、同梱の互換の版が統合先の `CCNAVI_COMPAT` と違えば受けない。
-互換の違う判定をリモートに乗せると、手元の取り込みで判定し直したときに答えが分かれるため。
+互換の違う判定をリモートに乗せると、手元で判定し直したときに答えが分かれるため。
 書く先は親チケットのブランチ `P` だけで、予約の名前・統合先の名前は受けない。
 
 呼び方は `handle(<要求の JSON>, root)`。`root` は仮のツリーを組む場所で、Pyodide では `/ws`、
@@ -49,8 +46,7 @@ Snapshot の形は次のとおり（拡張の `src/core/snapshot.ts` と対）�
 自身のレイヤー・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは手元と同じ形で組む。
 ワークスペースルートにワークスペースの統合先、`projects/<名前>/` にプロジェクトの統合先
 （`done/` と、プロジェクトの統合先のレイヤーに共通レイヤーをコピーしたレイヤー）、親子のチケットは
-`projects/<名前>` のワークツリーとして `.claude/worktrees/<P>` に置く。取り込み状態は
-`sync/self/` と `sync/<名前>/` に分けて組む。
+`projects/<名前>` のワークツリーとして `.claude/worktrees/<P>` に置く。
 
     "project": "<プロジェクト名>",
     "workspace": {"integration": {"name": ..., "source": ..., "head": ...},
@@ -60,7 +56,7 @@ Snapshot の形は次のとおり（拡張の `src/core/snapshot.ts` と対）�
 要求の `family` は親のブランチ名のまま（拡張が読み書きするブランチ）で、そのブランチの上に、変換した
 識別子の親チケットがあれば、そのブランチが親のブランチ（`_family_ident`）。リモートのブランチ一覧は
 変換して親チケットの識別子と照合する。仮のツリーは `.claude/worktrees/<識別子>` に組み、HEAD を親の
-ブランチに向け、取り込み状態は識別子を鍵に `branch` へ親のブランチ名を書く（キャッシュ）。
+ブランチに向ける。
 同じ識別子の親チケットを持つブランチが snapshot に 2 本以上あれば、どれを正とするか決まらない
 として止める。閉包の先行の親子のチケットのブランチは、snapshot の中で変換した識別子が一致する
 ブランチを探し、無ければ要求の `hints`（識別子 → ブランチ名。ボードの親子のチケットの一覧から
@@ -89,7 +85,6 @@ from ccnavi.tickets import (
     core,
     review,
     review_host,
-    syncstate,
     ticket_ids,
     ticket_model,
     via,
@@ -99,9 +94,6 @@ from ccnavi.tickets import ticket as ticket_mod
 # 要求と答えの形の版。拡張の `PY_SCHEMA` と揃える。
 SCHEMA = 1
 
-# 取り込み状態の名前（ワークスペース自身）。
-SELF_REPO = syncstate.SELF
-
 # 参照の閉包で辿る親子のチケットの上限。1 組あたり tree 1 回と blob をまとめて読む 1 回なので、
 # 承認 1 回の読み取りが 40 回ほどに収まる。超えたら「決まらない」で止め、手元での確かめを案内する。
 FAMILY_LIMIT = 16
@@ -110,13 +102,9 @@ FAMILY_LIMIT = 16
 WORKTREES = ".claude/worktrees"
 
 # 統合先から読むもの（置き場のパスの設定に依らないもの）。
-# 手元の統合先の取り込み結果に書き出すものと同じリスト。
 COMMON_LAYER = ".ccnavi/config/common"
 SETTINGS_FILE = ".claude/settings.json"
 COMPAT_FILE = lint.SH_COMPAT_FILE.replace(os.sep, "/")
-
-# 取り込み状態に当たるものの置き場（仮のツリーの中。手元の既定の state の置き場と同じパス）。
-STATE_DIR = settings.DEFAULT_STATE.replace(os.sep, "/")
 
 # ホストから来たパスのうち、根から始まるもの（絶対パス・ホーム・ドライブ）の表記。
 # 仮のツリーの外へ出ないよう `_check_rel` が断る。
@@ -526,9 +514,7 @@ def _closure(snap: dict, place: dict, family: str, hints: dict[str, str] | None 
 # ---- 仮のツリーと承認待ち ---------------------------------------------------------------
 
 
-def _build(
-    root: str, snap: dict, place: dict, families: list[str], idents: dict | None = None
-) -> None:
+def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
     """統合先をワークスペースルートに、親子のチケットをワークツリーに置いた仮のツリーを組む。
 
     プロジェクトのリポジトリは、ワークスペースの統合先をワークスペースルートに、
@@ -586,8 +572,6 @@ def _build(
         _head(registry, name)
         for path, text in _files(snap, name).items():
             _write(tree, path, text)
-    for rel, text in records(snap, place, families, idents).items():
-        _write(root, f"{STATE_DIR}/{rel}", text)
 
 
 def project_layer(snap: dict, place: dict) -> dict[str, str]:
@@ -608,79 +592,6 @@ def project_layer(snap: dict, place: dict) -> dict[str, str]:
         for path, text in _files(snap, snap["integration"]["name"]).items()
         if path.startswith(prefix)
     }
-
-
-def records(
-    snap: dict, place: dict, families: list[str], idents: dict | None = None
-) -> dict[str, str]:
-    """取り込み状態に当たるもの（state の置き場からの相対パス → 中身）。
-    手元の `ccnavi-sync.sh` が書く形。
-
-    - 統合先の取り込み結果（`sync/self/integration/`）: 統合先の `done/`・共通レイヤー・
-    自身のレイヤー・
-      `.claude/settings.json` のコピーと `head`
-    - 親子のチケットの取り込み状態（`sync/self/families/<P>`）: ホストに在れば `present`、
-      無ければ `gone`
-
-    先頭の sha と取り込んだ時刻は書かない。判定に要らず、手元の試験も
-    これを state の置き場に書き、同じ取り込み状態で判定させる。
-    """
-    integ = snap["integration"]
-    project = _project(snap)
-    base = f"sync/{project or SELF_REPO}"
-    out: dict[str, str] = {
-        f"{base}/integration/head": (
-            f"remote origin\nbranch {integ['name']}\nsource {integ.get('source') or ''}\n"
-        ),
-    }
-    if not project:
-        keep = tuple(p + "/" for p in place["integration_paths"])
-        for path, text in _files(snap, integ["name"]).items():
-            if path.startswith(keep) or path == SETTINGS_FILE:
-                out[f"{base}/integration/{path}"] = text
-    else:
-        # プロジェクトの統合先の取り込み結果（閉じたものとプロジェクトのレイヤー）と、
-        # ワークスペースの統合先の取り込み結果
-        keep = tuple(p + "/" for p in place["project_paths"])
-        for path, text in _files(snap, integ["name"]).items():
-            if path.startswith(keep):
-                out[f"{base}/integration/{path}"] = text
-        ws = snap["workspace"]
-        wsbase = f"sync/{SELF_REPO}"
-        out[f"{wsbase}/integration/head"] = (
-            f"remote origin\nbranch {ws['integration']['name']}\n"
-            f"source {ws['integration'].get('source') or ''}\n"
-        )
-        keep = tuple(p + "/" for p in place["workspace_paths"])
-        for path, text in ws["files"].items():
-            if path.startswith(keep) or path == SETTINGS_FILE:
-                out[f"{wsbase}/integration/{path}"] = text
-    absent = set(snap.get("absent") or [])
-    for name in families:
-        if name == integ["name"]:
-            continue
-        # 取り込み状態の鍵は親子のチケットの識別子、中の branch に親のブランチ名。ホストに
-        # 無い親子のチケットは宣言する親チケットを読めないので、読みに行った名前
-        # （識別子かその見当）で書く。
-        if name in snap["branches"]:
-            ident = _tree_ident(snap, place, name)
-            out[f"{base}/families/{ident}"] = f"remote origin\nbranch {name}\nstate present\n"
-        elif name in absent:
-            # 読みに行った名前の親子のチケット（閉包の `idents`。無ければその名前を識別子とする）。
-            # 識別子の形でなければ取り込み状態を書けない。
-            # 何も言わずに飛ばさず、決まらないとして止める。
-            ident = (idents or {}).get(name, ticket_ids.branch_to_id(name))
-            if not ticket_ids.is_valid_id(ident):
-                raise Refused(
-                    f"ホストにない親ブランチ {name} の親子チケット（{ident}）が"
-                    "識別子の形式ではありません。"
-                    "親子チケットを特定できません"
-                )
-            out[f"{base}/families/{ident}"] = (
-                f"remote origin\nbranch {name}\nstate gone\n"
-                f"reason 親のブランチ {name} がホストに無い\n"
-            )
-    return dict(sorted(out.items()))
 
 
 def _head(gitdir: str, branch: str) -> None:
@@ -746,7 +657,7 @@ def _op_board(req: dict, root: str) -> dict:
     unreadable = _unreadable(snap, closure)
     if unreadable:
         return {"family": family, "undecided": unreadable, "closure": closure}
-    _build(root, snap, place, closure["families"], closure["idents"])
+    _build(root, snap, place, closure["families"])
 
     code, first, err = _preview(root, [])
     if first is None:
@@ -921,7 +832,7 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
     unreadable = _unreadable(snap, closure)
     if unreadable:
         raise Refused(unreadable)
-    _build(root, snap, place, closure["families"], closure["idents"])
+    _build(root, snap, place, closure["families"])
     return snap, place, family, closure
 
 

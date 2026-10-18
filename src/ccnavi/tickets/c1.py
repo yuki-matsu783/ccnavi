@@ -8,8 +8,8 @@
 - `ccnavi c1 family <識別子>`: その識別子の親子のチケットと、C1 の対象かと、親のブランチ名
   （`branch`。親のワークツリーの HEAD から読む。変換した識別子がフォルダ名と合うときだけ）
   - 対象は、置き場のパスが相対で、親のワークツリーがあり、origin があり、HEAD の確認に通る
-    親子のチケット。取り込み状態（記録）の有無や、マージリクエストで見るフェーズの有無は問わない
-  - 止める理由（閉じた・gone・blocked・親のワークツリーが無い・HEAD の確認に通らないなど）のある
+    親子のチケット。マージリクエストで見るフェーズの有無は問わない
+  - 止める理由（親のワークツリーが無い・HEAD の確認に通らないなど）のある
     親子のチケットは `target stop`。sh は何も書かずに止める
   - origin の無い親のワークツリーは対象外（ローカルの git の設定だけを読む）
 - `ccnavi c1 sort <親> [<版>]`: 親のワークツリーの置き場（`.ccnavi/approved/`・
@@ -42,8 +42,8 @@ import os
 import re
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, settings
-from . import approval_marks, archive, syncstate, ticket_ids, ticket_model
+from ..infra import fsio, gitcmd, settings, tree
+from . import approval_marks, archive, standing, ticket_ids, ticket_model
 
 # 答えの頭の行。sh はこれが無ければ「実行ファイルが C1 を知らない（古い）」と読んで止める。
 HEAD = "c1 1"
@@ -92,9 +92,9 @@ def _relative_places(conf: settings.Settings) -> tuple[str, str] | None:
     return approved, f"{tickets.strip('/')}/{ticket_model.REVIEW}"
 
 
-def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, syncstate.Standing]:
+def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, standing.Standing]:
     """C1 の対象か（`TARGET_YES` / `TARGET_NO` / `TARGET_STOP`）と、その理由と立ち位置。"""
-    st = syncstate.standing_any(conf, root, parent)
+    st = standing.standing_any(conf, root, parent)
     if _relative_places(conf) is None:
         return TARGET_NO, "置き場のパスが絶対パス（C1 と Chrome の対象外）", st
     if st.stop or st.home is None:
@@ -115,11 +115,11 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     verdict, why, st = target(conf, root, parent)
     lines.append(("repo", st.repo))
     # 親のブランチ名。sh は識別子からブランチ名を組み立てず、これを使う
-    # （ref・fetch・push・ls-remote・取り込み状態の `branch`）。名前は親のワークツリー
+    # （ref・fetch・push・ls-remote）。名前は親のワークツリー
     # （`.claude/worktrees/<識別子>`）の HEAD から読み、変換した識別子がフォルダ名と合うときだけ
     # `branch` の行を出す。読めない・合わないときは `branch_refused` で理由を言う（sh はその親子の
     # チケットを動かさずに止める）。
-    fams = syncstate.Families(conf, root)
+    fams = standing.Families(conf, root)
     branch = st.branch or fams.branch_any(parent)
     refused = _branch_refusal(parent, branch)
     if refused:
@@ -133,10 +133,8 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     lines.append(("target", verdict))
     if why:
         lines.append(("why", why))
-    if st.record is not None:
-        lines.append(("state", st.record.state or "broken"))
     if verdict == TARGET_STOP:
-        for hint in syncstate.guidance(root, st):
+        for hint in standing.guidance(root, st):
             lines.append(("hint", hint))
     stdout.write(HEAD + "\n")
     for key, value in lines:
@@ -168,7 +166,7 @@ def sort(
 ) -> int:
     """`ccnavi c1 sort <親> [<版>]`。置き場の変更を (b)・(c)・(d) に分けて 1 行 1 つ。"""
     places = _relative_places(conf)
-    st = syncstate.standing_any(conf, root, parent)
+    st = standing.standing_any(conf, root, parent)
     if places is None or st.home is None:
         stderr.write(f"ccnavi: c1 sort: 親子のチケット {parent} の親のワークツリーが決まらない\n")
         return 1
@@ -178,7 +176,7 @@ def sort(
         stderr.write(f"ccnavi: c1 sort: {why}\n")
         return 1
     stdout.write(HEAD + "\n")
-    archive_at = (root, syncstate.project_of_key(st.repo))
+    archive_at = (root, tree.project_of_key(st.repo))
     for kind, rel, why in classify_all(tree_root, places, parent, changed, since, archive_at):
         stdout.write(f"{kind} {rel}\n")
         if why:

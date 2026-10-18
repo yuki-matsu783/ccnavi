@@ -353,10 +353,8 @@ class FetchTest(unittest.TestCase):
     # ---- 取り込み済みの親子のチケット
     # SessionStart は親のワークツリーを早送りするだけで、merge はしない。
 
-    def family(self, name="i0001", record=True):
-        """親のワークツリー .claude/worktrees/<name>（親チケットを送ってある）と、
-        親子のチケットの取り込み状態。
-        """
+    def family(self, name="i0001"):
+        """親のワークツリー .claude/worktrees/<name>（親チケットを送ってある）。"""
         self.leave_main()
         tree = os.path.join(self.ws, ".claude", "worktrees", name)
         git(self.ws, "worktree", "add", "-q", tree, "-b", name, "main")
@@ -365,11 +363,6 @@ class FetchTest(unittest.TestCase):
         git(tree, "add", "--", copy)
         git(tree, "commit", "-q", "-m", "copy")
         git(tree, "push", "-q", "-u", "origin", name)
-        if record:
-            write(
-                os.path.join(self.ws, "logs", "state", "sync", "self", "families", name),
-                f"remote origin\nbranch {name}\nsha x\nfetched_at 1\nstate present\nreason \n",
-            )
         return tree
 
     def test_a_family_is_fast_forwarded_past_unrelated_work_in_progress(self):
@@ -497,12 +490,18 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(main_before, self.sha(self.ws, "refs/heads/main"))
         self.assertIn("develop", done.stdout)
 
-    def test_the_worktree_base_follows_the_name_ccnavi_sync_recorded(self):
+    def test_the_worktree_base_follows_the_name_in_settings_local_json(self):
+        # 統合先の名前は、環境変数が無ければ `.claude/settings.local.json` の env から読む
+        # （実行ファイルの `sync paths` が運ぶ）。ccnavi-sync.sh が書いたコピーは読まない。
         git(self.ws, "push", "-q", "origin", "main:develop")
         git(self.ws, "branch", "-q", "develop", "main")
         write(
+            os.path.join(self.ws, ".claude", "settings.local.json"),
+            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}\n',
+        )
+        write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch develop\nsource settings.local.json\nsha x\nfetched_at 1\n",
+            "remote origin\nbranch main\nsource default\nsha x\nfetched_at 1\n",
         )
         self.leave_main()
         head = self.advance(self.remote, "develop")
@@ -515,10 +514,10 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertIn("統合先ブランチ nope がリモートにありません", done.stdout)
 
-    def test_a_worktree_without_a_record_is_fast_forwarded_too(self):
-        # 取り込み状態（記録）の有無は早送りの対象に関係しない。HEAD のブランチ名を変換した
-        # 識別子がフォルダ名と同じ親のワークツリーは、すべて早送りする。
-        tree = self.family(record=False)
+    def test_a_worktree_is_fast_forwarded_without_any_state(self):
+        # 親子ごとの取り込み状態は持たない。HEAD のブランチ名を変換した識別子がフォルダ名と同じ
+        # 親のワークツリーは、すべて早送りする。
+        tree = self.family()
         before = self.sha(tree, "HEAD")
         head = self.advance(self.remote, "i0001")
         write(os.path.join(tree, "note.txt"), "書きかけ\n")
@@ -527,6 +526,9 @@ class FetchTest(unittest.TestCase):
         self.assertNotEqual(before, self.sha(tree, "HEAD"))
         self.assertEqual(head, self.sha(tree, "HEAD"))
         self.assertIn("親ブランチ", "\n".join(self.lines(done)))
+        self.assertFalse(
+            os.path.exists(os.path.join(self.ws, "logs", "state", "sync", "self", "families"))
+        )
         # 書きかけは残る
         self.assertTrue(os.path.exists(os.path.join(tree, "note.txt")))
 

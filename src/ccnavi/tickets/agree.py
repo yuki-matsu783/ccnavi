@@ -510,8 +510,6 @@ def waiting(
     読んだ形で比べる）。待ち方は計画から
     決まるので、待ち方だけの改版は無い。
     `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
-    統合先の取り込み結果の `done/` にある識別子（閉じた識別子の再利用）はここでは外さず、
-    `candidates` が理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
     """
     known = approval_checks.by_id(approved + closed + review)
     open_index = approval_checks.by_id(approved)

@@ -296,12 +296,9 @@ def guard_off_message(found: str) -> str:
 
 # ユーザが端末で打つ入口のうち、引数を読み切れない形。human_path_form と組み込みの script 節は
 # 文字として並んだ表記で見るので、引数を変数・置換・glob で組み立てると外れる（ADR-0122）。
-# 次の 3 つは 2 段目（実行ファイルの端末要求）が無く、hook が唯一の保護なので、止める操作を
+# 次の 2 つは 2 段目（実行ファイルの端末要求）が無く、hook が唯一の保護なので、止める操作を
 # 組み立てうるなら止める。組み立てられない形（読むだけの形）は通す。
 #
-# - `ccnavi-sync.sh`: `--forget` は実行ファイルを起動せず、sh が取り込み状態を消す。sh は
-#   1 つ目の引数だけを `--forget` として読むので、1 つ目（空に展開しうる語は飛ばす）が
-#   `--forget` になりうるときに止める。`--preview` のような文字どおりの語が先頭なら通す
 # - `ccnavi-review.sh decide`: `--choices` はボードの経路で、端末を求めない。`--choices` に
 #   なりうる語があれば止める。文字どおりの `--preview` があれば通す
 #   （sh が `--choices` と一緒に断る）
@@ -322,7 +319,6 @@ def guard_off_message(found: str) -> str:
 # 標準入力から読むシェル（パイプの先の `sh`・`bash`、`sh -s`、ヒアドキュメント・ヒアストリング）が
 # あれば、コマンド行の文字列のどこかに入口の名前があるだけで止める（流し込む文字列の中の語は
 # 語として読めない）。走査が止まる形（バッククォート）は生の文字列の語で見る。
-_ENTRY_SYNC = "ccnavi-sync.sh"
 _ENTRY_REVIEW = "ccnavi-review.sh"
 _ENTRY_EXE = frozenset({"ccnavi", "ccnavi.exe", "ccnavi.__main__", "ccnavi-launcher.sh"})
 # 入口の前に置けるコマンド。どれも後ろの語をそのまま実行する。
@@ -350,7 +346,7 @@ _IMPORT_FLAGS = (
     "--delete-template",
 )
 _GUARD_FLAGS = ("--guard-ticket-approval",)
-_FORGET_FLAGS = ("--forget",)
+_ABANDON_FLAGS = ("--abandon",)
 _CHOICES_FLAGS = ("--choices",)
 # 実行ファイルの診断の旗。どれも承認の経路（`--agree` / `--reviewed` / `--close-early`）より前に
 # 分かれて、承認を行わない（cli._parsed の振り分けの順）。
@@ -372,7 +368,7 @@ _EXE_DIAGNOSES = frozenset(
 # 旗を足したらここにも足す（tests/ticket/test_ticket.py が flags と比べる）。
 EXE_OPTIONS = frozenset(
     {
-        "--accept-check", "--accept-done", "--accept-plan",
+        "--abandon", "--accept-check", "--accept-done", "--accept-plan",
         "--accept-unresolved", "--actor", "--agent-id", "--agree", "--approved", "--body-file",
         "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
         "--expect",
@@ -431,11 +427,6 @@ def _could_be(word: str, flags: tuple[str, ...]) -> bool:
     return any(rx.fullmatch(f) or rx.fullmatch(f + "=x") for f in flags)
 
 
-def _vanishes(word: str) -> bool:
-    """語が展開で空になりうるか（展開と glob を除くと何も残らない）。"""
-    return _is_open(word) and not _OPEN_PART.sub("", word)
-
-
 def _drop_redirects(args: list[str]) -> list[str]:
     """リダイレクト（演算子と行き先）を除いた引数。行き先は入口に渡らない。"""
     kept: list[str] = []
@@ -489,7 +480,7 @@ def _literal_quoted(subject: str) -> str:
 
 def _entry_kind(word: str, bin_base: str) -> str:
     base = _base_name(word)
-    if base in (_ENTRY_SYNC, _ENTRY_REVIEW):
+    if base == _ENTRY_REVIEW:
         return base
     if base in _ENTRY_EXE or (bin_base and base == bin_base):
         return "ccnavi"
@@ -527,17 +518,8 @@ def _hidden_args(kind: str, args: list[str]) -> str:
     """入口の引数のうち、止める理由になる語。無ければ空。
 
     文字として並んだ `--choices` と `--digest` の組は human_path_form が先に止める。文字として
-    並んだ `--forget` はここでも返す（`busybox sh` や `sh < x` を前に置くと script 節から外れる）。
     """
     args = _drop_redirects(args)
-    if kind == _ENTRY_SYNC:
-        # sh は 1 つ目の引数だけを `--forget` として読む。空になりうる語は飛ばして次を見る。
-        for arg in args:
-            if _could_be(arg, _FORGET_FLAGS):
-                return arg
-            if not _vanishes(arg):
-                return ""
-        return ""
     if kind == _ENTRY_REVIEW:
         sub = args[0] if args else ""
         if "decide" in [a.lower() for a in args] or (_is_open(sub) and _could_be(sub, ("decide",))):
@@ -562,11 +544,31 @@ def _hidden_args(kind: str, args: list[str]) -> str:
     guard = [a for a in opened if _could_be(a, _GUARD_FLAGS)]
     if guard:
         return guard[0]
+    abandon = _abandon_word(args, opened)
+    if abandon:
+        return abandon
     # テンプレートの取り込み（`--import` と `--yes`）も、承認と同じく組で読めない形にして隠せる。
     if any(_could_be(a, _APPROVAL_FLAGS + _IMPORT_FLAGS) for a in args) and any(
         _could_be(a, _YES_FLAGS) for a in args
     ):
         return next(a for a in opened if _could_be(a, _APPROVAL_FLAGS + _IMPORT_FLAGS + _YES_FLAGS))
+    return ""
+
+
+def _abandon_word(args: list[str], opened: list[str]) -> str:
+    """`worktree retire --abandon`（放棄した親の記録を消す操作）を組み立てうる語。無ければ空。
+
+    文字どおりの `worktree retire` は `_CLI_FORMS` が止める。ここは、副命令の `retire` か
+    `--abandon` を変数・glob で組み立てて外す形を止める。
+    """
+    if "worktree" not in args:
+        return ""
+    for arg in opened:
+        if _could_be(arg, _ABANDON_FLAGS):
+            return arg
+    verb = args.index("worktree") + 1
+    if verb < len(args) and _is_open(args[verb]) and _could_be(args[verb], ("retire",)):
+        return args[verb]
     return ""
 
 
@@ -624,12 +626,7 @@ def hidden_user_entry(
     """
     inner = list(inner or [])
     entry, word = _hidden_entry(subject, inner, bin_path)
-    found = (entry, word.translate(_UNMARK))
-    if found[1] == "--forget":
-        script = re.compile(_SCRIPT_FORMS, re.IGNORECASE)
-        if any(script.search(c) for c in commands(subject) + [layer for _, layer in inner]):
-            return "", ""
-    return found
+    return entry, word.translate(_UNMARK)
 
 
 def _hidden_entry(subject: str, inner: list[tuple[str, str]], bin_path: str) -> tuple[str, str]:
@@ -675,7 +672,7 @@ def _hidden_entry(subject: str, inner: list[tuple[str, str]], bin_path: str) -> 
 
 
 STDIN_SHELL = "標準入力から読むシェル"
-_NAMED_SCRIPTS = frozenset({_ENTRY_SYNC, _ENTRY_REVIEW, "ccnavi-launcher.sh"})
+_NAMED_SCRIPTS = frozenset({_ENTRY_REVIEW, "ccnavi-launcher.sh"})
 # 流し込む文字列を、コマンドの切れ目と引用符で切る。引用した文字列は 1 本のコマンド行として読む。
 _STRING_SEGMENT = re.compile(r"[;&|\n()`'\"]+")
 # 実行される語の前に置けるもの（入口の前置きのほか、後ろの語を実行するコマンド）。
@@ -736,17 +733,13 @@ def _executed_entry(words: list[str], bin_base: str) -> str:
 
 # 止めた語が、実行の時点で何になりうるか（入口ごと）と、通る形の案内。
 _ENTRY_REASONS = {
-    _ENTRY_SYNC: (
-        "1 つ目の引数として --forget（取り込み状態を削除する操作）になりうる",
-        "取り込むだけなら、親の識別子をそのまま書けば通ります。",
-    ),
     _ENTRY_REVIEW: (
         "decide の --choices（ボードで押した選択を置く操作）になりうる",
         "一覧を見るだけなら decide <N> --preview は通ります。",
     ),
     "ccnavi": (
-        "承認の旗（--agree / --reviewed）と --yes、または端末要求を切る "
-        "--guard-ticket-approval になりうる",
+        "承認の旗（--agree / --reviewed）と --yes、放棄した親の記録を消す "
+        "worktree retire --abandon、または端末要求を切る --guard-ticket-approval になりうる",
         "診断（--docs・--test・--lint・--explain など）は、その旗を展開を含む語より前に書けば"
         "通ります。承認待ちを見るだけなら --agree --preview も通ります。",
     ),
@@ -755,12 +748,7 @@ _ENTRY_REASONS = {
 
 def hidden_entry_message(entry: str, found: str) -> str:
     """ユーザが端末で打つ入口を、エージェントが打った形で止めた文。"""
-    if found == "--forget":
-        return (
-            f"{entry} の --forget（取り込み状態を削除する操作）は、ユーザが端末で実行します。"
-            "必要なら、理由を添えてユーザに依頼してください。"
-        )
-    tail = "承認・残った指摘の対応方針・取り込み状態を削除する操作は、ユーザが端末で実行します。"
+    tail = "承認・残った指摘の対応方針・放棄した親の記録を消す操作は、ユーザが端末で実行します。"
     if found == STDIN_SHELL:
         return (
             f"標準入力から読むシェルに流し込む文字列に、ユーザが端末で実行する入口（{entry}）の名前が"
@@ -866,16 +854,13 @@ def prune_message() -> str:
     )
 
 
-# 承認の sh・取り込み状態を消す sh・ユーザの判断の入口の sh を、コマンドの位置の表記で止める節。
+# 承認の sh・放棄した親の記録を消す入口（worktree retire --abandon）・ユーザの判断の入口の sh を、
+# コマンドの位置の表記で止める節。
 # ticket_approval_rule が使い、hidden_user_entry は同じ形をこの節に任せる（文面を 1 つにするため）。
 _SCRIPT_FORMS = (
     # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る。
     # `ccnavi-approve.sh` は `ccnavi-agree.sh` の前の名前。古いコピーが残っていても止める。
     r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(agree|approve|push-approved)\.sh\b"
-    # 親子のチケットの削除せずに残した取り込み状態を消す、ユーザが打つスクリプト。消すと、
-    # 止めていた親子のチケットが取り込み状態の無いものとして今の手元の動きに戻るので、
-    # 打つのはユーザ。
-    r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
     # ユーザの判断に使うスクリプト。中で
     # `--close-early` を起こし、最後に承認の push を呼ぶ。打つのはユーザ。
     r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
@@ -898,9 +883,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     承認の push（`ccnavi-push-approved.sh`）も止める。コミットして push することは
     合意そのものではないが、push は外へ出す操作で、その時機を決めるのはユーザ。
 
-    親子のチケットの取り込み状態を消す `ccnavi-sync.sh --forget` も止める。
-    削除せずに残した取り込み状態を消すと、決まらないで止めていた親子のチケット（gone など）が、
-    取り込み状態の無いものに戻り、動けるようになる。
+    放棄した親の片付けの記録を消す `ccnavi worktree retire --abandon <親>` も止める
+    （`worktree retire` の形が止める）。消すと、`ccnavi-sync.sh` が知らせていた片付け待ちの親が
+    見えなくなるので、打つのはユーザ。
 
     ボードの経路の形（`--yes` の組、sh の `--choices` と `--digest`）と、端末要求を切る形は、
     ここではなく `human_path_form` が止める。実行ファイルのパスに頼らず見るため。
@@ -935,8 +920,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）"
             "もユーザが実行します。"
-            "親子のチケットの取り込み状態を削除する "
-            f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、ユーザの判断の入口"
+            "放棄した親の片付けの記録を消す 'ccnavi worktree retire --abandon <親>' と、"
+            "ユーザの判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-review.sh')} "
             "close-early'）もユーザが実行します。"
             "テンプレートの取り込み（'ccnavi --templates --import'）・"

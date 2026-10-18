@@ -1,8 +1,8 @@
 """親のワークツリーが決まらないとき、読む側はその置き場のマーカーを読まない。
 
-親のフォルダ（`.claude/worktrees/<親>`）が実在しても、HEAD が別のブランチ・取り込みで止めた
-（gone）などで決まらなければ、そこにあるマーカー（レビュー済み・早めに閉じた）は親のものとは
-限らない。読む側は「何も無い」と読み、書く側は止まる。
+親のフォルダ（`.claude/worktrees/<親>`）が実在しても、HEAD が別のブランチ・途中の操作
+（rebase など）があるなどで決まらなければ、そこにあるマーカー（レビュー済み・早めに閉じた）は
+親のものとは限らない。読む側は「何も無い」と読み、書く側は止まる。
 
 道具は依頼までの道の促しの受入テスト（test_stop_request_nudge.RequestNudgeTest）のものを借りる。
 """
@@ -53,12 +53,21 @@ class UnsettledHomeTest(RequestNudgeTest):
         self.plant_marks()
         self.assert_marks_not_read(conf)
 
-    def test_marks_of_a_parent_stopped_by_the_sync_are_not_read(self):
+    def busy(self):
+        """親のワークツリーを rebase の途中（HEAD は切り離される）にする。"""
+        gitdir = git(self.parent_tree, "rev-parse", "--git-dir").strip()
+        if not os.path.isabs(gitdir):
+            gitdir = os.path.join(self.parent_tree, gitdir)
+        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        os.makedirs(os.path.join(gitdir, "rebase-merge"))
+        write(os.path.join(gitdir, "HEAD"), head + "\n")
+
+    def test_marks_of_a_parent_in_the_middle_of_an_operation_are_not_read(self):
         self.family(plan=["work-mr"])
         self.close_children(work=False)
         conf, _ = settings.load(self.root)
         self.plant_marks()
-        self.gone_record("self")
+        self.busy()
         self.assert_marks_not_read(conf)
 
     def test_the_end_of_a_phase_is_not_marked_when_the_parent_is_not_settled(self):
@@ -66,7 +75,7 @@ class UnsettledHomeTest(RequestNudgeTest):
         self.family(plan=["work-mr"])
         self.close_children(work=False)
         conf, _ = settings.load(self.root)
-        self.gone_record("self")
+        git(self.parent_tree, "checkout", "--quiet", "-b", "other")
         copies, _ = approval.scan(conf, self.root)
         parent = approval_checks.by_id(copies)["i0001"]
         self.assertEqual(phase.announce(io.StringIO(), self.root, conf, parent), "")

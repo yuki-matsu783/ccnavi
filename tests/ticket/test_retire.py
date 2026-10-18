@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import os
 
+from ccnavi.infra import settings
+from ccnavi.tickets import retire
 from tests.ticket.test_archive import ReadyHarness
 from tests.ticket.test_ticket import git, write
 
@@ -201,7 +203,7 @@ class CancelledChildTest(RetireHarness):
 
 
 class TidyAfterMergeTest(RetireHarness):
-    """MR がマージされたと分かった後の片付け（親のブランチと取り込み記録）。"""
+    """MR がマージされたと分かった後の片付け（親のブランチと片付けの記録）。"""
 
     def tidy(self, sha):
         return self.ccnavi("--cwd", self.root, "sync", "tidy", "i0001", "self", "i0001", sha)
@@ -226,12 +228,34 @@ class TidyAfterMergeTest(RetireHarness):
         git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "未 push")
         done = self.tidy(head)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("MR の先頭", done.stdout)
         self.assertIn("未 push のコミットがある", done.stdout)
         self.assertIn(f"git -C {self.root} branch -D i0001", done.stdout)
         self.assertIn("i0001", self.branches())
         self.assertEqual(done.stdout.splitlines()[-1], "record no")
         self.assertTrue(os.path.exists(self.record))
+
+    def test_a_branch_that_fails_the_check_keeps_the_worktree(self):
+        # 同じ名前のブランチを作り直して使っている親（MR の先頭に含まれない先頭）のワークツリーは、
+        # ブランチの確認を通るまで消さない。
+        self.closed_and_pushed()
+        head = self.pushed_head()
+        git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "作り直した親")
+        done = self.tidy(head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn(
+            "ワークツリーは、ブランチが片付けの条件を満たさないので消しません", done.stdout
+        )
+        self.assertNotIn("ワークツリー i0001 を削除しました", done.stdout)
+        self.assertTrue(os.path.isdir(self.parent_tree))
+        self.assertIn("i0001", self.branches())
+
+    def test_a_branch_that_passes_the_check_loses_the_worktree_first(self):
+        self.closed_and_pushed()
+        done = self.tidy(self.pushed_head())
+        lines = done.stdout.splitlines()
+        worktree = next(i for i, line in enumerate(lines) if "ワークツリー i0001 を" in line)
+        branch = next(i for i, line in enumerate(lines) if "ブランチ i0001 を削除" in line)
+        self.assertLess(worktree, branch)
 
     def test_uncommitted_changes_keep_the_worktree_and_the_branch(self):
         self.closed_and_pushed()
@@ -284,3 +308,302 @@ class TidyAfterMergeTest(RetireHarness):
         refused = self.tidy("not-a-sha")
         self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
         self.assertIn("i0001", self.branches())
+
+
+class NoteTest(RetireHarness):
+    """`ready` が書く片付けの記録（`retire/<親>.json`）。"""
+
+    def test_ready_notes_the_mr_number(self):
+        self.closed_and_pushed()
+        self.assertEqual(self.read_record()["mr"], 7)
+
+    def test_a_broken_record_is_not_overwritten_and_ready_stops(self):
+        fixture = self.closable()
+        write(self.record, "{broken")
+        done = self.ready(fixture)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("上書きしない", done.stderr)
+        with open(self.record, encoding="utf-8") as f:
+            self.assertEqual(f.read(), "{broken")
+        # 退避に進んでいないので、親は作業ツリーに残り、直せば打ち直せる。
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "done", "i0001.md")))
+        os.remove(self.record)
+        again = self.ready(fixture)
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual(self.read_record()["mr"], 7)
+
+    def test_an_unreadable_closed_ticket_stops_ready(self):
+        fixture = self.closable()
+        write(os.path.join(self.approved, "done", "i0001-01-77.md"), "---\nticket: [x\n---\n")
+        self.commit_parent("読めない閉じたチケット")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        done = self.ready(fixture)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("読めない閉じたチケットがあり", done.stderr, done.stderr)
+        self.assertFalse(os.path.exists(self.record))
+
+    def test_a_missing_state_place_is_a_failure_reason(self):
+        conf, _ = settings.load(self.root)
+        conf.state = ""
+        reason = retire.note(self.root, conf, "i0001", "", "", 7)
+        self.assertIn("state の置き場が空", reason)
+
+    def test_an_empty_new_mr_keeps_the_previous_one(self):
+        self.closed_and_pushed()
+        conf, _ = settings.load(self.root)
+        self.assertEqual(retire.note(self.root, conf, "i0001", "", self.parent_tree, None), "")
+        self.assertEqual(self.read_record()["mr"], 7)
+        self.assertEqual(retire.note(self.root, conf, "i0001", "", self.parent_tree, 9), "")
+        self.assertEqual(self.read_record()["mr"], 9)
+        self.assertEqual(
+            [c["ticket"] for c in self.read_record()["children"]], [CHILD], "子の一覧は保つ"
+        )
+
+
+class RetiredEntriesTest(RetireHarness):
+    """`ccnavi sync retired`（片付けの列挙元）。"""
+
+    def retired(self):
+        done = self.ccnavi("sync", "retired")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        lines = done.stdout.splitlines()
+        self.assertEqual(lines[0], "retired 1")
+        return lines[1:]
+
+    def put(self, name, text):
+        write(os.path.join(self.state, "retire", name), text)
+
+    def test_nothing_is_just_the_head(self):
+        self.assertEqual(self.retired(), [])
+
+    def test_a_noted_parent_is_listed_with_mr_and_branch(self):
+        self.closed_and_pushed()
+        self.assertEqual(self.retired(), ["retired i0001 self 7 i0001"])
+
+    def test_a_project_parent_is_listed_by_its_name(self):
+        self.put(
+            "pj0001.json",
+            json.dumps({"parent": "pj0001", "project": "app", "branch": "pj0001", "mr": 3}),
+        )
+        self.assertEqual(self.retired(), ["retired pj0001 app 3 pj0001"])
+
+    def test_an_empty_branch_is_a_dash(self):
+        self.put("i0002.json", json.dumps({"parent": "i0002", "project": "", "mr": 5}))
+        self.assertEqual(self.retired(), ["retired i0002 self 5 -"])
+
+    def test_a_record_without_mr_is_incomplete(self):
+        self.put("i0002.json", json.dumps({"parent": "i0002", "project": "", "branch": "i0002"}))
+        (line,) = self.retired()
+        self.assertTrue(line.startswith("incomplete i0002 "), line)
+
+    def test_a_broken_record_is_incomplete(self):
+        self.put("i0003.json", "{broken")
+        (line,) = self.retired()
+        self.assertTrue(line.startswith("incomplete i0003 "), line)
+        self.assertEqual(line.count("\n"), 0)
+
+    def test_a_record_whose_parent_differs_from_its_name_is_skipped(self):
+        self.put("i0004.json", json.dumps({"parent": "i0009", "project": "", "mr": 5}))
+        self.assertEqual(self.retired(), [])
+
+    def test_other_files_are_not_listed(self):
+        self.put("i0005.json.tmp.1", json.dumps({"parent": "i0005", "mr": 5}))
+        self.put("note.txt", "x")
+        self.assertEqual(self.retired(), [])
+
+    def test_works_with_ticket_control_disabled(self):
+        self.closed_and_pushed()
+        done = self.ccnavi("--ticket-control", "disable", "sync", "retired")
+        self.assertEqual(done.stdout.splitlines()[1:], ["retired i0001 self 7 i0001"])
+
+
+class AbandonTest(RetireHarness):
+    """`ccnavi worktree retire --abandon <親>`。"""
+
+    def abandon(self, name="i0001"):
+        return self.ccnavi("--cwd", self.root, "worktree", "retire", "--abandon", name)
+
+    def test_a_parent_whose_worktree_stays_is_refused(self):
+        self.closed_and_pushed()
+        refused = self.abandon()
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("ワークツリー", refused.stderr)
+        self.assertTrue(os.path.exists(self.record))
+
+    def test_the_record_goes_once_the_worktree_is_gone(self):
+        self.closed_and_pushed()
+        self.assertEqual(self.retire().returncode, 0)
+        self.assertTrue(os.path.exists(self.record))
+        done = self.abandon()
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertFalse(os.path.exists(self.record))
+        # ブランチには触らない
+        self.assertIn("i0001", self.branches())
+        again = self.abandon()
+        self.assertEqual(again.returncode, 1, again.stdout + again.stderr)
+        self.assertIn("記録はありません", again.stderr)
+
+    def test_a_bad_name_is_refused(self):
+        refused = self.abandon("../x")
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+
+    def test_it_is_only_for_retire(self):
+        refused = self.ccnavi("--cwd", self.root, "worktree", "drop", "--abandon", "i0001")
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+
+
+class UnverifiableParentTest(RetireHarness):
+    """親のワークツリーが在るのに、成果が失われないと確かめられないときは、何も消さない。"""
+
+    def tidy(self, sha, branch="i0001"):
+        return self.ccnavi("--cwd", self.root, "sync", "tidy", "i0001", "self", branch, sha)
+
+    def pushed_head(self):
+        return git(self.root, "rev-parse", "refs/remotes/origin/i0001").strip()
+
+    def assert_nothing_removed(self, done):
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(done.stdout.splitlines()[-1], "record no", done.stdout)
+        # 親のワークツリーとブランチだけが対象（合流済みの子は MR の先頭で別に判定する）
+        self.assertNotIn("ワークツリー i0001 を削除しました", done.stdout)
+        self.assertNotIn("ブランチ i0001 を削除しました", done.stdout)
+        self.assertTrue(os.path.isdir(self.parent_tree))
+        self.assertTrue(os.path.exists(self.record))
+
+    def test_a_worktree_whose_branch_ref_is_gone_is_not_removed(self):
+        self.closed_and_pushed()
+        head = self.pushed_head()
+        git(self.root, "update-ref", "-d", "refs/heads/i0001")
+        done = self.tidy(head)
+        self.assert_nothing_removed(done)
+        self.assertIn("ref が手元に無いのに親のワークツリーが在り", done.stdout)
+
+    def test_a_head_on_another_branch_than_the_recorded_one_is_not_removed(self):
+        self.closed_and_pushed()
+        head = self.pushed_head()
+        git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
+        git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "別のブランチの成果")
+        done = self.tidy(head)
+        self.assert_nothing_removed(done)
+        self.assertIn("HEAD は elsewhere で、記録のブランチ i0001 と違う", done.stdout)
+        self.assertIn("elsewhere", git(self.root, "branch", "--format=%(refname:short)").split())
+
+    def test_a_detached_head_is_not_removed(self):
+        self.closed_and_pushed()
+        head = self.pushed_head()
+        git(self.parent_tree, "checkout", "--quiet", "--detach")
+        done = self.tidy(head)
+        self.assert_nothing_removed(done)
+        self.assertIn("HEAD がブランチを指していない", done.stdout)
+
+
+class BrokenChildrenTest(RetireHarness):
+    """記録の `children` が配列でないとき（null・数）は、落ちずに、壊れた記録として扱う。"""
+
+    def break_children(self, value):
+        held = self.read_record()
+        held["children"] = value
+        write(self.record, json.dumps(held))
+
+    def test_sync_tidy_does_not_crash_and_keeps_the_record(self):
+        self.closed_and_pushed()
+        self.break_children(None)
+        head = git(self.root, "rev-parse", "refs/remotes/origin/i0001").strip()
+        done = self.ccnavi("--cwd", self.root, "sync", "tidy", "i0001", "self", "i0001", head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("Traceback", done.stderr)
+        self.assertIn("片付けの記録を読めない", done.stdout)
+        self.assertEqual(done.stdout.splitlines()[-1], "record no")
+        self.assertTrue(os.path.exists(self.record))
+
+    def test_sync_retired_names_it_as_incomplete(self):
+        self.closed_and_pushed()
+        self.break_children(None)
+        done = self.ccnavi("sync", "retired")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        (line,) = done.stdout.splitlines()[1:]
+        self.assertTrue(line.startswith("incomplete i0001 "), line)
+        self.assertIn("children が配列ではない", line)
+
+    def test_worktree_retire_removes_nothing(self):
+        self.closed_and_pushed()
+        self.break_children(5)
+        done = self.retire()
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("children が配列ではない", done.stderr)
+        self.assertTrue(os.path.isdir(self.child_tree))
+        self.assertTrue(os.path.isdir(self.parent_tree))
+
+    def test_ready_does_not_overwrite_it(self):
+        fixture = self.closable()
+        write(
+            self.record,
+            json.dumps({"parent": "i0001", "project": "", "children": None, "mr": 7}),
+        )
+        done = self.ready(fixture)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("上書きしない", done.stderr)
+        self.assertIn("children が配列ではない", done.stderr)
+
+
+class BrokenSiblingRecordTest(CancelledChildTest):
+    def test_a_broken_record_of_another_parent_does_not_stop_the_branch_tidy(self):
+        write(
+            os.path.join(self.state, "retire", "i0000.json"),
+            json.dumps({"parent": "i0000", "project": "", "children": None}),
+        )
+        write(os.path.join(self.state, "retire", "i0009.json"), "{broken")
+        done = self.retire("branch", "i0001-01-09", "confirmed")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("Traceback", done.stderr)
+        self.assertNotIn("i0001-01-09", self.branches())
+
+
+class CaseFoldTest(CancelledChildTest):
+    """大文字小文字だけが違う名前は同じものとして扱う（Linux でも）。"""
+
+    def conf(self):
+        conf, _ = settings.load(self.root)
+        return conf
+
+    def test_the_record_is_found_by_a_name_that_differs_only_in_case(self):
+        self.assertEqual(retire.record_path(self.conf(), "I0001"), self.record)
+        # 無いときは与えた名前のまま組む
+        self.assertTrue(retire.record_path(self.conf(), "I0777").endswith("I0777.json"))
+
+    def test_abandon_with_another_spelling_keeps_the_record_while_the_worktree_stays(self):
+        refused = self.ccnavi("--cwd", self.root, "worktree", "retire", "--abandon", "I0001")
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertTrue(os.path.exists(self.record))
+
+    def test_abandon_with_another_spelling_removes_the_same_record(self):
+        self.assertEqual(self.retire().returncode, 1)
+        self.assertFalse(os.path.exists(self.parent_tree))
+        done = self.ccnavi("--cwd", self.root, "worktree", "retire", "--abandon", "I0001")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertFalse(os.path.exists(self.record))
+
+    def test_a_record_file_in_another_spelling_is_listed_when_its_parent_matches(self):
+        os.rename(self.record, os.path.join(self.state, "retire", "I0001.json"))
+        done = self.ccnavi("sync", "retired")
+        self.assertEqual(done.stdout.splitlines()[1:], ["retired I0001 self 7 i0001"])
+
+    def test_a_child_branch_is_found_by_a_name_that_differs_only_in_case(self):
+        done = self.retire("branch", "I0001-01-09", "confirmed")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("i0001-01-09", self.branches())
+
+    def test_the_parent_of_a_child_is_compared_without_case(self):
+        held = self.read_record()
+        held["parent"] = "I0001"
+        write(self.record, json.dumps(held))
+        done = self.retire("branch", "i0001-01-09", "confirmed")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_the_archived_mr_is_read_from_a_copy_in_another_spelling(self):
+        from ccnavi.entry import sh_ask
+
+        path = os.path.join(self.root, "logs", "archive", "self", "done", "I0042.md")
+        write(path, "---\nversion: 1\nticket: I0042\nmr: 42\n---\n")
+        self.assertEqual(sh_ask._archived_mr(self.root, "", "i0042"), "42")
+        self.assertEqual(sh_ask._archived_mr(self.root, "", "i0043"), "")

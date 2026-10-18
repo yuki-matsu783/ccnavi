@@ -2,9 +2,9 @@
 
 見るのは次のとおり。
 
-1. `ticket status`（引数なし）が親を 1 行ずつ出す。親・ブランチ・MR・次の子・最終取り込み・未送信
-2. 取り込み状態が無い親は「リモート未確認」。取り込み状態があれば時刻と MR の番号を出す
-3. 親を渡した `ticket status` にも最終取り込みを出す。子のワークツリーの状態は引数なしのときだけ
+1. `ticket status`（引数なし）が親を 1 行ずつ出す。親・ブランチ・MR・次の子・未送信
+2. MR の番号は親チケットの `mr:`。取り込みの時刻（最終取り込み）は出さない
+3. 親を渡した `ticket status` は、子のワークツリーの状態を出さない（引数なしのときだけ）
 4. 子のワークツリーの状態（合流済み・未合流・未コミットあり）
 5. セッション開始で渡す一覧（`overview.session_text`）
 """
@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
 
 from ccnavi.infra import settings
 from ccnavi.tickets import approval, overview
@@ -20,27 +19,8 @@ from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text
 
-FETCHED = 1_800_000_000
-
-
-def label(seconds):
-    return datetime.fromtimestamp(seconds).astimezone().strftime("%Y-%m-%d %H:%M")
-
 
 class OverviewTest(PhaseHarness):
-    def record(self, **fields):
-        base = {
-            "remote": "origin",
-            "branch": "i0001",
-            "sha": "0" * 40,
-            "fetched_at": str(FETCHED),
-            "state": "present",
-            "reason": "",
-        }
-        base.update(fields)
-        text = "".join(f"{k} {v}\n" for k, v in base.items())
-        write(os.path.join(self.state, "sync", "self", "families", "i0001"), text)
-
     def said(self, *args):
         result = self.ccnavi("ticket", "status", *args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -67,44 +47,21 @@ class OverviewTest(PhaseHarness):
         self.assertIn("ブランチ i0001", line)
         self.assertIn("MR !1", line)  # 親チケットの mr:
         self.assertIn("次の子 i0001-01-01", line)
-        self.assertIn("最終取り込み リモート未確認", line)
+        self.assertNotIn("最終取り込み", line)
         # origin が無いので、リモート追跡の ref が無い。送っていないものは「一度も送っていない」
         self.assertIn("未送信 一度も送っていないあり", line)
 
-    def test_a_predecessor_of_a_family_closed_by_the_sync_is_met_as_in_the_approval(self):
-        """閉じて片付いた別の親子の先行は、承認と同じく取り込み状態で閉じたと読む。"""
-        write(
-            os.path.join(self.state, "sync", "self", "families", "i0099"),
-            "remote origin\nbranch i0099\nsha x\nfetched_at 1\nstate closed\nreason r\n",
-        )
-        write(
-            os.path.join(self.state, "sync", "self", "integration", "head"),
-            "branch main\nsha x\nsource default\n",
-        )
+    def test_the_mr_number_comes_from_the_parent_ticket_only(self):
         self.family(plan=["research", "design"])
-        text = child_text("i0001-01-01", "i0001", 1, ["wip/research/*"])
-        self.propose(
-            "i0001-01-01", text.replace("phase: 1\n", "phase: 1\npredecessors: [i0099-01-01]\n")
-        )
-        self.commit_parent()
-        result = self.approve()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("次の子 i0001-01-01", self.parent_line(self.said()))
-
-    def test_record_gives_the_time_and_the_mr_number(self):
-        self.family(plan=["research", "design"])
-        self.record(mr="12")
         line = self.parent_line(self.said())
-        self.assertIn(f"最終取り込み {label(FETCHED)}", line)
-        # 親チケットの mr: が先。取り込み記録の mr（12）は親チケットに無いときの控え
         self.assertIn("MR !1", line)
         self.assertNotIn("リモート未確認", line)
 
-    def test_row_reads_the_mr_from_the_record(self):
+    def test_row_reads_the_mr_from_the_parent_ticket(self):
         self.family(plan=["research"])
-        self.record(mr="12")
         rows = self.rows()
         self.assertEqual(rows[0].mr, "1")
+        self.assertFalse(hasattr(rows[0], "fetched_at"))
 
     def rows(self):
         conf, _ = settings.load(self.root)
@@ -128,14 +85,12 @@ class OverviewTest(PhaseHarness):
 
     # ---- 3. 親を渡したとき
 
-    def test_status_of_a_parent_says_the_last_sync_but_not_the_children(self):
+    def test_status_of_a_parent_does_not_say_the_children_or_the_last_sync(self):
         self.family(plan=["research", "design"])
         out = self.said("i0001")
-        self.assertIn("最終取り込み: リモート未確認", out)
+        self.assertNotIn("最終取り込み", out)
         self.assertNotIn("== このPCで作業中の親", out)
         self.assertNotIn("子のワークツリー:", out)
-        self.record()
-        self.assertIn(f"最終取り込み: {label(FETCHED)}", self.said("i0001"))
 
     # ---- 4. 子のワークツリーの状態
 
@@ -156,16 +111,8 @@ class OverviewTest(PhaseHarness):
         conf, _ = settings.load(self.root)
         self.assertEqual(overview.session_text(conf, self.root), "")
         self.family(plan=["research"])
-        self.record(mr="3")
         text = overview.session_text(conf, self.root)
         self.assertTrue(text.startswith("[ccnavi] このPCで作業中の親:"), text)
         self.assertIn("- 親 i0001  ブランチ i0001  MR !1", text)
-        self.assertIn(f"最終取り込み {label(FETCHED)}", text)
-        self.assertNotIn("リモート未確認の親は", text)
-
-    def test_session_text_points_to_sync_for_unchecked_parents(self):
-        conf, _ = settings.load(self.root)
-        self.family(plan=["research"])
-        text = overview.session_text(conf, self.root)
-        self.assertIn("リモート未確認", text)
-        self.assertIn("ccnavi-sync.sh <親>", text)
+        self.assertNotIn("最終取り込み", text)
+        self.assertNotIn("リモート未確認", text)

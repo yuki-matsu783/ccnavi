@@ -114,9 +114,10 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                    : や + を含む引数(refspec・URL)は不可。手元の ref は ccnavi-sync.sh が進める)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release と統合先 (CCNAVI_INTEGRATION_BRANCH、無ければ
-                   ccnavi-sync.sh の取り込み結果、無ければ origin/HEAD) へ直接は送れない。
+                   settings.local.json の env、無ければ origin/HEAD) へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
-                   リモートから消えた(取り込み状態が gone の)親のブランチへは送れない)
+                   リモートから消えた親のブランチへは送れない。親のワークツリーは push の前に
+                   リモートに在るかを確かめる。捨てた親ならワークツリーを片付ける)
   取り込み  直接作業(チケットを起こさない)のワークツリーを、統合先のツリーへコミットせずに取り込む。
             統合先をチェックアウトしているツリーで実行します。チケットのワークツリーは対象外(マージリクエストで出す)
             integrate <名前>          .claude/worktrees/<名前> のブランチを merge --squash で staged にする。
@@ -658,7 +659,7 @@ ig_where() {
 		reject not-a-repo "git リポジトリの中で実行してください（統合先をチェックアウトしているツリーで $SELF $sub ... を実行します）。"
 	ig_integ=$(ccnavi_integration "$ig_top" "$WS") || ig_integ=""
 	[ -n "$ig_integ" ] ||
-		reject integrate-no-integration "統合先の名前が決まりません（CCNAVI_INTEGRATION_BRANCH・ccnavi-sync.sh の取り込み結果・origin/HEAD のどれもありません）。統合先をユーザに確かめ、CCNAVI_INTEGRATION_BRANCH に入れてもらってから再実行してください。"
+		reject integrate-no-integration "統合先の名前が決まりません（CCNAVI_INTEGRATION_BRANCH・settings.local.json の env・origin/HEAD のどれもありません）。統合先をユーザに確かめ、CCNAVI_INTEGRATION_BRANCH に入れてもらってから再実行してください。"
 	ig_head=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
 	if [ "$ig_head" != "$ig_integ" ]; then
 		ig_home=$(git worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/$ig_integ" '
@@ -719,7 +720,7 @@ ig_wt_branch() {
 #
 # 親のワークツリー（ccnavi_parent_tree）のほか、どのツリー（ワークスペースルート・projects/ の下・
 # .claude/worktrees/ の下）の置き場にでも同じ名前の承認済みチケットか提案があれば、子のものも含めて当たる。
-# 親子のチケットの取り込み状態があっても当たる。広めに当てて断る向き。
+# 広めに当てて断る向き。
 ig_bound() {
 	ig_why=""
 	ig_pt_rc=0
@@ -745,12 +746,19 @@ ig_bound() {
 			fi
 		done
 	done
-	ig_key=$(ccnavi_repo_key "$ig_top" "$WS")
-	if [ -f "$(ccnavi_family_record "$WS" "$ig_key" "$1")" ] ||
-		[ -f "$(ccnavi_family_record "$WS" "$ig_key" "$(ccnavi_branch_to_id "$1")")" ]; then
-		ig_why="親子のチケットの取り込み状態がある"
-		return 0
-	fi
+	# チケットや提案がまだ無い間（ccnavi-start.sh の直後）の親も断る。ccnavi-start.sh は親のブランチを
+	# origin へ送ってから始めるので、親のワークツリー（.claude/worktrees/<識別子>で、HEAD のブランチが
+	# 同じ識別子になるもの）のブランチが origin に在れば、チケットに結び付くワークツリーとみなす。
+	# 直接作業のワークツリーも名前の形は同じなので、origin に在るかが見分けになる（直接作業のブランチは
+	# 送らず、統合先へ直接取り込む）。
+	ig_id=$(ccnavi_branch_to_id "$1")
+	for ig_cand in "$1" "$ig_id"; do
+		ig_hb=$(ccnavi_head_branch "$WS/.claude/worktrees/$ig_cand" "$ig_cand" 2>/dev/null) || continue
+		if git -C "$WS/.claude/worktrees/$ig_cand" show-ref --verify --quiet "refs/remotes/origin/$ig_hb" 2>/dev/null; then
+			ig_why="親のブランチ（origin/${ig_hb}）のワークツリー（.claude/worktrees/${ig_cand}）がある"
+			return 0
+		fi
+	done
 	return 1
 }
 
@@ -1719,10 +1727,9 @@ checkout | switch)
 	# 親のワークツリー（.claude/worktrees/<P> で、親チケットか提案があるもの）では、許す形
 	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない。
 	# 親チケットか提案があるかは ccnavi_parent_tree が実行ファイルに聞く。ccnavi-sync.sh・ccnavi-fetch.sh・
-	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
+	# standing.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
 	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
-	# このツリーへ取り込まなくなる。取り込み状態がある親（親のブランチを一度でも origin へ push したか、
-	# ccnavi-sync.sh で取り込んだ親）では、実行ファイル（syncstate.standing）が親のワークツリーを決められず、
+	# このツリーへ取り込まなくなる。実行ファイル（standing.standing）も親のワークツリーを決められず、
 	# 親と子のチケットの承認・状態の操作・実行前の判定を止める。
 	#
 	co_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
@@ -1864,25 +1871,13 @@ push)
 		;;
 	esac
 	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も止める。名前は ccnavi-fetch.sh が
-	# ワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 →
+	# ワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env →
 	# origin/HEAD → origin/main・master）で、このツリーが属するリポジトリ（プロジェクトならその
 	# プロジェクト）について決める。決まらなければ上の固定のリストだけで判定する。
 	push_integ=$(ccnavi_integration "${push_top:-.}" "$WS") || push_integ=""
 	log_debug push の統合先 -- "integration=$push_integ"
 	if [ -n "$push_integ" ] && [ "$push_branch" = "$push_integ" ]; then
 		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
-	fi
-	# リモートから消えた親のブランチ（取り込み状態が gone）へは送らない。
-	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子のチケット）を確かめないまま親子のチケットが
-	# 動き出す。毎回の ls-remote はせず、取り込み状態を読むだけにする。ユーザが戻した後は ccnavi-sync.sh が
-	# present に書き直して、この拒否が解ける。
-	# 取り込み状態は識別子を鍵にする。居るブランチ名を変換した（/ を - に置き換えた）識別子で引く。
-	push_key=$(ccnavi_repo_key "${push_top:-.}" "$WS")
-	push_record=$(ccnavi_family_record "$WS" "$push_key" "$(ccnavi_branch_to_id "$push_branch")")
-	[ -f "$push_record" ] || push_record=""
-	if [ -n "$push_record" ] && [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
-		push_family="${push_record##*/}"
-		reject push-gone-family "$push_branch はリモートから消えた親のブランチです（親子のチケット $push_family の取り込み状態が gone）。普通の push で作り直すと、消えた理由を確かめないまま親子のチケットが動き出すので使用できません。改名や消し間違いならユーザに元の名前で戻してもらい（戻し方は $SYNC $push_family が出します）、戻した後に $SYNC $push_family を再実行すると送れます。親子のチケットを捨てたなら親のワークツリーを片付け、ユーザが $SYNC --forget $push_family で取り込み状態を削除します（エージェントは実行しません）。"
 	fi
 	push_seen_remote=""
 	for arg in ${1+"$@"}; do
@@ -1915,6 +1910,43 @@ push)
 			;;
 		esac
 	done
+	# リモートから消えた親のブランチへは送らない（push の関門。C1・ccnavi-push-approved.sh と同じ）。
+	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子のチケット）を確かめないまま親子のチケットが
+	# 動き出す。送り先が origin のときだけ見る。送り先は git と同じ順で解く: 引数のリモート →
+	# branch.<b>.pushRemote → remote.pushDefault → branch.<b>.remote → origin。
+	push_dest="${push_seen_remote:-}"
+	if [ -z "$push_dest" ]; then
+		push_dest=$(git config --get "branch.$push_branch.pushRemote" 2>/dev/null ||
+			git config --get remote.pushDefault 2>/dev/null ||
+			git config --get "branch.$push_branch.remote" 2>/dev/null || echo origin)
+	fi
+	# 設定済みのリモート名でない引数（`:` を含まない URL やローカルのパス）は、origin と同じ URL なら origin とみなす。
+	# origin の URL が `:` を含まないローカルのパスのとき、`push <そのパス>` で関門を飛ばせてしまうため。
+	if [ "$push_dest" != origin ]; then
+		push_dest_url=$(git config --get "remote.$push_dest.url" 2>/dev/null || printf '%s' "$push_dest")
+		push_origin_url=$(git config --get remote.origin.url 2>/dev/null || :)
+		if [ -n "$push_origin_url" ] && [ "$push_dest_url" = "$push_origin_url" ]; then
+			push_dest=origin
+		fi
+	fi
+	if [ "$push_dest" = origin ] && [ -n "$push_root" ]; then
+		case "$push_top" in
+		"$push_root"/.claude/worktrees/*)
+			push_gate_rc=0
+			# 秒数は C1・ccnavi-push-approved.sh と同じ既定（60 秒。CCNAVI_C1_TIMEOUT で変えられる）。
+			case "${CCNAVI_C1_TIMEOUT:-}" in
+			'' | *[!0-9]*) push_gate_secs=60 ;;
+			*) push_gate_secs="$CCNAVI_C1_TIMEOUT" ;;
+			esac
+			ccnavi_push_gate "$push_top" "$push_branch" "${push_top##*/}" "$push_root" "$push_gate_secs" || push_gate_rc=$?
+			case "$push_gate_rc" in
+			0) ;;
+			1) reject push-parent-missing "${ccnavi_pg_why}。エージェントは戻せない（生の git は使えない）ので、ユーザに伝えて止まってください。" ;;
+			*) reject push-parent-unverified "${ccnavi_pg_why}。直せなければユーザに伝えて止まってください（生の git で押し通さない）。" ;;
+			esac
+			;;
+		esac
+	fi
 	;;
 integrate)
 	# 直接作業の取り込み。merge --squash はここの中でだけ使う（下の ig_integrate）。
@@ -1946,66 +1978,6 @@ clone | submodule | lfs)
 	reject not-allowed "$sub は許可リストにありません。使える形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
 	;;
 esac
-
-# push が通ったら、親のブランチなら取り込み状態を作る。最初の push からその親子のチケットを C1 の
-# 対象に入れ、次の取り込みまで Chrome 拡張からだけ見える間を作らない。
-#
-# 送った先が親のブランチ（.claude/worktrees/<P> で、居るブランチ名の / を - に置き換えたものが
-# ディレクトリ名、親チケットか提案がある）で、送り先が origin のときだけ。取り込み状態の
-# 鍵は識別子（ディレクトリ名）で、中の branch に親のブランチ名を書く（キャッシュ）。取り込み状態があれば（present）sha を
-# 書き直すだけで、closed・blocked は触らない。取り込み状態が無く、置き場に未コミットの変更があれば作らずに言う
-# （未送信の状態を持ち込まないため）。取り込み状態があると SessionStart の早送りと ccnavi-sync.sh の消えたかの
-# 確かめの対象になる。
-push_record_family() {
-	# 送り先は git と同じ順で解く: 引数のリモート → branch.<b>.pushRemote → remote.pushDefault →
-	# branch.<b>.remote → origin。origin 以外へ送ったなら取り込み状態を作らない（取り込み状態は origin の P を見る）。
-	pr_remote="${push_seen_remote:-}"
-	if [ -z "$pr_remote" ]; then
-		pr_remote=$(git config --get "branch.$push_branch.pushRemote" 2>/dev/null ||
-			git config --get remote.pushDefault 2>/dev/null ||
-			git config --get "branch.$push_branch.remote" 2>/dev/null || echo origin)
-	fi
-	[ "$pr_remote" = origin ] || return 0
-	case "$push_top" in
-	"$WS_P"/.claude/worktrees/*) ;;
-	*) return 0 ;;
-	esac
-	# ワークツリーの名前が親の識別子で、居るブランチ名を変換した（/ を - に置き換えた）ものが
-	# その名前のときだけ。
-	pr_name="${push_top##*/}"
-	ccnavi_parent_tree "$push_top" "$pr_name" || return 0
-	[ "$(ccnavi_branch_to_id "$push_branch")" = "$pr_name" ] || return 0
-	pr_sha=$(git rev-parse --verify --quiet HEAD 2>/dev/null || :)
-	[ -n "$pr_sha" ] || return 0
-	push_record=$(ccnavi_family_record "$WS" "$push_key" "$pr_name")
-	pr_state=$(ccnavi_record_get "$push_record" state)
-	case "$pr_state" in
-	present)
-		ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
-			fetched_at "$(ccnavi_record_get "$push_record" fetched_at)" state present \
-			reason "$(ccnavi_record_get "$push_record" reason)" || :
-		return 0
-		;;
-	'') ;;
-	*) return 0 ;;
-	esac
-	pr_approved=.ccnavi/approved # 固定
-	pr_proposals=wip/proposals   # 固定
-	pr_dirty=$(git -C "$push_top" status --porcelain --untracked-files=all -- \
-		"${pr_approved%/}" "${pr_proposals%/}/review" 2>/dev/null | cut -c4- | tr '\n' ' ' | sed 's/ *$//')
-	if [ -n "$pr_dirty" ]; then
-		printf '案内: 置き場に未コミットの状態がある（%s）。コミットして push し直すと、この親子のチケットは取り込み（%s %s）の対象になる\n' \
-			"$pr_dirty" "$SYNC" "$pr_name"
-		return 0
-	fi
-	if ccnavi_record_write "$push_record" remote origin branch "$push_branch" sha "$pr_sha" \
-		fetched_at "$(date +%s)" state present reason ""; then
-		log_info 親子のチケットの取り込み状態を作った -- "family=$pr_name" "repo=$push_key"
-		printf '案内: %s の取り込み状態を作った。以後、リモートでの承認は %s %s で取り込む\n' \
-			"$pr_name" "$SYNC" "$pr_name"
-	fi
-	return 0
-}
 
 # 外部 diff ドライバは設定にも書けるので、読む系では毎回無効にして呼ぶ。
 case "$sub" in
@@ -2101,9 +2073,6 @@ if [ "$status" -eq 0 ]; then
 	body | head -n "$MAX_LINES"
 	if [ "$lines" -gt "$MAX_LINES" ]; then
 		printf '... 残り %d 行は %s にある\n' "$((lines - MAX_LINES))" "$logrel"
-	fi
-	if [ "$sub" = push ]; then
-		push_record_family
 	fi
 	if [ "$sub" = worktree ] && [ -n "$wt_fresh_warn" ]; then
 		printf '警告: %s\n' "$wt_fresh_warn"

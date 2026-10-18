@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 
 from ccnavi.entry import lint, version
 from ccnavi.infra import settings
@@ -203,9 +202,6 @@ class ReviewableTest(ActorHarness):
             board["reviewable"],
             [{"phase": 1, "mr": 7, "host": "fixture", "children": ["i0001-01-01"]}],
         )
-        # ボードの要求は取り込み状態相当を手元にもコピーする（手元は C1 の対象になり、直打ちの
-        # confirm を断る）。ここでは手元のマーカーを置くためだけに取り込み状態を外す
-        shutil.rmtree(os.path.join(self.state, "sync"))
         self.assertEqual(self.confirm_as(fixture).returncode, 0)
         self.commit_parent("reviewed")
         board = self.ask_chrome(self.chrome_request("board", "i0001"))

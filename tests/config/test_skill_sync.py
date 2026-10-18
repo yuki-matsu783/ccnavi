@@ -160,10 +160,6 @@ class SkillSyncTest(ConfigUnionHarness):
         )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        write(
-            os.path.join(self.state, "sync", "lib", "families", "i0001"),
-            "remote origin\nbranch i0001\nsha 0\nfetched_at 1\nstate present\nreason \n",
-        )
         target = os.path.join(self.ws, "logs", "state", "c1", "lib", "i0001.t.writes")
         started = self.ccnavi(
             "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"
@@ -287,10 +283,6 @@ class SkillSyncTest(ConfigUnionHarness):
             ),
         )
         self.assertEqual(self.approve().returncode, 0)
-        write(
-            os.path.join(self.state, "sync", "lib", "families", "i0001"),
-            "remote origin\nbranch i0001\nsha 0\nfetched_at 1\nstate present\nreason \n",
-        )
         target = os.path.join(self.ws, "logs", "state", "c1", "lib", "i0001.t.writes")
         started = self.ccnavi(
             "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"

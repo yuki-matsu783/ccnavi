@@ -17,7 +17,7 @@ import unittest
 
 from ccnavi.tickets import approval, ticket_fold, ticket_model
 from tests.ticket.test_phases import PhaseHarness
-from tests.ticket.test_sync_authority import AuthorityHarness
+from tests.ticket.test_standing import AuthorityHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import parent_text
 
@@ -232,7 +232,6 @@ class ImportedFamilyTest(AuthorityHarness):
         return self.ccnavi("--agree", "--preview", "--verify")
 
     def test_a_settled_family_says_to_push_from_the_parent_worktree(self):
-        self.record("present")
         verify = self.revision_in_root()
         self.assertIn(
             "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", verify.stdout
@@ -242,7 +241,6 @@ class ImportedFamilyTest(AuthorityHarness):
     def test_a_stopped_family_carries_the_reason_family_problems_gives(self):
         """親子のチケットが止まっている（親のツリーの HEAD がブランチを指していない）なら、
         承認の手前で言っていた止まった理由と手順（`approval_checks.family_stop_text`）を同じ文面で添える。"""
-        self.record("present")
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         verify = self.revision_in_root()
         self.assertIn("親子のチケットが止まっている", verify.stdout)

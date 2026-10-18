@@ -23,7 +23,7 @@ from ..tickets import (
     overview,
     phase,
     risk,
-    syncstate,
+    standing,
     ticket_fold,
     ticket_model,
 )
@@ -73,9 +73,6 @@ def board(
         # まだ在るもの（退避の後の push が戻されたなど）は `tickets` の側に出すので、
         # ここには出さない。
         "archived": [],
-        # このPCでは未準備の親（取り込み状態の記録だけがあり、親のワークツリーが無いもの）。
-        # 「準備する」で `ccnavi-start.sh --mr <番号>` を呼ぶ入口を出すための欄。
-        "unprepared": [],
     }
     if not conf.tickets_enabled:
         problems.append(f"{settings.TICKET_CONTROL_ENV}=disable。チケット制御を使っていない")
@@ -171,34 +168,7 @@ def board(
     payload["archived"] = _archived_records(
         root, {(t["project"], t["ticket"]) for t in payload["tickets"]}
     )
-    payload["unprepared"] = _unprepared_records(conf, root)
     return payload
-
-
-def _unprepared_records(conf: settings.Settings, root: str) -> list[dict]:
-    """このPCに親のワークツリーが無い親（取り込み状態の記録＝キャッシュだけが残っているもの）。
-
-    ほかのツリーのコピーで代用しないので、ボードにはチケットが出ない。代わりに「このPCでは
-    未準備」として、ブランチ・MR の番号（記録の控え）・止まった理由を出す。閉じた親は出さない。
-    """
-    fams = syncstate.Families(conf, root)
-    out = []
-    for repo, name in syncstate.family_names(conf.state):
-        project = syncstate.project_of_key(repo)
-        st = fams.standing(name, project)
-        if st.home is not None or st.closed:
-            continue
-        record = st.record
-        out.append(
-            {
-                "family": name,
-                "project": project,
-                "branch": record.branch if record is not None else "",
-                "mr": int(record.mr) if record is not None and record.mr.isdigit() else None,
-                "reason": st.stop,
-            }
-        )
-    return out
 
 
 def _archived_records(root: str, skip: set[tuple[str, str]]) -> list[dict]:
@@ -458,14 +428,12 @@ def _ticket_record(
         # 親のワークツリーがあるときの `remote`（子は null）。
         "mr": source.mr,
         "branch": (
-            syncstate.head_branch(found.root, ticket_id)
+            standing.head_branch(found.root, ticket_id)
             if found is not None and not source.is_child
             else ""
         ),
         "remote": (
-            overview.remote_info(conf, ticket_id, found.root, source.project)
-            if found is not None and not source.is_child
-            else None
+            overview.remote_info(found.root) if found is not None and not source.is_child else None
         ),
         "predecessors": list(source.predecessors),
         # 満たしていない先行（`done/` に無いか取り消しのもの）。承認と着手はこれが空でなければ

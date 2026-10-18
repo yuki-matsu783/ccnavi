@@ -194,7 +194,7 @@ test("CX-T104 決まらない親子のチケットでは書かない（読めな
   const r = (await board(gone.d)).families.find((x) => x.family.name === "i0001")?.result;
   assert.deepEqual(r?.closure.absent, ["i0009"]);
   const rejected = r?.rejected?.find((x) => x.ticket === "i0001-01-01");
-  assert.ok(rejected?.problems.some((p) => /i0009/.test(p) && /gone/.test(p)), JSON.stringify(r?.rejected));
+  assert.ok(rejected?.problems.some((p) => /i0009/.test(p) && /親のワークツリー（.claude\/worktrees\/i0009）がありません/.test(p)), JSON.stringify(r?.rejected));
 });
 
 test("CX-T105 互換の版が違えば承認も取り下げも書かない（7.3）。ボタンも出さない", async () => {

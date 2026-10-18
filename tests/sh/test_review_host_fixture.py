@@ -726,13 +726,14 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertIn("マージ先（main）が統合先（trunk）ではない", done.stderr)
         self.assertFalse(os.path.exists(sent))
 
-    def test_request_compares_with_the_recorded_integration(self):
-        """統合先は fetch と同じ順で決める。取り込み結果が develop なら main の MR は止まる。"""
+    def test_request_compares_with_the_configured_integration(self):
+        """統合先は fetch と同じ順で決める。環境変数が develop なら main の MR は止まる。
+        統合先のコピー（sync/<リポジトリ>/integration/head）は読まない。"""
         write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch develop-v1.0.0\nsource default\n",
+            "remote origin\nbranch trunk-v2\nsource default\n",
         )
-        done, _ = self.request_on()
+        done, _ = self.request_on(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("統合先（develop-v1.0.0）", done.stderr)
 

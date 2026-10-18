@@ -61,7 +61,9 @@ def extension_compat() -> int:
     path = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "src", "core", "version.ts")
     with open(path, encoding="utf-8") as f:
         found = re.search(r"^export const EXTENSION_COMPAT = ([0-9]+);$", f.read(), re.MULTILINE)
-    assert found is not None, "src/core/version.ts に EXTENSION_COMPAT が無い"
+    assert found is not None, (
+        "extensions/vscode/ccnavi-board/src/core/version.ts に EXTENSION_COMPAT が無い"
+    )
     return int(found.group(1))
 
 
@@ -238,6 +240,19 @@ class CompatAgreesTest(unittest.TestCase):
         flags = run_ccnavi(["--version"], cwd=ROOT).stdout
         self.assertIn("--accept-plan", flags)
         self.assertIn("--accept-done", flags)
+
+    def test_v15_dropping_the_sync_records_raised_the_compat_to_13(self):
+        """V15 親子ごとの取り込み状態（`sync/<リポジトリ>/families/<P>`）と統合先のコピー
+        （`integration/`）を廃止した。新しい sh は、実行ファイルの新しい副命令
+        （`tree parent` の追加の行 `approved`・`requested`・`archived`・`mr`、`sync retired`、
+        `sync migrate`）を呼ぶ。Chrome と手元の判定の規則も変わった。なので 13 以上。
+
+        旧い sh（互換 12）は取り込み状態の `present` を前提に C1 と承認の push を止める。
+        組み合わせると、新しい実行ファイルは記録を書かないので、旧い sh が止まる。
+        食い違いとして知らせる。sh の版と実行ファイルの版は揃える。
+        """
+        self.assertGreaterEqual(version.COMPAT, 13)
+        self.assertEqual(sh_compat(), version.COMPAT)
 
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")

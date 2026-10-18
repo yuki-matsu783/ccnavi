@@ -50,7 +50,7 @@ keywords: [提案, 判断, 相談, メリット, デメリット, サブエー�
   書き込みは Write / Edit と、Bash のリダイレクト・`tee`・`sed -i`・`cp`/`mv` の行き先を見る。`python -c` などのコードは読み切れないので、
   親のワークツリーのパスと書き込みを疑う語が並べば止める（スクリプトのファイルを実行する形や、変数で組んだ行き先は見ない）。
   下書き・提案・ELI5 の置き場（`wip/proposals/`・`wip/handoff/`・`wip/eli5/`）は書ける
-- 親を閉じたあとの片付け（子と親のワークツリー、子と親の手元のブランチ、取り込み記録）は ccnavi が行う。ブランチは、成果が失われないと
+- 親を閉じたあとの片付け（子と親のワークツリー、子と親の手元のブランチ、片付けの記録）は ccnavi が行う。ブランチは、成果が失われないと
   条件で確かめられたものだけを消す。エージェントに`git branch -D`は開けない。片付けの入口（`ccnavi sync tidy`・`ccnavi worktree retire`・
   `ccnavi worktree branch`・`ccnavi-clean.sh --branch`）は、メインもサブエージェントも直には打てない（sh が中で呼ぶ）。取り消した子のブランチは、
   一覧をユーザに見せ、ユーザが先頭に`!`を付けて`ccnavi-clean.sh --branch <子> --confirmed`を打つ（.ccnavi/docs/worktree-cleanup.md）。

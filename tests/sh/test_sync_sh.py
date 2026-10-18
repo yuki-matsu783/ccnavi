@@ -1,13 +1,14 @@
 """ccnavi-sync.sh の受入テスト。
 
 ccnavi-sync.sh は親のブランチを取り込み（早送りか merge）、リモートから消えた親のブランチは
-統合先の done/ で閉じたかを確かめてから、親子のチケットの取り込み状態に書く。
+MR がマージ済みかで「閉じた」か「消えた」かを言う。親子ごとの取り込み状態や
+統合先のコピーは書かない。親を閉じた後の片付けは、`ready` が書く `retire/<P>.json`（実行ファイルの
+`sync retired` が列挙する）が元になる。
 
 使い捨てのワークスペースと bare のリモートを組み、sh を外から呼ぶ。リモートを動かすのは別に clone
 した押し手で、ワークスペースからは「他の機械が push した」「ホストがブランチを消した」ように見える。
 
-読み返すのは終了コード・標準出力と、git に残った ref、
-取り込み状態（logs/state/sync/...）の中身だけ。
+読み返すのは終了コード・標準出力と、git に残った ref、片付けの記録（logs/state/retire/）の有無だけ。
 MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答えを決めた代役の sh に差し替える。
 
 `CCNAVI_SH_DIR` で、写す sh（`SCRIPTS` の 3 本）の出どころを差し替えられる。既定はこのツリーの
@@ -18,6 +19,7 @@ MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import shutil
 import signal
@@ -43,6 +45,7 @@ CONFIG = (
 PARENT = "i0001"
 COPY = f".ccnavi/approved/doing/{PARENT}.md"
 BASE_SHA = "1" * 40
+NO_MR = "mr 欄に MR の番号が無いので、閉じたか（MR がマージ済みか）判断できない"
 STARTED_AT = "2026-09-02T00:00:00+09:00"
 
 
@@ -51,9 +54,13 @@ STARTED_AT = "2026-09-02T00:00:00+09:00"
 ALLOW = 'allow:\n  - match: Write\n    glob: "wip/*"\n'
 
 
-def copy_text(name=PARENT, base_sha=BASE_SHA, started_at=STARTED_AT, extra="", body=""):
-    """着手済みの親の承認済みチケット（承認で欄を書かない形。着手の欄はスクリプトが書く）。"""
-    head = f"---\nversion: 1\nticket: {name}\nmr: 1\n{ALLOW}"
+def copy_text(name=PARENT, base_sha=BASE_SHA, started_at=STARTED_AT, extra="", body="", mr="42"):
+    """着手済みの親の承認済みチケット（承認で欄を書かない形。着手の欄はスクリプトが書く）。
+
+    `mr` は親のブランチの MR の番号（空なら欄を書かない）。ccnavi-sync.sh が MR がマージ済みかを
+    聞くときの番号で、前は手元の取り込み記録に保存していた。
+    """
+    head = f"---\nversion: 1\nticket: {name}\n" + (f"mr: {mr}\n" if mr else "") + ALLOW
     fields = f"base_sha: {base_sha}\n" if base_sha else ""
     fields += f"started_at: '{started_at}'\n" if started_at else ""
     return f"{head}{fields}{extra}---\n{body}"
@@ -94,7 +101,7 @@ def os_name():
 
 
 class NoTicketYamlInShTest(unittest.TestCase):
-    """sh はチケットの YAML を自分で読まない。閉じたかの見分けは `ccnavi sync closed`、
+    """sh はチケットの YAML を自分で読まない。閉じたかは `ccnavi-review.sh merged` に、
     親のワークツリーかは `ccnavi tree parent` に聞く（答えの約束は tests/core/test_sh_ask.py）。
 
     前は sh が frontmatter を awk で読み、Python と同じ値になることを見本で確かめていた。
@@ -140,19 +147,24 @@ class SyncHarness(unittest.TestCase):
         git(self.ws, "remote", "add", "origin", self.remote)
         git(self.ws, "push", "-q", "-u", "origin", "main")
         git(self.ws, "remote", "set-head", "origin", "main")
-        # 親のワークツリー。承認済みの親チケットをコミットして送ってある。
+        # 親のワークツリー。承認済みの親チケット（mr: 42）をコミットして送ってある。
         self.tree = self.parent_tree(PARENT, push=True)
         self.state = os.path.join(self.ws, "logs", "state")
-        self.record = os.path.join(self.state, "sync", "self", "families", PARENT)
-        self.mirror = os.path.join(self.state, "sync", "self", "integration")
+        # ready が書く片付けの記録の置き場。
+        self.retire_dir = os.path.join(self.state, "retire")
 
     # ---- 道具
 
-    def parent_tree(self, name, push=False):
+    def parent_tree(self, name, push=False, approved=True):
+        """親のワークツリー。承認済みの親チケットを置く（`approved=False` なら提案だけ）。"""
         tree = os.path.join(self.ws, ".claude", "worktrees", name)
         git(self.ws, "worktree", "add", "-q", tree, "-b", name, "main")
-        rel = f".ccnavi/approved/doing/{name}.md"
-        write(os.path.join(tree, rel), copy_text(name))
+        if approved:
+            rel = f".ccnavi/approved/doing/{name}.md"
+            write(os.path.join(tree, rel), copy_text(name))
+        else:
+            rel = f"wip/proposals/todo/{name}.md"
+            write(os.path.join(tree, rel), f"---\nversion: 1\nticket: {name}\nmr: 42\n---\n")
         git(tree, "add", "--", rel)
         git(tree, "commit", "-q", "-m", "copy")
         if push:
@@ -200,7 +212,6 @@ class SyncHarness(unittest.TestCase):
 
     def env(self, **extra):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        env.update({"CCNAVI_SYNC_RETRIES": "0", "CCNAVI_SYNC_RETRY_WAIT": "0"})
         # sh はチケットを読まず実行ファイルに聞く（親のワークツリーか、閉じたか）ので、
         # ソースの実行ファイルを既定で渡す。実行ファイルの無い形を見るテストは自分で上書きする。
         if "CCNAVI_BIN_PATH" not in extra:
@@ -224,16 +235,25 @@ class SyncHarness(unittest.TestCase):
         done = git(tree, "rev-parse", "--verify", "-q", ref, check=False)
         return done.stdout.strip() if done.returncode == 0 else ""
 
-    def keep_record(self, state="present", mr="42", branch=PARENT):
-        """前に取り込んだ（取り込み状態がある）親子のチケットにする。
+    def retire_record(self, mr=42, branch=PARENT, name=PARENT, project="", extra=None):
+        """ready の後の片付けの記録（`retire/<P>.json`）を置く。パスを返す。"""
+        data = {"parent": name, "project": project, "branch": branch, "children": []}
+        if mr is not None:
+            data["mr"] = mr
+        data.update(extra or {})
+        path = os.path.join(self.retire_dir, f"{name}.json")
+        write(path, json.dumps(data, ensure_ascii=False, indent=1) + "\n")
+        return path
 
-        MR の番号は ccnavi-start.sh が記録する（`mr=""` で記録の無い形にする）。
-        """
+    def legacy_record(self, state="gone", mr="42", branch=PARENT, name=PARENT, repo="self"):
+        """旧い取り込み状態（`sync/<repo>/families/<P>`。今は誰も書かない）を置く。"""
+        path = os.path.join(self.state, "sync", repo, "families", name)
         write(
-            self.record,
+            path,
             f"remote origin\nbranch {branch}\nsha {self.sha(self.tree, 'HEAD')}\n"
             f"fetched_at 1\nstate {state}\nreason \n" + (f"mr {mr}\n" if mr else ""),
         )
+        return path
 
     def git_path(self, tree, name):
         path = git(tree, "rev-parse", "--git-path", name).stdout.strip()
@@ -279,22 +299,16 @@ class SyncHarness(unittest.TestCase):
 class SyncTest(SyncHarness):
     # ---- 取り込み（P がリモートにある）
 
-    def test_fast_forward_and_records(self):
+    def test_fast_forward_and_leaves_no_state(self):
         head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(head, self.sha(self.tree, "HEAD"))
         self.assertIn("早送り", done.stdout)
         self.assertIn("統合先: main（ホストのデフォルトブランチ）", done.stdout)
-        record = fields(self.record)
-        self.assertEqual("present", record["state"])
-        self.assertEqual(head, record["sha"])
-        self.assertEqual("origin", record["remote"])
-        self.assertTrue(record["fetched_at"].isdigit())
-        head_of = fields(os.path.join(self.mirror, "head"))
-        self.assertEqual("main", head_of["branch"])
-        self.assertEqual("default", head_of["source"])
-        self.assertEqual(self.sha(self.ws, "refs/remotes/origin/main"), head_of["sha"])
+        # 親子ごとの取り込み状態も、統合先のコピーも、もう書かない。
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
+        self.assertFalse(os.path.exists(self.retire_dir))
         self.assertFalse(os.path.exists(self.lock_dir()), "ロックが残っている")
 
     def test_diverged_branches_are_merged(self):
@@ -371,7 +385,6 @@ class SyncTest(SyncHarness):
         done = self.sync()
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(head, self.sha(self.tree, "HEAD"))
-        self.assertTrue(os.path.exists(self.record))
         self.assertNotIn("free", done.stdout)
 
     def test_a_repeated_argument_is_taken_once(self):
@@ -385,30 +398,27 @@ class SyncTest(SyncHarness):
 
     # ---- 取り込みの後の検査（`--lint` の該当分と判定し直し）
 
-    def test_the_check_blocks_the_family_and_a_later_run_clears_it(self):
+    def test_the_check_reports_an_error_and_a_later_run_clears_it(self):
         launcher = self.launcher()
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual("present", fields(self.record)["state"])
         # 元ツリーに未コミットで残った子チケット（親のワークツリーの外）。
-        # 取り込み済みの親子のチケットでは信頼しないので、検査が親子のチケットを止める。
+        # 検査が error を言い、終了コードが 1 になる。状態は何も書かない。
         stray = write(
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        record = fields(self.record)
-        self.assertEqual("blocked", record["state"])
-        self.assertIn("ワークツリーの外", record["reason"])
-        self.assertIn("blocked にした", done.stdout)
-        self.assertIn("再実行して", done.stdout)
-        # 理由を片付けて打ち直せば、検査し直して present に戻る。
+        self.assertIn("取り込みの後の検査で止める理由がある", done.stdout)
+        self.assertIn("ワークツリーの外", done.stdout)
+        self.assertIn("再実行してください", done.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
+        # 理由を片付けて打ち直せば、検査し直して通る。
         os.remove(stray)
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        record = fields(self.record)
-        self.assertEqual(("present", ""), (record["state"], record["reason"]))
+        self.assertNotIn("検査で止める", done.stdout)
 
     def test_an_old_executable_that_cannot_check_does_not_block(self):
         # 古い実行ファイル（`sync check` を知らない）は、検査の error と分けて警告だけにする。
@@ -427,31 +437,37 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT, CCNAVI_BIN_PATH=old)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("検査を実行できなかった", done.stdout)
-        self.assertEqual("present", fields(self.record)["state"])
 
-    def test_the_check_does_not_overwrite_a_record_changed_meanwhile(self):
-        # 検査の間に並行する sync が取り込み状態を gone にしたら、blocked で上書きしない。
-        launcher = self.launcher()
-        racer = write(
-            os.path.join(self._tmp.name, "bin", "racer"),
+    def test_the_check_shows_warnings_and_errors_from_the_executable(self):
+        # sh は実行ファイルの `warn` と `error` の行をそのまま見せ、error があれば 1 で終わる。
+        fake = write(
+            os.path.join(self._tmp.name, "bin", "fake-check"),
             "#!/bin/sh\n"
             'case "$*" in *"sync check"*)\n'
-            f'  sed "s/^state .*/state gone/" "{self.record}" > "{self.record}.x" && '
-            f'mv "{self.record}.x" "{self.record}" ;; esac\n'
-            f'exec "{launcher}" "$@"\n',
+            '  printf "check 1\\nwarn 層がずれている\\nerror 正とする側が合わない\\n"; '
+            "exit 1 ;; esac\n"
+            f'exec "{self.launcher()}" "$@"\n',
         )
-        os.chmod(racer, 0o755)
-        write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
-            child_copy_text(),
-        )
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=racer)
+        os.chmod(fake, 0o755)
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=fake)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertIn("変わった。書き換えない", done.stdout)
-        self.assertEqual("gone", fields(self.record)["state"])
+        self.assertIn("注意: 層がずれている", done.stdout)
+        self.assertIn("- 正とする側が合わない", done.stdout)
+        # warn だけなら通る。
+        warn_only = write(
+            os.path.join(self._tmp.name, "bin", "warn-check"),
+            "#!/bin/sh\n"
+            'case "$*" in *"sync check"*)\n'
+            '  printf "check 1\\nwarn 層がずれている\\n"; exit 0 ;; esac\n'
+            f'exec "{self.launcher()}" "$@"\n',
+        )
+        os.chmod(warn_only, 0o755)
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=warn_only)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("注意: 層がずれている", done.stdout)
 
-    def test_the_check_that_cannot_write_the_record_ends_with_3(self):
-        # 止める理由があるのにロックが取れない（他の操作が持ち続ける）なら、3 回試して 3 で終わる。
+    def test_the_check_never_ends_with_3(self):
+        # 検査が error を言っても、ロックの再取得も書き込みも無い。終了コードは 1 だけ。
         launcher = self.launcher()
         holder = write(
             os.path.join(self._tmp.name, "bin", "holder"),
@@ -468,22 +484,20 @@ class SyncTest(SyncHarness):
             child_copy_text(),
         )
         done = self.sync(PARENT, CCNAVI_BIN_PATH=holder, CCNAVI_LOCK_WAIT="0")
-        self.assertEqual(3, done.returncode, done.stdout + done.stderr)
-        self.assertIn("まだ止まっていない", done.stdout)
-        self.assertEqual("present", fields(self.record)["state"])
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn("まだ止まっていない", done.stdout)
 
-    def test_the_check_is_skipped_for_a_closed_family(self):
-        # 閉じた親子のチケット（取り込み状態が closed）は検査しない（状態の操作が無い）。
-        self.keep_record()
+    def test_the_check_is_skipped_for_a_branch_gone_from_the_remote(self):
+        # リモートに親のブランチが無い（消えた）親子のチケットは検査しない。
         write(
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
-        self.remote_commit("main", f".ccnavi/approved/done/{PARENT}.md", copy_text())
+        self.review_says("none")
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT, CCNAVI_BIN_PATH=self.launcher())
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual("closed", fields(self.record)["state"])
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertIn("戻し方 1", done.stdout)
         self.assertNotIn("検査", done.stdout)
 
     def test_a_single_branch_clone_still_sees_the_parent_branch(self):
@@ -498,12 +512,22 @@ class SyncTest(SyncHarness):
     # ---- P がリモートに無い（マージ後に消えたか、改名・消し間違いか）
 
     def test_a_family_never_pushed_is_left_as_it_is(self):
-        tree = self.parent_tree("i0002")
+        # 一度も送っていない親（origin/P の参照も、承認済みの親チケットも、依頼のマーカーも無い）。
+        tree = self.parent_tree("i0002", approved=False)
         done = self.sync("i0002")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("まだ送っていない", done.stdout)
-        self.assertFalse(os.path.exists(os.path.join(os.path.dirname(self.record), "i0002")))
         self.assertTrue(os.path.isdir(tree))
+
+    def test_a_family_with_an_approved_ticket_is_not_taken_for_never_pushed(self):
+        # 参照（origin/P）が fetch.prune で消えても、承認済みの親チケットがあれば送った親にする。
+        self.review_says("none")
+        git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{PARENT}")
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn("まだ送っていない", done.stdout)
+        self.assertIn("戻し方 1", done.stdout)
 
     def close_on_main(self, text=None):
         self.remote_commit("main", f".ccnavi/approved/done/{PARENT}.md", text or copy_text())
@@ -514,70 +538,29 @@ class SyncTest(SyncHarness):
         git(self.tree, "push", "-q", "origin", PARENT)
 
     def closed_after_delete(self):
+        """リモートの親のブランチを消して sync を打つ。MR の答えは「マージされていない」。"""
         self.review_says("none")
-        self.keep_record()
         self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT)
-        return fields(self.record)["state"], done
+        return self.sync(PARENT)
 
-    def test_a_merged_and_deleted_branch_is_closed(self):
-        self.keep_record()
-        self.close_on_main()
-        self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT)
+    def assertClosed(self, done):
+        """MR がマージ済みと分かって、手元の親を片付けた。"""
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("クローズ済みの親子のチケット", done.stdout)
+        self.assertIn("マージ済み（クローズ済みの親子のチケット）", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
-        self.assertEqual("closed", fields(self.record)["state"])
 
-    def test_a_closed_family_without_a_record_is_closed(self):
-        # 取り込み状態が無くても、統合先で閉じていれば閉じた親子のチケット。
-        self.close_on_main()
-        self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("クローズ済みの親子のチケット", done.stdout)
-        self.assertNotIn("まだ送っていない", done.stdout)
-        self.assertEqual("closed", fields(self.record)["state"])
-
-    def test_an_old_done_copy_of_the_same_id_is_not_this_family(self):
-        # 同じ識別子の古い親チケット（着手の基準点が違う）は、
-        # 今の親子のチケットが閉じた記録ではない。後ろの欄（started_at）が同じでも見ない。
-        self.close_on_main(copy_text(base_sha="2" * 40))
-        state, done = self.closed_after_delete()
+    def assertGone(self, done):
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertEqual("gone", state)
+        self.assertIn("戻し方 1", done.stdout)
 
-    def test_started_at_is_compared_when_base_sha_is_on_one_side_only(self):
-        self.mine(copy_text(base_sha=""))
-        self.close_on_main(copy_text())
-        self.assertEqual("closed", self.closed_after_delete()[0])
-
-    def test_a_parent_cancelled_before_start_is_matched_by_cancelled_at(self):
-        # 未着手のまま取り消した親は cancelled_at で照合する（永久に止まらない）。
-        unstarted = copy_text(base_sha="", started_at="", extra="cancelled_at: '2026-09-03'\n")
-        self.mine(unstarted)
-        self.close_on_main(unstarted)
-        self.assertEqual("closed", self.closed_after_delete()[0])
-
-    def test_nothing_to_compare_is_not_closed(self):
-        # どの欄でも照合できない（空どうし、空文字）なら閉じていない扱いにして止め、戻し方を出す。
-        bare = copy_text(base_sha="''", started_at="")
-        self.mine(bare)
-        self.close_on_main(bare)
-        state, done = self.closed_after_delete()
-        self.assertEqual("gone", state)
-        self.assertIn("戻し方", done.stdout)
-
-    def test_fields_in_the_body_are_not_read(self):
-        # 欄は frontmatter の行頭だけから拾う。本文の同じ語の行で別の値を拾わない。
-        self.mine(copy_text(base_sha="", body="base_sha: aaaa\n"))
-        self.close_on_main(copy_text(base_sha="", body="base_sha: bbbb\n"))
-        self.assertEqual("closed", self.closed_after_delete()[0])
-
-    def test_a_crlf_done_copy_is_read(self):
-        self.close_on_main(copy_text().replace("\n", "\r\n"))
-        self.assertEqual("closed", self.closed_after_delete()[0])
+    def test_a_done_copy_on_the_integration_branch_is_not_consulted(self):
+        # 統合先の done/ にある同じ識別子の親チケットは、もう閉じた根拠にしない。
+        # 閉じたかは MR がマージ済みかだけで決める（マージされていなければ、消えた親として止める）。
+        self.close_on_main()
+        done = self.closed_after_delete()
+        self.assertGone(done)
+        self.assertNotIn("クローズ済みの親子のチケット", done.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
     def test_a_parent_missing_in_the_parent_tree_is_not_closed(self):
         # 承認前の提案だけが残る親のワークツリー（この親子のチケットは閉じようがない）。
@@ -586,153 +569,121 @@ class SyncTest(SyncHarness):
         git(self.tree, "commit", "-q", "-m", "back to todo")
         git(self.tree, "push", "-q", "origin", PARENT)
         self.close_on_main()
-        state, done = self.closed_after_delete()
-        self.assertEqual("gone", state, done.stdout + done.stderr)
-
-    def test_a_child_copy_in_done_is_not_the_parent(self):
-        self.review_says("none")
-        self.keep_record()
-        self.remote_commit(
-            "main",
-            f".ccnavi/approved/done/{PARENT}.md",
-            copy_text().replace("ticket: i0001\n", "ticket: i0001\nparent: x\n"),
-        )
-        self.delete_remote_branch(PARENT)
-        self.sync(PARENT)
-        self.assertEqual("gone", fields(self.record)["state"])
+        done = self.closed_after_delete()
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn("クローズ済みの親子のチケット", done.stdout)
 
     def test_a_branch_gone_without_a_closed_record_stops_the_family(self):
         self.review_says("none")
-        self.keep_record()
-        kept = fields(self.record)["sha"]
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertIn("状態を決められない", done.stdout)
+        self.assertIn("決められない", done.stdout)
+        self.assertIn("push の関門", done.stdout)
         self.assertIn("戻し方 1", done.stdout)
-        self.assertIn(f"git push origin {kept}:refs/heads/{PARENT}", done.stdout)
+        self.assertIn(f"git push origin {PARENT}", done.stdout)
         self.assertIn("戻し方 2", done.stdout)
-        self.assertIn(
-            "--forget i0001 を実行すると親子のチケットの取り込み状態が消える", done.stdout
-        )
-        record = fields(self.record)
-        self.assertEqual("gone", record["state"])
-        self.assertEqual(kept, record["sha"])
+        self.assertIn("worktree remove", done.stdout)
+        self.assertIn("retire --abandon i0001", done.stdout)
+        self.assertNotIn("--forget", done.stdout)
+        # 状態は書かない。ワークツリーが在る間は、何度打っても 1。
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
+        self.assertEqual(1, self.sync(PARENT).returncode)
+        self.assertEqual(1, self.sync().returncode)
 
-    def test_a_pushed_branch_without_a_record_stops_without_writing_gone(self):
-        # 送った形跡（origin/P・追跡の設定）はあるが、取り込み状態の無い親子のチケット
-        # （取り込み状態を作る仕組みが入る前に送ったもの）。
-        # MR の番号が無いので、ブランチから MR を探す推定はせずに止める（取り込み状態は作らない）。
+    def test_a_pushed_branch_without_an_mr_number_stops_without_guessing(self):
+        # MR の番号（親チケットの mr 欄）が無いので、ブランチから MR を探す推定はせずに止める。
         log = os.path.join(self._tmp.name, "review-args")
         write(os.path.join(self.scripts, "ccnavi-review.sh"), f"#!/bin/sh\necho \"$*\" >>'{log}'\n")
+        self.mine(copy_text(mr=""))
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertIn("MR の番号が無いので、閉じたか（MR がマージ済みか）判断できない", done.stdout)
-        self.assertFalse(os.path.exists(self.record))
+        self.assertIn(NO_MR, done.stdout)
         self.assertFalse(os.path.exists(log))
 
-    def test_an_unknown_merge_answer_does_not_write_gone(self):
-        # API が失敗した・道具が無い。none のときだけ gone を書く。
+    def test_an_unknown_merge_answer_stops_without_calling_it_gone(self):
+        # API が失敗した・道具が無い。「消えた」とは言わず、確かめられなかったと言って止まる。
         for text, code in (("unknown", 3), ("", 2), ("", 0), ("merged?", 0)):
             with self.subTest(text=text, code=code):
                 self.review_says(text, code)
-                self.keep_record()
-                self.delete_remote_branch(PARENT) if self.sha(
-                    self.remote, f"refs/heads/{PARENT}"
-                ) else None
+                if self.sha(self.remote, f"refs/heads/{PARENT}"):
+                    self.delete_remote_branch(PARENT)
                 done = self.sync(PARENT)
                 self.assertEqual(1, done.returncode, done.stdout + done.stderr)
                 self.assertIn("確かめられなかった", done.stdout)
-                self.assertEqual("present", fields(self.record)["state"])
+                self.assertNotIn("戻し方", done.stdout)
 
-    def test_a_restored_branch_is_present_again(self):
-        self.keep_record("gone")
+    def test_a_restored_branch_is_taken_in_again(self):
+        # 消えた親のブランチをユーザが戻せば、次の sync は普通に取り込む（何も書き換えない）。
+        self.review_says("none")
+        self.delete_remote_branch(PARENT)
+        self.assertEqual(1, self.sync(PARENT).returncode)
+        git(self.tree, "push", "-q", "origin", PARENT)
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual("present", fields(self.record)["state"])
+        self.assertIn("リモートと同じ", done.stdout)
 
     def branches(self):
         return git(self.ws, "branch", "--format=%(refname:short)").stdout.split()
 
     def test_a_merged_request_cleans_up_without_a_done_copy(self):
         # 統合先には閉じたチケットを残さない（ready が退避して消し、squash でマージする）ので、
-        # MR がマージ済みと分かれば閉じたと読み、手元の親のブランチと取り込み記録を片付ける。
+        # MR がマージ済みと分かれば閉じたと読み、手元の親のブランチを片付ける。
+        # MR の番号は親チケットの mr 欄から引く。
         head = self.sha(self.tree, "HEAD")
-        self.review_says(f"merged 42 {head}")
-        self.keep_record()
+        log = self.review_log(f"merged 42 {head}")
         self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="1")
+        done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("マージ済み", done.stdout)
         self.assertIn("42", done.stdout)
         self.assertIn(f"ブランチ {PARENT} を削除しました", done.stdout)
-        self.assertIn("取り込み記録を削除した", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
-        self.assertFalse(os.path.exists(self.record))
+        with open(log, encoding="utf-8") as f:
+            self.assertEqual("merged 42", f.read().strip())
         self.assertFalse(os.path.exists(self.tree))
         self.assertEqual(["main"], self.branches())
         self.assertFalse(os.path.exists(self.lock_dir()))
 
-    def test_a_merged_answer_does_not_wait_for_the_integration(self):
-        # 統合先の done/ を待つ確かめ直しは、マージ済みかの答えが得られないときだけ。
-        self.review_says(f"merged 42 {self.sha(self.tree, 'HEAD')}")
-        self.keep_record()
-        self.delete_remote_branch(PARENT)
-        started = time.monotonic()
-        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="3", CCNAVI_SYNC_RETRY_WAIT="30")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        # 待てば 30 秒を超える。1 回の取り込みが遅い機械（Windows）でも、待ちと見分けられる。
-        self.assertLess(time.monotonic() - started, 30)
-        self.assertFalse(os.path.exists(self.record))
-
-    def test_an_unpushed_commit_keeps_the_branch_and_the_record(self):
+    def test_an_unpushed_commit_keeps_the_branch(self):
         merged_head = self.sha(self.tree, "HEAD")
         self.local_commit("notes.txt", "未 push\n")
         self.review_says(f"merged 42 {merged_head}")
-        self.keep_record()
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("未 push のコミットがある", done.stdout)
         self.assertIn(f"branch -D {PARENT}", done.stdout)
-        self.assertIn("取り込み記録は残す", done.stdout)
+        self.assertIn("消さなかったものがある", done.stdout)
         self.assertIn(PARENT, self.branches())
-        self.assertTrue(os.path.exists(self.record))
 
-    def test_uncommitted_changes_keep_the_worktree_and_the_record(self):
+    def test_uncommitted_changes_keep_the_worktree(self):
         self.review_says(f"merged 42 {self.sha(self.tree, 'HEAD')}")
-        self.keep_record()
         write(os.path.join(self.tree, "memo.txt"), "書きかけ\n")
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertIn("未コミットの変更があるので、何も削除しませんでした", done.stdout)
         self.assertTrue(os.path.isdir(self.tree))
         self.assertIn(PARENT, self.branches())
-        self.assertTrue(os.path.exists(self.record))
 
     def test_without_the_head_of_the_request_nothing_is_deleted(self):
         self.review_says("merged 42")
-        self.keep_record()
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertIn("先頭の sha をホストから取れなかった", done.stdout)
         self.assertTrue(os.path.isdir(self.tree))
         self.assertIn(PARENT, self.branches())
-        self.assertTrue(os.path.exists(self.record))
 
-    # ---- 親のワークツリーを片付けた後（ready の後）。取り込み記録と手元のブランチが残る
+    # ---- 親のワークツリーを片付けた後（ready の後）。片付けの記録と手元のブランチが残る
 
     def retire_tree(self):
-        """ready の後の状態にする。取り込み記録は、ワークツリーを消す前に置いておく。"""
+        """ready の後の状態にする。片付けの記録は、ワークツリーを消す前に置いておく。"""
         git(self.ws, "worktree", "remove", self.tree)
-
-    def record_with_mr(self, number="42", state="present", branch=PARENT):
-        self.keep_record(state, mr=number, branch=branch)
 
     def test_a_retired_family_is_cleaned_when_its_request_is_merged(self):
         head = self.sha(self.tree, "HEAD")
-        self.record_with_mr()
+        record = self.retire_record()
         self.retire_tree()
         self.review_says(f"merged 42 {head} {PARENT}")
         self.delete_remote_branch(PARENT)
@@ -741,7 +692,8 @@ class SyncTest(SyncHarness):
         self.assertIn("ワークツリーは片付け済み", done.stdout)
         self.assertIn(f"親のブランチ {PARENT} はリモートから消えた", done.stdout)
         self.assertIn(f"ブランチ {PARENT} を削除しました", done.stdout)
-        self.assertFalse(os.path.exists(self.record))
+        # 片付けの記録は実行ファイル（sync tidy）が消す。sh は消さない。
+        self.assertFalse(os.path.exists(record))
         self.assertEqual(["main"], self.branches())
         # 打ち直しても何も起きない
         again = self.sync()
@@ -749,7 +701,7 @@ class SyncTest(SyncHarness):
 
     def test_a_retired_family_asks_by_the_request_number(self):
         head = self.sha(self.tree, "HEAD")
-        self.record_with_mr("42")
+        self.retire_record(mr=42)
         self.retire_tree()
         log = os.path.join(self._tmp.name, "review-args")
         write(
@@ -759,26 +711,61 @@ class SyncTest(SyncHarness):
         self.sync(PARENT)
         with open(log, encoding="utf-8") as f:
             self.assertEqual("merged 42", f.read().strip())
-        self.assertFalse(os.path.exists(self.record))
 
     def test_a_retired_family_with_an_unmerged_request_is_left_alone(self):
-        self.record_with_mr()
+        record = self.retire_record()
         self.retire_tree()
         self.review_says("none")
         done = self.sync()
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertTrue(os.path.exists(self.record))
+        self.assertIn("まだマージされていないので片付けない", done.stdout)
+        self.assertIn("retire --abandon i0001", done.stdout)
+        self.assertTrue(os.path.exists(record))
         self.assertIn(PARENT, self.branches())
 
     def test_a_retired_family_stops_when_the_merge_cannot_be_checked(self):
-        self.record_with_mr()
+        record = self.retire_record()
         self.retire_tree()
         self.review_says("unknown", 3)
         done = self.sync()
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("確かめられなかった", done.stdout)
-        self.assertTrue(os.path.exists(self.record))
+        self.assertTrue(os.path.exists(record))
         self.assertIn(PARENT, self.branches())
+
+    def test_a_retired_record_without_an_mr_number_is_only_announced(self):
+        # mr の無い記録は incomplete と答えられる。一覧の案内だけで、自動では片付けない。
+        record = self.retire_record(mr=None)
+        self.retire_tree()
+        log = self.review_log("none")
+        for args in ((), (PARENT,)):
+            done = self.sync(*args)
+            self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+            self.assertIn("片付けの記録（retire/i0001.json）が使えない", done.stdout)
+            self.assertIn("mr", done.stdout)
+        self.assertFalse(os.path.exists(log), "番号が無いのにホストへ聞いた")
+        self.assertTrue(os.path.exists(record))
+        self.assertIn(PARENT, self.branches())
+
+    def test_a_retired_record_of_another_parent_is_not_taken(self):
+        # ファイル名と中の parent が合わない記録は数えない（別の親を指させない）。
+        path = self.retire_record(name="other")
+        os.replace(path, os.path.join(self.retire_dir, f"{PARENT}.json"))
+        self.retire_tree()
+        log = self.review_log("none")
+        done = self.sync()
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn("ワークツリーは片付け済み", done.stdout)
+        self.assertFalse(os.path.exists(log))
+
+    def test_a_retired_record_is_not_listed_while_the_worktree_exists(self):
+        # 親のワークツリーが在れば、記録があっても親として取り込む（片付けの列挙には入れない）。
+        self.retire_record()
+        self.review_says("none")
+        done = self.sync()
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn("ワークツリーは片付け済み", done.stdout)
+        self.assertIn(f"{PARENT}: リモートと同じ", done.stdout)
 
     # ---- リモートにブランチが残っていても、MR がマージ済みなら閉じている
 
@@ -793,72 +780,46 @@ class SyncTest(SyncHarness):
 
     def test_a_merged_request_whose_branch_is_left_on_the_remote_is_cleaned(self):
         head = self.sha(self.tree, "HEAD")
-        self.keep_record()
         self.review_says(f"merged 42 {head} {PARENT}")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn(f"親のブランチ {PARENT} はリモートに残っているが", done.stdout)
-        self.assertIn("取り込み記録を削除した", done.stdout)
+        self.assertIn("片付けた", done.stdout)
         self.assertFalse(os.path.exists(self.tree))
-        self.assertFalse(os.path.exists(self.record))
         self.assertEqual(["main"], self.branches())
 
     def test_an_open_request_of_a_present_family_changes_nothing(self):
-        self.keep_record()
         log = self.review_log("none")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         with open(log, encoding="utf-8") as f:
             self.assertEqual("merged 42", f.read().strip())
         self.assertTrue(os.path.isdir(self.tree))
-        self.assertEqual("present", fields(self.record)["state"])
 
     def test_a_present_family_without_an_mr_number_is_not_guessed(self):
-        self.keep_record(mr="")
+        self.mine(copy_text(mr=""))
         log = self.review_log(f"merged 7 {self.sha(self.tree, 'HEAD')} {PARENT}")
         done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("MR の番号が無いので、閉じたか（MR がマージ済みか）判断できない", done.stdout)
+        # 取り込みの後の検査も、mr の無い親チケットを error と言う（終了コード 1）。
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertIn(NO_MR, done.stdout)
+        self.assertIn("mr: が記録されていない", done.stdout)
         self.assertFalse(os.path.exists(log))
         self.assertTrue(os.path.isdir(self.tree))
 
     def test_a_merged_request_of_another_branch_does_not_clean_this_family(self):
-        self.keep_record()
         self.review_says(f"merged 42 {self.sha(self.tree, 'HEAD')} feature/other")
         done = self.sync(PARENT)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("元ブランチ feature/other が親のブランチ", done.stdout)
         self.assertTrue(os.path.isdir(self.tree))
-        self.assertTrue(os.path.exists(self.record))
 
     # ---- ready の後に残った記録（present 以外も）
 
-    def test_a_retired_gone_family_is_cleaned_when_its_request_is_merged(self):
+    def test_a_retired_family_takes_the_branch_from_the_request(self):
+        """記録にブランチが無ければ、ブランチ名は MR の元ブランチから取る。"""
         head = self.sha(self.tree, "HEAD")
-        self.record_with_mr(state="gone")
-        self.retire_tree()
-        self.review_says(f"merged 42 {head} {PARENT}")
-        self.delete_remote_branch(PARENT)
-        done = self.sync()
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn(f"ブランチ {PARENT} を削除しました", done.stdout)
-        self.assertFalse(os.path.exists(self.record))
-
-    def test_a_retired_gone_family_with_an_unmerged_request_says_why_it_is_kept(self):
-        self.record_with_mr(state="gone")
-        self.retire_tree()
-        self.review_says("none")
-        done = self.sync()
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn(
-            "取り込み状態が gone で、マージリクエスト（42）はマージされていないので", done.stdout
-        )
-        self.assertTrue(os.path.exists(self.record))
-
-    def test_a_retired_family_takes_the_branch_from_the_request_not_the_record(self):
-        """取り込み記録の branch はキャッシュ。ブランチ名は MR の元ブランチから取る。"""
-        head = self.sha(self.tree, "HEAD")
-        self.record_with_mr(branch="stale-name")
+        self.retire_record(branch="")
         self.retire_tree()
         self.review_says(f"merged 42 {head} {PARENT}")
         done = self.sync()
@@ -869,9 +830,21 @@ class SyncTest(SyncHarness):
         self.assertIn(f"ブランチ {PARENT} を削除しました", done.stdout)
         self.assertEqual(["main"], self.branches())
 
+    def test_a_retired_family_whose_record_names_another_branch_is_not_cleaned(self):
+        """記録のブランチと MR の元ブランチが違えば、片付けずに止める。"""
+        head = self.sha(self.tree, "HEAD")
+        record = self.retire_record(branch="stale-name")
+        self.retire_tree()
+        self.review_says(f"merged 42 {head} {PARENT}")
+        done = self.sync()
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertIn("片付けの記録のブランチ stale-name と違う", done.stdout)
+        self.assertTrue(os.path.exists(record))
+        self.assertIn(PARENT, self.branches())
+
     def test_a_retired_family_keeps_the_lock_held_by_the_caller(self):
         """入れ子（外側が持つロック）は、片付けの段で消さない。外すのは持ち主だけ。"""
-        self.record_with_mr()
+        record = self.retire_record()
         self.retire_tree()
         self.review_says("none")
         started = str(int(time.time()))
@@ -880,23 +853,21 @@ class SyncTest(SyncHarness):
         done = self.sync(CCNAVI_LOCK_HELD=f"self/{PARENT}:{pid}-{started}")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(lock))
-        self.assertTrue(os.path.exists(self.record))
+        self.assertTrue(os.path.exists(record))
 
     def archive_locally(self, text):
         write(os.path.join(self.ws, "logs", "archive", "self", "done", f"{PARENT}.md"), text)
 
     def test_the_local_archive_does_not_close_it_when_merge_is_unknown(self):
         # マージ済みかを確かめられないときは、手元の退避（ready が移した先）の親があっても推定せず、
-        # 取り込み状態を変えずに止める。
+        # 何も変えずに止める。
         self.review_says("unknown", 3)
-        self.keep_record()
         self.archive_locally(copy_text())
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("確かめられなかった", done.stdout)
         self.assertNotIn("クローズ済みの親子のチケット", done.stdout)
-        self.assertEqual("present", fields(self.record)["state"])
 
     def archive_the_parent(self):
         """ready の後の状態。親チケットをツリーから消して push し、手元の退避に置く。"""
@@ -907,77 +878,120 @@ class SyncTest(SyncHarness):
         git(self.tree, "push", "-q", "origin", PARENT)
 
     def test_a_parent_tree_whose_copy_was_archived_is_still_a_parent_tree(self):
-        self.keep_record()
         self.archive_the_parent()
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual("present", fields(self.record)["state"])
         listed = self.sync()
         self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
         self.assertIn(PARENT, listed.stdout)
 
+    def test_an_archived_parent_counts_as_having_been_pushed(self):
+        # ready の後（承認済みの親チケットはツリーに無く、退避に在る）で、参照も消えていても、
+        # リモートに無い親は「まだ送っていない」とは言わない。
+        self.archive_the_parent()
+        git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{PARENT}")
+        self.review_says("none")
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertNotIn("まだ送っていない", done.stdout, done.stdout + done.stderr)
+
     def test_the_local_archive_does_not_override_an_unmerged_answer(self):
         # マージされていないと分かれば、退避があっても閉じたとは読まない。
         self.review_says("none")
-        self.keep_record()
         self.archive_locally(copy_text())
         self.delete_remote_branch(PARENT)
-        self.sync(PARENT)
-        self.assertEqual("gone", fields(self.record)["state"])
+        self.assertGone(self.sync(PARENT))
 
     def test_branch_names_are_matched_exactly(self):
         # i0001-x があっても i0001 があることにはならない（前方一致で取り違えない）。
         self.review_says("none")
-        self.keep_record()
         pusher = self.pusher()
         git(pusher, "push", "-q", "origin", f"origin/{PARENT}:refs/heads/{PARENT}-x")
         self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT)
-        self.assertEqual("gone", fields(self.record)["state"], done.stdout)
+        self.assertGone(self.sync(PARENT))
 
-    # ---- 取り込み状態の寿命（削除せずに残し、消すのはユーザの `--forget` だけ）
+    # ---- 廃止した `--forget`（放棄した親の記録は `worktree retire --abandon` で消す）
 
-    def test_records_of_removed_worktrees_are_kept_as_tombstones(self):
-        # 親のワークツリーを片付けて sync を打っても、gone の取り込み状態は消えない。
-        self.keep_record("gone", mr="")
+    def test_forget_is_gone_and_says_what_to_do_instead(self):
+        done = self.sync("--forget", PARENT)
+        self.assertEqual(2, done.returncode, done.stdout + done.stderr)
+        self.assertIn("廃止", done.stderr)
+        self.assertIn("retire --abandon", done.stderr)
+
+    def test_an_abandoned_parent_stops_being_listed_when_its_worktree_is_removed(self):
+        # 放棄した親（リモートのブランチが消え、MR はマージされていない）は、ワークツリーが在る間は
+        # 引数なしでも名指しでも 1 を返す。ワークツリーを片付ければ、列挙されなくなり 1 が止まる。
+        self.review_says("none")
+        self.delete_remote_branch(PARENT)
+        self.assertEqual(1, self.sync(PARENT).returncode)
+        self.assertEqual(1, self.sync().returncode)
         git(self.ws, "worktree", "remove", "--force", self.tree)
         done = self.sync()
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertNotIn("取り込み状態を削除した", done.stdout)
-        self.assertIn("取り込み状態が gone なので片付けない", done.stdout)
-        self.assertEqual("gone", fields(self.record)["state"])
-        # 同じ名前で切り直しても、取り込み状態は gone のまま（push は ccnavi-git.sh が止める）。
-        self.parent_tree(PARENT + "x")  # 別の親子のチケットは触らない
-        self.assertEqual("gone", fields(self.record)["state"])
+        self.assertNotIn(PARENT, done.stdout)
+        # 名指しすると、ワークツリーが無いと言う（片付けの記録も無い）。
+        named = self.sync(PARENT)
+        self.assertEqual(1, named.returncode, named.stdout + named.stderr)
+        self.assertIn("親のワークツリー（.claude/worktrees/i0001）がありません", named.stdout)
 
-    def test_forget_removes_only_a_record_whose_parent_tree_is_gone(self):
-        self.keep_record("gone")
-        refused = self.sync("--forget", PARENT)
-        self.assertEqual(1, refused.returncode, refused.stdout + refused.stderr)
-        self.assertIn("まだある", refused.stdout)
-        self.assertTrue(os.path.exists(self.record))
+    def test_old_records_of_removed_worktrees_are_moved_to_retire(self):
+        # 旧い取り込み状態（gone など）のうち、親のワークツリーが無いものは、先頭の
+        # `ccnavi sync migrate` が mr と branch を片付けの記録へ移し、旧い記録を消す。
+        # 状態（gone など）は捨てる。
+        legacy = self.legacy_record("gone", mr="42")
         git(self.ws, "worktree", "remove", "--force", self.tree)
-        done = self.sync("--forget", PARENT)
+        self.review_says("none")
+        done = self.sync()
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("state gone", done.stdout)
-        self.assertFalse(os.path.exists(self.record))
-        again = self.sync("--forget", PARENT)
-        self.assertEqual(0, again.returncode)
-        self.assertIn("取り込み状態はありません", again.stdout)
+        self.assertIn("旧い取り込み記録を、片付けの記録（retire/）へ移した", done.stdout)
+        self.assertFalse(os.path.exists(legacy))
+        moved = os.path.join(self.retire_dir, f"{PARENT}.json")
+        with open(moved, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual((PARENT, 42, PARENT), (data["parent"], data["mr"], data["branch"]))
+        # 移した記録は、そのまま片付けの列挙に入る（MR は未マージなので片付けない）。
+        self.assertIn("まだマージされていないので片付けない", done.stdout)
+        # 打ち直しても移し直さない（冪等）。
+        again = self.sync()
+        self.assertNotIn("移した", again.stdout)
+        self.assertTrue(os.path.exists(moved))
 
-    def test_forget_needs_a_name_and_does_not_touch_the_network(self):
-        self.assertEqual(2, self.sync("--forget").returncode)
-        self.assertEqual(2, self.sync("--forget", "../x").returncode)
-        # origin が無くても消せる（ネットワークを使わない）。
-        self.keep_record("gone")
-        git(self.ws, "worktree", "remove", "--force", self.tree)
-        git(self.ws, "remote", "remove", "origin")
-        done = self.sync("--forget", PARENT)
+    def test_old_records_of_live_worktrees_are_dropped(self):
+        legacy = self.legacy_record("present", mr="42")
+        done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertFalse(os.path.exists(self.record))
+        self.assertIn("旧い取り込み記録を捨てた", done.stdout)
+        self.assertFalse(os.path.exists(legacy))
+        self.assertFalse(os.path.exists(os.path.join(self.retire_dir, f"{PARENT}.json")))
+
+    def test_the_old_integration_copy_is_removed(self):
+        head = write(
+            os.path.join(self.state, "sync", "self", "integration", "head"),
+            "remote origin\nbranch main\nsource default\n",
+        )
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("旧い統合先のコピー", done.stdout)
+        self.assertFalse(os.path.exists(head))
+        self.assertFalse(os.path.exists(os.path.dirname(head)))
+
+    def test_an_executable_that_does_not_know_migrate_does_not_stop_the_run(self):
+        # 旧い実行ファイルは `sync migrate` を知らない。何もせずに先へ進む。
+        launcher = self.launcher()
+        old = write(
+            os.path.join(self._tmp.name, "bin", "no-migrate"),
+            "#!/bin/sh\n"
+            'case "$*" in *"sync migrate"*) echo "ccnavi: unknown command" >&2; exit 2 ;; esac\n'
+            f'exec "{launcher}" "$@"\n',
+        )
+        os.chmod(old, 0o755)
+        self.legacy_record("gone")
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=old)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn("移した", done.stdout)
 
     # ---- 統合先（設定か、無ければホストのデフォルトブランチ）と、
-    # 統合先の取り込み結果（最後に取り込んだ先頭）
+    # 統合先への取り込み（最後に取り込んだ先頭）
 
     def put_on_main(self, files):
         pusher = self.pusher()
@@ -990,73 +1004,13 @@ class SyncTest(SyncHarness):
         git(pusher, "push", "-q", "origin", "main")
         return pusher
 
-    def test_the_integration_mirror_copies_what_judging_reads(self):
-        files = {
-            ".ccnavi/approved/done/old.md": "old\n",
-            ".ccnavi/config/common/rules.yml": "rules\n",
-            ".ccnavi/config/project/phases.yml": "phases\n",
-            ".claude/settings.json": "{}\n",
-            "src/app.py": "x\n",
-            # export-ignore・eol の属性があっても、コミットの中身そのものをコピーする。
-            ".gitattributes": ".ccnavi/config/common/rules.yml export-ignore\n*.yml eol=crlf\n",
-        }
-        self.put_on_main(files)
-        done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        for rel in (
-            ".ccnavi/approved/done/old.md",
-            ".ccnavi/config/common/rules.yml",
-            ".ccnavi/config/project/phases.yml",
-            ".claude/settings.json",
-        ):
-            with open(os.path.join(self.mirror, rel), "rb") as f:
-                self.assertEqual(files[rel].encode(), f.read())
-        self.assertFalse(os.path.exists(os.path.join(self.mirror, "src")))
-        self.assertFalse(os.path.exists(os.path.join(self.mirror, "README.md")))
-
-    def test_links_are_not_copied_into_the_mirror(self):
-        # シンボリックリンクは統合先の取り込み結果にコピーしない。
-        pusher = self.pusher()
-        git(pusher, "checkout", "-q", "main")
-        os.makedirs(os.path.join(pusher, ".ccnavi", "approved", "done"), exist_ok=True)
-        write(os.path.join(pusher, ".ccnavi", "approved", "done", "real.md"), "real\n")
-        try:
-            evil = os.path.join(pusher, ".ccnavi", "approved", "done", "evil.md")
-            os.symlink("/etc/passwd", evil)
-        except (OSError, NotImplementedError):
-            self.skipTest("リンクを作れない")
-        git(pusher, "add", "-A")
-        git(pusher, "commit", "-q", "-m", "link")
-        git(pusher, "push", "-q", "origin", "main")
-        done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        done_dir = os.path.join(self.mirror, ".ccnavi", "approved", "done")
-        self.assertTrue(os.path.exists(os.path.join(done_dir, "real.md")))
-        self.assertFalse(os.path.lexists(os.path.join(done_dir, "evil.md")))
-
-    def test_the_mirror_is_kept_when_the_integration_head_is_the_same(self):
-        self.put_on_main({".ccnavi/config/common/rules.yml": "rules\n"})
-        self.assertEqual(0, self.sync(PARENT).returncode)
-        marker = write(os.path.join(self.mirror, "kept-marker"), "x")
-        left = os.path.join(self.state, "sync", "self", "integration.tmp.99999")
-        os.makedirs(left)
-        self.assertEqual(0, self.sync(PARENT).returncode)
-        self.assertTrue(os.path.exists(marker), "先頭が同じなのにコピーし直した")
-        self.assertFalse(os.path.exists(left), "前の回の残りを消していない")
-        self.put_on_main({".ccnavi/config/common/rules.yml": "rules 2\n"})
-        self.assertEqual(0, self.sync(PARENT).returncode)
-        self.assertFalse(os.path.exists(marker))
-
     def test_a_configured_integration_branch_is_used_and_named(self):
         git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/develop")
         self.remote_commit("develop", ".ccnavi/approved/done/d.md", "d\n")
         done = self.sync(PARENT, CCNAVI_INTEGRATION_BRANCH="develop")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("統合先: develop（環境変数 CCNAVI_INTEGRATION_BRANCH）", done.stdout)
-        head_of = fields(os.path.join(self.mirror, "head"))
-        self.assertEqual("develop", head_of["branch"])
-        self.assertEqual("env", head_of["source"])
-        self.assertTrue(os.path.exists(os.path.join(self.mirror, ".ccnavi/approved/done/d.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
     def test_a_configured_integration_branch_missing_on_the_remote_stops(self):
         head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
@@ -1067,8 +1021,6 @@ class SyncTest(SyncHarness):
         self.assertIn(said, done.stdout)
         self.assertEqual(before, self.sha(self.tree, "HEAD"))
         self.assertNotEqual(head, before)
-        self.assertFalse(os.path.exists(self.mirror))
-        self.assertFalse(os.path.exists(self.record))
 
     def test_settings_local_json_names_the_integration_branch(self):
         # ユーザが端末で打つ sh には settings.local.json の env が反映されない。
@@ -1082,7 +1034,6 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("統合先: develop（.claude/settings.local.json", done.stdout)
-        self.assertEqual("settings.local.json", fields(os.path.join(self.mirror, "head"))["source"])
         # 環境変数が先。
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher, CCNAVI_INTEGRATION_BRANCH="main")
         self.assertIn("統合先: main（環境変数", done.stdout)
@@ -1093,7 +1044,6 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(2, done.returncode, done.stdout + done.stderr)
         self.assertIn("返さなかった", done.stderr)
-        self.assertFalse(os.path.exists(self.mirror))
 
     def test_the_host_default_branch_is_read_from_the_remote(self):
         # 手元の origin/HEAD が無くても、ls-remote --symref でホストの既定を読む。
@@ -1111,7 +1061,6 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("取ってこられなかった", done.stdout)
-        self.assertFalse(os.path.exists(self.record))
 
     def test_a_project_without_families_does_not_fail_the_run(self):
         # 引数を省いた回で、親子のチケットの無いプロジェクトの ls-remote が失敗しても 1 にしない。
@@ -1225,7 +1174,6 @@ class SyncTest(SyncHarness):
     def test_a_terminated_run_releases_its_lock_under_dash(self):
         # dash は EXIT の trap を TERM で走らせない。TERM でもロックを外す。
         write(os.path.join(self.scripts, "ccnavi-review.sh"), "#!/bin/sh\nsleep 30\n")
-        self.keep_record()
         self.delete_remote_branch(PARENT)
         script = os.path.join(self.scripts, "ccnavi-sync.sh")
         proc = subprocess.Popen(
@@ -1297,20 +1245,13 @@ class PlacesAreNotReadTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         # 親のワークツリーを既定の置き場（.ccnavi/approved・wip/proposals）で家族と見つけた。
         self.assertEqual(self.head, self.sha(self.tree, "HEAD"))
-        self.assertEqual("present", fields(self.record)["state"])
-        self.assertEqual(self.head, fields(self.record)["sha"])
-        other = os.path.join(self.state, "sync", "self", "families", "i0002")
-        self.assertEqual("present", fields(other)["state"])
-        # 統合先の控えは既定の置き場の done/ とレイヤー（.ccnavi/config/project）を写す。
-        for rel in (".ccnavi/approved/done/old.md", ".ccnavi/config/project/phases.yml"):
-            self.assertTrue(os.path.isfile(os.path.join(self.mirror, rel)), rel)
+        self.assertIn("i0002: リモートと同じ", done.stdout)
         # プロジェクトは既定の projects/ の下で見つける。
         self.assertIn("p: リモートのブランチの一覧を取ってこられなかった", done.stdout)
         # env が指す場所には何も作らない。
         self.assertFalse(os.path.exists(self.outside), "CCNAVI_STATE を読んでいる")
         for rel in ("tickets", ".nav", "repos"):
             self.assertFalse(os.path.exists(os.path.join(self.ws, rel)), rel)
-            self.assertFalse(os.path.exists(os.path.join(self.mirror, rel)), rel)
 
     def test_the_variables_do_not_move_the_places(self):
         """実行ファイルが `sync paths` に答える道。env を入れても既定の置き場で取り込む。"""

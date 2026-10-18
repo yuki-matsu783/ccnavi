@@ -266,19 +266,6 @@ export function pushApprovedCommand(
 }
 
 /**
- * 「準備する」でターミナルに送る行。親のワークツリーを切る入口（`ccnavi-start.sh --mr <番号>`）を、
- * このPCで呼ぶ。プロジェクトの親は、そのプロジェクトの中で打つ（`projects/<名前>/` に cd してから）。
- */
-export function prepareCommand(root: string, mr: number, project = ""): string {
-  const call = `${scriptCommand(root, "ccnavi-start.sh")} --mr ${mr}`;
-  if (project === "") {
-    return call;
-  }
-  const dir = path.posix.join(toPosixPath(root), "projects", project);
-  return `cd ${shellQuote(dir)} && ${call}`;
-}
-
-/**
  * `ccnavi c1 family <親>` の答えから `target`（`yes` / `no` / `stop`）を読む。頭の `c1 1` が無ければ
  * 空文字（古い実行ファイル）。行末の CR は除く
  */

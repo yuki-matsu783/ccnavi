@@ -571,7 +571,7 @@ def decide_at_start(
         )
         if guide:
             texts.append(guide)
-        # このPCで作業中の親を 1 行ずつ（親・ブランチ・MR・次の子・最終取り込み・未送信）。
+        # このPCで作業中の親を 1 行ずつ（親・ブランチ・MR・次の子・未送信）。
         # 読めなくても開始は止めない。
         parents = _parents_at_start(stderr, conf, root)
         if parents:
