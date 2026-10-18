@@ -99,7 +99,7 @@ src/
     flow/post.ts の muteForTour は、案内の間に tourDone 以外を拡張ホストへ送らない。board/post.ts の mutePosts も同じ
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
     styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する
-    （CSS の値）重なり順（--z-*）・角丸（--radius-*）・文字サイズ（--font-*）・すき間（--gap-*）・影（--shadow-popup）は page.css の :root で定め、画面の CSS には数値を直書きしない。直書きは test/shared/style.test.ts の CB-T583 が見つける（Chrome 拡張の CSS も対象）
+    （CSS の値）重なり順（--z-*）・角丸（--radius-*）・文字サイズ（--font-*）・すき間（--gap-*）・影（--shadow-popup）は page.css の :root で定め、画面の CSS には数値を直書きしない。直書きは test/shared/style.test.ts の CB-T583 が見つける（Chrome 拡張の CSS も対象。見つけるのは z-index・px の角丸・em の文字サイズ・gap の数値・影の rgba で、`font:` の省略形、rem、TSX のインライン style は見ない）
     board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
     board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）
     board/Card.css    Card.tsx の CSS（カード 1 枚）

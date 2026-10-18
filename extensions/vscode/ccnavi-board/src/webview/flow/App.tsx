@@ -232,7 +232,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     },
   });
   const sc = sceneOf(SAMPLE, scene);
-  // 段の様子が替わるたびに新しい値にする（図は替わったときだけ、そのノードを選び直す）
+  // 手順の様子が替わるたびに新しい値にする（図は替わったときだけ、そのノードを選び直す）
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const tourFocus = useMemo(() => ({ ids: sc.picked }), [scene]);
 

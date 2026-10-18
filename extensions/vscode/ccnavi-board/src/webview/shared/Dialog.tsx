@@ -10,7 +10,7 @@ export interface DialogProps {
   readonly titleId: string;
   /** 背景に足すクラス（画面ごとの目印） */
   readonly backdropClass: string;
-  /** 1 枚に足すクラス（画面ごとの目印と幅の指定） */
+  /** 本体に足すクラス（画面ごとの目印と幅の指定） */
   readonly cardClass: string;
   readonly id?: string;
   /** 案内の指す先（`data-tour`） */
