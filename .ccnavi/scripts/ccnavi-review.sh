@@ -4,7 +4,7 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh request --phase <N> --body-file <依頼文> --eli5 <HTML>
 #   sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>
 #   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
-#   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （ユーザが端末で打つ）
+#   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （ユーザが端末か VS Code のボードで行う）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged [<番号>]       （MR がマージ済みか。番号で聞くこともできる。ccnavi-sync.sh が使う）
 #   sh .ccnavi/scripts/ccnavi-review.sh ready [--parent <親>]                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
@@ -75,7 +75,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
                                                   crit review <パス> と crit push <番号> を出す
   confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（依頼の時刻では絞らない）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
-  decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で実行します。--preview は一覧を JSON で見るだけ）
+  decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末か VS Code のボードで実行します。--preview は一覧を JSON で見るだけ）
   ready        [--parent <親>]                    閉じられて push 済みなら、クローズ済みのチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを削除して削除を push し、Draft を解除する（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを削除します（中から実行したときは消さず、外から実行する 1 本を出す）。--parent なら親のワークツリーの外から実行できる
   close-early  --reason <理由> [--no-issue]       まだ残っているが早めに閉じる判断（ユーザが端末で実行します）。残りを issue に書き出す。Draft は親が ready で外す
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
