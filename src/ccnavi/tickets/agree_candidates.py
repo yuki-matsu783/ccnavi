@@ -672,6 +672,8 @@ def validate(
     problems: list[rules.Problem] = []
     overflow: list[rules.Problem] = []
     if not t.is_child:
+        if t.has_plan:
+            overflow.extend(phasetypes.parent_scope_problems(t))
         return plan_problems(t, config, approved=approved), overflow
     problems.extend(phasetypes.copy_problems(t))
     parent = pool.get(t.parent)

@@ -401,6 +401,45 @@ def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
     return problems
 
 
+def _probe(entry) -> str:
+    return entry.prefix() + "x" if entry.glob != entry.prefix() else entry.glob
+
+
+def _overlaps(entry, pt: PhaseType) -> bool:
+    """親の `allow` の 1 項と定義の範囲が重なるか（片方がもう片方を含むか）。"""
+    if pt.decide(_probe(entry)) == rules.ALLOW:
+        return True
+    return any(entry.matches(_probe(own)) for own in pt.scope or [])
+
+
+def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
+    """親の `allow` のうち、計画のどの定義の範囲にも入らない項を名指しする。
+
+    承認しても、その範囲には子が書けない（子 ⊆ 定義の上限）。承認と着手のあとの子の提案ではじめて
+    気づくので、親を作るときと承認の確認（`--verify`）で言う。計画に `scope: inherit` の定義が
+    あれば上限が無いので、何も言わない。warn で、承認は止めない。
+    """
+    types = list(types_of(parent).values())
+    if not types or any(pt.inherits_scope for pt in types):
+        return []
+    problems: list[Problem] = []
+    for entry in parent.entries:
+        if entry.decision == rules.DENY or entry.regex:
+            continue
+        if not any(_overlaps(entry, pt) for pt in types):
+            titles = ", ".join(f"{pt.title} / {pt.id}" for pt in types)
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    parent.ticket,
+                    f"`{entry.glob}` は計画のどの定義（{titles}）の範囲とも重ならない。"
+                    "子は書けない。計画に範囲を持つ定義を足すか、`--plan quick-work`"
+                    "（範囲は親の allow そのまま）に切り替える",
+                )
+            )
+    return problems
+
+
 # ---- 親に固定する定義（親の `phases:`）
 #
 # 計画を持つ親は、計画（`plan:` / `feedback:`）が使う定義**だけ**の写しを frontmatter の

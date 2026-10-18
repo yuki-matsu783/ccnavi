@@ -32,11 +32,17 @@ from tests import c1flag
 from tests.ticket.test_board import _portable
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
-from tests.ticketsample import child_text, parent_text
+from tests.ticketsample import child_text
+from tests.ticketsample import parent_text as sample_parent_text
 
 FIXTURES = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures")
 
 APPROVE_VERSION = 1
+
+
+def parent_text(*args, allow=("wip/*",), **kwargs):
+    """計画（research, design）の範囲と重なる allow の親。重ならないと親にも超過が出る。"""
+    return sample_parent_text(*args, allow=allow, **kwargs)
 
 
 class ApproveJsonTest(PhaseHarness):
@@ -433,7 +439,12 @@ class ApproveJsonTest(PhaseHarness):
         足すと改版は拒まれて一括のチケットに入らない。
         """
         self.family(plan=("research", "design"))
-        path = self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
+        path = self.propose(
+            "i0001",
+            parent_text(
+                "i0001", ["research", "design", "acceptance"], allow=("src/*", "wip/*", "tests/*")
+            ),
+        )
         self.commit_parent("revise")
         shown = self.preview()
         self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001"])

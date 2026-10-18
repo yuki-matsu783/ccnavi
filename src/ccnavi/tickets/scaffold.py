@@ -380,6 +380,9 @@ def run(
         fsio.remove(path)
         return refuse(f"phases: を差し込めなかった（{done.why}）")
 
+    # 写しを差し込んだあとの提案を読み直して、allow が定義の上限を超えていないかを見る
+    filled, _ = ticket_mod.load(path)
+    over = phasetypes.parent_scope_problems(filled) if filled is not None else []
     written: list[str] = []
     if used is not None:
         # 承認の検査（定義の kind と置き場、順序）を、書いた提案に当てる。通らなければ書き戻す。
@@ -402,6 +405,8 @@ def run(
     stdout.write("allow（phases.yml の scope を集めた）:\n")
     for glob in allow:
         stdout.write(f"  {ALLOW_MATCH} {glob}\n")
+    for p in over:
+        stdout.write(f"承認しても書けない: {p.detail}\n")
     tail = "並行させたい項は after を直す。" if used is None else "計画の項と文の固有名を直す。"
     # ccnavi を PATH に持たない環境でも、そのまま打てるように、起動の sh 経由で書く
     launcher = settings.script_command(root, "ccnavi-launcher.sh")
