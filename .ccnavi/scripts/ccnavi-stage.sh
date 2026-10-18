@@ -72,14 +72,23 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 # 下書きの置き場。cwd が .claude/worktrees/<名前> の中ならそのワークツリー、それ以外はワークスペースルート。
+# cwd とルートは、リンクや表記の違い（macOS の /private、Windows の C:/ と /c/ など）を解いてから比べる。
 here=$(ccnavi_abs .) || here=""
+here=$(ccnavi_phys "$here")
+root_phys=$(ccnavi_phys "$root")
 case "$here" in
-"$root"/.claude/worktrees/*)
-	stage_wt="${here#"$root"/.claude/worktrees/}"
+"$root_phys"/.claude/worktrees/*)
+	stage_wt="${here#"$root_phys"/.claude/worktrees/}"
 	handoff="$root/.claude/worktrees/${stage_wt%%/*}/wip/handoff"
 	;;
 *) handoff="$root/wip/handoff" ;;
 esac
+# 置き場（か wip/）がリンクなら、cp と mkdir がリンクの先へ書く。ワークツリーの置き場はブランチの
+# 内容で決まるので、リンクを追跡しているブランチだと書き先が外へ出る。書かずに断る。
+if [ -z "$commands" ] && { [ -L "$handoff" ] || [ -L "$(dirname "$handoff")" ]; }; then
+	printf 'ccnavi-stage: 下書きの置き場（%s）か wip/ がシンボリックリンクです。リンクの先へは書きません。\n' "$handoff" >&2
+	exit 2
+fi
 
 # 元のファイルの、ワークスペースルートからの相対パスを出す。使えないパスは理由を言って 1 を返す。
 relative_of() {
@@ -156,7 +165,7 @@ for arg in "$@"; do
 		fi
 		continue
 	fi
-	staged="${staged:+$staged }$rel"
+	staged="${staged:+$staged }$root/$rel"
 	if [ -e "$draft" ]; then
 		if cmp -s "$orig" "$draft"; then
 			printf '下書きは既にある（元と同じ）: %s\n' "$draft"

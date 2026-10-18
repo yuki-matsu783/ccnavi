@@ -320,6 +320,16 @@ class IntegrateTest(unittest.TestCase):
         self.assertIn("マージリクエスト", r.stderr)
         self.assertEqual("", self.status())
 
+    def test_it_refuses_when_the_exe_cannot_say_whether_the_name_is_bound(self):
+        """チケットに結び付くかは実行ファイルに聞く。答えが無ければ断る向きに倒す。"""
+        self.work_in_branch()
+        with open(self.bin, "w", encoding="utf-8", newline="\n") as f:
+            f.write("#!/bin/sh\nexit 0\n")
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r, 2)
+        self.assertIn("実行ファイルに確かめられない", r.stderr)
+        self.assertEqual("", self.status())
+
     def test_a_parent_started_but_not_yet_proposed_is_refused(self):
         """`ccnavi-start.sh` は親のブランチを origin へ送ってから始める。チケットも提案も
         まだ無い間も、origin に在る親のワークツリーのブランチは、統合先へ直接取り込まない

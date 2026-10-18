@@ -46,7 +46,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, pathcase, settings, tree
 from . import archive, ops_close, ops_stop, ticket_ids, ticket_model
 
 # Stop で直接作業の `integrate` を促すときの理由コード。止めるのは 1 回だけの促しで、
@@ -195,6 +195,41 @@ def _bound_to_ticket(root: str, conf: settings.Settings, here: tree.Tree) -> boo
     return bool(bound_reason(root, conf, here))
 
 
+def _tree_roots(root: str, conf: settings.Settings) -> list[str]:
+    """チケットの置き場を探すツリーの根。登録されたツリーに加え、`.claude/worktrees/` と
+    プロジェクトの置き場の直下のディレクトリも、登録の有無によらず入れる。
+
+    外れたワークツリーの残骸や、まだ git リポジトリにしていないプロジェクトにチケットがあっても、
+    `integrate` は断る（広めに当てて断る向き）。
+    """
+    roots = [t.root for t in tree.all_trees(root, conf.projects)]
+    homes = [os.path.join(root, tree.WORKTREES_DIR)]
+    if conf.projects:
+        homes.append(
+            conf.projects if os.path.isabs(conf.projects) else os.path.join(root, conf.projects)
+        )
+    for home in homes:
+        try:
+            entries = sorted(os.listdir(home))
+        except OSError:
+            continue
+        roots.extend(os.path.join(home, e) for e in entries if os.path.isdir(os.path.join(home, e)))
+    return list(dict.fromkeys(roots))
+
+
+def _named_file(directory: str, name: str) -> str:
+    """ディレクトリの中の `<名前>.md`（実際の表記のパス）。大文字小文字と NFC は畳んで比べる。"""
+    want = pathcase.fold(tree.nfc(f"{name}.md"))
+    try:
+        entries = sorted(os.listdir(directory))
+    except OSError:
+        return ""
+    for entry in entries:
+        if pathcase.fold(tree.nfc(entry)) == want:
+            return os.path.join(directory, entry)
+    return ""
+
+
 def bound_reason(root: str, conf: settings.Settings, here: tree.Tree) -> str:
     """この名前のワークツリーがチケットに結び付く理由。結び付かなければ空。
 
@@ -213,28 +248,28 @@ def bound_reason(root: str, conf: settings.Settings, here: tree.Tree) -> str:
     決められないものは結び付くとして扱う（促さない側。`integrate` も断る向きに倒す）。
     """
     name = here.name
-    for t in tree.all_trees(root, conf.projects):
-        approved = settings.approved_dir(conf, t.root)
-        proposals = os.path.join(t.root, conf.tickets.replace("/", os.sep))
+    for base_root in _tree_roots(root, conf):
+        approved = settings.approved_dir(conf, base_root)
+        proposals = os.path.join(base_root, conf.tickets.replace("/", os.sep))
         for base, state in (
             (approved, ticket_model.DOING),
             (approved, ticket_model.DONE),
             (proposals, ticket_model.TODO),
             (proposals, ticket_model.REVIEW),
         ):
-            path = os.path.join(base, state, f"{name}.md")
-            if os.path.isfile(path):
-                rel = os.path.relpath(path, root).replace(os.sep, "/")
+            found = _named_file(os.path.join(base, state), name)
+            if found:
+                rel = os.path.relpath(found, root).replace(os.sep, "/")
                 return f"チケットか提案（{rel}）がある"
     if archive.archived_fields(root, here.project, name) is not None:
         return "手元の退避（ready 済み）に同じ名前の親がある"
     ident = ticket_ids.branch_to_id(name)
     for cand in dict.fromkeys((name, ident)):
-        work = os.path.join(root, tree.WORKTREES_DIR, cand)
+        work = tree.worktree_path(root, cand)
         if not os.path.isdir(work) or os.path.islink(work):
             continue
         branch = tree.branch_of(work)
-        if not branch or ticket_ids.branch_to_id(branch) != cand:
+        if not branch or pathcase.fold(ticket_ids.branch_to_id(branch)) != pathcase.fold(cand):
             continue
         if gitcmd.run(
             work, ["show-ref", "--verify", "--quiet", f"refs/remotes/origin/{branch}"]

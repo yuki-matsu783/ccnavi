@@ -87,6 +87,30 @@ class StageShTest(unittest.TestCase):
         self.assertEqual(2, r.returncode)
         self.assertIn("下書きの置き場の中", r.stderr)
 
+    def test_inside_a_worktree_a_relative_path_gets_an_absolute_next_step(self):
+        """cwd のワークツリーの中の相対パスで渡しても、「次:」は絶対パスで言う。
+        どの cwd から打っても同じファイルを指す。"""
+        wt = os.path.join(self.ws, ".claude", "worktrees", "scratch-1-x")
+        inner = os.path.join(wt, ".ccnavi", "config", "common", "rules.yml")
+        write(inner, "version: 1\n")
+        r = self.stage(".ccnavi/config/common/rules.yml", cwd=wt)
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertIn(f"--commands {inner}", r.stdout)
+
+    def test_a_linked_handoff_directory_is_refused(self):
+        wt = os.path.join(self.ws, ".claude", "worktrees", "scratch-1-x")
+        outside = os.path.join(self._tmp.name, "outside")
+        os.makedirs(os.path.join(wt, "wip"))
+        os.makedirs(outside)
+        try:
+            os.symlink(outside, os.path.join(wt, "wip", "handoff"))
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+        r = self.stage(self.rules, cwd=wt)
+        self.assertEqual(2, r.returncode)
+        self.assertIn("シンボリックリンク", r.stderr)
+        self.assertEqual([], os.listdir(outside))
+
     def test_relative_to_cwd_and_absolute_paths(self):
         result = self.stage("config/common/rules.yml", cwd=os.path.join(self.ws, ".ccnavi"))
         self.assertEqual(0, result.returncode, result.stderr)
@@ -103,8 +127,7 @@ class StageShTest(unittest.TestCase):
         self.assertNotIn("<パス>", nexts[0])
         self.assertTrue(
             nexts[0].endswith(
-                "--commands .ccnavi/config/common/rules.yml .claude/hooks/lint-py.sh"
-                " を打つ（差し替えの mv が出る）"
+                f"--commands {self.rules} {self.hook} を打つ（差し替えの mv が出る）"
             ),
             nexts[0],
         )

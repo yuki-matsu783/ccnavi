@@ -89,6 +89,23 @@ class TreeBoundTest(Harness):
             os.remove(path)
         self.assertEqual("no", self.bound()["bound"])
 
+    def test_unregistered_directories_are_searched_too(self):
+        """外れたワークツリーの残骸や、git リポジトリでないプロジェクトの置き場でも断る。"""
+        for rel in (
+            f".claude/worktrees/stale/{APPROVED}/doing/p0001.md",
+            f"projects/pp/{APPROVED}/doing/p0001.md",
+        ):
+            path = os.path.join(self.ws, *rel.split("/"))
+            write(path, front(ticket="p0001"))
+            out = self.bound()
+            self.assertEqual("yes", out["bound"], rel)
+            self.assertIn(rel, out["why"])
+            os.remove(path)
+
+    def test_the_file_name_is_compared_ignoring_case(self):
+        write(os.path.join(self.ws, *f"{APPROVED}/doing/P0001.md".split("/")), front(ticket="p"))
+        self.assertEqual("yes", self.bound()["bound"])
+
     def test_a_branch_on_origin_binds(self):
         git(self.ws, "update-ref", "refs/remotes/origin/p0001", "p0001")
         out = self.bound()
