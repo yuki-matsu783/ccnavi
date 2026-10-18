@@ -43,7 +43,7 @@ VS Code 拡張が決める。ccnavi が約束するのは置き場と名前と `
 REQ-EXT-03 の UTF-8 は、実行ファイルの入口（`hookio.rebind_streams`）が標準入出力を張り直して守る。VS Code 拡張は
 念のため `PYTHONUTF8=1`・`PYTHONIOENCODING=utf-8` も渡す。
 
-REQ-EXT-05 の 3 か所は `tests/sh/test_compat_skew.py` が突き合わせる。Chrome 拡張は互換の版を、
+REQ-EXT-05 の 3 か所は `tests/sh/test_compat_skew.py` が突き合わせる。Chrome 拡張は、互換の版を
 組み立てのときに REQ-EXT-06 の行から埋め込む。版の JSON の形と、食い違ったときの直し方は README「[版の JSON](../../README.md#版の-json)」にある。
 
 REQ-EXT-07 の文言は、`--version` を知らない古い実行ファイルを VS Code 拡張が見分けるのに使う。新しいフラグを知っているかは
