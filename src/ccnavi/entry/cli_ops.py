@@ -265,7 +265,8 @@ def operate(
         else:
             code = review_close.ready(stdout, stderr, root, conf, cwd, args.result)
     else:
-        stderr.write(cli_usage.USAGE)
+        word = cli_usage.TOPIC_WORDS.get(kind)
+        stderr.write(cli_usage.topic(word) if word else cli_usage.OVERVIEW)
     return EXIT_OK if code == 0 else EXIT_ERROR
 
 

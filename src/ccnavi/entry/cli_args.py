@@ -18,6 +18,7 @@ from ..records import audit, prune
 from ..tickets import (
     ticket_ids,
 )
+from . import cli_usage
 
 # フラグで上書きする設定の欄と、空文字を「指定した」と読むかどうか。
 # 空文字を受ける欄は、既定が None のフラグで受け渡す。「記録しない」「state の置き場を持たない」を
@@ -371,3 +372,29 @@ def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
         log.write(record)
     except OSError as exc:
         stderr.write(f"ccnavi: ログを保存できませんでした：{exc}\n")
+
+
+# `--help` が出す話題を決める旗。上から当たったもの。
+_HELP_FLAGS = (
+    ("version", lambda a: a.version),
+    ("lint", lambda a: a.lint),
+    ("test", lambda a: a.test is not None or bool(a.test_expectations)),
+    ("explain", lambda a: a.explain),
+    ("docs", lambda a: a.docs),
+    ("templates", lambda a: a.templates),
+    ("logs", lambda a: a.prune or a.suggest),
+    ("agree", lambda a: a.agree or a.plan_order is not None or a.fill_phases),
+    ("scripts", lambda a: a.reviewed is not None or a.close_early),
+)
+
+
+def help_text(args: argparse.Namespace) -> str:
+    """`--help` の本文。`--all` なら全文、話題の旗か語（`--help docs`・`ticket --help`）が
+    あればその節、なければ話題の一覧。"""
+    if args.all:
+        return cli_usage.USAGE
+    for name, given in _HELP_FLAGS:
+        if given(args):
+            return cli_usage.topic(name)
+    word = cli_usage.TOPIC_WORDS.get(args.command[0]) if args.command else None
+    return cli_usage.topic(word) if word else cli_usage.OVERVIEW

@@ -337,6 +337,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # ユーザの判断はフラグで受ける。
     parser.add_argument("--close-early", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
+    # `--help --all` が全文を出す（既定は話題の一覧）。
+    parser.add_argument("--all", action="store_true")
     # 版・組み立ての元のコミット・受け付けるフラグ・互換の版を言う。拡張と sh が起動のときに読む。
     parser.add_argument("--version", action="store_true")
     # この実行で書いた・消したパスを、state の置き場の下のファイルに 1 行 1 つで書き出す
@@ -381,8 +383,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if test_words is not None and args.test is None:
         args.test = test_words
     if args.help:
-        # `--docs --help` は索引の引き方の節だけ。全文は読む量が多い。
-        stderr.write(cli_usage.DOCS_USAGE if args.docs else cli_usage.USAGE)
+        # 一覧か話題の節だけ。全文は `--all`（読む量が多い）。
+        stderr.write(cli_args.help_text(args))
         return EXIT_ERROR
     refused = _test_usage(parser, args)
     if refused:
@@ -1100,7 +1102,7 @@ def _hook_steps(
         payload = hookio.decode(stdin)
     except hookio.NoPayload:
         # hook ではなく端末の前のユーザ。何も判定していないので何も記録しない。
-        stderr.write(cli_usage.USAGE)
+        stderr.write(cli_usage.OVERVIEW)
         return EXIT_ERROR
     except hookio.Unusable as exc:
         stderr.write(
