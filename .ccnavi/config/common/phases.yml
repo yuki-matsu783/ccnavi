@@ -29,7 +29,7 @@ phases:
     title: 小さい作業
     review: mr
     scope: inherit
-    when: 設計判断や並行作業が要らないとき（範囲が複数のディレクトリや文書・設定にまたがってもよい）
+    when: 設計判断や並行作業が要らないとき
 
   research:
     kind: work
