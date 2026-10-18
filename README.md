@@ -2601,7 +2601,7 @@ error 3 件、warn 1 件、info 0 件
 | warn | ワークスペースの git の索引に、`projects/` の下の入れ子のリポジトリ（gitlink）だけが載っている（載せ忘れ）。`.gitignore` に入れる前に `git add` したものとみて、索引から外して `.gitignore` に `/projects/` を足すよう案内する |
 | warn | `projects/` がワークスペースの `.gitignore` に入っていない。上の 2 つのどちらかが出るときは出さない（同じ原因で、`.gitignore` に入れる案内が誤りか、先に索引から外さないと効かないため） |
 | error | 予約名（`common` / `self`。大文字小文字は問わない）のプロジェクトがある |
-| warn | プロジェクトの中にワークツリー（`.claude/worktrees/`）がある。ワークツリーはワークスペースの `.claude/worktrees/` に置く。ここのものは承認の走査の対象外で、書いた提案は承認待ちに並ばない。ワークスペースの ccnavi が古い可能性があるので、`scripts/ccnavi-setup.sh --force` で配り直し、このワークツリーはユーザに伝えて片付ける |
+| warn | プロジェクトの中にワークツリーがある（名前を並べる）。ワークツリーはワークスペースの `.claude/worktrees/` に置く。ここのものは承認の走査の対象外で、書いた提案は承認待ちに並ばない。ワークスペースの ccnavi が古い（`projects/<名前>` の写しをルートと取り違える）可能性があるので、`scripts/ccnavi-setup.sh --force` で配り直し、このワークツリーはユーザに伝えて片付ける |
 
 ## lint の JSON
 
