@@ -458,7 +458,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         # 承認の画面は、書き込みが向かうリポジトリをユーザに見せる
         self.assertIn("■ プロジェクト: lib", approved.stdout)
-        # 承認は `project:` を書き足さない（中身を変えない）。承認済みチケットのプロジェクトも
+        # 承認は `project:` を書き足さない。承認済みチケットのプロジェクトも
         # 置き場（ツリー）から決まる
         for name in ("i0007", "i0007-01-01"):
             with open(self.approved_path("doing", name + ".md"), encoding="utf-8") as f:

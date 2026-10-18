@@ -548,7 +548,7 @@ def main() -> int:
         if st != 404:
             record(f"実験場に {name} ブランチが無い", False, f"status={st}。手で片付けてから")
             return finish()
-    # 統合先は main ではなく使い捨てのブランチにする（実験場の main に触れない）。履歴は無関係でよい
+    # 統合先は main ではなく使い捨てのブランチにする。履歴は無関係でよい
     pushed = run(["git", "push", "--quiet", "origin", f"main:refs/heads/{BASE}"], ROOT)
     if pushed.returncode == 0:
         MADE_BRANCHES.append(BASE)
