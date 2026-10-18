@@ -156,7 +156,7 @@ class FetchTest(unittest.TestCase):
         """ルートを `main` 以外に移す。issue #56 のワークスペースと同じ形。"""
         git(tree or self.ws, "checkout", "-q", "-b", branch)
 
-    # ---- 起点になるデフォルトブランチ
+    # ---- 起点になる統合先ブランチ
 
     def test_default_branch_advances_while_root_is_elsewhere(self):
         # ルートが main に居なくても、ワークツリーの起点になる main は新しくなる。
@@ -184,7 +184,7 @@ class FetchTest(unittest.TestCase):
         self.assertIn("trunk", done.stdout)
 
     def test_default_branch_is_created_when_it_is_missing(self):
-        # 手元に無いと `worktree add ... main` の起点に指せない。リモートの版で作る。
+        # 手元に無いと `worktree add ... main` の起点に指せない。origin/main から作る。
         self.leave_main()
         head = self.sha(self.ws, "refs/heads/main")
         git(self.ws, "branch", "-q", "-D", "main")

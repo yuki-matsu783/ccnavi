@@ -229,7 +229,7 @@ ccnavi_fetch_family() {
 ccnavi_fetch_forward() {
 	ccnavi_fw_key=$(ccnavi_repo_key "$1" "$root")
 	ccnavi_fetch_or_note "$1" "$3" \
-		"${2}: リモートを取ってこられなかった。手元の版で判定する" \
+		"${2}: リモートを取ってこられなかった。ローカルの版で判定する" \
 		"${2}: 親のブランチ ${3} をリモートから取ってこられなかった（リモートにありません）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめてください" ||
 		return 0
 	ccnavi_fw_now=$(date +%s)
@@ -304,14 +304,14 @@ report=$(
 		[ -d "$tree/$approved" ] || continue
 		git -C "$tree" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || continue
 		ccnavi_fetch_or_note "$tree" "$branch" \
-			"${name}: リモートを取ってこられなかった。手元の版で判定する" \
-			"${name}: ${branch} がリモートに無いので取ってこられなかった。手元の版で判定する" || continue
+			"${name}: リモートを取ってこられなかった。ローカルの版で判定する" \
+			"${name}: ${branch} がリモートに無いので取ってこられなかった。ローカルの版で判定する" || continue
 		behind=$(git -C "$tree" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
 		[ "$behind" = "0" ] && continue
 
 		dirty=$(git -C "$tree" status --porcelain --untracked-files=no 2>/dev/null || :)
 		if [ -n "$dirty" ]; then
-			printf '%s: リモートが %s 件先に進んでいるが、未コミットの変更があるので進めない\n' \
+			printf '%s: リモートが %s コミット先に進んでいるが、未コミットの変更があるので進めない\n' \
 				"$name" "$behind"
 			continue
 		fi
@@ -325,7 +325,7 @@ report=$(
 		fi
 	done
 
-	# 第 2 周。リポジトリごとに、ワークツリーの起点になるデフォルトブランチを進める。
+	# 第 2 周。リポジトリごとに、ワークツリーの起点になる統合先ブランチを進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue
 		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
