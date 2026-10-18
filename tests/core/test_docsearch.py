@@ -779,8 +779,9 @@ class SessionStartTest(Repo):
         said = docsearch.at_start(conf, self.root)
         self.assertEqual(len(said.splitlines()), 1, said)
         self.assertIn("--docs --keyword <語>", said)
-        for listed in ("--format", "--sort", "--since", "type は必須", "kebab-case", "--help"):
+        for listed in ("--format", "--sort", "--since", "type は必須", "kebab-case"):
             self.assertNotIn(listed, said)
+        self.assertIn("--help", said)
 
     def test_points_to_the_convention_document_through_docs_when_present(self):
         self.put("docs/a.md", doc(type="guide"))
