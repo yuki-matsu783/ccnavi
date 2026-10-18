@@ -30,7 +30,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`flows/`（残っていれば旧版の`events/`）を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
 | 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（`.ccnavi/docs/templates.md`） |
-| テンプレートの下書き（エージェントが書く。効力は無い） | そのツリーの`wip/proposals/templates/<名前>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/templates/<名前>.yml` |
+| テンプレートの下書き（エージェントが書く。効力は無い） | 取り込み先と同じ相対パスで`wip/handoff/`の下（`wip/handoff/.ccnavi/config/project/templates/<名前>.yml`など）。プロジェクト向けは`projects/<名前>/wip/handoff/…`。取り込むのはユーザ（`ccnavi user handoff`） |
 | ユーザに渡す物（保護対象を直した写しなど） | ワークスペースのワークツリーの`wip/handoff/`（追跡する。統合のときに`integrate`が外す） |
 | 使い捨てのファイル・コミットしたくないもの | ワークスペースルート直下の`scratchpad/`（`.gitignore`で追跡から外す。`.ccnavi/docs/scratchpad.md`）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の置き物もワークスペース側に置く |
 | ワークスペースのルール | 共通レイヤーの`.ccnavi/config/common/rules.yml`。リスクの配点とフェーズ定義（`phases.yml`）も同じ場所。レイアウトに依存するフェーズ定義は自身のレイヤーの`.ccnavi/config/project/phases.yml` |
@@ -45,7 +45,7 @@ Draftを外したマーカー（`ready.json`）は、`ready`が閉じたチケ�
 
 効力のあるフロー（`.ccnavi/approved/flows/`）は、エージェントが書かず、シェルからも書かない。下書きは`wip/proposals/flows/<子>.yml`に、
 頼まれたときだけ書き、`ccnavi --lint --flow <下書き>`で確かめてから渡す。下書きには効力が無く、ユーザがボードのフロー編集画面で
-差分を読んで取り込み、保存したものだけが効く。保存とコミット・pushはユーザが`ccnavi-push-approved.sh`で行う。取り込んで消えた下書きも
+差分を読んで取り込み、保存したものだけが効く。保存とコミット・pushはユーザが`ccnavi-user-push-approved.sh`で行う。取り込んで消えた下書きも
 一緒にコミットして push する。着手中はユーザも書き換えられない。着手のあとにフローが変わると、`NOTICE_TICKET_FLOW_CHANGED`で
 ユーザに知らされる。親のツリーから起動されたときは、自分が担当する子のフローだけに従う。
 
@@ -57,14 +57,14 @@ Draftを外したマーカー（`ready.json`）は、`ready`が閉じたチケ�
 
 承認はチケットの中身を変えない。手で`doing/`へ動かした承認とccnaviの承認は同じ中身になるので、欄が無いことや
 未コミットであることは、承認が途中で止まった印ではない。未コミットの承認済みチケットはエージェントが運ばず、
-statusが言うとおりユーザに`ccnavi-push-approved.sh <親>`を打ってもらう。
+statusが言うとおりユーザに`ccnavi-user-push-approved.sh <親>`を打ってもらう。
 
 ## チケットの置き場の移り方
 
 チケットは1つのファイルで、`wip/proposals/todo/`（承認待ち）→`.ccnavi/approved/doing/`（ユーザが承認）→
 `wip/proposals/review/`（`ticket finish`。レビューが要るとき）→`.ccnavi/approved/done/`（ユーザがレビュー）の順に
 移る。`.ccnavi/approved/`へ移すのはユーザ、`wip/proposals/`へ移すのはエージェントで、
-エージェントは`ccnavi-ticket.sh`を使う。レビューで残った指摘は、ユーザが`decide`で指摘ごとに扱いを決める。`decide`はボードの「決める」か端末から使う。
+エージェントは`ccnavi-ticket.sh`を使う。レビューで残った指摘は、ユーザが`decide`で指摘ごとに扱いを決める。`decide`はボードの「決める」か端末の`ccnavi-user-decide.sh <N>`から使う。
 選べるのは「対応しない」「このフェーズで直す」「issueに回す」の3つ。「このフェーズで直す」は続きの子チケットを`doing/`に作る。
 
 ラッパースクリプトは、記録のパスをcwdから開ける形で出す。そのまま`sed -n`などで開けばよい。

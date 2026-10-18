@@ -159,8 +159,8 @@ prompt を変えて呼び出しを打たせるか、期待を直すかを決め�
 
 次は人間しかできないので、シナリオの step にして一時停止する。
 
-- `ccnavi --agree`（承認は人間の判断）
-- `ccnavi-review.sh decide` / `confirm`
+- `ccnavi user agree`（承認は人間の判断）
+- `ccnavi-user-decide.sh` / `ccnavi-review.sh confirm`
 - MR のマージ（squash）
 - ホストの認証や、実物のリモートへの書き込みが要る操作
 - 拡張機能の見た目など、画面を見て確かめること（`check` に書く）

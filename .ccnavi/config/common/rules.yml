@@ -21,9 +21,15 @@ version: 1
 
 deny:
   # hook の場所
+  # 下書きの置き場（各ツリー直下の `wip/handoff/`）の中は、守る場所の写しなので外す。
+  # 写しは元と同じ相対パス（`wip/handoff/.ccnavi/scripts/x.sh` など）に置くので、パスに
+  # `.ccnavi/` や `.claude/` が入る。写しは、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。
+  # `docs/wip/handoff/` のように、ツリーの直下でない綴りは外さない。
   - id: guard-hooks
     match: Write|Edit
     glob: "*/.claude/hooks/*"
+    except:
+      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
     message: >-
       hook 本体です。エージェントの判断で書き換えず、理由を
       伝えてユーザに変更を依頼してください。
@@ -32,6 +38,8 @@ deny:
   - id: guard-scripts
     match: Write|Edit
     glob: "*/.ccnavi/scripts/*"
+    except:
+      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
     message: >-
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
       エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
@@ -40,6 +48,8 @@ deny:
   - id: guard-ccnavi-config
     match: Write|Edit|NotebookEdit
     regex: '[\\/]\.ccnavi[\\/]config[\\/]common[\\/](rules|phases|risks)\.yml$'
+    except:
+      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
     message: >-
       ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。エージェントの判断で
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください
@@ -183,6 +193,8 @@ deny:
   - id: guard-settings
     match: Write|Edit|NotebookEdit
     regex: '[\\/]\.claude[\\/]settings(\.local)?\.json$'
+    except:
+      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
     message: >-
       hook の登録そのものです。ワークツリー側の設定も統合で統合先の設定になります。
       エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。

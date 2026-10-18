@@ -46,6 +46,19 @@ deny:
     subject: "/repo/wip/handoffx/a.md"
     why: workspace-root の except が除くのは wip/handoff/ だけ。名前の続く別のディレクトリは除かない
   - tool: Write
+    subject: "/repo/docs/wip/handoff/.ccnavi/scripts/x.sh"
+    why: >-
+      写しの例外が効くのは、ツリーの直下の wip/handoff/ だけ。docs/ の下の同名の綴りは、
+      守る場所そのものの綴りではないので除かない（guard-scripts と組み込みの guard-project-home）
+  - tool: Edit
+    subject: "/repo/wip/handoffx/.claude/hooks/x.sh"
+    why: 写しの例外は wip/handoff/ だけ。名前の続く別のディレクトリは除かない（guard-hooks）
+  - tool: Write
+    subject: "/repo/wip/../.ccnavi/scripts/x.sh"
+    why: >-
+      wip/handoff/ から .. で抜けた先は、守る場所そのもの。解いたあとのパスで当てるので除かない
+      （guard-scripts）
+  - tool: Write
     subject: "/repo/wip/a.md"
     why: wip/ の直下は除かない。ユーザに渡す物は wip/handoff/ に置く
   - tool: Write
@@ -249,6 +262,23 @@ ask:
     why: >-
       workspace-root の except で除く、ユーザに渡す物の置き場。止めないが allow にも無いので、
       権限モードに渡る（端末からの試験では ask）
+  - tool: Write
+    subject: "/repo/wip/handoff/.ccnavi/scripts/ccnavi-x.sh"
+    why: >-
+      守る場所の写し。ccnavi-stage.sh が元と同じ相対パスで写すので、パスに .ccnavi/ が入る。
+      写しにはルールとしての効力が無く、ユーザが ccnavi user handoff で取り込むまで何も変わらない。
+      guard-scripts と組み込みの guard-project-home が除く。止めないが allow にも無いので、
+      権限モードに渡る
+  - tool: Edit
+    subject: "/repo/wip/handoff/.claude/settings.json"
+    why: >-
+      hook の登録の写し。guard-settings が除く。ユーザが ccnavi user handoff で取り込むまで
+      何も変わらない。権限モードに渡る
+  - tool: Write
+    subject: "/repo/wip/handoff/.ccnavi/config/common/rules.yml"
+    why: >-
+      ルールの下書き。guard-ccnavi-config と組み込みの guard-project-home が除く。
+      検査は取り込むときに ccnavi user handoff が行う。権限モードに渡る
   - tool: Write
     subject: "/repo/scratchpad/a.md"
     why: >-

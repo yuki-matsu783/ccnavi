@@ -40,7 +40,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
 
   | どこ | 3 | 4 |
   |---|---|---|
-  | 実行ファイル | `EXIT_ANSWER_NO`（問われたことへの「いいえ」。`--agree --preview --verify`） | `EXIT_PARTIAL`（`--agree` だけ。承認済みチケットを一部だけ置いて止まった） |
+  | 実行ファイル | `EXIT_ANSWER_NO`（問われたことへの「いいえ」。`--agree --preview --verify`） | `EXIT_PARTIAL`（`user agree` だけ。承認済みチケットを一部だけ置いて止まった） |
   | `ccnavi-start.sh` | 候補が複数（何も作らない） | `EXIT_HOST`（ホストに届かず、MCP などで代行が要る） |
   | `ccnavi-worktree.sh` | — | `EXIT_NET`（origin に届かないか、ブランチ一覧を取れない。リモート未確認） |
   | `ccnavi-review.sh merged` | `unknown`（MR がマージ済みかを確かめられない） | — |
@@ -54,7 +54,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
 - 親を閉じたときのブランチの片付けも実行ファイルが行う（`worktree retire <親>`・`worktree branch <名前> [confirmed]`・
   `sync tidy <親> <リポジトリ> <ブランチ> <sha>`。`tickets/retire.py`）。MR がマージ済みかと、その先頭の sha は sh が
   `ccnavi-review.sh merged [<番号>]` で取って渡し、実行ファイルはその sha を基準に、手元の先頭が含まれるかなどをローカルの git で
-  確かめて消す。エージェントに `git branch -D` を開けないので、消す入口はこれらだけ（`ccnavi-clean.sh --branch`）。最後の行が
+  確かめて消す。エージェントに `git branch -D` を開けないので、消す入口はこれらだけ（`ccnavi-user-clean-branch.sh`）。最後の行が
   `record yes|no`（取り込み記録を消してよいか）で、記録を消すのは sh
 - ワークツリーの片付け（`worktree drop <名前>`・`worktree tidy <親>`）も実行ファイルが行う。消すかどうかの判断（cwdが中か、未コミットが
   あるか、gitのワークツリーか）と、生成物の掃除・`git worktree remove`はローカルの操作で、ネットワークには出ない。
