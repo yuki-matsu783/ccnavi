@@ -161,6 +161,10 @@ REF_SUFFIX = ".ref"
 # 中断して翌日に開き直した形までは拾える幅にしてある。
 KEEP_DAYS = 3
 
+# 変わっていないバックアップの更新時刻を新しくする間隔（秒）。書き直さない代わりに、
+# 掃除が生きているセッションを古いと読まないよう、`KEEP_DAYS` より十分短くしておく。
+REFRESH_SECONDS = 86400
+
 # 実体をコピーするときの一時名。コピーの途中で中断されたものを、次のセッションが
 # 中身の揃ったバックアップとして拾わないように、名前を分けてから置き換える。
 _PART_SUFFIX = ".part"
@@ -961,7 +965,28 @@ def _read_backup(state_dir: str, session: str, target: selfguard_targets.Target)
 def _write_backup(
     state_dir: str, session: str, target: selfguard_targets.Target, content: bytes
 ) -> str:
-    return _write(_backup_path(state_dir, session, target), content)
+    """バックアップを取る。取れていて中身が同じなら書かない。
+
+    呼び出しのたびに取るので、変わっていない対象を毎回書き直すのは無駄になる。
+    ただし掃除（`sweep`）は更新時刻で生きているセッションを見分けるため、書かない代わりに
+    古くなったときだけ更新時刻を新しくする。何日も続くセッションが、他のセッションの
+    開始で置き場を失わないように。
+    """
+    path = _backup_path(state_dir, session, target)
+    if _read(path) == content:
+        _refresh(path)
+        return ""
+    return _write(path, content)
+
+
+def _refresh(path: str) -> None:
+    """更新時刻が `KEEP_DAYS` の一部より古ければ新しくする。中身には触らない。"""
+    now = time.time()
+    try:
+        if now - os.stat(path).st_mtime > REFRESH_SECONDS:
+            os.utime(path, (now, now))
+    except OSError:
+        pass
 
 
 def _read(path: str) -> bytes | None:

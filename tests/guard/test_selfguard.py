@@ -228,6 +228,55 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(json.loads(read(self.rules)), json.loads(edited))
 
+    # 変わっていないバックアップは書き直さない
+
+    def backup_files(self, session="s1"):
+        found = os.path.join(self.state, "selfguard", session)
+        return [
+            os.path.join(found, name)
+            for name in sorted(os.listdir(found))
+            if os.path.isfile(os.path.join(found, name)) and not name.endswith(".absent")
+        ]
+
+    def set_age(self, paths, seconds):
+        old = time.time() - seconds
+        for path in paths:
+            os.utime(path, (old, old))
+
+    def test_変わっていないバックアップは書き直さない(self):
+        self.run_hook("PreToolUse")
+        files = self.backup_files()
+        self.assertTrue(files)
+        self.set_age(files, 3600)
+        before = {path: os.stat(path).st_mtime_ns for path in files}
+
+        self.run_hook("PreToolUse")
+
+        self.assertEqual({path: os.stat(path).st_mtime_ns for path in files}, before)
+
+    def test_変わった設定は次の実行前でバックアップが新しくなる(self):
+        self.run_hook("PreToolUse")
+        edited = json.dumps(RULES | {"version": 1, "ask": []})
+        write(self.rules, edited)
+
+        self.run_hook("PreToolUse")
+        write(self.rules, "{}")
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(self.rules)), json.loads(edited))
+
+    def test_古くなったバックアップは中身を変えずに更新時刻だけ新しくする(self):
+        self.run_hook("PreToolUse")
+        files = self.backup_files()
+        contents = {path: read(path) for path in files}
+        self.set_age(files, 2 * 86400)
+
+        self.run_hook("PreToolUse")
+
+        for path in files:
+            self.assertEqual(read(path), contents[path])
+            self.assertLess(time.time() - os.stat(path).st_mtime, 3600)
+
     # 消されたとき
 
     def test_消された設定ファイルは実行前に戻る(self):
