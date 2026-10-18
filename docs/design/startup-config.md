@@ -122,7 +122,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 
 | 書くもの | 中身 |
 |---|---|
-| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場は固定である |
+| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場の env は書かない（置き場は固定。残っていても読まない） |
 | `.claude/settings.json` の `hooks` | 8 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true` と `git.repositoryScanMaxDepth: 2`。足りないキーだけを足す。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,sync,clean,branches,start,launcher}.sh`、共通部の部品 `ccnavi-common-{state,lock,write-and-push,host,log}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない）。使い方の文書は配布元の `.ccnavi/docs/*.md` を全部 `.ccnavi/docs/` へ配る（`--docs` の索引はここだけ `.ccnavi/` の下でも載せる。配布先の既にあるものは `--force` のときだけ入れ替える）。配布元に `.ccnavi/docs/` が無ければ「配布元に無くて配れないもの」に挙げる。共通の作業・レビュー計画のテンプレートは配布元の `.ccnavi/config/common/templates/*.yml` を 1 本ずつ同じ場所へ配る（既にあるものは `--force` のときだけ入れ替える。配布元に置き場や `*.yml` が無ければ何もせず、何も言わない）。共通の工程スキルは、配布元の `.claude/skills/<名前>/SKILL.md` の frontmatter に `process: true` を持つものについて、`SKILL.md` と `references/common/` の下の `.md` を同じ場所へ 1 ファイルずつ配る（`.DS_Store` や `ccnavi-index.jsonl` のような生成物は配らない。`process: true` の読み方は親チケットの着手が写す判定に寄せ、CRLF の改行と、行末の `# コメント`は許し、閉じの `---` が無いものは配らない。配布先の道にディレクトリでないものがあるときは、そのファイルだけ配らずに挙げる）（既にあるものは `--force` のときだけ入れ替える。親チケットの着手がプロジェクトへ写す元になる。`.ccnavi/docs/skill-processes.md`）。配布元に該当するスキルが無ければ何もせず、何も言わない |
@@ -148,7 +148,7 @@ sh の探し方: `here=${0%/*}`（`$0` に `/` が無ければ `.`）から `bin
 `ccnavi.exe` の順に `[ -f ]` を見て、見つかったものへ `exec` で引数と標準入力を渡す。
 
 - 隣（`.ccnavi/scripts/<os>-<arch>/`）は探さない。自己防衛のパス（8.2）が当たらない置き場になるため
-- `bin_dir` は `..` を含むまま使う
+- `bin_dir` は `..` を含むまま使い、正規化しない。シンボリックリンクも解かない
 - 見つからなければ終了コード 127 で、文面に `<os>-<arch>` と探した `bin_dir` を出す。在るが実行できなければ `exec` が失敗して 126
 
 hook は sh を直に起動するので、sh に実行ビットが要る。ccnavi のリポジトリでは追跡するモードを 100755 にする。配布先では
@@ -173,7 +173,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 |---|---|
 | 無い | `.ccnavi/scripts/ccnavi-launcher.sh` を書く |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | 何もしない |
-| それ以外（ユーザが決めたパス） | 書き換えず、名指しで 1 行出す。`--check` では揃っていない側に数える。「値が違う env」の一覧には入れない |
+| それ以外（ユーザが決めたパス） | 書き換えず、名指しで 1 行出す。導入は止めず、終了コードも変えない。`--check` では揃っていない側に数える。「値が違う env」の一覧には入れない |
 
 `--mode disable` は断る（4.3）。`--check` は書かずに揃っていないところだけを並べ、揃っていなければ終了コード 1。
 名指しした `--deploy` が組み立てられていないか、目印が無くて置き場を決められなければ終了コード 2 で断る。ただし、

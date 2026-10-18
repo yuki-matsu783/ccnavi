@@ -125,6 +125,7 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 ラッパーも同じ場所の検査（`core_hit`）を 2 重目に持つ。見るのは既定の置き場の名前だけで、動かした置き場は hook が見る。
 記録の置き場（`logs/`）はワークスペースルートの下だけに当てる。承認済みチケットの置き場は `core_hit` では見ず、過去の中身に戻す形を
 前からの置き場の検査（`restore-store-source`・`checkout-store`）が止める。`rm -n` / `--dry-run` は通す。
+見る副命令は `rm`・`restore`・`checkout` だけ（`stash` と `merge` は作業ツリーの変更を退避・取り込むだけで、守る場所を自分では過去の中身にしないため）。
 
 保護済みの sh の前に置く環境変数（`DENY_SCRIPT_ENV_OVERRIDE`）: 保護済みの sh（`ccnavi-*.sh`）は、
 ワークスペースルート・承認済みチケットの置き場・実行ファイルを環境変数から読む。そのため、`CCNAVI_GUARD_CORE_FILES` が有効な間は、保護済みの sh を呼ぶ
