@@ -629,6 +629,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     if (graphMaximized()) {
       return;
     }
+    // 提案・依頼文・保存前の確認の Esc は、この keydown が受ける（Ctrl+Z などと同じ分岐に並ぶため `useEscape` へ移していない）。
+    // `useEscape` は window の捕捉の段で止めるので、全画面の図・案内の吹き出しが手前に出ている間はここへ届かない
     if (proposal !== undefined || requestText !== undefined) {
       if (event.key === "Escape") {
         event.preventDefault();
