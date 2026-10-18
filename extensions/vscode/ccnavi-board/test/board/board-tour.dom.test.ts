@@ -130,7 +130,7 @@ test("CB-D203 案内の間の見本の絞り込み・畳みは見本の上だけ
 
     // 列を畳む案内: 見本の完了の列が畳まれ、実際の畳み（取り消し）は見本に持ち込まない
     await start(dom, "progress");
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
