@@ -78,7 +78,7 @@ HOOK_TIMEOUT=10
 # 気づかないうちに行われなくなる。何が行われなくなるかは README「設定」の表にある。
 EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure Stop SubagentStart SubagentStop"
 # セッションの開始時に、承認済みチケットとマーカー（親ブランチに含まれて届く）と、ワークツリーの
-# 起点になるデフォルトブランチを取得する sh。本体とは別の 1 行として SessionStart に登録する。
+# 起点になる統合先ブランチを取得する sh。本体とは別の 1 行として SessionStart に登録する。
 # 取得しないと、別の機械で承認したものが反映されず、古い main からブランチを切ることになる。
 # 通信するので、要らないプロジェクトは --no-fetch で外す。上限は、sh の中の
 # タイムアウト監視（1 回 15 秒）が重なっても収まる長さにしてある。

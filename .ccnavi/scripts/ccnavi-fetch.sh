@@ -228,7 +228,7 @@ ccnavi_fetch_family() {
 ccnavi_fetch_forward() {
 	ccnavi_fw_key=$(ccnavi_repo_key "$1" "$root")
 	ccnavi_fetch_or_note "$1" "$3" \
-		"${2}: リモートを取ってこられなかった。手元の版で判定する" \
+		"${2}: リモートを取ってこられなかった。ローカルの版で判定する" \
 		"${2}: 親のブランチ ${3} をリモートから取ってこられなかった（リモートにありません）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめてください" ||
 		return 0
 	ccnavi_fw_now=$(date +%s)
@@ -244,7 +244,7 @@ ccnavi_fetch_forward() {
 	git -C "$1" merge-base --is-ancestor "$ccnavi_fw_remote" "$ccnavi_fw_local" 2>/dev/null && return 0
 	if ! git -C "$1" merge-base --is-ancestor "$ccnavi_fw_local" "$ccnavi_fw_remote" 2>/dev/null; then
 		# 分岐か、浅い clone で履歴が足りないだけかは見分けない。見るのは一致しているかどうかだけ。
-		printf '%s: リモートの最新と一致しないので、取り込みが必要です（手元 %s、リモート %s。浅い clone なら git fetch --unshallow。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
+		printf '%s: リモートの最新と一致しないので、取り込みが必要です（ローカル %s、リモート %s。浅い clone なら git fetch --unshallow。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
 			"$2" "$(git -C "$1" rev-parse --short "$ccnavi_fw_local")" \
 			"$(git -C "$1" rev-parse --short "$ccnavi_fw_remote")" "$root" "$2"
 		return 0
@@ -256,7 +256,7 @@ ccnavi_fetch_forward() {
 	fi
 	ccnavi_fw_behind=$(git -C "$1" rev-list --count "$ccnavi_fw_local..$ccnavi_fw_remote" 2>/dev/null || echo '?')
 	if LC_ALL=C git -C "$1" merge --ff-only --quiet "$ccnavi_fw_remote" </dev/null >/dev/null 2>"$scratch/ff"; then
-		printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$2" "$ccnavi_fw_behind" "$3"
+		printf '%s: 親ブランチ %s を %s コミット進めた\n' "$2" "$3" "$ccnavi_fw_behind"
 	else
 		printf '%s: 早送りできなかった。%s（取り込みは sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
 			"$2" "$(ccnavi_git_refusal "$scratch/ff")" "$root" "$2"
@@ -303,22 +303,22 @@ report=$(
 		[ -d "$tree/$approved" ] || continue
 		git -C "$tree" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || continue
 		ccnavi_fetch_or_note "$tree" "$branch" \
-			"${name}: リモートを取ってこられなかった。手元の版で判定する" \
-			"${name}: ${branch} がリモートに無いので取ってこられなかった。手元の版で判定する" || continue
+			"${name}: リモートを取ってこられなかった。ローカルの版で判定する" \
+			"${name}: ${branch} がリモートに無いので取ってこられなかった。ローカルの版で判定する" || continue
 		behind=$(git -C "$tree" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
 		[ "$behind" = "0" ] && continue
 
 		dirty=$(git -C "$tree" status --porcelain --untracked-files=no 2>/dev/null || :)
 		if [ -n "$dirty" ]; then
-			printf '%s: リモートが %s 件先に進んでいるが、未コミットの変更があるので進めない\n' \
+			printf '%s: リモートが %s コミット先に進んでいるが、未コミットの変更があるので進めない\n' \
 				"$name" "$behind"
 			continue
 		fi
 		if git -C "$tree" merge --ff-only --quiet "@{u}" 2>/dev/null; then
-			printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
+			printf '%s: 親ブランチ %s を %s コミット進めた\n' "$name" "$branch" "$behind"
 		else
 			# 分岐か、浅い clone で履歴が足りないだけかは見分けない。見るのは一致しているかどうかだけ。
-			printf '%s: %s がリモートの最新と一致しないので進めない（手元 %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新してもらってください（浅いなら git fetch --unshallow）\n' \
+			printf '%s: %s がリモートの最新と一致しないので進めない（ローカル %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新してもらってください（浅いなら git fetch --unshallow）\n' \
 				"$name" "$branch" "$(git -C "$tree" rev-parse --short HEAD)" \
 				"$(git -C "$tree" rev-parse --short "@{u}")"
 		fi
@@ -336,7 +336,7 @@ report=$(
 		fi
 	fi
 
-	# 第 2 周。リポジトリごとに、ワークツリーの起点になるデフォルトブランチを進める。
+	# 第 2 周。リポジトリごとに、ワークツリーの起点になる統合先ブランチを進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue
 		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
@@ -351,8 +351,8 @@ report=$(
 		fi
 
 		ccnavi_fetch_or_note "$repo" "$default" \
-			"${name}: ワークツリーの起点になる ${default} を取ってこられなかった。手元の版から切ることになる" \
-			"${name}: ワークツリーの起点になる ${default}（統合先）がリモートにありません。CCNAVI_INTEGRATION_BRANCH を確かめてください" ||
+			"${name}: 統合先ブランチ ${default} を取ってこられなかった。ローカルの版から切ることになる" \
+			"${name}: 統合先ブランチ ${default} がリモートにありません。CCNAVI_INTEGRATION_BRANCH を確かめてください" ||
 			continue
 
 		old=$(git -C "$repo" rev-parse --verify --quiet "refs/heads/$default" 2>/dev/null || :)
@@ -360,8 +360,8 @@ report=$(
 			# 手元に無い。無いままでは `worktree add ... <統合先>` の起点に指せない。
 			git -C "$repo" update-ref -m ccnavi-fetch "refs/heads/$default" "$ref" 2>/dev/null || continue
 			git -C "$repo" branch --quiet --set-upstream-to "origin/$default" "$default" >/dev/null 2>&1 || :
-			printf '%s: ワークツリーの起点になる %s が手元に無かったので、リモートの版で作った\n' \
-				"$name" "$default"
+			printf '%s: ローカルに統合先ブランチ %s が無かったので、origin/%s から作った\n' \
+				"$name" "$default" "$default"
 			continue
 		fi
 
@@ -371,7 +371,7 @@ report=$(
 		if [ "$ahead" != "0" ]; then
 			# 進められない理由（本当の分岐か、浅い clone で履歴が足りないだけか）は見分けない。
 			# 見るのは、手元の版がリモートの最新と一致しているかどうかだけ。
-			printf '%s: ワークツリーの起点になる %s がリモートの最新と一致しない（手元 %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新してもらってください（浅いなら git fetch --unshallow）\n' \
+			printf '%s: ローカルの統合先ブランチ %s がリモートの最新と一致しない（ローカル %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新を頼んでください（浅いなら git fetch --unshallow）\n' \
 				"$name" "$default" "$(git -C "$repo" rev-parse --short "refs/heads/$default")" \
 				"$(git -C "$repo" rev-parse --short "$ref")"
 			continue
@@ -380,27 +380,27 @@ report=$(
 		if [ -n "$here" ]; then
 			dirty=$(git -C "$here" status --porcelain --untracked-files=no 2>/dev/null || :)
 			if [ -n "$dirty" ]; then
-				printf '%s: ワークツリーの起点になる %s がリモートより %s 件古いが、未コミットの変更があるので進めない\n' \
+				printf '%s: ローカルの統合先ブランチ %s がリモートより %s コミット古いが、未コミットの変更があるので進めない\n' \
 					"$name" "$default" "$behind"
 				continue
 			fi
 			git -C "$here" merge --ff-only --quiet "$ref" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。ユーザに合流させてもらってください\n' \
+				printf '%s: ローカルの統合先ブランチ %s を進められなかった。ユーザに合流を頼んでください\n' \
 					"$name" "$default"
 				continue
 			}
 		else
 			git -C "$repo" update-ref -m ccnavi-fetch "refs/heads/$default" "$ref" "$old" 2>/dev/null || {
-				printf '%s: ワークツリーの起点になる %s を進められなかった。ユーザに合流させてもらってください\n' \
+				printf '%s: ローカルの統合先ブランチ %s を進められなかった。ユーザに合流を頼んでください\n' \
 					"$name" "$default"
 				continue
 			}
 		fi
-		printf '%s: ワークツリーの起点になる %s を %s 件分だけ新しくした\n' "$name" "$default" "$behind"
+		printf '%s: 統合先ブランチ %s を %s コミット進めた\n' "$name" "$default" "$behind"
 	done
 )
 
 [ -n "$report" ] || exit 0
-printf '[ccnavi] 承認済みチケットとマーカーは親ブランチに含まれて届き、ワークツリーの起点はデフォルトブランチになる。セッションの開始時に取ってきた結果:\n'
+printf '[ccnavi] セッション開始時に、統合先ブランチと親ブランチをリモートの最新に合わせようとした結果です。\n'
 printf '%s\n' "$report"
 exit 0

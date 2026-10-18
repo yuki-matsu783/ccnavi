@@ -4,7 +4,7 @@
 
 1. そのツリーがチェックアウトしているブランチを upstream まで ff で進める（承認済みチケットと
    マーカーが届く経路）
-2. ワークツリーの起点になるデフォルトブランチを、チェックアウトされていなくても ff で進める
+2. ワークツリーの起点になる統合先ブランチを、チェックアウトされていなくても ff で進める
    （古い起点から枝が伸びないようにする）
 
 ワークスペースは一時ディレクトリに git と bare のリモートで作る。リモートを進めるのは
@@ -156,7 +156,7 @@ class FetchTest(unittest.TestCase):
         """ルートを `main` 以外に移す。issue #56 のワークスペースと同じ形。"""
         git(tree or self.ws, "checkout", "-q", "-b", branch)
 
-    # ---- 起点になるデフォルトブランチ
+    # ---- 起点になる統合先ブランチ
 
     def test_default_branch_advances_while_root_is_elsewhere(self):
         # ルートが main に居なくても、ワークツリーの起点になる main は新しくなる。
@@ -166,7 +166,7 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
         self.assertEqual(1, len(self.lines(done)), done.stdout)
-        self.assertIn("起点", done.stdout)
+        self.assertIn("統合先ブランチ", "\n".join(self.lines(done)))
         self.assertIn("main", done.stdout)
 
     def test_default_branch_comes_from_origin_head(self):
@@ -184,7 +184,7 @@ class FetchTest(unittest.TestCase):
         self.assertIn("trunk", done.stdout)
 
     def test_default_branch_is_created_when_it_is_missing(self):
-        # 手元に無いと `worktree add ... main` の起点に指せない。リモートの版で作る。
+        # 手元に無いと `worktree add ... main` の起点に指せない。origin/main から作る。
         self.leave_main()
         head = self.sha(self.ws, "refs/heads/main")
         git(self.ws, "branch", "-q", "-D", "main")
@@ -194,7 +194,7 @@ class FetchTest(unittest.TestCase):
             "origin/main",
             git(self.ws, "rev-parse", "--abbrev-ref", "main@{u}").stdout.strip(),
         )
-        self.assertIn("手元に無かった", done.stdout)
+        self.assertIn("ローカルに統合先ブランチ main が無かった", done.stdout)
 
     def test_default_branch_is_left_alone_when_it_diverged(self):
         # 手元にしか無いコミットがあるときは触らない。ff で入らないものはユーザが合流させる。
@@ -248,7 +248,7 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertEqual(head, self.sha(tree, "HEAD"))
         self.assertEqual("", git(tree, "status", "--porcelain").stdout.strip())
-        self.assertIn("起点", done.stdout)
+        self.assertIn("統合先ブランチ", "\n".join(self.lines(done)))
 
     def test_project_default_branch_advances(self):
         # プロジェクトも同じ。起点はそのプロジェクトのデフォルトブランチ。
@@ -269,7 +269,7 @@ class FetchTest(unittest.TestCase):
         head = self.advance(self.remote, "claude/x")
         done = self.fetch()
         self.assertEqual(head, self.sha(self.ws, "HEAD"))
-        self.assertIn("承認済みチケットとマーカー", done.stdout)
+        self.assertIn("親ブランチ", "\n".join(self.lines(done)))
 
     def test_checked_out_branch_that_does_not_match_is_named_not_merged(self):
         # 進められない理由（分岐か、浅い clone か）は見分けず、一致しないことと両方の sha を言う。
@@ -292,8 +292,8 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
         self.assertEqual(1, len(self.lines(done)), done.stdout)
-        self.assertIn("承認済みチケットとマーカー", done.stdout)
-        self.assertNotIn("起点", self.lines(done)[0])
+        self.assertIn("親ブランチ", "\n".join(self.lines(done)))
+        self.assertNotIn("統合先ブランチ", self.lines(done)[0])
 
     # ---- 届かないとき
 
@@ -374,7 +374,7 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual(head, self.sha(tree, "HEAD"))
-        self.assertIn("i0001: 承認済みチケットとマーカー", done.stdout)
+        self.assertIn("i0001: 親ブランチ", done.stdout)
 
     def test_a_family_that_overlaps_work_in_progress_is_not_moved(self):
         tree = self.family()
@@ -512,7 +512,7 @@ class FetchTest(unittest.TestCase):
         self.leave_main()
         done = self.fetch(CCNAVI_INTEGRATION_BRANCH="nope")
         self.assertEqual(0, done.returncode, done.stderr)
-        self.assertIn("nope（統合先）がリモートにありません", done.stdout)
+        self.assertIn("統合先ブランチ nope がリモートにありません", done.stdout)
 
     def test_a_worktree_is_fast_forwarded_without_any_state(self):
         # 親子ごとの取り込み状態は持たない。HEAD のブランチ名を変換した識別子がフォルダ名と同じ
@@ -525,7 +525,7 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertNotEqual(before, self.sha(tree, "HEAD"))
         self.assertEqual(head, self.sha(tree, "HEAD"))
-        self.assertIn("承認済みチケットとマーカーを", done.stdout)
+        self.assertIn("親ブランチ", "\n".join(self.lines(done)))
         self.assertFalse(
             os.path.exists(os.path.join(self.ws, "logs", "state", "sync", "self", "families"))
         )
