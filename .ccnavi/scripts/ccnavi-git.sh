@@ -2072,7 +2072,7 @@ if [ "$status" -eq 0 ]; then
 	printf 'ok  git %s  %s  log=%s\n' "$sub" "$summary" "$logrel"
 	body | head -n "$MAX_LINES"
 	if [ "$lines" -gt "$MAX_LINES" ]; then
-		printf '... 残り %d 行は %s にある\n' "$((lines - MAX_LINES))" "$logrel"
+		printf '... 残り %d 行は %s にある（全文は Read ツールでこのファイルを読む）\n' "$((lines - MAX_LINES))" "$logrel"
 	fi
 	if [ "$sub" = worktree ] && [ -n "$wt_fresh_warn" ]; then
 		printf '警告: %s\n' "$wt_fresh_warn"
