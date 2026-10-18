@@ -1,0 +1,809 @@
+name: full-phases
+description: phases.yml の作業フェーズ（work）を全部、番号順に一直線で回す。各子は開発→haiku で横展開漏れ調査→sonnet で敵対的レビューの順で進める
+when: ccnavi 自身の変更で、調査・設計・受入テスト・実装・文書まで省かずに通したいとき。小さい作業なら quick-work 単独の提案にする
+plan:
+- quick-work
+- type: research
+  after:
+  - 1
+- type: design
+  after:
+  - 2
+- type: acceptance
+  after:
+  - 3
+- type: implement
+  after:
+  - 4
+- type: implement-ccnavi
+  after:
+  - 5
+- type: staging
+  after:
+  - 6
+- type: docs
+  after:
+  - 7
+feedback:
+- design-feedback
+- type: implement-feedback
+  after:
+  - 1
+- type: learning-consolidate
+  after:
+  - 2
+- type: learning-apply
+  after:
+  - 3
+- type: skill-improve
+  after:
+  - 4
+flows:
+  1:
+    id: dev-sweep-review
+    name: 開発→横展開漏れ調査→敵対的レビュー
+    version: 1.0.0
+    nodes:
+    - id: start
+      type: start
+      name: 開始
+      position:
+        x: 0
+        y: 0
+      data: {}
+    - id: develop
+      type: prompt
+      name: 開発
+      position:
+        x: 0
+        y: 100
+      data:
+        prompt: チケットの範囲と成果物に沿って開発する。変更の型（同じ直し方が効く場所の条件）を最後に 1 行で書き残す。
+    - id: sweep
+      type: subAgent
+      name: 横展開漏れ調査（haiku）
+      position:
+        x: 0
+        y: 200
+      data:
+        description: 同じ型の直しが要る場所の取りこぼしを探す
+        prompt: 直前の開発の差分を読み、同じ型の直しが要るのに直っていない場所を、リポジトリ全体から grep で洗い出す。直さず、場所・理由・確度を一覧で返す。見つからなければ「漏れなし」と、探した語と範囲を返す。
+        builtInType: Explore
+        model: haiku
+    - id: fix
+      type: prompt
+      name: 漏れの反映
+      position:
+        x: 0
+        y: 300
+      data:
+        prompt: 調査の一覧を確かめ、本当に漏れだと判断したものだけをチケットの範囲内で直す。範囲外のものは直さず、報告に書く。
+    - id: review
+      type: subAgent
+      name: 敵対的レビュー（sonnet）
+      position:
+        x: 0
+        y: 400
+      data:
+        description: 壊れる経路を探す
+        prompt: 差分の作者の意図を信じず、壊れる入力・状態・並行実行・大文字小文字やパス区切りの違い・テストの抜けを探す。指摘は再現できる手順と根拠つきで、重大度順に返す。問題が無ければ、確かめた観点を挙げて「指摘なし」と返す。
+        builtInType: general-purpose
+        model: sonnet
+    - id: apply
+      type: prompt
+      name: 指摘への対応
+      position:
+        x: 0
+        y: 500
+      data:
+        prompt: 指摘を 1 件ずつ検証し、再現できるものを直す。直さない指摘は理由を報告に書く。
+    - id: end
+      type: end
+      name: 終了
+      position:
+        x: 0
+        y: 600
+      data: {}
+    connections:
+    - id: c1
+      from: start
+      to: develop
+      fromPort: output
+      toPort: input
+    - id: c2
+      from: develop
+      to: sweep
+      fromPort: output
+      toPort: input
+    - id: c3
+      from: sweep
+      to: fix
+      fromPort: output
+      toPort: input
+    - id: c4
+      from: fix
+      to: review
+      fromPort: output
+      toPort: input
+    - id: c5
+      from: review
+      to: apply
+      fromPort: output
+      toPort: input
+    - id: c6
+      from: apply
+      to: end
+      fromPort: output
+      toPort: input
+  2:
+    id: dev-sweep-review
+    name: 開発→横展開漏れ調査→敵対的レビュー
+    version: 1.0.0
+    nodes:
+    - id: start
+      type: start
+      name: 開始
+      position:
+        x: 0
+        y: 0
+      data: {}
+    - id: develop
+      type: prompt
+      name: 開発
+      position:
+        x: 0
+        y: 100
+      data:
+        prompt: チケットの範囲と成果物に沿って開発する。変更の型（同じ直し方が効く場所の条件）を最後に 1 行で書き残す。
+    - id: sweep
+      type: subAgent
+      name: 横展開漏れ調査（haiku）
+      position:
+        x: 0
+        y: 200
+      data:
+        description: 同じ型の直しが要る場所の取りこぼしを探す
+        prompt: 直前の開発の差分を読み、同じ型の直しが要るのに直っていない場所を、リポジトリ全体から grep で洗い出す。直さず、場所・理由・確度を一覧で返す。見つからなければ「漏れなし」と、探した語と範囲を返す。
+        builtInType: Explore
+        model: haiku
+    - id: fix
+      type: prompt
+      name: 漏れの反映
+      position:
+        x: 0
+        y: 300
+      data:
+        prompt: 調査の一覧を確かめ、本当に漏れだと判断したものだけをチケットの範囲内で直す。範囲外のものは直さず、報告に書く。
+    - id: review
+      type: subAgent
+      name: 敵対的レビュー（sonnet）
+      position:
+        x: 0
+        y: 400
+      data:
+        description: 壊れる経路を探す
+        prompt: 差分の作者の意図を信じず、壊れる入力・状態・並行実行・大文字小文字やパス区切りの違い・テストの抜けを探す。指摘は再現できる手順と根拠つきで、重大度順に返す。問題が無ければ、確かめた観点を挙げて「指摘なし」と返す。
+        builtInType: general-purpose
+        model: sonnet
+    - id: apply
+      type: prompt
+      name: 指摘への対応
+      position:
+        x: 0
+        y: 500
+      data:
+        prompt: 指摘を 1 件ずつ検証し、再現できるものを直す。直さない指摘は理由を報告に書く。
+    - id: end
+      type: end
+      name: 終了
+      position:
+        x: 0
+        y: 600
+      data: {}
+    connections:
+    - id: c1
+      from: start
+      to: develop
+      fromPort: output
+      toPort: input
+    - id: c2
+      from: develop
+      to: sweep
+      fromPort: output
+      toPort: input
+    - id: c3
+      from: sweep
+      to: fix
+      fromPort: output
+      toPort: input
+    - id: c4
+      from: fix
+      to: review
+      fromPort: output
+      toPort: input
+    - id: c5
+      from: review
+      to: apply
+      fromPort: output
+      toPort: input
+    - id: c6
+      from: apply
+      to: end
+      fromPort: output
+      toPort: input
+  3:
+    id: dev-sweep-review
+    name: 開発→横展開漏れ調査→敵対的レビュー
+    version: 1.0.0
+    nodes:
+    - id: start
+      type: start
+      name: 開始
+      position:
+        x: 0
+        y: 0
+      data: {}
+    - id: develop
+      type: prompt
+      name: 開発
+      position:
+        x: 0
+        y: 100
+      data:
+        prompt: チケットの範囲と成果物に沿って開発する。変更の型（同じ直し方が効く場所の条件）を最後に 1 行で書き残す。
+    - id: sweep
+      type: subAgent
+      name: 横展開漏れ調査（haiku）
+      position:
+        x: 0
+        y: 200
+      data:
+        description: 同じ型の直しが要る場所の取りこぼしを探す
+        prompt: 直前の開発の差分を読み、同じ型の直しが要るのに直っていない場所を、リポジトリ全体から grep で洗い出す。直さず、場所・理由・確度を一覧で返す。見つからなければ「漏れなし」と、探した語と範囲を返す。
+        builtInType: Explore
+        model: haiku
+    - id: fix
+      type: prompt
+      name: 漏れの反映
+      position:
+        x: 0
+        y: 300
+      data:
+        prompt: 調査の一覧を確かめ、本当に漏れだと判断したものだけをチケットの範囲内で直す。範囲外のものは直さず、報告に書く。
+    - id: review
+      type: subAgent
+      name: 敵対的レビュー（sonnet）
+      position:
+        x: 0
+        y: 400
+      data:
+        description: 壊れる経路を探す
+        prompt: 差分の作者の意図を信じず、壊れる入力・状態・並行実行・大文字小文字やパス区切りの違い・テストの抜けを探す。指摘は再現できる手順と根拠つきで、重大度順に返す。問題が無ければ、確かめた観点を挙げて「指摘なし」と返す。
+        builtInType: general-purpose
+        model: sonnet
+    - id: apply
+      type: prompt
+      name: 指摘への対応
+      position:
+        x: 0
+        y: 500
+      data:
+        prompt: 指摘を 1 件ずつ検証し、再現できるものを直す。直さない指摘は理由を報告に書く。
+    - id: end
+      type: end
+      name: 終了
+      position:
+        x: 0
+        y: 600
+      data: {}
+    connections:
+    - id: c1
+      from: start
+      to: develop
+      fromPort: output
+      toPort: input
+    - id: c2
+      from: develop
+      to: sweep
+      fromPort: output
+      toPort: input
+    - id: c3
+      from: sweep
+      to: fix
+      fromPort: output
+      toPort: input
+    - id: c4
+      from: fix
+      to: review
+      fromPort: output
+      toPort: input
+    - id: c5
+      from: review
+      to: apply
+      fromPort: output
+      toPort: input
+    - id: c6
+      from: apply
+      to: end
+      fromPort: output
+      toPort: input
+  4:
+    id: dev-sweep-review
+    name: 開発→横展開漏れ調査→敵対的レビュー
+    version: 1.0.0
+    nodes:
+    - id: start
+      type: start
+      name: 開始
+      position:
+        x: 0
+        y: 0
+      data: {}
+    - id: develop
+      type: prompt
+      name: 開発
+      position:
+        x: 0
+        y: 100
+      data:
+        prompt: チケットの範囲と成果物に沿って開発する。変更の型（同じ直し方が効く場所の条件）を最後に 1 行で書き残す。
+    - id: sweep
+      type: subAgent
+      name: 横展開漏れ調査（haiku）
+      position:
+        x: 0
+        y: 200
+      data:
+        description: 同じ型の直しが要る場所の取りこぼしを探す
+        prompt: 直前の開発の差分を読み、同じ型の直しが要るのに直っていない場所を、リポジトリ全体から grep で洗い出す。直さず、場所・理由・確度を一覧で返す。見つからなければ「漏れなし」と、探した語と範囲を返す。
+        builtInType: Explore
+        model: haiku
+    - id: fix
+      type: prompt
+      name: 漏れの反映
+      position:
+        x: 0
+        y: 300
+      data:
+        prompt: 調査の一覧を確かめ、本当に漏れだと判断したものだけをチケットの範囲内で直す。範囲外のものは直さず、報告に書く。
+    - id: review
+      type: subAgent
+      name: 敵対的レビュー（sonnet）
+      position:
+        x: 0
+        y: 400
+      data:
+        description: 壊れる経路を探す
+        prompt: 差分の作者の意図を信じず、壊れる入力・状態・並行実行・大文字小文字やパス区切りの違い・テストの抜けを探す。指摘は再現できる手順と根拠つきで、重大度順に返す。問題が無ければ、確かめた観点を挙げて「指摘なし」と返す。
+        builtInType: general-purpose
+        model: sonnet
+    - id: apply
+      type: prompt
+      name: 指摘への対応
+      position:
+        x: 0
+        y: 500
+      data:
+        prompt: 指摘を 1 件ずつ検証し、再現できるものを直す。直さない指摘は理由を報告に書く。
+    - id: end
+      type: end
+      name: 終了
+      position:
+        x: 0
+        y: 600
+      data: {}
+    connections:
+    - id: c1
+      from: start
+      to: develop
+      fromPort: output
+      toPort: input
+    - id: c2
+      from: develop
+      to: sweep
+      fromPort: output
+      toPort: input
+    - id: c3
+      from: sweep
+      to: fix
+      fromPort: output
+      toPort: input
+    - id: c4
+      from: fix
+      to: review
+      fromPort: output
+      toPort: input
+    - id: c5
+      from: review
+      to: apply
+      fromPort: output
+      toPort: input
+    - id: c6
+      from: apply
+      to: end
+      fromPort: output
+      toPort: input
+  5:
+    id: dev-sweep-review
+    name: 開発→横展開漏れ調査→敵対的レビュー
+    version: 1.0.0
+    nodes:
+    - id: start
+      type: start
+      name: 開始
+      position:
+        x: 0
+        y: 0
+      data: {}
+    - id: develop
+      type: prompt
+      name: 開発
+      position:
+        x: 0
+        y: 100
+      data:
+        prompt: チケットの範囲と成果物に沿って開発する。変更の型（同じ直し方が効く場所の条件）を最後に 1 行で書き残す。
+    - id: sweep
+      type: subAgent
+      name: 横展開漏れ調査（haiku）
+      position:
+        x: 0
+        y: 200
+      data:
+        description: 同じ型の直しが要る場所の取りこぼしを探す
+        prompt: 直前の開発の差分を読み、同じ型の直しが要るのに直っていない場所を、リポジトリ全体から grep で洗い出す。直さず、場所・理由・確度を一覧で返す。見つからなければ「漏れなし」と、探した語と範囲を返す。
+        builtInType: Explore
+        model: haiku
+    - id: fix
+      type: prompt
+      name: 漏れの反映
+      position:
+        x: 0
+        y: 300
+      data:
+        prompt: 調査の一覧を確かめ、本当に漏れだと判断したものだけをチケットの範囲内で直す。範囲外のものは直さず、報告に書く。
+    - id: review
+      type: subAgent
+      name: 敵対的レビュー（sonnet）
+      position:
+        x: 0
+        y: 400
+      data:
+        description: 壊れる経路を探す
+        prompt: 差分の作者の意図を信じず、壊れる入力・状態・並行実行・大文字小文字やパス区切りの違い・テストの抜けを探す。指摘は再現できる手順と根拠つきで、重大度順に返す。問題が無ければ、確かめた観点を挙げて「指摘なし」と返す。
+        builtInType: general-purpose
+        model: sonnet
+    - id: apply
+      type: prompt
+      name: 指摘への対応
+      position:
+        x: 0
+        y: 500
+      data:
+        prompt: 指摘を 1 件ずつ検証し、再現できるものを直す。直さない指摘は理由を報告に書く。
+    - id: end
+      type: end
+      name: 終了
+      position:
+        x: 0
+        y: 600
+      data: {}
+    connections:
+    - id: c1
+      from: start
+      to: develop
+      fromPort: output
+      toPort: input
+    - id: c2
+      from: develop
+      to: sweep
+      fromPort: output
+      toPort: input
+    - id: c3
+      from: sweep
+      to: fix
+      fromPort: output
+      toPort: input
+    - id: c4
+      from: fix
+      to: review
+      fromPort: output
+      toPort: input
+    - id: c5
+      from: review
+      to: apply
+      fromPort: output
+      toPort: input
+    - id: c6
+      from: apply
+      to: end
+      fromPort: output
+      toPort: input
+  6:
+    id: dev-sweep-review
+    name: 開発→横展開漏れ調査→敵対的レビュー
+    version: 1.0.0
+    nodes:
+    - id: start
+      type: start
+      name: 開始
+      position:
+        x: 0
+        y: 0
+      data: {}
+    - id: develop
+      type: prompt
+      name: 開発
+      position:
+        x: 0
+        y: 100
+      data:
+        prompt: チケットの範囲と成果物に沿って開発する。変更の型（同じ直し方が効く場所の条件）を最後に 1 行で書き残す。
+    - id: sweep
+      type: subAgent
+      name: 横展開漏れ調査（haiku）
+      position:
+        x: 0
+        y: 200
+      data:
+        description: 同じ型の直しが要る場所の取りこぼしを探す
+        prompt: 直前の開発の差分を読み、同じ型の直しが要るのに直っていない場所を、リポジトリ全体から grep で洗い出す。直さず、場所・理由・確度を一覧で返す。見つからなければ「漏れなし」と、探した語と範囲を返す。
+        builtInType: Explore
+        model: haiku
+    - id: fix
+      type: prompt
+      name: 漏れの反映
+      position:
+        x: 0
+        y: 300
+      data:
+        prompt: 調査の一覧を確かめ、本当に漏れだと判断したものだけをチケットの範囲内で直す。範囲外のものは直さず、報告に書く。
+    - id: review
+      type: subAgent
+      name: 敵対的レビュー（sonnet）
+      position:
+        x: 0
+        y: 400
+      data:
+        description: 壊れる経路を探す
+        prompt: 差分の作者の意図を信じず、壊れる入力・状態・並行実行・大文字小文字やパス区切りの違い・テストの抜けを探す。指摘は再現できる手順と根拠つきで、重大度順に返す。問題が無ければ、確かめた観点を挙げて「指摘なし」と返す。
+        builtInType: general-purpose
+        model: sonnet
+    - id: apply
+      type: prompt
+      name: 指摘への対応
+      position:
+        x: 0
+        y: 500
+      data:
+        prompt: 指摘を 1 件ずつ検証し、再現できるものを直す。直さない指摘は理由を報告に書く。
+    - id: end
+      type: end
+      name: 終了
+      position:
+        x: 0
+        y: 600
+      data: {}
+    connections:
+    - id: c1
+      from: start
+      to: develop
+      fromPort: output
+      toPort: input
+    - id: c2
+      from: develop
+      to: sweep
+      fromPort: output
+      toPort: input
+    - id: c3
+      from: sweep
+      to: fix
+      fromPort: output
+      toPort: input
+    - id: c4
+      from: fix
+      to: review
+      fromPort: output
+      toPort: input
+    - id: c5
+      from: review
+      to: apply
+      fromPort: output
+      toPort: input
+    - id: c6
+      from: apply
+      to: end
+      fromPort: output
+      toPort: input
+  7:
+    id: dev-sweep-review
+    name: 開発→横展開漏れ調査→敵対的レビュー
+    version: 1.0.0
+    nodes:
+    - id: start
+      type: start
+      name: 開始
+      position:
+        x: 0
+        y: 0
+      data: {}
+    - id: develop
+      type: prompt
+      name: 開発
+      position:
+        x: 0
+        y: 100
+      data:
+        prompt: チケットの範囲と成果物に沿って開発する。変更の型（同じ直し方が効く場所の条件）を最後に 1 行で書き残す。
+    - id: sweep
+      type: subAgent
+      name: 横展開漏れ調査（haiku）
+      position:
+        x: 0
+        y: 200
+      data:
+        description: 同じ型の直しが要る場所の取りこぼしを探す
+        prompt: 直前の開発の差分を読み、同じ型の直しが要るのに直っていない場所を、リポジトリ全体から grep で洗い出す。直さず、場所・理由・確度を一覧で返す。見つからなければ「漏れなし」と、探した語と範囲を返す。
+        builtInType: Explore
+        model: haiku
+    - id: fix
+      type: prompt
+      name: 漏れの反映
+      position:
+        x: 0
+        y: 300
+      data:
+        prompt: 調査の一覧を確かめ、本当に漏れだと判断したものだけをチケットの範囲内で直す。範囲外のものは直さず、報告に書く。
+    - id: review
+      type: subAgent
+      name: 敵対的レビュー（sonnet）
+      position:
+        x: 0
+        y: 400
+      data:
+        description: 壊れる経路を探す
+        prompt: 差分の作者の意図を信じず、壊れる入力・状態・並行実行・大文字小文字やパス区切りの違い・テストの抜けを探す。指摘は再現できる手順と根拠つきで、重大度順に返す。問題が無ければ、確かめた観点を挙げて「指摘なし」と返す。
+        builtInType: general-purpose
+        model: sonnet
+    - id: apply
+      type: prompt
+      name: 指摘への対応
+      position:
+        x: 0
+        y: 500
+      data:
+        prompt: 指摘を 1 件ずつ検証し、再現できるものを直す。直さない指摘は理由を報告に書く。
+    - id: end
+      type: end
+      name: 終了
+      position:
+        x: 0
+        y: 600
+      data: {}
+    connections:
+    - id: c1
+      from: start
+      to: develop
+      fromPort: output
+      toPort: input
+    - id: c2
+      from: develop
+      to: sweep
+      fromPort: output
+      toPort: input
+    - id: c3
+      from: sweep
+      to: fix
+      fromPort: output
+      toPort: input
+    - id: c4
+      from: fix
+      to: review
+      fromPort: output
+      toPort: input
+    - id: c5
+      from: review
+      to: apply
+      fromPort: output
+      toPort: input
+    - id: c6
+      from: apply
+      to: end
+      fromPort: output
+      toPort: input
+  8:
+    id: dev-sweep-review
+    name: 開発→横展開漏れ調査→敵対的レビュー
+    version: 1.0.0
+    nodes:
+    - id: start
+      type: start
+      name: 開始
+      position:
+        x: 0
+        y: 0
+      data: {}
+    - id: develop
+      type: prompt
+      name: 開発
+      position:
+        x: 0
+        y: 100
+      data:
+        prompt: チケットの範囲と成果物に沿って開発する。変更の型（同じ直し方が効く場所の条件）を最後に 1 行で書き残す。
+    - id: sweep
+      type: subAgent
+      name: 横展開漏れ調査（haiku）
+      position:
+        x: 0
+        y: 200
+      data:
+        description: 同じ型の直しが要る場所の取りこぼしを探す
+        prompt: 直前の開発の差分を読み、同じ型の直しが要るのに直っていない場所を、リポジトリ全体から grep で洗い出す。直さず、場所・理由・確度を一覧で返す。見つからなければ「漏れなし」と、探した語と範囲を返す。
+        builtInType: Explore
+        model: haiku
+    - id: fix
+      type: prompt
+      name: 漏れの反映
+      position:
+        x: 0
+        y: 300
+      data:
+        prompt: 調査の一覧を確かめ、本当に漏れだと判断したものだけをチケットの範囲内で直す。範囲外のものは直さず、報告に書く。
+    - id: review
+      type: subAgent
+      name: 敵対的レビュー（sonnet）
+      position:
+        x: 0
+        y: 400
+      data:
+        description: 壊れる経路を探す
+        prompt: 差分の作者の意図を信じず、壊れる入力・状態・並行実行・大文字小文字やパス区切りの違い・テストの抜けを探す。指摘は再現できる手順と根拠つきで、重大度順に返す。問題が無ければ、確かめた観点を挙げて「指摘なし」と返す。
+        builtInType: general-purpose
+        model: sonnet
+    - id: apply
+      type: prompt
+      name: 指摘への対応
+      position:
+        x: 0
+        y: 500
+      data:
+        prompt: 指摘を 1 件ずつ検証し、再現できるものを直す。直さない指摘は理由を報告に書く。
+    - id: end
+      type: end
+      name: 終了
+      position:
+        x: 0
+        y: 600
+      data: {}
+    connections:
+    - id: c1
+      from: start
+      to: develop
+      fromPort: output
+      toPort: input
+    - id: c2
+      from: develop
+      to: sweep
+      fromPort: output
+      toPort: input
+    - id: c3
+      from: sweep
+      to: fix
+      fromPort: output
+      toPort: input
+    - id: c4
+      from: fix
+      to: review
+      fromPort: output
+      toPort: input
+    - id: c5
+      from: review
+      to: apply
+      fromPort: output
+      toPort: input
+    - id: c6
+      from: apply
+      to: end
+      fromPort: output
+      toPort: input
