@@ -12,6 +12,7 @@
 ## 常に守ること
 
 - sh は Windows (Git Bash / WSL)・Linux・macOS のどれでも動くように書く
+- パスと名前は、どの機械でも大文字小文字を区別せず比べる（同じ綴り違いは同じものとして、両立させない）。`os.path.normcase`を単独で使わず、`pathcase.fold`を通す。決まりは `docs/claude/environment.md`
 - ccnavi の使い方に関わる考え方と決まり（ワークツリー・git の入口・下書きの置き場・サブエージェントへの委任・合意が要る変更の範囲・保護対象の直し方）は `.ccnavi/CCNAVI.md` に書く。セッション開始時に ccnavi がそれを渡すので、ここには書かない。ccnavi の振る舞いが変わったら CCNAVI.md を直す
 
 ## 詳細
@@ -22,7 +23,7 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | 読むとき | 開くファイル |
 |---|---|
 | ccnavi のリポジトリの md に付ける frontmatter の `type` の値を確かめる | `docs/claude/frontmatter.md`（付け方は `.ccnavi/docs/frontmatter.md`） |
-| sh やスクリプトを書く、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `docs/claude/environment.md` |
+| sh やスクリプトを書く、パス・名前を比べる、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `docs/claude/environment.md` |
 | ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
 | sh・Python・TS でログを書く、logger を直す | `docs/claude/logging.md` |
 | sh や実行ファイルの出力に案内（`次:`・`案内:`・`必須:`）を足す・直す、ワークフローを進める出力を新しく書く | `docs/claude/script-output.md` |

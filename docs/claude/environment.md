@@ -3,7 +3,7 @@ type: guide
 title: 実行環境とADRの扱い
 description: ccnaviの開発で対応する実行環境（Windows、macOS、Linux）と、sh・Pythonを書くときの決まり、文書やコメントでのADRへの触れ方
 tags: [sh-scripts, environment]
-keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
+keywords: [大文字小文字, casefold, normcase, pathcase, 実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
 ---
 
 # 実行環境とADRの扱い
@@ -24,6 +24,23 @@ keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash,
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
   `uv run --with pyinstaller python build.py`でビルドする。ビルドしていないとランチャーが終了コード127で終わり、
   hookは何もしない
+
+## パスと名前の大文字小文字
+
+大文字小文字だけが違うパス・名前は同じものとして扱い、両立させない。Windows と macOS の既定のファイルシステムは
+区別しないので、Linux だけ区別する書き方をすると、Windows で clone したときにだけ判定が割れる。
+
+- 比べるときは、どの機械でも区別しない。パスは`pathcase.fold()`（`src/ccnavi/infra/pathcase.py`）を通す。
+  名前だけなら`.casefold()`でもよい。`os.path.normcase`を単独で使わない（Linux では何もしない）
+- `fold()`の結果は比べるための文字列で、ファイルを開く表記には使わない。開く・表示する・書き戻すときは元の表記のまま使う。
+  比べて残りの名前を取り出すときは`tree.parts_under()`を使う（小文字にしたパスから切り出さない）
+- ワークツリーの名前は`tree.worktree_path()`で引く。在るディレクトリの実際の表記で返る。
+  大文字小文字だけ違う別のワークツリー・識別子・ブランチを作らない。作ろうとしたら拒否または警告する
+- 「表記まで同じであること」を求める判定を新しく足さない
+- sh の`case`でパスを比べるときも、同じ場所の別の綴りを通すつもりで書く。ccnavi が自分で組んだ
+  `<root>/.claude/worktrees/*`のようなパスは、綴りが決まっているので`case`のままでよい
+- 例外は、git が追跡する綴りに依る名前。状態のディレクトリ（`todo` `doing` `review` `done`）と`wip/`の置き場は、
+  git が区別するので綴りまで求める。例外を足すときはこの節に書く
 
 ## 文書とコメントでのADRの扱い
 
