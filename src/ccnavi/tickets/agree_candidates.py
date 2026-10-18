@@ -672,7 +672,8 @@ def validate(
     problems: list[rules.Problem] = []
     overflow: list[rules.Problem] = []
     if not t.is_child:
-        if t.has_plan:
+        # 承認済みの親は写しが固定で、言われても直せない（改版が要る）。承認の前に言えば足りる
+        if t.has_plan and not approved:
             overflow.extend(phasetypes.parent_scope_problems(t))
         return plan_problems(t, config, approved=approved), overflow
     problems.extend(phasetypes.copy_problems(t))

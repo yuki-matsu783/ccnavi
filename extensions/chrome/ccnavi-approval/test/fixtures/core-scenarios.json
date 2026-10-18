@@ -9,7 +9,7 @@
       "path": ".ccnavi/approved/doing/i0001-01-01.md"
      },
      {
-      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
       "op": "create",
       "path": ".ccnavi/approved/doing/i0001.md"
      },
@@ -34,7 +34,7 @@
     ]
    },
    "code": null,
-   "digest": "d630b2b5a65978441906cab1376823f59048587a4805c3cffada78062f8b86cb",
+   "digest": "68141843da67a984d4d79a3b7bc0598a48527a5d92a4061d4905380eaf943dfe",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -48,7 +48,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    このチケットでは、以下に示す場所のみ編集できるようになります。allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可されていても、このチケットの範囲外では編集できません。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ チケットで編集対象としているが、書き込めない場所\n    親の範囲かフェーズ定義の上限を超えている。承認はできますが、これらの場所への書き込みは拒否されます。\n    `src/*` は計画のどの定義（調査 / research, 設計 / design）の範囲とも重ならない。子は書けない。計画に範囲を持つ定義を足すか、`--plan quick-work`（範囲は親の allow そのまま）に切り替える\n    `tests/*` は計画のどの定義（調査 / research, 設計 / design）の範囲とも重ならない。子は書けない。計画に範囲を持つ定義を足すか、`--plan quick-work`（範囲は親の allow そのまま）に切り替える\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。先行フェーズの終了と必要なレビューの完了を確認するまで、このフェーズの子チケットは承認できません。\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係（計画の各項目の after で決まります。承認後に phases.yml を変更しても変わりません）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。承認後に phases.yml を変更しても、この親チケットの編集可能範囲・確認対象・成果物は変わりません。\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: にない）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
+   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    このチケットでは、以下に示す場所のみ編集できるようになります。allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可されていても、このチケットの範囲外では編集できません。ルールの deny はこの範囲の中でも止まる\n    allow: wip/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。先行フェーズの終了と必要なレビューの完了を確認するまで、このフェーズの子チケットは承認できません。\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係（計画の各項目の after で決まります。承認後に phases.yml を変更しても変わりません）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。承認後に phases.yml を変更しても、この親チケットの編集可能範囲・確認対象・成果物は変わりません。\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: にない）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: wip/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
   },
   "request": {
    "family": "i0001",
@@ -60,7 +60,7 @@
      "i0001": {
       "files": {
        "wip/proposals/todo/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: false\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/research/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
-       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
+       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },

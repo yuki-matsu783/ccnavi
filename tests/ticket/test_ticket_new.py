@@ -242,6 +242,7 @@ class TicketNewScopeTest(TicketNewTestBase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認しても書けない: `docs/**`", result.stdout)
         self.assertIn("quick-work", result.stdout)
+        self.assertIn("案内: 承認しても書けない", result.stdout)
         self.assertNotIn("`src/*` は計画", result.stdout)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-qm", "proposal")
@@ -254,6 +255,11 @@ class TicketNewScopeTest(TicketNewTestBase):
         os.remove(self.todo)
         result = self.new("--scope", "docs/**", plan="quick-work")
         self.assertNotIn("承認しても書けない", result.stdout)
+        # パスを 1 つに決められない glob（前置が空か、ワイルドカードが後ろに続く）は言わない
+        for glob in ("**/*.py", "*.md", "src/**/*.py"):
+            os.remove(self.todo)
+            result = self.new("--scope", glob, plan="implement")
+            self.assertNotIn("承認しても書けない", result.stdout, glob)
 
     def test_a_placeholder_from_a_guidance_line_is_refused(self):
         # 案内の行の仮の値（`<触るファイルの glob>`・`<題>`）をそのまま打つと、

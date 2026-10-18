@@ -405,21 +405,37 @@ def _probe(entry) -> str:
     return entry.prefix() + "x" if entry.glob != entry.prefix() else entry.glob
 
 
+def _norm_prefix(entry) -> str:
+    return entry.prefix().replace("\\", "/").lower()
+
+
 def _overlaps(entry, pt: PhaseType) -> bool:
-    """親の `allow` の 1 項と定義の範囲が重なるか（片方がもう片方を含むか）。"""
+    """親の `allow` の 1 項と定義の範囲が重なり得るか。
+
+    言うのは「明らかに無関係」のときだけ（偽陽性を出すより黙る）。字義どおりの前置のどちらかが
+    もう片方の前置になっていれば重なり得るとみなす（`*.md` や `**/*.py` のように前置が空か
+    ワイルドカードが後ろに続く項は、パスを 1 つに決められないため）。
+    """
     if pt.decide(_probe(entry)) == rules.ALLOW:
         return True
-    return any(entry.matches(_probe(own)) for own in pt.scope or [])
+    mine = _norm_prefix(entry)
+    for own in pt.scope or []:
+        theirs = _norm_prefix(own)
+        if mine.startswith(theirs) or theirs.startswith(mine):
+            return True
+    return False
 
 
 def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
-    """親の `allow`（ask を含む。deny は除く）のうち、計画のどの定義の範囲にも入らない項を名指しする。
+    """親の `allow`（ask を含む。deny は除く）のうち、計画のどの定義とも重ならない項を名指しする。
 
     承認しても、その範囲には子が書けない（子 ⊆ 定義の上限）。承認と着手のあとの子の提案ではじめて
     気づくので、親を作るときと承認の確認（`--verify`）で言う。計画に `scope: inherit` の定義が
     あれば上限が無いので、何も言わない。warn で、承認は止めない。
     """
-    types = list(types_of(parent).values())
+    # 見るのは plan の項の定義だけ。feedback の定義は多くが `inherit` で、混ぜると警告が効かなくなる
+    defs = types_of(parent)
+    types = [defs[item.type] for item in parent.plan if item.type in defs]
     if not types or any(pt.inherits_scope for pt in types):
         return []
     problems: list[Problem] = []
@@ -433,8 +449,8 @@ def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
                     SEVERITY_WARN,
                     parent.ticket,
                     f"`{entry.glob}` は計画のどの定義（{titles}）の範囲とも重ならない。"
-                    "子は書けない。計画に範囲を持つ定義を足すか、`--plan quick-work`"
-                    "（範囲は親の allow そのまま）に切り替える",
+                    "子は書けない。計画に範囲を持つ定義を足すか、`scope: inherit` の定義"
+                    "（`quick-work` など。範囲は親の allow そのまま）に切り替える",
                 )
             )
     return problems

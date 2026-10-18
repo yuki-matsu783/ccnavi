@@ -408,7 +408,7 @@ def run(
     for glob in allow:
         stdout.write(f"  {ALLOW_MATCH} {glob}\n")
     for p in over:
-        stdout.write(f"承認しても書けない: {p.detail}\n")
+        stdout.write(f"案内: 承認しても書けない: {p.detail}\n")
     tail = "並行させたい項は after を直す。" if used is None else "計画の項と文の固有名を直す。"
     # ccnavi を PATH に持たない環境でも、そのまま打てるように、起動の sh 経由で書く
     launcher = settings.script_command(root, "ccnavi-launcher.sh")

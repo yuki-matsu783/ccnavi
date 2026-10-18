@@ -179,6 +179,19 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(body["rejected"], [])
         self.assertNotIn("編集対象としているが", body["text"])
 
+    def test_a_parent_allow_outside_the_plan_is_flagged_even_with_a_feedback_plan(self):
+        """feedback の定義は多くが inherit だが、plan の子は書けないので警告は消さない。"""
+        self.propose(
+            "i0001",
+            parent_text(
+                "i0001", ["acceptance", "implement"], ["implement-feedback"], allow=("docs/**",)
+            ),
+        )
+        self.commit_parent()
+        overflow = self.preview()["batch"][0]["overflow"]
+        self.assertEqual(len(overflow), 1, overflow)
+        self.assertIn("`docs/**`", overflow[0])
+
     # ---- 2. 承認待ちが無い
 
     def test_preview_with_nothing_pending_is_an_empty_batch(self):
