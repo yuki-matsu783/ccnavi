@@ -105,7 +105,7 @@ ccnavi は、チケットの置き場（`todo/` `doing/` `review/` `done/`）の
 1. 親ブランチの状態（承認済みチケット、`phases/<親>/` のマーカー、MR）からチケットの状態を判断する
 2. チケットの切れ目で別 PC に移っても動く
 
-取り込み状態は手元にだけあるので、別 PC に引き継げない。`gone` `blocked` `broken` は判定を止めるのに使われ、設計書（`docs/design/tickets/sharing.md`）の「判定には使わない」と食い違っている。実装側では、write-and-push の `present` 確認（`ccnavi-common-write-and-push.sh:263`、`ccnavi-push-approved.sh:255`）と `ccnavi-git.sh push` の `gone` 拒否が、記録に頼って「消えた親ブランチの再作成」を止めている。
+取り込み状態は手元にだけあるので、別 PC に引き継げない。`gone` `blocked` `broken` は判定を止めるのに使われ、設計書（`docs/design/tickets/sharing.md`）の「判定には使わない」と食い違っている。実装側では、C1 の `present` 確認（`ccnavi-common-c1.sh:263`、`ccnavi-push-approved.sh:255`）と `ccnavi-git.sh push` の `gone` 拒否が、記録に頼って「消えた親ブランチの再作成」を止めている。
 
 この作業が目指すのは「**判定**が別 PC でも同じ結果になること」。親を閉じた後の片付けは、`ready` を打った PC のローカル状態（`retire/<親>.json`）に残る。
 
@@ -128,7 +128,7 @@ ccnavi は、チケットの置き場（`todo/` `doing/` `review/` `done/`）の
 
 ### push の関門
 
-- 素の `git push` を打つ経路は 3 つある: `ccnavi-git.sh push`、write-and-push（`ccnavi-common-write-and-push.sh`。素の push の行は設計時に確かめる）、`ccnavi-push-approved.sh`。記録の `present` 確認を消すと、write-and-push と承認の push は関門を通らずに消えたブランチを再作成する。
+- 素の `git push` を打つ経路は 3 つある: `ccnavi-git.sh push`、C1（`ccnavi-common-c1.sh`。素の push の行は設計時に確かめる）、`ccnavi-push-approved.sh`。記録の `present` 確認を消すと、C1 と承認の push は関門を通らずに消えたブランチを再作成する。
 - 関門は 1 つの共通関数にして 3 経路で共有する。置き場は `ccnavi-common-state.sh`（`ccnavi_git_timed` と同じ部品）。内容:
   - 対象は親ワークツリーのブランチだけ（通常ブランチ・子の push には掛けない。`ccnavi_parent_tree` と `ccnavi_branch_to_id` の条件を持ち込む）
   - 「追跡の形跡」は `refs/remotes/origin/<B>` の存在だけ。`branch.<B>.remote` は使わない（`origin/main` から切っただけの未 push の親が形跡ありと誤判定されるため）
@@ -136,7 +136,7 @@ ccnavi は、チケットの置き場（`todo/` `doing/` `review/` `done/`）の
   - 形跡があるのにリモートに無いとき、`ls-remote` と `ccnavi-review.sh merged` で聞く。**マージ済みも拒否**する（閉じた名前の再作成を許さない）
   - `ls-remote` / `merged` が失敗・`unknown` のときは**拒否側に倒す**。ユーザが打つ迂回手段を 1 つ用意する
   - `ls-remote` を打つ条件（形跡があるときだけか、形跡が無い承認済みの親でも打つか）は設計で確定する
-- sh に判定を足さない決まりの例外（`docs/claude/exe-boundary.md` の P13、ADR-0118）は、今は `ccnavi-git.sh` の中だけ。関門を write-and-push と `push-approved` にも置くので、**例外の範囲を明示して広げる**（`exe-boundary.md` と ADR に書く）。
+- sh に判定を足さない決まりの例外（`docs/claude/exe-boundary.md` の P13、ADR-0118）は、今は `ccnavi-git.sh` の中だけ。関門を C1 と `push-approved` にも置くので、**例外の範囲を明示して広げる**（`exe-boundary.md` と ADR に書く）。
 - 旧 `--forget` の代わりに、捨てた親の扱い（親のワークツリーを片付ければ関門の対象外）を案内する。
 
 ### MR の特定
@@ -172,7 +172,7 @@ ccnavi は、チケットの置き場（`todo/` `doing/` `review/` `done/`）の
 
 ### 順序と互換の版
 
-sh（`.ccnavi/scripts/`）はエージェントが書けず、ユーザがコピーするまで効かない。実行ファイルだけ先に記録を消すと、旧 sh は「記録なし」を `state != present` と読み、write-and-push と承認の push が止まる。そこで順序は次のとおりにする。
+sh（`.ccnavi/scripts/`）はエージェントが書けず、ユーザがコピーするまで効かない。実行ファイルだけ先に記録を消すと、旧 sh は「記録なし」を `state != present` と読み、C1 と承認の push が止まる。そこで順序は次のとおりにする。
 
 1. 実装（追加のみ）: 新しい副命令（push 関門の判定、`retire` の列挙）、warn、拡張の受け口。**既存の記録の読み書きは消さない。** 実行ファイルは「記録が無い」を既に許す
 2. staging（1 回目）: sh を新しい形にする。記録を読まず書かず、新しい副命令を使う。旧実行ファイルでも動くよう、記録が残っていても邪魔しない。互換の版は変えない
@@ -189,8 +189,8 @@ sh（`.ccnavi/scripts/`）はエージェントが書けず、ユーザがコピ
 - `families/<P>` の記録すべてと `ccnavi-sync.sh --forget`
 - `integration/` コピー（`ccnavi-sync.sh` の `write_integration`、`syncstate.Integration` ほか）
 - `syncstate.py` のうち記録・統合先に関わる部分。残すのは、親のワークツリーの有無・HEAD とフォルダ名の一致・途中の操作というファイルだけで決まる立ち位置（`Standing`）。`DoneCopy` `same_parent` `_copy_fields`（`sh_ask.py` `archive.py` が `git show` 側で使う）は別モジュールへ移す
-- 記録の読み書き: `ccnavi-sync.sh` `ccnavi-git.sh`（push 後の書き戻し `:1980-2010`）`ccnavi-common-write-and-push.sh` `ccnavi-push-approved.sh` `ccnavi-start.sh`（`record_mr`）
-- 記録に依る表示・分岐: `lint.py`（`family_check`）`lint_layers.py` `diagnose_board.py` `status.py` `overview.py` `scaffold.py` `ops_stop_integrate.py` `write_and_push.py`（`state` 行）`approval_checks.py` `ops_close.py`
+- 記録の読み書き: `ccnavi-sync.sh` `ccnavi-git.sh`（push 後の書き戻し `:1980-2010`）`ccnavi-common-c1.sh` `ccnavi-push-approved.sh` `ccnavi-start.sh`（`record_mr`）
+- 記録に依る表示・分岐: `lint.py`（`family_check`）`lint_layers.py` `diagnose_board.py` `status.py` `overview.py` `scaffold.py` `ops_stop_integrate.py` `c1.py`（`state` 行）`approval_checks.py` `ops_close.py`
 - `Standing.stop` と `guidance()` の `gone` `blocked` `--forget` の案内文
 
 ### 足すもの
@@ -221,7 +221,7 @@ sh（`.ccnavi/scripts/`）はエージェントが書けず、ユーザがコピ
 7. `ccnavi-git.sh` のホワイトリストで、追跡設定の解除が打てるか
 8. 旧拡張との互換（拡張の公開順序で足りるか）
 9. `--mcp-checked` の使われ方（承認経路で受けない方針の影響）
-10. write-and-push の素の push の行番号と、push 関門を差し込む位置
+10. C1 の素の push の行番号と、push 関門を差し込む位置
 11. 関門で `ls-remote` を打つ条件の確定
 
 ## メリットとデメリット
@@ -230,7 +230,7 @@ sh（`.ccnavi/scripts/`）はエージェントが書けず、ユーザがコピ
 - 手元にだけある状態が減り、別 PC への引き継ぎで判定が食い違わない
 - 設計書と実装の食い違い（「判定に使わない」と書いて止めに使っている）が消える
 - `syncstate.py`（776 行）の大半、`ccnavi-sync.sh` の書き込み部、`integration` コピー、Chrome 拡張の記録組み立てが消える
-- 旧 `gone` の拒否が、3 経路で同じ関門になる（今は write-and-push と承認の push が記録頼み）
+- 旧 `gone` の拒否が、3 経路で同じ関門になる（今は C1 と承認の push が記録頼み）
 
 失うもの・残るもの:
 - `gone` `blocked` の永続的な検知。オフラインの hook は消失を知れず、気づくのは sync・push・セッション開始の fetch の時点になる
@@ -252,7 +252,7 @@ sh（`.ccnavi/scripts/`）はエージェントが書けず、ユーザがコピ
 
 ## ADR と文書
 
-- ADR は新規 1 本（番号は 0142 の見込み。足す直前に `origin/main` を取って最後尾の次を採る）を **design の項**で書く。既存の ADR-0093（取り込みと write-and-push の D 項）、ADR-0136（記録はキャッシュ、推定しない）、ADR-0103（ブランチからの MR 探索）は、部分的に改めるだけなので、`docs/adr/README.md` の規則に従い**状態行への追記**で扱う。
+- ADR は新規 1 本（番号は 0142 の見込み。足す直前に `origin/main` を取って最後尾の次を採る）を **design の項**で書く。既存の ADR-0093（取り込みと C1 の D 項）、ADR-0136（記録はキャッシュ、推定しない）、ADR-0103（ブランチからの MR 探索）は、部分的に改めるだけなので、`docs/adr/README.md` の規則に従い**状態行への追記**で扱う。
 - `docs/adr/README.md` の一覧に新規の 1 行を足す（`tests/core/test_adr_numbers.py` が見る。ドキュメントだけのコミットでは回らない）。この一覧と追記は docs の項で扱う。
 - 直す文書（確認済みの語の hit）: `README.md`、`docs/design/tickets/sharing.md` `places.md`、`docs/CONTEXT.md`、`docs/requirements/extension-if.md`、`docs/claude/exe-boundary.md`、ADR-0102・0104（記録語の hit）。
 - **`.ccnavi/` の下は全部が保護対象**（`builtin:guard-project-home`）。sh だけでなく `.ccnavi/docs/*.md` も、エージェントは書けない。次の文書は、完成品を `wip/design/` に置いてユーザがコピーする（staging の項に含める）: `.ccnavi/docs/worktree-start.md`、`worktree-cleanup.md`、`projects.md`、`worktree.md`、`worktree-merge.md`（内容は未読。直す対象かは設計時に確かめる）。`.ccnavi/CCNAVI.md` は記録語の hit が無いため、直す必要があるかは設計時に確かめる。
