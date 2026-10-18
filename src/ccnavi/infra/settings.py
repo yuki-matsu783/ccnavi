@@ -159,9 +159,7 @@ DEFAULT_RISK = os.path.join(".ccnavi", "config", "common", "risks.yml")
 # （プロジェクトは自分の git を持つ）。
 DEFAULT_PROJECTS = "projects"
 # ccnavi ディレクトリ。プロジェクトの設定はプロジェクトの git で育てるので、`.claude/` の下には
-# 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
-# `--lint` が「ワークツリーでもワークスペースルートでもないのに `.claude/` を持つ」と
-# 警告する）。`config/` でもなく `.ccnavi/` にするのは、3 本とスクリプトを 1 つの
+# 置かない。`config/` でもなく `.ccnavi/` にするのは、3 本とスクリプトを 1 つの
 # ディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。
 DEFAULT_PROJECT_HOME = ".ccnavi"
 # 引用せずにシェルへ渡せるパス。空白とシェルの記号を含まない。

@@ -284,14 +284,14 @@ class ProjectsCollisionTest(unittest.TestCase):
         self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
 
     def test_the_other_project_checks_still_run_beside_the_collision(self):
-        """予約名と `.claude/` の検査（各プロジェクトごと）は、ぶつかりがあっても今どおり出す。"""
+        """予約名とワークツリーの誤配置の検査（各プロジェクトごと）は、ぶつかりがあっても出す。"""
         self.track()
         lib = self.project("lib")
-        os.makedirs(os.path.join(lib, ".claude"))
+        os.makedirs(os.path.join(lib, ".claude", "worktrees", "feature-1-memo"))
 
         details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
 
-        self.assertTrue(any(".claude/ を持つ" in d for d in details), details)
+        self.assertTrue(any("プロジェクトの中にワークツリーがある" in d for d in details), details)
 
     # ---- A6. 追跡が無いとき（今どおり）
 
@@ -526,14 +526,14 @@ class ProjectsAddedByMistakeTest(unittest.TestCase):
         self.assertEqual(len(found), 1, found)
         self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
 
-    def test_the_claude_check_still_runs_beside_added_by_mistake(self):
-        """プロジェクトごとの `.claude/` の検査は今どおり出る。"""
+    def test_a_project_with_a_claude_dir_is_not_warned(self):
+        """プロジェクトが `.claude/` を持つのは通常の形。それだけでは何も言わない。"""
         self.forget()
         os.makedirs(os.path.join(self.projects, "lib", ".claude"))
 
         details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
 
-        self.assertTrue(any(".claude/ を持つ" in d for d in details), details)
+        self.assertEqual(details, [])
 
     def test_a_worktree_inside_a_project_is_named(self):
         """プロジェクトの中の `.claude/worktrees/` のワークツリーは、走査の対象外なので言う。"""

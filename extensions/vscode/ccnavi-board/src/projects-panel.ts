@@ -138,7 +138,6 @@ async function gather(root: string): Promise<Gathered> {
   const origins: Record<string, string> = {};
   const rulesRels: Record<string, string> = {};
   const rulesExists: Record<string, boolean> = {};
-  const hasClaudeDir: Record<string, boolean> = {};
   await Promise.all(
     projects.map(async (t) => {
       origins[t.name] = await readOrigin(t.root);
@@ -148,7 +147,6 @@ async function gather(root: string): Promise<Gathered> {
         rulesRels[t.name] = toPosix(path.relative(root, rulesPath));
         rulesExists[t.name] = isFile(rulesPath);
       }
-      hasClaudeDir[t.name] = isDir(path.join(t.root, ".claude"));
     }),
   );
 
@@ -171,7 +169,6 @@ async function gather(root: string): Promise<Gathered> {
       ignored: gitignoreHasProjects(readText(path.join(root, ".gitignore")), projectsRel),
       rulesRels,
       rulesExists,
-      hasClaudeDir,
       selfRulesRel: selfRulesPath === "" ? "" : toPosix(path.relative(root, selfRulesPath)),
       selfRulesExists: selfRulesPath !== "" && isFile(selfRulesPath),
     }),
@@ -197,14 +194,6 @@ function readText(filePath: string): string | undefined {
 function isFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function isDir(dirPath: string): boolean {
-  try {
-    return fs.statSync(dirPath).isDirectory();
   } catch {
     return false;
   }
