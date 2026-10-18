@@ -179,7 +179,7 @@
 | W4 | 着手の後にボードを開く | 取り下げが出ず、`ccnavi-ticket.sh cancel` を案内する | 画面の文面 |
 | W5 | 取り下げの後、手元で `ccnavi-sync.sh i0001` | blocked にならない | sync の出力 |
 | W6 | GitHub の画面で提案を `todo/` から `doing/` へ動かして（rename のコミット）承認し、ボードで取り下げる | 取り下げのボタンが出て、W1 と同じ 1 コミットになる。計画を持つ親でも、中身が提案と同じなら取り下げられる | コミットの sha、戻った提案と元の提案のバイト列の差分（改行・BOM を含む） |
-| W7 | 端末の `--agree` で計画を持つ親を承認して push し、ボードで取り下げる | `doing/` だけが消える（承認は `phases/<親>/workflow.yml` を書かないので、消すものも無い） | コミットの変更の一覧 |
+| W7 | 端末の `ccnavi user agree` で計画を持つ親を承認して push し、ボードで取り下げる | `doing/` だけが消える（承認は `phases/<親>/workflow.yml` を書かないので、消すものも無い） | コミットの変更の一覧 |
 
 ### 4.4 レビュー済み（GitHub）
 
@@ -194,7 +194,7 @@ Approve の付いた PR を試すには、PR の作者と別のアカウント�
 | V4 | 依頼の後に置き場の外を変えるコミットを push してから開く | compare の変更の一覧で「動いた」かを判定する。ユーザが見るものが動いていれば通らない | `GET /compare/<base>...<head>` の応答（`status`・`files` の件数・改名の `previous_filename`） |
 | V5 | PR に Approve が付いた状態で「レビュー済み」か承認を押す | 確認の文に「このコミットで MR の Approve が外れることがある」が出る。保護ありの設定で Approve が実際に外れる | 確認の文、PR の Approve の有無 |
 | V6 | 書きかけ（PENDING）のレビューを別のアカウントで残す | 結論が変わらない | `reviews` の応答に PENDING が出るか |
-| V7 | 手元で `ccnavi-review.sh confirm --phase <N>` と `decide <N>` を（別の親子のチケットで）打つ | マーカーに `actor`（`gh`・`glab`・curl のどれでもトークンの持ち主）が入る | マーカーの中身 |
+| V7 | 手元で `ccnavi-review.sh confirm --phase <N>` と `ccnavi-user-decide.sh decide <N>` を（別の親子のチケットで）打つ | マーカーに `actor`（`gh`・`glab`・curl のどれでもトークンの持ち主）が入る | マーカーの中身 |
 | V8 | `GET /pulls?state=open&head=<owner>%3A<branch>` が `:` のままと同じ答えになるか | 同じ PR を返す | 応答 |
 
 ### 4.5 GitLab
@@ -266,7 +266,7 @@ GitLab でも 4.1〜4.4 と同じ操作を行い、加えて次を確かめま�
 | X7 | レート制限 | 当てるのは難しいので、当たったときだけ記録する。拡張は原因と回復の時刻を示し、Retry-After が 60 秒以内なら 1 回だけ待ち直す | 画面の文面、`x-ratelimit-*`・`retry-after` のヘッダ |
 | X8 | PAT を失効させてからボードを開く | 401 で差し替えを促す | 画面の文面 |
 | X9 | 権限の足りない PAT（例 Pull requests を外す）で開く | 権限が原因だと示す | 画面の文面、応答 |
-| X11 | 古い実行ファイルと新しい sh の組み合わせ: `--version --json` を知らない古い実行ファイルか、flags に `--via` の無い実行ファイルを `CCNAVI_BIN_PATH` で指し、手元で `ccnavi-review.sh confirm --phase <N>` と `decide <N>` を打つ | どちらも失敗せず、`--actor`・`--via` を渡さずに前と同じマーカーを置く（`actor` が無い） | マーカーの中身、sh の出力 |
+| X11 | 古い実行ファイルと新しい sh の組み合わせ: `--version --json` を知らない古い実行ファイルか、flags に `--via` の無い実行ファイルを `CCNAVI_BIN_PATH` で指し、手元で `ccnavi-review.sh confirm --phase <N>` と `ccnavi-user-decide.sh decide <N>` を打つ | どちらも失敗せず、`--actor`・`--via` を渡さずに前と同じマーカーを置く（`actor` が無い） | マーカーの中身、sh の出力 |
 | X12 | Windows の Git Bash を 2 つ開き、片方で `sh -c 'echo $$; exec sleep 300'` を打って pid を記録し、もう一方から `kill -0 <pid>; echo $?` を打つ。`sleep` が終わった後にもう一度打つ | 生きている間は 0、終わった後は 0 以外（ロックの持ち主が生きているかを sh が見分けられる） | 2 回の終了コード |
 | X10 | GitHub の stale の外しにパスの除外があるか、GitLab の Code Owners で `.ccnavi/approved/` を外せるか | ホストの設定画面で確かめる（拡張の操作ではない） | 見つけた設定の名前、無ければ「無い」 |
 

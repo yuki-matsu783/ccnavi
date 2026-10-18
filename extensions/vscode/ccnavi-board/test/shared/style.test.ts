@@ -23,6 +23,7 @@ import { page as rulesPage, rulesHtml } from "../helpers/rules.js";
 import { flowHtml, page as flowPage } from "../helpers/flow.js";
 import { workflowHtml, workflowPage } from "../helpers/workflow.js";
 import { page as templatesPage, templatesHtml } from "../helpers/templates.js";
+import { handoffHtml, page as handoffPage } from "../helpers/handoff.js";
 
 /** 画面の名前と、その 1 枚。中身は画面（React）が組み、CSS と body だけを拡張が入れる */
 function reactPages(appearance?: "claude-dark"): [string, string][] {
@@ -37,6 +38,7 @@ function reactPages(appearance?: "claude-dark"): [string, string][] {
     ["flow", flowHtml({ kind: "page", page: flowPage() }, options)],
     ["workflow", workflowHtml({ kind: "page", page: workflowPage() }, options)],
     ["templates", templatesHtml({ kind: "page", page: templatesPage() }, options)],
+    ["handoff", handoffHtml({ kind: "page", page: handoffPage() }, options)],
   ];
 }
 
@@ -208,9 +210,9 @@ test("CB-T168 部品の CSS には、同じ名前の部品がある（部品を�
   assert.deepEqual(missing, [], "部品がないのに CSS だけ残っている。CSS と style.css の @import を削除");
 });
 
-test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画面のほか全部）でヘッダの右上に同じ形で固定し、右端はその幅だけ空ける", () => {
-  // プロジェクト管理画面は案内を持たない（2026-10-05 に外した）
-  for (const name of screenNames().filter((n) => n !== "projects")) {
+test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画面と取り込み待ち画面のほか全部）でヘッダの右上に同じ形で固定し、右端はその幅だけ空ける", () => {
+  // プロジェクト管理画面は案内を持たない（2026-10-05 に外した）。取り込み待ち画面は、一覧と確認の帯だけの小さい画面で案内を持たない
+  for (const name of screenNames().filter((n) => n !== "projects" && n !== "handoff")) {
     const style = flatStyle(`<style nonce="x">\n${screenStyle(name)}\n</style>`);
     assert.match(style, /\.toolbar > \.tour-button \{[^}]*position: absolute;[^}]*top: 8px;[^}]*right: 4px;[^}]*width: 22px;/, `${name} の ? が右上に固定されていない`);
     assert.match(style, /\.toolbar \{ padding-right: 34px; \}/, `${name} のツールバーが ? の幅を空けていない`);

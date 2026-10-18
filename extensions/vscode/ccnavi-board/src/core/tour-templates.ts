@@ -4,15 +4,13 @@
  * 見本は実行ファイルの JSON（`--templates --json`）より小さい書き方で YAML に書き、ここで `TemplatesPage`（画面が描く形）にする。
  * 案内の間に描くだけで、読み取りにも取り込みにも使わない。有効か・捨てた理由・取り込めるかは見本に書いた値をそのまま使い、判定しない。
  */
-import type { DraftEntry, FlowSummary, ImportAnswer, PlanItem, ProblemSeverity, Sum, SumRow, TemplateEntry, TemplateProblem, TemplatesPage } from "./templates-view.js";
+import type { DraftEntry, FlowSummary, PlanItem, ProblemSeverity, Sum, SumRow, TemplateEntry, TemplateProblem, TemplatesPage } from "./templates-view.js";
 
 export interface TemplatesSample {
   /** 見本の画面（対象はワークスペース、見せる層は self） */
   readonly page: TemplatesPage;
   /** テンプレートの名前 → 本文（「本文を見る」の見本） */
   readonly texts: Readonly<Record<string, string>>;
-  /** 取り込みの下見の答えの見本（取り込み先は共通の設定） */
-  readonly preview: ImportAnswer;
 }
 
 function object(value: unknown, at: string): Record<string, unknown> {
@@ -121,7 +119,6 @@ export function parseTemplatesSample(raw: unknown): TemplatesSample {
       name,
       tree: "",
       path: `${name}.yml`,
-      sha: `sample-draft-${name}`,
       valid: true,
       description: str(map.description),
       when: str(map.when),
@@ -130,11 +127,6 @@ export function parseTemplatesSample(raw: unknown): TemplatesSample {
       has_flows: flows.length > 0,
       flows,
       problems: problemsOf(map.problems, `${at}.problems`),
-      text: str(map.text),
-      importable: map.importable !== false,
-      checked_with: "common",
-      exists_in: [],
-      also_in: [],
     };
   });
   const sums: Sum[] = list(root.sums, "sample.sums").map((item, index) => {
@@ -148,7 +140,6 @@ export function parseTemplatesSample(raw: unknown): TemplatesSample {
     return { name: str(map.name), layers: list(map.layers, `${at}.layers`).map((layer) => str(layer)), templates: rows };
   });
   const all = [...templates.flatMap((t) => t.problems), ...drafts.flatMap((d) => d.problems)];
-  const unlocked = { locked: false, reason: "", doing: [] };
   const page: TemplatesPage = {
     root: "",
     generatedAt: "",
@@ -167,31 +158,9 @@ export function parseTemplatesSample(raw: unknown): TemplatesSample {
       infos: all.filter((p) => p.severity === "info").length,
       drafts,
     },
-    lock: unlocked,
-    projectLocks: {},
-    importLayers: ["self"],
-    // 案内の間は編集のオプションを出さない（見本の上で編集は始めない）
-    edit: { enabled: false, reason: "案内の間は編集できません" },
+    // 案内の間は取り込み待ち画面を開かない（見本の上では何も始めない）
+    handoff: { enabled: false, reason: "案内の間は開けません" },
     notices: [],
   };
-  const previewMap = object(root.preview, "sample.preview");
-  const first = drafts[0];
-  const preview: ImportAnswer = {
-    ok: true,
-    draft: first === undefined ? null : { name: first.name, tree: "", path: first.path, sha: first.sha },
-    to: "common",
-    layer: "",
-    target: str(previewMap.target),
-    exists: false,
-    replace: false,
-    errors: [],
-    infos: [],
-    problems: [],
-    diff: [],
-    new_text: str(previewMap.new_text),
-    written: false,
-    removed: false,
-    kept: "",
-  };
-  return { page, texts, preview };
+  return { page, texts };
 }

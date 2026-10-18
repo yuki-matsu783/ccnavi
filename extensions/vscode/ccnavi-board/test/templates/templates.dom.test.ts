@@ -1,6 +1,6 @@
 /**
  * テンプレート管理画面（React）を happy-dom で動かす。一覧の札と捨てた理由、統合結果の枠、
- * 1 件の計画と本文、下書き、帯と錠、エラー・読み込み中、見た目、対象の切り替えを見る。
+ * 1 件の計画と本文、下書き（読むだけ）と取り込み待ちへの入口、エラー・読み込み中、見た目、対象の切り替えを見る。
  * 見本は `tests/fixtures/templates-json.json` の `expect`（self の層）。
  */
 import { test } from "node:test";
@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import type { TemplateDetail } from "../../src/core/templates-view.js";
 import { fixtureJson, openTemplates, page, openPage } from "../helpers/templates.js";
 import type { DomPage } from "../helpers/dom.js";
-import type { HTMLDetailsElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLDetailsElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 要素の文字。前後の空白は除く */
 function text(element: { textContent: string | null } | null | undefined): string {
@@ -111,38 +111,49 @@ test("CB-D327 苦情の件数と深刻度の文字（[error] [warn] [info]）が
   }
 });
 
-test("CB-D328 下書きは 3 件出て、取り込めない・TODO・同名ありを札で出す。効力がないことを一覧の前に言う", async () => {
+test("CB-D328 下書きは 3 件出て、error・TODO を札で出す。効力がなく読むだけであることを一覧の前に言い、取り込み・編集のボタンを持たない", async () => {
   const dom = await openTemplates();
   try {
     assert.equal(dom.all("li.draft").length, 3);
-    assert.match(text(dom.one('li.draft[data-name="broken"]')), /取り込めない/);
+    assert.match(text(dom.one('li.draft[data-name="broken"]')), /error あり/);
     assert.match(text(dom.one('li.draft[data-name="login"]')), /TODO が残っている/);
-    assert.match(text(dom.one('li.draft[data-name="research"]')), /同名あり: common/);
     assert.match(text(dom.one('[data-tour="drafts"] .hint')), /効力のない下書き/);
+    assert.match(text(dom.one('[data-tour="drafts"] .hint')), /読むだけ/);
+    // 取り込み・保存・改名・移動・削除の操作はこの画面に無い
+    for (const action of ["open-import", "edit-draft", "rename-draft", "delete-draft", "rename-template", "move-template", "delete-template", "preview-import", "import-yes"]) {
+      assert.equal(dom.all(`[data-action="${action}"]`).length, 0, `${action} が残っている`);
+    }
+    assert.equal(dom.all("#lock, #changed, #dirty").length, 0, "取り込みと編集の帯は無い");
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D329 外の変更の帯は changed で隠れた帯が現れ、更新は refresh を送る。錠は隠れた p が理由つきで現れる", async () => {
+test("CB-D329 下書きの節に「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
   const dom = await openTemplates();
   try {
-    assert.ok(dom.one("#changed").classList.contains("hidden"));
-    assert.ok(dom.one("#lock").classList.contains("hidden"));
-    await dom.send({ type: "changed" });
-    assert.ok(!dom.one("#changed").classList.contains("hidden"));
-    dom.click(dom.one('#changed button[data-action="reload"]'));
+    const button = dom.one<HTMLButtonElement>('[data-action="open-handoff"]');
+    assert.equal(button.disabled, false);
+    dom.click(button);
     await dom.settle();
-    assert.deepEqual(dom.posted.filter((message) => message.type === "refresh"), [{ type: "refresh", dirty: false }]);
-    await dom.send({
-      type: "lock",
-      lock: { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"] },
-      projectLocks: {},
-    });
-    assert.ok(!dom.one("#lock").classList.contains("hidden"));
-    assert.match(text(dom.one("#lock")), /取り込みと編集は止めています: 作業中のチケットがあります（T1）/);
+    assert.deepEqual(dom.posted.filter((message) => message.type === "openHandoff"), [{ type: "openHandoff" }]);
+    dom.click(dom.one('button[data-action="reload"][data-tour="refresh"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "refresh"), [{ type: "refresh" }]);
   } finally {
     await dom.close();
+  }
+  const reason = "実行ファイルが古い版です。組み立て直してください";
+  const old = await openTemplates({ handoff: { enabled: false, reason } });
+  try {
+    const button = old.one<HTMLButtonElement>('[data-action="open-handoff"]');
+    assert.equal(button.disabled, true);
+    assert.equal(text(old.one('[data-role="handoff-reason"]')), reason);
+    old.click(button);
+    await old.settle();
+    assert.equal(old.posted.filter((message) => message.type === "openHandoff").length, 0);
+  } finally {
+    await old.close();
   }
 });
 

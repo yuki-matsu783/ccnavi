@@ -89,31 +89,59 @@ test("CB-T270 使うフラグを実行ファイルが知っているかを版の
 
 test("CB-T567 版の JSON の features を読む。持たない古い JSON は features が空", () => {
   const body = { schema: VERSION_SCHEMA, version: "0.1.0", commit: "unknown", built: false, compat: 1, flags: ["--lint"] };
-  const withFeatures = parseVersionJson(JSON.stringify({ ...body, features: ["templates.edit", 3] }));
+  const withFeatures = parseVersionJson(JSON.stringify({ ...body, features: ["handoff", 3] }));
   assert.ok(withFeatures.ok);
-  assert.deepEqual(withFeatures.value.features, ["templates.edit"]);
+  assert.deepEqual(withFeatures.value.features, ["handoff"]);
   const without = parseVersionJson(JSON.stringify(body));
   assert.ok(without.ok);
   assert.deepEqual(without.value.features, []);
 });
 
 test("CB-T568 使う機能を実行ファイルが持つかを features で見る。足りなければ名指しし、確認できなければ進めない", () => {
-  const what = "テンプレートの編集";
-  assert.equal(missingFeatures(ok({ features: ["templates.edit", "templates.draft-text"] }), ["templates.edit"], what, false), undefined);
+  const what = "取り込み待ち画面";
+  assert.equal(missingFeatures(ok({ features: ["handoff", "user-entry"] }), ["handoff"], what, false), undefined);
 
-  const missing = missingFeatures(ok({ features: ["templates.edit"] }), ["templates.edit", "templates.draft-text"], what, false) ?? "";
-  assert.match(missing, /templates\.draft-text の機能を持ちません/);
-  assert.doesNotMatch(missing, /templates\.edit /);
-  assert.match(missing, /テンプレートの編集 で確認できない/);
+  const missing = missingFeatures(ok({ features: ["handoff"] }), ["handoff", "user-entry"], what, false) ?? "";
+  assert.match(missing, /user-entry の機能を持ちません/);
+  assert.doesNotMatch(missing, /handoff /);
+  assert.match(missing, /取り込み待ち画面 で確認できない/);
 
-  const old = missingFeatures({ kind: "old" }, ["templates.edit"], what, true) ?? "";
+  const old = missingFeatures({ kind: "old" }, ["handoff"], what, true) ?? "";
   assert.match(old, /--version に対応していません/);
   assert.match(old, /組み立て直して/);
 
-  const failed = missingFeatures({ kind: "failed", error: "打ち切った" }, ["templates.edit"], what, false) ?? "";
+  const failed = missingFeatures({ kind: "failed", error: "打ち切った" }, ["handoff"], what, false) ?? "";
   assert.match(failed, /打ち切った/);
 });
 
 test("CB-T569 features のない実行ファイルは、機能を求めると足りないと言う", () => {
-  assert.match(missingFeatures(ok(), ["templates.edit"], "テンプレートの編集", false) ?? "", /templates\.edit の機能を持ちません/);
+  assert.match(missingFeatures(ok(), ["handoff"], "取り込み待ち画面", false) ?? "", /handoff の機能を持ちません/);
+});
+
+test("CB-T1137 handoff を持たない実行ファイルには、取り込み待ち画面を無効にして古い版と言い、組み立て直しを案内する", () => {
+  const what = "取り込み待ち画面";
+  assert.equal(missingFeatures(ok({ features: ["user-entry", "handoff"] }), ["handoff"], what, true), undefined);
+
+  // user-entry だけを持つ（handoff の前の）実行ファイル
+  const stale = missingFeatures(ok({ features: ["user-entry"] }), ["handoff"], what, true) ?? "";
+  assert.match(stale, /handoff の機能を持ちません（古い版です）/);
+  assert.match(stale, /組み立て直して/);
+  // 配り直しの案内（ccnavi のリポジトリではないワークスペース）
+  assert.match(missingFeatures(ok({ features: [] }), ["handoff"], what, false) ?? "", /ccnavi-setup\.sh/);
+  // 版を知らない・確かめられない実行ファイルも進めない
+  assert.match(missingFeatures({ kind: "old" }, ["handoff"], what, true) ?? "", /古い版です/);
+  assert.match(missingFeatures({ kind: "failed", error: "打ち切った" }, ["handoff"], what, true) ?? "", /打ち切った/);
+});
+
+test("CB-T1100 user-entry を持たない実行ファイルには、ユーザ専用の操作の入口で古い版と言って組み立て直しを案内する", () => {
+  const what = "ccnavi user agree --yes";
+  assert.equal(missingFeatures(ok({ features: ["user-entry"] }), ["user-entry"], what, false), undefined);
+
+  const stale = missingFeatures(ok({ compat: 12, features: ["handoff"] }), ["user-entry"], what, true) ?? "";
+  assert.match(stale, /user-entry の機能を持ちません（古い版です）/);
+  assert.match(stale, /ccnavi user agree --yes で確認できない/);
+  assert.match(stale, /組み立て直して/);
+
+  // `--version` を知らない実行ファイルも、同じく進めない
+  assert.match(missingFeatures({ kind: "old" }, ["user-entry"], what, true) ?? "", /古い版です/);
 });

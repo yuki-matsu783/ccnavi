@@ -1,17 +1,14 @@
 /**
- * テンプレート管理画面が読む実行ファイルの答えの読み取り（`--templates --json`・`--templates --show <名前> --json`・
- * `--templates --import … --json`）。形の契約は `templates-view.ts`、見本は `tests/fixtures/templates-json.json`。
+ * テンプレート管理画面が読む実行ファイルの答えの読み取り（`--templates --json`・`--templates --show <名前> --json`）。
+ * 形の契約は `templates-view.ts`、見本は `tests/fixtures/templates-json.json`。
  *
- * 読むだけで判定はしない（有効か・捨てた理由・取り込めるかは実行ファイルが決めて答える）。読み方は `planordermodel.ts` と
+ * 読むだけで判定はしない（有効か・捨てた理由は実行ファイルが決めて答える）。読み方は `planordermodel.ts` と
  * `lintmodel.ts` に揃える。答えの版が違えば解釈せず、版の違いを伝える。VS Code の API も DOM も node も読まない。
  */
 import type {
   Dropped,
   DraftEntry,
-  EditAnswer,
   FlowSummary,
-  ImportAnswer,
-  ImportDraftRef,
   PlanItem,
   ProblemSeverity,
   Sum,
@@ -28,8 +25,6 @@ export const TEMPLATES_VERSION = 1;
 
 export type TemplatesParse = { readonly ok: true; readonly value: TemplatesJson } | { readonly ok: false; readonly error: string };
 export type TemplateShowParse = { readonly ok: true; readonly value: TemplateDetail } | { readonly ok: false; readonly error: string };
-export type ImportParse = { readonly ok: true; readonly value: ImportAnswer } | { readonly ok: false; readonly error: string };
-export type EditParse = { readonly ok: true; readonly value: EditAnswer } | { readonly ok: false; readonly error: string };
 
 /** `--templates --json` の答えを読む。版が違う・欄が足りないときは文面を返す */
 export function parseTemplates(text: string): TemplatesParse {
@@ -98,86 +93,6 @@ export function parseTemplateShow(text: string): TemplateShowParse {
 }
 
 /**
- * `--templates --import … --json` の答えを読む。`draft` 欄を持つ答えは（下見でエラーを返したものも含めて）
- * `ok` が偽でも中身を返す。`draft` 欄の無い失敗の答え（`{version, ok:false, error}`）は error を返す。
- */
-export function parseImport(text: string): ImportParse {
-  const parsed = parseRecord(text);
-  if (!parsed.ok) {
-    return parsed;
-  }
-  const raw = parsed.value;
-  if (raw.version !== TEMPLATES_VERSION) {
-    return { ok: false, error: versionMismatch(raw.version) };
-  }
-  if (!("draft" in raw)) {
-    return { ok: false, error: str(raw.error) || "取り込みの答えに draft 欄がありません" };
-  }
-  return {
-    ok: true,
-    value: {
-      ok: raw.ok === true,
-      draft: isRecord(raw.draft) ? readDraftRef(raw.draft) : null,
-      to: str(raw.to),
-      layer: str(raw.layer),
-      target: str(raw.target),
-      exists: bool(raw.exists),
-      replace: bool(raw.replace),
-      errors: strings(raw.errors),
-      infos: strings(raw.infos),
-      problems: readProblems(raw.problems),
-      diff: strings(raw.diff),
-      new_text: str(raw.new_text),
-      written: bool(raw.written),
-      removed: bool(raw.removed),
-      kept: str(raw.kept),
-    },
-  };
-}
-
-/**
- * `--templates --save-draft` などの編集の答えを読む（`--json`。下見と実行で同じ形）。
- * 版が違えば文面を返す。`ok` が真偽値でなければ、読めない答えとして文面を返す。
- */
-export function parseEdit(text: string): EditParse {
-  const parsed = parseRecord(text);
-  if (!parsed.ok) {
-    return parsed;
-  }
-  const raw = parsed.value;
-  if (raw.version !== TEMPLATES_VERSION) {
-    return { ok: false, error: versionMismatch(raw.version) };
-  }
-  if (typeof raw.ok !== "boolean") {
-    return { ok: false, error: "編集の JSON の ok 欄が真偽値ではありません" };
-  }
-  return {
-    ok: true,
-    value: {
-      ok: raw.ok,
-      op: str(raw.op),
-      name: str(raw.name),
-      on: str(raw.on),
-      layer: str(raw.layer),
-      new_name: str(raw.new_name),
-      to: str(raw.to),
-      to_layer: str(raw.to_layer),
-      source: str(raw.source),
-      target: str(raw.target),
-      sha: str(raw.sha),
-      errors: strings(raw.errors),
-      infos: strings(raw.infos),
-      problems: readProblems(raw.problems),
-      diff: strings(raw.diff),
-      new_text: str(raw.new_text),
-      written: bool(raw.written),
-      removed: bool(raw.removed),
-      new_sha: str(raw.new_sha),
-    },
-  };
-}
-
-/**
  * 読み違えを誘う文字を `\uXXXX` に直して見せる。制御文字（Cc）と書式文字（Cf）・行と段落の区切り（Zl・Zp）が対象で、
  * 改行とタブは残す。BMP の外の文字は `\UXXXXXXXX`。実行ファイルの `plan_templates.reveal` と同じ形。
  */
@@ -230,7 +145,6 @@ function readDraft(raw: Record<string, unknown>): DraftEntry {
     name: str(raw.name),
     tree: str(raw.tree),
     path: str(raw.path),
-    sha: str(raw.sha),
     valid: bool(raw.valid),
     description: str(raw.description),
     when: str(raw.when),
@@ -239,11 +153,6 @@ function readDraft(raw: Record<string, unknown>): DraftEntry {
     has_flows: bool(raw.has_flows),
     flows: readFlows(raw.flows),
     problems: readProblems(raw.problems),
-    text: str(raw.text),
-    importable: bool(raw.importable),
-    checked_with: str(raw.checked_with),
-    exists_in: strings(raw.exists_in),
-    also_in: strings(raw.also_in),
   };
 }
 
@@ -274,10 +183,6 @@ function readSumRow(raw: Record<string, unknown>): SumRow {
     effective: bool(raw.effective),
     dropped: readDropped(raw.dropped),
   };
-}
-
-function readDraftRef(raw: Record<string, unknown>): ImportDraftRef {
-  return { name: str(raw.name), tree: str(raw.tree), path: str(raw.path), sha: str(raw.sha) };
 }
 
 function readProblems(value: unknown): TemplateProblem[] {

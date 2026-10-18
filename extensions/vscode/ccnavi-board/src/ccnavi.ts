@@ -6,14 +6,14 @@
  * `--test-expectations --json`（期待する判定の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
- * `--agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
+ * `user agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
  * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）、
  * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。計画編集タブが読む）と
  * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`（その保存。提案を書き換えるのは実行ファイル）と、
  * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、
- * `--templates --import <下書き> --to … --json`（取り込みの下見。何も書かない）と
- * `--templates --import <下書き> --to … --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ）。
- * 編集（保存・削除・改名・移動）も同じ 2 段で、下見は `--templates --save-draft … --json` などの `--json`、実行は `--yes --expect <ハッシュ> --via board --json`。
+ * `user handoff [<パス>…] --json`（`wip/handoff/` の下書きの一覧を見る。何も書かない。取り込み待ち画面が読む。`--root` で指したツリー 1 本だけを見る）と
+ * `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ。
+ * `expect` は取り込むパスを指して見るだけをもう一度呼んだ答えのもの）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
@@ -25,7 +25,6 @@
  */
 import { execFile } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 
 import {
@@ -42,6 +41,8 @@ import {
   approveArgs,
   c1TargetOf,
   decideArgs,
+  handoffArgs,
+  handoffYesArgs,
   decidePreviewArgs,
   GIT_SCRIPT,
   overrideArgs,
@@ -49,12 +50,9 @@ import {
   planOrderWriteArgs,
   previewArgs,
   REVIEW_SCRIPT,
+  USER_DECIDE_SCRIPT,
   templatesArgs,
-  templatesEditArgs,
   templatesDraftArgs,
-  templatesEditYesArgs,
-  templatesImportArgs,
-  templatesImportYesArgs,
   templatesShowArgs,
   toPosixPath,
   type Launcher,
@@ -73,8 +71,10 @@ import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
 import { parsePlanOrder, type PlanOrder, type PlanOrderAnswer, type PlanOrderWrite } from "./core/planordermodel.js";
 import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
-import type { EditAnswer, EditRequest, ImportAnswer, ImportRequest, TemplateDetail, TemplatesJson } from "./core/templates-view.js";
-import { parseEdit, parseImport, parseTemplates, parseTemplateShow } from "./core/templatesmodel.js";
+import type { HandoffList, HandoffResult } from "./core/handoff-view.js";
+import { parseHandoffList, parseHandoffResult } from "./core/handoffmodel.js";
+import type { TemplateDetail, TemplatesJson } from "./core/templates-view.js";
+import { parseTemplates, parseTemplateShow } from "./core/templatesmodel.js";
 import {
   parseExpectationsJson,
   parseTestJson,
@@ -277,7 +277,7 @@ export async function runApprovePreview(
 }
 
 /**
- * 見せた一覧をそのまま承認する（`--agree --yes <識別子,…> --digest <ダイジェスト> --json`）。
+ * 見せた一覧をそのまま承認する（`user agree --yes <識別子,…> --digest <ダイジェスト> --json`）。
  * 実行ファイルは見せた一覧と本文が今と同じことを求め、違えば `mismatch` を返して何も置かない。
  */
 export async function runApproveYes(
@@ -291,6 +291,10 @@ export async function runApproveYes(
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
+  const refused = await checkUserEntry(root, setting, "ccnavi user agree --yes");
+  if (refused !== undefined) {
+    return { ok: false, error: refused };
+  }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
   // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（agree.py の for cand in batch）ので、
   // 途中で強制終了されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
@@ -299,7 +303,7 @@ export async function runApproveYes(
     return {
       ok: false,
       error:
-        `${cutOff("ccnavi --agree --yes", APPROVE_TIMEOUT_MS)}。` +
+        `${cutOff("ccnavi user agree --yes", APPROVE_TIMEOUT_MS)}。` +
         "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・pushするコマンドはターミナルに送信していません" +
         "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確認してください",
     };
@@ -308,7 +312,7 @@ export async function runApproveYes(
   if (parsed.ok) {
     return ran.code === 0
       ? parsed
-      : { ok: false, error: `ccnavi --agree --yes が失敗しました: ${firstLine(ran.stderr)}` };
+      : { ok: false, error: `ccnavi user agree --yes が失敗しました: ${firstLine(ran.stderr)}` };
   }
   if ("mismatch" in parsed) {
     return parsed;
@@ -319,7 +323,7 @@ export async function runApproveYes(
     return parsed;
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
-  return { ok: false, error: said === "" ? `ccnavi --agree --yes の出力を読み取れません（${parsed.error}）` : said };
+  return { ok: false, error: said === "" ? `ccnavi user agree --yes の出力を読み取れません（${parsed.error}）` : said };
 }
 
 /**
@@ -339,7 +343,7 @@ export async function runDecidePreview(
   tree: string,
   phase: number,
 ): Promise<RunResult<DecidePreview>> {
-  const ran = await runScript(shell, root, tree, decidePreviewArgs(phase), DECIDE_TIMEOUT_MS);
+  const ran = await runScript(shell, root, REVIEW_SCRIPT, tree, decidePreviewArgs(phase), DECIDE_TIMEOUT_MS);
   if (ran.killed) {
     return { ok: false, error: `${cutOff("ccnavi-review.sh decide --preview", DECIDE_TIMEOUT_MS)}。反映していません` };
   }
@@ -351,23 +355,28 @@ export async function runDecidePreview(
 }
 
 /**
- * ユーザが選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <ダイジェスト>`）。
+ * ユーザが選んだ行き先を置く（`ccnavi-user-decide.sh decide <N> --choices <JSON> --digest <ダイジェスト>`）。
  * 見せた指摘と今の指摘が違えば、実行ファイルは何も置かず `mismatch` を返す
  */
 export async function runDecideYes(
   root: string,
+  setting: string,
   shell: string,
   tree: string,
   phase: number,
   choices: Readonly<Record<string, string>>,
   digest: string,
 ): Promise<DecideOutcome> {
-  const ran = await runScript(shell, root, tree, decideArgs(phase, choices, digest), DECIDE_TIMEOUT_MS);
+  const refused = await checkUserEntry(root, setting, "ccnavi-user-decide.sh decide");
+  if (refused !== undefined) {
+    return { ok: false, error: refused };
+  }
+  const ran = await runScript(shell, root, USER_DECIDE_SCRIPT, tree, decideArgs(phase, choices, digest), DECIDE_TIMEOUT_MS);
   if (ran.killed) {
     return {
       ok: false,
       error:
-        `${cutOff("ccnavi-review.sh decide", DECIDE_TIMEOUT_MS)}。` +
+        `${cutOff("ccnavi-user-decide.sh decide", DECIDE_TIMEOUT_MS)}。` +
         "反映できたか分かりません。チケット管理画面を更新して、フェーズの状態を確認してください",
     };
   }
@@ -376,7 +385,7 @@ export async function runDecideYes(
     return parsed;
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
-  return { ok: false, error: said === "" ? `ccnavi-review.sh decide の出力を読み取れません（${parsed.error}）` : said };
+  return { ok: false, error: said === "" ? `ccnavi-user-decide.sh decide の出力を読み取れません（${parsed.error}）` : said };
 }
 
 /**
@@ -402,11 +411,12 @@ export async function runChildWorktreeAdd(shell: string, root: string, w: Approv
 function runScript(
   shell: string,
   root: string,
+  script: string,
   cwd: string,
   args: readonly string[],
   timeout: number,
 ): Promise<Ran> {
-  return spawn(shell, [toPosixPath(path.join(root, REVIEW_SCRIPT)), ...args], cwd, timeout);
+  return spawn(shell, [toPosixPath(path.join(root, script)), ...args], cwd, timeout);
 }
 
 /** 1 件を判定する。`rules` は当てるルールファイルの差し替え（編集中の内容を置いた一時ファイルでもよい） */
@@ -616,11 +626,32 @@ export async function runC1Target(root: string, setting: string, parent: string)
 const PLAN_ORDER_FLAGS = ["--plan-order", "--order", "--expect", "--write"] as const;
 
 /** テンプレート管理画面が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
-const TEMPLATES_FLAGS = ["--templates", "--show", "--import", "--expect", "--yes", "--via"] as const;
+const TEMPLATES_FLAGS = ["--templates", "--show"] as const;
 
-/** テンプレートの編集が求めるフラグと機能。知らない古い実行ファイルは、編集の欄を無効にして理由を出す */
-const TEMPLATES_EDIT_FLAGS = ["--save-draft", "--delete-draft", "--rename-template", "--move-template", "--delete-template", "--new-name", "--on", "--to-layer"] as const;
-const TEMPLATES_EDIT_FEATURES = ["templates.edit", "templates.draft-text"] as const;
+/**
+ * 取り込み待ち画面が求める機能（`ccnavi user handoff` を実行ファイルが持つ）。持たない古い実行ファイルは `user handoff` を知らず、
+ * argparse の苦情（不明瞭な断り）で返すので、画面を開くときに見て「古い版です」と言い、画面を無効にする
+ */
+const HANDOFF_FEATURES = ["handoff"] as const;
+
+/**
+ * ユーザ専用の入口（`ccnavi user <操作>`）を実行ファイルが持つことを示す機能名。持たない古い実行ファイルは
+ * `user` を知らず、argparse の苦情（不明瞭な断り）で返すので、打つ前に見て「古い版です」と言う
+ */
+const USER_ENTRY_FEATURES = ["user-entry"] as const;
+
+/**
+ * ユーザ専用の操作（承認・対応方針）を打つ前に、実行ファイルが `user-entry` を持つかを聞く。
+ * 知っていれば undefined、知らなければ（確かめられないときも）理由。起動時の互換の版の比べ（`warnVersionSkew`）は
+ * 知らせるだけで止めないので、止めるのはここ。`what` は使おうとしたもの
+ */
+export async function checkUserEntry(root: string, setting: string, what: string): Promise<string | undefined> {
+  const probe = await probeVersion(root, setting);
+  if (probe === undefined) {
+    return NOT_FOUND;
+  }
+  return missingFeatures(probe, USER_ENTRY_FEATURES, what, hasSource(root));
+}
 
 /**
  * 実行ファイルが `--plan-order` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
@@ -637,7 +668,7 @@ export async function checkPlanOrder(root: string, setting: string, what = "計�
 /**
  * 親の提案の計画を、振り直した答えで読む（`--plan-order <親> --json [--order <JSON>]`）。何も書かない。
  * `order` は元の番号での直接の先行で、空なら提案のまま。番号の振り直しと検査は実行ファイルが答える。
- * `--plan-order` は `--agree` の外の独立したフラグなので、組み込みの止めにも端末の確かめにも当たらない。
+ * `--plan-order` は `user` の外の独立したオプションなので、組み込みの止めにも端末の確かめにも当たらない。
  * 失敗（実行ファイルが無い・非 0 終了・JSON でない）は理由の文にして返し、画面は壊さない。古い実行ファイルかは
  * 呼び手が先に `checkPlanOrder` で聞く
  */
@@ -696,7 +727,7 @@ export async function runPlanOrderWrite(root: string, setting: string, parent: s
 }
 
 /**
- * 実行ファイルが `--templates` と取り込みのフラグを知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
+ * 実行ファイルが `--templates` と `--show` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
  * テンプレート管理画面は読み込むたびに 1 回聞く。
  */
 export async function checkTemplates(root: string, setting: string): Promise<string | undefined> {
@@ -707,16 +738,16 @@ export async function checkTemplates(root: string, setting: string): Promise<str
   return missingFlags(probe, TEMPLATES_FLAGS, "テンプレート管理画面", hasSource(root));
 }
 
-/** 実行ファイルが編集のオプションと機能を知っているかを聞く。知っていれば undefined、知らなければ理由（編集の欄を無効にする理由） */
-export async function checkTemplatesEdit(root: string, setting: string): Promise<string | undefined> {
+/**
+ * 実行ファイルが `user handoff` を持つか（`features` に `handoff`）を聞く。持っていれば undefined、持たなければ理由
+ * （取り込み待ち画面を無効にして、この理由を言う）。取り込み待ち画面は読み込むたびに 1 回聞く。
+ */
+export async function checkHandoff(root: string, setting: string): Promise<string | undefined> {
   const probe = await probeVersion(root, setting);
   if (probe === undefined) {
     return NOT_FOUND;
   }
-  return (
-    missingFlags(probe, TEMPLATES_EDIT_FLAGS, "テンプレートの編集", hasSource(root)) ??
-    missingFeatures(probe, TEMPLATES_EDIT_FEATURES, "テンプレートの編集", hasSource(root))
-  );
+  return missingFeatures(probe, HANDOFF_FEATURES, "取り込み待ち画面", hasSource(root));
 }
 
 /** 失敗の答え（`{ok:false,error}`）の error。読めなければ空 */
@@ -774,59 +805,6 @@ export async function runTemplateShow(root: string, setting: string, name: strin
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
 }
 
-/**
- * 取り込みの子プロセス（下見と実行で共有）。下見でエラーを返す答えは終了コードが 1 でも `ok:true` の答えとして読む
- * （画面が errors を並べるため）。読めず、かつ非 0 終了なら失敗にする。期限切れは `killedNote` を後ろに付ける。
- */
-async function runImport(
-  root: string,
-  setting: string,
-  args: readonly string[],
-  what: string,
-  killedNote: string,
-): Promise<RunResult<ImportAnswer>> {
-  const launcher = findLauncher(root, setting);
-  if (launcher === undefined) {
-    return { ok: false, error: NOT_FOUND };
-  }
-  const ran = await run(launcher, root, args, DIAGNOSE_TIMEOUT_MS);
-  if (ran.killed) {
-    return { ok: false, error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}${killedNote}` };
-  }
-  const parsed = parseImport(ran.stdout);
-  if (parsed.ok) {
-    return { ok: true, value: parsed.value };
-  }
-  if (ran.code !== 0) {
-    return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
-  }
-  return { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
-}
-
-/** 取り込みの下見（`--templates --import <下書き> --to … --json`）。何も書かない */
-export async function runTemplateImport(root: string, setting: string, request: ImportRequest): Promise<RunResult<ImportAnswer>> {
-  return runImport(root, setting, templatesImportArgs(request), "ccnavi --templates --import --json", "");
-}
-
-/**
- * 取り込みの実行（`--templates --import <下書き> --to … --yes --expect <ハッシュ> --via board --json`）。
- * 期限切れのときは、取り込めたかが分からないことを文に足す。
- */
-export async function runTemplateImportYes(
-  root: string,
-  setting: string,
-  request: ImportRequest,
-  expect: string,
-): Promise<RunResult<ImportAnswer>> {
-  return runImport(
-    root,
-    setting,
-    templatesImportYesArgs(request, expect),
-    "ccnavi --templates --import --yes --json",
-    "（取り込めたかは分かりません。一覧を再読み込みして確認してください）",
-  );
-}
-
 /** 下書きを作った答え */
 export interface DraftMade {
   readonly name: string;
@@ -869,55 +847,54 @@ export async function runTemplateDraft(root: string, setting: string, parent: st
   };
 }
 
-/** 編集の子プロセス（下見と実行で共有）。save の本文は一時ディレクトリの本文ファイルに書いて渡し、終わったら消す */
-async function runEdit(
-  root: string,
-  setting: string,
-  request: EditRequest,
-  build: (bodyFile: string) => readonly string[],
-  what: string,
-  killedNote: string,
-): Promise<RunResult<EditAnswer>> {
-  const launcher = findLauncher(root, setting);
+/**
+ * `wip/handoff/` の下書きの一覧を見る（`user handoff [<パス>…] --json`）。何も書かない。
+ * `workspace` は実行ファイルを探すワークスペースのルート、`tree` は見るツリーのルート（`--root` に渡す）。
+ * ワークスペースのルートのツリーなら二つは同じ。実行ファイルは `workspace` の側で探す
+ * （プロジェクトやワークツリーには `dist/ccnavi/` が無いため）。
+ * 見るだけの答えは、対象に error や conflict があっても終了コード 0 で返る。
+ */
+export async function runHandoff(workspace: string, setting: string, tree: string, paths: readonly string[] = []): Promise<RunResult<HandoffList>> {
+  const what = "ccnavi user handoff --json";
+  const launcher = findLauncher(workspace, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-tpl-"));
-  try {
-    const bodyFile = path.join(dir, "body.yml");
-    if (request.op === "save") {
-      fs.writeFileSync(bodyFile, request.body, "utf8");
-    }
-    const ran = await run(launcher, root, build(bodyFile), DIAGNOSE_TIMEOUT_MS);
-    if (ran.killed) {
-      return { ok: false, error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}${killedNote}` };
-    }
-    const parsed = parseEdit(ran.stdout);
-    if (parsed.ok) {
-      return { ok: true, value: parsed.value };
-    }
-    if (ran.code !== 0) {
-      return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
-    }
-    return { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+  const ran = await run(launcher, tree, handoffArgs(paths), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
   }
+  const parsed = parseHandoffList(ran.stdout);
+  if (parsed.ok) {
+    return { ok: true, value: parsed.value };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+  }
+  return { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
 }
 
-/** 編集の下見。何も書かない */
-export async function runTemplateEdit(root: string, setting: string, request: EditRequest): Promise<RunResult<EditAnswer>> {
-  return runEdit(root, setting, request, (bodyFile) => templatesEditArgs(request, bodyFile), "ccnavi --templates 編集のプレビュー --json", "");
-}
-
-/** 編集の実行。期限切れのときは、書けたかが分からないことを文に足す */
-export async function runTemplateEditYes(root: string, setting: string, request: EditRequest, expect: string): Promise<RunResult<EditAnswer>> {
-  return runEdit(
-    root,
-    setting,
-    request,
-    (bodyFile) => templatesEditYesArgs(request, bodyFile, expect),
-    "ccnavi --templates 編集の実行 --yes --json",
-    "（保存できたかは分かりません。一覧を再読み込みして確認してください）",
-  );
+/**
+ * 取り込みの実行（`user handoff <パス…> --yes --expect <ハッシュ> --via board --json`）。書くのは実行ファイルで、
+ * 拡張はファイルを書かない。失敗は `{ok:false, error}` の結果で返し、投げない。
+ * 期限切れのときは、取り込めたかが分からないことを文に足す。
+ */
+export async function runHandoffYes(workspace: string, setting: string, tree: string, paths: readonly string[], expect: string): Promise<HandoffResult> {
+  const what = "ccnavi user handoff --yes --json";
+  const launcher = findLauncher(workspace, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, tree, handoffYesArgs(paths, expect), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}（取り込めたかは分かりません。一覧を再読み込みして確認してください）` };
+  }
+  const parsed = parseHandoffResult(ran.stdout);
+  if (parsed.ok) {
+    return parsed.value;
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+  }
+  return { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
 }

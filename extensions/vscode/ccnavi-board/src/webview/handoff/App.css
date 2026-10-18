@@ -1,0 +1,17 @@
+/*
+ * 取り込み待ち画面の骨組み（`App.tsx`）。節、札（tag）、取り込みの確認の帯、脚注の状態。
+ * 1 件の対象は `Entry.css`、取り込みの結果は `Result.css`。
+ */
+section { margin-bottom: 18px; }
+/* 札。色は意味の色を文字にだけ使い、枠は同じ色の currentColor で付ける（色だけに頼らず、必ず文字も付ける） */
+.tag { display: inline-block; font-size: .85em; padding: 0 7px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); font-family: var(--vscode-editor-font-family); white-space: nowrap; }
+.tag.ok { color: var(--ok-text); border-color: currentColor; }
+.tag.bad { color: var(--error-text); border-color: currentColor; }
+.tag.warn { color: var(--warn-text); border-color: currentColor; }
+.status { margin: 8px 0 0; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
+.status.failed { border-color: var(--vscode-editorError-foreground); color: var(--error-text); }
+.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0 10px; }
+.confirm { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--vscode-focusBorder); border-radius: 4px; background: var(--vscode-editorWidget-background); }
+.confirm ul { margin: 4px 0 8px; padding-left: 20px; font-family: var(--vscode-editor-font-family); overflow-wrap: anywhere; }
+.confirm .buttons { display: flex; gap: 6px; }
+.tree-select { margin-right: 10px; }

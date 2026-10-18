@@ -12,6 +12,7 @@ function spy(): { readonly screens: Screens; readonly calls: string[] } {
       risk: async (target) => void calls.push(`risk:${target.kind}`),
       phases: async (target) => void calls.push(`phases:${target.kind}`),
       templates: async (target) => void calls.push(`templates:${target.kind}`),
+      handoff: async (tree) => void calls.push(`handoff:${tree ?? "-"}`),
       projects: async () => void calls.push("projects"),
       flow: async (ticket) => void calls.push(`flow:${ticket}`),
       workflow: async (ticket) => void calls.push(`workflow:${ticket}`),
@@ -26,11 +27,13 @@ test("CB-T136 登録した入口を帳面から開く。要求する側は相手
   await screens().rules({ kind: "project", name: "lib" });
   await screens().phases({ kind: "self" });
   await screens().templates({ kind: "self" });
+  await screens().handoff("project:lib");
+  await screens().handoff();
   await screens().risk({ kind: "workspace" });
   await screens().projects();
   await screens().flow("i0001-01-01");
   await screens().workflow("i0001");
-  assert.deepEqual(calls, ["board:lib", "rules:project", "phases:self", "templates:self", "risk:workspace", "projects", "flow:i0001-01-01", "workflow:i0001"]);
+  assert.deepEqual(calls, ["board:lib", "rules:project", "phases:self", "templates:self", "handoff:project:lib", "handoff:-", "risk:workspace", "projects", "flow:i0001-01-01", "workflow:i0001"]);
   forgetScreens();
 });
 

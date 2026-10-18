@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { openTemplates } from "../helpers/templates.js";
 import { loadTour } from "../helpers/tour.js";
 import type { DomPage } from "../helpers/dom.js";
-import type { HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
 const def = loadTour("templates");
 
@@ -139,7 +139,7 @@ test("CB-D360 段の scene が画面の様子を替える（テンプレート�
   }
 });
 
-test("CB-D361 統合結果と取り込みの案内は、見本の統合結果を選び、取り込みの欄とプレビューの見本を出す。送信はせず、閉じたら消える", async () => {
+test("CB-D361 統合結果の案内は、見本の統合結果を選び、閉じたら消える。取り込み待ちへの入口の段は、見本の上で何も送らない", async () => {
   const sum = await openTemplates();
   try {
     await goto(sum, "read-sum", 1);
@@ -150,41 +150,19 @@ test("CB-D361 統合結果と取り込みの案内は、見本の統合結果を
   }
   const dom = await openTemplates();
   try {
-    await goto(dom, "import", 2);
-    assert.equal(dom.all('[data-role="import-form"]').length, 1);
-    assert.equal(dom.all('[data-role="import-preview"]').length, 0);
-    await next(dom);
-    assert.equal(dom.all('[data-role="import-preview"]').length, 1);
-    assert.match(dom.one('[data-role="import-preview"]').textContent ?? "", /login\.yml/);
-    // 見本の上の「下見」「取り込む」は何も送らない
-    dom.click(dom.one('[data-action="preview-import"]'));
-    dom.click(dom.one('[data-action="import-yes"]'));
+    // 下書きの案内の 3 段目（0 始まりで 2）は「取り込み待ちを開く」を指す。案内の間は押せず、何も送らない
+    await goto(dom, "read-drafts", 2);
+    assert.equal(dom.one("#tour-title").textContent, "取り込み待ちの画面へ");
+    assert.equal(dom.one<HTMLButtonElement>(`[data-tour="handoff"]`).disabled, true);
+    dom.click(dom.one(`[data-tour="handoff"]`));
     await dom.settle();
     assert.deepEqual(
       dom.posted.filter((message) => message.type !== "ready"),
       [],
     );
-    await next(dom);
-    assert.equal(dom.all('[data-role="import-form"]').length, 0, "段をまたいで取り込みの欄が残った");
-    dom.click(dom.one('[data-action="tour-skip"]'));
+    dom.click(dom.one(`[data-action="tour-skip"]`));
     await dom.settle();
-    assert.equal(dom.all('[data-role="import-preview"]').length, 0);
-  } finally {
-    await dom.close();
-  }
-});
-
-test("CB-D362 編集の欄を開いたまま案内を始めても、案内の間は実際の編集の欄を出さず、閉じたら元に戻る", async () => {
-  const dom = await openTemplates();
-  try {
-    dom.click(dom.one('li.draft[data-name="login"] [data-action="edit-draft"]'));
-    await dom.settle();
-    assert.equal(dom.all('[data-role="edit-panel"]').length, 1);
-    await startCourse(dom, "intro");
-    assert.equal(dom.all('[data-role="edit-panel"]').length, 0, "案内の間に実際の編集の欄が出た");
-    dom.click(dom.one('[data-action="tour-skip"]'));
-    await dom.settle();
-    assert.equal(dom.all('[data-role="edit-panel"]').length, 1, "閉じたあと編集の欄が戻らなかった");
+    assert.equal(dom.one<HTMLButtonElement>(`[data-tour="handoff"]`).disabled, false, "閉じたあと、入口が実際の状態に戻る");
   } finally {
     await dom.close();
   }

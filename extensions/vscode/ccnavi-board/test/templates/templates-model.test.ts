@@ -6,8 +6,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  parseEdit,
-  parseImport,
   parseTemplates,
   parseTemplateShow,
   revealControls,
@@ -36,6 +34,11 @@ function fixtureWith(edit: (raw: Record<string, unknown>) => void): string {
   return JSON.stringify(raw);
 }
 
+/** 答えを読んで、最初の下書きを返す */
+function fixtureDraft(text: string): TemplatesJson["drafts"][number] {
+  return value(parseTemplates(text)).drafts[0];
+}
+
 test("CB-T532 見本の一覧を読める。テンプレートの件数、drafts の名前、errors / warns / infos の数", () => {
   const data = fixture();
   assert.equal(data.version, 1);
@@ -59,20 +62,29 @@ test("CB-T533 捨てた理由を読める。共通の broken は invalid、self 
   assert.equal(common?.dropped, null, "捨てていなければ null");
 });
 
-test("CB-T558 下書きの login は importable・checked_with・exists_in・also_in を型どおり読む", () => {
+test("CB-T558 下書きは読むだけの欄（名前・置かれたツリー・パス・読めたか・指摘）を読む。取り込みのための欄は持たない", () => {
   const data = fixture();
   const login = data.drafts.find((draft) => draft.name === "login");
-  assert.deepEqual(
-    {
-      importable: login?.importable,
-      checked_with: login?.checked_with,
-      exists_in: login?.exists_in,
-      also_in: login?.also_in,
-    },
-    { importable: true, checked_with: "self", exists_in: [], also_in: ["lib"] },
-  );
+  assert.equal(login?.valid, true);
+  assert.equal(login?.tree, "");
+  assert.ok((login?.path ?? "") !== "");
+  assert.ok(login?.problems.some((problem) => problem.detail.includes("TODO")), "TODO の指摘を読む");
   const broken = data.drafts.find((draft) => draft.name === "broken");
-  assert.equal(broken?.importable, false, "読み込めない下書きは取り込めない");
+  assert.equal(broken?.valid, false, "読み込めない下書きは valid が偽");
+  // 取り込みの判断は取り込み待ち画面（実行ファイルの user handoff）が受け持つので、読み取りの型に持ち込まない
+  assert.deepEqual(
+    Object.keys(login ?? {}).filter((key) => ["sha", "text", "importable", "checked_with", "exists_in", "also_in"].includes(key)),
+    [],
+  );
+});
+
+test("CB-T1103 下書きの欄が古い形（sha・importable・text・exists_in を含む答え）でも読める。余分な欄は捨てる", () => {
+  const text = fixtureWith((raw) => {
+    const drafts = raw.drafts as Record<string, unknown>[];
+    drafts[0] = { ...drafts[0], sha: "x", importable: true, text: "t", exists_in: ["common"], also_in: ["lib"], checked_with: "self" };
+  });
+  const draft = fixtureDraft(text);
+  assert.equal(Object.keys(draft).includes("importable"), false);
 });
 
 test("CB-T535 drafts 欄がない答えは、古い実行ファイルの文で失敗する", () => {
@@ -122,65 +134,6 @@ test("CB-T539 --show の失敗の答えは error をそのまま返す。templat
   assert.equal(parseTemplateShow('{"version":1,"root":"r","layer":"self","template":{"name":"a"}}').ok, false);
 });
 
-test("CB-T540 プレビューの答え（ok・draft あり・diff と new_text）を読む", () => {
-  const text = JSON.stringify({
-    version: 1,
-    ok: true,
-    draft: { name: "login", tree: "", path: "wip/proposals/templates/login.yml", sha: "ab12" },
-    to: "project",
-    layer: "self",
-    target: ".ccnavi/config/project/templates/login.yml",
-    exists: false,
-    replace: false,
-    errors: [],
-    infos: [],
-    problems: [{ severity: "warn", detail: "TODO が残っている" }],
-    diff: ["+ name: login", "+ description: x"],
-    new_text: "name: login\n",
-    written: false,
-    removed: false,
-    kept: "",
-  });
-  const answer = value(parseImport(text));
-  assert.equal(answer.ok, true);
-  assert.equal(answer.draft?.sha, "ab12");
-  assert.equal(answer.layer, "self");
-  assert.deepEqual(answer.diff, ["+ name: login", "+ description: x"]);
-  assert.equal(answer.new_text, "name: login\n");
-  assert.deepEqual(answer.problems, [{ severity: "warn", detail: "TODO が残っている" }]);
-});
-
-test("CB-T541 プレビューでエラーを返した答え（ok が偽・draft あり）は、ok:false の値として読む", () => {
-  const text = JSON.stringify({
-    version: 1,
-    ok: false,
-    draft: null,
-    to: "common",
-    layer: "",
-    target: "",
-    exists: false,
-    replace: false,
-    errors: ["login は既に在る"],
-    infos: [],
-    problems: [{ severity: "error", detail: "login は既に在る" }],
-    diff: [],
-    new_text: "",
-    written: false,
-    removed: false,
-    kept: "",
-  });
-  const parsed = parseImport(text);
-  assert.equal(parsed.ok, true, "draft 欄があれば、ok が偽でも値として読む");
-  const answer = value(parsed);
-  assert.equal(answer.ok, false);
-  assert.equal(answer.draft, null);
-  assert.deepEqual(answer.errors, ["login は既に在る"]);
-});
-
-test("CB-T542 draft 欄のない失敗の答えは、error を返す", () => {
-  assert.deepEqual(parseImport('{"version":1,"ok":false,"error":"y"}'), { ok: false, error: "y" });
-});
-
 test("CB-T543 読み違えを誘う文字（書式・幅ゼロ）を \\u で見せ、改行とタブは残す", () => {
   assert.equal(revealControls("a‮b​c\nd\te"), "a\\u202eb\\u200bc\nd\te");
 });
@@ -194,44 +147,4 @@ test("CB-T545 本文を読む層は、project なら名前、それ以外は sel
   assert.equal(templatesLayerOf({ kind: "project", name: "lib" }), "lib");
   assert.equal(templatesLayerOf({ kind: "workspace", name: "" }), "self");
   assert.equal(templatesLayerOf({ kind: "self", name: "self" }), "self");
-});
-
-test("CB-T565 編集の答え（プレビュー・欄を全部持つ JSON）を読める", () => {
-  const text = JSON.stringify({
-    version: 1,
-    ok: true,
-    op: "rename",
-    name: "feature",
-    on: "project",
-    layer: "self",
-    new_name: "feature2",
-    to: "",
-    to_layer: "",
-    source: ".ccnavi/config/self/templates/feature.yml",
-    target: ".ccnavi/config/self/templates/feature2.yml",
-    sha: "a".repeat(64),
-    errors: [],
-    infos: ["i"],
-    problems: [{ severity: "warn", detail: "d" }],
-    diff: ["+x"],
-    new_text: "name: feature2\n",
-    written: false,
-    removed: false,
-    new_sha: "",
-  });
-  const answer = value(parseEdit(text));
-  assert.equal(answer.ok, true);
-  assert.equal(answer.op, "rename");
-  assert.equal(answer.new_name, "feature2");
-  assert.equal(answer.source, ".ccnavi/config/self/templates/feature.yml");
-  assert.equal(answer.sha, "a".repeat(64));
-  assert.deepEqual(answer.problems, [{ severity: "warn", detail: "d" }]);
-  assert.deepEqual(answer.diff, ["+x"]);
-  assert.equal(answer.written, false);
-  assert.equal(answer.removed, false);
-});
-
-test("CB-T566 編集の答えの ok が真偽値でなければ、読み込めない答えとして失敗する", () => {
-  const parsed = parseEdit(JSON.stringify({ version: 1, ok: "yes", op: "save" }));
-  assert.deepEqual(parsed, { ok: false, error: "編集の JSON の ok 欄が真偽値ではありません" });
 });

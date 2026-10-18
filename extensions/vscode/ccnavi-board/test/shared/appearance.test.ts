@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { appearanceClass, bodyTag, parseAppearance, sendAppearance } from "../../src/core/appearance.js";
 import { retainedHost, screenHost, type Surface } from "../../src/core/screen-host.js";
 import type { ToBoard } from "../../src/core/board-view.js";
+import type { ToHandoff } from "../../src/core/handoff-view.js";
 import type { ToPhases } from "../../src/core/phases-view.js";
 import type { ToProjects } from "../../src/core/projects-view.js";
 import type { ToRisk } from "../../src/core/risk-view.js";
@@ -197,7 +198,7 @@ function source(name: string): string {
 
 /** 保持しない画面（表に戻ると作り直される）と、保持する画面（作り直されない） */
 const REBUILT_PANELS = ["board-panel.ts", "projects-panel.ts"];
-const RETAINED_PANELS = ["rules-panel.ts", "risk-panel.ts", "phases-panel.ts", "templates-panel.ts"];
+const RETAINED_PANELS = ["rules-panel.ts", "risk-panel.ts", "phases-panel.ts", "templates-panel.ts", "handoff-panel.ts"];
 
 test("CB-T183 見た目は段取りを通る。直に postMessage を呼ぶ道と、自前の送り直しを持たない", () => {
   const follow = source("appearance.ts");
@@ -206,7 +207,7 @@ test("CB-T183 見た目は段取りを通る。直に postMessage を呼ぶ道�
   assert.match(follow, /export function followAppearance\(panel: vscode\.WebviewPanel, host: AppearanceSink\)/);
 });
 
-test("CB-T183b 6 画面とも、段取りに繋いで、組み上がったところで送り直す", () => {
+test("CB-T183b 7 画面とも、段取りに繋いで、組み上がったところで送り直す", () => {
   for (const name of [...REBUILT_PANELS, ...RETAINED_PANELS]) {
     const text = source(name);
     assert.match(text, /followAppearance\(panel, current\.host\)/, `${name} が段取りに繋いでいない`);
@@ -237,7 +238,8 @@ test("CB-T183c 保持する画面は、表に戻ったところでも送り直�
  * ここで 1 か所にまとめて確かめ直す。6 画面目を足す人は、この配列に 1 行足せば同じ検査が有効になる。
  */
 const APPEARANCE: AppearanceMessage = { type: "appearance", value: "claude-dark" };
-const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhases, ToTemplates] = [
+const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhases, ToTemplates, ToHandoff] = [
+  APPEARANCE,
   APPEARANCE,
   APPEARANCE,
   APPEARANCE,
@@ -246,8 +248,8 @@ const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhase
   APPEARANCE,
 ];
 
-test("CB-T184 見た目のメッセージは 6 画面すべての契約に入っている（外すとコンパイルが通らない）", () => {
-  assert.equal(IN_EVERY_CONTRACT.length, 6);
+test("CB-T184 見た目のメッセージは 7 画面すべての契約に入っている（外すとコンパイルが通らない）", () => {
+  assert.equal(IN_EVERY_CONTRACT.length, 7);
   for (const message of IN_EVERY_CONTRACT) {
     assert.deepEqual(message, { type: "appearance", value: "claude-dark" });
   }

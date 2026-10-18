@@ -24,7 +24,7 @@ export type PhasesTarget = RulesTarget;
 /** テンプレート管理画面が開く対象。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定（ルール管理・リスク管理・フェーズ管理と同じ 3 種） */
 export type TemplatesTarget = RulesTarget;
 
-/** 画面の入口（サイドパネルに並ぶ 6 つと、ボードから開くフロー編集・計画編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
+/** 画面の入口（サイドパネルに並ぶ 7 つと、ボードから開くフロー編集・計画編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
 export interface Screens {
   /** ボード。`project` は開いたときの絞り込み（`""` はワークスペース（プロジェクト外）、`"*"` は全部、未指定は前回のまま） */
   readonly board: (project?: string) => Promise<void>;
@@ -32,6 +32,11 @@ export interface Screens {
   readonly risk: (target: RiskTarget) => Promise<void>;
   readonly phases: (target: PhasesTarget) => Promise<void>;
   readonly templates: (target: TemplatesTarget) => Promise<void>;
+  /**
+   * 取り込み待ち画面（`wip/handoff/` の下書きを取り込む）。`tree` は見るツリーの鍵（`main:` はワークスペース、
+   * `project:<名前>`、`worktree:<名前>`）。未指定はワークスペース。タブは 1 枚で、別のツリーを開けば中身を入れ替える
+   */
+  readonly handoff: (tree?: string) => Promise<void>;
   readonly projects: () => Promise<void>;
   /**
    * 子チケット 1 枚のフロー編集画面。ボードのカードの「フロー」からだけ開く。

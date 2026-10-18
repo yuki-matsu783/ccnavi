@@ -1,7 +1,7 @@
 {
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
-  "description": "ccnavi のチケットと、それに付随する提案・承認済みチケット・マーカー・ワークツリーをカンバンで表示します。承認する内容をオーバーレイで確認して承認でき、承認結果やレビュー完了の通知を Claude Code に送れます。ルールと hook を画面で確認し、ルールを直して判定を試せます。実際の変更内容に基づくリスク評価の配点や、フェーズ定義も画面で編集できます。projects/ のプロジェクトを一覧し、git clone をターミナルに送れます。ルール管理とリスク管理では共通・ワークスペース・プロジェクトの設定を、フェーズ管理ではワークスペース・プロジェクトの設定を切り替えて直せます。テンプレート管理では、作業・レビュー計画のテンプレートと下書きを表示し、下書きを取り込めます。ルールとリスクでは、共通の設定との統合結果も読み取り専用で確認できます。",
+  "description": "ccnavi のチケットと、それに付随する提案・承認済みチケット・マーカー・ワークツリーをカンバンで表示します。承認する内容をオーバーレイで確認して承認でき、承認結果やレビュー完了の通知を Claude Code に送れます。ルールと hook を画面で確認し、ルールを直して判定を試せます。実際の変更内容に基づくリスク評価の配点や、フェーズ定義も画面で編集できます。projects/ のプロジェクトを一覧し、git clone をターミナルに送れます。ルール管理とリスク管理では共通・ワークスペース・プロジェクトの設定を、フェーズ管理ではワークスペース・プロジェクトの設定を切り替えて直せます。テンプレート管理では、作業・レビュー計画のテンプレートと下書きを表示します（読むだけ）。取り込み待ちでは、wip/handoff/ に置いた下書き（テンプレート・設定・docs）の差分を読んで、選んだ対象を取り込めます。ルールとリスクでは、共通の設定との統合結果も読み取り専用で確認できます。",
   "version": "0.11.21",
   "publisher": "local",
   "private": true,
@@ -61,6 +61,10 @@
       {
         "command": "ccnaviBoard.openTemplates",
         "title": "ccnavi ボード: テンプレート管理を開く"
+      },
+      {
+        "command": "ccnaviBoard.openHandoff",
+        "title": "ccnavi ボード: 取り込み待ちを開く"
       },
       {
         "command": "ccnaviBoard.openWorkflow",
@@ -143,7 +147,7 @@
             "Claude の配色（ダーク）"
           ],
           "default": "vscode",
-          "description": "ccnavi の 6 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は、背景・枠・文字の色と、意味を表す色を Claude の配色に置き換えます（ハイコントラストのテーマでは置き換えません）。サイドパネルのタイトルバーの配色のアイコンからも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
+          "description": "ccnavi の 7 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は、背景・枠・文字の色と、意味を表す色を Claude の配色に置き換えます（ハイコントラストのテーマでは置き換えません）。サイドパネルのタイトルバーの配色のアイコンからも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
         }
       }
     }
@@ -157,6 +161,7 @@
     "test:phases": "node scripts/test-groups.js phases",
     "test:projects": "node scripts/test-groups.js projects",
     "test:templates": "node scripts/test-groups.js templates",
+    "test:handoff": "node scripts/test-groups.js handoff",
     "test:flow": "node scripts/test-groups.js flow",
     "test:workflow": "node scripts/test-groups.js workflow",
     "test:shared": "node scripts/test-groups.js shared",

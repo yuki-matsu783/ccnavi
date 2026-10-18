@@ -5,7 +5,7 @@
 import type { JSX } from "react";
 
 import { revealControls } from "../../core/templatesmodel.js";
-import type { EditOp, FlowSummary, TemplateDetail, TemplateEntry } from "../../core/templates-view.js";
+import type { FlowSummary, TemplateDetail, TemplateEntry } from "../../core/templates-view.js";
 import { Plan } from "./Plan.js";
 import { Problems } from "./Problems.js";
 import { droppedLabel, flowText, layerLabel } from "./text.js";
@@ -21,23 +21,9 @@ export interface TemplateProps {
   readonly onShow: () => void;
   /** 案内が指す先にする（一覧の最初の 1 件だけ） */
   readonly tour: boolean;
-  /** 編集を使えるか（実行ファイルが持つか）。使えなければ理由 */
-  readonly editEnabled: boolean;
-  readonly editReason: string;
-  /** 編集の欄を開く（押した操作） */
-  readonly onEdit: (op: EditOp) => void;
-  /** 開いている編集の欄。この行のものでなければ null */
-  readonly editPanel: JSX.Element | null;
 }
 
-/** 書ける（共通かプロジェクトの層にある）テンプレートの見出しに出す編集のボタン */
-const EDIT_BUTTONS: readonly { readonly op: EditOp; readonly label: string; readonly action: string }[] = [
-  { op: "rename", label: "改名", action: "rename-template" },
-  { op: "move", label: "移動", action: "move-template" },
-  { op: "delete", label: "削除", action: "delete-template" },
-];
-
-export function Template({ entry, open, onToggle, detail, detailError, onShow, tour, editEnabled, editReason, onEdit, editPanel }: TemplateProps): JSX.Element {
+export function Template({ entry, open, onToggle, detail, detailError, onShow, tour }: TemplateProps): JSX.Element {
   const dropped = entry.dropped;
   return (
     <li className={`row template${open ? " open" : ""}`} data-name={entry.name} data-layer={entry.layer} data-tour={tour ? "template" : undefined}>
@@ -59,26 +45,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
         <span className="tag tpl-layer">{layerLabel(entry.layer)}</span>
         <StateTags entry={entry} />
         {entry.description !== "" && <span className="tpl-desc">{entry.description}</span>}
-        {entry.writable &&
-          EDIT_BUTTONS.map((button) => (
-            <button
-              key={button.action}
-              type="button"
-              className="action small"
-              data-action={button.action}
-              disabled={!editEnabled}
-              title={!editEnabled ? editReason : undefined}
-              onClick={(event) => {
-                event.stopPropagation();
-                onEdit(button.op);
-              }}
-              onKeyDown={(event) => event.stopPropagation()}
-            >
-              {button.label}
-            </button>
-          ))}
       </div>
-      {editPanel}
       {dropped !== null && <p className="hint tpl-dropped">{dropped.detail}</p>}
       {open && (
         <div className="row-body tpl-body">
