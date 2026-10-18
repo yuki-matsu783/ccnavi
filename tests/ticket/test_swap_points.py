@@ -38,7 +38,7 @@ from unittest import mock
 from ccnavi.entry import lint, version
 from ccnavi.infra import fsio, pathcase, settings
 from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets import approval, approval_ops, core, core_base, history, ticket_model
+from ccnavi.tickets import approval, approval_ops, core, core_base, ticket_model, via
 from tests import config_path, requires_symlink
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_phases_dag import DEFS, PLAN
@@ -116,18 +116,18 @@ class CoreHarness(PhaseHarness):
         return out
 
     def snapshot(self):
-        return core.read_fs(self.conf(), self.root, STAMP, core.Actor("", history.VIA_CHROME))
+        return core.read_fs(self.conf(), self.root, STAMP, core.Actor("", via.VIA_CHROME))
 
     def write_changes(self, changes):
         out, err = io.StringIO(), io.StringIO()
-        with history.session(history.VIA_CHROME, err):
+        with via.session(via.VIA_CHROME):
             applied = core.write_fs(out, err, changes.planned)
         return applied, out.getvalue(), err.getvalue()
 
     def plan_local(self, only=None):
         """手元でコアを通して承認する。答えは (Changes, 書いた前後の差分)。"""
         snapshot = self.snapshot()
-        with history.session(history.VIA_CHROME, None):
+        with via.session(via.VIA_CHROME):
             verdict = core.judge_approval(snapshot, only)
             changes = core.plan(snapshot, verdict)
         before = self.disk()
@@ -225,11 +225,9 @@ class CoreHarness(PhaseHarness):
 
 
 class ClockTest(unittest.TestCase):
-    def test_a_fixed_clock_gives_one_instant_to_both_stamps(self):
+    def test_a_fixed_clock_gives_the_stamp(self):
         with fsio.clock("2026-09-29T09:30:05+0900"):
             self.assertEqual(fsio.stamp(), "2026-09-29T09:30:05+0900")
-            self.assertEqual(fsio.utc_stamp(), "2026-09-29T00:30:05Z")
-            self.assertEqual(history.stamp(), "2026-09-29T00:30:05Z")
         self.assertNotEqual(fsio.stamp(), "2026-09-29T09:30:05+0900")
 
     def test_an_unreadable_stamp_is_refused(self):
@@ -237,18 +235,10 @@ class ClockTest(unittest.TestCase):
             pass
 
 
-def _approved_rows(approved_dir: str, ident: str) -> list[dict]:
-    """状態の履歴の `approved` の行。"""
-    path = os.path.join(approved_dir, history.EVENTS_DIR, ident + history.SUFFIX)
-    with open(path, encoding="utf-8") as f:
-        rows = [json.loads(line) for line in f if line.strip()]
-    return [r for r in rows if r.get("kind") == history.KIND_APPROVED]
-
-
 class SourcePathTest(CoreHarness):
-    """承認は提案の中身を変えない。出所（ブランチ名）は状態の履歴に残る。"""
+    """承認は提案の中身を変えない。"""
 
-    def test_the_copy_is_the_proposal_and_the_history_records_the_branch(self):
+    def test_the_copy_is_the_proposal(self):
         text = parent_text("i0001", ["research"])
         self.propose("i0001", text)
         self.commit_parent()
@@ -262,7 +252,6 @@ class SourcePathTest(CoreHarness):
         path = os.path.join(self.approved, "doing", "i0001.md")
         with open(path, "rb") as f:
             self.assertEqual(before, f.read())
-        self.assertEqual([r.get("tree") for r in _approved_rows(self.approved, "i0001")], ["i0001"])
 
     def test_a_crlf_proposal_moves_byte_for_byte(self):
         text = parent_text("i0001", ["research"]).replace("\n", "\r\n")
@@ -311,20 +300,8 @@ class BranchOfTest(unittest.TestCase):
         self.assertEqual(tree.branch_of(root), "i0001")
 
 
-class SourceBranchTest(CoreHarness):
-    """履歴の `tree` はブランチ名。分からなければツリーの名前（`per_branch` と同じ決め方）。"""
-
-    def approve_one(self):
-        self.propose("i0001", parent_text("i0001", ["research"]))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        return _approved_rows(self.approved, "i0001")[-1].get("tree")
-
-    @staticmethod
-    def approved_tree(rows):
-        events = next(r for r in rows if r["path"].endswith("events/i0001.jsonl"))
-        found = [json.loads(line) for line in events["content"].decode().splitlines()]
-        return [r.get("tree") for r in found if r.get("kind") == history.KIND_APPROVED]
+class DetachedHeadTest(CoreHarness):
+    """親のワークツリーの HEAD がブランチを指していなければ承認しない。"""
 
     def test_a_detached_head_is_not_approved(self):
         # 親のワークツリーの HEAD がブランチを指していなければ、ほかのツリーで代用せずに止まる
@@ -334,9 +311,6 @@ class SourceBranchTest(CoreHarness):
         self.assertNotEqual(self.approve().returncode, 0)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
-    def test_the_branch_name_is_recorded_from_the_head(self):
-        self.assertEqual(self.approve_one(), "i0001")
-
 
 class PlanWriterTest(CoreHarness):
     """plan は書かない。Writer(FS) が書いた結果は plan の Changes のとおり。"""
@@ -344,7 +318,7 @@ class PlanWriterTest(CoreHarness):
     def plan_and_write(self, only=None):
         snapshot = self.snapshot()
         before = self.disk()
-        with history.session(history.VIA_CHROME, None):
+        with via.session(via.VIA_CHROME):
             verdict = core.judge_approval(snapshot, only)
             changes = core.plan(snapshot, verdict)
         self.assertEqual(self.disk(), before, "plan がディスクを書いた")
@@ -374,16 +348,11 @@ class PlanWriterTest(CoreHarness):
             [
                 ("create", ".ccnavi/approved/doing/i0001-01-01.md"),
                 ("create", ".ccnavi/approved/doing/i0001.md"),
-                ("create", ".ccnavi/approved/events/i0001-01-01.jsonl"),
-                ("create", ".ccnavi/approved/events/i0001.jsonl"),
                 # 待ち方は書かない（承認済みチケットの計画から都度計算する）
                 ("delete", "wip/proposals/todo/i0001-01-01.md"),
                 ("delete", "wip/proposals/todo/i0001.md"),
             ],
         )
-        event = json.loads(rows[3]["content"].decode())
-        self.assertEqual(event["at"], "2026-09-29T03:00:00Z")
-        self.assertEqual(event["tree"], "i0001")
         # 承認済みチケットは提案のバイト列のまま（承認の記録を書き足さない）
         self.assertEqual(rows[1]["content"], parent_text("i0001", ["research", "design"]).encode())
 
@@ -446,7 +415,7 @@ class DurableWiringTest(CoreHarness):
 
     def planned(self):
         snapshot = self.snapshot()
-        with history.session(history.VIA_CHROME, None):
+        with via.session(via.VIA_CHROME):
             return core.plan(snapshot, core.judge_approval(snapshot))
 
     def test_approval_writes_the_ticket_durably_and_no_workflow(self):
@@ -521,7 +490,7 @@ class WriterFailureTest(CoreHarness):
 
     def planned(self):
         snapshot = self.snapshot()
-        with history.session(history.VIA_CHROME, None):
+        with via.session(via.VIA_CHROME):
             return core.plan(snapshot, core.judge_approval(snapshot))
 
     def failing(self, name, when):
@@ -594,16 +563,6 @@ class WriterFailureTest(CoreHarness):
         self.assertIn("ccnavi: i0001: 改版の提案を todo/ から削除できない (わざと失敗させた)", err)
         self.assertIn("i0001 の全体計画を改版した", out)
 
-    def test_an_unwritable_history_is_a_warning(self):
-        self.propose("i0001", parent_text("i0001", ["research"]))
-        self.commit_parent()
-        changes = self.planned()
-        with self.failing("append", lambda path, data: path.endswith(".jsonl")):
-            applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("ccnavi: 警告: i0001 の履歴（approved）を", err)
-        self.assertIn("（わざと失敗させた）。状態は動いた", err)
-
     def reopened(self):
         self.family(plan=["design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
@@ -615,10 +574,6 @@ class WriterFailureTest(CoreHarness):
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         return marks
-
-    def reopened_events(self):
-        events, _ = history.read(self.approved, "i0001")
-        return [e for e in events if e["kind"] == history.KIND_PHASE_REOPENED]
 
     def test_a_reviewed_mark_that_cannot_be_removed_stops(self):
         """reviewed を消せなければ止める。ほかの種類には手を付けない。"""
@@ -632,11 +587,10 @@ class WriterFailureTest(CoreHarness):
         self.assertIn("ここで止める", err)
         self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
         self.assertTrue(os.path.exists(os.path.join(marks, "1.reviewed")))
-        self.assertEqual(self.reopened_events(), [])
         self.assertNotIn("を削除した", out)
 
     def test_another_mark_that_cannot_be_removed_is_said_and_left(self):
-        """reviewed 以外は言って続ける。行と履歴は実際に消せた種類だけ。"""
+        """reviewed 以外は言って続ける。行は実際に消せた種類だけ。"""
         marks = self.reopened()
         changes = self.planned()
         # 見え方（Chrome の 1 コミット）では両方消える。
@@ -654,7 +608,6 @@ class WriterFailureTest(CoreHarness):
         self.assertIn("マーカー（reviewed）を削除しました", out)
         self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
-        self.assertEqual([e["cleared"] for e in self.reopened_events()], [["reviewed"]])
 
     @requires_symlink
     def test_a_mark_that_is_a_link_is_removed_as_a_link(self):
@@ -702,12 +655,7 @@ def _normalized(changes):
             content = row.get("content")
             if isinstance(content, str):
                 content = row["content"] = content.replace("\r\n", "\n")
-            if content is not None and row["path"].endswith(".jsonl"):
-                lines = [json.loads(line) for line in content.splitlines() if line]
-                for line in lines:
-                    line.pop("via", None)
-                row["content"] = lines
-            elif content is not None and row["path"].endswith(".reviewed"):
+            if content is not None and row["path"].endswith(".reviewed"):
                 mark = json.loads(content)
                 mark.pop("via", None)
                 row["content"] = mark
@@ -951,14 +899,12 @@ class CoreChromeTest(CoreHarness):
         # 無い（承認済みチケットの計画から都度計算する）。
         held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
         self.assertFalse(os.path.exists(held))
-        request = self.chrome_request(
-            "withdraw", "i0001", ids=["i0001"], prior={"i0001": text}, reason="押し間違い"
-        )
+        request = self.chrome_request("withdraw", "i0001", ids=["i0001"], prior={"i0001": text})
         answer = self.ask_chrome(request)
         self.assertEqual(answer["problems"], [])
         self.assertIsNone(answer["code"])
         before = self.disk()
-        checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()}, "押し間違い")
+        checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()})
         self.assertEqual(checked.problems, [])
         self.assertEqual(answer["lines"], checked.changes.lines)
         applied, out, err = self.write_changes(checked.changes)
@@ -971,10 +917,6 @@ class CoreChromeTest(CoreHarness):
             self.assertEqual(f.read(), text)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         self.assertFalse(os.path.exists(held))
-        events, _ = history.read(self.approved, "i0001")
-        self.assertEqual(events[-1]["kind"], history.KIND_WITHDRAWN)
-        self.assertEqual(events[-1]["via"], history.VIA_CHROME)
-        self.assertEqual(events[-1]["reason"], "押し間違い")
         self.keep_scenario("withdraw", request, answer)
 
     def host_compare(self):
@@ -1045,13 +987,6 @@ class CoreChromeTest(CoreHarness):
         self.assertEqual(
             json.loads(mark["content"]), {"mr": 7, "accepted": [], "via": "chrome", "at": STAMP}
         )
-        event = [
-            json.loads(line)
-            for row in answer["changes"]["i0001"]
-            if row["path"].endswith(".jsonl")
-            for line in row["content"].splitlines()
-        ][-1]
-        self.assertEqual(event["via"], history.VIA_CHROME)
         self.keep_scenario("confirm", request, answer)
 
     def test_an_unreadable_stamp_is_an_error_not_an_exception(self):
@@ -1730,7 +1665,7 @@ class RecordWritesTest(CoreHarness):
             # なく、C1 の書いたパスの一覧に載せるものでもない。
             ("gitstate", "shutil.move(source, target)"),
         }
-        names = ("tickets.approval", "tickets.agree", "tickets.history", "tickets.configsync")
+        names = ("tickets.approval", "tickets.agree", "tickets.via", "tickets.configsync")
         names += ("tickets.ops", "tickets.flow", "tickets.risk", "tickets.core", "tickets.review")
         names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
         names += ("tickets.approval_marks", "tickets.approval_checks", "tickets.approval_times")

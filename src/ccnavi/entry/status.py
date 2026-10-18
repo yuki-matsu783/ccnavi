@@ -2,7 +2,7 @@
 
 エージェントがファイルと `git status` を読んで推測すると、手で置いた承認（欄が無く未コミット）を
 「承認が途中で止まった」と読み違える。承認はチケットの中身を変えないので、どの経路で承認したかは
-中身からは分からない。分かるのは置き場・状態の履歴・git で、それを読んで言い切るのがここ。
+中身からは分からない。分かるのは置き場・git で、それを読んで言い切るのがここ。
 
 `.ccnavi/scripts/ccnavi-ticket.sh status [<親>]` が呼ぶ。親を渡せばその親子のチケットを、
 渡さなければ作業中・レビュー待ち・承認待ちのチケットがある親子を全部、閉じたものも含めて出す。
@@ -29,7 +29,6 @@ from ..tickets import (
     approval_checks,
     approval_times,
     c1,
-    history,
     ops_stop,
     overview,
     phase,
@@ -141,7 +140,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
     fams = syncstate.Families(conf, root)
     sync = settings.script_command(root, "ccnavi-sync.sh")
     stdout.write(
-        "ccnavi: チケットの状態。手元の置き場・状態の履歴・git だけを読む"
+        "ccnavi: チケットの状態。手元の置き場・git だけを読む"
         "（リモートからの取得は行いません）。\n"
         "  push済みかどうかは、最後に取得したリモートの状態に基づくため、"
         f"最新の状態と異なる場合があります。最新にするには先に '{sync} <親>' を実行してください。\n"
@@ -296,13 +295,6 @@ class _Family:
                     "取り込み済みの親子（C1 の対象）で、承認済みチケットが親のブランチに"
                     "未コミット。ユーザがコミットして push するまで start は実行できません"
                 )
-        else:
-            if not _started_recorded(self.conf, t):
-                warns.append(
-                    "着手の欄（started_at）があるのに、状態の履歴に着手（started）の行がありません。"
-                    "start を通さずに書かれた欄かもしれない。ユーザに started_at と base_sha を"
-                    "確かめてもらう"
-                )
         # 基準点が HEAD の祖先でないのは warn。`start` は止めない（基準点を HEAD で書き直す）。
         off = ops_stop.base_off_head(self.root, self.conf, t)
         if off:
@@ -386,14 +378,6 @@ class _Family:
                 "子チケットより先に、親チケットを開始してください。"
             )
         return ""
-
-
-def _started_recorded(conf: settings.Settings, t: ticket_model.Ticket) -> bool:
-    """状態の履歴に着手の行があるか。読めなければ、あるとみなす（言わない側）。"""
-    if not t.tree_root:
-        return True
-    entries, why = history.read(settings.approved_dir(conf, t.tree_root), t.ticket, limit=0)
-    return bool(why) or any(x.get("kind") == history.KIND_STARTED for x in entries)
 
 
 def _file_states(root: str, found: list[ticket_model.Ticket]) -> dict[str, FileState]:

@@ -89,7 +89,7 @@ test("CX-T130 変更の一覧（compare）: 祖先から進んだぶんだけを
   assert.deepEqual(await gh.compareFiles(c, "acme", "widgets", at, head), { base: at, head, files: [REQUESTED] });
   // GitHub は一覧を 300 件で切る。300 件あれば打ち切られたとみなす
   const many: Record<string, string> = {};
-  for (let i = 0; i < gh.COMPARE_FILES_LIMIT; i += 1) many[`.ccnavi/approved/events/x${i}.jsonl`] = `${i}\n`;
+  for (let i = 0; i < gh.COMPARE_FILES_LIMIT; i += 1) many[`.ccnavi/approved/phases/x/${i}.pending`] = `${i}\n`;
   mock.push(FAMILY, many);
   assert.equal((await gh.compareFiles(c, "acme", "widgets", at, mock.head(FAMILY) as string)).files, null);
   mock.branch("other", "main");
@@ -148,8 +148,6 @@ test("CX-T132 レビュー済みにする: 子を done/ へ動かし、マーカ
   assert.deepEqual([mark.mr, mark.accepted, mark.actor, mark.via], [42, [], LOGIN, "chrome"]);
   assert.ok(`.ccnavi/approved/done/${FAMILY}-01-01.md` in files);
   assert.ok(!(`wip/proposals/review/${FAMILY}-01-01.md` in files));
-  const last = JSON.parse(files[`.ccnavi/approved/events/${FAMILY}.jsonl`].trim().split("\n").pop() as string);
-  assert.deepEqual([last.kind, last.mark, last.via, last.actor, last.version], ["phase-mark", "reviewed", "chrome", LOGIN, "9.9.9"]);
   // 書いた後のボードからは候補が消える
   const { fam } = await panelOf(mock);
   assert.deepEqual(fam.reviews, []);
@@ -183,7 +181,7 @@ test("CX-T134 依頼の後にユーザが見るもの（置き場の外）が動
   assert.equal(mock.commitCalls.length, 0);
 
   const ok = reviewing("resolved");
-  ok.push(FAMILY, { [`.ccnavi/approved/events/${FAMILY}.jsonl`]: '{"at": "2026-09-29T00:00:00Z", "ticket": "i0004", "kind": "phase-mark", "via": "hook", "phase": 1, "mark": "pending"}\n' });
+  ok.push(FAMILY, { [`.ccnavi/approved/phases/${FAMILY}/1.pending`]: '{"at": "2026-09-29T00:00:00+0000"}\n' });
   assert.equal((await confirmPhase(REPO, FAMILY, 1, depsFor(ok))).kind, "written");
 });
 

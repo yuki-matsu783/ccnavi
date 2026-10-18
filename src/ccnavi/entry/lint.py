@@ -22,7 +22,6 @@ import io
 import json
 import os
 import re
-from dataclasses import replace
 from typing import TextIO
 
 from ..hook import ccnavimd, judge
@@ -37,7 +36,6 @@ from ..tickets import (
     flow_render,
     flow_shape,
     flow_text,
-    history,
     phasetypes,
     risk,
     syncstate,
@@ -579,20 +577,11 @@ def family_check(
     problems: list[Problem] = []
     for t in mine:
         # チケットごとに判定し直し、error がどのチケットのものかを構造で持つ（文面の書式に頼らない）
-        found = [
+        problems.extend(
             p
             for p in lint_ticket._copy_problems(root, conf, [t], index, closed)
             if p.severity == SEVERITY_ERROR
-        ]
-        written = _written_by_chrome(conf, t) if found else None
-        if written is not None:
-            found = [
-                replace(
-                    p, detail=f"Chrome {written} と手元 {version.VERSION} で判定が違う: {p.detail}"
-                )
-                for p in found
-            ]
-        problems.extend(found)
+        )
     # 親のワークツリーの中の読めないチケットも止める理由（読めないチケットはリストに入らないので、
     # 判定し直しの対象から気づかないうちに外れる）。
     if st.home is not None:
@@ -605,25 +594,3 @@ def family_check(
     if st.stop and not st.closed:
         problems.append(Problem(SEVERITY_ERROR, where, st.stop))
     return problems
-
-
-def _written_by_chrome(conf: settings.Settings, t: ticket_model.Ticket) -> str | None:
-    """この承認済みチケットを最後に書いたのが Chrome 拡張なら、その拡張の版。
-    そうでなければ None。
-
-    履歴の最後の行が Chrome（`via: chrome`）の承認か改版のときだけ Chrome が書いたとみなす。
-    その後に手元の
-    操作（着手・マーカーなど）の履歴があれば、違いが手元の操作から来ることもあるので名指ししない。
-    互換の版が同じなら Chrome と手元は同じ答えを出すはずで、違えば不具合として版を名指しする
-    （止めるかどうかは変えない。親子のチケットの取り込み状態を `blocked` にするのは sh）。
-    """
-    events, _ = history.read(settings.approved_dir(conf, t.tree_root), t.ticket)
-    if not events:
-        return None
-    last = events[-1]
-    if last.get("via") != history.VIA_CHROME or last.get("kind") not in (
-        history.KIND_APPROVED,
-        history.KIND_REVISED,
-    ):
-        return None
-    return str(last.get("version") or "?")

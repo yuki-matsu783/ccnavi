@@ -17,14 +17,14 @@
 - Writer(FS): `write_fs` が Changes をディスクに書く。fsio を通るので、C1 の記録層
   （`fsio.recording`）がそのまま使われる
 - Clock: 時刻は `Snapshot.stamp`（空なら今）。plan の間は `fsio.clock` で固定し、承認の
-  記録と履歴に同じ時刻を書く
+  記録に同じ時刻を書く
 
 判定そのもの（`agree.gather` / `candidates` / `waiting`、`review` の検査）は今のコードを
 そのまま通る。ここは入口と出口の形を揃えるだけで、判定は変えない。
 
 このモジュールは入力・判定・書き込みの共通部分だけを持つ。`confirm` の答え（`Checked`）と
-`reviewed_mark`、並べる段で履歴を書けないと分かったときの知らせ（`unwritten`）も、
-`core_review` と `core_withdraw` の両方が使うのでここに置く。他の `core_*` はこのモジュールを読み、
+`reviewed_mark` も、`core_review` と `core_withdraw` の両方が使うのでここに置く。
+他の `core_*` はこのモジュールを読み、
 `core` は全部を読んで名前を再エクスポートする（呼び出し側は `core.<名前>` のまま引く）。
 
 """
@@ -41,7 +41,6 @@ from . import (
     agree,
     agree_candidates,
     agree_digest,
-    history,
     review,
 )
 
@@ -52,12 +51,11 @@ from . import (
 class Actor:
     """誰がどの経路で動かしたか。`account` はホストのアカウント名か、手元ではトークンの持ち主。
 
-    空なら書かない（マーカーと履歴の中身を前のままにする）。
+    空なら書かない（マーカーの中身を前のままにする）。
     """
 
     account: str = ""
     via: str = ""
-    version: str = ""
 
 
 @dataclass
@@ -242,11 +240,10 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: agree.Planned) -> agree.Ap
     - `FAIL_WARN`: 同じ形で言って続ける
     - `FAIL_LINE`: 行を出し、同じ組の残り（続く書き込みと行）を飛ばす
     - `FAIL_QUIET`: 何も出さずに続ける
-    - `FAIL_HISTORY`: 履歴の書けなかった知らせに溜める（入口が警告で出す）
 
     並べる段で止まっていたら（`planned.stopped`）、並べた分を書いてから同じ形で言って止める。
-    `view_only` の書き込みは書かない。`Call` は同じ組で書けた名札（`tag`）を渡して呼び、
-    返った行を出す（マーカーの消去の行と履歴は、実際に消せた種類で書く）。
+    `Call` は同じ組で書けた名札（`tag`）を渡して呼び、
+    返った行を出す（マーカーの消去の行は、実際に消せた種類で書く）。
     """
     placed: list[str] = []
     skipped: set[int] = set()
@@ -261,8 +258,6 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: agree.Planned) -> agree.Ap
         if isinstance(item, fsio.Call):
             for line in item.run(done.get(item.group, set())):
                 stdout.write(line + "\n")
-            continue
-        if item.view_only:
             continue
         failed = _write_op(item)
         rule = item.policy
@@ -285,8 +280,6 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: agree.Planned) -> agree.Ap
         elif rule.on_fail == fsio.FAIL_LINE:
             stdout.write(f"  {message}\n")
             skipped.add(rule.group)
-        elif rule.on_fail == fsio.FAIL_HISTORY:
-            history.failed_to_write(message)
     if planned.stopped is not None:
         ticket_id, reason = planned.stopped
         stderr.write((f"ccnavi: {ticket_id}: " if ticket_id else "ccnavi: ") + reason + "\n")
@@ -320,8 +313,6 @@ def _write_op(op: fsio.Op) -> str:
         if os.path.lexists(op.path):
             return "移動先に既にある"
         return fsio.move(op.source, op.path)
-    if op.kind == fsio.OP_APPEND:
-        return fsio.append(op.path, op.data)
     if op.kind == fsio.OP_REPLACE:
         return fsio.replace_bytes(op.path, op.content or b"", op.temp_suffix)
     return f"未対応の書き込みの種類: {op.kind}"
@@ -354,8 +345,6 @@ class Checked:
 
 
 # 通らなかった根拠の種別。付録 A の `CORE_*`。
-# 書く段で履歴を残せないと分かった（`unwritten`）。確認と取り下げで共通。
-CODE_HISTORY_UNWRITABLE = "CORE_HISTORY_UNWRITABLE"
 
 
 def tagged(code: str, line: str) -> str:
@@ -371,12 +360,3 @@ def refused(code: str, problems: list[str]) -> Checked:
     lines = list(problems) or [f"ccnavi: {code}"]
     lines[0] = tagged(code, lines[0])
     return Checked(lines, None, code)
-
-
-def unwritten(text: str) -> list[str]:
-    """並べる段で履歴を書けないと分かった知らせ。書いても履歴が残らないので、error として返す。
-
-    手元の Writer(FS) なら警告で続ける所だが、ここで分かるのは書く前（識別子の形が違う、
-    リンクになっている）なので、書かずに止めて直させる。
-    """
-    return [line.replace("ccnavi: 警告: ", "ccnavi: ", 1) for line in text.splitlines() if line]

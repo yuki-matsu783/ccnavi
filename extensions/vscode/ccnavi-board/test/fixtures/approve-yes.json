@@ -14,10 +14,8 @@
  "written": [
   ".claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md",
   ".claude/worktrees/i0001/wip/proposals/todo/i0001.md",
-  ".claude/worktrees/i0001/.ccnavi/approved/events/i0001.jsonl",
   ".claude/worktrees/i0001/.ccnavi/approved/doing/i0001-01-01.md",
-  ".claude/worktrees/i0001/wip/proposals/todo/i0001-01-01.md",
-  ".claude/worktrees/i0001/.ccnavi/approved/events/i0001-01-01.jsonl"
+  ".claude/worktrees/i0001/wip/proposals/todo/i0001-01-01.md"
  ],
  "worktrees": [
   {

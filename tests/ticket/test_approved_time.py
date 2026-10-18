@@ -1,8 +1,8 @@
 """承認の時刻。承認は承認済みチケットに時刻を書かないので、表示（ボードの JSON と `--explain`）は
-状態の履歴 → `doing/` に足したコミット → 「未コミット（手で置いた）」の順で引く。
+`doing/` に足したコミット → 「未コミット（手で置いた）」の順で引く。
 
-git はツリーごとに 1 回だけ打つ。git の無い場（Chrome の Pyodide）では履歴だけを読む。
-判定の拒否文には時刻を出さない（hook の中では履歴も git も読まない）。
+git はツリーごとに 1 回だけ打つ。git の無い場（Chrome の Pyodide）では分からない。
+判定の拒否文には時刻を出さない（hook の中では git も読まない）。
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import gitcmd, settings
-from ccnavi.tickets import approval, approval_times, history
+from ccnavi.tickets import approval, approval_times
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text
@@ -35,18 +35,10 @@ class ApprovedTimeTest(PhaseHarness):
         return next(t for t in board["tickets"] if t["ticket"] == ident)["copy"]
 
     def move_by_hand(self, ident, text, commit=True):
-        """GitHub の画面での移動と同じく、提案を doing/ へ動かす（状態の履歴は書かない）。"""
+        """GitHub の画面での移動と同じく、提案を doing/ へ動かす。"""
         write(os.path.join(self.approved, "doing", ident + ".md"), text)
         if commit:
             self.commit_parent(f"Rename {ident}")
-
-    def test_the_history_is_read_first(self):
-        self.family(plan=["research"])
-        copy = self.board_copy("i0001")
-        events, _ = history.read(self.approved, "i0001")
-        approved = [e for e in events if e["kind"] == history.KIND_APPROVED]
-        self.assertEqual(copy["approved_at"], approved[-1]["at"])
-        self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_HISTORY)
 
     def test_a_committed_manual_approval_reads_the_commit_time(self):
         self.family(plan=["research"])
@@ -73,9 +65,8 @@ class ApprovedTimeTest(PhaseHarness):
         self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_COMMIT)
 
     def test_a_reapproval_after_a_withdrawal_reads_the_commit_time(self):
-        """取り下げのあとに手で動かして承認し直したら、前の承認の行は使わず、コミットの時刻を読む。"""
+        """取り下げのあとに手で動かして承認し直したら、コミットの時刻を読む。"""
         self.family(plan=["research"])
-        history.note(self.approved, "i0001", history.KIND_WITHDRAWN, "doing", "todo")
         text_path = os.path.join(self.approved, "doing", "i0001.md")
         with open(text_path, encoding="utf-8") as f:
             text = f.read()
@@ -114,7 +105,7 @@ class ApprovedTimeTest(PhaseHarness):
         with mock.patch.object(gitcmd, "run", counted):
             times = approval_times.approved_times(self.conf(), list(found.values()))
         self.assertEqual(runs, ["log"])
-        self.assertEqual(times[found["i0001"].path].source, approval_times.APPROVED_FROM_HISTORY)
+        self.assertEqual(times[found["i0001"].path].source, approval_times.APPROVED_FROM_COMMIT)
         self.assertEqual(
             times[found["i0001-01-02"].path].source, approval_times.APPROVED_FROM_COMMIT
         )
@@ -123,12 +114,6 @@ class ApprovedTimeTest(PhaseHarness):
             times = approval_times.approved_times(self.conf(), list(found.values()), use_git=False)
         self.assertEqual(runs, [])
         self.assertNotIn(found["i0001-01-02"].path, times)
-
-    def test_a_raised_followup_reads_raised(self):
-        self.family(plan=["research"])
-        with history.session(history.VIA_TERMINAL, None):
-            history.note(self.approved, "i0001-01-07", history.KIND_RAISED, None, "doing")
-        self.assertTrue(approval_times.history_time(self.approved, "i0001-01-07"))
 
     def test_the_refusal_text_does_not_carry_the_approval_time(self):
         self.family(plan=["research"])

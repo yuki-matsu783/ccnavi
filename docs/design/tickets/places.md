@@ -19,7 +19,6 @@ keywords: [置き場, 提案, 承認済みチケット, マーカー, wip/propos
 | 閉じたチケットの退避 | ワークスペースの `logs/archive/<リポジトリ>/`（承認済みの領域と同じ構成）と、ready のマーカー `ready/<親>.json` | `ccnavi-review.sh ready`（実行ファイルの `review ready`）だけ。エージェントの書き込みは記録の保護が止める | 入れない（`logs/` は git が追跡しない） |
 | 子の記録 | 同 `phases/<親>/<子>.risk.json` / `.judge.json` / `.flow.json`（着手のときのフローのハッシュ。9.3.1） | `ticket finish` / `ticket record-risk` / `ticket start` | 親のブランチにコミット |
 | 気づきの記録 | 子（と親）のワークツリーの `wip/handoff/learnings/<識別子>.md` と `.digest.json`（9.16）。直接作業は `docs/wiki/inbox/`、ルートは `wip/handoff/inbox/` | `ticket learn`、子のセッション | 子の合流で親のブランチへ届く。`wip/handoff/` の分は統合で外れる |
-| 状態の履歴 | 同 `events/<識別子>.jsonl`（9.6。1 行 1 JSON の追記だけ） | 状態を動かす実行ファイル（承認・`ticket` と `review` の副命令・`--reviewed`・`close-early`・hook の告知）。書き換え・消すコードは無い | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごとコミットして push する） |
 | 子のフロー | 同 `flows/<子>.yml`（9.3.1） | ユーザ（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごとコミットして push する） |
 | 子のフローの下書き | フローと同じツリーの `wip/proposals/flows/<子>.yml`（9.3.1。効力は無い） | 頼まれたエージェント。ユーザがフロー編集画面で取り込み、保存が成功したら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-push-approved.sh` がフローと一緒にコミットして push する |
 | テンプレートの下書き | 提案の置き場の `wip/proposals/templates/<名前>.yml`（そのツリーの。プロジェクトのツリーならそのプロジェクトの下。9.15。効力は無い） | 頼まれたエージェント（`ccnavi --templates --draft <親>` か直接）。ユーザが `ccnavi --templates --import` で取り込み、書けたら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-push-approved.sh` が承認済みチケットの置き場の変更と一緒にコミットして push する |

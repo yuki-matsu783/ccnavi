@@ -75,7 +75,7 @@ test("CX-T062 承認と取り下げで Python に投げた要求（plan・withdr
   const r = board.families.find((f) => f.family.name === "i0001")?.result;
   const shown = { ids: (r?.batch ?? []).map((e) => e.ticket), digest: r?.digest ?? "", only: r?.only ?? null };
   assert.equal((await approveFamily(repo, "i0001", shown, d)).kind, "written");
-  assert.equal((await withdrawTicket(repo, "i0001", "i0001", "押し間違い", d)).kind, "written");
+  assert.equal((await withdrawTicket(repo, "i0001", "i0001", d)).kind, "written");
   const ops = new Set(log.map((l) => l.req.op));
   for (const op of ["board", "plan", "withdraw"]) assert.ok(ops.has(op), op);
   for (const { req, res } of log) {

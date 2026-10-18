@@ -33,9 +33,9 @@ async function until(pred: () => boolean, what = "条件"): Promise<void> {
   assert.fail(`${what} にならなかった`);
 }
 
-function harness(opts: { confirm?: boolean; prompt?: string | null; ops?: Partial<BoardOps>; repos?: RepoConfig[]; tokenNotice?: { level: string; text: string } | null } = {}) {
+function harness(opts: { confirm?: boolean; ops?: Partial<BoardOps>; repos?: RepoConfig[]; tokenNotice?: { level: string; text: string } | null } = {}) {
   const store: Record<string, unknown> = { repos: opts.repos ?? [REPO] };
-  const log = { confirm: [] as string[], prompt: [] as string[], set: [] as Record<string, unknown>[], get: [] as string[], sent: [] as unknown[], collect: 0, options: 0 };
+  const log = { confirm: [] as string[], set: [] as Record<string, unknown>[], get: [] as string[], sent: [] as unknown[], collect: 0, options: 0 };
   const timers: (() => void)[] = [];
   let editing = false;
   const env: BoardEnv = {
@@ -63,10 +63,6 @@ function harness(opts: { confirm?: boolean; prompt?: string | null; ops?: Partia
     confirm: (m) => {
       log.confirm.push(m);
       return opts.confirm ?? true;
-    },
-    prompt: (m) => {
-      log.prompt.push(m);
-      return opts.prompt === undefined ? "理由" : opts.prompt;
     },
     startWorker: () => ({ call: async () => ({}), init: async () => ({ boot_ms: 10, import_ms: 20, total_ms: 30, pyodide: "0.test", violations: [] }) }),
     blobCache: async () => ({ get: async () => undefined, put: async () => undefined }),
@@ -150,7 +146,7 @@ test("CX-T221 確認のダイアログで断れば何も書かない（承認・
     withdrawTicket: async () => (calls.push("withdraw"), WRITTEN),
     startIssue: async () => (calls.push("start"), { kind: "started", name: "feature-1-x", head: "abcdef0123", mr: { number: 7, url: "https://example.invalid/7" } }),
   };
-  const h = harness({ confirm: false, prompt: null, ops });
+  const h = harness({ confirm: false, ops });
   await h.c.refresh();
   const loads = h.log.collect;
   const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
@@ -166,8 +162,7 @@ test("CX-T221 確認のダイアログで断れば何も書かない（承認・
     await until(() => !h.c.snapshot().busy, "押せる状態");
     assert.equal(h.c.snapshot().state, "done");
   }
-  assert.equal(h.log.confirm.length, 3);
-  assert.equal(h.log.prompt.length, 1);
+  assert.equal(h.log.confirm.length, 4);
   assert.deepEqual(calls, []);
   assert.deepEqual(h.log.set, []);
   assert.equal(h.log.collect, loads);

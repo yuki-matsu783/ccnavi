@@ -19,7 +19,7 @@ import { approveFamily, fileChanges, localStamp, MAX_ROUNDS, withdrawTicket, typ
 import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { deps, hostCall, memoryCache, newStats } from "./helpers/host.js";
 import { COMPAT } from "./helpers/compat.js";
-import { blobSha, LOGIN, MockGitHub, TOKEN } from "./helpers/mock-github.js";
+import { blobSha, MockGitHub, TOKEN } from "./helpers/mock-github.js";
 import { pyodidePy } from "./helpers/python.js";
 
 let py: PyCall;
@@ -67,7 +67,6 @@ function shownOf(b: RepoBoard, family: string) {
 
 const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
-const EVENTS = ".ccnavi/approved/events/i0001.jsonl";
 const WORKFLOW = ".ccnavi/approved/phases/i0001/workflow.yml";
 
 test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足す・消すは Python の Changes のとおり。書いた後の中身も確かめる", async () => {
@@ -83,15 +82,13 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   assert.equal(call.headline, `ccnavi: i0001 を承認（Chrome 拡張 ${VERSION}）`);
   assert.deepEqual(call.deletions, [{ path: TODO }]);
   // 待ち方のファイルは書かない（承認済みチケットの計画の項の after から都度計算する）
-  assert.deepEqual(call.additions.map((a) => a.path).sort(), [DOING, EVENTS].sort());
-  // 書いた中身: 提案のままの承認済みチケット（欄を書き足さない）、状態の履歴（経路・アカウント・拡張の版）
+  assert.deepEqual(call.additions.map((a) => a.path).sort(), [DOING].sort());
+  // 書いた中身: 提案のままの承認済みチケット（欄を書き足さない）
   const files = mock.files("i0001");
   assert.ok(!(TODO in files));
   assert.equal(files[DOING], proposal);
   assert.doesNotMatch(files[DOING], /^ccnavi_approved:/m);
   assert.ok(!(WORKFLOW in files));
-  const event = JSON.parse(files[EVENTS].trim().split("\n").pop() as string);
-  assert.deepEqual({ kind: event.kind, via: event.via, actor: event.actor, version: event.version }, { kind: "approved", via: "chrome", actor: LOGIN, version: VERSION });
   // 統合先・ほかのブランチには書かない
   assert.ok(mock.commitCalls.every((c) => c.branch === "i0001"));
   // 承認した後のボード: 承認待ちから消え、作業中の承認済みチケットとして出る。子の提案があるので
@@ -209,7 +206,7 @@ test("CX-T105 互換の版が違えば承認も取り下げも書かない（7.3
   const out = await approveFamily(REPO, "i0001", shownOf(b, "i0001"), d);
   assert.equal(out.kind, "refused");
   assert.match(out.kind === "refused" ? out.message : "", /拡張を更新してください/);
-  const w = await withdrawTicket(REPO, "i0001", "i0001", "", d);
+  const w = await withdrawTicket(REPO, "i0001", "i0001", d);
   assert.equal(w.kind, "refused");
   assert.equal(mock.commitCalls.length, 0);
   const dom = new JSDOM("<!doctype html><body></body>");
@@ -224,7 +221,7 @@ test("CX-T106 取り下げ: 承認コミットの親の提案をバイト列の�
   assert.equal((await approveFamily(REPO, "i0001", shownOf(await board(d), "i0001"), d)).kind, "written");
   // 承認の後に関係の無い merge が積まれても、承認コミットを引ける
   mock.merge("i0001", "feature-x");
-  const out = await withdrawTicket(REPO, "i0001", "i0001", "押し間違い", d);
+  const out = await withdrawTicket(REPO, "i0001", "i0001", d);
   assert.equal(out.kind, "written", JSON.stringify(out));
   const call = mock.commitCalls[mock.commitCalls.length - 1];
   assert.equal(call.headline, `ccnavi: i0001 の承認を取り下げ（Chrome 拡張 ${VERSION}）`);
@@ -233,11 +230,6 @@ test("CX-T106 取り下げ: 承認コミットの親の提案をバイト列の�
   assert.equal(files[TODO], original);
   assert.ok(!(DOING in files));
   assert.ok(!(WORKFLOW in files));
-  const event = JSON.parse(files[EVENTS].trim().split("\n").pop() as string);
-  assert.deepEqual(
-    { kind: event.kind, via: event.via, actor: event.actor, version: event.version, reason: event.reason },
-    { kind: "withdrawn", via: "chrome", actor: LOGIN, version: VERSION, reason: "押し間違い" },
-  );
 });
 
 test("CX-T107 取り下げ: 承認が merge で入った（親が 2 つのコミットでしか足していない）なら取り下げない", async () => {
@@ -249,7 +241,7 @@ test("CX-T107 取り下げ: 承認が merge で入った（親が 2 つのコミ
   const { mock, d } = world(f);
   mock.merge("i0001", "side");
   mock.push("i0001", { [TODO]: null });
-  const out = await withdrawTicket(REPO, "i0001", "i0001", "", d);
+  const out = await withdrawTicket(REPO, "i0001", "i0001", d);
   assert.equal(out.kind, "refused", JSON.stringify(out));
   assert.match(out.kind === "refused" ? out.message : "", /承認コミット/);
   assert.equal(mock.commitCalls.length, 0);

@@ -34,8 +34,8 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 
 # ---- 時計（判定のコアの Clock の差し替え点）
 #
-# 時刻はこの 2 つの関数だけが読む。`clock` で固定すると、その間の `stamp` と `utc_stamp` は
-# 同じ 1 つの時刻を返す。承認の plan が履歴（`at`）やマーカーに書く時刻を固定し、
+# 時刻は `stamp` だけが読む。`clock` で固定すると、その間の `stamp` は
+# 同じ 1 つの時刻を返す。承認の plan がマーカーに書く時刻を固定し、
 # Chrome（Pyodide）と手元が同じ入力から同じバイト列を出すため。
 _CLOCK: dict = {"fixed": ""}
 _STAMP_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
@@ -64,14 +64,6 @@ def _parse_stamp(text: str) -> datetime.datetime:
 def stamp() -> str:
     """マーカーと記録に書く時刻。手元の時計、オフセット付き。"""
     return _CLOCK["fixed"] or time.strftime(_STAMP_FORMAT)
-
-
-def utc_stamp() -> str:
-    """履歴に書く時刻。UTC の ISO 8601（秒まで、`Z` 付き）。固定した時刻があればそれを直す。"""
-    fixed = _CLOCK["fixed"]
-    if fixed:
-        return _parse_stamp(fixed).astimezone(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def slashed(path: str) -> str:
@@ -611,43 +603,6 @@ def write_new(path: str, content: bytes) -> str:
     return ""
 
 
-def append(path: str, data: bytes) -> str:
-    """末尾に足す（`O_APPEND`、リンクは辿らない）。足せたら空文字、駄目なら理由。
-
-    1 行をまるごと 1 回の write で出す。同じファイルに 2 つのプロセスが同時に足しても
-    行が混ざらないのは POSIX の `O_APPEND` に頼っている（history.py）。
-    """
-    if _STAGE["current"] is not None:
-        if os.path.islink(path):
-            return "シンボリックリンクなので反映しません"
-        staged, before = _staged(path)
-        if not staged:
-            before = _disk_bytes(path)
-        return _stage_put(Op(OP_APPEND, path, (before or b"") + data, data=data))
-    try:
-        if os.path.islink(path):
-            return "シンボリックリンクなので反映しません"
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        flags = (
-            os.O_APPEND
-            | os.O_CREAT
-            | os.O_WRONLY
-            | getattr(os, "O_NOFOLLOW", 0)
-            # Windows で改行を書き換えさせない。
-            | getattr(os, "O_BINARY", 0)
-        )
-        fd = os.open(path, flags, 0o644)
-        try:
-            os.write(fd, data)
-        finally:
-            os.close(fd)
-    except (OSError, ValueError) as exc:
-        # ValueError はパスに NUL が混ざったときなど。
-        return str(exc)
-    _record(path)
-    return ""
-
-
 def replace_bytes(path: str, content: bytes, temp_suffix: str) -> str:
     """一時ファイル（`<path><temp_suffix>`）に書いてから置き換える。駄目なら理由。
 
@@ -811,7 +766,6 @@ OP_NEW = "new"  # write_new（在れば書かない）
 OP_REMOVE = "remove"  # remove（無くても消せなくても何も出さない）
 OP_UNLINK = "unlink"  # unlink（消せなければ理由）
 OP_MOVE = "move"  # move（path が行き先、source が元）
-OP_APPEND = "append"  # append（data を足す。content は足した後の全体）
 OP_REPLACE = "replace"  # replace_bytes
 
 # 書けなかったときの扱い。
@@ -819,7 +773,6 @@ FAIL_STOP = "stop"  # そこで止め、理由を呼び手へ返す
 FAIL_WARN = "warn"  # 標準エラーに言って続ける
 FAIL_LINE = "line"  # 知らせる行を標準出力に出し、同じ組の残りを飛ばす
 FAIL_QUIET = "quiet"  # 何も出さずに続ける
-FAIL_HISTORY = "history"  # 履歴の書けなかった知らせに溜めて続ける（history.py）
 
 
 @dataclass(frozen=True)
@@ -861,11 +814,8 @@ class Op:
     text: str = ""
     newline: str | None = None
     source: str = ""
-    data: bytes = b""
     temp_suffix: str = ""
     policy: Policy = field(default_factory=Policy)
-    # 見え方（Changes）にだけ載せ、Writer(FS) は書かない。同じ中身を `Call` が書く（履歴）。
-    view_only: bool = False
 
 
 @dataclass
@@ -873,7 +823,7 @@ class Call:
     """Writer(FS) が、同じ組の書き込みを済ませた後に呼ぶ手順。
 
     `run` は組の中で書けた `tag` の集まりを受け、見せる行を返す。書けたものに合わせて
-    行と履歴を書く所（マーカーの消去）で使う。溜める段では呼ばない。
+    行を書く所（マーカーの消去）で使う。溜める段では呼ばない。
     """
 
     run: Callable[[set[str]], list[str]]
@@ -944,7 +894,7 @@ class Stage:
         ]
 
 
-_STAGE: dict = {"current": None, "policy": Policy(), "view_only": False}
+_STAGE: dict = {"current": None, "policy": Policy()}
 
 
 @contextlib.contextmanager
@@ -975,21 +925,9 @@ def policy(**changes: Any) -> Iterator[None]:
         _STAGE["policy"] = before
 
 
-@contextlib.contextmanager
-def view_only() -> Iterator[None]:
-    """この間に溜める書き込みは見え方（Changes）にだけ載せ、Writer(FS) は書かない。"""
-    before = _STAGE["view_only"]
-    _STAGE["view_only"] = True
-    try:
-        yield
-    finally:
-        _STAGE["view_only"] = before
-
-
 def _stage_put(op: Op, quiet: bool = False) -> str:
     stage: Stage = _STAGE["current"]
     op.policy = _STAGE["policy"]
-    op.view_only = _STAGE["view_only"]
     if quiet:
         op.policy = Policy(**{**op.policy.__dict__, "on_fail": FAIL_QUIET})
     if op.kind == OP_MOVE:

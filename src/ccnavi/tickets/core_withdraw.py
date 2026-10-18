@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import io
 import os
 
 import yaml
@@ -18,8 +17,8 @@ from . import (
     approval_checks,
     approval_marks,
     core_base,
-    history,
     ticket_model,
+    via,
 )
 
 # ---- 承認の取り下げ ----------------------------------------------------------------------------
@@ -53,7 +52,6 @@ def withdraw(
     snapshot: core_base.Snapshot,
     ids: list[str],
     prior_proposals: dict[str, bytes],
-    reason: str = "",
 ) -> core_base.Checked:
     """承認を未承認（`todo/`）に戻す。条件は以下に書く。通れば書くものを並べる。
 
@@ -97,11 +95,10 @@ def withdraw(
         )
     stamp = snapshot.stamp or fsio.stamp()
     actor = snapshot.actor
-    notes = io.StringIO()
     with (
         fsio.staging() as stage,
         fsio.clock(stamp),
-        history.session(actor.via or history.via(), notes),
+        via.session(actor.via or via.via()),
     ):
         stopped = None
         for ident in wanted:
@@ -122,21 +119,7 @@ def withdraw(
                     message="承認済みチケットを doing/ から削除できない ({reason})", undo=(todo,)
                 ):
                     fsio.unlink(approval.copy_path(where, ident))
-            history.note(
-                where,
-                ident,
-                history.KIND_WITHDRAWN,
-                ticket_model.DOING,
-                ticket_model.TODO,
-                actor=actor.account,
-                version=actor.version,
-                reason=reason,
-            )
             stage.line(f"  {ident} の承認を取り下げた（doing/ → todo/）")
-    if notes.getvalue():
-        return core_base.refused(
-            core_base.CODE_HISTORY_UNWRITABLE, core_base.unwritten(notes.getvalue())
-        )
     return core_base.Checked([], core_base.Changes(agree.Planned(stage, stopped), root, conf))
 
 

@@ -29,7 +29,7 @@ __pycache__/
 
 # md の frontmatter の索引（`ccnavi --docs`、SessionStart が書く）。
 # ccnavi は git がここを無視しているときだけ書くので、ここで無視する。
-# 状態の履歴（`events/*.jsonl`）は追跡するので、`*.jsonl` 全体は無視しない。
+# 旧版の `events/*.jsonl` は追跡するので、`*.jsonl` 全体は無視しない。
 **/ccnavi-index.jsonl
 
 # 途中を見せない書き方（一時ファイルに書いて差し替える。fsio.write_*_atomic / write_*_durable）が、

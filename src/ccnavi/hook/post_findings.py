@@ -278,7 +278,7 @@ def _script_writes(
       レビュー待ちか閉じた置き場に現れた組。片側だけなら外さない
 
     * `ready` の退避（`tickets/archive.py`）が消したもの。閉じた親の `done/` の親子のチケット・
-      `phases/<親>/`・`events/`・`flows/` の削除で、ready のマーカーに載り、消えた中身が
+      `phases/<親>/`・`flows/` の削除で、ready のマーカーに載り、消えた中身が
       ワークスペースの `logs/archive/` のコピーと同じもの（見分けは C1 と同じ
       `c1.archived_removal`）。`root`（ワークスペースルート）が空なら外さない
 

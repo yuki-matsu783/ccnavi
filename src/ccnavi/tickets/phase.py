@@ -41,7 +41,6 @@ from . import (
     approval,
     approval_checks,
     approval_marks,
-    history,
     phase_forms,
     phasetypes,
     risk,
@@ -708,12 +707,6 @@ def review_next(
             f"{lead}まだ{LABEL_PREPARING}。親が合流・ELI5・{request} を済ませるまで、"
             "ユーザには回らない"
         )
-    if _was_requested(conf, root, child.parent, n):
-        text += (
-            f"。フェーズ {owner.label} は前に依頼したが、"
-            "続きの子を追加したときに依頼の記録が外れた。"
-            "前回の依頼より後に閉じた子があるので、依頼し直しが必要です"
-        )
     return text + _AFTER_REQUEST.format(done=f"{conf.approved}/{ticket_model.DONE}/")
 
 
@@ -728,20 +721,6 @@ def _later(a: str, b: str) -> bool:
         return datetime.datetime.fromisoformat(a) > datetime.datetime.fromisoformat(b)
     except (TypeError, ValueError):
         return False
-
-
-def _was_requested(conf: settings.Settings, root: str, parent: str, number: int) -> bool:
-    """このフェーズの依頼の記録が、続きの子を足したときに消されたことがあるか（親の状態の履歴）。"""
-    where = approval.home_dir_read(conf, root, parent, "")
-    entries, _ = history.read(where, parent, limit=0)
-    for entry in entries:
-        if (
-            entry.get("kind") == history.KIND_PHASE_REOPENED
-            and entry.get("phase") == number
-            and approval_marks.MARK_REQUESTED in (entry.get("cleared") or [])
-        ):
-            return True
-    return False
 
 
 def resumed_review(

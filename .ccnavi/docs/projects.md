@@ -26,9 +26,8 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | gitのラッパースクリプトの記録 | ワークスペースの`logs/<プロジェクト>/`。ワークスペース自身の記録は`logs/` |
 | 判定の記録とstateの置き場 | ワークスペースの`logs/decisions.jsonl`と`logs/state/`（親子のチケットの取り込み状態は`logs/state/sync/<リポジトリ>/families/<親の識別子>`で、中の`branch`などはキャッシュで、判定には使わない） |
 | ワークツリー | ワークスペースの`.claude/worktrees/<名前>` |
-| 状態の履歴（いつ、どの経路で置き場が変わったか）。追記するだけの補助の記録で、今の状態はチケットがどの置き場にあるかで決まる | 承認済みチケットと同じツリーの`.ccnavi/approved/events/<識別子>.jsonl`。中身は1行に1つのJSON。マーカーの履歴は親のファイルに書く |
 | 子のフロー（担当のサブエージェントが読む手順書） | 親チケットのツリーの`.ccnavi/approved/flows/<子>.yml`。置き場は固定。中身はYAML。チケットの欄で場所を指定しない |
-| 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`events/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
+| 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`flows/`（残っていれば旧版の`events/`）を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
 | 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（`.ccnavi/docs/templates.md`） |
 | テンプレートの下書き（エージェントが書く。効力は無い） | そのツリーの`wip/proposals/templates/<名前>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/templates/<名前>.yml` |

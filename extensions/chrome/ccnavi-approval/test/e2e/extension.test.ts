@@ -168,7 +168,7 @@ test("CX-T073 悪意のある Markdown を描いても何も動かない（scrip
 async function openBoard(): Promise<Page> {
   const page = await ctx.newPage();
   watch(page);
-  page.on("dialog", (d) => void (d.type() === "prompt" ? d.accept("押し間違い") : d.accept()));
+  page.on("dialog", (d) => void d.accept());
   await page.goto(`chrome-extension://${id}/board.html`);
   await page.waitForFunction(() => document.body.dataset.state === "done", null, { timeout: 120_000 });
   return page;
@@ -190,12 +190,10 @@ test("CX-T075 ボードで承認すると、親のブランチへ 1 コミット
   const call = mock.commitCalls[0];
   assert.deepEqual([call.branch, call.expected, call.result], ["i0001", before, "written"]);
   assert.match(call.headline, /^ccnavi: i0001 を承認（Chrome 拡張 /);
-  // 承認は提案の中身を変えずに動かす（REQ-APV-05）。承認したことは状態の履歴に残す
+  // 承認は提案の中身を変えずに動かす（REQ-APV-05）
   const files = mock.files("i0001");
   assert.ok(!("wip/proposals/todo/i0001.md" in files));
   assert.equal(files[".ccnavi/approved/doing/i0001.md"], proposal);
-  const event = JSON.parse(files[".ccnavi/approved/events/i0001.jsonl"].trim().split("\n").pop() as string);
-  assert.deepEqual([event.kind, event.via, event.actor], ["approved", "chrome", LOGIN]);
   // 描き直したボード: i0001 は承認待ちから消え、作業中の承認済みチケットに出る
   assert.equal(await page.locator('[data-family="i0001"] .entry').count(), 0);
   assert.equal(await page.locator('[data-family="i0001"] .approved-item[data-ticket="i0001"]').count(), 1);
@@ -212,8 +210,6 @@ test("CX-T076 着手前で子の無い承認は、ボードから取り下げら
   const files = mock.files("i0001");
   assert.equal(files["wip/proposals/todo/i0001.md"], original);
   assert.ok(!(".ccnavi/approved/doing/i0001.md" in files));
-  const last = JSON.parse(files[".ccnavi/approved/events/i0001.jsonl"].trim().split("\n").pop() as string);
-  assert.deepEqual([last.kind, last.via, last.reason, last.actor], ["withdrawn", "chrome", "押し間違い", "alice"]);
   // 取り下げた提案はまた承認待ちに出る
   assert.equal(await page.locator('[data-family="i0001"] .entry[data-ticket="i0001"]').count(), 1);
   await page.close();
@@ -335,12 +331,10 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   assert.match(said, /^written: 承認を反映しました/);
   assert.equal(lab.glCommits.length, 1);
   assert.deepEqual([lab.glCommits[0].branch, lab.glCommits[0].parent, lab.glCommits[0].result], ["i0001", before, "written"]);
-  // 承認は提案の中身を変えずに動かす（REQ-APV-05）。承認したことは状態の履歴に残す
+  // 承認は提案の中身を変えずに動かす（REQ-APV-05）
   const files = lab.files("i0001");
   assert.ok(!("wip/proposals/todo/i0001.md" in files));
   assert.equal(files[".ccnavi/approved/doing/i0001.md"], proposal);
-  const event = JSON.parse(files[".ccnavi/approved/events/i0001.jsonl"].trim().split("\n").pop() as string);
-  assert.deepEqual([event.kind, event.via], ["approved", "chrome"]);
   assert.ok(lab.calls.some((c) => c.endsWith("/personal_access_tokens/self")));
   assert.ok(!(await page.content()).includes(TOKEN));
   await page.close();

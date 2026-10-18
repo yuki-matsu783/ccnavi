@@ -7,16 +7,13 @@ import { useEffect, useRef, useState, type JSX } from "react";
 import type { Action, Card, PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 import { flowButtonLabel } from "../../core/flow-view.js";
-import type { FlowJson, HistoryEntryJson } from "../../core/model.js";
+import type { FlowJson } from "../../core/model.js";
 import { post } from "./post.js";
 import {
   COPY_LABELS,
   STARTED_LABELS,
   STARTED_TITLES,
   MARK_LABELS,
-  VIA_LABELS,
-  historyAt,
-  historyText,
   holdLabel,
   predecessorsBadge,
   isHighRisk,
@@ -95,7 +92,6 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
       <Facts card={card} />
       {card.isParent ? <Origin card={card} /> : null}
       {card.phases.length > 0 ? <Phases phases={card.phases} /> : null}
-      {card.history.length > 0 ? <History entries={card.history} /> : null}
       {card.issues.length > 0 ? (
         <ul className="issues" data-tour="issues">
           {card.issues.map((issue, i) => (
@@ -117,29 +113,8 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
   );
 }
 
-/** カードの上で押しても提案を開かない場所。ボタン・リンク・折りたためる履歴 */
+/** カードの上で押しても提案を開かない場所。ボタン・リンク */
 const NOT_OPENING = "button, a, details, .review-menu";
-
-/**
- * 状態の履歴。既定で折りたたみ、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
- * （状態の正は置き場。実行ファイルが渡した新しい側だけを並べる）
- */
-function History({ entries }: { readonly entries: readonly HistoryEntryJson[] }): JSX.Element {
-  return (
-    <details className="history" data-tour="history">
-      <summary>履歴（{entries.length} 件）</summary>
-      <ol className="history-list">
-        {[...entries].reverse().map((e, i) => (
-          <li key={i} className={`history-item history-${e.kind}`} title={e.at}>
-            <span className="history-at">{historyAt(e.at)}</span>
-            <span className="history-text">{historyText(e)}</span>
-            {e.via !== "" ? <span className="history-via">{VIA_LABELS[e.via] ?? e.via}</span> : null}
-          </li>
-        ))}
-      </ol>
-    </details>
-  );
-}
 
 /**
  * 枠付きのバッジは、ユーザが動く必要がある状態だけ。未承認、

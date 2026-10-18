@@ -62,7 +62,7 @@ test("CX-T118 取り下げ: GitHub が承認コミットを renamed で返して
   };
   assert.deepEqual(detail.files.find((f) => f.filename === DOING), { filename: DOING, status: "renamed", previous_filename: TODO });
   mock.filesLimit = 1;
-  const out = await withdrawTicket(REPO, "i0001", "i0001", "", d);
+  const out = await withdrawTicket(REPO, "i0001", "i0001", d);
   assert.equal(out.kind, "written", JSON.stringify(out));
   assert.equal(mock.files("i0001")[TODO], parentOnly().i0001.files[TODO]);
 });
@@ -75,10 +75,9 @@ test("CX-T119 取り下げ: 承認コミットが P の first-parent の鎖の�
   const cd = depsFor(copy);
   assert.equal((await approveFamily(REPO, "i0001", await shown(cd), cd)).kind, "written");
   const approved = copy.files("i0001");
-  const events = ".ccnavi/approved/events/i0001.jsonl";
   // 別の枝 side で承認して P に merge する。git log -- path は side のコミットを返す
   mock.branch("side", "i0001");
-  mock.push("side", { [TODO]: null, [DOING]: approved[DOING], [events]: approved[events] }, "side で承認");
+  mock.push("side", { [TODO]: null, [DOING]: approved[DOING] }, "side で承認");
   mock.push("i0001", { "src/app.py": "print('p')\n" }, "P の上の別の変更");
   mock.merge("i0001", "side");
   const b = await collectRepo(REPO, d);
@@ -86,7 +85,7 @@ test("CX-T119 取り下げ: 承認コミットが P の first-parent の鎖の�
   assert.deepEqual(w.map((x) => x.ticket), ["i0001"]);
   // 拡張が足す理由も、Python が同じ場合に返すのと同じコードを頭に載せる
   assert.match(w[0].problems.join(" "), /^\[CORE_WITHDRAW_NO_PRIOR\] 承認コミット/);
-  const out = await withdrawTicket(REPO, "i0001", "i0001", "", d);
+  const out = await withdrawTicket(REPO, "i0001", "i0001", d);
   assert.equal(out.kind, "refused");
   assert.equal(out.kind === "refused" && out.code, "CORE_WITHDRAW_NO_PRIOR");
   assert.equal(mock.commitCalls.length, 0);

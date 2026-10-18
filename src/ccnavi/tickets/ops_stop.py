@@ -134,8 +134,7 @@ def nudged_before(state_dir: str, session: str, found: Unfinished) -> bool:
 
 
 def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
-    """促した (チケット, HEAD) を記録する。書けなければ理由。
-    git で共有する履歴（history）には入れない。"""
+    """促した (チケット, HEAD) を記録する。書けなければ理由。"""
     path = nudge_path(state_dir, session)
     data = fsio.read_dict(path) or {}
     data[found.ticket.ticket] = found.head

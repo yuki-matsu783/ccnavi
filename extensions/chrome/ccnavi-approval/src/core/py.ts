@@ -184,13 +184,13 @@ export interface PlanResult extends Written {
 
 export interface WithdrawResult extends Written {
   readonly problems: readonly string[];
-  /** `CORE_WITHDRAW_*`・`CORE_HISTORY_UNWRITABLE`。理由が幾つもあれば最初の理由のもの */
+  /** `CORE_WITHDRAW_*`。理由が幾つもあれば最初の理由のもの */
   readonly code: ReasonCode;
 }
 
 export interface ConfirmResult extends Written {
   readonly problems: readonly string[];
-  /** `CORE_CONFIRM_*`・`CORE_HISTORY_UNWRITABLE` */
+  /** `CORE_CONFIRM_*` */
   readonly code: ReasonCode;
   /** 依頼の後に親のブランチが動いていれば、比べる 2 つ（拡張が compare API で読んで呼び直す） */
   readonly need_compare?: { readonly base: string; readonly head: string };
@@ -253,7 +253,7 @@ export const py = {
   ) => ask<PlanResult>(call, "plan", { ...body }, ""),
   withdraw: (
     call: PyCall,
-    body: { snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; reason: string; stamp: string; actor: Actor },
+    body: { snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; stamp: string; actor: Actor },
   ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
   start: (call: PyCall, body: { snapshot: Snapshot; issue: number; title: string; prefix?: string; taken: readonly string[] }) =>
     ask<StartResult>(call, "start", { ...body }, ""),

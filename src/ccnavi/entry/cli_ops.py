@@ -17,7 +17,6 @@ from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
     c1,
     core,
-    history,
     learning,
     next_id,
     ops,
@@ -28,6 +27,7 @@ from ..tickets import (
     review_decide,
     scaffold,
     ticket_ids,
+    via,
     worktrees,
 )
 from . import cli_args, cli_usage, lint, status
@@ -78,7 +78,7 @@ def operate(
         # ユーザの判断。`--agree` / `--reviewed` と同じく端末を求める。
         if not cli_args._from_terminal(stdin, conf, stderr, "--close-early"):
             return EXIT_ERROR
-        history.set_via(history.VIA_TERMINAL)
+        via.set_via(via.VIA_TERMINAL)
         for flag, path in (
             ("--accept-plan", args.accept_plan),
             ("--accept-done", args.accept_done),
@@ -121,7 +121,7 @@ def operate(
                 msg = f"ccnavi: {flag} には、状態保存ディレクトリ配下のパスを指定してください。\n"
                 stderr.write(msg)
                 return EXIT_ERROR
-        history.set_via(history.VIA_BOARD)
+        via.set_via(via.VIA_BOARD)
         _decide_actor(args)
         if args.preview:
             code = review_decide.decide_preview(
@@ -159,7 +159,7 @@ def operate(
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None:
-        history.set_via(history.VIA_TERMINAL)
+        via.set_via(via.VIA_TERMINAL)
         _decide_actor(args)
         code = review_decide.reviewed(
             stdin,
@@ -423,17 +423,17 @@ def _decide_writes(args) -> bool:
 
 
 def _decide_actor(args) -> None:
-    """decide のマーカーと履歴に入れるアカウントと経路。
+    """decide のマーカーに入れるアカウントと経路。
 
-    `--actor` があれば履歴の行にアカウントを足し、`--via` があれば経路を差し替える。マーカーの
+    `--actor` があればアカウントを足し、`--via` があれば経路を差し替える。マーカーの
     `actor`・`via` は `review_decide.apply_decision` がこの起動の値から書く。
-    無ければマーカーも履歴も前と同じ。
+    無ければマーカーは前と同じ。
     """
     if not args.actor:
         return
-    history.set_actor(args.actor)
+    via.set_actor(args.actor)
     if args.via:
-        history.set_via(args.via)
+        via.set_via(args.via)
 
 
 class _Family:

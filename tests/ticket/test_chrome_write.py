@@ -8,9 +8,8 @@
    受けない
 3. 見せた一覧とダイジェスト: 違えば書くものを出さない
 4. 書く先は親のブランチ `P` だけ。予約の名前・統合先の名前へは書かない
-5. 履歴の行に経路（chrome）・アカウント・拡張の版が入る
-6. 手元の ccnavi が、Chrome の書いた承認済みチケットを同じに読む（判定し直しで error が出ない）。
-   error が出れば、Chrome と手元の版の違いとして名指しする
+5. マーカーに経路（chrome）・アカウントが入る
+6. 手元の ccnavi が、Chrome の書いた承認済みチケットを同じに読む（判定し直しで error が出ない）
 7. 取り下げの可否をボードに出す
 """
 
@@ -21,7 +20,6 @@ import os
 
 from ccnavi.entry import lint, version
 from ccnavi.infra import settings
-from ccnavi.tickets import history
 from tests.ticket.test_swap_points import CoreHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, load_chrome, parent_text
@@ -193,22 +191,6 @@ class WriteGuardTest(ChromeWriteHarness):
 
 
 class WrittenCopyTest(ChromeWriteHarness):
-    def test_the_event_carries_chrome_the_account_and_the_version(self):
-        self.propose("i0001", parent_text("i0001", ["research"]))
-        self.commit_parent()
-        body = self.plan()
-        self.assertIsNone(body["mismatch"])
-        self.assertIsNone(body["code"])
-        self.assertEqual(sorted(body["changes"]), ["i0001"])
-        events = next(
-            r for r in body["changes"]["i0001"] if r["path"].endswith("events/i0001.jsonl")
-        )
-        line = json.loads(events["content"].splitlines()[-1])
-        self.assertEqual(
-            {k: line[k] for k in ("kind", "via", "actor", "version")},
-            {"kind": "approved", "via": "chrome", "actor": "alice", "version": "9.9.9"},
-        )
-
     def test_the_local_ccnavi_reads_what_chrome_wrote_the_same(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.propose(
@@ -226,46 +208,9 @@ class WrittenCopyTest(ChromeWriteHarness):
         explained = self.ccnavi("--lint", "--json")
         errors = [p for p in json.loads(explained.stdout)["problems"] if p["severity"] == "error"]
         self.assertEqual(errors, [])
-        events, _ = history.read(self.approved, "i0001-01-01")
-        self.assertEqual(events[-1]["via"], "chrome")
         # 子のワークツリーを切って着手の判定が通る形（手元の続きの操作が読める）
         doing = os.path.join(self.approved, "doing")
         self.assertEqual(sorted(os.listdir(doing)), ["i0001-01-01.md", "i0001.md"])
-
-    def test_a_disagreement_names_the_chrome_and_local_versions(self):
-        self.propose("i0001", parent_text("i0001", ["research"]))
-        self.commit_parent()
-        body = self.plan()
-        self.apply(body["changes"]["i0001"], self.parent_tree)
-        copy = os.path.join(self.approved, "doing", "i0001.md")
-        with open(copy, encoding="utf-8") as f:
-            text = f.read()
-        write(copy, text.replace("  - research", "  - no-such-phase", 1))
-        problems = lint.family_check(self.conf(), self.root, "i0001", "self")
-        self.assertTrue(problems, "壊した承認済みチケットは判定し直しで error になる")
-        self.assertTrue(
-            problems[0].detail.startswith(f"Chrome 9.9.9 と手元 {version.VERSION} で判定が違う: "),
-            problems[0].detail,
-        )
-
-    def test_a_later_local_touch_is_not_blamed_on_chrome(self):
-        """Chrome の承認の後に手元の履歴（着手など）があれば、違いを Chrome の版のせいにしない。"""
-        self.propose("i0001", parent_text("i0001", ["research"]))
-        self.commit_parent()
-        body = self.plan()
-        self.apply(body["changes"]["i0001"], self.parent_tree)
-        events = os.path.join(self.approved, "events", "i0001.jsonl")
-        with open(events, "a", encoding="utf-8") as f:
-            f.write(
-                json.dumps({"at": "x", "ticket": "i0001", "kind": "started", "via": "cli"}) + "\n"
-            )
-        copy = os.path.join(self.approved, "doing", "i0001.md")
-        with open(copy, encoding="utf-8") as f:
-            text = f.read()
-        write(copy, text.replace("  - research", "  - no-such-phase", 1))
-        problems = lint.family_check(self.conf(), self.root, "i0001", "self")
-        self.assertTrue(problems)
-        self.assertFalse(any(p.detail.startswith("Chrome ") for p in problems), problems)
 
 
 class EntryDetailTest(ChromeWriteHarness):
@@ -291,14 +236,6 @@ class EntryDetailTest(ChromeWriteHarness):
         for path in ("/a", "~/a", "C:/a", "a\\b", "a/../b"):
             with self.subTest(path=path), self.assertRaises(chrome.Refused):
                 chrome._check_rel(path)
-
-    def test_a_history_that_cannot_be_written_stops_the_plan(self):
-        chrome = load_chrome()
-        root = os.path.join(os.sep, "ws")
-        chrome._unwritten(root, "")
-        with self.assertRaises(chrome.Refused) as caught:
-            chrome._unwritten(root, f"ccnavi: 警告: i0001 の履歴を {root}{os.sep}x に書けない\n")
-        self.assertEqual(str(caught.exception), "ccnavi: i0001 の履歴を x に書けない")
 
     def test_every_writing_op_checks_compat_and_the_branch(self):
         self.propose("i0001", parent_text("i0001", ["research"]))

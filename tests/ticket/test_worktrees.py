@@ -5,7 +5,7 @@
 
 1. `finish` で子を `review/` へ動かしただけでは「ユーザのレビューを待つ」と言わない。依頼の前は
    「レビュー準備中」と親の次の一手（request）を言い、依頼の後は待つと言う。依頼の後に子を足して
-   閉じたら、依頼し直しが要ると言う。`status` の次の一手も同じ
+   閉じたら、またレビュー準備中と言う。`status` の次の一手も同じ
 2. 最後のレビューを `confirm` したら、親の finish から ready までの流れを言う
 3. `worktree tidy <親> --phase <N>` は done/ に動いた子のワークツリーを消し、ブランチは残す。
    取り消しで閉じた子のワークツリーも消す（ワークツリーがあるのは作業中の子だけ）
@@ -85,13 +85,12 @@ class ReviewTurnTest(PhaseHarness):
         after = self.next_step("i0001-01-01")
         self.assertIn("依頼済み（レビュー待ち）", after)
         self.assertIn("ユーザのレビューを待つ", after)
-        # 依頼の後に同じフェーズへ子を足して閉じた。依頼の記録は外れ、依頼し直しが要る
+        # 依頼の後に同じフェーズへ子を足して閉じた。依頼の記録は外れ、またレビュー準備中になる
         _, again = self.child("i0001-01-02")
         self.assertIn("レビュー準備中", again.stdout)
-        self.assertIn("依頼し直しが必要です", again.stdout)
         self.assertEqual(again.stdout.count("done/ へ動"), 1, again.stdout)
         self.assertNotIn("ユーザのレビューを待つ", again.stdout)
-        self.assertIn("依頼し直しが必要です", self.next_step("i0001-01-02"))
+        self.assertIn("レビュー準備中", self.next_step("i0001-01-02"))
 
     def test_status_does_not_say_wait_when_the_phase_is_unknown(self):
         """子のフェーズが読めない（`review_next` が空）とき、依頼済みかが分からないので

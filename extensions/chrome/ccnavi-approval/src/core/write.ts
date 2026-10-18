@@ -35,7 +35,7 @@ export const MAX_ROUNDS = 3;
 export interface WriteDeps extends ReadDeps {
   /** ホストの種類（応答が届かなかった書き込みの見分け方が違う。無ければ github） */
   readonly kind?: "github" | "gitlab";
-  /** 拡張の版（状態の履歴の `version` とコミットの見出し） */
+  /** 拡張の版（コミットの見出し） */
   readonly version: string;
   /** 待つ（書いた直後の読み取りの遅れ）。無ければ実物の時計。試験は 0 秒にする */
   readonly sleep?: (ms: number) => Promise<void>;
@@ -317,7 +317,7 @@ type Planned =
 
 /**
  * 読んだ親子のチケットと時刻から書くものを決める。時刻（`stamp`）は周ごとに 1 回決め、事後確認の判定し直しにも同じ値を渡す
- * （時計が進んで状態の履歴の `at` が変わるだけで「書くものが違う」にしない）
+ * （時計が進んでマーカーの `at` が変わるだけで「書くものが違う」にしない）
  */
 type Plan = (read: FamilyRead, stamp: string) => Promise<Planned>;
 
@@ -509,7 +509,7 @@ async function readOrMoved(repo: RepoConfig, family: string, deps: WriteDeps): P
 }
 
 /** 承認を取り下げる。着手前の新規の承認だけ。元の提案は承認コミットの親から戻す */
-export async function withdrawTicket(repo: RepoConfig, family: string, ident: string, reason: string, deps: WriteDeps): Promise<Outcome> {
+export async function withdrawTicket(repo: RepoConfig, family: string, ident: string, deps: WriteDeps): Promise<Outcome> {
   let actor: Actor;
   try {
     actor = await actorOf(deps, repo);
@@ -523,7 +523,6 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
       family,
       ids: [ident],
       prior: prior === null ? {} : { [ident]: prior },
-      reason,
       stamp,
       actor,
     });

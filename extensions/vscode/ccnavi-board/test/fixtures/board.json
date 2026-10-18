@@ -348,7 +348,7 @@
    "copy": {
     "status": "open",
     "approved_at": "2026-09-13T13:50:21+0000",
-    "approved_from": "history",
+    "approved_from": "commit",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md"
    },
    "worktree": {
@@ -368,37 +368,6 @@
    "flow": null,
    "risk": null,
    "judge": null,
-   "history": [
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001",
-     "kind": "approved",
-     "from": "todo",
-     "to": "doing",
-     "via": "terminal",
-     "tree": "i0001"
-    },
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001",
-     "kind": "phase-mark",
-     "from": null,
-     "to": null,
-     "via": "hook",
-     "phase": 1,
-     "mark": "pending"
-    },
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001",
-     "kind": "phase-mark",
-     "from": null,
-     "to": null,
-     "via": "cli",
-     "phase": 1,
-     "mark": "reviewed"
-    }
-   ],
    "issues": [],
    "attention": false
   },
@@ -424,7 +393,7 @@
    "copy": {
     "status": "closed",
     "approved_at": "2026-09-13T13:50:22+0000",
-    "approved_from": "history",
+    "approved_from": "commit",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-01-01.md"
    },
    "worktree": {
@@ -466,43 +435,6 @@
     "summary": "1 ファイル、+1 -0 行、消したファイル 0"
    },
    "judge": null,
-   "history": [
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-01-01",
-     "kind": "approved",
-     "from": "todo",
-     "to": "doing",
-     "via": "terminal",
-     "tree": "i0001"
-    },
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-01-01",
-     "kind": "started",
-     "from": "doing",
-     "to": "doing",
-     "via": "cli",
-     "base_sha": "0000000000000000000000000000000000000000"
-    },
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-01-01",
-     "kind": "finished",
-     "from": "doing",
-     "to": "review",
-     "via": "cli"
-    },
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-01-01",
-     "kind": "settled",
-     "from": "review",
-     "to": "done",
-     "via": "cli",
-     "phase": 1
-    }
-   ],
    "issues": [],
    "attention": false
   },
@@ -528,7 +460,7 @@
    "copy": {
     "status": "open",
     "approved_at": "2026-09-13T13:50:22+0000",
-    "approved_from": "history",
+    "approved_from": "commit",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001-02-02.md"
    },
    "worktree": {
@@ -562,26 +494,6 @@
    },
    "risk": null,
    "judge": null,
-   "history": [
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-02-02",
-     "kind": "approved",
-     "from": "todo",
-     "to": "doing",
-     "via": "board",
-     "tree": "i0001"
-    },
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-02-02",
-     "kind": "started",
-     "from": "doing",
-     "to": "doing",
-     "via": "cli",
-     "base_sha": "0000000000000000000000000000000000000000"
-    }
-   ],
    "issues": [],
    "attention": false
   },
@@ -653,7 +565,6 @@
    },
    "risk": null,
    "judge": null,
-   "history": [],
    "issues": [],
    "attention": true
   },
@@ -685,7 +596,7 @@
    "copy": {
     "status": "review",
     "approved_at": "2026-09-13T13:50:22+0000",
-    "approved_from": "history",
+    "approved_from": "commit",
     "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md"
    },
    "worktree": {
@@ -738,34 +649,6 @@
     "summary": "1 ファイル、+2 -0 行、消したファイル 0"
    },
    "judge": null,
-   "history": [
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-02-04",
-     "kind": "approved",
-     "from": "todo",
-     "to": "doing",
-     "via": "board",
-     "tree": "i0001"
-    },
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-02-04",
-     "kind": "started",
-     "from": "doing",
-     "to": "doing",
-     "via": "cli",
-     "base_sha": "0000000000000000000000000000000000000000"
-    },
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-02-04",
-     "kind": "finished",
-     "from": "doing",
-     "to": "review",
-     "via": "cli"
-    }
-   ],
    "issues": [],
    "attention": false
   },
@@ -791,7 +674,7 @@
    "copy": {
     "status": "closed",
     "approved_at": "2026-09-13T13:50:22+0000",
-    "approved_from": "history",
+    "approved_from": "commit",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-02-05.md"
    },
    "worktree": {
@@ -810,26 +693,6 @@
    "flow": null,
    "risk": null,
    "judge": null,
-   "history": [
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-02-05",
-     "kind": "approved",
-     "from": "todo",
-     "to": "doing",
-     "via": "terminal",
-     "tree": "i0001"
-    },
-    {
-     "at": "2026-09-13T13:50:22Z",
-     "ticket": "i0001-02-05",
-     "kind": "cancelled",
-     "from": "doing",
-     "to": "done",
-     "via": "cli",
-     "reason": "要らなくなった"
-    }
-   ],
    "issues": [],
    "attention": false
   }

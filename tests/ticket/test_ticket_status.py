@@ -145,7 +145,7 @@ class TicketStatusTest(PhaseHarness):
         self.family(plan=["research"])
         mine = self.block(self.said("i0001"), "i0001")
         self.assertIn("リモート追跡参照がない", mine)
-        # 承認は状態の履歴に時刻を残す
+        # 承認は時刻を残さない
         self.assertNotIn("未コミット（手で置いた）", mine)
         self.assertNotIn("承認: 不明", mine)
         bare = os.path.join(self.root, "origin.git")

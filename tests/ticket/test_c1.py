@@ -126,71 +126,25 @@ class SortTest(AuthorityHarness):
     def put(self, rel, text):
         return write(os.path.join(self.parent_tree, *rel.split("/")), text)
 
-    def events(self):
-        return f"{APPROVED}/events/i0001.jsonl"
-
-    def append_event(self, row):
-        path = os.path.join(self.parent_tree, *self.events().split("/"))
-        with open(path, "a", encoding="utf-8", newline="\n") as f:
-            f.write(json.dumps(row) + "\n")
-
     def test_nothing_changed_lists_nothing(self):
         self.assertEqual(self.sort(), [])
 
-    def test_hook_marks_and_event_lines_are_b(self):
+    def test_hook_marks_are_b(self):
         pending = f"{APPROVED}/phases/i0001/2.pending"
         skipped = f"{APPROVED}/phases/i0001/3.skipped"
         self.put(pending, json.dumps({"review": "mr", "source": "common", "at": "t"}))
         self.put(skipped, json.dumps({"deferred_to": 4, "at": "t"}))
-        self.append_event(
-            {"at": "t", "ticket": "i0001", "kind": "phase-mark", "phase": 2, "mark": "pending"}
-        )
-        self.assertEqual(
-            self.sort(), sorted([("b", pending), ("b", skipped), ("b", self.events())])
-        )
+        self.assertEqual(self.sort(), sorted([("b", pending), ("b", skipped)]))
 
     def test_b_is_only_the_hook_marks_of_this_family(self):
-        """履歴は親の phase-mark の pending・skipped だけ。
-
-        別の親・別の種類・全角の数字・新しい履歴のファイルは (b) にしない。
-        """
-        self.append_event(
-            {"at": "t", "ticket": "i0001", "kind": "phase-mark", "phase": 1, "mark": "reviewed"}
-        )
-        self.assertEqual(self.sort(), [("c", self.events())])
-        git(self.parent_tree, "checkout", "--", self.events())
-        self.append_event(
-            {"at": "t", "ticket": "i0099", "kind": "phase-mark", "phase": 1, "mark": "pending"}
-        )
-        self.assertEqual(self.sort(), [("c", self.events())])
-        git(self.parent_tree, "checkout", "--", self.events())
+        """別の親・全角の数字のマーカーは (b) にしない。"""
         other = f"{APPROVED}/phases/i0099/2.pending"
         wide = f"{APPROVED}/phases/i0001/２.pending"
-        fresh = f"{APPROVED}/events/i0099.jsonl"
         self.put(other, json.dumps({"review": "mr", "at": "t"}))
         self.put(wide, json.dumps({"review": "mr", "at": "t"}))
-        self.put(fresh, json.dumps({"at": "t", "ticket": "i0099", "kind": "phase-mark"}) + "\n")
         found = dict((path, kind) for kind, path in self.sort())
         self.assertEqual(found[other], "d")
         self.assertEqual(found[wide], "d")
-        self.assertEqual(found[fresh], "d")
-
-    def test_an_event_line_that_is_not_utf8_says_why(self):
-        path = os.path.join(self.parent_tree, *self.events().split("/"))
-        with open(path, "ab") as f:
-            f.write(b'{"at": "t", "ticket": "i0001", "kind": "\xff"}\n')
-        self.assertEqual(self.sort(), [("d", self.events())])
-        self.assertTrue(any("UTF-8" in why for why in self.last_why), self.last_why)
-
-    def test_crlf_in_the_working_tree_still_reads_as_an_append(self):
-        """autocrlf で作業ツリーの履歴だけが CRLF でも、hook の追記は (b)。"""
-        path = os.path.join(self.parent_tree, *self.events().split("/"))
-        with open(path, "rb") as f:
-            body = f.read()
-        row = {"at": "t", "ticket": "i0001", "kind": "phase-mark", "phase": 2, "mark": "pending"}
-        with open(path, "wb") as f:
-            f.write(body.replace(b"\n", b"\r\n") + json.dumps(row).encode() + b"\n")
-        self.assertEqual(self.sort(), [("b", self.events())])
 
     def test_moves_written_by_a_human_decision_are_c(self):
         """ユーザのレビュー（review/ から done/）と早めに閉じたときの取り消し（doing/ から done/）、
@@ -225,17 +179,6 @@ class SortTest(AuthorityHarness):
         self.commit_parent("mark")
         self.put(rel, json.dumps({"review": "mr", "at": "u"}))
         self.assertEqual(self.sort(), [("d", rel)])
-
-    def test_an_edited_event_history_is_not_b(self):
-        path = os.path.join(self.parent_tree, *self.events().split("/"))
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write(text.replace('"approved"', '"started"', 1))
-        self.assertEqual(self.sort(), [("d", self.events())])
-        git(self.parent_tree, "checkout", "--", self.events())
-        self.append_event({"at": "t", "ticket": "i0001"})  # kind が無い
-        self.assertEqual(self.sort(), [("d", self.events())])
 
     def test_flows_approvals_and_other_files(self):
         flow = f"{APPROVED}/flows/i0001-01-01.yml"

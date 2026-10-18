@@ -115,8 +115,6 @@ export interface BoardEnv {
   readonly openOptions: () => Promise<void> | void;
   /** `window.confirm` */
   readonly confirm: (message: string) => boolean;
-  /** `window.prompt` */
-  readonly prompt: (message: string, value: string) => string | null;
   readonly startWorker: () => PyWorker;
   readonly blobCache: () => Promise<BlobCache>;
   readonly now: () => Date;
@@ -345,10 +343,9 @@ export function createBoardController(env: BoardEnv): BoardController {
     withdraw(repoBoard, family, ticket) {
       void act(async () => {
         if (await blocked(repoBoard.repo, family.family.name)) return false;
-        const reason = env.prompt(`${ticket} の承認を取り下げて todo/ に戻します。理由を入力してください（任意）`, "");
-        if (reason === null) return false;
+        if (!env.confirm(`${ticket} の承認を取り下げて todo/ に戻します。よろしいですか？`)) return false;
         const deps = await writeDeps(repoBoard.repo);
-        const outcome = await ops.withdrawTicket(repoBoard.repo, family.family.name, ticket, reason, deps);
+        const outcome = await ops.withdrawTicket(repoBoard.repo, family.family.name, ticket, deps);
         await noteAttention(repoBoard.repo, family.family.name, outcome);
         say(outcome, "取り下げ");
         return true;

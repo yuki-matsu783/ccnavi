@@ -3,8 +3,8 @@
 見るのは 4 つ。
 
 1. 手元の `review confirm --actor <アカウント>` は、マーカーに `actor` と `via: cli` を書き、
-   履歴にもアカウントを足す。`--actor` が無ければ（sh がアカウントを引けなかった）
-   マーカーも履歴も前と同じ中身
+   マーカーにアカウントを書く。`--actor` が無ければ（sh がアカウントを引けなかった）
+   マーカーは前と同じ中身
 2. `--actor` の形と、`review confirm` の外で渡されたときは断る
 3. 依頼の後にユーザが見るものが動いたかは、手元と Chrome が同じ関数（`review.moved_since`）
    で決める。Chrome は compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
@@ -20,7 +20,7 @@ import shutil
 
 from ccnavi.entry import lint, version
 from ccnavi.infra import settings
-from ccnavi.tickets import history, review, review_host
+from ccnavi.tickets import review, review_host
 from tests.ticket.test_swap_points import STAMP, CoreHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text
@@ -60,10 +60,6 @@ class ActorHarness(CoreHarness):
             *extra,
         )
 
-    def last_event(self, ident="i0001-01-01"):
-        events, _ = history.read(self.approved, ident)
-        return events[-1]
-
     def host_compare(self):
         recorded = read_json(self.mark_path("requested"))["head"]
         head = git(self.parent_tree, "rev-parse", "HEAD").strip()
@@ -92,11 +88,8 @@ class LocalActorTest(ActorHarness):
         mark = read_json(self.mark_path())
         self.assertEqual(sorted(mark), ["accepted", "at", "mr"])
         self.assertEqual((mark["mr"], mark["accepted"]), (7, []))
-        event = self.last_event()
-        self.assertNotIn("actor", event)
-        self.assertEqual(event["via"], history.VIA_CLI)
 
-    def test_an_actor_goes_into_the_mark_and_the_event(self):
+    def test_an_actor_goes_into_the_mark(self):
         fixture = self.ready()
         done = self.confirm_as(fixture, "--actor", "octo-reviewer")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
@@ -106,8 +99,6 @@ class LocalActorTest(ActorHarness):
             {k: mark[k] for k in ("mr", "accepted", "actor", "via")},
             {"mr": 7, "accepted": [], "actor": "octo-reviewer", "via": "cli"},
         )
-        event = self.last_event()
-        self.assertEqual((event["actor"], event["via"]), ("octo-reviewer", history.VIA_CLI))
 
     def test_a_malformed_actor_is_refused_and_nothing_is_written(self):
         fixture = self.ready()
@@ -188,9 +179,7 @@ class MovedSinceTest(ActorHarness):
 class SameMarkTest(ActorHarness):
     def test_chrome_and_local_marks_differ_only_by_the_route_and_the_time(self):
         fixture = self.ready()
-        chrome = self.chrome_confirm(
-            self.host_compare(), actor={"account": "octo-reviewer", "version": "9.9.9"}
-        )
+        chrome = self.chrome_confirm(self.host_compare(), actor={"account": "octo-reviewer"})
         row = next(r for r in chrome["changes"]["i0001"] if r["path"].endswith("1.reviewed"))
         remote = json.loads(row["content"])
         done = self.confirm_as(fixture, "--actor", "octo-reviewer")
@@ -445,7 +434,6 @@ class DecideActorTest(ActorHarness):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         mark = read_json(self.mark_path())
         self.assertEqual(sorted(mark), ["accepted", "at", "mr"])
-        self.assertNotIn("actor", self.last_event())
 
     def test_an_actor_and_the_way_go_into_the_decide_mark(self):
         for via in ("board", "terminal"):
@@ -456,10 +444,6 @@ class DecideActorTest(ActorHarness):
                 mark = read_json(self.mark_path())
                 self.assertEqual(list(mark), ["mr", "accepted", "actor", "via", "at"])
                 self.assertEqual((mark["actor"], mark["via"]), ("octo-reviewer", via))
-                # マーカーを置いた履歴（親の phase-mark）にもアカウントと経路が入る
-                event = self.last_event("i0001")
-                self.assertEqual(event["kind"], history.KIND_PHASE_MARK)
-                self.assertEqual((event["actor"], event["via"]), ("octo-reviewer", via))
 
     def again(self):
         """マーカーを外して、同じフェーズをもう 1 度決められるようにする。"""

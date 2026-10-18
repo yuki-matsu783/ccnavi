@@ -1,6 +1,6 @@
-"""承認の時刻（表示だけ）。承認済みチケットがいつ承認されたかを、履歴か git から引く。
+"""承認の時刻（表示だけ）。承認済みチケットがいつ承認されたかを、git から引く。
 
-ボードと `--diagnose` が見せるためだけに読む。判定は履歴も git も読まない取り決めなので、
+ボードと `--diagnose` が見せるためだけに読む。判定は git も読まない取り決めなので、
 hook の判定の経路からは呼ばない。approval から分けた。
 """
 
@@ -11,13 +11,12 @@ import sys
 from dataclasses import dataclass
 
 from ..infra import gitcmd, settings
-from . import history, ticket_model
+from . import ticket_model
 
 # どこから引いた時刻か。
-APPROVED_FROM_HISTORY = "history"  # 状態の履歴の approved（続きの子は raised）
 APPROVED_FROM_COMMIT = "commit"  # doing/ に足したコミットの時刻
-APPROVED_UNCOMMITTED = "uncommitted"  # 履歴もコミットも無い（手で置いて、まだコミットしていない）
-# git を打たない場（Chrome の Pyodide）では、履歴の無い承認の時刻は分からない（空）。
+APPROVED_UNCOMMITTED = "uncommitted"  # コミットが無い（手で置いて、まだコミットしていない）
+# git を打たない場（Chrome の Pyodide）では、承認の時刻は分からない（空）。
 
 
 @dataclass(frozen=True)
@@ -39,27 +38,18 @@ def approved_times(
 ) -> dict[str, ApprovedTime]:
     """承認済みチケットごと（パスで引く）の承認の時刻。表示（ボード・`--diagnose`）だけが読む。
 
-    次の順で引く。
+    ツリーごとに 1 回 `git log --no-renames --diff-filter=A` を打ち、`doing/<識別子>.md` を足した
+    コミットのうち新しいものの時刻を引く。`--no-renames` を付けるのは、GitHub の画面での
+    移動が rename のコミットになり、付けないと足したことにならないため。
+    コミットが無ければ「未コミット（手で置いた）」（`doing/` にあるものだけ。ほかは分からない）。
 
-    1. 状態の履歴 `events/<識別子>.jsonl` の `approved`（続きの子は `raised`）の
-       うち新しいものの `at`
-    2. 1 で取れないチケットがあるツリーだけ、ツリーごとに 1 回
-       `git log --no-renames --diff-filter=A` を打ち、`doing/<識別子>.md` を足した
-       コミットのうち新しいものの時刻。`--no-renames` を付けるのは、GitHub の画面での
-       移動が rename のコミットになり、付けないと足したことにならないため
-    3. どれも無ければ「未コミット（手で置いた）」（`doing/` にあるものだけ。ほかは分からない）
-
-    判定は履歴も git も読まない取り決めなので、hook の判定の経路からは呼ばない。`use_git` が偽
-    （Chrome の Pyodide など、git の無い場）なら 2 を飛ばし、1 で取れなければ分からないとする。
+    判定は git を読まない取り決めなので、hook の判定の経路からは呼ばない。`use_git` が偽
+    （Chrome の Pyodide など、git の無い場）なら分からないとする。
     """
     out: dict[str, ApprovedTime] = {}
     missing: dict[str, list[ticket_model.Ticket]] = {}
     for t in found:
-        where = settings.approved_dir(conf, t.tree_root) if t.tree_root else ""
-        at = history_time(where, t.ticket) if where else ""
-        if at:
-            out[t.path] = ApprovedTime(at, APPROVED_FROM_HISTORY)
-        elif t.tree_root:
+        if t.tree_root:
             missing.setdefault(t.tree_root, []).append(t)
     if not use_git or sys.platform == "emscripten":
         return out
@@ -71,22 +61,6 @@ def approved_times(
             elif ok and t.state == ticket_model.DOING:
                 out[t.path] = ApprovedTime("", APPROVED_UNCOMMITTED)
     return out
-
-
-def history_time(approved_dir: str, ident: str) -> str:
-    """履歴の最後の承認の時刻。最後の承認のあとに取り下げがあれば空（次の手段の git に任せる）。
-
-    取り下げたあとに手で動かして承認し直すと、履歴には前の承認の行しか残らない。それを今の
-    承認の時刻と言わないため。
-    """
-    entries, _ = history.read(approved_dir, ident, limit=0)
-    kinds = (history.KIND_APPROVED, history.KIND_RAISED)
-    for entry in reversed(entries):
-        if entry.get("kind") == history.KIND_WITHDRAWN:
-            return ""
-        if entry.get("kind") in kinds and isinstance(entry.get("at"), str):
-            return entry["at"]
-    return ""
 
 
 def _added_times(conf: settings.Settings, tree_root: str) -> tuple[dict[str, str], bool]:

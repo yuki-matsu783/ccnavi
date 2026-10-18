@@ -33,9 +33,9 @@ from ..tickets import (
     c1,
     c1_merge,
     core,
-    history,
     review,
     skillsync,
+    via,
 )
 from . import (
     cli_args,
@@ -91,11 +91,10 @@ def _take_test_words(argv: list[str]) -> tuple[list[str], list[str] | None]:
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。
 
-    状態の履歴（history）の経路はここで決まる。既定はエージェントが sh から打つ副命令（`cli`）で、
-    ユーザの判断の経路（端末・ボード）と hook は枝の中で差し替える。履歴を書けなかった知らせは、
-    起動を抜けるときに標準エラーへ出す（状態の履歴は補助で状態の正は置き場なので、状態の操作は止めない）。
+    マーカーに書く経路（via）はここで決まる。既定はエージェントが sh から打つ副命令（`cli`）で、
+    ユーザの判断の経路（端末・ボード）と hook は枝の中で差し替える。
     """
-    with history.session(history.VIA_CLI, stderr):
+    with via.session(via.VIA_CLI):
         try:
             return _run(stdin, stdout, stderr, argv)
         except approval.NoParentWorktree as exc:
@@ -369,7 +368,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--actor", default="")
     # decide が書くレビュー済みのマーカーの経路（`via`）で、`terminal` か `board` を渡す。
     # `--actor` があるときだけ受け付ける。アカウントを引けなかったときに、
-    # マーカーも履歴も前と同じ中身にするため。
+    # マーカーを前と同じ中身にするため。
     # `--templates --import --yes` の board 経路（`--expect` と `--json` と組む）でも受け付ける。
     parser.add_argument("--via", default="")
     try:
@@ -410,7 +409,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 取り込みを書く形（`--templates --import --yes`）は、拡張の子プロセスから board で呼ぶ。
     # `--actor` は読まない。`--expect` と `--json` が揃ったときだけ通す。
     if args.templates and cli_templates.editing(args) and args.yes:
-        if args.via and args.via != history.VIA_BOARD:
+        if args.via and args.via != via.VIA_BOARD:
             stderr.write("ccnavi: --via は --import --yes では board だけ渡せる\n")
             return EXIT_ERROR
         if args.via and (args.expect is None or not args.json):
@@ -422,12 +421,12 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     elif args.via and (not args.actor or not cli_ops._decide_writes(args)):
         stderr.write("ccnavi: --via は decide の --actor と一緒に指定してください。\n")
         return EXIT_ERROR
-    if args.via and args.via not in (history.VIA_TERMINAL, history.VIA_BOARD):
-        stderr.write(f"ccnavi: --via に渡せるのは {history.VIA_TERMINAL} か {history.VIA_BOARD}\n")
+    if args.via and args.via not in (via.VIA_TERMINAL, via.VIA_BOARD):
+        stderr.write(f"ccnavi: --via に渡せるのは {via.VIA_TERMINAL} か {via.VIA_BOARD}\n")
         return EXIT_ERROR
     # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
     # --yes はボードの押した選択と、C1 の中の端末の decide（選ぶのを先に済ませた形）の両方が通る
-    if args.via == history.VIA_BOARD and not args.yes:
+    if args.via == via.VIA_BOARD and not args.yes:
         stderr.write(
             "ccnavi: --via board は --yes（ボードで押した選択）と一緒に指定してください。\n"
         )
@@ -706,8 +705,8 @@ def _parsed(
         # 承認（--agree --yes）と同じく、拡張の子プロセスは端末を持たないので、端末の確認の代わりに
         # --expect の一致と hook の止めに置く。
         if cli_templates.editing(args) and args.yes:
-            if args.via == history.VIA_BOARD:
-                history.set_via(history.VIA_BOARD)
+            if args.via == via.VIA_BOARD:
+                via.set_via(via.VIA_BOARD)
             elif not cli_args._from_terminal(stdin, conf, stderr, "--templates --yes"):
                 return EXIT_ERROR
         return cli_templates.run(stdout, stderr, conf, root, args)
@@ -855,7 +854,7 @@ def _parsed(
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
         # deny（phase_forms.ticket_approval_rule）が止める。
         if args.yes:
-            history.set_via(history.VIA_BOARD)
+            via.set_via(via.VIA_BOARD)
             # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
             code = core.approve_yes(
                 stdout,
@@ -870,7 +869,7 @@ def _parsed(
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not cli_args._from_terminal(stdin, conf, stderr, "--agree"):
             return EXIT_ERROR
-        history.set_via(history.VIA_TERMINAL)
+        via.set_via(via.VIA_TERMINAL)
         # `--agree` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
         approved = core.approve(
             stdin, stdout, stderr, conf, root, only=list(args.command), placed_out=args.placed_out
@@ -1133,7 +1132,7 @@ def _hook_steps(
     # 書いた JSON と内部エラーの応答が混ざって、どちらも読まれなくなるのを避けるため。
     buffered = io.StringIO()
     try:
-        history.set_via(history.VIA_HOOK)
+        via.set_via(via.VIA_HOOK)
         record.subject = judge.subject_of(payload)
         code = events.decide(buffered, stderr, mode, conf, root, payload, record, deadline)
     except Exception as exc:  # noqa: BLE001 想定外の例外を、終了コード 1 で通る形にしない

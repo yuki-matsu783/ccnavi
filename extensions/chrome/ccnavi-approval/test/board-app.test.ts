@@ -279,7 +279,6 @@ function stubEnv(over: { ops?: Partial<BoardOps> } = {}): BoardEnv {
     },
     openOptions: () => undefined,
     confirm: () => true,
-    prompt: () => "理由",
     startWorker: () => ({ call: async () => ({}), init: async () => ({ boot_ms: 10, import_ms: 20, total_ms: 30, pyodide: "0.test", violations: [] }) }),
     blobCache: async () => ({ get: async () => undefined, put: async () => undefined }),
     now: () => new Date("2026-01-01T00:00:00Z"),

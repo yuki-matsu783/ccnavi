@@ -383,7 +383,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
         body = self.ask(
             "plan",
             ids=[e["ticket"] for e in board["batch"]],
-            actor={"account": "a", "version": "1"},
+            actor={"account": "a"},
         )
         self.assertNotIn("error", body, body)
         self.assertEqual(list(body["changes"]), [BRANCH])

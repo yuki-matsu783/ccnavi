@@ -20,12 +20,12 @@ from . import (
     approval,
     approval_marks,
     approval_ops,
-    history,
     phase,
     review,
     review_host,
     syncstate,
     ticket_model,
+    via,
 )
 
 DECIDE_FILE = "review-decide-{parent}-{phase}.md"
@@ -60,7 +60,7 @@ def _followup_from_choice(
 ) -> str | None:
     """ユーザが選んだ続きの子を `doing/` に起こし、識別子を返す。起こせなければ None。"""
     children = [t for t in ph.tickets if ph.states.get(t.ticket) in ticket_model.FINISHED]
-    ident, failed = approval_ops.followup(conf, root, parent, ph.number, children, items)
+    ident, failed = approval_ops.followup(conf, root, parent, ph.number, children, items, stderr)
     if failed:
         stderr.write(f"ccnavi: 続きの子チケットを起こせない: {failed}\n")
         return None
@@ -494,12 +494,12 @@ def _write_plan(
 def _decide_actor() -> tuple[str, str]:
     """decide のマーカーに入れる (アカウント, 経路)。
 
-    アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの（履歴の行の
-    `actor`）。経路はこの起動の経路（端末は `terminal`、ボードは `board`）。アカウントが無ければ
+    アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの。
+    経路はこの起動の経路（端末は `terminal`、ボードは `board`）。アカウントが無ければ
     どちらも書かない（confirm と同じく、引けなければマーカーは前と同じバイト列）。
     """
-    account = str(history.extra().get("actor") or "")
-    return (account, history.via()) if account else ("", "")
+    account = via.actor()
+    return (account, via.via()) if account else ("", "")
 
 
 def _precheck(

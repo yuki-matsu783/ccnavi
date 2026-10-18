@@ -602,7 +602,7 @@ def home_dir_read(
 ) -> str:
     """`home_dir` の読む側。親のワークツリーが決まらないときは、存在しない置き場のパスを返す。
 
-    読む側（マーカー・記録・状態の履歴）は、親のワークツリーが決まらなければ「何も無い」と読む。
+    読む側（マーカー・記録）は、親のワークツリーが決まらなければ「何も無い」と読む。
     決まらないのは、親のワークツリーが無い・HEAD のブランチが違う・途中の操作がある・
     取り込みで止めた（gone・blocked）・閉じた、のどれでも同じ。フォルダが実在しても
     （別のブランチを checkout したままなど）、その中のマーカーは読まない。
@@ -641,13 +641,3 @@ def source_path(t: ticket_model.Ticket) -> str:
         if rel and not rel.startswith("../") and rel != "..":
             return rel
     return t.path
-
-
-def source_branch(t: ticket_model.Ticket) -> str:
-    """提案が乗っていたブランチの名前。
-
-    HEAD がブランチを指していなければ（切り離した・破損した・読めない）ツリーの名前
-    （ワークスペースルートなら空）。Changes の `per_branch` の名前と同じ決め方。
-    """
-    found = tree.branch_of(t.tree_root) if t.tree_root else None
-    return found or t.tree
