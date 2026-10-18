@@ -2,7 +2,7 @@
 
 sh（`ccnavi_branch_to_id`）と TS（拡張の `branchToId`）は、同じ表
 （`tests/fixtures/branch-to-id.json`）で一致を確かめる。
-ここでは Python の側と、`ccnavi worktree id <ブランチ>`（sh が採用の可否を聞く副命令）を見る。
+ここでは Python の側と、`ccnavi worktree id <ブランチ>`（sh が採用の可否を聞くサブコマンド）を見る。
 """
 
 from __future__ import annotations

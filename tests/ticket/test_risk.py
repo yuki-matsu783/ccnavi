@@ -186,7 +186,7 @@ class RiskTest(PhaseHarness):
     def setUp(self):
         super().setUp()
         # 配点と定義は共通レイヤーの既定の置き場へ。`--risk` / `--phases` は診断でだけ有効で、
-        # `ticket` の副命令には届かない。差し替えるテストはこの形に書き直す。
+        # `ticket` のサブコマンドには届かない。差し替えるテストはこの形に書き直す。
         self.risk = write(common_path(self.root, "risk"), RISK)
         # 範囲の上限が無く、レビュー不要の定義。宣言では「レビュー不要」な作業を実績で上書きする。
         self.phases_text = (
@@ -375,7 +375,7 @@ class RiskTest(PhaseHarness):
         denied = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(denied))
 
-    # ---- 5. 副命令に配点を渡しても反映されない（`--risk` は診断でだけ有効）
+    # ---- 5. サブコマンドに配点を渡しても反映されない（`--risk` は診断でだけ有効）
 
     def test_a_risk_flag_on_ticket_done_does_not_change_the_score(self):
         """`ticket finish <子> --risk <別の配点>` は採点を差し替えない。issue #65。

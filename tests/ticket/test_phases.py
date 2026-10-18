@@ -1307,7 +1307,7 @@ class WrapperFlagsComeOnceTest(PhaseHarness):
 
 
 class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
-    """`ticket` の副命令に `--phases` を足しても、定義は共通レイヤーのまま（issue #65）。
+    """`ticket` のサブコマンドに `--phases` を足しても、定義は共通レイヤーのまま（issue #65）。
 
     `.ccnavi/scripts/ccnavi-ticket.sh` が引数をそのまま渡すので、この形はエージェントが
     Bash で打てる。通していた頃は、`review: mr` の定義を `review: none` と宣言する

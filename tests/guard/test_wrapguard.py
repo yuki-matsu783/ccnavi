@@ -543,7 +543,7 @@ class SubagentParentTreeTest(unittest.TestCase):
         child = self.trees["i0001-01-01"]
         reason = self.hook(child, "", tool="Write", path=os.path.join(parent, "src", "x.py"))
         self.assertTrue(self.denied(reason), reason)
-        # 文面はファイルの書き込みとして言う（ラッパーの副命令と取り違えない）。
+        # 文面はファイルの書き込みとして言う（ラッパーのサブコマンドと取り違えない）。
         self.assertNotIn("ccnavi-git.sh write", reason)
         self.assertIn("書き込みません（Write）", reason)
         reason = self.hook(child, "", tool="Write", path=os.path.join(child, "src", "x.py"))
@@ -953,7 +953,7 @@ class CorePathTest(unittest.TestCase):
             ("sh .ccnavi/scripts/ccnavi-git.sh restore --source $R src/a.py", False),
             ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B", False),
             ("sh .ccnavi/scripts/ccnavi-git.sh restore $P", False),
-            # 副命令が文字どおりの語でない（変数・置換・glob）。
+            # サブコマンドが文字どおりの語でない（変数・置換・glob）。
             ("S=rm; sh .ccnavi/scripts/ccnavi-git.sh $S .ccnavi/approved/t/r", True),
             ("sh .ccnavi/scripts/ccnavi-git.sh ${S:-rm} .ccnavi/approved/t/r", True),
             ("sh .ccnavi/scripts/ccnavi-git.sh $(echo rm) .ccnavi/approved/t/r", True),
@@ -961,7 +961,8 @@ class CorePathTest(unittest.TestCase):
             # 標準入力から読むシェルに流す文字列の中の呼び出し。
             ("echo 'sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/approved/t/r' | sh", True),
             ("echo 'sh .ccnavi/scripts/ccnavi-git.sh status; rm -rf .ccnavi' | sh", True),
-            # 長い旗・値を取る旗を前に置いたシェルと、`env`・`command` 越しのシェルも読む。
+            # 長いオプション・値を取るオプションを前に置いたシェルと、`env`・`command`
+            # 越しのシェルも読む。
             *(
                 (
                     f"echo 'sh .ccnavi/scripts/ccnavi-git.sh rm wip/proposals/review/i0002.md'"
@@ -981,7 +982,7 @@ class CorePathTest(unittest.TestCase):
                     "command sh",
                 )
             ),
-            # 走査が読み切れず、ラッパーの名前の後ろに文字どおりの副命令が無い。
+            # 走査が読み切れず、ラッパーの名前の後ろに文字どおりのサブコマンドが無い。
             ("echo rm .ccnavi/approved/t/r | xargs sh .ccnavi/scripts/ccnavi-git.sh", True),
             ("xargs -a f sh .ccnavi/scripts/ccnavi-git.sh", True),
             # 直接の呼び出しは通す。

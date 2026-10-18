@@ -498,7 +498,7 @@ class ConfigUnionHarness(unittest.TestCase):
         レイヤーの置き場はフラグで渡さない。共通レイヤーの 3 本
         （`--rules` / `--phases` / `--risk`）も、
         レイヤーを探す先の 2 本（`--projects` / `--project-home`）も、診断（`--lint` / `--test` /
-        `--explain`）でだけ有効で、hook の判定とチケットの副命令では無視する。
+        `--explain`）でだけ有効で、hook の判定とチケットのサブコマンドでは無視する。
         土台は `--root` の下の既定の置き場に置くので、渡す必要も無い。
 
         差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。

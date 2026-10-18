@@ -59,9 +59,12 @@ class Drafts(PhaseHarness):
         self.conf, _ = settings.load(self.root)
 
     def tpl(self, *args, guard=None):
-        """`--templates` と `--lint` を動かす。PhaseHarness.ccnavi が足す判定の旗は付けない。
+        """`--templates` と `--lint` を動かす。
 
-        `guard` は端末の確かめ（CCNAVI_GUARD_TICKET_APPROVAL）。`--templates` は旗では渡せない。
+        PhaseHarness.ccnavi が足す判定のオプションは付けない。
+
+        `guard` は端末の確かめ（CCNAVI_GUARD_TICKET_APPROVAL）。`--templates`
+        はオプションでは渡せない。
         """
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("CLAUDE_PROJECT_DIR", None)

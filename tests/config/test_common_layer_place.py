@@ -188,7 +188,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
 
     `--project-rules-file` / `--project-phases-file` と揃える。有効なのは `--lint` /
     `--test` / `--test-expectations` / `--explain` だけで、hook からの判定と
-    `ticket` / `review` の副命令では無視する。無視したことは標準エラーに出す。
+    `ticket` / `review` のサブコマンドでは無視する。無視したことは標準エラーに出す。
 
     上の `FlagsStillMoveTheCommonLayerTest` と対で読む。あちらは診断では有効なことを、
     ここは診断の外では有効でないことを見る。片方だけだと、フラグを消しても

@@ -198,7 +198,7 @@ class CompatAgreesTest(unittest.TestCase):
 
         確かめを持たない古い sh（互換 7）と新しい実行ファイルを組み合わせると、`wip/` の削除が
         未コミットのまま Draft が外れうるので、食い違いとして知らせる。sh は `worktree drop|tidy`
-        （古い実行ファイルの知らない副命令）も呼ぶ。
+        （古い実行ファイルの知らないサブコマンド）も呼ぶ。
         """
         self.assertGreaterEqual(version.COMPAT, 8)
 
@@ -230,7 +230,8 @@ class CompatAgreesTest(unittest.TestCase):
     def test_v14_accepting_by_resolving_the_thread_raised_the_compat_to_12(self):
         """V14 受け入れた未解決スレッドに、sh が返信を残して解決するようになった。
 
-        sh は実行ファイルに受け入れの計画を書かせる旗（`--accept-plan`・`--accept-done`）を渡す。
+        sh は実行ファイルに受け入れの計画を書かせるオプション（`--accept-plan`・`--accept-done`）
+        を渡す。
         古い実行ファイルは知らずに落ちるか、受け入れを記録に足すだけでホストを解決済みにしないので、
         食い違いとして知らせる。なので 12 以上。
         """

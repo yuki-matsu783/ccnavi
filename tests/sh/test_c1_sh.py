@@ -1704,7 +1704,7 @@ exec '{git}' "$@"
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
 class C1ReviewTest(C1Harness):
-    """ccnavi-review.sh の状態を書く副命令も C1 で回す（decide を代表に見る）。"""
+    """ccnavi-review.sh の状態を書くサブコマンドも C1 で回す（decide を代表に見る）。"""
 
     def setUp(self):
         super().setUp()
@@ -1773,7 +1773,7 @@ class C1ReviewTest(C1Harness):
         self.assertEqual(self.sha(self.tree, "HEAD"), head)
 
 
-# 実行ファイルの代役（ホストに触る副命令の試験用）。状態を書く副命令だけを代わりに書き
+# 実行ファイルの代役（ホストに触るサブコマンドの試験用）。状態を書くサブコマンドだけを代わりに書き
 # （親のワークツリーにマーカーを置き、書いたパスの一覧を出す）、`c1`・`sync` などは
 # 実際のものに渡す。
 # HALF_FAIL にファイル名があれば、`review requested` を最初の 1 回だけ失敗させる（打ち直しの試験）。
@@ -1925,7 +1925,7 @@ class C1HostHarness(C1Harness):
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
 class C1HostTest(C1HostHarness):
-    """ホストに触る副命令（request・confirm・ready・decide・close-early）の C1。"""
+    """ホストに触るサブコマンド（request・confirm・ready・decide・close-early）の C1。"""
 
     def test_request_confirm_and_ready_are_carried(self):
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")

@@ -2437,7 +2437,7 @@ class TicketTest(unittest.TestCase):
             "/tmp/x --reviewed 1 --accept-unresolved --yes j --digest d --json",
             "./copy --yes i0001 --agree --digest d",
             # 敵対的レビューで止められずに通った形。読み取り用の道具に似た名前、
-            # 文字列を実行する道具、引数のリスト、変数に入れた副命令、分け書き
+            # 文字列を実行する道具、引数のリスト、変数に入れたサブコマンド、分け書き
             "/tmp/cat.bin --reviewed 1 --accept-unresolved --yes j --digest d",
             "awk 'BEGIN{system(\"ccnavi --agree --yes a --digest X\")}'",
             "awk 'BEGIN{system(\"sh .ccnavi/scripts/ccnavi-review.sh decide 3 --choices X "
@@ -2576,7 +2576,7 @@ class TicketTest(unittest.TestCase):
     def test_user_entries_stop_only_forms_that_can_build_the_operation(self):
         """ユーザの入口は、止める操作を組み立てうるときだけ止める（ADR-0122）。
 
-        読むだけの形（`--preview`、診断の旗が展開より前にある形）・リダイレクトの行き先・
+        読むだけの形（`--preview`、診断のオプションが展開より前にある形）・リダイレクトの行き先・
         単引用符の中の文字どおりの値は通す。標準入力から読むシェルへ流し込む文字列に
         入口の名前があれば止める。
         """
@@ -2648,7 +2648,8 @@ class TicketTest(unittest.TestCase):
             f'sh {sync} "$X"',
             f'sh {review} decide 3 "$C"',
             f"sh -c 'sh {sync} $X'",
-            # 長い旗・値を取る旗を前に置いたシェルと、`env`・`command` 越しのシェルも
+            # 長いオプション・値を取るオプションを前に置いたシェルと、`env`・`command`
+            # 越しのシェルも
             # 標準入力から読む。
             *(
                 f'echo "sh {sync} --forget i1" | {sh}'
@@ -2664,7 +2665,8 @@ class TicketTest(unittest.TestCase):
                     "command sh",
                 )
             ),
-            # 実行ファイルが受ける旗（main の `ticket new` が足した旗を含む）の後ろの展開。
+            # 実行ファイルが受けるオプション（main の `ticket new` が足したオプションを含む）
+            # の後ろの展開。
             "ccnavi --title t $A",
             "ccnavi --plan p $A",
             "ccnavi --issue 1 $A",
@@ -2697,7 +2699,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("標準入力から読むシェル", self.reason(result))
 
     def test_executable_options_list_matches_the_parser(self):
-        """入口の止めが知っている実行ファイルの旗は、実行ファイルが受ける旗と同じ。"""
+        """入口の止めが知っている実行ファイルのオプションは、実行ファイルが受けるオプションと同じ。"""
         out = io.StringIO()
         cli.run(io.StringIO(), out, io.StringIO(), ["--version", "--json"])
         flags = set(json.loads(out.getvalue())["flags"]) | {"-h", "-r"}

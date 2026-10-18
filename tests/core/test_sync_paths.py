@@ -100,7 +100,8 @@ class SyncPathsTest(unittest.TestCase):
         self.assertEqual(".ccnavi/approved", found["approved"])
 
     def test_place_flags_are_ignored_outside_diagnosis(self):
-        # sh は受け取った引数を `"$@"` で渡すので、副命令に置き場のフラグを足されても効かない。
+        # sh は受け取った引数を `"$@"` で渡すので、
+        # サブコマンドに置き場のフラグを足されても効かない。
         # 無視したことは標準エラーに出す。
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
