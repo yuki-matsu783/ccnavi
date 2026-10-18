@@ -1256,10 +1256,11 @@ def default_root() -> str:
 def _is_worktree_dir(directory: str) -> bool:
     """`<ワークスペースルート>/.claude/worktrees/<名前>` の位置にあるディレクトリか。
 
-    大文字小文字の扱いは tree と同じ。区別しない機械（Windows）でだけ区別しない（normcase）。
+    大文字小文字は、どの機械でも区別しない。Windows で clone したワークツリーは
+    表記が変わることがあり、機械ごとに判定が割れると Windows でだけ失敗するため。
     """
-    holder = os.path.normcase(os.path.dirname(directory))
-    return holder.endswith(os.sep + os.path.normcase(tree.WORKTREES_DIR))
+    holder = os.path.dirname(directory).replace("\\", "/").casefold()
+    return holder.endswith("/" + tree.WORKTREES_DIR.replace(os.sep, "/").casefold())
 
 
 def _find_project_root() -> str:
