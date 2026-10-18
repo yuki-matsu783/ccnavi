@@ -68,6 +68,25 @@ class StageShTest(unittest.TestCase):
         self.assertEqual("echo lint\n", read(self.draft_hook))
         self.assertEqual("version: 1\n", read(self.rules), "元は触らない")
 
+    def test_inside_a_worktree_the_draft_goes_to_that_worktrees_handoff(self):
+        """cwd が .claude/worktrees/<名前> の中なら、下書きはそのワークツリーの wip/handoff/ に置く
+        （ブランチに載るので push でき、直接作業なら integrate が外す）。mv の行き先は元のまま。"""
+        wt = os.path.join(self.ws, ".claude", "worktrees", "scratch-1-x")
+        os.makedirs(os.path.join(wt, "src"))
+        r = self.stage(self.rules, cwd=os.path.join(wt, "src"))
+        self.assertEqual(0, r.returncode, r.stderr)
+        draft = os.path.join(wt, "wip", "handoff", ".ccnavi", "config", "common", "rules.yml")
+        self.assertTrue(os.path.isfile(draft), r.stdout)
+        self.assertFalse(os.path.exists(self.draft_rules))
+        write(draft, "version: 2\n")
+        r = self.stage("--commands", self.rules, cwd=wt)
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertIn(f"mv '{draft}' '{self.rules}'", r.stdout)
+        # 下書きの置き場の中（ワークツリー側）は元として受けない。
+        r = self.stage(draft, cwd=wt)
+        self.assertEqual(2, r.returncode)
+        self.assertIn("下書きの置き場の中", r.stderr)
+
     def test_relative_to_cwd_and_absolute_paths(self):
         result = self.stage("config/common/rules.yml", cwd=os.path.join(self.ws, ".ccnavi"))
         self.assertEqual(0, result.returncode, result.stderr)

@@ -3410,7 +3410,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
 | `.ccnavi/scripts/ccnavi-worktree.sh` | 作業用のワークツリーを統合先から切る。`fetch`・遅れの確認・起点の選択（遅れていれば `origin/<統合先>` から `--no-track`）・`worktree add` を `ccnavi-git.sh` 経由で順に打つ。ワークツリーが既にあればパスを出すだけ。手元の統合先が `origin` と分岐している（先行も遅れもある）ときは、切らずに終了コード 1 で止まり、先に手元の統合先を揃えるよう案内する（`--from-origin` で警告つきで `origin/<統合先>` から切れる）。`fetch` が届かないときは何も切らず終了コード 4 で止まり、直して打ち直す手と `--offline`（手元の統合先から切る）を案内する |
-| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層）へ `cp` する。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
+| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層）へ `cp` する（cwd が `.claude/worktrees/<名前>` の中ならそのワークツリーの `wip/handoff/`）。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |
