@@ -364,7 +364,9 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
          何も集めないため、--scope を指定してください。--mr N は親のブランチのマージ
          リクエストの番号（ccnavi-start.sh が出す。親の提案の mr: に書く）で、省くと
          取り込み状態に保存された番号を使います。phases.yml がない場合、子のidを
-         指定した場合、または allow が空になる場合は停止します。
+         指定した場合、または allow が空になる場合は停止します。allow の項が計画のどの
+         フェーズの範囲とも重ならないときは、停止せず「承認しても書けない」と警告します
+         （scope: inherit のタイプが計画にあれば警告しません）。
          ccnavi-ticket.sh を経由せず、直接実行します）
     ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
                            [--with-feedback] [--issue N]

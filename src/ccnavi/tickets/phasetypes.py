@@ -413,7 +413,7 @@ def _overlaps(entry, pt: PhaseType) -> bool:
 
 
 def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
-    """親の `allow` のうち、計画のどの定義の範囲にも入らない項を名指しする。
+    """親の `allow`（ask を含む。deny は除く）のうち、計画のどの定義の範囲にも入らない項を名指しする。
 
     承認しても、その範囲には子が書けない（子 ⊆ 定義の上限）。承認と着手のあとの子の提案ではじめて
     気づくので、親を作るときと承認の確認（`--verify`）で言う。計画に `scope: inherit` の定義が
