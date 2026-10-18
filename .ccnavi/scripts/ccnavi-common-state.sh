@@ -174,7 +174,7 @@ ccnavi_integration_local() {
 		ccnavi_il_val=$(printf '%s\n' "$ccnavi_il_out" | sed -n 's/^integration //p' | head -n 1)
 		ccnavi_il_root="$1"
 	fi
-	[ -n "$ccnavi_il_val" ] || return 1
+	[ -n "${ccnavi_il_val:-}" ] || return 1
 	printf '%s\n' "$ccnavi_il_val"
 }
 
@@ -224,14 +224,18 @@ ccnavi_parent_tree() {
 #   ccnavi_pi_approved   親のワークツリーの承認済み（approved/ の doing か done）に親チケットがある（提案は数えない）
 #   ccnavi_pi_requested  承認済みの phases/<名前>/ に <N>.requested が 1 つ以上ある
 #   ccnavi_pi_archived   手元の退避（ready 済み）に親がある
+#   ccnavi_pi_started    承認済みの親チケットの started_at が空でない（着手は push してから完了する）
 #   ccnavi_pi_mr         親チケットの mr 欄（無ければ空）
-# 旧い実行ファイルは新しい行（approved・requested・archived・mr）を出さない。そのときは unknown のまま。
+#   ccnavi_pi_hasmr      答えに mr の行が在ったら yes（無ければ空。旧い実行ファイル）
+# 旧い実行ファイルは新しい行（approved・requested・archived・started・mr）を出さない。そのときは unknown のまま。
 ccnavi_parent_info() {
 	ccnavi_pi_parent=unknown
 	ccnavi_pi_approved=unknown
 	ccnavi_pi_requested=unknown
 	ccnavi_pi_archived=unknown
+	ccnavi_pi_started=unknown
 	ccnavi_pi_mr=""
+	ccnavi_pi_hasmr=""
 	[ -d "$1" ] || return 1
 	case "$1" in
 	*/.claude/worktrees/*) ccnavi_pi_ws="${1%/.claude/worktrees/*}" ;;
@@ -239,7 +243,7 @@ ccnavi_parent_info() {
 	esac
 	ccnavi_pi_out=$(ccnavi_ask "$ccnavi_pi_ws" tree parent "$1" "$2") || return 2
 	[ "$(printf '%s\n' "$ccnavi_pi_out" | head -n 1)" = "tree 1" ] || return 2
-	for ccnavi_pi_key in parent approved requested archived; do
+	for ccnavi_pi_key in parent approved requested archived started; do
 		ccnavi_pi_ans=$(printf '%s\n' "$ccnavi_pi_out" | sed -n "s/^$ccnavi_pi_key //p" | head -n 1)
 		case "$ccnavi_pi_ans" in
 		yes | no | unreadable) ;;
@@ -250,9 +254,14 @@ ccnavi_parent_info() {
 		approved) ccnavi_pi_approved="$ccnavi_pi_ans" ;;
 		requested) ccnavi_pi_requested="$ccnavi_pi_ans" ;;
 		archived) ccnavi_pi_archived="$ccnavi_pi_ans" ;;
+		started) ccnavi_pi_started="$ccnavi_pi_ans" ;;
 		esac
 	done
 	ccnavi_pi_mr=$(printf '%s\n' "$ccnavi_pi_out" | sed -n 's/^mr //p' | head -n 1)
+	# `mr` の行が在ったか（旧い実行ファイルは出さない。呼ぶ側が「欄に番号が無い」と「行が無い」を言い分ける）
+	if printf '%s\n' "$ccnavi_pi_out" | grep -q '^mr '; then
+		ccnavi_pi_hasmr=yes
+	fi
 	[ "$ccnavi_pi_mr" != "-" ] || ccnavi_pi_mr=""
 	return 0
 }
@@ -260,14 +269,16 @@ ccnavi_parent_info() {
 # 親のブランチを一度は送った形跡があれば 0。ccnavi_parent_info を呼んだ後に使う。<ツリー> <ブランチ>
 #
 # 形跡は、手元の `refs/remotes/origin/<ブランチ>`（`branch.<ブランチ>.remote` は使わない。origin/main から切った
-# だけの未 push の親でも設定されるため）か、実行ファイルが答える承認済みの親チケット・.requested・退避
-# （fetch.prune で参照が消えても残る）。push の関門（ccnavi_push_gate）と ccnavi-sync.sh の「消えた親」の判定が
-# 同じ述語を使う。
+# だけの未 push の親でも設定されるため）か、実行ファイルが答える .requested・退避・着手済み（started_at）
+# （fetch.prune で参照が消えても残る）。承認済みというだけでは形跡にしない（直接作業で提案を書き、同名のワークツリーを
+# 切って承認し、最初の push を打つ流れが、初回の push として通らなくなる）。着手（ticket start）は C1 で push して
+# から完了するので、started_at があれば一度は push している。push の関門（ccnavi_push_gate）と ccnavi-sync.sh の
+# 「消えた親」の判定が同じ述語を使う。
 ccnavi_parent_trace() {
 	if git -C "$1" show-ref --verify --quiet "refs/remotes/origin/$2" 2>/dev/null; then
 		return 0
 	fi
-	[ "$ccnavi_pi_approved" = yes ] || [ "$ccnavi_pi_requested" = yes ] || [ "$ccnavi_pi_archived" = yes ]
+	[ "$ccnavi_pi_requested" = yes ] || [ "$ccnavi_pi_archived" = yes ] || [ "$ccnavi_pi_started" = yes ]
 }
 
 # 親のブランチの push の関門。0 通す、1 拒否、2 確かめられない（拒否側）。
@@ -280,10 +291,11 @@ ccnavi_parent_trace() {
 # 同じ名前で作り直してしまう。リモートから消えた形跡があるのにリモートに無いときだけ止める。
 #
 # 形跡は 2 つ。手元の `refs/remotes/origin/<ブランチ>`（`branch.<ブランチ>.remote` は使わない。origin/main から
-# 切っただけの未 push の親でも設定されるため）と、実行ファイルが答える承認済みの親チケット・.requested・退避
+# 切っただけの未 push の親でも設定されるため）と、実行ファイルが答える .requested・退避・着手済み
 # （fetch.prune で参照が消えても残る）。どちらかがあれば `ls-remote` で在るかを聞く。聞けない・時間切れは 2。
-# 形跡が無く、実行ファイルが「承認も依頼も退避も無い」と答えれば、最初の push として通す。
-# 実行ファイルが無い・古くて新しい行を知らないときは、参照の形跡だけで決める。
+# 承認済みというだけでは形跡にしない（承認して最初に打つ push が、初回として通る）。
+# 形跡が無ければ、最初の push として通す。ただし承認済みチケットを読めない（unreadable）ときは、
+# 着手済みかを確かめられないので 2。実行ファイルが無い・古くて新しい行を知らないときは、参照の形跡だけで決める。
 ccnavi_push_gate() {
 	ccnavi_pg_why=""
 	ccnavi_pg_tree=$(ccnavi_phys "$1")

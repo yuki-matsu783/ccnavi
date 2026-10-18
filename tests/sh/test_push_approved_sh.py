@@ -140,8 +140,9 @@ class Workspace(unittest.TestCase):
             "  [ \"$STUB_PARENT\" = no ] && { printf 'tree 1\\nparent no\\n'; exit 0; }\n"
             "  printf 'tree 1\\nparent yes\\n'\n"
             '  [ "$STUB_PARENT" = old ] && exit 0\n'
-            "  printf 'approved %s\\nrequested %s\\narchived %s\\nmr -\\n' "
-            '"${STUB_APPROVED:-no}" "${STUB_REQUESTED:-no}" "${STUB_ARCHIVED:-no}"\n'
+            "  printf 'approved %s\\nrequested %s\\narchived %s\\nstarted %s\\nmr -\\n' "
+            '"${STUB_APPROVED:-no}" "${STUB_REQUESTED:-no}" "${STUB_ARCHIVED:-no}" '
+            '"${STUB_STARTED:-no}"\n'
             "  exit 0 ;;\n"
             "esac\nexit 0\n",
         )
@@ -447,16 +448,17 @@ class PushApprovedTest(Workspace):
     # ---- 親のブランチの push の関門（ccnavi_push_gate）。取り込み状態は見ない。
     # 実行ファイルの代役が `tree parent` に答える（STUB_PARENT）。答えなければ参照だけで決める。
 
-    def sent_parent(self, name="i0001", approved="yes", **extra):
+    def sent_parent(self, name="i0001", started="yes", **extra):
         """送ったことのある親のワークツリー。ホストがブランチを消した（参照だけが残る）形にする。
 
         返すのは、ツリーと、関門に聞かれる実行ファイルの答えを入れた環境。
+        承認済みの親チケットは置いてある（STUB_APPROVED=yes）。着手済み（STUB_STARTED）が形跡になる。
         """
         tree = self.worktree(name)
         git(tree, "push", "-q", "-u", "origin", name)
         git(self._tmp.name, "--git-dir", self.remote, "update-ref", "-d", f"refs/heads/{name}")
         self.place(tree)
-        env = self.env(STUB_PARENT="1", STUB_APPROVED=approved, **extra)
+        env = self.env(STUB_PARENT="1", STUB_APPROVED="yes", STUB_STARTED=started, **extra)
         return tree, env
 
     def test_a_parent_gone_from_the_remote_is_committed_but_not_pushed(self):
@@ -476,7 +478,7 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
 
     def test_an_approved_parent_without_a_reference_is_still_guarded(self):
-        # fetch.prune で参照が消えても、承認済みの親チケットがあれば、作り直さない。
+        # fetch.prune で参照が消えても、着手済みの親チケットがあれば、作り直さない。
         tree, env = self.sent_parent()
         git(self.ws, "update-ref", "-d", "refs/remotes/origin/i0001")
         result = self.push(env=env)
@@ -487,12 +489,22 @@ class PushApprovedTest(Workspace):
     def test_a_request_marker_or_an_archive_also_counts_as_having_been_sent(self):
         for key in ("STUB_REQUESTED", "STUB_ARCHIVED"):
             with self.subTest(key=key):
-                tree, env = self.sent_parent(name=f"i0001-{key[5:9].lower()}", approved="no")
+                tree, env = self.sent_parent(name=f"i0001-{key[5:9].lower()}", started="no")
                 git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{os.path.basename(tree)}")
                 env[key] = "yes"
                 result = self.push(env=env)
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn("リモートに無い", result.stderr)
+
+    def test_an_approved_parent_never_started_passes_as_the_first_push(self):
+        # 直接作業で提案を書き、同名のワークツリーで承認して、最初に打つ承認の push。
+        # 承認済みというだけでは形跡にしない。
+        tree = self.worktree("i0001")
+        self.place(tree)
+        env = self.env(STUB_PARENT="1", STUB_APPROVED="yes", STUB_STARTED="no")
+        result = self.push(env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
 
     def test_the_first_push_of_a_parent_never_sent_passes(self):
         # 形跡が無く、承認済みの親チケットも依頼も退避も無い。最初の push として通す。

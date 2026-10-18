@@ -260,6 +260,12 @@ ccnavi_c1_prepare() {
 			ccnavi_c1_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も反映していません。接続と、上に出た原因を直してから再実行してください"
 			return 1
 		fi
+		# 取り込みが、マージ済みの親のワークツリーを片付けて 0 で終わることがある。無いツリーには書かずに止める。
+		if [ ! -d "$ccnavi_c1_tree" ]; then
+			ccnavi_c1_say "親のワークツリーが取り込みの後に無い。親子のチケット ${ccnavi_c1_family_id} は閉じた（マージ済み）か、ワークツリーが無い。何も反映していません"
+			log_info C1 で止めた -- "family=$ccnavi_c1_family_id" "reason=parent-tree-gone"
+			return 1
+		fi
 		# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push の関門。3 経路で同じ）。
 		ccnavi_cp_gate=0
 		ccnavi_push_gate "$ccnavi_c1_tree" "$ccnavi_c1_branch" "$ccnavi_c1_family_id" "$ccnavi_c1_root" \

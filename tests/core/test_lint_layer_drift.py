@@ -80,6 +80,10 @@ class LayerDriftTest(unittest.TestCase):
         self.assertIn(LAYER, found.detail)
         self.assertIn("origin/main", found.detail)
         self.assertIn("中身が違う", found.detail)
+        # 手元の origin/main が古いだけのこともあるので、先に取得する案内を添える。
+        self.assertIn(
+            "手元の origin/main が古いだけなら、先に取得（fetch）してから見直す", found.detail
+        )
 
     def test_a_changed_common_layer_is_told_for_the_workspace_itself(self):
         write(os.path.join(self.root, COMMON), "version: 1\nrules: [x]\n")

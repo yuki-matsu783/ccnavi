@@ -21,12 +21,20 @@ from dataclasses import dataclass
 from ..infra import pathcase, settings, tree
 from . import ticket_ids
 
+# `Standing.kind`: 止める理由の種別。案内（`guidance`）は文面ではなくこれで分ける。
+STOP_BUSY = "busy"  # 親のワークツリーに途中の操作がある
+STOP_MISMATCH = "mismatch"  # HEAD のブランチ名を変換した識別子がフォルダ名と合わない
+STOP_ABSENT = "absent"  # 親のワークツリーがない
+STOP_AMBIGUOUS = "ambiguous"  # 同じ識別子の親が複数のリポジトリにある
+
 
 @dataclass(frozen=True)
 class Standing:
     """親子のチケットの立ち位置。
 
-    `stop` は決まらないので止める理由（空なら止めない）。
+    `stop` は決まらないので止める理由（空なら止めない）。`kind` はその種別（`STOP_*`。
+    止めないなら空）。`head` は合わないときの、ワークツリーの HEAD の生のブランチ名
+    （読めなければ空）。
     `home` は親のワークツリー（`.claude/worktrees/<P>` で、HEAD のブランチ名を変換したものが
     フォルダ名と一致するもの）。
     `branch` は親のブランチ名。ワークツリーの HEAD から読んだもので、読めなければ空
@@ -38,6 +46,8 @@ class Standing:
     home: tree.Tree | None = None
     stop: str = ""
     branch: str = ""
+    kind: str = ""
+    head: str = ""
 
     @property
     def branch_name(self) -> str:
@@ -97,6 +107,7 @@ class Families:
             stop=(
                 f"親子のチケット {family_id} が複数のリポジトリ（{where}）にある。どれか決まらない"
             ),
+            kind=STOP_AMBIGUOUS,
         )
 
     def home_tree(self, family_id: str, project: str) -> tree.Tree | None:
@@ -139,23 +150,28 @@ class Families:
         named = self._named_tree(family_id, project)
         busy = tree.busy_of(named.root) if named is not None else ""
         where = f"{tree.WORKTREES_DIR.replace(os.sep, '/')}/{family_id}"
+        head = ""
         if busy:
+            kind = STOP_BUSY
             stop = (
                 f"親のワークツリー（{where}）に途中の操作（{busy}）がある。"
                 "済ませるか取りやめるまで、どのチケットを正とするかが決まらない"
             )
         elif named is not None:
+            kind = STOP_MISMATCH
+            head = tree.branch_of(named.root) or ""
             stop = (
                 f"親のワークツリー（{where}）の HEAD のブランチ名を変換した識別子が"
                 f"フォルダ名（{family_id}）と合わない。"
                 "どのチケットを正とするかが決まらない"
             )
         else:
+            kind = STOP_ABSENT
             stop = (
                 f"親のワークツリー（{where}）がありません。"
                 "ほかのツリーのコピーでは代用しない（どのチケットを正とするかが決まらない）"
             )
-        return Standing(family_id, repo, None, stop=stop, branch=branch)
+        return Standing(family_id, repo, None, stop=stop, branch=branch, kind=kind, head=head)
 
 
 def head_branch(tree_root: str, family_id: str) -> str:
@@ -198,15 +214,21 @@ def guidance(root: str, st: Standing) -> list[str]:
     git = settings.script_command(root, "ccnavi-git.sh")
     name = st.family
     branch = st.branch_name
-    if st.home is None and "途中の操作" in st.stop:
+    if st.kind == STOP_BUSY:
         return [
             "親のワークツリーの途中の操作（merge・rebase など）を済ませるか取りやめてから"
             "再実行してください"
         ]
-    if st.home is None and "合わない" in st.stop:
+    if st.kind == STOP_MISMATCH:
+        now = f"（今の HEAD: {st.head}）" if st.head else "（HEAD がブランチを指していない）"
         return [
             f"親のワークツリー（.claude/worktrees/{name}）の HEAD を、ブランチ名の `/` を `-` に"
-            f"置き換えると {name} になるブランチ（{branch}）に戻してください"
+            f"置き換えると {name} になるブランチに戻してください{now}"
+        ]
+    if st.kind == STOP_AMBIGUOUS:
+        return [
+            f"同じ名前 {name} の親のワークツリーが複数のリポジトリにあります。"
+            "片方の親子のチケットを片付けるか、識別子を変えて、1 つのリポジトリに絞ってください"
         ]
     return [
         f"親のワークツリーを切り直してください（'{git} fetch origin {branch}' のあと "

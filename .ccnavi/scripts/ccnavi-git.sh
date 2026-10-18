@@ -1920,15 +1920,29 @@ push)
 			git config --get remote.pushDefault 2>/dev/null ||
 			git config --get "branch.$push_branch.remote" 2>/dev/null || echo origin)
 	fi
+	# 設定済みのリモート名でない引数（`:` を含まない URL やローカルのパス）は、origin と同じ URL なら origin とみなす。
+	# origin の URL が `:` を含まないローカルのパスのとき、`push <そのパス>` で関門を飛ばせてしまうため。
+	if [ "$push_dest" != origin ]; then
+		push_dest_url=$(git config --get "remote.$push_dest.url" 2>/dev/null || printf '%s' "$push_dest")
+		push_origin_url=$(git config --get remote.origin.url 2>/dev/null || :)
+		if [ -n "$push_origin_url" ] && [ "$push_dest_url" = "$push_origin_url" ]; then
+			push_dest=origin
+		fi
+	fi
 	if [ "$push_dest" = origin ] && [ -n "$push_root" ]; then
 		case "$push_top" in
 		"$push_root"/.claude/worktrees/*)
 			push_gate_rc=0
-			ccnavi_push_gate "$push_top" "$push_branch" "${push_top##*/}" "$push_root" || push_gate_rc=$?
+			# 秒数は C1・ccnavi-push-approved.sh と同じ既定（60 秒。CCNAVI_C1_TIMEOUT で変えられる）。
+			case "${CCNAVI_C1_TIMEOUT:-}" in
+			'' | *[!0-9]*) push_gate_secs=60 ;;
+			*) push_gate_secs="$CCNAVI_C1_TIMEOUT" ;;
+			esac
+			ccnavi_push_gate "$push_top" "$push_branch" "${push_top##*/}" "$push_root" "$push_gate_secs" || push_gate_rc=$?
 			case "$push_gate_rc" in
 			0) ;;
 			1) reject push-parent-missing "${ccnavi_pg_why}。エージェントは戻せない（生の git は使えない）ので、ユーザに伝えて止まってください。" ;;
-			*) reject push-parent-unverified "${ccnavi_pg_why}。" ;;
+			*) reject push-parent-unverified "${ccnavi_pg_why}。直せなければユーザに伝えて止まってください（生の git で押し通さない）。" ;;
 			esac
 			;;
 		esac

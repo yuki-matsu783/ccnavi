@@ -13,8 +13,10 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   （ツリーが `.claude/worktrees/` の下のときだけ）。
   続けて、push の関門（sh）が「初回の push か、消えた親ブランチの再作成か」を見分ける材料を返す。
   `approved`（承認済みの親チケットが在るか。提案は数えない）・`requested`（`.requested` の
-  マーカーが在るか）・`archived`（手元の退避に親が在るか）・`mr`（親チケットの `mr:` 欄）。
-  旧い実行ファイルはこの 4 行を返さない（sh は `approved` が無ければ `unknown` と読む）
+  マーカーが在るか）・`archived`（手元の退避に親が在るか）・`started`（承認済みの親チケットの
+  `started_at` が空でないか。着手は push してから完了するので、着手済みなら一度は push した）・
+  `mr`（親チケットの `mr:` 欄）。
+  旧い実行ファイルはこの 5 行を返さない（sh は `approved` が無ければ `unknown` と読む）
 
 git はローカルの読み取りだけ。ネットワークには出ない。
 """
@@ -73,13 +75,14 @@ def _under_worktrees(root: str, path: str) -> bool:
 def parent_tree(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, path: str, name: str
 ) -> int:
-    """`ccnavi tree parent <ツリー> <名前>`。頭に `tree 1`、続けて 5 行。
+    """`ccnavi tree parent <ツリー> <名前>`。頭に `tree 1`、続けて 6 行。
 
     ```
     parent yes|no|unreadable
     approved yes|no|unreadable
     requested yes|no
     archived yes|no
+    started yes|no
     mr <番号>|-
     ```
 
@@ -94,7 +97,7 @@ def parent_tree(
         return 1
     work = _tree_of(root, conf, path, name)
     answer = _holds_parent(conf, work)
-    approved, mr = _approved_parent(conf, work)
+    approved, mr, started = _approved_parent(conf, work)
     # 手元の退避を見るのは `.claude/worktrees/<名前>` の形のときだけ（退避のリポジトリは
     # ワークツリーの元リポジトリで決まる）。
     archived = NO
@@ -111,6 +114,7 @@ def parent_tree(
     stdout.write(f"approved {approved}\n")
     stdout.write(f"requested {_requested(conf, work)}\n")
     stdout.write(f"archived {archived}\n")
+    stdout.write(f"started {started}\n")
     stdout.write(f"mr {mr or '-'}\n")
     return 0
 
@@ -157,10 +161,12 @@ def _holds_parent(conf: settings.Settings, work: tree.Tree) -> str:
     return UNREADABLE if unreadable else NO
 
 
-def _approved_parent(conf: settings.Settings, work: tree.Tree) -> tuple[str, str]:
-    """承認済みの置き場（`doing/`・`done/`）に親チケットが在るかと、その `mr:` 欄。
+def _approved_parent(conf: settings.Settings, work: tree.Tree) -> tuple[str, str, str]:
+    """承認済みの置き場（`doing/`・`done/`）に親チケットが在るかと、その `mr:` 欄、着手済みか。
 
     提案（`todo/`・`review/`）は数えない。push の関門が見るのは、承認された親だけ。
+    着手済みは `started_at` が空でないこと（`ticket start` は C1 で push してから完了するので、
+    着手済みなら一度は push した）。親チケットが無い・読めないときは `no`。
     """
     approved = settings.approved_dir(conf, work.root)
     unreadable = False
@@ -175,8 +181,9 @@ def _approved_parent(conf: settings.Settings, work: tree.Tree) -> tuple[str, str
             unreadable = True
             continue
         if str(front.get("ticket") or "").strip() == work.name and not front.get("parent"):
-            return YES, _mr_of(front)
-    return (UNREADABLE if unreadable else NO), ""
+            started = YES if str(front.get("started_at") or "").strip() else NO
+            return YES, _mr_of(front), started
+    return (UNREADABLE if unreadable else NO), "", NO
 
 
 def _requested(conf: settings.Settings, work: tree.Tree) -> str:
@@ -193,7 +200,13 @@ def _requested(conf: settings.Settings, work: tree.Tree) -> str:
 
 def _archived_mr(root: str, project: str, ident: str) -> str:
     """手元の退避の親チケットの `mr:` 欄。無い・読めないなら空。"""
-    data = archive.archived_bytes(root, project, f"{ticket_model.DONE}/{ident}.md")
+    # 大文字小文字だけが違う識別子の退避も同じものとして引く（`archived_fields` と同じ）。
+    name = archive.archived_name(root, project, ident)
+    data = (
+        archive.archived_bytes(root, project, f"{ticket_model.DONE}/{name}.md")
+        if name is not None
+        else None
+    )
     if data is None:
         return ""
     try:

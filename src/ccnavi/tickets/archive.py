@@ -228,21 +228,29 @@ def _fields(data: bytes | None) -> donecopy.DoneCopy | None:
         return None
 
 
+def archived_name(root: str, project: str, ident: str) -> str | None:
+    """退避の `done/` にある、その識別子のファイルの実際の綴り（幹）。無ければ None。
+
+    大文字小文字だけが違う識別子も同じものとして引く。
+    """
+    if not ticket_ids.is_valid_id(ident):
+        return None
+    if archived_bytes(root, project, f"{ticket_model.DONE}/{ident}.md") is not None:
+        return ident
+    directory = _done_dir(root, tree.repo_key(project))
+    folded = [i for i in (_regular_md(directory) if directory else []) if same_id(i, ident)]
+    return folded[0] if folded else None
+
+
 def archived_fields(root: str, project: str, ident: str) -> donecopy.DoneCopy | None:
     """退避の `done/<識別子>.md` の識別子・親・着手と取り消しの欄。無い・読めない・リンクなら None。
 
     大文字小文字だけが違う識別子も同じものとして引く（区別しないファイルシステムでは、ブランチと
     ワークツリーの名前がぶつかるため。使い回しの検査を緩めない向き）。
     """
-    if not ticket_ids.is_valid_id(ident):
+    name = archived_name(root, project, ident)
+    if name is None:
         return None
-    name = ident
-    if archived_bytes(root, project, f"{ticket_model.DONE}/{ident}.md") is None:
-        directory = _done_dir(root, tree.repo_key(project))
-        folded = [i for i in (_regular_md(directory) if directory else []) if same_id(i, ident)]
-        if not folded:
-            return None
-        name = folded[0]
     copy = _fields(archived_bytes(root, project, f"{ticket_model.DONE}/{name}.md"))
     # 区別しないファイルシステムでは、`I0001.md` で `i0001.md` が直に読める（folded を通らない）。
     # 区別するファイルシステムと同じ答えにするため、ここも大文字小文字を問わず突き合わせる。

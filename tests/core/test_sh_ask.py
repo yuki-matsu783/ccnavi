@@ -134,7 +134,7 @@ class TreeParentTest(Harness):
 
 
 class TreeParentGateFactsTest(Harness):
-    """push の関門が聞く 4 行（approved・requested・archived・mr）。"""
+    """push の関門が聞く 5 行（approved・requested・archived・started・mr）。"""
 
     def facts(self, name="p0001"):
         return self.answer("tree 1", "tree", "parent", self.tree, name)
@@ -142,8 +142,40 @@ class TreeParentGateFactsTest(Harness):
     def test_the_lines_come_in_a_fixed_order(self):
         out = self.ask("tree", "parent", self.tree, "p0001").stdout.splitlines()
         self.assertEqual(
-            ["tree 1", "parent no", "approved no", "requested no", "archived no", "mr -"], out
+            [
+                "tree 1",
+                "parent no",
+                "approved no",
+                "requested no",
+                "archived no",
+                "started no",
+                "mr -",
+            ],
+            out,
         )
+
+    def test_started_needs_a_started_at_in_the_approved_parent(self):
+        path = os.path.join(self.tree, APPROVED, "doing", "p0001.md")
+        write(path, front(ticket="p0001"))
+        self.assertEqual("no", self.facts()["started"])
+        write(path, front(ticket="p0001", started_at='""'))
+        self.assertEqual("no", self.facts()["started"])
+        write(path, front(ticket="p0001", started_at="2026-10-18T00:00:00Z"))
+        found = self.facts()
+        self.assertEqual("yes", found["started"])
+        self.assertEqual("yes", found["approved"])
+
+    def test_started_is_no_for_a_proposal_a_child_and_unreadable_frontmatter(self):
+        write(
+            os.path.join(self.tree, PROPOSALS, "todo", "p0001.md"),
+            front(ticket="p0001", started_at="2026-10-18T00:00:00Z"),
+        )
+        self.assertEqual("no", self.facts()["started"])
+        done = os.path.join(self.tree, APPROVED, "doing", "p0001.md")
+        write(done, front(ticket="p0001", parent="x", started_at="2026-10-18T00:00:00Z"))
+        self.assertEqual("no", self.facts()["started"])
+        write(done, "---\nticket: [p0001\n---\n")
+        self.assertEqual("no", self.facts()["started"])
 
     def test_nothing_says_no_everywhere(self):
         self.assertEqual(
@@ -152,6 +184,7 @@ class TreeParentGateFactsTest(Harness):
                 "approved": "no",
                 "requested": "no",
                 "archived": "no",
+                "started": "no",
                 "mr": "-",
             },
             self.facts(),

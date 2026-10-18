@@ -47,7 +47,7 @@ import os
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, pathcase, settings, tree
 from . import approval, archive, ticket_ids, worktrees
 
 STATE_DIR = "retire"
@@ -79,8 +79,29 @@ class Outcome:
     text: str = ""
 
 
+def _same(a: str, b: str) -> bool:
+    """名前を、大文字小文字（と NFC/NFD）を区別せずに比べる。"""
+    return pathcase.fold(tree.nfc(a)) == pathcase.fold(tree.nfc(b))
+
+
 def record_path(conf: settings.Settings, parent: str) -> str:
-    return os.path.join(conf.state, STATE_DIR, f"{parent}.json") if conf.state else ""
+    """親の片付けの記録の場所。
+
+    大文字小文字だけが違う名前は同じ記録として扱うので、在るときはファイルの実際の表記で返す。
+    無いときは与えた名前のまま組む。
+    """
+    if not conf.state:
+        return ""
+    base = os.path.join(conf.state, STATE_DIR)
+    want = f"{parent}.json"
+    try:
+        existing = sorted(os.listdir(base))
+    except OSError:
+        existing = []
+    for entry in existing:
+        if _same(entry, want):
+            return os.path.join(base, entry)
+    return os.path.join(base, want)
 
 
 def _projects_dir(root: str, conf: settings.Settings) -> str:
@@ -123,6 +144,8 @@ def _held_record(path: str) -> tuple[dict, str]:
         return {}, f"{failed}"
     if not isinstance(data, dict):
         return {}, "JSON の辞書ではない"
+    if "children" in data and not isinstance(data["children"], list):
+        return {}, "children が配列ではない"
     return data, ""
 
 
@@ -183,7 +206,9 @@ def note(
             "読めない閉じたチケットがあり、片付ける子の一覧から漏れる"
             f"（{'; '.join(unread[:3])}）。直してから打ち直す"
         )
-    children = {c["ticket"]: c for c in held.get("children", []) if isinstance(c, dict)}
+    children = {
+        c["ticket"]: c for c in held.get("children") or [] if isinstance(c, dict) and "ticket" in c
+    }
     for c in _closed_children(root, conf, parent):
         children[c.ticket] = {
             "ticket": c.ticket,
@@ -229,7 +254,7 @@ def merge_legacy(
     if broken:
         return Merged(failed=f"既存の片付けの記録を読めない（{broken}）。上書きしない")
     present = os.path.lexists(path)
-    if present and str(held.get("parent") or "") != parent:
+    if present and not _same(str(held.get("parent") or ""), parent):
         return Merged(failed="既存の片付けの記録の parent が親と合わない。上書きしない")
     data = dict(held) if present else {"parent": parent, "project": project, "children": []}
     changed = not present
@@ -285,7 +310,10 @@ def entries(conf: settings.Settings) -> list[Entry]:
             reason = f"{failed}" if failed is not None else "JSON の辞書ではない"
             out.append(Entry(stem, incomplete=f"記録を読めない（{reason}）"))
             continue
-        if str(data.get("parent") or "") != stem:
+        if not _same(str(data.get("parent") or ""), stem):
+            continue
+        if "children" in data and not isinstance(data["children"], list):
+            out.append(Entry(stem, incomplete="記録の children が配列ではない"))
             continue
         project = str(data.get("project") or "")
         branch = str(data.get("branch") or "")
@@ -336,7 +364,8 @@ def run_abandon(
 
 def _children_from(record: dict) -> list[Child]:
     out = []
-    for c in record.get("children", []):
+    children = record.get("children")
+    for c in children if isinstance(children, list) else []:
         if (
             isinstance(c, dict)
             and c.get("ticket")
@@ -501,7 +530,7 @@ def _parent_of(root: str, conf: settings.Settings, project: str, ident: str) -> 
         + approval.scan_review(conf, root, raw=raw)[0]
     )
     for t in found:
-        if t.ticket == ident:
+        if _same(t.ticket, ident):
             return t.parent or ""
     copy = archive.archived_fields(root, project, ident)
     return (copy.parent or "") if copy is not None else ""
@@ -515,7 +544,13 @@ def run_retire(
     Draft を外した後に呼ぶ。消さなかったものがあれば 1。
     """
     family = worktrees.family_for(root, conf, family)
-    held = read_record(conf, family)
+    held, broken = _held_record(record_path(conf, family)) if conf.state else ({}, "")
+    if broken:
+        stderr.write(
+            f"ccnavi: 親 {family} の片付けの記録を読めない（{broken}）。"
+            "子の一覧が分からないので、何も消さない。直すか消してから打ち直す\n"
+        )
+        return 1
     children = {c.ticket: c for c in _children_from(held)}
     for c in _closed_children(root, conf, family):
         children.setdefault(c.ticket, c)
@@ -582,11 +617,12 @@ def run_branch(
         if not entry.endswith(".json"):
             continue
         parent = entry[: -len(".json")]
-        record = read_record(conf, parent)
-        if str(record.get("parent") or "") != parent:
+        # 壊れた記録は飛ばして続ける（1 本の壊れで、ほかの親の子のブランチ片付けを止めない）。
+        record, broken = _held_record(os.path.join(directory, entry))
+        if broken or not _same(str(record.get("parent") or ""), parent):
             continue
         for child in _children_from(record):
-            if child.ticket == name:
+            if _same(child.ticket, name):
                 found = (record, child)
     if found is None:
         stderr.write(
@@ -595,11 +631,12 @@ def run_branch(
         )
         return 1
     record, child = found
+    name = child.ticket  # 以降は記録の綴りで扱う（ブランチは git が大文字小文字を区別する）
     # 記録は state の置き場のファイルで、書き換えれば消す対象を広げられる。消す前に、記録の子が
     # 実際にこの親の子か（承認済みチケットか退避の `parent:` が記録の親か）を確かめ直す。
     parent = str(record.get("parent") or "")
     actual = _parent_of(root, conf, child.project, name)
-    if not parent or actual != parent:
+    if not parent or not _same(actual, parent):
         stderr.write(
             f"ccnavi: {name} は、記録の親（{parent or '空'}）の子として承認済みチケットにも"
             f"退避にも見つからない（見つかった親: {actual or 'なし'}）。記録を信じて消さない\n"
@@ -623,6 +660,28 @@ def run_branch(
 
 
 # ---- MR がマージされたと分かった後（片付け 2）
+
+
+def _parent_head_blocker(parent_path: str, branch: str, has_ref: bool) -> str:
+    """親のワークツリーが在るのに、そのままブランチの確認に進めない理由。進めるなら空。
+
+    ワークツリーの HEAD が記録のブランチを指し、そのブランチの ref が手元に在るときだけ、
+    ブランチの確認（`_merged_blocker`）が実際の HEAD を見たことになる。
+    """
+    head = tree.branch_of(parent_path)
+    if head is None:
+        return (
+            "親のワークツリーの HEAD がブランチを指していない（切り離し、または読めない）ので、"
+            "成果が失われないか確かめられない"
+        )
+    if head != branch:
+        return (
+            f"親のワークツリーの HEAD は {head} で、記録のブランチ {branch} と違う。"
+            f"{head} のコミットが push 済みか確かめられない"
+        )
+    if not has_ref:
+        return f"ブランチ {branch} の ref が手元に無いのに親のワークツリーが在り、確かめられない"
+    return ""
 
 
 def _merged_blocker(repo: str, branch: str, tip: str, head_sha: str) -> str:
@@ -677,13 +736,21 @@ def run_merged(
     repo = repo_dir(root, conf, project)
     clean = True
     tip = _tip(repo, branch)
-    blocker = _merged_blocker(repo, branch, tip, head_sha) if tip else ""
+    parent_path = tree.worktree_path(root, family)
+    on_disk = os.path.lexists(parent_path)
+    # ワークツリーが在るなら、その HEAD が記録のブランチか確かめる。`worktrees.drop` が見るのは
+    # 未コミットと ignored だけで、HEAD が push 済みか・MR に含まれるかは見ない。
+    blocker = _parent_head_blocker(parent_path, branch, bool(tip)) if on_disk else ""
+    if not blocker and tip:
+        blocker = _merged_blocker(repo, branch, tip, head_sha)
     if blocker:
-        outcome = _keep(repo, branch, blocker)
         stdout.write(
             f"親 {family} のワークツリーは、ブランチが片付けの条件を満たさないので消しません\n"
         )
-        _say(stdout, outcome)
+        if tip:
+            _say(stdout, _keep(repo, branch, blocker))
+        else:
+            stdout.write(f"親のワークツリーは消しませんでした: {blocker}\n")
         clean = False
     else:
         if not _drop_worktree(
@@ -695,7 +762,12 @@ def run_merged(
             _say(stdout, outcome)
             if outcome.status != DELETED:
                 clean = False
-    held = read_record(conf, family)
+    path = record_path(conf, family)
+    held, broken = _held_record(path) if path else ({}, "")
+    if broken:
+        # 子の一覧を読めないので、子の片付けは進められず、記録も消さない。
+        stdout.write(f"親 {family} の片付けの記録を読めないので、子は片付けません: {broken}\n")
+        clean = False
     asking: list[Outcome] = []
     for child in _children_from(held):
         if not _drop_worktree(stdout, root, child.ticket, cwd, "。ブランチは別に片付ける"):
@@ -718,9 +790,7 @@ def run_merged(
         )
         for outcome in asking:
             stdout.write(outcome.text + "\n")
-    if clean and not asking:
-        path = record_path(conf, family)
-        if path and os.path.lexists(path):
-            fsio.unlink(path)
+    if clean and not asking and path and os.path.lexists(path):
+        fsio.unlink(path)
     stdout.write(f"record {'yes' if clean else 'no'}\n")
     return 0

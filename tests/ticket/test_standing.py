@@ -25,7 +25,7 @@ from ccnavi.tickets import (
 )
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
-from tests.ticketsample import child_text
+from tests.ticketsample import child_text, parent_text
 
 
 def record_text(name, state, reason="", sha="0" * 40):
@@ -355,6 +355,182 @@ class PredecessorTest(AuthorityHarness):
         pool = {"i0001-01-08": [doing, closed]}
         approval_checks.align_imported(self.conf(), self.root, pool)
         self.assertEqual([doing], pool["i0001-01-08"])
+
+
+class UnreadableChildTest(AuthorityHarness):
+    """マージのコンフリクトマーカーなどで読めなくなった子の承認済みチケットが、親のツリーにある。"""
+
+    def start_second_child(self):
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
+        self.commit_parent("propose second")
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.worktree("i0001-01-02", "i0001")
+        started = self.ccnavi("ticket", "start", "i0001-01-02")
+        self.assertEqual(started.returncode, 0, started.stderr)
+        return tree
+
+    def corrupt(self, name="i0001-01-02"):
+        write(
+            os.path.join(self.approved, "doing", f"{name}.md"),
+            "<<<<<<< HEAD\nticket: x\n=======\nticket: y\n>>>>>>> other\n",
+        )
+
+    def test_the_unreadable_child_is_not_given_the_range_of_the_parent(self):
+        """読めない子のワークツリーで、親の範囲を借りて書けることはない。
+
+        子のワークツリー自身に読める写しがあれば、親のワークツリーの外にしか無いチケットとして
+        止まる（deny）。その写しも読めなければ、チケットのないツリーと同じ扱い（ccnavi の判定は
+        undeclared で、親の範囲では許さない）。
+        """
+        second = self.start_second_child()
+        self.corrupt()
+        blocked = self.write_to(second, "wip/research/a")
+        self.assertEqual("deny", self.decision(blocked), blocked.stdout)
+        self.assertIn("DENY_TICKET_BLOCKED", self.reason(blocked))
+        write(
+            os.path.join(second, ".ccnavi", "approved", "doing", "i0001-01-02.md"),
+            "<<<<<<< HEAD\nticket: x\n=======\nticket: y\n>>>>>>> other\n",
+        )
+        undeclared = self.write_to(second, "wip/research/a")
+        self.assertNotEqual("allow", self.decision(undeclared), undeclared.stdout)
+        self.assertIn("UNDECLARED", self.reason(undeclared))
+
+    def test_the_siblings_keep_working_and_the_check_names_the_unreadable_copy(self):
+        """失ったもの: 読めない子があっても、読める兄弟と親の書き込みは止まらない。
+
+        読めないことは `sync check` の表示と終了コードでだけ伝わる。
+        """
+        self.start_second_child()
+        self.corrupt()
+        self.assertNotEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
+        self.assertNotEqual("deny", self.decision(self.write_to(self.parent_tree, "wip/x")))
+        check = self.ccnavi("sync", "check", "i0001")
+        self.assertEqual(1, check.returncode, check.stdout + check.stderr)
+        self.assertIn("i0001-01-02.md", check.stdout)
+
+
+class GuidanceByKindTest(AuthorityHarness):
+    """止める理由の種別（`Standing.kind`）で解き方を分ける。文面の部分一致には頼らない。"""
+
+    def guidance(self, st):
+        return "\n".join(standing.guidance(self.root, st))
+
+    def test_a_mismatched_head_names_the_raw_head_not_a_placeholder(self):
+        git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
+        st = standing.standing(self.conf(), self.root, "i0001")
+        self.assertEqual(standing.STOP_MISMATCH, st.kind)
+        self.assertEqual("elsewhere", st.head)
+        self.assertEqual("", st.branch)
+        text = self.guidance(st)
+        self.assertIn("今の HEAD: elsewhere", text)
+        self.assertIn("に戻してください", text)
+        self.assertNotIn("<ブランチ名>", text)
+        self.assertNotIn("切り直してください", text)
+
+    def test_a_detached_head_says_it_does_not_point_at_a_branch(self):
+        git(self.parent_tree, "checkout", "--quiet", "--detach")
+        st = standing.standing(self.conf(), self.root, "i0001")
+        self.assertEqual(standing.STOP_MISMATCH, st.kind)
+        self.assertIn("HEAD がブランチを指していない", self.guidance(st))
+
+    def test_a_busy_tree_says_to_finish_the_operation(self):
+        gitdir = git(self.parent_tree, "rev-parse", "--git-dir").strip()
+        if not os.path.isabs(gitdir):
+            gitdir = os.path.join(self.parent_tree, gitdir)
+        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        os.makedirs(os.path.join(gitdir, "rebase-merge"))
+        with open(os.path.join(gitdir, "HEAD"), "w", encoding="utf-8") as f:
+            f.write(head + "\n")
+        st = standing.standing(self.conf(), self.root, "i0001")
+        self.assertEqual(standing.STOP_BUSY, st.kind)
+        self.assertIn("途中の操作", self.guidance(st))
+        self.assertNotIn("切り直してください", self.guidance(st))
+
+    def test_an_absent_tree_says_to_recut_it(self):
+        self.drop_parent()
+        st = standing.standing(self.conf(), self.root, "i0001")
+        self.assertEqual(standing.STOP_ABSENT, st.kind)
+        self.assertIn("切り直してください", self.guidance(st))
+
+    def test_a_family_in_two_repositories_does_not_say_to_recut_the_tree(self):
+        from ccnavi.infra import tree
+
+        fams = standing.Families(self.conf(), self.root)
+        fams._worktrees = [
+            *fams.worktrees(),
+            tree.Tree("i0001", os.path.join(self.root, "x"), "web"),
+        ]
+        st = fams.standing_any("i0001")
+        self.assertEqual(standing.STOP_AMBIGUOUS, st.kind)
+        text = self.guidance(st)
+        self.assertIn("複数のリポジトリ", text)
+        self.assertIn("1 つのリポジトリに絞って", text)
+        self.assertNotIn("切り直してください", text)
+        self.assertNotIn("worktree add", text)
+
+    def test_a_standing_that_does_not_stop_has_no_kind(self):
+        self.assertEqual("", standing.standing(self.conf(), self.root, "i0001").kind)
+
+
+class LegacySyncRecordsTest(AuthorityHarness):
+    """旧い `logs/state/sync/` が残る PC でも、立ち位置・承認・hook の判定は変わらない。"""
+
+    def plant(self):
+        for state in ("gone", "blocked"):
+            write(
+                os.path.join(self.state, "sync", "self", "families", "i0001"),
+                record_text("i0001", state, "旧い理由"),
+            )
+        write(os.path.join(self.state, "sync", "self", "integration", "head"), "branch main\n")
+        write(
+            os.path.join(self.state, "sync", "self", "integration", ".ccnavi", "approved", "done")
+            + os.sep
+            + "i0001-01-01.md",
+            "旧いコピー\n",
+        )
+
+    def observed(self):
+        st = standing.standing(self.conf(), self.root, "i0001")
+        check = self.ccnavi("sync", "check", "i0001")
+        return (
+            st.stop,
+            st.branch,
+            self.decision(self.write_to(self.child_tree, "wip/research/a")),
+            self.decision(self.write_to(self.child_tree, "src/keep.py")),
+            check.returncode,
+            check.stdout,
+        )
+
+    def test_the_old_records_change_nothing(self):
+        before = self.observed()
+        self.plant()
+        self.assertEqual(before, self.observed())
+        self.assertEqual("", before[0])
+
+    def test_an_approval_still_goes_through(self):
+        self.plant()
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
+        self.commit_parent("propose second")
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertTrue(os.path.isfile(os.path.join(self.approved, "doing", "i0001-01-02.md")))
+
+
+class ClosedIdentifierReuseTest(AuthorityHarness):
+    """承認では、閉じた識別子の再利用を検知しない（検知は開始時のホストへの照会だけ）。"""
+
+    def test_a_proposal_that_reuses_an_archived_identifier_is_approved(self):
+        write(
+            os.path.join(self.root, "logs", "archive", "self", "done", "i0002.md"),
+            "---\nversion: 1\nticket: i0002\ntitle: 閉じた親\n"
+            "completed_at: 2026-01-01T00:00:00+0900\n---\n",
+        )
+        other = self.worktree("i0002", "main")
+        self.propose("i0002", parent_text("i0002", ["research"]), tree=other)
+        result = self.approve()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertTrue(
+            os.path.isfile(os.path.join(other, ".ccnavi", "approved", "doing", "i0002.md"))
+        )
 
 
 class ReadyTest(AuthorityHarness):

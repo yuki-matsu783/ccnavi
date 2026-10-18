@@ -105,6 +105,22 @@ class RecordsTest(ChromeWriteHarness):
             rejected,
         )
 
+    def test_a_requested_family_missing_from_the_snapshot_is_refused(self):
+        """要求した親子のブランチ自体が snapshot の branches に無ければ、偽のツリーを組まずに断る。
+
+        記録（gone）を足さなくても、拡張の側で止まる。ホストに無いと分かっていても同じ。
+        """
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        for absent in ([], ["i0003"]):
+            request = self.chrome_request("plan", "i0003")
+            request["snapshot"]["absent"] = absent
+            for op in ("board", "plan"):
+                with self.subTest(op=op, absent=absent):
+                    body = self.answer({**request, "op": op})
+                    self.assertIn("family のブランチが snapshot にありません", body["error"])
+                    self.assertNotIn("identifiers", body)
+
     def test_an_unreadable_input_stops_the_board_and_the_plan(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()

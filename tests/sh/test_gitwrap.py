@@ -1218,9 +1218,10 @@ class ParentPushGateTest(GitWrapperTest):
     """親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る（push の関門）。
 
     取り込み状態（記録）は見ない。「一度は送った形跡」は `refs/remotes/origin/<ブランチ>` と、
-    実行ファイルが答える承認済みの親チケット・依頼のマーカー・手元の退避。形跡があるのに
-    リモートに無ければ拒否し（改名・消し間違い・捨てた親子のチケットを、確かめずに作り直さない）、
-    形跡が無ければ初回の push として通す。確かめられないとき（ls-remote の失敗）は拒否する。
+    実行ファイルが答える着手済み（承認済みの親チケットの started_at）・依頼のマーカー・手元の退避。
+    形跡があるのにリモートに無ければ拒否し（改名・消し間違い・捨てた親子のチケットを、確かめずに作り直さない）、
+    形跡が無ければ初回の push として通す。承認済みというだけでは形跡にしない
+    （承認して最初に打つ push が通る）。確かめられないとき（ls-remote の失敗）は拒否する。
     親のワークツリーでないツリーと、origin 以外への push には掛けない。
     """
 
@@ -1237,10 +1238,11 @@ class ParentPushGateTest(GitWrapperTest):
         git(self.tree, "commit", "-q", "-m", "proposal")
         self.state = os.path.join(self.dir, "logs", "state")
 
-    def approve(self):
-        """承認済みの親チケットを置く（形跡になる）。"""
+    def approve(self, started=False):
+        """承認済みの親チケットを置く。着手済み（started_at あり）のときだけ形跡になる。"""
         copy = os.path.join(self.tree, ".ccnavi", "approved", "doing", "i0001.md")
-        write_text(copy, "---\nversion: 1\nticket: i0001\n---\n")
+        mark = "started_at: 2026-10-18T00:00:00Z\n" if started else ""
+        write_text(copy, f"---\nversion: 1\nticket: i0001\n{mark}---\n")
         git(self.tree, "add", ".ccnavi/approved/doing/i0001.md")
         git(self.tree, "commit", "-q", "-m", "copy")
 
@@ -1274,14 +1276,49 @@ class ParentPushGateTest(GitWrapperTest):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), self.remote_sha())
 
-    def test_an_approved_parent_missing_from_the_remote_is_refused(self):
-        # 参照（origin/i0001）が無くても、承認済みの親チケットがあれば、送った親として扱う。
+    def test_an_approved_parent_never_started_passes_as_the_first_push(self):
+        # 直接作業で提案を書き、同名のワークツリーで承認して、最初に打つ push。
+        # 承認済みというだけでは形跡にしない。
         self.approve()
+        result = self.push()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), self.remote_sha())
+
+    def test_a_started_parent_missing_from_the_remote_is_refused(self):
+        # 参照（origin/i0001）が無くても、着手済み（started_at あり）なら一度は送った親として扱う。
+        self.approve(started=True)
         result = self.push()
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("親のブランチ i0001 がリモートに無い", result.stderr)
         self.assertIn("ccnavi-sync.sh i0001", result.stderr)
         self.assertEqual("", self.remote_sha())
+
+    def test_a_requested_parent_missing_from_the_remote_is_refused(self):
+        self.approve()
+        write_text(
+            os.path.join(self.tree, ".ccnavi", "approved", "phases", "i0001", "1.requested"), "{}\n"
+        )
+        result = self.push()
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("親のブランチ i0001 がリモートに無い", result.stderr)
+
+    def test_the_origin_url_written_directly_is_still_gated(self):
+        # origin の URL が `:` を含まないローカルのパスのとき、
+        # 引数にそのパスを書いても関門を飛ばせない。
+        self.assertEqual(0, self.push().returncode)
+        self.delete_on_remote()
+        result = run_in(self.tree, "push", "-u", self.bare, "i0001")
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("リモートに無い", result.stderr)
+        self.assertEqual("", self.remote_sha())
+
+    def test_an_unverifiable_remote_tells_the_agent_to_stop(self):
+        self.assertEqual(0, self.push().returncode)
+        git(self.dir, "remote", "set-url", "origin", os.path.join(self.dir, "nowhere.git"))
+        result = self.push()
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("ユーザに伝えて止まってください", result.stderr)
+        self.assertNotIn("。。", result.stderr)
 
     def test_a_branch_gone_from_the_remote_is_refused_until_it_is_restored(self):
         self.assertEqual(0, self.push().returncode)
@@ -1310,7 +1347,7 @@ class ParentPushGateTest(GitWrapperTest):
     def test_no_executable_decides_by_the_reference_alone(self):
         """実行ファイルが無いときは、参照の形跡だけで決める。参照が無ければ初回として通す。"""
         approved_only = {"CCNAVI_BIN_PATH": os.path.join(self.dir, "no-such-ccnavi")}
-        self.approve()
+        self.approve(started=True)
         result = self.run_in_tree(approved_only)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.delete_on_remote()
@@ -1645,7 +1682,7 @@ class SymlinkedWorkspaceTest(GitWrapperTest):
         git(self.dir, "worktree", "add", "-q", tree, "-b", "i0001")
         write_text(
             os.path.join(tree, ".ccnavi", "approved", "doing", "i0001.md"),
-            "---\nversion: 1\nticket: i0001\n---\n",
+            "---\nversion: 1\nticket: i0001\nstarted_at: 2026-10-18T00:00:00Z\n---\n",
         )
         git(tree, "add", ".ccnavi/approved/doing/i0001.md")
         git(tree, "commit", "-q", "-m", "copy")
@@ -1681,7 +1718,7 @@ class PushRemoteResolutionTest(ParentPushGateTest):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_push_default_to_origin_is_gated(self):
-        self.approve()
+        self.approve(started=True)
         git(self.tree, "config", "remote.pushDefault", "origin")
         git(self.tree, "config", "push.default", "current")
         result = run_in(self.tree, "push")

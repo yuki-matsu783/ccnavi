@@ -221,7 +221,18 @@ if [ -n "$info_from" ]; then
 			case "$mg_kind" in
 			moved) printf '案内: %s: 旧い取り込み記録を、片付けの記録（retire/）へ移した\n' "${mg_rest%% *}" ;;
 			dropped) printf '案内: %s: 旧い取り込み記録を捨てた（%s）\n' "${mg_rest%% *}" "${mg_rest#* * }" ;;
-			skipped) printf '案内: %s: 旧い取り込み記録を触らなかった（%s）。ユーザが中身を確かめてください\n' "${mg_rest%% *}" "${mg_rest#* * }" ;;
+			skipped)
+				case "$mg_rest" in
+				integration\ *)
+					# `skipped integration <repo> <理由>` は親ではなく統合先のコピーの行。
+					mg_after="${mg_rest#integration }"
+					printf '案内: 旧い統合先のコピー（%s）を触らなかった（%s）。ユーザが中身を確かめてください\n' "${mg_after%% *}" "${mg_after#* }"
+					;;
+				*)
+					printf '案内: %s: 旧い取り込み記録を触らなかった（%s）。ユーザが中身を確かめてください\n' "${mg_rest%% *}" "${mg_rest#* * }"
+					;;
+				esac
+				;;
 			removed) printf '案内: 旧い統合先のコピー（%s）を消した\n' "${mg_rest#integration }" ;;
 			esac
 		done <"$scratch/migrate"
@@ -364,7 +375,10 @@ load_retired() {
 	[ -n "$info_from" ] || return 0
 	run_ccnavi sync retired >"$scratch/retired-raw" 2>/dev/null || :
 	tr -d '\r' <"$scratch/retired-raw" >"$scratch/retired-out"
-	[ "$(head -n 1 "$scratch/retired-out")" = "retired 1" ] || return 0
+	if [ "$(head -n 1 "$scratch/retired-out")" != "retired 1" ]; then
+		printf '案内: 実行ファイルが片付けの記録の一覧（sync retired）に答えなかった（実行ファイルが古い可能性）。ready の後の親の片付けは列挙できない。実行ファイルを新しくして再実行してください\n'
+		return 0
+	fi
 	awk 'BEGIN { OFS = "\t" } $1 == "retired" && NF >= 5 { print $2, $3, $4, $5 }' "$scratch/retired-out" >"$scratch/retired-all"
 	sed -n 's/^incomplete //p' "$scratch/retired-out" >"$scratch/retired-bad"
 }
@@ -518,7 +532,7 @@ sync_family() {
 		;;
 	esac
 
-	# 親チケットの mr 欄と、送った形跡（承認済み・依頼・退避）を実行ファイルに聞く。
+	# 親チケットの mr 欄と、送った形跡（着手済み・依頼・退避）を実行ファイルに聞く。
 	ccnavi_parent_info "$tree" "$P" || :
 	fam_mr="$ccnavi_pi_mr"
 
@@ -667,6 +681,9 @@ split_merged() {
 # MR の番号が無いときの 1 行。<添える語>
 no_mr_note() {
 	printf '%s: 親チケットの mr 欄に MR の番号が無いので、閉じたか（MR がマージ済みか）判断できない%s\n' "$P" "$1"
+	if [ -z "$ccnavi_pi_hasmr" ]; then
+		printf '案内: %s: 実行ファイルの答えに mr の行が無かった（実行ファイルが古い可能性）。親チケットに mr 欄があるなら、実行ファイルを新しくして再実行してください\n' "$P"
+	fi
 }
 
 # MR がマージ済みと分かった後の手元の片付け。<MR の先頭の sha>

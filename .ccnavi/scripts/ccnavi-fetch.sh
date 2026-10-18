@@ -324,6 +324,18 @@ report=$(
 		fi
 	done
 
+	# 第 2 周の前に、統合先の名前（settings.local.json の env）を実行ファイルに 1 回だけ聞いて控える。
+	# リポジトリごとの `$( )` の中で聞くと、控えが親に戻らず、環境変数が無いときは毎回実行ファイルを起こす。
+	# 控えはここ（`$( )` の外）で作り、第 2 周のサブシェルが引き継ぐ。時間の枠を過ぎていれば、実行ファイルは起こさず空を控える。
+	if [ -z "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
+		if [ "$(ccnavi_fetch_left)" -gt 0 ]; then
+			ccnavi_integration_local "$root" >/dev/null 2>&1 || :
+		else
+			ccnavi_il_val=""
+			ccnavi_il_root="$root"
+		fi
+	fi
+
 	# 第 2 周。リポジトリごとに、ワークツリーの起点になるデフォルトブランチを進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue

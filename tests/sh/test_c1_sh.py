@@ -773,6 +773,21 @@ class C1TicketTest(C1Harness):
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
         self.assertEqual(self.remote_sha(), "")
 
+    def test_a_take_in_that_tidied_the_parent_away_writes_nothing(self):
+        """取り込み（ccnavi-sync.sh）が、マージ済みの親のワークツリーを片付けて 0 で終わっても、
+        存在しないツリーには書かずに止まる。"""
+        write(
+            os.path.join(self.scripts, "ccnavi-sync.sh"),
+            f'#!/bin/sh\ngit -C "{self.ws}" worktree remove --force "{self.tree}"\nexit 0\n',
+        )
+        before = self.remote_sha()
+        result = self.ticket("start", PARENT)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("閉じた（マージ済み）か、ワークツリーが無い", result.stderr)
+        self.assertIn("何も反映していません", result.stderr)
+        self.assertFalse(os.path.exists(self.tree))
+        self.assertEqual(self.remote_sha(), before)
+
     def test_record_risk_is_not_c1_and_rides_on_the_finish(self):
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
         tree = self.child_tree()

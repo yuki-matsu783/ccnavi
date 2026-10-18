@@ -463,10 +463,26 @@ class ParentBranchShTest(unittest.TestCase):
         self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
-    def test_an_approved_parent_whose_reference_was_pruned_is_still_guarded(self):
-        """fetch.prune で参照（origin/ブランチ）が消えても、承認済みの親チケットがあれば、
+    def test_an_approved_parent_never_started_is_pushed_once_without_a_reference(self):
+        """承認しただけで一度も送っていない親（着手していない）は、参照もリモートのブランチも無くても、
+        最初の push を通す。"""
+        self.add_parent_tree()
+        self.approve()
+        self.delete_remote_branch()
+        git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{BRANCH}")
+        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
+    def test_a_started_parent_whose_reference_was_pruned_is_still_guarded(self):
+        """fetch.prune で参照（origin/ブランチ）が消えても、着手済み（started_at あり）の親は、
         リモートに無いブランチを作り直さない。"""
         self.imported_family()
+        copy = os.path.join(self.tree, APPROVED, "doing", PARENT + ".md")
+        with open(copy, encoding="utf-8") as f:
+            text = f.read()
+        write(copy, text.replace("---\n", "---\nstarted_at: 2026-10-18T00:00:00Z\n", 1))
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "start")
         self.delete_remote_branch()
         git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{BRANCH}")
         refused = self.refused(

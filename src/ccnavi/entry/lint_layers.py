@@ -341,7 +341,8 @@ def _drift(conf: settings.Settings, root: str, project: str) -> tuple[list[Probl
                 SEVERITY_WARN,
                 where,
                 f"作業ツリーの {rel} が統合先（origin/{branch}）と違う（{how}）。"
-                "統合先に取り込まれるまで、他の機械と Chrome の判定には使われない",
+                "統合先に取り込まれるまで、他の機械と Chrome の判定には使われない。"
+                f"手元の origin/{branch} が古いだけなら、先に取得（fetch）してから見直す",
             )
         )
     return problems, True

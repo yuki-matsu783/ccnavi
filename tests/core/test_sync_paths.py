@@ -202,6 +202,27 @@ class SyncMigrateTest(unittest.TestCase):
         self.assertFalse(os.path.exists(old))
         self.assertFalse(os.path.exists(self.record("i0001")))
 
+    def test_a_parent_worktree_that_differs_only_in_case_is_a_live_one(self):
+        # 大小違いのワークツリーは同じものとして扱う。実在する親を片付け待ちとして移さない。
+        os.makedirs(os.path.join(self.ws, ".claude", "worktrees", "I0001"))
+        old = self.legacy("self", "i0001")
+        (line,) = self.migrate()
+        self.assertTrue(line.startswith("dropped i0001 self "), line)
+        self.assertFalse(os.path.exists(old))
+        self.assertFalse(os.path.exists(os.path.join(self.state, "retire")))
+
+    def test_a_note_that_differs_only_in_case_is_the_same_note(self):
+        write(
+            self.record("I0001"),
+            json.dumps({"parent": "I0001", "project": "", "branch": "", "children": []}),
+        )
+        self.legacy("self", "i0001", mr="12", branch="i0001")
+        self.assertEqual(["moved i0001 self"], self.migrate())
+        self.assertEqual(["I0001.json"], os.listdir(os.path.join(self.state, "retire")))
+        with open(self.record("I0001"), encoding="utf-8") as f:
+            held = json.load(f)
+        self.assertEqual(("i0001", 12), (held["branch"], held["mr"]))
+
     def test_a_record_with_neither_mr_nor_branch_is_dropped(self):
         old = self.legacy("self", "i0002", mr=None, branch="")
         (line,) = self.migrate()
