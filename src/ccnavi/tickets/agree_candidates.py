@@ -562,7 +562,7 @@ def _unreadable(t: ticket_model.Ticket, why: str) -> rules.Problem:
     return rules.Problem(
         rules.SEVERITY_ERROR,
         t.ticket,
-        f"範囲を変える改版は、範囲の項が全部読めるときだけ出せる: {why}",
+        f"範囲の節に、判定が読めない項がある改版は出せない: {why}",
     )
 
 

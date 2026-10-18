@@ -99,8 +99,22 @@ class GlobRegexTest(unittest.TestCase):
         after = self.read_entry('regex: "src/app"')
         self.assertTrue(approval.plan_differs(after, before))
         text = "\n".join(agree_screen._scope_diff_lines(before, after))
-        self.assertIn("allow 追加: regex:src/app", text)
+        self.assertIn("allow 追加: regex(src/app)", text)
         self.assertIn("allow 削除: src/app", text)
+
+    def test_a_glob_that_looks_like_the_old_prefix_is_not_confused_with_a_regex(self):
+        before = self.read_entry('glob: "regex:src/app"')
+        after = self.read_entry('regex: "src/app"')
+        self.assertTrue(approval.plan_differs(after, before))
+        text = "\n".join(agree_screen._scope_diff_lines(before, after))
+        self.assertIn("allow 追加: regex(src/app)", text)
+        self.assertIn("allow 削除: regex:src/app", text)
+
+    def test_a_duplicate_entry_is_not_a_difference(self):
+        once = read(allow=("src/*",))
+        twice = read(allow=("src/*", "src/*"))
+        self.assertFalse(approval.plan_differs(twice, once))
+        self.assertEqual([], agree_screen._scope_diff_lines(once, twice))
 
 
 class UnreadableScopeTest(unittest.TestCase):

@@ -457,8 +457,8 @@ def phases_signature(t: ticket_model.Ticket) -> tuple | None:
 
 
 def scope_signature(t: ticket_model.Ticket) -> tuple:
-    """チケットの範囲（deny / ask / allow の項）を比べる形。項の並び順の違いは区別しない。"""
-    return tuple(sorted((e.decision, e.glob, e.regex) for e in t.entries))
+    """チケットの範囲（deny / ask / allow の項）を比べる形。項の並び順と重複は区別しない。"""
+    return tuple(sorted({(e.decision, e.glob, e.regex) for e in t.entries}))
 
 
 def plan_differs(proposal: ticket_model.Ticket, current: ticket_model.Ticket) -> bool:
