@@ -72,6 +72,11 @@ CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 # どこにも書けない。
 CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
 
+# 親のワークツリーに、置き場（下書き・提案・ELI5・承認済み）以外を書こうとした。親の範囲の
+# 外に書いたのではなく、親は作業の場ではないことが根拠なので、CODE_TICKET_SCOPE とは分ける。
+# 次の一手も違う。範囲を広げても通らず、子のチケットを起こしてそのワークツリーで作業する。
+CODE_TICKET_PARENT = "DENY_TICKET_PARENT"
+
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
 # 無いので、組み込みの名前（`builtin:` で始まる）にして、ファイルの中を探しても見つからない
 # ことを見た目で示す。
@@ -85,6 +90,7 @@ SUBAGENT_TICKET_OP_RULE = "builtin:subagent-ticket-op"  # DENY_SUBAGENT_TICKET_O
 PHASE_REVIEW_RULE = "builtin:phase-review"  # DENY_PHASE_REVIEW
 TICKET_PROJECT_RULE = "builtin:ticket-project"  # DENY_TICKET_PROJECT_MISMATCH
 TICKET_BLOCKED_RULE = "builtin:ticket-blocked"  # DENY_TICKET_BLOCKED
+TICKET_PARENT_RULE = "builtin:ticket-parent"  # DENY_TICKET_PARENT
 
 # 書き直しを求める形（shellread の FORM_*）ごとの理由コード。ルールに当たったのではなく読みの
 # 決めごとで止めたので、記録のルール名は TICKET_RULE と同じく組み込みの名前

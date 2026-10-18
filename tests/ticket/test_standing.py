@@ -403,7 +403,7 @@ class UnreadableChildTest(AuthorityHarness):
         self.start_second_child()
         self.corrupt()
         self.assertNotEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
-        self.assertNotEqual("deny", self.decision(self.write_to(self.parent_tree, "wip/x")))
+        self.assertNotEqual("deny", self.decision(self.write_to(self.parent_tree, "wip/handoff/x")))
         check = self.ccnavi("sync", "check", "i0001")
         self.assertEqual(1, check.returncode, check.stdout + check.stderr)
         self.assertIn("i0001-01-02.md", check.stdout)
