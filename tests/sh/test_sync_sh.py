@@ -1065,8 +1065,12 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertNotIn("合わせた", done.stdout)
+        self.assertIn("統合先: main", done.stdout)
         head = git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD").stdout.strip()
         self.assertEqual("refs/remotes/origin/main", head)
+        # 綴り違いの ref は取らない（大文字小文字を区別しない FS で origin/main と衝突する）。
+        refs = git(self.ws, "for-each-ref", "--format=%(refname)", "refs/remotes/origin").stdout
+        self.assertNotIn("refs/remotes/origin/Main", refs.split())
 
     def test_a_host_default_starting_with_a_dash_is_not_followed(self):
         # ホストが -x のような名前を返しても使わない（後ろの git の引数でオプションに読まれる）。
