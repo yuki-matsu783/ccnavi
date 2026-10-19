@@ -46,11 +46,15 @@ def serial_names(
     """
     problems: list[str] = []
     if scanned is None:
-        raw = approval.read_raw(conf, root)
-        copies, _ = approval.scan(conf, root, raw=raw)
-        closed, _ = approval.scan(conf, root, closed=True, raw=raw)
-        review, _ = approval.scan_review(conf, root, raw=raw)
-        proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+        try:
+            raw = approval.read_raw(conf, root)
+            copies, _ = approval.scan(conf, root, raw=raw)
+            closed, _ = approval.scan(conf, root, closed=True, raw=raw)
+            review, _ = approval.scan_review(conf, root, raw=raw)
+            proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+        except Exception as exc:  # noqa: BLE001  置き場を読めなければ、番号を決めない
+            copies = closed = review = proposals = []
+            problems.append(f"チケットと提案の置き場を読めなかった（{exc}）")
     else:
         copies, closed, review, proposals = scanned
     names = [t.ticket for t in list(copies) + list(closed) + list(review) + list(proposals)]
