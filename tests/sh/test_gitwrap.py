@@ -1600,6 +1600,28 @@ class WorktreeFreshBaseTest(GitWrapperTest):
         git(self.dir, "merge", "-q", "--ff-only", f"origin/{self.integ}")
         self.assertCreated("a", "-b", "a")
 
+    def test_the_suggested_commands_run_from_a_fresh_shell(self):
+        import re
+
+        self.push_from_elsewhere()
+        git(self.dir, "fetch", "-q", "origin")
+        result = self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "a")
+        commands = re.findall(r"`([^`]+)`", result.stderr)
+        fetch = next(c for c in commands if " fetch origin " in c)
+        cut = next(c for c in commands if " worktree add " in c)
+        for command in (fetch, cut):
+            done = subprocess.run(
+                [SHELL, "-c", command],
+                cwd=self.dir,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=with_exe(dict(os.environ)),
+            )
+            self.assertEqual(done.returncode, 0, (command, done.stdout, done.stderr))
+        self.assertEqual("a", git_out(self.tree("a"), "branch", "--show-current"))
+
     def test_diverged_is_rejected_with_a_message_that_does_not_suggest_ff_only(self):
         write_text(os.path.join(self.dir, "local.txt"), "l\n")
         git(self.dir, "add", "local.txt")
