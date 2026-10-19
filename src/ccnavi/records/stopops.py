@@ -23,7 +23,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..infra import fsio
+from ..infra import fsio, pathcase
 
 RESULT_DIR = "stopops-result"
 
@@ -47,13 +47,18 @@ UNLINK_AFTER_SECONDS = 30.0  # 結び付け直しても見つからないまま�
 _SCRIPT = "ccnavi-ticket.sh"
 
 
+def _fold(path: str) -> str:
+    """パスを比べるための鍵。区切りは `/` にそろえ、大文字小文字は区別しない。"""
+    return pathcase.fold(path).replace("\\", "/")
+
+
 def propose_ident(words: list[str]) -> str:
     """コマンドの語から、`ccnavi-ticket.sh propose <識別子>` の識別子を取る。無ければ空文字。
 
     識別子は `--` と `--reason <値>` を読み飛ばした最初の語（sh の `ticket_id` と同じ読み方）。
     """
     for at, word in enumerate(words):
-        if os.path.basename(word.replace("\\", "/")).casefold() != _SCRIPT:
+        if os.path.basename(_fold(word)) != _SCRIPT:
             continue
         rest = words[at + 1 :]
         if not rest or rest[0] != "propose":
@@ -86,6 +91,10 @@ def _pre_path(state: str, tool_use_id: str) -> str:
 
 def _op_path(state: str, tool_use_id: str) -> str:
     return os.path.join(state, f"stopops-op-{fsio.safe_name(tool_use_id)}.json")
+
+
+def _refs_path(state: str, session: str) -> str:
+    return os.path.join(state, f"stoprefs-{fsio.safe_name(session)}.json")
 
 
 def _turn_path(state: str, session: str) -> str:
@@ -262,10 +271,10 @@ def written_ident(file_path: str, tickets_dir: str) -> str:
 
     大文字小文字は区別しない。置き場は設定の相対パス（既定 `wip/proposals`）。
     """
-    path = file_path.replace("\\", "/").casefold()
-    marker = f"/{tickets_dir.strip('/').casefold()}/todo/"
+    path = _fold(file_path)
+    marker = f"/{_fold(tickets_dir).strip('/')}/todo/"
     at = path.rfind(marker)
-    if at < 0:
+    if at < 0 or len(path) != len(file_path):
         return ""
     name = path[at + len(marker) :]
     if "/" in name or not name.endswith(".md") or len(name) <= 3:
@@ -311,7 +320,7 @@ def unsent_writes(writes: list[dict[str, Any]], ops: list[dict[str, Any]]) -> li
         if op["route"] != SENT:
             continue
         for item in op.get("files") or []:
-            tail = str(item.get("path", "")).replace("\\", "/").casefold().rsplit("/todo/", 1)[-1]
+            tail = _fold(str(item.get("path", ""))).rsplit("/todo/", 1)[-1]
             sent[tail] = max(sent.get(tail, 0.0), float(op["ended"]))
     unsent = []
     for row in writes:
@@ -323,3 +332,22 @@ def unsent_writes(writes: list[dict[str, Any]], ops: list[dict[str, Any]]) -> li
 
 def unsent_key(ident: str) -> str:
     return f"proposal:{ident}:{UNSENT}"
+
+
+# --- issue・MR の指定 -------------------------------------------------------------
+
+
+def note_refs(state: str, session: str, labels: list[str], now: float) -> None:
+    """依頼に issue・MR の指定があれば、ラベルを時刻つきで足す（セッションの間は残す）。"""
+    if not (state and session and labels):
+        return
+    row = fsio.read_dict(_refs_path(state, session)) or {"refs": []}
+    kept = [r for r in row["refs"] if r.get("label") not in labels][-19:]
+    kept += [{"label": label, "t": now} for label in labels]
+    fsio.write_json_atomic(_refs_path(state, session), {"refs": kept})
+
+
+def session_refs(state: str, session: str) -> list[str]:
+    """このセッションで指定された issue・MR のラベル（古い順）。"""
+    row = fsio.read_dict(_refs_path(state, session)) if state and session else None
+    return [str(r["label"]) for r in (row or {}).get("refs", []) if r.get("label")]

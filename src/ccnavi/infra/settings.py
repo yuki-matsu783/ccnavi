@@ -56,6 +56,9 @@ STOP_REVIEW_ENV = "CCNAVI_STOP_REVIEW"
 # agent hook を登録したワークスペースが 1 を置く。起動するかどうかは登録の有無で決め、
 # 置かなければ Stop で判定計画を作らない（誰も読まない計画を溜めない）。
 STOP_REVIEW_AGENT_ENV = "CCNAVI_STOP_REVIEW_AGENT"
+# 判定役の呼び出しの payload の `agent_type`。空（既定）のうちは判定役を見分けず、除外も作業者の
+# 呼び出しの停止もしない。実機で来る値を確かめてから設定する。
+STOP_REVIEW_JUDGE_ENV = "CCNAVI_STOP_REVIEW_JUDGE_TYPE"
 GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # GUARD_TICKET_APPROVAL_ENV は、チケットの承認の経路を守るか。enable（既定）なら、
 # シェルから、ユーザ専用の入口（`ccnavi user <操作>` と `ccnavi-user-*.sh`）と、実行ファイルへの
@@ -383,6 +386,7 @@ class Settings:
     # Stop の AI 判定の設定。書かれたままの値で、読むのは records.stopreview.setting。
     stop_review: str = ""
     stop_review_agent: bool = False
+    stop_review_judge: str = ""
     # guard_ticket_approval はチケットの承認の経路（承認・レビュー済みの受け入れ・
     # 状態の移動）をエージェントの手から守るか。enable / disable の 2 つだけを取る。
     #
@@ -491,6 +495,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         guard_core_files=os.environ.get(GUARD_CORE_FILES_ENV, ""),
         stop_review=os.environ.get(STOP_REVIEW_ENV, ""),
         stop_review_agent=os.environ.get(STOP_REVIEW_AGENT_ENV, "") == "1",
+        stop_review_judge=os.environ.get(STOP_REVIEW_JUDGE_ENV, ""),
         guard_ticket_approval=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_ticket_approval_declared=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_unwatched=os.environ.get(GUARD_UNWATCHED_ENV, ""),

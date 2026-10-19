@@ -39,6 +39,7 @@ from . import (
     post_findings,
     projskills,
     proposalhint,
+    stopjudge,
     subagent,
 )
 
@@ -70,6 +71,17 @@ def decide(
     """
     if mode == modes.DISABLE:
         record.decision, record.reason = audit.SKIP, audit.REASON_MODE_DISABLED
+        return EXIT_OK
+    if stopjudge.is_judge(conf, payload):
+        # 判定役の呼び出しは、ほかの hook の副作用を動かさない（Stop の AI 判定の判定役）。
+        if payload.event == hookio.PRE_TOOL_USE:
+            stopjudge.before(stdout, mode, conf, payload, record)
+        else:
+            record.decision, record.reason = audit.SKIP, "stop-review-judge"
+        return EXIT_OK
+    if payload.event == hookio.PRE_TOOL_USE and stopjudge.before(
+        stdout, mode, conf, payload, record
+    ):
         return EXIT_OK
     _track_proposals(conf, payload)
     if payload.event == hookio.PRE_TOOL_USE:
@@ -372,6 +384,8 @@ def _track_proposals(conf: settings.Settings, payload: hookio.Input) -> None:
     if payload.event == hookio.USER_PROMPT_SUBMIT:
         if not payload.from_background_task():
             stopops.start_turn(conf.state, payload.session_id, now)
+            labels = [r.label() for r in branchfind.prompt_refs(payload.prompt)]
+            stopops.note_refs(conf.state, payload.session_id, labels, now)
     elif payload.event == hookio.PRE_TOOL_USE and payload.tool_name == "Bash":
         command = payload.tool_input.get("command")
         for words, _place in shellread.placed(command) if isinstance(command, str) else []:
@@ -434,7 +448,30 @@ _NOT_CANDIDATE_FINAL = {
     "existing_nudge": stopreview.FINAL_OUT_OF_SCOPE,
     "approved_in_progress": stopreview.FINAL_OUT_OF_SCOPE,
     "target_unresolvable": stopreview.FINAL_UNCHECKED,
+    "criteria_unreadable": stopreview.FINAL_UNCHECKED,
 }
+
+
+def _submitted(
+    conf: settings.Settings, root: str, raw: approval.Raw | None, session: str
+) -> list[dict]:
+    """このセッションで propose した提案と、今の承認状態。"""
+    idents = sorted({op["ident"] for op in stopops.turn_ops(conf.state, session, 0)})
+    if not idents:
+        return []
+    copies, _ = approval.scan(conf, root, raw=raw)
+    by_id = approval_checks.by_id(copies)
+    rows = []
+    for ident in idents:
+        bound = tree.lookup(by_id, ident)
+        rows.append(
+            {
+                "ident": ident,
+                "approved": bound is not None,
+                "in_progress": bool(bound is not None and bound.in_progress),
+            }
+        )
+    return rows
 
 
 def _plan_stop_review(
@@ -462,6 +499,18 @@ def _plan_stop_review(
         return
     effective = stopreview.setting(mode, conf.stop_review)
     now = time.time()
+    stopreview.configure_log(conf.state, stopreview.logs_dir(conf.log))
+    previous = stopreview.last_stop(conf.state, payload.session_id)
+    if (
+        payload.stop_hook_active
+        and continuation is None
+        and previous is not None
+        and not previous.get("nudged")
+        and not previous.get("sent_back")
+    ):
+        stopreview.log_suspected(conf.state, payload.session_id, key)
+    stopreview.note_last_stop(conf.state, payload.session_id, key, nudged, False, now)
+    criteria, _source = stopreview.load_criteria(root)
     stopops.rebind(conf.state, payload.session_id, now)
     since = stopops.turn_start(conf.state, payload.session_id)
     finals = stopops.final_versions(stopops.turn_ops(conf.state, payload.session_id, since))
@@ -506,6 +555,8 @@ def _plan_stop_review(
         proposal_activity=bool(proposals),
         approved_in_progress=_approved_in_progress(conf, root, payload.cwd, raw),
     )
+    if ok and not criteria:
+        ok, why = False, "criteria_unreadable"
     if not ok and why not in _NOT_CANDIDATE_FINAL:
         return
     plan = {
@@ -515,13 +566,15 @@ def _plan_stop_review(
         "targets": [stopreview.STOP_TARGET, *(p["key"] for p in proposals)],
         "proposals": proposals,
         "no_r2": [p["key"] for p in proposals if p["route"] != stopops.SENT],
-        "material_version": stopreview.material_version(),
+        "material_version": stopreview.material_version(criteria),
+        "refs": stopops.session_refs(conf.state, payload.session_id),
+        "submitted": _submitted(conf, root, raw, payload.session_id) if ok else [],
+        "tainted": stopreview.tainted_flag(conf.state, payload.session_id),
         "effective": effective,
         "rejudge": continuation is not None,
         "original": continuation["attempt_id"] if continuation else "",
         "existing_nudge": nudged,
     }
-    stopreview.configure_log(conf.state, conf.log)
     try:
         stopreview.expire_overdue(conf.state)
         stopreview.write_plan(conf.state, key, plan)

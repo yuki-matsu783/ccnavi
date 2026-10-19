@@ -1,0 +1,231 @@
+"""Stop の AI 判定の評価の集計。採用を判断する材料を、基準ごとの単位で偏りなく出す。
+
+単位は、R1・R3 が Stop の機会、R2・R4 が提案の版。読むのは state の試行
+（`stopreview-attempt-*.json`）、
+専用の記録（`logs/stop-review/events.jsonl`）、独立した評価（`logs/stop-review/labels.jsonl`）。
+
+独立した評価は 1 行 1 件の JSON: `{"attempt_id", "criterion", "target", "truth": "flaw"|"ok"}`。
+人かシナリオの期待結果が書く。見逃し率・誤差し戻し率・不要介入率はこれが無いと出せない（None）。
+
+指標（基準ごと）:
+
+- 検査カバー率: 対象と判断した機会（対象外・検査省略を除く）のうち、有効な検査が完了した（終了可か
+  不備検出）割合
+- 見逃し率: 評価で不備がある単位のうち、その基準で不備検出にならなかった割合。未検査と、AI の誤った
+  対象外を含める
+- 誤差し戻し率: その基準で不備検出になった単位のうち、評価で不備が無い割合
+- 不要介入率: 評価で不備が無い単位のうち、その基準で不備検出になった割合
+- 修正率: 差し戻し送出のうち、再判定で解消した割合（再判定できなかったものは別に数える）
+
+分けて数えるもの: ccnavi が決めた対象外・AI が決めた対象外・検査省略・期限切れ・出力不正（拒否）・
+未連携・記録外の停止の疑い・汚染・計画待ちのまま残ったもの（計画なし）。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from typing import Any
+
+from ..infra import fsio
+from . import stopops, stopreview
+
+LABELS_FILE = "labels.jsonl"
+
+
+def _attempts(state: str) -> list[dict[str, Any]]:
+    found = []
+    try:
+        names = sorted(fsio.listdir(state)) if state else []
+    except OSError:
+        names = []
+    for name in names:
+        if name.startswith("stopreview-attempt-") and name.endswith(".json"):
+            row = fsio.read_dict(os.path.join(state, name))
+            if row:
+                found.append(row)
+    return found
+
+
+def _jsonl(path: str) -> list[dict[str, Any]]:
+    text = fsio.read_text(path, errors="replace") if os.path.isfile(path) else None
+    rows = []
+    for line in (text or "").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def _rate(numerator: int, denominator: int) -> float | None:
+    return numerator / denominator if denominator else None
+
+
+def summarize(state: str, log_dir: str) -> dict[str, Any]:
+    """集計。期限切れの確定を先に行う。"""
+    stopreview.expire_overdue(state)
+    attempts = _attempts(state)
+    events = _jsonl(stopreview.log_path(log_dir))
+    labels = _jsonl(os.path.join(log_dir, "stop-review", LABELS_FILE))
+
+    counts = {
+        "ccnavi_out_of_scope": 0,
+        "ai_out_of_scope": 0,
+        "skipped": 0,
+        "expired": 0,
+        "rejected": 0,
+        "plan_missing": 0,
+        "tainted": 0,
+        "checked_ok": 0,
+        "flawed": 0,
+        "unchecked": 0,
+    }
+    resolved = unresolved = not_rejudged = sent_back = 0
+    for a in attempts:
+        final, judge = a.get("final"), a.get("judge")
+        if a.get("state") == stopreview.PLAN_WAIT:
+            counts["plan_missing"] += 1
+        elif final == stopreview.FINAL_OUT_OF_SCOPE:
+            counts[
+                "ai_out_of_scope" if judge == stopreview.JUDGE_AI else "ccnavi_out_of_scope"
+            ] += 1
+        elif final == stopreview.FINAL_SKIPPED:
+            counts["skipped"] += 1
+        elif a.get("state") == stopreview.EXPIRED:
+            counts["expired"] += 1
+            counts["unchecked"] += 1
+        elif final == stopreview.FINAL_OK:
+            counts["checked_ok"] += 1
+        elif final == stopreview.FINAL_FLAWED:
+            counts["flawed"] += 1
+        elif final == stopreview.FINAL_UNCHECKED:
+            counts["unchecked"] += 1
+        if a.get("accepted") is False:
+            counts["rejected"] += 1
+        if a.get("tainted"):
+            counts["tainted"] += 1
+        if a.get("state") in (stopreview.SENT_BACK, stopreview.CONSUMED):
+            sent_back += 1
+            if a.get("rejudge") == "resolved":
+                resolved += 1
+            elif a.get("rejudge") == "unresolved":
+                unresolved += 1
+            else:
+                not_rejudged += 1
+
+    judged = counts["checked_ok"] + counts["flawed"] + counts["unchecked"]
+    summary: dict[str, Any] = {
+        "attempts": len(attempts),
+        "counts": counts,
+        "suspected_unrecorded_stops": sum(
+            1 for e in events if e.get("event") == "suspected_unrecorded_stop"
+        ),
+        "fix_rate": _rate(resolved, sent_back),
+        "fix": {
+            "sent_back": sent_back,
+            "resolved": resolved,
+            "unresolved": unresolved,
+            "not_rejudged": not_rejudged,
+        },
+        "coverage": _rate(counts["checked_ok"] + counts["flawed"], judged),
+        "criteria": _by_criterion(attempts, labels),
+    }
+    return summary
+
+
+def _units(attempts: list[dict[str, Any]]) -> dict[tuple[str, str, str], str]:
+    """(試行, 基準, 対象) → 検出の結果。不備検出は "flawed"、そうでなければ "clear"。
+
+    結果の行が無い単位（未検査・AI の誤った対象外・期限切れ）は "missed"（検出できなかった）とする。
+    """
+    units: dict[tuple[str, str, str], str] = {}
+    for a in attempts:
+        for row in a.get("results") or []:
+            flawed = (
+                a.get("accepted") is not False
+                and row["criterion"] in stopreview.FLAW_CRITERIA
+                and row["result"] == stopreview.FAIL
+            )
+            units[(a["attempt_id"], row["criterion"], row["target"])] = (
+                "flawed" if flawed else "clear"
+            )
+    return units
+
+
+def _by_criterion(
+    attempts: list[dict[str, Any]], labels: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    units = _units(attempts)
+    out: dict[str, dict[str, Any]] = {}
+    for criterion in stopreview.CRITERIA:
+        flagged = sum(
+            1 for (_, crit, _t), o in units.items() if crit == criterion and o == "flawed"
+        )
+        rows = [x for x in labels if x.get("criterion") == criterion]
+        flaw_total = missed = ok_total = ok_flagged = labeled_flagged = 0
+        for label in rows:
+            outcome = units.get((label.get("attempt_id"), criterion, label.get("target")), "missed")
+            labeled_flagged += outcome == "flawed"
+            if label.get("truth") == "flaw":
+                flaw_total += 1
+                missed += outcome != "flawed"
+            elif label.get("truth") == "ok":
+                ok_total += 1
+                ok_flagged += outcome == "flawed"
+        out[criterion] = {
+            "unit": "stop" if criterion in stopreview.STOP_UNIT else "proposal_version",
+            "flagged": flagged,
+            "labeled": len(rows),
+            "miss_rate": _rate(missed, flaw_total),
+            "false_block_rate": _rate(ok_flagged, labeled_flagged),
+            "needless_rate": _rate(ok_flagged, ok_total),
+        }
+    return out
+
+
+def render(summary: dict[str, Any], unlinked: int = 0) -> str:
+    """人が読む形。取れない指標は「不明」。"""
+
+    def pct(value: float | None) -> str:
+        return "不明" if value is None else f"{value * 100:.1f}%"
+
+    c = summary["counts"]
+    lines = [
+        f"試行 {summary['attempts']} 件。検査カバー率 {pct(summary['coverage'])}。"
+        f"修正率 {pct(summary['fix_rate'])}"
+        f"（差し戻し {summary['fix']['sent_back']} 件、解消 {summary['fix']['resolved']}、"
+        f"未解消 {summary['fix']['unresolved']}、再判定なし {summary['fix']['not_rejudged']}）",
+        "基準ごと（Stop の機会: R1・R3 / 提案の版: R2・R4）:",
+    ]
+    for name, row in summary["criteria"].items():
+        lines.append(
+            f"  {name}（{row['unit']}）: 不備検出 {row['flagged']} 件、評価 {row['labeled']} 件、"
+            f"見逃し率 {pct(row['miss_rate'])}、誤差し戻し率 {pct(row['false_block_rate'])}、"
+            f"不要介入率 {pct(row['needless_rate'])}"
+        )
+    lines.append(
+        f"分けて数えるもの: ccnavi の対象外 {c['ccnavi_out_of_scope']}、AI の対象外 "
+        f"{c['ai_out_of_scope']}、検査省略 {c['skipped']}、計画なし {c['plan_missing']}、"
+        f"期限切れ {c['expired']}、出力不正 {c['rejected']}、未連携 {unlinked}、"
+        f"記録外の停止の疑い {summary['suspected_unrecorded_stops']}、汚染 {c['tainted']}"
+    )
+    lines.append("費用・待ち時間: 不明（取れていない）")
+    return "\n".join(lines)
+
+
+def unlinked_total(state: str) -> int:
+    """未連携の propose 呼び出しの数（全セッション）。"""
+    total = 0
+    try:
+        names = sorted(fsio.listdir(state)) if state else []
+    except OSError:
+        return 0
+    for name in names:
+        if name.startswith("stopops-pre-") and name.endswith(".json"):
+            row = fsio.read_dict(os.path.join(state, name))
+            if row and row.get("bound") == stopops.UNLINKED:
+                total += 1
+    return total

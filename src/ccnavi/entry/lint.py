@@ -25,7 +25,7 @@ import re
 from typing import TextIO
 
 from ..hook import ccnavimd, judge
-from ..infra import modes, settings, tree
+from ..infra import fsio, modes, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
@@ -52,6 +52,86 @@ from . import (
 # `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、
 # 読む側（VS Code 拡張）は違う版を「読めない」として扱う。
 LINT_VERSION = 1
+
+
+def stop_review_problems(root: str, conf: settings.Settings) -> list[Problem]:
+    """Stop の AI 判定の設定と、agent hook の登録の食い違い。
+
+    - `CCNAVI_STOP_REVIEW` の値が disable / dry-run / enable でない（実際は dry-run で動く）
+    - 登録した印（`CCNAVI_STOP_REVIEW_AGENT=1`）と、`.claude/settings.json` の agent 型 Stop hook が
+      合わない
+      （印だけで hook が無い: 計画が溜まるだけで誰も判定しない／hook だけで印が無い: 判定役が計画を
+      受け取れず、すべて未検査になる）
+    - agent 型の Stop hook が複数ある（同じ Stop で判定が重複する）
+    - 判定役を見分ける値（`CCNAVI_STOP_REVIEW_JUDGE_TYPE`）が無いまま enable（判定役の呼び出しが
+      ほかの hook の副作用を動かす）
+    """
+    out: list[Problem] = []
+    declared = (conf.stop_review or "").strip().lower()
+    valid = (modes.DISABLE, modes.DRY_RUN, modes.ENABLE)
+    if declared and declared not in valid:
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                f"{settings.STOP_REVIEW_ENV}={declared}。{'・'.join(valid)} のどれでもないので"
+                f"{modes.DRY_RUN} として動いている",
+            )
+        )
+    hooks = stop_review_hooks(root)
+    if conf.stop_review_agent and not hooks:
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                f"{settings.STOP_REVIEW_AGENT_ENV}=1 だが、agent 型の Stop hook が"
+                " .claude/settings.json に見つからない（計画が溜まるだけで判定されない）",
+            )
+        )
+    if hooks and not conf.stop_review_agent:
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                f"agent 型の Stop hook があるが {settings.STOP_REVIEW_AGENT_ENV}=1 が無い"
+                "（判定計画が作られず、判定はすべて未検査になる）",
+            )
+        )
+    if len(hooks) > 1:
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                f"agent 型の Stop hook が {len(hooks)} 件ある（同じ Stop で判定が重複する）",
+            )
+        )
+    effective = declared if declared in valid else modes.DRY_RUN
+    if conf.stop_review_agent and effective == modes.ENABLE and not conf.stop_review_judge.strip():
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                f"{settings.STOP_REVIEW_ENV}=enable だが {settings.STOP_REVIEW_JUDGE_ENV} が無い"
+                "（判定役の呼び出しを見分けられず、ほかの hook の副作用が動く。"
+                "実測で確かめた値を設定するまで enable にしない）",
+            )
+        )
+    return out
+
+
+def stop_review_hooks(root: str) -> list[str]:
+    """`.claude/settings.json` の Stop にある agent 型 hook の一覧（説明つき）。読めなければ空。"""
+    path = os.path.join(root, ".claude", "settings.json")
+    data, error = fsio.read_json(path) if os.path.isfile(path) else (None, None)
+    found: list[str] = []
+    if error is not None or not isinstance(data, dict):
+        return found
+    groups = (data.get("hooks") or {}).get("Stop") or []
+    for group in groups if isinstance(groups, list) else []:
+        for hook in (group or {}).get("hooks") or []:
+            if isinstance(hook, dict) and hook.get("type") == "agent":
+                found.append(str(hook.get("description") or hook.get("prompt", ""))[:60])
+    return found
 
 
 def report(
@@ -187,6 +267,8 @@ def report(
     # 理由は上の 2 つと同じ（外から見て、守られている状態と区別が付かない）。
     problems.extend(_gate(settings.GUARD_CORE_FILES_ENV, guard_core_files, mode, _CORE_FILES_VOICE))
     problems.extend(_gate(settings.RESTORE_IF_DENY_ENV, restore_if_deny, mode, _RESTORE_VOICE))
+
+    problems.extend(stop_review_problems(root, conf))
 
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
     warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)

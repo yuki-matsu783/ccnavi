@@ -27,6 +27,11 @@ state（`logs/state/`）。 消すのはセッションを名前に持つもの�
 消さない。チケットやレビューの寿命で使われるか、ユーザのファイルそのものなので、セッションの
 日付では決められない。
 
+Stop の AI 判定の記録は例外で、それ自身の日付で消す。計画・試行・propose の操作の記録
+（`stopreview-plan-*`・`stopreview-attempt-*`・`stopops-*`）は state の保持日数で、
+再評価用の材料（`logs/stop-review/material/`）と試行のイベント（`logs/stop-review/events.jsonl`）は
+評価の途中で消えないよう、別の保持日数（CCNAVI_STOP_REVIEW_KEEP_DAYS。既定 90 日）で消す。
+
 しきい値は環境変数で動かせる（LIMITS）。0 はその段を止める。読めない値・有限でない値
 （`inf`・`nan`）・0 より大きく下限（FLOORS、1 MB と 1 日）より小さい値は既定で動き、報告に
 出す。下限を置くのは、しきい値を 0 に近づけるだけで保持日数のうちの記録が消えるため。
@@ -80,7 +85,20 @@ _SESSION_ONLY = (
     re.compile(r"^(?P<s>.+)\.turn\.json$"),  # post._turn_path
     re.compile(r"^(?P<s>.+)\.accepted\.json$"),  # post._accepted_path
     re.compile(r"^busy-(?P<s>.+)\.json$"),  # busy._path
+    re.compile(r"^stopturn-(?P<s>.+)\.json$"),  # stopops._turn_path
+    re.compile(r"^stoprefs-(?P<s>.+)\.json$"),  # stopops._refs_path
+    re.compile(r"^stoptaint-(?P<s>.+)\.json$"),  # stopjudge._taint_path
+    re.compile(r"^stoplast-(?P<s>.+)\.json$"),  # stopreview._last_path
 )
+# セッションを名前に持たない、Stop の AI 判定の記録。それ自身の日付で消す。
+_OWN_DATE = re.compile(r"^(?:stopreview-(?:plan|attempt)-.+|stopops-(?:pre|op)-.+)\.json$")
+# Stop の AI 判定の再評価用の材料（`logs/stop-review/material/`）の保持日数。
+# 評価の途中で消えないよう、記録の保持日数とは別にして長くする。0 は消さない。
+STOP_REVIEW_KEEP_DAYS_ENV = "CCNAVI_STOP_REVIEW_KEEP_DAYS"
+DEFAULT_STOP_REVIEW_KEEP_DAYS = 90.0
+STOP_OPS_RESULT_DIR = "stopops-result"  # stopops.RESULT_DIR
+STOP_REVIEW_MATERIAL = os.path.join("stop-review", "material")  # stopreview.MATERIAL_DIR
+STOP_REVIEW_EVENTS = os.path.join("stop-review", "events.jsonl")  # stopreview.log_path
 # 名前の後ろにセッション以外の鍵が `-` で続く記録。セッションにも `-` が入るので、
 # 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。
 _SESSION_AND_KEY = (
@@ -89,6 +107,7 @@ _SESSION_AND_KEY = (
     ("subagent-", ".bounced"),  # subagent._bounce_path
     ("subagent-", ".unchecked"),  # subagent._unchecked_path
     ("subagent-", ".running"),  # subagent._running_path
+    ("stopwrite-", ".json"),  # stopops._write_path
 )
 # `<セッション>.reported.json`（post._reported_path）と、改名の前の `<セッション>.json`
 # （post._legacy_reported_path）。Claude Code のセッションは UUID なので、その形に
@@ -168,7 +187,58 @@ def run(
     _prune_diag(report, root, rotate_mb, log_days, dry_run, now)
     if state_dir and state_days > 0:
         _prune_state(report, root, state_dir, session, now - state_days * 86400, dry_run)
+        _prune_directory(
+            report,
+            root,
+            os.path.join(state_dir, STOP_OPS_RESULT_DIR),
+            now - state_days * 86400,
+            dry_run,
+        )
+    keep = _stop_review_keep_days(report)
+    if log_path and keep > 0:
+        material = os.path.join(os.path.dirname(log_path), STOP_REVIEW_MATERIAL)
+        _prune_directory(report, root, material, now - keep * 86400, dry_run)
+        # 試行のイベントの記録も、決定の記録と同じ形でローテートする。保持は材料と同じ長さ。
+        events = os.path.join(os.path.dirname(log_path), STOP_REVIEW_EVENTS)
+        if rotate_mb > 0:
+            _rotate(report, root, events, int(rotate_mb * 1024 * 1024), dry_run, now)
+        _prune_logs(report, root, events, now - keep * 86400, dry_run)
     return report
+
+
+def _stop_review_keep_days(report: Report) -> float:
+    raw = os.environ.get(STOP_REVIEW_KEEP_DAYS_ENV, "").strip()
+    if not raw:
+        return DEFAULT_STOP_REVIEW_KEEP_DAYS
+    try:
+        value = float(raw)
+    except ValueError:
+        value = -1.0
+    if value < 0 or not math.isfinite(value):
+        report.problems.append(
+            f"{STOP_REVIEW_KEEP_DAYS_ENV}={raw!r} は 0 以上の数ではないので既定の "
+            f"{DEFAULT_STOP_REVIEW_KEEP_DAYS:g} で動く"
+        )
+        return DEFAULT_STOP_REVIEW_KEEP_DAYS
+    return value
+
+
+def _prune_directory(
+    report: Report, root: str, directory: str, cutoff: float, dry_run: bool
+) -> None:
+    """1 つのディレクトリの直下のファイルを、それ自身の日付で消す。リンクは辿らない。"""
+    if os.path.islink(directory) or not os.path.isdir(directory):
+        return
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        return
+    for name in names:
+        path = os.path.join(directory, name)
+        if os.path.islink(path) or not os.path.isfile(path) or _touched(path) >= cutoff:
+            continue
+        if _remove(report, root, path, dry_run):
+            report.state.append(_shown(root, path))
 
 
 def summary(report: Report) -> str:
@@ -419,6 +489,7 @@ def _session_entries(
             groups.setdefault(name, []).append(path)
 
     keyed: list[tuple[str, str, str, str]] = []
+    own_dated: list[str] = []
     for entry in names:
         path = os.path.join(state_dir, entry)
         if not os.path.isfile(path):
@@ -441,13 +512,16 @@ def _session_entries(
         if pair is not None:
             keyed.append((entry, name, pair[0], pair[1]))
             continue
+        if _OWN_DATE.match(name):
+            own_dated.append(path)
+            continue
         for pattern in (*_SESSION_ONLY, _REPORTED):
             m = pattern.match(name)
             if m:
                 groups.setdefault(m.group("s"), []).append(path)
                 break
 
-    loose = []
+    loose = list(own_dated)
     known = sorted(groups, key=len, reverse=True)
     for entry, name, prefix, suffix in keyed:
         middle = name[len(prefix) : len(name) - len(suffix)]

@@ -16,8 +16,9 @@ import subprocess
 import time
 from typing import TextIO
 
-from ..infra import settings
-from ..records import stopreview
+from ..infra import settings, tree
+from ..records import stopeval, stopreview
+from ..tickets import approval, approval_checks
 
 EXIT_OK = 0
 # 計画が届くのを待つ時間と間隔（秒）。値は成立性の検証の後に決める（暫定）。
@@ -46,6 +47,8 @@ def run(
     words: list[str],
     root: str = "",
 ):
+    if words[1:2] == ["report"] and len(words) == 2:
+        return _report(stdout, conf)
     if len(words) != 4 or words[1] not in ("material", "record"):
         stderr.write(
             "ccnavi: stop-review は material か record に <セッション> <transcript> を渡す\n"
@@ -54,14 +57,14 @@ def run(
     _, verb, session, transcript = words
     if not conf.state:
         return _not_candidate(stdout, "no_state") if verb == "material" else _ok(stdout)
-    stopreview.configure_log(conf.state, conf.log)
+    stopreview.configure_log(conf.state, stopreview.logs_dir(conf.log))
     key = stopreview.shared_key(session, transcript)
     if not key:
         return _not_candidate(stdout, "no_key") if verb == "material" else _ok(stdout)
     stopreview.expire_overdue(conf.state)
     if verb == "material":
         return _material(stdout, conf, key, transcript, root)
-    return _record(stdin, stdout, conf, key)
+    return _record(stdin, stdout, conf, key, root)
 
 
 def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str, root: str) -> int:
@@ -75,10 +78,23 @@ def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str
         return _not_candidate(stdout, "plan_timeout")
     if state != "candidate" or plan is None:
         return _not_candidate(stdout, state)
+    criteria, _source = stopreview.load_criteria(root)
     material = stopreview.turn_material(transcript)
-    stopreview.note_insufficient(conf.state, key, bool(material["insufficient"]))
+    # 定義が計画を作った時から変わっていたら、材料が変わったとして扱う（record が拒否する）。
+    changed = stopreview.material_version(criteria) != plan.get("material_version")
+    stopreview.note_insufficient(
+        conf.state, key, bool(material["insufficient"]) or changed or not criteria
+    )
     bodies = {p["key"]: _body(root, p) for p in plan.get("proposals") or []}
-    stdout.write(stopreview.render_material(plan, material, stopreview.CRITERIA_MD, bodies) + "\n")
+    rendered = stopreview.render_material(plan, material, criteria, bodies)
+    stopreview.save_material(
+        stopreview.logs_dir(conf.log),
+        plan["attempt_id"],
+        stopreview.EXTRACTOR_VERSION,
+        criteria,
+        rendered,
+    )
+    stdout.write(rendered + "\n")
     return EXIT_OK
 
 
@@ -128,11 +144,40 @@ def _body(root: str, proposal: dict) -> str:
     return "\n".join(parts)
 
 
-def _record(stdin: TextIO, stdout: TextIO, conf: settings.Settings, key: str) -> int:
+def _record(stdin: TextIO, stdout: TextIO, conf: settings.Settings, key: str, root: str) -> int:
     try:
         result = json.loads(stdin.read())
     except ValueError:
         result = None
-    out = stopreview.accept(conf.state, key, result, material_version=stopreview.material_version())
+    criteria, _source = stopreview.load_criteria(root)
+    plan = stopreview.read_plan(conf.state, key) or {}
+    idents = {p["key"]: p["ident"] for p in plan.get("proposals") or []}
+    out = stopreview.accept(
+        conf.state,
+        key,
+        result,
+        material_version=stopreview.material_version(criteria),
+        still_unapproved=lambda target: not _approved(conf, root, idents.get(target, "")),
+    )
     stdout.write(json.dumps(out, ensure_ascii=False) + "\n")
+    return EXIT_OK
+
+
+def _approved(conf: settings.Settings, root: str, ident: str) -> bool:
+    """提案が今、承認済みの置き場にあるか。判定の途中で別のPCから承認されたかを確かめる。"""
+    if not ident:
+        return False
+    copies, _ = approval.scan(conf, root)
+    return tree.lookup(approval_checks.by_id(copies), ident) is not None
+
+
+def _report(stdout: TextIO, conf: settings.Settings) -> int:
+    """評価の集計を出す（ユーザが採用を判断する材料）。判定役の入口ではない。"""
+    log_dir = stopreview.logs_dir(conf.log)
+    stdout.write(
+        stopeval.render(
+            stopeval.summarize(conf.state, log_dir), stopeval.unlinked_total(conf.state)
+        )
+        + "\n"
+    )
     return EXIT_OK

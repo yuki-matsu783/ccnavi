@@ -521,8 +521,16 @@ def accept(
     if plan.get("rejudge") and attempt.get("original"):
         _resolve_original(state, attempt["original"], final != FINAL_FLAWED)
     if sends_back:
+        _mark_sent_back(state, key)
         return {"ok": False, "reason": rebuke(attempt["attempt_id"], valid)}
     return dict(OK_RETURN)
+
+
+def _mark_sent_back(state: str, key: str) -> None:
+    session = key.split(":", 1)[0]
+    last = last_stop(state, session)
+    if last is not None and last.get("key") == key:
+        note_last_stop(state, session, key, bool(last.get("nudged")), True, last.get("t", 0.0))
 
 
 def _resolve_original(state: str, original: str, resolved: bool) -> None:
@@ -541,6 +549,11 @@ def log_path(log_dir: str) -> str:
 
 
 _LOG_STATE: dict[str, str] = {}
+
+
+def logs_dir(log_file: str) -> str:
+    """設定の `log`（`logs/decisions.jsonl` というファイル）が置かれたディレクトリ。"""
+    return os.path.dirname(log_file) if log_file else ""
 
 
 def configure_log(state: str, log_dir: str) -> None:
@@ -707,6 +720,16 @@ def render_material(
     out += ["</data>", "<data kind=current_turn>"]
     out += [f"--- {t['role']} ---\n{t['text']}" for t in material["turn"]]
     out.append("</data>")
+    out.append("<data kind=issue_mr_refs>")
+    out += [str(label) for label in plan.get("refs") or []] or ["（指定なし）"]
+    out.append("</data>")
+    out.append("<data kind=submitted_proposals>")
+    for row in plan.get("submitted") or []:
+        state = "承認済み" if row["approved"] else "承認待ち"
+        out.append(f"{row['ident']}: {state}{'（着手済み）' if row['in_progress'] else ''}")
+    if not plan.get("submitted"):
+        out.append("（このセッションで propose した提案なし）")
+    out.append("</data>")
     for proposal in plan.get("proposals") or []:
         body = (bodies or {}).get(proposal["key"])
         out.append(
@@ -716,3 +739,81 @@ def render_material(
         out.append(body if body else "（本文は取れない。送れなかった提案で、R2 は判定しない）")
         out.append("</data>")
     return "\n".join(out)
+
+
+# --- 判定用 Markdown・再評価用の材料・記録外の停止の疑い ------------------------------
+
+CRITERIA_FILE = os.path.join(".ccnavi", "config", "stop-review.md")
+CRITERIA_LIMIT = 40_000
+MATERIAL_DIR = os.path.join("stop-review", "material")  # records.prune が同じ名前を持つ
+
+
+def load_criteria(root: str) -> tuple[str, str]:
+    """判定用 Markdown の実効の中身と出どころ。(本文, "default" か "file")。
+
+    ワークスペースが 1 枚持てば（`.ccnavi/config/stop-review.md`）それを元の定義として読む。
+    無ければ組み込みの定義。あるのに読めない・空・大きすぎるときは本文を空にして返す
+    （別の定義を推測しない。呼び手は未検査にする）。
+    """
+    path = os.path.join(root, CRITERIA_FILE) if root else ""
+    if not path or not os.path.lexists(path):
+        return CRITERIA_MD, "default"
+    text = fsio.read_text(path, errors="replace") if os.path.isfile(path) else None
+    if not text or not text.strip() or len(text) > CRITERIA_LIMIT:
+        return "", "file"
+    return text, "file"
+
+
+def save_material(log_dir: str, attempt: str, extractor: str, criteria: str, rendered: str) -> int:
+    """判定に渡した材料の実体を、伏せ字にして試行ごとに保存する。伏せ字で変わった箇所の数を返す。
+
+    判定役には伏せ字の前の材料を渡し、保存するのは伏せ字の後の材料。再評価で本文が削除・変更
+    されていても同じ材料で比べられるようにする。書けなければ -1（判定は止めない）。
+    """
+    from . import redact
+
+    shown = redact.redact(rendered)
+    changed = shown.count(redact.MASK) - rendered.count(redact.MASK)
+    row = {
+        "attempt_id": attempt,
+        "extractor": extractor,
+        "criteria_version": criteria_version(criteria),
+        "criteria": redact.redact(criteria),
+        "material": shown,
+        "redactions": max(changed, 0),
+    }
+    path = os.path.join(log_dir, MATERIAL_DIR, f"{fsio.safe_name(attempt)}.json")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fsio.write_json_atomic(path, row)
+    except OSError:
+        return -1
+    return row["redactions"]
+
+
+def _last_path(state: str, session: str) -> str:
+    return os.path.join(state, f"stoplast-{fsio.safe_name(session)}.json")
+
+
+def note_last_stop(
+    state: str, session: str, key: str, nudged: bool, sent_back: bool, now: float
+) -> None:
+    """この Stop に ccnavi の促しか差し戻し送出があったか。次の Stop の疑いの判定が読む。"""
+    if state and session:
+        row = {"key": key, "nudged": nudged, "sent_back": sent_back, "t": now}
+        fsio.write_json_atomic(_last_path(state, session), row)
+
+
+def last_stop(state: str, session: str) -> dict[str, Any] | None:
+    return fsio.read_dict(_last_path(state, session)) if state and session else None
+
+
+def log_suspected(state: str, session: str, key: str) -> None:
+    """記録外の停止の疑い。ほかの hook による継続を含みうるので、疑いとして数える。"""
+    log_event(state, "suspected_unrecorded_stop", {"attempt_id": key, "reason": session})
+
+
+def tainted_flag(state: str, session: str) -> bool:
+    """作業者が `stop-review` を打った印があるか（hook.stopjudge が書く）。"""
+    row = fsio.read_dict(os.path.join(state, f"stoptaint-{fsio.safe_name(session)}.json"))
+    return bool((row or {}).get("calls"))
