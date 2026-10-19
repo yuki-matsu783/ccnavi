@@ -25,7 +25,7 @@ keywords: [スキル, 工程スキル, フェーズ定義, phases.yml, 名前, �
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
 | 名前を `process-` に続く語にする。後ろの語は、対応するフェーズ定義の id と同じにする（`process-research` `process-design` `process-implement` `process-test`） | 名前から対応が引ける。`process-` が付くので、他のスキルと重なりにくく、一覧でも並ぶ（重ならないことまでは保証しない）。`research` は、ユーザが調査の英語として指定した | フェーズ定義の id をスキルの語に寄せる（id は計画や写しに書かれるので、影響が広い）、対応表だけ置く（語の食い違いが残る）、プレフィックス無し（個人のスキルに隠される） |
-| 対応するフェーズ定義が無いものも同じ形にする（`process-debug` `process-review` `process-release`） | プレフィックスで組み込みの名前（`debug` `review`）と重ならなくなり、形を揃えられる | 旧名のまま残す（形が揃わない） |
+| 対応するフェーズ定義が無いものも同じ形にする（`process-debug` `process-review` `process-release`） | プレフィックスで組み込みの名前（`debug` `review`）と重ならなくなり、形を揃えられる | 古い名前のまま残す（形が揃わない） |
 | 実装の入口として `process-implement` を7本目に足す | フェーズ定義に `implement` があり、実装には入口が無かった。`process-debug` は原因の調査に絞られている | `process-test` に混ぜる（実装とテストは別の作業で、description が膨らむ） |
 | 対応するフェーズ定義の id を `.ccnavi/docs/skill-processes.md` の表に書く | 対応が無いスキルは「なし」と明記し、後から足すときに表を見る | 対応表を別の文書にする |
 | reference の `tags` には、スキル名（`process-test` など）をそのまま入れる | 引く鍵とスキル名が1対1のまま | 後ろの語だけを鍵にする（スキル名と鍵が食い違う） |

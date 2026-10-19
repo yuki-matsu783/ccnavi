@@ -48,7 +48,7 @@ ccnavi は、チケットの置き場のほかに、手元の `logs/state/sync/`
 | Chrome 拡張は、`ccnavi_chrome.py` の `records()` と、記録の組み立て（`families`・`integration` の `state`）を削る。仮のツリー、`_placement`、手元と同じ関数で読むこと（REQ-EXT-32）は変えない。ホストに親ブランチが無いときの停止は、偽のワークツリーが作られず `Standing.stop`（親のワークツリーがありません）で止まる既存の動きに任せ、`gone` 専用の入力は足さない | 拡張が手元の記録の形を知らなくてよくなる。止まる向きは変わらない | `gone` の入力を拡張に足す |
 | VS Code のボードは、`unprepared[]`・`remote.fetched_at`・`remote.mr` を消す。「このPCでは未準備」のカードと「準備する」ボタン、「最終取り込み」の表示は項目ごとなくす。MR の番号は親チケットの `mr:` から出す | 出す元の記録が無い。親のワークツリーが無い PC では、その親子のチケットがボードに出ず、`ccnavi-start.sh --mr <番号>` で用意する | 親チケットの有無から未準備を組み直す |
 | 互換の版 `CCNAVI_COMPAT` を 12 から 13 に上げる（`COMPAT`・`CCNAVI_COMPAT`・`EXTENSION_COMPAT` の 3 か所を同時に）。`tests/sh/test_compat_skew.py` の版を追従する | 新しい sh が、実行ファイルの新しい副命令（`tree parent` の追加行、`sync retired`、`sync migrate`）を呼ぶ。Chrome と手元の判定の規則が変わる（記録の有無で止まらなくなる） | 上げずに副命令の有無を見る |
-| 古い取り込み状態を `ccnavi sync migrate`（冪等）で移す。`ccnavi-sync.sh` は先頭で 1 回呼ぶ（頭の行が `migrate 1` でなければ何もしない）。親のワークツリー（`.claude/worktrees/<P>`）が無い旧記録だけを、`mr` と `branch` を持つ `retire/<P>.json` に書く（`moved`）。既にある `retire/<P>.json` は尊重する（`kept`）。親のワークツリーが在る記録、`mr` も `branch` も無い記録は旧ファイルを消す（`dropped`）。シンボリックリンクは辿らず消さない（`skipped`）。`integration/` は消す。状態（`gone`・`blocked` など）は捨てる。古い記録の読み取りは使い捨てのモジュール `tickets/legacy_sync.py` に最小限で写す | ADR-0115 は移行のための読み取りを外す方針だが、ready 済みで `retire/<P>.json` が無い古い親の片付けを列挙し続けるために 1 回だけ要る。使い捨てにして本体に残さない | 移行せず、古い親を手で片付けてもらう |
+| 古い取り込み状態を `ccnavi sync migrate`（冪等）で移す。`ccnavi-sync.sh` は先頭で 1 回呼ぶ（頭の行が `migrate 1` でなければ何もしない）。親のワークツリー（`.claude/worktrees/<P>`）が無い古い記録だけを、`mr` と `branch` を持つ `retire/<P>.json` に書く（`moved`）。既にある `retire/<P>.json` は尊重する（`kept`）。親のワークツリーが在る記録、`mr` も `branch` も無い記録は古いファイルを消す（`dropped`）。シンボリックリンクは辿らず消さない（`skipped`）。`integration/` は消す。状態（`gone`・`blocked` など）は捨てる。古い記録の読み取りは使い捨てのモジュール `tickets/legacy_sync.py` に最小限で写す | ADR-0115 は移行のための読み取りを外す方針だが、ready 済みで `retire/<P>.json` が無い古い親の片付けを列挙し続けるために 1 回だけ要る。使い捨てにして本体に残さない | 移行せず、古い親を手で片付けてもらう |
 
 ### push の関門の判定
 
@@ -73,7 +73,7 @@ ccnavi は、チケットの置き場のほかに、手元の `logs/state/sync/`
 
 ## 得たもの・失ったもの
 
-- 得たもの: 手元にだけある取り込みの状態が無くなり、別の PC への引き継ぎで判定が食い違わない。設計書の「判定には使わない」と実装の食い違いが消えた。`syncstate.py`（776 行）の大半、`ccnavi-sync.sh` の書き込み、`integration` コピー、Chrome 拡張の記録の組み立てが消えた。旧 `gone` の拒否が、3 経路で同じ関門になった（それまで write-and-push と承認の push は記録頼みだった）
+- 得たもの: 手元にだけある取り込みの状態が無くなり、別の PC への引き継ぎで判定が食い違わない。設計書の「判定には使わない」と実装の食い違いが消えた。`syncstate.py`（776 行）の大半、`ccnavi-sync.sh` の書き込み、`integration` コピー、Chrome 拡張の記録の組み立てが消えた。古い `gone` の拒否が、3 経路で同じ関門になった（それまで write-and-push と承認の push は記録頼みだった）
 - 失ったもの: `gone`・`blocked` の永続的な検知。オフラインの hook では親ブランチの消失が分からず、気づくのは `ccnavi-sync.sh`・push の関門・セッション開始の fetch の時点になる。`blocked` が埋めていた、取り込み直後に判定し直しの error が出るまでの間の止めも無くなり、error は `ccnavi sync check` の表示と終了コード 1 でだけ伝わる
 - 失ったもの: 閉じた識別子の再利用検知のオフライン動作と、承認経路での検知（統合先のコピーに頼る形は元から効いていなかった）。検知は開始時の照会だけになる
 - 失ったもの: 常時のレイヤーのずれ検知。warn と運用の決まりで守る。ccnavi 自身の開発では、レイヤーを変える作業と、それを使う作業を別のチケットに分ける。Chrome の承認は統合先のレイヤーを読むので、ずれは手元の warn でしか知らされない
