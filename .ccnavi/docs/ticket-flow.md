@@ -118,3 +118,4 @@ sequenceDiagram
 - 承認済みかどうかや置き場は、ファイルを読んで推測せず `ccnavi-ticket.sh status` で確かめる
 - 子の `finish` から `request` までは、決まった手順の続きなので、ユーザの許可を待たずに進める。本当にユーザの判断が要る問いだけを、最後に書いて終える
 - `request` を打つまでは、レビューを依頼したと報告しない。ユーザのレビュー待ちになるのは、`requested` のマーカーが置かれてから
+- ホストへの送信（decide の返信・issue・コメント、close-early、request、comment、ready の補助コメント）は、`logs/state/ops/` の操作記録に段階ごとに載る。途中で失敗したら、`ccnavi-ticket.sh status` が「引き継ぎ未完了」として出す。decide は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る。送ったか確定できない段階は自動では送り直さず、ホストで目印 `ccnavi:op=<操作ID>` を探して確かめる

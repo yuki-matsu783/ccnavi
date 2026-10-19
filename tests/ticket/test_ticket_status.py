@@ -59,6 +59,13 @@ class TicketStatusTest(PhaseHarness):
             end += 1
         return "\n".join(lines[start:end])
 
+    def test_an_unfinished_operation_is_listed_even_without_open_tickets(self):
+        begun = self.ccnavi("ops", "begin", "comment", "p1", "0", "7", "k", "comment:comment")
+        self.assertEqual(begun.returncode, 0, begun.stdout + begun.stderr)
+        out = self.said()
+        self.assertIn("引き継ぎ未完了", out)
+        self.assertIn(begun.stdout.strip(), out)
+
     # ---- 1. 手で置いて未コミット
 
     def test_a_ticket_placed_by_hand_is_uncommitted_and_may_start_when_not_write_and_push(self):

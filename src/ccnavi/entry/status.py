@@ -28,6 +28,7 @@ from ..tickets import (
     approval,
     approval_checks,
     approval_times,
+    oplog,
     ops_stop,
     overview,
     phase,
@@ -130,6 +131,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         families = sorted(busy)
     if not families:
         stdout.write("ccnavi: 作業中・レビュー待ち・承認待ちのチケットはありません。\n")
+        _unfinished_ops(stdout, conf)
         return 0
 
     pool = approval_checks.predecessor_pool_of(doing, review, closed, proposals)
@@ -165,7 +167,19 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         for e in members:
             for line in ctx.describe(e, e.ident in revisions):
                 stdout.write(line + "\n")
+    _unfinished_ops(stdout, conf)
     return 0
+
+
+def _unfinished_ops(stdout: TextIO, conf: settings.Settings) -> None:
+    """送り終えていない操作（引き継ぎ未完了）があれば、1 行ずつ出す。"""
+    left = oplog.pending(conf.state)
+    if not left:
+        return
+    stdout.write("\n== 引き継ぎ未完了（ホストへの送信が終わっていない操作）\n")
+    for record in left:
+        stdout.write(f"  {oplog.summary(record)}\n")
+    stdout.write("  続きは 'ccnavi ops show <操作ID>' で確かめ、decide は --resume で再開する\n")
 
 
 class _Family:
