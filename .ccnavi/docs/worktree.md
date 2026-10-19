@@ -80,7 +80,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   環境変数や`.claude/settings.local.json`で上書きする手段は無く、`projects/`の下のプロジェクトも、それぞれ自分の`origin/HEAD`で決まる。
   origin の無いリポジトリでは統合先が決まらない。`origin/HEAD`は`ccnavi-fetch.sh`がセッションの開始時にホストの既定ブランチへ付け替える。
   決まらないと案内が出たら、ユーザに`git fetch origin`のあと`git remote set-head origin -a`を頼む。`ccnavi-git.sh push`は決まった統合先へも
-  （`main`・`master`・`develop`・`release`・`release/*`と同じく）直接は送らず、`ccnavi-review.sh`が作るマージリクエストの宛先もこの統合先になる
+  （`main`・`master`・`develop`・`release`・`release/*`と同じく）直接は送らず、`ccnavi-review.sh`は依頼のとき、既存のマージリクエストのマージ先がこの統合先と一致するかを確かめる（マージリクエストを作るのは`ccnavi-start.sh`）
 - 手元の統合先が古いと、そこから切ったブランチも古いコミットから始まり、`<統合先>`に取り込むときにfast-forwardできなくなる。
   そのため、セッションの開始時に`ccnavi-fetch.sh`が手元の統合先をfast-forwardで進める。ワークスペースルートが別のブランチを
   チェックアウトしていても進める。統合先をチェックアウトしているツリーに未コミットの変更があるときと、
@@ -94,7 +94,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   logにコミットが出るなら次の項目の手順で`origin/<統合先>`から切る。
   分岐しているならユーザに合流させてもらい、未コミットの変更があるならそのツリーの持ち主に聞く
 - 手元の統合先を進めるのは、セッションの開始時の`ccnavi-fetch.sh`だけである。`ccnavi-git.sh fetch origin <統合先>`が進めるのは
-  `origin/<統合先>`だけで、手元の`<統合先>`は古いままになる。`ccnavi-sync.sh`が進めるのも親のブランチだけである。
+  `origin/<統合先>`だけで、手元の`<統合先>`は古いままになる。`ccnavi-sync.sh`が動かすのは、親のブランチと、取得した`origin/<統合先>`・`origin/HEAD`だけで、手元の`<統合先>`は進めない。
   セッション中にリモートが進んだときは、`ccnavi-git.sh fetch origin <統合先>`のあとに
   `ccnavi-git.sh worktree add <行き先> -b <名前> --no-track origin/<統合先>`で`origin/<統合先>`から切る。
   `--no-track`を省くと、新しいブランチが`origin/<統合先>`を追跡する。すると次のセッションの開始時に、

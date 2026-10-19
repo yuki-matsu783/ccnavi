@@ -37,7 +37,7 @@ keywords: [統合先, origin/HEAD, CCNAVI_INTEGRATION_BRANCH, --integration-bran
 - ホストの既定ブランチ以外へマージする使い方がほぼ無い。上書きの手段を持つ値打ちが小さい
 - ワークスペースで 1 つの値が B1 を生んでいた。プロジェクトの統合先への push の止めがすり抜け、Python の `--lint` の識別子の予約がプロジェクトの統合先で効かなかった
 - `settings.local.json` はエージェントが書けるファイルで、sh はそれをその場で読むので、エージェントが統合先を動かせた
-- Chrome 拡張はもともとホスト API の `default_branch` を見ており、sh・Python とずれていた。廃止でそろう
+- Chrome 拡張はもともとホスト API の `default_branch` を見ており、sh・Python とずれていた。廃止でそろう。ただし拡張のリポジトリごとの「統合先の名前」設定欄はこの変更の対象外で残っており、sh・Python との統一は欄の扱いの判断待ちである
 
 ## 代償と逃げ道
 

@@ -48,8 +48,9 @@
    **統合先（`main`）への commit と push はユーザが素の `git` で打ちます。** ccnavi のラッパー（`ccnavi-git.sh`）は `main` へ直接は送らず、
    エージェントにも打たせません。
    拡張は統合先の `.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT` と `.claude/settings.json` を読むので、この 2 つが統合先に要ります。
-5. 統合先は `main`（デフォルトブランチ）のままにします。別の名前を試すときは、ホストの既定ブランチをその名前に変え、
-   手元は `git fetch origin` のあと `git remote set-head origin -a` で合わせます。拡張は設定画面の「統合先の名前」に同じ名前を書きます。
+5. 統合先は `main`（デフォルトブランチ）のままにします。別の名前を試すときは、ホストの既定ブランチをその名前に変えます。
+   手元の `origin/HEAD` は、次のセッションの開始時に `ccnavi-fetch.sh` が付け替えます（すぐ要るときは `git fetch origin` のあと
+   `git remote set-head origin -a`）。拡張は設定画面の「統合先の名前」に同じ名前を書きます。
 6. ブランチ保護は 2 通りで試します。GitHub と GitLab の両方で同じにします。
    - **保護なし**: 何も設定しない
    - **保護あり**: 統合先（`main`）を保護し、必須のチェック（何でもよい。例: 常に通る CI のジョブ 1 本）と、

@@ -448,8 +448,8 @@ _SCRIPTS = """\
          "warn: ..." を1行表示します。形式どおりなら何も表示しません。拒否はしません）
     ccnavi sync paths
         （.ccnavi/scripts/ccnavi-sync.sh 用。1行に "<key> <value>" を1組ずつ出力します。
-         対象は、承認済みと提案の置き場、ccnaviのディレクトリ、.claude/settings.local.json の
-         env に書かれた統合先ブランチです。統合先ブランチについては、環境変数を読みません）
+         対象は、承認済みと提案の置き場、ccnaviのディレクトリです。統合先ブランチは返しません
+         （sh が各リポジトリの origin/HEAD で決めます））
     ccnavi sync check <parent> [<repo>]
         （ccnavi-sync.sh が <parent> を取り込んだ後に使用します。ファミリーの承認済みチケットと
          その権限を再判定します。"check 1" の行に続いて、"error <detail>" か "warn <detail>" を

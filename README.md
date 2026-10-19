@@ -1708,7 +1708,8 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 受け取る側では、セッション開始時に `.ccnavi/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは fast-forward だけで、未コミットの変更があるツリーや
 分岐したツリーは触らず理由を 1 行で示す。取ってくるのは、チェックアウト中のブランチと、ワークツリーの起点になる統合先（そのリポジトリの手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`。ワークスペースの値は無く、
 `projects/` の下のプロジェクトも、それぞれ自分の `origin/HEAD` で決まる）。統合先の決め方は
-`ccnavi-common-state.sh` の `ccnavi_integration` 1 か所にあり、`ccnavi-git.sh` の push の拒否と `ccnavi-review.sh` が照らすマージリクエストのマージ先も同じ決め方をする。
+`ccnavi-common-state.sh` の `ccnavi_integration` 1 か所（手元の `origin/HEAD` を読むだけ）にあり、`ccnavi-git.sh` の push の拒否と `ccnavi-review.sh` が照らすマージリクエストのマージ先も同じ決め方をする。
+`ccnavi-sync.sh` だけは、先にホストの答えを聞いて手元の `origin/HEAD` を合わせてから決める（下記）。
 手元の `origin/HEAD` は clone のときに作られたまま、普通の fetch では動かない。そこで `ccnavi-fetch.sh` が、承認済みチケットの取得の後、ワークツリーの起点を進める前に、
 リポジトリごとに `ls-remote --symref origin HEAD` でホストの既定ブランチを聞き、手元と違えばそのブランチを fetch してから `origin/HEAD` を付け替え、1 行出す
 （ホストに届かない・fetch に失敗したときは、何も出さず何も変えない）。`ccnavi-sync.sh` は、ホストの答え、無ければ手元の `origin/HEAD`・`main`・`master` の順で読み、

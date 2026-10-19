@@ -56,7 +56,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 受け取る側では、セッションの最初に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、ワークツリーの
 起点になる統合先（そのリポジトリの手元の `origin/HEAD` が指すもの。無ければ `origin/main`・`origin/master`）も、チェックアウトされていなければ `update-ref` で
 進める。統合先の決め方は `ccnavi-common-state.sh` の `ccnavi_integration` にまとめてあり、`ccnavi-git.sh` は
-その名前への直接の push を（`main` などの固定のリストと同じく）拒み、`ccnavi-review.sh` はそれをマージリクエストの宛先にする。
+その名前への直接の push を（`main` などの固定のリストと同じく）拒み、`ccnavi-review.sh` は依頼のとき、既存のマージリクエストのマージ先がこの統合先と一致するかを確かめる（マージリクエストを作るのは `ccnavi-start.sh`）。
 手元の `origin/HEAD` は clone のときのまま動かないので、`ccnavi-fetch.sh` が第 1 周（承認済みチケットの取得）の後、第 2 周（起点を進める）の前に、
 リポジトリごとにホストの既定ブランチ（`ls-remote --symref origin HEAD`）を聞き、違えばそのブランチを fetch してから付け替えて 1 行出す
 （届かない・失敗のときは何も出さず何も変えない。ADR-0146）。`ccnavi-sync.sh` は、ホストに聞くのを先にして、読めないときに手元の
@@ -67,8 +67,8 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 親のワークツリー（`.claude/worktrees/<P>` で、HEAD のブランチ名を変換した識別子がフォルダ名と合うもの）は、SessionStart では
 早送りだけにし、ロックが取れなければ飛ばす。分かれた親子のチケットの merge と、リモートから消えた
 親のブランチの確かめ（閉じたかは MR がマージ済みかで決める。ホストに聞けなければ推定せず止まる）は、ユーザが打つ
-`ccnavi-sync.sh` が持つ。統合先はホストのデフォルトブランチで、その名前が
-リモートに無ければ止める。親のブランチ名は、実行ファイルの `ccnavi write-and-push family <P>` の `branch` の行（親のワークツリーの HEAD から読んだ名前）で知る。
+`ccnavi-sync.sh` が持つ。統合先は、ホストの答え（`ls-remote --symref origin HEAD`）、無ければ手元の `origin/HEAD`、`main`・`master` の順で、
+リモートにある最初の名前にする。どれも無ければ止める。親のブランチ名は、実行ファイルの `ccnavi write-and-push family <P>` の `branch` の行（親のワークツリーの HEAD から読んだ名前）で知る。
 `ccnavi-sync.sh` は取り込んだ後に `ccnavi sync check <P>` でその親子のチケットを判定し直し、error があれば表示して終了コード 1 にする
 （理由を直して打ち直せば通る）。MR がマージ済みと分かったら、手元の片付け（`ccnavi sync tidy`。9.11）を行う。
 旧い取り込み状態が残る機械では、`ccnavi-sync.sh` の先頭が `ccnavi sync migrate` を 1 回呼び、親のワークツリーが無い親の `mr` と `branch` を
