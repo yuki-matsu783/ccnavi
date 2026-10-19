@@ -117,6 +117,14 @@ class ManualSettleTest(PhaseHarness):
         self.assertIn("移動の後に付いた指摘", refused.stderr)
         self.assertIsNone(approval_marks.read_mark(self.approved, "i0001", 1, "reviewed"))
 
+    def test_a_reply_added_after_the_move_is_not_accepted(self):
+        self.requested()
+        self.move_by_hand()
+        self.share()
+        refused = self.confirm(self.result([_thread(last_at=FUTURE, last_id="c9")]), 1)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("移動の後に付いた指摘", refused.stderr)
+
     def test_a_thread_with_an_unreadable_time_is_not_accepted(self):
         self.requested()
         self.move_by_hand()
@@ -171,6 +179,12 @@ class LedgerCountingTest(PhaseHarness):
         self.assertEqual(review_host._unresolved([again], ledger=ledger), [again])
         # 台帳が無ければ数える
         self.assertEqual(review_host._unresolved([t]), [t])
+
+    def test_a_thread_without_a_last_comment_id_is_never_hidden(self):
+        t = self.thread()
+        t.last_comment_id = ""
+        ledger = [{**self.entry(t), "last_comment_id": ""}]
+        self.assertEqual(review_host._unresolved([t], ledger=ledger), [t])
 
     def test_a_broken_ledger_hides_nothing(self):
         write(os.path.join(self.approved, "phases", "i0001", "accepted.json"), "{not json")

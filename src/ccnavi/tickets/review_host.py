@@ -326,10 +326,13 @@ def _accepted_by_ledger(t: Thread, ledger: list[dict]) -> bool:
     """受け入れ台帳（`accepted.json`）が受け入れ済みとする指摘か。
 
     鍵と版が台帳の項目と同じで、受け入れたときの最後のコメントから変わっていないとき（受け入れた
-    後に誰かがコメントを付けた指摘は、再提起として数える）。最後のコメントが取れていない
-    （台帳も指摘も空）ときは、版だけで見る。
+    後に誰かがコメントを付けた指摘は、再提起として数える）。鍵か最後のコメントの id が取れていない
+    指摘は受け入れ済みにしない（隠さない側に倒す）。
     """
     key, version = thread_key(t), thread_version(t)
+    if not key or not t.last_comment_id:
+        # 鍵か最後のコメントが分からない指摘は、再提起を見分けられないので受け入れ済みにしない
+        return False
     for entry in ledger:
         if entry.get("key") != key or entry.get("version") != version:
             continue

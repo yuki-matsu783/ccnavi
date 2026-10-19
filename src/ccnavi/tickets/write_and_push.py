@@ -71,7 +71,10 @@ _HOOK_MARKS = (approval_marks.MARK_PENDING, approval_marks.MARK_SKIPPED)
 _TEMP = re.compile(r"(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$")
 # ユーザの判断が書くもの。フローの本文、reviewed・close-early のマーカー、
 # ユーザの承認で置かれた承認済みチケット。
-_HUMAN_MARK_NAMES = (f"{approval_marks.PARENT_MARK_CLOSE_EARLY}.json",)
+_HUMAN_MARK_NAMES = (
+    f"{approval_marks.PARENT_MARK_CLOSE_EARLY}.json",
+    f"{approval_marks.LEDGER_NAME}.json",  # 受け入れ台帳（reviewed と一緒に書かれる）
+)
 _TIMEOUT = 20.0
 
 

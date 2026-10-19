@@ -150,8 +150,12 @@ def _manual_refusal(root, conf, parent, phase_no, result, manual) -> core_base.C
         )
     late = []
     for t in review.unresolved_for(root, conf, parent, phase_no, result):
-        made = review_host.epoch(t.created_at)
-        if made <= 0 or made > manual.moved_at - manual_settle.MARGIN_SECONDS:
+        # 最初のコメントだけでなく最後のコメントの時刻も見る（移動の後に付いた返信を受け入れない）
+        made = max(review_host.epoch(t.created_at), review_host.epoch(t.last_comment_at))
+        if (
+            review_host.epoch(t.created_at) <= 0
+            or made > manual.moved_at - manual_settle.MARGIN_SECONDS
+        ):
             late.append(t)
     if not late:
         return None

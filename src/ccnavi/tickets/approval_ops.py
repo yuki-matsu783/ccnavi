@@ -162,13 +162,14 @@ def settle_review(
             continue
         where = approval.home_dir(conf, root, t.ticket, parent_id, project=t.project)
         closed = approval.closed_path(where, t.ticket)
+        # 経路を先に移動元へ書く（動かした後で落ちると、ccnavi が動かした子が手動に見える）
+        if by:
+            failed = _write_settled_by(t.path, by)
+            if failed:
+                return moved, failed
         failed = move_file(t.path, closed)
         if failed:
             return moved, failed
-        if by:
-            failed = _write_settled_by(closed, by)
-            if failed:
-                return moved, failed
         moved.append(t.ticket)
     return moved, ""
 

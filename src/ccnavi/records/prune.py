@@ -92,6 +92,7 @@ _SESSION_AND_KEY = (
     ("subagent-", ".bounced"),  # subagent._bounce_path
     ("subagent-", ".unchecked"),  # subagent._unchecked_path
     ("subagent-", ".running"),  # subagent._running_path
+    ("subagent-", ".outcome"),  # subagent_outcome.path
 )
 # `<セッション>.reported.json`（post._reported_path）と、改名の前の `<セッション>.json`
 # （post._legacy_reported_path）。Claude Code のセッションは UUID なので、その形に
