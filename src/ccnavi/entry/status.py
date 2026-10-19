@@ -184,7 +184,7 @@ def _manual_lines(
     phases = phase.phases_of(root, conf, parent_id)
     out = []
     for ph in phases:
-        if not ph.gate_closed:
+        if not ph.review_required:
             continue
         line = manual_settle.assess(root, conf, parent, ph, phases).line()
         if line:

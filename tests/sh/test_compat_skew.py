@@ -274,7 +274,7 @@ class CompatAgreesTest(unittest.TestCase):
         など）を断る。古い sh（ccnavi-agree.sh など）は断られるので、食い違いとして知らせ、
         sh の配り直しを言う。なので 16 以上。
         """
-        self.assertGreaterEqual(version.COMPAT, 16)
+        self.assertGreaterEqual(version.COMPAT, 17)
         self.assertEqual(sh_compat(), version.COMPAT)
 
 

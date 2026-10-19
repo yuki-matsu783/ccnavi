@@ -157,7 +157,8 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     if not _any_copies(conf, root) and not tree_has_tickets(root, conf.tickets):
         # 承認済みチケットも提案も無い状態は不備ではない。チケットによる制御は任意で、
         # 使っていないプロジェクトにここで苦情を返すと、その 1 行が常態になって
-        # 他の報告ごと読まれなくなる。
+        # 他の報告ごと読まれなくなる。送信の途中で止まった操作は、チケットが無くても言う。
+        problems.extend(_operation_problems(conf, root, [], []))
         return problems
 
     problems.extend(_approved_guarded(conf, root))
@@ -260,7 +261,17 @@ def _operation_problems(
         for record in oplog.pending(conf.state):
             severity = SEVERITY_ERROR if record.get("broken") else SEVERITY_WARN
             problems.append(
-                Problem(severity, "(ticket)", f"引き継ぎ未完了: {oplog.summary(record)}")
+                Problem(
+                    severity,
+                    "(ticket)",
+                    f"引き継ぎ未完了: {oplog.summary(record)}。"
+                    + (
+                        "記録が壊れている。ユーザが logs/state/ops/ の該当ファイルを確かめて消す"
+                        if record.get("broken")
+                        else "decide は 'ccnavi-user-decide.sh --resume <操作ID>' で続きを送る。"
+                        "request・comment・ready・close-early は同じコマンドを打ち直す"
+                    ),
+                )
             )
     for parent in copies:
         if parent.is_child:

@@ -204,7 +204,7 @@ def _explain_modes(stdout: TextIO, conf: settings.Settings) -> None:
             "": "ツールが分からない",
             "Write": "Write・Edit・NotebookEdit・Agent",
             "Read": "Read・Grep・Glob",
-            "Bash": "Bash・PowerShell",
+            "Bash": "Bash",
             "Foo": "知らないツール",
         }[tool]
         enable = "止める" if modes.fail_closed(modes.ENABLE, tool) else "通す"

@@ -532,6 +532,7 @@ ${eli5_how}"
 			printf '\n---\n\nELI5（変更をやさしく説明した HTML）はこのマージリクエストの差分の `%s`。手元のチェックアウトのルートで `crit review %s` を開いてソースの行に指摘を付け、`crit push %s` でここに送ってください（送った指摘は行のスレッドになり、未解決の間はレビュー済みにならない。`crit %s` だけだと描画のプレビューになり、そこで付けたピンは送られない）。\n' \
 				"$eli5_rel" "$eli5_rel" "$number" "$eli5_rel"
 		} >"$eli5_posted"
+		tell_skew
 		posted=$(comment_staged request "$request_marker" "$number" "$url" "$eli5_posted") ||
 			{
 				rm -f "$eli5_posted"
@@ -580,6 +581,7 @@ comment)
 		cat "$body"
 	} >"$noted"
 	comment_key="@$body"
+	tell_skew
 	posted=$(comment_staged comment "$comment_key" "$number" "$url" "$noted") ||
 		{
 			rm -f "$noted"

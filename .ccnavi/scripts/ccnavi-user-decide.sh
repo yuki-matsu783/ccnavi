@@ -108,6 +108,8 @@ resume_prepare() {
 	# review_host（JQ を決める）の前に動くので、jq は自分で探す。
 	rp_jq=$(command -v jq || :)
 	[ -n "$rp_jq" ] || fail no-jq "jq が見つかりません。" 2
+	# 互換のずれは、最初の `ops` が失敗する前に親で言う（`$( )` の中に消さない）
+	tell_skew
 	if [ -z "$resume_op" ]; then
 		rp_list=$(ccnavi ops pending 2>/dev/null | grep ' decide ' | sed 's/ .*//' || :)
 		rp_count=$(printf '%s\n' "$rp_list" | grep -c . || :)

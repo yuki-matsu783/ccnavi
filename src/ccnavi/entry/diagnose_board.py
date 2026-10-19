@@ -648,7 +648,7 @@ def _phase_records(
     out = []
     for ph in phases:
         line = ""
-        if ph.gate_closed:
+        if ph.review_required:
             line = manual_settle.assess(root, conf, parent, ph, phases).line()
         out.append(_phase_record(ph, line))
     return out
