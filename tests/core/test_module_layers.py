@@ -275,6 +275,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.cli_plan",
                 "entry.cli_templates",
                 "entry.cli_handoff",
+                "entry.cli_stopreview",
                 "entry.lint_templates",
                 "entry.sh_ask",
                 "entry.status",

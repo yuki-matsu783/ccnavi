@@ -8,14 +8,16 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import io
+import os
 from typing import TextIO
 
 from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
-from ..records import audit, busy, failstreak, prune, repeat
+from ..records import audit, busy, failstreak, prune, repeat, stopreview
 from ..tickets import (
     approval,
     approval_checks,
@@ -79,7 +81,7 @@ def decide(
     if payload.event == hookio.USER_PROMPT_SUBMIT:
         return decide_at_prompt(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.STOP:
-        return decide_at_stop(stdout, stderr, conf, root, payload, record)
+        return decide_at_stop(stdout, stderr, conf, root, payload, record, mode)
     if payload.event == hookio.SUBAGENT_START:
         return subagent.at_start(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_STOP:
@@ -268,6 +270,7 @@ def decide_at_stop(
     root: str,
     payload: hookio.Input,
     record: audit.Record,
+    mode: str = modes.ENABLE,
 ) -> int:
     """ターンが終わったとき。宣言した保護領域の今の状態をユーザへ報告する。
 
@@ -326,26 +329,121 @@ def decide_at_stop(
     repeated = repeat.at_stop(conf.state, payload.session_id, repeat.threshold(conf.deny_repeat))
     if repeated:
         report = f"{report}\n\n{repeated}" if report else repeated
-    nudge = _finish_nudge(stderr, conf, root, payload, record, raw)
+    # AI 判定の差し戻しの次の Stop（AI による継続）は、既存の促しを `stop_hook_active` が偽のときと
+    # 同じに 1 回だけ動かす。差し戻しのせいで既存の促しが黙るのを防ぐため。
+    continuation = _ai_continuation(conf, payload)
+    asked = dataclasses.replace(payload, stop_hook_active=False) if continuation else payload
+    nudge = _finish_nudge(stderr, conf, root, asked, record, raw)
     if not nudge:
         # finish の促しで止める回は、依頼までの道の促しを出しも数えもしない。
-        nudge = _request_nudge(stderr, conf, root, payload, record, raw)
+        nudge = _request_nudge(stderr, conf, root, asked, record, raw)
     if not nudge:
         # 上の促しで止める回は、直接作業の促しを出しも数えもしない。前提を満たせず促せない回は
         # 止めずに理由だけを報告へ足す。
-        nudge, notice = _integrate_nudge(stderr, conf, root, payload, record)
+        nudge, notice = _integrate_nudge(stderr, conf, root, asked, record)
         if notice:
             report = f"{report}\n\n{notice}" if report else notice
     if not nudge:
         # 上の促しで止める回は、ルールの促しを数えもしない。1 回の Stop で
         # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
-        nudge = stop_rules_nudge(stderr, conf, root, payload, record)
+        nudge = stop_rules_nudge(stderr, conf, root, asked, record)
+    # 既存の促しの連鎖を実行したあとで、AI 判定の計画を確定する（回数を進める副作用で
+    # 判断が食い違わないように）。
+    _plan_stop_review(stderr, conf, root, payload, mode, bool(nudge), continuation, raw)
     if nudge:
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
     if report:
         hookio.write_system_message(stdout, report)
     return EXIT_OK
+
+
+def _ai_continuation(conf: settings.Settings, payload: hookio.Input) -> dict | None:
+    """この Stop が、AI 判定の差し戻しで続いた回なら、その試行を消費して返す。"""
+    if not (payload.stop_hook_active and conf.stop_review_agent and conf.state):
+        return None
+    if payload.agent_id or not payload.session_id:
+        return None
+    return stopreview.consume_continuation(conf.state, payload.session_id)
+
+
+def _approved_in_progress(
+    conf: settings.Settings, root: str, cwd: str, raw: approval.Raw | None
+) -> bool:
+    """cwd のワークツリーに結び付いた、着手済みの承認済みチケットがあるか。"""
+    here = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
+    if here is None or here.is_main:
+        return False
+    copies, _ = approval.scan(conf, root, raw=raw)
+    bound = tree.lookup(approval_checks.by_id(copies), here.name)
+    return bound is not None and bound.in_progress
+
+
+# 候補にならなかった理由ごとの、ccnavi が確定する最終分類。ここに無い理由は計画を書かない。
+_NOT_CANDIDATE_FINAL = {
+    "stop_hook_active": stopreview.FINAL_SKIPPED,
+    "existing_nudge": stopreview.FINAL_OUT_OF_SCOPE,
+    "approved_in_progress": stopreview.FINAL_OUT_OF_SCOPE,
+    "target_unresolvable": stopreview.FINAL_UNCHECKED,
+}
+
+
+def _plan_stop_review(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    mode: str,
+    nudged: bool,
+    continuation: dict | None,
+    raw: approval.Raw | None,
+) -> None:
+    """Stop の AI 判定の計画と試行を、共有キーで 1 件書く。
+
+    判定役（agent hook）が `material` で取る。
+
+    agent hook を登録していなければ（`CCNAVI_STOP_REVIEW_AGENT`）何もしない。書けなくても Stop は
+    止めない。提案の操作実績と対象の解決はまだ無いので、対象は Stop の機会（R1・R3）だけで、
+    「提案の操作実績がある」は偽として扱う。
+    """
+    if not (conf.state and payload.session_id and conf.stop_review_agent):
+        return
+    key = stopreview.shared_key(payload.session_id, payload.transcript_path)
+    if not key:
+        return
+    effective = stopreview.setting(mode, conf.stop_review)
+    ok, why = stopreview.candidate(
+        main_agent=not payload.agent_id,
+        stop_hook_active=payload.stop_hook_active,
+        ai_continuation=continuation is not None,
+        already_rejudged=False,
+        effective=effective,
+        tickets_enabled=conf.tickets_enabled,
+        registered=True,
+        existing_nudge=nudged,
+        target_unresolvable=False,
+        proposal_activity=False,
+        approved_in_progress=_approved_in_progress(conf, root, payload.cwd, raw),
+    )
+    if not ok and why not in _NOT_CANDIDATE_FINAL:
+        return
+    plan = {
+        "is_candidate": ok,
+        "reason": why,
+        "final": _NOT_CANDIDATE_FINAL.get(why, ""),
+        "targets": [stopreview.STOP_TARGET],
+        "material_version": stopreview.material_version(),
+        "effective": effective,
+        "rejudge": continuation is not None,
+        "original": continuation["attempt_id"] if continuation else "",
+        "existing_nudge": nudged,
+    }
+    stopreview.configure_log(conf.state, conf.log)
+    try:
+        stopreview.expire_overdue(conf.state)
+        stopreview.write_plan(conf.state, key, plan)
+    except OSError as exc:
+        stderr.write(f"ccnavi: Stop の AI 判定の計画を書けない: {exc}\n")
 
 
 def stop_rules_nudge(
