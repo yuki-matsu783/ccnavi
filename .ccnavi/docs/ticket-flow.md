@@ -129,4 +129,4 @@ ccnavi を更新したら、次の 4 点が変わる。
 - `dry-run` でも、チケットの操作（状態の操作）と、承認済みの置き場・操作記録への書き込みは止まる。止まらないのは一般のルールの `deny`・`ask` だけ（報告になる）。`ccnavi --explain` の「dry-run のときに止めるもの」で確かめられる
 - 互換の版が 17 になった。`decide` のダイジェストは版 2（指摘ごとの版を含む）になり、ボードは版 1 のものを断る。手で動かした子の確定は、受け入れ台帳（`phases/<親>/accepted.json`）と `via: manual` を書く。ccnavi の実行ファイル、`.ccnavi/scripts/` の sh、VS Code 拡張を、そろえて更新する（`sh scripts/ccnavi-setup.sh <ワークスペース> --force` と拡張の入れ直し）。食い違えば sh と拡張と `--lint` が `(version)` で知らせる
 - 旧い子（`finished_to` が無い。この更新より前に閉じた子）は、`review/` から `done/` へ手で動かしても確定できない。`confirm` か `decide` を使う。`--lint` が info で並べる
-- 未完了の操作記録（`logs/state/ops/`）は、prune で消えない。`ccnavi-ticket.sh status` か `--lint` で見つけ、`--resume <操作ID>` で続きを送る
+- 未完了の操作記録（`logs/state/ops/`）は、prune で消えない。`ccnavi-ticket.sh status` か `--lint` で見つけ、decide は `--resume <操作ID>` で続きを送り、request・comment・ready・close-early は同じコマンドを打ち直す

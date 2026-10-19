@@ -249,7 +249,7 @@ def _operation_problems(
 ) -> list[Problem]:
     """送信の途中で止まった操作、受け入れ台帳の壊れ、経路の欄を持たない子、保護の外れた組み合わせ。
 
-    - 未完了の操作記録は warn（読めない記録は error）。ユーザが `--resume` で続きを送る
+    - 未完了の操作記録は warn（読めない記録は error）。decide は `--resume`、ほかは打ち直して続ける
     - 受け入れ台帳（`phases/<親>/accepted.json`）が読めなければ warn（空として扱うので、
       受け入れ済みの指摘が未解決に戻る）
     - `finished_to` を持たない review/ の子は info（この変更より前に閉じた子は、手で動かしても

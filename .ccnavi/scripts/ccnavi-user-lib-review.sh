@@ -46,12 +46,12 @@ reply_already_sent() {
 	fi
 	[ "$(printf '%s' "$ra_rec" | "$JQ" -r --arg k "reply_try_$1" '.applied[$k] // empty')" = true ] || return 1
 	ra_last=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0].last_author // empty' "$2" 2>/dev/null)
-	ra_first=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0].author // empty' "$2" 2>/dev/null)
+	# 最後のコメントがスレッドの最初のコメントと別のもの（作成の時刻が違う）のときだけ、返信とみなす。
+	# 自分が立てたスレッドの最初のコメントを、自分の返信と取り違えないため（取り違えると返信が欠ける。
+	# 時刻が同じ秒に収まる返信は送り直す側に倒れ、二重の返信は出うるが欠落は出さない）。
+	ra_later=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0] | if (.last_at // "") != "" and (.last_at // "") != (.created_at // "") then "yes" else "" end' "$2" 2>/dev/null)
 	op_account
-	# 最後のコメントが自分のものでも、スレッドを立てたのが自分なら返信とは限らない（自分の指摘への返信
-	# を落とさないよう、その場合は送り直す側に倒す。二重の返信は出うるが、返信の欠落は出さない）。
-	if [ -n "$ra_last" ] && [ -n "${op_who:-}" ] && [ "$ra_last" = "$op_who" ] &&
-		[ -n "$ra_first" ] && [ "$ra_first" != "$op_who" ]; then
+	if [ -n "$ra_last" ] && [ -n "${op_who:-}" ] && [ "$ra_last" = "$op_who" ] && [ -n "$ra_later" ]; then
 		reply_mark "reply_$1"
 		return 0
 	fi

@@ -2596,7 +2596,7 @@ error 3 件、warn 1 件、info 0 件
 | warn | ワークツリー側に置かれた承認済みチケット（読まれない） |
 | warn | 承認済みチケットはあるがワークツリーが無い（範囲が適用されない） |
 | warn | リモートの種類に合うトークン（`GITHUB_TOKEN` / `GITLAB_TOKEN`）が無い、`origin` が無い |
-| warn | 未完了の操作記録（`logs/state/ops/`。送信の途中で止まった操作。`--resume` で続きを送る）。記録そのものが読めないものは error |
+| warn | 未完了の操作記録（`logs/state/ops/`。送信の途中で止まった操作。decide は `--resume` で続きを送り、ほかの操作は打ち直す）。記録そのものが読めないものは error |
 | warn | 読めない受け入れ台帳（`phases/<親>/accepted.json`）。空として扱うので、受け入れ済みの指摘が未解決に戻る |
 | info | `finished_to` の無い `review/` の子（この変更より前に閉じた子）。手で `done/` に動かしても確定できないので、`confirm` か `decide` を使う |
 | warn | `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_GUARD_CORE_FILES` が両方 `disable`（承認の直接実行も設定ファイルの書き換えも止まらない） |

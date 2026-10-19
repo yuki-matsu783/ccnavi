@@ -49,7 +49,7 @@ export interface DecidePreview {
 export interface DecideResult {
   readonly parent: string;
   readonly phase: number;
-  /** レビュー済みになったか（直す指摘が無ければ真） */
+  /** レビュー済みになったか（直す指摘も見せたあとに増えた指摘も無ければ真） */
   readonly reviewed: boolean;
   /** 見せたあとに追加された指摘（今回の判断の対象外。未対応として残る）の鍵 */
   readonly pending_extra: readonly string[];
