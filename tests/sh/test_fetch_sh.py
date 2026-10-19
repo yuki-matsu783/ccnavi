@@ -155,24 +155,40 @@ class FetchTest(unittest.TestCase):
         done = git(repo or self.ws, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
         return done.stdout.strip()
 
-    def spy_on_ls_remote(self, fail=False):
+    def spy_on_ls_remote(self, fail=False, answer=None, hang=False, fail_fetch=False):
         """`git ls-remote` が打たれた回数を残す git の代役。fail なら ls-remote だけ失敗させる。
-        PATH に足す値と、記録のパスを返す。"""
+        answer があれば、ls-remote の出力をその 1 行（`ref: refs/heads/<名前>\tHEAD`）に差し替える。
+        hang なら ls-remote が返事をしない。fail_fetch なら fetch だけ失敗させる（fetch の回数は
+        返す記録の隣の `.fetch` に残る）。PATH に足す値と、ls-remote の記録のパスを返す。"""
         bindir = os.path.join(self._tmp.name, "spy-bin")
         log = os.path.join(self._tmp.name, "ls-remote.log")
-        write(
-            os.path.join(bindir, "git"),
-            "#!/bin/sh\n"
-            'for a in "$@"; do\n'
-            '  if [ "$a" = ls-remote ]; then\n'
-            f"    echo \"$*\" >>'{posix(log)}'\n"
-            + ("    echo 'fatal: unable to access' >&2; exit 128\n" if fail else "")
-            + "  fi\n"
-            "done\n"
-            f"exec '{posix(GIT)}' \"$@\"\n",
-        )
+        fetch_log = log + ".fetch"
+        script = '#!/bin/sh\nfor a in "$@"; do\n  if [ "$a" = ls-remote ]; then\n'
+        script += f"    echo \"$*\" >>'{posix(log)}'\n"
+        if hang:
+            script += "    exec sleep 30\n"
+        if fail:
+            script += "    echo 'fatal: unable to access' >&2; exit 128\n"
+        if answer is not None:
+            script += f"    printf 'ref: refs/heads/%s\\tHEAD\\n' '{answer}'; exit 0\n"
+        script += "  fi\n"
+        script += '  if [ "$a" = fetch ]; then\n'
+        script += f"    echo \"$*\" >>'{posix(fetch_log)}'\n"
+        if fail_fetch:
+            script += "    echo 'fatal: could not read from remote repository' >&2; exit 128\n"
+        script += "  fi\ndone\n"
+        script += f"exec '{posix(GIT)}' \"$@\"\n"
+        write(os.path.join(bindir, "git"), script)
         os.chmod(os.path.join(bindir, "git"), 0o755)
         return os.pathsep.join([bindir, os.environ.get("PATH", "")]), log
+
+    def fetch_calls(self, log):
+        """spy_on_ls_remote の代役が受けた fetch の行。"""
+        try:
+            with open(log + ".fetch", encoding="utf-8") as f:
+                return f.read().splitlines()
+        except FileNotFoundError:
+            return []
 
     def sha(self, tree, ref):
         done = git(tree, "rev-parse", "--verify", "-q", ref, check=False)
@@ -594,14 +610,66 @@ class FetchTest(unittest.TestCase):
         self.assertTrue(os.path.exists(log), "ls-remote を打っていない")
 
     def test_a_failed_fetch_of_the_new_default_does_not_move_origin_head(self):
-        # ホストは trunk と答えたが、trunk を取れない（リモートに実体が無い）。向け直さない。
+        # ホストは trunk と答えたが、trunk を取れない（fetch が失敗する）。向け直さない。
+        # ls-remote の答えは代役が返し、fetch は代役が失敗させる。向け直す手前の経路を通すため。
         self.leave_main()
-        git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/gone")
         before = self.origin_head()
-        done = self.fetch()
+        path, log = self.spy_on_ls_remote(answer="trunk", fail_fetch=True)
+        done = self.fetch(PATH=path)
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual(before, self.origin_head())
         self.assertNotIn("合わせた", done.stdout)
+        self.assertTrue(
+            any("refs/heads/trunk" in call for call in self.fetch_calls(log)),
+            "trunk を取りに行っていない（向け直す手前の経路を通っていない）",
+        )
+
+    def test_a_default_the_host_does_not_have_does_not_move_origin_head(self):
+        # ホストは trunk と答えたが、リモートに trunk が無い（本物の fetch が「無い」と返す）。
+        # 存在しない ref を指す状態を残さない。
+        self.leave_main()
+        before = self.origin_head()
+        path, _ = self.spy_on_ls_remote(answer="trunk")
+        done = self.fetch(PATH=path)
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual(before, self.origin_head())
+        self.assertNotIn("合わせた", done.stdout)
+
+    def test_a_hung_origin_is_not_waited_for_twice(self):
+        # 向け直しの ls-remote が返事をしない origin は、第 2 周で同じ origin をもう一度待たない。
+        self.leave_main()
+        head = self.advance(self.remote)
+        path, log = self.spy_on_ls_remote(hang=True)
+        started = time.monotonic()
+        done = self.fetch(PATH=path, CCNAVI_FETCH_TIMEOUT="2", CCNAVI_FETCH_BUDGET="30")
+        elapsed = time.monotonic() - started
+        self.assertEqual(0, done.returncode, done.stderr)
+        # 向け直しの待ちは 1 回だけ（2 秒）。第 2 周の fetch は打たず、2 回目の待ちが入らない。
+        self.assertEqual([], self.fetch_calls(log))
+        self.assertLess(elapsed, 8)
+        self.assertNotEqual(head, self.sha(self.ws, "refs/heads/main"))
+        self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
+
+    def test_a_host_default_that_differs_only_in_case_is_the_same_name(self):
+        # ホストは Main と答える。手元は main。綴り違いだけなので向け直さず、何も取りに行かない。
+        self.leave_main()
+        path, log = self.spy_on_ls_remote(answer="Main")
+        done = self.fetch(PATH=path)
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("refs/remotes/origin/main", self.origin_head())
+        self.assertNotIn("合わせた", done.stdout)
+        self.assertFalse(any("Main" in call for call in self.fetch_calls(log)))
+
+    def test_a_host_default_starting_with_a_dash_is_not_followed(self):
+        # ホストが -x のような名前を返しても、後ろの git の引数に流れないよう向け直さない。
+        self.leave_main()
+        before = self.origin_head()
+        path, log = self.spy_on_ls_remote(answer="-x")
+        done = self.fetch(PATH=path)
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual(before, self.origin_head())
+        self.assertNotIn("合わせた", done.stdout)
+        self.assertFalse(any("-x" in call for call in self.fetch_calls(log)))
 
     def test_no_ls_remote_for_an_origin_that_failed_in_the_first_lap(self):
         # 第 1 周で届かなかった origin には、向け直すための ls-remote を打たない。

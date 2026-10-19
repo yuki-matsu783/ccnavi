@@ -1058,6 +1058,28 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT)
         self.assertNotIn("合わせた", done.stdout)
 
+    def test_a_host_default_that_differs_only_in_case_does_not_move_the_origin_head(self):
+        # ホストが Main と答え、手元は main。綴り違いだけなので同じ名前として、向け直さない。
+        git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/Main")
+        git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/Main")
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn("合わせた", done.stdout)
+        head = git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD").stdout.strip()
+        self.assertEqual("refs/remotes/origin/main", head)
+
+    def test_a_host_default_starting_with_a_dash_is_not_followed(self):
+        # ホストが -x のような名前を返しても使わない（後ろの git の引数でオプションに読まれる）。
+        # 手元の origin/HEAD（main）に回る。
+        git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/-x")
+        git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/-x")
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("統合先: main", done.stdout)
+        self.assertNotIn("合わせた", done.stdout)
+        head = git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD").stdout.strip()
+        self.assertEqual("refs/remotes/origin/main", head)
+
     # ---- 止まる・対象外
 
     def test_an_unreachable_remote_stops(self):

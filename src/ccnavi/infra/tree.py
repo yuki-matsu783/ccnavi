@@ -330,11 +330,21 @@ def origin_head(repo_root: str) -> str:
     無ければ空。
 
     ファイルだけを読む。`ccnavi_default_branch` が `symbolic-ref`
-    で読むものと同じ。
+    で読むものと同じ。リンクされたワークツリーでは、`refs/remotes/` は共通の git ディレクトリ
+    （ワークツリーの git ディレクトリの `commondir`）にあるので、そちらを読む。
     """
     gitdir = git_dir(repo_root)
     if gitdir is None:
         return ""
+    try:
+        with open(os.path.join(gitdir, "commondir"), encoding="utf-8") as f:
+            common = f.read().strip()
+        if common:
+            gitdir = (
+                common if os.path.isabs(common) else os.path.normpath(os.path.join(gitdir, common))
+            )
+    except (OSError, ValueError):
+        pass
     try:
         with open(os.path.join(gitdir, "refs", "remotes", "origin", "HEAD"), encoding="utf-8") as f:
             text = f.read().strip()

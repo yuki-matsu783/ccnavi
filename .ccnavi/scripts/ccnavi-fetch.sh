@@ -99,6 +99,9 @@ fetch_cleanup() {
 trap 'fetch_cleanup' EXIT
 trap 'fetch_cleanup; exit 130' INT TERM HUP
 : >"$scratch/failed"
+# 向け直しのための ls-remote が失敗・時間切れだった origin。第 2 周で同じ origin を二重に待たないために
+# 覚える（failed とは別。ここは第 1 周の取得の失敗ではない）。
+: >"$scratch/rt-failed"
 
 # 認証で失敗したときに git（と資格情報の仕組み）が出す文言。https・ssh・GitHub・GitLab。
 auth_failed='Authentication failed|could not read (Username|Password)|terminal prompts disabled'
@@ -124,6 +127,12 @@ ccnavi_fetch_git() {
 	ccnavi_fg_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
 	if [ -n "$ccnavi_fg_url" ] && grep -qxF -- "$ccnavi_fg_url" "$scratch/failed"; then
 		return 2
+	fi
+	# 向け直しのための ls-remote が届かなかった origin は、ここでも待たない。失敗した origin として
+	# 数え直し、この 1 本は失敗として返す（報せは今までどおり、その origin で初めて失敗したときの 1 行）。
+	if [ -n "$ccnavi_fg_url" ] && grep -qxF -- "$ccnavi_fg_url" "$scratch/rt-failed" 2>/dev/null; then
+		printf '%s\n' "$ccnavi_fg_url" >>"$scratch/failed"
+		return 1
 	fi
 	ccnavi_fg_left=$(ccnavi_fetch_left)
 	[ "$ccnavi_fg_left" -gt 0 ] || return 5
@@ -180,6 +189,7 @@ ccnavi_fetch_integration() {
 #
 # 何も出さないのは、ホストに聞けない・fetch できない・時間切れ・ホストに聞いた名前が手元と同じ、のとき。
 # 失敗は $scratch/failed に書かない（ここは「向け直せなかった」だけで、第 1 周の取得の失敗とは別）。
+# ただし ls-remote が時間切れになった origin は $scratch/rt-failed に覚え、第 2 周の取得で二重に待たない。
 # 第 1 周でその origin への接続に失敗していたら、同じ origin で二重に待たないよう聞かない。
 # 向け直すのは fetch が成功した後にする（存在しない ref を指す状態を残さないため）。
 ccnavi_fetch_retarget() {
@@ -193,12 +203,27 @@ ccnavi_fetch_retarget() {
 	ccnavi_rt_limit="$limit"
 	[ "$ccnavi_rt_left" -lt "$ccnavi_rt_limit" ] && ccnavi_rt_limit="$ccnavi_rt_left"
 	ccnavi_git_timed "$ccnavi_rt_limit" "$scratch/rt-err" "$1" ls-remote --symref origin HEAD \
-		>"$scratch/rt-out" || return 0
+		>"$scratch/rt-out" || {
+		ccnavi_rt_rc=$?
+		# 時間切れ（TERM で切られた = 143、KILL = 137）のときだけ覚える。すぐ失敗した origin
+		# （認証の失敗・オフライン）は待っていないので、第 2 周で今までどおり取りに行って理由を言う。
+		case "$ccnavi_rt_rc" in
+		143 | 137) printf '%s\n' "$ccnavi_rt_url" >>"$scratch/rt-failed" ;;
+		esac
+		return 0
+	}
 	ccnavi_rt_new=$(sed -n 's#^ref: refs/heads/\([^[:space:]]*\)[[:space:]]*HEAD$#\1#p' "$scratch/rt-out" 2>/dev/null | head -n 1)
 	[ -n "$ccnavi_rt_new" ] || return 0
+	# 先頭が - の名前は、起点として後ろの git の引数に渡るとオプションに読まれる。向け直さない。
+	case "$ccnavi_rt_new" in
+	-*) return 0 ;;
+	esac
 	git check-ref-format "refs/heads/$ccnavi_rt_new" 2>/dev/null || return 0
 	ccnavi_rt_old=$(ccnavi_fetch_integration "$1" || :)
-	[ "$ccnavi_rt_new" != "$ccnavi_rt_old" ] || return 0
+	# 大文字小文字だけ違う名前は同じものとして扱う（綴り違いの ref を並べて作らない）。
+	ccnavi_rt_new_f=$(printf '%s' "$ccnavi_rt_new" | tr '[:upper:]' '[:lower:]')
+	ccnavi_rt_old_f=$(printf '%s' "$ccnavi_rt_old" | tr '[:upper:]' '[:lower:]')
+	[ "$ccnavi_rt_new_f" != "$ccnavi_rt_old_f" ] || return 0
 	# そのブランチを取る。成功してから向け直す。
 	ccnavi_rt_left=$(ccnavi_fetch_left)
 	[ "$ccnavi_rt_left" -gt 0 ] || return 0

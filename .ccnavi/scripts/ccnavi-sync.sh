@@ -268,6 +268,13 @@ default_branch() {
 		db_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
 		db_head="${db_head#origin/}"
 	fi
+	# 先頭が - の名前は、後ろの git の引数に渡るとオプションに読まれる。使わず、main・master に回す。
+	case "$db_head" in
+	-*)
+		db_head=""
+		db_host=""
+		;;
+	esac
 	if [ -n "$db_head" ] && has_head "$2" "$db_head"; then
 		# ホストに聞いて得た名前か。`$( )` の中で呼ぶので、変数ではなくファイルで呼び元へ渡す。
 		[ -z "$db_host" ] || : >"$scratch/db-host"
@@ -909,7 +916,10 @@ while IFS= read -r key <&4; do
 	if [ -e "$scratch/db-host" ]; then
 		old_head=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
 		old_head="${old_head#origin/}"
-		if [ "$old_head" != "$integ" ] &&
+		# 大文字小文字だけ違う名前は同じものとして扱う。
+		old_head_f=$(printf '%s' "$old_head" | tr '[:upper:]' '[:lower:]')
+		integ_f=$(printf '%s' "$integ" | tr '[:upper:]' '[:lower:]')
+		if [ "$old_head_f" != "$integ_f" ] &&
 			git -C "$repo" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$integ" 2>/dev/null; then
 			printf '%s 統合先を %s から %s に合わせた（ホストの既定ブランチ）\n' "$label" "${old_head:-未設定}" "$integ"
 		fi
