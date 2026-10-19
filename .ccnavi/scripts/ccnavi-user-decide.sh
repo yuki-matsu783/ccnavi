@@ -115,8 +115,10 @@ resume_prepare() {
 		rp_count=$(printf '%s\n' "$rp_list" | grep -c . || :)
 		case "$rp_count" in
 		0)
-			printf '%s: 未完了の判断はありません。\n' "$review_label"
-			exit 0
+			# 操作記録を入れる前の版が残した下書き（issue とコメント）があるかは、親が決まってから見る
+			# （review_host のあと。無ければそこで「未完了の判断はありません」と言う）。
+			resume_legacy=check
+			return 0
 			;;
 		1) resume_op="$rp_list" ;;
 		*)
@@ -160,6 +162,54 @@ if [ -n "$resuming" ]; then
 	review_exe || review_no_bin
 fi
 review_host
+
+# 古い形の下書きの送り直し（--resume で未完了の判断が無く、下書きだけが残っているとき）。
+# 下書きから issue とコメントを、操作記録の段階（鍵は下書きの名前）に載せて送る。送れた下書きは消す。
+resume_legacy_drafts() {
+	printf '%s: 操作記録を入れる前の版が残した下書きがあります:\n' "$review_label"
+	printf '  %s\n' $resume_legacy
+	printf '送りますか [y/N]: '
+	read -r rl_answer || rl_answer=n
+	case "$rl_answer" in
+	y | Y | yes | YES) ;;
+	*) fail decide-not-confirmed "送らずにやめました。" 1 ;;
+	esac
+	fetch_all >"$result"
+	rl_number=$("$JQ" '.mr.number' "$result")
+	rl_url=$("$JQ" -r '.mr.url' "$result")
+	rl_failed=""
+	rl_issue_note=""
+	for rl_file in $resume_legacy; do
+		case "$rl_file" in
+		*/review-issue-*)
+			if rl_made=$(staged_send decide "$(basename "$rl_file")" issue issue "$rl_number" "$rl_url" "$rl_file"); then
+				rl_issue_note=$(printf '%s' "$rl_made" | "$JQ" -r '"\nissue に回した分: #" + ((.number // 0) | tostring) + " " + (.url // "")')
+				rm -f "$rl_file"
+			else
+				rl_failed=1
+			fi
+			;;
+		esac
+	done
+	for rl_file in $resume_legacy; do
+		case "$rl_file" in
+		*/review-decide-*)
+			if [ -n "$rl_issue_note" ]; then
+				printf '%s\n' "$rl_issue_note" >>"$rl_file"
+				rl_issue_note=""
+			fi
+			if staged_send decide "$(basename "$rl_file")" comment note "$rl_number" "$rl_url" "$rl_file" >/dev/null; then
+				rm -f "$rl_file"
+			else
+				rl_failed=1
+			fi
+			;;
+		esac
+	done
+	[ -z "$rl_failed" ] || fail decide-legacy-incomplete "送れなかった下書きがあります。確かめてから --resume を打ち直してください。" 1
+	printf 'OK: 古い形の下書きを送った\n'
+	exit 0
+}
 
 # decide: 選択を置く前に、受け入れる指摘（対応しない・issue に回す）へ返信を残して解決する。
 # <選択の JSON> <ダイジェスト>。計画の段（置く側の事前検査とダイジェストの照合を含む。何も置かない）
@@ -243,6 +293,15 @@ trap 'review_exit=$?; ccnavi_wap_end; accept_cleanup "$review_exit"; rm -f "$res
 trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
 review_wap
+
+if [ -n "${resume_legacy:-}" ]; then
+	resume_legacy=$(ls "$state"/review-issue-"$family"-*.md "$state"/review-decide-"$family"-*.md 2>/dev/null || :)
+	if [ -z "$resume_legacy" ]; then
+		printf '%s: 未完了の判断はありません。\n' "$review_label"
+		exit 0
+	fi
+	resume_legacy_drafts
+fi
 
 # マーカーに残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
 # ロックを取る前に引く。引けなければ渡さず、マーカーは前と同じ。

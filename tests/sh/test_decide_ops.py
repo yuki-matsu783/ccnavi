@@ -341,6 +341,20 @@ class DecideOpsShTest(unittest.TestCase):
         self.assertEqual(kinds.count("reply"), 1, "返信済みのスレッドに重ねない")
         self.assertIn("resolve", kinds)
 
+    def test_resume_sends_drafts_left_by_the_version_before_the_records(self):
+        with open(os.path.join(self.state, "review-issue-i0001-1.md"), "w", encoding="utf-8") as f:
+            f.write("issue の題\n\n本文\n")
+        with open(os.path.join(self.state, "review-decide-i0001-1.md"), "w", encoding="utf-8") as f:
+            f.write("<!-- ccnavi:decide -->\n決めた\n")
+        done = self.run_decide("--resume", stdin="y\n")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual([k for k, _ in GitLab.posted], ["issue", "note"])
+        self.assertIn("stage=issue", STORE["issues"][0]["description"])
+        self.assertIn("issue に回した分: #1", STORE["notes"][0]["body"])
+        self.assertEqual(
+            [n for n in os.listdir(self.state) if n.startswith("review-")], [], "送れた下書きは消す"
+        )
+
     def test_resume_asks_first_and_stops_on_no(self):
         STORE["reject"].add("note")
         self.choose()
