@@ -559,6 +559,8 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.head_of(remote, "work"), self.head(project))
         self.assertNotIn(NOTHING, result.stdout)
 
+    # ---- チケット approve-carry-05 の 7・8
+
     def said(self, result, name):
         """sh 自身が標準エラーに name を名指ししたか。git のエラー文に紛れた名前は数えない。"""
         return any(
