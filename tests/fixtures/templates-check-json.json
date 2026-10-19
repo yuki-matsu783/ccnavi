@@ -1,0 +1,200 @@
+{
+ "about": "`ccnavi --templates --check-file <パス> --json` の答えの見本。tests/ticket/test_plan_templates.py の FEATURE（plan 2 項・feedback 1 項・flows 1 本）を、共通に PHASES を置いたワークスペースで検査した答え。sha と source_sha は <sha> に置き換える。欄: version、ok、layer、name、sha、valid、problems（severity・detail）、data（読んだ中身の写し。読めなければ null）、plans（承認の preview の plans と同じ ApprovePlan の形。番号は全体計画が 1.. でフィードバック計画はその続き）、types（この層で使えるフェーズ定義）。",
+ "expect": {
+  "version": 1,
+  "ok": true,
+  "layer": "self",
+  "name": "feature",
+  "sha": "<sha>",
+  "valid": true,
+  "problems": [],
+  "data": {
+   "name": "feature",
+   "description": "機能を設計から実装まで進める",
+   "when": "新しい機能を足すとき",
+   "plan": [
+    "design",
+    {
+     "type": "implement",
+     "after": [
+      1
+     ]
+    }
+   ],
+   "feedback": [
+    "implement-feedback"
+   ],
+   "flows": {
+    "2": {
+     "id": "wf-impl",
+     "name": "実装の手順",
+     "version": "1.0.0",
+     "nodes": [
+      {
+       "id": "s",
+       "type": "start",
+       "name": "開始",
+       "position": {
+        "x": 0,
+        "y": 0
+       },
+       "data": {}
+      },
+      {
+       "id": "p",
+       "type": "prompt",
+       "name": "実装",
+       "position": {
+        "x": 1,
+        "y": 0
+       },
+       "data": {
+        "prompt": "先にテスト"
+       }
+      },
+      {
+       "id": "e",
+       "type": "end",
+       "name": "終了",
+       "position": {
+        "x": 2,
+        "y": 0
+       },
+       "data": {}
+      }
+     ],
+     "connections": [
+      {
+       "id": "c1",
+       "from": "s",
+       "to": "p",
+       "fromPort": "output",
+       "toPort": "input"
+      },
+      {
+       "id": "c2",
+       "from": "p",
+       "to": "e",
+       "fromPort": "output",
+       "toPort": "input"
+      }
+     ]
+    }
+   }
+  },
+  "plans": [
+   {
+    "ticket": "feature",
+    "part": "plan",
+    "source_sha": "<sha>",
+    "items": [
+     {
+      "number": 1,
+      "from": 1,
+      "type": "design",
+      "title": "設計",
+      "review": "mr",
+      "deferred": false,
+      "review_at": null,
+      "locked": false
+     },
+     {
+      "number": 2,
+      "from": 2,
+      "type": "implement",
+      "title": "実装とテスト",
+      "review": "mr",
+      "deferred": false,
+      "review_at": null,
+      "locked": false
+     }
+    ],
+    "after": {
+     "2": [
+      1
+     ]
+    },
+    "proposed": {
+     "2": [
+      1
+     ]
+    },
+    "current": null,
+    "loose": [],
+    "ready": [
+     1
+    ],
+    "problems": []
+   },
+   {
+    "ticket": "feature",
+    "part": "feedback",
+    "source_sha": "<sha>",
+    "items": [
+     {
+      "number": 3,
+      "from": 3,
+      "type": "implement-feedback",
+      "title": "実装フィードバック対応",
+      "review": "mr",
+      "deferred": false,
+      "review_at": null,
+      "locked": false
+     }
+    ],
+    "after": {},
+    "proposed": {},
+    "current": null,
+    "loose": [],
+    "ready": [
+     3
+    ],
+    "problems": []
+   }
+  ],
+  "types": [
+   {
+    "id": "acceptance",
+    "title": "受入テスト作成",
+    "kind": "work",
+    "review": "mr"
+   },
+   {
+    "id": "chores",
+    "title": "片付け",
+    "kind": "work",
+    "review": "mr"
+   },
+   {
+    "id": "chores-feedback",
+    "title": "片付けフィードバック対応",
+    "kind": "feedback",
+    "review": "mr"
+   },
+   {
+    "id": "design",
+    "title": "設計",
+    "kind": "work",
+    "review": "mr"
+   },
+   {
+    "id": "implement",
+    "title": "実装とテスト",
+    "kind": "work",
+    "review": "mr"
+   },
+   {
+    "id": "implement-feedback",
+    "title": "実装フィードバック対応",
+    "kind": "feedback",
+    "review": "mr"
+   },
+   {
+    "id": "research",
+    "title": "調査",
+    "kind": "work",
+    "review": "none"
+   }
+  ]
+ }
+}

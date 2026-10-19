@@ -2,9 +2,13 @@
 
     ccnavi --templates [--layer <self|プロジェクト名>] [--keyword <語>]... [--json]
     ccnavi --templates --show <名前> [--layer <名前>] [--json]
+    ccnavi --templates --check-file <パス> [--layer <名前>|common] [--json]
     ccnavi --templates --draft <親> [--name <名前>] [--to common|project] [--layer <名前>] [--json]
 
-一覧・検索・表示は読むだけ。`--draft` は完了した親から下書きを `wip/handoff/<取り込み先の相対パス>`
+一覧・検索・表示・`--check-file` は読むだけ。`--check-file` は任意のパスのテンプレートを、
+そのレイヤーのフェーズ定義で検査し、計画の図の中身（`plans`）と読んだ中身（`data`）を返す
+（保存の前の確かめ用）。
+`--draft` は完了した親から下書きを `wip/handoff/<取り込み先の相対パス>`
 に書くだけで、下書きに効力は無いので、エージェントが打ってよい。取り込みはほかの保護対象と同じく、
 ユーザが `ccnavi user handoff` で行う（テンプレート専用の取り込み・改名・移動・削除は無い。
 改名・移動・削除は、ユーザがファイルを直接操作する）。cli を読まない。
@@ -38,6 +42,7 @@ def asked(args: argparse.Namespace) -> bool:
         or args.show is not None
         or args.layer
         or args.draft is not None
+        or args.check_file is not None
         or args.name
         or args.to
     )
@@ -79,6 +84,7 @@ def usage_problem(args: argparse.Namespace) -> str:
         return "--with-feedback は ticket new <識別子> --title <題> --template <名前> でだけ使う"
     if not args.templates:
         for flag, given in (
+            ("--check-file", args.check_file is not None),
             ("--show", args.show is not None),
             # `ticket new --template` の `--layer` は、テンプレートを引くレイヤー。
             ("--layer", bool(args.layer) and not _ticket_new(args)),
@@ -100,6 +106,21 @@ def usage_problem(args: argparse.Namespace) -> str:
             return f"{flag} は --docs でだけ使える"
     if args.command:
         return f"--templates にはフラグ以外の語を付けられない（{' '.join(args.command)}）"
+    if args.check_file is not None:
+        if not args.check_file.strip():
+            return "--check-file にはパスを渡す"
+        for flag, given in (
+            ("--show", args.show is not None),
+            ("--draft", args.draft is not None),
+            ("--keyword", bool(args.keyword)),
+            ("--name", bool(args.name)),
+            ("--to", bool(args.to)),
+            ("--expect", args.expect is not None),
+            ("--yes", bool(args.yes)),
+        ):
+            if given:
+                return f"{flag} は --check-file と一緒に使えない"
+        return ""
     storing = _storing_problem(args)
     if storing:
         return storing
@@ -123,6 +144,8 @@ def run(
     """
     if args.draft is not None:
         return _draft(stdout, stderr, conf, root, args)
+    if args.check_file is not None:
+        return _check_file(stdout, stderr, conf, root, args)
     layer = (args.layer or plan_templates.LAYER_SELF).strip()
     known = [view.name for view in ruleload.layers(conf, root)]
     if layer not in known:
@@ -152,6 +175,33 @@ def _fail(stdout: TextIO, stderr: TextIO, as_json: bool, error: str) -> int:
     else:
         stderr.write(f"ccnavi: {error}\n")
     return EXIT_ERROR
+
+
+def _check_file(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    args: argparse.Namespace,
+) -> int:
+    """任意のパスのテンプレートを検査する（`--check-file`）。書かない。"""
+    layer = (args.layer or plan_templates.LAYER_SELF).strip()
+    known = [view.name for view in ruleload.layers(conf, root)]
+    if layer not in known and layer != plan_templates.LAYER_COMMON:
+        return _fail(
+            stdout, stderr, args.json, f"レイヤー {layer!r} はありません（{' / '.join(known)}）"
+        )
+    path = args.check_file.strip()
+    answer = plan_templates.check_file(conf, root, path, layer)
+    if args.json:
+        stdout.write(json.dumps(answer, ensure_ascii=True, indent=1))
+        stdout.write("\n")
+        return EXIT_OK
+    stdout.write(f"ccnavi: テンプレートの検査: {path}（{layer}）\n")
+    stdout.write(f"  名前: {answer['name']}  読めた: {'はい' if answer['valid'] else 'いいえ'}\n")
+    for said in answer["problems"]:
+        stdout.write(f"  {_label(said['severity'])} {said['detail']}\n")
+    return EXIT_OK
 
 
 def _drafts(

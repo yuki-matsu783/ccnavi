@@ -73,6 +73,11 @@ export function templatesShowArgs(name: string, layer: string): readonly string[
   return ["--templates", "--show", name, "--layer", layer, "--json"];
 }
 
+/** `--templates --check-file <パス> --layer <名前> --json`。編集中の 1 本を読ませる（何も書かない）。ファイル名の拡張子を除いたものが名前の期待値 */
+export function templatesCheckArgs(file: string, layer: string): readonly string[] {
+  return ["--templates", "--check-file", file, "--layer", layer, "--json"];
+}
+
 /**
  * `--templates --draft <親> --json`。完了した親から下書きを作る（効力の無い下書きを書くだけ）。`--root` は `run()` が付ける
  */

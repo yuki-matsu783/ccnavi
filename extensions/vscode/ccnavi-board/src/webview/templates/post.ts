@@ -1,5 +1,5 @@
 /**
- * テンプレート管理画面が拡張ホストへ返す操作。読み取りの画面なので、送るのは契約（`core/templates-view.ts` の `TemplatesMessage`）に
+ * テンプレート管理画面が拡張ホストへ返す操作。送るのは契約（`core/templates-view.ts` の `TemplatesMessage`）に
  * 書いてあるものだけ。
  */
 import { poster } from "../vscode.js";

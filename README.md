@@ -2897,6 +2897,8 @@ ccnavi --templates                          # 一覧（名前・層・説明・�
 ccnavi --templates --keyword 調査            # name・description・when の検索（語を重ねるとどれか）
 ccnavi --templates --show feature           # 1 本の中身（計画・フロー・検査・ファイルの本文）
 ccnavi --templates --layer lib --json       # 共通 + プロジェクト lib の統合結果。画面向けの完全な答え
+ccnavi --templates --check-file <パス> [--layer <名前>|common] --json
+                                            # 任意のパスのテンプレートを検査する（読むだけ。画面の保存前の確かめ。答えの形は tests/fixtures/templates-check-json.json）
 ccnavi --templates --draft <親> [--name <名前>] [--to common|project] [--layer <名前>]
                                             # 完了した親から下書きを wip/handoff/ に作る（エージェントが打ってよい）
 ccnavi user handoff [<相対パス>…]            # 下書きの一覧と差分（何も書かない。ユーザ専用）
@@ -3080,7 +3082,7 @@ plan（3 項）: 1 research / 2 design（待つ 1・defer） / 3 implement（待
 
 同じ拡張の「テンプレート管理画面」で、テンプレートの一覧・検索・表示ができる。対象は共通の設定（`.ccnavi/config/common/templates/`）、ワークスペースの設定、プロジェクトの設定の 3 種で、「設定」の欄で切り替える。
 一覧は「統合結果」（共通と選んだ層で実際に使われる結果）と「層ごと」（層ごとの生の中身）を切り替えて見られる。有効か・捨てた理由・検査の結果は、実行ファイルの答えをそのまま出す。
-この画面は読むだけで、取り込みも編集もしない。
+開いている対象の層のテンプレートは、行の「編集」で、計画の項と線を図で、子のフローをフロー編集と同じ図で直して保存できる（「作る」で新規も作れる）。保存は、実行ファイルの検査（`--templates --check-file`）に error が無く、読み返した中身が書こうとした中身と同じで、開いたときからファイルが外で変わっておらず、作業中のチケットが無いときだけ書く。下書きは読むだけで、取り込みは取り込み待ち画面で行う。
 
 下書きの取り込みは「取り込み待ち」の画面で行う。`wip/handoff/` の下書きのうち、テンプレート・設定（`rules.yml` など）・文書の種類を一覧にし、
 差分を読んでから取り込む（`ccnavi user handoff` を `--via board` で呼ぶ）。防御のファイル（`.ccnavi/scripts/`・hook・`settings.json`）は一覧に出るが、

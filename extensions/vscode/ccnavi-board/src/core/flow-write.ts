@@ -118,8 +118,9 @@ function linkedError(where: string): string {
 
 /**
  * フローのファイルを書く。リンクを辿らず、読み込んだときから外で変わっていなければ、一時ファイルの入れ替えで書く。
+ * `noun` は断る文に出す呼び名（テンプレートの保存は同じ書き方を `テンプレート` の名で使う）。
  */
-export function writeFlowFile(tree: string, file: string, text: string, expect: FlowExpect): FlowWriteResult {
+export function writeFlowFile(tree: string, file: string, text: string, expect: FlowExpect, noun = "フロー"): FlowWriteResult {
   if (segments(tree, file) === undefined) {
     return { ok: false, error: `ツリーの外には保存しません（${file}）` };
   }
@@ -132,13 +133,13 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
   if (made !== undefined) {
     return { ok: false, error: made };
   }
-  const changed = changedSince(file, expect);
+  const changed = changedSince(file, expect, noun);
   if (changed !== undefined) {
     return { ok: false, error: changed };
   }
   const size = Buffer.byteLength(text, "utf8");
   if (size > FLOW_FILE_LIMIT) {
-    return { ok: false, error: `フローが大きすぎるため、保存しません（${size} バイト、上限 ${FLOW_FILE_LIMIT}）。実行ファイルはこれより大きいフローを読みません` };
+    return { ok: false, error: `${noun}が大きすぎるため、保存しません（${size} バイト、上限 ${FLOW_FILE_LIMIT}）。実行ファイルはこれより大きい${noun}を読みません` };
   }
   const temp = path.join(dir, `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`);
   let renamed = false;
@@ -146,11 +147,11 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
     try {
       fs.writeFileSync(temp, text, { encoding: "utf8", flag: "wx" });
     } catch (error) {
-      return { ok: false, error: `フローのファイルに保存できません: ${(error as Error).message}` };
+      return { ok: false, error: `${noun}のファイルに保存できません: ${(error as Error).message}` };
     }
     // 入れ替えの直前にもう一度確かめる（確かめてから入れ替えるまでの隙間を狭める）
     const relinked = linkedSegment(tree, file);
-    const again = relinked !== undefined ? linkedError(relinked) : changedSince(file, expect);
+    const again = relinked !== undefined ? linkedError(relinked) : changedSince(file, expect, noun);
     if (again !== undefined) {
       return { ok: false, error: again };
     }
@@ -158,7 +159,7 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
       fs.renameSync(temp, file);
       renamed = true;
     } catch (error) {
-      return { ok: false, error: `フローのファイルに保存できません: ${(error as Error).message}` };
+      return { ok: false, error: `${noun}のファイルに保存できません: ${(error as Error).message}` };
     }
     return { ok: true };
   } finally {
@@ -174,20 +175,20 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
 }
 
 /** 読み込んでから外で変わったなら理由。変わっていなければ undefined */
-function changedSince(file: string, expect: FlowExpect): string | undefined {
+function changedSince(file: string, expect: FlowExpect, noun: string): string | undefined {
   let stat: fs.Stats | undefined;
   try {
     stat = fs.lstatSync(file);
   } catch (error) {
     if (code(error) !== "ENOENT") {
-      return `フローのファイルを確認できません: ${(error as Error).message}`;
+      return `${noun}のファイルを確認できません: ${(error as Error).message}`;
     }
   }
   if (!expect.exists) {
-    return stat === undefined ? undefined : "フローのファイルは、読み込んだあとに画面の外で作られています。再読込してから編集し直してください（上書きしません）";
+    return stat === undefined ? undefined : `${noun}のファイルは、読み込んだあとに画面の外で作られています。再読込してから編集し直してください（上書きしません）`;
   }
   if (stat === undefined) {
-    return "フローのファイルは、読み込んだあとに画面の外で消されています。再読込してから編集し直してください";
+    return `${noun}のファイルは、読み込んだあとに画面の外で消されています。再読込してから編集し直してください`;
   }
   if (stat.isSymbolicLink() || !stat.isFile()) {
     return `${file} がシンボリックリンクか、ファイルではないため、保存しません`;
@@ -196,7 +197,7 @@ function changedSince(file: string, expect: FlowExpect): string | undefined {
     return hardLinkedError(file, "保存しません");
   }
   if (stat.mtimeMs !== expect.mtimeMs) {
-    return "フローのファイルは、読み込んだあとに画面の外で変更されています。再読込してから編集し直してください（この変更は上書きしません）";
+    return `${noun}のファイルは、読み込んだあとに画面の外で変更されています。再読込してから編集し直してください（この変更は上書きしません）`;
   }
   return undefined;
 }

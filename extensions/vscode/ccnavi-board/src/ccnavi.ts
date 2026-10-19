@@ -10,7 +10,7 @@
  * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）、
  * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。計画編集タブが読む）と
  * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`（その保存。提案を書き換えるのは実行ファイル）と、
- * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、
+ * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、`--templates --check-file <パス> --json`（編集中の 1 本を読ませる）、
  * `user handoff [<パス>…] --json`（`wip/handoff/` の下書きの一覧を見る。取り込み待ち画面が読む。`--root` で指したツリー 1 本だけを見る）と
  * `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ。
  * `expect` は取り込むパスを指して見るだけをもう一度呼んだ答えのもの）。
@@ -52,6 +52,7 @@ import {
   REVIEW_SCRIPT,
   USER_DECIDE_SCRIPT,
   templatesArgs,
+  templatesCheckArgs,
   templatesDraftArgs,
   templatesShowArgs,
   toPosixPath,
@@ -73,8 +74,8 @@ import { parsePlanOrder, type PlanOrder, type PlanOrderAnswer, type PlanOrderWri
 import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
 import type { HandoffList, HandoffResult } from "./core/handoff-view.js";
 import { parseHandoffList, parseHandoffResult } from "./core/handoffmodel.js";
-import type { TemplateDetail, TemplatesJson } from "./core/templates-view.js";
-import { parseTemplates, parseTemplateShow } from "./core/templatesmodel.js";
+import type { TemplateCheck, TemplateDetail, TemplatesJson } from "./core/templates-view.js";
+import { parseTemplateCheck, parseTemplates, parseTemplateShow } from "./core/templatesmodel.js";
 import {
   parseExpectationsJson,
   parseTestJson,
@@ -628,6 +629,9 @@ const PLAN_ORDER_FLAGS = ["--plan-order", "--order", "--expect", "--write"] as c
 /** テンプレート管理画面が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
 const TEMPLATES_FLAGS = ["--templates", "--show"] as const;
 
+/** テンプレートの編集が求めるフラグ。知らない古い実行ファイルは、読ませて確かめられないので編集を始めない */
+const TEMPLATE_EDIT_FLAGS = ["--templates", "--check-file"] as const;
+
 /**
  * 取り込み待ち画面が求める機能（`ccnavi user handoff` を実行ファイルが持つ）。持たない古い実行ファイルは `user handoff` を知らず、
  * argparse の苦情（不明瞭な断り）で返すので、画面を開くときに見て「古い版です」と言い、画面を無効にする
@@ -739,6 +743,18 @@ export async function checkTemplates(root: string, setting: string): Promise<str
 }
 
 /**
+ * 実行ファイルが `--templates --check-file` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
+ * テンプレートの編集を始めるたびに 1 回聞く。知らなければ編集の入口を無効にして、この理由を言う。
+ */
+export async function checkTemplateEdit(root: string, setting: string): Promise<string | undefined> {
+  const probe = await probeVersion(root, setting);
+  if (probe === undefined) {
+    return NOT_FOUND;
+  }
+  return missingFlags(probe, TEMPLATE_EDIT_FLAGS, "テンプレートの編集", hasSource(root));
+}
+
+/**
  * 実行ファイルが `user handoff` を持つか（`features` に `handoff`）を聞く。持っていれば undefined、持たなければ理由
  * （取り込み待ち画面を無効にして、この理由を言う）。取り込み待ち画面は読み込むたびに 1 回聞く。
  */
@@ -802,6 +818,24 @@ export async function runTemplateShow(root: string, setting: string, name: strin
     return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
   }
   const parsed = parseTemplateShow(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
+}
+
+/** 編集中の 1 本を実行ファイルに読ませる（`--templates --check-file <パス> --layer <名前> --json`）。何も書かない */
+export async function runTemplateCheck(root: string, setting: string, file: string, layer: string): Promise<RunResult<TemplateCheck>> {
+  const what = "ccnavi --templates --check-file --json";
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, templatesCheckArgs(file, layer), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+  }
+  const parsed = parseTemplateCheck(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
 }
 

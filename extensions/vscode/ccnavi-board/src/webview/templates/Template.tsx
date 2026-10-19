@@ -21,9 +21,11 @@ export interface TemplateProps {
   readonly onShow: () => void;
   /** 案内が指す先にする（一覧の最初の 1 件だけ） */
   readonly tour: boolean;
+  /** 編集を始める。渡さなければ「編集」は出さない（読み取り専用の層・読めない行・案内の間） */
+  readonly onEdit?: () => void;
 }
 
-export function Template({ entry, open, onToggle, detail, detailError, onShow, tour }: TemplateProps): JSX.Element {
+export function Template({ entry, open, onToggle, detail, detailError, onShow, tour, onEdit }: TemplateProps): JSX.Element {
   const dropped = entry.dropped;
   return (
     <li className={`row template${open ? " open" : ""}`} data-name={entry.name} data-layer={entry.layer} data-tour={tour ? "template" : undefined}>
@@ -62,6 +64,11 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           <button type="button" className="action small" data-action="show-text" onClick={onShow}>
             本文を見る
           </button>
+          {onEdit !== undefined && (
+            <button type="button" className="action small" data-action="edit-template" onClick={onEdit}>
+              編集
+            </button>
+          )}
           {detail !== undefined && detailMatches(detail, entry) && (
             <>
               <h3 className="tpl-text-head">本文（制御文字・書式文字は \uXXXX で表示）</h3>
