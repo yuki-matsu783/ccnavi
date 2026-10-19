@@ -300,7 +300,15 @@ def _manual_confirm_note(
     if failed:
         stderr.write(f"ccnavi: 手動移動の案内を残せないので、案内しない: {failed}\n")
         return ""
-    return ops_stop_request.request_nudge(root, found)
+    # 発言の内容を読まずに出すので、Stop の促しより弱く言う（許可の要否ではなく状態の知らせ）。
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    return (
+        f"[ccnavi] 親 {found.parent.ticket} のフェーズ {found.number} は、ユーザが子 "
+        f"{', '.join(found.children)} を手で done/ に動かして共有しています"
+        "（レビュー完了確認待ち）。この発言が別の用件なら触れずに進めてよい。"
+        f"確定するなら '{review_sh} confirm --phase {found.number}' を実行する。"
+        "移動の前に付いた未解決の指摘だけが版つきで受け入れられ、移動の後に付いたものがあれば止まる。"
+    )
 
 
 def decide_at_stop(

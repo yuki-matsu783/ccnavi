@@ -46,8 +46,12 @@ reply_already_sent() {
 	fi
 	[ "$(printf '%s' "$ra_rec" | "$JQ" -r --arg k "reply_try_$1" '.applied[$k] // empty')" = true ] || return 1
 	ra_last=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0].last_author // empty' "$2" 2>/dev/null)
+	ra_first=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0].author // empty' "$2" 2>/dev/null)
 	op_account
-	if [ -n "$ra_last" ] && [ -n "${op_who:-}" ] && [ "$ra_last" = "$op_who" ]; then
+	# 最後のコメントが自分のものでも、スレッドを立てたのが自分なら返信とは限らない（自分の指摘への返信
+	# を落とさないよう、その場合は送り直す側に倒す。二重の返信は出うるが、返信の欠落は出さない）。
+	if [ -n "$ra_last" ] && [ -n "${op_who:-}" ] && [ "$ra_last" = "$op_who" ] &&
+		[ -n "$ra_first" ] && [ "$ra_first" != "$op_who" ]; then
 		reply_mark "reply_$1"
 		return 0
 	fi
@@ -133,7 +137,11 @@ accept_threads() {
 			accept_i=$((accept_i + 1))
 			continue
 		fi
-		reply_mark "reply_try_$accept_id"
+		# 送る前の印を書けなければ送らない（書けないまま送って落ちると、二重に返信しうる）
+		if [ -n "${op_id:-}" ] && ! ccnavi ops applied "$op_id" "reply_try_$accept_id" true 2>/dev/null; then
+			printf '%s: 操作記録に返信の印を書けなかった。何も送らずに止めた。\n' "$review_label" >&2
+			return 1
+		fi
 		if ! accept_reply "$accept_id" "$accept_text" "$accept_mr"; then
 			printf '%s: 受け入れを完了できない。スレッド %s に返信を残せなかった。何も置いていない（返信が済んだ分は残る。解決はまだ誰もしていない）。\n' "$review_label" "$accept_key" >&2
 			return 1

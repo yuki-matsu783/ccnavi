@@ -251,17 +251,18 @@ def _rmw(state: str, op_id: str):
         try:
             fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
+            # 待つ上限は先に見る（消せない・読めないときに、上限を飛ばして回り続けない）
+            if time.time() > deadline:
+                raise OpError("操作記録を更新中の別のプロセスがある。打ち直してください") from None
             try:
                 stale = time.time() - os.path.getmtime(path) > RMW_STALE_SECONDS
             except OSError:
-                continue
+                stale = False
             if stale:
                 with contextlib.suppress(OSError):
                     os.remove(path)
-                continue
-            if time.time() > deadline:
-                raise OpError("操作記録を更新中の別のプロセスがある。打ち直してください") from None
-            time.sleep(0.02)
+            else:
+                time.sleep(0.02)
     try:
         yield
     finally:
@@ -405,6 +406,9 @@ def retire_parent(state: str, parent: str) -> list[str]:
     親を閉じる片付け（ready）が呼ぶ。未完了の記録と、読めない記録は消さない。
     """
     gone = []
+    if not parent:
+        # 親が空だと、親を持たない記録を全部消してしまう
+        return gone
     for op_id in all_ids(state):
         try:
             record = load(state, op_id)

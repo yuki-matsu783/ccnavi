@@ -389,16 +389,32 @@ staged_send() {
 	# ロックが使えない構成（root が無い）では、取らずに進む。
 	cs_locked=""
 	if [ -n "${root:-}" ] && command -v ccnavi_lock_take >/dev/null 2>&1; then
+		# 取る関数の状態はグローバル変数 1 組。write-and-push のロックを持ったまま取ると、その情報が
+		# 上書きされて外せなくなるので、取る前に退避して、外したあとに戻す。
+		cs_sv_dir="$ccnavi_lock_dir"
+		cs_sv_mark="$ccnavi_lock_mark"
+		cs_sv_set="$ccnavi_lock_set_held"
+		cs_sv_prev="$ccnavi_lock_prev_held"
+		cs_sv_prev_set="$ccnavi_lock_prev_set"
 		if ccnavi_lock_take "$root" ops "$cs_id" 30; then
 			cs_locked=1
 		else
+			ccnavi_lock_dir="$cs_sv_dir"
+			ccnavi_lock_mark="$cs_sv_mark"
 			printf '%s: 同じ投稿が別のプロセスで実行中。待っても取れなかったので止めた。\n' "${review_label:-ccnavi-review}" >&2
 			return 1
 		fi
 	fi
 	staged_send_locked
 	cs_rc=$?
-	[ -z "$cs_locked" ] || ccnavi_lock_drop
+	if [ -n "$cs_locked" ]; then
+		ccnavi_lock_drop
+		ccnavi_lock_dir="$cs_sv_dir"
+		ccnavi_lock_mark="$cs_sv_mark"
+		ccnavi_lock_set_held="$cs_sv_set"
+		ccnavi_lock_prev_held="$cs_sv_prev"
+		ccnavi_lock_prev_set="$cs_sv_prev_set"
+	fi
 	return "$cs_rc"
 }
 

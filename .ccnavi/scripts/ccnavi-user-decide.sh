@@ -295,7 +295,16 @@ trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 review_wap
 
 if [ -n "${resume_legacy:-}" ]; then
-	resume_legacy=$(ls "$state"/review-issue-"$family"-*.md "$state"/review-decide-"$family"-*.md 2>/dev/null || :)
+	# 名前が `<親>-<フェーズの数字>.md` のものだけ（`i0001` の glob が親 `i0001-x` の下書きに当たらないように）
+	resume_legacy=""
+	for rl_cand in "$state"/review-issue-"$family"-[0-9]*.md "$state"/review-decide-"$family"-[0-9]*.md; do
+		[ -f "$rl_cand" ] || continue
+		case "${rl_cand##*/}" in
+		review-issue-"$family"-*[!0-9.md]* | review-decide-"$family"-*[!0-9.md]*) continue ;;
+		esac
+		resume_legacy="${resume_legacy:+$resume_legacy
+}$rl_cand"
+	done
 	if [ -z "$resume_legacy" ]; then
 		printf '%s: 未完了の判断はありません。\n' "$review_label"
 		exit 0

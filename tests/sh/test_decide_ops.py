@@ -355,6 +355,16 @@ class DecideOpsShTest(unittest.TestCase):
             [n for n in os.listdir(self.state) if n.startswith("review-")], [], "送れた下書きは消す"
         )
 
+    def test_resume_leaves_the_drafts_of_another_parent_alone(self):
+        other = os.path.join(self.state, "review-decide-i0001-x-1.md")
+        with open(other, "w", encoding="utf-8") as f:
+            f.write("<!-- ccnavi:decide -->\n別の親\n")
+        done = self.run_decide("--resume", stdin="y\n")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("未完了の判断はありません", done.stdout)
+        self.assertEqual(GitLab.posted, [])
+        self.assertTrue(os.path.exists(other), "別の親の下書きは送らず、消さない")
+
     def test_resume_asks_first_and_stops_on_no(self):
         STORE["reject"].add("note")
         self.choose()

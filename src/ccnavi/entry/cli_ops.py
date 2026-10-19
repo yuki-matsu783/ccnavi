@@ -579,7 +579,8 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
         "ccnavi: ops の使い方: pending / show <操作ID> / "
         "stage-set <操作ID> <段階ID> <pending|sent|unknown> [URL] [アカウント] / "
         "begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>… / applied <操作ID> <鍵> <値> / "
-        "reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント] / done <操作ID>\n"
+        "reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント] / "
+        "done <操作ID> / retire <親>\n"
     )
     return EXIT_ERROR
 

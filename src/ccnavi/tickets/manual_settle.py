@@ -18,7 +18,9 @@ ccnavi が子を動かす経路（confirm・decide・close-early・feedback-plan
 
 from __future__ import annotations
 
+import math
 import os
+import time
 from dataclasses import dataclass, field
 
 from ..infra import gitcmd, settings, tree
@@ -134,9 +136,11 @@ def assess(
     if external:
         if moved_at is None:
             return Manual(READY, names, need_time=True, paths=[t.path for t in hand])
-        if moved_at <= 0:
+        if not math.isfinite(moved_at) or moved_at <= 0:
             return Manual(BROKEN, names, note="移動の時刻を読めない")
-        return Manual(READY, names, moved_at=moved_at)
+        # コミットの時刻は書いた側の時計で決まる。未来にずれていれば、今の時刻に抑える
+        # （移動の後に付いた指摘を、移動の前のものとして受け入れないため）
+        return Manual(READY, names, moved_at=min(moved_at, time.time()))
     shared = _shared(root, parent, hand)
     if isinstance(shared, str):
         return Manual(UNSHARED if shared == "unshared" else BROKEN, names, note=shared)
