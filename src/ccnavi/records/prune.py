@@ -94,7 +94,7 @@ _SESSION_AND_KEY = (
     ("subagent-", ".running"),  # subagent._running_path
 )
 # `<セッション>.reported.json`（post._reported_path）。Claude Code のセッションは UUID なので、
-# その形に限る。`.+` で読むと、置き場に置かれた別のファイル（`package.json`、レビューの結果の
+# その形に限る。`.+` で読むと、同じ置き場にある別のファイル（`package.json`、レビューの結果の
 # コピーなど）をセッションの記録と読み違えて消す。形の違う名前は知らないファイルとして残す。
 _REPORTED = re.compile(
     r"^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})"
