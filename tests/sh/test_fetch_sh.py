@@ -98,6 +98,8 @@ class FetchTest(unittest.TestCase):
         git(self._tmp.name, "init", "-q", "--bare", "-b", "main", remote)
         git(path, "remote", "add", "origin", remote)
         git(path, "push", "-q", "-u", "origin", "main")
+        # clone のときに置かれる origin/HEAD（普通の fetch では更新されない）。
+        git(path, "remote", "set-head", "origin", "main")
         return remote
 
     def advance(self, remote, branch="main"):
@@ -143,6 +145,35 @@ class FetchTest(unittest.TestCase):
             os.chmod(path, 0o755)
         return path
 
+    def host_default(self, branch):
+        """ホストの既定ブランチ（bare のリモートの HEAD）を付け替える。"""
+        git(
+            self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", f"refs/heads/{branch}"
+        )
+
+    def origin_head(self, repo=None):
+        done = git(repo or self.ws, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
+        return done.stdout.strip()
+
+    def spy_on_ls_remote(self, fail=False):
+        """`git ls-remote` が打たれた回数を残す git の代役。fail なら ls-remote だけ失敗させる。
+        PATH に足す値と、記録のパスを返す。"""
+        bindir = os.path.join(self._tmp.name, "spy-bin")
+        log = os.path.join(self._tmp.name, "ls-remote.log")
+        write(
+            os.path.join(bindir, "git"),
+            "#!/bin/sh\n"
+            'for a in "$@"; do\n'
+            '  if [ "$a" = ls-remote ]; then\n'
+            f"    echo \"$*\" >>'{posix(log)}'\n"
+            + ("    echo 'fatal: unable to access' >&2; exit 128\n" if fail else "")
+            + "  fi\n"
+            "done\n"
+            f"exec '{posix(GIT)}' \"$@\"\n",
+        )
+        os.chmod(os.path.join(bindir, "git"), 0o755)
+        return os.pathsep.join([bindir, os.environ.get("PATH", "")]), log
+
     def sha(self, tree, ref):
         done = git(tree, "rev-parse", "--verify", "-q", ref, check=False)
         return done.stdout.strip() if done.returncode == 0 else ""
@@ -174,6 +205,7 @@ class FetchTest(unittest.TestCase):
         git(self.ws, "checkout", "-q", "-b", "trunk")
         git(self.ws, "push", "-q", "-u", "origin", "trunk")
         git(self.ws, "remote", "set-head", "origin", "trunk")
+        self.host_default("trunk")
         self.leave_main()
         before = self.sha(self.ws, "refs/heads/main")
         head = self.advance(self.remote, "trunk")
@@ -477,22 +509,9 @@ class FetchTest(unittest.TestCase):
         self.fetch()
         self.assertEqual(head, self.sha(tree, "HEAD"))
 
-    def test_the_worktree_base_follows_the_integration_branch(self):
-        # 2 周目（ワークツリーの起点）は統合先に合わせる。
-        git(self.ws, "push", "-q", "origin", "main:develop")
-        git(self.ws, "branch", "-q", "develop", "main")
-        self.leave_main()
-        head = self.advance(self.remote, "develop")
-        main_before = self.sha(self.ws, "refs/heads/main")
-        self.advance(self.remote)
-        done = self.fetch(CCNAVI_INTEGRATION_BRANCH="develop")
-        self.assertEqual(head, self.sha(self.ws, "refs/heads/develop"))
-        self.assertEqual(main_before, self.sha(self.ws, "refs/heads/main"))
-        self.assertIn("develop", done.stdout)
-
-    def test_the_worktree_base_follows_the_name_in_settings_local_json(self):
-        # 統合先の名前は、環境変数が無ければ `.claude/settings.local.json` の env から読む
-        # （実行ファイルの `sync paths` が運ぶ）。ccnavi-sync.sh が書いたコピーは読まない。
+    def test_the_variable_and_settings_local_json_do_not_name_the_base(self):
+        # 統合先は手元の origin/HEAD が決める。環境変数も `.claude/settings.local.json` の env も、
+        # ccnavi-sync.sh が書いたコピーも読まない。
         git(self.ws, "push", "-q", "origin", "main:develop")
         git(self.ws, "branch", "-q", "develop", "main")
         write(
@@ -501,18 +520,110 @@ class FetchTest(unittest.TestCase):
         )
         write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch main\nsource default\nsha x\nfetched_at 1\n",
+            "remote origin\nbranch develop\nsource default\nsha x\nfetched_at 1\n",
         )
         self.leave_main()
-        head = self.advance(self.remote, "develop")
-        self.fetch()
-        self.assertEqual(head, self.sha(self.ws, "refs/heads/develop"))
+        develop_before = self.sha(self.ws, "refs/heads/develop")
+        self.advance(self.remote, "develop")
+        head = self.advance(self.remote)
+        done = self.fetch(CCNAVI_INTEGRATION_BRANCH="develop")
+        self.assertEqual(develop_before, self.sha(self.ws, "refs/heads/develop"))
+        self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
+        self.assertNotIn("合わせた", done.stdout)
 
-    def test_a_missing_integration_branch_is_named(self):
+    # ---- 手元の origin/HEAD をホストの既定ブランチに合わせる
+
+    def test_a_changed_host_default_moves_origin_head_and_the_base_follows(self):
+        # ホストの既定が main から trunk に変わった。手元の origin/HEAD は clone のときのまま。
+        # trunk を取り、origin/HEAD を付け替え、1 行言う。第 2 周は trunk で進む。
+        git(self.ws, "push", "-q", "origin", "main:trunk")
         self.leave_main()
-        done = self.fetch(CCNAVI_INTEGRATION_BRANCH="nope")
+        self.host_default("trunk")
+        head = self.advance(self.remote, "trunk")
+        main_before = self.sha(self.ws, "refs/heads/main")
+        path, log = self.spy_on_ls_remote()
+        done = self.fetch(PATH=path)
         self.assertEqual(0, done.returncode, done.stderr)
-        self.assertIn("統合先ブランチ nope がリモートにありません", done.stdout)
+        self.assertEqual("refs/remotes/origin/trunk", self.origin_head())
+        said = "ws: 統合先を main から trunk に合わせた（ホストの既定ブランチ）"
+        self.assertEqual(1, done.stdout.count(said), done.stdout)
+        self.assertEqual(head, self.sha(self.ws, "refs/remotes/origin/trunk"))
+        # 第 2 周は新しい名前で進む（手元の trunk は無かったので origin/trunk から作る）。
+        self.assertEqual(head, self.sha(self.ws, "refs/heads/trunk"))
+        self.assertEqual(main_before, self.sha(self.ws, "refs/heads/main"))
+        with open(log, encoding="utf-8") as f:
+            self.assertEqual(1, len(f.read().splitlines()))
+
+    def test_a_host_default_branch_not_yet_known_locally_is_caught_up_in_one_session(self):
+        # 手元に origin/trunk が無い（set-head は失敗する状態）。1 回のセッションで追いつく。
+        git(self._tmp.name, "--git-dir", self.remote, "branch", "trunk", "main")
+        self.host_default("trunk")
+        self.leave_main()
+        self.assertEqual("", self.sha(self.ws, "refs/remotes/origin/trunk"))
+        done = self.fetch()
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("refs/remotes/origin/trunk", self.origin_head())
+        self.assertNotEqual("", self.sha(self.ws, "refs/remotes/origin/trunk"))
+        self.assertNotEqual("", self.sha(self.ws, "refs/heads/trunk"))
+        self.assertIn("統合先を main から trunk に合わせた", done.stdout)
+
+    def test_a_project_origin_head_follows_its_own_host(self):
+        # ワークスペースの既定は main のまま、プロジェクトのホストだけ trunk に変わる。
+        project = os.path.join(self.ws, "projects", "p")
+        remote = self.repository(project)
+        git(self._tmp.name, "--git-dir", remote, "branch", "trunk", "main")
+        git(self._tmp.name, "--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/trunk")
+        self.leave_main()
+        self.leave_main(project, "claude/p")
+        done = self.fetch()
+        self.assertEqual("refs/remotes/origin/main", self.origin_head())
+        self.assertEqual("refs/remotes/origin/trunk", self.origin_head(project))
+        self.assertIn("p: 統合先を main から trunk に合わせた", done.stdout)
+        self.assertNotIn("ws: 統合先を", done.stdout)
+
+    def test_an_unreachable_host_leaves_origin_head_and_says_nothing(self):
+        # ls-remote が失敗する（オフライン・時間切れ）。何も変えず何も出さない。
+        self.leave_main()
+        self.host_default("trunk")
+        before = self.origin_head()
+        path, log = self.spy_on_ls_remote(fail=True)
+        done = self.fetch(PATH=path)
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("", done.stdout.strip())
+        self.assertEqual(before, self.origin_head())
+        self.assertTrue(os.path.exists(log), "ls-remote を打っていない")
+
+    def test_a_failed_fetch_of_the_new_default_does_not_move_origin_head(self):
+        # ホストは trunk と答えたが、trunk を取れない（リモートに実体が無い）。付け替えない。
+        self.leave_main()
+        git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/gone")
+        before = self.origin_head()
+        done = self.fetch()
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual(before, self.origin_head())
+        self.assertNotIn("合わせた", done.stdout)
+
+    def test_no_ls_remote_for_an_origin_that_failed_in_the_first_lap(self):
+        # 第 1 周で届かなかった origin には、付け替えのための ls-remote を打たない。
+        self.leave_main()
+        git(self.ws, "branch", "-q", "--set-upstream-to", "origin/main")
+        missing = posix(os.path.join(self._tmp.name, "nowhere.git"))
+        git(self.ws, "remote", "set-url", "origin", "file://" + missing.lstrip("/"))
+        path, log = self.spy_on_ls_remote()
+        done = self.fetch(PATH=path)
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
+        self.assertFalse(os.path.exists(log), "第 1 周で失敗した origin に ls-remote を打った")
+
+    def test_a_retarget_failure_is_not_recorded_as_a_failed_origin(self):
+        # ls-remote が失敗しても、その origin を「失敗した origin」に数えない。第 2 周は取りに行く。
+        self.leave_main()
+        head = self.advance(self.remote)
+        path, _ = self.spy_on_ls_remote(fail=True)
+        done = self.fetch(PATH=path)
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
+        self.assertIn("統合先ブランチ main を", done.stdout)
 
     def test_a_worktree_is_fast_forwarded_without_any_state(self):
         # 親子ごとの取り込み状態は持たない。HEAD のブランチ名を変換した識別子がフォルダ名と同じ

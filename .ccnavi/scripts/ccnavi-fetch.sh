@@ -7,10 +7,17 @@
 # push されて届く。取ってこないと、B の機械は古い版で判定する。承認したのに
 # 範囲が反映されない、レビュー済みなのに止まったまま、という形になる。
 #
-# 2 つめはワークツリーの起点になる統合先（CCNAVI_INTEGRATION_BRANCH、無ければ settings.local.json の
-# env に書かれた名前、無ければデフォルトブランチ＝`origin/HEAD` が指すもの。多くは `main`）。親のワークツリーは `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で
+# 2 つめはワークツリーの起点になる統合先（そのリポジトリの手元の `origin/HEAD` が指すブランチ。
+# 無ければ `origin/main`・`origin/master`。多くは `main`）。親のワークツリーは `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>` で
 # 切り、起点は `<統合先>` の HEAD になる。手元の `main` が古いと、そこから切るブランチも古いコミットから
 # 始まる。統合先に取り込むときに fast-forward が通らず、承認済みチケットも古い版で判定することになる。
+#
+# 手元の `origin/HEAD` は clone のときに作られたまま、普通の fetch では更新されない。ホストの既定ブランチが
+# 変わっていたら、第 1 周（承認済みチケット）の後、第 2 周（統合先を進める）の前に付け替える。
+# `ls-remote --symref origin HEAD` でホストの答えを聞き、手元の統合先と違えばそのブランチを fetch して、
+# 成功してから `refs/remotes/origin/HEAD` を向け直す（`git remote set-head origin -a` は手元に
+# `origin/<名前>` が無いと失敗するため、自分で順を踏む）。付け替えたときだけ 1 行言う。ホストに聞けない・
+# fetch できない・時間切れのときは、何も言わず何も変えない。
 #
 # デフォルトブランチは、チェックアウトされていなくても進める。 ワークスペースルートが
 # `main` 以外に居るセッションでは、上の 1 つめ（そのツリーがチェックアウトしているブランチを
@@ -162,13 +169,48 @@ ccnavi_fetch_or_note() {
 
 # ワークツリーの起点にするブランチ、つまり統合先の名前を出す。
 #
-# 環境変数 CCNAVI_INTEGRATION_BRANCH（SessionStart には settings.local.json の env も渡る）、
-# 無ければ settings.local.json の env に書かれた名前（実行ファイルの `sync paths` が答える）、
-# 無ければホストのデフォルトブランチ（`origin/HEAD`、無ければ `origin/main`・`origin/master`）。
+# そのリポジトリの手元の `origin/HEAD`（無ければ `origin/main`・`origin/master`）。
 # 決め方は ccnavi-git.sh の push の拒否・ccnavi-review.sh のマージリクエストの宛先と揃えるため、
 # ccnavi-common-state.sh の ccnavi_integration に 1 つだけ置いてある。
 ccnavi_fetch_integration() {
-	ccnavi_integration "$1" "$root"
+	ccnavi_integration "$1"
+}
+
+# 手元の origin/HEAD を、ホストの既定ブランチに付け替える。<リポジトリ>
+#
+# 何も言わないのは、ホストに聞けない・fetch できない・時間切れ・ホストの答えが手元と同じ、のとき。
+# 失敗は $scratch/failed に書かない（ここは「付け替えられなかった」だけで、第 1 周の取得の失敗とは別）。
+# 第 1 周でその origin への接続に失敗していたら、同じ origin で二重に待たないよう聞かない。
+# fetch が成功する前に付け替えない（存在しない ref を指す状態を残さない）。
+ccnavi_fetch_retarget() {
+	ccnavi_rt_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
+	[ -n "$ccnavi_rt_url" ] || return 0
+	if grep -qxF -- "$ccnavi_rt_url" "$scratch/failed" 2>/dev/null; then
+		return 0
+	fi
+	ccnavi_rt_left=$(ccnavi_fetch_left)
+	[ "$ccnavi_rt_left" -gt 0 ] || return 0
+	ccnavi_rt_limit="$limit"
+	[ "$ccnavi_rt_left" -lt "$ccnavi_rt_limit" ] && ccnavi_rt_limit="$ccnavi_rt_left"
+	ccnavi_git_timed "$ccnavi_rt_limit" "$scratch/rt-err" "$1" ls-remote --symref origin HEAD \
+		>"$scratch/rt-out" || return 0
+	ccnavi_rt_new=$(sed -n 's#^ref: refs/heads/\([^[:space:]]*\)[[:space:]]*HEAD$#\1#p' "$scratch/rt-out" 2>/dev/null | head -n 1)
+	[ -n "$ccnavi_rt_new" ] || return 0
+	git check-ref-format "refs/heads/$ccnavi_rt_new" 2>/dev/null || return 0
+	ccnavi_rt_old=$(ccnavi_fetch_integration "$1" || :)
+	[ "$ccnavi_rt_new" != "$ccnavi_rt_old" ] || return 0
+	# そのブランチを取る。成功してから付け替える。
+	ccnavi_rt_left=$(ccnavi_fetch_left)
+	[ "$ccnavi_rt_left" -gt 0 ] || return 0
+	ccnavi_rt_limit="$limit"
+	[ "$ccnavi_rt_left" -lt "$ccnavi_rt_limit" ] && ccnavi_rt_limit="$ccnavi_rt_left"
+	ccnavi_git_timed "$ccnavi_rt_limit" "$scratch/rt-err" "$1" \
+		fetch --quiet origin "+refs/heads/$ccnavi_rt_new:refs/remotes/origin/$ccnavi_rt_new" >/dev/null || return 0
+	git -C "$1" rev-parse --verify --quiet "refs/remotes/origin/$ccnavi_rt_new^{commit}" >/dev/null 2>&1 || return 0
+	git -C "$1" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$ccnavi_rt_new" 2>/dev/null || return 0
+	printf '%s: 統合先を %s から %s に合わせた（ホストの既定ブランチ）\n' \
+		"$(basename "$1")" "${ccnavi_rt_old:-未設定}" "$ccnavi_rt_new"
+	return 0
 }
 
 # そのブランチをチェックアウトしているツリーのパス。どこにも無ければ空。
@@ -324,17 +366,14 @@ report=$(
 		fi
 	done
 
-	# 第 2 周の前に、統合先の名前（settings.local.json の env）を実行ファイルに 1 回だけ聞いて控える。
-	# リポジトリごとの `$( )` の中で聞くと、控えが親に戻らず、環境変数が無いときは毎回実行ファイルを起こす。
-	# 控えはここ（`$( )` の外）で作り、第 2 周のサブシェルが引き継ぐ。時間の枠を過ぎていれば、実行ファイルは起こさず空を控える。
-	if [ -z "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
-		if [ "$(ccnavi_fetch_left)" -gt 0 ]; then
-			ccnavi_integration_local "$root" >/dev/null 2>&1 || :
-		else
-			ccnavi_il_val=""
-			ccnavi_il_root="$root"
-		fi
-	fi
+	# 第 1.5 周。リポジトリごとに、手元の origin/HEAD をホストの既定ブランチに合わせる。
+	# 第 2 周は付け替えた後の名前で進める。
+	printf '%s\n' "$repos" | while IFS= read -r repo; do
+		[ -n "$repo" ] || continue
+		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+		git -C "$repo" remote get-url origin >/dev/null 2>&1 || continue
+		ccnavi_fetch_retarget "$repo"
+	done
 
 	# 第 2 周。リポジトリごとに、ワークツリーの起点になる統合先ブランチを進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
@@ -352,7 +391,7 @@ report=$(
 
 		ccnavi_fetch_or_note "$repo" "$default" \
 			"${name}: 統合先ブランチ ${default} を取ってこられなかった。ローカルの版から切ることになる" \
-			"${name}: 統合先ブランチ ${default} がリモートにありません。CCNAVI_INTEGRATION_BRANCH を確かめてください" ||
+			"${name}: 統合先ブランチ ${default} がリモートにありません。ユーザに git fetch origin のあと git remote set-head origin -a を頼んでください" ||
 			continue
 
 		old=$(git -C "$repo" rev-parse --verify --quiet "refs/heads/$default" 2>/dev/null || :)

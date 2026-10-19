@@ -466,10 +466,10 @@ stop_host() {
 	exit "$EXIT_HOST"
 }
 
-# ---- 統合先。worktree.md の決め方（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env → origin/HEAD → origin/main・master）。
-integration=$(ccnavi_integration "$top" "$root") || integration=""
+# ---- 統合先。worktree.md の決め方（そのリポジトリの origin/HEAD → origin/main・master）。
+integration=$(ccnavi_integration "$top") || integration=""
 [ -n "$integration" ] ||
-	fail no-integration "統合先のブランチを決められません（CCNAVI_INTEGRATION_BRANCH も origin/HEAD も origin/main・master もありません）。CCNAVI_INTEGRATION_BRANCH に統合先の名前を渡してください。"
+	fail no-integration "$(ccnavi_integration_hint "$top")"
 
 # ---- 小道具
 ref_exists() {

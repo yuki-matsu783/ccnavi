@@ -309,7 +309,7 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(head, self.sha(self.tree, "HEAD"))
         self.assertIn("早送り", done.stdout)
-        self.assertIn("統合先: main（ホストのデフォルトブランチ）", done.stdout)
+        self.assertIn("統合先: main", done.stdout)
         # 親子ごとの取り込み状態も、統合先のコピーも、もう書かない。
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         self.assertFalse(os.path.exists(self.retire_dir))
@@ -1008,39 +1008,21 @@ class SyncTest(SyncHarness):
         git(pusher, "push", "-q", "origin", "main")
         return pusher
 
-    def test_a_configured_integration_branch_is_used_and_named(self):
-        git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/develop")
-        self.remote_commit("develop", ".ccnavi/approved/done/d.md", "d\n")
-        done = self.sync(PARENT, CCNAVI_INTEGRATION_BRANCH="develop")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("統合先: develop（環境変数 CCNAVI_INTEGRATION_BRANCH）", done.stdout)
-        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
-
-    def test_a_configured_integration_branch_missing_on_the_remote_stops(self):
-        head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
-        before = self.sha(self.tree, "HEAD")
-        done = self.sync(PARENT, CCNAVI_INTEGRATION_BRANCH="nope")
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        said = "統合先 nope（環境変数 CCNAVI_INTEGRATION_BRANCH）がリモートにありません。"
-        self.assertIn(said, done.stdout)
-        self.assertEqual(before, self.sha(self.tree, "HEAD"))
-        self.assertNotEqual(head, before)
-
-    def test_settings_local_json_names_the_integration_branch(self):
-        # ユーザが端末で打つ sh には settings.local.json の env が反映されない。
-        # 実行ファイルが読んで渡す。
+    def test_the_old_variable_and_the_old_setting_are_ignored(self):
+        """環境変数と settings.local.json の CCNAVI_INTEGRATION_BRANCH は、統合先を動かさない。"""
         git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/develop")
         write(
             os.path.join(self.ws, ".claude", "settings.local.json"),
             '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}\n',
         )
-        launcher = self.launcher()
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
+        done = self.sync(
+            PARENT, CCNAVI_BIN_PATH=self.launcher(), CCNAVI_INTEGRATION_BRANCH="develop"
+        )
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("統合先: develop（.claude/settings.local.json", done.stdout)
-        # 環境変数が先。
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher, CCNAVI_INTEGRATION_BRANCH="main")
-        self.assertIn("統合先: main（環境変数", done.stdout)
+        self.assertIn("統合先: main", done.stdout)
+        self.assertNotIn("develop", done.stdout)
+        self.assertNotIn("CCNAVI_INTEGRATION_BRANCH", done.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
     def test_a_failing_executable_stops_instead_of_using_the_default(self):
         # 実行ファイルが在るのに答えなければ、統合先を何も言わずに既定に戻さない。
@@ -1051,12 +1033,30 @@ class SyncTest(SyncHarness):
 
     def test_the_host_default_branch_is_read_from_the_remote(self):
         # 手元の origin/HEAD が無くても、ls-remote --symref でホストの既定を読む。
+        # fetch が成功した後に、手元の origin/HEAD をそれに付け替えて言う。
         git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/trunk")
         git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/trunk")
         git(self.ws, "remote", "set-head", "origin", "--delete")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("統合先: trunk（ホストのデフォルトブランチ）", done.stdout)
+        self.assertIn("統合先: trunk", done.stdout)
+        self.assertIn("統合先を 未設定 から trunk に合わせた（ホストの既定ブランチ）", done.stdout)
+        head = git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD").stdout
+        self.assertEqual("refs/remotes/origin/trunk", head.strip())
+
+    def test_a_changed_host_default_branch_moves_the_local_origin_head(self):
+        git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/trunk")
+        git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/trunk")
+        before = git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD").stdout.strip()
+        self.assertEqual("refs/remotes/origin/main", before)
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("統合先を main から trunk に合わせた（ホストの既定ブランチ）", done.stdout)
+        head = git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD").stdout.strip()
+        self.assertEqual("refs/remotes/origin/trunk", head)
+        # 合っていれば、2 回目は言わない。
+        done = self.sync(PARENT)
+        self.assertNotIn("合わせた", done.stdout)
 
     # ---- 止まる・対象外
 

@@ -197,12 +197,13 @@ review_host
 # ---- 統合先。MR のマージ先と比べる。MR は作らない（作るのは ccnavi-start.sh）。
 
 default_branch() {
-	# 統合先。ccnavi-fetch.sh がワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH →
-	# settings.local.json の env → origin/HEAD → origin/main・master。ccnavi-common-state.sh の ccnavi_integration）で、
-	# cwd のツリーが属するリポジトリについて決める。どれも決まらなければ main。
+	# 統合先。ccnavi-fetch.sh がワークツリーの起点に使うのと同じ決め方（origin/HEAD → origin/main・master。
+	# ccnavi-common-state.sh の ccnavi_integration）で、cwd のツリーが属するリポジトリについて決める。
+	# 決まらなければ当てずっぽうの main にせず、案内を出して止まる。
 	db_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	db_name=$(ccnavi_integration "${db_tree:-.}" "$root") || db_name=""
-	[ -n "$db_name" ] && printf '%s' "$db_name" || printf 'main'
+	db_name=$(ccnavi_integration "${db_tree:-.}") || db_name=""
+	[ -n "$db_name" ] || fail no-integration "$(ccnavi_integration_hint "${db_tree:-.}")"
+	printf '%s' "$db_name"
 }
 
 # ---- 目印で始まる投稿を探す。{url, created_at} を返す（無ければ空）。<番号> <URL> <目印>
@@ -505,7 +506,7 @@ ${eli5_how}"
 	mr_target=$(printf '%s' "$mr" | "$JQ" -r '.target // ""')
 	[ "$mr_source" = "$branch" ] ||
 		fail mr-source-mismatch "マージリクエストの元ブランチ（${mr_source:-不明}）がこのツリーの HEAD のブランチ（${branch}）と違う。依頼は作らずに止めた。"
-	mr_integration=$(default_branch)
+	mr_integration=$(default_branch) || exit "$?"
 	[ "$mr_target" = "$mr_integration" ] ||
 		fail mr-target-mismatch "マージリクエストのマージ先（${mr_target:-不明}）が統合先（${mr_integration}）ではない。依頼は作らずに止めた。マージ先を直すか、ユーザに相談してください。"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')

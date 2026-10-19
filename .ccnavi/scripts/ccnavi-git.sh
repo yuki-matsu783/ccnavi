@@ -113,8 +113,8 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   通信      fetch  pull  (--force / --prune は不可。取ってくるのは <リモート> <ブランチ> だけで、
                    : や + を含む引数(refspec・URL)は不可。手元の ref は ccnavi-sync.sh が進める)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
-                   main master develop release と統合先 (CCNAVI_INTEGRATION_BRANCH、無ければ
-                   settings.local.json の env、無ければ origin/HEAD) へ直接は送れない。
+                   main master develop release と統合先 (そのリポジトリの origin/HEAD、無ければ
+                   origin/main・origin/master) へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
                    リモートから消えた親のブランチへは送れない。親のワークツリーは push の前に
                    リモートに在るかを確かめる。捨てた親ならワークツリーを片付ける)
@@ -564,7 +564,7 @@ wt_fresh() {
 	fi
 	wt_f_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
 	[ -n "$wt_f_top" ] || return 0
-	wt_f_integ=$(ccnavi_integration "$wt_f_top" "$WS") || return 0
+	wt_f_integ=$(ccnavi_integration "$wt_f_top") || return 0
 	[ -n "$wt_f_integ" ] || return 0
 	wt_f_from="$wt_base"
 	case "$wt_f_from" in
@@ -654,9 +654,9 @@ ig_where() {
 	ig_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	[ -n "$ig_top" ] ||
 		reject not-a-repo "git リポジトリの中で実行してください（統合先をチェックアウトしているツリーで $SELF $sub ... を実行します）。"
-	ig_integ=$(ccnavi_integration "$ig_top" "$WS") || ig_integ=""
+	ig_integ=$(ccnavi_integration "$ig_top") || ig_integ=""
 	[ -n "$ig_integ" ] ||
-		reject integrate-no-integration "統合先の名前が決まりません（CCNAVI_INTEGRATION_BRANCH・settings.local.json の env・origin/HEAD のどれもありません）。統合先をユーザに確かめ、CCNAVI_INTEGRATION_BRANCH に入れてもらってから再実行してください。"
+		reject integrate-no-integration "$(ccnavi_integration_hint "$ig_top")"
 	ig_head=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
 	if [ "$ig_head" != "$ig_integ" ]; then
 		ig_home=$(git worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/$ig_integ" '
@@ -1848,10 +1848,10 @@ push)
 		;;
 	esac
 	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も止める。名前は ccnavi-fetch.sh が
-	# ワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env →
-	# origin/HEAD → origin/main・master）で、このツリーが属するリポジトリ（プロジェクトならその
-	# プロジェクト）について決める。決まらなければ上の固定のリストだけで判定する。
-	push_integ=$(ccnavi_integration "${push_top:-.}" "$WS") || push_integ=""
+	# ワークツリーの起点に使うのと同じ決め方（origin/HEAD → origin/main・master）で、このツリーが
+	# 属するリポジトリ（プロジェクトならそのプロジェクト）について決める。決まらなければ上の固定の
+	# リストだけで判定する。
+	push_integ=$(ccnavi_integration "${push_top:-.}") || push_integ=""
 	log_debug push の統合先 -- "integration=$push_integ"
 	if [ -n "$push_integ" ] && [ "$push_branch" = "$push_integ" ]; then
 		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"

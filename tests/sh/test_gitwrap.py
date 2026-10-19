@@ -1730,10 +1730,9 @@ class PushRemoteResolutionTest(ParentPushGateTest):
 class IntegrationPushTest(GitWrapperTest):
     """固定のリスト（main など）に無い名前の統合先へも直接は送らない。
 
-    統合先の名前は ccnavi-fetch.sh と同じ順（CCNAVI_INTEGRATION_BRANCH →
-    settings.local.json の env（実行ファイルの `sync paths`）→
-    origin/HEAD → origin/main・master）で、push したツリーが属するリポジトリについて決める。
-    決まらなければ固定のリストだけで判定する（今までの挙動）。
+    統合先の名前は ccnavi-fetch.sh と同じ決め方（origin/HEAD → origin/main・master）で、
+    push したツリーが属するリポジトリについて決める。環境変数 CCNAVI_INTEGRATION_BRANCH も
+    settings.local.json の env も読まない。決まらなければ固定のリストだけで判定する。
     """
 
     BRANCH = "develop-v1.0.0"
@@ -1791,12 +1790,14 @@ class IntegrationPushTest(GitWrapperTest):
         self.point_origin_head(self.dir, self.BRANCH)
         self.assertRefused(self.push())
 
-    def test_the_environment_names_the_integration(self):
-        self.assertRefused(self.push(CCNAVI_INTEGRATION_BRANCH=self.BRANCH))
+    def test_the_environment_does_not_name_the_integration(self):
+        result = self.push(CCNAVI_INTEGRATION_BRANCH=self.BRANCH)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-    def test_settings_local_json_names_the_integration(self):
+    def test_settings_local_json_does_not_name_the_integration(self):
         self.local_setting(self.BRANCH)
-        self.assertRefused(self.push())
+        result = self.push()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_the_old_sync_copy_does_not_name_the_integration(self):
         """統合先のコピー（sync/<リポジトリ>/integration/head）が残っていても読まない。"""
@@ -1807,19 +1808,18 @@ class IntegrationPushTest(GitWrapperTest):
         result = self.push()
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-    def test_the_environment_wins_and_the_fixed_list_still_holds(self):
-        """環境変数が別の名前なら origin/HEAD は読まない。固定のリストはそのまま止める。"""
+    def test_the_environment_does_not_override_origin_head_and_the_fixed_list_holds(self):
+        """環境変数が別の名前でも origin/HEAD が決める。固定のリストはそのまま止める。"""
         self.point_origin_head(self.dir, self.BRANCH)
-        result = self.push(CCNAVI_INTEGRATION_BRANCH="trunk")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertRefused(self.push(CCNAVI_INTEGRATION_BRANCH="trunk"))
         git(self.dir, "checkout", "--quiet", "-b", "main")
         result = self.push(branch="main", CCNAVI_INTEGRATION_BRANCH="trunk")
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("main は統合先です", result.stderr)
 
     def test_a_project_is_judged_by_its_own_integration(self):
-        """projects/<名前>/ の中から送るときは、そのプロジェクトの origin で統合先を決める。
-        settings.local.json の統合先は、ワークスペース全体のものとして同じ名前で効く。"""
+        """projects/<名前>/ の中から送るときは、そのプロジェクトの origin/HEAD で統合先を決める。
+        ワークスペースの origin/HEAD は関係しない。"""
         project = os.path.join(self.dir, "projects", "app")
         os.makedirs(project)
         git(project, "init", "-q")
@@ -1839,13 +1839,43 @@ class IntegrationPushTest(GitWrapperTest):
         result = self.push(project)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-        # settings.local.json が develop-v1.0.0 を統合先にしていれば、プロジェクトでも止める。
+        # プロジェクト側の origin/HEAD が develop-v1.0.0 なら止める（固定のリストに無い名前）。
         # 送り先は空のものに替えて見る。
         bare2 = os.path.join(parent, "app2.git")
         git(project, "init", "-q", "--bare", bare2)
         git(project, "remote", "set-url", "origin", bare2)
-        self.local_setting(self.BRANCH)
+        self.point_origin_head(project, self.BRANCH)
         self.assertRefused(self.push(project), bare2)
+
+    def test_workspace_wide_settings_do_not_reach_a_project(self):
+        """環境変数と settings.local.json に main を置いても、プロジェクトの統合先は動かない。
+        ワークスペースの origin/HEAD は main、projects/app の origin/HEAD は trunk。
+        trunk を projects/app から送れば止まり、ワークスペースから送る trunk は止まらない。
+        変数が残っていても読まないことを確かめる（B1 の再発防止）。"""
+        self.local_setting("main")
+        env = {"CCNAVI_INTEGRATION_BRANCH": "main"}
+        self.point_origin_head(self.dir, "main")
+        project = os.path.join(self.dir, "projects", "app")
+        os.makedirs(project)
+        git(project, "init", "-q")
+        git(project, "config", "user.email", "t@example.invalid")
+        git(project, "config", "user.name", "t")
+        git(project, "commit", "-q", "--allow-empty", "-m", "seed")
+        git(project, "checkout", "--quiet", "-b", "trunk")
+        parent = tempfile.mkdtemp(prefix="ccnavi-gitwrap-origin-")
+        self.addCleanup(shutil.rmtree, parent, ignore_errors=True)
+        bare = os.path.join(parent, "app.git")
+        git(project, "init", "-q", "--bare", bare)
+        git(project, "remote", "add", "origin", bare)
+        self.point_origin_head(project, "trunk")
+
+        result = self.push(project, branch="trunk", **env)
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("trunk は統合先です", result.stderr)
+
+        git(self.dir, "checkout", "--quiet", "-b", "trunk")
+        result = self.push(branch="trunk", **env)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 class SafeAdditionsTest(GitWrapperTest):

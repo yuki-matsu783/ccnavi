@@ -135,8 +135,6 @@ class Workspace(unittest.TestCase):
             f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
             '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
             "no\\n'; exit 0 ;;\n"
-            # 統合先（settings.local.json の env）。STUB_INTEGRATION があれば答える。
-            '*" sync paths "*) printf \'integration %s\\n\' "${STUB_INTEGRATION:-}"; exit 0 ;;\n'
             # 親か・承認済みか（push の関門が聞く）。STUB_PARENT があるときだけ答える。
             # STUB_PARENT=old は、新しい行（approved など）を知らない旧い実行ファイル。
             '*" tree parent "*)\n'
@@ -388,27 +386,23 @@ class PushApprovedTest(Workspace):
         self.place(tree)
         self.assertNotPushed(self.push(), tree, "develop-v1.0.0")
 
-    def test_the_environment_and_settings_local_json_name_the_integration(self):
+    def test_the_environment_and_settings_local_json_do_not_name_the_integration(self):
+        """環境変数も settings.local.json の env も、統合先を決めない。統合先のコピーも読まない。"""
         tree = self.worktree("develop-v1.0.0")
         self.place(tree)
-        env = self.env(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
-        self.assertNotPushed(self.push(env=env), tree, "develop-v1.0.0")
-
-        # settings.local.json の env（`sync paths` が運ぶ）。統合先のコピーは読まない。
-        other = self.worktree("release-2")
-        self.place(other)
+        write(
+            os.path.join(self.ws, ".claude", "settings.local.json"),
+            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop-v1.0.0"}}\n',
+        )
         write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch release-2\nsource default\n",
+            "remote origin\nbranch develop-v1.0.0\nsource default\n",
         )
-        result = self.push()
+        env = self.env(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
+        result = self.push(env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("統合先 release-2", result.stderr)
-
-        third = self.worktree("release-3")
-        self.place(third)
-        env = self.env(STUB_INTEGRATION="release-3")
-        self.assertNotPushed(self.push(env=env), third, "release-3")
+        self.assertNotIn("統合先 develop-v1.0.0", result.stderr)
+        self.assertEqual(self.remote_head("develop-v1.0.0"), self.head(tree))
 
     def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
         """統合先が決まらない（origin/HEAD も origin/main・master も無い）なら今までどおり送る。"""
@@ -419,22 +413,31 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.remote_head("develop-v1.0.0"), self.head(tree))
 
     def test_a_project_is_judged_by_its_own_integration(self):
-        """projects/<名前>/ のツリーは、そのプロジェクトの origin で統合先を決める。
-        settings.local.json の統合先は、ワークスペース全体のものとして同じ名前で効く。"""
+        """projects/<名前>/ のツリーは、そのプロジェクトの origin/HEAD で統合先を決める。
+        ワークスペースの origin/HEAD も、環境変数も settings.local.json も、プロジェクトの
+        統合先を動かさない（固定のリストに無い名前 develop-v1.0.0 で止まる）。"""
         project = os.path.join(self.ws, "projects", "app")
         remote = self.repository(project, "develop-v1.0.0")
         self.place(project)
+        write(
+            os.path.join(self.ws, ".claude", "settings.local.json"),
+            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "main"}}\n',
+        )
+        env = self.env(CCNAVI_INTEGRATION_BRANCH="main")
         # ワークスペース自身の origin/HEAD が同じ名前でも、プロジェクトの統合先は別（origin も空）。
         ref = "refs/remotes/origin/develop-v1.0.0"
         git(self.ws, "update-ref", ref, "HEAD")
         git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
-        result = self.push()
+        result = self.push(env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.head_of(remote, "develop-v1.0.0"), self.head(project))
 
+        # プロジェクト側の origin/HEAD が develop-v1.0.0 なら、そのプロジェクトでは止まる。
         write(os.path.join(project, *APPROVED.split("/"), "i0002.md"), "approved\n")
         before = self.head_of(remote, "develop-v1.0.0")
-        result = self.push(env=self.env(STUB_INTEGRATION="develop-v1.0.0"))
+        git(project, "update-ref", ref, "HEAD")
+        git(project, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
+        result = self.push(env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("統合先 develop-v1.0.0", result.stderr)
         self.assertEqual(self.head_of(remote, "develop-v1.0.0"), before)
