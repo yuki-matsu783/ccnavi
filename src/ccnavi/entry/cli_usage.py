@@ -377,8 +377,6 @@ _SCRIPTS = """\
 設定の値を上書きするフラグもあります。--mode、--ticket-control、--restore-if-deny、
 --guard-core-files、--guard-ticket-approval は環境変数と同じ値を取ります。--log、--state、
 --approved、--tickets は記録と置き場の場所を動かし、上の5つと同じく診断専用です。
---integration-branch <name> は統合先の名前です（実行ファイルは環境変数を読まないので、
-.ccnavi/scripts/ のスクリプトが決めて渡します。--lint の識別子の予約が読みます）。
 
 .ccnavi/scripts/ のスクリプトが付けるフラグは次のとおりです。
 
@@ -452,8 +450,8 @@ _SCRIPTS = """\
          "warn: ..." を1行表示します。形式どおりなら何も表示しません。拒否はしません）
     ccnavi sync paths
         （.ccnavi/scripts/ccnavi-sync.sh 用。1行に "<key> <value>" を1組ずつ出力します。
-         対象は、承認済みと提案の置き場、ccnaviのディレクトリ、.claude/settings.local.json の
-         env に書かれた統合先ブランチです。統合先ブランチについては、環境変数を読みません）
+         対象は、承認済みと提案の置き場、ccnaviのディレクトリです。統合先ブランチは返しません
+         （sh が各リポジトリの origin/HEAD で決めます））
     ccnavi sync check <parent> [<repo>]
         （ccnavi-sync.sh が <parent> を取り込んだ後に使用します。ファミリーの承認済みチケットと
          その権限を再判定します。"check 1" の行に続いて、"error <detail>" か "warn <detail>" を

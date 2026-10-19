@@ -51,8 +51,24 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         }
         if agent_id:
             payload["agent_id"] = agent_id
-        env = {settings.INTEGRATION_ENV: integration} if integration else {}
-        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload), env=env)
+        self.point_origin_head(integration)
+        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+
+    def point_origin_head(self, integration):
+        """統合先は手元の origin/HEAD で決まる。空なら origin の無いリポジトリにする。"""
+        remotes = git(self.root, "remote").split()
+        if not integration:
+            if "origin" in remotes:
+                git(self.root, "remote", "remove", "origin")
+            return
+        if "origin" not in remotes:
+            git(self.root, "remote", "add", "origin", self.root + ".origin.git")
+        git(
+            self.root,
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            f"refs/remotes/origin/{integration}",
+        )
 
     def direct(self, name="scratch", commit=False, dirty=False):
         """チケットに結び付かない直接作業のワークツリー。"""
@@ -189,7 +205,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
             "--ticket-control",
             "disable",
             stdin=payload,
-            env={settings.INTEGRATION_ENV: "main"},
         )
         # チケット制御が無効でも、直接作業はチケットに結び付かないので促す。
         self.asked(off)
@@ -243,7 +258,33 @@ class IntegrateNudgeTest(base.StopNudgeTest):
     def test_no_integration_branch_is_reported_without_stopping(self):
         path = self.direct(commit=True)
         body = self.assert_not_asked(self.stop(path, integration=""))
-        self.assertIn("統合先の名前が決まりません", body["systemMessage"])
+        self.assertIn("origin が無いので統合先が決まらない", body["systemMessage"])
+
+    def test_an_origin_without_head_asks_for_set_head(self):
+        path = self.direct(commit=True)
+        git(self.root, "remote", "add", "origin", self.root + ".origin.git")
+        body = self.assert_not_asked(self.ccnavi("--mode", "enable", stdin=self.payload(path)))
+        self.assertIn("git remote set-head origin -a", body["systemMessage"])
+        self.assertNotIn("CCNAVI_INTEGRATION_BRANCH", body["systemMessage"])
+
+    def test_the_environment_and_local_settings_do_not_decide_the_integration_branch(self):
+        path = self.direct(commit=True)
+        self.point_origin_head("")
+        write(
+            os.path.join(self.root, ".claude", "settings.local.json"),
+            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "main"}}\n',
+        )
+        result = self.ccnavi(
+            "--mode",
+            "enable",
+            stdin=self.payload(path),
+            env={"CCNAVI_INTEGRATION_BRANCH": "main"},
+        )
+        body = self.assert_not_asked(result)
+        self.assertIn("origin が無いので統合先が決まらない", body["systemMessage"])
+
+    def payload(self, cwd, session="s1"):
+        return json.dumps({"hook_event_name": "Stop", "cwd": cwd, "session_id": session})
 
     def test_a_busy_integration_tree_is_reported_without_stopping(self):
         path = self.direct(commit=True)

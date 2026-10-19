@@ -133,9 +133,9 @@ top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	fail not-git "cwd が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
 scripts="$root/.ccnavi/scripts"
 dest="$root/.claude/worktrees/$name"
-integ=$(ccnavi_integration "$(ccnavi_phys "$top")" "$root") || integ=""
+integ=$(ccnavi_integration "$(ccnavi_phys "$top")") || integ=""
 [ -n "$integ" ] ||
-	fail no-integration "統合先の名前を決められません。CCNAVI_INTEGRATION_BRANCH に統合先の名前を渡すか、origin/HEAD を設定してください（git remote set-head origin -a はユーザに頼む）。"
+	fail no-integration "$(ccnavi_integration_hint "$top")"
 log_info 始めた -- "name=$name" "integration=$integ" "offline=${offline:-no}" "dry=${dry:-no}"
 
 # ccnavi-git.sh 経由の git。成功は何も出さず、失敗は出力を標準エラーへ出して 1 を返す。
@@ -264,7 +264,7 @@ if ! cgit fetch origin "$integ"; then
 		printf 'ワークツリーは切っていない。origin から統合先 %s を取れなかった（上の出力に原因が出ている。ネットワーク・認証・origin の設定のどれか）。\n' "$integ"
 		case "$cgit_out" in
 		*"couldn't find remote ref"*)
-			printf '注意: origin に統合先 %s がありません（名前の誤りか、統合先の設定の誤り）。--offline で切ると古い手元の統合先から切るので、先に名前を確かめる（CCNAVI_INTEGRATION_BRANCH）。\n' "$integ"
+			printf '注意: origin に統合先 %s がありません（手元の origin/HEAD がホストの既定ブランチとずれている）。--offline で切ると古い手元の統合先から切るので、先にユーザに git fetch origin のあと git remote set-head origin -a を頼む。\n' "$integ"
 			;;
 		esac
 		printf '次の手:\n'

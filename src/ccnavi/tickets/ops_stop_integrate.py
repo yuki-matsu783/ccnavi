@@ -30,12 +30,9 @@
 
 ## 統合先
 
-`ccnavi_integration`（`ccnavi-common-state.sh`）の順（環境変数、`settings.local.json` の統合先、
-既定ブランチ）に、hook が設定から読む `--integration-branch` を足したもの。環境変数
-`CCNAVI_INTEGRATION_BRANCH`、`.claude/settings.local.json` の `env`、`--integration-branch`
-（sh 側には無い）、`origin/HEAD`、`origin/main`・`origin/master`。
-決まらなければ `integrate` が断るので、
-促さずに理由を言う。
+`ccnavi_integration`（`ccnavi-common-state.sh`）と同じ。そのリポジトリの手元の `origin/HEAD`、
+無ければ `origin/main`・`origin/master`。origin の無いリポジトリでは決まらない。
+決まらなければ `integrate` が断るので、促さずに理由を言う。
 
 ## 促さずに理由を言う
 
@@ -228,7 +225,7 @@ def probe(
     if not head:
         return Probe(UNKNOWN)
     owner = tree.project_root(conf.projects, here.project) or root
-    integration = _integration(root, conf, owner, deadline)
+    integration = _integration(owner, deadline)
     if integration is None:
         return Probe(UNKNOWN)
     dirty = _dirty(here.root, deadline)
@@ -253,11 +250,15 @@ def probe(
         return Probe(CLEAR)
     found = Direct(here.name, here.root, head, dirty, ahead, integration)
     if not integration:
-        found.blocked = (
-            "統合先の名前が決まりません（CCNAVI_INTEGRATION_BRANCH・"
-            "origin/HEAD のどれもありません）。統合先をユーザに確かめ、CCNAVI_INTEGRATION_BRANCH に"
-            "入れてもらってください"
-        )
+        if gitcmd.run(owner, ["remote", "get-url", "origin"], ops_close.TIMEOUT_SECONDS).ok:
+            found.blocked = (
+                "統合先 (origin/HEAD) が決まらない。ユーザに `git fetch origin` のあと "
+                "`git remote set-head origin -a` を頼んでください"
+            )
+        else:
+            found.blocked = (
+                "origin が無いので統合先が決まらない。ユーザに origin の追加を頼んでください"
+            )
         return Probe(HIT, found)
     integ_tree = _integration_tree(owner, integration, deadline)
     if integ_tree is None:
@@ -286,28 +287,20 @@ def _integrable_name(name: str) -> bool:
     return direct_candidates.integrable_name(name)
 
 
-def integration_name(root: str, conf: settings.Settings, owner: str, project: str) -> str:
+def integration_name(owner: str) -> str:
     """そのリポジトリ（`owner` はそのチェックアウト）の統合先の名前。決まらなければ空。
 
-    環境変数、`settings.local.json` の `env`、`--integration-branch`（これだけ
-    `ccnavi_integration` には無い）、`origin/HEAD`、`origin/main`・`origin/master` の順。
+    手元の `origin/HEAD`、無ければ `origin/main`、`origin/master` の順。sh の
+    `ccnavi_integration`（`ccnavi_default_branch`）と同じ。環境変数も設定ファイルも読まない
+    （ワークスペースで 1 つの値がプロジェクトの統合先を塗りつぶすのを避ける）。
+    origin の無いリポジトリでは決まらない。
     統合先の解決は、hook・`--lint`・レイヤーの比べ方がこの関数を共通に使う。
-    `project` は呼び手の互換のために残した引数で、使わない。
     """
-    return _integration(root, conf, owner) or ""
+    return _integration(owner) or ""
 
 
-def _integration(
-    root: str, conf: settings.Settings, owner: str, deadline: float | None = None
-) -> str | None:
+def _integration(owner: str, deadline: float | None = None) -> str | None:
     """`integration_name` の期限つきの版。期限不足・git の失敗で決められなければ None。"""
-    for name in (
-        os.environ.get(settings.INTEGRATION_ENV, ""),
-        settings.integration_local(root),
-        conf.integration_branch,
-    ):
-        if name and name.strip():
-            return name.strip()
     head = tree.origin_head(owner)
     if head:
         return head

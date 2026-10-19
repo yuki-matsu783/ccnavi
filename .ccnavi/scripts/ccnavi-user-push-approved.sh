@@ -488,9 +488,9 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 		;;
 	esac
 	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も送らない。名前は ccnavi-fetch.sh・
-	# ccnavi-git.sh と同じ順（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env → origin/HEAD →
-	# origin/main・master）で、そのツリーが属するリポジトリについて決める。決まらなければ固定のリストだけ。
-	integ=$(ccnavi_integration "$tree" "$root") || integ=""
+	# ccnavi-git.sh と同じ決め方（origin/HEAD → origin/main・master）で、そのツリーが属する
+	# リポジトリについて決める。決まらなければ固定のリストだけ。
+	integ=$(ccnavi_integration "$tree") || integ=""
 	if [ -n "$integ" ] && [ "$branch" = "$integ" ]; then
 		printf 'ccnavi-user-push-approved: %s では保護対象の統合先 %s を使用しているため、pushしません。送るかどうかはユーザが決めます。\n' \
 			"$name" "$branch" >&2
