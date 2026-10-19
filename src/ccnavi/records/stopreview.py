@@ -2,7 +2,7 @@
 
 このモジュールは LLM を呼ばない。agent hook が出した判定結果を受けて、構造を確かめ、基準ごとの
 結果から Stop 全体の最終分類を一意に作り、agent hook がそのまま返す返り値を作る。
-最終分類を書くのは `accept` の 1 か所だけ（試行の書き手を 1 つにするため）。
+最終分類を書くのは `accept` だけ（試行を書く主体を 1 つにするため）。
 
 置くもの（state の置き場）:
 
@@ -243,7 +243,7 @@ def read_attempt(state: str, aid: str) -> dict[str, Any] | None:
 
 
 def write_plan(state: str, key: str, plan: dict[str, Any], now: float | None = None) -> str:
-    """計画を 1 件書き、試行を作る。試行 ID を返す。同じキーへの再呼び出しは冪等。
+    """計画を 1 件書いて試行を作り、試行 ID を返す。同じキーで呼び直しても結果は変わらない（冪等）。
 
     候補でない計画は、作成と同時に ccnavi が最終分類（対象外・検査省略）まで確定する。
     計画より先に material が来ていた（plan_wait）なら、その試行を開始待ちへ進める。
@@ -260,7 +260,7 @@ def write_plan(state: str, key: str, plan: dict[str, Any], now: float | None = N
         fresh["original"] = plan.get("original", "")
         if not plan.get("is_candidate"):
             _finalize_ccnavi(fresh, plan)
-        # 排他で作る。material が先に plan_wait を置く競合で、どちらかが上書きしないように。
+        # 排他的に作る。material が先に plan_wait を置く競合で、どちらも上書きしないため。
         if _create(state, fresh):
             if fresh["state"] == DONE:
                 log_event(state, "final", fresh)
@@ -363,9 +363,9 @@ def note_insufficient(state: str, key: str, insufficient: bool) -> None:
 def expire_overdue(
     state: str, now: float | None = None, ttl: float = DEFAULT_TTL_SECONDS
 ) -> list[str]:
-    """期限を過ぎて終わっていない試行を、未検査の期限切れで確定する。
+    """期限を過ぎても終わっていない試行は、未検査の期限切れとして確定する。
 
-    次の hook 起動時と集計時に呼ぶ。
+    次の hook の起動時と集計時に呼ぶ。
     """
     when = time.time() if now is None else now
     expired: list[str] = []
@@ -449,8 +449,8 @@ def validate(result: Any, plan: dict[str, Any]) -> dict[str, Any]:
         raise Rejected("results がリストではない")
     targets = set(plan.get("targets") or [])
     no_r2 = set(plan.get("no_r2") or [])
-    # 本文が無い版（送れなかった提案）の R2 は対象外。判定役が余分に出した行は、受理せずに捨てる
-    # （実機で、判定役が出してしまう例があった。記録ごと拒否すると、ほかの基準の結果まで失う）。
+    # 本文が無い版（送れなかった提案）の R2 は対象外。判定役が余分に出した行は、受理せず捨てる。
+    # 記録ごと拒否すると、ほかの基準の結果まで失うため（実機で余分な行を出す例があった）。
     rows = [
         r
         for r in rows
@@ -571,7 +571,8 @@ def accept(
 ) -> dict[str, Any]:
     """record の本体。受け取った結果を検証し、最終分類を確定して、agent hook の返り値を返す。
 
-    拒否したときは未検査で閉じて `{"ok": true}`。受理して enable で不備検出のときだけ差し戻す。
+    拒否したときは未検査で閉じ、`{"ok": true}` を返す。
+    受理した結果が不備検出で、enable のときだけ差し戻す。
     再判定の試行は差し戻さず、元の試行に解消か未解消を残す。
     `still_unapproved(target) -> bool` は、承認状態の再確認（承認済みになっていたら材料が変わった
     として拒否する）。
@@ -633,7 +634,7 @@ def _mark_sent_back(state: str, key: str) -> None:
 
 
 def _resolve_original(state: str, original: str, final: str) -> None:
-    """元の試行に、再判定の結果を残す。解消は終了可のときだけ。未検査・対象外は決められない。"""
+    """再判定の結果は元の試行に残す。解消と言えるのは終了可のときだけで、未検査・対象外では決められない。"""
     attempt = read_attempt(state, original)
     if attempt is not None:
         attempt["rejudge"] = (
@@ -703,7 +704,7 @@ CRITERIA_MD = """\
 ## R1（単位: Stop の機会）
 材料の中に、チケット作業の明示の指示・合意、または issue／MR の指定が特定できるのに、提案を書かずに
 作成の許可だけを求めて終えたら不備。問題箇所は最終回答の引用。
-当たらない例: 指定が無いときに直接作業かチケット作業かを確認した／公開・課金・破壊的な操作・合意外の
+不備でない例: 指定が無いときに直接作業かチケット作業かを確認した／公開・課金・破壊的な操作・合意外の
 変更の許可を求めた／提案を書かないよう指示されている／必須の情報が欠けていて書くと勝手な意思決定に
 なる／提出済みの提案の承認待ちを説明しただけ／根拠を材料の中に特定できない（判定不能）。
 
@@ -826,7 +827,8 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
     }
 
 
-# 過去の発言から、明示の指示・合意を拾う型。拾うのは候補で、判定は判定役が材料全体を見て下す。
+# 過去の発言から、明示の指示・合意を拾うパターン。拾うのは候補までで、
+# 判定は判定役が材料全体を見て下す。
 # 引用（`>` で始まる行）とコードブロックの中は、指示として扱わない。
 _INSTRUCTION_KINDS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
@@ -887,12 +889,12 @@ _DELIMITER = re.compile(r"<(/?)(data|criteria)\b", re.IGNORECASE)
 
 
 def defang(text: str) -> str:
-    """材料の区切り（`<data …>`・`<criteria>`）を本文に書かれても、囲みを破れないようにする。"""
+    """本文に材料の区切り（`<data …>`・`<criteria>`）が書かれていても、囲みを破れないようにする。"""
     return _DELIMITER.sub(lambda m: f"＜{m.group(1)}{m.group(2)}", text)
 
 
 def _attr(value: object) -> str:
-    """属性に入れる値。空白・括弧・引用符を落として、タグの形を崩せないようにする。"""
+    """属性に入れる値から空白・括弧・引用符を落とし、タグの形を崩せないようにする。"""
     return re.sub(r"[^\w.:/@+-]", "_", str(value))[:120]
 
 
@@ -955,13 +957,13 @@ def render_material(
 
 CRITERIA_FILE = os.path.join(".ccnavi", "config", "stop-review.md")
 CRITERIA_LIMIT = 40_000
-MATERIAL_DIR = os.path.join("stop-review", "material")  # records.prune が同じ名前を持つ
+MATERIAL_DIR = os.path.join("stop-review", "material")  # prune（records/prune.py）も同じ名前を使う
 
 
 def load_criteria(root: str) -> tuple[str, str]:
-    """判定用 Markdown の実効の中身と出どころ。(本文, "default" か "file")。
+    """判定用 Markdown の中身と出どころ。(本文, "default" か "file")。
 
-    ワークスペースが 1 枚持てば（`.ccnavi/config/stop-review.md`）それを元の定義として読む。
+    ワークスペースに 1 枚あれば（`.ccnavi/config/stop-review.md`）、それを判定の定義として読む。
     無ければ組み込みの定義。あるのに読めない・空・大きすぎるときは本文を空にして返す
     （別の定義を推測しない。呼び手は未検査にする）。
     """
@@ -975,7 +977,7 @@ def load_criteria(root: str) -> tuple[str, str]:
 
 
 def save_material(log_dir: str, attempt: str, extractor: str, criteria: str, rendered: str) -> int:
-    """判定に渡した材料の実体を、伏せ字にして試行ごとに保存する。伏せ字で変わった箇所の数を返す。
+    """判定に渡した材料を、伏せ字にして試行ごとに保存する。伏せ字で変わった箇所の数を返す。
 
     判定役には伏せ字の前の材料を渡し、保存するのは伏せ字の後の材料。再評価で本文が削除・変更
     されていても同じ材料で比べられるようにする。書けなければ -1（判定は止めない）。
@@ -1008,7 +1010,8 @@ def _last_path(state: str, session: str) -> str:
 def note_last_stop(
     state: str, session: str, key: str, nudged: bool, sent_back: bool, now: float
 ) -> None:
-    """この Stop に ccnavi の促しか差し戻し送出があったか。次の Stop の疑いの判定が読む。"""
+    """この Stop で ccnavi の促しか差し戻しが出たかどうか。
+    次の Stop で、記録外の停止の疑いを判定するときに読む。"""
     if state and session:
         row = {"key": key, "nudged": nudged, "sent_back": sent_back, "t": now}
         fsio.write_json_atomic(_last_path(state, session), row)

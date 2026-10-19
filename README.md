@@ -470,9 +470,9 @@ hook からの判定と `ticket` / `review` などのサブコマンドに渡す
 | `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と知らせる |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、バックアップして戻す側の両方が切り替わる。承認済みの置き場と操作記録への書き込み、保護済みの sh への環境変数の指定の止めは、この値では切れない |
-| `CCNAVI_STOP_REVIEW` | `dry-run`（既定）、`enable`、`disable`。Stop の AI 判定（agent 型 Stop フック）の効き方。全体のモードと掛け合わせる（全体が dry-run なら dry-run、disable なら disable）。`dry-run` は記録だけで止めず、`enable` は検証に通った不備検出だけを差し戻す。登録は `scripts/ccnavi-stop-review.sh`（構成は [docs/design/stop-review.md](docs/design/stop-review.md)） |
-| `CCNAVI_STOP_REVIEW_AGENT` | `1` のとき、Stop で判定計画を作る。agent hook を登録したワークスペースが置く（`scripts/ccnavi-stop-review.sh register` が書く）。無ければ何も作らない。評価の集計は `ccnavi stop-review report` |
-| `CCNAVI_STOP_REVIEW_KEEP_DAYS` | 判定の再評価用の材料（`logs/stop-review/`）を残す日数。既定は `90`。`0` で消さない |
+| `CCNAVI_STOP_REVIEW` | `dry-run`（既定）、`enable`、`disable`。Stop の AI 判定（agent 型 Stop フック）の効き方。全体のモードと掛け合わせる（全体が dry-run なら dry-run、disable なら disable）。`dry-run` は記録だけで止めず、`enable` は検証に通った不備検出だけを差し戻す。登録は `scripts/ccnavi-stop-review.sh` で行う（構成は [docs/design/stop-review.md](docs/design/stop-review.md)） |
+| `CCNAVI_STOP_REVIEW_AGENT` | `1` のとき、Stop で判定計画を作る。agent hook を登録したワークスペースに置かれる（`scripts/ccnavi-stop-review.sh register` が書く）。無ければ何も作らない。評価の集計は `ccnavi stop-review report` |
+| `CCNAVI_STOP_REVIEW_KEEP_DAYS` | 判定の再評価用の材料（`logs/stop-review/`）を残す日数。既定は `90`。`0` にすると消さない |
 | `CCNAVI_DENY_REPEAT` | 同じ理由で同じ呼び出しを何回止めたら、拒否の文面に「言い換えずにユーザに相談する」一文を足し、ターンの終わりにユーザへ報告するか。既定は `3`。2 未満と読めない値は既定に戻る。判定は変わらない（「同じ呼び出しを繰り返し止めたとき」） |
 | `CCNAVI_FAIL_STREAK_COUNT` | ツール呼び出しの失敗か ccnavi の拒否が何回続けて起きたら、資料を引く案内（`--docs` で索引を引く）を出すか。既定は `3`。`0` なら数えも案内もしない。負数と読めない値は既定に戻る。判定は変わらない（「失敗や拒否が続いたとき」） |
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。ユーザにも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない。「ルールが言及していない呼び出し」）。`dry-run` は無く、それ以外の値は `enable` として動き、`--lint` が指摘する |
@@ -2316,18 +2316,18 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 ### Stop の AI 判定
 
 チケット提案の取りこぼし（提案を書かずに作成の許可だけ取る・具体性の無い提案・書いたのに送らない提案）を、
-独立したコンテキストの agent 型 Stop hook が判定する。既定は登録なしで、登録しても `CCNAVI_STOP_REVIEW` の
-既定は `dry-run`（記録だけで、止めない）。構成は [docs/design/stop-review.md](docs/design/stop-review.md)。
+独立したコンテキストの agent 型 Stop hook が判定する。既定では登録されておらず、登録しても `CCNAVI_STOP_REVIEW` の
+既定は `dry-run`（記録だけ残して止めない）。構成は [docs/design/stop-review.md](docs/design/stop-review.md)。
 
 - 登録・解除・点検: `sh scripts/ccnavi-stop-review.sh register|unregister|check [--root <ワークスペース>]`。
   判定役のモデルの既定は `haiku`、タイムアウトは 60 秒（`register --model <名前>` で変えられる）
-- 効き方: `CCNAVI_STOP_REVIEW`（`dry-run` / `enable` / `disable`）。`enable` は、検証に通った不備検出だけを
+- 効き方: `CCNAVI_STOP_REVIEW`（`dry-run` / `enable` / `disable`）。`enable` のときは、検証に通った不備検出だけを
   1 回差し戻す。差し戻しの次の Stop では、既存の促しを 1 回通常どおり動かし、修正後の材料で 1 回だけ再判定する
-- 判定の基準: 組み込みの基準を、ワークスペースの `.ccnavi/config/stop-review.md` が置き換える（無ければ組み込み）。
-  読めない・空の場合は、別の基準を推測せず未検査にする
+- 判定の基準: 組み込みの基準を、ワークスペースの `.ccnavi/config/stop-review.md` があればそれで置き換える（無ければ組み込み）。
+  ファイルが読めない・空のときは、別の基準を推測せず未検査にする
 - 集計: `ccnavi stop-review report`。独立した評価（人が付ける正否）は `logs/stop-review/labels.jsonl` に
-  1 行 1 件の JSON `{"attempt_id", "criterion", "target", "truth": "flaw"|"ok"}` で書く。評価が無い指標は「不明」と出す
-- 追加の待ち時間は 1 Stop あたり約 10 秒、費用は約 0.0025 ドル（実測。設計書の「測定結果」）
+  1 行 1 件の JSON `{"attempt_id", "criterion", "target", "truth": "flaw"|"ok"}` で書く。評価が無い指標は「不明」と表示する
+- 1 Stop あたりの追加の待ち時間は約 10 秒、費用は約 0.0025 ドル（実測値。設計書の「測定結果」）
 
 ### 記録の後始末
 
@@ -2560,7 +2560,7 @@ error 3 件、warn 1 件、info 0 件
 | warn | モードが `disable` / `dry-run`、あるいはモードとして読めない値 |
 | warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |
 | warn | 読めない `CCNAVI_STOP_REVIEW` の値（`dry-run` として動く） |
-| warn | Stop の AI 判定の登録の食い違い: `CCNAVI_STOP_REVIEW_AGENT=1` があるのに agent 型 Stop hook が無い、hook があるのに印が無い（判定計画が作られず、すべて未検査になる）、hook が複数ある（判定が重複する） |
+| warn | Stop の AI 判定の登録の食い違い: `CCNAVI_STOP_REVIEW_AGENT=1` があるのに agent 型 Stop hook が無い、hook はあるが印が無い（判定計画が作られず、すべて未検査になる）、hook が複数ある（判定が重複する） |
 | warn | 判定役の Bash（`stop-review` の 2 つの入口）を許す権限が `permissions.allow` に無い（判定役は `dontAsk` で動くので、材料を取れず、すべて未検査になる） |
 | warn | 守る働きを持つ設定が止めない値になっている（`CCNAVI_GUARD_CORE_FILES` と `CCNAVI_RESTORE_IF_DENY` が `disable` か `dry-run`、`CCNAVI_GUARD_UNWATCHED` と `CCNAVI_GUARD_TICKET_APPROVAL` が `disable`） |
 | warn | 上書き設定ファイル `ccnavi.settings.local.json` が読めない。このファイルを読むのは ccnavi 自身のソースツリーだけ（設計 4.3） |

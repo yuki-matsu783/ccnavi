@@ -1,21 +1,21 @@
-"""propose の操作実績。どの提案を送ったか、送らなかったかを、どの道を通っても確定する。
+"""propose の操作実績。どの提案を送ったか、送らなかったかを、どの経路を通っても確定する。
 
 3 つの記録をつなぐ。
 
 - 実行前（PreToolUse）: `ccnavi-ticket.sh propose <識別子>` を読んだら、`tool_use_id`・セッション・
   識別子・時刻を登録する（`register`）
-- 結果ファイル: `ccnavi-ticket.sh` が出口で、どの道を通っても 1 つ書く
-  （`stopops-result/<開始秒>-<pid>.kv`）。標準出力の識別行は、出力を切られると消えるので頼らない
+- 結果ファイル: `ccnavi-ticket.sh` が出口で、どの経路を通っても 1 つ書く
+  （`stopops-result/<開始秒>-<pid>.kv`）。標準出力の識別行は、出力が切られると消えるので頼らない
 - 実行後（PostToolUse・PostToolUseFailure）: `tool_use_id` と、識別子・時刻の範囲で結果ファイルを
   結び付ける（`bind`）。エラーの中身は使わない。バックグラウンドの実行などで結び付けられなかったものは、
-  Stop と集計のときに時刻の範囲で結び付け直し（`rebind`）、それでも駄目なら「未連携」にする
+  Stop と集計のときに時刻の範囲で結び付け直し（`rebind`）、それでも結べなければ「未連携」にする
 
 判定の対象は提案ごとの最終の有効版（`final_versions`）。途中の版は記録に残る。
 
-道（`route`）は 7 つ: 送った・変更なし・書くだけ（origin なし）・止めた・コードが未 push・
+経路（`route`）は 7 つ: 送った・変更なし・書くだけ（origin なし）・止めた・コードが未 push・
 送る前に失敗・push 後の後処理で失敗。
 
-置き場は state の置き場。ターンの開始時刻（`start_turn`）もここに置く（通知でない発言の時刻）。
+保存先は state と同じ場所。ターンの開始時刻（`start_turn`）もここに置く（通知でない発言の時刻）。
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ FAILED_AFTER = "failed_after"
 ROUTES = frozenset(
     {SENT, UNCHANGED, WRITE_ONLY, STOPPED, UNPUSHED_CODE, FAILED_BEFORE, FAILED_AFTER}
 )
-# 提案の最終の有効版になる道。変更なしは、前の送った版がそのまま有効。
+# 提案の最終の有効版になる経路。変更なしは、前に送った版がそのまま有効のままになる。
 EFFECTIVE = frozenset({SENT, UNCHANGED})
 
 UNLINKED = "unlinked"
@@ -110,7 +110,7 @@ def _names(directory: str) -> list[str]:
 
 
 def _call(tool_use_id: str, ident: str) -> str:
-    """1 つの Bash に propose が複数あっても別の呼び出しとして扱う鍵。"""
+    """1 つの Bash に propose が複数あっても、それぞれ別の呼び出しとして扱うための鍵。"""
     return f"{tool_use_id}~{ident.casefold()}"
 
 

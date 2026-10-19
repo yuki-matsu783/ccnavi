@@ -1,7 +1,7 @@
 """Stop の AI 判定の判定役（agent hook）の呼び出しを見分け、ccnavi の各 hook から除く。
 
-判定役は独立したコンテキストで `ccnavi stop-review material|record` を打つ。その呼び出しが、
-作業者のものと同じに扱われると、失敗の連続・範囲の読み取り・フェーズの知らせ・実行中の印・
+判定役は独立したコンテキストで `ccnavi stop-review material|record` を打つ。この呼び出しを
+作業者のものと同じに扱うと、失敗の連続・範囲の読み取り・フェーズの知らせ・実行中の印・
 範囲の差し戻しが動いて、既存の挙動が変わる。そこで、見分けられた判定役の呼び出しは次のように扱う。
 
 | hook | 判定役の呼び出し |
@@ -104,7 +104,7 @@ def judge_command_ok(command: str, cwd: str = "") -> bool:
     """判定役に許す Bash か。`ccnavi stop-review material|record …` の 1 本だけ。
 
     標準入力の JSON を渡すための `echo`・`printf`・`cat`（パイプの左）とヒアドキュメントは許す。
-    実機で、判定役が癖で付けた `cd <プロジェクト> 2>/dev/null;` を拒否して、材料を取れずに期限切れに
+    実機で、判定役が付けた `cd <プロジェクト> 2>/dev/null;` を拒否して、材料を取れずに期限切れに
     なった。そのため、判定役自身の作業ディレクトリ（`cwd`）への `cd` と、`/dev/null` や `&1` への
     リダイレクトだけは許す。
     ほかのコマンドの連結（`;`・`&&`・`||`）・ほかのリダイレクト・コマンド置換・読み切れない形は許さない。
@@ -183,7 +183,7 @@ def before(
     payload: hookio.Input,
     record: audit.Record,
 ) -> bool:
-    """PreToolUse の入口。通常の判定へ回さないなら真（応答は書き終えた）。"""
+    """PreToolUse の入口。通常の判定へ回さないなら真を返す（応答はすでに書き終えている）。"""
     if not conf.stop_review_agent:
         return False
     command = payload.tool_input.get("command")

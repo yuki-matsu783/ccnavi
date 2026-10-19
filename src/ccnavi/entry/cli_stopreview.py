@@ -1,9 +1,9 @@
 """`ccnavi stop-review material|record`。Stop の agent hook（判定役）が Bash から打つ入口。
 
 - `material <セッション> <transcript>`: 共有キーで判定計画を取り、材料を返す。候補でなければ、
-  その旨とそのまま返す返り値を返す。対象のファイルは変えないが、試行の状態は更新する。
+  その旨の返り値を、そのまま返す。対象のファイルは変えないが、試行の状態は更新する。
 - `record <セッション> <transcript>`: 標準入力の判定結果（JSON）を検証し、agent hook がそのまま返す
-  返り値（JSON 1 行）だけを標準出力に書く。拒否・打てない場合も `{"ok": true}`。
+  返り値（JSON 1 行）だけを標準出力に書く。拒否・実行できない場合も `{"ok": true}`。
 
 どちらも終了コード 0 で終わる。判定役の失敗が作業を止めてはならないため。
 LLM は呼ばない。作業者向けの文書と `--docs` の索引には、この入口の打ち方を載せない。
@@ -118,7 +118,7 @@ def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str
 
 
 def _unsent_body(root: str, proposal: dict) -> str:
-    """送っていない提案の本文。書いた md の今の中身を、上限つきで読む。"""
+    """送っていない提案の本文。書いた md の現在の中身を、上限つきで読む。"""
     parts = []
     for item in proposal.get("files") or []:
         path = str(item.get("path", ""))
@@ -133,7 +133,7 @@ def _unsent_body(root: str, proposal: dict) -> str:
 
 
 def _body(root: str, proposal: dict) -> str:
-    """送った版の提案の本文。送ったコミットから読む（作業ツリーの今の姿ではなく、送った版）。
+    """送った版の提案の本文。送ったコミットから読む（作業ツリーの現在の姿ではなく、送った版）。
 
     読めないときは空文字（材料に本文が無いと示す）。送った提案のファイルは `todo/` の下の md。
     """
