@@ -483,6 +483,6 @@ test("CB-T316 統合結果は読み取り専用で、境目の点・項目・由
   }
 });
 
-test("CB-T1139 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
+test("CB-T1150 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
   await checkHandoffLink((handoff) => openRisk({ handoff }));
 });

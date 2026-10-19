@@ -1,7 +1,7 @@
 /**
  * フロー編集画面の「元に戻す・やり直す」の履歴。画面（`webview/flow/App.tsx`）の `edit()` だけが積む。
  *
- * 積むのは直す前のコピー（`FlowDoc` は書き換えないコピーなので、そのまま持てばよい）。上限を超えたら古いほうから捨てる。
+ * 積むのは直す前のコピー（`FlowDoc` は書き換えないコピーなので、そのまま持てばよい）。テンプレート管理画面の編集（`T` = `EditTemplate`）も同じ履歴を使う。上限を超えたら古いほうから捨てる。
  *
  * 1 回の操作で 1 件にする。
  * - ドラッグ・線を引く・足す・消すは、呼び手が 1 回だけ `record` を呼ぶので 1 件
@@ -20,16 +20,16 @@ export const HISTORY_LIMIT = 100;
 /** 同じ欄への打ち込みを 1 件にまとめる間（ミリ秒）。これより空けば別の 1 件 */
 export const MERGE_MS = 1000;
 
-export interface FlowHistory {
-  readonly past: readonly FlowDoc[];
-  readonly future: readonly FlowDoc[];
+export interface FlowHistory<T = FlowDoc> {
+  readonly past: readonly T[];
+  readonly future: readonly T[];
   /** 直前に積んだ打ち込みの欄。まとめてよいのはこれと同じ欄だけ */
   readonly key?: string;
   /** 直前に打った時刻 */
   readonly at?: number;
 }
 
-export function emptyHistory(): FlowHistory {
+export function emptyHistory<T = FlowDoc>(): FlowHistory<T> {
   return { past: [], future: [] };
 }
 
@@ -45,7 +45,7 @@ export interface RecordOptions {
  * 直す前のコピー `before` を積む。やり直しのリストは捨てる（戻してから別の操作をしたら、その先は無くなる）。
  * 同じ欄に続けて打っているときは積まずに時刻だけ進める（最初の 1 字の前のコピーが残る）。
  */
-export function record(history: FlowHistory, before: FlowDoc, options: RecordOptions = {}): FlowHistory {
+export function record<T = FlowDoc>(history: FlowHistory<T>, before: T, options: RecordOptions = {}): FlowHistory<T> {
   const now = options.now ?? Date.now();
   const { key } = options;
   if (key !== undefined && history.key === key && history.at !== undefined && now - history.at <= MERGE_MS && history.past.length > 0) {
@@ -57,20 +57,20 @@ export function record(history: FlowHistory, before: FlowDoc, options: RecordOpt
 }
 
 /** 打ち込みのまとまりを区切る（欄からフォーカスが外れた）。次に打つ字は別の 1 件になる */
-export function seal(history: FlowHistory): FlowHistory {
+export function seal<T = FlowDoc>(history: FlowHistory<T>): FlowHistory<T> {
   return history.key === undefined && history.at === undefined ? history : { past: history.past, future: history.future };
 }
 
-export function canUndo(history: FlowHistory): boolean {
+export function canUndo<T = FlowDoc>(history: FlowHistory<T>): boolean {
   return history.past.length > 0;
 }
 
-export function canRedo(history: FlowHistory): boolean {
+export function canRedo<T = FlowDoc>(history: FlowHistory<T>): boolean {
   return history.future.length > 0;
 }
 
 /** 1 件戻す。戻せなければ undefined。`current` はいまのコピーで、やり直しのリストに積む */
-export function undo(history: FlowHistory, current: FlowDoc): { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined {
+export function undo<T = FlowDoc>(history: FlowHistory<T>, current: T): { readonly history: FlowHistory<T>; readonly doc: T } | undefined {
   const doc = history.past[history.past.length - 1];
   if (doc === undefined) {
     return undefined;
@@ -79,7 +79,7 @@ export function undo(history: FlowHistory, current: FlowDoc): { readonly history
 }
 
 /** 1 件やり直す。やり直せなければ undefined */
-export function redo(history: FlowHistory, current: FlowDoc): { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined {
+export function redo<T = FlowDoc>(history: FlowHistory<T>, current: T): { readonly history: FlowHistory<T>; readonly doc: T } | undefined {
   const doc = history.future[history.future.length - 1];
   if (doc === undefined) {
     return undefined;

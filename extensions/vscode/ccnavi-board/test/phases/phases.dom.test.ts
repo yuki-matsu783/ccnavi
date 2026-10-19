@@ -507,6 +507,6 @@ test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄
   }
 });
 
-test("CB-D383 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
+test("CB-D392 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
   await checkHandoffLink((handoff) => openPhases({ handoff }));
 });

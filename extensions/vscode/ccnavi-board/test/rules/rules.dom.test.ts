@@ -1461,6 +1461,6 @@ test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・再読
   }
 });
 
-test("CB-D382 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
+test("CB-D391 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
   await checkHandoffLink((handoff) => openRules({ handoff }));
 });

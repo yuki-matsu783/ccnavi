@@ -126,10 +126,13 @@ _TEMPLATES = """\
 
     ccnavi --templates [--layer self|PROJECT] [--keyword K]... [--json]
     ccnavi --templates --show NAME [--layer self|PROJECT] [--json]
+    ccnavi --templates --check-file PATH [--layer self|PROJECT|common] [--json]
 
 一覧は、共通レイヤーと1つのレイヤー（--layer を指定しない場合は self）を合わせたものです。
 --keyword は名前、説明、または使う場面の一部に一致します（2回指定した場合はどちらかに一致）。
 --show は、1件のテンプレートを計画・フロー・検査結果とともに表示します。
+--check-file は、任意のパスのテンプレートを、そのレイヤーのフェーズ定義で検査します
+（何も書き込みません。保存前の確かめ用で、--show・--draft・--keyword とは併用できません）。
 両方のレイヤーに同じ名前で内容の異なるテンプレートがある場合はエラーとなり、
 そのレイヤー側のテンプレートは使用されません。--json は、ボード画面が描画する完全な応答で、
 README.md（「作業・レビュー計画のテンプレート」）に記載しています。--keyword は --docs

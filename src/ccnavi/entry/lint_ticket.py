@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import os
 
 from ..infra import gitcmd, hookio, settings, tree
@@ -222,19 +221,9 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     known = frozenset(t.ticket for t in proposals + copies + closed + review)
     problems.extend(lint_branch._worktree_problems(root, conf, worktrees, index, copies, known))
     problems.extend(lint_branch._unregistered_worktree_problems(root, worktrees))
-    names = {t.name for t in worktrees}
     if any(not t.is_child for t in copies):
         problems.extend(_review_token(root))
     problems.extend(_ticket_hooks(root))
-    for stray in _stray_claude_dirs(root, names):
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                f"{stray} はワークツリーでもワークスペースルートでもないのに .claude/ を持つ。"
-                "そこへ cd するだけで、別のワークスペースルートのように見える",
-            )
-        )
     return problems
 
 
@@ -580,28 +569,3 @@ def tree_has_tickets(root: str, tickets_rel: str) -> bool:
         if os.path.isdir(os.path.join(t.root, tickets_rel.replace("/", os.sep))):
             return True
     return False
-
-
-def _stray_claude_dirs(root: str, worktree_names: set[str]) -> list[str]:
-    """リポジトリの中で `.claude/` を持つ、ワークツリーでもワークスペースルートでもない
-    ディレクトリ。
-
-    見るのは 2 段まで。深くたどると大きなリポジトリで検証が待たされる。
-    """
-    found = []
-    skip = {".git", ".claude", "node_modules", ".venv", "dist", "build"}
-    try:
-        first = sorted(os.listdir(root))
-    except OSError:
-        return found
-    for name in first:
-        top = os.path.join(root, name)
-        if name in skip or not os.path.isdir(top):
-            continue
-        candidates = [top]
-        with contextlib.suppress(OSError):
-            candidates += [os.path.join(top, n) for n in sorted(os.listdir(top))]
-        for candidate in candidates:
-            if os.path.isdir(os.path.join(candidate, ".claude")):
-                found.append(os.path.relpath(candidate, root))
-    return found

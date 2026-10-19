@@ -29,7 +29,6 @@ export function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     rel: "projects/lib",
     rulesRel: "projects/lib/.ccnavi/config/project/rules.yml",
     rulesExists: true,
-    hasClaudeDir: false,
     origin: "",
     originKey: "",
     worktrees: [],

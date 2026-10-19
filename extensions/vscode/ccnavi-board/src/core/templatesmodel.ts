@@ -5,15 +5,18 @@
  * 読むだけ（有効か・捨てた理由は実行ファイルが決めて答える）。読み方は `planordermodel.ts` と
  * `lintmodel.ts` に揃える。答えの版が違えば解釈せず、版の違いを伝える。VS Code の API も DOM も node も読まない。
  */
+import { readPlans } from "./approvemodel.js";
 import type {
   Dropped,
   DraftEntry,
   FlowSummary,
   PlanItem,
+  PhaseTypeInfo,
   ProblemSeverity,
   Sum,
   SumRow,
   TemplateDetail,
+  TemplateCheck,
   TemplateEntry,
   TemplateLayer,
   TemplateProblem,
@@ -92,6 +95,49 @@ export function parseTemplateShow(text: string): TemplateShowParse {
   return { ok: true, value: { ...readEntry(template), text: body } };
 }
 
+export type TemplateCheckParse = { readonly ok: true; readonly value: TemplateCheck } | { readonly ok: false; readonly error: string };
+
+/** `--templates --check-file <パス> --json` の答えを読む。失敗の答え（`{ok:false,error}`）は error をそのまま返す */
+export function parseTemplateCheck(text: string): TemplateCheckParse {
+  const parsed = parseRecord(text);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  const raw = parsed.value;
+  if (raw.ok === false) {
+    return { ok: false, error: str(raw.error) || "テンプレートを検査できませんでした" };
+  }
+  if (raw.version !== TEMPLATES_VERSION) {
+    return { ok: false, error: versionMismatch(raw.version) };
+  }
+  for (const key of ["problems", "plans", "types"] as const) {
+    if (!Array.isArray(raw[key])) {
+      return { ok: false, error: `テンプレートの検査の JSON の ${key} 欄が配列ではありません` };
+    }
+  }
+  const valid = bool(raw.valid);
+  // 読めたと言うのに中身が無い答えは、見比べる相手が無いので受けない
+  if (valid && !isRecord(raw.data)) {
+    return { ok: false, error: "テンプレートの検査の JSON の data 欄がありません。ccnavi が古い可能性があります。実行ファイルを更新してください" };
+  }
+  return {
+    ok: true,
+    value: {
+      version: TEMPLATES_VERSION,
+      layer: str(raw.layer),
+      name: str(raw.name),
+      sha: str(raw.sha),
+      valid,
+      problems: readProblems(raw.problems),
+      data: valid ? raw.data : null,
+      plans: valid ? readPlans(raw.plans) : [],
+      types: list(raw.types)
+        .filter(isRecord)
+        .map((t): PhaseTypeInfo => ({ id: str(t.id), title: str(t.title), kind: str(t.kind), review: str(t.review) })),
+    },
+  };
+}
+
 /**
  * 読み違えを誘う文字を `\uXXXX` に直して見せる。制御文字（Cc）と書式文字（Cf）・行と段落の区切り（Zl・Zp）が対象で、
  * 改行とタブは残す。BMP の外の文字は `\UXXXXXXXX`。実行ファイルの `plan_templates.reveal` と同じ形。
@@ -107,6 +153,37 @@ export function revealControls(text: string): string {
 /** 本文を読むときの層。`project` の対象は層の名前（その層）、それ以外は共通との統合結果の self */
 export function templatesLayerOf(target: { readonly kind: string; readonly name: string }): string {
   return target.kind === "project" ? target.name : "self";
+}
+
+/** 対象が見せる層の名前。共通の設定は common、ワークスペースは self、プロジェクトはその名前（編集できるのはこの層のテンプレートだけ） */
+export function shownLayerOf(target: { readonly kind: string; readonly name: string }): string {
+  if (target.kind === "workspace") {
+    return "common";
+  }
+  return target.kind === "project" ? target.name : "self";
+}
+
+/** テンプレートの名前に使える形（実行ファイルの `NAME_RE` と上限と同じ。ファイル名になるので、読ませる前にここでも断る） */
+export function validTemplateName(name: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) && name.length <= 64;
+}
+
+/**
+ * 新しいテンプレートの名前が、共通の層か `layer` の層の既存の名前と重なるか。大文字小文字は区別しない（別の機械で 2 本が 1 本に重なる）。
+ * 重なる既存の 1 件を返す。無ければ undefined
+ */
+export function templateNameTaken(layers: readonly TemplateLayer[], layer: string, name: string): { readonly layer: string; readonly name: string } | undefined {
+  const folded = name.toLowerCase();
+  for (const l of layers) {
+    if (l.name !== "common" && l.name !== layer) {
+      continue;
+    }
+    const hit = l.templates.find((t) => t.name.toLowerCase() === folded);
+    if (hit !== undefined) {
+      return { layer: l.name, name: hit.name };
+    }
+  }
+  return undefined;
 }
 
 /** 書き方が読み違いを誘う文字（`revealControls` が直す対象）。改行とタブは含めない */

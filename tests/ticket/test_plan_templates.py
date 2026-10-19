@@ -718,6 +718,116 @@ def showcase(root: str) -> None:
     )
 
 
+class CheckFileTest(Harness):
+    """`--templates --check-file <パス>`。任意のパスのテンプレートを検査する（書かない）。"""
+
+    def check(self, text: str, name: str = "feature", *args: str) -> dict:
+        path = write(os.path.join(self.root, "tmp-check", name + ".yml"), text)
+        result = self.ccnavi("--templates", "--check-file", path, "--json", *args)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_a_plan_with_feedback_and_flows_is_read(self):
+        got = self.check(FEATURE)
+        self.assertTrue(got["ok"])
+        self.assertTrue(got["valid"])
+        self.assertEqual(got["name"], "feature")
+        self.assertEqual(got["sha"], plan_templates.digest(FEATURE.encode()))
+        self.assertEqual(got["problems"], [])
+        self.assertEqual(got["data"]["plan"], ["design", {"type": "implement", "after": [1]}])
+        self.assertEqual(list(got["data"]["flows"]), ["2"])
+        plan, feedback = got["plans"]
+        self.assertEqual((plan["part"], feedback["part"]), ("plan", "feedback"))
+        self.assertEqual([i["number"] for i in plan["items"]], [1, 2])
+        self.assertEqual([i["number"] for i in feedback["items"]], [3])
+        self.assertEqual(plan["items"][0]["title"], "設計")
+        self.assertEqual(plan["after"], {"2": [1]})
+        self.assertEqual(plan["ready"], [1])
+        self.assertEqual(plan["problems"], [])
+        self.assertEqual(plan["source_sha"], got["sha"])
+        self.assertIn("implement", [t["id"] for t in got["types"]])
+
+    def test_a_plan_only_template_has_one_graph(self):
+        got = self.check(RESEARCH, "research")
+        self.assertEqual([p["part"] for p in got["plans"]], ["plan"])
+        self.assertEqual(got["plans"][0]["items"][0]["review"], "none")
+
+    def test_unreadable_yaml_is_invalid(self):
+        got = self.check("name: [\n")
+        self.assertFalse(got["valid"])
+        self.assertIsNone(got["data"])
+        self.assertEqual(got["plans"], [])
+        self.assertEqual(self.problems(got, "error")[:1] != [], True)
+
+    def test_a_bad_after_is_an_error_and_the_graph_still_comes(self):
+        got = self.check(template("feature", "  - design\n  - {type: implement, after: [2]}\n"))
+        self.assertTrue(got["valid"])
+        self.assertTrue(self.problems(got, "error"))
+        plan = got["plans"][0]
+        self.assertEqual(plan["after"], {"2": [2]})
+        self.assertEqual(plan["loose"], [])
+        self.assertEqual(plan["ready"], [])
+        self.assertTrue(plan["problems"])
+
+    def test_an_unknown_type_is_a_warn_and_the_graph_comes(self):
+        got = self.check(template("feature", "  - nothing\n"))
+        self.assertTrue(got["valid"])
+        self.assertTrue(self.problems(got, "warn"))
+        self.assertFalse(self.problems(got, "error"))
+        self.assertEqual(got["plans"][0]["items"][0]["title"], "(定義なし) nothing")
+
+    def test_the_layer_is_checked_with_its_own_types(self):
+        for layer in ("common", "self"):
+            got = self.check(RESEARCH, "research", "--layer", layer)
+            self.assertEqual(got["layer"], layer)
+            self.assertIn("research", [t["id"] for t in got["types"]])
+
+    def test_an_unknown_layer_fails(self):
+        path = write(os.path.join(self.root, "tmp-check", "feature.yml"), FEATURE)
+        result = self.ccnavi("--templates", "--check-file", path, "--layer", "nothing", "--json")
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(json.loads(result.stdout)["ok"])
+
+    def test_a_missing_file_is_an_error_problem(self):
+        result = self.ccnavi(
+            "--templates", "--check-file", os.path.join(self.root, "none.yml"), "--json"
+        )
+        got = json.loads(result.stdout)
+        self.assertFalse(got["valid"])
+        self.assertTrue(self.problems(got, "error"))
+
+    def test_the_text_form_prints_a_summary(self):
+        path = write(os.path.join(self.root, "tmp-check", "feature.yml"), FEATURE)
+        out = self.ccnavi("--templates", "--check-file", path)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("読めた: はい", out.stdout)
+
+    def test_it_does_not_combine_with_other_modes(self):
+        path = write(os.path.join(self.root, "tmp-check", "feature.yml"), FEATURE)
+        for extra in (["--show", "x"], ["--draft", "p"], ["--keyword", "k"]):
+            out = self.ccnavi("--templates", "--check-file", path, *extra)
+            self.assertNotEqual(out.returncode, 0, extra)
+            self.assertIn("--check-file", out.stderr)
+        alone = self.ccnavi("--check-file", path)
+        self.assertNotEqual(alone.returncode, 0)
+        self.assertIn("--templates と一緒に使う", alone.stderr)
+
+    def test_the_flag_is_listed_in_the_version(self):
+        out = self.ccnavi("--version", "--json")
+        self.assertIn("--check-file", json.loads(out.stdout)["flags"])
+
+    def test_the_answer_matches_the_fixture(self):
+        got = self.check(FEATURE)
+        got["sha"] = "<sha>"
+        for plan in got["plans"]:
+            plan["source_sha"] = "<sha>"
+        fixture_path = os.path.join(ROOT, "tests", "fixtures", "templates-check-json.json")
+        with open(fixture_path, encoding="utf-8") as f:
+            fixture = json.load(f)
+        self.assertEqual(got, fixture["expect"])
+        self.assertTrue(fixture["about"])
+
+
 class ShapeTest(unittest.TestCase):
     """`--templates --json` の答えの形。拡張と共有する見本（templates-json.json）。"""
 

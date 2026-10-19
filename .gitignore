@@ -55,8 +55,8 @@ __pycache__/
 
 settings.local.json*
 
-# 参照専用の他プロジェクト。中に .claude/ を持つので、リポジトリの中に置くと
-# Claude Code がそこのスキルを読み込み、cd 1 回で別の根に見える。
+# 参照専用の他プロジェクト。.claude/ を持つ外部リポジトリは、--root なしの端末の
+# ccnavi が根を取り違える（洗い出しは docs/design/multi-repo/standalone-clone-gaps.md の A2）ので、
 # 読み終えたら外へ出す。置いている間だけ無視する。
 /参考/
 
