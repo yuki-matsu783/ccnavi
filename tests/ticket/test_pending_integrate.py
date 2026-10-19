@@ -109,6 +109,13 @@ class PendingIntegrateTest(TicketTest):
         self.assertIn("w5（統合先のツリー", text)
         self.assertEqual(text.count("記録と今の状態が合わないか、読めません"), 2)
 
+    def test_a_directory_without_a_marker_is_told_as_D(self):
+        os.makedirs(os.path.join(self.root, ".git", "ccnavi-integrate", "w9"))
+        write(os.path.join(self.root, ".git", "ccnavi-integrate", "w9", "paths"), "x\n")
+        text = self.notice()
+        self.assertIn("w9（統合先のツリー", text)
+        self.assertIn("記録と今の状態が合わないか、読めません", text)
+
     def test_an_expired_deadline_starts_no_git_and_says_so(self):
         head = self.head()
         self.marker("w6", state="staged", branch="w6", branch_sha=head, base=head, tree="t")

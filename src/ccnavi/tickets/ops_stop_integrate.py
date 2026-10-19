@@ -240,7 +240,7 @@ def probe(
         else _unique(here.root, here.name, deadline)
     )
     if ahead is None:
-        if not (dirty and integration):
+        if not (dirty and integration) or not _ref_missing(here.root, integration, deadline):
             return Probe(UNKNOWN)
         # 未コミットの変更があるのに統合先の ref を引けない。
         found = Direct(here.name, here.root, head, dirty, 0, integration)
@@ -454,6 +454,18 @@ def _ahead(worktree: str, integration: str, deadline: float | None = None) -> in
         out = counted.out.strip()
         return int(out) if counted.ok and out.isdigit() else None
     return None
+
+
+def _ref_missing(worktree: str, integration: str, deadline: float | None = None) -> bool:
+    """統合先の ref が、手元にも origin にも「無い」と確かめられたか。
+
+    期限不足・git の失敗は「確かめられていない」ので偽（呼び手は不明として扱う）。
+    """
+    for ref in (f"refs/heads/{integration}", f"refs/remotes/origin/{integration}"):
+        done = _run(worktree, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], deadline)
+        if done.failure or done.ok:
+            return False
+    return True
 
 
 def _unique(worktree: str, name: str, deadline: float | None = None) -> int | None:

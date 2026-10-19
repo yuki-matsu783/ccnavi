@@ -63,7 +63,7 @@ def _branch_name_problems(
                 )
             )
         else:
-            serial = ticket_ids.next_serial(names, prefixes)
+            serial = ticket_ids.next_serial(names, prefixes, skip_children=False)
     said: set[str] = set()
     fresh: list = []
     for t in proposals:

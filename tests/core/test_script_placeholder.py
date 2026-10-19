@@ -67,6 +67,8 @@ class FillTextTest(unittest.TestCase):
         self.assertEqual(settings.shell_path("/a/b"), "/a/b")
         self.assertEqual(settings.shell_path("/a b/c"), '"/a b/c"')
         self.assertEqual(settings.shell_path("C:\\a b"), '"C:/a b"')
+        # POSIX の `\` は名前の一部で、`/` に変えない。
+        self.assertEqual(settings.shell_path("/a\\b"), "'/a\\b'")
         self.assertEqual(settings.shell_path('/a"b'), "'/a\"b'")
 
 

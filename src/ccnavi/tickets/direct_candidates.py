@@ -58,7 +58,11 @@ def path_of(state_dir: str, session: str) -> str:
 
 
 def _same(a: str, b: str) -> bool:
-    return pathcase.fold(tree.nfc(a)) == pathcase.fold(tree.nfc(b))
+    # リンクを解いて比べる。`tree` はリンクを解いたパスを返すが、hook のルートは解いていないことがある。
+    def norm(path: str) -> str:
+        return pathcase.fold(tree.nfc(os.path.realpath(path)))
+
+    return norm(a) == norm(b)
 
 
 def _read(state_dir: str, session: str) -> list[dict]:

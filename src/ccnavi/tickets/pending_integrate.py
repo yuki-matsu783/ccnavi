@@ -140,9 +140,10 @@ def _notice(root: str, conf: settings.Settings, deadline: float) -> str:
         except OSError:
             continue
         for name in names:
-            marker = os.path.join(marks, name, "marker")
-            if not os.path.isfile(marker):
+            if not os.path.isdir(os.path.join(marks, name)):
                 continue
+            # marker が無い（保存に失敗した）ものは、読めない記録として区分 D に回る。
+            marker = os.path.join(marks, name, "marker")
             lines.append(_line(root, top, name, classify(top, name, marker, deadline)))
     if cut:
         lines.append(CUT_LINE)

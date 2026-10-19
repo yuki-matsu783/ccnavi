@@ -124,6 +124,34 @@ class NextIdTest(unittest.TestCase):
         )
         self.assertEqual("21\n", self.next_id().stdout)
 
+    def test_a_tag_with_the_branch_name_and_child_shaped_names_still_count(self):
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.email=a@b",
+                "-c",
+                "user.name=n",
+                "commit",
+                "--allow-empty",
+                "-qm",
+                "x",
+            ],
+            cwd=self.ws,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(["git", "branch", "feature-50-a"], cwd=self.ws, check=True)
+        subprocess.run(["git", "tag", "feature-50-a"], cwd=self.ws, check=True)
+        self.assertEqual("51\n", self.next_id().stdout)
+        subprocess.run(["git", "branch", "fix-60-x-10-19"], cwd=self.ws, check=True)
+        self.assertEqual("61\n", self.next_id().stdout)
+
+    def test_a_workspace_that_is_not_a_git_repository_is_not_an_error(self):
+        shutil.rmtree(os.path.join(self.ws, ".git"))
+        result = self.next_id()
+        self.assertEqual((0, "1\n"), (result.returncode, result.stdout), result.stderr)
+
     def test_a_repository_that_cannot_be_counted_gives_exit_2_and_no_number(self):
         project = os.path.join(self.ws, "projects", "p")
         os.makedirs(project)

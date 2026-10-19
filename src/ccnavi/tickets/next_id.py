@@ -58,13 +58,19 @@ def serial_names(
         (t.root, f"プロジェクト {t.name}") for t in tree.projects(conf.projects)
     ]
     for repo, label in repos:
-        done = gitcmd.run(repo, ["for-each-ref", "--format=%(refname:short)", "refs/heads/"])
+        if not os.path.exists(os.path.join(repo, ".git")):
+            # git のリポジトリでない（モード B のワークスペースなど）。
+            # 数えるものが無いだけで、数えきれないのではない。
+            continue
+        done = gitcmd.run(repo, ["for-each-ref", "--format=%(refname)", "refs/heads/"])
         if not done.ok:
             why = done.failure or done.err.strip() or f"終了コード {done.code}"
             problems.append(f"{label}のブランチを数えられなかった（{why}）")
             continue
         names.extend(
-            ticket_ids.branch_to_id(line.strip()) for line in done.out.splitlines() if line.strip()
+            ticket_ids.branch_to_id(line.strip().removeprefix("refs/heads/"))
+            for line in done.out.splitlines()
+            if line.strip()
         )
     homes = os.path.join(root, tree.WORKTREES_DIR)
     try:
@@ -81,7 +87,7 @@ def serial_names(
 def serial_now(conf: settings.Settings, root: str) -> tuple[int, list[str]]:
     """いまの次の通し番号と、数えきれなかった理由（空なら全部数えた）。"""
     names, problems = serial_names(conf, root)
-    return ticket_ids.next_serial(names, conf.branch_prefixes), problems
+    return ticket_ids.next_serial(names, conf.branch_prefixes, skip_children=False), problems
 
 
 def identifier_problem(prefix: str, slug: str, serial: int, prefixes) -> str:

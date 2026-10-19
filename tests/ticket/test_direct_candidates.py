@@ -78,6 +78,36 @@ class DirectCandidatesTest(base.IntegrateNudgeTest):
         self.assertEqual(entry["name"], "scratch")
         self.assertEqual(entry["checked"], 0)
 
+    def test_a_root_reached_through_a_symlink_still_registers(self):
+        path = self.direct(commit=True)
+        link = self.root + "-link"
+        os.symlink(self.root, link)
+        self.addCleanup(os.remove, link)
+        payload = hookio.Input(
+            event=hookio.POST_TOOL_USE,
+            tool_name="Write",
+            tool_input={"file_path": os.path.join(link, ".claude", "worktrees", "scratch", "a.py")},
+            session_id="s1",
+            cwd=link,
+        )
+        direct_candidates.touch(self.conf(), link, payload)
+        self.assertEqual([e["name"] for e in self.entries()], ["scratch"])
+        self.assertTrue(path)
+
+    def test_an_expired_ref_lookup_is_unknown_not_a_missing_ref_report(self):
+        path = self.direct(dirty=True)
+        here = ops_stop_integrate.tree.tree_of(self.root, path, "")
+        real = ops_stop_integrate._run
+
+        def fake(cwd, args, deadline=None, timeout=5.0):
+            if args[:2] == ["rev-parse", "--verify"]:
+                return gitcmd.Done(failure="期限不足", timed_out=True)
+            return real(cwd, args, deadline, timeout)
+
+        with mock.patch.object(ops_stop_integrate, "_run", side_effect=fake):
+            got = ops_stop_integrate.probe(self.root, self.conf(), here, None)
+        self.assertEqual(got.state, ops_stop_integrate.UNKNOWN)
+
     def test_reads_and_the_main_tree_are_not_registered(self):
         path = self.direct(commit=True)
         for tool in ("Read", "Grep", "Bash"):

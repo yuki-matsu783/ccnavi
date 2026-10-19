@@ -159,15 +159,18 @@ def identifier_number(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> i
     return int(matched.group("num")) if matched else None
 
 
-def next_serial(names, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int:
+def next_serial(
+    names, prefixes=settings.DEFAULT_BRANCH_PREFIXES, skip_children: bool = True
+) -> int:
     """issue の無い提案に使う、次の通し番号。番号を持つ識別子の最大 + 1。
 
     数えるのは親の識別子だけ（子は親の番号を持つ）。先頭の語が違っても同じ通し番号を使う。
-    番号を持つものが無ければ 1。
+    番号を持つものが無ければ 1。`skip_children` が偽なら、子の形の名前も数える（手元のブランチと
+    ワークツリーの名前には、親の居ない子や、末尾が子の形の名前が混ざりうる。子の番号は親と同じ）。
     """
     found = []
     for name in names:
-        if _CHILD.match(name or ""):
+        if skip_children and _CHILD.match(name or ""):
             continue
         number = identifier_number(name, prefixes)
         if number:

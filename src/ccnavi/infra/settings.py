@@ -190,7 +190,10 @@ def shell_path(path: str) -> str:
 
     `cd <パス> && …` の形で、別のツリーへ移って打つコマンドに使う。
     """
-    return _quoted(path.replace("\\", "/"))
+    # 区切りを `/` に揃えるのは Windows のパスだけ（POSIX の `\` は名前の一部）。
+    if os.name == "nt" or re.match(r"[A-Za-z]:\\", path):
+        path = path.replace("\\", "/")
+    return _quoted(path)
 
 
 def has_git_wrapper(root: str) -> bool:
