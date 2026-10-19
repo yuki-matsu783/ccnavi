@@ -45,6 +45,7 @@ SLACK_SECONDS = 2.0  # 時計の粗さ（sh は秒単位）と実行の前後の
 UNLINK_AFTER_SECONDS = 30.0  # 結び付け直しても見つからないまま、この秒数を過ぎたら未連携
 
 _SCRIPT = "ccnavi-ticket.sh"
+_SHELLS = frozenset({"sh", "bash", "zsh", "dash", "ksh"})
 
 
 def _fold(path: str) -> str:
@@ -59,6 +60,9 @@ def propose_ident(words: list[str]) -> str:
     """
     for at, word in enumerate(words):
         if os.path.basename(_fold(word)) != _SCRIPT:
+            continue
+        # 実行される位置だけ。`echo …ccnavi-ticket.sh propose x` のような引数の中は数えない。
+        if at > 1 or (at == 1 and os.path.basename(_fold(words[0])) not in _SHELLS):
             continue
         rest = words[at + 1 :]
         if not rest or rest[0] != "propose":
@@ -85,12 +89,17 @@ def _names(directory: str) -> list[str]:
         return []
 
 
-def _pre_path(state: str, tool_use_id: str) -> str:
-    return os.path.join(state, f"stopops-pre-{fsio.safe_name(tool_use_id)}.json")
+def _call(tool_use_id: str, ident: str) -> str:
+    """1 つの Bash に propose が複数あっても別の呼び出しとして扱う鍵。"""
+    return f"{tool_use_id}~{ident.casefold()}"
 
 
-def _op_path(state: str, tool_use_id: str) -> str:
-    return os.path.join(state, f"stopops-op-{fsio.safe_name(tool_use_id)}.json")
+def _pre_path(state: str, tool_use_id: str, ident: str) -> str:
+    return os.path.join(state, f"stopops-pre-{fsio.safe_name(_call(tool_use_id, ident))}.json")
+
+
+def _op_path(state: str, tool_use_id: str, ident: str) -> str:
+    return os.path.join(state, f"stopops-op-{fsio.safe_name(_call(tool_use_id, ident))}.json")
 
 
 def _refs_path(state: str, session: str) -> str:
@@ -119,7 +128,7 @@ def register(state: str, session: str, tool_use_id: str, ident: str, now: float)
     if not (state and session and tool_use_id and ident):
         return
     fsio.write_json_atomic(
-        _pre_path(state, tool_use_id),
+        _pre_path(state, tool_use_id, ident),
         {"tool_use_id": tool_use_id, "session": session, "ident": ident, "t0": now, "bound": ""},
     )
 
@@ -173,13 +182,27 @@ def _bound_files(state: str) -> set[str]:
 
 
 def bind(state: str, tool_use_id: str, now: float) -> dict[str, Any] | None:
-    """実行後に、結果ファイルを `tool_use_id` へ結び付ける。結べたら操作の記録を書いて返す。
+    """実行後に、結果ファイルを `tool_use_id` の呼び出しへ結び付ける。最後に結べた操作を返す。
+
+    1 つの Bash に propose が複数あれば、登録は識別子ごとにある。それぞれ結ぶ。
+    """
+    bound = None
+    if state and tool_use_id:
+        for name in _names(state):
+            if name.startswith("stopops-pre-") and name.endswith(".json"):
+                pre = fsio.read_dict(os.path.join(state, name))
+                if pre and pre.get("tool_use_id") == tool_use_id:
+                    bound = _bind_one(state, pre, now) or bound
+    return bound
+
+
+def _bind_one(state: str, pre: dict[str, Any], now: float) -> dict[str, Any] | None:
+    """1 件の登録に、結果ファイルを結ぶ。
 
     識別子が合い、開始が登録の時刻より後で、終了が今より前（どちらも粗さの分を許す）、まだ
     どの呼び出しにも結ばれていない結果ファイルのうち、最も新しいもの。
     """
-    pre = fsio.read_dict(_pre_path(state, tool_use_id)) if state and tool_use_id else None
-    if not pre or pre.get("bound"):
+    if pre.get("bound"):
         return None
     taken = _bound_files(state)
     lower, upper = float(pre["t0"]) - SLACK_SECONDS, now + SLACK_SECONDS
@@ -194,10 +217,11 @@ def bind(state: str, tool_use_id: str, now: float) -> dict[str, Any] | None:
     if not fit:
         return None
     result = max(fit, key=lambda r: r["ended"])
-    op = dict(result, tool_use_id=tool_use_id, session=pre["session"], ident=pre["ident"])
-    fsio.write_json_atomic(_op_path(state, tool_use_id), op)
+    tool_use_id, ident = pre["tool_use_id"], pre["ident"]
+    op = dict(result, tool_use_id=tool_use_id, session=pre["session"], ident=ident)
+    fsio.write_json_atomic(_op_path(state, tool_use_id, ident), op)
     pre["bound"] = result["file"]
-    fsio.write_json_atomic(_pre_path(state, tool_use_id), pre)
+    fsio.write_json_atomic(_pre_path(state, tool_use_id, ident), pre)
     return op
 
 
@@ -209,7 +233,7 @@ def rebind(state: str, session: str, now: float) -> None:
         pre = fsio.read_dict(os.path.join(state, name))
         if not pre or pre.get("session") != session or pre.get("bound"):
             continue
-        if bind(state, pre["tool_use_id"], now):
+        if _bind_one(state, pre, now):
             continue
         if now - float(pre["t0"]) > UNLINK_AFTER_SECONDS:
             pre["bound"] = UNLINKED

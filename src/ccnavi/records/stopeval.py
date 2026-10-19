@@ -83,7 +83,7 @@ def summarize(state: str, log_dir: str) -> dict[str, Any]:
         "flawed": 0,
         "unchecked": 0,
     }
-    resolved = unresolved = not_rejudged = sent_back = 0
+    resolved = unresolved = inconclusive = not_rejudged = sent_back = 0
     for a in attempts:
         final, judge = a.get("final"), a.get("judge")
         if a.get("state") == stopreview.PLAN_WAIT:
@@ -107,12 +107,14 @@ def summarize(state: str, log_dir: str) -> dict[str, Any]:
             counts["rejected"] += 1
         if a.get("tainted"):
             counts["tainted"] += 1
-        if a.get("state") in (stopreview.SENT_BACK, stopreview.CONSUMED):
+        if a.get("sent_at"):
             sent_back += 1
             if a.get("rejudge") == "resolved":
                 resolved += 1
             elif a.get("rejudge") == "unresolved":
                 unresolved += 1
+            elif a.get("rejudge") == "inconclusive":
+                inconclusive += 1
             else:
                 not_rejudged += 1
 
@@ -128,6 +130,7 @@ def summarize(state: str, log_dir: str) -> dict[str, Any]:
             "sent_back": sent_back,
             "resolved": resolved,
             "unresolved": unresolved,
+            "inconclusive": inconclusive,
             "not_rejudged": not_rejudged,
         },
         "coverage": _rate(counts["checked_ok"] + counts["flawed"], judged),
@@ -197,7 +200,8 @@ def render(summary: dict[str, Any], unlinked: int = 0) -> str:
         f"試行 {summary['attempts']} 件。検査カバー率 {pct(summary['coverage'])}。"
         f"修正率 {pct(summary['fix_rate'])}"
         f"（差し戻し {summary['fix']['sent_back']} 件、解消 {summary['fix']['resolved']}、"
-        f"未解消 {summary['fix']['unresolved']}、再判定なし {summary['fix']['not_rejudged']}）",
+        f"未解消 {summary['fix']['unresolved']}、判定不能 {summary['fix']['inconclusive']}、"
+        f"再判定なし {summary['fix']['not_rejudged']}）",
         "基準ごと（Stop の機会: R1・R3 / 提案の版: R2・R4）:",
     ]
     for name, row in summary["criteria"].items():

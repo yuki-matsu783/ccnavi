@@ -12,11 +12,13 @@ LLM は呼ばない。作業者向けの文書と `--docs` の索引には、こ
 from __future__ import annotations
 
 import json
+import os
+import re
 import subprocess
 import time
 from typing import TextIO
 
-from ..infra import settings, tree
+from ..infra import pathcase, settings, tree
 from ..records import stopeval, stopreview
 from ..tickets import approval, approval_checks
 
@@ -26,6 +28,7 @@ PLAN_WAIT_SECONDS = 5.0
 PLAN_POLL_SECONDS = 0.25
 
 NOT_CANDIDATE = "STOP_REVIEW_NOT_CANDIDATE"
+_SHA = re.compile(r"[0-9a-f]{7,64}")
 
 
 def _not_candidate(stdout: TextIO, why: str) -> int:
@@ -61,10 +64,14 @@ def run(
     key = stopreview.shared_key(session, transcript)
     if not key:
         return _not_candidate(stdout, "no_key") if verb == "material" else _ok(stdout)
-    stopreview.expire_overdue(conf.state)
-    if verb == "material":
-        return _material(stdout, conf, key, transcript, root)
-    return _record(stdin, stdout, conf, key, root)
+    try:
+        stopreview.expire_overdue(conf.state)
+        if verb == "material":
+            return _material(stdout, conf, key, transcript, root)
+        return _record(stdin, stdout, conf, key, root)
+    except Exception as exc:  # 判定役の失敗が作業を止めてはならない。出力は必ず決まった形にする
+        stderr.write(f"ccnavi: stop-review {verb} に失敗した: {type(exc).__name__}\n")
+        return _not_candidate(stdout, "error") if verb == "material" else _ok(stdout)
 
 
 def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str, root: str) -> int:
@@ -98,12 +105,12 @@ def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str
     return EXIT_OK
 
 
-def _unsent_body(proposal: dict) -> str:
+def _unsent_body(root: str, proposal: dict) -> str:
     """送っていない提案の本文。書いた md の今の中身を、上限つきで読む。"""
     parts = []
     for item in proposal.get("files") or []:
         path = str(item.get("path", ""))
-        if not path.endswith(".md"):
+        if not path.casefold().endswith(".md") or not _inside(root, path):
             continue
         try:
             with open(path, encoding="utf-8", errors="replace") as handle:
@@ -119,8 +126,8 @@ def _body(root: str, proposal: dict) -> str:
     読めないときは空文字（材料に本文が無いと示す）。送った提案のファイルは `todo/` の下の md。
     """
     if proposal.get("route") == "unsent":
-        return _unsent_body(proposal)
-    if not (root and proposal.get("commit")):
+        return _unsent_body(root, proposal)
+    if not (root and _SHA.fullmatch(str(proposal.get("commit", "")))):
         return ""
     parts = []
     for item in proposal.get("files") or []:
@@ -181,3 +188,11 @@ def _report(stdout: TextIO, conf: settings.Settings) -> int:
         + "\n"
     )
     return EXIT_OK
+
+
+def _inside(root: str, path: str) -> bool:
+    """実体がワークスペースの中にあるか（リンクで外のファイルを材料に出さない）。"""
+    if not root:
+        return False
+    real, base = pathcase.fold(os.path.realpath(path)), pathcase.fold(os.path.realpath(root))
+    return real == base or real.startswith(base.rstrip("/\\") + os.sep)

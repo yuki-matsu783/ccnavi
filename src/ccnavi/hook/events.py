@@ -12,6 +12,7 @@ import dataclasses
 import functools
 import io
 import os
+import sys
 import time
 from typing import TextIO
 
@@ -71,6 +72,9 @@ def decide(
     """
     if mode == modes.DISABLE:
         record.decision, record.reason = audit.SKIP, audit.REASON_MODE_DISABLED
+        if payload.event == hookio.STOP:
+            # 判定役を登録していても待たせない（検査省略の計画を書く）。
+            _plan_stop_review(stderr, conf, root, payload, mode, False, None, None)
         return EXIT_OK
     if stopjudge.is_judge(conf, payload):
         # 判定役の呼び出しは、ほかの hook の副作用を動かさない（Stop の AI 判定の判定役）。
@@ -373,6 +377,14 @@ def decide_at_stop(
 
 
 def _track_proposals(conf: settings.Settings, payload: hookio.Input) -> None:
+    """`_track_proposals_inner` の受け皿。記録の失敗で、ほかの hook の判定を止めない。"""
+    try:
+        _track_proposals_inner(conf, payload)
+    except Exception as exc:  # 記録は判定の材料でしかない。落ちても作業を止めない
+        sys.stderr.write(f"ccnavi: propose の操作実績を記録できない: {type(exc).__name__}: {exc}\n")
+
+
+def _track_proposals_inner(conf: settings.Settings, payload: hookio.Input) -> None:
     """propose の操作実績とターンの開始を、state に記録する（Stop の AI 判定の材料）。
 
     agent hook を登録していなければ何もしない。判定にも出力にも影響しない。サブエージェントの
@@ -449,6 +461,8 @@ _NOT_CANDIDATE_FINAL = {
     "approved_in_progress": stopreview.FINAL_OUT_OF_SCOPE,
     "target_unresolvable": stopreview.FINAL_UNCHECKED,
     "criteria_unreadable": stopreview.FINAL_UNCHECKED,
+    "disabled": stopreview.FINAL_SKIPPED,
+    "not_main_agent": stopreview.FINAL_SKIPPED,
 }
 
 
@@ -475,6 +489,26 @@ def _submitted(
 
 
 def _plan_stop_review(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    mode: str,
+    nudged: bool,
+    continuation: dict | None,
+    raw: approval.Raw | None,
+) -> None:
+    """`_plan_stop_review_inner` の受け皿。
+
+    AI 判定の失敗で、既存の促し（数え終えたもの）が出ずに Stop が終わらないようにする。
+    """
+    try:
+        _plan_stop_review_inner(stderr, conf, root, payload, mode, nudged, continuation, raw)
+    except Exception as exc:  # 計画は AI 判定のためだけのもの。落ちても Stop を止めない
+        stderr.write(f"ccnavi: Stop の AI 判定の計画を作れない: {type(exc).__name__}: {exc}\n")
+
+
+def _plan_stop_review_inner(
     stderr: TextIO,
     conf: settings.Settings,
     root: str,

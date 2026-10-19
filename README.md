@@ -469,6 +469,10 @@ hook からの判定と `ticket` / `review` などのサブコマンドに渡す
 | `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と知らせる |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、バックアップして戻す側の両方が切り替わる |
+| `CCNAVI_STOP_REVIEW` | `dry-run`（既定）、`enable`、`disable`。Stop の AI 判定（agent 型 Stop フック）の効き方。全体のモードと掛け合わせる（全体が dry-run なら dry-run、disable なら disable）。`dry-run` は記録だけで止めず、`enable` は検証に通った不備検出だけを差し戻す。登録は `scripts/ccnavi-stop-review.sh`（構成は [docs/design/stop-review.md](docs/design/stop-review.md)） |
+| `CCNAVI_STOP_REVIEW_AGENT` | `1` のとき、Stop で判定計画を作る。agent hook を登録したワークスペースが置く（`scripts/ccnavi-stop-review.sh register` が書く）。無ければ何も作らない |
+| `CCNAVI_STOP_REVIEW_JUDGE_TYPE` | 判定役の呼び出しの payload の `agent_type`。空のうちは判定役を見分けず、除外も作業者の `stop-review` の停止もしない。実機で確かめた値を設定する。`enable` にする前に要る（`--lint` が警告する） |
+| `CCNAVI_STOP_REVIEW_KEEP_DAYS` | 判定の再評価用の材料（`logs/stop-review/`）を残す日数。既定は `90`。`0` で消さない |
 | `CCNAVI_DENY_REPEAT` | 同じ理由で同じ呼び出しを何回止めたら、拒否の文面に「言い換えずにユーザに相談する」一文を足し、ターンの終わりにユーザへ報告するか。既定は `3`。2 未満と読めない値は既定に戻る。判定は変わらない（「同じ呼び出しを繰り返し止めたとき」） |
 | `CCNAVI_FAIL_STREAK_COUNT` | ツール呼び出しの失敗か ccnavi の拒否が何回続けて起きたら、資料を引く案内（`--docs` で索引を引く）を出すか。既定は `3`。`0` なら数えも案内もしない。負数と読めない値は既定に戻る。判定は変わらない（「失敗や拒否が続いたとき」） |
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。ユーザにも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない。「ルールが言及していない呼び出し」）。`dry-run` は無く、それ以外の値は `enable` として動き、`--lint` が指摘する |

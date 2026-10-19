@@ -195,6 +195,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0113](0113-stop-nudges-block-in-dry-run.md) | Stop の促し（finish・match: Stop）は dry-run でも止める |
 | [0119](0119-rule-expectations-rename.md) | ルールの「見本」を「期待する判定」と呼び、名前を rule-expectations に改める |
 | [0120](0120-nudge-request-path-at-stop.md) | レビュー依頼までの道の途中で終えようとしたら、Stop で 1 回だけ止めて次の一手を返す |
+| [0146](0146-ai-review-at-stop.md) | Stop の AI 判定（agent 型 Stop フック）を、既存の促しを変えずに足す |
 | [0122](0122-deny-unreadable-args-to-user-entries.md) | 2 段目の無いユーザの入口は、引数を読み切れなければ止める |
 | [0115](0115-drop-all-migration-reads.md) | 公開前なので、移行のための読み取りと掃除をすべて外す |
 | [0101](0101-child-id-carries-the-phase.md) | 子チケットの識別子にフェーズ番号を入れ、連番はフェーズごとに振る |

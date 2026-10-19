@@ -67,11 +67,15 @@ class SharedKeyTest(unittest.TestCase):
                 {"type": "assistant", "uuid": "a2"},
                 {"type": "assistant", "uuid": "side", "isSidechain": True},
                 {"type": "system", "uuid": "sys"},
-                {"type": "user", "uuid": "u"},
                 "not json",
+                {"type": "user", "uuid": "u"},
             ]
         )
         self.assertEqual(sr.shared_key("s1", path), "s1:a2")
+
+    def test_unfinished_last_line_gives_no_key(self):
+        path = self._transcript([{"type": "assistant", "uuid": "a1"}, '{"type": "assist'])
+        self.assertEqual(sr.shared_key("s1", path), "")
 
     def test_same_input_same_key(self):
         path = self._transcript([{"type": "assistant", "uuid": "a1"}])

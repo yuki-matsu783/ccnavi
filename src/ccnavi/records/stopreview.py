@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 from typing import Any
 
@@ -37,7 +38,7 @@ CONSUMED = "consumed"  # AI による継続の Stop で消費した
 FINAL_STATES = frozenset({DONE, EXPIRED, CONSUMED})
 
 TRANSITIONS: dict[str, frozenset[str]] = {
-    PLAN_WAIT: frozenset({PENDING}),
+    PLAN_WAIT: frozenset({PENDING, DONE, EXPIRED}),
     PENDING: frozenset({RUNNING, EXPIRED}),
     RUNNING: frozenset({DONE, SENT_BACK, EXPIRED}),
     SENT_BACK: frozenset({CONSUMED, EXPIRED}),
@@ -101,15 +102,27 @@ _TAIL_LIMIT = 4 * 1024 * 1024
 def shared_key(session_id: str, transcript_path: str) -> str:
     """セッション ID と、transcript の末尾にあるサイドチェーンでないアシスタント行の uuid。
 
-    hook・システムの行は除外し、末尾から読む。導けなければ空文字。
+    hook・システムの行は除外し、末尾から読む。導けなければ空文字。末尾の行が書きかけ（JSON として
+    読めない）なら、短い時間だけ読み直し、それでも読めなければ導けないとする（1 つ前の行の uuid で
+    代用すると、hook と判定役でキーがずれる）。
     """
     if not session_id or not transcript_path:
         return ""
-    uuid = _last_assistant_uuid(transcript_path)
-    return f"{session_id}:{uuid}" if uuid else ""
+    for attempt in range(_REREADS):
+        uuid = _last_assistant_uuid(transcript_path)
+        if uuid is not None:
+            return f"{session_id}:{uuid}" if uuid else ""
+        if attempt + 1 < _REREADS:
+            time.sleep(_REREAD_SECONDS)
+    return ""
 
 
-def _last_assistant_uuid(path: str) -> str:
+_REREADS = 3
+_REREAD_SECONDS = 0.05
+
+
+def _last_assistant_uuid(path: str) -> str | None:
+    """末尾のアシスタント行の uuid。無ければ空文字。末尾が書きかけなら None。"""
     try:
         size = os.path.getsize(path)
         with open(path, "rb") as handle:
@@ -123,14 +136,15 @@ def _last_assistant_uuid(path: str) -> str:
                 # 先頭は途中で切れているかもしれないので、先頭まで読み切るまでは捨てる。
                 complete = lines if end == 0 else lines[1:]
                 found = _scan(complete)
-                if found:
+                if found is None or found:
                     return found
     except OSError:
         return ""
     return ""
 
 
-def _scan(lines: list[bytes]) -> str:
+def _scan(lines: list[bytes]) -> str | None:
+    first = True
     for raw in reversed(lines):
         raw = raw.strip()
         if not raw:
@@ -138,7 +152,10 @@ def _scan(lines: list[bytes]) -> str:
         try:
             row = json.loads(raw)
         except ValueError:
+            if first:
+                return None  # 末尾の行が書きかけ
             continue
+        first = False
         if not isinstance(row, dict):
             continue
         if row.get("type") != "assistant" or row.get("isSidechain") is True:
@@ -230,20 +247,43 @@ def write_plan(state: str, key: str, plan: dict[str, Any], now: float | None = N
         fsio.write_json_atomic(_plan_path(state, key), body)
     attempt = read_attempt(state, aid)
     if attempt is None:
-        attempt = {"attempt_id": aid, "key": key, "created": when, "state": PENDING}
-        attempt["original"] = plan.get("original", "")
+        fresh = {"attempt_id": aid, "key": key, "created": when, "state": PENDING}
+        fresh["original"] = plan.get("original", "")
+        if not plan.get("is_candidate"):
+            _finalize_ccnavi(fresh, plan)
+        # 排他で作る。material が先に plan_wait を置く競合で、どちらかが上書きしないように。
+        if _create(state, fresh):
+            if fresh["state"] == DONE:
+                log_event(state, "final", fresh)
+            return aid
+        attempt = read_attempt(state, aid)
+    if attempt is not None and attempt["state"] == PLAN_WAIT:
+        # 計画より先に material が来ていた。候補なら開始待ちへ、候補でなければ ccnavi が確定する。
         if plan.get("is_candidate"):
-            _store(state, attempt)
+            _move(state, attempt, PENDING)
         else:
-            attempt["state"] = DONE
-            attempt["final"] = plan.get("final") or FINAL_SKIPPED
-            attempt["judge"] = JUDGE_CCNAVI
-            attempt["reason"] = plan.get("reason", "")
-            _store(state, attempt)
-            log_event(state, "final", attempt)
-    elif attempt["state"] == PLAN_WAIT:
-        _move(state, attempt, PENDING)
+            _finalize_ccnavi(attempt, plan, keep_state=True)
+            if _move(state, attempt, DONE):
+                log_event(state, "final", attempt)
     return aid
+
+
+def _finalize_ccnavi(
+    attempt: dict[str, Any], plan: dict[str, Any], keep_state: bool = False
+) -> None:
+    """候補でない試行の最終分類を、ccnavi が書く（対象外・検査省略・未検査）。"""
+    if not keep_state:
+        attempt["state"] = DONE
+    attempt["final"] = plan.get("final") or FINAL_SKIPPED
+    attempt["judge"] = JUDGE_CCNAVI
+    attempt["reason"] = plan.get("reason", "")
+
+
+def _create(state: str, attempt: dict[str, Any]) -> bool:
+    """試行のファイルを、まだ無いものとして作る。作れたら真。在れば偽（上書きしない）。"""
+    path = _attempt_path(state, attempt["attempt_id"])
+    body = json.dumps(attempt, ensure_ascii=False).encode("utf-8")
+    return not fsio.write_new(path, body)
 
 
 def _store(state: str, attempt: dict[str, Any]) -> None:
@@ -267,21 +307,20 @@ def begin(state: str, key: str, now: float | None = None) -> tuple[str, dict[str
     plan = read_plan(state, key)
     if plan is None:
         aid = attempt_id(key)
-        if read_attempt(state, aid) is None:
-            _store(
-                state,
-                {
-                    "attempt_id": aid,
-                    "key": key,
-                    "created": time.time() if now is None else now,
-                    "state": PLAN_WAIT,
-                },
-            )
+        _create(
+            state,
+            {
+                "attempt_id": aid,
+                "key": key,
+                "created": time.time() if now is None else now,
+                "state": PLAN_WAIT,
+            },
+        )
         return "wait", None
     if not plan.get("is_candidate"):
         return "not_candidate", plan
     attempt = read_attempt(state, plan["attempt_id"])
-    if attempt is None:
+    if attempt is None or attempt["state"] == PLAN_WAIT:
         return "wait", plan
     if attempt["state"] == PENDING:
         _move(state, attempt, RUNNING)
@@ -314,21 +353,30 @@ def expire_overdue(
         attempt = fsio.read_dict(os.path.join(state, name))
         if not attempt or attempt.get("state") in FINAL_STATES:
             continue
-        if attempt.get("state") == SENT_BACK:
-            continue  # 差し戻しは次の Stop で消費する。期限で落とさない。
-        if when - float(attempt.get("created", when)) < ttl:
+        sent_back = attempt.get("state") == SENT_BACK
+        started = attempt.get("sent_at", when) if sent_back else attempt.get("created", when)
+        if when - float(started) < ttl:
             continue
-        attempt["final"] = FINAL_UNCHECKED
-        attempt["judge"] = JUDGE_CCNAVI
-        attempt["reason"] = "expired"
+        if not sent_back:
+            # 差し戻した試行の最終分類（不備検出）は残す。消費されない差し戻しは閉じるだけ。
+            attempt["final"] = FINAL_UNCHECKED
+            attempt["judge"] = JUDGE_CCNAVI
+            attempt["reason"] = "expired"
         if _move(state, attempt, EXPIRED):
             log_event(state, "final", attempt)
             expired.append(attempt["attempt_id"])
     return expired
 
 
-def consume_continuation(state: str, session_id: str) -> dict[str, Any] | None:
-    """次の Stop が stop_hook_active で、同じセッションに差し戻し送出の試行があれば消費して返す。"""
+def consume_continuation(
+    state: str, session_id: str, now: float | None = None, window: float = DEFAULT_TTL_SECONDS
+) -> dict[str, Any] | None:
+    """次の Stop が stop_hook_active で、同じセッションに差し戻し送出の試行があれば消費して返す。
+
+    差し戻しから `window` 秒を過ぎたものは消費しない（ユーザが割り込んで新しい依頼を打った後の、
+    別の連鎖の Stop を「AI による継続」と取り違えないため）。
+    """
+    when = time.time() if now is None else now
     found: dict[str, Any] | None = None
     for name in _names(state):
         if not (name.startswith("stopreview-attempt-") and name.endswith(".json")):
@@ -338,6 +386,7 @@ def consume_continuation(state: str, session_id: str) -> dict[str, Any] | None:
             attempt
             and attempt.get("state") == SENT_BACK
             and str(attempt.get("key", "")).startswith(f"{session_id}:")
+            and when - float(attempt.get("sent_at", 0)) <= window
             and _move(state, attempt, CONSUMED)
         ):
             found = attempt
@@ -379,7 +428,9 @@ def validate(result: Any, plan: dict[str, Any]) -> dict[str, Any]:
     targets = set(plan.get("targets") or [])
     seen: set[tuple[str, str]] = set()
     for row in rows:
-        _row(row, targets, seen)
+        _row(row, targets, set(plan.get("no_r2") or []), seen)
+    if classification == CLASS_NOT_TICKET_WORK and plan.get("proposals"):
+        raise Rejected("ccnavi が提案の操作を見つけているのに、チケット作業ではないと分類した")
     if classification == CLASS_TICKET_WORK:
         for need in required(plan):
             if need not in seen:
@@ -397,10 +448,12 @@ def required(plan: dict[str, Any]) -> list[tuple[str, str]]:
     return needs
 
 
-def _row(row: Any, targets: set[str], seen: set[tuple[str, str]]) -> None:
+def _row(row: Any, targets: set[str], no_r2: set[str], seen: set[tuple[str, str]]) -> None:
     if not isinstance(row, dict):
         raise Rejected("結果の行がオブジェクトではない")
     criterion, target, outcome = row.get("criterion"), row.get("target"), row.get("result")
+    if not all(isinstance(x, str) for x in (criterion, target, outcome)):
+        raise Rejected("基準 ID・対象・結果は文字列")
     if criterion not in CRITERIA:
         raise Rejected(f"基準 ID が不正: {criterion!r}")
     unit = STOP_TARGET if criterion in STOP_UNIT else target
@@ -413,6 +466,8 @@ def _row(row: Any, targets: set[str], seen: set[tuple[str, str]]) -> None:
     if (criterion, unit) in seen:
         raise Rejected(f"{criterion} が対象 {unit} で重複")
     seen.add((criterion, unit))
+    if criterion == R2 and target in no_r2:
+        raise Rejected(f"本文が無い版 {target} には R2 を出さない")
     if outcome == FAIL and criterion in FLAW_CRITERIA:
         _entries(row.get("locations"), LOCATION_KINDS, "問題箇所")
         _entries(row.get("fixes"), FIX_KINDS, "修正")
@@ -437,16 +492,20 @@ def classify(result: dict[str, Any], plan: dict[str, Any], insufficient: bool = 
     """Stop 全体の最終分類。
 
     1. チケット作業の依頼ではない → 対象外（判定者: AI）
-    2. R1・R2・R4 に受理された不備がある → 不備検出
-    3. 必要な基準に判定不能がある、または材料不足 → 未検査
-    4. それ以外 → 終了可
+    2. 材料不足（切り詰め・読めない） → 未検査（不備の指摘も受理しない）
+    3. R1・R2・R4 に受理された不備がある → 不備検出
+    4. 必要な基準に判定不能がある → 未検査
+    5. それ以外 → 終了可
     """
     if result["classification"] == CLASS_NOT_TICKET_WORK:
         return FINAL_OUT_OF_SCOPE
+    if insufficient:
+        # 材料が切れていたら、「無い」を根拠にした不備は受理しない。
+        return FINAL_UNCHECKED
     rows = {(r["criterion"], r["target"]): r for r in result["results"]}
     if any(r["result"] == FAIL for r in rows.values() if r["criterion"] in FLAW_CRITERIA):
         return FINAL_FLAWED
-    if insufficient or any(rows[need]["result"] == UNKNOWN for need in required(plan)):
+    if any(rows[need]["result"] == UNKNOWN for need in required(plan)):
         return FINAL_UNCHECKED
     return FINAL_OK
 
@@ -498,11 +557,17 @@ def accept(
             for target in plan.get("targets") or []:
                 if target != STOP_TARGET and not still_unapproved(target):
                     raise Rejected("承認状態が変わった")
-    except Rejected as why:
-        attempt.update(final=FINAL_UNCHECKED, judge=JUDGE_CCNAVI, reason=f"rejected: {why}")
+    except Exception as why:  # 判定役の誤出力（深すぎる入れ子・型違いなど）で record を落とさない
+        reason = (
+            f"rejected: {why}" if isinstance(why, Rejected) else f"rejected: {type(why).__name__}"
+        )
+        attempt.update(final=FINAL_UNCHECKED, judge=JUDGE_CCNAVI, reason=reason)
         attempt["accepted"] = False
+        attempt["tainted"] = bool(plan.get("tainted"))
         if _move(state, attempt, DONE):
             log_event(state, "final", attempt)
+        if plan.get("rejudge") and attempt.get("original"):
+            _resolve_original(state, attempt["original"], FINAL_UNCHECKED)
         return dict(OK_RETURN)
 
     effective = effective or plan.get("effective") or modes.DRY_RUN
@@ -513,13 +578,16 @@ def accept(
         accepted=True,
         results=valid["results"],
         effective=effective,
+        tainted=bool(plan.get("tainted")),
     )
     sends_back = final == FINAL_FLAWED and effective == modes.ENABLE and not plan.get("rejudge")
     target_state = SENT_BACK if sends_back else DONE
+    if sends_back:
+        attempt["sent_at"] = time.time()
     _move(state, attempt, target_state)
     log_event(state, "final", attempt)
     if plan.get("rejudge") and attempt.get("original"):
-        _resolve_original(state, attempt["original"], final != FINAL_FLAWED)
+        _resolve_original(state, attempt["original"], final)
     if sends_back:
         _mark_sent_back(state, key)
         return {"ok": False, "reason": rebuke(attempt["attempt_id"], valid)}
@@ -533,10 +601,17 @@ def _mark_sent_back(state: str, key: str) -> None:
         note_last_stop(state, session, key, bool(last.get("nudged")), True, last.get("t", 0.0))
 
 
-def _resolve_original(state: str, original: str, resolved: bool) -> None:
+def _resolve_original(state: str, original: str, final: str) -> None:
+    """元の試行に、再判定の結果を残す。解消は終了可のときだけ。未検査・対象外は決められない。"""
     attempt = read_attempt(state, original)
     if attempt is not None:
-        attempt["rejudge"] = "resolved" if resolved else "unresolved"
+        attempt["rejudge"] = (
+            "resolved"
+            if final == FINAL_OK
+            else "unresolved"
+            if final == FINAL_FLAWED
+            else "inconclusive"
+        )
         _store(state, attempt)
         log_event(state, "rejudge", attempt)
 
@@ -658,7 +733,7 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
                     row = json.loads(line)
                 except ValueError:
                     continue
-                if isinstance(row, dict) and not row.get("isSidechain"):
+                if isinstance(row, dict) and not row.get("isSidechain") and not row.get("isMeta"):
                     rows.append(row)
     except OSError:
         return {"turn": [], "past_prompts": [], "insufficient": True, "reason": "unreadable"}
@@ -696,6 +771,19 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
     }
 
 
+_DELIMITER = re.compile(r"<(/?)(data|criteria)\b", re.IGNORECASE)
+
+
+def defang(text: str) -> str:
+    """材料の区切り（`<data …>`・`<criteria>`）を本文に書かれても、囲みを破れないようにする。"""
+    return _DELIMITER.sub(lambda m: f"＜{m.group(1)}{m.group(2)}", text)
+
+
+def _attr(value: object) -> str:
+    """属性に入れる値。空白・括弧・引用符を落として、タグの形を崩せないようにする。"""
+    return re.sub(r"[^\w.:/@+-]", "_", str(value))[:120]
+
+
 def render_material(
     plan: dict[str, Any],
     material: dict[str, Any],
@@ -716,27 +804,32 @@ def render_material(
         "</criteria>",
         "<data kind=past_user_prompts>",
     ]
-    out += [f"--- 過去の発言 {i + 1} ---\n{t}" for i, t in enumerate(material["past_prompts"])]
+    out += [
+        f"--- 過去の発言 {i + 1} ---\n{defang(t)}" for i, t in enumerate(material["past_prompts"])
+    ]
     out += ["</data>", "<data kind=current_turn>"]
-    out += [f"--- {t['role']} ---\n{t['text']}" for t in material["turn"]]
+    out += [f"--- {t['role']} ---\n{defang(t['text'])}" for t in material["turn"]]
     out.append("</data>")
     out.append("<data kind=issue_mr_refs>")
-    out += [str(label) for label in plan.get("refs") or []] or ["（指定なし）"]
+    out += [defang(str(label)) for label in plan.get("refs") or []] or ["（指定なし）"]
     out.append("</data>")
     out.append("<data kind=submitted_proposals>")
     for row in plan.get("submitted") or []:
         state = "承認済み" if row["approved"] else "承認待ち"
-        out.append(f"{row['ident']}: {state}{'（着手済み）' if row['in_progress'] else ''}")
+        shown = defang(str(row["ident"]))
+        out.append(f"{shown}: {state}{'（着手済み）' if row['in_progress'] else ''}")
     if not plan.get("submitted"):
         out.append("（このセッションで propose した提案なし）")
     out.append("</data>")
     for proposal in plan.get("proposals") or []:
         body = (bodies or {}).get(proposal["key"])
         out.append(
-            f"<data kind=proposal target={proposal['key']} route={proposal['route']}"
-            f" ident={proposal['ident']}>"
+            f"<data kind=proposal target={_attr(proposal['key'])} route={_attr(proposal['route'])}"
+            f" ident={_attr(proposal['ident'])}>"
         )
-        out.append(body if body else "（本文は取れない。送れなかった提案で、R2 は判定しない）")
+        out.append(
+            defang(body) if body else "（本文は取れない。送れなかった提案で、R2 は判定しない）"
+        )
         out.append("</data>")
     return "\n".join(out)
 
