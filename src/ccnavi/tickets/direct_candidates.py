@@ -1,11 +1,13 @@
-"""Stop で `integrate` を促す直接作業の「候補」の記録。
+"""Stop で `integrate` を促すための、直接作業の「候補」の記録。
 
 直接作業のワークツリー（`.claude/worktrees/<名前>`）に Write・Edit・NotebookEdit で書き込んだとき、
-そのツリーをセッションごとの記録に足す。Stop は cwd のツリーに加えて、ここに足された候補も調べる。
+そのツリーを、セッションごとの記録に加える。
+Stop は cwd のツリーに加えて、ここで加えられた候補も調べる。
 cwd がワークスペースルートのままでも、サブエージェントが書いたツリーでも、促しが届く。
 
-候補は促しの対象を絞る材料で、担当の証明ではない。登録は git を呼ばず、ファイルシステムだけで行う。
-確かめるのは Stop（`ops_stop_integrate.direct_at_stop`）。
+候補は、促す対象を絞るための材料であり、担当の証明ではない。
+登録では git を呼ばず、ファイルシステムだけを使う。
+候補を確かめるのは Stop（`ops_stop_integrate.direct_at_stop`）である。
 
 置き場は `logs/state/direct-<セッション>.json`。形は
 `{"session": "<ID>", "entries": [{"name", "path", "seen", "checked"}]}`。
@@ -29,15 +31,17 @@ from ..infra import fsio, hookio, pathcase, settings, tree
 TOOLS = ("Write", "Edit", "NotebookEdit")
 # 記録の上限。
 MAX_ENTRIES = 50
-# 同じ候補が末尾にあって、これ以内に見たものなら書き直さない（秒）。
+# 同じ候補が末尾にあり、これ以内に見たばかりなら書き直さない（秒）。
 REFRESH_SECONDS = 60
 
 
 def integrable_name(name: str) -> bool:
     """`integrate` が受ける名前か。`ccnavi-git.sh` の `ig_name` と同じ検査。
 
-    統合先に使う名前（main・master・develop・release・release-*）と、`ccnavi_is_ident` を通らない
-    形は断られるので、促さない。
+    統合先に使う名前（main・master・develop・release・release-*）と、
+    `ccnavi_is_ident` を通らない形は、
+    `integrate` が断る。
+    そのため、促さない。
     """
     if name in ("main", "master", "develop", "release") or name.startswith("release-"):
         return False
@@ -112,7 +116,7 @@ def _target(payload: hookio.Input) -> str:
 def touch(
     conf: settings.Settings, root: str, payload: hookio.Input, now: float | None = None
 ) -> None:
-    """成功した書き込みの先が直接作業のワークツリーなら、候補に足す。git は呼ばない。
+    """成功した書き込みの先が直接作業のワークツリーなら、候補に加える。git は呼ばない。
 
     メインにもサブエージェントにも効く（サブエージェントも親のセッションの候補になる）。
     保存できなければ何も言わない。
