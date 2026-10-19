@@ -1,0 +1,180 @@
+"""操作記録（`tickets/oplog.py`）。保存・段階の更新・未完了の判定・消さない条件を確かめる。"""
+
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+import time
+import unittest
+
+from ccnavi.records import prune
+from ccnavi.tickets import oplog
+
+REPO = {"host": "github.com", "kind": "github", "path": "o/r"}
+STAGES = [("reply", oplog.STAGE_REPLY), ("issue", oplog.STAGE_ISSUE), ("note", oplog.STAGE_COMMENT)]
+
+
+class OplogTest(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.state = os.path.join(directory.name, "logs", "state")
+
+    def begin(self, **extra):
+        return oplog.begin(
+            self.state,
+            oplog.KIND_DECIDE,
+            repo=REPO,
+            parent="i0001",
+            phase=1,
+            mr=7,
+            stages=STAGES,
+            **extra,
+        )
+
+    def test_begin_saves_before_anything_else_and_returns_a_32_hex_id(self):
+        op_id = self.begin(choices={"k": "keep"})
+        self.assertTrue(oplog.valid_id(op_id))
+        record = oplog.load(self.state, op_id)
+        self.assertEqual(record["kind"], "decide")
+        self.assertEqual(record["choices"], {"k": "keep"})
+        self.assertEqual([s["state"] for s in record["stages"]], ["pending"] * 3)
+        self.assertEqual(record["version"], 1)
+        self.assertTrue(record["created_at"])
+
+    def test_the_record_keeps_no_body_text(self):
+        op_id = self.begin(shown=[{"key": "k", "version": "v", "body": "指摘"}])
+        with open(oplog.record_path(self.state, op_id), encoding="utf-8") as f:
+            text = f.read()
+        self.assertNotIn("comment_body", text)
+        self.assertIn("指摘", text)  # 見せた指摘の本文は shown に持つ
+
+    def test_begin_with_an_existing_id_does_not_overwrite(self):
+        op_id = self.begin()
+        oplog.stage_set(self.state, op_id, "reply", oplog.SENT, url="u")
+        again = oplog.begin(self.state, oplog.KIND_DECIDE, repo=REPO, stages=STAGES, op_id=op_id)
+        self.assertEqual(again, op_id)
+        self.assertEqual(oplog.load(self.state, op_id)["stages"][0]["state"], "sent")
+
+    def test_a_bad_id_or_kind_is_refused(self):
+        with self.assertRaises(oplog.OpError):
+            oplog.begin(self.state, "unknown", repo=REPO)
+        with self.assertRaises(oplog.OpError):
+            oplog.begin(self.state, oplog.KIND_DECIDE, repo=REPO, op_id="../x")
+        with self.assertRaises(oplog.OpError):
+            oplog.load(self.state, "../../etc/passwd")
+
+    def test_stage_set_records_url_account_and_tries(self):
+        op_id = self.begin()
+        oplog.stage_set(self.state, op_id, "issue", oplog.UNKNOWN)
+        oplog.stage_set(self.state, op_id, "issue", oplog.PENDING)
+        oplog.stage_set(self.state, op_id, "issue", oplog.SENT, url="https://x/1", account="me")
+        stage = oplog.load(self.state, op_id)["stages"][1]
+        self.assertEqual(
+            (stage["state"], stage["url"], stage["account"]), ("sent", "https://x/1", "me")
+        )
+        self.assertGreaterEqual(stage["tries"], 1)
+
+    def test_a_sent_stage_cannot_go_back(self):
+        op_id = self.begin()
+        oplog.stage_set(self.state, op_id, "reply", oplog.SENT)
+        with self.assertRaises(oplog.OpError):
+            oplog.stage_set(self.state, op_id, "reply", oplog.PENDING)
+        with self.assertRaises(oplog.OpError):
+            oplog.stage_set(self.state, op_id, "nope", oplog.SENT)
+        with self.assertRaises(oplog.OpError):
+            oplog.stage_set(self.state, op_id, "reply", "weird")
+
+    def test_pending_lists_only_unfinished_records(self):
+        done = self.begin()
+        for sid, _ in STAGES:
+            oplog.stage_set(self.state, done, sid, oplog.SENT)
+        half = self.begin()
+        oplog.stage_set(self.state, half, "reply", oplog.SENT)
+        ids = [r["id"] for r in oplog.pending(self.state)]
+        self.assertEqual(ids, [half])
+        self.assertTrue(oplog.complete_if_done(self.state, done))
+        self.assertFalse(oplog.complete_if_done(self.state, half))
+        self.assertIsNone(oplog.load(self.state, done))
+        self.assertIsNotNone(oplog.load(self.state, half))
+
+    def test_a_broken_record_is_reported_not_hidden(self):
+        op_id = self.begin()
+        with open(oplog.record_path(self.state, op_id), "w", encoding="utf-8") as f:
+            f.write("{not json")
+        found = oplog.pending(self.state)
+        self.assertEqual(len(found), 1)
+        self.assertIn("broken", found[0])
+        self.assertIn("壊れている", oplog.summary(found[0]))
+
+    def test_the_lock_refuses_a_second_runner_and_frees_itself(self):
+        op_id = self.begin()
+        with (
+            oplog.locked(self.state, op_id),
+            self.assertRaises(oplog.OpError),
+            oplog.locked(self.state, op_id),
+        ):
+            pass
+        with oplog.locked(self.state, op_id):
+            pass
+
+    def test_a_stale_lock_is_taken_over(self):
+        op_id = self.begin()
+        path = os.path.join(oplog.ops_dir(self.state), f"{op_id}.lock")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("999999")
+        old = time.time() - oplog.LOCK_STALE_SECONDS - 5
+        os.utime(path, (old, old))
+        with oplog.locked(self.state, op_id):
+            pass
+
+    def test_applied_set_keeps_what_was_applied_locally(self):
+        op_id = self.begin()
+        oplog.applied_set(self.state, op_id, "moved", ["i0001-01-01"])
+        self.assertEqual(oplog.load(self.state, op_id)["applied"]["moved"], ["i0001-01-01"])
+
+    def test_the_record_is_valid_json_with_the_documented_fields(self):
+        op_id = self.begin()
+        with open(oplog.record_path(self.state, op_id), encoding="utf-8") as f:
+            data = json.load(f)
+        for key in (
+            "version",
+            "id",
+            "kind",
+            "repo",
+            "parent",
+            "phase",
+            "mr",
+            "request_head",
+            "shown",
+            "choices",
+            "plan",
+            "applied",
+            "stages",
+            "created_at",
+            "updated_at",
+        ):
+            self.assertIn(key, data)
+
+
+class PruneKeepsUnfinishedOpsTest(unittest.TestCase):
+    def test_prune_never_deletes_the_ops_directory(self):
+        with tempfile.TemporaryDirectory() as root:
+            state = os.path.join(root, "logs", "state")
+            op_id = oplog.begin(state, oplog.KIND_DECIDE, repo=REPO, stages=STAGES)
+            path = oplog.record_path(state, op_id)
+            old = time.time() - 400 * 86400
+            os.utime(path, (old, old))
+            report = prune.run(
+                root,
+                os.path.join(root, "logs", "decisions.jsonl"),
+                state,
+                "own-session",
+                dry_run=False,
+            )
+            self.assertTrue(os.path.exists(path), report)
+
+
+if __name__ == "__main__":
+    unittest.main()

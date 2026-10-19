@@ -9,6 +9,7 @@ cli から分けた。cli を読まない。
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 from typing import TextIO
@@ -20,6 +21,7 @@ from ..tickets import (
     learning,
     legacy_sync,
     next_id,
+    oplog,
     ops,
     phase,
     propose,
@@ -441,6 +443,62 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
     for key, value in lines:
         stdout.write(f"{key} {value}\n")
     return 0
+
+
+def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: list[str]) -> int:
+    """`ccnavi ops <副命令>`。操作記録（`logs/state/ops/`）を読み書きする。
+
+    sh が送信の段階を記録するために呼ぶ。
+
+    - `pending`: 未完了の記録を 1 行ずつ（`<操作ID> <種類> <未完了の段階>`）。無ければ何も出さない
+    - `show <操作ID>`: 記録の JSON
+    - `stage-set <操作ID> <段階ID> <状態> [URL] [アカウント]`: 段階の状態を書く
+    - `done <操作ID>`: すべての段階が sent なら記録を消す。消したら `done`、残るなら `open` を出す
+
+    書く副命令（`stage-set`・`done`）は、エージェントが偽の送信済みを書けないよう、
+    実行ファイルを直に呼ぶ形を hook が止める（`user_only.SUBS`）。
+    ネットワークにも git にも触れない。
+    """
+    if not conf.state:
+        stderr.write("ccnavi: state の置き場が空。操作記録を扱えない\n")
+        return EXIT_ERROR
+    try:
+        if words == ["pending"]:
+            for record in oplog.pending(conf.state):
+                if record.get("broken"):
+                    stdout.write(f"{record['id']} broken\n")
+                    continue
+                left = ",".join(s["id"] for s in oplog.unfinished(record))
+                stdout.write(f"{record['id']} {record['kind']} {left}\n")
+            return EXIT_OK
+        if len(words) == 2 and words[0] == "show":
+            record = oplog.load(conf.state, words[1])
+            if record is None:
+                stderr.write(f"ccnavi: 操作記録 {words[1]} が無い\n")
+                return EXIT_ERROR
+            stdout.write(json.dumps(record, ensure_ascii=False) + "\n")
+            return EXIT_OK
+        if len(words) in (4, 5, 6) and words[0] == "stage-set":
+            oplog.stage_set(
+                conf.state,
+                words[1],
+                words[2],
+                words[3],
+                words[4] if len(words) > 4 else "",
+                words[5] if len(words) > 5 else "",
+            )
+            return EXIT_OK
+        if len(words) == 2 and words[0] == "done":
+            stdout.write("done\n" if oplog.complete_if_done(conf.state, words[1]) else "open\n")
+            return EXIT_OK
+    except oplog.OpError as exc:
+        stderr.write(f"ccnavi: {exc}\n")
+        return EXIT_ERROR
+    stderr.write(
+        "ccnavi: ops の使い方: pending / show <操作ID> / "
+        "stage-set <操作ID> <段階ID> <pending|sent|unknown> [URL] [アカウント] / done <操作ID>\n"
+    )
+    return EXIT_ERROR
 
 
 SYNC_RETIRED_HEAD = "retired 1"

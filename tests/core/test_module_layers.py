@@ -108,6 +108,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.yamlread",
                 "records.redact",
                 "tickets.user_only",
+                "tickets.oplog",
                 "tickets.direct_candidates",
             }
         ),
