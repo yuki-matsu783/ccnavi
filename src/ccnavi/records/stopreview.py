@@ -693,8 +693,8 @@ def log_event(state: str, event: str, attempt: dict[str, Any]) -> None:
 
 # --- 会話の材料と判定用 Markdown ---------------------------------------------------
 
-EXTRACTOR_VERSION = "basic-1"
-PAST_PROMPTS = 5  # 過去の指示・合意を探すために渡す、直前のユーザの発言の数
+EXTRACTOR_VERSION = "basic-2"
+PAST_PROMPTS = 8  # 過去の指示・合意を探すために渡す、直前のユーザの発言の数（暫定の N）
 MATERIAL_LIMIT = 40_000  # 材料の各欄の上限（文字数）。超えたら切って材料不足として示す
 
 CRITERIA_MD = """\
@@ -757,6 +757,7 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
     読めない・切れたときは `insufficient` を真にする。
     """
     rows: list[dict[str, Any]] = []
+    compacted = False
     try:
         with open(transcript_path, encoding="utf-8") as handle:
             for line in handle:
@@ -764,10 +765,24 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
                     row = json.loads(line)
                 except ValueError:
                     continue
-                if isinstance(row, dict) and not row.get("isSidechain") and not row.get("isMeta"):
+                if not isinstance(row, dict):
+                    continue
+                if row.get("type") == "system" and row.get("subtype") == "compact_boundary":
+                    # compact より前は材料に含めない（要約になっていて、元の発言ではない）。
+                    rows, compacted = [], True
+                    continue
+                if row.get("isCompactSummary"):
+                    continue
+                if not row.get("isSidechain") and not row.get("isMeta"):
                     rows.append(row)
     except OSError:
-        return {"turn": [], "past_prompts": [], "insufficient": True, "reason": "unreadable"}
+        return {
+            "turn": [],
+            "past_prompts": [],
+            "instructions": [],
+            "insufficient": True,
+            "reason": "unreadable",
+        }
 
     said: list[tuple[str, str]] = []  # (役割, 本文)
     for row in rows:
@@ -780,7 +795,13 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
         said.append((role, text))
     starts = [i for i, (role, _) in enumerate(said) if role == "user"]
     if not starts:
-        return {"turn": [], "past_prompts": [], "insufficient": True, "reason": "no_user_prompt"}
+        return {
+            "turn": [],
+            "past_prompts": [],
+            "instructions": [],
+            "insufficient": True,
+            "reason": "compacted" if compacted else "no_user_prompt",
+        }
     turn = said[starts[-1] :]
     past = [text for role, text in said[: starts[-1]] if role == "user"][-PAST_PROMPTS:]
     cut = False
@@ -794,12 +815,72 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
         if len(text) > MATERIAL_LIMIT:
             text, cut = text[:MATERIAL_LIMIT], True
         clipped_past.append(text)
+    # 範囲が compact で失われているか: compact があり、取れた過去の発言が範囲の数に満たない。
+    lost = compacted and len(past) < PAST_PROMPTS
     return {
         "turn": clipped_turn,
         "past_prompts": clipped_past,
-        "insufficient": cut,
-        "reason": "truncated" if cut else "",
+        "instructions": extract_instructions(clipped_past),
+        "insufficient": cut or lost,
+        "reason": "truncated" if cut else "compacted" if lost else "",
     }
+
+
+# 過去の発言から、明示の指示・合意を拾う型。拾うのは候補で、判定は判定役が材料全体を見て下す。
+# 引用（`>` で始まる行）とコードブロックの中は、指示として扱わない。
+_INSTRUCTION_KINDS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "no_proposal",
+        re.compile(
+            r"(まだ|今は|いったん)?(提案|チケット)(は|を)?(書かず|書かない|作らず|作らない|出さず)"
+            r"|提案(は)?(まだ)?(不要|要らない)|do not (write|create) (a )?(proposal|ticket)",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "ticket_work",
+        re.compile(
+            r"チケット(作業|で進め|として|を作っ|を起こ)|親チケット|提案(を|から)?(書い|出し|作っ)"
+            r"|(as|via|through) (a )?ticket|ticket work",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "agreement",
+        re.compile(
+            r"^\s*(?:はい|うん|ok|OK|お願い(?:します)?|それで(?:お願い)?|いいです|進めて|続けて|承認)"
+            r"(?:[、,。！!\s]*(?:お願い(?:します)?|進めて|それで|ください))*[。！!\s]*$"
+            r"|(その方針|その案|それ)で(進めて|お願い|いい)",
+        ),
+    ),
+    ("reference", re.compile(r"(?<![\w/])(#\d{1,6}|![\d]{1,6})(?![\w])")),
+)
+_CODE_BLOCK = re.compile(r"```.*?```", re.DOTALL)
+
+
+def _own_words(text: str) -> str:
+    """引用とコードブロックを除いた、発言者自身の文。"""
+    text = _CODE_BLOCK.sub("", text)
+    return "\n".join(line for line in text.split("\n") if not line.lstrip().startswith(">"))
+
+
+def extract_instructions(past: list[str]) -> list[dict[str, Any]]:
+    """過去の発言から、明示の指示・合意の候補と位置（何ターン前か）を取り出す（抽出器 basic-2）。"""
+    found: list[dict[str, Any]] = []
+    for at, text in enumerate(past):
+        own = _own_words(text)
+        for kind, pattern in _INSTRUCTION_KINDS:
+            match = pattern.search(own)
+            if match:
+                start = max(match.start() - 20, 0)
+                found.append(
+                    {
+                        "kind": kind,
+                        "turns_ago": len(past) - at,
+                        "excerpt": own[start : match.end() + 40].strip().replace("\n", " ")[:160],
+                    }
+                )
+    return found
 
 
 _DELIMITER = re.compile(r"<(/?)(data|criteria)\b", re.IGNORECASE)
@@ -838,6 +919,11 @@ def render_material(
     out += [
         f"--- 過去の発言 {i + 1} ---\n{defang(t)}" for i, t in enumerate(material["past_prompts"])
     ]
+    out += ["</data>", "<data kind=explicit_instruction_candidates>"]
+    out += [
+        f"{i['turns_ago']} ターン前 [{i['kind']}] {defang(i['excerpt'])}"
+        for i in material.get("instructions") or []
+    ] or ["（候補なし。過去の発言の本文から、根拠を特定できなければ R1 は unknown にする）"]
     out += ["</data>", "<data kind=current_turn>"]
     out += [f"--- {t['role']} ---\n{defang(t['text'])}" for t in material["turn"]]
     out.append("</data>")
