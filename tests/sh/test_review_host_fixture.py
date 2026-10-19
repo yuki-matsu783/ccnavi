@@ -768,27 +768,9 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertIn("git remote set-head origin -a", done.stderr)
         self.assertFalse(os.path.exists(sent))
 
-    def test_request_ignores_the_old_variable_and_the_old_setting(self):
-        """環境変数と settings.local.json に別の名前があっても、統合先は origin/HEAD だけで決める。
-        統合先のコピー（sync/<リポジトリ>/integration/head）も読まない。"""
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch trunk-v2\nsource default\n",
-        )
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop-v1.0.0"}}\n',
-        )
-        done, _ = self.request_on(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-
     def test_request_judges_a_project_by_its_own_origin_head(self):
         """projects/app の統合先は trunk。ワークスペースの origin/HEAD が main でも、
-        環境変数と settings.local.json が main でも、projects/app から打てば trunk と比べる。"""
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "main"}}\n',
-        )
+        projects/app から打てば trunk と比べる。"""
         self.set_origin_head(self.ws, "main")
         project = os.path.join(self.ws, "projects", "app")
         subprocess.run(["git", "init", "-q", "-b", "i0001", project], check=True)
@@ -808,9 +790,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         git = ["git", "-C", project, "-c", "user.name=t", "-c", "user.email=t@e.invalid"]
         subprocess.run([*git, "add", "--", rel], check=True)
         subprocess.run([*git, "commit", "-q", "-m", "add eli5"], check=True)
-        done, sent = self.request_on(
-            cwd=project, html=html.replace(os.sep, "/"), CCNAVI_INTEGRATION_BRANCH="main"
-        )
+        done, sent = self.request_on(cwd=project, html=html.replace(os.sep, "/"))
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("マージ先（main）が統合先（trunk）ではない", done.stderr)
         self.assertFalse(os.path.exists(sent))

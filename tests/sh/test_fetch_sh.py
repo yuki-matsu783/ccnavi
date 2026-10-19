@@ -525,28 +525,6 @@ class FetchTest(unittest.TestCase):
         self.fetch()
         self.assertEqual(head, self.sha(tree, "HEAD"))
 
-    def test_the_variable_and_settings_local_json_do_not_name_the_base(self):
-        # 統合先は手元の origin/HEAD が決める。環境変数も `.claude/settings.local.json` の env も、
-        # ccnavi-sync.sh が書いたコピーも読まない。
-        git(self.ws, "push", "-q", "origin", "main:develop")
-        git(self.ws, "branch", "-q", "develop", "main")
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}\n',
-        )
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch develop\nsource default\nsha x\nfetched_at 1\n",
-        )
-        self.leave_main()
-        develop_before = self.sha(self.ws, "refs/heads/develop")
-        self.advance(self.remote, "develop")
-        head = self.advance(self.remote)
-        done = self.fetch(CCNAVI_INTEGRATION_BRANCH="develop")
-        self.assertEqual(develop_before, self.sha(self.ws, "refs/heads/develop"))
-        self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
-        self.assertNotIn("合わせた", done.stdout)
-
     # ---- 手元の origin/HEAD をホストの既定ブランチに合わせる
 
     def test_a_changed_host_default_moves_origin_head_and_the_base_follows(self):

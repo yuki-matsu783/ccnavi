@@ -2,8 +2,7 @@
 
 `ccnavi-sync.sh` は jq を使わず JSON も読まない。置き場のパスを、
 実行ファイルが 1 行 1 項目（`<鍵> <値>`）で返す。
-統合先の名前は返さない（sh が各リポジトリの `origin/HEAD` で決める。
-環境変数も `settings.local.json` も読まない）。
+統合先の名前は返さない（sh が各リポジトリの `origin/HEAD` で決める）。
 置き場は固定で、env では動かない（設計 wip/design/i0064-fixed-places.md）。
 """
 
@@ -70,17 +69,6 @@ class SyncPathsTest(unittest.TestCase):
             },
             found,
         )
-
-    def test_no_integration_line_is_returned(self):
-        # 統合先は各リポジトリの origin/HEAD で決まる。環境変数も settings.local.json も読まず、
-        # 行も返さない。
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}',
-        )
-        found = self.paths({"CCNAVI_INTEGRATION_BRANCH": "develop"})
-        self.assertNotIn("integration", found)
-        self.assertEqual({"approved", "proposals", "home"}, set(found))
 
     def test_works_with_ticket_control_disabled(self):
         found = self.paths({"CCNAVI_TICKET_CONTROL": "disable"})

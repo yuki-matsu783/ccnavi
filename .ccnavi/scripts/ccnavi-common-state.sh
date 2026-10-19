@@ -166,8 +166,7 @@ ccnavi_default_branch() {
 # そのツリーが属するリポジトリの統合先の名前。分からなければ 1。<ツリー>
 #
 # 手元の origin/HEAD（無ければ origin/main・origin/master。ccnavi_default_branch）だけで決める。
-# 環境変数も settings.local.json も読まない（リポジトリごとに違う値が要るのに、ワークスペースで
-# 1 つの値になってしまうため）。手元の origin/HEAD は ccnavi-fetch.sh がホストに合わせる。
+# 手元の origin/HEAD は ccnavi-fetch.sh がホストに合わせる。
 # ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への push の拒否）・
 # ccnavi-review.sh（マージリクエストの宛先）が同じ決め方になるよう、ここに 1 つだけ置く。
 ccnavi_integration() {
