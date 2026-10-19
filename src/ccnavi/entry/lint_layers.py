@@ -237,7 +237,7 @@ def _drift(conf: settings.Settings, root: str, project: str) -> tuple[list[Probl
     home = tree.project_root(conf.projects, project) if project else root
     if not home or not os.path.isdir(home):
         return [], True
-    branch = ops_stop_integrate.integration_name(root, conf, home, project)
+    branch = ops_stop_integrate.integration_name(home)
     ref = f"refs/remotes/origin/{branch}" if branch else ""
     if (
         not ref

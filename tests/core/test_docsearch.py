@@ -650,7 +650,6 @@ class CliTest(Repo):
             ("--guard-core-files", "disable"),
             ("--guard-ticket-approval", "enable"),
             ("--restore-if-deny", "x"),
-            ("--integration-branch", "main"),
             ("--choose-out", "x"),
         ):
             with self.subTest(args=args):

@@ -424,9 +424,8 @@ def _write_and_push_bypass(
 def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
     """`ccnavi-sync.sh` が要るパスと名前を 1 行 1 項目（`<鍵> <値>`）で返す。
 
-    sh は jq を使わず、JSON も読まない。置き場のパス（ツリーのルートからの相対）と、
-    `.claude/settings.local.json` の `env` に書かれた統合先の名前をここが読んで渡す。
-    統合先の名前は環境変数からは読まない（sh が先に環境変数を見る）。
+    sh は jq を使わず、JSON も読まない。置き場のパス（ツリーのルートからの相対）をここが渡す。
+    統合先の名前は返さない（sh が各リポジトリの `origin/HEAD` で決める）。
     置き場は固定（`settings.load` の既定）で、env では動かない。`ccnavi-sync.sh` は答えが
     無いとき同じ既定を直に使う。
     ネットワークにも git にも触らない。
@@ -435,7 +434,6 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
         ("approved", fsio.slashed(conf.approved).strip("/")),
         ("proposals", fsio.slashed(conf.tickets).strip("/")),
         ("home", fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")),
-        ("integration", settings.integration_local(root)),
     )
     for key, value in lines:
         stdout.write(f"{key} {value}\n")

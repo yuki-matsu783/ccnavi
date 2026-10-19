@@ -375,8 +375,6 @@ _SCRIPTS = """\
 設定の値を上書きするフラグもあります。--mode、--ticket-control、--restore-if-deny、
 --guard-core-files、--guard-ticket-approval は環境変数と同じ値を取ります。--log、--state、
 --approved、--tickets は記録と置き場の場所を動かし、上の5つと同じく診断専用です。
---integration-branch <name> は統合先の名前です（実行ファイルは環境変数を読まないので、
-.ccnavi/scripts/ のスクリプトが決めて渡します。--lint の識別子の予約が読みます）。
 
 .ccnavi/scripts/ のスクリプトが付けるフラグは次のとおりです。
 

@@ -383,10 +383,6 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （何も書かない）。`--no-issue` は返信の文言のため（残りを issue に書き出さない）。
     parser.add_argument("--accept-check", default="")
     parser.add_argument("--no-issue", action="store_true")
-    # 統合先の名前。手元では環境変数 `CCNAVI_INTEGRATION_BRANCH`（未設定なら
-    # ホストのデフォルトブランチ）で決まる。sh が決めて渡す。
-    # いまは `--lint` の識別子の予約（統合先と同じ名前の識別子を使わせない）が読む。
-    parser.add_argument("--integration-branch", default="")
     # レビュー済みのマーカーに入れるアカウント（押したユーザではなくトークンの持ち主）。
     # ccnavi-review.sh がトークンの持ち主をホストに聞いて渡す。実行ファイルは
     # ネットワークに出ない。
@@ -772,8 +768,6 @@ def _parsed(
             stderr.write(f"ccnavi: {flag} は <名前>=<パス> の形で指定してください。\n")
             return EXIT_ERROR
         swaps[name] = os.path.abspath(path)
-
-    conf.integration_branch = args.integration_branch.strip()
 
     # フローの確かめは `--lint` だけが読む。ほかの差し替えと同じく、
     # 診断の外では無視して言う。診断でも `--lint` でなければ読む先が無いので、そう言って無視する。

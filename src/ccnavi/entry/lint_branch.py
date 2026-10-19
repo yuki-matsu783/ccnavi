@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
 from ..infra import gitcmd, settings, tree
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
@@ -16,7 +17,7 @@ def _branch_name_problems(
     copies: list,
     closed: list,
     review: list,
-    integration: str = "",
+    integration_of: Callable[[str], str] = lambda project: "",
     prefixes=settings.DEFAULT_BRANCH_PREFIXES,
     adopted: frozenset = frozenset(),
 ) -> list[Problem]:
@@ -39,8 +40,8 @@ def _branch_name_problems(
       途中（`<親>-<フェーズ>`）と紛れる
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
-    `integration` はその時点の統合先の名前（`ops_stop_integrate.integration_name`）。
-    決まらなければ固定のリストだけを見る。
+    `integration_of` はチケットの `project`（空ならワークスペース）から、そのリポジトリの統合先の
+    名前（`ops_stop_integrate.integration_name`）を引く関数。決まらなければ固定のリストだけを見る。
     """
     problems: list[Problem] = []
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
@@ -55,7 +56,7 @@ def _branch_name_problems(
         if t.ticket in adopted:
             continue
         fresh.append(t)
-        for text in ticket_ids.branch_name_problems(t, integration, serial, prefixes):
+        for text in ticket_ids.branch_name_problems(t, integration_of(t.project), serial, prefixes):
             problems.append(
                 Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {text}（親のブランチ名の規則）")
             )

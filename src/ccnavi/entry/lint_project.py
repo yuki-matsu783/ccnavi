@@ -177,8 +177,7 @@ def _local_settings(root: str) -> list[Problem]:
     承認と判定は、保護の切り替えや動作モードを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
     手元だけのファイルに置いた値は Claude Code が起こしたプロセスにだけ使われ、Chrome と
     ユーザが端末で打つ sh には使われないので、同じ親子のチケットにプロセスごとに別の保護が掛かる。
-    例外は `CCNAVI_INTEGRATION_BRANCH` だけ（統合先の名前はリポジトリに置かず、手元では環境変数で
-    持つと決めた）。
+    置ける例外は無い（統合先の名前は各リポジトリの `origin/HEAD` で決まり、env では動かさない）。
     """
     path = os.path.join(root, LOCAL_SETTINGS)
     try:
@@ -200,8 +199,7 @@ def _local_settings(root: str) -> list[Problem]:
             "同じ親子のチケットに"
             "プロセスごとに別の保護が掛かることになる）。"
             f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から"
-            "渡してください。"
-            f"ここに置けるのは {settings.INTEGRATION_ENV} だけ",
+            "渡してください。",
         )
         for name in _LOCAL_FORBIDDEN
         if name in env

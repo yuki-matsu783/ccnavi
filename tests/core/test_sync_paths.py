@@ -14,7 +14,6 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.infra import settings
 from tests.inproc import run_ccnavi
 
 
@@ -44,7 +43,6 @@ class SyncPathsTest(unittest.TestCase):
                 "approved": ".ccnavi/approved",
                 "proposals": "wip/proposals",
                 "home": ".ccnavi",
-                "integration": "",
             },
             self.paths(),
         )
@@ -68,33 +66,20 @@ class SyncPathsTest(unittest.TestCase):
                 "approved": ".ccnavi/approved",
                 "proposals": "wip/proposals",
                 "home": ".ccnavi",
-                "integration": "",
             },
             found,
         )
 
-    def test_the_integration_branch_comes_from_settings_local_json_only(self):
-        # 環境変数は読まない。
-        self.assertEqual("", self.paths({"CCNAVI_INTEGRATION_BRANCH": "develop"})["integration"])
+    def test_no_integration_line_is_returned(self):
+        # 統合先は各リポジトリの origin/HEAD で決まる。環境変数も settings.local.json も読まず、
+        # 行も返さない。
         write(
             os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": " develop "}}',
+            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}',
         )
-        self.assertEqual("develop", self.paths()["integration"])
-
-    def test_unreadable_settings_fall_back_to_the_default(self):
-        for text in ("{", "[]", '{"env": []}', '{"env": {"CCNAVI_INTEGRATION_BRANCH": 3}}'):
-            with self.subTest(text=text):
-                write(os.path.join(self.ws, ".claude", "settings.local.json"), text)
-                self.assertEqual("", self.paths()["integration"])
-
-    def test_a_value_with_a_newline_is_not_used(self):
-        # 1 行 1 項目の契約（sh は jq を使わない）に合わない値は使わない。
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "a\\nb"}}',
-        )
-        self.assertEqual("", settings.integration_local(self.ws))
+        found = self.paths({"CCNAVI_INTEGRATION_BRANCH": "develop"})
+        self.assertNotIn("integration", found)
+        self.assertEqual({"approved", "proposals", "home"}, set(found))
 
     def test_works_with_ticket_control_disabled(self):
         found = self.paths({"CCNAVI_TICKET_CONTROL": "disable"})
