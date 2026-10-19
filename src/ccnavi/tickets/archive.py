@@ -2,13 +2,12 @@
 
 `ccnavi-review.sh ready` が Draft を外す直前に、親のツリーの承認済みの領域から、閉じた親
 （`done/` に在る親。今回の親と、統合先にたまっていた過去の親）のファイルを手元の退避の置き場へ移す。
-移すのは次の 4 つで、親のツリーの git の上では削除になる。削除は write-and-push がコミットして push
+移すのは次の 3 つで、親のツリーでは git 上の削除になる。削除は write-and-push がコミットして push
 してから
 Draft を外すので、squash でマージすると既定のブランチにはチケットが残らない。
 
 - `done/` の親と子のチケット
 - `phases/<親>/` の下（マーカー・子の記録・Draft を外したマーカーも含む）
-- `events/` の旧版の履歴（残っていれば。そのままコピーする）
 - `flows/` の子のフロー
 
 置き場はワークスペースルートの `logs/archive/<リポジトリ>/` で、`<リポジトリ>` は
@@ -271,7 +270,7 @@ def same_id(a: str, b: str) -> bool:
 class Plan:
     """移すもの。`files` は承認済みの領域からの相対（"/" 区切り）で、移す順に並ぶ。
 
-    順は、マーカー（`phases/`）・旧版の `events/`・フロー・子のチケット・親のチケットの順。
+    順は、マーカー（`phases/`）・フロー・子のチケット・親のチケットの順。
     止まったときに
     `done/<親>.md` がツリーに残り、次の `ready` が同じ親を拾い直せるようにするため。
     """
@@ -314,7 +313,7 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
     親として拾うのは、`done/` に `parent:` を持たないチケットとして在るものと、手元の退避に親として
     在るもの（前の回が途中で止まった残り。`root` を渡したときだけ）。子は名前の形ではなくチケットの
     `parent:` 欄で親に結ぶ（`rel-01` という親を `rel` の子と取り違えない）。
-    旧版の `events/` とフローは、
+    フローは、
     その親か、`done/`（または退避）に在る子のもの、どこにもチケットの無い子（取り下げた子）のもの。
     `phases/<親>/` は下をすべて。
     """
@@ -337,7 +336,7 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
             if held is not None and held.parent in family:
                 children.add(ident)
     # どの置き場にもチケットの無い識別子（取り下げた子など）。
-    # 旧版の `events/` とフローしか残っていないので、
+    # フローしか残っていないので、
     # このときだけ子の形（`<親>-<フェーズ番号>-<連番>`）で親に結ぶ。チケットが在る識別子は
     # `parent:` 欄で決める。
     known = set(done) | set(_regular_md(os.path.join(approved_dir, ticket_model.DOING)))
@@ -353,10 +352,6 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
     out = Plan(parents=sorted(family))
     for p in out.parents:
         out.files += _walk(approved_dir, f"{PHASES_DIR}/{p}")
-    for name in _names(os.path.join(approved_dir, LEGACY_EVENTS_DIR)):
-        stem, ext = os.path.splitext(name)
-        if ext == ".jsonl" and belongs(stem):
-            out.files.append(f"{LEGACY_EVENTS_DIR}/{name}")
     for name in _names(os.path.join(approved_dir, FLOWS_DIR)):
         stem, ext = os.path.splitext(name)
         if ext in FLOW_SUFFIXES and stem not in family and belongs(stem):
@@ -447,21 +442,16 @@ def _tree_key(tree_root: str) -> str:
     return pathcase.fold(os.path.realpath(tree_root)) if tree_root else ""
 
 
-# 旧版は状態の履歴をここに書いていたが、いまは書かない。
-# 既存のリポジトリに残っていれば、ほかの記録と同じく ready が手元の退避へ移す。
-LEGACY_EVENTS_DIR = "events"
-
-# ready のマーカーに載せてよいのは、承認済みの領域のこの 4 つの下だけ。
+# ready のマーカーに載せてよいのは、承認済みの領域のこの 3 つの下だけ。
 READY_PLACES = (
     f"{ticket_model.DONE}/",
     f"{PHASES_DIR}/",
-    f"{LEGACY_EVENTS_DIR}/",
     f"{FLOWS_DIR}/",
 )
 
 
 def in_ready_places(rel: str) -> bool:
-    """承認済みの領域からの相対が、ready が移す 4 つの置き場の下か（`..` などは受けない）。"""
+    """承認済みの領域からの相対が、ready が移す 3 つの置き場の下か（`..` などは受けない）。"""
     parts = rel.split("/")
     return rel.startswith(READY_PLACES) and not any(p in ("", ".", "..") for p in parts)
 
@@ -554,7 +544,7 @@ def move(
 
     行き先にコピーが既に在るとき、ツリーの中身をコピーしたものと読めれば（前の回の残り）コピーせずに元だけ
     消す。違えば、チケット（`done/`）なら上書きせずに止め（閉じた記録を書き換えない）、マーカー・
-    旧版の events/・フローなら今の中身で置き換える（push が通らずに write-and-push
+    フローなら今の中身で置き換える（push が通らずに write-and-push
     が戻した後の打ち直し）。
 
     `ready_parent` と `tree_root` を渡せば、消す前に ready のマーカー（`ready/<親>.json`）へ移す

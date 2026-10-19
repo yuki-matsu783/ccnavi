@@ -63,7 +63,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   確かめて消す。エージェントに `git branch -D` を開けないので、消す入口はこれらだけ（`ccnavi-user-clean-branch.sh`）。最後の行が
   `record yes|no`（片付けが済んだか）で、`yes`のときは実行ファイルが`retire/<親>.json`も消す（shは消さない）。
   `ready`が書く`retire/<親>.json`（MRの番号を含む）が、親のワークツリーを片付けた後の列挙元で、shはJSONを読まず`sync retired`に聞く。
-  放棄した親の記録は`worktree retire --abandon <親>`（ユーザだけ）で消す。古い取り込み状態は`sync migrate`（冪等）が`retire/`へ移す
+  放棄した親の記録は`worktree retire --abandon <親>`（ユーザだけ）で消す。
 - ワークツリーの片付け（`worktree drop <名前>`・`worktree tidy <親>`）も実行ファイルが行う。消すかどうかの判断（cwdが中か、未コミットが
   あるか、gitのワークツリーか）と、生成物の掃除・`git worktree remove`はローカルの操作で、ネットワークには出ない。
   shは状態を書く操作（write-and-pushならpushまで）が済んでから呼ぶ。`ready`ではDraftを外したあとの最後に呼ぶ

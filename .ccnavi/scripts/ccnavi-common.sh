@@ -235,8 +235,8 @@ ccnavi_compat_skew() {
 		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
 	else
 		# sh が古いと、新しい実行ファイルは古い形の呼び出し（ユーザ専用の操作を `user` の外で使う形）を断る。
-		# 配り直しは sh も入れ替え、古い名前の sh（ccnavi-agree.sh など。今は ccnavi-user-*.sh）を消す。
-		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください（sh の再配布で、ユーザが打つ sh は ccnavi-user-*.sh に入れ替わり、古い名前の sh は消えます）"
+		# 配り直しは sh も入れ替える。
+		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
 	fi
 	if [ -z "$ccnavi_cs_have" ]; then
 		printf '実行ファイル %s は --version で互換の版を返しません（古い版です）。%s。\n' "$2" "$ccnavi_cs_fix"

@@ -683,9 +683,6 @@ class FetchTest(unittest.TestCase):
         self.assertNotEqual(before, self.sha(tree, "HEAD"))
         self.assertEqual(head, self.sha(tree, "HEAD"))
         self.assertIn("親ブランチ", "\n".join(self.lines(done)))
-        self.assertFalse(
-            os.path.exists(os.path.join(self.ws, "logs", "state", "sync", "self", "families"))
-        )
         # 書きかけは残る
         self.assertTrue(os.path.exists(os.path.join(tree, "note.txt")))
 

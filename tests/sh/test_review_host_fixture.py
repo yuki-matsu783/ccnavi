@@ -798,7 +798,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
     def test_request_stops_without_an_eli5_html(self):
         """--eli5 の誤りは 2、置き場とコミットの欠けは全部を挙げて 1 で止める。
 
-        実行ファイルもホストも触らない。旧方式（追跡しない wip/tmp/ の HTML）も、wip/eli5/ の外の
+        実行ファイルもホストも触らない。wip/eli5/ の外の
         wip/ も、名前に `'`・`$`・空白・日本語を含むものも、リンクや実行ビット付きも止まる。
         """
         out = os.path.join(self._tmp.name, "out")
@@ -810,7 +810,6 @@ class GitLabHostFixtureTest(unittest.TestCase):
         docs = self.eli5("docs/eli5.html")
         blank_docs = self.eli5("docs/blank.html", "\n")
         design = self.eli5("wip/design/x.html")
-        old_way = self.eli5("wip/tmp/eli5.html", commit=False)
         dirty = self.eli5("wip/eli5/phase-2.html")
         write(dirty, "<p>書き換えた</p>\n")
         outside = write(os.path.join(self._tmp.name, "elsewhere", "eli5.html"), "<p>x</p>\n")
@@ -855,7 +854,6 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 ["中身が空", "wip/eli5/ の下にありません"],
             ),
             "wip/eli5/ の外の wip/": (["--eli5", design], 1, ["wip/eli5/ の下にありません"]),
-            "旧方式（wip/tmp/）": (["--eli5", old_way], 1, ["wip/eli5/ の下にありません"]),
             "未追跡": (["--eli5", untracked], 1, ["HEAD にありません"]),
             "未コミット": (["--eli5", dirty], 1, ["HEAD から変わっている"]),
             "ワークツリーの外": (["--eli5", outside], 1, ["このワークツリーの外"]),

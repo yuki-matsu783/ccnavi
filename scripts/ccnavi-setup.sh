@@ -157,14 +157,6 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
 DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
-# 前の版が配った、今は配らない古い名前の sh。ユーザだけが打つ sh を ccnavi-user-*.sh に改名したので、
-# 古い名前のまま配布先に残ると、新しい実行ファイルに断られる（`user` の外のユーザ専用のオプション）うえ、
-# 手順書の古い名前で打てるように見える。配布先にあれば消す。消すのは --force のときだけで、ほかの配るものと
-# 同じく、--force なしでは配布先にあるものに触らない（残っていることを報告し、--check は揃っていないと数える）。
-# 一覧は src/ccnavi/tickets/user_only.py の SCRIPTS のうち、スクリプトごと止める行（サブコマンドもオプションも
-# 持たない行）の名前。食い違いは tests/sh/test_setup.py が見る。
-LEGACY_SCRIPTS="ccnavi-agree.sh ccnavi-approve.sh ccnavi-push-approved.sh"
-
 mode="$DEFAULT_MODE"
 # 明示されたかどうかを別の変数で持つ。--force で置き換えてよいのは、ユーザがこの実行で
 # 指定した値だけ。既定で埋めただけの値まで置き換えると、`--all` を足すための実行し直しが、
@@ -479,9 +471,6 @@ ccnavi_md_verdict=""
 risk_verdict=""
 common_phases_verdict=""
 scripts_todo=""
-legacy_todo=""
-legacy_kept=""
-legacy_blocked=""
 docs_todo=""
 templates_todo=""
 templates_skipped=""
@@ -744,21 +733,6 @@ if [ -n "$deploy" ]; then
 		esac
 		if [ "$name" = "$LAUNCHER_NAME" ]; then
 			launcher_verdict="$script_verdict"
-		fi
-	done
-	# 古い名前の sh。配布先にあれば、--force なら消し、なければ残して報告する。リンクはリンクだけを消す
-	# （辿った先は消さない）。ディレクトリは消さない。
-	for name in $LEGACY_SCRIPTS; do
-		legacy_path="$root/$DEPLOY_SCRIPT_DIR/$name"
-		[ -e "$legacy_path" ] || [ -L "$legacy_path" ] || continue
-		if [ -d "$legacy_path" ] && [ ! -L "$legacy_path" ]; then
-			legacy_blocked="$legacy_blocked$DEPLOY_SCRIPT_DIR/$name
-"
-		elif [ "$force" = yes ]; then
-			legacy_todo="$legacy_todo $name"
-		else
-			legacy_kept="$legacy_kept$DEPLOY_SCRIPT_DIR/$name
-"
 		fi
 	done
 fi
@@ -1183,20 +1157,6 @@ report_deploy() {
 		printf '配布元に無くて配れないもの:\n'
 		printf '%s' "$deploy_absent" | sed 's/^/  /'
 	fi
-	if [ -n "$legacy_todo" ]; then
-		printf '%s:\n' "$5"
-		for legacy_name in $legacy_todo; do
-			printf '  %s/%s\n' "$DEPLOY_SCRIPT_DIR" "$legacy_name"
-		done
-	fi
-	if [ -n "$legacy_kept" ]; then
-		printf '配布先に残っている古い名前の sh（ユーザ専用の sh は ccnavi-user-*.sh に改名した。消すなら --force）:\n'
-		printf '%s' "$legacy_kept" | sed 's/^/  /'
-	fi
-	if [ -n "$legacy_blocked" ]; then
-		printf '古い名前の sh の場所にディレクトリがあるので消していないもの（中身を確かめて手で片付けてください）:\n'
-		printf '%s' "$legacy_blocked" | sed 's/^/  /'
-	fi
 	if [ -n "$templates_skipped" ]; then
 		printf '名前に使えない文字があるので配っていないテンプレート（英数字で始め、英数字と . _ - だけ）:\n'
 		printf '%s' "$templates_skipped" | sed 's/^/  /'
@@ -1243,7 +1203,7 @@ report_deploy() {
 launcher_mode_failed=""
 
 report_deploy_plan() {
-	report_deploy '配る' '入れ替える' '.gitignore に足す' '実行ビットを付ける' '消す古い名前の sh（ユーザ専用の sh は ccnavi-user-*.sh に改名した）'
+	report_deploy '配る' '入れ替える' '.gitignore に足す' '実行ビットを付ける'
 }
 
 # 揃っているかを判定する。値の違いと、別の表記での登録も「揃っていない」に数える。
@@ -1261,10 +1221,6 @@ fi
 # 履歴に入る。
 if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$deploy_absent" ] ||
 	[ -n "$ignore_todo" ] || [ -n "$launcher_mode_todo" ]; then
-	settled=no
-fi
-# 古い名前の sh が配布先に残っているのも数える（新しい実行ファイルに断られる sh が残っている）。
-if [ -n "$legacy_todo" ] || [ -n "$legacy_kept" ] || [ -n "$legacy_blocked" ]; then
 	settled=no
 fi
 # 既定でないパスも「揃っていない」に数える。
@@ -1420,7 +1376,7 @@ if [ -n "$missing_vscode" ]; then
 fi
 deploy_work=no
 if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$ignore_todo" ] ||
-	[ -n "$launcher_mode_todo" ] || [ -n "$legacy_todo" ]; then
+	[ -n "$launcher_mode_todo" ]; then
 	deploy_work=yes
 fi
 
@@ -1605,16 +1561,6 @@ if [ "$deploy_work" = yes ]; then
 			chmod +x "$root/$BIN_PATH" 2>/dev/null || true
 		fi
 	done
-	# 古い名前の sh を消す（--force のときだけ。上で決めた）。新しい名前の sh を配った後に消すので、途中で失敗しても
-	# 両方とも無い状態にはならない。消せなかったものは報告する。
-	legacy_failed=""
-	for name in $legacy_todo; do
-		rm -f "$root/$DEPLOY_SCRIPT_DIR/$name" 2>/dev/null || :
-		if [ -e "$root/$DEPLOY_SCRIPT_DIR/$name" ] || [ -L "$root/$DEPLOY_SCRIPT_DIR/$name" ]; then
-			legacy_failed="$legacy_failed$DEPLOY_SCRIPT_DIR/$name
-"
-		fi
-	done
 	# 配らなかった回でも、実行ビットが外れた sh には付け直す。付けられなかったときは報告する。
 	if [ -n "$launcher_mode_todo" ]; then
 		chmod +x "$root/$BIN_PATH" 2>/dev/null || true
@@ -1652,11 +1598,7 @@ if [ "$deploy_work" = yes ]; then
 	append_ignore "$LOGS_IGNORE_HEADER" "$ignore_logs_todo"
 fi
 
-report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた' '消した古い名前の sh（ユーザ専用の sh は ccnavi-user-*.sh に改名した）'
-if [ -n "${legacy_failed:-}" ]; then
-	printf '消せなかった古い名前の sh（手で消してください）:\n'
-	printf '%s' "$legacy_failed" | sed 's/^/  /'
-fi
+report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'
 if [ -n "$launcher_mode_failed" ]; then
 	printf '実行ビットを付けられなかった振り分けの sh（hook が起動しません。chmod +x で付けてください）:\n'
 	printf '%s' "$launcher_mode_failed" | sed 's/^/  /'

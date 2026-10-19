@@ -1564,11 +1564,9 @@ class RecordWritesTest(CoreHarness):
         climbing = os.path.join(self.place(), "..", "..", "..", "wip", "list.txt")
         self.refused(climbing)
         self.assertFalse(os.path.exists(outside))
-        # `--state` で置き場を動かしても、`CCNAVI_STATE` を入れても、書き出し先は動かない。
+        # `--state` で置き場を動かしても、書き出し先は動かない。
         moved = os.path.join(self.root, "wip")
         self.refused(os.path.join(moved, "write-and-push", "list.txt"), "--state", moved)
-        with mock.patch.dict(os.environ, {"CCNAVI_STATE": moved}):
-            self.refused(os.path.join(moved, "write-and-push", "list.txt"))
         self.assertFalse(os.path.exists(os.path.join(moved, "write-and-push")))
 
     @requires_symlink

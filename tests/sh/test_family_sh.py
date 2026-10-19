@@ -61,14 +61,6 @@ class FamilyShTest(unittest.TestCase):
             with self.subTest(ident=ident):
                 self.assertEqual(self.family(ident), (parent, "stop"))
 
-    def test_the_answer_does_not_depend_on_a_record(self):
-        families = os.path.join(self.root, "logs", "state", "sync", "ws", "families")
-        os.makedirs(families)
-        with open(os.path.join(families, "web-i0012"), "w", encoding="utf-8") as f:
-            f.write("")
-        # 記録があってもなくても、実行ファイルに聞けなければ止める
-        self.assertEqual(self.family("web-i0012-05-01"), ("web-i0012", "stop"))
-
 
 if __name__ == "__main__":
     unittest.main()
