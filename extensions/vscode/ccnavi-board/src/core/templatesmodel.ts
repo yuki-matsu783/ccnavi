@@ -168,6 +168,24 @@ export function validTemplateName(name: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) && name.length <= 64;
 }
 
+/**
+ * 新しいテンプレートの名前が、共通の層か `layer` の層の既存の名前と重なるか。大文字小文字は区別しない（別の機械で 2 本が 1 本に重なる）。
+ * 重なる既存の 1 件を返す。無ければ undefined
+ */
+export function templateNameTaken(layers: readonly TemplateLayer[], layer: string, name: string): { readonly layer: string; readonly name: string } | undefined {
+  const folded = name.toLowerCase();
+  for (const l of layers) {
+    if (l.name !== "common" && l.name !== layer) {
+      continue;
+    }
+    const hit = l.templates.find((t) => t.name.toLowerCase() === folded);
+    if (hit !== undefined) {
+      return { layer: l.name, name: hit.name };
+    }
+  }
+  return undefined;
+}
+
 /** 書き方が読み違いを誘う文字（`revealControls` が直す対象）。改行とタブは含めない */
 const HIDDEN = /^[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]$/u;
 

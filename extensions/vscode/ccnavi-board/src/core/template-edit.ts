@@ -245,14 +245,21 @@ function remap(template: EditTemplate, part: PlanPart, order: readonly number[])
   return withPart(template, part, next, flows);
 }
 
-/** 項を消す。全体計画の最後の 1 項は消せない（計画が空になる）。後ろの項の添字と、フローのキーを振り直す */
+/**
+ * 項を消す。全体計画の最後の 1 項は消せない（計画が空になる）。消す項を待っていた項は、消す項の先行を引き継いで待つ
+ * （途中の項を消しても、後ろの項が前の項と並行して始まる項に変わらない）。後ろの項の添字と、フローのキーを振り直す
+ */
 export function removeItem(template: EditTemplate, part: PlanPart, index: number): EditTemplate {
   const items = partOf(template, part);
   if (index < 1 || index > items.length || (part === "plan" && items.length <= 1)) {
     return template;
   }
+  const inherited = items[index - 1].after;
+  const bridged = items.map((item) =>
+    item.after.includes(index) ? { ...item, after: [...new Set([...item.after, ...inherited])].filter((n) => n !== index).sort((a, b) => a - b) } : item,
+  );
   const order = items.map((_, i) => i + 1).filter((i) => i !== index);
-  return remap(template, part, order);
+  return remap(withPart(template, part, bridged), part, order);
 }
 
 /** 先行が必ず自分より小さい添字か */

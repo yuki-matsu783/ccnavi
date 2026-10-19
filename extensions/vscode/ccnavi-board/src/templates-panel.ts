@@ -42,7 +42,7 @@ import { MAIN_TREE_KEY } from "./core/handoffmodel.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { screens, type TemplatesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
-import { shownLayerOf, templatesLayerOf, validTemplateName } from "./core/templatesmodel.js";
+import { shownLayerOf, templateNameTaken, templatesLayerOf, validTemplateName } from "./core/templatesmodel.js";
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { TemplateCheck, TemplateLayer, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
 import { WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
@@ -501,11 +501,11 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
       return;
     }
     case "editOpen": {
-      await editOpen(current, message.session, message.name, message.layer);
+      await attempt(() => editOpen(current, message.session, message.name, message.layer), (e) => current.host.post({ type: "editOpened", session: message.session, opened: null, error: e } satisfies ToTemplates));
       return;
     }
     case "editNew": {
-      await editNew(current, message.session, message.name);
+      await attempt(() => editNew(current, message.session, message.name), (e) => current.host.post({ type: "editOpened", session: message.session, opened: null, error: e } satisfies ToTemplates));
       return;
     }
     case "editClose": {
@@ -515,11 +515,11 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
       return;
     }
     case "editCheck": {
-      await editCheck(current, message.session, message.seq, message.data);
+      await attempt(() => editCheck(current, message.session, message.seq, message.data), (e) => current.host.post({ type: "editChecked", session: message.session, seq: message.seq, check: null, error: e } satisfies ToTemplates));
       return;
     }
     case "editSave": {
-      await editSave(current, message);
+      await attempt(() => editSave(current, message), (e) => current.host.post({ type: "editSaved", session: message.session, sha: "", error: e } satisfies ToTemplates));
       return;
     }
     case "openHandoff": {
@@ -571,6 +571,15 @@ function asMessage(message: unknown): TemplatesMessage | undefined {
 
 // ---- 編集
 
+/** 編集の処理を走らせる。思いがけない例外（一時ファイルが書けない・実行ファイルが落ちるなど）でも、画面が待ち続けないよう理由を返す */
+async function attempt(run: () => Promise<void>, fail: (error: string) => void): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    fail(`編集の処理で失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 /** 編集の写しを読ませるテンプレートの形。画面が送ってくる `data` は、名前を持つマッピングでなければ受けない */
 function dataOf(data: unknown): { readonly name: string } | undefined {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
@@ -581,12 +590,12 @@ function dataOf(data: unknown): { readonly name: string } | undefined {
 }
 
 /** 開いている対象に掛ける作業中の錠。確かめられなければ掛かった錠にする */
-async function lockOf(current: PanelState): Promise<Lock> {
+async function lockOf(current: PanelState, target: TemplatesTarget = current.target): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
   if (!result.ok) {
     return lockFromError(result.error);
   }
-  return lockFromBoard(result.board, current.target.kind === "project" ? current.target.name : undefined);
+  return lockFromBoard(result.board, target.kind === "project" ? target.name : undefined);
 }
 
 function scheduleLock(current: PanelState): void {
@@ -656,21 +665,55 @@ function templateFile(root: string, layer: TemplateLayer, name: string): string 
 }
 
 /** 一時の置き場に `<名前>.yml` として書き、実行ファイルに読ませる。ファイル名が名前の期待値になる */
-async function checkBytes(current: PanelState, name: string, bytes: string | Uint8Array): Promise<{ readonly ok: true; readonly check: TemplateCheck } | { readonly ok: false; readonly error: string }> {
-  current.tmpDir ??= fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-templates-"));
-  const file = path.join(current.tmpDir, `${name}.yml`);
-  fs.writeFileSync(file, bytes);
-  const result = await runTemplateCheck(current.folder.uri.fsPath, binSetting(), file, templatesLayerOf(currentKey(current.target)));
-  return result.ok ? { ok: true, check: result.value } : { ok: false, error: result.error };
+async function checkBytes(
+  current: PanelState,
+  target: TemplatesTarget,
+  name: string,
+  bytes: string | Uint8Array,
+): Promise<{ readonly ok: true; readonly check: TemplateCheck } | { readonly ok: false; readonly error: string }> {
+  // 呼び出しごとに別の置き場を使う（保存中の検査と、編集中の検査が同じ名前のファイルを奪い合わない）。
+  // 一時の置き場が消えていても作り直す。書けないときは理由にして返す
+  let dir: string;
+  try {
+    if (current.tmpDir === undefined || !fs.existsSync(current.tmpDir)) {
+      current.tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-templates-"));
+    }
+    dir = fs.mkdtempSync(path.join(current.tmpDir, "check-"));
+    fs.writeFileSync(path.join(dir, `${name}.yml`), bytes);
+  } catch (error) {
+    return { ok: false, error: `検査のための一時ファイルを書けません: ${(error as Error).message}` };
+  }
+  try {
+    const result = await runTemplateCheck(current.folder.uri.fsPath, binSetting(), path.join(dir, `${name}.yml`), templatesLayerOf(currentKey(target)));
+    return result.ok ? { ok: true, check: result.value } : { ok: false, error: result.error };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 function sha256(bytes: string | Uint8Array): string {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
-async function editOpen(current: PanelState, session: number, name: string, layerName: string): Promise<void> {
-  const unsupported = await checkTemplateEdit(current.folder.uri.fsPath, binSetting());
+/**
+ * 読ませている間に、対象が別に切り替わった（またはパネルが閉じた）か。切り替わっていたら `reply` で理由を返して真を返す。
+ * 層・錠・検査に使う対象は入口で控えたものに揃っているので、途中で変わった答えは使わない（別の層の錠で通さない）
+ */
+function abandoned(current: PanelState, target: TemplatesTarget, reply: (error: string) => void): boolean {
   if (!alive(current)) {
+    return true;
+  }
+  if (!sameTarget(current.target, target)) {
+    reply("対象が切り替わったため、中止しました。開き直してください");
+    return true;
+  }
+  return false;
+}
+
+async function editOpen(current: PanelState, session: number, name: string, layerName: string): Promise<void> {
+  const target = current.target;
+  const unsupported = await checkTemplateEdit(current.folder.uri.fsPath, binSetting());
+  if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
     return;
   }
   if (unsupported !== undefined) {
@@ -699,8 +742,8 @@ async function editOpen(current: PanelState, session: number, name: string, laye
     postOpened(current, session, null, decoded.error);
     return;
   }
-  const checked = await checkBytes(current, name, read.bytes);
-  if (!alive(current)) {
+  const checked = await checkBytes(current, target, name, read.bytes);
+  if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
     return;
   }
   if (!checked.ok) {
@@ -712,8 +755,8 @@ async function editOpen(current: PanelState, session: number, name: string, laye
     postOpened(current, session, null, `読み込めないため、画面では編集できません。ファイルを直接直してください: ${why}`);
     return;
   }
-  const lock = await lockOf(current);
-  if (!alive(current)) {
+  const lock = await lockOf(current, target);
+  if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
     return;
   }
   current.editing = session;
@@ -721,8 +764,9 @@ async function editOpen(current: PanelState, session: number, name: string, laye
 }
 
 async function editNew(current: PanelState, session: number, name: string): Promise<void> {
+  const target = current.target;
   const unsupported = await checkTemplateEdit(current.folder.uri.fsPath, binSetting());
-  if (!alive(current)) {
+  if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
     return;
   }
   if (unsupported !== undefined) {
@@ -740,6 +784,13 @@ async function editNew(current: PanelState, session: number, name: string): Prom
     postOpened(current, session, null, `テンプレートの名前 ${name} は使えません（英数字で始め、英数字と . _ - のみ、64 字まで）`);
     return;
   }
+  // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で 2 本が 1 本に重なるため）。共通の層にある名前も、
+  // 同名で中身が違うと統合結果で捨てられるので作らない
+  const taken = current.loaded === undefined ? undefined : templateNameTaken(current.loaded.data.layers, layerName, name);
+  if (taken !== undefined) {
+    postOpened(current, session, null, `名前 ${name} は、${taken.layer === "common" ? "共通" : "この層"}の ${taken.name} と同じです（大文字小文字は区別しません）。別の名前にしてください`);
+    return;
+  }
   try {
     if (readFlowFile(current.folder.uri.fsPath, file) !== undefined) {
       postOpened(current, session, null, `${name}.yml は既にあります。一覧から開いて編集してください`);
@@ -751,16 +802,16 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   }
   // 型の選択肢を知るために、仮の 1 項で読ませる。画面はこの答えの `types` から最初の項の型を決める
   const data = { name, description: "", plan: ["implement"] };
-  const checked = await checkBytes(current, name, yamlText(data));
-  if (!alive(current)) {
+  const checked = await checkBytes(current, target, name, yamlText(data));
+  if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
     return;
   }
   if (!checked.ok) {
     postOpened(current, session, null, checked.error);
     return;
   }
-  const lock = await lockOf(current);
-  if (!alive(current)) {
+  const lock = await lockOf(current, target);
+  if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
     return;
   }
   current.editing = session;
@@ -768,6 +819,7 @@ async function editNew(current: PanelState, session: number, name: string): Prom
 }
 
 async function editCheck(current: PanelState, session: number, seq: number, data: unknown): Promise<void> {
+  const target = current.target;
   const reply = (check: TemplateCheck | null, error: string): void => {
     current.host.post({ type: "editChecked", session, seq, check, error } satisfies ToTemplates);
   };
@@ -776,27 +828,32 @@ async function editCheck(current: PanelState, session: number, seq: number, data
     reply(null, "テンプレートの名前が使えません（英数字で始め、英数字と . _ - のみ、64 字まで）");
     return;
   }
-  const checked = await checkBytes(current, named.name, yamlText(data));
-  if (!alive(current)) {
+  const checked = await checkBytes(current, target, named.name, yamlText(data));
+  if (abandoned(current, target, (e) => reply(null, e))) {
     return;
   }
   reply(checked.ok ? checked.check : null, checked.ok ? "" : checked.error);
 }
 
 async function editSave(current: PanelState, message: Extract<TemplatesMessage, { type: "editSave" }>): Promise<void> {
+  const target = current.target;
   const { session, name, layer: layerName, expect, data } = message;
   const reply = (sha: string, error: string): void => {
     current.host.post({ type: "editSaved", session, sha, error } satisfies ToTemplates);
   };
   const root = current.folder.uri.fsPath;
+  if (session !== current.editing) {
+    reply("", "保存しません: この編集は開いていません。開き直してください");
+    return;
+  }
   const where = editableLayer(current, layerName);
   if (!where.ok) {
     reply("", where.error);
     return;
   }
   // 作業中の錠は押した時点で取り直す（開いたあとにチケットが着手されていることがある）
-  const lock = await lockOf(current);
-  if (!alive(current)) {
+  const lock = await lockOf(current, target);
+  if (abandoned(current, target, (e) => reply("", e))) {
     return;
   }
   if (lock.locked) {
@@ -812,8 +869,8 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   }
   // 1. 書き出す本文を実行ファイルに読ませる。error が 1 件でもあれば書かない
   const text = yamlText(data);
-  const checked = await checkBytes(current, name, text);
-  if (!alive(current)) {
+  const checked = await checkBytes(current, target, name, text);
+  if (abandoned(current, target, (e) => reply("", e))) {
     return;
   }
   if (!checked.ok) {
@@ -828,6 +885,16 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   // 2. 実行ファイルが読み返した中身が、画面が書こうとした中身と同じときだけ書く
   if (!sameData(data, checked.check.data)) {
     reply("", "保存しません: 実行ファイルが読み返した中身が、画面の中身と食い違いました（YAML の読み方の違い）。食い違う欄を直してから、保存し直してください");
+    return;
+  }
+  // 錠は、読ませている間に着手されたチケットを見逃さないよう、読んで書く直前（同期の区間の手前）にもう一度取り直す
+  const final = await lockOf(current, target);
+  if (abandoned(current, target, (e) => reply("", e))) {
+    return;
+  }
+  if (final.locked) {
+    current.host.post({ type: "editLock", session, lock: final } satisfies ToTemplates);
+    reply("", `保存しません: ${final.reason}`);
     return;
   }
   // 3. 開いたときからファイルが外で変わっていない（新規はまだ無い）

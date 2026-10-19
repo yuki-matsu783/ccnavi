@@ -27,7 +27,7 @@ import {
   toData,
   type EditTemplate,
 } from "../../src/core/template-edit.js";
-import { parseTemplateCheck, shownLayerOf, validTemplateName } from "../../src/core/templatesmodel.js";
+import { parseTemplateCheck, shownLayerOf, templateNameTaken, validTemplateName } from "../../src/core/templatesmodel.js";
 import { templatesCheckFixtureText } from "../helpers/templates.js";
 
 const FLOW = (id: string): FlowDoc => ({ id, name: id, nodes: [{ id: "s", type: "start", name: "開始" }], connections: [] });
@@ -96,10 +96,13 @@ test("CB-T1142 項を消すと、後ろの項の添字・先行・全体計画�
     [
       ["design", []],
       ["docs", [1]],
-      ["acceptance", [2]],
+      ["acceptance", [1, 2]],
     ],
   );
-  // 2 番のフローは項と一緒に消え、4 番のフローは 3 番になる
+  // 途中の項を消しても、後ろの項は前の項を待ち続ける（並行して始まる項に変わらない）
+  const chain: EditTemplate = { ...sample(), plan: [{ type: "a", review: "", after: [] }, { type: "b", review: "", after: [1] }, { type: "c", review: "", after: [2] }], flows: {} };
+  assert.deepEqual(removeItem(chain, "plan", 2).plan.map((i) => [i.type, [...i.after]]), [["a", []], ["c", [1]]]);
+  // 2 番のフローは項と一緒に消え、4 番のフローは 3 番になる（4 番は 2 を待っていたので、2 の先行の 1 を引き継ぐ。1 と 3 を待つ）
   assert.deepEqual(Object.keys(next.flows), ["3"]);
   assert.equal((next.flows["3"] as FlowDoc).id, "f4");
   assert.equal(removeItem({ ...sample(), plan: [sample().plan[0]], flows: {} }, "plan", 1).plan.length, 1);
@@ -206,4 +209,13 @@ test("CB-T1148 テンプレートの名前はファイル名になるので、�
   assert.equal(shownLayerOf({ kind: "workspace", name: "" }), "common");
   assert.equal(shownLayerOf({ kind: "self", name: "" }), "self");
   assert.equal(shownLayerOf({ kind: "project", name: "lib" }), "lib");
+});
+
+test("CB-T1149 新しい名前は、共通の層とこの層の既存の名前と、大文字小文字を区別せず重なるかを見る。ほかの層の名前は見ない", () => {
+  const layer = (name: string, names: string[]) => ({ name, path: "", exists: true, unreadable: "", writable: true, problems: [], templates: names.map((n) => ({ name: n })) }) as never;
+  const layers = [layer("common", ["Review"]), layer("self", ["impl"]), layer("lib", ["libonly"])];
+  assert.deepEqual(templateNameTaken(layers, "self", "review"), { layer: "common", name: "Review" });
+  assert.deepEqual(templateNameTaken(layers, "self", "IMPL"), { layer: "self", name: "impl" });
+  assert.equal(templateNameTaken(layers, "self", "libonly"), undefined);
+  assert.equal(templateNameTaken(layers, "self", "fresh"), undefined);
 });
