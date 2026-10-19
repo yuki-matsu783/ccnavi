@@ -29,6 +29,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -624,7 +625,10 @@ class WriterFailureTest(CoreHarness):
 
 
 def _normalized(changes):
-    """経路（`via`）の欄を除いた Changes。手元の CLI（board・cli）と Chrome（chrome）で違う所。"""
+    """経路（`via`・`settled_by`）の欄を除いた Changes。
+
+    手元の CLI（board・cli）と Chrome（chrome）で違う所。
+    """
     out = {}
     for name, rows in (changes or {}).items():
         kept = []
@@ -633,6 +637,10 @@ def _normalized(changes):
             content = row.get("content")
             if isinstance(content, str):
                 content = row["content"] = content.replace("\r\n", "\n")
+                # 子を動かした経路の欄（settled_by）も、CLI（confirm）と Chrome（chrome）で違う。
+                content = row["content"] = re.sub(
+                    r'^settled_by: "[a-z-]+"\n', "", content, flags=re.M
+                )
             if content is not None and row["path"].endswith(".reviewed"):
                 mark = json.loads(content)
                 mark.pop("via", None)

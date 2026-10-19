@@ -212,7 +212,8 @@ def script_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             t.ticket,
             f"{names} はスクリプト（ccnavi-ticket.sh）だけが書く欄。"
             "提案には値を書かない（空にするか削除します）。改版の提案では、承認済みチケットを写したときに"
-            "入る started_at・completed_at・base_sha・merged_sha・cancelled_at・cancel_reason を"
+            "入る started_at・completed_at・base_sha・merged_sha・cancelled_at・cancel_reason・"
+            "finished_to・settled_by を"
             "空にする"
             "（改版は承認済みチケットの側の値を残し、計画・`phases:`・範囲だけを差し替える）",
         )

@@ -240,11 +240,12 @@ threads() {
 		page=0
 		while :; do
 			query=$("$JQ" -n --arg o "$owner" --arg r "$repo" --argjson n "$mr_number" --argjson c "$cursor" '{
-				query: "query($o:String!,$r:String!,$n:Int!,$c:String){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{id isResolved comments(first:1){nodes{url path line body createdAt}}}}}}}",
+				query: "query($o:String!,$r:String!,$n:Int!,$c:String){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{id isResolved comments(first:1){nodes{url path line body createdAt}} last:comments(last:1){nodes{id createdAt author{login}}}}}}}}",
 				variables: {o: $o, r: $r, n: $n, c: $c}}')
 			res=$(api POST graphql "$query")
-			chunk=$(printf '%s' "$res" | "$JQ" '[.data.repository.pullRequest.reviewThreads.nodes[] | . as $t | (.comments.nodes[0] // {}) as $c |
-				{id: $t.id, resolved: $t.isResolved, url: ($c.url // ""), path: ($c.path // ""), line: ($c.line // 0), body: ($c.body // ""), created_at: ($c.createdAt // "")}]')
+			chunk=$(printf '%s' "$res" | "$JQ" '[.data.repository.pullRequest.reviewThreads.nodes[] | . as $t | (.comments.nodes[0] // {}) as $c | (.last.nodes[0] // {}) as $l |
+				{id: $t.id, resolved: $t.isResolved, url: ($c.url // ""), path: ($c.path // ""), line: ($c.line // 0), body: ($c.body // ""), created_at: ($c.createdAt // ""),
+				 last_id: ($l.id // ""), last_at: ($l.createdAt // ""), last_author: ($l.author.login // "")}]')
 			all=$(printf '%s\n%s' "$all" "$chunk" | "$JQ" -s '.[0] + .[1]')
 			more=$(printf '%s' "$res" | "$JQ" -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
 			[ "$more" = true ] || break
@@ -258,7 +259,8 @@ threads() {
 			"$JQ" --arg u "$mr_url" '[.[] | select((.notes // []) | length > 0) | select(.notes[0].resolvable) | . as $d | .notes[0] as $n |
 				{id: ($d.id | tostring), resolved: ([$d.notes[] | select(.resolvable) | .resolved] | all),
 				 url: ($u + "#note_" + ($n.id | tostring)), path: ($n.position.new_path // ""), line: ($n.position.new_line // 0),
-				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: (($n.author.id // "") | tostring)}]'
+				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: (($n.author.id // "") | tostring),
+				 last_id: (($d.notes[-1].id // "") | tostring), last_at: ($d.notes[-1].created_at // ""), last_author: ($d.notes[-1].author.username // "")}]'
 	fi
 }
 

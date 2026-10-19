@@ -608,7 +608,7 @@ def _settle(
                 return None
             skipped.append(ph.number)
         elif ph in left.unreviewed:
-            if not review._settle_children(stdout, stderr, root, conf, parent, ph):
+            if not review._settle_children(stdout, stderr, root, conf, parent, ph, "close-early"):
                 return None
             if not review._mark(
                 stderr,

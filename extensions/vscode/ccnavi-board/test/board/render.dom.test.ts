@@ -85,16 +85,16 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
 
 function decidePreview(canIssue: boolean): DecidePreview {
   return {
-    version: 1,
+    version: 2,
     parent: "i0001",
     phase: 2,
     mr: { number: 7, url: "https://example.com/mr/7" },
     can_issue: canIssue,
     threads: [
-      { key: "u1", url: "u1", path: "src/a.py", line: 3, body: "命名を直す\n詳しく" },
-      { key: "u2", url: "u2", path: "", line: 0, body: "<b>テスト</b>" },
+      { key: "u1", url: "u1", path: "src/a.py", line: 3, body: "命名を直す\n詳しく", version: "v".repeat(32), last_comment: { id: "", at: "", author: "" } },
+      { key: "u2", url: "u2", path: "", line: 0, body: "<b>テスト</b>", version: "v".repeat(32), last_comment: { id: "", at: "", author: "" } },
     ],
-    digest: "a".repeat(64),
+    digest: "v2.eyJiIjoiYSIsInQiOnt9fQ",
   };
 }
 

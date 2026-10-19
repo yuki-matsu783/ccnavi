@@ -12,7 +12,10 @@
       "path": "src/app.py",
       "line": 3,
       "body": "ここは直す",
-      "created_at": "2026-09-29T01:00:00Z"
+      "created_at": "2026-09-29T01:00:00Z",
+      "last_id": "",
+      "last_at": "",
+      "last_author": ""
     },
     {
       "id": "PRRT_kwDOAbCdEs5AAAAC",
@@ -21,7 +24,10 @@
       "path": "wip/design/plan.md",
       "line": 12,
       "body": "表を追加する\n\n- 列を 1 つ",
-      "created_at": "2026-09-29T01:05:00Z"
+      "created_at": "2026-09-29T01:05:00Z",
+      "last_id": "",
+      "last_at": "",
+      "last_author": ""
     }
   ],
   "reviews": [

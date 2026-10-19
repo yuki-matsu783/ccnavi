@@ -587,6 +587,10 @@ export interface ReviewThread {
   readonly line: number;
   readonly body: string;
   readonly created_at: string;
+  /** 最後のコメントの id・時刻・作成者。再提起（受け入れたあとに付いたコメント）を見分ける。取れなければ空 */
+  readonly last_id: string;
+  readonly last_at: string;
+  readonly last_author: string;
   /** 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持ち、ccnavi の依頼のスレッドを見分けるのに使う（目印は誰でも書けるので書き手で見る） */
   readonly author?: string;
 }
@@ -635,13 +639,18 @@ const THREADS = `query($owner: String!, $name: String!, $number: Int!, $after: S
     pullRequest(number: $number) {
       reviewThreads(first: 100, after: $after) {
         pageInfo { hasNextPage endCursor }
-        nodes { id isResolved comments(first: 1) { nodes { url path line body createdAt } } }
+        nodes { id isResolved comments(first: 1) { nodes { url path line body createdAt } } last: comments(last: 1) { nodes { id createdAt author { login } } } }
       }
     }
   }
 }`;
 
-type ThreadNode = { id?: unknown; isResolved?: unknown; comments?: { nodes?: Record<string, unknown>[] } | null };
+type ThreadNode = {
+  id?: unknown;
+  isResolved?: unknown;
+  comments?: { nodes?: Record<string, unknown>[] } | null;
+  last?: { nodes?: Record<string, unknown>[] } | null;
+};
 
 /** MR のスレッド（sh の `threads` と同じ読み方。最初のコメントの url・path・line・本文・時刻） */
 export async function reviewThreads(client: Client, owner: string, repo: string, number: number): Promise<ReviewThread[]> {
@@ -654,6 +663,8 @@ export async function reviewThreads(client: Client, owner: string, repo: string,
     if (!threads) throw new HostError(`マージリクエスト #${number} のスレッドを取得できません`);
     for (const t of threads.nodes) {
       const c = t.comments?.nodes?.[0] ?? {};
+      const l = t.last?.nodes?.[0] ?? {};
+      const lastAuthor = (l.author ?? {}) as { login?: unknown };
       out.push({
         id: String(t.id),
         resolved: t.isResolved === true,
@@ -662,6 +673,9 @@ export async function reviewThreads(client: Client, owner: string, repo: string,
         line: Number(alt(c.line, 0)),
         body: String(alt(c.body, "")),
         created_at: String(alt(c.createdAt, "")),
+        last_id: String(alt(l.id, "")),
+        last_at: String(alt(l.createdAt, "")),
+        last_author: String(alt(lastAuthor.login, "")),
       });
     }
     if (!threads.pageInfo.hasNextPage) return out;

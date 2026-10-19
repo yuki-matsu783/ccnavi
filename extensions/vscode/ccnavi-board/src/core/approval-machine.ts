@@ -672,18 +672,22 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     if (value.warning !== "") {
       effects.unshift({ kind: "warn", text: value.warning });
     }
+    const waiting = value.pending_extra.length > 0;
     const note = value.followup
       ? `直す指摘を含む追加対応用の子チケット ${value.followup} を作成しました。フェーズを再開しました。`
-      : "フェーズはレビュー済みになりました。";
+      : waiting
+        ? `今回の判断は適用済みです。見せたあとに追加された指摘 ${value.pending_extra.length} 件は判断待ちです（フェーズはレビュー済みにしていません）。もう一度「決める」を開いてください。`
+        : "フェーズはレビュー済みになりました。";
     const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
     return move(
       state,
       {
         overlay: {
           kind: "prompt",
-          title: value.followup
-            ? `フェーズ ${value.phase} の未解決（Unresolved）指摘の対応方針を決めました`
-            : `フェーズ ${value.phase} をレビュー済みにしました`,
+          title:
+            value.followup || waiting
+              ? `フェーズ ${value.phase} の未解決（Unresolved）指摘の対応方針を決めました`
+              : `フェーズ ${value.phase} をレビュー済みにしました`,
           note:
             `${note}${issued} Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、` +
             "新しいセッションで開いてください。送るときは自分で Enter を押してください。",

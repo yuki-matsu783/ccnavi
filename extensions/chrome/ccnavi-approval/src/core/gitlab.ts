@@ -402,6 +402,7 @@ export async function discussions(client: Client, owner: string, repo: string, n
     if (alt(first.resolvable, false) === false) continue;
     const resolvable = notes.filter((n) => alt(n?.resolvable, false) !== false);
     const pos = first.position ?? null;
+    const last = notes[notes.length - 1] ?? {};
     // jq と同じく、欄の型はそのまま残す（文字列の行番号を数に直さない）。書き手は username でなく id
     out.push({
       id: tostring(d.id),
@@ -412,6 +413,9 @@ export async function discussions(client: Client, owner: string, repo: string, n
       body: alt(first.body, "") as string,
       created_at: alt(first.created_at, "") as string,
       author: tostring(alt(first.author?.id, "")),
+      last_id: tostring(alt(last.id, "")),
+      last_at: alt(last.created_at, "") as string,
+      last_author: String(alt(last.author?.username, "")),
     });
   }
   return out;

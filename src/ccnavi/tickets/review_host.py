@@ -46,6 +46,12 @@ class Thread:
     # 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持つ
     # （ccnavi の投稿を見分けるため）
     author: str = ""
+    # 最後のコメントの id・時刻・作成者。再提起（受け入れたあとに付いたコメント）を
+    # 見分けるために取る。
+    # 返信をすべて取るわけではない（全文の範囲は最初のコメント）。取れなければ空。
+    last_comment_id: str = ""
+    last_comment_at: str = ""
+    last_comment_author: str = ""
 
 
 @dataclass
@@ -151,6 +157,9 @@ class Result:
                     body=str(t.get("body") or ""),
                     created_at=str(t.get("created_at") or ""),
                     author=str(t.get("author") or ""),
+                    last_comment_id=str(t.get("last_id") or ""),
+                    last_comment_at=str(t.get("last_at") or ""),
+                    last_comment_author=str(t.get("last_author") or ""),
                 )
                 for t in data.get("threads") or []
                 if isinstance(t, dict)
@@ -206,11 +215,17 @@ def accept_plan_problem(threads: list[Thread]) -> str:
     return ""
 
 
-def write_accept_plan(path: str, items: list[tuple[Thread, str]], digest: str = "") -> str:
-    """計画を書く。`items` は (スレッド, 返信の本文)。書けなければ理由を返す。"""
+def write_accept_plan(
+    path: str, items: list[tuple[Thread, str]], digest: str = "", op: str = ""
+) -> str:
+    """計画を書く。`items` は (スレッド, 返信の本文)。書けなければ理由を返す。
+
+    `op` は操作記録の操作ID。sh が送信の段階を記録するときと、置く呼び出しが同じ記録を読むときの鍵。
+    """
     body = {
         "version": ACCEPT_PLAN_VERSION,
         "digest": digest,
+        "op": op,
         "threads": [{"id": t.id, "key": t.url or t.id, "reply": reply} for t, reply in items],
     }
     return fsio.write_text(path, json.dumps(body, ensure_ascii=False) + "\n", newline="\n")
@@ -223,6 +238,7 @@ class AcceptPlan:
     digest: str = ""
     ids: list[str] = field(default_factory=list)
     keys: list[str] = field(default_factory=list)
+    op: str = ""
 
 
 def read_accept_plan(path: str) -> AcceptPlan | None:
@@ -233,6 +249,7 @@ def read_accept_plan(path: str) -> AcceptPlan | None:
     rows = [t for t in data.get("threads") or [] if isinstance(t, dict)]
     return AcceptPlan(
         digest=str(data.get("digest") or ""),
+        op=str(data.get("op") or ""),
         ids=[str(t.get("id") or "") for t in rows],
         keys=[str(t.get("key") or "") for t in rows],
     )

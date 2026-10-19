@@ -12,7 +12,10 @@
       "path": "src/app.py",
       "line": 8,
       "body": "済み",
-      "created_at": "2026-09-29T01:00:00Z"
+      "created_at": "2026-09-29T01:00:00Z",
+      "last_id": "",
+      "last_at": "",
+      "last_author": ""
     }
   ],
   "reviews": [

@@ -733,6 +733,8 @@ def resumed_fields(t: ticket_model.Ticket) -> list[str]:
         "merged_sha": t.merged_sha,
         "cancelled_at": t.cancelled_at,
         "cancel_reason": t.cancel_reason,
+        "finished_to": t.finished_to,
+        "settled_by": t.settled_by,
     }
     return [name for name, value in values.items() if value]
 

@@ -13,7 +13,10 @@
       "line": 1,
       "body": "ここは直してほしい",
       "created_at": "2026-09-29T05:00:00.000Z",
-      "author": "202"
+      "author": "202",
+      "last_id": "5101",
+      "last_at": "2026-09-29T05:00:00.000Z",
+      "last_author": "lab-reviewer"
     }
   ],
   "reviews": [

@@ -127,7 +127,7 @@ test("CB-T423 承認・残った指摘・渡す文のオーバーレイの見本
     // 残った指摘のある親・フェーズは、見本のレビュー待ちのフェーズ
     const chip = card(decide.preview.parent).phases.find((p) => p.number === decide.preview.phase);
     assert.ok(chip?.reviewWaiting);
-    assert.ok(decide.preview.threads.length >= 2 && decide.preview.digest.length === 64);
+    assert.ok(decide.preview.threads.length >= 2 && decide.preview.digest.startsWith("v2."));
     assert.equal(decide.preview.mr.number, card(decide.preview.parent).mrNumber);
   }
   assert.equal(sample.overlays.done.kind, "done");

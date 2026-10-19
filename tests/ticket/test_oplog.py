@@ -158,6 +158,86 @@ class OplogTest(unittest.TestCase):
             self.assertIn(key, data)
 
 
+class ReconcileTest(unittest.TestCase):
+    """送信の照合の表。目印の一致、最後まで読めた0件、打ち切り、アカウント違い、複数、読めない。"""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.state = os.path.join(directory.name, "logs", "state")
+        self.op = oplog.begin(self.state, oplog.KIND_DECIDE, repo=REPO, stages=STAGES)
+
+    def record(self):
+        return oplog.load(self.state, self.op)
+
+    def test_one_match_is_sent(self):
+        got = oplog.reconcile(self.record(), "issue", ["https://x/1"], True, "me")
+        self.assertEqual(got[0], oplog.V_SENT)
+
+    def test_many_matches_stop(self):
+        got = oplog.reconcile(self.record(), "issue", ["a", "b"], True, "me")
+        self.assertEqual(got[0], oplog.V_STOP)
+
+    def test_zero_matches_on_a_fully_read_list_means_not_sent(self):
+        got = oplog.reconcile(self.record(), "issue", [], True, "me")
+        self.assertEqual(got[0], oplog.V_SEND)
+
+    def test_a_truncated_list_cannot_confirm_zero(self):
+        got = oplog.reconcile(self.record(), "issue", [], False, "me")
+        self.assertEqual(got[0], oplog.V_UNKNOWN)
+        self.assertIn("打ち切った", got[1])
+
+    def test_an_unreadable_list_stops(self):
+        self.assertEqual(oplog.reconcile(self.record(), "issue", [], None, "me")[0], oplog.V_STOP)
+
+    def test_a_different_account_cannot_confirm_zero(self):
+        oplog.stage_set(self.state, self.op, "issue", oplog.UNKNOWN, account="alice")
+        got = oplog.reconcile(self.record(), "issue", [], True, "bob")
+        self.assertEqual(got[0], oplog.V_UNKNOWN)
+
+    def test_a_just_tried_stage_may_not_be_listed_yet(self):
+        oplog.stage_set(self.state, self.op, "issue", oplog.UNKNOWN, account="me")
+        record = self.record()
+        got = oplog.reconcile(record, "issue", [], True, "me")
+        self.assertEqual(got[0], oplog.V_UNKNOWN)
+        later = time.time() + oplog.RECENT_SECONDS + 60
+        self.assertEqual(
+            oplog.reconcile(record, "issue", [], True, "me", now=later)[0], oplog.V_SEND
+        )
+
+    def test_an_unknown_stage_name_stops(self):
+        self.assertEqual(oplog.reconcile(self.record(), "nope", [], True, "me")[0], oplog.V_STOP)
+
+
+class DiscardTest(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.state = os.path.join(directory.name, "logs", "state")
+
+    def begin(self, parent="i0001", phase=1):
+        return oplog.begin(
+            self.state, oplog.KIND_DECIDE, repo=REPO, parent=parent, phase=phase, stages=STAGES
+        )
+
+    def test_old_untouched_records_for_the_same_target_go_away(self):
+        old, mine = self.begin(), self.begin()
+        gone = oplog.discard_untouched(self.state, oplog.KIND_DECIDE, "i0001", 1, keep=mine)
+        self.assertEqual(gone, [old])
+        self.assertIsNone(oplog.load(self.state, old))
+        self.assertIsNotNone(oplog.load(self.state, mine))
+
+    def test_records_where_something_happened_stay(self):
+        sent, applied, other = self.begin(), self.begin(), self.begin(phase=2)
+        oplog.stage_set(self.state, sent, "reply", oplog.SENT)
+        oplog.applied_set(self.state, applied, "local", True)
+        mine = self.begin()
+        gone = oplog.discard_untouched(self.state, oplog.KIND_DECIDE, "i0001", 1, keep=mine)
+        self.assertEqual(gone, [])
+        for kept in (sent, applied, other):
+            self.assertIsNotNone(oplog.load(self.state, kept))
+
+
 class PruneKeepsUnfinishedOpsTest(unittest.TestCase):
     def test_prune_never_deletes_the_ops_directory(self):
         with tempfile.TemporaryDirectory() as root:

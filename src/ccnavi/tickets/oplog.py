@@ -89,6 +89,7 @@ def _stage(stage_id: str, kind: str) -> dict[str, Any]:
         "url": "",
         "account": "",
         "tries": 0,
+        "at": "",
     }
 
 
@@ -229,6 +230,7 @@ def stage_set(
         if new_state != stage.get("state") or new_state == PENDING:
             stage["tries"] = int(stage.get("tries") or 0) + (1 if new_state != SENT else 0)
         stage["state"] = new_state
+        stage["at"] = _now()
         if url:
             stage["url"] = url
         if account:
@@ -236,6 +238,64 @@ def stage_set(
         _save(state, record)
         return
     raise OpError(f"操作記録 {op_id} に段階 {stage_id} が無い")
+
+
+# 照合の結果。
+V_SENT = "sent"  # 送ったと確かめた（URL を保存する）
+V_SEND = "send"  # 送っていないと確定した（同じ段階IDで送る）
+V_UNKNOWN = "unknown"  # 送ったか確定できない（自動では送らない）
+V_STOP = "stop"  # 複数ある、読めない（止めて、確かめ方を表示する）
+
+# 作成直後は一覧に反映されるのが遅れうる。この秒数のあいだは、0 件でも未送信と確定しない。
+RECENT_SECONDS = 120.0
+
+
+def _parse_time(text: str) -> float | None:
+    try:
+        return time.mktime(time.strptime(text[:19], "%Y-%m-%dT%H:%M:%S"))
+    except (ValueError, OverflowError):
+        return None
+
+
+def reconcile(
+    record: dict[str, Any],
+    stage_id: str,
+    found: list[str],
+    complete: bool | None,
+    account: str,
+    now: float | None = None,
+) -> tuple[str, str]:
+    """送信の照合。ホストの一覧から目印で探した結果（found）と、段階の記録から結論を出す。
+
+    found は、目印（`ccnavi:op=<操作ID> stage=<段階ID>`）が一致し、送ったアカウントの作成だった
+    ものの URL。complete は一覧を上限で打ち切らずに最後まで読めたか（読めなかった・失敗は None）。
+    account は今のトークンの持ち主。返すのは（結論, 理由）。
+
+    - 1 件だけ: 送った（V_SENT）
+    - 複数: 止める（V_STOP）
+    - 0 件で、最後まで読めて、送ったアカウントと同じで、作成直後でない: 送っていないと確定（V_SEND）
+    - 0 件で、打ち切った・作成直後・アカウントが違う: 確定できない（V_UNKNOWN）
+    - 一覧を読めない: 止める（V_STOP）
+    """
+    stage = next((s for s in record["stages"] if s.get("id") == stage_id), None)
+    if stage is None:
+        return V_STOP, f"段階 {stage_id} が記録に無い"
+    if complete is None:
+        return V_STOP, "ホストの一覧を読めなかった"
+    if len(found) > 1:
+        return V_STOP, f"目印の一致が {len(found)} 件ある（重複して送られている）"
+    if len(found) == 1:
+        return V_SENT, ""
+    sent_by = str(stage.get("account") or "")
+    if sent_by and account and sent_by != account:
+        return V_UNKNOWN, f"送ったアカウント（{sent_by}）と今のトークンの持ち主（{account}）が違う"
+    if not complete:
+        return V_UNKNOWN, "一覧を上限で打ち切ったので、0 件とは言い切れない"
+    at = _parse_time(str(stage.get("at") or ""))
+    clock = time.time() if now is None else now
+    if stage.get("tries") and at is not None and clock - at < RECENT_SECONDS:
+        return V_UNKNOWN, "送ってから間がなく、ホストの一覧に反映されていないかもしれない"
+    return V_SEND, ""
 
 
 def applied_set(state: str, op_id: str, key: str, value: Any) -> None:
@@ -277,6 +337,37 @@ def all_ids(state: str) -> list[str]:
             except OSError:
                 continue
     return [stem for _, stem in sorted(found)]
+
+
+def untouched(record: dict[str, Any]) -> bool:
+    """何も起きていない記録（どの段階も送っておらず、ローカルにも何も適用していない）。"""
+    return not record.get("applied") and all(s.get("state") == PENDING for s in record["stages"])
+
+
+def discard_untouched(state: str, kind: str, parent: str, phase: int, keep: str = "") -> list[str]:
+    """同じ対象の、何も起きていない古い記録を消す。消した操作ID を返す。
+
+    判断をやり直したとき（前の判断が返信の前で止まった）に、使われない記録が未完了として
+    残り続けないようにする。何かが送られた記録・適用された記録は消さない。
+    """
+    gone = []
+    for op_id in all_ids(state):
+        if op_id == keep:
+            continue
+        try:
+            record = load(state, op_id)
+        except OpError:
+            continue
+        if (
+            record is not None
+            and record.get("kind") == kind
+            and record.get("parent") == parent
+            and record.get("phase") == phase
+            and untouched(record)
+        ):
+            remove(state, op_id)
+            gone.append(op_id)
+    return gone
 
 
 def pending(state: str) -> list[dict[str, Any]]:

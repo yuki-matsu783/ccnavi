@@ -45,6 +45,7 @@ import contextlib
 import hashlib
 import os
 import re
+import unicodedata
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathcase, settings, tree
@@ -61,6 +62,7 @@ from . import (
     ticket_fields,
     ticket_model,
     ticket_places,
+    via,
 )
 
 TIMEOUT_SECONDS = 15.0
@@ -334,6 +336,11 @@ def review_problems(
     return lines
 
 
+def _settled_by_confirm() -> str:
+    """confirm が子を動かした経路。Chrome のレビュー済みも同じコアを通るので、経路で見分ける。"""
+    return "chrome" if via.via() == via.VIA_CHROME else "confirm"
+
+
 def settle_and_mark(
     stage,
     root: str,
@@ -352,7 +359,7 @@ def settle_and_mark(
         on_fail=fsio.FAIL_STOP, ticket="", message="{reason}", prefix="", undo=(), places=""
     ):
         moved, failed = approval_ops.settle_review(
-            conf, root, parent.ticket, [*ph.covers, ph.number]
+            conf, root, parent.ticket, [*ph.covers, ph.number], by=_settled_by_confirm()
         )
         if failed:
             return "", failed
@@ -379,8 +386,11 @@ def _settle_children(
     conf: settings.Settings,
     parent: ticket_model.Ticket,
     ph: phase.Phase,
+    by: str,
 ) -> bool:
     """レビューが済んだフェーズ（延期を引き受けた分を含む）のレビュー待ちの子を `done/` へ動かす。
+
+    `by` は動かした経路（`ticket_model.SETTLED_BY_VALUES`）。子の `settled_by` に書く。
 
     ユーザが見たことの記録はマーカーで、場所の移動はそれに合わせたもの。
     動かせなければ言って False。
@@ -390,7 +400,9 @@ def _settle_children(
     拒むので、取り出す操作が無くなる。
     逆順なら、動いたのにマーカーが置けなくても、次の `confirm` が置き直す（動かす分は空）。
     """
-    moved, failed = approval_ops.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
+    moved, failed = approval_ops.settle_review(
+        conf, root, parent.ticket, [*ph.covers, ph.number], by=by
+    )
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return False
@@ -405,6 +417,17 @@ def _settle_children(
 def thread_key(t: review_host.Thread) -> str:
     """選択をスレッドに対応づける鍵。URL を先に使い、無ければスレッドの id。"""
     return t.url or t.id
+
+
+def thread_version(t: review_host.Thread) -> str:
+    """指摘の版。SHA-256(鍵 + 改行 + 正規化した最初のコメントの本文) の先頭 32 桁。
+
+    正規化するのは改行コード（CRLF・CR を LF に）と Unicode の NFC だけ。本文が変わるか、鍵が
+    変わると版が変わる。見せた指摘と、適用の直前に取り直した指摘が同じかを、この版で照合する
+    （CLI と Chrome が同じ Python のコアでこの 1 か所を使う）。
+    """
+    body = unicodedata.normalize("NFC", t.body.replace("\r\n", "\n").replace("\r", "\n"))
+    return hashlib.sha256(f"{thread_key(t)}\n{body}".encode()).hexdigest()[:32]
 
 
 def _approved_rel(conf: settings.Settings) -> str:
