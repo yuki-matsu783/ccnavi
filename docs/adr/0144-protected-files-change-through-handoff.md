@@ -82,7 +82,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
 | ボードに、テンプレート専用の取り込み・編集の画面の代わりに、handoff の一覧の画面（`template`・`layer-config`・`docs` の種類）を置く。一覧は `user handoff --json`（見るだけ）で作り、取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。テンプレートの画面は、一覧・検索・表示だけにする。`defense`（と、防御の記述を動かす `rules.yml`）は一覧に出し、「端末で取り込む」ことと打つコマンド（`ccnavi --root <ツリー> user handoff <パス> --yes --expect <ハッシュ>`。引用は POSIX の sh の形）を案内する | 拡張も、同じ 1 つのコマンドを呼ぶだけ | テンプレートの画面だけ残す。拡張が直接書く |
-| `user_only.py` の表に `handoff` の操作と `--handoff` を足し、テンプレートの書き込みの操作を実行ファイルの `user` から外す。外したオプションは `legacy`（今の実行ファイルは受け付けないが、古い実行ファイルが手元に残るときのため、hook は止め続ける）にする。ボードの組み合わせの語のグループ（`user-board-verb`）に `handoff` を足し、旧い `templates` の組み合わせは `legacy` のグループで残す | 表を正本のままにする | 外したオプションの止めも消す |
+| `user_only.py` の表に `handoff` の操作と `--handoff` を足し、テンプレートの書き込みの操作を実行ファイルの `user` から外す。外したオプションは `legacy`（今の実行ファイルは受け付けないが、古い実行ファイルが手元に残るときのため、hook は止め続ける）にする。ボードの組み合わせの語のグループ（`user-board-verb`）に `handoff` を足し、古い `templates` の組み合わせは `legacy` のグループで残す | 表を正本のままにする | 外したオプションの止めも消す |
 | エージェントが `wip/handoff/` の下の写しを編集できるよう、名指しのツール（Write / Edit）の保護に例外を入れる。対象は、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下だけ。組み込みの `guard-project-home` と、リポジトリのルール `guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` に入れる。`..` の段・リンク・ハードリンクのあるパス、`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。リポジトリのルールの `except` は式でファイルを見ないので、置き場の中のリンク・ハードリンクの対象への書き込みは組み込みの `builtin:guard-handoff-links` が別に止め、置き場の中にリンクを作るシェルの形（`ln`・`link`・リンクを作る `cp`）は `builtin:guard-handoff-ln` が止める。シェルからの書き込みの保護は、ほかは変えない | `ccnavi-stage.sh` は写しを元と同じ相対パスに置く。パスに `.ccnavi/` や `.claude/` が入るので、保護の glob に当たり、エージェントが写しを編集できなかった（この手順が一般の保護対象では最初から成り立っていなかった）。写しはユーザが取り込むまで効力が無い | 例外を入れず、ユーザが写しを編集する |
 | 互換の版は、ADR-0143 と同じ 15 のまま（同じ版で出す）。`features` から `templates.edit`・`board.template-draft` を外し、`handoff` を足す | まだ出ていない版の中の変更なので、二重に上げない | 14 に上げる |
 | ボードの rules・phases・risks の画面は、今は拡張が直接書く。この ADR では変えない | 範囲を広げすぎない。画面を handoff に寄せるかは別に決める | 同時に直す |
@@ -110,6 +110,6 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 
 1. 取り込みの処理（`tickets/handoff.py`）、検査の共有（パスを受ける関数の切り出し）、実行ファイルの `user handoff`、表と hook の更新
 2. `--draft` の置き場の変更、`ready` の止め、`--lint` の置き場の変更、テンプレート専用の取り込み・編集の削除
-3. テスト（旧い試験の削除、handoff の試験の追加）
+3. テスト（古い試験の削除、handoff の試験の追加）
 4. 拡張（handoff の一覧の画面、テンプレートの画面の縮小）
 5. docs・`.ccnavi/docs/`・`ccnavi-stage.sh` の案内

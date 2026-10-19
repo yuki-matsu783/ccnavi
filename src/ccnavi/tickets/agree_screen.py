@@ -336,7 +336,7 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
 def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:
     """改版の範囲の差分。足した項・外した項を、deny / ask / allow ごとに並べる。
 
-    旧い範囲は承認のあとに上書きされ、ccnavi の側には残らない。承認する人が、
+    古い範囲は承認のあとに上書きされ、ccnavi の側には残らない。承認する人が、
     新たに書けるようになる範囲と書けなくなる範囲を、ここで見られるようにする。
     """
     lines: list[str] = []
@@ -350,7 +350,7 @@ def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket
     return [
         "■ 範囲の差分（改版で親に固定する範囲）",
         "    allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、"
-        "deny はこのチケットでも編集できない場所。承認すると、旧い範囲は上書きされる",
+        "deny はこのチケットでも編集できない場所。承認すると、古い範囲は上書きされる",
         *lines,
         "    作業中の子は居ない（居れば改版は通らない）。新しい範囲の子は、新しい子として提案する。"
         "狭めた場合、完了済み・レビュー待ちの子の範囲が親の外に出ることがあるが、"

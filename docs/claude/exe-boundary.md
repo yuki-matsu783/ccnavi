@@ -37,7 +37,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   （ネットワークはshの仕事）。この2経路にほかの判定は足さない
 - shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`write-and-push family`・`sync retired`・
   `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
-  （止める側の検査は止める向き、ツリーを動かす側は動かさない向き）。`tree parent`の答えの`approved`・`started`などの行が無い（旧い実行ファイル）ときは
+  （止める側の検査は止める向き、ツリーを動かす側は動かさない向き）。`tree parent`の答えの`approved`・`started`などの行が無い（古い実行ファイル）ときは
   `unknown`として読む
 - 実行ファイルには、ディレクトリの外へ情報を取りに行くコードを足さない。取得する処理はshに任せ、
   実行ファイルには取得した結果を読む処理だけを足す。shと実行ファイルの間の契約は、このJSONの形で決まる。
@@ -63,7 +63,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   確かめて消す。エージェントに `git branch -D` を開けないので、消す入口はこれらだけ（`ccnavi-user-clean-branch.sh`）。最後の行が
   `record yes|no`（片付けが済んだか）で、`yes`のときは実行ファイルが`retire/<親>.json`も消す（shは消さない）。
   `ready`が書く`retire/<親>.json`（MRの番号を含む）が、親のワークツリーを片付けた後の列挙元で、shはJSONを読まず`sync retired`に聞く。
-  放棄した親の記録は`worktree retire --abandon <親>`（ユーザだけ）で消す。旧い取り込み状態は`sync migrate`（冪等）が`retire/`へ移す
+  放棄した親の記録は`worktree retire --abandon <親>`（ユーザだけ）で消す。古い取り込み状態は`sync migrate`（冪等）が`retire/`へ移す
 - ワークツリーの片付け（`worktree drop <名前>`・`worktree tidy <親>`）も実行ファイルが行う。消すかどうかの判断（cwdが中か、未コミットが
   あるか、gitのワークツリーか）と、生成物の掃除・`git worktree remove`はローカルの操作で、ネットワークには出ない。
   shは状態を書く操作（write-and-pushならpushまで）が済んでから呼ぶ。`ready`ではDraftを外したあとの最後に呼ぶ

@@ -460,7 +460,7 @@ class LintBranchNamesTest(unittest.TestCase):
     def test_a_parent_ending_in_two_digits_is_still_named(self):
         # 右から 2 段を剥がすので親の割り出しは誤らないが、別の親の子の途中
         # （`<親>-<フェーズ>`）と紛れる。
-        # 旧い形の子と同じ綴りなので、今までどおり warn にする。
+        # 古い形の子と同じ綴りなので、今までどおり warn にする。
         self.place("done", "abc-01")
         lines = self.lint()
         self.assertEqual(1, len(lines), lines)

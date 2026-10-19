@@ -250,7 +250,7 @@ class SyncHarness(unittest.TestCase):
         return path
 
     def legacy_record(self, state="gone", mr="42", branch=PARENT, name=PARENT, repo="self"):
-        """旧い取り込み状態（`sync/<repo>/families/<P>`）を置く。"""
+        """古い取り込み状態（`sync/<repo>/families/<P>`）を置く。"""
         path = os.path.join(self.state, "sync", repo, "families", name)
         write(
             path,
@@ -939,15 +939,15 @@ class SyncTest(SyncHarness):
         self.assertIn("親のワークツリー（.claude/worktrees/i0001）がありません", named.stdout)
 
     def test_old_records_of_removed_worktrees_are_moved_to_retire(self):
-        # 旧い取り込み状態（gone など）のうち、親のワークツリーが無いものは、先頭の
-        # `ccnavi sync migrate` が mr と branch を片付けの記録へ移し、旧い記録を消す。
+        # 古い取り込み状態（gone など）のうち、親のワークツリーが無いものは、先頭の
+        # `ccnavi sync migrate` が mr と branch を片付けの記録へ移し、古い記録を消す。
         # 状態（gone など）は捨てる。
         legacy = self.legacy_record("gone", mr="42")
         git(self.ws, "worktree", "remove", "--force", self.tree)
         self.review_says("none")
         done = self.sync()
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("旧い取り込み記録を、片付けの記録（retire/）へ移した", done.stdout)
+        self.assertIn("古い取り込み記録を、片付けの記録（retire/）へ移した", done.stdout)
         self.assertFalse(os.path.exists(legacy))
         moved = os.path.join(self.retire_dir, f"{PARENT}.json")
         with open(moved, encoding="utf-8") as f:
@@ -964,7 +964,7 @@ class SyncTest(SyncHarness):
         legacy = self.legacy_record("present", mr="42")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("旧い取り込み記録を捨てた", done.stdout)
+        self.assertIn("古い取り込み記録を捨てた", done.stdout)
         self.assertFalse(os.path.exists(legacy))
         self.assertFalse(os.path.exists(os.path.join(self.retire_dir, f"{PARENT}.json")))
 
@@ -975,12 +975,12 @@ class SyncTest(SyncHarness):
         )
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("旧い統合先のコピー", done.stdout)
+        self.assertIn("古い統合先のコピー", done.stdout)
         self.assertFalse(os.path.exists(head))
         self.assertFalse(os.path.exists(os.path.dirname(head)))
 
     def test_an_executable_that_does_not_know_migrate_does_not_stop_the_run(self):
-        # 旧い実行ファイルは `sync migrate` を知らない。何もせずに先へ進む。
+        # 古い実行ファイルは `sync migrate` を知らない。何もせずに先へ進む。
         launcher = self.launcher()
         old = write(
             os.path.join(self._tmp.name, "bin", "no-migrate"),

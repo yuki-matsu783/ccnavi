@@ -7,7 +7,7 @@ keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflo
 ---
 # ADR-0115: 公開前なので、移行のための読み取りと掃除をすべて外す
 
-状態: 採用（ADR-0104 の「既存の承認済みチケットに残る欄は消さない。移行はしない」「古い形も読む」、ADR-0109 の「前の版が書いた待ち方のファイルは読まない（`--lint` が warn で言う）」を改める。追記: 旧い取り込み状態を読む移行は、ADR-0142 の `ccnavi sync migrate`（`tickets/legacy_sync.py`）が使い捨ての読み取りとして 1 回だけ持つ）
+状態: 採用（ADR-0104 の「既存の承認済みチケットに残る欄は消さない。移行はしない」「古い形も読む」、ADR-0109 の「前の版が書いた待ち方のファイルは読まない（`--lint` が warn で言う）」を改める。追記: 古い取り込み状態を読む移行は、ADR-0142 の `ccnavi sync migrate`（`tickets/legacy_sync.py`）が使い捨ての読み取りとして 1 回だけ持つ）
 
 ## 状況
 
@@ -20,7 +20,7 @@ keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflo
 - 前の版が書いた待ち方のファイル `phases/<親>/workflow.yml` が残っていることの warn、
   `load_copy` が互換のためだけに受けていた `approved_dir`、`waits_of` の読まない `types`
 - 前の形の識別子 `i<番号>`・`<名前>-i<番号>`（通し番号の数えと lint の文面）
-- 旧い索引名 `index.jsonl` を新しい名前に移るときに消す処理
+- 古い索引名 `index.jsonl` を新しい名前に移るときに消す処理
 - フェーズ定義の旧欄 `order`・`after`・`overlap`・`requires` の警告と、VS Code 拡張のフェーズ画面の「読まない欄」の帯
 - hook が承認を伝えていた頃の記録 `approved-<セッション>-<エージェント>.json` の掃除
 

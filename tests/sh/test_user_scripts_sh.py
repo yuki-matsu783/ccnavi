@@ -8,11 +8,11 @@ hook はその名前で止めるので、名前と置き場の決まりが崩れ
    `ccnavi-user-*.sh` の中だけにあり、エージェントも読む共通部（`ccnavi-common*.sh`）は持たない。
    共通部に置くと `sh -c '. …common….sh; 関数'` の形で、ユーザ専用の sh の名前を出さずに呼べる
 2. 実行ファイルを起こす `ccnavi_wap_exe` の定義は共通部の 1 か所（と、レビューの共通部の包み）だけ
-3. もとの sh に残した旧い入口は、何も動かさずに終了コード 2 で新しい sh を案内する
+3. もとの sh に残した古い入口は、何も動かさずに終了コード 2 で新しい sh を案内する
 4. どの `ccnavi-user-*.sh` も単体で起動でき（`-h`）、hook の名前の止めに当たる。
-   旧い名前の sh は置き場に無い
+   古い名前の sh は置き場に無い
 
-旧い入口と新しい sh の中身の動きは、それぞれの sh の試験
+古い入口と新しい sh の中身の動きは、それぞれの sh の試験
 （test_review_decide・test_write_and_push_sh・test_sync_sh・test_clean_sh・test_push_approved_sh）が見る。
 """
 
@@ -137,7 +137,7 @@ class PlacementTest(unittest.TestCase):
                 self.assertTrue(pattern.search(f"sh .ccnavi/scripts/{name} x"), name)
 
     def test_the_old_names_are_in_the_table(self):
-        """旧い名前は、hook が旧い形として止める表（user_only.SCRIPTS）にある。"""
+        """古い名前は、hook が古い形として止める表（user_only.SCRIPTS）にある。"""
         listed = {f"{n}.sh" for row in user_only.SCRIPTS for n in row.names}
         for name in OLD_NAMES:
             self.assertIn(name, listed)
@@ -161,7 +161,7 @@ class EntryTest(unittest.TestCase):
         for name in os.listdir(SH_DIR):
             if name.endswith(".sh"):
                 shutil.copy(os.path.join(SH_DIR, name), scripts)
-        # 実行ファイルの代役。呼ばれたら印を残す（旧い入口は呼ばないこと）
+        # 実行ファイルの代役。呼ばれたら印を残す（古い入口は呼ばないこと）
         self.called = os.path.join(self.work, "called")
         self.bin = os.path.join(self.work, "bin", "ccnavi")
         os.makedirs(os.path.dirname(self.bin))
@@ -221,7 +221,7 @@ class EntryTest(unittest.TestCase):
                 self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
                 self.assertIn(new, refused.stderr)
                 self.assertIn("何もしていません", refused.stderr)
-        self.assertFalse(os.path.exists(self.called), "旧い入口は実行ファイルを起こさない")
+        self.assertFalse(os.path.exists(self.called), "古い入口は実行ファイルを起こさない")
 
     def test_review_usage_names_the_user_scripts(self):
         shown = self.run_sh("ccnavi-review.sh", "--help")

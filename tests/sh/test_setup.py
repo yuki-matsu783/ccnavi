@@ -1714,10 +1714,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 self.assertIn("--bin は使えないオプションです", result.stderr)
                 self.assertEqual(os.listdir(self.dir), [".git"])
 
-    # ---- 旧い名前の sh（ユーザ専用の sh を ccnavi-user-*.sh に改名した前の名前）
+    # ---- 古い名前の sh（ユーザ専用の sh を ccnavi-user-*.sh に改名した前の名前）
 
     def put_legacy(self, *legacy):
-        """配布先に、前の版が配った旧い名前の sh を置く。"""
+        """配布先に、前の版が配った古い名前の sh を置く。"""
         for name in legacy:
             path = self.deployed(".ccnavi", "scripts", name)
             os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1725,12 +1725,12 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 f.write(f"# 前の版の {name}\n")
 
     def test_old_names_are_kept_and_reported_without_force(self):
-        """--force なしでは配布先にあるものに触らない。旧い名前の sh も残し、残っていると言う。"""
+        """--force なしでは配布先にあるものに触らない。古い名前の sh も残し、残っていると言う。"""
         src = self.make_source()
         self.put_legacy("ccnavi-agree.sh", "ccnavi-push-approved.sh")
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        kept = section(result.stdout, "配布先に残っている旧い名前の sh")
+        kept = section(result.stdout, "配布先に残っている古い名前の sh")
         for name in ("ccnavi-agree.sh", "ccnavi-push-approved.sh"):
             with self.subTest(name=name):
                 self.assertTrue(names(kept, f".ccnavi/scripts/{name}"), result.stdout)
@@ -1740,7 +1740,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             "\n".join(
                 line
                 for line in result.stdout.splitlines()
-                if line.startswith("配布先に残っている旧い名前")
+                if line.startswith("配布先に残っている古い名前")
             ),
         )
         # 新しい名前の sh は配る
@@ -1750,27 +1750,27 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
         self.assertTrue(
             names(
-                section(checked.stdout, "配布先に残っている旧い名前の sh"),
+                section(checked.stdout, "配布先に残っている古い名前の sh"),
                 ".ccnavi/scripts/ccnavi-agree.sh",
             )
         )
 
     def test_force_removes_the_old_names(self):
-        """--force なら、配る sh を入れ替えたうえで旧い名前の sh を消し、消したと言う。"""
+        """--force なら、配る sh を入れ替えたうえで古い名前の sh を消し、消したと言う。"""
         src = self.make_source()
         self.put_legacy("ccnavi-agree.sh", "ccnavi-approve.sh", "ccnavi-push-approved.sh")
         result = self.run_setup("--mode", "enable", "--deploy", src, "--force")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        gone = section(result.stdout, "消した旧い名前の sh")
+        gone = section(result.stdout, "消した古い名前の sh")
         for name in ("ccnavi-agree.sh", "ccnavi-approve.sh", "ccnavi-push-approved.sh"):
             with self.subTest(name=name):
                 self.assertTrue(names(gone, f".ccnavi/scripts/{name}"), result.stdout)
                 self.assertFalse(os.path.exists(self.deployed(".ccnavi", "scripts", name)))
         for name in DEPLOY_SCRIPTS:
             self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)), name)
-        # 消したあとは揃っている（旧い名前は残っていない）
+        # 消したあとは揃っている（古い名前は残っていない）
         checked = self.run_setup("--mode", "enable", "--deploy", src, "--check")
-        self.assertNotIn("旧い名前", checked.stdout)
+        self.assertNotIn("古い名前", checked.stdout)
 
     def test_check_with_force_lists_what_it_would_remove(self):
         src = self.make_source()
@@ -1778,7 +1778,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         result = self.run_setup("--mode", "enable", "--deploy", src, "--force", "--check")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertTrue(
-            names(section(result.stdout, "消す旧い名前の sh"), ".ccnavi/scripts/ccnavi-agree.sh")
+            names(section(result.stdout, "消す古い名前の sh"), ".ccnavi/scripts/ccnavi-agree.sh")
         )
         self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh")))
 
@@ -1807,13 +1807,13 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.path.isdir(self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh")))
         self.assertTrue(
             names(
-                section(result.stdout, "旧い名前の sh の場所にディレクトリがある"),
+                section(result.stdout, "古い名前の sh の場所にディレクトリがある"),
                 ".ccnavi/scripts/ccnavi-agree.sh",
             )
         )
 
     def test_the_old_names_match_the_table(self):
-        """setup が消す旧い名前は、表（user_only.SCRIPTS）のスクリプトごと止める行の名前と同じ。"""
+        """setup が消す古い名前は、表（user_only.SCRIPTS）のスクリプトごと止める行の名前と同じ。"""
         with open(SCRIPT, encoding="utf-8") as f:
             found = re.search(r'^LEGACY_SCRIPTS="([^"]*)"$', f.read(), re.MULTILINE)
         self.assertIsNotNone(found)
@@ -1825,7 +1825,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             for name in row.names
         }
         self.assertEqual(set(found.group(1).split()), wanted)
-        # 旧い名前は、今配るものには入らない
+        # 古い名前は、今配るものには入らない
         self.assertFalse(wanted & set(DEPLOY_SCRIPTS))
 
     def test_the_deployed_list_matches_the_scripts_in_the_tree(self):
