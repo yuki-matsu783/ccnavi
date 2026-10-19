@@ -33,7 +33,8 @@ keywords: [dry-run, 関門, 補助, 一般, 承認済みの置き場, 操作記�
 - 承認済みの置き場（`.ccnavi/approved/` の下すべて）と操作記録の置き場（`logs/state/ops/`）は、組み込みのゲートにする。
   `CCNAVI_GUARD_CORE_FILES` の値にも dry-run にも依らず止める。
 - 保護済みの sh への環境変数の指定の止めは、`CCNAVI_GUARD_CORE_FILES` では切れない（補助）。
-- チケット制御が無効なときは関門を足さない。生の git はいつも止め、そのときは一般として扱う。
+- チケット制御が無効なときは関門を足さない。生の git の止めはチケット制御の有無に関わらず足すが、
+  無効なときは一般の保護として扱い、dry-run では報告だけにする。
 - 関門と補助で止めた回は、dry-run でも `enforced` が真になり、拒否文に「dry-run でもこの止めは効く」の 1 行を添える。
 - `CCNAVI_GUARD_TICKET_APPROVAL=disable` で外れるのは、今までどおり承認の経路の形だけ。
 

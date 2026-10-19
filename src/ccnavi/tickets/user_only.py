@@ -411,7 +411,7 @@ SUBAGENT_ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 )
 
 # 呼び出しの前置き。`sh`・`bash`（選択肢付き）、直接実行（`./x.sh`・パス・引用したパス）、
-# `exec`・`command`・`source`・`.` を数える。
+# `exec`・`command`・`source`・`.` を含める。
 _CALL_HEAD = (
     r"(^|[;&|]\s*)(?:(?:exec|command|source|\.)\s+)?(?:(?:sh|bash)(?:\s+-\S+)*\s+)?[\"']?[^\s;&|]*?"
 )

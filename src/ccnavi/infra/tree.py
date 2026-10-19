@@ -326,7 +326,7 @@ def head_text(tree_root: str) -> str | None:
 
 
 def has_origin(repo_root: str) -> bool:
-    """そのリポジトリに `origin` の remote があるか。設定ファイルだけを読む（git は起こさない）。"""
+    """そのリポジトリに `origin` の remote があるか。設定ファイルだけを読む（git は走らせない）。"""
     gitdir = git_dir(repo_root)
     if gitdir is None:
         return False
