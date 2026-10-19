@@ -53,6 +53,26 @@ def _fold(path: str) -> str:
     return pathcase.fold(path).replace("\\", "/")
 
 
+_WRAPPERS = frozenset(
+    {"env", "nohup", "time", "timeout", "sudo", "uv", "run", "nice", "command", "exec", "stdbuf"}
+)
+
+
+def _runs(before: list[str]) -> bool:
+    """スクリプトの前に並ぶ語が、実行の前置き（シェル・`VAR=値`・env・timeout・オプション）だけか。"""
+    for word in before:
+        name = os.path.basename(_fold(word))
+        plain = word.lstrip("-")
+        if name in _SHELLS or name in _WRAPPERS or word.startswith("-") or plain.isdigit():
+            continue
+        if "=" in word and "/" not in word.split("=", 1)[0]:
+            continue
+        if word.replace(".", "", 1).isdigit():
+            continue
+        return False
+    return True
+
+
 def propose_ident(words: list[str]) -> str:
     """コマンドの語から、`ccnavi-ticket.sh propose <識別子>` の識別子を取る。無ければ空文字。
 
@@ -61,8 +81,8 @@ def propose_ident(words: list[str]) -> str:
     for at, word in enumerate(words):
         if os.path.basename(_fold(word)) != _SCRIPT:
             continue
-        # 実行される位置だけ。`echo …ccnavi-ticket.sh propose x` のような引数の中は数えない。
-        if at > 1 or (at == 1 and os.path.basename(_fold(words[0])) not in _SHELLS):
+        # 実行される位置だけ。`echo …` や `grep …` の引数の中は数えない。
+        if not _runs(words[:at]):
             continue
         rest = words[at + 1 :]
         if not rest or rest[0] != "propose":

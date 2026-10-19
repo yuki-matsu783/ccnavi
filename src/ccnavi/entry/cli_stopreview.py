@@ -51,7 +51,11 @@ def run(
     root: str = "",
 ):
     if words[1:2] == ["report"] and len(words) == 2:
-        return _report(stdout, conf)
+        try:
+            return _report(stdout, conf)
+        except Exception as exc:  # 集計の失敗で落ちない。壊れた記録を名指しする
+            stderr.write(f"ccnavi: 評価の集計に失敗した（{type(exc).__name__}: {exc}）\n")
+            return 1
     if len(words) != 4 or words[1] not in ("material", "record"):
         stderr.write(
             "ccnavi: stop-review は material か record に <セッション> <transcript> を渡す\n"

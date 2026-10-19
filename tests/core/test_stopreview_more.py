@@ -317,6 +317,9 @@ class PruneTest(Base):
         self.assertTrue(os.path.exists(path))
 
 
+MARK = sr.HOOK_MARK
+
+
 class LintTest(Base):
     def _settings_json(self, hooks):
         os.makedirs(os.path.join(self.root, ".claude"), exist_ok=True)
@@ -339,21 +342,50 @@ class LintTest(Base):
 
     def test_marker_without_hook_and_hook_without_marker(self):
         self.assertTrue(any("見つからない" in d for d in self._details()))
-        self._settings_json([{"type": "agent", "prompt": "判定"}])
+        self._settings_json([{"type": "agent", "prompt": MARK + "判定"}])
         self.assertEqual(self._details(), [])
         self.conf.stop_review_agent = False
         self.assertTrue(any("計画が作られず" in d for d in self._details()))
 
     def test_duplicate_hooks(self):
-        self._settings_json([{"type": "agent", "prompt": "a"}, {"type": "agent", "prompt": "b"}])
+        self._settings_json(
+            [{"type": "agent", "prompt": MARK + "a"}, {"type": "agent", "prompt": MARK + "b"}]
+        )
         self.assertTrue(any("2 件" in d for d in self._details()))
+
+    def test_the_users_own_agent_hook_is_not_ours(self):
+        self.conf.stop_review_agent = False
+        self._settings_json([{"type": "agent", "prompt": "user own"}])
+        self.assertEqual(self._details(), [])
+
+    def test_the_marker_in_settings_json_env_counts_as_registered(self):
+        os.makedirs(os.path.join(self.root, ".claude"), exist_ok=True)
+        with open(os.path.join(self.root, ".claude", "settings.json"), "w") as handle:
+            json.dump(
+                {
+                    "env": {"CCNAVI_STOP_REVIEW_AGENT": "1"},
+                    "hooks": {"Stop": [{"hooks": [{"type": "agent", "prompt": MARK + "x"}]}]},
+                },
+                handle,
+            )
+        self.conf.stop_review_agent = False
+        self.assertEqual(self._details(), [])
+
+    def test_malformed_settings_never_crash_the_diagnosis(self):
+        for data in ({"hooks": "x"}, {"hooks": {"Stop": ["x"]}}, {"hooks": [1]},
+                     {"hooks": {"Stop": [{"hooks": "abc"}]}}, {"env": "x"}, [1]):  # fmt: skip
+            os.makedirs(os.path.join(self.root, ".claude"), exist_ok=True)
+            with open(os.path.join(self.root, ".claude", "settings.json"), "w") as handle:
+                json.dump(data, handle)
+            with self.subTest(data=data):
+                self._details()
 
     def test_other_hooks_are_not_counted(self):
         self._settings_json([{"type": "command", "command": "x"}])
         self.assertTrue(any("見つからない" in d for d in self._details()))
 
     def test_enable_needs_the_judge_value(self):
-        self._settings_json([{"type": "agent", "prompt": "a"}])
+        self._settings_json([{"type": "agent", "prompt": MARK + "a"}])
         self.conf.stop_review = "enable"
         self.assertTrue(any("JUDGE_TYPE" in d for d in self._details()))
         self.conf.stop_review_judge = "stop-judge"
@@ -555,6 +587,114 @@ class ReviewFixesTest(Base):
                                              "files": [{"path": "a.md"}]}), "")  # fmt: skip
         self.assertFalse(cli_stopreview._inside(self.root, link_target))
         self.assertTrue(cli_stopreview._inside(self.root, os.path.join(self.root, "a.md")))
+
+
+class SecondReviewFixesTest(Base):
+    def _attempt(self, aid, final, **extra):
+        row = {"attempt_id": aid, "key": f"s1:{aid}", "state": sr.DONE, "final": final,
+               "judge": sr.JUDGE_AI, "accepted": True, "results": []}  # fmt: skip
+        row.update(extra)
+        with open(os.path.join(self.state, f"stopreview-attempt-{aid}.json"), "w") as handle:
+            json.dump(row, handle)
+
+    def test_expired_sent_back_attempt_counts_as_flawed(self):
+        flaw = {"criterion": "R1", "target": "stop", "result": "fail"}
+        self._attempt("a", sr.FINAL_FLAWED, state=sr.EXPIRED, sent_at=1, results=[flaw])
+        summary = stopeval.summarize(self.state, os.path.join(self.root, "logs"))
+        self.assertEqual(summary["counts"]["flawed"], 1)
+        self.assertEqual(summary["counts"]["expired"], 0)
+        self.assertEqual(summary["criteria"]["R1"]["flagged"], 1)
+
+    def test_rejudge_attempts_are_not_counted_as_separate_stops(self):
+        self._attempt("a", sr.FINAL_FLAWED, state=sr.CONSUMED, sent_at=1, rejudge="resolved")
+        self._attempt("b", sr.FINAL_OK, original="a")
+        summary = stopeval.summarize(self.state, os.path.join(self.root, "logs"))
+        self.assertEqual(summary["attempts"], 1)
+        self.assertEqual(summary["fix"]["resolved"], 1)
+
+    def test_running_attempts_are_counted_apart(self):
+        self._attempt("a", None, state=sr.RUNNING)
+        summary = stopeval.summarize(self.state, os.path.join(self.root, "logs"))
+        self.assertEqual(summary["counts"]["in_progress"], 1)
+
+    def test_broken_rows_and_labels_do_not_crash_the_report(self):
+        self._attempt("a", sr.FINAL_OK, results=[{"target": "stop"}, "x", {"criterion": "R1"}])
+        directory = os.path.join(self.root, "logs", "stop-review")
+        os.makedirs(directory)
+        rows = [
+            {"attempt_id": "a", "criterion": "R1", "target": ["stop"], "truth": "flaw"},
+            {"attempt_id": "a", "criterion": "R1", "target": "STOP", "truth": "FLAW"},
+            {"attempt_id": "a", "criterion": "R1", "target": "STOP", "truth": "ok"},
+            {"attempt_id": "a", "criterion": "R1", "target": "stop", "truth": "ok"},
+        ]
+        with open(os.path.join(directory, stopeval.LABELS_FILE), "w") as handle:
+            handle.writelines(json.dumps(r) + "\n" for r in rows)
+        summary = stopeval.summarize(self.state, os.path.join(self.root, "logs"))
+        self.assertEqual(summary["criteria"]["R1"]["labeled"], 1)  # 重複と不正を除く
+
+    def test_rotated_events_are_read(self):
+        directory = os.path.join(self.root, "logs", "stop-review")
+        os.makedirs(directory)
+        for name in ("events.jsonl", "events.20260101-000000.jsonl"):
+            with open(os.path.join(directory, name), "w") as handle:
+                handle.write('{"event": "suspected_unrecorded_stop"}\n')
+        summary = stopeval.summarize(self.state, os.path.join(self.root, "logs"))
+        self.assertEqual(summary["suspected_unrecorded_stops"], 2)
+
+    def test_prune_never_follows_a_linked_state_directory(self):
+        outside = os.path.join(os.path.dirname(self.root), "outside-state")
+        os.makedirs(os.path.join(outside, stopops.RESULT_DIR), exist_ok=True)
+        victim = os.path.join(outside, stopops.RESULT_DIR, "x.kv")
+        with open(victim, "w") as handle:
+            handle.write("x")
+        old = time.time() - 40 * 86400
+        os.utime(victim, (old, old))
+        linked = os.path.join(self.root, "linked-state")
+        os.symlink(outside, linked)
+        prune.run(self.root, self.log_file, linked, now=time.time())
+        self.assertTrue(os.path.exists(victim))
+        os.unlink(linked)
+
+    def test_prune_never_follows_a_linked_stop_review_directory(self):
+        outside = os.path.join(os.path.dirname(self.root), "outside-logs")
+        material = os.path.join(outside, "material")
+        os.makedirs(material, exist_ok=True)
+        victim = os.path.join(material, "a.json")
+        with open(victim, "w") as handle:
+            handle.write("x")
+        old = time.time() - 200 * 86400
+        os.utime(victim, (old, old))
+        os.symlink(outside, os.path.join(self.root, "logs", "stop-review"))
+        prune.run(self.root, self.log_file, self.state, now=time.time())
+        self.assertTrue(os.path.exists(victim))
+
+    def test_event_rotation_does_not_depend_on_the_keep_days(self):
+        directory = os.path.join(self.root, "logs", "stop-review")
+        os.makedirs(directory)
+        events_file = os.path.join(directory, "events.jsonl")
+        with open(events_file, "w") as handle:
+            handle.write("x" * (2 * 1024 * 1024))
+        from unittest import mock
+
+        with mock.patch.dict(os.environ, {"CCNAVI_STOP_REVIEW_KEEP_DAYS": "0",
+                                          "CCNAVI_LOG_ROTATE_MB": "1"}):  # fmt: skip
+            prune.run(self.root, self.log_file, self.state, now=time.time())
+        self.assertFalse(os.path.exists(events_file))
+        self.assertTrue(any(n.startswith("events.2") for n in os.listdir(directory)))
+
+    def test_an_unwritable_attempt_is_reported_not_swallowed(self):
+        from unittest import mock
+
+        with mock.patch.object(sr.fsio, "write_new", return_value="Permission denied"):
+            with self.assertRaises(OSError):
+                sr.write_plan(self.state, self.key, {"is_candidate": True, "targets": ["stop"]})
+
+    def test_an_unreadable_existing_attempt_is_replaced(self):
+        aid = sr.attempt_id(self.key)
+        with open(os.path.join(self.state, f"stopreview-attempt-{aid}.json"), "w") as handle:
+            handle.write("{broken")
+        sr.write_plan(self.state, self.key, {"is_candidate": True, "targets": ["stop"]})
+        self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.PENDING)
 
 
 if __name__ == "__main__":

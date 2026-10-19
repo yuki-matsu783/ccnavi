@@ -26,6 +26,8 @@ from typing import Any
 from ..infra import fsio, modes, settings
 
 STOP_REVIEW_ENV = settings.STOP_REVIEW_ENV
+# 登録した agent hook の prompt の先頭行（scripts/ccnavi-stop-review.sh と同じ）。
+HOOK_MARK = "[ccnavi-stop-review]"
 
 # 試行の状態。
 PLAN_WAIT = "plan_wait"  # 計画より先に material が来た
@@ -257,6 +259,12 @@ def write_plan(state: str, key: str, plan: dict[str, Any], now: float | None = N
                 log_event(state, "final", fresh)
             return aid
         attempt = read_attempt(state, aid)
+        if attempt is None:
+            # 在るのに読めない（書きかけ・壊れた）試行は、新しい試行で置き直す。
+            _store(state, fresh)
+            if fresh["state"] == DONE:
+                log_event(state, "final", fresh)
+            return aid
     if attempt is not None and attempt["state"] == PLAN_WAIT:
         # 計画より先に material が来ていた。候補なら開始待ちへ、候補でなければ ccnavi が確定する。
         if plan.get("is_candidate"):
@@ -283,7 +291,12 @@ def _create(state: str, attempt: dict[str, Any]) -> bool:
     """試行のファイルを、まだ無いものとして作る。作れたら真。在れば偽（上書きしない）。"""
     path = _attempt_path(state, attempt["attempt_id"])
     body = json.dumps(attempt, ensure_ascii=False).encode("utf-8")
-    return not fsio.write_new(path, body)
+    reason = fsio.write_new(path, body)
+    if not reason:
+        return True
+    if os.path.lexists(path):
+        return False  # 既にある（別のプロセスが先に作った）
+    raise OSError(reason)  # 作れなかった（権限・ディスク）。呼び手が「計画を書けない」と言う
 
 
 def _store(state: str, attempt: dict[str, Any]) -> None:

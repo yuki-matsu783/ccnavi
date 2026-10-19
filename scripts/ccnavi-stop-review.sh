@@ -84,18 +84,37 @@ if [ -f "$settings" ]; then
 	}
 fi
 
+# 構造が想定と違う設定は書き換えない（jq の生のエラーで終わらせず、終了コード 2 で理由を言う）。
+shape=$(printf '%s' "$current" | jq -r '
+	if ((.hooks // {}) | type) != "object" then ".hooks がオブジェクトではありません"
+	elif ((.hooks.Stop // []) | type) != "array" then ".hooks.Stop が配列ではありません"
+	elif ((.hooks.Stop // []) | any(type != "object")) then ".hooks.Stop にオブジェクトでない要素があります"
+	elif ((.hooks.Stop // []) | any((.hooks // []) | type != "array")) then ".hooks.Stop の hooks が配列ではありません"
+	elif ([(.hooks.Stop // [])[] | (.hooks // [])[]] | any(type != "object")) then ".hooks.Stop の hook がオブジェクトではありません"
+	elif ((.env // {}) | type) != "object" then ".env がオブジェクトではありません"
+	else "" end' | tr -d '\r')
+if [ -n "$shape" ]; then
+	printf 'ccnavi-stop-review: %s の%s。書き換えません\n' "$SETTINGS_REL" "$shape" >&2
+	exit 2
+fi
+
 # 目印のある agent hook の件数（Stop）。
 marked() {
 	printf '%s' "$1" | jq -r --arg mark "$MARK" '
 		[ (.hooks.Stop // [])[]? | (.hooks // [])[]?
-		  | select(.type == "agent" and ((.prompt // "") | startswith($mark))) ] | length'
+		  | select(.type == "agent" and ((.prompt // "") | startswith($mark))) ] | length' | tr -d '\r'
 }
 agent_total() {
 	printf '%s' "$1" | jq -r '
-		[ (.hooks.Stop // [])[]? | (.hooks // [])[]? | select(.type == "agent") ] | length'
+		[ (.hooks.Stop // [])[]? | (.hooks // [])[]? | select(.type == "agent") ] | length' | tr -d '\r'
 }
 env_flag() {
-	printf '%s' "$1" | jq -r '(.env // {}).CCNAVI_STOP_REVIEW_AGENT // ""'
+	printf '%s' "$1" | jq -r '(.env // {}).CCNAVI_STOP_REVIEW_AGENT // ""' | tr -d '\r'
+}
+
+# 書式の違い（整形・キーの順）だけの差は、差と見ない。
+same() {
+	[ "$(printf '%s' "$1" | jq -S . | tr -d '\r')" = "$(printf '%s' "$2" | jq -S . | tr -d '\r')" ]
 }
 
 write_settings() {
@@ -107,7 +126,8 @@ write_settings() {
 		printf '%s\n' "$1" >"$settings"
 	else
 		tmp="$settings.tmp.$$"
-		trap 'rm -f "$tmp"' EXIT INT TERM
+		trap 'rm -f "$tmp"' EXIT
+		trap 'rm -f "$tmp"; exit 1' INT TERM
 		printf '%s\n' "$1" >"$tmp"
 		mv "$tmp" "$settings"
 		trap - EXIT INT TERM
@@ -145,13 +165,18 @@ check)
 	;;
 unregister)
 	updated=$(printf '%s' "$current" | jq --arg mark "$MARK" '
-		if .hooks.Stop then
-			.hooks.Stop |= (map(.hooks |= map(select((.type == "agent" and ((.prompt // "") | startswith($mark))) | not)))
-				| map(select((.hooks // []) | length > 0)))
-		else . end
-		| if (.hooks.Stop // [1]) == [] then del(.hooks.Stop) else . end
-		| if .env then .env |= del(.CCNAVI_STOP_REVIEW_AGENT) else . end')
-	if [ "$updated" = "$current" ]; then
+		def ours: .type == "agent" and ((.prompt // "") | startswith($mark));
+		(if .hooks.Stop then
+			.hooks.Stop |= [ .[] | (.hooks // []) as $h
+				| if ($h | any(ours)) then
+					(.hooks = ($h | map(select(ours | not)))) | select((.hooks | length) > 0)
+				  else . end ]
+		else . end)
+		| (if .hooks.Stop == [] then del(.hooks.Stop) else . end)
+		| (if .hooks == {} then del(.hooks) else . end)
+		| (if (.env.CCNAVI_STOP_REVIEW_AGENT // "") == "1" then del(.env.CCNAVI_STOP_REVIEW_AGENT) else . end)
+		| (if .env == {} then del(.env) else . end)')
+	if same "$updated" "$current"; then
 		printf '外すものはありません\n'
 		exit 0
 	fi
@@ -173,16 +198,23 @@ $MARK
    まず classification を決める。ユーザの依頼がチケット作業でなければ not_ticket_work、そうでなければ ticket_work。
    ticket_work なら、R1 と R3 は target を stop で、R2 と R4 は targets に並ぶ proposal の対象キーごとに result を出す（pass / fail / unknown）。
    根拠を材料の中に特定できないときは推測せず unknown にする。fail のときは locations（kind は final_answer / proposal / material と引用 text）と fixes（kind は write_proposal / revise_proposal / send_proposal と text）を必ず付け、依頼との不一致があれば mismatch に書く。
-4. 判定を JSON にして、Bash で次の標準入力に渡す: $LAUNCHER stop-review record <session_id> <transcript_path>
-   JSON の形: {"attempt_id": "...", "classification": "...", "results": [{"criterion": "R1", "target": "stop", "result": "pass", "locations": [], "mismatch": "", "fixes": []}]}
+4. 判定を JSON にして、次の形（ヒアドキュメント）で record に渡す。ほかのコマンドをつなげない。リダイレクトも使わない。
+cat <<'EOF' | $LAUNCHER stop-review record <session_id> <transcript_path>
+{"attempt_id": "...", "classification": "...", "results": [{"criterion": "R1", "target": "stop", "result": "pass", "locations": [], "mismatch": "", "fixes": []}]}
+EOF
 5. record が出力した 1 行の JSON を、そのまま返して終わる。加工しない。record を実行できなかったときは {"ok": true} を返す。
 PROMPT
 )
 
 updated=$(printf '%s' "$current" | jq --arg mark "$MARK" --arg prompt "$prompt" \
 	--arg model "$model" --arg judge "$judge" --argjson timeout "$TIMEOUT" '
-	def ours: select((.type == "agent" and ((.prompt // "") | startswith($mark))) | not);
-	(if .hooks.Stop then .hooks.Stop |= (map(.hooks |= map(ours)) | map(select((.hooks // []) | length > 0))) else . end)
+	def ours: .type == "agent" and ((.prompt // "") | startswith($mark));
+	(if .hooks.Stop then
+		.hooks.Stop |= [ .[] | (.hooks // []) as $h
+			| if ($h | any(ours)) then
+				(.hooks = ($h | map(select(ours | not)))) | select((.hooks | length) > 0)
+			  else . end ]
+	else . end)
 	| .hooks.Stop = ((.hooks.Stop // []) + [{
 		hooks: [ {type: "agent", prompt: $prompt, timeout: $timeout}
 			+ (if $model != "" then {model: $model} else {} end) ]
@@ -190,7 +222,7 @@ updated=$(printf '%s' "$current" | jq --arg mark "$MARK" --arg prompt "$prompt" 
 	| .env = ({CCNAVI_STOP_REVIEW_AGENT: "1"} + (.env // {}))
 	| if $judge != "" then .env.CCNAVI_STOP_REVIEW_JUDGE_TYPE = $judge else . end')
 
-if [ "$updated" = "$current" ]; then
+if same "$updated" "$current"; then
 	printf 'すでに登録されています\n'
 	exit 0
 fi

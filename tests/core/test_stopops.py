@@ -34,6 +34,13 @@ class IdentTest(unittest.TestCase):
             ("sh", "ccnavi-ticket.sh", "start", "p1"): "",
             ("sh", "ccnavi-ticket.sh", "propose"): "",
             ("echo", "propose", "p1"): "",
+            ("FOO=1", "sh", "ccnavi-ticket.sh", "propose", "p1"): "p1",
+            ("env", "FOO=1", "sh", "ccnavi-ticket.sh", "propose", "p1"): "p1",
+            ("timeout", "60", "sh", "ccnavi-ticket.sh", "propose", "p1"): "p1",
+            ("nohup", "sh", "-x", "ccnavi-ticket.sh", "propose", "p1"): "p1",
+            ("uv", "run", "sh", "ccnavi-ticket.sh", "propose", "p1"): "p1",
+            ("echo", "-n", "ccnavi-ticket.sh", "propose", "p1"): "",
+            ("grep", "ccnavi-ticket.sh", "propose", "p1"): "",
         }
         for words, want in cases.items():
             with self.subTest(words=words):

@@ -27,7 +27,7 @@ import json
 import os
 from typing import Any
 
-from ..infra import fsio
+from ..infra import fsio, pathcase
 from . import stopops, stopreview
 
 LABELS_FILE = "labels.jsonl"
@@ -60,6 +60,22 @@ def _jsonl(path: str) -> list[dict[str, Any]]:
     return rows
 
 
+def _all_events(log_dir: str) -> list[dict[str, Any]]:
+    """試行のイベント。ローテートした `events.<日時>.jsonl` も読む。"""
+    current = stopreview.log_path(log_dir)
+    directory = os.path.dirname(current)
+    paths = [current]
+    try:
+        paths += [
+            os.path.join(directory, name)
+            for name in sorted(fsio.listdir(directory))
+            if name.startswith("events.") and name.endswith(".jsonl") and name != "events.jsonl"
+        ]
+    except OSError:
+        pass
+    return [row for path in paths for row in _jsonl(path)]
+
+
 def _rate(numerator: int, denominator: int) -> float | None:
     return numerator / denominator if denominator else None
 
@@ -67,8 +83,10 @@ def _rate(numerator: int, denominator: int) -> float | None:
 def summarize(state: str, log_dir: str) -> dict[str, Any]:
     """集計。期限切れの確定を先に行う。"""
     stopreview.expire_overdue(state)
-    attempts = _attempts(state)
-    events = _jsonl(stopreview.log_path(log_dir))
+    every = _attempts(state)
+    # 再判定の試行は元の試行の修正率にだけ使う。Stop の機会を二重に数えない。
+    attempts = [a for a in every if not a.get("original")]
+    events = _all_events(log_dir)
     labels = _jsonl(os.path.join(log_dir, "stop-review", LABELS_FILE))
 
     counts = {
@@ -82,11 +100,14 @@ def summarize(state: str, log_dir: str) -> dict[str, Any]:
         "checked_ok": 0,
         "flawed": 0,
         "unchecked": 0,
+        "in_progress": 0,
     }
     resolved = unresolved = inconclusive = not_rejudged = sent_back = 0
     for a in attempts:
         final, judge = a.get("final"), a.get("judge")
-        if a.get("state") == stopreview.PLAN_WAIT:
+        if a.get("sent_at"):
+            counts["flawed"] += 1  # 差し戻した試行は、期限で閉じても最終分類（不備検出）で数える
+        elif a.get("state") == stopreview.PLAN_WAIT:
             counts["plan_missing"] += 1
         elif final == stopreview.FINAL_OUT_OF_SCOPE:
             counts[
@@ -103,6 +124,8 @@ def summarize(state: str, log_dir: str) -> dict[str, Any]:
             counts["flawed"] += 1
         elif final == stopreview.FINAL_UNCHECKED:
             counts["unchecked"] += 1
+        else:
+            counts["in_progress"] += 1  # 開始待ち・実行中（まだ最終分類が無い）
         if a.get("accepted") is False:
             counts["rejected"] += 1
         if a.get("tainted"):
@@ -147,6 +170,10 @@ def _units(attempts: list[dict[str, Any]]) -> dict[tuple[str, str, str], str]:
     units: dict[tuple[str, str, str], str] = {}
     for a in attempts:
         for row in a.get("results") or []:
+            if not isinstance(row, dict) or not all(
+                isinstance(row.get(k), str) for k in ("criterion", "target", "result")
+            ):
+                continue
             flawed = (
                 a.get("accepted") is not False
                 and row["criterion"] in stopreview.FLAW_CRITERIA
@@ -158,10 +185,30 @@ def _units(attempts: list[dict[str, Any]]) -> dict[tuple[str, str, str], str]:
     return units
 
 
+def _clean_labels(labels: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """独立した評価を整える。形の違う行・不正な truth を捨て、同じ単位の重複を除く。
+
+    対象と試行 ID は大文字小文字を区別せずに比べる。
+    """
+    seen: set[tuple[str, str, str]] = set()
+    kept = []
+    for label in labels:
+        values = [label.get(k) for k in ("attempt_id", "criterion", "target")]
+        if not all(isinstance(v, str) for v in values) or label.get("truth") not in ("flaw", "ok"):
+            continue
+        key = (values[0], values[1], pathcase.fold(values[2]))
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(dict(label, target=pathcase.fold(values[2])))
+    return kept
+
+
 def _by_criterion(
     attempts: list[dict[str, Any]], labels: list[dict[str, Any]]
 ) -> dict[str, dict[str, Any]]:
-    units = _units(attempts)
+    units = {(a, c, pathcase.fold(t)): o for (a, c, t), o in _units(attempts).items()}
+    labels = _clean_labels(labels)
     out: dict[str, dict[str, Any]] = {}
     for criterion in stopreview.CRITERIA:
         flagged = sum(

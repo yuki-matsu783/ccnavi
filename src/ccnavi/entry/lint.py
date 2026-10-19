@@ -29,6 +29,7 @@ from ..infra import fsio, modes, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
+from ..records import stopreview
 from ..tickets import (
     approval,
     approval_checks,
@@ -78,8 +79,10 @@ def stop_review_problems(root: str, conf: settings.Settings) -> list[Problem]:
                 f"{modes.DRY_RUN} として動いている",
             )
         )
-    hooks = stop_review_hooks(root)
-    if conf.stop_review_agent and not hooks:
+    hooks, file_flag = stop_review_hooks(root)
+    # 端末の `--lint` には settings.json の env が渡らない。無ければ settings.json の env を読む。
+    registered = conf.stop_review_agent or file_flag == "1"
+    if registered and not hooks:
         out.append(
             Problem(
                 SEVERITY_WARN,
@@ -88,7 +91,7 @@ def stop_review_problems(root: str, conf: settings.Settings) -> list[Problem]:
                 " .claude/settings.json に見つからない（計画が溜まるだけで判定されない）",
             )
         )
-    if hooks and not conf.stop_review_agent:
+    if hooks and not registered:
         out.append(
             Problem(
                 SEVERITY_WARN,
@@ -106,7 +109,7 @@ def stop_review_problems(root: str, conf: settings.Settings) -> list[Problem]:
             )
         )
     effective = declared if declared in valid else modes.DRY_RUN
-    if conf.stop_review_agent and effective == modes.ENABLE and not conf.stop_review_judge.strip():
+    if registered and effective == modes.ENABLE and not conf.stop_review_judge.strip():
         out.append(
             Problem(
                 SEVERITY_WARN,
@@ -119,19 +122,30 @@ def stop_review_problems(root: str, conf: settings.Settings) -> list[Problem]:
     return out
 
 
-def stop_review_hooks(root: str) -> list[str]:
-    """`.claude/settings.json` の Stop にある agent 型 hook の一覧（説明つき）。読めなければ空。"""
+def stop_review_hooks(root: str) -> tuple[list[str], str]:
+    """`.claude/settings.json` の Stop にある、ccnavi の agent 型 hook の一覧と、env の印の値。
+
+    数えるのは prompt の先頭が目印（`[ccnavi-stop-review]`）の agent 型 hook だけ。ユーザ自身の
+    agent 型 hook は数えない。形が違う・読めない設定は空として読む（診断が壊れた設定で落ちない）。
+    """
     path = os.path.join(root, ".claude", "settings.json")
     data, error = fsio.read_json(path) if os.path.isfile(path) else (None, None)
-    found: list[str] = []
     if error is not None or not isinstance(data, dict):
-        return found
-    groups = (data.get("hooks") or {}).get("Stop") or []
+        return [], ""
+    found: list[str] = []
+    hooks = data.get("hooks")
+    groups = hooks.get("Stop") if isinstance(hooks, dict) else None
     for group in groups if isinstance(groups, list) else []:
-        for hook in (group or {}).get("hooks") or []:
-            if isinstance(hook, dict) and hook.get("type") == "agent":
-                found.append(str(hook.get("description") or hook.get("prompt", ""))[:60])
-    return found
+        inner = group.get("hooks") if isinstance(group, dict) else None
+        for hook in inner if isinstance(inner, list) else []:
+            if not isinstance(hook, dict) or hook.get("type") != "agent":
+                continue
+            prompt = hook.get("prompt")
+            if isinstance(prompt, str) and prompt.startswith(stopreview.HOOK_MARK):
+                found.append(prompt[:60])
+    env = data.get("env")
+    flag = env.get(settings.STOP_REVIEW_AGENT_ENV) if isinstance(env, dict) else ""
+    return found, flag if isinstance(flag, str) else ""
 
 
 def report(

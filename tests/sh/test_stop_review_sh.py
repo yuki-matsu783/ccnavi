@@ -134,6 +134,56 @@ class StopReviewSetupTest(unittest.TestCase):
         with open(self.settings, encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "[1, 2]")
 
+    def test_malformed_settings_exit_with_2_and_are_not_rewritten(self):
+        cases = [
+            {"hooks": "x"},
+            {"hooks": {"Stop": {"hooks": []}}},
+            {"hooks": {"Stop": ["str"]}},
+            {"hooks": {"Stop": [{"hooks": "abc"}]}},
+            {"hooks": {"Stop": [{"hooks": ["x"]}]}},
+            {"env": "x"},
+        ]
+        for data in cases:
+            self.write(data)
+            for action in ("check", "register", "unregister"):
+                with self.subTest(data=data, action=action):
+                    done = self.sh(action)
+                    self.assertEqual(done.returncode, 2, done.stderr)
+            self.assertEqual(self.read(), data)
+
+    def test_nothing_to_remove_does_not_rewrite_the_file(self):
+        os.makedirs(os.path.dirname(self.settings))
+        text = '{"model":"x","permissions":{"allow":["Bash(ls)"]}}'
+        with open(self.settings, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        done = self.sh("unregister")
+        self.assertIn("外すものはありません", done.stdout)
+        with open(self.settings, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), text)
+        self.assertFalse(os.path.exists(self.settings + ".bak"))
+
+    def test_register_unregister_round_trip_restores_the_user_settings(self):
+        original = {
+            "model": "x",
+            "env": {"KEEP": "1"},
+            "hooks": {"Stop": [{"hooks": []}, {"hooks": [{"type": "command", "command": "c"}]}]},
+        }
+        self.write(original)
+        self.sh("register")
+        self.sh("unregister")
+        self.assertEqual(self.read(), original)
+        self.write({})
+        self.sh("register")
+        self.sh("unregister")
+        self.assertEqual(self.read(), {})
+
+    def test_the_users_own_agent_hook_with_a_similar_prompt_stays(self):
+        mine = {"type": "agent", "prompt": "x [ccnavi-stop-review] not at the start"}
+        self.write({"hooks": {"Stop": [{"hooks": [mine]}]}})
+        self.sh("register")
+        self.sh("unregister")
+        self.assertEqual(self.agents(), [mine])
+
     def test_bad_arguments(self):
         self.assertEqual(subprocess.run(["sh", SCRIPT], capture_output=True).returncode, 2)
         self.assertEqual(subprocess.run(["sh", SCRIPT, "nope"], capture_output=True).returncode, 2)

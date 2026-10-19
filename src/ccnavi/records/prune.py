@@ -195,14 +195,17 @@ def run(
             dry_run,
         )
     keep = _stop_review_keep_days(report)
-    if log_path and keep > 0:
-        material = os.path.join(os.path.dirname(log_path), STOP_REVIEW_MATERIAL)
-        _prune_directory(report, root, material, now - keep * 86400, dry_run)
-        # 試行のイベントの記録も、決定の記録と同じ形でローテートする。保持は材料と同じ長さ。
+    if log_path:
+        # 試行のイベントの記録も、決定の記録と同じ形でローテートする。ローテートは保持日数と独立で、
+        # 保持（材料と同じ長さ）が 0 のときは消さないだけ。
         events = os.path.join(os.path.dirname(log_path), STOP_REVIEW_EVENTS)
-        if rotate_mb > 0:
+        if rotate_mb > 0 and _linkless(root, os.path.dirname(events)):
             _rotate(report, root, events, int(rotate_mb * 1024 * 1024), dry_run, now)
-        _prune_logs(report, root, events, now - keep * 86400, dry_run)
+        if keep > 0:
+            material = os.path.join(os.path.dirname(log_path), STOP_REVIEW_MATERIAL)
+            _prune_directory(report, root, material, now - keep * 86400, dry_run)
+            if _linkless(root, os.path.dirname(events)):
+                _prune_logs(report, root, events, now - keep * 86400, dry_run)
     return report
 
 
@@ -223,11 +226,28 @@ def _stop_review_keep_days(report: Report) -> float:
     return value
 
 
+def _linkless(root: str, path: str) -> bool:
+    """`root` の下の `path` までの道に、リンクが 1 つも無いか。`path` が `root` の外なら偽。"""
+    top = os.path.abspath(root)
+    current = os.path.abspath(path)
+    if os.path.commonpath([top, current]) != top:
+        return False
+    while current != top:
+        if os.path.islink(current):
+            return False
+        current = os.path.dirname(current)
+    return True
+
+
 def _prune_directory(
     report: Report, root: str, directory: str, cutoff: float, dry_run: bool
 ) -> None:
-    """1 つのディレクトリの直下のファイルを、それ自身の日付で消す。リンクは辿らない。"""
-    if os.path.islink(directory) or not os.path.isdir(directory):
+    """1 つのディレクトリの直下のファイルを、それ自身の日付で消す。
+
+    ワークスペースルートからの道のどこかがリンクなら、何も消さない（リンクの先は ccnavi の置き場とは
+    限らない）。
+    """
+    if not _linkless(root, directory) or not os.path.isdir(directory):
         return
     try:
         names = sorted(os.listdir(directory))
