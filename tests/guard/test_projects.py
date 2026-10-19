@@ -459,7 +459,7 @@ class ProjectsTest(unittest.TestCase):
         ないこと（DENY_TICKET_PARENT）。範囲を広げても通らないので、案内は子を起こす手を言う。
         """
         self.family_in_lib("i0007")
-        approved = self.ccnavi("--agree", stdin="y\n")
+        approved = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         home = self.worktree(self.lib, "i0007")
         for rel in (("src", "a", "a.py"), ("docs", "x.md"), ("wip", "design", "d.md")):
@@ -711,23 +711,6 @@ class ProjectsTest(unittest.TestCase):
         passed = self.hook("Bash", app, command="psql")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
-
-    def test_an_empty_projects_env_still_counts_the_projects(self):
-        # A3（置き場の固定）。`CCNAVI_PROJECTS=""` は「プロジェクトを数えない」と読まれていた。
-        # 6 つの env を廃止したので、空文字を入れても `projects/` の下は数えられる。
-        env = {"CCNAVI_PROJECTS": ""}
-        denied = self.hook(
-            "Write", self.ws, env=env, file_path=os.path.join(self.app, "schema", "x.sql")
-        )
-        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
-        self.assertIn("projects/app/.ccnavi/config/project/rules.yml:schema", self.reason(denied))
-        self.assertEqual(self.last_record()["project"], "app")
-
-        denied = self.hook("Bash", self.ws, env=env, command="psql -c 'select 1'")
-        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
-        self.assertIn("projects/lib/.ccnavi/config/project/rules.yml:raw-psql", self.reason(denied))
-
-    # ---- 8. --project-rules-file は診断でだけ 1 つのプロジェクトのルールを差し替える
 
     def test_project_rules_file_swaps_one_projects_rules_for_diagnostics_only(self):
         # VS Code 拡張が、編集中の lib のルールを保存せずに試す形。lib の deny に

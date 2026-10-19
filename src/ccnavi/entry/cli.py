@@ -917,12 +917,10 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if cli_ops.sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
-    # 親を閉じた後の片付けの列挙元（`retire/<親>.json`）と、古い取り込み状態の 1 回限りの移行。
-    # どちらもネットワークにも git にも触れず、チケット制御の有無に依らない。
+    # 親を閉じた後の片付けの列挙元（`retire/<親>.json`）。
+    # ネットワークにも git にも触れず、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "retired"]:
         return EXIT_OK if cli_ops.sync_retired(stdout, conf) == 0 else EXIT_ERROR
-    if list(args.command) == ["sync", "migrate"]:
-        return EXIT_OK if cli_ops.sync_migrate(stdout, conf, root) == 0 else EXIT_ERROR
     # 取り込みの後の検査（正とする側と、手元と統合先のレイヤーの食い違い）。
     # error があれば sh が親子のチケットの取り込みを止める。warn は表示するだけ。
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:

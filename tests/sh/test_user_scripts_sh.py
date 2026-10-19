@@ -9,8 +9,7 @@ hook はその名前で止めるので、名前と置き場の決まりが崩れ
    共通部に置くと `sh -c '. …common….sh; 関数'` の形で、ユーザ専用の sh の名前を出さずに呼べる
 2. 実行ファイルを起こす `ccnavi_wap_exe` の定義は共通部の 1 か所（と、レビューの共通部の包み）だけ
 3. もとの sh に残した古い入口は、何も動かさずに終了コード 2 で新しい sh を案内する
-4. どの `ccnavi-user-*.sh` も単体で起動でき（`-h`）、hook の名前の止めに当たる。
-   古い名前の sh は置き場に無い
+4. どの `ccnavi-user-*.sh` も単体で起動でき（`-h`）、hook の名前の止めに当たる
 
 古い入口と新しい sh の中身の動きは、それぞれの sh の試験
 （test_review_decide・test_write_and_push_sh・test_sync_sh・test_clean_sh・test_push_approved_sh）が見る。
@@ -124,11 +123,6 @@ class PlacementTest(unittest.TestCase):
             if name.endswith(".sh") and "ccnavi_wap_exe" in defined(name)
         )
         self.assertEqual(where, ["ccnavi-common-review.sh", "ccnavi-common-write-and-push.sh"])
-
-    def test_the_old_names_are_gone(self):
-        for name in OLD_NAMES:
-            with self.subTest(name=name):
-                self.assertFalse(os.path.exists(os.path.join(SH_DIR, name)))
 
     def test_every_user_script_is_caught_by_the_name(self):
         pattern = user_only.user_script_pattern()

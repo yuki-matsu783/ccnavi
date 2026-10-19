@@ -56,10 +56,10 @@ uv run python -m tests --plan          # 何をどの順で回すか出すだけ
 | `src/ccnavi/**/*.py`・`main.py` | `guard` `config` `ticket` |
 | `src/ccnavi/infra/platformtag.py` | 上に加えて `sh` |
 | `build.py` | `guard` `sh` `e2e` |
-| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-agree.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
+| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-user-agree.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
-| `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
+| `.ccnavi/scripts/ccnavi-user-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh` | `sh` |
 | `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |

@@ -2550,7 +2550,6 @@ class TicketTest(unittest.TestCase):
             "ccnavi worktree drop P1",
             "ccnavi worktree tidy P1 --phase 2",
             "ccnavi sync retired",
-            "ccnavi sync migrate",
             "sh .ccnavi/scripts/ccnavi-git.sh log --grep 'worktree retire --abandon'",
             "sh .ccnavi/scripts/ccnavi-git.sh log --grep ccnavi-sync.sh --oneline",
             "ccnavi --agree --preview --json",

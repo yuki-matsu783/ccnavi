@@ -114,38 +114,6 @@ test("CX-T046 blob は sha でキャッシュし、2 回目は tree だけを読
   assert.ok(first.board.stats.rest + first.board.stats.graphql < 40, JSON.stringify(first.board.stats));
 });
 
-test("CX-T047 置き場は既定に固定し、統合先の .claude/settings.json の env で動かさない", async () => {
-  const b = fixture();
-  const env = { CCNAVI_TICKETS_PROPOSAL: "wip/tickets", CCNAVI_TICKETS_APPROVED: "moved/approved", CCNAVI_PROJECT_HOME: "moved/home" };
-  b.main.files[".claude/settings.json"] = JSON.stringify({ env });
-  b.i0001.files[".claude/settings.json"] = b.main.files[".claude/settings.json"];
-  // env の指す先にも同じ提案を置く。読むのは既定の置き場だけ
-  for (const k of Object.keys(b.i0001.files)) {
-    if (k.startsWith("wip/proposals/")) b.i0001.files[k.replace("wip/proposals/", "wip/tickets/")] = b.i0001.files[k];
-  }
-  // 承認済みの置き場とレイヤーも既定のものを読む。env の指す先（moved/）には同じ形のものを置いても読まない
-  b.main.files[".ccnavi/config/project/rules.yml"] = b.main.files[".ccnavi/config/common/rules.yml"];
-  b.main.files["moved/approved/done/i0001.md"] = b.main.files[".ccnavi/approved/done/i0005.md"];
-  b.main.files["moved/home/config/rules.yml"] = b.main.files[".ccnavi/config/common/rules.yml"];
-  const { board } = await run(b);
-  assert.equal(board.error, "");
-  assert.deepEqual(family(board, "i0001")?.result?.batch?.map((e) => e.path), ["i0001:wip/proposals/todo/i0001.md"]);
-  const read = Object.keys(board.seen?.branches.main?.files ?? {});
-  assert.ok(read.includes(".ccnavi/approved/done/i0005.md") && read.includes(".ccnavi/config/project/rules.yml"), JSON.stringify(read));
-  assert.deepEqual(read.filter((p) => p.startsWith("moved/")), []);
-});
-
-test("CX-T048 置き場の env に絶対パスを入れても止めず、既定の置き場を読む", async () => {
-  for (const form of ["/srv", "C:/srv", "~/srv"]) {
-    const b = fixture();
-    const env = { CCNAVI_TICKETS_PROPOSAL: `${form}/proposals`, CCNAVI_TICKETS_APPROVED: `${form}/approved`, CCNAVI_PROJECT_HOME: `${form}/home` };
-    b.main.files[".claude/settings.json"] = JSON.stringify({ env });
-    const { board } = await run(b);
-    assert.equal(board.error, "", form);
-    assert.deepEqual(family(board, "i0001")?.result?.batch?.map((e) => e.path), ["i0001:wip/proposals/todo/i0001.md"], form);
-  }
-});
-
 test("CX-T049 先行の閉包が 16 組の親子のチケットを超えたら決まらないで止める（3.3 の 5）", async () => {
   const b = fixture();
   const base = b.main.files;

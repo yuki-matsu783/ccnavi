@@ -465,11 +465,6 @@ _SCRIPTS = """\
          （state/retire/<parent>.json）を "retired <parent> <self|project> <mr|-> <branch|->" の
          形で1行ずつ出力します。読めない記録や mr の無い記録は "incomplete <parent> <理由>"
          です。ネットワークにも git にも触れません）
-    ccnavi sync migrate
-        （ccnavi-sync.sh 用。冪等です。古い取り込み状態（state/sync/<repo>/families/<parent>）の
-         mr と branch を state/retire/<parent>.json に移し、古い記録と integration/ を消します。
-         "migrate 1" の行に続いて、"moved|kept <parent> <repo>"、"dropped|skipped <parent> <repo>
-         <理由>"、"removed integration <repo>" を出力します。ネットワークにも git にも触れません）
     ccnavi tree parent <tree> <name>
         （スクリプト用。"tree 1" の行に続いて、"parent yes|no|unreadable"（そのツリーが
          親のチケットまたは提案 <name> を保持しているか）、"approved yes|no|unreadable"

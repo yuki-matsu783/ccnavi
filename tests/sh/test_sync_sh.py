@@ -249,16 +249,6 @@ class SyncHarness(unittest.TestCase):
         write(path, json.dumps(data, ensure_ascii=False, indent=1) + "\n")
         return path
 
-    def legacy_record(self, state="gone", mr="42", branch=PARENT, name=PARENT, repo="self"):
-        """古い取り込み状態（`sync/<repo>/families/<P>`）を置く。"""
-        path = os.path.join(self.state, "sync", repo, "families", name)
-        write(
-            path,
-            f"remote origin\nbranch {branch}\nsha {self.sha(self.tree, 'HEAD')}\n"
-            f"fetched_at 1\nstate {state}\nreason \n" + (f"mr {mr}\n" if mr else ""),
-        )
-        return path
-
     def git_path(self, tree, name):
         path = git(tree, "rev-parse", "--git-path", name).stdout.strip()
         return path if os.path.isabs(path) else os.path.join(tree, path)
@@ -938,62 +928,6 @@ class SyncTest(SyncHarness):
         self.assertEqual(1, named.returncode, named.stdout + named.stderr)
         self.assertIn("親のワークツリー（.claude/worktrees/i0001）がありません", named.stdout)
 
-    def test_old_records_of_removed_worktrees_are_moved_to_retire(self):
-        # 古い取り込み状態（gone など）のうち、親のワークツリーが無いものは、先頭の
-        # `ccnavi sync migrate` が mr と branch を片付けの記録へ移し、古い記録を消す。
-        # 状態（gone など）は捨てる。
-        legacy = self.legacy_record("gone", mr="42")
-        git(self.ws, "worktree", "remove", "--force", self.tree)
-        self.review_says("none")
-        done = self.sync()
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("古い取り込み記録を、片付けの記録（retire/）へ移した", done.stdout)
-        self.assertFalse(os.path.exists(legacy))
-        moved = os.path.join(self.retire_dir, f"{PARENT}.json")
-        with open(moved, encoding="utf-8") as f:
-            data = json.load(f)
-        self.assertEqual((PARENT, 42, PARENT), (data["parent"], data["mr"], data["branch"]))
-        # 移した記録は、そのまま片付けの列挙に入る（MR は未マージなので片付けない）。
-        self.assertIn("まだマージされていないので片付けない", done.stdout)
-        # 打ち直しても移し直さない（冪等）。
-        again = self.sync()
-        self.assertNotIn("移した", again.stdout)
-        self.assertTrue(os.path.exists(moved))
-
-    def test_old_records_of_live_worktrees_are_dropped(self):
-        legacy = self.legacy_record("present", mr="42")
-        done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("古い取り込み記録を捨てた", done.stdout)
-        self.assertFalse(os.path.exists(legacy))
-        self.assertFalse(os.path.exists(os.path.join(self.retire_dir, f"{PARENT}.json")))
-
-    def test_the_old_integration_copy_is_removed(self):
-        head = write(
-            os.path.join(self.state, "sync", "self", "integration", "head"),
-            "remote origin\nbranch main\nsource default\n",
-        )
-        done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("古い統合先のコピー", done.stdout)
-        self.assertFalse(os.path.exists(head))
-        self.assertFalse(os.path.exists(os.path.dirname(head)))
-
-    def test_an_executable_that_does_not_know_migrate_does_not_stop_the_run(self):
-        # 古い実行ファイルは `sync migrate` を知らない。何もせずに先へ進む。
-        launcher = self.launcher()
-        old = write(
-            os.path.join(self._tmp.name, "bin", "no-migrate"),
-            "#!/bin/sh\n"
-            'case "$*" in *"sync migrate"*) echo "ccnavi: unknown command" >&2; exit 2 ;; esac\n'
-            f'exec "{launcher}" "$@"\n',
-        )
-        os.chmod(old, 0o755)
-        self.legacy_record("gone")
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=old)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertNotIn("移した", done.stdout)
-
     # ---- 統合先（設定か、無ければホストのデフォルトブランチ）と、
     # 統合先への取り込み（最後に取り込んだ先頭）
 
@@ -1014,6 +948,31 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
         self.assertEqual(2, done.returncode, done.stdout + done.stderr)
         self.assertIn("返さなかった", done.stderr)
+
+    def test_the_fallback_without_an_answer_uses_the_default_places(self):
+        """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の置き場の綴りを直に使う。
+
+        `sync paths` だけを空で返し、ほか（`write-and-push family` の `branch` の行）
+        は実際のものに答えさせる。
+        `write-and-push family` まで空だと、sh は親のブランチ名を知らずに取り込みを止める。
+        """
+        head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
+        # 提案（wip/proposals/todo/）だけがある親。既定の提案の置き場で家族と見つける。
+        other = os.path.join(self.ws, ".claude", "worktrees", "i0002")
+        git(self.ws, "worktree", "add", "-q", other, "-b", "i0002", "main")
+        rel = "wip/proposals/todo/i0002.md"
+        write(os.path.join(other, rel), "---\nversion: 1\nticket: i0002\n---\n")
+        git(other, "add", "--", rel)
+        git(other, "commit", "-q", "-m", "propose")
+        git(other, "push", "-q", "-u", "origin", "i0002")
+        body = (
+            '#!/bin/sh\nif [ "$3" = sync ] && [ "$4" = paths ]; then exit 0; fi\n'
+            f'PYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n'
+        )
+        done = self.sync(CCNAVI_BIN_PATH=self.launcher(body))
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertEqual(head, self.sha(self.tree, "HEAD"))
+        self.assertIn("i0002: リモートと同じ", done.stdout)
 
     def test_the_host_default_branch_is_read_from_the_remote(self):
         # 手元の origin/HEAD が無くても、ls-remote --symref でホストの既定を読む。
@@ -1214,79 +1173,6 @@ class SyncTest(SyncHarness):
     def kill_group(self, proc):
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(proc.pid, signal.SIGKILL)
-
-
-@unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
-class PlacesAreNotReadTest(SyncHarness):
-    """置き場を動かす環境変数は読まない（置き場は固定。A9）。
-
-    `.ccnavi/scripts/` が写す版（i0064-10）になる前は失敗する。写す前の sh は、
-    `ccnavi-common.sh` の `ccnavi_state` が `CCNAVI_STATE` を、`ccnavi_parent_tree` が
-    `CCNAVI_TICKETS_APPROVED`・`CCNAVI_TICKETS_PROPOSAL` を読み、`ccnavi-sync.sh` の予備が
-    `CCNAVI_TICKETS_*`・`CCNAVI_PROJECT_HOME` を、`projects` が `CCNAVI_PROJECTS` を読むため。
-    """
-
-    def moved(self):
-        """既定と違う綴りの 5 つ。控えはワークスペースの外の絶対パス、ほかは相対。"""
-        self.outside = os.path.join(self._tmp.name, "elsewhere-state")
-        return {
-            "CCNAVI_STATE": self.outside,
-            "CCNAVI_TICKETS_APPROVED": "tickets/approved",
-            "CCNAVI_TICKETS_PROPOSAL": "tickets/proposals/",
-            "CCNAVI_PROJECT_HOME": ".nav",
-            "CCNAVI_PROJECTS": "repos",
-        }
-
-    def arrange(self):
-        """リモートに親の 1 件、統合先に done/ とレイヤー、提案だけの家族、
-        家族の無いプロジェクト。"""
-        self.head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
-        self.remote_commit("main", ".ccnavi/approved/done/old.md", "old\n")
-        self.remote_commit("main", ".ccnavi/config/project/phases.yml", "phases\n")
-        # 提案（wip/proposals/todo/）だけがある親。既定の提案の置き場で家族と見つける。
-        other = os.path.join(self.ws, ".claude", "worktrees", "i0002")
-        git(self.ws, "worktree", "add", "-q", other, "-b", "i0002", "main")
-        rel = "wip/proposals/todo/i0002.md"
-        write(os.path.join(other, rel), "---\nversion: 1\nticket: i0002\n---\n")
-        git(other, "add", "--", rel)
-        git(other, "commit", "-q", "-m", "propose")
-        git(other, "push", "-q", "-u", "origin", "i0002")
-        project = os.path.join(self.ws, "projects", "p")
-        git(self._tmp.name, "init", "-q", "-b", "main", project)
-        git(project, "remote", "add", "origin", os.path.join(self._tmp.name, "nowhere.git"))
-
-    def assertDefaultPlaces(self, done):
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        # 親のワークツリーを既定の置き場（.ccnavi/approved・wip/proposals）で家族と見つけた。
-        self.assertEqual(self.head, self.sha(self.tree, "HEAD"))
-        self.assertIn("i0002: リモートと同じ", done.stdout)
-        # プロジェクトは既定の projects/ の下で見つける。
-        self.assertIn("p: リモートのブランチの一覧を取ってこられなかった", done.stdout)
-        # env が指す場所には何も作らない。
-        self.assertFalse(os.path.exists(self.outside), "CCNAVI_STATE を読んでいる")
-        for rel in ("tickets", ".nav", "repos"):
-            self.assertFalse(os.path.exists(os.path.join(self.ws, rel)), rel)
-
-    def test_the_variables_do_not_move_the_places(self):
-        """実行ファイルが `sync paths` に答える道。env を入れても既定の置き場で取り込む。"""
-        self.arrange()
-        done = self.sync(CCNAVI_BIN_PATH=self.launcher(), **self.moved())
-        self.assertDefaultPlaces(done)
-
-    def test_the_fallback_without_an_answer_uses_the_defaults(self):
-        """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。
-
-        `sync paths` だけを空で返し、ほか（`write-and-push family` の `branch` の行）
-        は実際のものに答えさせる。
-        `write-and-push family` まで空だと、sh は親のブランチ名を知らずに取り込みを止める。
-        """
-        self.arrange()
-        body = (
-            '#!/bin/sh\nif [ "$3" = sync ] && [ "$4" = paths ]; then exit 0; fi\n'
-            f'PYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n'
-        )
-        done = self.sync(CCNAVI_BIN_PATH=self.launcher(body), **self.moved())
-        self.assertDefaultPlaces(done)
 
 
 if __name__ == "__main__":

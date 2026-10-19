@@ -6,7 +6,7 @@ tags: [review, tickets, host]
 keywords: [手動移動, finished_to, settled_by, 受け入れ台帳, accepted.json, 再提起, confirm, 余裕幅]
 ---
 
-# ADR-0149: 手で動かした子は、経路の欄と受け入れ台帳で版つきで受け入れる
+# ADR-0152: 手で動かした子は、経路の欄と受け入れ台帳で版つきで受け入れる
 
 状態: 採用
 

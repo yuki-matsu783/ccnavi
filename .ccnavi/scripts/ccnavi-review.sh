@@ -602,7 +602,7 @@ decide)
 	;;
 ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
-	# 閉じた親子のチケット（done/ の親子・phases/<親>/・flows/・残っていれば旧版の events/）を手元の logs/archive/ へ
+	# 閉じた親子のチケット（done/ の親子・phases/<親>/・flows/）を手元の logs/archive/ へ
 	# 退避する（git の上では削除）。write-and-push の中なら、その削除をコミットして push してから、ここが外して
 	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
 	wap_start "$family"

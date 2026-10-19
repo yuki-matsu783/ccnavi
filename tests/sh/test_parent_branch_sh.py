@@ -392,24 +392,6 @@ class ParentBranchShTest(unittest.TestCase):
         self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
-    # ---- 古い取り込み状態が残っていても判定に使わない
-
-    def test_a_leftover_legacy_record_does_not_change_the_answer(self):
-        """古い取り込み状態（branch が別のブランチ）が残っていても、判定には使わない。
-        親のブランチ名は HEAD から読む。先頭の `sync migrate` が古い記録を捨てる。"""
-        self.imported_family()
-        record = os.path.join(self.state, "sync", "self", "families", PARENT)
-        write(
-            record,
-            "remote origin\nbranch feature/other\nsha 0\nfetched_at 1\nstate gone\nreason \n",
-        )
-        family = self.ok(self.exe("write-and-push", "family", PARENT))
-        self.assertIn("target yes\n", family.stdout)
-        self.assertIn(f"branch {BRANCH}\n", family.stdout)
-        self.ok(self.sh("ccnavi-sync.sh", PARENT))
-        self.assertFalse(os.path.exists(record))
-        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
-
     def test_a_left_over_branch_field_is_an_error(self):
         self.add_parent_tree()
         self.write_approved_copy("origin/main")

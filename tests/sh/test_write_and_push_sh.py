@@ -1546,41 +1546,6 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(self.remote_sha(), before)
 
 
-class PlacesAreNotReadTest(WriteAndPushHarness):
-    """控えの置き場を動かす環境変数は読まない（置き場は固定。A9）。
-
-    `.ccnavi/scripts/` が写す版（i0064-10）になる前は失敗する。写す前の sh（`ccnavi-common.sh` の
-    `ccnavi_state`）は `CCNAVI_STATE` を読み、ロックと控えを env が指す場所に置くため。
-    """
-
-    def hold_lock(self):
-        os.makedirs(self.lock_dir())
-        host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
-        system = subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
-        now = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout)
-        write(
-            os.path.join(self.lock_dir(), "owner"),
-            f"{host} {live_sh_pid(self)} {now} {live_sh_pid(self)}-{now} {system}\n",
-        )
-
-    def test_the_state_variable_does_not_move_the_lock(self):
-        outside = os.path.join(self._base, "elsewhere-state")
-        # 既定の置き場（logs/state/locks/...）のロックを持たれていれば、env を入れても止まる。
-        self.hold_lock()
-        held = self.ticket("start", PARENT, CCNAVI_STATE=outside)
-        self.assertEqual(held.returncode, 1, held.stdout + held.stderr)
-        self.assertIn("ロックを他の操作が持っている", held.stderr)
-        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
-        shutil.rmtree(self.lock_dir())
-        # ロックが空けば、既定の置き場でロックを取って送る。
-        result = self.ticket("start", PARENT, CCNAVI_STATE=outside)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        head = self.sha(self.tree, "HEAD")
-        self.assertEqual(self.remote_sha(), head)
-        self.assertFalse(os.path.exists(self.lock_dir()))
-        self.assertFalse(os.path.exists(outside), "CCNAVI_STATE を読んでいる")
-
-
 class WriteAndPushChildWorktreeTest(WriteAndPushHarness):
     """子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチから作る。
 

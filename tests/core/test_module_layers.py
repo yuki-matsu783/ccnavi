@@ -149,7 +149,6 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "policy.selfguard_shell",
                 "tickets.archive",
                 "tickets.donecopy",
-                "tickets.legacy_sync",
                 "tickets.flow",
                 "tickets.flow_text",
                 "tickets.flow_shape",

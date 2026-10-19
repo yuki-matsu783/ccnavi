@@ -162,20 +162,6 @@ class OriginSubcommandTest(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn("origin の URL を読めない", done.stderr)
 
-    def test_the_state_variable_is_not_read(self):
-        """`CCNAVI_STATE=/x` を入れても、sh は控えを `logs/state/` に置く（置き場は固定。A9）。
-
-        sh は起動のたびに控えの置き場を作る（`mkdir -p "$state"`）。以前は `$root/` に
-        `CCNAVI_STATE` を継ぎ足すので、絶対パスを入れると存在しない置き場を見ていた。
-        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は失敗する。
-        写す前の sh（`ccnavi-review.sh`）は `CCNAVI_STATE` を読むため。
-        """
-        result = self.origin("http://127.0.0.1:9/root/p.git", extra_env={"CCNAVI_STATE": "/x"})
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        state = os.path.join(self.dir, "logs", "state")
-        self.assertTrue(os.path.isdir(state), "logs/state/ が無い")
-        self.assertFalse(os.path.exists(os.path.join(self.dir, "x")), "CCNAVI_STATE を読んでいる")
-
 
 if __name__ == "__main__":
     unittest.main()

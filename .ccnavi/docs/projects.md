@@ -27,7 +27,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 判定の記録とstateの置き場 | ワークスペースの`logs/decisions.jsonl`と`logs/state/`（親を閉じたあとの片付けの記録は`logs/state/retire/<親の識別子>.json`で、ロックは`logs/state/locks/<リポジトリ>/<親の識別子>`。親子ごとの取り込み状態は持たない） |
 | ワークツリー | ワークスペースの`.claude/worktrees/<名前>` |
 | 子のフロー（担当のサブエージェントが読む手順書） | 親チケットのツリーの`.ccnavi/approved/flows/<子>.yml`。置き場は固定。中身はYAML。チケットの欄で場所を指定しない |
-| 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`flows/`（残っていれば旧版の`events/`）を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
+| 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
 | 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（`.ccnavi/docs/templates.md`） |
 | テンプレートの下書き（エージェントが書く。効力は無い） | 取り込み先と同じ相対パスで`wip/handoff/`の下（`wip/handoff/.ccnavi/config/project/templates/<名前>.yml`など）。プロジェクト向けは`projects/<名前>/wip/handoff/…`。取り込むのはユーザ（`ccnavi user handoff`） |

@@ -365,13 +365,11 @@ def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool
     フローの本文、ユーザの承認で置かれた承認済みチケット、
     reviewed・(b) でない skipped・close-early・設定を見た上書きの記録、
     ユーザの判断が消したマーカー、ユーザの判断が一緒に書く移動（review/ から done/、
-    doing/ から done/）、旧版の ccnavi が追記した `events/<識別子>.jsonl`。
+    doing/ から done/）。
     """
     rel = f"{approved_rel}/{'/'.join(parts)}"
     if len(parts) == 2 and parts[0] == "flows" and parts[1].endswith((".yml", ".yaml")):
         return True
-    if len(parts) == 2 and parts[0] == archive.LEGACY_EVENTS_DIR and parts[1].endswith(".jsonl"):
-        return True  # 旧版の ccnavi が追記した履歴。ユーザが確かめてコミットするか消す
     if len(parts) == 2 and parts[0] == ticket_model.DOING:
         if added(rel):
             return True  # ユーザの承認で置かれた承認済みチケット
