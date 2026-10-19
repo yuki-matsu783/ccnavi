@@ -67,7 +67,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | `CCNAVI_MODE` | 挙動 |
 |---|---|
 | `enable`（既定） | 判定し、`deny` なら止め、`ask` ならユーザに確認を出す |
-| `dry-run` | 同じ判定を行い、呼び出しには手を出さず「`enable` なら何をしていたか」を `additionalContext` で伝える |
+| `dry-run` | 同じ判定を行い、一般の保護は呼び出しに手を出さず「`enable` なら何をしていたか」を `additionalContext` で伝える。チケットの関門と補助の保護は、`dry-run` でも `enable` と同じく止める（6.8） |
 | `disable` | 判定しない。記録に `mode-disabled` を残す |
 
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY`、`CCNAVI_GUARD_CORE_FILES`）も同じ 3 値を取り、`CCNAVI_MODE=dry-run` のときは
@@ -82,12 +82,12 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 |---|---|
 | `enable` の deny / ask | `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny\|ask", "permissionDecisionReason": "…", "additionalContext": "…"}}`。`additionalContext` はルールが文を持つときだけ |
 | `enable` の allow、委ねた回 | 判定は出さない。通知（既定を使った、コアファイルを戻した、ルールの文）があれば `additionalContext` だけ |
-| `dry-run` の deny / ask | `additionalContext` に「enable なら止めていた / 聞いていた」と理由を並べる。終了コード 0 |
+| `dry-run` の deny / ask | 一般の保護は、`additionalContext` に「enable なら止めていた / 聞いていた」と理由を並べる。終了コード 0。関門と補助の保護は `enable` と同じ応答で止め、理由の末尾に「dry-run でもこの止めは効く」の 1 行を添える |
 | `Stop` | `{"systemMessage": "…"}`。`finish`・レビュー依頼までの道・直接作業の `integrate` を促すときは、モードによらず（`dry-run` でも）`{"decision": "block", "reason": "…", "systemMessage": "…"}`。Stop でモデルに文を届ける経路は止めることしか無いため |
 | `PostToolUse` / `SubagentStop` の差し戻し | 標準エラーに文、終了コード 2。`dry-run` なら `additionalContext` で 0 |
 
 期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として、`enable` は
-終了コード 2、`dry-run` は 0（REQ-CMN-08）。この block は理由を返せないので、生の文字列に `>` が 50 個を超えて並ぶ入力は、シェルから書き込む形の組み込みの保護だけを当てずに、ほかのルールの `deny` と `ask` を当てたあとで、`deny` に当たっていなければ `DENY_REDIRECT_LIMIT` に上げて理由と書き直し方を返す（付録 A）。この保護の照合は `>` の個数 × その後ろの空白の無い語の長さで伸びるので、上限で `>` の個数を抑える。上限の下でも尾が長い入力（400KB 程度）は期限に届きうる。実ルールでの実測では、`*x*` 形の glob の照合が長いと、期限の確認が間に合わずに 3 秒を超える（[12.1](limits.md)）。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
+終了コード 2。`dry-run` は、設定を読まずに安全と分かる読み取り（`hook.failsafe`）だけ 0 で、そのほかのツールの呼び出しは `dry-run` でも止める（REQ-CMN-08）。この block は理由を返せないので、生の文字列に `>` が 50 個を超えて並ぶ入力は、シェルから書き込む形の組み込みの保護だけを当てずに、ほかのルールの `deny` と `ask` を当てたあとで、`deny` に当たっていなければ `DENY_REDIRECT_LIMIT` に上げて理由と書き直し方を返す（付録 A）。この保護の照合は `>` の個数 × その後ろの空白の無い語の長さで伸びるので、上限で `>` の個数を抑える。上限の下でも尾が長い入力（400KB 程度）は期限に届きうる。実ルールでの実測では、`*x*` 形の glob の照合が長いと、期限の確認が間に合わずに 3 秒を超える（[12.1](limits.md)）。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
 git の読み取りが 2 秒で打ち切られる。
 
 payload が JSON でない・オブジェクトでない・`hook_event_name` が無いとき、`hook_event_name`・`tool_name`・
@@ -96,8 +96,8 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 同じ結果になる。記録を書けないときは標準エラーに出して捨て、判定は変えない。UTF-8 にできない字（JSON の
 `"\ud800"` のような孤立したサロゲート）は、記録では `\ud800` の 6 字にして書く。期限切れと `payload-unusable` の文は、
 先頭に `[ccnavi] <理由>` を置き、次の一手（期限切れはコマンドを分ける・長い文はファイルで渡す、`payload-unusable` は
-書き直しでは直らないので hook の登録と版をユーザに確かめてもらう）を添える。文はモードとイベントに合わせる。`dry-run` は
-終了コード 0 で通すので「止めた」と言わず、`enable` なら止めていたと言う。`payload-unusable` の終了コード 2 が何を止め、
+書き直しでは直らないので hook の登録と版をユーザに確かめてもらう）を添える。文はモードとイベントに合わせる。`dry-run` のうち、ツールの呼び出しを持たないイベントは
+終了コード 0 で通すので「止めた」と言わず、`enable` なら止めていたと言う。`PreToolUse` とイベントすら読めなかった回は `dry-run` でも止める。`payload-unusable` の終了コード 2 が何を止め、
 標準エラーが誰に届くかはイベントで違うので、読めたところまでのイベント名で文を分ける（`PreToolUse` は呼び出し、
 `PostToolUse` は走ったあとの確認、`UserPromptSubmit` はユーザの発言、`Stop` / `SubagentStop` は終わり）。イベント名を
 読めなかった回とほかのイベントは、何を止めたかを言わずに直す側だけを名指しする。記録の `event` も読めたぶんを残す。
@@ -113,7 +113,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 
 | イベント | 終え方 |
 |---|---|
-| `PreToolUse`、payload を読む前（イベントが分からない） | 標準エラーに文、`enable` は終了コード 2 で止める。`dry-run` は 0（判定に達せなかった回の既定と同じ） |
+| `PreToolUse`、payload を読む前（イベントが分からない） | 標準エラーに文、終了コード 2 で止める。ツールの種類で決め、Write・Edit・NotebookEdit・Agent とツールが分からない回は `dry-run` でも止める。Read・Grep・Glob は組み込みの最低限の deny（認証情報の形・`.git` の中・`logs/state/ops/`）に当たらなければ通し、Bash は狭い許可リスト（`pwd`・`ls`・`cat` / `head` / `tail` / `wc` の単独の 1 パス・`ccnavi-ticket.sh status` / `--help`）だけ通す。PowerShell は止める。未知のツールは `enable` だけ止める |
 | `PostToolUse` | ツールはもう走っていて止めるものは無い。`enable` は終了コード 2 と標準エラーで、実行後の検査をしていないことをモデルに言う。`dry-run` は 0 |
 | それ以外（`SessionStart`・`UserPromptSubmit`・`Stop`・`SubagentStart`・`SubagentStop`・未知のイベント） | 終了コード 0 で、ユーザに `systemMessage` で知らせる。終了コード 2 で終えると、`Stop` と `SubagentStop` は終われずに続けさせられ、`UserPromptSubmit` は依頼文を消す。ccnavi の不具合が作業そのものを止めないようにする。`SubagentStop` は、子の範囲を確かめられなかった回と同じ印を置き、親に届ける（9.12） |
 
@@ -199,7 +199,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 | 欄 | 数えるもの |
 |---|---|
 | `decision` = `allow` / `ask` / `deny` / `handover` / `nudge` / `skip` | 下した判定。`handover` は権限モードに委ねた回。`nudge` は `Stop` で `finish` を促した回と、`match: Stop` のルールで止めた回 |
-| `enforced` | 実際に適用したか。`dry-run` は常に偽 |
+| `enforced` | 実際に適用したか。`dry-run` は、一般の保護では偽、関門と補助の保護で止めた回は真 |
 | `code` | 判定の根拠の種別（付録 A） |
 | `reason` | `skip` の理由 |
 | `degraded` | コマンドを読み切れず生の文字列に当てたかどうか |

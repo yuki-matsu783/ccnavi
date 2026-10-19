@@ -118,6 +118,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "hook.agentkind",
+                "hook.failsafe",
                 "infra.gitstate",
                 "infra.shellread",
                 "infra.shellread_cd",

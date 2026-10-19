@@ -32,14 +32,15 @@ EXIT_PARTIAL = 4
 
 # モードは判定をどう扱うかを決めるだけで、どう判定するかは決めない。
 # 判定を続ける 2 つのモードは同じ経路を通るので、dry-run が報告するものが
-# enable なら実際に起きたことと一致する。
+# enable なら実際に起きたことと一致する。ただし関門（GATE）と補助（AUX）は dry-run でも
+# 止めるので、その分は報告ではなく実際に起きる（下の分類）。
 #
 # 名前はガードそのものの状態を言う。判定に deny と ask の 2 つがある以上、
 # 名前が「止める」だけを言うと、確認で済む回には名前が事実と合わなくなる。
 # 弱いほうから強いほうへ並ぶのは lint の深刻度と同じ。
 DISABLE = "disable"  # 判定しない
 
-DRY_RUN = "dry-run"  # 判定して報告するが、呼び出しには手を出さない
+DRY_RUN = "dry-run"  # 判定して報告する。一般の保護は手を出さず、関門と補助は止める（下の分類）
 
 ENABLE = "enable"  # 判定を呼び出しに適用する
 
@@ -109,11 +110,46 @@ def effective_setting(mode: str, declared: str) -> str:
     return declared if mode == ENABLE else DRY_RUN
 
 
-def fail_closed(mode: str) -> int:
+# 止めている箇所の分類。dry-run のときの扱いを分類で決める。
+# GENERAL: ルールファイルの deny・ask など一般の保護。dry-run は報告だけにする。
+# GATE: チケット制御の関門（状態の操作、承認済みの置き場、範囲、レビュー待ちなど）。
+#   dry-run でも止める。
+# AUX: 関門を外す抜け道をふさぐ補助の保護（生の git、環境変数の指定など）。dry-run でも止める。
+GENERAL = "general"
+GATE = "gate"
+AUX = "aux"
+
+
+def holds_in_dry_run(kind: str) -> bool:
+    """dry-run でも止める分類か。"""
+    return kind in (GATE, AUX)
+
+
+# ツールの種類ごとの、判定に達せなかったときの扱い。
+STRICT_TOOLS = ("Write", "Edit", "NotebookEdit", "Agent")
+READ_TOOLS = ("Read", "Grep", "Glob")
+SHELL_TOOLS = ("Bash", "PowerShell")
+
+
+def fail_closed(mode: str, tool: str | None = None, *, safe: bool = False) -> int:
     """「判定に達せなかった」ときの終了コード。
 
-    enable は呼び出しを止める。達せなかった判定が許可になってはならないから。
-    dry-run は通す。呼び出しに手を出さないことがそのモードの約束なので、
-    自分の失敗で作業を止めるようでは意味がない。
+    tool が None（ツールの呼び出しを持たないイベント）は、enable で止め、dry-run で通す。
+    達せなかった判定が許可になってはならないが、呼び出しに手を出さないことが dry-run の
+    約束なので、自分の失敗で作業を止めるようでは意味がない。
+
+    PreToolUse の呼び出しはツールの種類で分ける。`safe` は、呼び手が設定を読まずに「通してよい」と
+    確かめた呼び出し（`hook.failsafe`）。
+
+    - 空（payload が読めずツールが分からない）: 止める
+    - Write・Edit・NotebookEdit・Agent: dry-run でも止める
+    - Read・Grep・Glob・Bash・PowerShell: `safe` のときだけ通す。dry-run でも同じ
+    - 知らないツール: enable は止め、dry-run は通す
     """
+    if tool is None:
+        return EXIT_OK if mode == DRY_RUN else EXIT_BLOCK
+    if tool == "" or tool in STRICT_TOOLS:
+        return EXIT_BLOCK
+    if tool in READ_TOOLS or tool in SHELL_TOOLS:
+        return EXIT_OK if safe else EXIT_BLOCK
     return EXIT_OK if mode == DRY_RUN else EXIT_BLOCK

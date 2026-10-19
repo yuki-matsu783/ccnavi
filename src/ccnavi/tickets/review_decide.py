@@ -88,6 +88,9 @@ def _followup_next(root: str, parent: ticket_model.Ticket, ident: str) -> str:
     """続きの子を起こしたあと、エージェントが打つ 2 手。"""
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    if tree.has_origin(root):
+        # origin があれば、start がワークツリーを切る。手で切る手順は添えない。
+        return f"エージェントが '{ticket_sh} start {ident}' で着手する"
     base = standing.head_branch(tree.worktree_path(root, parent.ticket), parent.ticket)
     return (
         f"エージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
@@ -717,7 +720,7 @@ def _decided_prompt(
         return (
             f"{head}\n直す指摘は続きの子チケット {followup} に載せ、承認済みにしてある。"
             f"{_followup_next(root, d.parent, followup)}。指摘:\n{items}\n"
-            "サブエージェントには渡さない。\n"
+            "状態の操作（start・finish）はメインが打つ。実装はサブエージェントに任せてよい。\n"
             f"{_status_line(root, d.parent)}"
         )
     return (
