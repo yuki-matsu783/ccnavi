@@ -1670,8 +1670,8 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 
 - ワークスペース、`projects/*`、`.claude/worktrees/*` のツリーごとに、変更があれば置き場（`.ccnavi/approved/`）だけをコミットし、そのブランチへ push する
 - シンボリックリンクは辿らず、名指しして飛ばす
-- `main` / `master` / `develop` / `release` / `release/*` と、そのリポジトリの統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ
-  `.claude/settings.local.json` の `env`、無ければ `origin/HEAD`・`origin/main`・`origin/master`。決まらなければ固定のリストだけ）、
+- `main` / `master` / `develop` / `release` / `release/*` と、そのリポジトリの統合先（手元の `origin/HEAD`、無ければ
+  `origin/main`・`origin/master`。決まらなければ固定のリストだけ）、
   ブランチをチェックアウトしていないツリーは push せず、コミットまでで止める
 - 親のワークツリーのブランチは、push の前に共通の push の関門（`ccnavi_push_gate`）を通す。親のブランチがリモートから消えているのに作り直す形を止める（次の節）
 - コミットするものが無ければ `コミットして push する承認済みチケットはありません。` と 1 行出す
@@ -1706,17 +1706,20 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 コミットして push する。並べたパスの変更があるツリーだけを対象にする。`<親>` とは一緒に使えない。
 
 受け取る側では、セッション開始時に `.ccnavi/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは fast-forward だけで、未コミットの変更があるツリーや
-分岐したツリーは触らず理由を 1 行で示す。取ってくるのは、チェックアウト中のブランチと、ワークツリーの起点になる統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ
-`.claude/settings.local.json` の `env`、無ければデフォルトブランチ＝`origin/HEAD`）。統合先の決め方は
-`ccnavi-common-state.sh` の `ccnavi_integration` 1 か所にあり、`ccnavi-git.sh` の push の拒否と `ccnavi-review.sh` が照らすマージリクエストのマージ先も同じ順で決める
-（`ccnavi-sync.sh` だけは、デフォルトブランチを先にホストへ聞く `ls-remote --symref` で読み、読めないときに手元の `origin/HEAD`・`main`・`master` に落とす）。
+分岐したツリーは触らず理由を 1 行で示す。取ってくるのは、チェックアウト中のブランチと、ワークツリーの起点になる統合先（そのリポジトリの手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`。ワークスペースの値は無く、
+`projects/` の下のプロジェクトも、それぞれ自分の `origin/HEAD` で決まる）。統合先の決め方は
+`ccnavi-common-state.sh` の `ccnavi_integration` 1 か所にあり、`ccnavi-git.sh` の push の拒否と `ccnavi-review.sh` が照らすマージリクエストのマージ先も同じ決め方をする。
+手元の `origin/HEAD` は clone のときに作られたまま、普通の fetch では動かない。そこで `ccnavi-fetch.sh` が、承認済みチケットの取得の後、ワークツリーの起点を進める前に、
+リポジトリごとに `ls-remote --symref origin HEAD` でホストの既定ブランチを聞き、手元と違えばそのブランチを fetch してから `origin/HEAD` を付け替え、1 行出す
+（ホストに届かない・fetch に失敗したときは、何も出さず何も変えない）。`ccnavi-sync.sh` は、ホストの答え、無ければ手元の `origin/HEAD`・`main`・`master` の順で読み、
+違えば、そのブランチを取れた後に手元を付け替える。origin の無いリポジトリでは統合先が決まらない。
 リモートに届かないときは、手元の版で判定する。認証は尋ねず、fetch 1 回を `CCNAVI_FETCH_TIMEOUT` 秒（既定 15）で切る。
 認証で失敗したときはその旨を 1 行添えるので、ユーザが端末で一度 `git fetch origin` を打って資格情報を保存すれば、次のセッションから通る。
 
 親のワークツリー（`.claude/worktrees/<P>` で、HEAD のブランチ名の `/` を `-` に置き換えたものがフォルダ名と同じもの）は、
 未コミットの変更があっても早送りを試し、書きかけと重なれば重なったパスを示す。分かれていれば「取り込みが要る」と 1 行出す。
 取り込み（merge）と、親のブランチがリモートから消えたかの確かめは、ユーザが打つ `.ccnavi/scripts/ccnavi-sync.sh [<P>...]` がする。
-統合先は環境変数 `CCNAVI_INTEGRATION_BRANCH`（`.claude/settings.local.json` の `env` でもよい）、空ならホストのデフォルトブランチ（`ls-remote --symref` で聞き、読めなければ手元の `origin/HEAD`・`main`・`master`）で、
+統合先はホストのデフォルトブランチ（`ls-remote --symref` で聞き、読めなければ手元の `origin/HEAD`・`main`・`master`）で、
 使った名前を出力の冒頭に出す。
 取り込んだ後は親子のチケットを判定し直し（`ccnavi sync check`）、error があれば表示して終了コード 1 にする。取り込み状態は書かない。直してからオンラインで打ち直せば、次の確認は通る。
 どの親子のチケットも、親のブランチ上のチケット（親のワークツリーの中）だけを正とする。ほかのツリー（ワークスペースルート・
@@ -2591,7 +2594,7 @@ error 3 件、warn 1 件、info 0 件
 
 | 深刻度 | 拾うもの |
 |---|---|
-| error | `.claude/settings.local.json` の `env` に承認と判定に影響する値（チケット制御・承認の保護・ccnavi 自身の設定の保護・戻す働き・確かめられないモードの止め・同じ理由の拒否の数え方・モード）がある。置けるのは `CCNAVI_INTEGRATION_BRANCH` だけ（`CCNAVI_BIN_PATH`・診断ログ・タイムアウト監視の秒は答えを変えないので指摘しない） |
+| error | `.claude/settings.local.json` の `env` に承認と判定に影響する値（チケット制御・承認の保護・ccnavi 自身の設定の保護・戻す働き・確かめられないモードの止め・同じ理由の拒否の数え方・モード）がある。置ける例外は無い（`CCNAVI_BIN_PATH`・診断ログ・タイムアウト監視の秒は答えを変えないので指摘しない） |
 | warn | 名前が親の識別子の親のワークツリーが、別のブランチをチェックアウトしている（取り込みと正とする側の検査は、同じ名前のブランチだけを見る） |
 | error | 親子のチケットが決まらない（`ccnavi sync check` で言う）: 親のワークツリーが無いか HEAD が別のブランチ、途中の操作がある、など。承認・状態の操作・実行前チェックがその親子のチケットを止める。解き方を添える |
 | error | 承認済みチケットが、親のワークツリーの外にしか無い（元ツリーに未コミットで残ったチケットなど。信じないので止まる）。親の承認済みチケットに `mr:` が無いのも error |
@@ -3219,7 +3222,7 @@ md が 1 本も無い・git の外なら何も出さない。新しくするの�
 argparse が止めていた打ち間違いを、知らせずに通さないため）。`--docs` にほかの経路のフラグ（`--lint` `--yes` `--preview` `--result`
 `--tickets` `--flow` など）と、判定やチケットの経路の設定・sh が渡すフラグ（`--cwd` `--mode` `--approved` `--rules` `--phases`
 `--risk` `--projects` `--project-home` `--ticket-control` `--guard-core-files` `--guard-ticket-approval` `--restore-if-deny`
-`--integration-branch` `--record-writes` `--choose-out` `--actor` `--via` など）を付けたときも、無視せずに 1 で終わる。
+`--record-writes` `--choose-out` `--actor` `--via` など）を付けたときも、無視せずに 1 で終わる。
 使われるのは引く場所の `--root` と、記録の置き場の `--log` / `--state`（`--docs` は何も記録しないので結果は変わらない）だけ。
 
 `ccnavi-index.jsonl` と `--format jsonl` の 1 行、`--format json` の配列の要素は同じ形。
@@ -3270,7 +3273,7 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
   取り返しがつかない形も、サブコマンドの中で止める
 - `push` は**今いるブランチを、そのままの名前で送る形だけ**通す。`--force`・`--force-with-lease`・`--delete`・`--all`・`--mirror`・`--tags`、
   別の名前へ送る refspec（`HEAD:main` など）は通さない。`main` `master` `develop` `release` `release/*` と、そのリポジトリの統合先
-  （`CCNAVI_INTEGRATION_BRANCH`、無ければ `.claude/settings.local.json` の `env`、無ければ `origin/HEAD`・`origin/main`・`origin/master`。
+  （手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`。プロジェクトはプロジェクト自身の値で決まる。
   `develop-v1.0.0` のような名前でもよい）へ直接は送れない。統合先が決まらなければ固定のリストだけで判定する。マージはユーザの側に残す。送り先が origin で、親のワークツリーのブランチなら、前の「push の関門」も通す
 - `fetch`・`pull` は**リモート名とブランチ名だけ**を通す。`:` か `+` を含む引数（refspec と URL）は通さない。
   `branch` の `-M`（強制の改名）と `-C`（強制の複製）も通さない。親のブランチを別のコミットへ移すと、親のブランチ上の承認済みチケットが差し替わるため

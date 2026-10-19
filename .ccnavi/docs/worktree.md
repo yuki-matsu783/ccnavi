@@ -76,8 +76,10 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
 
 ### 起点にする統合先
 
-- 起点はリモートにある最新の統合先にする。統合先の名前は`CCNAVI_INTEGRATION_BRANCH`を使い、無ければ`.claude/settings.local.json`の`env`に書かれた名前、
-  それも無ければデフォルトブランチ＝`origin/HEAD`が指すものを使う。`ccnavi-git.sh push`はこの順で決まる統合先へも
+- 起点はリモートにある最新の統合先にする。統合先の名前は、そのリポジトリの手元の`origin/HEAD`が指すブランチで、無ければ`origin/main`、`origin/master`の順に使う。
+  環境変数や`.claude/settings.local.json`で上書きする手段は無く、`projects/`の下のプロジェクトも、それぞれ自分の`origin/HEAD`で決まる。
+  origin の無いリポジトリでは統合先が決まらない。`origin/HEAD`は`ccnavi-fetch.sh`がセッションの開始時にホストの既定ブランチへ付け替える。
+  決まらないと案内が出たら、ユーザに`git fetch origin`のあと`git remote set-head origin -a`を頼む。`ccnavi-git.sh push`は決まった統合先へも
   （`main`・`master`・`develop`・`release`・`release/*`と同じく）直接は送らず、`ccnavi-review.sh`が作るマージリクエストの宛先もこの統合先になる
 - 手元の統合先が古いと、そこから切ったブランチも古いコミットから始まり、`<統合先>`に取り込むときにfast-forwardできなくなる。
   そのため、セッションの開始時に`ccnavi-fetch.sh`が手元の統合先をfast-forwardで進める。ワークスペースルートが別のブランチを

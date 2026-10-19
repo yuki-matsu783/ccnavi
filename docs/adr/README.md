@@ -248,3 +248,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0037](0037-rewrite-design-doc.md) | 設計書を実装に合わせて書き直す |
 | [0132](0132-abolish-review-chat.md) | レビューの chat を廃止し、見る場所を none と mr の 2 つにする |
 | [0133](0133-process-skill-names-follow-phase-ids.md) | 工程スキルの名前を process- とフェーズ定義の id の語にし、implement を足す |
+| [0146](0146-integration-is-the-origin-head-only.md) | 統合先は各リポジトリの origin/HEAD だけで決め、環境変数と --integration-branch を廃止する |
