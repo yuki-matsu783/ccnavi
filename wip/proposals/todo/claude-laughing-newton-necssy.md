@@ -206,7 +206,7 @@ sh（`.ccnavi/scripts/`）はエージェントが書けず、ユーザがコピ
 
 - `ccnavi-sync.sh` の取り込み実体（fetch・早送り・merge・衝突時の取りやめ）、MR のマージ済み判定と手元の片付け（`sync tidy`）
 - ロック（`ccnavi-common-lock.sh`）、`ccnavi_record_get/write/put`（`integrate` のマーカー）、`ccnavi_repo_key`（ロックの置き場）、`retire/<親>.json`、`logs/archive/`
-- `ccnavi_integration`（統合先ブランチ名の解決）。ただし `integration/head` の枝は外す。統合先は各リポジトリの手元の `origin/HEAD` だけで決める（ADR-0146）
+- `ccnavi_integration`（統合先ブランチ名の解決）。ただし `integration/head` の枝は外す。統合先は各リポジトリの手元の `origin/HEAD` だけで決める（ADR-0148）
 
 ## 調査で確かめること（research の項）
 

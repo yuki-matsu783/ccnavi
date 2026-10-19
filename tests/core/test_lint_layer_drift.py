@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 
 from ccnavi.entry import lint_layers
 from ccnavi.infra import settings
@@ -109,13 +108,7 @@ class LayerDriftTest(unittest.TestCase):
         git(self.root, "push", "-q", "origin", "develop")
         git(self.root, "checkout", "-q", "main")
         write(os.path.join(self.root, LAYER), "version: 1\nrules: [dev]\n")
-        # 環境変数と settings.local.json の CCNAVI_INTEGRATION_BRANCH は読まない。
-        write(
-            os.path.join(self.root, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}',
-        )
-        with mock.patch.dict(os.environ, {"CCNAVI_INTEGRATION_BRANCH": "develop"}):
-            (found,) = self.drift()
+        (found,) = self.drift()
         self.assertIn("origin/main", found.detail)
         git(self.root, "remote", "set-head", "origin", "develop")
         self.assertEqual([], self.drift())

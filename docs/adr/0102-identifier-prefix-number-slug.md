@@ -9,7 +9,7 @@ keywords: [識別子, ブランチ名, feature, hotfix, 先頭の語, CCNAVI_BRA
 
 状態: 採用（1〜5 章。5 章の `branch:` キーは 2026-10-04 に実装。取り込み状態の鍵や `syncstate` で引く処理への言及は、取り込み状態をやめた ADR-0142 が改める）
 
-改訂（2026-10-19）: 統合先の名前の決め方（`CCNAVI_INTEGRATION_BRANCH` と `integration_local` への言及）は ADR-0146 が改める。統合先は各リポジトリの `origin/HEAD` だけで決め、環境変数 `CCNAVI_INTEGRATION_BRANCH`・`settings.local.json` の env・`--integration-branch` は廃止した。本文は当時の記述として残す。
+改訂（2026-10-19）: 統合先の名前の決め方（`CCNAVI_INTEGRATION_BRANCH` と `integration_local` への言及）は ADR-0148 が改める。統合先は各リポジトリの `origin/HEAD` だけで決め、環境変数 `CCNAVI_INTEGRATION_BRANCH`・`settings.local.json` の env・`--integration-branch` は廃止した。本文は当時の記述として残す。
 
 改訂（2026-10-14）: 5 章の `branch:` キーと承認後の `switch` の手順は、ADR-0136 が置き換えた。親の識別子はブランチ名の `/` を `-` に置き換えたもので、`branch:` があればエラーになる。
 
