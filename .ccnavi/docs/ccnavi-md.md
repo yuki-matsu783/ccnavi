@@ -71,6 +71,7 @@ mdでは`<!-- ccnavi:if has_docker -->`と書く。
 |---|---|
 | `worktrees` | ワークツリーの置き場（`.claude/worktrees`） |
 | `git_sh` / `ticket_sh` / `stage_sh` | `ccnavi-git.sh` / `ccnavi-ticket.sh` / `ccnavi-stage.sh`を打てる形にしたコマンド |
+| `worktree_sh` | `ccnavi-worktree.sh`を打てる形にしたコマンド（直接作業のワークツリーを切る） |
 | `handoff` | ユーザに渡す物の置き場（`wip/handoff`） |
 | `scratch` | 使い捨ての置き場（ワークスペースルート直下の`scratchpad`の絶対パス。`.gitignore`で追跡から外れる。ワークツリーの中から相対で書くとワークツリー直下に作ってしまうため、絶対パスで差し込む） |
 | `projects` | プロジェクトの置き場（ワークスペースルートからの相対） |
