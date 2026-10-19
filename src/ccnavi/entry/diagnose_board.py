@@ -20,6 +20,7 @@ from ..tickets import (
     approval_times,
     archive,
     flow,
+    manual_settle,
     overview,
     phase,
     risk,
@@ -608,7 +609,7 @@ def _high_risk(record: object) -> bool:
     return isinstance(record, dict) and record.get("level") in risk.ESCALATE_FROM
 
 
-def _phase_record(ph: phase.Phase) -> dict:
+def _phase_record(ph: phase.Phase, manual: str = "") -> dict:
     """フェーズ 1 つ。判定と同じ Phase から組む。"""
     if not ph.tickets:
         state = "planned"
@@ -635,7 +636,22 @@ def _phase_record(ph: phase.Phase) -> dict:
         "risk": ph.risk,
         "risk_escalates": ph.risk_escalates,
         "risk_line": ph.risk_line,
+        # 手で done/ に動かされた子の確認待ち・未共有など（`manual_settle`）。無ければ空
+        "manual": manual,
     }
+
+
+def _phase_records(
+    root: str, conf: settings.Settings, parent: ticket_model.Ticket, raw: approval.Raw | None
+) -> list[dict]:
+    phases = phase.phases_of(root, conf, parent.ticket, raw=raw)
+    out = []
+    for ph in phases:
+        line = ""
+        if ph.gate_closed:
+            line = manual_settle.assess(root, conf, parent, ph, phases).line()
+        out.append(_phase_record(ph, line))
+    return out
 
 
 def _parent_record(
@@ -666,5 +682,5 @@ def _parent_record(
         "closed_record": approval_marks.read_parent_mark(
             where, parent.ticket, approval_marks.PARENT_MARK_CLOSED
         ),
-        "phases": [_phase_record(ph) for ph in phase.phases_of(root, conf, parent.ticket, raw=raw)],
+        "phases": _phase_records(root, conf, parent, raw),
     }

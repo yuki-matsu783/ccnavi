@@ -406,6 +406,8 @@ _SCRIPTS = """\
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
     ccnavi review confirm   --cwd <dir> --phase N --result <json> [--actor <account>]
+        （手で done/ に動かして共有済みの子は、移動の前の未解決の指摘を受け入れ台帳 accepted.json に
+         版つきで足して確定します。移動の後に付いた指摘が残れば確定しません）
     ccnavi review ready     --cwd <dir> --result <json>
         （標準出力: コメントの下書き、"tree <dir>"、続いて "wip-from <sha>" と、
          wip/ から削除した追跡済みファイルごとに "wip <path>" を1行ずつ出力します）

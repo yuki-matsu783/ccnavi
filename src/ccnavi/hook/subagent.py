@@ -269,7 +269,7 @@ def _judge_stop(
             who,
             bound.ticket if attributed and bound is not None else "",
             subagent_outcome.UNCHECKED
-            if unchecked
+            if unchecked and attributed
             else (
                 subagent_outcome.FIXED
                 if _bounced(conf.state, payload.session_id, who)
@@ -301,6 +301,9 @@ def _judge_stop(
         _record_outcome(
             stderr, conf, payload, who, "", subagent_outcome.UNATTRIBUTED, paths=found_paths
         )
+        if changed:
+            note = "\n".join(changed)
+            hookio.write_context(stdout, hookio.SUBAGENT_STOP, note, system=note)
         return EXIT_OK
     if mode == modes.ENABLE and not already:
         _remember_bounce(stderr, conf.state, payload.session_id, who)
@@ -629,7 +632,12 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
         return ""
     fsio.remove(_bounce_path(state_dir, payload.session_id, agent_id))
     found = subagent_outcome.of(state_dir, payload.session_id, agent_id)
-    if found is not None and found.outcome in (subagent_outcome.OK, subagent_outcome.FIXED):
+    if found is not None and found.outcome in (
+        subagent_outcome.OK,
+        subagent_outcome.FIXED,
+        subagent_outcome.UNCHECKED,
+    ):
+        # 直った、または範囲を確かめられなかった（後者は unchecked_scope が言う。断定しない）
         return ""
     return (
         f"[ccnavi] {post_findings.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
@@ -669,6 +677,8 @@ def unchecked_scope(state_dir: str, payload: hookio.Input) -> str:
         if found is None:
             continue
         fsio.remove(path)
+        # 同じことを Stop でもう一度促さない
+        subagent_outcome.mark_nudged(state_dir, payload.session_id, who)
         tickets = ", ".join(found)
         if not tickets:
             # SubagentStop の処理が ccnavi の内部エラーで終わった回。どの子を見るはずだったかも
@@ -732,7 +742,10 @@ def unchecked_after_error(
         failed = fsio.write_text(path, _mark_text(payload.session_id, []))
         if failed:
             stderr.write(f"ccnavi: 範囲を確かめられなかった印を保存できませんでした: {failed}\n")
-        _record_outcome(stderr, conf, payload, who, "", subagent_outcome.UNCHECKED)
+        existing = subagent_outcome.of(conf.state, payload.session_id, who)
+        if existing is None or not existing.final:
+            # 先に書いた結果（outside・unattributed）を、内部エラーで上書きしない
+            _record_outcome(stderr, conf, payload, who, "", subagent_outcome.UNCHECKED)
 
 
 def _unchecked_path(state_dir: str, session: str, who: str) -> str:

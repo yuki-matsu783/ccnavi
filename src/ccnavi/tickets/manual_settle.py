@@ -52,7 +52,7 @@ class Manual:
     note: str = ""
 
     def line(self) -> str:
-        """status・ボード・hook が出す 1 行。出すものが無ければ空。"""
+        """status・confirm・Stop が出す 1 行。出すものが無ければ空。"""
         who = "、".join(self.children)
         if self.state == READY:
             return (

@@ -108,20 +108,24 @@ def read(file: str, session: str) -> Outcome | None:
     outcome = str(data.get("outcome") or "")
     if outcome not in OUTCOMES:
         return None
-    return Outcome(
-        id=str(data.get("id") or ""),
-        session=session,
-        agent_id=str(data.get("agent_id") or ""),
-        child=str(data.get("child") or ""),
-        outcome=outcome,
-        bounces=int(data.get("bounces") or 0),
-        paths=[str(p) for p in data.get("paths") or []],
-        final=bool(data.get("final", True)),
-        notified=bool(data.get("notified")),
-        nudged=bool(data.get("nudged")),
-        at=float(data.get("at") or 0),
-        file=file,
-    )
+    try:
+        return Outcome(
+            id=str(data.get("id") or ""),
+            session=session,
+            agent_id=str(data.get("agent_id") or ""),
+            child=str(data.get("child") or ""),
+            outcome=outcome,
+            bounces=int(data.get("bounces") or 0),
+            paths=[str(p) for p in data.get("paths") or []],
+            final=bool(data.get("final", True)),
+            notified=bool(data.get("notified")),
+            nudged=bool(data.get("nudged")),
+            at=float(data.get("at") or 0),
+            file=file,
+        )
+    except (ValueError, TypeError):
+        # 手で直した・版が違うなどで型が合わない記録は、読めないものとして捨てる（hook を止めない）
+        return None
 
 
 def of(state_dir: str, session: str, who: str) -> Outcome | None:
@@ -166,13 +170,20 @@ def line(one: Outcome) -> str:
         f" ほか {len(one.paths) - 5} 件" if len(one.paths) > 5 else ""
     )
     if one.outcome == OUTSIDE:
+        if one.bounces == 0:
+            return (
+                f"サブエージェント {one.agent_id} は、子 {who} の範囲外の変更を"
+                "残したまま終わっている"
+                f"（差し戻していない。dry-run か、差し戻しの対象外）: {shown}"
+            )
         return (
             f"サブエージェント {one.agent_id} は、子 {who} の範囲外の変更を"
             f"差し戻された（{one.bounces} 回）後も残したまま終わっている: {shown}"
         )
     if one.outcome == UNCHECKED:
+        target = f"子 {one.child}" if one.child else "子"
         return (
-            f"サブエージェント {one.agent_id} の終わりに、子 {who} の範囲を確かめられていない"
+            f"サブエージェント {one.agent_id} の終わりに、{target}の範囲を確かめられていない"
             "（ワークツリーを読めないか、ccnavi の内部エラー）"
         )
     return (
@@ -203,6 +214,13 @@ def confirm(state_dir: str, done: list[Outcome]) -> str:
     return failed
 
 
+def mark_nudged(state_dir: str, session: str, who: str) -> None:
+    """この相手の結果を「促した」ことにする（別の経路で同じ内容を親に言ったとき）。"""
+    one = of(state_dir, session, who)
+    if one is not None and one.final and not one.nudged:
+        _mark(one, "nudged")
+
+
 def stop_pending(state_dir: str, session: str) -> list[Outcome]:
     """Stop が促す結果（`outside`・`unchecked`。まだ促していないもの）。"""
     return [o for o in all_of(state_dir, session) if o.outcome in NUDGE and not o.nudged]
@@ -213,10 +231,10 @@ def stop_nudge(state_dir: str, session: str) -> str:
     todo = stop_pending(state_dir, session)
     if not todo:
         return ""
-    for one in todo:
-        if _mark(one, "nudged"):
-            # 印を付けられないと毎回止めてしまう。促さない側に倒す。
-            return ""
+    # 印を付けられないものは促さない（付けないと毎回止めてしまう）。付けられたものだけ促す。
+    todo = [o for o in todo if not _mark(o, "nudged")]
+    if not todo:
+        return ""
     lines = [f"  - {line(o)}" for o in todo]
     return "\n".join(
         [

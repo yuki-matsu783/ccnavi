@@ -18,6 +18,8 @@ keywords: [手動移動, finished_to, settled_by, 受け入れ台帳, accepted.j
 
 ## 決定
 
+ADR-0139 は受け入れの記録ファイル `accepted.json` を廃止した。この ADR はそれを、手で動かした子の確定にだけ、版つきの台帳として復活させる（`decide`・`close-early` の受け入れは 0139 のまま、ホストのスレッドで持つ）。
+
 - `finish` が置いた先を `finished_to` に、ccnavi が `review/` から動かした経路を `settled_by`（confirm・decide・
   close-early・feedback-plan・chrome）に書く。`finished_to: review` で `settled_by` が無い子が `done/` にあれば、
   手で動かした子とする。`finished_to` が無い子（この変更より前に閉じた子）は手動とみなさない

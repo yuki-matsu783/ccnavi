@@ -8,13 +8,15 @@ from __future__ import annotations
 import os
 
 from ..infra import gitcmd, hookio, settings, tree
-from ..policy import rules
-from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+from ..policy import rules, selfguard
+from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..tickets import (
     agree,
     agree_candidates,
     approval,
     approval_checks,
+    approval_marks,
+    oplog,
     ops_stop,
     ops_stop_integrate,
     phase,
@@ -234,6 +236,64 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     if any(not t.is_child for t in copies):
         problems.extend(_review_token(root))
     problems.extend(_ticket_hooks(root))
+    problems.extend(_operation_problems(conf, root, copies, review))
+    return problems
+
+
+def _operation_problems(
+    conf: settings.Settings,
+    root: str,
+    copies: list[ticket_model.Ticket],
+    review: list[ticket_model.Ticket],
+) -> list[Problem]:
+    """送信の途中で止まった操作、受け入れ台帳の壊れ、経路の欄を持たない子、保護の外れた組み合わせ。
+
+    - 未完了の操作記録は warn（読めない記録は error）。ユーザが `--resume` で続きを送る
+    - 受け入れ台帳（`phases/<親>/accepted.json`）が読めなければ warn（空として扱うので、
+      受け入れ済みの指摘が未解決に戻る）
+    - `finished_to` を持たない review/ の子は info（この変更より前に閉じた子は、手で動かしても
+      確定できない。confirm か decide で確かめる）
+    - 承認済みの置き場の保護と設定ファイルの自己防衛が両方切れている組み合わせは warn
+    """
+    problems: list[Problem] = []
+    if conf.state:
+        for record in oplog.pending(conf.state):
+            severity = SEVERITY_ERROR if record.get("broken") else SEVERITY_WARN
+            problems.append(
+                Problem(severity, "(ticket)", f"引き継ぎ未完了: {oplog.summary(record)}")
+            )
+    for parent in copies:
+        if parent.is_child:
+            continue
+        try:
+            home = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
+        except approval.NoParentWorktree:
+            continue
+        _, bad = approval_marks.read_ledger(home, parent.ticket)
+        if bad:
+            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{parent.ticket}: {bad}"))
+    for child in review:
+        if child.is_child and not child.finished_to:
+            problems.append(
+                Problem(
+                    SEVERITY_INFO,
+                    "(ticket)",
+                    f"{child.ticket}: review/ の子に `finished_to` が無い（この変更より前に"
+                    "閉じた子）。手で done/ に動かしても確定できないので、confirm か decide を使う",
+                )
+            )
+    if (
+        conf.guard_ticket_approval == selfguard.DISABLE
+        and conf.guard_core_files == selfguard.DISABLE
+    ):
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{settings.GUARD_TICKET_APPROVAL_ENV} と {settings.GUARD_CORE_FILES_ENV} が"
+                "両方 disable。承認の直接実行も設定ファイルの書き換えも止まらない",
+            )
+        )
     return problems
 
 

@@ -136,6 +136,7 @@ function chipOf(overrides: Partial<PhaseChip> = {}): PhaseChip {
     reviewRequired: true,
     riskLevel: "",
     riskLine: "",
+    manual: "",
     tickets: [],
     mrUrl: "",
     mrNumber: null,

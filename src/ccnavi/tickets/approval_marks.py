@@ -190,6 +190,8 @@ def write_child_record(approved_dir: str, parent: str, child: str, kind: str, da
 #   phases/<親>/accepted.json  {"version": 1, "entries": [{key, version, last_comment_id,
 #                              accepted_by, phase, op, at, account}]}
 # accepted_by: manual（手で動かした子の確定）・decide・close-early
+# 実際に書くのは今は manual だけ。decide・close-early はホストのスレッドを解決して受け入れ、
+# 台帳には書かない。LEDGER_BY の後ろ 2 つは、書く側の無い予約の値
 LEDGER_NAME = "accepted"
 LEDGER_BY = ("manual", "decide", "close-early")
 

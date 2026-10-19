@@ -62,6 +62,8 @@ export interface PhaseChip {
   /** 実績のリスクの水準（LOW / MEDIUM / HIGH / CRITICAL）。測っていなければ空 */
   readonly riskLevel: string;
   readonly riskLine: string;
+  /** 手で動かした子の確認待ち・移動が未共有など（判定の 1 行）。無ければ空 */
+  readonly manual: string;
   readonly tickets: readonly string[];
   /** 依頼のマーカーが持つマージリクエストの URL（依頼の投稿を指す）。無ければ空 */
   readonly mrUrl: string;
@@ -443,6 +445,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     reviewRequired: p.review_required,
     riskLevel: typeof p.risk?.level === "string" ? p.risk.level : "",
     riskLine: p.risk_line,
+    manual: p.manual,
     tickets: p.tickets,
     mrUrl: typeof requested.url === "string" ? requested.url : "",
     mrNumber: typeof requested.mr === "number" ? requested.mr : null,

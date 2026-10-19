@@ -208,7 +208,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0136](0136-handoff-across-pcs-and-parent-branch-authority.md) | 親ブランチを正本にして、PC をまたいだ引き継ぎを決める（0102 の `branch:` キーと 0103 の `switch` の手順を置き換える） |
 | [0137](0137-merge-child-at-finish.md) | 子の成果の合流を finish で行い、状態と 1 つのマージコミットにして push する |
 | [0138](0138-tidy-up-when-parent-closes.md) | 親を閉じるときの片付けを ccnavi が行い、消すのは成果が失われないと確かめられたものだけにする |
-| [0139](0139-accept-by-resolving-the-thread.md) | 受け入れた未解決スレッドは記録ファイルに持たず、ホストのスレッドに返信を残して解決する（0030・0081 の `accepted.json` への記録を置き換える） |
+| [0139](0139-accept-by-resolving-the-thread.md) | 受け入れた未解決スレッドは記録ファイルに持たず、ホストのスレッドに返信を残して解決する（0030・0081 の `accepted.json` への記録を置き換える。手で動かした子の確定にだけ ADR-0149 が台帳として復活させた） |
 | [0140](0140-paths-ignore-case-everywhere.md) | パスと名前の大文字小文字は、どの機械でも区別せず同じものとして扱い、両立させない |
 | [0141](0141-drop-the-state-history.md) | 状態の履歴（`events/<識別子>.jsonl`）をやめ、状態は置き場とマーカーだけで持つ（0086 を置き換える） |
 | [0143](0143-user-only-entries-are-separate.md) | ユーザ専用の操作を、実行ファイルの `user` 入口と `ccnavi-user-*.sh` に分け、定義を表 1 つにして hook の止めをそこから作る |

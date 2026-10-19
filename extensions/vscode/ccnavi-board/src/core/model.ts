@@ -217,6 +217,8 @@ export interface PhaseJson {
   readonly risk: Record<string, unknown> | null;
   readonly risk_escalates: boolean;
   readonly risk_line: string;
+  /** 手で done/ に動かされた子の確認待ち・移動が未共有など。判定が出す 1 行。無ければ空 */
+  readonly manual: string;
 }
 
 export interface ParentJson {
@@ -638,6 +640,7 @@ function phase(raw: Record<string, unknown>): PhaseJson {
     risk: isRecord(raw.risk) ? raw.risk : null,
     risk_escalates: raw.risk_escalates === true,
     risk_line: str(raw.risk_line),
+    manual: str(raw.manual),
   };
 }
 
