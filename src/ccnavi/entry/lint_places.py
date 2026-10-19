@@ -26,8 +26,8 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     """プロジェクトの置き場が正しい形か。
 
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
-    予約名（`common` / `self`、表記違いも含む）を使っていないこと、プロジェクトが
-    `.claude/` を持たないことを見る。層の中身は
+    予約名（`common` / `self`、表記違いも含む）を使っていないこと、プロジェクトの中に
+    ワークツリーが無いことを見る。層の中身は
     `_layers` が見る。無視の確認は、置き場のディレクトリが在るなら、プロジェクトが 0 件でも行う。
     ディレクトリ自体が無いワークスペースでは何も言わない（プロジェクトを使わない人への苦情になる）。
 
@@ -76,19 +76,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     "プロジェクトを別の名前に変えてください",
                 )
             )
-        if os.path.isdir(os.path.join(p.root, ".claude")):
-            # 文面の先頭「.claude/ を持つ」は VS Code 拡張（extensions/vscode/ccnavi-board の
-            # projects-render.ts）が同じ事象の説明と重ねないために見ている。変えるならそちらも直す
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    where,
-                    ".claude/ を持つ。Claude Code がそこのスキルを読み込み、そこへ cd するだけで"
-                    "別のルートのように見える。"
-                    f"プロジェクトの設定は {conf.project_home}/ に置いてください",
-                )
-            )
-            problems.extend(_misplaced_worktrees(p, where))
+        problems.extend(_misplaced_worktrees(p, where))
     return problems
 
 

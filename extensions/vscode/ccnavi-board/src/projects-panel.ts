@@ -8,7 +8,7 @@
  *
  * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
  * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
- * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
+ * `.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
  * そのルールファイルの場所は layers（レイヤー）の答えを使い、`.ccnavi` から自分で組まない（組み方を実行ファイルとずらさない）。
  *
  * clone は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
@@ -138,7 +138,6 @@ async function gather(root: string): Promise<Gathered> {
   const origins: Record<string, string> = {};
   const rulesRels: Record<string, string> = {};
   const rulesExists: Record<string, boolean> = {};
-  const hasClaudeDir: Record<string, boolean> = {};
   await Promise.all(
     projects.map(async (t) => {
       origins[t.name] = await readOrigin(t.root);
@@ -148,7 +147,6 @@ async function gather(root: string): Promise<Gathered> {
         rulesRels[t.name] = toPosix(path.relative(root, rulesPath));
         rulesExists[t.name] = isFile(rulesPath);
       }
-      hasClaudeDir[t.name] = isDir(path.join(t.root, ".claude"));
     }),
   );
 
@@ -171,7 +169,6 @@ async function gather(root: string): Promise<Gathered> {
       ignored: gitignoreHasProjects(readText(path.join(root, ".gitignore")), projectsRel),
       rulesRels,
       rulesExists,
-      hasClaudeDir,
       selfRulesRel: selfRulesPath === "" ? "" : toPosix(path.relative(root, selfRulesPath)),
       selfRulesExists: selfRulesPath !== "" && isFile(selfRulesPath),
     }),
@@ -197,14 +194,6 @@ function readText(filePath: string): string | undefined {
 function isFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function isDir(dirPath: string): boolean {
-  try {
-    return fs.statSync(dirPath).isDirectory();
   } catch {
     return false;
   }
@@ -274,7 +263,6 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
     `${rel}/*/.git/config`,
     `${rel}/*/.git/worktrees/*`,
     ...(layerDir === "" ? [] : [`${rel}/*/${layerDir}/*`, `${layerDir}/*`]),
-    `${rel}/*/.claude`,
     ".gitignore",
     ".claude/settings.json",
   ];

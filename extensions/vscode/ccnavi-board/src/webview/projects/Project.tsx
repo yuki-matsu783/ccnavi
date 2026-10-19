@@ -8,7 +8,6 @@ import type { JSX } from "react";
 
 import type { LintProblem } from "../../core/lintmodel.js";
 import type { ProjectRow } from "../../core/projects-view.js";
-import { problemsOf } from "./text.js";
 
 export interface ProjectProps {
   readonly row: ProjectRow;
@@ -18,7 +17,7 @@ export interface ProjectProps {
 }
 
 export function Project({ row, ticketsEnabled, tour = false }: ProjectProps): JSX.Element {
-  const problems = problemsOf(row);
+  const problems = row.problems;
   const flags = [
     row.doing > 0 ? { key: "doing", className: "badge doing", text: `作業中 ${row.doing}` } : undefined,
     problems.some((p) => p.severity === "error") ? { key: "error", className: "badge error", text: "error" } : undefined,

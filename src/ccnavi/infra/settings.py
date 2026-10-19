@@ -158,11 +158,10 @@ DEFAULT_RISK = os.path.join(".ccnavi", "config", "common", "risks.yml")
 # 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
 # （プロジェクトは自分の git を持つ）。
 DEFAULT_PROJECTS = "projects"
-# ccnavi ディレクトリ。プロジェクトの設定はプロジェクトの git で育てるので、`.claude/` の下には
-# 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
-# `--lint` が「ワークツリーでもワークスペースルートでもないのに `.claude/` を持つ」と
-# 警告する）。`config/` でもなく `.ccnavi/` にするのは、3 本とスクリプトを 1 つの
-# ディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。
+# ccnavi ディレクトリ。プロジェクトの設定はプロジェクトの git で育てる。`.claude/` は Claude Code
+# 自身のものを置く場所なので、その下には置かない。`config/` でもなく `.ccnavi/` にするのは、
+# 3 本とスクリプトを 1 つのディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
+# 済ませるため。
 DEFAULT_PROJECT_HOME = ".ccnavi"
 # 引用せずにシェルへ渡せるパス。空白とシェルの記号を含まない。
 _BARE_PATH = re.compile(r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+")

@@ -113,9 +113,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   const dom = await openProjects(
     [
       row({
-        hasClaudeDir: true,
         problems: [
-          problem("warn", ".claude/ を持つ。Claude Code がそこのスキルを読み込み、そこへ cd するだけで別のルートのように見える"),
           problem("warn", ".claude/settings.json を読み込めない: 壊れている"),
           problem("error", "文面がありません", "(projects/lib) x"),
         ],
@@ -135,28 +133,12 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
     assert.equal(dom.all('button[data-action="fix-ignore"]').length, 1);
     assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
     assert.ok(banners.some((b) => b === "warn: 別の指摘"), banners.join(" / "));
-    // .claude/ の説明があるので、lint の同じ指摘（実物の文面「.claude/ を持つ。…」）は重ねない。
-    // ".claude/settings.json を読めない" のような別の warn と error は出る
+    // ".claude/settings.json を読めない" のような warn と error は、lint の指摘のまま出る
     const lint = dom.all(`${cardSelector("lib")} ul.lint li`).map((li) => text(li));
-    assert.ok(!lint.some((l) => /\.claude\/ を持つ/.test(l)), lint.join(" / "));
     assert.ok(lint.some((l) => l === "warn: .claude/settings.json を読み込めない: 壊れている"), lint.join(" / "));
-    assert.ok(lint.some((l) => /\.claude\/ があります。Claude Code は.*プロジェクトの設定は \.ccnavi\/config\/project\/ に置いてください/.test(l)), lint.join(" / "));
     assert.ok(lint.some((l) => l === "error: 文面がありません"), lint.join(" / "));
   } finally {
     await dom.close();
-  }
-
-  // 置き場の案内はレイヤーのルールの置き場から逆算する。ディレクトリを挟まない形やレイヤーでない行は既定
-  const flat = await openProjects([
-    row({ hasClaudeDir: true, rulesRel: "projects/lib/rules.yml" }),
-    row({ name: "app", rel: "projects/app", hasClaudeDir: true, rulesRel: "projects/app/conf/ccnavi/rules.yml" }),
-    row({ name: "Self", rel: "projects/Self", hasClaudeDir: true, rulesRel: "" }),
-  ]);
-  try {
-    const dirs = flat.all("ul.lint li").flatMap((li) => [...text(li).matchAll(/プロジェクトの設定は ([^ ]+)\/ に置いてください/g)].map((m) => m[1]));
-    assert.deepEqual(dirs, [".ccnavi/config/project", "conf/ccnavi", ".ccnavi/config/project"]);
-  } finally {
-    await flat.close();
   }
 
   // .gitignore が済んでいれば lint の指摘はそのまま出る

@@ -220,7 +220,6 @@ export interface PageInput {
   /** プロジェクト名 → プロジェクトの設定のルールファイルのルート相対（`layers[]` の path から）。プロジェクトの設定として数えられていなければ無い */
   readonly rulesRels: Readonly<Record<string, string>>;
   readonly rulesExists: Readonly<Record<string, boolean>>;
-  readonly hasClaudeDir: Readonly<Record<string, boolean>>;
   readonly selfRulesRel: string;
   readonly selfRulesExists: boolean;
 }
@@ -239,7 +238,6 @@ export function buildProjectsPage(input: PageInput): ProjectsPage {
         rel: `${input.projectsRel}/${t.name}`,
         rulesRel: input.rulesRels[t.name] ?? "",
         rulesExists: input.rulesExists[t.name] === true,
-        hasClaudeDir: input.hasClaudeDir[t.name] === true,
         origin,
         originKey: remoteKeyOf(origin),
         worktrees: trees.filter((w) => w.kind === "worktree" && w.project === t.name).map((w) => w.name),

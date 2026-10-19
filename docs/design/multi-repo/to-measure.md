@@ -19,4 +19,4 @@ keywords: [実測, 性能, Windows, gitdir]
 - `projects/` をワークスペースの `.gitignore` に入れても、プロジェクトの CLAUDE.md は読まれる。ルート起動では `projects/` 配下のファイルを読んだ時点で追加され、
   プロジェクト内で起動すると起動時に読まれる。ワークスペースの CLAUDE.md と矛盾しないように書く
 - ルートで起動して cd した場合、`${CLAUDE_PROJECT_DIR}` はルートのまま（stdin の `cwd` だけが変わる）。プロジェクト内で起動すると `CLAUDE_PROJECT_DIR` がプロジェクトになり、
-  ワークスペースの `.claude/settings.json` は読まれず ccnavi の hook は動かない。プロジェクトの作業はルートで起動して cd で入る前提
+  ワークスペースの `.claude/settings.json` は読まれず、ワークスペースの ccnavi の hook は動かない（プロジェクトの `.claude/` の hook とスキルが使われる）。プロジェクトの作業はルートで起動して cd で入る前提

@@ -147,7 +147,6 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
     ignored: false,
     rulesRels: { app: "projects/app/.ccnavi/config/project/rules.yml", lib: "projects/lib/.ccnavi/config/project/rules.yml" },
     rulesExists: { app: true },
-    hasClaudeDir: { lib: true },
     selfRulesRel: ".ccnavi/config/project/rules.yml",
     selfRulesExists: false,
   });
@@ -158,7 +157,6 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
   assert.equal(app.problems.length, 1);
   assert.equal(app.problems[0].severity, "error");
   assert.equal(lib.rulesExists, false);
-  assert.equal(lib.hasClaudeDir, true);
   assert.deepEqual(lib.worktrees, ["i0002"]);
   assert.equal(lib.tickets, 1);
   assert.equal(lib.doing, 1);

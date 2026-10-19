@@ -31,7 +31,7 @@ const PAGE_CSS = path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "style
 /** 画面の名前と、その 1 枚。中身は画面（React）が組み、CSS と body だけを拡張が入れる */
 function reactPages(appearance?: "claude-dark"): [string, string][] {
   const options = appearance === undefined ? {} : { appearance };
-  const page = buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/project/rules.yml", selfRulesExists: false });
+  const page = buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", ignored: true, rulesRels: {}, rulesExists: {}, selfRulesRel: ".ccnavi/config/project/rules.yml", selfRulesExists: false });
   return [
     ["board", boardPage({ kind: "board", board: buildBoard(fixture()) }, options)],
     ["projects", projectsHtml({ kind: "page", page }, options)],

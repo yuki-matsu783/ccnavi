@@ -31,7 +31,6 @@ export interface ProjectRow {
   /** プロジェクトの設定のルールファイル。ルートからの相対、"/" 区切り。プロジェクトの設定として数えられていない（予約名）なら空 */
   readonly rulesRel: string;
   readonly rulesExists: boolean;
-  readonly hasClaudeDir: boolean;
   readonly origin: string;
   readonly originKey: string;
   readonly worktrees: readonly string[];

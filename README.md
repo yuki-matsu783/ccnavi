@@ -444,7 +444,8 @@ md の書き方（条件 `ccnavi:if` / `ccnavi:else`、差し込み `{{名前}}`
 | state | `logs/state/`（ワークスペースルートの下。実行後チェックの記録） |
 
 `projects/` のプロジェクトの作業も、ワークスペースルートで Claude Code を起動して `cd` で入る。プロジェクトの中で起動すると
-`CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれず、ccnavi の hook が動かない
+`CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれず、ワークスペースの ccnavi の hook は動かない
+（プロジェクトが自前の `.claude/` を持っていれば、その hook とスキルが使われる）
 （実測は `docs/design/multi-repo/to-measure.md`）。
 
 別の場所を指せるのはフラグ（`--log` / `--state` / `--approved` / `--tickets` / `--projects` /
@@ -483,6 +484,8 @@ hook からの判定と `ticket` / `review` などのサブコマンドに渡す
 ワークスペースルートは `CLAUDE_PROJECT_DIR`、無ければ作業ディレクトリから親へ辿って
 `.claude` を探して決める。ワークツリー（`.claude/worktrees/<名前>`）は自分も `.claude` を
 持つが、ワークスペースルートとは数えず飛ばして親へ辿る。
+
+`CLAUDE_PROJECT_DIR` が無い端末や Bash ツールから、`.claude/` を持つプロジェクトの中で `ccnavi` を直接打つと、`--root` を渡さない限りそのプロジェクトが根と見なされる。`--root` を付けるか、sh のラッパーを通す。未解決で、洗い出しは `docs/design/multi-repo/standalone-clone-gaps.md` の A2。
 
 ### 実行ファイルとルールを配る
 
@@ -2234,11 +2237,13 @@ curl と `GITHUB_TOKEN` / `GITLAB_TOKEN` で読む）、名前に番号を含む
 
 ### プロジェクトのスキル
 
-プロジェクトは `.claude/` を持たない（hook やスキルなどの道具はワークスペースが持つ）ので、プロジェクト向けのスキルの形の手順書は
+プロジェクト向けのスキルの形の手順書は、プロジェクトの git で育てるため、
 `projects/<名前>/skills/<スキル>/SKILL.md` に置く（頭の frontmatter に `name` と `description`）。
-Claude Code はそこを読まないので、ccnavi が `SessionStart` と `SubagentStart` で、cwd がそのプロジェクトの中にあるときだけ目録
+Claude Code はそこをスキルとして読まないので、ccnavi が `SessionStart` と `SubagentStart` で、cwd がそのプロジェクトの中にあるときだけ目録
 （名前・説明・場所）を渡す。ワークスペースルートで始めて `cd` で入ったセッションには、cwd がそのプロジェクトの中にある最初の
 `PreToolUse` で 1 度だけ添える。本文はエージェントが要るときに参考に開く（CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う）。
+プロジェクトが自前の `.claude/skills/` を持つなら、Claude Code がそれを別に読む。ワークスペースから起動した場合、プロジェクトの `.claude/skills` が読み込まれるかは、`projects/` がワークスペースの git で無視されているかで変わる（Claude Code 2.1.303 で確かめた）。無視されている標準の構成では読み込まれない。ccnavi は `projects/` を無視させるので、ワークスペースから起動してプロジェクトの `.claude/skills` に頼ることはできない。プロジェクトで起動すれば、そのプロジェクトの `.claude/` のスキルと hook だけが使われる。読み込まれた場合に限り、ワークスペースのスキルと同名なら、素の名前はワークスペースのもので、プロジェクトのものは `projects/<名前>:<スキル名>` になる。目録に載るのは `skills/` の分だけ。
+`skills/` はプロジェクトだけを clone した人の手元にも git で入るが、目録は渡らない（目録を出す hook はワークスペースの `.claude` にあり、単体 clone では何も出さない。検出はしていない）。洗い出しは `docs/design/multi-repo/standalone-clone-gaps.md` の C2。
 ディレクトリ名は `^[A-Za-z0-9._-]+$` のものだけを読む。上限は 30 本・4000 文字。専用の保護は無く、ほかのファイルと同じ判定になる
 （直すのは承認したチケットの範囲の中。`.ccnavi/` の外に置いたのは、組み込みの保護を緩めずに書けるようにするため）。
 ワークスペースの `.claude/skills/` で `process: true` を持つ工程スキルは、親の `ticket start` がプロジェクトの `skills/<工程>/`（`SKILL.md` と `references/common/` の `.md`）へ写し、共通側から無くなった `.md` は写し先からも消す。`references/` の最上段は `common/`（写す）と `project/`（そのリポジトリ固有。写さない）に分けるので、プロジェクト固有の reference は上書きも削除もされない（設計 11.13）。
@@ -2581,7 +2586,6 @@ error 3 件、warn 1 件、info 0 件
 | warn | ワークツリー側に置かれた承認済みチケット（読まれない） |
 | warn | 承認済みチケットはあるがワークツリーが無い（範囲が適用されない） |
 | warn | リモートの種類に合うトークン（`GITHUB_TOKEN` / `GITLAB_TOKEN`）が無い、`origin` が無い |
-| warn | ワークツリーでもワークスペースルートでもないのに `.claude/` を持つディレクトリがある |
 
 **取り込みと正とする側**。取り込みの状態（旧 `logs/state/sync/`）は持たないので、親のワークツリーとチケットの置き場、取得済みの `origin/<統合先>` だけを見る。
 
@@ -2602,7 +2606,7 @@ error 3 件、warn 1 件、info 0 件
 | warn | ワークスペースの git の索引に、`projects/` の下の入れ子のリポジトリ（gitlink）だけが載っている（載せ忘れ）。`.gitignore` に入れる前に `git add` したものとみて、索引から外して `.gitignore` に `/projects/` を足すよう案内する |
 | warn | `projects/` がワークスペースの `.gitignore` に入っていない。上の 2 つのどちらかが出るときは出さない（同じ原因で、`.gitignore` に入れる案内が誤りか、先に索引から外さないと効かないため） |
 | error | 予約名（`common` / `self`。大文字小文字は問わない）のプロジェクトがある |
-| warn | プロジェクトが `.claude/` を持っている |
+| warn | プロジェクトの中にワークツリーがある（名前を並べる）。ワークツリーはワークスペースの `.claude/worktrees/` に置く。ここのものは承認の走査の対象外で、書いた提案は承認待ちに並ばない。ワークスペースの ccnavi が古い（`projects/<名前>` の写しをルートと取り違える）可能性があるので、`scripts/ccnavi-setup.sh --force` で配り直し、このワークツリーはユーザに伝えて片付ける |
 
 ## lint の JSON
 
