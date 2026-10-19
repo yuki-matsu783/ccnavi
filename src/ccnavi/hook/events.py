@@ -380,6 +380,15 @@ def _track_proposals(conf: settings.Settings, payload: hookio.Input) -> None:
                 stopops.register(conf.state, payload.session_id, payload.tool_use_id, ident, now)
     elif payload.event in (hookio.POST_TOOL_USE, hookio.POST_TOOL_USE_FAILURE):
         stopops.bind(conf.state, payload.tool_use_id, now)
+        file_path = payload.tool_input.get("file_path")
+        if (
+            payload.event == hookio.POST_TOOL_USE
+            and payload.tool_name in ("Write", "Edit", "MultiEdit")
+            and isinstance(file_path, str)
+        ):
+            ident = stopops.written_ident(file_path, conf.tickets)
+            if ident:
+                stopops.note_written(conf.state, payload.session_id, ident, file_path, now)
 
 
 def _unstarted_ops(
@@ -456,7 +465,14 @@ def _plan_stop_review(
     stopops.rebind(conf.state, payload.session_id, now)
     since = stopops.turn_start(conf.state, payload.session_id)
     finals = stopops.final_versions(stopops.turn_ops(conf.state, payload.session_id, since))
+    turn = stopops.turn_ops(conf.state, payload.session_id, since)
     ops = _unstarted_ops(conf, root, raw, list(finals.values()))
+    unsent = _unstarted_ops(
+        conf,
+        root,
+        raw,
+        stopops.unsent_writes(stopops.turn_writes(conf.state, payload.session_id, since), turn),
+    )
     proposals = [
         {
             "key": stopops.target_key(op),
@@ -466,6 +482,16 @@ def _plan_stop_review(
             "files": op.get("files", []),
         }
         for op in ops
+    ]
+    proposals += [
+        {
+            "key": stopops.unsent_key(row["ident"]),
+            "ident": row["ident"],
+            "route": stopops.UNSENT,
+            "commit": "",
+            "files": [{"path": row["path"]}],
+        }
+        for row in unsent
     ]
     ok, why = stopreview.candidate(
         main_agent=not payload.agent_id,

@@ -145,5 +145,61 @@ class FinalVersionTest(unittest.TestCase):
         self.assertEqual(stopops.target_key(self._op("stopped", 1)), "proposal:p1:stopped")
 
 
+class UnsentTest(unittest.TestCase):
+    def test_written_ident(self):
+        cases = {
+            "/w/wip/proposals/todo/p1.md": "p1",
+            "C:\\w\\WIP\\Proposals\\todo\\P1-01-02.md": "P1-01-02",
+            "/w/wip/proposals/todo/sub/p1.md": "",
+            "/w/wip/proposals/flows/p1.yml": "",
+            "/w/wip/proposals/todo/p1.txt": "",
+            "/w/wip/proposals/todo/.md": "",
+            "/w/src/todo/p1.md": "",
+        }
+        for path, want in cases.items():
+            with self.subTest(path=path):
+                self.assertEqual(stopops.written_ident(path, "wip/proposals"), want)
+
+    def _write(self, ident, t):
+        return {"ident": ident, "t": t, "path": f"/w/wip/proposals/todo/{ident}.md"}
+
+    def _sent(self, ended, *idents):
+        files = [{"sha": "x", "path": f"wip/proposals/todo/{i}.md"} for i in idents]
+        return {"route": "sent", "ended": ended, "files": files}
+
+    def test_written_and_never_sent(self):
+        self.assertEqual(
+            stopops.unsent_writes([self._write("p1", 10)], []), [self._write("p1", 10)]
+        )
+
+    def test_sent_after_writing_covers_the_family(self):
+        writes = [self._write("p1", 10), self._write("p1-01-01", 11)]
+        ops = [self._sent(20, "p1", "p1-01-01")]
+        self.assertEqual(stopops.unsent_writes(writes, ops), [])
+
+    def test_edit_after_sending_is_unsent_again(self):
+        self.assertEqual(
+            [
+                r["ident"]
+                for r in stopops.unsent_writes([self._write("p1", 30)], [self._sent(20, "p1")])
+            ],
+            ["p1"],
+        )
+
+    def test_a_failed_propose_does_not_cover(self):
+        failed = {"route": "failed_before", "ended": 20, "files": []}
+        self.assertEqual(len(stopops.unsent_writes([self._write("p1", 10)], [failed])), 1)
+
+    def test_notes_are_per_session_and_turn(self):
+        with tempfile.TemporaryDirectory() as state:
+            stopops.note_written(state, "s1", "p1", "/w/p1.md", 10)
+            stopops.note_written(
+                state, "s1", "P1", "/w/p1.md", 50
+            )  # 同じ識別子（大文字小文字違い）
+            stopops.note_written(state, "s2", "p2", "/w/p2.md", 50)
+            self.assertEqual([r["t"] for r in stopops.turn_writes(state, "s1", 0)], [50])
+            self.assertEqual(stopops.turn_writes(state, "s1", 60), [])
+
+
 if __name__ == "__main__":
     unittest.main()

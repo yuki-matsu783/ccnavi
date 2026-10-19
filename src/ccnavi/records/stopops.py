@@ -250,3 +250,76 @@ def target_key(op: dict[str, Any]) -> str:
     """判定の対象キー。識別子と、版（送った先頭、無ければ道）から決める。"""
     version = str(op.get("commit") or op["route"])[:12]
     return f"proposal:{op['ident']}:{version}"
+
+
+# --- 未送信の提案 --------------------------------------------------------------
+
+UNSENT = "unsent"
+
+
+def written_ident(file_path: str, tickets_dir: str) -> str:
+    """書き込んだパスが `<提案の置き場>/todo/<識別子>.md` なら識別子。違えば空文字。
+
+    大文字小文字は区別しない。置き場は設定の相対パス（既定 `wip/proposals`）。
+    """
+    path = file_path.replace("\\", "/").casefold()
+    marker = f"/{tickets_dir.strip('/').casefold()}/todo/"
+    at = path.rfind(marker)
+    if at < 0:
+        return ""
+    name = path[at + len(marker) :]
+    if "/" in name or not name.endswith(".md") or len(name) <= 3:
+        return ""
+    return file_path.replace("\\", "/")[at + len(marker) : -3]
+
+
+def _write_path(state: str, session: str, ident: str) -> str:
+    return os.path.join(
+        state, f"stopwrite-{fsio.safe_name(session)}-{fsio.safe_name(ident.casefold())}.json"
+    )
+
+
+def note_written(state: str, session: str, ident: str, path: str, now: float) -> None:
+    """提案を `todo/` へ書いた（Write・Edit）ことを、書いた時刻つきで残す。"""
+    if state and session and ident:
+        fsio.write_json_atomic(
+            _write_path(state, session, ident),
+            {"session": session, "ident": ident, "path": path, "t": now},
+        )
+
+
+def turn_writes(state: str, session: str, since: float) -> list[dict[str, Any]]:
+    """このターンに書いた提案。"""
+    found = []
+    prefix = f"stopwrite-{fsio.safe_name(session)}-"
+    for name in _names(state):
+        if name.startswith(prefix) and name.endswith(".json"):
+            row = fsio.read_dict(os.path.join(state, name))
+            if row and float(row.get("t", 0)) >= since:
+                found.append(row)
+    return sorted(found, key=lambda r: (r["t"], r["ident"]))
+
+
+def unsent_writes(writes: list[dict[str, Any]], ops: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """書いたのに、書いた後に送った操作が無い提案。
+
+    送ったかは、送った操作の `files` に `todo/<識別子>.md` があり、その終了が書いた時刻より
+    後（粗さの分を許す）かで決める。親の propose は子の提案も一緒に送るので、識別子では決めない。
+    """
+    sent: dict[str, float] = {}
+    for op in ops:
+        if op["route"] != SENT:
+            continue
+        for item in op.get("files") or []:
+            tail = str(item.get("path", "")).replace("\\", "/").casefold().rsplit("/todo/", 1)[-1]
+            sent[tail] = max(sent.get(tail, 0.0), float(op["ended"]))
+    unsent = []
+    for row in writes:
+        tail = f"{row['ident']}.md".casefold()
+        if sent.get(tail, -1.0) < float(row["t"]) - SLACK_SECONDS:
+            unsent.append(row)
+    return unsent
+
+
+def unsent_key(ident: str) -> str:
+    return f"proposal:{ident}:{UNSENT}"

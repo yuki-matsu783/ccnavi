@@ -149,7 +149,10 @@ class PlanAtStopTest(unittest.TestCase):
         os.makedirs(self.state)
         self.transcript = _transcript(tmp.name, ROWS)
         self.conf = settings.Settings(
-            state=self.state, log=os.path.join(tmp.name, "logs"), stop_review_agent=True
+            state=self.state,
+            log=os.path.join(tmp.name, "logs"),
+            stop_review_agent=True,
+            tickets="wip/proposals",
         )
         self.payload = hookio.Input(
             event=hookio.STOP, session_id="s1", transcript_path=self.transcript, cwd=tmp.name
@@ -265,6 +268,66 @@ class ProposalPlanTest(PlanAtStopTest):
         needs = sr.required(plan)
         self.assertIn((sr.R4, key), needs)
         self.assertNotIn((sr.R2, key), needs)
+
+    def _write_post(self, ident="p1", tool="Write"):
+        path = os.path.join(self.root, "wip", "proposals", "todo", f"{ident}.md")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("# 提案\n目的\n")
+        events._track_proposals(
+            self.conf,
+            hookio.Input(
+                event=hookio.POST_TOOL_USE,
+                session_id="s1",
+                cwd=self.root,
+                tool_name=tool,
+                tool_input={"file_path": path},
+                tool_use_id="w1",
+            ),
+        )
+        return path
+
+    def test_written_but_unsent_proposal_is_a_target(self):
+        path = self._write_post()
+        self._plan()
+        plan = sr.read_plan(self.state, self.key)
+        self.assertTrue(plan["is_candidate"])
+        (proposal,) = plan["proposals"]
+        self.assertEqual((proposal["route"], proposal["key"]), ("unsent", "proposal:p1:unsent"))
+        self.assertEqual(plan["no_r2"], [proposal["key"]])
+        body = cli_stopreview._body(self.root, proposal)
+        self.assertIn("目的", body)
+        self.assertIn(path, body)
+
+    def test_written_then_sent_is_not_unsent(self):
+        self._write_post()
+        time.sleep(0.01)
+        now = int(time.time()) + 5
+        directory = os.path.join(self.state, stopops.RESULT_DIR)
+        os.makedirs(directory, exist_ok=True)
+        with open(os.path.join(directory, "k.kv"), "w") as handle:
+            handle.write(
+                f"id=p1\nroute=sent\nrc=0\nstarted={now}\nended={now}\ncommit=abc123\n"
+                "file=sha wip/proposals/todo/p1.md\n"
+            )
+        stopops.register(self.state, "s1", "tu1", "p1", now - 1)
+        stopops.bind(self.state, "tu1", now + 1)
+        self._plan()
+        plan = sr.read_plan(self.state, self.key)
+        self.assertEqual([p["route"] for p in plan["proposals"]], ["sent"])
+
+    def test_non_proposal_writes_and_edit_failures_are_ignored(self):
+        events._track_proposals(
+            self.conf,
+            hookio.Input(
+                event=hookio.POST_TOOL_USE,
+                session_id="s1",
+                cwd=self.root,
+                tool_name="Write",
+                tool_input={"file_path": os.path.join(self.root, "src", "a.py")},
+            ),
+        )
+        self.assertEqual(stopops.turn_writes(self.state, "s1", 0), [])
 
 
 if __name__ == "__main__":

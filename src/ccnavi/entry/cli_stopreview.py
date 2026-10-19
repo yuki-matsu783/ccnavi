@@ -82,11 +82,28 @@ def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str
     return EXIT_OK
 
 
+def _unsent_body(proposal: dict) -> str:
+    """送っていない提案の本文。書いた md の今の中身を、上限つきで読む。"""
+    parts = []
+    for item in proposal.get("files") or []:
+        path = str(item.get("path", ""))
+        if not path.endswith(".md"):
+            continue
+        try:
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                parts.append(f"--- {path}（未送信）---\n{handle.read(stopreview.MATERIAL_LIMIT)}")
+        except OSError:
+            continue
+    return "\n".join(parts)
+
+
 def _body(root: str, proposal: dict) -> str:
     """送った版の提案の本文。送ったコミットから読む（作業ツリーの今の姿ではなく、送った版）。
 
     読めないときは空文字（材料に本文が無いと示す）。送った提案のファイルは `todo/` の下の md。
     """
+    if proposal.get("route") == "unsent":
+        return _unsent_body(proposal)
     if not (root and proposal.get("commit")):
         return ""
     parts = []
