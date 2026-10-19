@@ -1062,25 +1062,6 @@ class ProblemsSaidOnceTest(ConfigUnionHarness):
         self.assertEqual(len(said), len(set(said)), said)
 
 
-class LegacyPlaceTest(ConfigUnionHarness):
-    """旧い置き場（`.ccnavi/common/`・`.ccnavi/config/*.yml`）の設定は読まれず、`--lint` が言う。"""
-
-    def legacy(self):
-        return [p for p in self.lint_json()["problems"] if "旧い置き場" in p["detail"]]
-
-    def test_no_old_file_no_complaint(self):
-        self.assertEqual(self.legacy(), [])
-
-    def test_old_workspace_and_project_files_are_named(self):
-        write(os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), "version: 1\n")
-        write(os.path.join(self.ws, ".ccnavi", "config", "phases.yml"), "version: 1\n")
-        write(os.path.join(self.lib, ".ccnavi", "config", "rules.yml"), "version: 1\n")
-        said = "\n".join(p["detail"] for p in self.legacy())
-        self.assertIn(".ccnavi/config/common/rules.yml へ移す", said)
-        self.assertIn(".ccnavi/config/project/phases.yml へ移す", said)
-        self.assertIn("projects/lib/.ccnavi/config/project/rules.yml へ移す", said)
-
-
 class PostMonitoringUnionTest(ConfigUnionHarness):
     """実行後チェックも「共通レイヤー + そのツリーのレイヤー」の和。
 

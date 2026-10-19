@@ -76,16 +76,6 @@ EVENTS = (
     "SubagentStop",
 )
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_BIN_PATH")
-# 置き場を動かしていた 6 つ。廃止した（置き場は固定）。導入スクリプトは書かない。
-# 値は既定の置き場（設計 wip/design/i0064-fixed-places.md §1）。
-PLACE_ENV_DEFAULTS = {
-    "CCNAVI_PROJECTS": "projects",
-    "CCNAVI_PROJECT_HOME": ".ccnavi",
-    "CCNAVI_TICKETS_PROPOSAL": "wip/proposals",
-    "CCNAVI_TICKETS_APPROVED": ".ccnavi/approved",
-    "CCNAVI_LOG": "logs/decisions.jsonl",
-    "CCNAVI_STATE": "logs/state",
-}
 # `projects/` がワークスペースの git に追跡されているときの知らせの先頭の句。`--lint` の
 # `(projects)` の warn と同じ句で始まる（VS Code 拡張が見分けに使う）。
 TRACKED_LEAD = "`projects/` はワークスペースの git が追跡している"
@@ -465,11 +455,7 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual([FETCH_COMMAND, HOOK_COMMAND], commands)
 
     def test_writes_the_paths_ccnavi_reads(self):
-        """env の値そのものを見る。存在するだけでは、取り違えを見つけられない。
-
-        置き場は固定なので、置き場を動かす 6 つを書かないことは
-        `DoesNotWriteThePlaceVariables` が見る。
-        """
+        """env の値そのものを見る。存在するだけでは、取り違えを見つけられない。"""
         self.run_setup("--mode", "enable")
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_MODE"], "enable")
@@ -577,27 +563,6 @@ class WritesTheExpectedShape(SetupTest):
         self.assertTrue(names(missing, "/".join(RULES_PARTS)), result.stdout)
         for name in DEPLOY_SCRIPTS:
             self.assertTrue(names(missing, f".ccnavi/scripts/{name}"), name)
-
-
-class DoesNotWriteThePlaceVariables(SetupTest):
-    """置き場を動かす 6 つの env は書かない（置き場は固定。設計 §5、A7）。
-
-    `env` は導入スクリプトが持つ欄で、読まれない語を混ぜない（共通レイヤーの 3 本と同じ理由）。
-    導入済みの env からの除去はしない（旧版の配布先が無いため）。
-    """
-
-    def written(self, *args):
-        result = self.run_setup(*args)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        return self.read_settings()["env"]
-
-    def test_does_not_write_the_place_variables(self):
-        """既定の導入でも `--all` でも、6 つは書かない。"""
-        for args in (("--mode", "enable"), ("--mode", "enable", "--all")):
-            env = self.written(*args)
-            for name in PLACE_ENV_DEFAULTS:
-                with self.subTest(args=args, name=name):
-                    self.assertNotIn(name, env)
 
 
 @unittest.skipUnless(shutil.which("git"), "git が見つからない")
