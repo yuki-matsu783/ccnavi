@@ -183,7 +183,7 @@ def deliver(
             text = _with_file(
                 stderr,
                 bases or [],
-                rules.fill_root(rule.additional_context, rule.root),
+                rules.fill_text(rule.additional_context, rule.root),
                 rule.additional_context_file,
             )
             if text:
@@ -192,7 +192,7 @@ def deliver(
             once = _with_file(
                 stderr,
                 bases or [],
-                rules.fill_root(rule.additional_context_once, rule.root),
+                rules.fill_text(rule.additional_context_once, rule.root),
                 rule.additional_context_once_file,
             )
             if once:

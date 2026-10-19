@@ -209,6 +209,8 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
             integration,
             conf.branch_prefixes,
             _adopted_parents(root, proposals),
+            conf,
+            root,
         )
     )
     problems.extend(lint_branch._prefix_setting_problems(conf))

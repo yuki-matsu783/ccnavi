@@ -157,6 +157,29 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                 )
             )
 
+    # `{script:<名前>}` の差し込み。形が不正なら置き換わらず、スクリプトが無ければ置き換わっても
+    # 実行できない。どちらも案内を受けたモデルの実行が失敗するだけなので warn。
+    for field_name, text in (
+        ("message", rule.message),
+        ("additionalContext", rule.additional_context),
+        ("additionalContextOnce", rule.additional_context_once),
+    ):
+        for hit in rules.SCRIPT_PLACEHOLDER.finditer(text):
+            script = hit.group(1)
+            if not rules.SCRIPT_NAME.fullmatch(script):
+                why = (
+                    f"`{hit.group(0)}` の名前が不正（使える字は英数字と `.` `_` `-`）。"
+                    "置き換わらない"
+                )
+            elif not os.path.isfile(os.path.join(home, ".ccnavi", "scripts", script)):
+                why = (
+                    f"`{hit.group(0)}` の `.ccnavi/scripts/{script}` が無い。"
+                    "置き換わっても実行できない"
+                )
+            else:
+                continue
+            problems.append(Problem(SEVERITY_WARN, name, f"{field_name} の {why}"))
+
     # ルールが指すファイルは、ルートの中を指していて、いま在って、上限に収まるか。
     # 無いのは warn。作るまで何も足さないだけで、判定は変わらない。
     for key, rel in (

@@ -133,7 +133,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import yamlread
+from ..infra import settings, yamlread
 from ..infra.globmatch import translate
 
 # このビルドが読めるルールファイルの書式の版。`deny` `ask` `allow` の 3 タイプで、探すものは
@@ -325,6 +325,34 @@ def not_root_pattern(root: str) -> str:
     for ch in reversed(root):
         body = "(?:" + _NOT_ROOT_END + "|" + _differs(ch) + "|" + _same(ch) + body + ")"
     return body
+
+
+# 文の差し込み `{script:<名前>}`。名前は `.ccnavi/scripts/` のファイル名。
+SCRIPT_PLACEHOLDER = re.compile(r"\{script:([^{}]*)\}")
+SCRIPT_NAME = re.compile(r"[A-Za-z0-9._-]+")
+
+
+def fill_text(text: str, root: str) -> str:
+    """モデルへ渡す文の差し込みを置き換える。
+
+    - `{root}` は、これまでどおりワークスペースルートの実パス（引用しない）。
+    - `{script:<名前>}` は `settings.script_command(root, <名前>)`（`sh <引用したパス>`）。
+      `<名前>` は `[A-Za-z0-9._-]+` だけを受ける。形が不正なものは置き換えずに残す
+      （`--lint` が warn を出す）。スクリプトが無くても置き換える（そのままでは実行できないので、
+      これも lint が warn を出す）。
+
+    ルートが渡らない読み方（診断で `--root` が無い）では、どちらも置き換えずに返す。
+    """
+    if not root:
+        return text
+
+    def script(found: re.Match) -> str:
+        name = found.group(1)
+        if not SCRIPT_NAME.fullmatch(name):
+            return found.group(0)
+        return settings.script_command(root, name)
+
+    return fill_root(SCRIPT_PLACEHOLDER.sub(script, text), root)
 
 
 def fill_root(text: str, root: str) -> str:
@@ -569,8 +597,8 @@ class Rule:
         if self.degraded_message:
             # 名前は読み込みのあとで決まる（ファイルの相対パス）ので、ここで入れる。
             text = self.degraded_message.replace(DEGRADED_RULE_NAME, record_name(self))
-            return fill_root(text, self.root)
-        return fill_root(self.message, self.root)
+            return fill_text(text, self.root)
+        return fill_text(self.message, self.root)
 
     def key(self) -> tuple:
         """レイヤーをまたいで「同じ定義」と言えるかどうかの鍵。
