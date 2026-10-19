@@ -28,6 +28,7 @@ from ..tickets import (
     approval,
     approval_checks,
     approval_times,
+    manual_settle,
     oplog,
     ops_stop,
     overview,
@@ -167,8 +168,28 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         for e in members:
             for line in ctx.describe(e, e.ident in revisions):
                 stdout.write(line + "\n")
+        for line in _manual_lines(root, conf, name, doing):
+            stdout.write(line + "\n")
     _unfinished_ops(stdout, conf)
     return 0
+
+
+def _manual_lines(
+    root: str, conf: settings.Settings, parent_id: str, doing: list[ticket_model.Ticket]
+) -> list[str]:
+    """手で done/ に動かされた子の確認待ち・未共有などを、フェーズごとに 1 行で出す。"""
+    parent = approval_checks.by_id(doing).get(parent_id)
+    if parent is None or parent.is_child:
+        return []
+    phases = phase.phases_of(root, conf, parent_id)
+    out = []
+    for ph in phases:
+        if not ph.gate_closed:
+            continue
+        line = manual_settle.assess(root, conf, parent, ph, phases).line()
+        if line:
+            out.append(f"  フェーズ {ph.number}: {line}")
+    return out
 
 
 def _unfinished_ops(stdout: TextIO, conf: settings.Settings) -> None:

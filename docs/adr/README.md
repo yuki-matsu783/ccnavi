@@ -215,6 +215,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0146](0146-gates-hold-in-dry-run.md) | dry-run でも、チケットの関門と補助の保護は止める（止めている箇所を一般・関門・補助に分ける） |
 | [0147](0147-fail-closed-by-tool.md) | 判定に達せなかったときは、ツールの種類で決める（書き込みは止め、読み取りは最低限の deny を当てて通す） |
 | [0148](0148-operation-log-and-staged-sends.md) | ホストへの送信は操作記録に載せ、段階ごとに照合してから送る（確定できないときは自動で送り直さない） |
+| [0149](0149-manual-move-accepted-with-versions.md) | 手で動かした子は、経路の欄と受け入れ台帳で版つきで受け入れる（再提起は受け入れた後のコメントで見分ける） |
 | [0144](0144-protected-files-change-through-handoff.md) | 保護対象の変更は、テンプレート専用の手順をやめ、wip/handoff/ に置いた下書きを `ccnavi user handoff` で取り込む一本の手順にそろえる |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
 | [0142](0142-drop-sync-records.md) | 取り込み状態（sync/）を廃止し、親ブランチの状態だけで判定する |

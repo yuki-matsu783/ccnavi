@@ -240,7 +240,10 @@ def _decision(
     open_now = {
         id(t)
         for t in review_host._unresolved(
-            result.threads, result.host, str(requested_mark.get("poster") or "")
+            result.threads,
+            result.host,
+            str(requested_mark.get("poster") or ""),
+            review.ledger_of(root, conf, parent),
         )
     }
     unresolved = [t for t in result.threads if id(t) in open_now or (t.id and t.id in carry)]

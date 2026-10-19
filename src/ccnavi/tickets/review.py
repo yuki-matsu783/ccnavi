@@ -309,7 +309,10 @@ def review_problems(
             *[f"  - {r.url}" for r in changes],
         ]
     unresolved = review_host._unresolved(
-        result.threads, result.host, _poster(parent, phase_no, root, conf)
+        result.threads,
+        result.host,
+        _poster(parent, phase_no, root, conf),
+        ledger_of(root, conf, parent),
     )
     if not unresolved:
         return []
@@ -335,6 +338,38 @@ def review_problems(
     return lines
 
 
+def changes_requested(result: review_host.Result) -> list[review_host.Review]:
+    """有効な変更要求のレビュー（レビュアーごとの最新）。"""
+    return [
+        r
+        for r in review_host.effective(result.reviews)
+        if r.state.upper() == review_host.CHANGES_REQUESTED
+    ]
+
+
+def unresolved_for(
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_model.Ticket,
+    phase_no: int,
+    result: review_host.Result,
+) -> list[review_host.Thread]:
+    """数える未解決の指摘（機構の投稿と、受け入れ台帳が受け入れ済みとするものを除く）。"""
+    return review_host._unresolved(
+        result.threads,
+        result.host,
+        _poster(parent, phase_no, root, conf),
+        ledger_of(root, conf, parent),
+    )
+
+
+def ledger_of(root: str, conf: settings.Settings, parent: ticket_model.Ticket) -> list[dict]:
+    """親の受け入れ台帳の項目。読めなければ空（読めない台帳で未解決を隠さない）。"""
+    home = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
+    entries, problem = approval_marks.read_ledger(home, parent.ticket)
+    return [] if problem else entries
+
+
 def _settled_by_confirm() -> str:
     """confirm が子を動かした経路。Chrome のレビュー済みも同じコアを通るので、経路で見分ける。"""
     return "chrome" if via.via() == via.VIA_CHROME else "confirm"
@@ -347,6 +382,7 @@ def settle_and_mark(
     parent: ticket_model.Ticket,
     ph: phase.Phase,
     mark: dict,
+    ledger: list[dict] | None = None,
 ) -> tuple[str, str] | None:
     """レビュー済みで書くもの（子を `done/` へ、
     レビュー済みのマーカー）を fsio の書き込みを溜める段に並べる。
@@ -368,6 +404,11 @@ def settle_and_mark(
                 f"{', '.join(moved)}"
             )
         home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+        if ledger:
+            # 台帳を先に書く（マーカーだけが置かれて、受け入れた指摘が数えられる状態を作らない）
+            failed = approval_marks.add_ledger(home, parent.ticket, ledger)
+            if failed:
+                return "", f"受け入れ台帳を書けない: {failed}"
         with fsio.policy(prefix="マーカーを置けない: "):
             failed = approval_marks.write_mark(
                 home, parent.ticket, ph.number, approval_marks.MARK_REVIEWED, mark

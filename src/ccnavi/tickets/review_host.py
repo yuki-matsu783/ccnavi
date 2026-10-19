@@ -376,6 +376,11 @@ def _ccnavi_post(t: Thread, host: str, poster: str) -> bool:
     return mine and t.body.startswith(MARKER_PREFIX)
 
 
+def epoch(text: str) -> float:
+    """ホストの時刻（ISO 8601）をエポック秒に。読めなければ 0。"""
+    return _epoch(text)
+
+
 def _epoch(text: str) -> float:
     if not text:
         return 0.0
