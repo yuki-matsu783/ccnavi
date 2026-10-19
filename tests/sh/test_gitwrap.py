@@ -1600,6 +1600,28 @@ class WorktreeFreshBaseTest(GitWrapperTest):
         git(self.dir, "merge", "-q", "--ff-only", f"origin/{self.integ}")
         self.assertCreated("a", "-b", "a")
 
+    def test_the_suggested_commands_run_from_a_fresh_shell(self):
+        import re
+
+        self.push_from_elsewhere()
+        git(self.dir, "fetch", "-q", "origin")
+        result = self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "a")
+        commands = re.findall(r"`([^`]+)`", result.stderr)
+        fetch = next(c for c in commands if " fetch origin " in c)
+        cut = next(c for c in commands if " worktree add " in c)
+        for command in (fetch, cut):
+            done = subprocess.run(
+                [SHELL, "-c", command],
+                cwd=self.dir,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=with_exe(dict(os.environ)),
+            )
+            self.assertEqual(done.returncode, 0, (command, done.stdout, done.stderr))
+        self.assertEqual("a", git_out(self.tree("a"), "branch", "--show-current"))
+
     def test_diverged_is_rejected_with_a_message_that_does_not_suggest_ff_only(self):
         write_text(os.path.join(self.dir, "local.txt"), "l\n")
         git(self.dir, "add", "local.txt")
@@ -1739,8 +1761,7 @@ class IntegrationPushTest(GitWrapperTest):
     """固定のリスト（main など）に無い名前の統合先へも直接は送らない。
 
     統合先の名前は ccnavi-fetch.sh と同じ決め方（origin/HEAD → origin/main・master）で、
-    push したツリーが属するリポジトリについて決める。環境変数 CCNAVI_INTEGRATION_BRANCH も
-    settings.local.json の env も読まない。決まらなければ固定のリストだけで判定する。
+    push したツリーが属するリポジトリについて決める。決まらなければ固定のリストだけで判定する。
     """
 
     BRANCH = "develop-v1.0.0"
@@ -1752,7 +1773,7 @@ class IntegrationPushTest(GitWrapperTest):
         git(self.dir, "checkout", "--quiet", "-b", self.BRANCH)
 
     def push(self, cwd=None, branch=None, **env):
-        environment = {k: v for k, v in os.environ.items() if k != "CCNAVI_INTEGRATION_BRANCH"}
+        environment = dict(os.environ)
         with_exe(environment)
         environment.update(env)
         return subprocess.run(
@@ -1781,13 +1802,6 @@ class IntegrationPushTest(GitWrapperTest):
         git(repo, "update-ref", f"refs/remotes/origin/{name}", "HEAD")
         git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{name}")
 
-    def local_setting(self, name):
-        """settings.local.json の env に統合先を書く（実行ファイルが `sync paths` で運ぶ）。"""
-        write_text(
-            os.path.join(self.dir, ".claude", "settings.local.json"),
-            f'{{"env": {{"CCNAVI_INTEGRATION_BRANCH": "{name}"}}}}\n',
-        )
-
     def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
         """origin/HEAD も origin/main・master も無ければ、固定のリストに無い名前は通す。"""
         result = self.push()
@@ -1798,30 +1812,11 @@ class IntegrationPushTest(GitWrapperTest):
         self.point_origin_head(self.dir, self.BRANCH)
         self.assertRefused(self.push())
 
-    def test_the_environment_does_not_name_the_integration(self):
-        result = self.push(CCNAVI_INTEGRATION_BRANCH=self.BRANCH)
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_settings_local_json_does_not_name_the_integration(self):
-        self.local_setting(self.BRANCH)
-        result = self.push()
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_the_old_sync_copy_does_not_name_the_integration(self):
-        """統合先のコピー（sync/<リポジトリ>/integration/head）が残っていても読まない。"""
-        write_text(
-            os.path.join(self.dir, "logs", "state", "sync", "self", "integration", "head"),
-            f"remote origin\nbranch {self.BRANCH}\nsource default\n",
-        )
-        result = self.push()
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_the_environment_does_not_override_origin_head_and_the_fixed_list_holds(self):
-        """環境変数が別の名前でも origin/HEAD が決める。固定のリストはそのまま止める。"""
+    def test_the_fixed_list_holds_beside_origin_head(self):
+        """origin/HEAD が別の名前でも、固定のリストの main は止める。"""
         self.point_origin_head(self.dir, self.BRANCH)
-        self.assertRefused(self.push(CCNAVI_INTEGRATION_BRANCH="trunk"))
         git(self.dir, "checkout", "--quiet", "-b", "main")
-        result = self.push(branch="main", CCNAVI_INTEGRATION_BRANCH="trunk")
+        result = self.push(branch="main")
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("main は統合先です", result.stderr)
 
@@ -1855,13 +1850,9 @@ class IntegrationPushTest(GitWrapperTest):
         self.point_origin_head(project, self.BRANCH)
         self.assertRefused(self.push(project), bare2)
 
-    def test_workspace_wide_settings_do_not_reach_a_project(self):
-        """環境変数と settings.local.json に main を置いても、プロジェクトの統合先は変わらない。
-        ワークスペースの origin/HEAD は main、projects/app の origin/HEAD は trunk。
-        trunk を projects/app から送れば止まり、ワークスペースから送る trunk は止まらない。
-        変数が残っていても読まないことを確かめる（B1 の再発防止）。"""
-        self.local_setting("main")
-        env = {"CCNAVI_INTEGRATION_BRANCH": "main"}
+    def test_each_repository_has_its_own_integration(self):
+        """ワークスペースの origin/HEAD は main、projects/app の origin/HEAD は trunk。
+        trunk を projects/app から送れば止まり、ワークスペースから送る trunk は止まらない。"""
         self.point_origin_head(self.dir, "main")
         project = os.path.join(self.dir, "projects", "app")
         os.makedirs(project)
@@ -1877,12 +1868,12 @@ class IntegrationPushTest(GitWrapperTest):
         git(project, "remote", "add", "origin", bare)
         self.point_origin_head(project, "trunk")
 
-        result = self.push(project, branch="trunk", **env)
+        result = self.push(project, branch="trunk")
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("trunk は統合先です", result.stderr)
 
         git(self.dir, "checkout", "--quiet", "-b", "trunk")
-        result = self.push(branch="trunk", **env)
+        result = self.push(branch="trunk")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 

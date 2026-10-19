@@ -1,13 +1,13 @@
 ---
 type: adr
 title: 公開前なので、移行のための読み取りと掃除をすべて外す
-description: 承認記録の古い形・待ち方ファイルの名残り・旧識別子・旧索引名・旧承認の知らせの掃除など、過去データを読むための処理を消し、互換の版を 10 に上げる
+description: 承認記録の古い形・待ち方ファイルの名残り・古い識別子・古い索引名・古い承認の知らせの掃除など、過去データを読むための処理を消し、互換の版を 10 に上げる
 tags: [approval, ticket, records, compat]
 keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflow.yml, i<番号>, index.jsonl, approved-, COMPAT, 互換の版]
 ---
 # ADR-0115: 公開前なので、移行のための読み取りと掃除をすべて外す
 
-状態: 採用（ADR-0104 の「既存の承認済みチケットに残る欄は消さない。移行はしない」「古い形も読む」、ADR-0109 の「前の版が書いた待ち方のファイルは読まない（`--lint` が warn で言う）」を改める。追記: 旧い取り込み状態を読む移行は、ADR-0142 の `ccnavi sync migrate`（`tickets/legacy_sync.py`）が使い捨ての読み取りとして 1 回だけ持つ）
+状態: 採用（ADR-0104 の「既存の承認済みチケットに残る欄は消さない。移行はしない」「古い形も読む」、ADR-0109 の「前の版が書いた待ち方のファイルは読まない（`--lint` が warn で言う）」を改める。追記: 古い取り込み状態を読む移行は、ADR-0142 の `ccnavi sync migrate`（`tickets/legacy_sync.py`）が使い捨ての読み取りとして 1 回だけ持つ）
 
 ## 状況
 
@@ -20,8 +20,8 @@ keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflo
 - 前の版が書いた待ち方のファイル `phases/<親>/workflow.yml` が残っていることの warn、
   `load_copy` が互換のためだけに受けていた `approved_dir`、`waits_of` の読まない `types`
 - 前の形の識別子 `i<番号>`・`<名前>-i<番号>`（通し番号の数えと lint の文面）
-- 旧い索引名 `index.jsonl` を新しい名前に移るときに消す処理
-- フェーズ定義の旧欄 `order`・`after`・`overlap`・`requires` の警告と、VS Code 拡張のフェーズ画面の「読まない欄」の帯
+- 古い索引名 `index.jsonl` を新しい名前に移るときに消す処理
+- フェーズ定義の古い欄 `order`・`after`・`overlap`・`requires` の警告と、VS Code 拡張のフェーズ画面の「読まない欄」の帯
 - hook が承認を伝えていた頃の記録 `approved-<セッション>-<エージェント>.json` の掃除
 
 ## 決定
@@ -47,7 +47,7 @@ keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflo
 - 失ったもの: 古い承認済みチケット（`ccnavi_approved` を持つ）は、取り下げの条件と照合で新しい形と同じに扱われる。
   取り込み済みの親子に古い形が残っていると、欄が無いため「閉じていない」と読まれて止まる。ユーザが `done/` の
   チケットを確かめる
-- 失ったもの: 旧 `index.jsonl`、旧 `approved-*.json`、`phases/<親>/workflow.yml` は自動では消えなくなる。残っていれば
+- 失ったもの: 古い `index.jsonl`、古い `approved-*.json`、`phases/<親>/workflow.yml` は自動では消えなくなる。残っていれば
   ユーザが消す。読まれないので害は無い
 - 失ったもの: 互換の版を上げるので、組み直す前の実行ファイルと配り直す前の Chrome 拡張は食い違いを知らせる
 

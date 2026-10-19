@@ -234,7 +234,7 @@ ccnavi_compat_skew() {
 	if [ -f "$1/build.py" ] && [ -f "$1/src/ccnavi/__main__.py" ]; then
 		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
 	else
-		# sh が古いと、新しい実行ファイルは旧い形の呼び出し（ユーザ専用の操作を `user` の外で使う形）を断る。
+		# sh が古いと、新しい実行ファイルは古い形の呼び出し（ユーザ専用の操作を `user` の外で使う形）を断る。
 		# 配り直しは sh も入れ替える。
 		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
 	fi

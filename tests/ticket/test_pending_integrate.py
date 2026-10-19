@@ -136,6 +136,21 @@ class PendingIntegrateTest(TicketTest):
         self.assertIn(HEAD, out["hookSpecificOutput"]["additionalContext"])
         self.assertIn(HEAD, out["systemMessage"])
 
+    def test_the_notice_does_not_write_to_the_object_database(self):
+        head = self.head()
+        tree = git(self.root, "rev-parse", "HEAD^{tree}").strip()
+        self.marker("w10", state="staged", branch="w10", branch_sha=head, base=head, tree=tree)
+
+        def objects():
+            found = []
+            for base, _dirs, files in os.walk(os.path.join(self.root, ".git", "objects")):
+                found.extend(os.path.join(base, f) for f in files)
+            return sorted(found)
+
+        before = objects()
+        self.assertIn(HEAD, self.notice())
+        self.assertEqual(before, objects())
+
     def test_a_subagent_is_not_told(self):
         head = self.head()
         self.marker("w8", state="conflict", branch="w8", branch_sha=head, base=head)

@@ -459,7 +459,7 @@ class ProjectsTest(unittest.TestCase):
         ないこと（DENY_TICKET_PARENT）。範囲を広げても通らないので、案内は子を起こす手を言う。
         """
         self.family_in_lib("i0007")
-        approved = self.ccnavi("--agree", stdin="y\n")
+        approved = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         home = self.worktree(self.lib, "i0007")
         for rel in (("src", "a", "a.py"), ("docs", "x.md"), ("wip", "design", "d.md")):

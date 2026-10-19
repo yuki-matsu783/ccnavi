@@ -1,7 +1,7 @@
 """チケットとレビューのサブコマンド（`ticket` / `review` / `write_and_push` など）を
 ops・review へ渡す。
 
-`sync` の問い合わせ（`sync paths` / `sync check` / `sync retired` / `sync migrate`）もここで答える。
+`sync` の問い合わせ（`sync paths` / `sync check` / `sync retired`）もここで答える。
 
 cli から分けた。cli を読まない。
 """

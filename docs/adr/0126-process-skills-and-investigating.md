@@ -22,7 +22,7 @@ ADR-0111 の5本は、標準の作業ごとに置く薄い入口で、細かい�
 | 呼び名を「工程スキル」にする | 設計・調査・テスト・レビュー・リリースは開発の工程の名前で、5本の共通点（標準の工程ごとの入口）が名前に出る。短く、既存の語と衝突しない | 入口スキル（CCNAVI.md の「git の入口」と重なる）、標準スキル（ほかのスキルが非標準に見える）、作業スキル（`commit` も作業で区別がつかない）、領域スキル、フェーズスキル（`phases.yml` と紛れる） |
 | SKILL.md の frontmatter のキーを `concept: true` から `process: true` に改める | 呼び名に揃える。ccnavi の中で `process` に別の用法が無い | `stage`（`git add` の stage と紛れる）、`phase`（フェーズ定義と紛れる）、`concept` のまま |
 | `investigating` を6本目に足す | 不具合に限らない調べものの入口が無かった。`debugging` は不具合の原因調査に絞り、それ以外の調べものは `investigating` に分ける | `debugging` に混ぜる（description が膨らみ、当たる作業が曖昧になる） |
-| 文書 `.ccnavi/docs/skill-concepts.md` を `skill-processes.md` に改める | 呼び名に揃える | 旧名のまま |
+| 文書 `.ccnavi/docs/skill-concepts.md` を `skill-processes.md` に改める | 呼び名に揃える | 古い名前のまま |
 
 ## 得たもの・失ったもの
 

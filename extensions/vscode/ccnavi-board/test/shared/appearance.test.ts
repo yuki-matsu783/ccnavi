@@ -234,7 +234,7 @@ test("CB-T183c 保持する画面は、再表示されたところでも送り�
 /**
  * 見た目のメッセージが、9 画面すべての契約（`To*`）に入っていること。tsc が確かめる。
  *
- * 旧いコードは呼び出しのたびに `{ type: "appearance", value } satisfies ToBoard` と書いていて、
+ * 古いコードは呼び出しのたびに `{ type: "appearance", value } satisfies ToBoard` と書いていて、
  * その画面の契約に入っていることをコンパイラが確かめていた。`postAppearance(host)` にそろえたときに
  * その検査が消えた（`ScreenHost<D>.post` は `unknown` を取るので、契約から外しても通ってしまう）。
  * ここで 1 か所にまとめて確かめ直す。画面を足す人は、この配列に 1 行足せば同じ検査が有効になる。

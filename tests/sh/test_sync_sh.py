@@ -942,22 +942,6 @@ class SyncTest(SyncHarness):
         git(pusher, "push", "-q", "origin", "main")
         return pusher
 
-    def test_the_old_variable_and_the_old_setting_are_ignored(self):
-        """環境変数と settings.local.json の CCNAVI_INTEGRATION_BRANCH は、統合先を変えない。"""
-        git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/develop")
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}\n',
-        )
-        done = self.sync(
-            PARENT, CCNAVI_BIN_PATH=self.launcher(), CCNAVI_INTEGRATION_BRANCH="develop"
-        )
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("統合先: main", done.stdout)
-        self.assertNotIn("develop", done.stdout)
-        self.assertNotIn("CCNAVI_INTEGRATION_BRANCH", done.stdout)
-        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
-
     def test_a_failing_executable_stops_instead_of_using_the_default(self):
         # 実行ファイルが在るのに答えなければ、統合先を何も言わずに既定に戻さない。
         launcher = self.launcher("#!/bin/sh\necho broken >&2\nexit 1\n")
@@ -999,8 +983,12 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertNotIn("合わせた", done.stdout)
+        self.assertIn("統合先: main", done.stdout)
         head = git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD").stdout.strip()
         self.assertEqual("refs/remotes/origin/main", head)
+        # 綴り違いの ref は取らない（大文字小文字を区別しない FS で origin/main と衝突する）。
+        refs = git(self.ws, "for-each-ref", "--format=%(refname)", "refs/remotes/origin").stdout
+        self.assertNotIn("refs/remotes/origin/Main", refs.split())
 
     def test_a_host_default_starting_with_a_dash_is_not_followed(self):
         # ホストが -x のような名前を返しても使わない（後ろの git の引数でオプションに読まれる）。

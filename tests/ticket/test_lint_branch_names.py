@@ -405,28 +405,21 @@ class LintBranchNamesTest(unittest.TestCase):
             subprocess.run([*git, *args], cwd=cwd, check=True, capture_output=True)
 
     def test_each_repository_reserves_its_own_default_branch(self):
-        # 統合先はそのリポジトリの origin/HEAD だけで決まる。環境変数と settings.local.json に
-        # 置いた CCNAVI_INTEGRATION_BRANCH は、ワークスペースの値として全プロジェクトに
-        # 当たっていた（B1）が、いまは読まない。
+        # 統合先はそのリポジトリの origin/HEAD だけで決まる。ワークスペースが main でも、
+        # projects/app（trunk）向けのチケットは trunk を予約する。
         shutil.rmtree(self.ws)
         os.makedirs(os.path.join(self.ws, ".claude"))
         self.repo_with_origin(self.ws, "main")
         self.repo_with_origin(os.path.join(self.ws, "projects", "app"), "trunk")
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "main"}}\n',
-        )
         self.rules = write(os.path.join(self.ws, "rules.yml"), json.dumps({"version": 1}))
         write(
             os.path.join(self.ws, "projects", "app", "wip", "proposals", "todo", "trunk.md"),
             ticket_text("trunk"),
         )
         self.propose("Trunk-ws")
-        for env in (None, {"CCNAVI_INTEGRATION_BRANCH": "main"}):
-            with self.subTest(env=env):
-                lines = [line for line in self.lint(env=env) if "統合先" in line]
-                self.assertEqual(1, len(lines), lines)
-                self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
+        lines = [line for line in self.lint() if "統合先" in line]
+        self.assertEqual(1, len(lines), lines)
+        self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
 
     def test_the_workspace_reserves_its_own_default_branch(self):
         shutil.rmtree(self.ws)
@@ -436,15 +429,6 @@ class LintBranchNamesTest(unittest.TestCase):
         self.propose("trunk")
         lines = [line for line in self.lint() if "統合先" in line]
         self.assertEqual(1, len(lines), lines)
-
-    def test_a_record_of_the_old_sync_is_not_read(self):
-        # 取り込み状態（sync/<リポジトリ>/integration/head）は廃止した。残っていても読まない。
-        self.propose("trunk")
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch trunk\nsource default\nsha x\nfetched_at 1\n",
-        )
-        self.assertEqual([], [line for line in self.lint() if "統合先" in line])
 
     def test_approved_and_closed_ids_are_left_alone(self):
         # 既存の i0055 などは issue: を持たない。承認済みの識別子は変えられないので言わない。
@@ -476,7 +460,7 @@ class LintBranchNamesTest(unittest.TestCase):
     def test_a_parent_ending_in_two_digits_is_still_named(self):
         # 右から 2 段を剥がすので親の割り出しは誤らないが、別の親の子の途中
         # （`<親>-<フェーズ>`）と紛れる。
-        # 旧い形の子と同じ綴りなので、今までどおり warn にする。
+        # 古い形の子と同じ綴りなので、今までどおり warn にする。
         self.place("done", "abc-01")
         lines = self.lint()
         self.assertEqual(1, len(lines), lines)

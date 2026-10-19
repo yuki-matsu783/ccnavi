@@ -55,7 +55,7 @@ class FamilyShTest(unittest.TestCase):
             ("abc-01-02-03", "abc-01"),
             ("i0001", "i0001"),
             ("web-i0012", "web-i0012"),
-            # 旧い形は子として扱わない（自身が親）
+            # 古い形は子として扱わない（自身が親）
             ("i0012-01", "i0012-01"),
         ):
             with self.subTest(ident=ident):

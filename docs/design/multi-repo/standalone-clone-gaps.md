@@ -92,7 +92,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 - 当時の処理: 統合先ブランチ名の解決は、環境変数 `CCNAVI_INTEGRATION_BRANCH`、`settings.local.json` の env、`origin/HEAD` の順で、前の 2 つはワークスペースで 1 つの値だった。sh は `ccnavi_integration_local`（ワークスペースの `sync paths` だけを見る）、Python は `ops_stop_integrate.integration_name`（`project` 引数を使わない）と `infra/settings.py` が読んでいた
 - 当時の害: ワークスペースの値が全プロジェクトに当たった。ワークスペースが `develop`、p の既定が `trunk` のとき、`ccnavi-git.sh push` の拒否が `trunk` を統合先と見ず止めない。Python の `--lint` の識別子の予約も、プロジェクトの統合先で効かない。`settings.local.json` はエージェントが書き換えられるので、エージェントが統合先を変えられた
-- 解消: 環境変数と `--integration-branch` と `settings.local.json` の読みを廃止し、統合先は各リポジトリの手元の `origin/HEAD`（無ければ `origin/main`・`origin/master`）だけで決める。`ccnavi-fetch.sh` が SessionStart で `origin/HEAD` をホストの既定ブランチへ向け直す。識別子の予約はチケットの `project` ごとにそのリポジトリの統合先で検査する（[ADR-0146](../../adr/0146-integration-is-the-origin-head-only.md)）
+- 解消: 環境変数と `--integration-branch` と `settings.local.json` の読みを廃止し、統合先は各リポジトリの手元の `origin/HEAD`（無ければ `origin/main`・`origin/master`）だけで決める。`ccnavi-fetch.sh` が SessionStart で `origin/HEAD` をホストの既定ブランチへ向け直す。識別子の予約はチケットの `project` ごとにそのリポジトリの統合先で検査する（[ADR-0148](../../adr/0148-integration-is-the-origin-head-only.md)）
 - 残る制約: origin の無いリポジトリでは統合先が決まらない。ワークスペースと単体 clone のどちらも、そのリポジトリの `origin/HEAD` だけを見るので食い違わない
 
 ## C. 単体 clone で動かない・縮退する
@@ -229,7 +229,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 次は設計判断が要る点で、選択肢だけを並べる。どれも決定していない。
 
 - 根の決め方（A1、A2、A3、N1）: 次の 3 つの選択肢がある。(a) いまのまま、hook は `CLAUDE_PROJECT_DIR` を採り、Python は `.claude/` を持つ最も近い祖先を採る。(b) 祖先をたどるとき、`<親>/projects/<名前>` の形で親が ccnavi の根なら親を採り、sh と揃える。(c) 根の目印を `.claude/` ではなく `.ccnavi/scripts/ccnavi-common.sh` にする。sh に `CLAUDE_PROJECT_DIR` を読ませる案は、Bash ツールの環境に来ないので選択肢にならない
-- 分岐名の接頭辞の設定（N2）: `CCNAVI_BRANCH_PREFIXES` をプロジェクトごとに持つかどうか。統合先ブランチの優先順位（B1）は、変数を廃止して解消した（ADR-0146）
+- 分岐名の接頭辞の設定（N2）: `CCNAVI_BRANCH_PREFIXES` をプロジェクトごとに持つかどうか。統合先ブランチの優先順位（B1）は、変数を廃止して解消した（ADR-0148）
 - ミラーの指紋（D1）: 単体用とワークスペース用の写しを印で見分けるか、ワークスペースの共通と違うときは上書きせず差を warn して止めるか
 - 単体 clone の初回導入（C1）: 実行ファイルが無いときの専用の案内と、単体 clone に setup を実行する手順を、どこに置くか
 - 単体 clone での縮退の中身（C2）: 目録を MAIN のツリーでも出すか、別の形に落とすか。工程スキルがワークスペース内 clone で二重に出る例外をどうするか

@@ -59,7 +59,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 その名前への直接の push を（`main` などの固定のリストと同じく）拒み、`ccnavi-review.sh` は依頼のとき、既存のマージリクエストのマージ先がこの統合先と一致するかを確かめる（マージリクエストを作るのは `ccnavi-start.sh`）。
 手元の `origin/HEAD` は clone のときのまま更新されないので、`ccnavi-fetch.sh` が第 1 周（承認済みチケットの取得）の後、第 2 周（起点を進める）の前に、
 リポジトリごとにホストの既定ブランチ（`ls-remote --symref origin HEAD`）を聞き、違えばそのブランチを fetch してから向け直して 1 行出す
-（届かない・失敗のときは何も出さず何も変えない。ADR-0146）。`ccnavi-sync.sh` は、ホストに聞くのを先にして、読めないときに手元の
+（届かない・失敗のときは何も出さず何も変えない。ADR-0148）。`ccnavi-sync.sh` は、ホストに聞くのを先にして、読めないときに手元の
 `origin/HEAD`・`main`・`master` に落とし、違えば取れた後に手元を向け直す。
 リモートに届かないときは手元の版で判定を続ける。fetch は 1 回ずつ時間を監視して打ち切り、hook の
 上限に当たらないようにする。
@@ -71,8 +71,8 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 リモートにある最初の名前にする。どれも無ければ止める。親のブランチ名は、実行ファイルの `ccnavi write-and-push family <P>` の `branch` の行（親のワークツリーの HEAD から読んだ名前）で知る。
 `ccnavi-sync.sh` は取り込んだ後に `ccnavi sync check <P>` でその親子のチケットを判定し直し、error があれば表示して終了コード 1 にする
 （理由を直して打ち直せば通る）。MR がマージ済みと分かったら、手元の片付け（`ccnavi sync tidy`。9.11）を行う。
-旧い取り込み状態が残る機械では、`ccnavi-sync.sh` の先頭が `ccnavi sync migrate` を 1 回呼び、親のワークツリーが無い親の `mr` と `branch` を
-`retire/<P>.json` に移して旧い記録と `integration/` を消す（冪等。状態は捨てる）。
+古い取り込み状態が残る機械では、`ccnavi-sync.sh` の先頭が `ccnavi sync migrate` を 1 回呼び、親のワークツリーが無い親の `mr` と `branch` を
+`retire/<P>.json` に移して古い記録と `integration/` を消す（冪等。状態は捨てる）。
 
 **`ccnavi-git.sh` の中の判定は P13 の例外。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（生の
 `git` は組み込みでいつも止まる）、その中で次の可否を sh が一次に判定する。チケットに結び付くブランチの `integrate` を断る
@@ -92,7 +92,7 @@ write-and-push（`ccnavi_wap_prepare`）と `ccnavi-user-push-approved.sh` の p
 形跡（`refs/remotes/origin/<B>`、または着手済み（承認済みの親チケットの `started_at`）・`.requested`・退避）があれば `ls-remote`（60 秒）でリモートにあるかを聞き、
 無ければ拒否、失敗・時間切れは確かめられない（拒否側）。形跡が無く、着手も依頼も退避も無ければ初回の push として通す。
 承認済みというだけでは形跡にしない（承認して最初に打つ push を通す。着手は write-and-push で push してから完了するので、着手済みなら一度は push している）。
-実行ファイルが無い、または旧くて `started` の行を返さないときは、参照の形跡だけで決める。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）は関門では呼ばない。
+実行ファイルが無い、または古くて `started` の行を返さないときは、参照の形跡だけで決める。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）は関門では呼ばない。
 迂回は、ユーザが端末で `git push origin <B>` を一度打つこと。捨てた親は、親のワークツリーを片付ければ対象から外れる。
 
 **正とする側。** 全部の親子のチケットで同じく、親のブランチに固定する。手元では `.claude/worktrees/<P>`（HEAD のブランチ名の

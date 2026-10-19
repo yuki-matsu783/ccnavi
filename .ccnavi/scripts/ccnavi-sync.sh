@@ -241,6 +241,18 @@ default_branch() {
 		db_host=""
 		;;
 	esac
+	# ホストの答えが手元の origin/HEAD と綴りの大文字小文字だけ違うなら、同じ名前として手元の綴りを使う。
+	# 別の綴りで取ると、大文字小文字を区別しない FS で origin/<名前> が衝突する。
+	if [ -n "$db_host" ]; then
+		db_local=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
+		db_local="${db_local#origin/}"
+		db_local_f=$(printf '%s' "$db_local" | tr '[:upper:]' '[:lower:]')
+		db_head_f=$(printf '%s' "$db_head" | tr '[:upper:]' '[:lower:]')
+		if [ -n "$db_local" ] && [ "$db_local_f" = "$db_head_f" ]; then
+			printf '%s\n' "$db_local"
+			return 0
+		fi
+	fi
 	if [ -n "$db_head" ] && has_head "$2" "$db_head"; then
 		# ホストに聞いて得た名前か。`$( )` の中で呼ぶので、変数ではなくファイルで呼び元へ渡す。
 		[ -z "$db_host" ] || : >"$scratch/db-host"
@@ -882,10 +894,7 @@ while IFS= read -r key <&4; do
 	if [ -e "$scratch/db-host" ]; then
 		old_head=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
 		old_head="${old_head#origin/}"
-		# 大文字小文字だけ違う名前は同じものとして扱う。
-		old_head_f=$(printf '%s' "$old_head" | tr '[:upper:]' '[:lower:]')
-		integ_f=$(printf '%s' "$integ" | tr '[:upper:]' '[:lower:]')
-		if [ "$old_head_f" != "$integ_f" ] &&
+		if [ "$old_head" != "$integ" ] &&
 			git -C "$repo" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$integ" 2>/dev/null; then
 			printf '%s 統合先を %s から %s に合わせた（ホストの既定ブランチ）\n' "$label" "${old_head:-未設定}" "$integ"
 		fi

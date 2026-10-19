@@ -10,7 +10,7 @@ keywords: [判定, sh, ccnavi-git.sh, integrate, integrate-done, push, carry, �
 
 状態: 採用（例外の範囲を、親ブランチの共通の push 関門（write-and-push と `ccnavi-push-approved.sh` の push の前を含む）に広げることは ADR-0142 が改める。表の `push-gone-family`・`push-ambiguous-family` の材料だった取り込み状態の `state`・`branch`、`ig_bound` が読んでいた取り込み状態、統合先の名前の「取り込み結果」の分は、取り込み状態をやめたことで改まった）
 
-改訂（2026-10-19）: 統合先の名前の決め方（環境変数・取り込み結果・`origin/HEAD` の順）は ADR-0146 が改める。統合先は各リポジトリの `origin/HEAD` だけで決め、環境変数 `CCNAVI_INTEGRATION_BRANCH`・`settings.local.json` の env・`--integration-branch` は廃止した。本文は当時の記述として残す。
+改訂（2026-10-19）: 統合先の名前の決め方（環境変数・取り込み結果・`origin/HEAD` の順）は ADR-0148 が改める。統合先は各リポジトリの `origin/HEAD` だけで決め、環境変数 `CCNAVI_INTEGRATION_BRANCH`・`settings.local.json` の env・`--integration-branch` は廃止した。本文は当時の記述として残す。
 
 改訂（2026-10-14）: 「承認済みの `branch:` のブランチへ移る 1 操作の前提」は、ADR-0136 が `branch:` を廃止したため無くなった。
 
