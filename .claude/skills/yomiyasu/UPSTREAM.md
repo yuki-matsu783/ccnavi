@@ -29,7 +29,7 @@ upstream の `skills/yomiyasu/` から次をそのまま写した。
 
 ## ローカルの変更
 
-- 禁止語に「旧い」を足した（「古い」に統一する）。`scripts/yomiyasu_lint.py` の `SLOP_WORDS` と `references/slop-catalog.md` の表。upstream から差し替えるときは足し直す
+- 禁止語に「旧い」とその活用形（「旧く」「旧かっ」「旧けれ」）を足した（「古い」に統一する）。`scripts/yomiyasu_lint.py` の `SLOP_WORDS` と `references/slop-catalog.md` の表。upstream から差し替えるときは足し直す
 
 ## 既知の注意
 
