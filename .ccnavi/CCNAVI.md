@@ -12,7 +12,7 @@
 ## 作業の決まり
 
 <!-- ccnavi:if workspace_root -->
-  - 編集する前にワークツリー（{{worktrees}}/<名前>）を切り、その中で編集する。切り方は ccnavi-git.sh の --help（worktree add）。直接作業の名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md）。
+  - 編集する前に {{worktree_sh}} <名前> でワークツリー（{{worktrees}}/<名前>）を切り、その中で編集する。直接作業の名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md）。
 <!-- ccnavi:endif -->
 <!-- ccnavi:if git_wrapper -->
   - git は直接呼ばず {{git_sh}} を通す。止められたら迂回せず、出力の案内に従う。

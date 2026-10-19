@@ -198,7 +198,15 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(
         _proposal_problems(proposals, copies, index, closed, done, repo_of, preds, root=root)
     )
-    integration = ops_stop_integrate.integration_name(root, conf, root, "")
+    integrations: dict[str, str] = {}
+
+    def integration_of(project: str) -> str:
+        # 統合先はリポジトリごと。チケットの project のリポジトリの origin/HEAD で引く。
+        if project not in integrations:
+            owner = tree.project_root(conf.projects, project) or root
+            integrations[project] = ops_stop_integrate.integration_name(owner)
+        return integrations[project]
+
     problems.extend(lint_branch._place_problems(root, proposals, copies, closed, review, repo_of))
     problems.extend(
         lint_branch._branch_name_problems(
@@ -206,9 +214,11 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
             copies,
             closed,
             review,
-            integration,
+            integration_of,
             conf.branch_prefixes,
             _adopted_parents(root, proposals),
+            conf,
+            root,
         )
     )
     problems.extend(lint_branch._prefix_setting_problems(conf))

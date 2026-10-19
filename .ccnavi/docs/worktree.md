@@ -58,10 +58,10 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
 
 ### 手で切るとき
 
-- `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>`で作る。末尾の`<統合先>`を省くと今いるブランチが起点になるため、
-  `<統合先>`が`main`のときも省かずに書く
+- `ccnavi-git.sh worktree add <行き先> -b <名前> --no-track origin/<統合先>`で作る。起点は`origin/<統合先>`にして、
+  手元の`<統合先>`は進めない（追跡の設定も付けない）。末尾の起点を省くと今いるブランチが起点になるため、省かずに書く
 - 切る前に`ccnavi-git.sh fetch origin <統合先>`し、`ccnavi-git.sh log --oneline <統合先>..origin/<統合先>`で遅れを確かめる。
-  遅れていれば、統合先のワークツリーで`ccnavi-git.sh merge --ff-only origin/<統合先>`してから切る（基点を`origin/<統合先>`にしてもよい）。
+  遅れていなければ、基点を`<統合先>`にして切ってもよい。遅れていれば、上のとおり`origin/<統合先>`から切る
   基点が`<統合先>`か`origin/<統合先>`のとき、`worktree add`は最後のfetchが10分より前、または手元の統合先がoriginより遅れていると拒否する。
   fetchを試して失敗した記録が10分以内にあるとき（オフライン）は、警告だけで通す
 - `<行き先>`はcwdからの相対パスとして解釈される。ワークスペースルートからなら`.claude/worktrees/<名前>`、
@@ -76,9 +76,11 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
 
 ### 起点にする統合先
 
-- 起点はリモートにある最新の統合先にする。統合先の名前は`CCNAVI_INTEGRATION_BRANCH`を使い、無ければ`.claude/settings.local.json`の`env`に書かれた名前、
-  それも無ければデフォルトブランチ＝`origin/HEAD`が指すものを使う。`ccnavi-git.sh push`はこの順で決まる統合先へも
-  （`main`・`master`・`develop`・`release`・`release/*`と同じく）直接は送らず、`ccnavi-review.sh`が作るマージリクエストの宛先もこの統合先になる
+- 起点はリモートにある最新の統合先にする。統合先の名前は、そのリポジトリの手元の`origin/HEAD`が指すブランチで、無ければ`origin/main`、`origin/master`の順に使う。
+  環境変数や`.claude/settings.local.json`で上書きする手段は無く、`projects/`の下のプロジェクトも、それぞれ自分の`origin/HEAD`で決まる。
+  origin の無いリポジトリでは統合先が決まらない。`origin/HEAD`は、セッションの開始時に`ccnavi-fetch.sh`がホストの既定ブランチへ向け直す。
+  決まらないと案内が出たら、ユーザに`git fetch origin`のあと`git remote set-head origin -a`を頼む。`ccnavi-git.sh push`は決まった統合先へも
+  （`main`・`master`・`develop`・`release`・`release/*`と同じく）直接は送らず、`ccnavi-review.sh`は依頼のとき、既存のマージリクエストのマージ先がこの統合先と一致するかを確かめる（マージリクエストを作るのは`ccnavi-start.sh`）
 - 手元の統合先が古いと、そこから切ったブランチも古いコミットから始まり、`<統合先>`に取り込むときにfast-forwardできなくなる。
   そのため、セッションの開始時に`ccnavi-fetch.sh`が手元の統合先をfast-forwardで進める。ワークスペースルートが別のブランチを
   チェックアウトしていても進める。統合先をチェックアウトしているツリーに未コミットの変更があるときと、
@@ -91,8 +93,8 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   fetchが通ってlogに何も出なければ、手元の統合先は最新である。fetchが失敗するならネットワークや認証といった原因を解消し、
   logにコミットが出るなら次の項目の手順で`origin/<統合先>`から切る。
   分岐しているならユーザに合流させてもらい、未コミットの変更があるならそのツリーの持ち主に聞く
-- 手元の統合先を進めるのは、セッションの開始時の`ccnavi-fetch.sh`だけである。`ccnavi-git.sh fetch origin <統合先>`が進めるのは
-  `origin/<統合先>`だけで、手元の`<統合先>`は古いままになる。`ccnavi-sync.sh`が進めるのも親のブランチだけである。
+- 手元の統合先を進めるのは、セッションの開始時の`ccnavi-fetch.sh`だけである。`ccnavi-git.sh fetch origin <統合先>`が更新するのは
+  `origin/<統合先>`だけで、手元の`<統合先>`は古いままになる。`ccnavi-sync.sh`が更新するのは、親のブランチと、取得した`origin/<統合先>`・`origin/HEAD`だけで、手元の`<統合先>`は進めない。
   セッション中にリモートが進んだときは、`ccnavi-git.sh fetch origin <統合先>`のあとに
   `ccnavi-git.sh worktree add <行き先> -b <名前> --no-track origin/<統合先>`で`origin/<統合先>`から切る。
   `--no-track`を省くと、新しいブランチが`origin/<統合先>`を追跡する。すると次のセッションの開始時に、
@@ -127,7 +129,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
 直接作業のワークツリーで調べて提案を書き始め、そのままチケット作業になることがある。親のワークツリーは識別子と同名でなければならないので、提案を書いたツリーが識別子と違う名前なら、承認の前に切り直す。
 
 - 識別子の番号は、issueがあればその番号、無ければ次の通し番号にする。通し番号は`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-ticket.sh next-id`で聞く（ADR-0102）。同じリポジトリの別の親と番号が重なると`--lint`が警告する
-- 提案を書いたツリーが識別子と違う名前なら、承認の前に`worktree add .claude/worktrees/<識別子> -b <識別子> <統合先>`で識別子と同名のワークツリーを切る。提案をそこへ移し（`wip/proposals/todo/`の同じ相対位置）、元のツリーの提案は消す
+- 提案を書いたツリーが識別子と違う名前なら、承認の前に`worktree add .claude/worktrees/<識別子> -b <識別子> --no-track origin/<統合先>`（直接作業の名前なら`ccnavi-worktree.sh <識別子>`）で識別子と同名のワークツリーを切る。提案をそこへ移し（`wip/proposals/todo/`の同じ相対位置）、元のツリーの提案は消す
 - 承認の後に切り直さない。ccnaviは親のワークツリーを「名前が識別子のもの」として探し、そこにあるチケットだけを正とするので、別名のツリーで承認すると親が決まらず、承認済みチケットの自動コミットも動かず、`--lint`が「親 X が承認されていない」を出し続ける
 - 先に書いた提案は、識別子と同名のワークツリーに移してから承認の依頼に進む。ユーザの承認が別名のツリーの提案に対するものだったら、移した後の中身が同じことを見せて、承認を取り直す
 - `--lint`は、識別子と違う名前のツリーにある親の提案と、親と同名でないツリーにある子の提案を警告する（ワークスペースルートの提案は言わない）

@@ -133,9 +133,9 @@ top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	fail not-git "cwd が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
 scripts="$root/.ccnavi/scripts"
 dest="$root/.claude/worktrees/$name"
-integ=$(ccnavi_integration "$(ccnavi_phys "$top")" "$root") || integ=""
+integ=$(ccnavi_integration "$(ccnavi_phys "$top")") || integ=""
 [ -n "$integ" ] ||
-	fail no-integration "統合先の名前を決められません。CCNAVI_INTEGRATION_BRANCH に統合先の名前を渡すか、origin/HEAD を設定してください（git remote set-head origin -a はユーザに頼む）。"
+	fail no-integration "$(ccnavi_integration_hint "$top")"
 log_info 始めた -- "name=$name" "integration=$integ" "offline=${offline:-no}" "dry=${dry:-no}"
 
 # ccnavi-git.sh 経由の git。成功は何も出さず、失敗は出力を標準エラーへ出して 1 を返す。
@@ -147,6 +147,13 @@ cgit() {
 	return 0
 }
 
+# 最後の行（名前の警告よりも後）に出す次の一手。コマンドは 1 行で完結する形にする。
+print_next() {
+	pn_q=$(ccnavi_sh_quote "$dest")
+	pn_g="sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh")"
+	printf '次: 編集はこのワークツリーの下で行います（Write / Edit に渡すパス: %s/…）。git は `cd %s && %s <サブコマンド>` の形で実行します。終わったらコミットし、ターンの終わりの integrate の案内に従います\n' "$dest" "$pn_q" "$pn_g"
+}
+
 if [ -e "$dest" ] || [ -L "$dest" ]; then
 	# 在るのは、このリポジトリのワークツリーで、同じ名前のブランチを開いているときだけ成功にする。
 	have=$(git worktree list --porcelain 2>/dev/null | awk -v want="$(ccnavi_phys "$dest")" '
@@ -156,10 +163,11 @@ if [ -e "$dest" ] || [ -L "$dest" ]; then
 		fail dest-exists "${dest} は既にありますが、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${have:-ワークツリーの登録が無い}）。中身を確かめ、不要ならユーザに確かめてから片付け、別の名前で再実行してください。"
 	printf 'ワークツリーは既にある: %s\n' "$dest"
 	log_info 既にある -- "name=$name"
+	print_next
 	exit 0
 fi
 if git show-ref --verify --quiet "refs/heads/$name"; then
-	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すなら ccnavi-git.sh worktree add .claude/worktrees/${name} ${name}、新しく切るなら別の名前にしてください。"
+	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すなら sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")、新しく切るなら別の名前にしてください。"
 fi
 
 # 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。
@@ -172,8 +180,8 @@ same_id_guard() {
 	log_info 同じ識別子のブランチ -- "name=$name" "where=$2"
 	printf 'ワークツリーは切っていない。%s にブランチ %s があり、%s と同じ識別子（%s。英字の大文字小文字は区別しない）になる。\n' "$2" "$sg_other" "$name" "$name"
 	printf '同じ識別子のブランチが 2 本あると、ワークツリーの置き場が重なる。既にあるブランチは ccnavi-start.sh で始める:\n'
-	printf '  sh %s/ccnavi-start.sh --mr <MR の番号>\n  sh %s/ccnavi-start.sh --issue <issue の番号>\n' "$scripts" "$scripts"
-	printf '別の作業として新しく切るなら、別の名前で再実行する: sh %s/ccnavi-worktree.sh <別の名前>\n' "$scripts"
+	printf '  sh %s --mr <MR の番号>\n  sh %s --issue <issue の番号>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")" "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")"
+	printf '別の作業として新しく切るなら、別の名前で再実行する: sh %s <別の名前>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")"
 	exit 1
 }
 {
@@ -230,7 +238,7 @@ diverged_guard() {
 	printf 'このまま origin/%s から切ると、手元にだけある先行 %s 件を知らないブランチになり、統合（integrate）で詰まる。\n' "$integ" "$ahead"
 	printf '次の手:\n'
 	printf '  1. 先に手元の %s を origin/%s に揃える。ccnavi は手元の統合先を進めないので、ユーザに頼む（先行分を push するか、別のブランチに退避してから揃える）\n' "$integ" "$integ"
-	printf '  2. 揃えたら同じコマンドを再実行する: sh %s/ccnavi-worktree.sh %s\n' "$scripts" "$name"
+	printf '  2. 揃えたら同じコマンドを再実行する: sh %s %s\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
 	printf '  3. 先行分が不要・承知のうえなら --from-origin を付けて再実行します（警告つきで origin/%s から切る）\n' "$integ"
 	exit 1
 }
@@ -256,13 +264,13 @@ if ! cgit fetch origin "$integ"; then
 		printf 'ワークツリーは切っていない。origin から統合先 %s を取れなかった（上の出力に原因が出ている。ネットワーク・認証・origin の設定のどれか）。\n' "$integ"
 		case "$cgit_out" in
 		*"couldn't find remote ref"*)
-			printf '注意: origin に統合先 %s がありません（名前の誤りか、統合先の設定の誤り）。--offline で切ると古い手元の統合先から切るので、先に名前を確かめる（CCNAVI_INTEGRATION_BRANCH）。\n' "$integ"
+			printf '注意: origin に統合先 %s がありません（手元の origin/HEAD がホストの既定ブランチとずれている）。--offline で切ると古い手元の統合先から切るので、先にユーザに git fetch origin のあと git remote set-head origin -a を頼む。\n' "$integ"
 			;;
 		esac
 		printf '次の手:\n'
-		printf '  1. 原因を直せるなら直して、同じコマンドを再実行する: sh %s/ccnavi-worktree.sh %s\n' "$scripts" "$name"
+		printf '  1. 原因を直せるなら直して、同じコマンドを再実行する: sh %s %s\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
 		printf '     認証や origin の設定が必要なときは、ユーザに頼む（ccnavi は git config を通さない）\n'
-		printf '  2. 直せない・オフラインで続けるなら --offline を付けて再実行する: sh %s/ccnavi-worktree.sh %s --offline\n' "$scripts" "$name"
+		printf '  2. 直せない・オフラインで続けるなら --offline を付けて再実行する: sh %s %s --offline\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
 		printf '     手元の %s から切る。origin が古いかもしれないので、切ったことをユーザに伝える\n' "$integ"
 		exit "$EXIT_NET"
 	fi
@@ -291,8 +299,8 @@ if [ -z "$fetch_note" ]; then
 		if [ -z "$offline" ]; then
 			printf 'ワークツリーは切っていない。origin のブランチ一覧を取れなかった（%s）。リモート未確認のままでは、同じ識別子になるブランチが origin に無いか確かめられない。\n' "${remote_why:-理由不明}"
 			printf '次の手:\n'
-			printf '  1. 原因を直せるなら直して、同じコマンドを再実行する: sh %s/ccnavi-worktree.sh %s\n' "$scripts" "$name"
-			printf '  2. 直せない・オフラインで続けるなら --offline を付けて再実行する: sh %s/ccnavi-worktree.sh %s --offline\n' "$scripts" "$name"
+			printf '  1. 原因を直せるなら直して、同じコマンドを再実行する: sh %s %s\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
+			printf '  2. 直せない・オフラインで続けるなら --offline を付けて再実行する: sh %s %s --offline\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
 			printf '     手元に残る origin の追跡ブランチでだけ確かめて切る。切ったことと、リモート未確認であることをユーザに伝える\n'
 			exit "$EXIT_NET"
 		fi
@@ -301,8 +309,8 @@ if [ -z "$fetch_note" ]; then
 		log_info リモートに同名のブランチ -- "name=$name"
 		printf 'ワークツリーは切っていない。origin にブランチ %s が既にある（MR の元ブランチかもしれない）。\n' "$name"
 		printf '既にあるブランチは、MR を探して採用してよいか確かめてから出す。ccnavi-start.sh で始める:\n'
-		printf '  sh %s/ccnavi-start.sh --mr <MR の番号>\n  sh %s/ccnavi-start.sh --issue <issue の番号>\n' "$scripts" "$scripts"
-		printf '別の作業として新しく切るなら、別の名前で再実行する: sh %s/ccnavi-worktree.sh <別の名前>\n' "$scripts"
+		printf '  sh %s --mr <MR の番号>\n  sh %s --issue <issue の番号>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")" "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")"
+		printf '別の作業として新しく切るなら、別の名前で再実行する: sh %s <別の名前>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")"
 		exit 1
 	else
 		same_id_guard "$heads_list" origin
@@ -312,7 +320,7 @@ else
 	if git show-ref --verify --quiet "refs/remotes/origin/$name"; then
 		printf 'ワークツリーは切っていない。origin にブランチ %s がある（手元に残る追跡ブランチで分かった。MR の元ブランチかもしれない）。\n' "$name"
 		printf '既にあるブランチは、MR を探して採用してよいか確かめてから出す。ccnavi-start.sh で始める:\n'
-		printf '  sh %s/ccnavi-start.sh --mr <MR の番号>\n  sh %s/ccnavi-start.sh --issue <issue の番号>\n' "$scripts" "$scripts"
+		printf '  sh %s --mr <MR の番号>\n  sh %s --issue <issue の番号>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")" "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")"
 		exit 1
 	fi
 	remote_note="リモート未確認。origin に届かなかったので、同じ識別子のブランチは手元に残る origin の追跡ブランチでだけ確かめた。"
@@ -339,4 +347,5 @@ if name_bin=$(ccnavi_bin "$root"); then
 	name_note=$("$name_bin" --root "$root" worktree name "$name" 2>/dev/null </dev/null) || name_note=""
 fi
 [ -z "$name_note" ] || printf '%s\n' "$name_note"
+print_next
 log_info 完了 -- "name=$name" "base=$base"

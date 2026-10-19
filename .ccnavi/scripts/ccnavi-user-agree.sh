@@ -26,7 +26,7 @@
 # （review/ の変更や、前の失敗で残ったファイル）は巻き込まない。push が失敗しても承認自体は 0 で終わる（コミットは残り、打ち直せば送れる）。
 #
 # 統合先が保護ブランチ（main / master / develop / release / release/*）であるか、そのリポジトリの
-# 統合先ブランチ（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env → origin/HEAD）上にいるときは
+# 統合先ブランチ（そのリポジトリの origin/HEAD）上にいるときは
 # push しない。そこへ直接送るかどうかはユーザが判断するため、ブランチ名を示して停止する。
 #
 # エージェントからは hook が止める（ccnavi-user- で始まる sh の名前と、実行ファイルの `user` の入口）。

@@ -546,9 +546,9 @@ class ReadyTest(AuthorityHarness):
 
 
 class LintTest(AuthorityHarness):
-    def test_local_settings_may_hold_only_the_integration_branch(self):
+    def test_local_settings_may_hold_nothing_that_decides_approval(self):
         path = os.path.join(self.root, ".claude", "settings.local.json")
-        write(path, json.dumps({"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}))
+        write(path, json.dumps({"env": {"CCNAVI_LOG_LEVEL": "DEBUG"}}))
         problems = json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
         self.assertFalse([p for p in problems if "settings.local.json" in p["detail"]])
         write(
@@ -556,7 +556,6 @@ class LintTest(AuthorityHarness):
             json.dumps(
                 {
                     "env": {
-                        "CCNAVI_INTEGRATION_BRANCH": "develop",
                         "CCNAVI_MODE": "disable",
                         "CCNAVI_RESTORE_IF_DENY": "disable",
                         "CCNAVI_LOG_LEVEL": "DEBUG",

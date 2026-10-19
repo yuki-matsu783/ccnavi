@@ -80,6 +80,9 @@ _SESSION_ONLY = (
     re.compile(r"^(?P<s>.+)\.turn\.json$"),  # post._turn_path
     re.compile(r"^(?P<s>.+)\.accepted\.json$"),  # post._accepted_path
     re.compile(r"^busy-(?P<s>.+)\.json$"),  # busy._path
+    re.compile(
+        r"^direct-(?P<s>.+)\.json$"
+    ),  # direct_candidates.path_of（compact・clear では捨てない）
 )
 # 名前の後ろにセッション以外の鍵が `-` で続く記録。セッションにも `-` が入るので、
 # 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。

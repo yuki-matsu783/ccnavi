@@ -246,7 +246,6 @@ _NOT_WITH_DOCS = (
     "--accept-done",
     "--accept-check",
     "--placed-out",
-    "--integration-branch",
     "--actor",
     "--via",
 )

@@ -73,6 +73,11 @@ reject() {
 # 共通部分。ワークスペースルートの探し方と、プロジェクト名の導出はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
 
+# 案内の文専用の、引用した自分の呼び方。パスに空白や ' があっても、そのまま打てる。
+# `SELF` は今までの動きのまま変えない。
+SELF_Q="sh $(ccnavi_sh_quote "$0")"
+WT_SH_Q="sh $(ccnavi_sh_quote "$(dirname "$0")/ccnavi-worktree.sh")"
+
 # ワークスペースルート。道具と記録の置き場。git のトップとは違うもので、
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
 # 上へたどって `.ccnavi/scripts/ccnavi-common.sh` を探す（保護済みスクリプトはワークスペースルートの .ccnavi/scripts/ に置くため）。
@@ -113,8 +118,8 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   通信      fetch  pull  (--force / --prune は不可。取ってくるのは <リモート> <ブランチ> だけで、
                    : や + を含む引数(refspec・URL)は不可。手元の ref は ccnavi-sync.sh が進める)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
-                   main master develop release と統合先 (CCNAVI_INTEGRATION_BRANCH、無ければ
-                   settings.local.json の env、無ければ origin/HEAD) へ直接は送れない。
+                   main master develop release と統合先 (そのリポジトリの origin/HEAD、無ければ
+                   origin/main・origin/master) へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
                    リモートから消えた親のブランチへは送れない。親のワークツリーは push の前に
                    リモートに在るかを確かめる。捨てた親ならワークツリーを片付ける)
@@ -564,7 +569,7 @@ wt_fresh() {
 	fi
 	wt_f_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
 	[ -n "$wt_f_top" ] || return 0
-	wt_f_integ=$(ccnavi_integration "$wt_f_top" "$WS") || return 0
+	wt_f_integ=$(ccnavi_integration "$wt_f_top") || return 0
 	[ -n "$wt_f_integ" ] || return 0
 	wt_f_from="$wt_base"
 	case "$wt_f_from" in
@@ -604,10 +609,19 @@ wt_fresh() {
 		reject worktree-base-diverged "ワークツリーの基点 $wt_f_integ が origin/$wt_f_integ と分岐しています（先行 ${wt_f_ahead} 件・遅れ ${wt_f_behind} 件）。$SELF merge --ff-only では進められません。基点を origin/${wt_f_integ} にして切ると、手元にだけある先行 ${wt_f_ahead} 件を知らないブランチになり、統合で詰まります。ユーザに頼んで、先行分を push するか別のブランチに退避してから、手元の ${wt_f_integ} を origin/${wt_f_integ} に揃えてください。揃えたら再実行します。"
 	fi
 	if [ "$wt_f_behind" -ne 0 ]; then
-		reject worktree-base-behind "ワークツリーの基点 $wt_f_integ が origin/$wt_f_integ より ${wt_f_behind} 件遅れています。古い統合先から切ると、取り込み済みの変更を知らないブランチになります。$SELF fetch origin ${wt_f_integ} のあと、統合先のワークツリーで $SELF merge --ff-only origin/${wt_f_integ} を実行するか、基点を origin/${wt_f_integ} にして切り直してください（$SELF worktree add $wt_dest -b ${wt_leaf} origin/${wt_f_integ}）。"
+		wt_q_integ=$(ccnavi_sh_quote "$wt_f_integ")
+		wt_q_leaf=$(ccnavi_sh_quote "$wt_leaf")
+		wt_q_dest=$(ccnavi_sh_quote "$wt_dest")
+		wt_q_origin=$(ccnavi_sh_quote "origin/$wt_f_integ")
+		reject worktree-base-behind "ワークツリーの基点 $wt_f_integ が origin/$wt_f_integ より ${wt_f_behind} 件遅れています。古い統合先から切ると、取り込み済みの変更を知らないブランチになります。直接作業なら \`$WT_SH_Q $wt_q_leaf\` で切り直すと、起点を自動で選びます。手で切るなら \`$SELF_Q fetch origin $wt_q_integ\` のあと、\`$SELF_Q worktree add $wt_q_dest -b $wt_q_leaf --no-track $wt_q_origin\` を実行してください（手元の ${wt_f_integ} は進めない）。"
 	fi
 	if [ "$wt_f_stale" = yes ] && [ "$wt_f_offline" = no ]; then
-		reject worktree-fetch-stale "ワークツリーの基点 $wt_f_from の元になる origin/${wt_f_integ} が古いかもしれません（最後の fetch が 10 分より前、または fetch の記録がありません）。まず $SELF fetch origin ${wt_f_integ} を実行し、$SELF log --oneline ${wt_f_integ}..origin/${wt_f_integ} で遅れを確かめてから、再実行してください。遅れていれば統合先のワークツリーで $SELF merge --ff-only origin/${wt_f_integ} を実行するか、基点を origin/${wt_f_integ} にして切り直します。"
+		wt_q_integ=$(ccnavi_sh_quote "$wt_f_integ")
+		wt_q_leaf=$(ccnavi_sh_quote "$wt_leaf")
+		wt_q_dest=$(ccnavi_sh_quote "$wt_dest")
+		wt_q_origin=$(ccnavi_sh_quote "origin/$wt_f_integ")
+		wt_q_range=$(ccnavi_sh_quote "${wt_f_integ}..origin/${wt_f_integ}")
+		reject worktree-fetch-stale "ワークツリーの基点 $wt_f_from の元になる origin/${wt_f_integ} が古いかもしれません（最後の fetch が 10 分より前、または fetch の記録がありません）。まず \`$SELF_Q fetch origin $wt_q_integ\` を実行し、\`$SELF_Q log --oneline $wt_q_range\` で遅れを確かめてから、再実行してください。遅れていれば、直接作業なら \`$WT_SH_Q $wt_q_leaf\` で切り直します。手で切るなら \`$SELF_Q worktree add $wt_q_dest -b $wt_q_leaf --no-track $wt_q_origin\` を実行してください（手元の ${wt_f_integ} は進めない）。"
 	fi
 	if [ "$wt_f_stale" = yes ]; then
 		wt_fresh_warn="fetch を試して失敗した記録があるため、origin/${wt_f_integ} が古いかもしれないまま ${wt_f_from} から切りました（オフラインの可能性）。つながったら $SELF fetch origin ${wt_f_integ} で遅れを確かめてください。"
@@ -654,9 +668,9 @@ ig_where() {
 	ig_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	[ -n "$ig_top" ] ||
 		reject not-a-repo "git リポジトリの中で実行してください（統合先をチェックアウトしているツリーで $SELF $sub ... を実行します）。"
-	ig_integ=$(ccnavi_integration "$ig_top" "$WS") || ig_integ=""
+	ig_integ=$(ccnavi_integration "$ig_top") || ig_integ=""
 	[ -n "$ig_integ" ] ||
-		reject integrate-no-integration "統合先の名前が決まりません（CCNAVI_INTEGRATION_BRANCH・settings.local.json の env・origin/HEAD のどれもありません）。統合先をユーザに確かめ、CCNAVI_INTEGRATION_BRANCH に入れてもらってから再実行してください。"
+		reject integrate-no-integration "$(ccnavi_integration_hint "$ig_top")"
 	ig_head=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
 	if [ "$ig_head" != "$ig_integ" ]; then
 		ig_home=$(git worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/$ig_integ" '
@@ -1848,10 +1862,10 @@ push)
 		;;
 	esac
 	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も止める。名前は ccnavi-fetch.sh が
-	# ワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env →
-	# origin/HEAD → origin/main・master）で、このツリーが属するリポジトリ（プロジェクトならその
-	# プロジェクト）について決める。決まらなければ上の固定のリストだけで判定する。
-	push_integ=$(ccnavi_integration "${push_top:-.}" "$WS") || push_integ=""
+	# ワークツリーの起点に使うのと同じ決め方（origin/HEAD → origin/main・master）で、このツリーが
+	# 属するリポジトリ（プロジェクトならそのプロジェクト）について決める。決まらなければ上の固定の
+	# リストだけで判定する。
+	push_integ=$(ccnavi_integration "${push_top:-.}") || push_integ=""
 	log_debug push の統合先 -- "integration=$push_integ"
 	if [ -n "$push_integ" ] && [ "$push_branch" = "$push_integ" ]; then
 		reject push-integration-branch "$push_branch は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
