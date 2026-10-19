@@ -97,6 +97,13 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | `PreToolUse` で `permissionDecision` と `additionalContext` を 1 つの応答に入れたとき、両方がモデルに届くか | 届く（Claude Code 2.1.235）。deny と ask では `permissionDecisionReason` と一緒に届く |
 | ask の `permissionDecisionReason` が誰に見えるか | ユーザの確認ダイアログに出る。Yes を押した後もモデルには届かない。No のときは拒否の定型文だけがモデルに届いてターンが終わる。allow の文面はどこにも出ない |
 | `/compact` の後に `SessionStart` が来るか | `source: compact` の `SessionStart` が同じ `session_id` で届く |
+| サブエージェントの `PostToolUse`・`SubagentStart`・`SubagentStop` の `session_id` は親と同じか | 同じ（前景・背景とも）。`agent_id`（と `agent_type`）が付き、`cwd` は起動した側のまま。親（メイン）の呼び出しには `agent_id` が付かない |
+| サブエージェントの `PostToolUse` の `tool_input` のパスは絶対か相対か | 絶対パスで来た（`Write`・`Edit` の `file_path`）。相対で来ても `cwd` から解く実装にしてある |
+| 前景と背景のサブエージェントで payload の形は違うか | 違わない。背景は `PostToolUse` が親の `Agent` 呼び出しより後に来ることがある |
+| 入れ子のサブエージェント（サブエージェントがさらに起動する体）の payload | 実測できない。この版ではサブエージェントが `Agent` ツールを持たなかった（`ToolSearch` でも見つからない） |
+| `SubagentStop` が来て実行中の印が外れるか | 来る（前景・背景とも、`agent_id` つき）。印は `SubagentStop` で外れる |
+| 期限の数値（残り − 0.5 秒・0.2 秒以下は起動しない・SessionStart の 2 秒）で足りるか | Linux では足りる（ワークツリー 8 本・記録 1 件で、Stop も SessionStart も 1 回 0.3 秒未満）。Windows の Git Bash は未測定で、測ってから見直す |
+| `/clear` の後の `SessionStart` の `session_id` と `source` | 未実測（ユーザの操作が要る）。`compact` は上の行のとおり |
 | `${CLAUDE_PROJECT_DIR}` は `env` で展開されるか | hook の `command` では展開されるが `env` では展開されない |
 | `env` は再読み込みされるか | されない。セッションを開き直すまで古い値が残る。hook の `command` は即座に反映される |
 | Bash ツールの環境に `CLAUDE_PROJECT_DIR` は来るか | 来ない。hook の環境にだけ来る |
