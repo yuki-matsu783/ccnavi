@@ -1,7 +1,7 @@
 /**
  * 画面を覆う背景と、その上の本体。承認（`Approval`）・保存前の確かめ（`SaveReview`・`Review`）・エージェントの提案の確認
  * （`Proposal`）が使い、`role="dialog"`・`aria-modal`・`aria-labelledby` と見た目（`Dialog.css`）を 1 か所に持つ。
- * 旧来のクラス名（`backdropClass`・`cardClass`）は、画面の幅の指定とテストの目印に残す。
+ * 古いクラス名（`backdropClass`・`cardClass`）は、画面の幅の指定とテストの目印に残す。
  */
 import type { JSX, ReactNode, Ref } from "react";
 

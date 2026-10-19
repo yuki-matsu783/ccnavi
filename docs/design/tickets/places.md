@@ -92,7 +92,7 @@ write-and-push（`ccnavi_wap_prepare`）と `ccnavi-user-push-approved.sh` の p
 形跡（`refs/remotes/origin/<B>`、または着手済み（承認済みの親チケットの `started_at`）・`.requested`・退避）があれば `ls-remote`（60 秒）でリモートにあるかを聞き、
 無ければ拒否、失敗・時間切れは確かめられない（拒否側）。形跡が無く、着手も依頼も退避も無ければ初回の push として通す。
 承認済みというだけでは形跡にしない（承認して最初に打つ push を通す。着手は write-and-push で push してから完了するので、着手済みなら一度は push している）。
-実行ファイルが無い、または旧くて `started` の行を返さないときは、参照の形跡だけで決める。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）は関門では呼ばない。
+実行ファイルが無い、または古くて `started` の行を返さないときは、参照の形跡だけで決める。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）は関門では呼ばない。
 迂回は、ユーザが端末で `git push origin <B>` を一度打つこと。捨てた親は、親のワークツリーを片付ければ対象から外れる。
 
 **正とする側。** 全部の親子のチケットで同じく、親のブランチに固定する。手元では `.claude/worktrees/<P>`（HEAD のブランチ名の
