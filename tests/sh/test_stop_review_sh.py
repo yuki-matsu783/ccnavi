@@ -85,6 +85,14 @@ class StopReviewSetupTest(unittest.TestCase):
         self.assertEqual(agent["model"], "haiku")
         self.assertTrue(os.path.exists(self.settings + ".bak"))
 
+    def test_defaults_are_haiku_and_a_60_second_timeout(self):
+        self.assertEqual(self.sh("register").returncode, 0)
+        (agent,) = self.agents()
+        self.assertEqual((agent["model"], agent["timeout"]), ("haiku", 60))
+        self.assertEqual(self.sh("register", "--model", "sonnet").returncode, 0)
+        (agent,) = self.agents()
+        self.assertEqual(agent["model"], "sonnet")  # 上書きできる（重複せず置き換わる）
+
     def test_register_sets_the_marker_env_and_is_idempotent(self):
         self.assertEqual(self.sh("register").returncode, 0)
         before = self.read()

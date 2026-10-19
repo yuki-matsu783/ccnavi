@@ -1,7 +1,7 @@
 #!/bin/sh
 # ccnavi-stop-review Stop の AI 判定の agent 型 Stop hook を、.claude/settings.json に登録・解除・点検する。
 #
-#   sh scripts/ccnavi-stop-review.sh register   [--root <ワークスペース>] [--model <名前>]
+#   sh scripts/ccnavi-stop-review.sh register   [--root <ワークスペース>] [--model <名前。既定 haiku>]
 #   sh scripts/ccnavi-stop-review.sh unregister [--root <ワークスペース>]
 #   sh scripts/ccnavi-stop-review.sh check      [--root <ワークスペース>]
 #
@@ -29,7 +29,10 @@ LAUNCHER='sh .ccnavi/scripts/ccnavi-launcher.sh'
 ALLOW_RULES="Bash($LAUNCHER stop-review material:*)
 Bash($LAUNCHER stop-review record:*)"
 allow_json=$(printf '%s\n' "$ALLOW_RULES" | jq -R -s 'split("\n") | map(select(length > 0))')
-TIMEOUT=120
+# 実測（haiku・sonnet で最大 23 秒）の 2 倍以上。固まった判定役を長く居座らせない。
+TIMEOUT=60
+# 判定役の既定のモデル。比較（docs/design/stop-review.md）で、haiku が sonnet と同じ精度で費用が約 16 分の 1 だった。
+DEFAULT_MODEL=haiku
 
 usage() {
 	sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' >&2
@@ -55,7 +58,7 @@ register | unregister | check) ;;
 esac
 
 root=""
-model=""
+model=$DEFAULT_MODEL
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 	--root | --model)
