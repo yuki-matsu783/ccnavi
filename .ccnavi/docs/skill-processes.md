@@ -40,7 +40,7 @@ keywords: [工程スキル, reference, references, skill-reference, 入口, proc
 `common/` と `project/` の中のディレクトリ構造は任意。最上段の 2 つ以外のディレクトリや、`references/` 直下のファイルは作らない。
 
 - 共通の工程スキルの `SKILL.md` と `references/common/` は、親チケットの `ticket start` がプロジェクトの `skills/<工程>/` へ写す。`common/` は共通の写しなので、上書き・追加に加えて、共通側から無くなった `.md` を消す（空になったディレクトリも片付ける）。`SKILL.md` は消さない。
-  プロジェクトだけを clone しても、同じ入口と reference が使えるようにするため。写した分は着手の出力に出るので、その場でコミットする
+  プロジェクトだけを clone した人の手元にも入口と reference が入るようにするため。写した分は着手の出力に出るので、その場でコミットする。単体 clone では、reference は`ccnavi --docs`で引ける。入口の`SKILL.md`を読ませる目録は出ない（未解決）
 - 共通の工程スキルは、SKILL.md の frontmatter に `process: true`（真偽値。文字列の `"true"` や BOM 付きの SKILL.md は写されない）を持つ。写されるのはこのスキルだけ。ディレクトリ名は `^[A-Za-z0-9._-]+$` にする。当たらない名前は、写されても目録に載らない
 - 工程スキルのディレクトリ自体や、その下にシンボリックリンクがあると、何も写さず着手しない
 - 写されたファイル（`SKILL.md` と `references/common/`）は共通側の写しなので、プロジェクトの中で直さない。直すと次の着手で上書きされる。共通を直したいときは、共通の置き場（`.claude/skills/<工程>/`）の提案にする

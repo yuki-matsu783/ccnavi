@@ -26,6 +26,8 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 `.claude/` を持つ最初のディレクトリ、の順で決める。ただし `.claude/worktrees/<名前>` の位置の
 ディレクトリ（ワークツリー）は `.claude/` を持っていても飛ばす。
 
+`CLAUDE_PROJECT_DIR` が無い端末や Bash ツールから、`.claude/` を持つプロジェクトの中で `ccnavi` を直接打つと、`--root` を渡さない限りそのプロジェクトが根と見なされる。`--root` を付けるか、sh のラッパーを通す。未解決で、洗い出しは `docs/design/multi-repo/standalone-clone-gaps.md` の A2。
+
 配布物は PyInstaller の onedir。実行時の依存は PyYAML 1 本で、読むのは `safe_load` に限る。
 呼び出しごとに起動して終わる。
 

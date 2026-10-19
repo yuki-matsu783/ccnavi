@@ -10,11 +10,13 @@ keywords: [スキル, SKILL.md, skills, 工程スキル, 目録, 写し]
 
 ### 11.13 プロジェクトのスキル
 
-プロジェクト向けのスキルの形をした手順書は、プロジェクトの git で育て、プロジェクトだけを clone した人にも見えるよう、プロジェクトの
+プロジェクト向けのスキルの形をした手順書は、プロジェクトの git で育てるため、プロジェクトの
 `skills/<名前>/SKILL.md` に置く（パスは固定）。形は Claude Code のスキルと同じで、頭の
 frontmatter に `name` と `description`、必要なら同じディレクトリに `references/`。Claude Code は `skills/` をスキルとして読まないので、ccnavi が目録を渡す。
 
-プロジェクトが自前の `.claude/skills/` を持つ場合は、Claude Code がそれを別に読む。ワークスペースから起動しても、そのプロジェクトのファイルを読んだ時点でそのスキルが読み込まれ、ワークスペースのスキルと共存する。同名のとき、素の名前はワークスペースのもので、プロジェクトのものは `projects/<名前>:<スキル名>` になる。プロジェクトで起動した場合は、そのプロジェクトのスキルだけが見える。目録に載るのは `skills/` の分だけ。
+プロジェクトが自前の `.claude/skills/` を持つ場合は、Claude Code がそれを別に読む。ワークスペースから起動した場合、プロジェクトの `.claude/skills` が読み込まれるかは、`projects/` がワークスペースの git で無視されているかで変わる（Claude Code 2.1.303 で確かめた）。無視されている標準の構成では読み込まれない。ccnavi は `projects/` を無視させるので、ワークスペースから起動してプロジェクトの `.claude/skills` に頼ることはできない。プロジェクトで起動すれば、そのプロジェクトの `.claude/` のスキルと hook だけが使われる。読み込まれた場合に限り、ワークスペースのスキルと同名なら、素の名前はワークスペースのもので、プロジェクトのものは `projects/<名前>:<スキル名>` になる。目録に載るのは `skills/` の分だけ。
+
+`skills/` はプロジェクトだけを clone した人の手元にも git で入る。ただし、目録を出す hook はワークスペースの `.claude` にしかなく、`projskills.project_of` は単体 clone で空文字を返す。単体 clone では目録が出ず、単体 clone であることも検出していない（未解決。[11.14](standalone-clone-gaps.md) の C2）。単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほうである。
 
 | いつ | どう |
 |---|---|
@@ -40,8 +42,10 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 
 #### 共通の工程スキルの写し
 
-ワークスペースの `.claude/skills/<工程>/SKILL.md` の頭の frontmatter に `process: true` があるスキルを、工程スキルと呼ぶ。プロジェクトだけを clone しても同じ入口と reference が使えるよう、
+ワークスペースの `.claude/skills/<工程>/SKILL.md` の頭の frontmatter に `process: true` があるスキルを、工程スキルと呼ぶ。プロジェクトだけを clone した人の手元にも入口と reference が入るよう、
 親チケットの `ticket start`（`tickets/skillsync.py`）が、親のワークツリーにあるプロジェクトの `skills/<工程>/` へ `SKILL.md` と `references/common/` の下の `.md` を写す。`references/` の最上段は `common/`（共通。写す）と `project/`（そのリポジトリ固有。写さない）に分ける。
+
+単体 clone では、写した reference は `ccnavi --docs`（`--type skill-reference`）で引ける。入口の `SKILL.md` を読ませるのは目録だけで、単体 clone では出ないので、入口は渡っていない（未解決）。
 
 - `common/` は共通の写しなので、共通レイヤーのミラー（11.12）と同じく、共通側から無くなった `.md` は写し先からも消し、空になったディレクトリも `common/` の下から片付ける。消す対象は `common/` の `.md` だけで、`SKILL.md` は消さない。`project/` は写さず触れないので、プロジェクト固有の reference は上書きも削除もされない。`common/` の `.md` 以外のファイルにも触れない
 - `common/` の同じパスのファイルは共通の中身で上書きする
