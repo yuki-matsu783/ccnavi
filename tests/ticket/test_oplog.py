@@ -158,6 +158,25 @@ class OplogTest(unittest.TestCase):
             self.assertIn(key, data)
 
 
+class ConcurrentUpdateTest(unittest.TestCase):
+    def test_parallel_updates_do_not_lose_each_other(self):
+        import threading
+
+        with tempfile.TemporaryDirectory() as root:
+            state = os.path.join(root, "logs", "state")
+            op_id = oplog.begin(state, oplog.KIND_DECIDE, repo=REPO, stages=STAGES)
+            keys = [f"k{i}" for i in range(12)]
+            threads = [
+                threading.Thread(target=oplog.applied_set, args=(state, op_id, k, True))
+                for k in keys
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            self.assertEqual(sorted(oplog.load(state, op_id)["applied"]), sorted(keys))
+
+
 class ReconcileTest(unittest.TestCase):
     """送信の照合の表。目印の一致、最後まで読めた0件、打ち切り、アカウント違い、複数、読めない。"""
 

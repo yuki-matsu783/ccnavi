@@ -55,6 +55,9 @@ STAGE_KINDS = (STAGE_REPLY, STAGE_ISSUE, STAGE_COMMENT, STAGE_MR, STAGE_PUSH, ST
 # 同じ PC の並行実行を防ぐロックの古さの上限（秒）。これより古いロックは、
 # 落ちたプロセスの残りとして取り直す。
 LOCK_STALE_SECONDS = 120.0
+# 記録の読み書きの短いロック（`_rmw`）を待つ長さと、古いとみなす長さ（秒）。
+RMW_WAIT_SECONDS = 5.0
+RMW_STALE_SECONDS = 30.0
 
 
 class OpError(Exception):
@@ -159,14 +162,15 @@ def _add_stages(state: str, op_id: str, stages: list[tuple[str, str]]) -> None:
     """既にある記録に、まだ無い段階だけを足す（単発の投稿が段階を順に足していく）。"""
     if not stages:
         return
-    record = load(state, op_id)
-    if record is None:
-        return
-    have = {s.get("id") for s in record["stages"]}
-    new = [_stage(sid, skind) for sid, skind in stages if sid not in have]
-    if new:
-        record["stages"].extend(new)
-        _save(state, record)
+    with _rmw(state, op_id):
+        record = load(state, op_id)
+        if record is None:
+            return
+        have = {s.get("id") for s in record["stages"]}
+        new = [_stage(sid, skind) for sid, skind in stages if sid not in have]
+        if new:
+            record["stages"].extend(new)
+            _save(state, record)
 
 
 def _save(state: str, record: dict[str, Any]) -> None:
@@ -231,6 +235,41 @@ def locked(state: str, op_id: str):
             os.remove(path)
 
 
+@contextlib.contextmanager
+def _rmw(state: str, op_id: str):
+    """記録の読み書きの間だけ持つ短いロック。並行する更新が互いの書き込みを失わせないため。
+
+    `locked`（操作の実行中を断るロック）とは別で、数秒待つ。取れなければ OpError。
+    """
+    if not valid_id(op_id):
+        raise OpError(f"操作ID の形が不正: {op_id!r}")
+    os.makedirs(ops_dir(state), exist_ok=True)
+    path = os.path.join(ops_dir(state), f"{op_id}.rmw")
+    deadline = time.time() + RMW_WAIT_SECONDS
+    fd = -1
+    while fd < 0:
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                stale = time.time() - os.path.getmtime(path) > RMW_STALE_SECONDS
+            except OSError:
+                continue
+            if stale:
+                with contextlib.suppress(OSError):
+                    os.remove(path)
+                continue
+            if time.time() > deadline:
+                raise OpError("操作記録を更新中の別のプロセスがある。打ち直してください") from None
+            time.sleep(0.02)
+    try:
+        yield
+    finally:
+        os.close(fd)
+        with contextlib.suppress(OSError):
+            os.remove(path)
+
+
 def stage_set(
     state: str,
     op_id: str,
@@ -243,6 +282,18 @@ def stage_set(
 
     sent を戻さない（sent の段階は繰り返さない）。無い段階は OpError。
     """
+    with _rmw(state, op_id):
+        _stage_set(state, op_id, stage_id, new_state, url, account)
+
+
+def _stage_set(
+    state: str,
+    op_id: str,
+    stage_id: str,
+    new_state: str,
+    url: str,
+    account: str,
+) -> None:
     if new_state not in STATES:
         raise OpError(f"知らない段階の状態: {new_state}")
     record = load(state, op_id)
@@ -326,11 +377,12 @@ def reconcile(
 
 def applied_set(state: str, op_id: str, key: str, value: Any) -> None:
     """ローカルに適用したものを残す（子・マーカー・台帳の項目・push した先頭など）。"""
-    record = load(state, op_id)
-    if record is None:
-        raise OpError(f"操作記録 {op_id} が無い")
-    record["applied"][key] = value
-    _save(state, record)
+    with _rmw(state, op_id):
+        record = load(state, op_id)
+        if record is None:
+            raise OpError(f"操作記録 {op_id} が無い")
+        record["applied"][key] = value
+        _save(state, record)
 
 
 def unfinished(record: dict[str, Any]) -> list[dict[str, Any]]:

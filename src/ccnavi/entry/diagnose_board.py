@@ -21,6 +21,7 @@ from ..tickets import (
     archive,
     flow,
     manual_settle,
+    oplog,
     overview,
     phase,
     risk,
@@ -75,6 +76,9 @@ def board(
         # ここには出さない。
         "archived": [],
     }
+    # 送信の途中で止まった操作(引き継ぎ未完了)。ボードは problems の行として並べる。
+    if conf.state:
+        problems.extend(f"引き継ぎ未完了: {oplog.summary(r)}" for r in oplog.pending(conf.state))
     if not conf.tickets_enabled:
         problems.append(f"{settings.TICKET_CONTROL_ENV}=disable。チケット制御を使っていない")
         payload["archived"] = _archived_records(root, set())

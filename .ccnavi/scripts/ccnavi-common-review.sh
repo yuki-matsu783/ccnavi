@@ -385,6 +385,25 @@ staged_send() {
 		if [ "$cs_skind" = issue ]; then create_issue "$cs_file"; else comment "$cs_mr" "$cs_url" "$cs_file"; fi
 		return $?
 	fi
+	# 同じ操作を同時に送らない（照合の前に 2 つが「未送信」と見て、両方が投稿するのを防ぐ）。
+	# ロックが使えない構成（root が無い）では、取らずに進む。
+	cs_locked=""
+	if [ -n "${root:-}" ] && command -v ccnavi_lock_take >/dev/null 2>&1; then
+		if ccnavi_lock_take "$root" ops "$cs_id" 30; then
+			cs_locked=1
+		else
+			printf '%s: 同じ投稿が別のプロセスで実行中。待っても取れなかったので止めた。\n' "${review_label:-ccnavi-review}" >&2
+			return 1
+		fi
+	fi
+	staged_send_locked
+	cs_rc=$?
+	[ -z "$cs_locked" ] || ccnavi_lock_drop
+	return "$cs_rc"
+}
+
+# staged_send の本体（操作 ID のロックを持った状態で呼ぶ）。
+staged_send_locked() {
 	# 記録を読めないまま送ると、送り済みの段階をもう一度送りかねない。読めなければ止める。
 	if ! ccnavi ops show "$cs_id" >/dev/null 2>&1; then
 		printf '%s: 操作記録 %s を読めない。二重に送らないよう止めた。\n' "${review_label:-ccnavi-review}" "$cs_id" >&2
