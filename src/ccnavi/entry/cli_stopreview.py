@@ -12,6 +12,7 @@ LLM は呼ばない。作業者向けの文書と `--docs` の索引には、こ
 from __future__ import annotations
 
 import json
+import subprocess
 import time
 from typing import TextIO
 
@@ -37,7 +38,14 @@ def _ok(stdout: TextIO) -> int:
     return EXIT_OK
 
 
-def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: list[str]):
+def run(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    words: list[str],
+    root: str = "",
+):
     if len(words) != 4 or words[1] not in ("material", "record"):
         stderr.write(
             "ccnavi: stop-review は material か record に <セッション> <transcript> を渡す\n"
@@ -52,11 +60,11 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, conf: settings.Settings, 
         return _not_candidate(stdout, "no_key") if verb == "material" else _ok(stdout)
     stopreview.expire_overdue(conf.state)
     if verb == "material":
-        return _material(stdout, conf, key, transcript)
+        return _material(stdout, conf, key, transcript, root)
     return _record(stdin, stdout, conf, key)
 
 
-def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str) -> int:
+def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str, root: str) -> int:
     deadline = time.monotonic() + PLAN_WAIT_SECONDS
     while True:
         state, plan = stopreview.begin(conf.state, key)
@@ -69,8 +77,38 @@ def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str
         return _not_candidate(stdout, state)
     material = stopreview.turn_material(transcript)
     stopreview.note_insufficient(conf.state, key, bool(material["insufficient"]))
-    stdout.write(stopreview.render_material(plan, material, stopreview.CRITERIA_MD) + "\n")
+    bodies = {p["key"]: _body(root, p) for p in plan.get("proposals") or []}
+    stdout.write(stopreview.render_material(plan, material, stopreview.CRITERIA_MD, bodies) + "\n")
     return EXIT_OK
+
+
+def _body(root: str, proposal: dict) -> str:
+    """送った版の提案の本文。送ったコミットから読む（作業ツリーの今の姿ではなく、送った版）。
+
+    読めないときは空文字（材料に本文が無いと示す）。送った提案のファイルは `todo/` の下の md。
+    """
+    if not (root and proposal.get("commit")):
+        return ""
+    parts = []
+    for item in proposal.get("files") or []:
+        path = str(item.get("path", ""))
+        if not path.endswith(".md") or path.startswith("/") or ".." in path.split("/"):
+            continue
+        try:
+            shown = subprocess.run(
+                ["git", "-C", root, "show", f"{proposal['commit']}:{path}"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if shown.returncode == 0:
+            parts.append(f"--- {path} ---\n{shown.stdout[: stopreview.MATERIAL_LIMIT]}")
+    return "\n".join(parts)
 
 
 def _record(stdin: TextIO, stdout: TextIO, conf: settings.Settings, key: str) -> int:

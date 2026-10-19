@@ -185,6 +185,13 @@ def candidate(
 # --- 計画と試行 ----------------------------------------------------------------
 
 
+def _names(directory: str) -> list[str]:
+    try:
+        return fsio.listdir(directory) if directory else []
+    except OSError:
+        return []
+
+
 def _digest(text: str) -> str:
     return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
 
@@ -301,7 +308,7 @@ def expire_overdue(
     """
     when = time.time() if now is None else now
     expired: list[str] = []
-    for name in fsio.listdir(state) if state else []:
+    for name in _names(state):
         if not (name.startswith("stopreview-attempt-") and name.endswith(".json")):
             continue
         attempt = fsio.read_dict(os.path.join(state, name))
@@ -323,7 +330,7 @@ def expire_overdue(
 def consume_continuation(state: str, session_id: str) -> dict[str, Any] | None:
     """次の Stop が stop_hook_active で、同じセッションに差し戻し送出の試行があれば消費して返す。"""
     found: dict[str, Any] | None = None
-    for name in fsio.listdir(state) if state else []:
+    for name in _names(state):
         if not (name.startswith("stopreview-attempt-") and name.endswith(".json")):
             continue
         attempt = fsio.read_dict(os.path.join(state, name))
@@ -383,9 +390,10 @@ def validate(result: Any, plan: dict[str, Any]) -> dict[str, Any]:
 def required(plan: dict[str, Any]) -> list[tuple[str, str]]:
     """計画から決まる、結果が要る (基準, 対象) の一覧。"""
     needs = [(R1, STOP_TARGET), (R3, STOP_TARGET)]
+    no_r2 = set(plan.get("no_r2") or [])  # 本文が無い版（送れなかった提案）には R2 を求めない
     for target in plan.get("targets") or []:
         if target != STOP_TARGET:
-            needs += [(R2, target), (R4, target)]
+            needs += [(R4, target)] if target in no_r2 else [(R2, target), (R4, target)]
     return needs
 
 
@@ -675,7 +683,12 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
     }
 
 
-def render_material(plan: dict[str, Any], material: dict[str, Any], criteria: str) -> str:
+def render_material(
+    plan: dict[str, Any],
+    material: dict[str, Any],
+    criteria: str,
+    bodies: dict[str, str] | None = None,
+) -> str:
     """agent hook に渡す文字列。本文と会話は区切ったデータとして渡し、指示として読ませない。"""
     out = [
         "STOP_REVIEW_MATERIAL",
@@ -694,4 +707,12 @@ def render_material(plan: dict[str, Any], material: dict[str, Any], criteria: st
     out += ["</data>", "<data kind=current_turn>"]
     out += [f"--- {t['role']} ---\n{t['text']}" for t in material["turn"]]
     out.append("</data>")
+    for proposal in plan.get("proposals") or []:
+        body = (bodies or {}).get(proposal["key"])
+        out.append(
+            f"<data kind=proposal target={proposal['key']} route={proposal['route']}"
+            f" ident={proposal['ident']}>"
+        )
+        out.append(body if body else "（本文は取れない。送れなかった提案で、R2 は判定しない）")
+        out.append("</data>")
     return "\n".join(out)

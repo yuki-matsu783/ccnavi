@@ -7,11 +7,13 @@ import io
 import json
 import os
 import tempfile
+import time
 import unittest
 
 from ccnavi.entry import cli_stopreview
 from ccnavi.hook import events
 from ccnavi.infra import hookio, modes, settings
+from ccnavi.records import stopops
 from ccnavi.records import stopreview as sr
 
 
@@ -196,6 +198,73 @@ class PlanAtStopTest(unittest.TestCase):
         payload = dataclasses.replace(self.payload, stop_hook_active=True)
         self.assertIsNone(events._ai_continuation(self.conf, payload))
         self.assertIsNone(events._ai_continuation(self.conf, self.payload))
+
+
+class ProposalPlanTest(PlanAtStopTest):
+    """propose の操作実績が、計画の対象になる。"""
+
+    CMD = "sh .ccnavi/scripts/ccnavi-ticket.sh propose p1"
+
+    def _hook(self, event, tool_use_id="tu1", command=None):
+        return hookio.Input(
+            event=event,
+            session_id="s1",
+            cwd=self.root,
+            tool_name="Bash",
+            tool_input={"command": command or self.CMD},
+            tool_use_id=tool_use_id,
+        )
+
+    def _propose(self, route="sent", commit="c0ffee0123456789", tool_use_id="tu1"):
+        now = int(time.time())
+        events._track_proposals(self.conf, self._hook(hookio.PRE_TOOL_USE, tool_use_id))
+        directory = os.path.join(self.state, stopops.RESULT_DIR)
+        os.makedirs(directory, exist_ok=True)
+        lines = ["id=p1", f"route={route}", "rc=0", f"started={now}", f"ended={now}"]
+        if commit:
+            lines += [f"commit={commit}", "file=abc wip/proposals/todo/p1.md"]
+        with open(os.path.join(directory, f"{now}-{tool_use_id}.kv"), "w") as handle:
+            handle.write("\n".join(lines) + "\n")
+        events._track_proposals(self.conf, self._hook(hookio.POST_TOOL_USE, tool_use_id))
+
+    def test_pre_and_post_bind_the_result(self):
+        self._propose()
+        (op,) = stopops.turn_ops(self.state, "s1", 0)
+        self.assertEqual((op["ident"], op["route"], op["tool_use_id"]), ("p1", "sent", "tu1"))
+
+    def test_other_commands_and_subagents_are_not_tracked(self):
+        events._track_proposals(
+            self.conf, self._hook(hookio.PRE_TOOL_USE, command="sh ccnavi-ticket.sh status")
+        )
+        sub = dataclasses.replace(self._hook(hookio.PRE_TOOL_USE), agent_id="a1")
+        events._track_proposals(self.conf, sub)
+        self.assertEqual([n for n in os.listdir(self.state) if n.startswith("stopops-pre-")], [])
+
+    def test_unregistered_workspace_tracks_nothing(self):
+        self.conf.stop_review_agent = False
+        events._track_proposals(self.conf, self._hook(hookio.PRE_TOOL_USE))
+        self.assertEqual(os.listdir(self.state), [])
+
+    def test_sent_proposal_becomes_a_target(self):
+        self._propose()
+        self._plan()
+        plan = sr.read_plan(self.state, self.key)
+        self.assertTrue(plan["is_candidate"])
+        (proposal,) = plan["proposals"]
+        self.assertEqual(proposal["key"], "proposal:p1:c0ffee012345")
+        self.assertEqual(plan["targets"], [sr.STOP_TARGET, proposal["key"]])
+        self.assertEqual(plan["no_r2"], [])
+        self.assertIn((sr.R2, proposal["key"]), sr.required(plan))
+
+    def test_unsent_proposal_needs_r4_only(self):
+        self._propose(route="stopped", commit="")
+        self._plan()
+        plan = sr.read_plan(self.state, self.key)
+        key = plan["proposals"][0]["key"]
+        self.assertEqual(plan["no_r2"], [key])
+        needs = sr.required(plan)
+        self.assertIn((sr.R4, key), needs)
+        self.assertNotIn((sr.R2, key), needs)
 
 
 if __name__ == "__main__":

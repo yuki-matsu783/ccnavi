@@ -12,12 +12,13 @@ import dataclasses
 import functools
 import io
 import os
+import time
 from typing import TextIO
 
-from ..infra import fsio, hookio, modes, settings, tree
+from ..infra import fsio, hookio, modes, settings, shellread, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
-from ..records import audit, busy, failstreak, prune, repeat, stopreview
+from ..records import audit, busy, failstreak, prune, repeat, stopops, stopreview
 from ..tickets import (
     approval,
     approval_checks,
@@ -70,6 +71,7 @@ def decide(
     if mode == modes.DISABLE:
         record.decision, record.reason = audit.SKIP, audit.REASON_MODE_DISABLED
         return EXIT_OK
+    _track_proposals(conf, payload)
     if payload.event == hookio.PRE_TOOL_USE:
         return judge.decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)
     if payload.event == hookio.POST_TOOL_USE:
@@ -358,6 +360,44 @@ def decide_at_stop(
     return EXIT_OK
 
 
+def _track_proposals(conf: settings.Settings, payload: hookio.Input) -> None:
+    """propose の操作実績とターンの開始を、state に記録する（Stop の AI 判定の材料）。
+
+    agent hook を登録していなければ何もしない。判定にも出力にも影響しない。サブエージェントの
+    呼び出しは数えない（propose はサブエージェントから呼べない）。
+    """
+    if not (conf.stop_review_agent and conf.state and payload.session_id) or payload.agent_id:
+        return
+    now = time.time()
+    if payload.event == hookio.USER_PROMPT_SUBMIT:
+        if not payload.from_background_task():
+            stopops.start_turn(conf.state, payload.session_id, now)
+    elif payload.event == hookio.PRE_TOOL_USE and payload.tool_name == "Bash":
+        command = payload.tool_input.get("command")
+        for words, _place in shellread.placed(command) if isinstance(command, str) else []:
+            ident = stopops.propose_ident(words)
+            if ident:
+                stopops.register(conf.state, payload.session_id, payload.tool_use_id, ident, now)
+    elif payload.event in (hookio.POST_TOOL_USE, hookio.POST_TOOL_USE_FAILURE):
+        stopops.bind(conf.state, payload.tool_use_id, now)
+
+
+def _unstarted_ops(
+    conf: settings.Settings, root: str, raw: approval.Raw | None, ops: list[dict]
+) -> list[dict]:
+    """着手済みの親に属する提案を除いた操作。着手済みの親への子の追加は、判定の対象外。"""
+    if not ops:
+        return []
+    copies, _ = approval.scan(conf, root, raw=raw)
+    by_id = approval_checks.by_id(copies)
+    kept = []
+    for op in ops:
+        bound = tree.lookup(by_id, op["ident"])
+        if bound is None or not bound.in_progress:
+            kept.append(op)
+    return kept
+
+
 def _ai_continuation(conf: settings.Settings, payload: hookio.Input) -> dict | None:
     """この Stop が、AI 判定の差し戻しで続いた回なら、その試行を消費して返す。"""
     if not (payload.stop_hook_active and conf.stop_review_agent and conf.state):
@@ -403,8 +443,8 @@ def _plan_stop_review(
     判定役（agent hook）が `material` で取る。
 
     agent hook を登録していなければ（`CCNAVI_STOP_REVIEW_AGENT`）何もしない。書けなくても Stop は
-    止めない。提案の操作実績と対象の解決はまだ無いので、対象は Stop の機会（R1・R3）だけで、
-    「提案の操作実績がある」は偽として扱う。
+    止めない。対象は Stop の機会（R1・R3）と、このターンの提案の最終の有効版（R2・R4）。
+    提案の操作実績（`stopops`）で、着手済みの親に属さない提案があれば候補にする。
     """
     if not (conf.state and payload.session_id and conf.stop_review_agent):
         return
@@ -412,6 +452,21 @@ def _plan_stop_review(
     if not key:
         return
     effective = stopreview.setting(mode, conf.stop_review)
+    now = time.time()
+    stopops.rebind(conf.state, payload.session_id, now)
+    since = stopops.turn_start(conf.state, payload.session_id)
+    finals = stopops.final_versions(stopops.turn_ops(conf.state, payload.session_id, since))
+    ops = _unstarted_ops(conf, root, raw, list(finals.values()))
+    proposals = [
+        {
+            "key": stopops.target_key(op),
+            "ident": op["ident"],
+            "route": op["route"],
+            "commit": op.get("commit", ""),
+            "files": op.get("files", []),
+        }
+        for op in ops
+    ]
     ok, why = stopreview.candidate(
         main_agent=not payload.agent_id,
         stop_hook_active=payload.stop_hook_active,
@@ -422,7 +477,7 @@ def _plan_stop_review(
         registered=True,
         existing_nudge=nudged,
         target_unresolvable=False,
-        proposal_activity=False,
+        proposal_activity=bool(proposals),
         approved_in_progress=_approved_in_progress(conf, root, payload.cwd, raw),
     )
     if not ok and why not in _NOT_CANDIDATE_FINAL:
@@ -431,7 +486,9 @@ def _plan_stop_review(
         "is_candidate": ok,
         "reason": why,
         "final": _NOT_CANDIDATE_FINAL.get(why, ""),
-        "targets": [stopreview.STOP_TARGET],
+        "targets": [stopreview.STOP_TARGET, *(p["key"] for p in proposals)],
+        "proposals": proposals,
+        "no_r2": [p["key"] for p in proposals if p["route"] != stopops.SENT],
         "material_version": stopreview.material_version(),
         "effective": effective,
         "rejudge": continuation is not None,
