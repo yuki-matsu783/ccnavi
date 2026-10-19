@@ -58,7 +58,7 @@ def path_of(state_dir: str, session: str) -> str:
 
 
 def _same(a: str, b: str) -> bool:
-    # リンクを解いて比べる。`tree` はリンクを解いたパスを返すが、hook のルートは解いていないことがある。
+    # リンクを解いて比べる。`tree` は解いたパスを返すが、hook のルートは解いていないことがある。
     def norm(path: str) -> str:
         return pathcase.fold(tree.nfc(os.path.realpath(path)))
 
