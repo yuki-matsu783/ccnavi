@@ -39,7 +39,7 @@ keywords: [サブエージェント, SubagentStart, SubagentStop, 差し戻し, 
 子が居ない親は何も出ない。計画の無い親（局面が空）や、局面を組めなかったとき（置き場を読めないなど）は、その行だけ出さず、
 `SubagentStart` は失敗させない。局面は案内であって判定ではない。
 
-**終了結果の記録。** `SubagentStop` は、終わり方を 5 つに分けて `state/subagent-<セッション>-<agent_id>.outcome`（JSON）に残す（`hook/subagent_outcome.py`）。差し戻しの記録（`.bounced`）は「差し戻したか」、こちらは「終わったときにどうだったか」を持つ。
+**終了結果の記録。** `SubagentStop` は、終わり方を 5 つに分けて `state/subagent-<セッション>-<agent_id>.outcome`（JSON）に残す（`hook/subagent_outcome.py`）。差し戻しの記録（`.bounced`）が残すのは「差し戻したか」で、こちらは「終わったときにどうだったか」を残す。
 
 | 結果 | 意味 | 親への知らせ | Stop の促し |
 |---|---|---|---|

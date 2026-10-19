@@ -1,4 +1,4 @@
-"""手で動かした子の判定。ユーザが GitHub の画面などで子を `review/` から `done/` へ動かしたことを、
+"""手で動かした子の判定。ユーザが GitHubの画面などで子を `review/` から `done/` へ動かしたことを、
 レビュー完了の意思として読む。
 
 ccnavi が子を動かす経路（confirm・decide・close-early・feedback-plan・chrome）は、動かした子に
@@ -11,7 +11,7 @@ ccnavi が子を動かす経路（confirm・decide・close-early・feedback-plan
 言うだけ。
 
 - 子が 1 つだけ動いたとき: 子 X はレビュー完了、フェーズは未完了（PARTIAL）
-- 移動が未コミット・未 push: 確定しない（UNSHARED）。エージェントが代わりに push することはしない
+- 移動が未コミット・未 push: 確定しない（UNSHARED）。エージェントは代わりに push しない
 - 依頼のマーカーが無い: 確認待ち（NO_REQUEST）。request を案内する
 - `finished_to` を持たない子（この変更より前に閉じた子）: 手動とはみなさない（ROUTE_UNKNOWN）
 """

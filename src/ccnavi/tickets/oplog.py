@@ -1,4 +1,4 @@
-"""操作記録。ユーザの判断と外部への書き込みを、副作用を起こす前に保存する。
+"""操作記録。ユーザの判断と外部への書き込みを、実行する前に保存する。
 
 decide・close-early・request・comment・ready は、ホストへの返信・解決・投稿とローカルへの適用が
 複数の段階に分かれ、途中で止まりうる。止まったあとに「どこまで済んだか」を同じ記録から読み、
@@ -73,7 +73,7 @@ def record_path(state: str, op_id: str) -> str:
 
 
 def valid_id(op_id: str) -> bool:
-    """操作ID の形（`uuid4().hex` の 32 桁）。パスの一部になるので、形を決めて外を断る。"""
+    """操作IDの形（`uuid4().hex` の 32 桁）。パスの一部になるので、形を決めて外を断る。"""
     return len(op_id) == 32 and all(c in "0123456789abcdef" for c in op_id)
 
 
@@ -131,7 +131,7 @@ def begin(
         raise OpError(f"知らない操作の種類: {kind}")
     op_id = op_id or new_id()
     if not valid_id(op_id):
-        raise OpError(f"操作ID の形が不正: {op_id!r}")
+        raise OpError(f"操作IDの形が不正: {op_id!r}")
     path = record_path(state, op_id)
     if os.path.exists(path):
         _add_stages(state, op_id, stages or [])
@@ -185,7 +185,7 @@ def _save(state: str, record: dict[str, Any]) -> None:
 def load(state: str, op_id: str) -> dict[str, Any] | None:
     """記録を読む。無ければ None。壊れていれば OpError。"""
     if not valid_id(op_id):
-        raise OpError(f"操作ID の形が不正: {op_id!r}")
+        raise OpError(f"操作IDの形が不正: {op_id!r}")
     text = fsio.read_text(record_path(state, op_id))
     if text is None:
         return None
@@ -207,7 +207,7 @@ def load(state: str, op_id: str) -> dict[str, Any] | None:
 def locked(state: str, op_id: str):
     """操作ID ごとのロック。同じ PC の並行実行を、待たずに断る（取れなければ OpError）。"""
     if not valid_id(op_id):
-        raise OpError(f"操作ID の形が不正: {op_id!r}")
+        raise OpError(f"操作IDの形が不正: {op_id!r}")
     os.makedirs(ops_dir(state), exist_ok=True)
     path = os.path.join(ops_dir(state), f"{op_id}.lock")
     fd = -1
@@ -242,7 +242,7 @@ def _rmw(state: str, op_id: str):
     `locked`（操作の実行中を断るロック）とは別で、数秒待つ。取れなければ OpError。
     """
     if not valid_id(op_id):
-        raise OpError(f"操作ID の形が不正: {op_id!r}")
+        raise OpError(f"操作IDの形が不正: {op_id!r}")
     os.makedirs(ops_dir(state), exist_ok=True)
     path = os.path.join(ops_dir(state), f"{op_id}.rmw")
     deadline = time.time() + RMW_WAIT_SECONDS

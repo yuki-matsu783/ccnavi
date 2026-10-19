@@ -119,14 +119,14 @@ sequenceDiagram
 - 子の `finish` から `request` までは、決まった手順の続きなので、ユーザの許可を待たずに進める。本当にユーザの判断が要る問いだけを、最後に書いて終える
 - `request` を打つまでは、レビューを依頼したと報告しない。ユーザのレビュー待ちになるのは、`requested` のマーカーが置かれてから
 - ホストへの送信（decide の返信・issue・コメント、close-early、request、comment、ready の補助コメント）は、`logs/state/ops/` の操作記録に段階ごとに載る。途中で失敗したら、`ccnavi-ticket.sh status` が「引き継ぎ未完了」として出す。decide は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る。送ったか確定できない段階は自動では送り直さず、ホストで目印 `ccnavi:op=<操作ID>` を探して確かめる
-- ユーザが子を `review/` から `done/` へ手で動かして commit・push すると、`ccnavi-ticket.sh status` が「レビュー完了確認待ち」と言い、Stop が `ccnavi-review.sh confirm --phase N` を 1 回だけ促す（`STEP_CONFIRM`）。confirm は移動の前に付いた未解決の指摘だけを、版つきで `phases/<親>/accepted.json` に受け入れる（ホストのスレッドは解決しない）。移動の後に付いた指摘、変更要求があれば確定しない。未コミット・未 push の移動は「移動が未共有」と言って確定しない
+- ユーザが子を `review/` から `done/` へ手で動かして commit・push すると、`ccnavi-ticket.sh status` が「レビュー完了確認待ち」と言い、Stop が `ccnavi-review.sh confirm --phase N` を 1 回だけ促す（`STEP_CONFIRM`）。confirm は移動の前に付いた未解決の指摘だけを、版つきで `phases/<親>/accepted.json` に受け入れる（ホストのスレッドは解決しない）。移動の後に付いた指摘や変更要求があれば確定しない。未コミット・未 push の移動は「移動が未共有」と言って確定しない
 
 
 ## 更新したときの変更点
 
 ccnavi を更新したら、次の 4 点が変わる。
 
-- `dry-run` でも、チケットの操作（状態の操作）と、承認済みの置き場・操作記録への書き込みは止まる。止まらないのは一般のルールの `deny`・`ask` だけ（報告になる）。`ccnavi --explain` の「dry-run のときに止めるもの」で確かめられる
-- 互換の版が 17 になった。`decide` のダイジェストは版 2（指摘ごとの版を含む）になり、ボードは版 1 のものを断る。手で動かした子の確定は、受け入れ台帳（`phases/<親>/accepted.json`）と `via: manual` を書く。ccnavi の実行ファイル、`.ccnavi/scripts/` の sh、VS Code 拡張を、そろえて更新する（`sh scripts/ccnavi-setup.sh <ワークスペース> --force` と拡張の入れ直し）。食い違えば sh と拡張と `--lint` が `(version)` で知らせる
-- 旧い子（`finished_to` が無い。この更新より前に閉じた子）は、`review/` から `done/` へ手で動かしても確定できない。`confirm` か `decide` を使う。`--lint` が info で並べる
+- `dry-run` でも、チケットの操作（状態の操作）と、承認済みの置き場・操作記録への書き込みは止まる。一般のルールの `deny`・`ask` だけは止まらず、報告になる。`ccnavi --explain` の「dry-run のときに止めるもの」で確かめられる
+- 互換の版が 17 になった。`decide` のダイジェストは版 2（指摘ごとの版を含む）になり、ボードは版 1 のダイジェストを受け付けない。手で動かした子の確定は、受け入れ台帳（`phases/<親>/accepted.json`）と `via: manual` を書く。ccnavi の実行ファイル、`.ccnavi/scripts/` の sh、VS Code 拡張を、そろえて更新する（`sh scripts/ccnavi-setup.sh <ワークスペース> --force` と拡張の入れ直し）。食い違えば sh と拡張と `--lint` が `(version)` で知らせる
+- 旧い子（`finished_to` が無い。この更新より前に閉じた子）は、`review/` から `done/` へ手で動かしても確定できない。`confirm` か `decide` を使う。`--lint` が info として並べる
 - 未完了の操作記録（`logs/state/ops/`）は、prune で消えない。`ccnavi-ticket.sh status` か `--lint` で見つけ、decide は `--resume <操作ID>` で続きを送り、request・comment・ready・close-early は同じコマンドを打ち直す

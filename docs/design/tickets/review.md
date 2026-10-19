@@ -213,7 +213,7 @@ ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを
 | 未解決のスレッドがある | マーカーを置かず、一覧（URL・場所・要旨）を返す。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は含めない |
 | どちらも無い | `reviewed` を置く。止まっていた状態が解除される |
 
-**手で動かした子の確定（受け入れ台帳）。** ユーザが子を `review/` から `done/` へ手で動かして commit・push した（共有済み）とき、`confirm` は移動の前に付いた未解決の指摘をホストで解決せずに、版つき（鍵・指摘の版・最後のコメントの id）で `phases/<親>/accepted.json` に足して `reviewed` を置く（マーカーに `via: manual` と `moved`）。`decide`・`close-early` の受け入れでは廃止した `accepted.json` を、この確定にだけ台帳として復活させた。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は、`confirm`・`decide`・`close-early` のどれでも未解決として数えない（`review_host._unresolved` の `ledger` 引数）。本文が変わる・受け入れの後にコメントが付く指摘は数える。移動の後（最初のコメントも最後のコメントも）に付いた指摘が残れば確定せず、`decide` へ案内する。変更要求は保留する。Stop は共有済みの手動移動を見つけたら `confirm` を 1 回促し（`STEP_CONFIRM`）、`status` は「レビュー完了確認待ち」「移動が未共有」を出す。Chrome 拡張の確定も同じ。git が無いので、移動の時刻は拡張がホストの履歴（そのパスを最初に加えたコミット）から読んで渡す。
+**手で動かした子の確定（受け入れ台帳）。** ユーザが子を `review/` から `done/` へ手で動かして commit・push した（共有済み）とき、`confirm` は移動の前に付いた未解決の指摘をホストで解決せずに、版つき（鍵・指摘の版・最後のコメントの id）で `phases/<親>/accepted.json` に足して `reviewed` を置く（マーカーに `via: manual` と `moved`）。`decide`・`close-early` の受け入れでは廃止した `accepted.json` を、この確定にだけ台帳として復活させた。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は、`confirm`・`decide`・`close-early` のどれでも未解決として数えない（`review_host._unresolved` の `ledger` 引数）。本文が変わる・受け入れの後にコメントが付く指摘は数える。移動の後に付いた指摘が残れば確定せず、`decide` へ案内する。判定は指摘の最初と最後のコメントの両方で見る。変更要求は保留する。Stop は共有済みの手動移動を見つけたら `confirm` を 1 回促し（`STEP_CONFIRM`）、`status` は「レビュー完了確認待ち」「移動が未共有」を出す。Chrome 拡張の確定も同じ。git が無いので、移動の時刻は拡張がホストの履歴（そのパスを最初に加えたコミット）から読んで渡す。
 
 sh は GitLab と GitHub をリモート URL のホストで見分け（`github.com` なら GitHub、それ以外は
 GitLab）、`gh` / `glab` がそのホストで認証されていれば（起動時に 1 度実行して確かめる）それを、
