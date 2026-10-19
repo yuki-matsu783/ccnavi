@@ -3,8 +3,6 @@
 ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への push の拒否）・
 ccnavi-review.sh（マージリクエストの宛先）が同じ関数を読む。決め方は、そのリポジトリの手元の
 origin/HEAD → origin/main・origin/master だけ。どれも無ければ「分からない」（終了コード 1）。
-環境変数 CCNAVI_INTEGRATION_BRANCH も `.claude/settings.local.json` の env も、統合先のコピー
-（sync/<リポジトリ>/integration/）も読まない。
 
 使い捨てのワークスペースを組み、ccnavi-common.sh を読む sh から関数を呼んで、標準出力と
 終了コードだけを見る。
@@ -105,24 +103,6 @@ class IntegrationTest(unittest.TestCase):
         point_origin_head(self.ws, "develop-v1.0.0")
         self.assertIntegration("develop-v1.0.0")
 
-    def test_the_variable_and_the_local_setting_are_not_read(self):
-        """環境変数も settings.local.json の env も、統合先を変えない。"""
-        point_origin_head(self.ws, "main")
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop-v1.0.0"}}\n',
-        )
-        self.assertIntegration("main", CCNAVI_INTEGRATION_BRANCH="trunk")
-
-    def test_the_old_integration_copy_is_not_read(self):
-        """統合先のコピー（sync/<リポジトリ>/integration/head）が残っていても読まない。"""
-        point_origin_head(self.ws, "main")
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch develop-v1.0.0\nsource default\n",
-        )
-        self.assertIntegration("main")
-
     def test_a_worktree_and_a_project_each_read_their_own_repository(self):
         """ワークツリーは元リポジトリの参照を読む。プロジェクトは自分の origin を読む。"""
         tree = os.path.join(self.ws, ".claude", "worktrees", "i0001")
@@ -131,9 +111,9 @@ class IntegrationTest(unittest.TestCase):
         seed(project)
         point_origin_head(project, "trunk")
         point_origin_head(self.ws, "main")
-        # ワークスペースの値が main でも、環境変数が main でも、プロジェクトは trunk。
-        self.assertIntegration("main", tree, CCNAVI_INTEGRATION_BRANCH="main")
-        self.assertIntegration("trunk", project, CCNAVI_INTEGRATION_BRANCH="main")
+        # ワークスペースの値が main でも、プロジェクトは trunk。
+        self.assertIntegration("main", tree)
+        self.assertIntegration("trunk", project)
 
     def test_the_hint_tells_apart_no_origin_and_no_origin_head(self):
         """案内は、origin が無いときと、origin/HEAD が決まらないときで言い分ける。"""
@@ -144,7 +124,6 @@ class IntegrationTest(unittest.TestCase):
         result = self.run_sh('ccnavi_integration_hint "$2"\n', self.ws)
         self.assertIn("統合先 (origin/HEAD) が決まらない", result.stdout)
         self.assertIn("git remote set-head origin -a", result.stdout)
-        self.assertNotIn("CCNAVI_INTEGRATION_BRANCH", result.stdout)
 
 
 if __name__ == "__main__":
