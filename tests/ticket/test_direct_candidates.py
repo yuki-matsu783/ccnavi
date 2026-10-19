@@ -156,6 +156,31 @@ class DirectCandidatesTest(base.IntegrateNudgeTest):
         # 同じ状態では 1 回だけ。
         self.assert_not_asked(self.stop(self.root))
 
+    def test_the_nudge_commands_run_from_a_fresh_shell_at_the_root(self):
+        import re
+        import subprocess
+
+        path = self.direct(commit=True)
+        write(os.path.join(path, "src", "draft.py"), "y\n")
+        reason = self.asked(self.stop(path))
+        commands = re.findall(r"`([^`]+)`", reason)
+        self.assertTrue(any(" status" in c for c in commands), commands)
+        for command in commands:
+            if " integrate" in command or " add " in command or " commit " in command:
+                continue
+            # テストのワークスペースにはスクリプトが無いので、実行はせず、新しいシェルで 1 行として
+            # 読めること（引用が閉じていること）と、`cd` の行き先が実在することを確かめる。
+            done = subprocess.run(
+                ["sh", "-n", "-c", command], cwd="/", capture_output=True, text=True
+            )
+            self.assertEqual(done.returncode, 0, (command, done.stderr))
+            target = command.split(" && ")[0][len("cd ") :].strip("\"'")
+            self.assertTrue(os.path.isdir(target), command)
+        # 打てる形になっているか（`<…>` 以外に未解決の差し込みが無い）。
+        for command in commands:
+            self.assertNotIn("{", command)
+            self.assertTrue(command.startswith("cd "), command)
+
     def test_ticket_control_does_not_matter(self):
         path = self.direct(commit=True)
         self.post(os.path.join(path, "src", "a.py"))
