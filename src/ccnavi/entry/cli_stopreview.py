@@ -56,6 +56,12 @@ def run(
         except Exception as exc:  # 集計の失敗で落ちない。壊れた記録を名指しする
             stderr.write(f"ccnavi: 評価の集計に失敗した（{type(exc).__name__}: {exc}）\n")
             return 1
+    inline = ""
+    if len(words) == 5 and words[1] == "record":
+        inline = words[
+            4
+        ]  # JSON を最後の引数で渡す形（権限の許可に合わせた、パイプ・ヒアドキュメントの無い形）
+        words = words[:4]
     if len(words) != 4 or words[1] not in ("material", "record"):
         stderr.write(
             "ccnavi: stop-review は material か record に <セッション> <transcript> を渡す\n"
@@ -67,12 +73,13 @@ def run(
     stopreview.configure_log(conf.state, stopreview.logs_dir(conf.log))
     key = stopreview.shared_key(session, transcript)
     if not key:
+        stopreview.log_event(conf.state, "no_key", {"reason": "judge"})
         return _not_candidate(stdout, "no_key") if verb == "material" else _ok(stdout)
     try:
         stopreview.expire_overdue(conf.state)
         if verb == "material":
             return _material(stdout, conf, key, transcript, root)
-        return _record(stdin, stdout, conf, key, root)
+        return _record(stdin, stdout, conf, key, root, inline)
     except Exception as exc:  # 判定役の失敗が作業を止めてはならない。出力は必ず決まった形にする
         stderr.write(f"ccnavi: stop-review {verb} に失敗した: {type(exc).__name__}\n")
         return _not_candidate(stdout, "error") if verb == "material" else _ok(stdout)
@@ -86,6 +93,7 @@ def _material(stdout: TextIO, conf: settings.Settings, key: str, transcript: str
             break
         time.sleep(PLAN_POLL_SECONDS)
     if state == "wait":
+        stopreview.log_event(conf.state, "plan_timeout", {"attempt_id": stopreview.attempt_id(key)})
         return _not_candidate(stdout, "plan_timeout")
     if state != "candidate" or plan is None:
         return _not_candidate(stdout, state)
@@ -155,9 +163,11 @@ def _body(root: str, proposal: dict) -> str:
     return "\n".join(parts)
 
 
-def _record(stdin: TextIO, stdout: TextIO, conf: settings.Settings, key: str, root: str) -> int:
+def _record(
+    stdin: TextIO, stdout: TextIO, conf: settings.Settings, key: str, root: str, inline: str = ""
+) -> int:
     try:
-        result = json.loads(stdin.read())
+        result = json.loads(inline or stdin.read())
     except ValueError:
         result = None
     criteria, _source = stopreview.load_criteria(root)

@@ -12,6 +12,7 @@ from ccnavi.hook import events, stopjudge
 from ccnavi.infra import hookio, modes, settings
 from ccnavi.records import audit
 
+JUDGE = "hook-agent-6f1c2d3e"
 CALL = "ccnavi stop-review material s1 /t/transcript.jsonl"
 
 
@@ -32,9 +33,7 @@ class StopJudgeTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.state = tmp.name
-        self.conf = settings.Settings(
-            state=tmp.name, stop_review_agent=True, stop_review_judge="stop-judge"
-        )
+        self.conf = settings.Settings(state=tmp.name, stop_review_agent=True)
 
     def _before(self, payload, mode=modes.ENABLE, conf=None):
         out, record = io.StringIO(), audit.Record()
@@ -53,23 +52,25 @@ class StopJudgeTest(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertEqual(stopjudge.stop_review_call(command), want)
 
-    def test_judge_is_recognised_only_when_configured(self):
-        judge = _payload(agent_type="Stop-Judge")
+    def test_judge_is_recognised_by_the_agent_id_prefix_when_registered(self):
+        judge = _payload(agent_id=JUDGE)
         self.assertTrue(stopjudge.is_judge(self.conf, judge))
-        self.assertFalse(stopjudge.is_judge(self.conf, _payload(agent_type="other")))
-        unset = settings.Settings(state=self.state, stop_review_agent=True)
-        self.assertFalse(stopjudge.is_judge(unset, judge))
-        unregistered = settings.Settings(state=self.state, stop_review_judge="stop-judge")
+        self.assertFalse(stopjudge.is_judge(self.conf, _payload(agent_id="sub-1")))
+        self.assertFalse(stopjudge.is_judge(self.conf, _payload(agent_type="hook-agent-x")))
+        unregistered = settings.Settings(state=self.state)
         self.assertFalse(stopjudge.is_judge(unregistered, judge))
 
     def test_judge_may_run_only_stop_review(self):
-        handled, out, _ = self._before(_payload(agent_type="stop-judge"))
-        self.assertEqual((handled, out), (True, ""))
-        handled, out, record = self._before(_payload(agent_type="stop-judge", command="ls"))
+        handled, out, _ = self._before(_payload(agent_id=JUDGE))
+        self.assertTrue(handled)
+        self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "allow")
+        handled, out, _ = self._before(_payload(agent_id=JUDGE, tool="StructuredOutput"))
+        self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "allow")
+        handled, out, record = self._before(_payload(agent_id=JUDGE, command="ls"))
         self.assertTrue(handled)
         self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "deny")
         self.assertEqual(record.decision, audit.DENY)
-        handled, out, _ = self._before(_payload(agent_type="stop-judge", tool="Read"))
+        handled, out, _ = self._before(_payload(agent_id=JUDGE, tool="Read"))
         self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "deny")
 
     def test_worker_call_is_stopped_and_tainted(self):
@@ -84,8 +85,8 @@ class StopJudgeTest(unittest.TestCase):
         self.assertEqual((handled, out), (False, ""))
         self.assertTrue(stopjudge.tainted(self.state, "s1"))
 
-    def test_worker_without_a_judge_value_is_never_stopped(self):
-        unset = settings.Settings(state=self.state, stop_review_agent=True)
+    def test_unregistered_workspace_is_never_touched(self):
+        unset = settings.Settings(state=self.state)
         handled, out, _ = self._before(_payload(), conf=unset)
         self.assertEqual((handled, out), (False, ""))
         self.assertFalse(stopjudge.tainted(self.state, "s1"))
@@ -113,21 +114,27 @@ class StopJudgeTest(unittest.TestCase):
         for command in bad:
             with self.subTest(bad=command):
                 self.assertFalse(stopjudge.judge_command_ok(command))
-                handled, out, _ = self._before(_payload(agent_type="stop-judge", command=command))
+                handled, out, _ = self._before(_payload(agent_id=JUDGE, command=command))
                 self.assertTrue(handled)
                 self.assertEqual(
                     json.loads(out)["hookSpecificOutput"]["permissionDecision"], "deny"
                 )
 
     def test_the_commands_in_the_registered_prompt_are_allowed(self):
-        launcher = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-launcher.sh"'
+        launcher = "sh .ccnavi/scripts/ccnavi-launcher.sh"
         material = f"{launcher} stop-review material sess-1 /home/u/t.jsonl"
         record = (
             f"cat <<'EOF' | {launcher} stop-review record sess-1 /home/u/t.jsonl\n"
             '{"attempt_id": "x", "results": [{"fixes": ["$(whoami)"]}]}\nEOF'
         )
+        inline = (
+            f"{launcher} stop-review record sess-1 /home/u/t.jsonl "
+            '\'{"attempt_id": "x", "results": [{"fixes": ["$(whoami) `id`"]}]}\''
+        )
         self.assertTrue(stopjudge.judge_command_ok(material))
         self.assertTrue(stopjudge.judge_command_ok(record))
+        self.assertTrue(stopjudge.judge_command_ok(inline))
+        self.assertFalse(stopjudge.judge_command_ok(inline + " $(id)"))
 
     def test_indirect_worker_calls_are_tainted_but_mentions_are_not(self):
         for command in (
@@ -164,7 +171,7 @@ class StopJudgeTest(unittest.TestCase):
                 out, record = io.StringIO(), audit.Record()
                 code = events.decide(
                     out, io.StringIO(), modes.ENABLE, self.conf, self.state,
-                    _payload(event=event, agent_type="stop-judge"), record, 0.0,
+                    _payload(event=event, agent_id=JUDGE), record, 0.0,
                 )  # fmt: skip
                 self.assertEqual((code, out.getvalue()), (0, ""))
                 self.assertEqual(record.reason, "stop-review-judge")

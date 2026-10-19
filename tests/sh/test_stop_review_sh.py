@@ -65,13 +65,16 @@ class StopReviewSetupTest(unittest.TestCase):
                 },
             }
         )
-        done = self.sh("register", "--judge-type", "judge-1", "--model", "haiku")
+        done = self.sh("register", "--model", "haiku")
         self.assertEqual(done.returncode, 0, done.stderr)
         data = self.read()
-        self.assertEqual(data["permissions"], {"allow": ["Bash(ls)"]})
         self.assertEqual(data["env"]["KEEP"], "1")
         self.assertEqual(data["env"]["CCNAVI_STOP_REVIEW_AGENT"], "0")  # 既にある値は触らない
-        self.assertEqual(data["env"]["CCNAVI_STOP_REVIEW_JUDGE_TYPE"], "judge-1")
+        allow = data["permissions"]["allow"]
+        self.assertEqual(allow[0], "Bash(ls)")  # ユーザの許可の順は保つ
+        self.assertIn("Bash(sh .ccnavi/scripts/ccnavi-launcher.sh stop-review material:*)", allow)
+        self.assertIn("Bash(sh .ccnavi/scripts/ccnavi-launcher.sh stop-review record:*)", allow)
+        self.assertEqual(len(allow), 3)
         commands = [h for g in data["hooks"]["Stop"] for h in g["hooks"] if h["type"] == "command"]
         self.assertEqual(commands, [{"type": "command", "command": "x"}])
         (agent,) = self.agents(data)

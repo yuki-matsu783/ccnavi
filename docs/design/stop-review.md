@@ -14,7 +14,7 @@ keywords: [Stop, agent hook, AI 判定, 判定役, 共有キー, 試行, 判定�
 
 ```
 Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キーで判定計画と試行を 1 件書く
-      └─ agent hook（判定役）  : stop-review material → 判定 → stop-review record → 返り値をそのまま返す
+      └─ agent hook（判定役）  : 材料を取る → 判定 → 結果を渡す → 返り値をそのまま返す
 ```
 
 - **共有キー**: セッション ID と、transcript 末尾のサイドチェーンでないアシスタント行の `uuid`（`records/stopreview.py` の `shared_key`）。末尾が書きかけなら短く読み直し、それでも読めなければ導けない（未検査）。
@@ -24,11 +24,11 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 
 ## stop-review
 
-`ccnavi stop-review material|record <セッション> <transcript>`（`entry/cli_stopreview.py`）。どちらも終了コード 0 で、`record` の標準出力は agent hook がそのまま返す JSON 1 行だけ。拒否・失敗・打てないときは `{"ok": true}`。
+判定役が使う 2 つの入口（材料を取る・結果を渡す。`entry/cli_stopreview.py`）。どちらも終了コード 0 で、結果を渡す側の標準出力は agent hook がそのまま返す JSON 1 行だけ。拒否・失敗・打てないときは `{"ok": true}`。作業者向けの文書と索引には、打ち方を載せない。
 
-- `material`: 計画を最大 5 秒待ち、材料を区切ったデータとして返す。材料は、今回のターン、直前 5 件のユーザ発言、判定用 Markdown（`.ccnavi/config/stop-review.md`、無ければ組み込み）、issue／MR の指定、提出済みの提案と承認状態、提案の版ごとの本文（送ったコミットから読む。未送信は書いたファイルの中身）。本文中の区切りは無害にする。判定に渡した材料は伏せ字にして `logs/stop-review/material/` に保存する。
-- `record`: 構造を検証し（試行 ID・対象・基準・種別つきの問題箇所と修正・必要な基準の網羅）、材料の版と承認状態を確かめ直し、最終分類を確定する。enable で不備検出のときだけ `{"ok": false, "reason": …}`。差し戻しの文に、試行 ID、基準 ID・問題箇所・修正、「本当にユーザの判断が要る問いなら、修正の後にその問いを最後に書き直して終える」の一文を必ず含める。再判定は差し戻さない。
-- `report`: 評価の集計（基準ごとの検査カバー率・見逃し率・誤差し戻し率・不要介入率・修正率と、分けて数えるもの）。独立した評価は `logs/stop-review/labels.jsonl`。
+- 材料を取る側: 計画を最大 5 秒待ち、材料を区切ったデータとして返す。材料は、今回のターン、直前 5 件のユーザ発言、判定用 Markdown（`.ccnavi/config/stop-review.md`、無ければ組み込み）、issue／MR の指定、提出済みの提案と承認状態、提案の版ごとの本文（送ったコミットから読む。未送信は書いたファイルの中身）。本文中の区切りは無害にする。判定に渡した材料は伏せ字にして `logs/stop-review/material/` に保存する。
+- 結果を渡す側: 構造を検証し（試行 ID・対象・基準・種別つきの問題箇所と修正・必要な基準の網羅）、材料の版と承認状態を確かめ直し、最終分類を確定する。enable で不備検出のときだけ `{"ok": false, "reason": …}`。差し戻しの文に、試行 ID、基準 ID・問題箇所・修正、「本当にユーザの判断が要る問いなら、修正の後にその問いを最後に書き直して終える」の一文を必ず含める。再判定は差し戻さない。
+- 評価の集計（ユーザ向け。使い方は README）（基準ごとの検査カバー率・見逃し率・誤差し戻し率・不要介入率・修正率と、分けて数えるもの）。独立した評価は `logs/stop-review/labels.jsonl`。
 
 最終分類は、AI が「チケット作業の依頼ではない」→ 対象外（判定者 AI）、材料不足 → 未検査、R1・R2・R4 に受理された不備 → 不備検出、必要な基準に判定不能 → 未検査、それ以外 → 終了可。出力の検証は構造だけを確かめる。指摘が正しいことは保証しない。
 
@@ -41,7 +41,7 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 
 ## 判定役の除外（`hook/stopjudge.py`）
 
-`CCNAVI_STOP_REVIEW_JUDGE_TYPE` に判定役の `agent_type` が設定されているときだけ、判定役の呼び出しを見分ける。PreToolUse は `stop-review material|record` の Bash だけ通し、ほかは止める。PostToolUse・PostToolUseFailure・SubagentStart・SubagentStop・Stop は何もしない。作業者の `stop-review` は止めて汚染の印を付ける（dry-run では印だけ）。
+判定役の呼び出しは、payload の `agent_id` が `hook-agent-` で始まることで見分ける（実機で確かめた。登録したワークスペースだけ）。PreToolUse は、判定役の 2 つの入口を呼ぶ Bash と返り値の道具だけ通し、ほかは止める。PostToolUse・PostToolUseFailure・SubagentStart・SubagentStop・Stop は何もしない。作業者の `stop-review` は止めて汚染の印を付ける（dry-run では印だけ）。
 
 ## 登録と診断
 
@@ -52,16 +52,29 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 
 試行のイベントは `logs/stop-review/events.jsonl`（`decisions.jsonl` には書かない）。計画・試行・操作は state の置き場。`records/prune.py` が、セッションを名前に持つものはセッションごとに、持たないものはそれ自身の日付で（state の保持日数）、再評価用の材料と events は `CCNAVI_STOP_REVIEW_KEEP_DAYS`（既定 90 日）で消す。
 
+## 測定結果（Claude Code 2.1.303、2026-10-19、claude -p で実測）
+
+| ID | 結果 | 暫定のしきい値 |
+|---|---|---|
+| S1 共有キーの一致 | command hook と agent hook の session_id・transcript_path は同じ。9 Stop すべてで計画が見つかり、キーの不一致は 0 | 不一致率 1% 以下 |
+| S2 判定役の見分け | agent 型 hook の中の呼び出しは `agent_id` が `hook-agent-<uuid>`、`agent_type` は無い。PreToolUse・PostToolUse・SubagentStop（失敗時）が来る。SubagentStart は観測していない | 見分けられること |
+| S3 Bash の実行 | 許可の規則では実行できない（`dontAsk`。未信頼のワークスペースでは `permissions.allow` が無視される）。PreToolUse の許可の応答で実行できる | 実行できること |
+| S4 返り値に従う率 | 9 件すべてで、判定役は結果を渡す入口を実行し、その出力のとおりに返した。記録外の停止の疑いは 0。差し戻しの文は次の Stop で `stop_hook_active` が真になって届き、再判定で解消した 1 件を確認 | 記録外の停止の率 2% 以下 |
+| S5 費用・待ち時間 | 単純な 1 ターンで、判定役なし 約 5 秒・約 0.004 ドル、判定役あり 約 14〜15 秒・約 0.0063 ドル（判定役 1 回で約 +10 秒・約 +0.0024 ドル）。複雑な依頼では 1 ターンあたり +10 秒前後 | 1 Stop あたりの追加が中央値 15 秒以下・0.01 ドル以下 |
+
+標本は小さい（Stop 9 件）。しきい値は暫定で、採用の前にユーザと開発担当が決め直す。
+判定の中身は、1 ターン目の依頼の対象外（チケット作業でない）の分類が 4/4、チケット作業の依頼での不備の検出は試行した範囲で動いた。精度の評価は dry-run の運用で `ccnavi stop-review report` を使って出す。
+
 ## 限界
 
-- 判定役の Bash は `stop-review material|record` の 1 本（と標準入力を渡す `echo`・`printf`・`cat`、ヒアドキュメント）だけ通す。連結・リダイレクト・コマンド置換は止める。判定役の制限は dry-run でも実際に止める（判定役はほかの hook の判定の対象ではなく、制限しないと transcript の命令で任意のコマンドが通るため）。
+- 判定役の Bash は 2 つの入口のどちらか 1 本（と標準入力を渡す `echo`・`printf`・`cat`、ヒアドキュメント）だけ通す。連結・リダイレクト・コマンド置換は止める。判定役の制限は dry-run でも実際に止める（判定役はほかの hook の判定の対象ではなく、制限しないと transcript の命令で任意のコマンドが通るため）。
 - 作業者の呼び出しは、サブエージェントの分も含めて止めて印を付ける。`sh -c`・`eval`・変数展開のように読み取れない形は、`stop-review` と動詞が並んでいれば印だけ付ける（止められない）。
-- `CCNAVI_STOP_REVIEW_JUDGE_TYPE` は一意な名前にする。`general-purpose` のように作業者のサブエージェントも名乗りうる値にすると、そのサブエージェントが判定役として扱われ、実行前チェックと実行後の検査が外れる。
+- ユーザ自身の agent 型 hook も `hook-agent-` で始まる `agent_id` になるので、登録したワークスペースでは判定役として扱われる（Bash は止まる）。
 - `material` と `record` に認証は無い。セッション ID と transcript のパスが分かれば誰でも打てる。防ぐのは上の PreToolUse の制限だけで、見分ける値が無ければ防げない。
 - 外側の層を飛ばす `CCNAVI_PROPOSE_INNER=1 sh ccnavi-ticket.sh propose …` と、外側に TERM だけが届いた場合は、操作実績が残らない（未連携として数える）。
 - 差し戻しの消費には窓がある（既定 600 秒）。窓を過ぎた差し戻しは、次の Stop で消費されず、期限で閉じる（最終分類は不備検出のまま、修正率の「再判定なし」に数える）。
 
 - 成立性の検証（共有キーの不一致率・判定役の見分け・Bash の実行可否・記録外の停止の率・費用）は実機でまだ測っていない。しきい値も未決。
-- 作業者が `stop-review` を打つことは、判定役を見分ける値が設定されていなければ止められない。悪意のある作業者を完全には防げない。
+- 作業者による判定役の入口の実行は、悪意のある作業者を完全には防げない。
 - 費用・待ち時間は取れていない（集計は「不明」）。
 - 子の作業完了の判定・finish の促しの引き継ぎ・着手済みの親への子の追加は対象外。

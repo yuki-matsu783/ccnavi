@@ -23,6 +23,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 from typing import Any
@@ -65,15 +66,25 @@ def _all_events(log_dir: str) -> list[dict[str, Any]]:
     current = stopreview.log_path(log_dir)
     directory = os.path.dirname(current)
     paths = [current]
-    try:
+    with contextlib.suppress(OSError):
         paths += [
             os.path.join(directory, name)
             for name in sorted(fsio.listdir(directory))
             if name.startswith("events.") and name.endswith(".jsonl") and name != "events.jsonl"
         ]
-    except OSError:
-        pass
     return [row for path in paths for row in _jsonl(path)]
+
+
+def _latency(attempts: list[dict[str, Any]]) -> dict[str, float] | None:
+    """計画の作成から判定の完了まで（秒）。完了した試行だけ。"""
+    waits = sorted(
+        float(a["done_at"]) - float(a["created"])
+        for a in attempts
+        if isinstance(a.get("done_at"), (int, float)) and isinstance(a.get("created"), (int, float))
+    )
+    if not waits:
+        return None
+    return {"n": len(waits), "median": waits[len(waits) // 2], "max": waits[-1]}
 
 
 def _rate(numerator: int, denominator: int) -> float | None:
@@ -155,6 +166,11 @@ def summarize(state: str, log_dir: str) -> dict[str, Any]:
             "unresolved": unresolved,
             "inconclusive": inconclusive,
             "not_rejudged": not_rejudged,
+        },
+        "latency": _latency(attempts),
+        "key_failures": {
+            "no_key": sum(1 for e in events if e.get("event") == "no_key"),
+            "plan_timeout": sum(1 for e in events if e.get("event") == "plan_timeout"),
         },
         "coverage": _rate(counts["checked_ok"] + counts["flawed"], judged),
         "criteria": _by_criterion(attempts, labels),
@@ -263,7 +279,18 @@ def render(summary: dict[str, Any], unlinked: int = 0) -> str:
         f"期限切れ {c['expired']}、出力不正 {c['rejected']}、未連携 {unlinked}、"
         f"記録外の停止の疑い {summary['suspected_unrecorded_stops']}、汚染 {c['tainted']}"
     )
-    lines.append("費用・待ち時間: 不明（取れていない）")
+    wait = summary.get("latency")
+    shown = (
+        "不明"
+        if not wait
+        else f"中央値 {wait['median']:.1f} 秒、最大 {wait['max']:.1f} 秒（{wait['n']} 件）"
+    )
+    lines.append(f"待ち時間（計画の作成から判定の完了まで）: {shown}")
+    lines.append("費用: 不明（hook からは取れない。claude -p の total_cost_usd で測る）")
+    lines.append(
+        f"共有キーを導けなかった Stop {summary['key_failures']['no_key']} 件、"
+        f"判定役が計画を待ち切れなかった {summary['key_failures']['plan_timeout']} 件"
+    )
     return "\n".join(lines)
 
 

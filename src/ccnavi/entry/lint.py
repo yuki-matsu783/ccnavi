@@ -64,8 +64,8 @@ def stop_review_problems(root: str, conf: settings.Settings) -> list[Problem]:
       （印だけで hook が無い: 計画が溜まるだけで誰も判定しない／hook だけで印が無い: 判定役が計画を
       受け取れず、すべて未検査になる）
     - agent 型の Stop hook が複数ある（同じ Stop で判定が重複する）
-    - 判定役を見分ける値（`CCNAVI_STOP_REVIEW_JUDGE_TYPE`）が無いまま enable（判定役の呼び出しが
-      ほかの hook の副作用を動かす）
+    - 判定役の Bash を許す権限（`permissions.allow`）が無い（agent 型 hook の中は `dontAsk` で動き、
+      許可が無いと `material` を実行できず、すべて未検査になる）
     """
     out: list[Problem] = []
     declared = (conf.stop_review or "").strip().lower()
@@ -108,18 +108,27 @@ def stop_review_problems(root: str, conf: settings.Settings) -> list[Problem]:
                 f"agent 型の Stop hook が {len(hooks)} 件ある（同じ Stop で判定が重複する）",
             )
         )
-    effective = declared if declared in valid else modes.DRY_RUN
-    if registered and effective == modes.ENABLE and not conf.stop_review_judge.strip():
+    if hooks and not allows_judge_bash(root):
         out.append(
             Problem(
                 SEVERITY_WARN,
                 "(stop-review)",
-                f"{settings.STOP_REVIEW_ENV}=enable だが {settings.STOP_REVIEW_JUDGE_ENV} が無い"
-                "（判定役の呼び出しを見分けられず、ほかの hook の副作用が動く。"
-                "実測で確かめた値を設定するまで enable にしない）",
+                "判定役の Bash（stop-review material と record）を許す権限が "
+                ".claude/settings.json の permissions.allow に無い（判定役は dontAsk で動くので、"
+                "材料を取れず、すべて未検査になる。register で足せる）",
             )
         )
     return out
+
+
+def allows_judge_bash(root: str) -> bool:
+    """`permissions.allow` に、判定役の `stop-review material` と `record` の両方があるか。"""
+    path = os.path.join(root, ".claude", "settings.json")
+    data, error = fsio.read_json(path) if os.path.isfile(path) else (None, None)
+    perms = data.get("permissions") if isinstance(data, dict) and error is None else None
+    allow = perms.get("allow") if isinstance(perms, dict) else None
+    rules = {r for r in allow if isinstance(r, str)} if isinstance(allow, list) else set()
+    return all(rule in rules for rule in stopreview.JUDGE_ALLOW_RULES)
 
 
 def stop_review_hooks(root: str) -> tuple[list[str], str]:

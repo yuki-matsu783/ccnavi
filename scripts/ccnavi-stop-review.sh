@@ -1,7 +1,7 @@
 #!/bin/sh
 # ccnavi-stop-review Stop の AI 判定の agent 型 Stop hook を、.claude/settings.json に登録・解除・点検する。
 #
-#   sh scripts/ccnavi-stop-review.sh register   [--root <ワークスペース>] [--judge-type <値>] [--model <名前>]
+#   sh scripts/ccnavi-stop-review.sh register   [--root <ワークスペース>] [--model <名前>]
 #   sh scripts/ccnavi-stop-review.sh unregister [--root <ワークスペース>]
 #   sh scripts/ccnavi-stop-review.sh check      [--root <ワークスペース>]
 #
@@ -12,8 +12,8 @@
 # 登録するもの:
 #   - hooks.Stop に agent 型の hook を 1 件。prompt の先頭行が目印（[ccnavi-stop-review]）。
 #     Claude Code が許す欄だけを使い、目印は prompt の中に置く。
-#   - env.CCNAVI_STOP_REVIEW_AGENT=1（既にあれば触らない）。--judge-type を渡したときは
-#     env.CCNAVI_STOP_REVIEW_JUDGE_TYPE も（判定役の呼び出しの agent_type。実機で確かめた値）。
+#   - env.CCNAVI_STOP_REVIEW_AGENT=1（既にあれば触らない）。
+#   - permissions.allow に、判定役の Bash（stop-review material と record）だけを許す 2 件。
 # 他の hook・env・ユーザの定義は保持する。目印のある hook が既にあれば、重ねずに置き換える。
 # unregister は目印のある hook と CCNAVI_STOP_REVIEW_AGENT だけを外す。
 #
@@ -23,7 +23,12 @@ set -eu
 
 MARK='[ccnavi-stop-review]'
 SETTINGS_REL=".claude/settings.json"
-LAUNCHER='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-launcher.sh"'
+LAUNCHER='sh .ccnavi/scripts/ccnavi-launcher.sh'
+# 判定役（agent 型 hook の中）は dontAsk で動く。許可が無いと material を実行できない。
+# 実機（Claude Code 2.1）で、許可が無いと Bash が拒否されて全部が未検査になることを確かめた。
+ALLOW_RULES="Bash($LAUNCHER stop-review material:*)
+Bash($LAUNCHER stop-review record:*)"
+allow_json=$(printf '%s\n' "$ALLOW_RULES" | jq -R -s 'split("\n") | map(select(length > 0))')
 TIMEOUT=120
 
 usage() {
@@ -50,18 +55,16 @@ register | unregister | check) ;;
 esac
 
 root=""
-judge=""
 model=""
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-	--root | --judge-type | --model)
+	--root | --model)
 		[ "$#" -ge 2 ] || {
 			printf 'ccnavi-stop-review: %s には値が要ります\n' "$1" >&2
 			exit 2
 		}
 		case "$1" in
 		--root) root=$2 ;;
-		--judge-type) judge=$2 ;;
 		--model) model=$2 ;;
 		esac
 		shift 2
@@ -164,7 +167,7 @@ check)
 	exit 1
 	;;
 unregister)
-	updated=$(printf '%s' "$current" | jq --arg mark "$MARK" '
+	updated=$(printf '%s' "$current" | jq --arg mark "$MARK" --argjson allow "$allow_json" '
 		def ours: .type == "agent" and ((.prompt // "") | startswith($mark));
 		(if .hooks.Stop then
 			.hooks.Stop |= [ .[] | (.hooks // []) as $h
@@ -175,7 +178,10 @@ unregister)
 		| (if .hooks.Stop == [] then del(.hooks.Stop) else . end)
 		| (if .hooks == {} then del(.hooks) else . end)
 		| (if (.env.CCNAVI_STOP_REVIEW_AGENT // "") == "1" then del(.env.CCNAVI_STOP_REVIEW_AGENT) else . end)
-		| (if .env == {} then del(.env) else . end)')
+		| (if .env == {} then del(.env) else . end)
+		| (if .permissions.allow then .permissions.allow -= $allow else . end)
+		| (if (.permissions.allow // [1]) == [] then del(.permissions.allow) else . end)
+		| (if (.permissions // [1]) == {} then del(.permissions) else . end)')
 	if same "$updated" "$current"; then
 		printf '外すものはありません\n'
 		exit 0
@@ -198,16 +204,14 @@ $MARK
    まず classification を決める。ユーザの依頼がチケット作業でなければ not_ticket_work、そうでなければ ticket_work。
    ticket_work なら、R1 と R3 は target を stop で、R2 と R4 は targets に並ぶ proposal の対象キーごとに result を出す（pass / fail / unknown）。
    根拠を材料の中に特定できないときは推測せず unknown にする。fail のときは locations（kind は final_answer / proposal / material と引用 text）と fixes（kind は write_proposal / revise_proposal / send_proposal と text）を必ず付け、依頼との不一致があれば mismatch に書く。
-4. 判定を JSON にして、次の形（ヒアドキュメント）で record に渡す。ほかのコマンドをつなげない。リダイレクトも使わない。
-cat <<'EOF' | $LAUNCHER stop-review record <session_id> <transcript_path>
-{"attempt_id": "...", "classification": "...", "results": [{"criterion": "R1", "target": "stop", "result": "pass", "locations": [], "mismatch": "", "fixes": []}]}
-EOF
+4. 判定を JSON 1 行にして、record の最後の引数に単一引用符で渡す（JSON の中の ' は '\\'' と書く）。ほかのコマンドをつなげない。リダイレクトも使わない。
+$LAUNCHER stop-review record <session_id> <transcript_path> '{"attempt_id": "...", "classification": "...", "results": [{"criterion": "R1", "target": "stop", "result": "pass", "locations": [], "mismatch": "", "fixes": []}]}'
 5. record が出力した 1 行の JSON を、そのまま返して終わる。加工しない。record を実行できなかったときは {"ok": true} を返す。
 PROMPT
 )
 
 updated=$(printf '%s' "$current" | jq --arg mark "$MARK" --arg prompt "$prompt" \
-	--arg model "$model" --arg judge "$judge" --argjson timeout "$TIMEOUT" '
+	--arg model "$model" --argjson allow "$allow_json" --argjson timeout "$TIMEOUT" '
 	def ours: .type == "agent" and ((.prompt // "") | startswith($mark));
 	(if .hooks.Stop then
 		.hooks.Stop |= [ .[] | (.hooks // []) as $h
@@ -220,7 +224,7 @@ updated=$(printf '%s' "$current" | jq --arg mark "$MARK" --arg prompt "$prompt" 
 			+ (if $model != "" then {model: $model} else {} end) ]
 	}])
 	| .env = ({CCNAVI_STOP_REVIEW_AGENT: "1"} + (.env // {}))
-	| if $judge != "" then .env.CCNAVI_STOP_REVIEW_JUDGE_TYPE = $judge else . end')
+	| .permissions = ((.permissions // {}) | (.allow // []) as $have | .allow = ($have + ($allow - $have)))')
 
 if same "$updated" "$current"; then
 	printf 'すでに登録されています\n'
@@ -228,6 +232,3 @@ if same "$updated" "$current"; then
 fi
 write_settings "$updated"
 printf '登録しました（agent 型の Stop hook 1 件と CCNAVI_STOP_REVIEW_AGENT=1）。効き方は CCNAVI_STOP_REVIEW（既定 dry-run）で決まります\n'
-if [ -z "$judge" ]; then
-	printf '判定役を見分ける値（--judge-type）は未設定です。enable にする前に、実機で確かめた値を設定してください\n'
-fi

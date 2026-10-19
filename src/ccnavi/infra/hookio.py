@@ -30,6 +30,7 @@ SUBAGENT_STOP = "SubagentStop"
 
 # 1 回の呼び出しに対する判定。緩い順に並べてある。
 ASK = "ask"
+ALLOW = "allow"
 DENY = "deny"
 
 

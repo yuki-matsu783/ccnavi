@@ -294,7 +294,8 @@ class ProposalPlanTest(PlanAtStopTest):
         self.assertTrue(plan["is_candidate"])
         (proposal,) = plan["proposals"]
         self.assertEqual((proposal["route"], proposal["key"]), ("unsent", "proposal:p1:unsent"))
-        self.assertEqual(plan["no_r2"], [proposal["key"]])
+        self.assertEqual(plan["no_r2"], [])  # 書いたファイルの本文があるので R2 も判定する
+        self.assertIn((sr.R2, proposal["key"]), sr.required(plan))
         body = cli_stopreview._body(self.root, proposal)
         self.assertIn("目的", body)
         self.assertIn(path, body)
@@ -315,6 +316,13 @@ class ProposalPlanTest(PlanAtStopTest):
         self._plan()
         plan = sr.read_plan(self.state, self.key)
         self.assertEqual([p["route"] for p in plan["proposals"]], ["sent"])
+
+    def test_an_operated_proposal_is_not_listed_twice_as_unsent(self):
+        self._write_post("p1")
+        self._propose(route="stopped", commit="")
+        self._plan()
+        plan = sr.read_plan(self.state, self.key)
+        self.assertEqual([p["route"] for p in plan["proposals"]], ["stopped"])
 
     def test_non_proposal_writes_and_edit_failures_are_ignored(self):
         events._track_proposals(

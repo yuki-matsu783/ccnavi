@@ -28,6 +28,13 @@ from ..infra import fsio, modes, settings
 STOP_REVIEW_ENV = settings.STOP_REVIEW_ENV
 # 登録した agent hook の prompt の先頭行（scripts/ccnavi-stop-review.sh と同じ）。
 HOOK_MARK = "[ccnavi-stop-review]"
+# 判定役の Bash を許す権限（`dontAsk` で動く agent 型 hook の中で、許可が無いと実行できない）。
+# scripts/ccnavi-stop-review.sh の ALLOW_RULES と同じ。
+JUDGE_LAUNCHER = "sh .ccnavi/scripts/ccnavi-launcher.sh"
+JUDGE_ALLOW_RULES = (
+    f"Bash({JUDGE_LAUNCHER} stop-review material:*)",
+    f"Bash({JUDGE_LAUNCHER} stop-review record:*)",
+)
 
 # 試行の状態。
 PLAN_WAIT = "plan_wait"  # 計画より先に material が来た
@@ -307,6 +314,8 @@ def _move(state: str, attempt: dict[str, Any], target: str) -> bool:
     if target not in TRANSITIONS.get(attempt.get("state", ""), frozenset()):
         return False
     attempt["state"] = target
+    if target in (DONE, SENT_BACK):
+        attempt["done_at"] = time.time()  # 待ち時間（作成から完了まで）を集計で出す
     _store(state, attempt)
     log_event(state, target, attempt)
     return True
@@ -439,9 +448,18 @@ def validate(result: Any, plan: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(rows, list):
         raise Rejected("results がリストではない")
     targets = set(plan.get("targets") or [])
+    no_r2 = set(plan.get("no_r2") or [])
+    # 本文が無い版（送れなかった提案）の R2 は対象外。判定役が余分に出した行は、受理せずに捨てる
+    # （実機で、判定役が出してしまう例があった。記録ごと拒否すると、ほかの基準の結果まで失う）。
+    rows = [
+        r
+        for r in rows
+        if not (isinstance(r, dict) and r.get("criterion") == R2 and r.get("target") in no_r2)
+    ]
+    result = dict(result, results=rows)
     seen: set[tuple[str, str]] = set()
     for row in rows:
-        _row(row, targets, set(plan.get("no_r2") or []), seen)
+        _row(row, targets, no_r2, seen)
     if classification == CLASS_NOT_TICKET_WORK and plan.get("proposals"):
         raise Rejected("ccnavi が提案の操作を見つけているのに、チケット作業ではないと分類した")
     if classification == CLASS_TICKET_WORK:

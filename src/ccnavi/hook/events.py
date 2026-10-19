@@ -528,8 +528,11 @@ def _plan_stop_review_inner(
     """
     if not (conf.state and payload.session_id and conf.stop_review_agent):
         return
+    stopreview.configure_log(conf.state, stopreview.logs_dir(conf.log))
     key = stopreview.shared_key(payload.session_id, payload.transcript_path)
     if not key:
+        # 共有キーを導けない Stop は、未検査（キーなし）として数える（S1 の不一致率の分子）。
+        stopreview.log_event(conf.state, "no_key", {"reason": "hook"})
         return
     effective = stopreview.setting(mode, conf.stop_review)
     now = time.time()
@@ -566,6 +569,9 @@ def _plan_stop_review_inner(
         }
         for op in ops
     ]
+    # 同じ識別子の propose の操作があれば（止めた・失敗した理由が分かる）、未送信としては重ねない。
+    operated = {op["ident"].casefold() for op in turn}
+    unsent = [row for row in unsent if row["ident"].casefold() not in operated]
     proposals += [
         {
             "key": stopops.unsent_key(row["ident"]),
@@ -599,7 +605,7 @@ def _plan_stop_review_inner(
         "final": _NOT_CANDIDATE_FINAL.get(why, ""),
         "targets": [stopreview.STOP_TARGET, *(p["key"] for p in proposals)],
         "proposals": proposals,
-        "no_r2": [p["key"] for p in proposals if p["route"] != stopops.SENT],
+        "no_r2": [p["key"] for p in proposals if p["route"] not in (stopops.SENT, stopops.UNSENT)],
         "material_version": stopreview.material_version(criteria),
         "refs": stopops.session_refs(conf.state, payload.session_id),
         "submitted": _submitted(conf, root, raw, payload.session_id) if ok else [],

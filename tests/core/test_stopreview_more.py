@@ -267,7 +267,8 @@ class EvalTest(Base):
     def test_render_says_unknown_for_missing_numbers(self):
         text = stopeval.render(stopeval.summarize(self.state, os.path.join(self.root, "logs")))
         self.assertIn("不明", text)
-        self.assertIn("費用・待ち時間: 不明", text)
+        self.assertIn("待ち時間（計画の作成から判定の完了まで）: 不明", text)
+        self.assertIn("費用: 不明", text)
 
     def test_report_command(self):
         out = io.StringIO()
@@ -324,7 +325,13 @@ class LintTest(Base):
     def _settings_json(self, hooks):
         os.makedirs(os.path.join(self.root, ".claude"), exist_ok=True)
         with open(os.path.join(self.root, ".claude", "settings.json"), "w") as handle:
-            json.dump({"hooks": {"Stop": [{"hooks": hooks}]}}, handle)
+            json.dump(
+                {
+                    "permissions": {"allow": list(sr.JUDGE_ALLOW_RULES)},
+                    "hooks": {"Stop": [{"hooks": hooks}]},
+                },
+                handle,
+            )
 
     def _details(self):
         from ccnavi.entry import lint
@@ -364,6 +371,7 @@ class LintTest(Base):
             json.dump(
                 {
                     "env": {"CCNAVI_STOP_REVIEW_AGENT": "1"},
+                    "permissions": {"allow": list(sr.JUDGE_ALLOW_RULES)},
                     "hooks": {"Stop": [{"hooks": [{"type": "agent", "prompt": MARK + "x"}]}]},
                 },
                 handle,
@@ -384,11 +392,24 @@ class LintTest(Base):
         self._settings_json([{"type": "command", "command": "x"}])
         self.assertTrue(any("見つからない" in d for d in self._details()))
 
-    def test_enable_needs_the_judge_value(self):
-        self._settings_json([{"type": "agent", "prompt": MARK + "a"}])
-        self.conf.stop_review = "enable"
-        self.assertTrue(any("JUDGE_TYPE" in d for d in self._details()))
-        self.conf.stop_review_judge = "stop-judge"
+    def _write_settings(self, hooks, allow):
+        os.makedirs(os.path.join(self.root, ".claude"), exist_ok=True)
+        with open(os.path.join(self.root, ".claude", "settings.json"), "w") as handle:
+            json.dump(
+                {
+                    "permissions": {"allow": allow},
+                    "hooks": {"Stop": [{"hooks": hooks}]},
+                },
+                handle,
+            )
+
+    def test_the_judge_needs_permission_to_run_bash(self):
+        hooks = [{"type": "agent", "prompt": MARK + "a"}]
+        self._write_settings(hooks, [])
+        self.assertTrue(any("permissions.allow" in d for d in self._details()))
+        self._write_settings(hooks, list(sr.JUDGE_ALLOW_RULES[:1]))
+        self.assertTrue(any("permissions.allow" in d for d in self._details()))
+        self._write_settings(hooks, list(sr.JUDGE_ALLOW_RULES))
         self.assertEqual(self._details(), [])
 
 
@@ -461,7 +482,7 @@ class ReviewFixesTest(Base):
         attempt = sr.read_attempt(self.state, aid)
         self.assertEqual((attempt["final"], attempt["accepted"]), (sr.FINAL_UNCHECKED, False))
 
-    def test_r2_for_an_unsent_version_is_refused(self):
+    def test_a_stray_r2_row_for_a_version_without_a_body_is_dropped(self):
         key = "proposal:x:unsent"
         aid = self._running(targets=[sr.STOP_TARGET, key], no_r2=[key],
                             proposals=[{"key": key, "ident": "x", "route": "unsent"}])  # fmt: skip
@@ -474,8 +495,11 @@ class ReviewFixesTest(Base):
              "fixes": [{"kind": "revise_proposal", "text": "t"}]},
         ]}  # fmt: skip
         out = sr.accept(self.state, self.key, result, material_version=sr.material_version())
-        self.assertEqual(out, {"ok": True})
-        self.assertFalse(sr.read_attempt(self.state, aid)["accepted"])
+        self.assertEqual(out, {"ok": True})  # 余分な R2 の不備は受理せず、差し戻さない
+        attempt = sr.read_attempt(self.state, aid)
+        self.assertTrue(attempt["accepted"])
+        self.assertEqual(attempt["final"], sr.FINAL_OK)
+        self.assertNotIn("R2", [r["criterion"] for r in attempt["results"]])
 
     def test_truncated_material_never_blocks(self):
         aid = self._running()
@@ -685,9 +709,11 @@ class SecondReviewFixesTest(Base):
     def test_an_unwritable_attempt_is_reported_not_swallowed(self):
         from unittest import mock
 
-        with mock.patch.object(sr.fsio, "write_new", return_value="Permission denied"):
-            with self.assertRaises(OSError):
-                sr.write_plan(self.state, self.key, {"is_candidate": True, "targets": ["stop"]})
+        with (
+            mock.patch.object(sr.fsio, "write_new", return_value="Permission denied"),
+            self.assertRaises(OSError),
+        ):
+            sr.write_plan(self.state, self.key, {"is_candidate": True, "targets": ["stop"]})
 
     def test_an_unreadable_existing_attempt_is_replaced(self):
         aid = sr.attempt_id(self.key)

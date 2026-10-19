@@ -6,7 +6,7 @@
 
 | hook | 判定役の呼び出し |
 |---|---|
-| PreToolUse | `stop-review material|record` の Bash だけ通し、ほかは止める |
+| PreToolUse | `stop-review material|record` の Bash と返り値の道具だけ通し、ほかは止める |
 | PostToolUse・PostToolUseFailure | 何もしない（失敗の連続・範囲・知らせ・報告を動かさない） |
 | SubagentStart・SubagentStop | 何もしない（実行中の印を置かず、範囲の検査・差し戻しをしない） |
 | Stop | 何もしない |
@@ -14,10 +14,10 @@
 作業者が `stop-review` を打ったときは止めて、汚染の印を付ける（試行の横取り・偽の記録・
 評価の汚染・差し戻しの回避を防ぐ。dry-run では止めず、印だけ付ける）。
 
-見分ける値は `CCNAVI_STOP_REVIEW_JUDGE_TYPE`（判定役の呼び出しの payload の `agent_type`）。
-どの値で来るかは実機で確かめるまで分からないので、既定は空で、空のうちは見分けない。
-見分けられないまま作業者を止めると判定役自身を止めてしまうので、止めるのも印を付けるのも、
-見分ける値が設定されているときだけ。
+見分けるのは payload の `agent_id`。実機（Claude Code 2.1）の agent 型 hook の中の呼び出しは、
+`agent_id` が `hook-agent-<uuid>` で `agent_type` は無い。SubagentStart・SubagentStop は来ない。
+登録していないワークスペースでは見分けない。ユーザ自身の agent 型 hook も同じ接頭辞になるので、
+登録したワークスペースでは、それも判定役として扱う（Bash は止める）。
 """
 
 from __future__ import annotations
@@ -33,12 +33,15 @@ from ..records import audit, redact
 EXIT_OK = modes.EXIT_OK
 
 VERBS = ("material", "record")
+# 判定役が結果を返すために呼ぶ道具（agent 型 hook の返り値）。止めると判定役が返せない。
+RETURN_TOOL = "StructuredOutput"
+# 実機で確かめた、agent 型 hook の中の呼び出しの agent_id の接頭辞。
+JUDGE_AGENT_ID_PREFIX = "hook-agent-"
 
 
 def is_judge(conf: settings.Settings, payload: hookio.Input) -> bool:
-    """この呼び出しが判定役のものか。見分ける値が設定されていなければ偽。"""
-    mark = conf.stop_review_judge.strip().casefold()
-    return bool(conf.stop_review_agent and mark and payload.agent_type.strip().casefold() == mark)
+    """この呼び出しが判定役（agent 型 hook の中）のものか。登録していなければ偽。"""
+    return bool(conf.stop_review_agent and payload.agent_id.startswith(JUDGE_AGENT_ID_PREFIX))
 
 
 def stop_review_call(command: str) -> bool:
@@ -74,7 +77,8 @@ def judge_command_ok(command: str) -> bool:
     reading = shellread.read(command)
     head = _heredoc_head(command)
     if head is not None:
-        head = head.replace("${CLAUDE_PROJECT_DIR}", "")  # 登録した hook の prompt が使うパス
+        # 単一引用符の中はシェルが展開しない（JSON を引数で渡す形）。引用の外だけを見る。
+        head = re.sub(r"'[^']*'", "''", head)
     if reading.degraded or head is None or "$(" in head or "`" in head or "${" in head:
         return False
     calls = 0
@@ -142,14 +146,19 @@ def before(
     record: audit.Record,
 ) -> bool:
     """PreToolUse の入口。通常の判定へ回さないなら真（応答は書き終えた）。"""
-    if not conf.stop_review_agent or not conf.stop_review_judge.strip():
+    if not conf.stop_review_agent:
         return False
     command = payload.tool_input.get("command")
     asks = payload.tool_name == "Bash" and isinstance(command, str) and stop_review_call(command)
     if is_judge(conf, payload):
-        record.decision, record.reason = audit.SKIP, "stop-review-judge"
-        if asks and judge_command_ok(command):
+        record.reason = "stop-review-judge"
+        if (asks and judge_command_ok(command)) or payload.tool_name == RETURN_TOOL:
+            # 許すと答える。agent 型 hook の中は dontAsk で動き、許可の規則が無いと Bash が
+            # 拒否される（実機で確かめた）。hook の許可で通す。返り値を返す道具も同じ。
+            record.decision = audit.ALLOW
+            hookio.write_verdict(stdout, hookio.ALLOW, "ccnavi: Stop の判定役の呼び出し")
             return True
+        record.decision = audit.SKIP
         hookio.write_verdict(
             stdout,
             hookio.DENY,
