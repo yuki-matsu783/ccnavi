@@ -249,7 +249,7 @@ export function embedData(data: RulesData): string {
  */
 export function modeBanner(mode: string): string {
   if (mode === "dry-run") {
-    return "判定と記録だけをします。deny や ask にヒットしても、ツールの実行は止まりません";
+    return "判定と記録をします。deny や ask にヒットしても、一般の保護はツールの実行を止めません（チケットの関門と補助の保護は止まります）";
   }
   if (mode === "disable") {
     return "判定しません。ルールは使われず、deny や ask に当たる操作も止まりません";

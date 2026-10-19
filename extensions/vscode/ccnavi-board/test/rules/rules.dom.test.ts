@@ -476,7 +476,7 @@ test("CB-T50 実行ファイルが答えたモードで帯を出す。dry-run �
   };
   const dryRun = (await banners("dry-run")).join("\n");
   assert.match(dryRun, /CCNAVI_MODE.*dry-run/);
-  assert.match(dryRun, /判定と記録だけ/);
+  assert.match(dryRun, /判定と記録をします/);
   const disable = (await banners("disable")).join("\n");
   assert.match(disable, /CCNAVI_MODE.*disable/);
   // disable は判定しない。dry-run と同じ「判定と記録」の文面にしない

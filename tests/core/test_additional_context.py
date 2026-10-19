@@ -120,12 +120,16 @@ class AdditionalContextTest(unittest.TestCase):
         self.rules(
             deny=[
                 rule(
-                    "push", "Bash", "push はユーザが行う", glob="*git push*", additionalContext=NOTE
+                    "deploy",
+                    "Bash",
+                    "deploy はユーザが行う",
+                    glob="*make deploy*",
+                    additionalContext=NOTE,
                 )
             ],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
-        out = self.judge("Bash", "git push origin main", mode="dry-run")
+        out = self.judge("Bash", "make deploy prod", mode="dry-run")
         self.assertNotIn("permissionDecision", out)
         self.assertIn("would have stopped", out["additionalContext"])
         self.assertIn(NOTE, out["additionalContext"])

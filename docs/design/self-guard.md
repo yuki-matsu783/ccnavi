@@ -31,7 +31,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 ### 8.2 止める側
 
-`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す。
+`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す。これとは別に、チケット制御が有効な間は、承認済みの置き場（`.ccnavi/approved/` の下すべて）と操作記録の置き場（`logs/state/ops/`）への書き込みを止める組み込みの関門（`ticket_guard.gate_rules`）を足す。関門は `CCNAVI_GUARD_CORE_FILES` の値にも `dry-run` にも依らず止める。
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
@@ -132,13 +132,14 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 見るサブコマンドは `rm`・`restore`・`checkout` だけ（`stash` と `merge` は作業ツリーの変更を退避・取り込むだけで、守る場所を自分では過去の中身にしないため）。
 
 保護済みの sh の前に置く環境変数（`DENY_SCRIPT_ENV_OVERRIDE`）: 保護済みの sh（`ccnavi-*.sh`）は、
-ワークスペースルート・承認済みチケットの置き場・実行ファイルを環境変数から読む。そのため、`CCNAVI_GUARD_CORE_FILES` が有効な間は、保護済みの sh を呼ぶ
+ワークスペースルート・承認済みチケットの置き場・実行ファイルを環境変数から読む。そのため、保護済みの sh を呼ぶ
 コマンド行で `CCNAVI_` で始まる変数と `CLAUDE_PROJECT_DIR` を置く・外す形を、ルールより先に止める。数えるのは前置きの代入、
 `env X=…` と `env -u X`、`export` `declare` `readonly` `local` `unset` の引数、素の代入、環境を丸ごと空にする `env -i` で、
 コマンド行のどこに書いても数える。実行役のコマンド越し（`sudo env X=… bash …`）と、関数の定義の本体（`f() { …; }`）も同じ。
 子の push の検査も関数の本体を見る。出力の量と待ち時間だけを変える 4 つ（`CCNAVI_GIT_MAX_LINES`・
 `CCNAVI_GIT_FAIL_LINES`・`CCNAVI_GIT_KEEP_LOGS`・`CCNAVI_FETCH_TIMEOUT`）は通す。通すものを並べる形なので、sh が
 あとから読むようになった変数は止まる側になる。読み切れない形（`sh -c "…"`）は allow が当たらず確認になる。
+この止めは補助の保護で、`CCNAVI_GUARD_CORE_FILES` では切れず、`dry-run` でも止める。
 hook 自身は settings.json の env で起動するので、ここで見る代入の影響を受けない。
 
 ### 8.3 戻す側

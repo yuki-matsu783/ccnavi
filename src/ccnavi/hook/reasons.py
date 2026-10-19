@@ -424,7 +424,7 @@ def builtin_refusal(code: str, rule_id: str, subject: str, text: str) -> str:
     return "\n".join([f"[ccnavi] {code} (組み込みのルール: {rule_id})", f"subject: {shown}", text])
 
 
-def internal_error(code: str, event: str, kind: str, log_path: str) -> str:
+def internal_error(code: str, event: str, kind: str, log_path: str, *, passed: bool = False) -> str:
     """ccnavi 自身の例外で判定や検査を終えられなかったときに、モデルへ返す文。
 
     呼び出しの中身が原因ではないので、書き直し方は言えない。言えるのは、同じ呼び出しを
@@ -435,6 +435,11 @@ def internal_error(code: str, event: str, kind: str, log_path: str) -> str:
         what = (
             "ccnavi hit an internal error while checking what this call changed, so the "
             "protected areas were not checked after it ran."
+        )
+    elif passed:
+        what = (
+            "ccnavi hit an internal error before it could judge this call. This call is a plain "
+            "read that ccnavi can check without its rules, so it went through."
         )
     else:
         what = "ccnavi hit an internal error before it could judge this call, so it stopped it."
@@ -504,12 +509,15 @@ def payload_unusable(code: str, problem: str, *, event: str = "", mode: str = ""
 
     文はイベントとモードに合わせる。exit 2 が何を止め、標準エラーが誰に届くかはイベントで違い、
     UserPromptSubmit で「この呼び出しを止めた」と言うと、ユーザが自分の発言についての文として
-    読めない。dry-run は exit 0 で通すので「止めた」と言わない。event はイベント名すら読めなかった
-    回は空で、そのときは何を止めたかを言わない。
+    読めない。ツールの呼び出しを持たないイベントは、dry-run なら exit 0 で通すので「止めた」と
+    言わない（PreToolUse とイベントすら読めなかった回は dry-run でも止める）。event は
+    イベント名すら読めなかった回は空で、そのときは何を止めたかを言わない。
     """
     head = f"[ccnavi] {code}"
     said = f"ccnavi could not read the hook input from Claude Code ({problem}), "
-    if mode == DRY_RUN:
+    # ツールの呼び出しを判定するイベント（と、イベントすら読めなかった回）は dry-run でも止める
+    # （`modes.fail_closed`）。ほかのイベントは、dry-run なら通す。
+    if mode == DRY_RUN and event not in ("", hookio.PRE_TOOL_USE):
         return "\n".join(
             [
                 head,
@@ -528,7 +536,7 @@ def payload_unusable(code: str, problem: str, *, event: str = "", mode: str = ""
     return "\n".join([head, said + stopped])
 
 
-def deadline_exceeded(code: str, seconds: float, *, mode: str = "") -> str:
+def deadline_exceeded(code: str, seconds: float, *, passed: bool = False) -> str:
     """判定が期限に届かなかったときの文。
 
     照合が長引くのは、コマンドの文字列が長いか、`>` のような照合を伸ばす形が多いとき。
@@ -536,12 +544,12 @@ def deadline_exceeded(code: str, seconds: float, *, mode: str = "") -> str:
     ユーザに伝えさせる。
 
     期限を見るのは実行前チェック（PreToolUse）だけなので、宛先はツール呼び出しを書いたモデル。
-    dry-run は exit 0 で通すので「止めた」と言わず、enable なら止めていたと言う。
+    dry-run は、設定を読まずに安全と分かる読み取りだけ exit 0 で通すので、その回は「止めた」と
+    言わず、enable なら止めていたと言う。それ以外の呼び出しは dry-run でも止める。
     """
-    if mode == DRY_RUN:
+    if passed:
         what = (
-            "CCNAVI_MODE is dry-run, so the call goes through; under enable it would have been "
-            "stopped."
+            "This call is a plain read that ccnavi can check without its rules, so it went through."
         )
     else:
         what = "so it stopped it."
@@ -549,7 +557,7 @@ def deadline_exceeded(code: str, seconds: float, *, mode: str = "") -> str:
         [
             f"[ccnavi] {code}",
             f"ccnavi ran out of time ({seconds:g} s) before it finished judging this call"
-            + (". " if mode == DRY_RUN else ", ")
+            + (". " if passed else ", ")
             + what
             + " Long commands and long inline text make matching slow: split the command "
             "into smaller ones, or write long text to a file with the Write tool and pass the "

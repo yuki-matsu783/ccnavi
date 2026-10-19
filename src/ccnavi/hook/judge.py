@@ -7,12 +7,13 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from collections.abc import Callable
 from typing import TextIO
 
 from ..infra import fsio, hookio, modes, settings, shellread, tree
-from ..infra.modes import EXIT_OK
+from ..infra.modes import AUX, EXIT_OK, GATE, GENERAL
 from ..policy import (
     builtin,
     ctxfile,
@@ -35,7 +36,7 @@ from ..tickets import (
     ticket_model,
     ticket_places,
 )
-from . import docsearch, parentwrite, projskills, reasons, wrapguard
+from . import docsearch, failsafe, parentwrite, projskills, reasons, wrapguard
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
 # それより先に自前の判定を出し終えることが、遅い判定が何も返さないまま許可として扱われて
@@ -66,6 +67,12 @@ PERMISSION_NO_JUDGE = ("dontAsk", "bypassPermissions")
 # 同じ変数に入るので、ルールファイルには現れない表記にしてある。
 HANDOVER = "(handover)"
 
+# dry-run でも効く止め（関門と補助）の拒否文に添える 1 行。
+DRY_RUN_HOLDS_NOTE = (
+    "[ccnavi] CCNAVI_MODE is dry-run, but this stop still applies: ticket gates and the "
+    "protections that keep them from being bypassed are enforced in every mode except disable."
+)
+
 # 範囲の中かどうかを問うツール。作業ツリーを書き換えるものだけ。
 # Bash は入れていない。コマンド文字列に現れるパスは追えないので、ここで
 # 当てると当たったり当たらなかったりする判定になる。シェル経由の書き込みは
@@ -90,6 +97,8 @@ SHELL_GUARD_RULE_IDS = (
     selfguard_shell.SHELL_RULE_ID,
     builtin.CONFIG_VIA_BASH_RULE_ID,
     ticket_guard.STATE_SHELL_RULE_ID,
+    ticket_guard.APPROVED_SHELL_RULE_ID,
+    ticket_guard.OPS_SHELL_RULE_ID,
 )
 
 
@@ -182,9 +191,13 @@ def decide_before(
     rule_set.deny.append(ticket_guard.raw_git_rule(root))
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_guard.guard_rules(conf.tickets, root))
+        # 承認済みの置き場と操作記録の置き場。関門なので dry-run でも
+        # `CCNAVI_GUARD_CORE_FILES` の値でも外れない。
+        rule_set.deny.extend(ticket_guard.gate_rules(conf.approved, root))
         # ユーザの判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
-        if conf.guard_ticket_approval != selfguard.DISABLE:
+        # サブエージェントからは、設定に関わらず止める。実行ファイルを直接呼んで状態を動かさせない。
+        if conf.guard_ticket_approval != selfguard.DISABLE or payload.agent_id:
             rule_set.deny.append(phase_forms.ticket_approval_rule(conf.bin, root))
 
     subject, bare, inner, rewrites = screen(payload.tool_name, record.subject, record)
@@ -218,9 +231,10 @@ def decide_before(
     # 子の push の検査を外す。hook は settings.json の env で起動するので、この代入の影響を
     # 受けない。止める場所を hook に置き、sh の検査は 2 重目にする。読むのは元のコマンド。
     # `cd` を追うには区切りの残った形が要る。
-    if payload.tool_name == "Bash" and (
-        modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
-    ):
+    # 環境変数の指定の止めは補助の保護（AUX）で、`CCNAVI_GUARD_CORE_FILES` では切れない
+    # （切れるのは自己防衛だけ）。dry-run でも止める。
+    core_files_on = modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
+    if payload.tool_name == "Bash":
         script, names = wrapguard.check_env(record.subject, record.degraded)
         if names:
             record.code, record.rules = wrapguard.CODE_ENV, [wrapguard.ENV_RULE_ID]
@@ -240,12 +254,15 @@ def decide_before(
                 ],
                 conf=conf,
                 root=root,
+                kind=AUX,
             )
         # git のラッパーの `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象を
         # 消す・別のコミットの中身に戻す形。シェルの rm と同じ場所を、ラッパー越しにも止める。
         # ラッパー自身が消えても、生の git の組み込みの止めは外れない（いつも足す）。
-        sub, word, kind = wrapguard.check_core_paths(
-            conf, root, payload.cwd, record.subject, record.degraded
+        sub, word, kind = (
+            wrapguard.check_core_paths(conf, root, payload.cwd, record.subject, record.degraded)
+            if core_files_on
+            else ("", "", "")
         )
         if sub:
             record.code, record.rules = wrapguard.CODE_CORE_PATH, [wrapguard.CORE_PATH_RULE_ID]
@@ -265,6 +282,7 @@ def decide_before(
                 ],
                 conf=conf,
                 root=root,
+                kind=GENERAL,
             )
 
     # 記録と state を消す `ccnavi user prune`（内部は `--prune`。`--preview` の無い形）は、
@@ -297,6 +315,7 @@ def decide_before(
                 ],
                 conf=conf,
                 root=root,
+                kind=GENERAL,
             )
 
     # ユーザの判断の経路のうち、hook のほかに保護が無い形（端末要求を切る形、ボードの経路の形）は
@@ -333,6 +352,7 @@ def decide_before(
                 ],
                 conf=conf,
                 root=root,
+                kind=GATE,
             )
         # 2 段目の無いユーザの入口（`ccnavi-review.sh decide`・実行ファイルの `user` の入口と
         # `--yes`）は、引数を変数・置換・glob で組み立てると表記の検査から外れる。読めなければ止める
@@ -359,6 +379,7 @@ def decide_before(
                 ],
                 conf=conf,
                 root=root,
+                kind=GATE,
             )
 
     # 子チケットのワークツリーからの `ccnavi-git.sh push` は、誰が打っても止める。sh も同じ検査を
@@ -385,6 +406,7 @@ def decide_before(
                 ],
                 conf=conf,
                 root=root,
+                kind=GATE,
             )
 
     # サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない。
@@ -411,6 +433,7 @@ def decide_before(
             notices + [reasons.subagent_forbidden(display_subject, runner, layer)],
             conf=conf,
             root=root,
+            kind=GATE,
         )
 
     # サブエージェントは親のワークツリーを書き換えない。合流・コミット・push はメインが finish で
@@ -470,6 +493,7 @@ def decide_before(
                 ],
                 conf=conf,
                 root=root,
+                kind=GATE,
             )
 
     # 承認済みチケットの置き場（`approval.read_raw`）。1 回の判定で読むのは 1 度だけにし、
@@ -489,7 +513,14 @@ def decide_before(
             record.code, record.rules = phase.CODE_REVIEW, [reasons.PHASE_REVIEW_RULE]
             reason = phase.hold_reason(held, payload.tool_name, root)
             return refuse(
-                stdout, mode, record, rules.DENY, notices + [reason], conf=conf, root=root
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices + [reason],
+                conf=conf,
+                root=root,
+                kind=GATE,
             )
 
     # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
@@ -520,7 +551,14 @@ def decide_before(
                 [reasons.TICKET_PROJECT_RULE],
             )
             return refuse(
-                stdout, mode, record, rules.DENY, notices + [mismatch], conf=conf, root=root
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices + [mismatch],
+                conf=conf,
+                root=root,
+                kind=GATE,
             )
 
     # 着手中の子のフローは書き換えさせない。ルールより先に見る。
@@ -533,7 +571,14 @@ def decide_before(
         if locked:
             record.code, record.rules = flow.CODE_LOCKED, [flow.LOCK_RULE]
             return refuse(
-                stdout, mode, record, rules.DENY, notices + [locked], conf=conf, root=root
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices + [locked],
+                conf=conf,
+                root=root,
+                kind=GATE,
             )
 
     # 書き直しを求める形は、ルールより先に止める（読み分けずに止めて書き直しを案内する）。
@@ -544,6 +589,7 @@ def decide_before(
     # 止まらずに通る。どれも書き直す方法が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
     # 1 回で返す。
     if rewrites:
+        rewrite_kind = _rewrite_kind(conf, payload, subject, inner, rewrites)
         forms = list(dict.fromkeys(form for form, _ in rewrites))
         record.code = reasons.CODE_REWRITE[forms[0]]
         record.rules = [reasons.rewrite_rule(form) for form in forms]
@@ -556,7 +602,16 @@ def decide_before(
             )
             for form in forms
         ]
-        return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf, root=root)
+        return refuse(
+            stdout,
+            mode,
+            record,
+            rules.DENY,
+            notices + parts,
+            conf=conf,
+            root=root,
+            kind=rewrite_kind,
+        )
 
     # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから
     # 書き込む形の保護の照合が `>` の個数 × 尾の長さで遅くなる（selfguard_shell.REDIRECT_LIMIT）。
@@ -603,14 +658,21 @@ def decide_before(
         layers = sorted(inner, key=lambda x: x[2]) if name != rules.ALLOW else []
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
+                # 期限切れの結論もツールの種類で決める。通すのは、設定を読まずに安全と
+                # 分かる読み取りだけ。dry-run でも、通さない呼び出しは止めて、そう言う。
+                code = modes.fail_closed(
+                    mode, payload.tool_name, safe=failsafe.is_safe(payload, root)
+                )
                 stderr.write(
                     reasons.deadline_exceeded(
-                        audit.REASON_DEADLINE_EXCEEDED, DEADLINE_SECONDS, mode=mode
+                        audit.REASON_DEADLINE_EXCEEDED,
+                        DEADLINE_SECONDS,
+                        passed=code == EXIT_OK,
                     )
                     + "\n"
                 )
                 record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
-                return modes.fail_closed(mode)
+                return code
             raw_skipped = capped and rule.id in SHELL_GUARD_RULE_IDS
             if not raw_skipped and rule.matches(payload.tool_name, subject):
                 group.append(rule)
@@ -624,6 +686,9 @@ def decide_before(
         if group:
             verdict = name
             break
+    # 土台（base）の deny を落とす前の id。分類（dry-run でも止めるか）は落とす前の組で決める。
+    # 層の deny が同時に当たっても、生の git の補助止めの分類を失わない。
+    hit_ids = {rule.id for rule in group}
     if verdict == rules.DENY and any(rule.base for rule in group):
         # 組み込みの deny（土台）は常に当たるが、レイヤーの deny にも当たったなら、
         # そちらだけを言う。拒否は変わらない。同じ拒否を 2 つの文面で返さないため。
@@ -844,7 +909,82 @@ def decide_before(
             )
         return EXIT_OK
 
-    return refuse(stdout, mode, record, verdict, notices + texts, context, conf=conf, root=root)
+    return refuse(
+        stdout,
+        mode,
+        record,
+        verdict,
+        notices + texts,
+        context,
+        conf=conf,
+        root=root,
+        kind=final_kind(conf, hit_ids, ticket_reason, capped),
+    )
+
+
+# 一般の保護とは別に、dry-run でも止める関門のルール。チケット制御が有効なときだけ足されるので、
+# 当たったならそのまま関門として数える。
+GATE_RULE_IDS = (
+    ticket_guard.STATE_RULE_ID,
+    ticket_guard.STATE_SHELL_RULE_ID,
+    ticket_guard.APPROVED_RULE_ID,
+    ticket_guard.APPROVED_SHELL_RULE_ID,
+    ticket_guard.OPS_RULE_ID,
+    ticket_guard.OPS_SHELL_RULE_ID,
+    phase_forms.TICKET_APPROVAL_RULE_ID,
+)
+
+
+def final_kind(conf: settings.Settings, ids: set[str], ticket_reason: str, capped: bool) -> str:
+    """ルールとチケットの判定を拒否にした回の分類。dry-run でも止めるかを決める。
+
+    ids は当たったルールの id（土台を落とす前の組）。関門（GATE）が優先、次が補助（AUX）、
+    それ以外は一般。チケット制御が無効なら関門は足されていない。生の git はそのときでも止めるが、
+    一般の保護として扱う。
+
+    `>` の数の上限で上げた拒否は、シェルから書き込む形の保護（関門の置き場を守る 2 本を含む）を
+    生の文字列に当てていない代わりの拒否。関門の穴にならないよう、チケット制御が有効なら関門にする。
+    """
+    if capped:
+        return GATE if conf.tickets_enabled else GENERAL
+    if ticket_reason:
+        return GATE if conf.tickets_enabled else GENERAL
+    if conf.tickets_enabled and ids & set(GATE_RULE_IDS):
+        return GATE
+    if ticket_guard.RAW_GIT_RULE_ID in ids:
+        return AUX if conf.tickets_enabled else GENERAL
+    return GENERAL
+
+
+# 書き直しを求める形のうち、生の git や ccnavi の入口を隠しうるもの。語として現れる `git` と
+# `ccnavi`（パスの一部の `/ccnavi/` は数えない）、保護済みの sh の名前。
+_ENTRY_WORD = re.compile(
+    r"(?<![\w/.-])(?:git|ccnavi)(?:\.exe)?(?![\w-])|ccnavi-[\w-]+\.sh", re.IGNORECASE
+)
+
+
+def _rewrite_kind(
+    conf: settings.Settings,
+    payload: hookio.Input,
+    subject: str,
+    inner: list[tuple[str, str, bool]],
+    rewrites: list[tuple[str, str]],
+) -> str:
+    """書き直しを求める拒否の分類。生の git や ccnavi の入口を隠しうる形は、補助にする。
+
+    実行時に決まるコマンド名（`c=git; $c push`）は、中身を読めないので生の git を隠しうる。
+    呼び手がサブエージェントの回、語としての `git` / `ccnavi` / 保護済みの sh の名前が現れる回も
+    同じ。ただし文字列の一部に `ccnavi` が入っているだけ（`ls /work/ccnavi/{src,tests}`）では
+    補助にしない。チケット制御が無効なら補助は足さない。
+    """
+    if not conf.tickets_enabled:
+        return GENERAL
+    if payload.agent_id:
+        return AUX
+    if any(form == shellread.FORM_COMMAND_NAME for form, _ in rewrites):
+        return AUX
+    texts = [subject, *(layer for _, layer, _ in inner), *(text for _, text in rewrites)]
+    return AUX if any(_ENTRY_WORD.search(text) for text in texts) else GENERAL
 
 
 def refuse(
@@ -856,8 +996,14 @@ def refuse(
     context: str = "",
     conf: settings.Settings | None = None,
     root: str = "",
+    *,
+    kind: str,
 ) -> int:
     """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。
+
+    kind は止めている箇所の分類（`modes.GENERAL`・`GATE`・`AUX`）。dry-run で報告だけにするのは
+    GENERAL だけで、チケット制御の関門（GATE）と補助の保護（AUX）は dry-run でも止める。
+    拒否の文面には「dry-run でもこの止めは効く」と 1 行添える。
 
     context はルールの `additionalContext`。判定と一緒にモデルへ渡す文で、
     dry-run では判定の代わりの文に続けて出す。止めない回でも文だけは届く形にして、
@@ -877,7 +1023,9 @@ def refuse(
     if conf is not None and verdict == rules.DENY:
         streak = fail_streak_hint(conf, root, record)
 
-    if mode == modes.DRY_RUN:
+    if mode == modes.DRY_RUN and modes.holds_in_dry_run(kind):
+        reason += "\n\n" + DRY_RUN_HOLDS_NOTE
+    if mode == modes.DRY_RUN and not modes.holds_in_dry_run(kind):
         record.decision, record.enforced = decision, False
         would = "stopped" if verdict == rules.DENY else "asked the user about"
         text = f"[ccnavi dry-run] {modes.ENABLE} would have {would} this call:\n" + reason

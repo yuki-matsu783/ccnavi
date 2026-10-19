@@ -32,7 +32,7 @@
    sh <ccnavi のリポジトリ>/scripts/ccnavi-setup.sh ~/ccnavi-verify-gh --mode dry-run
    ```
 
-   `--mode dry-run` は判定を記録するだけです。手元の hook が本番どおりに止める流れ（git のラッパーの拒否、write-and-push の取り込み）まで
+   `--mode dry-run` は一般の保護を記録するだけで、承認の関門と補助の保護は止めます。手元の hook が本番どおりに止める流れ（git のラッパーの拒否、write-and-push の取り込み）まで
    見る回は `--mode enable` にします（こちらを勧めます）。
 
 3. `.gitignore` に `logs/` と `.claude/worktrees/` が無ければ足します（判定の記録とエージェントのワークツリーを送らないため）。

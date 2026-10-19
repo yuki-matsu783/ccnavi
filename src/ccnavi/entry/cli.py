@@ -21,7 +21,7 @@ import time
 import traceback
 from typing import TextIO
 
-from ..hook import events, judge, reasons, subagent
+from ..hook import events, failsafe, judge, reasons, subagent
 from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
@@ -1170,7 +1170,8 @@ def _hook_steps(
                 reason=audit.REASON_PAYLOAD_UNUSABLE,
             ),
         )
-        return modes.fail_closed(mode)
+        # ツールが分からない PreToolUse（とイベントすら読めなかった回）は dry-run でも止める。
+        return modes.fail_closed(mode, "" if exc.event in ("", hookio.PRE_TOOL_USE) else None)
 
     so_far.payload = payload
     record = audit.Record(
@@ -1258,7 +1259,9 @@ def _internal_error(
     しないので、PreToolUse の呼び出しがそのまま通り、記録も残らない。ここで受けて、判定に
     達せなかった回として終える。
 
-    - PreToolUse: 呼び出しを止める（dry-run は通す）。標準エラーの文がモデルに届く
+    - PreToolUse: ツールの種類で決める（`modes.fail_closed`）。書き込み・Agent・
+      ツールが分からない回は dry-run でも止める。読み取りは最低限の deny に当たらなければ通す。
+      標準エラーの文がモデルに届く
     - PostToolUse: ツールはもう走っているので止めるものは無い。enable は終了コード 2 と
       標準エラーで、実行後の検査をしていないことをモデルに言う（dry-run は 0）
     - payload を読む前に落ちた（イベントが分からない）: PreToolUse と同じく止める
@@ -1286,11 +1289,20 @@ def _internal_error(
     record.code, record.rules = "", []
     record.detail = f"{kind} at {where}" if where else kind
     if payload.event in ("", hookio.PRE_TOOL_USE, hookio.POST_TOOL_USE):
+        if payload.event == hookio.POST_TOOL_USE:
+            code = modes.fail_closed(mode)
+        else:
+            # 呼び出しの前（イベントが分からない回を含む）は、ツールの種類で決める。設定を読まずに
+            # 通してよいと確かめられた読み取りだけを通す（`hook.failsafe`）。
+            code = modes.fail_closed(mode, payload.tool_name, safe=failsafe.is_safe(payload, root))
+        passed = code == 0 and payload.event != hookio.POST_TOOL_USE
         stderr.write(
-            reasons.internal_error(audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path)
+            reasons.internal_error(
+                audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path, passed=passed
+            )
             + "\n"
         )
-        return modes.fail_closed(mode)
+        return code
     if payload.event == hookio.SUBAGENT_STOP:
         subagent.unchecked_after_error(stderr, conf, root, payload)
     hookio.write_system_message(

@@ -212,6 +212,8 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0140](0140-paths-ignore-case-everywhere.md) | パスと名前の大文字小文字は、どの機械でも区別せず同じものとして扱い、両立させない |
 | [0141](0141-drop-the-state-history.md) | 状態の履歴（`events/<識別子>.jsonl`）をやめ、状態は置き場とマーカーだけで持つ（0086 を置き換える） |
 | [0143](0143-user-only-entries-are-separate.md) | ユーザ専用の操作を、実行ファイルの `user` 入口と `ccnavi-user-*.sh` に分け、定義を表 1 つにして hook の止めをそこから作る |
+| [0146](0146-gates-hold-in-dry-run.md) | dry-run でも、チケットの関門と補助の保護は止める（止めている箇所を一般・関門・補助に分ける） |
+| [0147](0147-fail-closed-by-tool.md) | 判定に達せなかったときは、ツールの種類で決める（書き込みは止め、読み取りは最低限の deny を当てて通す） |
 | [0144](0144-protected-files-change-through-handoff.md) | 保護対象の変更は、テンプレート専用の手順をやめ、wip/handoff/ に置いた下書きを `ccnavi user handoff` で取り込む一本の手順にそろえる |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
 | [0142](0142-drop-sync-records.md) | 取り込み状態（sync/）を廃止し、親ブランチの状態だけで判定する |

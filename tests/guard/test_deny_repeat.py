@@ -104,7 +104,7 @@ class DenyMessageTest(unittest.TestCase):
     def test_dry_run_does_not_count(self):
         """dry-run は止めていないので数えない。記録も作らない。"""
         for _ in range(3):
-            result = _bash(self.ws, "git push origin main", mode="dry-run")
+            result = _bash(self.ws, "rm -rf /tmp/some-dir", mode="dry-run")
             self.assertNotIn(NOTE, result.stdout)
         names = os.listdir(self.state) if os.path.isdir(self.state) else []
         self.assertEqual([], [f for f in names if f.startswith("denied-")])
