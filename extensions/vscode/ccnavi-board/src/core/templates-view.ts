@@ -1,7 +1,7 @@
 /**
  * テンプレート管理画面の、拡張ホストと Webview の間の契約。見せるのは `ccnavi --templates --json` の答え（テンプレートの一覧・層ごとの中身・統合結果の索引・下書き）と、
  * 1 件の本文（`--templates --show <名前> --json`）。形の見本は `tests/fixtures/templates-json.json`。
- * 一覧・検索・表示だけの画面で、下書きの取り込みと編集は取り込み待ち画面（`handoff-view.ts`）が受け持つ。
+ * 一覧・検索・表示と、テンプレートの編集（保存はユーザが押したときだけ）をする画面。下書きの取り込みは取り込み待ち画面（`handoff-view.ts`）が受け持つ。
  *
  * 判定は実行ファイルが答え、画面は読むだけにする（有効か・捨てた理由は実行ファイルが決める）。読み取りは `templatesmodel.ts` の側に置く。
  * 画面は React で組み、拡張ホストは HTML を組み立てない（`phases-view.ts` と同じ作り）。ここには VS Code の API も DOM も node も入れない。
@@ -104,7 +104,7 @@ export interface Sum {
 
 /**
  * 下書き 1 件（`wip/handoff/` の `template` の下書き）。効力は無く、templates にも統合結果にも入らない。
- * この画面は読むだけで、取り込みは取り込み待ち画面（`user handoff`）が受け持つ
+ * 下書きは読むだけで、取り込みは取り込み待ち画面（`user handoff`）が受け持つ
  */
 export interface DraftEntry {
   readonly name: string;

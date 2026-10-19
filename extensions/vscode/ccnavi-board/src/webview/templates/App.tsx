@@ -3,7 +3,7 @@
  *
  * 見せる中身は拡張ホストが渡す（`TemplatesData`）。画面が自分で持つのは、ユーザが触って決めるもの
  * （開いている行、本文の取り出しの結果）だけ。有効か・捨てた理由は実行ファイルの答えを読むだけ。
- * 読むだけの画面で、下書きの取り込みと編集は「取り込み待ち」の画面が受け持つ。ここにあるのは、そこへ進む入口だけ。
+ * 下書きは読むだけで、取り込みは「取り込み待ち」の画面が受け持つ（ここにあるのは入口だけ）。テンプレートの編集は `Edit.tsx`。
  * 案内の間は見本（`core/tour-templates.ts`）を描き、実際の中身・開閉には触れない。
  */
 import { useRef, useState, type JSX } from "react";
@@ -274,7 +274,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                     className="action small"
                     data-action="new-template"
                     disabled={!validTemplateName(newName) || shownTemplates.some((t) => t.name === newName)}
-                    title={newName === "" || validTemplateName(newName) ? "この層に新しいテンプレートを作ります（保存するまでファイルは作りません）" : "英数字で始め、英数字と . _ - だけ。64 字まで"}
+                    title={newName === "" || validTemplateName(newName) ? "この層に新しいテンプレートを作ります。保存するまでファイルは作りません" : "英数字で始め、英数字と . _ - のみ、64 字まで"}
                     onClick={() => startEdit({ type: "editNew", name: newName })}
                   >
                     作る
@@ -282,7 +282,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                 </p>
               )}
               {shownTemplates.length === 0 ? (
-                <p className="empty">{"テンプレートがありません。共通は .ccnavi/config/common/templates/、プロジェクトは .ccnavi/config/project/templates/ に <名前>.yml で置きます。"}</p>
+                <p className="empty">{"テンプレートがありません。共通は .ccnavi/config/common/templates/、プロジェクトは .ccnavi/config/project/templates/ の下に、<名前>.yml の名前で置きます。"}</p>
               ) : (
                 <ul className="list">{shownTemplates.map((entry) => templateRow(entry))}</ul>
               )}
@@ -302,7 +302,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           <h2>
             下書き <span className="count">{page.data.drafts.length}</span>
           </h2>
-          <p className="hint">エージェントが作成した効力のない下書きです。取り込むまでテンプレートとしては使われません。この画面では読むだけです。</p>
+          <p className="hint">エージェントが作った効力のない下書きです。取り込むまでテンプレートとしては使われません。この画面では読むだけです。</p>
           <p className="handoff-link">
             <button
               type="button"
@@ -318,7 +318,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
             {!page.handoff.enabled && !touring && <span className="hint" data-role="handoff-reason"> {page.handoff.reason}</span>}
           </p>
           {page.data.drafts.length === 0 ? (
-            <p className="empty">{"下書きはありません。親チケットがクローズする前に ccnavi --templates --draft <親> で作れます。"}</p>
+            <p className="empty">{"下書きはありません。親チケットを閉じる前に、ccnavi --templates --draft <親> で作れます。"}</p>
           ) : (
             <ul className="list">
               {page.data.drafts.map((draft, index) => (

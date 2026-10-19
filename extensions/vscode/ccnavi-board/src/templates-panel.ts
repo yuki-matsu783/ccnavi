@@ -11,13 +11,13 @@
  * プロジェクト 1 つの設定のテンプレート。画面は一覧・検索・表示と、開いている対象の層のテンプレートの編集（計画の項と線・子のフロー）。
  * 読んだ中身（一覧・層ごとの中身・統合結果の索引・下書き）は `ccnavi --templates --json` の答えをそのまま渡す。
  *
- * **編集。** 編集中の中身は画面が持ち、拡張ホストは「実行ファイルに読ませる」（`--templates --check-file`）と「保存する」だけを受け持つ。
- * 読めるか・計画の順序・フローの形・図に描く中身は実行ファイルの答えのまま。保存は、(1) 書き出す本文を実行ファイルに読ませて error が無い、
+ * **編集。** 編集中の中身は画面が持つ。拡張ホストが受け持つのは、実行ファイルでの検査（`--templates --check-file`）と保存だけ。
+ * 読めるか・計画の順序・フローの形・図に描く中身は、実行ファイルの答えのまま。保存は、(1) 書き出す本文を実行ファイルで検査して error が無い、
  * (2) 実行ファイルが読み返した中身が、画面が書こうとした中身と同じ（食い違えば書かない）、(3) 開いたときからファイルが外で変わっていない
  * （ハッシュが同じ。新規はまだ無い）、(4) リンクを辿らず一時ファイルの入れ替えで書く（`core/flow-write.ts`）、を満たしたときだけ書く。
  * 編集できるのは、開いている対象の層で、実行ファイルが書ける（`writable`）と答えた層のテンプレートだけ。
  * **作業中の錠。** 作業中のチケットがある間は、編集はできるが保存できない（取り込み待ち画面がテンプレートの取り込みを止めるのと同じ決まり。
- * 共通の設定とワークスペースはどのツリーの作業中でも、プロジェクトはそのプロジェクトの作業中だけ。確かめられなければ止める側に倒す）。
+ * 共通の設定とワークスペースはどのツリーの作業中でも、プロジェクトはそのプロジェクトの作業中だけ。確かめられなければ止める）。
  * 錠は編集を始めたときと、チケットが動いたときと、保存を押した時点で取り直す。実行ファイルには錠を足さない。
  * 改名・移動・削除は持たない（ユーザがファイルを直接操作する）。
  * 下書き（`wip/handoff/` の `template`）の取り込みと編集は「取り込み待ち」の画面が受け持つ。ここからはそちらを開く入口だけを持つ。
@@ -323,7 +323,7 @@ function alive(current: PanelState): boolean {
   return state === current;
 }
 
-/** ファイルが外で変わったら、少し待ってから読み直す。この画面は書かないので、自分の書き込みを見分ける必要は無い */
+/** ファイルが外で変わったら、少し待ってから読み直す。自分の保存でも読み直す（編集欄は中身を替えない） */
 function scheduleChanged(current: PanelState): void {
   if (current.timer !== undefined) {
     clearTimeout(current.timer);
@@ -639,7 +639,7 @@ function editableLayer(current: PanelState, layerName: string): { readonly ok: t
     return { ok: false, error: `この層の置き場を読めないため、編集できません: ${layer.unreadable}` };
   }
   if (!layer.writable) {
-    return { ok: false, error: "この層は読み取り専用です（実行ファイルが書けないと答えました）。ファイルの置き場の権限を確かめてください" };
+    return { ok: false, error: "この層は読み取り専用です。実行ファイルが書けないと答えたため、置き場の権限を確かめてください" };
   }
   return { ok: true, layer };
 }
@@ -737,7 +737,7 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   }
   const file = templateFile(current.folder.uri.fsPath, where.layer, name);
   if (file === undefined) {
-    postOpened(current, session, null, `テンプレートの名前 ${name} は使えません（英数字で始め、英数字と . _ - だけ。64 字まで）`);
+    postOpened(current, session, null, `テンプレートの名前 ${name} は使えません（英数字で始め、英数字と . _ - のみ、64 字まで）`);
     return;
   }
   try {
@@ -773,7 +773,7 @@ async function editCheck(current: PanelState, session: number, seq: number, data
   };
   const named = dataOf(data);
   if (named === undefined || !validTemplateName(named.name)) {
-    reply(null, "テンプレートの名前が使えません（英数字で始め、英数字と . _ - だけ。64 字まで）");
+    reply(null, "テンプレートの名前が使えません（英数字で始め、英数字と . _ - のみ、64 字まで）");
     return;
   }
   const checked = await checkBytes(current, named.name, yamlText(data));
@@ -827,7 +827,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   }
   // 2. 実行ファイルが読み返した中身が、画面が書こうとした中身と同じときだけ書く
   if (!sameData(data, checked.check.data)) {
-    reply("", "保存しません: 書き出した本文を実行ファイルが読むと、画面の中身と食い違います（YAML の読み方の違い）。食い違う欄を書き換えてから保存し直してください");
+    reply("", "保存しません: 実行ファイルが読み返した中身が、画面の中身と食い違いました（YAML の読み方の違い）。食い違う欄を直してから、保存し直してください");
     return;
   }
   // 3. 開いたときからファイルが外で変わっていない（新規はまだ無い）

@@ -88,7 +88,7 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
             onDisconnect={(from, to) => onChange(disconnectItems(template, from, to))}
             fitKey={`${part}:${items.length}`}
           />
-          {!fresh && <p className="hint">実行ファイルに読ませています。終わるまで線は引けません。</p>}
+          {!fresh && <p className="hint">実行ファイルで読んでいます。終わるまで線は引けません。</p>}
         </>
       ) : (
         <p className="hint">図は、実行ファイルが読み終えると出ます。</p>

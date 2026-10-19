@@ -2,7 +2,7 @@
 
     ccnavi --templates [--layer <self|プロジェクト名>] [--keyword <語>]... [--json]
     ccnavi --templates --show <名前> [--layer <名前>] [--json]
-    ccnavi --templates --check-file <パス> [--layer <名前>] [--json]
+    ccnavi --templates --check-file <パス> [--layer <名前>|common] [--json]
     ccnavi --templates --draft <親> [--name <名前>] [--to common|project] [--layer <名前>] [--json]
 
 一覧・検索・表示・`--check-file` は読むだけ。`--check-file` は任意のパスのテンプレートを、

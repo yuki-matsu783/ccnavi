@@ -96,7 +96,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
           setChecked({ key: asked.current.key, check: message.check as TemplateCheck });
           setCheckError("");
         } else {
-          setCheckError(String(message.error ?? "実行ファイルに読ませられませんでした"));
+          setCheckError(String(message.error ?? "実行ファイルで検査できませんでした"));
         }
       } else if (message.type === "editLock") {
         setLock(message.lock as Lock);
@@ -234,7 +234,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
       )}
       {checkError !== "" && (
         <p className="status failed" data-role="check-error">
-          実行ファイルに読ませられません: {checkError}
+          実行ファイルで検査できません: {checkError}
         </p>
       )}
       <label className="field">
@@ -250,7 +250,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
       <PlanEdit part="feedback" template={tpl} plan={planOf("feedback")} fresh={fresh} types={checked.check.types} onChange={updatePlan} />
       <section className="tpl-edit-flows" data-role="flows">
         <h3>子のフロー</h3>
-        <p className="hint">全体計画の項ごとに、子のフローを持てます。使うとき、子のフローの下書きにこの文が写ります。</p>
+        <p className="hint">全体計画の項ごとに、子のフローを持てます。テンプレートを使うと、子のフローの下書きにこの文が写ります。</p>
         <ul className="list">
           {tpl.plan.map((item, i) => {
             const index = i + 1;

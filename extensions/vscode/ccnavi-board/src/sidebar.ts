@@ -56,7 +56,7 @@ const ENTRIES: readonly Entry[] = [
   },
   {
     label: "テンプレート管理",
-    description: "作業・レビュー計画のテンプレートと下書きの一覧（読むだけ）",
+    description: "作業・レビュー計画のテンプレートと下書きの一覧と、テンプレートの編集",
     command: "ccnaviBoard.openTemplates",
     icon: "files",
     needsTickets: true,

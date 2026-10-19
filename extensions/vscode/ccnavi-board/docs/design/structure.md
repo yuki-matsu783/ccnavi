@@ -87,7 +87,7 @@ src/
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
     projects-render.ts プロジェクト管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
-    lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）。取り込み待ち画面は template と layer-config の取り込みにこの錠をそのまま掛ける（handoffmodel.ts の lockForTree が見るツリーに合わせる）
+    lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）。取り込み待ち画面は template と layer-config の取り込みに、テンプレート管理画面（templates-panel.ts）は編集の保存に、この錠をそのまま掛ける（handoffmodel.ts の lockForTree が見るツリーに合わせる）
     commands.ts       ターミナルに送るコマンド行と、承認・残った指摘の対応方針を子プロセスで打つ引数の配列
     decidemodel.ts    残った指摘の JSON（実行ファイルとの契約）の読み取りと、選んだ対応方針の確かめ
     screens.ts        画面の入口の帳面（Root）。どの画面をどう開くかを 1 か所に集める。画面どうしは互いを import せず、ここへ要求を出す
@@ -252,7 +252,7 @@ test/
   workflow/           計画編集（planordermodel, workflow-view, ボードと結ぶ帳面の workflow-tabs と、画面を動かす workflow.dom）
   shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine, plan-graph）
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
-  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。画面はどれも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom, flow.dom, templates.dom, handoff.dom）
+  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。画面はどれも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom, flow.dom, templates.dom, templates-edit.dom, handoff.dom）
   shared/test-ids.test.ts  ID の決まり（重複しない・名前は ID から始まる）を、テストで守る
 scripts/
   bundle.js           esbuild で本体を out/extension.js にバンドルする
