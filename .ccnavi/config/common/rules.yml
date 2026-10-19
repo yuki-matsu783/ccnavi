@@ -69,11 +69,13 @@ deny:
       - regex: '^{root}[\\/]scratchpad(?:[\\/]|$)'
       - regex: '^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)'
     message: >-
-      チェックアウトしたブランチ直下では編集しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh worktree add
-      .claude/worktrees/<名前> -b <名前>' でワークツリーを切り、その中で編集して、
-      ff-only で統合先に取り込んでください。ワークスペースルートの `wip/handoff/`（ユーザに渡す物）と `scratchpad/`（使い捨て）へは書き込めます。
-      プロジェクト（projects/<名前>/）の中を直すときは、'cd projects/<名前>' してから、そのプロジェクトで
-      'sh {root}/.ccnavi/scripts/ccnavi-git.sh worktree add ...' を打ってワークツリーを切り、その中で編集してください。
+      チェックアウトしたブランチ直下では編集しません。{script:ccnavi-worktree.sh} <名前> でワークツリーを切り、出力されたパスの下で編集してコミットしてください。
+      名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md「直接作業のワークツリーの名前」）。
+      統合先へ直接 merge しないでください。取り込みはターンの終わりに出る integrate の案内に従います。
+      案内が出ないときは .ccnavi/docs/worktree-merge.md「直接作業のワークツリーを取り込む」を読んでください。
+      ワークスペースルートの wip/handoff/（ユーザに渡す物）と scratchpad/（使い捨て）へは書き込めます。
+      プロジェクト（projects/<名前>/）の中を直すときは、cd projects/<プロジェクト名> && {script:ccnavi-worktree.sh} <名前> を実行します
+      （行き先は同じ {root}/.claude/worktrees/<名前>）。
 
   # セッションが示すスクラッチパッド（/tmp/claude-*/ の下の scratchpad）は置き場にしない。
   # ユーザに渡す物は wip/handoff/、使い捨てはワークスペースルート直下の scratchpad/ に置く
@@ -265,10 +267,9 @@ allow:
     match: Bash
     regex: 'ccnavi-git\.sh\s+worktree\s+add(\s|$)'
     additionalContextOnce: >-
-      ワークツリーを切る前に、先に 'sh {root}/.ccnavi/scripts/ccnavi-git.sh fetch origin <統合先>' を打ち、
-      'sh {root}/.ccnavi/scripts/ccnavi-git.sh log --oneline <統合先>..origin/<統合先>' で遅れを確かめてください。
-      遅れていれば、手元の統合先を進めてから（統合先のワークツリーで 'merge --ff-only origin/<統合先>'）切ります。
-      手順は .ccnavi/docs/worktree.md の「ワークツリーを切る」にあります。
+      直接作業のワークツリーは {script:ccnavi-worktree.sh} <名前> で切ると、fetch・遅れの確認・起点の選択をまとめて行います。
+      worktree add が断られたら、出力の案内どおりに打ち直してください。手元の統合先は進めません。
+      origin/<統合先> から切るときは --no-track を付けます。
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
   # 一度だけ勧める。読む手段を取り上げるのが目的ではないので deny でも ask でもない。

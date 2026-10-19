@@ -107,6 +107,23 @@ ccnavi_abs() {
 	esac
 }
 
+# 引数を単引用符で囲んで出す。中の ' は '"'"' に直す。案内の文に、そのまま打てるパスを載せる。
+# <文字列>
+ccnavi_sh_quote() {
+	ccnavi_q_rest=$1
+	ccnavi_q_out=""
+	while :; do
+		case "$ccnavi_q_rest" in
+		*\'*)
+			ccnavi_q_out="${ccnavi_q_out}${ccnavi_q_rest%%\'*}'\"'\"'"
+			ccnavi_q_rest=${ccnavi_q_rest#*\'}
+			;;
+		*) break ;;
+		esac
+	done
+	printf "'%s%s'\n" "$ccnavi_q_out" "$ccnavi_q_rest"
+}
+
 # 実在するディレクトリの、リンクを解いたパス。無ければ受けたパスをそのまま返す。
 #
 # git の `rev-parse --show-toplevel` はリンクを解いたパスを返すので、ワークスペースルート（cwd から
