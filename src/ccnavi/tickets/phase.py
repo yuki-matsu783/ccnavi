@@ -421,7 +421,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         )
     else:
         todo = (
-            "やること: 子の成果を親ブランチへ合流し、ELI5 の HTML を "
+            "やること: 子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を "
             f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
             f"'{review_sh} request --phase {n} --body-file <依頼文> "
             f"--eli5 wip/eli5/phase-{n}.html' "
@@ -522,7 +522,7 @@ def announce(
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました"
                 f"（{LABEL_PREPARING}）。{who}"
-                "子の成果を親ブランチへ合流し、ELI5 の HTML を "
+                "子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を "
                 f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
                 f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
                 f"--body-file <依頼文> --eli5 wip/eli5/phase-{n}.html' "

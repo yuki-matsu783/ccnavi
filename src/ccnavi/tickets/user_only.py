@@ -404,15 +404,48 @@ def agent_script_forms() -> str:
     return r"ccnavi-(?:" + "|".join(AGENT_SCRIPTS) + r")\.sh"
 
 
+# サブエージェントの役割の表（スクリプト × 副命令）。止めるのは状態を動かす・公開する操作で、
+# 読み取りは許す。表に無い副命令は、状態を持つスクリプト（ticket・review）では禁止にする。
+# git のラッパーは、禁止する副命令だけを並べる（それ以外は wrapguard の検査に任せる）。
+# 各行は（スクリプト名の語幹, 方式, 副命令の一覧）。
+#   allow: 一覧の副命令だけ許し、それ以外（副命令が無い呼び出しを含む）は禁止
+#   deny: 一覧の副命令だけ禁止し、それ以外は許す
+#   all: 副命令に関わらず禁止
+# `decide <N> --preview` は review の下見で、許す（`allow` の一覧の `decide\s+\S+\s+--preview`）。
+SUBAGENT_ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("ccnavi-ticket", "allow", ("status", "next-id", "--help", "learn")),
+    (
+        "ccnavi-review",
+        "allow",
+        ("fetch", "origin", "merged", "--help", r"decide\s+\S+\s+--preview"),
+    ),
+    ("ccnavi-git", "deny", ("push", "worktree", "integrate", "integrate-done")),
+    ("ccnavi-start", "all", ()),
+    ("ccnavi-sync", "all", ()),
+    ("ccnavi-worktree", "all", ()),
+    ("ccnavi-clean", "all", ()),
+)
+
+# 呼び出しの前置き。`sh`・`bash`（選択肢付き）、直接実行（`./x.sh`・パス・引用したパス）、
+# `exec`・`command`・`source`・`.` を数える。
+_CALL_HEAD = (
+    r"(^|[;&|]\s*)(?:(?:exec|command|source|\.)\s+)?(?:(?:sh|bash)(?:\s+-\S+)*\s+)?[\"']?[^\s;&|]*?"
+)
+
+
 def subagent_forbidden_forms() -> str:
-    """サブエージェントに許さないサブコマンドの正規表現（コマンドの先頭の `sh` に固定）。"""
-    return (
-        r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*"
-        + agent_script_forms()
-        + r"\s+(?:"
-        + "|".join(re.escape(w) for w in SUBAGENT_FORBIDDEN)
-        + r")\b"
-    )
+    """サブエージェントに許さない形の正規表現（`SUBAGENT_ROLES` から組む）。"""
+    parts: list[str] = []
+    for stem, how, subs in SUBAGENT_ROLES:
+        name = re.escape(stem) + r"\.sh[\"']?(?=\s|$|[;&|])"
+        listed = "|".join(subs)
+        if how == "all":
+            parts.append(_CALL_HEAD + name)
+        elif how == "allow":
+            parts.append(_CALL_HEAD + name + rf"(?!\s+(?:{listed})(?![\w-]))")
+        else:
+            parts.append(_CALL_HEAD + name + rf"\s+(?:{listed})(?![\w-])")
+    return "|".join(parts)
 
 
 class UserEntryError(Exception):

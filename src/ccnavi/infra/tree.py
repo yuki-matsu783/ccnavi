@@ -325,6 +325,22 @@ def head_text(tree_root: str) -> str | None:
         return None
 
 
+def has_origin(repo_root: str) -> bool:
+    """そのリポジトリに `origin` の remote があるか。設定ファイルだけを読む（git は起こさない）。"""
+    gitdir = git_dir(repo_root)
+    if gitdir is None:
+        return False
+    try:
+        common = os.path.join(gitdir, "commondir")
+        if os.path.exists(common):
+            with open(common, encoding="utf-8") as f:
+                gitdir = os.path.normpath(os.path.join(gitdir, f.read().strip()))
+        with open(os.path.join(gitdir, "config"), encoding="utf-8") as f:
+            return '[remote "origin"]' in f.read()
+    except (OSError, ValueError):
+        return False
+
+
 def origin_head(repo_root: str) -> str:
     """そのリポジトリの `origin/HEAD` が指すブランチ名（`refs/remotes/origin/HEAD` の中身）。
     無ければ空。

@@ -21,7 +21,7 @@ import time
 import traceback
 from typing import TextIO
 
-from ..hook import events, judge, reasons, subagent
+from ..hook import events, failsafe, judge, reasons, subagent
 from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
@@ -1170,7 +1170,8 @@ def _hook_steps(
                 reason=audit.REASON_PAYLOAD_UNUSABLE,
             ),
         )
-        return modes.fail_closed(mode)
+        # ツールが分からない PreToolUse（とイベントすら読めなかった回）は dry-run でも止める。
+        return modes.fail_closed(mode, "" if exc.event in ("", hookio.PRE_TOOL_USE) else None)
 
     so_far.payload = payload
     record = audit.Record(
@@ -1290,7 +1291,11 @@ def _internal_error(
             reasons.internal_error(audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path)
             + "\n"
         )
-        return modes.fail_closed(mode)
+        if payload.event == hookio.POST_TOOL_USE:
+            return modes.fail_closed(mode)
+        # 呼び出しの前（イベントが分からない回を含む）は、ツールの種類で決める。設定を読まずに
+        # 通してよいと確かめられた読み取りだけを通す（`hook.failsafe`）。
+        return modes.fail_closed(mode, payload.tool_name, safe=failsafe.is_safe(payload))
     if payload.event == hookio.SUBAGENT_STOP:
         subagent.unchecked_after_error(stderr, conf, root, payload)
     hookio.write_system_message(

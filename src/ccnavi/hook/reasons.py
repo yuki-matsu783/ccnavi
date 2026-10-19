@@ -509,7 +509,9 @@ def payload_unusable(code: str, problem: str, *, event: str = "", mode: str = ""
     """
     head = f"[ccnavi] {code}"
     said = f"ccnavi could not read the hook input from Claude Code ({problem}), "
-    if mode == DRY_RUN:
+    # ツールの呼び出しを判定するイベント（と、イベントすら読めなかった回）は dry-run でも止める
+    # （`modes.fail_closed`）。ほかのイベントは、dry-run なら通す。
+    if mode == DRY_RUN and event not in ("", hookio.PRE_TOOL_USE):
         return "\n".join(
             [
                 head,

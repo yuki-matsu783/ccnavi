@@ -1042,6 +1042,7 @@ class SelfGuardTest(unittest.TestCase):
         ids = {r.id for r in rule_set.deny}
         ids.add(builtin._config_via_bash("x")["id"])
         ids.update(r.id for r in ticket_guard.guard_rules("wip/proposals", self.repo))
+        ids.update(r.id for r in ticket_guard.gate_rules(".ccnavi/approved", self.repo))
         self.assertLessEqual(set(judge.SHELL_GUARD_RULE_IDS), ids)
 
     # 実行ファイル
