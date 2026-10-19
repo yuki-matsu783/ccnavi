@@ -528,7 +528,11 @@ ${eli5_how}"
 			printf '\n---\n\nELI5（変更をやさしく説明した HTML）はこのマージリクエストの差分の `%s`。手元のチェックアウトのルートで `crit review %s` を開いてソースの行に指摘を付け、`crit push %s` でここに送ってください（送った指摘は行のスレッドになり、未解決の間はレビュー済みにならない。`crit %s` だけだと描画のプレビューになり、そこで付けたピンは送られない）。\n' \
 				"$eli5_rel" "$eli5_rel" "$number" "$eli5_rel"
 		} >"$eli5_posted"
-		posted=$(comment "$number" "$url" "$eli5_posted")
+		posted=$(comment_staged request "$request_marker" "$number" "$url" "$eli5_posted") ||
+			{
+				rm -f "$eli5_posted"
+				fail request-post-failed "依頼を投稿できたか確定できなかった（上の案内を見る）。マーカーは置いていない。確かめてから、同じコマンドを打ち直す。"
+			}
 		rm -f "$eli5_posted"
 	fi
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
@@ -571,7 +575,12 @@ comment)
 		printf '<!-- ccnavi:comment -->\n'
 		cat "$body"
 	} >"$noted"
-	posted=$(comment "$number" "$url" "$noted")
+	comment_key=$(cksum <"$body" | cut -d' ' -f1)
+	posted=$(comment_staged comment "$comment_key" "$number" "$url" "$noted") ||
+		{
+			rm -f "$noted"
+			fail comment-post-failed "コメントを投稿できたか確定できなかった（上の案内を見る）。確かめてから、同じコマンドを打ち直す。"
+		}
 	rm -f "$noted"
 	printf 'OK: 記録した（%s）\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
 	;;
@@ -619,7 +628,9 @@ ready)
 	still=$(undraft "$number")
 	[ "$still" = "false" ] || fail undraft-failed "Draft を解除できませんでした（${url}）。ホストの返事は上に出ている。"
 	if [ -n "$noted" ] && [ -f "$noted" ]; then
-		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
+		comment_staged ready ready "$number" "$url" "$noted" >/dev/null ||
+			fail ready-comment-failed "Draft の解除は完了。補助のコメントは未完了（${url}）。確かめてから ready を打ち直すと、コメントだけ送り直す。"
+		rm -f "$noted"
 	fi
 	printf 'OK: Draft を解除した（%s）。マージはユーザが行う\n' "$url"
 	# 最後に子と親の片付けをする（`worktree retire`）。Draft を外す前には消さない（ready を打ち直せなくなる）。

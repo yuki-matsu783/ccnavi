@@ -341,6 +341,80 @@ find_marked() {
 	esac
 }
 
+# ---- エージェントの単発の投稿（request・comment・ready の補助コメント）を、操作記録に載せて送る。
+#
+# comment_staged <操作の種類 request|comment|ready> <鍵> <MR の番号> <MR の URL> <本文のファイル>
+# 操作ID は種類・親・MR・鍵から決まる（打ち直しが同じ記録に当たる）。標準出力は `comment` と同じ形の JSON
+# （{url, created_at, author}。送り済みと分かったときは {url} だけ）。送り済みなら送らず、前に試した形跡が
+# あれば先にホストを目印で照合する。確定できないときは止めて 1（自動では送り直さない）。
+# 記録を作れない（古い実行ファイル・書けない）ときは、前と同じ `comment` に戻る。
+
+cs_set() {
+	ccnavi ops stage-set "$cs_id" comment "$@" 2>/dev/null ||
+		printf '%s: 操作記録に段階 comment を書けなかった。\n' "${review_label:-ccnavi-review}" >&2
+}
+
+cs_field() {
+	ccnavi ops show "$cs_id" 2>/dev/null | "$JQ" -r --arg f "$1" '[.stages[]? | select(.id == "comment")][0][$f] // empty'
+}
+
+comment_staged() {
+	cs_kind="$1"
+	cs_key="$2"
+	cs_mr="$3"
+	cs_url="$4"
+	cs_file="$5"
+	cs_id=$(ccnavi ops begin "$cs_kind" "${branch:-}" 0 "$cs_mr" "$cs_key" comment:comment 2>/dev/null) || cs_id=""
+	if [ -z "$cs_id" ]; then
+		comment "$cs_mr" "$cs_url" "$cs_file"
+		return $?
+	fi
+	cs_state=$(cs_field state)
+	if [ "$cs_state" = sent ]; then
+		printf '%s: 同じ投稿は送信済み（%s）。送り直さない\n' "${review_label:-ccnavi-review}" "$(cs_field url)" >&2
+		"$JQ" -n --arg u "$(cs_field url)" '{url: $u}'
+		return 0
+	fi
+	cs_who=""
+	cs_tries=$(cs_field tries)
+	if [ "${cs_tries:-0}" -gt 0 ] || [ "$cs_state" = unknown ]; then
+		cs_who=$(account || :)
+		cs_found=$(find_marked note "$cs_id" comment "$cs_mr" "$cs_who" "$cs_url")
+		cs_urls="${cs_found#* }"
+		cs_verdict=$(ccnavi ops reconcile "$cs_id" comment "$cs_urls" "${cs_found%% *}" "$cs_who" 2>/dev/null) || cs_verdict="stop 照合できなかった"
+		case "$cs_verdict" in
+		sent*)
+			cs_set sent "$cs_urls" "$cs_who"
+			"$JQ" -n --arg u "$cs_urls" '{url: $u}'
+			return 0
+			;;
+		send*) : ;;
+		*)
+			cs_set unknown
+			printf '%s: 投稿を送ったか確定できない（%s）。自動では送り直さない。ホストで目印 ccnavi:op=%s stage=comment を探して確かめてください。\n' \
+				"${review_label:-ccnavi-review}" "${cs_verdict#* }" "$cs_id" >&2
+			return 1
+			;;
+		esac
+	fi
+	cs_body="$state/review-staged-$$.md"
+	{
+		cat "$cs_file"
+		printf '\n<!-- ccnavi:op=%s stage=comment -->\n' "$cs_id"
+	} >"$cs_body"
+	cs_set pending
+	cs_out=$(comment "$cs_mr" "$cs_url" "$cs_body") || cs_out=""
+	rm -f "$cs_body"
+	cs_posted=$(printf '%s' "$cs_out" | "$JQ" -r '.url // empty' 2>/dev/null || :)
+	if [ -z "$cs_posted" ]; then
+		cs_set unknown
+		return 1
+	fi
+	[ -n "$cs_who" ] || cs_who=$(account || :)
+	cs_set sent "$cs_posted" "$cs_who"
+	printf '%s\n' "$cs_out"
+}
+
 # 取ってきた時点の状態を取り直して $result に置く。
 refetch() {
 	fetch_all >"$result.re"
