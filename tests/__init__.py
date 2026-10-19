@@ -254,5 +254,8 @@ def put_ccnavi_md(root: str) -> str:
     """
     target = os.path.join(root, ".ccnavi", "CCNAVI.md")
     os.makedirs(os.path.dirname(target), exist_ok=True)
-    _shutil.copyfile(os.path.join(ROOT, ".ccnavi", "CCNAVI.md"), target)
+    # 保護対象の下書き（wip/handoff/）があれば、取り込んだ後の姿として下書きを読む。
+    draft = os.path.join(ROOT, "wip", "handoff", ".ccnavi", "CCNAVI.md")
+    source = draft if os.path.isfile(draft) else os.path.join(ROOT, ".ccnavi", "CCNAVI.md")
+    _shutil.copyfile(source, target)
     return target

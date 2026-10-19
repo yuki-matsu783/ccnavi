@@ -75,5 +75,8 @@ statusが言うとおりユーザに`ccnavi-user-push-approved.sh <親>`を打�
 絶対パスに置き換わる。相対パスの`sh .ccnavi/scripts/...`は、`cwd`がプロジェクトの中にあると見つからない。
 
 ```yaml
-message: 生の git は実行しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh ...' を使ってください。
+message: 生の git は実行しません。{script:ccnavi-git.sh} ... を使ってください。
 ```
+
+`{script:<名前>}`は`sh <引用したパス>/.ccnavi/scripts/<名前>`に置き換わる（空白や`'`を含むパスも、そのまま打てる形になる）。
+名前は`[A-Za-z0-9._-]+`だけ。形が違うもの、スクリプトが無いものは`--lint`が警告する。

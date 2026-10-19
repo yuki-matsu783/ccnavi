@@ -126,7 +126,7 @@ class LintOpsTest(PhaseHarness):
         self.assertTrue(
             any(
                 "`<先頭の語>-<番号>-<slug>` の形でない" in line
-                and "worktree add .claude/worktrees/<名前> -b <名前> <統合先>" in line
+                and "ccnavi-worktree.sh <名前>` で切る" in line
                 and "既にある名前は変えなくてよい" in line
                 for line in lines
             ),

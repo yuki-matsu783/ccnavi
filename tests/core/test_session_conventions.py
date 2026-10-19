@@ -83,7 +83,10 @@ class SessionConventionsTest(unittest.TestCase):
         text = block(self.start("--mode", "enable"))
 
         self.assertIn(".claude/worktrees/<名前>", text)
-        self.assertIn("--help（worktree add）", text)
+        self.assertIn(
+            f"sh {self.root}/.ccnavi/scripts/ccnavi-worktree.sh <名前> でワークツリー", text
+        )
+        self.assertNotIn("--help（worktree add）", text)
         git_sh = f"sh {self.root}/.ccnavi/scripts/ccnavi-git.sh"
         self.assertIn(git_sh, text)
         self.assertIn("迂回せず", text)
