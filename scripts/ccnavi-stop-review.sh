@@ -199,7 +199,7 @@ esac
 prompt=$(cat <<PROMPT
 $MARK
 あなたは ccnavi の Stop の判定役です。入力（JSON）: \$ARGUMENTS
-入力の session_id と transcript_path を使い、次の手順だけを行ってください。ファイルの修正・承認・チケットの操作・ほかのエージェントの起動はしません。
+入力の session_id と transcript_path を使い、次の手順だけを行ってください。作業ディレクトリはすでにプロジェクトのルートです。cd しない。パスを変えない。コマンドに ; && | 2>/dev/null などを付けない。ファイルの修正・承認・チケットの操作・ほかのエージェントの起動はしません。
 
 1. Bash で次を実行する: $LAUNCHER stop-review material <session_id> <transcript_path>
 2. 出力の先頭が STOP_REVIEW_NOT_CANDIDATE なら、出力の "return:" の行の JSON をそのまま返して終わる。

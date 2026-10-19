@@ -91,6 +91,35 @@ class StopJudgeTest(unittest.TestCase):
         self.assertEqual((handled, out), (False, ""))
         self.assertFalse(stopjudge.tainted(self.state, "s1"))
 
+    def test_the_habits_seen_on_a_real_judge_are_allowed_but_nothing_else(self):
+        cwd = "/tmp/claude-0/ws"
+        material = f"sh .ccnavi/scripts/ccnavi-launcher.sh stop-review material s1 {cwd}/t.jsonl"
+        for command in (
+            f"cd {cwd} 2>/dev/null; {material}",
+            f"cd {cwd}/ && {material} 2>&1",
+            f"{material} 2>/dev/null",
+            f"cd {cwd}; {material} >/dev/null 2>&1",
+        ):
+            with self.subTest(ok=command):
+                self.assertTrue(stopjudge.judge_command_ok(command, cwd))
+        for command in (
+            f"cd /etc; {material}",
+            f"cd {cwd} && cd /etc && {material}",
+            f"{material} > /tmp/out",
+            f"{material} 2> /home/u/.ssh/x",
+            f"cd {cwd}; rm -rf x; {material}",
+        ):
+            with self.subTest(bad=command):
+                self.assertFalse(stopjudge.judge_command_ok(command, cwd))
+        self.assertFalse(
+            stopjudge.judge_command_ok(f"cd {cwd}; {material}", "")
+        )  # cwd 不明なら cd は許さない
+
+    def test_the_denial_names_the_exact_allowed_form(self):
+        _, out, _ = self._before(_payload(agent_id=JUDGE, command="ls"))
+        reason = json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("stop-review material <session_id> <transcript_path>", reason)
+
     def test_judge_cannot_chain_other_commands(self):
         ok = [
             CALL,

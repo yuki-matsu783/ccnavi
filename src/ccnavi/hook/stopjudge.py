@@ -67,11 +67,47 @@ _LOOSE = re.compile(r"stop-review[\"'\s]+[\"']?(?:material|record)\b", re.IGNORE
 _REDIRECT = re.compile(r"^(?:\d*>|&>|<(?!<))")
 
 
-def judge_command_ok(command: str) -> bool:
+_HARMLESS_REDIRECT = re.compile(r"^(?:\d?>>?|&>)(?:/dev/null|&\d)$")
+_REDIRECT_OP = re.compile(r"^(?:\d?>>?|&>|>&)$")
+_FD = re.compile(r"^\d$")
+
+
+def _redirects_ok(words: list[str]) -> bool:
+    """語の並びのリダイレクトが、`/dev/null` か別の fd への複製だけか。
+
+    シェルの読み取りは `2>/dev/null` を `2`・`>`・`/dev/null`（`2>&1` を `2`・`>&`・`1`）の
+    ように語に割ることがあるので、並びで見る。ほかの行き先は許さない。
+    """
+    at = 0
+    while at < len(words):
+        word = words[at]
+        if _HARMLESS_REDIRECT.match(word):
+            at += 1
+            continue
+        if _REDIRECT_OP.match(word):
+            target = words[at + 1] if at + 1 < len(words) else ""
+            if target == "/dev/null" or (word.endswith("&") and _FD.match(target)):
+                at += 2
+                continue
+            return False
+        if _REDIRECT.match(word):
+            return False
+        at += 1
+    return True
+
+
+def _same_dir(a: str, b: str) -> bool:
+    return bool(a and b) and pathcase.fold(a).rstrip("/\\") == pathcase.fold(b).rstrip("/\\")
+
+
+def judge_command_ok(command: str, cwd: str = "") -> bool:
     """判定役に許す Bash か。`ccnavi stop-review material|record …` の 1 本だけ。
 
     標準入力の JSON を渡すための `echo`・`printf`・`cat`（パイプの左）とヒアドキュメントは許す。
-    ほかのコマンドの連結（`;`・`&&`・`||`）・リダイレクト・コマンド置換・読み切れない形は許さない。
+    実機で、判定役が癖で付けた `cd <プロジェクト> 2>/dev/null;` を拒否して、材料を取れずに期限切れに
+    なった。そのため、判定役自身の作業ディレクトリ（`cwd`）への `cd` と、`/dev/null` や `&1` への
+    リダイレクトだけは許す。
+    ほかのコマンドの連結（`;`・`&&`・`||`）・ほかのリダイレクト・コマンド置換・読み切れない形は許さない。
     判定役は transcript を読むので、そこに書かれた命令でほかのコマンドを通されないようにする。
     """
     reading = shellread.read(command)
@@ -87,9 +123,11 @@ def judge_command_ok(command: str) -> bool:
             return False
         if _is_stop_review(words):
             calls += 1
+        elif words[0] == "cd" and _same_dir(words[1] if len(words) > 1 else "", cwd):
+            pass
         elif os.path.basename(pathcase.fold(words[0])) not in _FEEDERS:
             return False
-        if any(_REDIRECT.match(word) for word in words):
+        if not _redirects_ok(words):
             return False
     return calls == 1
 
@@ -152,7 +190,7 @@ def before(
     asks = payload.tool_name == "Bash" and isinstance(command, str) and stop_review_call(command)
     if is_judge(conf, payload):
         record.reason = "stop-review-judge"
-        if (asks and judge_command_ok(command)) or payload.tool_name == RETURN_TOOL:
+        if (asks and judge_command_ok(command, payload.cwd)) or payload.tool_name == RETURN_TOOL:
             # 許すと答える。agent 型 hook の中は dontAsk で動き、許可の規則が無いと Bash が
             # 拒否される（実機で確かめた）。hook の許可で通す。返り値を返す道具も同じ。
             record.decision = audit.ALLOW
@@ -162,7 +200,9 @@ def before(
         hookio.write_verdict(
             stdout,
             hookio.DENY,
-            "ccnavi: Stop の判定役が使えるのは `ccnavi stop-review material|record` だけです。",
+            "ccnavi: Stop の判定役が使えるのは、次の形の 1 本だけです。連結・リダイレクトは付けず、"
+            "作業ディレクトリのまま実行してください: sh .ccnavi/scripts/ccnavi-launcher.sh "
+            "stop-review material <session_id> <transcript_path>",
         )
         record.decision, record.enforced = audit.DENY, True
         return True
