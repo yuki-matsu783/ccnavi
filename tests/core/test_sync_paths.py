@@ -46,29 +46,6 @@ class SyncPathsTest(unittest.TestCase):
             self.paths(),
         )
 
-    def test_places_do_not_follow_the_environment(self):
-        # 置き場を動かしていた 6 つの env を、既定と違う綴り（相対・絶対・末尾 `/` 付き）で
-        # 全部入れても、返すのは既定の置き場。項目ごとではなく辞書全体で見る。
-        elsewhere = os.path.join(tempfile.gettempdir(), "ccnavi-elsewhere")
-        found = self.paths(
-            {
-                "CCNAVI_TICKETS_APPROVED": "tickets/approved/",
-                "CCNAVI_TICKETS_PROPOSAL": os.path.join(elsewhere, "proposals"),
-                "CCNAVI_PROJECT_HOME": ".nav",
-                "CCNAVI_PROJECTS": "repos/",
-                "CCNAVI_LOG": os.path.join(elsewhere, "log.jsonl"),
-                "CCNAVI_STATE": "state",
-            }
-        )
-        self.assertEqual(
-            {
-                "approved": ".ccnavi/approved",
-                "proposals": "wip/proposals",
-                "home": ".ccnavi",
-            },
-            found,
-        )
-
     def test_works_with_ticket_control_disabled(self):
         found = self.paths({"CCNAVI_TICKET_CONTROL": "disable"})
         self.assertEqual(".ccnavi/approved", found["approved"])

@@ -71,8 +71,6 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 リモートにある最初の名前にする。どれも無ければ止める。親のブランチ名は、実行ファイルの `ccnavi write-and-push family <P>` の `branch` の行（親のワークツリーの HEAD から読んだ名前）で知る。
 `ccnavi-sync.sh` は取り込んだ後に `ccnavi sync check <P>` でその親子のチケットを判定し直し、error があれば表示して終了コード 1 にする
 （理由を直して打ち直せば通る）。MR がマージ済みと分かったら、手元の片付け（`ccnavi sync tidy`。9.11）を行う。
-古い取り込み状態が残る機械では、`ccnavi-sync.sh` の先頭が `ccnavi sync migrate` を 1 回呼び、親のワークツリーが無い親の `mr` と `branch` を
-`retire/<P>.json` に移して古い記録と `integration/` を消す（冪等。状態は捨てる）。
 
 **`ccnavi-git.sh` の中の判定は P13 の例外。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（生の
 `git` は組み込みでいつも止まる）、その中で次の可否を sh が一次に判定する。チケットに結び付くブランチの `integrate` を断る
