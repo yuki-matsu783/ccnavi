@@ -89,6 +89,9 @@ _SESSION_ONLY = (
     re.compile(r"^stoprefs-(?P<s>.+)\.json$"),  # stopops._refs_path
     re.compile(r"^stoptaint-(?P<s>.+)\.json$"),  # stopjudge._taint_path
     re.compile(r"^stoplast-(?P<s>.+)\.json$"),  # stopreview._last_path
+    re.compile(
+        r"^direct-(?P<s>.+)\.json$"
+    ),  # direct_candidates.path_of（compact・clear では捨てない）
 )
 # セッションを名前に持たない、Stop の AI 判定の記録。それ自身の日付で消す。
 _OWN_DATE = re.compile(r"^(?:stopreview-(?:plan|attempt)-.+|stopops-(?:pre|op)-.+)\.json$")
@@ -109,13 +112,12 @@ _SESSION_AND_KEY = (
     ("subagent-", ".running"),  # subagent._running_path
     ("stopwrite-", ".json"),  # stopops._write_path
 )
-# `<セッション>.reported.json`（post._reported_path）と、改名の前の `<セッション>.json`
-# （post._legacy_reported_path）。Claude Code のセッションは UUID なので、その形に
-# 限る。`.+` で読むと、置き場に置かれた別のファイル（`package.json`、レビューの結果の
+# `<セッション>.reported.json`（post._reported_path）。Claude Code のセッションは UUID なので、
+# その形に限る。`.+` で読むと、同じ置き場にある別のファイル（`package.json`、レビューの結果の
 # コピーなど）をセッションの記録と読み違えて消す。形の違う名前は知らないファイルとして残す。
 _REPORTED = re.compile(
     r"^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})"
-    r"(?:\.reported)?\.json$"
+    r"\.reported\.json$"
 )
 
 

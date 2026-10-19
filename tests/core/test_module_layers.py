@@ -108,6 +108,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.yamlread",
                 "records.redact",
                 "tickets.user_only",
+                "tickets.direct_candidates",
             }
         ),
     ),
@@ -117,6 +118,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "hook.agentkind",
+                "hook.failsafe",
                 "infra.gitstate",
                 "infra.shellread",
                 "infra.shellread_cd",
@@ -148,7 +150,6 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "policy.selfguard_shell",
                 "tickets.archive",
                 "tickets.donecopy",
-                "tickets.legacy_sync",
                 "tickets.flow",
                 "tickets.flow_text",
                 "tickets.flow_shape",
@@ -242,6 +243,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.ops_stop",
                 "tickets.ops_stop_integrate",
                 "tickets.ops_stop_request",
+                "tickets.pending_integrate",
                 "hook.post",
                 "hook.post_findings",
                 "hook.post_report",

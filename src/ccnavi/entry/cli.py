@@ -21,7 +21,7 @@ import time
 import traceback
 from typing import TextIO
 
-from ..hook import events, judge, reasons, subagent
+from ..hook import events, failsafe, judge, reasons, subagent
 from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
@@ -384,10 +384,6 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （何も書かない）。`--no-issue` は返信の文言のため（残りを issue に書き出さない）。
     parser.add_argument("--accept-check", default="")
     parser.add_argument("--no-issue", action="store_true")
-    # 統合先の名前。手元では環境変数 `CCNAVI_INTEGRATION_BRANCH`（未設定なら
-    # ホストのデフォルトブランチ）で決まる。sh が決めて渡す。
-    # いまは `--lint` の識別子の予約（統合先と同じ名前の識別子を使わせない）が読む。
-    parser.add_argument("--integration-branch", default="")
     # レビュー済みのマーカーに入れるアカウント（押したユーザではなくトークンの持ち主）。
     # ccnavi-review.sh がトークンの持ち主をホストに聞いて渡す。実行ファイルは
     # ネットワークに出ない。
@@ -774,8 +770,6 @@ def _parsed(
             return EXIT_ERROR
         swaps[name] = os.path.abspath(path)
 
-    conf.integration_branch = args.integration_branch.strip()
-
     # フローの確かめは `--lint` だけが読む。ほかの差し替えと同じく、
     # 診断の外では無視して言う。診断でも `--lint` でなければ読む先が無いので、そう言って無視する。
     if args.flow:
@@ -920,12 +914,10 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if cli_ops.sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
-    # 親を閉じた後の片付けの列挙元（`retire/<親>.json`）と、旧い取り込み状態の 1 回限りの移行。
-    # どちらもネットワークにも git にも触れず、チケット制御の有無に依らない。
+    # 親を閉じた後の片付けの列挙元（`retire/<親>.json`）。
+    # ネットワークにも git にも触れず、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "retired"]:
         return EXIT_OK if cli_ops.sync_retired(stdout, conf) == 0 else EXIT_ERROR
-    if list(args.command) == ["sync", "migrate"]:
-        return EXIT_OK if cli_ops.sync_migrate(stdout, conf, root) == 0 else EXIT_ERROR
     # 取り込みの後の検査（正とする側と、手元と統合先のレイヤーの食い違い）。
     # error があれば sh が親子のチケットの取り込みを止める。warn は表示するだけ。
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
@@ -1175,7 +1167,8 @@ def _hook_steps(
                 reason=audit.REASON_PAYLOAD_UNUSABLE,
             ),
         )
-        return modes.fail_closed(mode)
+        # ツールが分からない PreToolUse（とイベントすら読めなかった回）は dry-run でも止める。
+        return modes.fail_closed(mode, "" if exc.event in ("", hookio.PRE_TOOL_USE) else None)
 
     so_far.payload = payload
     record = audit.Record(
@@ -1263,7 +1256,9 @@ def _internal_error(
     しないので、PreToolUse の呼び出しがそのまま通り、記録も残らない。ここで受けて、判定に
     達せなかった回として終える。
 
-    - PreToolUse: 呼び出しを止める（dry-run は通す）。標準エラーの文がモデルに届く
+    - PreToolUse: ツールの種類で決める（`modes.fail_closed`）。書き込み・Agent・
+      ツールが分からない回は dry-run でも止める。読み取りは最低限の deny に当たらなければ通す。
+      標準エラーの文がモデルに届く
     - PostToolUse: ツールはもう走っているので止めるものは無い。enable は終了コード 2 と
       標準エラーで、実行後の検査をしていないことをモデルに言う（dry-run は 0）
     - payload を読む前に落ちた（イベントが分からない）: PreToolUse と同じく止める
@@ -1291,11 +1286,20 @@ def _internal_error(
     record.code, record.rules = "", []
     record.detail = f"{kind} at {where}" if where else kind
     if payload.event in ("", hookio.PRE_TOOL_USE, hookio.POST_TOOL_USE):
+        if payload.event == hookio.POST_TOOL_USE:
+            code = modes.fail_closed(mode)
+        else:
+            # 呼び出しの前（イベントが分からない回を含む）は、ツールの種類で決める。設定を読まずに
+            # 通してよいと確かめられた読み取りだけを通す（`hook.failsafe`）。
+            code = modes.fail_closed(mode, payload.tool_name, safe=failsafe.is_safe(payload, root))
+        passed = code == 0 and payload.event != hookio.POST_TOOL_USE
         stderr.write(
-            reasons.internal_error(audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path)
+            reasons.internal_error(
+                audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path, passed=passed
+            )
             + "\n"
         )
-        return modes.fail_closed(mode)
+        return code
     if payload.event == hookio.SUBAGENT_STOP:
         subagent.unchecked_after_error(stderr, conf, root, payload)
     hookio.write_system_message(

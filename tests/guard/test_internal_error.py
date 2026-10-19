@@ -46,7 +46,7 @@ def boom(*_args, **_kwargs):
     raise RuntimeError("想定外")
 
 
-PRE = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "ls"}}
+PRE = {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "echo hi"}}
 
 
 class InternalErrorTest(unittest.TestCase):
@@ -74,10 +74,14 @@ class InternalErrorTest(unittest.TestCase):
         self.assertIn("ERROR", diag)
         self.assertIn("error=RuntimeError", diag)
 
-    def test_pre_tool_use_in_dry_run_lets_the_call_through(self):
+    def test_pre_tool_use_in_dry_run_lets_only_a_safe_read_through(self):
+        # 判定できない間に通すのは、狭い許可リストの読み取りだけ。dry-run でも変わらない。
+        safe = {**PRE, "tool_input": {"command": "ls"}}
         with mock.patch.object(judge, "decide_before", side_effect=boom):
-            result, row = run(self.root, PRE, mode="dry-run")
+            result, row = run(self.root, safe, mode="dry-run")
+            stopped, _ = run(self.root, PRE, mode="dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(stopped.returncode, 2, stopped.stderr)
         self.assertEqual(row["reason"], "internal-error")
 
     def test_output_written_before_the_error_is_dropped(self):
@@ -252,8 +256,11 @@ class InternalErrorTest(unittest.TestCase):
                 self.assertEqual(row["event"], event)
 
     def test_unusable_payload_in_dry_run_does_not_say_stopped(self):
-        """dry-run は exit 0 で通す。「止めた」とは言わず、enable なら止めていたと言う。"""
-        for event in ("PreToolUse", "UserPromptSubmit"):
+        """ツールの呼び出しを持たないイベントは、dry-run なら exit 0 で通す。
+
+        「止めた」とは言わず、enable なら止めていたと言う。
+        """
+        for event in ("UserPromptSubmit", "Stop"):
             with self.subTest(event=event):
                 payload = {"hook_event_name": event, "cwd": 1}
                 result = run_raw(self.root, json.dumps(payload), mode="dry-run")
@@ -262,6 +269,107 @@ class InternalErrorTest(unittest.TestCase):
                 self.assertIn("nothing was stopped", result.stderr)
                 self.assertNotIn("stopped it", result.stderr)
                 self.assertNotIn("held this message back", result.stderr)
+
+    def test_unusable_payload_before_a_tool_call_stops_even_in_dry_run(self):
+        """ツールが分からない呼び出しの前は、dry-run でも止める。"""
+        for event in ("PreToolUse", ""):
+            with self.subTest(event=event):
+                payload = {"hook_event_name": event, "cwd": 1}
+                result = run_raw(self.root, json.dumps(payload), mode="dry-run")
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("[ccnavi] payload-unusable", result.stderr)
+                self.assertNotIn("nothing was stopped", result.stderr)
+
+
+class FailClosedByToolTest(unittest.TestCase):
+    """判定に達せなかった回の結論は、ツールの種類で決まる。"""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = directory.name
+
+    def crash(self, tool, tool_input, mode="enable"):
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": tool,
+            "tool_input": tool_input,
+            "cwd": self.root,
+        }
+        with mock.patch.object(judge, "decide_before", side_effect=boom):
+            result, _ = run(self.root, payload, mode)
+        return result.returncode
+
+    def test_writes_and_agents_stop_even_in_dry_run(self):
+        for tool, tool_input in (
+            ("Write", {"file_path": "/tmp/x"}),
+            ("Edit", {"file_path": "/tmp/x"}),
+            ("NotebookEdit", {"notebook_path": "/tmp/x.ipynb"}),
+            ("Agent", {"description": "d"}),
+        ):
+            with self.subTest(tool=tool, mode="dry-run"):
+                self.assertEqual(self.crash(tool, tool_input, "dry-run"), 2)
+
+    def test_reads_pass_unless_the_minimal_deny_hits(self):
+        for mode in ("enable", "dry-run"):
+            with self.subTest(mode=mode):
+                self.assertEqual(self.crash("Read", {"file_path": "/tmp/notes.md"}, mode), 0)
+                self.assertEqual(self.crash("Read", {"file_path": "/home/u/.env"}, mode), 2)
+                self.assertEqual(self.crash("Read", {"file_path": "/r/.git/config"}, mode), 2)
+                self.assertEqual(
+                    self.crash("Read", {"file_path": "/r/logs/state/ops/a.json"}, mode), 2
+                )
+                self.assertEqual(self.crash("Grep", {"path": "/home/u/.ssh/id_rsa"}, mode), 2)
+
+    def test_shell_passes_only_the_narrow_allowlist(self):
+        for command, expected in (
+            ("pwd", 0),
+            ("ls", 0),
+            ("ls docs", 0),
+            ("cat README.md", 0),
+            ("head wip/a.md", 0),
+            ("sh .ccnavi/scripts/ccnavi-ticket.sh status", 0),
+            ("sh /w/.ccnavi/scripts/ccnavi-ticket.sh --help", 2),
+            ("sh /tmp/evil/.ccnavi/scripts/ccnavi-ticket.sh status", 2),
+            ("sh ../x/.ccnavi/scripts/ccnavi-ticket.sh status", 2),
+            ("wc --files0-from=.env", 2),
+            ("cat -n README.md", 2),
+            ("cat /dev/zero", 2),
+            ("ls -R", 2),
+            ("cat .git/config", 2),
+            ("cat .GIT/config", 2),
+            ("cat logs/state/ops/a.json", 2),
+            ("cat key.pem", 2),
+            ("cat ~/.aws/credentials", 2),
+            ("cat credentials.json", 2),
+            ("cat secrets/prod.txt", 2),
+            ("less README.md", 2),
+            ("rg --pre cmd x .", 2),
+            ("echo hi", 2),
+            ("grep x README.md", 2),
+            ("cat a.md > b.md", 2),
+            ("cat $(echo a)", 2),
+            ("cat *.md", 2),
+            ("ls && rm x", 2),
+            ("cat .env", 2),
+            ("sh .ccnavi/scripts/ccnavi-ticket.sh start i0001", 2),
+        ):
+            for mode in ("enable", "dry-run"):
+                with self.subTest(command=command, mode=mode):
+                    self.assertEqual(self.crash("Bash", {"command": command}, mode), expected)
+
+    def test_the_status_script_must_be_this_workspaces(self):
+        mine = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-ticket.sh")
+        self.assertEqual(self.crash("Bash", {"command": f"sh {mine} status"}), 0)
+        self.assertEqual(self.crash("Bash", {"command": f"sh {mine} --help"}, "dry-run"), 0)
+        self.assertEqual(self.crash("Bash", {"command": f"sh {mine} start i0001"}), 2)
+
+    def test_powershell_stops(self):
+        self.assertEqual(self.crash("PowerShell", {"command": "pwd"}, "dry-run"), 2)
+
+    def test_unknown_tools_stop_in_enable_and_pass_in_dry_run(self):
+        self.assertEqual(self.crash("Mystery", {}), 2)
+        self.assertEqual(self.crash("Mystery", {}, "dry-run"), 0)
 
 
 class DeadlineTextTest(unittest.TestCase):
@@ -272,9 +380,10 @@ class DeadlineTextTest(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = directory.name
 
-    def run_late(self, mode):
+    def run_late(self, mode, command="echo hi"):
+        payload = {**PRE, "tool_input": {"command": command}}
         with mock.patch.object(judge, "DEADLINE_SECONDS", -1):
-            return run(self.root, PRE, mode)
+            return run(self.root, payload, mode)
 
     def test_enable_stops_and_says_so(self):
         result, row = self.run_late("enable")
@@ -285,10 +394,10 @@ class DeadlineTextTest(unittest.TestCase):
         self.assertEqual(row["reason"], "deadline-exceeded")
 
     def test_dry_run_lets_it_through_and_does_not_say_stopped(self):
-        result, row = self.run_late("dry-run")
+        result, row = self.run_late("dry-run", "ls")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
-        self.assertIn("would have been stopped", result.stderr)
+        self.assertIn("went through", result.stderr)
         self.assertNotIn("so it stopped it", result.stderr)
         self.assertEqual(row["reason"], "deadline-exceeded")
 

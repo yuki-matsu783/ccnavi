@@ -634,7 +634,7 @@ def _restore(
 
 
 def _reported_path(state_dir: str, session: str) -> str:
-    """報告済みの変更の記録。改名前は `<セッション>.json` だった（`_legacy_reported_path`）。"""
+    """報告済みの変更の記録。"""
     name = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"{name}.reported.json")
 
@@ -680,11 +680,6 @@ def _fingerprint(finding: post_findings.Finding) -> str:
     except OSError:
         return "-"
     return digest.hexdigest()
-
-
-def _legacy_reported_path(state_dir: str, session: str) -> str:
-    name = fsio.safe_name(session) or "unknown"
-    return os.path.join(state_dir, f"{name}.json")
 
 
 def _turn_path(state_dir: str, session: str) -> str:
@@ -860,8 +855,7 @@ def capture_baseline(
 def _load_reported(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool, bool]:
     """すでに報告した変更と、基準を持つか、起動時の変更をもう伝えたかを返す。
 
-    基準を持つのは、SessionStart の基準か、改名の前の記録（それは初回の実行後
-    チェックが書いたもの）がある場合。持たなければ「初めて」として扱う。
+    基準を持つのは、SessionStart の基準がある場合。持たなければ「初めて」として扱う。
     3 つめが偽なのは、基準は在るが起動時に在った変更をまだ伝えていないとき。
 
     読めなければ「初めて」として扱う。記録を失ったときに、前から在った変更を
@@ -870,23 +864,16 @@ def _load_reported(stderr: TextIO, state_dir: str, session: str) -> tuple[set[st
     if not state_dir:
         return set(), False, True
     data, failed = fsio.read_json(_reported_path(state_dir, session))
-    legacy = isinstance(failed, FileNotFoundError)
-    if legacy:
-        data, failed = fsio.read_json(_legacy_reported_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
             stderr.write(f"ccnavi: 実行後チェックの記録を読めない: {failed}\n")
         return set(), False, True
-    # キーも改名した（`seen` → `reported`）。改名の前に書かれた記録も読む。
     items = None
     if isinstance(data, dict):
-        items = data.get("reported", data.get("seen"))
+        items = data.get("reported")
     if not isinstance(items, list):
         return set(), False, True
     reported_set = {s for s in items if isinstance(s, str)}
-    # 改名の前の記録は、初回の実行後チェックが伝えたあとに書かれたもの。
-    if legacy:
-        return reported_set, True, True
     if data.get("baseline_captured") is not True:
         return set(), False, True
     return reported_set, True, data.get("announced") is not False
@@ -921,6 +908,3 @@ def _save_reported(
     )
     if failed:
         stderr.write(f"ccnavi: 実行後チェックの記録を保存できませんでした: {failed}\n")
-        return
-    # 改名の前の記録は、新しい記録に置き換わったので消す。
-    fsio.remove(_legacy_reported_path(state_dir, session))

@@ -21,11 +21,10 @@
 # リポジトリ（ワークスペース自身と、親子のチケットの元のプロジェクト）ごとに 1 回、次の順に行う。
 #
 #   1. `ls-remote --heads origin` で全ブランチの有無を得る。失敗したら（オフライン・認証）止める
-#   2. 統合先の名前を決める。CCNAVI_INTEGRATION_BRANCH（環境変数、無ければ
-#      .claude/settings.local.json の env）、空ならホストのデフォルトブランチ（`ls-remote --symref
-#      origin HEAD`、読めなければ origin/HEAD・main・master）。設定した名前がリモートに無ければ、
-#      既定にせずに止める
-#   3. 統合先を fetch する（取り込みの後の検査が、レイヤーのずれを origin/<統合先> と比べるため）
+#   2. 統合先の名前を決める。ホストのデフォルトブランチ（`ls-remote --symref origin HEAD`）、
+#      読めなければ手元の origin/HEAD、それも無ければ一覧にある main・master。決まらなければ止める
+#   3. 統合先を fetch する（取り込みの後の検査が、レイヤーのずれを origin/<統合先> と比べるため）。
+#      成功した後、手元の origin/HEAD がホストに聞いた名前と違えば向け直す（fetch の前には向け直さない）
 #
 # 親子のチケットごとに次を行う（ロックを待って取る）。
 #
@@ -57,14 +56,13 @@
 # （検査の error とは分ける）。
 #
 # 実行ファイルはネットワークに出ない。ここが git で取ってくる。
-# 置き場のパスと settings.local.json の読みは実行ファイル（`ccnavi sync paths`）に、チケットの YAML が要る
+# 置き場のパスは実行ファイル（`ccnavi sync paths`）に、チケットの YAML が要る
 # 親の状態（親のワークツリーか・承認済みか・依頼のマーカーがあるか・退避にあるか・mr 欄）は
 # `ccnavi tree parent` に聞く（sh はチケットを読まない）。
 # 実行ファイルが無ければ、ほかの sh と同じく既定のパス（固定）を使う。在るのに
-# 答えなかったときは、統合先を取り違えないよう止める。
-# 起動したら先頭で `ccnavi sync migrate` を 1 回呼ぶ（旧い取り込み記録を ready の後の片付けの記録へ移す。冪等）。
+# 答えなかったときは、置き場を取り違えないよう止める。
 #
-# 環境変数: CCNAVI_INTEGRATION_BRANCH / CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/
+# 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/
 #   CCNAVI_SYNC_TIMEOUT（ls-remote・fetch 1 回のタイムアウト監視の秒、既定 60）
 # 終了コード: 0 全部取り込んだ（取り込むものが無いを含む） / 1 止めた親子のチケットかリポジトリがある /
 #           2 引数か環境の誤り
@@ -85,8 +83,7 @@ sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
   MR がマージ済みなら、手元の親のブランチとワークツリー、片付けの記録を片付ける
   （未 push のコミットや未コミットの変更があれば消さずに理由を言う）。
 
-  統合先: CCNAVI_INTEGRATION_BRANCH（環境変数か .claude/settings.local.json の env）、
-          空ならホストのデフォルトブランチ
+  統合先: ホストのデフォルトブランチ。読めなければ手元の origin/HEAD、それも無ければ main・master
 USAGE
 }
 
@@ -167,7 +164,7 @@ git_path() {
 	esac
 }
 
-# ---- 置き場のパスと、settings.local.json の統合先。実行ファイルに聞く（JSON は sh で読まない）。
+# ---- 置き場のパス。実行ファイルに聞く（設定ファイルは sh で読まない）。
 
 sync_info=""
 info_from=""
@@ -183,7 +180,7 @@ fi
 sync_info=$(printf '%s\n' "$sync_info" | tr -d '\r')
 case "$info_from" in
 failed:*)
-	printf 'ccnavi-sync: 実行ファイル（%s）が置き場のパスと統合先の設定を返さなかった（%s）。統合先を取り違えないよう止めた。\n' \
+	printf 'ccnavi-sync: 実行ファイル（%s）が置き場のパスを返さなかった（%s）。置き場を取り違えないよう止めた。\n' \
 		"${info_from#failed:}" "$(head -n 1 "$scratch/info" 2>/dev/null)" >&2
 	exit 2
 	;;
@@ -204,39 +201,6 @@ run_ccnavi() {
 	esac
 }
 
-# ---- 旧い取り込み記録の移行（冪等。実行ファイルが無い・古くて知らないときは何もしない）。
-#
-# 旧い `sync/<リポジトリ>/families/<P>` のうち、親のワークツリーが無いものを ready の後の片付けの記録
-# （retire/<P>.json）へ移し、統合先のコピー（sync/<リポジトリ>/integration/）を消す。列挙の前に済ませる。
-
-if [ -n "$info_from" ]; then
-	run_ccnavi sync migrate >"$scratch/migrate-raw" 2>/dev/null || :
-	tr -d '\r' <"$scratch/migrate-raw" >"$scratch/migrate"
-	if [ "$(head -n 1 "$scratch/migrate")" = "migrate 1" ]; then
-		while IFS= read -r mg_line; do
-			mg_kind="${mg_line%% *}"
-			mg_rest="${mg_line#* }"
-			case "$mg_kind" in
-			moved) printf '案内: %s: 旧い取り込み記録を、片付けの記録（retire/）へ移した\n' "${mg_rest%% *}" ;;
-			dropped) printf '案内: %s: 旧い取り込み記録を捨てた（%s）\n' "${mg_rest%% *}" "${mg_rest#* * }" ;;
-			skipped)
-				case "$mg_rest" in
-				integration\ *)
-					# `skipped integration <repo> <理由>` は親ではなく統合先のコピーの行。
-					mg_after="${mg_rest#integration }"
-					printf '案内: 旧い統合先のコピー（%s）を触らなかった（%s）。ユーザが中身を確かめてください\n' "${mg_after%% *}" "${mg_after#* }"
-					;;
-				*)
-					printf '案内: %s: 旧い取り込み記録を触らなかった（%s）。ユーザが中身を確かめてください\n' "${mg_rest%% *}" "${mg_rest#* * }"
-					;;
-				esac
-				;;
-			removed) printf '案内: 旧い統合先のコピー（%s）を消した\n' "${mg_rest#integration }" ;;
-			esac
-		done <"$scratch/migrate"
-	fi
-fi
-
 # 親子のチケットの親のブランチ名。<P>
 #
 # 親のワークツリー（.claude/worktrees/<P>）の HEAD から読む（ccnavi_head_branch）。HEAD のブランチ名を
@@ -245,31 +209,10 @@ fi
 family_branch() {
 	ccnavi_head_branch "$root/.claude/worktrees/$1" "$1"
 }
-integration_local=$(info integration)
 projects=projects # 固定
 projects="${projects%/}"
 
 # ---- 統合先の名前
-
-if [ -n "${CCNAVI_INTEGRATION_BRANCH:-}" ]; then
-	integration_want="$CCNAVI_INTEGRATION_BRANCH"
-	integration_source=env
-elif [ -n "$integration_local" ]; then
-	integration_want="$integration_local"
-	integration_source=settings.local.json
-else
-	integration_want=""
-	integration_source=default
-fi
-
-# 出力に出す、統合先をどこから決めたか。
-source_words() {
-	case "$1" in
-	env) printf '環境変数 CCNAVI_INTEGRATION_BRANCH' ;;
-	settings.local.json) printf '.claude/settings.local.json の CCNAVI_INTEGRATION_BRANCH' ;;
-	*) printf 'ホストのデフォルトブランチ' ;;
-	esac
-}
 
 # ls-remote の一覧に refs/heads/<名前> があるか。前方一致で取り違えないよう、2 列目を
 # grep -F -x で完全一致に比べる（i0131 と i0131-x）。<一覧> <名前>
@@ -281,14 +224,38 @@ has_head() {
 # 読めなければ手元の origin/HEAD、無ければ一覧にある main・master。どれも無ければ 1。<リポジトリ> <一覧>
 default_branch() {
 	db_head=""
+	db_host=""
+	rm -f "$scratch/db-host"
 	if ccnavi_git_timed "$timeout" "$scratch/err-symref" "$1" ls-remote --symref origin HEAD >"$scratch/symref"; then
 		db_head=$(sed -n "s|^ref: refs/heads/\\(.*\\)${tab}HEAD\$|\\1|p" "$scratch/symref" | head -n 1)
+		[ -z "$db_head" ] || db_host=yes
 	fi
 	if [ -z "$db_head" ]; then
 		db_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
 		db_head="${db_head#origin/}"
 	fi
+	# 先頭が - の名前は、後ろの git の引数に渡るとオプションに読まれる。使わず、main・master に回す。
+	case "$db_head" in
+	-*)
+		db_head=""
+		db_host=""
+		;;
+	esac
+	# ホストの答えが手元の origin/HEAD と綴りの大文字小文字だけ違うなら、同じ名前として手元の綴りを使う。
+	# 別の綴りで取ると、大文字小文字を区別しない FS で origin/<名前> が衝突する。
+	if [ -n "$db_host" ]; then
+		db_local=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
+		db_local="${db_local#origin/}"
+		db_local_f=$(printf '%s' "$db_local" | tr '[:upper:]' '[:lower:]')
+		db_head_f=$(printf '%s' "$db_head" | tr '[:upper:]' '[:lower:]')
+		if [ -n "$db_local" ] && [ "$db_local_f" = "$db_head_f" ]; then
+			printf '%s\n' "$db_local"
+			return 0
+		fi
+	fi
 	if [ -n "$db_head" ] && has_head "$2" "$db_head"; then
+		# ホストに聞いて得た名前か。`$( )` の中で呼ぶので、変数ではなくファイルで呼び元へ渡す。
+		[ -z "$db_host" ] || : >"$scratch/db-host"
 		printf '%s\n' "$db_head"
 		return 0
 	fi
@@ -912,24 +879,25 @@ while IFS= read -r key <&4; do
 		repo_fail
 		continue
 	fi
-	if [ -n "$integration_want" ]; then
-		if ! has_head "$heads" "$integration_want"; then
-			printf '%s 統合先 %s（%s）がリモートにありません。設定を直してください。取り込みを止めた\n' "$label" \
-				"$integration_want" "$(source_words "$integration_source")"
-			repo_fail
-			continue
-		fi
-		integ="$integration_want"
-	elif ! integ=$(default_branch "$repo" "$heads"); then
-		printf '%s 統合先が決まらない（ホストのデフォルトブランチが読めず、main・master もリモートにありません）。CCNAVI_INTEGRATION_BRANCH を設定してください。取り込みを止めた\n' "$label"
+	if ! integ=$(default_branch "$repo" "$heads"); then
+		printf '%s %s 取り込みを止めた\n' "$label" "$(ccnavi_integration_hint "$repo")"
 		repo_fail
 		continue
 	fi
-	printf '%s 統合先: %s（%s）\n' "$label" "$integ" "$(source_words "$integration_source")"
+	printf '%s 統合先: %s\n' "$label" "$integ"
 	if ! fetch_one "$repo" "$integ"; then
 		printf '%s 統合先 %s を取ってこられなかった（%s）。止める\n' "$label" "$integ" "$(head -n 1 "$scratch/err")"
 		repo_fail
 		continue
+	fi
+	# ホストに聞いた名前と手元の origin/HEAD が違えば、fetch が成功した今、向け直す。
+	if [ -e "$scratch/db-host" ]; then
+		old_head=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
+		old_head="${old_head#origin/}"
+		if [ "$old_head" != "$integ" ] &&
+			git -C "$repo" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$integ" 2>/dev/null; then
+			printf '%s 統合先を %s から %s に合わせた（ホストの既定ブランチ）\n' "$label" "${old_head:-未設定}" "$integ"
+		fi
 	fi
 	awk -F "$tab" -v k="$key" '$3 == k' "$scratch/families" >"$scratch/these"
 	# 読む先は fd 3。中で起こす git が標準入力を読んでも、親子のチケットの一覧を読み取ってしまわない。

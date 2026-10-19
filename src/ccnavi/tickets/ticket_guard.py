@@ -112,6 +112,83 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     return [write_rule, shell_rule]
 
 
+def _dir_rules(
+    rule_id: str, shell_id: str, place_rel: str, message: str
+) -> tuple[rules.Rule, rules.Rule]:
+    """置き場のディレクトリ全体への書き込みを止める 2 本（ツールの書き込みとシェルの書き込み）。
+
+    `guard_rules` が状態の名前を絞るのに対し、ここは置き場の下すべてを守る。
+    """
+    place = _place(place_rel)
+    path = rf"(^|[\\/]){place}[\\/]"
+    write_rule = rules.Rule(
+        id=rule_id,
+        match="|".join(ticket_model.WRITE_TOOLS),
+        regex=path,
+        message=message,
+        decision=rules.DENY,
+    )
+    write_rule.compiled = re.compile(path, re.IGNORECASE)
+    loose = place + r"([\\/]|\s|$)"
+    # 書き込み動詞の列挙（リダイレクト、mv・rm・tee・dd・sed -i、cp の行き先）に加えて、
+    # 置き場の名前を引数に取る作成・変更・展開の道具と、コードを走らせる道具も止める。
+    # 置き場の名前が現れるだけで当たるので、読み取りの道具（cat・grep・ls・head）は巻き込まない。
+    also = (
+        r"(^|\x00|[;&|]\s*)(touch|mkdir|chmod|chown|rsync|sponge|unzip|tar|python3?|node|perl|ruby"
+        r"|Set-Content|Add-Content|New-Item|Copy-Item|Move-Item|Remove-Item|Out-File)\b"
+        rf"[^\x00]*{place}"
+    )
+    shell = "|".join(
+        (
+            rf"{selfguard_shell._WRITE_VERBS}{loose}",
+            selfguard_shell.copy_destination_regex(selfguard_shell.copy_last_place(place), loose),
+            also,
+        )
+    )
+    shell_rule = rules.Rule(
+        id=shell_id,
+        match="Bash|PowerShell",
+        regex=shell,
+        message=message,
+        decision=rules.DENY,
+    )
+    shell_rule.compiled = re.compile(shell, re.IGNORECASE)
+    return write_rule, shell_rule
+
+
+APPROVED_RULE_ID = "builtin:ticket-approved"
+APPROVED_SHELL_RULE_ID = APPROVED_RULE_ID + "-shell"
+OPS_RULE_ID = "builtin:ticket-ops"
+OPS_SHELL_RULE_ID = OPS_RULE_ID + "-shell"
+
+# 操作記録の置き場（`logs/state/ops/`）。置き場の位置は設定で動かない（`settings.DEFAULT_STATE`）。
+OPS_REL = "logs/state/ops"
+
+
+def gate_rules(approved_rel: str, root: str) -> list[rules.Rule]:
+    """承認済みの置き場と操作記録の置き場を守るルール。組み込みで、ルールファイルには書かない。
+
+    承認済みの置き場（承認済みチケット、`doing/`・`done/`、`phases/` のマーカー・子の記録・
+    受け入れ台帳、`flows/`）は、動かすのは ccnavi のスクリプトとユーザの操作だけ。エージェントの
+    直接の書き込みは、dry-run でも `CCNAVI_GUARD_CORE_FILES` の値でも止める
+    （チケット制御が有効な間）。
+    操作記録（判断の保存と送信の段階）も同じ。書き直すと、送り直しの根拠を偽れる。
+    """
+    approved_message = (
+        "承認済みの置き場です。承認・状態・レビューの記録は、ユーザの操作と ccnavi のスクリプト"
+        f"（'{settings.script_command(root, 'ccnavi-ticket.sh')} status' で確かめられます）だけが"
+        "動かします。直接書き込まないでください。"
+    )
+    ops_message = (
+        "操作記録の置き場です。ユーザの判断と外部への送信の段階を保存する記録で、書き直すと送り直しの"
+        "根拠が変わります。ccnavi のスクリプトだけが書きます。直接書き込まないでください。"
+    )
+    return [
+        *_dir_rules(APPROVED_RULE_ID, APPROVED_SHELL_RULE_ID, approved_rel, approved_message),
+        *_dir_rules(OPS_RULE_ID, OPS_SHELL_RULE_ID, OPS_REL, ops_message),
+    ]
+
+
 def raw_git_rule(root: str) -> rules.Rule:
     """生の git を止めるルール。組み込みで、ルールファイルには書かない。いつも足す。
 

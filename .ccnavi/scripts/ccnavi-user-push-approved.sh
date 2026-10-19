@@ -16,7 +16,7 @@
 # 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）のワークツリーは、
 # write-and-push と同じ手順でコミットして push する。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
 # 手順は、ロック（write-and-push の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
-# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き（と旧い templates/ の下書き））を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
+# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き（と古い templates/ の下書き））を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
 # push が失敗してもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`write-and-push family`）に聞く。
 # 取り込みの後、push の前に、親のブランチがリモートから消えていないかを push の関門（ccnavi_push_gate）で確かめる。
 # 消えていれば（確かめられないときも）コミットも push もせずに止める。親でないツリーの push の前にも同じ関門を通す。
@@ -35,7 +35,7 @@
 # wip/proposals の todo/ から動かすので、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。
 # 同じく、ボードのフロー編集画面が取り込んだ下書き（wip/proposals の flows/）を
-# フローの保存のあとに消す。旧い版が置いた templates/ の下書き（追跡されていたもの）の削除も同じに拾う。
+# フローの保存のあとに消す。古い版が置いた templates/ の下書き（追跡されていたもの）の削除も同じに拾う。
 # 追跡されていた下書きの削除だけをコミットする。`ccnavi user handoff` の下書き（wip/handoff/）は
 # 追跡しないので、ここでは扱わない。
 # 消えたものだけをここで拾う。
@@ -488,9 +488,9 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 		;;
 	esac
 	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も送らない。名前は ccnavi-fetch.sh・
-	# ccnavi-git.sh と同じ順（CCNAVI_INTEGRATION_BRANCH → settings.local.json の env → origin/HEAD →
-	# origin/main・master）で、そのツリーが属するリポジトリについて決める。決まらなければ固定のリストだけ。
-	integ=$(ccnavi_integration "$tree" "$root") || integ=""
+	# ccnavi-git.sh と同じ決め方（origin/HEAD → origin/main・master）で、そのツリーが属する
+	# リポジトリについて決める。決まらなければ固定のリストだけ。
+	integ=$(ccnavi_integration "$tree") || integ=""
 	if [ -n "$integ" ] && [ "$branch" = "$integ" ]; then
 		printf 'ccnavi-user-push-approved: %s では保護対象の統合先 %s を使用しているため、pushしません。送るかどうかはユーザが決めます。\n' \
 			"$name" "$branch" >&2

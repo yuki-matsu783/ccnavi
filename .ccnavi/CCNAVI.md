@@ -12,7 +12,7 @@
 ## 作業の決まり
 
 <!-- ccnavi:if workspace_root -->
-  - 編集する前にワークツリー（{{worktrees}}/<名前>）を切り、その中で編集する。切り方は ccnavi-git.sh の --help（worktree add）。直接作業の名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md）。
+  - 編集する前に {{worktree_sh}} <名前> でワークツリー（{{worktrees}}/<名前>）を切り、その中で編集する。直接作業の名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md）。
 <!-- ccnavi:endif -->
 <!-- ccnavi:if git_wrapper -->
   - git は直接呼ばず {{git_sh}} を通す。止められたら迂回せず、出力の案内に従う。
@@ -69,6 +69,6 @@
 
   作業中の正本は親のブランチを checkout した親のワークツリー（名前はブランチ名の `/` を `-` にしたもの）。親のワークツリーには書かず、子のワークツリーで作業する。ワークツリーが無い・HEAD が違うPCでは操作が止まるので、案内の `ccnavi-start.sh` で準備する。親の提案には `mr:` を必ず書く。詳細は `.ccnavi/docs/worktree.md`。
   <!-- ccnavi:if dry_run -->
-    （現状: {{mode_env}}=dry-run。deny にヒットしても止まらない。通ったことを許可と読まず、表示された案内に次からは従う）
+    （現状: {{mode_env}}=dry-run。一般の deny は止まらないが、チケットの関門（状態の操作・範囲・レビュー待ち・承認済みの置き場など）と補助の保護は止まる。通ったことを許可と読まず、表示された案内に次からは従う）
   <!-- ccnavi:endif -->
 <!-- ccnavi:endif -->

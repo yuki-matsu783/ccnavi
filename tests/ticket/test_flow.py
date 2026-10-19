@@ -875,13 +875,14 @@ class FlowLockTest(FlowHarness):
         self.assertNotIn("[askUserQuestion]", text)
         self.assertTrue(self.board_flow(CHILD)["linked"])
 
-    def test_dry_run_only_reports_the_lock(self):
+    def test_dry_run_still_holds_the_lock(self):
+        """フローのロックは関門で、dry-run でも止める。"""
         self.run_child(CHILD)
         result = self.hook(
             "PreToolUse", "Write", self.parent_tree, mode="dry-run", file_path=self.flow_path
         )
         self.assertIn(flow.CODE_LOCKED, result.stdout)
-        self.assertNotIn('"deny"', result.stdout)
+        self.assertIn('"deny"', result.stdout)
 
     def test_the_lock_is_released_when_the_child_finishes(self):
         child_tree = self.run_child(CHILD, [("wip/research/summary.md", "まとめ\n")])

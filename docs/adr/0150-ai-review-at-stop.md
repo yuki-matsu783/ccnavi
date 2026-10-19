@@ -6,7 +6,7 @@ tags: [rules, tickets, hooks, logging]
 keywords: [Stop, agent 型 hook, AI 判定, 差し戻し, dry-run, transcript, prompt, 再判定, 共有キー, 判定役, 提案, R1, R2, R4]
 ---
 
-# ADR-0146: Stop の AI 判定（agent 型 Stop フック）を、既存の促しを変えずに足す
+# ADR-0150: Stop の AI 判定（agent 型 Stop フック）を、既存の促しを変えずに足す
 
 状態: 採用（接続部分まで実装。enable にする前の条件は「決定」の最後に書く）
 

@@ -31,7 +31,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 | A2 | `CLAUDE_PROJECT_DIR` が無い端末の直打ちで、Python が根を取り違える | major | 実行 |
 | A3 | `.claude/` を持つ祖先の下に置いた単体 clone で、祖先が根になる | minor | 実行 |
 | A4 | sh の `*/projects` 判定が大文字小文字を区別する | minor | 読み（Linux では再現できない） |
-| B1 | 統合先ブランチ名を、ワークスペースの値だけで決める | 中 | 実行（sh）、読み（push 拒否） |
+| B1 | 統合先ブランチ名を、ワークスペースの値だけで決める（変数を廃止して解消した） | 中 | 実行（sh）、読み（push 拒否） |
 | C1 | 単体 clone の直後は `.ccnavi/bin/` が無く、案内が合わない | 初回は blocker（単体 clone 固有ではない） | 実行 |
 | C2 | プロジェクトのスキルの目録が、単体 clone で出ない | major | 実行 |
 | C3 | setup が `/.claude/worktrees/` を `.gitignore` に足さない | minor から中 | 実行 |
@@ -88,14 +88,12 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 ## B. 統合先ブランチ
 
-#### B1 統合先ブランチ名を、ワークスペースの値だけで決める（中）
+#### B1 統合先ブランチ名を、ワークスペースの値だけで決める（中。変数を廃止して解消した）
 
-- 処理と場所: 統合先ブランチ名の解決は、環境変数 `CCNAVI_INTEGRATION_BRANCH`、`settings.local.json` の env、`origin/HEAD` の順。`.ccnavi/scripts/ccnavi-common-state.sh:171-197` の `ccnavi_integration_local` は、`$2`（ワークスペースルート）の `sync paths` だけを見る。呼び出しは `ccnavi-fetch.sh:171`、`ccnavi-worktree.sh:136`、`ccnavi-git.sh:567,657,1854`、`ccnavi-review.sh:204`、`ccnavi-start.sh:470`、`ccnavi-user-push-approved.sh:493`。Python 側は `src/ccnavi/tickets/ops_stop_integrate.py:164-190`（`project` 引数を使わない）と `src/ccnavi/infra/settings.py:672`
-- ワークスペース内 clone: ワークスペースの値を全プロジェクトに当てる。ワークスペースの `settings.local.json` に `develop` と書くと、`cd projects/p; ccnavi-worktree.sh feat-2-b --dry-run` が「統合先 develop が手元にも origin にもありません」で止まる（p には `main` しかない）。ワークスペースが `develop`、p の既定が `trunk` のとき、`ccnavi-git.sh` の push 拒否（1854 行）が `trunk` を統合先と見ず、止めない
-- 単体 clone: そのプロジェクトの値だけを見るので、食い違わない
-- 起きること: 実害が出るのは、ワークスペースの値とプロジェクトの既定が違うときだけ
-- 確認: sh は実行で確認。push 拒否は読みのみ
-- 直し方の案: 参照元を「その repo のツリーの根」に切り替え、ワークスペースの値は `self` にだけ当てる。優先順位は未決
+- 当時の処理: 統合先ブランチ名の解決は、環境変数 `CCNAVI_INTEGRATION_BRANCH`、`settings.local.json` の env、`origin/HEAD` の順で、前の 2 つはワークスペースで 1 つの値だった。sh は `ccnavi_integration_local`（ワークスペースの `sync paths` だけを見る）、Python は `ops_stop_integrate.integration_name`（`project` 引数を使わない）と `infra/settings.py` が読んでいた
+- 当時の害: ワークスペースの値が全プロジェクトに当たった。ワークスペースが `develop`、p の既定が `trunk` のとき、`ccnavi-git.sh push` の拒否が `trunk` を統合先と見ず止めない。Python の `--lint` の識別子の予約も、プロジェクトの統合先で効かない。`settings.local.json` はエージェントが書き換えられるので、エージェントが統合先を変えられた
+- 解消: 環境変数と `--integration-branch` と `settings.local.json` の読みを廃止し、統合先は各リポジトリの手元の `origin/HEAD`（無ければ `origin/main`・`origin/master`）だけで決める。`ccnavi-fetch.sh` が SessionStart で `origin/HEAD` をホストの既定ブランチへ向け直す。識別子の予約はチケットの `project` ごとにそのリポジトリの統合先で検査する（[ADR-0148](../../adr/0148-integration-is-the-origin-head-only.md)）
+- 残る制約: origin の無いリポジトリでは統合先が決まらない。ワークスペースと単体 clone のどちらも、そのリポジトリの `origin/HEAD` だけを見るので食い違わない
 
 ## C. 単体 clone で動かない・縮退する
 
@@ -231,7 +229,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 次は設計判断が要る点で、選択肢だけを並べる。どれも決定していない。
 
 - 根の決め方（A1、A2、A3、N1）: 次の 3 つの選択肢がある。(a) いまのまま、hook は `CLAUDE_PROJECT_DIR` を採り、Python は `.claude/` を持つ最も近い祖先を採る。(b) 祖先をたどるとき、`<親>/projects/<名前>` の形で親が ccnavi の根なら親を採り、sh と揃える。(c) 根の目印を `.claude/` ではなく `.ccnavi/scripts/ccnavi-common.sh` にする。sh に `CLAUDE_PROJECT_DIR` を読ませる案は、Bash ツールの環境に来ないので選択肢にならない
-- 統合先ブランチの優先順位（B1、N2）: 環境変数、ワークスペースの `settings.local.json`、プロジェクト自身の設定、`origin/HEAD` のどれをどの順で採り、ワークスペースの値を `self` にだけ当てるかどうか
+- 分岐名の接頭辞の設定（N2）: `CCNAVI_BRANCH_PREFIXES` をプロジェクトごとに持つかどうか。統合先ブランチの優先順位（B1）は、変数を廃止して解消した（ADR-0148）
 - ミラーの指紋（D1）: 単体用とワークスペース用の写しを印で見分けるか、ワークスペースの共通と違うときは上書きせず差を warn して止めるか
 - 単体 clone の初回導入（C1）: 実行ファイルが無いときの専用の案内と、単体 clone に setup を実行する手順を、どこに置くか
 - 単体 clone での縮退の中身（C2）: 目録を MAIN のツリーでも出すか、別の形に落とすか。工程スキルがワークスペース内 clone で二重に出る例外をどうするか

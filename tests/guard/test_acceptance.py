@@ -109,12 +109,21 @@ class VerdictTest(unittest.TestCase):
 
     def test_dry_runは手を出さずに報告する(self):
         result = run(
-            mode="dry-run", payload=pre_tool_use("Bash", "command", "git push origin main")
+            mode="dry-run", payload=pre_tool_use("Bash", "command", "rm -rf /tmp/some-dir")
         )
 
         out = verdict(self, result)
         self.assertNotIn("permissionDecision", out, "dry-run は報告するだけで手を出さない")
-        self.assertIn("git push", out["additionalContext"])
+        self.assertIn("rm -rf", out["additionalContext"])
+
+    def test_dry_runでも生のgitは止まる(self):
+        # 生の git は補助の保護で、dry-run でも止める（チケット制御が有効なとき）。
+        result = run(
+            mode="dry-run", payload=pre_tool_use("Bash", "command", "git push origin main")
+        )
+
+        out = verdict(self, result)
+        self.assertEqual(out.get("permissionDecision"), "deny")
 
     def test_disableは何も判定しない(self):
         # disable は起動したユーザの環境からしか反映されない。フラグからは反映されない。
@@ -387,14 +396,14 @@ class RecordTest(unittest.TestCase):
             self.assertEqual(got[i].get("reason"), reason, f"{i + 1} 行目")
 
     def test_dry_runは適用しなかった判定を記録する(self):
-        got = self.logged("dry-run", pre_tool_use("Bash", "command", "git push origin main"))
+        got = self.logged("dry-run", pre_tool_use("Bash", "command", "rm -rf /tmp/some-dir"))
 
         self.assertEqual(len(got), 1)
         # warn で走らせる理由そのものが「何を止めるはずだったか」を数えることなので、
         # 何も起きなくても判定は記録に残らないといけない。
         self.assertEqual(got[0]["decision"], "deny")
         self.assertFalse(got[0]["enforced"], "warn は呼び出しを通したはず")
-        self.assertEqual(got[0].get("rules"), [".ccnavi/config/common/rules.yml:git-push"])
+        self.assertEqual(got[0].get("rules"), ["builtin:recursive-delete"])
 
     def test_読めたものと読めなかったものを分けて記録する(self):
         got = self.logged(

@@ -88,6 +88,9 @@ class IntegrateTest(unittest.TestCase):
         write(os.path.join(self.ws, "other.txt"), "x\n")
         git(self.ws, "add", ".")
         git(self.ws, "commit", "-q", "-m", "seed")
+        # 統合先は手元の origin/HEAD が決める（origin の URL は要らない。参照だけ置く）。
+        git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
+        git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
         git(self.ws, "worktree", "add", "-q", ".claude/worktrees/wt", "-b", "wt", "main")
         self.wt = os.path.join(self.ws, ".claude", "worktrees", "wt")
 
@@ -97,7 +100,6 @@ class IntegrateTest(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("CLAUDE_PROJECT_DIR", None)
         env["CCNAVI_BIN_PATH"] = self.bin
-        env["CCNAVI_INTEGRATION_BRANCH"] = "main"
         if self.path is not None:
             env["PATH"] = self.path
         script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh").replace(os.sep, "/")
@@ -308,6 +310,21 @@ class IntegrateTest(unittest.TestCase):
         self.assertIn(os.path.realpath(self.ws).replace(os.sep, "/"), r.stderr.replace(os.sep, "/"))
         r = self.run_git_sh("integrate-done", "wt", cwd=self.wt)
         self.assertOk(r, 2)
+
+    def test_undetermined_integration_is_refused_with_the_set_head_hint(self):
+        """origin/HEAD も origin/main・master も無ければ、ローカルの main で代わりにせず断る。
+        origin が無いか、あるかで案内を言い分ける。"""
+        self.work_in_branch()
+        git(self.ws, "update-ref", "--no-deref", "-d", "refs/remotes/origin/HEAD")
+        git(self.ws, "update-ref", "-d", "refs/remotes/origin/main")
+        r = self.run_git_sh("integrate", "wt", cwd=self.ws)
+        self.assertOk(r, 2)
+        self.assertIn("origin が無いので統合先が決まらない", r.stderr)
+        git(self.ws, "remote", "add", "origin", "https://example.invalid/x.git")
+        r = self.run_git_sh("integrate", "wt", cwd=self.ws)
+        self.assertOk(r, 2)
+        self.assertIn("統合先 (origin/HEAD) が決まらない", r.stderr)
+        self.assertIn("git remote set-head origin -a", r.stderr)
 
     def test_ticket_worktree_is_refused(self):
         self.work_in_branch()

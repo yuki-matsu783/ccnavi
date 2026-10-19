@@ -20,9 +20,13 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, draft
 
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SH_DIR = (
+    os.path.join(ROOT, os.environ["CCNAVI_SH_DIR"])
+    if os.environ.get("CCNAVI_SH_DIR")
+    else draft.scripts_dir()
+)
 
 
 def with_exe(environment):
@@ -1589,9 +1593,34 @@ class WorktreeFreshBaseTest(GitWrapperTest):
                 result = self.assertRejected("worktree", "add", ".claude/worktrees/a", *args)
                 want = f"基点 {self.integ} が origin/{self.integ} より 1 件遅れて"
                 self.assertIn(want, result.stderr)
-                self.assertIn(f"merge --ff-only origin/{self.integ}", result.stderr)
+                # 案内は、基点を origin/<統合先> にして切る完全なコマンド（手元の統合先は進めない）
+                self.assertIn(f"--no-track 'origin/{self.integ}'", result.stderr)
+                self.assertIn("ccnavi-worktree.sh", result.stderr)
+                self.assertNotIn("merge --ff-only origin", result.stderr)
         git(self.dir, "merge", "-q", "--ff-only", f"origin/{self.integ}")
         self.assertCreated("a", "-b", "a")
+
+    def test_the_suggested_commands_run_from_a_fresh_shell(self):
+        import re
+
+        self.push_from_elsewhere()
+        git(self.dir, "fetch", "-q", "origin")
+        result = self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "a")
+        commands = re.findall(r"`([^`]+)`", result.stderr)
+        fetch = next(c for c in commands if " fetch origin " in c)
+        cut = next(c for c in commands if " worktree add " in c)
+        for command in (fetch, cut):
+            done = subprocess.run(
+                [SHELL, "-c", command],
+                cwd=self.dir,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=with_exe(dict(os.environ)),
+            )
+            self.assertEqual(done.returncode, 0, (command, done.stdout, done.stderr))
+        self.assertEqual("a", git_out(self.tree("a"), "branch", "--show-current"))
 
     def test_diverged_is_rejected_with_a_message_that_does_not_suggest_ff_only(self):
         write_text(os.path.join(self.dir, "local.txt"), "l\n")
@@ -1615,7 +1644,8 @@ class WorktreeFreshBaseTest(GitWrapperTest):
         for args in (("-b", "a"), ("-b", "a", self.integ), ("-b", "a", f"origin/{self.integ}")):
             with self.subTest(args=args):
                 result = self.assertRejected("worktree", "add", ".claude/worktrees/a", *args)
-                self.assertIn(f"fetch origin {self.integ}", result.stderr)
+                self.assertIn(f"fetch origin '{self.integ}'", result.stderr)
+                self.assertNotIn("merge --ff-only origin", result.stderr)
         fetched = self.run_wrapper("fetch", "origin", self.integ)
         self.assertEqual(0, fetched.returncode, fetched.stdout + fetched.stderr)
         self.assertCreated("a", "-b", "a")
@@ -1730,10 +1760,8 @@ class PushRemoteResolutionTest(ParentPushGateTest):
 class IntegrationPushTest(GitWrapperTest):
     """固定のリスト（main など）に無い名前の統合先へも直接は送らない。
 
-    統合先の名前は ccnavi-fetch.sh と同じ順（CCNAVI_INTEGRATION_BRANCH →
-    settings.local.json の env（実行ファイルの `sync paths`）→
-    origin/HEAD → origin/main・master）で、push したツリーが属するリポジトリについて決める。
-    決まらなければ固定のリストだけで判定する（今までの挙動）。
+    統合先の名前は ccnavi-fetch.sh と同じ決め方（origin/HEAD → origin/main・master）で、
+    push したツリーが属するリポジトリについて決める。決まらなければ固定のリストだけで判定する。
     """
 
     BRANCH = "develop-v1.0.0"
@@ -1745,7 +1773,7 @@ class IntegrationPushTest(GitWrapperTest):
         git(self.dir, "checkout", "--quiet", "-b", self.BRANCH)
 
     def push(self, cwd=None, branch=None, **env):
-        environment = {k: v for k, v in os.environ.items() if k != "CCNAVI_INTEGRATION_BRANCH"}
+        environment = dict(os.environ)
         with_exe(environment)
         environment.update(env)
         return subprocess.run(
@@ -1774,13 +1802,6 @@ class IntegrationPushTest(GitWrapperTest):
         git(repo, "update-ref", f"refs/remotes/origin/{name}", "HEAD")
         git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{name}")
 
-    def local_setting(self, name):
-        """settings.local.json の env に統合先を書く（実行ファイルが `sync paths` で運ぶ）。"""
-        write_text(
-            os.path.join(self.dir, ".claude", "settings.local.json"),
-            f'{{"env": {{"CCNAVI_INTEGRATION_BRANCH": "{name}"}}}}\n',
-        )
-
     def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
         """origin/HEAD も origin/main・master も無ければ、固定のリストに無い名前は通す。"""
         result = self.push()
@@ -1791,35 +1812,17 @@ class IntegrationPushTest(GitWrapperTest):
         self.point_origin_head(self.dir, self.BRANCH)
         self.assertRefused(self.push())
 
-    def test_the_environment_names_the_integration(self):
-        self.assertRefused(self.push(CCNAVI_INTEGRATION_BRANCH=self.BRANCH))
-
-    def test_settings_local_json_names_the_integration(self):
-        self.local_setting(self.BRANCH)
-        self.assertRefused(self.push())
-
-    def test_the_old_sync_copy_does_not_name_the_integration(self):
-        """統合先のコピー（sync/<リポジトリ>/integration/head）が残っていても読まない。"""
-        write_text(
-            os.path.join(self.dir, "logs", "state", "sync", "self", "integration", "head"),
-            f"remote origin\nbranch {self.BRANCH}\nsource default\n",
-        )
-        result = self.push()
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_the_environment_wins_and_the_fixed_list_still_holds(self):
-        """環境変数が別の名前なら origin/HEAD は読まない。固定のリストはそのまま止める。"""
+    def test_the_fixed_list_holds_beside_origin_head(self):
+        """origin/HEAD が別の名前でも、固定のリストの main は止める。"""
         self.point_origin_head(self.dir, self.BRANCH)
-        result = self.push(CCNAVI_INTEGRATION_BRANCH="trunk")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         git(self.dir, "checkout", "--quiet", "-b", "main")
-        result = self.push(branch="main", CCNAVI_INTEGRATION_BRANCH="trunk")
+        result = self.push(branch="main")
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("main は統合先です", result.stderr)
 
     def test_a_project_is_judged_by_its_own_integration(self):
-        """projects/<名前>/ の中から送るときは、そのプロジェクトの origin で統合先を決める。
-        settings.local.json の統合先は、ワークスペース全体のものとして同じ名前で効く。"""
+        """projects/<名前>/ の中から送るときは、そのプロジェクトの origin/HEAD で統合先を決める。
+        ワークスペースの origin/HEAD は関係しない。"""
         project = os.path.join(self.dir, "projects", "app")
         os.makedirs(project)
         git(project, "init", "-q")
@@ -1839,13 +1842,39 @@ class IntegrationPushTest(GitWrapperTest):
         result = self.push(project)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-        # settings.local.json が develop-v1.0.0 を統合先にしていれば、プロジェクトでも止める。
+        # プロジェクト側の origin/HEAD が develop-v1.0.0 なら止める（固定のリストに無い名前）。
         # 送り先は空のものに替えて見る。
         bare2 = os.path.join(parent, "app2.git")
         git(project, "init", "-q", "--bare", bare2)
         git(project, "remote", "set-url", "origin", bare2)
-        self.local_setting(self.BRANCH)
+        self.point_origin_head(project, self.BRANCH)
         self.assertRefused(self.push(project), bare2)
+
+    def test_each_repository_has_its_own_integration(self):
+        """ワークスペースの origin/HEAD は main、projects/app の origin/HEAD は trunk。
+        trunk を projects/app から送れば止まり、ワークスペースから送る trunk は止まらない。"""
+        self.point_origin_head(self.dir, "main")
+        project = os.path.join(self.dir, "projects", "app")
+        os.makedirs(project)
+        git(project, "init", "-q")
+        git(project, "config", "user.email", "t@example.invalid")
+        git(project, "config", "user.name", "t")
+        git(project, "commit", "-q", "--allow-empty", "-m", "seed")
+        git(project, "checkout", "--quiet", "-b", "trunk")
+        parent = tempfile.mkdtemp(prefix="ccnavi-gitwrap-origin-")
+        self.addCleanup(shutil.rmtree, parent, ignore_errors=True)
+        bare = os.path.join(parent, "app.git")
+        git(project, "init", "-q", "--bare", bare)
+        git(project, "remote", "add", "origin", bare)
+        self.point_origin_head(project, "trunk")
+
+        result = self.push(project, branch="trunk")
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("trunk は統合先です", result.stderr)
+
+        git(self.dir, "checkout", "--quiet", "-b", "trunk")
+        result = self.push(branch="trunk")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 class SafeAdditionsTest(GitWrapperTest):
@@ -1935,42 +1964,6 @@ class TagListOnlyTest(GitWrapperTest):
             with self.subTest(args=args):
                 result = self.run_wrapper(*args)
                 self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-
-class PlacesAreNotReadTest(GitWrapperTest):
-    """置き場を動かす環境変数は読まない（置き場は固定。A9）。
-
-    `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は失敗する。
-    写す前の sh（`ccnavi-common.sh` の `ccnavi_project`）は `CCNAVI_PROJECTS` を読むため。
-    """
-
-    def test_the_projects_variable_does_not_move_where_the_wrapper_logs(self):
-        """`CCNAVI_PROJECTS=/x` を入れても、`projects/foo` の中の記録は `logs/foo/` に分かれる。
-
-        `ccnavi_project` は置き場の下のディレクトリの名前（プロジェクト名）を返し、記録の
-        置き場がそこで決まる。以前は絶対パスを与えると相対の `projects/...` と照らせず、
-        プロジェクトが「無い」ことになって `logs/` の直下に書かれた。
-        """
-        project = os.path.join(self.dir, "projects", "foo")
-        os.makedirs(project)
-        git(project, "init", "-q")
-        environment = dict(os.environ)
-        environment["CCNAVI_PROJECTS"] = "/x"
-
-        result = subprocess.run(
-            [SHELL, SCRIPT, "status"],
-            cwd=project,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=environment,
-        )
-
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        made = os.path.join(self.dir, "logs", "foo")
-        self.assertTrue(os.path.isdir(made), f"logs/foo/ が無い: {result.stdout}")
-        self.assertEqual(1, len(os.listdir(made)))
 
 
 if __name__ == "__main__":

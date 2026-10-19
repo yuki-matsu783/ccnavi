@@ -200,6 +200,15 @@ def _is_ancestor(worktree: str, base: str, head: str) -> bool:
     return done.ok
 
 
-def worktree_head_sha(worktree: str) -> str:
-    rc, out = gitcmd.output(worktree, ["rev-parse", "HEAD"], ops_close.TIMEOUT_SECONDS)
+def worktree_head_sha(worktree: str, deadline: float | None = None) -> str:
+    """ワークツリーの HEAD の sha。読めなければ空。
+
+    `deadline`（`time.monotonic` の絶対時刻）があれば、過ぎてから git を起こさない。
+    """
+    if deadline is None:
+        rc, out = gitcmd.output(worktree, ["rev-parse", "HEAD"], ops_close.TIMEOUT_SECONDS)
+    else:
+        rc, out, _ = gitcmd.output_until(
+            worktree, ["rev-parse", "HEAD"], deadline, ops_close.TIMEOUT_SECONDS
+        )
     return out.strip() if rc == 0 else ""

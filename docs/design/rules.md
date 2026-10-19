@@ -49,7 +49,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 `{root}` は、読み込み時にワークスペースルートの実パスへ置き換わる。regex では区切りが `[\\/]` になる。
 ルートを渡さずに読むと error。文面（`message` / `additionalContext` / `additionalContextOnce`）の `{root}` は、
-モデルへ渡すときに実パス（区切りは `/`）へ置き換える（`rules.fill_root`）。ルートが渡されない読み方では置き換えない。
+モデルへ渡すときに、実パス（区切りは `/`）へ置き換える（`rules.fill_text`）。`{script:<名前>}` は `settings.script_command` の値に置き換える。ルートが渡されない読み方では、置き換えない。
 
 先読み・後読み・後方参照を弾くのは、ルールがエンジンをまたいでも同じ意味になり、組み合わせ爆発を起こしうる書き方を受け付けないため
 （Python の `re` に時間制限は無い）。

@@ -135,10 +135,8 @@ class Workspace(unittest.TestCase):
             f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
             '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
             "no\\n'; exit 0 ;;\n"
-            # 統合先（settings.local.json の env）。STUB_INTEGRATION があれば答える。
-            '*" sync paths "*) printf \'integration %s\\n\' "${STUB_INTEGRATION:-}"; exit 0 ;;\n'
             # 親か・承認済みか（push の関門が聞く）。STUB_PARENT があるときだけ答える。
-            # STUB_PARENT=old は、新しい行（approved など）を知らない旧い実行ファイル。
+            # STUB_PARENT=old は、新しい行（approved など）を知らない古い実行ファイル。
             '*" tree parent "*)\n'
             '  [ -n "${STUB_PARENT:-}" ] || exit 0\n'
             "  [ \"$STUB_PARENT\" = no ] && { printf 'tree 1\\nparent no\\n'; exit 0; }\n"
@@ -388,28 +386,6 @@ class PushApprovedTest(Workspace):
         self.place(tree)
         self.assertNotPushed(self.push(), tree, "develop-v1.0.0")
 
-    def test_the_environment_and_settings_local_json_name_the_integration(self):
-        tree = self.worktree("develop-v1.0.0")
-        self.place(tree)
-        env = self.env(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
-        self.assertNotPushed(self.push(env=env), tree, "develop-v1.0.0")
-
-        # settings.local.json の env（`sync paths` が運ぶ）。統合先のコピーは読まない。
-        other = self.worktree("release-2")
-        self.place(other)
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch release-2\nsource default\n",
-        )
-        result = self.push()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("統合先 release-2", result.stderr)
-
-        third = self.worktree("release-3")
-        self.place(third)
-        env = self.env(STUB_INTEGRATION="release-3")
-        self.assertNotPushed(self.push(env=env), third, "release-3")
-
     def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
         """統合先が決まらない（origin/HEAD も origin/main・master も無い）なら今までどおり送る。"""
         tree = self.worktree("develop-v1.0.0")
@@ -419,8 +395,9 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.remote_head("develop-v1.0.0"), self.head(tree))
 
     def test_a_project_is_judged_by_its_own_integration(self):
-        """projects/<名前>/ のツリーは、そのプロジェクトの origin で統合先を決める。
-        settings.local.json の統合先は、ワークスペース全体のものとして同じ名前で効く。"""
+        """projects/<名前>/ のツリーは、そのプロジェクトの origin/HEAD で統合先を決める。
+        ワークスペースの origin/HEAD はプロジェクトの統合先を変えない（固定のリストに無い名前
+        develop-v1.0.0 で止まる）。"""
         project = os.path.join(self.ws, "projects", "app")
         remote = self.repository(project, "develop-v1.0.0")
         self.place(project)
@@ -432,9 +409,12 @@ class PushApprovedTest(Workspace):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.head_of(remote, "develop-v1.0.0"), self.head(project))
 
+        # プロジェクト側の origin/HEAD が develop-v1.0.0 なら、そのプロジェクトでは止まる。
         write(os.path.join(project, *APPROVED.split("/"), "i0002.md"), "approved\n")
         before = self.head_of(remote, "develop-v1.0.0")
-        result = self.push(env=self.env(STUB_INTEGRATION="develop-v1.0.0"))
+        git(project, "update-ref", ref, "HEAD")
+        git(project, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
+        result = self.push()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("統合先 develop-v1.0.0", result.stderr)
         self.assertEqual(self.head_of(remote, "develop-v1.0.0"), before)
@@ -578,75 +558,6 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.committed(project), [f"{APPROVED}/i0001.md"])
         self.assertEqual(self.head_of(remote, "work"), self.head(project))
         self.assertNotIn(NOTHING, result.stdout)
-
-    def test_does_not_read_the_place_variables(self):
-        """12（改）. 置き場を動かす環境変数は読まない。既定の置き場だけをコミットして push する
-        （置き場は固定。A9）。
-
-        `CCNAVI_PROJECTS` / `CCNAVI_TICKETS_APPROVED` / `CCNAVI_TICKETS_PROPOSAL` を既定と違う
-        値で入れても、`projects/` の下と既定の置き場（`.ccnavi/approved`）をコミットして
-        push し、既定の提案の置き場（`wip/proposals/todo`）で消えた提案の削除を
-        同じコミットに入れる。
-        env が指した置き場はコミットしない。以前は 12（`CCNAVI_TICKETS_APPROVED` で置き場が動く）と
-        パスの正規化の 2 本（`CCNAVI_PROJECTS=/`・`CCNAVI_TICKETS_APPROVED=.`）が見ていた。
-
-        3 つのどれか 1 つでも読まれれば、下の確かめのどれかが失敗する。
-
-        - `CCNAVI_PROJECTS`: `projects/app` がコミットされず、env が指す `x/stray` がコミットされる
-        - `CCNAVI_TICKETS_APPROVED`: 既定の置き場の代わりに `approved/tickets` がコミットされる
-        - `CCNAVI_TICKETS_PROPOSAL`: `wip/proposals/todo` の削除がコミットされず、env が指す
-          `elsewhere/proposals/todo` の削除がコミットされる
-
-        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は失敗する。
-        写す前の sh は 3 つの値を読むため。
-        """
-        project = os.path.join(self.ws, "projects", "app")
-        remote = self.repository(project, "work")
-        self.place(project)
-        tree = self.worktree("i0001")
-        # 承認で todo/ から動いた提案の形。既定の置き場と env が指す置き場に 1 枚ずつ
-        # 追跡させてから消す。運ばれてよいのは既定の側の削除だけ。
-        kept = "elsewhere/proposals/todo/x.md"
-        gone = "wip/proposals/todo/x.md"
-        for rel in (gone, kept):
-            write(os.path.join(tree, *rel.split("/")), "proposal\n")
-        git(tree, "add", "--", gone, kept)
-        git(tree, "commit", "-q", "-m", "proposals")
-        for rel in (gone, kept):
-            os.remove(os.path.join(tree, *rel.split("/")))
-        self.place(tree)
-        # env が指す承認済みチケットの置き場。読まれたときにだけコミットされる。
-        other = "approved/tickets"
-        write(os.path.join(tree, *other.split("/"), "i0009.md"), "approved\n")
-        # env が指すプロジェクトの置き場（`/x` は末尾の / を除くとルートの下の `x`）。
-        # 読まれたときにだけ、その下のリポジトリが運ばれる。
-        stray = os.path.join(self.ws, "x", "stray")
-        stray_remote = self.repository(stray, "work")
-        self.place(stray)
-        stray_before = self.head(stray)
-
-        result = self.push(
-            env=self.env(
-                CCNAVI_PROJECTS="/x",
-                CCNAVI_TICKETS_APPROVED=other,
-                CCNAVI_TICKETS_PROPOSAL="elsewhere/proposals",
-            )
-        )
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        # `projects/` の下のプロジェクトと、切ったワークツリーの既定の置き場を運ぶ。
-        self.assertEqual(self.subject(project), MESSAGE, result.stderr)
-        self.assertEqual(self.committed(project), [f"{APPROVED}/i0001.md"])
-        self.assertEqual(self.head_of(remote, "work"), self.head(project))
-        # ワークツリーは既定の置き場と、既定の提案の置き場で消えた提案を 1 つのコミットで運ぶ。
-        self.assertEqual(self.subject(tree), MESSAGE, result.stderr)
-        self.assertEqual(self.committed(tree), sorted([f"{APPROVED}/i0001.md", gone]))
-        self.assertEqual(self.remote_head("i0001"), self.head(tree))
-        # env が指した置き場は運ばない。承認済みチケットの置き場も、消えた提案も、
-        # その下のリポジトリも。
-        self.assertTrue(self.dirty(tree, other))
-        self.assertTrue(self.dirty(tree, kept))
-        self.assertEqual(self.head(stray), stray_before)
-        self.assertEqual(self.head_of(stray_remote, "work"), "")
 
     # ---- チケット approve-carry-05 の 7・8
 

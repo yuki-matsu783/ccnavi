@@ -51,8 +51,24 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         }
         if agent_id:
             payload["agent_id"] = agent_id
-        env = {settings.INTEGRATION_ENV: integration} if integration else {}
-        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload), env=env)
+        self.point_origin_head(integration)
+        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+
+    def point_origin_head(self, integration):
+        """統合先は手元の origin/HEAD で決まる。空なら origin の無いリポジトリにする。"""
+        remotes = git(self.root, "remote").split()
+        if not integration:
+            if "origin" in remotes:
+                git(self.root, "remote", "remove", "origin")
+            return
+        if "origin" not in remotes:
+            git(self.root, "remote", "add", "origin", self.root + ".origin.git")
+        git(
+            self.root,
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            f"refs/remotes/origin/{integration}",
+        )
 
     def direct(self, name="scratch", commit=False, dirty=False):
         """チケットに結び付かない直接作業のワークツリー。"""
@@ -81,9 +97,10 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         path = self.direct(commit=True)
         reason = self.asked(self.stop(path))
         git_sh = settings.script_command(self.root, "ccnavi-git.sh")
-        self.assertIn(f"'{git_sh} integrate scratch'", reason)
-        self.assertIn(f"'{git_sh} integrate-done scratch -m <メッセージ>'", reason)
-        self.assertIn(f"'{git_sh} integrate --abort scratch'", reason)
+        cd = f"cd {settings.shell_path(self.root)} && {git_sh}"
+        self.assertIn(f"`{cd} integrate scratch`", reason)
+        self.assertIn(f"`{cd} integrate-done scratch -m '<メッセージ>'`", reason)
+        self.assertIn(f"`{cd} integrate --abort scratch`", reason)
         self.assertIn("staged", reason)
         self.assertIn("コミット 1 件", reason)
         self.assertIn(os.path.basename(self.root), reason)
@@ -98,7 +115,10 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         path = self.direct(dirty=True)
         reason = self.asked(self.stop(path))
         self.assertIn("未コミットの変更", reason)
-        self.assertIn("先にワークツリーの中でコミット", reason)
+        self.assertIn("先にコミットしてください", reason)
+        work = settings.shell_path(path)
+        git_sh = settings.script_command(self.root, "ccnavi-git.sh")
+        self.assertIn(f"`cd {work} && {git_sh} commit -m '<メッセージ>'`", reason)
 
     def test_the_record_stops_the_hook_from_doing_anything(self):
         """判定の材料は記録だけ。ここは integrate を打たない（統合先のツリーは変わらない）。"""
@@ -115,13 +135,35 @@ class IntegrateNudgeTest(base.StopNudgeTest):
 
     def test_an_integrate_record_means_it_already_went_ahead(self):
         path = self.direct(commit=True)
+        head = git(path, "rev-parse", "HEAD").strip()
+        # 取り込みの途中の記録は、中身によらず「記録あり」。片付けた記録の写しは、branch_sha が
+        # 今の HEAD と同じで、未コミットの変更が無いときだけ「記録あり」。
         for sub in ("ccnavi-integrate/scratch/marker", "ccnavi-integrate-done/scratch"):
             top = sub.split("/")[0]
             gitdir = os.path.join(self.root, git(self.root, "rev-parse", "--git-path", top).strip())
-            write(os.path.join(gitdir, *sub.split("/")[1:]), "state staged\n")
+            write(os.path.join(gitdir, *sub.split("/")[1:]), f"state staged\nbranch_sha {head}\n")
             self.assert_not_asked(self.stop(path, session=sub))
             shutil.rmtree(gitdir, ignore_errors=True)
         self.asked(self.stop(path, session="after"))
+
+    def test_a_done_copy_does_not_silence_a_reused_name(self):
+        """名前を使い直したときの 3 通り。
+
+        新しいコミット・同じ HEAD で未コミット・同じ HEAD で変更なし。
+        """
+        path = self.direct(commit=True)
+        head = git(path, "rev-parse", "HEAD").strip()
+        gitdir = os.path.join(
+            self.root, git(self.root, "rev-parse", "--git-path", "ccnavi-integrate-done").strip()
+        )
+        copy = os.path.join(gitdir, "scratch")
+        write(copy, f"state staged\nbranch_sha {head}\n")
+        self.assert_not_asked(self.stop(path, session="same"))
+        write(os.path.join(path, "src", "draft.py"), "y\n")
+        self.asked(self.stop(path, session="dirty"))
+        os.remove(os.path.join(path, "src", "draft.py"))
+        self.commit_work(path, rel="src/more.py")
+        self.asked(self.stop(path, session="newer"))
 
     def test_a_worktree_bound_to_a_ticket_is_not_asked(self):
         """チケット（承認済み・提案）の名前のワークツリーは、マージリクエストで出す。"""
@@ -152,7 +194,7 @@ class IntegrateNudgeTest(base.StopNudgeTest):
     def test_the_workspace_root_is_not_asked(self):
         self.assert_not_asked(self.stop(self.root))
 
-    def test_stop_hook_active_subagent_and_ticket_control_are_not_asked(self):
+    def test_stop_hook_active_and_subagent_are_not_asked_but_ticket_control_does_not_matter(self):
         path = self.direct(commit=True)
         self.assert_not_asked(self.stop(path, active=True))
         self.assert_not_asked(self.stop(path, event="SubagentStop", agent_id="a1"))
@@ -163,9 +205,9 @@ class IntegrateNudgeTest(base.StopNudgeTest):
             "--ticket-control",
             "disable",
             stdin=payload,
-            env={settings.INTEGRATION_ENV: "main"},
         )
-        self.assert_not_asked(off)
+        # チケット制御が無効でも、直接作業はチケットに結び付かないので促す。
+        self.asked(off)
 
     def test_a_running_subagent_defers_the_nudge_without_using_it_up(self):
         from ccnavi.hook import subagent
@@ -216,7 +258,16 @@ class IntegrateNudgeTest(base.StopNudgeTest):
     def test_no_integration_branch_is_reported_without_stopping(self):
         path = self.direct(commit=True)
         body = self.assert_not_asked(self.stop(path, integration=""))
-        self.assertIn("統合先の名前が決まりません", body["systemMessage"])
+        self.assertIn("origin が無いので統合先が決まらない", body["systemMessage"])
+
+    def test_an_origin_without_head_asks_for_set_head(self):
+        path = self.direct(commit=True)
+        git(self.root, "remote", "add", "origin", self.root + ".origin.git")
+        body = self.assert_not_asked(self.ccnavi("--mode", "enable", stdin=self.payload(path)))
+        self.assertIn("git remote set-head origin -a", body["systemMessage"])
+
+    def payload(self, cwd, session="s1"):
+        return json.dumps({"hook_event_name": "Stop", "cwd": cwd, "session_id": session})
 
     def test_a_busy_integration_tree_is_reported_without_stopping(self):
         path = self.direct(commit=True)

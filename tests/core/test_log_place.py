@@ -1,9 +1,6 @@
 """記録は `<root>/logs/decisions.jsonl`、控えは `<root>/logs/state`。空文字の口は無い
 （置き場の固定の A4。設計 wip/design/i0064-fixed-places.md §6）。
 
-`CCNAVI_LOG=""` は「記録しない」、`CCNAVI_STATE=""` は「控えを持たない」と読まれていた。
-6 つの env を廃止したので、空文字を入れても既定の置き場に書かれる。
-
 診断のフラグ `--log ""` / `--state ""` は残る（テスト 20 本以上がこれで置き場を指している）。
 ここはフラグを渡さずに起動する。
 """
@@ -58,15 +55,6 @@ class EmptyEnvStillWritesTheRecordTest(unittest.TestCase):
             records = [json.loads(line) for line in f if line.strip()]
         self.assertEqual(len(records), 1, records)
         self.assertEqual(records[0]["tool"], "Bash")
-
-    def test_an_empty_state_env_still_keeps_the_state(self):
-        """`CCNAVI_STATE=""` を入れても、控えは `logs/state/` に置かれる。"""
-        env = {"CCNAVI_STATE": ""}
-        self.hook("UserPromptSubmit", "", env)
-        self.hook("PreToolUse", "Bash", env)
-        self.hook("PostToolUse", "Bash", env)
-
-        self.assertTrue(os.path.isfile(os.path.join(self.ws, "logs", "state", "s1.reported.json")))
 
 
 if __name__ == "__main__":

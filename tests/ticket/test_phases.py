@@ -1427,19 +1427,16 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("DENY_TICKET_SCOPE", reason)
         self.assertIn("limit: phase type 調査 (research): wip/research/*", reason)
 
-    def test_dry_run_lets_the_write_through_and_says_which_limit(self):
-        """8. dry-run: 同じ Write は通り、enable なら止めたことと `limit: phase type` が出る。
-
-        dry-run の文面は今の judge.decide_before のもの（新しい処理は足さない）。
-        """
+    def test_dry_run_still_stops_the_write_and_says_which_limit(self):
+        """8. dry-run: 範囲の外の Write は関門なので止まり、`limit: phase type` が出る。"""
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         result = self.write_to(tree, "src/a/x.py", mode="dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotEqual(self.decision(result), "deny", result.stdout)
+        self.assertEqual(self.decision(result), "deny", result.stdout)
         text = self.reason(result)
-        self.assertIn("[ccnavi dry-run] enable would have", text)
+        self.assertIn("still applies", text)
         self.assertIn("DENY_TICKET_SCOPE", text)
         self.assertIn("limit: phase type", text)
 

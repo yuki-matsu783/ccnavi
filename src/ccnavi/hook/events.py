@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import functools
 import io
@@ -24,10 +25,12 @@ from ..tickets import (
     approval,
     approval_checks,
     branchfind,
+    direct_candidates,
     ops_stop,
     ops_stop_integrate,
     ops_stop_request,
     overview,
+    pending_integrate,
     phase,
     session_rejects,
     skillsync,
@@ -43,6 +46,9 @@ from . import (
     stopjudge,
     subagent,
 )
+
+# SessionStart で、終わっていない integrate の記録を確かめる時間の上限（秒）。
+PENDING_SECONDS = 2.0
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
@@ -99,7 +105,7 @@ def decide(
     if payload.event == hookio.USER_PROMPT_SUBMIT:
         return decide_at_prompt(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.STOP:
-        return decide_at_stop(stdout, stderr, conf, root, payload, record, mode)
+        return decide_at_stop(stdout, stderr, conf, root, payload, record, deadline, mode)
     if payload.event == hookio.SUBAGENT_START:
         return subagent.at_start(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_STOP:
@@ -288,6 +294,7 @@ def decide_at_stop(
     root: str,
     payload: hookio.Input,
     record: audit.Record,
+    deadline: float | None = None,
     mode: str = modes.ENABLE,
 ) -> int:
     """ターンが終わったとき。宣言した保護領域の今の状態をユーザへ報告する。
@@ -358,7 +365,7 @@ def decide_at_stop(
     if not nudge:
         # 上の促しで止める回は、直接作業の促しを出しも数えもしない。前提を満たせず促せない回は
         # 止めずに理由だけを報告へ足す。
-        nudge, notice = _integrate_nudge(stderr, conf, root, asked, record)
+        nudge, notice = _integrate_nudge(stderr, conf, root, asked, record, deadline)
         if notice:
             report = f"{report}\n\n{notice}" if report else notice
     if not nudge:
@@ -774,6 +781,7 @@ def _integrate_nudge(
     root: str,
     payload: hookio.Input,
     record: audit.Record,
+    deadline: float | None = None,
 ) -> tuple[str, str]:
     """直接作業が `integrate` まで進んでいないとき、打ち方を促す文と、促せない理由。
 
@@ -782,15 +790,16 @@ def _integrate_nudge(
     綺麗なこと）を満たせないときで、止めずに報告へ足す。
 
     止めない回と止め方は `_request_nudge` と同じ（`stop_hook_active`・サブエージェント・
-    state の置き場・チケット制御を見て、モードは見ない。実行中のサブエージェントが居る間も止めず、
-    「1 回だけ」の記録も進めない）。同じ状態では促しも理由も 1 回だけで、記録は
-    `nudged-<セッション>.json` の `integrate:` で始まる鍵。
+    state の置き場を見て、モードは見ない。実行中のサブエージェントが居る間も止めず、
+    「1 回だけ」の記録も進めない）。チケット制御の有無は見ない（直接作業はチケットに結び付かない）。
+    同じ状態では促しも理由も 1 回だけで、記録は `nudged-<セッション>.json` の `integrate:` で
+    始まる鍵。`deadline`（`time.monotonic` の絶対時刻）を過ぎてから git を起こさない。
     """
-    if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
+    if payload.stop_hook_active or payload.agent_id or not conf.state:
         return "", ""
     if subagent.running(conf.state, payload.session_id):
         return "", ""
-    found = ops_stop_integrate.direct_at_stop(root, conf, payload.cwd)
+    found = ops_stop_integrate.direct_at_stop(root, conf, payload.cwd, payload.session_id, deadline)
     if found is None or ops_stop_integrate.nudged_before(conf.state, payload.session_id, found):
         return "", ""
     failed = ops_stop_integrate.remember_nudge(conf.state, payload.session_id, found)
@@ -869,6 +878,15 @@ def decide_at_start(
     rejects = ""
     if conf.tickets_enabled and not payload.agent_id:
         rejects = session_rejects.notice(conf, root, payload.cwd, deadline)
+    # 終わっていない integrate の記録（別のセッションの取り込みの途中かもしれない）。モデルにも
+    # ユーザにも出す。チケット制御は見ない。サブエージェントには出さない。期限は hook の期限と
+    # 開始から 2 秒の小さいほうで、索引（docsearch）より先に組んで残りを渡す。
+    pending = ""
+    if not payload.agent_id:
+        limit = time.monotonic() + PENDING_SECONDS
+        pending = pending_integrate.pending_notice(
+            root, conf, limit if deadline is None else min(deadline, limit)
+        )
     # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
     # サブエージェントには出さない。失敗しても何も出さない
     # （docsearch.at_start が例外を外に出さない）。先に組むのは、作業の決まりの
@@ -894,6 +912,8 @@ def decide_at_start(
             texts.append(parents)
     if rejects:
         texts.append(rejects)
+    if pending:
+        texts.append(pending)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
@@ -901,7 +921,12 @@ def decide_at_start(
     if docs:
         texts.append(docs)
     if texts:
-        hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts), system=rejects)
+        hookio.write_context(
+            stdout,
+            hookio.SESSION_START,
+            "\n\n".join(texts),
+            system="\n\n".join(p for p in (rejects, pending) if p),
+        )
     return EXIT_OK
 
 
@@ -1023,6 +1048,27 @@ def decide_after_failure(
 
 
 def decide_after(
+    stdout: TextIO,
+    stderr: TextIO,
+    mode: str,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> int:
+    """実行後チェックを 1 回動かし、言うことがあれば返す。そのあと、直接作業の候補を登録する。
+
+    候補の登録（`direct_candidates.touch`）は git を呼ばず、失敗しても何も言わない。
+    実行後チェックが差し戻して終わる回でも登録する（書き込みは起きている）。
+    """
+    try:
+        return _decide_after(stdout, stderr, mode, conf, root, payload, record)
+    finally:
+        with contextlib.suppress(Exception):  # 登録の失敗でツールの結果を変えない
+            direct_candidates.touch(conf, root, payload)
+
+
+def _decide_after(
     stdout: TextIO,
     stderr: TextIO,
     mode: str,

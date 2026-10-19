@@ -48,15 +48,15 @@ from ..tickets import phasetypes, risk, ticket_model
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"
 # 実行ファイルと sh・拡張の契約の版。上げ方は冒頭の説明のとおり。
-# 13: 新しい sh が実行ファイルの新しいサブコマンド（`tree parent` の追加行、`sync retired`、
-# `sync migrate`）を呼ぶ。Chrome と手元の判定の規則が変わる（取り込み状態を読まない）。
+# 13: 新しい sh が実行ファイルの新しいサブコマンド（`tree parent` の追加行、`sync retired`）を呼ぶ。
+# Chrome と手元の判定の規則が変わる（取り込み状態を読まない）。
 # 14: C1 を write-and-push に改名した。sh が呼ぶサブコマンドが
 # `c1 family|sort|merge|merge-blame` から `write-and-push …` に変わり、答えの頭の行も
 # `c1 1` から `write-and-push 1` に変わった。
 # 15: `integrate` がチケットに結び付くかの判定を、実行ファイルの `tree bound` に聞くようにした。
 # sh が呼ぶサブコマンドが増え、sh は答えの頭の行 `tree 1` が無ければ断る向きに倒す。
 # 16: ユーザだけが打つ操作を `user <操作>`（agree・reviewed・close-early・prune・handoff）に集め、
-# sh を ccnavi-user-*.sh に分けた。`user` の外の形は断るので、旧い sh は新しい実行ファイルで
+# sh を ccnavi-user-*.sh に分けた。`user` の外の形は断るので、古い sh は新しい実行ファイルで
 # 動かない。
 COMPAT = 16
 # `--version --json` の形の版。欄を足すだけなら上げない。

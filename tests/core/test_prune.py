@@ -195,10 +195,11 @@ class StatePruneTest(_Base):
     def session_files(self, s: str, age: float) -> list[str]:
         """1 つのセッションが置く記録を全部置く。"""
         paths = [
-            _write(os.path.join(self.state, f"{s}.json"), age_days=age),
+            _write(os.path.join(self.state, f"{s}.reported.json"), age_days=age),
             _write(os.path.join(self.state, f"{s}.turn.json"), age_days=age),
             _write(os.path.join(self.state, f"nudged-{s}.json"), age_days=age),
             _write(os.path.join(self.state, f"denied-{s}.json"), age_days=age),
+            _write(os.path.join(self.state, f"direct-{s}.json"), age_days=age),
             _write(os.path.join(self.state, f"once-{s}-main.json"), age_days=age),
             _write(os.path.join(self.state, f"once-{s}-peers-agent-1.json"), age_days=age),
             _write(os.path.join(self.state, f"failstreak-{s}-main.json"), age_days=age),

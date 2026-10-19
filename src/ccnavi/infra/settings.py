@@ -100,13 +100,6 @@ DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
 # 「資料を検索する」案内を出すか（failstreak）。既定は 3。0 なら数えも案内もしない。
 # 読めない値と負数は既定に戻る。判定は変わらない。
 FAIL_STREAK_COUNT_ENV = "CCNAVI_FAIL_STREAK_COUNT"
-# INTEGRATION_ENV は統合先の名前。リポジトリには置かず、未設定ならホストのデフォルトブランチ。
-# `done/` とレイヤーと置き場のパスを読むブランチで、親のブランチはここから切る。
-# ccnavi はこの環境変数を読まない。読むのは sh（`ccnavi-sync.sh`）で、sh が環境変数か
-# `.claude/settings.local.json` の `env` から決め、要る所へ `--integration-branch` で渡す。
-# settings.local.json の `env` は Claude Code が起こしたプロセスにしか渡らないので、ユーザが端末で
-# 打つ sh のために、その値だけを `sync paths` が読んで返す（integration_local）。
-INTEGRATION_ENV = "CCNAVI_INTEGRATION_BRANCH"
 # 個人の上書き設定。Claude Code が `env` を起こしたプロセスに渡す。
 LOCAL_CLAUDE_SETTINGS = os.path.join(".claude", "settings.local.json")
 # 共有の設定。`env` に書いた値は、Claude Code が起こしたプロセスに渡る。
@@ -190,6 +183,17 @@ def script_command(root: str, name: str) -> str:
     """
     base = os.path.realpath(root).replace("\\", "/").rstrip("/")
     return f"sh {_quoted(f'{base}/{DEFAULT_PROJECT_HOME}/scripts/{name}')}"
+
+
+def shell_path(path: str) -> str:
+    """文面で案内するパス。`script_command` と同じ規則（区切りは `/`、要るときだけ引用）で引用する。
+
+    `cd <パス> && …` の形で、別のツリーへ移って打つコマンドに使う。
+    """
+    # 区切りを `/` に揃えるのは Windows のパスだけ（POSIX の `\` は名前の一部）。
+    if os.name == "nt" or re.match(r"[A-Za-z]:\\", path):
+        path = path.replace("\\", "/")
+    return _quoted(path)
 
 
 def has_git_wrapper(root: str) -> bool:
@@ -447,9 +451,6 @@ class Settings:
     # branch_prefixes_rejected は環境変数に書かれていたが使えない語（lint が warn で名指しする）。
     branch_prefixes: tuple = DEFAULT_BRANCH_PREFIXES
     branch_prefixes_rejected: tuple = ()
-    # integration_branch は統合先の名前。環境変数からは読まず、`--integration-branch` で
-    # 渡されたときだけ入る。いまは識別子の予約（統合先と同じ名前を使わせない）の検査が読む。
-    integration_branch: str = ""
 
     @property
     def tickets_enabled(self) -> bool:
@@ -680,26 +681,6 @@ def _resolve_bin(root: str, path: str) -> str:
         if not full.endswith(suffix) and os.path.exists(full + suffix):
             return full + suffix
     return full
-
-
-def integration_local(root: str) -> str:
-    """`.claude/settings.local.json` の `env` に書かれた統合先の名前。
-
-    環境変数は読まない。sh が環境変数を先に見て、空のときにこれを使う。ユーザが端末で打つ sh には
-    settings.local.json の `env` が渡らないので、JSON を読む役をここが持つ（sh は jq を使わない）。
-    ファイルが無い・読めない・値が文字列でないときは空を返す（既定の統合先になる）。
-    """
-    try:
-        with open(os.path.join(root, LOCAL_CLAUDE_SETTINGS), encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError, RecursionError):
-        return ""
-    env = data.get("env") if isinstance(data, dict) else None
-    value = env.get(INTEGRATION_ENV) if isinstance(env, dict) else None
-    if not isinstance(value, str):
-        return ""
-    # 1 行で返す契約（sh は jq を使わず 1 行 1 項目で読む）。改行を含む値は使えないので空にする。
-    return "" if ("\n" in value or "\r" in value) else value.strip()
 
 
 class HookView(NamedTuple):

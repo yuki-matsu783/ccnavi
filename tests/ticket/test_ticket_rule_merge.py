@@ -838,14 +838,14 @@ class Boundaries(Workspace):
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
 
     def test_dry_run_says_what_enable_would_do(self):
-        """ルールが allow の場所でチケットが止める判定も、dry-run では止めずに言うだけ。"""
+        """ルールが allow の場所でチケットが止める判定（関門）は、dry-run でも止める。"""
         self.family()
         self.use_rules(rules_with("allow"))
         result = self.write_hook(self.child, TICKET_OUTSIDE, mode="dry-run")
         out = self.out(result)
-        self.assertNotIn("permissionDecision", out)
-        self.assertIn("would have stopped", out.get("additionalContext", ""))
-        self.assertIn("DENY_TICKET_SCOPE", out.get("additionalContext", ""))
+        self.assertEqual(out.get("permissionDecision"), "deny")
+        self.assertIn("DENY_TICKET_SCOPE", out.get("permissionDecisionReason", ""))
+        self.assertIn("still applies", out.get("permissionDecisionReason", ""))
 
     def test_builtin_fallback_still_applies_the_ticket(self):
         self.family()

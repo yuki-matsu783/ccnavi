@@ -130,8 +130,11 @@ class RepoRulesTest(unittest.TestCase):
             "allow",
             "ccnavi-git-worktree-add",
         )
-        self.assertIn("fetch origin", body["response"])
-        self.assertIn("ワークツリーを切る", body["response"])
+        # ルートが渡らない読み方では `{script:}` は置き換わらない。
+        # 置き換えは tests/core/test_script_placeholder.py
+        self.assertIn("ccnavi-worktree.sh", body["response"])
+        self.assertIn("--no-track", body["response"])
+        self.assertNotIn("ff-only", body["response"])
         # ほかのサブコマンドには添えない。
         self.assertNotIn(
             "ccnavi-git-worktree-add",

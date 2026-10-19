@@ -194,7 +194,6 @@ def env_for() -> dict[str, str]:
             "GITHUB_TOKEN": TOKEN,
             "GH_TOKEN": TOKEN,
             "CCNAVI_BIN_PATH": EXE,
-            "CCNAVI_INTEGRATION_BRANCH": BASE,
             "CCNAVI_GUARD_TICKET_APPROVAL": "disable",
             "CCNAVI_MODE": "enable",
             "CCNAVI_GUARD_CORE_FILES": "disable",

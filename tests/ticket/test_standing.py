@@ -2,11 +2,11 @@
 
 正とする側は、全部の親子のチケットで同じく親のブランチ（`.claude/worktrees/<P>` で HEAD が `<P>` を
 指すツリー）に固定する。決まらなければ（親のワークツリーが無い・HEAD が合わない・途中の操作がある）
-承認も状態の操作も実行前チェックも止める。判定は親のワークツリーの有無・HEAD・途中の操作だけで決まり、
-手元に残る取り込みの記録は読まない。判定は git もネットワークも使わない。
+承認も状態の操作も実行前チェックも止める。判定は親のワークツリーの有無・HEAD・途中の操作だけで決まる。
+判定は git もネットワークも使わない。
 
-`AuthorityHarness` は、親 i0001 と子 i0001-01-01 を承認して子のワークツリーを作った状態から
-始める土台で、ほかのテストも使う。`record_text` は旧い取り込み状態の書式（移行のテストが使う）。
+`AuthorityHarness` は、親 i0001 と子 i0001-01-01 を承認して子のワークツリーを作った状態を用意する。
+ほかのテストも使う。
 """
 
 from __future__ import annotations
@@ -26,13 +26,6 @@ from ccnavi.tickets import (
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, parent_text
-
-
-def record_text(name, state, reason="", sha="0" * 40):
-    """旧い取り込み状態（`sync/<リポジトリ>/families/<P>`）の中身。移行の入力にだけ使う。"""
-    return (
-        f"remote origin\nbranch {name}\nsha {sha}\nfetched_at 1\nstate {state}\nreason {reason}\n"
-    )
 
 
 class AuthorityHarness(PhaseHarness):
@@ -472,49 +465,6 @@ class GuidanceByKindTest(AuthorityHarness):
         self.assertEqual("", standing.standing(self.conf(), self.root, "i0001").kind)
 
 
-class LegacySyncRecordsTest(AuthorityHarness):
-    """旧い `logs/state/sync/` が残る PC でも、立ち位置・承認・hook の判定は変わらない。"""
-
-    def plant(self):
-        for state in ("gone", "blocked"):
-            write(
-                os.path.join(self.state, "sync", "self", "families", "i0001"),
-                record_text("i0001", state, "旧い理由"),
-            )
-        write(os.path.join(self.state, "sync", "self", "integration", "head"), "branch main\n")
-        write(
-            os.path.join(self.state, "sync", "self", "integration", ".ccnavi", "approved", "done")
-            + os.sep
-            + "i0001-01-01.md",
-            "旧いコピー\n",
-        )
-
-    def observed(self):
-        st = standing.standing(self.conf(), self.root, "i0001")
-        check = self.ccnavi("sync", "check", "i0001")
-        return (
-            st.stop,
-            st.branch,
-            self.decision(self.write_to(self.child_tree, "wip/research/a")),
-            self.decision(self.write_to(self.child_tree, "src/keep.py")),
-            check.returncode,
-            check.stdout,
-        )
-
-    def test_the_old_records_change_nothing(self):
-        before = self.observed()
-        self.plant()
-        self.assertEqual(before, self.observed())
-        self.assertEqual("", before[0])
-
-    def test_an_approval_still_goes_through(self):
-        self.plant()
-        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
-        self.commit_parent("propose second")
-        self.assertEqual(self.approve().returncode, 0)
-        self.assertTrue(os.path.isfile(os.path.join(self.approved, "doing", "i0001-01-02.md")))
-
-
 class ClosedIdentifierReuseTest(AuthorityHarness):
     """承認では、閉じた識別子の再利用を検知しない（検知は開始時のホストへの照会だけ）。"""
 
@@ -546,9 +496,9 @@ class ReadyTest(AuthorityHarness):
 
 
 class LintTest(AuthorityHarness):
-    def test_local_settings_may_hold_only_the_integration_branch(self):
+    def test_local_settings_may_hold_nothing_that_decides_approval(self):
         path = os.path.join(self.root, ".claude", "settings.local.json")
-        write(path, json.dumps({"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}))
+        write(path, json.dumps({"env": {"CCNAVI_LOG_LEVEL": "DEBUG"}}))
         problems = json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
         self.assertFalse([p for p in problems if "settings.local.json" in p["detail"]])
         write(
@@ -556,7 +506,6 @@ class LintTest(AuthorityHarness):
             json.dumps(
                 {
                     "env": {
-                        "CCNAVI_INTEGRATION_BRANCH": "develop",
                         "CCNAVI_MODE": "disable",
                         "CCNAVI_RESTORE_IF_DENY": "disable",
                         "CCNAVI_LOG_LEVEL": "DEBUG",

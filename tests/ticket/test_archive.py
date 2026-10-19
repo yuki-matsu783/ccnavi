@@ -100,24 +100,6 @@ class ArchiveModuleTest(ArchiveTreeHarness):
         for rel in todo.files:
             self.assertNotIn("open", rel)
 
-    def legacy_events(self):
-        for name in ("i0001", "i0001-01-01", "old", "open"):
-            write(os.path.join(self.approved, "events", f"{name}.jsonl"), '{"a": 1}\n')
-
-    def test_a_legacy_events_file_goes_with_its_family(self):
-        """旧版が書いた `events/<識別子>.jsonl` が残っていれば、そのままコピーして移す。"""
-        self.legacy_events()
-        todo = archive.plan(self.approved, archive.closed_parents(self.approved))
-        self.assertIn("events/old.jsonl", todo.files)
-        self.assertIn("events/i0001-01-01.jsonl", todo.files)
-        self.assertNotIn("events/open.jsonl", todo.files)
-        moved, failed = archive.move(self.root, "", self.approved, todo)
-        self.assertEqual(failed, "")
-        base = archive.base_dir(self.root, "")
-        with open(os.path.join(base, "events", "old.jsonl"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), '{"a": 1}\n')
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "events", "old.jsonl")))
-
     def test_move_copies_then_removes(self):
         todo = archive.plan(self.approved, ["i0001"])
         moved, failed = archive.move(self.root, "", self.approved, todo)
@@ -344,11 +326,11 @@ class ReadyArchivesTest(ReadyHarness):
     def test_write_and_push_and_the_post_check_count_only_the_archive_removals(self):
         fixture = self.closable()
         # 退避と関係の無い削除も 1 つ混ぜる（開いた親の書きかけ）
-        write(os.path.join(self.approved, "events", "stray.jsonl"), "{}\n")
+        write(os.path.join(self.approved, "stray", "stray.jsonl"), "{}\n")
         self.commit_parent("stray")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         self.assertEqual(self.ready(fixture).returncode, 0)
-        os.remove(os.path.join(self.approved, "events", "stray.jsonl"))
+        os.remove(os.path.join(self.approved, "stray", "stray.jsonl"))
         status = git(self.parent_tree, "status", "--porcelain", "--no-renames").splitlines()
         changed = sorted(line[3:] for line in status)
         places = (".ccnavi/approved", "wip/proposals/review")
@@ -364,7 +346,7 @@ class ReadyArchivesTest(ReadyHarness):
         self.assertEqual(
             sorted_out[".ccnavi/approved/phases/i0001/closed.json"], write_and_push.KIND_B
         )
-        self.assertEqual(sorted_out[".ccnavi/approved/events/stray.jsonl"], write_and_push.KIND_C)
+        self.assertEqual(sorted_out[".ccnavi/approved/stray/stray.jsonl"], write_and_push.KIND_D)
         # 退避の置き場を渡さなければ、前のとおり ccnavi の書き込みとは見分けない（止める）
         plain = write_and_push.classify_all(self.parent_tree, places, "i0001", changed, "", None)
         self.assertNotIn(write_and_push.KIND_B, {kind for kind, _, _ in plain})
@@ -447,15 +429,6 @@ class ReviewFindingsTest(ReadyHarness):
         )
         kinds = self.sorted_kinds(changed, "HEAD~1")
         self.assertEqual(kinds[".ccnavi/approved/done/i0001.md"], write_and_push.KIND_B)
-
-    def test_4_committed_legacy_events_are_carried_by_write_and_push(self):
-        fixture = self.closable()
-        write(os.path.join(self.approved, "events", "i0001.jsonl"), '{"a": 1}\n')
-        self.commit_parent("legacy events")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        self.assertEqual(self.ready(fixture).returncode, 0)
-        kinds = self.sorted_kinds()
-        self.assertEqual(kinds[".ccnavi/approved/events/i0001.jsonl"], write_and_push.KIND_B)
 
     def test_5_a_removal_outside_ready_is_not_carried(self):
         self.family(plan=["design"])

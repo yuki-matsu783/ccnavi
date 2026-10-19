@@ -525,6 +525,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         subprocess.run(
             [*git, "remote", "add", "origin", "https://gitlab.com/acme/widgets.git"], check=True
         )
+        subprocess.run([*git, "update-ref", "refs/remotes/origin/main", "HEAD"], check=True)
         self.bin = os.path.join(self._tmp.name, "bin")
         gitlab_host.install(self.bin, sys.executable)
         self.args = os.path.join(self._tmp.name, "args.txt")
@@ -534,7 +535,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         )
         os.chmod(self.exe, 0o755)
 
-    def review(self, scene, *args, **extra):
+    def review(self, scene, *args, cwd=None, **extra):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("GITHUB_TOKEN", None)
         env.update(
@@ -548,7 +549,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         )
         return subprocess.run(
             [SHELL, *script_and_args(self.ws, args)],
-            cwd=self.ws,
+            cwd=cwd or self.ws,
             env=env,
             capture_output=True,
             text=True,
@@ -690,7 +691,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         with open(state, encoding="utf-8") as f:
             self.assertEqual(len(json.load(f)), 1)
 
-    def request_on(self, branch="", **extra):
+    def request_on(self, branch="", cwd=None, html=None, **extra):
         """request を打つ。branch を渡すとそのブランチへ移ってから（場面の MR は i0001 だけ）。
 
         マージリクエストを作る要求（POST .../merge_requests）が出たら、この試験の curl が
@@ -698,7 +699,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         """
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)
-        html = self.eli5()
+        html = html or self.eli5()
         if branch:
             subprocess.run(["git", "-C", self.ws, "checkout", "-q", "-b", branch], check=True)
         sent = os.path.join(self._tmp.name, "created.json")
@@ -721,6 +722,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             CCNAVI_BIN_PATH=stub,
             PATH=path,
             FAKE_GITLAB_STATE=os.path.join(self._tmp.name, "notes.json"),
+            cwd=cwd,
             **extra,
         )
         return done, sent
@@ -739,28 +741,64 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertFalse(os.path.exists(sent))
 
+    def set_origin_head(self, repo, name):
+        git = ["git", "-C", repo]
+        subprocess.run([*git, "update-ref", f"refs/remotes/origin/{name}", "HEAD"], check=True)
+        subprocess.run(
+            [*git, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{name}"],
+            check=True,
+        )
+
     def test_request_stops_when_the_target_is_not_the_integration(self):
-        """マージ先が統合先と違う MR には依頼を投稿しない。統合先は環境変数が先に決める。"""
-        done, sent = self.request_on(CCNAVI_INTEGRATION_BRANCH="trunk")
+        """マージ先が統合先と違う MR には依頼を投稿しない。統合先は origin/HEAD が決める。"""
+        self.set_origin_head(self.ws, "trunk")
+        done, sent = self.request_on()
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("マージ先（main）が統合先（trunk）ではない", done.stderr)
         self.assertFalse(os.path.exists(sent))
 
-    def test_request_compares_with_the_configured_integration(self):
-        """統合先は fetch と同じ順で決める。環境変数が develop なら main の MR は止まる。
-        統合先のコピー（sync/<リポジトリ>/integration/head）は読まない。"""
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch trunk-v2\nsource default\n",
+    def test_request_stops_when_the_integration_is_undetermined(self):
+        """origin/HEAD も origin/main・master も無ければ、main に倒さず案内して止まる。"""
+        subprocess.run(
+            ["git", "-C", self.ws, "update-ref", "-d", "refs/remotes/origin/main"], check=True
         )
-        done, _ = self.request_on(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
+        done, sent = self.request_on()
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("統合先（develop-v1.0.0）", done.stderr)
+        self.assertIn("統合先 (origin/HEAD) が決まらない", done.stderr)
+        self.assertIn("git remote set-head origin -a", done.stderr)
+        self.assertFalse(os.path.exists(sent))
+
+    def test_request_judges_a_project_by_its_own_origin_head(self):
+        """projects/app の統合先は trunk。ワークスペースの origin/HEAD が main でも、
+        projects/app から打てば trunk と比べる。"""
+        self.set_origin_head(self.ws, "main")
+        project = os.path.join(self.ws, "projects", "app")
+        subprocess.run(["git", "init", "-q", "-b", "i0001", project], check=True)
+        subprocess.run(
+            ["git", "-C", project, "-c", "user.name=t", "-c", "user.email=t@e.invalid"]
+            + ["commit", "-q", "--allow-empty", "-m", "seed"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", project, "remote", "add", "origin"]
+            + ["https://gitlab.com/acme/widgets.git"],
+            check=True,
+        )
+        self.set_origin_head(project, "trunk")
+        rel = ELI5
+        html = write(os.path.join(project, *rel.split("/")), "<!doctype html><p>説明</p>\n")
+        git = ["git", "-C", project, "-c", "user.name=t", "-c", "user.email=t@e.invalid"]
+        subprocess.run([*git, "add", "--", rel], check=True)
+        subprocess.run([*git, "commit", "-q", "-m", "add eli5"], check=True)
+        done, sent = self.request_on(cwd=project, html=html.replace(os.sep, "/"))
+        self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("マージ先（main）が統合先（trunk）ではない", done.stderr)
+        self.assertFalse(os.path.exists(sent))
 
     def test_request_stops_without_an_eli5_html(self):
         """--eli5 の誤りは 2、置き場とコミットの欠けは全部を挙げて 1 で止める。
 
-        実行ファイルもホストも触らない。旧方式（追跡しない wip/tmp/ の HTML）も、wip/eli5/ の外の
+        実行ファイルもホストも触らない。wip/eli5/ の外の
         wip/ も、名前に `'`・`$`・空白・日本語を含むものも、リンクや実行ビット付きも止まる。
         """
         out = os.path.join(self._tmp.name, "out")
@@ -772,7 +810,6 @@ class GitLabHostFixtureTest(unittest.TestCase):
         docs = self.eli5("docs/eli5.html")
         blank_docs = self.eli5("docs/blank.html", "\n")
         design = self.eli5("wip/design/x.html")
-        old_way = self.eli5("wip/tmp/eli5.html", commit=False)
         dirty = self.eli5("wip/eli5/phase-2.html")
         write(dirty, "<p>書き換えた</p>\n")
         outside = write(os.path.join(self._tmp.name, "elsewhere", "eli5.html"), "<p>x</p>\n")
@@ -817,7 +854,6 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 ["中身が空", "wip/eli5/ の下にありません"],
             ),
             "wip/eli5/ の外の wip/": (["--eli5", design], 1, ["wip/eli5/ の下にありません"]),
-            "旧方式（wip/tmp/）": (["--eli5", old_way], 1, ["wip/eli5/ の下にありません"]),
             "未追跡": (["--eli5", untracked], 1, ["HEAD にありません"]),
             "未コミット": (["--eli5", dirty], 1, ["HEAD から変わっている"]),
             "ワークツリーの外": (["--eli5", outside], 1, ["このワークツリーの外"]),

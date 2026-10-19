@@ -7,7 +7,8 @@
 
 ## 促す条件
 
-cwd のツリーが次を全部満たすとき。
+調べる対象は、cwd のツリーと、このセッションが書き込んだ直接作業のツリー（候補の記録。
+`direct_candidates`）。チケット制御の有無は問わない。1 本のツリーが次の全部を満たすとき。
 
 - `.claude/worktrees/<名前>` のワークツリーで、今のブランチが名前と同じ
 - チケットに結び付かない。`ccnavi-git.sh integrate` と同じ判定（`bound_reason`。全ツリーの
@@ -15,17 +16,23 @@ cwd のツリーが次を全部満たすとき。
   使うので、促したのに `integrate` が断る食い違いは起きない
 - 作業が残っている。ワークツリーに未コミットの変更がある（追跡していないファイルも数える）か、
   統合先に入っていないコミットがある
-- `integrate <名前>` の記録が無い。統合先のツリーの git ディレクトリの `ccnavi-integrate/<名前>/` も
-  `ccnavi-integrate-done/<名前>` も無い
+- `integrate <名前>` の記録が無い。統合先のツリーの git ディレクトリの `ccnavi-integrate/<名前>/` が
+  無く、`ccnavi-integrate-done/<名前>`（片付けた記録の写し）も、写しの `branch_sha` が今の HEAD と
+  同じで未コミットの変更が無い、という形では無い（名前を使い直した作業を、前の写しで黙らせない）
+
+## 3 つの結果
+
+1 本を調べた結果は `HIT`（当たる）・`CLEAR`（当たらない。確認済み）・
+`UNKNOWN`（期限不足・git の失敗・決められない）のどれか。外してよい `CLEAR`（`drop`）は、
+ディレクトリが無い・HEAD のブランチが名前と違う・チケットに結び付く・`integrate` が受けない名前、
+のときだけ。`UNKNOWN` は候補を外さず、促した記録も
+残さない。git は、期限（`time.monotonic` の絶対時刻）を過ぎてから起こさない（`gitcmd.run_until`）。
 
 ## 統合先
 
-`ccnavi_integration`（`ccnavi-common-state.sh`）の順（環境変数、`settings.local.json` の統合先、
-既定ブランチ）に、hook が設定から読む `--integration-branch` を足したもの。環境変数
-`CCNAVI_INTEGRATION_BRANCH`、`.claude/settings.local.json` の `env`、`--integration-branch`
-（sh 側には無い）、`origin/HEAD`、`origin/main`・`origin/master`。
-決まらなければ `integrate` が断るので、
-促さずに理由を言う。
+`ccnavi_integration`（`ccnavi-common-state.sh`）と同じ。そのリポジトリの手元の `origin/HEAD`、
+無ければ `origin/main`・`origin/master`。origin の無いリポジトリでは決まらない。
+決まらなければ `integrate` が断るので、促さずに理由を言う。
 
 ## 促さずに理由を言う
 
@@ -44,10 +51,11 @@ git とファイルだけを読む。ネットワークには出ない（`docs/c
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 
 from ..infra import fsio, gitcmd, pathcase, settings, tree
-from . import archive, ops_close, ops_stop, ticket_ids, ticket_model
+from . import archive, direct_candidates, ops_close, ops_stop, ticket_ids, ticket_model
 
 # Stop で直接作業の `integrate` を促すときの理由コード。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。
@@ -91,108 +99,221 @@ class Direct:
         return f"{kind}:{'dirty' if self.dirty else 'clean'}:{self.ahead}@{self.head}"
 
 
-def direct_at_stop(root: str, conf: settings.Settings, cwd: str) -> Direct | None:
+# 1 本のツリーを調べた結果。
+HIT = "hit"  # 促すか、理由を言う相手になる
+CLEAR = "clear"  # 今は促す必要が無いと確認できた
+UNKNOWN = "unknown"  # 期限不足・git の失敗・決められないものがあり、確認できない
+
+
+@dataclass
+class Probe:
+    """1 本のツリーを調べた結果。
+
+    `drop` は `CLEAR` のうち「候補から外してよい」と確認できたもの（ディレクトリが無い、HEAD の
+    ブランチが名前と違う、チケットに結び付く、`integrate` が受けない名前）。`UNKNOWN` のときは
+    候補を外さず、促した記録も残さない。
+    """
+
+    state: str
+    found: Direct | None = None
+    drop: bool = False
+
+
+def _expired(deadline: float | None) -> bool:
+    """期限（`time.monotonic` の絶対時刻）の手前で、git を起こすのをやめる時点か。"""
+    if deadline is None:
+        return False
+    return deadline - time.monotonic() - gitcmd.DEADLINE_MARGIN <= gitcmd.DEADLINE_FLOOR
+
+
+def _run(
+    cwd: str,
+    args: list[str],
+    deadline: float | None = None,
+    timeout: float = ops_close.TIMEOUT_SECONDS,
+) -> gitcmd.Done:
+    """git を起こす。期限があれば、期限を過ぎてから起こさない（`gitcmd.run_until`）。"""
+    if deadline is None:
+        return gitcmd.run(cwd, args, timeout)
+    return gitcmd.run_until(cwd, args, deadline, timeout)
+
+
+def _out(cwd: str, args: list[str], deadline: float | None = None) -> tuple[int, str]:
+    done = _run(cwd, args, deadline)
+    if done.failure:
+        return 1, ""
+    return done.code, done.out
+
+
+def direct_at_stop(
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    session: str = "",
+    deadline: float | None = None,
+) -> Direct | None:
     """メインエージェントが終わろうとしたとき、`integrate` を促す（か理由を言う）直接作業。
 
-    条件はモジュールの説明のとおり。git かファイルを読めなければ None（促しは保護ではないので、
-    読めないときは今までどおり何も出さずに通す）。
+    1. cwd のツリーを調べる。当たり、まだ促していなければ返す。
+    2. 記録の候補（`direct_candidates`）を、`checked` の小さい順（未調査が先、同じなら `seen` の
+       新しい順）に調べる。cwd と同じものは除く。調べ始めた候補は、結果が「不明」でも `checked` を
+       今にする。「外してよい」と確認できた候補は記録から外す。当たり、まだ促していないものが
+       見つかったらそこで止めて返す。
+    3. 期限が足りなくなったら打ち切る。それまでの `checked` と外す候補は保存する。
+
+    `session` が空なら候補は見ない。`deadline` は `time.monotonic` の絶対時刻で、省けば期限なし。
+    git かファイルを読めなければ None（促しは保護ではないので、読めないときは何も出さずに通す）。
     """
     here = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
-    if here is None or here.is_main or tree.branch_of(here.root) != here.name:
+    skip = ""
+    if here is not None and not here.is_main:
+        got = probe(root, conf, here, deadline)
+        skip = here.name
+        if got.found is not None and not _already(conf, session, got.found):
+            return got.found
+    if not session or not conf.state:
         return None
+    entries = direct_candidates.load(conf, root, session)
+    entries = [e for e in entries if not (skip and pathcase.fold(e["name"]) == pathcase.fold(skip))]
+    entries.sort(key=lambda e: (e["checked"], -e["seen"]))
+    checked: dict[str, float] = {}
+    dropped: set[str] = set()
+    result: Direct | None = None
+    for item in entries:
+        if _expired(deadline):
+            break
+        checked[item["name"]] = time.time()
+        work = item["path"]
+        if not os.path.isdir(work):
+            dropped.add(item["name"])
+            continue
+        cand = tree.tree_of(root, work, conf.projects)
+        if cand is None or cand.is_main or pathcase.fold(cand.name) != pathcase.fold(item["name"]):
+            dropped.add(item["name"])
+            continue
+        got = probe(root, conf, cand, deadline)
+        if got.drop:
+            dropped.add(item["name"])
+        if got.found is not None and not _already(conf, session, got.found):
+            result = got.found
+            break
+    direct_candidates.update(conf, session, checked, dropped)
+    return result
+
+
+def _already(conf: settings.Settings, session: str, found: Direct) -> bool:
+    return bool(session) and nudged_before(conf.state, session, found)
+
+
+def probe(
+    root: str, conf: settings.Settings, here: tree.Tree, deadline: float | None = None
+) -> Probe:
+    """1 本のワークツリーを 3 つの結果のどれかで調べる（モジュールの説明の「促す条件」）。"""
+    branch = tree.branch_of(here.root)
+    if branch is None:
+        return Probe(UNKNOWN)
+    if branch != here.name:
+        return Probe(CLEAR, drop=True)
     if not _integrable_name(here.name):
-        return None
-    if _bound_to_ticket(root, conf, here):
-        return None
-    head = ops_stop.worktree_head_sha(here.root)
+        return Probe(CLEAR, drop=True)
+    reason, unsure = bound_check(root, conf, here, deadline)
+    if reason:
+        return Probe(CLEAR, drop=True)
+    if unsure:
+        return Probe(UNKNOWN)
+    head = ops_stop.worktree_head_sha(here.root, deadline)
     if not head:
-        return None
+        return Probe(UNKNOWN)
     owner = tree.project_root(conf.projects, here.project) or root
-    integration = integration_name(root, conf, owner, here.project)
-    dirty = _dirty(here.root)
+    integration = _integration(owner, deadline)
+    if integration is None:
+        return Probe(UNKNOWN)
+    dirty = _dirty(here.root, deadline)
     if dirty is None:
-        return None
-    ahead = _ahead(here.root, integration) if integration else _unique(here.root, here.name)
+        return Probe(UNKNOWN)
+    ahead = (
+        _ahead(here.root, integration, deadline)
+        if integration
+        else _unique(here.root, here.name, deadline)
+    )
     if ahead is None:
-        if not (dirty and integration):
-            return None
-        # 未コミットの変更があるのに統合先の ref を引けない。コミットだけなら黙る（下の説明）。
+        if not (dirty and integration) or not _ref_missing(here.root, integration, deadline):
+            return Probe(UNKNOWN)
+        # 未コミットの変更があるのに統合先の ref を引けない。
         found = Direct(here.name, here.root, head, dirty, 0, integration)
         found.blocked = (
             f"統合先（{integration}）の ref が無く、引けません。統合先の名前が合っているか、"
             "ブランチが手元か origin にあるかをユーザに確かめてください"
         )
-        return found
+        return Probe(HIT, found)
     if not (dirty or ahead):
-        return None
+        return Probe(CLEAR)
     found = Direct(here.name, here.root, head, dirty, ahead, integration)
     if not integration:
-        found.blocked = (
-            "統合先の名前が決まりません（CCNAVI_INTEGRATION_BRANCH・"
-            "origin/HEAD のどれもありません）。統合先をユーザに確かめ、CCNAVI_INTEGRATION_BRANCH に"
-            "入れてもらってください"
-        )
-        return found
-    found.integ_tree = _integration_tree(owner, integration)
+        if gitcmd.run(owner, ["remote", "get-url", "origin"], ops_close.TIMEOUT_SECONDS).ok:
+            found.blocked = (
+                "統合先 (origin/HEAD) が決まらない。ユーザに `git fetch origin` のあと "
+                "`git remote set-head origin -a` を頼んでください"
+            )
+        else:
+            found.blocked = (
+                "origin が無いので統合先が決まらない。ユーザに origin の追加を頼んでください"
+            )
+        return Probe(HIT, found)
+    integ_tree = _integration_tree(owner, integration, deadline)
+    if integ_tree is None:
+        return Probe(UNKNOWN)
+    found.integ_tree = integ_tree
     if not found.integ_tree:
         found.blocked = (
             f"統合先（{integration}）をチェックアウトしているツリーが見当たりません。"
             "どのツリーで取り込むかをユーザに確かめてください"
         )
-        return found
-    if _recorded(found.integ_tree, here.name):
-        return None
-    found.blocked = _integration_busy(found.integ_tree)
-    return found
+        return Probe(HIT, found)
+    recorded = _recorded(found.integ_tree, here.name, head, dirty, deadline)
+    if recorded is None:
+        return Probe(UNKNOWN)
+    if recorded:
+        return Probe(CLEAR)
+    busy = _integration_busy(found.integ_tree, deadline)
+    if busy is None:
+        return Probe(UNKNOWN)
+    found.blocked = busy
+    return Probe(HIT, found)
 
 
 def _integrable_name(name: str) -> bool:
-    """`integrate` が受ける名前か。`ccnavi-git.sh` の `ig_name` と同じ検査。
-
-    統合先に使う名前（main・master・develop・release・release-*）と、`ccnavi_is_ident` を通らない
-    形は断られるので、促さない。
-    """
-    if name in ("main", "master", "develop", "release") or name.startswith("release-"):
-        return False
-    if not name or name[0] in "-." or ".." in name or "/" in name or "\\" in name:
-        return False
-    if not (name[0].isascii() and name[0].isalnum()):
-        return False
-    return all(c.isalnum() and c.isascii() or c in "._-" or ord(c) >= 0x80 for c in name)
+    """`integrate` が受ける名前か（`direct_candidates.integrable_name`）。"""
+    return direct_candidates.integrable_name(name)
 
 
-def integration_name(root: str, conf: settings.Settings, owner: str, project: str) -> str:
+def integration_name(owner: str) -> str:
     """そのリポジトリ（`owner` はそのチェックアウト）の統合先の名前。決まらなければ空。
 
-    環境変数、`settings.local.json` の `env`、`--integration-branch`（これだけ
-    `ccnavi_integration` には無い）、`origin/HEAD`、`origin/main`・`origin/master` の順。
+    手元の `origin/HEAD`、無ければ `origin/main`、`origin/master` の順。sh の
+    `ccnavi_integration`（`ccnavi_default_branch`）と同じ。
+    origin の無いリポジトリでは決まらない。
     統合先の解決は、hook・`--lint`・レイヤーの比べ方がこの関数を共通に使う。
-    `project` は呼び手の互換のために残した引数で、使わない。
     """
-    for name in (
-        os.environ.get(settings.INTEGRATION_ENV, ""),
-        settings.integration_local(root),
-        conf.integration_branch,
-    ):
-        if name and name.strip():
-            return name.strip()
+    return _integration(owner) or ""
+
+
+def _integration(owner: str, deadline: float | None = None) -> str | None:
+    """`integration_name` の期限つきの版。期限不足・git の失敗で決められなければ None。"""
     head = tree.origin_head(owner)
     if head:
         return head
     for name in ("main", "master"):
-        done = gitcmd.run(
+        done = _run(
             owner,
             ["rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{name}"],
-            ops_close.TIMEOUT_SECONDS,
+            deadline,
         )
+        if done.failure:
+            return None
         if done.ok:
             return name
     return ""
-
-
-def _bound_to_ticket(root: str, conf: settings.Settings, here: tree.Tree) -> bool:
-    """この名前がチケットに結び付くか。`bound_reason` が理由を言うかで決める。"""
-    return bool(bound_reason(root, conf, here))
 
 
 def _tree_roots(root: str, conf: settings.Settings) -> list[str]:
@@ -233,6 +354,20 @@ def _named_file(directory: str, name: str) -> str:
 def bound_reason(root: str, conf: settings.Settings, here: tree.Tree) -> str:
     """この名前のワークツリーがチケットに結び付く理由。結び付かなければ空。
 
+    `integrate`（`ccnavi tree bound`）の判定。決められないものは、これまでどおり結び付かないと
+    読む。Stop の判定は、決められないことを区別する `bound_check` を使う。
+    """
+    return bound_check(root, conf, here)[0]
+
+
+def bound_check(
+    root: str, conf: settings.Settings, here: tree.Tree, deadline: float | None = None
+) -> tuple[str, bool]:
+    """`bound_reason` の本体。`(理由, 決められなかったか)`。
+
+    理由が空で決められなかったときは、Stop の判定が「不明」として受ける（候補を外さない）。
+    決められないのは、origin の追跡ブランチの有無を引く git が期限不足か失敗で終わったとき。
+
     Stop の促し（`direct_at_stop`）と `ccnavi-git.sh integrate`（`ccnavi tree bound`）が同じ判定を
     使う。材料は次の 3 つで、広めに当てて断る向き。
 
@@ -245,7 +380,6 @@ def bound_reason(root: str, conf: settings.Settings, here: tree.Tree) -> str:
       送ってから始めるので、チケットも提案もまだ無い親は、これで見分ける。直接作業のブランチは
       送らず統合先へ直接取り込むので、origin にあるかで見分けられる
 
-    決められないものは結び付くとして扱う（促さない側。`integrate` も断る向きに倒す）。
     """
     name = here.name
     for base_root in _tree_roots(root, conf):
@@ -260,9 +394,10 @@ def bound_reason(root: str, conf: settings.Settings, here: tree.Tree) -> str:
             found = _named_file(os.path.join(base, state), name)
             if found:
                 rel = os.path.relpath(found, root).replace(os.sep, "/")
-                return f"チケットか提案（{rel}）がある"
+                return f"チケットか提案（{rel}）がある", False
     if archive.archived_fields(root, here.project, name) is not None:
-        return "手元の退避（ready 済み）に同じ名前の親がある"
+        return "手元の退避（ready 済み）に同じ名前の親がある", False
+    unsure = False
     ident = ticket_ids.branch_to_id(name)
     for cand in dict.fromkeys((name, ident)):
         work = tree.worktree_path(root, cand)
@@ -271,49 +406,63 @@ def bound_reason(root: str, conf: settings.Settings, here: tree.Tree) -> str:
         branch = tree.branch_of(work)
         if not branch or pathcase.fold(ticket_ids.branch_to_id(branch)) != pathcase.fold(cand):
             continue
-        if gitcmd.run(
-            work, ["show-ref", "--verify", "--quiet", f"refs/remotes/origin/{branch}"]
-        ).ok:
+        done = _run(
+            work,
+            ["show-ref", "--verify", "--quiet", f"refs/remotes/origin/{branch}"],
+            deadline,
+            gitcmd.TIMEOUT_SECONDS,
+        )
+        if done.failure or done.code not in (0, 1):
+            unsure = True
+        elif done.ok:
             return (
                 f"親のブランチ（origin/{branch}）のワークツリー"
-                f"（{tree.WORKTREES_DIR.replace(os.sep, '/')}/{cand}）がある"
+                f"（{tree.WORKTREES_DIR.replace(os.sep, '/')}/{cand}）がある",
+                False,
             )
-    return ""
+    return "", unsure
 
 
-def _dirty(worktree: str) -> bool | None:
+def _dirty(worktree: str, deadline: float | None = None) -> bool | None:
     """ワークツリーに未コミットの変更があるか（追跡していないものも数える）。読めなければ None。"""
-    rc, out = gitcmd.output(
-        worktree, ["status", "--porcelain", "--untracked-files=all"], ops_close.TIMEOUT_SECONDS
-    )
-    if rc != 0:
+    done = _run(worktree, ["status", "--porcelain", "--untracked-files=all"], deadline)
+    if not done.ok:
         return None
-    return bool(out.strip())
+    return bool(done.out.strip())
 
 
-def _ahead(worktree: str, integration: str) -> int | None:
+def _ahead(worktree: str, integration: str, deadline: float | None = None) -> int | None:
     """統合先に入っていないコミットの数。統合先の ref を引けない・数えられないときは None。
 
     手元のブランチを先に見て、無ければ `origin/<統合先>`。
     """
     for ref in (f"refs/heads/{integration}", f"refs/remotes/origin/{integration}"):
-        done = gitcmd.run(
-            worktree,
-            ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
-            ops_close.TIMEOUT_SECONDS,
-        )
+        done = _run(worktree, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], deadline)
+        if done.failure:
+            return None
         if not done.ok:
             continue
-        rc, out = gitcmd.output(
-            worktree, ["rev-list", "--count", f"{ref}..HEAD"], ops_close.TIMEOUT_SECONDS
-        )
-        return int(out.strip()) if rc == 0 and out.strip().isdigit() else None
+        counted = _run(worktree, ["rev-list", "--count", f"{ref}..HEAD"], deadline)
+        out = counted.out.strip()
+        return int(out) if counted.ok and out.isdigit() else None
     return None
 
 
-def _unique(worktree: str, name: str) -> int | None:
+def _ref_missing(worktree: str, integration: str, deadline: float | None = None) -> bool:
+    """統合先の ref が、手元にも origin にも「無い」と確かめられたか。
+
+    期限不足・git の失敗は「確かめられていない」ので偽（呼び手は不明として扱う）。
+    """
+    for ref in (f"refs/heads/{integration}", f"refs/remotes/origin/{integration}"):
+        done = _run(worktree, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], deadline)
+        if done.failure or done.ok:
+            return False
+    return True
+
+
+def _unique(worktree: str, name: str, deadline: float | None = None) -> int | None:
     """統合先が決まらないときの目安。ほかのどのブランチにも入っていないコミットの数。"""
-    rc, out = gitcmd.output(
+    done = _run(
         worktree,
         [
             "rev-list",
@@ -324,18 +473,19 @@ def _unique(worktree: str, name: str) -> int | None:
             "--branches",
             "--remotes",
         ],
-        ops_close.TIMEOUT_SECONDS,
+        deadline,
     )
-    return int(out.strip()) if rc == 0 and out.strip().isdigit() else None
+    out = done.out.strip()
+    return int(out) if done.ok and out.isdigit() else None
 
 
-def _integration_tree(owner: str, integration: str) -> str:
-    """統合先のブランチをチェックアウトしているツリー。見つからなければ空。"""
-    rc, out = gitcmd.output(owner, ["worktree", "list", "--porcelain"], ops_close.TIMEOUT_SECONDS)
-    if rc != 0:
-        return ""
+def _integration_tree(owner: str, integration: str, deadline: float | None = None) -> str | None:
+    """統合先のブランチをチェックアウトしているツリー。見つからなければ空、読めなければ None。"""
+    done = _run(owner, ["worktree", "list", "--porcelain"], deadline)
+    if not done.ok:
+        return None
     path = ""
-    for line in out.splitlines():
+    for line in done.out.splitlines():
         if line.startswith("worktree "):
             path = line[len("worktree ") :]
         elif line.strip() == f"branch refs/heads/{integration}":
@@ -343,28 +493,68 @@ def _integration_tree(owner: str, integration: str) -> str:
     return ""
 
 
-def _git_path(top: str, name: str) -> str:
-    rc, out = gitcmd.output(top, ["rev-parse", "--git-path", name], ops_close.TIMEOUT_SECONDS)
-    path = out.strip() if rc == 0 else ""
-    if path and not os.path.isabs(path):
-        path = os.path.join(top, path)
-    return path
+def _git_path(top: str, name: str, deadline: float | None = None) -> str | None:
+    """`git rev-parse --git-path`。引けなければ None（期限不足・git の失敗）。"""
+    done = _run(top, ["rev-parse", "--git-path", name], deadline)
+    path = done.out.strip() if done.ok else ""
+    if not path:
+        return None
+    return path if os.path.isabs(path) else os.path.join(top, path)
 
 
-def _recorded(integ_tree: str, name: str) -> bool:
-    """`integrate <名前>` の記録（取り込み中の記録、片付けた記録の写し）が在るか。"""
-    marks = _git_path(integ_tree, _RECORD_DIR)
-    done = _git_path(integ_tree, _DONE_DIR)
-    return bool(
-        (marks and os.path.lexists(os.path.join(marks, name)))
-        or (done and os.path.lexists(os.path.join(done, name)))
-    )
+def _read_record(path: str) -> dict[str, str]:
+    """`ccnavi_record_write` が書いた「鍵 値」の行の記録。読めなければ空。"""
+    text = fsio.read_text(path, errors="replace")
+    out: dict[str, str] = {}
+    for line in (text or "").splitlines():
+        key, _, value = line.partition(" ")
+        if key:
+            out[key] = value.strip()
+    return out
 
 
-def _integration_busy(integ_tree: str) -> str:
-    """統合先のツリーが `integrate` の前提（綺麗で、途中の操作が無い）を満たさない理由。"""
+def _recorded(
+    integ_tree: str,
+    name: str,
+    head: str = "",
+    dirty: bool | None = False,
+    deadline: float | None = None,
+) -> bool | None:
+    """`integrate <名前>` の記録があるか。調べられなければ None（判定全体を「不明」にする）。
+
+    - `ccnavi-integrate/<名前>/`（取り込みの途中）があれば「記録あり」。
+    - `ccnavi-integrate-done/<名前>`（片付けた記録の写し）は、写しの `branch_sha` が今の HEAD と
+      同じで、`dirty` が「変更無し」と確認できたときだけ「記録あり」。名前を使い直した作業
+      （新しいコミットを積んだ、同じ HEAD で未コミットの変更がある）を、前の写しで黙らせない。
+    - `dirty` が不明なら、取り込み済みとみなさず、判定全体を不明にする。
+    - 写しを読めないときは「記録なし」（促す側に倒す）。
+    """
+    marks = _git_path(integ_tree, _RECORD_DIR, deadline)
+    if marks is None:
+        return None
+    if os.path.lexists(os.path.join(marks, name)):
+        return True
+    done = _git_path(integ_tree, _DONE_DIR, deadline)
+    if done is None:
+        return None
+    copy = os.path.join(done, name)
+    if not os.path.lexists(copy):
+        return False
+    sha = _read_record(copy).get("branch_sha", "")
+    if not sha or not head or sha != head:
+        return False
+    if dirty is None:
+        return None
+    return not dirty
+
+
+def _integration_busy(integ_tree: str, deadline: float | None = None) -> str | None:
+    """統合先のツリーが `integrate` の前提（綺麗で、途中の操作が無い）を満たさない理由。
+
+    満たすなら空。期限不足で確かめられなければ None（判定全体を「不明」にする）。
+    """
     mark = tree.busy_of(integ_tree)
-    squash = _git_path(integ_tree, _SQUASH_MSG)
+    squash = _git_path(integ_tree, _SQUASH_MSG, deadline)
     if not mark and squash and os.path.lexists(squash):
         mark = _SQUASH_MSG
     if mark:
@@ -372,12 +562,12 @@ def _integration_busy(integ_tree: str) -> str:
             f"統合先のツリー（{integ_tree}）に途中の操作（{mark}）があります。"
             "持ち主に確かめて済ませてもらってください"
         )
-    rc, out = gitcmd.output(
-        integ_tree, ["status", "--porcelain", "--untracked-files=all"], ops_close.TIMEOUT_SECONDS
-    )
-    if rc != 0:
+    done = _run(integ_tree, ["status", "--porcelain", "--untracked-files=all"], deadline)
+    if done.timed_out:
+        return None
+    if not done.ok:
         return f"統合先のツリー（{integ_tree}）の状態を読めません"
-    lines = [ln for ln in out.splitlines() if ln.strip()]
+    lines = [ln for ln in done.out.splitlines() if ln.strip()]
     if lines:
         listed = " ".join(ln.strip() for ln in lines[:_LISTED])
         more = f" ほか {len(lines) - _LISTED} 件" if len(lines) > _LISTED else ""
@@ -412,27 +602,35 @@ def _left(found: Direct) -> str:
 
 
 def integrate_nudge(root: str, found: Direct) -> str:
-    """Stop を止めて渡す文。`integrate` の打ち方と、staged で止めて確かめてもらう手順を言う。"""
+    """Stop を止めて渡す文。`integrate` の打ち方と、staged で止めて確かめてもらう手順を言う。
+
+    コマンドは 1 行で完結させ、別のツリーで打つものは `cd <引用したパス> && …` で始める
+    （Bash の cwd が次の呼び出しに残るとは限らない）。ラッパーを通らない `git` は書かない。
+    """
     n = found.name
     git_sh = settings.script_command(root, "ccnavi-git.sh")
+    work = settings.shell_path(found.worktree)
+    integ = settings.shell_path(found.integ_tree)
     lines = [
         f"[ccnavi] {CODE_INTEGRATE_NUDGE} (worktree: {n})",
         f"ワークツリー .claude/worktrees/{n} はチケットに結び付かない直接作業で、"
-        f"{_left(found)}があり、'integrate {n}' の記録がありません。",
+        f"{_left(found)}があり、integrate {n} の記録がありません。",
     ]
     if found.dirty:
         lines.append(
-            "integrate が取り込むのはコミットした分だけです。"
-            "先にワークツリーの中でコミットしてください。"
+            "integrate が取り込むのはコミットした分だけです。先にコミットしてください: "
+            f"`cd {work} && {git_sh} add -- <パス>` と "
+            f"`cd {work} && {git_sh} commit -m '<メッセージ>'`。"
         )
     lines += [
-        f"作業が終わったなら、統合先のツリー（{found.integ_tree}）で '{git_sh} integrate {n}' を"
-        "実行して staged にし、そこで止めてください。hook は integrate を実行しません。",
-        "続き: ユーザに git status と git diff --staged で中身を確かめてもらい、"
-        f"よければ '{git_sh} integrate-done {n} -m <メッセージ>' でコミットして片付けます。"
-        f"やめるなら '{git_sh} integrate --abort {n}' で取り込む前に戻します。",
+        f"作業が終わったなら `cd {integ} && {git_sh} integrate {n}` を実行して staged にし、"
+        "そこで止めてください。hook は integrate を実行しません。",
+        f"続き: `cd {integ} && {git_sh} status` と `cd {integ} && {git_sh} diff --staged` の結果を"
+        "ユーザに見せます。了承を得たら "
+        f"`cd {integ} && {git_sh} integrate-done {n} -m '<メッセージ>'` でコミットして片付けます。"
+        f"やめるなら `cd {integ} && {git_sh} integrate --abort {n}`。",
         "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
-        "この案内は同じ状態では 1 回だけで、コミットを追加するまで次に終えるときは止めません。",
+        "この案内は同じ状態では 1 回だけです。",
     ]
     return "\n".join(lines)
 

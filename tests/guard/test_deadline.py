@@ -89,7 +89,7 @@ class DeadlineTest(unittest.TestCase):
             return [json.loads(line) for line in f if line.strip()][-1]
 
     def test_enable_stops_with_exit_code_2(self):
-        result = self.run_with("ls", Clock(0))
+        result = self.run_with("echo hi", Clock(0))
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertEqual(result.stdout, "")
 
@@ -100,12 +100,12 @@ class DeadlineTest(unittest.TestCase):
         self.assertIn("deadline-exceeded", result.stderr)
 
     def test_stderr_names_the_deadline(self):
-        result = self.run_with("ls", Clock(0))
+        result = self.run_with("echo hi", Clock(0))
         self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
         self.assertIn(f"({judge.DEADLINE_SECONDS:g} s)", result.stderr)
 
     def test_record_says_deadline_exceeded(self):
-        self.run_with("ls", Clock(0))
+        self.run_with("echo hi", Clock(0))
         row = self.last_record()
         self.assertEqual(row["decision"], "skip")
         self.assertEqual(row["reason"], "deadline-exceeded")
@@ -113,14 +113,14 @@ class DeadlineTest(unittest.TestCase):
     def test_reaching_exactly_the_deadline_is_not_exceeded(self):
         # 比べるのは `>`。期限ちょうどは超えていない。
         clock = Clock(0, after=START + judge.DEADLINE_SECONDS)
-        result = self.run_with("ls", clock)
+        result = self.run_with("echo hi", clock)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("deadline-exceeded", result.stderr)
 
     def test_a_call_that_hits_the_deadline_never_gets_a_verdict(self):
         # 照合の回数を数え、どの回で期限に達しても、応答を出さずに止めることを確かめる。
         # 止めるコマンド（deny）も、通すコマンド（allow）も同じ。
-        for command in ("ls", "git push origin main", "cat .env"):
+        for command in ("echo hi", "git push origin main", "cat .env"):
             with self.subTest(command=command):
                 counting = Clock(10**9)
                 done = self.run_with(command, counting)

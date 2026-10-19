@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 
 from ccnavi.entry import lint_layers
 from ccnavi.infra import settings
@@ -57,10 +56,6 @@ class LayerDriftTest(unittest.TestCase):
     def setUp(self):
         self.ws = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-drift-"))
         self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
-        env = {k: v for k, v in os.environ.items() if k != settings.INTEGRATION_ENV}
-        patcher = mock.patch.dict(os.environ, env, clear=True)
-        patcher.start()
-        self.addCleanup(patcher.stop)
         repo(os.path.join(self.ws, "ws"))
         self.root = os.path.join(self.ws, "ws")
         write(os.path.join(self.root, ".claude", "settings.json"), "{}\n")
@@ -105,7 +100,7 @@ class LayerDriftTest(unittest.TestCase):
         write(os.path.join(self.root, LAYER), "version: 1\r\nrules: []\r\n", newline="")
         self.assertEqual([], self.drift())
 
-    def test_the_integration_branch_follows_the_settings(self):
+    def test_the_integration_branch_follows_origin_head_only(self):
         git(self.root, "branch", "develop")
         write(os.path.join(self.root, LAYER), "version: 1\nrules: [dev]\n")
         git(self.root, "checkout", "-q", "develop")
@@ -113,14 +108,10 @@ class LayerDriftTest(unittest.TestCase):
         git(self.root, "push", "-q", "origin", "develop")
         git(self.root, "checkout", "-q", "main")
         write(os.path.join(self.root, LAYER), "version: 1\nrules: [dev]\n")
-        write(
-            os.path.join(self.root, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop"}}',
-        )
-        self.assertEqual([], self.drift())
-        os.remove(os.path.join(self.root, ".claude", "settings.local.json"))
         (found,) = self.drift()
         self.assertIn("origin/main", found.detail)
+        git(self.root, "remote", "set-head", "origin", "develop")
+        self.assertEqual([], self.drift())
 
     def test_no_origin_branch_is_silent(self):
         git(self.root, "update-ref", "-d", "refs/remotes/origin/main")

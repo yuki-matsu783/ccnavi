@@ -106,6 +106,10 @@ class CleanupFormsTest(HookCase):
                 with self.subTest(command=command, agent=agent):
                     decision, reason = self.hook(command, agent)
                     self.assertEqual(decision, "deny", reason)
+                    if agent and "ccnavi-clean.sh" in command:
+                        # clean の sh は、サブエージェントには役割の表で先に止まる。
+                        self.assertIn("DENY_SUBAGENT_TICKET_OP", reason)
+                        continue
                     self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
                     self.assertIn("! を付けて", reason)
 

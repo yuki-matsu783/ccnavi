@@ -1,6 +1,6 @@
 """`--lint` のうち、設定のレイヤーをまたぐ検査。
 
-旧い置き場に設定が残っていないか、ワークツリーの ccnavi ディレクトリに元リポジトリに無いファイルが
+ワークツリーの ccnavi ディレクトリに元リポジトリに無いファイルが
 無いか、取得済みの `origin/<統合先>` のレイヤーが手元のレイヤーと食い違っていないかを見る。
 1 つのレイヤーの 1 本ずつの検査（ルールの読み・phases / risk の合成）は
 `tickets.config_check` にあり、保護対象の下書きの取り込み（`user handoff`）も同じものを呼ぶ。
@@ -25,39 +25,6 @@ from ..tickets import ticket as ticket_mod
 
 # 苦情の出どころの表記。VS Code 拡張がこの前置きでプロジェクトを引く。
 layer_where = config_check.layer_where
-
-
-def _legacy_places(conf: settings.Settings, root: str) -> list[Problem]:
-    """旧い置き場（`.ccnavi/common/`・`.ccnavi/config/{rules,phases,risks}.yml`）に設定が残っていないか。
-
-    設定の置き場は `.ccnavi/config/common/` と `.ccnavi/config/project/` に移った。旧い置き場の
-    ファイルは読まれないので、書いたルール・配点・フェーズ定義が黙って効かなくなる。
-    ワークスペースと、その下のプロジェクトの両方を見る。移すのはユーザで、ここは名指しするだけ。
-    """
-    problems: list[Problem] = []
-    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
-    names = tuple(settings.LAYER_FILE_NAMES.values())
-    bases = [("", root)] + [(f"projects/{t.name} ", t.root) for t in tree.projects(conf.projects)]
-    for label, base in bases:
-        for old, new in (
-            (f"{home}/common", f"{home}/{settings.COMMON_DIR}"),
-            (f"{home}/config", f"{home}/{settings.LAYER_CONFIG_DIR}"),
-        ):
-            for name in names:
-                path = os.path.join(base, *old.split("/"), name)
-                if not os.path.isfile(path):
-                    continue
-                where = f"({label.strip() or 'legacy'})"
-                shown = f"{label.replace(' ', '/')}{old}/{name}"
-                problems.append(
-                    Problem(
-                        SEVERITY_WARN,
-                        where,
-                        f"{shown} は旧い置き場で、読まれていない。"
-                        f"{label.replace(' ', '/')}{new}/{name} へ移す",
-                    )
-                )
-    return problems
 
 
 def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
@@ -237,7 +204,7 @@ def _drift(conf: settings.Settings, root: str, project: str) -> tuple[list[Probl
     home = tree.project_root(conf.projects, project) if project else root
     if not home or not os.path.isdir(home):
         return [], True
-    branch = ops_stop_integrate.integration_name(root, conf, home, project)
+    branch = ops_stop_integrate.integration_name(home)
     ref = f"refs/remotes/origin/{branch}" if branch else ""
     if (
         not ref

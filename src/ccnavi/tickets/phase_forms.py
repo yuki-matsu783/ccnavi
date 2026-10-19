@@ -392,11 +392,11 @@ EXE_OPTIONS = frozenset(
     {
         "--abandon", "--accept-check", "--accept-done", "--accept-plan",
         "--accept-unresolved", "--actor", "--agent-id", "--agree", "--all", "--approved",
-        "--body-file",
+        "--body-file", "--check-file",
         "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
         "--expect",
         "--explain", "--fill-phases", "--flow", "--format", "--guard-core-files",
-        "--guard-ticket-approval", "--handoff", "--help", "--integration-branch", "--issue",
+        "--guard-ticket-approval", "--handoff", "--help", "--issue",
         "--json",
         "--keyword", "--layer", "--limit", "--lint", "--log", "--mode", "--mr", "--name",
         "--no-issue",

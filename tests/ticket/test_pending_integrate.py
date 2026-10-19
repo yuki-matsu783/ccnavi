@@ -1,0 +1,175 @@
+"""SessionStart で、終わっていない `integrate` の記録を知らせる（pending_integrate）の受入テスト。
+
+記録（統合先のツリーの `.git/ccnavi-integrate/<名前>/marker`）を A〜D に分け、モデルの文脈と
+`systemMessage` の両方に出す。記録が無ければ何も足さない。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+import time
+import unittest
+
+from ccnavi.infra import gitcmd, settings
+from ccnavi.tickets import pending_integrate
+from tests.ticket.test_ticket import TicketTest, git, write
+
+
+def load_tests(loader, tests, pattern):
+    suite = unittest.TestSuite()
+    for name in sorted(vars(PendingIntegrateTest)):
+        if name.startswith("test_"):
+            suite.addTest(PendingIntegrateTest(name))
+    return suite
+
+
+HEAD = "終わっていない integrate の記録があります"
+
+
+class PendingIntegrateTest(TicketTest):
+    def marker(self, name, **fields):
+        gitdir = os.path.join(self.root, ".git", "ccnavi-integrate", name)
+        os.makedirs(gitdir, exist_ok=True)
+        write(
+            os.path.join(gitdir, "marker"),
+            "".join(f"{k} {v}\n" for k, v in fields.items()),
+        )
+
+    def notice(self, deadline=None):
+        conf = settings.Settings(projects="")
+        return pending_integrate.pending_notice(
+            self.root, conf, time.monotonic() + 30 if deadline is None else deadline
+        )
+
+    def head(self):
+        return git(self.root, "rev-parse", "HEAD").strip()
+
+    def start(self, **extra):
+        payload = {
+            "hook_event_name": "SessionStart",
+            "source": "startup",
+            "session_id": "ss",
+            "cwd": self.root,
+        }
+        payload.update(extra)
+        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+
+    def test_no_record_says_nothing(self):
+        self.assertEqual(self.notice(), "")
+        self.assertNotIn(HEAD, self.start().stdout)
+
+    def test_a_staged_record_matching_head_and_index_is_A(self):
+        head = self.head()
+        tree = git(self.root, "rev-parse", "HEAD^{tree}").strip()
+        self.marker("w1", state="staged", branch="w1", branch_sha=head, base=head, tree=tree)
+        text = self.notice()
+        self.assertIn(HEAD, text)
+        self.assertIn("w1（統合先のツリー", text)
+        self.assertIn("HEAD と staged の内容は、取り込みの記録と一致しています", text)
+        self.assertIn("integrate-done w1 -m '<メッセージ>'", text)
+        self.assertIn("integrate --abort w1", text)
+
+    def test_a_moved_head_with_nothing_staged_is_B_and_does_not_claim_completion(self):
+        old = self.head()
+        write(os.path.join(self.root, "src", "later.py"), "x\n")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "--quiet", "-m", "later")
+        self.marker("w2", state="staged", branch="w2", branch_sha=old, base=old, tree="x")
+        text = self.notice()
+        self.assertIn("片付けだけが残っている可能性がありますが、確かめてはいません", text)
+        self.assertIn("log --oneline -5", text)
+        self.assertNotIn("取り込み済みです", text)
+
+    def test_a_conflict_record_is_C(self):
+        head = self.head()
+        self.marker("w3", state="conflict", branch="w3", branch_sha=head, base=head)
+        self.assertIn("取り込みが途中で止まっています", self.notice())
+
+    def test_a_broken_record_is_D_without_raising(self):
+        self.marker("w4", state="???")
+        self.assertIn("記録と今の状態が合わないか、読めません", self.notice())
+        head = self.head()
+        # staged の記録でも、staged が記録の tree と違えば A にも B にもしない。
+        write(os.path.join(self.root, "src", "dirty.py"), "x\n")
+        git(self.root, "add", "-A")
+        self.marker(
+            "w5",
+            state="staged",
+            branch="w5",
+            branch_sha=head,
+            base=head,
+            tree=git(self.root, "rev-parse", "HEAD^{tree}").strip(),
+        )
+        text = self.notice()
+        self.assertIn("w5（統合先のツリー", text)
+        self.assertEqual(text.count("記録と今の状態が合わないか、読めません"), 2)
+
+    def test_a_directory_without_a_marker_is_told_as_D(self):
+        os.makedirs(os.path.join(self.root, ".git", "ccnavi-integrate", "w9"))
+        write(os.path.join(self.root, ".git", "ccnavi-integrate", "w9", "paths"), "x\n")
+        text = self.notice()
+        self.assertIn("w9（統合先のツリー", text)
+        self.assertIn("記録と今の状態が合わないか、読めません", text)
+
+    def test_an_expired_deadline_starts_no_git_and_says_so(self):
+        head = self.head()
+        self.marker("w6", state="staged", branch="w6", branch_sha=head, base=head, tree="t")
+        calls = []
+        real = gitcmd.run
+        gitcmd.run = lambda *a, **k: calls.append(a) or real(*a, **k)
+        try:
+            text = self.notice(deadline=time.monotonic() - 1)
+        finally:
+            gitcmd.run = real
+        self.assertEqual(calls, [])
+        self.assertIn("ほかのツリーは時間切れで確かめていません", text)
+
+    def test_session_start_gives_both_context_and_system_message_before_docs(self):
+        head = self.head()
+        self.marker("w7", state="conflict", branch="w7", branch_sha=head, base=head)
+        out = json.loads(self.start().stdout)
+        self.assertIn(HEAD, out["hookSpecificOutput"]["additionalContext"])
+        self.assertIn(HEAD, out["systemMessage"])
+
+    def test_the_notice_does_not_write_to_the_object_database(self):
+        head = self.head()
+        tree = git(self.root, "rev-parse", "HEAD^{tree}").strip()
+        self.marker("w10", state="staged", branch="w10", branch_sha=head, base=head, tree=tree)
+
+        def objects():
+            found = []
+            for base, _dirs, files in os.walk(os.path.join(self.root, ".git", "objects")):
+                found.extend(os.path.join(base, f) for f in files)
+            return sorted(found)
+
+        before = objects()
+        self.assertIn(HEAD, self.notice())
+        self.assertEqual(before, objects())
+
+    def test_a_subagent_is_not_told(self):
+        head = self.head()
+        self.marker("w8", state="conflict", branch="w8", branch_sha=head, base=head)
+        self.assertNotIn(HEAD, self.start(agent_id="a1").stdout)
+
+    def test_the_commands_run_from_a_fresh_shell_in_a_path_with_space_and_quote(self):
+        base = tempfile.mkdtemp(prefix="ccnavi-pend-")
+        self.addCleanup(shutil.rmtree, base, ignore_errors=True)
+        ws = os.path.join(base, "a b's")
+        os.makedirs(os.path.join(ws, ".ccnavi", "scripts"))
+        write(os.path.join(ws, ".ccnavi", "scripts", "ccnavi-git.sh"), 'echo "ARGS:$*"\n')
+        for kind in "ABCD":
+            line = pending_integrate._line(ws, ws, "nm", kind)
+            for cmd in re.findall(r"`([^`]+)`", line):
+                cmd = cmd.replace("<メッセージ>", "msg")
+                done = subprocess.run(["sh", "-c", cmd], cwd="/", capture_output=True, text=True)
+                self.assertEqual(done.returncode, 0, (cmd, done.stderr))
+                self.assertIn("ARGS:", done.stdout)
+
+
+if __name__ == "__main__":
+    unittest.main()

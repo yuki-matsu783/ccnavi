@@ -21,7 +21,7 @@ keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, te
 | 下書き | 本物の全文を写して 1 件足す。期待する判定も 1 行足す（止めたくないものも一緒に） | エージェント | `/ccnavi-config`、置き場は `wip/handoff/`（`ccnavi-stage.sh` で写す） |
 | 検証 | 防御を消す記述が無いか、当たるかどうかを機械に聞く。目で判定を真似しない | エージェント | `ccnavi --lint`、`--test-expectations`、`scripts/check_rules.py` |
 | 承認 | 何をなぜ変えるかと一緒に渡し、ユーザが差分を読んで置く | ユーザ | `ccnavi user handoff` |
-| 効く | 次の判定から効く。`dry-run` の間は止めず「enable なら止めていた」を伝えるだけ | ccnavi | `CCNAVI_MODE` |
+| 効く | 次の判定から効く。`dry-run` の間、一般の保護は止めず「enable なら止めていた」を伝えるだけ（チケットの関門と補助の保護は止める） | ccnavi | `CCNAVI_MODE` |
 | 配る | 共通レイヤーのルールは、親の着手でプロジェクトの `.ccnavi/config/common/` へミラーされる | ccnavi | 親の `ticket start` |
 
 ## 規則

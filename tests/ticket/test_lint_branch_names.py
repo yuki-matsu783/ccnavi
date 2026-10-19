@@ -389,40 +389,46 @@ class LintBranchNamesTest(unittest.TestCase):
             lines[0],
         )
 
-    def test_the_integration_branch_flag_reserves_its_name(self):
-        self.propose("trunk")
-        reserved = [line for line in self.lint() if "統合先" in line]
-        self.assertEqual([], reserved)
-        lines = [line for line in self.lint("--integration-branch", "trunk") if "統合先" in line]
-        self.assertEqual(1, len(lines), lines)
-        self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
+    def repo_with_origin(self, path, branch):
+        """origin を持ち、`origin/HEAD` が `branch` を指すリポジトリ。"""
+        os.makedirs(path, exist_ok=True)
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com"]
+        bare = path + ".origin.git"
+        for args, cwd in (
+            (["init", "--quiet", "-b", branch], path),
+            (["commit", "--quiet", "--allow-empty", "-m", "x"], path),
+            (["init", "--quiet", "--bare", bare], os.path.dirname(path)),
+            (["remote", "add", "origin", bare], path),
+            (["push", "--quiet", "origin", branch], path),
+            (["remote", "set-head", "origin", branch], path),
+        ):
+            subprocess.run([*git, *args], cwd=cwd, check=True, capture_output=True)
 
-    def test_the_environment_and_the_local_settings_reserve_the_name_too(self):
-        # 統合先の解決は hook や sh と同じ順（環境変数、settings.local.json の env、
-        # --integration-branch、origin/HEAD）。
-        self.propose("trunk")
-        lines = [
-            line
-            for line in self.lint(env={"CCNAVI_INTEGRATION_BRANCH": "trunk"})
-            if "統合先" in line
-        ]
-        self.assertEqual(1, len(lines), lines)
+    def test_each_repository_reserves_its_own_default_branch(self):
+        # 統合先はそのリポジトリの origin/HEAD だけで決まる。ワークスペースが main でも、
+        # projects/app（trunk）向けのチケットは trunk を予約する。
+        shutil.rmtree(self.ws)
+        os.makedirs(os.path.join(self.ws, ".claude"))
+        self.repo_with_origin(self.ws, "main")
+        self.repo_with_origin(os.path.join(self.ws, "projects", "app"), "trunk")
+        self.rules = write(os.path.join(self.ws, "rules.yml"), json.dumps({"version": 1}))
         write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "trunk"}}\n',
+            os.path.join(self.ws, "projects", "app", "wip", "proposals", "todo", "trunk.md"),
+            ticket_text("trunk"),
         )
+        self.propose("Trunk-ws")
         lines = [line for line in self.lint() if "統合先" in line]
         self.assertEqual(1, len(lines), lines)
         self.assertIn("trunk: 識別子が統合先の名前（trunk）", lines[0])
 
-    def test_a_record_of_the_old_sync_is_not_read(self):
-        # 取り込み状態（sync/<リポジトリ>/integration/head）は廃止した。残っていても読まない。
+    def test_the_workspace_reserves_its_own_default_branch(self):
+        shutil.rmtree(self.ws)
+        os.makedirs(os.path.join(self.ws, ".claude"))
+        self.repo_with_origin(self.ws, "trunk")
+        self.rules = write(os.path.join(self.ws, "rules.yml"), json.dumps({"version": 1}))
         self.propose("trunk")
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch trunk\nsource default\nsha x\nfetched_at 1\n",
-        )
-        self.assertEqual([], [line for line in self.lint() if "統合先" in line])
+        lines = [line for line in self.lint() if "統合先" in line]
+        self.assertEqual(1, len(lines), lines)
 
     def test_approved_and_closed_ids_are_left_alone(self):
         # 既存の i0055 などは issue: を持たない。承認済みの識別子は変えられないので言わない。
@@ -454,7 +460,7 @@ class LintBranchNamesTest(unittest.TestCase):
     def test_a_parent_ending_in_two_digits_is_still_named(self):
         # 右から 2 段を剥がすので親の割り出しは誤らないが、別の親の子の途中
         # （`<親>-<フェーズ>`）と紛れる。
-        # 旧い形の子と同じ綴りなので、今までどおり warn にする。
+        # 古い形の子と同じ綴りなので、今までどおり warn にする。
         self.place("done", "abc-01")
         lines = self.lint()
         self.assertEqual(1, len(lines), lines)

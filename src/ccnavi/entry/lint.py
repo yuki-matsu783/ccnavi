@@ -442,7 +442,8 @@ def check(
             Problem(
                 SEVERITY_WARN,
                 "(mode)",
-                f"{modes.DRY_RUN} なので判定はしても、呼び出しには何もしない",
+                f"{modes.DRY_RUN} なので一般の保護は報告だけにする"
+                "（チケットの関門と補助の保護は止める）",
             )
         )
 
@@ -459,7 +460,6 @@ def check(
     # レイヤーの読み込みは判定と同じ経路（ruleload.survey）を通る。読めないレイヤーの苦情は
     # そこが書く標準エラーにも出るので、受け皿で受け取って二重に言わない。
     problems.extend(config_check.layer_rules(io.StringIO(), conf, root))
-    problems.extend(lint_layers._legacy_places(conf, root))
     problems.extend(config_check.layer_configs(conf, root))
     problems.extend(lint_templates._templates(conf, root))
     problems.extend(lint_layers._worktree_layers(conf, root))

@@ -225,14 +225,6 @@ class StartShTest(unittest.TestCase):
             if line.startswith("POST ") and i + 1 < len(lines) and lines[i + 1].startswith("BODY ")
         ]
 
-    def record(self, ident):
-        """旧い取り込み記録（logs/state/sync/self/families/<識別子>）の中身。作らないことを確かめる。"""
-        path = os.path.join(self.ws, "logs", "state", "sync", "self", "families", ident)
-        if not os.path.exists(path):
-            return {}
-        with open(path, encoding="utf-8") as f:
-            return dict(line.rstrip("\n").partition(" ")[::2] for line in f if line.strip())
-
     def wt(self, name):
         return os.path.join(self.ws, ".claude", "worktrees", name)
 
@@ -297,8 +289,6 @@ class StartShTest(unittest.TestCase):
             "--plan quick-work --scope '<触るファイルの glob>' --issue 152 --mr 7", nexts[0]
         )
         self.assertIn("直接実装に切り替えず、ユーザに報告して止まる", done.stdout)
-        # MR の番号は親チケットの mr 欄が持つ（手元の記録は空のまま）
-        self.assertEqual(self.record(BRANCH), {})
 
     def test_second_run_continues_without_duplicates(self):
         self.github_new()
@@ -328,7 +318,6 @@ class StartShTest(unittest.TestCase):
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
-        self.assertEqual(self.record("fix-152-other"), {})
         self.assertEqual(self.posts(), [])
         self.assertEqual(self.fields(done.stdout)["ブランチ"], "fix-152-other")
 
@@ -659,7 +648,6 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(sorted(self.local_branches()), ["main", "topic/x"])
         self.assertNotIn("switch", done.stdout)
         self.assertIn("識別子: topic-x", done.stdout)
-        self.assertEqual(self.record("topic-x"), {})
 
     # ---- 6. 既存の MR を採用するときの確認
 
@@ -966,7 +954,6 @@ class StartShGitLabTest(StartShTest):
         done = self.run_sh("--mr", "9")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(git(self.wt("topic-x"), "rev-parse", "--abbrev-ref", "HEAD"), "topic/x")
-        self.assertEqual(self.record("topic-x"), {})
 
     def test_gitlab_fork_mr_is_refused(self):
         mr = {

@@ -169,11 +169,11 @@ class EnvHookTest(unittest.TestCase):
         self.assertEqual(decision, "")
         self.assertNotIn(wrapguard.CODE_ENV, reason)
 
-    def test_turned_off_with_the_core_files_guard(self):
-        # ccnavi 自身を守る設定を切ると、この止め方も切れ、allow が当たる。
+    def test_not_turned_off_with_the_core_files_guard(self):
+        # 環境変数の指定の止めは補助の保護で、自己防衛の設定では切れない。
         decision, reason = self.hook(self.COMMAND, CCNAVI_GUARD_CORE_FILES="disable")
-        self.assertEqual(decision, "")
-        self.assertNotIn(wrapguard.CODE_ENV, reason)
+        self.assertEqual(decision, "deny")
+        self.assertIn(wrapguard.CODE_ENV, reason)
 
 
 # （cwd の置き場, コマンド, チケットをどこに置くか, 止まるか）

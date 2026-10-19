@@ -1,7 +1,7 @@
 """チケットとレビューのサブコマンド（`ticket` / `review` / `write_and_push` など）を
 ops・review へ渡す。
 
-`sync` の問い合わせ（`sync paths` / `sync check` / `sync retired` / `sync migrate`）もここで答える。
+`sync` の問い合わせ（`sync paths` / `sync check` / `sync retired`）もここで答える。
 
 cli から分けた。cli を読まない。
 """
@@ -13,12 +13,11 @@ import os
 import re
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
     core,
     learning,
-    legacy_sync,
     next_id,
     ops,
     phase,
@@ -58,6 +57,12 @@ def operate(
         # ワークツリーの片付けはチケット制御が無くても打てる（ccnavi-clean.sh --worktree の中身）。
         # tidy はチケットを読むので、チケット制御が要る。
         return _worktree(stdout, stderr, conf, root, args, words, cwd)
+    if words[:2] == ["ticket", "next-id"]:
+        # 番号を答えるだけ（読むだけ）。チケット制御が無くても使える。
+        # 0 は成功、1 は識別子にできない形、
+        # 2 は数えきれなかった。
+        code = next_id.run(stdout, stderr, root, conf, words[2:])
+        return EXIT_OK if code == 0 else (2 if code == 2 else EXIT_ERROR)
     if not conf.tickets_enabled:
         stderr.write(
             f"ccnavi: チケット制御が無効になっています（{settings.TICKET_CONTROL_ENV}）。\n"
@@ -192,9 +197,6 @@ def operate(
             code = status.run(
                 stdout, stderr, root, conf, write_and_push.family_of(target) if target else ""
             )
-    elif kind == "ticket" and verb == "next-id":
-        # ticket next-id [<先頭の語> <slug>]。読むだけ。issue の無い親の識別子の番号を答える。
-        code = next_id.run(stdout, stderr, root, conf, words[2:])
     elif kind == "ticket" and verb == "propose" and target:
         # ticket propose <識別子>。親子の提案（todo/ と flows/）を、書いたパスの一覧に載せるだけ。
         # コミットと push は sh（ccnavi-ticket.sh propose）が write-and-push の手順で行う。
@@ -308,7 +310,7 @@ def _worktree(
         return EXIT_OK if code == 0 else EXIT_ERROR
     if verb == "name" and len(words) == 3:
         # 直接作業の名前の形を言う（warn の 1 行）。sh の作成の後に呼ぶ。
-        text = ticket_ids.direct_name_warning(words[2], conf.branch_prefixes)
+        text = ticket_ids.direct_name_warning(words[2], conf.branch_prefixes, root)
         if text:
             stdout.write(f"warn: {text}\n")
         return EXIT_OK
@@ -424,9 +426,8 @@ def _write_and_push_bypass(
 def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
     """`ccnavi-sync.sh` が要るパスと名前を 1 行 1 項目（`<鍵> <値>`）で返す。
 
-    sh は jq を使わず、JSON も読まない。置き場のパス（ツリーのルートからの相対）と、
-    `.claude/settings.local.json` の `env` に書かれた統合先の名前をここが読んで渡す。
-    統合先の名前は環境変数からは読まない（sh が先に環境変数を見る）。
+    sh は jq を使わず、JSON も読まない。置き場のパス（ツリーのルートからの相対）をここが渡す。
+    統合先の名前は返さない（sh が各リポジトリの `origin/HEAD` で決める）。
     置き場は固定（`settings.load` の既定）で、env では動かない。`ccnavi-sync.sh` は答えが
     無いとき同じ既定を直に使う。
     ネットワークにも git にも触らない。
@@ -435,7 +436,6 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
         ("approved", fsio.slashed(conf.approved).strip("/")),
         ("proposals", fsio.slashed(conf.tickets).strip("/")),
         ("home", fsio.slashed(conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")),
-        ("integration", settings.integration_local(root)),
     )
     for key, value in lines:
         stdout.write(f"{key} {value}\n")
@@ -443,7 +443,6 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
 
 
 SYNC_RETIRED_HEAD = "retired 1"
-SYNC_MIGRATE_HEAD = "migrate 1"
 
 
 def _one_line(text: str) -> str:
@@ -468,75 +467,6 @@ def sync_retired(stdout: TextIO, conf: settings.Settings) -> int:
         else:
             stdout.write(f"retired {e.parent} {e.repo} {e.mr or '-'} {e.branch or '-'}\n")
     return 0
-
-
-def sync_migrate(stdout: TextIO, conf: settings.Settings, root: str) -> int:
-    """旧い取り込み状態（`sync/<repo>/families/<親>`・`integration/`）の 1 回限りの移行。冪等。
-
-    ```
-    migrate 1
-    moved <親> <repo>          retire/<親>.json を新規に書いた、または不足分（mr・branch）を足した
-    kept <親> <repo>           retire/<親>.json が既にあり、そちらを尊重した
-    dropped <親> <repo> <理由>  親のワークツリーが在る、または mr も branch も無い。旧い記録を消した
-    skipped <親> <repo> <理由>  リンクなど。消さない
-    removed integration <repo> sync/<repo>/integration/ を消した
-    ```
-
-    親のワークツリーが無い旧い記録だけを `retire/<親>.json` に移す。取り込みの状態（gone や
-    blocked など）は捨てる。リンクは辿らない。ネットワークにも git にも触れない。
-    """
-    stdout.write(SYNC_MIGRATE_HEAD + "\n")
-    if not conf.state:
-        return 0
-    for fam in legacy_sync.read_families(conf.state):
-        _migrate_one(stdout, conf, root, fam)
-    for repo in legacy_sync.integration_repos(conf.state):
-        if not _REPO_NAME.fullmatch(repo):
-            stdout.write(f"skipped integration {_one_line(repo)} リポジトリの名前の形が違う\n")
-            continue
-        removed, why = legacy_sync.remove_integration(conf.state, repo)
-        if why:
-            stdout.write(f"skipped integration {repo} {_one_line(why)}\n")
-        elif removed:
-            stdout.write(f"removed integration {repo}\n")
-    return 0
-
-
-def _migrate_one(
-    stdout: TextIO, conf: settings.Settings, root: str, fam: legacy_sync.LegacyFamily
-) -> None:
-    name = fam.name or "-"
-    repo = fam.repo if _REPO_NAME.fullmatch(fam.repo) else "-"
-    if fam.skipped or not fam.name:
-        stdout.write(f"skipped {name} {repo} {_one_line(fam.skipped or '名前が空')}\n")
-        return
-    if repo == "-" or not _FAMILY.fullmatch(fam.name) or ".." in fam.name:
-        stdout.write(f"skipped {name} {repo} 名前の形が違う\n")
-        return
-    if os.path.lexists(tree.worktree_path(root, fam.name)):
-        gone = legacy_sync.remove_family(conf.state, fam.repo, fam.name)
-        _migrate_dropped(stdout, fam, gone, "親のワークツリーが在る")
-        return
-    if not fam.mr and not fam.branch:
-        gone = legacy_sync.remove_family(conf.state, fam.repo, fam.name)
-        _migrate_dropped(stdout, fam, gone, "mr も branch も無い")
-        return
-    result = retire.merge_legacy(conf, fam.name, tree.project_of_key(fam.repo), fam.branch, fam.mr)
-    if result.failed:
-        stdout.write(f"skipped {fam.name} {fam.repo} {_one_line(result.failed)}\n")
-        return
-    stdout.write(f"{result.status} {fam.name} {fam.repo}\n")
-    if not legacy_sync.remove_family(conf.state, fam.repo, fam.name):
-        stdout.write(f"skipped {fam.name} {fam.repo} 旧い記録を消せない\n")
-
-
-def _migrate_dropped(
-    stdout: TextIO, fam: legacy_sync.LegacyFamily, removed: bool, why: str
-) -> None:
-    if removed:
-        stdout.write(f"dropped {fam.name} {fam.repo} {why}\n")
-    else:
-        stdout.write(f"skipped {fam.name} {fam.repo} {why}。旧い記録を消せない\n")
 
 
 def _in_state(conf: settings.Settings, path: str) -> bool:

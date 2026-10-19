@@ -836,7 +836,7 @@ class OrderingAndIsolationTest(Base):
             mock.patch.object(events, "stop_rules_nudge", side_effect=spy),
         ):
             events.decide_at_stop(io.StringIO(), io.StringIO(), self.conf, self.root, again,
-                                  audit.Record(), modes.ENABLE)  # fmt: skip
+                                  audit.Record(), mode=modes.ENABLE)  # fmt: skip
         self.assertEqual(seen, [False, False, False, False])
         plan = sr.read_plan(self.state, self.key)
         self.assertTrue(plan["rejudge"])
@@ -858,7 +858,7 @@ class OrderingAndIsolationTest(Base):
 
         with mock.patch.object(events, "_finish_nudge", side_effect=spy):
             events.decide_at_stop(io.StringIO(), io.StringIO(), self.conf, self.root, again,
-                                  audit.Record(), modes.ENABLE)  # fmt: skip
+                                  audit.Record(), mode=modes.ENABLE)  # fmt: skip
         self.assertEqual(seen, [True])  # 継続でなければ、これまでどおり stop_hook_active が真のまま
 
 

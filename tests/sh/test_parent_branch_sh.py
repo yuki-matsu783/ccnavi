@@ -18,7 +18,7 @@ ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは�
    （ccnavi-fetch.sh）が、HEAD から読んだ親のブランチ名の ref を使う
 5. 親のワークツリーでは、今のブランチと、変換するとその識別子になるブランチのほかへ移れない
 6. 子のワークツリーからは送れない（子のブランチは子の識別子）
-7. HEAD が合わない・`branch:` の欄が残る（エラー）場合の動き。旧い取り込み状態が残っていても
+7. HEAD が合わない・`branch:` の欄が残る（エラー）場合の動き。古い取り込み状態が残っていても
    判定に使わない
 8. リモートから消えた親のブランチへは、記録が無くても送れない（push の関門）。一度も送っていない
    親の最初の push は通す
@@ -391,24 +391,6 @@ class ParentBranchShTest(unittest.TestCase):
         self.approve()
         self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
-
-    # ---- 旧い取り込み状態が残っていても判定に使わない
-
-    def test_a_leftover_legacy_record_does_not_change_the_answer(self):
-        """旧い取り込み状態（branch が別のブランチ）が残っていても、判定には使わない。
-        親のブランチ名は HEAD から読む。先頭の `sync migrate` が旧い記録を捨てる。"""
-        self.imported_family()
-        record = os.path.join(self.state, "sync", "self", "families", PARENT)
-        write(
-            record,
-            "remote origin\nbranch feature/other\nsha 0\nfetched_at 1\nstate gone\nreason \n",
-        )
-        family = self.ok(self.exe("write-and-push", "family", PARENT))
-        self.assertIn("target yes\n", family.stdout)
-        self.assertIn(f"branch {BRANCH}\n", family.stdout)
-        self.ok(self.sh("ccnavi-sync.sh", PARENT))
-        self.assertFalse(os.path.exists(record))
-        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
 
     def test_a_left_over_branch_field_is_an_error(self):
         self.add_parent_tree()

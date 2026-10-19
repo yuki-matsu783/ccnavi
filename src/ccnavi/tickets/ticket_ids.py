@@ -128,18 +128,27 @@ def has_form(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> bool:
     return form_of(name, prefixes) is not None
 
 
-def direct_name_warning(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> str:
+def direct_name_warning(
+    name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES, root: str = ""
+) -> str:
     """直接作業のワークツリーの名前が形に合わないときの案内（1 行）。合えば空。
 
     `--lint` の warn と、`ccnavi-worktree.sh` が切ったあとに出す案内が同じ文面を使う。
+    `root` があれば、切り方を `sh <引用したパス>/ccnavi-worktree.sh <名前>` の完全な形で出す。
+    無いときだけ、これまでのスクリプト名だけの形にする。
     """
     if has_form(name, prefixes):
         return ""
+    cut = (
+        f"`{settings.script_command(root, 'ccnavi-worktree.sh')} <名前>`"
+        if root
+        else "`ccnavi-worktree.sh <名前>`"
+    )
     return (
         f"直接作業のワークツリー {name} の名前が `<先頭の語>-<番号>-<slug>` の形でない。"
         "新しく切るときは、先頭の語（CCNAVI_BRANCH_PREFIXES）と番号（issue の番号、"
         "無ければ `ccnavi-ticket.sh next-id` の通し番号）を付けて "
-        "`worktree add .claude/worktrees/<名前> -b <名前> <統合先>` で切る。"
+        f"{cut} で切る。"
         "既にある名前は変えなくてよい"
     )
 
@@ -150,15 +159,18 @@ def identifier_number(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> i
     return int(matched.group("num")) if matched else None
 
 
-def next_serial(names, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int:
+def next_serial(
+    names, prefixes=settings.DEFAULT_BRANCH_PREFIXES, skip_children: bool = True
+) -> int:
     """issue の無い提案に使う、次の通し番号。番号を持つ識別子の最大 + 1。
 
     数えるのは親の識別子だけ（子は親の番号を持つ）。先頭の語が違っても同じ通し番号を使う。
-    番号を持つものが無ければ 1。
+    番号を持つものが無ければ 1。`skip_children` が偽なら、子の形の名前も数える（手元のブランチと
+    ワークツリーの名前には、親の居ない子や、末尾が子の形の名前が混ざりうる。子の番号は親と同じ）。
     """
     found = []
     for name in names:
-        if _CHILD.match(name or ""):
+        if skip_children and _CHILD.match(name or ""):
             continue
         number = identifier_number(name, prefixes)
         if number:
@@ -358,8 +370,8 @@ def branch_name_problems(
     深刻度は呼ぶ側が決める（いまは warn）。大文字小文字だけが違う識別子、子の形に当たる親の識別子、
     番号の重なりは、他のチケットと並べて見るので `lint` の側で数える。
 
-    `integration` はその時点の統合先の名前。環境変数からは読まず、呼び手が
-    渡したときだけ予約に足す。固定のリスト（main など）と同じく大文字小文字を区別せずに比べる。
+    `integration` はその時点の統合先の名前。呼び手が渡したときだけ予約に足す。
+    固定のリスト（main など）と同じく大文字小文字を区別せずに比べる。
     `serial` は次の通し番号（`next_serial`）。渡されたときだけ、形の warn の文に添える。
     `prefixes` は使える先頭の語のリスト（`settings.branch_prefixes`）。
     """

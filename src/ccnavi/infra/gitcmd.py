@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 from dataclasses import dataclass
 
 # 渡されなかったときの期限。
@@ -103,6 +104,44 @@ def run(
     except OSError as exc:
         return Done(failure=f"{exc}")
     return Done(done.returncode, done.stdout, done.stderr)
+
+
+# 期限つきの呼び出しが、期限の手前に残す余白と、これ以下の残りなら起こさない下限（秒）。
+DEADLINE_MARGIN = 0.5
+DEADLINE_FLOOR = 0.2
+
+
+def run_until(
+    cwd: str,
+    args: list[str],
+    deadline: float,
+    timeout: float = TIMEOUT_SECONDS,
+    raw_paths: bool = False,
+) -> Done:
+    """期限（`time.monotonic` の絶対時刻）を守って git を起こす。
+
+    timeout は `min(timeout, 残り - 0.5 秒)`。残りが 0.2 秒以下なら git を起こさず、
+    `timed_out` の `Done` を返す。守るのは「期限を過ぎてから git を起こさない」ことだけで、
+    処理全体が期限内に終わることは約束しない（上限は各呼び出しの timeout が決める）。
+    """
+    left = deadline - time.monotonic() - DEADLINE_MARGIN
+    if left <= DEADLINE_FLOOR:
+        return Done(failure="期限不足", timed_out=True)
+    return run(cwd, args, min(timeout, left), raw_paths)
+
+
+def output_until(
+    cwd: str,
+    args: list[str],
+    deadline: float,
+    timeout: float = TIMEOUT_SECONDS,
+    raw_paths: bool = False,
+) -> tuple[int, str, bool]:
+    """終了コードと標準出力と、期限不足か（時間切れも含む）。起こせなければ (1, "", 理由)。"""
+    done = run_until(cwd, args, deadline, timeout, raw_paths)
+    if done.failure:
+        return 1, "", done.timed_out
+    return done.code, done.out, False
 
 
 def output(
