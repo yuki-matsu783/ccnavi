@@ -130,10 +130,19 @@ def _dir_rules(
     )
     write_rule.compiled = re.compile(path, re.IGNORECASE)
     loose = place + r"([\\/]|\s|$)"
+    # 書き込み動詞の列挙（リダイレクト、mv・rm・tee・dd・sed -i、cp の行き先）に加えて、
+    # 置き場の名前を引数に取る作成・変更・展開の道具と、コードを走らせる道具も止める。
+    # 置き場の名前が現れるだけで当たるので、読み取りの道具（cat・grep・ls・head）は巻き込まない。
+    also = (
+        r"(^|\x00|[;&|]\s*)(touch|mkdir|chmod|chown|rsync|sponge|unzip|tar|python3?|node|perl|ruby"
+        r"|Set-Content|Add-Content|New-Item|Copy-Item|Move-Item|Remove-Item|Out-File)\b"
+        rf"[^\x00]*{place}"
+    )
     shell = "|".join(
         (
             rf"{selfguard_shell._WRITE_VERBS}{loose}",
             selfguard_shell.copy_destination_regex(selfguard_shell.copy_last_place(place), loose),
+            also,
         )
     )
     shell_rule = rules.Rule(

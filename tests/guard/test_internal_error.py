@@ -329,7 +329,20 @@ class FailClosedByToolTest(unittest.TestCase):
             ("cat README.md", 0),
             ("head wip/a.md", 0),
             ("sh .ccnavi/scripts/ccnavi-ticket.sh status", 0),
-            ("sh /w/.ccnavi/scripts/ccnavi-ticket.sh --help", 0),
+            ("sh /w/.ccnavi/scripts/ccnavi-ticket.sh --help", 2),
+            ("sh /tmp/evil/.ccnavi/scripts/ccnavi-ticket.sh status", 2),
+            ("sh ../x/.ccnavi/scripts/ccnavi-ticket.sh status", 2),
+            ("wc --files0-from=.env", 2),
+            ("cat -n README.md", 2),
+            ("cat /dev/zero", 2),
+            ("ls -R", 2),
+            ("cat .git/config", 2),
+            ("cat .GIT/config", 2),
+            ("cat logs/state/ops/a.json", 2),
+            ("cat key.pem", 2),
+            ("cat ~/.aws/credentials", 2),
+            ("cat credentials.json", 2),
+            ("cat secrets/prod.txt", 2),
             ("less README.md", 2),
             ("rg --pre cmd x .", 2),
             ("echo hi", 2),
@@ -344,6 +357,12 @@ class FailClosedByToolTest(unittest.TestCase):
             for mode in ("enable", "dry-run"):
                 with self.subTest(command=command, mode=mode):
                     self.assertEqual(self.crash("Bash", {"command": command}, mode), expected)
+
+    def test_the_status_script_must_be_this_workspaces(self):
+        mine = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-ticket.sh")
+        self.assertEqual(self.crash("Bash", {"command": f"sh {mine} status"}), 0)
+        self.assertEqual(self.crash("Bash", {"command": f"sh {mine} --help"}, "dry-run"), 0)
+        self.assertEqual(self.crash("Bash", {"command": f"sh {mine} start i0001"}), 2)
 
     def test_powershell_stops(self):
         self.assertEqual(self.crash("PowerShell", {"command": "pwd"}, "dry-run"), 2)
@@ -378,7 +397,7 @@ class DeadlineTextTest(unittest.TestCase):
         result, row = self.run_late("dry-run", "ls")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
-        self.assertIn("would have been stopped", result.stderr)
+        self.assertIn("went through", result.stderr)
         self.assertNotIn("so it stopped it", result.stderr)
         self.assertEqual(row["reason"], "deadline-exceeded")
 

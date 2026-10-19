@@ -93,6 +93,54 @@ class DryRunKindsTest(HookCase):
         self.assertEqual(decision, "deny")
 
 
+class ClassificationTest(HookCase):
+    """分類を決める分岐ごとに、dry-run で止まるか報告だけかを固定する。"""
+
+    def test_a_raw_git_stays_an_aux_stop_when_a_layer_rule_also_hits(self):
+        # 層の deny（認証情報）と同時に当たっても、生の git の補助止めは dry-run で効く。
+        decision, text = self.bash("git status; cat .env", mode="dry-run")
+        self.assertEqual(decision, "deny", text)
+        self.assertIn("still applies", text)
+
+    def test_the_redirect_cap_stops_writes_to_the_places_in_dry_run(self):
+        command = (
+            "echo hi "
+            + "> /dev/null " * 60
+            + "> .ccnavi/approved/phases/i0001/1.reviewed ; cat <<EOF"
+        )
+        decision, text = self.bash(command, mode="dry-run")
+        self.assertEqual(decision, "deny", text)
+
+    def test_rewrites_that_can_hide_git_stop_in_dry_run(self):
+        for command in ("c=git; $c push origin main", "{git,push,origin,main}"):
+            with self.subTest(command=command):
+                decision, text = self.bash(command, mode="dry-run")
+                self.assertEqual(decision, "deny", text)
+
+    def test_a_path_containing_ccnavi_is_not_an_entry(self):
+        decision, text = self.bash("ls /work/ccnavi/{src,tests}", mode="dry-run")
+        self.assertNotEqual(decision, "deny", text)
+        # enable では書き直しを求めて止める。
+        decision, _ = self.bash("ls /work/ccnavi/{src,tests}")
+        self.assertEqual(decision, "deny")
+
+    def test_the_subagent_rewrites_stop_in_dry_run(self):
+        decision, text = self.bash("ls {src,tests}", mode="dry-run", agent="a1")
+        self.assertEqual(decision, "deny", text)
+
+    def test_other_writers_cannot_touch_the_places(self):
+        for command in (
+            "touch .ccnavi/approved/phases/i0001/1.reviewed",
+            "mkdir -p .ccnavi/approved/phases/i0001",
+            "rsync -a /tmp/x .ccnavi/approved/",
+            "python3 -c \"open('.ccnavi/approved/doing/x.md','w')\"",
+            "chmod 000 logs/state/ops/a1.json",
+        ):
+            with self.subTest(command=command):
+                decision, text = self.bash(command, mode="dry-run")
+                self.assertEqual(decision, "deny", text)
+
+
 class PlacesTest(HookCase):
     PLACES = (
         ".ccnavi/approved/phases/i0001/1.reviewed",
@@ -171,6 +219,9 @@ class SubagentRolesTest(HookCase):
         "sh .ccnavi/scripts/ccnavi-sync.sh",
         "sh .ccnavi/scripts/ccnavi-worktree.sh add x",
         "sh .ccnavi/scripts/ccnavi-clean.sh --worktree i0001-01-01",
+        "sh .ccnavi/scripts/ccnavi-launcher.sh worktree add x",
+        "sh .ccnavi/scripts/ccnavi-launcher.sh review comment 3",
+        "sh .ccnavi/scripts/ccnavi-launcher.sh",
     )
     PASSED = (
         "sh .ccnavi/scripts/ccnavi-ticket.sh status",
@@ -187,6 +238,8 @@ class SubagentRolesTest(HookCase):
         "sh .ccnavi/scripts/ccnavi-fetch.sh",
         "sh .ccnavi/scripts/ccnavi-branches.sh",
         "sh .ccnavi/scripts/ccnavi-launcher.sh --docs x",
+        "sh .ccnavi/scripts/ccnavi-launcher.sh --lint",
+        "sh .ccnavi/scripts/ccnavi-launcher.sh --explain x",
     )
 
     def test_the_subagent_cannot_type_them_in_any_mode(self):

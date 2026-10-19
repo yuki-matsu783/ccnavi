@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from collections.abc import Callable
 from typing import TextIO
@@ -588,12 +589,7 @@ def decide_before(
     # 止まらずに通る。どれも書き直す方法が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
     # 1 回で返す。
     if rewrites:
-        # 呼び手がサブエージェントか、解析した層に ccnavi の入口が含まれる形は、関門の抜け道に
-        # なりうるので dry-run でも止める（補助）。それ以外の書き直しは一般の保護。
-        entry_in_layers = "ccnavi" in subject.lower() or any(
-            "ccnavi" in layer.lower() for _, layer, _ in inner
-        )
-        rewrite_kind = AUX if payload.agent_id or entry_in_layers else GENERAL
+        rewrite_kind = _rewrite_kind(conf, payload, subject, inner, rewrites)
         forms = list(dict.fromkeys(form for form, _ in rewrites))
         record.code = reasons.CODE_REWRITE[forms[0]]
         record.rules = [reasons.rewrite_rule(form) for form in forms]
@@ -664,12 +660,14 @@ def decide_before(
             if time.monotonic() > deadline:
                 # 期限切れの結論もツールの種類で決める。通すのは、設定を読まずに安全と
                 # 分かる読み取りだけ。dry-run でも、通さない呼び出しは止めて、そう言う。
-                code = modes.fail_closed(mode, payload.tool_name, safe=failsafe.is_safe(payload))
+                code = modes.fail_closed(
+                    mode, payload.tool_name, safe=failsafe.is_safe(payload, root)
+                )
                 stderr.write(
                     reasons.deadline_exceeded(
                         audit.REASON_DEADLINE_EXCEEDED,
                         DEADLINE_SECONDS,
-                        mode=mode if code == EXIT_OK else modes.ENABLE,
+                        passed=code == EXIT_OK,
                     )
                     + "\n"
                 )
@@ -688,6 +686,9 @@ def decide_before(
         if group:
             verdict = name
             break
+    # 土台（base）の deny を落とす前の id。分類（dry-run でも止めるか）は落とす前の組で決める。
+    # 層の deny が同時に当たっても、生の git の補助止めの分類を失わない。
+    hit_ids = {rule.id for rule in group}
     if verdict == rules.DENY and any(rule.base for rule in group):
         # 組み込みの deny（土台）は常に当たるが、レイヤーの deny にも当たったなら、
         # そちらだけを言う。拒否は変わらない。同じ拒否を 2 つの文面で返さないため。
@@ -917,7 +918,7 @@ def decide_before(
         context,
         conf=conf,
         root=root,
-        kind=final_kind(conf, group, ticket_reason, capped),
+        kind=final_kind(conf, hit_ids, ticket_reason, capped),
     )
 
 
@@ -934,24 +935,56 @@ GATE_RULE_IDS = (
 )
 
 
-def final_kind(
-    conf: settings.Settings, group: list[rules.Rule], ticket_reason: str, capped: bool
-) -> str:
+def final_kind(conf: settings.Settings, ids: set[str], ticket_reason: str, capped: bool) -> str:
     """ルールとチケットの判定を拒否にした回の分類。dry-run でも止めるかを決める。
 
-    関門（GATE）が優先、次が補助（AUX）、それ以外は一般。チケット制御が無効なら関門は足されて
-    いない。生の git はそのときでも止めるが、一般の保護として扱う。
+    ids は当たったルールの id（土台を落とす前の組）。関門（GATE）が優先、次が補助（AUX）、
+    それ以外は一般。チケット制御が無効なら関門は足されていない。生の git はそのときでも止めるが、
+    一般の保護として扱う。
+
+    `>` の数の上限で上げた拒否は、シェルから書き込む形の保護（関門の置き場を守る 2 本を含む）を
+    生の文字列に当てていない代わりの拒否。関門の穴にならないよう、チケット制御が有効なら関門にする。
     """
     if capped:
-        return GENERAL
+        return GATE if conf.tickets_enabled else GENERAL
     if ticket_reason:
         return GATE if conf.tickets_enabled else GENERAL
-    ids = {rule.id for rule in group}
     if conf.tickets_enabled and ids & set(GATE_RULE_IDS):
         return GATE
     if ticket_guard.RAW_GIT_RULE_ID in ids:
         return AUX if conf.tickets_enabled else GENERAL
     return GENERAL
+
+
+# 書き直しを求める形のうち、生の git や ccnavi の入口を隠しうるもの。語として現れる `git` と
+# `ccnavi`（パスの一部の `/ccnavi/` は数えない）、保護済みの sh の名前。
+_ENTRY_WORD = re.compile(
+    r"(?<![\w/.-])(?:git|ccnavi)(?:\.exe)?(?![\w-])|ccnavi-[\w-]+\.sh", re.IGNORECASE
+)
+
+
+def _rewrite_kind(
+    conf: settings.Settings,
+    payload: hookio.Input,
+    subject: str,
+    inner: list[tuple[str, str, bool]],
+    rewrites: list[tuple[str, str]],
+) -> str:
+    """書き直しを求める拒否の分類。生の git や ccnavi の入口を隠しうる形は、補助にする。
+
+    実行時に決まるコマンド名（`c=git; $c push`）は、中身を読めないので生の git を隠しうる。
+    呼び手がサブエージェントの回、語としての `git` / `ccnavi` / 保護済みの sh の名前が現れる回も
+    同じ。ただし文字列の一部に `ccnavi` が入っているだけ（`ls /work/ccnavi/{src,tests}`）では
+    補助にしない。チケット制御が無効なら補助は足さない。
+    """
+    if not conf.tickets_enabled:
+        return GENERAL
+    if payload.agent_id:
+        return AUX
+    if any(form == shellread.FORM_COMMAND_NAME for form, _ in rewrites):
+        return AUX
+    texts = [subject, *(layer for _, layer, _ in inner), *(text for _, text in rewrites)]
+    return AUX if any(_ENTRY_WORD.search(text) for text in texts) else GENERAL
 
 
 def refuse(

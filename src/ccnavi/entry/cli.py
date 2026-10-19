@@ -1289,15 +1289,20 @@ def _internal_error(
     record.code, record.rules = "", []
     record.detail = f"{kind} at {where}" if where else kind
     if payload.event in ("", hookio.PRE_TOOL_USE, hookio.POST_TOOL_USE):
+        if payload.event == hookio.POST_TOOL_USE:
+            code = modes.fail_closed(mode)
+        else:
+            # 呼び出しの前（イベントが分からない回を含む）は、ツールの種類で決める。設定を読まずに
+            # 通してよいと確かめられた読み取りだけを通す（`hook.failsafe`）。
+            code = modes.fail_closed(mode, payload.tool_name, safe=failsafe.is_safe(payload, root))
+        passed = code == 0 and payload.event != hookio.POST_TOOL_USE
         stderr.write(
-            reasons.internal_error(audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path)
+            reasons.internal_error(
+                audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path, passed=passed
+            )
             + "\n"
         )
-        if payload.event == hookio.POST_TOOL_USE:
-            return modes.fail_closed(mode)
-        # 呼び出しの前（イベントが分からない回を含む）は、ツールの種類で決める。設定を読まずに
-        # 通してよいと確かめられた読み取りだけを通す（`hook.failsafe`）。
-        return modes.fail_closed(mode, payload.tool_name, safe=failsafe.is_safe(payload))
+        return code
     if payload.event == hookio.SUBAGENT_STOP:
         subagent.unchecked_after_error(stderr, conf, root, payload)
     hookio.write_system_message(
