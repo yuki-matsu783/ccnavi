@@ -48,9 +48,13 @@ comment() {
 	[ -z "${POST_FAIL:-}" ] || return 1
 	printf '{"url":"https://h/c/1","created_at":"","author":"me"}\\n'
 }
+create_issue() {
+	cat "$1" >"$STATE/issue.md"
+	printf '{"number":5,"url":"https://h/o/r/issues/5"}\\n'
+}
 find_marked() { printf 'yes %s\\n' "${FOUND:-}"; }
 account() { printf 'me'; }
-comment_staged "$@"
+"${FUNC:-comment_staged}" "$@"
 """
 
 
@@ -114,6 +118,29 @@ class CommentStagedTest(unittest.TestCase):
         log = self.ops_log()
         self.assertIn("stage-set " + "a" * 32 + " comment pending", log)
         self.assertIn("comment sent https://h/c/1 me", log)
+
+    def test_close_early_issue_is_created_with_a_marker(self):
+        done = subprocess.run(
+            [SHELL, self.harness, "close-early", "fam", "issue", "issue", "7", "u", self.body],
+            env={
+                **os.environ,
+                "JQ_BIN": JQ,
+                "STATE": self.dir,
+                "OPID": "a" * 32,
+                "ST": "pending",
+                "TRIES": "0",
+                "FUNC": "staged_send",
+            },
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60,
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("issues/5", done.stdout)
+        with open(os.path.join(self.dir, "issue.md"), encoding="utf-8") as f:
+            self.assertIn("stage=issue -->", f.read())
+        self.assertIn("issue sent https://h/o/r/issues/5", self.ops_log())
 
     def test_without_a_record_it_posts_like_before(self):
         done = self.run_staged(NO_RECORD="1")
