@@ -176,7 +176,7 @@ ccnavi_integration() {
 
 # 統合先が決まらないときの案内の 1 文。<ツリー>
 #
-# origin が無ければ「origin が無い」と言い、あれば origin/HEAD を直す手を言う。呼ぶ側が前置きを付ける。
+# origin が無ければ「origin が無い」と言い、あれば origin/HEAD を直す方法を示す。呼ぶ側が前置きを付ける。
 ccnavi_integration_hint() {
 	if git -C "$1" remote get-url origin >/dev/null 2>&1; then
 		printf '統合先 (origin/HEAD) が決まらない。ユーザに git fetch origin のあと git remote set-head origin -a を頼んでください。'

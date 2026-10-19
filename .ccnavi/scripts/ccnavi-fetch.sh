@@ -13,11 +13,11 @@
 # 始まる。統合先に取り込むときに fast-forward が通らず、承認済みチケットも古い版で判定することになる。
 #
 # 手元の `origin/HEAD` は clone のときに作られたまま、普通の fetch では更新されない。ホストの既定ブランチが
-# 変わっていたら、第 1 周（承認済みチケット）の後、第 2 周（統合先を進める）の前に付け替える。
-# `ls-remote --symref origin HEAD` でホストの答えを聞き、手元の統合先と違えばそのブランチを fetch して、
+# 変わっていたら、第 1 周（承認済みチケット）の後、第 2 周（統合先を進める）の前に向け直す。
+# `ls-remote --symref origin HEAD` でホストに既定ブランチを聞き、手元の統合先と違えばそのブランチを fetch して、
 # 成功してから `refs/remotes/origin/HEAD` を向け直す（`git remote set-head origin -a` は手元に
-# `origin/<名前>` が無いと失敗するため、自分で順を踏む）。付け替えたときだけ 1 行言う。ホストに聞けない・
-# fetch できない・時間切れのときは、何も言わず何も変えない。
+# `origin/<名前>` が無いと失敗するため、自分で順を踏む）。向け直したときだけ 1 行出す。ホストに聞けない・
+# fetch できない・時間切れのときは、何も出さず何も変えない。
 #
 # デフォルトブランチは、チェックアウトされていなくても進める。 ワークスペースルートが
 # `main` 以外に居るセッションでは、上の 1 つめ（そのツリーがチェックアウトしているブランチを
@@ -176,12 +176,12 @@ ccnavi_fetch_integration() {
 	ccnavi_integration "$1"
 }
 
-# 手元の origin/HEAD を、ホストの既定ブランチに付け替える。<リポジトリ>
+# 手元の origin/HEAD を、ホストの既定ブランチに向け直す。<リポジトリ>
 #
-# 何も言わないのは、ホストに聞けない・fetch できない・時間切れ・ホストの答えが手元と同じ、のとき。
-# 失敗は $scratch/failed に書かない（ここは「付け替えられなかった」だけで、第 1 周の取得の失敗とは別）。
+# 何も出さないのは、ホストに聞けない・fetch できない・時間切れ・ホストに聞いた名前が手元と同じ、のとき。
+# 失敗は $scratch/failed に書かない（ここは「向け直せなかった」だけで、第 1 周の取得の失敗とは別）。
 # 第 1 周でその origin への接続に失敗していたら、同じ origin で二重に待たないよう聞かない。
-# fetch が成功する前に付け替えない（存在しない ref を指す状態を残さない）。
+# 向け直すのは fetch が成功した後にする（存在しない ref を指す状態を残さないため）。
 ccnavi_fetch_retarget() {
 	ccnavi_rt_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
 	[ -n "$ccnavi_rt_url" ] || return 0
@@ -199,7 +199,7 @@ ccnavi_fetch_retarget() {
 	git check-ref-format "refs/heads/$ccnavi_rt_new" 2>/dev/null || return 0
 	ccnavi_rt_old=$(ccnavi_fetch_integration "$1" || :)
 	[ "$ccnavi_rt_new" != "$ccnavi_rt_old" ] || return 0
-	# そのブランチを取る。成功してから付け替える。
+	# そのブランチを取る。成功してから向け直す。
 	ccnavi_rt_left=$(ccnavi_fetch_left)
 	[ "$ccnavi_rt_left" -gt 0 ] || return 0
 	ccnavi_rt_limit="$limit"
@@ -367,7 +367,7 @@ report=$(
 	done
 
 	# 第 1.5 周。リポジトリごとに、手元の origin/HEAD をホストの既定ブランチに合わせる。
-	# 第 2 周は付け替えた後の名前で進める。
+	# 第 2 周は向け直した後の名前で進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue
 		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue

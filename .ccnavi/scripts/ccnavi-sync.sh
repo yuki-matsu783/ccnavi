@@ -24,7 +24,7 @@
 #   2. 統合先の名前を決める。ホストのデフォルトブランチ（`ls-remote --symref origin HEAD`）、
 #      読めなければ手元の origin/HEAD、それも無ければ一覧にある main・master。決まらなければ止める
 #   3. 統合先を fetch する（取り込みの後の検査が、レイヤーのずれを origin/<統合先> と比べるため）。
-#      成功した後、手元の origin/HEAD がホストの答えと違えば付け替える（fetch の前には付け替えない）
+#      成功した後、手元の origin/HEAD がホストに聞いた名前と違えば向け直す（fetch の前には向け直さない）
 #
 # 親子のチケットごとに次を行う（ロックを待って取る）。
 #
@@ -269,7 +269,7 @@ default_branch() {
 		db_head="${db_head#origin/}"
 	fi
 	if [ -n "$db_head" ] && has_head "$2" "$db_head"; then
-		# ホストが答えた名前か。`$( )` の中で呼ぶので、変数ではなくファイルで呼び元へ渡す。
+		# ホストに聞いて得た名前か。`$( )` の中で呼ぶので、変数ではなくファイルで呼び元へ渡す。
 		[ -z "$db_host" ] || : >"$scratch/db-host"
 		printf '%s\n' "$db_head"
 		return 0
@@ -905,7 +905,7 @@ while IFS= read -r key <&4; do
 		repo_fail
 		continue
 	fi
-	# ホストが答えた名前と手元の origin/HEAD が違えば、fetch が成功した今、付け替える。
+	# ホストに聞いた名前と手元の origin/HEAD が違えば、fetch が成功した今、向け直す。
 	if [ -e "$scratch/db-host" ]; then
 		old_head=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
 		old_head="${old_head#origin/}"

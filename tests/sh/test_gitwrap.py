@@ -1848,7 +1848,7 @@ class IntegrationPushTest(GitWrapperTest):
         self.assertRefused(self.push(project), bare2)
 
     def test_workspace_wide_settings_do_not_reach_a_project(self):
-        """環境変数と settings.local.json に main を置いても、プロジェクトの統合先は動かない。
+        """環境変数と settings.local.json に main を置いても、プロジェクトの統合先は変わらない。
         ワークスペースの origin/HEAD は main、projects/app の origin/HEAD は trunk。
         trunk を projects/app から送れば止まり、ワークスペースから送る trunk は止まらない。
         変数が残っていても読まないことを確かめる（B1 の再発防止）。"""

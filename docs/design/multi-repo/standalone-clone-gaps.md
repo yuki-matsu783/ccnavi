@@ -91,8 +91,8 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 #### B1 統合先ブランチ名を、ワークスペースの値だけで決める（中。変数を廃止して解消した）
 
 - 当時の処理: 統合先ブランチ名の解決は、環境変数 `CCNAVI_INTEGRATION_BRANCH`、`settings.local.json` の env、`origin/HEAD` の順で、前の 2 つはワークスペースで 1 つの値だった。sh は `ccnavi_integration_local`（ワークスペースの `sync paths` だけを見る）、Python は `ops_stop_integrate.integration_name`（`project` 引数を使わない）と `infra/settings.py` が読んでいた
-- 当時の害: ワークスペースの値が全プロジェクトに当たった。ワークスペースが `develop`、p の既定が `trunk` のとき、`ccnavi-git.sh push` の拒否が `trunk` を統合先と見ず止めない。Python の `--lint` の識別子の予約も、プロジェクトの統合先で効かない。`settings.local.json` はエージェントが書けるので、エージェントが統合先を動かせた
-- 解消: 環境変数と `--integration-branch` と `settings.local.json` の読みを廃止し、統合先は各リポジトリの手元の `origin/HEAD`（無ければ `origin/main`・`origin/master`）だけで決める。`ccnavi-fetch.sh` が SessionStart で `origin/HEAD` をホストの既定ブランチへ付け替える。識別子の予約はチケットの `project` ごとにそのリポジトリの統合先で検査する（[ADR-0146](../../adr/0146-integration-is-the-origin-head-only.md)）
+- 当時の害: ワークスペースの値が全プロジェクトに当たった。ワークスペースが `develop`、p の既定が `trunk` のとき、`ccnavi-git.sh push` の拒否が `trunk` を統合先と見ず止めない。Python の `--lint` の識別子の予約も、プロジェクトの統合先で効かない。`settings.local.json` はエージェントが書き換えられるので、エージェントが統合先を変えられた
+- 解消: 環境変数と `--integration-branch` と `settings.local.json` の読みを廃止し、統合先は各リポジトリの手元の `origin/HEAD`（無ければ `origin/main`・`origin/master`）だけで決める。`ccnavi-fetch.sh` が SessionStart で `origin/HEAD` をホストの既定ブランチへ向け直す。識別子の予約はチケットの `project` ごとにそのリポジトリの統合先で検査する（[ADR-0146](../../adr/0146-integration-is-the-origin-head-only.md)）
 - 残る制約: origin の無いリポジトリでは統合先が決まらない。ワークスペースと単体 clone のどちらも、そのリポジトリの `origin/HEAD` だけを見るので食い違わない
 
 ## C. 単体 clone で動かない・縮退する

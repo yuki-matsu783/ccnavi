@@ -49,7 +49,7 @@
    エージェントにも打たせません。
    拡張は統合先の `.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT` と `.claude/settings.json` を読むので、この 2 つが統合先に要ります。
 5. 統合先は `main`（デフォルトブランチ）のままにします。別の名前を試すときは、ホストの既定ブランチをその名前に変えます。
-   手元の `origin/HEAD` は、次のセッションの開始時に `ccnavi-fetch.sh` が付け替えます（すぐ要るときは `git fetch origin` のあと
+   手元の `origin/HEAD` は、次のセッションの開始時に `ccnavi-fetch.sh` が向け直します（すぐ要るときは `git fetch origin` のあと
    `git remote set-head origin -a`）。拡張は設定画面の「統合先の名前」に同じ名前を書きます。
 6. ブランチ保護は 2 通りで試します。GitHub と GitLab の両方で同じにします。
    - **保護なし**: 何も設定しない

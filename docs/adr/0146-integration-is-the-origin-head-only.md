@@ -24,25 +24,25 @@ keywords: [統合先, origin/HEAD, CCNAVI_INTEGRATION_BRANCH, --integration-bran
 
 ## 決定
 
-- 統合先は、そのリポジトリの手元の `refs/remotes/origin/HEAD` だけで決める。無ければ `origin/main` → `origin/master`。sh も Python も同じ
+- 統合先は、そのリポジトリの手元の `refs/remotes/origin/HEAD` だけで決める。無ければ `origin/main` → `origin/master`。sh も Python も同じ決め方にする
 - `CCNAVI_INTEGRATION_BRANCH` と `--integration-branch` を廃止する。`settings.local.json` から統合先を読む処理も無くす。上書きの手段は用意しない。古い設定を読む処理・警告・移行用のコードも書かない
 - origin の無いリポジトリ（ローカルだけ・未 push）では統合先は決まらない。ローカルの `main`・`master` で代わりにはしない。`integrate` は `integrate-no-integration` で断り、Stop の促しは出さない。案内は「統合先 (origin/HEAD) が決まらない。ユーザに `git fetch origin` のあと `git remote set-head origin -a` を頼んでください」（origin が無ければ「origin が無いので統合先が決まらない」）
-- 手元の `origin/HEAD` は SessionStart でホストに合わせる。`ccnavi-fetch.sh` が、承認済みチケットの取得（第 1 周）の後、ワークツリーの起点を進める（第 2 周）前に、リポジトリごとに `ls-remote --symref origin HEAD` でホストの既定ブランチを聞く。手元と違えばそのブランチを fetch し、成功してから `git symbolic-ref refs/remotes/origin/HEAD` で付け替えて 1 行出す。失敗・時間切れ・オフラインのときは、何も出さず何も変えない。`git remote set-head origin -a` は手元に `refs/remotes/origin/<名前>` が無いと失敗するので使わない
-- `ccnavi-sync.sh` は、ホストの答え、無ければ手元の `origin/HEAD`、`main`・`master` の順で読み、違えば fetch が成功した後に手元を付け替える
+- 手元の `origin/HEAD` は SessionStart でホストに合わせる。`ccnavi-fetch.sh` が、承認済みチケットの取得（第 1 周）の後、ワークツリーの起点を進める（第 2 周）前に、リポジトリごとに `ls-remote --symref origin HEAD` でホストの既定ブランチを聞く。手元と違えばそのブランチを fetch し、成功してから `git symbolic-ref refs/remotes/origin/HEAD` で向け直して 1 行出す。失敗・時間切れ・オフラインのときは、何も出さず何も変えない。`git remote set-head origin -a` は手元に `refs/remotes/origin/<名前>` が無いと失敗するので使わない
+- `ccnavi-sync.sh` は、ホストに聞いた名前、聞けなければ手元の `origin/HEAD`、`main`・`master` の順で統合先を決め、違えば fetch が成功した後に手元を向け直す
 - Python の識別子の予約（「識別子が統合先の名前と同じ」）は、チケットの `project` ごとに、そのリポジトリの統合先で検査する
 - `ccnavi-git.sh push` の固定のリスト（`main | master | develop | release | release/*`）は残す
 
 ## 理由
 
-- ホストの既定ブランチ以外へマージする使い方がほぼ無い。上書きの手段を持つ値打ちが小さい
-- ワークスペースで 1 つの値が B1 を生んでいた。プロジェクトの統合先への push の止めがすり抜け、Python の `--lint` の識別子の予約がプロジェクトの統合先で効かなかった
-- `settings.local.json` はエージェントが書けるファイルで、sh はそれをその場で読むので、エージェントが統合先を動かせた
-- Chrome 拡張はもともとホスト API の `default_branch` を見ており、sh・Python とずれていた。廃止でそろう。ただし拡張のリポジトリごとの「統合先の名前」設定欄はこの変更の対象外で残っており、sh・Python との統一は欄の扱いの判断待ちである
+- ホストの既定ブランチ以外へマージする使い方はほぼ無いので、上書きの手段を持つ意味は小さい
+- ワークスペースで 1 つの値が B1 を生んでいた。プロジェクトの統合先への push を止められず、Python の `--lint` の識別子の予約もプロジェクトの統合先で効かなかった
+- `settings.local.json` はエージェントが書き換えられるファイルで、sh はその内容をその場で読むため、エージェントが統合先を変えられた
+- Chrome 拡張はもともとホスト API の `default_branch` を見ており、sh・Python とずれていた。廃止すると sh・Python と揃う。ただし拡張のリポジトリごとの「統合先の名前」設定欄はこの変更の対象外で残っており、sh・Python との統一は欄の扱いの判断待ちである
 
 ## 代償と逃げ道
 
 - 既定が `main` のまま `develop`・`release/*` へマージリクエストを出す運用（hotfix など）では、宛先がずれる。宛先はホストの画面で直す
-- origin の無いリポジトリでは統合先が決まらず、`integrate` が断る。origin が要ると割り切った
+- origin の無いリポジトリでは統合先が決まらず、`integrate` が断る。origin があることを前提にした
 - 古い sh と新しい実行ファイル、その逆の組み合わせでは、`sync paths` の `integration` 行を無視するか空として読むだけなので害は無い。互換の版（`CCNAVI_COMPAT`）は上げない
 
 ## 関係する ADR

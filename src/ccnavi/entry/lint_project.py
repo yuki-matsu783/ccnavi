@@ -145,8 +145,8 @@ def _project_settings(root: str) -> list[Problem]:
 
 
 # `.claude/settings.local.json` に置かせない、承認と判定に影響する値。
-# チケット制御と承認の保護の切り替え・動作モード。置ける例外は無い（統合先の名前は各リポジトリの
-# origin/HEAD で決まり、env では動かさない）。置き場は既定に固定で env では動かないので、
+# チケット制御と承認の保護の切り替え・動作モード。例外は無い（統合先の名前は各リポジトリの
+# origin/HEAD で決まり、env では変えられない）。置き場は既定に固定で env では変えられないので、
 # 置き場の env は数えない。
 LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 

@@ -415,7 +415,7 @@ class PushApprovedTest(Workspace):
     def test_a_project_is_judged_by_its_own_integration(self):
         """projects/<名前>/ のツリーは、そのプロジェクトの origin/HEAD で統合先を決める。
         ワークスペースの origin/HEAD も、環境変数も settings.local.json も、プロジェクトの
-        統合先を動かさない（固定のリストに無い名前 develop-v1.0.0 で止まる）。"""
+        統合先を変えない（固定のリストに無い名前 develop-v1.0.0 で止まる）。"""
         project = os.path.join(self.ws, "projects", "app")
         remote = self.repository(project, "develop-v1.0.0")
         self.place(project)

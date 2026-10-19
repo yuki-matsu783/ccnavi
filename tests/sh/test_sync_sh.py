@@ -1009,7 +1009,7 @@ class SyncTest(SyncHarness):
         return pusher
 
     def test_the_old_variable_and_the_old_setting_are_ignored(self):
-        """環境変数と settings.local.json の CCNAVI_INTEGRATION_BRANCH は、統合先を動かさない。"""
+        """環境変数と settings.local.json の CCNAVI_INTEGRATION_BRANCH は、統合先を変えない。"""
         git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/develop")
         write(
             os.path.join(self.ws, ".claude", "settings.local.json"),
@@ -1033,7 +1033,7 @@ class SyncTest(SyncHarness):
 
     def test_the_host_default_branch_is_read_from_the_remote(self):
         # 手元の origin/HEAD が無くても、ls-remote --symref でホストの既定を読む。
-        # fetch が成功した後に、手元の origin/HEAD をそれに付け替えて言う。
+        # fetch が成功した後に、手元の origin/HEAD をそれに向け直して 1 行出す。
         git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/trunk")
         git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/trunk")
         git(self.ws, "remote", "set-head", "origin", "--delete")
@@ -1054,7 +1054,7 @@ class SyncTest(SyncHarness):
         self.assertIn("統合先を main から trunk に合わせた（ホストの既定ブランチ）", done.stdout)
         head = git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD").stdout.strip()
         self.assertEqual("refs/remotes/origin/trunk", head)
-        # 合っていれば、2 回目は言わない。
+        # 合っていれば、2 回目は出さない。
         done = self.sync(PARENT)
         self.assertNotIn("合わせた", done.stdout)
 

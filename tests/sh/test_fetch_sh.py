@@ -146,7 +146,7 @@ class FetchTest(unittest.TestCase):
         return path
 
     def host_default(self, branch):
-        """ホストの既定ブランチ（bare のリモートの HEAD）を付け替える。"""
+        """ホストの既定ブランチ（bare のリモートの HEAD）を別のブランチへ変える。"""
         git(
             self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", f"refs/heads/{branch}"
         )
@@ -535,7 +535,7 @@ class FetchTest(unittest.TestCase):
 
     def test_a_changed_host_default_moves_origin_head_and_the_base_follows(self):
         # ホストの既定が main から trunk に変わった。手元の origin/HEAD は clone のときのまま。
-        # trunk を取り、origin/HEAD を付け替え、1 行言う。第 2 周は trunk で進む。
+        # trunk を取り、origin/HEAD を向け直し、1 行出す。第 2 周は trunk で進む。
         git(self.ws, "push", "-q", "origin", "main:trunk")
         self.leave_main()
         self.host_default("trunk")
@@ -594,7 +594,7 @@ class FetchTest(unittest.TestCase):
         self.assertTrue(os.path.exists(log), "ls-remote を打っていない")
 
     def test_a_failed_fetch_of_the_new_default_does_not_move_origin_head(self):
-        # ホストは trunk と答えたが、trunk を取れない（リモートに実体が無い）。付け替えない。
+        # ホストは trunk と答えたが、trunk を取れない（リモートに実体が無い）。向け直さない。
         self.leave_main()
         git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/gone")
         before = self.origin_head()
@@ -604,7 +604,7 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("合わせた", done.stdout)
 
     def test_no_ls_remote_for_an_origin_that_failed_in_the_first_lap(self):
-        # 第 1 周で届かなかった origin には、付け替えのための ls-remote を打たない。
+        # 第 1 周で届かなかった origin には、向け直すための ls-remote を打たない。
         self.leave_main()
         git(self.ws, "branch", "-q", "--set-upstream-to", "origin/main")
         missing = posix(os.path.join(self._tmp.name, "nowhere.git"))

@@ -106,7 +106,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertIntegration("develop-v1.0.0")
 
     def test_the_variable_and_the_local_setting_are_not_read(self):
-        """環境変数も settings.local.json の env も、統合先を動かさない。"""
+        """環境変数も settings.local.json の env も、統合先を変えない。"""
         point_origin_head(self.ws, "main")
         write(
             os.path.join(self.ws, ".claude", "settings.local.json"),
