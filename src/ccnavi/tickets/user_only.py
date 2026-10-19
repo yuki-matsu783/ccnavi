@@ -281,22 +281,6 @@ USER_SCRIPT_PREFIX = "ccnavi-user-"
 
 # エージェントが sh で打てるスクリプト。止めている間も通す（phase_forms.exempt）。
 AGENT_SCRIPTS: tuple[str, ...] = ("ticket", "review", "git")
-# サブエージェントには許さないサブコマンド（AGENT_SCRIPTS の sh の形）。
-# メインのエージェントは打てる。
-SUBAGENT_FORBIDDEN: tuple[str, ...] = (
-    "start",
-    "finish",
-    "cancel",
-    "propose",
-    "record-risk",
-    "request",
-    "confirm",
-    "comment",
-    "decide",
-    "ready",
-    "close-early",
-    "push",
-)
 
 
 def op(op_id: str) -> Op:

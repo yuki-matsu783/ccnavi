@@ -45,7 +45,10 @@ _SINGLE = re.compile(
     rf"^(?:pwd|ls(?:\s+{_PATH})?|(?:cat|head|tail|wc)\s+{_PATH})$",
 )
 # 状態を見る入口。`sh <ルート>/.ccnavi/scripts/ccnavi-ticket.sh status|--help` だけ。
-_STATUS = re.compile(rf"^(?:sh|bash)\s+{_PATH}ccnavi-ticket\.sh\s+(?:status|--help)$")
+_STATUS = re.compile(
+    rf"^(?:sh|bash)\s+(?:{_PATH}[\\/])?\.ccnavi[\\/]scripts[\\/]ccnavi-ticket\.sh\s+(?:status|--help)$",
+    re.IGNORECASE,
+)
 
 
 def _paths(payload: hookio.Input) -> list[str]:
@@ -58,8 +61,8 @@ def read_is_safe(payload: hookio.Input) -> bool:
         found = _paths(payload)
         # 探す場所を省いた Grep・Glob は cwd を探す。cwd が操作記録の置き場の中でない限り、
         # 省略は通す（置き場の中に居る場合は cwd の文字列で当たる）。
-        if payload.cwd:
-            found.append(payload.cwd) if not found else None
+        if not found and payload.cwd:
+            found.append(payload.cwd)
         return not any(_MINIMAL_DENY.search(pathcase.fold(p).replace("\\", "/")) for p in found)
     except Exception:  # noqa: BLE001 評価できなければ通さない
         return False

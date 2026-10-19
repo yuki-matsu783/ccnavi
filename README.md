@@ -81,7 +81,7 @@ Claude Code の hook でツール呼び出しを止め、止めた理由と代�
 （`rm -rf`、`git push`、`git reset --hard`、認証情報の置き場、`.claude/` の下）。組み込みの既定
 （「ルールファイルが読めないとき」の節）がちょうどその範囲なので、写して直すのが早い。
 
-`allow` は空のままでよい。`dry-run` は呼び出しに手を出さないので作業は止まらず、ルールの抜けている箇所だけが記録に溜まる。
+`allow` は空のままでよい。`dry-run` は一般の保護には手を出さないので作業は止まらず、ルールの抜けている箇所だけが記録に溜まる（チケット制御が有効なら、チケットの関門と補助の保護は `dry-run` でも止める）。
 
 導入したら、設定そのものを確かめる。
 
@@ -468,7 +468,7 @@ hook からの判定と `ticket` / `review` などのサブコマンドに渡す
 | `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と知らせる |
-| `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、バックアップして戻す側の両方が切り替わる |
+| `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、バックアップして戻す側の両方が切り替わる。承認済みの置き場と操作記録への書き込み、保護済みの sh への環境変数の指定の止めは、この値では切れない |
 | `CCNAVI_DENY_REPEAT` | 同じ理由で同じ呼び出しを何回止めたら、拒否の文面に「言い換えずにユーザに相談する」一文を足し、ターンの終わりにユーザへ報告するか。既定は `3`。2 未満と読めない値は既定に戻る。判定は変わらない（「同じ呼び出しを繰り返し止めたとき」） |
 | `CCNAVI_FAIL_STREAK_COUNT` | ツール呼び出しの失敗か ccnavi の拒否が何回続けて起きたら、資料を引く案内（`--docs` で索引を引く）を出すか。既定は `3`。`0` なら数えも案内もしない。負数と読めない値は既定に戻る。判定は変わらない（「失敗や拒否が続いたとき」） |
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。ユーザにも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない。「ルールが言及していない呼び出し」）。`dry-run` は無く、それ以外の値は `enable` として動き、`--lint` が指摘する |
@@ -1361,7 +1361,7 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。
 | 値 | 挙動 |
 |---|---|
 | `enable` | 判定し、`deny` なら止め、`ask` ならユーザに確認を出す。指定が無いときはこれ |
-| `dry-run` | 同じ判定を行い、呼び出しには手を出さず「`enable` なら何をしていたか」を伝える |
+| `dry-run` | 同じ判定を行い、一般の保護は呼び出しに手を出さず「`enable` なら何をしていたか」を伝える。チケットの関門（状態の操作・範囲・レビュー待ち・承認済みの置き場と操作記録への書き込み・サブエージェントの状態操作）と、それを外す抜け道をふさぐ補助の保護（生の git・環境変数の指定など）は、`dry-run` でも止める |
 | `disable` | 判定しない |
 
 `disable` は `.claude/settings.json` に書いても有効にならない（その指定を名指しで無視し、理由を出す）。エージェントが書き換えられるファイルなので、
@@ -2278,7 +2278,7 @@ Claude Code はそこをスキルとして読まないので、ccnavi が `Sessi
 | 欄 | 中身 |
 |---|---|
 | `decision` | `allow` `ask` `deny` `handover` `skip`。`handover` は権限モードに委ねた回 |
-| `enforced` | 実際に適用したか。`dry-run` は `false` |
+| `enforced` | 実際に適用したか。`dry-run` は、一般の保護では `false`、関門と補助の保護で止めた回は `true` |
 | `code` | 判定の根拠の種別。一覧は [設計 付録 A](docs/design/appendix.md)。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は `POST_VIOLATION` などで、件が混ざった回は強いほう 1 つ |
 | `rules` | 当たったルールの名前（ルールファイル由来は `<相対パス>:<id>`、組み込みは id）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
 | `reason` | `skip` の理由。`mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、`payload-unusable`、`deadline-exceeded`、`tool-cannot-write`、`worktree-unreadable`（`detail` に理由）、`no-turn-baseline` の 9 つ |

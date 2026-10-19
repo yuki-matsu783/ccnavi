@@ -1259,7 +1259,9 @@ def _internal_error(
     しないので、PreToolUse の呼び出しがそのまま通り、記録も残らない。ここで受けて、判定に
     達せなかった回として終える。
 
-    - PreToolUse: 呼び出しを止める（dry-run は通す）。標準エラーの文がモデルに届く
+    - PreToolUse: ツールの種類で決める（`modes.fail_closed`）。書き込み・Agent・
+      ツールが分からない回は
+      dry-run でも止め、読み取りは最低限の deny に当たらなければ通す。標準エラーの文がモデルに届く
     - PostToolUse: ツールはもう走っているので止めるものは無い。enable は終了コード 2 と
       標準エラーで、実行後の検査をしていないことをモデルに言う（dry-run は 0）
     - payload を読む前に落ちた（イベントが分からない）: PreToolUse と同じく止める

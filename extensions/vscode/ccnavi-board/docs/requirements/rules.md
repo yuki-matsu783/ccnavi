@@ -103,4 +103,4 @@ keywords: [要件, ルール管理, ルール, rules.yml, 判定を試す, サ�
 - **コメントを残す。** `rules.yml` のコメントと折り返しは、変えていない場所ではそのまま。変えた欄も
   引用符や折り返しの書き方は元のまま。新しく足すルールは glob / regex を単引用符で囲む
 - **記録を汚さない。** 試し打ちは `--ticket-control disable --state "" --log ""` で走らせ、`decisions.jsonl` に残さない
-- 上部に、実行ファイルが答えた動作モード（`--explain --json` の `settings.mode`）が `dry-run` か `disable` のときの注意が出る。`dry-run` は判定と記録だけで止めないこと、`disable` は判定しないことを言う。読めない値は実行ファイルが `enable` と答えるので注意は出ない。試す判定は enable のときの答え
+- 上部に、実行ファイルが答えた動作モード（`--explain --json` の `settings.mode`）が `dry-run` か `disable` のときの注意が出る。`dry-run` は判定と記録をして、一般の保護は止めず、チケットの関門と補助の保護は止めること、`disable` は判定しないことを言う。読めない値は実行ファイルが `enable` と答えるので注意は出ない。試す判定は enable のときの答え

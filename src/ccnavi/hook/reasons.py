@@ -504,8 +504,9 @@ def payload_unusable(code: str, problem: str, *, event: str = "", mode: str = ""
 
     文はイベントとモードに合わせる。exit 2 が何を止め、標準エラーが誰に届くかはイベントで違い、
     UserPromptSubmit で「この呼び出しを止めた」と言うと、ユーザが自分の発言についての文として
-    読めない。dry-run は exit 0 で通すので「止めた」と言わない。event はイベント名すら読めなかった
-    回は空で、そのときは何を止めたかを言わない。
+    読めない。ツールの呼び出しを持たないイベントは、dry-run なら exit 0 で通すので「止めた」と
+    言わない（PreToolUse とイベントすら読めなかった回は dry-run でも止める）。event は
+    イベント名すら読めなかった回は空で、そのときは何を止めたかを言わない。
     """
     head = f"[ccnavi] {code}"
     said = f"ccnavi could not read the hook input from Claude Code ({problem}), "
@@ -538,7 +539,8 @@ def deadline_exceeded(code: str, seconds: float, *, mode: str = "") -> str:
     ユーザに伝えさせる。
 
     期限を見るのは実行前チェック（PreToolUse）だけなので、宛先はツール呼び出しを書いたモデル。
-    dry-run は exit 0 で通すので「止めた」と言わず、enable なら止めていたと言う。
+    dry-run は、設定を読まずに安全と分かる読み取りだけ exit 0 で通すので、その回は「止めた」と
+    言わず、enable なら止めていたと言う。それ以外の呼び出しは dry-run でも止める。
     """
     if mode == DRY_RUN:
         what = (

@@ -963,7 +963,8 @@ def refuse(
     context: str = "",
     conf: settings.Settings | None = None,
     root: str = "",
-    kind: str = GENERAL,
+    *,
+    kind: str,
 ) -> int:
     """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。
 

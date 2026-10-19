@@ -223,7 +223,7 @@ state-transitions.md）。承認を渡す文（`approved_text`）は、計画を
 提案を `todo/` に書いた回に、この確認を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket_guard.propose_notice`）。
 判定には足さず、ルールの文と同じ `PreToolUse` の `additionalContext` の経路で渡す。
 
-`CCNAVI_MODE=dry-run` の間は deny が止めないので、エージェントは `--yes` を打てる。承認の経路だけを
+`CCNAVI_MODE=dry-run` の間も、承認の経路は関門なので止まり、エージェントは `--yes` を打てない。承認の経路だけを
 例外にはしない。
 
 **承認したことは、拡張が渡す文と `status` で伝わる。** hook は承認を伝えない。

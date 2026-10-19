@@ -1,5 +1,5 @@
 ---
-type: report
+type: design
 title: ccnavi チケット作業フロー修正 実装設計書
 description: 原設計書の R1〜R10 を main（c715ceaa）の実装に反映するための実装設計。段階1〜5の構成と部品を決める
 tags: [design-doc, tickets]

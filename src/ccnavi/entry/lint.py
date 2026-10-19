@@ -337,7 +337,8 @@ def check(
             Problem(
                 SEVERITY_WARN,
                 "(mode)",
-                f"{modes.DRY_RUN} なので判定はしても、呼び出しには何もしない",
+                f"{modes.DRY_RUN} なので一般の保護は報告だけにする"
+                "（チケットの関門と補助の保護は止める）",
             )
         )
 
