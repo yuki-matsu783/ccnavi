@@ -170,5 +170,75 @@ class TranscribeTest(unittest.TestCase):
         self.assertIn("line 1199 ", joined)
 
 
+class PostTextTest(unittest.TestCase):
+    """保存した判断から、投稿の本文を作り直す（記録は本文を持たない）。"""
+
+    def record(self, **extra):
+        base = {
+            "id": "a" * 32,
+            "kind": "decide",
+            "parent": "i0001",
+            "phase": 2,
+            "mr": 7,
+            "repo": {"host": "gitlab", "mr_url": "https://h/mr/7"},
+            "shown": [
+                {"key": "u1", "id": "d1", "url": "u1", "path": "a.py", "line": 3, "body": "指摘 1"},
+                {"key": "u2", "id": "d2", "url": "u2", "path": "", "line": 0, "body": "指摘 2"},
+                {"key": "u3", "id": "d3", "url": "u3", "path": "", "line": 0, "body": "指摘 3"},
+            ],
+            "choices": {"u1": "issue", "u2": "keep", "u3": "fix"},
+            "applied": {"local": True, "followup": "i0001-02-03"},
+            "stages": [
+                {"id": "issue", "state": "pending"},
+                {"id": "note", "state": "pending"},
+            ],
+        }
+        base.update(extra)
+        return base
+
+    def test_the_issue_text_has_the_issue_threads_only_and_the_operation_id(self):
+        text = review_decide.post_text(self.record(), "issue")
+        self.assertIn("### 指摘 1", text)
+        self.assertIn("指摘 1", text)
+        self.assertNotIn("指摘 2", text)
+        self.assertNotIn("指摘 3", text)
+        self.assertIn("操作: " + "a" * 32, text)
+        self.assertIn("取得元: gitlab", text)
+
+    def test_the_note_lists_each_destination_and_the_followup(self):
+        text = review_decide.post_text(self.record(), "note")
+        self.assertTrue(text.startswith(review_host.MARKER_DECIDE))
+        self.assertIn("issue に回す:\n- u1", text)
+        self.assertIn("対応しない（受け入れて進む）:\n- u2", text)
+        self.assertIn("続きの子チケット `i0001-02-03`", text)
+
+    def test_the_note_names_the_issue_once_it_was_created(self):
+        stages = [
+            {"id": "issue", "state": "sent", "url": "https://h/demo/-/issues/12"},
+            {"id": "note", "state": "pending"},
+        ]
+        text = review_decide.post_text(self.record(stages=stages), "note")
+        self.assertIn("issue に回した分: #12 https://h/demo/-/issues/12", text)
+
+    def test_unknown_stage_and_missing_issue_threads_give_nothing(self):
+        self.assertIsNone(review_decide.post_text(self.record(), "nope"))
+        self.assertIsNone(review_decide.post_text(self.record(), "issue-part-1"))
+        self.assertIsNone(review_decide.post_text(self.record(choices={"u1": "keep"}), "issue"))
+
+    def test_the_resume_plan_replies_to_the_saved_accepted_threads_only(self):
+        import json
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "plan.json")
+            self.assertEqual(review_decide.resume_plan(self.record(), path), 0)
+            plan = review_host.read_accept_plan(path)
+        self.assertEqual(plan.ids, ["d1", "d2"])
+        self.assertEqual(plan.op, "a" * 32)
+        self.assertEqual(plan.digest, "")
+        self.assertTrue(json.dumps(plan.keys))
+
+
 if __name__ == "__main__":
     unittest.main()

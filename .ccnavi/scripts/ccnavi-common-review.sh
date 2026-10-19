@@ -294,6 +294,53 @@ comment() {
 	fi
 }
 
+# ---- 目印で自分の投稿を探す（送ったかどうかの照合）。
+#
+# <種類 issue|note|issue-note> <操作ID> <段階ID> <対象の番号> <アカウント> <対象の URL>
+# 種類: issue（issue の作成）、note（MR へのコメント）、issue-note（issue へのコメント）。
+# 対象は note なら MR、issue-note なら issue（GitLab の URL を組むのに使う）。
+# 標準出力は 1 行: `<yes|no|error> <URL,URL,…>`。1 つめは一覧を上限で打ち切らずに最後まで読めたか
+# （yes）、打ち切ったか（no）、読めなかったか（error）。2 つめは目印が一致した投稿の URL。
+# 目印は本文の末尾の `<!-- ccnavi:op=<操作ID> stage=<段階ID> -->`。アカウントが分かれば、その人の投稿だけ数える
+# （GitHub は `.user.login`、GitLab は `.author.username`）。検索 API は使わず、そのリポジトリの
+# issue / MR のコメントの一覧を、新しい順に読む。
+find_marked() {
+	fm_kind="$1"
+	fm_mark="<!-- ccnavi:op=$2 stage=$3 -->"
+	fm_mr="$4"
+	fm_who="$5"
+	fm_url="${6:-}"
+	fm_rc=0
+	if [ "$kind" = github ]; then
+		if [ "$fm_kind" = issue ]; then
+			fm_rel="repos/$path/issues?state=all&sort=created&direction=desc"
+			[ -z "$fm_who" ] || fm_rel="$fm_rel&creator=$(ccnavi_host_encode "$fm_who")"
+		else
+			fm_rel="repos/$path/issues/$fm_mr/comments?sort=created&direction=desc"
+		fi
+		fm_list=$(ccnavi_hg_partial=1 ccnavi_host_pages "$fm_rel") || fm_rc=$?
+		fm_urls=$(printf '%s' "$fm_list" | "$JQ" -r --arg m "$fm_mark" --arg w "$fm_who" \
+			'[.[]? | select(has("pull_request") | not) | select((.body // "") | contains($m)) | select($w == "" or ((.user.login // "") == $w)) | .html_url] | join(",")' 2>/dev/null) || fm_rc=1
+	else
+		if [ "$fm_kind" = issue ]; then
+			fm_rel="projects/$(encoded_path)/issues?scope=all&order_by=created_at&sort=desc"
+			[ -z "$fm_who" ] || fm_rel="$fm_rel&author_username=$(ccnavi_host_encode "$fm_who")"
+		elif [ "$fm_kind" = issue-note ]; then
+			fm_rel="projects/$(encoded_path)/issues/$fm_mr/notes?order_by=created_at&sort=desc"
+		else
+			fm_rel="projects/$(encoded_path)/merge_requests/$fm_mr/notes?order_by=created_at&sort=desc"
+		fi
+		fm_list=$(ccnavi_hg_partial=1 ccnavi_host_pages "$fm_rel") || fm_rc=$?
+		fm_urls=$(printf '%s' "$fm_list" | "$JQ" -r --arg m "$fm_mark" --arg w "$fm_who" --arg u "${fm_url:-}" \
+			'[.[]? | select(((.description // "") + (.body // "")) | contains($m)) | select($w == "" or ((.author.username // "") == $w)) | (.web_url // ($u + "#note_" + (.id | tostring)))] | join(",")' 2>/dev/null) || fm_rc=1
+	fi
+	case "$fm_rc" in
+	0) printf 'yes %s\n' "$fm_urls" ;;
+	2) printf 'no %s\n' "$fm_urls" ;;
+	*) printf 'error \n' ;;
+	esac
+}
+
 # 取ってきた時点の状態を取り直して $result に置く。
 refetch() {
 	fetch_all >"$result.re"

@@ -133,6 +133,7 @@ accept_execute() {
 	}
 	[ "$accept_count" -gt 0 ] || return 0
 	accept_threads "$accept_file" "$result" || exit 1
+	op_set reply sent
 	refetch
 }
 
@@ -159,5 +160,158 @@ create_issue() {
 		payload=$("$JQ" -n --rawfile all "$draft" \
 			'($all | split("\n")) as $l | {title: ($l[0]), description: ($l[2:] | join("\n"))}')
 		api POST "projects/$(encoded_path)/issues" "$payload" | "$JQ" '{number: .iid, url: .web_url}'
+	fi
+}
+
+# ---- issue へのコメント（長い指摘の続き）。{url} を返す。<issue の番号> <issue の URL> <本文のファイル>
+
+issue_note() {
+	in_body=$("$JQ" -Rs '{body: .}' <"$3")
+	if [ "$kind" = github ]; then
+		api POST "repos/$path/issues/$1/comments" "$in_body" | "$JQ" '{url: (.html_url // "")}'
+	else
+		api POST "projects/$(encoded_path)/issues/$1/notes" "$in_body" |
+			"$JQ" --arg u "$2" '{url: ($u + "#note_" + (.id | tostring))}'
+	fi
+}
+
+# ---- 操作記録。判断を保存した記録（`ccnavi ops`）に、投稿の段階を記録し、投稿の前に照合する。
+#
+# 操作ID は受け入れの計画（`--accept-plan` が書く）が持つ。記録が無い形（古い実行ファイルの答え）では
+# op_id が空のままで、ここの関数は何もしない（投稿は前の形に戻る）。
+# 投稿の本文は記録に持たない。`ccnavi ops post-text` が保存した判断から作り直す。
+# 本文の末尾に目印 `<!-- ccnavi:op=<操作ID> stage=<段階ID> -->` を足すので、送ったかどうかを
+# あとから目印で照合できる（先頭の `<!-- ccnavi:request …` などの目印は変えない）。
+
+op_id=""
+op_who=""
+op_who_read=""
+
+op_use_plan() {
+	op_id=$("$JQ" -r '.op // empty' "$1" 2>/dev/null || :)
+}
+
+op_set() {
+	[ -n "$op_id" ] || return 0
+	ccnavi ops stage-set "$op_id" "$@" 2>/dev/null ||
+		printf '%s: 操作記録に段階 %s を書けなかった。\n' "$review_label" "$1" >&2
+}
+
+# <段階ID> <欄>。無ければ空。
+op_field() {
+	ccnavi ops show "$op_id" 2>/dev/null | "$JQ" -r --arg s "$1" --arg f "$2" '[.stages[]? | select(.id == $s)][0][$f] // empty'
+}
+
+op_account() {
+	if [ -z "$op_who_read" ]; then
+		op_who_read=1
+		op_who=$(account || :)
+	fi
+}
+
+# 段階 1 つを送る。<段階ID> <種類 issue|note|issue-note> <対象の番号> <対象の URL>
+# 送れたら（または送り済みなら）URL を標準出力に出して 0。送れなかった・確定できないときは 1。
+# 前に試した形跡（試した回数が 1 以上、または unknown）があれば、先にホストの一覧を目印で照合する。
+post_staged() {
+	ps_stage="$1"
+	ps_kind="$2"
+	ps_target="$3"
+	ps_url="$4"
+	ps_state=$(op_field "$ps_stage" state)
+	if [ "$ps_state" = sent ]; then
+		op_field "$ps_stage" url
+		return 0
+	fi
+	ps_tries=$(op_field "$ps_stage" tries)
+	if [ "${ps_tries:-0}" -gt 0 ] || [ "$ps_state" = unknown ]; then
+		op_account
+		ps_found=$(find_marked "$ps_kind" "$op_id" "$ps_stage" "$ps_target" "$op_who" "$ps_url")
+		ps_complete="${ps_found%% *}"
+		ps_urls="${ps_found#* }"
+		ps_verdict=$(ccnavi ops reconcile "$op_id" "$ps_stage" "$ps_urls" "$ps_complete" "$op_who" 2>/dev/null) || ps_verdict="stop 照合できなかった"
+		case "$ps_verdict" in
+		sent*)
+			op_set "$ps_stage" sent "$ps_urls" "$op_who"
+			printf '%s' "$ps_urls"
+			return 0
+			;;
+		send*) : ;;
+		unknown*)
+			op_set "$ps_stage" unknown
+			printf '%s: %s を送ったか確定できない（%s）。自動では送り直さない。ホストで目印 ccnavi:op=%s stage=%s を探して確かめてください。\n' \
+				"$review_label" "$ps_stage" "${ps_verdict#unknown }" "$op_id" "$ps_stage" >&2
+			return 1
+			;;
+		*)
+			printf '%s: %s の送信を照合できない（%s）。止めた。ホストで目印 ccnavi:op=%s stage=%s を探して確かめてください。\n' \
+				"$review_label" "$ps_stage" "${ps_verdict#stop }" "$op_id" "$ps_stage" >&2
+			return 1
+			;;
+		esac
+	fi
+	ps_text="$state/review-post-$$-$ps_stage.md"
+	ps_body="$ps_text.send"
+	ccnavi ops post-text "$op_id" "$ps_stage" "$ps_text" || {
+		rm -f "$ps_text"
+		return 1
+	}
+	{
+		cat "$ps_text"
+		printf '\n<!-- ccnavi:op=%s stage=%s -->\n' "$op_id" "$ps_stage"
+	} >"$ps_body"
+	op_set "$ps_stage" pending
+	ps_posted=""
+	case "$ps_kind" in
+	issue) ps_posted=$(create_issue "$ps_body" | "$JQ" -r '.url // empty' 2>/dev/null || :) ;;
+	note) ps_posted=$(comment "$ps_target" "$ps_url" "$ps_body" | "$JQ" -r '.url // empty' 2>/dev/null || :) ;;
+	issue-note) ps_posted=$(issue_note "$ps_target" "$ps_url" "$ps_body" | "$JQ" -r '.url // empty' 2>/dev/null || :) ;;
+	esac
+	rm -f "$ps_text" "$ps_body"
+	if [ -z "$ps_posted" ]; then
+		op_set "$ps_stage" unknown
+		return 1
+	fi
+	op_account
+	op_set "$ps_stage" sent "$ps_posted" "$op_who"
+	printf '%s' "$ps_posted"
+}
+
+# 投稿の段階をすべて進める（issue → 続きのコメント → 決めた内容のコメント）。
+# 置いたあとの投稿なので、失敗しても決めたことは戻さない。post_warning に言い、記録を残す。
+post_decision_staged() {
+	issue_url=""
+	post_warning=""
+	pd_mr=$("$JQ" '.mr.number' "$result")
+	pd_mr_url=$("$JQ" -r '.mr.url' "$result")
+	pd_ids=$(ccnavi ops show "$op_id" 2>/dev/null | "$JQ" -r '.stages[].id') || pd_ids=""
+	pd_issue_no=""
+	pd_failed=""
+	for pd_stage in $pd_ids; do
+		case "$pd_stage" in
+		reply) continue ;;
+		issue)
+			if issue_url=$(post_staged issue issue "$pd_mr" "$pd_mr_url"); then
+				pd_issue_no="${issue_url##*/}"
+			else
+				issue_url=""
+				pd_failed="$pd_failed issue"
+			fi
+			;;
+		issue-part-*)
+			[ -n "$pd_issue_no" ] || {
+				pd_failed="$pd_failed $pd_stage"
+				continue
+			}
+			post_staged "$pd_stage" issue-note "$pd_issue_no" "$issue_url" >/dev/null || pd_failed="$pd_failed $pd_stage"
+			;;
+		note)
+			post_staged note note "$pd_mr" "$pd_mr_url" >/dev/null || pd_failed="$pd_failed note"
+			;;
+		esac
+	done
+	if [ -n "$pd_failed" ]; then
+		post_warning="引き継ぎ未完了（送れなかった段階:${pd_failed}）。ユーザが 'sh .ccnavi/scripts/ccnavi-user-decide.sh --resume $op_id' で続きを送れる"
+	else
+		ccnavi ops done "$op_id" >/dev/null 2>&1 || :
 	fi
 }

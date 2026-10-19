@@ -9,12 +9,14 @@ review から分けた。review を読む末端で、review からは読まれ�
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import io
 import json
 import os
 import re
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
@@ -485,6 +487,11 @@ def decide_yes(
     current = decision_digest(d)
     changed = changed_since_shown(d, *want)
     if changed:
+        if planned is not None and planned.op:
+            # ホストに書いたあとに外れた。返信・解決を済ませた分は、ホストで効いたユーザの選択なので
+            # 操作記録に残す（取り消さない）。fix の続きの子とレビュー済みのマーカーは置かない。
+            with contextlib.suppress(oplog.OpError):
+                oplog.applied_set(conf.state, planned.op, "accepted_on_host", list(planned.keys))
         stdout.write(
             json.dumps(
                 {
@@ -806,6 +813,9 @@ def apply_decision(
     issue_draft = ""
     if picked[CHOICE_ISSUE]:
         issue_draft = _write_decide_issue(stderr, conf, d, picked[CHOICE_ISSUE], op_id)
+    if op_id and followup:
+        with contextlib.suppress(oplog.OpError):
+            oplog.applied_set(conf.state, op_id, "followup", followup)
     if conf.state:
         _write_decide_comment(stderr, conf, d, picked, followup)
     if followup:
@@ -980,14 +990,10 @@ def _part_path(issue_path: str, n: int) -> str:
     return f"{stem}.part{n}{ext}"
 
 
-def _write_decide_comment(
-    stderr: TextIO,
-    conf: settings.Settings,
-    d: Decision,
-    picked: dict[str, list[review_host.Thread]],
-    followup: str,
-) -> None:
-    """MR に書き込む、決めた内容のコメント。issue の表記は sh が作ったあとに書き足す。"""
+def decide_comment_text(
+    d: Decision, picked: dict[str, list[review_host.Thread]], followup: str
+) -> str:
+    """MR に書き込む、決めた内容のコメントの本文。issue の表記は、作ったあとに書き足す。"""
     lines = [
         review_host.MARKER_DECIDE,
         f"フェーズ {d.ph.number} の未解決（Unresolved）指摘の対応方針:",
@@ -1011,10 +1017,82 @@ def _write_decide_comment(
             review_host.MARKER_DECIDE,
             f"フェーズ {d.ph.number} で未解決（Unresolved）の指摘なし。レビュー済みにした。",
         ]
+    return "\n".join(lines) + "\n"
+
+
+def _write_decide_comment(
+    stderr: TextIO,
+    conf: settings.Settings,
+    d: Decision,
+    picked: dict[str, list[review_host.Thread]],
+    followup: str,
+) -> None:
+    """MR に書き込む、決めた内容のコメントの下書きを書く。sh が投稿する（操作記録が無い形）。"""
     path = os.path.join(conf.state, DECIDE_FILE.format(parent=d.parent.ticket, phase=d.ph.number))
-    failed = fsio.write_text(path, "\n".join(lines) + "\n", newline="\n")
+    failed = fsio.write_text(path, decide_comment_text(d, picked, followup), newline="\n")
     if failed:
         stderr.write(f"ccnavi: 記録を書き出せない ({failed})\n")
+
+
+def _decision_of(record: dict) -> tuple[Decision, dict[str, list[review_host.Thread]]]:
+    """保存した判断から、投稿の本文を作る材料（Decision の代わり）と、選択ごとの指摘を組む。
+
+    本文は記録に持たない（`shown`・`choices` から送るたびに作り直す）。使うのは親・フェーズ・
+    MR・取得元と指摘だけなので、Decision の形をした軽い入れ物で足りる。
+    """
+    repo = record.get("repo") or {}
+    threads = [
+        review_host.Thread(
+            id=str(row.get("id") or ""),
+            url=str(row.get("url") or ""),
+            path=str(row.get("path") or ""),
+            line=int(row.get("line") or 0),
+            body=str(row.get("body") or ""),
+        )
+        for row in record.get("shown") or []
+    ]
+    choices = record.get("choices") or {}
+    picked = {c: [t for t in threads if choices.get(review.thread_key(t)) == c] for c in CHOICES}
+    like = SimpleNamespace(
+        parent=SimpleNamespace(ticket=record.get("parent", "")),
+        ph=SimpleNamespace(number=record.get("phase", 0)),
+        result=SimpleNamespace(
+            host=repo.get("host", ""),
+            mr=SimpleNamespace(number=record.get("mr", 0), url=repo.get("mr_url", "")),
+        ),
+        unresolved=threads,
+    )
+    return like, picked  # type: ignore[return-value]
+
+
+def post_text(record: dict, stage_id: str) -> str | None:
+    """段階 `stage_id` で投稿する本文。保存した判断から作り直す。作れなければ None。
+
+    - `issue`: issue の下書き（1 行目が題、空行のあとが本文）
+    - `issue-part-<N>`: issue の続きのコメント
+    - `note`: 決めた内容の MR へのコメント。issue を作っていれば、その URL も書き足す
+    """
+    like, picked = _decision_of(record)
+    op_id = str(record.get("id") or "")
+    if stage_id in ("issue",) or stage_id.startswith("issue-part-"):
+        if not picked[CHOICE_ISSUE]:
+            return None
+        main, parts = issue_texts(like, picked[CHOICE_ISSUE], op_id)
+        if stage_id == "issue":
+            return main
+        try:
+            return parts[int(stage_id.rsplit("-", 1)[1]) - 1]
+        except (ValueError, IndexError):
+            return None
+    if stage_id == "note":
+        followup = str((record.get("applied") or {}).get("followup") or "")
+        text = decide_comment_text(like, picked, followup)
+        issue = next((s for s in record.get("stages") or [] if s.get("id") == "issue"), None)
+        if issue and issue.get("state") == oplog.SENT and issue.get("url"):
+            url = str(issue["url"])
+            text += f"\nissue に回した分: #{url.rstrip('/').rsplit('/', 1)[-1]} {url}\n"
+        return text
+    return None
 
 
 def _decided_prompt(

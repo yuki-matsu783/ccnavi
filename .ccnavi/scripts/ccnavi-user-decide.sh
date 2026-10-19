@@ -3,6 +3,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh <N>                                     端末で 1 件ずつ選ぶ
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>  ボードでユーザが押した選択を置く
+#   sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]                    止まった判断の続きを送る
 #
 # 前は `ccnavi-review.sh decide <N> [--choices … --digest …]` だった。ユーザだけが打つ sh は ccnavi-user-*.sh に
 # 分けてあり、エージェントからは hook が名前で止める。一覧を見るだけの形（`ccnavi-review.sh decide <N> --preview`）は
@@ -27,10 +28,16 @@ set -eu
 usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-user-decide.sh <N> [--choices <JSON> --digest <ダイジェスト>]
+sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]
 
   未解決（Unresolved）の指摘の対応方針を指摘ごとに選んで置く。対応しない・このフェーズで直す・issue に回す。
   ユーザが端末で実行します。--choices と --digest は、ボードでユーザが押した選択を置く形（組で渡す）。
   一覧を見るだけなら sh .ccnavi/scripts/ccnavi-review.sh decide <N> --preview。
+
+  --resume は、途中で止まった判断の続きを送る。保存した判断（操作記録）から、返信・解決・適用・
+  issue・コメントの済んでいない段階だけを進める。選び直しはさせず、送り終えた段階は繰り返さない。
+  送る前に内容の要約を見せて、端末で y/N を聞く。操作ID を省くと、未完了の判断が 1 件のときそれを選ぶ。
+  ワークスペースの中ならどこからでも打てる（親のワークツリーへは自分で移る）。
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
 USAGE
@@ -50,15 +57,30 @@ case "${1:-}" in
 esac
 # 診断ログに残す引数の数（読む前の数）。
 args_n=$#
-n="${1:-}"
-case "$n" in
-'' | *[!0-9]*) fail decide-no-phase "<N>（フェーズ番号）が必要です。" 2 ;;
-esac
-# 下書きの名前は実行ファイルが整数で組む（`01` でも `1`）。揃えないと、書いた下書きを拾えない
-n=$(printf '%s' "$n" | sed 's/^0*\([0-9]\)/\1/')
-shift
+resume_op=""
+resuming=""
 choices=""
 digest=""
+if [ "${1:-}" = --resume ]; then
+	resuming=1
+	shift
+	[ "$#" -le 1 ] || fail decide-bad-option "--resume には操作ID を 1 つまで渡せます。" 2
+	resume_op="${1:-}"
+	[ "$#" -eq 0 ] || shift
+	case "$resume_op" in
+	'' | [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) : ;;
+	*) fail decide-bad-op "操作ID は 32 桁の 16 進です。" 2 ;;
+	esac
+	n=0
+else
+	n="${1:-}"
+	case "$n" in
+	'' | *[!0-9]*) fail decide-no-phase "<N>（フェーズ番号）が必要です。" 2 ;;
+	esac
+	# 下書きの名前は実行ファイルが整数で組む（`01` でも `1`）。揃えないと、書いた下書きを拾えない
+	n=$(printf '%s' "$n" | sed 's/^0*\([0-9]\)/\1/')
+	shift
+fi
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 	--preview)
@@ -77,8 +99,64 @@ if [ -n "$choices" ] || [ -n "$digest" ]; then
 	[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "--choices と --digest は組で渡してください。" 2
 fi
 
+# ---- --resume: 保存した判断（操作記録）から、止まった判断の続きを送る。
+#
+# 操作ID を決め、内容の要約を見せて y/N を聞く。親のワークツリーへ移り、保存した選択とダイジェストを
+# 使って、以降は選択を置く形（--choices --digest）と同じ道を通る。選び直しはさせない。
+# 返信・解決が済んでいれば繰り返さず、適用が済んでいれば投稿の段階だけを進める。
+resume_prepare() {
+	# review_host（JQ を決める）の前に動くので、jq は自分で探す。
+	rp_jq=$(command -v jq || :)
+	[ -n "$rp_jq" ] || fail no-jq "jq が見つかりません。" 2
+	if [ -z "$resume_op" ]; then
+		rp_list=$(ccnavi ops pending 2>/dev/null | grep ' decide ' | sed 's/ .*//' || :)
+		rp_count=$(printf '%s\n' "$rp_list" | grep -c . || :)
+		case "$rp_count" in
+		0)
+			printf '%s: 未完了の判断はありません。\n' "$review_label"
+			exit 0
+			;;
+		1) resume_op="$rp_list" ;;
+		*)
+			printf '%s: 未完了の判断が複数あります。操作ID を渡してください:\n%s\n' "$review_label" "$rp_list" >&2
+			exit 2
+			;;
+		esac
+	fi
+	rp_json=$(ccnavi ops show "$resume_op" 2>/dev/null) ||
+		fail decide-no-op "操作記録 $resume_op がありません。" 1
+	[ "$(printf '%s' "$rp_json" | "$rp_jq" -r '.kind')" = decide ] ||
+		fail decide-not-decide "操作 $resume_op は decide ではありません。" 1
+	rp_parent=$(printf '%s' "$rp_json" | "$rp_jq" -r '.parent')
+	n=$(printf '%s' "$rp_json" | "$rp_jq" -r '.phase')
+	rp_left=$(printf '%s' "$rp_json" | "$rp_jq" -r '[.stages[] | select(.state != "sent") | .id + "=" + .state] | join(", ")')
+	rp_counts=$(printf '%s' "$rp_json" | "$rp_jq" -r '[.choices[]] | group_by(.) | map(.[0] + " " + (length | tostring) + " 件") | join("、")')
+	printf '%s: 未完了の判断 %s\n  親 %s のフェーズ %s（MR !%s）\n  選択: %s\n  済んでいない段階: %s\n' \
+		"$review_label" "$resume_op" "$rp_parent" "$n" "$(printf '%s' "$rp_json" | "$rp_jq" -r '.mr')" "$rp_counts" "$rp_left"
+	printf '続きを送りますか [y/N]: '
+	read -r rp_answer || rp_answer=n
+	case "$rp_answer" in
+	y | Y | yes | YES) ;;
+	*) fail decide-not-confirmed "送らずにやめました。" 1 ;;
+	esac
+	choices=$(printf '%s' "$rp_json" | "$rp_jq" -c '.choices')
+	digest=$(printf '%s' "$rp_json" | "$rp_jq" -r '.plan.digest')
+	# 今いる場所が、その親のブランチのワークツリーならそのまま。そうでなければ親のワークツリーへ移る。
+	rp_here=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
+	if [ "$rp_here" != "$rp_parent" ]; then
+		rp_dir="$root/.claude/worktrees/$rp_parent"
+		[ -d "$rp_dir" ] || fail decide-no-worktree "親のワークツリー $rp_dir がありません。" 1
+		cd "$rp_dir" || fail decide-no-worktree "親のワークツリーへ移れません。" 1
+	fi
+}
+
 review_place
 review_exe || review_no_bin
+if [ -n "$resuming" ]; then
+	resume_prepare
+	review_place
+	review_exe || review_no_bin
+fi
 review_host
 
 # decide: 選択を置く前に、受け入れる指摘（対応しない・issue に回す）へ返信を残して解決する。
@@ -87,6 +165,18 @@ review_host
 accept_before_place() {
 	accept_plan="$state/review-accept-$family-$n.json"
 	rm -f "$accept_plan"
+	if [ -n "$resume_op" ]; then
+		# 保存した判断から計画を書き直す。返信・解決が済んでいれば繰り返さず、結果を取り直して置く側へ渡す。
+		ccnavi ops resume-plan "$resume_op" "$accept_plan" || exit 1
+		op_use_plan "$accept_plan"
+		if [ "$(op_field reply state)" = sent ] || [ "$("$JQ" '.threads | length' "$accept_plan")" -eq 0 ]; then
+			accept_file="$accept_plan"
+			refetch
+			return 0
+		fi
+		accept_execute "$accept_plan"
+		return 0
+	fi
 	accept_rc=0
 	accept_out=$(ccnavi user reviewed "$n" --accept-unresolved --yes "$1" --digest "$2" --json --result "$result" --accept-plan "$accept_plan") ||
 		accept_rc=$?
@@ -94,6 +184,7 @@ accept_before_place() {
 		[ -z "$accept_out" ] || printf '%s\n' "$accept_out"
 		exit 1
 	fi
+	op_use_plan "$accept_plan"
 	accept_execute "$accept_plan"
 }
 
@@ -103,6 +194,10 @@ accept_before_place() {
 # 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子。ブランチ名と違うことがある）。
 
 post_decision() {
+	if [ -n "$op_id" ]; then
+		post_decision_staged
+		return 0
+	fi
 	issue_url=""
 	post_warning=""
 	number=$("$JQ" '.mr.number' "$result")
@@ -131,6 +226,14 @@ post_decision() {
 	fi
 }
 
+# --resume の終わりに言うこと。
+resume_report() {
+	printf 'OK: 判断（操作 %s）の続きを送った\n' "$resume_op"
+	[ -z "$issue_url" ] || printf 'issue に回した: %s\n' "$issue_url"
+	[ -z "$post_warning" ] || printf '%s: %s\n' "$review_label" "$post_warning" >&2
+	return 0
+}
+
 review_begin "$args_n"
 # 抜けるときに exe に渡した JSON を消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
 # rm が失敗しても、`set -e` がその失敗の値で抜けて元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
@@ -157,7 +260,15 @@ fetch_all >"$result"
 if [ -n "$choices" ]; then
 	# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
 	tell_skew
-	# 受け入れる指摘（対応しない・issue に回す）には、置く前に返信を残して解決する。できなければここで止める。
+	# 適用まで済んでいる判断の続きは、投稿の段階だけを進める。
+	if [ -n "$resume_op" ] && [ "$(ccnavi ops show "$resume_op" | "$JQ" -r '.applied.local // empty')" = true ]; then
+		op_id="$resume_op"
+		post_decision_staged
+		resume_report
+		exit 0
+	fi
+	# 受け入れる指摘（対応しない・このフェーズで直す・issue に回す）のうち、受け入れる分には、置く前に返信を残して解決する。
+	# できなければここで止める。
 	accept_before_place "$choices" "$digest"
 	ccnavi_wap_capture="$state/review-decide-$$.out"
 	decide_rc=0
@@ -173,6 +284,10 @@ if [ -n "$choices" ]; then
 		exit 1
 	}
 	post_decision "$n"
+	if [ -n "$resuming" ]; then
+		resume_report
+		exit 0
+	fi
 	printf '%s' "$out" | "$JQ" -c --arg u "$issue_url" --arg w "$post_warning" '. + {issue_url: $u, warning: $w}'
 	exit 0
 fi

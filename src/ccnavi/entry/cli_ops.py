@@ -456,6 +456,7 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
     - `applied <操作ID> <鍵> <値>`: ローカルに適用したものを残す（値は true / false / 文字列）
     - `reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント]`: 送信の照合。結論を
       `sent|send|unknown|stop` で出す（`yes` は一覧を最後まで読めた、`no` は打ち切った）
+    - `post-text <操作ID> <段階ID> <ファイル>`: 段階で投稿する本文を、保存した判断から作り直して書く
     - `resume-plan <操作ID> <ファイル>`: 保存した判断から受け入れの計画を書き直す（`--resume`）
     - `done <操作ID>`: すべての段階が sent なら記録を消す。消したら `done`、残るなら `open` を出す
 
@@ -506,6 +507,25 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
                 record, words[2], found, complete, words[5] if len(words) > 5 else ""
             )
             stdout.write(f"{verdict} {why}".rstrip() + "\n")
+            return EXIT_OK
+        if len(words) == 4 and words[0] == "post-text":
+            record = oplog.load(conf.state, words[1])
+            if record is None:
+                stderr.write(f"ccnavi: 操作記録 {words[1]} が無い\n")
+                return EXIT_ERROR
+            if record.get("kind") != oplog.KIND_DECIDE or not record.get("applied", {}).get(
+                "local"
+            ):
+                stderr.write("ccnavi: この記録は、まだ適用が済んでいない（投稿の本文は作れない）\n")
+                return EXIT_ERROR
+            text = review_decide.post_text(record, words[2])
+            if text is None:
+                stderr.write(f"ccnavi: 段階 {words[2]} の本文は作れない\n")
+                return EXIT_ERROR
+            failed = fsio.write_text(words[3], text, newline="\n")
+            if failed:
+                stderr.write(f"ccnavi: 本文を {words[3]} に書けない（{failed}）\n")
+                return EXIT_ERROR
             return EXIT_OK
         if len(words) == 3 and words[0] == "resume-plan":
             record = oplog.load(conf.state, words[1])

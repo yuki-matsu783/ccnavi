@@ -187,7 +187,12 @@ ccnavi_host_pages() {
 		ccnavi_hg_all=$(printf '%s\n%s' "$ccnavi_hg_all" "$ccnavi_hg_chunk" | "$ccnavi_h_jq" -s '.[0] + .[1]')
 		[ "$ccnavi_hg_n" -lt 100 ] && break
 		ccnavi_hg_page=$((ccnavi_hg_page + 1))
-		[ "$ccnavi_hg_page" -gt 20 ] && return 2
+		if [ "$ccnavi_hg_page" -gt 20 ]; then
+			# 打ち切った。呼び手が ccnavi_hg_partial を立てていれば、読めた分を出す
+			# （送信の照合は、途中までの一覧でも目印を探し、0 件だけは確定にしない）。
+			[ -z "${ccnavi_hg_partial:-}" ] || printf '%s' "$ccnavi_hg_all"
+			return 2
+		fi
 	done
 	printf '%s' "$ccnavi_hg_all"
 }
