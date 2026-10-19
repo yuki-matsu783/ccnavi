@@ -160,13 +160,13 @@ class DirectCandidatesTest(base.IntegrateNudgeTest):
         path = self.direct(commit=True)
         self.post(os.path.join(path, "src", "a.py"))
         payload = json.dumps({"hook_event_name": "Stop", "cwd": self.root, "session_id": "s1"})
+        self.point_origin_head("main")
         off = self.ccnavi(
             "--mode",
             "enable",
             "--ticket-control",
             "disable",
             stdin=payload,
-            env={settings.INTEGRATION_ENV: "main"},
         )
         self.asked(off)
 
@@ -199,11 +199,11 @@ class DirectCandidatesTest(base.IntegrateNudgeTest):
         self.ccnavi("--mode", "enable", *off, stdin=json.dumps(start))
         self.assertTrue(subagent.running(self.state, "s1"))
         payload = json.dumps({"hook_event_name": "Stop", "cwd": path, "session_id": "s1"})
-        env = {settings.INTEGRATION_ENV: "main"}
-        self.assert_not_asked(self.ccnavi("--mode", "enable", *off, stdin=payload, env=env))
+        self.point_origin_head("main")
+        self.assert_not_asked(self.ccnavi("--mode", "enable", *off, stdin=payload))
         stop = dict(start, hook_event_name="SubagentStop")
         self.ccnavi("--mode", "enable", *off, stdin=json.dumps(stop))
-        self.asked(self.ccnavi("--mode", "enable", *off, stdin=payload, env=env))
+        self.asked(self.ccnavi("--mode", "enable", *off, stdin=payload))
 
     def test_another_sessions_record_is_not_used(self):
         path = self.direct(commit=True)
