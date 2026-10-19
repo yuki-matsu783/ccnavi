@@ -8,7 +8,7 @@ import os
 
 from ..infra import gitcmd, settings, tree
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from ..tickets import agree_candidates, ticket_ids, ticket_model
+from ..tickets import agree_candidates, next_id, ticket_ids, ticket_model
 
 
 def _branch_name_problems(
@@ -19,6 +19,8 @@ def _branch_name_problems(
     integration: str = "",
     prefixes=settings.DEFAULT_BRANCH_PREFIXES,
     adopted: frozenset = frozenset(),
+    conf: settings.Settings | None = None,
+    root: str = "",
 ) -> list[Problem]:
     """新しく切る親の識別子を、ブランチ名として使える形にできるか（warn だけ。拒否は
     `ccnavi-git.sh` が受け持つ）。
@@ -46,6 +48,22 @@ def _branch_name_problems(
     everyone = list(copies) + list(closed) + list(review) + list(proposals)
     settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
     serial = ticket_ids.next_serial([t.ticket for t in everyone], prefixes)
+    if conf is not None:
+        # `ticket next-id` と同じ集め方（手元のブランチとワークツリーも数える）。読み込み済みの
+        # 一覧を渡すので、置き場は読み直さない。数えきれなければ、番号を添えずにそう言う。
+        names, counting = next_id.serial_names(conf, root, (copies, closed, review, proposals))
+        if counting:
+            serial = 0
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"次の通し番号を数えきれなかった（{'。'.join(counting)}）。番号を決めずに、"
+                    "ユーザに確かめる（親のブランチ名の規則）",
+                )
+            )
+        else:
+            serial = ticket_ids.next_serial(names, prefixes, skip_children=False)
     said: set[str] = set()
     fresh: list = []
     for t in proposals:
@@ -133,7 +151,12 @@ def _number_problems(everyone: list, fresh: list, prefixes, serial: int) -> list
                     "(ticket)",
                     f"{t.ticket}: 識別子の番号 {number} が {', '.join(others)} と重なる。"
                     "issue の番号と通し番号が同じ数になっていないか確かめる。"
-                    f"issue が無いなら次の通し番号は {serial}（親のブランチ名の規則）",
+                    + (
+                        f"issue が無いなら次の通し番号は {serial}（親のブランチ名の規則）"
+                        if serial
+                        else "通し番号は数えきれなかったので、ユーザに確かめる"
+                        "（親のブランチ名の規則）"
+                    ),
                 )
             )
     return problems
@@ -197,7 +220,7 @@ def _worktree_problems(
                     "そこへの書き込みはルールだけで判定する",
                 )
             )
-            text = ticket_ids.direct_name_warning(t.name, conf.branch_prefixes)
+            text = ticket_ids.direct_name_warning(t.name, conf.branch_prefixes, root)
             if text and t.name not in known:
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", text))
 

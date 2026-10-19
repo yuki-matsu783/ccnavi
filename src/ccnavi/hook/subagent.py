@@ -328,7 +328,7 @@ def _note_running(
 ) -> str:
     """SubagentStart で、このサブエージェントが実行中だと印を置く。置けなくても始まりは止めない。
 
-    チケット制御が無ければ、促しも無いので置かない。返すのは、同じ作業ツリーで動く別の
+    チケット制御の有無によらず置く（直接作業の促しも、実行中のサブエージェントが居る間は止める）。返すのは、同じ作業ツリーで動く別の
     編集するサブエージェントへの案内（無ければ空）。
 
     印の 3 行目以降は、編集するサブエージェントだけが書く（`tree <種類> <名前>` と
@@ -336,7 +336,7 @@ def _note_running(
     同時に起動した相手が書きかけの印を読まないよう、途中の状態が見えない書き方で置く。置いてから
     相手を探すので、同時に起動した 2 つのうち、後から探すほうは先に置かれた印を見つける。
     """
-    if not conf.tickets_enabled or not conf.state or not payload.agent_id:
+    if not conf.state or not payload.agent_id:
         return ""
     lines = [str(int(time.time()))]
     editing = (

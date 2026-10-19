@@ -58,6 +58,12 @@ def operate(
         # ワークツリーの片付けはチケット制御が無くても打てる（ccnavi-clean.sh --worktree の中身）。
         # tidy はチケットを読むので、チケット制御が要る。
         return _worktree(stdout, stderr, conf, root, args, words, cwd)
+    if words[:2] == ["ticket", "next-id"]:
+        # 番号を答えるだけ（読むだけ）。チケット制御が無くても使える。
+        # 0 は成功、1 は識別子にできない形、
+        # 2 は数えきれなかった。
+        code = next_id.run(stdout, stderr, root, conf, words[2:])
+        return EXIT_OK if code == 0 else (2 if code == 2 else EXIT_ERROR)
     if not conf.tickets_enabled:
         stderr.write(
             f"ccnavi: チケット制御が無効になっています（{settings.TICKET_CONTROL_ENV}）。\n"
@@ -192,9 +198,6 @@ def operate(
             code = status.run(
                 stdout, stderr, root, conf, write_and_push.family_of(target) if target else ""
             )
-    elif kind == "ticket" and verb == "next-id":
-        # ticket next-id [<先頭の語> <slug>]。読むだけ。issue の無い親の識別子の番号を答える。
-        code = next_id.run(stdout, stderr, root, conf, words[2:])
     elif kind == "ticket" and verb == "propose" and target:
         # ticket propose <識別子>。親子の提案（todo/ と flows/）を、書いたパスの一覧に載せるだけ。
         # コミットと push は sh（ccnavi-ticket.sh propose）が write-and-push の手順で行う。
@@ -308,7 +311,7 @@ def _worktree(
         return EXIT_OK if code == 0 else EXIT_ERROR
     if verb == "name" and len(words) == 3:
         # 直接作業の名前の形を言う（warn の 1 行）。sh の作成の後に呼ぶ。
-        text = ticket_ids.direct_name_warning(words[2], conf.branch_prefixes)
+        text = ticket_ids.direct_name_warning(words[2], conf.branch_prefixes, root)
         if text:
             stdout.write(f"warn: {text}\n")
         return EXIT_OK

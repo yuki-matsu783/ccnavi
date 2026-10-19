@@ -20,9 +20,13 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, draft
 
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SH_DIR = (
+    os.path.join(ROOT, os.environ["CCNAVI_SH_DIR"])
+    if os.environ.get("CCNAVI_SH_DIR")
+    else draft.scripts_dir()
+)
 
 
 def with_exe(environment):
@@ -1589,7 +1593,10 @@ class WorktreeFreshBaseTest(GitWrapperTest):
                 result = self.assertRejected("worktree", "add", ".claude/worktrees/a", *args)
                 want = f"基点 {self.integ} が origin/{self.integ} より 1 件遅れて"
                 self.assertIn(want, result.stderr)
-                self.assertIn(f"merge --ff-only origin/{self.integ}", result.stderr)
+                # 案内は、基点を origin/<統合先> にして切る完全なコマンド（手元の統合先は進めない）
+                self.assertIn(f"--no-track 'origin/{self.integ}'", result.stderr)
+                self.assertIn("ccnavi-worktree.sh", result.stderr)
+                self.assertNotIn("merge --ff-only origin", result.stderr)
         git(self.dir, "merge", "-q", "--ff-only", f"origin/{self.integ}")
         self.assertCreated("a", "-b", "a")
 
@@ -1615,7 +1622,8 @@ class WorktreeFreshBaseTest(GitWrapperTest):
         for args in (("-b", "a"), ("-b", "a", self.integ), ("-b", "a", f"origin/{self.integ}")):
             with self.subTest(args=args):
                 result = self.assertRejected("worktree", "add", ".claude/worktrees/a", *args)
-                self.assertIn(f"fetch origin {self.integ}", result.stderr)
+                self.assertIn(f"fetch origin '{self.integ}'", result.stderr)
+                self.assertNotIn("merge --ff-only origin", result.stderr)
         fetched = self.run_wrapper("fetch", "origin", self.integ)
         self.assertEqual(0, fetched.returncode, fetched.stdout + fetched.stderr)
         self.assertCreated("a", "-b", "a")

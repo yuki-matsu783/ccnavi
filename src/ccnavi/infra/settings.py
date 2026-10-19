@@ -185,6 +185,17 @@ def script_command(root: str, name: str) -> str:
     return f"sh {_quoted(f'{base}/{DEFAULT_PROJECT_HOME}/scripts/{name}')}"
 
 
+def shell_path(path: str) -> str:
+    """文面で案内するパス。`script_command` と同じ規則（区切りは `/`、要るときだけ引用）で引用する。
+
+    `cd <パス> && …` の形で、別のツリーへ移って打つコマンドに使う。
+    """
+    # 区切りを `/` に揃えるのは Windows のパスだけ（POSIX の `\` は名前の一部）。
+    if os.name == "nt" or re.match(r"[A-Za-z]:\\", path):
+        path = path.replace("\\", "/")
+    return _quoted(path)
+
+
 def has_git_wrapper(root: str) -> bool:
     """ワークスペースルートに git のラッパー（`ccnavi-git.sh`）がある。"""
     wrapper = os.path.join(root, DEFAULT_PROJECT_HOME, "scripts", "ccnavi-git.sh")
