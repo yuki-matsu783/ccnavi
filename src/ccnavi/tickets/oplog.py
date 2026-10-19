@@ -131,6 +131,7 @@ def begin(
         raise OpError(f"操作ID の形が不正: {op_id!r}")
     path = record_path(state, op_id)
     if os.path.exists(path):
+        _add_stages(state, op_id, stages or [])
         return op_id
     now = _now()
     record = {
@@ -152,6 +153,20 @@ def begin(
     }
     _save(state, record)
     return op_id
+
+
+def _add_stages(state: str, op_id: str, stages: list[tuple[str, str]]) -> None:
+    """既にある記録に、まだ無い段階だけを足す（単発の投稿が段階を順に足していく）。"""
+    if not stages:
+        return
+    record = load(state, op_id)
+    if record is None:
+        return
+    have = {s.get("id") for s in record["stages"]}
+    new = [_stage(sid, skind) for sid, skind in stages if sid not in have]
+    if new:
+        record["stages"].extend(new)
+        _save(state, record)
 
 
 def _save(state: str, record: dict[str, Any]) -> None:

@@ -255,6 +255,13 @@ if exe_knows --actor && exe_knows --via; then
 	fi
 fi
 # 端末で選ぶ形は、選ぶのを write-and-push の外で先に済ませる（ロックを持ったままユーザを待たない）ので、ここでは始めない。
+# 適用（ローカルへの反映）が write-and-push で戻された・失敗したとき、記録の「適用済み」を外す。
+# 外さないと、--resume が存在しない適用を前提に、実在しない子を名指しして投稿してしまう。
+unapply_local() {
+	ua_op=$("$JQ" -r '.op // empty' "$accept_file" 2>/dev/null || :)
+	[ -n "$ua_op" ] || ua_op="${resume_op:-}"
+	[ -z "$ua_op" ] || ccnavi ops applied "$ua_op" local false 2>/dev/null || :
+}
 [ -z "$choices" ] || wap_start "$family"
 fetch_all >"$result"
 if [ -n "$choices" ]; then
@@ -280,6 +287,7 @@ if [ -n "$choices" ]; then
 	rm -f "$ccnavi_wap_capture"
 	ccnavi_wap_capture=""
 	[ "$decide_rc" -eq 0 ] || {
+		unapply_local
 		printf '%s\n' "$out"
 		exit 1
 	}
@@ -333,6 +341,7 @@ yes)
 	rm -f "$ccnavi_wap_capture"
 	ccnavi_wap_capture=""
 	if [ "$decide_rc" -ne 0 ]; then
+		unapply_local
 		[ -z "$out" ] || printf '%s\n' "$out"
 		exit 1
 	fi
@@ -344,6 +353,7 @@ yes)
 	out=$(ccnavi user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who) ||
 		decide_rc=$?
 	if [ "$decide_rc" -ne 0 ]; then
+		unapply_local
 		[ -z "$out" ] || printf '%s\n' "$out"
 		exit 1
 	fi

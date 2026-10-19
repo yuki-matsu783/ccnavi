@@ -188,7 +188,18 @@ def _count_ops(state_dir: str) -> int:
         names = os.listdir(os.path.join(state_dir, OPS_DIR)) if state_dir else []
     except OSError:
         return 0
-    return sum(1 for name in names if name.endswith(".json"))
+    count = 0
+    for name in names:
+        if not name.endswith(".json"):
+            continue
+        data = fsio.read_dict(os.path.join(state_dir, OPS_DIR, name))
+        stages = data.get("stages") if isinstance(data, dict) else None
+        # 読めない記録も数える（壊れた印として残す）。段階がすべて sent なら終わっているので数えない
+        if not isinstance(stages, list) or any(
+            not isinstance(x, dict) or x.get("state") != "sent" for x in stages
+        ):
+            count += 1
+    return count
 
 
 def summary(report: Report) -> str:

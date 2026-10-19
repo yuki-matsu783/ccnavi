@@ -514,6 +514,9 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
             # begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>…
             # 鍵から決めた ID で作る（既にあれば作らない）
             kind, parent, phase, mr, key = words[1:6]
+            if key.startswith("@"):
+                # 鍵の中身をファイルから取る（本文そのものを鍵にして、衝突を避ける）
+                key = fsio.read_text(key[1:]) or key
             stages = []
             for spec in words[6:]:
                 sid, _, skind = spec.partition(":")
@@ -544,6 +547,9 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
             if text is None:
                 stderr.write(f"ccnavi: 段階 {words[2]} の本文は作れない\n")
                 return EXIT_ERROR
+            if not _in_state(conf, words[3]):
+                stderr.write("ccnavi: 書き先は state の置き場の下に限る\n")
+                return EXIT_ERROR
             failed = fsio.write_text(words[3], text, newline="\n")
             if failed:
                 stderr.write(f"ccnavi: 本文を {words[3]} に書けない（{failed}）\n")
@@ -553,6 +559,9 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
             record = oplog.load(conf.state, words[1])
             if record is None:
                 stderr.write(f"ccnavi: 操作記録 {words[1]} が無い\n")
+                return EXIT_ERROR
+            if not _in_state(conf, words[2]):
+                stderr.write("ccnavi: 書き先は state の置き場の下に限る\n")
                 return EXIT_ERROR
             return EXIT_OK if review_decide.resume_plan(record, words[2]) == 0 else EXIT_ERROR
         if len(words) == 2 and words[0] == "done":

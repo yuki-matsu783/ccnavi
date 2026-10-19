@@ -353,8 +353,10 @@ find_marked() {
 # 記録を作れない（古い実行ファイル・書けない）ときは、前と同じ送り方に戻る。
 
 cs_set() {
-	ccnavi ops stage-set "$cs_id" "$cs_stage" "$@" 2>/dev/null ||
+	ccnavi ops stage-set "$cs_id" "$cs_stage" "$@" 2>/dev/null || {
 		printf '%s: 操作記録に段階 %s を書けなかった。\n' "${review_label:-ccnavi-review}" "$cs_stage" >&2
+		return 1
+	}
 }
 
 cs_field() {
@@ -378,10 +380,15 @@ staged_send() {
 	cs_mr="$5"
 	cs_url="$6"
 	cs_file="$7"
-	cs_id=$(ccnavi ops begin "$cs_kind" "${branch:-}" 0 "$cs_mr" "$cs_key" issue:issue comment:comment 2>/dev/null) || cs_id=""
+	cs_id=$(ccnavi ops begin "$cs_kind" "${branch:-}" 0 "$cs_mr" "$cs_key" "$cs_stage:$cs_stage" 2>/dev/null) || cs_id=""
 	if [ -z "$cs_id" ]; then
 		if [ "$cs_skind" = issue ]; then create_issue "$cs_file"; else comment "$cs_mr" "$cs_url" "$cs_file"; fi
 		return $?
+	fi
+	# 記録を読めないまま送ると、送り済みの段階をもう一度送りかねない。読めなければ止める。
+	if ! ccnavi ops show "$cs_id" >/dev/null 2>&1; then
+		printf '%s: 操作記録 %s を読めない。二重に送らないよう止めた。\n' "${review_label:-ccnavi-review}" "$cs_id" >&2
+		return 1
 	fi
 	cs_state=$(cs_field state)
 	if [ "$cs_state" = sent ]; then
@@ -398,13 +405,13 @@ staged_send() {
 		cs_verdict=$(ccnavi ops reconcile "$cs_id" "$cs_stage" "$cs_urls" "${cs_found%% *}" "$cs_who" 2>/dev/null) || cs_verdict="stop 照合できなかった"
 		case "$cs_verdict" in
 		sent*)
-			cs_set sent "$cs_urls" "$cs_who"
+			cs_set sent "$cs_urls" "$cs_who" || :
 			cs_sent_json "$cs_urls"
 			return 0
 			;;
 		send*) : ;;
 		*)
-			cs_set unknown
+			cs_set unknown || :
 			printf '%s: 投稿を送ったか確定できない（%s）。自動では送り直さない。ホストで目印 ccnavi:op=%s stage=%s を探して確かめてください。\n' \
 				"${review_label:-ccnavi-review}" "${cs_verdict#* }" "$cs_id" "$cs_stage" >&2
 			return 1
@@ -416,7 +423,12 @@ staged_send() {
 		cat "$cs_file"
 		printf '\n<!-- ccnavi:op=%s stage=%s -->\n' "$cs_id" "$cs_stage"
 	} >"$cs_body"
-	cs_set pending
+	# 送る前の記録（試した回数と送るアカウント）を残せなければ、送らない（残らないと、落ちたあとの照合ができない）。
+	[ -n "$cs_who" ] || cs_who=$(account || :)
+	if ! cs_set pending "" "$cs_who"; then
+		rm -f "$cs_body"
+		return 1
+	fi
 	if [ "$cs_skind" = issue ]; then
 		cs_out=$(create_issue "$cs_body") || cs_out=""
 	else
@@ -425,11 +437,11 @@ staged_send() {
 	rm -f "$cs_body"
 	cs_posted=$(printf '%s' "$cs_out" | "$JQ" -r '.url // empty' 2>/dev/null || :)
 	if [ -z "$cs_posted" ]; then
-		cs_set unknown
+		cs_set unknown || :
 		return 1
 	fi
 	[ -n "$cs_who" ] || cs_who=$(account || :)
-	cs_set sent "$cs_posted" "$cs_who"
+	cs_set sent "$cs_posted" "$cs_who" || :
 	printf '%s\n' "$cs_out"
 }
 

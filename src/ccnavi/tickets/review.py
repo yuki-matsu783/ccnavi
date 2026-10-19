@@ -45,7 +45,6 @@ import contextlib
 import hashlib
 import os
 import re
-import unicodedata
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathcase, settings, tree
@@ -416,7 +415,7 @@ def _settle_children(
 
 def thread_key(t: review_host.Thread) -> str:
     """選択をスレッドに対応づける鍵。URL を先に使い、無ければスレッドの id。"""
-    return t.url or t.id
+    return review_host.thread_key(t)
 
 
 def thread_version(t: review_host.Thread) -> str:
@@ -426,8 +425,7 @@ def thread_version(t: review_host.Thread) -> str:
     変わると版が変わる。見せた指摘と、適用の直前に取り直した指摘が同じかを、この版で照合する
     （CLI と Chrome が同じ Python のコアでこの 1 か所を使う）。
     """
-    body = unicodedata.normalize("NFC", t.body.replace("\r\n", "\n").replace("\r", "\n"))
-    return hashlib.sha256(f"{thread_key(t)}\n{body}".encode()).hexdigest()[:32]
+    return review_host.thread_version(t)
 
 
 def _approved_rel(conf: settings.Settings) -> str:

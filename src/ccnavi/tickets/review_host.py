@@ -9,10 +9,12 @@ GitHub か GitLab かを見分ける読み方だけを置く。review から分�
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import shutil
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -304,7 +306,44 @@ def transport_problem(url: str) -> str:
     return ""
 
 
-def _unresolved(threads: list[Thread], host: str = "", poster: str = "") -> list[Thread]:
+def thread_key(t: Thread) -> str:
+    """選択をスレッドに対応づける鍵。URL を先に使い、無ければスレッドの id。"""
+    return t.url or t.id
+
+
+def thread_version(t: Thread) -> str:
+    """指摘の版。SHA-256(鍵 + 改行 + 正規化した最初のコメントの本文) の先頭 32 桁。
+
+    正規化するのは改行コード（CRLF・CR を LF に）と Unicode の NFC だけ。本文が変わるか、鍵が
+    変わると版が変わる。見せた指摘と、適用の直前に取り直した指摘、受け入れ台帳の項目が同じかを、
+    この版で照合する。
+    """
+    body = unicodedata.normalize("NFC", t.body.replace("\r\n", "\n").replace("\r", "\n"))
+    return hashlib.sha256(f"{thread_key(t)}\n{body}".encode()).hexdigest()[:32]
+
+
+def _accepted_by_ledger(t: Thread, ledger: list[dict]) -> bool:
+    """受け入れ台帳（`accepted.json`）が受け入れ済みとする指摘か。
+
+    鍵と版が台帳の項目と同じで、受け入れたときの最後のコメントから変わっていないとき（受け入れた
+    後に誰かがコメントを付けた指摘は、再提起として数える）。最後のコメントが取れていない
+    （台帳も指摘も空）ときは、版だけで見る。
+    """
+    key, version = thread_key(t), thread_version(t)
+    for entry in ledger:
+        if entry.get("key") != key or entry.get("version") != version:
+            continue
+        if str(entry.get("last_comment_id") or "") == t.last_comment_id:
+            return True
+    return False
+
+
+def _unresolved(
+    threads: list[Thread],
+    host: str = "",
+    poster: str = "",
+    ledger: list[dict] | None = None,
+) -> list[Thread]:
     """まだ解決されていない指摘。
 
     付いた時刻では絞らない。依頼より後のものだけを数えると、
@@ -322,7 +361,13 @@ def _unresolved(threads: list[Thread], host: str = "", poster: str = "") -> list
     投稿者が分からなければ見分けずに数える（誰でも目印を書けるので、
     本文だけで除くと未解決を隠せる）。
     """
-    return [t for t in threads if not t.resolved and not _ccnavi_post(t, host, poster)]
+    return [
+        t
+        for t in threads
+        if not t.resolved
+        and not _ccnavi_post(t, host, poster)
+        and not (ledger and _accepted_by_ledger(t, ledger))
+    ]
 
 
 def _ccnavi_post(t: Thread, host: str, poster: str) -> bool:

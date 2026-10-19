@@ -255,6 +255,30 @@ class PruneKeepsUnfinishedOpsTest(unittest.TestCase):
             )
             self.assertTrue(os.path.exists(path), report)
 
+    def test_a_finished_record_is_not_counted_as_unfinished(self):
+        with tempfile.TemporaryDirectory() as root:
+            state = os.path.join(root, "logs", "state")
+            op_id = oplog.begin(
+                state, oplog.KIND_COMMENT, repo=REPO, stages=[("comment", "comment")]
+            )
+            self.assertEqual(prune.run(root, "", state, "s", dry_run=True).kept_ops, 1)
+            oplog.stage_set(state, op_id, "comment", oplog.SENT, "u")
+            self.assertEqual(prune.run(root, "", state, "s", dry_run=True).kept_ops, 0)
+            self.assertTrue(os.path.exists(oplog.record_path(state, op_id)))
+
+
+class BeginAddsStagesTest(unittest.TestCase):
+    def test_begin_again_adds_only_the_missing_stages(self):
+        with tempfile.TemporaryDirectory() as root:
+            state = os.path.join(root, "logs", "state")
+            fixed = oplog.id_for("close-early", "p", "0", "7", "k")
+            for stages in ([("issue", "issue")], [("issue", "issue"), ("comment", "comment")]):
+                oplog.begin(state, oplog.KIND_CLOSE_EARLY, repo={}, stages=stages, op_id=fixed)
+            oplog.stage_set(state, fixed, "issue", oplog.SENT, "u")
+            record = oplog.load(state, fixed)
+            self.assertEqual([x["id"] for x in record["stages"]], ["issue", "comment"])
+            self.assertEqual(record["stages"][0]["state"], "sent")
+
 
 if __name__ == "__main__":
     unittest.main()

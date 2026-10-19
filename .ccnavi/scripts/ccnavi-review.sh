@@ -575,7 +575,7 @@ comment)
 		printf '<!-- ccnavi:comment -->\n'
 		cat "$body"
 	} >"$noted"
-	comment_key=$(cksum <"$body" | cut -d' ' -f1)
+	comment_key="@$body"
 	posted=$(comment_staged comment "$comment_key" "$number" "$url" "$noted") ||
 		{
 			rm -f "$noted"

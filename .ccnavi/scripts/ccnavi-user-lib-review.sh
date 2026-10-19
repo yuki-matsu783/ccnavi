@@ -259,7 +259,12 @@ post_staged() {
 		cat "$ps_text"
 		printf '\n<!-- ccnavi:op=%s stage=%s -->\n' "$op_id" "$ps_stage"
 	} >"$ps_body"
-	op_set "$ps_stage" pending
+	op_account
+	if ! ccnavi ops stage-set "$op_id" "$ps_stage" pending "" "$op_who" 2>/dev/null; then
+		printf '%s: 操作記録に段階 %s を書けなかった。送らずに止めた。\n' "$review_label" "$ps_stage" >&2
+		rm -f "$ps_text" "$ps_body"
+		return 1
+	fi
 	ps_posted=""
 	case "$ps_kind" in
 	issue) ps_posted=$(create_issue "$ps_body" | "$JQ" -r '.url // empty' 2>/dev/null || :) ;;
