@@ -251,9 +251,9 @@ class CompatAgreesTest(unittest.TestCase):
         （`tree parent` の追加の行 `approved`・`requested`・`archived`・`mr`、`sync retired`、
         `sync migrate`）を呼ぶ。Chrome と手元の判定の規則も変わった。なので 13 以上。
 
-        旧い sh（互換 12）は取り込み状態の `present` を前提に write-and-push と承認の push
+        古い sh（互換 12）は取り込み状態の `present` を前提に write-and-push と承認の push
         を止める。
-        組み合わせると、新しい実行ファイルは記録を書かないので、旧い sh が止まる。
+        組み合わせると、新しい実行ファイルは記録を書かないので、古い sh が止まる。
         食い違いとして知らせる。sh の版と実行ファイルの版は揃える。
         """
         self.assertGreaterEqual(version.COMPAT, 13)
@@ -261,7 +261,7 @@ class CompatAgreesTest(unittest.TestCase):
 
     def test_v16_integrate_tree_bound_raised_the_compat_to_15(self):
         """V16 `integrate` がチケットに結び付くかの判定を、sh が自分で置き場を読まずに実行ファイルの
-        `tree bound` に聞くようになった。旧い実行ファイルはサブコマンドを知らず頭の行を返さない
+        `tree bound` に聞くようになった。古い実行ファイルはサブコマンドを知らず頭の行を返さない
         ので、新しい sh は断る向きに倒す。食い違いとして知らせる。なので 15 以上。
         """
         self.assertGreaterEqual(version.COMPAT, 15)

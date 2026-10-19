@@ -215,8 +215,8 @@ ccnavi_parent_tree() {
 #   ccnavi_pi_archived   手元の退避（ready 済み）に親がある
 #   ccnavi_pi_started    承認済みの親チケットの started_at が空でない（着手は push してから完了する）
 #   ccnavi_pi_mr         親チケットの mr 欄（無ければ空）
-#   ccnavi_pi_hasmr      答えに mr の行が在ったら yes（無ければ空。旧い実行ファイル）
-# 旧い実行ファイルは新しい行（approved・requested・archived・started・mr）を出さない。そのときは unknown のまま。
+#   ccnavi_pi_hasmr      答えに mr の行が在ったら yes（無ければ空。古い実行ファイル）
+# 古い実行ファイルは新しい行（approved・requested・archived・started・mr）を出さない。そのときは unknown のまま。
 ccnavi_parent_info() {
 	ccnavi_pi_parent=unknown
 	ccnavi_pi_approved=unknown
@@ -247,7 +247,7 @@ ccnavi_parent_info() {
 		esac
 	done
 	ccnavi_pi_mr=$(printf '%s\n' "$ccnavi_pi_out" | sed -n 's/^mr //p' | head -n 1)
-	# `mr` の行が在ったか（旧い実行ファイルは出さない。呼ぶ側が「欄に番号が無い」と「行が無い」を言い分ける）
+	# `mr` の行が在ったか（古い実行ファイルは出さない。呼ぶ側が「欄に番号が無い」と「行が無い」を言い分ける）
 	if printf '%s\n' "$ccnavi_pi_out" | grep -q '^mr '; then
 		ccnavi_pi_hasmr=yes
 	fi

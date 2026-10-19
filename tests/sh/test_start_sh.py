@@ -226,7 +226,7 @@ class StartShTest(unittest.TestCase):
         ]
 
     def record(self, ident):
-        """旧い取り込み記録（logs/state/sync/self/families/<識別子>）の中身。作らないことを確かめる。"""
+        """古い取り込み記録（logs/state/sync/self/families/<識別子>）の中身。作らないことを確かめる。"""
         path = os.path.join(self.ws, "logs", "state", "sync", "self", "families", ident)
         if not os.path.exists(path):
             return {}

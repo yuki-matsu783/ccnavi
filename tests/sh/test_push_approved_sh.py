@@ -136,7 +136,7 @@ class Workspace(unittest.TestCase):
             '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
             "no\\n'; exit 0 ;;\n"
             # 親か・承認済みか（push の関門が聞く）。STUB_PARENT があるときだけ答える。
-            # STUB_PARENT=old は、新しい行（approved など）を知らない旧い実行ファイル。
+            # STUB_PARENT=old は、新しい行（approved など）を知らない古い実行ファイル。
             '*" tree parent "*)\n'
             '  [ -n "${STUB_PARENT:-}" ] || exit 0\n'
             "  [ \"$STUB_PARENT\" = no ] && { printf 'tree 1\\nparent no\\n'; exit 0; }\n"

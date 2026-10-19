@@ -1,4 +1,4 @@
-"""旧い取り込み状態（`tickets/legacy_sync.py`）の読み取りと削除。
+"""古い取り込み状態（`tickets/legacy_sync.py`）の読み取りと削除。
 
 `ccnavi sync migrate` だけが使う。リンクは辿らず、読まない・消さない。
 """

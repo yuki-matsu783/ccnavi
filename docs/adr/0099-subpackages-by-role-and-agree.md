@@ -59,4 +59,4 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
   （`chrome-extension/ccnavi-approval/src/core/protocol.ts:333-338`、`render.ts:71`。ADR-0093 の
   7.3 の設計どおり）。拡張の配り直しが要る
 - 失ったもの（実行ファイル）: マージ後は `build.py` で実行ファイルを組み直すまで、端末の承認が通らない。
-  旧い実行ファイルは `--agree` を知らないので、新しい sh（`ccnavi-agree.sh`）から呼ぶと落ちる
+  古い実行ファイルは `--agree` を知らないので、新しい sh（`ccnavi-agree.sh`）から呼ぶと落ちる

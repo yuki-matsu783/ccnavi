@@ -1,6 +1,6 @@
 """`--lint` のうち、設定のレイヤーをまたぐ検査。
 
-旧い置き場に設定が残っていないか、ワークツリーの ccnavi ディレクトリに元リポジトリに無いファイルが
+古い置き場に設定が残っていないか、ワークツリーの ccnavi ディレクトリに元リポジトリに無いファイルが
 無いか、取得済みの `origin/<統合先>` のレイヤーが手元のレイヤーと食い違っていないかを見る。
 1 つのレイヤーの 1 本ずつの検査（ルールの読み・phases / risk の合成）は
 `tickets.config_check` にあり、保護対象の下書きの取り込み（`user handoff`）も同じものを呼ぶ。
@@ -28,9 +28,9 @@ layer_where = config_check.layer_where
 
 
 def _legacy_places(conf: settings.Settings, root: str) -> list[Problem]:
-    """旧い置き場（`.ccnavi/common/`・`.ccnavi/config/{rules,phases,risks}.yml`）に設定が残っていないか。
+    """古い置き場（`.ccnavi/common/`・`.ccnavi/config/{rules,phases,risks}.yml`）に設定が残っていないか。
 
-    設定の置き場は `.ccnavi/config/common/` と `.ccnavi/config/project/` に移った。旧い置き場の
+    設定の置き場は `.ccnavi/config/common/` と `.ccnavi/config/project/` に移った。古い置き場の
     ファイルは読まれないので、書いたルール・配点・フェーズ定義が黙って効かなくなる。
     ワークスペースと、その下のプロジェクトの両方を見る。移すのはユーザで、ここは名指しするだけ。
     """
@@ -53,7 +53,7 @@ def _legacy_places(conf: settings.Settings, root: str) -> list[Problem]:
                     Problem(
                         SEVERITY_WARN,
                         where,
-                        f"{shown} は旧い置き場で、読まれていない。"
+                        f"{shown} は古い置き場で、読まれていない。"
                         f"{label.replace(' ', '/')}{new}/{name} へ移す",
                     )
                 )

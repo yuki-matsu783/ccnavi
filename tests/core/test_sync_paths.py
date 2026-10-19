@@ -119,7 +119,7 @@ class SyncPathsTest(unittest.TestCase):
 
 
 class SyncMigrateTest(unittest.TestCase):
-    """`ccnavi sync migrate`。旧い取り込み状態から `retire/<親>.json` への 1 回限りの移行。"""
+    """`ccnavi sync migrate`。古い取り込み状態から `retire/<親>.json` への 1 回限りの移行。"""
 
     def setUp(self):
         self.ws = tempfile.mkdtemp(prefix="ccnavi-sync-migrate-")

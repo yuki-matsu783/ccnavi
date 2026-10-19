@@ -1063,10 +1063,10 @@ class ProblemsSaidOnceTest(ConfigUnionHarness):
 
 
 class LegacyPlaceTest(ConfigUnionHarness):
-    """旧い置き場（`.ccnavi/common/`・`.ccnavi/config/*.yml`）の設定は読まれず、`--lint` が言う。"""
+    """古い置き場（`.ccnavi/common/`・`.ccnavi/config/*.yml`）の設定は読まれず、`--lint` が言う。"""
 
     def legacy(self):
-        return [p for p in self.lint_json()["problems"] if "旧い置き場" in p["detail"]]
+        return [p for p in self.lint_json()["problems"] if "古い置き場" in p["detail"]]
 
     def test_no_old_file_no_complaint(self):
         self.assertEqual(self.legacy(), [])
