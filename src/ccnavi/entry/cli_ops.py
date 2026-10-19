@@ -517,7 +517,12 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
             kind, parent, phase, mr, key = words[1:6]
             if key.startswith("@"):
                 # 鍵の中身をファイルから取る（本文そのものを鍵にして、衝突を避ける）
-                key = fsio.read_text(key[1:]) or key
+                body = fsio.read_text(key[1:])
+                if not body:
+                    # 読めない・空のときにパス文字列で代えると、本文が違っても同じ操作になってしまう
+                    stderr.write(f"ccnavi: 鍵にする本文のファイルを読めない（{key[1:]}）\n")
+                    return EXIT_ERROR
+                key = body
             stages = []
             for spec in words[6:]:
                 sid, _, skind = spec.partition(":")
@@ -565,6 +570,16 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
                 stderr.write("ccnavi: 書き先は state の置き場の下に限る\n")
                 return EXIT_ERROR
             return EXIT_OK if review_decide.resume_plan(record, words[2]) == 0 else EXIT_ERROR
+        if len(words) == 8 and words[0] == "mark-sent":
+            # mark-sent <種類> <親> <MR> <鍵> <段階ID> <URL>: 目印で見つけた投稿を送り済みにする
+            key = words[4]
+            if key.startswith("@"):
+                key = fsio.read_text(key[1:]) or ""
+            if not key:
+                stderr.write("ccnavi: 鍵にする本文を読めない\n")
+                return EXIT_ERROR
+            oplog.mark_sent(conf.state, words[1], words[2], words[3], key, words[5], words[6])
+            return EXIT_OK
         if len(words) == 2 and words[0] == "retire":
             for op_id in oplog.retire_parent(conf.state, words[1]):
                 stdout.write(op_id + "\n")

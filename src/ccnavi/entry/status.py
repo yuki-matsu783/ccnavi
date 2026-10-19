@@ -194,6 +194,8 @@ def _manual_lines(
 
 def _unfinished_ops(stdout: TextIO, conf: settings.Settings) -> None:
     """送り終えていない操作（引き継ぎ未完了）があれば、1 行ずつ出す。"""
+    if not conf.state:
+        return
     left = oplog.pending(conf.state)
     if not left:
         return

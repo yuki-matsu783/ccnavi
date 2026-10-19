@@ -167,6 +167,11 @@ review_host
 # 下書きから issue とコメントを、操作記録の段階（鍵は下書きの名前）に載せて送る。送れた下書きは消す。
 resume_legacy_drafts() {
 	printf '%s: 操作記録を入れる前の版が残した下書きがあります:\n' "$review_label"
+	# 下書きの一覧は改行区切り。パスに空白があっても割れないよう、語の区切りを改行だけにする。
+	rl_ifs="$IFS"
+	IFS='
+'
+	set -f
 	printf '  %s\n' $resume_legacy
 	printf '送りますか [y/N]: '
 	read -r rl_answer || rl_answer=n
@@ -206,6 +211,8 @@ resume_legacy_drafts() {
 			;;
 		esac
 	done
+	set +f
+	IFS="$rl_ifs"
 	[ -z "$rl_failed" ] || fail decide-legacy-incomplete "送れなかった下書きがあります。確かめてから --resume を打ち直してください。" 1
 	printf 'OK: 古い形の下書きを送った\n'
 	exit 0

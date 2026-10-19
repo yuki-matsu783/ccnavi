@@ -218,7 +218,7 @@ SUBS: tuple[Sub, ...] = (
     Sub(("sync",), ("tidy",), "tidy"),
     # 操作記録の書き込み。偽の送信済みを書かせないため、エージェントには直に打たせない。
     # 呼ぶのは sh の中だけ。読む副命令（pending・show）は止めない。
-    Sub(("ops",), ("begin", "stage-set", "applied", "done", "retire"), "state-direct"),
+    Sub(("ops",), ("begin", "stage-set", "applied", "done", "retire", "mark-sent"), "state-direct"),
     Sub(("worktree",), ("retire", "branch"), "tidy"),
 )
 

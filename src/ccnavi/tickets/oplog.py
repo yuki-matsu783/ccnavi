@@ -400,6 +400,25 @@ def remove(state: str, op_id: str) -> None:
     fsio.remove(record_path(state, op_id))
 
 
+def mark_sent(state: str, kind: str, parent: str, mr: str, key: str, stage: str, url: str) -> str:
+    """別の経路（先頭の目印の照合）で送り済みと分かった単発の投稿を、記録の上でも送り済みにする。
+
+    記録が無ければ作る。送り済みの段階は戻さない。操作ID を返す。
+    """
+    op_id = id_for(kind, parent, "0", mr, key)
+    begin(
+        state,
+        kind,
+        repo={},
+        parent=parent,
+        mr=int(mr) if str(mr).isdigit() else 0,
+        stages=[(stage, STAGE_COMMENT)],
+        op_id=op_id,
+    )
+    stage_set(state, op_id, stage, SENT, url)
+    return op_id
+
+
 def retire_parent(state: str, parent: str) -> list[str]:
     """親の記録のうち、すべての段階が送り終わったものを消し、消した操作ID を返す。
 

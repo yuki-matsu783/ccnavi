@@ -523,6 +523,9 @@ ${eli5_how}"
 		fail request-posted-unknown "投稿済みの依頼を確かめられなかった（ホストの返事は上に出ている）。二重に投稿しないよう止めた。"
 	if [ -n "$posted" ]; then
 		printf '同じ依頼は投稿済み（%s）。投稿し直さない\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
+		# 前の試みが結果を確定できないまま残っていても、ここで送り済みに直す（「引き継ぎ未完了」を残さない）
+		ccnavi ops mark-sent request "${branch:-}" "$number" "$request_marker" comment \
+			"$(printf '%s' "$posted" | "$JQ" -r '.url' | tr -d '\r')" >/dev/null 2>&1 || :
 	else
 		# 本文の末尾に、ELI5 の HTML の在りかと crit での見方を 1 行足す。HTML の中身は
 		# 載せない（マージリクエストの差分にある）。目印は 1 行目なので、足しても二重投稿の見分けは変わらない。

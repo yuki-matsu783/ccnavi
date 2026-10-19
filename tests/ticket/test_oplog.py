@@ -158,6 +158,28 @@ class OplogTest(unittest.TestCase):
             self.assertIn(key, data)
 
 
+class MarkSentTest(unittest.TestCase):
+    def test_an_unknown_post_found_by_its_marker_becomes_sent_and_a_missing_key_is_refused(self):
+        with tempfile.TemporaryDirectory() as root:
+            state = os.path.join(root, "logs", "state")
+            op_id = oplog.id_for("request", "p1", "0", "7", "k")
+            oplog.begin(
+                state,
+                "request",
+                repo={},
+                parent="p1",
+                mr=7,
+                stages=[("comment", "comment")],
+                op_id=op_id,
+            )
+            oplog.stage_set(state, op_id, "comment", oplog.UNKNOWN)
+            self.assertEqual(
+                oplog.mark_sent(state, "request", "p1", "7", "k", "comment", "u"), op_id
+            )
+            self.assertEqual(oplog.load(state, op_id)["stages"][0]["state"], "sent")
+            self.assertEqual(oplog.pending(state), [])
+
+
 class RetireParentTest(unittest.TestCase):
     def test_only_finished_records_of_that_parent_are_removed(self):
         with tempfile.TemporaryDirectory() as root:
