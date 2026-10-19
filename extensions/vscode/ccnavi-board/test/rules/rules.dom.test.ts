@@ -10,6 +10,7 @@ import { KNOWN_TOOLS, type Sections } from "../../src/core/rules-view.js";
 import { rulesSums } from "../../src/core/sums.js";
 import type { RuleHitJson, TestJson } from "../../src/core/testmodel.js";
 import { openPage, openRules, page, rowSelector } from "../helpers/rules.js";
+import { checkHandoffLink } from "../helpers/handoff-link.js";
 import type { DomPage } from "../helpers/dom.js";
 import { sumsBoard } from "../helpers/sums.js";
 import type { HTMLButtonElement, HTMLDetailsElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
@@ -1458,4 +1459,8 @@ test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・再読
   } finally {
     await dom.close();
   }
+});
+
+test("CB-D391 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
+  await checkHandoffLink((handoff) => openRules({ handoff }));
 });

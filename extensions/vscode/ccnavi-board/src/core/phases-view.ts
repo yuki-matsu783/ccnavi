@@ -14,6 +14,7 @@
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
  * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身が届くのは、画面の編集を捨ててよいときだけ。
  */
+import type { HandoffEntry, OpenHandoffMessage } from "./handoff-entry.js";
 import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
@@ -99,6 +100,8 @@ export interface PhasesPage {
   readonly lock: Lock;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
+  /** 取り込み待ち画面へ進む入口（開けるか）。読み込めなかったときは無い */
+  readonly handoff?: HandoffEntry;
   /** 上部に error の帯で出す文（共通の設定の phases.yml を読めない、など）。画面は開いたまま。`--lint` が error を言う間は保存できない */
   readonly errors?: readonly string[];
   /**
@@ -148,7 +151,8 @@ export type PhasesMessage =
   /** 案内を閉じた。拡張ホストは見たことを残し、次からは初回の案内を送らない */
   | { readonly type: "tourDone" }
   /** 開いたまま別の設定へ切り替える。未保存の変更があれば、拡張ホストが破棄してよいかを聞く */
-  | { readonly type: "switchTarget"; readonly kind: string; readonly name: string };
+  | { readonly type: "switchTarget"; readonly kind: string; readonly name: string }
+  | OpenHandoffMessage;
 
 /** 最初の中身を埋める `<script type="application/json">` の id */
 export const DATA_ID = "ccnavi-phases-data";

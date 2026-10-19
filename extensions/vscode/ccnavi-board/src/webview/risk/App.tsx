@@ -14,6 +14,7 @@ import type { Lock } from "../../core/lock.js";
 import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskMessage, type RiskPage, type ToRisk } from "../../core/risk-view.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { TargetSelect } from "../TargetSelect.js";
+import { HandoffLink } from "../shared/HandoffLink.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseRiskSample } from "../../core/tour-risk.js";
@@ -312,6 +313,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           </span>
         </div>
         <div className="controls">
+          <HandoffLink entry={touring ? undefined : page?.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
           <button type="button" className="action" data-action="open-risk" disabled={!shownExists} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>

@@ -8,6 +8,7 @@
  * 両側から import されるので、片方だけが持てるものを置くとバンドルできなくなる。
  */
 import type { AppearanceMessage } from "./appearance.js";
+import type { HandoffEntry } from "./handoff-entry.js";
 import type { ApprovePlan } from "./approvemodel.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
@@ -186,7 +187,7 @@ export interface TemplatesPage {
    * 取り込み待ち画面を開けるか。実行ファイルが `handoff` の機能を持たなければ `enabled` が偽で、理由を `reason` に入れる。
    * この画面は下書きを一覧するだけで、取り込み・編集は取り込み待ち画面が受け持つ
    */
-  readonly handoff: { readonly enabled: boolean; readonly reason: string };
+  readonly handoff: HandoffEntry;
   readonly notices: readonly string[];
 }
 

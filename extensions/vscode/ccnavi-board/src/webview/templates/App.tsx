@@ -17,6 +17,7 @@ import { useHostMessages } from "../useHostMessages.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import templatesTour from "../tours/templates.yml";
 import { TargetSelect } from "../TargetSelect.js";
+import { HandoffLink } from "../shared/HandoffLink.js";
 import { Draft } from "./Draft.js";
 import { Edit } from "./Edit.js";
 import { post } from "./post.js";
@@ -304,18 +305,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           </h2>
           <p className="hint">エージェントが作った効力のない下書きです。取り込むまでテンプレートとしては使われません。この画面では読むだけです。</p>
           <p className="handoff-link">
-            <button
-              type="button"
-              className="action"
-              data-action="open-handoff"
-              data-tour="handoff"
-              disabled={touring || !page.handoff.enabled}
-              title={page.handoff.enabled ? "下書きの取り込みと編集は、取り込み待ちの画面で行います" : page.handoff.reason}
-              onClick={() => act({ type: "openHandoff" })}
-            >
-              取り込み待ちを開く
-            </button>
-            {!page.handoff.enabled && !touring && <span className="hint" data-role="handoff-reason"> {page.handoff.reason}</span>}
+            <HandoffLink entry={page.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
           </p>
           {page.data.drafts.length === 0 ? (
             <p className="empty">{"下書きはありません。親チケットを閉じる前に、ccnavi --templates --draft <親> で作れます。"}</p>

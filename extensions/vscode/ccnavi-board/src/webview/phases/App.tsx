@@ -28,6 +28,7 @@ import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parsePhasesSample, parsePhasesTexts } from "../../core/tour-phases.js";
 import phasesTour from "../tours/phases.yml";
 import { TargetSelect } from "../TargetSelect.js";
+import { HandoffLink } from "../shared/HandoffLink.js";
 import { post } from "./post.js";
 import { COMMON_NOTE, commonIdNote, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
 import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
@@ -359,6 +360,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           </span>
         </div>
         <div className="controls">
+          <HandoffLink entry={touring ? undefined : page?.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
           <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
