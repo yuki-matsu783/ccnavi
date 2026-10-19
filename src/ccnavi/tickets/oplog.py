@@ -17,6 +17,7 @@ decide・close-early・request・comment・ready は、ホストへの返信・�
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import time
@@ -79,6 +80,16 @@ def _now() -> str:
 
 def new_id() -> str:
     return uuid.uuid4().hex
+
+
+def id_for(*parts: str) -> str:
+    """内容から決まる操作ID（32 桁の 16 進）。
+
+    エージェントの操作（request・comment・ready）は、同じ操作を打ち直して復旧する。打ち直しが
+    同じ記録に当たるよう、操作の鍵（種類・親・MR・本文の鍵など）から ID を決める。
+    """
+    joined = "\x1f".join(parts)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:32]
 
 
 def _stage(stage_id: str, kind: str) -> dict[str, Any]:

@@ -456,6 +456,8 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
     - `applied <操作ID> <鍵> <値>`: ローカルに適用したものを残す（値は true / false / 文字列）
     - `reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント]`: 送信の照合。結論を
       `sent|send|unknown|stop` で出す（`yes` は一覧を最後まで読めた、`no` は打ち切った）
+    - `begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>…`: 鍵から決めた操作ID で記録を作る
+      （エージェントの request・comment・ready が、打ち直しで同じ記録に当たるため）。ID を出す
     - `post-text <操作ID> <段階ID> <ファイル>`: 段階で投稿する本文を、保存した判断から作り直して書く
     - `resume-plan <操作ID> <ファイル>`: 保存した判断から受け入れの計画を書き直す（`--resume`）
     - `done <操作ID>`: すべての段階が sent なら記録を消す。消したら `done`、残るなら `open` を出す
@@ -508,6 +510,26 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
             )
             stdout.write(f"{verdict} {why}".rstrip() + "\n")
             return EXIT_OK
+        if len(words) >= 7 and words[0] == "begin":
+            # begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>…
+            # 鍵から決めた ID で作る（既にあれば作らない）
+            kind, parent, phase, mr, key = words[1:6]
+            stages = []
+            for spec in words[6:]:
+                sid, _, skind = spec.partition(":")
+                stages.append((sid, skind or oplog.STAGE_COMMENT))
+            op_id = oplog.begin(
+                conf.state,
+                kind,
+                repo={},
+                parent=parent,
+                phase=int(phase) if phase.isdigit() else 0,
+                mr=int(mr) if mr.isdigit() else 0,
+                stages=stages,
+                op_id=oplog.id_for(kind, parent, phase, mr, key),
+            )
+            stdout.write(op_id + "\n")
+            return EXIT_OK
         if len(words) == 4 and words[0] == "post-text":
             record = oplog.load(conf.state, words[1])
             if record is None:
@@ -542,7 +564,7 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
     stderr.write(
         "ccnavi: ops の使い方: pending / show <操作ID> / "
         "stage-set <操作ID> <段階ID> <pending|sent|unknown> [URL] [アカウント] / "
-        "applied <操作ID> <鍵> <値> / "
+        "begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>… / applied <操作ID> <鍵> <値> / "
         "reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント] / done <操作ID>\n"
     )
     return EXIT_ERROR
