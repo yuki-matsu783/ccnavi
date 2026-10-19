@@ -167,6 +167,7 @@ _LOCAL_FORBIDDEN = (
     settings.GUARD_UNWATCHED_ENV,
     settings.RESTORE_IF_DENY_ENV,
     settings.DENY_REPEAT_ENV,
+    settings.STOP_REVIEW_ENV,
     settings.MODE_ENV,
 )
 

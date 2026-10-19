@@ -441,7 +441,8 @@ md の書き方（条件 `ccnavi:if` / `ccnavi:else`、差し込み `{{名前}}`
 | 提案 | `wip/proposals/`（各ツリーのルートの直下。そのツリーの git が追跡する） |
 | 承認済みチケットとフェーズのマーカー | `.ccnavi/approved/`（各ツリーのルートの直下。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く） |
 | 判定の記録 | `logs/decisions.jsonl`（ワークスペースルートの下） |
-| state | `logs/state/`（ワークスペースルートの下。実行後チェックの記録と、促しの記録・実行中の印・直接作業の候補 `direct-<セッション>.json` などの一時の印） |
+| state | `logs/state/`（ワークスペースルートの下。実行後チェックの記録と、促しの記録・実行中の印・直接作業の候補 `direct-<セッション>.json` などの一時の印。Stop の AI 判定の計画・試行・propose の操作実績も、ここに置く） |
+| Stop の AI 判定の記録 | `logs/stop-review/`（試行のイベント `events.jsonl`、判定に渡した材料の保存 `material/`、独立した評価 `labels.jsonl`。`decisions.jsonl` には書かない） |
 
 `projects/` のプロジェクトの作業も、ワークスペースルートで Claude Code を起動して `cd` で入る。プロジェクトの中で起動すると
 `CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれず、ワークスペースの ccnavi の hook は動かない
@@ -2312,6 +2313,22 @@ jq -r 'select(.decision == "deny") | .source' logs/decisions.jsonl | sort | uniq
 URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、redis-cli の `-a` など）を伏せる。
 18 字未満の値は `***`、それより長い値は先頭 6 字と末尾 4 字を残す（`ghp_Ab***Q7r8`）。判定は伏せる前の文字列で下す。
 
+### Stop の AI 判定
+
+チケット提案の取りこぼし（提案を書かずに作成の許可だけ取る・具体性の無い提案・書いたのに送らない提案）を、
+独立したコンテキストの agent 型 Stop hook が判定する。既定は登録なしで、登録しても `CCNAVI_STOP_REVIEW` の
+既定は `dry-run`（記録だけで、止めない）。構成は [docs/design/stop-review.md](docs/design/stop-review.md)。
+
+- 登録・解除・点検: `sh scripts/ccnavi-stop-review.sh register|unregister|check [--root <ワークスペース>]`。
+  判定役のモデルの既定は `haiku`、タイムアウトは 60 秒（`register --model <名前>` で変えられる）
+- 効き方: `CCNAVI_STOP_REVIEW`（`dry-run` / `enable` / `disable`）。`enable` は、検証に通った不備検出だけを
+  1 回差し戻す。差し戻しの次の Stop では、既存の促しを 1 回通常どおり動かし、修正後の材料で 1 回だけ再判定する
+- 判定の基準: 組み込みの基準を、ワークスペースの `.ccnavi/config/stop-review.md` が置き換える（無ければ組み込み）。
+  読めない・空の場合は、別の基準を推測せず未検査にする
+- 集計: `ccnavi stop-review report`。独立した評価（人が付ける正否）は `logs/stop-review/labels.jsonl` に
+  1 行 1 件の JSON `{"attempt_id", "criterion", "target", "truth": "flaw"|"ok"}` で書く。評価が無い指標は「不明」と出す
+- 追加の待ち時間は 1 Stop あたり約 10 秒、費用は約 0.0025 ドル（実測。設計書の「測定結果」）
+
 ### 記録の後始末
 
 セッションが始まるたびに、記録と state を片付ける。実行前チェックでは走らない。
@@ -2320,7 +2337,11 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 - ローテートした記録のうち、最後に書かれてから `CCNAVI_LOG_KEEP_DAYS`（既定 14 日）を過ぎたものを消す
 - `logs/state/` の、セッションを名前に持つ記録を、そのセッションのどれもが `CCNAVI_STATE_KEEP_DAYS`（既定 14 日）
   書かれていなければまとめて消す。いま始まったセッションと、レビューの下書き・退避したファイルなどセッションを
-  名前に持たないもの、知らない名前のファイル、リンクになった置き場は消さない
+  名前に持たないもの、知らない名前のファイル、リンクになった置き場は消さない。Stop の AI 判定の計画・試行・
+  propose の操作実績（`stopreview-*`・`stopops-*`）は、セッションを名前に持たないが、それ自身の日付で
+  `CCNAVI_STATE_KEEP_DAYS` を過ぎたら消す
+- `logs/stop-review/` の再評価用の材料（`material/`）とイベントの記録は、評価の途中で消えないよう別の保持日数
+  `CCNAVI_STOP_REVIEW_KEEP_DAYS`（既定 90 日）で消す。イベントの記録のローテートは、この値と独立に行う
 
 動かした数はセッション開始の行の `detail` に `pruned rotated=1 logs=2 state=5` の形で残る。手で走らせるなら端末から打つ。
 エージェントが Bash から `--preview` の無い形を打つと、チケット制御に依らず `DENY_RECORDS_PRUNE` で止まる。
@@ -2538,6 +2559,9 @@ error 3 件、warn 1 件、info 0 件
 | error | `.claude/settings.json` の `env` の `CCNAVI_BIN_PATH` が指す先は在るが、実行できない。hook が 126 で起動せず、何も判定していない |
 | warn | モードが `disable` / `dry-run`、あるいはモードとして読めない値 |
 | warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |
+| warn | 読めない `CCNAVI_STOP_REVIEW` の値（`dry-run` として動く） |
+| warn | Stop の AI 判定の登録の食い違い: `CCNAVI_STOP_REVIEW_AGENT=1` があるのに agent 型 Stop hook が無い、hook があるのに印が無い（判定計画が作られず、すべて未検査になる）、hook が複数ある（判定が重複する） |
+| warn | 判定役の Bash（`stop-review` の 2 つの入口）を許す権限が `permissions.allow` に無い（判定役は `dontAsk` で動くので、材料を取れず、すべて未検査になる） |
 | warn | 守る働きを持つ設定が止めない値になっている（`CCNAVI_GUARD_CORE_FILES` と `CCNAVI_RESTORE_IF_DENY` が `disable` か `dry-run`、`CCNAVI_GUARD_UNWATCHED` と `CCNAVI_GUARD_TICKET_APPROVAL` が `disable`） |
 | warn | 上書き設定ファイル `ccnavi.settings.local.json` が読めない。このファイルを読むのは ccnavi 自身のソースツリーだけ（設計 4.3） |
 | warn | `CCNAVI_TICKET_CONTROL=disable`（チケットの範囲も HITL ポイントも適用されない） |

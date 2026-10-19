@@ -190,7 +190,7 @@ unregister)
 		exit 0
 	fi
 	write_settings "$updated"
-	printf '外しました（目印のある agent hook と CCNAVI_STOP_REVIEW_AGENT）。CCNAVI_STOP_REVIEW_JUDGE_TYPE は残しています\n'
+	printf '外しました（目印のある agent hook と CCNAVI_STOP_REVIEW_AGENT）\n'
 	exit 0
 	;;
 esac

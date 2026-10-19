@@ -1,8 +1,8 @@
 """動作モードと終了コード。判定をどう扱うかを決め、どう判定するかは決めない。
 
 enable / dry-run / disable の 3 値はここが持つ。判定のモード（CCNAVI_MODE）も、
-戻す働きの設定（CCNAVI_RESTORE_IF_DENY、CCNAVI_GUARD_CORE_FILES）も同じ 3 値を
-取るので、定義は 1 か所にして selfguard はここから借りる。
+戻す働きの設定（CCNAVI_RESTORE_IF_DENY、CCNAVI_GUARD_CORE_FILES）と Stop の AI 判定の設定
+（CCNAVI_STOP_REVIEW）も同じ 3 値を取るので、定義は 1 か所にして selfguard はここから借りる。
 
 フラグ・環境・設定ファイルのどれから来た値がモードになるか（resolve_mode）、
 モードを掛けたあとに戻す働きがどうなるか（effective_setting）、判定に達せな

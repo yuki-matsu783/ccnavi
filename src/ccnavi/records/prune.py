@@ -47,7 +47,7 @@ import shutil
 import time
 from dataclasses import dataclass, field
 
-from ..infra import fsio
+from ..infra import fsio, pathcase
 from . import diaglog
 
 # しきい値の環境変数と既定値。
@@ -232,7 +232,7 @@ def _linkless(root: str, path: str) -> bool:
     """`root` の下の `path` までの道に、リンクが 1 つも無いか。`path` が `root` の外なら偽。"""
     top = os.path.abspath(root)
     current = os.path.abspath(path)
-    if os.path.commonpath([top, current]) != top:
+    if os.path.commonpath([pathcase.fold(top), pathcase.fold(current)]) != pathcase.fold(top):
         return False
     while current != top:
         if os.path.islink(current):
