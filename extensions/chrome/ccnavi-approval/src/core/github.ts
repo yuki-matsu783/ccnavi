@@ -745,6 +745,28 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
   return { base: b, head: h, files };
 }
 
+/** パスの履歴を読む件数の上限。届けば履歴が途切れていて、最初のコミットを言えない */
+export const PATH_HISTORY_LIMIT = 100;
+
+/**
+ * そのパスを最初に加えたコミットの時刻（epoch 秒）。手で `done/` に動かした子の移動の時刻に使う。
+ * ブランチ `ref` でそのパスに触れたコミットのうち最も古いものを取る。履歴が上限に届いた・読めない・
+ * 日付を読めないときは null（呼び手は確かめられないものとして確定しない）。
+ */
+export async function pathCommitTime(client: Client, owner: string, repo: string, ref: string, path: string): Promise<{ time: number | null }> {
+  const r = checkBranch(ref);
+  const p = checkPath(path);
+  const { status, body } = await rest(
+    client,
+    `${repoPath(owner, repo)}/commits?sha=${encodeURIComponent(r)}&path=${encodeURIComponent(p)}&per_page=${PATH_HISTORY_LIMIT}`,
+  );
+  if (status === 404 || !Array.isArray(body) || body.length === 0 || body.length >= PATH_HISTORY_LIMIT) return { time: null };
+  const oldest = body[body.length - 1] as { commit?: { committer?: { date?: unknown } } };
+  const date = oldest?.commit?.committer?.date;
+  const ms = typeof date === "string" ? Date.parse(date) : Number.NaN;
+  return { time: Number.isFinite(ms) ? Math.floor(ms / 1000) : null };
+}
+
 // ---- 「始める」。issue の一覧と、親のブランチを作る -------------------------------
 
 /** 全部のブランチの名前を読むページの上限（100 × 50）。超えたら読み切れないので止める（「始める」の重なりの検査） */

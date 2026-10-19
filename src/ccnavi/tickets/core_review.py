@@ -241,6 +241,25 @@ def confirm_local(
     return code
 
 
+def manual_for(
+    snapshot: core_base.Snapshot, parent_id: str, phase_no: int, moved_at: float | None = None
+) -> manual_settle.Manual | None:
+    """git を持たない呼び手（Chrome）向けの、手で動かした子の判定。親かフェーズが無ければ None。
+
+    移動の時刻は呼び手がホストの履歴から読んで渡す。`moved_at` が None のうちは `need_time` が真で、
+    `paths`（動かした子の done/ のファイル）の時刻を読んでから渡し直す。
+    """
+    parent = _open_parent(snapshot.root, snapshot.conf, parent_id)
+    if parent is None:
+        return None
+    ph = review._phase(snapshot.root, snapshot.conf, parent, phase_no)
+    if ph is None:
+        return None
+    return manual_settle.assess(
+        snapshot.root, snapshot.conf, parent, ph, external=True, moved_at=moved_at
+    )
+
+
 def _manual_notes(manual: manual_settle.Manual | None) -> list[str]:
     """手で動かした移動が、確定できない形のときの知らせ（確定できるときは出さない）。"""
     if manual is None or manual.state in (manual_settle.NONE, manual_settle.READY):

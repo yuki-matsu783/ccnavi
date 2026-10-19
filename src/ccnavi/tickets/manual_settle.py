@@ -50,6 +50,10 @@ class Manual:
     # まだ動いていない子（PARTIAL）
     waiting: list[str] = field(default_factory=list)
     note: str = ""
+    # 外から移動の時刻をもらう形（Chrome）で、まだ時刻が無いとき真。動かした子の done/ のパス
+    # （ツリーの根からの絶対パス）を `paths` に入れる。呼び手は時刻を読んで `moved_at` を渡し直す
+    need_time: bool = False
+    paths: list[str] = field(default_factory=list)
 
     def line(self) -> str:
         """status・confirm・Stop が出す 1 行。出すものが無ければ空。"""
@@ -87,8 +91,16 @@ def assess(
     parent: ticket_model.Ticket,
     ph: phase.Phase,
     phases: list[phase.Phase] | None = None,
+    *,
+    external: bool = False,
+    moved_at: float | None = None,
 ) -> Manual:
-    """このフェーズ（延期を引き受けた分を含む）の手動の移動を判定する。"""
+    """このフェーズ（延期を引き受けた分を含む）の手動の移動を判定する。
+
+    `external` は git を持たない呼び手（Chrome）。ホストの親のブランチを読んでいるので、共有済み
+    と見なし、移動の時刻だけを外から受ける。`moved_at`（epoch 秒）が無ければ `need_time` で返し、
+    読めなかった（0 以下）なら確かめられないものとして BROKEN で返す。
+    """
     if approval_marks.MARK_REVIEWED in ph.marks or not ph.review_required:
         return Manual()
     if phases is None:
@@ -119,6 +131,12 @@ def assess(
         return Manual(PARTIAL, names, waiting=waiting)
     if ph.marks.get(approval_marks.MARK_REQUESTED) is None:
         return Manual(NO_REQUEST, names)
+    if external:
+        if moved_at is None:
+            return Manual(READY, names, need_time=True, paths=[t.path for t in hand])
+        if moved_at <= 0:
+            return Manual(BROKEN, names, note="移動の時刻を読めない")
+        return Manual(READY, names, moved_at=moved_at)
     shared = _shared(root, parent, hand)
     if isinstance(shared, str):
         return Manual(UNSHARED if shared == "unshared" else BROKEN, names, note=shared)

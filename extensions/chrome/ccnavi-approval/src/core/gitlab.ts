@@ -486,6 +486,26 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
   return { base: b, head: h, files };
 }
 
+/** パスの履歴を読む件数の上限。届けば履歴が途切れていて、最初のコミットを言えない */
+export const PATH_HISTORY_LIMIT = 100;
+
+/**
+ * そのパスを最初に加えたコミットの時刻（epoch 秒）。ブランチ `ref` でそのパスに触れたコミットのうち
+ * 最も古いものを取る。履歴が上限に届いた・読めない・日付を読めないときは null（確定しない）。
+ */
+export async function pathCommitTime(client: Client, owner: string, repo: string, ref: string, path: string): Promise<{ time: number | null }> {
+  const r = checkBranch(ref);
+  const p = checkPath(path);
+  const { status, body } = await get(
+    client,
+    `${project(owner, repo)}/repository/commits?ref_name=${encodeURIComponent(r)}&path=${encodeURIComponent(p)}&per_page=${PATH_HISTORY_LIMIT}`,
+  );
+  if (status === 404 || !Array.isArray(body) || body.length === 0 || body.length >= PATH_HISTORY_LIMIT) return { time: null };
+  const oldest = body[body.length - 1] as { committed_date?: unknown };
+  const ms = typeof oldest?.committed_date === "string" ? Date.parse(oldest.committed_date) : Number.NaN;
+  return { time: Number.isFinite(ms) ? Math.floor(ms / 1000) : null };
+}
+
 // ---- 書き込み -----------------------------------------------------------------
 
 /** GitLab が書き込みを断った（`last_commit_id` が違う・書き換えるものが無い など）。何も書いていない。元に戻すコミットならユーザの対応に切り替える */

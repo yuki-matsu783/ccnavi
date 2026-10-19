@@ -44,6 +44,7 @@ export type HostOp =
   | "commitParents"
   | "reviewCopy"
   | "compareFiles"
+  | "pathCommitTime"
   | "issues"
   | "branchNames"
   | "createBranch"
@@ -508,6 +509,11 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
     case "compareFiles":
       if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
       value = await x.compareFiles(client, o, r, github.checkOid(a), github.checkOid(b));
+      break;
+    case "pathCommitTime":
+      // 手で done/ に動かした子の移動の時刻: ブランチ a のパス b を最初に加えたコミットの時刻。読むだけ
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
+      value = await x.pathCommitTime(client, o, r, github.checkBranch(a), github.checkPath(b));
       break;
     case "branchNames":
       value = await x.branchNames(client, o, r);

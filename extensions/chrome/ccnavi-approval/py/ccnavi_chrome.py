@@ -1015,7 +1015,21 @@ def _op_confirm(req: dict, root: str) -> dict:
         changed = core.moved_on_host(
             snapshot, ident, phase_no, head, _compare_files(compare, recorded, head)
         )
-        checked = core.confirm(snapshot, ident, phase_no, result, changed)
+        # 手で done/ に動かされた子の確定。移動の時刻は拡張がホストの履歴から読む。
+        at = req.get("manual_moved_at")
+        at = float(at) if isinstance(at, (int, float)) and not isinstance(at, bool) else None
+        manual = core.manual_for(snapshot, ident, phase_no, at)
+        if manual is not None and manual.need_time:
+            marker = "/" + snapshot.conf.approved.strip("/") + "/"
+            paths = [p[p.index(marker) + 1 :] for p in manual.paths if marker in p]
+            return {
+                "family": family,
+                "need_manual": {"paths": paths},
+                "problems": [],
+                "code": None,
+                **_changes(root, None),
+            }
+        checked = core.confirm(snapshot, ident, phase_no, result, changed, manual)
     body = _changes(root, checked.changes)
     _one_branch(body, family)
     return {

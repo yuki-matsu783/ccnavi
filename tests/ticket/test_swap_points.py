@@ -974,6 +974,44 @@ class CoreChromeTest(CoreHarness):
         )
         self.keep_scenario("confirm", request, answer)
 
+    def test_confirm_a_hand_moved_child_asks_for_the_time_and_accepts_old_threads(self):
+        """手で done/ に動かされた子: 移動の時刻を拡張に求め、移動前のスレッドを台帳に受ける。"""
+        import shutil
+
+        self.reviewed_phase_one()
+        waiting = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
+        done = os.path.join(self.parent_tree, ".ccnavi", "approved", "done", "i0001-01-01.md")
+        os.makedirs(os.path.dirname(done), exist_ok=True)
+        shutil.move(waiting, done)
+        self.commit_parent("moved by hand")
+        old = {
+            "id": "t1",
+            "url": "https://h/c/1",
+            "body": "直して",
+            "created_at": "2026-01-01T00:00:00Z",
+        }
+        old["last_id"] = "c1"
+        result = {
+            "host": "fixture",
+            "mr": {"number": 7, "url": "u/7"},
+            "threads": [old],
+            "reviews": [],
+        }
+        compare = self.host_compare()
+        need = self.ask_chrome(self.confirm_request(result, compare))
+        self.assertEqual(need["need_manual"], {"paths": [".ccnavi/approved/done/i0001-01-01.md"]})
+        self.assertIsNone(need["changes"])
+        moved = self.ask_chrome({**self.confirm_request(result, compare), "manual_moved_at": 4e9})
+        self.assertEqual(moved["problems"], [])
+        paths = [r["path"] for r in moved["changes"]["i0001"]]
+        self.assertIn(".ccnavi/approved/phases/i0001/accepted.json", paths)
+        mark = next(r for r in moved["changes"]["i0001"] if r["path"].endswith("1.reviewed"))
+        self.assertEqual(json.loads(mark["content"])["via"], "manual")
+        # 移動の時刻を読めなければ確かめられないので、未解決の指摘は受け入れない
+        unknown = self.ask_chrome({**self.confirm_request(result, compare), "manual_moved_at": 0})
+        self.assertIsNone(unknown["changes"])
+        self.assertTrue(unknown["problems"])
+
     def test_an_unreadable_stamp_is_an_error_not_an_exception(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
