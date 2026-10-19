@@ -242,7 +242,7 @@ class Merged:
 def merge_legacy(
     conf: settings.Settings, parent: str, project: str, branch: str, mr: str
 ) -> Merged:
-    """旧い取り込み状態の `mr` と `branch` を `retire/<親>.json` に写す（`sync migrate` が使う）。
+    """古い取り込み状態の `mr` と `branch` を `retire/<親>.json` に写す（`sync migrate` が使う）。
 
     記録が無ければ新しく書く。既にあれば、そちらを尊重して、空の `mr` と `branch` だけを足す
     （足すものが無ければ `kept`）。既存の記録が壊れているときは書かず、理由を返す。

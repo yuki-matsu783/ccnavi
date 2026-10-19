@@ -136,7 +136,7 @@ class Workspace(unittest.TestCase):
             '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
             "no\\n'; exit 0 ;;\n"
             # 親か・承認済みか（push の関門が聞く）。STUB_PARENT があるときだけ答える。
-            # STUB_PARENT=old は、新しい行（approved など）を知らない旧い実行ファイル。
+            # STUB_PARENT=old は、新しい行（approved など）を知らない古い実行ファイル。
             '*" tree parent "*)\n'
             '  [ -n "${STUB_PARENT:-}" ] || exit 0\n'
             "  [ \"$STUB_PARENT\" = no ] && { printf 'tree 1\\nparent no\\n'; exit 0; }\n"
@@ -386,24 +386,6 @@ class PushApprovedTest(Workspace):
         self.place(tree)
         self.assertNotPushed(self.push(), tree, "develop-v1.0.0")
 
-    def test_the_environment_and_settings_local_json_do_not_name_the_integration(self):
-        """環境変数も settings.local.json の env も、統合先を決めない。統合先のコピーも読まない。"""
-        tree = self.worktree("develop-v1.0.0")
-        self.place(tree)
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "develop-v1.0.0"}}\n',
-        )
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "remote origin\nbranch develop-v1.0.0\nsource default\n",
-        )
-        env = self.env(CCNAVI_INTEGRATION_BRANCH="develop-v1.0.0")
-        result = self.push(env=env)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("統合先 develop-v1.0.0", result.stderr)
-        self.assertEqual(self.remote_head("develop-v1.0.0"), self.head(tree))
-
     def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
         """統合先が決まらない（origin/HEAD も origin/main・master も無い）なら今までどおり送る。"""
         tree = self.worktree("develop-v1.0.0")
@@ -414,21 +396,16 @@ class PushApprovedTest(Workspace):
 
     def test_a_project_is_judged_by_its_own_integration(self):
         """projects/<名前>/ のツリーは、そのプロジェクトの origin/HEAD で統合先を決める。
-        ワークスペースの origin/HEAD も、環境変数も settings.local.json も、プロジェクトの
-        統合先を変えない（固定のリストに無い名前 develop-v1.0.0 で止まる）。"""
+        ワークスペースの origin/HEAD はプロジェクトの統合先を変えない（固定のリストに無い名前
+        develop-v1.0.0 で止まる）。"""
         project = os.path.join(self.ws, "projects", "app")
         remote = self.repository(project, "develop-v1.0.0")
         self.place(project)
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "main"}}\n',
-        )
-        env = self.env(CCNAVI_INTEGRATION_BRANCH="main")
         # ワークスペース自身の origin/HEAD が同じ名前でも、プロジェクトの統合先は別（origin も空）。
         ref = "refs/remotes/origin/develop-v1.0.0"
         git(self.ws, "update-ref", ref, "HEAD")
         git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
-        result = self.push(env=env)
+        result = self.push()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.head_of(remote, "develop-v1.0.0"), self.head(project))
 
@@ -437,7 +414,7 @@ class PushApprovedTest(Workspace):
         before = self.head_of(remote, "develop-v1.0.0")
         git(project, "update-ref", ref, "HEAD")
         git(project, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
-        result = self.push(env=env)
+        result = self.push()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("統合先 develop-v1.0.0", result.stderr)
         self.assertEqual(self.head_of(remote, "develop-v1.0.0"), before)

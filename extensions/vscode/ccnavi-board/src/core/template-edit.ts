@@ -222,9 +222,9 @@ export function addItem(template: EditTemplate, part: PlanPart, type: string): E
   return withPart(template, part, [...items, { type, review: "", after }]);
 }
 
-/** 項を `order`（新しい添字の順に、旧い添字を並べたもの。入れない旧い添字は落とす）で並べ直す。全体計画ならフローのキーも合わせる */
+/** 項を `order`（新しい添字の順に、古い添字を並べたもの。入れない古い添字は落とす）で並べ直す。全体計画ならフローのキーも合わせる */
 function remap(template: EditTemplate, part: PlanPart, order: readonly number[]): EditTemplate {
-  // order[新しい添字-1] = 旧い添字
+  // order[新しい添字-1] = 古い添字
   const items = partOf(template, part);
   const toNew = new Map<number, number>();
   order.forEach((old, i) => toNew.set(old, i + 1));

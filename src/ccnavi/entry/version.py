@@ -56,7 +56,7 @@ VERSION = "0.1.0"
 # 15: `integrate` がチケットに結び付くかの判定を、実行ファイルの `tree bound` に聞くようにした。
 # sh が呼ぶサブコマンドが増え、sh は答えの頭の行 `tree 1` が無ければ断る向きに倒す。
 # 16: ユーザだけが打つ操作を `user <操作>`（agree・reviewed・close-early・prune・handoff）に集め、
-# sh を ccnavi-user-*.sh に分けた。`user` の外の形は断るので、旧い sh は新しい実行ファイルで
+# sh を ccnavi-user-*.sh に分けた。`user` の外の形は断るので、古い sh は新しい実行ファイルで
 # 動かない。
 # 17: 送信を操作記録（`ops` サブコマンド）に載せ、decide の判断のダイジェストを版 2 にした。
 # 手で動かした子の確定が受け入れ台帳（`phases/<親>/accepted.json`）と `via: manual` を書く。

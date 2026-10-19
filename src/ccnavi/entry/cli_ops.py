@@ -618,18 +618,18 @@ def sync_retired(stdout: TextIO, conf: settings.Settings) -> int:
 
 
 def sync_migrate(stdout: TextIO, conf: settings.Settings, root: str) -> int:
-    """旧い取り込み状態（`sync/<repo>/families/<親>`・`integration/`）の 1 回限りの移行。冪等。
+    """古い取り込み状態（`sync/<repo>/families/<親>`・`integration/`）の 1 回限りの移行。冪等。
 
     ```
     migrate 1
     moved <親> <repo>          retire/<親>.json を新規に書いた、または不足分（mr・branch）を足した
     kept <親> <repo>           retire/<親>.json が既にあり、そちらを尊重した
-    dropped <親> <repo> <理由>  親のワークツリーが在る、または mr も branch も無い。旧い記録を消した
+    dropped <親> <repo> <理由>  親のワークツリーが在る、または mr も branch も無い。古い記録を消した
     skipped <親> <repo> <理由>  リンクなど。消さない
     removed integration <repo> sync/<repo>/integration/ を消した
     ```
 
-    親のワークツリーが無い旧い記録だけを `retire/<親>.json` に移す。取り込みの状態（gone や
+    親のワークツリーが無い古い記録だけを `retire/<親>.json` に移す。取り込みの状態（gone や
     blocked など）は捨てる。リンクは辿らない。ネットワークにも git にも触れない。
     """
     stdout.write(SYNC_MIGRATE_HEAD + "\n")
@@ -674,7 +674,7 @@ def _migrate_one(
         return
     stdout.write(f"{result.status} {fam.name} {fam.repo}\n")
     if not legacy_sync.remove_family(conf.state, fam.repo, fam.name):
-        stdout.write(f"skipped {fam.name} {fam.repo} 旧い記録を消せない\n")
+        stdout.write(f"skipped {fam.name} {fam.repo} 古い記録を消せない\n")
 
 
 def _migrate_dropped(
@@ -683,7 +683,7 @@ def _migrate_dropped(
     if removed:
         stdout.write(f"dropped {fam.name} {fam.repo} {why}\n")
     else:
-        stdout.write(f"skipped {fam.name} {fam.repo} {why}。旧い記録を消せない\n")
+        stdout.write(f"skipped {fam.name} {fam.repo} {why}。古い記録を消せない\n")
 
 
 def _in_state(conf: settings.Settings, path: str) -> bool:

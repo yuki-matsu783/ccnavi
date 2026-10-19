@@ -169,12 +169,8 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual("topic", git(self.wt("topic"), "branch", "--show-current"))
 
     def test_a_project_starts_from_its_own_origin_head(self):
-        """環境変数と settings.local.json に main があっても、projects/app の起点は trunk。
-        統合先は、その作業をするリポジトリの origin/HEAD だけで決める（B1 の再発防止）。"""
-        write(
-            os.path.join(self.ws, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "main"}}\n',
-        )
+        """ワークスペースの統合先が main でも、projects/app の起点は trunk。
+        統合先は、その作業をするリポジトリの origin/HEAD だけで決める。"""
         project = os.path.join(self.ws, "projects", "app")
         git(self._tmp.name, "init", "-q", "-b", "work", project)
         for key, value in (("user.email", "t@example.invalid"), ("user.name", "t")):
@@ -182,7 +178,7 @@ class WorktreeShTest(unittest.TestCase):
         git(project, "commit", "-q", "--allow-empty", "-m", "seed")
         git(project, "update-ref", "refs/remotes/origin/trunk", "HEAD")
         git(project, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
-        result = self.run_sh("topic", "--dry-run", cwd=project, CCNAVI_INTEGRATION_BRANCH="main")
+        result = self.run_sh("topic", "--dry-run", cwd=project)
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertIn("起点 origin/trunk", result.stdout)
         self.assertNotIn("起点 main", result.stdout)

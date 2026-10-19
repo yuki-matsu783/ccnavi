@@ -291,8 +291,7 @@ def integration_name(owner: str) -> str:
     """そのリポジトリ（`owner` はそのチェックアウト）の統合先の名前。決まらなければ空。
 
     手元の `origin/HEAD`、無ければ `origin/main`、`origin/master` の順。sh の
-    `ccnavi_integration`（`ccnavi_default_branch`）と同じ。環境変数も設定ファイルも読まない
-    （ワークスペースで 1 つの値がプロジェクトの統合先を塗りつぶすのを避ける）。
+    `ccnavi_integration`（`ccnavi_default_branch`）と同じ。
     origin の無いリポジトリでは決まらない。
     統合先の解決は、hook・`--lint`・レイヤーの比べ方がこの関数を共通に使う。
     """

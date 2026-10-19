@@ -16,7 +16,7 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   マーカーが在るか）・`archived`（手元の退避に親が在るか）・`started`（承認済みの親チケットの
   `started_at` が空でないか。着手は push してから完了するので、着手済みなら一度は push した）・
   `mr`（親チケットの `mr:` 欄）。
-  旧い実行ファイルはこの 5 行を返さない（sh は `approved` が無ければ `unknown` と読む）
+  古い実行ファイルはこの 5 行を返さない（sh は `approved` が無ければ `unknown` と読む）
 
 - `ccnavi tree bound <ツリー> <名前>`: その名前の直接作業のワークツリーが、チケットに結び付くか
   （`ccnavi-git.sh integrate` が断る条件。Stop の促しと同じ判定）。`bound yes|no` に続けて、

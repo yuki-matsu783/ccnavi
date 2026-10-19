@@ -6,7 +6,7 @@
 手元に残る取り込みの記録は読まない。判定は git もネットワークも使わない。
 
 `AuthorityHarness` は、親 i0001 と子 i0001-01-01 を承認して子のワークツリーを作った状態から
-始める土台で、ほかのテストも使う。`record_text` は旧い取り込み状態の書式（移行のテストが使う）。
+始める土台で、ほかのテストも使う。`record_text` は古い取り込み状態の書式（移行のテストが使う）。
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from tests.ticketsample import child_text, parent_text
 
 
 def record_text(name, state, reason="", sha="0" * 40):
-    """旧い取り込み状態（`sync/<リポジトリ>/families/<P>`）の中身。移行の入力にだけ使う。"""
+    """古い取り込み状態（`sync/<リポジトリ>/families/<P>`）の中身。移行の入力にだけ使う。"""
     return (
         f"remote origin\nbranch {name}\nsha {sha}\nfetched_at 1\nstate {state}\nreason {reason}\n"
     )
@@ -473,20 +473,20 @@ class GuidanceByKindTest(AuthorityHarness):
 
 
 class LegacySyncRecordsTest(AuthorityHarness):
-    """旧い `logs/state/sync/` が残る PC でも、立ち位置・承認・hook の判定は変わらない。"""
+    """古い `logs/state/sync/` が残る PC でも、立ち位置・承認・hook の判定は変わらない。"""
 
     def plant(self):
         for state in ("gone", "blocked"):
             write(
                 os.path.join(self.state, "sync", "self", "families", "i0001"),
-                record_text("i0001", state, "旧い理由"),
+                record_text("i0001", state, "古い理由"),
             )
         write(os.path.join(self.state, "sync", "self", "integration", "head"), "branch main\n")
         write(
             os.path.join(self.state, "sync", "self", "integration", ".ccnavi", "approved", "done")
             + os.sep
             + "i0001-01-01.md",
-            "旧いコピー\n",
+            "古いコピー\n",
         )
 
     def observed(self):

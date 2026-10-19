@@ -1,9 +1,9 @@
-"""旧い取り込み状態（`sync/`）の最小の読み取りと削除。
+"""古い取り込み状態（`sync/`）の最小の読み取りと削除。
 
 `ccnavi sync migrate` だけが使う使い捨てのモジュール。
 
-取り込み状態は廃止した。このモジュールの役割は、移行の副命令が、旧い記録から
-`retire/<親>.json` に写すもの（ブランチ・MR の番号）を拾い、旧い記録を消すことだけ。
+取り込み状態は廃止した。このモジュールの役割は、移行の副命令が、古い記録から
+`retire/<親>.json` に写すもの（ブランチ・MR の番号）を拾い、古い記録を消すことだけ。
 移行が行き渡ったら、このモジュールごと削除する。
 
     <state の置き場>/sync/<リポジトリ>/families/<P>
@@ -25,13 +25,13 @@ from dataclasses import dataclass
 SYNC_DIR = "sync"
 FAMILIES_DIR = "families"
 INTEGRATION_DIR = "integration"
-# 旧い記録 1 つの大きさの上限。超えたら切らずに読まない。
+# 古い記録 1 つの大きさの上限。超えたら切らずに読まない。
 _RECORD_LIMIT = 64 * 1024
 
 
 @dataclass(frozen=True)
 class LegacyFamily:
-    """旧い記録 1 つ。
+    """古い記録 1 つ。
 
     `skipped` が空でなければ読まず・消さない理由（リンクなど。`branch` `mr` は空）。
     `branch` は記録に書いた親のブランチ名（前の記録は識別子と同じ名前を書いている）。無ければ空。
@@ -47,7 +47,7 @@ class LegacyFamily:
 
 
 def read_families(state_dir: str) -> list[LegacyFamily]:
-    """旧い記録の一覧（リポジトリ名、親の識別子の順）。書きかけ（`*.tmp.*`）は数えない。
+    """古い記録の一覧（リポジトリ名、親の識別子の順）。書きかけ（`*.tmp.*`）は数えない。
 
     `sync/` が無ければ空。読めない記録は `skipped` に理由を入れて並べる。
     """
@@ -73,7 +73,7 @@ def read_families(state_dir: str) -> list[LegacyFamily]:
 
 
 def remove_family(state_dir: str, repo: str, name: str) -> bool:
-    """旧い記録 1 つを消す。消したら True。リンク・ふつうのファイルでないものは消さず False。"""
+    """古い記録 1 つを消す。消したら True。リンク・ふつうのファイルでないものは消さず False。"""
     path = os.path.join(state_dir, SYNC_DIR, repo, FAMILIES_DIR, name)
     if not _is_plain_file(path) or _above_linked(state_dir, repo):
         return False

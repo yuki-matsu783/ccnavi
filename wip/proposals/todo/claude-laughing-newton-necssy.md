@@ -206,15 +206,14 @@ sh（`.ccnavi/scripts/`）はエージェントが書けず、ユーザがコピ
 
 - `ccnavi-sync.sh` の取り込み実体（fetch・早送り・merge・衝突時の取りやめ）、MR のマージ済み判定と手元の片付け（`sync tidy`）
 - ロック（`ccnavi-common-lock.sh`）、`ccnavi_record_get/write/put`（`integrate` のマーカー）、`ccnavi_repo_key`（ロックの置き場）、`retire/<親>.json`、`logs/archive/`
-- `ccnavi_integration`（統合先ブランチ名の解決）。ただし `integration/head` の枝は外す。環境変数と `settings.local.json` の `env` と `origin/HEAD` の順に揃える（sh 側の `settings.local.json` の扱いは調査 1）
+- `ccnavi_integration`（統合先ブランチ名の解決）。ただし `integration/head` の枝は外す。統合先は各リポジトリの手元の `origin/HEAD` だけで決める（ADR-0148）
 
 ## 調査で確かめること（research の項）
 
 初回レビューで答えが出ていた 7 項目（`sync check` の中身、`ready` 後の列挙元、`integrate` の束縛判定、`ccnavi_repo_key` の使い道、拡張が `sync/` の書き手であること、承認の経路から照会を呼べないこと、統合先の解決順の食い違い）は、上の設計に反映した。残る確認:
 
-1. `settings.local.json` の `env` が sh（`ccnavi-git.sh` `ccnavi-fetch.sh`）に渡るか。渡らないなら統合先の解決を実行ファイルに聞く形にする
-2. `hook` が取り込み直後のリモートの承認済みチケットを、検査の前に範囲判定へ使う窓（旧 `blocked` が埋めていた分）の大きさ。`Ticket.blocked` を hook が見るか
-3. `approval_checks._closed_elsewhere` の置き換え先。閉じた親子の子を先行に持つチケットの扱い
+1. `hook` が取り込み直後のリモートの承認済みチケットを、検査の前に範囲判定へ使う窓（旧 `blocked` が埋めていた分）の大きさ。`Ticket.blocked` を hook が見るか
+2. `approval_checks._closed_elsewhere` の置き換え先。閉じた親子の子を先行に持つチケットの扱い
 4. 新 sh と旧実行ファイル、旧 sh と新実行ファイルの混在時の挙動（`sync check` を知らない旧版は検査が fail-open になる）。上の「順序と互換の版」で足りるか
 5. `start` 直後〜提案作成前の `integrate` の束縛判定の窓（`ig_bound` の前段が false の間）
 6. 放棄した親（MR をマージせずに閉じた）が毎回 `sync` の終了コードを 1 にする問題の扱い

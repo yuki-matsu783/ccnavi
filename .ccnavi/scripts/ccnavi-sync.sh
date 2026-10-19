@@ -61,7 +61,7 @@
 # `ccnavi tree parent` に聞く（sh はチケットを読まない）。
 # 実行ファイルが無ければ、ほかの sh と同じく既定のパス（固定）を使う。在るのに
 # 答えなかったときは、置き場を取り違えないよう止める。
-# 起動したら先頭で `ccnavi sync migrate` を 1 回呼ぶ（旧い取り込み記録を ready の後の片付けの記録へ移す。冪等）。
+# 起動したら先頭で `ccnavi sync migrate` を 1 回呼ぶ（古い取り込み記録を ready の後の片付けの記録へ移す。冪等）。
 #
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/
 #   CCNAVI_SYNC_TIMEOUT（ls-remote・fetch 1 回のタイムアウト監視の秒、既定 60）
@@ -202,9 +202,9 @@ run_ccnavi() {
 	esac
 }
 
-# ---- 旧い取り込み記録の移行（冪等。実行ファイルが無い・古くて知らないときは何もしない）。
+# ---- 古い取り込み記録の移行（冪等。実行ファイルが無い・古くて知らないときは何もしない）。
 #
-# 旧い `sync/<リポジトリ>/families/<P>` のうち、親のワークツリーが無いものを ready の後の片付けの記録
+# 古い `sync/<リポジトリ>/families/<P>` のうち、親のワークツリーが無いものを ready の後の片付けの記録
 # （retire/<P>.json）へ移し、統合先のコピー（sync/<リポジトリ>/integration/）を消す。列挙の前に済ませる。
 
 if [ -n "$info_from" ]; then
@@ -215,21 +215,21 @@ if [ -n "$info_from" ]; then
 			mg_kind="${mg_line%% *}"
 			mg_rest="${mg_line#* }"
 			case "$mg_kind" in
-			moved) printf '案内: %s: 旧い取り込み記録を、片付けの記録（retire/）へ移した\n' "${mg_rest%% *}" ;;
-			dropped) printf '案内: %s: 旧い取り込み記録を捨てた（%s）\n' "${mg_rest%% *}" "${mg_rest#* * }" ;;
+			moved) printf '案内: %s: 古い取り込み記録を、片付けの記録（retire/）へ移した\n' "${mg_rest%% *}" ;;
+			dropped) printf '案内: %s: 古い取り込み記録を捨てた（%s）\n' "${mg_rest%% *}" "${mg_rest#* * }" ;;
 			skipped)
 				case "$mg_rest" in
 				integration\ *)
 					# `skipped integration <repo> <理由>` は親ではなく統合先のコピーの行。
 					mg_after="${mg_rest#integration }"
-					printf '案内: 旧い統合先のコピー（%s）を触らなかった（%s）。ユーザが中身を確かめてください\n' "${mg_after%% *}" "${mg_after#* }"
+					printf '案内: 古い統合先のコピー（%s）を触らなかった（%s）。ユーザが中身を確かめてください\n' "${mg_after%% *}" "${mg_after#* }"
 					;;
 				*)
-					printf '案内: %s: 旧い取り込み記録を触らなかった（%s）。ユーザが中身を確かめてください\n' "${mg_rest%% *}" "${mg_rest#* * }"
+					printf '案内: %s: 古い取り込み記録を触らなかった（%s）。ユーザが中身を確かめてください\n' "${mg_rest%% *}" "${mg_rest#* * }"
 					;;
 				esac
 				;;
-			removed) printf '案内: 旧い統合先のコピー（%s）を消した\n' "${mg_rest#integration }" ;;
+			removed) printf '案内: 古い統合先のコピー（%s）を消した\n' "${mg_rest#integration }" ;;
 			esac
 		done <"$scratch/migrate"
 	fi
@@ -275,6 +275,18 @@ default_branch() {
 		db_host=""
 		;;
 	esac
+	# ホストの答えが手元の origin/HEAD と綴りの大文字小文字だけ違うなら、同じ名前として手元の綴りを使う。
+	# 別の綴りで取ると、大文字小文字を区別しない FS で origin/<名前> が衝突する。
+	if [ -n "$db_host" ]; then
+		db_local=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
+		db_local="${db_local#origin/}"
+		db_local_f=$(printf '%s' "$db_local" | tr '[:upper:]' '[:lower:]')
+		db_head_f=$(printf '%s' "$db_head" | tr '[:upper:]' '[:lower:]')
+		if [ -n "$db_local" ] && [ "$db_local_f" = "$db_head_f" ]; then
+			printf '%s\n' "$db_local"
+			return 0
+		fi
+	fi
 	if [ -n "$db_head" ] && has_head "$2" "$db_head"; then
 		# ホストに聞いて得た名前か。`$( )` の中で呼ぶので、変数ではなくファイルで呼び元へ渡す。
 		[ -z "$db_host" ] || : >"$scratch/db-host"
@@ -916,10 +928,7 @@ while IFS= read -r key <&4; do
 	if [ -e "$scratch/db-host" ]; then
 		old_head=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
 		old_head="${old_head#origin/}"
-		# 大文字小文字だけ違う名前は同じものとして扱う。
-		old_head_f=$(printf '%s' "$old_head" | tr '[:upper:]' '[:lower:]')
-		integ_f=$(printf '%s' "$integ" | tr '[:upper:]' '[:lower:]')
-		if [ "$old_head_f" != "$integ_f" ] &&
+		if [ "$old_head" != "$integ" ] &&
 			git -C "$repo" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$integ" 2>/dev/null; then
 			printf '%s 統合先を %s から %s に合わせた（ホストの既定ブランチ）\n' "$label" "${old_head:-未設定}" "$integ"
 		fi

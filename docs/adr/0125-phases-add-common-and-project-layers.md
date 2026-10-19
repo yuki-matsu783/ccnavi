@@ -46,7 +46,7 @@ ADR-0107 は、フェーズ定義（`phases.yml`）を config の 1 本だけに
 - 失ったもの: 共通の `phases.yml` を直すと、全プロジェクトの次の承認に効く。進行中の親は写しを読むので変わらない
 - 失ったもの: ミラーは次の親の着手まで共通とずれる（ルールと配点と同じ）
 - 失ったもの: 新しく導入したワークスペースには、自身のレイヤーの `phases.yml` のひな形が無い。レイアウトに依存する定義（文書の置き場や配布の sh を範囲に持つものなど）は、ユーザが書く
-- 失ったもの: この変更より前に配られた `.ccnavi/config/project/phases.yml`（`quick` や `implement` などの汎用の定義を含む版）は、`ccnavi-setup.sh` を打ち直しても入れ替わらない（自身のレイヤーの `phases.yml` はもう配らず、既にあるものには `--force` でも触らない）。共通の `phases.yml` と同じ `id` で中身が違う定義（旧版の `implement` など）があると、`--lint` が error を出し、その定義を捨てて共通の定義を使う（そのレイヤーのほかの定義は使われる）。移行は、`phases.yml` から共通に移った定義（`quick` `research` `design` `acceptance` `implement` `design-feedback` `implement-feedback`）を消し、そのプロジェクトだけに要る定義を残す。ユーザが持つ設定なので、書き換えるのはユーザ
+- 失ったもの: この変更より前に配られた `.ccnavi/config/project/phases.yml`（`quick` や `implement` などの汎用の定義を含む版）は、`ccnavi-setup.sh` を打ち直しても入れ替わらない（自身のレイヤーの `phases.yml` はもう配らず、既にあるものには `--force` でも触らない）。共通の `phases.yml` と同じ `id` で中身が違う定義（古い版の `implement` など）があると、`--lint` が error を出し、その定義を捨てて共通の定義を使う（そのレイヤーのほかの定義は使われる）。移行は、`phases.yml` から共通に移った定義（`quick` `research` `design` `acceptance` `implement` `design-feedback` `implement-feedback`）を消し、そのプロジェクトだけに要る定義を残す。ユーザが持つ設定なので、書き換えるのはユーザ
 
 ## 採らなかった案
 

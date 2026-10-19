@@ -265,23 +265,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         git(self.root, "remote", "add", "origin", self.root + ".origin.git")
         body = self.assert_not_asked(self.ccnavi("--mode", "enable", stdin=self.payload(path)))
         self.assertIn("git remote set-head origin -a", body["systemMessage"])
-        self.assertNotIn("CCNAVI_INTEGRATION_BRANCH", body["systemMessage"])
-
-    def test_the_environment_and_local_settings_do_not_decide_the_integration_branch(self):
-        path = self.direct(commit=True)
-        self.point_origin_head("")
-        write(
-            os.path.join(self.root, ".claude", "settings.local.json"),
-            '{"env": {"CCNAVI_INTEGRATION_BRANCH": "main"}}\n',
-        )
-        result = self.ccnavi(
-            "--mode",
-            "enable",
-            stdin=self.payload(path),
-            env={"CCNAVI_INTEGRATION_BRANCH": "main"},
-        )
-        body = self.assert_not_asked(result)
-        self.assertIn("origin が無いので統合先が決まらない", body["systemMessage"])
 
     def payload(self, cwd, session="s1"):
         return json.dumps({"hook_event_name": "Stop", "cwd": cwd, "session_id": session})

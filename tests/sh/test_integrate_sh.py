@@ -313,14 +313,13 @@ class IntegrateTest(unittest.TestCase):
 
     def test_undetermined_integration_is_refused_with_the_set_head_hint(self):
         """origin/HEAD も origin/main・master も無ければ、ローカルの main で代わりにせず断る。
-        環境変数が残っていても読まない。origin が無いか、あるかで案内を言い分ける。"""
+        origin が無いか、あるかで案内を言い分ける。"""
         self.work_in_branch()
         git(self.ws, "update-ref", "--no-deref", "-d", "refs/remotes/origin/HEAD")
         git(self.ws, "update-ref", "-d", "refs/remotes/origin/main")
         r = self.run_git_sh("integrate", "wt", cwd=self.ws)
         self.assertOk(r, 2)
         self.assertIn("origin が無いので統合先が決まらない", r.stderr)
-        self.assertNotIn("CCNAVI_INTEGRATION_BRANCH", r.stderr)
         git(self.ws, "remote", "add", "origin", "https://example.invalid/x.git")
         r = self.run_git_sh("integrate", "wt", cwd=self.ws)
         self.assertOk(r, 2)

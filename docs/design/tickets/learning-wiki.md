@@ -255,7 +255,7 @@ learning-wiki は手順書（スキル・ルール・テンプレート）を作
 
 #### いまのスキル向けの仕組みからの移行
 
-移行は段階で進める。`docs/wiki/**` の既存の文書の `type` を `learning-wiki` に書き換える段は済んでいる（作業のセッションの既定の検索に出さないため）。ファイルの改名（`skill-wiki.md`、`skill-impact.md`）、手順書（`skill-review.md`）、`skill-improve` から `learning-apply` への置き換え、`skill-candidates.md` から子ごとの記録への切り替えは、まだ。旧い流れもそのまま動く。
+移行は段階で進める。`docs/wiki/**` の既存の文書の `type` を `learning-wiki` に書き換える段は済んでいる（作業のセッションの既定の検索に出さないため）。ファイルの改名（`skill-wiki.md`、`skill-impact.md`）、手順書（`skill-review.md`）、`skill-improve` から `learning-apply` への置き換え、`skill-candidates.md` から子ごとの記録への切り替えは、まだ。古い流れもそのまま動く。
 
 | いま | 移行後 |
 |---|---|

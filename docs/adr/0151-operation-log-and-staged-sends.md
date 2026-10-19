@@ -6,7 +6,7 @@ tags: [review, host, recovery]
 keywords: [操作記録, ops, 段階, 目印, 照合, resume, decide, 引き継ぎ未完了, digest]
 ---
 
-# ADR-0148: ホストへの送信は操作記録に載せ、段階ごとに照合してから送る
+# ADR-0151: ホストへの送信は操作記録に載せ、段階ごとに照合してから送る
 
 状態: 採用
 

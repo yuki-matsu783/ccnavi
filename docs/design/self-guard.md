@@ -43,11 +43,11 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 | `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていない写しと置き場の外には当たらない |
 | `builtin:guard-handoff-ln` | ワークスペースルートが決まっているとき | Bash で、リンクを作るコマンド（`ln`・`link`・`cp -l` / `-s` / `--link` / `--symbolic-link`）があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中の形。行き先は読み分けない（止める側に倒す） |
 
-同じ設定が有効な間、`ccnavi user prune`（旧い形は `ccnavi --prune` の `--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
+同じ設定が有効な間、`ccnavi user prune`（古い形は `ccnavi --prune` の `--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
 擬似端末（`script -qc`）を使えば満たせてしまい、チケット制御を切ったワークスペースでは端末要求を切る変数も止まらないため。
 見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と `user prune`（`user` の次の語が `prune`）か単独の語の `--prune` が並べば止める。
-免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ旧い形だけ（`user prune` に免除は無い）。
+免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ古い形だけ（`user prune` に免除は無い）。
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
 
