@@ -410,7 +410,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `PostToolUseFailure` | 失敗した呼び出しも、成功した呼び出しと同じに設定ファイルと保護領域を照合して戻す（失敗する前に変えていることがあるため）。ツール自体の失敗を数え、失敗や拒否が続いたら資料を引く案内を返す（「失敗や拒否が続いたとき」） | 失敗の連続を数えられず、案内が出ない |
 | `Stop` | このターンで変わった保護領域をユーザへ報告する。動かしている作業（バックグラウンドのコマンド、予約した繰り返し）が残っているかを記録し、残っていれば次の発言での受け入れをしない。cwd のワークツリーのチケットを `finish` し忘れていそうなら 1 回だけ止めて促す。レビューの依頼までの道の途中（作業中の子が残っている、子が全部閉じたのに依頼が無い）も、実行中のサブエージェントが居なければ 1 回だけ止めて次の一手を促す。チケットに結び付かない直接作業のワークツリー（cwd のもの、またはこのセッションが書き込んだもの。チケット制御の有無は問わない）に未コミットの変更か統合先に入っていないコミットがあり `integrate` の記録も無ければ、`integrate` の打ち方を 1 回だけ促す（統合の前提を満たせないときは止めずに理由を言う）。`match: Stop` のルールがあれば、そのタイミングで止めて文を渡す | 変更がユーザの目に触れない。閉じ忘れたチケットが作業中に残る。ターンの終わりの促しが届かない |
 | `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録も。チケット制御の有無によらず、実行中の印を置き、同じ作業ツリーで編集する別のサブエージェントが動いていればその案内も渡す | サブエージェントが自分の範囲を知らずに始める |
-| `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す。ワークツリーを読めなかった回は止めず、親へ伝える印（`.unchecked`）を置く。実行中の印を外す | 範囲外のコミット済みの変更が親に届く |
+| `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す。ワークツリーを読めなかった回は止めず、親へ伝える印（`.unchecked`）を置く。実行中の印を外す。終わり方を `ok`・`fixed`・`outside`・`unchecked`・`unattributed` に分けて `logs/state/subagent-<セッション>-<agent_id>.outcome`（JSON）に残す。担当の子が決まるのは cwd が子のワークツリーのときだけで、親のツリーから起動された体は全部の子を検査するが差し戻さず、`unattributed` として親へ 1 度知らせる（`PostToolUse` と `UserPromptSubmit`。出力に書き終えてから `notified` の印を付ける）。差し戻して直ったもの（`fixed`）は親に警告しない。差し戻しを残したまま終わったもの（`outside`）は親に言う（`dry-run` は差し戻さないので「差し戻していない」と言う） | 範囲外のコミット済みの変更が親に届く |
 
 `SessionStart` で渡す作業の決まりは、`.ccnavi/CCNAVI.md` の本文で、起動・再開・compact・clear のたびに、メインのセッションにだけ届く。
 文面は md が持ち、実行ファイルは条件と差し込みを解いて 1 つの文にするだけ。ccnavi の動作に依存する決まりと考え方なので、
@@ -441,7 +441,7 @@ md の書き方（条件 `ccnavi:if` / `ccnavi:else`、差し込み `{{名前}}`
 | 提案 | `wip/proposals/`（各ツリーのルートの直下。そのツリーの git が追跡する） |
 | 承認済みチケットとフェーズのマーカー | `.ccnavi/approved/`（各ツリーのルートの直下。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く） |
 | 判定の記録 | `logs/decisions.jsonl`（ワークスペースルートの下） |
-| state | `logs/state/`（ワークスペースルートの下。実行後チェックの記録と、促しの記録・実行中の印・直接作業の候補 `direct-<セッション>.json` などの一時の印。ホストへの送信の操作記録 `ops/` もここに置き、prune は消さない） |
+| state | `logs/state/`（ワークスペースルートの下。実行後チェックの記録と、促しの記録・実行中の印・サブエージェントの終了結果 `subagent-<セッション>-<agent_id>.outcome`（JSON。prune が 14 日で掃除する）・直接作業の候補 `direct-<セッション>.json` などの一時の印。ホストへの送信の操作記録 `ops/` もここに置き、prune は消さない） |
 
 `projects/` のプロジェクトの作業も、ワークスペースルートで Claude Code を起動して `cd` で入る。プロジェクトの中で起動すると
 `CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれず、ワークスペースの ccnavi の hook は動かない
@@ -1422,7 +1422,9 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 `finish` を促さなかった回は、レビューの依頼までの道の途中なら（承認済みの親に作業中の子が残っているか、子が全部閉じたのに依頼のマーカーが無い）、決まった道の途中でユーザの許可は要らないことと次のコマンド（`finish`・すべての子が合流済みかの確認・ELI5・`request`）を渡して止める（理由コード `NUDGE_TICKET_REQUEST`）。ユーザが `review/` の子を `done/` へ手で動かして commit・push（共有）済みのフェーズでは、次の一手を `confirm`（`STEP_CONFIRM`）にして 1 回だけ促す。未コミット・未 push の移動は促さず、`status` が「移動が未共有」と言う。最後の発言は読まず、同じ状態では 1 回だけで、`dry-run` でも止める。実行中のサブエージェントが居る間（`SubagentStart` が印を置き、`SubagentStop` が外す。開始から 4 時間を過ぎた印、セッションの起動・再開で捨てる印は数えない）は、委任して待つ回なので促しを出さずに待ち、「1 回だけ」の記録も進めない。印を読めないときも同じ。チームメイトと背景のシェルは待ちに数えない。
 
-どちらも促さなかった回は、チケットに結び付かない直接作業のワークツリー（cwd のもの、または Write・Edit・NotebookEdit の書き込み先として `logs/state/direct-<セッション>.json` に記録したもの。チケット制御の有無は問わない）に、未コミットの変更か統合先に入っていないコミットがあり、統合先のツリーに `integrate <名前>` の記録も無ければ、`integrate` の打ち方と、staged で止めてユーザに `git status`・`git diff --staged` で確かめてもらう手順を渡して止める。理由コードは `NUDGE_INTEGRATE` である。hook は `integrate` を打たない。`integrate` が断る名前は促さない。統合先のツリーに未コミットの変更や途中の操作があるとき、また未コミットの変更があるのに統合先の ref を引けないときは、止めずに理由を報告へ足す。同じ状態では 1 回だけで、`dry-run` でも止める。実行中のサブエージェントが居る間は促しを出さずに待つ。
+依頼までの道の促しも出さなかった回で、終わったサブエージェントの結果が `outside`（範囲外の変更を残したまま終わった）か `unchecked`（範囲を確かめられなかった）で、まだ促していなければ、その子と結果を 1 行ずつ並べ、「合流（`finish`）の前に、その子のワークツリーの範囲外の変更を確かめて直すか、ユーザに伝える」と渡して止める（理由コード `NUDGE_SUBAGENT_OUTCOME`）。同じ結果では 1 回だけ（記録は `logs/state/subagent-<セッション>-<agent_id>.outcome` の `nudged`）。`unattributed` と正常な終わり（`ok`・`fixed`）では促さない。実行中のサブエージェントが居る間と、`stop_hook_active` が真のときも止めない。記録の `decision` は `nudge`。順序は `finish` → 依頼までの道 → サブエージェントの結果 → `integrate` → ルール。
+
+これらのどれも促さなかった回は、チケットに結び付かない直接作業のワークツリー（cwd のもの、または Write・Edit・NotebookEdit の書き込み先として `logs/state/direct-<セッション>.json` に記録したもの。チケット制御の有無は問わない）に、未コミットの変更か統合先に入っていないコミットがあり、統合先のツリーに `integrate <名前>` の記録も無ければ、`integrate` の打ち方と、staged で止めてユーザに `git status`・`git diff --staged` で確かめてもらう手順を渡して止める。理由コードは `NUDGE_INTEGRATE` である。hook は `integrate` を打たない。`integrate` が断る名前は促さない。統合先のツリーに未コミットの変更や途中の操作があるとき、また未コミットの変更があるのに統合先の ref を引けないときは、止めずに理由を報告へ足す。同じ状態では 1 回だけで、`dry-run` でも止める。実行中のサブエージェントが居る間は促しを出さずに待つ。
 
 これらを促さなかった回は、`match: Stop` のルールが渡す回ならそこで止める（「ターンの終わりに止めて渡す」）。
 
@@ -2392,6 +2394,7 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 （件数と中身は例。）順序は判定と同じ 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）で、重複として捨てた定義は出ない。
 「どのルールにも一致しないツール呼び出し」の節は、権限モードごとに、読めた呼び出しと読み切れない呼び出し（`degraded`）の結末を 1 行ずつ出す。
 判定と同じ関数で組み、`CCNAVI_GUARD_UNWATCHED` も hook と同じ読み方で解いた値を使う。
+`--explain` は、ルールの表のあとに「dry-run のときに止めるもの」（一般の保護は報告だけにし、チケットの関門とその抜け道をふさぐ補助の保護は止める）と、「判定に達せなかったとき」（内部の例外・期限切れ・payload が読めない。ツールごとに、`enable` で止めるか通すか、`dry-run` で止めるか通すか）の節も出す。判定と同じ定数・関数から組む。
 読めないレイヤーは「読めない: <理由>。このレイヤーは空として扱う」、設定ファイルが無いレイヤーは「このレイヤーの設定ファイルはありません。設定なしとして扱います。」と出る。
 `levels` の行は共通レイヤーの値。レイヤーで `levels` を書くとキーごとに小さいほうが採られるので、チケットに適用される値はその `project:` のレイヤーで変わる。
 
@@ -2593,6 +2596,10 @@ error 3 件、warn 1 件、info 0 件
 | warn | ワークツリー側に置かれた承認済みチケット（読まれない） |
 | warn | 承認済みチケットはあるがワークツリーが無い（範囲が適用されない） |
 | warn | リモートの種類に合うトークン（`GITHUB_TOKEN` / `GITLAB_TOKEN`）が無い、`origin` が無い |
+| warn | 未完了の操作記録（`logs/state/ops/`。送信の途中で止まった操作。`--resume` で続きを送る）。記録そのものが読めないものは error |
+| warn | 読めない受け入れ台帳（`phases/<親>/accepted.json`）。空として扱うので、受け入れ済みの指摘が未解決に戻る |
+| info | `finished_to` の無い `review/` の子（この変更より前に閉じた子）。手で `done/` に動かしても確定できないので、`confirm` か `decide` を使う |
+| warn | `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_GUARD_CORE_FILES` が両方 `disable`（承認の直接実行も設定ファイルの書き換えも止まらない） |
 
 **取り込みと正とする側**。取り込みの状態（旧 `logs/state/sync/`）は持たないので、親のワークツリーとチケットの置き場、取得済みの `origin/<統合先>` だけを見る。
 
@@ -2756,7 +2763,7 @@ ccnavi --explain --json
 | `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（設計 9.7 の文。閉じた親は空文字） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
 | `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
-| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` はユーザがどこで見るか（`none` / `mr`）。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、ボードはこれを写すだけで組み直さない。 |
+| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line, manual}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` はユーザがどこで見るか（`none` / `mr`）。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、ボードはこれを写すだけで組み直さない。`manual` は、手で `done/` に動かされた子の確認待ち・移動が未共有など、手で動かした子についての 1 行（無ければ空文字）。VS Code のフェーズ行に出す。 |
 
 ## 承認の JSON
 
@@ -2862,7 +2869,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ## 版の JSON
 
 ```sh
-ccnavi --version          # 1 行 1 項目（`compat: 15` など。sh が読む）
+ccnavi --version          # 1 行 1 項目（`compat: 17` など。sh が読む）
 ccnavi --version --json
 ```
 
@@ -2870,7 +2877,7 @@ ccnavi --version --json
 `.ccnavi/scripts/` の sh で、どちらも起動のときに互換の版を自分のものと比べる。
 
 ```json
-{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 15,
+{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 17,
  "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}
 ```
@@ -3346,6 +3353,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/approval.py` | 承認済みチケットの置き場。読み込み・走査・提案の集め方・置き場の決め方 |
 | `src/ccnavi/tickets/approval_ops.py` | 承認済みチケットを動かす・書く操作。承認、欄の書き換え、閉じる、レビューへ送る、続きの子 |
 | `src/ccnavi/tickets/approval_marks.py` | フェーズのマーカー、親ごとのマーカー、子ごとの記録（`phases/<親>/`） |
+| `src/ccnavi/tickets/manual_settle.py` | 手で `done/` に動かされた子の判定（確定してよい形か、確認待ちか、未共有か）。ボードの `manual` の 1 行もここが組む |
+| `src/ccnavi/tickets/oplog.py` | 操作記録（`logs/state/ops/<操作ID>.json`）。ホストへの送信を段階ごとに残し、`--resume` で続きから送る |
 | `src/ccnavi/tickets/approval_checks.py` | 承認済みチケットの構造の検査。親子と統合先、先行、プロジェクトの欄 |
 | `src/ccnavi/tickets/approval_times.py` | 承認の時刻（表示だけ）。git から引く |
 | `src/ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を集めて `--preview` / `--verify` に答え、書き込みを並べて置き場へ動かす。承認待ちの一覧 |
@@ -3393,6 +3402,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/hook/reasons.py` | 判定に添える文面と理由コード |
 | `src/ccnavi/hook/ccnavimd.py` | `SessionStart` で渡す作業の決まり（`.ccnavi/CCNAVI.md`）の条件と差し込みを解く。`--lint` の書き方の検査も持つ |
 | `src/ccnavi/hook/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、同じ作業ツリーで編集する別のサブエージェントの案内、範囲外の変更の差し戻し |
+| `src/ccnavi/hook/subagent_outcome.py` | サブエージェントの終了結果（`ok`・`fixed`・`outside`・`unchecked`・`unattributed`）の記録（`.outcome`）、親への 1 度きりの知らせ、Stop の促しの文 |
 | `src/ccnavi/hook/agentkind.py` | サブエージェントが編集するものか、読み取り専用かの見分け |
 | `src/ccnavi/hook/docsearch.py` | `--docs` と `SessionStart` の入口。索引を置く場所（ワークスペースとプロジェクト）を決めて集め、引き方を案内する |
 | `src/ccnavi/hook/docsearch_index.py` | md の frontmatter の索引（`ccnavi-index.jsonl`）を組む。変わった md だけを読み直す |

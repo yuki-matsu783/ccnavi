@@ -216,6 +216,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0147](0147-fail-closed-by-tool.md) | 判定に達せなかったときは、ツールの種類で決める（書き込みは止め、読み取りは最低限の deny を当てて通す） |
 | [0148](0148-operation-log-and-staged-sends.md) | ホストへの送信は操作記録に載せ、段階ごとに照合してから送る（確定できないときは自動で送り直さない） |
 | [0149](0149-manual-move-accepted-with-versions.md) | 手で動かした子は、経路の欄と受け入れ台帳で版つきで受け入れる（再提起は受け入れた後のコメントで見分ける） |
+| [0150](0150-subagent-outcomes-are-recorded-in-five-kinds.md) | サブエージェントの終了結果は 5 つに分けて記録し、担当の子が分からない体は差し戻さず親へ知らせる（Stop が促すのは範囲外を残したものと確かめられなかったものだけ） |
 | [0144](0144-protected-files-change-through-handoff.md) | 保護対象の変更は、テンプレート専用の手順をやめ、wip/handoff/ に置いた下書きを `ccnavi user handoff` で取り込む一本の手順にそろえる |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
 | [0142](0142-drop-sync-records.md) | 取り込み状態（sync/）を廃止し、親ブランチの状態だけで判定する |

@@ -109,6 +109,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "records.redact",
                 "tickets.user_only",
                 "tickets.oplog",
+                "hook.subagent_outcome",
                 "tickets.direct_candidates",
             }
         ),
@@ -207,6 +208,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.overview",
                 "tickets.skillsync",
                 "tickets.phase",
+                "tickets.manual_settle",
                 "tickets.phase_forms",
                 "tickets.phase_scope",
                 "tickets.plan_order",
