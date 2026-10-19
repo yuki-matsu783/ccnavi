@@ -48,7 +48,7 @@ def run_ccnavi(
     built = os.environ.get("CCNAVI_TEST_EXE", "")
     if built:
         # 組み立て済みの実行ファイルで動かす（`CCNAVI_TEST_EXE=<パス>`）。配る物を測る。
-        merged = {**os.environ, **GIT_ENV, **env} if env is None else {**GIT_ENV, **env}
+        merged = {**os.environ, **GIT_ENV} if env is None else {**GIT_ENV, **env}
         done = subprocess.run(
             [built, *argv],
             input=input or "",
