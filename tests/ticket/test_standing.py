@@ -28,13 +28,6 @@ from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, parent_text
 
 
-def record_text(name, state, reason="", sha="0" * 40):
-    """旧い取り込み状態（`sync/<リポジトリ>/families/<P>`）の中身。移行の入力にだけ使う。"""
-    return (
-        f"remote origin\nbranch {name}\nsha {sha}\nfetched_at 1\nstate {state}\nreason {reason}\n"
-    )
-
-
 class AuthorityHarness(PhaseHarness):
     """親 i0001 と子 i0001-01-01 を承認し、子のワークツリーを作って着手した状態から始める。"""
 
@@ -470,49 +463,6 @@ class GuidanceByKindTest(AuthorityHarness):
 
     def test_a_standing_that_does_not_stop_has_no_kind(self):
         self.assertEqual("", standing.standing(self.conf(), self.root, "i0001").kind)
-
-
-class LegacySyncRecordsTest(AuthorityHarness):
-    """旧い `logs/state/sync/` が残る PC でも、立ち位置・承認・hook の判定は変わらない。"""
-
-    def plant(self):
-        for state in ("gone", "blocked"):
-            write(
-                os.path.join(self.state, "sync", "self", "families", "i0001"),
-                record_text("i0001", state, "旧い理由"),
-            )
-        write(os.path.join(self.state, "sync", "self", "integration", "head"), "branch main\n")
-        write(
-            os.path.join(self.state, "sync", "self", "integration", ".ccnavi", "approved", "done")
-            + os.sep
-            + "i0001-01-01.md",
-            "旧いコピー\n",
-        )
-
-    def observed(self):
-        st = standing.standing(self.conf(), self.root, "i0001")
-        check = self.ccnavi("sync", "check", "i0001")
-        return (
-            st.stop,
-            st.branch,
-            self.decision(self.write_to(self.child_tree, "wip/research/a")),
-            self.decision(self.write_to(self.child_tree, "src/keep.py")),
-            check.returncode,
-            check.stdout,
-        )
-
-    def test_the_old_records_change_nothing(self):
-        before = self.observed()
-        self.plant()
-        self.assertEqual(before, self.observed())
-        self.assertEqual("", before[0])
-
-    def test_an_approval_still_goes_through(self):
-        self.plant()
-        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
-        self.commit_parent("propose second")
-        self.assertEqual(self.approve().returncode, 0)
-        self.assertTrue(os.path.isfile(os.path.join(self.approved, "doing", "i0001-01-02.md")))
 
 
 class ClosedIdentifierReuseTest(AuthorityHarness):

@@ -249,16 +249,6 @@ class SyncHarness(unittest.TestCase):
         write(path, json.dumps(data, ensure_ascii=False, indent=1) + "\n")
         return path
 
-    def legacy_record(self, state="gone", mr="42", branch=PARENT, name=PARENT, repo="self"):
-        """旧い取り込み状態（`sync/<repo>/families/<P>`）を置く。"""
-        path = os.path.join(self.state, "sync", repo, "families", name)
-        write(
-            path,
-            f"remote origin\nbranch {branch}\nsha {self.sha(self.tree, 'HEAD')}\n"
-            f"fetched_at 1\nstate {state}\nreason \n" + (f"mr {mr}\n" if mr else ""),
-        )
-        return path
-
     def git_path(self, tree, name):
         path = git(tree, "rev-parse", "--git-path", name).stdout.strip()
         return path if os.path.isabs(path) else os.path.join(tree, path)
@@ -937,62 +927,6 @@ class SyncTest(SyncHarness):
         named = self.sync(PARENT)
         self.assertEqual(1, named.returncode, named.stdout + named.stderr)
         self.assertIn("親のワークツリー（.claude/worktrees/i0001）がありません", named.stdout)
-
-    def test_old_records_of_removed_worktrees_are_moved_to_retire(self):
-        # 旧い取り込み状態（gone など）のうち、親のワークツリーが無いものは、先頭の
-        # `ccnavi sync migrate` が mr と branch を片付けの記録へ移し、旧い記録を消す。
-        # 状態（gone など）は捨てる。
-        legacy = self.legacy_record("gone", mr="42")
-        git(self.ws, "worktree", "remove", "--force", self.tree)
-        self.review_says("none")
-        done = self.sync()
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("旧い取り込み記録を、片付けの記録（retire/）へ移した", done.stdout)
-        self.assertFalse(os.path.exists(legacy))
-        moved = os.path.join(self.retire_dir, f"{PARENT}.json")
-        with open(moved, encoding="utf-8") as f:
-            data = json.load(f)
-        self.assertEqual((PARENT, 42, PARENT), (data["parent"], data["mr"], data["branch"]))
-        # 移した記録は、そのまま片付けの列挙に入る（MR は未マージなので片付けない）。
-        self.assertIn("まだマージされていないので片付けない", done.stdout)
-        # 打ち直しても移し直さない（冪等）。
-        again = self.sync()
-        self.assertNotIn("移した", again.stdout)
-        self.assertTrue(os.path.exists(moved))
-
-    def test_old_records_of_live_worktrees_are_dropped(self):
-        legacy = self.legacy_record("present", mr="42")
-        done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("旧い取り込み記録を捨てた", done.stdout)
-        self.assertFalse(os.path.exists(legacy))
-        self.assertFalse(os.path.exists(os.path.join(self.retire_dir, f"{PARENT}.json")))
-
-    def test_the_old_integration_copy_is_removed(self):
-        head = write(
-            os.path.join(self.state, "sync", "self", "integration", "head"),
-            "remote origin\nbranch main\nsource default\n",
-        )
-        done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("旧い統合先のコピー", done.stdout)
-        self.assertFalse(os.path.exists(head))
-        self.assertFalse(os.path.exists(os.path.dirname(head)))
-
-    def test_an_executable_that_does_not_know_migrate_does_not_stop_the_run(self):
-        # 旧い実行ファイルは `sync migrate` を知らない。何もせずに先へ進む。
-        launcher = self.launcher()
-        old = write(
-            os.path.join(self._tmp.name, "bin", "no-migrate"),
-            "#!/bin/sh\n"
-            'case "$*" in *"sync migrate"*) echo "ccnavi: unknown command" >&2; exit 2 ;; esac\n'
-            f'exec "{launcher}" "$@"\n',
-        )
-        os.chmod(old, 0o755)
-        self.legacy_record("gone")
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=old)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertNotIn("移した", done.stdout)
 
     # ---- 統合先（設定か、無ければホストのデフォルトブランチ）と、
     # 統合先への取り込み（最後に取り込んだ先頭）

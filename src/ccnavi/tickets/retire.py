@@ -232,49 +232,6 @@ def note(
 
 
 @dataclass
-class Merged:
-    """`merge_legacy` の結果。`status` は `moved`（書いた・足した）か `kept`（そのまま）。"""
-
-    status: str = ""
-    failed: str = ""
-
-
-def merge_legacy(
-    conf: settings.Settings, parent: str, project: str, branch: str, mr: str
-) -> Merged:
-    """旧い取り込み状態の `mr` と `branch` を `retire/<親>.json` に写す（`sync migrate` が使う）。
-
-    記録が無ければ新しく書く。既にあれば、そちらを尊重して、空の `mr` と `branch` だけを足す
-    （足すものが無ければ `kept`）。既存の記録が壊れているときは書かず、理由を返す。
-    """
-    path = record_path(conf, parent)
-    if not path:
-        return Merged(failed="state の置き場が空なので、片付けの記録を書けない")
-    held, broken = _held_record(path)
-    if broken:
-        return Merged(failed=f"既存の片付けの記録を読めない（{broken}）。上書きしない")
-    present = os.path.lexists(path)
-    if present and not _same(str(held.get("parent") or ""), parent):
-        return Merged(failed="既存の片付けの記録の parent が親と合わない。上書きしない")
-    data = dict(held) if present else {"parent": parent, "project": project, "children": []}
-    changed = not present
-    if not _mr_text(data.get("mr")) and _mr_text(mr):
-        data["mr"] = int(_mr_text(mr))
-        changed = True
-    if not str(data.get("branch") or "") and branch:
-        data["branch"] = branch
-        changed = True
-    data.setdefault("branch", "")
-    if not changed:
-        return Merged("kept")
-    text = json.dumps(data, ensure_ascii=False, indent=1) + "\n"
-    failed = fsio.write_text_atomic(path, text, newline="\n")
-    return (
-        Merged(failed=f"片付けの記録を書けない（{path}: {failed}）") if failed else Merged("moved")
-    )
-
-
-@dataclass
 class Entry:
     """`sync retired` の 1 件。`incomplete` が空でなければ、列挙できない理由（他の欄は空）。"""
 

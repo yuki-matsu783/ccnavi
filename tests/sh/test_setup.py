@@ -19,7 +19,6 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.tickets import user_only
 from tests import ROOT
 
 SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
@@ -1679,120 +1678,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 self.assertIn("--bin は使えないオプションです", result.stderr)
                 self.assertEqual(os.listdir(self.dir), [".git"])
 
-    # ---- 旧い名前の sh（ユーザ専用の sh を ccnavi-user-*.sh に改名した前の名前）
-
-    def put_legacy(self, *legacy):
-        """配布先に、前の版が配った旧い名前の sh を置く。"""
-        for name in legacy:
-            path = self.deployed(".ccnavi", "scripts", name)
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(f"# 前の版の {name}\n")
-
-    def test_old_names_are_kept_and_reported_without_force(self):
-        """--force なしでは配布先にあるものに触らない。旧い名前の sh も残し、残っていると言う。"""
-        src = self.make_source()
-        self.put_legacy("ccnavi-agree.sh", "ccnavi-push-approved.sh")
-        result = self.run_setup("--mode", "enable", "--deploy", src)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        kept = section(result.stdout, "配布先に残っている旧い名前の sh")
-        for name in ("ccnavi-agree.sh", "ccnavi-push-approved.sh"):
-            with self.subTest(name=name):
-                self.assertTrue(names(kept, f".ccnavi/scripts/{name}"), result.stdout)
-                self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
-        self.assertIn(
-            "--force",
-            "\n".join(
-                line
-                for line in result.stdout.splitlines()
-                if line.startswith("配布先に残っている旧い名前")
-            ),
-        )
-        # 新しい名前の sh は配る
-        self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", "ccnavi-user-agree.sh")))
-        # --check は揃っていないと数える
-        checked = self.run_setup("--mode", "enable", "--deploy", src, "--check")
-        self.assertEqual(checked.returncode, 1, checked.stdout + checked.stderr)
-        self.assertTrue(
-            names(
-                section(checked.stdout, "配布先に残っている旧い名前の sh"),
-                ".ccnavi/scripts/ccnavi-agree.sh",
-            )
-        )
-
-    def test_force_removes_the_old_names(self):
-        """--force なら、配る sh を入れ替えたうえで旧い名前の sh を消し、消したと言う。"""
-        src = self.make_source()
-        self.put_legacy("ccnavi-agree.sh", "ccnavi-approve.sh", "ccnavi-push-approved.sh")
-        result = self.run_setup("--mode", "enable", "--deploy", src, "--force")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        gone = section(result.stdout, "消した旧い名前の sh")
-        for name in ("ccnavi-agree.sh", "ccnavi-approve.sh", "ccnavi-push-approved.sh"):
-            with self.subTest(name=name):
-                self.assertTrue(names(gone, f".ccnavi/scripts/{name}"), result.stdout)
-                self.assertFalse(os.path.exists(self.deployed(".ccnavi", "scripts", name)))
-        for name in DEPLOY_SCRIPTS:
-            self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)), name)
-        # 消したあとは揃っている（旧い名前は残っていない）
-        checked = self.run_setup("--mode", "enable", "--deploy", src, "--check")
-        self.assertNotIn("旧い名前", checked.stdout)
-
-    def test_check_with_force_lists_what_it_would_remove(self):
-        src = self.make_source()
-        self.put_legacy("ccnavi-agree.sh")
-        result = self.run_setup("--mode", "enable", "--deploy", src, "--force", "--check")
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertTrue(
-            names(section(result.stdout, "消す旧い名前の sh"), ".ccnavi/scripts/ccnavi-agree.sh")
-        )
-        self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh")))
-
-    def test_an_old_name_that_is_a_link_loses_only_the_link(self):
-        """リンクはリンクだけを消す。辿った先は消さない。"""
-        src = self.make_source()
-        outside = os.path.join(self.dir, "keep.sh")
-        with open(outside, "w", encoding="utf-8") as f:
-            f.write("keep\n")
-        link = self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh")
-        os.makedirs(os.path.dirname(link), exist_ok=True)
-        try:
-            os.symlink(outside, link)
-        except (OSError, NotImplementedError):
-            self.skipTest("シンボリックリンクを作れない")
-        result = self.run_setup("--mode", "enable", "--deploy", src, "--force")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertFalse(os.path.lexists(link))
-        self.assertTrue(os.path.isfile(outside))
-
-    def test_an_old_name_that_is_a_directory_is_left_alone(self):
-        src = self.make_source()
-        os.makedirs(self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh", "x"))
-        result = self.run_setup("--mode", "enable", "--deploy", src, "--force")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(os.path.isdir(self.deployed(".ccnavi", "scripts", "ccnavi-agree.sh")))
-        self.assertTrue(
-            names(
-                section(result.stdout, "旧い名前の sh の場所にディレクトリがある"),
-                ".ccnavi/scripts/ccnavi-agree.sh",
-            )
-        )
-
-    def test_the_old_names_match_the_table(self):
-        """setup が消す旧い名前は、表（user_only.SCRIPTS）のスクリプトごと止める行の名前と同じ。"""
-        with open(SCRIPT, encoding="utf-8") as f:
-            found = re.search(r'^LEGACY_SCRIPTS="([^"]*)"$', f.read(), re.MULTILINE)
-        self.assertIsNotNone(found)
-        wanted = {
-            f"{name}.sh"
-            for row in user_only.SCRIPTS
-            if not row.subcommand
-            and not any(flag.script and flag.where in row.names for flag in user_only.FLAGS)
-            for name in row.names
-        }
-        self.assertEqual(set(found.group(1).split()), wanted)
-        # 旧い名前は、今配るものには入らない
-        self.assertFalse(wanted & set(DEPLOY_SCRIPTS))
-
     def test_the_deployed_list_matches_the_scripts_in_the_tree(self):
         """配る sh の一覧（DEPLOY_SCRIPTS）は、このツリーの .ccnavi/scripts/ の sh と同じ。"""
         with open(SCRIPT, encoding="utf-8") as f:
@@ -2379,24 +2264,6 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
                 self.assertTrue(written.startswith(f"node_modules/\n{existing}\n"), written)
                 self.assertEqual(written.count("ccnavi-index.jsonl"), 1, written)
                 self.assertNotIn(INDEX_HEADER, written)
-
-    def test_an_old_name_line_does_not_count_and_the_new_line_is_added(self):
-        """旧名 index.jsonl の行は、新しい名前の索引を無視しない行としては数えない。"""
-        for old in ("**/index.jsonl", "index.jsonl"):
-            with self.subTest(old=old):
-                self.write_gitignore(f"node_modules/\n{old}\n")
-                self.make_git()
-                self.run_setup("--deploy", self.make_source())
-                written = self.gitignore()
-                self.assertTrue(written.startswith(f"node_modules/\n{old}\n"), written)
-                self.assertIn(f"{INDEX_HEADER}\n{INDEX_LINE}\n", written)
-
-    def test_an_old_name_negation_does_not_stop_the_new_line(self):
-        self.write_gitignore("!**/index.jsonl\n")
-        self.make_git()
-        result = self.run_setup("--deploy", self.make_source())
-        self.assertNotIn("ユーザが索引を追跡しているので", result.stdout)
-        self.assertIn(f"{INDEX_HEADER}\n{INDEX_LINE}\n", self.gitignore())
 
     def test_does_not_undo_a_negation_of_the_user(self):
         """ユーザが ccnavi-index.jsonl を否定していれば足さず、そう言う（--check でも）。"""
