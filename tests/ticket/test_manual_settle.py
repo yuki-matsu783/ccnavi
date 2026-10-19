@@ -151,6 +151,23 @@ class ManualSettleTest(PhaseHarness):
         second = self.hook("Stop", "", self.parent_tree)
         self.assertNotIn("NUDGE_TICKET_REQUEST", second.stdout)
 
+    def test_the_next_prompt_says_to_confirm_once_and_stop_does_not_repeat_it(self):
+        self.requested()
+        self.move_by_hand()
+        self.share()
+        payload = {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "prompt": "続けて",
+        }
+        first = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        self.assertIn("confirm --phase 1", first.stdout)
+        second = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        self.assertNotIn("confirm --phase 1", second.stdout)
+        stop = self.hook("Stop", "", self.parent_tree)
+        self.assertNotIn("confirm --phase 1", stop.stdout)
+
 
 class LedgerCountingTest(PhaseHarness):
     def thread(self, **extra):

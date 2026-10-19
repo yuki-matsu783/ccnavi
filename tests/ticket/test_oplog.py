@@ -158,6 +158,21 @@ class OplogTest(unittest.TestCase):
             self.assertIn(key, data)
 
 
+class RetireParentTest(unittest.TestCase):
+    def test_only_finished_records_of_that_parent_are_removed(self):
+        with tempfile.TemporaryDirectory() as root:
+            state = os.path.join(root, "logs", "state")
+            done = oplog.begin(state, oplog.KIND_COMMENT, repo=REPO, parent="p1", stages=STAGES)
+            for sid, _ in STAGES:
+                oplog.stage_set(state, done, sid, oplog.SENT)
+            open_op = oplog.begin(state, oplog.KIND_COMMENT, repo=REPO, parent="p1", stages=STAGES)
+            other = oplog.begin(state, oplog.KIND_COMMENT, repo=REPO, parent="p2", stages=[])
+            self.assertEqual(oplog.retire_parent(state, "p1"), [done])
+            self.assertIsNone(oplog.load(state, done))
+            self.assertIsNotNone(oplog.load(state, open_op))
+            self.assertIsNotNone(oplog.load(state, other))
+
+
 class ConcurrentUpdateTest(unittest.TestCase):
     def test_parallel_updates_do_not_lose_each_other(self):
         import threading

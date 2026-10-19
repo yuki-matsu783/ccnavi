@@ -328,6 +328,19 @@ class DecideOpsShTest(unittest.TestCase):
         self.assertIn("stage=note", STORE["notes"][0]["body"])
         self.assertIsNone(self.record())
 
+    def test_resume_after_a_resolve_failure_does_not_reply_twice(self):
+        GitLab.fail_resolve = True
+        first = self.choose()
+        self.assertNotEqual(first.returncode, 0, first.stdout)
+        replies = [k for k, _ in GitLab.posted if k == "reply"]
+        self.assertEqual(len(replies), 1)
+        GitLab.fail_resolve = False
+        done = self.run_decide("--resume", stdin="y\n")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        kinds = [k for k, _ in GitLab.posted]
+        self.assertEqual(kinds.count("reply"), 1, "返信済みのスレッドに重ねない")
+        self.assertIn("resolve", kinds)
+
     def test_resume_asks_first_and_stops_on_no(self):
         STORE["reject"].add("note")
         self.choose()

@@ -30,6 +30,30 @@ accept_file=""
 # 在ることを確かめる。書いたあとは結果を取り直して置く呼び出しに渡す（実行ファイルが、受け入れた
 # スレッドが全部ホストで解決済みで、ほかの未解決が増えていないことを実状態で確かめる）。
 # 打ち直すと、返信まで済んで解決できなかったスレッドには返信が重なる。
+# 返信の進み具合を操作記録の applied に残す（`reply_try_<id>` は送る前、`reply_<id>` は送れた後）。
+# op_id が空（記録の無い形）なら何もしない。
+reply_mark() {
+	[ -n "${op_id:-}" ] || return 0
+	ccnavi ops applied "$op_id" "$1" true 2>/dev/null || :
+}
+
+# このスレッドへの返信を送り済みか。<スレッドの id> <取り直した結果のファイル>。送り済みなら 0。
+reply_already_sent() {
+	[ -n "${op_id:-}" ] || return 1
+	ra_rec=$(ccnavi ops show "$op_id" 2>/dev/null) || return 1
+	if [ "$(printf '%s' "$ra_rec" | "$JQ" -r --arg k "reply_$1" '.applied[$k] // empty')" = true ]; then
+		return 0
+	fi
+	[ "$(printf '%s' "$ra_rec" | "$JQ" -r --arg k "reply_try_$1" '.applied[$k] // empty')" = true ] || return 1
+	ra_last=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0].last_author // empty' "$2" 2>/dev/null)
+	op_account
+	if [ -n "$ra_last" ] && [ -n "${op_who:-}" ] && [ "$ra_last" = "$op_who" ]; then
+		reply_mark "reply_$1"
+		return 0
+	fi
+	return 1
+}
+
 # <スレッドの id> <返信の本文> <MR の番号>
 accept_reply() {
 	accept_id="$1"
@@ -100,10 +124,21 @@ accept_threads() {
 		accept_id=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].id' "$accept_file")
 		accept_key=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].key' "$accept_file")
 		accept_text=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].reply' "$accept_file")
+		# 操作記録があれば、返信を送り済みのスレッドには重ねない（打ち直し・--resume で二重に返信しない）。
+		# 試して結果が分からないスレッド（記録に試した印だけある）は、ホストのスレッドの最後のコメントが
+		# 自分のものなら送り済みとみなし、そうでなければ送り直す。
+		if reply_already_sent "$accept_id" "$accept_rfile"; then
+			accept_kept="$accept_file"
+			accept_plan=""
+			accept_i=$((accept_i + 1))
+			continue
+		fi
+		reply_mark "reply_try_$accept_id"
 		if ! accept_reply "$accept_id" "$accept_text" "$accept_mr"; then
 			printf '%s: 受け入れを完了できない。スレッド %s に返信を残せなかった。何も置いていない（返信が済んだ分は残る。解決はまだ誰もしていない）。\n' "$review_label" "$accept_key" >&2
 			return 1
 		fi
+		reply_mark "reply_$accept_id"
 		# 1 件でも書いたら、置けずに終わったとき計画を残す（accept_cleanup）
 		accept_kept="$accept_file"
 		accept_plan=""

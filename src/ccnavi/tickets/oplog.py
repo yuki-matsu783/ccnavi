@@ -399,6 +399,23 @@ def remove(state: str, op_id: str) -> None:
     fsio.remove(record_path(state, op_id))
 
 
+def retire_parent(state: str, parent: str) -> list[str]:
+    """親の記録のうち、すべての段階が送り終わったものを消し、消した操作ID を返す。
+
+    親を閉じる片付け（ready）が呼ぶ。未完了の記録と、読めない記録は消さない。
+    """
+    gone = []
+    for op_id in all_ids(state):
+        try:
+            record = load(state, op_id)
+        except OpError:
+            continue
+        if record is not None and record.get("parent") == parent and finished(record):
+            remove(state, op_id)
+            gone.append(op_id)
+    return gone
+
+
 def all_ids(state: str) -> list[str]:
     """置いてある記録の操作ID（古い順）。"""
     path = ops_dir(state)

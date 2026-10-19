@@ -265,13 +265,42 @@ def decide_at_prompt(
     outcomes, told = (
         subagent.outcome_notices(conf.state, payload) if conf.tickets_enabled else ("", [])
     )
-    hint = "\n\n".join(p for p in (guard, hint, unchecked, outcomes) if p)
+    manual = _manual_confirm_note(stderr, conf, root, payload, raw)
+    hint = "\n\n".join(p for p in (guard, hint, unchecked, outcomes, manual) if p)
     if hint:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, hint)
     if told:
         # 出力に書き終えてから「通知済み」の印を付ける（書く前に止まったら次の機会に出し直す）。
         subagent.confirm_outcomes(conf.state, told)
     return EXIT_OK
+
+
+def _manual_confirm_note(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    raw: approval.Raw | None,
+) -> str:
+    """ユーザが子を手で done/ に動かして共有していたら、次の発言の前に confirm を案内する。
+
+    Stop の促し（`_request_nudge`）と状態の記録を共有するので、ここで言えば Stop では繰り返さない。
+    サブエージェントの中、チケット制御が無いとき、状態の置き場が無いときは何も言わない。
+    """
+    if not conf.tickets_enabled or payload.agent_id or not conf.state:
+        return ""
+    found = ops_stop_request.pending_at_stop(root, conf, payload.cwd, raw)
+    if (
+        found is None
+        or found.step != ops_stop_request.STEP_CONFIRM
+        or ops_stop_request.nudged_before(conf.state, payload.session_id, found)
+    ):
+        return ""
+    failed = ops_stop_request.remember_nudge(conf.state, payload.session_id, found)
+    if failed:
+        stderr.write(f"ccnavi: 手動移動の案内を残せないので、案内しない: {failed}\n")
+        return ""
+    return ops_stop_request.request_nudge(root, found)
 
 
 def decide_at_stop(

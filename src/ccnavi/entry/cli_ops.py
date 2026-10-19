@@ -461,6 +461,7 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
     - `post-text <操作ID> <段階ID> <ファイル>`: 段階で投稿する本文を、保存した判断から作り直して書く
     - `resume-plan <操作ID> <ファイル>`: 保存した判断から受け入れの計画を書き直す（`--resume`）
     - `done <操作ID>`: すべての段階が sent なら記録を消す。消したら `done`、残るなら `open` を出す
+    - `retire <親>`: 親の記録のうち、送り終わったものを消す（親を閉じる片付け。ready が呼ぶ）
 
     書く副命令（`stage-set`・`done`）は、エージェントが偽の送信済みを書けないよう、
     実行ファイルを直に呼ぶ形を hook が止める（`user_only.SUBS`）。
@@ -564,6 +565,10 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
                 stderr.write("ccnavi: 書き先は state の置き場の下に限る\n")
                 return EXIT_ERROR
             return EXIT_OK if review_decide.resume_plan(record, words[2]) == 0 else EXIT_ERROR
+        if len(words) == 2 and words[0] == "retire":
+            for op_id in oplog.retire_parent(conf.state, words[1]):
+                stdout.write(op_id + "\n")
+            return EXIT_OK
         if len(words) == 2 and words[0] == "done":
             stdout.write("done\n" if oplog.complete_if_done(conf.state, words[1]) else "open\n")
             return EXIT_OK
