@@ -110,10 +110,10 @@ test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、�
     ["full-page", 1, null],
     // GitHub では目印で始まるスレッドも数える（目印は誰でも書ける）
     ["paged", 0, /未解決のスレッドが 4 件残っている/],
-    ["changes-requested", 0, /変更要求のレビューが立っている/],
+    ["changes-requested", 0, /変更要求（Changes requested）が出ています/],
     // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない
-    ["cr-commented", 0, /変更要求のレビューが立っている/],
-    ["pending", 0, /変更要求のレビューが立っている/],
+    ["cr-commented", 0, /変更要求（Changes requested）が出ています/],
+    ["pending", 0, /変更要求（Changes requested）が出ています/],
   ] as const) {
     const mock = reviewing(scene);
     const { board, panel } = await panelOf(mock);

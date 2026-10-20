@@ -144,8 +144,8 @@ def _manual_refusal(root, conf, parent, phase_no, result, manual) -> core_base.C
         return core_base.refused(
             CODE_CONFIRM_REVIEW_OPEN,
             [
-                "ccnavi: 手で動かした移動は保持するが、変更要求のレビューが立っているため"
-                "レビュー済みにはできません（保留）。approve か dismiss を待ちます"
+                f"ccnavi: {review_host.changes_requested_note(result.host)}。"
+                "手で動かした移動は保持するが、変更要求があるためレビュー済みにはできません（保留）"
             ],
         )
     late = []

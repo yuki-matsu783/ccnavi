@@ -304,10 +304,9 @@ def review_problems(
     ]
     if changes:
         return [
-            "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
-            "変更要求があるため、レビュー済みにはできません。修正する場合は同じフェーズに"
-            "新しい子を提案し、ユーザの承認を受けてください。修正・再依頼のあと、"
-            "レビュアーの approve（または dismiss）を待ちます",
+            f"ccnavi: {review_host.changes_requested_note(result.host)}。"
+            "decide でも通せない。変更要求があるため、レビュー済みにはできません。"
+            "修正する場合は同じフェーズに新しい子を提案し、ユーザの承認を受けてください",
             *[f"  - {r.url}" for r in changes],
         ]
     unresolved = review_host._unresolved(

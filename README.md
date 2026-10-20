@@ -2072,7 +2072,12 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 直す指摘が無く、見せたあとに増えた指摘（追加分）も無ければレビュー済みにし、1 件でも直すなら見た子を `done/` へ動かしてマーカーは置かない。追加分は止めずに未対応のまま残し（結果の `pending_extra`）、直す指摘が無ければレビュー済みのマーカーも置かない。次の `decide` で扱う。決めた内容は sh がコメントに写す。
 途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送れる（操作記録は `logs/state/ops/`）。
 ボードの経路は端末を求めない代わりに、見せた指摘のダイジェスト（`digest`）の一致を求め、エージェントが同じ形を打つ経路は組み込みの deny が止める。
-変更要求のレビューが出ている間はどの経路も通らない。解除できるのはレビュアーの approve / dismiss だけ。
+変更要求のレビューが出ている間はどの経路も通らない（判定はホストを問わず同じ）。案内はホスト（取得した結果の `host`）ごとに出し分ける。
+
+| ホスト | 案内 |
+|---|---|
+| GitLab | 変更を依頼（Request changes）が出ています。解除はレビュアーの承認（Approve）で行います。作成者によるレビューの再依頼（Re-request review）で状態が戻るかは未検証です。再依頼した場合も、ccnavi で状態を取り直して確かめます |
+| GitHub | 変更要求（Changes requested）が出ています。解除はレビュアーの Approve か、レビューの dismiss で行います |
 
 **リモートを読み書きするのは sh で、実行ファイルはネットワークに出ない。** マージリクエストの中身は `ccnavi-review.sh` が取ってきて
 JSON で渡す（`--result <path>`）。

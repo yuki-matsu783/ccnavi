@@ -99,6 +99,28 @@ def effective(reviews: list[Review]) -> list[Review]:
     return [r for r in latest.values() if r.state.upper() != DISMISSED]
 
 
+# 変更要求の案内（ホストごと）。判定（`effective`・`CHANGES_REQUESTED`）はホストを問わず同じで、
+# 案内だけ出し分ける。ホストは取得した結果の `host`
+# （sh の分類。Chrome 拡張はユーザが明示した種類を含む）。
+CHANGES_GITLAB = (
+    "変更を依頼（Request changes）が出ています。解除はレビュアーの承認（Approve）で行います。"
+    "作成者によるレビューの再依頼（Re-request review）で状態が戻るかは未検証です。"
+    "再依頼した場合も、ccnavi で状態を取り直して確かめます"
+)
+CHANGES_GITHUB = (
+    "変更要求（Changes requested）が出ています。"
+    "解除はレビュアーの Approve か、レビューの dismiss で行います"
+)
+
+
+def changes_requested_note(host: str) -> str:
+    """変更要求が出ているときの案内の 1 文。解除のしかたはホストで違う（GitLab は Approve だけ）。
+
+    GitLab 以外（GitHub・見本の `fixture` など）は GitHub の案内。
+    """
+    return CHANGES_GITLAB if host == "gitlab" else CHANGES_GITHUB
+
+
 @dataclass
 class MergeRequest:
     number: int = 0

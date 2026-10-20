@@ -362,10 +362,9 @@ def close_early(
         for r in review_host.effective(result.reviews)
     ):
         stderr.write(
-            "ccnavi: 変更要求のレビューが立っている。端末からも通せない。"
-            "変更要求があるため、レビュー済みにはできません。修正する場合は同じフェーズに"
-            "新しい子を提案し、ユーザの承認を受けてください。修正・再依頼のあと、"
-            "レビュアーの approve（または dismiss）を待ちます\n"
+            f"ccnavi: {review_host.changes_requested_note(result.host)}。"
+            "端末からも通せない。変更要求があるため、レビュー済みにはできません。"
+            "修正する場合は同じフェーズに新しい子を提案し、ユーザの承認を受けてください\n"
         )
         return 1
     phases = phase.phases_of(root, conf, parent.ticket)

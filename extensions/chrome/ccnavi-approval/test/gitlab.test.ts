@@ -347,7 +347,7 @@ test("CX-T152 GitLab のレビュー済み: 依頼したアカウントの ccnav
   for (const [scene, why] of [
     ["resolved", null],
     ["impostor", /未解決のスレッドが 2 件残っている/],
-    ["requested-changes", /変更要求のレビューが立っている/],
+    ["requested-changes", /変更を依頼（Request changes）が出ています/],
     ["paged", /未解決のスレッドが 11 件残っている/],
     // ccnavi の依頼コメントへの返信は、返信を代表の指摘として数える（system のノートは除く）
     ["replies", /未解決のスレッドが 6 件残っている/],

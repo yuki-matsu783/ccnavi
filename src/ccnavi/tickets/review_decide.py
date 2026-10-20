@@ -232,10 +232,9 @@ def _decision(
         for r in review_host.effective(result.reviews)
     ):
         stderr.write(
-            "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
-            "変更要求があるため、レビュー済みにはできません。修正する場合は同じフェーズに"
-            "新しい子を提案し、ユーザの承認を受けてください。修正・再依頼のあと、"
-            "レビュアーの approve（または dismiss）を待ちます\n"
+            f"ccnavi: {review_host.changes_requested_note(result.host)}。"
+            "decide でも通せない。変更要求があるため、レビュー済みにはできません。"
+            "修正する場合は同じフェーズに新しい子を提案し、ユーザの承認を受けてください\n"
         )
         return None
     open_now = {
