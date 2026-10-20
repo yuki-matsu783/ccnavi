@@ -296,7 +296,7 @@ def read_accept_plan(path: str) -> AcceptPlan | None:
 # --lint と sh の言うことを揃える。scheme の大文字小文字は区別しない（`HTTPS://` も読む）。
 _REMOTE = re.compile(
     r"^(?:(?i:https?)://|(?i:ssh)://git@|git@)(?:[^/]*@)?"
-    r"(?P<host>\[[^\]/]+\]|[^/:@]+)(?::(?P<port>\d+))?[/:]+(?P<path>.+?)(?:\.git)?/?$"
+    r"(?P<host>\[[^\]/]+\]|[^/:@]+)(?::(?P<port>[0-9]+))?[/:]+(?P<path>.+?)(?:\.git)?/?$"
 )
 
 GHE_DOMAIN = "ghe.com"
@@ -380,7 +380,9 @@ def transport_problem(url: str) -> str:
     found = classify(url)
     kind = found.kind
     if not kind:
-        return f"origin ({url}) が GitHub でも GitLab でもない"
+        # URL に埋めた資格情報（`user:token@`）は出力に残さない
+        shown = re.sub(r"//[^/@]*@", "//<伏せた>@", url)
+        return f"origin ({shown}) が GitHub でも GitLab でもない"
     if found.problem:
         return found.problem
     if shutil.which("jq") is None:

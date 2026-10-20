@@ -74,11 +74,23 @@ ccnavi_host_parse() {
 	esac
 	ccnavi_h_host="${ccnavi_hp_rest%%/*}"
 	# ssh の `git@host:group/proj` は `:` の後ろがパス。数字だけならポート、
-	# そうでなければパスの先頭なので除く。
-	case "$ccnavi_h_host" in
-	*:*)
-		case "${ccnavi_h_host##*:}" in
-		'' | *[!0-9]*) ccnavi_h_host="${ccnavi_h_host%%:*}" ;;
+	# そうでなければパスの先頭なので除く。IPv6 は `[::1]` の形で、`]` までがホスト（後ろに数字のポートが続けばそれも）。
+	case "$ccnavi_hp_rest" in
+	'['*']'*)
+		ccnavi_hp_v6="${ccnavi_hp_rest%%]*}]"
+		ccnavi_hp_after="${ccnavi_hp_rest#"$ccnavi_hp_v6"}"
+		ccnavi_h_host="$ccnavi_hp_v6"
+		case "$ccnavi_hp_after" in
+		:[0-9]*) ccnavi_h_host="$ccnavi_hp_v6${ccnavi_hp_after%%[!:0-9]*}" ;;
+		esac
+		;;
+	*)
+		case "$ccnavi_h_host" in
+		*:*)
+			case "${ccnavi_h_host##*:}" in
+			'' | *[!0-9]*) ccnavi_h_host="${ccnavi_h_host%%:*}" ;;
+			esac
+			;;
 		esac
 		;;
 	esac
@@ -90,7 +102,8 @@ ccnavi_host_parse() {
 		*) break ;;
 		esac
 	done
-	ccnavi_h_path="${ccnavi_hp_tail%.git}"
+	ccnavi_h_path="${ccnavi_hp_tail%/}"
+	ccnavi_h_path="${ccnavi_h_path%.git}"
 	ccnavi_h_path="${ccnavi_h_path%/}"
 	[ -n "$ccnavi_h_path" ] || return 3
 	# 分類に使うホスト: 小文字にして、数字だけのポートを除く。照合は `.` の区切りで行う

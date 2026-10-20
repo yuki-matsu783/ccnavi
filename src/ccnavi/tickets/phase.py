@@ -951,14 +951,14 @@ def plan_finished(root: str, conf: settings.Settings, parent: ticket_model.Ticke
     if not parent.has_plan:
         return False
     last = len(parent.plan)
-    seen = set()
+    seen: set[int] = set()
     for phase in phases_of(root, conf, parent.ticket):
         if phase.number > last:
             break
         if not phase.ended or not reviewed_or_skipped(phase):
             return False
         seen.add(phase.number)
-    return len(seen) == last
+    return seen == set(range(1, last + 1))
 
 
 def review_venues(root: str, conf: settings.Settings, parent_id: str) -> dict[int, str]:

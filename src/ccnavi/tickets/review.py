@@ -1129,7 +1129,10 @@ def moved_detail(
 # 説明に並べるコミットの最大数。これを超えた分は「ほか N 件」。
 MAX_COMMITS = 5
 _SCAN_COMMITS = 100
-_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
+# 制御文字・行区切り・幅ゼロと向きを変える文字（U+200B〜200F、202A〜202E、2066〜2069、FEFF）
+_CONTROL = re.compile(
+    "[\x00-\x1f\x7f-\x9f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+"
+)
 
 
 def _quoted(text: str, limit: int) -> str:
@@ -1201,7 +1204,9 @@ def moved_explanation(moved: Moved) -> list[str]:
     一覧（手元の git で取れたときだけ）と、固定の案内（エージェントが作っていないコミットがあれば、
     取り込んだことをユーザに伝えてから依頼し直す。作者から何かを自動で判定しない）を添える。
     """
-    if not moved.text:
+    if not moved.text or not moved.kind:
+        # 動いたのではなく、親ブランチの HEAD が push されていないだけのとき（kind が空）は、
+        # 説明を足さない（依頼時と同じレビュー対象であることは変わらない）
         return []
     if moved.kind == KIND_SEEN:
         lines = [

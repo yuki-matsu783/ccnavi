@@ -160,6 +160,20 @@ class MovedListTest(ActorHarness):
         self.assertIn("『偽』", item)
         self.assertEqual(item.count("件名「"), 1)
 
+    def test_a_push_pending_stop_adds_no_moved_explanation(self):
+        """動いたのではなく push されていないだけのとき（kind が空）は、説明を足さない。"""
+        from ccnavi.tickets import review
+
+        self.assertEqual(
+            review.moved_explanation(review.Moved("親ブランチの HEAD が push されていない")), []
+        )
+
+    def test_direction_and_zero_width_characters_are_replaced(self):
+        from ccnavi.tickets import review
+
+        shown = review._quoted("a\u202eb\u200bc\ufeffd", 60)
+        self.assertEqual(shown, "「a b c d」")
+
     def test_decide_says_the_same_when_the_head_moved(self):
         fixture = self.ready()
         self.commit_as("alice", "修正", {"src/a.py": "1\n"})

@@ -47,6 +47,15 @@ class HostKindsTest(unittest.TestCase):
         for host in ("evilgithub.com", "github.com.evil", "evilghe.com", "ghe.com.evil"):
             self.assertEqual(review_host.remote_kind(f"https://{host}/a/b.git"), "gitlab", host)
 
+    def test_the_message_for_an_unreadable_form_hides_credentials(self):
+        problem = review_host.transport_problem("ssh://user:SECRET@host.example/a/b")
+        self.assertNotIn("SECRET", problem)
+        self.assertIn("<伏せた>", problem)
+
+    def test_a_non_ascii_digit_is_not_a_port(self):
+        got = review_host.classify("git@x.ghe.com:\u0663:/a/b.git")
+        self.assertEqual(got.problem, "")
+
     def test_an_unreadable_form_is_still_unreadable(self):
         for url in ("ssh://user@host.example.com/g/p.git", "not a url"):
             self.assertEqual(review_host.remote_kind(url), "")
