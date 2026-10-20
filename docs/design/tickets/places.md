@@ -21,7 +21,7 @@ keywords: [置き場, 提案, 承認済みチケット, マーカー, wip/propos
 | 気づきの記録 | 子（と親）のワークツリーの `wip/handoff/learnings/<識別子>.md` と `.digest.json`（9.16）。直接作業は `docs/wiki/inbox/`、ルートは `wip/handoff/inbox/` | `ticket learn`、子のセッション | 子の合流で親のブランチへ届く。`wip/handoff/` の分は統合で外れる |
 | 子のフロー | 同 `flows/<子>.yml`（9.3.1） | ユーザ（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-user-push-approved.sh` が置き場ごとコミットして push する） |
 | 子のフローの下書き | フローと同じツリーの `wip/proposals/flows/<子>.yml`（9.3.1。効力は無い） | 頼まれたエージェント。ユーザがフロー編集画面で取り込み、保存が成功したら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-user-push-approved.sh` がフローと一緒にコミットして push する |
-| テンプレートの下書き | `wip/handoff/` の下の、取り込み先と同じ相対パス（例: `wip/handoff/.ccnavi/config/project/templates/<名前>.yml`。そのツリーの。プロジェクトのツリーならそのプロジェクトの下。9.15、9.19。効力は無い） | 頼まれたエージェント（`ccnavi --templates --draft <親>` か直接）。ユーザが `ccnavi user handoff` で取り込み、書けたら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んだ結果は、そのツリーのブランチの変更として残る |
+| テンプレートの下書き | `wip/handoff/` の下の、反映する先と同じ相対パス（例: `wip/handoff/.ccnavi/config/project/templates/<名前>.yml`。そのツリーの。プロジェクトのツリーならそのプロジェクトの下。9.15、9.19。効力は無い） | 頼まれたエージェント（`ccnavi --templates --draft <親>` か直接）。ユーザが `ccnavi user handoff` で取り込み、書けたら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んだ結果は、そのツリーのブランチの変更として残る |
 | ワークツリー | `.claude/worktrees/<識別子>/` | 親が git のラッパースクリプトで切る | 管理外 |
 
 状態は置き場で表す。チケットは 1 本のファイルで、2 つの置き場を行き来する。ユーザが動かす
@@ -53,7 +53,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 
 **承認済みチケットは git で共有する。** 承認した機械と作業する機械が違っても承認が届くよう、承認済み
 チケットもマーカーも親チケットのブランチに乗せ、`ccnavi-user-push-approved.sh` がコミットして push する（9.4）。
-受け取る側では、セッションの最初に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、ワークツリーの
+受け取る側では、セッションの最初に `ccnavi-fetch.sh` が fast-forward で取り込む。`--no-overwrite-ignore` を付けるので、ignored のファイルと重なるときは上書きせず、進められなかったと知らせる。同じ sh が、ワークツリーの
 起点になる統合先（そのリポジトリの手元の `origin/HEAD` が指すもの。無ければ `origin/main`・`origin/master`）も、チェックアウトされていなければ `update-ref` で
 進める。統合先の決め方は `ccnavi-common-state.sh` の `ccnavi_integration` にまとめてあり、`ccnavi-git.sh` は
 その名前への直接の push を（`main` などの固定のリストと同じく）拒み、`ccnavi-review.sh` は依頼のとき、既存のマージリクエストのマージ先がこの統合先と一致するかを確かめる（マージリクエストを作るのは `ccnavi-start.sh`）。
@@ -77,10 +77,10 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 （`integrate-ticket`）、統合先への push を断る、親のワークツリーのブランチが
 リモートから消えていれば push を断る（push の関門。下）、親のワークツリーでの
 `checkout`・`switch` の行き先を、今のブランチと、変換した名前がフォルダ名になるブランチに限る（`worktree add` も変換した名前の
-形だけ）。`integrate` / `integrate-done` の状態操作（取り込みの記録・`merge --squash`・取り込んだブランチの
+形だけ）。`integrate` / `integrate-done` の状態操作（取り込みの記録・一時ワークツリー・取り込み先への `merge --ff-only --no-overwrite-ignore`・取り込んだブランチの
 `update-ref -d`）も sh が持つ。例外に入るのは、生の操作が組み込みで止まり、ラッパーが許可リストで読み、判定の材料のうち
 チケットの中身を実行ファイルに聞くものだけ。sh はチケットの YAML を読まず、親のワークツリーか・承認済みの親チケットと着手済みか・`.requested`・退避の有無・
-親チケットの `mr:` は `ccnavi tree parent`、`integrate` が断る「チケットに結び付く名前」かどうかは `ccnavi tree bound`（Stop の促しと同じ判定）、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める。答えが得られないときは、
+親チケットの `mr:` は `ccnavi tree parent`、`integrate` が断る「チケットに結び付く名前」かどうかは `ccnavi tree bound`（Stop の促しと同じ判定）、直接作業の取り込み先のブランチがチケットに結び付くかは `ccnavi tree base-bound`、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める。答えが得られないときは、
 止める側の検査は止める向きに（`integrate` は断り、checkout は親のワークツリーとして狭める）、ツリーを動かす側
 （`ccnavi-fetch.sh` の早送り、`ccnavi-sync.sh` の取り込み）は動かさない向きに倒す。
 

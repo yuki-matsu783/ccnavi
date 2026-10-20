@@ -51,7 +51,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, gitstate, hookio, settings, tree
+from ..infra import fsio, gitcmd, gitstate, hookio, pathcase, settings, tree
 from ..policy import rules, selfguard
 from ..records import audit
 from ..tickets import (
@@ -169,6 +169,29 @@ def check(
             # 同じ変更を呼び出しのたびに言わない。言ったぶんは今の指紋を受け入れ済みに直す。
             accepted.update({f.key(): _fingerprint(f) for f in fresh if f.key() in shadowed})
             _save_accepted(stderr, state_dir, payload.session_id, accepted)
+    side_roots = _side_roots(read)
+    # 横で作業するチェックアウトの変更は戻さないので、鍵が報告済みのままだと、同じファイルへの
+    # 以降の書き込みが見えなくなる。報告したときの指紋と違えば、新しい変更として言い直す。
+    side_seen = _load_accepted(state_dir, payload.session_id)
+    side_changed = [
+        f
+        for f in known
+        if _in_side(f, side_roots)
+        and _restorable(f)
+        and f.key() not in shadowed
+        and (side_seen.get(_SIDE_PREFIX + f.key()) or _fingerprint(f)) != _fingerprint(f)
+    ]
+    if side_changed:
+        fresh += side_changed
+        known = [f for f in known if f not in side_changed]
+    side_marks = {
+        _SIDE_PREFIX + f.key(): _fingerprint(f)
+        for f in fresh
+        if _in_side(f, side_roots) and _restorable(f) and f.key() not in shadowed
+    }
+    if side_marks and any(side_seen.get(k) != v for k, v in side_marks.items()):
+        side_seen.update(side_marks)
+        _save_accepted(stderr, state_dir, payload.session_id, side_seen)
     # 基準が無いセッションでは、今そこに在るものは直前の実行の結果ではない。
     # 記録を取るだけにして、原因を付けずに 1 度だけ伝える。
     # 基準が在るなら、起動時に在ったものが、まだ伝えられていない分に当たる。
@@ -191,10 +214,12 @@ def check(
     # 取り違えないようにする。
     if restore == selfguard.ENABLE:
         for w, top, _ in read:
+            if w.side_by_side:
+                continue
             here = [
                 f
                 for f in fresh
-                if f.tree_name == w.tree.name and _restorable(f) and f.key() not in shadowed
+                if _same_tree(f, w.tree.root) and _restorable(f) and f.key() not in shadowed
             ]
             if not here:
                 continue
@@ -209,7 +234,11 @@ def check(
     # 予行で言うのも、本番で戻すのと同じ集合に限る。戻さない 1 件に「本番なら
     # 戻していた」と書くと、設定を enable にしたときに起きることを読み違えさせる。
     would = (
-        {f.key() for f in fresh if _restorable(f) and f.key() not in shadowed}
+        {
+            f.key()
+            for f in fresh
+            if _restorable(f) and f.key() not in shadowed and not _in_side(f, side_roots)
+        }
         if restore == selfguard.DRY_RUN
         else set()
     )
@@ -238,6 +267,9 @@ def check(
         notes.append(f"preexisting {len(carried)}")
     if known:
         notes.append(f"known {len(known)}")
+    side_fresh = [f for f in fresh if _in_side(f, side_roots) and _restorable(f)]
+    if side_fresh:
+        notes.append(f"side-by-side {len(side_fresh)}")
     if restored:
         notes.append(f"restored {len(restored)}")
     elif would:
@@ -268,6 +300,7 @@ def check(
             not_restored=gated and (not _restorable(f) or f.key() in shadowed),
             git=git,
             shadowed=f.key() in shadowed,
+            side_by_side=_in_side(f, side_roots) and _restorable(f),
         )
         for f in fresh
     ]
@@ -451,6 +484,7 @@ def at_stop(
     # ここを足さないと、保護領域を汚してからコミットした回が「何も起きなかった」と
     # 同じ見た目になる（呼び出しごとの実行後チェックも同じ見落としがあるが、そちらは戻しに関わるので
     # 断面を変えない。ユーザが 1 度で見るのはこの報告）。
+    side_roots = _side_roots(read)
     committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places, synced)
     found += committed
     if not found and not uncounted:
@@ -490,9 +524,14 @@ def at_stop(
             )
         )
         kind = gitstate.KIND_LABELS.get(finding.change.kind, finding.change.kind)
+        origin = (
+            f" {post_report.SIDE_BY_SIDE_LABEL}。"
+            if _in_side(finding, side_roots) and _restorable(finding)
+            else ""
+        )
         lines.append(
             f"  {where}{finding.change.path}（{kind}）"
-            f" 対象のルール: {rules.record_name(rule)} / {how}"
+            f" 対象のルール: {rules.record_name(rule)} /{origin} {how}"
         )
     if len(found) > REPORT_LIMIT:
         all_at = (
@@ -557,6 +596,9 @@ class Watched:
     tree: tree.Tree
     rule_set: rules.RuleSet
     source: str
+    # 横で作業する指定が有効なメインのチェックアウト（`infra.directrec`）。ここで新しく見つかった
+    # 変更は、ユーザか別のセッションのものかもしれないので、戻さず報告だけにする。
+    side_by_side: bool = False
 
 
 def _read_all(
@@ -665,6 +707,24 @@ def _save_accepted(stderr: TextIO, state_dir: str, session: str, accepted: dict[
     )
     if failed:
         stderr.write(f"ccnavi: 受け入れた変更の記録を保存できませんでした: {failed}\n")
+
+
+# 横で作業するチェックアウトの変更を報告したときの指紋は、受け入れた変更（`accepted`）と同じ
+# ファイルに、この接頭辞を付けた鍵で置く。接頭辞があるので、受け入れた変更とは取り違えない。
+_SIDE_PREFIX = "side:"
+
+
+def _side_roots(read: list[tuple[Watched, str, list[gitstate.Change]]]) -> set[str]:
+    """横で作業する指定が有効なツリーのルート。名前ではなくパスで持つ（別のツリーに同じ名前がありうる）。"""
+    return {pathcase.fold(w.tree.root) for w, _, _ in read if w.side_by_side}
+
+
+def _same_tree(finding: post_findings.Finding, root: str) -> bool:
+    return bool(finding.tree_root) and pathcase.fold(finding.tree_root) == pathcase.fold(root)
+
+
+def _in_side(finding: post_findings.Finding, roots: set[str]) -> bool:
+    return bool(finding.tree_root) and pathcase.fold(finding.tree_root) in roots
 
 
 def _fingerprint(finding: post_findings.Finding) -> str:

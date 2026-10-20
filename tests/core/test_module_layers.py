@@ -121,6 +121,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
             {
                 "hook.agentkind",
                 "hook.failsafe",
+                "infra.directrec",
                 "infra.gitstate",
                 "infra.shellread",
                 "infra.shellread_cd",
@@ -244,6 +245,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.ops_plan",
                 "tickets.ops_stop",
                 "tickets.ops_stop_integrate",
+                "tickets.base_bound",
                 "tickets.ops_stop_request",
                 "tickets.pending_integrate",
                 "hook.post",
@@ -276,6 +278,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.lint_branch",
                 "entry.lint_ticket",
                 "entry.lint_layers",
+                "entry.lint_direct",
                 "entry.lint_places",
                 "entry.lint_project",
                 "entry.cli_plan",

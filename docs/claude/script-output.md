@@ -76,7 +76,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 | `ccnavi-ticket.sh start`（親で子の無いフェーズが残る） | フェーズごとに子チケットを作る | `tickets/ops_plan.py` |
 | `ccnavi-ticket.sh finish`（子で、レビュー不要） | 親の `status` | `tickets/ops.py` |
 | `ccnavi-ticket.sh finish`（親） | 移動をコミットして push し、Draft を解除する | `tickets/ops.py` |
-| `ccnavi-git.sh integrate` | `status` と `diff --staged` で確かめ、`integrate-done` | `ccnavi-git.sh` |
+| `ccnavi-git.sh integrate` | 差分と変わるファイルをユーザに見せ、了承を得て `integrate-done`（やめるなら `integrate --abort`） | `ccnavi-git.sh` |
 | `ccnavi-worktree.sh` の成功（切ったとき・既にあるとき） | 編集は、ワークツリーの中で行う。git は `cd <引用したパス> && <ラッパー> <サブコマンド>`。終わったらコミットし、integrate の案内に従う。名前の警告の後に出る最後の行 | `ccnavi-worktree.sh` の `print_next` |
 
 issue・MRを指定された依頼文には、ccnaviのUserPromptSubmitが「出力に『次:』があればそれに従う」と足す（`tickets/branchfind.py` の `_start_lines`）。

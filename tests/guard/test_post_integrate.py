@@ -407,5 +407,84 @@ class IntegratedCommitsTest(unittest.TestCase):
         self.assertEqual(post_findings.integrated_paths(self.repo, self.squash), set())
 
 
+class DirectCommitsTest(unittest.TestCase):
+    """版 4 の `integrate-done` が fast-forward で載せた K を、ターンの終わりの検査から外す条件。
+
+    K の親が記録の `head`、K の木が記録の `c_tree` で、名前がチケットに結び付かないとき。
+    専用の ref は使わず、記録（done の写し）と git のオブジェクトで照らす。
+    """
+
+    def setUp(self):
+        self.repo = os.path.realpath(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.repo, True)
+        git(self.repo, "init", "-q", "-b", "main")
+        write(self.repo, "a.txt", "a\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "init")
+        self.turn = git(self.repo, "rev-parse", "HEAD")
+        write(self.repo, "a.txt", "a2\n")
+        write(self.repo, "new.txt", "new\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "K")
+        self.k = git(self.repo, "rev-parse", "HEAD")
+        self.c_tree = git(self.repo, "rev-parse", "HEAD^{tree}")
+
+    def done(self, name="feat", **over):
+        fields = {
+            "version": "4",
+            "k": self.k,
+            "head": self.turn,
+            "c_tree": self.c_tree,
+            "base_branch": "main",
+        }
+        fields.update(over)
+        ddir = os.path.join(self.repo, ".git", post_findings.INTEGRATE_DONE_DIR)
+        os.makedirs(ddir, exist_ok=True)
+        with open(os.path.join(ddir, name), "w", encoding="utf-8") as f:
+            f.writelines(f"{k} {v}\n" for k, v in fields.items())
+
+    def paths(self):
+        return post_findings.integrated_paths(self.repo, self.turn)
+
+    def test_k_is_dropped(self):
+        self.done()
+        self.assertEqual(self.paths(), {"a.txt", "new.txt"})
+
+    def test_an_empty_k_field_still_matches_by_parent_and_tree(self):
+        self.done(k="-")
+        self.assertEqual(self.paths(), {"a.txt", "new.txt"})
+
+    def test_no_record_is_reported(self):
+        self.assertEqual(self.paths(), set())
+
+    def test_a_different_parent_is_reported(self):
+        self.done(head="0" * 40)
+        self.assertEqual(self.paths(), set())
+
+    def test_a_different_tree_is_reported(self):
+        self.done(c_tree="0" * 40)
+        self.assertEqual(self.paths(), set())
+
+    def test_a_record_naming_another_commit_as_k_is_reported(self):
+        self.done(k="1" * 40)
+        self.assertEqual(self.paths(), set())
+
+    def test_a_ticket_bound_name_is_reported(self):
+        write(self.repo, ".ccnavi/approved/doing/feat.md", "---\n---\n")
+        self.done()
+        self.assertEqual(self.paths(), set())
+
+    def test_a_later_user_commit_on_the_same_path_is_reported(self):
+        self.done()
+        write(self.repo, "a.txt", "a3\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "user")
+        self.assertEqual(self.paths(), {"new.txt"})
+
+    def test_an_old_format_record_is_not_read_as_version_4(self):
+        self.done(version="3")
+        self.assertEqual(self.paths(), set())
+
+
 if __name__ == "__main__":
     unittest.main()

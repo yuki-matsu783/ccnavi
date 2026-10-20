@@ -322,7 +322,7 @@ ccnavi_fetch_forward() {
 		return 0
 	fi
 	ccnavi_fw_behind=$(git -C "$1" rev-list --count "$ccnavi_fw_local..$ccnavi_fw_remote" 2>/dev/null || echo '?')
-	if LC_ALL=C git -C "$1" merge --ff-only --quiet "$ccnavi_fw_remote" </dev/null >/dev/null 2>"$scratch/ff"; then
+	if LC_ALL=C git -C "$1" merge --ff-only --no-overwrite-ignore --quiet "$ccnavi_fw_remote" </dev/null >/dev/null 2>"$scratch/ff"; then
 		printf '%s: 親ブランチ %s を %s コミット進めた\n' "$2" "$3" "$ccnavi_fw_behind"
 	else
 		printf '%s: 早送りできなかった。%s（取り込みは sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
@@ -381,7 +381,7 @@ report=$(
 				"$name" "$behind"
 			continue
 		fi
-		if git -C "$tree" merge --ff-only --quiet "@{u}" 2>/dev/null; then
+		if git -C "$tree" merge --ff-only --no-overwrite-ignore --quiet "@{u}" 2>/dev/null; then
 			printf '%s: 親ブランチ %s を %s コミット進めた\n' "$name" "$branch" "$behind"
 		else
 			# 分岐か、浅い clone で履歴が足りないだけかは見分けない。見るのは一致しているかどうかだけ。
@@ -448,7 +448,7 @@ report=$(
 					"$name" "$default" "$behind"
 				continue
 			fi
-			git -C "$here" merge --ff-only --quiet "$ref" 2>/dev/null || {
+			git -C "$here" merge --ff-only --no-overwrite-ignore --quiet "$ref" 2>/dev/null || {
 				printf '%s: ローカルの統合先ブランチ %s を進められなかった。ユーザに合流を頼んでください\n' \
 					"$name" "$default"
 				continue

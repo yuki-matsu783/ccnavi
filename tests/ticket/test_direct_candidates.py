@@ -164,7 +164,7 @@ class DirectCandidatesTest(base.IntegrateNudgeTest):
         write(os.path.join(path, "src", "draft.py"), "y\n")
         reason = self.asked(self.stop(path))
         commands = re.findall(r"`([^`]+)`", reason)
-        self.assertTrue(any(" status" in c for c in commands), commands)
+        self.assertTrue(any(" --adopt " in c for c in commands), commands)
         for command in commands:
             if " integrate" in command or " add " in command or " commit " in command:
                 continue

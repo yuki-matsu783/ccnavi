@@ -42,6 +42,7 @@ from ..tickets import (
     ticket_model,
 )
 from . import (
+    lint_direct,
     lint_layers,
     lint_places,
     lint_project,
@@ -465,6 +466,7 @@ def check(
     problems.extend(lint_layers._worktree_layers(conf, root))
     problems.extend(lint_places._ticket_places(conf, root))
     problems.extend(lint_places._projectless_worktrees(conf, root))
+    problems.extend(lint_direct._direct(conf, root))
     problems.extend(lint_project._local_settings(root))
     problems.extend(lint_layers._sync(conf, root))
     return problems

@@ -345,3 +345,119 @@ class TreeParentGateFactsTest(Harness):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TreeBaseBoundTest(Harness):
+    """`ccnavi tree base-bound`。取り込み先のブランチがチケットに結び付くか。
+    `ccnavi-worktree.sh` はこれで断る。
+
+    識別子の衝突はワークスペース全体、結び付きは取り込み先のリポジトリだけを見る。
+    """
+
+    def setUp(self):
+        super().setUp()
+        git(self.ws, "init", "-q", "-b", "main")
+        git(self.ws, "commit", "-q", "--allow-empty", "-m", "init")
+        self.p = os.path.join(self.ws, "projects", "p")
+        self.q = os.path.join(self.ws, "projects", "q")
+        for repo in (self.p, self.q):
+            os.makedirs(repo)
+            git(repo, "init", "-q", "-b", "main")
+            git(repo, "commit", "-q", "--allow-empty", "-m", "init")
+
+    def bound(self, repo=None, branch="feature/x"):
+        return self.answer("tree 1", "tree", "base-bound", repo or self.p, branch)
+
+    def test_nothing_ties_the_branch(self):
+        self.assertEqual({"bound": "no"}, self.bound())
+
+    def test_each_material_binds(self):
+        cases = {
+            "identifier": (f"projects/p/{APPROVED}/doing/feature-x.md", front(ticket="feature-x")),
+            "branch field": (
+                f"projects/p/{APPROVED}/done/t1.md",
+                front(ticket="t1", branch="feature/x"),
+            ),
+            "proposal anywhere": (f"projects/q/{PROPOSALS}/todo/feature-x.md", front(ticket="x")),
+        }
+        for label, (rel, text) in cases.items():
+            with self.subTest(label):
+                path = os.path.join(self.ws, *rel.split("/"))
+                write(path, text)
+                out = self.bound()
+                self.assertEqual("yes", out["bound"])
+                self.assertIn(rel, out["why"])
+                os.remove(path)
+        self.assertEqual("no", self.bound()["bound"])
+
+    def test_another_repository_branch_field_does_not_bind(self):
+        write(
+            os.path.join(self.q, *f"{APPROVED}/doing/t1.md".split("/")),
+            front(ticket="t1", branch="feature/x"),
+        )
+        self.assertEqual({"bound": "no"}, self.bound(self.p))
+        self.assertEqual("yes", self.bound(self.q)["bound"])
+
+    def test_identifier_collision_is_checked_across_the_workspace(self):
+        # 識別子の衝突はワークスペース全体。別のリポジトリの承認済みチケットでも、
+        # 同じ識別子なら取り込み先のブランチは断る（結び付きの `branch:` 欄とは範囲が違う）。
+        rel = f"projects/q/{APPROVED}/doing/feature-x.md"
+        write(os.path.join(self.ws, *rel.split("/")), front(ticket="feature-x"))
+        out = self.bound(self.p)
+        self.assertEqual("yes", out["bound"])
+        self.assertIn(rel, out["why"])
+
+    def test_leftover_ticket_files_on_the_default_branch_do_not_bind(self):
+        write(
+            os.path.join(self.p, *f"{APPROVED}/done/old.md".split("/")),
+            front(ticket="old", branch="other"),
+        )
+        self.assertEqual({"bound": "no"}, self.bound(self.p, "main"))
+
+    def test_undecidable_is_unknown(self):
+        write(os.path.join(self.p, *f"{APPROVED}/doing/broken.md".split("/")), "---\n: [\n---\n")
+        self.assertEqual("unknown", self.bound()["bound"])
+        self.assertEqual("unknown", self.bound(os.path.join(self.ws, "projects"))["bound"])
+
+    def test_a_bad_tree_is_refused(self):
+        self.assertEqual(
+            1, self.ask("tree", "base-bound", os.path.join(self.ws, "none"), "x").returncode
+        )
+
+
+class TreeGuardedTest(Harness):
+    """`tree guarded`: 守る対象（自己防衛）に当たるパスだけを挙げる。"""
+
+    def setUp(self):
+        super().setUp()
+        write(os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"), "ask: []\n")
+
+    def test_a_guarded_rules_file_is_named(self):
+        result = self.ask("tree", "guarded", self.ws, ".ccnavi/config/common/rules.yml", "src/a.py")
+        self.assertEqual(0, result.returncode, result.stderr)
+        lines = result.stdout.splitlines()
+        self.assertEqual("tree 1", lines[0])
+        self.assertIn("guarded yes", lines)
+        self.assertIn("path .ccnavi/config/common/rules.yml", lines)
+        self.assertNotIn("path src/a.py", lines)
+
+    def test_an_ordinary_path_is_not_guarded(self):
+        got = self.answer("tree 1", "tree", "guarded", self.ws, "src/a.py", "docs/b.md")
+        self.assertEqual("no", got["guarded"])
+        self.assertNotIn("path", got)
+
+    def test_a_missing_tree_is_refused(self):
+        result = self.ask("tree", "guarded", os.path.join(self.ws, "nope"), "a")
+        self.assertNotEqual(0, result.returncode)
+
+
+class TreeHandoffPendingTest(Harness):
+    """`tree handoff-pending`: 取り込んでいない下書きの件数と一覧。"""
+
+    def test_no_drafts_means_zero(self):
+        got = self.answer("tree 1", "tree", "handoff-pending", self.tree)
+        self.assertEqual("0", got["pending"])
+
+    def test_a_missing_tree_is_refused(self):
+        result = self.ask("tree", "handoff-pending", os.path.join(self.ws, "nope"))
+        self.assertNotEqual(0, result.returncode)

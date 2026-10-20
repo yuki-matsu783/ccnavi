@@ -121,7 +121,12 @@ class WorktreeWithoutProjectTest(unittest.TestCase):
         return json.loads(result.stdout)["problems"]
 
     def mentions(self, name: str) -> list[dict]:
-        return [p for p in self.lint_problems() if name in p["where"] + p["detail"]]
+        # 直接作業の記録の検査（`(direct/…)`）は、元のプロジェクトの有無とは別の話なので数えない。
+        return [
+            p
+            for p in self.lint_problems()
+            if name in p["where"] + p["detail"] and not p["where"].startswith("(direct/")
+        ]
 
     # ---- 前提（いまの判定。実装前から通る）
 

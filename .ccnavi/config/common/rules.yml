@@ -202,6 +202,15 @@ deny:
       エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
 
 ask:
+  # 直接作業の取り込み先・状態の了承・横で作業する指定・引き取りは、ユーザの確認ダイアログに出す。
+  # ダイアログのコマンドに、取り込み先のブランチ名と選んだ指定が見える。
+  # --side-by-side は自動復元を緩めるので、ほかにずれが無くても必ずダイアログに出す。
+  - id: direct-worktree-confirm
+    match: Bash
+    regex: 'ccnavi-worktree\.sh\b[^\x00]*\s--(base|accept|side-by-side|adopt)(\s|=|$)'
+    additionalContext: >-
+      ユーザが取り込み先と状態を了承した。出力の「取り込み先:」「起点:」の行を報告に含め、作業後は integrate の案内に従う。
+
   # 依存関係の変更。pyproject.toml は依存の宣言、uv.lock は依存の固定。
   - id: dependencies
     match: Write|Edit
@@ -261,15 +270,16 @@ allow:
       git の入口は 'sh {root}/.ccnavi/scripts/ccnavi-git.sh <サブコマンド> ...' の形です。
       パスをそのまま書き、コマンド名を変数に入れないでください。diff も同じ入口です。
 
-  # ワークツリーを切る前に、統合先が古くないかを確かめさせる。止めない案内で、止める 2 重目の確認は
-  # ccnavi-git.sh の worktree add の中にある（hook は git もネットワークも起こさないので、遅れの判定はそこ）。
+  # 直接作業のワークツリーは {script:ccnavi-worktree.sh} だけで切る。手の worktree add に誘わない。
+  # ccnavi-git.sh の worktree add を直接打ったときの止めない案内（既存のブランチを出すときなど、親や子のワークツリー用）。
+  # 止める 2 重目の確認は ccnavi-git.sh の worktree add の中にある（hook は git もネットワークも起こさないので、遅れの判定はそこ）。
   - id: ccnavi-git-worktree-add
     match: Bash
     regex: 'ccnavi-git\.sh\s+worktree\s+add(\s|$)'
     additionalContextOnce: >-
-      直接作業のワークツリーは {script:ccnavi-worktree.sh} <名前> で切ると、fetch・遅れの確認・起点の選択をまとめて行います。
-      worktree add が断られたら、出力の案内どおりに打ち直してください。手元の統合先は進めません。
-      origin/<統合先> から切るときは --no-track を付けます。
+      直接作業のワークツリーは {script:ccnavi-worktree.sh} <名前> で切ります。取り込み先の確認・リモートとのずれの確認・
+      書きかけの扱いをまとめて行い、手で worktree add を打つ必要はありません。
+      worktree add が断られたら、出力の案内どおりに打ち直してください。手元の取り込み先は進めません。
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
   # 一度だけ勧める。読む手段を取り上げるのが目的ではないので deny でも ask でもない。

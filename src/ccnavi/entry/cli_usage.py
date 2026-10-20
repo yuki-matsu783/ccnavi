@@ -476,6 +476,17 @@ _SCRIPTS = """\
         （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"bound yes|no"（その名前の
          ワークツリーがチケットに結び付くか。結び付くと integrate は断ります）、結び付くなら
          "why <理由>" を出力します。Stop の促しと同じ判定です）
+    ccnavi tree base-bound <main-checkout> <branch>
+        （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"bound yes|no|unknown"（取り込み先の
+         ブランチがチケットに結び付くか。yes と unknown は切るのを断ります）、yes なら
+         "why <理由>" を出力します。結び付きは取り込み先のリポジトリだけを見ます）
+    ccnavi tree guarded <main-checkout> <path>...
+        （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"guarded yes|no"（パスが自己防衛の
+         守る対象に当たるか。当たると integrate-done は端末から打つよう案内します）、
+         当たるパスごとに "path <パス>" を出力します。パスはメインのチェックアウトからの相対です）
+    ccnavi tree handoff-pending <tree>
+        （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"pending <件数>"（取り込んでいない
+         wip/handoff/ の下書きの数）と、1 件ごとに "path <パス>" を出力します）
     ccnavi worktree id <branch>
         （スクリプト用。"id <識別子>"（ブランチ名の / を - に置き換えたもの）に続いて、
          親に採用できなければ "problem <理由>"（58文字以内・末尾が -2桁でない・字の種類・NFC）、
