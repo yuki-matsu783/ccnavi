@@ -2639,6 +2639,11 @@ logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
 	printf '\n--- 出力 ---\n'
 } >"$logfile"
 
+# ネットワークに出る git には、gh / glab の資格情報を使わせる（認証済みなら git の認証も通る）。
+case "$sub" in
+push | fetch | pull | ls-remote) ccnavi_git_auth . ;;
+esac
+
 status=0
 git --no-pager "$sub" ${1+"$@"} >>"$logfile" 2>&1 || status=$?
 

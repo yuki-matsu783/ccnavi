@@ -509,6 +509,7 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 	fi
 
 	# push は失敗しても巻き戻さない。コミットは残るので、ユーザがもう一度送れる。
+	ccnavi_git_auth "$tree"
 	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then
 		printf '承認済みチケットをブランチ %s にpushしました（%s）。\n' "$branch" "$name"
 	else

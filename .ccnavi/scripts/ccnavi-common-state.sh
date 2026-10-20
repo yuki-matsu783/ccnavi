@@ -339,6 +339,7 @@ ccnavi_git_timed() {
 	ccnavi_gt_err="$2"
 	ccnavi_gt_repo="$3"
 	shift 3
+	ccnavi_git_auth "$ccnavi_gt_repo"
 	ccnavi_gt_ssh="${GIT_SSH_COMMAND:-}"
 	if [ -z "$ccnavi_gt_ssh" ] && [ -z "${GIT_SSH:-}" ] &&
 		! git -C "$ccnavi_gt_repo" config --get core.sshCommand >/dev/null 2>&1; then
