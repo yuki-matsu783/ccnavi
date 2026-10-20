@@ -177,10 +177,13 @@ class FinishOrderTest(unittest.TestCase):
     REL = "sub/keep.txt"
 
     def run_finish(self, root, out, scn):
+        files, dirs = runner._setup(scn, root)
         st = {
-            "setup_made": runner._setup(scn, root),
+            "setup_made": files,
+            "setup_dirs": dirs,
             "session_ids": [],
             "pre_digests": {},
+            "pre_repo": runner.repo_snapshot(root),
             "cost_usd": 0.0,
         }
         return runner.finish(scn, out, st, root)
@@ -299,10 +302,11 @@ class ExpectAfterTest(unittest.TestCase):
             root, out = Path(d) / "root", Path(d) / "out"
             root.mkdir()
             out.mkdir()
+            st["pre_repo"] = runner.repo_snapshot(root)
             rc = runner.finish(scn, out, st, root)
             report = json.loads((out / "report.json").read_text(encoding="utf-8"))
         self.assertEqual(rc, 2)
-        self.assertEqual([r["kind"] for r in report], ["expect_after"])
+        self.assertEqual([r["kind"] for r in report], ["expect_after", "repo"])
         self.assertEqual(report[0]["verdict"], runner.INCONCLUSIVE)
 
     def load_yml(self, text):
@@ -367,6 +371,67 @@ class ModeCheckTest(unittest.TestCase):
         (Path(root) / ".claude/settings.json").write_text("{", encoding="utf-8")
         with mock.patch.dict("os.environ", {}, clear=True):
             self.assertFalse(runner.mode_check(root)[0])
+
+
+class SetupSafetyTest(unittest.TestCase):
+    def scenario(self, rel):
+        return {"setup": {"files": {rel: "x\n"}}}
+
+    def test_existing_file_is_a_clash_and_not_touched(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "keep.txt").write_text("元の中身\n", encoding="utf-8")
+            self.assertEqual(runner.setup_clashes(self.scenario("keep.txt"), root), ["keep.txt"])
+
+    def test_cleanup_removes_only_dirs_setup_created(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "keepdir").mkdir()
+            files, dirs = runner._setup(self.scenario("keepdir/a/b.txt"), root)
+            self.assertEqual(dirs, ["keepdir/a"])
+            runner._cleanup(files, dirs, root)
+            self.assertFalse((root / "keepdir/a").exists())
+            self.assertTrue((root / "keepdir").is_dir())
+
+
+class StepFailureTest(unittest.TestCase):
+    def test_nonzero_exit_is_an_error(self):
+        proc = subprocess.CompletedProcess(args=["claude"], returncode=1, stdout="", stderr="x")
+        scn = {"model": "haiku", "budget_usd": 1, "_prompt_steps": 1, "permission_mode": "auto"}
+        with (
+            tempfile.TemporaryDirectory() as d,
+            mock.patch.object(runner, "_ENTRY", True),
+            mock.patch.object(runner.subprocess, "run", return_value=proc),
+            self.assertRaises(RuntimeError),
+        ):
+            runner.run_step(scn, {"prompt": "x"}, Path(d), 1, "s", None, False, Path(d))
+
+    def test_failed_step_halts_with_run_kind_and_later_steps_do_not_run(self):
+        scn = {
+            "steps": [{"prompt": "a"}, {"prompt": "b"}],
+            "_prompt_steps": 2,
+        }
+        st = {"next_step": 0, "session_ids": [], "cost_usd": 0.0}
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            with mock.patch.object(
+                runner, "run_step", side_effect=RuntimeError("起動できない")
+            ) as m:
+                rc = runner.drive(scn, out, st, Path(d))
+        self.assertEqual(rc, 11)
+        self.assertEqual(st["halt"]["kind"], "run")
+        self.assertEqual(m.call_count, 1)
+
+
+class RepoResultTest(unittest.TestCase):
+    def test_same_state_passes(self):
+        self.assertEqual(runner.repo_result("a", "a")[0], runner.PASS)
+
+    def test_changed_state_fails(self):
+        self.assertEqual(runner.repo_result("a", "b"), (runner.FAIL, runner.REPO_CHANGED))
+
+    def test_missing_before_state_is_not_passed(self):
+        self.assertEqual(runner.repo_result(None, "a")[0], runner.INCONCLUSIVE)
 
 
 class PersistTest(unittest.TestCase):

@@ -5,6 +5,7 @@ reqs: [REQ-MLT-34, REQ-MLT-36]
 status: draft
 model: haiku
 budget_usd: 3.0
+test_repo: true                  # 親チケットの着手で、projects/test-repo にブランチ・ワークツリーを作る。回す前に問い 2 を確かめる
 
 # 親の `ticket start` が、ワークスペースルートの `.ccnavi/config/common/` を親のワークツリーのプロジェクトの
 # `.ccnavi/config/common/` へ写す（docs/design/multi-repo/distribute-common.md の 11.12）。

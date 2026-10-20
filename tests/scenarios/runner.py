@@ -8,8 +8,11 @@
 
 next は、人間の操作で止まったあと、人間が「次へ」と言ってから打つ。
 
---confirmed を付けるのは、人間が「状態がきれいで最新か」「test-repo にブランチや MR が
-できてよいか」に答えたあとだけ。付けずに打つと、確認に使う事実を出して止まる（終了コード 3）。
+--confirmed を付けるのは、人間が「状態がきれいで最新か」（と、test_repo のシナリオでは
+「test-repo にブランチや MR ができてよいか」）に答えたあとだけ。
+付けずに打つと、確認に使う事実を出して止まる（終了コード 3）。
+ccnavi 本体にブランチ・コミット・ワークツリーが残らないことは、
+回す前後の状態を比べて確かめる（repo）。
 
 終了コード: 0 全部通った / 1 不合格がある / 2 未成立か意味の判定待ちがある /
 3 人間の確認が要る / 10 人間の操作で止まった（「次へ」のあと next で続ける）。
@@ -21,6 +24,7 @@ inconclusive（未成立。fail にしない）。意味で読むもの（judge�
 """
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -285,6 +289,36 @@ def overall(results):
     return PASS
 
 
+# ---- ccnavi 本体の変化を確かめる（回す前と後で比べる） ----
+
+REPO_CHANGED = "回す前と変わっている（HEAD・ブランチ・ワークツリーのどれか）"
+
+
+def repo_snapshot(root):
+    """ccnavi 本体の HEAD・ブランチの一覧・ワークツリーの一覧。回す前と後で比べる。"""
+    parts = []
+    for args in (
+        ["rev-parse", "HEAD"],
+        ["for-each-ref", "--format=%(refname)", "refs/heads"],
+        ["worktree", "list", "--porcelain"],
+    ):
+        r = subprocess.run(
+            ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=120
+        )
+        parts.append(r.stdout if r.returncode == 0 else f"エラー {r.returncode}: {r.stderr}")
+    return "\n".join(parts)
+
+
+def repo_result(pre, now):
+    """回す前と後の ccnavi 本体の状態を比べる。(判定, 理由)。
+    pre が無いとき（この決まりより前に作られた状態ファイル）は、確かめられないので未成立にする。"""
+    if pre is None:
+        return INCONCLUSIVE, "回す前の状態が無い（この実行より前に作られた状態ファイル）"
+    if pre == now:
+        return PASS, "変わっていない"
+    return FAIL, REPO_CHANGED
+
+
 # ---- 人間への確認に使う事実 ----
 
 
@@ -380,6 +414,9 @@ def run_step(scn, step, out, idx, session_id, resume_id, persist, root):
     (out / f"step-{idx}.jsonl").write_text(r.stdout, encoding="utf-8")
     if r.stderr.strip():
         (out / f"step-{idx}.stderr").write_text(r.stderr, encoding="utf-8")
+    if r.returncode != 0:
+        # 失敗した step の出力は、ここでは判定に使わない（drive が止める）
+        raise RuntimeError(f"claude が終了コード {r.returncode} で終わった")
     return parse_stream(r.stdout)
 
 
@@ -396,29 +433,39 @@ def _write_state(out, st):
     (out / "state.json").write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
+def setup_clashes(scn, root):
+    """setup のファイルのうち、もう有るもの。有れば回さない（後片付けで消してしまうため）。"""
+    return [rel for rel in (scn.get("setup") or {}).get("files", {}) if (Path(root) / rel).exists()]
+
+
 def _setup(scn, root):
-    made = []
+    """setup のファイルを作る。(作ったファイル, 作ったディレクトリ) を返す。
+    既にあるパスには触らない（setup_clashes で先に確かめてある）。
+    ディレクトリは、この関数が新しく作ったものだけ。"""
+    files, dirs = [], []
     for rel, body in (scn.get("setup") or {}).get("files", {}).items():
         p = Path(root) / rel
-        p.parent.mkdir(parents=True, exist_ok=True)
+        missing = []
+        d = p.parent
+        while d != Path(root) and not d.exists():
+            missing.append(d)
+            d = d.parent
+        for d in reversed(missing):
+            d.mkdir()
+            dirs.append(str(d.relative_to(root)))
         p.write_text(body, encoding="utf-8")
-        made.append(rel)
-    return made
+        files.append(rel)
+    return files, dirs
 
 
-def _cleanup(made, root):
+def _cleanup(made, made_dirs, root):
     for rel in made:
         p = Path(root) / rel
         if p.is_file():
             p.unlink()
-    for rel in made:  # 空になった親も消す（setup で作ったものだけ）
-        d = (Path(root) / rel).parent
-        try:
-            while d != Path(root) and not any(d.iterdir()):
-                d.rmdir()
-                d = d.parent
-        except OSError:
-            pass
+    for rel in sorted(made_dirs, key=len, reverse=True):  # 深いものから。空のときだけ消す
+        with contextlib.suppress(OSError):
+            (Path(root) / rel).rmdir()
 
 
 def drive(scn, out, st, root):
@@ -443,7 +490,19 @@ def drive(scn, out, st, root):
         resume_id = st["session_ids"][-1] if step.get("resume") and st["session_ids"] else None
         sid = str(uuid.uuid4())
         t0 = time.time()
-        ev = run_step(scn, step, out, idx + 1, sid, resume_id, _persist_needed(steps, idx), root)
+        persist = _persist_needed(steps, idx)
+        try:
+            ev = run_step(scn, step, out, idx + 1, sid, resume_id, persist, root)
+        except Exception as e:  # 起動できない・時間切れ・終了コードが 0 でない
+            # 後続は回さず止める。finish に回して、後片付けを通す
+            st["halt"] = {
+                "step": idx + 1,
+                "kind": "run",
+                "reasons": [f"step {idx + 1} が正常に終わらなかった: {e}"],
+            }
+            _write_state(out, st)
+            print(f"step {idx + 1}: 正常に終わらなかった（{e}）。後続の step には進まず止める")
+            return 11
         print(f"step {idx + 1}: {time.time() - t0:.0f} 秒、費用 {ev['cost_usd']:.3f} USD")
         for s in ev["session_ids"] or [sid]:
             if s not in st["session_ids"]:
@@ -480,11 +539,13 @@ def finish(scn, out, st, root):
         if halt:
             # 止まった回は後続の step が回っていないので、decisions・state は必ず落ちる。外す
             results = [r for r in results if r[0] not in ("decisions", "state")]
-            results.append(
-                ("expect_after", {"step": halt["step"]}, INCONCLUSIVE, "; ".join(halt["reasons"]))
-            )
+            kind = halt.get("kind", "expect_after")
+            results.append((kind, {"step": halt["step"]}, INCONCLUSIVE, "; ".join(halt["reasons"])))
+        # ccnavi 本体に、ブランチ・コミット・ワークツリーが残っていないかを実際の状態で確かめる
+        v, why = repo_result(st.get("pre_repo"), repo_snapshot(root))
+        results.append(("repo", "ccnavi 本体の HEAD・ブランチ・ワークツリー", v, why))
     finally:
-        _cleanup(st["setup_made"], root)
+        _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
     write_report(scn, out, st, results, rows, raw)
     final = overall(results)
     print(f"\n結果: {final}（レポート: {out}/report.md）")
@@ -736,6 +797,11 @@ def cmd_run(args):
         # 確認の前に止める。--confirmed を付けても、enable でなければ回さない
         print(mode_text)
         return 3
+    clash = setup_clashes(scn, root)
+    if clash:
+        # 有るものを後片付けで消さないよう、回す前に止める
+        print(f"setup のパスが既にある（消されてしまうので回さない）: {', '.join(clash)}")
+        return 1
     if not args.confirmed:
         print("回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。\n")
         print(mode_text + "\n")
@@ -743,14 +809,15 @@ def cmd_run(args):
         print(
             "問い 1: 今の状態はきれいで、最新か（他のセッションの作業中や未コミットの変更が無いか）"
         )
-        print("問い 2: projects/test-repo にブランチや MR ができてよいか")
-        print("問い 3: ccnavi 本体にブランチ・コミット・MR が残らない前提でよいか")
+        if scn.get("test_repo"):
+            print("問い 2: projects/test-repo にブランチや MR ができてよいか")
         return 3
     out = Path(
         args.out or ROOT / "logs" / "scenarios" / f"{scn['id']}-{datetime.now():%Y%m%d-%H%M%S}"
     )
     out.mkdir(parents=True, exist_ok=True)
     pre = {rel: file_digest(root / rel) for rel in scn["expect"].get("files_unchanged", [])}
+    setup_files, setup_dirs = _setup(scn, root)
     st = {
         "scenario": str(Path(args.scenario).resolve()),
         "root": str(root),
@@ -758,14 +825,21 @@ def cmd_run(args):
         "session_ids": [],
         "cost_usd": 0.0,
         "pre_digests": pre,
-        "setup_made": _setup(scn, root),
+        "pre_repo": repo_snapshot(root),
+        "setup_made": setup_files,
+        "setup_dirs": setup_dirs,
     }
     _write_state(out, st)
     return _continue(scn, out, st, root)
 
 
 def _continue(scn, out, st, root):
-    rc = drive(scn, out, st, Path(root))
+    try:
+        rc = drive(scn, out, st, Path(root))
+    except BaseException:
+        # 割り込みなど、drive を抜けて finish に届かないときも、setup のファイルを残さない
+        _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
+        raise
     return finish(scn, out, st, Path(root)) if rc is None or rc == 11 else rc
 
 
@@ -773,8 +847,13 @@ def cmd_next(args):
     out = Path(args.out)
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
     if st.get("halt"):
-        print(f"step {st['halt']['step']} の expect_after を満たさず止めた回。続きは回せない")
+        print(f"step {st['halt']['step']} で止めた回。続きは回せない")
         return 2
+    # 人間の操作の間にモードが変わることがあるので、続けるたびに確かめる
+    mode_ok, mode_text = mode_check(Path(st["root"]))
+    if not mode_ok:
+        print(mode_text)
+        return 3
     scn = load_scenario(st["scenario"])
     scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
     return _continue(scn, out, st, st["root"])
