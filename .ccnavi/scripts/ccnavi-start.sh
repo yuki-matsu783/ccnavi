@@ -213,7 +213,7 @@ host_open() {
 		return 1
 	fi
 	if ! ccnavi_host_parse "$origin"; then
-		host_why="origin の URL を読めない（$(ccnavi_mask_url "$origin")）"
+		host_why="origin の URL を読めない（$(ccnavi_mask_url "$origin")）${ccnavi_h_parse_why:+。$ccnavi_h_parse_why}"
 		host_rc=1
 		return 1
 	fi

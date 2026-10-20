@@ -185,7 +185,7 @@ look_at_host() {
 	fi
 	origin_shown=$(ccnavi_mask_url "$origin")
 	if ! ccnavi_host_parse "$origin"; then
-		unchecked "origin の URL を読めない（${origin_shown}）" origin-unreadable
+		unchecked "origin の URL を読めない（${origin_shown}）${ccnavi_h_parse_why:+。$ccnavi_h_parse_why}" origin-unreadable
 		return 0
 	fi
 	connect_rc=0
