@@ -1,7 +1,7 @@
 {
  "version": 1,
  "root": "<root>",
- "generated_at": "2026-10-19T16:45:39+0000",
+ "generated_at": "2026-09-13T13:50:22+0000",
  "settings": {
   "mode": "enable",
   "ticket_control": "enable",
@@ -33,6 +33,12 @@
    "root": "<root>/.claude/worktrees/i0001-02-02",
    "project": "",
    "kind": "worktree"
+  },
+  {
+   "name": "i0001-02-04",
+   "root": "<root>/.claude/worktrees/i0001-02-04",
+   "project": "",
+   "kind": "worktree"
   }
  ],
  "projects": [],
@@ -50,7 +56,7 @@
       "match": "Write|Edit|NotebookEdit",
       "kind": "glob",
       "written": "*/.ccnavi/*",
-      "pattern": "^(?s:(?>.*?[///]/.ccnavi[///]).*)/Z",
+      "pattern": "(?s:(?>.*?[///]/.ccnavi[///]).*)/Z",
       "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。"
      }
     ],
@@ -180,7 +186,7 @@
       "match": "Write|Edit|NotebookEdit",
       "kind": "glob",
       "written": "*/.ccnavi/*",
-      "pattern": "^(?s:(?>.*?[///]/.ccnavi[///]).*)/Z",
+      "pattern": "(?s:(?>.*?[///]/.ccnavi[///]).*)/Z",
       "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。"
      }
     ],
@@ -224,7 +230,7 @@
       "kind": "deleted_over",
       "value": 3,
       "points": 20,
-      "message": "削除したファイルが多い"
+      "message": "消したファイルが多い"
      }
     ],
     "fallback": "",
@@ -321,7 +327,7 @@
    "title": "親",
    "project": "",
    "issue": null,
-   "mr": 1,
+   "mr": null,
    "branch": "i0001",
    "remote": {
     "branch": "i0001",
@@ -339,7 +345,7 @@
    "blocked": "",
    "copy": {
     "status": "open",
-    "approved_at": "2026-10-19T16:45:39+00:00",
+    "approved_at": "2026-09-13T13:50:21+0000",
     "approved_from": "commit",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md"
    },
@@ -348,30 +354,14 @@
     "path": "<root>/.claude/worktrees/i0001",
     "project": ""
    },
-   "started_at": "2026-10-19T16:45:39+0000",
+   "started_at": "",
    "completed_at": "",
-   "base_sha": "5d06d620b82f37ffda48b2ca61c91a31e60a641c",
+   "base_sha": "",
    "merged_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
-   "in_progress": true,
-   "seen_in": [
-    {
-     "tree": "i0001",
-     "state": "doing",
-     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md"
-    },
-    {
-     "tree": "i0001-01-01",
-     "state": "doing",
-     "path": "<root>/.claude/worktrees/i0001-01-01/.ccnavi/approved/doing/i0001.md"
-    },
-    {
-     "tree": "i0001-02-02",
-     "state": "doing",
-     "path": "<root>/.claude/worktrees/i0001-02-02/.ccnavi/approved/doing/i0001.md"
-    }
-   ],
+   "in_progress": false,
+   "seen_in": [],
    "scattered": [],
    "flow": null,
    "risk": null,
@@ -400,7 +390,7 @@
    "blocked": "",
    "copy": {
     "status": "closed",
-    "approved_at": "2026-10-19T16:45:39+00:00",
+    "approved_at": "2026-09-13T13:50:22+0000",
     "approved_from": "commit",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-01-01.md"
    },
@@ -409,41 +399,38 @@
     "path": "<root>/.claude/worktrees/i0001-01-01",
     "project": ""
    },
-   "started_at": "2026-10-19T16:45:39+0000",
-   "completed_at": "2026-10-19T16:45:39+0000",
-   "base_sha": "5d06d620b82f37ffda48b2ca61c91a31e60a641c",
-   "merged_sha": "cff86220b85228a070fde0fff368ddf84c9d91c9",
+   "started_at": "2026-09-13T13:50:22+0000",
+   "completed_at": "2026-09-13T13:50:22+0000",
+   "base_sha": "e5b468badbc7004f744ee323f41c24cb3d36baf8",
+   "merged_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
    "in_progress": false,
-   "seen_in": [
-    {
-     "tree": "i0001-01-01",
-     "state": "doing",
-     "path": "<root>/.claude/worktrees/i0001-01-01/.ccnavi/approved/doing/i0001-01-01.md"
-    },
-    {
-     "tree": "i0001",
-     "state": "done",
-     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-01-01.md"
-    },
-    {
-     "tree": "i0001-02-02",
-     "state": "done",
-     "path": "<root>/.claude/worktrees/i0001-02-02/.ccnavi/approved/done/i0001-01-01.md"
-    }
-   ],
+   "seen_in": [],
    "scattered": [],
-   "flow": null,
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01-01.yml",
+    "rel": ".ccnavi/approved/flows/i0001-01-01.yml",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": true,
+    "linked": false,
+    "locked": false,
+    "draft": {
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-01-01.yml",
+     "rel": "wip/proposals/flows/i0001-01-01.yml",
+     "exists": false,
+     "linked": false
+    }
+   },
    "risk": {
     "points": 0,
     "level": "LOW",
     "hits": [],
     "unmeasured": [],
-    "head": "cff86220b85228a070fde0fff368ddf84c9d91c9",
-    "base": "5d06d620b82f37ffda48b2ca61c91a31e60a641c",
-    "at": "2026-10-19T16:45:39+0000",
-    "summary": "1 ファイル、+1 -0 行、削除したファイル 0"
+    "head": "596e9f5ea27eec025c386e28a7fb70f44182c0fb",
+    "base": "e5b468badbc7004f744ee323f41c24cb3d36baf8",
+    "at": "2026-09-13T13:50:22+0000",
+    "summary": "1 ファイル、+1 -0 行、消したファイル 0"
    },
    "judge": null,
    "issues": [],
@@ -470,7 +457,7 @@
    "blocked": "",
    "copy": {
     "status": "open",
-    "approved_at": "2026-10-19T16:45:39+00:00",
+    "approved_at": "2026-09-13T13:50:22+0000",
     "approved_from": "commit",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001-02-02.md"
    },
@@ -479,25 +466,14 @@
     "path": "<root>/.claude/worktrees/i0001-02-02",
     "project": ""
    },
-   "started_at": "2026-10-19T16:45:39+0000",
+   "started_at": "2026-09-13T13:50:22+0000",
    "completed_at": "",
-   "base_sha": "aaa438c6b61e320cbc140f6a187c88c2959827b6",
+   "base_sha": "7b48d1c301419efae9ea26026e061fb329be1b0e",
    "merged_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
    "in_progress": true,
-   "seen_in": [
-    {
-     "tree": "i0001",
-     "state": "doing",
-     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001-02-02.md"
-    },
-    {
-     "tree": "i0001-02-02",
-     "state": "doing",
-     "path": "<root>/.claude/worktrees/i0001-02-02/.ccnavi/approved/doing/i0001-02-02.md"
-    }
-   ],
+   "seen_in": [],
    "scattered": [],
    "flow": {
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02-02.yml",
@@ -578,7 +554,6 @@
     "exists": false,
     "linked": false,
     "locked": false,
-    "lock_kind": null,
     "draft": {
      "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-03.yml",
      "rel": "wip/proposals/flows/i0001-02-03.yml",
@@ -590,6 +565,134 @@
    "judge": null,
    "issues": [],
    "attention": true
+  },
+  {
+   "ticket": "i0001-02-04",
+   "parent": "i0001",
+   "phase": 2,
+   "title": "子 i0001-02-04",
+   "project": "",
+   "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
+   "predecessors": [],
+   "predecessors_unmet": [],
+   "human_review": {
+    "required": true,
+    "reason": "t"
+   },
+   "proposal": {
+    "state": "review",
+    "tree": "i0001",
+    "tree_root": "<root>/.claude/worktrees/i0001",
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md",
+    "has_plan": false
+   },
+   "template_draft": false,
+   "blocked": "",
+   "copy": {
+    "status": "review",
+    "approved_at": "2026-09-13T13:50:22+0000",
+    "approved_from": "commit",
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md"
+   },
+   "worktree": {
+    "exists": true,
+    "path": "<root>/.claude/worktrees/i0001-02-04",
+    "project": ""
+   },
+   "started_at": "2026-09-13T13:50:22+0000",
+   "completed_at": "2026-09-13T13:50:23+0000",
+   "base_sha": "7b48d1c301419efae9ea26026e061fb329be1b0e",
+   "merged_sha": "",
+   "cancelled_at": "",
+   "cancel_reason": "",
+   "in_progress": false,
+   "seen_in": [
+    {
+     "tree": "i0001",
+     "state": "review",
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md"
+    },
+    {
+     "tree": "i0001-02-04",
+     "state": "review",
+     "path": "<root>/.claude/worktrees/i0001-02-04/wip/proposals/review/i0001-02-04.md"
+    }
+   ],
+   "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02-04.yml",
+    "rel": ".ccnavi/approved/flows/i0001-02-04.yml",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": false,
+    "linked": false,
+    "locked": false,
+    "draft": {
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-04.yml",
+     "rel": "wip/proposals/flows/i0001-02-04.yml",
+     "exists": false,
+     "linked": false
+    }
+   },
+   "risk": {
+    "points": 0,
+    "level": "LOW",
+    "hits": [],
+    "unmeasured": [],
+    "head": "9c1f2e3d4b5a69788796a5b4c3d2e1f0a9b8c7d6",
+    "base": "7b48d1c301419efae9ea26026e061fb329be1b0e",
+    "at": "2026-09-13T13:50:23+0000",
+    "summary": "1 ファイル、+2 -0 行、消したファイル 0"
+   },
+   "judge": null,
+   "issues": [],
+   "attention": false
+  },
+  {
+   "ticket": "i0001-02-05",
+   "parent": "i0001",
+   "phase": 2,
+   "title": "子 i0001-02-05",
+   "project": "",
+   "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
+   "predecessors": [],
+   "predecessors_unmet": [],
+   "human_review": {
+    "required": true,
+    "reason": "t"
+   },
+   "proposal": null,
+   "template_draft": false,
+   "blocked": "",
+   "copy": {
+    "status": "closed",
+    "approved_at": "2026-09-13T13:50:22+0000",
+    "approved_from": "commit",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-02-05.md"
+   },
+   "worktree": {
+    "exists": false,
+    "path": "<root>/.claude/worktrees/i0001-02-05"
+   },
+   "started_at": "",
+   "completed_at": "",
+   "base_sha": "",
+   "merged_sha": "",
+   "cancelled_at": "2026-09-13T13:50:24+0000",
+   "cancel_reason": "やめた",
+   "in_progress": false,
+   "seen_in": [],
+   "scattered": [],
+   "flow": null,
+   "risk": null,
+   "judge": null,
+   "issues": [],
+   "attention": false
   }
  ],
  "parents": [
@@ -636,10 +739,10 @@
       "level": "LOW",
       "hits": [],
       "unmeasured": [],
-      "head": "cff86220b85228a070fde0fff368ddf84c9d91c9",
-      "base": "5d06d620b82f37ffda48b2ca61c91a31e60a641c",
-      "at": "2026-10-19T16:45:39+0000",
-      "summary": "1 ファイル、+1 -0 行、削除したファイル 0"
+      "head": "596e9f5ea27eec025c386e28a7fb70f44182c0fb",
+      "base": "e5b468badbc7004f744ee323f41c24cb3d36baf8",
+      "at": "2026-09-13T13:50:22+0000",
+      "summary": "1 ファイル、+1 -0 行、消したファイル 0"
      },
      "risk_escalates": false,
      "risk_line": "リスク: 0 (LOW)",
@@ -652,10 +755,14 @@
      "label": "2（設計）",
      "state": "active",
      "tickets": [
-      "i0001-02-02"
+      "i0001-02-02",
+      "i0001-02-04",
+      "i0001-02-05"
      ],
      "states": {
-      "i0001-02-02": "doing"
+      "i0001-02-02": "doing",
+      "i0001-02-04": "review",
+      "i0001-02-05": "cancelled"
      },
      "marks": {},
      "review_required": true,
