@@ -13,6 +13,7 @@
 
 - sh は Windows (Git Bash / WSL)・Linux・macOS のどれでも動くように書く
 - パスと名前は、どの機械でも大文字小文字を区別せず比べる（同じ綴り違いは同じものとして、両立させない）。`os.path.normcase`を単独で使わず、`pathcase.fold`を通す。決まりは `docs/claude/environment.md`
+- Python の全件テストは `discover -s tests` の 1 本で回さない。グループに分けて回すか、`uv run python -m tests`（モジュールごとに別プロセスで同時に回す）を使う。1 本で回すと数十分かかり、時間の上限で途中で打ち切られて結果が残らない。グループの決め方は `.claude/skills/commit/references/test-groups.md`
 - ccnavi の使い方に関わる考え方と決まり（ワークツリー・git の入口・下書きの置き場・サブエージェントへの委任・合意が要る変更の範囲・保護対象の直し方）は `.ccnavi/CCNAVI.md` に書く。セッション開始時に ccnavi がそれを渡すので、ここには書かない。ccnavi の振る舞いが変わったら CCNAVI.md を直す
 
 ## 詳細

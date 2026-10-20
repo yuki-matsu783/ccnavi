@@ -23,8 +23,10 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, d
 
 ```sh
 uv run python -m unittest discover -s tests/core -t .    # 1 グループ
-uv run python -m unittest discover -s tests -t .         # 全件
+uv run python -m unittest discover -s tests -t .         # 全件（1 本。数十分かかるので使わない。下記）
 ```
+
+**全件を `discover -s tests` の 1 本で回さない。** 数十分かかり、時間の上限（セッションの 30 分など）で途中で打ち切られて、結果が残らない。グループごとに分けて回すか、下の `python -m tests` を使う。分けて回すときは、グループごとに別のプロセスで同時に走らせ、それぞれの終了コードを残す。
 
 複数のグループは 1 つずつ続けて回す（`discover -s` は 1 か所しか取らない）。
 時間の目安は並行セッションがあると数倍になる。続けて回すと長いので、全件は下の `python -m tests`（同時実行）を勧める。
