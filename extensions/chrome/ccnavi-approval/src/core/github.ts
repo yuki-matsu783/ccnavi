@@ -423,7 +423,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
   return out;
 }
 
-// ---- 書き込みと、取り下げのための履歴・MR の Approve・PAT の期限 ----------------------
+// ---- 書き込みと、書いた後の確かめ・MR の Approve・PAT の期限 ----------------------
 
 /** 期限のヘッダの表記（`2026-12-31 00:00:00 UTC`・`2026-12-31 09:00:00 +0900`）を ISO にする。読めなければ空 */
 export function parseExpiration(text: string): string {
@@ -483,69 +483,6 @@ export async function createCommit(
   const data = await graphql(client, CREATE_COMMIT, { input });
   const oid = (data.createCommitOnBranch as { commit?: { oid?: unknown } } | undefined)?.commit?.oid;
   return checkOid(oid);
-}
-
-export interface ApprovalCommit {
-  readonly commit: string;
-  readonly parent: string;
-}
-
-/** 1 回の取り下げで履歴を遡る上限（1 ページのコミットの数とページの数） */
-const HISTORY_PAGE = 30;
-const HISTORY_PAGES = 3;
-/** first-parent の鎖を確かめるのに読む祖先の数 */
-const CHAIN_DEPTH = 100;
-
-const HISTORY = `query($owner: String!, $name: String!, $oid: GitObjectID!) {
-  repository(owner: $owner, name: $name) {
-    object(oid: $oid) { ... on Commit { history(first: ${CHAIN_DEPTH}) { nodes { oid parents(first: 1) { nodes { oid } } } } } }
-  }
-}`;
-
-/** `sha` から最初の親を辿った鎖（`CHAIN_DEPTH` の祖先の中で辿れたところまで） */
-export async function firstParentChain(client: Client, owner: string, repo: string, sha: string): Promise<Set<string>> {
-  const data = await graphql(client, HISTORY, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), oid: checkOid(sha) });
-  const nodes =
-    ((data.repository as { object?: { history?: { nodes?: { oid?: unknown; parents?: { nodes?: { oid?: unknown }[] } }[] } } } | null)?.object?.history
-      ?.nodes ?? []);
-  const first = new Map<string, string>();
-  for (const n of nodes) {
-    if (typeof n.oid !== "string") continue;
-    const p = n.parents?.nodes?.[0]?.oid;
-    first.set(n.oid, typeof p === "string" ? p : "");
-  }
-  const chain = new Set<string>();
-  let at = sha;
-  while (at && first.has(at) && !chain.has(at)) {
-    chain.add(at);
-    at = first.get(at) as string;
-  }
-  return chain;
-}
-
-/**
- * 承認コミット: `sha` から遡って `path`（`doing/<識別子>.md`）を最後に変えたコミットが、
- * 最初の親に `path` が無く自分には在る（足した）コミットで、親が 1 つで、`sha` の first-parent の鎖の上に
- * あるときだけ、そのコミットと親を返す。どれかを確かめられなければ null（取り下げを出さない）。
- *
- * 「足した」はコミットの変更の一覧（`files` の `status`）に頼らない。GitHub は承認コミット（提案の削除と
- * 承認済みのチケットの追加）を `renamed` と返すことがあり、一覧は 300 件で切れるため。両方の木で `path` を引いて比べる。
- * 一覧（`GET /commits?path=`）は `git log -- path` の簡略化で、merge や別の枝のコミットも出うる。
- */
-export async function approvalCommit(client: Client, owner: string, repo: string, sha: string, path: string): Promise<ApprovalCommit | null> {
-  const q = `?sha=${checkOid(sha)}&path=${encodeURIComponent(checkPath(path))}&per_page=${HISTORY_PAGE}`;
-  const { items } = await restPages(client, `${repoPath(owner, repo)}/commits${q}`, HISTORY_PAGES);
-  const newest = items[0] as { sha?: unknown; parents?: { sha?: unknown }[] } | undefined;
-  if (!newest) return null;
-  const commit = checkOid(newest.sha);
-  const parents = Array.isArray(newest.parents) ? newest.parents : [];
-  if (parents.length !== 1) return null;
-  const parent = checkOid(parents[0].sha);
-  const here = await pathObjects(client, owner, repo, commit, [path]);
-  const before = await pathObjects(client, owner, repo, parent, [path]);
-  if (here[path]?.type !== "blob" || before[path] !== null) return null;
-  const chain = await firstParentChain(client, owner, repo, sha);
-  return chain.has(commit) ? { commit, parent } : null;
 }
 
 /** コミットの親（書いた後の確かめ。応答だけが届かなかったとき、新しい先頭が自分の書いたものかを見る） */

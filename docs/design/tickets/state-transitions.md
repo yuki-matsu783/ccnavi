@@ -41,8 +41,10 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`ccnavi-user-close-early.sh`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
 | `review` → `done` | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh` | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |
 | 無し → `doing`（続きの子） | ユーザが `decide` で選ぶ | レビューで指摘が残った（9.10）。同じフェーズの番号、範囲は見た子の和 | `followup_of`（トップレベルの欄。ccnavi が新しく作るチケットに書く） |
-| `doing` → `todo`（取り下げ） | Chrome 拡張（ユーザ） | 着手前の新規の承認。`doing/` の中身が承認コミットの親の提案とバイト単位で同じ。子もマーカーも無く、続きの子でない。承認の前に計画編集タブ（`--plan-order --write`）か `--fill-phases` で書き換えた提案は、書き換えがコミットされないまま承認されるので取り下げられない。違いが `plan:` / `feedback:` / `phases:`（子は `phase:` か `predecessors:`）の値だけなら、文面が `ccnavi-ticket.sh cancel` で取り消して出し直すよう案内する。識別子と `phase:` を付け替えた子は、承認コミットの親に同じ識別子の提案が無いので、案内は出ずに止まる | ―（承認コミットの親の提案のバイト列を戻す） |
 | `done` → `doing` | ユーザが hook の外で動かす | エージェントは `Write` でもシェルでも止まる。再開の意図がレビューのやり直しなら、そのフェーズのマーカーも手で消す | ― |
+
+承認を取り下げて `todo/` に戻す操作は無い（Chrome 拡張にも置かない）。承認した子は `cancel --reason` で取り消し、
+新しい連番の子として出し直す。承認した親は、中身を直すなら改版し、やめるなら `cancel` する。
 
 スクリプトは置き場を動かして欄の行だけを書き換える。本文とユーザの書いたコメントは保つ（承認は
 中身を変えずに動かすだけ）。コミットは親がする。`start` と `finish` と `cancel` は

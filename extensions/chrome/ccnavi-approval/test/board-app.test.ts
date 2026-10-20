@@ -64,7 +64,7 @@ afterEach(async () => {
 const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 7, extraBranches: [], project: "", workspace: "" };
 const KEY = "github.com/acme/widgets";
 
-/** 書くボタンがひととおり出る親子のチケット（承認・取り下げ・レビュー済み） */
+/** 書くボタンがひととおり出る親子のチケット（承認・レビュー済み） */
 function writable(name: string): FamilyBoard {
   return {
     family: { name, title: `見本 ${name}`, family: name },
@@ -78,7 +78,6 @@ function writable(name: string): FamilyBoard {
       digest: "0123456789abcdef",
       only: null,
       write: { allowed: true, reason: "" },
-      withdrawable: [{ ticket: name, title: "親", problems: [] }],
       rejected: [],
       problems: [],
     },
@@ -102,7 +101,6 @@ function board(recentDays = 7): RepoBoard {
 const pressed: string[] = [];
 const actions: Actions = {
   approve: (_r, f) => void pressed.push(`approve ${f.family.name}`),
-  withdraw: (_r, f, t) => void pressed.push(`withdraw ${f.family.name} ${t}`),
   review: (_r, f, n) => void pressed.push(`review ${f.family.name} ${n}`),
   loadIssues: () => void pressed.push("issues"),
   start: (_r, issue) => void pressed.push(`start ${issue.number}`),
@@ -173,7 +171,7 @@ test("CX-T226 書く操作の最中は、欄のボタン（button.action）を�
   assert.equal(actionButtons().length, doc.querySelectorAll("main button").length);
   assert.deepEqual(
     actionButtons().map((b) => b.dataset.action),
-    ["recent-days", "approve", "withdraw", "review", "dismiss", "issues"],
+    ["recent-days", "approve", "review", "dismiss", "issues"],
   );
   assert.ok(actionButtons().every((b) => !b.disabled));
   await f.set({ busy: true, state: "writing" });
@@ -182,7 +180,7 @@ test("CX-T226 書く操作の最中は、欄のボタン（button.action）を�
   await f.set({ sections: sections({ ...all, issues: { list: [{ number: 12, title: "題", url: "https://example.test/12" }], error: "" } }) });
   assert.deepEqual(
     actionButtons().map((b) => b.dataset.action),
-    ["recent-days", "approve", "withdraw", "review", "dismiss", "start"],
+    ["recent-days", "approve", "review", "dismiss", "start"],
   );
   assert.ok(actionButtons().every((b) => b.disabled));
   // 書き終えて読み直しが始まるまで（busy は外れたが state は writing）も押せない
@@ -195,7 +193,7 @@ test("CX-T226 書く操作の最中は、欄のボタン（button.action）を�
   assert.equal(doc.querySelectorAll("header.top button.action").length, 0);
   // 押せば渡した操作を呼ぶ
   for (const b of actionButtons()) await act(async () => b.click());
-  assert.deepEqual(pressed, ["days 7", "approve i0001", "withdraw i0001 i0001", "review i0001 1", "dismiss i0002", "start 12"]);
+  assert.deepEqual(pressed, ["days 7", "approve i0001", "review i0001 1", "dismiss i0002", "start 12"]);
 });
 
 test("CX-T227 直近の日数の入力欄は、自動の読み直しで欄を描き直しても、入力中の値を消さない", async () => {

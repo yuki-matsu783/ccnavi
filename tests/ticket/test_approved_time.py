@@ -64,14 +64,14 @@ class ApprovedTimeTest(PhaseHarness):
         copy = self.board_copy("i0001-01-01")
         self.assertEqual(copy["approved_from"], approval_times.APPROVED_FROM_COMMIT)
 
-    def test_a_reapproval_after_a_withdrawal_reads_the_commit_time(self):
-        """取り下げのあとに手で動かして承認し直したら、コミットの時刻を読む。"""
+    def test_a_reapproval_after_a_removal_reads_the_commit_time(self):
+        """承認済みチケットを消したあとに手で動かして承認し直したら、コミットの時刻を読む。"""
         self.family(plan=["research"])
         text_path = os.path.join(self.approved, "doing", "i0001.md")
         with open(text_path, encoding="utf-8") as f:
             text = f.read()
         os.remove(text_path)
-        self.commit_parent("withdrawn")
+        self.commit_parent("removed")
         self.move_by_hand("i0001", text)
         when = git(self.parent_tree, "log", "-1", "--format=%cI").strip()
         copy = self.board_copy("i0001")

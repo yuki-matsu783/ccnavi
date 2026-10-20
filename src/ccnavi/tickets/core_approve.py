@@ -24,7 +24,7 @@ from . import (
 )
 
 # ボードの承認（`--agree --yes`）が通らなかった根拠の種別。付録 A の `CORE_APPROVE_*`。
-# 確認（`CORE_CONFIRM_*`）・取り下げ（`CORE_WITHDRAW_*`）と同じく、文面の頭に
+# 確認（`CORE_CONFIRM_*`）と同じく、文面の頭に
 # `[<コード>]` で載せる。
 # `--digest` が無い。
 CODE_APPROVE_NO_DIGEST = "CORE_APPROVE_NO_DIGEST"

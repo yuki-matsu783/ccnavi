@@ -5,7 +5,7 @@
  * - 拡張のページの Web Worker で Pyodide が MV3 の CSP（'wasm-unsafe-eval' だけ）の下で起動し、ccnavi を import できる
  * - 設定画面で PAT とリポジトリを登録し、ボードが描ける
  * - 悪意のある Markdown を描いても、承認しても何も動かない
- * - ボードから承認と取り下げを書く（`createCommitOnBranch` の 1 コミット）
+ * - ボードから承認を書く（`createCommitOnBranch` の 1 コミット）
  * - 依頼済みのフェーズに MR のスレッドを出し（悪意のある本文でも何も動かず、隠れない）、
  *   ボードからレビュー済みのマーカーを書く
  * - service worker が PAT の期限のヘッダを CORS に公開されていなくても読み、ボードの帯とバッジで知らせる（模擬のホストで）
@@ -194,24 +194,8 @@ test("CX-T075 ボードで承認すると、親のブランチへ 1 コミット
   const files = mock.files("i0001");
   assert.ok(!("wip/proposals/todo/i0001.md" in files));
   assert.equal(files[".ccnavi/approved/doing/i0001.md"], proposal);
-  // 描き直したボード: i0001 は承認待ちから消え、作業中の承認済みチケットに出る
+  // 描き直したボード: i0001 は承認待ちから消える
   assert.equal(await page.locator('[data-family="i0001"] .entry').count(), 0);
-  assert.equal(await page.locator('[data-family="i0001"] .approved-item[data-ticket="i0001"]').count(), 1);
-  await page.close();
-});
-
-test("CX-T076 着手前で子の無い承認は、ボードから取り下げられる（承認コミットの親の提案に戻す）", async () => {
-  const original = fixture().i0001.files["wip/proposals/todo/i0001.md"];
-  // 開発者が子の提案を片付けた（子の提案があれば取り下げは出さない）
-  mock.push("i0001", { "wip/proposals/todo/i0001-01-01.md": null }, "子の提案を片付ける");
-  const page = await openBoard();
-  const said = await press(page, '[data-family="i0001"] .approved-item[data-ticket="i0001"] button[data-action=withdraw]');
-  assert.match(said, /^written: 取り下げを反映しました/);
-  const files = mock.files("i0001");
-  assert.equal(files["wip/proposals/todo/i0001.md"], original);
-  assert.ok(!(".ccnavi/approved/doing/i0001.md" in files));
-  // 取り下げた提案はまた承認待ちに出る
-  assert.equal(await page.locator('[data-family="i0001"] .entry[data-ticket="i0001"]').count(), 1);
   await page.close();
 });
 

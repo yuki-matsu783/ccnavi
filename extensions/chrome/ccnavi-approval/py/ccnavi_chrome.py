@@ -6,9 +6,9 @@
 互換の比べも Python が出し、拡張（TS）は並べるだけ。TS で判定し直すと、hook・lint と答えが
 2 か所に分かれるため。
 
-判定のコア（`ccnavi.tickets.core`）の `plan`・`withdraw`・`confirm` も呼べる。どれも書くもの
+判定のコア（`ccnavi.tickets.core`）の `plan`・`confirm` も呼べる。どれも書くもの
 （Changes）を値で返すだけで、ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。
-拡張は `plan`（承認）・`withdraw`（取り下げ）・`confirm`（レビュー済み）の答えを、親のブランチへの
+拡張は `plan`（承認）・`confirm`（レビュー済み）の答えを、親のブランチへの
 1 コミットにして書く。
 通らなかった答えは、理由コード（付録 A の `CORE_*`）を鍵 `code` に持つ（通れば null）。
 拡張はこの鍵で分岐する。
@@ -22,7 +22,7 @@
 - 判定の入力に読めない（バイナリの）ファイルがあれば、何も判定せず「決まらない」で止める
   （取っていないファイルと同じく、無いとも空とも読ませない）
 
-書く操作（`plan`・`withdraw`）は、同梱の互換の版が統合先の `CCNAVI_COMPAT` と違えば受けない。
+書く操作（`plan`・`confirm`）は、同梱の互換の版が統合先の `CCNAVI_COMPAT` と違えば受けない。
 互換の違う判定をリモートに乗せると、手元で判定し直したときに答えが分かれるため。
 書く先は親チケットのブランチ `P` だけで、予約の名前・統合先の名前は受けない。
 
@@ -681,7 +681,6 @@ def _op_board(req: dict, root: str) -> dict:
             "allowed": not _write_refusal(snap, family),
             "reason": _write_refusal(snap, family),
         },
-        "withdrawable": _withdrawable(req, root, place, ident),
         # レビュー済みを付けられる候補。
         # 通るかは `confirm` がホストから取得した結果で決める
         "reviewable": _reviewable(root, place, ident),
@@ -741,7 +740,7 @@ def _write_refusal(snap: dict, family: str) -> str:
     """
     compat = _compat(snap)
     if not compat["same"]:
-        return f"{compat['message']}。表示のみとし、承認と取り下げのボタンは表示しません"
+        return f"{compat['message']}。表示のみとし、承認のボタンは表示しません"
     folded = family.casefold()
     if (
         folded in ticket_ids.RESERVED_BRANCH_IDS
@@ -750,18 +749,6 @@ def _write_refusal(snap: dict, family: str) -> str:
     ):
         return f"{family} は予約された名前か統合先の名前のため、Chrome からは書き込めません"
     return ""
-
-
-def _withdrawable(req: dict, root: str, place: dict, family: str) -> list[dict]:
-    """作業中のチケットごとの取り下げの可否。仮のツリーは組んである前提。`family` は識別子。"""
-    with _environ():
-        conf, _ = settings.load(root)
-        snapshot = core.read_fs(conf, root)
-        found = core.withdrawable(snapshot, family)
-    return [
-        {"ticket": ident, "title": title, "problems": [_relative(root, p) for p in problems]}
-        for ident, title, problems in found
-    ]
 
 
 def _refused(root: str, code: int, err: str) -> str:
@@ -951,30 +938,6 @@ def _op_plan(req: dict, root: str) -> dict:
             {"ticket": t.ticket, "problems": [_relative(root, str(p)) for p in complaints]}
             for t, complaints in verdict.rejected
         ],
-        **body,
-    }
-
-
-def _op_withdraw(req: dict, root: str) -> dict:
-    """承認の取り下げで書くもの。`prior` は識別子ごとの承認コミットの親の提案の本文。"""
-    snap, place, family, _ = _family_tree(req, root)
-    _writable(snap, family)
-    ids = req.get("ids")
-    prior = req.get("prior")
-    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
-        raise Refused("ids は識別子のリスト")
-    if not isinstance(prior, dict) or not all(isinstance(v, str) for v in prior.values()):
-        raise Refused("prior は識別子ごとの本文")
-    with _environ():
-        snapshot = _core_snapshot(req, root)
-        checked = core.withdraw(snapshot, ids, {k: v.encode("utf-8") for k, v in prior.items()})
-    body = _changes(root, checked.changes)
-    _one_branch(body, family)
-    return {
-        "family": family,
-        "problems": [_relative(root, p) for p in checked.problems],
-        # 通らなかった根拠の種別（`CORE_*`。文面の頭の `[<コード>]` と同じ）。通れば null
-        "code": checked.code or None,
         **body,
     }
 
@@ -1230,7 +1193,6 @@ _OPS = {
     "closure": _op_closure,
     "board": _op_board,
     "plan": _op_plan,
-    "withdraw": _op_withdraw,
     "confirm": _op_confirm,
     "compat": _op_compat,
     "start": _op_start,

@@ -1,5 +1,5 @@
 /**
- * Chrome からの承認と承認の取り下げ。
+ * Chrome からの承認とレビュー済み。
  *
  * 判定は Python（同梱の ccnavi）が出し、ここは Python が返した書くもの（Changes）を
  * 親のブランチ `P` への 1 コミットにして送るだけ。TS が判定を出すと手元と答えが 2 か所に分かれるため。流れは次のとおり。
@@ -12,18 +12,17 @@
  *    ダイジェストが同じなら新しい plan を書く。違えば「見直す」。3 周しても書けなければユーザの対応に切り替える
  * 5. 書いた後、新しい先頭の中身が書いたとおりか確かめる（blob の sha を突き合わせる）
  *
- * 取り下げも同じ流れで書く。見せたダイジェストは無いが、毎周 Python が条件を見直す。
  * レビュー済みも同じ流れで、毎周 MR のスレッドとレビューを読み直して Python の `confirm`
  * （手元の `ccnavi review confirm` と同じコア）に通るかを決めさせる。
  *
  * GitLab にも書く。GitLab の Commits API には比較つきの書き込みが無いので、事後確認と元に戻すコミット（revert）で守る: 書いた答えのコミットの親が読んだ先頭と違えば（間に別の書き込みが入った）、自分の書き込みの
  * 直前の状態で判定し直す。同じ書くものになれば、そのまま残す。違えば（結論が変わった）元に戻すコミットを積み、
  * 新しい先頭から読み直して再試行する。元に戻すコミットもさらに競合して 2 回で収まらなければ、止めてユーザの対応に切り替える（`attention`）。
- * 書き込みどうしの競合は検出しない。そのため、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に残りうる。
+ * 書き込みどうしの競合は検出しない。
  */
 import { APPROVE_DIGEST_CHANGED, APPROVE_LIST_CHANGED, py, PyError, tagged, type Actor, type ChangeRow, type PlanResult, type ReasonCode, type Written } from "./py.js";
 import type { RepoConfig } from "./settings.js";
-import { findPrior, MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
+import { MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
 import type { BlobText, FileAddition, PathObject, ReviewCopy } from "./github.js";
 import { askConfirm } from "./reviewed.js";
 import { underPlaces } from "./guard.js";
@@ -506,33 +505,6 @@ async function readOrMoved(repo: RepoConfig, family: string, deps: WriteDeps): P
     if (err instanceof MovedError) return null;
     throw err;
   }
-}
-
-/** 承認を取り下げる。着手前の新規の承認だけ。元の提案は承認コミットの親から戻す */
-export async function withdrawTicket(repo: RepoConfig, family: string, ident: string, deps: WriteDeps): Promise<Outcome> {
-  let actor: Actor;
-  try {
-    actor = await actorOf(deps, repo);
-  } catch (err) {
-    return { kind: "failed", message: (err as Error).message ?? String(err) };
-  }
-  return await writeLoop(repo, family, deps, "取り下げ直してください。", async (read, stamp) => {
-    const prior = await findPrior((op, args) => deps.call(op, [repo.owner, repo.repo, ...args]), read.place, read.head, ident);
-    const res = await py.withdraw(deps.py, {
-      snapshot: read.input,
-      family,
-      ids: [ident],
-      prior: prior === null ? {} : { [ident]: prior },
-      stamp,
-      actor,
-    });
-    if (res.problems.length > 0 || !res.changes) {
-      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || "取り下げる対象がありません", ...codeOf(res) } };
-    }
-    const rows = rowsOf(res, family, read);
-    if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };
-    return { kind: "rows", rows, message: commitMessage([ident], "の承認を取り下げ", "取り下げた", deps.version), lines: res.lines };
-  });
 }
 
 /**

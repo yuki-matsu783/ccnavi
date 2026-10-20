@@ -277,7 +277,7 @@ def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
     """提案に続きの子の目印（`followup_of`）があれば拒む。
 
     承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。続きの子の
-    目印は取り下げを止める。ユーザの判断（レビューの行き先）だけが残すもので、
+    目印は、ユーザの判断（レビューの行き先）だけが残すもので、
     提案に書かせると続きの子を装える。
     """
     if approval.FOLLOWUP_KEY not in t.raw:

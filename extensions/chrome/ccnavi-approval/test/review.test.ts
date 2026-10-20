@@ -1,5 +1,5 @@
 /**
- * 承認と取り下げを入れたときのレビューで直したものの回帰試験。
+ * 承認を入れたときのレビューで直したものの回帰試験。
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -13,7 +13,7 @@ import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo } from "../src/core/snapshot.js";
-import { approveFamily, commitMessage, withdrawTicket, type WriteDeps } from "../src/core/write.js";
+import { approveFamily, commitMessage, type WriteDeps } from "../src/core/write.js";
 import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { deps, hostCall, HOSTS, memoryCache, newStats } from "./helpers/host.js";
 import { blobSha, MockGitHub, TOKEN } from "./helpers/mock-github.js";
@@ -51,45 +51,6 @@ async function shown(d: WriteDeps, family = "i0001") {
   assert.ok(r?.digest, JSON.stringify(r ?? b.error));
   return { ids: (r.batch ?? []).map((e) => e.ticket), digest: r.digest, only: r.only ?? null };
 }
-
-test("CX-T118 取り下げ: GitHub が承認コミットを renamed で返しても、変更の一覧が切れていても、木を比べて「足した」と分かる", async () => {
-  const mock = new MockGitHub(parentOnly());
-  const d = depsFor(mock);
-  assert.equal((await approveFamily(REPO, "i0001", await shown(d), d)).kind, "written");
-  const approval = mock.head("i0001") as string;
-  const detail = (await mock.fetch(`https://api.github.com/repos/acme/widgets/commits/${approval}`, { method: "GET", headers: { Authorization: `Bearer ${TOKEN}` } }).then((r) => r.json())) as {
-    files: { filename: string; status: string; previous_filename?: string }[];
-  };
-  assert.deepEqual(detail.files.find((f) => f.filename === DOING), { filename: DOING, status: "renamed", previous_filename: TODO });
-  mock.filesLimit = 1;
-  const out = await withdrawTicket(REPO, "i0001", "i0001", d);
-  assert.equal(out.kind, "written", JSON.stringify(out));
-  assert.equal(mock.files("i0001")[TODO], parentOnly().i0001.files[TODO]);
-});
-
-test("CX-T119 取り下げ: 承認コミットが P の first-parent の鎖の上に無ければ（別の枝で承認して merge）出さない（決定 B）", async () => {
-  const mock = new MockGitHub(parentOnly());
-  const d = depsFor(mock);
-  // 承認した中身を作るだけのコピー
-  const copy = new MockGitHub(parentOnly());
-  const cd = depsFor(copy);
-  assert.equal((await approveFamily(REPO, "i0001", await shown(cd), cd)).kind, "written");
-  const approved = copy.files("i0001");
-  // 別の枝 side で承認して P に merge する。git log -- path は side のコミットを返す
-  mock.branch("side", "i0001");
-  mock.push("side", { [TODO]: null, [DOING]: approved[DOING] }, "side で承認");
-  mock.push("i0001", { "src/app.py": "print('p')\n" }, "P の上の別の変更");
-  mock.merge("i0001", "side");
-  const b = await collectRepo(REPO, d);
-  const w = b.families.find((x) => x.family.name === "i0001")?.result?.withdrawable ?? [];
-  assert.deepEqual(w.map((x) => x.ticket), ["i0001"]);
-  // 拡張が足す理由も、Python が同じ場合に返すのと同じコードを頭に載せる
-  assert.match(w[0].problems.join(" "), /^\[CORE_WITHDRAW_NO_PRIOR\] 承認コミット/);
-  const out = await withdrawTicket(REPO, "i0001", "i0001", d);
-  assert.equal(out.kind, "refused");
-  assert.equal(out.kind === "refused" && out.code, "CORE_WITHDRAW_NO_PRIOR");
-  assert.equal(mock.commitCalls.length, 0);
-});
 
 test("CX-T120 レート制限: Retry-After が短ければ 1 回待ち直し、長ければ原因を言う。GraphQL の RATE_LIMITED も原因を言う", async () => {
   const mock = new MockGitHub(fixture());
@@ -175,7 +136,7 @@ test("CX-T126 承認の画面: ccnavi の本文を承認のボタンの上に開
   const dom = new JSDOM("<!doctype html><body></body>");
   const doc = dom.window.document;
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);
-  renderBoard(doc, md, b, { approve: () => undefined, withdraw: () => undefined });
+  renderBoard(doc, md, b, { approve: () => undefined });
   const box = doc.querySelector('[data-family="i0001"]') as HTMLElement;
   const screen = box.querySelector("[data-testid=screen]") as HTMLElement;
   assert.ok(screen && !screen.closest("details"));

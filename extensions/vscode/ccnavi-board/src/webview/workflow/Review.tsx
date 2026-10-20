@@ -80,7 +80,7 @@ export function Review({ ticket, answer, onConfirm, onCancel, focus = true }: Re
         </>
       )}
       <p className="small" data-tour="review-note">
-        計画の値の中のコメントは消えます（値の外のコメントは残ります）。変更した提案はコミットされないまま承認されるので、承認したあとは取り下げられません（取り消して出し直します）。保存したら、承認はボードから開き直してください。
+        計画の値の中のコメントは消えます（値の外のコメントは残ります）。変更した提案はコミットされないまま承認されるので、承認したあとに直すときは、子は取り消して出し直し、親は改版するか取り消します。保存したら、承認はボードから開き直してください。
       </p>
       <DialogActions className="workflow-review-actions">
         <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>

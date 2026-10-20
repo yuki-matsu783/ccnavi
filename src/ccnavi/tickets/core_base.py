@@ -1,16 +1,16 @@
 """判定のコアの入力・判定・書き込み。手元と Chrome（Pyodide）で同じ判定を動かすため、
 入出力を分ける。
 
-承認・承認の取り下げ・レビュー済みを、同じ形の 3 段に分ける。
+承認とレビュー済みを、同じ形の 3 段に分ける。
 
-    Snapshot（入力）→ judge_approval / withdraw / confirm（判定）→ Changes（書くもの）→ Writer
+    Snapshot（入力）→ judge_approval / confirm（判定）→ Changes（書くもの）→ Writer
 
 - Reader: Snapshot の中身はファイルシステムから読む（Reader(FS)）。手元は
   作業ツリー、Chrome は API で読んだ中身を MEMFS に組んだ仮のツリー。
   core はブランチごとの blob の表（取っていないファイルを `NOT_FETCHED` にする形）を持たない
 - 判定: `judge_approval`（実行前チェックのモジュール `ccnavi.hook.judge` と
   紛れないように名前を変えた）は承認の対象と画面とダイジェストを返す。通らない理由を返す
-  `withdraw` と `confirm` は `core_withdraw` と `core_review` にある
+  `confirm` は `core_review` にある
 - Changes: 書き込みを値として並べたもの（`plan`）。書くときの失敗の仕方（止める・言って続ける）
   もつけてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを
   1 コミットにする
@@ -23,7 +23,7 @@
 そのまま通る。ここは入口と出口の形を揃えるだけで、判定は変えない。
 
 このモジュールは入力・判定・書き込みの共通部分だけを持つ。`confirm` の答え（`Checked`）と
-`reviewed_mark` も、`core_review` と `core_withdraw` の両方が使うのでここに置く。
+`reviewed_mark` もここに置く。
 他の `core_*` はこのモジュールを読み、
 `core` は全部を読んで名前を再エクスポートする（呼び出し側は `core.<名前>` のまま引く）。
 
@@ -331,7 +331,7 @@ def reviewed_mark(
 
 @dataclass
 class Checked:
-    """`confirm` と `withdraw` の答え。`problems` は標準エラーに出す文面（行のリスト）。
+    """`confirm` の答え。`problems` は標準エラーに出す文面（行のリスト）。
 
     通らなければ `changes` は None で、`code` に通らなかった根拠の種別（`CORE_*`）が入る。
     端末と Chrome の画面と試験が、文の言い回しではなく同じ材料で分岐できるようにするため。

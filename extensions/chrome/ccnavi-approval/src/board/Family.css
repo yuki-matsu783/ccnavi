@@ -13,7 +13,7 @@
 .family h4 { margin: 10px 0 4px; font-size: var(--font-lg); overflow-wrap: anywhere; }
 .family .empty { margin: 4px 0; }
 .family .problems { margin: 8px 0 4px; }
-.entry, .approved, .rejected { border-top: 1px solid var(--vscode-panel-border); margin-top: 8px; padding-top: 4px; }
+.entry, .rejected { border-top: 1px solid var(--vscode-panel-border); margin-top: 8px; padding-top: 4px; }
 .entry .path { margin: 0 0 4px; font-size: var(--font-sm); }
 .screen pre {
   margin: 0; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere;
@@ -23,10 +23,6 @@
 .actions { display: flex; flex-wrap: wrap; gap: var(--gap-3) var(--gap-4); align-items: center; margin: 8px 0; }
 .actions > button.action { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .actions .digest { font-family: var(--vscode-editor-font-family); font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
-.approved-item { margin: 4px 0; overflow-wrap: anywhere; }
-.approved-item > button.action { margin-left: 4px; vertical-align: middle; }
-/* 取り下げられない理由。カードの不備（`.card .issues`）と同じ警告の小さな字 */
-.why-not { list-style: none; margin: 2px 0 0; padding: 0 0 0 12px; font-size: var(--font-sm); color: var(--warn-text); }
 .rejected h4 { color: var(--error-text); }
 .rejected ul { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--warn-text); }
 .rejected li { overflow-wrap: anywhere; }

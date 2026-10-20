@@ -16,8 +16,8 @@
  * blob は sha で引き、キャッシュ（IndexedDB）にあれば読まない。判定はここでは出さない。
  */
 import type { PathObject, RecentRef, TreeEntry, BlobText } from "./github.js";
-import { BLOB_BATCH, LINK_MODE, type ApprovalCommit } from "./github.js";
-import { py, tagged, WITHDRAW_NO_PRIOR, type BoardResult, type Branch, type Compat, type Family, type Placement, type PyCall, type Snapshot, type Workspace } from "./py.js";
+import { BLOB_BATCH, LINK_MODE } from "./github.js";
+import { py, type BoardResult, type Branch, type Compat, type Family, type Placement, type PyCall, type Snapshot, type Workspace } from "./py.js";
 import { reviewPanels, type ReviewPanel } from "./reviewed.js";
 import type { RepoConfig } from "./settings.js";
 
@@ -338,7 +338,6 @@ async function familyBoard(
     }
     const input = await closureInput(family.name, reader, integration, place, deps, familyHints.get(hintKey(reader.repoConfig)));
     const board = await py.board(deps.py, input, family.name);
-    const result = await withdrawableHere(board, reader, place, family.name);
     const reviews = await reviewPanels(
       board.reviewable ?? [],
       deps.py,
@@ -346,47 +345,10 @@ async function familyBoard(
       { snapshot: input, family: family.name },
       deps.now(),
     );
-    return { family, result, error: "", reviews };
+    return { family, result: board, error: "", reviews };
   } catch (err) {
     return { family, result: null, error: (err as Error).message ?? String(err) };
   }
-}
-
-/**
- * 取り下げを出すのは、承認コミットを引けて、その親で提案を読めるときだけにする（取り下げを出せる場合を狭める条件）。
- * Python が理由を返さなかった承認済みのチケットでも、引けなければ理由を足す。
- */
-async function withdrawableHere(board: BoardResult, reader: Reader, place: Placement, family: string): Promise<BoardResult> {
-  const head = reader.branches[family]?.head;
-  if (!board.withdrawable || !head) return board;
-  const out = [];
-  for (const w of board.withdrawable) {
-    if (w.problems.length > 0) {
-      out.push(w);
-      continue;
-    }
-    const prior = await findPrior((op, args) => reader.call(op, ...args), place, head, w.ticket);
-    // Python の `withdraw` が同じ場合に返す理由と同じコードを載せる（押した後の答えと表記をそろえる）
-    const why = "承認コミット（親のブランチの first-parent の履歴で、この承認済みチケットを足したコミット）が見つからないか、そのコミットの親に提案がありません";
-    out.push(prior === null ? { ...w, problems: [tagged(WITHDRAW_NO_PRIOR, why)] } : w);
-  }
-  return { ...board, withdrawable: out };
-}
-
-type Ask = (op: string, args: readonly unknown[]) => Promise<unknown>;
-
-/** 承認コミットの親にあった提案の本文。引けなければ null */
-export async function findPrior(ask: Ask, place: Placement, head: string, ident: string): Promise<string | null> {
-  const doing = `${place.approved}/doing/${ident}.md`;
-  const todo = `${place.tickets}/todo/${ident}.md`;
-  const found = (await ask("approvalCommit", [head, doing])) as ApprovalCommit | null;
-  if (found === null) return null;
-  const objs = (await ask("pathObjects", [found.parent, [todo]])) as Record<string, PathObject | null>;
-  const obj = objs[todo];
-  if (!obj || obj.type !== "blob") return null;
-  const texts = (await ask("blobs", [[obj.oid]])) as Record<string, BlobText>;
-  const blob = texts[obj.oid];
-  return blob && !blob.binary && typeof blob.text === "string" ? blob.text : null;
 }
 
 export interface FamilyRead extends IntegrationRead {

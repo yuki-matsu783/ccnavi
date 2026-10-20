@@ -54,7 +54,7 @@ test("CX-T212 ボードの入力欄: リポジトリごとに出し、変える�
   const mk = (repo: string, recentDays: number): RepoBoard =>
     ({ repo: { host: "github.com", owner: "acme", repo, integration: "", recentDays, extraBranches: [], project: "", workspace: "" }, error: "取れなかった", families: [], candidates: [], missingExtras: [] }) as unknown as RepoBoard;
   const got: [string, string][] = [];
-  const actions = { approve() {}, withdraw() {}, setRecentDays: (b: RepoBoard, v: string) => void got.push([b.repo.repo, v]) };
+  const actions = { approve() {}, setRecentDays: (b: RepoBoard, v: string) => void got.push([b.repo.repo, v]) };
   // 2 つの欄は 1 回の描画で同じ文書に並べる（renderBoard を続けて呼ぶと前の欄は文書から外れる）
   const [a, b] = renderBoards(doc, md, [mk("a", 7), mk("b", 30)], actions);
   assert.equal(doc.querySelectorAll("form.recent-days input").length, 2);
@@ -67,5 +67,5 @@ test("CX-T212 ボードの入力欄: リポジトリごとに出し、変える�
   inputB.value = "5";
   b.querySelector<HTMLFormElement>("form.recent-days")!.dispatchEvent(new dom.window.Event("submit", { cancelable: true }));
   assert.deepEqual(got, [["b", "5"]]);
-  assert.equal(renderBoard(doc, md, mk("c", 7), { approve() {}, withdraw() {} }).querySelector("form.recent-days"), null);
+  assert.equal(renderBoard(doc, md, mk("c", 7), { approve() {} }).querySelector("form.recent-days"), null);
 });

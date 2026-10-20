@@ -118,7 +118,7 @@ def confirm(
         if problems:
             return core_base.refused(CODE_CONFIRM_REVIEW_OPEN, problems)
     stamp = snapshot.stamp or fsio.stamp()
-    # 経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形。
+    # 経路は Snapshot の経路（Chrome なら chrome）。
     actor = snapshot.actor
     with (
         fsio.staging() as stage,

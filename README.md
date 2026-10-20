@@ -1995,7 +1995,7 @@ ccnavi は、1 台の PC・1 つのセッションで完結する個人作業だ
    push が通らなければ戻して取り込み直し、もう 1 回だけ試す。2 回目も通らなければ戻して `ccnavi-sync.sh` を案内して終わる
 
 **承認者・レビュアーの操作は、作業者の環境に閉じ込めない。** Chrome 拡張は、承認者のブラウザとトークンだけで動き、親のブランチへ
-1 コミットとして承認・取り下げ・レビュー済みを書く（GitHub は `expectedHeadOid` で書く時点の先頭を確かめる）。VS Code のボードは、
+1 コミットとして承認・レビュー済みを書く（GitHub は `expectedHeadOid` で書く時点の先頭を確かめる）。VS Code のボードは、
 ユーザの VS Code が ccnavi の実行ファイルを呼び、端末の入力を要しない。どちらも、ほかの人が作業しているセッションへ文を送り込む手段は持たず、
 結果は次の `fetch` / `sync` で作業側に届く。拡張は表示と書き込みの入口で、判定のコアは hook と同じ ccnavi を使う。
 
@@ -2932,7 +2932,7 @@ ccnavi --version --json
 **互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
 sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたときに上げる。データの形（承認済みの置き場に置くものの並び、
-待ち方の置き場、取り下げの条件など）が変わるときも上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が
+待ち方の置き場など）が変わるときも上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が
 新しい形のデータを読み違えるため。フラグや欄を足すだけで、データの形も変わらないなら上げない（拡張は使う前に `flags` を見る）。
 レイヤーのファイルは頭の `version:` が書式の版を示し、読めない版は `--lint` が既に error を出すので、レイヤーに別の版は足さない。
 
@@ -3378,7 +3378,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/policy/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルのバックアップと復元 |
 | `src/ccnavi/policy/selfguard_targets.py` | 守る対象の一覧。設定ファイル・層の 3 本・実行ファイルと、ワークツリー側の写し |
 | `src/ccnavi/policy/selfguard_shell.py` | 守る対象へのシェルからの書き込みを止める組み込みのルール（正規表現と `add_rules`） |
-| `src/ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、承認・取り下げ・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、リスク、操作 |
+| `src/ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、承認・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、リスク、操作 |
 | `src/ccnavi/tickets/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
 | `src/ccnavi/tickets/ticket_model.py` | チケットの形。書式の定数・状態の名前・範囲の項・計画の項・待ち方と `Ticket` |
 | `src/ccnavi/tickets/ticket_ids.py` | 識別子とブランチ名の規則。issue から識別子を作る手順 |
@@ -3423,11 +3423,10 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/ops_stop.py` | Stop で `finish` の打ち忘れを促す判定と、基準点の確認（git の読み取り） |
 | `src/ccnavi/tickets/ops_stop_integrate.py` | Stop で、チケットに結び付かない直接作業が `integrate` まで進んでいないことを見つけ、打ち方を促す判定（統合先のツリーが綺麗でないときは促さず理由を言う） |
 | `src/ccnavi/tickets/ops_stop_request.py` | Stop でレビュー依頼までの道（`finish`・すべての子が合流済みかの確認・ELI5・`request`）の途中を見つけ、次の一手を促す判定 |
-| `src/ccnavi/tickets/core.py` | 承認・取り下げ・レビュー済みの判定のコアの入口。名前を束ね直すだけで、`entry/cli.py` と Chrome 拡張（Pyodide）はここを引く |
+| `src/ccnavi/tickets/core.py` | 承認・レビュー済みの判定のコアの入口。名前を束ね直すだけで、`entry/cli.py` と Chrome 拡張（Pyodide）はここを引く |
 | `src/ccnavi/tickets/core_base.py` | 判定のコアの共通部分。入力（`Snapshot`）・承認の判定（`judge_approval`）・書くもの（`Changes`）・ディスクへの書き込み |
 | `src/ccnavi/tickets/core_approve.py` | 判定のコアを通す手元の承認の入口（`user agree` の 4 つの枝） |
 | `src/ccnavi/tickets/core_review.py` | 判定のコアを通すレビュー済み（`review confirm`）の判定 |
-| `src/ccnavi/tickets/core_withdraw.py` | 判定のコアを通す承認の取り下げ |
 | `src/ccnavi/tickets/write_and_push.py` | write-and-push で sh が聞くこと。親子のチケットが write-and-push の対象か（`write-and-push family`）と、置き場の変更の分け方（`write-and-push sort`） |
 | `src/ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント |
 | `src/ccnavi/hook/post.py` | 実行後チェックの手順。作業ツリーの読み取り、前からあった変更の記録、復元 |

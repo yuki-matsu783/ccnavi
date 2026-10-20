@@ -1,10 +1,9 @@
 /**
- * Chrome からの承認と取り下げ。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * Chrome からの承認。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  *
  * - 1 コミットの組み立て（`createCommitOnBranch`、`expectedHeadOid` = 読んだ P の先頭）と、書いた後の確かめ
  * - 先頭が動いたら新しい Snapshot で判定と plan をやり直す。ダイジェストが同じなら見せ直さずに書き、違えば書かない
  * - 見せたダイジェストが違えば書かない。決まらない親子のチケット・版ずれでは書かない
- * - 取り下げ: 承認コミット（merge を飛ばす）の親の提案をそのまま戻す
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +14,7 @@ import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
-import { approveFamily, fileChanges, localStamp, MAX_ROUNDS, withdrawTicket, type WriteDeps } from "../src/core/write.js";
+import { approveFamily, fileChanges, localStamp, MAX_ROUNDS, type WriteDeps } from "../src/core/write.js";
 import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { deps, hostCall, memoryCache, newStats } from "./helpers/host.js";
 import { COMPAT } from "./helpers/compat.js";
@@ -46,13 +45,6 @@ function depsFor(mock: MockGitHub): WriteDeps {
 function world(branches: Record<string, FixtureBranch> = fixture()) {
   const mock = new MockGitHub(branches);
   return { mock, d: depsFor(mock) };
-}
-
-/** 子の提案の無い見本（親を取り下げられる形。子が無い） */
-function parentOnly(): Record<string, FixtureBranch> {
-  const f = fixture();
-  delete f.i0001.files["wip/proposals/todo/i0001-01-01.md"];
-  return f;
 }
 
 async function board(d: WriteDeps, repo: Partial<RepoConfig> = {}): Promise<RepoBoard> {
@@ -91,12 +83,9 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   assert.ok(!(WORKFLOW in files));
   // 統合先・ほかのブランチには書かない
   assert.ok(mock.commitCalls.every((c) => c.branch === "i0001"));
-  // 承認した後のボード: 承認待ちから消え、作業中の承認済みチケットとして出る。子の提案があるので
-  // 取り下げは出さない
+  // 承認した後のボード: 承認待ちから消える
   const after = (await board(d)).families.find((f) => f.family.name === "i0001")?.result;
   assert.deepEqual(after?.batch?.map((e) => e.ticket), []);
-  // 理由には押した後の答えと同じ表記でコードが載る
-  assert.deepEqual(after?.withdrawable?.map((w) => [w.ticket, w.problems]), [["i0001", ["[CORE_WITHDRAW_HAS_CHILDREN] todo/ に子の提案がある"]]]);
 });
 
 test("CX-T101 先頭が動いたら（expectedHeadOid の競合）新しい Snapshot で判定し直し、ダイジェストが同じなら見せ直さずに書く", async () => {
@@ -197,7 +186,7 @@ test("CX-T104 決まらない親子のチケットでは書かない（読めな
   assert.ok(rejected?.problems.some((p) => /i0009/.test(p) && /親のワークツリー（.claude\/worktrees\/i0009）がありません/.test(p)), JSON.stringify(r?.rejected));
 });
 
-test("CX-T105 互換の版が違えば承認も取り下げも書かない（7.3）。ボタンも出さない", async () => {
+test("CX-T105 互換の版が違えば承認を書かない（7.3）。ボタンも出さない", async () => {
   const { mock, d } = world(fixture(COMPAT + 1));
   const b = await board(d);
   const r = b.families.find((f) => f.family.name === "i0001")?.result;
@@ -206,45 +195,11 @@ test("CX-T105 互換の版が違えば承認も取り下げも書かない（7.3
   const out = await approveFamily(REPO, "i0001", shownOf(b, "i0001"), d);
   assert.equal(out.kind, "refused");
   assert.match(out.kind === "refused" ? out.message : "", /拡張を更新してください/);
-  const w = await withdrawTicket(REPO, "i0001", "i0001", d);
-  assert.equal(w.kind, "refused");
   assert.equal(mock.commitCalls.length, 0);
   const dom = new JSDOM("<!doctype html><body></body>");
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);
-  renderBoard(dom.window.document, md, b, { approve: () => undefined, withdraw: () => undefined });
+  renderBoard(dom.window.document, md, b, { approve: () => undefined });
   assert.equal(dom.window.document.querySelectorAll("button").length, 0);
-});
-
-test("CX-T106 取り下げ: 承認コミットの親の提案をバイト列のまま todo/ に戻し、doing/ を消す 1 コミット（待ち方のファイルは無い）", async () => {
-  const { mock, d } = world(parentOnly());
-  const original = mock.files("i0001")[TODO];
-  assert.equal((await approveFamily(REPO, "i0001", shownOf(await board(d), "i0001"), d)).kind, "written");
-  // 承認の後に関係の無い merge が積まれても、承認コミットを引ける
-  mock.merge("i0001", "feature-x");
-  const out = await withdrawTicket(REPO, "i0001", "i0001", d);
-  assert.equal(out.kind, "written", JSON.stringify(out));
-  const call = mock.commitCalls[mock.commitCalls.length - 1];
-  assert.equal(call.headline, `ccnavi: i0001 の承認を取り下げ（Chrome 拡張 ${VERSION}）`);
-  assert.deepEqual(call.deletions, [{ path: DOING }]);
-  const files = mock.files("i0001");
-  assert.equal(files[TODO], original);
-  assert.ok(!(DOING in files));
-  assert.ok(!(WORKFLOW in files));
-});
-
-test("CX-T107 取り下げ: 承認が merge で入った（親が 2 つのコミットでしか足していない）なら取り下げない", async () => {
-  const f = parentOnly();
-  const side = { ...f.i0001.files };
-  delete side[TODO];
-  side[DOING] = f.i0001.files[TODO];
-  f.side = { committedDate: "2026-09-01T00:00:00Z", files: side };
-  const { mock, d } = world(f);
-  mock.merge("i0001", "side");
-  mock.push("i0001", { [TODO]: null });
-  const out = await withdrawTicket(REPO, "i0001", "i0001", d);
-  assert.equal(out.kind, "refused", JSON.stringify(out));
-  assert.match(out.kind === "refused" ? out.message : "", /承認コミット/);
-  assert.equal(mock.commitCalls.length, 0);
 });
 
 test("CX-T108 書けたのに応答だけが返らなかったら、先頭が書いたとおりか確かめて書けたとする（2 度書かない）", async () => {
@@ -291,7 +246,7 @@ test("CX-T111 承認の画面（ボタンのある形）でも、悪意のある
   const doc = dom.window.document;
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);
   const pressed: string[] = [];
-  renderBoard(doc, md, b, { approve: (_, f) => pressed.push(`approve ${f.family.name}`), withdraw: () => undefined });
+  renderBoard(doc, md, b, { approve: (_, f) => pressed.push(`approve ${f.family.name}`) });
   const box = doc.querySelector('[data-family="i0002"]');
   assert.ok(box);
   assert.equal(box.querySelectorAll("script, img, svg, iframe, form, style, input").length, 0);

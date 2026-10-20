@@ -1,6 +1,6 @@
 # ccnavi 承認ボード（Chrome 拡張）
 
-承認者がブラウザと PAT だけで、リモートのブランチの承認待ちを見て、承認・承認の取り下げ・レビュー済みを親のブランチへ書き、
+承認者がブラウザと PAT だけで、リモートのブランチの承認待ちを見て、承認・レビュー済みを親のブランチへ書き、
 issue から親のブランチを始める拡張。GitHub と GitLab の、ワークスペースとプロジェクトのリポジトリを扱う。
 GitLab での ccnavi の書き込みどうしの競合の検出は、実際の GitLab で前提を確かめるまで未実装。
 
@@ -30,7 +30,7 @@ pnpm test       # 単体・Node の上の Pyodide での組み立て・手元の
                 # 判定のコアの見本 test/fixtures/core-scenarios.json は、リポジトリの tests/ticket/test_swap_points.py が
                 # 書き出す（CCNAVI_CHROME_FIXTURE=1）
 pnpm test:e2e   # 拡張を読み込んだ Chromium（Playwright、PLAYWRIGHT_BROWSERS_PATH）と模擬の GitHub・GitLab で実機の試験
-                # （承認・取り下げ・レビュー済み・「始める」を含む。GitLab はセルフホストとして通信先に足したビルドで回す）
+                # （承認・レビュー済み・「始める」を含む。GitLab はセルフホストとして通信先に足したビルドで回す）
 ```
 
 ### ホストの応答の見本（レビュー済み）

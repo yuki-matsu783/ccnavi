@@ -26,7 +26,7 @@ import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
-import { approveFamily, withdrawTicket, type WriteDeps } from "../src/core/write.js";
+import { approveFamily, type WriteDeps } from "../src/core/write.js";
 import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats } from "./helpers/host.js";
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
@@ -267,12 +267,12 @@ test("CX-T171 元に戻すコミットはバイト列のまま戻す（CRLF も�
   assert.equal(mock.files("i0001")[TODO], original);
 });
 
-test("CX-T172 「要確認」の親子のチケットには、そのブラウザで承認・取り下げ・レビュー済みのボタンを出さず、ほかの承認者には見えないと言う", async () => {
+test("CX-T172 「要確認」の親子のチケットには、そのブラウザで承認・レビュー済みのボタンを出さず、ほかの承認者には見えないと言う", async () => {
   const mock = new MockGitLab(fixture());
   const b = await collectRepo(GITLAB_REPO, glDeps(mock));
   const dom = new JSDOM("<!doctype html><body></body>");
   const md = createRenderer(dom.window as unknown as Window & typeof globalThis);
-  const actions = { approve: () => undefined, withdraw: () => undefined, review: () => undefined, dismiss: () => undefined };
+  const actions = { approve: () => undefined, review: () => undefined, dismiss: () => undefined };
   const html = renderBoard(dom.window.document, md, b, actions, { attention: { i0001: "元に戻せなかった" } });
   const box = html.querySelector('[data-family="i0001"]') as HTMLElement;
   assert.deepEqual([...box.querySelectorAll("button")].map((x) => (x as HTMLElement).dataset.action), ["dismiss"]);
@@ -359,29 +359,29 @@ test("CX-T176 GitLab で応答が返らず、先頭が読んだ先頭に届か�
   assert.equal(mock.glCommits.length, 1);
 });
 
-test("CX-T177 GitLab の update には、読んだ先頭でそのファイルを最後に変えたコミットを last_commit_id に付ける。割り込みで変わっていれば 400 で何も書かない", async () => {
+test("CX-T177 GitLab の delete には、読んだ先頭でそのファイルを最後に変えたコミットを last_commit_id に付ける。割り込みで変わっていれば 400 で何も書かない", async () => {
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
+  const last = mock.lastChange(mock.head("i0001") as string, TODO);
   assert.equal((await approveFamily(GITLAB_REPO, "i0001", shown, d)).kind, "written");
-  const approval = mock.head("i0001") as string;
-  // 取り下げは doing/ を消す（delete）。その last_commit_id は承認コミット（読んだ先頭でそのファイルを最後に変えた）
-  const back = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", glDeps(mock));
-  assert.equal(back.kind, "written", JSON.stringify(back));
-  const deleted = mock.glCommits[1].actions.find((a) => a.action === "delete");
-  assert.deepEqual([deleted?.file_path, deleted?.last_commit_id], [DOING, approval]);
+  // 承認は todo/ を消す（delete）。その last_commit_id は、読んだ先頭でそのファイルを最後に変えたコミット
+  const deleted = mock.glCommits[0].actions.find((a) => a.action === "delete");
+  assert.deepEqual([deleted?.file_path, deleted?.last_commit_id], [TODO, last]);
 
-  // 書く直前に、消す doing/ を別の書き手が変える: GitLab が 400 で断り、そのコミットは何も書かない
+  // 書く直前に、消す todo/ を別の書き手が変える: GitLab が 400 で断り、そのコミットは何も書かない
   const race = new MockGitLab(parentOnly());
   const rd = glDeps(race);
-  assert.equal((await approveFamily(GITLAB_REPO, "i0001", shownOf(await collectRepo(GITLAB_REPO, rd), "i0001"), rd)).kind, "written");
+  const rshown = shownOf(await collectRepo(GITLAB_REPO, rd), "i0001");
+  const rlast = race.lastChange(race.head("i0001") as string, TODO);
   const line = "別の書き手の行\n";
-  race.beforeCommit = (b) => void race.push(b, { [DOING]: `${race.files(b)[DOING]}${line}` }, "別の書き手の doing");
-  const raced = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", glDeps(race));
-  assert.equal(race.glCommits[1].result, "error");
-  assert.equal(race.glCommits[1].actions.find((a) => a.action === "delete")?.last_commit_id, race.glCommits[0].oid);
-  // 読み直して判定し直しても、別の書き手の行は残る（上書きしない。承認後に変わった承認済みチケットは取り下げない）
-  assert.ok(race.files("i0001")[DOING].includes(line), JSON.stringify(raced));
+  race.beforeCommit = (b) => void race.push(b, { [TODO]: `${race.files(b)[TODO]}${line}` }, "別の書き手の todo");
+  const raced = await approveFamily(GITLAB_REPO, "i0001", rshown, rd);
+  assert.equal(race.glCommits[0].result, "error");
+  assert.equal(race.glCommits[0].actions.find((a) => a.action === "delete")?.last_commit_id, rlast);
+  // 読み直して判定し直しても、別の書き手の行は残り、承認済みチケットは作られない（上書きしない）
+  assert.ok(race.files("i0001")[TODO].includes(line), JSON.stringify(raced));
+  assert.ok(!(DOING in race.files("i0001")), JSON.stringify(raced));
 });
 
 test("CX-T178 GitLab の開いた MR は全ページを読んでからこのプロジェクトのものに絞る（1 ページ目がフォークで埋まっても外さない）。Approve の数もフォークを数えない", async () => {

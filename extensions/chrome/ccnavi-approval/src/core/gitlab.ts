@@ -25,7 +25,6 @@ import {
   fetchNoRedirect,
   HostError,
   RETRY_LIMIT_SECONDS,
-  type ApprovalCommit,
   type BlobText,
   type Client,
   type Fetch,
@@ -294,41 +293,7 @@ export async function tokenExpiry(client: Client): Promise<string> {
   return Number.isNaN(t) ? "" : new Date(t).toISOString();
 }
 
-// ---- 取り下げと書いた後の確かめ ---------------------------------------------------------
-
-const HISTORY_PAGE = 30;
-const CHAIN_DEPTH = 100;
-
-type CommitItem = { id?: unknown; parent_ids?: unknown };
-
-/** `sha` から最初の親を辿った鎖（`first_parent=true` の一覧の `CHAIN_DEPTH` 件） */
-export async function firstParentChain(client: Client, owner: string, repo: string, sha: string): Promise<Set<string>> {
-  const { status, body } = await get(client, `${project(owner, repo)}/repository/commits?ref_name=${checkOid(sha)}&first_parent=true&per_page=${CHAIN_DEPTH}`);
-  const chain = new Set<string>();
-  if (status === 404 || !Array.isArray(body)) return chain;
-  for (const c of body as CommitItem[]) if (typeof c.id === "string") chain.add(c.id);
-  return chain;
-}
-
-/**
- * 承認コミット。GitHub の `approvalCommit` と同じ規則: `sha` から遡って `path` を最後に変えたコミットが、
- * 親が 1 つで、親に `path` が無く自分には在り（足した）、`sha` の first-parent の鎖の上にあるときだけ返す
- */
-export async function approvalCommit(client: Client, owner: string, repo: string, sha: string, path: string): Promise<ApprovalCommit | null> {
-  const q = `?ref_name=${checkOid(sha)}&path=${encodeURIComponent(checkPath(path))}&per_page=${HISTORY_PAGE}`;
-  const { status, body } = await get(client, `${project(owner, repo)}/repository/commits${q}`);
-  const newest = status === 404 || !Array.isArray(body) ? undefined : (body[0] as CommitItem | undefined);
-  if (!newest) return null;
-  const commit = checkOid(newest.id);
-  const parents = Array.isArray(newest.parent_ids) ? newest.parent_ids : [];
-  if (parents.length !== 1) return null;
-  const parent = checkOid(parents[0]);
-  const here = await pathObjects(client, owner, repo, commit, [path]);
-  const before = await pathObjects(client, owner, repo, parent, [path]);
-  if (here[path]?.type !== "blob" || before[path] !== null) return null;
-  const chain = await firstParentChain(client, owner, repo, sha);
-  return chain.has(commit) ? { commit, parent } : null;
-}
+// ---- 書いた後の確かめ ---------------------------------------------------------
 
 /** コミットの親（書いた後の確かめ） */
 export async function commitParents(client: Client, owner: string, repo: string, sha: string): Promise<string[]> {

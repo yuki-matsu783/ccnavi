@@ -176,7 +176,7 @@ class FacadePatchTest(unittest.TestCase):
     def test_the_collection_finds_the_known_facades(self):
         """集め方が壊れて何も見つけなくなったら、上の検査は黙って通る。知っている形で確かめる。"""
         facades = _facades()
-        self.assertLessEqual({"approve", "judge_approval", "withdraw"}, facades["tickets.core"])
+        self.assertLessEqual({"approve", "judge_approval", "confirm"}, facades["tickets.core"])
         self.assertLessEqual({"explain", "test", "board"}, facades["entry.diagnose"])
         self.assertLessEqual({"types_path", "layer_types", "load_types"}, facades["tickets.phase"])
         self.assertIn("PATH_TOOLS", facades["hook.judge"])
