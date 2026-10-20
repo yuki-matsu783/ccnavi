@@ -98,7 +98,7 @@ hook の止めは表から作る。ユーザ専用の入口の止めは `DENY_TI
 | sh から呼ぶだけの操作 | `SUBS` の `ticket start/finish/…`・`review confirm/…`・`sync tidy`・`worktree retire/branch` を実行ファイルで直に打つ形 |
 
 エージェントが sh で打てるのは `ccnavi-ticket.sh`・`ccnavi-review.sh`・`ccnavi-git.sh`（`AGENT_SCRIPTS`）で、サブエージェントは
-さらに役割の表（`user_only.SUBAGENT_ROLES`）で決めた操作を打てない。状態を持つ `ccnavi-ticket.sh` と `ccnavi-review.sh` は、読み取りの副命令だけ打てる。`ccnavi-git.sh` は push・worktree・integrate 系だけを止め、`ccnavi-start.sh`・`ccnavi-sync.sh`・`ccnavi-worktree.sh`・`ccnavi-clean.sh` は副命令に関わらず止める。`ccnavi user --help` も `user` の入口なので止まる。
+さらに役割の表（`user_only.SUBAGENT_ROLES`）で決めた操作を打てない。実行ファイルを直に呼ぶ `SUBS` の状態操作も、`CCNAVI_GUARD_TICKET_APPROVAL` の値によらず打てない（REQ-TKT-10）。状態を持つ `ccnavi-ticket.sh` と `ccnavi-review.sh` は、読み取りの副命令だけ打てる。`ccnavi-git.sh` は push・worktree・integrate 系だけを止め、`ccnavi-start.sh`・`ccnavi-sync.sh`・`ccnavi-worktree.sh`・`ccnavi-clean.sh` は副命令に関わらず止める。`ccnavi user --help` も `user` の入口なので止まる。
 
 hook は擬似端末を作る実行役（`script`・`tmux`・`screen`・`expect`）越しの呼び出しを読めない。
 `--` で始まらない語（`$X` だけ）で `--yes` を組み立て、入口の名前も読めない形（名前を変えたコピー）は、文字列検査に当たらない。

@@ -78,6 +78,7 @@ Stop の AI 判定の効き方 `CCNAVI_STOP_REVIEW` も同じ 3 値で、`CCNAVI
 既定で有効にしないため）。起動するかどうかは設定でなく、agent 型 Stop hook の登録で決まる（`scripts/ccnavi-stop-review.sh`）。
 
 `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL`、`CCNAVI_GUARD_UNWATCHED` は `enable` / `disable` の 2 値。
+設定が読めずチケット制御の値が分からないときは、チケット制御は有効とみなす（REQ-CMN-13。判定できないときの扱いは下の表）。
 `CCNAVI_LEARNING`（学びの蓄積。9.16）も 2 値で、`enable` のときだけ効く。書き誤りは `--lint` が warn で言い、`disable` として動く。
 
 ### 4.5 応答の形と結果
@@ -117,7 +118,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 
 | イベント | 終え方 |
 |---|---|
-| `PreToolUse`、payload を読む前（イベントが分からない） | 標準エラーに文、終了コード 2 で止める。ツールの種類で決め、Write・Edit・NotebookEdit・Agent とツールが分からない回は `dry-run` でも止める。Read・Grep・Glob は組み込みの最低限の deny（認証情報の形・`.git` の中・`logs/state/ops/`）に当たらなければ通し、Bash は狭い許可リスト（`pwd`・`ls`・`cat` / `head` / `tail` / `wc` の単独の 1 パス・`ccnavi-ticket.sh status` / `--help`）だけ通す。PowerShell は止める。未知のツールは `enable` だけ止める |
+| `PreToolUse`、payload を読む前（イベントが分からない）、または判定中の内部例外 | 標準エラーに文、終了コード 2 で止める。ツールの種類で決め、Write・Edit・NotebookEdit・Agent とツールが分からない回は `dry-run` でも止める。Read・Grep・Glob は組み込みの最低限の deny（認証情報の形・`.git` の中・`logs/state/ops/`）に当たらなければ通し、Bash は狭い許可リスト（`pwd`・`ls`・`cat` / `head` / `tail` / `wc` の単独の 1 パス・`ccnavi-ticket.sh status` / `--help`）だけ通す。PowerShell は止める。未知のツールは `enable` だけ止める |
 | `PostToolUse` | ツールはもう走っていて止めるものは無い。`enable` は終了コード 2 と標準エラーで、実行後の検査をしていないことをモデルに言う。`dry-run` は 0 |
 | それ以外（`SessionStart`・`UserPromptSubmit`・`Stop`・`SubagentStart`・`SubagentStop`・未知のイベント） | 終了コード 0 で、ユーザに `systemMessage` で知らせる。終了コード 2 で終えると、`Stop` と `SubagentStop` は終われずに続けさせられ、`UserPromptSubmit` は依頼文を消す。ccnavi の不具合が作業そのものを止めないようにする。`SubagentStop` は、子の範囲を確かめられなかった回と同じ印を置き、親に届ける（9.12） |
 
