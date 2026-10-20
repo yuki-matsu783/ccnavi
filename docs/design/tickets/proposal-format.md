@@ -146,7 +146,7 @@ base_sha: ""
 
 **効かせるのはユーザ。判定がそれを守る。** 効力のあるフロー（承認済みの領域）は、ユーザがボードのエディタ（VS Code 拡張のフロー編集画面）で
 保存したものだけで、エージェントは書けない（エージェントが書けるのは下の下書きだけ。ユーザが差分を読んで取り込む）。承認済みの領域は、どのツリーでも `builtin:guard-project-home`（`Write` / `Edit` /
-`NotebookEdit`）と `builtin:guard-setting-files`（シェル）が止める。承認済みチケットと同じ保護。ユーザが保存した
+`NotebookEdit`）と `builtin:guard-setting-files`（シェル）と、チケット制御が有効な間の `builtin:ticket-approved` が止める。承認済みチケットと同じ保護。ユーザが保存した
 実行後チェックでは、範囲の検査が承認済みの領域を外し、呼び出しごとの実行後チェックが frontmatter の無い
 ファイルをサブコマンドの書き込みとして外す（`post_findings._script_writes`）。コミットと push は `ccnavi-user-push-approved.sh` が
 置き場ごとまとめて行う。

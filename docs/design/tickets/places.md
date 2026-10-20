@@ -40,7 +40,7 @@ keywords: [置き場, 提案, 承認済みチケット, マーカー, wip/propos
 
 `review/` への直接の作成・移動は、`Write` でもシェルでも、誰がやっても組み込みが止める
 （`Write` 系は `builtin:ticket-state`、シェルは `builtin:ticket-state-shell`）。`.ccnavi/approved/` は
-ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`）が止める。`todo/` への作成と編集は自由。
+ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`）と、チケット制御が有効な間の `builtin:ticket-approved`（実行後の保護範囲にも足す）が止める。`todo/` への作成と編集は自由。
 シェルの `cp` `ln` `install` は、組み込みの保護（11.6）と同じ部品で行き先を読む（`-t <dir>` の値か、選択肢でない
 最後の引数）。`cp -t wip/proposals/review <提案>` も、行き先のあとに選択肢を回した形も止まり、置き場から外へ写すだけの形は止めない。
 提案の置き場そのものを行き先にして、元の名前が状態の名前（`review`）か名前の決まらない形（`cp -r /tmp/review wip/proposals/`）も止める。

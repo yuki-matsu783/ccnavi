@@ -1318,7 +1318,7 @@ docs/../.env
 判定に届かない。`Grep(path=<git プロジェクトルート>)` は `.env` や `secrets/` の中身を返しうるが、
 ルールは起点にしか当たらない。
 
-だから共通レイヤーの `credentials` ルールの `match` は `Bash|Read|Write|Edit|NotebookEdit` で、
+だから組み込みの `builtin:credentials` の `match` は `Bash|Read|Write|Edit|NotebookEdit` で、
 `Grep` と `Glob` を含めていない。
 
 `Grep` と `Glob` は ccnavi が受け持たない。探すツールが読むファイルを見るのは、下の表の上 2 つ。
@@ -1351,7 +1351,7 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。
 - 降りた先に `.git` があれば、そこから下はそのリポジトリの `.gitignore` が適用される。ワークスペース
   ルートが git 管理下でなくても適用される。`.git` がファイル（ワークツリーの gitdir ポインタ）でも同じ
 - 隠しファイルは弾かれない。ドットで始まるものも、ignore されていなければ `Grep` が読む（素の `rg` の既定とは違う）
-- `Read` ツールは `credentials` ルールと `Read()` の `deny` が見る
+- `Read` ツールは `builtin:credentials` と `Read()` の `deny` が見る
 
 `.ignore`・`.rgignore`・`.git/info/exclude`・git のグローバルな除外（`core.excludesFile`、既定では
 `~/.config/git/ignore`）も ripgrep は読む。どれも弾く側に働く。
@@ -1563,7 +1563,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 | `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
 
 - `.ccnavi/approved/` へ動かすのはユーザ、`wip/proposals/` へ動かすのはエージェント
-- `review/` への直接の作成・移動は誰がやっても止まる（`builtin:ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリを守る組み込みのルールが止める
+- `review/` への直接の作成・移動は誰がやっても止まる（`builtin:ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリを守る組み込みのルールと `builtin:ticket-approved` が止める
 - 動かすスクリプトと push はサブエージェントには打てない（`DENY_SUBAGENT_TICKET_OP`）。子チケットのワークツリーからの push は
   git のラッパースクリプトが拒む。サブエージェントは子のワークツリーで手元にコミットするだけで、親のワークツリーへの merge・commit・書き込みも
   hook が止める（`DENY_SUBAGENT_PARENT_TREE`。子のワークツリーでのコミットと、衝突を解くための親のブランチの merge は通る）。

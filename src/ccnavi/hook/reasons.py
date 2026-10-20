@@ -122,17 +122,18 @@ def fallen_back(rules_path: str) -> str:
     プロジェクトのルールを 1 件も見ていない、という状態が続く。それは
     ガードが止まっていることより悪い。止まっていれば誰かが気づくから。
 
-    直し方に Write / Edit を名指しするのは、既定の側がシェルからこの場所への
-    書き込みを止めているため。止めた先に代わりの方法が無いと、拒否されたあと先へ進めなくなる。
+    直し方に下書きとユーザの取り込みを名指しするのは、既定の側がシェルからも、Write / Edit からも
+    この場所への書き込みを止めているため（builtin:guard-ccnavi-config は読めない間も外れない）。
+    止めた先に代わりの方法が無いと、拒否されたあと先へ進めなくなる。
     """
     return (
         "[ccnavi] the rule file at "
         + rules_path
         + " could not be read, so ccnavi is judging with its built-in defaults. "
-        "The project's own rules are not in force right now. Repair that file with "
-        "the Write or Edit tool; while the defaults are in force the shell cannot "
-        "write to it, so that the path that breaks it and the path that fixes it "
-        "are not the same one."
+        "The project's own rules are not in force right now. Neither the shell nor "
+        "the Write or Edit tool can write to that file while the defaults are in "
+        "force. Put a draft at wip/handoff/.ccnavi/config/common/rules.yml and ask "
+        "the user to import it with 'ccnavi user handoff' (or to fix the file by hand)."
     )
 
 
