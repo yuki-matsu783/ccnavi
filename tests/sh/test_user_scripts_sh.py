@@ -12,7 +12,7 @@ hook はその名前で止めるので、名前と置き場の決まりが崩れ
 4. どの `ccnavi-user-*.sh` も単体で起動でき（`-h`）、hook の名前の止めに当たる
 
 古い入口と新しい sh の中身の動きは、それぞれの sh の試験
-（test_review_decide・test_write_and_push_sh・test_sync_sh・test_clean_sh・test_push_approved_sh）が見る。
+（test_review_decide・test_write_and_push_*・test_sync_sh・test_clean_sh・test_push_approved_sh）が見る。
 """
 
 from __future__ import annotations
