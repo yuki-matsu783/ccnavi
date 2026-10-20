@@ -1,6 +1,6 @@
 """write-and-push の受入テスト（ホストの代役（GitLab・GitHub）とレビューの状態）。
 
-道具と全体の説明は `tests/sh/write_and_push_harness.py`。
+共通の道具と全体の説明は `tests/sh/write_and_push_harness.py` にある。
 """
 
 from __future__ import annotations

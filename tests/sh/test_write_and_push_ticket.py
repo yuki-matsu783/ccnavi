@@ -1,6 +1,6 @@
 """write-and-push の受入テスト（チケットの状態を書く操作の順序・ロック・競合・戻し）。
 
-道具と全体の説明は `tests/sh/write_and_push_harness.py`。
+共通の道具と全体の説明は `tests/sh/write_and_push_harness.py` にある。
 """
 
 from __future__ import annotations
