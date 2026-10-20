@@ -58,7 +58,11 @@ VERSION = "0.1.0"
 # 16: ユーザだけが打つ操作を `user <操作>`（agree・reviewed・close-early・prune・handoff）に集め、
 # sh を ccnavi-user-*.sh に分けた。`user` の外の形は断るので、古い sh は新しい実行ファイルで
 # 動かない。
-COMPAT = 16
+# 17: 送信を操作記録（`ops` サブコマンド）に載せ、decide の判断のダイジェストを版 2 にした。
+# 手で動かした子の確定が受け入れ台帳（`phases/<親>/accepted.json`）と `via: manual` を書く。
+# 新しい sh が実行ファイルの `ops …` を呼び、ボードは版 1 の decide を断る。旧い sh は新しい
+# 実行ファイルの decide（版 2）を扱えず、旧い実行ファイルは新しい sh の `ops` を知らない。
+COMPAT = 17
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 実行ファイルが持つ振る舞い。オプションや JSON の欄の有無を `flags` から読めないものを足す。

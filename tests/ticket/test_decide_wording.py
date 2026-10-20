@@ -13,6 +13,7 @@ def decision(unresolved=()):
         parent=SimpleNamespace(ticket="i0064"),
         ph=SimpleNamespace(number=1),
         unresolved=list(unresolved),
+        extra=[],
     )
 
 

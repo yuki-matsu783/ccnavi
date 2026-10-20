@@ -7,7 +7,8 @@
  * （マージリクエストを読むのは sh、判断するのは実行ファイル）。
  */
 
-export const DECIDE_VERSION = 1;
+/** 版 2: ダイジェストは指摘ごとの版（見せたあとに追加された指摘は止めない）。版 1 の JSON は読まない */
+export const DECIDE_VERSION = 2;
 
 /** 行き先。対応しない（受け入れて進む）・このフェーズで直す（続きの子）・issue に回す */
 export type DecideChoice = "keep" | "fix" | "issue";
@@ -27,6 +28,10 @@ export interface DecideThread {
   readonly path: string;
   readonly line: number;
   readonly body: string;
+  /** 指摘の版（鍵と最初のコメントの本文から決まる）。画面は見せるだけで、解釈しない */
+  readonly version: string;
+  /** 最後のコメント（再提起を見分ける）。取れなければ空 */
+  readonly last_comment: { readonly id: string; readonly at: string; readonly author: string };
 }
 
 export interface DecidePreview {
@@ -37,15 +42,17 @@ export interface DecidePreview {
   /** issue に回せるか（フィードバック計画が承認されたあとだけ） */
   readonly can_issue: boolean;
   readonly threads: readonly DecideThread[];
-  /** 見せた指摘のダイジェスト。選択を置くときに `--digest` で返す */
+  /** 見せた指摘のダイジェスト（不透明な文字列）。選択を置くときに `--digest` で返す */
   readonly digest: string;
 }
 
 export interface DecideResult {
   readonly parent: string;
   readonly phase: number;
-  /** レビュー済みになったか（直す指摘が無ければ真） */
+  /** レビュー済みになったか（直す指摘も見せたあとに増えた指摘も無ければ真） */
   readonly reviewed: boolean;
+  /** 見せたあとに追加された指摘（今回の判断の対象外。未対応として残る）の鍵 */
+  readonly pending_extra: readonly string[];
   /** 起こした続きの子の識別子。起こしていなければ空 */
   readonly followup: string;
   /** Claude Code に渡す文 */
@@ -74,8 +81,8 @@ export function parseDecidePreview(text: string): DecidePreviewParse {
   const raw = top.raw;
   const mr: Record<string, unknown> = isRecord(raw.mr) ? raw.mr : {};
   const digest = str(raw.digest);
-  if (!/^[0-9a-f]{64}$/.test(digest)) {
-    return { ok: false, error: "ccnavi-review.sh decide --preview の digest が 64 桁の 16 進ではありません" };
+  if (!/^v2\.[A-Za-z0-9_-]+$/.test(digest)) {
+    return { ok: false, error: "ccnavi-review.sh decide --preview の digest が版 2 の形ではありません" };
   }
   return {
     ok: true,
@@ -113,6 +120,7 @@ export function parseDecideResult(text: string): DecideOutcome {
       parent: str(raw.parent),
       phase: int(raw.phase),
       reviewed: raw.reviewed === true,
+      pending_extra: list(raw.pending_extra).filter((k): k is string => typeof k === "string"),
       followup: str(raw.followup),
       prompt: str(raw.prompt),
       issue_url: str(raw.issue_url),
@@ -171,7 +179,16 @@ function parseTop(text: string): Top {
 }
 
 function thread(raw: Record<string, unknown>): DecideThread {
-  return { key: str(raw.key), url: str(raw.url), path: str(raw.path), line: int(raw.line), body: str(raw.body) };
+  const last: Record<string, unknown> = isRecord(raw.last_comment) ? raw.last_comment : {};
+  return {
+    key: str(raw.key),
+    url: str(raw.url),
+    path: str(raw.path),
+    line: int(raw.line),
+    body: str(raw.body),
+    version: str(raw.version),
+    last_comment: { id: str(last.id), at: str(last.at), author: str(last.author) },
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

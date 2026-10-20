@@ -39,7 +39,11 @@
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす。
 #            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、マーカーに残す。
-#            actor は記録で、判定には使わない。引けなければ渡さず、マーカーは前と同じ
+#            actor は記録で、判定には使わない。引けなければ渡さず、マーカーは前と同じ。
+#            ユーザが子を手で done/ に動かして commit・push 済みなら、移動の前に付いた未解決の指摘は
+#            ホストで解決せず、版つきで phases/<親>/accepted.json（受け入れ台帳）に足して確定する
+#            （マーカーに via: manual と moved）。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は数えない。
+#            移動の後に付いた指摘が残れば確定しない。変更要求は保留
 #   decide <N> --preview:
 #            ここが取ってくる → `ccnavi --reviewed N --accept-unresolved --preview` が見せる一覧を JSON で返す。
 #            何も置かない（見るだけ）。選んだものを置くのは ccnavi-user-decide.sh
@@ -69,7 +73,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|
                                                   wip/eli5/phase-<N>.html）に置いてコミットし、push しておく（マージリクエストの
                                                   差分に載せる）。相対パスは実行した場所から。投稿が済むと、ユーザが実行する
                                                   crit review <パス> と crit push <番号> を出す
-  confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（未解決のスレッドは依頼の時刻に関わらずすべて数える）
+  confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（未解決のスレッドは依頼の時刻に関わらずすべて数える。手で done/ に動かして共有した子は、移動の前の指摘を台帳 accepted.json に版つきで受け入れて確定する）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> --preview                      未解決（Unresolved）の指摘と、選べる対応方針の一覧を JSON で見るだけ。何も置かない
   ready        [--parent <親>]                    閉じられて push 済みなら、クローズ済みのチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを削除して削除を push し、Draft を解除する（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを削除します（中から実行したときは消さず、外から実行する 1 本を出す）。--parent なら親のワークツリーの外から実行できる
@@ -519,6 +523,9 @@ ${eli5_how}"
 		fail request-posted-unknown "投稿済みの依頼を確かめられなかった（ホストの返事は上に出ている）。二重に投稿しないよう止めた。"
 	if [ -n "$posted" ]; then
 		printf '同じ依頼は投稿済み（%s）。投稿し直さない\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
+		# 前の試みが結果を確定できないまま残っていても、ここで送り済みに直す（「引き継ぎ未完了」を残さない）
+		ccnavi ops mark-sent request "${branch:-}" "$number" "$request_marker" comment \
+			"$(printf '%s' "$posted" | "$JQ" -r '.url' | tr -d '\r')" >/dev/null 2>&1 || :
 	else
 		# 本文の末尾に、ELI5 の HTML の在りかと crit での見方を 1 行足す。HTML の中身は
 		# 載せない（マージリクエストの差分にある）。目印は 1 行目なので、足しても二重投稿の見分けは変わらない。
@@ -528,7 +535,12 @@ ${eli5_how}"
 			printf '\n---\n\nELI5（変更をやさしく説明した HTML）はこのマージリクエストの差分の `%s`。手元のチェックアウトのルートで `crit review %s` を開いてソースの行に指摘を付け、`crit push %s` でここに送ってください（送った指摘は行のスレッドになり、未解決の間はレビュー済みにならない。`crit %s` だけだと描画のプレビューになり、そこで付けたピンは送られない）。\n' \
 				"$eli5_rel" "$eli5_rel" "$number" "$eli5_rel"
 		} >"$eli5_posted"
-		posted=$(comment "$number" "$url" "$eli5_posted")
+		tell_skew
+		posted=$(comment_staged request "$request_marker" "$number" "$url" "$eli5_posted") ||
+			{
+				rm -f "$eli5_posted"
+				fail request-post-failed "依頼を投稿できたか確定できなかった（上の案内を見る）。マーカーは置いていない。確かめてから、同じコマンドを打ち直す。"
+			}
 		rm -f "$eli5_posted"
 	fi
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
@@ -571,7 +583,13 @@ comment)
 		printf '<!-- ccnavi:comment -->\n'
 		cat "$body"
 	} >"$noted"
-	posted=$(comment "$number" "$url" "$noted")
+	comment_key="@$body"
+	tell_skew
+	posted=$(comment_staged comment "$comment_key" "$number" "$url" "$noted") ||
+		{
+			rm -f "$noted"
+			fail comment-post-failed "コメントを投稿できたか確定できなかった（上の案内を見る）。確かめてから、同じコマンドを打ち直す。"
+		}
 	rm -f "$noted"
 	printf 'OK: 記録した（%s）\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
 	;;
@@ -619,9 +637,13 @@ ready)
 	still=$(undraft "$number")
 	[ "$still" = "false" ] || fail undraft-failed "Draft を解除できませんでした（${url}）。ホストの返事は上に出ている。"
 	if [ -n "$noted" ] && [ -f "$noted" ]; then
-		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
+		comment_staged ready ready "$number" "$url" "$noted" >/dev/null ||
+			fail ready-comment-failed "Draft の解除は完了。補助のコメントは未完了（${url}）。確かめてから ready を打ち直すと、コメントだけ送り直す。"
+		rm -f "$noted"
 	fi
 	printf 'OK: Draft を解除した（%s）。マージはユーザが行う\n' "$url"
+	# 親を閉じる片付け: この親の送り終わった操作記録を消す（未完了のものは残す）
+	ccnavi ops retire "${branch:-}" >/dev/null 2>&1 || :
 	# 最後に子と親の片付けをする（`worktree retire`）。Draft を外す前には消さない（ready を打ち直せなくなる）。
 	# 閉じた子のワークツリー（レビュー待ちだったものも）、子の手元のブランチ（合流した子は条件を確かめて削除。
 	# 取り消した子は一覧を出すだけで、ユーザの確認が取れてから消す）、親のワークツリーの順。未コミットの変更や

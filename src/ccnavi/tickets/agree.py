@@ -462,7 +462,7 @@ def _apply_steps(
                         return t.ticket, f"マーカーを置けない: {failed}"
                     # 全体計画の子でレビュー待ちに残っているものは、見たうえでの計画なので閉じる。
                     moved, failed = approval_ops.settle_review(
-                        conf, root, t.ticket, list(range(1, len(t.plan) + 1))
+                        conf, root, t.ticket, list(range(1, len(t.plan) + 1)), by="feedback-plan"
                     )
                     if failed:
                         return t.ticket, failed

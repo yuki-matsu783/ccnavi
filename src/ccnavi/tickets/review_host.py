@@ -9,10 +9,12 @@ GitHub か GitLab かを見分ける読み方だけを置く。review から分�
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import shutil
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -46,6 +48,12 @@ class Thread:
     # 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持つ
     # （ccnavi の投稿を見分けるため）
     author: str = ""
+    # 最後のコメントの id・時刻・作成者。再提起（受け入れたあとに付いたコメント）を
+    # 見分けるために取る。
+    # 返信をすべて取るわけではない（全文の範囲は最初のコメント）。取れなければ空。
+    last_comment_id: str = ""
+    last_comment_at: str = ""
+    last_comment_author: str = ""
 
 
 @dataclass
@@ -151,6 +159,9 @@ class Result:
                     body=str(t.get("body") or ""),
                     created_at=str(t.get("created_at") or ""),
                     author=str(t.get("author") or ""),
+                    last_comment_id=str(t.get("last_id") or ""),
+                    last_comment_at=str(t.get("last_at") or ""),
+                    last_comment_author=str(t.get("last_author") or ""),
                 )
                 for t in data.get("threads") or []
                 if isinstance(t, dict)
@@ -206,11 +217,17 @@ def accept_plan_problem(threads: list[Thread]) -> str:
     return ""
 
 
-def write_accept_plan(path: str, items: list[tuple[Thread, str]], digest: str = "") -> str:
-    """計画を書く。`items` は (スレッド, 返信の本文)。書けなければ理由を返す。"""
+def write_accept_plan(
+    path: str, items: list[tuple[Thread, str]], digest: str = "", op: str = ""
+) -> str:
+    """計画を書く。`items` は (スレッド, 返信の本文)。書けなければ理由を返す。
+
+    `op` は操作記録の操作ID。sh が送信の段階を記録するときと、置く呼び出しが同じ記録を読むときの鍵。
+    """
     body = {
         "version": ACCEPT_PLAN_VERSION,
         "digest": digest,
+        "op": op,
         "threads": [{"id": t.id, "key": t.url or t.id, "reply": reply} for t, reply in items],
     }
     return fsio.write_text(path, json.dumps(body, ensure_ascii=False) + "\n", newline="\n")
@@ -223,6 +240,7 @@ class AcceptPlan:
     digest: str = ""
     ids: list[str] = field(default_factory=list)
     keys: list[str] = field(default_factory=list)
+    op: str = ""
 
 
 def read_accept_plan(path: str) -> AcceptPlan | None:
@@ -233,6 +251,7 @@ def read_accept_plan(path: str) -> AcceptPlan | None:
     rows = [t for t in data.get("threads") or [] if isinstance(t, dict)]
     return AcceptPlan(
         digest=str(data.get("digest") or ""),
+        op=str(data.get("op") or ""),
         ids=[str(t.get("id") or "") for t in rows],
         keys=[str(t.get("key") or "") for t in rows],
     )
@@ -287,7 +306,47 @@ def transport_problem(url: str) -> str:
     return ""
 
 
-def _unresolved(threads: list[Thread], host: str = "", poster: str = "") -> list[Thread]:
+def thread_key(t: Thread) -> str:
+    """選択をスレッドに対応づける鍵。URL を先に使い、無ければスレッドの id。"""
+    return t.url or t.id
+
+
+def thread_version(t: Thread) -> str:
+    """指摘の版。SHA-256(鍵 + 改行 + 正規化した最初のコメントの本文) の先頭 32 桁。
+
+    正規化するのは改行コード（CRLF・CR を LF に）と Unicode の NFC だけ。本文が変わるか、鍵が
+    変わると版が変わる。見せた指摘と、適用の直前に取り直した指摘、受け入れ台帳の項目が同じかを、
+    この版で照合する。
+    """
+    body = unicodedata.normalize("NFC", t.body.replace("\r\n", "\n").replace("\r", "\n"))
+    return hashlib.sha256(f"{thread_key(t)}\n{body}".encode()).hexdigest()[:32]
+
+
+def _accepted_by_ledger(t: Thread, ledger: list[dict]) -> bool:
+    """受け入れ台帳（`accepted.json`）が受け入れ済みとする指摘か。
+
+    鍵と版が台帳の項目と同じで、受け入れたときの最後のコメントから変わっていないとき（受け入れた
+    後に誰かがコメントを付けた指摘は、再提起として数える）。鍵か最後のコメントの id が取れていない
+    指摘は受け入れ済みにしない（隠さない側に倒す）。
+    """
+    key, version = thread_key(t), thread_version(t)
+    if not key or not t.last_comment_id:
+        # 鍵か最後のコメントが分からない指摘は、再提起を見分けられないので受け入れ済みにしない
+        return False
+    for entry in ledger:
+        if entry.get("key") != key or entry.get("version") != version:
+            continue
+        if str(entry.get("last_comment_id") or "") == t.last_comment_id:
+            return True
+    return False
+
+
+def _unresolved(
+    threads: list[Thread],
+    host: str = "",
+    poster: str = "",
+    ledger: list[dict] | None = None,
+) -> list[Thread]:
     """まだ解決されていない指摘。
 
     付いた時刻では絞らない。依頼より後のものだけを数えると、
@@ -305,13 +364,24 @@ def _unresolved(threads: list[Thread], host: str = "", poster: str = "") -> list
     投稿者が分からなければ見分けずに数える（誰でも目印を書けるので、
     本文だけで除くと未解決を隠せる）。
     """
-    return [t for t in threads if not t.resolved and not _ccnavi_post(t, host, poster)]
+    return [
+        t
+        for t in threads
+        if not t.resolved
+        and not _ccnavi_post(t, host, poster)
+        and not (ledger and _accepted_by_ledger(t, ledger))
+    ]
 
 
 def _ccnavi_post(t: Thread, host: str, poster: str) -> bool:
     """ccnavi 自身が投稿したスレッドか（`_unresolved`）。"""
     mine = host == "gitlab" and bool(poster) and t.author == poster
     return mine and t.body.startswith(MARKER_PREFIX)
+
+
+def epoch(text: str) -> float:
+    """ホストの時刻（ISO 8601）をエポック秒に。読めなければ 0。"""
+    return _epoch(text)
 
 
 def _epoch(text: str) -> float:

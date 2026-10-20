@@ -381,7 +381,7 @@ def close_early(
             "子を閉じるか取り消してから、親を早めに閉じてください\n"
         )
         return 1
-    left = _leftovers(parent, phases, result)
+    left = _leftovers(parent, phases, result, review.ledger_of(root, conf, parent))
     if plan_done or plan_check:
         planned = review_host.read_accept_plan(plan_done or plan_check)
         if planned is None:
@@ -520,6 +520,7 @@ def _leftovers(
     parent: ticket_model.Ticket,
     phases: list[phase.Phase],
     result: review_host.Result,
+    ledger: list[dict] | None = None,
 ) -> Leftovers:
     not_ended = [ph for ph in phases if not ph.ended]
 
@@ -539,7 +540,7 @@ def _leftovers(
         ],
         unreviewed=[ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)],
         unplanned=parent.has_plan and parent.feedback is None,
-        unresolved=review_host._unresolved(result.threads),
+        unresolved=review_host._unresolved(result.threads, ledger=ledger),
     )
 
 
@@ -608,7 +609,7 @@ def _settle(
                 return None
             skipped.append(ph.number)
         elif ph in left.unreviewed:
-            if not review._settle_children(stdout, stderr, root, conf, parent, ph):
+            if not review._settle_children(stdout, stderr, root, conf, parent, ph, "close-early"):
                 return None
             if not review._mark(
                 stderr,

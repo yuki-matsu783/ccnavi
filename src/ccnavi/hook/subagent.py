@@ -18,7 +18,7 @@ from ..policy import ctxfile, rules
 from ..records import audit
 from ..tickets import approval, approval_checks, flow, phase, phase_scope, phasetypes, ticket_model
 from ..tickets import ticket as ticket_mod
-from . import agentkind, judge, post, post_findings, projskills, reasons
+from . import agentkind, judge, post, post_findings, projskills, reasons, subagent_outcome
 
 # サブエージェントには Stop の振り返り（`match: Stop` のルールの文）が届かないので、
 # 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（.ccnavi/docs/skill-review.md）。
@@ -232,6 +232,9 @@ def _judge_stop(
     bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
     if bound is not None:
         targets = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
+    # 担当の子が決まるのは、cwd が子のワークツリーのとき。親のツリーから起動された体は、
+    # どの子の担当か分からないので、全部の子を調べても差し戻さず、親に知らせる。
+    attributed = bound is not None and bound.is_child
     findings = []
     unchecked: list[str] = []
     for child in targets:
@@ -259,6 +262,20 @@ def _judge_stop(
     # 止められないので、止めずに知らせる。
     changed = [n for n in (flow.changed_notice(conf, root, c) for c in targets) if n]
     if not findings:
+        _record_outcome(
+            stderr,
+            conf,
+            payload,
+            who,
+            bound.ticket if attributed and bound is not None else "",
+            subagent_outcome.UNCHECKED
+            if unchecked and attributed
+            else (
+                subagent_outcome.FIXED
+                if _bounced(conf.state, payload.session_id, who)
+                else subagent_outcome.OK
+            ),
+        )
         if changed:
             note = "\n".join(changed)
             hookio.write_context(stdout, hookio.SUBAGENT_STOP, note, system=note)
@@ -276,12 +293,46 @@ def _judge_stop(
     text = "\n".join(lines + changed)
 
     already = _bounced(conf.state, payload.session_id, who)
+    found_paths = [f"{c.ticket}:{rel}" for c, rel, _ in findings]
+    child_name = bound.ticket if attributed and bound is not None else ""
+    if not attributed:
+        # 担当が分からないので差し戻さない（別の子の変更を、関係ない体に直させない）。
+        record.enforced = False
+        _record_outcome(
+            stderr, conf, payload, who, "", subagent_outcome.UNATTRIBUTED, paths=found_paths
+        )
+        if changed:
+            note = "\n".join(changed)
+            hookio.write_context(stdout, hookio.SUBAGENT_STOP, note, system=note)
+        return EXIT_OK
     if mode == modes.ENABLE and not already:
         _remember_bounce(stderr, conf.state, payload.session_id, who)
         record.enforced = True
+        # 差し戻して続けさせる回なので、結果はまだ確定しない（次の終了で直ったかが決まる）。
+        _record_outcome(
+            stderr,
+            conf,
+            payload,
+            who,
+            child_name,
+            subagent_outcome.OUTSIDE,
+            bounces=1,
+            paths=found_paths,
+            final=False,
+        )
         stderr.write(text + "\n")
         return EXIT_BLOCK
     record.enforced = False
+    _record_outcome(
+        stderr,
+        conf,
+        payload,
+        who,
+        child_name,
+        subagent_outcome.OUTSIDE,
+        bounces=1 if already else 0,
+        paths=found_paths,
+    )
     hookio.write_context(stdout, hookio.SUBAGENT_STOP, text, system="\n".join(changed))
     return EXIT_OK
 
@@ -523,14 +574,71 @@ def _limit_note(child: ticket_model.Ticket, found: phase_scope.ScopeVerdict) -> 
     return ""
 
 
+def _record_outcome(
+    stderr: TextIO,
+    conf: settings.Settings,
+    payload: hookio.Input,
+    who: str,
+    child: str,
+    outcome: str,
+    bounces: int = 0,
+    paths: list[str] | None = None,
+    final: bool = True,
+) -> None:
+    """終了結果を残す。残せなくても止めない（言うだけ）。"""
+    if not conf.state or not who:
+        return
+    try:
+        failed = subagent_outcome.write(
+            conf.state, payload.session_id, who, outcome, child, bounces, paths, final
+        )
+    except (OSError, ValueError) as exc:
+        failed = str(exc)
+    if failed:
+        stderr.write(f"ccnavi: サブエージェントの終了結果を保存できませんでした: {failed}\n")
+
+
+def outcome_notices(state_dir: str, payload: hookio.Input) -> tuple[str, list]:
+    """親に言う終了結果の知らせ（担当の子が分からなかった体）と、書き終えたあとに印を付ける結果。
+
+    読むのは親（`agent_id` の無いメインのセッション）だけ。入れ子の体の中で読むと、親に届かない。
+    """
+    if not state_dir or payload.agent_id:
+        return "", []
+    return subagent_outcome.notices(state_dir, payload.session_id)
+
+
+def confirm_outcomes(state_dir: str, done: list) -> None:
+    """知らせを書き終えた結果に「通知済み」の印を付ける。付けられなくても、次の機会に出し直すだけ。"""
+    if done:
+        subagent_outcome.confirm(state_dir, done)
+
+
+def stop_nudge(state_dir: str, session: str) -> str:
+    """Stop で促す文（`subagent_outcome.stop_nudge`）。"""
+    return subagent_outcome.stop_nudge(state_dir, session)
+
+
 def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
-    """終わったサブエージェントが差し戻しを受けていたなら、その旨。マーカーは消す。"""
+    """終わったサブエージェントが差し戻しを受けていたなら、その旨。マーカーは消す。
+
+    言うのは、終了結果が `outside`（直らないまま終わった）のときだけ。差し戻しの後に直った
+    （`fixed`）なら言わない。結果の記録が無い体（記録を入れる前の終了）は今までどおり言う。
+    """
     if payload.tool_name != judge.AGENT_TOOL:
         return ""
     agent_id = str(payload.tool_response.get("agentId") or "")
     if not agent_id or not _bounced(state_dir, payload.session_id, agent_id):
         return ""
     fsio.remove(_bounce_path(state_dir, payload.session_id, agent_id))
+    found = subagent_outcome.of(state_dir, payload.session_id, agent_id)
+    if found is not None and found.outcome in (
+        subagent_outcome.OK,
+        subagent_outcome.FIXED,
+        subagent_outcome.UNCHECKED,
+    ):
+        # 直った、または範囲を確かめられなかった（後者は unchecked_scope が言う。断定しない）
+        return ""
     return (
         f"[ccnavi] {post_findings.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
         "差し戻されたまま終わっています。合流する前に、その子のワークツリーの範囲外の"
@@ -569,6 +677,8 @@ def unchecked_scope(state_dir: str, payload: hookio.Input) -> str:
         if found is None:
             continue
         fsio.remove(path)
+        # 同じことを Stop でもう一度促さない
+        subagent_outcome.mark_nudged(state_dir, payload.session_id, who)
         tickets = ", ".join(found)
         if not tickets:
             # SubagentStop の処理が ccnavi の内部エラーで終わった回。どの子を見るはずだったかも
@@ -632,6 +742,10 @@ def unchecked_after_error(
         failed = fsio.write_text(path, _mark_text(payload.session_id, []))
         if failed:
             stderr.write(f"ccnavi: 範囲を確かめられなかった印を保存できませんでした: {failed}\n")
+        existing = subagent_outcome.of(conf.state, payload.session_id, who)
+        if existing is None or not existing.final:
+            # 先に書いた結果（outside・unattributed）を、内部エラーで上書きしない
+            _record_outcome(stderr, conf, payload, who, "", subagent_outcome.UNCHECKED)
 
 
 def _unchecked_path(state_dir: str, session: str, who: str) -> str:

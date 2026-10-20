@@ -402,6 +402,7 @@ export async function discussions(client: Client, owner: string, repo: string, n
     if (alt(first.resolvable, false) === false) continue;
     const resolvable = notes.filter((n) => alt(n?.resolvable, false) !== false);
     const pos = first.position ?? null;
+    const last = notes[notes.length - 1] ?? {};
     // jq と同じく、欄の型はそのまま残す（文字列の行番号を数に直さない）。書き手は username でなく id
     out.push({
       id: tostring(d.id),
@@ -412,6 +413,9 @@ export async function discussions(client: Client, owner: string, repo: string, n
       body: alt(first.body, "") as string,
       created_at: alt(first.created_at, "") as string,
       author: tostring(alt(first.author?.id, "")),
+      last_id: tostring(alt(last.id, "")),
+      last_at: alt(last.created_at, "") as string,
+      last_author: String(alt(last.author?.username, "")),
     });
   }
   return out;
@@ -480,6 +484,26 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
     if (typeof d.old_path === "string" && d.old_path !== d.new_path) files.push(d.old_path);
   }
   return { base: b, head: h, files };
+}
+
+/** パスの履歴を読む件数の上限。届けば履歴が途切れていて、最初のコミットを言えない */
+export const PATH_HISTORY_LIMIT = 100;
+
+/**
+ * そのパスを最初に加えたコミットの時刻（epoch 秒）。ブランチ `ref` でそのパスに触れたコミットのうち
+ * 最も古いものを取る。履歴が上限に届いた・読めない・日付を読めないときは null（確定しない）。
+ */
+export async function pathCommitTime(client: Client, owner: string, repo: string, ref: string, path: string): Promise<{ time: number | null }> {
+  const r = checkBranch(ref);
+  const p = checkPath(path);
+  const { status, body } = await get(
+    client,
+    `${project(owner, repo)}/repository/commits?ref_name=${encodeURIComponent(r)}&path=${encodeURIComponent(p)}&per_page=${PATH_HISTORY_LIMIT}`,
+  );
+  if (status === 404 || !Array.isArray(body) || body.length === 0 || body.length >= PATH_HISTORY_LIMIT) return { time: null };
+  const oldest = body[body.length - 1] as { committed_date?: unknown };
+  const ms = typeof oldest?.committed_date === "string" ? Date.parse(oldest.committed_date) : Number.NaN;
+  return { time: Number.isFinite(ms) ? Math.floor(ms / 1000) : null };
 }
 
 // ---- 書き込み -----------------------------------------------------------------

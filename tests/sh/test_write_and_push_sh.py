@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -2530,11 +2531,11 @@ class WriteAndPushChromeConfirmTest(PhaseOne, WriteAndPushHarness):
 
     @staticmethod
     def normalized(path, text):
-        """経路・時刻を除く（違ってよいもの）。"""
+        """経路・時刻を除く（違ってよいもの）。子を動かした経路の欄（settled_by）も経路。"""
         drop = ("via", "at")
         if path.endswith((".reviewed", ".json")):
             return {k: v for k, v in json.loads(text).items() if k not in drop}
-        return text
+        return re.sub(r'^settled_by: "[a-z-]+"\n', "", text, flags=re.M)
 
     def request(self):
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")

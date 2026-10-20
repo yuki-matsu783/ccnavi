@@ -210,12 +210,15 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0136](0136-handoff-across-pcs-and-parent-branch-authority.md) | 親ブランチを正本にして、PC をまたいだ引き継ぎを決める（0102 の `branch:` キーと 0103 の `switch` の手順を置き換える） |
 | [0137](0137-merge-child-at-finish.md) | 子の成果の合流を finish で行い、状態と 1 つのマージコミットにして push する |
 | [0138](0138-tidy-up-when-parent-closes.md) | 親を閉じるときの片付けを ccnavi が行い、消すのは成果が失われないと確かめられたものだけにする |
-| [0139](0139-accept-by-resolving-the-thread.md) | 受け入れた未解決スレッドは記録ファイルに持たず、ホストのスレッドに返信を残して解決する（0030・0081 の `accepted.json` への記録を置き換える） |
+| [0139](0139-accept-by-resolving-the-thread.md) | 受け入れた未解決スレッドは記録ファイルに持たず、ホストのスレッドに返信を残して解決する（0030・0081 の `accepted.json` への記録を置き換える。手で動かした子の確定にだけ ADR-0152 が台帳として復活させた） |
 | [0140](0140-paths-ignore-case-everywhere.md) | パスと名前の大文字小文字は、どの機械でも区別せず同じものとして扱い、両立させない |
 | [0141](0141-drop-the-state-history.md) | 状態の履歴（`events/<識別子>.jsonl`）をやめ、状態は置き場とマーカーだけで持つ（0086 を置き換える） |
 | [0143](0143-user-only-entries-are-separate.md) | ユーザ専用の操作を、実行ファイルの `user` 入口と `ccnavi-user-*.sh` に分け、定義を表 1 つにして hook の止めをそこから作る |
 | [0146](0146-gates-hold-in-dry-run.md) | dry-run でも、チケットの関門と補助の保護は止める（止めている箇所を一般・関門・補助に分ける） |
 | [0147](0147-fail-closed-by-tool.md) | 判定に達せなかったときは、ツールの種類で決める（書き込みは止め、読み取りは最低限の deny を当てて通す） |
+| [0151](0151-operation-log-and-staged-sends.md) | ホストへの送信は操作記録に載せ、段階ごとに照合してから送る（確定できないときは自動で送り直さない） |
+| [0152](0152-manual-move-accepted-with-versions.md) | 手で動かした子は、経路の欄と受け入れ台帳で版つきで受け入れる（再提起は受け入れた後のコメントで見分ける） |
+| [0150](0150-subagent-outcomes-are-recorded-in-five-kinds.md) | サブエージェントの終了結果は 5 つに分けて記録し、担当の子が分からない体は差し戻さず親へ知らせる（Stop が促すのは範囲外を残したものと確かめられなかったものだけ） |
 | [0144](0144-protected-files-change-through-handoff.md) | 保護対象の変更は、テンプレート専用の手順をやめ、wip/handoff/ に置いた下書きを `ccnavi user handoff` で取り込む一本の手順にそろえる |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
 | [0142](0142-drop-sync-records.md) | 取り込み状態（sync/）を廃止し、親ブランチの状態だけで判定する |

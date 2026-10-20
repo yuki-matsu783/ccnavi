@@ -52,7 +52,14 @@ SCRIPT_FIELDS = (
     "merged_sha",
     "cancelled_at",
     "cancel_reason",
+    # 子の経路の欄。finish が子をどこに置いたか（`review` か `done`）と、レビュー待ちの子を
+    # `done/` へ動かしたのが ccnavi のどの経路か。ユーザが手で動かした子は `settled_by` を持たない。
+    "finished_to",
+    "settled_by",
 )
+
+# `settled_by` の値。ccnavi が子を `review/` から `done/` へ動かす経路。
+SETTLED_BY_VALUES = ("confirm", "decide", "close-early", "feedback-plan", "chrome")
 
 # glob のワイルドカード。これより前が字義どおりの前置。
 _WILDCARDS = "*?["
@@ -238,6 +245,8 @@ class Ticket:
     merged_sha: str = ""
     cancelled_at: str = ""
     cancel_reason: str = ""
+    finished_to: str = ""
+    settled_by: str = ""
     # 読んだままの frontmatter。承認済みチケットを作るときに使う。
     raw: dict = field(default_factory=dict)
     body: str = ""

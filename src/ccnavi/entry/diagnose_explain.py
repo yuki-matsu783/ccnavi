@@ -8,7 +8,7 @@ import unicodedata
 from typing import TextIO
 
 from ..hook import judge
-from ..infra import settings, tree
+from ..infra import modes, settings, tree
 from ..policy import builtin, ruleload, rules, selfguard
 from ..tickets import (
     approval,
@@ -182,6 +182,43 @@ def _explain_undeclared(stdout: TextIO, conf: settings.Settings) -> None:
     )
 
 
+def _explain_modes(stdout: TextIO, conf: settings.Settings) -> None:
+    """dry-run で止めるものと止めないもの、判定に達せなかったときの扱い。
+
+    止める箇所の分類（`modes.GENERAL`・`GATE`・`AUX`）と、ツールごとの扱い（`modes.fail_closed`）は
+    判定と同じ定数・関数から組む。チケット制御が無効なら、関門と補助の保護も効かない。
+    """
+    stdout.write("\n■ dry-run のときに止めるもの\n")
+    stdout.write(
+        "  一般の保護（ルールの deny・ask）: dry-run は止めずに報告だけにする\n"
+        "  チケットの関門（状態の操作、承認済みの置き場、範囲、レビュー待ち）と、その抜け道を"
+        "ふさぐ補助の保護（生の git、環境変数の指定など）: dry-run でも止める\n"
+    )
+    if not conf.tickets_enabled:
+        stdout.write(
+            f"  {settings.TICKET_CONTROL_ENV}=disable なので、関門と補助の保護も効いていない\n"
+        )
+    stdout.write("\n■ 判定に達せなかったとき（内部の例外・期限切れ・payload が読めない）\n")
+    for tool in ("", "Write", "Read", "Bash", "Foo"):
+        label = {
+            "": "ツールが分からない",
+            "Write": "Write・Edit・NotebookEdit・Agent",
+            "Read": "Read・Grep・Glob",
+            "Bash": "Bash",
+            "Foo": "知らないツール",
+        }[tool]
+        enable = "止める" if modes.fail_closed(modes.ENABLE, tool) else "通す"
+        dry = "止める" if modes.fail_closed(modes.DRY_RUN, tool) else "通す"
+        safe = "止める" if modes.fail_closed(modes.ENABLE, tool, safe=True) else "通す"
+        if tool in modes.READ_TOOLS or tool in modes.SHELL_TOOLS:
+            stdout.write(f"  {label}: 最低限の許可リストに当たれば{safe}、当たらなければ{enable}\n")
+        else:
+            stdout.write(f"  {label}: enable は{enable}、dry-run は{dry}\n")
+    stdout.write(
+        "  内部の期限には限りがあり、期限切れも「判定に達せなかった」として上の扱いになる\n"
+    )
+
+
 def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
     """いま有効な宣言を、判定を行わずに一覧する。
 
@@ -225,6 +262,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     _explain_risk(stdout, conf, root, views)
 
     _explain_undeclared(stdout, conf)
+    _explain_modes(stdout, conf)
 
     projectless = tree.worktrees_without_project(root, conf.projects)
     if projectless:

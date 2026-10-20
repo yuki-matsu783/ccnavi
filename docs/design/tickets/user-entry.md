@@ -23,7 +23,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 | `OPS` | 操作。何をする操作か（`what`）と、実行ファイルが端末を求めるときに標準エラーへ出す表示名（`terminal`。`user agree` の形） |
 | `FLAGS` | 実行ファイル（`where` が空）と sh スクリプトのオプション。どの止めに入るか（`cli`・`script`）、所属するグループ、`user` の外で断るか（`gated`）、断らない条件（`unless`。`preview` は `--preview` と一緒のとき、`no-yes` は `--yes` が無いとき） |
 | `SCRIPTS` | コマンドの位置で止める sh。前の名前が残っていれば並べる |
-| `SUBS` | 実行ファイルを直に呼ぶ形のサブコマンド（`ticket`・`review`・`sync`・`worktree`） |
+| `SUBS` | 実行ファイルを直に呼ぶ形のサブコマンド（`ticket`・`review`・`sync`・`worktree`・`ops`。`ops` は書き込む副命令だけを止め、読むだけの `pending`・`show`・`reconcile` は通す） |
 | `BOARD_COMBOS` | ボードで押した操作の、オプションの組み合わせ。どのグループからも 1 つずつがコマンド行に並んだら止める。語のグループ `user-board-verb` に `handoff` を含み、古い `templates` の組み合わせは `legacy` のグループに残す。`--via`（グループ `via`）と `board` の語（グループ `board`）の組は、`user` を伴わなくても止める |
 | `VERBS` | `ccnavi user <操作>` の読み替え。操作の語、読み替えた先の内部のオプション、値を取るか |
 | `WRAPPER_OPTIONS` | sh と拡張が先に付ける値つきのオプション（`--root`・`--cwd`・`--record-writes`・`--record-tree`） |

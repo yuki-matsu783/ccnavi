@@ -40,10 +40,28 @@ export async function askConfirm(call: PyCall, ask: Ask, input: ConfirmInput): P
     stamp: input.stamp,
     ...(input.actor ? { actor: input.actor } : {}),
   };
-  const first = await py.confirm(call, body);
-  if (!first.need_compare) return first;
-  const compare = (await ask("compareFiles", [first.need_compare.base, first.need_compare.head])) as Compare;
-  return await py.confirm(call, { ...body, compare });
+  let extra: Record<string, unknown> = {};
+  let res = await py.confirm(call, body);
+  if (res.need_compare) {
+    const compare = (await ask("compareFiles", [res.need_compare.base, res.need_compare.head])) as Compare;
+    extra = { compare };
+    res = await py.confirm(call, { ...body, ...extra });
+  }
+  if (res.need_manual) {
+    // 手で done/ に動かされた子の移動の時刻。全部の子の最初のコミットの時刻のうち最も新しいもの。
+    // 1 つでも読めなければ 0（Python が確かめられないものとして確定しない）
+    let newest = 0;
+    for (const path of res.need_manual.paths) {
+      const got = (await ask("pathCommitTime", [input.family, path])) as { time: number | null };
+      if (typeof got.time !== "number" || got.time <= 0) {
+        newest = 0;
+        break;
+      }
+      newest = Math.max(newest, got.time);
+    }
+    res = await py.confirm(call, { ...body, ...extra, manual_moved_at: newest });
+  }
+  return res;
 }
 
 /** ボードに出すフェーズ 1 つ。`problems` が空で `error` も無ければ「レビュー済みにする」を出せる */

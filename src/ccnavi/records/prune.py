@@ -92,6 +92,7 @@ _SESSION_AND_KEY = (
     ("subagent-", ".bounced"),  # subagent._bounce_path
     ("subagent-", ".unchecked"),  # subagent._unchecked_path
     ("subagent-", ".running"),  # subagent._running_path
+    ("subagent-", ".outcome"),  # subagent_outcome.path
 )
 # `<セッション>.reported.json`（post._reported_path）。Claude Code のセッションは UUID なので、
 # その形に限る。`.+` で読むと、同じ置き場にある別のファイル（`package.json`、レビューの結果の
@@ -114,6 +115,9 @@ class Report:
     logs: list[str] = field(default_factory=list)
     state: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
+    # 消さずに残す操作記録（`logs/state/ops/<操作ID>.json`）の数。未完了の記録は、後始末で消さない
+    # （消えると、送り終えていない判断を復旧できなくなる）。終わった記録はその操作が自分で消す。
+    kept_ops: int = 0
 
     def empty(self) -> bool:
         return not (self.rotated or self.logs or self.state)
@@ -170,7 +174,32 @@ def run(
     _prune_diag(report, root, rotate_mb, log_days, dry_run, now)
     if state_dir and state_days > 0:
         _prune_state(report, root, state_dir, session, now - state_days * 86400, dry_run)
+    report.kept_ops = _count_ops(state_dir)
     return report
+
+
+# 操作記録の置き場の名前（`tickets/oplog.OPS_DIR`）。records は tickets を読めないので写して持つ。
+OPS_DIR = "ops"
+
+
+def _count_ops(state_dir: str) -> int:
+    """操作記録の数。数えるだけで、触らない。"""
+    try:
+        names = os.listdir(os.path.join(state_dir, OPS_DIR)) if state_dir else []
+    except OSError:
+        return 0
+    count = 0
+    for name in names:
+        if not name.endswith(".json"):
+            continue
+        data = fsio.read_dict(os.path.join(state_dir, OPS_DIR, name))
+        stages = data.get("stages") if isinstance(data, dict) else None
+        # 読めない記録も数える（壊れた印として残す）。段階がすべて sent なら終わっているので数えない
+        if not isinstance(stages, list) or any(
+            not isinstance(x, dict) or x.get("state") != "sent" for x in stages
+        ):
+            count += 1
+    return count
 
 
 def summary(report: Report) -> str:
@@ -185,6 +214,8 @@ def lines(report: Report, dry_run: bool) -> list[str]:
     rotate, remove = ("ローテートする", "削除する") if dry_run else ("ローテートした", "削除した")
     out = [f"{rotate}  {src} → {dst}" for src, dst in report.rotated]
     out += [f"{remove}  {path}" for path in report.logs + report.state]
+    if report.kept_ops:
+        out.append(f"残す  未完了の操作記録 {report.kept_ops} 件（{OPS_DIR}/。消さない）")
     if not out:
         out.append("動かすものはありません。")
     return out

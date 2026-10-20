@@ -185,6 +185,41 @@ def write_child_record(approved_dir: str, parent: str, child: str, kind: str, da
     )
 
 
+# 受け入れ台帳。ホストで未解決のまま受け入れた指摘を、版つきで親ごとに持つ
+# （フェーズを開き直しても残る）。
+#   phases/<親>/accepted.json  {"version": 1, "entries": [{key, version, last_comment_id,
+#                              accepted_by, phase, op, at, account}]}
+# accepted_by: manual（手で動かした子の確定）・decide・close-early
+# 実際に書くのは今は manual だけ。decide・close-early はホストのスレッドを解決して受け入れ、
+# 台帳には書かない。LEDGER_BY の後ろ 2 つは、書く側の無い予約の値
+LEDGER_NAME = "accepted"
+LEDGER_BY = ("manual", "decide", "close-early")
+
+
+def read_ledger(approved_dir: str, parent: str) -> tuple[list[dict], str]:
+    """台帳の項目と、読めなかった理由（読めれば空）。無ければ空の台帳。"""
+    path = parent_mark_path(approved_dir, parent, LEDGER_NAME)
+    if not os.path.exists(path):
+        return [], ""
+    data = fsio.read_dict(path)
+    entries = data.get("entries") if isinstance(data, dict) else None
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        return [], f"受け入れ台帳 {path} を読めない"
+    return entries, ""
+
+
+def add_ledger(approved_dir: str, parent: str, new: list[dict]) -> str:
+    """台帳に項目を足す（同じ鍵は置き換える）。書けなければ理由。読めない台帳には書かない。"""
+    entries, problem = read_ledger(approved_dir, parent)
+    if problem:
+        return problem
+    keys = {str(e.get("key")) for e in new}
+    kept = [e for e in entries if str(e.get("key")) not in keys]
+    stamp = now()
+    merged = kept + [{**e, "at": e.get("at") or stamp} for e in new]
+    return write_parent_mark(approved_dir, parent, LEDGER_NAME, {"version": 1, "entries": merged})
+
+
 def marks(approved_dir: str, parent: str, phase: int) -> dict[str, dict]:
     found = {}
     for kind in MARKS:
