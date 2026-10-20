@@ -88,6 +88,10 @@ test("CB-T623 mr-state: URL が http(s) でなくても状態は出す（リン�
   assert.match(failed.kind === "unknown" ? failed.detail : "", /終了コード 127 で終わりました: sh: not found/);
   const spawn = interpretMrState(ran("", { code: -1, stderr: "spawn sh ENOENT" }), 12);
   assert.equal(spawn.kind === "unknown" ? spawn.reason : "", "failed");
+  // 終了コード 2 でも stderr に理由があれば（ワークスペースが見つからないなど）、形の異常と言わず失敗として出す
+  const refused = interpretMrState(ran("", { code: 2, stderr: "ccnavi: ワークスペースが見つかりません" }), 12);
+  assert.equal(refused.kind === "unknown" ? refused.reason : "", "failed");
+  assert.match(refused.kind === "unknown" ? refused.detail : "", /終了コード 2 で終わりました/);
 });
 
 test("CB-T624 古い sh: 頭の行が mr-state 1 でなく、知らない副命令の形（終了コード 2・「mr-state は使用できません」）のときだけ「配り直してください」", () => {

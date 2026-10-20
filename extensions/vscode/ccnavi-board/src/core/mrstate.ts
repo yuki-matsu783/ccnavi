@@ -96,7 +96,9 @@ export function interpretMrState(ran: Ran, expected: number): MrStateResult {
   }
   if (lines[0] !== MR_STATE_HEAD) {
     // sh が想定外の終了コード（実行できない・落ちた）で終わったのか、答えの形が違うのか
-    return ran.code !== 0 && ran.code !== 1
+    // 終了コード 2 は引数の誤りやワークスペース不明。stderr に理由があれば、形の異常ではなく実行の失敗として出す
+    const failed = ran.code !== 0 && ran.code !== 1 && (ran.code !== 2 || ran.stderr.trim() !== "");
+    return failed
       ? unknown("failed", `sh が終了コード ${ran.code} で終わりました${tail(ran.stderr)}`)
       : format(lines.length === 0 ? "出力が空です" : "1 行目が mr-state 1 ではありません");
   }
@@ -212,7 +214,7 @@ export function parseRetired(ran: Pick<Ran, "code" | "stdout" | "killed">): Reti
     const at = `${i + 2} 行目`;
     const words = line.split(" ");
     if (words[0] === "retired") {
-      if (words.length < 5 || words.slice(1, 5).some((w) => w === "")) {
+      if (words.length !== 5 || words.slice(1, 5).some((w) => w === "")) {
         return { ok: false, error: `一覧を取れない（形式の異常: ${at}の retired の項目が足りません）` };
       }
       const mr = parseNumber(words[3]);
