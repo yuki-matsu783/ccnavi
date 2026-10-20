@@ -6,7 +6,7 @@ tags: [tickets, review, approval, compat]
 keywords: [フィードバック計画, feedback, settle_last_review, settled_by, feedback-plan, plan_finished, can_issue, decide, issue に回す, reviewed, 互換の版]
 ---
 
-# ADR-0154: フィードバック計画の承認でレビューの状態を変えず、issue に回すをいつでも選べるようにする
+# ADR-0157: フィードバック計画の承認でレビューの状態を変えず、issue に回すをいつでも選べるようにする
 
 状態: 採用（互換の版を 17 から 18 に上げる）
 
