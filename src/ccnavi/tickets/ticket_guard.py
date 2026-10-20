@@ -188,8 +188,8 @@ def approved_message_for(root: str) -> str:
 def approved_write_rule(approved_rel: str, root: str) -> rules.Rule:
     """承認済みの置き場を名前で書くツールから守る 1 本（`builtin:ticket-approved`）。
 
-    実行後の保護範囲（`events.watched_for`）に足す。シェル版は要らない（実行後は作業ツリーの
-    変更を見る）。実行前の関門（`gate_rules`）と同じ式・同じ文面。
+    実行後の保護範囲（`events.watched_for`）に足す。シェル版は足さない。実行後は作業ツリーの
+    変更を見るため。実行前の関門（`gate_rules`）と同じ式・同じ文面。
     """
     return _dir_rules(
         APPROVED_RULE_ID, APPROVED_SHELL_RULE_ID, approved_rel, approved_message_for(root)
@@ -200,7 +200,7 @@ def gate_rules(approved_rel: str, root: str) -> list[rules.Rule]:
     """承認済みの置き場と操作記録の置き場を守るルール。組み込みで、ルールファイルには書かない。
 
     承認済みの置き場（承認済みチケット、`doing/`・`done/`、`phases/` のマーカー・子の記録・
-    受け入れ台帳、`flows/`）は、動かすのは ccnavi のスクリプトとユーザの操作だけ。エージェントの
+    受け入れ台帳、`flows/`）は、動かせるのは ccnavi のスクリプトとユーザの操作だけ。エージェントの
     直接の書き込みは、dry-run でも `CCNAVI_GUARD_CORE_FILES` の値でも止める
     （チケット制御が有効な間）。
     操作記録（判断の保存と送信の段階）も同じ。書き直すと、送り直しの根拠を偽れる。

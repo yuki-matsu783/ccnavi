@@ -1304,7 +1304,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
             "id": SETTINGS_RULE_ID,
             "regex": _SETTINGS_REGEX,
             "message": (
-                "hook の登録そのものです。ワークツリー側の設定も統合で統合先の設定になります。"
+                "hook の登録そのものです。ワークツリー側の設定も統合すると統合先の設定になります。"
                 "エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。"
                 f"{stage}"
             ),
@@ -1317,7 +1317,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
                 "id": SCRIPTS_RULE_ID,
                 "glob": f"*/{_home_name(project_home)}/scripts/*",
                 "message": (
-                    "事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。"
+                    "安全を確かめたコマンドだけを実行するラッパースクリプトです。"
                     "エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。"
                     f"{stage}"
                 ),
@@ -1328,7 +1328,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
                 "message": (
                     "ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。エージェントの判断で"
                     "書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください"
-                    "（/ccnavi-config）。ルールファイルが読めないときも同じで、書き換えず、"
+                    "（/ccnavi-config）。ルールファイルが読めないときも同じです。書き換えず、"
                     "wip/handoff/.ccnavi/config/common/rules.yml に下書きを置いて"
                     "ユーザに取り込みを頼んでください。"
                     f"{stage}"

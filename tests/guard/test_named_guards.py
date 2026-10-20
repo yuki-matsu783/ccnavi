@@ -336,7 +336,7 @@ class CredentialsTest(Workspace):
                 self.assertEqual(ids, [CREDENTIALS])
 
     def test_the_sample_env_is_stopped_too(self):
-        # 見本の `.env.example` も、土台は止める。設定で外せないので、誤検知が出ても外せない。
+        # 見本の `.env.example` も土台が止める。設定で外せないため、誤検知が出ても外せない。
         for tool, field in self.FILE_TOOLS:
             with self.subTest(tool=tool):
                 _, reason, ids = self.hook(tool, {field: self.at(".env.example")})

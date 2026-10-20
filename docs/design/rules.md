@@ -180,7 +180,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   rm と reset は、後の始まりで当たるなら最初の始まりでも当たるので、コマンドの中で最初の `rm` / `reset` に決めて 1 度だけ読む。
   git のオプションは、中に git の始まりを持たない語だけを読む
 
-認証情報の 1 本（`builtin:credentials`）も、既定のときに限らず常に当たる土台の deny。設定で切れないので、誤検知が出ても外せない。
+認証情報の 1 本（`builtin:credentials`）も、既定のときに限らず常に当たる土台の deny。設定で切れず、誤検知が出ても外せない。
 見本の `.env.example` も、対象の 5 つのツール（`Bash` `Read` `Write` `Edit` `NotebookEdit`）で止まる。`Grep` `Glob` `PowerShell` は対象に入れない。
 鍵のファイルは拡張子として書かれた形（`x.pem`、`x.pem.bak`、`x.key.json`）で当てる。判定に達せなかったときの許可リスト（`hook/failsafe.py`）は、
 この式に揃え、独自に `.gnupg`、`id_ecdsa`、`.p12` / `.pfx`、`.git`、操作記録の置き場を足している。
