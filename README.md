@@ -296,7 +296,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 |---|---|
 | 変更要求（`POST .../request_changes`）は EE 限定 | 当てられない。CE の `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
 | URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh はユーザの情報を除いて伏せる。実行ファイルの `remote_kind` も読み飛ばす |
-| ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を引き継がないので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く（probe はリポジトリの `credential.helper` を空にしてから足す） |
+| ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を引き継がないので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く。ただし gh / glab で認証済みなら、ccnavi が `ccnavi_git_auth` でその helper を足す（利用者の環境変数での差し替えは効かない）。probe はリポジトリの `credential.helper` を空にしてから足す |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tests/manual/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |
 
@@ -2100,7 +2100,7 @@ JSON で渡す（`--result <path>`）。
   道具は起動時に絶対パスへ解いて固定する。GitHub と GitLab は origin の URL で見分ける（`github.com`・`ghe.com`・`*.ghe.com` が GitHub、それ以外は GitLab）
 - origin の表記はポートと scheme をそのまま使う（`http://localhost:8929/g/p.git` なら `http://localhost:8929/api/v4`）。
   URL に埋めた資格情報は読み飛ばし、出力では伏せる
-- push の認証は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは `GIT_CONFIG_COUNT` を外し
+- push の認証は、gh / glab でログイン済みならそのまま通る。origin が http(s) のとき、`ccnavi_git_auth`（`ccnavi-common-host.sh`）が `gh auth git-credential` / `glab auth git-credential` を origin のホストだけに環境変数で足す（git 2.31 以上。origin と `.gitconfig` は書き換えず、既存の `credential.helper` が先に使われる）。それ以外は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは `GIT_CONFIG_COUNT` を外し
   `GIT_TERMINAL_PROMPT=0` で動くので、環境変数での差し替えも認証画面も使えない。GitLab の実物で分かった注意点は [実測で分かった落とし穴](#実測で分かった落とし穴)、
   確かめ直すための道具は `tests/manual/gitlab/probe_gitlab.py`
 - `--result` を実行ファイルに直接渡せるのはユーザの手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）。エージェントはスクリプト 2 本を通す

@@ -280,3 +280,73 @@ ccnavi_host_project_id() {
 	esac
 	printf '%s' "$ccnavi_hi_val"
 }
+
+# ---- git の認証（gh / glab の資格情報を git に使わせる）
+#
+#   ccnavi_git_auth <リポジトリ>  origin が http(s) のとき、そのホストの資格情報の取り手に
+#                                 `gh auth git-credential`（GitHub 系）か `glab auth git-credential`
+#                                 （それ以外）を足す。git を打つ前に呼ぶ（以降の git に効く）。
+#
+# gh / glab で認証済みでも、git の push・fetch は別に認証が要る（`could not read Username` で止まる）。
+# ログイン済みのホストだけに足すので、未認証・未導入のホストでは何も足されず、
+# git は元の設定の取り手（ccnavi が足すのは末尾なので、先にあるものが優先）で進む。
+# 足し方は環境変数（GIT_CONFIG_COUNT 系）。.gitconfig や origin の URL は書き換えず、この呼び出しの子プロセスにだけ効く。
+# 道具は絶対パスへ解く（PATH の細工で差し替えられないように。ccnavi_host_connect と同じ）。
+ccnavi_ga_seen=""
+ccnavi_ga_base=""
+ccnavi_ga_had=""
+
+# 自分が足した分を外す。元の環境が GIT_CONFIG_COUNT を持たなかったなら、変数ごと戻す。
+ccnavi_git_auth_reset() {
+	[ -n "$ccnavi_ga_base" ] || return 0
+	if [ "$ccnavi_ga_base" = 0 ] && [ -z "$ccnavi_ga_had" ]; then
+		unset GIT_CONFIG_COUNT
+	else
+		GIT_CONFIG_COUNT="$ccnavi_ga_base"
+		export GIT_CONFIG_COUNT
+	fi
+}
+
+ccnavi_git_auth() {
+	ccnavi_ga_url=$(git -C "${1:-.}" remote get-url origin 2>/dev/null || :)
+	[ "$ccnavi_ga_url" = "$ccnavi_ga_seen" ] && return 0
+	# origin が変わったら、前に足した分を外す（http(s) でなければ、そのまま何も足さない）。
+	ccnavi_git_auth_reset
+	case "$ccnavi_ga_url" in
+	[hH][tT][tT][pP]://* | [hH][tT][tT][pP][sS]://*) ;;
+	*) return 0 ;;
+	esac
+	# 親の環境が GIT_CONFIG_COUNT を持っていればその続きに足す。origin が変わったら、自分が足した分を外してやり直す。
+	if [ -z "$ccnavi_ga_base" ]; then
+		ccnavi_ga_had="${GIT_CONFIG_COUNT+set}"
+		ccnavi_ga_base="${GIT_CONFIG_COUNT:-0}"
+	fi
+	case "$ccnavi_ga_base" in '' | *[!0-9]*) return 0 ;; esac
+	ccnavi_ga_seen="$ccnavi_ga_url"
+	# ホストの見分けは ccnavi_host_parse に任せる。呼び手の ccnavi_h_* を壊さないよう、副シェルで読む。
+	ccnavi_ga_info=$(ccnavi_host_parse "$ccnavi_ga_url" >/dev/null 2>&1 && printf '%s %s %s' "$ccnavi_h_scheme" "$ccnavi_h_host" "$ccnavi_h_kind") || { ccnavi_git_auth_reset; return 0; }
+	ccnavi_ga_scheme="${ccnavi_ga_info%% *}"
+	ccnavi_ga_rest="${ccnavi_ga_info#* }"
+	ccnavi_ga_host="${ccnavi_ga_rest% *}"
+	ccnavi_ga_kind="${ccnavi_ga_rest##* }"
+	if [ "$ccnavi_ga_kind" = github ]; then
+		ccnavi_ga_name=gh
+	else
+		ccnavi_ga_name=glab
+	fi
+	ccnavi_ga_cli=$(command -v "$ccnavi_ga_name" 2>/dev/null || :)
+	# 絶対パスで、式に効く文字（" $ ` \）を含まないものだけ使う。相対パスだと、リポジトリの中の gh が helper として動く。
+	case "$ccnavi_ga_cli" in
+	*[\"\$\`\\]*) ccnavi_git_auth_reset; return 0 ;;
+	[A-Za-z]:[/\\]* | /*) ;;
+	*) ccnavi_git_auth_reset; return 0 ;;
+	esac
+	# 値は変数のまま eval に渡す（ホスト名や道具のパスを式に埋めない。origin の文字列がコマンドとして走らないように）。
+	ccnavi_ga_key="credential.$ccnavi_ga_scheme://$ccnavi_ga_host.helper"
+	ccnavi_ga_val="!\"$ccnavi_ga_cli\" auth git-credential"
+	eval "GIT_CONFIG_KEY_$ccnavi_ga_base=\$ccnavi_ga_key GIT_CONFIG_VALUE_$ccnavi_ga_base=\$ccnavi_ga_val"
+	eval "export GIT_CONFIG_KEY_$ccnavi_ga_base GIT_CONFIG_VALUE_$ccnavi_ga_base"
+	GIT_CONFIG_COUNT=$((ccnavi_ga_base + 1))
+	export GIT_CONFIG_COUNT
+	return 0
+}
