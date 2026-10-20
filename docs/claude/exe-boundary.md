@@ -35,7 +35,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   満たさないが、同じ関門を共有しないと消えた親のブランチを作り直せてしまうため、関門だけを例外に入れる。関門の材料のうちチケットの中身
   （着手済み＝承認済みの親チケットの`started_at`・`.requested`・退避の有無）は実行ファイルの`tree parent`に聞き、shは自分で読まない。承認済みというだけでは形跡にしない。関門が`ls-remote`を打つのはshの側
   （ネットワークはshの仕事）。この2経路にほかの判定は足さない
-- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`write-and-push family`・`sync retired`・
+- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`tree base-bound`・`tree guarded`・`tree handoff-pending`・`write-and-push family`・`sync retired`・
   `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
   （止める側の検査は止める向き、ツリーを動かす側は動かさない向き）。`tree parent`の答えの`approved`・`started`などの行が無い（古い実行ファイル）ときは
   `unknown`として読む

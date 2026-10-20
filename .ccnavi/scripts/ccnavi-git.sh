@@ -1366,7 +1366,7 @@ ig_integrate() {
 		reject integrate-source-dirty "ワークツリー .claude/worktrees/$ig_n に未コミットの変更があります。取り込むのはコミットした分だけなので、ワークツリーの中でコミットしてから再実行してください。変更（先頭 10 件）: $(printf '%s' "$ig_wdirty" | tr '\n' ' ')"
 	fi
 	if ! d4_draft_check "$d4_s"; then
-		reject integrate-draft "$d4_draft_why。ユーザに cd $(ccnavi_sh_quote "$ig_wt") && ccnavi user handoff を頼み、取り込んだ変更を作業ワークツリーでコミットしてください。要らない下書きは消してコミットします。"
+		reject integrate-draft "${d4_draft_why}。ユーザに cd $(ccnavi_sh_quote "$ig_wt") && ccnavi user handoff を頼み、取り込んだ変更を作業ワークツリーでコミットしてください。要らない下書きは消してコミットします。"
 	fi
 	d4_tip=$(git rev-parse --verify "refs/heads/$ig_n^{commit}")
 	if git ls-tree -r "$d4_tip" 2>/dev/null | grep -q '^160000 '; then
@@ -1430,13 +1430,14 @@ $d4_added
 EOF
 	d4_guard_ask "$d4_changed"
 	# 一時ワークツリーに C を展開する。
-	mkdir -p "${d4_tmp%/*}" 2>/dev/null || reject integrate-tmp "一時ワークツリーの置き場（${d4_tmp%/*}）を作れません。"
+	mkdir -p "${d4_tmp%/*}" 2>/dev/null || reject integrate-tmp "一時ワークツリーの置き場（${d4_tmp%/*}）を作れません。書き込める場所か確かめ、ユーザに伝えてください。"
 	if ! d4_wa=$(git worktree add --detach "$d4_tmp" "$d4_head" 2>&1); then
-		reject integrate-tmp "一時ワークツリー ${d4_tmp} を作れませんでした（$(printf '%s' "$d4_wa" | tail -n 1)）。メインのチェックアウトは変えていません。"
+		d4_wa=$(printf '%s' "$d4_wa" | tail -n 1)
+		reject integrate-tmp "一時ワークツリー ${d4_tmp} を作れませんでした（${d4_wa}）。メインのチェックアウトは変えていません。原因を確かめ、ユーザに伝えてください。"
 	fi
 	if ! git -C "$d4_tmp" read-tree --reset -u "$d4_c" >/dev/null 2>&1; then
 		git worktree remove --force "$d4_tmp" >/dev/null 2>&1 || :
-		reject integrate-tmp "一時ワークツリーに取り込み結果を展開できませんでした。メインのチェックアウトは変えていません。"
+		reject integrate-tmp "一時ワークツリーに取り込み結果を展開できませんでした。メインのチェックアウトは変えていません。ユーザに伝えてください。"
 	fi
 	ccnavi_record_write "$ig_mark" version 4 head "$d4_head" tip "$d4_tip" c_tree "$d4_c" tmp "$d4_tmp" empty no \
 		created "$(date +%s)" || {
@@ -1542,7 +1543,7 @@ d4_finish() {
 			d4_stop "ワークツリー .claude/worktrees/$ig_n に未コミットの変更があるので、削除していません。変更（先頭 10 件）: $(printf '%s' "$d4_wd" | tr '\n' ' ')" worktree-dirty
 		fi
 		if ! d4_draft_check "${d4_ss:-$d4_m_head}"; then
-			d4_stop "$d4_draft_why。ワークツリーは削除していません" worktree-draft
+			d4_stop "${d4_draft_why}。ワークツリーは削除していません" worktree-draft
 		fi
 		ig_cl_rc=0
 		ig_cl=$(sh "$(dirname "$0")/ccnavi-clean.sh" --worktree "$ig_n" 2>&1) || ig_cl_rc=$?
@@ -1654,7 +1655,7 @@ ig_done() {
 		fi
 		d4_ss0=$(git rev-parse --verify --quiet "$d4_ref/s^{commit}" 2>/dev/null || :)
 		if [ -d "$ig_wt" ] && ! d4_draft_check "${d4_ss0:-$d4_m_head}"; then
-			reject integrate-done-draft "$d4_draft_why。ユーザに cd $(ccnavi_sh_quote "$ig_wt") && ccnavi user handoff を頼み、取り込んだ変更をコミットしてから、integrate を打ち直してください。"
+			reject integrate-done-draft "${d4_draft_why}。ユーザに cd $(ccnavi_sh_quote "$ig_wt") && ccnavi user handoff を頼み、取り込んだ変更をコミットしてから、integrate を打ち直してください。"
 		fi
 		if [ "$d4_m_empty" = yes ]; then
 			d4_finish
