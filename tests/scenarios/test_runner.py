@@ -508,6 +508,52 @@ class ConfirmationTextTest(unittest.TestCase):
         m.assert_not_called()
 
 
+class JudgeTest(unittest.TestCase):
+    TABLE = "| 基準 | 判定 | 理由 |\n|---|---|---|\n| a | pass | r1 |\n| b | pass | r2 |\n"
+
+    def test_parse_reads_rows_and_skips_header(self):
+        rows = runner.parse_judgment(self.TABLE)
+        self.assertEqual(rows, [("a", "pass", "r1"), ("b", "pass", "r2")])
+
+    def test_parse_rejects_a_verdict_that_is_not_pass_or_fail(self):
+        with self.assertRaises(ValueError):
+            runner.parse_judgment("| a | needs-review | r |\n")
+
+    def test_final_verdict_waits_until_user_accepts(self):
+        mech = [("decisions", {}, runner.PASS, "")]
+        judged = [("a", runner.PASS, "")]
+        self.assertIn("受け入れ待ち", runner.final_verdict(mech, judged, False))
+
+    def test_final_verdict_after_acceptance(self):
+        mech = [("decisions", {}, runner.PASS, "")]
+        self.assertEqual(runner.final_verdict(mech, [("a", runner.PASS, "")], True), runner.PASS)
+        self.assertEqual(runner.final_verdict(mech, [("a", runner.FAIL, "")], True), runner.FAIL)
+        bad = [("decisions", {}, runner.FAIL, "")]
+        self.assertEqual(runner.final_verdict(bad, [("a", runner.PASS, "")], True), runner.FAIL)
+
+    def test_cmd_judge_appends_once_and_records_acceptance(self):
+        uc01 = str(Path(__file__).parent / "UC-01-direct-edit-denied.yml")
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            (out / "report.md").write_text("# UC-01\n\n全体: needs-review\n", encoding="utf-8")
+            (out / "state.json").write_text(json.dumps({"scenario": uc01}), encoding="utf-8")
+            recorded = [
+                {"kind": "decisions", "expect": {}, "verdict": "pass", "why": "x"},
+                {"kind": "judge", "expect": "a", "verdict": "needs-review", "why": ""},
+                {"kind": "judge", "expect": "b", "verdict": "needs-review", "why": ""},
+            ]
+            (out / "report.json").write_text(json.dumps(recorded), encoding="utf-8")
+            table = Path(d) / "judge.md"
+            table.write_text(self.TABLE, encoding="utf-8")
+            ns = runner.argparse.Namespace(out=str(out), file=str(table), accept=True)
+            self.assertEqual(runner.cmd_judge(ns), 0)
+            text = (out / "report.md").read_text(encoding="utf-8")
+            self.assertIn(runner.JUDGE_HEADING, text)
+            self.assertIn("ユーザの受け入れ: あり", text)
+            self.assertIn("全体（機械判定と意味の判定の合わせ）: pass", text)
+            self.assertEqual(runner.cmd_judge(ns), 1)
+
+
 class RepoResultTest(unittest.TestCase):
     def test_same_state_passes(self):
         self.assertEqual(runner.repo_result("a", "a")[0], runner.PASS)

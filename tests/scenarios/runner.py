@@ -6,6 +6,7 @@
     uv run python -m tests.scenarios.runner run <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ> --confirmed
     uv run python -m tests.scenarios.runner next <出力の置き場>
+    uv run python -m tests.scenarios.runner judge <出力の置き場> <判定の表のファイル> [--accept]
 
 next は、人間の操作で止まったあと、人間が「次へ」と言ってから打つ。
 
@@ -911,6 +912,67 @@ def cmd_preflight(args):
     return 3
 
 
+JUDGE_HEADING = "## 意味の判定（別のエージェント）"
+
+
+def parse_judgment(text):
+    """判定の表（| 基準 | 判定 | 理由 |）を読む。[(基準, 判定, 理由)]。判定は pass か fail だけ。"""
+    rows = []
+    for line in text.splitlines():
+        s = line.strip()
+        if not s.startswith("|"):
+            continue
+        cells = [c.strip() for c in s.strip("|").split("|")]
+        if len(cells) < 3 or cells[0] == "基準" or set(cells[0]) <= set("-: "):
+            continue
+        verdict = cells[1].lower()
+        if verdict not in (PASS, FAIL):
+            raise ValueError(f"判定は pass か fail にする: {cells[0]} → {cells[1]}")
+        rows.append((cells[0], verdict, cells[2]))
+    return rows
+
+
+def final_verdict(mechanical, judged, accepted):
+    """機械判定と意味の判定と、ユーザの受け入れから、最終の判定を決める。"""
+    if not accepted:
+        return "受け入れ待ち（ユーザが判定を確かめるまで、全体の判定は確定しない）"
+    judge_verdicts = [v for _, v, _ in judged]
+    if overall(mechanical) != PASS:
+        return overall(mechanical)
+    return FAIL if FAIL in judge_verdicts else PASS
+
+
+def cmd_judge(args):
+    """意味の判定（別のエージェントが書いた判定の表）を報告に足す。
+    --accept は、ユーザが判定を受け入れたことを記す。"""
+    out = Path(args.out)
+    report = out / "report.md"
+    if JUDGE_HEADING in report.read_text(encoding="utf-8"):
+        print("この回の意味の判定は、もう報告に足してある（二重には足さない）")
+        return 1
+    judged = parse_judgment(Path(args.file).read_text(encoding="utf-8"))
+    st = json.loads((out / "state.json").read_text(encoding="utf-8"))
+    scn = load_scenario(st["scenario"])
+    expected = len(scn["expect"].get("judge", []))
+    if not judged or len(judged) != expected:
+        print(f"判定の表の行数が違う: 期待 {expected} 行、読めた {len(judged)} 行")
+        return 1
+    recorded = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    mechanical = [
+        (r["kind"], r["expect"], r["verdict"], r["why"]) for r in recorded if r["kind"] != "judge"
+    ]
+    lines = ["", JUDGE_HEADING, "", "| 基準 | 判定 | 理由 |", "|---|---|---|"]
+    lines += [f"| {c} | {v} | {w} |" for c, v, w in judged]
+    lines += ["", f"ユーザの受け入れ: {'あり' if args.accept else 'なし'}"]
+    verdict = final_verdict(mechanical, judged, args.accept)
+    lines += [f"全体（機械判定と意味の判定の合わせ）: {verdict}"]
+    text = report.read_text(encoding="utf-8")
+    report.write_text(text + "\n".join(lines) + "\n", encoding="utf-8")
+    print(f"意味の判定を報告に足した: {report}")
+    print(f"全体: {verdict}")
+    return 0
+
+
 def cmd_run(args):
     _require_entry()
     root = Path(args.root).resolve()
@@ -991,6 +1053,11 @@ def main(argv=None):
     p.add_argument("scenario")
     p.add_argument("--root", default=str(ROOT))
     p.set_defaults(fn=cmd_preflight)
+    j = sub.add_parser("judge")
+    j.add_argument("out")
+    j.add_argument("file", help="判定の表（| 基準 | 判定 | 理由 |）を書いたファイル")
+    j.add_argument("--accept", action="store_true", help="ユーザが判定を受け入れた")
+    j.set_defaults(fn=cmd_judge)
     n = sub.add_parser("next")
     n.add_argument("out")
     n.set_defaults(fn=cmd_next)
