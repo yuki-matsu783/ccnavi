@@ -887,7 +887,8 @@ def confirmation_text(scn, root, mode_text):
     if clash:
         facts += ["", f"注意: setup のパスが既にある（run は回さない）: {', '.join(clash)}"]
     questions = [
-        "確認事項 1: 今の状態はきれいで、最新か（他のセッションの作業中や未コミットの変更が無いか）"
+        "確認事項 1: 作業ツリーに未コミットの変更がなく、origin と同期しているか"
+        "（他のセッションが作業中の変更を含まないか）"
     ]
     if scn.get("test_repo"):
         questions.append("確認事項 2: projects/test-repo にブランチや MR ができてよいか")
