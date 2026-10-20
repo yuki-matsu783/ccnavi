@@ -47,6 +47,7 @@ confirm_local = core_review.confirm_local
 reviewable = core_review.reviewable
 requested_head = core_review.requested_head
 moved_on_host = core_review.moved_on_host
+moved_detail_on_host = core_review.moved_detail_on_host
 manual_for = core_review.manual_for
 
 withdraw = core_withdraw.withdraw

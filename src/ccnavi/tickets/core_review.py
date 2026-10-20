@@ -53,6 +53,7 @@ def confirm(
     result,
     changed_since_request: str,
     manual: manual_settle.Manual | None = None,
+    moved: review.Moved | None = None,
 ) -> core_base.Checked:
     """レビュー済みにしてよいかを見て、通れば書くもの（子を `done/` へ、
     レビュー済みのマーカー）を並べる。
@@ -61,6 +62,8 @@ def confirm(
     読めなかったときの扱い（`--result` が無い、読めない）は読む側（手元は `confirm_local`）が持つ。
     `changed_since_request` は依頼の後にユーザが見るものが動いたかの説明（空なら動いていない）。
     手元は git の差分、Chrome は compare API から作る。
+    `moved` は動いた理由の種類と（手元だけ）コミットの一覧。止めたあとの説明にだけ使い、判定は
+    `changed_since_request` で決まる。
     """
     conf, root = snapshot.conf, snapshot.root
     parent = _open_parent(root, conf, parent_id)
@@ -93,7 +96,8 @@ def confirm(
             CODE_CONFIRM_MOVED,
             [
                 f"ccnavi: {changed_since_request}。ユーザが見たものと今の HEAD が違う。"
-                f"{review._redo_request(root, phase_no)}"
+                f"{review._redo_request(root, phase_no)}",
+                *(review.moved_explanation(moved) if moved is not None else []),
             ],
         )
     problems = review.matching_problems(result, requested_mark)
@@ -209,16 +213,14 @@ def confirm_local(
         return 1
     parent, ph = found
     requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
-    moved = ""
+    moved = review.Moved()
     result = None
     # 読む順は前と同じ。依頼の記録が無ければ差分も取得した結果も見ない。
     # 動いていれば取得した結果を読まない。レビュー済みなら差分も取得した結果も読まない
     # （コアが「レビュー済み」で止める。Chrome と同じ文面）
     if requested_mark is not None and approval_marks.MARK_REVIEWED not in ph.marks:
-        moved = review._moved_since_request(
-            tree.worktree_path(root, parent.ticket), conf, requested_mark
-        )
-        if not moved:
+        moved = review._moved_detail(tree.worktree_path(root, parent.ticket), conf, requested_mark)
+        if not moved.text:
             result = review._result(stderr, result_path)
             if result is None:
                 return 1
@@ -227,7 +229,13 @@ def confirm_local(
     for line in _manual_notes(manual):
         stdout.write(line + "\n")
     checked = confirm(
-        core_base.read_fs(conf, root, actor=who), parent.ticket, phase_no, result, moved, manual
+        core_base.read_fs(conf, root, actor=who),
+        parent.ticket,
+        phase_no,
+        result,
+        moved.text,
+        manual,
+        moved,
     )
     for line in checked.problems:
         stderr.write(line + "\n")
@@ -351,13 +359,28 @@ def moved_on_host(
     head: str,
     changed: list[str] | None,
 ) -> str:
+    """`moved_detail_on_host` の判定の文だけ（空なら動いていない）。"""
+    return moved_detail_on_host(snapshot, parent_id, phase_no, head, changed).text
+
+
+def moved_detail_on_host(
+    snapshot: core_base.Snapshot,
+    parent_id: str,
+    phase_no: int,
+    head: str,
+    changed: list[str] | None,
+) -> review.Moved:
     """ホストで読んだ親の先頭 `head` と変更の一覧から、依頼の後にユーザが見るものが動いたかを言う。
 
     手元の confirm と同じ関数（`review.moved_since`）で決める。依頼の記録が無ければ空を返し、
     `confirm` が「依頼の記録が無い」で止める。
     """
     mark = _requested_mark(snapshot, parent_id, phase_no)
-    return "" if mark is None else review.moved_since(snapshot.conf, mark, head, changed)
+    # Chrome は祖先かどうかを compare API の一覧に任せる（読めなければ changed が None）。
+    # コミットの一覧は手元の git が無いので出さない
+    return (
+        review.Moved() if mark is None else review.moved_detail(snapshot.conf, mark, head, changed)
+    )
 
 
 def _open_parent(root: str, conf: settings.Settings, parent_id: str) -> ticket_model.Ticket | None:

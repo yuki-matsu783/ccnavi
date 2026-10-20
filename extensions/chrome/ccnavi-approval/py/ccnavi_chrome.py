@@ -1012,9 +1012,10 @@ def _op_confirm(req: dict, root: str) -> dict:
                 "code": None,
                 **_changes(root, None),
             }
-        changed = core.moved_on_host(
+        moved = core.moved_detail_on_host(
             snapshot, ident, phase_no, head, _compare_files(compare, recorded, head)
         )
+        changed = moved.text
         # 手で done/ に動かされた子の確定。移動の時刻は拡張がホストの履歴から読む。
         at = req.get("manual_moved_at")
         at = float(at) if isinstance(at, (int, float)) and not isinstance(at, bool) else None
@@ -1029,7 +1030,7 @@ def _op_confirm(req: dict, root: str) -> dict:
                 "code": None,
                 **_changes(root, None),
             }
-        checked = core.confirm(snapshot, ident, phase_no, result, changed, manual)
+        checked = core.confirm(snapshot, ident, phase_no, result, changed, manual, moved)
     body = _changes(root, checked.changes)
     _one_branch(body, family)
     return {

@@ -150,9 +150,50 @@ class MovedSinceTest(ActorHarness):
         root = self.root.replace(os.sep, "/")
         same = [p.replace(os.sep, "/").replace(f"{root}/memfs/", "") for p in chrome["problems"]]
         said = [line.replace(os.sep, "/").replace(f"{root}/", "") for line in said]
+        # コミットの一覧は手元の git で取れたときだけ（Chrome は出さない）。ほかは同じ文面
+        listed = [i for i, line in enumerate(said) if line.startswith("依頼のあとのコミット")]
+        self.assertEqual(len(listed), 1)
+        self.assertIn("late code", said[listed[0] + 1])
+        del said[listed[0] : listed[0] + 2]
         self.assertEqual([p.replace(f"{root}/", "") for p in same], said)
         self.assertIn("依頼の後に親の HEAD が動いている", chrome["problems"][0])
         self.assertIsNone(chrome["changes"])
+
+    def test_the_explanation_by_kind_and_the_fixed_guidance(self):
+        """止めたあとの説明だけを足す。判定は変えない。"""
+        conf = self.conf()
+        mark = {"head": "a" * 40}
+        seen = review.moved_detail(conf, mark, "b" * 40, ["src/app.py"])
+        self.assertEqual(seen.kind, review.KIND_SEEN)
+        text = "\n".join(review.moved_explanation(seen))
+        self.assertIn(
+            "ユーザが見たのは依頼時の HEAD で、その後の変更はレビューに入っていない", text
+        )
+        self.assertIn("GitLab の「提案を適用」や Web IDE の編集もここに入る", text)
+        self.assertIn(
+            "一覧にエージェントが作っていないコミットがあれば、取り込んだことをユーザに", text
+        )
+        # 確認できない（読めない・祖先でない・compare の打ち切り）: 変更があると断定しない
+        for unverified in (
+            review.moved_detail(conf, mark, "b" * 40, None),
+            review.moved_detail(conf, mark, "b" * 40, ["src/app.py"], ancestor=False),
+            review.moved_detail(conf, {}, "b" * 40, []),
+        ):
+            self.assertEqual(unverified.kind, review.KIND_UNVERIFIED)
+            text = "\n".join(review.moved_explanation(unverified))
+            self.assertIn("依頼時と同じレビュー対象だと確認できない", text)
+            self.assertNotIn("その後の変更はレビューに入っていない", text)
+            self.assertIn("取り込んだことをユーザに", text)
+        # 動いていなければ説明は無い
+        self.assertEqual(
+            review.moved_explanation(review.moved_detail(conf, mark, "a" * 40, [])), []
+        )
+        self.assertEqual(
+            review.moved_explanation(
+                review.moved_detail(conf, mark, "b" * 40, [".ccnavi/approved/x"])
+            ),
+            [],
+        )
 
     def test_a_truncated_or_mismatched_compare_counts_as_moved(self):
         self.ready()
@@ -167,6 +208,12 @@ class MovedSinceTest(ActorHarness):
             self.assertTrue(
                 any("依頼の後に親の HEAD が動いている" in p for p in chrome["problems"]), chrome
             )
+            # 確認できないときは、変更があると断定しない（一覧も出さない）
+            said = "\n".join(chrome["problems"])
+            self.assertIn("依頼時と同じレビュー対象だと確認できない", said)
+            self.assertNotIn("その後の変更はレビューに入っていない", said)
+            self.assertNotIn("依頼のあとのコミット", said)
+            self.assertIn("取り込んだことをユーザに伝えてから依頼し直す", said)
 
     def test_only_the_places_moved_so_chrome_writes(self):
         self.ready()
