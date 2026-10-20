@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import unittest
 from types import SimpleNamespace
 
 from ccnavi.tickets import review, review_decide
+from tests import ROOT
 
 
 def decision(unresolved=()):
@@ -79,3 +81,13 @@ class ThreadLabelTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ResolveNoteCopyTest(unittest.TestCase):
+    def test_the_board_note_carries_the_same_sentence_as_the_executable(self):
+        """ボードの note は文を直書きしているので、実行ファイルの `RESOLVE_NOTE` と突き合わせる。"""
+        path = os.path.join(
+            ROOT, "extensions", "vscode", "ccnavi-board", "src", "core", "approval-machine.ts"
+        )
+        with open(path, encoding="utf-8") as f:
+            self.assertIn(review.RESOLVE_NOTE, f.read())

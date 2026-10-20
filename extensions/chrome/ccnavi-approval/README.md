@@ -43,7 +43,7 @@ sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANG
 親のブランチ・依頼を投稿したアカウントの id `poster`、ホストの応答は `mrs.json`・`discussions.<N>.json`・`reviewers.<N>.json`・`user.json`）。
 代役は sh の試験の `tests/sh/gitlab_host.py` と拡張の試験の `test/helpers/gitlab-fixture.ts`、試験は `tests/sh/test_review_host_fixture.py` の
 `GitLabHostFixtureTest` と拡張の CX-T144。結論（`conclusion.json`）を出すときは、`poster` が投稿した ccnavi の依頼のスレッドを数えない（目印は誰でも書けるので、書いたアカウントで見分ける）。
-ホストの自動判定の表は `src/core/hostclass.ts`（`github.com` と `*.ghe.com` は GitHub、それ以外は GitLab。`tests/fixtures/host-kinds.json` の表で sh・実行ファイルと突き合わせる）。設定画面でユーザが明示した種類は自動判定より優先する。GHE.com を GitHub として登録すると API は `https://api.<ホスト>`（GraphQL は `/graphql`）、許可は画面と API の origin の両方に取る。それ以外の GitHub の登録は Enterprise Server（`/api/v3`・`/api/graphql`）。未登録のホストへ自動で通信したり PAT を送ったりしない。GHE.com の URL の規則は未検証。
+ホストの自動判定の表は `src/core/hostclass.ts`（設定画面は種類を手で選ぶので、この表は GHE.com の接続先の組み立てと、sh・実行ファイルとの突き合わせに使う。`github.com`・`ghe.com`・`*.ghe.com` は GitHub、それ以外は GitLab。`tests/fixtures/host-kinds.json` の表で sh・実行ファイルと突き合わせる）。設定画面でユーザが明示した種類は自動判定より優先する。GHE.com を GitHub として登録すると API は `https://api.<ホスト>`（GraphQL は `/graphql`）、許可は画面と API の origin の両方に取る。それ以外の GitHub の登録は Enterprise Server（`/api/v3`・`/api/graphql`）。未登録のホストへ自動で通信したり PAT を送ったりしない。GHE.com の URL の規則は未検証。
 依頼コメントへの返信（`replies`・`replies-accepted`）は、system のノートを除いたノートで代表のノートと `own` を決める見本で、返信は指摘として数える（実物の GitLab で返信がスレッドになり resolvable になるかは未検証）。
 更新の手順は下の GitHub と同じ（実物は `glab api` で取る）。
 

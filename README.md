@@ -2094,7 +2094,7 @@ JSON で渡す（`--result <path>`）。
 | `origin` | origin をどう読んだか（ホスト・scheme・API の URL・使う道具）。origin の読み方が合わないときに確かめる |
 
 - 道具は `gh` / `glab` があればそれ、無ければ `curl` と `GITHUB_TOKEN` / `GITLAB_TOKEN`。どちらも無ければ止まる。`jq` が要る。
-  道具は起動時に絶対パスへ解いて固定する。GitHub と GitLab は origin の URL で見分ける
+  道具は起動時に絶対パスへ解いて固定する。GitHub と GitLab は origin の URL で見分ける（`github.com`・`ghe.com`・`*.ghe.com` が GitHub、それ以外は GitLab）
 - origin の表記はポートと scheme をそのまま使う（`http://localhost:8929/g/p.git` なら `http://localhost:8929/api/v4`）。
   URL に埋めた資格情報は読み飛ばし、出力では伏せる
 - push の認証は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは `GIT_CONFIG_COUNT` を外し
@@ -2905,7 +2905,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ## 版の JSON
 
 ```sh
-ccnavi --version          # 1 行 1 項目（`compat: 17` など。sh が読む）
+ccnavi --version          # 1 行 1 項目（`compat: 18` など。sh が読む）
 ccnavi --version --json
 ```
 
@@ -2913,7 +2913,7 @@ ccnavi --version --json
 `.ccnavi/scripts/` の sh で、どちらも起動のときに互換の版を自分のものと比べる。
 
 ```json
-{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 17,
+{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 18,
  "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}
 ```
