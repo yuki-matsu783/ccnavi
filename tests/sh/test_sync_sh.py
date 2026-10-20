@@ -314,6 +314,21 @@ class SyncTest(SyncHarness):
         parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()[1:]
         self.assertEqual({theirs, mine}, set(parents))
 
+    def ignore_locally(self, rel):
+        with open(os.path.join(self.ws, ".git", "info", "exclude"), "a", encoding="utf-8") as f:
+            f.write(rel + "\n")
+
+    def test_a_fast_forward_does_not_overwrite_an_ignored_file(self):
+        self.remote_commit(PARENT, "theirs.txt", "theirs\n")
+        self.ignore_locally("theirs.txt")
+        write(os.path.join(self.tree, "theirs.txt"), "手元の ignored\n")
+        before = self.sha(self.tree, "HEAD")
+        done = self.sync(PARENT)
+        self.assertEqual(before, self.sha(self.tree, "HEAD"), done.stdout)
+        self.assertIn("早送りできなかった", done.stdout)
+        with open(os.path.join(self.tree, "theirs.txt"), encoding="utf-8") as f:
+            self.assertEqual("手元の ignored\n", f.read())
+
     def test_a_conflict_is_aborted_and_left_to_a_person(self):
         self.remote_commit(PARENT, COPY, copy_text(body="theirs\n"))
         mine = self.local_commit(COPY, copy_text(body="mine\n"))

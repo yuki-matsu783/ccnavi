@@ -60,9 +60,11 @@ def _violation(
             "yourself: say what you ran, and let the user decide whose change it is."
         )
     if moved is None:
-        undo = gitstate.undo(change, git)
-        no_wrapper = "ユーザに頼んでください（git の操作はエージェントには止まります）"
-        lines.append(f"undo: {undo or (no_wrapper if git is None else '')}")
+        if not side_by_side:
+            # 横で作業する変更は、誰の変更かをユーザが決める。戻す手順を並べると、上の文と矛盾する。
+            undo = gitstate.undo(change, git)
+            no_wrapper = "ユーザに頼んでください（git の操作はエージェントには止まります）"
+            lines.append(f"undo: {undo or (no_wrapper if git is None else '')}")
         if not_restored:
             lines.append(
                 "not-restored: "

@@ -794,6 +794,33 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(git(self.wt("topic-x"), "rev-parse", "HEAD"), tip)
         self.assertIn("早送り", again.stdout)
 
+    def test_fast_forward_does_not_overwrite_an_ignored_file(self):
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic/x")
+        git(self.ws, "fetch", "-q", self.bare, "topic/x:refs/heads/topic/x")
+        self.route({f"GET {GITHUB}/pulls/5": [200, pr(5, "topic/x")], **closed_pulls("topic/x")})
+        first = self.run_sh("--mr", "5")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        wt = self.wt("topic-x")
+        before = git(wt, "rev-parse", "HEAD")
+        other = os.path.join(self._tmp.name, "other")
+        git(self._tmp.name, "clone", "-q", self.bare, other)
+        for key, value in (("user.email", "t@example.invalid"), ("user.name", "t")):
+            git(other, "config", key, value)
+        git(other, "checkout", "-q", "topic/x")
+        write(os.path.join(other, "ign.txt"), "remote\n")
+        git(other, "add", "ign.txt")
+        git(other, "commit", "-q", "-m", "remote ign")
+        git(other, "push", "-q", "origin", "topic/x")
+        common = git(wt, "rev-parse", "--git-common-dir")
+        common = common if os.path.isabs(common) else os.path.join(wt, common)
+        write(os.path.join(common, "info", "exclude"), "ign.txt\n")
+        write(os.path.join(wt, "ign.txt"), "手元の ignored\n")
+        again = self.run_sh("--mr", "5")
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertEqual(before, git(wt, "rev-parse", "HEAD"))
+        with open(os.path.join(wt, "ign.txt"), encoding="utf-8") as f:
+            self.assertEqual("手元の ignored\n", f.read())
+
     def test_unreachable_remote_continues_and_says_unchecked(self):
         tip = git(self.ws, "commit-tree", "-p", "main", "-m", "work", "main^{tree}")
         git(self.ws, "branch", "fix-152-other", tip)

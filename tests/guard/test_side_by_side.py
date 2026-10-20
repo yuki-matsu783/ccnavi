@@ -1,4 +1,4 @@
-"""横で作業する指定が有効な間の実行後チェックの受入テスト（仕様 3.5）。
+"""横で作業する指定が有効な間の実行後チェックの受入テスト。
 
 ワークスペース 1 つとプロジェクト 2 つ（p と q）を作り、p の作業ワークツリーと
 直接作業の記録（`ccnavi-direct/<名前>`）を置く。見るのは次のこと。
@@ -115,9 +115,9 @@ class SideBySideTest(unittest.TestCase):
             ),
         )
 
-    def hook(self, cwd, restore="enable"):
+    def hook(self, cwd, restore="enable", event="PostToolUse", guard_core="disable"):
         body = {
-            "hook_event_name": "PostToolUse",
+            "hook_event_name": event,
             "tool_name": "Bash",
             "tool_input": {"command": "make"},
             "session_id": "s1",
@@ -134,7 +134,7 @@ class SideBySideTest(unittest.TestCase):
                 "--restore-if-deny",
                 restore,
                 "--guard-core-files",
-                "disable",
+                guard_core,
                 "--guard-ticket-approval",
                 "disable",
             ],
@@ -248,6 +248,76 @@ class SideBySideTest(unittest.TestCase):
         with open(os.path.join(self.ws, "logs", "decisions.jsonl"), encoding="utf-8") as f:
             last = [json.loads(line) for line in f if line.strip()][-1]
         self.assertIn("side-by-side 1", last.get("detail", ""))
+
+    def test_同名の別ツリーが混ざっても報告と戻す判定が食い違わない(self):
+        # q の下に p と同じ名前のワークツリーを切る。
+        # 名前で突き合わせると、戻していない p のメインを戻したと言う。
+        self.record()
+        twin = os.path.join(self.ws, ".claude", "worktrees", "p")
+        git(self.q, "worktree", "add", "--quiet", twin, "-b", "p")
+        self.hook(self.wt)
+        p_path = self.dirty(self.p)
+        self.dirty(twin)
+
+        result = self.hook(twin)
+
+        self.assertEqual(self.text(p_path), "-- changed\n", "p のメインは戻さない")
+        self.assertIn("出所不明の変更", result.stderr)
+
+    def test_報告したあとに中身が変わったら言い直す(self):
+        self.record()
+        self.hook(self.wt)
+        path = self.dirty(self.p)
+        first = self.hook(self.wt)
+        again = self.hook(self.wt)
+        write(path, "-- changed again\n")
+        changed = self.hook(self.wt)
+
+        self.assertEqual(first.returncode, 2, first.stderr)
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual(changed.returncode, 2, changed.stderr)
+        self.assertIn("出所不明の変更", changed.stderr)
+
+    def test_報告の文は戻す手順を並べない(self):
+        self.record()
+        self.hook(self.wt)
+        self.dirty(self.p)
+
+        result = self.hook(self.wt)
+
+        self.assertIn("Do not undo it", result.stderr)
+        self.assertNotIn("undo:", result.stderr)
+
+    def test_dry_runでは本番で戻す集合に横で作業する変更を入れない(self):
+        self.record()
+        self.hook(self.wt, restore="dry-run")
+        self.dirty(self.p)
+
+        result = self.hook(self.wt, restore="dry-run")
+
+        self.assertIn("出所不明の変更", result.stderr)
+        self.assertNotIn("would-restore", result.stderr)
+
+    def test_ターンの終わりの報告にも出所不明と付く(self):
+        self.record()
+        self.hook(self.wt, event="UserPromptSubmit")
+        self.dirty(self.p)
+
+        result = self.hook(self.wt, event="Stop")
+
+        self.assertIn("出所不明の変更", result.stderr + result.stdout)
+        self.assertIn("schema/keep.sql", result.stderr + result.stdout)
+
+    def test_自己防衛の対象は横で作業する間も戻す(self):
+        self.record()
+        self.hook(self.wt, guard_core="enable")
+        rules_path = os.path.join(self.p, ".ccnavi", "config", "project", "rules.yml")
+        before = self.text(rules_path)
+        write(rules_path, json.dumps({"version": 1, "deny": [], "allow": []}))
+
+        self.hook(self.wt, guard_core="enable")
+
+        self.assertEqual(self.text(rules_path), before)
 
 
 if __name__ == "__main__":

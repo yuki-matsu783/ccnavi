@@ -364,6 +364,20 @@ class PassTest(GitWrapperTest):
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.dir, "topic.txt")))
 
+    def test_a_fast_forward_merge_with_no_overwrite_ignore_goes_through(self):
+        # SessionStart と start.sh の早送りが打つ形。ignored のファイルを上書きしないための旗。
+        self.assertEqual(0, self.run_wrapper("checkout", "-b", "topic").returncode)
+        with open(os.path.join(self.dir, "topic.txt"), "w", encoding="utf-8") as f:
+            f.write("topic\n")
+        self.run_wrapper("add", "topic.txt")
+        self.run_wrapper("commit", "-m", "topic")
+        self.run_wrapper("checkout", "-")
+
+        result = self.run_wrapper("merge", "--ff-only", "--no-overwrite-ignore", "topic")
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "topic.txt")))
+
     def test_push_sends_the_current_branch(self):
         """作業用のブランチは、そのままの名前で送れる。
 

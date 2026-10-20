@@ -9,7 +9,7 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from ..infra import fsio, gitcmd, gitstate, tree
+from ..infra import fsio, gitcmd, gitstate, pathcase, tree
 from ..policy import rules
 from ..tickets import (
     archive,
@@ -183,8 +183,18 @@ class Finding:
     tree_root: str = ""
 
     def key(self) -> str:
-        """記録の鍵。ツリーが違えば同じ相対パスでも別の変更。"""
-        return f"{self.tree_name}|{self.change.key()}" if self.tree_name else self.change.key()
+        """記録の鍵。ツリーが違えば同じ相対パスでも別の変更。
+
+        別のリポジトリに同じ名前のワークツリーがありうるので、名前だけでなくルートの場所も入れる。
+        """
+        if not self.tree_name:
+            return self.change.key()
+        where = (
+            f"{self.tree_name}@{pathcase.fold(self.tree_root)}"
+            if self.tree_root
+            else self.tree_name
+        )
+        return f"{where}|{self.change.key()}"
 
 
 def _findings(

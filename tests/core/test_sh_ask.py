@@ -398,6 +398,15 @@ class TreeBaseBoundTest(Harness):
         self.assertEqual({"bound": "no"}, self.bound(self.p))
         self.assertEqual("yes", self.bound(self.q)["bound"])
 
+    def test_identifier_collision_is_checked_across_the_workspace(self):
+        # 識別子の衝突はワークスペース全体。別のリポジトリの承認済みチケットでも、
+        # 同じ識別子なら取り込み先のブランチは断る（結び付きの `branch:` 欄とは範囲が違う）。
+        rel = f"projects/q/{APPROVED}/doing/feature-x.md"
+        write(os.path.join(self.ws, *rel.split("/")), front(ticket="feature-x"))
+        out = self.bound(self.p)
+        self.assertEqual("yes", out["bound"])
+        self.assertIn(rel, out["why"])
+
     def test_leftover_ticket_files_on_the_default_branch_do_not_bind(self):
         write(
             os.path.join(self.p, *f"{APPROVED}/done/old.md".split("/")),
