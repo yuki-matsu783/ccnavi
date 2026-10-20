@@ -987,6 +987,9 @@ def cmd_judge(args):
     report = out / "report.md"
     if JUDGE_HEADING in report.read_text(encoding="utf-8"):
         return record_acceptance(out, report, args.accept)
+    if not args.file:
+        print("意味の判定がまだ無い。判定の表のファイルを渡す")
+        return 1
     judged = parse_judgment(Path(args.file).read_text(encoding="utf-8"))
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
     scn = load_scenario(st["scenario"])
@@ -1088,7 +1091,11 @@ def main(argv=None):
     p.set_defaults(fn=cmd_preflight)
     j = sub.add_parser("judge")
     j.add_argument("out")
-    j.add_argument("file", help="判定の表（| 基準 | 判定 | 理由 |）を書いたファイル")
+    j.add_argument(
+        "file",
+        nargs="?",
+        help="判定の表（| 基準 | 判定 | 理由 |）のファイル。足し済みの回の受け入れには要らない",
+    )
     j.add_argument("--accept", action="store_true", help="ユーザが判定を受け入れた")
     j.set_defaults(fn=cmd_judge)
     n = sub.add_parser("next")

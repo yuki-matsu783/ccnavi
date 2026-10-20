@@ -584,6 +584,26 @@ class JudgeTest(unittest.TestCase):
             self.assertEqual(runner.cmd_judge(later), 1)
 
 
+class AcceptWithoutTableFileTest(unittest.TestCase):
+    def test_accept_needs_no_table_file_once_the_table_is_added(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            report = (
+                "# UC-XX\n\n全体: needs-review\n\n"
+                f"{runner.JUDGE_HEADING}\n\n| 基準 | 判定 | 理由 |\n|---|---|---|\n"
+                "| a | pass | r |\n\nユーザの受け入れ: なし\n"
+                "全体（機械判定と意味の判定の合わせ）: 受け入れ待ち\n"
+            )
+            (out / "report.md").write_text(report, encoding="utf-8")
+            recorded = [{"kind": "decisions", "expect": {}, "verdict": "pass", "why": ""}]
+            (out / "report.json").write_text(json.dumps(recorded), encoding="utf-8")
+            ns = runner.argparse.Namespace(out=str(out), file=None, accept=True)
+            self.assertEqual(runner.cmd_judge(ns), 0)
+            text = (out / "report.md").read_text(encoding="utf-8")
+            self.assertIn("ユーザの受け入れ: あり", text)
+            self.assertIn("全体（機械判定と意味の判定の合わせ）: pass", text)
+
+
 class RepoResultTest(unittest.TestCase):
     def test_same_state_passes(self):
         self.assertEqual(runner.repo_result("a", "a")[0], runner.PASS)
