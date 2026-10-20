@@ -5,6 +5,7 @@ reqs: [REQ-PRE-01, REQ-PRE-02]
 status: verified
 model: haiku
 budget_usd: 2.0
+test_repo: true                  # projects/test-repo にブランチ・コミットを作る。回す前に確認事項 2 を確かめる
 
 # チケットを起こさない小さな修正の通常の道。ガードに止められずに最後まで通ること、止められたとしても案内に従って戻れること。
 # `integrate` は取り込み結果を一時ワークツリー（logs/direct-tmp/）に展開して止まり、メインのチェックアウトには何も書かない。
@@ -31,11 +32,11 @@ expect:
     - event: PreToolUse
       tool: Edit
       decision: deny
-      rules_include: [workspace-root]
+      rules_include: [.ccnavi/config/common/rules.yml:workspace-root]
     - event: PreToolUse
       tool: Write
       decision: deny
-      rules_include: [workspace-root]
+      rules_include: [.ccnavi/config/common/rules.yml:workspace-root]
   state:
     - cwd: projects/test-repo
       run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh log --oneline -1

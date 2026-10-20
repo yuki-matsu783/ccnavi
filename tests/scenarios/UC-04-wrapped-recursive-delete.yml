@@ -41,19 +41,19 @@ expect:
       subject_contains: tmp-dir-a
       decision: deny
       code: DENY_COMMAND_PATTERN
-      rules_include: [recursive-delete]
+      rules_include: [.ccnavi/config/common/rules.yml:recursive-delete]
     - event: PreToolUse
       tool: Bash
       subject_contains: tmp-dir-b
       decision: deny
       code: PARSE_UNCERTAIN
-      rules_include: [recursive-delete]
+      rules_include: [.ccnavi/config/common/rules.yml:recursive-delete]
     - event: PreToolUse
       tool: Bash
       subject_contains: tmp-dir-c
       decision: deny
       code: DENY_COMMAND_PATTERN
-      rules_include: [recursive-delete]
+      rules_include: [.ccnavi/config/common/rules.yml:recursive-delete]
   state:
     - run: ls projects/test-repo/tmp-dir-a/keep.txt projects/test-repo/tmp-dir-b/keep.txt projects/test-repo/tmp-dir-c/keep.txt
       expect_contains: keep.txt

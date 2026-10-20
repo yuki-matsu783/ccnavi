@@ -2,14 +2,19 @@
 
 普段のテストには含めない。人間に確認を取ってから、明確な指示があったときだけ回す。
 
+    uv run python -m tests.scenarios.runner preflight <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ> --confirmed
     uv run python -m tests.scenarios.runner next <出力の置き場>
+    uv run python -m tests.scenarios.runner judge <出力の置き場> <判定の表のファイル> [--accept]
 
 next は、人間の操作で止まったあと、人間が「次へ」と言ってから打つ。
 
---confirmed を付けるのは、人間が「状態がきれいで最新か」「test-repo にブランチや MR が
-できてよいか」に答えたあとだけ。付けずに打つと、確認に使う事実を出して止まる（終了コード 3）。
+--confirmed を付けるのは、人間が「状態がきれいで最新か」（と、test_repo のシナリオでは
+「test-repo にブランチや MR ができてよいか」）に答えたあとだけ。
+付けずに打つと、確認に使う事実を出して止まる（終了コード 3）。
+ccnavi 本体にブランチ・コミット・ワークツリーが残らないことは、
+回す前後の状態を比べて確かめる（repo）。
 
 終了コード: 0 全部通った / 1 不合格がある / 2 未成立か意味の判定待ちがある /
 3 人間の確認が要る / 10 人間の操作で止まった（「次へ」のあと next で続ける）。
@@ -21,8 +26,10 @@ inconclusive（未成立。fail にしない）。意味で読むもの（judge�
 """
 
 import argparse
+import contextlib
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -284,6 +291,36 @@ def overall(results):
     return PASS
 
 
+# ---- ccnavi 本体の変化を確かめる（回す前と後で比べる） ----
+
+REPO_CHANGED = "回す前と変わっている（HEAD・ブランチ・ワークツリーのどれか）"
+
+
+def repo_snapshot(root):
+    """ccnavi 本体の HEAD・ブランチの一覧・ワークツリーの一覧。回す前と後で比べる。"""
+    parts = []
+    for args in (
+        ["rev-parse", "HEAD"],
+        ["for-each-ref", "--format=%(refname)", "refs/heads"],
+        ["worktree", "list", "--porcelain"],
+    ):
+        r = subprocess.run(
+            ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=120
+        )
+        parts.append(r.stdout if r.returncode == 0 else f"エラー {r.returncode}: {r.stderr}")
+    return "\n".join(parts)
+
+
+def repo_result(pre, now):
+    """回す前と後の ccnavi 本体の状態を比べる。(判定, 理由)。
+    pre が無いとき（この決まりより前に作られた状態ファイル）は、確かめられないので未成立にする。"""
+    if pre is None:
+        return INCONCLUSIVE, "回す前の状態が無い（この実行より前に作られた状態ファイル）"
+    if pre == now:
+        return PASS, "変わっていない"
+    return FAIL, REPO_CHANGED
+
+
 # ---- 人間への確認に使う事実 ----
 
 
@@ -303,6 +340,50 @@ def preflight_facts(root):
             )
             lines.append(f"## {label}: git {sub}\n{(r.stdout or r.stderr).strip()}\n")
     return "\n".join(lines)
+
+
+MODE_ENV = "CCNAVI_MODE"
+
+
+def mode_check(root):
+    """判定のモードが enable かを確かめる。(enable か, 人間に見せる文)。
+
+    dry-run では、hook は拒否を報告するだけで止めない（enforced が false の行になる）。
+    シナリオは「止まる」ことを確かめるので、enable 以外では回さない。値は、プロジェクトの
+    .claude/settings.json の env と、実行の環境変数を見る。どちらかに enable 以外の値が
+    あれば止める。値が無ければ enable（hook の既定と同じ）。
+    """
+    settings_path = Path(root) / ".claude/settings.json"
+    try:
+        declared = json.loads(settings_path.read_text(encoding="utf-8")).get("env", {})
+    except FileNotFoundError:
+        declared = {}
+    except (OSError, ValueError) as exc:
+        return (
+            False,
+            f"## 判定のモード: {settings_path} を読めない（{exc}）。確かめられないので回さない",
+        )
+    sources = [
+        (".claude/settings.json の env", declared.get(MODE_ENV)),
+        ("実行の環境変数", os.environ.get(MODE_ENV)),
+    ]
+    lines = ["## 判定のモード（CCNAVI_MODE）"]
+    ok = True
+    for label, value in sources:
+        if value is None:
+            lines.append(f"- {label}: 指定なし")
+            continue
+        lines.append(f"- {label}: {value}")
+        if value.strip().lower() not in ("", "enable"):
+            ok = False
+    if ok:
+        lines.append("enable で判定している。回してよい")
+    else:
+        lines.append(
+            "enable ではない。dry-run などでは止まらない判定が混じるので回さない。"
+            "モードを enable にしてから打ち直す（設定の変更はユーザが行う）"
+        )
+    return ok, "\n".join(lines)
 
 
 # ---- 実行 ----
@@ -335,6 +416,9 @@ def run_step(scn, step, out, idx, session_id, resume_id, persist, root):
     (out / f"step-{idx}.jsonl").write_text(r.stdout, encoding="utf-8")
     if r.stderr.strip():
         (out / f"step-{idx}.stderr").write_text(r.stderr, encoding="utf-8")
+    if r.returncode != 0:
+        # 失敗した step の出力は、ここでは判定に使わない（drive が止める）
+        raise RuntimeError(f"claude が終了コード {r.returncode} で終わった")
     return parse_stream(r.stdout)
 
 
@@ -351,29 +435,39 @@ def _write_state(out, st):
     (out / "state.json").write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
+def setup_clashes(scn, root):
+    """setup のファイルのうち、もう有るもの。有れば回さない（後片付けで消してしまうため）。"""
+    return [rel for rel in (scn.get("setup") or {}).get("files", {}) if (Path(root) / rel).exists()]
+
+
 def _setup(scn, root):
-    made = []
+    """setup のファイルを作る。(作ったファイル, 作ったディレクトリ) を返す。
+    既にあるパスには触らない（setup_clashes で先に確かめてある）。
+    ディレクトリは、この関数が新しく作ったものだけ。"""
+    files, dirs = [], []
     for rel, body in (scn.get("setup") or {}).get("files", {}).items():
         p = Path(root) / rel
-        p.parent.mkdir(parents=True, exist_ok=True)
+        missing = []
+        d = p.parent
+        while d != Path(root) and not d.exists():
+            missing.append(d)
+            d = d.parent
+        for d in reversed(missing):
+            d.mkdir()
+            dirs.append(str(d.relative_to(root)))
         p.write_text(body, encoding="utf-8")
-        made.append(rel)
-    return made
+        files.append(rel)
+    return files, dirs
 
 
-def _cleanup(made, root):
+def _cleanup(made, made_dirs, root):
     for rel in made:
         p = Path(root) / rel
         if p.is_file():
             p.unlink()
-    for rel in made:  # 空になった親も消す（setup で作ったものだけ）
-        d = (Path(root) / rel).parent
-        try:
-            while d != Path(root) and not any(d.iterdir()):
-                d.rmdir()
-                d = d.parent
-        except OSError:
-            pass
+    for rel in sorted(made_dirs, key=len, reverse=True):  # 深いものから。空のときだけ消す
+        with contextlib.suppress(OSError):
+            (Path(root) / rel).rmdir()
 
 
 def drive(scn, out, st, root):
@@ -398,7 +492,19 @@ def drive(scn, out, st, root):
         resume_id = st["session_ids"][-1] if step.get("resume") and st["session_ids"] else None
         sid = str(uuid.uuid4())
         t0 = time.time()
-        ev = run_step(scn, step, out, idx + 1, sid, resume_id, _persist_needed(steps, idx), root)
+        persist = _persist_needed(steps, idx)
+        try:
+            ev = run_step(scn, step, out, idx + 1, sid, resume_id, persist, root)
+        except Exception as e:  # 起動できない・時間切れ・終了コードが 0 でない
+            # 後続は回さず止める。finish に回して、後片付けを通す
+            st["halt"] = {
+                "step": idx + 1,
+                "kind": "run",
+                "reasons": [f"step {idx + 1} が正常に終わらなかった: {e}"],
+            }
+            _write_state(out, st)
+            print(f"step {idx + 1}: 正常に終わらなかった（{e}）。後続の step には進まず止める")
+            return 11
         print(f"step {idx + 1}: {time.time() - t0:.0f} 秒、費用 {ev['cost_usd']:.3f} USD")
         for s in ev["session_ids"] or [sid]:
             if s not in st["session_ids"]:
@@ -435,11 +541,13 @@ def finish(scn, out, st, root):
         if halt:
             # 止まった回は後続の step が回っていないので、decisions・state は必ず落ちる。外す
             results = [r for r in results if r[0] not in ("decisions", "state")]
-            results.append(
-                ("expect_after", {"step": halt["step"]}, INCONCLUSIVE, "; ".join(halt["reasons"]))
-            )
+            kind = halt.get("kind", "expect_after")
+            results.append((kind, {"step": halt["step"]}, INCONCLUSIVE, "; ".join(halt["reasons"])))
+        # ccnavi 本体に、ブランチ・コミット・ワークツリーが残っていないかを実際の状態で確かめる
+        v, why = repo_result(st.get("pre_repo"), repo_snapshot(root))
+        results.append(("repo", "ccnavi 本体の HEAD・ブランチ・ワークツリー", v, why))
     finally:
-        _cleanup(st["setup_made"], root)
+        _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
     write_report(scn, out, st, results, rows, raw)
     final = overall(results)
     print(f"\n結果: {final}（レポート: {out}/report.md）")
@@ -604,6 +712,32 @@ def _results_table(results, limit=None):
     return lines
 
 
+ANSWER_LIMIT = 1500
+
+
+def step_answer_lines(scn, out):
+    """step ごとの入力プロンプトと、claude の最後の出力を報告に出す行。
+    人間の操作の step は、その指示を出す。"""
+    lines = []
+    for num, step in enumerate(scn.get("steps") or [], 1):
+        lines.append("")
+        if step.get("human"):
+            lines.append(f"### step {num}（人間の操作）")
+            lines.append(_one_line(step.get("instruction", ""), 200))
+            continue
+        lines.append(f"### step {num}")
+        lines.append("【入力プロンプト】")
+        lines.append(step.get("prompt", "").strip())
+        lines.append("【最終出力】")
+        path = out / f"step-{num}.jsonl"
+        if not path.exists():
+            lines.append("未実行")
+            continue
+        final = parse_stream(path.read_text(encoding="utf-8"))["final_text"]
+        lines.append(_clip(final, ANSWER_LIMIT, path.name) or "（出力なし）")
+    return lines
+
+
 def write_report(scn, out, st, results, rows, raw):
     lines = [
         f"# {scn['id']} {scn['title']}",
@@ -612,6 +746,7 @@ def write_report(scn, out, st, results, rows, raw):
         "",
     ]
     lines += _results_table(results, 100)
+    lines += ["", "## ステップごとの入力プロンプトと最終出力", *step_answer_lines(scn, out)]
     if scn.get("unconfirmed"):
         lines += ["", "## 確かめる点（unconfirmed）"] + [f"- {u}" for u in scn["unconfirmed"]]
     (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -681,25 +816,223 @@ def write_report(scn, out, st, results, rows, raw):
     (out / "evidence.md").write_text("\n".join(ev) + "\n", encoding="utf-8")
 
 
+def _one_line(text, limit=120):
+    s = " ".join(str(text).split())
+    return s if len(s) <= limit else s[:limit] + "…"
+
+
+def _cond_text(cond):
+    parts = [f"{k}={cond[k]}" for k in ("event", "tool", "decision", "code") if k in cond]
+    if cond.get("rules_include"):
+        parts.append("ルール∋" + ", ".join(cond["rules_include"]))
+    if cond.get("subject_contains"):
+        parts.append(f"対象∋{cond['subject_contains']}")
+    return " ".join(parts)
+
+
+def scenario_summary(scn):
+    """回す前に人間へ見せる、シナリオの概要（何をさせ、何を期待し、何を残すか）。"""
+    lines = [f"## 受け入れシナリオ {scn['id']}: {scn['title']}"]
+    lines.append(
+        f"層 {scn.get('layer', '-')}・要求 {', '.join(scn.get('reqs') or []) or '-'}・"
+        f"状態 {scn.get('status', '-')}・モデル {scn.get('model', '-')}・"
+        f"費用の上限 {scn.get('budget_usd', '-')} USD"
+    )
+    if scn.get("test_repo"):
+        lines.append("作るもの: projects/test-repo にブランチ・コミット・MR が残る（後で片付ける）")
+    else:
+        lines.append(
+            "作るもの: なし。ccnavi 本体に何か残らないことは、回したあと repo の判定で確かめる"
+        )
+    setup = (scn.get("setup") or {}).get("files", {})
+    if setup:
+        lines.append("回す前に作り、回したあとに消すファイル: " + ", ".join(setup))
+    lines.append("手順:")
+    for i, step in enumerate(scn["steps"], 1):
+        if step.get("human"):
+            lines.append(f"  {i}. 人間の操作: {_one_line(step.get('instruction', ''))}")
+        else:
+            lines.append(f"  {i}. {_one_line(step.get('prompt', ''))}")
+    expect = scn.get("expect") or {}
+    lines.append("期待:")
+    for cond in expect.get("decisions", []):
+        lines.append(f"  - 判定が出ている: {_cond_text(cond)}")
+    for cond in expect.get("decisions_none", []):
+        lines.append(f"  - 出ていてはいけない判定: {_cond_text(cond)}")
+    for rel in expect.get("files_unchanged", []):
+        lines.append(f"  - 変わっていないこと: {rel}")
+    for item in expect.get("state", []):
+        text = f"`{item['run']}`"
+        if "expect_contains" in item:
+            text += f" の出力に「{item['expect_contains']}」が出る"
+        if "expect_not_contains" in item:
+            text += f" の出力に「{item['expect_not_contains']}」が出ない"
+        lines.append(f"  - 最後の状態: {text}")
+    for s in expect.get("transcript_forbidden", []):
+        lines.append(f"  - 出力に出てはいけない: {s}")
+    for criterion in expect.get("judge", []):
+        lines.append(f"  - 意味で読む: {criterion}")
+    unconfirmed = scn.get("unconfirmed") or []
+    if unconfirmed:
+        lines.append("まだ実ログと突き合わせていない点:")
+        lines += [f"  - {u}" for u in unconfirmed]
+    return "\n".join(lines)
+
+
+def confirmation_text(scn, root, mode_text):
+    """回す前に人間へ見せる文。順は、事実 → ワークスペース状態 → ユーザ確認事項。
+    run の確認と preflight で同じものを出す。"""
+    facts = [scenario_summary(scn), "", mode_text]
+    clash = setup_clashes(scn, root)
+    if clash:
+        facts += ["", f"注意: setup のパスが既にある（run は回さない）: {', '.join(clash)}"]
+    questions = [
+        "確認事項 1: 今の状態はきれいで、最新か（他のセッションの作業中や未コミットの変更が無いか）"
+    ]
+    if scn.get("test_repo"):
+        questions.append("確認事項 2: projects/test-repo にブランチや MR ができてよいか")
+    return "\n".join(
+        [
+            "回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。",
+            "",
+            "# 1. 事実",
+            "",
+            *facts,
+            "",
+            "# 2. ワークスペース状態",
+            "",
+            preflight_facts(root),
+            "",
+            "# 3. ユーザ確認事項",
+            "",
+            *questions,
+        ]
+    )
+
+
+def cmd_preflight(args):
+    """回さずに、確認に出す文だけを出す。終了コードは run の確認と同じ 3。"""
+    root = Path(args.root).resolve()
+    scn = load_scenario(args.scenario)
+    _, mode_text = mode_check(root)
+    print(confirmation_text(scn, root, mode_text))
+    return 3
+
+
+JUDGE_HEADING = "## 意味の判定（別のエージェント）"
+
+
+def parse_judgment(text):
+    """判定の表（| 基準 | 判定 | 理由 |）を読む。[(基準, 判定, 理由)]。判定は pass か fail だけ。"""
+    rows = []
+    for line in text.splitlines():
+        s = line.strip()
+        if not s.startswith("|"):
+            continue
+        cells = [c.strip() for c in s.strip("|").split("|")]
+        if len(cells) < 3 or cells[0] == "基準" or set(cells[0]) <= set("-: "):
+            continue
+        verdict = cells[1].lower()
+        if verdict not in (PASS, FAIL):
+            raise ValueError(f"判定は pass か fail にする: {cells[0]} → {cells[1]}")
+        rows.append((cells[0], verdict, cells[2]))
+    return rows
+
+
+def final_verdict(mechanical, judged, accepted):
+    """機械判定と意味の判定と、ユーザの受け入れから、最終の判定を決める。"""
+    if not accepted:
+        return "受け入れ待ち（ユーザが判定を確かめるまで、全体の判定は確定しない）"
+    judge_verdicts = [v for _, v, _ in judged]
+    if overall(mechanical) != PASS:
+        return overall(mechanical)
+    return FAIL if FAIL in judge_verdicts else PASS
+
+
+def mechanical_results(out):
+    """報告の機械判定（judge 以外）を、final_verdict に渡す形で読む。"""
+    recorded = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    return [
+        (r["kind"], r["expect"], r["verdict"], r["why"]) for r in recorded if r["kind"] != "judge"
+    ]
+
+
+def record_acceptance(out, report, accept):
+    """報告に足してある意味の判定に、ユーザの受け入れを記す。判定の表は変えない。"""
+    if not accept:
+        print("この回の意味の判定は、もう報告に足してある（受け入れを記すなら --accept を付ける）")
+        return 1
+    text = report.read_text(encoding="utf-8")
+    head, section = text.split(JUDGE_HEADING, 1)
+    if "ユーザの受け入れ: あり" in section:
+        print("受け入れは、もう記録してある（二重には記さない）")
+        return 1
+    judged = parse_judgment(section)
+    verdict = final_verdict(mechanical_results(out), judged, True)
+    section = "\n".join(
+        f"全体（機械判定と意味の判定の合わせ）: {verdict}"
+        if line.startswith("全体（機械判定と意味の判定の合わせ）:")
+        else line.replace("ユーザの受け入れ: なし", "ユーザの受け入れ: あり")
+        for line in section.split("\n")
+    )
+    report.write_text(head + JUDGE_HEADING + section, encoding="utf-8")
+    print(f"ユーザの受け入れを記した。全体: {verdict}")
+    return 0
+
+
+def cmd_judge(args):
+    """意味の判定（別のエージェントが書いた判定の表）を報告に足す。
+    足してあれば、--accept でユーザの受け入れを記す。"""
+    out = Path(args.out)
+    report = out / "report.md"
+    if JUDGE_HEADING in report.read_text(encoding="utf-8"):
+        return record_acceptance(out, report, args.accept)
+    if not args.file:
+        print("意味の判定がまだ無い。判定の表のファイルを渡す")
+        return 1
+    judged = parse_judgment(Path(args.file).read_text(encoding="utf-8"))
+    st = json.loads((out / "state.json").read_text(encoding="utf-8"))
+    scn = load_scenario(st["scenario"])
+    expected = len(scn["expect"].get("judge", []))
+    if not judged or len(judged) != expected:
+        print(f"判定の表の行数が違う: 期待 {expected} 行、読めた {len(judged)} 行")
+        return 1
+    lines = ["", JUDGE_HEADING, "", "| 基準 | 判定 | 理由 |", "|---|---|---|"]
+    lines += [f"| {c} | {v} | {w} |" for c, v, w in judged]
+    lines += ["", f"ユーザの受け入れ: {'あり' if args.accept else 'なし'}"]
+    verdict = final_verdict(mechanical_results(out), judged, args.accept)
+    lines += [f"全体（機械判定と意味の判定の合わせ）: {verdict}"]
+    text = report.read_text(encoding="utf-8")
+    report.write_text(text + "\n".join(lines) + "\n", encoding="utf-8")
+    print(f"意味の判定を報告に足した: {report}")
+    print(f"全体: {verdict}")
+    return 0
+
+
 def cmd_run(args):
     _require_entry()
     root = Path(args.root).resolve()
     scn = load_scenario(args.scenario)
     scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
+    mode_ok, mode_text = mode_check(root)
+    if not mode_ok:
+        # 確認の前に止める。--confirmed を付けても、enable でなければ回さない
+        print(mode_text)
+        return 3
+    clash = setup_clashes(scn, root)
+    if clash:
+        # 有るものを後片付けで消さないよう、回す前に止める
+        print(f"setup のパスが既にある（消されてしまうので回さない）: {', '.join(clash)}")
+        return 1
     if not args.confirmed:
-        print("回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。\n")
-        print(preflight_facts(root))
-        print(
-            "問い 1: 今の状態はきれいで、最新か（他のセッションの作業中や未コミットの変更が無いか）"
-        )
-        print("問い 2: projects/test-repo にブランチや MR ができてよいか")
-        print("問い 3: ccnavi 本体にブランチ・コミット・MR が残らない前提でよいか")
+        print(confirmation_text(scn, root, mode_text))
         return 3
     out = Path(
         args.out or ROOT / "logs" / "scenarios" / f"{scn['id']}-{datetime.now():%Y%m%d-%H%M%S}"
     )
     out.mkdir(parents=True, exist_ok=True)
     pre = {rel: file_digest(root / rel) for rel in scn["expect"].get("files_unchanged", [])}
+    setup_files, setup_dirs = _setup(scn, root)
     st = {
         "scenario": str(Path(args.scenario).resolve()),
         "root": str(root),
@@ -707,14 +1040,21 @@ def cmd_run(args):
         "session_ids": [],
         "cost_usd": 0.0,
         "pre_digests": pre,
-        "setup_made": _setup(scn, root),
+        "pre_repo": repo_snapshot(root),
+        "setup_made": setup_files,
+        "setup_dirs": setup_dirs,
     }
     _write_state(out, st)
     return _continue(scn, out, st, root)
 
 
 def _continue(scn, out, st, root):
-    rc = drive(scn, out, st, Path(root))
+    try:
+        rc = drive(scn, out, st, Path(root))
+    except BaseException:
+        # 割り込みなど、drive を抜けて finish に届かないときも、setup のファイルを残さない
+        _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
+        raise
     return finish(scn, out, st, Path(root)) if rc is None or rc == 11 else rc
 
 
@@ -722,8 +1062,13 @@ def cmd_next(args):
     out = Path(args.out)
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
     if st.get("halt"):
-        print(f"step {st['halt']['step']} の expect_after を満たさず止めた回。続きは回せない")
+        print(f"step {st['halt']['step']} で止めた回。続きは回せない")
         return 2
+    # 人間の操作の間にモードが変わることがあるので、続けるたびに確かめる
+    mode_ok, mode_text = mode_check(Path(st["root"]))
+    if not mode_ok:
+        print(mode_text)
+        return 3
     scn = load_scenario(st["scenario"])
     scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
     return _continue(scn, out, st, st["root"])
@@ -740,6 +1085,19 @@ def main(argv=None):
     r.add_argument("--root", default=str(ROOT))
     r.add_argument("--out")
     r.set_defaults(fn=cmd_run)
+    p = sub.add_parser("preflight")
+    p.add_argument("scenario")
+    p.add_argument("--root", default=str(ROOT))
+    p.set_defaults(fn=cmd_preflight)
+    j = sub.add_parser("judge")
+    j.add_argument("out")
+    j.add_argument(
+        "file",
+        nargs="?",
+        help="判定の表（| 基準 | 判定 | 理由 |）のファイル。足し済みの回の受け入れには要らない",
+    )
+    j.add_argument("--accept", action="store_true", help="ユーザが判定を受け入れた")
+    j.set_defaults(fn=cmd_judge)
     n = sub.add_parser("next")
     n.add_argument("out")
     n.set_defaults(fn=cmd_next)

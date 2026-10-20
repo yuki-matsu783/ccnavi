@@ -9,7 +9,7 @@
    git の行は、生の git を組み込みがいつも止めるので常に載る。文は、ラッパーがあれば打つ形を
    名指しし、無ければユーザに頼む形にする
 3. チケット制御が有効なときだけ、承認済みチケットの状態の確かめ方（`status`）が載る
-4. プロジェクトの置き場にプロジェクトがあるときだけ、cd してから作業する行が載る
+4. projects/ にプロジェクトがあるときだけ、cd してから作業する行が載る
 5. md の索引の案内が出る回だけ、詳しい決まりを --docs で引く行が載る
 6. サブエージェントの起動（agent_id がある）には出さない。文は短い
 """
@@ -31,7 +31,7 @@ WORKTREE_LINE = ".claude/worktrees/<名前>"
 GIT_LINE = "git は直接呼ばず"
 # ラッパーが無いワークスペースの git の行。誘導先が無いので、ユーザに頼む形になる。
 NO_WRAPPER_GIT_LINE = "git は直接呼ばない。"
-# ワークツリーと git の行を支える deny。中身は判定に関わらないので最小にしてある。
+# ワークツリーと git の行を支える deny。中身は判定に関係しないので、最小限にしてある。
 WORKSPACE_ROOT_RULE = {
     "id": "workspace-root",
     "match": "Write",
@@ -164,7 +164,7 @@ class SessionConventionsTest(unittest.TestCase):
         text = block(self.start("--mode", "enable"))
 
         self.assertNotIn(WORKTREE_LINE, text)
-        # 組み込みの止めは既定の間も足すので、git の行は載る。
+        # 既定に戻っても組み込みの止めは足されるので、git の行は載る。
         self.assertIn(GIT_LINE, text)
 
     def test_ラッパーが無ければgitの行はユーザに頼む形になる(self):
@@ -215,7 +215,7 @@ class SessionConventionsTest(unittest.TestCase):
         text = self.start("--mode", "enable")
 
         self.assertIn("--docs で、--keyword <語> を付けて引く", block(text))
-        # 「下の案内」が指す索引の案内は、決まりより後ろにある。
+        # 「下の案内」は索引の案内を指すので、その案内は決まりより後ろに出る。
         self.assertLess(text.index(HEAD), text.index("[ccnavi] ドキュメント（*.md）"))
 
     def test_dry_runの注記は進め方の最後の行のまま(self):
@@ -233,14 +233,27 @@ class SessionConventionsTest(unittest.TestCase):
     def test_サブエージェントには出さない(self):
         self.assertEqual(block(self.start("--mode", "enable", agent_id="a1")), "")
 
-    def test_常駐の文脈なので短い(self):
-        # 毎回の起動・再開・compact に届く。考え方と作業の決まりと詳細の表と進め方を合わせて
-        # 3600 字に収める（直接作業の確認と取り込み先の決まりを 2 行足したので 3400 から上げた）。
+    def test_毎回届くので短い(self):
+        # 毎回の起動・再開・compact に届く。考え方・作業の決まり・詳細の表・進め方を合わせて
+        # 3000 字未満に収める（詳細は .ccnavi/docs/ に分け、ここには入口だけ置く）。
         os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
         text = block(self.start("--mode", "enable"))
         body = text.replace(self.root, "<root>")
 
-        self.assertLess(len(body), 3600, body)
+        self.assertLess(len(body), 3000, body)
+
+    def test_索引の案内とdry_runの注記を足しても短い(self):
+        # 索引の案内が出る回（docs の行が載る）と dry-run の注記が重なる、いちばん長い回。
+        os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
+        subprocess.run(["git", "init", "-q", self.root], check=True)
+        with open(os.path.join(self.root, ".gitignore"), "w", encoding="utf-8") as f:
+            f.write("**/ccnavi-index.jsonl\n")
+        with open(os.path.join(self.root, "README.md"), "w", encoding="utf-8") as f:
+            f.write("---\ntype: guide\n---\n# x\n")
+        body = block(self.start("--mode", "dry-run")).replace(self.root, "<root>")
+
+        self.assertIn("--docs で", body)
+        self.assertLess(len(body), 3000, body)
 
 
 if __name__ == "__main__":

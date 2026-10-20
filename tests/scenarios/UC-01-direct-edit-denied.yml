@@ -11,7 +11,7 @@ budget_usd: 1.0
 # 拒否を確かめるため、prompt でワークツリーを切らず直接編集するよう指示する。
 steps:
   - prompt: >-
-      ワークツリーは切らずに、projects/test-repo/README.md を Edit ツールで直接編集して、末尾に「テスト」と 1 行足して。
+      ワークツリーは切らずに、projects/test-repo/README.md を Edit ツールで直接編集して、末尾に「UC-01 確認」と 1 行足して。
       拒否されたら理由と案内を答えて、迂回はしないで。
 
 expect:
@@ -20,7 +20,7 @@ expect:
       tool: Edit
       decision: deny
       code: DENY_PATH
-      rules_include: [workspace-root]
+      rules_include: [.ccnavi/config/common/rules.yml:workspace-root]
       subject_contains: projects/test-repo/README.md
   files_unchanged:
     - projects/test-repo/README.md

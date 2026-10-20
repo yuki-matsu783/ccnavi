@@ -100,20 +100,23 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 
 1. **回す前に、人間に確認する。** 確認が取れるまで、1 本も回さない。回すたびに取り直す（前の回の了承を使い回さない）。
    エージェントは先に次の事実を集め、そのまま見せて、人間に問う。
+   - 概要: 実行器が出す「受け入れシナリオ」の節（何をさせ、何を期待し、何が残るか、まだ確かめていない点）。確認の前に、人間がこれを読んで決める
    - 事実: ワークスペースルートと `projects/test-repo` の `ccnavi-git.sh status`、origin との先行・遅れ、残っているワークツリーとブランチ、
      `projects/test-repo` の開いている MR と、回すシナリオの ID・作るもの（ブランチ・MR・ファイル）
-   - 問い 1: 今の状態はきれいで、最新か（他のセッションが作業中のツリーや、未コミットの変更が無いか）
-   - 問い 2: `projects/test-repo` にブランチや MR ができてよいか
-   - 問い 3: ccnavi 本体にブランチ・コミット・MR が残らないことを前提にしてよいか
+   - 確認事項 1: 今の状態はきれいで、最新か（他のセッションが作業中のツリーや、未コミットの変更が無いか）
+   - 確認事項 2: `projects/test-repo` にブランチや MR ができてよいか（`test_repo: true` のシナリオだけ）
+   ccnavi 本体にブランチ・コミット・ワークツリーが残らないことは、問わない。実行器が回す前後の HEAD・ブランチ・ワークツリーを比べて、`repo` の判定で確かめる
    「いいえ」や条件が付いたときは、人間が整えるまで待つ（エージェントが勝手に整えない）
 2. **回す前の状態を確かめる。**
    - ワークスペースルートと `projects/test-repo` の作業ツリーが clean である（`ccnavi-git.sh status`）。他のセッションが作業中のツリーでは回さない
-   - ビルド済みの実行ファイル（`.ccnavi/bin/`）があり、判定が `enable` モードで強制される（`decisions.jsonl` の `enforced` が `true`）
+   - 判定のモードが `enable` である。実行器が最初に `.claude/settings.json` の env と実行の環境変数の `CCNAVI_MODE` を確かめ、`enable` でなければ `--confirmed` があっても回さない（終了コード 3）。回したあとは `decisions.jsonl` の `enforced` が `true` であることも確かめる
+   - ビルド済みの実行ファイル（`.ccnavi/bin/`）がある
    - `projects/test-repo` を使うシナリオは、統合先が origin と合っていて、前の回のワークツリーとブランチが残っていない
    - `setup.files` があれば、先に作る（回したあとに消す）
 3. **実行器で回す。** 人間の確認が取れたあとだけ、`--confirmed` を付ける。
 
    ```sh
+   uv run python -m tests.scenarios.runner preflight tests/scenarios/UC-01-direct-edit-denied.yml    # 回さずに、確認に出す文（概要・モード・事実・ユーザ確認事項）だけを出す（終了コード 3）
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml          # 確認の事実を出して止まる（終了コード 3）
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
    ```
@@ -125,7 +128,11 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。
    人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ
 5. **`expect_after` を満たさず止まった回を扱う。** `expect_after` を満たさず止まった回は `next` で続けられない（終了コード 2）。prompt か期待を直して、`run` からやり直す。止まった回の `report.md` には `expect_after` の行が `inconclusive` で出て、止まった step より後に頼る `decisions`・`state` の判定は載せない
-6. **判定を読む。** `report.md` に期待ごとの判定が出る（下の「判定の 3 つ」）。`judge` がある場合は、`evidence.md` を別のエージェントに読ませる
+6. **判定を読む。** `report.md` に期待ごとの判定が出る（下の「判定の 3 つ」）。`judge` がある場合は、`evidence.md` を別のエージェントに読ませる。
+   - 別のエージェントは、判定の表（`| 基準 | 判定 | 理由 |`。判定は pass か fail）を、ヒアドキュメントを使わず、編集ツールで `scratchpad/` に書く
+   - その表を `uv run python -m tests.scenarios.runner judge <出力の置き場> <判定の表のファイル>` で報告に足す。足すのは一度だけ
+   - ユーザが判定を受け入れたら、同じ `judge` に `--accept` を付けて打つ。判定の表は変えず、「ユーザの受け入れ」と全体の判定だけを書き直す（受け入れは一度だけ記す）
+   - 受け入れまで、全体の判定は「受け入れ待ち」のまま。シナリオの `status` を `verified` にするのは、受け入れのあと
 7. **後片付けをする。** 実行器が `setup.files` を消す。シナリオで作ったワークツリー・ブランチ・MR は、`projects/test-repo` のものだけ残してよい（後でまとめて片付ける）。
    ccnavi 本体に変更が残っていたら、期待が破れたということなので、そのまま報告して直さない（見つけたものの扱いに従い issue にする）
 8. **結果を残す。** `report.md` が、各 step の期待と実際、費用をまとめている。期待と違えば、どの欄で違ったかが分かる
@@ -138,7 +145,7 @@ AI の出力を機械だけで判定することはできない。ccnavi の判�
 | 判定 | 意味 | 何で決まるか |
 |---|---|---|
 | `pass` / `fail` | 機械で比べた結果 | `decisions`（回した step のセッション ID の行だけを `logs/decisions.jsonl` から取り出して比べる）、`decisions_none`、`files_unchanged`、`state`、`transcript_forbidden` |
-| `inconclusive`（未成立） | 期待した呼び出し自体が記録に無い。`fail` にしない | `decisions` の `event`・`tool`・`subject_contains` に当たる行が無い。`expect_after` を満たさず止めた回も `inconclusive`(理由に満たさなかった欄が出る) |
+| `inconclusive`（未成立） | 期待した呼び出し自体が記録に無い。`fail` にしない | `decisions` の `event`・`tool`・`subject_contains` に当たる行が無い。`expect_after` を満たさず止めた回も `inconclusive`(理由に満たさなかった欄が出る)。claude が終了コード 0 で終わらなかった・起動できなかった・時間切れのときも、その step で止めて `inconclusive`（`run` の行） |
 | `needs-review` | 意味で読む | `judge`。実行器が `evidence.md` に、機械判定の表・judge の基準・step ごとの入力プロンプト・ツール呼び出しと結果（成功とエラーは別の見出し。hook の拒否理由と同じ文のエラーは「hook の応答を参照」と書く）・hook の応答（拒否・確認・終了コードが 0 でないもの・停止・案内文・通知・Stop だけ。他は件数）・最後の報告・判定の行（step 列つきの表）を抜き出す。拒否の文面は全文を載せ、他を切るときは切ったことと全量の在りかを書く。別のエージェントが基準に照らして読み、`report.md` に結果を書く |
 
 全体の判定は `fail` > `inconclusive` > `needs-review` > `pass` の順で重い方を採る。`inconclusive` が出たら、
