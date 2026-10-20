@@ -1124,6 +1124,9 @@ def _decided_prompt(
             f"{head}\n直す指摘は続きの子チケット {followup} に載せ、承認済みにしてある。"
             f"{_followup_next(root, d.parent, followup)}。指摘:\n{items}\n"
             "状態の操作（start・finish）はメインが打つ。実装はサブエージェントに任せてよい。\n"
+            # fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して
+            # resolve する仕組みは、この文の対象外
+            f"{review.RESOLVE_NOTE}\n"
             f"{_status_line(root, d.parent)}"
         )
     if d.extra:

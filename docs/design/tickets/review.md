@@ -224,6 +224,8 @@ GitLab は dismiss を案内しない（GitLab に GitHub の dismiss に当た�
 
 **手で動かした子の確定（受け入れ台帳）。** ユーザが子を `review/` から `done/` へ手で動かして commit・push した（共有済み）とき、`confirm` は移動の前に付いた未解決の指摘をホストで解決せずに、版つき（鍵・指摘の版・最後のコメントの id）で `phases/<親>/accepted.json` に足して `reviewed` を置く（マーカーに `via: manual` と `moved`）。`decide`・`close-early` の受け入れでは廃止した `accepted.json` を、この確定にだけ台帳として復活させた。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は、`confirm`・`decide`・`close-early` のどれでも未解決として数えない（`review_host._unresolved` の `ledger` 引数）。本文が変わる・受け入れの後にコメントが付く指摘は数える。移動の後に付いた指摘が残れば確定せず、`decide` へ案内する。判定は指摘の最初と最後のコメントの両方で見る。変更要求は保留する。Stop は共有済みの手動移動を見つけたら `confirm` を 1 回促し（`STEP_CONFIRM`）、`status` は「レビュー完了確認待ち」「移動が未共有」を出す。Chrome 拡張の確定も同じ。git が無いので、移動の時刻は拡張がホストの履歴（そのパスを最初に加えたコミット）から読んで渡す。
 
+**fix で直した指摘は、ユーザが resolve する。** `decide` の「このフェーズで直す」を選んだスレッドは、ホスト上で未解決のまま残る（仕様。続きの子で直したあと、ユーザが確かめて resolve する）。案内はホストを問わない同じ書き方で、「修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない」。入れる場所は、`decide` の結果の文（`review_decide._decided_prompt`。fix があるとき）、VS Code ボードの `decided` の note、依頼の本文の末尾の固定の 1 文（`review.RESOLVE_NOTE`。`HANDOFF_NOTE` のあとに足す）。依頼の目印の鍵は、この 1 文を足す前の本文と親のブランチの先頭から作るので、1 文を足す前に投稿した依頼を打ち直しても二重に投稿されない。keep・issue を選んだスレッドに sh が返信して resolve する仕組み（受け入れの返信と解決）は、この案内の対象外。
+
 **ホストの分類。** ホストの分類は、origin から取り出したホストを小文字にしてポートを除いたもの（分類に使うホスト）を、`.` の区切りで照合して決める（`evilgithub.com`・`github.com.evil`・`evilghe.com`・`ghe.com.evil` は GitHub にならない）。scheme の大文字小文字は区別しない（`HTTPS://` も読む）。
 
 | 分類に使うホスト | 種類 | REST | GraphQL |

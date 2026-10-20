@@ -36,6 +36,25 @@ class DecidedPromptTest(unittest.TestCase):
         self.assertIn("ccnavi-ticket.sh status", text)
         self.assertIn("置き場のファイルを自分で探さない", text)
 
+    def test_a_fix_tells_the_user_to_resolve_the_thread_and_the_agent_not_to(self):
+        """fix のスレッドはホスト上で未解決のまま残る。resolve するのはユーザ。
+
+        keep・issue のときに sh が返信して resolve する仕組みは、この文の対象外。
+        """
+        t = SimpleNamespace(url="u1", path="a.py", line=1, body="x")
+        picked = {c: [] for c in review_decide.CHOICES}
+        picked[review_decide.CHOICE_FIX] = [t]
+        text = review_decide._decided_prompt("/w", decision([t]), picked, "i0064-01-02")
+        self.assertIn("修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。", text)
+        self.assertIn("エージェントは fix を理由に resolve しない。", text)
+        # fix の無い回には入れない
+        keep = {c: [] for c in review_decide.CHOICES}
+        keep[review_decide.CHOICE_KEEP] = [t]
+        self.assertNotIn(
+            "fix を理由に resolve しない",
+            review_decide._decided_prompt("/w", decision([t]), keep, ""),
+        )
+
 
 class ThreadLabelTest(unittest.TestCase):
     def label(self, **kw):

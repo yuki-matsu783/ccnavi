@@ -674,7 +674,9 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     }
     const waiting = value.pending_extra.length > 0;
     const note = value.followup
-      ? `直す指摘を含む追加対応用の子チケット ${value.followup} を作成しました。フェーズを再開しました。`
+      ? `直す指摘を含む追加対応用の子チケット ${value.followup} を作成しました。フェーズを再開しました。` +
+        // fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して resolve する仕組みは対象外
+        "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない。"
       : waiting
         ? `今回の判断は適用済みです。見せたあとに追加された指摘 ${value.pending_extra.length} 件は判断待ちです（フェーズはレビュー済みにしていません）。もう一度「決める」を開いてください。`
         : "フェーズはレビュー済みになりました。";

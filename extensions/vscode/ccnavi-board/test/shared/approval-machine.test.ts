@@ -954,6 +954,9 @@ test("CB-T204 置けたら渡す文を見せて再読み込みする。投稿の
   });
   assert.equal(done.state.overlay?.kind, "prompt");
   assert.equal(done.state.overlay?.kind === "prompt" ? done.state.overlay.prompt : "", "決めた文");
+  // fix のスレッドはホスト上で未解決のまま残る。resolve するのはユーザ（keep・issue の返信と解決は対象外）
+  const note = done.state.overlay?.kind === "prompt" ? done.state.overlay.note : "";
+  assert.match(note, /修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない。/);
   assert.deepEqual(kinds(done.effects), ["warn", "refresh"]);
   const copied = approvalStep(done.state, { kind: "handOver", how: "promptCopy" });
   assert.deepEqual(copied.effects, [{ kind: "copy", prompt: "決めた文", what: "対応方針の連絡文" }]);

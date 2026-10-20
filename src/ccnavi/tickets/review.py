@@ -77,6 +77,17 @@ HANDOFF_NOTE = (
     f"{ticket_places.HANDOFF}/ 配下はユーザに渡す写しで、レビューの対象外。integrate で消える。"
 )
 
+# 依頼の本文の末尾に、`HANDOFF_NOTE` のあとに足す固定の 1 文。fix で直した指摘のスレッドは、ホストの
+# 上で未解決のまま残る（仕様）。直ったかを見て resolve するのはユーザで、エージェントは fix を理由に
+# resolve しない。ホストを問わない書き方。keep・issue を選んだときに sh が返信して resolve する
+# 仕組み（受け入れの返信と解決）はこの文の対象外。
+# 依頼の目印の鍵は、この文を足す前の本文と親のブランチの先頭から作る（文を足しても鍵は
+# 変わらないので、足す前に投稿した依頼を打ち直しても、二重に投稿されない）。
+RESOLVE_NOTE = (
+    "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。"
+    "エージェントは fix を理由に resolve しない。"
+)
+
 
 def prepare(
     stdout: TextIO,
@@ -129,7 +140,7 @@ def prepare(
     ).hexdigest()[:16]
     marker = f"{review_host.MARKER_REQUEST}{parent.ticket}:{phase_no} key={key} -->\n"
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
-    failed = fsio.write_text(path, marker + body, newline="\n")
+    failed = fsio.write_text(path, marker + body + "\n" + RESOLVE_NOTE + "\n", newline="\n")
     if failed:
         stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
         return 1
