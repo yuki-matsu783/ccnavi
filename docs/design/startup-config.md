@@ -40,7 +40,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | `PreToolUse` | 呼び出しを判定する（6 章）。コアファイルをバックアップする（8 章）。cwd がプロジェクトの中に入った最初の回に、そのスキルの目録を添える（11.13） | `permissionDecision` と `additionalContext` |
 | `PostToolUse` | コアファイルをバックアップと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ書き出し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う。Write で新しく作った md に frontmatter か `type` が無ければ、書き方を 1 度だけ案内する（止めない。`NOTICE_DOC_FRONTMATTER`。10） | 終了コード 2 と標準エラー、または `additionalContext` |
 | `PostToolUseFailure` | 失敗した呼び出しも、`PostToolUse` と同じに設定ファイルのバックアップとの突き合わせと実行後チェックを行い、結果を `additionalContext` で渡す（失敗する前に変えていることがあり、通さないと次の発言で受け入れられる。8.3）。ツール自体の失敗を数える（`failstreak`）。ユーザの中断（`is_interrupt`）は数えない。連続が `CCNAVI_FAIL_STREAK_COUNT` 回（既定 3。0 で無効）に達した回に、資料の索引（`--docs`）を引く案内を返す。止められないイベント。成功（`PostToolUse`）で連続を 0 に戻し、案内は連続の中で 1 回だけ。`PreToolUse` の `deny`（`dry-run` でも）も同じ連続に数え、案内は拒否の文面の末尾に付く。記録は `state/failstreak-<セッション>-<main\|エージェント>.json` | `additionalContext` |
-| `Stop` | このターンで変わった保護領域をユーザへ報告する（7.4）。動かしている作業（payload の `background_tasks`・`session_crons`）が残っているかを `state/busy-<セッション>.json` に記録する。残っていなければ消す。起動と再開でも消す。残っていれば、次の発言での受け入れ（8.3、7.4）はしない。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6）。促さなかった回で、レビューの依頼までの道の途中にあれば、1 回だけ止めて次の一手を促す（`NUDGE_TICKET_REQUEST`。実行中のサブエージェントが居る間は止めない。9.6・9.12）。途中とは、承認済みの親に作業中の子が残っている、または子が全部閉じたのに依頼のマーカーが無い状態のことである。どちらも促さなかった回は、メインエージェントの cwd か、このセッションが書き込んだ（候補の記録 `direct-<セッション>.json`）、チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`）に未コミットの変更か統合先に入っていないコミットがあり、`integrate <名前>` の記録も無ければ（チケット制御の有無は問わない）、1 回だけ止めて `integrate` の打ち方と、staged で止めてユーザに確かめてもらう手順を促す（`NUDGE_INTEGRATE`。6.6）。どれも促さなかった回は、`match: Stop` のルールが渡す回なら止めてその文を渡す（6.6） | `systemMessage`。止めるときは `decision: block` と `reason` も |
+| `Stop` | このターンで変わった保護領域をユーザへ報告する（7.4）。agent 型 Stop hook（判定役）を登録したワークスペースでは、既存の促しを実行したあとに AI 判定の計画を書き、判定役が差し戻しの返り値を返すことがある（[stop-review.md](stop-review.md)。setup は登録しない）。動かしている作業（payload の `background_tasks`・`session_crons`）が残っているかを `state/busy-<セッション>.json` に記録する。残っていなければ消す。起動と再開でも消す。残っていれば、次の発言での受け入れ（8.3、7.4）はしない。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6）。促さなかった回で、レビューの依頼までの道の途中にあれば、1 回だけ止めて次の一手を促す（`NUDGE_TICKET_REQUEST`。実行中のサブエージェントが居る間は止めない。9.6・9.12）。途中とは、承認済みの親に作業中の子が残っている、または子が全部閉じたのに依頼のマーカーが無い状態のことである。どちらも促さなかった回は、メインエージェントの cwd か、このセッションが書き込んだ（候補の記録 `direct-<セッション>.json`）、チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`）に未コミットの変更か統合先に入っていないコミットがあり、`integrate <名前>` の記録も無ければ（チケット制御の有無は問わない）、1 回だけ止めて `integrate` の打ち方と、staged で止めてユーザに確かめてもらう手順を促す（`NUDGE_INTEGRATE`。6.6）。どれも促さなかった回は、`match: Stop` のルールが渡す回なら止めてその文を渡す（6.6） | `systemMessage`。止めるときは `decision: block` と `reason` も |
 | `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。気づいたスキル候補は最後の報告に節を足して返すよう 1 行渡す（6.6）。`agent_id` があれば（チケット制御の有無によらず）、実行中の印を置き、同じ作業ツリーで編集する別のサブエージェントが動いていればその案内も渡す（9.12） | `additionalContext` |
 | `SubagentStop` | 子のワークツリーの差分を読み、範囲外の変更（スクリプト経由など、`PreToolUse` が事前に止められなかったもの）が残っていれば 1 回だけ差し戻す。ワークツリーを読めず確かめられなかったときは、親へ伝える印を置く（9.12）。差し戻さない回に実行中の印を外す（9.12）。終わり方を `ok`・`fixed`・`outside`・`unchecked`・`unattributed` に分けて `state/subagent-<セッション>-<id>.outcome` に残す。担当の子が決まるのは cwd が子のときだけで、親のツリーからの起動は差し戻さず親へ知らせる（9.12） | 終了コード 2 と標準エラー |
 | その他 | 何もせず通す。記録に `event-not-checked` | 無し |
@@ -72,6 +72,10 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY`、`CCNAVI_GUARD_CORE_FILES`）も同じ 3 値を取り、`CCNAVI_MODE=dry-run` のときは
 こちらが `enable` でも `dry-run` として振る舞う。組み合わせの表は [要件 2.2](../requirements/common.md)。
+
+Stop の AI 判定の効き方 `CCNAVI_STOP_REVIEW` も同じ 3 値で、`CCNAVI_MODE` に掛かる（全体が `dry-run` なら `dry-run`、
+`disable` なら `disable`）。例外は読めない値の扱いで、他の 3 値と違い `enable` ではなく `dry-run` として動く（差し戻しを
+既定で有効にしないため）。起動するかどうかは設定でなく、agent 型 Stop hook の登録で決まる（`scripts/ccnavi-stop-review.sh`）。
 
 `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL`、`CCNAVI_GUARD_UNWATCHED` は `enable` / `disable` の 2 値。
 `CCNAVI_LEARNING`（学びの蓄積。9.16）も 2 値で、`enable` のときだけ効く。書き誤りは `--lint` が warn で言い、`disable` として動く。
@@ -189,7 +193,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 
 記録に書く `subject` / `unwrapped` / `detail` は、書く直前に秘密の形を伏せる（`src/ccnavi/records/redact.py`）。伏せるのは
 記録だけで、判定は伏せる前の文字列で下す。記録が 10 MB を超えたら `decisions.<日時>.jsonl` へローテートし、ローテートした
-記録と終わったセッションの記録（`logs/state/`）は 14 日で消す。走るのはセッション開始と `ccnavi user prune` で、
+記録と終わったセッションの記録（`logs/state/`）は 14 日で消す（Stop の AI 判定の計画・試行・操作の記録はセッションを名前に持たないので、それ自身の日付で 14 日、再評価用の材料とイベントの記録は別の保持日数 `CCNAVI_STOP_REVIEW_KEEP_DAYS`＝既定 90 日）。走るのはセッション開始と `ccnavi user prune` で、
 記録はセッションごとにまとめて、どれかが保持日数のうちに書かれていれば全部残す
 （`src/ccnavi/records/prune.py`）。`<セッション>.json`（改名前の記録）と `<セッション>.reported.json` と読むのは UUID の形の名前だけで、知らない名前のファイルと、
 リンクになった置き場（`logs/state` そのものと `selfguard/`）には触らない。操作記録の `ops/` も消さない（14 日で消す対象に入らない）。しきい値は 0 のほか 1 MB・1 日より

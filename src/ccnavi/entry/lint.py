@@ -25,10 +25,11 @@ import re
 from typing import TextIO
 
 from ..hook import ccnavimd, judge
-from ..infra import modes, settings, tree
+from ..infra import fsio, modes, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
+from ..records import stopreview
 from ..tickets import (
     approval,
     approval_checks,
@@ -52,6 +53,108 @@ from . import (
 # `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、
 # 読む側（VS Code 拡張）は違う版を「読めない」として扱う。
 LINT_VERSION = 1
+
+
+def stop_review_problems(root: str, conf: settings.Settings) -> list[Problem]:
+    """Stop の AI 判定の設定と、agent hook の登録の食い違い。
+
+    - `CCNAVI_STOP_REVIEW` の値が disable / dry-run / enable でない（実際は dry-run で動く）
+    - 登録した印（`CCNAVI_STOP_REVIEW_AGENT=1`）と、`.claude/settings.json` の agent 型 Stop hook が
+      合わない
+      （印だけで hook が無い: 計画が溜まるだけで誰も判定しない／hook だけで印が無い: 判定役が計画を
+      受け取れず、すべて未検査になる）
+    - agent 型の Stop hook が複数ある（同じ Stop で判定が重複する）
+    - 判定役の Bash を許す権限（`permissions.allow`）が無い（agent 型 hook の中は `dontAsk` で動き、
+      許可が無いと `material` を実行できず、すべて未検査になる）
+    """
+    out: list[Problem] = []
+    declared = (conf.stop_review or "").strip().lower()
+    valid = (modes.DISABLE, modes.DRY_RUN, modes.ENABLE)
+    if declared and declared not in valid:
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                f"{settings.STOP_REVIEW_ENV}={declared}。{'・'.join(valid)} のどれでもないので"
+                f"{modes.DRY_RUN} として動いている",
+            )
+        )
+    hooks, file_flag = stop_review_hooks(root)
+    # 端末の `--lint` には settings.json の env が渡らない。無ければ settings.json の env を読む。
+    registered = conf.stop_review_agent or file_flag == "1"
+    if registered and not hooks:
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                f"{settings.STOP_REVIEW_AGENT_ENV}=1 だが、agent 型の Stop hook が"
+                " .claude/settings.json に見つからない（計画が溜まるだけで判定されない）",
+            )
+        )
+    if hooks and not registered:
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                f"agent 型の Stop hook があるが {settings.STOP_REVIEW_AGENT_ENV}=1 が無い"
+                "（判定計画が作られず、判定はすべて未検査になる）",
+            )
+        )
+    if len(hooks) > 1:
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                f"agent 型の Stop hook が {len(hooks)} 件ある（同じ Stop で判定が重複する）",
+            )
+        )
+    if hooks and not allows_judge_bash(root):
+        out.append(
+            Problem(
+                SEVERITY_WARN,
+                "(stop-review)",
+                "判定役の Bash（stop-review material と record）を許す権限が "
+                ".claude/settings.json の permissions.allow に無い（判定役は dontAsk で動くので、"
+                "材料を取れず、すべて未検査になる。register で足せる）",
+            )
+        )
+    return out
+
+
+def allows_judge_bash(root: str) -> bool:
+    """`permissions.allow` に、判定役の `stop-review material` と `record` の両方があるか。"""
+    path = os.path.join(root, ".claude", "settings.json")
+    data, error = fsio.read_json(path) if os.path.isfile(path) else (None, None)
+    perms = data.get("permissions") if isinstance(data, dict) and error is None else None
+    allow = perms.get("allow") if isinstance(perms, dict) else None
+    rules = {r for r in allow if isinstance(r, str)} if isinstance(allow, list) else set()
+    return all(rule in rules for rule in stopreview.JUDGE_ALLOW_RULES)
+
+
+def stop_review_hooks(root: str) -> tuple[list[str], str]:
+    """`.claude/settings.json` の Stop にある、ccnavi の agent 型 hook の一覧と、env の印の値。
+
+    数えるのは prompt の先頭が目印（`[ccnavi-stop-review]`）の agent 型 hook だけ。ユーザ自身の
+    agent 型 hook は数えない。形が違う・読めない設定は空として読む（診断が壊れた設定で落ちない）。
+    """
+    path = os.path.join(root, ".claude", "settings.json")
+    data, error = fsio.read_json(path) if os.path.isfile(path) else (None, None)
+    if error is not None or not isinstance(data, dict):
+        return [], ""
+    found: list[str] = []
+    hooks = data.get("hooks")
+    groups = hooks.get("Stop") if isinstance(hooks, dict) else None
+    for group in groups if isinstance(groups, list) else []:
+        inner = group.get("hooks") if isinstance(group, dict) else None
+        for hook in inner if isinstance(inner, list) else []:
+            if not isinstance(hook, dict) or hook.get("type") != "agent":
+                continue
+            prompt = hook.get("prompt")
+            if isinstance(prompt, str) and prompt.startswith(stopreview.HOOK_MARK):
+                found.append(prompt[:60])
+    env = data.get("env")
+    flag = env.get(settings.STOP_REVIEW_AGENT_ENV) if isinstance(env, dict) else ""
+    return found, flag if isinstance(flag, str) else ""
 
 
 def report(
@@ -187,6 +290,8 @@ def report(
     # 理由は上の 2 つと同じ（外から見て、守られている状態と区別が付かない）。
     problems.extend(_gate(settings.GUARD_CORE_FILES_ENV, guard_core_files, mode, _CORE_FILES_VOICE))
     problems.extend(_gate(settings.RESTORE_IF_DENY_ENV, restore_if_deny, mode, _RESTORE_VOICE))
+
+    problems.extend(stop_review_problems(root, conf))
 
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
     warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)

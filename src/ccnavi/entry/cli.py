@@ -42,6 +42,7 @@ from . import (
     cli_handoff,
     cli_ops,
     cli_plan,
+    cli_stopreview,
     cli_templates,
     cli_usage,
     diagnose,
@@ -1010,6 +1011,10 @@ def _parsed(
             args.json,
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
+
+    # Stop の AI 判定の判定役（agent hook）が打つ入口。payload は読まない。
+    if args.command[:1] == ["stop-review"]:
+        return cli_stopreview.run(stdin, stdout, stderr, conf, list(args.command), root)
 
     if args.command or args.reviewed is not None or args.close_early:
         # 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` は端末を求めない。

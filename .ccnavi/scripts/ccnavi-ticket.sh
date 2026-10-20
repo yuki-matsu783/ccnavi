@@ -146,18 +146,6 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-# 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
-if ccnavi_wap_use_exe "$root"; then
-	if [ -n "$ccnavi_wap_bin" ]; then
-		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
-	fi
-else
-	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
-	exit 2
-fi
-
-here="$(pwd -W 2>/dev/null || pwd)"
-
 # 識別子を実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を読み飛ばした最初の語。
 # サブコマンド（1 つ目の語）は読まない。
 ticket_id() {
@@ -181,6 +169,46 @@ ticket_id() {
 	done
 	printf '%s' "$ti_id"
 }
+
+# propose は、どの道を通っても結果ファイルを 1 つ書く（Stop の AI 判定が、提案を送ったか送らなかったかを
+# 確定する）。自分をもう 1 度起こし（CCNAVI_PROPOSE_INNER）、終わった後に外側が書く。中がどこで終わっても
+# （止めた・送る前の失敗・出力を切られた）外側は残る。結果は ccnavi 自身の記録で、判定には使わない。
+# 道は、中が申し送り（CCNAVI_PROPOSE_NOTE の route=）に書く。書かれていなければ、終了コードで決める。
+if [ "$1" = propose ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ]; then
+	po_id=$(ticket_id "$@")
+	po_dir="$root/logs/state/stopops-result"
+	po_start=$(date +%s 2>/dev/null || printf 0)
+	po_file="$po_dir/$po_start-$$.kv"
+	mkdir -p "$po_dir" 2>/dev/null || :
+	: >"$po_file.note" 2>/dev/null || :
+	po_rc=0
+	CCNAVI_PROPOSE_INNER=1 CCNAVI_PROPOSE_NOTE="$po_file.note" sh "$0" "$@" || po_rc=$?
+	po_route=$(sed -n 's/^route=//p' "$po_file.note" 2>/dev/null | tail -n 1)
+	if [ -z "$po_route" ]; then
+		po_route=failed_before
+	elif [ "$po_rc" -ne 0 ] && [ "$po_route" = sent ]; then
+		po_route=failed_after
+	fi
+	{
+		printf 'id=%s\nroute=%s\nrc=%s\nstarted=%s\nended=%s\n' \
+			"$po_id" "$po_route" "$po_rc" "$po_start" "$(date +%s 2>/dev/null || printf 0)"
+		grep -v '^route=' "$po_file.note" 2>/dev/null || :
+	} >"$po_file.tmp" 2>/dev/null && mv "$po_file.tmp" "$po_file" 2>/dev/null || :
+	rm -f "$po_file.note" "$po_file.tmp" 2>/dev/null || :
+	exit "$po_rc"
+fi
+
+# 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
+if ccnavi_wap_use_exe "$root"; then
+	if [ -n "$ccnavi_wap_bin" ]; then
+		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
+	fi
+else
+	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+	exit 2
+fi
+
+here="$(pwd -W 2>/dev/null || pwd)"
 
 # finish・cancel が通った後に、その親子の閉じた（done/ の）子のワークツリーを全部片付ける。ワークツリーが
 # あるのは作業中の子だけにする。子の finish・cancel でも、その子に限らず同じ親子の閉じた子をまとめて消す
@@ -224,6 +252,7 @@ propose_guard() {
 	[ "$pg_count" -gt 0 ] || return 0
 	ccnavi_wap_say "親のブランチに未 push のコードの変更が${pg_count}件ある（${pg_other# }${pg_other:+ }など）。propose は提案だけを送るので、止めた。コードは先に送るか、手元の変更を整理してから再実行してください（何も反映していません）"
 	log_info 提案を送らずに止めた -- "family=$ccnavi_wap_family_id" "reason=unpushed-code"
+	ccnavi_wap_note "route=unpushed_code"
 	return 1
 }
 
@@ -282,6 +311,7 @@ start | finish | cancel | propose)
 	ccnavi_wap_family "$wap_id"
 	case "$ccnavi_wap_target" in
 	stop)
+		ccnavi_wap_note "route=stopped"
 		ccnavi_wap_refuse
 		exit 1
 		;;
@@ -321,6 +351,7 @@ start | finish | cancel | propose)
 	esac
 	ccnavi_wap_end
 	trap - EXIT INT TERM HUP
+	[ "$1" != propose ] || ccnavi_wap_note "route=write_only"
 	;;
 esac
 

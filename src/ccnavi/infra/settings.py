@@ -49,6 +49,13 @@ MODE_ENV = "CCNAVI_MODE"
 #
 # 分けた理由は selfguard.py の冒頭にある。片方だけを切れることが要る。
 RESTORE_IF_DENY_ENV = "CCNAVI_RESTORE_IF_DENY"
+
+# Stop の AI 判定（agent 型 Stop フック）の効き方。disable / dry-run / enable。既定は dry-run。
+# 全体のモードと掛け合わせる（records.stopreview.setting）。
+STOP_REVIEW_ENV = "CCNAVI_STOP_REVIEW"
+# agent hook を登録したワークスペースが 1 を置く。起動するかどうかは登録の有無で決め、
+# 置かなければ Stop で判定計画を作らない（誰も読まない計画を溜めない）。
+STOP_REVIEW_AGENT_ENV = "CCNAVI_STOP_REVIEW_AGENT"
 GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # GUARD_TICKET_APPROVAL_ENV は、チケットの承認の経路を守るか。enable（既定）なら、
 # シェルから、ユーザ専用の入口（`ccnavi user <操作>` と `ccnavi-user-*.sh`）と、実行ファイルへの
@@ -377,6 +384,9 @@ class Settings:
     # 対象は組み込みで固定なので、広がりようがない。
     restore_if_deny: str = ""
     guard_core_files: str = ""
+    # Stop の AI 判定の設定。書かれたままの値で、読むのは records.stopreview.setting。
+    stop_review: str = ""
+    stop_review_agent: bool = False
     # guard_ticket_approval はチケットの承認の経路（承認・レビュー済みの受け入れ・
     # 状態の移動）をエージェントの手から守るか。enable / disable の 2 つだけを取る。
     #
@@ -480,6 +490,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         state=os.path.join(root, DEFAULT_STATE),
         restore_if_deny=os.environ.get(RESTORE_IF_DENY_ENV, ""),
         guard_core_files=os.environ.get(GUARD_CORE_FILES_ENV, ""),
+        stop_review=os.environ.get(STOP_REVIEW_ENV, ""),
+        stop_review_agent=os.environ.get(STOP_REVIEW_AGENT_ENV, "") == "1",
         guard_ticket_approval=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_ticket_approval_declared=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_unwatched=os.environ.get(GUARD_UNWATCHED_ENV, ""),

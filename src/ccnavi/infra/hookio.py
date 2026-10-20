@@ -30,6 +30,7 @@ SUBAGENT_STOP = "SubagentStop"
 
 # 1 回の呼び出しに対する判定。緩い順に並べてある。
 ASK = "ask"
+ALLOW = "allow"
 DENY = "deny"
 
 
@@ -112,6 +113,9 @@ class Input:
     # prompt は UserPromptSubmit にだけ来る。ユーザの依頼文で、issue・MR の指定を探すのに読む
     # （tickets.branchfind）。記録にも診断ログにも書かない。
     prompt: str = ""
+    # transcript_path は会話の記録（JSONL）の場所。Stop の AI 判定が共有キー（末尾のアシスタント行の
+    # uuid）を導くためだけに読む。記録にも診断ログにも書かない。
+    transcript_path: str = ""
     # busy は Stop にだけ来る。エージェントが動かしているバックグラウンド作業
     # （`background_tasks`）か、予約した繰り返し（`session_crons`）が残っているとき真。
     # そのターンの終わりのあとにも、エージェントの手が作業ツリーに届きうる。
@@ -190,6 +194,9 @@ def decode(stream: TextIO) -> Input:
         stop_hook_active=data.get("stop_hook_active") is True,
         source=str(data.get("source") or ""),
         prompt=data.get("prompt") if isinstance(data.get("prompt"), str) else "",
+        transcript_path=(
+            data.get("transcript_path") if isinstance(data.get("transcript_path"), str) else ""
+        ),
         busy=_has_items(data.get("background_tasks")) or _has_items(data.get("session_crons")),
     )
 

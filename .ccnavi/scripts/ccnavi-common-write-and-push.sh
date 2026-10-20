@@ -616,6 +616,7 @@ ccnavi_wap_write() {
 		fi
 		if [ -z "$ccnavi_cw_c" ] && [ "$(git -C "$ccnavi_wap_tree" rev-parse HEAD)" = "$(git -C "$ccnavi_wap_tree" rev-parse --verify -q "refs/remotes/origin/$ccnavi_wap_branch" 2>/dev/null)" ]; then
 			rm -f "$ccnavi_cw_list"
+			ccnavi_wap_note "route=unchanged"
 			return 0 # 書いたものが無く、送るものも無い
 		fi
 		ccnavi_cw_head=$(git -C "$ccnavi_wap_tree" rev-parse HEAD)
@@ -689,8 +690,23 @@ ccnavi_wap_undo() {
 	return 0
 }
 
+# propose の結果ファイル（ccnavi-ticket.sh が書く）への申し送り。CCNAVI_PROPOSE_NOTE が無ければ何もしない。
+# 書けなくても propose は止めない。
+ccnavi_wap_note() {
+	[ -z "${CCNAVI_PROPOSE_NOTE:-}" ] || printf '%s\n' "$1" >>"$CCNAVI_PROPOSE_NOTE" 2>/dev/null || :
+}
+
 # 送れた。<送った先頭>
 ccnavi_wap_sent() {
+	ccnavi_wap_note "route=sent"
+	ccnavi_wap_note "commit=$1"
+	if [ -n "${CCNAVI_PROPOSE_NOTE:-}" ] && [ -f "${ccnavi_cw_list:-}" ]; then
+		while IFS= read -r ccnavi_ws_path; do
+			[ -n "$ccnavi_ws_path" ] || continue
+			ccnavi_ws_sha=$(git -C "$ccnavi_wap_tree" rev-parse --verify -q "$1:$ccnavi_ws_path" 2>/dev/null || :)
+			[ -z "$ccnavi_ws_sha" ] || ccnavi_wap_note "file=$ccnavi_ws_sha $ccnavi_ws_path"
+		done <"$ccnavi_cw_list"
+	fi
 	ccnavi_wap_say "親子のチケット $ccnavi_wap_family_id のチケットの状態を送った（$(printf '%.12s' "$1")）"
 	log_info write-and-push で送った -- "family=$ccnavi_wap_family_id"
 }

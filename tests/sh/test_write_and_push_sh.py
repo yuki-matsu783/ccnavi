@@ -1465,6 +1465,50 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
         self.assertEqual(self.remote_sha(), before)
 
+    def results(self):
+        """propose の結果ファイル（Stop の AI 判定の操作実績）を、書かれた順に読む。"""
+        directory = os.path.join(self.ws, "logs", "state", "stopops-result")
+        found = []
+        for name in sorted(os.listdir(directory)) if os.path.isdir(directory) else []:
+            if not name.endswith(".kv"):
+                continue
+            text = self.read(os.path.join(directory, name))
+            row = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+            row["text"] = text
+            found.append(row)
+        return found
+
+    def test_the_result_file_records_the_route_sent(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.md")
+        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        (result,) = self.results()
+        self.assertEqual((result["id"], result["route"], result["rc"]), (PARENT, "sent", "0"))
+        head = self.sha(self.tree, "HEAD")
+        self.assertEqual(result["commit"], head)
+        self.assertIn(f"file={self.sha(self.tree, f'HEAD:{rel}')} {rel}", result["text"])
+
+    def test_the_result_file_records_unchanged_unpushed_code_and_failure(self):
+        rel = self.put(f"{self.TODO}/{PARENT}.md")
+        git(self.tree, "add", "--", rel)
+        git(self.tree, "commit", "-q", "-m", "propose by hand")
+        self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
+        self.put("src/secret.py", "x = 1\n")
+        git(self.tree, "add", "--", "src/secret.py")
+        git(self.tree, "commit", "-q", "-m", "wip code")
+        self.put(f"{self.TODO}/{PARENT}.md", "v2\n")
+        self.assertEqual(self.ticket("propose", PARENT).returncode, 1)
+        routes = [r["route"] for r in self.results()]
+        self.assertEqual(routes[-1], "unpushed_code")
+        self.assertIn(routes[0], ("sent", "unchanged"))
+
+    def test_a_rejected_push_leaves_a_failed_before_result(self):
+        self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
+        self.reject_pushes()
+        self.assertNotEqual(self.ticket("propose", PARENT).returncode, 0)
+        (result,) = self.results()
+        self.assertEqual(result["route"], "failed_before")
+        self.assertNotEqual(result["rc"], "0")
+
     def reject_pushes(self):
         """リモートの push をすべて断る（pre-receive が 1 で終わる）。"""
         hook = os.path.join(self.remote, "hooks", "pre-receive")
