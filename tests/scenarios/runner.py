@@ -389,12 +389,12 @@ def mode_check(root):
 # ---- 実行 ----
 
 
-def run_step(scn, step, out, idx, session_id, resume_id, persist, root):
+def run_step(scn, step, out, idx, session_id, resume_id, persist, root, issue_no=None):
     _require_entry()
     cmd = [
         "claude",
         "-p",
-        step["prompt"].strip(),
+        fill_issue(step["prompt"].strip(), issue_no),
         "--model",
         scn["model"],
         "--output-format",
@@ -470,6 +470,49 @@ def _cleanup(made, made_dirs, root):
             (Path(root) / rel).rmdir()
 
 
+ISSUE_PLACEHOLDER = "{issue}"
+
+
+def issue_number(url):
+    """gh issue create の出力（issue の URL）の末尾から番号を取る。"""
+    tail = url.strip().splitlines()[-1].rstrip("/").rsplit("/", 1)[-1]
+    if not tail.isdigit():
+        raise RuntimeError(f"issue の番号が取れない: {url.strip()}")
+    return int(tail)
+
+
+def make_issue(issue, root):
+    """setup の issue の欄どおりに、test-repo へ issue を新しく 1 つ作る。番号を返す。"""
+    r = subprocess.run(
+        ["gh", "issue", "create", "--title", issue["title"], "--body", issue.get("body", "")],
+        cwd=Path(root) / issue["repo"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(f"gh issue create が終了コード {r.returncode}: {r.stderr.strip()}")
+    return issue_number(r.stdout)
+
+
+def close_issue(issue, number, root):
+    """回したあとに、作った issue を閉じる（setup の issue の close: true のときだけ）。"""
+    r = subprocess.run(
+        ["gh", "issue", "close", str(number)],
+        cwd=Path(root) / issue["repo"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if r.returncode != 0:
+        print(f"issue #{number} を閉じられなかった: {r.stderr.strip()}")
+
+
+def fill_issue(text, number):
+    """prompt の {issue} を、作った issue の番号に置き換える。番号が無ければそのまま。"""
+    return text if number is None else text.replace(ISSUE_PLACEHOLDER, str(number))
+
+
 def drive(scn, out, st, root):
     """st['next_step'] から、人間の操作の step か末尾まで進める。
     人間の操作で止まったら 10、末尾まで進んだら None を返す。
@@ -494,7 +537,9 @@ def drive(scn, out, st, root):
         t0 = time.time()
         persist = _persist_needed(steps, idx)
         try:
-            ev = run_step(scn, step, out, idx + 1, sid, resume_id, persist, root)
+            ev = run_step(
+                scn, step, out, idx + 1, sid, resume_id, persist, root, st.get("issue_no")
+            )
         except Exception as e:  # 起動できない・時間切れ・終了コードが 0 でない
             # 後続は回さず止める。finish に回して、後片付けを通す
             st["halt"] = {
@@ -548,6 +593,9 @@ def finish(scn, out, st, root):
         results.append(("repo", "ccnavi 本体の HEAD・ブランチ・ワークツリー", v, why))
     finally:
         _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
+        issue = (scn.get("setup") or {}).get("issue")
+        if issue and issue.get("close") and st.get("issue_no"):
+            close_issue(issue, st["issue_no"], root)
     write_report(scn, out, st, results, rows, raw)
     final = overall(results)
     print(f"\n結果: {final}（レポート: {out}/report.md）")
@@ -847,6 +895,13 @@ def scenario_summary(scn):
     setup = (scn.get("setup") or {}).get("files", {})
     if setup:
         lines.append("回す前に作り、回したあとに消すファイル: " + ", ".join(setup))
+    issue = (scn.get("setup") or {}).get("issue")
+    if issue:
+        close = "（回したあとに閉じる）" if issue.get("close") else "（閉じない）"
+        lines.append(
+            f"回す前に {issue['repo']} へ issue を 1 つ作り、"
+            f"prompt の {ISSUE_PLACEHOLDER} に番号を入れる{close}"
+        )
     lines.append("手順:")
     for i, step in enumerate(scn["steps"], 1):
         if step.get("human"):
@@ -1033,6 +1088,9 @@ def cmd_run(args):
     )
     out.mkdir(parents=True, exist_ok=True)
     pre = {rel: file_digest(root / rel) for rel in scn["expect"].get("files_unchanged", [])}
+    issue = (scn.get("setup") or {}).get("issue")
+    # issue は回すたびに新しく作る。番号は state に残し、続きの step の prompt にも入れる
+    issue_no = make_issue(issue, root) if issue else None
     setup_files, setup_dirs = _setup(scn, root)
     st = {
         "scenario": str(Path(args.scenario).resolve()),
@@ -1044,6 +1102,7 @@ def cmd_run(args):
         "pre_repo": repo_snapshot(root),
         "setup_made": setup_files,
         "setup_dirs": setup_dirs,
+        "issue_no": issue_no,
     }
     _write_state(out, st)
     return _continue(scn, out, st, root)

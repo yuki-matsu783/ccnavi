@@ -677,6 +677,30 @@ class ScenarioFilesTest(unittest.TestCase):
                         self.assertTrue(step.get("instruction"))
 
 
+class IssueSetupTest(unittest.TestCase):
+    def test_issue_number_from_url(self):
+        self.assertEqual(runner.issue_number("https://github.com/o/r/issues/34\n"), 34)
+
+    def test_issue_number_rejects_non_url(self):
+        with self.assertRaises(RuntimeError):
+            runner.issue_number("作成できませんでした")
+
+    def test_fill_issue_replaces_placeholder(self):
+        text = "issue #{issue} で `--issue {issue}` を打つ"
+        self.assertEqual(runner.fill_issue(text, 34), "issue #34 で `--issue 34` を打つ")
+
+    def test_fill_issue_keeps_text_without_number(self):
+        self.assertEqual(runner.fill_issue("issue #{issue}", None), "issue #{issue}")
+
+    def test_uc09_creates_issue_per_run(self):
+        scn = runner.load_scenario(Path(__file__).parent / "UC-09-quick-ticket.yml")
+        issue = scn["setup"]["issue"]
+        self.assertEqual(issue["repo"], "projects/test-repo")
+        self.assertTrue(issue["close"])
+        self.assertIn("{issue}", scn["steps"][0]["prompt"])
+        self.assertNotIn("#34", scn["steps"][0]["prompt"])
+
+
 class EvidenceTest(unittest.TestCase):
     def _hook(self, event, name, stdout="", stderr=""):
         return {

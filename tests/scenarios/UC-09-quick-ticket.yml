@@ -6,14 +6,20 @@ status: draft
 model: haiku
 budget_usd: 3.0
 test_repo: true                  # projects/test-repo にブランチ・MR を作る。回す前に確認事項 2 を確かめる
+setup:
+  issue:                         # 回すたびに test-repo へ issue を新しく作り、prompt の {issue} に番号を入れる
+    repo: projects/test-repo
+    title: "README の末尾に 1 行を足す（受け入れシナリオ UC-09 用）"
+    body: "受け入れシナリオ UC-09 で使う issue。README.md の末尾に「テスト 2」を 1 行足す作業の着手に使う。"
+    close: true                  # 回したあとに閉じる
 
 # 設計に触れる・ユーザのレビューが要る作業は、提案を書いて承認を受ける（docs/design/tickets/phases.md の「小さい作業」）。
 # 承認（`ccnavi user agree`）とマージリクエストのレビュー（ホスト上）は人間しかできないので、そこで止める。
 # 親は `plan: [quick]` の 1 項だけ、子は `phase: 1`。範囲は親の範囲そのまま。
 steps:
   - prompt: >-
-      projects/test-repo の README.md の末尾に「テスト 2」と 1 行足す小さい作業を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
-      提案を wip/proposals/todo/ に書いて、`ccnavi --agree --preview --verify` で自己検証して、ユーザに承認を依頼するところで止めて。
+      projects/test-repo の issue #{issue} を指定された小さい作業（README.md の末尾に「テスト 2」と 1 行足す）を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
+      issue #{issue} で `sh .ccnavi/scripts/ccnavi-start.sh --issue {issue}` を打って、出た親のワークツリーに提案を wip/proposals/todo/ に書いて、`ccnavi --agree --preview --verify` で自己検証して、ユーザに承認を依頼するところで止めて。
       実装はまだしないで。
   - human: true
     instruction: >-
