@@ -1,0 +1,446 @@
+[
+  {
+    "id": "a0000000000000000000000000000000000000a1",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5301,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5302,
+        "type": "DiscussionNote",
+        "body": "この方針で良いか確認したい",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5420,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:accept -->\n受け入れて進みます",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "b0000000000000000000000000000000000000b1",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5303,
+        "type": "DiscussionNote",
+        "body": "全体の感想です",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": false,
+        "resolved": false,
+        "position": null
+      },
+      {
+        "id": 5304,
+        "type": "DiscussionNote",
+        "body": "ここは直したほうがよい",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5521,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:accept -->\n受け入れて進みます",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "c0000000000000000000000000000000000000c1",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5305,
+        "type": "DiscussionNote",
+        "body": "ただのコメントです",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": false,
+        "resolved": false,
+        "position": null
+      },
+      {
+        "id": 5306,
+        "type": "DiscussionNote",
+        "body": "返信です",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": false,
+        "resolved": false,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "d0000000000000000000000000000000000000d1",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5307,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5622,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:accept -->\n受け入れて進みます",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "e0000000000000000000000000000000000000e1",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5308,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5309,
+        "type": "DiscussionNote",
+        "body": "自分で気づいた点: 命名を直す",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5723,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:accept -->\n受け入れて進みます",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "h1000000000000000000000000000000000000h1",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5310,
+        "type": null,
+        "body": "added 1 commit",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": true,
+        "resolvable": false,
+        "resolved": false,
+        "position": null
+      },
+      {
+        "id": 5311,
+        "type": "DiscussionNote",
+        "body": "system の後の指摘",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5824,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:accept -->\n受け入れて進みます",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "h2000000000000000000000000000000000000h2",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5312,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5313,
+        "type": "DiscussionNote",
+        "body": "system をはさむ前の返信",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5314,
+        "type": null,
+        "body": "changed this line",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": true,
+        "resolvable": false,
+        "resolved": false,
+        "position": null
+      },
+      {
+        "id": 5315,
+        "type": "DiscussionNote",
+        "body": "system の後の返信",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5925,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:accept -->\n受け入れて進みます",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "h3000000000000000000000000000000000000h3",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5316,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5317,
+        "type": "DiscussionNote",
+        "body": "末尾に system が付く返信",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      },
+      {
+        "id": 5318,
+        "type": null,
+        "body": "resolved all threads",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": true,
+        "resolvable": false,
+        "resolved": false,
+        "position": null
+      },
+      {
+        "id": 6026,
+        "type": "DiscussionNote",
+        "body": "<!-- ccnavi:accept -->\n受け入れて進みます",
+        "author": {
+          "id": 201,
+          "username": "lab-bot",
+          "name": "lab-bot"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "position": null
+      }
+    ]
+  },
+  {
+    "id": "i0000000000000000000000000000000000000i1",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 5319,
+        "type": null,
+        "body": "assigned to @lab-reviewer",
+        "author": {
+          "id": 202,
+          "username": "lab-reviewer",
+          "name": "lab-reviewer"
+        },
+        "created_at": "2026-09-29T05:00:00.000Z",
+        "system": true,
+        "resolvable": false,
+        "resolved": false,
+        "position": null
+      }
+    ]
+  }
+]

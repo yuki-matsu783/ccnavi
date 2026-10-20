@@ -43,6 +43,7 @@ sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANG
 親のブランチ・依頼を投稿したアカウントの id `poster`、ホストの応答は `mrs.json`・`discussions.<N>.json`・`reviewers.<N>.json`・`user.json`）。
 代役は sh の試験の `tests/sh/gitlab_host.py` と拡張の試験の `test/helpers/gitlab-fixture.ts`、試験は `tests/sh/test_review_host_fixture.py` の
 `GitLabHostFixtureTest` と拡張の CX-T144。結論（`conclusion.json`）を出すときは、`poster` が投稿した ccnavi の依頼のスレッドを数えない（目印は誰でも書けるので、書いたアカウントで見分ける）。
+依頼コメントへの返信（`replies`・`replies-accepted`）は、system のノートを除いたノートで代表のノートと `own` を決める見本で、返信は指摘として数える（実物の GitLab で返信がスレッドになり resolvable になるかは未検証）。
 更新の手順は下の GitHub と同じ（実物は `glab api` で取る）。
 
 MR のスレッドとレビューを取ってくる処理は、手元の sh（`.ccnavi/scripts/ccnavi-review.sh` の `find_mr`・`threads`・`reviews`）と

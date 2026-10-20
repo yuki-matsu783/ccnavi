@@ -54,6 +54,11 @@ class Thread:
     last_comment_id: str = ""
     last_comment_at: str = ""
     last_comment_author: str = ""
+    # スレッドの note が全部 ccnavi の目印で始まるか（ccnavi の投稿だけのスレッドか）。GitLab から
+    # 取得した結果だけが持つ。JSON の `true` / `false` だけを受け、それ以外（`"true"`・`1` など）と
+    # 欄が無いときは None（目印と書き手で見る従来の判定に戻る）。
+    # ユーザが ccnavi の依頼コメントに返信したスレッドは False（代表の note は返信）。
+    own: bool | None = None
 
 
 @dataclass
@@ -162,6 +167,7 @@ class Result:
                     last_comment_id=str(t.get("last_id") or ""),
                     last_comment_at=str(t.get("last_at") or ""),
                     last_comment_author=str(t.get("last_author") or ""),
+                    own=t["own"] if isinstance(t.get("own"), bool) else None,
                 )
                 for t in data.get("threads") or []
                 if isinstance(t, dict)
@@ -357,8 +363,9 @@ def _unresolved(
     返信を残してホスト側で解決済みにする（`MARKER_ACCEPT`）。
     解決済みなので数えず、受け入れたあとで誰かが開き直せば、未解決として数える。
 
-    機構自身の投稿と見るのは、GitLab から取得した結果で、本文が目印で始まり、
-    書いたのが依頼を投稿したアカウント（`poster`）のときだけ。
+    機構自身の投稿と見るのは、GitLab から取得した結果で、書いたのが依頼を投稿したアカウント
+    （`poster`）で、本文が目印で始まるときだけ。スレッドの note が分かる結果（`own`）では、
+    note が全部目印で始まるときだけ（ユーザが依頼コメントに返信したスレッドは指摘として数える）。
     GitHub の依頼は MR のコメントでスレッドにならないので、
     目印で始まるスレッドはユーザが書いたものとして数える。
     投稿者が分からなければ見分けずに数える（誰でも目印を書けるので、
@@ -374,8 +381,14 @@ def _unresolved(
 
 
 def _ccnavi_post(t: Thread, host: str, poster: str) -> bool:
-    """ccnavi 自身が投稿したスレッドか（`_unresolved`）。"""
+    """ccnavi 自身が投稿したスレッドか（`_unresolved`）。
+
+    `own` が真偽値で取れていれば、それで決める（偽は書き手が同じでも数える）。取れていなければ
+    （None）、代表の note の本文と書き手で見る。
+    """
     mine = host == "gitlab" and bool(poster) and t.author == poster
+    if t.own is not None:
+        return mine and t.own
     return mine and t.body.startswith(MARKER_PREFIX)
 
 

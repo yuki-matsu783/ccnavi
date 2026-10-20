@@ -593,6 +593,8 @@ export interface ReviewThread {
   readonly last_author: string;
   /** 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持ち、ccnavi の依頼のスレッドを見分けるのに使う（目印は誰でも書けるので書き手で見る） */
   readonly author?: string;
+  /** スレッドのノートが全部 ccnavi の目印で始まるか。GitLab から取得した結果だけが持つ。ユーザが依頼コメントに返信したスレッドは false */
+  readonly own?: boolean;
 }
 
 /** レビュー 1 つ（`ccnavi-review.sh` の `reviews` と同じ形） */

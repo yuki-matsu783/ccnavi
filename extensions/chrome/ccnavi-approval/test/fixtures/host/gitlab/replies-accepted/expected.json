@@ -1,0 +1,115 @@
+{
+  "host": "gitlab",
+  "mr": {
+    "number": 7,
+    "url": "https://gitlab.com/acme/widgets/-/merge_requests/7"
+  },
+  "threads": [
+    {
+      "id": "a0000000000000000000000000000000000000a1",
+      "resolved": true,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5302",
+      "path": "",
+      "line": 0,
+      "body": "この方針で良いか確認したい",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "202",
+      "own": false,
+      "last_id": "5420",
+      "last_at": "2026-09-29T05:00:00.000Z",
+      "last_author": "lab-bot"
+    },
+    {
+      "id": "b0000000000000000000000000000000000000b1",
+      "resolved": true,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5303",
+      "path": "",
+      "line": 0,
+      "body": "全体の感想です",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "202",
+      "own": false,
+      "last_id": "5521",
+      "last_at": "2026-09-29T05:00:00.000Z",
+      "last_author": "lab-bot"
+    },
+    {
+      "id": "d0000000000000000000000000000000000000d1",
+      "resolved": true,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5307",
+      "path": "",
+      "line": 0,
+      "body": "<!-- ccnavi:request i0001:1 key=4f2a9c -->\nフェーズ 1 のレビューを依頼します",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "201",
+      "own": true,
+      "last_id": "5622",
+      "last_at": "2026-09-29T05:00:00.000Z",
+      "last_author": "lab-bot"
+    },
+    {
+      "id": "e0000000000000000000000000000000000000e1",
+      "resolved": true,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5309",
+      "path": "",
+      "line": 0,
+      "body": "自分で気づいた点: 命名を直す",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "201",
+      "own": false,
+      "last_id": "5723",
+      "last_at": "2026-09-29T05:00:00.000Z",
+      "last_author": "lab-bot"
+    },
+    {
+      "id": "h1000000000000000000000000000000000000h1",
+      "resolved": true,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5311",
+      "path": "",
+      "line": 0,
+      "body": "system の後の指摘",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "202",
+      "own": false,
+      "last_id": "5824",
+      "last_at": "2026-09-29T05:00:00.000Z",
+      "last_author": "lab-bot"
+    },
+    {
+      "id": "h2000000000000000000000000000000000000h2",
+      "resolved": true,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5313",
+      "path": "",
+      "line": 0,
+      "body": "system をはさむ前の返信",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "202",
+      "own": false,
+      "last_id": "5925",
+      "last_at": "2026-09-29T05:00:00.000Z",
+      "last_author": "lab-bot"
+    },
+    {
+      "id": "h3000000000000000000000000000000000000h3",
+      "resolved": true,
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7#note_5317",
+      "path": "",
+      "line": 0,
+      "body": "末尾に system が付く返信",
+      "created_at": "2026-09-29T05:00:00.000Z",
+      "author": "202",
+      "own": false,
+      "last_id": "6026",
+      "last_at": "2026-09-29T05:00:00.000Z",
+      "last_author": "lab-bot"
+    }
+  ],
+  "reviews": [
+    {
+      "state": "APPROVED",
+      "url": "https://gitlab.com/acme/widgets/-/merge_requests/7",
+      "submitted_at": "2026-09-29T04:00:00.000Z",
+      "author": "9"
+    }
+  ]
+}

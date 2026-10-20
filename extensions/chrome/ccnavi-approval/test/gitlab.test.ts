@@ -82,7 +82,7 @@ const DOING = ".ccnavi/approved/doing/i0001.md";
 const WORKFLOW = ".ccnavi/approved/phases/i0001/workflow.yml";
 
 test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
-  assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "requested-changes", "resolved"]);
+  assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "replies", "replies-accepted", "requested-changes", "resolved"]);
   for (const name of gitlabSceneNames()) {
     const scene = loadGitLabScene(name);
     const client = { host: GL, token: TOKEN, fetch: gitlabSceneFetch(scene), counter: { rest: 0, graphql: 0 }, sleep: noWait };
@@ -349,6 +349,9 @@ test("CX-T152 GitLab のレビュー済み: 依頼したアカウントの ccnav
     ["impostor", /未解決のスレッドが 2 件残っている/],
     ["requested-changes", /変更要求のレビューが立っている/],
     ["paged", /未解決のスレッドが 11 件残っている/],
+    // ccnavi の依頼コメントへの返信は、返信を代表の指摘として数える（system のノートは除く）
+    ["replies", /未解決のスレッドが 6 件残っている/],
+    ["replies-accepted", null],
   ] as const) {
     const { panel } = await panelOn(reviewingOnGitLab(scene));
     assert.ok(panel, scene);
