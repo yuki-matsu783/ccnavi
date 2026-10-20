@@ -234,10 +234,13 @@ def _linkless(root: str, path: str) -> bool:
     current = os.path.abspath(path)
     if os.path.commonpath([pathcase.fold(top), pathcase.fold(current)]) != pathcase.fold(top):
         return False
-    while current != top:
+    while pathcase.fold(current) != pathcase.fold(top):
         if os.path.islink(current):
             return False
-        current = os.path.dirname(current)
+        parent = os.path.dirname(current)
+        if parent == current:
+            return False
+        current = parent
     return True
 
 

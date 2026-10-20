@@ -28,7 +28,7 @@ import time
 from typing import TextIO
 
 from ..infra import fsio, hookio, modes, pathcase, settings, shellread
-from ..records import audit, redact
+from ..records import audit, redact, stopreview
 
 EXIT_OK = modes.EXIT_OK
 
@@ -100,6 +100,52 @@ def _same_dir(a: str, b: str) -> bool:
     return bool(a and b) and pathcase.fold(a).rstrip("/\\") == pathcase.fold(b).rstrip("/\\")
 
 
+def _strip_redirects(words: list[str]) -> list[str] | None:
+    """無害なリダイレクト（`/dev/null`・`&N`）の語を除く。ほかのリダイレクトがあれば None。"""
+    if not _redirects_ok(words):
+        return None
+    out: list[str] = []
+    at = 0
+    while at < len(words):
+        word = words[at]
+        following = words[at + 1] if at + 1 < len(words) else ""
+        if _HARMLESS_REDIRECT.match(word):
+            at += 1
+        elif _FD.match(word) and _REDIRECT_OP.match(following):
+            # `2>/dev/null` は語に `2`・`>`・`/dev/null` と割れることがある。
+            at += 3
+        elif _REDIRECT_OP.match(word):
+            at += 2
+        else:
+            out.append(word)
+            at += 1
+    return out
+
+
+_LAUNCHER = ".ccnavi/scripts/ccnavi-launcher.sh"
+_SHELLS = frozenset({"sh", "bash"})
+# 動詞のあとの引数の数。material は <session_id> <transcript_path>、record は JSON を 1 つ足せる。
+_ARGS = {"material": (2, 2), "record": (2, 3)}
+
+
+def _strict_call(words: list[str], cwd: str) -> bool:
+    """語の並びが、許す形の `stop-review material|record` そのものか（先頭語から完全一致）。"""
+    if words and words[0] == "ccnavi":
+        rest = words[1:]
+    elif len(words) > 1 and words[0] in _SHELLS:
+        launcher = pathcase.fold(words[1]).replace("\\", "/")
+        own = pathcase.fold(cwd).replace("\\", "/").rstrip("/") + "/" + _LAUNCHER if cwd else ""
+        if launcher != _LAUNCHER and launcher != own:
+            return False
+        rest = words[2:]
+    else:
+        return False
+    if len(rest) < 2 or rest[0] != "stop-review" or rest[1] not in _ARGS:
+        return False
+    low, high = _ARGS[rest[1]]
+    return low <= len(rest) - 2 <= high
+
+
 def judge_command_ok(command: str, cwd: str = "") -> bool:
     """判定役に許す Bash か。`ccnavi stop-review material|record …` の 1 本だけ。
 
@@ -107,7 +153,9 @@ def judge_command_ok(command: str, cwd: str = "") -> bool:
     実機で、判定役が付けた `cd <プロジェクト> 2>/dev/null;` を拒否して、材料を取れずに期限切れに
     なった。そのため、判定役自身の作業ディレクトリ（`cwd`）への `cd` と、`/dev/null` や `&1` への
     リダイレクトだけは許す。
-    ほかのコマンドの連結（`;`・`&&`・`||`）・ほかのリダイレクト・コマンド置換・読み切れない形は許さない。
+    許すのは、先頭語から完全一致する形だけ（`ccnavi` か `sh <launcher>`、`cd <cwd>`、パスの付かない
+    `echo`・`printf`・`cat`）。ほかのコマンドの連結（`;`・`&&`・`||`）・ほかのリダイレクト・
+    プロセス置換・コマンド置換・読み切れない形は許さない。
     判定役は transcript を読むので、そこに書かれた命令でほかのコマンドを通されないようにする。
     """
     reading = shellread.read(command)
@@ -115,24 +163,46 @@ def judge_command_ok(command: str, cwd: str = "") -> bool:
     if head is not None:
         # 単一引用符の中はシェルが展開しない（JSON を引数で渡す形）。引用の外だけを見る。
         head = re.sub(r"'[^']*'", "''", head)
-    if reading.degraded or head is None or "$(" in head or "`" in head or "${" in head:
+    if (
+        reading.degraded
+        or head is None
+        or "$(" in head
+        or "`" in head
+        or "${" in head
+        or "<(" in head
+        or ">(" in head
+        or not _heredoc_body_inert(command)
+    ):
         return False
     calls = 0
     for words, _place in shellread.placed(command):
+        words = _strip_redirects(words) if words else None
         if not words:
             return False
-        if _is_stop_review(words):
+        if _strict_call(words, cwd):
             calls += 1
-        elif words[0] == "cd" and _same_dir(words[1] if len(words) > 1 else "", cwd):
+        elif words[0] == "cd" and len(words) == 2 and _same_dir(words[1], cwd):
             pass
-        elif os.path.basename(pathcase.fold(words[0])) not in _FEEDERS:
-            return False
-        if not _redirects_ok(words):
+        elif words[0] not in _FEEDERS:
             return False
     return calls == 1
 
 
-_HEREDOC = re.compile(r"<<-?\s*[\"']?(\w+)[\"']?")
+_HEREDOC = re.compile(r"<<-?\s*([\"']?)(\w+)\1")
+
+
+def _heredoc_body_inert(command: str) -> bool:
+    """ヒアドキュメントの本文でシェルが何も展開しないか。
+
+    区切りが引用されていれば本文は展開されない。引用が無いときは、`$`・`` ` ``・`\\` があれば偽。
+    """
+    lines = command.strip("\n").split("\n")
+    if len(lines) == 1:
+        return True
+    found = _HEREDOC.search(lines[0])
+    if not found or found.group(1):
+        return True
+    return not any(c in "\n".join(lines[1:]) for c in ("$", "`", "\\"))
 
 
 def _heredoc_head(command: str) -> str | None:
@@ -147,7 +217,7 @@ def _heredoc_head(command: str) -> str | None:
     if not found:
         return None
     for at, line in enumerate(lines[1:], 1):
-        if line.strip() == found.group(1):
+        if line.strip() == found.group(2):
             return lines[0] if not any(x.strip() for x in lines[at + 1 :]) else None
     return None
 
@@ -210,7 +280,7 @@ def before(
         return False
     if conf.state and payload.session_id:
         mark_taint(conf.state, payload.session_id, command, time.time())
-    if mode == modes.DRY_RUN:
+    if mode == modes.DRY_RUN or stopreview.setting(mode, conf.stop_review) != modes.ENABLE:
         return False
     record.decision, record.enforced = audit.DENY, True
     record.reason = "stop-review-worker"

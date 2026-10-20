@@ -33,7 +33,9 @@ class StopJudgeTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.state = tmp.name
-        self.conf = settings.Settings(state=tmp.name, stop_review_agent=True)
+        self.conf = settings.Settings(
+            state=tmp.name, stop_review_agent=True, stop_review=modes.ENABLE
+        )
 
     def _before(self, payload, mode=modes.ENABLE, conf=None):
         out, record = io.StringIO(), audit.Record()
@@ -108,6 +110,17 @@ class StopJudgeTest(unittest.TestCase):
             f"{material} > /tmp/out",
             f"{material} 2> /home/u/.ssh/x",
             f"cd {cwd}; rm -rf x; {material}",
+            "touch /tmp/x ccnavi stop-review material",
+            "python3 -c 'pass' ccnavi stop-review material",
+            "sh /tmp/evil.sh ccnavi stop-review material",
+            "/tmp/evil/ccnavi stop-review material a b",
+            "sh /tmp/evil/ccnavi-launcher.sh stop-review material a b",
+            "ccnavi stop-review material a b <(touch /tmp/x)",
+            "ccnavi stop-review material a b >(touch /tmp/x)",
+            "ccnavi stop-review material a b c d e",
+            "./echo hi | ccnavi stop-review record a b",
+            "/tmp/x/cat f | ccnavi stop-review record a b",
+            "ccnavi stop-review material a b <<EOF\n$(touch /tmp/x)\nEOF",
         ):
             with self.subTest(bad=command):
                 self.assertFalse(stopjudge.judge_command_ok(command, cwd))
