@@ -1553,7 +1553,7 @@ class TicketTest(unittest.TestCase):
         self.assertEqual([t["key"] for t in data["threads"]], ["u1", "u2"])
         self.assertEqual(data["parent"], "i0001")
         self.assertFalse(data["can_issue"])
-        self.assertRegex(data["digest"], r"^[0-9a-f]{64}$")
+        self.assertRegex(data["digest"], r"^v2\.[A-Za-z0-9_-]+$")
         phases = os.path.join(self.approved, "phases", "i0001")
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
         self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
@@ -1944,9 +1944,12 @@ class TicketTest(unittest.TestCase):
         )
         grown = os.path.join(self.state, "grown.json")
         write(grown, json.dumps(data))
+        # 見せたあとに増えた指摘は止めず、未対応のまま残す（reviewed は置かない）
         changed = self.decide(grown, *args)
-        self.assertNotEqual(changed.returncode, 0)
-        self.assertTrue(json.loads(changed.stdout)["mismatch"])
+        self.assertEqual(changed.returncode, 0, changed.stderr)
+        answer = json.loads(changed.stdout)
+        self.assertFalse(answer["reviewed"])
+        self.assertEqual(answer["pending_extra"], ["u3"])
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
 
         # 解決済みで、ほかに増えていなければ置く。受け入れた鍵がマーカーに残る
