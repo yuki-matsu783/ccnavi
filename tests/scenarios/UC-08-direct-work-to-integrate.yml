@@ -43,13 +43,13 @@ expect:
       expect_contains: README
     - cwd: projects/test-repo
       run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh worktree list
-      expect_contains: 3 行    # 回す前の 3 行（本体 + 前の回の残り 2 つ）のまま。この回で切ったワークツリーが片付いた
+      expect_contains: worktree  1 行    # 回す前と同じ 1 行（本体のみ）。この回で切ったワークツリーが片付いた
     - cwd: projects/test-repo
       run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh status
       expect_contains: nothing to commit
     - cwd: projects/test-repo
-      run: tail -n 3 README.md
-      expect_contains: テスト
+      run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh diff HEAD~1 HEAD -- README.md
+      expect_contains: +テスト    # この回の取り込みが README に 1 行足したこと。回す前の HEAD は merge で、HEAD~1 との差分は空
     - run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh status
       expect_contains: nothing to commit    # ccnavi 本体は何も変わっていない
   judge:
@@ -60,4 +60,4 @@ unconfirmed:
   - コミットメッセージの形(prefix と日本語 1 行)まで比べるか。いまは README を含むことだけ見る（回した回では docs: README の末尾に「テスト」の 1 行を追加 だった）
   - 回すたびに projects/test-repo の main に「テスト」のコミットが 1 つ残り、README.md の末尾に行が足される。繰り返し回すなら、戻す手順（revert など）を決める
   - ターンの途中で切ったワークツリーの確認不能の警告は、分岐点から数えるようにして出さなくした（issue #378）。次に回すとき、Stop にこの警告が出ないことを確かめる
-  - worktree list の行数（3 行）は、回す前の projects/test-repo の状態に依る。前の回の残り（chore-1-test-repo-main-todo、readme-update）が片付いたら、行数を直す
+  - worktree list の行数（1 行）は、回す前の projects/test-repo の状態に依る。残ったワークツリーが増えたら、行数を直す（残骸は `worktree prune` で片付けた）
