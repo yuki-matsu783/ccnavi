@@ -126,6 +126,7 @@ review_host() {
 		case "$?" in
 		2) fail origin-no-host "origin からホストを読めない ($origin_shown)。" ;;
 		3) fail origin-no-path "origin からプロジェクトのパスを読めない ($origin_shown)。" ;;
+		4) fail origin-ghe-port "$ccnavi_h_parse_why ($origin_shown)。ポートを外した origin にしてください。" ;;
 		*) fail origin-unreadable "origin の URL を読めない ($origin_shown)。" ;;
 		esac
 	}
@@ -255,12 +256,21 @@ threads() {
 		done
 		printf '%s' "$all"
 	else
+		# 判定に使う note は、discussion の note から system: true を除いたもの（空なら discussion ごと除く）。
+		# 対象は、その note が 1 つでも resolvable な discussion。代表の note（本文・url・位置・作成者）は
+		# 本文が目印 `<!-- ccnavi:` で始まらない最初の note（無ければ先頭）。ccnavi の依頼コメントに
+		# ユーザが返信したスレッドは、返信が代表になる。own は、note の本文が全部目印で始まるときだけ真
+		# （ccnavi の投稿だけのスレッド）。last_* は集合の最後の note。
 		pages "projects/$(encoded_path)/merge_requests/$mr_number/discussions" |
-			"$JQ" --arg u "$mr_url" '[.[] | select((.notes // []) | length > 0) | select(.notes[0].resolvable) | . as $d | .notes[0] as $n |
-				{id: ($d.id | tostring), resolved: ([$d.notes[] | select(.resolvable) | .resolved] | all),
+			"$JQ" --arg u "$mr_url" 'def marked: ((.body // "") | if type == "string" then startswith("<!-- ccnavi:") else false end);
+				[.[] | . as $d | [($d.notes // [])[] | select(.system != true)] as $ns
+				| select(($ns | length) > 0) | select($ns | any(.resolvable))
+				| ([$ns[] | select(marked | not)] | .[0] // $ns[0]) as $n | $ns[-1] as $l |
+				{id: ($d.id | tostring), resolved: ([$ns[] | select(.resolvable) | .resolved] | all),
 				 url: ($u + "#note_" + ($n.id | tostring)), path: ($n.position.new_path // ""), line: ($n.position.new_line // 0),
 				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: (($n.author.id // "") | tostring),
-				 last_id: (($d.notes[-1].id // "") | tostring), last_at: ($d.notes[-1].created_at // ""), last_author: ($d.notes[-1].author.username // "")}]'
+				 own: ($ns | all(marked)),
+				 last_id: (($l.id // "") | tostring), last_at: ($l.created_at // ""), last_author: ($l.author.username // "")}]'
 	fi
 }
 

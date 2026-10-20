@@ -42,9 +42,9 @@
 
 # この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの src/ccnavi/entry/version.py の COMPAT、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
-# sh を直さないと動かない形に変えたときと、データの形（待ち方の置き場・取り下げの条件など）が
+# sh を直さないと動かない形に変えたときと、データの形（待ち方の置き場など）が
 # 変わるとき（上げ方は src/ccnavi/entry/version.py の説明）。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=17
+CCNAVI_COMPAT=18
 
 # 相対パスを絶対に直す。
 #

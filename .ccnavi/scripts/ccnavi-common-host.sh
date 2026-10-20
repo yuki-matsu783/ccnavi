@@ -9,8 +9,20 @@
 # 道具は ccnavi_host_connect で絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
 #   ccnavi_host_parse <origin>  origin を読み、ccnavi_h_scheme・ccnavi_h_host・ccnavi_h_path・
-#                               ccnavi_h_kind（github / gitlab）・ccnavi_h_token_name・ccnavi_h_api_base を決める。
-#                               読めなければ 1（URL の形式）・2（ホスト）・3（パス）
+#                               ccnavi_h_kind（github / gitlab）・ccnavi_h_token_name・ccnavi_h_api_base・
+#                               ccnavi_h_class_host を決める（GitHub 系は ccnavi_h_graphql_base も）。
+#                               読めなければ 1（URL の形式）・2（ホスト）・3（パス）・4（GHE.com のホストにポートが
+#                               付いていて API の URL を組めない。理由は ccnavi_h_parse_why）
+#
+# ホストの分類（GitHub か GitLab か）は、origin から取り出したホストを小文字にしてポートを除いたもの
+# （ccnavi_h_class_host）を、`.` の区切りで照合して決める。scheme の大文字小文字は区別しない。
+#   GitHub : github.com、ghe.com とそのサブドメイン（*.ghe.com）
+#            REST は github.com が https://api.github.com、GHE.com が https://api.<分類に使うホスト>。
+#            GraphQL はその REST の根の /graphql。GHE.com の API の URL の規則は実物では未検証
+#   GitLab : 上のどれにも当たらないもの全部（gitlab.com、*.aslead.cloud、セルフホスト、未知のホスト）。
+#            接続先は origin の scheme・ホスト・ポートをそのまま保つ（<scheme>://<ホスト[:ポート]>/api/v4）
+# Python の review_host.classify と、Chrome 拡張の hostclass.ts が同じ規則で、tests/fixtures/host-kinds.json の
+# 同じ表で突き合わせる。
 #   ccnavi_host_connect         道具を選ぶ。ccnavi_h_jq・ccnavi_h_cli・ccnavi_h_cli_name・ccnavi_h_curl・
 #                               ccnavi_h_token・ccnavi_h_transport（gh / glab / curl）を決める。
 #                               jq が無ければ 3、curl はあるがトークンが無ければ 4、curl も無ければ 5
@@ -31,11 +43,22 @@ ccnavi_h_max_time=120
 
 ccnavi_host_parse() {
 	ccnavi_hp_origin="$1"
-	# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
-	# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の形式には
+	ccnavi_h_parse_why=""
+	# scheme は origin から取る（大文字小文字は区別しない）。https に決め打ちすると、社内や手元で
+	# 平文で立てた GitLab（`http://localhost:8929` のような形）に当たらない。ssh の形式には
 	# scheme が無いので、そこだけ https にする。
-	# host にはポートを残す。省くと `:8929` のような立て方がすべて当たらなくなり、しかも
-	# 省かれたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。
+	# host にはポートを残す（GitLab の接続先に使う）。省くと `:8929` のような立て方がすべて当たらなくなり、しかも
+	# 省かれたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。分類にはポートを除いた
+	# ホスト（ccnavi_h_class_host）を使う。
+	case "$ccnavi_hp_origin" in
+	*://*)
+		ccnavi_hp_scheme=$(printf '%s' "${ccnavi_hp_origin%%://*}" | tr 'A-Z' 'a-z')
+		case "$ccnavi_hp_scheme" in
+		*[/@:]*) ;;
+		*) ccnavi_hp_origin="$ccnavi_hp_scheme://${ccnavi_hp_origin#*://}" ;;
+		esac
+		;;
+	esac
 	case "$ccnavi_hp_origin" in
 	http://*) ccnavi_h_scheme=http ;;
 	*) ccnavi_h_scheme=https ;;
@@ -51,11 +74,23 @@ ccnavi_host_parse() {
 	esac
 	ccnavi_h_host="${ccnavi_hp_rest%%/*}"
 	# ssh の `git@host:group/proj` は `:` の後ろがパス。数字だけならポート、
-	# そうでなければパスの先頭なので除く。
-	case "$ccnavi_h_host" in
-	*:*)
-		case "${ccnavi_h_host##*:}" in
-		'' | *[!0-9]*) ccnavi_h_host="${ccnavi_h_host%%:*}" ;;
+	# そうでなければパスの先頭なので除く。IPv6 は `[::1]` の形で、`]` までがホスト（後ろに数字のポートが続けばそれも）。
+	case "$ccnavi_hp_rest" in
+	'['*']'*)
+		ccnavi_hp_v6="${ccnavi_hp_rest%%]*}]"
+		ccnavi_hp_after="${ccnavi_hp_rest#"$ccnavi_hp_v6"}"
+		ccnavi_h_host="$ccnavi_hp_v6"
+		case "$ccnavi_hp_after" in
+		:[0-9]*) ccnavi_h_host="$ccnavi_hp_v6${ccnavi_hp_after%%[!:0-9]*}" ;;
+		esac
+		;;
+	*)
+		case "$ccnavi_h_host" in
+		*:*)
+			case "${ccnavi_h_host##*:}" in
+			'' | *[!0-9]*) ccnavi_h_host="${ccnavi_h_host%%:*}" ;;
+			esac
+			;;
 		esac
 		;;
 	esac
@@ -67,14 +102,44 @@ ccnavi_host_parse() {
 		*) break ;;
 		esac
 	done
-	ccnavi_h_path="${ccnavi_hp_tail%.git}"
+	ccnavi_h_path="${ccnavi_hp_tail%/}"
+	ccnavi_h_path="${ccnavi_h_path%.git}"
 	ccnavi_h_path="${ccnavi_h_path%/}"
 	[ -n "$ccnavi_h_path" ] || return 3
-	case "$ccnavi_h_host" in
-	github.com | github.com:*)
+	# 分類に使うホスト: 小文字にして、数字だけのポートを除く。照合は `.` の区切りで行う
+	# （`evilgithub.com` や `github.com.evil` は GitHub にならない）。
+	ccnavi_hp_port=""
+	ccnavi_h_class_host=$(printf '%s' "$ccnavi_h_host" | tr 'A-Z' 'a-z')
+	case "$ccnavi_h_class_host" in
+	*:*)
+		case "${ccnavi_h_class_host##*:}" in
+		'' | *[!0-9]*) ;;
+		*)
+			ccnavi_hp_port="${ccnavi_h_class_host##*:}"
+			ccnavi_h_class_host="${ccnavi_h_class_host%:*}"
+			;;
+		esac
+		;;
+	esac
+	ccnavi_h_graphql_base=""
+	case "$ccnavi_h_class_host" in
+	github.com)
 		ccnavi_h_kind=github
 		ccnavi_h_token_name=GITHUB_TOKEN
+		ccnavi_h_host="$ccnavi_h_class_host"
 		ccnavi_h_api_base="https://api.github.com"
+		ccnavi_h_graphql_base="https://api.github.com/graphql"
+		;;
+	ghe.com | ?*.ghe.com)
+		ccnavi_h_kind=github
+		ccnavi_h_token_name=GITHUB_TOKEN
+		if [ -n "$ccnavi_hp_port" ]; then
+			ccnavi_h_parse_why="GHE.com のホスト ${ccnavi_h_class_host} にポート :${ccnavi_hp_port} が付いているので、API の URL（https://api.${ccnavi_h_class_host}）を組めない"
+			return 4
+		fi
+		ccnavi_h_host="$ccnavi_h_class_host"
+		ccnavi_h_api_base="https://api.$ccnavi_h_class_host"
+		ccnavi_h_graphql_base="$ccnavi_h_api_base/graphql"
 		;;
 	*)
 		ccnavi_h_kind=gitlab
