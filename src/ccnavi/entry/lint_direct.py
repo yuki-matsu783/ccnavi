@@ -1,15 +1,15 @@
 """`--lint` のうち、直接作業（`ccnavi-worktree.sh` で切るワークツリー）の記録の検査。
 
-見るのは、ワークスペース自身と各プロジェクトのメインのチェックアウトの git の共通ディレクトリ
+見るのは、ワークスペース自身と各プロジェクトのメインのチェックアウトのgitの共通ディレクトリ
 （`ccnavi-direct/`・`ccnavi-integrate/`・`ccnavi-integrate-done/`）と、`refs/ccnavi/direct/`、
-一時ワークツリーの置き場（`logs/direct-tmp/`）。git を起こすのは ref の一覧と、ブランチの有無だけ。
+一時ワークツリーの置き場（`logs/direct-tmp/`）。gitを起こすのはrefの一覧と、ブランチの有無だけ。
 
 - info: 記録の無い直接作業のワークツリー（`--adopt` で引き取る）
 - warn: 壊れた記録（版・取り込み先・起点・共通ディレクトリのどれかが欠ける）
 - info: 有効な横で作業する記録があり、そのチェックアウトで自動復元が緩んでいること
 - info: 作業ワークツリーもブランチも無い記録
-- info: 残った一時ワークツリー・専用の ref（t・c・k）・版 4 の marker
-- warn: 旧形式の marker（版の無いもの）
+- info: 残った一時ワークツリー・専用のref（t・c・k）・版 4 のmarker
+- warn: 旧形式のmarker（版の無いもの）
 """
 
 from __future__ import annotations

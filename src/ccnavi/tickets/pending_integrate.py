@@ -1,7 +1,7 @@
 """SessionStart で、終わっていない `integrate` の記録を知らせる。
 
 見るのは、ワークスペースルートと各プロジェクトの元ツリーである。`ccnavi-git.sh integrate` がメインの
-チェックアウトの git ディレクトリに置く記録（`ccnavi-integrate/<名前>/marker`）が残っていれば、
+チェックアウトのgitディレクトリに置く記録（`ccnavi-integrate/<名前>/marker`）が残っていれば、
 別のセッションの取り込みの途中かもしれない。そのため、操作する前にユーザへ確かめるよう知らせる。
 この知らせは、メインのチェックアウトの変更を操作してよい根拠ではない。
 
@@ -11,16 +11,16 @@
 
 ## 版 4（取り込み先へ 1 コミットで載せる形）
 
-marker に `version 4` がある記録は、別の見方をする。K（`k`）を作ってあるか、取り込み先に K が
+markerに `version 4` がある記録は、別の見方をする。K（`k`）を作ってあるか、取り込み先にKが
 載っているか（`merge-base --is-ancestor`）を見て、続きの一手（`integrate-done` の打ち直し、
-`integrate --abort`、abort してから打ち直し）を出す。K の親が記録の `head`、K の木が `c_tree` と
+`integrate --abort`、abortしてから打ち直し）を出す。Kの親が記録の `head`、Kの木が `c_tree` と
 合わないもの、必須の項目が欠けたものは、壊れた記録として「操作せずにユーザに確かめる」と出す。
-自動では再開しない。marker が無くても、残った一時ワークツリー（`logs/direct-tmp/`）・専用の ref
-（`refs/ccnavi/direct/<名前>/{t,c,k}`）・片付けの途中の done の記録を挙げる。
+自動では再開しない。markerが無くても、残った一時ワークツリー（`logs/direct-tmp/`）・専用のref
+（`refs/ccnavi/direct/<名前>/{t,c,k}`）・片付けの途中のdoneの記録を挙げる。
 
-## 旧形式（版の無い marker）
+## 旧形式（版の無いmarker）
 
-旧形式の記録は git で次の 4 つに分ける（`write-tree` は使わない。index を書くため）。
+旧形式の記録はgitで次の 4 つに分ける（`write-tree` は使わない。indexを書くため）。
 
 - A: `state` が `staged`、HEAD が `base` と同じ、`diff-index --cached --quiet <tree>` が 0
 - B: `state` が `staged`、HEAD が `base` と違う、`diff --cached --quiet` が 0
@@ -133,13 +133,13 @@ _V4_NEED = ("head", "tip", "c_tree")
 
 
 def _git_out(top: str, args: list[str], deadline: float) -> str | None:
-    """git の標準出力（前後の空白を除く）。成功しなければ None。"""
+    """gitの標準出力（前後の空白を除く）。成功しなければNone。"""
     done = gitcmd.run_until(top, args, deadline, gitcmd.TIMEOUT_SECONDS)
     return done.out.strip() if done.ok else None
 
 
 def _v4_line(root: str, top: str, name: str, fields: dict[str, str], deadline: float) -> str:
-    """版 4 の marker 1 件の知らせ。例外は出さない。"""
+    """版 4 のmarker 1 件の知らせ。例外は出さない。"""
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     t = settings.shell_path(top)
     head = f"{name}（取り込み先のツリー {t}）: "
@@ -207,9 +207,9 @@ def _repo_key(root: str, top: str) -> str:
 
 
 def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list[str]:
-    """marker の無い名前で残っている、取り込みの途中の跡（一時ワークツリー・ref・done の記録）。
+    """markerの無い名前で残っている、取り込みの途中の跡（一時ワークツリー・ref・doneの記録）。
 
-    作業中の記録（`ccnavi-direct`）・`s`・`pending` の ref・作業ワークツリーは、普通の状態なので
+    作業中の記録（`ccnavi-direct`）・`s`・`pending` のref・作業ワークツリーは、普通の状態なので
     挙げない。
     """
     common = directrec.common_dir(top)

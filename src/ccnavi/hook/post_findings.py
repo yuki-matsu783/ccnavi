@@ -362,10 +362,10 @@ def _script_writes(
 
 
 def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
-    """旧形式の `ccnavi-git.sh integrate` が統合先のツリーに staged で残した変更の実パス。
+    """旧形式の `ccnavi-git.sh integrate` が統合先のツリーにstagedで残した変更の実パス。
 
-    版 4 の取り込みはメインのチェックアウトに staged を残さない（一時ワークツリーで作った K を
-    fast-forward で載せる）ので、ここは版の無い marker（`state staged`）専用。
+    版 4 の取り込みはメインのチェックアウトにstagedを残さない（一時ワークツリーで作ったKを
+    fast-forwardで載せる）ので、ここは版の無いmarker（`state staged`）専用。
 
     統合先のツリーは保護領域なので、外さないと integrate の結果が「保護領域の変更」として報告され、
     戻す設定では自分で戻される。
@@ -541,12 +541,12 @@ def _commit_paths(top: str, sha: str) -> set[str] | None:
 def _is_direct_commit(
     top: str, sha: str, parent: str, records: list[tuple[str, dict[str, str]]]
 ) -> bool:
-    """コミットが、版 4 の取り込みの K（`integrate-done` が fast-forward で載せたコミット）か。
+    """コミットが、版 4 の取り込みのK（`integrate-done` がfast-forwardで載せたコミット）か。
 
-    K の親が記録の `head`、K の木が記録の `c_tree` で、記録に `k` があればそれが K 自身で、
-    名前がチケットに結び付かないこと。専用の ref は求めない。gc でオブジェクトが消えたあとは
+    Kの親が記録の `head`、Kの木が記録の `c_tree` で、記録に `k` があればそれがK自身で、
+    名前がチケットに結び付かないこと。専用のrefは求めない。gcでオブジェクトが消えたあとは
     照合できず、報告に出る（許容）。記録は `.git` の中でエージェントにも書けるので、内容だけを
-    信用せず git のオブジェクトと照らす。意図的な偽装までは防げない。
+    信用せずgitのオブジェクトと照らす。意図的な偽装までは防げない。
     """
     tree_of = gitcmd.run(top, ["rev-parse", "--verify", f"{sha}^{{tree}}"])
     if not tree_of.ok:

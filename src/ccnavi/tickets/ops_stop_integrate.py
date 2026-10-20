@@ -3,7 +3,7 @@
 チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`。ブランチも同じ名前）で
 終えようとしたとき、作業が残っていて `integrate <名前>` の記録も無ければ、1 回だけ止めて
 `integrate` の打ち方と、一時ワークツリーに展開した取り込み結果をユーザに確かめてもらう手順を返す。
-hook 自身は `integrate` を打たない。促すだけ。
+hook自身は `integrate` を打たない。促すだけ。
 
 ## 促す条件
 
@@ -19,9 +19,9 @@ hook 自身は `integrate` を打たない。促すだけ。
   （`ccnavi-direct/<名前>`。取り込み先 `base_branch` と起点 `snap_sha`）があれば
   `S..先頭` で数える。
   記録が無いときは統合先（`origin/HEAD`）で数え、`integrate` が断るので `--adopt` を案内する
-- 取り込みの途中の marker（`ccnavi-integrate/<名前>/`）が無い。あれば「`integrate-done` か
+- 取り込みの途中のmarker（`ccnavi-integrate/<名前>/`）が無い。あれば「`integrate-done` か
   `integrate --abort`」を促す。片付けた記録の写し（`ccnavi-integrate-done/<名前>`）は、旧形式の
-  写しの `branch_sha` が今の HEAD と同じで未コミットの変更が無い、という形では無い
+  写しの `branch_sha` が今のHEADと同じで未コミットの変更が無い、という形では無い
   （名前を使い直した作業を、前の写しで黙らせない）
 
 ## 3 つの結果
@@ -36,18 +36,18 @@ hook 自身は `integrate` を打たない。促すだけ。
 
 記録があれば、取り込み先は記録の `base_branch` で、メインのチェックアウトがそのブランチを
 開いていることを求める。記録が無いときの統合先は `ccnavi_integration`（`ccnavi-common-state.sh`）と
-同じ。そのリポジトリの手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`。origin の
+同じ。そのリポジトリの手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`。originの
 無いリポジトリでは決まらず、決まらなければ促さずに理由を言う。
-`origin/<取り込み先>` が手元より進んでいれば、push の前に手元を合わせる警告を足す
-（手元の ref だけで比べる）。
+`origin/<取り込み先>` が手元より進んでいれば、pushの前に手元を合わせる警告を足す
+（手元のrefだけで比べる）。
 
 ## 促さずに理由を言う
 
 `blocked` に理由を入れて返し、呼び手が止めずに報告する。理由になるのは、取り込み先が切り替わった、
-メインのチェックアウトに途中の操作（MERGE_HEAD など）がある、記録が壊れている、
+メインのチェックアウトに途中の操作（MERGE_HEADなど）がある、記録が壊れている、
 記録の共通ディレクトリが合わない（共通の前提チェック）、統合先が決まらない（記録が無いとき）。
 メインのチェックアウトの書きかけ（未コミットの変更）では止めない。ユーザの書きかけは最後の
-fast-forward で git が持ち越す。
+fast-forwardでgitが持ち越す。
 
 ## 1 回だけ
 
@@ -100,9 +100,9 @@ class Direct:
     blocked: str = ""
     # 取り込み先のブランチ。記録があるときだけ入る（無いときは統合先で数える）。
     base: str = ""
-    # 記録が無い（更新前に切った・手で切った）。integrate は断るので、`--adopt` を案内する。
+    # 記録が無い（更新前に切った・手で切った）。integrateは断るので、`--adopt` を案内する。
     no_record: bool = False
-    # 取り込みの途中の marker。"" なし、"v4" 新形式、"old" 旧形式。
+    # 取り込みの途中のmarker。"" なし、"v4" 新形式、"old" 旧形式。
     marker: str = ""
     # 手元の取り込み先より `origin/<取り込み先>` が先に進んでいるコミットの数。
     origin_ahead: int = 0
@@ -318,9 +318,9 @@ def probe(
 
 
 def direct_record(owner: str, name: str) -> dict[str, str] | None:
-    """`ccnavi-worktree.sh` が置いた直接作業の記録。無ければ None。
+    """`ccnavi-worktree.sh` が置いた直接作業の記録。無ければNone。
 
-    git の共通ディレクトリの `ccnavi-direct/<名前>`（version 4）を、ファイルだけで読む。
+    gitの共通ディレクトリの `ccnavi-direct/<名前>`（version 4）を、ファイルだけで読む。
     読めても形が違う（版・取り込み先・起点が欠ける）記録は、`broken` を立てて返す。
     """
     common = directrec.common_dir(owner)
@@ -339,7 +339,7 @@ def direct_record(owner: str, name: str) -> dict[str, str] | None:
 
 
 def marker_kind(marks: str, name: str) -> str:
-    """`ccnavi-integrate/<名前>/` の marker の種類。無ければ空、版 4 なら "v4"、ほかは "old"。"""
+    """`ccnavi-integrate/<名前>/` のmarkerの種類。無ければ空、版 4 なら "v4"、ほかは "old"。"""
     folder = os.path.join(marks, name)
     if not os.path.lexists(folder):
         return ""
@@ -350,7 +350,7 @@ def marker_kind(marks: str, name: str) -> str:
 def _origin_ahead(owner: str, base: str, deadline: float | None) -> int:
     """手元の取り込み先より `origin/<取り込み先>` が先に進んでいるコミットの数。引けなければ 0。
 
-    手元の ref だけで比べる（ネットワークには出ない）。
+    手元のrefだけで比べる（ネットワークには出ない）。
     """
     done = _run(
         owner, ["rev-list", "--count", f"refs/heads/{base}..refs/remotes/origin/{base}"], deadline
@@ -367,7 +367,7 @@ def _probe_recorded(
     rec: dict[str, str],
     deadline: float | None,
 ) -> Probe:
-    """記録（取り込み先と起点 S）がある直接作業を調べる。
+    """記録（取り込み先と起点S）がある直接作業を調べる。
 
     入っていないコミットは `S..先頭` で数える。促せない（`blocked`）のは、記録が壊れている・
     共通の前提チェックが通らない・取り込み先が切り替わった・メインのチェックアウトに途中の操作が
@@ -704,7 +704,7 @@ def _integration_busy(
     """取り込み先のツリーが `integrate` の前提（途中の操作が無い）を満たさない理由。
 
     満たすなら空。期限不足で確かめられなければ None（判定全体を「不明」にする）。
-    `dirty_too` を偽にすると未コミットの変更は見ない（ユーザの書きかけは fast-forward で持ち越す
+    `dirty_too` を偽にすると未コミットの変更は見ない（ユーザの書きかけはfast-forwardで持ち越す
     ので、促しを止める理由にしない）。
     """
     mark = tree.busy_of(integ_tree)
@@ -769,7 +769,7 @@ def _origin_warning(found: Direct) -> str:
 
 
 def integrate_nudge(root: str, found: Direct) -> str:
-    """Stop を止めて渡す文。`integrate` の打ち方と、確認してもらう手順を言う。
+    """Stopを止めて渡す文。`integrate` の打ち方と、確認してもらう手順を言う。
 
     コマンドは 1 行で完結させ、別のツリーで打つものは `cd <引用したパス> && …` で始める
     （Bash の cwd が次の呼び出しに残るとは限らない）。ラッパーを通らない `git` は書かない。

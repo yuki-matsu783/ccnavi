@@ -1,32 +1,32 @@
 #!/bin/sh
-# ccnavi-worktree 直接作業のワークツリーを、取り込み先のブランチから切る。
+# ccnavi-worktree直接作業のワークツリーを、取り込み先のブランチから切る。
 #
 # 直接作業（チケットを使わない作業）用で、名前と同じブランチを新しく切る。親子のチケットの親のワークツリーには
-# 使わない（親は ccnavi-start.sh --mr <番号> / --issue <番号> で、親のブランチを直接チェックアウトして作る）。
+# 使わない（親はccnavi-start.sh --mr <番号> / --issue <番号> で、親のブランチを直接チェックアウトして作る）。
 #
 #   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept <確認コード>]
 #                                        [--copy-wip | --no-wip] [--side-by-side] [--dry-run]
 #   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> --adopt --base <ブランチ> [--accept <確認コード>] [--side-by-side]
 #
 # 取り込み先は、切った時点でメインのチェックアウト（`git worktree list` の先頭）が開いているブランチ。
-# 起点 S は、書きかけを写すとき（--copy-wip）は確認した時点の書きかけを含むスナップショット、それ以外は
-# 取り込み先の HEAD。ルートの index と作業ツリーには書かない（スナップショットは一時的な index で作る）。
-# 手元の取り込み先は進めない（進めるのはセッション開始時の ccnavi-fetch.sh だけ）。origin からも切らない。
+# 起点Sは、書きかけを写すとき（--copy-wip）は確認した時点の書きかけを含むスナップショット、それ以外は
+# 取り込み先のHEAD。ルートのindexと作業ツリーには書かない（スナップショットは一時的なindexで作る）。
+# 手元の取り込み先は進めない（進めるのはセッション開始時のccnavi-fetch.shだけ）。originからも切らない。
 #
 # 次のどれかに当たるとき、ワークツリーを切らずに終了コード 3 で止まり、状態・勧め・リスク・選択肢・確認コードを
-# 出す。報告をユーザに伝え、了承を得てから --base / --accept などを付けて打ち直す。
-#   C4 cwd のブランチと取り込み先が違う（--base <取り込み先> が要る）
+# 出す。報告をユーザに伝え、了承を得てから --base / --acceptなどを付けて打ち直す。
+#   C4 cwdのブランチと取り込み先が違う（--base <取り込み先> が要る）
 #   C5 取り込み先が統合先（origin/HEAD）でない
-#   C6 origin/<取り込み先> より遅れている・進んでいる・分岐している・origin に無い・リモート未確認
-#   C7 メインのチェックアウトに書きかけ（追跡済みの変更・新規ファイル）がある（--copy-wip か --no-wip が要る）
+#   C6 origin/<取り込み先> より遅れている・進んでいる・分岐している・originに無い・リモート未確認
+#   C7 メインのチェックアウトに書きかけ（追跡済みの変更・新規ファイル）がある（--copy-wipか --no-wipが要る）
 #   C5〜C7 のどれかに当たるときは --accept <確認コード> も要る。確認コードは今の状態から決まるので、
 #   状態が動けば報告からやり直しになる。
-# 当たらないときは確認なしで S = 取り込み先の HEAD から切る。--side-by-side だけは ask ルールがユーザの確認を取る。
+# 当たらないときは確認なしでS = 取り込み先のHEADから切る。--side-by-sideだけはaskルールがユーザの確認を取る。
 #
-# 先に断るもの: メインのチェックアウトが detached HEAD（C1）、取り込み先がチケットに結び付く・結び付くかを
-# 確かめられない（C2。実行ファイルの `tree base-bound`）、git が 2.40 未満（C3）。
+# 先に断るもの: メインのチェックアウトがdetached HEAD（C1）、取り込み先がチケットに結び付く・結び付くかを
+# 確かめられない（C2。実行ファイルの `tree base-bound`）、gitが 2.40 未満（C3）。
 #
-# 手で打つ git ではなく ccnavi-git.sh を通す。fetch は origin <取り込み先> だけ。
+# 手で打つgitではなくccnavi-git.shを通す。fetchはorigin <取り込み先> だけ。
 # ワークツリーが既にあれば、何もせずパスを出す（冪等）。
 #
 # origin か手元に同じ識別子になるブランチ（同じ名前、`/` を `-` に置き換えると同じになる名前、英字の大文字小文字だけ
@@ -37,13 +37,13 @@
 # 名前の字の種類・NFC・長さ（64 文字まで）は実行ファイルに聞く（`worktree id`）。sh はマルチバイトの字を見分けない。
 # 答えが無ければ「確かめられない」と止まる。
 #
-# 記録は git の共通ディレクトリの ccnavi-direct/<名前>（version 4）に書く。S は refs/ccnavi/direct/<名前>/s に置く。
-# 書きかけを写す候補は確認が要るときに refs/ccnavi/direct/<名前>/pending に置き、切ったら消す。
+# 記録はgitの共通ディレクトリのccnavi-direct/<名前>（version 4）に書く。Sはrefs/ccnavi/direct/<名前>/sに置く。
+# 書きかけを写す候補は確認が要るときにrefs/ccnavi/direct/<名前>/pendingに置き、切ったら消す。
 #
-# --dry-run は何も作らず、調べた結果と予定だけを出す（fetch もしない）。
-# --offline / --from-origin は廃止（終了コード 2）。--accept で代わりができる。--adopt は記録の無い既存のワークツリーを引き取る（2 回の呼び出しで確認コードを使う）。
+# --dry-runは何も作らず、調べた結果と予定だけを出す（fetchもしない）。
+# --offline / --from-originは廃止（終了コード 2）。--acceptで代わりができる。--adoptは記録の無い既存のワークツリーを引き取る（2 回の呼び出しで確認コードを使う）。
 #
-# 終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り / 3 確認が要る
+# 終了コード: 0 完了 / 1 前提の未充足かworktree addの拒否 / 2 引数か環境の誤り / 3 確認が要る
 
 set -eu
 
@@ -233,7 +233,7 @@ same_id_guard() {
 [ -n "$adopt" ] || same_id_guard "$heads_list" 手元
 
 # ---- C1〜C3。先に断るもの。
-# 取り込み先は、メインのチェックアウト（git worktree list の先頭）が開いているブランチ。
+# 取り込み先は、メインのチェックアウト（git worktree listの先頭）が開いているブランチ。
 main_tree=$(git -C "$top" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p' | tr -d '\r')
 [ -n "$main_tree" ] ||
 	fail no-main-tree "このリポジトリのメインのチェックアウトを git worktree list から読めません。"
@@ -270,9 +270,9 @@ if [ -n "$base_arg" ] && [ "$base_arg" != "$target" ]; then
 	fail base-mismatch "--base ${base_arg} は、今の取り込み先（${target}。メインのチェックアウト ${main_tree}）と違います。取り込み先が切り替わっていれば、ユーザに確かめて、報告からやり直してください（引数なしで打ち直す）。"
 fi
 
-# ---- 引き取り（--adopt）。記録の無い既存の直接作業のワークツリーを v4 の形式に引き取る。
-# 1 回目は推定した S・取り込む範囲・差分の stat を見せて確認コードを出し、終了コード 3 で止まる。
-# 2 回目は --accept <確認コード> が一致したときだけ、記録（snap_wip no・confirm adopt）と s の ref を書く。
+# ---- 引き取り（--adopt）。記録の無い既存の直接作業のワークツリーをv4 の形式に引き取る。
+# 1 回目は推定したS・取り込む範囲・差分のstatを見せて確認コードを出し、終了コード 3 で止まる。
+# 2 回目は --accept <確認コード> が一致したときだけ、記録（snap_wip no・confirm adopt）とsのrefを書く。
 if [ -n "$adopt" ]; then
 	[ -n "$base_arg" ] ||
 		fail adopt-no-base "--adopt には --base <取り込み先> が要ります（今のメインのチェックアウトのブランチは ${target}）。ユーザに取り込み先を確かめてから付けてください。" 2
@@ -391,8 +391,8 @@ wip_staged=$(git -C "$main_tree" diff --cached --name-only 2>/dev/null | grep -c
 c7=no
 [ "$wip_changed" -eq 0 ] && [ "$wip_new" -eq 0 ] || c7=yes
 
-# 書きかけを含むスナップショット。ユーザの index と作業ツリーには触れない（一時的な index で作る）。
-# 日付と名前を固定するので、木と親が同じなら同じ sha になる（確認コードに入れて、確認したあとの編集を検出する）。
+# 書きかけを含むスナップショット。ユーザのindexと作業ツリーには触れない（一時的なindexで作る）。
+# 日付と名前を固定するので、木と親が同じなら同じshaになる（確認コードに入れて、確認したあとの編集を検出する）。
 make_candidate() {
 	rm -f "$cand_index"
 	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" read-tree "$head_sha" 2>/dev/null || return 1
@@ -586,7 +586,7 @@ if [ "$need_accept" = yes ]; then
 	[ "$accept" = "$code" ] || report_and_stop code
 fi
 
-# ---- S を決める。
+# ---- Sを決める。
 if [ "$c7" = yes ] && [ "$wip_mode" = copy ]; then
 	s_sha="$cand"
 	s_wip=yes
@@ -596,7 +596,7 @@ else
 fi
 s_short=$(git rev-parse --short "$s_sha" 2>/dev/null || printf '%s' "$s_sha")
 
-# ---- 記録を書き、ref を置いて切る。
+# ---- 記録を書き、refを置いて切る。
 side_word=no
 [ -z "$side" ] || side_word=yes
 confirm_word=-

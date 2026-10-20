@@ -9,7 +9,7 @@ keywords: [scratchpad, wip/handoff, 下書き, integrate, 置き場, チケッ�
 
 状態: 採用（2026-10-11 にユーザが決めた。「置き場をひとつにする」はADR-0129が改めた。`wip/handoff/` の扱いはこの ADR のまま）
 
-改訂（2026-10-20）: `integrate` が squash で staged にして止まる部分は、ADR-0154 が改める。`integrate` は一時ワークツリーに取り込み結果を展開し、`integrate-done` が 1 コミットにして fast-forward で載せる。ブランチが持ち込んだ `wip/handoff/` の下書きを取り込まない点は変わらない。
+改訂（2026-10-20）: `integrate` がsquashでstagedにして止まる部分は、ADR-0154 が改める。`integrate` は一時ワークツリーに取り込み結果を展開し、`integrate-done` が 1 コミットにしてfast-forwardで載せる。ブランチが持ち込んだ `wip/handoff/` の下書きを取り込まない点は変わらない。
 
 ## 状況
 
