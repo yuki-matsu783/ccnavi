@@ -38,9 +38,9 @@ RULES = {
     ],
     "ask": [
         {
-            "id": "secrets",
+            "id": "vault",
             "match": "Read",
-            "glob": "*/secrets/*",
+            "glob": "*/vault/*",
             "message": "秘密の置き場。読む前に確認する。",
         }
     ],
@@ -56,7 +56,7 @@ deny:
     why: push はユーザが行う
 ask:
   - tool: Read
-    subject: "/repo/secrets/token"
+    subject: "/repo/vault/token"
     why: 秘密の置き場
 allow:
   - tool: Bash
@@ -209,7 +209,7 @@ class TestJsonTest(unittest.TestCase):
                         {
                             "id": "search",
                             "match": "Grep|Glob",
-                            "glob": "*/secrets/*",
+                            "glob": "*/vault/*",
                             "message": "秘密の置き場は探さない",
                         },
                         {
@@ -231,8 +231,8 @@ class TestJsonTest(unittest.TestCase):
         )
         cases = [
             ("PowerShell", "Remove-Item -Recurse x", "ps"),
-            ("Grep", "/repo/secrets/keys", "search"),
-            ("Glob", "/repo/secrets/tokens", "search"),
+            ("Grep", "/repo/vault/keys", "search"),
+            ("Glob", "/repo/vault/tokens", "search"),
             ("Skill", "deploy prod", "skill"),
             ("WebFetch", "https://example.com/a", "fetch"),
         ]
@@ -272,7 +272,7 @@ class TestJsonTest(unittest.TestCase):
         self.assertTrue(skipped["skipped"])
         # `/repo` は走らせた場所に読み替わる。
         self.assertEqual(
-            by_subject["/repo/secrets/token"]["resolved_subject"], f"{self.root}/secrets/token"
+            by_subject["/repo/vault/token"]["resolved_subject"], f"{self.root}/vault/token"
         )
 
         # 文字で出すときは、食い違いがあれば終了コード 1。
