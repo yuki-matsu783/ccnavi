@@ -453,6 +453,28 @@ class ScenarioSummaryTest(unittest.TestCase):
         self.assertIn("まだ実ログと突き合わせていない点", text)
 
 
+class StepAnswerTest(unittest.TestCase):
+    def test_report_shows_each_step_input_and_final_output(self):
+        scn = {
+            "steps": [{"prompt": "一つ目の質問"}, {"human": True, "instruction": "手で確かめて"}],
+        }
+        line = '{"type": "result", "result": "一つ目の答え", "session_id": "s1"}\n'
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            (out / "step-1.jsonl").write_text(line, encoding="utf-8")
+            text = "\n".join(runner.step_answer_lines(scn, out))
+        self.assertIn("【入力プロンプト】\n一つ目の質問", text)
+        self.assertIn("【最終出力】\n一つ目の答え", text)
+        self.assertIn("### step 2（人間の操作）", text)
+        self.assertIn("手で確かめて", text)
+
+    def test_missing_step_output_is_marked_not_run(self):
+        scn = {"steps": [{"prompt": "a"}]}
+        with tempfile.TemporaryDirectory() as d:
+            text = "\n".join(runner.step_answer_lines(scn, Path(d)))
+        self.assertIn("【最終出力】\n未実行", text)
+
+
 class RepoResultTest(unittest.TestCase):
     def test_same_state_passes(self):
         self.assertEqual(runner.repo_result("a", "a")[0], runner.PASS)

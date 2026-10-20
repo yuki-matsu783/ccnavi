@@ -710,6 +710,32 @@ def _results_table(results, limit=None):
     return lines
 
 
+ANSWER_LIMIT = 1500
+
+
+def step_answer_lines(scn, out):
+    """step ごとの入力プロンプトと、claude の最後の出力を報告に出す行。
+    人間の操作の step は、その指示を出す。"""
+    lines = []
+    for num, step in enumerate(scn.get("steps") or [], 1):
+        lines.append("")
+        if step.get("human"):
+            lines.append(f"### step {num}（人間の操作）")
+            lines.append(_one_line(step.get("instruction", ""), 200))
+            continue
+        lines.append(f"### step {num}")
+        lines.append("【入力プロンプト】")
+        lines.append(step.get("prompt", "").strip())
+        lines.append("【最終出力】")
+        path = out / f"step-{num}.jsonl"
+        if not path.exists():
+            lines.append("未実行")
+            continue
+        final = parse_stream(path.read_text(encoding="utf-8"))["final_text"]
+        lines.append(_clip(final, ANSWER_LIMIT, path.name) or "（出力なし）")
+    return lines
+
+
 def write_report(scn, out, st, results, rows, raw):
     lines = [
         f"# {scn['id']} {scn['title']}",
@@ -718,6 +744,7 @@ def write_report(scn, out, st, results, rows, raw):
         "",
     ]
     lines += _results_table(results, 100)
+    lines += ["", "## ステップごとの入力プロンプトと最終出力", *step_answer_lines(scn, out)]
     if scn.get("unconfirmed"):
         lines += ["", "## 確かめる点（unconfirmed）"] + [f"- {u}" for u in scn["unconfirmed"]]
     (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
