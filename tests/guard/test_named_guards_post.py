@@ -391,6 +391,46 @@ class NamedPostTest(Fixture):
         self.assertNotIn("systemMessage", json.loads(result.stdout) if result.stdout else {})
 
 
+class UnreadableRulesPostTest(Fixture):
+    """共通のルールファイルが読めない間も、実行後の保護範囲から 4 本は外れない。"""
+
+    def test_the_four_stay_while_the_common_rules_are_broken(self):
+        write(self.path("ws", ".ccnavi/config/common/rules.yml"), "deny:\n  - id: [unclosed\n")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "--quiet", "-m", "broken rules")
+        self.baseline()
+        for rel, rule_id in (
+            (".claude/hooks/guard.sh", HOOKS),
+            (".ccnavi/scripts/ccnavi-x.sh", SCRIPTS),
+        ):
+            write(self.path("ws", rel), changed(rel))
+
+            result = self.run_hook(command="python build.py")
+
+            self.assertEqual(result.returncode, 2, self.said(result))
+            self.assertEqual(self.last_record()["rules"], [rule_id])
+            self.assertEqual(read(self.path("ws", rel)), initial(rel), "復元される")
+
+
+class SessionRejectsTest(Fixture):
+    """ticket の範囲の退けは、組み込みの保護（ルールファイルに無い）も数える。"""
+
+    def denied(self, rel):
+        from ccnavi.tickets import session_rejects
+
+        conf, _ = settings.load(self.root)
+        target = session_rejects.tree.Tree("w", self.trees["worktree"], "", "worktree")
+        rule_set = session_rejects._rule_set(conf, self.root, target)
+        rule = session_rejects._denied_by(rule_set, self.path("worktree", rel))
+        return rule.id if rule else None
+
+    def test_builtin_protections_are_counted(self):
+        self.assertEqual(self.denied(".claude/hooks/guard.sh"), HOOKS)
+        self.assertEqual(self.denied(".ccnavi/config/common/rules.yml"), CONFIG)
+        self.assertEqual(self.denied(DOING), APPROVED)
+        self.assertIsNone(self.denied("src/app.py"))
+
+
 class ApprovedPostTest(Fixture):
     """承認済みの置き場は、チケット制御の保護。自己防衛の値には依らない。"""
 
