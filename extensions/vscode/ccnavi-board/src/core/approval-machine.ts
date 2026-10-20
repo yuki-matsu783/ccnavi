@@ -17,7 +17,7 @@
  *
  * 描き直しが先、やることが後。 逆にすると、承認の文を渡すときに画面が古いまま残る。
  *
- * ## 状態（閉じているのを含めて 11）
+ * ## 状態（閉じているのを含めて 10）
  *
  * | 状態 | 何をしている |
  * |---|---|
@@ -27,10 +27,9 @@
  * | `approving` | 承認を打っている。ここでは閉じない（Esc も受け付けない。画面の側も同じ） |
  * | `done` | 承認した。渡す文がある |
  * | `error` | 読めなかった |
- * | `prompt` | 承認以外で渡す文（レビュー済みの連絡、残った指摘を決めた結果） |
- * | `reviewedLoading` | レビュー済み連絡の文のために、残った指摘を読んでいる |
- * | `decideLoading` | 残った指摘を読んでいる |
- * | `decidePreview` | 残った指摘を見せた。押されるまで何も置かない |
+ * | `prompt` | 承認以外で渡すプロンプト（残った指摘を決めた結果） |
+ * | `decideLoading` | 残った指摘を読んでいる（［レビュー完了］を押した） |
+ * | `decidePreview` | 残った指摘（0 件なら「未解決なし」）を見せた。押されるまで何も置かない |
  * | `deciding` | 選んだ行き先を置いている。ここでは閉じない |
  *
  * ## ガード（消すと承認が正しく動かなくなる順）
@@ -44,15 +43,18 @@
  * | 承認の途中（`loading`・`preview`・`approving`）は二重に開かない | 見せている一覧が、読み直しの途中の別の一覧になってしまう |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 文を渡せるのは `done` と `prompt` のときだけ | 文の無い状態で「コピー」が通る |
- * | `done` の上にレビュー済みの連絡を被せない | 承認の文が、渡す前に消える |
+ * | `done` の上に［レビュー完了］の読み込みを被せない | 承認のプロンプトが、渡す前に消える |
  * | 絞り込みで見えている承認待ちが、いまのボードでも承認待ちか | 古いボードの識別子で承認が通る |
  * | `deciding` の間は閉じない | 行き先を置いている最中に閉じられ、続きの子が起きたことをユーザが見ない |
  * | 行き先を置くのは `decidePreview` のときだけ | 二重に置ける。続きの子が 2 本起きる |
  * | 行き先が見せた指摘の全部に 1 つずつ付いているか | 古い画面から届いた選択で、見せていない指摘の扱いが決まる |
  * | 残った指摘を読むのは、ユーザのレビュー待ちのフェーズだけ | 依頼していないフェーズで、実行ファイルの前提の誤りをユーザが読むことになる |
+ * | 読み取りの結果が頼んだフェーズのものでなければ開かない | 別のフェーズの指摘に、対応方針を選ばせる |
+ * | 相談のプロンプトを組むのは、1 件以上の指摘を見せているとき（`decidePreview`）だけ | 閉じたあと・置いている最中・0 件の画面で、指摘の無いプロンプトが出る |
+ * | 相談のコピーの結果を受けるのは、見せている画面（`decidePreview`）のときだけ | 閉じたあとに返った結果が、別の画面の上に出る |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ（残った指摘も同じ） | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧になってしまう |
- * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
+ * | 決めた結果のプロンプトの上に、次の「レビュー完了」を被せない（決め直しを出す場合を除く） | 続きの子の識別子と次の 2 手を渡す前に、プロンプトが消える |
  * | 計画編集タブに未保存の変更がある親を含む一覧は、承認を打たない | 未保存の順序のまま承認され、直したつもりの順序と違うものが通る |
  * | 承認を打つ直前にも、未保存のタブがある親が打つ識別子に入っていないかを見る（`blockedBeforeApprove`） | 押したあとにタブで線を変えた一覧が、そのまま承認される |
  * | 「計画を編集」でタブを開くのは、一覧を見せているとき（preview）だけ | 承認を打っている最中に閉じられ、結果を受ける場所が消える |
@@ -65,7 +67,7 @@ import type { ApprovalOverlay } from "./board-view.js";
 import { changedSinceSave, partialMessage, unsavedParents, unsavedText, type ApproveOutcome, type ApprovePreview, type PreviewParse } from "./approvemodel.js";
 import { choicesProblem, type DecideOutcome, type DecidePreviewParse } from "./decidemodel.js";
 import type { PhaseChip } from "./board.js";
-import { PUSH_APPROVED_SCRIPT, reviewedPrompt } from "./commands.js";
+import { consultPrompt, PUSH_APPROVED_SCRIPT } from "./commands.js";
 
 /**
  * 承認のオーバーレイの持ち物。`overlay` が画面へ渡るぶんで、残りは拡張ホストの中だけに保持する。
@@ -135,24 +137,10 @@ export type ApprovalInput =
   | { readonly kind: "approved"; readonly outcome: ApproveOutcome; readonly carrier: boolean }
   /** 「やめる」「閉じる」を押した（画面の Esc も同じ） */
   | { readonly kind: "cancel" }
-  /**
-   * 「レビュー済み連絡」を押した。`tree` は親のワークツリー、`chip` はそのフェーズ。
-   * どちらもボードから引くので、無いことがある（古いボード）。`root` は文面に書くワークスペースルート
-   */
-  | {
-      readonly kind: "reviewed";
-      readonly parent: string;
-      readonly phase: number;
-      readonly tree: string | undefined;
-      readonly chip: PhaseChip | undefined;
-      readonly root: string;
-    }
-  /** 連絡の文のための指摘の読み取り（`decide <N> --preview`）が返った */
-  | { readonly kind: "reviewedChecked"; readonly result: DecidePreviewParse }
-  /** 承認の文・レビュー済みの連絡の文を渡した */
+  /** 承認のプロンプト・決めた結果のプロンプトを渡した */
   | { readonly kind: "handOver"; readonly how: "promptCopy" | "promptOpen" }
   /**
-   * フェーズの「決める」を押した。`tree` と `chip` はボードから引くので、無いことがある（古いボード）
+   * ［レビュー完了］を押した。`tree` と `chip` はボードから引くので、無いことがある（古いボード）
    */
   | {
       readonly kind: "decide";
@@ -163,8 +151,15 @@ export type ApprovalInput =
     }
   /** 残った指摘の一覧（`decide <N> --preview`）が返った */
   | { readonly kind: "decidePreviewed"; readonly result: DecidePreviewParse }
-  /** 「この行き先で決める」を押した */
+  /** 「この対応方針を確定」（0 件なら「レビュー済みにする」）を押した */
   | { readonly kind: "decideConfirm"; readonly choices: Readonly<Record<string, string>> }
+  /**
+   * 「エージェントに相談するプロンプトをコピー」を押した。`root` は文面に書くワークスペースルート
+   * （呼ぶ側が realpath で解く）。オーバーレイは閉じず、選びかけの対応方針も変えない
+   */
+  | { readonly kind: "consult"; readonly root: string }
+  /** 相談のプロンプトをクリップボードに入れた結果。入らなかったときは理由 */
+  | { readonly kind: "consultCopied"; readonly error: string | undefined }
   /** 行き先を置いた結果が返った。食い違い（`mismatch`）もここに入る */
   | { readonly kind: "decided"; readonly outcome: DecideOutcome };
 
@@ -184,10 +179,17 @@ export type ApprovalEffect =
    * コミット・push させる（同じ置き場の承認と無関係な変更を巻き込まない）。空なら古い実行ファイルで、絞らずに送る
    */
   | { readonly kind: "carry"; readonly paths: readonly string[] }
-  /** 残った指摘を読む（`decide <N> --preview`）。返ったら `decidePreviewed` で戻す */
-  | { readonly kind: "loadDecide"; readonly tree: string; readonly phase: number }
-  /** 連絡の文のために残った指摘を読む（`decide <N> --preview`）。返ったら `reviewedChecked` で戻す */
-  | { readonly kind: "loadReviewed"; readonly tree: string; readonly phase: number }
+  /**
+   * 残った指摘を読む（`decide <N> --preview`）。返ったら `decidePreviewed` で戻す。
+   * `parent`・`phase`・`mr` は頼んだもの（読み取りの検証が、返ってきた JSON と照らす）
+   */
+  | {
+      readonly kind: "loadDecide";
+      readonly tree: string;
+      readonly parent: string;
+      readonly phase: number;
+      readonly mr: number | null;
+    }
   /** 行き先を置く（`ccnavi-user-decide.sh decide <N> --choices … --digest …`）。返ったら `decided` で戻す */
   | {
       readonly kind: "decide";
@@ -196,9 +198,14 @@ export type ApprovalEffect =
       readonly choices: Readonly<Record<string, string>>;
       readonly digest: string;
     }
-  /** 文をクリップボードに入れる。`what` は何の文かの呼び名（伝える文面に出す） */
+  /** プロンプトをクリップボードに入れる。`what` は何のプロンプトかの呼び名（伝える文面に出す） */
   | { readonly kind: "copy"; readonly prompt: string; readonly what: string }
-  /** 文を埋めて新しいセッションで開く */
+  /**
+   * 相談のプロンプトをクリップボードに入れる。オーバーレイは閉じない。返ったら `consultCopied` で戻す
+   * （できたら短く知らせ、できなければ失敗と言う）
+   */
+  | { readonly kind: "copyConsult"; readonly prompt: string }
+  /** プロンプトを埋めて新しいセッションで開く */
   | { readonly kind: "openSession"; readonly prompt: string }
   /** 親の計画編集タブを開く（`screens().workflow`） */
   | { readonly kind: "openWorkflow"; readonly ticket: string }
@@ -240,10 +247,6 @@ export function approvalStep(state: ApprovalState, input: ApprovalInput): Approv
     case "cancel":
       // 承認を打っている最中と、行き先を置いている最中は閉じない。終わるまで、結果を受ける場所を残す
       return closable(state) ? move(state, CLOSED) : stay(state);
-    case "reviewed":
-      return reviewed(state, input);
-    case "reviewedChecked":
-      return reviewedChecked(state, input.result);
     case "handOver":
       return handedOver(state, input.how);
     case "decide":
@@ -254,6 +257,10 @@ export function approvalStep(state: ApprovalState, input: ApprovalInput): Approv
       return decideConfirmed(state, input.choices);
     case "decided":
       return decided(state, input.outcome);
+    case "consult":
+      return consulted(state, input.root);
+    case "consultCopied":
+      return consultCopied(state, input.error);
   }
 }
 
@@ -280,7 +287,7 @@ function opened(
     only = input.tickets;
   }
   // 承認の途中（読み込み中・一覧・承認中）は二重に開かない。
-  // 読めなかった・承認した文・レビュー済みの連絡の上には開ける
+  // 読めなかった・承認したプロンプトの上には開ける
   const kind = state.overlay?.kind;
   if (kind === "loading" || kind === "preview" || kind === "approving") {
     return stay(state);
@@ -437,98 +444,16 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
 }
 
 /**
- * 「レビュー済み連絡」。マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、
- * 承認の文と同じ 2 ボタンで渡す。`confirm` を打つのは文を受けたエージェント
- */
-function reviewed(
-  state: ApprovalState,
-  input: {
-    readonly parent: string;
-    readonly phase: number;
-    readonly tree: string | undefined;
-    readonly chip: PhaseChip | undefined;
-    readonly root: string;
-  },
-): ApprovalStep {
-  // 承認のオーバーレイ（読み込み中・一覧・承認中・承認した文）の上には被せない。承認した文は
-  // 取り返せないので、渡し終えるか閉じるまで消さない。前の連絡（prompt）と読めなかった（error）は
-  // 差し替えてよい
-  const kind = state.overlay?.kind;
-  if (kind !== undefined && kind !== "error" && kind !== "prompt") {
-    return stay(state);
-  }
-  // 決めた結果の文（取り返せない）の上にも被せない
-  if (keptPrompt(state)) {
-    return stay(state);
-  }
-  const { parent, phase, tree, chip } = input;
-  if (tree === undefined || chip === undefined) {
-    return stay(state, {
-      kind: "warn",
-      text: `親 ${parent} のワークツリーかフェーズ ${phase} がないので、レビュー済みの連絡文を作れません`,
-    });
-  }
-  // ボタンが出る条件（ユーザのレビュー待ち）を受け側でも持つ。待ちでなければ confirm の前提（依頼のマーカー）が無い
-  if (!chip.reviewWaiting) {
-    return stay(
-      state,
-      {
-        kind: "warn",
-        text: `親 ${parent} のフェーズ ${chip.label} はユーザのレビュー待ちではありません。チケット管理画面を更新しました`,
-      },
-      { kind: "refresh" },
-    );
-  }
-  // 押したときに未解決の指摘を読み、文に有無を書く。読む間はオーバーレイで待たせる（残った指摘を読むときと同じ）
-  return move(
-    state,
-    {
-      overlay: { kind: "reviewedLoading", parent, phase, tree, label: chip.label, mrUrl: chip.mrUrl, root: input.root },
-      only: state.only,
-    },
-    { kind: "loadReviewed", tree, phase },
-  );
-}
-
-/**
- * 指摘の読み取りが返った。頼んだとき（`reviewedLoading`）のままでなければ受けない。
- * 読めなかったとき（拡張のエラー・ネットワーク・ホストの応答など）や、別のフェーズの答えのときは、
- * 指摘の有無を言わない文にする。連絡自体は止めない
- */
-function reviewedChecked(state: ApprovalState, result: DecidePreviewParse): ApprovalStep {
-  const overlay = state.overlay;
-  if (overlay?.kind !== "reviewedLoading") {
-    return stay(state);
-  }
-  // 別のフェーズの一覧は、やめた前の連絡の遅れた答え。今の連絡の答えではないので捨てる
-  if (result.ok && (result.value.parent !== overlay.parent || result.value.phase !== overlay.phase)) {
-    return stay(state);
-  }
-  const unresolved = result.ok ? result.value.threads.length : undefined;
-  return move(state, {
-    overlay: {
-      kind: "prompt",
-      title: `フェーズ ${overlay.label} のレビュー済み連絡`,
-      note:
-        "レビューを終えたことを Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、" +
-        "新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントが confirm を実行して、レビュー済みを記録します。",
-      prompt: reviewedPrompt(overlay.root, overlay.parent, overlay.phase, overlay.label, overlay.tree, overlay.mrUrl, unresolved),
-    },
-    only: state.only,
-  });
-}
-
-/**
- * 文を Claude Code に渡す。文は拡張ホストが持っている分を使う（画面から届いた文は使わない）。
+ * プロンプトを Claude Code に渡す。プロンプトは拡張ホストが持っている分を使う（画面から届いたものは使わない）。
  * 渡したらオーバーレイを閉じる
  */
 function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen"): ApprovalStep {
   const overlay = state.overlay;
-  // 渡す文があるのは、承認した（done）ときとレビュー済みの連絡（prompt）のときだけ
+  // 渡すプロンプトがあるのは、承認した（done）ときと決めた結果（prompt）のときだけ
   if (overlay?.kind !== "done" && overlay?.kind !== "prompt") {
     return stay(state);
   }
-  const what = overlay.kind === "done" ? "承認の文" : (overlay.what ?? "レビュー済みの連絡の文");
+  const what = overlay.kind === "done" ? "承認のプロンプト" : (overlay.what ?? "プロンプト");
   const prompt = overlay.prompt;
   return move(
     state,
@@ -568,7 +493,7 @@ function closable(state: ApprovalState): boolean {
   return kind !== "approving" && kind !== "deciding";
 }
 
-/** 取り返せない文（残った指摘を決めた結果）を見せているか */
+/** 取り返せないプロンプト（残った指摘を決めた結果）を見せているか */
 function keptPrompt(state: ApprovalState): boolean {
   return state.overlay?.kind === "prompt" && state.overlay.keep === true;
 }
@@ -576,12 +501,12 @@ function keptPrompt(state: ApprovalState): boolean {
 /** 残った指摘を決める途中（読み込み中・一覧・置いている最中）か */
 function busyDeciding(state: ApprovalState): boolean {
   const kind = state.overlay?.kind;
-  return kind === "reviewedLoading" || kind === "decideLoading" || kind === "decidePreview" || kind === "deciding";
+  return kind === "decideLoading" || kind === "decidePreview" || kind === "deciding";
 }
 
 /**
- * フェーズの「決める」。残った指摘を読む。被せてよいのはレビュー済みの連絡と同じ場所（閉じている・
- * 読めなかった・前の連絡）だけで、承認の途中と承認した文の上、決める途中には被せない
+ * ［レビュー完了］。残った指摘を読む。被せてよいのは、閉じている・読めなかった・前のプロンプト（取り返せないものを除く）の
+ * 上だけで、承認の途中と承認したプロンプトの上、決める途中には被せない
  */
 function decideOpened(
   state: ApprovalState,
@@ -614,34 +539,44 @@ function decideOpened(
   }
   return move(
     state,
-    { overlay: { kind: "decideLoading", parent, phase, tree }, only: state.only },
-    { kind: "loadDecide", tree, phase },
+    { overlay: { kind: "decideLoading", parent, phase, tree, mr: chip.mrNumber }, only: state.only },
+    { kind: "loadDecide", tree, parent, phase, mr: chip.mrNumber },
   );
 }
 
-/** 残った指摘の一覧が返った。頼んだとき（`decideLoading`）のままでなければ受けない */
+/** 読み取れなかったときの言い方。件数は出さず、理由だけを言う */
+function unreadable(reason: string): string {
+  return `指摘を読み取れませんでした（${reason}）`;
+}
+
+/**
+ * 残った指摘の読み取りが返った。頼んだとき（`decideLoading`）のままでなければ受けない。
+ * 読み取れなかったときは件数を出さず、確定のボタンも出さない（エラーのオーバーレイ）。
+ * 検証の本体は `parseDecidePreview`（頼んだ親・フェーズ・MR の番号との照合を含む）で、ここでも頼んだフェーズかを見る
+ */
 function decidePreviewed(state: ApprovalState, result: DecidePreviewParse): ApprovalStep {
   const overlay = state.overlay;
   if (overlay?.kind !== "decideLoading") {
     return stay(state);
   }
+  if (!result.ok) {
+    return move(state, { overlay: { kind: "error", error: unreadable(result.error) }, only: state.only });
+  }
   // 頼んだフェーズの一覧か。別のフェーズの答えで開かない
-  if (result.ok && (result.value.parent !== overlay.parent || result.value.phase !== overlay.phase)) {
+  if (result.value.parent !== overlay.parent || result.value.phase !== overlay.phase) {
     return move(state, {
-      overlay: { kind: "error", error: "頼んだフェーズと違う一覧が返りました。チケット管理画面を更新してから決め直してください" },
+      overlay: { kind: "error", error: unreadable("頼んだフェーズと違う一覧が返りました。チケット管理画面を更新してから、もう一度レビュー完了を押してください") },
       only: state.only,
     });
   }
   return move(state, {
-    overlay: result.ok
-      ? { kind: "decidePreview", preview: result.value, tree: overlay.tree, notice: overlay.notice }
-      : { kind: "error", error: result.error },
+    overlay: { kind: "decidePreview", preview: result.value, tree: overlay.tree, notice: overlay.notice },
     only: state.only,
   });
 }
 
 /**
- * 「この行き先で決める」。見せた指摘の全部に行き先が 1 つずつ付いているときだけ送る。
+ * 「この対応方針を確定」（0 件なら「レビュー済みにする」）。見せた指摘の全部に行き先が 1 つずつ付いているときだけ送る。
  * ダイジェストは見せた一覧のもの。実行ファイルが今の指摘と比べ、違えば何も置かない
  */
 function decideConfirmed(state: ApprovalState, choices: Readonly<Record<string, string>>): ApprovalStep {
@@ -662,8 +597,41 @@ function decideConfirmed(state: ApprovalState, choices: Readonly<Record<string, 
 }
 
 /**
+ * 「エージェントに相談するプロンプトをコピー」。1 件以上の指摘を見せているとき（`decidePreview`）だけ組む。
+ * 置いている最中（`deciding`）と 0 件の画面では組まない。オーバーレイは閉じず、選びかけの対応方針にも触れない
+ * （描き直しもしない。結果は `consultCopied` で知らせる）
+ */
+function consulted(state: ApprovalState, root: string): ApprovalStep {
+  const overlay = state.overlay;
+  if (overlay?.kind !== "decidePreview" || overlay.preview.threads.length === 0) {
+    return stay(state);
+  }
+  const { preview, tree } = overlay;
+  const prompt = consultPrompt({ root, parent: preview.parent, phase: preview.phase, mrUrl: preview.mr.url, parentTree: tree });
+  return stay(state, { kind: "copyConsult", prompt });
+}
+
+/**
+ * 相談のプロンプトをクリップボードに入れた結果。見せている画面（`decidePreview`）のときだけ受ける。
+ * できたら短く知らせ、できなければ失敗と言う（画面の中に出す。選びかけの対応方針は保たれる）
+ */
+function consultCopied(state: ApprovalState, error: string | undefined): ApprovalStep {
+  if (state.overlay?.kind !== "decidePreview") {
+    return stay(state);
+  }
+  const overlay = state.overlay;
+  const consult =
+    error === undefined
+      ? { ok: true, text: "相談のプロンプトをコピーしました。エージェントに貼って送ってください" }
+      : { ok: false, text: `コピーできませんでした（${error}）` };
+  return move(state, { overlay: { ...overlay, consult }, only: state.only });
+}
+
+/**
  * 置いた結果。承認の結果と同じく「この状態でなければ受けない」を置かない。 置かれたものは
- * 戻らないので、受けずに捨てるとユーザに届かない
+ * 戻らないので、受けずに捨てるとユーザに届かない。
+ * 表示は実行ファイルの答えに従う。`reviewed` が真ならレビュー済み。偽で `pending_extra` があれば、
+ * 見せたあとに指摘が追加されたのでレビュー済みにしていない、と言う（続きの子が起きていなければ、決め直しへ戻れる）
  */
 function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
   if (outcome.ok) {
@@ -672,30 +640,43 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     if (value.warning !== "") {
       effects.unshift({ kind: "warn", text: value.warning });
     }
-    const waiting = value.pending_extra.length > 0;
-    const note = value.followup
-      ? `直す指摘を含む追加対応用の子チケット ${value.followup} を作成しました。フェーズを再開しました。` +
-        // fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して resolve する仕組みは対象外
-        "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない。"
-      : waiting
-        ? `今回の判断は適用済みです。見せたあとに追加された指摘 ${value.pending_extra.length} 件は判断待ちです（フェーズはレビュー済みにしていません）。もう一度「決める」を開いてください。`
-        : "フェーズはレビュー済みになりました。";
+    const extra = value.pending_extra.length;
     const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
+    const handover = " Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。";
+    const overlay = state.overlay;
+    const where = overlay?.kind === "deciding" ? { parent: overlay.preview.parent, phase: overlay.preview.phase } : { parent: value.parent, phase: value.phase };
+    let title: string;
+    let note: string;
+    if (value.followup) {
+      title = `フェーズ ${value.phase} の未解決（Unresolved）指摘の対応方針を決めました`;
+      note =
+        `直す指摘を含む追加対応用の子チケット ${value.followup} を作成しました。フェーズを再開しました。` +
+        // fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して resolve する仕組みは対象外
+        "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない。" +
+        (extra > 0 ? `表示した後に追加された指摘 ${extra} 件は判断待ちです（今回の判断の対象外です）。` : "");
+    } else if (value.reviewed) {
+      title = `フェーズ ${value.phase} をレビュー済みにしました`;
+      note = "フェーズはレビュー済みになりました。";
+    } else if (extra > 0) {
+      title = "表示した後に指摘が追加されたため、レビュー済みにしていません";
+      note = `今回の判断は適用済みです。追加された指摘 ${extra} 件は判断待ちです（フェーズ ${value.phase} はレビュー済みにしていません）。指摘を読み直して、決め直してください。`;
+    } else {
+      title = `フェーズ ${value.phase} は、まだレビュー済みになっていません`;
+      note = "実行ファイルの答えでは、レビュー済みになっていません。チケット管理画面を更新して、フェーズの状態を確かめてください。";
+    }
+    const retry = !value.followup && !value.reviewed && extra > 0;
     return move(
       state,
       {
         overlay: {
           kind: "prompt",
-          title:
-            value.followup || waiting
-              ? `フェーズ ${value.phase} の未解決（Unresolved）指摘の対応方針を決めました`
-              : `フェーズ ${value.phase} をレビュー済みにしました`,
-          note:
-            `${note}${issued} Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、` +
-            "新しいセッションで開いてください。送るときは自分で Enter を押してください。",
+          title,
+          note: `${note}${issued}${handover}`,
           prompt: value.prompt,
-          what: "対応方針の連絡文",
-          keep: true,
+          what: "対応方針のプロンプト",
+          // 続きの子が起きたときのプロンプトは取り返せない。決め直しへ戻れるとき（子が起きていない）は被せてよい
+          keep: !retry,
+          ...(retry ? { retry: where } : {}),
         },
         only: state.only,
       },
@@ -714,13 +695,14 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
           parent: preview.parent,
           phase: preview.phase,
           tree,
+          mr: preview.mr.number,
           notice: "表示した指摘と今の指摘が違います（増えたか、変更されました）。見直してから決めてください",
         },
         only: state.only,
       },
-      { kind: "loadDecide", tree, phase: preview.phase },
+      { kind: "loadDecide", tree, parent: preview.parent, phase: preview.phase, mr: preview.mr.number },
     );
   }
-  const error = "mismatch" in outcome ? "表示した指摘と今の指摘が違います。チケット管理画面を更新したので、もう一度「対応方針を決める」から決め直してください" : outcome.error;
+  const error = "mismatch" in outcome ? "表示した指摘と今の指摘が違います。チケット管理画面を更新したので、もう一度レビュー完了を押して決め直してください" : outcome.error;
   return move(state, { overlay: { kind: "error", error }, only: state.only }, { kind: "refresh" });
 }

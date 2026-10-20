@@ -17,7 +17,7 @@ VS Code 拡張「ccnavi ボード」の作りを書く。拡張ホスト（`src/
 | 読むとき | 開くファイル |
 |---|---|
 | ファイルの置き場と役目（`src/`・`media/`・`test/`・`scripts/`）、テストの ID の決まり | [design/structure.md](design/structure.md) |
-| 承認のオーバーレイの遷移、見た目の実装、ボードや画面に機能を足すときに触る場所、画面に中身を渡す段取り | [design/screens.md](design/screens.md) |
+| 承認のオーバーレイの遷移、カードの組み立て（状態の札・あなたの番・詳細）、ボタンの見た目、レビュー完了の流れ、マージ状況の確認、見た目の実装、ボードや画面に機能を足すときに触る場所、画面に中身を渡す段取り | [design/screens.md](design/screens.md) |
 
 ## 拡張ホストと画面の境目
 

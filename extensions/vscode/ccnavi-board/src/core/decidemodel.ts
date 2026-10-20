@@ -73,27 +73,87 @@ export type DecideOutcome =
   | { readonly ok: false; readonly mismatch: true }
   | { readonly ok: false; readonly error: string };
 
-export function parseDecidePreview(text: string): DecidePreviewParse {
+/**
+ * 読み取りの検証が照らす、頼んだもの。`mr` はフェーズ行の依頼が持つ MR の番号（分かるときだけ。分からなければ null で、番号の食い違いは見ない）
+ */
+export interface DecideExpect {
+  readonly parent: string;
+  readonly phase: number;
+  readonly mr: number | null;
+}
+
+/**
+ * `ccnavi-review.sh decide <N> --preview` の標準出力を読む。**厳しく読む**。次のどれかなら、件数を出さずに
+ * 「指摘を読み取れなかった」として扱う（呼び手は確定のボタンを出さない）。「未解決は 0 件」と読み間違えると、
+ * 指摘が残っているフェーズを「レビュー済みにする」と見せてしまうため。
+ *
+ * - JSON でない、最上位が辞書でない、`version` が想定外
+ * - `parent` が文字列でない、または頼んだものと違う
+ * - `phase` が整数でない、または頼んだものと違う
+ * - `mr.number` が整数でない、または頼んだ MR の番号（分かるとき）と違う
+ * - `digest` が無い、文字列でない、`v2.` で始まらない
+ * - `threads` が無い、または配列でない
+ * - スレッドの要素が辞書でない、`key` が空・文字列でない・重複している、`body`・`url`・`path` が文字列でない、`line` が整数でない
+ *   （不正な要素は捨てずに、全体をエラーにする）
+ *
+ * URL が http(s) でないことはエラーにしない（画面がリンクにしないだけ）。
+ * `expect` を渡さなければ、頼んだものとの照合だけを省く（型の検査はする）
+ */
+export function parseDecidePreview(text: string, expect?: DecideExpect): DecidePreviewParse {
   const top = parseTop(text);
   if (!top.ok) {
     return top;
   }
   const raw = top.raw;
-  const mr: Record<string, unknown> = isRecord(raw.mr) ? raw.mr : {};
-  const digest = str(raw.digest);
-  if (!/^v2\.[A-Za-z0-9_-]+$/.test(digest)) {
-    return { ok: false, error: "ccnavi-review.sh decide --preview の digest が版 2 の形ではありません" };
+  const fail = (reason: string): DecidePreviewParse => ({ ok: false, error: reason });
+  if (typeof raw.parent !== "string") {
+    return fail("parent が文字列ではありません");
+  }
+  if (expect !== undefined && raw.parent !== expect.parent) {
+    return fail(`parent が頼んだもの（${expect.parent}）と違います（${raw.parent}）`);
+  }
+  if (!isInt(raw.phase)) {
+    return fail("phase が整数ではありません");
+  }
+  if (expect !== undefined && raw.phase !== expect.phase) {
+    return fail(`phase が頼んだもの（${expect.phase}）と違います（${raw.phase}）`);
+  }
+  const mr = isRecord(raw.mr) ? raw.mr : undefined;
+  if (mr === undefined || !isInt(mr.number)) {
+    return fail("mr.number が整数ではありません");
+  }
+  if (expect !== undefined && expect.mr !== null && mr.number !== expect.mr) {
+    return fail(`mr.number が頼んだ依頼のマージリクエスト（#${expect.mr}）と違います（#${mr.number}）`);
+  }
+  if (typeof raw.digest !== "string" || !raw.digest.startsWith("v2.")) {
+    return fail("digest が無いか、版 2（v2. で始まる文字列）ではありません");
+  }
+  if (!Array.isArray(raw.threads)) {
+    return fail("threads が配列ではありません");
+  }
+  const threads: DecideThread[] = [];
+  const seen = new Set<string>();
+  for (const [i, item] of raw.threads.entries()) {
+    const read = thread(item, i);
+    if (typeof read === "string") {
+      return fail(read);
+    }
+    if (seen.has(read.key)) {
+      return fail(`threads[${i}] の key が重複しています（${read.key}）`);
+    }
+    seen.add(read.key);
+    threads.push(read);
   }
   return {
     ok: true,
     value: {
       version: top.version,
-      parent: str(raw.parent),
-      phase: int(raw.phase),
-      mr: { number: int(mr.number), url: str(mr.url) },
+      parent: raw.parent,
+      phase: raw.phase,
+      mr: { number: mr.number, url: str(mr.url) },
       can_issue: raw.can_issue === true,
-      threads: list(raw.threads).filter(isRecord).map(thread),
-      digest,
+      threads,
+      digest: raw.digest,
     },
   };
 }
@@ -175,17 +235,37 @@ function parseTop(text: string): Top {
   return { ok: true, raw, version };
 }
 
-function thread(raw: Record<string, unknown>): DecideThread {
-  const last: Record<string, unknown> = isRecord(raw.last_comment) ? raw.last_comment : {};
+/** スレッド 1 件を読む。読めなければ、何番目がなぜ不正かの文を返す */
+function thread(item: unknown, index: number): DecideThread | string {
+  const at = `threads[${index}]`;
+  if (!isRecord(item)) {
+    return `${at} が辞書ではありません`;
+  }
+  if (typeof item.key !== "string" || item.key === "") {
+    return `${at} の key が空か、文字列ではありません`;
+  }
+  for (const name of ["body", "url", "path"] as const) {
+    if (typeof item[name] !== "string") {
+      return `${at} の ${name} が文字列ではありません`;
+    }
+  }
+  if (!isInt(item.line)) {
+    return `${at} の line が整数ではありません`;
+  }
+  const last: Record<string, unknown> = isRecord(item.last_comment) ? item.last_comment : {};
   return {
-    key: str(raw.key),
-    url: str(raw.url),
-    path: str(raw.path),
-    line: int(raw.line),
-    body: str(raw.body),
-    version: str(raw.version),
+    key: item.key,
+    url: item.url as string,
+    path: item.path as string,
+    line: item.line,
+    body: item.body as string,
+    version: str(item.version),
     last_comment: { id: str(last.id), at: str(last.at), author: str(last.author) },
   };
+}
+
+function isInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

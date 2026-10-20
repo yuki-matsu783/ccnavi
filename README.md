@@ -1030,7 +1030,7 @@ VS Code を使わないときは `--no-vscode` を付ける。
 チケットがどのワークツリーでどこまで進んでいるかは、VS Code の拡張「ccnavi ボード」
 （`extensions/vscode/ccnavi-board/`）で見られる。拡張は `ccnavi --explain --json` の出力を
 並べるだけ。承認はボードのオーバーレイで一覧を見せ、ユーザが押したら `user agree --yes` を子プロセスで
-打つ（形は下の「承認の JSON」）。レビューで残った指摘は、フェーズ行の「決める」で指摘ごとに対応方針を
+打つ（形は下の「承認の JSON」）。レビューで残った指摘は、フェーズ行の［レビュー完了］で指摘ごとに対応方針を
 選び、拡張が `ccnavi-user-decide.sh` を子プロセスで打つ（形は下の「残った指摘の JSON」）。
 `close-early` はボードに置かず、端末で `ccnavi-user-close-early.sh` を打つ。組み立て方と使い方はそこの README、
 出力の形は下の「ボードの JSON」。
@@ -1765,8 +1765,9 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 
 承認したことは、拡張が渡す文と `ccnavi-ticket.sh status` で伝わる。hook は承認を伝えない。拡張は承認の文
 （`user agree --yes` の `prompt`）をオーバーレイの 2 ボタン（コピー、新しいセッションで開く）から渡せる。端末・GitLab や GitHub の画面・Chrome 拡張で
-承認したときは、ユーザがそのあとセッションに一言送る。ユーザがレビューを終えたことは、VS Code のボードの「レビュー済み連絡」が
-「親のワークツリーで `ccnavi-review.sh confirm --phase <N>` を打て」の文を同じ 2 ボタンで渡す。マーカーを置くのはその `confirm`。Chrome 拡張のレビュー済みや端末の `decide` で済ませたときも、ユーザがそのあとセッションに一言送り、エージェントは `status` で確かめる。
+承認したときは、ユーザがそのあとセッションに一言送る。ユーザがレビューを終えたことは、VS Code のボードの［レビュー完了］で済ませる
+（残った指摘を読み、0 件なら［レビュー済みにする］、1 件以上なら対応方針を決める。下の `decide`）。ボードがエージェントに `confirm` を打たせることはしない。
+端末の `confirm` や `decide`、Chrome 拡張のレビュー済みで済ませたときも、ユーザがそのあとセッションに一言送り、エージェントは `status` で確かめる。
 
 **承認済みチケットの状態は `status` で聞く。** ファイルや `git status` を読んで推測せず、ccnavi に聞く。
 
@@ -2058,13 +2059,13 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
   変更要求はレビュアーごとに最新だけを数え、取り下げは無い扱い。
   ユーザが子を手で `done/` に動かして commit・push した場合は、`confirm` が移動の前に付いた未解決の指摘をホストで解決せずに、版つきで受け入れ台帳 `phases/<親>/accepted.json` に足して確定する（マーカーに `via: manual` と `moved`）。
   台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は `confirm`・`decide`・`close-early` のどれでも未解決として数えない。移動の後に付いた指摘が残れば確定せず、変更要求があれば保留する。`status` は「レビュー完了確認待ち」「移動が未共有」を出す。Chrome 拡張の確定も同じ。git が無いので、移動の時刻は拡張がホストの履歴（そのパスを最初に加えたコミット）から読んで渡す（読めなければ確定しない）
-- レビュー済みにする場所は、端末の `ccnavi-review.sh confirm --phase <N>`、VS Code のボードの「レビュー済み連絡」
-  （この操作ではボードはマーカーを置かず、出た文を受けた親が `confirm` を打つ）、Chrome 拡張のボードの「レビュー済み」
+- レビュー済みにする場所は、端末の `ccnavi-review.sh confirm --phase <N>`、VS Code のボードの［レビュー完了］
+  （残った指摘を読み、0 件なら［レビュー済みにする］で `decide` と同じ答えを置く）、Chrome 拡張のボードの「レビュー済み」
   （親のブランチへマーカーと `done/` への移動を 1 コミットで書く。`confirm` と同じ判定を通る）、そして下の `decide`
   （指摘が 0 件、またはどれも直さないときにレビュー済みにする）
 - `comment` はこのセッションで受けた承認や判断をマージリクエストのコメントに写す
 
-残った指摘の対応方針はユーザが決める（`decide`）。ボードの「決める」か、端末で `ccnavi-user-decide.sh <N>`。
+残った指摘の対応方針はユーザが決める（`decide`）。ボードの［レビュー完了］か、端末で `ccnavi-user-decide.sh <N>`。
 
 - **対応しない（受け入れて進む）。** スレッドに受け入れて進む旨の返信を残して解決済みにする（sh が置く前にする。返信か解決に失敗したら何も置かずに止まる）。次の `confirm` はホスト上の未解決だけを数える。受け入れは親全体に当てはまり、他の人が開き直せば未解決として数える
 - **このフェーズで直す。** 直す指摘を写した続きの子を、同じフェーズの番号で `.ccnavi/approved/doing/<親>-<フェーズ番号>-<そのフェーズの次の連番>.md` に直に置く
@@ -2803,6 +2804,10 @@ ccnavi --explain --json
 | `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line, manual}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` はユーザがどこで見るか（`none` / `mr`）。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、ボードはこれを写すだけで組み直さない。`manual` は、手で `done/` に動かされた子の確認待ち・移動が未共有など、手で動かした子についての 1 行（無ければ空文字）。VS Code のフェーズ行に出す。 |
 
+VS Code のボードは、`gate_closed`・`review_waiting`・`marks` を次のように言葉に置き換えるだけで、レビューの要否・ゲートの条件・リスクは判定し直さない（フェーズ行の一言は上から最初に当たったもの）。`gate_closed` かつ `review_waiting` は「レビュー待ち」、`gate_closed` は「レビュー準備中」、`marks.reviewed` があれば「レビュー済み」、`marks.skipped.deferred_to` があり、その番号のフェーズに `marks.reviewed` があれば「レビュー済み」、`deferred_to` があれば「レビュー予定」、`marks.skipped` があれば「レビュー省略」、ほかは `state` により「終了」「進行中」「これから」。`marks` の中身（`skipped` の `deferred_to`、`requested` の `mr` と `url`）は JSON にそのまま載っているので、ボードは推測で代わりを作らない。
+
+また、ボードの「マージ状況を確認」は、`ccnavi sync retired`（片付けの記録を持つ親の一覧）と `ccnavi-review.sh mr-state <番号>`（マージリクエストの状況。読むだけ）を使う。どちらも形を厳しく検証し、形が想定外のものを「マージ待ち」「マージ済み」「ありません」と読まない。互換の版は上げない（追加だけで、実行ファイルを起こさない）。
+
 ## 承認の JSON
 
 ```sh
@@ -2867,7 +2872,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 
 ## 残った指摘の JSON
 
-ボードの「決める」が読み書きする形。拡張は sh（`ccnavi-review.sh decide <N> --preview` と `ccnavi-user-decide.sh`）を子プロセスで打ち、sh が取得した JSON を実行ファイルに渡す。
+ボードの［レビュー完了］が読み書きする形。拡張は sh（`ccnavi-review.sh decide <N> --preview` と `ccnavi-user-decide.sh`）を子プロセスで打ち、sh が取得した JSON を実行ファイルに渡す。
 版は `version`（今は 2。ボードは版 1 を断る）で、承認の JSON と別に数える。
 
 `ccnavi-review.sh decide <N> --preview`（実行ファイルは `--reviewed N --accept-unresolved --preview --json`）は何も置かない。
@@ -2875,7 +2880,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ```json
 {"version": 2, "parent": "i0050", "phase": 2,
  "mr": {"number": 7, "url": "https://…/merge_requests/7"},
- "can_issue": false,
+ "can_issue": true,
  "threads": [{"key": "https://…#note_1", "url": "https://…#note_1", "path": "src/a.py", "line": 3, "body": "…",
               "version": "<指摘の版>", "last_comment": {"id": "…", "at": "…", "author": "…"}}],
  "digest": "v2.<不透明な文字列>"}

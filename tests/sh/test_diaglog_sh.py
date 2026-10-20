@@ -387,12 +387,16 @@ class GuardScriptTest(_Workspace):
     def test_fail_logs_the_identifier_not_the_text(self):
         result = self.run_script("ccnavi-review.sh", "https://u:SECRET@h")
         self.assertEqual(2, result.returncode)
-        self.assertEqual(
-            "ccnavi-review: https://u:SECRET@h は使用できません。"
-            "使えるのは request / confirm / comment / decide / ready / "
-            "fetch / origin / merged です。\n",
+        # 使える副命令の並びは増える（merged の後ろに mr-state）。頭の文面だけ固定する
+        self.assertTrue(
+            result.stderr.startswith(
+                "ccnavi-review: https://u:SECRET@h は使用できません。"
+                "使えるのは request / confirm / comment / decide / ready / "
+                "fetch / origin / merged"
+            ),
             result.stderr,
         )
+        self.assertTrue(result.stderr.endswith(" です。\n"), result.stderr)
         (line,) = self.lines("ccnavi-review")
         self.assertEqual("止めた sub=https://***@h exit=2 reason=unknown-sub", body(line)[2])
 

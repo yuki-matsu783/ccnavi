@@ -2,11 +2,11 @@
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
  * 列は 未着手 / 作業中 / 完了 / 取り消し / アーカイブ。置き場との対応は、未着手 = `wip/proposals/todo/`、
- * 作業中 = `.ccnavi/approved/doing/` と `wip/proposals/review/`（レビュー待ちも作業中の列。待ちはカードの属性で言う）、
+ * 作業中 = `.ccnavi/approved/doing/` と `wip/proposals/review/`（レビュー待ちも作業中の列。待ちはカードの札で言う）、
  * 完了 = `.ccnavi/approved/done/`、取り消し = 同じ `done/` で `cancelled_at` を持つもの、アーカイブ = 手元の退避
- * （`logs/archive/`。JSON の `archived` の欄。既定では画面が隠す）。承認済みチケット・マーカー・
- * レビュー待ち・ワークツリーはカードのバッジで出す。止まっているかや承認待ちの判断はここでやり直さない。JSON が
- * 言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
+ * （`logs/archive/`。JSON の `archived` の欄。既定では画面が隠す）。カードの状況は状態の札（`status.ts`）、
+ * ユーザができること（承認・レビュー完了）は操作（`actions`）で言う。この 2 つは別の規則で決める。
+ * 止まっているかや承認待ちの判断はここでやり直さない。JSON が言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
  */
 import type {
   ArchivedTicketJson,
@@ -22,6 +22,7 @@ import type {
   SeenInJson,
   TicketJson,
 } from "./model.js";
+import { phaseStatusOf, statusOf, type PhaseStatus, type Status } from "./status.js";
 
 export interface ColumnDef {
   readonly state: ProposalState;
@@ -38,23 +39,24 @@ export const COLUMNS: readonly ColumnDef[] = [
 ];
 
 /**
- * ユーザが押せる操作。承認と受け入れは実行ファイルかターミナルへ、レビュー済みの連絡は Claude Code に渡す文を組む
- * （判定は動かさない。`confirm` を打つのはその文を受けたエージェント）。
+ * ユーザが押せる操作。承認は実行ファイルへ、レビュー完了は「残った指摘の読み取り」（`ccnavi-review.sh decide <N> --preview`）へ
+ * 進む（判定は動かさない。置くのは実行ファイル）。画面は［承認］と、［MR を開く］［レビュー完了］の組を出す。
  */
 export type Action =
   | { readonly kind: "approve" }
   /**
-   * レビューの対応。画面は 1 つのメニューボタンにして、中に「対応方針を決める」と「レビュー済み連絡」を並べる。
-   * 項目は常に有効（判定は `decide` と `confirm` が持つ）
+   * レビュー完了。札（`status`）やフェーズ行の状態の一言が「レビュー待ち」のときだけ付く。
+   * 押すと残った指摘を読み、0 件なら「レビュー済みにする」、1 件以上なら対応方針の画面になる
    */
-  | { readonly kind: "review"; readonly parent: string; readonly phase: number };
+  | { readonly kind: "review"; readonly parent: string; readonly phase: number; readonly mrUrl: string };
 
 export interface PhaseChip {
   readonly parent: string;
   readonly number: number;
   readonly label: string;
   readonly state: PhaseJson["state"];
-  readonly marks: readonly string[];
+  /** フェーズ行の状態の一言（`core/status.ts` の `phaseStatusOf`）。JSON の欄から決めた言葉で、画面はこれを出す */
+  readonly status: PhaseStatus;
   readonly gateClosed: boolean;
   /** 依頼を出したのに止まったまま（ユーザのレビュー待ち）。JSON の `review_waiting` をそのまま持つ */
   readonly reviewWaiting: boolean;
@@ -93,9 +95,6 @@ export interface Card {
   readonly reviewReason: string;
   readonly worktreeExists: boolean;
   readonly worktreePath: string;
-  readonly baseSha: string;
-  /** finish が親のブランチへ合流した子の先頭。空なら合流していない（表示だけ） */
-  readonly mergedSha: string;
   readonly startedAt: string;
   readonly completedAt: string;
   /** 取り消した時刻。空でなければ取り消しの列 */
@@ -106,12 +105,18 @@ export interface Card {
   readonly seenIn: readonly SeenInJson[];
   /** どれが正か決まらないチケットの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
   readonly scattered: readonly SeenInJson[];
-  /** 子なら自分のフェーズのマーカー、親なら空 */
-  readonly marks: readonly string[];
   readonly gateClosed: boolean;
   /** 子なら自分のフェーズがユーザのレビュー待ちか、親なら false */
   readonly reviewWaiting: boolean;
   readonly pendingApproval: boolean;
+  /** 親だけ。承認済みの親に改版の提案が出ているか（承認待ちで、承認済みチケットも在る） */
+  readonly revision: boolean;
+  /** 子だけ。自分のフェーズの名前（`1（調査）`）。引けなければ空 */
+  readonly phaseLabel: string;
+  /** 子だけ。自分のフェーズの状態の一言。フェーズが引けなければ空 */
+  readonly phaseStatus: PhaseStatus | "";
+  /** 状態の札（`core/status.ts` の `statusOf`）。見出しの右端に 1 つ出す */
+  readonly status: Status;
   /** 親だけ */
   readonly stage: string;
   readonly wrapped: boolean;
@@ -125,7 +130,10 @@ export interface Card {
    * `copyStatus` は `open` のままなので、列や承認済みのバッジからは分からない。
    */
   readonly blocked: string;
-  /** 親だけ。フェーズの依頼のマーカーから引いたマージリクエストの URL（依頼の投稿ではなくマージリクエスト自体）。無ければ空 */
+  /**
+   * 親ならフェーズの依頼のマーカーから、子なら自分のフェーズの依頼のマーカーから引いたマージリクエストの URL
+   * （依頼の投稿ではなくマージリクエスト自体）。無ければ空
+   */
   readonly mrUrl: string;
   readonly mrNumber: number | null;
   /** 親だけ。元になった issue の番号（親チケットの `issue:`）。無ければ null */
@@ -190,6 +198,8 @@ export interface Board {
   readonly archivedCount: number;
   readonly generatedAt: string;
   readonly root: string;
+  /** プロジェクトの置き場（設定の `projects`）。マージ状況の確認が、プロジェクトのリポジトリを cwd にするのに使う */
+  readonly projectsDir: string;
 }
 
 const REMAINING: readonly ProposalState[] = ["todo", "doing"];
@@ -223,6 +233,7 @@ export function buildBoard(json: BoardJson): Board {
     archivedCount: archived.length,
     generatedAt: json.generated_at,
     root: json.root,
+    projectsDir: json.settings.projects,
   };
 }
 
@@ -252,20 +263,18 @@ function toCard(
     ownParent && t.phase !== null
       ? ownParent.phases.find((p) => p.number === t.phase)
       : undefined;
-  const marks = ownPhase ? Object.keys(ownPhase.marks).sort() : [];
   const phases = isParent && ownParent ? ownParent.phases.map((p) => toChip(ownParent, p)) : [];
-  const mr = isParent ? mrOf(phases) : { url: "", number: null };
+  // 親は最後に依頼を出したフェーズのマージリクエスト、子は自分のフェーズの依頼のマージリクエスト
+  const own = ownPhase ? requestOf(ownPhase) : { url: "", number: null };
+  const mr = isParent ? mrOf(phases) : { url: mrPage(own.url), number: own.number };
 
-  const actions: Action[] = [];
-  if (pending.has(t.ticket)) {
-    actions.push({ kind: "approve" });
-  }
   const wrapped = ownParent?.close_early !== null && ownParent?.close_early !== undefined;
   const riskLevel = typeof t.risk?.level === "string" ? t.risk.level : "";
   const gateClosed = !isParent && (ownPhase?.gate_closed ?? false);
   const reviewWaiting = !isParent && (ownPhase?.review_waiting ?? false);
+  const pendingApproval = pending.has(t.ticket);
 
-  return {
+  const base: Omit<Card, "status" | "actions"> = {
     id: t.ticket,
     title: t.title,
     parent: t.parent,
@@ -283,8 +292,6 @@ function toCard(
     reviewReason: t.human_review.reason,
     worktreeExists: t.worktree.exists,
     worktreePath: t.worktree.path,
-    baseSha: t.base_sha,
-    mergedSha: t.merged_sha,
     startedAt: t.started_at,
     completedAt: t.completed_at,
     cancelledAt: t.cancelled_at,
@@ -293,15 +300,16 @@ function toCard(
     riskPoints: typeof t.risk?.points === "number" ? t.risk.points : null,
     seenIn: t.seen_in,
     scattered: t.scattered,
-    marks: isParent ? [] : marks,
     gateClosed,
     reviewWaiting,
-    pendingApproval: pending.has(t.ticket),
+    pendingApproval,
+    revision: isParent && pendingApproval && t.copy.status !== "none",
+    phaseLabel: !isParent && ownPhase ? ownPhase.label : "",
+    phaseStatus: !isParent && ownPhase && ownParent ? phaseStatusOf(ownPhase, ownParent.phases) : "",
     stage: ownParent && isParent ? ownParent.stage : "",
     wrapped: isParent && wrapped,
     ready: isParent && ownParent?.ready !== null && ownParent?.ready !== undefined,
     phases,
-    actions,
     issues: t.issues,
     blocked: t.blocked,
     mrUrl: mr.url,
@@ -316,6 +324,23 @@ function toCard(
     templateDraft: isParent && t.template_draft,
     predecessorsUnmet: t.predecessors_unmet,
   };
+  return withStatus(base);
+}
+
+/**
+ * 状態の札と、ユーザの番の操作を付ける。操作は札と別の規則で決める。
+ * 承認は `pendingApproval` だけを条件にする（札が「要確認」でも出す）。レビュー完了は札が「レビュー待ち」の子だけ
+ * （承認待ちの子には出さない）。親のレビュー完了は各フェーズ行が持つ
+ */
+function withStatus(base: Omit<Card, "status" | "actions">): Card {
+  const status = statusOf(base);
+  const actions: Action[] = [];
+  if (base.pendingApproval) {
+    actions.push({ kind: "approve" });
+  } else if (!base.isParent && status.label === "レビュー待ち" && base.phase !== null) {
+    actions.push({ kind: "review", parent: base.parent, phase: base.phase, mrUrl: mrPage(base.mrUrl) });
+  }
+  return { ...base, status, actions };
 }
 
 /**
@@ -324,7 +349,7 @@ function toCard(
  */
 function toArchivedCard(a: ArchivedTicketJson): Card {
   const isParent = a.parent === "";
-  return {
+  return withStatus({
     id: a.ticket,
     title: a.title,
     parent: a.parent,
@@ -342,8 +367,6 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     reviewReason: "",
     worktreeExists: false,
     worktreePath: "",
-    baseSha: "",
-    mergedSha: a.merged_sha ?? "",
     startedAt: a.started_at,
     completedAt: a.completed_at,
     cancelledAt: a.cancelled_at,
@@ -352,15 +375,16 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     riskPoints: null,
     seenIn: [],
     scattered: [],
-    marks: [],
     gateClosed: false,
     reviewWaiting: false,
     pendingApproval: false,
+    revision: false,
+    phaseLabel: "",
+    phaseStatus: "",
     stage: "",
     wrapped: false,
     ready: false,
     phases: [],
-    actions: [],
     issues: [],
     blocked: "",
     mrUrl: "",
@@ -374,7 +398,7 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     workflow: false,
     templateDraft: false,
     predecessorsUnmet: [],
-  };
+  });
 }
 
 /**
@@ -389,6 +413,23 @@ function flowOf(flow: FlowJson | null, column: ProposalState): FlowJson | null {
   return (column === "done" || column === "cancelled") && !flow.exists ? null : flow;
 }
 
+/** 依頼のマーカーの URL は依頼の投稿（`#note-…`）を指すので、断片を除いてマージリクエスト自体にする */
+export function mrPage(url: string): string {
+  return url.replace(/#.*$/, "");
+}
+
+/**
+ * フェーズの依頼のマーカー `{head, mr, url, host, since}`。URL は依頼の投稿を指す。中身を解釈せずそのまま渡すだけ。
+ * 依頼のマーカーは mr と url を必ず一緒に持ち、リンクは url があるときだけ出すので、他のマーカーの mr は読まない
+ */
+function requestOf(p: PhaseJson): { url: string; number: number | null } {
+  const requested = p.marks.requested ?? {};
+  return {
+    url: typeof requested.url === "string" ? requested.url : "",
+    number: typeof requested.mr === "number" ? requested.mr : null,
+  };
+}
+
 /**
  * 親カードに出すマージリクエスト。依頼のマーカーの URL は依頼の投稿（`#issuecomment-…`）を指すので、
  * 断片を除いてマージリクエスト自体にする。マージリクエストは親ブランチに 1 本なので、
@@ -398,14 +439,14 @@ function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | nul
   for (let i = phases.length - 1; i >= 0; i -= 1) {
     const p = phases[i];
     if (p.mrUrl !== "") {
-      return { url: p.mrUrl.replace(/#.*$/, ""), number: p.mrNumber };
+      return { url: mrPage(p.mrUrl), number: p.mrNumber };
     }
   }
   return { url: "", number: null };
 }
 
 /**
- * 列は置き場から引く。提案の側にあれば `todo/` は未着手、`review/` は作業中（レビュー待ちは属性で言う）。
+ * 列は置き場から引く。提案の側にあれば `todo/` は未着手、`review/` は作業中（レビュー待ちは札で言う）。
  * 無ければ承認済みチケットから。閉じた承認済みチケット（`done/`）は取り消しの時刻があれば cancelled、無ければ done。
  * 開いている承認済みチケット（`doing/`）は doing。どちらにも無いのは食い違いなので todo に置く（不備の文は実行ファイルの `issues`）。
  */
@@ -422,24 +463,23 @@ function columnOf(t: TicketJson): ProposalState {
   return "todo";
 }
 
+/**
+ * フェーズ行。状態の一言は JSON の欄から `phaseStatusOf` が決める。レビュー完了の操作は、一言が「レビュー待ち」の行だけに付く
+ * （待ちかどうかは判定が `gate_closed` と `review_waiting` で言う。ここでマーカーから組み直さない）。
+ */
 function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
-  const marks = Object.keys(p.marks).sort();
+  const status = phaseStatusOf(p, parent.phases);
+  const request = requestOf(p);
   const actions: Action[] = [];
-  // 残った指摘を決められるのは、ユーザのレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
-  // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済み」・「レビューの対応」の操作はみな
-  // それを読み、止まっているかとマーカーからここで組み直さない。
-  if (p.review_waiting) {
-    actions.push({ kind: "review", parent: parent.ticket, phase: p.number });
+  if (status === "レビュー待ち") {
+    actions.push({ kind: "review", parent: parent.ticket, phase: p.number, mrUrl: mrPage(request.url) });
   }
-  // 依頼のマーカー `{head, mr, url, host, since}`。URL は依頼の投稿を指す。中身を解釈せずそのまま渡すだけ。
-  // 依頼のマーカーは mr と url を必ず一緒に持ち、リンクは url があるときだけ出すので、他のマーカーの mr は読まない
-  const requested = p.marks.requested ?? {};
   return {
     parent: parent.ticket,
     number: p.number,
     label: p.label,
     state: p.state,
-    marks,
+    status,
     gateClosed: p.gate_closed,
     reviewWaiting: p.review_waiting,
     reviewRequired: p.review_required,
@@ -447,8 +487,8 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     riskLine: p.risk_line,
     manual: p.manual,
     tickets: p.tickets,
-    mrUrl: typeof requested.url === "string" ? requested.url : "",
-    mrNumber: typeof requested.mr === "number" ? requested.mr : null,
+    mrUrl: request.url,
+    mrNumber: request.number,
     actions,
   };
 }
@@ -515,4 +555,14 @@ export function templateDraftCardOf(board: Board, ticket: string): Card | undefi
 /** 親の識別子とフェーズの番号から、そのフェーズ行。無ければ undefined */
 export function phaseChipOf(board: Board, parent: string, phase: number): PhaseChip | undefined {
   return parentCardOf(board, parent)?.phases.find((p) => p.number === phase);
+}
+
+/**
+ * ボードのアーカイブにある親の題。プロジェクトと識別子が一致するものだけを引く（別プロジェクトの同じ識別子を取り違えない）。
+ * 無ければ undefined（呼び手は識別子だけを出す）。マージ状況の帯が、片付けの記録（題を持たない）の親に題を添えるのに使う
+ */
+export function archivedTitleOf(board: Board, project: string, parent: string): string | undefined {
+  const column = board.columns.find((c) => c.state === "archived");
+  const card = column?.cards.find((c) => c.isParent && c.id === parent && c.project === project);
+  return card === undefined || card.title === "" ? undefined : card.title;
 }

@@ -12,6 +12,7 @@ import * as path from "node:path";
 
 import { buildBoard } from "../../src/core/board.js";
 import type { ApprovalOverlay, BoardData } from "../../src/core/board-view.js";
+import type { MergeView } from "../../src/core/merge.js";
 import type { BoardJson } from "../../src/core/model.js";
 import { renderBoardPage, type RenderOptions } from "../../src/core/render.js";
 import { parseApprovePreview, type ApprovePreview } from "../../src/core/approvemodel.js";
@@ -45,10 +46,12 @@ export async function openBoard(
     readonly measure?: boolean;
     /** 計画編集タブに未保存の変更がある親（拡張ホストが渡す） */
     readonly unsaved?: readonly string[];
+    /** マージ状況の確認の結果（拡張ホストが渡す） */
+    readonly merge?: MergeView;
   } = {},
 ): Promise<DomPage> {
   return openPage(
-    { kind: "board", board: buildBoard(json), approval: extra.approval, filter: extra.filter, ...(extra.unsaved === undefined ? {} : { unsaved: extra.unsaved }) },
+    { kind: "board", board: buildBoard(json), approval: extra.approval, filter: extra.filter, ...(extra.unsaved === undefined ? {} : { unsaved: extra.unsaved }), ...(extra.merge === undefined ? {} : { merge: extra.merge }) },
     extra.state,
     { prepare: extra.prepare, measure: extra.measure },
   );

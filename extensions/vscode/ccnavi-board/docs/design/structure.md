@@ -13,7 +13,7 @@ src/
   extension.ts        画面の入口の登録（core/screens.ts の帳面）、コマンド登録とサイドパネルの登録（vscode に依存する）
   sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口（取り込み待ちは並べない）。チケット制御が disable なら 2 つ（プロジェクト管理・ルール管理）。見た目はタイトルバーの配色のアイコンで、今の値を見出しの横に出す（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に反映する。変化を監視する（vscode に依存する）
-  board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）
+  board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）。マージ状況の確認の結果（core/merge.ts）もここが持つ（ボードが開いている間だけ）。実行ファイルと sh を子プロセスで呼ぶ読み取りと、片付けの送信（ダイアログのあとだけ）を分けて行う
   rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通の設定の定義（読み取り専用。共通の設定を開いているときは並べない）と、共通の設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
@@ -37,7 +37,10 @@ src/
     testmodel.ts      試験の JSON の形（--test --json / --test-expectations --json）と読み取り
     suggestmodel.ts   候補の JSON の形（--suggest --json）と読み取り。allow の候補は並べない
     lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情とフローの苦情（(flow)）の抜き出し、古い実行ファイルの「知らないオプション」の見分け
-    board.ts          列とカードへの組み立て、操作の有無（親の提案のカードの「計画編集」は提案の has_plan から）
+    board.ts          列とカードへの組み立て、操作の有無（親の提案のカードの「計画編集」は提案の has_plan から）。状態の札とフェーズ行の一言を JSON の欄から付ける。マージ状況の帯の題を引く archivedTitleOf
+    status.ts         カードの状態の札（statusOf）とフェーズ行の状態の一言（phaseStatusOf）。上から最初に当たったものを採る純粋な関数で、JSON の判定済みの欄を表示の言葉に置き換えるだけ
+    mrstate.ts        マージ状況の確認が読む 2 つの答え（ccnavi-review.sh mr-state <番号>、ccnavi sync retired）の厳しい検証と、古い sh の見分け、リポジトリのディレクトリの引き方
+    merge.ts          マージ状況の確認の遷移（いまの状態 ＋ 入力 → 次の状態 ＋ やること）と、画面に渡す形 MergeView。世代（token）で遅れた答えを捨て、確認中の再押下・片付けの再入を受けない。外へ出る仕事は返すだけで、行うのは board-panel
     board-moved.ts    前の読み直しから列が変わったカードと、新しく現れたカード（いまの状態 ＋ 読めたボード → 次の状態）。持ち直すのは board-panel。VS Code に触れないので単体で試せる
     board-view.ts     ボードの拡張ホストと画面の契約（見せる中身 BoardData、押した操作 BoardMessage、承認のオーバーレイの状態）
     approval-machine.ts 承認のオーバーレイの遷移（いまの状態 ＋ 入力 → 次の状態 ＋ やること）。外へ出る仕事は返すだけで、行うのは board-panel。未保存の計画編集タブがある親を含む一覧は承認を打たない（承認を打つ直前の確かめ blockedBeforeApprove も）、「計画を編集」は閉じてからタブを開く、保存したあとに提案が変わった親を覚える、もここ。VS Code に触れないので単体で試せる
@@ -112,15 +115,17 @@ src/
     （CSS の値）重なり順（--z-*）・角丸（--radius-*）・文字サイズ（--font-*）・すき間（--gap-*）・影（--shadow-popup）は page.css の :root で定め、画面の CSS には数値を直書きしない。直書きは test/shared/style.test.ts の CB-T585 が見つける（Chrome 拡張の CSS も対象。見つけるのは z-index・px の角丸・em の文字サイズ・gap の数値・影の rgba で、`font:` の省略形、rem、TSX のインライン style は見ない）
     board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
     board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）
-    board/Card.css    Card.tsx の CSS（カード 1 枚）
+    board/Card.css    Card.tsx の CSS（カード 1 枚。操作ボタン card-button の寸法もここ）
+    board/MergeBand.tsx マージ状況の帯（親ごとの 1 行、［MR を開く］［片付ける］、コマンドのコピー）
+    board/MergeBand.css MergeBand.tsx の CSS
     board/Approval.css Approval.tsx の CSS（承認のオーバーレイ）
     board/post.ts     ボードの送り口。契約に無いものは型で止まる
     board/main.tsx    ボード画面の入口。埋め込みの JSON を読んでマウントする
     board/App.tsx     ツールバー・絞り込み・列・フェーズ・脚注と、拡張ホストからのメッセージの受け
-    board/Card.tsx    カード 1 枚（バッジ・属性・フェーズ行・不備・操作）
+    board/Card.tsx    カード 1 枚（見出し・位置・あなたの番・注意・フェーズ行・補助の操作・詳細）
     board/Approval.tsx 承認のオーバーレイ（一覧・計画の図（読むだけ）・本文・対象外・渡す文）
-    board/Decide.tsx   残った指摘の対応方針のオーバーレイの中身（指摘ごとの選択）
-    board/state.ts    画面が覚えるもの（絞り込み・畳んだ列・列の幅）の読み書き
+    board/Decide.tsx   レビュー完了のオーバーレイの中身（0 件は「レビュー済みにする」、1 件以上は指摘ごとの選択と相談のプロンプトのコピー）
+    board/state.ts    画面が覚えるもの（絞り込み・畳んだ列・列の幅・詳細を開いているカード）の読み書き
     board/text.ts     カードとフェーズ行に出す言葉
     projects/style.css   プロジェクト管理画面の CSS の入口
     projects/App.css     App.tsx の CSS（節・clone の欄・一覧の入れ物）
@@ -233,6 +238,7 @@ test/
   helpers/fixture.ts  board.json を読む
   helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を記録する
   helpers/board.ts    ボード画面（React）をバンドルしたものごと happy-dom で開く
+  helpers/cards.ts    カードの組み立てを欄ごとに指定して作る部品（状態の札・レビュー・マージの画面のテストが使う）
   helpers/projects.ts プロジェクト管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/risk.ts     リスク管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/phases.ts   フェーズ管理画面（React）をバンドルしたものごと happy-dom で開く
@@ -245,7 +251,7 @@ test/
   helpers/plan-order.ts --plan-order の答えの実例（fixtures/plan-order.json）を読む
   helpers/plan-reorder.ts 振り直しの見本の表（リポジトリの tests/fixtures/plan-reorder.json。実行ファイルのテストと共有し、書き換えない）を読み、表の計画を plans の形に並べる
   helpers/jsdom.ts    happy-dom で固まる図の点のドラッグだけを jsdom で動かす（いま使うテストは無い）
-  board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom、承認のオーバーレイの計画の図を動かす approval-graph.dom、カードの「計画編集」を動かす workflow-card.dom）
+  board/              ボード（board, model, approvemodel, status と、画面を動かす render.dom / board.dom / card.dom（カードの構造・操作・詳細）/ review.dom（レビュー完了の画面）/ merge.dom（マージ状況の帯）、承認のオーバーレイの計画の図を動かす approval-graph.dom、カードの「計画編集」を動かす workflow-card.dom）
   rules/              ルール管理（rules-doc, rules-when, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
@@ -254,7 +260,7 @@ test/
   projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
   flow/               フロー編集（flow-doc, flow-view, flow-lint, flow-match, flow-write と、書き出しを PyYAML で読み戻す flow-pyyaml（リポジトリのルートで uv run python か python3 を起動する。起動できなければ飛ばす）、画面を動かす flow.dom、線を引ける先・コピー・貼り付け・履歴・差分の flow-edit-ops、元に戻す・コピー・ミニマップ・保存前の確かめを画面で動かす flow-edit.dom、ボードのカードのボタンを動かす flow-card.dom、エージェントの下書きの取り込みと依頼のボタンを動かす flow-proposal.dom）
   workflow/           計画編集（planordermodel, workflow-view, ボードと結ぶ帳面の workflow-tabs と、画面を動かす workflow.dom）
-  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine, plan-graph）
+  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine, plan-graph, decidemodel, mrstate, merge, read-only（読み取りから書き込みを呼ばない）)
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。画面はどれも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom, flow.dom, templates.dom, templates-edit.dom, handoff.dom）
   shared/test-ids.test.ts  ID の決まり（重複しない・名前は ID から始まる）を、テストで守る

@@ -14,7 +14,12 @@ import {
   planOrderWriteArgs,
   previewArgs,
   pushApprovedCommand,
-  reviewedPrompt,
+  abandonCommand,
+  consultPrompt,
+  mrStateArgs,
+  retireCommand,
+  retireConfirmText,
+  syncRetiredArgs,
   scriptCommand,
   shellQuote,
   toPosixPath,
@@ -135,31 +140,63 @@ test("CB-T19c 文面の sh のパスは実行ファイルの script_command と�
   assert.equal(scriptCommand("/a$b", "x.sh"), `sh '/a$b/.ccnavi/scripts/x.sh'`);
 });
 
-test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリーで confirm を単体で打つこととマージリクエストの URL を言い、マーカーは置かせない", () => {
-  const text = reviewedPrompt("/ws", "i0001", 2, "2（設計）", "/ws/.claude/worktrees/i0001", "https://example.com/pull/18#issuecomment-5", 0);
-  assert.ok(
-    text.startsWith(
-      "[ccnavi] ユーザが親 i0001 のフェーズ 2（設計） のレビューを終えた。\n- マージリクエスト: https://example.com/pull/18#issuecomment-5\n- 未解決の指摘はありません。\n親（メインエージェント）が、親のワークツリー /ws/.claude/worktrees/i0001 で 'sh /ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 2' を打ち、",
-    ),
-    text,
-  );
-  // 止めている間の例外は sh …ccnavi-review.sh の形を単体で打ったときだけ。cd と連結する形へ誘導しない。
-  // サブエージェントには常に禁止（9.12）
-  assert.ok(text.includes("cd や他のコマンドと連結せず、単体の Bash で実行する（cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で実行する）"));
-  assert.ok(text.includes("サブエージェントには渡さない"));
+test("CB-T19d 相談のプロンプトは、親・フェーズ・MR・親のワークツリーを言い、読み取り専用の decide <N> --preview だけを単体で打たせ、確定の操作を禁じる", () => {
+  const text = consultPrompt({
+    root: "/ws",
+    parent: "i0001",
+    phase: 2,
+    mrUrl: "https://example.com/pull/18",
+    parentTree: "/ws/.claude/worktrees/i0001",
+  });
+  assert.ok(text.includes("親 i0001 のフェーズ 2"));
+  assert.ok(text.includes("- マージリクエスト: https://example.com/pull/18"));
+  assert.ok(text.includes("- 親のワークツリー: /ws/.claude/worktrees/i0001"));
+  // 許すのは preview だけ。cd と連結せず、cwd が違えば先に cd だけを別の Bash で
+  assert.ok(text.includes("読み取り専用の 'sh /ws/.ccnavi/scripts/ccnavi-review.sh decide 2 --preview' だけを単体の Bash で実行する"));
+  assert.ok(text.includes("cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で実行する"));
   assert.ok(!text.includes("&&"));
-  // ユーザの判断（--reviewed / decide）を代行させず、confirm が返す方法を先取りしない
-  assert.ok(!text.includes("--reviewed"));
-  assert.ok(!text.includes("decide"));
-  assert.ok(!text.includes("依頼し直す"));
-  assert.ok(text.includes("confirm が一覧と次の手順を返すので、それに従う"));
-  // 前の会話が無い新しいセッションでも、状況の確かめ方が分かる
-  assert.ok(text.includes("'sh /ws/.ccnavi/scripts/ccnavi-ticket.sh status i0001' で確認する（置き場のファイルを自分で探さない）"));
-  // マージリクエストが無ければ行ごと省き、フェーズの表示名が無ければ番号で言う。Windows の区切りは / にそろえる
-  const bare = reviewedPrompt("C:\\ws", "i0001", 3, "", "C:\\ws\\.claude\\worktrees\\i0001", "", undefined);
+  // 未解決の指摘を 1 件ずつ要約し、案（3 つ）と理由を返させる
+  assert.ok(text.includes("1 件ずつ要約し"));
+  assert.ok(text.includes("対応しない／このフェーズで直す／issue に回す"));
+  // 確定の操作は禁じる。決めるのはユーザで、ボードの「レビュー完了」から
+  assert.ok(text.includes("ccnavi-user-decide.sh、ccnavi-review.sh confirm、その他の状態を変える操作は実行しない"));
+  assert.ok(text.includes("ボードの『レビュー完了』から行う"));
+  // 実行してよい形として書いた行（'sh …' で囲んだもの）は preview と ticket status だけ
+  const runnable = [...text.matchAll(/'(sh [^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual(runnable, [
+    "sh /ws/.ccnavi/scripts/ccnavi-review.sh decide 2 --preview",
+    "sh /ws/.ccnavi/scripts/ccnavi-ticket.sh status i0001",
+  ]);
+  assert.ok(!text.includes("--choices") && !text.includes("--digest") && !text.includes("--yes"));
+  // マージリクエストが無ければ行ごと省く。Windows の区切りは / にそろえる
+  const bare = consultPrompt({ root: "C:\\ws", parent: "i0001", phase: 3, mrUrl: "", parentTree: "C:\\ws\\.claude\\worktrees\\i0001" });
   assert.ok(!bare.includes("マージリクエスト:"));
-  assert.ok(bare.includes("フェーズ 3 のレビューを終えた"));
-  assert.ok(bare.includes("親のワークツリー C:/ws/.claude/worktrees/i0001 で 'sh C:/ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 3'"));
+  assert.ok(bare.includes("- 親のワークツリー: C:/ws/.claude/worktrees/i0001"));
+  assert.ok(bare.includes("'sh C:/ws/.ccnavi/scripts/ccnavi-review.sh decide 3 --preview'"));
+});
+
+test("CB-T19e マージ状況の引数と片付けのコマンド。mr-state と sync retired は読むだけ、片付けは cd から始まり、パスと親を単引用符で引用する", () => {
+  assert.deepEqual(mrStateArgs(12), ["mr-state", "12"]);
+  assert.deepEqual(syncRetiredArgs(), ["sync", "retired"]);
+  assert.equal(
+    retireCommand("/ws", "i0001"),
+    "cd '/ws' && sh '/ws/.ccnavi/scripts/ccnavi-sync.sh' 'i0001'",
+  );
+  // 空白・引用符・シェルの記号を含むパスでも壊れない（単引用符の中では、単引用符だけを置き換えれば足りる）
+  assert.equal(
+    retireCommand("/my ws/it's;rm -rf $HOME", "i0001"),
+    `cd '/my ws/it'\\''s;rm -rf $HOME' && sh '/my ws/it'\\''s;rm -rf $HOME/.ccnavi/scripts/ccnavi-sync.sh' 'i0001'`,
+  );
+  // Windows の区切りは / にそろえ、末尾の区切りは落とす
+  assert.equal(retireCommand("C:\\Users\\me\\ws\\", "i0001"), "cd 'C:/Users/me/ws' && sh 'C:/Users/me/ws/.ccnavi/scripts/ccnavi-sync.sh' 'i0001'");
+  // 捨てた親の記録を消すコマンドは、ボードが送らずコピーするだけ。引用の規則は文面の sh と同じ
+  assert.equal(abandonCommand("/ws", "i0001"), "sh /ws/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon i0001");
+  assert.equal(abandonCommand("/my ws", "i0001"), 'sh "/my ws/.ccnavi/scripts/ccnavi-launcher.sh" worktree retire --abandon i0001');
+  // ダイアログは sync が何をするかを先に言う
+  const text = retireConfirmText("i0001");
+  assert.ok(text.startsWith("ccnavi-sync.sh i0001 を実行します。"));
+  assert.ok(text.includes("リモートの取り込みも行い、MR がマージ済みかを確かめ直したうえで、条件を満たすものだけを片付けます"));
+  assert.ok(text.includes("結果はターミナルで確認してください"));
 });
 
 test("CB-T317 リスクの配点の差し替え: 共通は --risk、ワークスペースは self=、プロジェクトは名前= で --project-risk-file に渡す", () => {

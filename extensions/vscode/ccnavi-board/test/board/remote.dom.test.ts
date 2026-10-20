@@ -57,21 +57,42 @@ test("CB-T579 リモートとの差の言い方。未送信・遅れ。読めな
   assert.deepEqual(remoteItems(board(null)), []);
 });
 
-test("CB-D363 親のカードが出どころとリモートとの差を描く。未送信と遅れは目立たせる", async () => {
+test("CB-D363 親のカードは、未送信を注意の行に短く出し、出どころ（issue・MR・ブランチ）とリモートとの差の全部は詳細に畳む", async () => {
   const remote: RemoteJson = { branch: "feature/12-login", ahead: 2, behind: 1 };
-  const page = await openBoard(withRemote(remote, { issue: 12, mr: 7, branch: "feature/12-login" }));
+  const json = withRemote(remote, { issue: 12, mr: 7, branch: "feature/12-login" });
+  const page = await openBoard(json);
   try {
     const parent = page.one('li.card[data-id="i0001"]');
-    const names = Array.from(parent.querySelectorAll(".origin-names .fact")).map((e) => e.textContent);
-    assert.deepEqual(names, ["issue #12", "MR !7", "ブランチ feature/12-login"]);
-    const remoteFacts = Array.from(parent.querySelectorAll(".origin-remote .fact")).map((e) => e.textContent);
-    assert.deepEqual(remoteFacts, ["未送信 2 件", "遅れ 1 件"]);
-    assert.equal(parent.querySelectorAll(".fact.remote-unsent").length, 1);
-    assert.equal(parent.querySelectorAll(".fact.remote-behind").length, 1);
-    // 子のカードには出さない
-    assert.equal(page.one('li.card[data-id="i0001-01-01"]').querySelectorAll(".origin").length, 0);
+    // 未送信（ahead が 1 以上）は注意の行に。遅れはここには出さない
+    assert.deepEqual(Array.from(parent.querySelectorAll(".notes .badge.unsent")).map((e) => e.textContent), ["未送信 2 件"]);
+    assert.equal(parent.querySelectorAll(".origin").length, 0, "出どころの行は常時は出さない");
+    // 詳細は畳んである（開くまで中身を出さない）
+    assert.equal(parent.querySelectorAll("details.card-details").length, 1);
+    assert.equal(parent.querySelectorAll(".detail-rows").length, 0);
   } finally {
-    page.close();
+    await page.close();
+  }
+  // 詳細を開いた状態（カードごとに覚えている）で開く
+  const opened = await openBoard(json, { state: { details: [JSON.stringify(["", "i0001"])] } });
+  try {
+    const parent = opened.one('li.card[data-id="i0001"]');
+    const row = (key: string): string => parent.querySelector(`.detail-row[data-row="${key}"] dd`)?.textContent ?? "";
+    assert.equal(row("issue"), "#12");
+    assert.equal(row("parent-mr"), "!7");
+    assert.equal(row("branch"), "feature/12-login");
+    assert.equal(row("remote"), "未送信 2 件遅れ 1 件");
+    // 子のカードには出さない
+    const child = opened.one('li.card[data-id="i0001-01-01"]');
+    assert.equal(child.querySelectorAll(".notes .badge.unsent").length, 0);
+  } finally {
+    await opened.close();
+  }
+  // 未送信が 0 件なら注意には出ない（普通のことは出さない）
+  const clean = await openBoard(withRemote({ branch: "a", ahead: 0, behind: 3 }, {}));
+  try {
+    assert.equal(clean.all(".badge.unsent").length, 0);
+  } finally {
+    await clean.close();
   }
 });
 

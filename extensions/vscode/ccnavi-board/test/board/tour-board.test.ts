@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { COLUMNS, type Board, type Card } from "../../src/core/board.js";
+import { archivedTitleOf, COLUMNS, type Board, type Card } from "../../src/core/board.js";
 import { parseBoardJson } from "../../src/core/model.js";
 import { OVERLAY_NAMES, parseBoardSample } from "../../src/core/tour-board.js";
 import { INTRO_ID } from "../../src/core/tour-def.js";
@@ -27,20 +27,20 @@ function idsOf(board: Board, state: string): string[] {
 
 test("CB-T420 ボードの見本は、実行ファイルの出力と同じ形を buildBoard に通した列とカードを持ち、どれも見本と分かる題で、root と時刻は渡したものを使う", () => {
   assert.deepEqual(idsOf(sample.board, "todo"), ["sample-a", "sample-a-01-01", "sample-b-03-01"]);
-  assert.deepEqual(idsOf(sample.board, "doing"), ["sample-b", "sample-b-02-01", "sample-c", "sample-e"]);
-  assert.deepEqual(idsOf(sample.board, "done"), ["sample-b-01-01", "sample-c-01-01"]);
+  assert.deepEqual(idsOf(sample.board, "doing"), ["sample-b", "sample-b-02-01", "sample-c", "sample-c-01-01", "sample-e"]);
+  assert.deepEqual(idsOf(sample.board, "done"), ["sample-b-01-01"]);
   assert.deepEqual(idsOf(sample.board, "cancelled"), ["sample-f"]);
-  assert.deepEqual(idsOf(sample.board, "archived"), ["sample-g"]);
+  assert.deepEqual(idsOf(sample.board, "archived"), ["sample-g", "sample-i"]);
   assert.ok(cards.every((c) => c.title.startsWith("（見本）")));
   assert.equal(sample.board.root, "/ws");
   assert.equal(sample.board.generatedAt, "2026-10-12");
   assert.deepEqual(sample.board.projects, ["web"]);
-  assert.deepEqual(sample.board.pendingApproval, ["sample-a", "sample-a-01-01"]);
+  assert.deepEqual(sample.board.pendingApproval, ["sample-a", "sample-a-01-01", "sample-b-03-01"]);
   // 集計は置き場のカードだけ（アーカイブは数えない）
   assert.equal(sample.board.totalCount, 10);
-  assert.equal(sample.board.remainingCount, 7);
+  assert.equal(sample.board.remainingCount, 8);
   assert.equal(sample.board.issueCount, 1);
-  assert.equal(sample.board.archivedCount, 1);
+  assert.equal(sample.board.archivedCount, 2);
   assert.deepEqual(
     sample.board.parents.map((p) => p.id),
     ["sample-a", "sample-b", "sample-c", "sample-e", "sample-f"],
@@ -73,27 +73,38 @@ test("CB-T421 ボードの見本の鍵はどれも読み取りが読む（綴り
   assert.deepEqual(lostKeys(raw, parsed.ok ? parsed.board : undefined, "board", free), []);
 });
 
-test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っている（承認待ち・レビュー待ち・HIGH・不備・先行待ち・取り消し・フェーズの進み・フロー・計画編集）", () => {
-  // 承認待ち: 1 件ずつ承認する操作と、「計画編集」の入口を持つ
+test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っている（札の各種・レビュー待ち・HIGH・不備・要確認・先行待ち・取り消し・フェーズの進み・フロー・計画編集・マージ状況）", () => {
+  // 承認待ち: 1 件ずつ承認する操作と、「計画編集」の入口を持つ。札は「承認待ち」
   assert.ok(card("sample-a").pendingApproval && card("sample-a").actions.some((a) => a.kind === "approve"));
   assert.ok(card("sample-a").workflow);
   assert.equal(card("sample-a").copyStatus, "none");
-  // レビュー待ち: 親のフェーズに「レビューの対応」の操作とマージリクエスト、子にレビュー待ちのバッジの元
+  assert.equal(card("sample-a").status.label, "承認待ち");
+  assert.equal(card("sample-b-03-01").status.label, "承認待ち");
+  // レビュー待ち: 親のフェーズ行に［MR を開く］［レビュー完了］、子のカードはあなたの番に同じ操作。札はどちらも「レビュー待ち」
   const chip = card("sample-c").phases[0];
-  assert.ok(chip.reviewWaiting && chip.gateClosed && chip.actions.some((a) => a.kind === "review"));
+  assert.ok(chip.reviewWaiting && chip.gateClosed && chip.status === "レビュー待ち" && chip.actions.some((a) => a.kind === "review"));
   assert.equal(card("sample-c").mrNumber, 12);
   assert.ok(card("sample-c").mrUrl.startsWith("https://") && !card("sample-c").mrUrl.includes("#"));
+  assert.equal(card("sample-c").status.label, "レビュー待ち");
   assert.ok(card("sample-c-01-01").gateClosed && card("sample-c-01-01").reviewWaiting);
-  // HIGH のリスク・不備・ワークツリーなし
+  assert.equal(card("sample-c-01-01").status.label, "レビュー待ち");
+  assert.ok(card("sample-c-01-01").actions.some((a) => a.kind === "review"));
+  // HIGH のリスク・不備・書き込み停止（札は要確認）
   assert.equal(card("sample-c-01-01").riskLevel, "HIGH");
   assert.ok(card("sample-e").issues.length === 1 && !card("sample-e").worktreeExists && card("sample-e").copyStatus === "open");
+  assert.equal(card("sample-e").status.label, "要確認");
   // 先行待ち
   assert.deepEqual(card("sample-b-03-01").predecessorsUnmet.map((p) => p.ticket), ["sample-b-02-01"]);
-  // 取り消しとアーカイブ
+  // 作業中・完了・取り消しとアーカイブ
+  assert.equal(card("sample-b").status.label, "作業中");
+  assert.equal(card("sample-b-02-01").status.label, "作業中");
+  assert.equal(card("sample-b-01-01").status.label, "完了");
   assert.ok(card("sample-f").cancelledAt !== "");
+  assert.equal(card("sample-f").status.label, "取り消し");
   assert.equal(card("sample-g").column, "archived");
-  // フェーズが進んだ親: 終了・進行中・未着手
+  // フェーズが進んだ親: 終了・進行中・未着手（フェーズ行は「レビュー省略・進行中・これから」と言う）
   assert.deepEqual(card("sample-b").phases.map((p) => p.state), ["ended", "active", "planned"]);
+  assert.deepEqual(card("sample-b").phases.map((p) => p.status), ["レビュー省略", "進行中", "これから"]);
   assert.ok(card("sample-b").stage !== "");
   // フロー: 作成・着手中の閲覧・終了済みの閲覧
   assert.equal(card("sample-a-01-01").flow?.exists, false);
@@ -109,6 +120,10 @@ test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っ
   // 動いた表示は、見本の中の作業中のカードに付く
   assert.deepEqual(sample.moved, [{ id: "sample-b-02-01", from: "todo", to: "doing" }]);
   assert.equal(card("sample-b-02-01").column, "doing");
+  // マージ状況の帯の見本: 5 つの行（マージ待ち・マージ済み・閉じた・確認できない・記録が不完全）。題は退避の同じ親から引ける
+  assert.deepEqual(sample.merge?.rows.map((r) => r.state), ["open", "merged", "closed", "unknown", "incomplete"]);
+  assert.equal(archivedTitleOf(sample.board, "", "sample-i"), "（見本）API の応答にキャッシュを付ける");
+  assert.equal(archivedTitleOf(sample.board, "", "sample-h"), undefined);
 });
 
 test("CB-T423 承認・残った指摘・渡す文のオーバーレイの見本は、実行ファイルの JSON の読み取りを通り、見本のチケットと合う", () => {
@@ -131,7 +146,6 @@ test("CB-T423 承認・残った指摘・渡す文のオーバーレイの見本
     assert.equal(decide.preview.mr.number, card(decide.preview.parent).mrNumber);
   }
   assert.equal(sample.overlays.done.kind, "done");
-  assert.equal(sample.overlays.reviewed.kind, "prompt");
 });
 
 test("CB-T424 見本の読み取りは、列でない名前・オブジェクトでない見本・壊れた承認の一覧を、読めたことにしない", () => {
@@ -140,11 +154,13 @@ test("CB-T424 見本の読み取りは、列でない名前・オブジェクト
   assert.throws(() => parseBoardSample([], "/ws", "t"), /オブジェクト/);
   const overlays = raw.overlays as Record<string, unknown>;
   assert.throws(() => parseBoardSample({ ...raw, overlays: { ...overlays, decide: { ...(overlays.decide as object), digest: "short" } } }, "/ws", "t"), /digest/);
-  assert.throws(() => parseBoardSample({ ...raw, overlays: { ...overlays, reviewed: { title: "t" } } }, "/ws", "t"), /note/);
+  // マージ状況の見本の状態は、帯が描ける 6 つのどれかだけ
+  assert.throws(() => parseBoardSample({ ...raw, merge: { rows: [{ parent: "x", state: "pending" }] } }, "/ws", "t"), /state/);
+  assert.throws(() => parseBoardSample({ ...raw, merge: { rows: [{ state: "open" }] } }, "/ws", "t"), /parent/);
 });
 
 /** 案内の `scene` が読む鍵（`board.yml` の先頭のコメントと `board/App.tsx` が読むもの） */
-const SCENE_KEYS = ["overlay", "project", "parent", "attention", "archived", "fold"];
+const SCENE_KEYS = ["overlay", "project", "parent", "attention", "archived", "fold", "details", "merge"];
 
 test("CB-T425 ボードの案内の scene は、見本にある絞り込み・列・オーバーレイの名前だけを指し、絞り込んでも見本のカードが残る（綴り違いが既定へ黙って戻らない）", () => {
   const parents = new Set([...sample.board.parents, ...sample.board.archivedParents].map((p) => p.id));
@@ -161,6 +177,10 @@ test("CB-T425 ボードの案内の scene は、見本にある絞り込み・�
       assert.ok(scene.parent === undefined || parents.has(String(scene.parent)), `${at}: parent ${String(scene.parent)} が見本にありません`);
       assert.ok(scene.attention === undefined || typeof scene.attention === "boolean", `${at}: attention は真偽`);
       assert.ok(scene.archived === undefined || typeof scene.archived === "boolean", `${at}: archived は真偽`);
+      assert.ok(scene.merge === undefined || (typeof scene.merge === "boolean" && sample.merge !== undefined), `${at}: merge は真偽で、見本に merge がある`);
+      for (const id of String(scene.details ?? "").split(",").filter((item) => item.trim() !== "")) {
+        assert.ok(cards.some((c) => c.id === id.trim()), `${at}: details の ${id} のカードが見本にありません`);
+      }
       for (const state of String(scene.fold ?? "").split(",").filter((item) => item.trim() !== "")) {
         assert.ok(states.has(state.trim() as never), `${at}: fold の ${state} は列の名前でない`);
       }
@@ -179,10 +199,11 @@ test("CB-T425 ボードの案内の scene は、見本にある絞り込み・�
 
 /** 画面が付ける印（`data-tour`）の固定の名前。`board.yml` の先頭のコメントと同じ一覧 */
 const FIXED_TARGETS = new Set([
-  "summary", "filter-project", "filter-parent", "filter-attention", "filter-archived", "refresh", "approve", "tour", "board",
-  "badge-copy", "badge-hold", "badge-blocked", "badge-preds", "badge-worktree", "badge-risk", "badge-seen",
-  "approve-one", "review-menu", "mr", "phases", "issues", "moved", "flow-create", "flow-edit", "flow-locked", "workflow-button",
-  "approval-batch", "approval-plan", "approve-confirm", "approval-prompt", "approval-handover", "edit-workflow", "decide-threads", "decide-confirm",
+  "summary", "filter-project", "filter-parent", "filter-attention", "filter-archived", "refresh", "merge-check", "approve", "tour", "board",
+  "merge-band", "merge-retire", "merge-abandon",
+  "status", "turn", "details", "notes", "badge-blocked", "badge-preds", "badge-worktree", "badge-risk", "badge-seen", "badge-issue", "badge-unsent",
+  "approve-one", "review-done", "mr", "phases", "phase-review", "moved", "flow-create", "flow-edit", "flow-locked", "workflow-button",
+  "approval-batch", "approval-plan", "approve-confirm", "approval-prompt", "approval-handover", "edit-workflow", "decide-threads", "decide-consult", "decide-confirm",
 ]);
 
 test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見本にあるカード・列の印だけで、基本の案内は今の題と順序、最後は案内の入口を指す", () => {
@@ -202,7 +223,7 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   }
   const intro = def.courses[0];
   assert.equal(intro.id, INTRO_ID);
-  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "カード", "承認", "更新", "案内"]);
+  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態の札", "あなたの番", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 
@@ -211,7 +232,7 @@ test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順で、「〜した�
   assert.ok(useCases.length >= 3 && useCases.length <= 8);
   assert.deepEqual(
     useCases.map((c) => c.id),
-    ["approve", "review", "attention", "progress", "filter", "closed", "flow"],
+    ["approve", "review", "merge", "attention", "progress", "filter", "closed", "flow"],
   );
   for (const course of useCases) {
     assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);

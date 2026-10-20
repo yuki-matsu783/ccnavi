@@ -1,0 +1,35 @@
+---
+type: guide
+title: ccnaviのPythonのテストを回す
+description: ccnaviのPythonのテストを全件回すときの決まり。1本で回さず、グループに分けるか同時実行の入口を使う
+tags: [process-test]
+keywords: [テスト, 全件, discover, グループ, python -m tests, 時間切れ, 同時実行]
+---
+
+# ccnaviのPythonのテストを回す
+
+## 全件を1本で回さない
+
+全件を`uv run python -m unittest discover -s tests -t .`の1本で回さない。
+数十分かかり、セッションの時間の上限（30分など）で途中で打ち切られる。打ち切られると終了コードも失敗の一覧も残らず、通ったのか分からない。
+
+次のどちらかで回す。
+
+- グループに分けて回す。グループごとに別のプロセスで同時に走らせ、それぞれの終了コードをファイルに残す
+- `uv run python -m tests`を使う。モジュールごとに別プロセスで同時に回す。中身は`discover`と同じ
+
+```sh
+uv run python -m tests                 # 全件（同時実行）
+uv run python -m tests tests/ticket    # グループを名指し（複数書ける）
+uv run python -m tests --plan          # 何をどの順で回すかだけ出す
+```
+
+## どのグループを回すか
+
+変えたファイルから回すグループを決める。表と時間の目安は`.claude/skills/commit/references/test-groups.md`にある。
+表に当たらない変更や、統合先に取り込む前・MRに出す前は全件を回す。
+
+## 待つとき
+
+長く走るテストは、バックグラウンドで走らせて終了を待つ。前景で`sleep`を繰り返さない。
+途中で打ち切られたときは、通ったとは扱わない。分けて回し直す。

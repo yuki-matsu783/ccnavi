@@ -54,6 +54,11 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   | `ccnavi-review.sh merged` | `unknown`（MR がマージ済みかを確かめられない） | — |
   | `ccnavi-fetch.sh` | 常に 0（取ってこられないことは失敗ではない） | — |
 
+  `ccnavi-review.sh mr-state <番号>`（読み取りだけ）は 3 と 4 を使わず、0（状態が分かった）・1（`unknown`。状態が分からない）・
+  2（引数の誤り）で返す。1 行目は `mr-state 1`、2 行目は `open <番号> <yes|no> <URL>`・`merged <番号> <URL>`・`closed <番号> <URL>`・
+  `unknown <種類> <理由>`（種類は `no-tool`・`auth`・`network`・`api`・`not-found`）。ボードが読む。知らない副命令として断る古い sh
+  （終了コード 2、標準エラーに「mr-state は使用できません。使えるのは」）は、ボードが「sh が古い版です」と言う
+
 - 実行ファイルの標準出力をshが読む約束もある。`review ready`は1行目にコメントの下書きのパス、2行目に`tree <退避したツリーのルート>`を出し、
   `wip/`から消したものがあれば続けて`wip-from <消す前のHEAD>`と`wip <パス>`（1行1本）を出す。shはwrite-and-pushの中でこの削除を
   コミットして送ってからDraftを外す（設計 9.10）。ファイルを`logs/archive/`へ動かすのと`wip/`の追跡済みのファイルを消すのは実行ファイルで、

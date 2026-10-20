@@ -18,7 +18,8 @@ import boardTour from "../tours/board.yml";
 import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
-import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
+import { MergeBand } from "./MergeBand.js";
+import { detailsKey, EMPTY, loadState, saveState, type ViewState } from "./state.js";
 import { FILTER_LABELS } from "./text.js";
 
 /** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSS の min-width と同じ値 */
@@ -58,6 +59,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // 次の中身を渡したとき。読み直しが失敗しても中身は届く（エラーの画面になる）ので、ここで戻す経路は要らない。
   // 実行ファイルが返らない場合は期限（ccnavi.ts）で打ち切る。
   const [refreshing, setRefreshing] = useState(false);
+  // 「マージ状況を確認」を押した直後から、拡張ホストの答え（確認中）が届くまで押せなくする
+  const [mergePending, setMergePending] = useState(false);
 
   const board = data.kind === "board" ? data.board : undefined;
   // 受け取る側（メッセージ）はいまのボードを知らないので、描くたびに ref へ入れておく
@@ -112,6 +115,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
       // 中身だけ。開いた直後の絞り込みは 1 枚目の HTML に埋まっていて、2 枚目以降は filter のメッセージで届く
       setData(message.data);
       setRefreshing(false);
+      setMergePending(false);
     } else if (message.type === "filter" && typeof message.project === "string") {
       pickProject(message.project);
     } else if (message.type === "tour") {
@@ -150,6 +154,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     document.body.classList.toggle("filtering", filtering);
   }, [filtering]);
 
+  // 詳細を開いているカード。覚えるのは実際のボードのカードだけ（消えたカードの分は捨てる）。
+  // 読み直せなかった画面（board が無い）では、覚えていた分を触らない
+  const cardKeys = board === undefined ? undefined : new Set(board.columns.flatMap((column) => column.cards.map(detailsKey)));
+  const details = cardKeys === undefined ? view.details : view.details.filter((key) => cardKeys.has(key));
+
   /**
    * 覚える。外した後の値（候補に無い絞り込みは「すべて」）で書くので、消えた親の絞り込みは
    * ここで正規化される。ユーザが触ったときだけでなく、拡張ホストから絞り込みを渡されたときも通る。
@@ -161,8 +170,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     if (board === undefined) {
       return;
     }
-    saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths });
-  }, [board === undefined, project, parent, attention, archived, view.folded, view.widths]);
+    saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths, details });
+  }, [board === undefined, project, parent, attention, archived, view.folded, view.widths, details.join("\u0000")]);
 
   // 案内の間は見本の上の様子を描く。絞り込み・畳んだ列・幅は `scene` が決め、実際の `view` は使わない（動かさない）
   const shownProject = touring ? (typeof scene.project === "string" ? scene.project : EMPTY.project) : project;
@@ -171,7 +180,20 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const shownArchived = touring ? scene.archived === true : archived;
   const shownFolded = touring ? sceneList(scene.fold) : view.folded;
   const shownWidths: Readonly<Record<string, number>> = touring ? {} : view.widths;
+  // 案内の間に詳細を開いて見せるカードは、手順の `scene.details`（識別子を , で区切る）が決める。実際の開閉（`view.details`）には書かない
+  const shownDetails: readonly string[] = touring ? sceneList(scene.details) : details;
+  const detailsOpenOf = (card: Card): boolean => (touring ? shownDetails.includes(card.id) : shownDetails.includes(detailsKey(card)));
+  const toggleDetails = (card: Card, open: boolean): void => {
+    if (touring) {
+      return;
+    }
+    const key = detailsKey(card);
+    setView((now) => ({ ...now, details: open ? [...now.details.filter((k) => k !== key), key] : now.details.filter((k) => k !== key) }));
+  };
   const shownParents = shown === undefined ? [] : shownArchived ? [...shown.parents, ...shown.archivedParents] : shown.parents;
+  // マージ状況の帯。実際の結果は拡張ホストが持ち（ボードが開いている間だけ）、ここは出すだけ。案内の間は見本の結果を、
+  // 手順の `scene.merge` が指すときだけ出す（実際の結果は見せない・書き換えない）
+  const mergeShown = touring ? (scene.merge === true ? sample?.merge : undefined) : data.kind === "board" ? data.merge : undefined;
   const overlay =
     touring && sample !== undefined
       ? typeof scene.overlay === "string" && (OVERLAY_NAMES as readonly string[]).includes(scene.overlay)
@@ -273,6 +295,25 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               </button>
               <button
                 type="button"
+                className={mergeShown?.checking === true || mergePending ? "action busy" : "action"}
+                data-action="merge-check"
+                data-tour="merge-check"
+                disabled={mergeShown?.checking === true || mergePending}
+                aria-busy={mergeShown?.checking === true || mergePending ? "true" : undefined}
+                title="片付けの記録を持つ親のマージリクエストが、マージ済みかを確かめます（読むだけで、何も変えません）"
+                onClick={() => {
+                  if (touring) {
+                    return;
+                  }
+                  setMergePending(true);
+                  post({ type: "mergeCheck" });
+                }}
+              >
+                <span className="spin" aria-hidden="true" />
+                <span className="label">{mergeShown?.checking === true || mergePending ? "確認中…" : "マージ状況を確認"}</span>
+              </button>
+              <button
+                type="button"
                 className="action primary"
                 data-action="approve"
                 data-tour="approve"
@@ -287,6 +328,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               </button>
             </div>
           </ScreenHeader>
+          {mergeShown !== undefined ? <MergeBand merge={mergeShown} board={shown} touring={touring} /> : null}
           {(sample === undefined ? board?.problems.length ?? 0 : 0) > 0 ? (
             <ul className="problems">
               {(board?.problems ?? []).map((problem, i) => (
@@ -304,6 +346,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 column={column}
                 hiddenOf={hiddenOf}
                 movedOf={movedOf}
+                detailsOpenOf={detailsOpenOf}
+                onDetails={toggleDetails}
                 folded={shownFolded.includes(column.state)}
                 width={shownWidths[column.state]}
                 onFold={(folded) =>
@@ -352,6 +396,8 @@ function Column({
   column,
   hiddenOf,
   movedOf,
+  detailsOpenOf,
+  onDetails,
   folded,
   width,
   onFold,
@@ -360,6 +406,8 @@ function Column({
   readonly column: BoardColumn;
   readonly hiddenOf: (card: Card) => boolean;
   readonly movedOf: (card: Card) => Moved | undefined;
+  readonly detailsOpenOf: (card: Card) => boolean;
+  readonly onDetails: (card: Card, open: boolean) => void;
   readonly folded: boolean;
   readonly width: number | undefined;
   readonly onFold: (folded: boolean) => void;
@@ -440,7 +488,14 @@ function Column({
       ) : (
         <ul className="cards">
           {column.cards.map((card) => (
-            <CardItem key={`${card.project}/${card.id}`} card={card} hidden={hiddenOf(card)} moved={movedOf(card)} />
+            <CardItem
+              key={`${card.project}/${card.id}`}
+              card={card}
+              hidden={hiddenOf(card)}
+              moved={movedOf(card)}
+              detailsOpen={detailsOpenOf(card)}
+              onDetails={(open) => onDetails(card, open)}
+            />
           ))}
         </ul>
       )}
