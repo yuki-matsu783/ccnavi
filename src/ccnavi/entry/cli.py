@@ -936,6 +936,9 @@ def _parsed(
     if len(args.command) == 4 and list(args.command[:2]) == ["tree", "bound"]:
         code = sh_ask.bound_tree(stdout, stderr, root, conf, args.command[2], args.command[3])
         return EXIT_OK if code == 0 else EXIT_ERROR
+    if len(args.command) == 4 and list(args.command[:2]) == ["tree", "base-bound"]:
+        code = sh_ask.base_bound_tree(stdout, stderr, root, conf, args.command[2], args.command[3])
+        return EXIT_OK if code == 0 else EXIT_ERROR
     if len(args.command) == 6 and list(args.command[:2]) == ["sync", "tidy"]:
         code = cli_ops.sync_tidy(
             stdout, stderr, root, conf, args.cwd or os.getcwd(), *args.command[2:]

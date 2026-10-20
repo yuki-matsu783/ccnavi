@@ -287,6 +287,23 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(before, self.sha(self.ws, "refs/heads/main"))
         self.assertIn("未コミットの変更", done.stdout)
 
+    def test_default_branch_does_not_overwrite_an_ignored_file(self):
+        # 進める先に ignored のファイルと同じパスがあれば、上書きせずに進めない（--no-overwrite-ignore）。
+        tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
+        self.leave_main()
+        git(self.ws, "worktree", "add", "-q", tree, "main")
+        before = self.sha(tree, "HEAD")
+        self.advance(self.remote)
+        pusher = os.path.join(self._tmp.name, "push-" + os.path.basename(self.remote))
+        added = git(pusher, "show", "--name-only", "--format=", "HEAD").stdout.strip()
+        write(os.path.join(self.ws, ".git", "info", "exclude"), added + "\n")
+        write(os.path.join(tree, added), "ignored の手元のファイル\n")
+        done = self.fetch()
+        self.assertEqual(before, self.sha(tree, "HEAD"))
+        with open(os.path.join(tree, added), encoding="utf-8") as handle:
+            self.assertEqual("ignored の手元のファイル\n", handle.read())
+        self.assertIn("進められなかった", done.stdout)
+
     def test_default_branch_advances_in_the_tree_that_holds_it(self):
         # チェックアウトされているブランチの ref は書き換えず、そのツリーで ff する。
         tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")

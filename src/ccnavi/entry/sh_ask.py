@@ -22,6 +22,11 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   （`ccnavi-git.sh integrate` が断る条件。Stop の促しと同じ判定）。`bound yes|no` に続けて、
   結び付くなら `why <理由>`。判定は `ops_stop_integrate.bound_reason`。
 
+- `ccnavi tree base-bound <メインのチェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが、
+  チケットに結び付くか（`ccnavi-worktree.sh` が切る前に断る条件）。`bound yes|no|unknown` に続けて、
+  yes なら `why <理由>`。識別子の衝突はワークスペース全体、結び付きは取り込み先のリポジトリだけを
+  見る（`base_bound.base_bound`）。unknown（決められない）も呼ぶ側は断る。
+
 git はローカルの読み取りだけ。ネットワークには出ない。
 """
 
@@ -37,6 +42,7 @@ from ..tickets import (
     approval_marks,
     archive,
     donecopy,
+    base_bound,
     ops_stop_integrate,
     ticket_ids,
     ticket_model,
@@ -149,6 +155,27 @@ def bound_tree(
     why = ops_stop_integrate.bound_reason(root, conf, _tree_of(root, conf, path, name))
     stdout.write(TREE_HEAD + "\n")
     stdout.write(f"bound {YES if why else NO}\n")
+    if why:
+        stdout.write(f"why {why}\n")
+    return 0
+
+
+def base_bound_tree(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, path: str, branch: str
+) -> int:
+    """`ccnavi tree base-bound <メインのチェックアウト> <ブランチ>`。
+
+    頭に `tree 1`、続けて `bound yes|no|unknown`、yes なら `why <理由>`。
+    """
+    if not branch or "\n" in branch or "\x00" in branch:
+        stderr.write(f"ccnavi: tree base-bound のブランチ {branch!r} は有効な名前ではありません。\n")
+        return 1
+    if not path or not os.path.isdir(path):
+        stderr.write(f"ccnavi: tree base-bound のツリー {path!r} が見つかりません。\n")
+        return 1
+    answer, why = base_bound.base_bound(root, conf, path, branch)
+    stdout.write(TREE_HEAD + "\n")
+    stdout.write(f"bound {answer}\n")
     if why:
         stdout.write(f"why {why}\n")
     return 0

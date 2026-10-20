@@ -73,6 +73,8 @@ FEATURES: tuple[str, ...] = (
     # 保護対象の下書きの取り込み（`ccnavi user handoff`）。テンプレート専用の取り込み・編集
     # （前の `templates.edit`・`board.template-draft`）の代わり。
     "handoff",
+    # 直接作業の取り込み先がチケットに結び付くかの問い合わせ（`tree base-bound`）。
+    "tree.base-bound",
 )
 # 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"
