@@ -108,7 +108,8 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    「いいえ」や条件が付いたときは、人間が整えるまで待つ（エージェントが勝手に整えない）
 2. **回す前の状態を確かめる。**
    - ワークスペースルートと `projects/test-repo` の作業ツリーが clean である（`ccnavi-git.sh status`）。他のセッションが作業中のツリーでは回さない
-   - ビルド済みの実行ファイル（`.ccnavi/bin/`）があり、判定が `enable` モードで強制される（`decisions.jsonl` の `enforced` が `true`）
+   - 判定のモードが `enable` である。実行器が最初に `.claude/settings.json` の env と実行の環境変数の `CCNAVI_MODE` を確かめ、`enable` でなければ `--confirmed` があっても回さない（終了コード 3）。回したあとは `decisions.jsonl` の `enforced` が `true` であることも確かめる
+   - ビルド済みの実行ファイル（`.ccnavi/bin/`）がある
    - `projects/test-repo` を使うシナリオは、統合先が origin と合っていて、前の回のワークツリーとブランチが残っていない
    - `setup.files` があれば、先に作る（回したあとに消す）
 3. **実行器で回す。** 人間の確認が取れたあとだけ、`--confirmed` を付ける。

@@ -58,7 +58,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
   ブランチ・コミット・MR を作る作業（UC-08・09）は `projects/test-repo` で行う
 
 - 判定は **`enable` モードで強制される状態**で回す。`dry-run` では、一般の保護の記録の `enforced` が `false` になり、止まらない（チケットの関門と補助の保護は止まる）。
-  設定が `enable` になっているか、最初に `decisions.jsonl` の `mode` を見る
+  実行器が最初に `CCNAVI_MODE` を確かめ、`enable` でなければ回さない（`mode_check`）。回したあとは `decisions.jsonl` の `mode` と `enforced` を見る
 - 判定の記録は `logs/decisions.jsonl`（1 行 1 判定の JSON）。`expect.decisions` は次の欄を比べる
   - `event`: `PreToolUse` / `PostToolUse` / `Stop` など
   - `tool`: ツール名（`Bash`・`Edit` など）

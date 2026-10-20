@@ -31,11 +31,11 @@ expect:
     - event: PreToolUse
       tool: Edit
       decision: deny
-      rules_include: [workspace-root]
+      rules_include: [.ccnavi/config/common/rules.yml:workspace-root]
     - event: PreToolUse
       tool: Write
       decision: deny
-      rules_include: [workspace-root]
+      rules_include: [.ccnavi/config/common/rules.yml:workspace-root]
   state:
     - cwd: projects/test-repo
       run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh log --oneline -1

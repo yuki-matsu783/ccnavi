@@ -23,6 +23,7 @@ inconclusive（未成立。fail にしない）。意味で読むもの（judge�
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -303,6 +304,50 @@ def preflight_facts(root):
             )
             lines.append(f"## {label}: git {sub}\n{(r.stdout or r.stderr).strip()}\n")
     return "\n".join(lines)
+
+
+MODE_ENV = "CCNAVI_MODE"
+
+
+def mode_check(root):
+    """判定のモードが enable かを確かめる。(enable か, 人間に見せる文)。
+
+    dry-run では、hook は拒否を報告するだけで止めない（enforced が false の行になる）。
+    シナリオは「止まる」ことを確かめるので、enable 以外では回さない。値は、プロジェクトの
+    .claude/settings.json の env と、実行の環境変数を見る。どちらかに enable 以外の値が
+    あれば止める。値が無ければ enable（hook の既定と同じ）。
+    """
+    settings_path = Path(root) / ".claude/settings.json"
+    try:
+        declared = json.loads(settings_path.read_text(encoding="utf-8")).get("env", {})
+    except FileNotFoundError:
+        declared = {}
+    except (OSError, ValueError) as exc:
+        return (
+            False,
+            f"## 判定のモード: {settings_path} を読めない（{exc}）。確かめられないので回さない",
+        )
+    sources = [
+        (".claude/settings.json の env", declared.get(MODE_ENV)),
+        ("実行の環境変数", os.environ.get(MODE_ENV)),
+    ]
+    lines = ["## 判定のモード（CCNAVI_MODE）"]
+    ok = True
+    for label, value in sources:
+        if value is None:
+            lines.append(f"- {label}: 指定なし")
+            continue
+        lines.append(f"- {label}: {value}")
+        if value.strip().lower() not in ("", "enable"):
+            ok = False
+    if ok:
+        lines.append("enable で判定している。回してよい")
+    else:
+        lines.append(
+            "enable ではない。dry-run などでは止まらない判定が混じるので回さない。"
+            "モードを enable にしてから打ち直す（設定の変更はユーザが行う）"
+        )
+    return ok, "\n".join(lines)
 
 
 # ---- 実行 ----
@@ -686,8 +731,14 @@ def cmd_run(args):
     root = Path(args.root).resolve()
     scn = load_scenario(args.scenario)
     scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
+    mode_ok, mode_text = mode_check(root)
+    if not mode_ok:
+        # 確認の前に止める。--confirmed を付けても、enable でなければ回さない
+        print(mode_text)
+        return 3
     if not args.confirmed:
         print("回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。\n")
+        print(mode_text + "\n")
         print(preflight_facts(root))
         print(
             "問い 1: 今の状態はきれいで、最新か（他のセッションの作業中や未コミットの変更が無いか）"

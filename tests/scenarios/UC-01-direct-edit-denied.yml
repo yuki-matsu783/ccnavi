@@ -20,7 +20,7 @@ expect:
       tool: Edit
       decision: deny
       code: DENY_PATH
-      rules_include: [workspace-root]
+      rules_include: [.ccnavi/config/common/rules.yml:workspace-root]
       subject_contains: projects/test-repo/README.md
   files_unchanged:
     - projects/test-repo/README.md

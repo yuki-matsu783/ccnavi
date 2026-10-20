@@ -336,6 +336,39 @@ class PreflightTest(unittest.TestCase):
         self.assertIn("置き場が無い", facts)
 
 
+class ModeCheckTest(unittest.TestCase):
+    def _root(self, settings_env):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        (Path(d.name) / ".claude").mkdir()
+        body = {"env": settings_env} if settings_env is not None else {}
+        (Path(d.name) / ".claude/settings.json").write_text(json.dumps(body), encoding="utf-8")
+        return d.name
+
+    def _check(self, settings_env, environ=None):
+        root = self._root(settings_env)
+        with mock.patch.dict("os.environ", environ or {}, clear=True):
+            return runner.mode_check(root)[0]
+
+    def test_enable_in_settings_passes(self):
+        self.assertTrue(self._check({"CCNAVI_MODE": "enable"}))
+
+    def test_dry_run_in_settings_stops(self):
+        self.assertFalse(self._check({"CCNAVI_MODE": "dry-run"}))
+
+    def test_dry_run_in_environment_stops_even_when_settings_enable(self):
+        self.assertFalse(self._check({"CCNAVI_MODE": "enable"}, {"CCNAVI_MODE": "dry-run"}))
+
+    def test_missing_value_counts_as_enable(self):
+        self.assertTrue(self._check({}))
+
+    def test_unreadable_settings_stops(self):
+        root = self._root({"CCNAVI_MODE": "enable"})
+        (Path(root) / ".claude/settings.json").write_text("{", encoding="utf-8")
+        with mock.patch.dict("os.environ", {}, clear=True):
+            self.assertFalse(runner.mode_check(root)[0])
+
+
 class PersistTest(unittest.TestCase):
     def test_session_is_kept_only_when_the_next_prompt_resumes(self):
         steps = [{"prompt": "a"}, {"human": True}, {"prompt": "b", "resume": True}, {"prompt": "c"}]
