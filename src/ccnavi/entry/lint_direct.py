@@ -198,8 +198,8 @@ def _unrecorded(
             Problem(
                 SEVERITY_INFO,
                 f"(direct/{label}/{name})",
-                f"直接作業のワークツリー .claude/worktrees/{name} に、"
-                "記録（ccnavi-direct）がありません。integrate は断ります。"
+                f".claude/worktrees/{name} に、直接作業の記録（ccnavi-direct）がありません。"
+                "integrate は断ります。"
                 "ユーザに取り込み先を確かめて、"
                 f"ccnavi-worktree.sh {name} --adopt --base <取り込み先> で引き取ります",
             )
