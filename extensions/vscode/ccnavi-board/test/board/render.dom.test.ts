@@ -106,7 +106,22 @@ test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "decidePreview");
     assert.equal(text(page, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘 2 件の対応方針");
     assert.ok(texts(page, ".approval-note").join(" ").includes("「このフェーズで直す」を 1 件でも選ぶと"));
-    assert.deepEqual(texts(page, ".decide-body"), ["命名を直す", "<b>テスト</b>"]);
+    // 本文は 1 行目を出し、2 行以上あれば <details> で全文。HTML は文字として出す
+    assert.deepEqual(texts(page, ".decide-first"), ["命名を直す", "<b>テスト</b>"]);
+    assert.equal(page.all('li[data-key="u1"] details.decide-more').length, 1);
+    assert.equal(page.all('li[data-key="u2"] details.decide-more').length, 0, "1 行だけの本文には「全文」を出さない");
+    assert.equal(text(page, 'li[data-key="u1"] .decide-full'), "命名を直す\n詳しく");
+    assert.equal(page.all(".decide-body b").length, 0);
+    // 指摘の URL は http(s) のときだけリンクにする（そうでなければ文字として出すだけ）
+    assert.equal(page.all("a.decide-url").length, 0);
+    // 対応方針の選択肢は同じ寸法の切り替え。ラジオの意味（同じ name のグループ）とキーボード操作はそのまま
+    const group = page.one('li[data-key="u1"] [role="radiogroup"]');
+    assert.equal(group.querySelectorAll("label.decide-choice").length, 3);
+    assert.equal(new Set(page.all('li[data-key="u1"] input[type="radio"]').map((r) => r.getAttribute("name"))).size, 1);
+    // 相談のプロンプトのコピー（1 件以上のときだけ）。押してもオーバーレイは閉じず、選びかけも変えない
+    const consult = page.one<HTMLButtonElement>('button[data-action="decide-consult"]');
+    assert.equal(consult.textContent, "エージェントに相談するプロンプトをコピー");
+    assert.equal(consult.disabled, false);
     // issue に回す行き先は、局面（フィードバック計画の承認の有無）に関わらず出す
     assert.equal(page.all('input[data-choice="issue"]').length, 2);
     assert.ok(!texts(page, ".approval-note").join(" ").includes("フィードバック計画"));
@@ -116,6 +131,10 @@ test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選
     page.click(page.one('li[data-key="u1"] input[data-choice="keep"]'));
     await page.settle();
     assert.equal(page.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true);
+    page.click(consult);
+    await page.settle();
+    assert.deepEqual(page.posted.at(-1), { type: "decideConsult" });
+    assert.equal((page.one('li[data-key="u1"] input[data-choice="keep"]') as unknown as { checked: boolean }).checked, true, "選びかけの対応方針は保たれる");
     page.click(page.one('li[data-key="u2"] input[data-choice="fix"]'));
     await page.settle();
     const ready = page.one<HTMLButtonElement>('button[data-action="decide-confirm"]');
@@ -141,6 +160,7 @@ test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選
   try {
     assert.equal(deciding.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true);
     assert.equal(deciding.one<HTMLButtonElement>('button[data-action="approve-cancel"]').disabled, true);
+    assert.equal(deciding.one<HTMLButtonElement>('button[data-action="decide-consult"]').disabled, true, "確定中は相談のコピーを押せない");
     assert.ok(deciding.all("input[type=radio]").every((r) => (r as unknown as { disabled: boolean }).disabled));
   } finally {
     await deciding.close();
@@ -150,7 +170,9 @@ test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選
     approval: { kind: "decidePreview", preview: { ...decidePreview(false), threads: [] }, tree: "/w" },
   });
   try {
-    assert.equal(text(none, "#approval-title"), "フェーズ 2 に未解決の指摘はありません。");
+    assert.equal(text(none, "#approval-title"), "フェーズ 2 に未解決の指摘はありません");
+    assert.equal(none.all('button[data-action="decide-consult"]').length, 0, "指摘が 0 件なら相談のボタンは出さない");
+    assert.ok(none.one('button[data-action="decide-confirm"]').classList.contains("primary"));
     const notes = texts(none, ".approval-note").join(" ");
     assert.ok(!notes.includes("このフェーズで直す"), notes);
     assert.ok(!notes.includes("issue に回せる"), notes);
@@ -253,7 +275,7 @@ test("CB-T108c カードの承認はそのカードの識別子だけを絞り�
   const page = await openBoard();
   try {
     const one = page.one(`button[data-action="approve-one"][data-ticket="${pending}"]`);
-    assert.equal(one.textContent, "この 1 件を承認");
+    assert.equal(one.textContent, "承認");
     page.click(one);
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: [pending], filtered: true });
@@ -332,9 +354,10 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
   assert.match(css(), /\.column:last-child \.resizer \{ right: 0; \}/);
   // 絞り込みの select は最長の選択肢の幅に広がらず、ページを横に流さない
   assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: var\(--w-field\);/);
-  // カードの不備の小さい字の指定は、ツールバーの「不備 N 件」には当てない
-  assert.doesNotMatch(css(), /(^|\})\s*\.issues \{/);
-  assert.match(css(), /\.card \.issues \{/);
+  // 操作ボタン（card-button）は、親（カード・フェーズ一覧）の文字サイズを引き継がず、文字サイズ・高さ・余白を明示する。
+  // 共通の button.action は使わない
+  assert.match(css(), /\.card-button \{[^}]*min-height: 26px;[^}]*font-size: var\(--vscode-font-size, 13px\);/);
+  assert.doesNotMatch(css(), /\.card-button \{[^}]*font: inherit/);
 });
 
 test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、その識別子を送る。上部の集計は絞らない", async () => {
@@ -354,242 +377,6 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
     assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').textContent, "承認待ち 1 件を承認");
   } finally {
     await page.close();
-  }
-});
-
-test("CB-T13c フェーズ行は状態の全文だけを出す。段の名前・マーカーの経過・レビューの要否・リスクの点と理由まで並ぶ", async () => {
-  const base = fixture();
-  const parent: ParentJson = {
-    ...base.parents[0],
-    phases: base.parents[0].phases.map((p): PhaseJson => {
-      if (p.number === 1) {
-        // 依頼して済んだレビューと HIGH のリスク。止まらなくなれば段の名前は出ず、点と理由とマーカーが残る
-        return {
-          ...p,
-          review_required: true,
-          marks: { requested: { at: "t" }, reviewed: { at: "t" } },
-          risk: { ...(p.risk ?? {}), points: 40, level: "HIGH" },
-          risk_line: "リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）",
-        };
-      }
-      // 依頼済みで止まったまま（判定は review_waiting で言う）。「レビュー待ち」と
-      // 残った指摘を決めるボタンが並ぶ
-      return { ...p, state: "ended", gate_closed: true, review_waiting: true, marks: { requested: { at: "t" } } };
-    }),
-  };
-  const page = await openBoard({ ...base, parents: [parent] });
-  try {
-    const rows = page.all(".card.parent .phase");
-    assert.equal(rows[0].querySelector(".phase-status")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー必須 · リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）");
-    assert.equal(rows[1].querySelector(".phase-status")?.textContent, "終了 · レビュー待ち · レビュー依頼済み · レビュー必須");
-    assert.equal(rows[1].querySelectorAll('button[data-action="review-menu"]').length, 1);
-    // 状態は項目ごとの塊で、区切りの「·」は前の項目の末尾に付く。ボタンは状態の列ではなく 2 段目
-    assert.deepEqual(
-      [...rows[1].querySelectorAll(".phase-status .phase-item")].map((item) => item.textContent),
-      ["終了 ·", "レビュー待ち ·", "レビュー依頼済み ·", "レビュー必須"],
-    );
-    assert.equal(rows[1].querySelectorAll(".phase-status button").length, 0);
-    assert.equal(rows[1].querySelectorAll('.phase-actions button[data-action="review-menu"]').length, 1);
-    assert.equal(rows[0].querySelectorAll(".phase-actions").length, 0, "リンクもボタンもない行には 2 段目を出さない");
-    // 状態は 1 か所にだけ描く（要約と全文の二重描画はしない）
-    assert.equal(page.all(".phase-brief, .phase-full").length, 0);
-  } finally {
-    await page.close();
-  }
-  // MEDIUM も点と理由ごと出る
-  const medium: ParentJson = {
-    ...parent,
-    phases: parent.phases.map((p): PhaseJson => (p.number === 1 ? { ...p, risk: { ...(p.risk ?? {}), level: "MEDIUM" }, risk_line: "リスク: 25 (MEDIUM)" } : p)),
-  };
-  const page2 = await openBoard({ ...base, parents: [medium] });
-  try {
-    const row = page2.all(".card.parent .phase")[0];
-    assert.equal(row.querySelector(".phase-status")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー必須 · リスク: 25 (MEDIUM)");
-  } finally {
-    await page2.close();
-  }
-  // 依頼を出していないフェーズは「レビュー準備中」。残った指摘を決めるボタンも出ない
-  const unasked: ParentJson = {
-    ...parent,
-    phases: parent.phases.map((p): PhaseJson => (p.number === 2 ? { ...p, marks: {}, review_waiting: false } : p)),
-  };
-  const page3 = await openBoard({ ...base, parents: [unasked] });
-  try {
-    const row = page3.all(".card.parent .phase")[1];
-    assert.equal(row.querySelector(".phase-status")?.textContent, "終了 · レビュー準備中 · レビュー必須");
-    assert.equal(row.querySelectorAll("button").length, 0);
-  } finally {
-    await page3.close();
-  }
-  // 要約と全文の二重描画はやめた。見えている全文がそのまま読み上げに渡り、幅で入れ替えない
-  assert.doesNotMatch(css(), /\.phase-(brief|full)\b/);
-  assert.doesNotMatch(css(), /@container \(min-width: 480px\)/);
-});
-
-test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジはユーザが動く状態だけで、属性は枠無しの行に出す", async () => {
-  const page = await openBoard();
-  try {
-    // ユーザが動く状態は枠付きのバッジ
-    assert.equal(text(page, ".badge.copy.copy-none"), "未承認");
-    assert.equal(text(page, ".badge.worktree.none"), "ワークツリーなし");
-    // 属性は枠無しの fact。承認済・レビューの要否・ワークツリーの名前・base
-    assert.ok(texts(page, ".fact.copy-open").includes("承認済み"));
-    // レビュー待ちは列ではなく属性。カードは作業中の列にある
-    assert.equal(text(page, '.column[data-state="doing"] .card[data-id="i0001-02-04"] .fact.copy-review'), "レビュー待ち");
-    // クローズは完了・取り消しの列で分かるので、カードには重ねて書かない。そこにいるカードにはレビューの要否も出さない
-    assert.equal(page.all(".fact.copy-closed").length, 0);
-    assert.equal(page.all('.column[data-state="done"] .card .fact.review').length, 0);
-    assert.equal(page.all('.column[data-state="cancelled"] .card .fact.review').length, 0);
-    // 実績のリスクは閉じたカードにも残る
-    assert.ok(texts(page, '.column[data-state="done"] .card[data-id="i0001-01-01"] .fact.risk').length > 0);
-    // 取り消しは列で分かるので、カードには重ねて書かない
-    assert.equal(page.all('.column[data-state="cancelled"] .card[data-id="i0001-02-05"]').length, 1);
-    assert.equal(page.all(".fact.cancelled").length, 0);
-    // 取り消した子にはワークツリーが無いが、閉じているので「ワークツリーなし」のバッジは出ない
-    assert.equal(page.all(".badge.worktree.none").length, 1);
-    assert.equal(text(page, ".fact.review"), "人間レビュー必須");
-    assert.ok((page.one(".fact.review").getAttribute("title") ?? "").length > 0, "レビューの要否は理由を tooltip に持つ");
-    assert.equal(text(page, ".fact.worktree:not(.none)"), "ワークツリー i0001");
-    assert.match(page.one(".fact.worktree:not(.none)").getAttribute("title") ?? "", /i0001/);
-    assert.match(text(page, ".fact.sha"), /^base [0-9a-f]{7}$/);
-    assert.match(page.one(".fact.sha").getAttribute("title") ?? "", /^[0-9a-f]+$/);
-    assert.ok(texts(page, ".fact.risk.risk-low").includes("リスク LOW（0 点）"));
-    // 承認済みとレビューの要否はバッジにしない
-    assert.equal(page.all(".badge.copy.copy-open").length, 0);
-    assert.equal(page.all(".badge.review").length, 0);
-    // 子のワークツリー上にチケットがあるのは普通なので、正常な場面ではバッジを出さない
-    assert.equal(page.all(".badge.seen").length, 0);
-    assert.ok(texts(page, ".card .where").includes("子 · 親 i0001 / フェーズ 2"));
-    // 親のフェーズは 1 フェーズ 1 行。状態は全文だけを出す。見えているので行の title には重ねない
-    const rows = page.all(".card.parent .phase");
-    assert.equal(rows[0].getAttribute("class"), "phase phase-ended");
-    assert.equal(rows[0].getAttribute("title"), null);
-    assert.equal(rows[0].querySelector(".phase-label")?.textContent, "1（調査）");
-    assert.equal(rows[0].querySelector(".phase-tickets")?.textContent, "i0001-01-01");
-    assert.equal(rows[0].querySelector(".phase-dot")?.getAttribute("aria-hidden"), "true");
-    assert.equal(rows[0].querySelector(".phase-status")?.textContent, "終了 · リスク: 0 (LOW)");
-    assert.equal(rows[0].querySelector(".phase-status")?.getAttribute("aria-hidden"), null);
-    assert.ok(page.all(".phase-status").some((full) => full.textContent === "進行中 · レビュー必須"));
-    // 止めていない・マーカーなし・レビュー不要は普通の状態なので書かない
-    assert.ok(!texts(page, ".phase-status").some((full) => full.includes("レビュー不要")));
-    // 早めに閉じる（close-early）ボタンは出さない
-    assert.equal(page.all('button[data-action="close-early"]').length, 0);
-  } finally {
-    await page.close();
-  }
-  // 属性は列からはみ出さない
-  assert.match(css(), /\.fact \{ white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; \}/);
-  // フェーズ行は 1 フェーズ 1 行。右に auto の列を置くと状態の 1 行分の幅が行を占め、段階名の列が
-  // 0 になって消えるので、状態の列は 55% で止める。幅を測るのはフェーズ一覧自身
-  assert.match(css(), /\.phases \{[^}]*container-type: inline-size; \}/);
-  assert.match(css(), /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\);/);
-  assert.match(css(), /\.phase-name \{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
-  assert.doesNotMatch(css(), /\.phase \{[^}]*minmax\(0, auto\)/);
-  // 状態は項目の途中で割らない（anywhere で「リスク / HIGH」と割れていた）。丸は 1 行目に合わせる。
-  // リンクとボタンは 2 段目に左寄せで折り返す。300px 以下では名前と状態を縦 2 段にする
-  assert.doesNotMatch(css(), /\.phase-status \{[^}]*overflow-wrap: anywhere/);
-  assert.match(css(), /\.phase-item \{ display: inline-block; max-width: 100%;/);
-  assert.match(css(), /\.phase-dot \{[^}]*align-self: start;/);
-  assert.match(css(), /\.phase-actions \{ grid-column: 2 \/ -1; display: flex; flex-wrap: wrap;/);
-  const narrow = css().match(/@container \(max-width: 300px\) \{[^@]*?\} \}/);
-  assert.ok(narrow, "狭いときの @container の塊がある");
-  assert.match(narrow[0], /\.phase \{ grid-template-columns: 12px minmax\(0, 1fr\); \}/);
-  assert.match(narrow[0], /\.phase-status \{ grid-column: 2;/);
-  // 止めているフェーズ行はフェーズ名も右の状態も赤（文字用に前景色へ寄せた赤）
-  assert.match(css(), /\.phase\.review-hold \.phase-label, \.phase\.review-hold \.phase-status \{ color: var\(--board-error-text\); \}/);
-  // 止めているカードの左線は承認待ちの左線より後に書き、こちらが採られる
-  assert.ok(css().indexOf(".card.pending { border-left") < css().indexOf(".card.review-hold { border-left"));
-});
-
-test("CB-T217 提案が残っていて未着手の列にいる閉じたカードには、列との食い違いの手がかりとしてクローズとレビューの要否を出す", async () => {
-  const base = fixture();
-  const proposal = { state: "todo", tree: "i0001", tree_root: "<root>/.claude/worktrees/i0001", path: "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-01-01.md" };
-  const page = await openBoard({
-    ...base,
-    tickets: base.tickets.map((t) => (t.ticket === "i0001-01-01" ? { ...t, proposal } : t)),
-  } as typeof base);
-  try {
-    const card = '.column[data-state="todo"] .card[data-id="i0001-01-01"]';
-    assert.equal(page.all(card).length, 1);
-    assert.equal(text(page, `${card} .fact.copy-closed`), "クローズ");
-    assert.equal(page.all(`${card} .fact.review`).length, 1);
-  } finally {
-    await page.close();
-  }
-});
-
-test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビューが済んで止まらなくなった子には出さない", async () => {
-  const base = fixture();
-  // 判定が出す形に揃える。止まるのはレビュー必須のときで、レビュー待ちは「依頼済み かつ 止まっている」を判定が言う
-  const withMarks = (marks: Record<string, Record<string, unknown>>, gateClosed: boolean) => ({
-    ...base,
-    parents: base.parents.map((parent) => ({
-      ...parent,
-      phases: parent.phases.map((p) =>
-        p.number === 1
-          ? { ...p, marks, review_required: true, gate_closed: gateClosed, review_waiting: gateClosed && "requested" in marks }
-          : p,
-      ),
-    })),
-  });
-  const full = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-status")?.textContent ?? "";
-
-  // クローズ・レビュー済み・止まっていない子（完了列の i0001-01-01）。バッジは出さず、レビュー済みは枠無しの行に出る。
-  // 親カードのフェーズ行にも段の名前は出ない。経過として「レビュー依頼済み · レビュー済み」が残る
-  const done = await openBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false));
-  try {
-    assert.equal(done.all(".badge.hold").length, 0);
-    assert.ok(texts(done, ".fact.mark.mark-reviewed").includes("レビュー済み"));
-    assert.equal(full(done), "終了 · レビュー依頼済み · レビュー済み · レビュー必須 · リスク: 0 (LOW)");
-  } finally {
-    await done.close();
-  }
-  // 依頼済のマーカーだけで止まっていない（判定が待ちと言わない）子にも、バッジと段の名前は出ない
-  const reopened = await openBoard(withMarks({ requested: { at: "t" } }, false));
-  try {
-    assert.equal(reopened.all(".badge.hold").length, 0);
-    assert.equal(full(reopened), "終了 · レビュー依頼済み · レビュー必須 · リスク: 0 (LOW)");
-  } finally {
-    await reopened.close();
-  }
-  // 依頼を出したのに止まったままの子にはバッジが出て、親のフェーズ行にも段の名前が出る。reviewed の有無では分岐しない
-  const waiting = await openBoard(withMarks({ requested: { at: "t" } }, true));
-  try {
-    assert.ok(texts(waiting, ".badge.hold").includes("レビュー待ち"));
-    assert.equal(full(waiting), "終了 · レビュー待ち · レビュー依頼済み · レビュー必須 · リスク: 0 (LOW)");
-  } finally {
-    await waiting.close();
-  }
-  const stillClosed = await openBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, true));
-  try {
-    assert.ok(texts(stillClosed, ".badge.hold").includes("レビュー待ち"));
-  } finally {
-    await stillClosed.close();
-  }
-  // 終了のマーカー（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
-  // 省略はレビュー済と同じく、閉じた後もユーザのレビューを通ったかの区別として残す
-  const ended = await openBoard(withMarks({ pending: { at: "t" } }, true));
-  try {
-    assert.equal(ended.all(".fact.mark-pending").length, 0);
-    assert.ok(texts(ended, ".badge.hold").includes("レビュー準備中"));
-  } finally {
-    await ended.close();
-  }
-  const skipped = await openBoard(withMarks({ pending: { at: "t" }, skipped: { at: "t" } }, false));
-  try {
-    assert.equal(skipped.all(".fact.mark-pending").length, 0);
-    assert.ok(texts(skipped, ".fact.mark.mark-skipped").includes("レビュー省略"));
-  } finally {
-    await skipped.close();
-  }
-  // 依頼を出していない子のバッジは「レビュー準備中」で、依頼済とは出ない
-  const notRequested = await openBoard(withMarks({}, true));
-  try {
-    assert.ok(texts(notRequested, ".badge.hold").includes("レビュー準備中"));
-    assert.equal(full(notRequested), "終了 · レビュー準備中 · レビュー必須 · リスク: 0 (LOW)");
-    assert.ok(!notRequested.document.body.textContent.includes("レビュー依頼済み"));
-  } finally {
-    await notRequested.close();
   }
 });
 
@@ -651,120 +438,13 @@ test("CB-T16 本文の文字列で表示が崩れない", async () => {
   }
 });
 
-test("CB-T118 どれが正か決まらないチケットだけをバッジにし、場所を tooltip に出す", async () => {
-  const base = fixture();
-  const child = base.tickets.find((t) => t.ticket === "i0001-02-03")!;
-  const where = [
-    { tree: "", state: "todo", path: "/x/wip/proposals/todo/i0001-02-03.md" },
-    { tree: "i0001-02-02", state: "todo", path: "/x/w/i0001-02-02/wip/proposals/todo/i0001-02-03.md" },
-  ];
-  const homeless: TicketJson = { ...child, seen_in: where, scattered: where };
-  const page = await openBoard({ ...base, tickets: [homeless] });
-  try {
-    assert.equal(text(page, ".badge.seen"), "複数の場所にある（2 か所）");
-    assert.equal(page.one(".badge.seen").getAttribute("title"), "main:todo, i0001-02-02:todo");
-  } finally {
-    await page.close();
-  }
-});
-
-/** フェーズ 2 をユーザのレビュー待ちにし、依頼のマーカーにマージリクエストを持たせる */
-function waitingWithMr(url: string) {
-  const base = fixture();
-  const parent: ParentJson = {
-    ...base.parents[0],
-    phases: base.parents[0].phases.map((p): PhaseJson =>
-      p.number === 2
-        ? {
-            ...p,
-            state: "ended",
-            gate_closed: true,
-            review_required: true,
-            review_waiting: true,
-            marks: { requested: { head: "abc", mr: 18, url, host: "github", since: "t", at: "t" } },
-          }
-        : p,
-    ),
-  };
-  return { ...base, parents: [parent] };
-}
-
-test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連絡」と依頼へのリンク、親カードにマージリクエストへのリンクを出す。http(s) 以外はリンクにしない", async () => {
-  const page = await openBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5"));
-  try {
-    // レビューの 2 操作は 1 つのメニューボタンにまとまる。本体は何も送らず、開くまで項目は出ない
-    const menu = page.one('button[data-action="review-menu"]');
-    assert.equal(menu.textContent, "レビューの対応");
-    assert.equal(menu.getAttribute("data-parent"), "i0001");
-    assert.equal(menu.getAttribute("data-phase"), "2");
-    assert.equal(menu.getAttribute("aria-haspopup"), "menu");
-    assert.equal(menu.getAttribute("aria-expanded"), "false");
-    assert.equal(page.all('button[data-action="decide"], button[data-action="reviewed"]').length, 0);
-    const before = page.posted.length;
-    page.click(menu);
-    await page.settle();
-    assert.equal(page.posted.length, before, "メニューの本体を押しても何も送らない");
-    assert.equal(page.one('button[data-action="review-menu"]').getAttribute("aria-expanded"), "true");
-    const reviewed = page.one('button[data-action="reviewed"]');
-    assert.equal(reviewed.textContent, "レビュー済み連絡");
-    assert.ok((reviewed.getAttribute("title") ?? "").includes("ccnavi-review.sh confirm --phase 2 を実行して、レビュー済みを記録します"));
-    const decide = page.one('button[data-action="decide"]');
-    assert.equal(decide.textContent, "対応方針を決める");
-    assert.equal(decide.hasAttribute("disabled"), false, "指摘の有無で無効にしない");
-    page.click(reviewed);
-    await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "reviewed", parent: "i0001", phase: 2 });
-    assert.equal(page.all('button[data-action="reviewed"]').length, 0, "選んだらメニューは閉じる");
-    page.click(page.one('button[data-action="review-menu"]'));
-    await page.settle();
-    page.click(page.one('button[data-action="decide"]'));
-    await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "decide", parent: "i0001", phase: 2 });
-    // メニュー外のクリックで閉じる
-    page.click(page.one('button[data-action="review-menu"]'));
-    await page.settle();
-    assert.equal(page.all('button[data-action="decide"]').length, 1);
-    page.click(page.one(".foot"));
-    await page.settle();
-    assert.equal(page.all('button[data-action="decide"]').length, 0);
-    // フェーズ行は依頼の投稿へ、親カードはマージリクエスト自体へ
-    const inPhase = page.one(".phase a.mr-link");
-    assert.equal(inPhase.getAttribute("href"), "https://example.com/o/r/pull/18#issuecomment-5");
-    assert.equal(inPhase.getAttribute("title"), "フェーズ 2（設計） のレビューの依頼を開く");
-    assert.equal(inPhase.textContent, "マージリクエスト #18");
-    const inCard = page.one(".card-head + .facts a.mr-link, .facts a.mr-link");
-    assert.equal(inCard.getAttribute("href"), "https://example.com/o/r/pull/18");
-    assert.equal(inCard.getAttribute("title"), "マージリクエストを開く");
-  } finally {
-    await page.close();
-  }
-  // 依頼していない見本にはリンクもボタンも無い
-  const plain = await openBoard();
-  try {
-    assert.equal(plain.all("a.mr-link").length, 0);
-    assert.equal(plain.all('button[data-action="reviewed"]').length, 0);
-  } finally {
-    await plain.close();
-  }
-  // http(s) 以外の URL は文字として出すだけで、href にしない
-  const spiked = await openBoard(waitingWithMr("javascript:alert(1)"));
-  try {
-    assert.equal(spiked.all("a.mr-link").length, 0);
-    const fact = spiked.one("span.fact.mr");
-    assert.equal(fact.textContent, "マージリクエスト #18");
-    assert.equal(fact.getAttribute("title"), "javascript:alert(1)");
-  } finally {
-    await spiked.close();
-  }
-});
-
-test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注意・文と、承認と同じコピー・新しいセッションで開く・閉じる", async () => {
+test("CB-T131o 決めた結果のプロンプトのオーバーレイは、題・注意・プロンプトと、承認と同じコピー・新しいセッションで開く・閉じる", async () => {
   const page = await openBoard(fixture(), {
-    approval: { kind: "prompt", title: "フェーズ 2 のレビュー済み連絡", note: "注意 <i>", prompt: "[ccnavi] レビューを終えた <b>" },
+    approval: { kind: "prompt", title: "フェーズ 2 をレビュー済みにしました", note: "注意 <i>", prompt: "[ccnavi] レビューを終えた <b>" },
   });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "prompt");
-    assert.equal(text(page, "#approval-title"), "フェーズ 2 のレビュー済み連絡");
+    assert.equal(text(page, "#approval-title"), "フェーズ 2 をレビュー済みにしました");
     assert.equal(text(page, ".approval-note"), "注意 <i>");
     assert.equal(text(page, "pre.approval-text"), "[ccnavi] レビューを終えた <b>");
     assert.equal(page.all('button[data-action="prompt-copy"]').length, 1);
@@ -831,30 +511,6 @@ test("CB-T162 再読み込みできなかった画面にも承認のオーバー
     assert.equal(escaped.all(".approval script").length, 0);
   } finally {
     await escaped.close();
-  }
-});
-
-test("CB-T141 止まっているカードに「書き込み停止中」のバッジが出て、理由が tooltip と不備の行に載る", async () => {
-  const base = fixture();
-  const child = base.tickets.find((t) => t.ticket === "i0001-02-02")!;
-  const reason = "親 i0001 の承認済みチケットが作業中にない（未承認か、閉じている）";
-  // 不備の文は実行ファイルが組んで渡す（ボードはそのまま出す）
-  const stopped: TicketJson = { ...child, blocked: reason, issues: [`書き込みが止まっています: ${reason}`], attention: true };
-  const parent = base.tickets.find((t) => t.ticket === "i0001")!;
-  const page = await openBoard({ ...base, tickets: [parent, stopped] });
-  try {
-    assert.equal(text(page, ".badge.blocked"), "書き込み停止中");
-    assert.equal(page.one(".badge.blocked").getAttribute("title"), reason);
-    assert.deepEqual(texts(page, ".card .issues li"), [`書き込みが止まっています: ${reason}`]);
-  } finally {
-    await page.close();
-  }
-  // 止まっていないカードには出さない。
-  const clean = await openBoard();
-  try {
-    assert.equal(clean.all(".badge.blocked").length, 0);
-  } finally {
-    await clean.close();
   }
 });
 
@@ -928,72 +584,10 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
     assert.match(title("i0001-02-02"), /着手はできません/);
     assert.doesNotMatch(title("i0001-02-02"), /承認/);
     assert.equal(text(page, '.card[data-id="i0001-02-04"] .badge.preds'), "先行チケットの条件が未達成（i0001-01-09）");
-    assert.match(title("i0001-02-04"), /着手済みです/);
-    assert.match(title("i0001-02-04"), /着手済みの作業や finish コマンドの実行は制限されません/);
+    assert.match(title("i0001-02-04"), /作業を始めています/);
+    assert.match(title("i0001-02-04"), /始めた作業や finish コマンドの実行は制限されません/);
   } finally {
     await page.close();
   }
 });
 
-test("CB-T328 承認済みのカードに、start がまだなら「未着手」、済みなら「着手済み」を枠のない属性で出す。バッジにはしない。レビュー待ち・未承認・閉じたカードには出さない", async () => {
-  const base = fixture();
-  const at = (id: string) => base.tickets.find((t) => t.ticket === id)!;
-  const tickets = base.tickets.map((t) => {
-    if (t.ticket === "i0001-02-02") {
-      return { ...t, started_at: "" }; // 承認済み・未着手
-    }
-    if (t.ticket === "i0001-02-04") {
-      return { ...t, started_at: "" }; // レビュー待ちで着手の時刻が空。copyStatus の除外だけで効く形
-    }
-    return t;
-  });
-  assert.equal(at("i0001-02-02").copy.status, "open");
-  assert.equal(at("i0001-02-04").copy.status, "review");
-  assert.equal(at("i0001").copy.status, "open");
-  assert.equal(at("i0001").started_at, ""); // 親も、承認済みで start がまだなら未着手
-  const page = await openBoard({ ...base, tickets });
-  try {
-    const card = (id: string) => `.card[data-id="${id}"]`;
-    assert.equal(text(page, `${card("i0001-02-02")} .fact.unstarted`), "未着手");
-    assert.match(page.one(`${card("i0001-02-02")} .fact.unstarted`).getAttribute("title") ?? "", /範囲は適用されません/);
-    assert.equal(page.all(`${card("i0001-02-02")} .fact.started`).length, 0);
-    assert.equal(text(page, `${card("i0001")} .fact.unstarted`), "未着手");
-    for (const t of base.tickets) {
-      assert.equal(page.all(`${card(t.ticket)} .badge.unstarted, ${card(t.ticket)} .badge.started`).length, 0, t.ticket);
-    }
-    // 承認済みでないカードには、どちらも出ない
-    for (const t of base.tickets.filter((x) => x.copy.status !== "open")) {
-      assert.equal(page.all(`${card(t.ticket)} .fact.unstarted, ${card(t.ticket)} .fact.started`).length, 0, t.ticket);
-    }
-  } finally {
-    await page.close();
-  }
-});
-
-test("CB-T329 start 後（started_at あり）の承認済みカードに「着手済み」の属性を出し、「未着手」は出さない", async () => {
-  const base = fixture();
-  const page = await openBoard(base);
-  try {
-    const card = '.card[data-id="i0001-02-02"]';
-    assert.equal(base.tickets.find((t) => t.ticket === "i0001-02-02")!.copy.status, "open");
-    assert.equal(text(page, `${card} .fact.started`), "着手済み");
-    assert.match(page.one(`${card} .fact.started`).getAttribute("title") ?? "", /範囲が適用されています/);
-    assert.equal(page.all(`${card} .fact.unstarted`).length, 0);
-  } finally {
-    await page.close();
-  }
-});
-
-test("CB-T330 先行が未達の承認済み・未着手のカードには、枠付きの「先行待ち」と枠のない「未着手」が並ぶ", async () => {
-  const base = fixture();
-  const unmet = [{ ticket: "i0001-01-09", state: "doing", label: "作業中（doing/）" }];
-  const tickets = base.tickets.map((t) => (t.ticket === "i0001-02-02" ? { ...t, started_at: "", predecessors_unmet: unmet } : t));
-  const page = await openBoard({ ...base, tickets });
-  try {
-    const card = '.card[data-id="i0001-02-02"]';
-    assert.equal(text(page, `${card} .badge.preds`), "先行待ち（i0001-01-09）");
-    assert.equal(text(page, `${card} .fact.unstarted`), "未着手");
-  } finally {
-    await page.close();
-  }
-});

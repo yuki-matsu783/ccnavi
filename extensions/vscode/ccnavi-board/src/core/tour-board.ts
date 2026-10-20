@@ -13,16 +13,19 @@ import { buildBoard, COLUMNS, type Board } from "./board.js";
 import type { Moved } from "./board-moved.js";
 import type { ApprovalOverlay } from "./board-view.js";
 import { DECIDE_VERSION, parseDecidePreview } from "./decidemodel.js";
+import type { MergeRowState, MergeView, MergeViewRow } from "./merge.js";
 import { BOARD_VERSION, parseBoardJson, type ProposalState } from "./model.js";
 
 /** 手順の `scene.overlay` が指せるオーバーレイ */
-export const OVERLAY_NAMES = ["approval", "done", "decide", "reviewed"] as const;
+export const OVERLAY_NAMES = ["approval", "done", "decide"] as const;
 export type OverlayName = (typeof OVERLAY_NAMES)[number];
 
 export interface BoardSample {
   readonly board: Board;
   /** 前の更新から列が変わったカード（動いた表示） */
   readonly moved: readonly Moved[];
+  /** マージ状況の帯の見本（手順の `scene.merge` が真のときだけ出す）。実際の確認の結果ではない */
+  readonly merge: MergeView | undefined;
   /** `scene.overlay` の名前で引く承認のオーバーレイ */
   readonly overlays: Readonly<Record<OverlayName, ApprovalOverlay>>;
 }
@@ -73,22 +76,52 @@ export function parseBoardSample(raw: unknown, root: string, generatedAt: string
   const approval = object(overlays.approval, "sample.overlays.approval");
   const done = object(overlays.done, "sample.overlays.done");
   const decide = object(overlays.decide, "sample.overlays.decide");
-  const reviewed = object(overlays.reviewed, "sample.overlays.reviewed");
   const { tree, ...decidePreview } = decide;
   return {
     board: buildBoard(json.board),
     moved,
+    merge: sample.merge === undefined ? undefined : mergeSample(sample.merge),
     overlays: {
       approval: { kind: "preview", preview: viaParser(parseApprovePreview, approval, "sample.overlays.approval") },
       done: { kind: "done", count: typeof done.count === "number" ? done.count : 0, prompt: str(done.prompt, "sample.overlays.done.prompt"), carried: done.carried === true },
       decide: { kind: "decidePreview", preview: viaParser(parseDecidePreview, decidePreview, "sample.overlays.decide", DECIDE_VERSION), tree: str(tree, "sample.overlays.decide.tree") },
-      reviewed: {
-        kind: "prompt",
-        title: str(reviewed.title, "sample.overlays.reviewed.title"),
-        note: str(reviewed.note, "sample.overlays.reviewed.note"),
-        prompt: str(reviewed.prompt, "sample.overlays.reviewed.prompt"),
-        what: str(reviewed.what, "sample.overlays.reviewed.what"),
-      },
     },
+  };
+}
+
+const MERGE_STATES: readonly MergeRowState[] = ["checking", "open", "merged", "closed", "unknown", "incomplete"];
+
+/** マージ状況の帯の見本。実際の `MergeView`（拡張ホストが画面へ渡す形）と同じ欄で書き、足りない欄は既定で埋める */
+function mergeSample(raw: unknown): MergeView {
+  const at = "sample.merge";
+  const merge = object(raw, at);
+  const rows = (Array.isArray(merge.rows) ? merge.rows : []).map((item, i): MergeViewRow => {
+    const where = `${at}.rows[${i}]`;
+    const row = object(item, where);
+    const state = MERGE_STATES.find((s) => s === row.state);
+    if (state === undefined) {
+      throw new Error(`${where}.state は ${MERGE_STATES.join(" / ")} のどれかにする`);
+    }
+    const text = (name: string): string => (row[name] === undefined ? "" : str(row[name], `${where}.${name}`));
+    return {
+      parent: str(row.parent, `${where}.parent`),
+      project: text("project"),
+      mr: typeof row.mr === "number" ? row.mr : null,
+      state,
+      draft: row.draft === true,
+      url: text("url"),
+      reason: text("reason"),
+      detail: text("detail"),
+      sent: row.sent === true,
+      busy: row.busy === true,
+      sendError: text("sendError"),
+      abandon: text("abandon"),
+    };
+  });
+  return {
+    checking: merge.checking === true,
+    checkedAt: merge.checkedAt === undefined ? "" : str(merge.checkedAt, `${at}.checkedAt`),
+    error: merge.error === undefined ? "" : str(merge.error, `${at}.error`),
+    rows,
   };
 }

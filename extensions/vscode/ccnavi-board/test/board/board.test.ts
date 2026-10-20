@@ -138,15 +138,14 @@ test("CB-T09 依頼済みで止まったフェーズに decide、早めに閉じ
   assert.deepEqual(card.actions, []);
   assert.equal(card.wrapped, true);
   assert.deepEqual(card.phases[0].actions, []);
-  // 残った指摘を決めるボタンと、レビューを終えたことの連絡（マーカーは置かない）が並ぶ
-  assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2 }]);
-  assert.deepEqual(card.phases[1].marks, ["requested"]);
+  // レビュー待ちの行には、レビュー完了の操作が付く（依頼のマーカーに URL が無ければ MR のリンクは出さない）
+  assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2, mrUrl: "" }]);
+  assert.equal(card.phases[1].status, "レビュー待ち");
   // ユーザのレビュー待ちは JSON の review_waiting をそのまま使う。依頼していないフェーズ 1 は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.equal(card.phases[1].reviewWaiting, true);
-  // 子のカードには自分のフェーズのマーカーと、止まっているかとレビュー待ちが反映される。親は false
+  // 子のカードには自分のフェーズの、止まっているかとレビュー待ちが反映される。親は false
   assert.equal(cards.get("i0001-02-02")!.gateClosed, true);
-  assert.deepEqual(cards.get("i0001-02-02")!.marks, ["requested"]);
   assert.equal(cards.get("i0001-02-02")!.reviewWaiting, true);
   assert.equal(cards.get("i0001-01-01")!.reviewWaiting, false);
   assert.equal(card.reviewWaiting, false);
@@ -170,11 +169,10 @@ test("CB-T09b レビューが済んで止まらなくなったフェーズは、
   };
   const cards = cardsOf(buildBoard({ ...base, parents: [parent] }));
   const card = cards.get("i0001")!;
-  // マーカーは残り、待ちだけが false になる。マーカーを削って「直す」形は取らない
-  assert.deepEqual(card.phases[0].marks, ["requested", "reviewed"]);
+  // マーカーは残り、待ちだけが false になる。マーカーを削って「直す」形は取らない（フェーズ行は「レビュー済み」と言う）
+  assert.equal(card.phases[0].status, "レビュー済み");
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.deepEqual(card.phases[0].actions, []);
-  assert.deepEqual(cards.get("i0001-01-01")!.marks, ["requested", "reviewed"]);
   assert.equal(cards.get("i0001-01-01")!.reviewWaiting, false);
 });
 
@@ -194,7 +192,6 @@ test("CB-T09c 親カードは、自分の番号のフェーズがレビュー待
   const card = cards.get("i0001")!;
   assert.equal(card.reviewWaiting, false);
   assert.equal(card.gateClosed, false);
-  assert.deepEqual(card.marks, []);
   // フェーズ行と子のカードには反映される
   assert.equal(card.phases[0].reviewWaiting, true);
   assert.equal(cards.get("i0001-01-01")!.reviewWaiting, true);
@@ -289,18 +286,20 @@ function waitingWithMr(url: string): BoardJson {
   return { ...base, parents: [parent] };
 }
 
-test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」も付き、依頼のマーカーのマージリクエストがフェーズ行と親カードに載る", () => {
+test("CB-T131 レビュー待ちのフェーズ行にレビュー完了が付き、依頼のマーカーのマージリクエストがフェーズ行・親カード・そのフェーズの子に載る", () => {
   const cards = cardsOf(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")));
   const card = cards.get("i0001")!;
-  assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2 }]);
-  // フェーズ行は依頼の投稿を指す。親カードは断片を除いてマージリクエスト自体を指す。子カードには持たせない
+  assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2, mrUrl: "https://example.com/o/r/pull/18" }]);
+  // フェーズ行は依頼の投稿を指す。親カードと、そのフェーズの子のカードは、断片を除いてマージリクエスト自体を指す
   assert.equal(card.phases[1].mrUrl, "https://example.com/o/r/pull/18#issuecomment-5");
   assert.equal(card.phases[1].mrNumber, 18);
   assert.equal(card.phases[0].mrUrl, "");
   assert.equal(card.phases[0].mrNumber, null);
   assert.equal(card.mrUrl, "https://example.com/o/r/pull/18");
   assert.equal(card.mrNumber, 18);
-  assert.equal(cards.get("i0001-02-02")!.mrUrl, "");
+  assert.equal(cards.get("i0001-02-02")!.mrUrl, "https://example.com/o/r/pull/18");
+  assert.equal(cards.get("i0001-02-02")!.mrNumber, 18);
+  assert.equal(cards.get("i0001-01-01")!.mrUrl, "", "依頼していないフェーズの子には持たせない");
   // 引く関数。承認と残った指摘を決めるボタンが使う parentTreeOf と同じ場所を見る
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001")?.id, "i0001");
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001-02-02"), undefined);
@@ -387,20 +386,6 @@ test("CB-T263 先行待ちはカードへそのまま渡り、列と要対応は
   assert.equal(after.attention, before.attention);
   // 欄が空なら何も持たない
   assert.deepEqual(before.predecessorsUnmet, []);
-});
-
-test("CB-T263b 合流した子の先頭（merged_sha）はカードへそのまま渡る。退避した子も同じ。無ければ空", () => {
-  const base = fixture();
-  const sha = "a".repeat(40);
-  const board = buildBoard({
-    ...base,
-    tickets: base.tickets.map((t) => (t.ticket === "i0001-02-03" ? { ...t, merged_sha: sha } : t)),
-    archived: [{ ...archivedJson("old-01-01", "old"), merged_sha: sha }, archivedJson("old-01-02", "old")],
-  });
-  const cards = cardsOf(board);
-  assert.equal(cards.get("i0001-02-03")!.mergedSha, sha);
-  assert.equal(cards.get("old-01-01")!.mergedSha, sha);
-  assert.equal(cards.get("old-01-02")!.mergedSha, "", "欄の無い古い答えは空");
 });
 
 function archivedJson(ticket: string, parent = ""): ArchivedTicketJson {

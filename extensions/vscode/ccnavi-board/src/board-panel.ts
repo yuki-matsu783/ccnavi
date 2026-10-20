@@ -8,17 +8,22 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runApprovePreview, runApproveYes, runChildWorktreeAdd, runDecidePreview, runDecideYes, runTemplateDraft } from "./ccnavi.js";
+import { loadBoard, runApprovePreview, runApproveYes, runChildWorktreeAdd, runDecidePreview, runDecideYes, runMrState, runSyncRetired, runTemplateDraft } from "./ccnavi.js";
 import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, templateDraftCardOf, todoParentsOf, workflowCardOf, type Board } from "./core/board.js";
 import { flowTicketOf } from "./core/flow-view.js";
 import { screens } from "./core/screens.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
 import {
+  abandonCommand,
   gitScriptCommand,
   PUSH_APPROVED_SCRIPT,
   pushApprovedCommand,
+  retireCommand,
+  retireConfirmText,
   type Launcher,
 } from "./core/commands.js";
+import { MERGE_IDLE, mergeStep, mergeView, type MergeEffect, type MergeInput, type MergeState } from "./core/merge.js";
+import { repoDirOf } from "./core/mrstate.js";
 import {
   approvalStep,
   blockedBeforeApprove,
@@ -30,7 +35,7 @@ import {
 import type { BoardData, BoardMessage, ToBoard } from "./core/board-view.js";
 import { renderBoardPage } from "./core/render.js";
 import { showLoading } from "./loading.js";
-import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
+import { copyCommand, copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlOf } from "./core/ticket-control.js";
 import { WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
@@ -75,6 +80,11 @@ interface PanelState {
    * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
    */
   moved: MovedState;
+  /**
+   * マージ状況の確認の結果（`core/merge.ts`）。ボードが開いている間だけここに持つ（タブを隠して画面が作り直されても残り、
+   * ボードを閉じて開き直すと消える）。遅れて返った結果は、世代が違えば遷移の側が捨てる
+   */
+  merge: MergeState;
   /** 計画編集タブの帳面（`core/workflow-tabs.ts`）を見るのをやめる */
   stopTabs?: () => void;
 }
@@ -160,6 +170,7 @@ export async function openBoard(project?: string): Promise<void> {
     filter: project,
     approval: CLOSED,
     moved: NOTHING_MOVED,
+    merge: MERGE_IDLE,
   };
   state = current;
   followAppearance(panel, current.host);
@@ -298,7 +309,14 @@ function show(current: PanelState, board: Board): void {
   current.moved = movedStep(current.moved, board);
   current.board = board;
   current.error = undefined;
-  send(current, { kind: "board", board, approval: current.approval.overlay, moved: current.moved.moved, unsaved: workflowTabs().unsaved });
+  send(current, {
+    kind: "board",
+    board,
+    approval: current.approval.overlay,
+    moved: current.moved.moved,
+    unsaved: workflowTabs().unsaved,
+    merge: mergeView(current.merge, (parent) => abandonCommand(realRoot(current.folder.uri.fsPath), parent)),
+  });
 }
 
 /** 読み直せなかったことを見せる。承認のオーバーレイがあれば、ボードのときと同じように被せる */
@@ -419,7 +437,8 @@ function handleMessage(message: BoardMessage | undefined): void {
       dispatch(current, { kind: "handOver", how: message.type });
       return;
     case "decide":
-      // 残った指摘の行き先を決めるオーバーレイを開く。sh が指摘を取ってきて、ユーザが指摘ごとに選ぶ。
+      // ［レビュー完了］。残った指摘を読むオーバーレイを開く。sh が指摘を取ってきて、0 件ならレビュー済みにする画面、
+      // 1 件以上ならユーザが指摘ごとに選ぶ画面になる。
       // ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める
       dispatch(current, {
         kind: "decide",
@@ -432,18 +451,19 @@ function handleMessage(message: BoardMessage | undefined): void {
     case "decideConfirm":
       dispatch(current, { kind: "decideConfirm", choices: message.choices });
       return;
-    case "reviewed":
-      // マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、承認の文と同じ
-      // オーバーレイ（コピー / 新しいセッションで開く）で渡す。confirm を打つのは文を受けたエージェント。
-      // ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、被せてよいかは遷移の側が決める
-      dispatch(current, {
-        kind: "reviewed",
-        parent: message.parent,
-        phase: message.phase,
-        tree: current.board ? parentTreeOf(current.board, message.parent) : undefined,
-        chip: current.board ? phaseChipOf(current.board, message.parent, message.phase) : undefined,
-        root: realRoot(root),
-      });
+    case "mergeCheck":
+      dispatchMerge(current, { kind: "check" });
+      return;
+    case "mergeRetire":
+      // 画面が言った親をそのまま信頼しない。マージ済みと確認できた親かは遷移の側が決める
+      dispatchMerge(current, { kind: "retire", parent: message.parent });
+      return;
+    case "mergeCopyAbandon":
+      void copyAbandon(current, message.parent);
+      return;
+    case "decideConsult":
+      // 相談のプロンプトを組むのは遷移の側。文面に書くワークスペースルートは、実行ファイルの案内と同じ realpath で渡す
+      dispatch(current, { kind: "consult", root: realRoot(root) });
       return;
     case "flow":
       // 画面が言った識別子をそのまま信頼せず、いまのボードに子のカードとして在るものだけを開く
@@ -523,6 +543,112 @@ function dispatch(current: PanelState, input: ApprovalInput): void {
 }
 
 /**
+ * マージ状況の確認に 1 つ入力を入れる。遷移の規則は `core/merge.ts` にある（VS Code に触れないので単体で試せる）。
+ * ここがするのは 3 つだけ。返った状態を持ち直す、描き直す、やることを行う。描き直しが先で、やることが後。
+ */
+function dispatchMerge(current: PanelState, input: MergeInput): void {
+  const step = mergeStep(current.merge, input);
+  current.merge = step.state;
+  if (step.redraw) {
+    redraw(current);
+  }
+  for (const effect of step.effects) {
+    void runMergeEffect(current, effect);
+  }
+}
+
+/** 同時に走らせる `mr-state` の数。ホストの API を叩くので、親が多くても一度に押し寄せない */
+const MR_STATE_SLOTS = 4;
+let mrStateRunning = 0;
+const mrStateQueue: (() => void)[] = [];
+
+async function withMrStateSlot<T>(job: () => Promise<T>): Promise<T> {
+  if (mrStateRunning >= MR_STATE_SLOTS) {
+    await new Promise<void>((resolve) => mrStateQueue.push(resolve));
+  }
+  mrStateRunning += 1;
+  try {
+    return await job();
+  } finally {
+    mrStateRunning -= 1;
+    mrStateQueue.shift()?.();
+  }
+}
+
+/** 確認した時刻の表示（ローカル時刻） */
+function nowText(): string {
+  const d = new Date();
+  const two = (n: number): string => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+}
+
+/** マージ状況の確認が遷移から頼まれた仕事を行う。返事が要るものは、パネルがまだ同じなら `dispatchMerge` で戻す */
+async function runMergeEffect(current: PanelState, effect: MergeEffect): Promise<void> {
+  const root = current.folder.uri.fsPath;
+  switch (effect.kind) {
+    case "loadList": {
+      const result = await runSyncRetired(root, binSetting());
+      if (state === current) {
+        dispatchMerge(current, { kind: "listed", token: effect.token, result, at: nowText() });
+      }
+      return;
+    }
+    case "loadState": {
+      // 1 回ごとに期限を付け（`runMrState`）、失敗はその親だけに留める。cwd は片付けの記録が指すリポジトリ
+      const cwd = repoDirOf(root, current.board?.projectsDir ?? "", effect.repo);
+      const result = await withMrStateSlot(() => runMrState(root, scriptShell(), cwd, effect.mr));
+      if (state === current) {
+        dispatchMerge(current, { kind: "stated", token: effect.token, parent: effect.parent, result, at: nowText() });
+      }
+      return;
+    }
+    case "confirmRetire": {
+      const run = "実行する";
+      const picked = await vscode.window.showWarningMessage(retireConfirmText(effect.parent), { modal: true }, run);
+      if (state === current) {
+        dispatchMerge(current, { kind: "retireAnswered", parent: effect.parent, accepted: picked === run });
+      }
+      return;
+    }
+    case "sendRetire": {
+      // 送れたこと＝実行の成功ではない（完了は検出しない）。送れなかったときだけ理由を持って戻す
+      let error: string | undefined;
+      try {
+        runInTerminal(root, retireCommand(root, effect.parent));
+      } catch (caught) {
+        error = caught instanceof Error && caught.message !== "" ? caught.message : "ターミナルに送れませんでした";
+      }
+      diaglog.get("ccnavi-board", root).info("片付けのコマンドを送った", { sent: error === undefined });
+      if (state === current) {
+        dispatchMerge(current, { kind: "retireSent", parent: effect.parent, error });
+      }
+      return;
+    }
+    case "warn":
+      vscode.window.showWarningMessage(effect.text);
+      return;
+    default: {
+      const unhandled: never = effect;
+      void unhandled;
+      return;
+    }
+  }
+}
+
+/**
+ * マージせずに閉じた親の、記録を消すコマンドをコピーする。ボードからは送らない（ユーザが端末で実行する）。
+ * 画面が言った親をそのまま信頼せず、いまの結果で「マージせず閉じた」と確認できている親だけを扱う
+ */
+async function copyAbandon(current: PanelState, parent: string): Promise<void> {
+  const list = current.merge.list;
+  const row = list.kind === "rows" ? list.rows.find((r) => r.parent === parent) : undefined;
+  if (row?.result?.kind !== "closed") {
+    return;
+  }
+  await copyCommand(abandonCommand(realRoot(current.folder.uri.fsPath), parent), "片付けの記録を消すコマンド");
+}
+
+/**
  * 遷移が返した「やること」を行う。外へ出るのはここだけ（実行ファイル・ターミナル・クリップボード・
  * 新しいセッション・通知）。返事が要るもの（一覧と承認の結果）は、返ってきたらまた `dispatch` に入れる。
  *
@@ -581,16 +707,20 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       await openPromptInSession(effect.prompt);
       return;
     case "loadDecide": {
-      const result = await runDecidePreview(root, scriptShell(), effect.tree, effect.phase);
+      const result = await runDecidePreview(root, scriptShell(), effect.tree, effect.phase, {
+        parent: effect.parent,
+        phase: effect.phase,
+        mr: effect.mr,
+      });
       if (state === current) {
         dispatch(current, { kind: "decidePreviewed", result });
       }
       return;
     }
-    case "loadReviewed": {
-      const result = await runDecidePreview(root, scriptShell(), effect.tree, effect.phase);
+    case "copyConsult": {
+      const error = await copyPrompt(effect.prompt, "相談のプロンプト");
       if (state === current) {
-        dispatch(current, { kind: "reviewedChecked", result });
+        dispatch(current, { kind: "consultCopied", error });
       }
       return;
     }
@@ -706,7 +836,10 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   promptOpen: true,
   decide: true,
   decideConfirm: true,
-  reviewed: true,
+  decideConsult: true,
+  mergeCheck: true,
+  mergeRetire: true,
+  mergeCopyAbandon: true,
   flow: true,
   editWorkflow: true,
   workflow: true,
@@ -741,6 +874,8 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "approveCancel":
     case "promptCopy":
     case "promptOpen":
+    case "decideConsult":
+    case "mergeCheck":
       return { type: m.type };
     case "approve":
       // 形が不正なら捨てる。「全部承認」として扱うと、検証に失敗したときに承認の範囲が広がってしまう。
@@ -765,7 +900,6 @@ function asMessage(message: unknown): BoardMessage | undefined {
         ? { type: "decideConfirm", choices: { ...(m.choices as Record<string, string>) } }
         : undefined;
     case "decide":
-    case "reviewed":
       return typeof m.parent === "string" && typeof m.phase === "number" && Number.isInteger(m.phase)
         ? { type: m.type, parent: m.parent, phase: m.phase }
         : undefined;
@@ -777,6 +911,10 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "workflow":
     case "templateDraft":
       return isTicketId(m.ticket) ? { type: m.type, ticket: m.ticket } : undefined;
+    case "mergeRetire":
+    case "mergeCopyAbandon":
+      // 親の識別子の形でないものは捨てる（コマンド行に入る文字列なので、ここで形を確かめる）
+      return isTicketId(m.parent) ? { type: m.type, parent: m.parent } : undefined;
     default:
       return undefined;
   }

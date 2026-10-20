@@ -73,7 +73,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
           <h2 id="approval-title">{overlay.count} 件を承認しました</h2>
           {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・pushするコマンドをターミナルに送信しました。</p> : null}
           <p className="approval-note">
-            Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。
+            Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。
           </p>
           <pre className="approval-text" data-tour="approval-prompt">{overlay.prompt}</pre>
           <HandOver />
@@ -85,7 +85,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
           <h2 id="approval-title">{overlay.title}</h2>
           <p className="approval-note">{overlay.note}</p>
           <pre className="approval-text" data-tour="approval-prompt">{overlay.prompt}</pre>
-          <HandOver />
+          <HandOver retry={overlay.retry} />
         </>
       );
     case "decideLoading":
@@ -97,19 +97,10 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
           </DialogActions>
         </>
       );
-    case "reviewedLoading":
-      return (
-        <>
-          <p className="approval-note">フェーズ {overlay.phase} の未解決の指摘を確認し、エージェントへの通知文を作成しています…</p>
-          <DialogActions className="approval-actions">
-            <Cancel label="キャンセル" />
-          </DialogActions>
-        </>
-      );
     case "decidePreview":
-      return <DecideBody preview={overlay.preview} deciding={false} notice={overlay.notice} />;
+      return <DecideBody preview={overlay.preview} deciding={false} notice={overlay.notice} consult={overlay.consult} />;
     case "deciding":
-      return <DecideBody preview={overlay.preview} deciding={true} notice={undefined} />;
+      return <DecideBody preview={overlay.preview} deciding={true} notice={undefined} consult={undefined} />;
   }
 }
 
@@ -277,8 +268,11 @@ function BodyText({ text }: { readonly text: string }): JSX.Element {
   );
 }
 
-/** 承認の文とレビュー済みの連絡は、同じ 2 ボタンで渡す。文は拡張ホストが持っている分を使う */
-function HandOver(): JSX.Element {
+/**
+ * 承認のプロンプトと決めた結果のプロンプトは、同じ 2 ボタンで渡す。プロンプトは拡張ホストが持っている分を使う。
+ * `retry` があるときは、指摘を読み直して決め直すボタンも出す（表示した後に指摘が追加されたとき）
+ */
+function HandOver({ retry }: { readonly retry?: { readonly parent: string; readonly phase: number } }): JSX.Element {
   return (
     <DialogActions className="approval-actions" tour="approval-handover">
       <button type="button" className="action primary" data-action="prompt-copy" onClick={() => post({ type: "promptCopy" })}>
@@ -287,6 +281,11 @@ function HandOver(): JSX.Element {
       <button type="button" className="action" data-action="prompt-open" onClick={() => post({ type: "promptOpen" })}>
         新しいセッションで開く
       </button>
+      {retry !== undefined ? (
+        <button type="button" className="action" data-action="decide-retry" onClick={() => post({ type: "decide", parent: retry.parent, phase: retry.phase })}>
+          指摘を読み直して決め直す
+        </button>
+      ) : null}
       <Cancel label="閉じる" />
     </DialogActions>
   );

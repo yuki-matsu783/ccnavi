@@ -89,8 +89,8 @@ test("CB-D202 案内の間は、実際のチケットではなく見本のカー
     assert.equal(dom.all(".banner.tour-sample").length, 1);
     assert.ok(cardIds(dom).length > 0 && cardIds(dom).every((id) => id.startsWith("sample-")), `実際のカードが出ている: ${cardIds(dom).join(",")}`);
     // 見本の集計
-    assert.equal(dom.one(".summary .pending").textContent, "承認待ち 2 件");
-    assert.equal(dom.one(".summary .counts").textContent?.replace(/\s+/g, " "), "残り 7 / 全 10");
+    assert.equal(dom.one(".summary .pending").textContent, "承認待ち 3 件");
+    assert.equal(dom.one(".summary .counts").textContent?.replace(/\s+/g, " "), "残り 8 / 全 10");
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.all(".banner.tour-sample").length, 0);
@@ -102,7 +102,7 @@ test("CB-D202 案内の間は、実際のチケットではなく見本のカー
 });
 
 test("CB-D203 案内の間の見本の絞り込み・畳みは見本の上だけに効き、実際の絞り込み・畳んだ列・state には触れない", async () => {
-  const saved = { project: "*", parent: "*", attention: false, archived: false, folded: ["cancelled"], widths: {} };
+  const saved = { project: "*", parent: "*", attention: false, archived: false, folded: ["cancelled"], widths: {}, details: [] };
   const dom = await openBoard(fixture(), { state: saved });
   try {
     const before = JSON.stringify(dom.state());
@@ -114,13 +114,13 @@ test("CB-D203 案内の間の見本の絞り込み・畳みは見本の上だけ
     assert.ok(dom.all(".card.hidden").length > 0 && dom.all(".card:not(.hidden)").length > 0);
     assert.equal(dom.one('.card[data-id="sample-a"]').classList.contains("hidden"), true);
     assert.equal(dom.one('.card[data-id="sample-b"]').classList.contains("hidden"), false);
-    // 4 番目の手順: 承認のボタンは、見えている承認待ち（0 件）だけが対象
+    // 4 番目の手順: 承認のボタンは、見えている承認待ち（web の 1 件）だけが対象
     for (let i = 0; i < 3; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.equal(dom.one('[data-action="approve"]').textContent?.trim(), "承認待ち 0 件を承認");
-    assert.equal(dom.one<HTMLButtonElement>('[data-action="approve"]').disabled, true);
+    assert.equal(dom.one('[data-action="approve"]').textContent?.trim(), "承認待ち 1 件を承認");
+    assert.equal(dom.one<HTMLButtonElement>('[data-action="approve"]').disabled, false);
     dom.key("Escape");
     await dom.settle();
     // 閉じたら実際の絞り込みと畳みに戻り、state は動いていない（実際のボードにはプロジェクトが無く、欄も出ない）
@@ -130,7 +130,7 @@ test("CB-D203 案内の間の見本の絞り込み・畳みは見本の上だけ
 
     // 列を畳む案内: 見本の完了の列が畳まれ、実際の畳み（取り消し）は見本に持ち込まない
     await start(dom, "progress");
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 4; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
@@ -151,6 +151,7 @@ test("CB-D204 案内の間は見本のボタンを押しても拡張ホストへ
   try {
     await start(dom, "approve");
     const posted = dom.posted.length;
+    const stateBefore = JSON.stringify(dom.state());
     const click = async (selector: string): Promise<void> => {
       dom.click(dom.one(selector));
       await dom.settle();
@@ -162,10 +163,10 @@ test("CB-D204 案内の間は見本のボタンを押しても拡張ホストへ
     await click('.card[data-id="sample-a"] .title');
     await click('[data-action="workflow"]');
     await click('[data-action="flow"]');
-    await click('button[data-action="review-menu"]');
-    await click('[data-action="decide"]');
-    await click('button[data-action="review-menu"]');
-    await click('[data-action="reviewed"]');
+    // カードのレビュー操作と、マージ状況の確認・帯の操作・詳細の開閉も、見本の上では何も送らない
+    await click('[data-action="review-done"]');
+    await click('[data-action="merge-check"]');
+    await click('.card-details summary');
     // 見本の承認の一覧（4 手順進める）
     for (let i = 0; i < 4; i += 1) {
       await click('[data-action="tour-next"]');
@@ -177,6 +178,8 @@ test("CB-D204 案内の間は見本のボタンを押しても拡張ホストへ
     dom.key("Escape");
     await dom.settle();
     assert.deepEqual(dom.posted.slice(posted), [{ type: "tourDone" }], "案内の間に拡張ホストへ余計な送信があった");
+    // 見本の上で詳細を開閉しても、実際の状態（覚えている詳細の開閉）を書き換えない
+    assert.equal(JSON.stringify(dom.state()), stateBefore, "案内の間の操作が覚えている state を書き換えた");
     assert.equal(dom.all(".tour").length, 0);
     // 閉じたら実際の操作は届く
     dom.click(dom.one('[data-action="approve"]'));

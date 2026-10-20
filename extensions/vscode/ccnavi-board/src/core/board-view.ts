@@ -13,6 +13,7 @@ import type { DecidePreview } from "./decidemodel.js";
 import type { AppearanceMessage } from "./appearance.js";
 import type { Board } from "./board.js";
 import type { Moved } from "./board-moved.js";
+import type { MergeView } from "./merge.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
 /**
@@ -35,48 +36,51 @@ export type ApprovalOverlay =
    */
   | { readonly kind: "done"; readonly count: number; readonly prompt: string; readonly carried?: boolean }
   /**
-   * 承認以外で Claude Code に渡す文（レビュー済みの連絡）。承認したときと同じ 2 ボタンで渡す。
-   * 判定は動かしていないので、置かれたものは何も無い
+   * 承認以外で Claude Code に渡すプロンプト（残った指摘を決めた結果）。承認したときと同じ 2 ボタンで渡す
    */
   | {
       readonly kind: "prompt";
       readonly title: string;
       readonly note: string;
       readonly prompt: string;
-      /** 渡したときにユーザへ言う呼び名（「…をコピーした」）。無ければレビュー済みの連絡の文 */
+      /** 渡したときにユーザへ言う呼び名（「…をコピーした」）。無ければ「プロンプト」 */
       readonly what?: string;
       /**
-       * 取り返せない文か（残った指摘を決めた結果。続きの子はもう置かれている）。真なら、
+       * 取り返せないプロンプトか（残った指摘を決めた結果。続きの子はもう置かれている）。真なら、
        * 承認した文（`done`）と同じく、渡し終えるか閉じるまで別のオーバーレイを被せない
        */
       readonly keep?: boolean;
+      /**
+       * 決め直しへ戻れる。表示した後に指摘が追加されて、レビュー済みにしていないとき（実行ファイルの答えの
+       * `reviewed` が偽で `pending_extra` がある）。押すと残った指摘を読み直す。続きの子が起きたときは付けない
+       * （そのプロンプトは取り返せない）
+       */
+      readonly retry?: { readonly parent: string; readonly phase: number };
     }
   /**
-   * 残った指摘を読み込んでいる（`ccnavi-review.sh decide <N> --preview`）。`tree` は親のワークツリーで、
-   * sh をそこで走らせる。`notice` は見せ直す理由（見せた指摘と今の指摘が違った）
+   * 残った指摘を読み込んでいる（`ccnavi-review.sh decide <N> --preview`）。「レビュー完了」を押すとここに入る。
+   * `tree` は親のワークツリーで、sh をそこで走らせる。`mr` はフェーズ行の依頼が持つ MR の番号（分かるときだけ。
+   * 読み取りの検証が、読んだ番号とこれを照らす）。`notice` は見せ直す理由（見せた指摘と今の指摘が違った）
    */
   | {
       readonly kind: "decideLoading";
       readonly parent: string;
       readonly phase: number;
       readonly tree: string;
+      readonly mr: number | null;
       readonly notice?: string;
     }
   /**
-   * 「レビュー済み連絡」の文を組むために、未解決の指摘を読んでいる（`decide <N> --preview`）。
-   * `chip` の `label` と URL を文に使うので持ち越す
+   * 残った指摘を見せた。0 件なら「未解決の指摘はありません」と［レビュー済みにする］、1 件以上なら行き先を指摘ごとに選ぶ。
+   * 押されるまで何も置かない。`consult` は「エージェントに相談するプロンプトをコピー」の結果（コピーできた・できなかった）
    */
   | {
-      readonly kind: "reviewedLoading";
-      readonly parent: string;
-      readonly phase: number;
+      readonly kind: "decidePreview";
+      readonly preview: DecidePreview;
       readonly tree: string;
-      readonly label: string;
-      readonly mrUrl: string;
-      readonly root: string;
+      readonly notice?: string;
+      readonly consult?: { readonly ok: boolean; readonly text: string };
     }
-  /** 残った指摘を見せた。行き先を指摘ごとに選ぶ。押されるまで何も置かない */
-  | { readonly kind: "decidePreview"; readonly preview: DecidePreview; readonly tree: string; readonly notice?: string }
   /** 選んだ行き先を置いている。ここでは閉じない */
   | { readonly kind: "deciding"; readonly preview: DecidePreview; readonly tree: string };
 
@@ -100,6 +104,11 @@ export type BoardData =
        * 承認のボタンを押せなくして理由を出す。拡張ホストはタブの様子が変わるたびに描き直す
        */
       readonly unsaved?: readonly string[];
+      /**
+       * マージ状況の確認の結果（`core/merge.ts`）。持つのも決めるのも拡張ホストで、オーバーレイと同じ理由
+       * （画面は非表示になると捨てられる）。まだ一度も確認していなければ無い。画面は渡された分を帯に出すだけ
+       */
+      readonly merge?: MergeView;
       /**
        * 開いた直後に選ぶプロジェクトの絞り込み（いまは呼び出し元が無い）。
        * 入るのは 1 枚目の HTML に埋めるときだけで、`ToBoard` の `data` では渡さない
@@ -135,10 +144,12 @@ export type BoardMessage =
   | { readonly type: "approveCancel" }
   | { readonly type: "promptCopy" }
   | { readonly type: "promptOpen" }
+  /** ［レビュー完了］を押した。残った指摘を読む流れに入る（0 件ならレビュー済みにする画面、1 件以上なら対応方針の画面） */
   | { readonly type: "decide"; readonly parent: string; readonly phase: number }
-  /** 残った指摘の行き先を決めた。鍵は指摘の `key`、値は `keep` / `fix` / `issue` */
+  /** 残った指摘の行き先を決めた（0 件なら「レビュー済みにする」）。鍵は指摘の `key`、値は `keep` / `fix` / `issue` */
   | { readonly type: "decideConfirm"; readonly choices: Readonly<Record<string, string>> }
-  | { readonly type: "reviewed"; readonly parent: string; readonly phase: number }
+  /** 対応方針の画面の「エージェントに相談するプロンプトをコピー」を押した。オーバーレイは閉じない */
+  | { readonly type: "decideConsult" }
   /**
    * 子のカードの「フロー」を押した。拡張ホストはいまのボードにその子が在ることを確かめてから、
    * フロー編集画面を開く（置き場と錠はその画面が実行ファイルに聞き直す）
@@ -159,6 +170,15 @@ export type BoardMessage =
    * 計画編集タブを開く（一覧の図にある親だけ。決めるのは承認の遷移）
    */
   | { readonly type: "editWorkflow"; readonly ticket: string }
+  /** 「マージ状況を確認」を押した。確認中なら拡張ホストが受けない（二重に走らせない） */
+  | { readonly type: "mergeCheck" }
+  /**
+   * マージ済みの親の［片付ける］を押した。拡張ホストが確認のダイアログを出し、「実行する」なら
+   * `cd … && sh …/ccnavi-sync.sh <親>` をボードのターミナルへ送る（MR がマージ済みかの確かめ直しと片付けは sync が決める）
+   */
+  | { readonly type: "mergeRetire"; readonly parent: string }
+  /** マージせずに閉じた親の、記録を消すコマンドのコピーを押した。コピーするだけで、ボードからは送らない */
+  | { readonly type: "mergeCopyAbandon"; readonly parent: string }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" };
 

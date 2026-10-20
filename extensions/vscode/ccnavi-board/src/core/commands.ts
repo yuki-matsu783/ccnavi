@@ -164,50 +164,87 @@ export function scriptCommand(root: string, name: string): string {
 }
 
 /**
- * ユーザがレビューを終えたことを Claude Code に伝える文。ボードの「レビュー済み連絡」が組み、
- * 承認の文と同じ 2 ボタン（コピー / 新しいセッションで開く）で渡す。判定は動かさず、マーカーも置かない。
- * `confirm` を打ってマーカーを置くのは、この文を受けた親（メインエージェント）で、親のワークツリーで打つ。
- * そこは止まっているので、通るのは `sh …ccnavi-review.sh …` の形を連結せずに単体で打ったときだけ
- * （`cd … && sh …` は止まる）。サブエージェントには同じ形が常に禁止される。文はその 2 つを言う。
- * 未解決の指摘の有無は、ボードが押したときに `decide <N> --preview` で読んで文に書く（`unresolved`。読めなければ `undefined` で、有無は言わない）。
- * 判定は `confirm` が持ち、文はエージェントへの手がかりでしかない。
- * 未解決が残っていれば `confirm` が一覧と次の方法（解決してもらう・同じフェーズに子を足す・ユーザが decide で決める）を
- * 返すので、文はそれに従うことだけを言う。
+ * 対応方針を決める画面の「エージェントに相談するプロンプトをコピー」が組むプロンプト。
+ * 未解決の指摘を 1 件ずつ要約させ、対応方針の案と理由を返させる。**読み取りだけ**を頼む:
+ * 渡す操作は `ccnavi-review.sh decide <N> --preview` だけで、対応方針を確定する `ccnavi-user-decide.sh`・
+ * `ccnavi-review.sh confirm`・そのほかの状態を変える操作は実行させない。決めるのはユーザで、ボードの「レビュー完了」から行う。
+ *
+ * `--preview` はレビューで止まっている間も通る読み取り専用の形。cwd が親のワークツリーでなければ、
+ * `cd` と連結せず、先に `cd` だけを別の Bash で実行させる（連結した形は止まる）。
  */
-export function reviewedPrompt(
-  root: string,
-  parent: string,
-  phase: number,
-  label: string,
-  parentTree: string,
-  mrUrl: string,
-  unresolved: number | undefined,
-): string {
-  const lines = [`[ccnavi] ユーザが親 ${parent} のフェーズ ${label || String(phase)} のレビューを終えた。`];
+export function consultPrompt(input: {
+  readonly root: string;
+  readonly parent: string;
+  readonly phase: number;
+  readonly mrUrl: string;
+  readonly parentTree: string;
+}): string {
+  const { root, parent, phase, mrUrl } = input;
+  const tree = toPosixPath(input.parentTree);
+  const lines = [
+    `[ccnavi] 親 ${parent} のフェーズ ${phase} のレビューで残った未解決（Unresolved）の指摘について、ユーザが対応方針を決めるための相談に乗る。`,
+    `- 親: ${parent}`,
+    `- フェーズ: ${phase}`,
+  ];
   if (mrUrl !== "") {
     lines.push(`- マージリクエスト: ${mrUrl}`);
   }
-  // ボードが `decide <N> --preview` で読んだ未解決（Unresolved）の指摘。読めなかったときは有無を言わない
-  if (unresolved === undefined) {
-    lines.push("- 未解決の指摘の有無は、ボードでは読み込めなかった。レビューの状況をエージェントが確認する。");
-  } else if (unresolved > 0) {
-    lines.push(`- 未解決の指摘があります（${unresolved} 件）。エージェントが指摘を確認する。`);
-  } else {
-    lines.push("- 未解決の指摘はありません。");
-  }
-  const tree = toPosixPath(parentTree);
   lines.push(
-    `親（メインエージェント）が、親のワークツリー ${tree} で '${scriptCommand(root, "ccnavi-review.sh")} confirm --phase ${phase}' を打ち、` +
-      "レビュー済みのマーカーを置く。レビューで止まっている間はこのコマンドだけが通るので、cd や他のコマンドと連結せず、" +
-      `単体の Bash で実行する（cwd が ${tree} でなければ、先に cd だけを別の Bash で実行する）。サブエージェントには渡さない。` +
-      "未解決の指摘が残っていれば confirm が一覧と次の手順を返すので、それに従う。" +
-      "マーカーが置かれて止まらなくなったら、次のフェーズへ進む。",
-  );
-  lines.push(
-    `前の会話が無くても、状況は '${scriptCommand(root, "ccnavi-ticket.sh")} status ${parent}' で確認する` +
-      "（置き場のファイルを自分で探さない）。",
+    `- 親のワークツリー: ${tree}`,
+    `親のワークツリー ${tree} で、読み取り専用の '${scriptCommand(root, "ccnavi-review.sh")} decide ${phase} --preview' だけを単体の Bash で実行する` +
+      `（cwd が ${tree} でなければ、先に cd だけを別の Bash で実行する。cd や他のコマンドと連結しない）。` +
+      "未解決の指摘を 1 件ずつ要約し、対応方針の案（対応しない／このフェーズで直す／issue に回す）と理由を返す。",
+    "対応方針を確定する ccnavi-user-decide.sh、ccnavi-review.sh confirm、その他の状態を変える操作は実行しない。" +
+      "決めるのはユーザで、ボードの『レビュー完了』から行う。",
+    `前の会話が無くても、状況は '${scriptCommand(root, "ccnavi-ticket.sh")} status ${parent}' で確認する（置き場のファイルを自分で探さない）。`,
   );
   return lines.join("\n");
+}
+
+/**
+ * `ccnavi-review.sh mr-state <番号>`。マージリクエストの状況を読むだけの副命令（書かない）。sh は実行した場所のリポジトリの
+ * origin を見るので、子プロセスの cwd は片付けの記録が指すリポジトリにする
+ */
+export function mrStateArgs(number: number): readonly string[] {
+  return ["mr-state", String(number)];
+}
+
+/** `ccnavi sync retired`。片付けの記録（`retire/<親>.json`）を持つ親の一覧。ネットワークにも git にも触れない。`--root` は `run()` が付ける */
+export function syncRetiredArgs(): readonly string[] {
+  return ["sync", "retired"];
+}
+
+/** 引用が要らない語（英数字と `._/-:` だけ）。それ以外を含むときだけ単引用符で囲む */
+function shellWord(text: string): string {
+  return /^[A-Za-z0-9._/:@%+=-]+$/.test(text) ? text : shellQuote(text);
+}
+
+/**
+ * マージ済みの親の片付けをターミナルに送るコマンド行: `cd <ワークスペースルート> && sh <ルート>/.ccnavi/scripts/ccnavi-sync.sh <親>`。
+ * ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届くよう、`cd` から始める。
+ * ルートも sh のパスも親も単引用符で引用する（空白・引用符・シェルの記号を含むパスでも壊れない）。
+ * ボードが打つのは**このコマンドの送信まで**。MR がマージ済みかの確かめ直しと、条件を満たすものだけの片付けは
+ * `ccnavi-sync.sh` が決める（ボードの確認を信用して片付けない）
+ */
+export function retireCommand(root: string, parent: string): string {
+  const base = toPosixPath(root).replace(/\/+$/, "");
+  return `cd ${shellQuote(base)} && sh ${shellQuote(`${base}/.ccnavi/scripts/ccnavi-sync.sh`)} ${shellQuote(parent)}`;
+}
+
+/** 片付けの確認のダイアログの文。sync が何をするか（リモートの取り込み・マージ済みの確かめ直し・条件を満たすものだけの片付け）を先に言う */
+export function retireConfirmText(parent: string): string {
+  return (
+    `ccnavi-sync.sh ${parent} を実行します。sync はリモートの取り込みも行い、MR がマージ済みかを確かめ直したうえで、` +
+    "条件を満たすものだけを片付けます。結果はターミナルで確認してください。"
+  );
+}
+
+/**
+ * マージせずに閉じた親（捨てた親）の、片付けの記録を消すコマンド: `sh <ルート>/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon <親>`。
+ * **ボードはこれを送らない**。コピーするだけで、ユーザが端末で実行する
+ */
+export function abandonCommand(root: string, parent: string): string {
+  return `${scriptCommand(root, "ccnavi-launcher.sh")} worktree retire --abandon ${shellWord(parent)}`;
 }
 
 /** `ccnavi-git.sh` を sh で呼ぶ前置き（ワークスペースルートの絶対パス。空白があれば引用する） */

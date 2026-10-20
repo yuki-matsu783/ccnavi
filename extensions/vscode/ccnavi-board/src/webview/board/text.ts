@@ -1,35 +1,18 @@
 /**
  * カードとフェーズ行に出す言葉。判定は実行ファイルがやっていて、ここは JSON が言ったことを
  * 言い換えるだけ。マーカーや済みから状態を組み直さない。
+ * 状態の札とフェーズ行の一言は `core/status.ts`。ここは札のほかの、注意の行と詳細の行の言葉を持つ。
  */
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
-
-export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "レビュー待ち", closed: "クローズ", archived: "アーカイブ済み" } as const;
-
-/** 承認済みチケットの着手の状態。`start` で `started_at` が入るまで、範囲は適用されない */
-export const STARTED_LABELS = { unstarted: "未着手", started: "着手済み" } as const;
-export const STARTED_TITLES = {
-  unstarted: "承認済みですが、未着手です。start コマンドで着手時刻（started_at）が記録されるまで、このチケットの編集可能範囲は適用されません。",
-  started: "着手済みです。このチケットの編集可能範囲が適用されています。",
-} as const;
 
 /** ツールバーの絞り込みのチェックボックスの言葉 */
 export const FILTER_LABELS = {
   attention: "要対応のみ",
   attentionTitle: "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
   archived: "アーカイブ済みチケットを表示",
-  archivedTitle: "Draft を解除したとき（ccnavi-review.sh ready）にローカルの logs/archive/ に移動した、クローズ済みのチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
+  archivedTitle: "Draft を解除したとき（ccnavi-review.sh ready）にローカルの logs/archive/ に移動した、完了・取り消しのチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
 } as const;
-
-export const MARK_LABELS: Readonly<Record<string, string>> = {
-  pending: "エージェントに終了を通知済み",
-  skipped: "レビュー省略",
-  requested: "レビュー依頼済み",
-  reviewed: "レビュー済み",
-};
-
-export const PHASE_STATE_LABELS = { planned: "未着手", active: "進行中", ended: "終了" } as const;
 
 /** 列の呼び名。列の順序と同じ 1 か所（`core/board.ts` の `COLUMNS`）から引く */
 const COLUMN_LABELS: Readonly<Record<string, string>> = Object.fromEntries(COLUMNS.map((c) => [c.state, c.label]));
@@ -43,19 +26,110 @@ export function movedLabel(moved: Moved): string {
   return moved.from === undefined ? "新規起票" : `${COLUMN_LABELS[moved.from] ?? moved.from} → ${COLUMN_LABELS[moved.to] ?? moved.to}`;
 }
 
-/** 親のカードの、issue・MR・ブランチ名の項目。無いものは出さない */
-export function originItems(card: Card): string[] {
-  const items: string[] = [];
-  if (card.issueNumber !== null) {
-    items.push(`issue #${card.issueNumber}`);
+/**
+ * カードの注意の行。例外のときだけ短い言葉で出す（理由の全文は詳細）。
+ * 不備・書き込み停止・先行待ち・リスク HIGH 以上・複数の場所にある・ワークツリーなし（閉じていないものだけ）・未送信。
+ * ユーザが動く必要がある状態だけで、普通のことは出さない。先行待ちは識別子の途中で折り返さないよう、`PredecessorNote` で別に出す
+ */
+export interface Note {
+  readonly key: "issue" | "blocked" | "risk" | "seen" | "worktree" | "unsent";
+  readonly text: string;
+  /** バッジの色の系統（CSS のクラス） */
+  readonly kind: string;
+}
+
+export function notesOf(card: Card): Note[] {
+  const notes: Note[] = [];
+  if (card.issues.length > 0) {
+    notes.push({ key: "issue", text: `不備 ${card.issues.length} 件`, kind: "issue" });
   }
-  if (card.parentMr !== null) {
-    items.push(`MR !${card.parentMr}`);
+  if (card.blocked !== "") {
+    notes.push({ key: "blocked", text: "書き込み停止中", kind: "blocked" });
   }
-  if (card.branch !== "") {
-    items.push(`ブランチ ${card.branch}`);
+  if (!card.worktreeExists && card.copyStatus !== "closed" && card.copyStatus !== "archived") {
+    notes.push({ key: "worktree", text: "ワークツリーなし", kind: "worktree none" });
   }
-  return items;
+  if (isHighRisk(card.riskLevel)) {
+    notes.push({ key: "risk", text: riskText(card), kind: `risk risk-${card.riskLevel.toLowerCase()}` });
+  }
+  // ほかのツリー上にもチケットがあること自体は普通なので数では出さない。どれが正か決まらないときだけ言う。
+  if (card.scattered.length > 0) {
+    notes.push({ key: "seen", text: `複数の場所にある（${card.scattered.length} か所）`, kind: "seen" });
+  }
+  if (card.remote !== null && card.remote.ahead !== null && card.remote.ahead > 0) {
+    notes.push({ key: "unsent", text: `未送信 ${card.remote.ahead} 件`, kind: "unsent" });
+  }
+  return notes;
+}
+
+/** 詳細の 1 行。`href` があれば普通のリンク（ボタンの寸法にしない）。値が複数なら 1 行ずつ */
+export interface DetailRow {
+  readonly key: string;
+  readonly label: string;
+  readonly values: readonly string[];
+  readonly href?: string;
+  readonly title?: string;
+}
+
+/**
+ * 詳細に畳む項目。MR・issue・ブランチ・ワークツリー名・プロジェクト・取り消しの理由と、
+ * 注意の行に出した例外の理由の全文、リスク（JSON の文言のまま）、人間レビューの要否と理由、フェーズごとのレビューの要否とリスク。
+ * base / 合流の sha とマーカー名は画面に出さない（チケットのファイルにだけ残る）。
+ * 出すものが無い行は作らない。
+ */
+export function detailRows(card: Card): DetailRow[] {
+  const rows: DetailRow[] = [];
+  const add = (row: DetailRow): void => {
+    if (row.values.some((v) => v !== "")) {
+      rows.push(row);
+    }
+  };
+  add({ key: "issues", label: "不備", values: card.issues });
+  add({ key: "blocked", label: "書き込み停止の理由", values: [card.blocked] });
+  add({
+    key: "scattered",
+    label: "複数の場所",
+    values: card.scattered.map((s) => `${s.tree || "main"}:${s.state}`),
+  });
+  add({
+    key: "predecessors",
+    label: "先行",
+    values: card.predecessorsUnmet.map((p) => `${p.ticket}: ${p.label}`),
+  });
+  if (card.column !== "archived") {
+    add({
+      key: "review",
+      label: "人間レビュー",
+      values: [`${card.reviewRequired ? "必須" : "不要"}${card.reviewReason === "" ? "" : `（${card.reviewReason}）`}`],
+    });
+  }
+  add({ key: "risk", label: "リスク", values: card.riskLevel === "" ? [] : [riskText(card)] });
+  for (const p of card.phases) {
+    add({ key: `phase-${p.number}`, label: `フェーズ ${p.label}`, values: [phaseDetail(p)] });
+  }
+  add({ key: "mr", label: "マージリクエスト", values: card.mrUrl === "" && card.mrNumber === null ? [] : [mrText(card.mrNumber)], href: isHttpUrl(card.mrUrl) ? card.mrUrl : undefined, title: card.mrUrl });
+  add({ key: "parent-mr", label: "親の MR", values: card.parentMr === null ? [] : [`!${card.parentMr}`] });
+  add({ key: "issue", label: "issue", values: card.issueNumber === null ? [] : [`#${card.issueNumber}`] });
+  add({ key: "branch", label: "ブランチ", values: [card.branch] });
+  add({
+    key: "worktree",
+    label: "ワークツリー",
+    values: card.worktreeExists ? [worktreeName(card.worktreePath)] : [],
+    title: card.worktreePath,
+  });
+  add({ key: "remote", label: "リモートとの差", values: remoteItems(card) });
+  add({ key: "project", label: "プロジェクト", values: [card.project] });
+  add({ key: "cancel", label: "取り消しの理由", values: [card.cancelReason] });
+  return rows;
+}
+
+/** フェーズごとの詳細（レビューの要否・リスク）。JSON の文言をそのまま使う */
+function phaseDetail(p: PhaseChip): string {
+  const parts = [p.reviewRequired ? "レビュー必須" : "レビュー不要"];
+  if (p.riskLine !== "") {
+    parts.push(p.riskLine);
+  }
+  return parts.join(" · ");
 }
 
 /**
@@ -71,15 +145,6 @@ export function remoteItems(card: Card): string[] {
   return [`未送信 ${count(r.ahead)}`, `遅れ ${count(r.behind)}`];
 }
 
-/**
- * レビューが済むまで止めている間の呼び名。依頼を出す前はエージェントの番（合流・push・依頼）で
- * 「レビュー準備中」、出した後はユーザの番で「レビュー待ち」。実行ファイルの `phase.review_label` と
- * 同じ分け方で、判定した 2 つの真偽値（`gate_closed` / `review_waiting`）を言い換えるだけ。
- */
-export function holdLabel(x: { readonly gateClosed: boolean; readonly reviewWaiting: boolean }): string {
-  return x.reviewWaiting ? "レビュー待ち" : "レビュー準備中";
-}
-
 export function riskText(card: Card): string {
   return card.riskPoints === null ? `リスク ${card.riskLevel}` : `リスク ${card.riskLevel}（${card.riskPoints} 点）`;
 }
@@ -92,30 +157,6 @@ export function isHighRisk(level: string): boolean {
 export function worktreeName(path: string): string {
   const name = path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
   return name === "" ? "あり" : name;
-}
-
-/**
- * フェーズ行の状態の項目のリスト。画面は ` · ` で区切って並べ、項目の途中では折り返さない。
- * `終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 25 (MEDIUM) — …`
- */
-export function phaseStatusItems(p: PhaseChip): string[] {
-  const notes: string[] = [];
-  if (p.gateClosed) {
-    notes.push(holdLabel(p));
-  }
-  for (const m of p.marks) {
-    notes.push(MARK_LABELS[m] ?? m);
-  }
-  if (p.reviewRequired) {
-    notes.push("レビュー必須");
-  }
-  if (p.riskLine !== "") {
-    notes.push(p.riskLine);
-  }
-  if (p.manual !== "") {
-    notes.push(p.manual);
-  }
-  return [PHASE_STATE_LABELS[p.state], ...notes];
 }
 
 /** マージリクエストのバッジの文字。番号が読めなければ「マージリクエスト」だけ */
@@ -176,7 +217,7 @@ export function approvalBody(text: string): BodyLine[] {
 
 /**
  * 先行を満たしていないカードのバッジ。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
- * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す。
+ * 作業中の作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す。
  * `lead` と `ids` は `text` を分けたもので、画面が識別子の途中で折り返さないために使う
  */
 export function predecessorsBadge(card: Card): { readonly text: string; readonly lead: string; readonly ids: readonly string[]; readonly title: string } {
@@ -189,7 +230,7 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
       text: `先行チケットの条件が未達成（${ids}）`,
       lead: "先行チケットの条件が未達成",
       ids: list,
-      title: `着手済みです。先行チケットが done/ にないか、取り消されているため、開始条件を満たしていません。ただし、着手済みの作業や finish コマンドの実行は制限されません。\n${detail}`,
+      title: `作業を始めています。先行チケットが done/ にないか、取り消されているため、開始条件を満たしていません。ただし、始めた作業や finish コマンドの実行は制限されません。\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認・着手は" : "着手は";

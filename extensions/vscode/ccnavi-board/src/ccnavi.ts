@@ -44,6 +44,8 @@ import {
   handoffArgs,
   handoffYesArgs,
   decidePreviewArgs,
+  mrStateArgs,
+  syncRetiredArgs,
   GIT_SCRIPT,
   overrideArgs,
   planOrderArgs,
@@ -64,12 +66,14 @@ export type { LintOverride, RulesOverride } from "./core/commands.js";
 import {
   parseDecidePreview,
   parseDecideResult,
+  type DecideExpect,
   type DecideOutcome,
   type DecidePreview,
 } from "./core/decidemodel.js";
 import { parseLintJson, unknownOption, type LintJson } from "./core/lintmodel.js";
 import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
+import { interpretMrState, parseRetired, type MrStateResult, type RetiredParse } from "./core/mrstate.js";
 import { parsePlanOrder, type PlanOrder, type PlanOrderAnswer, type PlanOrderWrite } from "./core/planordermodel.js";
 import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
 import type { HandoffList, HandoffResult } from "./core/handoff-view.js";
@@ -343,15 +347,17 @@ export async function runDecidePreview(
   shell: string,
   tree: string,
   phase: number,
+  expect: DecideExpect,
 ): Promise<RunResult<DecidePreview>> {
   const ran = await runScript(shell, root, REVIEW_SCRIPT, tree, decidePreviewArgs(phase), DECIDE_TIMEOUT_MS);
   if (ran.killed) {
     return { ok: false, error: `${cutOff("ccnavi-review.sh decide --preview", DECIDE_TIMEOUT_MS)}。反映していません` };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `ccnavi-review.sh decide --preview が失敗しました:\n${ran.stderr.trim()}` };
+    return { ok: false, error: `ccnavi-review.sh decide --preview が失敗しました: ${ran.stderr.trim()}` };
   }
-  const parsed = parseDecidePreview(ran.stdout);
+  // 頼んだ親・フェーズ・MR の番号と照らして厳しく読む。読めなければ呼び手は件数を出さない
+  const parsed = parseDecidePreview(ran.stdout, expect);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
@@ -387,6 +393,36 @@ export async function runDecideYes(
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
   return { ok: false, error: said === "" ? `ccnavi-user-decide.sh decide の出力を読み取れません（${parsed.error}）` : said };
+}
+
+/**
+ * マージ状況の 2 本に付ける期限（ミリ秒）。1 回ごとに付ける。`mr-state` はホストに聞くので、curl の上限（30 秒）に余裕を足す。
+ * gh / glab の経路には sh の側の上限が無いので、ここで打ち切る（期限切れは拡張の側だけの種類 `timeout`）
+ */
+const MR_STATE_TIMEOUT_MS = 45_000;
+const RETIRED_TIMEOUT_MS = 30_000;
+
+/**
+ * 片付けの記録を持つ親の一覧を読む（`ccnavi sync retired`）。ネットワークにも git にも触れない読み取り。
+ * 失敗・期限切れ・形式の異常は、「ありません」とは言わず `ok: false` で返す（行を黙って捨てない）
+ */
+export async function runSyncRetired(root: string, setting: string): Promise<RetiredParse> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: `一覧を取れない（${NOT_FOUND}）` };
+  }
+  const ran = await run(launcher, root, syncRetiredArgs(), RETIRED_TIMEOUT_MS);
+  return parseRetired(ran);
+}
+
+/**
+ * 1 件の MR の状況を聞く（`ccnavi-review.sh mr-state <番号>`。読むだけ）。cwd は片付けの記録が指すリポジトリ。
+ * 答えは `interpretMrState` が厳しく検証する。実行できなかった（シェルが無いなど）・期限切れ・古い sh は、
+ * その親の「確認できない」にとどめる（ほかの親は続ける）
+ */
+export async function runMrState(root: string, shell: string, cwd: string, number: number): Promise<MrStateResult> {
+  const ran = await runScript(shell, root, REVIEW_SCRIPT, cwd, mrStateArgs(number), MR_STATE_TIMEOUT_MS);
+  return interpretMrState(ran, number);
 }
 
 /**

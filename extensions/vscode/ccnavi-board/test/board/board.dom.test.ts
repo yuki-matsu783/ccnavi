@@ -123,56 +123,6 @@ test("CB-D42 「要対応のみ」でユーザが動く必要のないカード�
   }
 });
 
-test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提案は開かない。マージリクエストのリンクの上でも提案は開かない", async () => {
-  const base = fixture();
-  const parent = {
-    ...base.parents[0],
-    phases: base.parents[0].phases.map((p) =>
-      p.number === 2
-        ? {
-            ...p,
-            state: "ended" as const,
-            gate_closed: true,
-            review_required: true,
-            review_waiting: true,
-            marks: { requested: { mr: 18, url: "https://example.com/o/r/pull/18#issuecomment-5", at: "t" } },
-          }
-        : p,
-    ),
-  };
-  // 実行ファイルはレビュー待ちのフェーズの子と親を要対応と言う
-  const tickets = base.tickets.map((t) => (t.ticket === "i0001" || t.ticket === "i0001-02-02" ? { ...t, attention: true } : t));
-  const page = await openBoard({ ...base, tickets, parents: [parent] });
-  try {
-    page.click(page.one('button[data-action="review-menu"][data-parent="i0001"][data-phase="2"]'));
-    await page.settle();
-    // メニューの余白（項目の間）を押しても提案は開かない
-    const gap = page.posted.length;
-    page.click(page.one(".review-menu-list"));
-    await page.settle();
-    assert.equal(page.posted.length, gap);
-    page.click(page.one('button[data-action="reviewed"][data-parent="i0001"][data-phase="2"]'));
-    await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "reviewed", parent: "i0001", phase: 2 });
-    const before = page.posted.length;
-    // 実際の Webview では VS Code がリンクの遷移を横取りして既定のブラウザで開く。happy-dom には無いので既定の動きだけ止める
-    page.document.addEventListener("click", (event) => {
-      if ((event.target as unknown as { closest: (s: string) => unknown }).closest("a")) { event.preventDefault(); }
-    });
-    page.click(page.one('.card[data-id="i0001"] a.mr-link'));
-    await page.settle();
-    assert.equal(page.posted.length, before, "リンクを押しても open を送らない");
-    // 要対応の絞り込みで、レビュー待ちの親と子は残る
-    page.click(page.one("#attention-filter"));
-    await page.settle();
-    assert.ok(!page.one('.card[data-id="i0001"]').classList.contains("hidden"));
-    assert.ok(!page.one('.card[data-id="i0001-02-02"]').classList.contains("hidden"));
-    assert.ok(page.one('.card[data-id="i0001-01-01"]').classList.contains("hidden"));
-  } finally {
-    await page.close();
-  }
-});
-
 test("CB-D44 「更新」を押すと非活性になり、回り記号と「更新中」に替わる。次の中身が届くと活性に戻る", async () => {
   const page = await openBoard();
   try {
@@ -469,7 +419,7 @@ test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後�
     await dom.settle();
     // チケットがあるボードでも、案内の間は見本を描く
     assert.equal(dom.all(".tour-sample").length, 1);
-    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "カード", "承認", "更新", "案内"]);
+    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態の札", "あなたの番", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
@@ -500,7 +450,7 @@ test("CB-D96 チケットが 1 枚もないボードでは、案内の間だけ�
     assert.ok(dom.all(".card").length > 0, "見本のカードがありません");
     assert.ok(dom.all('.card[data-attention="1"]').length > 0);
     // カードの手順は見本のカードを指す（中ほどに出す文だけの吹き出しにならない）
-    while (dom.one("#tour-title").textContent !== "カード") {
+    while (dom.one("#tour-title").textContent !== "状態の札") {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
