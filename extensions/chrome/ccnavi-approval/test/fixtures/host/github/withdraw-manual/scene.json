@@ -1,9 +1,0 @@
-{
-  "kind": "withdraw",
-  "owner": "acme",
-  "repo": "widgets",
-  "branch": "i0001",
-  "head": "d67689484a17a61c386f8910386f5a723e08b4f8",
-  "ident": "i0001",
-  "about": "手で動かした承認（GitHub の画面で todo/ から doing/ へ改名）: rename のコミット。計画の無い CRLF の提案。状態の履歴はありません。取り下げられる"
-}

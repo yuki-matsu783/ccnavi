@@ -23,7 +23,7 @@ import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
 import { listIssues, startIssue } from "../src/core/start.js";
-import { approveFamily, confirmPhase, withdrawTicket, type WriteDeps } from "../src/core/write.js";
+import { approveFamily, confirmPhase, type WriteDeps } from "../src/core/write.js";
 import { fixture, NOW, projectFixture, requestedMark, reviewFamilyFiles, type FixtureBranch } from "./fixtures/repo.js";
 import { gitlabSceneFetch, gitlabSceneNames, GITLAB_SCENES, loadGitLabScene, type GitLabScene } from "./helpers/gitlab-fixture.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats, OPTIONS } from "./helpers/host.js";
@@ -79,10 +79,9 @@ function placeFiles(files: Record<string, string>): Record<string, string> {
 
 const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
-const WORKFLOW = ".ccnavi/approved/phases/i0001/workflow.yml";
 
 test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
-  assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "requested-changes", "resolved"]);
+  assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "replies", "replies-accepted", "requested-changes", "resolved"]);
   for (const name of gitlabSceneNames()) {
     const scene = loadGitLabScene(name);
     const client = { host: GL, token: TOKEN, fetch: gitlabSceneFetch(scene), counter: { rest: 0, graphql: 0 }, sleep: noWait };
@@ -94,7 +93,7 @@ test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む�
   }
 });
 
-test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・ダイジェスト・取り下げの可否を出す", async () => {
+test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・ダイジェストを出す", async () => {
   const hub = await collectRepo(GH_REPO, glDeps(new MockGitHub(fixture()), "github.com"));
   const lab = await collectRepo(GITLAB_REPO, glDeps(new MockGitLab(fixture())));
   assert.equal(lab.error, "", lab.error);
@@ -107,7 +106,6 @@ test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリ�
       digest: f.result?.digest,
       rejected: f.result?.rejected,
       undecided: f.result?.undecided,
-      withdrawable: f.result?.withdrawable,
     }));
   assert.ok(lab.families.length >= 2);
   assert.deepEqual(view(lab), view(hub));
@@ -116,7 +114,7 @@ test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリ�
   assert.equal(lab.stats.graphql, 0);
 });
 
-test("CX-T146 GitLab へ承認と取り下げを書く: Commits API の 1 コミット（作る・書き換える・消すを分ける）、親は読んだ先頭", async () => {
+test("CX-T146 GitLab へ承認を書く: Commits API の 1 コミット（作る・書き換える・消すを分ける）、親は読んだ先頭", async () => {
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
   const before = mock.head("i0001");
@@ -136,18 +134,6 @@ test("CX-T146 GitLab へ承認と取り下げを書く: Commits API の 1 コミ
   assert.ok(call.actions.every((a) => a.action === "delete" || a.encoding === "base64"));
   const files = mock.files("i0001");
   assert.ok(DOING in files && !(TODO in files));
-
-  // 取り下げ: 承認コミットを GitLab の履歴（first_parent）から引き、元の提案をそのまま戻す。
-  // 待ち方のファイルは無い（承認は書かない）
-  const back = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", glDeps(mock));
-  assert.equal(back.kind, "written", JSON.stringify(back));
-  const second = mock.glCommits[1];
-  assert.deepEqual(second.actions.map((a) => [a.action, a.file_path]).sort(), [
-    ["create", TODO],
-    ["delete", DOING],
-  ]);
-  assert.equal(mock.files("i0001")[TODO], parentOnly().i0001.files[TODO]);
-  assert.ok(!(WORKFLOW in mock.files("i0001")));
 });
 
 test("CX-T147 事後確認: 書く直前に関係の無い書き込み（コード）が割り込んでも、判定し直して同じなら残す（元に戻さない）", async () => {
@@ -347,8 +333,11 @@ test("CX-T152 GitLab のレビュー済み: 依頼したアカウントの ccnav
   for (const [scene, why] of [
     ["resolved", null],
     ["impostor", /未解決のスレッドが 2 件残っている/],
-    ["requested-changes", /変更要求のレビューが立っている/],
+    ["requested-changes", /変更を依頼（Request changes）が出ています/],
     ["paged", /未解決のスレッドが 11 件残っている/],
+    // ccnavi の依頼コメントへの返信は、返信を代表の指摘として数える（system のノートは除く）
+    ["replies", /未解決のスレッドが 6 件残っている/],
+    ["replies-accepted", null],
   ] as const) {
     const { panel } = await panelOn(reviewingOnGitLab(scene));
     assert.ok(panel, scene);
@@ -371,7 +360,7 @@ test("CX-T153 GitLab のスレッドの悪意のある本文は描いても実�
   const { board } = await panelOn(reviewingOnGitLab("hostile"));
   const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only" });
   const md = createRenderer(dom.window as unknown as Window & typeof globalThis);
-  const html = renderBoard(dom.window.document, md, board, { approve: () => undefined, withdraw: () => undefined, review: () => undefined });
+  const html = renderBoard(dom.window.document, md, board, { approve: () => undefined, review: () => undefined });
   const box = dom.window.document.querySelector(`[data-family="${FAMILY}"] .review`) as HTMLElement;
   assert.match(box.querySelector("h4")?.textContent ?? "", /マージリクエスト !7/);
   assert.equal(box.querySelectorAll(".thread").length, 8);
@@ -479,7 +468,6 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題�
   const pressed: string[] = [];
   const actions = {
     approve: () => undefined,
-    withdraw: () => undefined,
     loadIssues: () => void pressed.push("issues"),
     start: (_r: RepoBoard, issue: { number: number }) => void pressed.push(`start ${issue.number}`),
     dismiss: (_r: RepoBoard, family: string) => void pressed.push(`dismiss ${family}`),

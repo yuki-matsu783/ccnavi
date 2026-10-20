@@ -39,10 +39,12 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。フェーズ定義の成果物が在り、定性のリスク判定が揃っている（9.9） | `completed_at` |
 | `doing` → `done` | `ccnavi-ticket.sh finish` | 着手済み。子ならフェーズがレビュー不要。親なら開いている子が無く、レビューで止まっておらず、計画があればフィードバック計画が承認済みで全フェーズが終わっている（早めに閉じていれば子だけ） | `completed_at` |
 | `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`ccnavi-user-close-early.sh`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
-| `review` → `done` | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh`、フィードバック計画の承認 | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |
+| `review` → `done` | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh` | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |
 | 無し → `doing`（続きの子） | ユーザが `decide` で選ぶ | レビューで指摘が残った（9.10）。同じフェーズの番号、範囲は見た子の和 | `followup_of`（トップレベルの欄。ccnavi が新しく作るチケットに書く） |
-| `doing` → `todo`（取り下げ） | Chrome 拡張（ユーザ） | 着手前の新規の承認。`doing/` の中身が承認コミットの親の提案とバイト単位で同じ。子もマーカーも無く、続きの子でない。承認の前に計画編集タブ（`--plan-order --write`）か `--fill-phases` で書き換えた提案は、書き換えがコミットされないまま承認されるので取り下げられない。違いが `plan:` / `feedback:` / `phases:`（子は `phase:` か `predecessors:`）の値だけなら、文面が `ccnavi-ticket.sh cancel` で取り消して出し直すよう案内する。識別子と `phase:` を付け替えた子は、承認コミットの親に同じ識別子の提案が無いので、案内は出ずに止まる | ―（承認コミットの親の提案のバイト列を戻す） |
 | `done` → `doing` | ユーザが hook の外で動かす | エージェントは `Write` でもシェルでも止まる。再開の意図がレビューのやり直しなら、そのフェーズのマーカーも手で消す | ― |
+
+承認を取り下げて `todo/` に戻す操作は無い（Chrome 拡張にも置かない）。承認した子は `cancel --reason` で取り消し、
+新しい連番の子として出し直す。承認した親は、中身を直すなら改版し、やめるなら `cancel` する。
 
 スクリプトは置き場を動かして欄の行だけを書き換える。本文とユーザの書いたコメントは保つ（承認は
 中身を変えずに動かすだけ）。コミットは親がする。`start` と `finish` と `cancel` は
@@ -75,7 +77,7 @@ warn で言う。マーカーを消すかは、レビューをやり直すかど
 未着手、`blocked`、基準点が無い、子で親のブランチを引けない、親で `close_problems`（開いている子・レビュー準備中／レビュー待ち・フィードバック計画待ち・
 終わっていないフェーズ）が空でない、git を読めない、`SubagentStop`。`dry-run` は止めずに文を `systemMessage` に載せる。
 
-**レビューの依頼までの道の途中で終えようとしたら、`Stop` で 1 回だけ止める。** 子の `finish`（親ブランチへの合流を含む）・ELI5・`ccnavi-review.sh request` は決まった道で、各所で「進めてよいですか」と確認して止まる必要が無い。メインエージェントの `Stop` で、cwd のツリーが承認済みの親（`doing/`、着手済み、`blocked` でない、`close-early` が無い）に結び付いていて、(a) 作業中（`doing/`、着手済み）の子が残っている（子のツリーでは自分の子だけ。並行する別の子は別のセッションの作業）、または (b) 子が全部閉じ、レビューを要する（`review: none` でも延期でもない）フェーズに依頼のマーカー（`requested`）が無ければ、`decision: block` で止める（`NUDGE_TICKET_REQUEST`）。文は「決まった道の途中でユーザの許可は要らない・次のコマンド・ユーザの判断が本当に要る問いならその問いを最後に書き直して終える」で、次の一手は状態で分かれる: 作業中の子の `finish`、子のブランチが親の HEAD の祖先でなければ `ccnavi-git.sh merge <子>`、`wip/eli5/phase-N.html` が無ければ ELI5、それ以外は `request`。ユーザが子を手で `done/` へ動かして共有（commit・push）済みのフェーズでは、次の一手を `confirm` にして 1 回だけ促す（`STEP_CONFIRM`。手動移動の確定は review.md）。問いで終わった回も止める。変更要求のレビューが残る間は `requested` が残るので止めない（`reviewed` を置かないだけ）。同じフェーズに子を足すと `requested` が外れ、足した子が作業中になるので止める。同じ状態（親・フェーズ・残っている子・HEAD）では 1 回だけで、記録は `finish` の促しと同じ `nudged-<セッション>.json` の`request:<親>:<フェーズ>` の鍵。進めばまた止める。`stop_hook_active` が真、サブエージェント、state の置き場が無いか書けない、チケット制御かモードが `disable` では止めない。`dry-run` でも止める。1 回の `Stop` で止める理由は 1 つで、`finish` の促しが止める回は出さず覚えもしない。この促しが止める回は、あとの直接作業の `integrate` の促し（6.6）と `match: Stop` のルールも出さず数えもしない。実行中のサブエージェントが居る間は、委任して待つ回なので止めない。判定は `SubagentStart` / `SubagentStop` が残す印（9.12）で、1 体でも実行中の印があれば（入れ子の孫も数える。読めない・壊れた印も）促しを見送り、「1 回だけ」の記録は進めない。終わったあとの `Stop` でまた促せる。待ちに数えるのはサブエージェントだけ。制限: `agent_id` の無い `SubagentStart` は印を置けず、その体は実行中と数えられない。`SubagentStop` が `Stop` より少し遅れて来る終わりぎわの回は見送るだけで、害は無い。
+**レビューの依頼までの道の途中で終えようとしたら、`Stop` で 1 回だけ止める。** 子の `finish`（親ブランチへの合流を含む）・ELI5・`ccnavi-review.sh request` は決まった道で、各所で「進めてよいですか」と確認して止まる必要が無い。メインエージェントの `Stop` で、cwd のツリーが承認済みの親（`doing/`、着手済み、`blocked` でない、`close-early` が無い）に結び付いていて、(a) 作業中（`doing/`、着手済み）の子が残っている（子のツリーでは自分の子だけ。並行する別の子は別のセッションの作業）、または (b) 子が全部閉じ、レビューを要する（`review: none` でも延期でもない）フェーズに依頼のマーカー（`requested`）が無ければ、`decision: block` で止める（`NUDGE_TICKET_REQUEST`）。文は「決まった道の途中でユーザの許可は要らない・次のコマンド（コマンドでなく作業を続けることやユーザへの相談なら、無理にコマンドの形にしない）」に、共通の 1 文を添える。共通の 1 文は「直前にユーザが『止めて』『待って』『相談したい』と言った場合は、このまま進めずにターンを終える。止めた理由と、再開するときの次の一手を 1 行で書く。ユーザの判断が本当に要る問いがある場合は、その問いを最後に書き直して終える」（`ops_stop.USER_STOP_NOTE`。`finish` の促しにも同じ文）。次の一手は状態ごとの案内（各 `STEP_*`）のままで、共通の 1 文は状態の案内を変えない。状態ごとの次の一手は: 作業中の子の `finish`、子のブランチが親の HEAD の祖先でなければ `ccnavi-git.sh merge <子>`、`wip/eli5/phase-N.html` が無ければ ELI5、それ以外は `request`。ユーザが子を手で `done/` へ動かして共有（commit・push）済みのフェーズでは、次の一手を `confirm` にして 1 回だけ促す（`STEP_CONFIRM`。手動移動の確定は review.md）。問いで終わった回も止める。変更要求のレビューが残る間は `requested` が残るので止めない（`reviewed` を置かないだけ）。同じフェーズに子を足すと `requested` が外れ、足した子が作業中になるので止める。同じ状態（親・フェーズ・残っている子・HEAD）では 1 回だけで、記録は `finish` の促しと同じ `nudged-<セッション>.json` の`request:<親>:<フェーズ>` の鍵。進めばまた止める。`stop_hook_active` が真、サブエージェント、state の置き場が無いか書けない、チケット制御かモードが `disable` では止めない。`dry-run` でも止める。1 回の `Stop` で止める理由は 1 つで、`finish` の促しが止める回は出さず覚えもしない。この促しが止める回は、あとの直接作業の `integrate` の促し（6.6）と `match: Stop` のルールも出さず数えもしない。実行中のサブエージェントが居る間は、委任して待つ回なので止めない。判定は `SubagentStart` / `SubagentStop` が残す印（9.12）で、1 体でも実行中の印があれば（入れ子の孫も数える。読めない・壊れた印も）促しを見送り、「1 回だけ」の記録は進めない。終わったあとの `Stop` でまた促せる。待ちに数えるのはサブエージェントだけ。制限: `agent_id` の無い `SubagentStart` は印を置けず、その体は実行中と数えられない。`SubagentStop` が `Stop` より少し遅れて来る終わりぎわの回は見送るだけで、害は無い。
 
 **子の着手は親の着手のあと。** 親が `doing/` で着手済みでなければ、子の `start` は止まる（親のワークツリーが
 要る）。案内は親の置き場で分かれ、`todo/` なら承認から、`doing/` で未着手なら親の `start` から。親が
@@ -103,7 +105,7 @@ warn で言う。マーカーを消すかは、レビューをやり直すかど
 | 無し → `skipped` | 同上 | 終わっていて、マーカーが 1 つも無く、レビュー不要（または延期） |
 | 任意 → `skipped` | `ccnavi-user-close-early.sh`（ユーザ） | 終わっていないフェーズのうち、レビュー待ちか閉じた子が居るもの(未着手の子を取り消すと終わるもの)に置く。手を付けていないフェーズには置かず、issue に書き出す（9.11） |
 | 任意 → `requested` | `ccnavi-review.sh request`（親） | 9.10 の前提と ELI5 の HTML（`--eli5`。`wip/` の下にコミット済み）。`pending` は要らない |
-| `requested` → `reviewed` | `ccnavi-review.sh confirm`（ユーザが端末で打つか、VS Code のボードの連絡を受けた親が打つ）、`ccnavi-user-decide.sh`（ユーザ）、Chrome 拡張のレビュー済み、フィードバック計画の承認、`ccnavi-user-close-early.sh` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
+| `requested` → `reviewed` | `ccnavi-review.sh confirm`（ユーザが端末で打つか、VS Code のボードの連絡を受けた親が打つ）、`ccnavi-user-decide.sh`（ユーザ）、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
 | 任意 → 無し | `ccnavi user agree` で同じ番号の子が承認された | 4 種を全部消す |
 
 マーカーはユーザが子を再開しても残る。再開は想定しない運用で、された場合は `--lint` と

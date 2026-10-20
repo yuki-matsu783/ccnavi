@@ -39,7 +39,6 @@ export type HostOp =
   | "tree"
   | "blobs"
   | "viewer"
-  | "approvalCommit"
   | "pullApprovals"
   | "commitParents"
   | "reviewCopy"
@@ -447,9 +446,6 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
     }
     case "viewer":
       value = await x.viewer(client);
-      break;
-    case "approvalCommit":
-      value = await x.approvalCommit(client, o, r, github.checkOid(a), github.checkPath(b));
       break;
     case "pullApprovals":
       value = await x.pullApprovals(client, o, r, github.checkBranch(a));

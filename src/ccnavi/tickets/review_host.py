@@ -54,6 +54,11 @@ class Thread:
     last_comment_id: str = ""
     last_comment_at: str = ""
     last_comment_author: str = ""
+    # スレッドの note が全部 ccnavi の目印で始まるか（ccnavi の投稿だけのスレッドか）。GitLab から
+    # 取得した結果だけが持つ。JSON の `true` / `false` だけを受け、それ以外（`"true"`・`1` など）と
+    # 欄が無いときは None（目印と書き手で見る従来の判定に戻る）。
+    # ユーザが ccnavi の依頼コメントに返信したスレッドは False（代表の note は返信）。
+    own: bool | None = None
 
 
 @dataclass
@@ -92,6 +97,28 @@ def effective(reviews: list[Review]) -> list[Review]:
         if current is None or _epoch(r.submitted_at) >= _epoch(current.submitted_at):
             latest[key] = r
     return [r for r in latest.values() if r.state.upper() != DISMISSED]
+
+
+# 変更要求の案内（ホストごと）。判定（`effective`・`CHANGES_REQUESTED`）はホストを問わず同じで、
+# 案内だけ出し分ける。ホストは取得した結果の `host`
+# （sh の分類。Chrome 拡張はユーザが明示した種類を含む）。
+CHANGES_GITLAB = (
+    "変更を依頼（Request changes）が出ています。解除はレビュアーの承認（Approve）で行います。"
+    "作成者によるレビューの再依頼（Re-request review）で状態が戻るかは未検証です。"
+    "再依頼した場合も、ccnavi で状態を取り直して確かめます"
+)
+CHANGES_GITHUB = (
+    "変更要求（Changes requested）が出ています。"
+    "解除はレビュアーの Approve か、レビューの dismiss で行います"
+)
+
+
+def changes_requested_note(host: str) -> str:
+    """変更要求が出ているときの案内の 1 文。解除のしかたはホストで違う（GitLab は Approve だけ）。
+
+    GitLab 以外（GitHub・見本の `fixture` など）は GitHub の案内。
+    """
+    return CHANGES_GITLAB if host == "gitlab" else CHANGES_GITHUB
 
 
 @dataclass
@@ -162,6 +189,7 @@ class Result:
                     last_comment_id=str(t.get("last_id") or ""),
                     last_comment_at=str(t.get("last_at") or ""),
                     last_comment_author=str(t.get("last_author") or ""),
+                    own=t["own"] if isinstance(t.get("own"), bool) else None,
                 )
                 for t in data.get("threads") or []
                 if isinstance(t, dict)
@@ -264,21 +292,83 @@ def read_accept_plan(path: str) -> AcceptPlan | None:
 # `:` はパスの区切りなので、数字だけのときにポートと見なす。
 # `https://oauth2:token@host/` のユーザ情報は読み飛ばす。sh と同じく、authority の
 # 最後の `@` までをユーザ情報と見る（git がそう切る。トークンに `@` が入る形がある）。
-# IPv6 は `[::1]` の形。sh が読めない表記（`ssh://user@host/`、大文字の scheme）は
-# ここでも読めない扱いにして、--lint と sh の言うことを揃える。
+# IPv6 は `[::1]` の形。sh が読めない表記（`ssh://user@host/`）はここでも読めない扱いにして、
+# --lint と sh の言うことを揃える。scheme の大文字小文字は区別しない（`HTTPS://` も読む）。
 _REMOTE = re.compile(
-    r"^(?:https?://|ssh://git@|git@)(?:[^/]*@)?"
-    r"(?P<host>\[[^\]/]+\]|[^/:@]+)(?::\d+)?[/:]+(?P<path>.+?)(?:\.git)?/?$"
+    r"^(?:(?i:https?)://|(?i:ssh)://git@|git@)(?:[^/]*@)?"
+    r"(?P<host>\[[^\]/]+\]|[^/:@]+)(?::(?P<port>[0-9]+))?[/:]+(?P<path>.+?)(?:\.git)?/?$"
 )
+
+GHE_DOMAIN = "ghe.com"
+
+
+@dataclass(frozen=True)
+class HostClass:
+    """origin の URL から決めた、ホストの分類と接続先。`kind` が空なら読めない表記。
+
+    分類に使うホスト（`host`）は、origin から取り出したホストを小文字にしてポートを除いたもの。
+    照合は `.` の区切りで行う（`evilgithub.com` や `github.com.evil` は GitHub にならない）。
+
+    - GitHub: `github.com`、`ghe.com` とそのサブドメイン（`*.ghe.com`）。REST は github.com が
+      `https://api.github.com`、GHE.com が `https://api.<ホスト>`。GraphQL はその根の `/graphql`。
+      GHE.com の origin にポートが付いていると API の URL を組めないので `problem` を言う。
+      GHE.com の API の URL の規則は、実物では未検証
+    - GitLab: 上のどれにも当たらないもの全部（`gitlab.com`・`*.aslead.cloud`・セルフホスト・
+      未知のホスト）。接続先は origin の scheme・ホスト・ポートをそのまま保つ
+
+    sh の `ccnavi_host_parse`（ccnavi-common-host.sh）と Chrome 拡張の `hostclass.ts` が同じ規則で、
+    `tests/fixtures/host-kinds.json` の同じ表で突き合わせる。
+    """
+
+    kind: str = ""
+    host: str = ""
+    api: str = ""
+    graphql: str = ""
+    path: str = ""
+    problem: str = ""
+
+
+def is_ghe_host(host: str) -> bool:
+    """小文字のホスト名が `ghe.com` か、そのサブドメインか（`.` の区切りで照合する）。"""
+    return host == GHE_DOMAIN or (
+        host.endswith("." + GHE_DOMAIN) and len(host) > len(GHE_DOMAIN) + 1
+    )
+
+
+def classify(url: str) -> HostClass:
+    """origin の URL を GitHub か GitLab かに分け、接続先を決める。読めない表記なら `kind` が空。"""
+    m = _REMOTE.match(url)
+    if m is None:
+        return HostClass()
+    raw = m.group("host")
+    port = m.group("port") or ""
+    host = raw.lower()
+    path = m.group("path")
+    if host == "github.com":
+        return HostClass(
+            "github", host, "https://api.github.com", "https://api.github.com/graphql", path
+        )
+    if is_ghe_host(host):
+        if port:
+            return HostClass(
+                "github",
+                host,
+                path=path,
+                problem=(
+                    f"GHE.com のホスト {host} にポート :{port} が付いているので、"
+                    f"API の URL（https://api.{host}）を組めない"
+                ),
+            )
+        api = f"https://api.{host}"
+        return HostClass("github", host, api, api + "/graphql", path)
+    scheme = "http" if url[:7].lower() == "http://" else "https"
+    api = f"{scheme}://{raw}{':' + port if port else ''}/api/v4"
+    return HostClass("gitlab", host, api, "", path)
 
 
 def remote_kind(url: str) -> str:
     """origin の URL から、GitHub か GitLab か。読めない表記なら空。"""
-    m = _REMOTE.match(url)
-    if m is None:
-        return ""
-    host = m.group("host")
-    return "github" if host == "github.com" else "gitlab"
+    return classify(url).kind
 
 
 def transport_problem(url: str) -> str:
@@ -287,9 +377,14 @@ def transport_problem(url: str) -> str:
     sh と同じ順で探す。`gh` / `glab` があればそれ、無ければ `curl` とトークン。
     どちらも無ければ、レビューの依頼と確認は動かない。
     """
-    kind = remote_kind(url)
+    found = classify(url)
+    kind = found.kind
     if not kind:
-        return f"origin ({url}) が GitHub でも GitLab でもない"
+        # URL に埋めた資格情報（`user:token@`）は出力に残さない
+        shown = re.sub(r"//[^/@]*@", "//<伏せた>@", url)
+        return f"origin ({shown}) が GitHub でも GitLab でもない"
+    if found.problem:
+        return found.problem
     if shutil.which("jq") is None:
         return "jqが見つかりません。結果の JSON を作成できません"
     cli = "gh" if kind == "github" else "glab"
@@ -357,8 +452,9 @@ def _unresolved(
     返信を残してホスト側で解決済みにする（`MARKER_ACCEPT`）。
     解決済みなので数えず、受け入れたあとで誰かが開き直せば、未解決として数える。
 
-    機構自身の投稿と見るのは、GitLab から取得した結果で、本文が目印で始まり、
-    書いたのが依頼を投稿したアカウント（`poster`）のときだけ。
+    機構自身の投稿と見るのは、GitLab から取得した結果で、書いたのが依頼を投稿したアカウント
+    （`poster`）で、本文が目印で始まるときだけ。スレッドの note が分かる結果（`own`）では、
+    note が全部目印で始まるときだけ（ユーザが依頼コメントに返信したスレッドは指摘として数える）。
     GitHub の依頼は MR のコメントでスレッドにならないので、
     目印で始まるスレッドはユーザが書いたものとして数える。
     投稿者が分からなければ見分けずに数える（誰でも目印を書けるので、
@@ -374,8 +470,14 @@ def _unresolved(
 
 
 def _ccnavi_post(t: Thread, host: str, poster: str) -> bool:
-    """ccnavi 自身が投稿したスレッドか（`_unresolved`）。"""
+    """ccnavi 自身が投稿したスレッドか（`_unresolved`）。
+
+    `own` が真偽値で取れていれば、それで決める（偽は書き手が同じでも数える）。取れていなければ
+    （None）、代表の note の本文と書き手で見る。
+    """
     mine = host == "gitlab" and bool(poster) and t.author == poster
+    if t.own is not None:
+        return mine and t.own
     return mine and t.body.startswith(MARKER_PREFIX)
 
 

@@ -91,16 +91,6 @@ export interface BatchEntry {
   readonly body: string;
 }
 
-export interface Withdrawable {
-  readonly ticket: string;
-  readonly title: string;
-  /**
-   * 取り下げられない理由（空なら取り下げを出す。承認コミットが引けるかは押したときに見る）。
-   * 押した後の答え（`WithdrawResult.problems`）と同じく、文面の頭に `[<コード>]` が載る
-   */
-  readonly problems: readonly string[];
-}
-
 /** 依頼済みでまだレビュー済みでないフェーズ。通るかは `confirm` が決める */
 export interface Reviewable {
   readonly phase: number;
@@ -119,7 +109,6 @@ export interface BoardResult {
   readonly refused?: string;
   /** 書けるかどうか。互換の版と書く先の名前をもとに Python が決める */
   readonly write?: { readonly allowed: boolean; readonly reason: string };
-  readonly withdrawable?: readonly Withdrawable[];
   /** レビュー済みを付けられる候補 */
   readonly reviewable?: readonly Reviewable[];
   readonly batch?: readonly BatchEntry[];
@@ -163,8 +152,6 @@ export type ReasonCode = string | null;
 export const APPROVE_LIST_CHANGED = "CORE_APPROVE_LIST_CHANGED";
 /** 承認: 識別子は同じで、見せた中身（ダイジェスト）が今と違う */
 export const APPROVE_DIGEST_CHANGED = "CORE_APPROVE_DIGEST_CHANGED";
-/** 取り下げ: 承認コミットの親に提案が無い（承認コミットを引けない） */
-export const WITHDRAW_NO_PRIOR = "CORE_WITHDRAW_NO_PRIOR";
 
 /** 文面の頭にコードを載せる（Python の `core_base.tagged` の、`ccnavi: ` で始まらない行の形） */
 export function tagged(code: string, text: string): string {
@@ -178,12 +165,6 @@ export interface PlanResult extends Written {
   readonly refused: string;
   readonly rejected: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
   /** `CORE_APPROVE_*`（見せたものと違う・承認するものが無い） */
-  readonly code: ReasonCode;
-}
-
-export interface WithdrawResult extends Written {
-  readonly problems: readonly string[];
-  /** `CORE_WITHDRAW_*`。理由が幾つもあれば最初の理由のもの */
   readonly code: ReasonCode;
 }
 
@@ -252,10 +233,6 @@ export const py = {
     call: PyCall,
     body: { snapshot: Snapshot; family: string; only: readonly string[] | null; shown: { ids: readonly string[]; digest: string }; stamp: string; actor: Actor },
   ) => ask<PlanResult>(call, "plan", { ...body }, ""),
-  withdraw: (
-    call: PyCall,
-    body: { snapshot: Snapshot; family: string; ids: readonly string[]; prior: Record<string, string>; stamp: string; actor: Actor },
-  ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
   start: (call: PyCall, body: { snapshot: Snapshot; issue: number; title: string; prefix?: string; taken: readonly string[] }) =>
     ask<StartResult>(call, "start", { ...body }, ""),
   adopt: (call: PyCall, body: { snapshot: Snapshot; branch: string; names: readonly string[] }) =>

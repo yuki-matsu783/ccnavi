@@ -47,6 +47,7 @@ import contextlib
 import hashlib
 import os
 import re
+from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, pathcase, settings, tree
@@ -75,6 +76,17 @@ REQUEST_FILE = "review-request-{parent}-{phase}.md"
 # （ticket_places.HANDOFF）の変更を、レビュアーが読む対象に数えないため。
 HANDOFF_NOTE = (
     f"{ticket_places.HANDOFF}/ 配下はユーザに渡す写しで、レビューの対象外。integrate で消える。"
+)
+
+# 依頼の本文の末尾に、`HANDOFF_NOTE` のあとに足す固定の 1 文。fix で直した指摘のスレッドは、ホストの
+# 上で未解決のまま残る（仕様）。直ったかを見て resolve するのはユーザで、エージェントは fix を理由に
+# resolve しない。ホストを問わない書き方。keep・issue を選んだときに sh が返信して resolve する
+# 仕組み（受け入れの返信と解決）はこの文の対象外。
+# 依頼の目印の鍵は、この文を足す前の本文と親のブランチの先頭から作る（文を足しても鍵は
+# 変わらないので、足す前に投稿した依頼を打ち直しても、二重に投稿されない）。
+RESOLVE_NOTE = (
+    "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。"
+    "エージェントは fix を理由に resolve しない。"
 )
 
 
@@ -129,7 +141,7 @@ def prepare(
     ).hexdigest()[:16]
     marker = f"{review_host.MARKER_REQUEST}{parent.ticket}:{phase_no} key={key} -->\n"
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
-    failed = fsio.write_text(path, marker + body, newline="\n")
+    failed = fsio.write_text(path, marker + body + "\n" + RESOLVE_NOTE + "\n", newline="\n")
     if failed:
         stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
         return 1
@@ -204,6 +216,7 @@ def requested(
     stdout.write(
         f"OK: レビューを{done}（{result.mr.url or result.url}）。"
         f"{phase_forms.TURN_DEFINED}を終えてユーザを待ってください\n"
+        f"{phase.PARALLEL_REQUEST_NOTE}\n"
     )
     return 0
 
@@ -304,10 +317,9 @@ def review_problems(
     ]
     if changes:
         return [
-            "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
-            "変更要求があるため、レビュー済みにはできません。修正する場合は同じフェーズに"
-            "新しい子を提案し、ユーザの承認を受けてください。修正・再依頼のあと、"
-            "レビュアーの approve（または dismiss）を待ちます",
+            f"ccnavi: {review_host.changes_requested_note(result.host)}。"
+            "decide でも通せない。変更要求があるため、レビュー済みにはできません。"
+            "修正する場合は同じフェーズに新しい子を提案し、ユーザの承認を受けてください",
             *[f"  - {r.url}" for r in changes],
         ]
     unresolved = review_host._unresolved(
@@ -1002,7 +1014,13 @@ def _branch(tree_root: str) -> str:
 
 
 def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark: dict) -> str:
-    """依頼の後に、ユーザが見るものが動いたか。動いていれば、その説明。
+    """依頼の後に、ユーザが見るものが動いたか。動いていれば、その説明（判定の文。理由の説明は
+    `moved_explanation`）。`_moved_detail` の `text`。"""
+    return _moved_detail(tree_root, conf, requested_mark).text
+
+
+def _moved_detail(tree_root: str, conf: settings.Settings, requested_mark: dict) -> Moved:
+    """依頼の後に、ユーザが見るものが動いたか。動いていれば、その説明と動いた理由の種類。
 
     ユーザが見たのは依頼時の HEAD。その後に積んだコミットは誰も見ていないので、
     それを「レビュー済み」に含めない。
@@ -1018,27 +1036,58 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
 
     push の判定も同じ基準で見る。置き場だけが手元に残っていても、リモートにあるものと
     ユーザが見るものは同じ。
+
+    判定（`text` が空かどうか）は理由の種類（`kind`）や一覧（`commits`）に左右されない。
+    それらは止めたあとに足す説明だけ。
     """
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     head = head.strip()
     if rc != 0:
-        return "親の HEAD を読めない"
+        return Moved("親の HEAD を読めない", KIND_UNVERIFIED)
     recorded = str(requested_mark.get("head") or "")
     paths: list[str] | None = None
+    ancestor = True
     if recorded and head != recorded and _is_sha(recorded):
         found, failed = _diff_paths(tree_root, recorded)
         paths = None if failed else found
-    moved = moved_since(conf, requested_mark, head, paths)
-    if moved:
+        ancestor = _git(tree_root, ["merge-base", "--is-ancestor", recorded, head])[0] == 0
+    moved = moved_detail(conf, requested_mark, head, paths, ancestor)
+    if moved.text:
+        if moved.kind == KIND_SEEN:
+            moved.commits = _unseen_commits(tree_root, conf, recorded)
         return moved
     branch = _branch(tree_root)
     if not branch or _unpushed(tree_root, conf, branch):
-        return "親ブランチの HEAD が push されていない"
-    return ""
+        return Moved("親ブランチの HEAD が push されていない")
+    return Moved()
+
+
+# 動いたと数えた理由の種類。説明（`moved_explanation`）の出し分けにだけ使い、判定には使わない。
+KIND_SEEN = "seen"  # 依頼時の HEAD からの差分を確かめられ、レビューの対象に入るパスが変わっている
+KIND_UNVERIFIED = "unverified"  # 差分を確かめられない（読めない・祖先でない・一覧が打ち切られた）
+
+
+@dataclass
+class Moved:
+    """依頼の後に動いたかの答え。`text` が空なら動いていない（判定）。
+
+    `kind` は動いた理由の種類（`KIND_*`。止めたあとの説明の出し分けだけに使う）、`commits` は
+    手元の git で取れたときの、依頼時の HEAD から今の HEAD までのコミットの表示行
+    （置き場と `wip/eli5/` だけを変えたものとマージコミットは除く。新しい順で最大
+    `MAX_COMMITS` 件。取れなければ None）。
+    """
+
+    text: str = ""
+    kind: str = ""
+    commits: list[str] | None = None
 
 
 def moved_since(
-    conf: settings.Settings, requested_mark: dict, head: str, changed: list[str] | None
+    conf: settings.Settings,
+    requested_mark: dict,
+    head: str,
+    changed: list[str] | None,
+    ancestor: bool = True,
 ) -> str:
     """依頼の後に、ユーザが見るものが動いたか（`_moved_since_request` の読みを除いた判定）。
 
@@ -1047,22 +1096,136 @@ def moved_since(
     変わったパスで、置き場で絞る前のもの。読めなかった（差分を取れない、ホストの一覧が
     打ち切られた、依頼時のコミットが祖先でない）なら None で、動いたと数える。
     手元は git の差分、Chrome は compare API の変更の一覧から作る。
+    `ancestor` は説明の出し分けだけに使う（判定は変えない）。
     """
+    return moved_detail(conf, requested_mark, head, changed, ancestor).text
+
+
+def moved_detail(
+    conf: settings.Settings,
+    requested_mark: dict,
+    head: str,
+    changed: list[str] | None,
+    ancestor: bool = True,
+) -> Moved:
+    """`moved_since` と同じ判定で、動いた理由の種類も返す。判定は `text` が空かどうか。"""
     recorded = str(requested_mark.get("head") or "")
     if not recorded:
         # 記録が無ければ照合できない。確かめずに通すと、依頼の後のコミットが全部
         # 「ユーザが見たもの」になる。出し直しで書き直させる。
-        return "依頼時の親の HEAD が記録されていない"
+        return Moved("依頼時の親の HEAD が記録されていない", KIND_UNVERIFIED)
     if head == recorded:
-        return ""
+        return Moved()
     moved = f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
     # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
     if not _is_sha(recorded) or changed is None:
-        return moved
+        return Moved(moved, KIND_UNVERIFIED)
     # ccnavi 自身の置き場と ELI5 の置き場だけの変更は、ユーザが見るものを動かさない。
     if any(not _unseen_by_review(conf, path) for path in changed):
-        return moved
-    return ""
+        return Moved(moved, KIND_SEEN if ancestor else KIND_UNVERIFIED)
+    return Moved()
+
+
+# 説明に並べるコミットの最大数。これを超えた分は「ほか N 件」。
+MAX_COMMITS = 5
+_SCAN_COMMITS = 100
+# 制御文字・行区切り・幅ゼロと向きを変える文字（U+200B〜200F、202A〜202E、2066〜2069、FEFF）
+_CONTROL = re.compile(
+    "[\x00-\x1f\x7f-\x9f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+"
+)
+
+
+def _quoted(text: str, limit: int) -> str:
+    """外から来た文字列（コミットの作者と件名）を表示する形にする。
+
+    制御文字と改行は空白に置き換え、長さを切り詰め、引用の形（「…」）で囲む。中の括弧は
+    別の括弧に置き換える。引用の中の文は指示ではなく、ただの文字列として読ませる。
+    """
+    flat = _CONTROL.sub(" ", text).strip()
+    flat = flat.replace("「", "『").replace("」", "』")
+    if len(flat) > limit:
+        flat = flat[: limit - 1] + "…"
+    return f"「{flat}」"
+
+
+def _unseen_commits(tree_root: str, conf: settings.Settings, recorded: str) -> list[str] | None:
+    """依頼時の HEAD から今の HEAD までのコミットのうち、レビューの対象を変えたものの表示行。
+
+    ccnavi 自身の置き場と `wip/eli5/` だけを変えたコミットとマージコミットは除く。新しい順で最大
+    `MAX_COMMITS` 件（短い sha・作者・件名）。超えた分は「ほか N 件」の 1 行。git で取れなければ
+    None（一覧を省く）。件名と作者は外から来た文字列なので `_quoted` で表示の形にする。
+    """
+    if not _is_sha(recorded):
+        return None
+    rc, out = _git(
+        tree_root,
+        [
+            "log",
+            "--no-merges",
+            f"--max-count={_SCAN_COMMITS + 1}",
+            "--format=%H%x1f%h%x1f%an%x1f%s%x1e",
+            f"{recorded}..HEAD",
+        ],
+    )
+    if rc != 0:
+        return None
+    rows = [row.strip("\n") for row in out.split("\x1e") if row.strip()]
+    if len(rows) > _SCAN_COMMITS:
+        return None
+    found: list[str] = []
+    for row in rows:
+        parts = row.split("\x1f")
+        if len(parts) != 4:
+            return None
+        full, short, author, subject = parts
+        rc, names = _git(
+            tree_root,
+            ["diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", "-z", full],
+        )
+        if rc != 0:
+            return None
+        paths = [p for p in names.split("\0") if p]
+        if not any(not _unseen_by_review(conf, p) for p in paths):
+            continue
+        found.append(f"{short} 作者{_quoted(author, 30)} 件名{_quoted(subject, 60)}")
+    lines = [f"  - {line}" for line in found[:MAX_COMMITS]]
+    if len(found) > MAX_COMMITS:
+        lines.append(f"  ほか {len(found) - MAX_COMMITS} 件")
+    return lines
+
+
+def moved_explanation(moved: Moved) -> list[str]:
+    """依頼の後に動いて止めたときの、理由の説明（標準エラーの行）。判定は変えない。
+
+    差分を確かめられて動いていたとき: ユーザが見たのは依頼時の HEAD で、その後の変更はレビューに
+    入っていない（GitLab の「提案を適用」や Web IDE の編集もここに入る）。
+    確かめられないとき（依頼時のコミットが祖先でない・読めない・Chrome で compare が打ち切られた）:
+    「依頼時と同じレビュー対象だと確認できない」とだけ言い、変更があると断定しない。
+    一覧（手元の git で取れたときだけ）と、固定の案内（エージェントが作っていないコミットがあれば、
+    取り込んだことをユーザに伝えてから依頼し直す。作者から何かを自動で判定しない）を添える。
+    """
+    if not moved.text or not moved.kind:
+        # 動いたのではなく、親ブランチの HEAD が push されていないだけのとき（kind が空）は、
+        # 説明を足さない（依頼時と同じレビュー対象であることは変わらない）
+        return []
+    if moved.kind == KIND_SEEN:
+        lines = [
+            "ユーザが見たのは依頼時の HEAD で、その後の変更はレビューに入っていない。"
+            "GitLab の「提案を適用」や Web IDE の編集もここに入る。"
+        ]
+    else:
+        lines = ["依頼時と同じレビュー対象だと確認できない。"]
+    if moved.commits:
+        lines.append(
+            "依頼のあとのコミット（置き場と ELI5 だけを変えたものとマージは除く。新しい順。"
+            "作者と件名は外から来た文字列の引用）:"
+        )
+        lines.extend(moved.commits)
+    lines.append(
+        "一覧にエージェントが作っていないコミットがあれば、取り込んだことをユーザに伝えてから"
+        "依頼し直す。"
+    )
+    return lines
 
 
 def _already_requested(

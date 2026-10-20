@@ -25,7 +25,6 @@ import {
   fetchNoRedirect,
   HostError,
   RETRY_LIMIT_SECONDS,
-  type ApprovalCommit,
   type BlobText,
   type Client,
   type Fetch,
@@ -294,41 +293,7 @@ export async function tokenExpiry(client: Client): Promise<string> {
   return Number.isNaN(t) ? "" : new Date(t).toISOString();
 }
 
-// ---- 取り下げと書いた後の確かめ ---------------------------------------------------------
-
-const HISTORY_PAGE = 30;
-const CHAIN_DEPTH = 100;
-
-type CommitItem = { id?: unknown; parent_ids?: unknown };
-
-/** `sha` から最初の親を辿った鎖（`first_parent=true` の一覧の `CHAIN_DEPTH` 件） */
-export async function firstParentChain(client: Client, owner: string, repo: string, sha: string): Promise<Set<string>> {
-  const { status, body } = await get(client, `${project(owner, repo)}/repository/commits?ref_name=${checkOid(sha)}&first_parent=true&per_page=${CHAIN_DEPTH}`);
-  const chain = new Set<string>();
-  if (status === 404 || !Array.isArray(body)) return chain;
-  for (const c of body as CommitItem[]) if (typeof c.id === "string") chain.add(c.id);
-  return chain;
-}
-
-/**
- * 承認コミット。GitHub の `approvalCommit` と同じ規則: `sha` から遡って `path` を最後に変えたコミットが、
- * 親が 1 つで、親に `path` が無く自分には在り（足した）、`sha` の first-parent の鎖の上にあるときだけ返す
- */
-export async function approvalCommit(client: Client, owner: string, repo: string, sha: string, path: string): Promise<ApprovalCommit | null> {
-  const q = `?ref_name=${checkOid(sha)}&path=${encodeURIComponent(checkPath(path))}&per_page=${HISTORY_PAGE}`;
-  const { status, body } = await get(client, `${project(owner, repo)}/repository/commits${q}`);
-  const newest = status === 404 || !Array.isArray(body) ? undefined : (body[0] as CommitItem | undefined);
-  if (!newest) return null;
-  const commit = checkOid(newest.id);
-  const parents = Array.isArray(newest.parent_ids) ? newest.parent_ids : [];
-  if (parents.length !== 1) return null;
-  const parent = checkOid(parents[0]);
-  const here = await pathObjects(client, owner, repo, commit, [path]);
-  const before = await pathObjects(client, owner, repo, parent, [path]);
-  if (here[path]?.type !== "blob" || before[path] !== null) return null;
-  const chain = await firstParentChain(client, owner, repo, sha);
-  return chain.has(commit) ? { commit, parent } : null;
-}
+// ---- 書いた後の確かめ ---------------------------------------------------------
 
 /** コミットの親（書いた後の確かめ） */
 export async function commitParents(client: Client, owner: string, repo: string, sha: string): Promise<string[]> {
@@ -386,21 +351,31 @@ export async function pullApprovals(client: Client, owner: string, repo: string,
 /** sh の読みの上限と同じ（20 ページを超えたら止める） */
 const THREAD_PAGES = 20;
 
-type Note = { id?: unknown; body?: unknown; created_at?: unknown; resolvable?: unknown; resolved?: unknown; author?: { id?: unknown; username?: unknown } | null; position?: { new_path?: unknown; new_line?: unknown } | null };
+type Note = { id?: unknown; system?: unknown; body?: unknown; created_at?: unknown; resolvable?: unknown; resolved?: unknown; author?: { id?: unknown; username?: unknown } | null; position?: { new_path?: unknown; new_line?: unknown } | null };
+
+/** 本文が ccnavi の目印で始まるか（jq の `marked` と同じ。文字列でない本文は目印ではない） */
+function marked(n: Note | undefined): boolean {
+  const body = alt(n?.body, "");
+  return typeof body === "string" && body.startsWith("<!-- ccnavi:");
+}
 
 /**
- * MR のスレッド（sh の `threads` の GitLab の枝と同じ読み方）。最初のノートが解決できる discussion だけ。
- * 解決済みは、解決できるノートが全部解決しているとき。url は MR の URL + `#note_<最初のノートの id>`
+ * MR のスレッド（sh の `threads` の GitLab の枝と同じ読み方）。判定に使うノートは、discussion のノートから
+ * `system: true` を除いたもの（空なら discussion ごと除く）。対象は、そのノートが 1 つでも解決できる discussion。
+ * 解決済みは、解決できるノートが全部解決しているとき。代表のノート（本文・位置・書き手・url）は、本文が
+ * ccnavi の目印で始まらない最初のノート（無ければ先頭）。ユーザが依頼コメントに返信したスレッドは返信が代表になる。
+ * url は MR の URL + `#note_<代表のノートの id>`。`own` は、ノートの本文が全部目印で始まるときだけ真
  */
 export async function discussions(client: Client, owner: string, repo: string, number: number, mrUrl: string): Promise<ReviewThread[]> {
   const all = await pages(client, `${project(owner, repo)}/merge_requests/${number}/discussions`, THREAD_PAGES, `マージリクエスト !${number} のスレッド`);
   const out: ReviewThread[] = [];
   for (const d of all as { id?: unknown; notes?: unknown }[]) {
-    const notes = (Array.isArray(alt(d.notes, [])) ? (alt(d.notes, []) as Note[]) : []) ?? [];
+    const given = (Array.isArray(alt(d.notes, [])) ? (alt(d.notes, []) as Note[]) : []) ?? [];
+    const notes = given.filter((n) => n?.system !== true);
     if (notes.length === 0) continue;
-    const first = notes[0] ?? {};
-    if (alt(first.resolvable, false) === false) continue;
     const resolvable = notes.filter((n) => alt(n?.resolvable, false) !== false);
+    if (resolvable.length === 0) continue;
+    const first = notes.find((n) => !marked(n)) ?? notes[0] ?? {};
     const pos = first.position ?? null;
     const last = notes[notes.length - 1] ?? {};
     // jq と同じく、欄の型はそのまま残す（文字列の行番号を数に直さない）。書き手は username でなく id
@@ -413,6 +388,7 @@ export async function discussions(client: Client, owner: string, repo: string, n
       body: alt(first.body, "") as string,
       created_at: alt(first.created_at, "") as string,
       author: tostring(alt(first.author?.id, "")),
+      own: notes.every((n) => marked(n)),
       last_id: tostring(alt(last.id, "")),
       last_at: alt(last.created_at, "") as string,
       last_author: String(alt(last.author?.username, "")),

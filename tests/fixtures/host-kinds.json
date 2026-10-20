@@ -1,0 +1,30 @@
+{
+  "note": "origin の URL -> ホストの分類と接続先。Python（review_host.classify）・sh（ccnavi_host_parse）・Chrome 拡張（hostclass.ts の classifyOrigin）が同じ表で一致を確かめる。host は分類に使うホスト（小文字・ポート無し）。api は REST の根、graphql は GitHub 系の GraphQL（GitLab は REST だけなので null）。problem があるものは接続先を組めず止まる（api と graphql は無い）。GHE.com の API の URL の規則は実物では未検証で、この表は仕様の前提を固定するもの。",
+  "cases": [
+    {"origin": "https://github.com/acme/widgets.git", "kind": "github", "host": "github.com", "api": "https://api.github.com", "graphql": "https://api.github.com/graphql", "path": "acme/widgets"},
+    {"origin": "https://GITHUB.COM/acme/widgets.git", "kind": "github", "host": "github.com", "api": "https://api.github.com", "graphql": "https://api.github.com/graphql", "path": "acme/widgets"},
+    {"origin": "https://github.com:443/acme/widgets.git", "kind": "github", "host": "github.com", "api": "https://api.github.com", "graphql": "https://api.github.com/graphql", "path": "acme/widgets"},
+    {"origin": "git@github.com:acme/widgets.git", "kind": "github", "host": "github.com", "api": "https://api.github.com", "graphql": "https://api.github.com/graphql", "path": "acme/widgets"},
+    {"origin": "ssh://git@github.com/acme/widgets.git", "kind": "github", "host": "github.com", "api": "https://api.github.com", "graphql": "https://api.github.com/graphql", "path": "acme/widgets"},
+    {"origin": "https://github.com/acme/widgets.git/", "kind": "github", "host": "github.com", "api": "https://api.github.com", "graphql": "https://api.github.com/graphql", "path": "acme/widgets"},
+    {"origin": "https://[::1]/g/p.git", "kind": "gitlab", "host": "[::1]", "api": "https://[::1]/api/v4", "graphql": null, "path": "g/p"},
+    {"origin": "http://[::1]:8080/g/p.git", "kind": "gitlab", "host": "[::1]", "api": "http://[::1]:8080/api/v4", "graphql": null, "path": "g/p"},
+    {"origin": "https://nri.ghe.com/acme/widgets.git", "kind": "github", "host": "nri.ghe.com", "api": "https://api.nri.ghe.com", "graphql": "https://api.nri.ghe.com/graphql", "path": "acme/widgets"},
+    {"origin": "https://foo.ghe.com/acme/widgets.git", "kind": "github", "host": "foo.ghe.com", "api": "https://api.foo.ghe.com", "graphql": "https://api.foo.ghe.com/graphql", "path": "acme/widgets"},
+    {"origin": "https://ghe.com/acme/widgets.git", "kind": "github", "host": "ghe.com", "api": "https://api.ghe.com", "graphql": "https://api.ghe.com/graphql", "path": "acme/widgets"},
+    {"origin": "https://NRI.GHE.COM/acme/widgets.git", "kind": "github", "host": "nri.ghe.com", "api": "https://api.nri.ghe.com", "graphql": "https://api.nri.ghe.com/graphql", "path": "acme/widgets"},
+    {"origin": "HTTPS://nri.ghe.com/acme/widgets.git", "kind": "github", "host": "nri.ghe.com", "api": "https://api.nri.ghe.com", "graphql": "https://api.nri.ghe.com/graphql", "path": "acme/widgets"},
+    {"origin": "git@nri.ghe.com:acme/widgets.git", "kind": "github", "host": "nri.ghe.com", "api": "https://api.nri.ghe.com", "graphql": "https://api.nri.ghe.com/graphql", "path": "acme/widgets"},
+    {"origin": "https://nri.ghe.com:8443/acme/widgets.git", "kind": "github", "host": "nri.ghe.com", "problem": "ポート", "path": "acme/widgets"},
+    {"origin": "https://evilgithub.com/acme/widgets.git", "kind": "gitlab", "host": "evilgithub.com", "api": "https://evilgithub.com/api/v4", "graphql": null, "path": "acme/widgets"},
+    {"origin": "https://github.com.evil/acme/widgets.git", "kind": "gitlab", "host": "github.com.evil", "api": "https://github.com.evil/api/v4", "graphql": null, "path": "acme/widgets"},
+    {"origin": "https://evilghe.com/acme/widgets.git", "kind": "gitlab", "host": "evilghe.com", "api": "https://evilghe.com/api/v4", "graphql": null, "path": "acme/widgets"},
+    {"origin": "https://ghe.com.evil/acme/widgets.git", "kind": "gitlab", "host": "ghe.com.evil", "api": "https://ghe.com.evil/api/v4", "graphql": null, "path": "acme/widgets"},
+    {"origin": "https://foo.aslead.cloud/acme/widgets.git", "kind": "gitlab", "host": "foo.aslead.cloud", "api": "https://foo.aslead.cloud/api/v4", "graphql": null, "path": "acme/widgets"},
+    {"origin": "https://gitlab.com/acme/widgets.git", "kind": "gitlab", "host": "gitlab.com", "api": "https://gitlab.com/api/v4", "graphql": null, "path": "acme/widgets"},
+    {"origin": "https://gitlab.example.com:8929/g/p.git", "kind": "gitlab", "host": "gitlab.example.com", "api": "https://gitlab.example.com:8929/api/v4", "graphql": null, "path": "g/p"},
+    {"origin": "http://localhost:8929/demo/greeter.git", "kind": "gitlab", "host": "localhost", "api": "http://localhost:8929/api/v4", "graphql": null, "path": "demo/greeter"},
+    {"origin": "https://git.unknown.example/acme/widgets.git", "kind": "gitlab", "host": "git.unknown.example", "api": "https://git.unknown.example/api/v4", "graphql": null, "path": "acme/widgets"},
+    {"origin": "git@gitlab.example.com:g/p.git", "kind": "gitlab", "host": "gitlab.example.com", "api": "https://gitlab.example.com/api/v4", "graphql": null, "path": "g/p"}
+  ]
+}

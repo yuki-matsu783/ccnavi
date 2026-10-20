@@ -57,6 +57,9 @@ def skip_if_too_big_for_argument(test: unittest.TestCase, scene_dir: str) -> Non
         test.skipTest(f"{size} 字の引数を jq に渡せない（引数の上限）")
 
 
+# 写す sh の出どころ。`CCNAVI_SH_DIR` で差し替えられる（既定はこのツリーの `.ccnavi/scripts/`）。
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+
 # 写す sh。decide の置く形は、ユーザ専用の ccnavi-user-decide.sh（共有の部品を読む）に移った。
 REVIEW_SH = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")
 
@@ -136,8 +139,8 @@ class HostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in (*REVIEW_SH, *common_sh()):
-            shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
+        for name in (*REVIEW_SH, *common_sh(SH_DIR)):
+            shutil.copy(os.path.join(SH_DIR, name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)
         subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "seed"], check=True)
@@ -517,8 +520,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in (*REVIEW_SH, *common_sh()):
-            shutil.copy(os.path.join(ROOT, ".ccnavi", "scripts", name), scripts)
+        for name in (*REVIEW_SH, *common_sh(SH_DIR)):
+            shutil.copy(os.path.join(SH_DIR, name), scripts)
         git = ["git", "-C", self.ws, "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
         subprocess.run(["git", "init", "-q", "-b", "i0001", self.ws], check=True)
         subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "seed"], check=True)
@@ -577,6 +580,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 "nested",
                 "odd-types",
                 "paged",
+                "replies",
+                "replies-accepted",
                 "requested-changes",
                 "resolved",
             ],
@@ -617,6 +622,10 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(len(said("hostile")["unresolved"]), 8)
         self.assertEqual(said("nested"), said("resolved"))
         self.assertEqual(len(said("odd-types")["unresolved"]), 2)
+        # 依頼コメントへの返信は指摘として数える。依頼だけ・コメントだけ・system だけは数えない。
+        # 受け入れの返信を足してホストで解決した後は、数えない
+        self.assertEqual(len(said("replies")["unresolved"]), 6)
+        self.assertEqual(said("replies-accepted")["unresolved"], [])
 
     def test_a_fork_merge_request_is_not_picked(self):
         """フォークの同じ名前のブランチの MR（source_project_id が違う）は拾わない。"""

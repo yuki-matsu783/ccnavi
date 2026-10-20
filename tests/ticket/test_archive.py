@@ -581,7 +581,7 @@ class SecondReviewTest(ReadyHarness):
 class SecondReviewModuleTest(ArchiveTreeHarness):
     """2 回目のレビューの指摘の再現（archive.py）。"""
 
-    def test_10_a_withdrawn_child_flow_goes_with_its_family(self):
+    def test_10_a_ticketless_child_flow_goes_with_its_family(self):
         write(os.path.join(self.approved, "flows", "i0001-01-09.yml"), "steps: []\n")
         todo = archive.plan(self.approved, ["i0001"])
         self.assertIn("flows/i0001-01-09.yml", todo.files)
@@ -624,7 +624,7 @@ class PhaseChildIdsTest(ArchiveTreeHarness):
             closed_text("i0001-02-01", "i0001", 2),
         )
         write(os.path.join(self.approved, "flows", "i0001-02-01.yml"), "steps: []\n")
-        # 取り下げた子（チケットはどこにも無く、フローだけが残る）
+        # チケットが消えた子（チケットはどこにも無く、フローだけが残る）
         write(os.path.join(self.approved, "flows", "i0001-03-02.yml"), "steps: []\n")
         # 識別子が `<親>-<2 桁>` の親。新しい形では子の形ではないので、別の親子のまま
         write(os.path.join(self.approved, "doing", "i0001-02.md"), closed_text("i0001-02"))

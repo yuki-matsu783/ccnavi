@@ -126,7 +126,6 @@ test("CX-T113 PAT は画面へ返さない（どの頼みの答えにも入ら�
   const answers = [
     await dispatch({ kind: "token.status", host: "github.com" }, BOARD, withSpy),
     await dispatch({ kind: "host", host: "github.com", op: "viewer", args: ["acme", "widgets"] }, BOARD, withSpy),
-    await dispatch({ kind: "host", host: "github.com", op: "approvalCommit", args: ["acme", "widgets", head, ".ccnavi/approved/doing/i0001.md"] }, BOARD, withSpy),
     await dispatch({ kind: "host", host: "github.com", op: "pullApprovals", args: ["acme", "widgets", "i0001"] }, BOARD, withSpy),
     await dispatch(
       { kind: "host", host: "github.com", op: "commit", args: ["acme", "widgets", "i0001", head, "見出し", "", [{ path: "wip/proposals/y.md", contents: "eQo=" }], []] },
@@ -136,7 +135,7 @@ test("CX-T113 PAT は画面へ返さない（どの頼みの答えにも入ら�
     await dispatch({ kind: "token.get", host: "github.com" }, BOARD, withSpy),
   ];
   for (const a of answers) assert.ok(!JSON.stringify(a).includes(TOKEN), JSON.stringify(a));
-  assert.equal(answers[5].ok, false);
+  assert.equal(answers[4].ok, false);
   assert.ok(bodies.length > 0);
   for (const b of bodies) assert.ok(!b.includes(TOKEN), b);
 });

@@ -14,7 +14,7 @@ import { startAutoRefresh, type AutoRefresh, type AutoRefreshEnv } from "../core
 import { readRepos, repoKey, saveRecentDays, type RepoConfig, type StorageArea } from "../core/settings.js";
 import { collectRepo, type BlobCache, type Deps, type FamilyBoard, type HostCall, type RepoBoard, type Stats } from "../core/snapshot.js";
 import { listIssues, startIssue } from "../core/start.js";
-import { approveFamily, confirmPhase, withdrawTicket, type Outcome, type WriteDeps } from "../core/write.js";
+import { approveFamily, confirmPhase, type Outcome, type WriteDeps } from "../core/write.js";
 import type { PyWorker } from "./py-client.js";
 
 /** 親子のチケットごとの「要確認」（リポジトリの鍵 → 親のブランチ名 → 文面）。`chrome.storage.local` の `attention` */
@@ -29,7 +29,6 @@ export interface IssueList {
 /** ボタンを押したときの動き。ボードの欄（`Repo.tsx`）に渡す */
 export interface Actions {
   approve(repo: RepoBoard, family: FamilyBoard): void;
-  withdraw(repo: RepoBoard, family: FamilyBoard, ticket: string): void;
   /** レビュー済みにする。渡さなければ「レビュー済みにする」を出さない */
   review?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
   /** issue の一覧を読む（「始める」）。渡さなければ「始める」の欄を出さない */
@@ -98,7 +97,6 @@ export interface BoardOps {
   readonly collectRepo: typeof collectRepo;
   readonly approveFamily: typeof approveFamily;
   readonly confirmPhase: typeof confirmPhase;
-  readonly withdrawTicket: typeof withdrawTicket;
   readonly listIssues: typeof listIssues;
   readonly startIssue: typeof startIssue;
   readonly saveRecentDays: typeof saveRecentDays;
@@ -142,7 +140,7 @@ export interface BoardController {
   start(): void;
 }
 
-const DEFAULT_OPS: BoardOps = { collectRepo, approveFamily, confirmPhase, withdrawTicket, listIssues, startIssue, saveRecentDays };
+const DEFAULT_OPS: BoardOps = { collectRepo, approveFamily, confirmPhase, listIssues, startIssue, saveRecentDays };
 
 function newStats(): Stats {
   return { rest: 0, graphql: 0, blobsFetched: 0, blobsCached: 0 };
@@ -337,17 +335,6 @@ export function createBoardController(env: BoardEnv): BoardController {
         const outcome = await ops.confirmPhase(repoBoard.repo, family.family.name, phase, deps);
         await noteAttention(repoBoard.repo, family.family.name, outcome);
         say(outcome, "レビュー済み");
-        return true;
-      });
-    },
-    withdraw(repoBoard, family, ticket) {
-      void act(async () => {
-        if (await blocked(repoBoard.repo, family.family.name)) return false;
-        if (!env.confirm(`${ticket} の承認を取り下げて todo/ に戻します。よろしいですか？`)) return false;
-        const deps = await writeDeps(repoBoard.repo);
-        const outcome = await ops.withdrawTicket(repoBoard.repo, family.family.name, ticket, deps);
-        await noteAttention(repoBoard.repo, family.family.name, outcome);
-        say(outcome, "取り下げ");
         return true;
       });
     },

@@ -2615,7 +2615,7 @@ class WriteAndPushChromeConfirmTest(PhaseOne, WriteAndPushHarness):
         if "paged" in said:
             self.assertIn("未解決のスレッドが 4 件", said["paged"])
         for scene in ("changes-requested", "cr-commented", "pending"):
-            self.assertIn("変更要求のレビューが立っている", said[scene], scene)
+            self.assertIn("変更要求（Changes requested）が出ています", said[scene], scene)
 
     def test_chrome_writes_what_write_and_push_writes_and_sends(self):
         body = self.request()

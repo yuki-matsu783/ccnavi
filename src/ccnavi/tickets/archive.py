@@ -314,7 +314,7 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
     在るもの（前の回が途中で止まった残り。`root` を渡したときだけ）。子は名前の形ではなくチケットの
     `parent:` 欄で親に結ぶ（`rel-01` という親を `rel` の子と取り違えない）。
     フローは、
-    その親か、`done/`（または退避）に在る子のもの、どこにもチケットの無い子（取り下げた子）のもの。
+    その親か、`done/`（または退避）に在る子のもの、どこにもチケットの無い子のもの。
     `phases/<親>/` は下をすべて。
     """
     done = _done_copies(approved_dir)
@@ -335,7 +335,7 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
             held = archived_fields(root, project, ident)
             if held is not None and held.parent in family:
                 children.add(ident)
-    # どの置き場にもチケットの無い識別子（取り下げた子など）。
+    # どの置き場にもチケットの無い識別子（チケットが消えた子など）。
     # フローしか残っていないので、
     # このときだけ子の形（`<親>-<フェーズ番号>-<連番>`）で親に結ぶ。チケットが在る識別子は
     # `parent:` 欄で決める。

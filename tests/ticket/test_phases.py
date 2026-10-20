@@ -729,13 +729,54 @@ class PhaseTest(PhaseHarness):
         self.assertNotEqual(self.confirm(fixture, 1).returncode, 0)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
-        # フィードバック計画: 実装フィードバック対応を 1 本。承認がレビューの合意になり、
-        # 止まっていたのが解ける。指摘は消えず、フィードバック作業フェーズの check が数える。
+        # フィードバック計画の承認ではレビューの状態を変えない。レビューが済む前は拒む。
         self.start_parent()
         self.propose("i0001", parent_text("i0001", ["design"], feedback=["implement-feedback"]))
+        early = self.approve()
+        self.assertNotEqual(early.returncode, 0)
+        self.assertIn("レビューが済んでから", early.stderr)
+        # 最後のレビューでも、残った指摘を issue に回せる（フィードバック計画の有無に関わらない）。
+        # 回す先を選んだ decide がレビュー済みにする。
+        last = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "user",
+            "reviewed",
+            "1",
+            "--accept-unresolved",
+            "--preview",
+            "--json",
+            "--result",
+            fixture,
+        )
+        self.assertEqual(last.returncode, 0, last.stderr)
+        last_preview = json.loads(last.stdout)
+        self.assertTrue(last_preview["can_issue"])
+        settled = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "user",
+            "reviewed",
+            "1",
+            "--accept-unresolved",
+            "--yes",
+            json.dumps({"u/7#t0": "issue"}),
+            "--digest",
+            last_preview["digest"],
+            "--json",
+            "--result",
+            fixture,
+        )
+        self.assertEqual(settled.returncode, 0, settled.stdout + settled.stderr)
+        self.assertTrue(json.loads(settled.stdout)["reviewed"])
+        reviewed_mark = os.path.join(self.approved, "phases", "i0001", "1.reviewed")
+        with open(reviewed_mark, "rb") as f:
+            reviewed_before = f.read()
         planned = self.approve()
         self.assertEqual(planned.returncode, 0, planned.stdout + planned.stderr)
-        self.assertIn("済ませた扱い", planned.stdout)
+        self.assertNotIn("済ませた扱い", planned.stdout)
+        with open(reviewed_mark, "rb") as f:
+            self.assertEqual(f.read(), reviewed_before)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
         result = self.ccnavi("--explain")
@@ -755,9 +796,6 @@ class PhaseTest(PhaseHarness):
         # 前の指摘が残ったままなので、フィードバック作業フェーズの check も通らない。
         refused = self.confirm(fixture, 2)
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("u/7#t0", refused.stderr)
-        self.assertIn("選べるのは 2 つ", refused.stderr)
-        self.assertIn("decide", refused.stderr)
         data = read_json(fixture)
         data["threads"].append({"id": "t1", "resolved": False, "url": "u/7#t1", "body": "まだ"})
         write(fixture, json.dumps(data))

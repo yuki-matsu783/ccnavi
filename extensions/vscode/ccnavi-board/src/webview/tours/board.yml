@@ -205,7 +205,7 @@ sample:
       parent: sample-c
       phase: 1
       mr: { number: 12, url: "https://example.com/sample/pulls/12" }
-      can_issue: false
+      can_issue: true
       digest: "v2.eyJiIjoiYSIsInQiOnt9fQ"
       threads:
         - { key: thread-1, url: "https://example.com/sample/pulls/12#discussion_r1", path: src/log.ts, line: 42, body: "レベルの名前を定数にまとめてほしい\n同じ文字列が 3 か所にある" }
@@ -297,7 +297,7 @@ courses:
         body: フェーズ行の「レビューの対応」を押すと、「対応方針を決める」と「レビュー済み連絡」のメニューが開きます。押しただけでは何も実行されません。
       - target: decide-threads
         title: 残った指摘の対応方針を選ぶ
-        body: 未解決（Unresolved）の指摘を 1 件ずつ並べ、対応方針を選びます。「対応しない」は受け入れて進み、「このフェーズで直す」は追加対応用の子チケットを作成し、このフェーズを再開します。「issue に回す」は、フィードバック計画の承認後に選べます。
+        body: 未解決（Unresolved）の指摘を 1 件ずつ並べ、対応方針を選びます。「対応しない」は受け入れて進み、「このフェーズで直す」は追加対応用の子チケットを作成し、このフェーズを再開します。「issue に回す」は、指摘を別の issue に切り出して管理します。
         scene: { overlay: decide }
       - target: decide-confirm
         title: 方針を決める

@@ -454,24 +454,6 @@ def _apply_steps(
                 if scope_changed:
                     what = f"{what}・範囲" if what else "範囲"
                 stage.line(f"  {t.ticket} の{what}を改版した")
-                if cand.plans_feedback:
-                    # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
-                    with fsio.policy(prefix="マーカーを置けない: "):
-                        failed = phase.settle_last_review(where, t, stamp)
-                    if failed:
-                        return t.ticket, f"マーカーを置けない: {failed}"
-                    # 全体計画の子でレビュー待ちに残っているものは、見たうえでの計画なので閉じる。
-                    moved, failed = approval_ops.settle_review(
-                        conf, root, t.ticket, list(range(1, len(t.plan) + 1)), by="feedback-plan"
-                    )
-                    if failed:
-                        return t.ticket, failed
-                    if moved:
-                        stage.line(f"  レビュー待ちの子を閉じた: {', '.join(moved)}")
-                    stage.line(
-                        "  全体計画の最後のレビューを済ませた扱いにした。残った指摘は"
-                        "フィードバック作業フェーズの confirm が数える"
-                    )
                 continue
             where = approval.home_dir(
                 conf, root, t.ticket, t.parent, t.tree_root, project=t.project

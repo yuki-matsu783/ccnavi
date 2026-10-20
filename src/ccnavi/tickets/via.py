@@ -18,7 +18,7 @@ VIA_CLI = "cli"
 VIA_TERMINAL = "terminal"
 VIA_BOARD = "board"
 VIA_HOOK = "hook"
-#   chrome    Chrome 拡張から押した判断（承認の取り下げなど）
+#   chrome    Chrome 拡張から押した判断（承認・レビュー済みなど）
 VIA_CHROME = "chrome"
 
 _state: dict = {"via": VIA_CLI, "actor": ""}

@@ -51,7 +51,7 @@ function RepoBody({ board, actions, attention, issues }: RepoProps & { attention
   const dismiss = (family: string) => (actions?.dismiss ? () => actions.dismiss?.(board, family) : undefined);
   return (
     <>
-      {board.compat && !board.compat.same ? <Notice kind="warn" text={`${board.compat.message}（表示のみとし、承認と取り下げのボタンは表示しません）`} /> : null}
+      {board.compat && !board.compat.same ? <Notice kind="warn" text={`${board.compat.message}（表示のみとし、承認のボタンは表示しません）`} /> : null}
       {board.missingExtras.length > 0 ? <Notice kind="warn" text={`指定したブランチがリモートに見つかりません：${board.missingExtras.join(", ")}`} /> : null}
       <p className="scope">{`確認したブランチ（表示用）：${board.candidates.length === 0 ? "なし" : board.candidates.join(", ")}`}</p>
       {board.families.length === 0 ? <p className="empty">確認したブランチの中に、親チケットに対応するブランチはありません。</p> : null}
@@ -67,7 +67,6 @@ function RepoBody({ board, actions, attention, issues }: RepoProps & { attention
                 ? undefined
                 : {
                     approve: () => actions.approve(board, f),
-                    withdraw: (t) => actions.withdraw(board, f, t),
                     review: actions.review ? (n: number) => actions.review?.(board, f, n) : undefined,
                   }
             }

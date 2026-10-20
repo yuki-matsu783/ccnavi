@@ -1947,7 +1947,11 @@ feedback:                              # フィードバック計画。レビュ
   エージェントが打ってよい。承認は書き換えたあとの一覧で行い、
   承認を渡す文は「番号は承認済みチケットで読み直す」と添える
 - **合意は全部 `user agree` を通る。** 全体計画は親の承認、各フェーズの計画はその番号の子の承認、フィードバック計画は `feedback:` を
-  足した親の改版の承認（全体計画の最後のレビューが済んでから 1 回だけ。指摘が無くても `feedback: []` で出す）
+  足した親の改版の承認（全体計画の最後のレビューが済んでから 1 回だけ。指摘が無くても `feedback: []` で出す）。
+  この承認は**レビューの状態を変えない**（`reviewed` を置かず、`review/` の子も動かさない）。最後のフェーズが
+  レビュー済み（`reviewed` あり。レビュー不要・延期は今までどおり。手で `done/` に動かした子の確定でもよい）でなければ拒む。
+  まとめて承認するとき、この改版と同じ親の全体計画の番号の子が同じ承認に入っていたら、改版と該当する子を両方拒む
+  （全体計画に足す子を先に承認し、その作業と再レビューを済ませてから改版を承認する）
 - **順序は承認で止まる。** N 番目の子は、N 番目が待つ番号が全部閉じてレビュー（延期でなければ）が済むまで承認されない。
   フェーズには必ず子が 1 本以上あり、親は計画・依頼だけをする（合流は子の `finish`）
 - **改版**で変えられるのは `plan`・`feedback`・`phases:`・範囲（`allow`・`ask`・`deny`）だけ。範囲を変える改版は、作業中（`doing/`）の子が居ないときだけ通る。錠は番号ごとで、子が承認された番号の項は定義・`review`・番号・待ちを
@@ -1993,7 +1997,7 @@ ccnavi は、1 台の PC・1 つのセッションで完結する個人作業だ
    push が通らなければ戻して取り込み直し、もう 1 回だけ試す。2 回目も通らなければ戻して `ccnavi-sync.sh` を案内して終わる
 
 **承認者・レビュアーの操作は、作業者の環境に閉じ込めない。** Chrome 拡張は、承認者のブラウザとトークンだけで動き、親のブランチへ
-1 コミットとして承認・取り下げ・レビュー済みを書く（GitHub は `expectedHeadOid` で書く時点の先頭を確かめる）。VS Code のボードは、
+1 コミットとして承認・レビュー済みを書く（GitHub は `expectedHeadOid` で書く時点の先頭を確かめる）。VS Code のボードは、
 ユーザの VS Code が ccnavi の実行ファイルを呼び、端末の入力を要しない。どちらも、ほかの人が作業しているセッションへ文を送り込む手段は持たず、
 結果は次の `fetch` / `sync` で作業側に届く。拡張は表示と書き込みの入口で、判定のコアは hook と同じ ccnavi を使う。
 
@@ -2065,12 +2069,17 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 - **対応しない（受け入れて進む）。** スレッドに受け入れて進む旨の返信を残して解決済みにする（sh が置く前にする。返信か解決に失敗したら何も置かずに止まる）。次の `confirm` はホスト上の未解決だけを数える。受け入れは親全体に当てはまり、他の人が開き直せば未解決として数える
 - **このフェーズで直す。** 直す指摘を写した続きの子を、同じフェーズの番号で `.ccnavi/approved/doing/<親>-<フェーズ番号>-<そのフェーズの次の連番>.md` に直に置く
   （範囲は見た子の範囲の和）。本文は「### 指摘 N」の見出しごとに、指摘の鍵・URL・位置・版と最初のコメントの全文を転記する。frontmatter に操作記録の ID `ccnavi_op` が入る。フェーズは開き直り、マーカーは消える
-- **issue に回す。** 受け入れたうえで（返信に issue の下書きを置く旨も書く）、その指摘を載せた issue を作る。フィードバック計画が承認されたあとだけ選べる。本文が 60000 字に収まらなければ、issue の本文には目次（鍵・URL・版）だけを置き、全文は同じ issue への続きのコメントに分ける
+- **issue に回す。** 受け入れたうえで（返信に issue の下書きを置く旨も書く）、その指摘を載せた issue を作る。いつでも選べる（`decide` が求める前提の範囲で）。本文が 60000 字に収まらなければ、issue の本文には目次（鍵・URL・版）だけを置き、全文は同じ issue への続きのコメントに分ける
 
 直す指摘が無く、見せたあとに増えた指摘（追加分）も無ければレビュー済みにし、1 件でも直すなら見た子を `done/` へ動かしてマーカーは置かない。追加分は止めずに未対応のまま残し（結果の `pending_extra`）、直す指摘が無ければレビュー済みのマーカーも置かない。次の `decide` で扱う。決めた内容は sh がコメントに写す。
 途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送れる（操作記録は `logs/state/ops/`）。
 ボードの経路は端末を求めない代わりに、見せた指摘のダイジェスト（`digest`）の一致を求め、エージェントが同じ形を打つ経路は組み込みの deny が止める。
-変更要求のレビューが出ている間はどの経路も通らない。解除できるのはレビュアーの approve / dismiss だけ。
+変更要求のレビューが出ている間はどの経路も通らない（判定はホストを問わず同じ）。案内はホスト（取得した結果の `host`）ごとに出し分ける。
+
+| ホスト | 案内 |
+|---|---|
+| GitLab | 変更を依頼（Request changes）が出ています。解除はレビュアーの承認（Approve）で行います。作成者によるレビューの再依頼（Re-request review）で状態が戻るかは未検証です。再依頼した場合も、ccnavi で状態を取り直して確かめます |
+| GitHub | 変更要求（Changes requested）が出ています。解除はレビュアーの Approve か、レビューの dismiss で行います |
 
 **リモートを読み書きするのは sh で、実行ファイルはネットワークに出ない。** マージリクエストの中身は `ccnavi-review.sh` が取ってきて
 JSON で渡す（`--result <path>`）。
@@ -2087,7 +2096,7 @@ JSON で渡す（`--result <path>`）。
 | `origin` | origin をどう読んだか（ホスト・scheme・API の URL・使う道具）。origin の読み方が合わないときに確かめる |
 
 - 道具は `gh` / `glab` があればそれ、無ければ `curl` と `GITHUB_TOKEN` / `GITLAB_TOKEN`。どちらも無ければ止まる。`jq` が要る。
-  道具は起動時に絶対パスへ解いて固定する。GitHub と GitLab は origin の URL で見分ける
+  道具は起動時に絶対パスへ解いて固定する。GitHub と GitLab は origin の URL で見分ける（`github.com`・`ghe.com`・`*.ghe.com` が GitHub、それ以外は GitLab）
 - origin の表記はポートと scheme をそのまま使う（`http://localhost:8929/g/p.git` なら `http://localhost:8929/api/v4`）。
   URL に埋めた資格情報は読み飛ばし、出力では伏せる
 - push の認証は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは `GIT_CONFIG_COUNT` を外し
@@ -2873,7 +2882,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ```
 
 - `key` は選択を指摘に結び付ける鍵（URL か、無ければスレッドの id）。`reviewed` のマーカーの `accepted` 欄にもこの値が入る
-- `can_issue` は issue に回せるか（フィードバック計画が承認されたあとだけ真）
+- `can_issue` は issue に回せるか。常に真（互換のために欄を残す）
 - `digest` は見せた指摘のダイジェスト。`v2.` で始まる不透明な文字列で、中身は読まない。親・フェーズ・マージリクエストの番号・`can_issue`・各指摘の鍵と場所と本文に加え、指摘ごとの版（`thread_version`）も含む。指摘ごとの版は、見せたあとに指摘が書き換わったかを見分けるために使う
 
 `ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>`（実行ファイルは `user reviewed N --accept-unresolved --yes <JSON> --digest <ダイジェスト> --json`）は
@@ -2898,7 +2907,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ## 版の JSON
 
 ```sh
-ccnavi --version          # 1 行 1 項目（`compat: 17` など。sh が読む）
+ccnavi --version          # 1 行 1 項目（`compat: 18` など。sh が読む）
 ccnavi --version --json
 ```
 
@@ -2906,7 +2915,7 @@ ccnavi --version --json
 `.ccnavi/scripts/` の sh で、どちらも起動のときに互換の版を自分のものと比べる。
 
 ```json
-{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 17,
+{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 18,
  "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}
 ```
@@ -2925,7 +2934,7 @@ ccnavi --version --json
 **互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
 sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたときに上げる。データの形（承認済みの置き場に置くものの並び、
-待ち方の置き場、取り下げの条件など）が変わるときも上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が
+待ち方の置き場など）が変わるときも上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が
 新しい形のデータを読み違えるため。フラグや欄を足すだけで、データの形も変わらないなら上げない（拡張は使う前に `flags` を見る）。
 レイヤーのファイルは頭の `version:` が書式の版を示し、読めない版は `--lint` が既に error を出すので、レイヤーに別の版は足さない。
 
@@ -3372,7 +3381,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/policy/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルのバックアップと復元 |
 | `src/ccnavi/policy/selfguard_targets.py` | 守る対象の一覧。設定ファイル・層の 3 本・実行ファイルと、ワークツリー側の写し |
 | `src/ccnavi/policy/selfguard_shell.py` | 守る対象へのシェルからの書き込みを止める組み込みのルール（正規表現と `add_rules`） |
-| `src/ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、承認・取り下げ・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、リスク、操作 |
+| `src/ccnavi/tickets/` | チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、承認・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、リスク、操作 |
 | `src/ccnavi/tickets/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
 | `src/ccnavi/tickets/ticket_model.py` | チケットの形。書式の定数・状態の名前・範囲の項・計画の項・待ち方と `Ticket` |
 | `src/ccnavi/tickets/ticket_ids.py` | 識別子とブランチ名の規則。issue から識別子を作る手順 |
@@ -3418,11 +3427,10 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/ops_stop_integrate.py` | Stop で、チケットに結び付かない直接作業が `integrate` まで進んでいないことを見つけ、打ち方を促す判定（統合先のツリーが綺麗でないときは促さず理由を言う） |
 | `src/ccnavi/tickets/base_bound.py` | `ccnavi tree base-bound`。直接作業の取り込み先のブランチがチケットに結び付くか（識別子の衝突はワークスペース全体、取り込み先との結び付きは取り込み先のリポジトリだけを見る） |
 | `src/ccnavi/tickets/ops_stop_request.py` | Stop でレビュー依頼までの道（`finish`・すべての子が合流済みかの確認・ELI5・`request`）の途中を見つけ、次の一手を促す判定 |
-| `src/ccnavi/tickets/core.py` | 承認・取り下げ・レビュー済みの判定のコアの入口。名前を束ね直すだけで、`entry/cli.py` と Chrome 拡張（Pyodide）はここを引く |
+| `src/ccnavi/tickets/core.py` | 承認・レビュー済みの判定のコアの入口。名前を束ね直すだけで、`entry/cli.py` と Chrome 拡張（Pyodide）はここを引く |
 | `src/ccnavi/tickets/core_base.py` | 判定のコアの共通部分。入力（`Snapshot`）・承認の判定（`judge_approval`）・書くもの（`Changes`）・ディスクへの書き込み |
 | `src/ccnavi/tickets/core_approve.py` | 判定のコアを通す手元の承認の入口（`user agree` の 4 つの枝） |
 | `src/ccnavi/tickets/core_review.py` | 判定のコアを通すレビュー済み（`review confirm`）の判定 |
-| `src/ccnavi/tickets/core_withdraw.py` | 判定のコアを通す承認の取り下げ |
 | `src/ccnavi/tickets/write_and_push.py` | write-and-push で sh が聞くこと。親子のチケットが write-and-push の対象か（`write-and-push family`）と、置き場の変更の分け方（`write-and-push sort`） |
 | `src/ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント |
 | `src/ccnavi/hook/post.py` | 実行後チェックの手順。作業ツリーの読み取り、前からあった変更の記録、復元 |

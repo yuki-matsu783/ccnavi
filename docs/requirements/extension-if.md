@@ -28,7 +28,7 @@ JSON の欄の細かい形は README の各 JSON の節と [設計 10](../design
 | REQ-EXT-02 | 事象 | `--root <パス>` を受けたとき、ccnavi は、そのパスをワークスペースルートとして読むこと。`--root` が 2 度渡されたときは、標準エラーに理由を出して何もしないこと。ただし `--version` は `--root` を読まずに版を返すこと（REQ-EXT-04） |
 | REQ-EXT-03 | 常時 | ccnavi は、標準出力と標準エラーを、コンソールの文字コードによらず UTF-8・改行 LF で書くこと。`--explain --json`・`--test --json`・`--test-expectations --json`・`--lint --json`・`--suggest --json`・`--version --json` の JSON は ASCII に変換して（ASCII でない字は `\u` で）書き、承認の JSON（`user agree … --json`）と残った指摘の JSON は UTF-8 の字のまま書くこと |
 | REQ-EXT-04 | 事象 | `--version --json` を求められたとき、ccnavi は、設定もワークスペースも読まず、`schema`・`version`・`commit`・`built`・`compat`・`flags`・`formats` を返して 0 で終わること。`flags` は引数の定義から引き、足したフラグがそのまま並ぶこと |
-| REQ-EXT-05 | 常時 | ccnavi は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh、VS Code 拡張、Chrome 拡張）の契約の版（互換の版）を持ち、実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）・sh（`.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT`）・VS Code 拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）に同じ値を書くこと。呼ぶ側が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたとき、データの形（承認済みの置き場に置くものの並び、待ち方の置き場、取り下げの条件など）を変えたとき、sh が古い実行ファイルの知らないサブコマンドを呼ぶようになったときに 1 上げること。フラグや欄を足すだけでデータの形も変わらないなら上げないこと |
+| REQ-EXT-05 | 常時 | ccnavi は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh、VS Code 拡張、Chrome 拡張）の契約の版（互換の版）を持ち、実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）・sh（`.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT`）・VS Code 拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）に同じ値を書くこと。呼ぶ側が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたとき、データの形（承認済みの置き場に置くものの並び、待ち方の置き場など）を変えたとき、sh が古い実行ファイルの知らないサブコマンドを呼ぶようになったときに 1 上げること。フラグや欄を足すだけでデータの形も変わらないなら上げないこと |
 | REQ-EXT-06 | 常時 | ccnavi は、互換の版を、`src/ccnavi/entry/version.py` では行頭から行末までの 1 行 `COMPAT = <整数>`（`^COMPAT = N$`）で、`.ccnavi/scripts/ccnavi-common.sh` では行頭から始まる 1 行 `CCNAVI_COMPAT=<整数>`（`^CCNAVI_COMPAT=N$`）で書くこと。Chrome 拡張の組み立ては前者を、Chrome 拡張は統合先の後者を、それぞれ正規表現で読む |
 | REQ-EXT-07 | 異常時 | 知らないオプションを渡されたなら、ccnavi は、何もせずに argparse の文言（`ccnavi: error: unrecognized arguments: <オプション>`）を標準エラーに出し、終了コード 1 で終わること |
 | REQ-EXT-08 | 常時 | ccnavi は、使い方の誤りと読めない設定を、`ccnavi:` で始まる標準エラーの文と終了コード 1 で示すこと。終了コード 2 は hook の拒否と前の名前（`--approve`）の案内に、3 は確かめの「いいえ」（REQ-APV-13）に使い、1 と分けること |
@@ -95,15 +95,15 @@ Pyodide のメモリ上のファイルシステムに組んだ仮のツリーを
 | REQ-EXT-27 | 常時 | ccnavi は、下の表の名前（モジュール・関数・クラス・定数。下線で始まる `lint._SH_COMPAT` と `review._is_sha` を含む）を、表の引数と戻り値のまま置くこと。名前・引数・既存の戻り値を変える・消すときは、互換の版を上げること（REQ-EXT-05）。名前や戻り値の鍵を足すだけの変更（古い拡張が読み飛ばせるもの）では、互換の版を上げないこと |
 | REQ-EXT-28 | 事象 | `cli.run(stdin, stdout, stderr, argv)` を呼ばれたとき、ccnavi は、渡された標準入力・標準出力・標準エラーに書き、終了コードを返すこと（引数の読み違いの苦情だけは argparse がプロセスの標準エラーに書く）。判定の設定として読む環境変数は、名前が `CCNAVI_` で始まるものと `CLAUDE_PROJECT_DIR` に限ること |
 | REQ-EXT-29 | 事象 | `core.judge_approval(snapshot, only, shown_ids, shown_digest)` を呼ばれたとき、ccnavi は、`--agree --preview --json` と同じ関数で承認の対象・画面の本文・ダイジェストを出すこと。見せた識別子（`shown_ids`）とダイジェスト（`shown_digest`、提案の識別子の一覧と各提案ファイルのバイト列全体から作る。大文字小文字は問わない）が渡されたときは今のものと比べ、どちらかが違えば `mismatch`（`{expected, current, digest: {expected, current}}`）を返すこと。絞り（`only`）が通らないときは、絞らない一覧を今の一覧として比べること |
-| REQ-EXT-30 | 常時 | ccnavi は、`core.plan`・`core.withdraw`・`core.confirm` で、書くものを値（`Changes`）で返すだけにし、ディスクにもホストにも書かないこと。`withdraw` と `confirm` は、通らなければ `changes` を `None` にして理由を `problems` で返すこと。`Changes.per_branch()` はブランチごとに `{op: create\|update\|delete, path, content}`（`path` はツリーからの相対、`content` はバイト列）を返すこと |
-| REQ-EXT-31 | 常時 | ccnavi は、`Snapshot.stamp` が渡されたとき、書くものの時刻（マーカー・承認の記録）をその時刻に固定し、同じ入力から手元と同じバイト列を出すこと。`core.withdraw` と `core.confirm` は、`Snapshot.actor`（`Actor(account, via)`）のアカウントと経路をレビュー済みのマーカーに書くこと。`core.plan` が書くマーカーの経路とアカウントは、呼び手が `via.session` で渡すこと（Chrome 拡張は経路に `chrome` を渡す） |
+| REQ-EXT-30 | 常時 | ccnavi は、`core.plan`・`core.confirm` で、書くものを値（`Changes`）で返すだけにし、ディスクにもホストにも書かないこと。`confirm` は、通らなければ `changes` を `None` にして理由を `problems` で返すこと。`Changes.per_branch()` はブランチごとに `{op: create\|update\|delete, path, content}`（`path` はツリーからの相対、`content` はバイト列）を返すこと |
+| REQ-EXT-31 | 常時 | ccnavi は、`Snapshot.stamp` が渡されたとき、書くものの時刻（マーカー・承認の記録）をその時刻に固定し、同じ入力から手元と同じバイト列を出すこと。`core.confirm` は、`Snapshot.actor`（`Actor(account, via)`）のアカウントと経路をレビュー済みのマーカーに書くこと。`core.plan` が書くマーカーの経路とアカウントは、呼び手が `via.session` で渡すこと（Chrome 拡張は経路に `chrome` を渡す） |
 | REQ-EXT-32 | 常時 | ccnavi は、手元と同じ形に組んだ仮のツリー（ワークスペースルートに統合先、`.claude/worktrees/<識別子>` に親子のチケット、`projects/<名前>` にプロジェクトの統合先）を、手元と同じ関数で読むこと。ワークツリーの見分けとブランチ名は `.git` のファイル（`HEAD`・`gitdir:`）から読むこと。git を起こせない場（`sys.platform` が `emscripten`）では、承認の時刻のように git に頼る表示の値を分からないとして空にすること |
 
 Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 
 | モジュール | 名前 |
 |---|---|
-| `ccnavi.tickets.core` | `Snapshot`・`Actor`・`Changes`（`per_branch()`・`lines`・`planned.stopped`）・`read_fs(conf, root, stamp="", actor=None)`・`judge_approval(snapshot, only=None, shown_ids=None, shown_digest=None)`（戻り値の `gathered.refused`・`batch`・`mismatch`・`identifiers`・`screen_text`・`digest`・`rejected`）・`approval_refusal_code(verdict)`・`plan(snapshot, verdict)`・`withdraw(snapshot, ids, prior_proposals, reason="")`・`withdrawable(snapshot, family)`・`confirm(snapshot, parent_id, phase_no, result, changed_since_request)`（`withdraw` と `confirm` の戻り値の `problems`・`changes`・`code`）・`reviewable(snapshot, parent_id)`・`requested_head(snapshot, parent_id, phase_no)`・`moved_on_host(snapshot, parent_id, phase_no, head, changed)` |
+| `ccnavi.tickets.core` | `Snapshot`・`Actor`・`Changes`（`per_branch()`・`lines`・`planned.stopped`）・`read_fs(conf, root, stamp="", actor=None)`・`judge_approval(snapshot, only=None, shown_ids=None, shown_digest=None)`（戻り値の `gathered.refused`・`batch`・`mismatch`・`identifiers`・`screen_text`・`digest`・`rejected`）・`approval_refusal_code(verdict)`・`plan(snapshot, verdict)`・`confirm(snapshot, parent_id, phase_no, result, changed_since_request)`（`confirm` の戻り値の `problems`・`changes`・`code`）・`reviewable(snapshot, parent_id)`・`requested_head(snapshot, parent_id, phase_no)`・`moved_on_host(snapshot, parent_id, phase_no, head, changed)` |
 | `ccnavi.entry.cli` | `run(stdin, stdout, stderr, argv)` |
 | `ccnavi.entry.lint` | `SH_COMPAT_FILE`・`_SH_COMPAT`（`CCNAVI_COMPAT` の行を読む正規表現） |
 | `ccnavi.entry.version` | `VERSION`・`COMPAT` |
@@ -116,8 +116,8 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 
 REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が名前を直に引くため。改名すると、同梱の版を組み立て直すまで
 Chrome 拡張だけが動かなくなる。上げた互換の版は統合先の `CCNAVI_COMPAT` に載り、古い Chrome 拡張は書く操作を出さなくなる（REQ-CHR-03）。
-たとえば `approval_refusal_code` と、`withdraw`・`confirm` の戻り値の `code` を足したときは、古い拡張はそれを引かず読み飛ばすだけなので、互換の版を上げていない。
-`tests/ticket/test_swap_points.py` は、手元の承認・取り下げ・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
+たとえば `approval_refusal_code` と、`confirm` の戻り値の `code` を足したときは、古い拡張はそれを引かず読み飛ばすだけなので、互換の版を上げていない。
+`tests/ticket/test_swap_points.py` は、手元の承認・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
 
 REQ-EXT-29 のダイジェストが覆うものは README「[承認の JSON](../../README.md#承認の-json)」と同じ（提案の識別子の一覧と各提案ファイルのバイト列全体だけ）。
 違いがあれば拡張は書かずに「内容が更新されました」と最新を表示し直す。書いてよいのは、`batch` があり、`gathered.refused` も `mismatch` も無いときだけで、Chrome 拡張の入口は

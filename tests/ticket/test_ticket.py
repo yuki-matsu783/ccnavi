@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -1319,8 +1320,23 @@ class TicketTest(unittest.TestCase):
             posted = json.load(f)["comments"]
         self.assertIn("見てほしい点", posted[0]["body"])
         note = "wip/handoff/ 配下はユーザに渡す写しで、レビューの対象外。integrate で消える。"
-        self.assertTrue(posted[0]["body"].rstrip("\n").endswith(note), posted[0]["body"])
         self.assertEqual(posted[0]["body"].count(note), 1)
+        # 末尾は固定の 1 文（fix で直した指摘は、ユーザがホスト上で resolve する）。
+        # keep・issue のときに sh が返信して resolve する仕組みは、この文の対象外
+        resolve = (
+            "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。"
+            "エージェントは fix を理由に resolve しない。"
+        )
+        self.assertTrue(posted[0]["body"].rstrip("\n").endswith(resolve), posted[0]["body"])
+        self.assertEqual(posted[0]["body"].count(resolve), 1)
+        self.assertLess(posted[0]["body"].index(note), posted[0]["body"].index(resolve))
+        # 依頼の目印の鍵は、固定の 1 文を足す前の本文と親の先頭から作る（足す前に投稿した依頼を
+        # 打ち直しても、目印が同じなので二重に投稿されない）
+        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        first, _, rest = posted[0]["body"].partition("\n")
+        before = rest[: rest.index(resolve)].rstrip("\n") + "\n"
+        key = hashlib.sha256((before + "\n" + head).encode("utf-8")).hexdigest()[:16]
+        self.assertIn(f"key={key} -->", first)
         # マージリクエストの下書きは作らない（MR が無ければ依頼は止まる）
         self.assertEqual([n for n in os.listdir(self.state) if n.startswith("review-mr-")], [])
 
@@ -1552,7 +1568,8 @@ class TicketTest(unittest.TestCase):
         data = json.loads(shown.stdout)
         self.assertEqual([t["key"] for t in data["threads"]], ["u1", "u2"])
         self.assertEqual(data["parent"], "i0001")
-        self.assertFalse(data["can_issue"])
+        # フィードバック計画が無くても、issue に回せる（欄は互換のために残る）
+        self.assertTrue(data["can_issue"])
         self.assertRegex(data["digest"], r"^v2\.[A-Za-z0-9_-]+$")
         phases = os.path.join(self.approved, "phases", "i0001")
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
@@ -1977,7 +1994,7 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(plan))
 
     def test_decide_yes_refuses_what_was_not_shown(self):
-        """見せたあとに指摘が変わった、ダイジェストが無い、選択が揃っていない、issue に回せない。
+        """見せたあとに指摘が変わった、ダイジェストが無い、選択が揃っていない、知らない行き先。
 
         どれも何も置かない。
         """
@@ -1995,7 +2012,6 @@ class TicketTest(unittest.TestCase):
             ("--yes", both, "--json"),
             ("--yes", json.dumps({"u1": "keep"}), "--digest", digest, "--json"),
             ("--yes", json.dumps({"u1": "keep", "u2": "later"}), "--digest", digest, "--json"),
-            ("--yes", json.dumps({"u1": "keep", "u2": "issue"}), "--digest", digest, "--json"),
             ("--yes", "not json", "--digest", digest, "--json"),
         ):
             refused = self.decide(fixture, *extra)

@@ -1,17 +1,16 @@
-"""Chrome の承認・取り下げの Python の入口の受入テスト。
+"""Chrome の承認の Python の入口の受入テスト。
 
-見るのは 7 つ。
+見るのは 6 つ。
 
 1. 親のワークツリー相当: ホストに無い親子のチケットは仮のワークツリーが組まれず、その親子の
    チケットは「親のワークツリーがありません」で決まらない。判定の入力に読めない
    （バイナリの）ファイルがあれば止める
-2. 版ずれ: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan・withdraw）を
+2. 版ずれ: 統合先の互換のマーカーが違えば、書く操作（見せたものつきの plan）を
    受けない
 3. 見せた一覧とダイジェスト: 違えば書くものを出さない
 4. 書く先は親のブランチ `P` だけ。予約の名前・統合先の名前へは書かない
 5. マーカーに経路（chrome）・アカウントが入る
 6. 手元の ccnavi が、Chrome の書いた承認済みチケットを同じに読む（判定し直しで error が出ない）
-7. 取り下げの可否をボードに出す
 """
 
 from __future__ import annotations
@@ -145,10 +144,6 @@ class WriteGuardTest(ChromeWriteHarness):
         shown = {"ids": first["identifiers"], "digest": first["digest"]}
         refused = self.answer(self.chrome_request("plan", "i0001", shown=shown))
         self.assertIn("互換", refused["error"])
-        withdraw = self.answer(
-            self.chrome_request("withdraw", "i0001", ids=["i0001"], prior={"i0001": "x"})
-        )
-        self.assertIn("互換", withdraw["error"])
 
     def test_a_different_digest_writes_nothing(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
@@ -255,32 +250,10 @@ class EntryDetailTest(ChromeWriteHarness):
         self.compat(version.COMPAT + 1)
         for op, extra in (
             ("plan", {}),
-            ("withdraw", {"ids": ["i0001"], "prior": {}}),
             ("confirm", {"phase": 1, "result": {"host": "h", "mr": {"number": 1, "url": "u"}}}),
         ):
             body = self.answer(self.chrome_request(op, "i0001", **extra))
             self.assertIn("互換", body.get("error", ""), op)
-
-
-class WithdrawableTest(ChromeWriteHarness):
-    def test_the_board_says_which_copies_can_be_withdrawn(self):
-        self.propose("i0001", parent_text("i0001", ["research"]))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        board = self.answer(self.chrome_request("board", "i0001"))
-        self.assertEqual(
-            board["withdrawable"],
-            [{"ticket": "i0001", "title": board["withdrawable"][0]["title"], "problems": []}],
-        )
-        self.start_parent()
-        self.commit_parent("started")
-        board = self.answer(self.chrome_request("board", "i0001"))
-        problems = board["withdrawable"][0]["problems"]
-        self.assertTrue(any("着手済み" in p for p in problems), problems)
-        # 押した後の答え（withdraw の problems）と同じ表記でコードが載る
-        self.assertTrue(
-            any(p.startswith("[CORE_WITHDRAW_STARTED] 着手済み") for p in problems), problems
-        )
 
 
 class ProjectTest(ChromeWriteHarness):

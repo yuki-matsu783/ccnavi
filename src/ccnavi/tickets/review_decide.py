@@ -122,7 +122,8 @@ class Decision:
     ph: phase.Phase
     result: review_host.Result
     unresolved: list[review_host.Thread]
-    # issue に回せるか。回せるのはフィードバック計画が承認されたあと。
+    # issue に回せるか。いつでも真（JSON の欄は互換のために残す）。回せる範囲は、decide が
+    # 求める前提（依頼の記録・HEAD が動いていない・変更要求が無い）を満たした範囲に限る。
     can_issue: bool
     # 見せたあとに追加された未解決の指摘。今回の判断の対象ではなく、未対応として残す。
     extra: list[review_host.Thread] = field(default_factory=list)
@@ -219,9 +220,11 @@ def _decision(
         stderr.write("ccnavi: 依頼の記録がありません。先に request してください\n")
         return None
     tree_root = tree.worktree_path(root, parent.ticket)
-    moved = review._moved_since_request(tree_root, conf, requested_mark)
-    if moved:
-        stderr.write(f"ccnavi: {moved}。{review._redo_request(root, phase_no)}\n")
+    moved = review._moved_detail(tree_root, conf, requested_mark)
+    if moved.text:
+        stderr.write(f"ccnavi: {moved.text}。{review._redo_request(root, phase_no)}\n")
+        for line in review.moved_explanation(moved):
+            stderr.write(f"{line}\n")
         return None
     result = review._matching(stderr, result_path, requested_mark)
     if result is None:
@@ -231,10 +234,9 @@ def _decision(
         for r in review_host.effective(result.reviews)
     ):
         stderr.write(
-            "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
-            "変更要求があるため、レビュー済みにはできません。修正する場合は同じフェーズに"
-            "新しい子を提案し、ユーザの承認を受けてください。修正・再依頼のあと、"
-            "レビュアーの approve（または dismiss）を待ちます\n"
+            f"ccnavi: {review_host.changes_requested_note(result.host)}。"
+            "decide でも通せない。変更要求があるため、レビュー済みにはできません。"
+            "修正する場合は同じフェーズに新しい子を提案し、ユーザの承認を受けてください\n"
         )
         return None
     open_now = {
@@ -247,8 +249,7 @@ def _decision(
         )
     }
     unresolved = [t for t in result.threads if id(t) in open_now or (t.id and t.id in carry)]
-    can_issue = parent.has_plan and parent.feedback is not None
-    return Decision(parent, ph, result, unresolved, can_issue)
+    return Decision(parent, ph, result, unresolved, True)
 
 
 def _decision_json(d: Decision) -> dict:
@@ -374,24 +375,20 @@ def _ask_choices(
     stdin: TextIO, stdout: TextIO, stderr: TextIO, d: Decision
 ) -> dict[str, str] | None:
     """残った指摘の行き先を 1 件ずつ端末で選ばせる。決めなければ None。"""
-    keys = "k / f / i" if d.can_issue else "k / f"
+    keys = "k / f / i"
     stdout.write(
         "未解決（Unresolved）の指摘の対応方針を 1 件ずつ選びます。"
         "選択肢以外を入力すると、何もせずにやめます。\n"
     )
     for letter, choice in _CHOICE_KEYS.items():
-        if choice == CHOICE_ISSUE and not d.can_issue:
-            continue
         stdout.write(f"  {letter}  {CHOICE_LABELS[choice]}\n")
-    if not d.can_issue:
-        stdout.write("  （issue に回せるのは、フィードバック計画が承認されたあとです）\n")
     choices: dict[str, str] = {}
     for i, t in enumerate(d.unresolved, 1):
         stdout.write(f"[{i}/{len(d.unresolved)}] {review.thread_label(t)}\n")
         stdout.write(f"選択（{keys}）: ")
         stdout.flush()
         picked = _CHOICE_KEYS.get(fsio.read_line(stdin).strip().lower(), "")
-        if not picked or (picked == CHOICE_ISSUE and not d.can_issue):
+        if not picked:
             stderr.write("ccnavi: 決めなかった。何も置いていない\n")
             return None
         choices[review.thread_key(t)] = picked
@@ -516,9 +513,6 @@ def decide_yes(
     d.unresolved = [t for t in d.unresolved if review.thread_key(t) in shown]
     if set(raw) != shown:
         stderr.write("ccnavi: 選択が見せた指摘と揃っていない（足りないか、余分がある）\n")
-        return 1
-    if not d.can_issue and CHOICE_ISSUE in raw.values():
-        stderr.write("ccnavi: issue に回せるのは、フィードバック計画が承認されたあと\n")
         return 1
     picked = {c: [t for t in d.unresolved if raw.get(review.thread_key(t)) == c] for c in CHOICES}
     if not _precheck(stderr, root, conf, d, picked):
@@ -1132,6 +1126,9 @@ def _decided_prompt(
             f"{head}\n直す指摘は続きの子チケット {followup} に載せ、承認済みにしてある。"
             f"{_followup_next(root, d.parent, followup)}。指摘:\n{items}\n"
             "状態の操作（start・finish）はメインが打つ。実装はサブエージェントに任せてよい。\n"
+            # fix のスレッドはホスト上で未解決のまま残る。keep・issue のときに sh が返信して
+            # resolve する仕組みは、この文の対象外
+            f"{review.RESOLVE_NOTE}\n"
             f"{_status_line(root, d.parent)}"
         )
     if d.extra:

@@ -92,6 +92,9 @@ def candidates(
     # 親子のチケットの立ち位置。
     # 1 回の承認で 1 度だけ読む。
     fams = standing.Families(conf, root)
+    # フィードバック計画を初めて足す改版と、同じ親の全体計画の子が同じ承認に入っているもの。
+    # 子を足すとそのフェーズが開き直り、レビュー済みが前提の改版が成り立たない。両方を拒む。
+    mixed = _feedback_with_plan_children(revisions, pending, open_index)
 
     def config_for(t: ticket_model.Ticket) -> dict | None:
         name = project_of(t, pool)
@@ -109,6 +112,8 @@ def candidates(
         complaints += revision_problems(root, conf, t, current, config)
         complaints += approval_checks.family_problems(conf, root, t, fams)
         complaints += approval_checks.mr_problems(t)
+        if t.ticket in mixed:
+            complaints.append(_mixed_problem(t, mixed[t.ticket], is_revision=True))
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
@@ -143,6 +148,8 @@ def candidates(
         complaints += approval_checks.place_problems(root, conf, t)
         complaints += approval_checks.family_problems(conf, root, t, fams)
         complaints += approval_checks.mr_problems(t)
+        if t.is_child and t.parent in mixed and t in mixed[t.parent]:
+            complaints.append(_mixed_problem(t, mixed[t.parent], is_revision=False))
         complaints += approval_checks.branch_problems(
             conf, root, t, fams, list(approved) + list(pending) + list(revisions)
         )
@@ -174,6 +181,52 @@ def candidates(
         if t.is_child:
             added.setdefault(t.parent, []).append(t)
     return batch, rejected, pool
+
+
+def _feedback_with_plan_children(
+    revisions: list[ticket_model.Ticket],
+    pending: list[ticket_model.Ticket],
+    open_index: dict[str, ticket_model.Ticket],
+) -> dict[str, list[ticket_model.Ticket]]:
+    """親の識別子 → 同じ承認に入る、その親の全体計画（`len(plan)` 番以下）の子。
+
+    対象はフィードバック計画を初めて足す改版（`Candidate.plans_feedback` と同じ条件）だけ。
+    絞り込みの有無・入口（CLI・ボード・Chrome）に関わらず、`pending` / `revisions` が
+    同じなら同じ答えになる。フィードバック計画のフェーズの子は数えない（同時に承認してよい）。
+    """
+    out: dict[str, list[ticket_model.Ticket]] = {}
+    for rev in revisions:
+        current = open_index.get(rev.ticket)
+        if current is None or current.feedback is not None or rev.feedback is None:
+            continue
+        kids = [
+            c
+            for c in pending
+            if c.is_child
+            and c.parent == rev.ticket
+            and c.phase is not None
+            and c.phase <= len(rev.plan)
+        ]
+        if kids:
+            out[rev.ticket] = kids
+    return out
+
+
+def _mixed_problem(
+    t: ticket_model.Ticket, kids: list[ticket_model.Ticket], is_revision: bool
+) -> rules.Problem:
+    names = ", ".join(k.ticket for k in kids)
+    who = (
+        f"フィードバック計画の改版は、同じ承認で全体計画の子（{names}）を足すあいだは承認しない"
+        if is_revision
+        else f"親 {t.parent} のフィードバック計画の改版と同じ承認には入れない（{names}）"
+    )
+    return rules.Problem(
+        rules.SEVERITY_ERROR,
+        t.ticket,
+        f"{who}。全体計画に足す子を先に承認し、その作業と再レビュー（レビュー済み）を済ませてから、"
+        "フィードバック計画の改版を承認する",
+    )
 
 
 def _workflow_field(t: ticket_model.Ticket) -> list[rules.Problem]:
@@ -224,7 +277,7 @@ def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
     """提案に続きの子の目印（`followup_of`）があれば拒む。
 
     承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。続きの子の
-    目印は取り下げを止める。ユーザの判断（レビューの行き先）だけが残すもので、
+    目印は、ユーザの判断（レビューの行き先）だけが残すもので、
     提案に書かせると続きの子を装える。
     """
     if approval.FOLLOWUP_KEY not in t.raw:
@@ -485,8 +538,7 @@ def revision_problems(
     problems += lock_problems(revised, current, fixed)
     # フィードバック計画の番号は全体計画の続きなので、フィードバック計画を立てたあとに全体計画を
     # 変えると番号と `after` がずれる。比べるのは定義・`review`・推移的な待ちの並び。
-    # フィードバック計画を立てる改版でも同じ。全体計画の最後のレビューを済んだ扱いにするので、
-    # 一緒に足した全体計画の項までレビュー済みになる。
+    # フィードバック計画を立てる改版でも同じ。
     plan_changed = approval.plan_signature(revised, "plan") != approval.plan_signature(
         current, "plan"
     )

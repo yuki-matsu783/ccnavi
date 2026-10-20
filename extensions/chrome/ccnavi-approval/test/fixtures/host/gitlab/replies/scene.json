@@ -1,0 +1,7 @@
+{
+  "namespace": "acme",
+  "project": "widgets",
+  "branch": "i0001",
+  "poster": "201",
+  "about": "ccnavi の依頼コメントへの返信がスレッドになる形。note のうち system: true は除く。代表の note は本文が目印で始まらない最初の note（無ければ先頭）で、本文・URL・位置・書き手はここから取る。own は note が全部目印で始まるときだけ真。a 依頼への返信、b 先頭が resolvable でない、c 全部 resolvable でない（数えない）、d 依頼だけ（own）、e 依頼者と同じアカウントの返信（数える）、h* system が先頭・途中・末尾、i system だけ（除く）"
+}

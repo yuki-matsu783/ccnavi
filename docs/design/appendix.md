@@ -42,9 +42,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `POST_VIOLATION` / `POST_PREEXISTING` / `POST_TICKET_SCOPE` | 実行後チェック。保護領域の変更 / 前から在った変更 / チケットの範囲外。記録の `code` は 1 つで、件が混ざった回は `POST_VIOLATION` を `POST_TICKET_SCOPE` より先に採り、内訳を `detail` に `codes POST_VIOLATION 2, POST_TICKET_SCOPE 1` の形で書く。前から在った変更だけを知らせた回は `decision` が `allow` のまま `POST_PREEXISTING` |
 | `CORE_CONFIRM_NO_PARENT` / `CORE_CONFIRM_NO_PHASE` / `CORE_CONFIRM_ALREADY_REVIEWED` / `CORE_CONFIRM_NOT_REQUESTED` | レビュー済み（`review confirm` と Chrome の「レビュー済み」）が通らなかった。親の承認済みチケットが作業中に無い / そのフェーズの子が無い / もうレビュー済み / 依頼の記録が無い |
 | `CORE_CONFIRM_MOVED` / `CORE_CONFIRM_RESULT_MISMATCH` / `CORE_CONFIRM_REVIEW_OPEN` | レビュー済みが通らなかった。依頼の後にユーザが見るものが動いた / 取得した結果が依頼したマージリクエストと照合できない / 変更要求のレビューか未解決のスレッドが残っている |
-| `CORE_WITHDRAW_NO_IDS` / `CORE_WITHDRAW_NOT_OPEN` / `CORE_WITHDRAW_OTHER_BRANCH` / `CORE_WITHDRAW_BLOCKED` / `CORE_WITHDRAW_FOLLOWUP` / `CORE_WITHDRAW_STARTED` | 承認の取り下げが通らなかった。識別子が無い / 作業中（`doing/`）に無い / 親のブランチの `doing/` に無い / 承認済みチケット自体が信頼できない / 続きの子で戻す提案が無い / 着手済み |
-| `CORE_WITHDRAW_HAS_CHILDREN` / `CORE_WITHDRAW_MARKERS` / `CORE_WITHDRAW_TODO_EXISTS` / `CORE_WITHDRAW_NO_PRIOR` / `CORE_WITHDRAW_CHANGED` | 承認の取り下げが通らなかった。子の承認済みチケットか子の提案がある / フェーズのマーカーがある（読めないときも） / 戻す先に同じ識別子の提案がある / 承認コミットの親に提案が無い / 承認のあとに中身が変わった |
-| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi user agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた提案ファイルのバイト列が今と違う（この2つは「内容が更新されました」で、最新を表示し直す） / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認・取り下げと同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`core_approve.refusal_code` で 1 か所で決める） |
+| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi user agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた提案ファイルのバイト列が今と違う（この2つは「内容が更新されました」で、最新を表示し直す） / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認と同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`core_approve.refusal_code` で 1 か所で決める） |
 | `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書が付けないとする md（`README.md`・`CLAUDE.md` と、`.ccnavi/docs/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/handoff/`・`.claude/skills/yomiyasu/**`）には出さない。案内しても記録（`decisions.jsonl`）の `code` には残らない |
 | `NOTICE_PROPOSAL_PARENT_KEY` / `NOTICE_PROPOSAL_PARENT_FIELDS` | `PostToolUse`。Write で新しく作った提案（`wip/proposals/todo/` の直下の md）の書式の誤り。識別子が子の形でないのに `parent:` がある（`parent:` と `phase:` を消すよう言う）/ `parent:` の無い親に `mr:`・`plan:`・`phases:` が欠けている（欠けた欄を名指しし、`ccnavi ticket new` の雛形を勧める）。止めずに `additionalContext` で案内する。Edit・上書きでは出さない。案内しても記録の `code` には残らない |
 
@@ -56,14 +54,12 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 組み込みの判定で止めた文は、先頭の行に理由コードと記録の `rules` と同じ識別子を
 `[ccnavi] <コード> (組み込みのルール: <識別子>)` の形で並べる（`builtin:script-env` など）。
 
-ユーザの操作（レビュー済み・承認の取り下げ）が通らなかった答えは、`CORE_*` のコードを答えの `code` に持ち、
-文面の行にも `[<コード>]` の形で載せる（`ccnavi: ` で始まる行はその後ろ）。取り下げで理由が幾つもあるときは、
+ユーザの操作（レビュー済み）が通らなかった答えは、`CORE_*` のコードを答えの `code` に持ち、
+文面の行にも `[<コード>]` の形で載せる（`ccnavi: ` で始まる行はその後ろ）。理由が幾つもあるときは、
 行ごとに自分のコードを載せ、答えの `code` は最初の理由のものにする。
-Chrome 拡張の入口（`py/ccnavi_chrome.py`）が返す承認（`plan`）・取り下げ（`withdraw`）・レビュー済み（`confirm`）の
+Chrome 拡張の入口（`py/ccnavi_chrome.py`）が返す承認（`plan`）・レビュー済み（`confirm`）の
 JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`・`mismatch` と同じく、無いときは `null`）。拡張は
-分岐をこの鍵で決める。ボードの取り下げ候補（`withdrawable`）の `problems` にも、押した後の
-答えと同じ表記で `[<コード>]` を載せる。承認コミットを引けないときに拡張が足す理由も、同じ場合に `withdraw` が返す
-`[CORE_WITHDRAW_NO_PRIOR]` を頭に付ける。
+分岐をこの鍵で決める。
 
 ルールファイルの外の決めごとで止めた回は、記録の `rules` の先頭に `builtin:` 付きの名前を置く。判定ごとに名前を分け、
 別の判定の名前を使い回さない（同じ理由の繰り返し（6.4）の鍵と文面が、止めた理由の名前になるように）。

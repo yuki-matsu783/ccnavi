@@ -6,17 +6,19 @@
  */
 import { useEffect, useState, type FormEvent, type JSX } from "react";
 
-import { customHost, originPattern, patternShared, rowId, rowOf } from "../core/custom-hosts.js";
+import { customHost, originPatterns, releasablePatterns, rowId, rowOf } from "../core/custom-hosts.js";
 import type { Host } from "../core/hosts.js";
 import { ask, loadAllHosts, loadCustomHosts, loadRawCustomRows, loadRepos, type Said } from "./api.js";
 import { Status } from "./Status.js";
 
 const KIND = { github: "GitHub", gitlab: "GitLab" } as const;
 
-/** 許可を外す。外せなくても行は外れているので、失敗は言わない（Chrome の設定から外せる） */
-async function releasePermission(h: Host): Promise<void> {
+/** 許可を外す（ほかの通信先が使っていないものだけ）。外せなくても行は外れているので、失敗は言わない（Chrome の設定から外せる） */
+async function releasePermission(h: Host, others: readonly Host[]): Promise<void> {
+  const origins = releasablePatterns(h, others);
+  if (origins.length === 0) return;
   try {
-    await chrome.permissions.remove({ origins: [originPattern(h)] });
+    await chrome.permissions.remove({ origins });
   } catch {
     // 外せなかった許可は Chrome の設定で外せる
   }
@@ -38,7 +40,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
     try {
       // 許可の画面はユーザの操作の直後に出す。読み込みはそのあとにする
       const host = customHost(form.get("kind"), form.get("url"));
-      const granted = await chrome.permissions.request({ origins: [originPattern(host)] });
+      const granted = await chrome.permissions.request({ origins: originPatterns(host) });
       if (!granted) {
         throw new Error(`${host.web} への通信を許可しないと追加できません。`);
       }
@@ -51,7 +53,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
         await chrome.storage.local.set({ customHosts: [...rows, rowOf(host)] });
       } catch (err) {
         // 足せなかったら、今の許可で使う通信先が無ければ、いま付けた許可を外す
-        if (!patternShared(host, all)) await releasePermission(host);
+        await releasePermission(host, all);
         throw err;
       }
       setSaid({ text: `${host.web}（${KIND[host.kind]}）を追加しました。「PAT」欄でトークンを登録してください。`, ok: true });
@@ -80,7 +82,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       const rows = (await loadRawCustomRows()).filter((r) => rowId(r) !== h.id);
       await chrome.storage.local.set({ customHosts: rows });
       // 同じ許可を組み込みや別の port の行も使っていれば、許可は外さない
-      if (!patternShared(h, await loadAllHosts())) await releasePermission(h);
+      await releasePermission(h, await loadAllHosts());
       setSaid({ text: `${h.id} と、このブラウザに保存されていたPATを削除しました。ホスト側でもPATを失効させてください。`, ok: true });
     } catch (err) {
       setSaid({ text: (err as Error).message, ok: false });
@@ -132,6 +134,8 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       <p className="hint">
         追加すると、そのホストへの通信の許可を Chrome に求めます。許可したホスト名にのみ通信し、PAT も許可したホストにのみ送信します。追加できるのは https のホストと、http の localhost・127.0.0.1 です。GitLab
         は API が「ホスト/api/v4」、GitHub Enterprise Server は「ホスト/api/v3」と「ホスト/api/graphql」にあるものとして扱います。
+        GitHub として登録した *.ghe.com（GHE.com）は、API が「https://api.ホスト」、GraphQL が「https://api.ホスト/graphql」にあるものとして扱い、画面と API の両方の通信を許可してもらいます（ポートは付けられません）。
+        種類はここで選んだものが優先されます。
       </p>
     </section>
   );

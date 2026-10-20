@@ -14,7 +14,7 @@ function previewJson(extra: Record<string, unknown> = {}): string {
     parent: "i0001",
     phase: 2,
     mr: { number: 7, url: "https://example.com/mr/7" },
-    can_issue: false,
+    can_issue: true,
     threads: [
       {
         key: "u1",
@@ -62,7 +62,7 @@ test("CB-T207 置いた答えを読む。食い違いは mismatch、ok が真で
   assert.ok(!unknown.ok && "error" in unknown);
 });
 
-test("CB-T208 対応方針は見せた指摘の全部に 1 つずつ。知らない対応方針と、回せない issue は通さない", () => {
+test("CB-T208 対応方針は見せた指摘の全部に 1 つずつ。知らない対応方針は通さず、issue はいつでも通す", () => {
   const preview = parseDecidePreview(previewJson());
   assert.ok(preview.ok);
   if (!preview.ok) return;
@@ -70,6 +70,7 @@ test("CB-T208 対応方針は見せた指摘の全部に 1 つずつ。知らな
   assert.notEqual(choicesProblem(preview.value, {}), undefined);
   assert.notEqual(choicesProblem(preview.value, { u1: "keep", u2: "keep" }), undefined);
   assert.notEqual(choicesProblem(preview.value, { u1: "later" }), undefined);
-  assert.notEqual(choicesProblem(preview.value, { u1: "issue" }), undefined);
-  assert.equal(choicesProblem({ ...preview.value, can_issue: true }, { u1: "issue" }), undefined);
+  // issue はいつでも選べる。古い版が false を返しても、選べるかの判定には使わない
+  assert.equal(choicesProblem(preview.value, { u1: "issue" }), undefined);
+  assert.equal(choicesProblem({ ...preview.value, can_issue: false }, { u1: "issue" }), undefined);
 });

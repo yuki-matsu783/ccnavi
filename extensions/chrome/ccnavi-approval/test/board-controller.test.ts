@@ -138,12 +138,11 @@ test("CX-T220 読み直し: document と chrome の無いところで、差し�
   assert.equal(h.log.options, 1);
 });
 
-test("CX-T221 確認のダイアログで断れば何も書かない（承認・レビュー済み・取り下げ・始める）。押せる状態に戻し、読み直さない", async () => {
+test("CX-T221 確認のダイアログで断れば何も書かない（承認・レビュー済み・始める）。押せる状態に戻し、読み直さない", async () => {
   const calls: string[] = [];
   const ops: Partial<BoardOps> = {
     approveFamily: async () => (calls.push("approve"), WRITTEN),
     confirmPhase: async () => (calls.push("review"), WRITTEN),
-    withdrawTicket: async () => (calls.push("withdraw"), WRITTEN),
     startIssue: async () => (calls.push("start"), { kind: "started", name: "feature-1-x", head: "abcdef0123", mr: { number: 7, url: "https://example.invalid/7" } }),
   };
   const h = harness({ confirm: false, ops });
@@ -153,7 +152,6 @@ test("CX-T221 確認のダイアログで断れば何も書かない（承認・
   for (const press of [
     () => h.c.actions.approve(b, family()),
     () => h.c.actions.review?.(b, family(), 1),
-    () => h.c.actions.withdraw(b, family(), "i0001"),
     () => h.c.actions.start?.(b, { number: 1, title: "x" } as never),
   ]) {
     press();
@@ -162,7 +160,7 @@ test("CX-T221 確認のダイアログで断れば何も書かない（承認・
     await until(() => !h.c.snapshot().busy, "押せる状態");
     assert.equal(h.c.snapshot().state, "done");
   }
-  assert.equal(h.log.confirm.length, 4);
+  assert.equal(h.log.confirm.length, 3);
   assert.deepEqual(calls, []);
   assert.deepEqual(h.log.set, []);
   assert.equal(h.log.collect, loads);

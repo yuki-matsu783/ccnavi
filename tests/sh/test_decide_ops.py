@@ -328,6 +328,22 @@ class DecideOpsShTest(unittest.TestCase):
         self.assertIn("stage=note", STORE["notes"][0]["body"])
         self.assertIsNone(self.record())
 
+    def test_resume_sends_the_issue_after_the_issue_post_failed(self):
+        """issue への送信に失敗しても、--resume で続きを送れる（回帰。issue はいつでも選べる）。"""
+        STORE["reject"].add("issue")
+        self.choose()
+        record = self.record()
+        self.assertIsNotNone(record, "送れなかった段階は記録に残る")
+        states = {s["id"]: s["state"] for s in record["stages"]}
+        self.assertNotEqual(states["issue"], "sent")
+        STORE["reject"].clear()
+        self.age(record["id"], "issue")
+        resumed = self.run_decide("--resume", stdin="y\n")
+        self.assertEqual(resumed.returncode, 0, resumed.stdout + resumed.stderr)
+        self.assertEqual(len(STORE["issues"]), 1)
+        self.assertIn("stage=issue", STORE["issues"][0]["description"])
+        self.assertIsNone(self.record())
+
     def test_resume_after_a_resolve_failure_does_not_reply_twice(self):
         GitLab.fail_resolve = True
         first = self.choose()

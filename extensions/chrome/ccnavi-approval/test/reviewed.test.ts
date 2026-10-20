@@ -104,16 +104,16 @@ test("CX-T130 変更の一覧（compare）: 祖先から進んだぶんだけを
 test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、通るとき（解決済み・Approve）だけ「レビュー済みにする」を出す", async () => {
   const dom = new JSDOM("<!doctype html><body></body>");
   const md = createRenderer(dom.window as unknown as Window & typeof globalThis);
-  const noop = { approve: () => undefined, withdraw: () => undefined, review: () => undefined };
+  const noop = { approve: () => undefined, review: () => undefined };
   for (const [scene, button, why] of [
     ["resolved", 1, null],
     ["full-page", 1, null],
     // GitHub では目印で始まるスレッドも数える（目印は誰でも書ける）
     ["paged", 0, /未解決のスレッドが 4 件残っている/],
-    ["changes-requested", 0, /変更要求のレビューが立っている/],
+    ["changes-requested", 0, /変更要求（Changes requested）が出ています/],
     // 変更要求の後のコメントだけ・書きかけのレビューは変更要求を消さない
-    ["cr-commented", 0, /変更要求のレビューが立っている/],
-    ["pending", 0, /変更要求のレビューが立っている/],
+    ["cr-commented", 0, /変更要求（Changes requested）が出ています/],
+    ["pending", 0, /変更要求（Changes requested）が出ています/],
   ] as const) {
     const mock = reviewing(scene);
     const { board, panel } = await panelOf(mock);
@@ -191,7 +191,7 @@ test("CX-T135 スレッドの悪意のある本文は描いても実行されず
   assert.equal(panel?.copy?.threads.length, 8);
   const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only" });
   const md = createRenderer(dom.window as unknown as Window & typeof globalThis);
-  const html = renderBoard(dom.window.document, md, board, { approve: () => undefined, withdraw: () => undefined, review: () => undefined });
+  const html = renderBoard(dom.window.document, md, board, { approve: () => undefined, review: () => undefined });
   const box = dom.window.document.querySelector(`[data-family="${FAMILY}"] .review`) as HTMLElement;
   assert.equal(box.querySelectorAll("script, img, svg, iframe, form, style, details, summary, font").length, 0);
   const attrs = [...box.querySelectorAll("*")].flatMap((e) => [...e.attributes].map((a) => a.name));

@@ -229,6 +229,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
         lint_branch._existing_branch_problems(root, conf, proposals, copies, closed, review)
     )
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
+    problems.extend(_old_feedback_plan_marks(root, conf, copies))
 
     worktrees = tree.worktrees(root, conf.projects)
     known = frozenset(t.ticket for t in proposals + copies + closed + review)
@@ -239,6 +240,44 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(_ticket_hooks(root))
     problems.extend(_operation_problems(conf, root, copies, review))
     return problems
+
+
+def _old_feedback_plan_marks(
+    root: str, conf: settings.Settings, copies: list[ticket_model.Ticket]
+) -> list[Problem]:
+    """古い版が書いた `reviewed` の `by: feedback-plan` を一覧にする（info）。
+
+    フィードバック計画の承認はレビューの状態を変えなくなった。古い版は承認でこの印を置いて
+    最後のレビューを済んだ扱いにしていた。印は読めるまま残し、消すかどうかはユーザが決める
+    （公開前なので、移行のコードは書かない）。
+    """
+    out: list[Problem] = []
+    for parent in sorted(copies, key=lambda t: t.ticket):
+        if parent.is_child or not parent.has_plan:
+            continue
+        where = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
+        total = len(parent.plan) + len(parent.feedback or [])
+        old = [
+            n
+            for n in range(1, total + 1)
+            if (
+                approval_marks.read_mark(where, parent.ticket, n, approval_marks.MARK_REVIEWED)
+                or {}
+            ).get("by")
+            == "feedback-plan"
+        ]
+        if old:
+            shown = "、".join(str(n) for n in old)
+            out.append(
+                Problem(
+                    SEVERITY_INFO,
+                    parent.ticket,
+                    f"フェーズ {shown} の reviewed マーカーは、古い版がフィードバック計画の承認で"
+                    "置いたもの（by: feedback-plan）。いまは承認でレビューの状態を変えない。"
+                    "読めるまま残してあるので、レビューをやり直すなら削除する（消すかはユーザが決める）",
+                )
+            )
+    return out
 
 
 def _operation_problems(

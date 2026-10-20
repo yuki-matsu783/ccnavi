@@ -13,4 +13,4 @@ keywords: [要件, 承認, ダイジェスト, createCommitOnBranch, expectedHea
 | ID | 区分 | 要件 |
 |---|---|---|
 | REQ-CHR-01 | 事象 | 承認者が承認を押したとき、Chrome 拡張は、親子のチケット 1 組ぶんを読み直し、同梱の ccnavi に、見せた提案の識別子の一覧と各提案ファイルのバイト列のダイジェストを今のものと比べさせ、承認の可否を最新の状態から計算し直させ（REQ-APV-15）、返った書くもの（Changes）を GraphQL の `createCommitOnBranch`（`expectedHeadOid` = 読んだ先頭）の 1 コミットで親のブランチへ書くこと。先頭が動いていたら読み直して判定し直し、ダイジェストが同じなら書き直すこと（3 周まで）。ダイジェストが違えば何も書かず、「内容が更新されました」と伝えて最新の内容を表示し直すこと。書いた後、新しい先頭の中身が書いたとおりかを blob の sha で確かめること |
-| REQ-CHR-04 | 常時 | Chrome 拡張は、書く先が保護されたブランチの名前（`main`・`master`・`develop`・`release`・`release-*`・`release/*`。大文字小文字は問わない）か統合先の名前なら、承認・取り下げ・レビュー済みを書かないこと。書くパスが置き場（`wip/proposals/`・`.ccnavi/approved/`）の外にあるときも書かないこと（REQ-APV-17） |
+| REQ-CHR-04 | 常時 | Chrome 拡張は、書く先が保護されたブランチの名前（`main`・`master`・`develop`・`release`・`release-*`・`release/*`。大文字小文字は問わない）か統合先の名前なら、承認・レビュー済みを書かないこと。書くパスが置き場（`wip/proposals/`・`.ccnavi/approved/`）の外にあるときも書かないこと（REQ-APV-17） |

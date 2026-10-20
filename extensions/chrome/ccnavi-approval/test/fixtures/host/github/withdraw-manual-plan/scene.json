@@ -1,9 +1,0 @@
-{
-  "kind": "withdraw",
-  "owner": "acme",
-  "repo": "widgets",
-  "branch": "i0001",
-  "head": "3bc3a80c6907d750002b5c9cbc2d21bf54a19e6a",
-  "ident": "i0001",
-  "about": "手で動かした承認で、計画を持つ親: 待ち方は承認済みチケットの計画から決まるので、中身が提案と同じなら待ち方も同じ。取り下げられる"
-}

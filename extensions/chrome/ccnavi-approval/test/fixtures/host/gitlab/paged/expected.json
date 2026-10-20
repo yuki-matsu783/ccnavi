@@ -14,6 +14,7 @@
       "body": "指摘 0",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6000",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -27,6 +28,7 @@
       "body": "指摘 1",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6001",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -40,6 +42,7 @@
       "body": "指摘 2",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6002",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -53,6 +56,7 @@
       "body": "指摘 3",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6003",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -66,6 +70,7 @@
       "body": "指摘 4",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6004",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -79,6 +84,7 @@
       "body": "指摘 5",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6005",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -92,6 +98,7 @@
       "body": "指摘 6",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6006",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -105,6 +112,7 @@
       "body": "指摘 7",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6007",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -118,6 +126,7 @@
       "body": "指摘 8",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6008",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -131,6 +140,7 @@
       "body": "指摘 9",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6009",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -144,6 +154,7 @@
       "body": "指摘 10",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6010",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -157,6 +168,7 @@
       "body": "指摘 11",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6011",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -170,6 +182,7 @@
       "body": "指摘 12",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6012",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -183,6 +196,7 @@
       "body": "指摘 13",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6013",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -196,6 +210,7 @@
       "body": "指摘 14",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6014",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -209,6 +224,7 @@
       "body": "指摘 15",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6015",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -222,6 +238,7 @@
       "body": "指摘 16",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6016",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -235,6 +252,7 @@
       "body": "指摘 17",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6017",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -248,6 +266,7 @@
       "body": "指摘 18",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6018",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -261,6 +280,7 @@
       "body": "指摘 19",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6019",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -274,6 +294,7 @@
       "body": "指摘 20",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6020",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -287,6 +308,7 @@
       "body": "指摘 21",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6021",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -300,6 +322,7 @@
       "body": "指摘 22",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6022",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -313,6 +336,7 @@
       "body": "指摘 23",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6023",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -326,6 +350,7 @@
       "body": "指摘 24",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6024",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -339,6 +364,7 @@
       "body": "指摘 25",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6025",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -352,6 +378,7 @@
       "body": "指摘 26",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6026",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -365,6 +392,7 @@
       "body": "指摘 27",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6027",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -378,6 +406,7 @@
       "body": "指摘 28",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6028",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -391,6 +420,7 @@
       "body": "指摘 29",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6029",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -404,6 +434,7 @@
       "body": "指摘 30",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6030",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -417,6 +448,7 @@
       "body": "指摘 31",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6031",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -430,6 +462,7 @@
       "body": "指摘 32",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6032",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -443,6 +476,7 @@
       "body": "指摘 33",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6033",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -456,6 +490,7 @@
       "body": "指摘 34",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6034",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -469,6 +504,7 @@
       "body": "指摘 35",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6035",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -482,6 +518,7 @@
       "body": "指摘 36",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6036",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -495,6 +532,7 @@
       "body": "指摘 37",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6037",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -508,6 +546,7 @@
       "body": "指摘 38",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6038",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -521,6 +560,7 @@
       "body": "指摘 39",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6039",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -534,6 +574,7 @@
       "body": "指摘 40",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6040",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -547,6 +588,7 @@
       "body": "指摘 41",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6041",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -560,6 +602,7 @@
       "body": "指摘 42",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6042",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -573,6 +616,7 @@
       "body": "指摘 43",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6043",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -586,6 +630,7 @@
       "body": "指摘 44",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6044",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -599,6 +644,7 @@
       "body": "指摘 45",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6045",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -612,6 +658,7 @@
       "body": "指摘 46",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6046",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -625,6 +672,7 @@
       "body": "指摘 47",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6047",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -638,6 +686,7 @@
       "body": "指摘 48",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6048",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -651,6 +700,7 @@
       "body": "指摘 49",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6049",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -664,6 +714,7 @@
       "body": "指摘 50",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6050",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -677,6 +728,7 @@
       "body": "指摘 51",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6051",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -690,6 +742,7 @@
       "body": "指摘 52",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6052",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -703,6 +756,7 @@
       "body": "指摘 53",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6053",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -716,6 +770,7 @@
       "body": "指摘 54",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6054",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -729,6 +784,7 @@
       "body": "指摘 55",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6055",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -742,6 +798,7 @@
       "body": "指摘 56",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6056",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -755,6 +812,7 @@
       "body": "指摘 57",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6057",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -768,6 +826,7 @@
       "body": "指摘 58",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6058",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -781,6 +840,7 @@
       "body": "指摘 59",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6059",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -794,6 +854,7 @@
       "body": "指摘 60",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6060",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -807,6 +868,7 @@
       "body": "指摘 61",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6061",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -820,6 +882,7 @@
       "body": "指摘 62",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6062",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -833,6 +896,7 @@
       "body": "指摘 63",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6063",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -846,6 +910,7 @@
       "body": "指摘 64",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6064",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -859,6 +924,7 @@
       "body": "指摘 65",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6065",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -872,6 +938,7 @@
       "body": "指摘 66",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6066",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -885,6 +952,7 @@
       "body": "指摘 67",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6067",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -898,6 +966,7 @@
       "body": "指摘 68",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6068",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -911,6 +980,7 @@
       "body": "指摘 69",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6069",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -924,6 +994,7 @@
       "body": "指摘 70",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6070",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -937,6 +1008,7 @@
       "body": "指摘 71",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6071",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -950,6 +1022,7 @@
       "body": "指摘 72",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6072",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -963,6 +1036,7 @@
       "body": "指摘 73",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6073",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -976,6 +1050,7 @@
       "body": "指摘 74",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6074",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -989,6 +1064,7 @@
       "body": "指摘 75",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6075",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1002,6 +1078,7 @@
       "body": "指摘 76",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6076",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1015,6 +1092,7 @@
       "body": "指摘 77",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6077",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1028,6 +1106,7 @@
       "body": "指摘 78",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6078",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1041,6 +1120,7 @@
       "body": "指摘 79",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6079",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1054,6 +1134,7 @@
       "body": "指摘 80",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6080",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1067,6 +1148,7 @@
       "body": "指摘 81",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6081",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1080,6 +1162,7 @@
       "body": "指摘 82",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6082",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1093,6 +1176,7 @@
       "body": "指摘 83",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6083",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1106,6 +1190,7 @@
       "body": "指摘 84",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6084",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1119,6 +1204,7 @@
       "body": "指摘 85",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6085",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1132,6 +1218,7 @@
       "body": "指摘 86",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6086",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1145,6 +1232,7 @@
       "body": "指摘 87",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6087",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1158,6 +1246,7 @@
       "body": "指摘 88",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6088",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1171,6 +1260,7 @@
       "body": "指摘 89",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6089",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1184,6 +1274,7 @@
       "body": "指摘 90",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6090",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1197,6 +1288,7 @@
       "body": "指摘 91",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6091",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1210,6 +1302,7 @@
       "body": "指摘 92",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6092",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1223,6 +1316,7 @@
       "body": "指摘 93",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6093",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1236,6 +1330,7 @@
       "body": "指摘 94",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6094",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1249,6 +1344,7 @@
       "body": "指摘 95",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6095",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1262,6 +1358,7 @@
       "body": "指摘 96",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6096",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1275,6 +1372,7 @@
       "body": "指摘 97",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6097",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1288,6 +1386,7 @@
       "body": "指摘 98",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6098",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1301,6 +1400,7 @@
       "body": "指摘 99",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6099",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1314,6 +1414,7 @@
       "body": "2 ページ目の指摘 0",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6200",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1327,6 +1428,7 @@
       "body": "2 ページ目の指摘 1",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6201",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"
@@ -1340,6 +1442,7 @@
       "body": "2 ページ目の指摘 2",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "202",
+      "own": false,
       "last_id": "6202",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": "lab-reviewer"

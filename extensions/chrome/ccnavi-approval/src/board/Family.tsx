@@ -1,7 +1,7 @@
 /**
  * 親子のチケットの欄（`article.family[data-family]`）。判定は出さず、Python の答えを並べるだけ（判定を 1 か所に保つため）。
  *
- * 承認と取り下げのボタンを出すかは Python の答え（`write.allowed`・`withdrawable` の理由）で決まり、ここは答えのとおりに
+ * 承認のボタンを出すかは Python の答え（`write.allowed`）で決まり、ここは答えのとおりに
  * 並べるだけ。押したときの動き（`FamilyActions`）は呼び手が渡す。渡さなければボタンを出さない（読み取りだけ、または要確認）。
  * Markdown の本文だけを消毒した断片で入れ、ほかの素の文字列は textContent。
  */
@@ -14,7 +14,6 @@ import { Review } from "./Review.js";
 
 export interface FamilyActions {
   approve(): void;
-  withdraw(ticket: string): void;
   review?(phase: number): void;
 }
 
@@ -61,7 +60,6 @@ function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions })
   }
   const batch = r.batch ?? [];
   const write = r.write ?? { allowed: false, reason: "" };
-  const withdrawable = r.withdrawable ?? [];
   const problems = r.problems ?? [];
   return (
     <>
@@ -99,28 +97,6 @@ function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions })
             <span className="digest">{`ダイジェスト ${r.digest.slice(0, 12)}`}</span>
           </div>
         ) : null
-      ) : null}
-      {withdrawable.length > 0 ? (
-        <section className="approved">
-          <h4>作業中の承認済みチケット</h4>
-          {withdrawable.map((w) => (
-            <div key={w.ticket} className="approved-item" data-ticket={w.ticket}>
-              <code>{w.ticket}</code>
-              {` ${w.title} `}
-              {w.problems.length === 0 && write.allowed && actions ? (
-                <ActionButton action="withdraw" onClick={() => actions.withdraw(w.ticket)}>
-                  承認を取り下げる
-                </ActionButton>
-              ) : w.problems.length > 0 ? (
-                <ul className="why-not">
-                  {w.problems.map((p, i) => (
-                    <li key={i}>{`承認を取り下げられません：${p}`}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ))}
-        </section>
       ) : null}
       {(f.reviews ?? []).map((panel) => (
         <Review key={panel.phase} panel={panel} writable={write.allowed} onReview={actions?.review} />

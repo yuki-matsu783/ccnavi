@@ -11,12 +11,11 @@ Chrome（Pyodide）と手元が同じコアで判定するため。
 3. plan と Writer(FS): 書くもの（Changes）を並べるだけではディスクは変わらず、並べたものを
    書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの移動・フィードバック計画）
 4. Chrome の入口（`ccnavi_chrome.py`）が同じ入力から、手元が実際に書いたのと同じバイト列を出す
-   （新規・マーカーの消去・改版・フィードバック計画・多段の先行と外れる提案・取り下げ・レビュー済み）。
+   （新規・マーカーの消去・改版・フィードバック計画・多段の先行と外れる提案・レビュー済み）。
    同じ要求と答えを拡張の試験の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）
    に置き、拡張の試験が Pyodide でも同じ答えになることを見る
-5. 承認の取り下げの条件
-6. fsio の記録層（`--record-writes`）: 各コマンドで書いたパスの一覧が `git status` の変化と一致する
-7. Chrome の入口は置き場を既定に固定する。統合先の `.claude/settings.json` の `env` や手元の env に
+5. fsio の記録層（`--record-writes`）: 各コマンドで書いたパスの一覧が `git status` の変化と一致する
+6. Chrome の入口は置き場を既定に固定する。統合先の `.claude/settings.json` の `env` や手元の env に
    置き場の env を入れても既定の置き場を使い、`settings` の env 名の定数を参照しない
 
 見本の形を変えたら `CCNAVI_CHROME_FIXTURE=1` を付けてこのテストを走らせ、見本を書き直す。
@@ -39,9 +38,8 @@ from ccnavi.entry import lint, version
 from ccnavi.infra import fsio, pathcase, settings
 from ccnavi.infra import tree as tree_mod
 from ccnavi.tickets import approval, approval_ops, core, core_base, ticket_model, via
-from tests import config_path, requires_symlink
+from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness
-from tests.ticket.test_phases_dag import DEFS, PLAN
 from tests.ticket.test_ticket import ROOT, git, read_json, write
 from tests.ticketsample import CHROME, child_text, load_chrome, parent_text
 
@@ -409,19 +407,6 @@ class DurableWiringTest(CoreHarness):
         self.assertNotIn(_norm(held), seen)
         self.assertFalse(os.path.exists(held))
 
-    def test_a_withdrawal_puts_the_proposal_back_durably(self):
-        text = parent_text("i0001", ["research"])
-        self.propose("i0001", text)
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()})
-        self.assertEqual(checked.problems, [])
-        with durable_writes() as seen:
-            applied, out, err = self.write_changes(checked.changes)
-        self.assertEqual(applied.code, 0, out + err)
-        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
-        self.assertIn(_norm(todo), seen)
-
     def approved_parent_copy(self):
         self.family(plan=["design"])
         found, _ = approval.scan(self.conf(), self.root)
@@ -677,8 +662,7 @@ class CoreChromeTest(CoreHarness):
     """Chrome の入口が、手元の CLI が実際に書いたのと同じバイト列と出力を出す。
 
     比べるのは、Changes（経路の欄だけを除いて）、見せる行、止まったか、問題点の文面、
-    画面の本文とダイジェスト。取り下げは手元の CLI が無い（Chrome だけの操作）ので、
-    手元のコアを通して書いたものと比べる。
+    画面の本文とダイジェスト。
     """
 
     collected: dict = {}
@@ -875,35 +859,6 @@ class CoreChromeTest(CoreHarness):
             "human_review:", f"predecessors: {json.dumps(predecessors)}\nhuman_review:", 1
         )
 
-    def test_withdraw(self):
-        text = parent_text("i0001", ["research"])
-        self.propose("i0001", text)
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        # 承認は中身を変えないので、承認済みチケットは提案とバイト単位で同じ。待ち方のファイルは
-        # 無い（承認済みチケットの計画から都度計算する）。
-        held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
-        self.assertFalse(os.path.exists(held))
-        request = self.chrome_request("withdraw", "i0001", ids=["i0001"], prior={"i0001": text})
-        answer = self.ask_chrome(request)
-        self.assertEqual(answer["problems"], [])
-        self.assertIsNone(answer["code"])
-        before = self.disk()
-        checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()})
-        self.assertEqual(checked.problems, [])
-        self.assertEqual(answer["lines"], checked.changes.lines)
-        applied, out, err = self.write_changes(checked.changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertEqual(_flat(answer["lines"]), _flat(out.splitlines()))
-        self.assertEqual(answer["changes"], self.diff(before, self.disk()))
-        with open(
-            os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md"), encoding="utf-8"
-        ) as f:
-            self.assertEqual(f.read(), text)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
-        self.assertFalse(os.path.exists(held))
-        self.keep_scenario("withdraw", request, answer)
-
     def host_compare(self):
         """compare API の代わり: 依頼時の先頭から親の今の先頭までに変わったパス。"""
         recorded = read_json(
@@ -1026,7 +981,6 @@ SCENARIO_NAMES = (
     "revise",
     "feedback-plan",
     "predecessors",
-    "withdraw",
     "confirm",
 )
 
@@ -1199,331 +1153,6 @@ class ChromePlacementTest(CoreHarness):
                 load_chrome().handle(json.dumps(request), os.path.join(self.root, "m2"))
             )
         self.assertEqual(answer, plain)
-
-
-class WithdrawTest(CoreHarness):
-    """取り下げの条件。どれか 1 つでも当たれば何も並べない。
-
-    承認は提案を中身を変えずに動かすので、新しい形は「`doing/` の中身が承認コミットの親の提案と
-    バイト単位で同じ」だけで決める。待ち方は `doing/` の計画から決まるので、バイト列が同じなら
-    待ち方も同じ（別に比べる段も、一緒に消すファイルも無い）。
-    """
-
-    def approved_parent(self):
-        text = parent_text("i0001", ["research"])
-        self.propose("i0001", text)
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        return text
-
-    def new_parent(self, text=None, plan=("research",)):
-        text = text or parent_text("i0001", list(plan), copy=self.phases_text)
-        self.propose("i0001", text)
-        self.commit_parent()
-        approved = self.approve()
-        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        return text
-
-    def held(self):
-        return os.path.join(self.approved, "phases", "i0001", "workflow.yml")
-
-    def test_a_new_form_parent_is_withdrawn(self):
-        text = self.new_parent()
-        self.assertFalse(os.path.exists(self.held()))
-        listed = core.withdrawable(self.snapshot(), "i0001")
-        self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
-        checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()})
-        self.assertEqual(checked.problems, [])
-        applied, out, err = self.write_changes(checked.changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
-        with open(
-            os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md"), "rb"
-        ) as f:
-            self.assertEqual(f.read(), text.encode())
-
-    def test_a_half_written_record_does_not_skip_the_content_check(self):
-        """`approved_at` の空な記録で古い形を装っても、中身の一致の検査は飛ばない。"""
-        text = self.new_parent()
-        path = os.path.join(self.approved, "doing", "i0001.md")
-        forged = "ccnavi_approved: {approved_at: '', source_tree: i0001, source_path: p}\n"
-        write(path, text.replace("---\n", "---\n" + forged, 1) + "追記しました\n")
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
-
-    def test_a_manually_moved_child_is_withdrawn(self):
-        """手で動かした承認（`todo/` から `doing/` へ rename しただけ）も取り下げられる。
-
-        中身が提案と同じなら。
-        """
-        self.new_parent()
-        self.start_parent()
-        child = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
-        write(os.path.join(self.approved, "doing", "i0001-01-01.md"), child)
-        self.commit_parent("moved by hand")
-        checked = core.withdraw(self.snapshot(), ["i0001-01-01"], {"i0001-01-01": child.encode()})
-        self.assertEqual(checked.problems, [])
-
-    def test_each_refusal_carries_its_reason_code(self):
-        """通らなかった答えは理由コードを持ち、文面の行にも同じコードが載る。
-
-        理由が幾つもあるときは、行ごとに自分のコードを持ち、答えの `code` は最初の理由のもの。
-        """
-        text = self.new_parent()
-        write(os.path.join(self.approved, "doing", "i0001.md"), text + "追記しました\n")
-        checked = core.withdraw(self.snapshot(), ["i0001", "i0009"], {"i0001": text.encode()})
-        self.assertIsNone(checked.changes)
-        self.assertEqual(checked.code, "CORE_WITHDRAW_CHANGED")
-        self.assertTrue(checked.problems[0].startswith("[CORE_WITHDRAW_CHANGED] i0001: "))
-        self.assertIn(
-            "[CORE_WITHDRAW_NOT_OPEN] i0009: 承認済みチケットが作業中（doing/）にありません。",
-            checked.problems,
-        )
-        nothing = core.withdraw(self.snapshot(), [], {})
-        self.assertEqual(nothing.code, "CORE_WITHDRAW_NO_IDS")
-        self.assertEqual(
-            nothing.problems, ["[CORE_WITHDRAW_NO_IDS] 取り下げる識別子がありません。"]
-        )
-        # 一覧（Chrome のボード）の理由にも、押した後の答えと同じ表記でコードが載る
-        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
-        write(todo, text)
-        listed = core.withdrawable(self.snapshot(), "i0001")
-        self.assertEqual(
-            [(i, p) for i, _, p in listed],
-            [
-                (
-                    "i0001",
-                    [
-                        "[CORE_WITHDRAW_TODO_EXISTS] todo/ に同じ識別子の提案がある"
-                        "（戻す先に同じ識別子がすでにある）"
-                    ],
-                )
-            ],
-        )
-        os.remove(todo)
-        # 通った答えはコードを持たない
-        write(os.path.join(self.approved, "doing", "i0001.md"), text)
-        self.assertEqual(
-            core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()}).code, ""
-        )
-
-    def test_a_confirm_refusal_carries_its_reason_code(self):
-        self.new_parent()
-        checked = core.confirm(self.snapshot(), "i0009", 1, None, "")
-        self.assertEqual(checked.code, "CORE_CONFIRM_NO_PARENT")
-        self.assertEqual(
-            checked.problems,
-            ["ccnavi: [CORE_CONFIRM_NO_PARENT] 親 i0009 の承認済みチケットが作業中にありません。"],
-        )
-        checked = core.confirm(self.snapshot(), "i0001", 1, None, "")
-        self.assertEqual(checked.code, "CORE_CONFIRM_NOT_REQUESTED")
-        self.assertTrue(checked.problems[0].startswith("ccnavi: [CORE_CONFIRM_NOT_REQUESTED] "))
-
-    def test_a_changed_copy_is_not_withdrawn(self):
-        text = self.new_parent()
-        path = os.path.join(self.approved, "doing", "i0001.md")
-        write(path, text.replace("本文", "本文を書き換えた"))
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
-        # 一覧は中身を見ない（承認コミットを引く前に組むので）。押したときに止める。
-        listed = core.withdrawable(self.snapshot(), "i0001")
-        self.assertEqual(listed[0][2], [])
-
-    def test_bytes_are_compared_without_folding_newlines(self):
-        text = self.new_parent(parent_text("i0001", ["research"]).replace("\n", "\r\n"))
-        with open(os.path.join(self.approved, "doing", "i0001.md"), "rb") as f:
-            self.assertIn(b"\r\n", f.read())
-        self.assertEqual(self.problems({"i0001": text.encode()}), [])
-        folded = text.replace("\r\n", "\n").encode()
-        problems = self.problems({"i0001": folded})
-        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
-
-    def test_a_leftover_workflow_file_is_counted_as_a_marker(self):
-        """前の版の待ち方のファイルは読まないので、残っていれば置き場のほかのファイルと同じに止める。"""
-        text = self.new_parent()
-        write(self.held(), "order: dag\nwaits: {1: []}\n")
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("マーカー" in p for p in problems), problems)
-
-    def test_a_planned_parent_is_withdrawn_by_its_bytes_alone(self):
-        """計画を持つ親も、バイト列が同じなら取り下げられる。待ち方は計画から決まる。"""
-        self.use(DEFS)
-        text = self.new_parent(plan=PLAN)
-        self.assertEqual(self.problems({"i0001": text.encode()}), [])
-        write(os.path.join(self.approved, "doing", "i0001.md"), text + "x")
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
-
-    def test_phases_yml_changed_after_the_approval_does_not_matter(self):
-        """待ち方は phases.yml を読まないので、承認のあとに直しても取り下げの答えは変わらない。"""
-        self.use(DEFS)
-        text = self.new_parent(plan=PLAN)
-        self.use(DEFS.replace("phases:", "order: sequential\nphases:"))
-        self.assertEqual(self.problems({"i0001": text.encode()}), [])
-
-    def test_a_revised_plan_is_not_withdrawn(self):
-        """改版は承認済みチケットの計画を書き換えるので、承認コミットの親の提案と同じでない。"""
-        self.use(DEFS)
-        text = self.new_parent(plan=PLAN)
-        revised = list(PLAN[:3]) + [
-            {"type": "extra", "after": [1]},
-            {"type": "docs", "after": [2, 3, 4]},
-        ]
-        self.propose("i0001", parent_text("i0001", revised, copy=self.phases_text))
-        self.commit_parent("revise")
-        done = self.approve()
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
-
-    def test_a_parent_reordered_before_approval_is_told_to_cancel(self):
-        """承認の前に順序を書き換えた提案は、承認コミットの親の提案（書き換える前）と違う。
-
-        違いが `plan:` / `feedback:` / `phases:` の値だけなら、取り消して出し直すよう案内する。
-        """
-        self.use(DEFS)
-        before = parent_text("i0001", PLAN, copy=self.phases_text)
-        reordered = parent_text(
-            "i0001",
-            [PLAN[0], PLAN[2], {**PLAN[1], "after": [1]}, {**PLAN[3], "after": [2, 3]}],
-            copy=self.phases_text,
-        )
-        self.new_parent(reordered)
-        problems = self.problems({"i0001": before.encode()})
-        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
-        told = [p for p in problems if "計画編集タブ" in p]
-        self.assertTrue(told, problems)
-        self.assertIn("--fill-phases", told[0])
-        self.assertIn("cancel", told[0])
-        # 本文も違えば、その案内はしない（ほかの書き換えかもしれない）。
-        problems = self.problems({"i0001": before.replace("本文", "別の本文").encode()})
-        self.assertFalse(any("計画編集タブ" in p for p in problems), problems)
-        # 計画のほかの欄も違えば、その案内はしない。
-        problems = self.problems({"i0001": before.replace("title: 親", "title: 別の題").encode()})
-        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
-        self.assertFalse(any("計画編集タブ" in p for p in problems), problems)
-
-    def test_a_child_whose_predecessors_were_retargeted_is_told_to_cancel(self):
-        """計画編集タブで `predecessors` だけを直した子（識別子は同じ）にも案内する。"""
-        self.new_parent()
-        self.start_parent()
-        prior = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False).replace(
-            "human_review:", "predecessors: [i0002-02-01]\nhuman_review:", 1
-        )
-        now = prior.replace("[i0002-02-01]", "[i0002-01-01]")
-        write(os.path.join(self.approved, "doing", "i0001-01-01.md"), now)
-        self.commit_parent("moved by hand")
-        problems = core.withdraw(
-            self.snapshot(), ["i0001-01-01"], {"i0001-01-01": prior.encode()}
-        ).problems
-        self.assertTrue(any("計画編集タブ" in p for p in problems), problems)
-
-    def test_a_child_with_a_retargeted_id_has_no_prior_proposal(self):
-        """識別子を付け替えた子は、承認コミットの親に同じ名前の提案が無いので止まる（案内は出ない）。"""
-        self.new_parent(plan=("research", "design"))
-        child = child_text("i0001-02-01", "i0001", 2, ("wip/design/*",), False)
-        write(os.path.join(self.approved, "doing", "i0001-02-01.md"), child)
-        self.commit_parent("moved by hand")
-        problems = core.withdraw(self.snapshot(), ["i0001-02-01"], {}).problems
-        self.assertTrue(any("提案がありません" in p for p in problems), problems)
-        self.assertFalse(any("計画編集タブ" in p for p in problems), problems)
-
-    def test_a_followup_child_is_named(self):
-        self.new_parent()
-        self.start_parent()
-        child = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
-        child = child.replace("human_review:", "followup_of: [i0001-01-09]\nhuman_review:", 1)
-        write(os.path.join(self.approved, "doing", "i0001-01-01.md"), child)
-        problems = core.withdraw(self.snapshot(), ["i0001-01-01"], {"i0001-01-01": child.encode()})
-        self.assertTrue(any("続きの子" in p for p in problems.problems), problems.problems)
-        listed = dict((i, p) for i, _, p in core.withdrawable(self.snapshot(), "i0001"))
-        self.assertTrue(any("続きの子" in p for p in listed["i0001-01-01"]), listed)
-
-    def use(self, text):
-        write(config_path(self.root, "phases"), text)
-        self.phases_text = text
-
-    def problems(self, prior):
-        return core.withdraw(self.snapshot(), ["i0001"], prior).problems
-
-    def test_a_started_parent_is_not_withdrawn(self):
-        text = self.approved_parent()
-        self.start_parent()
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("着手済み" in p and "cancel" in p for p in problems), problems)
-
-    def test_a_parent_with_a_child_is_not_withdrawn(self):
-        text = self.approved_parent()
-        self.propose(
-            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
-        )
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("子の提案" in p for p in problems), problems)
-        self.assertEqual(self.approve().returncode, 0)
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("子の承認済みチケット" in p for p in problems), problems)
-
-    def test_marks_a_revision_a_blocked_todo_or_no_commit_refuse(self):
-        text = self.approved_parent()
-        self.assertTrue(any("承認コミット" in p for p in self.problems({})))
-        write(os.path.join(self.approved, "phases", "i0001", "1.pending"), "{}")
-        self.assertTrue(any("マーカー" in p for p in self.problems({"i0001": text.encode()})))
-        os.remove(os.path.join(self.approved, "phases", "i0001", "1.pending"))
-        self.propose("i0001", text)
-        self.assertTrue(any("戻す先" in p for p in self.problems({"i0001": text.encode()})))
-        self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.assertEqual(self.approve().returncode, 0)
-        # 改版は計画を書き換えるので、承認コミットの親の提案と一致せず止まる。
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
-
-    def test_copies_left_in_a_worktree_do_not_change_the_answer(self):
-        """承認の前に切ったワークツリーに `todo/` の提案が残っていても、答えは前と同じ。"""
-        text = parent_text("i0001", ["research"])
-        self.propose("i0001", text)
-        self.commit_parent()
-        other = self.worktree("i0001-01-05", "i0001")  # todo/i0001 を持ったまま切る
-        self.assertEqual(self.approve().returncode, 0)
-        self.assertEqual(self.problems({"i0001": text.encode()}), [])
-        listed = core.withdrawable(self.snapshot(), "i0001")
-        self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
-        # 承認済みの無い子の提案は、どのツリーに在っても止める（前と同じ）。
-        write(
-            os.path.join(other, "wip", "proposals", "todo", "i0001-01-01.md"),
-            child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False),
-        )
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("子の提案" in p for p in problems), problems)
-        listed = core.withdrawable(self.snapshot(), "i0001")
-        self.assertTrue(any("子の提案" in p for p in listed[0][2]), listed)
-
-    def test_a_leftover_temporary_file_is_not_a_marker(self):
-        """書きかけで止まって残った一時ファイルだけなら、マーカーとは数えず取り下げられる。"""
-        text = self.new_parent()
-        marks = os.path.join(self.approved, "phases", "i0001")
-        # 実際に残りうる名前。前の版の待ち方（write_bytes_atomic）と、前の版の受け入れた指摘の記録
-        # （write_json_atomic）が残した書きかけ。マーカーは一時ファイルを作らずに書く。
-        write(os.path.join(marks, ".workflow.yml.abc12345.part"), "half")
-        write(os.path.join(marks, ".accepted.abc12345.part.json"), "half")
-        problems = self.problems({"i0001": text.encode()})
-        self.assertFalse(any("マーカー" in p for p in problems), problems)
-        # 実際のマーカーが一緒に在れば、今までどおり止める。
-        write(os.path.join(marks, "1.pending"), "{}")
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("マーカーがある" in p for p in problems), problems)
-
-    def test_an_unreadable_marks_place_refuses(self):
-        """マーカーの置き場を読めない（ディレクトリでない）なら、無いとは言わずに止める。"""
-        text = self.approved_parent()
-        write(os.path.join(self.approved, "phases", "i0001"), "not a directory\n")
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("phases/i0001/ を読めない" in p for p in problems), problems)
-
-    def test_nothing_is_written_when_refused(self):
-        text = self.approved_parent()
-        self.start_parent()
-        checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()})
-        self.assertIsNone(checked.changes)
 
 
 class RecordWritesTest(CoreHarness):
@@ -1703,7 +1332,6 @@ class RecordWritesTest(CoreHarness):
             "tickets.core_base",
             "tickets.core_approve",
             "tickets.core_review",
-            "tickets.core_withdraw",
         )
         for dotted in names:
             package, name = dotted.split(".")

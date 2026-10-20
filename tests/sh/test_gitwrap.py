@@ -909,7 +909,7 @@ class StoreRewindTest(GitWrapperTest):
 
     `checkout <ref> <パス>` と `restore --source <ref>` は置き場を別のコミットの中身に戻し、
     `restore --ours / --theirs` は置き場の衝突を片側にそろえる。どれも承認が無かったことにも、
-    取り下げた承認が戻ったことにもなる。置き場に当たらないパスは今までどおり通す。
+    消した承認が戻ったことにもなる。置き場に当たらないパスは今までどおり通す。
     """
 
     COPY = ".ccnavi/approved/doing/i0001.md"

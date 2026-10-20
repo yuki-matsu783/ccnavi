@@ -14,6 +14,7 @@
       "body": "",
       "created_at": "2026-09-29T05:00:00.000Z",
       "author": "",
+      "own": false,
       "last_id": "n-1",
       "last_at": "2026-09-29T05:00:00.000Z",
       "last_author": ""
@@ -27,6 +28,7 @@
       "body": "数の行",
       "created_at": "",
       "author": "202",
+      "own": false,
       "last_id": "5401",
       "last_at": "",
       "last_author": "lab-reviewer"

@@ -39,7 +39,7 @@ export interface DecidePreview {
   readonly parent: string;
   readonly phase: number;
   readonly mr: { readonly number: number; readonly url: string };
-  /** issue に回せるか（フィードバック計画が承認されたあとだけ） */
+  /** issue に回せるか。常に true（JSON の欄は互換のために残す。選ぶ・選ばないの判定には使わない） */
   readonly can_issue: boolean;
   readonly threads: readonly DecideThread[];
   /** 見せた指摘のダイジェスト（不透明な文字列）。選択を置くときに `--digest` で返す */
@@ -146,9 +146,6 @@ export function choicesProblem(
     const choice = choices[key];
     if (!DECIDE_CHOICES.includes(choice as DecideChoice)) {
       return `不明な対応方針です: ${String(choice)}`;
-    }
-    if (choice === "issue" && !preview.can_issue) {
-      return "指摘をIssueとして管理できるのは、フィードバック計画の承認後です";
     }
   }
   return undefined;
