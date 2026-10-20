@@ -49,10 +49,12 @@ class GitAuthShTest(unittest.TestCase):
         os.chmod(path, 0o755)
         return path
 
-    def run_auth(self, origin: str, parent_count: str | None = None) -> dict:
+    def run_auth(
+        self, origin: str, parent_count: str | None = None, path: str | None = None
+    ) -> dict:
         subprocess.run(["git", "-C", self.repo, "remote", "add", "origin", origin], check=True)
         env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_CONFIG")}
-        env["PATH"] = self.bin + os.pathsep + "/usr/bin" + os.pathsep + "/bin"
+        env["PATH"] = path or self.bin + os.pathsep + "/usr/bin" + os.pathsep + "/bin"
         if parent_count is not None:
             env["GIT_CONFIG_COUNT"] = parent_count
             env["GIT_CONFIG_KEY_0"] = "user.name"
@@ -90,7 +92,27 @@ class GitAuthShTest(unittest.TestCase):
         self.assertEqual(self.run_auth("git@github.com:o/r.git")["count"], "")
 
     def test_missing_tool_adds_nothing(self):
-        self.assertEqual(self.run_auth("https://github.com/o/r.git")["count"], "0")
+        if shutil.which("gh", path="/usr/bin:/bin"):
+            self.skipTest("システムに gh がある")
+        self.assertEqual(self.run_auth("https://github.com/o/r.git")["count"], "")
+
+    def test_relative_tool_path_is_refused(self):
+        os.makedirs(os.path.join(self.repo, "bin"))
+        with open(os.path.join(self.repo, "bin", "gh"), "w", encoding="utf-8") as f:
+            f.write("#!/bin/sh\nexit 0\n")
+        os.chmod(os.path.join(self.repo, "bin", "gh"), 0o755)
+        got = self.run_auth("https://github.com/o/r.git", path="bin:/usr/bin:/bin")
+        self.assertEqual(got["keys"], [])
+
+    def test_tool_path_with_dollar_is_refused(self):
+        bad = os.path.join(self.tmp.name, "d$(touch pwned)")
+        os.makedirs(bad)
+        with open(os.path.join(bad, "gh"), "w", encoding="utf-8") as f:
+            f.write("#!/bin/sh\nexit 0\n")
+        os.chmod(os.path.join(bad, "gh"), 0o755)
+        got = self.run_auth("https://github.com/o/r.git", path=bad + ":/usr/bin:/bin")
+        self.assertEqual(got["keys"], [])
+        self.assertFalse(os.path.exists("pwned"))
 
     def test_parent_config_is_kept(self):
         self.tool("gh")
