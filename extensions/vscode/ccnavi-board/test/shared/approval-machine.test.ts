@@ -339,7 +339,6 @@ const GUARDS: readonly Guard[] = [
         { u1: "keep" },
         { u1: "keep", u2: "keep", u3: "keep" },
         { u1: "keep", u2: "later" },
-        { u1: "keep", u2: "issue" },
       ];
       for (const choices of cases) {
         const after = step(shown, { kind: "decideConfirm", choices });

@@ -1552,7 +1552,8 @@ class TicketTest(unittest.TestCase):
         data = json.loads(shown.stdout)
         self.assertEqual([t["key"] for t in data["threads"]], ["u1", "u2"])
         self.assertEqual(data["parent"], "i0001")
-        self.assertFalse(data["can_issue"])
+        # フィードバック計画が無くても、issue に回せる（欄は互換のために残る）
+        self.assertTrue(data["can_issue"])
         self.assertRegex(data["digest"], r"^v2\.[A-Za-z0-9_-]+$")
         phases = os.path.join(self.approved, "phases", "i0001")
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
@@ -1977,7 +1978,7 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(plan))
 
     def test_decide_yes_refuses_what_was_not_shown(self):
-        """見せたあとに指摘が変わった、ダイジェストが無い、選択が揃っていない、issue に回せない。
+        """見せたあとに指摘が変わった、ダイジェストが無い、選択が揃っていない、知らない行き先。
 
         どれも何も置かない。
         """
@@ -1995,7 +1996,6 @@ class TicketTest(unittest.TestCase):
             ("--yes", both, "--json"),
             ("--yes", json.dumps({"u1": "keep"}), "--digest", digest, "--json"),
             ("--yes", json.dumps({"u1": "keep", "u2": "later"}), "--digest", digest, "--json"),
-            ("--yes", json.dumps({"u1": "keep", "u2": "issue"}), "--digest", digest, "--json"),
             ("--yes", "not json", "--digest", digest, "--json"),
         ):
             refused = self.decide(fixture, *extra)

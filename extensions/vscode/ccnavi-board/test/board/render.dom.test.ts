@@ -107,8 +107,9 @@ test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選
     assert.equal(text(page, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘 2 件の対応方針");
     assert.ok(texts(page, ".approval-note").join(" ").includes("「このフェーズで直す」を 1 件でも選ぶと"));
     assert.deepEqual(texts(page, ".decide-body"), ["命名を直す", "<b>テスト</b>"]);
-    // issue に回せない局面では、その行き先を出さない
-    assert.equal(page.all('input[data-choice="issue"]').length, 0);
+    // issue に回す行き先は、局面（フィードバック計画の承認の有無）に関わらず出す
+    assert.equal(page.all('input[data-choice="issue"]').length, 2);
+    assert.ok(!texts(page, ".approval-note").join(" ").includes("フィードバック計画"));
     assert.equal(page.all('input[data-choice="keep"]').length, 2);
     const confirm = page.one<HTMLButtonElement>('button[data-action="decide-confirm"]');
     assert.equal(confirm.disabled, true);

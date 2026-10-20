@@ -28,7 +28,7 @@ export function DecideBody({
   const choices = picked.digest === preview.digest ? picked.choices : {};
   const choose = (key: string, choice: DecideChoice): void =>
     setPicked({ digest: preview.digest, choices: { ...choices, [key]: choice } });
-  const offered = DECIDE_CHOICES.filter((c) => c !== "issue" || preview.can_issue);
+  const offered = DECIDE_CHOICES;
   const count = preview.threads.length;
   const done = preview.threads.every((t) => t.key in choices);
   return (
@@ -45,7 +45,6 @@ export function DecideBody({
         {count === 0
           ? "このフェーズをレビュー済みにしますか？"
           : "「このフェーズで直す」を 1 件でも選ぶと、追加対応用の子チケットを作成し、このフェーズを再開します。"}
-        {count === 0 || preview.can_issue ? "" : " 指摘をIssueとして管理できるのは、フィードバック計画の承認後です。"}
       </p>
       {count === 0 ? null : (
         <ol className="decide-threads" data-tour="decide-threads">
