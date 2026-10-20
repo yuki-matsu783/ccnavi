@@ -146,6 +146,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0118](0118-wrapper-sh-judging-is-an-exception.md) | 入口を 1 本に寄せたラッパーの中の可否の判定は、止める・通すの原則の例外にする |
 | [0121](0121-wrapper-cannot-remove-core-paths.md) | git のラッパーでも、自己防衛の対象を消す・別のコミットの中身に戻す形は hook が止める |
 | [0131](0131-raw-git-always-builtin-no-common-sample.md) | 生の git は組み込みでいつも止め、共通レイヤーの見本を外す。組み込みの土台の id は ccnavi 自身を守るもの以外を `builtin-deny-` で始める |
+| [0158](0158-builtin-guards-replace-common-rules.md) | ccnavi 自身の保護と認証情報の保護を組み込みに寄せ、共通の rules.yml から外す |
 
 ### チケット制御
 

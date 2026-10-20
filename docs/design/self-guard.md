@@ -24,14 +24,14 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/`）は、この表に足さない。`*/.ccnavi/*` の一般の保護で止める。
 
-名指しのツール（Write / Edit）の保護には、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下を除く例外がある。守る場所の写し（`wip/handoff/.ccnavi/scripts/x.sh` など）は、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。例外が効くのは、`..` の段が無く、リンクを解いた実パスが綴りと同じで、既にあるファイルがハードリンクでつながっていないとき。`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。組み込みの保護（`builtin:guard-project-home`。`selfguard_shell.handoff_write_exempt`）と、リポジトリのルール（`guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` の `except`）が同じ範囲を除く。リポジトリのルールの `except` は式なのでファイルを見ず、ハードリンクの写しも除いてしまう。そこで、置き場の中のリンクを通る対象・ハードリンクでつながった対象・`..` を含む対象への書き込みは、組み込みの `builtin:guard-handoff-links`（`selfguard_shell.handoff_link_target`）が別に止める。置き場の中にリンクを作るシェルの形も `builtin:guard-handoff-ln` が止める（8.2）。シェルからの書き込みの保護は、ほかは変えない。
+名指しのツール（Write / Edit）の保護には、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下を除く例外がある。守る場所の写し（`wip/handoff/.ccnavi/scripts/x.sh` など）は、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。例外が効くのは、`..` の段が無く、リンクを解いた実パスが綴りと同じで、既にあるファイルがハードリンクでつながっていないとき。`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。組み込みの保護（`builtin:guard-project-home` と、名前で書くツールの 4 本 `builtin:guard-hooks`・`builtin:guard-settings`・`builtin:guard-scripts`・`builtin:guard-ccnavi-config`。どれも `selfguard_shell.handoff_write_exempt`）が同じ範囲を除く。この関数は、ハードリンクでつながった写しを除かない。利用者がリポジトリのルールに `except` で同じ範囲を除く場合、`except` は式なのでファイルを見ず、ハードリンクの写しも除いてしまう。そこで、置き場の中のリンクを通る対象・ハードリンクでつながった対象・`..` を含む対象への書き込みは、組み込みの `builtin:guard-handoff-links`（`selfguard_shell.handoff_link_target`）が別に止める。置き場の中にリンクを作るシェルの形も `builtin:guard-handoff-ln` が止める（8.2）。シェルからの書き込みの保護は、ほかは変えない。
 
 上のうち追跡されているものは、その元リポジトリから切ったワークツリー側の設定も対象に入る（11.6）。
-hook スクリプトと保護済みスクリプトはここに無く、ルールの `deny` で止めている。ccnavi ディレクトリの下のスクリプトも無く、組み込みの `deny` で止める。
+hook スクリプトと保護済みスクリプトは、この表の対象（バックアップと復元）には無い。名前で書くツールからの書き込みは、組み込みの 4 本（8.2）が実行前に止め、実行後の保護範囲（`events.watched_for`）が未コミットの変更を検知する。ccnavi ディレクトリの下のスクリプトも同じで、`builtin:guard-project-home` も止める。
 
 ### 8.2 止める側
 
-`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す。これとは別に、チケット制御が有効な間は、承認済みの置き場（`.ccnavi/approved/` の下すべて）と操作記録の置き場（`logs/state/ops/`）への書き込みを止める組み込みの関門（`ticket_guard.gate_rules`）を足す。関門は `CCNAVI_GUARD_CORE_FILES` の値にも `dry-run` にも依らず止める。
+`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す（`selfguard_shell.add_rules`）。そのあとに、名前で書くツールの 4 本（下）を挿す（`selfguard_shell.add_named_rules`）。これとは別に、チケット制御が有効な間は、承認済みの置き場（`.ccnavi/approved/` の下すべて）と操作記録の置き場（`logs/state/ops/`）への書き込みを止める組み込みの関門（`ticket_guard.gate_rules`）を足す。関門は `CCNAVI_GUARD_CORE_FILES` の値にも `dry-run` にも依らず止める。承認済みの置き場は、チケット制御の保護として扱う。チケット制御が有効な間は自己防衛の値に依らず、実行前は拒否し（`builtin:ticket-approved`。文面は承認の経路・`status`・`finish`・`propose` を案内する）、実行後は未コミットの変更を検知する。実行後の保護範囲には、同じ式と文面の 1 本（`ticket_guard.approved_write_rule`。シェル版は要らない）を `events.watched_for` が足す。復元は `CCNAVI_RESTORE_IF_DENY` の実効値が `enable` のときだけ。ccnavi のスクリプトによる正規の書き込みは、コマンド名ではなく変更の中身の形で外れる（`post_findings._script_writes`、ADR-0075）。コミット済みの変更の `Stop` での報告は対象外で（`post._committed_findings` がチケットの置き場のコミット済みの変更を一律に外す）、MR のレビューで確かめる。チケット制御を `disable` にすると、実行後の保護は外れる（実行前は、自己防衛が有効なら `builtin:guard-project-home` が止める）。
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
@@ -42,6 +42,24 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 | `builtin:guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
 | `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていない写しと置き場の外には当たらない |
 | `builtin:guard-handoff-ln` | ワークスペースルートが決まっているとき | Bash で、リンクを作るコマンド（`ln`・`link`・`cp -l` / `-s` / `--link` / `--symbolic-link`）があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中の形。行き先は読み分けない（止める側に倒す） |
+
+名前で書くツールの 4 本（`selfguard_shell.add_named_rules`。`Write` `Edit` `NotebookEdit`）。`CCNAVI_GUARD_CORE_FILES` の実効値が `disable` でなければ足す。
+
+| id | 当てるもの | 書き込みを許す例外 |
+|---|---|---|
+| `builtin:guard-hooks` | glob `*/.claude/hooks/*` | `handoff_write_exempt`（直下の `wip/handoff/` の普通の写し） |
+| `builtin:guard-settings` | regex `[\\/]\.claude[\\/]settings(\.local)?\.json$` | 同上 |
+| `builtin:guard-scripts` | glob `*/<ccnavi ディレクトリ>/scripts/*` | 同上 |
+| `builtin:guard-ccnavi-config` | regex `[\\/]<ccnavi ディレクトリ>[\\/]config[\\/]common[\\/](rules\|phases\|risks)\.yml$` | 同上 |
+
+- 共通のルールファイルには書かない。ルールファイルの `deny` に置くと、書き換えられた時点で保護も一緒に消える
+- ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない
+- `builtin:guard-ccnavi-config` はルートを固定せず、パスの末尾で当てる。`builtin:guard-common-layer` と同じ範囲だとは仮定しない
+- 足す場所は 3 つで、同じ関数から足す。実行前の通常時は `add_rules` の後に呼ぶ（`deny` の先頭に挿すので、専用の文面が `builtin:guard-project-home` / `builtin:guard-common-layer` より先に並ぶ。`add_rules` の中身は変えず、二重に足さない）。実行前で、共通のルールファイルが読めず組み込みの既定で動いている間は、`add_rules` は呼ばずこの関数だけ呼ぶ。実行後は `events.watched_for` が、各ツリーのルールの組にこの関数だけを足す（読めない間も同じ。`builtin:guard-project-home` 全体は足さない）
+- 一般の保護と同じ扱いで、`dry-run` では報告だけにする。実行後は、`CCNAVI_RESTORE_IF_DENY` を全体モードと掛け合わせた実効値（`modes.effective_setting`）が `enable` なら未コミットの変更を復元し、全体モードが `dry-run` なら報告だけにする。`Stop` は報告だけで復元しない。`UserPromptSubmit` と `SessionStart` は同じ保護範囲で基準を取り、前からある変更とユーザが受け入れた変更を戻さない
+- `disable` のときは、実行前にも実行後にも足さない。ワークスペースルートの `.claude/hooks/` と `.claude/settings*.json` は、ルールの `workspace-root` が実行前に止める
+
+共通のルールファイルが読めない間の修復は、エージェントが `Write` / `Edit` で直接直す形では通さない（ADR-0158。ADR-0012 を覆す）。読めない間も `builtin:guard-ccnavi-config` は外れない。直し方は 1 つで、エージェントが `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、ユーザが端末の `ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない `rules.yml` の取り込みは、`handoff._defense_change` が「確かめられないので端末に限る」と扱うので、ボードからの取り込みは断られる。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
 
 同じ設定が有効な間、`ccnavi user prune`（古い形は `ccnavi --prune` の `--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
@@ -178,7 +196,7 @@ hook 自身は settings.json の env で起動するので、ここで見る代�
 失敗した呼び出し（`PostToolUseFailure`）も、成功した呼び出しと同じ照合を行う。失敗する前に消した・書き換えたものを
 通すと、次の発言で「ユーザが消した」ものとして受け入れられるため。
 
-組み込みの既定を使っている間の修復だけは戻さない（REQ-PRE-06）。共通レイヤーのルールファイルが実行前のバックアップの時点で読めず、その呼び出しが
+組み込みの既定を使っている間の修復だけは戻さない（REQ-PRE-06。エージェントが名前で書くツールで直す道は、8.2 の `builtin:guard-ccnavi-config` が止めるので、通るのは `dry-run` で名前で書くツールが通った場合に限る。復元側の既存の例外として残し、実行後のチェック（`post.check`）には引き継がない）。共通レイヤーのルールファイルが実行前のバックアップの時点で読めず、その呼び出しが
 `Write` / `Edit` / `NotebookEdit` でそのファイルを書いたときに限る。判断は実行前の中身で行う。シェルからの書き込み、
 他の設定ファイル、ワークツリー側の設定は戻す。戻さなかったことは `left-as-repair` として報告し、直した中身をユーザが確かめるよう促す。
 

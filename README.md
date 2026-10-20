@@ -2414,7 +2414,7 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 
 ```
 ■ rules 共通レイヤー（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
-  deny  guard-hooks                  Write|Edit|NotebookEdit            */.claude/hooks/*
+  deny  workspace-root               Write|Edit|NotebookEdit            ^{root}[\\/]
 ■ rules ワークスペースのレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
   allow self:worktrees               Write|Edit                         */.claude/worktrees/*
 ■ rules lib（projects/lib/.ccnavi/config/project/rules.yml、deny 1 / ask 0 / allow 0）
