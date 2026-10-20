@@ -112,6 +112,9 @@ export function phaseStatusItems(p: PhaseChip): string[] {
   if (p.riskLine !== "") {
     notes.push(p.riskLine);
   }
+  if (p.manual !== "") {
+    notes.push(p.manual);
+  }
   return [PHASE_STATE_LABELS[p.state], ...notes];
 }
 

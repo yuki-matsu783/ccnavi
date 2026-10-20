@@ -115,7 +115,7 @@ noted="$state/review-close-early-note-$family.md"
 number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 if [ "$make_issue" -eq 1 ] && [ -f "$issue_draft" ]; then
-	issue=$(create_issue "$issue_draft")
+	issue=$(staged_send close-early "$family" issue issue "$number" "$url" "$issue_draft") || issue=""
 	[ -z "$issue" ] && fail issue-create-failed "残りを書き出す issue を作れなかった。下書きは $issue_draft にある。"
 	issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
 	issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
@@ -124,7 +124,8 @@ if [ "$make_issue" -eq 1 ] && [ -f "$issue_draft" ]; then
 	rm -f "$issue_draft"
 fi
 if [ -f "$noted" ]; then
-	comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
+	staged_send close-early "$family" comment note "$number" "$url" "$noted" >/dev/null &&
+		rm -f "$noted"
 fi
 # 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
 carry_human "$family" || exit 1

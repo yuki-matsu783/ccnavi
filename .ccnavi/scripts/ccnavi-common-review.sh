@@ -240,11 +240,12 @@ threads() {
 		page=0
 		while :; do
 			query=$("$JQ" -n --arg o "$owner" --arg r "$repo" --argjson n "$mr_number" --argjson c "$cursor" '{
-				query: "query($o:String!,$r:String!,$n:Int!,$c:String){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{id isResolved comments(first:1){nodes{url path line body createdAt}}}}}}}",
+				query: "query($o:String!,$r:String!,$n:Int!,$c:String){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{id isResolved comments(first:1){nodes{url path line body createdAt}} last:comments(last:1){nodes{id createdAt author{login}}}}}}}}",
 				variables: {o: $o, r: $r, n: $n, c: $c}}')
 			res=$(api POST graphql "$query")
-			chunk=$(printf '%s' "$res" | "$JQ" '[.data.repository.pullRequest.reviewThreads.nodes[] | . as $t | (.comments.nodes[0] // {}) as $c |
-				{id: $t.id, resolved: $t.isResolved, url: ($c.url // ""), path: ($c.path // ""), line: ($c.line // 0), body: ($c.body // ""), created_at: ($c.createdAt // "")}]')
+			chunk=$(printf '%s' "$res" | "$JQ" '[.data.repository.pullRequest.reviewThreads.nodes[] | . as $t | (.comments.nodes[0] // {}) as $c | (.last.nodes[0] // {}) as $l |
+				{id: $t.id, resolved: $t.isResolved, url: ($c.url // ""), path: ($c.path // ""), line: ($c.line // 0), body: ($c.body // ""), created_at: ($c.createdAt // ""),
+				 last_id: ($l.id // ""), last_at: ($l.createdAt // ""), last_author: ($l.author.login // "")}]')
 			all=$(printf '%s\n%s' "$all" "$chunk" | "$JQ" -s '.[0] + .[1]')
 			more=$(printf '%s' "$res" | "$JQ" -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
 			[ "$more" = true ] || break
@@ -258,7 +259,8 @@ threads() {
 			"$JQ" --arg u "$mr_url" '[.[] | select((.notes // []) | length > 0) | select(.notes[0].resolvable) | . as $d | .notes[0] as $n |
 				{id: ($d.id | tostring), resolved: ([$d.notes[] | select(.resolvable) | .resolved] | all),
 				 url: ($u + "#note_" + ($n.id | tostring)), path: ($n.position.new_path // ""), line: ($n.position.new_line // 0),
-				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: (($n.author.id // "") | tostring)}]'
+				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: (($n.author.id // "") | tostring),
+				 last_id: (($d.notes[-1].id // "") | tostring), last_at: ($d.notes[-1].created_at // ""), last_author: ($d.notes[-1].author.username // "")}]'
 	fi
 }
 
@@ -290,6 +292,197 @@ comment() {
 		api POST "projects/$(encoded_path)/merge_requests/$mr_number/notes" "$body_json" |
 			"$JQ" --arg u "$mr_url" '{url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: ((.author.id // "") | tostring)}'
 	fi
+}
+
+# ---- 目印で自分の投稿を探す（送ったかどうかの照合）。
+#
+# <種類 issue|note|issue-note> <操作ID> <段階ID> <対象の番号> <アカウント> <対象の URL>
+# 種類: issue（issue の作成）、note（MR へのコメント）、issue-note（issue へのコメント）。
+# 対象は note なら MR、issue-note なら issue（GitLab の URL を組むのに使う）。
+# 標準出力は 1 行: `<yes|no|error> <URL,URL,…>`。1 つめは一覧を上限で打ち切らずに最後まで読めたか
+# （yes）、打ち切ったか（no）、読めなかったか（error）。2 つめは目印が一致した投稿の URL。
+# 目印は本文の末尾の `<!-- ccnavi:op=<操作ID> stage=<段階ID> -->`。アカウントが分かれば、その人の投稿だけ数える
+# （GitHub は `.user.login`、GitLab は `.author.username`）。検索 API は使わず、そのリポジトリの
+# issue / MR のコメントの一覧を、新しい順に読む。
+find_marked() {
+	fm_kind="$1"
+	fm_mark="<!-- ccnavi:op=$2 stage=$3 -->"
+	fm_mr="$4"
+	fm_who="$5"
+	fm_url="${6:-}"
+	fm_rc=0
+	if [ "$kind" = github ]; then
+		if [ "$fm_kind" = issue ]; then
+			fm_rel="repos/$path/issues?state=all&sort=created&direction=desc"
+			[ -z "$fm_who" ] || fm_rel="$fm_rel&creator=$(ccnavi_host_encode "$fm_who")"
+		else
+			fm_rel="repos/$path/issues/$fm_mr/comments?sort=created&direction=desc"
+		fi
+		fm_list=$(ccnavi_hg_partial=1 ccnavi_host_pages "$fm_rel") || fm_rc=$?
+		fm_urls=$(printf '%s' "$fm_list" | "$JQ" -r --arg m "$fm_mark" --arg w "$fm_who" \
+			'[.[]? | select(has("pull_request") | not) | select((.body // "") | contains($m)) | select($w == "" or ((.user.login // "") == $w)) | .html_url] | join(",")' 2>/dev/null) || fm_rc=1
+	else
+		if [ "$fm_kind" = issue ]; then
+			fm_rel="projects/$(encoded_path)/issues?scope=all&order_by=created_at&sort=desc"
+			[ -z "$fm_who" ] || fm_rel="$fm_rel&author_username=$(ccnavi_host_encode "$fm_who")"
+		elif [ "$fm_kind" = issue-note ]; then
+			fm_rel="projects/$(encoded_path)/issues/$fm_mr/notes?order_by=created_at&sort=desc"
+		else
+			fm_rel="projects/$(encoded_path)/merge_requests/$fm_mr/notes?order_by=created_at&sort=desc"
+		fi
+		fm_list=$(ccnavi_hg_partial=1 ccnavi_host_pages "$fm_rel") || fm_rc=$?
+		fm_urls=$(printf '%s' "$fm_list" | "$JQ" -r --arg m "$fm_mark" --arg w "$fm_who" --arg u "${fm_url:-}" \
+			'[.[]? | select(((.description // "") + (.body // "")) | contains($m)) | select($w == "" or ((.author.username // "") == $w)) | (.web_url // ($u + "#note_" + (.id | tostring)))] | join(",")' 2>/dev/null) || fm_rc=1
+	fi
+	case "$fm_rc" in
+	0) printf 'yes %s\n' "$fm_urls" ;;
+	2) printf 'no %s\n' "$fm_urls" ;;
+	*) printf 'error \n' ;;
+	esac
+}
+
+# ---- エージェントの単発の投稿（request・comment・ready の補助コメント、close-early の issue とコメント）を、
+# 操作記録に載せて送る。
+#
+# staged_send <操作の種類> <鍵> <段階ID> <note|issue> <MR の番号> <MR の URL> <本文のファイル>
+# 操作ID は種類・親・MR・鍵から決まる（打ち直しが同じ記録に当たる）。段階は issue と comment の 2 つを
+# 記録に持つ。note は MR へのコメント、issue は issue の作成（create_issue が要る。本文の 1 行目が題）。
+# 標準出力は note なら `comment`、issue なら `create_issue` と同じ形の JSON（送り済みと分かったときは
+# {url}、issue はそれに {number}）。送り済みなら送らず、前に試した形跡があれば先にホストを目印で照合する。
+# 確定できないときは止めて 1（自動では送り直さない）。
+# 記録を作れない（古い実行ファイル・書けない）ときは、前と同じ送り方に戻る。
+
+cs_set() {
+	ccnavi ops stage-set "$cs_id" "$cs_stage" "$@" 2>/dev/null || {
+		printf '%s: 操作記録に段階 %s を書けなかった。\n' "${review_label:-ccnavi-review}" "$cs_stage" >&2
+		return 1
+	}
+}
+
+cs_field() {
+	ccnavi ops show "$cs_id" 2>/dev/null | "$JQ" -r --arg s "$cs_stage" --arg f "$1" '[.stages[]? | select(.id == $s)][0][$f] // empty'
+}
+
+# 送った先の URL から、返す JSON を作る。
+cs_sent_json() {
+	if [ "$cs_skind" = issue ]; then
+		"$JQ" -n --arg u "$1" '{url: $u, number: ($u | split("/") | last | tonumber? // 0)}'
+	else
+		"$JQ" -n --arg u "$1" '{url: $u}'
+	fi
+}
+
+staged_send() {
+	cs_kind="$1"
+	cs_key="$2"
+	cs_stage="$3"
+	cs_skind="$4"
+	cs_mr="$5"
+	cs_url="$6"
+	cs_file="$7"
+	cs_id=$(ccnavi ops begin "$cs_kind" "${branch:-}" 0 "$cs_mr" "$cs_key" "$cs_stage:$cs_stage" 2>/dev/null) || cs_id=""
+	if [ -z "$cs_id" ]; then
+		if [ "$cs_skind" = issue ]; then create_issue "$cs_file"; else comment "$cs_mr" "$cs_url" "$cs_file"; fi
+		return $?
+	fi
+	# 同じ操作を同時に送らない（照合の前に 2 つが「未送信」と見て、両方が投稿するのを防ぐ）。
+	# ロックが使えない構成（root が無い）では、取らずに進む。
+	cs_locked=""
+	if [ -n "${root:-}" ] && command -v ccnavi_lock_take >/dev/null 2>&1; then
+		# 取る関数の状態はグローバル変数 1 組。write-and-push のロックを持ったまま取ると、その情報が
+		# 上書きされて外せなくなるので、取る前に退避して、外したあとに戻す。
+		cs_sv_dir="$ccnavi_lock_dir"
+		cs_sv_mark="$ccnavi_lock_mark"
+		cs_sv_set="$ccnavi_lock_set_held"
+		cs_sv_prev="$ccnavi_lock_prev_held"
+		cs_sv_prev_set="$ccnavi_lock_prev_set"
+		if ccnavi_lock_take "$root" ops "$cs_id" 30; then
+			cs_locked=1
+		else
+			ccnavi_lock_dir="$cs_sv_dir"
+			ccnavi_lock_mark="$cs_sv_mark"
+			printf '%s: 同じ投稿が別のプロセスで実行中。待っても取れなかったので止めた。\n' "${review_label:-ccnavi-review}" >&2
+			return 1
+		fi
+	fi
+	staged_send_locked
+	cs_rc=$?
+	if [ -n "$cs_locked" ]; then
+		ccnavi_lock_drop
+		ccnavi_lock_dir="$cs_sv_dir"
+		ccnavi_lock_mark="$cs_sv_mark"
+		ccnavi_lock_set_held="$cs_sv_set"
+		ccnavi_lock_prev_held="$cs_sv_prev"
+		ccnavi_lock_prev_set="$cs_sv_prev_set"
+	fi
+	return "$cs_rc"
+}
+
+# staged_send の本体（操作 ID のロックを持った状態で呼ぶ）。
+staged_send_locked() {
+	# 記録を読めないまま送ると、送り済みの段階をもう一度送りかねない。読めなければ止める。
+	if ! ccnavi ops show "$cs_id" >/dev/null 2>&1; then
+		printf '%s: 操作記録 %s を読めない。二重に送らないよう止めた。\n' "${review_label:-ccnavi-review}" "$cs_id" >&2
+		return 1
+	fi
+	cs_state=$(cs_field state)
+	if [ "$cs_state" = sent ]; then
+		printf '%s: 同じ投稿は送信済み（%s）。送り直さない\n' "${review_label:-ccnavi-review}" "$(cs_field url)" >&2
+		cs_sent_json "$(cs_field url)"
+		return 0
+	fi
+	cs_who=""
+	cs_tries=$(cs_field tries)
+	if [ "${cs_tries:-0}" -gt 0 ] || [ "$cs_state" = unknown ]; then
+		cs_who=$(account || :)
+		cs_found=$(find_marked "$cs_skind" "$cs_id" "$cs_stage" "$cs_mr" "$cs_who" "$cs_url")
+		cs_urls="${cs_found#* }"
+		cs_verdict=$(ccnavi ops reconcile "$cs_id" "$cs_stage" "$cs_urls" "${cs_found%% *}" "$cs_who" 2>/dev/null) || cs_verdict="stop 照合できなかった"
+		case "$cs_verdict" in
+		sent*)
+			cs_set sent "$cs_urls" "$cs_who" || :
+			cs_sent_json "$cs_urls"
+			return 0
+			;;
+		send*) : ;;
+		*)
+			cs_set unknown || :
+			printf '%s: 投稿を送ったか確定できない（%s）。自動では送り直さない。ホストで目印 ccnavi:op=%s stage=%s を探して確かめてください。\n' \
+				"${review_label:-ccnavi-review}" "${cs_verdict#* }" "$cs_id" "$cs_stage" >&2
+			return 1
+			;;
+		esac
+	fi
+	cs_body="$state/review-staged-$$.md"
+	{
+		cat "$cs_file"
+		printf '\n<!-- ccnavi:op=%s stage=%s -->\n' "$cs_id" "$cs_stage"
+	} >"$cs_body"
+	# 送る前の記録（試した回数と送るアカウント）を残せなければ、送らない（残らないと、落ちたあとの照合ができない）。
+	[ -n "$cs_who" ] || cs_who=$(account || :)
+	if ! cs_set pending "" "$cs_who"; then
+		rm -f "$cs_body"
+		return 1
+	fi
+	if [ "$cs_skind" = issue ]; then
+		cs_out=$(create_issue "$cs_body") || cs_out=""
+	else
+		cs_out=$(comment "$cs_mr" "$cs_url" "$cs_body") || cs_out=""
+	fi
+	rm -f "$cs_body"
+	cs_posted=$(printf '%s' "$cs_out" | "$JQ" -r '.url // empty' 2>/dev/null || :)
+	if [ -z "$cs_posted" ]; then
+		cs_set unknown || :
+		return 1
+	fi
+	[ -n "$cs_who" ] || cs_who=$(account || :)
+	cs_set sent "$cs_posted" "$cs_who" || :
+	printf '%s\n' "$cs_out"
+}
+
+# MR へのコメント 1 つを送る（staged_send の note）。<操作の種類> <鍵> <MR の番号> <MR の URL> <本文のファイル>
+comment_staged() {
+	staged_send "$1" "$2" comment note "$3" "$4" "$5"
 }
 
 # 取ってきた時点の状態を取り直して $result に置く。

@@ -59,6 +59,26 @@ class TicketStatusTest(PhaseHarness):
             end += 1
         return "\n".join(lines[start:end])
 
+    def test_an_unfinished_operation_is_listed_even_without_open_tickets(self):
+        begun = self.ccnavi("ops", "begin", "comment", "p1", "0", "7", "k", "comment:comment")
+        self.assertEqual(begun.returncode, 0, begun.stdout + begun.stderr)
+        out = self.said()
+        self.assertIn("引き継ぎ未完了", out)
+        self.assertIn(begun.stdout.strip(), out)
+
+    def test_explain_says_what_dry_run_still_stops_and_what_happens_when_it_cannot_decide(self):
+        out = self.ccnavi("--explain").stdout
+        self.assertIn("dry-run のときに止めるもの", out)
+        self.assertIn("判定に達せなかったとき", out)
+        self.assertIn("Write・Edit・NotebookEdit・Agent: enable は止める、dry-run は止める", out)
+
+    def test_lint_reports_an_unfinished_operation(self):
+        self.by_hand()
+        begun = self.ccnavi("ops", "begin", "comment", "p1", "0", "7", "k", "comment:comment")
+        self.assertEqual(begun.returncode, 0, begun.stdout + begun.stderr)
+        out = self.ccnavi("--lint").stdout
+        self.assertIn("引き継ぎ未完了", out)
+
     # ---- 1. 手で置いて未コミット
 
     def test_a_ticket_placed_by_hand_is_uncommitted_and_may_start_when_not_write_and_push(self):

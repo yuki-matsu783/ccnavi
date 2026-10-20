@@ -193,6 +193,8 @@ export interface ConfirmResult extends Written {
   readonly code: ReasonCode;
   /** 依頼の後に親のブランチが動いていれば、比べる 2 つ（拡張が compare API で読んで呼び直す） */
   readonly need_compare?: { readonly base: string; readonly head: string };
+  /** 手で done/ に動かされた子があれば、その done/ のファイル（リポジトリからの相対）。拡張が最初に加えたコミットの時刻を読んで呼び直す */
+  readonly need_manual?: { readonly paths: readonly string[] };
 }
 
 /** compare API の変更の一覧（`github.compareFiles` の答え。`files` が null なら読めない・打ち切られた） */
@@ -266,6 +268,8 @@ export const py = {
       phase: number;
       result: unknown;
       compare?: Compare;
+      /** 手で done/ に動かされた子の移動の時刻（epoch 秒）。読めなければ 0 */
+      manual_moved_at?: number;
       stamp: string;
       actor?: Actor;
     },

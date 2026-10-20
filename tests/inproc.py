@@ -45,6 +45,21 @@ def run_ccnavi(
 ) -> subprocess.CompletedProcess[str]:
     """`python -m ccnavi *args` を同じプロセスの中で動かし、CompletedProcess の形で返す。"""
     argv = list(args)
+    built = os.environ.get("CCNAVI_TEST_EXE", "")
+    if built:
+        # 組み立て済みの実行ファイルで動かす（`CCNAVI_TEST_EXE=<パス>`）。配る物を測る。
+        merged = {**os.environ, **GIT_ENV} if env is None else {**GIT_ENV, **env}
+        done = subprocess.run(
+            [built, *argv],
+            input=input or "",
+            env=merged,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=120,
+        )
+        return subprocess.CompletedProcess(argv, done.returncode, done.stdout, done.stderr)
     stdin = io.StringIO(input or "")
     stdout = io.StringIO()
     stderr = io.StringIO()

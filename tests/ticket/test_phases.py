@@ -599,6 +599,35 @@ class PhaseTest(PhaseHarness):
         self.assertIn("1（設計）", self.last_request_body)
         self.assertIn("2（実装とテスト）", self.last_request_body)
 
+    # ---- 5.5 子の経路の欄
+
+    def test_finish_records_where_it_put_the_child_and_confirm_records_the_route(self):
+        """finish は置き場の名前を `finished_to` に、confirm は動かした経路を `settled_by` に書く。
+
+        ユーザが手で動かした子は `settled_by` を持たないので、ccnavi が動かしたものと区別できる。
+        """
+        self.family(plan=["design"])
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+        waiting = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
+        self.assertTrue(os.path.exists(waiting), "finish したレビュー待ちの子が無い")
+        with open(waiting, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn('finished_to: "review"', text)
+        self.assertNotIn("settled_by", text)
+        self.commit_parent("close 01")
+        self.merge("i0001-01-01")
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
+        with open(os.path.join(self.approved, "done", "i0001-01-01.md"), encoding="utf-8") as f:
+            done = f.read()
+        self.assertIn('finished_to: "review"', done)
+        self.assertIn('settled_by: "confirm"', done)
+
     # ---- 6. フィードバック計画
 
     def test_a_failed_copy_does_not_clear_the_marks_of_a_reviewed_phase(self):

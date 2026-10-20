@@ -105,14 +105,21 @@ function mismatchOf(expected: readonly string[], current: readonly string[]): Ap
 
 const TREE = "/w/.claude/worktrees/i0001";
 
-function decidePreviewOf(keys: readonly string[] = ["u1", "u2"], digest = "a".repeat(64), canIssue = false): DecidePreview {
+function decidePreviewOf(keys: readonly string[] = ["u1", "u2"], digest = "v2.eyJiIjoiYSIsInQiOnt9fQ", canIssue = false): DecidePreview {
   return {
-    version: 1,
+    version: 2,
     parent: "i0001",
     phase: 1,
     mr: { number: 7, url: "https://example.com/mr/7" },
     can_issue: canIssue,
-    threads: keys.map((key) => ({ key, url: key, path: "src/a.py", line: 1, body: `指摘 ${key}` })),
+    threads: keys.map((key) => ({
+      key,
+      url: key,
+      path: "src/a.py",
+      line: 1,
+      body: `指摘 ${key}`,
+      version: "v".repeat(32), last_comment: { id: "", at: "", author: "" },
+    })),
     digest,
   };
 }
@@ -129,6 +136,7 @@ function chipOf(overrides: Partial<PhaseChip> = {}): PhaseChip {
     reviewRequired: true,
     riskLevel: "",
     riskLine: "",
+    manual: "",
     tickets: [],
     mrUrl: "",
     mrNumber: null,
@@ -237,6 +245,7 @@ function toDecided(step: Step): ApprovalState {
         parent: "i0001",
         phase: 1,
         reviewed: false,
+        pending_extra: [],
         followup: "i0001-02-03",
         prompt: "決めた文",
         issue_url: "",
@@ -922,7 +931,7 @@ test("CB-T203 「この対応方針で決める」は、選んだ対応方針と
   const after = approvalStep(shown, { kind: "decideConfirm", choices: { u1: "keep", u2: "fix" } });
   assert.equal(after.state.overlay?.kind, "deciding");
   assert.deepEqual(after.effects, [
-    { kind: "decide", tree: TREE, phase: 1, choices: { u1: "keep", u2: "fix" }, digest: "a".repeat(64) },
+    { kind: "decide", tree: TREE, phase: 1, choices: { u1: "keep", u2: "fix" }, digest: "v2.eyJiIjoiYSIsInQiOnt9fQ" },
   ]);
 });
 
@@ -936,6 +945,7 @@ test("CB-T204 置けたら渡す文を見せて再読み込みする。投稿の
         parent: "i0001",
         phase: 1,
         reviewed: false,
+        pending_extra: [],
         followup: "i0001-02-03",
         prompt: "決めた文",
         issue_url: "",

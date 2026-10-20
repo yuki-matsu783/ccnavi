@@ -33,7 +33,9 @@ sh ならプロジェクトごとに直せる。
 数えるのは「いま解決されていない指摘」全部。依頼より後のものだけを数えると、
 指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで前回の
 指摘が数から消える。ユーザが解決も受け入れもしていないのに通ってしまう。
-除くのは機構自身の投稿と、ユーザが受け入れたものだけ。
+除くのは機構自身の投稿と、ユーザが受け入れたものだけ。受け入れたものは、decide・close-early では
+ホスト上で解決済みのスレッド、手で動かした子の確定では受け入れ台帳（accepted.json）に版つきで足したもの。
+台帳の指摘は、版と最後のコメントの id が同じ間だけ数えない。移動の後に付いた指摘は数える。
 
 レビューの状態（変更要求）はレビュアーごとの最新だけを見る。こちらは時刻で
 比べるので、ホストの `Z` と手元のオフセットをエポック秒に直してから並べる。
@@ -61,6 +63,7 @@ from . import (
     ticket_fields,
     ticket_model,
     ticket_places,
+    via,
 )
 
 TIMEOUT_SECONDS = 15.0
@@ -308,7 +311,10 @@ def review_problems(
             *[f"  - {r.url}" for r in changes],
         ]
     unresolved = review_host._unresolved(
-        result.threads, result.host, _poster(parent, phase_no, root, conf)
+        result.threads,
+        result.host,
+        _poster(parent, phase_no, root, conf),
+        ledger_of(root, conf, parent),
     )
     if not unresolved:
         return []
@@ -334,6 +340,43 @@ def review_problems(
     return lines
 
 
+def changes_requested(result: review_host.Result) -> list[review_host.Review]:
+    """有効な変更要求のレビュー（レビュアーごとの最新）。"""
+    return [
+        r
+        for r in review_host.effective(result.reviews)
+        if r.state.upper() == review_host.CHANGES_REQUESTED
+    ]
+
+
+def unresolved_for(
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_model.Ticket,
+    phase_no: int,
+    result: review_host.Result,
+) -> list[review_host.Thread]:
+    """数える未解決の指摘（機構の投稿と、受け入れ台帳が受け入れ済みとするものを除く）。"""
+    return review_host._unresolved(
+        result.threads,
+        result.host,
+        _poster(parent, phase_no, root, conf),
+        ledger_of(root, conf, parent),
+    )
+
+
+def ledger_of(root: str, conf: settings.Settings, parent: ticket_model.Ticket) -> list[dict]:
+    """親の受け入れ台帳の項目。読めなければ空（読めない台帳で未解決を隠さない）。"""
+    home = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
+    entries, problem = approval_marks.read_ledger(home, parent.ticket)
+    return [] if problem else entries
+
+
+def _settled_by_confirm() -> str:
+    """confirm が子を動かした経路。Chrome のレビュー済みも同じコアを通るので、経路で見分ける。"""
+    return "chrome" if via.via() == via.VIA_CHROME else "confirm"
+
+
 def settle_and_mark(
     stage,
     root: str,
@@ -341,6 +384,7 @@ def settle_and_mark(
     parent: ticket_model.Ticket,
     ph: phase.Phase,
     mark: dict,
+    ledger: list[dict] | None = None,
 ) -> tuple[str, str] | None:
     """レビュー済みで書くもの（子を `done/` へ、
     レビュー済みのマーカー）を fsio の書き込みを溜める段に並べる。
@@ -352,7 +396,7 @@ def settle_and_mark(
         on_fail=fsio.FAIL_STOP, ticket="", message="{reason}", prefix="", undo=(), places=""
     ):
         moved, failed = approval_ops.settle_review(
-            conf, root, parent.ticket, [*ph.covers, ph.number]
+            conf, root, parent.ticket, [*ph.covers, ph.number], by=_settled_by_confirm()
         )
         if failed:
             return "", failed
@@ -362,6 +406,11 @@ def settle_and_mark(
                 f"{', '.join(moved)}"
             )
         home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+        if ledger:
+            # 台帳を先に書く（マーカーだけが置かれて、受け入れた指摘が数えられる状態を作らない）
+            failed = approval_marks.add_ledger(home, parent.ticket, ledger)
+            if failed:
+                return "", f"受け入れ台帳を書けない: {failed}"
         with fsio.policy(prefix="マーカーを置けない: "):
             failed = approval_marks.write_mark(
                 home, parent.ticket, ph.number, approval_marks.MARK_REVIEWED, mark
@@ -379,8 +428,11 @@ def _settle_children(
     conf: settings.Settings,
     parent: ticket_model.Ticket,
     ph: phase.Phase,
+    by: str,
 ) -> bool:
     """レビューが済んだフェーズ（延期を引き受けた分を含む）のレビュー待ちの子を `done/` へ動かす。
+
+    `by` は動かした経路（`ticket_model.SETTLED_BY_VALUES`）。子の `settled_by` に書く。
 
     ユーザが見たことの記録はマーカーで、場所の移動はそれに合わせたもの。
     動かせなければ言って False。
@@ -390,7 +442,9 @@ def _settle_children(
     拒むので、取り出す操作が無くなる。
     逆順なら、動いたのにマーカーが置けなくても、次の `confirm` が置き直す（動かす分は空）。
     """
-    moved, failed = approval_ops.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
+    moved, failed = approval_ops.settle_review(
+        conf, root, parent.ticket, [*ph.covers, ph.number], by=by
+    )
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return False
@@ -404,7 +458,17 @@ def _settle_children(
 
 def thread_key(t: review_host.Thread) -> str:
     """選択をスレッドに対応づける鍵。URL を先に使い、無ければスレッドの id。"""
-    return t.url or t.id
+    return review_host.thread_key(t)
+
+
+def thread_version(t: review_host.Thread) -> str:
+    """指摘の版。SHA-256(鍵 + 改行 + 正規化した最初のコメントの本文) の先頭 32 桁。
+
+    正規化するのは改行コード（CRLF・CR を LF に）と Unicode の NFC だけ。本文が変わるか、鍵が
+    変わると版が変わる。見せた指摘と、適用の直前に取り直した指摘が同じかを、この版で照合する
+    （CLI と Chrome が同じ Python のコアでこの 1 か所を使う）。
+    """
+    return review_host.thread_version(t)
 
 
 def _approved_rel(conf: settings.Settings) -> str:

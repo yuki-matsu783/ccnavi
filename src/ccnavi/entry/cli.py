@@ -911,6 +911,10 @@ def _parsed(
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
+    # 操作記録（`logs/state/ops/`）の読み書き。sh が送信の段階を記録するために呼ぶ。
+    # チケット制御の有無に依らない（decide・request などの段階は、制御が有効なときだけ使われる）。
+    if args.command and args.command[0] == "ops":
+        return cli_ops.ops_command(stdout, stderr, conf, list(args.command[1:]))
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if cli_ops.sync_paths(stdout, root, conf) == 0 else EXIT_ERROR

@@ -216,6 +216,9 @@ SUBS: tuple[Sub, ...] = (
     # 打つときだけ。sh の中の呼び出しは hook を通らない。取り消した子のブランチを消す
     # `worktree branch … confirmed` は、ユーザが確かめたことをユーザ自身が打つことで守る。
     Sub(("sync",), ("tidy",), "tidy"),
+    # 操作記録の書き込み。偽の送信済みを書かせないため、エージェントには直に打たせない。
+    # 呼ぶのは sh の中だけ。読む副命令（pending・show）は止めない。
+    Sub(("ops",), ("begin", "stage-set", "applied", "done", "retire", "mark-sent"), "state-direct"),
     Sub(("worktree",), ("retire", "branch"), "tidy"),
 )
 

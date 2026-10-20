@@ -18,10 +18,12 @@ from . import (
     approval_checks,
     approval_marks,
     core_base,
+    manual_settle,
     ops,
     ops_close,
     phase,
     review,
+    review_host,
     ticket_model,
     ticket_places,
     via,
@@ -50,6 +52,7 @@ def confirm(
     phase_no: int,
     result,
     changed_since_request: str,
+    manual: manual_settle.Manual | None = None,
 ) -> core_base.Checked:
     """レビュー済みにしてよいかを見て、通れば書くもの（子を `done/` へ、
     レビュー済みのマーカー）を並べる。
@@ -96,9 +99,20 @@ def confirm(
     problems = review.matching_problems(result, requested_mark)
     if problems:
         return core_base.refused(CODE_CONFIRM_RESULT_MISMATCH, problems)
-    problems = review.review_problems(root, conf, parent, phase_no, result)
-    if problems:
-        return core_base.refused(CODE_CONFIRM_REVIEW_OPEN, problems)
+    mark_extra: dict = {}
+    ledger: list[dict] = []
+    if manual is not None and manual.state == manual_settle.READY:
+        # 手で動かした子の確定。未解決の指摘は解決せず、版つきで受け入れ台帳に足す。
+        refused = _manual_refusal(root, conf, parent, phase_no, result, manual)
+        if refused is not None:
+            return refused
+        threads = review.unresolved_for(root, conf, parent, phase_no, result)
+        ledger = [_ledger_entry(t, phase_no) for t in threads]
+        mark_extra = {"via": "manual", "moved": list(manual.children)}
+    else:
+        problems = review.review_problems(root, conf, parent, phase_no, result)
+        if problems:
+            return core_base.refused(CODE_CONFIRM_REVIEW_OPEN, problems)
     stamp = snapshot.stamp or fsio.stamp()
     # 経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形。
     actor = snapshot.actor
@@ -113,9 +127,57 @@ def confirm(
             conf,
             parent,
             ph,
-            core_base.reviewed_mark(result.mr.number, [], snapshot.actor),
+            {**core_base.reviewed_mark(result.mr.number, [], snapshot.actor), **mark_extra},
+            ledger,
         )
     return core_base.Checked([], core_base.Changes(agree.Planned(stage, stopped), root, conf))
+
+
+def _manual_refusal(root, conf, parent, phase_no, result, manual) -> core_base.Checked | None:
+    """手動移動の確定を止める理由。通れば None。
+
+    変更要求のレビューがあれば保留（移動は残す）。受け入れるのは、移動のコミットの時刻より余裕幅
+    （`manual_settle.MARGIN_SECONDS`）以上前にホストで作られたスレッドだけで、後に付いた指摘や、時刻が
+    読めないスレッドが残っていれば確定しない（その分は decide へ）。
+    """
+    if review.changes_requested(result):
+        return core_base.refused(
+            CODE_CONFIRM_REVIEW_OPEN,
+            [
+                "ccnavi: 手で動かした移動は保持するが、変更要求のレビューが立っているため"
+                "レビュー済みにはできません（保留）。approve か dismiss を待ちます"
+            ],
+        )
+    late = []
+    for t in review.unresolved_for(root, conf, parent, phase_no, result):
+        # 最初のコメントだけでなく最後のコメントの時刻も見る（移動の後に付いた返信を受け入れない）
+        made = max(review_host.epoch(t.created_at), review_host.epoch(t.last_comment_at))
+        if (
+            review_host.epoch(t.created_at) <= 0
+            or made > manual.moved_at - manual_settle.MARGIN_SECONDS
+        ):
+            late.append(t)
+    if not late:
+        return None
+    return core_base.refused(
+        CODE_CONFIRM_REVIEW_OPEN,
+        [
+            f"ccnavi: 移動の後に付いた指摘（または時刻を読めない指摘）が {len(late)} 件残っていて、"
+            "手で動かした移動を確定しません。decide で行き先を決めてください",
+            *[f"  - {review.thread_label(t)}" for t in late],
+        ],
+    )
+
+
+def _ledger_entry(t, phase_no: int) -> dict:
+    """受け入れ台帳の項目（版つき。受け入れたときの最後のコメントを覚える）。"""
+    return {
+        "key": review_host.thread_key(t),
+        "version": review_host.thread_version(t),
+        "last_comment_id": t.last_comment_id,
+        "accepted_by": "manual",
+        "phase": phase_no,
+    }
 
 
 # `confirm_local` は前の `review.confirm` を移したもの。手元の入力の読み方（cwd の親、git の
@@ -161,8 +223,11 @@ def confirm_local(
             if result is None:
                 return 1
     who = core_base.Actor(actor, via.VIA_CLI) if actor else core_base.Actor()
+    manual = manual_settle.assess(root, conf, parent, ph) if result is not None else None
+    for line in _manual_notes(manual):
+        stdout.write(line + "\n")
     checked = confirm(
-        core_base.read_fs(conf, root, actor=who), parent.ticket, phase_no, result, moved
+        core_base.read_fs(conf, root, actor=who), parent.ticket, phase_no, result, moved, manual
     )
     for line in checked.problems:
         stderr.write(line + "\n")
@@ -174,6 +239,33 @@ def confirm_local(
         if after:
             stdout.write(after + "\n")
     return code
+
+
+def manual_for(
+    snapshot: core_base.Snapshot, parent_id: str, phase_no: int, moved_at: float | None = None
+) -> manual_settle.Manual | None:
+    """git を持たない呼び手（Chrome）向けの、手で動かした子の判定。親かフェーズが無ければ None。
+
+    移動の時刻は呼び手がホストの履歴から読んで渡す。`moved_at` が None のうちは `need_time` が真で、
+    `paths`（動かした子の done/ のファイル）の時刻を読んでから渡し直す。
+    """
+    parent = _open_parent(snapshot.root, snapshot.conf, parent_id)
+    if parent is None:
+        return None
+    ph = review._phase(snapshot.root, snapshot.conf, parent, phase_no)
+    if ph is None:
+        return None
+    return manual_settle.assess(
+        snapshot.root, snapshot.conf, parent, ph, external=True, moved_at=moved_at
+    )
+
+
+def _manual_notes(manual: manual_settle.Manual | None) -> list[str]:
+    """手で動かした移動が、確定できない形のときの知らせ（確定できるときは出さない）。"""
+    if manual is None or manual.state in (manual_settle.NONE, manual_settle.READY):
+        return []
+    line = manual.line()
+    return [f"ccnavi: {line}"] if line else []
 
 
 def after_last_review(root: str, conf: settings.Settings, parent_id: str) -> str:

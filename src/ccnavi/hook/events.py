@@ -281,10 +281,53 @@ def decide_at_prompt(
     # バックグラウンドのサブエージェントが範囲を確かめられないまま終わり、そのあと親が
     # ツールを使わずにターンを終えたなら、印はここまで残っている。次の依頼の前に言う。
     unchecked = subagent.unchecked_scope(conf.state, payload) if conf.tickets_enabled else ""
-    hint = "\n\n".join(p for p in (guard, hint, unchecked) if p)
+    outcomes, told = (
+        subagent.outcome_notices(conf.state, payload) if conf.tickets_enabled else ("", [])
+    )
+    manual = _manual_confirm_note(stderr, conf, root, payload, raw)
+    hint = "\n\n".join(p for p in (guard, hint, unchecked, outcomes, manual) if p)
     if hint:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, hint)
+    if told:
+        # 出力に書き終えてから「通知済み」の印を付ける（書く前に止まったら次の機会に出し直す）。
+        subagent.confirm_outcomes(conf.state, told)
     return EXIT_OK
+
+
+def _manual_confirm_note(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    raw: approval.Raw | None,
+) -> str:
+    """ユーザが子を手で done/ に動かして共有していたら、次の発言の前に confirm を案内する。
+
+    Stop の促し（`_request_nudge`）と状態の記録を共有するので、ここで言えば Stop では繰り返さない。
+    サブエージェントの中、チケット制御が無いとき、状態の置き場が無いときは何も言わない。
+    """
+    if not conf.tickets_enabled or payload.agent_id or not conf.state:
+        return ""
+    found = ops_stop_request.pending_at_stop(root, conf, payload.cwd, raw)
+    if (
+        found is None
+        or found.step != ops_stop_request.STEP_CONFIRM
+        or ops_stop_request.nudged_before(conf.state, payload.session_id, found)
+    ):
+        return ""
+    failed = ops_stop_request.remember_nudge(conf.state, payload.session_id, found)
+    if failed:
+        stderr.write(f"ccnavi: 手動移動の案内を残せないので、案内しない: {failed}\n")
+        return ""
+    # 発言の内容を読まずに出すので、Stop の促しより弱く言う（許可の要否ではなく状態の知らせ）。
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    return (
+        f"[ccnavi] 親 {found.parent.ticket} のフェーズ {found.number} は、ユーザが子 "
+        f"{', '.join(found.children)} を手で done/ に動かして共有しています"
+        "（レビュー完了確認待ち）。この発言が別の用件なら触れずに進めてよい。"
+        f"確定するなら '{review_sh} confirm --phase {found.number}' を実行する。"
+        "移動の前に付いた未解決の指摘だけが版つきで受け入れられ、移動の後に付いたものがあれば止まる。"
+    )
 
 
 def decide_at_stop(
@@ -362,6 +405,8 @@ def decide_at_stop(
     if not nudge:
         # finish の促しで止める回は、依頼までの道の促しを出しも数えもしない。
         nudge = _request_nudge(stderr, conf, root, asked, record, raw)
+    if not nudge:
+        nudge = _subagent_nudge(conf, payload, record)
     if not nudge:
         # 上の促しで止める回は、直接作業の促しを出しも数えもしない。前提を満たせず促せない回は
         # 止めずに理由だけを報告へ足す。
@@ -775,6 +820,23 @@ def _request_nudge(
     return ops_stop_request.request_nudge(root, found)
 
 
+def _subagent_nudge(conf: settings.Settings, payload: hookio.Input, record: audit.Record) -> str:
+    """終わったサブエージェントが範囲外の変更を残した・範囲を確かめられなかったとき、Stop で促す文。
+
+    促すのは `outside` と `unchecked` だけ（`unattributed` と正常な終了では促さない）。同じ結果では
+    1 回だけ。実行中のサブエージェントが居る間と、サブエージェントの中では止めない。
+    """
+    if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
+        return ""
+    if subagent.running(conf.state, payload.session_id):
+        return ""
+    text = subagent.stop_nudge(conf.state, payload.session_id)
+    if text:
+        record.decision, record.code = audit.NUDGE, "NUDGE_SUBAGENT_OUTCOME"
+        record.enforced = True
+    return text
+
+
 def _integrate_nudge(
     stderr: TextIO,
     conf: settings.Settings,
@@ -1141,6 +1203,7 @@ def _decide_after(
         text = f"{guard}\n\n{text}" if text else guard
     # フェーズが終わったばかりなら、ここで 1 度だけ言う。止まるのは次の呼び出しから。
     bounced = ""
+    told: list = []
     if conf.tickets_enabled:
         # `post.check` が作業ツリーを戻そうとした回は、置き場のファイルも戻っていることが
         # あるので読み直す。それ以外の回は、上で読んだ置き場をそのまま使う。
@@ -1153,7 +1216,8 @@ def _decide_after(
         bounced = subagent.ignored_bounce(conf.state, payload)
         # 範囲を確かめられないまま終わったことも、同じ経路で親に言う。
         unchecked = subagent.unchecked_scope(conf.state, payload)
-        bounced = "\n\n".join(p for p in (bounced, unchecked) if p)
+        outcomes, told = subagent.outcome_notices(conf.state, payload)
+        bounced = "\n\n".join(p for p in (bounced, unchecked, outcomes) if p)
         if bounced:
             text = f"{text}\n\n{bounced}" if text else bounced
     # frontmatter の無い md を新しく作ったなら、書いた時点で 1 度だけ書き方を案内する。
@@ -1173,6 +1237,7 @@ def _decide_after(
         # このイベントで差し戻す経路は exit 2 と標準エラーだけ。ツールは
         # すでに走っているので取り消せず、渡せるのは「次に何をするか」になる。
         stderr.write("\n\n".join(p for p in (text, hint) if p) + "\n")
+        subagent.confirm_outcomes(conf.state, told)
         return EXIT_BLOCK
 
     if pushback:
@@ -1188,4 +1253,5 @@ def _decide_after(
     # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。
     system = bounced if payload.agent_id else ""
     hookio.write_context(stdout, hookio.POST_TOOL_USE, text, system=system)
+    subagent.confirm_outcomes(conf.state, told)
     return EXIT_OK

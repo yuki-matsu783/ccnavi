@@ -12,7 +12,7 @@ import { parseApprovePreview } from "./approvemodel.js";
 import { buildBoard, COLUMNS, type Board } from "./board.js";
 import type { Moved } from "./board-moved.js";
 import type { ApprovalOverlay } from "./board-view.js";
-import { parseDecidePreview } from "./decidemodel.js";
+import { DECIDE_VERSION, parseDecidePreview } from "./decidemodel.js";
 import { BOARD_VERSION, parseBoardJson, type ProposalState } from "./model.js";
 
 /** 手順の `scene.overlay` が指せるオーバーレイ */
@@ -50,8 +50,8 @@ function column(value: unknown, at: string): ProposalState {
 }
 
 /** 実行ファイルの JSON の読み取りは版を見るので、見本にも版を付けて通す */
-function viaParser<T>(parse: (text: string) => { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: string }, raw: unknown, at: string): T {
-  const parsed = parse(JSON.stringify({ version: 1, ...object(raw, at) }));
+function viaParser<T>(parse: (text: string) => { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: string }, raw: unknown, at: string, version = 1): T {
+  const parsed = parse(JSON.stringify({ version, ...object(raw, at) }));
   if (!parsed.ok) {
     throw new Error(`${at}: ${parsed.error}`);
   }
@@ -81,7 +81,7 @@ export function parseBoardSample(raw: unknown, root: string, generatedAt: string
     overlays: {
       approval: { kind: "preview", preview: viaParser(parseApprovePreview, approval, "sample.overlays.approval") },
       done: { kind: "done", count: typeof done.count === "number" ? done.count : 0, prompt: str(done.prompt, "sample.overlays.done.prompt"), carried: done.carried === true },
-      decide: { kind: "decidePreview", preview: viaParser(parseDecidePreview, decidePreview, "sample.overlays.decide"), tree: str(tree, "sample.overlays.decide.tree") },
+      decide: { kind: "decidePreview", preview: viaParser(parseDecidePreview, decidePreview, "sample.overlays.decide", DECIDE_VERSION), tree: str(tree, "sample.overlays.decide.tree") },
       reviewed: {
         kind: "prompt",
         title: str(reviewed.title, "sample.overlays.reviewed.title"),

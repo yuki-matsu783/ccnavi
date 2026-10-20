@@ -587,6 +587,10 @@ export interface ReviewThread {
   readonly line: number;
   readonly body: string;
   readonly created_at: string;
+  /** 最後のコメントの id・時刻・作成者。再提起（受け入れたあとに付いたコメント）を見分ける。取れなければ空 */
+  readonly last_id: string;
+  readonly last_at: string;
+  readonly last_author: string;
   /** 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持ち、ccnavi の依頼のスレッドを見分けるのに使う（目印は誰でも書けるので書き手で見る） */
   readonly author?: string;
 }
@@ -635,13 +639,18 @@ const THREADS = `query($owner: String!, $name: String!, $number: Int!, $after: S
     pullRequest(number: $number) {
       reviewThreads(first: 100, after: $after) {
         pageInfo { hasNextPage endCursor }
-        nodes { id isResolved comments(first: 1) { nodes { url path line body createdAt } } }
+        nodes { id isResolved comments(first: 1) { nodes { url path line body createdAt } } last: comments(last: 1) { nodes { id createdAt author { login } } } }
       }
     }
   }
 }`;
 
-type ThreadNode = { id?: unknown; isResolved?: unknown; comments?: { nodes?: Record<string, unknown>[] } | null };
+type ThreadNode = {
+  id?: unknown;
+  isResolved?: unknown;
+  comments?: { nodes?: Record<string, unknown>[] } | null;
+  last?: { nodes?: Record<string, unknown>[] } | null;
+};
 
 /** MR のスレッド（sh の `threads` と同じ読み方。最初のコメントの url・path・line・本文・時刻） */
 export async function reviewThreads(client: Client, owner: string, repo: string, number: number): Promise<ReviewThread[]> {
@@ -654,6 +663,8 @@ export async function reviewThreads(client: Client, owner: string, repo: string,
     if (!threads) throw new HostError(`マージリクエスト #${number} のスレッドを取得できません`);
     for (const t of threads.nodes) {
       const c = t.comments?.nodes?.[0] ?? {};
+      const l = t.last?.nodes?.[0] ?? {};
+      const lastAuthor = (l.author ?? {}) as { login?: unknown };
       out.push({
         id: String(t.id),
         resolved: t.isResolved === true,
@@ -662,6 +673,9 @@ export async function reviewThreads(client: Client, owner: string, repo: string,
         line: Number(alt(c.line, 0)),
         body: String(alt(c.body, "")),
         created_at: String(alt(c.createdAt, "")),
+        last_id: String(alt(l.id, "")),
+        last_at: String(alt(l.createdAt, "")),
+        last_author: String(alt(lastAuthor.login, "")),
       });
     }
     if (!threads.pageInfo.hasNextPage) return out;
@@ -729,6 +743,28 @@ export async function compareFiles(client: Client, owner: string, repo: string, 
     if (typeof f.previous_filename === "string") files.push(f.previous_filename);
   }
   return { base: b, head: h, files };
+}
+
+/** パスの履歴を読む件数の上限。届けば履歴が途切れていて、最初のコミットを言えない */
+export const PATH_HISTORY_LIMIT = 100;
+
+/**
+ * そのパスを最初に加えたコミットの時刻（epoch 秒）。手で `done/` に動かした子の移動の時刻に使う。
+ * ブランチ `ref` でそのパスに触れたコミットのうち最も古いものを取る。履歴が上限に届いた・読めない・
+ * 日付を読めないときは null（呼び手は確かめられないものとして確定しない）。
+ */
+export async function pathCommitTime(client: Client, owner: string, repo: string, ref: string, path: string): Promise<{ time: number | null }> {
+  const r = checkBranch(ref);
+  const p = checkPath(path);
+  const { status, body } = await rest(
+    client,
+    `${repoPath(owner, repo)}/commits?sha=${encodeURIComponent(r)}&path=${encodeURIComponent(p)}&per_page=${PATH_HISTORY_LIMIT}`,
+  );
+  if (status === 404 || !Array.isArray(body) || body.length === 0 || body.length >= PATH_HISTORY_LIMIT) return { time: null };
+  const oldest = body[body.length - 1] as { commit?: { committer?: { date?: unknown } } };
+  const date = oldest?.commit?.committer?.date;
+  const ms = typeof date === "string" ? Date.parse(date) : Number.NaN;
+  return { time: Number.isFinite(ms) ? Math.floor(ms / 1000) : null };
 }
 
 // ---- 「始める」。issue の一覧と、親のブランチを作る -------------------------------

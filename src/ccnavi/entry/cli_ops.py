@@ -9,6 +9,7 @@ cli から分けた。cli を読まない。
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 from typing import TextIO
@@ -19,6 +20,7 @@ from ..tickets import (
     core,
     learning,
     next_id,
+    oplog,
     ops,
     phase,
     propose,
@@ -440,6 +442,165 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
     for key, value in lines:
         stdout.write(f"{key} {value}\n")
     return 0
+
+
+def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: list[str]) -> int:
+    """`ccnavi ops <副命令>`。操作記録（`logs/state/ops/`）を読み書きする。
+
+    sh が送信の段階を記録するために呼ぶ。
+
+    - `pending`: 未完了の記録を 1 行ずつ（`<操作ID> <種類> <未完了の段階>`）。無ければ何も出さない
+    - `show <操作ID>`: 記録の JSON
+    - `stage-set <操作ID> <段階ID> <状態> [URL] [アカウント]`: 段階の状態を書く
+    - `applied <操作ID> <鍵> <値>`: ローカルに適用したものを残す（値は true / false / 文字列）
+    - `reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント]`: 送信の照合。結論を
+      `sent|send|unknown|stop` で出す（`yes` は一覧を最後まで読めた、`no` は打ち切った）
+    - `begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>…`: 鍵から決めた操作ID で記録を作る
+      （エージェントの request・comment・ready が、打ち直しで同じ記録に当たるため）。ID を出す
+    - `post-text <操作ID> <段階ID> <ファイル>`: 段階で投稿する本文を、保存した判断から作り直して書く
+    - `resume-plan <操作ID> <ファイル>`: 保存した判断から受け入れの計画を書き直す（`--resume`）
+    - `done <操作ID>`: すべての段階が sent なら記録を消す。消したら `done`、残るなら `open` を出す
+    - `retire <親>`: 親の記録のうち、送り終わったものを消す（親を閉じる片付け。ready が呼ぶ）
+
+    書く副命令（`stage-set`・`done`）は、エージェントが偽の送信済みを書けないよう、
+    実行ファイルを直に呼ぶ形を hook が止める（`user_only.SUBS`）。
+    ネットワークにも git にも触れない。
+    """
+    if not conf.state:
+        stderr.write("ccnavi: state の置き場が空。操作記録を扱えない\n")
+        return EXIT_ERROR
+    try:
+        if words == ["pending"]:
+            for record in oplog.pending(conf.state):
+                if record.get("broken"):
+                    stdout.write(f"{record['id']} broken\n")
+                    continue
+                left = ",".join(s["id"] for s in oplog.unfinished(record))
+                stdout.write(f"{record['id']} {record['kind']} {left}\n")
+            return EXIT_OK
+        if len(words) == 2 and words[0] == "show":
+            record = oplog.load(conf.state, words[1])
+            if record is None:
+                stderr.write(f"ccnavi: 操作記録 {words[1]} が無い\n")
+                return EXIT_ERROR
+            stdout.write(json.dumps(record, ensure_ascii=False) + "\n")
+            return EXIT_OK
+        if len(words) in (4, 5, 6) and words[0] == "stage-set":
+            oplog.stage_set(
+                conf.state,
+                words[1],
+                words[2],
+                words[3],
+                words[4] if len(words) > 4 else "",
+                words[5] if len(words) > 5 else "",
+            )
+            return EXIT_OK
+        if len(words) == 4 and words[0] == "applied":
+            oplog.applied_set(conf.state, words[1], words[2], _applied_value(words[3]))
+            return EXIT_OK
+        if len(words) in (5, 6) and words[0] == "reconcile":
+            record = oplog.load(conf.state, words[1])
+            if record is None:
+                stderr.write(f"ccnavi: 操作記録 {words[1]} が無い\n")
+                return EXIT_ERROR
+            found = [u for u in words[3].split(",") if u]
+            complete = {"yes": True, "no": False}.get(words[4])
+            verdict, why = oplog.reconcile(
+                record, words[2], found, complete, words[5] if len(words) > 5 else ""
+            )
+            stdout.write(f"{verdict} {why}".rstrip() + "\n")
+            return EXIT_OK
+        if len(words) >= 7 and words[0] == "begin":
+            # begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>…
+            # 鍵から決めた ID で作る（既にあれば作らない）
+            kind, parent, phase, mr, key = words[1:6]
+            if key.startswith("@"):
+                # 鍵の中身をファイルから取る（本文そのものを鍵にして、衝突を避ける）
+                body = fsio.read_text(key[1:])
+                if not body:
+                    # 読めない・空のときにパス文字列で代えると、本文が違っても同じ操作になってしまう
+                    stderr.write(f"ccnavi: 鍵にする本文のファイルを読めない（{key[1:]}）\n")
+                    return EXIT_ERROR
+                key = body
+            stages = []
+            for spec in words[6:]:
+                sid, _, skind = spec.partition(":")
+                stages.append((sid, skind or oplog.STAGE_COMMENT))
+            op_id = oplog.begin(
+                conf.state,
+                kind,
+                repo={},
+                parent=parent,
+                phase=int(phase) if phase.isdigit() else 0,
+                mr=int(mr) if mr.isdigit() else 0,
+                stages=stages,
+                op_id=oplog.id_for(kind, parent, phase, mr, key),
+            )
+            stdout.write(op_id + "\n")
+            return EXIT_OK
+        if len(words) == 4 and words[0] == "post-text":
+            record = oplog.load(conf.state, words[1])
+            if record is None:
+                stderr.write(f"ccnavi: 操作記録 {words[1]} が無い\n")
+                return EXIT_ERROR
+            if record.get("kind") != oplog.KIND_DECIDE or not record.get("applied", {}).get(
+                "local"
+            ):
+                stderr.write("ccnavi: この記録は、まだ適用が済んでいない（投稿の本文は作れない）\n")
+                return EXIT_ERROR
+            text = review_decide.post_text(record, words[2])
+            if text is None:
+                stderr.write(f"ccnavi: 段階 {words[2]} の本文は作れない\n")
+                return EXIT_ERROR
+            if not _in_state(conf, words[3]):
+                stderr.write("ccnavi: 書き先は state の置き場の下に限る\n")
+                return EXIT_ERROR
+            failed = fsio.write_text(words[3], text, newline="\n")
+            if failed:
+                stderr.write(f"ccnavi: 本文を {words[3]} に書けない（{failed}）\n")
+                return EXIT_ERROR
+            return EXIT_OK
+        if len(words) == 3 and words[0] == "resume-plan":
+            record = oplog.load(conf.state, words[1])
+            if record is None:
+                stderr.write(f"ccnavi: 操作記録 {words[1]} が無い\n")
+                return EXIT_ERROR
+            if not _in_state(conf, words[2]):
+                stderr.write("ccnavi: 書き先は state の置き場の下に限る\n")
+                return EXIT_ERROR
+            return EXIT_OK if review_decide.resume_plan(record, words[2]) == 0 else EXIT_ERROR
+        if len(words) == 8 and words[0] == "mark-sent":
+            # mark-sent <種類> <親> <MR> <鍵> <段階ID> <URL>: 目印で見つけた投稿を送り済みにする
+            key = words[4]
+            if key.startswith("@"):
+                key = fsio.read_text(key[1:]) or ""
+            if not key:
+                stderr.write("ccnavi: 鍵にする本文を読めない\n")
+                return EXIT_ERROR
+            oplog.mark_sent(conf.state, words[1], words[2], words[3], key, words[5], words[6])
+            return EXIT_OK
+        if len(words) == 2 and words[0] == "retire":
+            for op_id in oplog.retire_parent(conf.state, words[1]):
+                stdout.write(op_id + "\n")
+            return EXIT_OK
+        if len(words) == 2 and words[0] == "done":
+            stdout.write("done\n" if oplog.complete_if_done(conf.state, words[1]) else "open\n")
+            return EXIT_OK
+    except oplog.OpError as exc:
+        stderr.write(f"ccnavi: {exc}\n")
+        return EXIT_ERROR
+    stderr.write(
+        "ccnavi: ops の使い方: pending / show <操作ID> / "
+        "stage-set <操作ID> <段階ID> <pending|sent|unknown> [URL] [アカウント] / "
+        "begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>… / applied <操作ID> <鍵> <値> / "
+        "reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント] / "
+        "done <操作ID> / retire <親>\n"
+    )
+    return EXIT_ERROR
+
+
+def _applied_value(text: str) -> object:
+    return {"true": True, "false": False}.get(text, text)
 
 
 SYNC_RETIRED_HEAD = "retired 1"

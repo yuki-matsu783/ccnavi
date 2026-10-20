@@ -1553,7 +1553,7 @@ class TicketTest(unittest.TestCase):
         self.assertEqual([t["key"] for t in data["threads"]], ["u1", "u2"])
         self.assertEqual(data["parent"], "i0001")
         self.assertFalse(data["can_issue"])
-        self.assertRegex(data["digest"], r"^[0-9a-f]{64}$")
+        self.assertRegex(data["digest"], r"^v2\.[A-Za-z0-9_-]+$")
         phases = os.path.join(self.approved, "phases", "i0001")
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
         self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
@@ -1944,9 +1944,12 @@ class TicketTest(unittest.TestCase):
         )
         grown = os.path.join(self.state, "grown.json")
         write(grown, json.dumps(data))
+        # 見せたあとに増えた指摘は止めず、未対応のまま残す（reviewed は置かない）
         changed = self.decide(grown, *args)
-        self.assertNotEqual(changed.returncode, 0)
-        self.assertTrue(json.loads(changed.stdout)["mismatch"])
+        self.assertEqual(changed.returncode, 0, changed.stderr)
+        answer = json.loads(changed.stdout)
+        self.assertFalse(answer["reviewed"])
+        self.assertEqual(answer["pending_extra"], ["u3"])
         self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
 
         # 解決済みで、ほかに増えていなければ置く。受け入れた鍵がマーカーに残る
@@ -2252,9 +2255,9 @@ class TicketTest(unittest.TestCase):
         second = self.hook("SubagentStop", "", child, agent_id="sub-1")
         self.assertEqual(second.returncode, 0)
         self.assertIn("POST_TICKET_SCOPE", self.reason(second))
-        # 親の cwd からは、開いている子の全部を見る。
+        # 親の cwd からは、開いている子の全部を見るが、担当の子が分からないので差し戻さない。
         from_parent = self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-2")
-        self.assertEqual(from_parent.returncode, 2)
+        self.assertEqual(from_parent.returncode, 0)
 
     def test_subagent_stop_bounces_each_worktree_when_no_agent_id_is_given(self):
         """`agent_id` が来ない payload でも、別の子で作業する相手を巻き込まない。
@@ -3503,6 +3506,123 @@ class TicketTest(unittest.TestCase):
         }
         result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertIn("差し戻されたまま", self.reason(result))
+
+    def _agent_done(self, agent_id):
+        payload = {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Agent",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "tool_input": {"description": "子"},
+            "tool_response": {"agentId": agent_id},
+        }
+        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+
+    def _outcome_of(self, agent_id):
+        state = os.path.join(self.root, "logs", "state")
+        path = os.path.join(state, f"subagent-s1-{agent_id}.outcome")
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+
+    def _stray(self):
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        stray = os.path.join(child, "src", "b", "stray.py")
+        write(stray, "x\n")
+        git(child, "add", "-A")
+        git(child, "commit", "--quiet", "-m", "stray")
+        return child, stray
+
+    def test_outcome_ok_is_recorded_and_says_nothing(self):
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        self.assertEqual(self.hook("SubagentStop", "", child, agent_id="sub-o").returncode, 0)
+        self.assertEqual(self._outcome_of("sub-o")["outcome"], "ok")
+        self.assertNotIn("SUBAGENT", self.reason(self._agent_done("sub-o")))
+
+    def test_a_bounce_that_got_fixed_is_fixed_and_the_parent_is_not_warned(self):
+        self.family()
+        child, stray = self._stray()
+        self.assertEqual(self.hook("SubagentStop", "", child, agent_id="sub-f").returncode, 2)
+        self.assertFalse(self._outcome_of("sub-f")["final"])
+        git(child, "rm", "--quiet", "-f", "src/b/stray.py")
+        git(child, "commit", "--quiet", "-m", "revert")
+        self.assertEqual(self.hook("SubagentStop", "", child, agent_id="sub-f").returncode, 0)
+        self.assertEqual(self._outcome_of("sub-f")["outcome"], "fixed")
+        self.assertNotIn("差し戻されたまま", self.reason(self._agent_done("sub-f")))
+
+    def test_an_ignored_bounce_is_outside_and_stop_nudges_once(self):
+        self.family()
+        child, _ = self._stray()
+        self.hook("SubagentStop", "", child, agent_id="sub-x")
+        self.hook("SubagentStop", "", child, agent_id="sub-x")
+        found = self._outcome_of("sub-x")
+        self.assertEqual((found["outcome"], found["bounces"], found["final"]), ("outside", 1, True))
+        self.assertIn("差し戻されたまま", self.reason(self._agent_done("sub-x")))
+        stop = {"hook_event_name": "Stop", "cwd": self.parent_tree, "session_id": "s1"}
+        # 先に出る別の促し（依頼までの道）が 1 回ずつ出たあと、結果の促しが 1 回だけ出る
+        seen = [
+            "SUBAGENT_OUTCOME" in self.ccnavi("--mode", "enable", stdin=json.dumps(stop)).stdout
+            for _ in range(4)
+        ]
+        self.assertEqual(seen.count(True), 1, seen)
+
+    def test_a_broken_outcome_record_does_not_stop_the_parent(self):
+        self.family()
+        state = os.path.join(self.root, "logs", "state")
+        os.makedirs(state, exist_ok=True)
+        write(
+            os.path.join(state, "subagent-s1-bad.outcome"),
+            '{"session":"s1","outcome":"unattributed","bounces":"x","final":true}',
+        )
+        done = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("internal error", done.stderr)
+
+    def test_an_unreadable_worktree_of_another_child_does_not_make_a_parent_tree_agent_unchecked(
+        self,
+    ):
+        self.family()
+        shutil.rmtree(os.path.join(self.root, ".claude", "worktrees", "i0001-01-02"))
+        self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-p")
+        self.assertEqual(self._outcome_of("sub-p")["outcome"], "ok")
+
+    def test_without_a_bounce_the_outside_notice_does_not_claim_one(self):
+        self.family()
+        child, _ = self._stray()
+        self.ccnavi(
+            "--mode",
+            "dry-run",
+            stdin=json.dumps(
+                {
+                    "hook_event_name": "SubagentStop",
+                    "cwd": child,
+                    "session_id": "s1",
+                    "agent_id": "sub-d",
+                }
+            ),
+        )
+        found = self._outcome_of("sub-d")
+        self.assertEqual((found["outcome"], found["bounces"]), ("outside", 0))
+        from ccnavi.hook import subagent_outcome
+
+        one = subagent_outcome.of(os.path.join(self.root, "logs", "state"), "s1", "sub-d")
+        self.assertIn("差し戻していない", subagent_outcome.line(one))
+
+    def test_a_subagent_started_in_the_parent_tree_is_unattributed_and_not_bounced(self):
+        self.family()
+        self._stray()
+        done = self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-u")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self._outcome_of("sub-u")["outcome"], "unattributed")
+        first = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("SUBAGENT_UNATTRIBUTED", self.reason(first))
+        second = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertNotIn("SUBAGENT_UNATTRIBUTED", self.reason(second))
+        # Stop は unattributed では促さない
+        stop = {"hook_event_name": "Stop", "cwd": self.parent_tree, "session_id": "s1"}
+        self.assertNotIn(
+            "SUBAGENT_OUTCOME", self.ccnavi("--mode", "enable", stdin=json.dumps(stop)).stdout
+        )
 
     def test_parent_hears_when_the_scope_could_not_be_checked(self):
         """SubagentStop で子のワークツリーを読めなかった回は、止めずに記録で許可と分け、

@@ -44,6 +44,7 @@ from . import (
     approval,
     approval_checks,
     approval_marks,
+    manual_settle,
     ops_close,
     ops_stop,
     phase,
@@ -60,6 +61,8 @@ STEP_MERGE = "merge"
 STEP_LATE_FIX = "late-fix"
 STEP_ELI5 = "eli5"
 STEP_REQUEST = "request"
+# ユーザが子を手で done/ に動かした。親が confirm を打てば確定する。
+STEP_CONFIRM = "confirm"
 
 # 記録の鍵の頭。`finish` の促しの鍵（チケットの識別子）と分ける。
 _KEY_HEAD = "request:"
@@ -129,11 +132,18 @@ def pending_at_stop(
         return Pending(parent, number, STEP_FINISH, here.root, head, [t.ticket for t in doing])
     if bound.is_child:
         return None
-    for ph in phase.phases_of(root, conf, parent.ticket, raw=raw):
+    phases = phase.phases_of(root, conf, parent.ticket, raw=raw)
+    for ph in phases:
         # 終わっていて、レビューが要り、まだ済んでいないフェーズ。
         if not ph.gate_closed:
             continue
         if approval_marks.MARK_REQUESTED in ph.marks:
+            # 依頼のあとにユーザが子を手で done/ に動かして共有した。confirm で確定する。
+            manual = manual_settle.assess(root, conf, parent, ph, phases)
+            if manual.state == manual_settle.READY:
+                return Pending(
+                    parent, ph.number, STEP_CONFIRM, here.root, head, manual.children, ph.title
+                )
             continue
         step, children = _next_step(root, here.root, ph)
         return Pending(parent, ph.number, step, here.root, head, children, ph.title)
@@ -218,6 +228,16 @@ def request_nudge(root: str, found: Pending) -> str:
             " を実行します。まだ作業が残っているなら、確認を取らずに続けます。"
             "子が全部閉じて（合流は finish が済ませます）、すべての子が合流済みと確かめたら、"
             "ELI5、レビューの依頼（request）へ進みます。"
+        )
+    elif found.step == STEP_CONFIRM:
+        where = (
+            f"{p.ticket} の{phase_name}は、ユーザが子 {', '.join(found.children)} を "
+            f"{ticket_model.DONE}/ へ手で動かして共有しています（レビュー完了確認待ち）。"
+        )
+        todo = (
+            f"'{review_sh} confirm --phase {n}' を実行して確定します。"
+            "未解決の指摘は、移動の前に付いたものだけが版つきで受け入れられ、"
+            "移動の後に付いたものが残っていれば止まるので、その分は decide をユーザに頼みます。"
         )
     elif found.step == STEP_MERGE:
         where = (

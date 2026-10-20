@@ -205,6 +205,7 @@ class StatePruneTest(_Base):
             _write(os.path.join(self.state, f"failstreak-{s}-main.json"), age_days=age),
             _write(os.path.join(self.state, f"subagent-{s}-guard-records.bounced"), age_days=age),
             _write(os.path.join(self.state, f"subagent-{s}-agent-1.running"), age_days=age),
+            _write(os.path.join(self.state, f"subagent-{s}-agent-1.outcome"), age_days=age),
         ]
         guard = os.path.join(self.state, "selfguard", s)
         _write(os.path.join(guard, "rules_common"), age_days=age)
