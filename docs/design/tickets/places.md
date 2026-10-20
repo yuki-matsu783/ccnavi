@@ -53,7 +53,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 
 **承認済みチケットは git で共有する。** 承認した機械と作業する機械が違っても承認が届くよう、承認済み
 チケットもマーカーも親チケットのブランチに乗せ、`ccnavi-user-push-approved.sh` がコミットして push する（9.4）。
-受け取る側では、セッションの最初に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、ワークツリーの
+受け取る側では、セッションの最初に `ccnavi-fetch.sh` が fast-forward で取り込む（`--no-overwrite-ignore` つき。ignored のファイルと重なるときは上書きせず、進められなかったと知らせる）。同じ sh が、ワークツリーの
 起点になる統合先（そのリポジトリの手元の `origin/HEAD` が指すもの。無ければ `origin/main`・`origin/master`）も、チェックアウトされていなければ `update-ref` で
 進める。統合先の決め方は `ccnavi-common-state.sh` の `ccnavi_integration` にまとめてあり、`ccnavi-git.sh` は
 その名前への直接の push を（`main` などの固定のリストと同じく）拒み、`ccnavi-review.sh` は依頼のとき、既存のマージリクエストのマージ先がこの統合先と一致するかを確かめる（マージリクエストを作るのは `ccnavi-start.sh`）。
@@ -80,7 +80,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 形だけ）。`integrate` / `integrate-done` の状態操作（取り込みの記録・`merge --squash`・取り込んだブランチの
 `update-ref -d`）も sh が持つ。例外に入るのは、生の操作が組み込みで止まり、ラッパーが許可リストで読み、判定の材料のうち
 チケットの中身を実行ファイルに聞くものだけ。sh はチケットの YAML を読まず、親のワークツリーか・承認済みの親チケットと着手済みか・`.requested`・退避の有無・
-親チケットの `mr:` は `ccnavi tree parent`、`integrate` が断る「チケットに結び付く名前」かどうかは `ccnavi tree bound`（Stop の促しと同じ判定）、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める。答えが得られないときは、
+親チケットの `mr:` は `ccnavi tree parent`、`integrate` が断る「チケットに結び付く名前」かどうかは `ccnavi tree bound`（Stop の促しと同じ判定）、直接作業の取り込み先のブランチがチケットに結び付くかは `ccnavi tree base-bound`（名前ではなく取り込み先のブランチを見る別の判定）、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める。答えが得られないときは、
 止める側の検査は止める向きに（`integrate` は断り、checkout は親のワークツリーとして狭める）、ツリーを動かす側
 （`ccnavi-fetch.sh` の早送り、`ccnavi-sync.sh` の取り込み）は動かさない向きに倒す。
 

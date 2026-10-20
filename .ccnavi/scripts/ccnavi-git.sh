@@ -1565,7 +1565,7 @@ merge)
 	# もう一方の変更を気づかないうちに消す。並行して動いている他セッションの書きかけが
 	# そこに入っていることがあり、消えたことは差分にも記録にも残らない。
 	# オプションは許可リストで読む（略した --strategy-o=ours・まとめた -sours も同じに読む）。
-	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify autostash no-autostash" \
+	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify autostash no-autostash overwrite-ignore no-overwrite-ignore" \
 		"message file strategy strategy-option" "log" "qvne" "mFsX"
 	merge_cb() {
 		[ "$1" = opt ] || return 0
