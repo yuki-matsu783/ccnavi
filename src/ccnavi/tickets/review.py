@@ -215,6 +215,7 @@ def requested(
     stdout.write(
         f"OK: レビューを{done}（{result.mr.url or result.url}）。"
         f"{phase_forms.TURN_DEFINED}を終えてユーザを待ってください\n"
+        f"{phase.PARALLEL_REQUEST_NOTE}\n"
     )
     return 0
 

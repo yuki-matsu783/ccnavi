@@ -397,6 +397,17 @@ def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_model
     return parent_at(root, conf, cwd)[0]
 
 
+# レビュー準備中・レビュー待ちの間の、新しい依頼についての案内（文面は1か所に置く）。案内だけで、
+# セッション単位で機械的に止める仕組みではない（止めるのは、その親の cwd からのサブエージェントの
+# 起動とシェル実行だけ）。
+PARALLEL_REQUEST_NOTE = (
+    "レビュー準備中・レビュー待ちの間、このセッションでは別の親・別の目的の新しい依頼を受けない。"
+    "受けるときは、ワークスペースルートで起動した別のセッションで受けるようユーザに伝える。"
+    "同じ親のレビュー対応・相談・止める指示・取り消し・次のフェーズの計画・"
+    "動いている子の完了処理は、このセッションで続けてよい。"
+)
+
+
 def hold_reason(phase: Phase, tool: str, root: str) -> str:
     """止めたときに返す文。いまどの段にいて、次に何をすればよいかを言う。
 
@@ -436,6 +447,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             f"フェーズは終わっていて、{why}。"
             f"レビュー済みのマーカーが置かれるまで、{what}を止めます。",
             todo,
+            PARALLEL_REQUEST_NOTE,
             *([] if tool == "Agent" else [phase_forms.EXEMPT_NOTE]),
         ]
     )
