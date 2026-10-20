@@ -2,6 +2,7 @@
 
 普段のテストには含めない。人間に確認を取ってから、明確な指示があったときだけ回す。
 
+    uv run python -m tests.scenarios.runner preflight <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ> --confirmed
     uv run python -m tests.scenarios.runner next <出力の置き場>
@@ -877,6 +878,39 @@ def scenario_summary(scn):
     return "\n".join(lines)
 
 
+def confirmation_text(scn, root, mode_text):
+    """回す前に人間へ見せる文（概要・モード・事実・問い）。
+    run の確認と preflight で同じものを出す。"""
+    lines = [
+        "回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。",
+        "",
+        scenario_summary(scn),
+        "",
+        mode_text,
+        "",
+        preflight_facts(root),
+    ]
+    clash = setup_clashes(scn, root)
+    if clash:
+        lines += ["", f"注意: setup のパスが既にある（run は回さない）: {', '.join(clash)}"]
+    lines += [
+        "",
+        "問い 1: 今の状態はきれいで、最新か（他のセッションの作業中や未コミットの変更が無いか）",
+    ]
+    if scn.get("test_repo"):
+        lines.append("問い 2: projects/test-repo にブランチや MR ができてよいか")
+    return "\n".join(lines)
+
+
+def cmd_preflight(args):
+    """回さずに、確認に出す文だけを出す。終了コードは run の確認と同じ 3。"""
+    root = Path(args.root).resolve()
+    scn = load_scenario(args.scenario)
+    _, mode_text = mode_check(root)
+    print(confirmation_text(scn, root, mode_text))
+    return 3
+
+
 def cmd_run(args):
     _require_entry()
     root = Path(args.root).resolve()
@@ -893,15 +927,7 @@ def cmd_run(args):
         print(f"setup のパスが既にある（消されてしまうので回さない）: {', '.join(clash)}")
         return 1
     if not args.confirmed:
-        print("回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。\n")
-        print(scenario_summary(scn) + "\n")
-        print(mode_text + "\n")
-        print(preflight_facts(root))
-        print(
-            "問い 1: 今の状態はきれいで、最新か（他のセッションの作業中や未コミットの変更が無いか）"
-        )
-        if scn.get("test_repo"):
-            print("問い 2: projects/test-repo にブランチや MR ができてよいか")
+        print(confirmation_text(scn, root, mode_text))
         return 3
     out = Path(
         args.out or ROOT / "logs" / "scenarios" / f"{scn['id']}-{datetime.now():%Y%m%d-%H%M%S}"
@@ -961,6 +987,10 @@ def main(argv=None):
     r.add_argument("--root", default=str(ROOT))
     r.add_argument("--out")
     r.set_defaults(fn=cmd_run)
+    p = sub.add_parser("preflight")
+    p.add_argument("scenario")
+    p.add_argument("--root", default=str(ROOT))
+    p.set_defaults(fn=cmd_preflight)
     n = sub.add_parser("next")
     n.add_argument("out")
     n.set_defaults(fn=cmd_next)

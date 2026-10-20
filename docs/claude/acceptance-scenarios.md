@@ -116,6 +116,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 3. **実行器で回す。** 人間の確認が取れたあとだけ、`--confirmed` を付ける。
 
    ```sh
+   uv run python -m tests.scenarios.runner preflight tests/scenarios/UC-01-direct-edit-denied.yml    # 回さずに、確認に出す文（概要・モード・事実・問い）だけを出す（終了コード 3）
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml          # 確認の事実を出して止まる（終了コード 3）
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
    ```

@@ -475,6 +475,39 @@ class StepAnswerTest(unittest.TestCase):
         self.assertIn("【最終出力】\n未実行", text)
 
 
+class ConfirmationTextTest(unittest.TestCase):
+    def test_text_has_summary_mode_facts_and_questions(self):
+        scn = {"id": "UC-XX", "title": "t", "steps": [{"prompt": "a"}], "test_repo": True}
+        with tempfile.TemporaryDirectory() as d:
+            text = runner.confirmation_text(scn, Path(d), "MODE OK")
+        self.assertIn("UC-XX", text)
+        self.assertIn("MODE OK", text)
+        self.assertIn("## ワークスペースルート: git status", text)
+        self.assertIn("問い 1", text)
+        self.assertIn("問い 2", text)
+
+    def test_question_2_only_for_test_repo_scenarios(self):
+        scn = {"id": "UC-XX", "title": "t", "steps": [{"prompt": "a"}]}
+        with tempfile.TemporaryDirectory() as d:
+            text = runner.confirmation_text(scn, Path(d), "MODE OK")
+        self.assertNotIn("問い 2", text)
+
+    def test_preflight_command_does_not_run_claude(self):
+        args = [
+            "preflight",
+            str(Path(__file__).parent / "UC-01-direct-edit-denied.yml"),
+            "--root",
+            str(Path(__file__).parents[2]),
+        ]
+        with (
+            mock.patch.object(runner, "run_step") as m,
+            mock.patch.object(runner, "preflight_facts", return_value="FACTS"),
+        ):
+            rc = runner.main(args)
+        self.assertEqual(rc, 3)
+        m.assert_not_called()
+
+
 class RepoResultTest(unittest.TestCase):
     def test_same_state_passes(self):
         self.assertEqual(runner.repo_result("a", "a")[0], runner.PASS)
