@@ -258,3 +258,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0132](0132-abolish-review-chat.md) | レビューの chat を廃止し、見る場所を none と mr の 2 つにする |
 | [0133](0133-process-skill-names-follow-phase-ids.md) | 工程スキルの名前を process- とフェーズ定義の id の語にし、implement を足す |
 | [0148](0148-integration-is-the-origin-head-only.md) | 統合先は各リポジトリの origin/HEAD だけで決め、環境変数と --integration-branch を廃止する |
+| [0154](0154-feedback-plan-approval-does-not-settle-the-review.md) | フィードバック計画の承認でレビューの状態を変えず、issue に回すをいつでも選べるようにする |

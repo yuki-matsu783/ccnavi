@@ -127,7 +127,7 @@ class FeedbackRevisionTest(FeedbackFlowTest):
 
     def test_the_join_child_waits_even_when_approved_with_the_feedback_plan(self):
         """フィードバック計画を立てる改版と子を一緒に出しても、合流の項の子は待つ。"""
-        self.plan_reviewed(confirm=False)
+        self.plan_reviewed()
         self.propose("i0001", parent_text("i0001", ["design"], feedback=self.FB))
         for n in (2, 3, 4):
             name = f"i0001-0{n}-0{n}"

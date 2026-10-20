@@ -39,7 +39,7 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。フェーズ定義の成果物が在り、定性のリスク判定が揃っている（9.9） | `completed_at` |
 | `doing` → `done` | `ccnavi-ticket.sh finish` | 着手済み。子ならフェーズがレビュー不要。親なら開いている子が無く、レビューで止まっておらず、計画があればフィードバック計画が承認済みで全フェーズが終わっている（早めに閉じていれば子だけ） | `completed_at` |
 | `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`ccnavi-user-close-early.sh`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
-| `review` → `done` | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh`、フィードバック計画の承認 | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |
+| `review` → `done` | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh` | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |
 | 無し → `doing`（続きの子） | ユーザが `decide` で選ぶ | レビューで指摘が残った（9.10）。同じフェーズの番号、範囲は見た子の和 | `followup_of`（トップレベルの欄。ccnavi が新しく作るチケットに書く） |
 | `doing` → `todo`（取り下げ） | Chrome 拡張（ユーザ） | 着手前の新規の承認。`doing/` の中身が承認コミットの親の提案とバイト単位で同じ。子もマーカーも無く、続きの子でない。承認の前に計画編集タブ（`--plan-order --write`）か `--fill-phases` で書き換えた提案は、書き換えがコミットされないまま承認されるので取り下げられない。違いが `plan:` / `feedback:` / `phases:`（子は `phase:` か `predecessors:`）の値だけなら、文面が `ccnavi-ticket.sh cancel` で取り消して出し直すよう案内する。識別子と `phase:` を付け替えた子は、承認コミットの親に同じ識別子の提案が無いので、案内は出ずに止まる | ―（承認コミットの親の提案のバイト列を戻す） |
 | `done` → `doing` | ユーザが hook の外で動かす | エージェントは `Write` でもシェルでも止まる。再開の意図がレビューのやり直しなら、そのフェーズのマーカーも手で消す | ― |
@@ -103,7 +103,7 @@ warn で言う。マーカーを消すかは、レビューをやり直すかど
 | 無し → `skipped` | 同上 | 終わっていて、マーカーが 1 つも無く、レビュー不要（または延期） |
 | 任意 → `skipped` | `ccnavi-user-close-early.sh`（ユーザ） | 終わっていないフェーズのうち、レビュー待ちか閉じた子が居るもの(未着手の子を取り消すと終わるもの)に置く。手を付けていないフェーズには置かず、issue に書き出す（9.11） |
 | 任意 → `requested` | `ccnavi-review.sh request`（親） | 9.10 の前提と ELI5 の HTML（`--eli5`。`wip/` の下にコミット済み）。`pending` は要らない |
-| `requested` → `reviewed` | `ccnavi-review.sh confirm`（ユーザが端末で打つか、VS Code のボードの連絡を受けた親が打つ）、`ccnavi-user-decide.sh`（ユーザ）、Chrome 拡張のレビュー済み、フィードバック計画の承認、`ccnavi-user-close-early.sh` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
+| `requested` → `reviewed` | `ccnavi-review.sh confirm`（ユーザが端末で打つか、VS Code のボードの連絡を受けた親が打つ）、`ccnavi-user-decide.sh`（ユーザ）、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
 | 任意 → 無し | `ccnavi user agree` で同じ番号の子が承認された | 4 種を全部消す |
 
 マーカーはユーザが子を再開しても残る。再開は想定しない運用で、された場合は `--lint` と

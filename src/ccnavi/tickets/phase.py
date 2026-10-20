@@ -556,7 +556,8 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
     if not following:
         if parent.feedback is None:
             return (
-                "全体計画のフェーズは全部終わりました。レビューが済んだら、次はフィードバック計画です。"
+                "全体計画のフェーズは全部終わりました。最後のフェーズのレビューが済んだら、次はフィードバック計画です"
+                "（承認できるのは最後のレビューが済んだあとだけで、承認でレビューの状態は変わりません）。"
                 "親チケットに `feedback:` を追加して（対応が無くても `[]` で）改版を提案し、"
                 "承認を受けてください。項には `after` で先に済んでいるべき項の番号"
                 "（フィードバック計画の番号だけ）を書き、最後の項がほかの全部を待つようにします。"
@@ -873,9 +874,6 @@ def order_problems(
     for t in adding or []:
         if t.phase is not None:
             reopened.setdefault(t.phase, []).append(t.ticket)
-    # 同じ承認でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
-    # 済む（settle_last_review）。承認の前にマーカーは無いので、ここでは計画の側から読む。
-    settled = len(parent.plan) if parent.feedback is not None else 0
     problems: list[rules.Problem] = []
     # 待つ番号ごとに見る。`phases_of` は承認済みの親があればその計画で並べるので、同じ承認で
     # 計画を変える改版（フィードバック計画を立てる改版など）を通すと、改版で足した番号が並ばない。
@@ -896,8 +894,6 @@ def order_problems(
                 owner=parent,
             )
         ended = phase.ended and phase.number not in reopened
-        if phase.number == settled and ended:
-            continue
         if not ended:
             if phase.number in reopened:
                 names = ", ".join(reopened[phase.number])
@@ -932,30 +928,25 @@ def order_problems(
 
 
 def plan_finished(root: str, conf: settings.Settings, parent: ticket_model.Ticket) -> bool:
-    """全体計画のフェーズが全部閉じ、最後のレビューを頼んであるか。フィードバック計画を出せる条件。
+    """全体計画のフェーズが全部閉じ、最後のフェーズまでレビューが済んでいるか。
+    フィードバック計画を初めて足す改版を承認できる条件。
 
-    レビューが「通った」ことは求めない。差し戻し（未解決の指摘）を受けたあとに出すのが
-    フィードバック計画なので、通っていないのが普通。求めるのは、最後のフェーズまで閉じて
-    レビューを依頼したこと。その依頼へのユーザの応えを見て、親が計画を書く。
+    レビュー不要（`skipped`）と延期も済んだ扱い（`reviewed_or_skipped`）。依頼しただけ
+    （`requested`）では足りない。ユーザの応えが決まる前にフィードバック計画の承認で
+    レビューの状態を動かさないため。手で `done/` に動かした子の確定（`via: manual`）でも
+    `reviewed` が付くので、それで足りる。
     """
     if not parent.has_plan:
         return False
     last = len(parent.plan)
+    seen = set()
     for phase in phases_of(root, conf, parent.ticket):
         if phase.number > last:
             break
-        if not phase.ended:
+        if not phase.ended or not reviewed_or_skipped(phase):
             return False
-        if phase.number == last:
-            asked = {
-                approval_marks.MARK_REQUESTED,
-                approval_marks.MARK_REVIEWED,
-                approval_marks.MARK_SKIPPED,
-            }
-            return reviewed_or_skipped(phase) or bool(asked & set(phase.marks))
-        if not reviewed_or_skipped(phase):
-            return False
-    return False
+        seen.add(phase.number)
+    return len(seen) == last
 
 
 def review_venues(root: str, conf: settings.Settings, parent_id: str) -> dict[int, str]:
@@ -974,30 +965,6 @@ def without_mr(
     if venues is None:
         venues = review_venues(root, conf, parent_id)
     return bool(venues) and phasetypes.REVIEW_MR not in venues.values()
-
-
-def settle_last_review(approved_dir: str, parent: ticket_model.Ticket, stamp: str) -> str:
-    """フィードバック計画の承認で、全体計画の最後のレビューを済んだ扱いにする。
-
-    ユーザがレビューの結果を見たうえで対応を計画したので、その計画の承認がレビューの
-    合意になる。残った指摘は消えない。フィードバック作業フェーズの `confirm` が、
-    解決されていない指摘を全部数える。
-    """
-    if not parent.has_plan:
-        return ""
-    last = len(parent.plan)
-    if (
-        approval_marks.read_mark(approved_dir, parent.ticket, last, approval_marks.MARK_REVIEWED)
-        is not None
-    ):
-        return ""
-    return approval_marks.write_mark(
-        approved_dir,
-        parent.ticket,
-        last,
-        approval_marks.MARK_REVIEWED,
-        {"by": "feedback-plan", "at": stamp, "accepted": []},
-    )
 
 
 def stage(
