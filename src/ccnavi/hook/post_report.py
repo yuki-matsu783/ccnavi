@@ -25,6 +25,7 @@ def _violation(
     not_restored: bool = False,
     git: str | None = None,
     shadowed: bool = False,
+    side_by_side: bool = False,
 ) -> str:
     """1 件を、それだけで読んで成立する差し戻しの文に組む。
 
@@ -52,10 +53,18 @@ def _violation(
         f"tree: {finding.tree_name} ({finding.tree_root})" if finding.tree_name else "",
         f"after: {_call(payload)}",
     ]
+    if side_by_side and moved is None:
+        lines.append(
+            f"side-by-side: {SIDE_BY_SIDE_LABEL}. The user declared they work in this checkout "
+            "while this worktree exists, so ccnavi left the change as it is. Do not undo it "
+            "yourself: say what you ran, and let the user decide whose change it is."
+        )
     if moved is None:
-        undo = gitstate.undo(change, git)
-        no_wrapper = "ユーザに頼んでください（git の操作はエージェントには止まります）"
-        lines.append(f"undo: {undo or (no_wrapper if git is None else '')}")
+        if not side_by_side:
+            # 横で作業する変更は、誰の変更かをユーザが決める。戻す手順を並べると、上の文と矛盾する。
+            undo = gitstate.undo(change, git)
+            no_wrapper = "ユーザに頼んでください（git の操作はエージェントには止まります）"
+            lines.append(f"undo: {undo or (no_wrapper if git is None else '')}")
         if not_restored:
             lines.append(
                 "not-restored: "
@@ -92,6 +101,9 @@ def _violation(
     lines.append(_messages(group))
     return "\n".join(line for line in lines if line)
 
+
+# 横で作業する指定が有効なチェックアウトで見つかった変更につける呼び名（`directrec`）。
+SIDE_BY_SIDE_LABEL = "出所不明の変更（ユーザか別のセッションの可能性）"
 
 # 承認済みの置き場の報告につける 1 行。判定は変えない。ccnavi-ticket.sh / ccnavi-review.sh が
 # 前に書いた未コミットの変更は、後のどのコマンドの後でも同じ形で報告され、

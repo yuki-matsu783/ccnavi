@@ -9,7 +9,7 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from ..infra import fsio, gitcmd, gitstate, tree
+from ..infra import fsio, gitcmd, gitstate, pathcase, tree
 from ..policy import rules
 from ..tickets import (
     archive,
@@ -183,8 +183,18 @@ class Finding:
     tree_root: str = ""
 
     def key(self) -> str:
-        """記録の鍵。ツリーが違えば同じ相対パスでも別の変更。"""
-        return f"{self.tree_name}|{self.change.key()}" if self.tree_name else self.change.key()
+        """記録の鍵。ツリーが違えば同じ相対パスでも別の変更。
+
+        別のリポジトリに同じ名前のワークツリーがありうるので、名前だけでなくルートの場所も入れる。
+        """
+        if not self.tree_name:
+            return self.change.key()
+        where = (
+            f"{self.tree_name}@{pathcase.fold(self.tree_root)}"
+            if self.tree_root
+            else self.tree_name
+        )
+        return f"{where}|{self.change.key()}"
 
 
 def _findings(
@@ -352,7 +362,10 @@ def _script_writes(
 
 
 def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
-    """`ccnavi-git.sh integrate` が統合先のツリーに staged で残した変更の実パス。
+    """旧形式の `ccnavi-git.sh integrate` が統合先のツリーにstagedで残した変更の実パス。
+
+    版 4 の取り込みはメインのチェックアウトにstagedを残さない（一時ワークツリーで作ったKを
+    fast-forwardで載せる）ので、ここは版の無いmarker（`state staged`）専用。
 
     統合先のツリーは保護領域なので、外さないと integrate の結果が「保護領域の変更」として報告され、
     戻す設定では自分で戻される。
@@ -471,9 +484,10 @@ def integrated_paths(top: str, base: str) -> set[str]:
         names = sorted(n for n in os.listdir(ddir) if not n.startswith("."))
     except OSError:
         return set()
-    records = [(n, _read_record(os.path.join(ddir, n))) for n in names]
-    records = [(n, r) for n, r in records if r.get("branch") == n]
-    if not records:
+    everything = [(n, _read_record(os.path.join(ddir, n))) for n in names]
+    records = [(n, r) for n, r in everything if r.get("branch") == n]
+    direct = [(n, r) for n, r in everything if r.get("version") == "4"]
+    if not records and not direct:
         return set()
     listed = gitcmd.run(
         top, ["rev-list", "--first-parent", "--no-merges", "--parents", f"{base}..HEAD"]
@@ -489,7 +503,10 @@ def integrated_paths(top: str, base: str) -> set[str]:
         paths = _commit_paths(top, sha)
         if paths is None:
             return set()
-        if len(parents) == 1 and _is_integrate_commit(top, sha, parents[0], records):
+        if len(parents) == 1 and (
+            _is_integrate_commit(top, sha, parents[0], records)
+            or _is_direct_commit(top, sha, parents[0], direct)
+        ):
             squashed |= paths
         else:
             other |= paths
@@ -519,6 +536,32 @@ def _commit_paths(top: str, sha: str) -> set[str] | None:
     if not done.ok:
         return None
     return {p for p in done.out.split("\0") if p}
+
+
+def _is_direct_commit(
+    top: str, sha: str, parent: str, records: list[tuple[str, dict[str, str]]]
+) -> bool:
+    """コミットが、版 4 の取り込みのK（`integrate-done` がfast-forwardで載せたコミット）か。
+
+    Kの親が記録の `head`、Kの木が記録の `c_tree` で、記録に `k` があればそれがK自身で、
+    名前がチケットに結び付かないこと。専用のrefは求めない。gcでオブジェクトが消えたあとは
+    照合できず、報告に出る（許容）。記録は `.git` の中でエージェントにも書けるので、内容だけを
+    信用せずgitのオブジェクトと照らす。意図的な偽装までは防げない。
+    """
+    tree_of = gitcmd.run(top, ["rev-parse", "--verify", f"{sha}^{{tree}}"])
+    if not tree_of.ok:
+        return False
+    tree_sha = tree_of.out.strip()
+    for name, record in records:
+        if record.get("head") != parent or record.get("c_tree") != tree_sha:
+            continue
+        recorded_k = record.get("k", "-")
+        if recorded_k not in ("", "-") and recorded_k != sha:
+            continue
+        if _ticket_bound(top, name):
+            continue
+        return True
+    return False
 
 
 def _is_integrate_commit(

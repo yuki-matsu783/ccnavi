@@ -22,6 +22,18 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   （`ccnavi-git.sh integrate` が断る条件。Stop の促しと同じ判定）。`bound yes|no` に続けて、
   結び付くなら `why <理由>`。判定は `ops_stop_integrate.bound_reason`。
 
+- `ccnavi tree base-bound <メインのチェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが、
+  チケットに結び付くか（`ccnavi-worktree.sh` が切る前に断る条件）。`bound yes|no|unknown` に続けて、
+  yes なら `why <理由>`。識別子の衝突はワークスペース全体、結び付きは取り込み先のリポジトリだけを
+  見る（`base_bound.base_bound`）。unknown（決められない）のときも、呼ぶ側は断る。
+
+- `ccnavi tree guarded <メインのチェックアウト> <パス>…`: パスが自己防衛の守る対象に当たるか。
+  `guarded yes|no` に続けて、当たるパスごとに `path <パス>`。`ccnavi-git.sh integrate` が、
+  確定を端末から打つよう案内するかどうかを決めるために聞く。
+
+- `ccnavi tree handoff-pending <ツリー>`: 取り込んでいない下書き（`wip/handoff/`）の件数。
+  `pending <件数>` に続けて、1 件ごとに `path <パス>`。
+
 git はローカルの読み取りだけ。ネットワークには出ない。
 """
 
@@ -32,11 +44,14 @@ import re
 from typing import TextIO
 
 from ..infra import fsio, pathcase, settings, tree
+from ..policy import ruleload, selfguard_targets
 from ..tickets import (
     approval,
     approval_marks,
     archive,
+    base_bound,
     donecopy,
+    handoff,
     ops_stop_integrate,
     ticket_ids,
     ticket_model,
@@ -151,6 +166,80 @@ def bound_tree(
     stdout.write(f"bound {YES if why else NO}\n")
     if why:
         stdout.write(f"why {why}\n")
+    return 0
+
+
+def base_bound_tree(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, path: str, branch: str
+) -> int:
+    """`ccnavi tree base-bound <メインのチェックアウト> <ブランチ>`。
+
+    頭に `tree 1`、続けて `bound yes|no|unknown`、yes なら `why <理由>`。
+    """
+    if not branch or "\n" in branch or "\x00" in branch:
+        stderr.write(
+            f"ccnavi: tree base-bound のブランチ {branch!r} は有効な名前ではありません。\n"
+        )
+        return 1
+    if not path or not os.path.isdir(path):
+        stderr.write(f"ccnavi: tree base-bound のツリー {path!r} が見つかりません。\n")
+        return 1
+    answer, why = base_bound.base_bound(root, conf, path, branch)
+    stdout.write(TREE_HEAD + "\n")
+    stdout.write(f"bound {answer}\n")
+    if why:
+        stdout.write(f"why {why}\n")
+    return 0
+
+
+def guarded_tree(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    path: str,
+    rels: list[str],
+) -> int:
+    """`ccnavi tree guarded <メインのチェックアウト> <パス>…`。
+
+    頭に `tree 1`、続けて `guarded yes|no`、守る対象に当たるパスごとに `path <パス>`。
+    パスはメインのチェックアウトからの相対。判定は `selfguard_targets.targets`（自己防衛が
+    守る設定ファイル・実行ファイル）と、行き着く先まで解いたパスを大文字小文字を畳んで比べる。
+    """
+    if not path or not os.path.isdir(path):
+        stderr.write(f"ccnavi: tree guarded のツリー {path!r} が見つかりません。\n")
+        return 1
+    found = selfguard_targets.targets(
+        root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
+    )
+    guarded = {pathcase.fold(os.path.realpath(t.path)) for t in found}
+    hits = [
+        rel
+        for rel in rels
+        if rel
+        and pathcase.fold(os.path.realpath(os.path.join(path, rel.replace("/", os.sep)))) in guarded
+    ]
+    stdout.write(TREE_HEAD + "\n")
+    stdout.write(f"guarded {YES if hits else NO}\n")
+    for rel in hits:
+        stdout.write(f"path {rel}\n")
+    return 0
+
+
+def handoff_pending_tree(stdout: TextIO, stderr: TextIO, path: str) -> int:
+    """`ccnavi tree handoff-pending <ツリー>`。
+
+    頭に `tree 1`、続けて `pending <件数>` と、取り込んでいない下書きごとに `path <パス>`。
+    `ccnavi-git.sh integrate` が、下書き（`wip/handoff/`）の取り込み漏れを断る条件に使う。
+    """
+    if not path or not os.path.isdir(path):
+        stderr.write(f"ccnavi: tree handoff-pending のツリー {path!r} が見つかりません。\n")
+        return 1
+    left = handoff.pending(os.path.abspath(path))
+    stdout.write(TREE_HEAD + "\n")
+    stdout.write(f"pending {len(left)}\n")
+    for rel in left:
+        stdout.write(f"path {rel}\n")
     return 0
 
 

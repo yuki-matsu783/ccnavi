@@ -403,10 +403,10 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 
 | イベント | ここで何をするか | 登録しないと |
 |---|---|---|
-| `SessionStart` | 実行ファイルのバックアップを取る。起動・再開では実行中のサブエージェントの印を捨てる。ccnavi が前提にしている作業の決まり（ワークツリー・git の入口・下書きの置き場など）を 1 行ずつモデルに渡す。チケット制御を使っていれば、直接作業とチケット作業の使い分けも渡す。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す。終わっていない integrate の記録（`ccnavi-integrate/<名前>/marker`）があれば、モデルとユーザの両方に知らせる（チケット制御は見ない） | 実行ファイルが差し替えられても戻せない。モデルが、ccnavi の決まりと、チケットを起こす時点を知らないまま進む |
+| `SessionStart` | 実行ファイルのバックアップを取る。起動・再開では実行中のサブエージェントの印を捨てる。ccnaviが前提にしている作業の決まり（ワークツリー・gitの入口・下書きの置き場など）を 1 行ずつモデルに渡す。チケット制御を使っていれば、直接作業とチケット作業の使い分けも渡す。cwdがプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す。終わっていないintegrateの記録（`ccnavi-integrate/<名前>/marker`）と、残ったdoneの記録・一時ワークツリー・専用のrefがあれば、Kが取り込み先に載っているかと次の一手を、モデルとユーザの両方に知らせる（チケット制御は見ない）。壊れた記録は自動で再開せず、操作せずにユーザに確かめるよう伝える | 実行ファイルが差し替えられても戻せない。モデルが、ccnaviの決まりと、チケットを起こす時点を知らないまま進む |
 | `UserPromptSubmit` | 保護領域の状態とツリーごとの HEAD を記録し、ターンの基準にする。ユーザの発言なら、前のターンの終わりからの変更をユーザの手によるものとして受け入れる（設定ファイルのバックアップを今の状態に取り直す、`deny` の場所の今の変更を報告済みにする。バックグラウンド作業の完了通知では行わない）。依頼文に issue・MR の指定があれば、着手の前にブランチを探す指示を足す。範囲を確かめられなかったサブエージェントの印が残っていれば、それを伝える | ターンの終わりの報告が出ない（コミットに入った変更も見えない） |
 | `PreToolUse` | 呼び出しを判定し、設定ファイルをバックアップする。cwd がプロジェクトの中に入った最初の呼び出しでは、スキル目録を（文脈ごとに）1 度だけ添える | 判定そのものが働かない |
-| `PostToolUse` | 作業ツリーを見て、変わっていれば戻す。チケットの状態を承認済みチケットへ書き出す | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない |
+| `PostToolUse` | 作業ツリーを見て、変わっていれば戻す（横で作業する記録が有効なメインのチェックアウトの変更は、戻さずに「出所不明の変更」として報告する）。チケットの状態を承認済みチケットへ書き出す | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない |
 | `PostToolUseFailure` | 失敗した呼び出しも、成功した呼び出しと同じに設定ファイルと保護領域を照合して戻す（失敗する前に変えていることがあるため）。ツール自体の失敗を数え、失敗や拒否が続いたら資料を引く案内を返す（「失敗や拒否が続いたとき」） | 失敗の連続を数えられず、案内が出ない |
 | `Stop` | このターンで変わった保護領域をユーザへ報告する。動かしている作業（バックグラウンドのコマンド、予約した繰り返し）が残っているかを記録し、残っていれば次の発言での受け入れをしない。cwd のワークツリーのチケットを `finish` し忘れていそうなら 1 回だけ止めて促す。レビューの依頼までの道の途中（作業中の子が残っている、子が全部閉じたのに依頼が無い）も、実行中のサブエージェントが居なければ 1 回だけ止めて次の一手を促す。チケットに結び付かない直接作業のワークツリー（cwd のもの、またはこのセッションが書き込んだもの。チケット制御の有無は問わない）に未コミットの変更か統合先に入っていないコミットがあり `integrate` の記録も無ければ、`integrate` の打ち方を 1 回だけ促す（統合の前提を満たせないときは止めずに理由を言う）。`match: Stop` のルールがあれば、そのタイミングで止めて文を渡す | 変更がユーザの目に触れない。閉じ忘れたチケットが作業中に残る。ターンの終わりの促しが届かない |
 | `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録も。チケット制御の有無によらず、実行中の印を置き、同じ作業ツリーで編集する別のサブエージェントが動いていればその案内も渡す | サブエージェントが自分の範囲を知らずに始める |
@@ -468,7 +468,7 @@ hook からの判定と `ticket` / `review` などのサブコマンドに渡す
 | `CCNAVI_LOG_ROTATE_MB` | 記録をローテートする大きさ（MB）。既定は `10`。`0` でローテートしない。`1` より小さい値は既定で動く（「記録の後始末」） |
 | `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
-| `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と知らせる |
+| `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と知らせる。横で作業する記録が有効なメインのチェックアウトの変更は、`enable` でも戻さず報告するだけにする |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、バックアップして戻す側の両方が切り替わる。承認済みの置き場と操作記録への書き込み、保護済みの sh への環境変数の指定の止めは、この値では切れない |
 | `CCNAVI_STOP_REVIEW` | `dry-run`（既定）、`enable`、`disable`。Stop の AI 判定（agent 型 Stop フック）の効き方。全体のモードと掛け合わせる（全体が dry-run なら dry-run、disable なら disable）。`dry-run` は記録だけで止めず、`enable` は検証に通った不備検出だけを差し戻す。登録は `scripts/ccnavi-stop-review.sh` で行う（構成は [docs/design/stop-review.md](docs/design/stop-review.md)） |
 | `CCNAVI_STOP_REVIEW_AGENT` | `1` のとき、Stop で判定計画を作る。agent hook を登録したワークスペースに置かれる（`scripts/ccnavi-stop-review.sh register` が書く）。無ければ何も作らない。評価の集計は `ccnavi stop-review report` |
@@ -1397,6 +1397,7 @@ undo: rm -- ".ccnavi/config/common/probe.json"
 | 中身が変わった・消えた | `<git> restore --staged --worktree -- <path>` |
 | 追跡されていないものが現れた | `rm -- <path>` |
 | 索引に足された状態で現れた | `<git> restore --staged -- <path> && rm -- <path>` |
+| 横で作業する記録が有効なメインのチェックアウトで見つかった変更 | 戻す手順を出さない。「出所不明の変更（ユーザか別のセッションの可能性）」として報告し、戻すかはユーザが決める |
 
 `<git>` は、ワークスペースルートに git のラッパー（`.ccnavi/scripts/ccnavi-git.sh`）があればその実パス（`sh <ルート>/.ccnavi/scripts/ccnavi-git.sh`）、
 無ければ、git の操作はユーザに頼む文にする（生の git は組み込みでいつも止まるため）。ラッパーは `rm -f` と
@@ -1428,7 +1429,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 依頼までの道の促しも出さなかった回で、終わったサブエージェントの結果が `outside`（範囲外の変更を残したまま終わった）か `unchecked`（範囲を確かめられなかった）で、まだ促していなければ、その子と結果を 1 行ずつ並べ、「合流（`finish`）の前に、その子のワークツリーの範囲外の変更を確かめて直すか、ユーザに伝える」と渡して止める（理由コード `NUDGE_SUBAGENT_OUTCOME`）。同じ結果では 1 回だけ（記録は `logs/state/subagent-<セッション>-<agent_id>.outcome` の `nudged`）。`unattributed` と正常な終わり（`ok`・`fixed`）では促さない。実行中のサブエージェントが居る間と、`stop_hook_active` が真のときも止めない。記録の `decision` は `nudge`。順序は `finish` → 依頼までの道 → サブエージェントの結果 → `integrate` → ルール。
 
-これらのどれも促さなかった回は、チケットに結び付かない直接作業のワークツリー（cwd のもの、または Write・Edit・NotebookEdit の書き込み先として `logs/state/direct-<セッション>.json` に記録したもの。チケット制御の有無は問わない）に、未コミットの変更か統合先に入っていないコミットがあり、統合先のツリーに `integrate <名前>` の記録も無ければ、`integrate` の打ち方と、staged で止めてユーザに `git status`・`git diff --staged` で確かめてもらう手順を渡して止める。理由コードは `NUDGE_INTEGRATE` である。hook は `integrate` を打たない。`integrate` が断る名前は促さない。統合先のツリーに未コミットの変更や途中の操作があるとき、また未コミットの変更があるのに統合先の ref を引けないときは、止めずに理由を報告へ足す。同じ状態では 1 回だけで、`dry-run` でも止める。実行中のサブエージェントが居る間は促しを出さずに待つ。
+これらのどれも促さなかった回は、チケットに結び付かない直接作業のワークツリー（cwdのもの、またはWrite・Edit・NotebookEditの書き込み先として `logs/state/direct-<セッション>.json` に記録したもの。チケット制御の有無は問わない）に、未コミットの変更か統合先に入っていないコミットがあり、統合先のツリーに `integrate <名前>` の記録も無ければ、`integrate` の打ち方と、一時ワークツリーに展開した取り込み結果の差分をユーザに見せ、了承を得てから `integrate-done` を打つ手順を渡して止める。直接作業の記録（`ccnavi-direct/<名前>`）があれば、取り込み先と起点（S）を読み、取り込み先に入っていないコミットを `S..先頭` で数える。記録が無ければ統合先で数え、`ccnavi-worktree.sh <名前> --adopt --base <ブランチ>` での引き取りを案内する。理由コードは `NUDGE_INTEGRATE` である。hookは `integrate` を打たない。`integrate` が断る名前は促さない。止めずに理由を報告へ足すのは、取り込み先が切り替わったとき、メインのチェックアウトに途中の操作があるとき、記録が壊れているときである。メインのチェックアウトの書きかけでは止めない。`origin/<取り込み先>` が手元より進んでいれば警告を足す。同じ状態では 1 回だけで、`dry-run` でも止める。実行中のサブエージェントが居る間は促しを出さずに待つ。
 
 これらを促さなかった回は、`match: Stop` のルールが渡す回ならそこで止める（「ターンの終わりに止めて渡す」）。
 
@@ -1443,6 +1444,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 戻す先はコミット済みの内容なので、保護領域に置いた未コミットの変更は失われる。守りたいなら `disable` にするか、宣言を狭める。
 現れたファイルは消さずに `logs/state/aside/<日時>/` へ退避し、退避先を報告に載せる。
+例外として、直接作業の記録（`ccnavi-direct/<名前>`）が `side_by_side yes` で有効なメインのチェックアウト（作業ワークツリーが在り、同じ名前のブランチを開いている間だけ）は、ユーザが横で編集している前提なので戻さない。ターンの終わりに「出所不明の変更（ユーザか別のセッションの可能性）」として報告し、判定の記録にも残す。ccnavi の設定ファイルの自己防衛は、この例外の外で今までどおり戻す。
 
 ### コアファイルを守る
 
@@ -1711,7 +1713,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 `ccnavi-user-push-approved.sh --path <パス> [--path <パス>...]` は、置き場の変更のうち並べたパス（ワークスペースルートからの相対）だけを
 コミットして push する。並べたパスの変更があるツリーだけを対象にする。`<親>` とは一緒に使えない。
 
-受け取る側では、セッション開始時に `.ccnavi/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは fast-forward だけで、未コミットの変更があるツリーや
+受け取る側では、セッション開始時に `.ccnavi/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは fast-forward だけで、ignored のファイルと重なるときは上書きせず進めない（`--no-overwrite-ignore` を付ける）。未コミットの変更があるツリーや
 分岐したツリーは触らず理由を 1 行で示す。取ってくるのは、チェックアウト中のブランチと、ワークツリーの起点になる統合先（そのリポジトリの手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`。ワークスペースの値は無く、
 `projects/` の下のプロジェクトも、それぞれ自分の `origin/HEAD` で決まる）。統合先の決め方は
 `ccnavi-common-state.sh` の `ccnavi_integration` 1 か所（手元の `origin/HEAD` を読むだけ）にあり、`ccnavi-git.sh` の push の拒否と `ccnavi-review.sh` が見るマージリクエストのマージ先も、同じ決め方を使う。
@@ -1724,7 +1726,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 認証で失敗したときはその旨を 1 行添えるので、ユーザが端末で一度 `git fetch origin` を打って資格情報を保存すれば、次のセッションから通る。
 
 親のワークツリー（`.claude/worktrees/<P>` で、HEAD のブランチ名の `/` を `-` に置き換えたものがフォルダ名と同じもの）は、
-未コミットの変更があっても早送りを試し、書きかけと重なれば重なったパスを示す。分かれていれば「取り込みが要る」と 1 行出す。
+未コミットの変更があっても早送りを試し、書きかけや ignored のファイルと重なれば重なったパスを示して進めない。分かれていれば「取り込みが要る」と 1 行出す。
 取り込み（merge）と、親のブランチがリモートから消えたかの確かめは、ユーザが打つ `.ccnavi/scripts/ccnavi-sync.sh [<P>...]` がする。
 統合先はホストのデフォルトブランチ（`ls-remote --symref` で聞き、読めなければ手元の `origin/HEAD`・`main`・`master`）で、
 使った名前を出力の冒頭に出す。
@@ -1983,7 +1985,7 @@ ccnavi は、1 台の PC・1 つのセッションで完結する個人作業だ
 
 **手順**
 
-1. セッションの開始で `ccnavi-fetch.sh` が、親のブランチと統合先を取ってきて早送りだけで進める。届かなければ、手元の版で判定して「リモート未確認」と示す
+1. セッションの開始で `ccnavi-fetch.sh` が、親のブランチと統合先を取ってきて早送りだけで進める。ignored のファイルと重なるときは上書きせず進めない。届かなければ、手元の版で判定して「リモート未確認」と示す
 2. 親のワークツリーが無い PC では、承認や状態の操作は止まる。`ccnavi-start.sh --mr <番号>`（または `--issue <番号>`）で、
    origin から取って親のワークツリーを用意する
 3. 親のブランチが分かれたら、ユーザが `ccnavi-sync.sh [<親>]` を打って取り込む。衝突したら ccnavi が始めた merge だけ取りやめ、ユーザに回す
@@ -3351,6 +3353,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/infra/settings.py` | 環境と設定ファイルからの設定解決 |
 | `src/ccnavi/infra/gitstate.py` | 作業ツリーで実際に何が変わったかを git から読む |
 | `src/ccnavi/infra/tree.py` | ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
+| `src/ccnavi/infra/directrec.py` | 直接作業の記録（`ccnavi-direct/<名前>`）を読む。横で作業する指定がいま有効か（作業ワークツリーの有無と共通ディレクトリの一致を含む）だけを答える。書かない |
 | `src/ccnavi/infra/modes.py` | enable / dry-run / disable の 3 値と終了コード。モードの解決 |
 | `src/ccnavi/infra/gitcmd.py` | git を 1 回起動する。期限（単調時計の絶対時刻）つきの起動（`run_until`）は、期限を過ぎてから起動しない |
 | `src/ccnavi/infra/fsio.py` | ファイルの読み書きの型。state の記録・マーカー・承認済みチケット・下書きが全部これを通る |
@@ -3361,7 +3364,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/policy/` | ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル |
 | `src/ccnavi/policy/rules.py` | ルールファイルの読み込みと検証。文の差し込み（`fill_text`: `{root}`・`{script:<名前>}`） |
 | `src/ccnavi/tickets/direct_candidates.py` | 直接作業の促しの候補の記録（書き込み先のワークツリー。git を呼ばない） |
-| `src/ccnavi/tickets/pending_integrate.py` | セッション開始で、終わっていない integrate の記録を知らせる |
+| `src/ccnavi/tickets/pending_integrate.py` | セッション開始で、終わっていないintegrateの記録（marker・doneの記録・一時ワークツリー・専用のref）を知らせる |
 | `src/ccnavi/tickets/next_id.py` | `ticket next-id`。通し番号に数える名前の集め方と、数えきれないときの終了コード 2 |
 | `src/ccnavi/policy/builtin.py` | ルールファイルを読めないときの組み込み既定 |
 | `src/ccnavi/policy/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
@@ -3413,6 +3416,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/ops_close.py` | チケットを引いて動かしてよいかの検査。置き場の引き当て、取り込み済みの親子の停止、着手の前（親・先行）と終了の前（親を閉じられる・成果物）の検査 |
 | `src/ccnavi/tickets/ops_stop.py` | Stop で `finish` の打ち忘れを促す判定と、基準点の確認（git の読み取り） |
 | `src/ccnavi/tickets/ops_stop_integrate.py` | Stop で、チケットに結び付かない直接作業が `integrate` まで進んでいないことを見つけ、打ち方を促す判定（統合先のツリーが綺麗でないときは促さず理由を言う） |
+| `src/ccnavi/tickets/base_bound.py` | `ccnavi tree base-bound`。直接作業の取り込み先のブランチがチケットに結び付くか（識別子の衝突はワークスペース全体、取り込み先との結び付きは取り込み先のリポジトリだけを見る） |
 | `src/ccnavi/tickets/ops_stop_request.py` | Stop でレビュー依頼までの道（`finish`・すべての子が合流済みかの確認・ELI5・`request`）の途中を見つけ、次の一手を促す判定 |
 | `src/ccnavi/tickets/core.py` | 承認・取り下げ・レビュー済みの判定のコアの入口。名前を束ね直すだけで、`entry/cli.py` と Chrome 拡張（Pyodide）はここを引く |
 | `src/ccnavi/tickets/core_base.py` | 判定のコアの共通部分。入力（`Snapshot`）・承認の判定（`judge_approval`）・書くもの（`Changes`）・ディスクへの書き込み |
@@ -3443,6 +3447,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/lint_templates.py` | lint のうち、作業・レビュー計画のテンプレートの検査 |
 | `src/ccnavi/entry/lint_ticket.py` | lint のうち、承認済みチケット・承認・提案と、親子の運用に要る hook の検査 |
 | `src/ccnavi/entry/lint_branch.py` | lint のうち、チケットのブランチ名・連番・既存ブランチ・ワークツリーの検査 |
+| `src/ccnavi/entry/lint_direct.py` | lintのうち、直接作業の記録（記録の無いワークツリー・壊れた記録・横で作業する指定・残った一時ワークツリー、ref、marker・旧形式のmarker）の検査 |
 | `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain`。名前を引き受けるだけで、中身は下の 4 つに分けてある |
 | `src/ccnavi/entry/diagnose_try.py` | diagnose のうち、`--test` と `--test-expectations`。判定と同じ経路で 1 件と期待を試す |
 | `src/ccnavi/entry/diagnose_explain.py` | diagnose のうち、`--explain` の本文 |
@@ -3470,7 +3475,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを診断する（閉じたかはホストの MR で決める） |
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
-| `.ccnavi/scripts/ccnavi-worktree.sh` | 作業用のワークツリーを統合先から切る。`fetch`・遅れの確認・起点の選択（遅れていれば `origin/<統合先>` から `--no-track`）・`worktree add` を `ccnavi-git.sh` 経由で順に打つ。ワークツリーが既にあればパスを出すだけ。手元の統合先が `origin` と分岐している（先行も遅れもある）ときは、切らずに終了コード 1 で止まり、先に手元の統合先を揃えるよう案内する（`--from-origin` で警告つきで `origin/<統合先>` から切れる）。`fetch` が届かないときは何も切らず終了コード 4 で止まり、直して打ち直す手と `--offline`（手元の統合先から切る）を案内する |
+| `.ccnavi/scripts/ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先（メインのチェックアウトが開いているブランチ）から切る。ずれが無ければ確認なしで取り込み先のHEADから切る。cwdのブランチ違い・取り込み先が統合先でない・`origin/<取り込み先>` とのずれ（遅れ・進み・分岐・無い・リモート未確認）・書きかけがあるときは、切らずに終了コード 3 で状態・勧め・リスク・確認コードを出す。ユーザの了承を得て `--base`・`--accept`・`--copy-wip`/`--no-wip` を付けて打ち直す。`--side-by-side` で、横で作業する間の自動復元を緩める（`ask` ルールで確認が出る）。記録は共通のgitディレクトリの `ccnavi-direct/<名前>`。`--offline`・`--from-origin` は廃止 |
 | `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層。cwd が `.claude/worktrees/<名前>` の中ならそのワークツリーの `wip/handoff/`）へ `cp` する。`--commands` は編集済みの下書きの状態を出す（端末の前のユーザは `mv` の代わりに `ccnavi user handoff` で取り込める）。取り込むのはユーザ |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。子のブランチを消す `--branch` は `ccnavi-user-clean-branch.sh` に分かれている。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |

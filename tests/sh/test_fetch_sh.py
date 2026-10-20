@@ -287,6 +287,24 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(before, self.sha(self.ws, "refs/heads/main"))
         self.assertIn("未コミットの変更", done.stdout)
 
+    def test_default_branch_does_not_overwrite_an_ignored_file(self):
+        # 進める先に ignored と同じパスがあれば、上書きせず進めない。
+        # 判定は --no-overwrite-ignore で行う。
+        tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
+        self.leave_main()
+        git(self.ws, "worktree", "add", "-q", tree, "main")
+        before = self.sha(tree, "HEAD")
+        self.advance(self.remote)
+        pusher = os.path.join(self._tmp.name, "push-" + os.path.basename(self.remote))
+        added = git(pusher, "show", "--name-only", "--format=", "HEAD").stdout.strip()
+        write(os.path.join(self.ws, ".git", "info", "exclude"), added + "\n")
+        write(os.path.join(tree, added), "ignored の手元のファイル\n")
+        done = self.fetch()
+        self.assertEqual(before, self.sha(tree, "HEAD"))
+        with open(os.path.join(tree, added), encoding="utf-8") as handle:
+            self.assertEqual("ignored の手元のファイル\n", handle.read())
+        self.assertIn("進められなかった", done.stdout)
+
     def test_default_branch_advances_in_the_tree_that_holds_it(self):
         # チェックアウトされているブランチの ref は書き換えず、そのツリーで ff する。
         tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
@@ -318,6 +336,20 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertEqual(head, self.sha(self.ws, "HEAD"))
         self.assertIn("親ブランチ", "\n".join(self.lines(done)))
+
+    def test_checked_out_branch_does_not_overwrite_an_ignored_file(self):
+        self.leave_main()
+        git(self.ws, "push", "-q", "-u", "origin", "claude/x")
+        before = self.sha(self.ws, "HEAD")
+        self.advance(self.remote, "claude/x")
+        pusher = os.path.join(self._tmp.name, "push-" + os.path.basename(self.remote))
+        added = git(pusher, "show", "--name-only", "--format=", "HEAD").stdout.strip()
+        write(os.path.join(self.ws, ".git", "info", "exclude"), added + "\n")
+        write(os.path.join(self.ws, added), "手元の ignored\n")
+        done = self.fetch()
+        self.assertEqual(before, self.sha(self.ws, "HEAD"), done.stdout)
+        with open(os.path.join(self.ws, added), encoding="utf-8") as handle:
+            self.assertEqual("手元の ignored\n", handle.read())
 
     def test_checked_out_branch_that_does_not_match_is_named_not_merged(self):
         # 進められない理由（分岐か、浅い clone か）は見分けず、一致しないことと両方の sha を言う。
@@ -437,6 +469,19 @@ class FetchTest(unittest.TestCase):
         self.assertIn("重なる", done.stdout)
         self.assertIn(added, done.stdout)
         self.assertIn("ccnavi-sync.sh i0001", done.stdout)
+
+    def test_a_family_does_not_overwrite_an_ignored_file(self):
+        tree = self.family()
+        before = self.sha(tree, "HEAD")
+        self.advance(self.remote, "i0001")
+        pusher = os.path.join(self._tmp.name, "push-" + os.path.basename(self.remote))
+        added = git(pusher, "show", "--name-only", "--format=", "HEAD").stdout.strip()
+        write(os.path.join(self.ws, ".git", "info", "exclude"), added + "\n")
+        write(os.path.join(tree, added), "手元の ignored\n")
+        done = self.fetch()
+        self.assertEqual(before, self.sha(tree, "HEAD"), done.stdout)
+        with open(os.path.join(tree, added), encoding="utf-8") as handle:
+            self.assertEqual("手元の ignored\n", handle.read())
 
     def test_a_diverged_family_is_named_but_not_merged(self):
         tree = self.family()

@@ -536,7 +536,7 @@ sync_present() {
 		printf '%s: 手元が %s 件先に進んでいる（まだ送っていない）。取り込むものはありません。\n' "$P" "$ahead"
 	elif git -C "$tree" merge-base --is-ancestor "$local_sha" "$remote_sha" 2>/dev/null; then
 		behind=$(git -C "$tree" rev-list --count "$local_sha..$remote_sha" 2>/dev/null || echo '?')
-		if LC_ALL=C git -C "$tree" merge --ff-only --quiet "$remote_sha" </dev/null >/dev/null 2>"$scratch/err"; then
+		if LC_ALL=C git -C "$tree" merge --ff-only --no-overwrite-ignore --quiet "$remote_sha" </dev/null >/dev/null 2>"$scratch/err"; then
 			printf '%s: リモートの %s 件を早送りで取り込んだ\n' "$P" "$behind"
 		else
 			printf '%s: 早送りできなかった。%s\n' "$P" "$(ccnavi_git_refusal "$scratch/err")"

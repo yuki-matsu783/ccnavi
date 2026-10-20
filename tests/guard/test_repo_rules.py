@@ -107,6 +107,22 @@ class RepoRulesTest(unittest.TestCase):
             self.assertEqual(hit(body), [], body["rules"])
         return body
 
+    def test_直接作業の指定は確認ダイアログに出し_指定の無い呼び出しは当たらない(self):
+        script = "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh"
+        for flags in (
+            "--base feature/x",
+            "--accept 7f3a9c21",
+            "--side-by-side",
+            "--adopt --base feature/x",
+            "--base=feature/x --accept=7f3a9c21 --copy-wip",
+        ):
+            with self.subTest(flags=flags):
+                self.assert_verdict(f"{script} x {flags}", "ask", "direct-worktree-confirm")
+        for plain in (f"{script} x", f"{script} x --dry-run", f"{script} x --no-wip"):
+            with self.subTest(plain=plain):
+                body = judge("Bash", plain)
+                self.assertNotIn("direct-worktree-confirm", hit(body))
+
     # 変わるべきもの
 
     def test_引用付きの_grep_は_allow_に当たる(self):
@@ -133,7 +149,7 @@ class RepoRulesTest(unittest.TestCase):
         # ルートが渡らない読み方では `{script:}` は置き換わらない。
         # 置き換えは tests/core/test_script_placeholder.py
         self.assertIn("ccnavi-worktree.sh", body["response"])
-        self.assertIn("--no-track", body["response"])
+        self.assertNotIn("--no-track", body["response"], "手の worktree add に誘わない")
         self.assertNotIn("ff-only", body["response"])
         # ほかのサブコマンドには添えない。
         self.assertNotIn(

@@ -149,7 +149,7 @@ class FinalFilesTest(unittest.TestCase):
     def test_the_worktree_add_hint_has_no_ff_only_procedure(self):
         text = " ".join(self.rule("ccnavi-git-worktree-add")["additionalContextOnce"].split())
         self.assertIn("{script:ccnavi-worktree.sh} <名前>", text)
-        self.assertIn("--no-track", text)
+        self.assertNotIn("--no-track", text, "手の worktree add に誘わない")
         self.assertNotIn("ff-only", text)
 
     def test_no_ff_only_cutting_procedure_is_left_in_the_docs_or_rules(self):

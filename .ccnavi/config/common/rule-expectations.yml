@@ -254,6 +254,24 @@ deny:
     why: 同上。コマンド列の途中でも止まる
 
 ask:
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x --accept 7f3a9c21 --no-wip"
+    why: >-
+      直接作業の取り込み先と状態の了承は、ユーザの確認ダイアログに出す（direct-worktree-confirm）。
+      ダイアログのコマンドに、取り込み先のブランチ名と選んだ指定が見える
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --side-by-side"
+    why: >-
+      横で作業する指定は自動復元を緩めるので、ほかにずれが無くても必ずダイアログに出す
+      （direct-worktree-confirm）
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x"
+    why: 記録の無い既存のワークツリーの引き取りも、ユーザの確認を経る（direct-worktree-confirm）
+  - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x"
+    why: >-
+      指定の無い呼び出しは direct-worktree-confirm に当たらない。どのルールも言及せず権限モードへ渡る。
+      ずれがあれば sh が確認を求めて止まる（終了コード 3）ので、ダイアログは要らない
   - tool: Write
     subject: "/tmp/claude-0/-repo/0a1b2c/scratchpadx/a.md"
     why: 名前の続く別のディレクトリは session-scratchpad に当たらない。止めないが allow にも無いので権限モードに渡る

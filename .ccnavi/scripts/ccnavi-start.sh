@@ -564,7 +564,7 @@ fast_forward() {
 	ff_remote=$(git -C "$wt" rev-parse "refs/remotes/origin/$ff_branch" 2>/dev/null || :)
 	[ -n "$ff_local" ] && [ -n "$ff_remote" ] && [ "$ff_local" != "$ff_remote" ] || return 0
 	if git -C "$wt" merge-base --is-ancestor "$ff_local" "$ff_remote" 2>/dev/null; then
-		if (cd "$wt" && cgit merge --ff-only "origin/$ff_branch"); then
+		if (cd "$wt" && cgit merge --ff-only --no-overwrite-ignore "origin/$ff_branch"); then
 			ff_note="origin/$ff_branch に早送りした"
 			log_info 早送りした -- "branch=$ff_branch"
 		else
