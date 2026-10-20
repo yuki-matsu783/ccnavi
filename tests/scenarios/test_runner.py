@@ -423,6 +423,36 @@ class StepFailureTest(unittest.TestCase):
         self.assertEqual(m.call_count, 1)
 
 
+class ScenarioSummaryTest(unittest.TestCase):
+    def test_summary_shows_title_steps_and_expectations(self):
+        path = Path(__file__).parent / "UC-01-direct-edit-denied.yml"
+        text = runner.scenario_summary(runner.load_scenario(path))
+        self.assertIn("UC-01", text)
+        self.assertIn("ワークツリーを切らずに", text)
+        self.assertIn("DENY_PATH", text)
+        self.assertIn("projects/test-repo/README.md", text)
+        self.assertIn("ccnavi 本体", text)
+
+    def test_human_step_and_unconfirmed_are_shown(self):
+        scn = {
+            "id": "UC-XX",
+            "title": "t",
+            "layer": 3,
+            "steps": [
+                {"prompt": "a"},
+                {"human": True, "instruction": "確認して"},
+            ],
+            "expect": {"state": [{"run": "true", "expect_contains": "x"}]},
+            "unconfirmed": ["点"],
+            "test_repo": True,
+        }
+        text = runner.scenario_summary(scn)
+        self.assertIn("2. 人間の操作: 確認して", text)
+        self.assertIn("projects/test-repo にブランチ・コミット・MR", text)
+        self.assertIn("「x」が出る", text)
+        self.assertIn("まだ実ログと突き合わせていない点", text)
+
+
 class RepoResultTest(unittest.TestCase):
     def test_same_state_passes(self):
         self.assertEqual(runner.repo_result("a", "a")[0], runner.PASS)

@@ -787,6 +787,69 @@ def write_report(scn, out, st, results, rows, raw):
     (out / "evidence.md").write_text("\n".join(ev) + "\n", encoding="utf-8")
 
 
+def _one_line(text, limit=120):
+    s = " ".join(str(text).split())
+    return s if len(s) <= limit else s[:limit] + "…"
+
+
+def _cond_text(cond):
+    parts = [f"{k}={cond[k]}" for k in ("event", "tool", "decision", "code") if k in cond]
+    if cond.get("rules_include"):
+        parts.append("ルール∋" + ", ".join(cond["rules_include"]))
+    if cond.get("subject_contains"):
+        parts.append(f"対象∋{cond['subject_contains']}")
+    return " ".join(parts)
+
+
+def scenario_summary(scn):
+    """回す前に人間へ見せる、シナリオの概要（何をさせ、何を期待し、何を残すか）。"""
+    lines = [f"## 受け入れシナリオ {scn['id']}: {scn['title']}"]
+    lines.append(
+        f"層 {scn.get('layer', '-')}・要求 {', '.join(scn.get('reqs') or []) or '-'}・"
+        f"状態 {scn.get('status', '-')}・モデル {scn.get('model', '-')}・"
+        f"費用の上限 {scn.get('budget_usd', '-')} USD"
+    )
+    if scn.get("test_repo"):
+        lines.append("作るもの: projects/test-repo にブランチ・コミット・MR が残る（後で片付ける）")
+    else:
+        lines.append(
+            "作るもの: なし。ccnavi 本体に何か残らないことは、回したあと repo の判定で確かめる"
+        )
+    setup = (scn.get("setup") or {}).get("files", {})
+    if setup:
+        lines.append("回す前に作り、回したあとに消すファイル: " + ", ".join(setup))
+    lines.append("手順:")
+    for i, step in enumerate(scn["steps"], 1):
+        if step.get("human"):
+            lines.append(f"  {i}. 人間の操作: {_one_line(step.get('instruction', ''))}")
+        else:
+            lines.append(f"  {i}. {_one_line(step.get('prompt', ''))}")
+    expect = scn.get("expect") or {}
+    lines.append("期待:")
+    for cond in expect.get("decisions", []):
+        lines.append(f"  - 判定が出ている: {_cond_text(cond)}")
+    for cond in expect.get("decisions_none", []):
+        lines.append(f"  - 出ていてはいけない判定: {_cond_text(cond)}")
+    for rel in expect.get("files_unchanged", []):
+        lines.append(f"  - 変わっていないこと: {rel}")
+    for item in expect.get("state", []):
+        text = f"`{item['run']}`"
+        if "expect_contains" in item:
+            text += f" の出力に「{item['expect_contains']}」が出る"
+        if "expect_not_contains" in item:
+            text += f" の出力に「{item['expect_not_contains']}」が出ない"
+        lines.append(f"  - 最後の状態: {text}")
+    for s in expect.get("transcript_forbidden", []):
+        lines.append(f"  - 出力に出てはいけない: {s}")
+    for criterion in expect.get("judge", []):
+        lines.append(f"  - 意味で読む: {criterion}")
+    unconfirmed = scn.get("unconfirmed") or []
+    if unconfirmed:
+        lines.append("まだ実ログと突き合わせていない点:")
+        lines += [f"  - {u}" for u in unconfirmed]
+    return "\n".join(lines)
+
+
 def cmd_run(args):
     _require_entry()
     root = Path(args.root).resolve()
@@ -804,6 +867,7 @@ def cmd_run(args):
         return 1
     if not args.confirmed:
         print("回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。\n")
+        print(scenario_summary(scn) + "\n")
         print(mode_text + "\n")
         print(preflight_facts(root))
         print(
