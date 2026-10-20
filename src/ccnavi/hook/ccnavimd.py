@@ -94,8 +94,8 @@ CONDITIONS: dict[str, Callable[[Context], bool]] = {
 # 配布先が足す条件は、`.ccnavi/scripts/ccnavimd.sh` に関数 `ccnavi_cond_<名前>`
 # としてまとめて書く。組み込みと同じ名前の関数は使わない。
 # 置き場は他の sh と同じ `.ccnavi/scripts/`。
-# エージェントの Write / Edit は止まる（ルール guard-scripts）ので、セッションの頭に載る文面を、
-# エージェントが条件の側から書き換えられない。
+# エージェントの Write / Edit は止まる（組み込みの builtin:guard-scripts）ので、
+# セッションの頭に載る文面を、エージェントが条件の側から書き換えられない。
 SCRIPTS_DIR = "scripts"
 SCRIPT_FILE = "ccnavimd.sh"
 FUNCTION_PREFIX = "ccnavi_cond_"

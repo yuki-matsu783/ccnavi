@@ -167,12 +167,12 @@ def decide_before(
         record.tree, record.project = target.name, target.project
     # 設定ファイルを守る側が有効なら、そこへシェルから書き込む形を止める
     # ルールを judgment に足す。戻せるだけでは足りないので、同じ場所を
-    # 実行前にも止める。既定を使っているときは足さない。組み込みの既定が
+    # 実行前にも止める。既定を使っているときは `add_rules` を足さない。組み込みの既定が
     # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
-    if (
-        record.fallback != builtin.FALLBACK
-        and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
-    ):
+    # 名前で書くツールの 4 本（`add_named_rules`）は既定を使っている間も足す。組み込みの既定は
+    # 持っていないので、二重にならない。読めない間も共通の設定への Write / Edit は止まる。
+    core_on = modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
+    if record.fallback != builtin.FALLBACK and core_on:
         selfguard_shell.add_rules(
             rule_set,
             conf.bin,
@@ -183,6 +183,10 @@ def decide_before(
             tool=payload.tool_name,
             cwd=payload.cwd,
         )
+    if core_on:
+        # `add_rules` の後に呼ぶ。先頭に挿すので、専用の文面が
+        # `guard-project-home` / `guard-common-layer` より先に並ぶ。
+        selfguard_shell.add_named_rules(rule_set, conf.project_home, root)
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
     # 生の git は、チケット制御の有無によらず止める。入口を git のラッパー 1 本に寄せ、

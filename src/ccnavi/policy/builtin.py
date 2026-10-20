@@ -19,16 +19,21 @@ block なので、ファイルを置く前に hook を登録した時点でセ�
 ルールの一覧が信用できないので、広く止めても「なぜ止まったのか」をユーザが
 確かめる手立てが無い。止める数ではなく、止めそこねたときに戻せないものを見る。
 
-入れないもの: Write / Edit によるガード自身の設定の書き換え。
-通常のルールファイルはそこを止めているが、既定では通す。ルールファイルが
-破損している状態で編集まで止めると、直す方法が 1 つも残らない。要件にも
-「読み取りと設定自身の修復を妨げない」とあるのはこの意味。
+入れないもの: ガード自身の設定そのものの保護（hooks・settings・scripts・共通の設定 3 本への
+名前で書くツールの保護）。これは自己防衛の設定（`CCNAVI_GUARD_CORE_FILES`）で切れる側なので、
+常に効く土台には置かない。`selfguard_shell.add_named_rules` が、ルールファイルが読めるかどうかに
+よらず、設定が disable でない間だけ足す。
 
-入れるもの: Bash からガード自身の設定へ書き込む形。
-上と対になっている。修復は Write / Edit という構造化された、記録の残る経路だけに
-限る。ここを通すと、`echo x > .ccnavi/config/common/rules.yml` でルールを破損させ、
-その結果として保護の甘い既定に戻る、という手順が成り立ってしまう。
-破損させる側と直す側で経路を分けることで、その手順を成り立たなくする。
+読めない間の修復は、エージェントが共通のルールファイルを Write / Edit で直接直す形では通さない。
+読めない間も `builtin:guard-ccnavi-config` は外れず、Write / Edit は止まる。直し方は 1 つで、
+`wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、ユーザが端末の
+`ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない rules.yml の取り込みは、
+`handoff._defense_change` が「確かめられないので端末に限る」と扱う。ボードからの取り込みは断られる。
+ルールを書き換えて保護の甘い既定に戻す手順は、シェルからも名前で書くツールからも成り立たない。
+
+入れるもの: Bash からガード自身の設定へ書き込む形（`builtin:guard-config-via-bash`）。
+ルールファイルが読めないと既定に戻るので、シェルの書き込みで壊した結果として保護の甘い
+既定に戻る、という手順を成り立たせないために、読めない間も止める。
 
 止めるのは書き込む形だけで、場所の名前が出たかどうかでは止めない。
 同じ場所には `selfguard_shell.add_rules` の組み込みも当たる（ルールファイルが読める間の
@@ -43,7 +48,8 @@ YAML として読めないので既定に戻る。そこで解決の手が止ま
 いちばん強く適用される。
 
 シェルから入れられるのは、既にコミットされている内容だけになる。新しい文面は
-Write / Edit を通る。破損させる側と直す側を分ける狙いはそこで保たれている。
+下書きに置いてユーザが取り込む。壊す側（シェルの書き込み）と直す側（下書きとユーザの取り込み）が
+別の経路なので、その狙いは保たれている。
 書き込む形をここで数え漏らしても、既定はプロジェクトの `allow` を持たないので、
 当たらなかった呼び出しは権限モードに渡り、ユーザが居るモードなら 1 件ずつ確認が出る。
 
@@ -141,8 +147,10 @@ def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dic
         "message": (
             "ルールファイルを読めなかったため、ccnavi は組み込みの既定で動いています。"
             "シェルで書き込むのは適切ではありません。"
-            "新しい内容は Write か Edit のツールで書いてください。"
-            "そうすると、確かめられて記録される経路で直せます。" + resolve
+            "共通のルールファイルは Write / Edit でも直せません。"
+            "wip/handoff/.ccnavi/config/common/rules.yml に下書きを置き、"
+            "ユーザに端末の 'ccnavi user handoff' での取り込みを頼んでください。"
+            "そうすると、ユーザが差分を見て取り込む経路で直せます。" + resolve
         ),
     }
 
@@ -347,19 +355,24 @@ def _deny(root: str) -> list[dict]:
         },
         {
             "id": "builtin:credentials",
-            "match": "Bash|Read|Write|Edit",
+            # 常に効く土台なので、設定で切れない。誤検知が出ても外せない。範囲を広げたときは、
+            # 誤検知の出方（見本の `.env.example` も `x.pem.bak` も止まる）を承知の上で広げる。
+            # 対象は Bash / Read / Write / Edit / NotebookEdit の 5 つ。Grep / Glob / PowerShell は
+            # match に無いので当たらない（探す先のパスは取り出せるが、探索の中身を代表しない）。
+            "match": "Bash|Read|Write|Edit|NotebookEdit",
             # 先頭の境界（行頭・空白・区切り）を付ける。常時有効の土台なので、
-            # `jq '.env.X'` のようなフィールド参照や `process.env` を巻き込まない
-            # （リポジトリ自身の `credentials` と同じ形）。
-            # `.env` の後ろに続く `.envrc` `.env.local` は止める。
+            # `jq '.env.X'` のようなフィールド参照や `process.env` を巻き込まない。
+            # `.env` の後ろに続く `.envrc` `.env.local` `.env.example` は止める。
+            # 鍵のファイルは拡張子として書かれた形（`x.pem`、`x.pem.bak`、`x.key.json`）。
             "regex": (
-                r"(^|[ \\/\x00])\.(env|netrc|npmrc)"
-                r"|(^|[ \\/\x00])\.ssh[\\/]"
+                r"(^|[ \\/\x00])\.(env|dev\.vars|netrc|npmrc|pypirc)"
+                r"|(^|[ \\/\x00])\.(aws|ssh)[\\/]"
+                r"|[\w\-\\/]\.(pem|key)\b"
+                r"|[\\/]secrets[\\/]"
+                r"|[\\/]credentials([\\/]|\.json\b)"
                 r"|\b(id_rsa|id_ed25519)\b"
             ),
-            "message": (
-                "認証情報のある場所です。読まないでください。必要な値は、ユーザに尋ねてください。"
-            ),
+            "message": "認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。",
         },
         {
             "id": GIT_DIR_RULE_ID,
@@ -411,8 +424,9 @@ _ALLOW: list[dict] = [
         # ここまで確認を出すと、本当に見てほしい 1 件が見落とされる。
         # Grep と Glob は書かない。対象は取り出せる（探し始める場所のパス）が、
         # それは探索の中身を代表しない。Read は 1 ファイルずつなので
-        # builtin:credentials が先に当たって止まるのに対し、Grep はその deny の
-        # match に無いので、ここで広く許すと credentials ごと止められずに通る。
+        # builtin:credentials（match は Bash|Read|Write|Edit|NotebookEdit）が先に当たって
+        # 止まるのに対し、Grep はその deny の match に無いので、ここで広く許すと
+        # credentials ごと止められずに通る。
         "id": "builtin:read-anything",
         "match": "Read",
         "glob": "*",

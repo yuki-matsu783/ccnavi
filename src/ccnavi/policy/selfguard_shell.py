@@ -556,10 +556,13 @@ def handoff_write_exempt(root: str) -> Callable[[str], str] | None:
 def handoff_link_target(root: str) -> Callable[[str], str] | None:
     """名指しのツールで、置き場（`wip/handoff/`）の中のリンク・ハードリンクに書く形だけを残す関数。
 
-    ルールファイルの保護（`guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings`）は、
-    置き場の中を `except` の式で外す。式はファイルを見ないので、守る場所とハードリンクでつながった
-    写しへの書き込みも外れる。組み込みの 1 本（HANDOFF_LINK_RULE_ID）がこの関数で、置き場の中の
-    つながった対象だけを残して止める。つながっていない写しと、置き場の外は空を返す（当てない）。
+    名指しのツールの保護のうち、`except` の式で置き場の中を外すものは、式がファイルを見ないので、
+    守る場所とハードリンクでつながった写しへの書き込みも外れる（`rules.yml` に利用者が書く
+    ルールの `except` がこれにあたる）。組み込みの 4 本（`add_named_rules`）は
+    `handoff_write_exempt` でつながった写しを外さないが、利用者のルールには効かない。
+    組み込みの 1 本（HANDOFF_LINK_RULE_ID）が
+    この関数で、置き場の中のつながった対象だけを残して止める。つながっていない写しと、置き場の外は
+    空を返す（当てない）。
     """
     if not root:
         return None
@@ -1118,11 +1121,14 @@ def add_rules(
 
     4 本ある。シェルから書き込む形、名指しのツールで実行ファイルを書く形、
     名指しのツールで ccnavi ディレクトリ（`.ccnavi/`）の下を書く形、名指しのツールで
-    共通レイヤーの 3 本を書く形。hook の登録（`.claude/settings*.json`）を名指しのツールから
-    守るぶんはワークスペースのルールに任せる。そこは `deny` に 1 行書けば済み、書いたことが
-    読める場所に残る。実行ファイルと ccnavi ディレクトリは置き場が設定で動くので、
+    共通レイヤーの 3 本を書く形。実行ファイルと ccnavi ディレクトリは置き場が設定で動くので、
     ルールファイルにパスを固定できない。レイヤーの設定は行き先の判定に使うので、そのレイヤーの
     ルール自身に任せると、書けた時点で緩められる。
+
+    hook・settings・scripts・共通の設定 3 本を名前で書くツールから守る 4 本は、ここでは足さない。
+    別の関数（`add_named_rules`）が足す。ルールファイルが読めない間も、実行後の保護範囲
+    （`events.watched_for`）にも、同じ関数から足すため。ルールファイルの `deny` に書かせると、
+    書き換えられた時点で保護も一緒に消える。
 
     共通レイヤーの 3 本も同じ理由で組み込みに持つ。既定の置き場が ccnavi ディレクトリの下に
     あることに頼り、動かしたときはルールの 1 行に任せる形にすると、その 1 行は守られる
@@ -1231,6 +1237,106 @@ def add_rules(
             },
             root,
         )
+
+
+HOOKS_RULE_ID = "builtin:guard-hooks"
+SETTINGS_RULE_ID = "builtin:guard-settings"
+SCRIPTS_RULE_ID = "builtin:guard-scripts"
+CCNAVI_CONFIG_RULE_ID = "builtin:guard-ccnavi-config"
+NAMED_RULE_IDS = (HOOKS_RULE_ID, SETTINGS_RULE_ID, SCRIPTS_RULE_ID, CCNAVI_CONFIG_RULE_ID)
+
+_NAMED_MATCH = "Write|Edit|NotebookEdit"
+_SETTINGS_REGEX = r"[\\/]\.claude[\\/]settings(\.local)?\.json$"
+
+
+def _stage_hint(root: str) -> str:
+    """守る場所を直すときの案内の一文。ワークスペースの `ccnavi-stage.sh` を指す。"""
+    if not root:
+        return (
+            "wip/handoff/ に写しを置き、ユーザに ccnavi user handoff での取り込みを頼んでください。"
+        )
+    stage = settings.script_command(root, "ccnavi-stage.sh")
+    return (
+        f"直すときは '{stage} <パス>' で wip/handoff/ に写し、写しを直して、"
+        "ユーザに ccnavi user handoff での取り込みを頼んでください。"
+    )
+
+
+def _home_regex(project_home: str) -> str:
+    """ccnavi ディレクトリの名前を、区切りを `[\\/]` にした regex の部品にする。"""
+    parts = [re.escape(p) for p in _home_name(project_home).split("/") if p]
+    return r"[\\/]".join(parts)
+
+
+def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str = "") -> None:
+    """hook・settings・scripts・共通の設定 3 本を、名前で書くツールから守る。
+
+    対象のツールは Write / Edit / NotebookEdit。
+
+    自己防衛の設定（`CCNAVI_GUARD_CORE_FILES`）が disable でないときに、呼び手が足す。
+    ルールファイルの外から足すので、ルールを書き換えても消えない。ルールファイルが読めずに
+    組み込みの既定で動いている間も、実行後の保護範囲（`events.watched_for`）にも使う。
+    実行前の通常時は `add_rules` の後に呼ぶ（`_insert` は先頭に挿すので、この 4 本の専用の文面が
+    `guard-project-home` / `guard-common-layer` より先に並ぶ）。`add_rules` の中身には触れない。
+
+    下書きの置き場（各ツリー直下の `wip/handoff/`）の中は、守る場所の写しなので
+    `handoff_write_exempt` で外す。ハードリンクでつながった写しは外さない。
+
+    共通の設定 3 本（`builtin:guard-ccnavi-config`）は、ルートを固定せず、パスの末尾で当てる。
+    `common_layer_regex` が追う範囲（設定で動かした置き場）と同じとは限らないので、仮定しない。
+    ルールファイルが読めない間も外れない。直すときは `wip/handoff/.ccnavi/config/common/rules.yml`
+    に下書きを置き、ユーザが端末の `ccnavi user handoff` で取り込むか、手で直す。
+
+    ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない。
+    """
+    stage = _stage_hint(root)
+    exempt = handoff_write_exempt(root)
+    named: list[dict] = [
+        {
+            "id": HOOKS_RULE_ID,
+            "glob": "*/.claude/hooks/*",
+            "message": (
+                "hook 本体です。エージェントの判断で書き換えず、理由を伝えてユーザに変更を"
+                f"依頼してください。{stage}"
+            ),
+        },
+        {
+            "id": SETTINGS_RULE_ID,
+            "regex": _SETTINGS_REGEX,
+            "message": (
+                "hook の登録そのものです。ワークツリー側の設定も統合で統合先の設定になります。"
+                "エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。"
+                f"{stage}"
+            ),
+        },
+    ]
+    home = _home_regex(project_home)
+    if home:
+        named += [
+            {
+                "id": SCRIPTS_RULE_ID,
+                "glob": f"*/{_home_name(project_home)}/scripts/*",
+                "message": (
+                    "事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。"
+                    "エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。"
+                    f"{stage}"
+                ),
+            },
+            {
+                "id": CCNAVI_CONFIG_RULE_ID,
+                "regex": rf"[\\/]{home}[\\/]config[\\/]common[\\/](rules|phases|risks)\.yml$",
+                "message": (
+                    "ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。エージェントの判断で"
+                    "書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください"
+                    "（/ccnavi-config）。ルールファイルが読めないときも同じで、書き換えず、"
+                    "wip/handoff/.ccnavi/config/common/rules.yml に下書きを置いて"
+                    "ユーザに取り込みを頼んでください。"
+                    f"{stage}"
+                ),
+            },
+        ]
+    for raw in named:
+        _insert(rule_set, {**raw, "match": _NAMED_MATCH}, root, exempt=exempt)
 
 
 def _insert(
