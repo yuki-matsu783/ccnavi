@@ -103,8 +103,8 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    - 概要: 実行器が出す「受け入れシナリオ」の節（何をさせ、何を期待し、何が残るか、まだ確かめていない点）。確認の前に、人間がこれを読んで決める
    - 事実: ワークスペースルートと `projects/test-repo` の `ccnavi-git.sh status`、origin との先行・遅れ、残っているワークツリーとブランチ、
      `projects/test-repo` の開いている MR と、回すシナリオの ID・作るもの（ブランチ・MR・ファイル）
-   - 問い 1: 今の状態はきれいで、最新か（他のセッションが作業中のツリーや、未コミットの変更が無いか）
-   - 問い 2: `projects/test-repo` にブランチや MR ができてよいか（`test_repo: true` のシナリオだけ）
+   - 確認事項 1: 今の状態はきれいで、最新か（他のセッションが作業中のツリーや、未コミットの変更が無いか）
+   - 確認事項 2: `projects/test-repo` にブランチや MR ができてよいか（`test_repo: true` のシナリオだけ）
    ccnavi 本体にブランチ・コミット・ワークツリーが残らないことは、問わない。実行器が回す前後の HEAD・ブランチ・ワークツリーを比べて、`repo` の判定で確かめる
    「いいえ」や条件が付いたときは、人間が整えるまで待つ（エージェントが勝手に整えない）
 2. **回す前の状態を確かめる。**
@@ -116,7 +116,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 3. **実行器で回す。** 人間の確認が取れたあとだけ、`--confirmed` を付ける。
 
    ```sh
-   uv run python -m tests.scenarios.runner preflight tests/scenarios/UC-01-direct-edit-denied.yml    # 回さずに、確認に出す文（概要・モード・事実・問い）だけを出す（終了コード 3）
+   uv run python -m tests.scenarios.runner preflight tests/scenarios/UC-01-direct-edit-denied.yml    # 回さずに、確認に出す文（概要・モード・事実・ユーザ確認事項）だけを出す（終了コード 3）
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml          # 確認の事実を出して止まる（終了コード 3）
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
    ```

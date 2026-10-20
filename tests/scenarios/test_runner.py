@@ -483,14 +483,18 @@ class ConfirmationTextTest(unittest.TestCase):
         self.assertIn("UC-XX", text)
         self.assertIn("MODE OK", text)
         self.assertIn("## ワークスペースルート: git status", text)
-        self.assertIn("問い 1", text)
-        self.assertIn("問い 2", text)
+        self.assertIn("確認事項 1", text)
+        self.assertIn("確認事項 2", text)
+        order = [
+            text.index(h) for h in ("# 1. 事実", "# 2. ワークスペース状態", "# 3. ユーザ確認事項")
+        ]
+        self.assertEqual(order, sorted(order))
 
     def test_question_2_only_for_test_repo_scenarios(self):
         scn = {"id": "UC-XX", "title": "t", "steps": [{"prompt": "a"}]}
         with tempfile.TemporaryDirectory() as d:
             text = runner.confirmation_text(scn, Path(d), "MODE OK")
-        self.assertNotIn("問い 2", text)
+        self.assertNotIn("確認事項 2", text)
 
     def test_preflight_command_does_not_run_claude(self):
         args = [

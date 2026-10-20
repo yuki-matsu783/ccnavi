@@ -880,27 +880,34 @@ def scenario_summary(scn):
 
 
 def confirmation_text(scn, root, mode_text):
-    """回す前に人間へ見せる文（概要・モード・事実・問い）。
+    """回す前に人間へ見せる文。順は、事実 → ワークスペース状態 → ユーザ確認事項。
     run の確認と preflight で同じものを出す。"""
-    lines = [
-        "回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。",
-        "",
-        scenario_summary(scn),
-        "",
-        mode_text,
-        "",
-        preflight_facts(root),
-    ]
+    facts = [scenario_summary(scn), "", mode_text]
     clash = setup_clashes(scn, root)
     if clash:
-        lines += ["", f"注意: setup のパスが既にある（run は回さない）: {', '.join(clash)}"]
-    lines += [
-        "",
-        "問い 1: 今の状態はきれいで、最新か（他のセッションの作業中や未コミットの変更が無いか）",
+        facts += ["", f"注意: setup のパスが既にある（run は回さない）: {', '.join(clash)}"]
+    questions = [
+        "確認事項 1: 今の状態はきれいで、最新か（他のセッションの作業中や未コミットの変更が無いか）"
     ]
     if scn.get("test_repo"):
-        lines.append("問い 2: projects/test-repo にブランチや MR ができてよいか")
-    return "\n".join(lines)
+        questions.append("確認事項 2: projects/test-repo にブランチや MR ができてよいか")
+    return "\n".join(
+        [
+            "回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。",
+            "",
+            "# 1. 事実",
+            "",
+            *facts,
+            "",
+            "# 2. ワークスペース状態",
+            "",
+            preflight_facts(root),
+            "",
+            "# 3. ユーザ確認事項",
+            "",
+            *questions,
+        ]
+    )
 
 
 def cmd_preflight(args):

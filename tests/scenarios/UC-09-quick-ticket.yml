@@ -5,7 +5,7 @@ reqs: [REQ-APV-01, REQ-APV-02, REQ-TKT-01, REQ-TKT-26]
 status: draft
 model: haiku
 budget_usd: 3.0
-test_repo: true                  # projects/test-repo にブランチ・MR を作る。回す前に問い 2 を確かめる
+test_repo: true                  # projects/test-repo にブランチ・MR を作る。回す前に確認事項 2 を確かめる
 
 # 設計に触れる・ユーザのレビューが要る作業は、提案を書いて承認を受ける（docs/design/tickets/phases.md の「小さい作業」）。
 # 承認（`ccnavi user agree`）とマージリクエストのレビュー（ホスト上）は人間しかできないので、そこで止める。
