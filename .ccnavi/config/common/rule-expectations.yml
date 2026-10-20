@@ -49,15 +49,15 @@ deny:
     subject: "/repo/docs/wip/handoff/.ccnavi/scripts/x.sh"
     why: >-
       写しの例外が効くのは、ツリーの直下の wip/handoff/ だけ。docs/ の下の同名の綴りは、
-      守る場所そのものの綴りではないので除かない（guard-scripts と組み込みの guard-project-home）
+      守る場所そのものの綴りではないので除かない（builtin:guard-scripts と builtin:guard-project-home）
   - tool: Edit
     subject: "/repo/wip/handoffx/.claude/hooks/x.sh"
-    why: 写しの例外は wip/handoff/ だけ。名前の続く別のディレクトリは除かない（guard-hooks）
+    why: 写しの例外は wip/handoff/ だけ。名前の続く別のディレクトリは除かない（builtin:guard-hooks）
   - tool: Write
     subject: "/repo/wip/../.ccnavi/scripts/x.sh"
     why: >-
       wip/handoff/ から .. で抜けた先は、守る場所そのもの。解いたあとのパスで当てるので除かない
-      （guard-scripts）
+      （builtin:guard-scripts）
   - tool: Write
     subject: "/repo/wip/a.md"
     why: wip/ の直下は除かない。ユーザに渡す物は wip/handoff/ に置く
@@ -75,7 +75,7 @@ deny:
     why: .c で始まる隠しファイルも、.claude/worktrees/ の外なので止まる
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/settings.json"
-    why: ワークツリーの中でも hook の登録は触らない（guard-settings）。統合で main の登録になる
+    why: ワークツリーの中でも hook の登録は触らない（builtin:guard-settings）。統合で main の登録になる
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.claude/settings.local.json"
     why: 個人の上書きも同じ。permissions を足せる
@@ -135,25 +135,26 @@ deny:
   - tool: Read
     subject: "/repo/.env.example"
     why: >-
-      値を持たない見本の .env。共通の credentials-files は not で除くが、常に有効な組み込みの
-      builtin:credentials（実行ファイルの土台）が .env の後ろに続く名前ごと止める。
-      組み込みの match は Bash|Read|Write|Edit で、NotebookEdit には当たらない（ask の期待）
+      値を持たない見本の .env も止める。認証情報は組み込みの builtin:credentials（常に効く土台。
+      設定で切れないので、見本の誤検知が出ても外せない）が、.env の後ろに続く名前ごと止める。
+      match は Bash|Read|Write|Edit|NotebookEdit
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/.env.example"
+    why: >-
+      NotebookEdit でも見本の .env は止める。builtin:credentials の match に NotebookEdit が入っている
   - tool: NotebookEdit
     subject: "/repo/.claude/worktrees/x/secrets/.env.example"
-    why: >-
-      見本の名前で終わっても、secrets/ の下なので除かない。例外は .env の個別条件にだけ掛かる。
-      組み込みの builtin:credentials は NotebookEdit を見ないので、ここで外れると素通りする
+    why: 見本の名前で終わっても、secrets/ の下は止める（builtin:credentials）
   - tool: NotebookEdit
     subject: "/repo/.claude/worktrees/x/.env.local"
-    why: NotebookEdit でも .env は止める。組み込みは NotebookEdit を見ない
+    why: NotebookEdit でも .env は止める（builtin:credentials）
   - tool: Bash
     subject: "cat /repo/.env; cat /repo/.env.example"
     why: >-
-      Bash の credentials には例外を付けていないので、見本の名前を足しても外れない
+      Bash の builtin:credentials には例外を付けていないので、見本の名前を足しても外れない
   - tool: Bash
     subject: "cat /repo/secrets/token; cat /repo/.env.example"
-    why: >-
-      同上。.aws・secrets・*.pem は組み込みが止めないので、ここで外れると素通りする
+    why: 同上。.aws・secrets・*.pem も builtin:credentials が止める
   - tool: Bash
     subject: "cat /repo/certs/server.pem"
     why: 同上
@@ -169,7 +170,7 @@ deny:
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.ccnavi/config/common/rules.yml"
     why: >-
-      ワークツリー側の設定も止める（guard-ccnavi-config）。統合すればそのまま main の
+      ワークツリー側の設定も止める（builtin:guard-ccnavi-config）。統合すればそのまま main の
       ルールになる。直したい形は下書きを検証してユーザに渡す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.ccnavi/config/common/phases.yml"
@@ -285,28 +286,23 @@ ask:
     why: >-
       守る場所の写し。ccnavi-stage.sh が元と同じ相対パスで写すので、パスに .ccnavi/ が入る。
       写しにはルールとしての効力が無く、ユーザが ccnavi user handoff で取り込むまで何も変わらない。
-      guard-scripts と組み込みの guard-project-home が除く。止めないが allow にも無いので、
+      builtin:guard-scripts と builtin:guard-project-home が除く。止めないが allow にも無いので、
       権限モードに渡る
   - tool: Edit
     subject: "/repo/wip/handoff/.claude/settings.json"
     why: >-
-      hook の登録の写し。guard-settings が除く。ユーザが ccnavi user handoff で取り込むまで
+      hook の登録の写し。builtin:guard-settings が除く。ユーザが ccnavi user handoff で取り込むまで
       何も変わらない。権限モードに渡る
   - tool: Write
     subject: "/repo/wip/handoff/.ccnavi/config/common/rules.yml"
     why: >-
-      ルールの下書き。guard-ccnavi-config と組み込みの guard-project-home が除く。
+      ルールの下書き。builtin:guard-ccnavi-config と builtin:guard-project-home が除く。
       検査は取り込むときに ccnavi user handoff が行う。権限モードに渡る
   - tool: Write
     subject: "/repo/scratchpad/a.md"
     why: >-
       workspace-root の except で除く、使い捨ての置き場。止めないが allow にも無いので、
       権限モードに渡る（端末からの試験では ask）
-  - tool: NotebookEdit
-    subject: "/repo/.claude/worktrees/x/.env.example"
-    why: >-
-      値を持たない見本の .env。credentials-files が除き、組み込みの builtin:credentials は
-      NotebookEdit を見ないので、どのルールにも当たらず権限モードへ渡る
   - tool: Write
     subject: "/repo/.claude/worktrees/x/pyproject.toml"
     why: 実行時の依存が変わる。main の側は deny なのでワークツリーで見る
@@ -381,7 +377,7 @@ ask:
     why: 設定の Read も止めない。止めると何が効いているか分からなくなる
   - tool: Read
     subject: "/repo/.ccnavi/config/common/phases.yml"
-    why: guard-ccnavi-config は Write / Edit だけ。読むのは止めない
+    why: builtin:guard-ccnavi-config は Write / Edit / NotebookEdit だけ。読むのは止めない
   - tool: Bash
     subject: 'echo "$HOME" "$L"'
     why: 変数が引数にあるだけで、コマンド名の位置ではない。どのルールにも当たらず権限モードへ渡る
@@ -447,7 +443,7 @@ allow:
     why: 同上。文書もワークツリーで直して main に戻す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.vscode/settings.json"
-    why: guard-settings が止めるのは .claude/ の下の settings だけ。エディタの設定はワークツリーで直せる
+    why: builtin:guard-settings が止めるのは .claude/ の下の settings だけ。エディタの設定はワークツリーで直せる
   - tool: Write
     subject: "/repo/.claude/worktrees/x/wip/proposals/todo/i0001.md"
     why: 提案はワークツリーで書く。効くのは承認済みチケットの側

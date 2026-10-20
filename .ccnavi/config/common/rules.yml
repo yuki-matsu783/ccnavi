@@ -14,47 +14,14 @@
 #
 # 「A か B」「A かつ B」は glob / regex の代わりに when: で組み合わせ条件として書く。ノードは
 # `glob: '...'` / `regex: '...'`（個別条件）・`all: [...]`・`any: [...]`・`not: {...}` のどれか 1 つ。
-# credentials-files がこの形で、`any: [all: [.env, not: {any: [見本の .env]}], 残りの認証情報の場所…]`。
-# 例外を .env の個別条件の中に置き、他の個別条件に当たるパスまで外さない。
+# 書き方の例は docs/design/rules.md を見る。
 # 除くだけなら except のほうが読みやすいので、workspace-root は except のままにしてある。
 version: 1
 
+# ccnavi 自身の保護（hook・settings・scripts・共通の設定・承認済みの置き場・認証情報・再帰的な強制削除）は
+# 組み込みにあり、ここには書かない（builtin:guard-*、builtin:ticket-approved、builtin:credentials、
+# builtin:recursive-delete。`ccnavi --test` で判定を試せる）。ここに書くのはこのワークスペースの決まり。
 deny:
-  # hook の場所
-  # 下書きの置き場（各ツリー直下の `wip/handoff/`）の中は、守る場所の写しなので外す。
-  # 写しは元と同じ相対パス（`wip/handoff/.ccnavi/scripts/x.sh` など）に置くので、パスに
-  # `.ccnavi/` や `.claude/` が入る。写しは、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。
-  # `docs/wip/handoff/` のように、ツリーの直下でない綴りは外さない。
-  - id: guard-hooks
-    match: Write|Edit
-    glob: "*/.claude/hooks/*"
-    except:
-      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
-    message: >-
-      hook 本体です。エージェントの判断で書き換えず、理由を
-      伝えてユーザに変更を依頼してください。
-
-  # ラッパースクリプトの場所
-  - id: guard-scripts
-    match: Write|Edit
-    glob: "*/.ccnavi/scripts/*"
-    except:
-      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
-    message: >-
-      事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
-      エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
-
-  # ccnavi の設定（ルール・フェーズ定義・リスクの配点）
-  - id: guard-ccnavi-config
-    match: Write|Edit|NotebookEdit
-    regex: '[\\/]\.ccnavi[\\/]config[\\/]common[\\/](rules|phases|risks)\.yml$'
-    except:
-      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
-    message: >-
-      ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。エージェントの判断で
-      書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください
-      （/ccnavi-config）
-
   # チェックアウトしたブランチでは編集しない。`wip/handoff/`・`scratchpad/`・`.claude/worktrees/` だけが編集可能。
   # `wip/handoff/` は追跡して push する、ユーザに渡す物の置き場（統合時に wip/ ごと消す）。
   # `scratchpad/` は `.gitignore` で追跡から外す使い捨ての置き場（直接作業で一時的に見せる物）。
@@ -98,66 +65,6 @@ deny:
       ファイルを読む・書く・探すなら Read / Write / Edit / Grep / Glob ツールを使ってください。 
       PowerShell でしか実行できないことはユーザに実行を依頼してください。     
 
-  # settings.json の permissions.deny と同じ場所を並べてある。
-  # `.pem` と `.key` は拡張子として書かれた形だけに絞ってある。
-  # Bash はコマンド列の全体に当てるので、例外を付けると `cat .env; cat .env.example` のように
-  # 見本の名前を足すだけで外れる。そのため Bash には例外を付けず、1 本の regex で止める。
-  - id: credentials
-    match: Bash
-    regex: '(^|[ \\/])\.(env|dev\.vars|netrc|npmrc|pypirc)\b|(^|[ \\/])\.(aws|ssh)[\\/]|[\w\-\\/]\.(pem|key)\b|[\\/]secrets[\\/]|[\\/]credentials([\\/]|\.json\b)|\b(id_rsa|id_ed25519)\b'
-    message: 認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。
-
-  # ファイルを扱うツールは対象がパス 1 つなので、組み合わせ条件で見本の .env を除ける
-  # （.env.example / .env.sample / .env.template。値を持たない）。除くのは名前で終わる形だけで、
-  # `.env.example.bak` も、末尾に改行を足した形も除かない（`$` は改行の直前にも当たるので `\Z`）。
-  # 例外は .env の個別条件にだけ掛ける。組み合わせ条件全体に掛けると `secrets/.env.example` や `.aws/.env.example`
-  # のように他の個別条件に当たるパスまで外れ、組み込みの builtin:credentials が見ない NotebookEdit では
-  # そのまま素通りする。個別条件は上の credentials の regex を意味ごとに分けたもの。
-  - id: credentials-files
-    match: Read|Write|Edit|NotebookEdit
-    when:
-      any:
-        # .env と、.env.local / .env.production のような環境名付き。見本だけは除く
-        - all:
-            - regex: '(^|[ \\/])\.env\b'
-            - not:
-                any:
-                  - regex: '(^|[\\/])\.env\.example\Z'
-                  - regex: '(^|[\\/])\.env\.sample\Z'
-                  - regex: '(^|[\\/])\.env\.template\Z'
-        # Cloudflare Workers の手元の秘密
-        - regex: '(^|[ \\/])\.dev\.vars\b'
-        # パッケージの取得・公開の認証
-        - regex: '(^|[ \\/])\.netrc\b'
-        - regex: '(^|[ \\/])\.npmrc\b'
-        - regex: '(^|[ \\/])\.pypirc\b'
-        # クラウドと SSH の鍵の置き場
-        - regex: '(^|[ \\/])\.aws[\\/]'
-        - regex: '(^|[ \\/])\.ssh[\\/]'
-        # 鍵のファイル（拡張子として書かれた形）
-        - regex: '[\w\-\\/]\.(pem|key)\b'
-        - regex: '[\\/]secrets[\\/]'
-        - regex: '[\\/]credentials([\\/]|\.json\b)'
-        - regex: '\b(id_rsa|id_ed25519)\b'
-    message: >-
-      認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。
-      値を持たない見本（.env.example / .env.sample / .env.template）は除いています。
-
-  # 再帰的な強制削除は止める。組み込みの土台と同じ式。
-  # glob の `*rm -rf *` だと `rm -fr`・`rm -r -f`・`rm --recursive --force` が外れるので、
-  # 再帰（-r / -R / --recursive）と強制（-f / --force）の組を、まとめた形・分けた形・順序・
-  # 長い形（略した形も）を問わずに拾う。片方だけ（rm -r、rm -f）は当てない。`--` の後ろは
-  # オペランドなので選択肢に読まない（rm -f -- -r）。
-  # 先読みを使わずに、照合の時間を入力の長さにほぼ比例させる形で書いてある（所有的な繰り返しと
-  # アトミックグループ）。コマンドの中で最初の rm に決め、選択肢でない語は選択肢の語を
-  # 読み飛ばさない形で読む。後戻りが長引くと、判定の期限に気づかないまま hook の timeout に達する。
-  - id: recursive-delete
-    match: Bash
-    regex: '(?:^|\x00)(?>(?:[^\x00]*?[^\w.\x00-])??rm(?:\.exe)?\s)\s*+(?:(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqstuvwxyz]*+[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00rf][^\s\x00]*+|[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:(?:-[a-eg-qs-z]*+r[a-eg-z]*+|--r[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqrstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqrstuvwxyz]*+[f][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00f][^\s\x00]*+|[f][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+|(?:-[a-eg-qs-z]*+f[a-qs-z]*+|--f[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdefghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdefghijklmnopqstuvwxyz]*+[r][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00r][^\s\x00]*+|[r][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+)?--(?:\s++[^\s\x00]++)*?\s++(?:[^\s\x00]*?[^\w\s\x00.-])??rm(?:\.exe)?\s++)*+(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqstuvwxyz]*+[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00rf][^\s\x00]*+|[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:-[a-eg-qs-z]*+(?:r[a-eg-z]*+f|f[a-qs-z]*+r)[a-z]*+(?:[\s\x00]|$)|(?:-[a-qs-z]*+r[a-z]*+|--r[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqrstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqrstuvwxyz]*+[f][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00f][^\s\x00]*+|[f][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)(?:[\s\x00]|$)|(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdefghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdefghijklmnopqstuvwxyz]*+[r][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00r][^\s\x00]*+|[r][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:-[a-qs-z]*+r[a-z]*+|--r[a-z]*+)(?:[\s\x00]|$))'
-    message: >-
-      再帰的な強制削除です。消す対象を 1 つずつ名指しするか、git の管理下なら
-      'ccnavi-git.sh rm <パス>' を使ってください。git が中身を持っているので戻せます。
-
   # find の -delete と -fprintf は消すことも書くこともできるので止める。
   - id: find-writes
     match: Bash
@@ -176,30 +83,6 @@ deny:
       空のファイルを作るだけの場合も同じで、ヒアドキュメントは使わず、Write で作ってください。
       ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
       編集後に走る検査も、どちらも通りません。
-
-  # 承認済みチケットへの書き込みを禁止
-  - id: guard-approved-tickets
-    match: Write|Edit|NotebookEdit
-    glob: "*/.ccnavi/approved/*"
-    message: >-
-      承認済みチケットです。承認はユーザが VS Code のボード・Chrome のボード・
-      端末の 'ccnavi user agree'・置き場のファイルの移動のどれかで行います。
-      承認が済んだかどうかは 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh status' で確かめてください。
-      置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。
-      作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh finish <識別子>' で
-      レビュー待ち（wip/proposals/review/）へ動かしてください。
-      範囲を変えたいなら wip/proposals/todo/ に新しい提案を書き、{root}/.ccnavi/scripts/ccnavi-ticket.sh propose <識別子> で送ってから承認を依頼してください。
-
-  # hook の登録と個人の上書き。ワークスペースルートの側は workspace-root が先に当たるが、
-  # ワークツリー側の設定は統合で統合先へ入る道を持つので、そちらも名前で止める。
-  - id: guard-settings
-    match: Write|Edit|NotebookEdit
-    regex: '[\\/]\.claude[\\/]settings(\.local)?\.json$'
-    except:
-      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
-    message: >-
-      hook の登録そのものです。ワークツリー側の設定も統合で統合先の設定になります。
-      エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
 
 ask:
   # 直接作業の取り込み先・状態の了承・横で作業する指定・引き取りは、ユーザの確認ダイアログに出す。
