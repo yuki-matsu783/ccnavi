@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import os
 
-from ..infra import directrec, gitcmd, settings, tree
+from ..infra import directrec, gitcmd, pathcase, settings, tree
 from . import ops_stop_integrate as osi
 
 HEAD_LINE = (
@@ -199,9 +199,9 @@ def _v4_line(root: str, top: str, name: str, fields: dict[str, str], deadline: f
         return broken.format(why="読めません")
 
 
-def _repo_key(root: str, top: str) -> str:
+def repo_key(root: str, top: str) -> str:
     """一時ワークツリーの置き場の名前（`logs/direct-tmp/<repo>/`）。ワークスペース自身は `self`。"""
-    if os.path.normcase(os.path.realpath(top)) == os.path.normcase(os.path.realpath(root)):
+    if pathcase.fold(os.path.realpath(top)) == pathcase.fold(os.path.realpath(root)):
         return "self"
     return os.path.basename(os.path.normpath(top))
 
@@ -216,7 +216,7 @@ def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list
     if common is None:
         return []
     names: dict[str, list[str]] = {}
-    tmp_base = os.path.join(root, "logs", "direct-tmp", _repo_key(root, top))
+    tmp_base = os.path.join(root, "logs", "direct-tmp", repo_key(root, top))
     try:
         for entry in sorted(os.listdir(tmp_base)):
             names.setdefault(entry, []).append(

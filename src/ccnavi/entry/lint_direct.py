@@ -18,7 +18,7 @@ import os
 
 from ..infra import directrec, gitcmd, pathcase, settings, tree
 from ..policy.rules import SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import direct_candidates
+from ..tickets import direct_candidates, pending_integrate
 from ..tickets import ops_stop_integrate as osi
 
 _NEED = ("base_branch", "snap_sha", "common_dir", "main_tree")
@@ -138,7 +138,7 @@ def _markers(root: str, main: tree.Tree, common: str, label: str) -> list[Proble
 
 def _leftovers(root: str, main: tree.Tree, common: str, label: str) -> list[Problem]:
     problems = []
-    key = "self" if label == "self" else os.path.basename(os.path.normpath(main.root))
+    key = pending_integrate.repo_key(root, main.root)
     tmp_base = os.path.join(root, "logs", "direct-tmp", key)
     try:
         for entry in sorted(os.listdir(tmp_base)):

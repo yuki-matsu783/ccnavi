@@ -757,6 +757,225 @@ class IntegrateTest(Fixture):
         self.assertEqual("x\n", read(os.path.join(left, "x")))
 
 
+@unittest.skipUnless(SHELL and GIT and git_supports_v4(), "sh と git 2.40 以上が要る")
+class IntegrateReviewTest(Fixture):
+    """敵対的レビューの指摘に対する回帰テスト。外すと落ちる条件を 1 つずつ縛る。"""
+
+    def resolve_conflict(self, text="1\n2\nresolved\n"):
+        subprocess.run(["git", "merge", "-q", "main"], cwd=self.wt, capture_output=True)
+        write(os.path.join(self.wt, "keep.txt"), text)
+        git(self.wt, "add", "keep.txt")
+        git(self.wt, "commit", "-q", "-m", "resolve")
+
+    def k_made_but_not_landed(self):
+        """K を作ったが、ユーザの未コミットの変更で fast-forward が止まった状態にする。"""
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        write(os.path.join(self.ws, "keep.txt"), "1\n2\nmine\n")
+        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"), 1)
+        git(self.ws, "checkout", "--", "keep.txt")
+
+    def landed_but_cleanup_stopped(self):
+        """K を載せたあと、一時ワークツリーの未知のファイルで片付けが止まった状態にする。"""
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        write(os.path.join(self.tmp_wt(), "mystery.txt"), "somebody's file\n")
+        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"), 1)
+        return os.path.join(self.tmp_wt(), "mystery.txt")
+
+    # ---- 衝突を解いたあとの収束
+
+    def test_a_resolved_conflict_converges(self):
+        self.work_in_branch()
+        self.advance_main("keep.txt", "1\n2\nTHREE\n")
+        self.assertOk(self.run_git_sh("integrate", "wt"), 1)
+        self.resolve_conflict()
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r)
+        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"))
+        self.assertEqual("1\n2\nresolved\n", read(os.path.join(self.ws, "keep.txt")))
+        self.assertTrue(os.path.exists(os.path.join(self.ws, "new.txt")))
+
+    def test_the_base_moving_after_the_resolution_does_not_leak_into_the_result(self):
+        self.work_in_branch()
+        self.advance_main("keep.txt", "1\n2\nTHREE\n")
+        self.assertOk(self.run_git_sh("integrate", "wt"), 1)
+        self.resolve_conflict()
+        self.advance_main("other.txt", "later\n")
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        changed = git(
+            self.ws, "diff-tree", "-r", "--name-only", "HEAD^{tree}", self.marker_value("c_tree")
+        ).split()
+        self.assertEqual(["gone.txt", "keep.txt", "new.txt"], sorted(changed))
+
+    # ---- 名前のほうのチケットの結び付き
+
+    def test_a_name_bound_to_a_ticket_is_refused(self):
+        self.work_in_branch()
+        git(self.ws, "update-ref", "refs/remotes/origin/wt", "HEAD")
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r, 2)
+        self.assertIn("チケットに結び付く", r.stderr)
+        self.assertFalse(os.path.exists(self.tmp_wt()))
+
+    # ---- ルートの index に書かない
+
+    def test_integrate_does_not_rewrite_the_roots_index(self):
+        self.work_in_branch()
+        path = os.path.join(self.ws, "keep.txt")
+        write(path, "1\n2\n3\n")
+        os.utime(path, (time.time() + 5, time.time() + 5))
+        index = os.path.join(self.common_dir(), "index")
+        with open(index, "rb") as f:
+            before = f.read()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        with open(index, "rb") as f:
+            self.assertEqual(before, f.read())
+
+    # ---- 引用符が付く名前
+
+    @unittest.skipIf(os.name == "nt", "ファイル名に使えない文字を含む")
+    def test_names_that_git_quotes_are_handled(self):
+        draft = "wip/handoff/a\\b.md"
+        write(os.path.join(self.ws, draft), "draft two\n")
+        git(self.ws, "add", "-f", draft)
+        git(self.ws, "commit", "-q", "-m", "draft")
+        wt = self.cut("wt2")
+        git(wt, "rm", "-q", "--", draft)
+        write(os.path.join(wt, "tab\tname.txt"), "t\n")
+        git(wt, "add", ".")
+        git(wt, "commit", "-q", "-m", "agent")
+        r = self.run_git_sh("integrate", "wt2")
+        self.assertOk(r)
+        self.assertIn("  tab\tname.txt", r.stdout)
+        c = self.marker_value("c_tree", "wt2")
+        names = git(self.ws, "ls-tree", "-r", "-z", "--name-only", c).split("\0")
+        self.assertIn(draft, names)
+        self.assertIn("tab\tname.txt", names)
+
+    # ---- K の記録前に落ちた打ち直し
+
+    def test_a_k_committed_before_the_record_is_adopted_on_retry(self):
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        git(self.tmp_wt(), "commit", "-q", "-m", "committed by hand")
+        k = git(self.tmp_wt(), "rev-parse", "HEAD").strip()
+        self.assertNotIn("k ", read(self.marker()))
+        r = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(r)
+        self.assertEqual(k, self.head())
+        self.assertFalse(self.has_branch())
+
+    # ---- 縛られていなかった条件
+
+    def test_a_k_with_the_wrong_parent_is_not_adopted(self):
+        self.work_in_branch()
+        self.advance_main()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        old = git(self.ws, "rev-parse", "HEAD~1").strip()
+        k = git(self.ws, "commit-tree", self.marker_value("c_tree"), "-p", old, "-m", "k").strip()
+        write(self.marker(), read(self.marker()) + f"k {k}\n")
+        head = self.head()
+        r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
+        self.assertOk(r, 2)
+        self.assertEqual(head, self.head())
+
+    def test_a_tracked_edit_in_the_temp_worktree_stops_done(self):
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        write(os.path.join(self.tmp_wt(), "keep.txt"), "edited while verifying\n")
+        head = self.head()
+        r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
+        self.assertOk(r, 2)
+        self.assertIn("違います", r.stderr)
+        self.assertEqual(head, self.head())
+
+    def test_a_staged_edit_in_the_temp_worktree_stops_done(self):
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        write(os.path.join(self.tmp_wt(), "keep.txt"), "edited while verifying\n")
+        git(self.tmp_wt(), "add", "keep.txt")
+        head = self.head()
+        r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
+        self.assertOk(r, 2)
+        self.assertIn("違います", r.stderr)
+        self.assertEqual(head, self.head())
+
+    def test_cleanup_keeps_a_tracked_edit_in_the_temp_worktree(self):
+        mystery = self.landed_but_cleanup_stopped()
+        os.remove(mystery)
+        write(os.path.join(self.tmp_wt(), "keep.txt"), "edited later\n")
+        r = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(r, 1)
+        self.assertEqual("edited later\n", read(os.path.join(self.tmp_wt(), "keep.txt")))
+
+    def test_cleanup_keeps_a_staged_edit_in_the_temp_worktree(self):
+        mystery = self.landed_but_cleanup_stopped()
+        os.remove(mystery)
+        write(os.path.join(self.tmp_wt(), "keep.txt"), "edited later\n")
+        git(self.tmp_wt(), "add", "keep.txt")
+        r = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(r, 1)
+        self.assertEqual("edited later\n", read(os.path.join(self.tmp_wt(), "keep.txt")))
+
+    def test_cleanup_keeps_the_worktree_when_it_left_the_branch(self):
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        git(self.wt, "checkout", "-q", "-b", "elsewhere")
+        r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
+        self.assertOk(r, 1)
+        self.assertTrue(os.path.isdir(self.wt))
+        self.assertTrue(self.has_branch())
+
+    def test_cleanup_keeps_the_worktree_with_uncommitted_changes(self):
+        self.k_made_but_not_landed()
+        write(os.path.join(self.wt, "keep.txt"), "uncommitted\n")
+        r = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(r, 1)
+        self.assertEqual("uncommitted\n", read(os.path.join(self.wt, "keep.txt")))
+        self.assertTrue(self.has_branch())
+
+    def test_cleanup_keeps_the_worktree_with_a_new_ignored_draft(self):
+        self.k_made_but_not_landed()
+        write(os.path.join(self.wt, "wip/handoff/note.local"), "not in the start point\n")
+        r = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(r, 1)
+        self.assertTrue(os.path.exists(os.path.join(self.wt, "wip/handoff/note.local")))
+
+    def test_cleanup_stops_before_deleting_the_worktree_when_the_branch_moved(self):
+        self.k_made_but_not_landed()
+        tip = git(self.ws, "rev-parse", "wt").strip()
+        late = git(self.ws, "commit-tree", f"{tip}^{{tree}}", "-p", tip, "-m", "late").strip()
+        git(self.ws, "update-ref", "refs/heads/wt", late)
+        git(self.wt, "reset", "-q", "--hard", late)
+        r = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(r, 1)
+        self.assertTrue(os.path.isdir(self.wt))
+        self.assertTrue(self.has_branch())
+
+    def test_a_head_that_moved_after_k_was_made_asks_to_start_over(self):
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        write(os.path.join(self.ws, "keep.txt"), "1\n2\nmine\n")
+        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"), 1)
+        write(os.path.join(self.ws, "other.txt"), "moved\n")
+        git(self.ws, "commit", "-q", "-m", "user", "--", "other.txt")
+        r = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(r, 2)
+        self.assertIn("動きました", r.stderr)
+
+    def test_a_done_record_of_another_name_is_not_pruned(self):
+        done_dir = os.path.join(self.common_dir(), "ccnavi-integrate-done")
+        other = os.path.join(done_dir, "other-name")
+        write(other, "version 4\nbase_branch main\n")
+        old = time.time() - 30 * 86400
+        os.utime(other, (old, old))
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"))
+        self.assertTrue(os.path.exists(other))
+
+
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
 class OldMarkerTest(Fixture):
     """版の無い marker（旧形式）は、旧来の abort と確定にだけ回る。"""

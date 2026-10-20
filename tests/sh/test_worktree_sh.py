@@ -161,10 +161,13 @@ class WorktreeShTest(unittest.TestCase):
     def advance_origin(self):
         """origin の main に 1 コミット足す（手元の main はそのまま）。"""
         other = os.path.join(self._tmp.name, "other")
-        git(self._tmp.name, "clone", "-q", self.bare, other)
-        for key, value in (("user.email", "t@example.invalid"), ("user.name", "t")):
-            git(other, "config", key, value)
-        write(os.path.join(other, "new.txt"), "n")
+        if os.path.isdir(other):
+            git(other, "pull", "-q", "--ff-only", "origin", "main")
+        else:
+            git(self._tmp.name, "clone", "-q", self.bare, other)
+            for key, value in (("user.email", "t@example.invalid"), ("user.name", "t")):
+                git(other, "config", key, value)
+        write(os.path.join(other, "new.txt"), "n" + str(len(os.listdir(other))))
         git(other, "add", "new.txt")
         git(other, "commit", "-q", "-m", "ahead")
         git(other, "push", "-q", "origin", "main")
@@ -528,6 +531,87 @@ class WorktreeShTest(unittest.TestCase):
         before = self.snapshot_of_root()
         self.run_sh("topic")
         self.assertEqual(before, self.snapshot_of_root())
+
+    # ---- 確認コードが縛るもの（外すと落ちる）
+
+    def test_the_code_depends_on_the_head_when_origin_has_no_such_branch(self):
+        git(self.ws, "checkout", "-q", "-b", "local-only")
+        code = self.code_of(self.run_sh("topic"))
+        write(os.path.join(self.ws, "more.txt"), "m")
+        git(self.ws, "add", "more.txt")
+        git(self.ws, "commit", "-q", "-m", "moved")
+        result = self.run_sh("topic", "--accept", code)
+        self.assertEqual(3, result.returncode, result.stdout)
+        self.assertIn("合わない", result.stdout)
+
+    def test_the_code_depends_on_the_origin_sha(self):
+        self.advance_origin()
+        code = self.code_of(self.run_sh("topic"))
+        self.advance_origin()
+        result = self.run_sh("topic", "--accept", code)
+        self.assertEqual(3, result.returncode, result.stdout)
+        self.assertIn("合わない", result.stdout)
+
+    def test_the_code_depends_on_where_it_was_run_from(self):
+        self.make_feature_with_origin()
+        a = os.path.join(self._tmp.name, "side-a")
+        b = os.path.join(self._tmp.name, "side-b")
+        git(self.ws, "worktree", "add", "-q", a, "-b", "side-a")
+        git(self.ws, "worktree", "add", "-q", b, "-b", "side-b")
+        first = self.run_sh("topic", "--base", "feature/x", cwd=a, CCNAVI_WORKSPACE=self.ws)
+        self.assertEqual(3, first.returncode, first.stdout + first.stderr)
+        result = self.run_sh(
+            "topic",
+            "--base",
+            "feature/x",
+            "--accept",
+            self.code_of(first),
+            cwd=b,
+            CCNAVI_WORKSPACE=self.ws,
+        )
+        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
+        self.assertIn("合わない", result.stdout)
+
+    def test_the_code_depends_on_whether_the_remote_was_verified(self):
+        self.make_feature_with_origin()
+        unverified = self.run_sh("topic", FAKE_LS_REMOTE_FAIL="1")
+        self.assertEqual(3, unverified.returncode, unverified.stdout + unverified.stderr)
+        self.assertIn("リモート未確認", unverified.stdout)
+        result = self.run_sh("topic", "--accept", self.code_of(unverified))
+        self.assertEqual(3, result.returncode, result.stdout)
+        self.assertIn("合わない", result.stdout)
+        self.assertFalse(os.path.exists(self.wt("topic")))
+
+    # ---- ルートを読むだけで書かない・終わっていない取り込みを取り違えない
+
+    def test_reading_the_root_does_not_rewrite_its_index(self):
+        self.dirty_root()
+        path = os.path.join(self.ws, "tracked.txt")
+        later = os.stat(path).st_mtime + 5
+        os.utime(path, (later, later))
+        index = os.path.join(self.ws, ".git", "index")
+        with open(index, "rb") as f:
+            before = f.read()
+        self.run_sh("topic")
+        with open(index, "rb") as f:
+            self.assertEqual(before, f.read())
+
+    def test_a_marker_that_is_left_stops_the_cut(self):
+        marker = os.path.join(self.ws, ".git", "ccnavi-integrate", "topic", "marker")
+        write(marker, "version 4\nk abc\n")
+        result = self.run_sh("topic")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("取り込みの記録", result.stderr)
+        self.assertIn("integrate-done topic", result.stderr)
+        self.assertFalse(os.path.exists(self.wt("topic")))
+
+    def test_adopt_refuses_a_name_bound_to_a_ticket(self):
+        self.uncorded_worktree()
+        git(self.ws, "update-ref", "refs/remotes/origin/topic", "HEAD")
+        result = self.run_sh("topic", "--adopt", "--base", "main")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("チケットに結び付く", result.stderr)
+        self.assertFalse(os.path.exists(self.record_path("topic")))
 
     # ---- C1〜C3: 先に断るもの
 

@@ -1039,7 +1039,7 @@ d4_probe() {
 	ig_name "$1"
 	d4_top0=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	[ -n "$d4_top0" ] ||
-		reject not-a-repo "git リポジトリの中で実行してください（取り込み先のブランチをチェックアウトしているメインのチェックアウトで $SELF $sub ... を実行します）。"
+		reject not-a-repo "git リポジトリの中で実行してください（取り込み先のブランチをチェックアウトしているメインのチェックアウトで $SELF_Q $sub ... を実行します）。"
 	d4_g0=$(git rev-parse --git-path ccnavi-integrate 2>/dev/null || :)
 	[ -n "$d4_g0" ] || reject integrate-no-gitdir "git ディレクトリの場所が読めません。ユーザに伝えてください。"
 	case "$d4_g0" in
@@ -1059,9 +1059,12 @@ d4_probe() {
 # メインのgitディレクトリに置く。
 d4_begin() {
 	ig_name "$1"
+	# メインのチェックアウトを読むだけの git が index を書き直さない（確認している間、ルートの index に書かない）。
+	GIT_OPTIONAL_LOCKS=0
+	export GIT_OPTIONAL_LOCKS
 	ig_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	[ -n "$ig_top" ] ||
-		reject not-a-repo "git リポジトリの中で実行してください（取り込み先のブランチをチェックアウトしているメインのチェックアウトで $SELF $sub ... を実行します）。"
+		reject not-a-repo "git リポジトリの中で実行してください（取り込み先のブランチをチェックアウトしているメインのチェックアウトで $SELF_Q $sub ... を実行します）。"
 	d4_common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
 	[ -n "$d4_common" ] || reject integrate-no-gitdir "git の共通ディレクトリの場所が読めません。ユーザに伝えてください。"
 	d4_common=$(ccnavi_phys "$d4_common")
@@ -1139,6 +1142,8 @@ d4_tmp_why=""
 d4_tmp_remove() {
 	d4_tmp_why=""
 	if [ ! -e "$d4_tmp" ] && [ ! -L "$d4_tmp" ]; then
+		# 登録だけが残っているときの後始末。prune は git の定義で「ディレクトリが無くなった登録」だけを
+		# 外す（名前では絞れない）。ほかの名前の登録でも、ディレクトリが無ければ守るものは無い。
 		git worktree prune 2>/dev/null || :
 		return 0
 	fi
@@ -1212,10 +1217,16 @@ d4_draft_check() {
 		return 1
 	fi
 	if [ -d "$ig_wt/wip/handoff" ]; then
-		d4_df=$(cd "$ig_wt" && find wip/handoff -type f 2>/dev/null | head -n 200)
+		# 数に上限を付けない（上限の先を検査せずに通さない）。リンクなど通常のファイルでないものは、
+		# 起点と同じと確かめられないので、違うものとして扱う。
+		d4_df=$(cd "$ig_wt" && find wip/handoff ! -type d 2>/dev/null)
 		d4_dr=""
 		while IFS= read -r d4_f; do
 			[ -n "$d4_f" ] || continue
+			if [ -L "$ig_wt/$d4_f" ] || [ ! -f "$ig_wt/$d4_f" ]; then
+				d4_dr="$d4_dr $d4_f"
+				continue
+			fi
 			d4_h=$(git -C "$ig_wt" hash-object -- "$d4_f" 2>/dev/null || :)
 			d4_sb=$(git rev-parse --verify --quiet "$1:$d4_f" 2>/dev/null || :)
 			[ "$d4_h" = "$d4_sb" ] || d4_dr="$d4_dr $d4_f"
@@ -1230,7 +1241,27 @@ EOF
 	return 0
 }
 
-# 作業ブランチの先頭の木から、wip/handoff/ の差分をSに戻した木Tを作る。d4_t_treeに入れる。<S> <先頭>
+# 作業ブランチの先頭の木から、wip/handoff/ の差分を<基準>に戻した木Tを作る。d4_t_treeに入れる。
+# <基準> <先頭> [<S> <S0>]
+#
+# <S> <S0> を渡すと（作業ブランチが取り込み先を取り込んでいて、基準が S ではなく共通祖先のとき）、
+# 写した書きかけ（S0..S の差分）のうち、エージェントが S から変えていないパスも<基準>の版に戻す。
+# 写した書きかけそのものは成果に含めない。
+#
+# パスは -z で読む（引用符・バックスラッシュ・タブを含む名前を、引用符つきで受け取らない）。
+# 改行を含む名前だけは扱えない。
+d4_restore_path() {
+	# <index> <基準> <パス>
+	d4_ent=$(GIT_LITERAL_PATHSPECS=1 git ls-tree "$2" -- "$3" 2>/dev/null || :)
+	if [ -n "$d4_ent" ]; then
+		d4_mode=$(printf '%s\n' "$d4_ent" | awk '{ print $1 }')
+		d4_sha=$(printf '%s\n' "$d4_ent" | awk '{ print $3 }')
+		GIT_INDEX_FILE="$1" git update-index --add --cacheinfo "$d4_mode,$d4_sha,$3" 2>/dev/null
+	else
+		GIT_INDEX_FILE="$1" git update-index --force-remove -- "$3" 2>/dev/null
+	fi
+}
+
 d4_make_t() {
 	d4_idx=$(mktemp 2>/dev/null || mktemp -t ccnavi-idx) || return 1
 	rm -f "$d4_idx"
@@ -1238,33 +1269,46 @@ d4_make_t() {
 		rm -f "$d4_idx"
 		return 1
 	fi
-	d4_hp=$(git -c core.quotepath=off diff-tree -r --no-renames --name-only "$1" "$2" -- wip/handoff/ 2>/dev/null || :)
+	d4_hp=$(git diff-tree -r -z --no-renames --name-only "$1" "$2" -- wip/handoff/ 2>/dev/null | tr '\0' '\n' || :)
 	while IFS= read -r d4_p; do
 		[ -n "$d4_p" ] || continue
 		case "$d4_p" in
 		wip/handoff/*) ;;
 		*) continue ;;
 		esac
-		d4_ent=$(GIT_LITERAL_PATHSPECS=1 git ls-tree "$1" -- "$d4_p" 2>/dev/null || :)
-		if [ -n "$d4_ent" ]; then
-			d4_mode=$(printf '%s\n' "$d4_ent" | awk '{ print $1 }')
-			d4_sha=$(printf '%s\n' "$d4_ent" | awk '{ print $3 }')
-			GIT_INDEX_FILE="$d4_idx" git update-index --add --cacheinfo "$d4_mode,$d4_sha,$d4_p" 2>/dev/null || {
-				rm -f "$d4_idx"
-				return 1
-			}
-		else
-			GIT_INDEX_FILE="$d4_idx" git update-index --force-remove -- "$d4_p" 2>/dev/null || {
-				rm -f "$d4_idx"
-				return 1
-			}
-		fi
+		d4_restore_path "$d4_idx" "$1" "$d4_p" || {
+			rm -f "$d4_idx"
+			return 1
+		}
 	done <<EOF
 $d4_hp
 EOF
+	if [ -n "${3:-}" ] && [ -n "${4:-}" ]; then
+		d4_wp=$(git diff-tree -r -z --no-renames --name-only "$4" "$3" 2>/dev/null | tr '\0' '\n' || :)
+		while IFS= read -r d4_p; do
+			[ -n "$d4_p" ] || continue
+			case "$d4_p" in
+			wip/handoff/*) continue ;;
+			esac
+			d4_tb=$(GIT_LITERAL_PATHSPECS=1 git ls-tree "$2" -- "$d4_p" 2>/dev/null | awk '{ print $1 " " $3 }')
+			d4_sb=$(GIT_LITERAL_PATHSPECS=1 git ls-tree "$3" -- "$d4_p" 2>/dev/null | awk '{ print $1 " " $3 }')
+			[ "$d4_tb" = "$d4_sb" ] || continue
+			d4_restore_path "$d4_idx" "$1" "$d4_p" || {
+				rm -f "$d4_idx"
+				return 1
+			}
+		done <<EOF
+$d4_wp
+EOF
+	fi
 	d4_t_tree=$(GIT_INDEX_FILE="$d4_idx" git write-tree 2>/dev/null || :)
 	rm -f "$d4_idx"
 	[ -n "$d4_t_tree" ]
+}
+
+# 変わるパスの一覧（1 行 1 本）。<git diff-tree の追加引数>... <木> <木>
+d4_names() {
+	git diff-tree -r -z --no-renames --name-only "$@" 2>/dev/null | tr '\0' '\n'
 }
 
 # パスの一覧（1 行 1 本）が自己防衛の対象を含むか、実行ファイルに聞く。d4_guard（yes / no / unknown）と
@@ -1300,12 +1344,12 @@ EOF
 # integrate <名前>
 ig_integrate() {
 	[ "$#" -eq 1 ] ||
-		reject integrate-args "integrate は名前を 1 つだけ取ります（$SELF integrate <名前>。やめるなら $SELF integrate --abort <名前>）。"
+		reject integrate-args "integrate は名前を 1 つだけ取ります（$SELF_Q integrate <名前>。やめるなら $SELF_Q integrate --abort <名前>）。"
 	d4_probe "$1"
 	case "$d4_pv" in
 	4 | none) ;;
 	old)
-		reject integrate-old-marker "旧来の取り込み（staged で載せる形）が残っている（記録: ${d4_g0}/${1}/marker）。$SELF integrate --abort $1 で取り込む前に戻すか、$SELF integrate-done $1 で終わらせてから、integrate を打ち直してください。"
+		reject integrate-old-marker "旧来の取り込み（staged で載せる形）が残っている（記録: ${d4_g0}/${1}/marker）。$SELF_Q integrate --abort $1 で取り込む前に戻すか、$SELF_Q integrate-done $1 で終わらせてから、integrate を打ち直してください。"
 		;;
 	*) reject integrate-marker "取り込みの記録（${d4_g0}/${1}/marker）の版（${d4_pv}）を知りません。ユーザに確かめてください。" ;;
 	esac
@@ -1315,7 +1359,7 @@ ig_integrate() {
 	if [ -f "$ig_mark" ]; then
 		d4_k0=$(ccnavi_record_get "$ig_mark" k)
 		if [ -n "$d4_k0" ]; then
-			reject integrate-has-k "$ig_n は確定の途中です（K=$(ig_short "$d4_k0")）。$SELF integrate-done $ig_n -m '<メッセージ>' で続けるか、$SELF integrate --abort $ig_n でやめてください。"
+			reject integrate-has-k "$ig_n は確定の途中です（K=$(ig_short "$d4_k0")）。$SELF_Q integrate-done $ig_n -m '<メッセージ>' で続けるか、$SELF_Q integrate --abort $ig_n でやめてください。"
 		fi
 	fi
 	[ -f "$d4_rec" ] ||
@@ -1351,6 +1395,18 @@ ig_integrate() {
 	ig_b=$(ig_wt_branch)
 	[ "$ig_b" = "refs/heads/$ig_n" ] ||
 		reject integrate-worktree-branch ".claude/worktrees/$ig_n は、このリポジトリで $ig_n をチェックアウトしているワークツリーではありません（${ig_b:-このリポジトリの登録に無い}）。"
+	# 名前のほうもチケットに結び付かないことを確かめる（取り込み先の判定とは別）。
+	d4_nb=$(ccnavi_ask "$WS" tree bound "$ig_wt" "$ig_n") || d4_nb=""
+	if [ "$(printf '%s\n' "$d4_nb" | head -n 1)" != "tree 1" ]; then
+		reject integrate-ticket "$ig_n がチケットに結び付くかを実行ファイルに確かめられないので、取り込みません。"
+	fi
+	case "$(printf '%s\n' "$d4_nb" | sed -n 's/^bound //p' | head -n 1)" in
+	no) ;;
+	yes)
+		reject integrate-ticket "$ig_n はチケットに結び付くワークツリーです（$(printf '%s\n' "$d4_nb" | sed -n 's/^why //p' | head -n 1)）。チケットの作業は取り込み先へ直接取り込まず、マージリクエストで出します（.ccnavi/docs/worktree-merge.md）。"
+		;;
+	*) reject integrate-ticket "$ig_n がチケットに結び付くかを決められないので、取り込みません。" ;;
+	esac
 	ig_wdirty=$(git -C "$ig_wt" status --porcelain 2>/dev/null | head -n 10)
 	if [ -n "$ig_wdirty" ]; then
 		reject integrate-source-dirty "ワークツリー .claude/worktrees/$ig_n に未コミットの変更があります。取り込むのはコミットした分だけなので、ワークツリーの中でコミットしてから再実行してください。変更（先頭 10 件）: $(printf '%s' "$ig_wdirty" | tr '\n' ' ')"
@@ -1372,18 +1428,31 @@ ig_integrate() {
 	fi
 	d4_refs_drop t c k
 	# TとCを計算する。
-	d4_make_t "$d4_s" "$d4_tip" ||
+	# 基準は、ふつう起点 S。作業ブランチが取り込み先を取り込んでいる（先頭と HEAD の共通祖先 M が、記録した
+	# 確認時点の HEAD より新しい）ときは M にする。S のままだと、取り込み先側と同じ箇所を直した解決結果が
+	# 「両側が変更」と読まれ、衝突を解いても integrate が収束しない。
+	d4_s0=$(ccnavi_record_get "$d4_rec" base_sha)
+	d4_mb=$(git merge-base HEAD "$d4_tip" 2>/dev/null || :)
+	d4_bs="$d4_s"
+	d4_wipsnap=""
+	if [ -n "$d4_mb" ] && [ -n "$d4_s0" ] && [ "$d4_mb" != "$d4_s0" ] &&
+		git merge-base --is-ancestor "$d4_s0" "$d4_mb" 2>/dev/null; then
+		d4_bs="$d4_mb"
+		[ "$d4_s" = "$d4_s0" ] || d4_wipsnap="$d4_s $d4_s0"
+	fi
+	# shellcheck disable=SC2086
+	d4_make_t "$d4_bs" "$d4_tip" $d4_wipsnap ||
 		reject integrate-t "作業ブランチの先頭の木（T）を作れませんでした。何も変えていません。"
-	d4_t_commit=$(d4_commit_tree "$d4_t_tree" -p "$d4_s" -m "ccnavi: T" 2>/dev/null || :)
+	d4_t_commit=$(d4_commit_tree "$d4_t_tree" -p "$d4_bs" -m "ccnavi: T" 2>/dev/null || :)
 	[ -n "$d4_t_commit" ] || reject integrate-t "T のコミットを作れませんでした。何も変えていません。"
 	d4_mt_rc=0
-	d4_mt=$(git merge-tree --write-tree --name-only --merge-base="$d4_s" HEAD "$d4_t_commit" 2>/dev/null) || d4_mt_rc=$?
+	d4_mt=$(git merge-tree --write-tree --name-only --merge-base="$d4_bs" HEAD "$d4_t_commit" 2>/dev/null) || d4_mt_rc=$?
 	if [ "$d4_mt_rc" -eq 1 ]; then
 		printf 'fail  git integrate  %s の取り込みが衝突した（メインのチェックアウトは変えていない）\n' "$ig_n"
 		printf '衝突したパス:\n'
 		printf '%s\n' "$d4_mt" | sed -n '2,/^$/p' | grep -v '^$' | head -n "$MAX_LINES" | sed 's/^/  /'
 		printf '案内: ワークツリー（%s）の中で %s merge %s を実行して衝突を解いてコミットしてから、%s integrate %s を再実行します。\n' \
-			"$ig_wt" "$SELF" "$d4_base" "$SELF" "$ig_n"
+			"$ig_wt" "$SELF_Q" "$d4_base" "$SELF_Q" "$ig_n"
 		log_error 取り込みが衝突した -- "name=$ig_n"
 		exit 1
 	fi
@@ -1401,14 +1470,14 @@ ig_integrate() {
 			created "$(date +%s)" ||
 			reject integrate-marker "取り込みの記録（${ig_mark}）を書けません。ユーザに伝えてください。"
 		printf 'ok  git integrate  %s に取り込む差分は無かった（作業ブランチの中身は %s に入っている）\n' "$ig_n" "$d4_base"
-		printf '次: %s integrate-done %s で片付けだけを行う\n' "$SELF" "$ig_n"
+		printf '次: %s integrate-done %s で片付けだけを行う\n' "$SELF_Q" "$ig_n"
 		log_info 取り込む差分が無かった -- "name=$ig_n"
 		exit 0
 	fi
-	d4_changed=$(git -c core.quotepath=off diff-tree -r --no-renames --name-only "$d4_head_tree" "$d4_c" 2>/dev/null || :)
+	d4_changed=$(d4_names "$d4_head_tree" "$d4_c" || :)
 	d4_count=$(printf '%s\n' "$d4_changed" | awk 'NF { n++ } END { print n + 0 }')
 	# ignoredのファイルとの重なり（案内。最終的な防御は --no-overwrite-ignore）。
-	d4_added=$(git -c core.quotepath=off diff-tree -r --no-renames --diff-filter=A --name-only "$d4_head_tree" "$d4_c" 2>/dev/null || :)
+	d4_added=$(d4_names --diff-filter=A "$d4_head_tree" "$d4_c" || :)
 	d4_overlap=""
 	while IFS= read -r d4_ap; do
 		[ -n "$d4_ap" ] || continue
@@ -1450,7 +1519,7 @@ EOF
 			"$d4_base" "$(ccnavi_sh_quote "$ig_top")" "$d4_base"
 	fi
 	printf '次: 差分（%s diff %s %s）をユーザに見せ、了承を得たら %s integrate-done %s -m '"'"'<メッセージ>'"'"'。やめるなら %s integrate --abort %s\n' \
-		"$SELF" "$d4_head" "$d4_c" "$SELF" "$ig_n" "$SELF" "$ig_n"
+		"$SELF_Q" "$d4_head" "$d4_c" "$SELF_Q" "$ig_n" "$SELF_Q" "$ig_n"
 	log_info 取り込み結果を用意した -- "name=$ig_n" "files=$d4_count"
 	exit 0
 }
@@ -1458,7 +1527,7 @@ EOF
 # integrate --abort <名前>
 ig_abort() {
 	[ "$#" -eq 1 ] ||
-		reject integrate-args "integrate --abort は名前を 1 つだけ取ります（$SELF integrate --abort <名前>）。"
+		reject integrate-args "integrate --abort は名前を 1 つだけ取ります（$SELF_Q integrate --abort <名前>）。"
 	d4_probe "$1"
 	if [ "$d4_pv" = old ]; then
 		ig_abort_old "$1"
@@ -1471,7 +1540,7 @@ ig_abort() {
 	[ -n "$d4_m_k" ] || d4_m_k=$(git rev-parse --verify --quiet "$d4_ref/k" 2>/dev/null || :)
 	if [ -n "$d4_m_k" ] && git cat-file -e "${d4_m_k}^{commit}" 2>/dev/null &&
 		git merge-base --is-ancestor "$d4_m_k" HEAD 2>/dev/null; then
-		reject integrate-abort-landed "K（$(ig_short "$d4_m_k")）は取り込み先にもう載っています。やめるなら、ユーザが git revert します。片付けは $SELF integrate-done $ig_n で終わらせます。"
+		reject integrate-abort-landed "K（$(ig_short "$d4_m_k")）は取り込み先にもう載っています。やめるなら、ユーザが git revert します。片付けは $SELF_Q integrate-done $ig_n で終わらせます。"
 	fi
 	if [ ! -f "$ig_mark" ] && [ ! -e "$d4_tmp" ] && [ ! -L "$d4_tmp" ] &&
 		[ -z "$(git for-each-ref "$d4_ref/t" "$d4_ref/c" "$d4_ref/k" 2>/dev/null)" ]; then
@@ -1489,7 +1558,7 @@ ig_abort() {
 		reject integrate-abort-marker "取り込みの記録（${ig_mark}）を削除できませんでした。ユーザに伝えてください。"
 	printf 'ok  git integrate  %s の取り込みをやめた（作業ワークツリーとメインのチェックアウトは変えていない）\n' "$ig_n"
 	[ "$d4_a_left" = no ] || d4_tmp_note
-	printf '案内: 直接作業の記録は残した。作業を続けて、もう一度 %s integrate %s を打てる\n' "$SELF" "$ig_n"
+	printf '案内: 直接作業の記録は残した。作業を続けて、もう一度 %s integrate %s を打てる\n' "$SELF_Q" "$ig_n"
 	log_info 取り込みをやめた -- "name=$ig_n"
 	exit 0
 }
@@ -1505,7 +1574,7 @@ d4_stop() {
 	git show-ref --verify --quiet "refs/heads/$ig_n" && d4_kept="${d4_kept:+${d4_kept}、}ブランチ $ig_n"
 	[ -f "$ig_mark" ] && d4_kept="${d4_kept:+${d4_kept}、}取り込みの記録"
 	[ -z "$d4_kept" ] || printf '残したもの: %s\n' "$d4_kept"
-	printf '案内: 取り込み自体は成功している。原因を片付けてから、メインのチェックアウトで %s integrate-done %s を再実行すると、済んだところを飛ばして続きから進む\n' "$SELF" "$ig_n"
+	printf '案内: 取り込み自体は成功している。原因を片付けてから、メインのチェックアウトで %s integrate-done %s を再実行すると、済んだところを飛ばして続きから進む\n' "$SELF_Q" "$ig_n"
 	log_info 片付けを止めた -- "name=$ig_n" "reason=${2:-}"
 	exit 1
 }
@@ -1515,12 +1584,19 @@ d4_stop() {
 d4_finish() {
 	d4_ddir="${ig_gdir}-done"
 	mkdir -p "$d4_ddir" 2>/dev/null || :
-	find "$d4_ddir" -type f -mtime +7 -exec rm -f {} + 2>/dev/null || :
 	d4_ts=$(git rev-parse --verify --quiet "$d4_ref/t" 2>/dev/null || :)
 	d4_ss=$(git rev-parse --verify --quiet "$d4_ref/s" 2>/dev/null || :)
 	if ! ccnavi_record_write "$d4_done_file" version 4 k "${d4_m_k:--}" s "${d4_ss:--}" t "${d4_ts:--}" c_tree "$d4_m_ctree" \
 		head "$d4_m_head" base_branch "$d4_base" common_dir "$d4_common" created "$(date +%s)"; then
 		log_info 取り込みの写しを残せなかった -- "name=$ig_n"
+	fi
+	# ブランチの先頭が動いていたら、作業ワークツリー（②）を消す前に止める。消してからでは、積まれた
+	# コミットを作業ワークツリーから確かめられなくなる。
+	if git show-ref --verify --quiet "refs/heads/$ig_n"; then
+		d4_bpre=$(git rev-parse --verify "refs/heads/$ig_n" 2>/dev/null || :)
+		if [ "$d4_bpre" != "$d4_m_tip" ]; then
+			d4_stop "ブランチ $ig_n の先頭が取り込んだとき（$(ig_short "$d4_m_tip")）から動いている（今は $(ig_short "$d4_bpre")）。後から積んだコミットは取り込まれていないので、何も削除していません" branch-moved
+		fi
 	fi
 	# ② 作業ワークツリー
 	if [ -e "$ig_wt" ] || [ -L "$ig_wt" ]; then
@@ -1540,7 +1616,7 @@ d4_finish() {
 		if [ "$ig_cl_rc" -ne 0 ]; then
 			d4_stop "ワークツリー .claude/worktrees/$ig_n を削除できませんでした。ccnavi-clean.sh --worktree の出力: $ig_cl" worktree
 		fi
-		ig_did="${ig_did:+${ig_did}、}ワークツリー .claude/worktrees/$ig_n を削除しました。"
+		ig_did="${ig_did}ワークツリー .claude/worktrees/$ig_n を削除しました。"
 	fi
 	# ③ 一時ワークツリー
 	d4_ktree=""
@@ -1548,7 +1624,7 @@ d4_finish() {
 	if ! d4_tmp_remove "$d4_m_ctree" "${d4_ktree:-none}"; then
 		d4_stop "一時ワークツリー ${d4_tmp} を片付けられない（${d4_tmp_why}）。中身はユーザのものかもしれないので、黙って消さない" tmp
 	fi
-	ig_did="${ig_did:+${ig_did}、}一時ワークツリーを片付けました。"
+	ig_did="${ig_did}一時ワークツリーを片付けました。"
 	# ④ ブランチ（記録した先頭のままのときだけ消す）
 	if git show-ref --verify --quiet "refs/heads/$ig_n"; then
 		d4_bnow=$(git rev-parse --verify "refs/heads/$ig_n" 2>/dev/null || :)
@@ -1556,9 +1632,9 @@ d4_finish() {
 			d4_stop "ブランチ $ig_n の先頭が取り込んだとき（$(ig_short "$d4_m_tip")）から動いている（今は $(ig_short "$d4_bnow")）。後から積んだコミットは取り込まれていないので、ブランチを削除していません" branch-moved
 		fi
 		if ! d4_bd=$(git update-ref -d "refs/heads/$ig_n" "$d4_m_tip" 2>&1); then
-			d4_stop "ブランチ $ig_n を削除できませんでした（$(printf '%s' "$d4_bd" | head -n 1)）。ワークツリーの登録が残っているなら $SELF worktree prune で外してから再実行します" branch
+			d4_stop "ブランチ $ig_n を削除できませんでした（$(printf '%s' "$d4_bd" | head -n 1)）。ワークツリーの登録が残っているなら $SELF_Q worktree prune で外してから再実行します" branch
 		fi
-		ig_did="${ig_did:+${ig_did}、}ブランチ $ig_n を削除しました（先頭は $(ig_short "$d4_m_tip")）"
+		ig_did="${ig_did}ブランチ $ig_n を削除しました（先頭は $(ig_short "$d4_m_tip")）。"
 	fi
 	# ⑤ 専用のrefと直接作業の記録
 	d4_refs_drop t c k s pending
@@ -1572,8 +1648,8 @@ d4_finish() {
 	log_info 取り込みを片付けた -- "name=$ig_n"
 	# 8: pushはユーザが打つ。
 	if [ -n "$d4_m_k" ] && d4_origin_ahead "$d4_base"; then
-		printf '次: ユーザに %s で %s をリモートへ送るよう頼む（cd %s && git push origin %s）。ccnavi-git.sh push は取り込み先へ送らない\n' \
-			"端末" "$d4_base" "$(ccnavi_sh_quote "$ig_top")" "$d4_base"
+		printf '次: ユーザに端末で %s をリモートへ送るよう頼む（cd %s && git push origin %s）。ccnavi-git.sh push は取り込み先へ送らない\n' \
+			"$d4_base" "$(ccnavi_sh_quote "$ig_top")" "$d4_base"
 	fi
 	exit 0
 }
@@ -1593,7 +1669,7 @@ ig_done() {
 			printf 'ok  git integrate-done  %s は片付け済み（ワークツリーもブランチも取り込みの記録もありません）\n' "$ig_n"
 			exit 0
 		fi
-		reject integrate-done-no-marker "$ig_n の取り込みの記録がありません。先に $SELF integrate $ig_n で取り込み結果を用意し、中身を確かめてから実行してください（記録の無いブランチは、取り込んだことを確かめずには消しません）。"
+		reject integrate-done-no-marker "$ig_n の取り込みの記録がありません。先に $SELF_Q integrate $ig_n で取り込み結果を用意し、中身を確かめてから実行してください（記録の無いブランチは、取り込んだことを確かめずには消しません）。"
 		;;
 	4) ;;
 	*) reject integrate-marker "取り込みの記録の版（${d4_pv}）を知りません。ユーザに確かめてください。" ;;
@@ -1615,7 +1691,7 @@ ig_done() {
 	d4_m_k=$(ccnavi_record_get "$ig_mark" k)
 	d4_m_empty=$(ccnavi_record_get "$ig_mark" empty)
 	[ -n "$d4_m_head" ] && [ -n "$d4_m_tip" ] && [ -n "$d4_m_ctree" ] ||
-		reject integrate-bad-marker "取り込みの記録（${ig_mark}）の中身が足りません。自動では取り込みません。$SELF integrate --abort $ig_n で戻して、打ち直してください。"
+		reject integrate-bad-marker "取り込みの記録（${ig_mark}）の中身が足りません。自動では取り込みません。$SELF_Q integrate --abort $ig_n で戻して、打ち直してください。"
 	d4_cur=$(git rev-parse --verify HEAD)
 	if [ -n "$d4_m_k" ]; then
 		# 2: Kを作ったあとの再開。
@@ -1628,20 +1704,20 @@ ig_done() {
 			d4_finish
 		fi
 		if [ "$d4_cur" != "$d4_m_head" ]; then
-			reject integrate-done-moved "K を作ったあとに ${d4_base} の HEAD が動きました（記録 $(ig_short "$d4_m_head")、今 $(ig_short "$d4_cur")）。$SELF integrate --abort $ig_n で戻してから、$SELF integrate $ig_n を打ち直してください。"
+			reject integrate-done-moved "K を作ったあとに ${d4_base} の HEAD が動きました（記録 $(ig_short "$d4_m_head")、今 $(ig_short "$d4_cur")）。$SELF_Q integrate --abort $ig_n で戻してから、$SELF_Q integrate $ig_n を打ち直してください。"
 		fi
 	else
 		# 3: Kが無い場合の前提。
 		if [ "$d4_cur" != "$d4_m_head" ]; then
-			reject integrate-done-moved "確認したあとに ${d4_base} の HEAD が動きました（記録 $(ig_short "$d4_m_head")、今 $(ig_short "$d4_cur")）。$SELF integrate --abort $ig_n で戻してから、$SELF integrate $ig_n を打ち直してください。"
+			reject integrate-done-moved "確認したあとに ${d4_base} の HEAD が動きました（記録 $(ig_short "$d4_m_head")、今 $(ig_short "$d4_cur")）。$SELF_Q integrate --abort $ig_n で戻してから、$SELF_Q integrate $ig_n を打ち直してください。"
 		fi
 		d4_tip_now=$(git rev-parse --verify --quiet "refs/heads/$ig_n^{commit}" 2>/dev/null || :)
 		if [ "$d4_tip_now" != "$d4_m_tip" ]; then
-			reject integrate-done-branch-moved "作業ブランチ $ig_n の先頭が確認したとき（$(ig_short "$d4_m_tip")）から動いています（今 ${d4_tip_now:+$(ig_short "$d4_tip_now")}${d4_tip_now:-無し}）。$SELF integrate --abort $ig_n で戻してから、$SELF integrate $ig_n を打ち直してください。"
+			reject integrate-done-branch-moved "作業ブランチ $ig_n の先頭が確認したとき（$(ig_short "$d4_m_tip")）から動いています（今 ${d4_tip_now:+$(ig_short "$d4_tip_now")}${d4_tip_now:-無し}）。$SELF_Q integrate --abort $ig_n で戻してから、$SELF_Q integrate $ig_n を打ち直してください。"
 		fi
 		d4_wdirty=$(git -C "$ig_wt" status --porcelain 2>/dev/null | head -n 10)
 		if [ -d "$ig_wt" ] && [ -n "$d4_wdirty" ]; then
-			reject integrate-done-source-dirty "ワークツリー .claude/worktrees/$ig_n に未コミットの変更があります。コミットしてから $SELF integrate --abort $ig_n と integrate を打ち直してください。変更（先頭 10 件）: $(printf '%s' "$d4_wdirty" | tr '\n' ' ')"
+			reject integrate-done-source-dirty "ワークツリー .claude/worktrees/$ig_n に未コミットの変更があります。コミットしてから $SELF_Q integrate --abort $ig_n と integrate を打ち直してください。変更（先頭 10 件）: $(printf '%s' "$d4_wdirty" | tr '\n' ' ')"
 		fi
 		d4_ss0=$(git rev-parse --verify --quiet "$d4_ref/s^{commit}" 2>/dev/null || :)
 		if [ -d "$ig_wt" ] && ! d4_draft_check "${d4_ss0:-$d4_m_head}"; then
@@ -1651,47 +1727,59 @@ ig_done() {
 			d4_finish
 		fi
 		if [ ! -d "$d4_tmp" ]; then
-			reject integrate-done-no-tmp "一時ワークツリー（${d4_tmp}）がありません。$SELF integrate --abort $ig_n で戻してから、integrate を打ち直してください。"
+			reject integrate-done-no-tmp "一時ワークツリー（${d4_tmp}）がありません。$SELF_Q integrate --abort $ig_n で戻してから、integrate を打ち直してください。"
 		fi
 		if [ "$(git -C "$d4_tmp" write-tree 2>/dev/null || :)" != "$d4_m_ctree" ] || ! git -C "$d4_tmp" diff --quiet 2>/dev/null; then
-			reject integrate-done-tmp-differs "一時ワークツリーの中身が、確認した取り込み結果（C）と違います（検証で追跡ファイルを書き換えていないか）。$SELF integrate --abort $ig_n で戻してから、integrate を打ち直してください。"
+			reject integrate-done-tmp-differs "一時ワークツリーの中身が、確認した取り込み結果（C）と違います（検証で追跡ファイルを書き換えていないか）。$SELF_Q integrate --abort $ig_n で戻してから、integrate を打ち直してください。"
 		fi
-		d4_changed=$(git -c core.quotepath=off diff-tree -r --no-renames --name-only "HEAD^{tree}" "$d4_m_ctree" 2>/dev/null || :)
+		d4_changed=$(d4_names "HEAD^{tree}" "$d4_m_ctree" || :)
 		d4_guard_ask "$d4_changed"
 		if [ "$d4_guard" != no ] && [ ! -t 0 ]; then
-			reject integrate-done-terminal "自己防衛の対象（${d4_guard_paths:-対象を確かめられなかった}）を含む取り込みは、ユーザが端末で、エージェントのターンが終わってから打ちます（fast-forward で設定ファイルが書き換わると、ターンの終わりの照合が元に戻してしまうため）。ユーザに $SELF integrate-done $ig_n -m '<メッセージ>' を頼んでください。"
+			reject integrate-done-terminal "自己防衛の対象（${d4_guard_paths:-対象を確かめられなかった}）を含む取り込みは、ユーザが端末で、エージェントのターンが終わってから打ちます（fast-forward で設定ファイルが書き換わると、ターンの終わりの照合が元に戻してしまうため）。ユーザに $SELF_Q integrate-done $ig_n -m '<メッセージ>' を頼んでください。"
 		fi
-		[ "$ig_has_msg" = yes ] ||
-			reject integrate-done-no-message "取り込みをコミットするので、メッセージが要ります（$SELF integrate-done $ig_n -m <メッセージ>）。"
-		# 4: 一時ワークツリーでKをコミットする（フックを通す）。
-		d4_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-integrate) ||
-			reject integrate-tmp-file "一時ファイルが作れないので、コミットしていません。TMPDIR に書けるかを確かめてください。"
-		d4_crc=0
-		git -C "$d4_tmp" commit -q -m "$ig_msg" >"$d4_out" 2>&1 || d4_crc=$?
-		if [ "$d4_crc" -ne 0 ]; then
-			d4_why=$(ccnavi_git_refusal "$d4_out")
+		# K を commit したあと、記録する前に落ちた打ち直しは、一時ワークツリーの HEAD が既に K になっている。
+		# 親が head、木が c_tree ならそれを採用して記録する（commit し直さない）。
+		d4_newk=$(git -C "$d4_tmp" rev-parse --verify HEAD 2>/dev/null || :)
+		if [ -n "$d4_newk" ] && [ "$d4_newk" != "$d4_m_head" ] &&
+			[ "$(git rev-parse --verify "${d4_newk}^" 2>/dev/null || :)" = "$d4_m_head" ] &&
+			[ "$(git rev-parse --verify "${d4_newk}^{tree}" 2>/dev/null || :)" = "$d4_m_ctree" ]; then
+			d4_reuse=yes
+		else
+			d4_reuse=no
+		fi
+		if [ "$d4_reuse" = no ]; then
+			[ "$ig_has_msg" = yes ] ||
+				reject integrate-done-no-message "取り込みをコミットするので、メッセージが要ります（$SELF_Q integrate-done $ig_n -m <メッセージ>）。"
+			# 4: 一時ワークツリーでKをコミットする（フックを通す）。
+			d4_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-integrate) ||
+				reject integrate-tmp-file "一時ファイルが作れないので、コミットしていません。TMPDIR に書けるかを確かめてください。"
+			d4_crc=0
+			git -C "$d4_tmp" commit -q -m "$ig_msg" >"$d4_out" 2>&1 || d4_crc=$?
+			if [ "$d4_crc" -ne 0 ]; then
+				d4_why=$(ccnavi_git_refusal "$d4_out")
+				rm -f "$d4_out"
+				printf 'fail  git integrate-done  %s をコミットできなかった（%s）。メインのチェックアウトは変えていない\n' "$ig_n" "$d4_why"
+				printf '案内: 原因を直してから %s integrate-done %s -m '"'"'<メッセージ>'"'"' を再実行します。\n' "$SELF_Q" "$ig_n"
+				log_error コミットできなかった -- "name=$ig_n" "exit=$d4_crc"
+				exit 1
+			fi
 			rm -f "$d4_out"
-			printf 'fail  git integrate-done  %s をコミットできなかった（%s）。メインのチェックアウトは変えていない\n' "$ig_n" "$d4_why"
-			printf '案内: 原因を直してから %s integrate-done %s -m '"'"'<メッセージ>'"'"' を再実行します。\n' "$SELF" "$ig_n"
-			log_error コミットできなかった -- "name=$ig_n" "exit=$d4_crc"
-			exit 1
-		fi
-		rm -f "$d4_out"
-		d4_newk=$(git -C "$d4_tmp" rev-parse --verify HEAD)
-		if [ "$(git rev-parse --verify "${d4_newk}^" 2>/dev/null || :)" != "$d4_m_head" ] ||
-			[ "$(git rev-parse --verify "${d4_newk}^{tree}" 2>/dev/null || :)" != "$d4_m_ctree" ]; then
-			# フックが中身を変えた。Kは記録せず、参照の無いオブジェクトとして残す。一時ワークツリーをCに戻す。
-			git -C "$d4_tmp" reset -q --hard "$d4_m_head" >/dev/null 2>&1 || :
-			git -C "$d4_tmp" read-tree --reset -u "$d4_m_ctree" >/dev/null 2>&1 || :
-			printf 'fail  git integrate-done  %s のコミットのフックが、確認した取り込み結果と違う中身にした。記録せずに止めた（メインのチェックアウトは変えていない）\n' "$ig_n"
-			printf '案内: フックが何を変えたかをユーザに確かめてもらう。%s integrate --abort %s で戻せる。\n' "$SELF" "$ig_n"
-			log_error フックが中身を変えた -- "name=$ig_n"
-			exit 1
+			d4_newk=$(git -C "$d4_tmp" rev-parse --verify HEAD)
+			if [ "$(git rev-parse --verify "${d4_newk}^" 2>/dev/null || :)" != "$d4_m_head" ] ||
+				[ "$(git rev-parse --verify "${d4_newk}^{tree}" 2>/dev/null || :)" != "$d4_m_ctree" ]; then
+				# フックが中身を変えた。Kは記録せず、参照の無いオブジェクトとして残す。一時ワークツリーをCに戻す。
+				git -C "$d4_tmp" reset -q --hard "$d4_m_head" >/dev/null 2>&1 || :
+				git -C "$d4_tmp" read-tree --reset -u "$d4_m_ctree" >/dev/null 2>&1 || :
+				printf 'fail  git integrate-done  %s のコミットのフックが、確認した取り込み結果と違う中身にした。記録せずに止めた（メインのチェックアウトは変えていない）\n' "$ig_n"
+				printf '案内: フックが何を変えたかをユーザに確かめてもらう。%s integrate --abort %s で戻せる。\n' "$SELF_Q" "$ig_n"
+				log_error フックが中身を変えた -- "name=$ig_n"
+				exit 1
+			fi
 		fi
 		git update-ref "$d4_ref/k" "$d4_newk" 2>/dev/null || :
 		ccnavi_record_write "$ig_mark" version 4 head "$d4_m_head" tip "$d4_m_tip" c_tree "$d4_m_ctree" tmp "$d4_tmp" \
 			empty no k "$d4_newk" created "$(date +%s)" ||
-			reject integrate-marker "K（${d4_newk}）の記録（${ig_mark}）を書けません。ユーザに伝えてください。打ち直せば K を作り直します。"
+			reject integrate-marker "K（${d4_newk}）の記録（${ig_mark}）を書けません。ユーザに伝えてください。打ち直せば、一時ワークツリーの K を採用して記録し直します。"
 		d4_m_k="$d4_newk"
 	fi
 	# 5: メインのチェックアウトでfast-forward。
@@ -1703,7 +1791,7 @@ ig_done() {
 		d4_why=$(ccnavi_git_refusal "$d4_ffout")
 		rm -f "$d4_ffout"
 		printf 'fail  git integrate-done  %s を取り込めなかった（%s）。メインのチェックアウトは変えていない\n' "$ig_n" "$d4_why"
-		printf '案内: 原因を直してから、同じコマンド（%s integrate-done %s）を再実行すると、K（%s）から再開する。\n' "$SELF" "$ig_n" "$(ig_short "$d4_m_k")"
+		printf '案内: 原因を直してから、同じコマンド（%s integrate-done %s）を再実行すると、K（%s）から再開する。\n' "$SELF_Q" "$ig_n" "$(ig_short "$d4_m_k")"
 		log_error 取り込めなかった -- "name=$ig_n" "exit=$d4_ffrc"
 		exit 1
 	fi
@@ -1712,7 +1800,7 @@ ig_done() {
 	ig_did="取り込みました（K=$(ig_short "$d4_m_k")）。"
 	printf 'ok  git integrate-done  %s を %s に取り込みました（K=%s）\n' "$ig_n" "$d4_base" "$(ig_short "$d4_m_k")"
 	printf '変わったファイル:\n'
-	git -c core.quotepath=off diff-tree -r --no-renames --name-only "${d4_m_k}^" "$d4_m_k" 2>/dev/null | head -n "$MAX_LINES" | sed 's/^/  /'
+	d4_names "${d4_m_k}^" "$d4_m_k" | head -n "$MAX_LINES" | sed 's/^/  /'
 	d4_finish
 }
 

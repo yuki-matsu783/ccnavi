@@ -47,6 +47,11 @@
 
 set -eu
 
+# メインのチェックアウトの状態を読むだけの git が、index を書き直さない（確認している間、ルートの index に
+# 書かない）。ユーザの git add / commit と index.lock を取り合わない。
+GIT_OPTIONAL_LOCKS=0
+export GIT_OPTIONAL_LOCKS
+
 EXIT_CONFIRM=3
 
 # fail <識別子> <文面> [終了コード]。文面は標準エラーへ出す契約。識別子は診断ログにだけ残す。
@@ -266,6 +271,17 @@ yes)
 	;;
 esac
 
+# 同じ名前の終わっていない取り込み（marker）が残っていれば切らない。前の作業の K や一時ワークツリーを
+# 新しい作業と取り違え、新しい記録と ref を片付けてしまうため。
+mk_dir=$(git -C "$main_tree" rev-parse --git-path ccnavi-integrate 2>/dev/null || :)
+case "$mk_dir" in
+/* | [A-Za-z]:*) ;;
+*) mk_dir="$main_tree/$mk_dir" ;;
+esac
+if [ -n "$mk_dir" ] && [ -f "$mk_dir/$name/marker" ]; then
+	fail marker-left "${name} の取り込みの記録（${mk_dir}/${name}/marker）が残っています。前の取り込みが終わっていません。ccnavi-git.sh integrate-done ${name} で終わらせるか、integrate --abort ${name} でやめてから、切り直してください。"
+fi
+
 if [ -n "$base_arg" ] && [ "$base_arg" != "$target" ]; then
 	fail base-mismatch "--base ${base_arg} は、今の取り込み先（${target}。メインのチェックアウト ${main_tree}）と違います。取り込み先が切り替わっていれば、ユーザに確かめて、報告からやり直してください（引数なしで打ち直す）。"
 fi
@@ -295,6 +311,18 @@ if [ -n "$adopt" ]; then
 		fail adopt-branch "${dest} は、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${ad_have:-ワークツリーの登録が無い}）。"
 	ad_tip=$(git rev-parse "refs/heads/$name" 2>/dev/null || :)
 	[ -n "$ad_tip" ] || fail adopt-no-branch "ブランチ ${name} を読めません。"
+	# 取り込み先の判定（上の base-bound）とは別に、名前のほうもチケットに結び付かないことを確かめる。
+	# チケットに結び付くワークツリーは、MR を経ずに取り込み先へ載せる直接作業に変えない。
+	ad_nb=$(ccnavi_ask "$root" tree bound "$dest" "$name") || ad_nb=""
+	[ "$(printf '%s\n' "$ad_nb" | head -n 1)" = "tree 1" ] ||
+		fail adopt-ticket "${name} がチケットに結び付くかを、実行ファイルに確かめられません。引き取りません。"
+	case "$(printf '%s\n' "$ad_nb" | sed -n 's/^bound //p' | head -n 1)" in
+	no) ;;
+	yes)
+		fail adopt-ticket "${name} はチケットに結び付くワークツリーです（$(printf '%s\n' "$ad_nb" | sed -n 's/^why //p' | head -n 1)）。チケットの作業は直接作業に引き取らず、マージリクエストで出します。"
+		;;
+	*) fail adopt-ticket "${name} がチケットに結び付くかを決められないので、引き取りません。" ;;
+	esac
 	ad_bases=$(git merge-base --all "$name" "$target" 2>/dev/null || :)
 	ad_count=$(printf '%s\n' "$ad_bases" | grep -c . || :)
 	if [ "$ad_count" -eq 0 ]; then
@@ -315,9 +343,9 @@ if [ -n "$adopt" ]; then
 		printf '  ワークツリー %s（ブランチ %s。先頭 %s）\n' "$dest" "$name" "$(git rev-parse --short "$ad_tip")"
 		printf '  推定した起点 S: %s（%s と %s の merge-base）\n' "$ad_s_short" "$name" "$target"
 		printf '取り込むコミットの範囲（%s..%s）:\n' "$ad_s_short" "$name"
-		git log --oneline "$ad_s..$ad_tip" 2>/dev/null | sed 's/^/  /'
+		git log --oneline "$ad_s..$ad_tip" 2>/dev/null | head -n 50 | sed 's/^/  /'
 		printf '取り込みの差分:\n'
-		git diff --stat "$ad_s" "$ad_tip" 2>/dev/null | sed 's/^/  /'
+		git diff --stat "$ad_s" "$ad_tip" 2>/dev/null | head -n 50 | sed 's/^/  /'
 		printf '了承の文面: この範囲全体をエージェントの成果として扱う。範囲に他人のコミットや、取り込み先に入れたくない変更が混ざっていないかを、ユーザに確かめる\n'
 		ad_cmd="sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base $(ccnavi_sh_quote "$target") --accept $ad_code"
 		printf '次: 上をユーザに伝えて了承を得てから、%s\n' "$ad_cmd"
@@ -496,7 +524,7 @@ if [ "$c7" = yes ]; then
 	cand=$(make_candidate) ||
 		fail snapshot-failed "書きかけのスナップショットを作れませんでした（${main_tree}）。ユーザに確かめてください。"
 fi
-code_input="repo=$common_dir|name=$name|target=$target|head=$head_sha|origin=${origin_sha:-$remote_state}|default=$integ|cwd=${top_branch:--}|cand=${cand:--}"
+code_input="repo=$common_dir|name=$name|target=$target|head=$head_sha|origin=${origin_sha:-$remote_state}|rs=$remote_state|default=$integ|cwd=${top_branch:--}|cand=${cand:--}"
 code=$(printf '%s' "$code_input" | git hash-object --stdin | cut -c1-8)
 need_accept=no
 { [ "$c5" = yes ] || [ "$c6" = yes ] || [ "$c7" = yes ]; } && need_accept=yes
