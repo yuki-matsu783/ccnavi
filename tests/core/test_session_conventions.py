@@ -242,11 +242,17 @@ class SessionConventionsTest(unittest.TestCase):
 
         self.assertLess(len(body), 3000, body)
 
-    def test_dry_runの注記を足しても短い(self):
+    def test_索引の案内とdry_runの注記を足しても短い(self):
+        # 索引の案内が出る回（docs の行が載る）と dry-run の注記が重なる、いちばん長い回。
         os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
-        text = block(self.start("--mode", "dry-run"))
-        body = text.replace(self.root, "<root>")
+        subprocess.run(["git", "init", "-q", self.root], check=True)
+        with open(os.path.join(self.root, ".gitignore"), "w", encoding="utf-8") as f:
+            f.write("**/ccnavi-index.jsonl\n")
+        with open(os.path.join(self.root, "README.md"), "w", encoding="utf-8") as f:
+            f.write("---\ntype: guide\n---\n# x\n")
+        body = block(self.start("--mode", "dry-run")).replace(self.root, "<root>")
 
+        self.assertIn("--docs で", body)
         self.assertLess(len(body), 3000, body)
 
 

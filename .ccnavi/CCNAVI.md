@@ -39,20 +39,17 @@
 
 | 読むとき | 開くファイル |
 |---|---|
-| ワークツリーを切る、他セッションの影響を受けた、親の正本・親のワークツリーが無い・`mr:` を確かめる | `.ccnavi/docs/worktree.md` |
-| issue・MR を指定して作業を頼まれた | `.ccnavi/docs/worktree-start.md` |
-| `<統合先>` に取り込む、子の finish で親へ合流する・衝突を解く、マージリクエストに出す | `.ccnavi/docs/worktree-merge.md` |
-| ワークツリーや子のブランチを片付ける、親を閉じた後 | `.ccnavi/docs/worktree-cleanup.md` |
-| 下書きや使い捨てのファイルを置く | `.ccnavi/docs/scratchpad.md` |
-| `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `.ccnavi/docs/projects.md` |
+| ワークツリーを切る、他セッションの影響を受けた、親の正本・ワークツリーが無い、`mr:` を確かめる、issue・MR を指定して頼まれた | `.ccnavi/docs/worktree.md`、`worktree-start.md` |
+| `<統合先>` に取り込む、子の finish で親へ合流する・衝突を解く、MR に出す、ワークツリーや子のブランチを片付ける | `.ccnavi/docs/worktree-merge.md`、`worktree-cleanup.md` |
+| 下書き・使い捨てのファイルを置く | `.ccnavi/docs/scratchpad.md` |
+| `projects/` 配下を直す、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `.ccnavi/docs/projects.md` |
 | 提案を書く、承認・レビュー済みをユーザに頼む、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `.ccnavi/docs/decisions.md` |
-| 親の提案を始める、完了した親の計画とフローを使い回す、親が閉じるときにテンプレートの案内が出た | `.ccnavi/docs/templates.md` |
+| 親の提案を始める、完了した親の計画とフローを使い回す、親を閉じるときにテンプレートの案内が出た | `.ccnavi/docs/templates.md` |
 | 用語（ワークスペースルート・統合先ブランチなど）を引く | `.ccnavi/docs/terms.md` |
-| `.ccnavi/CCNAVI.md` の条件や差し込みを書く | `.ccnavi/docs/ccnavi-md.md` |
+| `.ccnavi/CCNAVI.md` の条件・差し込みを書く | `.ccnavi/docs/ccnavi-md.md` |
 | md に frontmatter を付ける・直す、索引で引く | `.ccnavi/docs/frontmatter.md` |
 | フィードバックが届いた、`.claude/skills/` を直す | `.ccnavi/docs/skill-review.md` |
-| スキルの振り返りで `docs/wiki/` に知識を溜める・読む | `.ccnavi/docs/skill-wiki.md` |
-| 工程スキル（process-*）の reference を引く・足す、スキルを新しく作る | `.ccnavi/docs/skill-processes.md` |
+| スキルの振り返りで知識を溜める・読む、工程スキル（process-*）の reference を引く・足す、スキルを新しく作る | `.ccnavi/docs/skill-wiki.md`、`skill-processes.md` |
 | ルール・フェーズ・リスク・計画テンプレート・工程スキルが育つ流れを確かめる | `.ccnavi/docs/grow.md` |
 
 <!-- ccnavi:if tickets -->
