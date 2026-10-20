@@ -73,7 +73,7 @@ expect:
       min_count: 1               # 省略時は 1
   decisions_none:                # 出ていてはいけない判定（同じ欄で書く）
     - decision: deny
-      rules_include: [guard-approved-tickets]
+      rules_include: [builtin:ticket-approved]
   files_unchanged:               # 変わっていてはいけないもの
     - README.md
   state:                         # 全 step のあとに打つコマンドと、出力の期待
