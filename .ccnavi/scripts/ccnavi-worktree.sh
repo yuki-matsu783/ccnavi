@@ -1,52 +1,52 @@
 #!/bin/sh
-# ccnavi-worktree 作業用のワークツリーを統合先から切る。fetch・遅れの確認・起点の選択・worktree add を 1 本にする。
+# ccnavi-worktree 直接作業のワークツリーを、取り込み先のブランチから切る。
 #
-# 直接作業（チケットを使わない作業）のワークツリー用で、名前と同じブランチを新しく切る。親子のチケットの
-# 親のワークツリーには使わない。親は識別子の名前のブランチを作らず、親のブランチ（MR の元ブランチ）を直接
-# チェックアウトする（ccnavi-start.sh --mr <番号> / --issue <番号> が作る）。子のワークツリーは
-# ccnavi-ticket.sh start が親のブランチから作る。
+# 直接作業（チケットを使わない作業）用で、名前と同じブランチを新しく切る。親子のチケットの親のワークツリーには
+# 使わない（親は ccnavi-start.sh --mr <番号> / --issue <番号> で、親のブランチを直接チェックアウトして作る）。
 #
-#   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--from-origin] [--dry-run]
+#   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept <確認コード>]
+#                                        [--copy-wip | --no-wip] [--side-by-side] [--dry-run]
 #
-# 手で打つと、次の順になる（.ccnavi/docs/worktree.md「ワークツリーを切る」）。
-#   1. ccnavi-git.sh fetch origin <統合先>
-#   2. ccnavi-git.sh log --oneline <統合先>..origin/<統合先> で遅れを確かめる
-#   3. 遅れていれば origin/<統合先> から --no-track で、遅れていなければ <統合先> から切る
-#   4. ccnavi-git.sh worktree add .claude/worktrees/<名前> -b <名前> <起点>（<統合先> を省かない。行き先は cwd に
-#      合わせて書く）
-# このスクリプトがその順に打つ。行き先は <ワークスペースルート>/.claude/worktrees/<名前>、ブランチ名は <名前> で、
-# 名前とブランチ名を揃える決まりもここで守る。git は ccnavi-git.sh を通すので、拒否や警告の判定は
-# ccnavi-git.sh のままで、ここでは判定を増やさない。手元の統合先は進めない（進めるのはセッション開始時の
-# ccnavi-fetch.sh だけ）。ワークツリーが既にあれば、何もせずパスを出す（冪等）。
+# 取り込み先は、切った時点でメインのチェックアウト（`git worktree list` の先頭）が開いているブランチ。
+# 起点 S は、書きかけを写すとき（--copy-wip）は確認した時点の書きかけを含むスナップショット、それ以外は
+# 取り込み先の HEAD。ルートの index と作業ツリーには書かない（スナップショットは一時的な index で作る）。
+# 手元の取り込み先は進めない（進めるのはセッション開始時の ccnavi-fetch.sh だけ）。origin からも切らない。
 #
-# fetch は origin に通信する。届かないとき（オフライン・認証・Claude remote のコンテナの制限）は、
-# ワークツリーを切らずに終了コード 4 で止まり、原因の見方と、次に取れる手を標準出力に出す。
-#   - 原因を直せるなら直して、同じコマンドを打ち直す
-#   - 直せない・オフラインで続けるなら --offline を付けて打ち直す。fetch は試すが、失敗しても手元の統合先から切る。
-#     origin が古いかもしれないので、切ったことをユーザに伝える（取り込むときに遅れが分かる）
+# 次のどれかに当たるとき、ワークツリーを切らずに終了コード 3 で止まり、状態・勧め・リスク・選択肢・確認コードを
+# 出す。報告をユーザに伝え、了承を得てから --base / --accept などを付けて打ち直す。
+#   C4 cwd のブランチと取り込み先が違う（--base <取り込み先> が要る）
+#   C5 取り込み先が統合先（origin/HEAD）でない
+#   C6 origin/<取り込み先> より遅れている・進んでいる・分岐している・origin に無い・リモート未確認
+#   C7 メインのチェックアウトに書きかけ（追跡済みの変更・新規ファイル）がある（--copy-wip か --no-wip が要る）
+#   C5〜C7 のどれかに当たるときは --accept <確認コード> も要る。確認コードは今の状態から決まるので、
+#   状態が動けば報告からやり直しになる。
+# 当たらないときは確認なしで S = 取り込み先の HEAD から切る。--side-by-side だけは ask ルールがユーザの確認を取る。
 #
-# 手元の統合先が origin/<統合先> と分岐している（先行も遅れもある）ときは、切らずに終了コード 1 で止まり、
-# 先に手元の統合先を揃えるよう案内する（そのまま切ると、手元にだけある先行コミットを知らないブランチになり、
-# 統合で詰まる）。承知のうえなら --from-origin を付けると、警告つきで origin/<統合先> から切る。
-# fetch が失敗して --offline で続けるときは、origin/<統合先> が古いかもしれないので、止めずに警告だけにする。
+# 先に断るもの: メインのチェックアウトが detached HEAD（C1）、取り込み先がチケットに結び付く・結び付くかを
+# 確かめられない（C2。実行ファイルの `tree base-bound`）、git が 2.40 未満（C3）。
+#
+# 手で打つ git ではなく ccnavi-git.sh を通す。fetch は origin <取り込み先> だけ。
+# ワークツリーが既にあれば、何もせずパスを出す（冪等）。
 #
 # origin か手元に同じ識別子になるブランチ（同じ名前、`/` を `-` に置き換えると同じになる名前、英字の大文字小文字だけ
 # 違う名前）があるときは、切らずに終了コード 1 で止まり、ccnavi-start.sh へ案内する。既にあるブランチ（MR の元ブランチ
 # など）は、MR を探して採用する確認をしてから出す必要があり、ここで新しく切ると、同じ識別子のブランチが 2 本になる
-# （ワークツリーの置き場が重なる）。origin のブランチ一覧（ls-remote）を取れないときは、確かめずに切らず、終了コード 4 で
-# 止まる（--offline なら、手元に残る origin の追跡ブランチで確かめて「リモート未確認」と言って続ける）。
+# （ワークツリーの置き場が重なる）。
 #
 # 名前の字の種類・NFC・長さ（64 文字まで）は実行ファイルに聞く（`worktree id`）。sh はマルチバイトの字を見分けない。
 # 答えが無ければ「確かめられない」と止まる。
 #
-# --dry-run は何も作らず、切る予定の起点とパスだけを出す（fetch もしない）。
+# 記録は git の共通ディレクトリの ccnavi-direct/<名前>（version 4）に書く。S は refs/ccnavi/direct/<名前>/s に置く。
+# 書きかけを写す候補は確認が要るときに refs/ccnavi/direct/<名前>/pending に置き、切ったら消す。
 #
-# 終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り /
-#             4 origin に届かず、案内の手が要る（案内を標準出力に出した）
+# --dry-run は何も作らず、調べた結果と予定だけを出す（fetch もしない）。
+# --offline / --from-origin は廃止（終了コード 2）。--accept で代わりができる。--adopt は未対応（終了コード 2）。
+#
+# 終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り / 3 確認が要る
 
 set -eu
 
-EXIT_NET=4
+EXIT_CONFIRM=3
 
 # fail <識別子> <文面> [終了コード]。文面は標準エラーへ出す契約。識別子は診断ログにだけ残す。
 fail() {
@@ -60,37 +60,72 @@ fail() {
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--from-origin] [--dry-run]
+sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept <確認コード>] [--copy-wip | --no-wip] [--side-by-side] [--dry-run]
 
-  <名前>      ワークツリーの名前。ブランチ名も同じ名前で切る（/ を含められない）。行き先は
-              <ワークスペースルート>/.claude/worktrees/<名前>
+  <名前>          ワークツリーの名前。ブランチ名も同じ名前で切る（/ を含められない）。行き先は
+                  <ワークスペースルート>/.claude/worktrees/<名前>
+  --base <ブランチ>
+                  確認した取り込み先（メインのチェックアウトが開いているブランチ）
+  --accept <確認コード>
+                  報告したずれ（取り込み先・origin との関係・書きかけ）を、ユーザが了承して進める
+  --copy-wip / --no-wip
+                  書きかけを写して切るか、写さず HEAD から切るか（書きかけがあるときはどちらかが要る）
+  --side-by-side  このワークツリーが残っている間、メインのチェックアウトで見つかった変更を自動で戻さず報告にする
+                  （ccnavi の設定ファイルは戻す）
+  --dry-run       何も作らず、調べた結果と予定だけ出す
 
 直接作業（チケットを使わない作業）用。親子のチケットの親のワークツリーには使わない
 （親は ccnavi-start.sh --mr <番号> / --issue <番号> で、親のブランチを直接チェックアウトして作る）。
-  --offline   fetch が失敗しても、手元の統合先から切って続ける（origin が古いかもしれない）
-  --from-origin
-              手元の統合先が origin と分岐していても、警告のうえ origin/<統合先> から切る
-              （切ったブランチは手元にだけある先行コミットを知らないので、統合で詰まりうる）
-  --dry-run   何も作らず、切る予定の起点とパスだけ出す
-
-fetch・遅れの確認・起点の選択・worktree add を順に行う。遅れていれば origin/<統合先> から --no-track で切る。
-ワークツリーが既にあれば、パスを出すだけ（冪等）。origin に届かないときは終了コード 4 で止まり、次の手を出す。
-終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り / 4 origin に届かず案内の手が必要です
+ずれが無ければ確認なしで切る。ずれがあれば切らずに状態・勧め・リスク・確認コードを出して終了コード 3 で止まる。
+ワークツリーが既にあれば、パスを出すだけ（冪等）。
+終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り / 3 確認が要る
 USAGE
 }
 
 name=""
-offline=""
-from_origin=""
+base_arg=""
+accept=""
+wip_mode=""
+side=""
 dry=""
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-	--offline)
-		offline=1
+	--offline | --from-origin)
+		fail retired-arg "$1 は廃止しました。fetch が届かない・手元が origin とずれているときは、引数なしで打つと状態と確認コードを報告するので、ユーザの了承を得てから --accept <確認コード> を付けて打ち直してください。" 2
+		;;
+	--adopt)
+		fail adopt-unsupported "--adopt（記録の無い既存のワークツリーの引き取り）はまだ使えません。" 2
+		;;
+	--base)
+		[ "$#" -ge 2 ] || fail base-missing "--base にブランチ名がありません。" 2
+		base_arg="$2"
+		shift 2
+		;;
+	--base=*)
+		base_arg="${1#--base=}"
 		shift
 		;;
-	--from-origin)
-		from_origin=1
+	--accept)
+		[ "$#" -ge 2 ] || fail accept-missing "--accept に確認コードがありません。" 2
+		accept="$2"
+		shift 2
+		;;
+	--accept=*)
+		accept="${1#--accept=}"
+		shift
+		;;
+	--copy-wip)
+		[ "$wip_mode" != no ] || fail wip-both "--copy-wip と --no-wip は同時に指定できません。" 2
+		wip_mode=copy
+		shift
+		;;
+	--no-wip)
+		[ "$wip_mode" != copy ] || fail wip-both "--copy-wip と --no-wip は同時に指定できません。" 2
+		wip_mode=no
+		shift
+		;;
+	--side-by-side)
+		side=1
 		shift
 		;;
 	--dry-run)
@@ -136,7 +171,7 @@ dest="$root/.claude/worktrees/$name"
 integ=$(ccnavi_integration "$(ccnavi_phys "$top")") || integ=""
 [ -n "$integ" ] ||
 	fail no-integration "$(ccnavi_integration_hint "$top")"
-log_info 始めた -- "name=$name" "integration=$integ" "offline=${offline:-no}" "dry=${dry:-no}"
+log_info 始めた -- "name=$name" "integration=$integ" "dry=${dry:-no}"
 
 # ccnavi-git.sh 経由の git。成功は何も出さず、失敗は出力を標準エラーへ出して 1 を返す。
 cgit() {
@@ -173,8 +208,9 @@ fi
 # 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。
 # <一覧のファイル> <どこ（手元・origin）>
 heads_list="$root/logs/state/worktree-heads-$$"
+cand_index="$root/logs/state/worktree-index-$$"
 mkdir -p "$root/logs/state" 2>/dev/null || :
-trap 'rm -f "$heads_list"' EXIT
+trap 'rm -f "$heads_list" "$heads_list.names" "$cand_index"' EXIT
 same_id_guard() {
 	sg_other=$(ccnavi_id_clash "$name" "$1") || return 0
 	log_info 同じ識別子のブランチ -- "name=$name" "where=$2"
@@ -190,157 +226,326 @@ same_id_guard() {
 } >"$heads_list"
 same_id_guard "$heads_list" 手元
 
-# ---- 起点を決める。遅れていれば origin/<統合先>、遅れていなければ <統合先>。
-# 遅れの数は fetch の後で数える。dry-run は fetch しないので、手元の ref のままの数で予定を出す。
-choose_base() {
-	base="$integ"
-	track=""
-	behind=0
-	ahead=0
-	if git show-ref --verify --quiet "refs/remotes/origin/$integ" &&
-		git show-ref --verify --quiet "refs/heads/$integ"; then
-		behind=$(git rev-list --count "$integ..origin/$integ" 2>/dev/null || echo 0)
-		ahead=$(git rev-list --count "origin/$integ..$integ" 2>/dev/null || echo 0)
-		if [ "$behind" -ne 0 ]; then
-			base="origin/$integ"
-			track="--no-track"
-		fi
-	elif git show-ref --verify --quiet "refs/remotes/origin/$integ"; then
-		base="origin/$integ"
-		track="--no-track"
-	elif ! git show-ref --verify --quiet "refs/heads/$integ"; then
-		fail no-base "統合先 ${integ} が手元にも origin にもありません。統合先の名前を確かめてください。"
-	fi
+# ---- C1〜C3。先に断るもの。
+# 取り込み先は、メインのチェックアウト（git worktree list の先頭）が開いているブランチ。
+main_tree=$(git -C "$top" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p' | tr -d '\r')
+[ -n "$main_tree" ] ||
+	fail no-main-tree "このリポジトリのメインのチェックアウトを git worktree list から読めません。"
+main_tree=$(ccnavi_phys "$main_tree")
+target=$(git -C "$main_tree" symbolic-ref --quiet --short HEAD 2>/dev/null || :)
+[ -n "$target" ] ||
+	fail detached "メインのチェックアウト（${main_tree}）がブランチを開いていません（detached HEAD）。取り込み先を決められないので切りません。ユーザにブランチへ戻してもらってから再実行してください。"
+head_sha=$(git -C "$main_tree" rev-parse HEAD 2>/dev/null || :)
+[ -n "$head_sha" ] ||
+	fail no-head "メインのチェックアウト（${main_tree}）の HEAD を読めません。"
+
+git_ver=$(git version 2>/dev/null | sed -n 's/^git version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')
+git_major=${git_ver% *}
+git_minor=${git_ver#* }
+if [ -z "$git_ver" ] || { [ "$git_major" -lt 2 ] || { [ "$git_major" -eq 2 ] && [ "$git_minor" -lt 40 ]; }; }; then
+	fail git-old "git が 2.40 未満（$(git version 2>/dev/null)）です。取り込みに使う merge-tree --merge-base が無いので切りません。git を 2.40 以上に更新してから再実行してください。"
+fi
+
+bound_out=$(ccnavi_ask "$root" tree base-bound "$main_tree" "$target") || bound_out=""
+if [ "$(printf '%s\n' "$bound_out" | head -n 1)" != "tree 1" ]; then
+	fail base-bound-unknown "取り込み先 ${target} がチケットに結び付くかを、実行ファイルに確かめられません。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
+fi
+case "$(printf '%s\n' "$bound_out" | sed -n 's/^bound //p' | head -n 1)" in
+no) ;;
+yes)
+	fail base-bound "取り込み先 ${target} はチケットに結び付く（$(printf '%s\n' "$bound_out" | sed -n 's/^why //p' | head -n 1)）ので、直接作業では切りません。チケットの作業は ccnavi-ticket.sh で進めます（.ccnavi/docs/worktree.md）。"
+	;;
+*)
+	fail base-bound-unknown "取り込み先 ${target} がチケットに結び付くかを決められません（置き場の読み取りに失敗）。ユーザに確かめてください。"
+	;;
+esac
+
+if [ -n "$base_arg" ] && [ "$base_arg" != "$target" ]; then
+	fail base-mismatch "--base ${base_arg} は、今の取り込み先（${target}。メインのチェックアウト ${main_tree}）と違います。取り込み先が切り替わっていれば、ユーザに確かめて、報告からやり直してください（引数なしで打ち直す）。"
+fi
+
+# ---- 状態を調べる（C4〜C8）。
+top_branch=$(git -C "$top" symbolic-ref --quiet --short HEAD 2>/dev/null || :)
+c4=no
+[ "$top_branch" = "$target" ] || c4=yes
+c5=no
+[ "$target" = "$integ" ] || c5=yes
+
+status_out=$(git -C "$main_tree" status --porcelain --untracked-files=all 2>/dev/null || :)
+wip_changed=$(printf '%s\n' "$status_out" | grep -c -E '^([^?! ]| [^?! ])' || :)
+wip_new=$(printf '%s\n' "$status_out" | grep -c '^??' || :)
+wip_staged=$(git -C "$main_tree" diff --cached --name-only 2>/dev/null | grep -c . || :)
+c7=no
+[ "$wip_changed" -eq 0 ] && [ "$wip_new" -eq 0 ] || c7=yes
+
+# 書きかけを含むスナップショット。ユーザの index と作業ツリーには触れない（一時的な index で作る）。
+# 日付と名前を固定するので、木と親が同じなら同じ sha になる（確認コードに入れて、確認したあとの編集を検出する）。
+make_candidate() {
+	rm -f "$cand_index"
+	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" read-tree "$head_sha" 2>/dev/null || return 1
+	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" add -A >/dev/null 2>&1 || return 1
+	mc_tree=$(GIT_INDEX_FILE="$cand_index" git -C "$main_tree" write-tree 2>/dev/null) || return 1
+	GIT_AUTHOR_NAME=ccnavi GIT_AUTHOR_EMAIL=ccnavi@localhost GIT_AUTHOR_DATE="1970-01-01T00:00:00+0000" \
+		GIT_COMMITTER_NAME=ccnavi GIT_COMMITTER_EMAIL=ccnavi@localhost GIT_COMMITTER_DATE="1970-01-01T00:00:00+0000" \
+		git -C "$main_tree" -c commit.gpgsign=false commit-tree "$mc_tree" -p "$head_sha" \
+		-m "ccnavi: 切った時点の書きかけ" 2>/dev/null
 }
 
-# 手元の統合先が origin と分岐している（先行も遅れもある）。そのまま切ると、手元にだけある先行コミットを知らない
-# ブランチになり、統合で詰まる。--from-origin が無ければ切らずに止まる。dry-run は止まらず、止まることを案内するだけ。fetch が失敗した（--offline）ときは古い ref の判定なので止めない。
-diverged_guard() {
-	[ "$ahead" -ne 0 ] && [ "$behind" -ne 0 ] || return 0
-	if [ -n "$fetch_note" ]; then
-		diverged_note="手元の ${integ} は origin/${integ} と分岐しているように見える（先行 ${ahead} 件・遅れ ${behind} 件）が、fetch が失敗していて origin/${integ} が古いかもしれないので止めなかった。つながったら ccnavi-git.sh fetch origin ${integ} で確かめ、本当に分岐していれば手元の ${integ} を揃えるようユーザに頼む。"
-		return 0
-	fi
-	if [ -n "$dry" ]; then
-		if [ -n "$from_origin" ]; then
-			diverged_note="手元の ${integ} は origin/${integ} と分岐している（先行 ${ahead} 件・遅れ ${behind} 件。fetch 前の数）。実行すると --from-origin で origin/${integ} から切る。手元にだけある先行 ${ahead} 件を、そのブランチは知らず、統合（integrate）で詰まる。"
-		else
-			diverged_note="手元の ${integ} は origin/${integ} と分岐している（先行 ${ahead} 件・遅れ ${behind} 件。fetch 前の数）。実行すると切らずに終了コード 1 で止まる。承知のうえなら --from-origin を付けると origin/${integ} から切る。"
-		fi
-		return 0
-	fi
-	if [ -n "$from_origin" ]; then
-		diverged_note="手元の ${integ} は origin/${integ} と分岐している（先行 ${ahead} 件・遅れ ${behind} 件）が、--from-origin で origin/${integ} から切った。手元にだけある先行 ${ahead} 件を、このブランチは知らない。統合（integrate）で詰まるので、先に手元の ${integ} を origin/${integ} に揃えるようユーザに頼む。詰まって取り込みの印（.git/ccnavi-integrate/<名前>/marker）が残ったときも、ユーザが手元の ${integ} を揃えてから再実行します。"
-		return 0
-	fi
-	log_info 分岐で止めた -- "integration=$integ" "ahead=$ahead" "behind=$behind"
-	printf 'ワークツリーは切っていない。手元の %s が origin/%s と分岐している（先行 %s 件・遅れ %s 件）。\n' "$integ" "$integ" "$ahead" "$behind"
-	printf 'このまま origin/%s から切ると、手元にだけある先行 %s 件を知らないブランチになり、統合（integrate）で詰まる。\n' "$integ" "$ahead"
-	printf '次の手:\n'
-	printf '  1. 先に手元の %s を origin/%s に揃える。ccnavi は手元の統合先を進めないので、ユーザに頼む（先行分を push するか、別のブランチに退避してから揃える）\n' "$integ" "$integ"
-	printf '  2. 揃えたら同じコマンドを再実行する: sh %s %s\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
-	printf '  3. 先行分が不要・承知のうえなら --from-origin を付けて再実行します（警告つきで origin/%s から切る）\n' "$integ"
-	exit 1
-}
-diverged_note=""
-fetch_note=""
+common_dir=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
+[ -n "$common_dir" ] || fail no-common-dir "git の共通ディレクトリを読めません。"
+common_dir=$(ccnavi_phys "$common_dir")
+ref_pending="refs/ccnavi/direct/$name/pending"
+ref_s="refs/ccnavi/direct/$name/s"
 
 if [ -n "$dry" ]; then
-	choose_base
-	diverged_guard
-	printf 'dry-run: 何も作らない。作る予定は次のとおり。\n'
-	printf 'ブランチ: %s（起点 %s%s）\n' "$name" "$base" "${track:+、$track}"
+	printf 'dry-run: 何も作らない。調べた結果と予定は次のとおり（fetch はしていないので、origin との関係は見ていない）。\n'
+	printf '取り込み先: %s（%s。リモートのデフォルトは %s）\n' "$target" "$main_tree" "$integ"
+	[ "$c4" = no ] || printf '状態: cwd のブランチ（%s）が取り込み先と違う。実行するには --base %s が要る\n' "${top_branch:-ブランチの外}" "$target"
+	[ "$c5" = no ] || printf '状態: 取り込み先がデフォルトブランチ（%s）でない。実行するには --accept が要る\n' "$integ"
+	[ "$c7" = no ] || printf '状態: 書きかけ 変更 %s・新規 %s（staged %s）。実行するには --accept と、--copy-wip か --no-wip が要る\n' "$wip_changed" "$wip_new" "$wip_staged"
+	printf 'ブランチ: %s（起点 %s）\n' "$name" "$(git -C "$main_tree" rev-parse --short "$head_sha")"
 	printf 'ワークツリー: %s\n' "$dest"
-	[ "$behind" -eq 0 ] || printf '案内: 手元の %s は origin/%s より %s 件遅れている（fetch 前の数）\n' "$integ" "$integ" "$behind"
-	[ -z "$diverged_note" ] || printf '案内: %s\n' "$diverged_note"
 	exit 0
 fi
 
-# ---- fetch。origin に通信するので、届かないときの手を案内する。
-fetch_note=""
-if ! cgit fetch origin "$integ"; then
-	log_info fetch-failed -- "integration=$integ" "offline=${offline:-no}"
-	if [ -z "$offline" ]; then
-		printf 'ワークツリーは切っていない。origin から統合先 %s を取れなかった（上の出力に原因が出ている。ネットワーク・認証・origin の設定のどれか）。\n' "$integ"
-		case "$cgit_out" in
-		*"couldn't find remote ref"*)
-			printf '注意: origin に統合先 %s がありません（手元の origin/HEAD がホストの既定ブランチとずれている）。--offline で切ると古い手元の統合先から切るので、先にユーザに git fetch origin のあと git remote set-head origin -a を頼む。\n' "$integ"
-			;;
-		esac
-		printf '次の手:\n'
-		printf '  1. 原因を直せるなら直して、同じコマンドを再実行する: sh %s %s\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
-		printf '     認証や origin の設定が必要なときは、ユーザに頼む（ccnavi は git config を通さない）\n'
-		printf '  2. 直せない・オフラインで続けるなら --offline を付けて再実行する: sh %s %s --offline\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
-		printf '     手元の %s から切る。origin が古いかもしれないので、切ったことをユーザに伝える\n' "$integ"
-		exit "$EXIT_NET"
+# ---- fetch。取り込み先だけ。届かなくても止めず、リモート未確認として確認を求める。
+remote_state=even
+remote_ahead=0
+remote_behind=0
+origin_sha=""
+remote_why=""
+fetch_ok=yes
+if ! cgit fetch origin "$target"; then
+	fetch_ok=no
+	log_info fetch-failed -- "target=$target"
+	case "$cgit_out" in
+	*"couldn't find remote ref"*) remote_state=absent ;;
+	*)
+		remote_state=unverified
+		remote_why=$(printf '%s\n' "$cgit_out" | head -n 1)
+		;;
+	esac
+fi
+if [ "$fetch_ok" = yes ]; then
+	if git show-ref --verify --quiet "refs/remotes/origin/$target"; then
+		origin_sha=$(git rev-parse "refs/remotes/origin/$target" 2>/dev/null || :)
+		remote_behind=$(git rev-list --count "$head_sha..$origin_sha" 2>/dev/null || echo 0)
+		remote_ahead=$(git rev-list --count "$origin_sha..$head_sha" 2>/dev/null || echo 0)
+		if [ "$remote_ahead" -ne 0 ] && [ "$remote_behind" -ne 0 ]; then
+			remote_state=diverged
+		elif [ "$remote_behind" -ne 0 ]; then
+			remote_state=behind
+		elif [ "$remote_ahead" -ne 0 ]; then
+			remote_state=ahead
+		fi
+	else
+		remote_state=absent
 	fi
-	fetch_note="origin から取れなかったため、手元の ${integ} から切った（オフラインの可能性。origin/${integ} が古いかもしれない）。つながったら ccnavi-git.sh fetch origin ${integ} で確かめ、遅れていれば取り込む前に統合先を合わせる。ユーザにも伝える。"
 fi
 
-choose_base
-diverged_guard
-
 # ---- origin に同じ名前・同じ識別子になるブランチがあれば止める（fetch が通ったときだけ見る）。
-remote_note=""
-if [ -z "$fetch_note" ]; then
+if [ "$fetch_ok" = yes ]; then
 	remote_err="$root/logs/state/worktree-ls-remote-err-$$"
 	remote_rc=0
 	ccnavi_git_timed "${CCNAVI_WORKTREE_GIT_TIMEOUT:-30}" "$remote_err" "$top" ls-remote --heads origin >"$heads_list" || remote_rc=$?
-	remote_why=$(head -n 1 "$remote_err" 2>/dev/null || :)
+	ls_why=$(head -n 1 "$remote_err" 2>/dev/null || :)
 	rm -f "$remote_err"
-	remote_out=""
-	if [ "$remote_rc" -eq 0 ]; then
-		sed -n 's#^[0-9a-fA-F]\{1,\}[[:space:]]\{1,\}refs/heads/##p' "$heads_list" | tr -d '\r' >"$heads_list.names"
-		mv "$heads_list.names" "$heads_list"
-		grep -F -x -q -- "$name" "$heads_list" && remote_out=yes
-	fi
 	if [ "$remote_rc" -ne 0 ]; then
 		log_info ls-remote できず -- "name=$name"
-		if [ -z "$offline" ]; then
-			printf 'ワークツリーは切っていない。origin のブランチ一覧を取れなかった（%s）。リモート未確認のままでは、同じ識別子になるブランチが origin に無いか確かめられない。\n' "${remote_why:-理由不明}"
-			printf '次の手:\n'
-			printf '  1. 原因を直せるなら直して、同じコマンドを再実行する: sh %s %s\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
-			printf '  2. 直せない・オフラインで続けるなら --offline を付けて再実行する: sh %s %s --offline\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$name"
-			printf '     手元に残る origin の追跡ブランチでだけ確かめて切る。切ったことと、リモート未確認であることをユーザに伝える\n'
-			exit "$EXIT_NET"
-		fi
-		remote_note="リモート未確認。origin のブランチ一覧を取れなかった（${remote_why:-理由不明}）ので、同じ識別子のブランチは手元に残る origin の追跡ブランチでだけ確かめた。"
-	elif [ -n "$remote_out" ]; then
-		log_info リモートに同名のブランチ -- "name=$name"
-		printf 'ワークツリーは切っていない。origin にブランチ %s が既にある（MR の元ブランチかもしれない）。\n' "$name"
-		printf '既にあるブランチは、MR を探して採用してよいか確かめてから出す。ccnavi-start.sh で始める:\n'
-		printf '  sh %s --mr <MR の番号>\n  sh %s --issue <issue の番号>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")" "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")"
-		printf '別の作業として新しく切るなら、別の名前で再実行する: sh %s <別の名前>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")"
-		exit 1
+		remote_state=unverified
+		remote_why="origin のブランチ一覧を取れなかった（${ls_why:-理由不明}）"
 	else
+		sed -n 's#^[0-9a-fA-F]\{1,\}[[:space:]]\{1,\}refs/heads/##p' "$heads_list" | tr -d '\r' >"$heads_list.names"
+		mv "$heads_list.names" "$heads_list"
+		if grep -F -x -q -- "$name" "$heads_list"; then
+			log_info リモートに同名のブランチ -- "name=$name"
+			printf 'ワークツリーは切っていない。origin にブランチ %s が既にある（MR の元ブランチかもしれない）。\n' "$name"
+			printf '既にあるブランチは、MR を探して採用してよいか確かめてから出す。ccnavi-start.sh で始める:\n'
+			printf '  sh %s --mr <MR の番号>\n  sh %s --issue <issue の番号>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")" "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")"
+			printf '別の作業として新しく切るなら、別の名前で再実行する: sh %s <別の名前>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")"
+			exit 1
+		fi
 		same_id_guard "$heads_list" origin
 	fi
-else
-	# origin に届かない（--offline）。手元に残る origin の追跡ブランチに同じ名前があれば、origin にあるものとして止める
-	if git show-ref --verify --quiet "refs/remotes/origin/$name"; then
-		printf 'ワークツリーは切っていない。origin にブランチ %s がある（手元に残る追跡ブランチで分かった。MR の元ブランチかもしれない）。\n' "$name"
-		printf '既にあるブランチは、MR を探して採用してよいか確かめてから出す。ccnavi-start.sh で始める:\n'
-		printf '  sh %s --mr <MR の番号>\n  sh %s --issue <issue の番号>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")" "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")"
-		exit 1
+fi
+if [ "$remote_state" = unverified ] && git show-ref --verify --quiet "refs/remotes/origin/$name"; then
+	printf 'ワークツリーは切っていない。origin にブランチ %s がある（手元に残る追跡ブランチで分かった。MR の元ブランチかもしれない）。\n' "$name"
+	printf '既にあるブランチは、MR を探して採用してよいか確かめてから出す。ccnavi-start.sh で始める:\n'
+	printf '  sh %s --mr <MR の番号>\n  sh %s --issue <issue の番号>\n' "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")" "$(ccnavi_sh_quote "$scripts/ccnavi-start.sh")"
+	exit 1
+fi
+c6=no
+[ "$remote_state" = even ] || c6=yes
+
+# ---- 書きかけの候補と確認コード。
+cand=""
+if [ "$c7" = yes ]; then
+	cand=$(make_candidate) ||
+		fail snapshot-failed "書きかけのスナップショットを作れませんでした（${main_tree}）。ユーザに確かめてください。"
+fi
+code_input="repo=$common_dir|name=$name|target=$target|head=$head_sha|origin=${origin_sha:-$remote_state}|default=$integ|cwd=${top_branch:--}|cand=${cand:--}"
+code=$(printf '%s' "$code_input" | git hash-object --stdin | cut -c1-8)
+need_accept=no
+{ [ "$c5" = yes ] || [ "$c6" = yes ] || [ "$c7" = yes ]; } && need_accept=yes
+
+# 確認が要るときの報告。切らずに終了コード 3 で止まる。
+report_and_stop() {
+	rs_why="$1"
+	[ -z "$cand" ] || git update-ref "$ref_pending" "$cand" 2>/dev/null || :
+	log_info 確認が要る -- "name=$name" "target=$target" "c4=$c4" "c5=$c5" "c6=$c6" "c7=$c7" "why=$rs_why"
+	printf '確認が要る: ワークツリーはまだ切っていない。\n'
+	[ "$rs_why" = "code" ] && printf '案内: 渡された確認コードが今の状態と合わない（報告のあとで状態が動いた）。報告からやり直す。\n'
+	printf '状態:\n'
+	printf '  取り込み先 %s (%s)。リモートのデフォルトは %s\n' "$target" "$main_tree" "$integ"
+	[ "$c4" = no ] || printf '  cwd のブランチは %s で、取り込み先と違う\n' "${top_branch:-ブランチの外}"
+	case "$remote_state" in
+	behind) printf '  origin/%s より %s 件遅れている\n' "$target" "$remote_behind" ;;
+	ahead) printf '  origin/%s より %s 件進んでいる（まだ送っていない）\n' "$target" "$remote_ahead" ;;
+	diverged) printf '  origin/%s と分岐している（先行 %s 件・遅れ %s 件）\n' "$target" "$remote_ahead" "$remote_behind" ;;
+	absent) printf '  origin に %s が無い\n' "$target" ;;
+	unverified) printf '  リモート未確認（%s）\n' "${remote_why:-origin に届かない}" ;;
+	esac
+	[ "$c5" = no ] || printf '  取り込み先がデフォルトブランチ（%s）でない\n' "$integ"
+	[ "$c7" = no ] || printf '  書きかけ: 変更 %s・新規 %s（staged %s。写す場合、staged かどうかは区別されない）\n' "$wip_changed" "$wip_new" "$wip_staged"
+	[ "$wip_staged" -eq 0 ] || [ "$c7" = yes ] || printf '  staged %s（情報）\n' "$wip_staged"
+	rs_main_q=$(ccnavi_sh_quote "$main_tree")
+	rs_target_q=$(ccnavi_sh_quote "$target")
+	case "$remote_state" in
+	behind)
+		printf '勧め: 先にローカルをリモートに合わせる\n'
+		printf '  cd %s && git pull --ff-only origin %s   （書きかけは先にコミットか git stash push -u）\n' "$rs_main_q" "$rs_target_q"
+		;;
+	diverged)
+		printf '勧め: 先にローカルをリモートに合わせる（合わせ方はユーザが選ぶ）\n'
+		printf '  cd %s && git pull --rebase origin %s\n' "$rs_main_q" "$rs_target_q"
+		printf '  cd %s && git pull --no-rebase origin %s\n' "$rs_main_q" "$rs_target_q"
+		;;
+	ahead) printf '勧め: 先に push するか、push せずに進めるかをユーザが決める（cd %s && git push origin %s）\n' "$rs_main_q" "$rs_target_q" ;;
+	absent) printf '勧め: origin に %s を push するか、このまま進めるかをユーザが決める\n' "$target" ;;
+	unverified) printf '勧め: origin に届いてから打ち直すと、リモートとの関係を確かめられる\n' ;;
+	esac
+	rs_risks=""
+	case "$remote_state" in
+	behind | diverged) rs_risks="${rs_risks}  - 古いコードの上で作業する。push の前に合わせ直しが要り、そのとき衝突しうる
+" ;;
+	ahead) rs_risks="${rs_risks}  - ${target} にだけある先行コミットの上で作業する。push する前に成果だけを送ることはできない
+" ;;
+	absent) rs_risks="${rs_risks}  - origin に無いブランチの上で作業する。成果は手元の ${target} にだけ載る
+" ;;
+	unverified) rs_risks="${rs_risks}  - リモートの最新を確かめないまま作業する。あとで合わせ直しが要りうる
+" ;;
+	esac
+	[ "$c5" = no ] || rs_risks="${rs_risks}  - 最後は ${target} に 1 コミットで載る。${integ} に届くのは ${target} の MR がマージされたとき
+"
+	[ "$c4" = no ] || rs_risks="${rs_risks}  - cwd のブランチ（${top_branch:-ブランチの外}）ではなく、メインのチェックアウトの ${target} へ取り込む
+"
+	if [ -n "$rs_risks" ]; then
+		printf '合わせない場合のリスク:\n'
+		printf '%s' "$rs_risks"
 	fi
-	remote_note="リモート未確認。origin に届かなかったので、同じ識別子のブランチは手元に残る origin の追跡ブランチでだけ確かめた。"
+	printf '選択肢:\n'
+	if [ "$c7" = yes ]; then
+		printf '  書きかけの扱い\n'
+		printf '    A. 写さない (--no-wip) : 書きかけはルートだけに残り、エージェントは HEAD から作業する\n'
+		printf '    B. 写す (--copy-wip) : いま確認した時点の書きかけを写す。このあとの編集は写らない。\n'
+		printf '       写した書きかけそのものは成果に含めない。それに依存する変更は、取り込み結果だけでは動かないことがある\n'
+	fi
+	printf '  横で作業するか (--side-by-side)\n'
+	printf '    このワークツリーが残っている間は、%s で見つかった変更（エージェントが Bash で書き換えた分も含む）を\n' "$main_tree"
+	printf '    自動で戻さず、報告にする。ccnavi の設定ファイルは戻す\n'
+	rs_cmd="sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name")"
+	[ "$c4" = no ] || rs_cmd="$rs_cmd --base $rs_target_q"
+	[ "$need_accept" = no ] || rs_cmd="$rs_cmd --accept $code"
+	[ "$c7" = no ] || rs_cmd="$rs_cmd --no-wip"
+	printf '次: 上をユーザに伝えて決めてもらう。合わせたら同じコマンドを打ち直す。このまま進めるなら例えば %s\n' "$rs_cmd"
+	printf '案内: ユーザの了承を得るまで --base・--accept・--side-by-side を付けない。確認コードは今の状態から決まるので、状態が動いたら報告からやり直す\n'
+	exit "$EXIT_CONFIRM"
+}
+
+if [ "$c7" = yes ] && [ -z "$wip_mode" ]; then
+	report_and_stop wip
+fi
+if [ "$c4" = yes ] && [ -z "$base_arg" ]; then
+	report_and_stop base
+fi
+if [ "$need_accept" = yes ]; then
+	[ -n "$accept" ] || report_and_stop accept
+	[ "$accept" = "$code" ] || report_and_stop code
 fi
 
-# ---- worktree add。起点は省かない。拒否の文面は ccnavi-git.sh のもの（行き先・起点の直し方つき）をそのまま見せる。
-if [ -n "$track" ]; then
-	cgit worktree add "$dest" -b "$name" "$track" "$base" ||
-		fail worktree-add-refused "ccnavi-git.sh worktree add が通りませんでした（上の出力の案内に従ってください）。"
+# ---- S を決める。
+if [ "$c7" = yes ] && [ "$wip_mode" = copy ]; then
+	s_sha="$cand"
+	s_wip=yes
 else
-	cgit worktree add "$dest" -b "$name" "$base" ||
-		fail worktree-add-refused "ccnavi-git.sh worktree add が通りませんでした（上の出力の案内に従ってください）。"
+	s_sha="$head_sha"
+	s_wip=no
 fi
+s_short=$(git rev-parse --short "$s_sha" 2>/dev/null || printf '%s' "$s_sha")
+
+# ---- 記録を書き、ref を置いて切る。
+side_word=no
+[ -z "$side" ] || side_word=yes
+confirm_word=-
+[ "$need_accept" = no ] || confirm_word="$code"
+rec_dir="$common_dir/ccnavi-direct"
+rec_file="$rec_dir/$name"
+rec_tmp="$rec_dir/.$name.$$"
+mkdir -p "$rec_dir" 2>/dev/null || fail record-failed "記録の置き場（${rec_dir}）を作れません。"
+{
+	printf 'version 4\n'
+	printf 'base_branch %s\n' "$target"
+	printf 'base_sha %s\n' "$head_sha"
+	printf 'snap_sha %s\n' "$s_sha"
+	printf 'snap_wip %s\n' "$s_wip"
+	printf 'side_by_side %s\n' "$side_word"
+	printf 'main_tree %s\n' "$main_tree"
+	printf 'common_dir %s\n' "$common_dir"
+	printf 'confirm %s\n' "$confirm_word"
+	printf 'created %s\n' "$(date +%s)"
+} >"$rec_tmp" 2>/dev/null && mv -f "$rec_tmp" "$rec_file" ||
+	{
+		rm -f "$rec_tmp"
+		fail record-failed "記録（${rec_file}）を書けません。"
+	}
+
+undo_cut() {
+	rm -f "$rec_file"
+	git update-ref -d "$ref_s" 2>/dev/null || :
+}
+git update-ref "$ref_s" "$s_sha" 2>/dev/null || {
+	undo_cut
+	fail ref-failed "S の ref（${ref_s}）を置けません。"
+}
+git update-ref -d "$ref_pending" 2>/dev/null || :
+cgit worktree add "$dest" -b "$name" --no-track "$s_sha" || {
+	undo_cut
+	fail worktree-add-refused "ccnavi-git.sh worktree add が通りませんでした（上の出力の案内に従ってください）。記録と ref は消しました。"
+}
 
 printf 'ワークツリーを切った: %s\n' "$dest"
-printf 'ブランチ: %s（起点 %s%s）\n' "$name" "$base" "${track:+、$track}"
-[ "$behind" -eq 0 ] || [ -n "$diverged_note" ] || printf '案内: 手元の %s は origin/%s より %s 件遅れていたので origin/%s から切った（手元の %s は進めていない）\n' "$integ" "$integ" "$behind" "$integ" "$integ"
-[ -z "$fetch_note" ] || printf '案内: %s\n' "$fetch_note"
-[ -z "$diverged_note" ] || printf '案内: %s\n' "$diverged_note"
-[ -z "$remote_note" ] || printf '案内: %s\n' "$remote_note"
+printf 'ブランチ: %s（起点 %s）\n' "$name" "$s_short"
+printf '取り込み先: %s（%s）\n' "$target" "$main_tree"
+if [ "$s_wip" = yes ]; then
+	printf '起点: %s（確認した時点の書きかけを含む。確認したあとの編集は写らない）\n' "$s_short"
+else
+	printf '起点: %s（%s の HEAD。書きかけは含まない）\n' "$s_short" "$target"
+fi
+if [ "$side_word" = yes ]; then
+	printf '横で作業する: はい（%s で見つかった変更は自動で戻さず報告する。ccnavi の設定ファイルは戻す）\n' "$main_tree"
+else
+	printf '横で作業する: いいえ\n'
+fi
+if [ "$c6" = yes ]; then
+	case "$remote_state" in
+	behind | diverged)
+		printf '案内: 手元の %s は origin/%s より古い（遅れ %s 件）。push の前に合わせ直しが要る: cd %s && git pull --ff-only origin %s\n' "$target" "$target" "$remote_behind" "$(ccnavi_sh_quote "$main_tree")" "$(ccnavi_sh_quote "$target")"
+		;;
+	ahead) printf '案内: 手元の %s は origin/%s より %s 件進んでいる（まだ送っていない）\n' "$target" "$target" "$remote_ahead" ;;
+	absent) printf '案内: origin に %s が無い。成果は手元の %s に載る\n' "$target" "$target" ;;
+	unverified) printf '案内: リモート未確認で切った。つながったら ccnavi-git.sh fetch origin %s で確かめ、遅れていれば取り込む前に合わせる。ユーザにも伝える\n' "$target" ;;
+	esac
+fi
 # 直接作業の名前の形は実行ファイルに聞く。取れなければ案内は出さない。
 name_note=""
 if name_bin=$(ccnavi_bin "$root"); then
@@ -348,4 +553,4 @@ if name_bin=$(ccnavi_bin "$root"); then
 fi
 [ -z "$name_note" ] || printf '%s\n' "$name_note"
 print_next
-log_info 完了 -- "name=$name" "base=$base"
+log_info 完了 -- "name=$name" "target=$target" "snap=$s_sha" "wip=$s_wip" "side=$side_word"

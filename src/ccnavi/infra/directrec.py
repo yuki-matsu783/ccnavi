@@ -72,7 +72,9 @@ def _same(a: str, b: str) -> bool:
 def _valid(root: str, main: tree.Tree, common: str, name: str, fields: dict[str, str]) -> bool:
     if fields.get("version") != VERSION or fields.get("side_by_side") != "yes":
         return False
-    if not fields.get("main_tree") or not _same(fields["main_tree"], main.root):
+    if not fields.get("main_tree"):
+        return False
+    if not _same(os.path.realpath(fields["main_tree"]), os.path.realpath(main.root)):
         return False
     recorded = fields.get("common_dir", "")
     if not recorded:
