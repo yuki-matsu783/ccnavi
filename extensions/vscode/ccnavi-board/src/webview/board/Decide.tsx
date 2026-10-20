@@ -115,7 +115,7 @@ export function DecideBody({
             data-action="decide-consult"
             data-tour="decide-consult"
             disabled={deciding}
-            title="未解決の指摘を要約し、対応方針の案を返してもらうプロンプトをコピーします。読み取りだけを頼むので、対応方針を確定する操作は含みません。決めるのはこの画面です"
+            title="未解決の指摘を要約し、対応方針の案を返してもらうプロンプトをコピーします。読み取りだけを頼むので、対応方針を確定する操作は含みません。対応方針は、この画面で決めます"
             onClick={() => post({ type: "decideConsult" })}
           >
             エージェントに相談するプロンプトをコピー

@@ -230,7 +230,7 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
       text: `先行チケットの条件が未達成（${ids}）`,
       lead: "先行チケットの条件が未達成",
       ids: list,
-      title: `作業を始めています。先行チケットが done/ にないか、取り消されているため、開始条件を満たしていません。ただし、始めた作業や finish コマンドの実行は制限されません。\n${detail}`,
+      title: `作業を始めています。先行チケットが done/ にないか取り消されているため、開始条件を満たしていません。ただし、作業と finish コマンドの実行は制限されません。\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認・着手は" : "着手は";
