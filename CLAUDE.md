@@ -13,7 +13,7 @@
 
 - sh は Windows (Git Bash / WSL)・Linux・macOS のどれでも動くように書く
 - パスと名前は、どの機械でも大文字小文字を区別せず比べる（同じ綴り違いは同じものとして、両立させない）。`os.path.normcase`を単独で使わず、`pathcase.fold`を通す。決まりは `docs/claude/environment.md`
-- Python の全件テストは `discover -s tests` の 1 本で回さない。グループに分けて回すか、`uv run python -m tests`（モジュールごとに別プロセスで同時に回す）を使う。1 本で回すと数十分かかり、時間の上限で途中で打ち切られて結果が残らない。グループの決め方は `.claude/skills/commit/references/test-groups.md`
+- CLAUDE.md は薄く保つ（段階的詳細化）。ここには毎回守る決まりを一言で書き、理由・手順・例は「詳細」の表が指す文書に置く。新しい決まりは、まず `docs/claude/` か `.ccnavi/docs/` に書いて表に 1 行足す。ここに足すのは、読む場面を選ばずに守るものだけにする
 - ccnavi の使い方に関わる考え方と決まり（ワークツリー・git の入口・下書きの置き場・サブエージェントへの委任・合意が要る変更の範囲・保護対象の直し方）は `.ccnavi/CCNAVI.md` に書く。セッション開始時に ccnavi がそれを渡すので、ここには書かない。ccnavi の振る舞いが変わったら CCNAVI.md を直す
 
 ## 詳細
@@ -28,4 +28,5 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
 | sh・Python・TS でログを書く、logger を直す | `docs/claude/logging.md` |
 | sh や実行ファイルの出力に案内（`次:`・`案内:`・`必須:`）を足す・直す、ワークフローを進める出力を新しく書く | `docs/claude/script-output.md` |
+| Python のテストを回す（特に全件）、回すグループを決める | `docs/claude/testing.md` |
 | 受入シナリオ（`tests/scenarios/`）を書く、`claude -p` で振る舞いを回す（明確な指示があったときだけ） | `docs/claude/acceptance-scenarios.md` |
