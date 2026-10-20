@@ -949,14 +949,44 @@ def final_verdict(mechanical, judged, accepted):
     return FAIL if FAIL in judge_verdicts else PASS
 
 
+def mechanical_results(out):
+    """報告の機械判定（judge 以外）を、final_verdict に渡す形で読む。"""
+    recorded = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    return [
+        (r["kind"], r["expect"], r["verdict"], r["why"]) for r in recorded if r["kind"] != "judge"
+    ]
+
+
+def record_acceptance(out, report, accept):
+    """報告に足してある意味の判定に、ユーザの受け入れを記す。判定の表は変えない。"""
+    if not accept:
+        print("この回の意味の判定は、もう報告に足してある（受け入れを記すなら --accept を付ける）")
+        return 1
+    text = report.read_text(encoding="utf-8")
+    head, section = text.split(JUDGE_HEADING, 1)
+    if "ユーザの受け入れ: あり" in section:
+        print("受け入れは、もう記録してある（二重には記さない）")
+        return 1
+    judged = parse_judgment(section)
+    verdict = final_verdict(mechanical_results(out), judged, True)
+    section = "\n".join(
+        f"全体（機械判定と意味の判定の合わせ）: {verdict}"
+        if line.startswith("全体（機械判定と意味の判定の合わせ）:")
+        else line.replace("ユーザの受け入れ: なし", "ユーザの受け入れ: あり")
+        for line in section.split("\n")
+    )
+    report.write_text(head + JUDGE_HEADING + section, encoding="utf-8")
+    print(f"ユーザの受け入れを記した。全体: {verdict}")
+    return 0
+
+
 def cmd_judge(args):
     """意味の判定（別のエージェントが書いた判定の表）を報告に足す。
-    --accept は、ユーザが判定を受け入れたことを記す。"""
+    足してあれば、--accept でユーザの受け入れを記す。"""
     out = Path(args.out)
     report = out / "report.md"
     if JUDGE_HEADING in report.read_text(encoding="utf-8"):
-        print("この回の意味の判定は、もう報告に足してある（二重には足さない）")
-        return 1
+        return record_acceptance(out, report, args.accept)
     judged = parse_judgment(Path(args.file).read_text(encoding="utf-8"))
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
     scn = load_scenario(st["scenario"])
@@ -964,14 +994,10 @@ def cmd_judge(args):
     if not judged or len(judged) != expected:
         print(f"判定の表の行数が違う: 期待 {expected} 行、読めた {len(judged)} 行")
         return 1
-    recorded = json.loads((out / "report.json").read_text(encoding="utf-8"))
-    mechanical = [
-        (r["kind"], r["expect"], r["verdict"], r["why"]) for r in recorded if r["kind"] != "judge"
-    ]
     lines = ["", JUDGE_HEADING, "", "| 基準 | 判定 | 理由 |", "|---|---|---|"]
     lines += [f"| {c} | {v} | {w} |" for c, v, w in judged]
     lines += ["", f"ユーザの受け入れ: {'あり' if args.accept else 'なし'}"]
-    verdict = final_verdict(mechanical, judged, args.accept)
+    verdict = final_verdict(mechanical_results(out), judged, args.accept)
     lines += [f"全体（機械判定と意味の判定の合わせ）: {verdict}"]
     text = report.read_text(encoding="utf-8")
     report.write_text(text + "\n".join(lines) + "\n", encoding="utf-8")

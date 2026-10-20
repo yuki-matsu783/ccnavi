@@ -557,6 +557,32 @@ class JudgeTest(unittest.TestCase):
             self.assertIn("全体（機械判定と意味の判定の合わせ）: pass", text)
             self.assertEqual(runner.cmd_judge(ns), 1)
 
+    def test_acceptance_can_be_recorded_after_the_table_was_added(self):
+        uc01 = str(Path(__file__).parent / "UC-01-direct-edit-denied.yml")
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            (out / "report.md").write_text("# UC-01\n\n全体: needs-review\n", encoding="utf-8")
+            (out / "state.json").write_text(json.dumps({"scenario": uc01}), encoding="utf-8")
+            recorded = [
+                {"kind": "decisions", "expect": {}, "verdict": "pass", "why": "x"},
+                {"kind": "judge", "expect": "a", "verdict": "needs-review", "why": ""},
+                {"kind": "judge", "expect": "b", "verdict": "needs-review", "why": ""},
+            ]
+            (out / "report.json").write_text(json.dumps(recorded), encoding="utf-8")
+            table = Path(d) / "judge.md"
+            table.write_text(self.TABLE, encoding="utf-8")
+            first = runner.argparse.Namespace(out=str(out), file=str(table), accept=False)
+            self.assertEqual(runner.cmd_judge(first), 0)
+            text = (out / "report.md").read_text(encoding="utf-8")
+            self.assertIn("ユーザの受け入れ: なし", text)
+            later = runner.argparse.Namespace(out=str(out), file=str(table), accept=True)
+            self.assertEqual(runner.cmd_judge(later), 0)
+            text = (out / "report.md").read_text(encoding="utf-8")
+            self.assertIn("ユーザの受け入れ: あり", text)
+            self.assertIn("全体（機械判定と意味の判定の合わせ）: pass", text)
+            self.assertEqual(text.count(runner.JUDGE_HEADING), 1)
+            self.assertEqual(runner.cmd_judge(later), 1)
+
 
 class RepoResultTest(unittest.TestCase):
     def test_same_state_passes(self):
