@@ -288,9 +288,9 @@ ccnavi_host_project_id() {
 #                                 （それ以外）を足す。git を打つ前に呼ぶ（以降の git に効く）。
 #
 # gh / glab で認証済みでも、git の push・fetch は別に認証が要る（`could not read Username` で止まる）。
-# 道具が自分でログインしているホストだけに答えるので、未認証・未導入のホストには何も起きず、
+# ログイン済みのホストだけに足すので、未認証・未導入のホストでは何も足されず、
 # git は元の設定の取り手（ccnavi が足すのは末尾なので、先にあるものが優先）で進む。
-# 足し方は環境変数（GIT_CONFIG_COUNT 系）。.gitconfig や origin の URL は書き換えず、この呼び出しの子にだけ効く。
+# 足し方は環境変数（GIT_CONFIG_COUNT 系）。.gitconfig や origin の URL は書き換えず、この呼び出しの子プロセスにだけ効く。
 # 道具は絶対パスへ解く（PATH の細工で差し替えられないように。ccnavi_host_connect と同じ）。
 ccnavi_ga_seen=""
 ccnavi_ga_base=""
