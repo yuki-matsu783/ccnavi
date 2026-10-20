@@ -288,7 +288,8 @@ class FetchTest(unittest.TestCase):
         self.assertIn("未コミットの変更", done.stdout)
 
     def test_default_branch_does_not_overwrite_an_ignored_file(self):
-        # 進める先に ignored のファイルと同じパスがあれば、上書きせずに進めない（--no-overwrite-ignore）。
+        # 進める先に ignored と同じパスがあれば、上書きせず進めない。
+        # 判定は --no-overwrite-ignore で行う。
         tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
         self.leave_main()
         git(self.ws, "worktree", "add", "-q", tree, "main")

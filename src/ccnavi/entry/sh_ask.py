@@ -25,7 +25,7 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
 - `ccnavi tree base-bound <メインのチェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが、
   チケットに結び付くか（`ccnavi-worktree.sh` が切る前に断る条件）。`bound yes|no|unknown` に続けて、
   yes なら `why <理由>`。識別子の衝突はワークスペース全体、結び付きは取り込み先のリポジトリだけを
-  見る（`base_bound.base_bound`）。unknown（決められない）も呼ぶ側は断る。
+  見る（`base_bound.base_bound`）。unknown（決められない）のときも、呼ぶ側は断る。
 
 git はローカルの読み取りだけ。ネットワークには出ない。
 """
@@ -41,8 +41,8 @@ from ..tickets import (
     approval,
     approval_marks,
     archive,
-    donecopy,
     base_bound,
+    donecopy,
     ops_stop_integrate,
     ticket_ids,
     ticket_model,
@@ -168,7 +168,9 @@ def base_bound_tree(
     頭に `tree 1`、続けて `bound yes|no|unknown`、yes なら `why <理由>`。
     """
     if not branch or "\n" in branch or "\x00" in branch:
-        stderr.write(f"ccnavi: tree base-bound のブランチ {branch!r} は有効な名前ではありません。\n")
+        stderr.write(
+            f"ccnavi: tree base-bound のブランチ {branch!r} は有効な名前ではありません。\n"
+        )
         return 1
     if not path or not os.path.isdir(path):
         stderr.write(f"ccnavi: tree base-bound のツリー {path!r} が見つかりません。\n")

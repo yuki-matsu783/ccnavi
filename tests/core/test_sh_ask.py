@@ -348,7 +348,8 @@ if __name__ == "__main__":
 
 
 class TreeBaseBoundTest(Harness):
-    """`ccnavi tree base-bound`。取り込み先のブランチがチケットに結び付くか（`ccnavi-worktree.sh` が断る条件）。
+    """`ccnavi tree base-bound`。取り込み先のブランチがチケットに結び付くか。
+    `ccnavi-worktree.sh` はこれで断る。
 
     識別子の衝突はワークスペース全体、結び付きは取り込み先のリポジトリだけを見る。
     """

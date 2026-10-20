@@ -25,7 +25,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   - `ccnavi_is_ident`・`ccnavi_is_branch`・`ccnavi_branch_ok`（sh）は、実行ファイルの`id_problem`・`branch_problem`の
     ASCIIで見分けられる分だけの複製。字の種類・NFC・長さは見ないので、名前を受け入れる入口は実行ファイルの
     `worktree id`に聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す
-- P13の例外: 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の中の可否の判定（`integrate-ticket`（結び付くかは実行ファイルの`tree bound`に聞く。取り込み先のブランチは`tree base-bound`に聞く。Stopの促しと同じ判定）、統合先と消えた親のブランチへの
+- P13の例外: 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の中の可否の判定（`integrate-ticket`（結び付くかは実行ファイルの`tree bound`に聞く（Stopの促しと同じ判定）。取り込み先のブランチは`tree base-bound`に聞く）、統合先と消えた親のブランチへの
   pushの拒否、親のワークツリーでの`checkout`・`switch`の行き先の確認）と、`integrate`・`integrate-done`の状態操作はshに置く。条件は3つで、
   生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
   （設計 9.2）。この3つを満たさない判定はshに足さない

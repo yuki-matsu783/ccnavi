@@ -1,16 +1,17 @@
 """直接作業の取り込み先のブランチが、チケットに結び付くか（`ccnavi tree base-bound`）。
 
-`ccnavi-worktree.sh` が、メインのチェックアウトのブランチへ直接作業を切ってよいかを決めるために聞く。
-`ops_stop_integrate.bound_check`（ワークツリーの名前が結び付くか）とは材料が違う。
+`ccnavi-worktree.sh` が、メインのチェックアウトのブランチへ直接作業を切ってよいかを
+決めるために聞く。`ops_stop_integrate.bound_check`（ワークツリーの名前が結び付くか）とは材料が違う。
 
 - 識別子の衝突: ワークスペース全体のチケット・提案に、`branch_to_id(ブランチ)` の名前のものがある
 - 取り込み先との結び付き: **取り込み先のリポジトリだけ**を見る。そのリポジトリの承認済みチケット
   （`doing/`・`done/`）の `branch:` 欄か識別子がこのブランチと一致する、またはそのリポジトリの退避に
   同じ名前の親がある。ほかのリポジトリの同じ名前のブランチでは断らない
 
-デフォルトブランチにチケットのファイルが残っているだけでは結び付くと読まない（名前も `branch:` も
-一致しないので、ここでは当たらない）。決められないもの（置き場を読めない・frontmatter を読めない）は
-`unknown` で、呼ぶ側は断る。
+デフォルトブランチにチケットのファイルが残っているだけでは結び付くと読まない。
+そのファイルは名前も `branch:` も、このブランチと一致しないからである。
+置き場を読めない、frontmatter を読めないなど決められないときは `unknown` になり、
+呼ぶ側は断る。
 """
 
 from __future__ import annotations
@@ -96,7 +97,9 @@ def base_bound(root: str, conf: settings.Settings, main_root: str, branch: str) 
                 unsure = True
                 continue
             tied = str(front.get("branch") or "").strip()
-            if (tied and _same(tied, branch)) or _same(str(front.get("ticket") or "").strip(), ident):
+            if (tied and _same(tied, branch)) or _same(
+                str(front.get("ticket") or "").strip(), ident
+            ):
                 rel = os.path.relpath(path, root).replace(os.sep, "/")
                 return YES, f"取り込み先のリポジトリの承認済みチケット（{rel}）に結び付く"
     return (UNKNOWN, "") if unsure else (NO, "")
