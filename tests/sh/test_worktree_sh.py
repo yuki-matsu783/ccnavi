@@ -586,7 +586,8 @@ class WorktreeShTest(unittest.TestCase):
 
     def test_reading_the_root_does_not_rewrite_its_index(self):
         self.dirty_root()
-        path = os.path.join(self.ws, "tracked.txt")
+        # 中身は同じで stat だけ違う追跡済みのファイル。git status が index を書き直す元になる。
+        path = os.path.join(self.ws, ".gitignore")
         later = os.stat(path).st_mtime + 5
         os.utime(path, (later, later))
         index = os.path.join(self.ws, ".git", "index")

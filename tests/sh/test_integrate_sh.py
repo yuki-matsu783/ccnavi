@@ -932,6 +932,7 @@ class IntegrateReviewTest(Fixture):
         write(os.path.join(self.wt, "keep.txt"), "uncommitted\n")
         r = self.run_git_sh("integrate-done", "wt")
         self.assertOk(r, 1)
+        self.assertIn("未コミットの変更があるので、削除していません", r.stdout)
         self.assertEqual("uncommitted\n", read(os.path.join(self.wt, "keep.txt")))
         self.assertTrue(self.has_branch())
 
@@ -940,6 +941,7 @@ class IntegrateReviewTest(Fixture):
         write(os.path.join(self.wt, "wip/handoff/note.local"), "not in the start point\n")
         r = self.run_git_sh("integrate-done", "wt")
         self.assertOk(r, 1)
+        self.assertIn("起点に無いか中身の違うファイル", r.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.wt, "wip/handoff/note.local")))
 
     def test_cleanup_stops_before_deleting_the_worktree_when_the_branch_moved(self):
