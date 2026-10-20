@@ -32,7 +32,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 | UC-02 | エージェントが生の `git` を打つと、拒否されて、`ccnavi-git.sh` の入口を案内され、そちらでは通る | 1 | [UC-02](UC-02-raw-git-denied.yml) | draft |
 | UC-03 | コマンド名を変数や置換で組み立てた呼び出しは、中身を確かめられないので止まる | 1 | [UC-03](UC-03-command-name-expansion.yml) | draft |
 | UC-04 | 再帰的な強制削除は、直接でも `sh -c`・`env` 越しでも止まり、消えない | 1 | [UC-04](UC-04-wrapped-recursive-delete.yml) | draft |
-| UC-05 | 認証情報の場所は読めない。値を持たない見本（`.env.example`）は読める | 1 | [UC-05](UC-05-credentials.yml) | draft |
+| UC-05 | 認証情報の場所は読めない。値を持たない見本（`.env.example`）も読めない | 1 | [UC-05](UC-05-credentials.yml) | draft |
 | UC-06 | ルールが言及しない呼び出しは判定せず Claude Code の権限モードに委ねる。案内は 1 度だけ届く | 1 | [UC-06](UC-06-undeclared-handover.yml) | draft |
 | UC-07 | ルール・hook・スクリプトの書き換えは、Write/Edit でもシェルでも止まる | 2 | [UC-07](UC-07-self-guard.yml) | draft |
 | UC-08 | 直接作業の正常な流れ: ワークツリー → 編集 → コミット → 取り込み先へ取り込み → 片付け | 2 | [UC-08](UC-08-direct-work-to-integrate.yml) | draft |

@@ -165,20 +165,47 @@ OPS_SHELL_RULE_ID = OPS_RULE_ID + "-shell"
 OPS_REL = "logs/state/ops"
 
 
+def approved_message_for(root: str) -> str:
+    """承認済みの置き場の文面。承認の経路・状態の確かめ方・終え方・範囲の変え方を 1 か所で言う。
+
+    実行前の関門（`gate_rules`）と、実行後の保護範囲（`approved_write_rule`）が同じ文を使う。
+    """
+    ticket = settings.script_command(root, "ccnavi-ticket.sh")
+    return (
+        "承認済みチケットの置き場です。承認・状態・レビューの記録は、ユーザの操作と"
+        " ccnavi のスクリプトだけが動かします。直接書き込まないでください。"
+        "承認はユーザが、VS Code のボード・Chrome のボード・端末の 'ccnavi user agree'・"
+        "置き場のファイルの移動のどれかで行います。"
+        f"承認が済んだかどうかは '{ticket} status' で確かめてください。"
+        "置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。"
+        f"作業を終えたら '{ticket} finish <識別子>' で、レビュー待ち（wip/proposals/review/）へ"
+        "動かしてください。"
+        "範囲を変えたいなら、wip/proposals/todo/ に新しい提案を書き、"
+        f"'{ticket} propose <識別子>' で送ってから承認を依頼してください。"
+    )
+
+
+def approved_write_rule(approved_rel: str, root: str) -> rules.Rule:
+    """承認済みの置き場を名前で書くツールから守る 1 本（`builtin:ticket-approved`）。
+
+    実行後の保護範囲（`events.watched_for`）に足す。シェル版は足さない。実行後は作業ツリーの
+    変更を見るため。実行前の関門（`gate_rules`）と同じ式・同じ文面。
+    """
+    return _dir_rules(
+        APPROVED_RULE_ID, APPROVED_SHELL_RULE_ID, approved_rel, approved_message_for(root)
+    )[0]
+
+
 def gate_rules(approved_rel: str, root: str) -> list[rules.Rule]:
     """承認済みの置き場と操作記録の置き場を守るルール。組み込みで、ルールファイルには書かない。
 
     承認済みの置き場（承認済みチケット、`doing/`・`done/`、`phases/` のマーカー・子の記録・
-    受け入れ台帳、`flows/`）は、動かすのは ccnavi のスクリプトとユーザの操作だけ。エージェントの
+    受け入れ台帳、`flows/`）は、動かせるのは ccnavi のスクリプトとユーザの操作だけ。エージェントの
     直接の書き込みは、dry-run でも `CCNAVI_GUARD_CORE_FILES` の値でも止める
     （チケット制御が有効な間）。
     操作記録（判断の保存と送信の段階）も同じ。書き直すと、送り直しの根拠を偽れる。
     """
-    approved_message = (
-        "承認済みの置き場です。承認・状態・レビューの記録は、ユーザの操作と ccnavi のスクリプト"
-        f"（'{settings.script_command(root, 'ccnavi-ticket.sh')} status' で確かめられます）だけが"
-        "動かします。直接書き込まないでください。"
-    )
+    approved_message = approved_message_for(root)
     ops_message = (
         "操作記録の置き場です。ユーザの判断と外部への送信の段階を保存する記録で、書き直すと送り直しの"
         "根拠が変わります。ccnavi のスクリプトだけが書きます。直接書き込まないでください。"

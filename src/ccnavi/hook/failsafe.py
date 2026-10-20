@@ -24,19 +24,21 @@ from ..infra import hookio, pathcase, shellread
 READ_TOOLS = ("Read", "Grep", "Glob")
 SHELL_TOOLS = ("Bash", "PowerShell")
 
-# 認証情報の形、`.git` の中、操作記録の置き場。通常の判定の `credentials` と
-# `credentials-files`（ルールの共通レイヤー）が止める形のうち、設定を読まずに言える分を写す。
-# 通常の判定が止めていない `.git` と操作記録の置き場の読み取りは、ここ独自の追加。
-# 片方だけ直る事故を避けるため、通常の判定に形を足したらここも見直す。
+# 認証情報の形、`.git` の中、操作記録の置き場。通常の判定の `builtin:credentials` が止める形のうち、
+# 設定を読まずに言える分を写す。
+# failsafe 独自に、通常より広く止めるものがある: `.gnupg`、`id_ecdsa`、`.p12` / `.pfx`、
+# `.git` の中と操作記録の置き場の読み取り、先頭が区切りでない `credentials/`。
+# 片方だけ直る事故を避けるため、`builtin:credentials` に形を足したらここも見直す。
 # 承認済みの置き場のうち秘密に当たるものは無いので、ここには入れない。
 _BOUND = r"(?:^|[ \\/\x00=])"
 _MINIMAL_DENY = re.compile(
     rf"{_BOUND}\.(env|netrc|npmrc|pypirc|dev\.vars)"
     rf"|{_BOUND}\.(ssh|aws|gnupg)(?:[\\/]|$)"
     r"|\b(id_rsa|id_ed25519|id_ecdsa)\b"
-    rf"|{_BOUND}credentials\.json"
+    rf"|{_BOUND}credentials(?:[\\/]|\.json)"
     rf"|{_BOUND}secrets?[\\/]"
-    r"|\.(pem|key|p12|pfx)(?:\s|$)"
+    r"|[\w\-\\/]\.(pem|key)\b"
+    r"|\.(p12|pfx)(?:\s|$)"
     rf"|{_BOUND}\.git(?:[\\/]|$)"
     rf"|{_BOUND}logs[\\/]state[\\/]ops(?:[\\/]|$)",
     re.IGNORECASE,

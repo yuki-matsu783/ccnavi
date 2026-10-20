@@ -48,7 +48,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 | `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md` | できない | 可 | UTF-8 であること |
 | `defense` | `.ccnavi/scripts/**/*.sh`、`.claude/hooks/**`、`.claude/settings.json`、`.claude/settings.local.json`、`.claude/skills/**/*.md`（スキルの frontmatter は使えるツールや hook を持てる） | できない | 不可（`--via board` は断る。端末の前のユーザだけ） | `.sh` は CRLF を error にして `sh -n`。`settings*.json` は JSON として読めること |
 
-`layer-config` の `rules.yml` のうち、防御の記述を動かす取り込みは、`defense` と同じく端末に限る（`--via board` は断り、`--json` の `board` は偽になる）。防御の記述とみなすのは、`guard-` で始まる id のルール（足す・消す・判定を移す・`except` を含む中身を変える）と、今ある deny（消す・中身を変える）。deny を足すのは止める側への変更なので数えない。今の中身か下書きが読めなければ、確かめられないので端末に限る（`handoff._defense_change`）。`phases.yml`・`risks.yml` はこの判定の外。
+`layer-config` の `rules.yml` のうち、防御の記述を動かす取り込みは、`defense` と同じく端末に限る（`--via board` は断り、`--json` の `board` は偽になる）。防御の記述とみなすのは、次の 2 つ。1 つめは `guard-` で始まる id のルールを足す・消す・判定を移す・`except` を含む中身を変える場合で、この id は利用者が防御のルールに付ける印（ccnavi 自身の保護は組み込みの `builtin:guard-*` にあり、共通のルールファイルには無い）。2 つめは今ある deny を消す・中身を変える場合。deny を足すのは止める側への変更なので数えない。今の中身か下書きが読めなければ、確かめられないので端末に限る（`handoff._defense_change`）。共通のルールファイルが読めない間の修復はこの経路になる。エージェントは `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（`builtin:guard-ccnavi-config` が共通のルールファイルへの直接の書き込みを止めるが、置き場の写しは例外で書ける）、ユーザが端末の `ccnavi user handoff` で取り込む。そのため、ボードからの取り込みは断られる。`phases.yml`・`risks.yml` はこの判定の外。
 
 表に足すときは、行を足し、テストで表と docs の食い違いを検出する。
 

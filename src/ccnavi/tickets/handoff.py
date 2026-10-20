@@ -612,7 +612,8 @@ def _check_contents(conf: settings.Settings, root: str, plan: Plan) -> None:
             _check_defense(entry)
 
 
-# ルールの id のうち、防御の記述の印。共通の `guard-hooks`・`guard-scripts`・`guard-settings` など。
+# ルールの id のうち、防御の記述の印。レイヤーの rules.yml に利用者が書く防御のルールの印。
+# ccnavi 自身の保護は組み込み（`builtin:guard-*`）にある。
 DEFENSE_ID_PREFIX = "guard-"
 _DECISIONS = ("deny", "ask", "allow")
 

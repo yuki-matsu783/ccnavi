@@ -290,18 +290,6 @@ class BuiltinSpeedTest(unittest.TestCase):
     達して呼び出しが止められずに通る。
     """
 
-    def common_rule(self, rule_id):
-        with open(
-            os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), encoding="utf-8"
-        ) as f:
-            data = yamlread.safe_load(f.read())
-        found = [r for r in data["deny"] if r["id"] == rule_id]
-        self.assertEqual(len(found), 1)
-        return found[0]["regex"]
-
-    def test_common_recursive_delete_is_the_builtin_one(self):
-        self.assertEqual(self.common_rule("recursive-delete"), builtin.RECURSIVE_DELETE_REGEX)
-
     def test_common_regexes_return_quickly(self):
         """共通ルールの regex（組み合わせ条件と except の中も）も、長い入力ですぐ返る。"""
         with open(
@@ -309,20 +297,27 @@ class BuiltinSpeedTest(unittest.TestCase):
         ) as f:
             data = yamlread.safe_load(f.read())
         found = []
+        by_rule: dict[str, list[str]] = {}
 
-        def walk(node):
+        def walk(node, rule_id=""):
             if isinstance(node, dict):
+                rule_id = node.get("id", rule_id) if isinstance(node.get("id"), str) else rule_id
                 for key, value in node.items():
                     if key == "regex" and isinstance(value, str):
-                        found.append(value.replace("{root}", "/ws").replace("{!root}", ""))
+                        expression = value.replace("{root}", "/ws").replace("{!root}", "")
+                        found.append(expression)
+                        by_rule.setdefault(rule_id, []).append(expression)
                     else:
-                        walk(value)
+                        walk(value, rule_id)
             elif isinstance(node, list):
                 for item in node:
-                    walk(item)
+                    walk(item, rule_id)
 
         walk(data)
-        self.assertGreater(len(found), 10)
+        # 残しているルール（ccnavi 自身の保護と認証情報は組み込みにあり、ここには無い）の
+        # regex が、検査の対象に入っていることを確かめる。入っていなければ速さを見たことにならない。
+        for rule_id in ("workspace-root", "session-scratchpad", "find-writes", "heredoc"):
+            self.assertIn(rule_id, by_rule)
         for text in (*COMMON_SLOW_BEFORE, *SLOW_BEFORE):
             for expression in found:
                 regex = re.compile(expression, re.IGNORECASE)

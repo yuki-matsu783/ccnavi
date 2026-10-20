@@ -160,11 +160,11 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 |---|---|
 | `rm -rf`、`git push`、`git reset --hard` | 止める。表記違いも止める（下） |
 | 生の git（いつも） | 止める（`builtin:guard-raw-git`。9.1） |
-| 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
+| 認証情報の置き場（`.env*`、`.dev.vars`、`.netrc`、`.npmrc`、`.pypirc`、`.aws/`、`.ssh/`、`*.pem` / `*.key`、`secrets/`、`credentials/`、`credentials.json`、`id_rsa`、`id_ed25519`）への `Bash` `Read` `Write` `Edit` `NotebookEdit` | 止める（`builtin:credentials`。下） |
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
 | `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`。下） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
-| `Write` / `Edit` でルールファイルを直す | 既定では止めない。権限モードに委ねる |
+| `hook`・`settings`・`scripts`・共通の設定 3 本への `Write` `Edit` `NotebookEdit` | 止める（`builtin:guard-hooks` など。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ。8.2）。ルールファイルが読めない間の修復も、直接は通さない。下書きを `wip/handoff/` に置き、ユーザが `ccnavi user handoff` で取り込む |
 | それ以外 | 権限モードに委ねる |
 
 取り返しの付かない操作の 3 本（`builtin:recursive-delete`・`builtin:git-push`・`builtin:git-reset-hard`）は、既定のときに限らず
@@ -174,11 +174,16 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   読み飛ばしてから `push` / `reset` を見る。値を取るオプションは値を最後まで読むので（`git -C gitx push` の `gitx` も 1 つの値。読みで空白が 2 字続く空の値 `git -C '' push` は空の値として読む）、`git -c push.default=current status` の値の `push` も値として読む。`push` の後ろは空白・区切り・末尾だけを見る。`reset` は後ろのどこかに `--hard`（略した `--har` も）があれば止める。`--` の後ろはパスなので見ない（`git reset -- --hard`）。
   サブコマンドを直接起こす `git-push` / `git-reset`（パス付きの `/usr/lib/git-core/git-push`、`.exe` 付き）も同じ 1 本で止める。
 - rm は、再帰（`-r` `-R` `--recursive`）と強制（`-f` `--force`）の組を、まとめた形（`-rf` `-fr` `-Rfv`）・分けた形（`-r -f`）・順序・
-  長い形（略した形も）を問わずに止める。共通レイヤーの見本の `recursive-delete` も同じ式
+  長い形（略した形も）を問わずに止める。共通のルールファイルには書かず、この土台だけが持つ
 - どの式も、照合の時間が入力の長さにほぼ比例する形で書く（所有的な繰り返しとアトミックグループ。先読みは使わない）。判定の期限は
   ルールの合間でしか確かめないので、1 本の照合が後戻りで長引くと hook の timeout に達し、呼び出しは止められずに通る。
   rm と reset は、後の始まりで当たるなら最初の始まりでも当たるので、コマンドの中で最初の `rm` / `reset` に決めて 1 度だけ読む。
   git のオプションは、中に git の始まりを持たない語だけを読む
+
+認証情報の 1 本（`builtin:credentials`）も、既定のときに限らず常に当たる土台の deny。設定で切れず、誤検知が出ても外せない。
+見本の `.env.example` も、対象の 5 つのツール（`Bash` `Read` `Write` `Edit` `NotebookEdit`）で止まる。`Grep` `Glob` `PowerShell` は対象に入れない。
+鍵のファイルは拡張子として書かれた形（`x.pem`、`x.pem.bak`、`x.key.json`）で当てる。判定に達せなかったときの許可リスト（`hook/failsafe.py`）は、
+この式に揃え、独自に `.gnupg`、`id_ecdsa`、`.p12` / `.pfx`、`.git`、操作記録の置き場を足している。
 
 `.git` の中への書き込みの 2 本（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`）も、既定のときに限らず常に当たる土台の deny。
 参照・索引・設定・hook を git を通さずに書き換えると、履歴や作業中の変更を失い、hook なら以後の git の操作のたびに任意のコマンドが走る。
