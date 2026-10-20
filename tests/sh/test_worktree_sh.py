@@ -15,8 +15,9 @@ fetch のときだけ origin の URL を bare リポジトリへ向ける git �
 5. 記録（version 4）が実行後チェックの読み取り（infra/directrec）で有効と読めること
 6. 既にあるワークツリーは何もせずパスを出すこと（冪等）、既にあるブランチ・使えない名前は断ること
 7. --dry-run は何も作らないこと。廃止した --offline / --from-origin は終了コード 2
-8. --adopt は、記録の無い既存のワークツリーを 2 回の呼び出し（確認コード）で v4 の記録に引き取ること。
-   merge-base が複数なら断ること。記録の無いワークツリーの integrate は --adopt を案内して断ること
+8. --adopt は、記録の無い既存のワークツリーを 2 回の呼び出し（確認コード）で v4 の記録に
+   引き取ること。merge-base が複数なら断ること。記録の無いワークツリーの integrate は
+   --adopt を案内して断ること
 """
 
 from __future__ import annotations
@@ -823,7 +824,8 @@ class WorktreeShTest(unittest.TestCase):
         self.uncorded_worktree()
         gitsh = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh")
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        env.update({"CCNAVI_BIN_PATH": self.exe, "PATH": os.pathsep.join([self.bin, os.environ["PATH"]])})
+        env["CCNAVI_BIN_PATH"] = self.exe
+        env["PATH"] = os.pathsep.join([self.bin, os.environ["PATH"]])
 
         def integrate():
             return subprocess.run(
