@@ -59,7 +59,7 @@ SCRIPT_FIELDS = (
 )
 
 # `settled_by` の値。ccnavi が子を `review/` から `done/` へ動かす経路。
-# `feedback-plan` は古い版がフィードバック計画の承認で書いた値。新しくは書かないが、読める値として残す。
+# `feedback-plan` は古い版がフィードバック計画の承認で書いた値。新しくは書かず、読める値として残す。
 SETTLED_BY_VALUES = ("confirm", "decide", "close-early", "feedback-plan", "chrome")
 
 # glob のワイルドカード。これより前が字義どおりの前置。
