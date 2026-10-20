@@ -7,6 +7,7 @@
  * 足すときの許可（`chrome.permissions.request`）は設定画面の役目で、ここには持たない。
  */
 import type { StorageArea } from "./settings.js";
+import { isGheHost } from "./hostclass.js";
 import { endpoint, type Host, type HostKind } from "./hosts.js";
 
 export const CUSTOM_KEY = "customHosts";
@@ -15,12 +16,13 @@ export const CUSTOM_KEY = "customHosts";
 const CUSTOM_ID = /^[a-z0-9][a-z0-9._-]*$/;
 
 /**
- * 許可の型を、`others`（h を除いた通信先：組み込みと、足したもの）も使っているか。使っていれば、許可は外さない
- * （同じホスト名の別の port や、組み込みの host_permissions と同じ許可を一緒に外してしまうため）
+ * h の許可の型のうち、`others`（h を除いた通信先：組み込みと、足したもの）が使っていないもの。外してよい許可。
+ * 使っているものは外さない（同じホスト名の別の port や、組み込みの host_permissions と同じ許可を
+ * 一緒に外してしまうため）。GHE.com は画面と API の origin が違うので、許可は複数になる
  */
-export function patternShared(h: Host, others: readonly Host[]): boolean {
-  const pattern = originPattern(h);
-  return others.some((o) => originPattern(o) === pattern);
+export function releasablePatterns(h: Host, others: readonly Host[]): string[] {
+  const used = new Set(others.flatMap((o) => originPatterns(o)));
+  return originPatterns(h).filter((p) => !used.has(p));
 }
 
 /** 保存する 1 行。URL はオリジン（パスなし） */
@@ -54,6 +56,15 @@ export function customHost(kind: unknown, value: unknown): Host {
   const id = url.hostname + (url.port ? `_${url.port}` : "") + (url.protocol === "http:" ? "_http" : "");
   if (!CUSTOM_ID.test(id)) {
     throw new Error(`ホストの名前が使えない形: ${id}`);
+  }
+  // 種類はユーザが明示したものを保つ（自動判定より優先）。GitHub として登録した *.ghe.com だけは、
+  // 画面と API の origin が違う（https://api.<ホスト>）。それ以外の GitHub は Enterprise Server（/api/v3）
+  if (kind === "github" && isGheHost(url.hostname)) {
+    if (url.port) {
+      throw new Error(`GHE.com のホスト ${url.hostname} にはポートを付けられません（API の URL を組めません）`);
+    }
+    const ghe = `https://api.${url.hostname}`;
+    return { id, kind, api: ghe, graphql: `${ghe}/graphql`, web: origin };
   }
   const api = kind === "gitlab" ? `${origin}/api/v4` : `${origin}/api/v3`;
   const graphql = kind === "gitlab" ? api : `${origin}/api/graphql`;
@@ -104,12 +115,18 @@ export async function loadHosts(area: StorageArea, builtIn: readonly Host[]): Pr
 }
 
 /**
- * ホストの許可の型（`chrome.permissions` の origins に渡す）。API と画面は同じオリジン。
+ * ホストの許可の型（`chrome.permissions` の origins に渡す）。画面と、API と GraphQL の origin のすべて。
+ * GHE.com は画面（`https://<名前>.ghe.com`）と API（`https://api.<名前>.ghe.com`）の origin が違う。
  * Chrome の一致パターンは port を書けないため、port を外す（`http://localhost/*` は port を問わず一致する）。
  */
-export function originPattern(h: Host): string {
-  const u = new URL(h.web);
-  return `${u.protocol}//${u.hostname}/*`;
+export function originPatterns(h: Host): string[] {
+  const out: string[] = [];
+  for (const value of [h.web, h.api, h.graphql]) {
+    const u = new URL(value);
+    const pattern = `${u.protocol}//${u.hostname}/*`;
+    if (!out.includes(pattern)) out.push(pattern);
+  }
+  return out;
 }
 
 /** 保存する行（ホストの web のオリジン） */

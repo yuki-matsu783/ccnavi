@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { CUSTOM_KEY, customHost, loadHosts, originPattern, patternShared, readCustomHosts, readCustomRows, rowOf } from "../src/core/custom-hosts.js";
+import { CUSTOM_KEY, customHost, loadHosts, originPatterns, releasablePatterns, readCustomHosts, readCustomRows, rowOf } from "../src/core/custom-hosts.js";
 import { HOSTS } from "./helpers/host.js";
 
 test("CX-T243 足すホスト: GitLab のオリジンから API（/api/v4）と web を組む。GraphQL は読まない（REST だけ）", () => {
@@ -94,8 +94,8 @@ test("CX-T247 通信先の一覧: 組み込み（ビルドのもの）が先で�
   // 行は種類と URL だけ（API の欄は読むたびに組み直す）
   assert.deepEqual(rowOf(hosts[2]), { kind: "gitlab", url: "http://localhost:8080" });
   // Chrome の一致パターンは port を書けない（port を外した形）
-  assert.equal(originPattern(hosts[2]), "http://localhost/*");
-  assert.equal(originPattern(customHost("gitlab", "https://gitlab.example.com:8443")), "https://gitlab.example.com/*");
+  assert.deepEqual(originPatterns(hosts[2]), ["http://localhost/*"]);
+  assert.deepEqual(originPatterns(customHost("gitlab", "https://gitlab.example.com:8443")), ["https://gitlab.example.com/*"]);
 });
 
 test("CX-T248 足すホストの id は、同じサーバーに別の id を付けさせない: https と http・ポートの違いで別の id。末尾のドットと _ は拒否", () => {
@@ -114,7 +114,7 @@ test("CX-T248 足すホストの id は、同じサーバーに別の id を付�
 test("CX-T249 許可を外す判断: 同じ許可を組み込みや別の行が使っていれば外さない", () => {
   const a = customHost("gitlab", "https://gitlab.example.com");
   const b = customHost("gitlab", "https://gitlab.example.com:8443");
-  assert.equal(patternShared(a, [b]), true);
-  assert.equal(patternShared(a, HOSTS), false);
-  assert.equal(patternShared(a, [...HOSTS, customHost("github", "https://gitlab.example.com")]), true);
+  assert.deepEqual(releasablePatterns(a, [b]), []);
+  assert.deepEqual(releasablePatterns(a, HOSTS), ["https://gitlab.example.com/*"]);
+  assert.deepEqual(releasablePatterns(a, [...HOSTS, customHost("github", "https://gitlab.example.com")]), []);
 });

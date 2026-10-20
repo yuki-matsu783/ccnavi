@@ -46,9 +46,10 @@ class RemoteKindTest(unittest.TestCase):
             # パスに `@` があっても authority の外なのでホストに入らない。
             "git@github.com:o/r@x.git": "github",
             "https://[::1]:9/g/p.git": "gitlab",
+            # scheme の大文字小文字は区別しない。
+            "HTTPS://github.com/o/r.git": "github",
             # sh が読めない表記は、こちらも読めない扱い。
             "ssh://user@host.example.com/g/p.git": "",
-            "HTTPS://github.com/o/r.git": "",
             "not a url": "",
         }
         for url, kind in cases.items():
