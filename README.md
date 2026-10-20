@@ -1030,7 +1030,7 @@ VS Code を使わないときは `--no-vscode` を付ける。
 チケットがどのワークツリーでどこまで進んでいるかは、VS Code の拡張「ccnavi ボード」
 （`extensions/vscode/ccnavi-board/`）で見られる。拡張は `ccnavi --explain --json` の出力を
 並べるだけ。承認はボードのオーバーレイで一覧を見せ、ユーザが押したら `user agree --yes` を子プロセスで
-打つ（形は下の「承認の JSON」）。レビューで残った指摘は、フェーズ行の「決める」で指摘ごとに対応方針を
+打つ（形は下の「承認の JSON」）。レビューで残った指摘は、フェーズ行の［レビュー完了］で指摘ごとに対応方針を
 選び、拡張が `ccnavi-user-decide.sh` を子プロセスで打つ（形は下の「残った指摘の JSON」）。
 `close-early` はボードに置かず、端末で `ccnavi-user-close-early.sh` を打つ。組み立て方と使い方はそこの README、
 出力の形は下の「ボードの JSON」。
@@ -2065,7 +2065,7 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
   （指摘が 0 件、またはどれも直さないときにレビュー済みにする）
 - `comment` はこのセッションで受けた承認や判断をマージリクエストのコメントに写す
 
-残った指摘の対応方針はユーザが決める（`decide`）。ボードの「決める」か、端末で `ccnavi-user-decide.sh <N>`。
+残った指摘の対応方針はユーザが決める（`decide`）。ボードの［レビュー完了］か、端末で `ccnavi-user-decide.sh <N>`。
 
 - **対応しない（受け入れて進む）。** スレッドに受け入れて進む旨の返信を残して解決済みにする（sh が置く前にする。返信か解決に失敗したら何も置かずに止まる）。次の `confirm` はホスト上の未解決だけを数える。受け入れは親全体に当てはまり、他の人が開き直せば未解決として数える
 - **このフェーズで直す。** 直す指摘を写した続きの子を、同じフェーズの番号で `.ccnavi/approved/doing/<親>-<フェーズ番号>-<そのフェーズの次の連番>.md` に直に置く
@@ -2872,7 +2872,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 
 ## 残った指摘の JSON
 
-ボードの「決める」が読み書きする形。拡張は sh（`ccnavi-review.sh decide <N> --preview` と `ccnavi-user-decide.sh`）を子プロセスで打ち、sh が取得した JSON を実行ファイルに渡す。
+ボードの［レビュー完了］が読み書きする形。拡張は sh（`ccnavi-review.sh decide <N> --preview` と `ccnavi-user-decide.sh`）を子プロセスで打ち、sh が取得した JSON を実行ファイルに渡す。
 版は `version`（今は 2。ボードは版 1 を断る）で、承認の JSON と別に数える。
 
 `ccnavi-review.sh decide <N> --preview`（実行ファイルは `--reviewed N --accept-unresolved --preview --json`）は何も置かない。

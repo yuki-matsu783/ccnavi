@@ -64,7 +64,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 どのグループがどのファイルを読むかは、テストの `import`（CSS は `@import`）を辿って決める。辿れないものだけはパスで決める。その決まりは `test-groups.js` の先頭にまとめてあり、固定データ `test/fixtures/` は全部のグループを回す。画面 `src/webview/` は、辿れたぶんとバンドルしたものを読むグループを回す。組み立てに使う `package.json`・`tsconfig*.json`・`scripts/`・`pnpm-lock.yaml` は全部を回し、文書 `*.md` と画像 `media/` は何も回さない。`out/`・`node_modules/` は数えない。テストが 1 つも読まないファイルは `tsc` だけ通す。`test/<グループ>/` を増やすときに直すのは、`package.json` の行 1 本だけ。
 
-`test/shared/` は 7 画面を比べるので、バンドルした画面を読む。そのため `shared` を含む計画には必ず画面の型検査とバンドルが付き、`src/core/` の大半は `shared` を含む。絞って減らせるのは 1 ターンあたり 2.5〜4.5 秒。
+`test/shared/` は 9 画面を比べるので、バンドルした画面を読む。そのため `shared` を含む計画には必ず画面の型検査とバンドルが付き、`src/core/` の大半は `shared` を含む。絞って減らせるのは 1 ターンあたり 2.5〜4.5 秒。
 
 ワークスペース側の hook（`.claude/hooks/mark-ext.sh` と `test-ext.sh`）は `pnpm test:for` と同じ仕組みで動く。拡張のファイルを触ったターンの終わりに、関わるグループだけが回る。
 

@@ -238,6 +238,7 @@ test/
   helpers/fixture.ts  board.json を読む
   helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を記録する
   helpers/board.ts    ボード画面（React）をバンドルしたものごと happy-dom で開く
+  helpers/cards.ts    カードの組み立てを欄ごとに指定して作る部品（状態の札・レビュー・マージの画面のテストが使う）
   helpers/projects.ts プロジェクト管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/risk.ts     リスク管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/phases.ts   フェーズ管理画面（React）をバンドルしたものごと happy-dom で開く

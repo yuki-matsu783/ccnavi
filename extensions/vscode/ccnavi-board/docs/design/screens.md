@@ -85,7 +85,7 @@ keywords: [設計, 画面, approval-machine, 状態の札, あなたの番, 詳�
 
 | 足すもの | 触る場所 |
 |---|---|
-| カードに出す項目 | `core/status.ts`（札の言葉と規則）→ `core/model.ts`（実行ファイルとの契約。JSON を増やすなら Python 側の `tests/ticket/test_board.py` が書き出す見本 `test/fixtures/board.json` も）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/text.ts`（出す言葉）→ `webview/board/Card.tsx`（見せ方）→ `webview/board/Card.css`（CSS）→ テスト（`test/board/model.test.ts`・`board.test.ts`・`render.dom.test.ts`） |
+| カードに出す項目 | `core/status.ts`（札の言葉と規則）→ `core/model.ts`（実行ファイルとの契約。JSON を増やすなら Python 側の `tests/ticket/test_board.py` が書き出す見本 `test/fixtures/board.json` も）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/text.ts`（出す言葉）→ `webview/board/Card.tsx`（見せ方）→ `webview/board/Card.css`（CSS）→ テスト（`test/board/model.test.ts`・`board.test.ts`・`status.test.ts`・`card.dom.test.ts`・`render.dom.test.ts`） |
 | ユーザが押せる操作 | `core/board-view.ts` の `BoardMessage` → 画面のボタン → `board-panel.ts` の `KNOWN`（形の確認の一覧）と `asMessage`（形の確認）と `handleMessage`（処理）。`KNOWN` か処理を書き忘れると型が合わなくなる（どちらも型で網羅を強制してある） |
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
