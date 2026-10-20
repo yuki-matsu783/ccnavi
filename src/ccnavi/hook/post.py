@@ -180,6 +180,7 @@ def check(
     else:
         carried = []
 
+    side_names = {w.tree.name for w, _, _ in read if w.side_by_side}
     restored: dict[str, str] = {}
     # 戻しを試みたか。戻せなかった 1 件も途中までファイルを動かしたかもしれないので含める。
     tried = False
@@ -191,6 +192,8 @@ def check(
     # 取り違えないようにする。
     if restore == selfguard.ENABLE:
         for w, top, _ in read:
+            if w.side_by_side:
+                continue
             here = [
                 f
                 for f in fresh
@@ -209,7 +212,11 @@ def check(
     # 予行で言うのも、本番で戻すのと同じ集合に限る。戻さない 1 件に「本番なら
     # 戻していた」と書くと、設定を enable にしたときに起きることを読み違えさせる。
     would = (
-        {f.key() for f in fresh if _restorable(f) and f.key() not in shadowed}
+        {
+            f.key()
+            for f in fresh
+            if _restorable(f) and f.key() not in shadowed and f.tree_name not in side_names
+        }
         if restore == selfguard.DRY_RUN
         else set()
     )
@@ -238,6 +245,9 @@ def check(
         notes.append(f"preexisting {len(carried)}")
     if known:
         notes.append(f"known {len(known)}")
+    side_fresh = [f for f in fresh if f.tree_name in side_names and _restorable(f)]
+    if side_fresh:
+        notes.append(f"side-by-side {len(side_fresh)}")
     if restored:
         notes.append(f"restored {len(restored)}")
     elif would:
@@ -268,6 +278,7 @@ def check(
             not_restored=gated and (not _restorable(f) or f.key() in shadowed),
             git=git,
             shadowed=f.key() in shadowed,
+            side_by_side=f.tree_name in side_names and _restorable(f),
         )
         for f in fresh
     ]
@@ -451,6 +462,7 @@ def at_stop(
     # ここを足さないと、保護領域を汚してからコミットした回が「何も起きなかった」と
     # 同じ見た目になる（呼び出しごとの実行後チェックも同じ見落としがあるが、そちらは戻しに関わるので
     # 断面を変えない。ユーザが 1 度で見るのはこの報告）。
+    side_names = {w.tree.name for w, _, _ in read if w.side_by_side}
     committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places, synced)
     found += committed
     if not found and not uncounted:
@@ -490,9 +502,14 @@ def at_stop(
             )
         )
         kind = gitstate.KIND_LABELS.get(finding.change.kind, finding.change.kind)
+        origin = (
+            f" {post_report.SIDE_BY_SIDE_LABEL}。"
+            if finding.tree_name in side_names and _restorable(finding)
+            else ""
+        )
         lines.append(
             f"  {where}{finding.change.path}（{kind}）"
-            f" 対象のルール: {rules.record_name(rule)} / {how}"
+            f" 対象のルール: {rules.record_name(rule)} /{origin} {how}"
         )
     if len(found) > REPORT_LIMIT:
         all_at = (
@@ -557,6 +574,9 @@ class Watched:
     tree: tree.Tree
     rule_set: rules.RuleSet
     source: str
+    # 横で作業する指定が有効なメインのチェックアウト（`infra.directrec`）。ここで新しく見つかった
+    # 変更は、ユーザか別のセッションのものかもしれないので、戻さず報告だけにする。
+    side_by_side: bool = False
 
 
 def _read_all(

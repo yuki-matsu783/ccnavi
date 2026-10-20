@@ -17,7 +17,7 @@ import sys
 import time
 from typing import TextIO
 
-from ..infra import fsio, hookio, modes, settings, shellread, tree
+from ..infra import directrec, fsio, hookio, modes, pathcase, settings, shellread, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
 from ..records import audit, busy, failstreak, prune, repeat, stopops, stopreview
@@ -149,6 +149,10 @@ def watched_for(
     別に書くと、実行前に通った書き込みがターンの終わりに報告される。
     """
     ws = tree.main_tree(root)
+    # 横で作業する指定が有効なメインのチェックアウトは、触ったツリーによらず毎回見る
+    # （エージェントは作業ワークツリーで動いていて、書き換えはそのメインのチェックアウトに起きる）。
+    sbs = directrec.side_by_side_roots(root, conf.projects)
+    sbs_keys = {pathcase.fold(t.root) for t in sbs}
     if payload is None:
         trees = tree.all_trees(root, conf.projects)
     else:
@@ -157,6 +161,8 @@ def watched_for(
         t = tree.tree_of(root, where, conf.projects)
         if t is not None and t.root != ws.root:
             trees.append(t)
+        have = {pathcase.fold(x.root) for x in trees}
+        trees += [x for x in sbs if pathcase.fold(x.root) not in have]
     loaded: dict[str, tuple[rules.RuleSet, str]] = {}
     out = []
     for t in trees:
@@ -172,7 +178,7 @@ def watched_for(
                 )
             loaded[t.project] = (rule_set, source)
         rule_set, source = loaded[t.project]
-        out.append(post.Watched(t, rule_set, source))
+        out.append(post.Watched(t, rule_set, source, pathcase.fold(t.root) in sbs_keys))
     return out
 
 
