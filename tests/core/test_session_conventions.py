@@ -235,12 +235,12 @@ class SessionConventionsTest(unittest.TestCase):
 
     def test_常駐の文脈なので短い(self):
         # 毎回の起動・再開・compact に届く。考え方と作業の決まりと詳細の表と進め方を合わせて
-        # 3600 字に収める（直接作業の確認と取り込み先の決まりを 2 行足したので 3400 から上げた）。
+        # 3000 字に収める（詳細は .ccnavi/docs/ に分け、ここには入口だけ置く）。
         os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
         text = block(self.start("--mode", "enable"))
         body = text.replace(self.root, "<root>")
 
-        self.assertLess(len(body), 3600, body)
+        self.assertLess(len(body), 3000, body)
 
 
 if __name__ == "__main__":
