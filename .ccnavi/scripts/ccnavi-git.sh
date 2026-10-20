@@ -44,6 +44,7 @@ export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
 # 引数だけ見て環境を見ないと、防いだつもりの穴が別の経路で開いたままになる。
 # GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が無ければ読まれないので、
 # 番号を数えて消す必要はない。GIT_CONFIG_COUNT を消せば全部読まれない。
+# 例外は、このあと実行直前に ccnavi_git_auth が足す gh / glab の credential helper だけ（利用者の環境変数は引き継がない）。
 unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || true
 # git が操作するリポジトリと作業ツリーを、居場所（cwd）でなく環境変数で決める経路も閉じる。
 # `GIT_DIR=<親>/.git GIT_WORK_TREE=<親> sh ccnavi-git.sh commit` を子のワークツリーで打つと、

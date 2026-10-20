@@ -169,7 +169,7 @@ ccnavi_fetch_or_note() {
 		return 1
 	fi
 	printf '%s\n' "$3"
-	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証に失敗した（資格情報が無いか、切れているか、権限がありません）。hook は資格情報の入力を求めない。ユーザに端末で一度 'git fetch origin' を実行して認証を済ませてもらえば、次のセッションから通る"
+	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証に失敗した（資格情報が無いか、切れているか、権限がありません）。hook は資格情報の入力を求めない。gh / glab でログイン済みなら自動で通るので、無ければユーザに gh auth login（GitLab は glab auth login）を頼む。または端末で一度 'git fetch origin' を実行して認証を済ませてもらえば、次のセッションから通る"
 	return 1
 }
 

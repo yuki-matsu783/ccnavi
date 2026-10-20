@@ -297,11 +297,16 @@ ccnavi_ga_base=""
 
 ccnavi_git_auth() {
 	ccnavi_ga_url=$(git -C "${1:-.}" remote get-url origin 2>/dev/null || :)
+	[ "$ccnavi_ga_url" = "$ccnavi_ga_seen" ] && return 0
+	# origin が変わったら、前に足した分を外す（http(s) でなければ、そのまま何も足さない）。
+	if [ -n "$ccnavi_ga_base" ]; then
+		GIT_CONFIG_COUNT="$ccnavi_ga_base"
+		export GIT_CONFIG_COUNT
+	fi
 	case "$ccnavi_ga_url" in
 	[hH][tT][tT][pP]://* | [hH][tT][tT][pP][sS]://*) ;;
 	*) return 0 ;;
 	esac
-	[ "$ccnavi_ga_url" = "$ccnavi_ga_seen" ] && return 0
 	# 親の環境が GIT_CONFIG_COUNT を持っていればその続きに足す。origin が変わったら、自分が足した分を外してやり直す。
 	[ -n "$ccnavi_ga_base" ] || ccnavi_ga_base="${GIT_CONFIG_COUNT:-0}"
 	case "$ccnavi_ga_base" in '' | *[!0-9]*) return 0 ;; esac
@@ -321,8 +326,10 @@ ccnavi_git_auth() {
 	fi
 	ccnavi_ga_cli=$(command -v "$ccnavi_ga_name" 2>/dev/null || :)
 	[ -n "$ccnavi_ga_cli" ] || return 0
-	eval "GIT_CONFIG_KEY_$ccnavi_ga_base=\"credential.$ccnavi_ga_scheme://$ccnavi_ga_host.helper\""
-	eval "GIT_CONFIG_VALUE_$ccnavi_ga_base=\"!\\\"$ccnavi_ga_cli\\\" auth git-credential\""
+	# 値は変数のまま eval に渡す（ホスト名や道具のパスを式に埋めない。origin の文字列がコマンドとして走らないように）。
+	ccnavi_ga_key="credential.$ccnavi_ga_scheme://$ccnavi_ga_host.helper"
+	ccnavi_ga_val="!\"$ccnavi_ga_cli\" auth git-credential"
+	eval "GIT_CONFIG_KEY_$ccnavi_ga_base=\$ccnavi_ga_key GIT_CONFIG_VALUE_$ccnavi_ga_base=\$ccnavi_ga_val"
 	eval "export GIT_CONFIG_KEY_$ccnavi_ga_base GIT_CONFIG_VALUE_$ccnavi_ga_base"
 	GIT_CONFIG_COUNT=$((ccnavi_ga_base + 1))
 	export GIT_CONFIG_COUNT
