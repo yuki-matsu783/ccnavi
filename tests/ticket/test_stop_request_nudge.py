@@ -76,7 +76,8 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertIn(f"'{ticket_sh} finish i0001-01-02'", reason)
         # 前置きと同じ考え方の 3 点: 許可は要らない・打つコマンド・本当の問いは書き直す。
         self.assertIn("ユーザの許可は要りません", reason)
-        self.assertIn("問いなら、その問いを最後に書き直して", reason)
+        self.assertIn("問いがある場合は、その問いを最後に書き直して", reason)
+        self.assertIn("このまま進めずにターンを終えてください", reason)
         # 同じ状態では 1 回だけ。連鎖の 2 回目も止めない。
         self.assert_not_asked(self.stop(self.parent_tree))
         self.assert_not_asked(self.stop(self.parent_tree, active=True))
