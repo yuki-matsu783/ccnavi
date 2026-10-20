@@ -64,6 +64,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
 
 ### 手で切るとき
 
+- 直接作業のワークツリーは手で切らず、`ccnavi-worktree.sh`で切る。起点は取り込み先のHEADで、`origin/<統合先>`から切らない。以下はチケット作業の親と子、または`ccnavi-worktree.sh`を使えないときの手順
 - `ccnavi-git.sh worktree add <行き先> -b <名前> --no-track origin/<統合先>`で作る。起点は`origin/<統合先>`にして、
   手元の`<統合先>`は進めない（追跡の設定も付けない）。末尾の起点を省くと今いるブランチが起点になるため、省かずに書く
 - 切る前に`ccnavi-git.sh fetch origin <統合先>`し、`ccnavi-git.sh log --oneline <統合先>..origin/<統合先>`で遅れを確かめる。
@@ -82,6 +83,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
 
 ### 起点にする統合先
 
+- この節は、親のワークツリーと、手で切るワークツリーの起点の話。直接作業のワークツリーの起点は取り込み先のHEAD（`--copy-wip`のときは書きかけのスナップショット）で、`origin`からは切らない
 - 起点はリモートにある最新の統合先にする。統合先の名前は、そのリポジトリの手元の`origin/HEAD`が指すブランチで、無ければ`origin/main`、`origin/master`の順に使う。
   環境変数や`.claude/settings.local.json`で上書きする手段は無く、`projects/`の下のプロジェクトも、それぞれ自分の`origin/HEAD`で決まる。
   origin の無いリポジトリでは統合先が決まらない。`origin/HEAD`は、セッションの開始時に`ccnavi-fetch.sh`がホストの既定ブランチへ向け直す。

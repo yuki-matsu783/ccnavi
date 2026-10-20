@@ -30,8 +30,8 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
 | 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（`.ccnavi/docs/templates.md`） |
-| テンプレートの下書き（エージェントが書く。効力は無い） | 取り込み先と同じ相対パスで`wip/handoff/`の下（`wip/handoff/.ccnavi/config/project/templates/<名前>.yml`など）。プロジェクト向けは`projects/<名前>/wip/handoff/…`。取り込むのはユーザ（`ccnavi user handoff`） |
-| ユーザに渡す物（保護対象を直した写しなど） | ワークスペースのワークツリーの`wip/handoff/`（追跡する。統合のときに`integrate`が外す） |
+| テンプレートの下書き（エージェントが書く。効力は無い） | 反映する先と同じ相対パスで`wip/handoff/`の下（`wip/handoff/.ccnavi/config/project/templates/<名前>.yml`など）。プロジェクト向けは`projects/<名前>/wip/handoff/…`。取り込むのはユーザ（`ccnavi user handoff`） |
+| ユーザに渡す物（保護対象を直した写しなど） | ワークスペースのワークツリーの`wip/handoff/`（追跡する。直接作業では`integrate`が取り込み結果から外す） |
 | 使い捨てのファイル・コミットしたくないもの | ワークスペースルート直下の`scratchpad/`（`.gitignore`で追跡から外す。`.ccnavi/docs/scratchpad.md`）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の置き物もワークスペース側に置く |
 | ワークスペースのルール | 共通レイヤーの`.ccnavi/config/common/rules.yml`。リスクの配点とフェーズ定義（`phases.yml`）も同じ場所。レイアウトに依存するフェーズ定義は自身のレイヤーの`.ccnavi/config/project/phases.yml` |
 | プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手するとき、共通レイヤーはプロジェクトの`.ccnavi/config/common/`にミラーされる（設計11.12）。フェーズ定義は共通レイヤーと`config/project/`の和 |

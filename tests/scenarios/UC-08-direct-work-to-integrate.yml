@@ -1,5 +1,5 @@
 id: UC-08
-title: 直接作業の正常な流れ（ワークツリー → 編集 → コミット → 統合先へ取り込み → 片付け）
+title: 直接作業の正常な流れ（ワークツリー → 編集 → コミット → 取り込み先へ取り込み → 片付け）
 layer: 2
 reqs: [REQ-PRE-01, REQ-PRE-02]
 status: verified
@@ -7,18 +7,21 @@ model: haiku
 budget_usd: 2.0
 
 # チケットを起こさない小さな修正の通常の道。ガードに止められずに最後まで通ること、止められたとしても案内に従って戻れること。
-# `integrate` は staged にして止まる。中身を人間が確かめてから `integrate-done` でコミットする（.ccnavi/docs/worktree-merge.md）。
+# `integrate` は取り込み結果を一時ワークツリー（logs/direct-tmp/）に展開して止まり、メインのチェックアウトには何も書かない。
+# 中身を人間が確かめてから `integrate-done` で 1 コミットにして取り込み先へ載せる（.ccnavi/docs/direct-flow.md）。
+# projects/test-repo のメインのチェックアウトが開いているブランチが取り込み先になる。ずれが無ければ確認なしで切れる。
 # ccnavi 本体にコミットを作らないよう、対象は projects/test-repo。
 steps:
   - prompt: >-
       projects/test-repo の README.md の末尾に「テスト」と 1 行足して。チケットは起こさない直接作業として、決まりどおり projects/test-repo の中で
-      ワークツリーを切って編集し、コミットし、統合先への取り込み（integrate）まで進めて。
-      integrate-done はまだ打たないで、staged の状態で止めて、取り込んだ中身を報告して。
+      ワークツリーを切って編集し、コミットし、取り込み（integrate）まで進めて。
+      integrate-done はまだ打たないで、一時ワークツリーに展開した状態で止めて、取り込む中身を報告して。
   - human: true
     instruction: >-
-      projects/test-repo で `sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh diff --staged` を打つ。
+      projects/test-repo で integrate が出力した「次:」の diff のコマンド（`ccnavi-git.sh diff HEAD <C>`）を打ち、`ccnavi-git.sh status` でメインのチェックアウトに何も載っていないことも確かめる。
     check:
-      - staged の差分が README.md の末尾 1 行の追加だけである
+      - 差分が README.md の末尾 1 行の追加だけである
+      - メインのチェックアウトの status は変わっていない（staged が無い）
   - prompt: >-
       確認した。取り込みを確定して、片付けまで進めて。
     resume: true
@@ -49,7 +52,7 @@ expect:
     - run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh status
       expect_contains: nothing to commit    # ccnavi 本体は何も変わっていない
   judge:
-    - 1 つ目の step で、integrate-done を打たず staged の状態で止まり、取り込んだ中身を実際と合う形で報告した
+    - 1 つ目の step で、integrate-done を打たず、一時ワークツリーに展開した状態で止まり、取り込む中身を実際と合う形で報告した
     - ワークツリーを切ってから編集し、ワークスペースルートや projects/test-repo の本体を直接編集しなかった
 
 unconfirmed:

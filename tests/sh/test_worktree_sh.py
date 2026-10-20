@@ -14,8 +14,9 @@ fetch のときだけ origin の URL を bare リポジトリへ向ける git �
 4. detached・チケットに結び付く・結び付くかを確かめられない・git 2.39 では断ること
 5. 記録（version 4）が実行後チェックの読み取り（infra/directrec）で有効と読めること
 6. 既にあるワークツリーは何もせずパスを出すこと（冪等）、既にあるブランチ・使えない名前は断ること
-7. --dry-run は何も作らないこと。廃止した --offline / --from-origin と未対応の --adopt は
-   終了コード 2
+7. --dry-run は何も作らないこと。廃止した --offline / --from-origin は終了コード 2
+8. --adopt は、記録の無い既存のワークツリーを 2 回の呼び出し（確認コード）で v4 の記録に引き取ること。
+   merge-base が複数なら断ること。記録の無いワークツリーの integrate は --adopt を案内して断ること
 """
 
 from __future__ import annotations
@@ -561,18 +562,16 @@ class WorktreeShTest(unittest.TestCase):
 
     # ---- 引数
 
-    def test_retired_and_unsupported_arguments_exit_2_with_guidance(self):
+    def test_retired_arguments_exit_2_with_guidance(self):
         for arg, why in (
             ("--offline", "廃止しました"),
             ("--from-origin", "廃止しました"),
-            ("--adopt", "まだ使えません"),
         ):
             with self.subTest(arg=arg):
                 result = self.run_sh("topic", arg)
                 self.assertEqual(2, result.returncode, result.stdout)
                 self.assertIn(why, result.stderr)
-                if arg != "--adopt":
-                    self.assertIn("--accept", result.stderr)
+                self.assertIn("--accept", result.stderr)
                 self.assertFalse(os.path.exists(self.wt("topic")))
 
     def test_copy_wip_and_no_wip_together_are_refused(self):
@@ -692,6 +691,160 @@ class WorktreeShTest(unittest.TestCase):
                 cwd=self.ws,
             ).returncode,
         )
+
+    # ---- 引き取り（--adopt）
+
+    def uncorded_worktree(self, name="topic", commits=2):
+        """記録の無い直接作業のワークツリー（更新前に切った・手で切ったもの）。"""
+        git(self.ws, "worktree", "add", "-q", self.wt(name), "-b", name)
+        for index in range(commits):
+            write(os.path.join(self.wt(name), f"w{index}.txt"), f"w{index}\n")
+            git(self.wt(name), "add", "-A")
+            git(self.wt(name), "-c", "commit.gpgsign=false", "commit", "-q", "-m", f"work {index}")
+
+    def record_path(self, name):
+        return os.path.join(self.ws, ".git", "ccnavi-direct", name)
+
+    def test_adopt_shows_the_range_and_the_code_first_and_writes_nothing(self):
+        self.uncorded_worktree()
+        first = self.run_sh("topic", "--adopt", "--base", "main")
+        self.assertEqual(3, first.returncode, first.stdout + first.stderr)
+        self.assertIn("この範囲全体をエージェントの成果として扱う", first.stdout)
+        self.assertIn("work 0", first.stdout)
+        self.assertIn("work 1", first.stdout)
+        self.assertIn("w1.txt", first.stdout)
+        self.assertIn(git(self.ws, "rev-parse", "--short", "main"), first.stdout)
+        self.code_of(first)
+        self.assertFalse(os.path.exists(self.record_path("topic")))
+        self.assertEqual("", git(self.ws, "for-each-ref", "refs/ccnavi/direct/topic"))
+
+    def test_adopt_with_the_code_writes_the_record_and_the_ref(self):
+        self.uncorded_worktree()
+        before = self.snapshot_of_root()
+        code = self.code_of(self.run_sh("topic", "--adopt", "--base", "main"))
+        done = self.run_sh("topic", "--adopt", "--base", "main", "--accept", code)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        base = git(self.ws, "rev-parse", "main")
+        record = self.record("topic")
+        self.assertEqual("4", record["version"])
+        self.assertEqual("main", record["base_branch"])
+        self.assertEqual(base, record["snap_sha"])
+        self.assertEqual("no", record["snap_wip"])
+        self.assertEqual("no", record["side_by_side"])
+        self.assertEqual("adopt", record["confirm"])
+        self.assertEqual(base, git(self.ws, "rev-parse", "refs/ccnavi/direct/topic/s"))
+        self.assertIn("取り込み先: main", done.stdout)
+        self.assertEqual(before, self.snapshot_of_root())
+
+    def test_adopt_side_by_side_is_only_set_when_given(self):
+        self.uncorded_worktree()
+        code = self.code_of(self.run_sh("topic", "--adopt", "--base", "main"))
+        done = self.run_sh("topic", "--adopt", "--base", "main", "--accept", code, "--side-by-side")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("yes", self.record("topic")["side_by_side"])
+
+    def test_adopt_with_a_wrong_code_starts_over(self):
+        self.uncorded_worktree()
+        wrong = self.run_sh("topic", "--adopt", "--base", "main", "--accept", "deadbeef")
+        self.assertEqual(3, wrong.returncode, wrong.stdout + wrong.stderr)
+        self.assertIn("確認コードが今の状態と合わない", wrong.stdout)
+        self.assertFalse(os.path.exists(self.record_path("topic")))
+
+    def test_adopt_code_changes_when_the_branch_moves(self):
+        self.uncorded_worktree()
+        code = self.code_of(self.run_sh("topic", "--adopt", "--base", "main"))
+        write(os.path.join(self.wt("topic"), "more.txt"), "m\n")
+        git(self.wt("topic"), "add", "-A")
+        git(self.wt("topic"), "-c", "commit.gpgsign=false", "commit", "-q", "-m", "more")
+        moved = self.run_sh("topic", "--adopt", "--base", "main", "--accept", code)
+        self.assertEqual(3, moved.returncode, moved.stdout + moved.stderr)
+        self.assertFalse(os.path.exists(self.record_path("topic")))
+
+    def test_adopt_needs_the_base_and_it_must_be_the_current_base(self):
+        self.uncorded_worktree()
+        none = self.run_sh("topic", "--adopt")
+        self.assertEqual(2, none.returncode, none.stdout + none.stderr)
+        self.assertIn("--base", none.stderr)
+        git(self.ws, "branch", "other")
+        wrong = self.run_sh("topic", "--adopt", "--base", "other")
+        self.assertEqual(1, wrong.returncode, wrong.stdout + wrong.stderr)
+        self.assertIn("今の取り込み先", wrong.stderr)
+
+    def test_adopt_refuses_when_there_are_several_merge_bases(self):
+        self.uncorded_worktree(commits=0)
+        write(os.path.join(self.ws, "x.txt"), "x\n")
+        git(self.ws, "add", "-A")
+        git(self.ws, "commit", "-q", "-m", "x on main")
+        write(os.path.join(self.wt("topic"), "y.txt"), "y\n")
+        git(self.wt("topic"), "add", "-A")
+        git(self.wt("topic"), "-c", "commit.gpgsign=false", "commit", "-q", "-m", "y on topic")
+        # 互いを merge して、共通の祖先が 2 つになる（交差する merge）。
+        topic_y = git(self.wt("topic"), "rev-parse", "HEAD")
+        main_x = git(self.ws, "rev-parse", "HEAD")
+        git(self.ws, "-c", "commit.gpgsign=false", "merge", "-q", "--no-edit", topic_y)
+        git(self.wt("topic"), "-c", "commit.gpgsign=false", "merge", "-q", "--no-edit", main_x)
+        self.assertEqual(2, len(git(self.ws, "merge-base", "--all", "topic", "main").split()))
+        result = self.run_sh("topic", "--adopt", "--base", "main")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("merge-base が複数", result.stderr)
+        self.assertFalse(os.path.exists(self.record_path("topic")))
+
+    def test_adopt_refuses_an_already_recorded_worktree_and_a_missing_one(self):
+        cut = self.run_sh("topic")
+        self.assertEqual(0, cut.returncode, cut.stdout + cut.stderr)
+        again = self.run_sh("topic", "--adopt", "--base", "main")
+        self.assertEqual(1, again.returncode, again.stdout + again.stderr)
+        self.assertIn("記録が既にあります", again.stderr)
+        missing = self.run_sh("nothing", "--adopt", "--base", "main")
+        self.assertEqual(1, missing.returncode, missing.stdout + missing.stderr)
+        self.assertIn("ワークツリー", missing.stderr)
+
+    def test_adopt_refuses_a_worktree_that_opens_another_branch(self):
+        self.uncorded_worktree()
+        git(self.wt("topic"), "checkout", "-q", "-b", "elsewhere")
+        result = self.run_sh("topic", "--adopt", "--base", "main")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertFalse(os.path.exists(self.record_path("topic")))
+
+    def test_adopt_is_refused_when_the_base_bound_cannot_be_answered(self):
+        self.uncorded_worktree()
+        result = self.run_sh("topic", "--adopt", "--base", "main", CCNAVI_BIN_PATH="/nonexistent")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertFalse(os.path.exists(self.record_path("topic")))
+
+    def test_adopt_dry_run_writes_nothing(self):
+        self.uncorded_worktree()
+        result = self.run_sh("topic", "--adopt", "--base", "main", "--dry-run")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("dry-run", result.stdout)
+        self.assertFalse(os.path.exists(self.record_path("topic")))
+
+    def test_integrate_without_a_record_points_to_adopt_and_it_works_after_adopting(self):
+        self.uncorded_worktree()
+        gitsh = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh")
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.update({"CCNAVI_BIN_PATH": self.exe, "PATH": os.pathsep.join([self.bin, os.environ["PATH"]])})
+
+        def integrate():
+            return subprocess.run(
+                [SHELL, gitsh, "integrate", "topic"],
+                cwd=self.ws,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+        refused = integrate()
+        self.assertNotEqual(0, refused.returncode, refused.stdout)
+        self.assertIn("--adopt", refused.stdout + refused.stderr)
+        code = self.code_of(self.run_sh("topic", "--adopt", "--base", "main"))
+        self.assertEqual(
+            0, self.run_sh("topic", "--adopt", "--base", "main", "--accept", code).returncode
+        )
+        done = integrate()
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
 
 
 @unittest.skipIf(SHELL is None or REAL_GIT is None, "sh か git が無い")

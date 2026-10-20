@@ -6,6 +6,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept <確認コード>]
 #                                        [--copy-wip | --no-wip] [--side-by-side] [--dry-run]
+#   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> --adopt --base <ブランチ> [--accept <確認コード>] [--side-by-side]
 #
 # 取り込み先は、切った時点でメインのチェックアウト（`git worktree list` の先頭）が開いているブランチ。
 # 起点 S は、書きかけを写すとき（--copy-wip）は確認した時点の書きかけを含むスナップショット、それ以外は
@@ -40,7 +41,7 @@
 # 書きかけを写す候補は確認が要るときに refs/ccnavi/direct/<名前>/pending に置き、切ったら消す。
 #
 # --dry-run は何も作らず、調べた結果と予定だけを出す（fetch もしない）。
-# --offline / --from-origin は廃止（終了コード 2）。--accept で代わりができる。--adopt は未対応（終了コード 2）。
+# --offline / --from-origin は廃止（終了コード 2）。--accept で代わりができる。--adopt は記録の無い既存のワークツリーを引き取る（2 回の呼び出しで確認コードを使う）。
 #
 # 終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り / 3 確認が要る
 
@@ -72,6 +73,9 @@ sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept
                   書きかけを写して切るか、写さず HEAD から切るか（書きかけがあるときはどちらかが要る）
   --side-by-side  このワークツリーが残っている間、メインのチェックアウトで見つかった変更を自動で戻さず報告にする
                   （ccnavi の設定ファイルは戻す）
+  --adopt         記録の無い既存の直接作業のワークツリー（.claude/worktrees/<名前>）を引き取る。--base <取り込み先> が要る。
+                  1 回目は推定した起点・取り込む範囲・差分を見せて確認コードを出し（終了コード 3）、
+                  ユーザの了承を得て --accept <確認コード> を付けて打ち直すと記録を書く
   --dry-run       何も作らず、調べた結果と予定だけ出す
 
 直接作業（チケットを使わない作業）用。親子のチケットの親のワークツリーには使わない
@@ -88,13 +92,15 @@ accept=""
 wip_mode=""
 side=""
 dry=""
+adopt=""
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 	--offline | --from-origin)
 		fail retired-arg "$1 は廃止しました。fetch が届かない・手元が origin とずれているときは、引数なしで打つと状態と確認コードを報告するので、ユーザの了承を得てから --accept <確認コード> を付けて打ち直してください。" 2
 		;;
 	--adopt)
-		fail adopt-unsupported "--adopt（記録の無い既存のワークツリーの引き取り）はまだ使えません。" 2
+		adopt=1
+		shift
 		;;
 	--base)
 		[ "$#" -ge 2 ] || fail base-missing "--base にブランチ名がありません。" 2
@@ -189,7 +195,7 @@ print_next() {
 	printf '次: 編集はこのワークツリーの下で行います（Write / Edit に渡すパス: %s/…）。git は `cd %s && %s <サブコマンド>` の形で実行します。終わったらコミットし、ターンの終わりの integrate の案内に従います\n' "$dest" "$pn_q" "$pn_g"
 }
 
-if [ -e "$dest" ] || [ -L "$dest" ]; then
+if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
 	# 在るのは、このリポジトリのワークツリーで、同じ名前のブランチを開いているときだけ成功にする。
 	have=$(git worktree list --porcelain 2>/dev/null | awk -v want="$(ccnavi_phys "$dest")" '
 		/^worktree / { p = substr($0, 10) }
@@ -201,7 +207,7 @@ if [ -e "$dest" ] || [ -L "$dest" ]; then
 	print_next
 	exit 0
 fi
-if git show-ref --verify --quiet "refs/heads/$name"; then
+if [ -z "$adopt" ] && git show-ref --verify --quiet "refs/heads/$name"; then
 	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すなら sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")、新しく切るなら別の名前にしてください。"
 fi
 
@@ -224,7 +230,7 @@ same_id_guard() {
 	git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null || :
 	git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin 2>/dev/null | grep -v -x 'HEAD' || :
 } >"$heads_list"
-same_id_guard "$heads_list" 手元
+[ -n "$adopt" ] || same_id_guard "$heads_list" 手元
 
 # ---- C1〜C3。先に断るもの。
 # 取り込み先は、メインのチェックアウト（git worktree list の先頭）が開いているブランチ。
@@ -262,6 +268,113 @@ esac
 
 if [ -n "$base_arg" ] && [ "$base_arg" != "$target" ]; then
 	fail base-mismatch "--base ${base_arg} は、今の取り込み先（${target}。メインのチェックアウト ${main_tree}）と違います。取り込み先が切り替わっていれば、ユーザに確かめて、報告からやり直してください（引数なしで打ち直す）。"
+fi
+
+# ---- 引き取り（--adopt）。記録の無い既存の直接作業のワークツリーを v4 の形式に引き取る。
+# 1 回目は推定した S・取り込む範囲・差分の stat を見せて確認コードを出し、終了コード 3 で止まる。
+# 2 回目は --accept <確認コード> が一致したときだけ、記録（snap_wip no・confirm adopt）と s の ref を書く。
+if [ -n "$adopt" ]; then
+	[ -n "$base_arg" ] ||
+		fail adopt-no-base "--adopt には --base <取り込み先> が要ります（今のメインのチェックアウトのブランチは ${target}）。ユーザに取り込み先を確かめてから付けてください。" 2
+	[ -z "$wip_mode" ] ||
+		fail adopt-wip "--adopt では --copy-wip / --no-wip は使えません（書きかけは写さない。起点は merge-base から決める）。" 2
+	ad_common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
+	[ -n "$ad_common" ] || fail no-common-dir "git の共通ディレクトリを読めません。"
+	ad_common=$(ccnavi_phys "$ad_common")
+	[ ! -e "$ad_common/ccnavi-direct/$name" ] ||
+		fail adopt-recorded "${name} には直接作業の記録が既にあります（${ad_common}/ccnavi-direct/${name}）。引き取りは記録の無いワークツリーだけです。"
+	[ -d "$dest" ] && [ ! -L "$dest" ] ||
+		fail adopt-no-worktree "ワークツリー ${dest} がありません。引き取るのは .claude/worktrees/${name} の既存のワークツリーです。"
+	ad_dest_common=$(git -C "$dest" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
+	[ -n "$ad_dest_common" ] && [ "$(ccnavi_phys "$ad_dest_common")" = "$ad_common" ] ||
+		fail adopt-common-dir "ワークツリー ${dest} の git の共通ディレクトリが、実行した場所のリポジトリと違います。別のリポジトリのワークツリーは引き取りません。"
+	ad_have=$(git worktree list --porcelain 2>/dev/null | awk -v want="$(ccnavi_phys "$dest")" '
+		/^worktree / { p = substr($0, 10) }
+		/^branch / { if (p == want) print substr($0, 8) }')
+	[ "$ad_have" = "refs/heads/$name" ] ||
+		fail adopt-branch "${dest} は、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${ad_have:-ワークツリーの登録が無い}）。"
+	ad_tip=$(git rev-parse "refs/heads/$name" 2>/dev/null || :)
+	[ -n "$ad_tip" ] || fail adopt-no-branch "ブランチ ${name} を読めません。"
+	ad_bases=$(git merge-base --all "$name" "$target" 2>/dev/null || :)
+	ad_count=$(printf '%s\n' "$ad_bases" | grep -c . || :)
+	if [ "$ad_count" -eq 0 ]; then
+		fail adopt-no-base-commit "${name} と ${target} の共通の祖先（merge-base）がありません。起点を決められないので引き取りません。"
+	fi
+	if [ "$ad_count" -gt 1 ]; then
+		fail adopt-many-bases "${name} と ${target} の merge-base が複数あります（$(printf '%s\n' "$ad_bases" | cut -c1-8 | tr '\n' ' ')）。起点を 1 つに決められないので引き取りません。ワークツリーの中で ccnavi-git.sh merge ${target} を打ってから、やり直してください。"
+	fi
+	ad_s="$ad_bases"
+	ad_s_short=$(git rev-parse --short "$ad_s" 2>/dev/null || printf '%s' "$ad_s")
+	ad_input="adopt|repo=$ad_common|name=$name|target=$target|head=$head_sha|s=$ad_s|tip=$ad_tip"
+	ad_code=$(printf '%s' "$ad_input" | git hash-object --stdin | cut -c1-8)
+	ad_report() {
+		printf '引き取りの確認が要る: 記録はまだ書いていない。\n'
+		[ "$1" != code ] || printf '案内: 渡された確認コードが今の状態と合わない（報告のあとでブランチか取り込み先が動いた）。報告からやり直す。\n'
+		printf '状態:\n'
+		printf '  取り込み先 %s (%s)\n' "$target" "$main_tree"
+		printf '  ワークツリー %s（ブランチ %s。先頭 %s）\n' "$dest" "$name" "$(git rev-parse --short "$ad_tip")"
+		printf '  推定した起点 S: %s（%s と %s の merge-base）\n' "$ad_s_short" "$name" "$target"
+		printf '取り込むコミットの範囲（%s..%s）:\n' "$ad_s_short" "$name"
+		git log --oneline "$ad_s..$ad_tip" 2>/dev/null | sed 's/^/  /'
+		printf '取り込みの差分:\n'
+		git diff --stat "$ad_s" "$ad_tip" 2>/dev/null | sed 's/^/  /'
+		printf '了承の文面: この範囲全体をエージェントの成果として扱う。範囲に他人のコミットや、取り込み先に入れたくない変更が混ざっていないかを、ユーザに確かめる\n'
+		ad_cmd="sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base $(ccnavi_sh_quote "$target") --accept $ad_code"
+		printf '次: 上をユーザに伝えて了承を得てから、%s\n' "$ad_cmd"
+		printf '案内: 横で作業する（ルートの変更を自動で戻さない）なら、了承を得たうえで --side-by-side を付ける\n'
+	}
+	log_info 引き取りを調べた -- "name=$name" "target=$target" "s=$ad_s" "tip=$ad_tip"
+	if [ -n "$dry" ]; then
+		printf 'dry-run: 何も書かない。引き取りの予定は次のとおり。\n'
+		ad_report first
+		exit 0
+	fi
+	if [ -z "$accept" ]; then
+		ad_report first
+		exit "$EXIT_CONFIRM"
+	fi
+	if [ "$accept" != "$ad_code" ]; then
+		ad_report code
+		exit "$EXIT_CONFIRM"
+	fi
+	ad_rec_dir="$ad_common/ccnavi-direct"
+	ad_rec="$ad_rec_dir/$name"
+	ad_tmp="$ad_rec_dir/.$name.$$"
+	ad_side=no
+	[ -z "$side" ] || ad_side=yes
+	mkdir -p "$ad_rec_dir" 2>/dev/null || fail record-failed "記録の置き場（${ad_rec_dir}）を作れません。"
+	{
+		printf 'version 4\n'
+		printf 'base_branch %s\n' "$target"
+		printf 'base_sha %s\n' "$head_sha"
+		printf 'snap_sha %s\n' "$ad_s"
+		printf 'snap_wip no\n'
+		printf 'side_by_side %s\n' "$ad_side"
+		printf 'main_tree %s\n' "$main_tree"
+		printf 'common_dir %s\n' "$ad_common"
+		printf 'confirm adopt\n'
+		printf 'created %s\n' "$(date +%s)"
+	} >"$ad_tmp" 2>/dev/null && mv -f "$ad_tmp" "$ad_rec" ||
+		{
+			rm -f "$ad_tmp"
+			fail record-failed "記録（${ad_rec}）を書けません。"
+		}
+	git update-ref "refs/ccnavi/direct/$name/s" "$ad_s" 2>/dev/null || {
+		rm -f "$ad_rec"
+		fail ref-failed "S の ref（refs/ccnavi/direct/${name}/s）を置けません。"
+	}
+	printf 'ワークツリーを引き取った: %s\n' "$dest"
+	printf 'ブランチ: %s（起点 %s）\n' "$name" "$ad_s_short"
+	printf '取り込み先: %s（%s）\n' "$target" "$main_tree"
+	printf '起点: %s（%s と %s の merge-base。範囲全体を成果として扱う）\n' "$ad_s_short" "$name" "$target"
+	if [ "$ad_side" = yes ]; then
+		printf '横で作業する: はい（%s で見つかった変更は自動で戻さず報告する。ccnavi の設定ファイルは戻す）\n' "$main_tree"
+	else
+		printf '横で作業する: いいえ\n'
+	fi
+	log_info 引き取った -- "name=$name" "target=$target" "snap=$ad_s" "side=$ad_side"
+	print_next
+	exit 0
 fi
 
 # ---- 状態を調べる（C4〜C8）。
