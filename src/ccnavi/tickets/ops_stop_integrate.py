@@ -15,10 +15,14 @@
   承認済みチケット・提案の `<名前>.md`、手元の退避、origin に在る親のブランチのワークツリー）を
   使うので、促したのに `integrate` が断る食い違いは起きない
 - 作業が残っている。ワークツリーに未コミットの変更がある（追跡していないファイルも数える）か、
-  統合先に入っていないコミットがある
-- `integrate <名前>` の記録が無い。統合先のツリーの git ディレクトリの `ccnavi-integrate/<名前>/` が
-  無く、`ccnavi-integrate-done/<名前>`（片付けた記録の写し）も、写しの `branch_sha` が今の HEAD と
-  同じで未コミットの変更が無い、という形では無い（名前を使い直した作業を、前の写しで黙らせない）
+  取り込み先に入っていないコミットがある。入っていないコミットは、直接作業の記録
+  （`ccnavi-direct/<名前>`。取り込み先 `base_branch` と起点 `snap_sha`）があれば
+  `S..先頭` で数える。
+  記録が無いときは統合先（`origin/HEAD`）で数え、`integrate` が断るので `--adopt` を案内する
+- 取り込みの途中の marker（`ccnavi-integrate/<名前>/`）が無い。あれば「`integrate-done` か
+  `integrate --abort`」を促す。片付けた記録の写し（`ccnavi-integrate-done/<名前>`）は、旧形式の
+  写しの `branch_sha` が今の HEAD と同じで未コミットの変更が無い、という形では無い
+  （名前を使い直した作業を、前の写しで黙らせない）
 
 ## 3 つの結果
 
@@ -28,16 +32,22 @@
 のときだけ。`UNKNOWN` は候補を外さず、促した記録も
 残さない。git は、期限（`time.monotonic` の絶対時刻）を過ぎてから起こさない（`gitcmd.run_until`）。
 
-## 統合先
+## 取り込み先と統合先
 
-`ccnavi_integration`（`ccnavi-common-state.sh`）と同じ。そのリポジトリの手元の `origin/HEAD`、
-無ければ `origin/main`・`origin/master`。origin の無いリポジトリでは決まらない。
-決まらなければ `integrate` が断るので、促さずに理由を言う。
+記録があれば、取り込み先は記録の `base_branch` で、メインのチェックアウトがそのブランチを
+開いていることを求める。記録が無いときの統合先は `ccnavi_integration`（`ccnavi-common-state.sh`）と
+同じ。そのリポジトリの手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`。origin の
+無いリポジトリでは決まらず、決まらなければ促さずに理由を言う。
+`origin/<取り込み先>` が手元より進んでいれば、push の前に手元を合わせる警告を足す
+（手元の ref だけで比べる）。
 
 ## 促さずに理由を言う
 
-`integrate` の前提を満たせないとき。統合先をチェックアウトしているツリーが無い、そのツリーに
-未コミットの変更や途中の操作がある。`blocked` に理由を入れて返し、呼び手が止めずに報告する。
+`blocked` に理由を入れて返し、呼び手が止めずに報告する。理由になるのは、取り込み先が切り替わった、
+メインのチェックアウトに途中の操作（MERGE_HEAD など）がある、記録が壊れている、
+記録の共通ディレクトリが合わない（共通の前提チェック）、統合先が決まらない（記録が無いとき）。
+メインのチェックアウトの書きかけ（未コミットの変更）では止めない。ユーザの書きかけは最後の
+fast-forward で git が持ち越す。
 
 ## 1 回だけ
 
@@ -54,7 +64,7 @@ import os
 import time
 from dataclasses import dataclass
 
-from ..infra import fsio, gitcmd, pathcase, settings, tree
+from ..infra import directrec, fsio, gitcmd, pathcase, settings, tree
 from . import archive, direct_candidates, ops_close, ops_stop, ticket_ids, ticket_model
 
 # Stop で直接作業の `integrate` を促すときの理由コード。止めるのは 1 回だけの促しで、
@@ -88,6 +98,14 @@ class Direct:
     integration: str
     integ_tree: str = ""
     blocked: str = ""
+    # 取り込み先のブランチ。記録があるときだけ入る（無いときは統合先で数える）。
+    base: str = ""
+    # 記録が無い（更新前に切った・手で切った）。integrate は断るので、`--adopt` を案内する。
+    no_record: bool = False
+    # 取り込みの途中の marker。"" なし、"v4" 新形式、"old" 旧形式。
+    marker: str = ""
+    # 手元の取り込み先より `origin/<取り込み先>` が先に進んでいるコミットの数。
+    origin_ahead: int = 0
 
     @property
     def key(self) -> str:
@@ -96,7 +114,14 @@ class Direct:
     @property
     def digest(self) -> str:
         kind = "blocked" if self.blocked else "nudge"
-        return f"{kind}:{'dirty' if self.dirty else 'clean'}:{self.ahead}@{self.head}"
+        extra = ""
+        if self.marker:
+            extra += f":marker-{self.marker}"
+        if self.no_record:
+            extra += ":no-record"
+        if self.origin_ahead:
+            extra += f":origin+{self.origin_ahead}"
+        return f"{kind}:{'dirty' if self.dirty else 'clean'}:{self.ahead}@{self.head}{extra}"
 
 
 # 1 本のツリーを調べた結果。
@@ -225,11 +250,14 @@ def probe(
     if not head:
         return Probe(UNKNOWN)
     owner = tree.project_root(conf.projects, here.project) or root
-    integration = _integration(owner, deadline)
-    if integration is None:
-        return Probe(UNKNOWN)
     dirty = _dirty(here.root, deadline)
     if dirty is None:
+        return Probe(UNKNOWN)
+    rec = direct_record(owner, here.name)
+    if rec is not None:
+        return _probe_recorded(owner, here, head, dirty, rec, deadline)
+    integration = _integration(owner, deadline)
+    if integration is None:
         return Probe(UNKNOWN)
     ahead = (
         _ahead(here.root, integration, deadline)
@@ -240,7 +268,7 @@ def probe(
         if not (dirty and integration) or not _ref_missing(here.root, integration, deadline):
             return Probe(UNKNOWN)
         # 未コミットの変更があるのに統合先の ref を引けない。
-        found = Direct(here.name, here.root, head, dirty, 0, integration)
+        found = Direct(here.name, here.root, head, dirty, 0, integration, no_record=True)
         found.blocked = (
             f"統合先（{integration}）の ref が無く、引けません。統合先の名前が合っているか、"
             "ブランチが手元か origin にあるかをユーザに確かめてください"
@@ -248,7 +276,7 @@ def probe(
         return Probe(HIT, found)
     if not (dirty or ahead):
         return Probe(CLEAR)
-    found = Direct(here.name, here.root, head, dirty, ahead, integration)
+    found = Direct(here.name, here.root, head, dirty, ahead, integration, no_record=True)
     if not integration:
         if gitcmd.run(owner, ["remote", "get-url", "origin"], ops_close.TIMEOUT_SECONDS).ok:
             found.blocked = (
@@ -270,15 +298,137 @@ def probe(
             "どのツリーで取り込むかをユーザに確かめてください"
         )
         return Probe(HIT, found)
+    marks = _git_path(found.integ_tree, _RECORD_DIR, deadline)
+    if marks is None:
+        return Probe(UNKNOWN)
+    found.marker = marker_kind(marks, here.name)
+    if found.marker:
+        found.no_record = False
+        return Probe(HIT, found)
     recorded = _recorded(found.integ_tree, here.name, head, dirty, deadline)
     if recorded is None:
         return Probe(UNKNOWN)
     if recorded:
         return Probe(CLEAR)
-    busy = _integration_busy(found.integ_tree, deadline)
+    busy = _integration_busy(found.integ_tree, deadline, dirty_too=False)
     if busy is None:
         return Probe(UNKNOWN)
     found.blocked = busy
+    return Probe(HIT, found)
+
+
+def direct_record(owner: str, name: str) -> dict[str, str] | None:
+    """`ccnavi-worktree.sh` が置いた直接作業の記録。無ければ None。
+
+    git の共通ディレクトリの `ccnavi-direct/<名前>`（version 4）を、ファイルだけで読む。
+    読めても形が違う（版・取り込み先・起点が欠ける）記録は、`broken` を立てて返す。
+    """
+    common = directrec.common_dir(owner)
+    if common is None:
+        return None
+    path = os.path.join(common, directrec.DIRECT_DIR, name)
+    if not os.path.isfile(path):
+        return None
+    fields = directrec.parse(fsio.read_text(path, errors="replace") or "")
+    fields["_common"] = common
+    if fields.get("version") != directrec.VERSION or not (
+        fields.get("base_branch") and fields.get("snap_sha")
+    ):
+        fields["broken"] = "yes"
+    return fields
+
+
+def marker_kind(marks: str, name: str) -> str:
+    """`ccnavi-integrate/<名前>/` の marker の種類。無ければ空、版 4 なら "v4"、ほかは "old"。"""
+    folder = os.path.join(marks, name)
+    if not os.path.lexists(folder):
+        return ""
+    fields = directrec.parse(fsio.read_text(os.path.join(folder, "marker"), errors="replace") or "")
+    return "v4" if fields.get("version") == directrec.VERSION else "old"
+
+
+def _origin_ahead(owner: str, base: str, deadline: float | None) -> int:
+    """手元の取り込み先より `origin/<取り込み先>` が先に進んでいるコミットの数。引けなければ 0。
+
+    手元の ref だけで比べる（ネットワークには出ない）。
+    """
+    done = _run(
+        owner, ["rev-list", "--count", f"refs/heads/{base}..refs/remotes/origin/{base}"], deadline
+    )
+    out = done.out.strip()
+    return int(out) if done.ok and out.isdigit() else 0
+
+
+def _probe_recorded(
+    owner: str,
+    here: tree.Tree,
+    head: str,
+    dirty: bool,
+    rec: dict[str, str],
+    deadline: float | None,
+) -> Probe:
+    """記録（取り込み先と起点 S）がある直接作業を調べる。
+
+    入っていないコミットは `S..先頭` で数える。促せない（`blocked`）のは、記録が壊れている・
+    共通の前提チェックが通らない・取り込み先が切り替わった・メインのチェックアウトに途中の操作が
+    あるときだけ。ルートの書きかけでは止めない。
+    """
+    base = rec.get("base_branch", "")
+    found = Direct(here.name, here.root, head, dirty, 0, base, integ_tree=owner, base=base)
+    if rec.get("broken"):
+        found.blocked = (
+            "直接作業の記録（ccnavi-direct）が壊れていて、取り込み先と起点を読めません。"
+            "操作せず、ユーザに確かめてください"
+        )
+        return Probe(HIT, found)
+    mine = directrec.common_dir(here.root)
+    main = directrec.common_dir(owner)
+    recorded = rec.get("common_dir", "")
+    same = [
+        x is not None and y is not None and pathcase.fold(x) == pathcase.fold(y)
+        for x, y in ((mine, main), (os.path.realpath(recorded) if recorded else None, main))
+    ]
+    if not all(same):
+        found.blocked = (
+            "記録の git の共通ディレクトリが、メインのチェックアウトと作業ワークツリーのものと"
+            "違います。別のリポジトリの記録かもしれないので、操作せずユーザに確かめてください"
+        )
+        return Probe(HIT, found)
+    marks = os.path.join(rec["_common"], _RECORD_DIR)
+    found.marker = marker_kind(marks, here.name)
+    current = tree.branch_of(owner)
+    if current != base:
+        found.blocked = (
+            f"メインのチェックアウト（{owner}）の取り込み先が切り替わっています"
+            f"（記録: {base}、今: {current or 'detached HEAD'}）。"
+            "ユーザに戻してもらってください（エージェントは checkout しません）"
+        )
+        return Probe(HIT, found)
+    busy = _integration_busy(owner, deadline, dirty_too=False)
+    if busy is None:
+        return Probe(UNKNOWN)
+    if busy:
+        found.blocked = busy
+        return Probe(HIT, found)
+    snap = _run(
+        here.root, ["rev-parse", "--verify", "--quiet", f"{rec['snap_sha']}^{{commit}}"], deadline
+    )
+    if snap.failure:
+        return Probe(UNKNOWN)
+    if not snap.ok:
+        found.blocked = (
+            f"記録の起点（{rec['snap_sha']}）のコミットを読めません。"
+            "操作せず、ユーザに確かめてください"
+        )
+        return Probe(HIT, found)
+    counted = _run(here.root, ["rev-list", "--count", f"{rec['snap_sha']}..HEAD"], deadline)
+    out = counted.out.strip()
+    if not (counted.ok and out.isdigit()):
+        return Probe(UNKNOWN)
+    found.ahead = int(out)
+    found.origin_ahead = _origin_ahead(owner, base, deadline)
+    if not (dirty or found.ahead or found.marker):
+        return Probe(CLEAR)
     return Probe(HIT, found)
 
 
@@ -548,10 +698,14 @@ def _recorded(
     return not dirty
 
 
-def _integration_busy(integ_tree: str, deadline: float | None = None) -> str | None:
-    """統合先のツリーが `integrate` の前提（綺麗で、途中の操作が無い）を満たさない理由。
+def _integration_busy(
+    integ_tree: str, deadline: float | None = None, dirty_too: bool = True
+) -> str | None:
+    """取り込み先のツリーが `integrate` の前提（途中の操作が無い）を満たさない理由。
 
     満たすなら空。期限不足で確かめられなければ None（判定全体を「不明」にする）。
+    `dirty_too` を偽にすると未コミットの変更は見ない（ユーザの書きかけは fast-forward で持ち越す
+    ので、促しを止める理由にしない）。
     """
     mark = tree.busy_of(integ_tree)
     squash = _git_path(integ_tree, _SQUASH_MSG, deadline)
@@ -562,6 +716,8 @@ def _integration_busy(integ_tree: str, deadline: float | None = None) -> str | N
             f"統合先のツリー（{integ_tree}）に途中の操作（{mark}）があります。"
             "持ち主に確かめて済ませてもらってください"
         )
+    if not dirty_too:
+        return ""
     done = _run(integ_tree, ["status", "--porcelain", "--untracked-files=all"], deadline)
     if done.timed_out:
         return None
@@ -597,12 +753,23 @@ def _left(found: Direct) -> str:
     if found.dirty:
         parts.append("未コミットの変更")
     if found.ahead:
-        parts.append(f"統合先（{found.integration}）に入っていないコミット {found.ahead} 件")
+        where = found.base or found.integration
+        parts.append(f"取り込み先（{where}）に入っていないコミット {found.ahead} 件")
     return "と".join(parts)
 
 
+def _origin_warning(found: Direct) -> str:
+    if not found.origin_ahead:
+        return ""
+    return (
+        f"注意: origin/{found.base} が手元の {found.base} より"
+        f" {found.origin_ahead} 件先に進んでいます。"
+        "取り込んだあとの push の前に、ユーザに手元を合わせてもらってください。"
+    )
+
+
 def integrate_nudge(root: str, found: Direct) -> str:
-    """Stop を止めて渡す文。`integrate` の打ち方と、staged で止めて確かめてもらう手順を言う。
+    """Stop を止めて渡す文。`integrate` の打ち方と、確認してもらう手順を言う。
 
     コマンドは 1 行で完結させ、別のツリーで打つものは `cd <引用したパス> && …` で始める
     （Bash の cwd が次の呼び出しに残るとは限らない）。ラッパーを通らない `git` は書かない。
@@ -611,33 +778,69 @@ def integrate_nudge(root: str, found: Direct) -> str:
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     work = settings.shell_path(found.worktree)
     integ = settings.shell_path(found.integ_tree)
-    lines = [
-        f"[ccnavi] {CODE_INTEGRATE_NUDGE} (worktree: {n})",
+    lines = [f"[ccnavi] {CODE_INTEGRATE_NUDGE} (worktree: {n})"]
+    if found.marker:
+        lines += [
+            f"ワークツリー .claude/worktrees/{n} の取り込み（integrate {n}）が、"
+            "確定を待っています。",
+            f"差分と変わるファイルの一覧をユーザに見せ、了承を得たら "
+            f"`cd {integ} && {git_sh} integrate-done {n} -m '<メッセージ>'`"
+            " で取り込んで片付けます。"
+            f"やめるなら `cd {integ} && {git_sh} integrate --abort {n}`。",
+            "ファイルをエディタで開いて保存していない編集がないか、ユーザに確かめてから確定します。",
+        ]
+        warn = _origin_warning(found)
+        if warn:
+            lines.append(warn)
+        return "\n".join(lines)
+    lines.append(
         f"ワークツリー .claude/worktrees/{n} はチケットに結び付かない直接作業で、"
-        f"{_left(found)}があり、integrate {n} の記録がありません。",
-    ]
+        f"{_left(found)}があり、"
+        + (
+            "取り込みの記録（ccnavi-direct）がありません。"
+            if found.no_record
+            else f"integrate {n} をまだ打っていません。"
+        )
+    )
     if found.dirty:
         lines.append(
             "integrate が取り込むのはコミットした分だけです。先にコミットしてください: "
             f"`cd {work} && {git_sh} add -- <パス>` と "
             f"`cd {work} && {git_sh} commit -m '<メッセージ>'`。"
         )
+    if found.no_record:
+        wt_sh = settings.script_command(root, "ccnavi-worktree.sh")
+        base = tree.branch_of(found.integ_tree) or "<取り込み先のブランチ>"
+        lines += [
+            "記録の無いワークツリー（更新前に切った・手で切った）は、integrate が断ります。"
+            "ユーザに取り込み先を確かめてから、引き取ります: "
+            f"`cd {integ} && {wt_sh} {n} --adopt --base {base}`。"
+            "出力の範囲と差分をユーザに見せ、了承を得て確認コードを付けて打ち直します。",
+            "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
+            "この案内は同じ状態では 1 回だけです。",
+        ]
+        return "\n".join(lines)
     lines += [
-        f"作業が終わったなら `cd {integ} && {git_sh} integrate {n}` を実行して staged にし、"
-        "そこで止めてください。hook は integrate を実行しません。",
-        f"続き: `cd {integ} && {git_sh} status` と `cd {integ} && {git_sh} diff --staged` の結果を"
-        "ユーザに見せます。了承を得たら "
-        f"`cd {integ} && {git_sh} integrate-done {n} -m '<メッセージ>'` でコミットして片付けます。"
+        f"作業が終わったなら `cd {integ} && {git_sh} integrate {n}` を実行して止めてください。"
+        "取り込み結果は一時ワークツリーに用意され、メインのチェックアウトは変わりません。"
+        "hook は integrate を実行しません。",
+        "続き: 出力の差分と変わるファイルの一覧をユーザに見せます。了承を得たら "
+        f"`cd {integ} && {git_sh} integrate-done {n} -m '<メッセージ>'` で取り込んで片付けます。"
         f"やめるなら `cd {integ} && {git_sh} integrate --abort {n}`。",
-        "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
-        "この案内は同じ状態では 1 回だけです。",
     ]
+    warn = _origin_warning(found)
+    if warn:
+        lines.append(warn)
+    lines.append(
+        "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
+        "この案内は同じ状態では 1 回だけです。"
+    )
     return "\n".join(lines)
 
 
 def blocked_notice(found: Direct) -> str:
     """促せないときにユーザへ言う文（`systemMessage`）。"""
     return (
-        f"[ccnavi] 直接作業 {found.name} は {_left(found)}があり、integrate の記録もありませんが、"
+        f"[ccnavi] 直接作業 {found.name} は {_left(found) or '取り込みの途中'}がありますが、"
         f"今は取り込みを促せません。{found.blocked}"
     )
