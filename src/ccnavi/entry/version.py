@@ -75,6 +75,9 @@ FEATURES: tuple[str, ...] = (
     "handoff",
     # 直接作業の取り込み先がチケットに結び付くかの問い合わせ（`tree base-bound`）。
     "tree.base-bound",
+    # 取り込みが自己防衛の対象を含むかと、取り込んでいない下書きの問い合わせ。
+    "tree.guarded",
+    "tree.handoff-pending",
 )
 # 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"

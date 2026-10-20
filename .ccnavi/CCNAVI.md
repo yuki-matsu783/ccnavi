@@ -14,6 +14,8 @@
 <!-- ccnavi:if workspace_root -->
   - 編集する前に {{worktree_sh}} <名前> でワークツリー（{{worktrees}}/<名前>）を切り、その中で編集する。直接作業の名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md）。
   - {{worktree_sh}} が「確認が要る」と言ったら、報告をユーザに伝え、了承を得るまで `--base`・`--accept`・`--side-by-side` を付けない。
+  - 取り込み先のブランチ（切った時点でメインのチェックアウトが開いていたもの）を切り替えない。切り替わっていたら、ユーザに戻してもらう。
+  - integrate-done の前に、変わるファイルの一覧をユーザに伝え、エディタで保存していない編集があれば保存してもらう。
 <!-- ccnavi:endif -->
 <!-- ccnavi:if git_wrapper -->
   - git は直接呼ばず {{git_sh}} を通す。止められたら迂回せず、出力の案内に従う。

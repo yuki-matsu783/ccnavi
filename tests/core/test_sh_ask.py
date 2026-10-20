@@ -423,3 +423,41 @@ class TreeBaseBoundTest(Harness):
         self.assertEqual(
             1, self.ask("tree", "base-bound", os.path.join(self.ws, "none"), "x").returncode
         )
+
+
+class TreeGuardedTest(Harness):
+    """`tree guarded`: 守る対象（自己防衛）に当たるパスだけを挙げる。"""
+
+    def setUp(self):
+        super().setUp()
+        write(os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"), "ask: []\n")
+
+    def test_a_guarded_rules_file_is_named(self):
+        result = self.ask("tree", "guarded", self.ws, ".ccnavi/config/common/rules.yml", "src/a.py")
+        self.assertEqual(0, result.returncode, result.stderr)
+        lines = result.stdout.splitlines()
+        self.assertEqual("tree 1", lines[0])
+        self.assertIn("guarded yes", lines)
+        self.assertIn("path .ccnavi/config/common/rules.yml", lines)
+        self.assertNotIn("path src/a.py", lines)
+
+    def test_an_ordinary_path_is_not_guarded(self):
+        got = self.answer("tree 1", "tree", "guarded", self.ws, "src/a.py", "docs/b.md")
+        self.assertEqual("no", got["guarded"])
+        self.assertNotIn("path", got)
+
+    def test_a_missing_tree_is_refused(self):
+        result = self.ask("tree", "guarded", os.path.join(self.ws, "nope"), "a")
+        self.assertNotEqual(0, result.returncode)
+
+
+class TreeHandoffPendingTest(Harness):
+    """`tree handoff-pending`: 取り込んでいない下書きの件数と一覧。"""
+
+    def test_no_drafts_means_zero(self):
+        got = self.answer("tree 1", "tree", "handoff-pending", self.tree)
+        self.assertEqual("0", got["pending"])
+
+    def test_a_missing_tree_is_refused(self):
+        result = self.ask("tree", "handoff-pending", os.path.join(self.ws, "nope"))
+        self.assertNotEqual(0, result.returncode)
