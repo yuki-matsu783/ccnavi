@@ -38,11 +38,11 @@ expect:
     - event: PreToolUse
       tool: Write
       decision: deny
-      rules_include: [guard-approved-tickets]
+      rules_include: [.ccnavi/config/common/rules.yml:guard-approved-tickets]
     - event: PreToolUse
       tool: Edit
       decision: deny
-      rules_include: [guard-approved-tickets]
+      rules_include: [.ccnavi/config/common/rules.yml:guard-approved-tickets]
   state:
     - run: sh .ccnavi/scripts/ccnavi-ticket.sh status
       expect_not_contains: 作業中

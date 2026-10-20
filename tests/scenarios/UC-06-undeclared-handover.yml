@@ -28,13 +28,13 @@ expect:
       tool: Bash
       subject_contains: "cat "
       decision_not: deny
-      rules_include: [prefer-read-grep]
+      rules_include: [.ccnavi/config/common/rules.yml:prefer-read-grep]
       hinted: true
     - event: PreToolUse
       tool: Bash
       subject_contains: "cat "
       decision_not: deny
-      rules_include: [prefer-read-grep]
+      rules_include: [.ccnavi/config/common/rules.yml:prefer-read-grep]
       hinted: false
   judge:
     - 1 つ目の step で、README.md の最初の見出しを実際と合う形で答えた

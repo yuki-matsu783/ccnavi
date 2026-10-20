@@ -27,7 +27,7 @@ expect:
     - event: PreToolUse
       tool: Edit
       decision: deny
-      rules_include: [guard-ccnavi-config]
+      rules_include: [.ccnavi/config/common/rules.yml:guard-ccnavi-config]
       subject_contains: rules.yml
     - event: PreToolUse
       tool: Bash
@@ -36,12 +36,12 @@ expect:
     - event: PreToolUse
       tool: Edit
       decision: deny
-      rules_include: [guard-scripts]
+      rules_include: [.ccnavi/config/common/rules.yml:guard-scripts]
       subject_contains: ccnavi-git.sh
     - event: PreToolUse
       tool: Edit
       decision: deny
-      rules_include: [guard-settings]
+      rules_include: [.ccnavi/config/common/rules.yml:guard-settings]
       subject_contains: settings.json
   files_unchanged:
     - .ccnavi/config/common/rules.yml
