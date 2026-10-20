@@ -622,7 +622,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(len(said("hostile")["unresolved"]), 8)
         self.assertEqual(said("nested"), said("resolved"))
         self.assertEqual(len(said("odd-types")["unresolved"]), 2)
-        # ccnavi の依頼コメントへの返信は指摘として数える。依頼だけ・コメントだけ・system だけは数えない。
+        # 依頼コメントへの返信は指摘として数える。依頼だけ・コメントだけ・system だけは数えない。
         # 受け入れの返信を足してホストで解決した後は、数えない
         self.assertEqual(len(said("replies")["unresolved"]), 6)
         self.assertEqual(said("replies-accepted")["unresolved"], [])
