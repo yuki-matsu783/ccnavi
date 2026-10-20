@@ -1,7 +1,7 @@
 # ccnavi の作業の決まり
 
 セッションの開始（起動・再開・compact・clear）のたびに ccnavi が渡す。サブエージェントには渡さない。
-ここには概念だけを書き、具体的な決まりは危険な作業や失敗を検知した時点で案内する。案内が出たらそれに従い、迂回しない。
+ここには概念だけを書き、決まりは危険な作業や失敗を検知した時に案内する。案内が出たらそれに従い、迂回しない。
 
 ## 考え方
 
@@ -39,28 +39,28 @@
 
 | 読むとき | 開くファイル |
 |---|---|
-| ワークツリーを切る、他セッションの変更の影響を受けた、親の正本・親のワークツリーが無いとき・`mr:` を確かめる | `.ccnavi/docs/worktree.md` |
+| ワークツリーを切る、他セッションの影響を受けた、親の正本・親のワークツリーが無い・`mr:` を確かめる | `.ccnavi/docs/worktree.md` |
 | issue・MR を指定して作業を頼まれた | `.ccnavi/docs/worktree-start.md` |
 | `<統合先>` に取り込む、子の finish で親へ合流する・衝突を解く、マージリクエストに出す | `.ccnavi/docs/worktree-merge.md` |
-| ワークツリーや子のブランチを片付ける、親を閉じたあとの片付け | `.ccnavi/docs/worktree-cleanup.md` |
+| ワークツリーや子のブランチを片付ける、親を閉じた後 | `.ccnavi/docs/worktree-cleanup.md` |
 | 下書きや使い捨てのファイルを置く | `.ccnavi/docs/scratchpad.md` |
 | `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `.ccnavi/docs/projects.md` |
 | 提案を書く、承認・レビュー済みをユーザに頼む、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `.ccnavi/docs/decisions.md` |
-| 親の提案を始める、完了した親の計画とフローを次に使い回したい、親が閉じるときにテンプレートの案内が出た | `.ccnavi/docs/templates.md` |
-| 用語（ワークスペースルート・統合先ブランチなど）を確かめる | `.ccnavi/docs/terms.md` |
-| `.ccnavi/CCNAVI.md` の条件や差し込みを書く・直す | `.ccnavi/docs/ccnavi-md.md` |
-| md に frontmatter を付ける・直す、md の索引で引く | `.ccnavi/docs/frontmatter.md` |
-| フィードバックが届いた、`.claude/skills/` を直したくなった | `.ccnavi/docs/skill-review.md` |
-| スキルの振り返りで知識を `docs/wiki/` に溜める、wiki を読む・書く | `.ccnavi/docs/skill-wiki.md` |
-| 工程スキル（process-*）の reference を引く・足す、スキルを新しく作りたくなった | `.ccnavi/docs/skill-processes.md` |
-| ルール・フェーズ定義・リスクの配点・計画のテンプレート・工程スキルが育つ流れを確かめる | `.ccnavi/docs/grow.md` |
+| 親の提案を始める、完了した親の計画とフローを使い回す、親が閉じるときにテンプレートの案内が出た | `.ccnavi/docs/templates.md` |
+| 用語（ワークスペースルート・統合先ブランチなど）を引く | `.ccnavi/docs/terms.md` |
+| `.ccnavi/CCNAVI.md` の条件や差し込みを書く | `.ccnavi/docs/ccnavi-md.md` |
+| md に frontmatter を付ける・直す、索引で引く | `.ccnavi/docs/frontmatter.md` |
+| フィードバックが届いた、`.claude/skills/` を直す | `.ccnavi/docs/skill-review.md` |
+| スキルの振り返りで `docs/wiki/` に知識を溜める・読む | `.ccnavi/docs/skill-wiki.md` |
+| 工程スキル（process-*）の reference を引く・足す、スキルを新しく作る | `.ccnavi/docs/skill-processes.md` |
+| ルール・フェーズ・リスク・計画テンプレート・工程スキルが育つ流れを確かめる | `.ccnavi/docs/grow.md` |
 
 <!-- ccnavi:if tickets -->
   ## 作業の進め方
 
-  このワークスペースはチケット制御を使っている。調査・小さな修正は直接作業、設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要るものはチケット作業（wip/proposals/todo/ に提案を書き、{{ticket_sh}} propose で送る）。迷ったらユーザに聞く。issue・MR を指定された実装はチケット作業にする。詰まったら直接実装に切り替えず、ユーザに報告して止まる。
-  レビュー準備中・レビュー待ちの間は、別の親・別の目的の依頼をこのセッションで受けず、別のセッションで受けるようユーザに伝える。詳細は `.ccnavi/docs/ticket-work.md`。
+  このワークスペースはチケット制御を使っている。調査・小さな修正は直接作業。設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要るものはチケット作業で、{{tickets_dir}}/todo/ に提案を書き {{ticket_sh}} propose で送る。迷ったらユーザに聞く。issue・MR を指定された実装は必ずチケット作業。詰まったら直接実装せず、報告して止まる。
+  親のワークツリーには書かず、子のワークツリーで作業する。レビュー準備中・レビュー待ちは、別の依頼を別のセッションで受けるようユーザに伝える。詳細は `.ccnavi/docs/ticket-work.md`。
   <!-- ccnavi:if dry_run -->
-    （現状: {{mode_env}}=dry-run。一般の deny は止まらないが、チケットの関門（状態の操作・範囲・レビュー待ち・承認済みの置き場など）と補助の保護は止まる。通ったことを許可と読まず、表示された案内に次からは従う）
+    （現状: {{mode_env}}=dry-run。一般の deny は止まらないが、チケットの関門と補助の保護で止まる。通ったことを許可と読まず、表示された案内に次からは従う）
   <!-- ccnavi:endif -->
 <!-- ccnavi:endif -->
