@@ -181,5 +181,18 @@ class PendingTest(unittest.TestCase):
         )
 
 
+class DefaultTest(unittest.TestCase):
+    def test_learning_is_enabled_when_unset(self):
+        from dataclasses import replace
+
+        from ccnavi.infra import settings
+
+        base = settings.Settings()
+        self.assertTrue(base.learning_enabled)
+        self.assertTrue(replace(base, learning="enable").learning_enabled)
+        self.assertTrue(replace(base, learning="nonsense").learning_enabled)
+        self.assertFalse(replace(base, learning="disable").learning_enabled)
+
+
 if __name__ == "__main__":
     unittest.main()
