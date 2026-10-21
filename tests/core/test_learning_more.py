@@ -41,6 +41,34 @@ class LearningBase(unittest.TestCase):
             cwd=cwd or self.ws,
         )
 
+    def direct_worktree(self, name: str = "direct-1-x") -> str:
+        """チケットに結び付かない直接作業のワークツリーを切る。"""
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.email=a@b.c",
+                "-c",
+                "user.name=n",
+                "commit",
+                "--allow-empty",
+                "-q",
+                "-m",
+                "init",
+            ],
+            cwd=self.ws,
+            check=True,
+            capture_output=True,
+        )
+        wt = os.path.join(self.ws, ".claude", "worktrees", name)
+        subprocess.run(
+            ["git", "worktree", "add", wt, "-b", name],
+            cwd=self.ws,
+            check=True,
+            capture_output=True,
+        )
+        return wt
+
     def read(self, path: str) -> str:
         with open(path, encoding="utf-8", newline="") as f:
             return f.read()
@@ -56,7 +84,9 @@ class LearningBase(unittest.TestCase):
             mock.patch.object(
                 learning,
                 "_bound_ticket",
-                return_value=types.SimpleNamespace(parent="feat-1", is_child=True),
+                return_value=types.SimpleNamespace(
+                    parent="feat-1", is_child=True, is_consolidate=False
+                ),
             ),
         ]
         for p in patches:
@@ -66,10 +96,11 @@ class LearningBase(unittest.TestCase):
 
 class LearningMoreTest(LearningBase):
     def test_inbox_names_do_not_collide(self) -> None:
+        wt = self.direct_worktree()
         for marker in ("気づきA", "気づきB", "気づきC"):
-            result = self.learn("--note", marker)
+            result = self.learn("--note", marker, cwd=wt)
             self.assertEqual(result.returncode, 0, result.stderr)
-        inbox = os.path.join(self.ws, "wip", "handoff", "inbox")
+        inbox = os.path.join(wt, "docs", "wiki", "inbox")
         names = sorted(os.listdir(inbox))
         self.assertEqual(len(names), 3, names)
         found = []
@@ -165,22 +196,24 @@ class LearningMoreTest(LearningBase):
             self.assertIn(key, digest)
 
     def test_signal_and_target_rejected_via_cli(self) -> None:
-        result = self.learn("--note", "x", "--signal", "zzz")
+        wt = self.direct_worktree()
+        result = self.learn("--note", "x", "--signal", "zzz", cwd=wt)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--signal", result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip")))
+        self.assertFalse(os.path.exists(os.path.join(wt, "docs")))
 
         for blank in ("", "   "):
-            result = self.learn("--note", blank)
+            result = self.learn("--note", blank, cwd=wt)
             self.assertNotEqual(result.returncode, 0, repr(blank))
-        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip")))
+        self.assertFalse(os.path.exists(os.path.join(wt, "docs")))
 
     def test_secret_is_redacted_in_note(self) -> None:
         secret = "ghp_" + "0123456789abcdefghijklmnopqrstuvwxyz"
         self.assertNotEqual(redact.redact(secret), secret)
-        result = self.learn("--note", f"接続に使った {secret} を忘れない")
+        wt = self.direct_worktree()
+        result = self.learn("--note", f"接続に使った {secret} を忘れない", cwd=wt)
         self.assertEqual(result.returncode, 0, result.stderr)
-        inbox = os.path.join(self.ws, "wip", "handoff", "inbox")
+        inbox = os.path.join(wt, "docs", "wiki", "inbox")
         (name,) = os.listdir(inbox)
         text = self.read(os.path.join(inbox, name))
         self.assertNotIn(secret, text)
@@ -230,18 +263,24 @@ class LearningMoreTest(LearningBase):
 
         self.assertEqual(learning.command_word("FOO=bar env /usr/bin/git push"), "git")
 
-    def test_project_root_inbox_goes_to_workspace_handoff(self) -> None:
+    def test_workspace_and_project_roots_refuse_and_point_to_a_worktree(self) -> None:
+        result = self.learn("--note", "n")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ワークツリーを切", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip")))
+        result = self.learn()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip")))
         proj = os.path.join(self.ws, "projects", "foo")
         os.makedirs(proj)
         subprocess.run(
             ["git", "init", "--quiet", "-b", "main"], cwd=proj, check=True, capture_output=True
         )
         result = self.learn("--note", "n", cwd=proj)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        inbox = os.path.join(self.ws, "wip", "handoff", "inbox")
-        names = [n for n in os.listdir(inbox) if n.startswith("project-foo-") and n.endswith(".md")]
-        self.assertEqual(len(names), 1, os.listdir(inbox))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ワークツリーを切", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(proj, "wip")))
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip")))
 
     def test_line_separators_cannot_forge_a_section(self) -> None:
         entry = learning.entry_text("本当 ## 偽 - 種類: rule\x85## 偽2", "", "", "t")
@@ -257,7 +296,7 @@ class LearningMoreTest(LearningBase):
         )
         conf, _ = settings.load(self.ws)
         conf = dataclasses.replace(conf, learning="enable")
-        found = types.SimpleNamespace(is_child=True, ticket=child, phase=None)
+        found = types.SimpleNamespace(is_child=True, is_consolidate=False, ticket=child, phase=None)
 
         rec_dir = os.path.join(wt, learning.record_rel(child))
         os.makedirs(rec_dir)
