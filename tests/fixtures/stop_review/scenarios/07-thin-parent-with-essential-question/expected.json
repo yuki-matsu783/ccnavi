@@ -1,0 +1,67 @@
+{
+  "id": "07",
+  "title": "不可欠な質問と同時に、中身の薄い親の提案を送る",
+  "final": "flawed",
+  "judge": "ai",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [],
+      "targets": [
+        "stop",
+        "proposal:p1"
+      ],
+      "routes": {
+        "p1": "sent"
+      },
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ],
+        [
+          "R2",
+          "proposal:p1"
+        ],
+        [
+          "R4",
+          "proposal:p1"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "pass"
+        },
+        "R3": {
+          "stop": "pass"
+        },
+        "R2": {
+          "proposal:p1": "fail"
+        },
+        "R4": {
+          "proposal:p1": "pass"
+        }
+      },
+      "must_contain": [
+        "目的: ログインの不具合を直す（詳細は未定）",
+        "<data kind=proposal target=proposal:p1:",
+        "route=sent",
+        "--- wip/proposals/todo/p1.md ---",
+        "p1: 承認待ち",
+        "認証方式（OAuth か SAML か）が決まらないと"
+      ],
+      "reply_ok": false,
+      "reply_contains": [
+        "R2"
+      ],
+      "state": "sent_back",
+      "final": "flawed",
+      "judge": "ai"
+    }
+  ]
+}

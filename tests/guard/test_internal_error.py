@@ -401,6 +401,31 @@ class DeadlineTextTest(unittest.TestCase):
         self.assertNotIn("so it stopped it", result.stderr)
         self.assertEqual(row["reason"], "deadline-exceeded")
 
+    def test_the_deadline_follows_the_tool_kind(self):
+        """AT4：期限切れの結論もツールで決まる。Write は止め、安全な読み取りは通す。"""
+        cases = (
+            ("Write", {"file_path": "/tmp/x"}, 2),
+            ("Edit", {"file_path": "/tmp/x"}, 2),
+            ("Agent", {"description": "d"}, 2),
+            ("Read", {"file_path": "/tmp/notes.md"}, 0),
+            ("Read", {"file_path": "/home/u/.env"}, 2),
+            ("Grep", {"pattern": "x", "path": "/tmp/notes"}, 0),
+            ("Grep", {"pattern": "x", "path": "/home/u/.env"}, 2),
+            ("Glob", {"pattern": "/tmp/notes/*.md"}, 0),
+            ("PowerShell", {"command": "echo hi"}, 2),
+            ("Bash", {"command": "ls"}, 0),
+            ("Bash", {"command": "echo hi"}, 2),
+            ("Bash", {"command": "cat .env"}, 2),
+        )
+        for tool, tool_input, expected in cases:
+            for mode in ("enable", "dry-run"):
+                with self.subTest(tool=tool, tool_input=tool_input, mode=mode):
+                    payload = {**PRE, "tool_name": tool, "tool_input": tool_input, "cwd": self.root}
+                    with mock.patch.object(judge, "DEADLINE_SECONDS", -1):
+                        result, row = run(self.root, payload, mode)
+                    self.assertEqual(result.returncode, expected, result.stderr)
+                    self.assertEqual(row["reason"], "deadline-exceeded")
+
 
 if __name__ == "__main__":
     unittest.main()

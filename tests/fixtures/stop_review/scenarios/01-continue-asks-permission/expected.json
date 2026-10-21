@@ -1,0 +1,48 @@
+{
+  "id": "01",
+  "title": "前のターンでチケット作業を指示され、今回の「続けて」に対して提案を書かずに「作ってよいですか」と聞く",
+  "final": "flawed",
+  "judge": "ai",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [],
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "fail"
+        },
+        "R3": {
+          "stop": "fail"
+        }
+      },
+      "must_contain": [
+        "このログイン周りの修正はチケット作業で進めます",
+        "[ticket_work]",
+        "続けて",
+        "チケットを作ってよいですか",
+        "（指定なし）"
+      ],
+      "reply_ok": false,
+      "reply_contains": [
+        "R1"
+      ],
+      "state": "sent_back",
+      "final": "flawed",
+      "judge": "ai"
+    }
+  ]
+}

@@ -12,7 +12,9 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
+from ccnavi.tickets import manual_settle
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -271,6 +273,115 @@ class SubagentRolesTest(HookCase):
                 self.assertEqual(decision, "deny", text)
                 decision, text = self.bash(command, CCNAVI_GUARD_TICKET_APPROVAL="disable")
                 self.assertNotEqual(decision, "deny", text)
+
+
+class GitRolesInChildTreeTest(HookCase):
+    """AT44：状態を動かさない git の副命令は、役割の表で止めない。"""
+
+    def test_the_subagent_git_rm_mv_restore_stash_reset_are_not_stopped_by_the_roles(self):
+        for sub in ("rm", "mv", "restore", "stash", "reset"):
+            for mode in ("enable", "dry-run"):
+                with self.subTest(sub=sub, mode=mode):
+                    decision, text = self.bash(
+                        f"sh .ccnavi/scripts/ccnavi-git.sh {sub} -- a.py", mode=mode, agent="a1"
+                    )
+                    self.assertNotIn("DENY_SUBAGENT_TICKET_OP", text)
+                    self.assertNotEqual(decision, "deny", text)
+
+    def test_the_subagent_git_push_family_is_still_stopped(self):
+        for sub in ("push", "worktree add x", "integrate"):
+            with self.subTest(sub=sub):
+                decision, text = self.bash(f"sh .ccnavi/scripts/ccnavi-git.sh {sub}", agent="a1")
+                self.assertEqual(decision, "deny", text)
+
+
+class PreToolUseReadsNoHistoryTest(HookCase):
+    """PreToolUse は git の履歴を読まない。手動移動の判定を例外にしても判定は返る。"""
+
+    def test_pre_tool_use_never_calls_the_manual_settle_assessment(self):
+        calls = []
+
+        def boom(*args, **kwargs):
+            calls.append(args)
+            raise RuntimeError("履歴を読んではいけない")
+
+        with (
+            mock.patch.object(manual_settle, "assess", side_effect=boom),
+            mock.patch.object(manual_settle, "_shared", side_effect=boom),
+        ):
+            decision, _ = self.bash("rm -rf /tmp/some-dir")
+            self.assertEqual(decision, "deny")
+            decision, _ = self.bash("git status")
+            self.assertEqual(decision, "deny")
+            decision, text = self.hook(
+                "Write",
+                {"file_path": os.path.join(self.root, ".ccnavi/approved/done/i0001-01-01.md")},
+            )
+            self.assertEqual(decision, "deny", text)
+            decision, text = self.hook("Write", {"file_path": os.path.join(self.root, "notes.md")})
+            self.assertNotEqual(decision, "deny", text)
+            decision, text = self.bash("ls")
+            self.assertNotEqual(decision, "deny", text)
+        self.assertEqual(calls, [])
+
+    def test_the_pre_tool_use_modules_do_not_reach_the_history_readers(self):
+        """上の mock は親の依頼済みフェーズが無いと空振りしうる。参照そのものも固定する。"""
+        for name in ("judge.py", "failsafe.py"):
+            with open(os.path.join(ROOT, "src", "ccnavi", "hook", name), encoding="utf-8") as f:
+                text = f.read()
+            for reader in ("manual_settle", "ops_stop_request"):
+                with self.subTest(module=name, reader=reader):
+                    self.assertNotIn(reader, text)
+
+
+class DryRunGeneralConfigTest(HookCase):
+    """AT1：dry-run では、一般の保護の対象の変更は報告だけ。一般の復元は通る。"""
+
+    def test_a_config_change_is_reported_not_stopped_in_dry_run(self):
+        for rel in (".claude/settings.json", ".ccnavi/config/common/rules.yml"):
+            for tool in ("Write", "Edit"):
+                with self.subTest(rel=rel, tool=tool):
+                    tool_input = {"file_path": os.path.join(self.root, rel)}
+                    decision, text = self.hook(tool, tool_input, mode="dry-run")
+                    self.assertEqual(decision, "")
+                    self.assertIn("[ccnavi dry-run] enable would have stopped this call", text)
+                    decision, _ = self.hook(tool, tool_input)
+                    self.assertEqual(decision, "deny")
+
+    def test_a_shell_write_to_the_config_is_reported_in_dry_run(self):
+        decision, text = self.bash("echo x > .claude/settings.json", mode="dry-run")
+        self.assertEqual(decision, "")
+        self.assertIn("enable would have stopped this call", text)
+        decision, _ = self.bash("echo x > .claude/settings.json")
+        self.assertEqual(decision, "deny")
+
+    def test_the_general_restore_works_as_before(self):
+        command = (
+            "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .ccnavi/config/common/rules.yml"
+        )
+        for mode in ("enable", "dry-run"):
+            with self.subTest(mode=mode):
+                decision, text = self.bash(command, mode=mode)
+                self.assertNotEqual(decision, "deny", text)
+
+
+class DryRunSelfApprovalTest(HookCase):
+    """AT2：dry-run でも、自己承認の形はメインエージェントでも拒否される。"""
+
+    FORMS = (
+        "ccnavi user agree",
+        "ccnavi user agree --yes",
+        "ccnavi --agree --yes i0001",
+        "uv run python -m ccnavi --agree --yes x",
+        "sh .ccnavi/scripts/ccnavi-agree.sh",
+    )
+
+    def test_the_main_agent_cannot_type_them_in_dry_run(self):
+        for command in self.FORMS:
+            with self.subTest(command=command):
+                decision, text = self.bash(command, mode="dry-run")
+                self.assertEqual(decision, "deny", text)
+                self.assertIn("DENY_TICKET_APPROVAL_CLI", text)
 
 
 if __name__ == "__main__":
