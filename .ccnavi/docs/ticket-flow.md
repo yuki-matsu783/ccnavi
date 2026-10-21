@@ -11,7 +11,7 @@ keywords: [チケット, 親, 子, 手順, 流れ, propose, start, finish, reque
 チケット作業は、親（計画とレビュー依頼を受け持つ）と子（実装を受け持つ）に分かれる。親は計画と依頼だけをし、作業は子が行う。
 各コマンドは `ccnavi-ticket.sh`・`ccnavi-review.sh`・`ccnavi-sync.sh`・`ccnavi-start.sh` を通す（使い方は `--help`）。
 直接作業の手順は[direct-flow.md](direct-flow.md)。合流と片付けの細部は[worktree-merge.md](worktree-merge.md)と[worktree-cleanup.md](worktree-cleanup.md)、ワークツリーの切り方は[worktree.md](worktree.md)。
-`start`・`finish`・`cancel`・`propose`・`request`・`confirm`・`decide`・`ready` など状態を動かす操作は、サブエージェントからは hook が止める。打つのはメインのエージェント（`decide` はユーザ）。
+`start`・`finish`・`cancel`・`propose`・`consolidate`・`request`・`confirm`・`decide`・`ready` など状態を動かす操作は、サブエージェントからは hook が止める。打つのはメインのエージェント（`decide` はユーザ）。
 
 ## 全体の流れ
 

@@ -79,7 +79,7 @@ Stop の AI 判定の効き方 `CCNAVI_STOP_REVIEW` も同じ 3 値で、`CCNAVI
 
 `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL`、`CCNAVI_GUARD_UNWATCHED` は `enable` / `disable` の 2 値。
 設定が読めずチケット制御の値が分からないときは、チケット制御は有効とみなす（REQ-CMN-13。判定できないときの扱いは下の表）。
-`CCNAVI_LEARNING`（学びの蓄積。9.16）も 2 値で、`enable` のときだけ効く。書き誤りは `--lint` が warn で言い、`disable` として動く。
+`CCNAVI_LEARNING`（学びの蓄積。9.16）も 2 値で、`enable` のときだけ効く。書き誤りは `--lint` が warn で言い、`enable` として動く（既定も `enable`）。
 
 ### 4.5 応答の形と結果
 

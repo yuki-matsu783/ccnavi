@@ -39,7 +39,7 @@
 # .ccnavi/approved/done/。ユーザが動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
 # wip/proposals/ へ。エージェントの側を動かすのはこのスクリプトだけで、直接ファイルを
 # 作ったり動かしたりするのは ccnavi が止める。
-# サブエージェントからの start・finish・cancel・propose・record-risk は ccnavi の hook が止める（判定がサブエージェントの
+# サブエージェントからの start・finish・cancel・propose・consolidate・record-risk は ccnavi の hook が止める（判定がサブエージェントの
 # 呼び出しを見分ける。実行ファイルとこのスクリプトは呼び手を知らない）。
 #
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
@@ -47,7 +47,7 @@
 # ソースツリーの `python -m ccnavi`。
 #
 # 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）の
-# start・finish・cancel・propose は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
+# start・finish・cancel・propose・consolidate は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk のコミットと送信は、その子の finish が行う。

@@ -335,6 +335,9 @@ _TICKET = """\
 レビューを依頼します。スクリプトは次を呼び出します。
 
     ccnavi ticket start|finish|cancel <id> [--reason <why>]
+    ccnavi ticket consolidate <親>
+        （親の finish が「判定されていない気づきがある」と止めたときに打つ。処理する統合の子
+         <親>-00-NN を doing/ に作る。処理すべきものが無いとき、disable のときは作らない）
         （start は、基点を .ccnavi/approved/doing/<id>.md に書き込みます。finish は、
          フェーズがレビュー対象の場合は wip/proposals/review/ に、それ以外は
          .ccnavi/approved/done/ に移動します。cancel は .ccnavi/approved/done/ に移動します）
