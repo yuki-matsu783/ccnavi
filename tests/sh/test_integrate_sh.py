@@ -1038,5 +1038,259 @@ class OldMarkerTest(Fixture):
         self.assertIn("片付け済み", r.stdout)
 
 
+@unittest.skipUnless(SHELL and GIT and git_supports_v4(), "sh と git 2.40 以上が要る")
+class IntegrateGapsTest(Fixture):
+    """設計 10 章の表で、ほかのクラスが一部しか見ていなかった条件。"""
+
+    # ---- 道具
+
+    def make_project(self, name):
+        """projects/<name> に、コミットと origin/HEAD のあるプロジェクトのリポジトリを作る。"""
+        project = os.path.join(self.ws, "projects", name)
+        os.makedirs(project)
+        git(project, "init", "-q", "-b", "main")
+        git(project, "config", "user.email", "t@example.invalid")
+        git(project, "config", "user.name", "t")
+        write(os.path.join(project, "a.txt"), "a\n")
+        git(project, "add", ".")
+        git(project, "commit", "-q", "-m", f"seed {name}")
+        git(project, "update-ref", "refs/remotes/origin/main", "HEAD")
+        git(project, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        return project
+
+    def project_work(self, wt):
+        write(os.path.join(wt, "a.txt"), "a\nagent\n")
+        git(wt, "commit", "-q", "-am", "agent")
+
+    def repo_state(self, repo):
+        """HEAD・index の木・status。そのリポジトリが動いたかを見る。"""
+        return (
+            git(repo, "rev-parse", "HEAD").strip(),
+            git(repo, "write-tree").strip(),
+            git(repo, "status", "--porcelain"),
+        )
+
+    def install_failing_git(self):
+        """FAIL_GIT_MATCH を引数に含む git の呼び出しだけ終了コード 1 にする代役を PATH に置く。"""
+        shim = os.path.join(self._tmp.name, "failgit")
+        write(
+            os.path.join(shim, "git"),
+            "#!/bin/sh\n"
+            'if [ -n "$FAIL_GIT_MATCH" ]; then\n'
+            '  case " $* " in\n'
+            '    *"$FAIL_GIT_MATCH"*) echo "fake git: failed on request" >&2; exit 1 ;;\n'
+            "  esac\n"
+            "fi\n"
+            f"exec '{GIT}' \"$@\"\n",
+        )
+        os.chmod(os.path.join(shim, "git"), 0o755)
+        self.path = shim + os.pathsep + os.environ.get("PATH", "")
+
+    def done_stopped_at(self, match, name="wt", cwd=None, base=None):
+        """integrate まで進め、match に当たる git が失敗する中で integrate-done -m を打つ。
+
+        K は載り、片付けの途中で止まる。K が載る前の HEAD を返す。代役は外して返る。
+        """
+        before = base or self.head()
+        r = self.run_git_sh(
+            "integrate-done", name, "-m", "feat: x", cwd=cwd, env_extra={"FAIL_GIT_MATCH": match}
+        )
+        self.path = None
+        return before, r
+
+    def assert_landed_once(self, before, r, cwd=None):
+        self.assertNotEqual(0, r.returncode, r.stdout + r.stderr)
+        self.assertIn("取り込みました", r.stdout)
+        repo = cwd or self.ws
+        head = git(repo, "rev-parse", "HEAD").strip()
+        self.assertNotEqual(before, head)
+        self.assertEqual([before], git(repo, "log", "-1", "--format=%P").split())
+        return head
+
+    def assert_fully_cleaned(self, before, k):
+        self.assertEqual(k, self.head())
+        self.assertEqual("1", git(self.ws, "rev-list", "--count", f"{before}..HEAD").strip())
+        self.assertFalse(os.path.exists(self.wt))
+        self.assertFalse(os.path.exists(self.tmp_wt()))
+        self.assertFalse(self.has_branch())
+        self.assertFalse(os.path.exists(self.marker()))
+        self.assertFalse(os.path.exists(self.record()))
+        for kind in ("s", "t", "c", "k"):
+            self.assertEqual("", self.ref(kind), kind)
+
+    def stage_stops_then_resumes(self, match, wt=True, tmp=True, branch=True):
+        """止めた段までの片付けが済み、その先が残っていることを見てから、打ち直して完了させる。"""
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        self.install_failing_git()
+        before, r = self.done_stopped_at(match)
+        k = self.assert_landed_once(before, r)
+        self.assertEqual(wt, os.path.exists(self.wt))
+        self.assertEqual(tmp, os.path.exists(self.tmp_wt()))
+        self.assertEqual(branch, self.has_branch())
+        self.assertTrue(os.path.isfile(self.marker()))
+        again = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(again)
+        self.assert_fully_cleaned(before, k)
+
+    # ---- 2: グローバルの excludes
+
+    def test_a_globally_ignored_file_is_not_overwritten(self):
+        excludes = os.path.join(self._tmp.name, "global-excludes")
+        write(excludes, "*.gignored\n")
+        config = os.path.join(self._tmp.name, "global-gitconfig")
+        write(config, f"[core]\n\texcludesFile = {excludes.replace(os.sep, '/')}\n")
+        env = {"GIT_CONFIG_GLOBAL": config}
+        write(os.path.join(self.wt, "added.gignored"), "agent\n")
+        git(self.wt, "add", "-f", "added.gignored")
+        git(self.wt, "commit", "-q", "-m", "tracked despite the global ignore")
+        write(os.path.join(self.ws, "added.gignored"), "user's globally ignored file\n")
+        r = self.run_git_sh("integrate", "wt", env_extra=env)
+        self.assertOk(r)
+        self.assertIn("ignored のファイルと重なっている", r.stdout)
+        self.assertIn("added.gignored", r.stdout)
+        head = self.head()
+        done = self.run_git_sh("integrate-done", "wt", "-m", "feat: x", env_extra=env)
+        self.assertOk(done, 1)
+        self.assertEqual(head, self.head())
+        self.assertEqual(
+            "user's globally ignored file\n", read(os.path.join(self.ws, "added.gignored"))
+        )
+        self.assertTrue(os.path.isfile(self.marker()))
+
+    # ---- 3: 片付けの各段で止まっても、打ち直せば完了する
+
+    def test_a_stop_at_the_work_worktree_resumes(self):
+        self.stage_stops_then_resumes("worktree remove /")
+
+    def test_a_stop_at_the_temp_worktree_resumes(self):
+        self.stage_stops_then_resumes("worktree remove --force", wt=False)
+
+    def test_a_stop_at_the_branch_resumes(self):
+        self.stage_stops_then_resumes("update-ref -d refs/heads/wt", wt=False, tmp=False)
+
+    # 実装の欠陥: d4_refs_drop は失敗を捨てて先へ進み、止まらず終了コード 0 で ref が残る。
+    # 打ち直しも「片付け済み」と答えて ref を消さない。
+    @unittest.expectedFailure
+    def test_a_stop_at_the_dedicated_refs_resumes(self):
+        self.stage_stops_then_resumes(
+            "update-ref -d refs/ccnavi/direct/wt/", wt=False, tmp=False, branch=False
+        )
+
+    def test_a_marker_put_back_after_completion_is_dropped_without_moving_head(self):
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        self.install_failing_git()
+        before, r = self.done_stopped_at("worktree remove /")
+        k = self.assert_landed_once(before, r)
+        saved = read(self.marker())
+        self.assertOk(self.run_git_sh("integrate-done", "wt"))
+        self.assert_fully_cleaned(before, k)
+        write(self.marker(), saved)
+        again = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(again)
+        self.assertFalse(os.path.exists(self.marker()))
+        self.assertEqual(k, self.head())
+
+    # ---- 4: プロジェクトの自己防衛の対象
+
+    def test_a_guarded_file_of_a_project_needs_the_terminal(self):
+        project = self.make_project("p")
+        wt = self.cut("pwt", repo=project)
+        rules = ".ccnavi/config/project/rules.yml"
+        write(os.path.join(wt, *rules.split("/")), "ask: []\n")
+        git(wt, "add", "-f", rules)
+        git(wt, "commit", "-q", "-m", "rules")
+        r = self.run_git_sh("integrate", "pwt", cwd=project)
+        self.assertOk(r)
+        self.assertIn("自己防衛", r.stdout)
+        self.assertIn(rules, r.stdout)
+        head = git(project, "rev-parse", "HEAD").strip()
+        done = self.run_git_sh("integrate-done", "pwt", "-m", "feat: p", cwd=project)
+        self.assertOk(done, 2)
+        self.assertIn("端末", done.stderr)
+        self.assertEqual(head, git(project, "rev-parse", "HEAD").strip())
+
+    # ---- 5: 一時ワークツリーに残った ignored のファイル
+
+    def test_done_keeps_an_ignored_file_left_in_the_temp_worktree(self):
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        left = os.path.join(self.tmp_wt(), "residue.local")
+        write(left, "somebody's ignored file\n")
+        r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
+        self.assertOk(r, 1)
+        self.assertIn("取り込みました", r.stdout)
+        self.assertIn("残したもの", r.stdout)
+        self.assertIn("residue.local", r.stdout)
+        self.assertEqual("somebody's ignored file\n", read(left))
+
+    def test_abort_keeps_an_ignored_file_left_in_the_temp_worktree(self):
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        left = os.path.join(self.tmp_wt(), "residue.local")
+        write(left, "somebody's ignored file\n")
+        r = self.run_git_sh("integrate", "--abort", "wt")
+        self.assertOk(r)
+        self.assertIn("residue.local", r.stdout)
+        self.assertEqual("somebody's ignored file\n", read(left))
+        self.assertFalse(os.path.exists(self.marker()))
+
+    # ---- 6, 7: 境界
+
+    def test_only_the_project_moves_and_the_workspace_and_the_other_project_stay(self):
+        p = self.make_project("p")
+        q = self.make_project("q")
+        wt = self.cut("pwt", repo=p)
+        self.project_work(wt)
+        ws_before = self.snapshot()
+        q_before = self.repo_state(q)
+        p_head = git(p, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("integrate", "pwt", cwd=p))
+        self.assertOk(self.run_git_sh("integrate-done", "pwt", "-m", "feat: p", cwd=p))
+        self.assertEqual("1", git(p, "rev-list", "--count", f"{p_head}..HEAD").strip())
+        self.assertEqual("a\nagent\n", read(os.path.join(p, "a.txt")))
+        self.assertEqual(ws_before, self.snapshot())
+        self.assertEqual(q_before, self.repo_state(q))
+
+    def test_a_stopped_cleanup_of_one_project_does_not_touch_the_other(self):
+        p = self.make_project("p")
+        q = self.make_project("q")
+        qwt = self.cut("qwt", repo=q)
+        self.project_work(qwt)
+        self.assertOk(self.run_git_sh("integrate", "qwt", cwd=q))
+        q_tmp = self.tmp_wt("qwt", "q")
+        q_marker = os.path.join(self.common_dir(q), "ccnavi-integrate", "qwt", "marker")
+        q_record = os.path.join(self.common_dir(q), "ccnavi-direct", "qwt")
+
+        def q_state():
+            return (
+                os.path.isdir(q_tmp),
+                git(q_tmp, "write-tree").strip(),
+                git(q, "for-each-ref", "refs/ccnavi/direct/"),
+                read(q_marker),
+                read(q_record),
+            )
+
+        before_q = q_state()
+        self.assertIn("refs/ccnavi/direct/qwt/t", before_q[2])
+        self.assertIn("refs/ccnavi/direct/qwt/c", before_q[2])
+        pwt = self.cut("pwt", repo=p)
+        self.project_work(pwt)
+        self.assertOk(self.run_git_sh("integrate", "pwt", cwd=p))
+        p_head = git(p, "rev-parse", "HEAD").strip()
+        self.install_failing_git()
+        _, r = self.done_stopped_at("update-ref -d refs/heads/pwt", "pwt", cwd=p, base=p_head)
+        k = self.assert_landed_once(p_head, r, cwd=p)
+        self.assertEqual(before_q, q_state())
+        again = self.run_git_sh("integrate-done", "pwt", cwd=p)
+        self.assertOk(again)
+        self.assertEqual(k, git(p, "rev-parse", "HEAD").strip())
+        self.assertEqual("1", git(p, "rev-list", "--count", f"{p_head}..HEAD").strip())
+        self.assertFalse(os.path.exists(pwt))
+        self.assertFalse(os.path.exists(self.tmp_wt("pwt", "p")))
+        self.assertEqual(before_q, q_state())
+
+
 if __name__ == "__main__":
     unittest.main()
