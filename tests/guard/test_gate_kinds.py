@@ -324,6 +324,15 @@ class PreToolUseReadsNoHistoryTest(HookCase):
             self.assertNotEqual(decision, "deny", text)
         self.assertEqual(calls, [])
 
+    def test_the_pre_tool_use_modules_do_not_reach_the_history_readers(self):
+        """上の mock は親の依頼済みフェーズが無いと空振りしうる。参照そのものも固定する。"""
+        for name in ("judge.py", "failsafe.py"):
+            with open(os.path.join(ROOT, "src", "ccnavi", "hook", name), encoding="utf-8") as f:
+                text = f.read()
+            for reader in ("manual_settle", "ops_stop_request"):
+                with self.subTest(module=name, reader=reader):
+                    self.assertNotIn(reader, text)
+
 
 class DryRunGeneralConfigTest(HookCase):
     """AT1：dry-run では、一般の保護の対象の変更は報告だけ。一般の復元は通る。"""

@@ -5,7 +5,7 @@
 
 1. ワークツリーの持ち主がプロジェクトと決まる
 2. 受け入れ台帳・マーカーの置き場（`approval.home_dir`）が、プロジェクトの親のワークツリーの中になる
-3. `manual_settle._shared` が、プロジェクトのリポジトリの履歴と `origin/<親のブランチ>` で共有済みかを決める
+3. `manual_settle._shared` が、プロジェクトの履歴と `origin/<親のブランチ>` で共有済みかを見る
 """
 
 from __future__ import annotations

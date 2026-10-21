@@ -7,7 +7,7 @@
 2. AT19: 置く段階で失敗し、あとから --resume で完了させる。返信は 1 回だけ
 3. AT17: 適用済み（applied.local）の記録を --resume しても、自分の変化を食い違いとして断らない
 4. AT25: 親のワークツリーを消したあと、ワークスペースのルートから --resume する
-5. AT20: 同じ操作の --resume を同時に 2 つ走らせても、投稿が重複しない
+5. AT20: 操作のロック（sh の `locks/ops/<操作ID>`）が取られている間の --resume は投稿しない
 
 実行ファイル側の AT43・AT13・AT24 は `tests/ticket/test_decide_exe.py`。
 """
@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 import unittest
 
 from ccnavi.tickets import oplog
@@ -26,16 +27,8 @@ from tests.sh import test_review_decide as base
 GitLab = ops.GitLab
 STORE = ops.STORE
 
-# `--yes` の代役に「ホストに書いたあとの照合が外れた」形を足し、
-# `ops stage-set … issue pending` を遅らせる
-# （同じ操作を同時に打ったとき、両方が「未送信」と読む窓を広げる）。
+# `--yes` の代役に「置く段階で失敗する」「ホストに書いたあとの照合が外れた」形を足す。
 STUB = ops.STUB.replace(
-    '*" ops "*) exec "$STUB_PY" -m ccnavi "$@" ;;',
-    '*" ops stage-set "*" issue pending "*)\n'
-    '  [ -z "$STUB_SLOW_PENDING" ] || sleep "$STUB_SLOW_PENDING"\n'
-    '  exec "$STUB_PY" -m ccnavi "$@" ;;\n'
-    '*" ops "*) exec "$STUB_PY" -m ccnavi "$@" ;;',
-).replace(
     '  [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }\n',
     '  [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }\n'
     '  if [ -n "$STUB_MISMATCH" ]; then\n'
@@ -72,7 +65,6 @@ class DecideRecoveryShTest(unittest.TestCase):
             STUB_BEGIN=self.begin,
             STUB_MRURL=self.mr_url,
             STUB_MISMATCH="",
-            STUB_SLOW_PENDING="",
             PYTHONPATH=os.path.join(ops.ROOT, "src"),
         )
         env.update(extra)
@@ -235,14 +227,20 @@ class DecideRecoveryShTest(unittest.TestCase):
         STORE["reject"].clear()
         self.age(record["id"], "issue")
         # もう一方の --resume が実行中の状態（新しいロックファイル）を作る
-        with oplog.locked(self.state, record["id"]):
-            result = self.run_decide("--resume", stdin="y\n")
+        lock = os.path.join(self.state, "locks", "ops", record["id"])
+        os.makedirs(lock)
+        host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
+        osname = subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
+        now = int(time.time())
+        with open(os.path.join(lock, "owner"), "w", encoding="utf-8") as f:
+            f.write(f"{host} {os.getpid()} {now} {os.getpid()}-{now} {osname}\n")
+        result = self.run_decide("--resume", stdin="y\n")
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertEqual(len(STORE["issues"]), 0, "ロック中なのに issue を作った")
         self.assertEqual(len(STORE["notes"]), 0)
 
-    # decide の --resume は操作IDのロックを取らない（post_staged は staged_send を通らず、
-    # oplog.locked はどこからも呼ばれない）。ロック中でも投稿する
+    # decide の --resume は操作IDのロック（ccnavi_lock_take）を取らない（post_staged は
+    # staged_send を通らない）。ロック中でも投稿する
     test_two_resumes_of_the_same_operation_do_not_post_twice = unittest.expectedFailure(
         test_two_resumes_of_the_same_operation_do_not_post_twice
     )

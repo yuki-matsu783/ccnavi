@@ -216,7 +216,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 | `test_manual_settle.py` `test_an_unshared_move_is_not_confirmed_even_with_no_threads` | 未共有の移動でも、未解決の指摘が無いと通常の confirm が通ります | AT38 は確定しない |
 | `test_decide_exe.py` `test_the_same_operation_replayed_after_the_marker_came_back_makes_no_second_child` | `ccnavi_op` は書くだけで、同じ操作IDの子を使い回しません（`approval_ops._followup_ticket`） | AT13 |
 | `test_decide_recovery.py` `test_resume_from_the_workspace_root_after_the_parent_worktree_is_gone` | `--resume` は親のワークツリーが無いと `decide-no-worktree` で断ります | AT25 |
-| `test_decide_recovery.py` `test_two_resumes_of_the_same_operation_do_not_post_twice` | decide の `--resume` は操作IDのロックを取らず、issue が 2 件できます（`oplog.locked` は本番から呼ばれません） | AT20 |
+| `test_decide_recovery.py` `test_two_resumes_of_the_same_operation_do_not_post_twice` | decide の `--resume` は操作IDのロックを取らず、issue が 2 件できます（本番の送信が使うロックは `staged_send` が取る `ccnavi_lock_take`（`locks/ops/<操作ID>`）で、decide の `post_staged` は取りません。`oplog.locked` は本番から呼ばれません）。テストは `locks/ops/<操作ID>` を先に作って `--resume` し、投稿しないことを確かめる | AT20 |
 | `test_write_and_push_post_fail.py` `test_a_post_response_without_a_url_is_not_reported_as_success` | GitLab の `id` 無しの 201 応答で、comment が「記録した」と言い `sent` にします（`ccnavi-common-review.sh` が `.id | tostring` で URL を組みます） | AT21 |
 
 その他の設計との違い: AT28 の `.outcome` 保存に失敗したとき、標準エラーに書いて続行し、`unchecked` にはしません（従来の差し戻し無視の経路で補います）。`unchecked_scope` が親に知らせた時点で「促した」印を付けるため、知らせの後は Stop が重ねて促しません。AT33 では、keep だけで追加の指摘が残ると、子は動かず、マーカーも置かれません（fix を選んだときだけ `settled_by: decide` で動き、依頼のマーカーも消えます）。
@@ -231,7 +231,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
   - 照合側の `ccnavi-review.sh` 429 行付近 `find_posted()`、`ccnavi-common-review.sh` 345 行付近
   - Chrome 拡張の読み側 `core/gitlab.ts` 383・385・392 行付近（実害は要確認です）
   - GitHub は `.html_url // ""` で、空なら unknown にするので、同じ形ではありません。
-- 操作IDのロックを取らないのは、decide の `--resume` だけではありません。`post_staged`（`ccnavi-user-lib-review.sh` 258 行付近）は decide の投稿すべて（新規の decide と `--resume`）に使われ、ロックを取りません。ロックを取るのは `staged_send`（`ccnavi-common-review.sh` 385 行付近）だけです。`ccnavi ops begin` が失敗すると、記録もロックも無いまま直接送ります（393-397 行付近）。`oplog.locked` は本番から呼ばれていません。ADR-0151 の「同じ操作の単発の投稿は操作IDのロックで直列にする」と、decide の投稿が合っているかは文言次第です（要確認）。
+- 操作IDのロックを取らないのは、decide の `--resume` だけではありません。`post_staged`（`ccnavi-user-lib-review.sh` 258 行付近）は decide の投稿すべて（新規の decide と `--resume`）に使われ、ロックを取りません。ロックを取るのは `staged_send`（`ccnavi-common-review.sh` 385 行付近）だけです。`ccnavi ops begin` が失敗すると、記録もロックも無いまま直接送ります（393-397 行付近）。送信のロックは sh の `ccnavi_lock_take`（`locks/ops/<操作ID>`）で、Python の `oplog.locked` は本番から呼ばれていません。ADR-0151 の「同じ操作の単発の投稿は操作IDのロックで直列にする」と、decide の投稿が合っているかは文言次第です（要確認）。
 - `ccnavi_op` は `approval_ops.py` 318 行付近で書くだけで、読む箇所がありません（AT13）。
 - 勧める対応: 欠けた `id` は成功と扱わない形にそろえます。decide の投稿にもロックを取らせるか、ADR-0151 を実装に合わせます。
 
