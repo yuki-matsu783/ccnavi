@@ -17,8 +17,8 @@ import unittest
 from ccnavi.infra import settings
 from ccnavi.tickets import learning_notice
 from tests import ROOT
-from tests.core.test_wiki_status import pattern
 from tests.inproc import run_ccnavi
+from tests.learningsample import pattern
 
 ENV = {"CCNAVI_LEARNING": "enable"}
 

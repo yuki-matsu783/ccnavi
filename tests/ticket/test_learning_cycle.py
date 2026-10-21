@@ -15,13 +15,12 @@ import unittest
 
 from ccnavi.infra import settings
 from ccnavi.tickets import learning_notice
-from tests.core.test_wiki_status import impact, pattern
+from tests.learningsample import impact, pattern
 from tests.ticket.test_learning_consolidate import (
     CHILD,
     CONS,
     EN,
     RECORD,
-    RECORD_TEXT,
     FlowHarness,
 )
 from tests.ticket.test_ticket import git, write
