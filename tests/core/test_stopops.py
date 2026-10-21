@@ -6,6 +6,8 @@ import os
 import tempfile
 import unittest
 
+from ccnavi.hook import events
+from ccnavi.infra import hookio, settings
 from ccnavi.records import stopops
 
 
@@ -45,6 +47,31 @@ class IdentTest(unittest.TestCase):
         for words, want in cases.items():
             with self.subTest(words=words):
                 self.assertEqual(stopops.propose_ident(list(words)), want)
+
+    def test_a_pipe_around_propose_still_registers_the_call(self):
+        # 出力を切るパイプ（`| head`）の左右にある propose も、コマンドの語として読んで登録する。
+        # `sh -c '…'` は引数 1 本の文字列で、中を読まないので登録しない（実装の読み方）。
+        cases = {
+            "sh ccnavi-ticket.sh propose p1 | head -1": True,
+            "sh .ccnavi/scripts/ccnavi-ticket.sh propose p1 2>&1 | tail -n 3": True,
+            "head -1 | sh ccnavi-ticket.sh propose p1": True,
+            "sh -c 'sh ccnavi-ticket.sh propose p1 | head -n 1'": False,
+        }
+        with tempfile.TemporaryDirectory() as state:
+            conf = settings.Settings(state=state, stop_review_agent=True)
+            for at, (command, registered) in enumerate(cases.items()):
+                tool_use_id = f"tu{at}"
+                payload = hookio.Input(
+                    event=hookio.PRE_TOOL_USE,
+                    session_id="s1",
+                    tool_name="Bash",
+                    tool_input={"command": command},
+                    tool_use_id=tool_use_id,
+                )
+                with self.subTest(command=command):
+                    events._track_proposals(conf, payload)
+                    path = stopops._pre_path(state, tool_use_id, "p1")
+                    self.assertEqual(os.path.exists(path), registered)
 
 
 class BindTest(unittest.TestCase):
