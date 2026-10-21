@@ -391,7 +391,7 @@ class TreeBaseBoundTest(Harness):
         self.assertEqual("no", self.bound()["bound"])
 
     def test_a_parent_in_the_archive_of_the_base_repository_binds(self):
-        """退避（logs/archive/<repoの鍵>/done/）の親は、取り込み先のリポジトリのものだけが結び付く。"""
+        """退避先（logs/archive/<リポジトリの鍵>/done/）にある親は、取り込み先のリポジトリのものだけが結び付く。"""
         for repo, key in ((self.p, "p"), (self.ws, "self")):
             with self.subTest(key):
                 path = os.path.join(self.ws, "logs", "archive", key, "done", "feature-x.md")
@@ -410,7 +410,8 @@ class TreeBaseBoundTest(Harness):
         self.assertEqual({"bound": "no"}, self.bound(self.p))
         self.assertEqual("yes", self.bound(self.q)["bound"])
 
-    # 実装の欠陥: base_bound は archived_fields の parent を見ず、退避の子でも yes にする。
+    # 実装の欠陥: base_bound は archived_fields の parent を見ないため、
+    # 退避された子でも yes を返す。
     @unittest.expectedFailure
     def test_an_archived_child_does_not_bind(self):
         write(
@@ -420,8 +421,8 @@ class TreeBaseBoundTest(Harness):
         self.assertEqual({"bound": "no"}, self.bound(self.p))
 
     def test_an_approved_ticket_whose_id_matches_under_another_file_name_binds(self):
-        # ファイル名が識別子と違っても、チケットの識別子欄がブランチの識別子と同じなら結び付く
-        # （名前の突き合わせでは見つからない、承認済みの置き場の中身を読む材料）。
+        # ファイル名が識別子と違っても、チケットの識別子欄がブランチの識別子と同じなら結び付く。
+        # ファイル名の突き合わせでは見つからず、承認済みの置き場の中身を読んで見つける場合。
         for state in ("doing", "done"):
             with self.subTest(state):
                 rel = f"projects/p/{APPROVED}/{state}/t2.md"

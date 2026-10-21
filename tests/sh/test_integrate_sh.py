@@ -1038,18 +1038,18 @@ class OldMarkerTest(Fixture):
         self.assertIn("片付け済み", r.stdout)
 
 
-@unittest.skipUnless(SHELL and GIT and git_supports_v4(), "sh と git 2.40 以上が要る")
+@unittest.skipUnless(SHELL and GIT and git_supports_v4(), "sh と git 2.40 以上が必要")
 class IntegrateGapsTest(Fixture):
-    """ほかのクラスが一部しか見ていなかった条件。
+    """ほかのクラスが一部しか見ていなかった条件を扱う。
 
-    グローバルの excludes・片付けの各段での停止と再開・プロジェクトの自己防衛・
-    一時ワークツリーに残った ignored のファイル・リポジトリ間の境界。
+    グローバルの excludes、片付けの各段での停止と再開、プロジェクトの自己防衛、
+    一時ワークツリーに残った ignored のファイル、リポジトリ間の境界。
     """
 
     # ---- 道具
 
     def make_project(self, name):
-        """projects/<name> に、コミットと origin/HEAD のあるプロジェクトのリポジトリを作る。"""
+        """projects/<name> に、コミットと origin/HEAD を持つプロジェクトのリポジトリを作る。"""
         project = os.path.join(self.ws, "projects", name)
         os.makedirs(project)
         git(project, "init", "-q", "-b", "main")
@@ -1075,7 +1075,8 @@ class IntegrateGapsTest(Fixture):
         )
 
     def install_failing_git(self):
-        """FAIL_GIT_MATCH を引数に含む git の呼び出しだけ終了コード 1 にする代役を PATH に置く。"""
+        """環境変数 FAIL_GIT_MATCH の値を引数に含む git の呼び出しだけ、
+        終了コード 1 で失敗させる代役を PATH に置く。"""
         shim = os.path.join(self._tmp.name, "failgit")
         write(
             os.path.join(shim, "git"),
@@ -1091,9 +1092,10 @@ class IntegrateGapsTest(Fixture):
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
 
     def done_stopped_at(self, match, name="wt", cwd=None, base=None):
-        """integrate まで進め、match に当たる git が失敗する中で integrate-done -m を打つ。
+        """integrate まで進めたうえで、match に当たる git が失敗する状態にして、
+        integrate-done -m を実行する。
 
-        K は載り、片付けの途中で止まる。K が載る前の HEAD を返す。代役は外して返る。
+        K は載り、片付けは途中で止まる。戻り値は K が載る前の HEAD で、代役は外してから返す。
         """
         before = base or self.head()
         r = self.run_git_sh(
@@ -1123,7 +1125,7 @@ class IntegrateGapsTest(Fixture):
             self.assertEqual("", self.ref(kind), kind)
 
     def stage_stops_then_resumes(self, match, wt=True, tmp=True, branch=True):
-        """止めた段までの片付けが済み、その先が残っていることを見てから、打ち直して完了させる。"""
+        """止めた段までの片付けが済み、その先が残っていることを確かめてから、打ち直して完了させる。"""
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))
         self.install_failing_git()
@@ -1173,8 +1175,8 @@ class IntegrateGapsTest(Fixture):
     def test_a_stop_at_the_branch_resumes(self):
         self.stage_stops_then_resumes("update-ref -d refs/heads/wt", wt=False, tmp=False)
 
-    # 実装の欠陥: d4_refs_drop は失敗を捨てて先へ進み、止まらず終了コード 0 で ref が残る。
-    # 打ち直しも「片付け済み」と答えて ref を消さない。
+    # 実装の欠陥: d4_refs_drop は失敗を捨てて先へ進むため、止まらず終了コード 0 になり、ref が残る。
+    # 打ち直しも「片付け済み」と答えて、ref を消さない。
     @unittest.expectedFailure
     def test_a_stop_at_the_dedicated_refs_resumes(self):
         self.stage_stops_then_resumes(
