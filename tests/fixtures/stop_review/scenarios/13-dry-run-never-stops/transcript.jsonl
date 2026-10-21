@@ -1,0 +1,2 @@
+{"type": "user", "message": {"role": "user", "content": "リスト内包表記と map の違いを教えて"}}
+{"type": "assistant", "uuid": "a1", "message": {"role": "assistant", "content": [{"type": "text", "text": "内包表記は読みやすく、map は既存の関数を渡すときに向いています。"}]}}

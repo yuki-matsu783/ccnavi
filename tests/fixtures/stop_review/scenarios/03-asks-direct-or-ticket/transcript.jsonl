@@ -1,0 +1,2 @@
+{"type": "user", "message": {"role": "user", "content": "ログインの文言を直して"}}
+{"type": "assistant", "uuid": "a1", "message": {"role": "assistant", "content": [{"type": "text", "text": "進め方を確認させてください。直接作業で進めますか、チケット作業で進めますか？"}]}}

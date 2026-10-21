@@ -1,0 +1,4 @@
+{"type": "user", "message": {"role": "user", "content": "このリポジトリの構成を教えて"}}
+{"type": "assistant", "uuid": "a1", "message": {"role": "assistant", "content": [{"type": "text", "text": "src/ にコード、tests/ にテストがあります。"}]}}
+{"type": "user", "message": {"role": "user", "content": "前に決めた方針で続けて"}}
+{"type": "assistant", "uuid": "a2", "message": {"role": "assistant", "content": [{"type": "text", "text": "前の方針どおり、チケットを作成してよいですか？"}]}}

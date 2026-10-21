@@ -1,0 +1,44 @@
+{
+  "id": "06",
+  "title": "「まだ書かず選択肢だけ」と指示されて、選択肢を示す",
+  "final": "ok",
+  "judge": "ai",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [],
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "pass"
+        },
+        "R3": {
+          "stop": "pass"
+        }
+      },
+      "must_contain": [
+        "まだ提案は書かず、選択肢だけ出して",
+        "[no_proposal]",
+        "[ticket_work]",
+        "どちらで進めますか"
+      ],
+      "reply_ok": true,
+      "state": "done",
+      "final": "ok",
+      "judge": "ai"
+    }
+  ]
+}

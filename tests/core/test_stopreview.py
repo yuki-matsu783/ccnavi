@@ -204,6 +204,42 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual((attempt["state"], attempt["final"]), (sr.EXPIRED, sr.FINAL_UNCHECKED))
         self.assertEqual(sr.begin(self.state, KEY)[0], "expired")
 
+    def test_a_running_attempt_expires_as_unchecked_and_a_late_record_changes_nothing(self):
+        aid = sr.write_plan(self.state, KEY, _plan(), now=0.0)
+        self.assertEqual(sr.begin(self.state, KEY)[0], "candidate")
+        self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.RUNNING)
+        ttl = sr.DEFAULT_TTL_SECONDS
+        self.assertEqual(
+            sr.expire_overdue(self.state, now=ttl - 1.0), []
+        )  # 期限内は期限切れにならない
+        self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.RUNNING)
+        self.assertEqual(sr.expire_overdue(self.state, now=ttl + 1.0), [aid])
+        attempt = sr.read_attempt(self.state, aid)
+        self.assertEqual(
+            (attempt["state"], attempt["final"], attempt["judge"], attempt["reason"]),
+            (sr.EXPIRED, sr.FINAL_UNCHECKED, sr.JUDGE_CCNAVI, "expired"),
+        )
+        result = {
+            "attempt_id": aid,
+            "classification": sr.CLASS_TICKET_WORK,
+            "results": [
+                _row(sr.R1, sr.STOP_TARGET, sr.PASS),
+                _row(sr.R3, sr.STOP_TARGET, sr.PASS),
+                _row(sr.R2, "p1", sr.PASS),
+                _row(sr.R4, "p1", sr.PASS),
+            ],
+        }
+        flawed = _flawed(aid)
+        for late in (
+            result,
+            flawed,
+        ):  # 遅れて届いたrecordは、終了可の結果でも不備の検出でも受理しない
+            out = sr.accept(self.state, KEY, late, effective=modes.ENABLE, material_version=VERSION)
+            self.assertEqual(out, {"ok": True})
+            attempt = sr.read_attempt(self.state, aid)
+            self.assertEqual((attempt["state"], attempt["final"]), (sr.EXPIRED, sr.FINAL_UNCHECKED))
+            self.assertNotIn("accepted", attempt)
+
     def test_events_logged_separately(self):
         sr.write_plan(self.state, KEY, _plan())
         sr.begin(self.state, KEY)

@@ -1,0 +1,26 @@
+{
+  "attempt_id": "$ATTEMPT",
+  "classification": "ticket_work",
+  "results": [
+    {
+      "criterion": "R1",
+      "target": "stop",
+      "result": "pass"
+    },
+    {
+      "criterion": "R3",
+      "target": "stop",
+      "result": "pass"
+    },
+    {
+      "criterion": "R2",
+      "target": "$PROPOSAL:p1",
+      "result": "pass"
+    },
+    {
+      "criterion": "R4",
+      "target": "$PROPOSAL:p1",
+      "result": "pass"
+    }
+  ]
+}
