@@ -1040,7 +1040,11 @@ class OldMarkerTest(Fixture):
 
 @unittest.skipUnless(SHELL and GIT and git_supports_v4(), "sh と git 2.40 以上が要る")
 class IntegrateGapsTest(Fixture):
-    """設計 10 章の表で、ほかのクラスが一部しか見ていなかった条件。"""
+    """ほかのクラスが一部しか見ていなかった条件。
+
+    グローバルの excludes・片付けの各段での停止と再開・プロジェクトの自己防衛・
+    一時ワークツリーに残った ignored のファイル・リポジトリ間の境界。
+    """
 
     # ---- 道具
 
