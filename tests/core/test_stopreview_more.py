@@ -890,7 +890,7 @@ class NudgeOverlapTest(Base):
         return self.key
 
     def _stop(self, payload, finish="", request="", integrate="", rules=""):
-        """促し 4 つを差し替えて decide_at_stop を通す。(促しが見た stop_hook_active の列, 標準出力)。"""
+        """促し 4 つを差し替えて decide_at_stop を通す。(促しが見た stop_hook_active, 標準出力)。"""
         from unittest import mock
 
         seen = []
