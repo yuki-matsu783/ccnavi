@@ -389,7 +389,7 @@ def parent_blocked(
 ) -> bool:
     """親の `finish` の学びの検査。止めたなら理由を出して True。
 
-    学び以外の検査をすべて通したあとに、親の今の HEAD で次を見る。統合を済ませた後でも毎回、
+    学び以外の検査をすべて通したあと、親の今の HEAD で次を見る。統合を済ませた後も毎回、
     今の HEAD で検査し直す。
     - 記録・パターン・受信箱の置き場に、未コミットか未追跡の変更がある
     - 読み取れない記録か、整合の検査に当たる記録がある
@@ -422,8 +422,9 @@ def parent_blocked(
         for item in found_items.items:
             stderr.write(f"  - {item.describe()}\n")
         stderr.write(
-            f"  '{ticket_sh} consolidate {found.ticket}' で統合の子を作り、処理が済んだら"
-            f"閉じてから '{ticket_sh} finish {found.ticket}' を打ち直してください\n"
+            f"  '{ticket_sh} consolidate {found.ticket}' で統合の子を作り、"
+            f"その子を処理して閉じたあと、"
+            f"'{ticket_sh} finish {found.ticket}' を打ち直してください\n"
         )
         return True
     return False

@@ -47,7 +47,7 @@ PROPOSING = "提案中"
 CANDIDATE = "候補"
 SETTLED = "決着"
 
-# frontmatter を探すのは頭のこの長さだけ。
+# frontmatter を探すのは、頭のこの長さの中だけ。
 HEAD_LIMIT = 64 * 1024
 
 
@@ -57,7 +57,7 @@ class Pattern:
 
     name: str
     target: str
-    # 重複を除いた観測元の ID（大文字小文字だけ違うものは同じ ID。最初の綴りを残す）。
+    # 重複を除いた観測元の ID（大文字小文字だけが違うものは同じ ID とみなす。残すのは最初の綴り）。
     sources: tuple[str, ...]
     title: str = ""
 
@@ -260,7 +260,7 @@ def build(
     impact_texts: Mapping[str, str],
     present: bool = True,
 ) -> Wiki:
-    """ファイル名（`.md` を除く）から本文への対応から、`Wiki` を組む。
+    """ファイル名（`.md` を除く）から本文への対応を作り、`Wiki` を組む。
 
     壊れたファイルは `broken` に積む。並びは名前順で、読み順によらず同じ答えにする。
     """
@@ -354,7 +354,7 @@ def pending(wiki: Wiki) -> list[Impact]:
 
 
 # 観測元の数の閾値と、通知する候補の件数の既定。
-# 書かれた値は settings の LEARNING_SOURCES_ENV と LEARNING_NOTICE_COUNT_ENV から来る。
+# 書かれた値は、settings の LEARNING_SOURCES_ENV と LEARNING_NOTICE_COUNT_ENV から読む。
 DEFAULT_SOURCES = 3
 DEFAULT_NOTICE_COUNT = 5
 

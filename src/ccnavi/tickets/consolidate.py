@@ -91,7 +91,8 @@ def build(
         return (
             "",
             "",
-            f"{ident} のファイルがすでに在る（{taken}）。上書きしないので、中身を確かめて片付ける",
+            f"{ident} のファイルがすでに在る（{taken}）。"
+            "上書きしないので、中身を確かめてから決める",
         )
     front: dict = {
         "version": ticket_model.VERSION,

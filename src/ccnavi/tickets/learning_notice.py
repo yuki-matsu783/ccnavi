@@ -3,8 +3,8 @@
 リポジトリごと（ワークスペース自身と `projects/<名前>/`）に、`ccnavi_integration` の規則で統合先を
 決め、その手元の参照が指すコミットの `docs/wiki/` を git のオブジェクトから読む（チェックアウトは
 要らない）。参照を決められないか読めないリポジトリは、その回の通知を見送り、通知済みの記録も
-変えない。同じ回の `ccnavi-fetch.sh` の取り込みが済んでいるかは保証しない（間に合わなければ次の回に
-知らせる）。
+変えない。同じ回の `ccnavi-fetch.sh` による取り込みが終わっているかは保証しない
+（間に合わなければ次の回に知らせる）。
 
 リポジトリごとに、「候補」の集合を C、そのうち観測元の数が閾値以上のものを R とする。次の 2 つが
 どちらも成り立てば、件数・`target` ごとの内訳・依頼の仕方を知らせる。
@@ -62,7 +62,7 @@ def decide(
     )
     if due and changed:
         return True, current
-    # 出さないときも、候補で無くなった ID は外す。残った ID の値は、通知した時のまま持つ。
+    # 出さないときも、候補でなくなった ID は外す。残す ID の値は、通知したときの値のまま持つ。
     return False, {n: v for n, v in seen.items() if n in current}
 
 
@@ -97,7 +97,7 @@ def notice(conf: settings.Settings, root: str, deadline: float | None = None) ->
             if text:
                 out.append(text)
         return "\n".join(out)
-    except Exception:  # noqa: BLE001 - 案内の足しで、セッションの開始を止めない
+    except Exception:  # noqa: BLE001 - 案内を足すだけなので、セッションの開始は止めない
         return ""
 
 

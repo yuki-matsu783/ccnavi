@@ -104,7 +104,7 @@ def parse(path: str, ident: str, text: str) -> tuple[Record | None, str]:
         return None, "frontmatter が閉じていない"
     try:
         front = yamlread.safe_load("\n".join(lines[1:end]))
-    except Exception as exc:  # YAML の誤りは種類を問わず「読めない」に寄せる
+    except Exception as exc:  # YAML の誤りは種類を問わず「読めない」として扱う
         return None, f"frontmatter が YAML として読めない（{str(exc).splitlines()[0]}）"
     if not isinstance(front, dict):
         return None, "frontmatter が YAML のマッピングでない"
