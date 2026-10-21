@@ -98,7 +98,10 @@ class HandoffCase(unittest.TestCase):
     # ---- 起動
 
     def run_handoff(self, *args, guard="disable", env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment[settings.GUARD_TICKET_APPROVAL_ENV] = guard
         environment.update(env or {})

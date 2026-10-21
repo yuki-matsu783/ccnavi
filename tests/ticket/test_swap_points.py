@@ -1270,7 +1270,10 @@ class RecordWritesTest(CoreHarness):
         self.commit_parent()
         digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         target = os.path.join(linked, "logs", "state", "write-and-push", "self", "l.writes")
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         from tests.inproc import run_ccnavi
 

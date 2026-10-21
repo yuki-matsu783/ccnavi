@@ -51,7 +51,10 @@ class TicketControlTest(unittest.TestCase):
 
     def start(self, *extra, env=None):
         payload = json.dumps({"hook_event_name": "SessionStart", "session_id": "s1"})
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.update(env or {})
         return run_ccnavi(
             ["--root", self.root, "--rules", self.rules, *extra],

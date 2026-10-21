@@ -66,7 +66,10 @@ class PhaseHarness(unittest.TestCase):
         return path
 
     def ccnavi(self, *args, stdin="", env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         # 学びの蓄積の既定は enable。学びを扱わないテストは切る（扱うテストは env で渡す）。
         environment["CCNAVI_LEARNING"] = "disable"

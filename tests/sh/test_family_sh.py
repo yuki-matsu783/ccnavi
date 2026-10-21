@@ -33,7 +33,10 @@ class FamilyShTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
 
     def family(self, ident):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env["CCNAVI_BIN"] = os.path.join(self.root, "no-such-ccnavi")
         result = subprocess.run(
             [SHELL, "-c", SCRIPT, COMMON, self.root, ident],

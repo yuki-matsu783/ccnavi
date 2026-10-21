@@ -29,7 +29,10 @@ class SyncPathsTest(unittest.TestCase):
         os.makedirs(os.path.join(self.ws, ".claude"))
 
     def paths(self, env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         result = run_ccnavi(["--root", self.ws, "sync", "paths"], env=environment)
@@ -54,7 +57,10 @@ class SyncPathsTest(unittest.TestCase):
         # sh は受け取った引数を `"$@"` で渡すので、
         # サブコマンドに置き場のフラグを足されても効かない。
         # 無視したことは標準エラーに出す。
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         elsewhere = os.path.join(self.ws, "elsewhere")
         result = run_ccnavi(

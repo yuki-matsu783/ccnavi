@@ -47,7 +47,10 @@ class Harness(unittest.TestCase):
         os.makedirs(self.tree)
 
     def ask(self, *words):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return run_ccnavi(["--root", self.ws, *words], env=environment)
 

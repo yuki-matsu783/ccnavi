@@ -139,7 +139,10 @@ class Harness:
         # 自分自身に仕掛けているので、テストを走らせるセッションが既に
         # モードを持っている。それを読むテストは、コードではなく走った
         # 機械のことを報告してしまう。
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         args = ["--mode", mode]
         if mode == "disable":
             # disable だけはフラグから言えない。作業ツリーの中から来た disable は

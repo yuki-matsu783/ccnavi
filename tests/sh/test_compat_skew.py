@@ -77,7 +77,10 @@ class CompatSkewTest(unittest.TestCase):
         write(os.path.join(self.ws, "dist", "ccnavi", "ccnavi"), text)
 
     def run_ticket(self):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         return subprocess.run(
             [SHELL, os.path.join(".ccnavi", "scripts", "ccnavi-ticket.sh"), "status", "x"],
             cwd=self.ws,
@@ -128,7 +131,10 @@ class CompatSkewTest(unittest.TestCase):
 
     def test_v5_the_real_executable_agrees_with_the_sh(self):
         """V5 ソースの `--version` が言う互換の版を、同じ読み方（sed）で sh が読める。"""
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         fake = os.path.join(self.ws, "ccnavi-src")
         python = sys.executable.replace("\\", "/")
         write(
@@ -171,7 +177,10 @@ class TicketStatusPassTest(unittest.TestCase):
         write(os.path.join(self.ws, "dist", "ccnavi", "ccnavi"), STUB.format(compat=sh_compat()))
 
     def run_ticket(self, *args):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         return subprocess.run(
             [SHELL, os.path.join(".ccnavi", "scripts", "ccnavi-ticket.sh"), *args],
             cwd=self.ws,

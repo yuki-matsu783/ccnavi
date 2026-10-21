@@ -305,7 +305,10 @@ class JudgeTest(unittest.TestCase):
                 "tool_input": tool_input,
             }
         )
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         done = run_ccnavi(
             [
                 "--root",
@@ -639,7 +642,10 @@ class CommandLineTest(unittest.TestCase):
             )
 
     def run_cli(self, *args: str) -> str:
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         done = run_ccnavi(
             ["--root", self.root, *args],

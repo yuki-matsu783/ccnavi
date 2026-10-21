@@ -63,7 +63,10 @@ class LintEveryTest(unittest.TestCase):
         return write(os.path.join(self.root, "rules.yml"), json.dumps(body))
 
     def lint(self, rules_path: str) -> subprocess.CompletedProcess:
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         return run_ccnavi(
             [
                 "--root",

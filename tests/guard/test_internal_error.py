@@ -28,7 +28,10 @@ def run(root, payload, mode="enable"):
 
 
 def run_raw(root, text, mode="enable"):
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.pop("CLAUDE_PROJECT_DIR", None)
     return run_ccnavi(["--root", root, "--mode", mode], input=text, cwd=ROOT, env=environment)
@@ -185,7 +188,10 @@ class InternalErrorTest(unittest.TestCase):
 
     def test_failure_while_loading_settings_outside_the_hook_is_raised(self):
         """hook でない経路（打った人が見られる経路）は、例外のまま伝える。"""
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         with (
             mock.patch.object(settings, "load", side_effect=RecursionError("深い")),
             self.assertRaises(RecursionError),
@@ -220,7 +226,10 @@ class InternalErrorTest(unittest.TestCase):
         self.assertEqual(missing, set())
 
     def test_unusable_payload_says_what_to_do(self):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         result = run_ccnavi(
             ["--root", self.root, "--log", "", "--mode", "enable"],
             input="not json",

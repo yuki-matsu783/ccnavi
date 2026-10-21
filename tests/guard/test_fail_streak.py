@@ -22,7 +22,10 @@ DOCS = "--docs"
 
 
 def _env(**extra: str) -> dict[str, str]:
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     # コアファイルのバックアップと復元は切る。試したいのは連続の数えだけ。
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.update(extra)

@@ -30,7 +30,10 @@ def run(root, payload, env=None):
     `logs/state` のバックアップが書き戻される。組み込みの既定はこの設定に依らず入るので、
     見たいものは変わらない。
     """
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.update(env or {})
     return run_ccnavi(

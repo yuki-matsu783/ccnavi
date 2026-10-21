@@ -89,7 +89,10 @@ class OriginSubcommandTest(unittest.TestCase):
     def origin(self, url: str, extra_env=None, sub="origin") -> subprocess.CompletedProcess:
         subprocess.run(["git", "remote", "remove", "origin"], cwd=self.dir, capture_output=True)
         subprocess.run(["git", "remote", "add", "origin", url], cwd=self.dir, check=True)
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.update(extra_env or {})
         # `origin` は exe を呼ばない。在ることだけ見るので、確実に在る実行ファイルを指す。
         env["CCNAVI_BIN_PATH"] = sys.executable

@@ -67,7 +67,10 @@ class Drafts(PhaseHarness):
         `guard` は端末の確かめ（CCNAVI_GUARD_TICKET_APPROVAL）。`--templates`
         はオプションでは渡せない。
         """
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         if guard is not None:
             env[settings.GUARD_TICKET_APPROVAL_ENV] = guard
@@ -137,7 +140,10 @@ class Drafts(PhaseHarness):
     def handoff(self, rel, tree=None, guard="disable"):
         """下書き 1 本を `ccnavi user handoff <rel> --yes --expect <見せたハッシュ>` で取り込む。"""
         tree = tree or self.parent_tree
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env[settings.GUARD_TICKET_APPROVAL_ENV] = guard
         shown = run_ccnavi(["--root", tree, "user", "handoff", rel, "--json"], env=env, cwd=ROOT)

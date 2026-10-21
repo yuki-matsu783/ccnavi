@@ -29,7 +29,10 @@ class OpsCliTest(unittest.TestCase):
         os.makedirs(os.path.join(self.root, ".claude"))
         _write(common_path(self.root, "rules"), json.dumps({"version": 1}))
         self.state = os.path.join(self.root, "logs", "state")
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        self.env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         self.env.pop("CLAUDE_PROJECT_DIR", None)
 
     def ccnavi(self, *words):
@@ -108,7 +111,10 @@ class OpsHookTest(unittest.TestCase):
         }
         if agent:
             payload["agent_id"] = agent
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         result = run_ccnavi(
             ["--root", self.root, "--mode", "enable"],

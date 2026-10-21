@@ -53,7 +53,10 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルのパスから
     当てる形を作るので、振り分けの sh を指したときの判定はこれで見る。
     """
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment.pop("CLAUDE_PROJECT_DIR", None)
     if bin_path:
         environment["CCNAVI_BIN_PATH"] = bin_path

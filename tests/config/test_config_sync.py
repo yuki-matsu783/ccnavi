@@ -209,7 +209,10 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         shown = run_ccnavi(
             ["--root", tree, "--templates", "--json"],
-            env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            env={
+                **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+                "CCNAVI_LEARNING": "disable",
+            },
             cwd=ROOT,
         )
 

@@ -81,7 +81,10 @@ def write(directory: str, name: str, text: str) -> str:
 
 def ccnavi(root: str, rules_path: str, *args: str) -> subprocess.CompletedProcess:
     """見るのはルールだけ。承認済みチケットと state は外し、記録も残さない。"""
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     return run_ccnavi(
         [
             "--root",

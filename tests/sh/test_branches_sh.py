@@ -153,7 +153,10 @@ class BranchesShTest(unittest.TestCase):
         git(cwd or self.ws, "remote", "add", "origin", url)
 
     def run_sh(self, *args, cwd=None, **extra):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         for name in ("GITHUB_TOKEN", "GITLAB_TOKEN", "CLAUDE_PROJECT_DIR"):
             env.pop(name, None)
         env.update(

@@ -238,7 +238,10 @@ class DecideOpsShTest(unittest.TestCase):
             found = shutil.which(name)
             if found and not os.path.exists(os.path.join(tools, name)):
                 base.put_tool(found, os.path.join(tools, name))
-        full = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        full = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         full.update(
             CCNAVI_WORKSPACE=self.ws,
             CCNAVI_BIN_PATH=self.stub,

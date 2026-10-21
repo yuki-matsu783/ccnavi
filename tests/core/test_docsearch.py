@@ -528,7 +528,10 @@ class RenderTest(unittest.TestCase):
 
 
 def clean_env(**extra: str) -> dict[str, str]:
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment.pop("CLAUDE_PROJECT_DIR", None)
     environment.update(extra)
     return environment

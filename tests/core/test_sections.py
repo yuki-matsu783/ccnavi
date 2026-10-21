@@ -63,7 +63,10 @@ class SectionsTest(unittest.TestCase):
                 "tool_input": {field: subject},
             }
         )
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         done = run_ccnavi(
             [
                 "--root",

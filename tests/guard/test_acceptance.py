@@ -26,7 +26,10 @@ def run(mode="enable", payload=""):
     コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     切らないと、作業ツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
     """
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
 
     # 記録はワークスペースルートの既定の置き場（logs/decisions.jsonl）に残る。置き場を動かす
@@ -127,7 +130,10 @@ class VerdictTest(unittest.TestCase):
 
     def test_disableは何も判定しない(self):
         # disable は起動したユーザの環境からしか反映されない。フラグからは反映されない。
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment["CCNAVI_MODE"] = "disable"
         result = run_ccnavi(
             ["--root", fixture_workspace()],

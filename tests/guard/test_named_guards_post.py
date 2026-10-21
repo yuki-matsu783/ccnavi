@@ -156,7 +156,10 @@ class Fixture(unittest.TestCase):
             body["source"] = source
         if event == "PostToolUseFailure":
             body["error"] = "exit 1"
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment[settings.TICKET_CONTROL_ENV] = tickets
         return run_ccnavi(
