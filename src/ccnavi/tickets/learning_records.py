@@ -20,7 +20,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ..infra import gitcmd, yamlread
+from ..infra import gitcmd, pathcase, yamlread
+from ..records import wiki
 
 LEARNING_DIR = "wip/handoff/learnings"
 INBOX_DIR = "docs/wiki/inbox"
@@ -30,12 +31,12 @@ WATCHED = (LEARNING_DIR, PATTERN_DIR, INBOX_DIR)
 
 PROCESS_REFLECT = "反映"
 PROCESS_SKIP = "対象外"
-INBOX_PREFIX = "inbox:"
 
 TIMEOUT = 5.0
 _REGULAR = ("100644", "100755")
 _PROCESS_LINE = re.compile(r"^- 処理:")
-_PROCESS_FORM = re.compile(r"^- 処理:[ \t]+(反映|対象外)(?:[ \t]+(.*\S))?[ \t]*$")
+# 区切りには、日本語入力で入りやすい全角空白（U+3000）も使える。
+_PROCESS_FORM = re.compile(r"^- 処理:[ \t\u3000]+(反映|対象外)(?:[ \t\u3000]+(.*\S))?[ \t\u3000]*$")
 
 
 @dataclass
@@ -172,26 +173,24 @@ def _text(tree_root: str, rel: str) -> str | None:
 
 
 def pattern_sources(tree_root: str, name: str) -> list[str] | None:
-    """HEAD のパターンの `sources`。パターンが無い・読めないなら None。"""
+    """HEAD のパターンの `sources`。無いか、壊れている（`--learnings` が数えない）なら None。
+
+    ファイル名は大文字小文字を区別せずに探す（`Foo` と `foo.md` は同じパターン）。
+    """
     if not name or "/" in name or "\\" in name or name.startswith("."):
         return None
-    text = _text(tree_root, f"{PATTERN_DIR}/{name}.md")
+    names, _ = _listing(tree_root, PATTERN_DIR)
+    want = pathcase.fold(name + ".md")
+    found = next(
+        (n for n, mode in names or [] if pathcase.fold(n) == want and mode in _REGULAR), ""
+    )
+    if not found:
+        return None
+    text = _text(tree_root, f"{PATTERN_DIR}/{found}")
     if text is None:
         return None
-    lines = text.lstrip("﻿").replace("\r\n", "\n").split("\n")
-    if not lines or lines[0].strip() != "---":
-        return None
-    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
-    if end is None:
-        return None
-    try:
-        front = yamlread.safe_load("\n".join(lines[1:end]))
-    except Exception:
-        return None
-    sources = front.get("sources") if isinstance(front, dict) else None
-    if not isinstance(sources, list):
-        return []
-    return [str(s) for s in sources]
+    parsed = wiki.parse_pattern(found[:-3], text)
+    return None if isinstance(parsed, str) else list(parsed.sources)
 
 
 def inbox_files(tree_root: str) -> tuple[list[str], str]:
@@ -199,7 +198,8 @@ def inbox_files(tree_root: str) -> tuple[list[str], str]:
     names, why = _listing(tree_root, INBOX_DIR)
     if names is None:
         return [], why
-    return sorted(n for n, _ in names if n.endswith(".md")), ""
+    # `.gitkeep` 以外は全部、判定するファイルとして数える（`.md` 以外も、大文字小文字違いも）。
+    return sorted(n for n, _ in names if n != ".gitkeep"), ""
 
 
 def pending(tree_root: str) -> Pending:
@@ -256,7 +256,7 @@ def _section_problem(tree_root: str, ident: str, sec: Section) -> str:
     sources = pattern_sources(tree_root, rest)
     if sources is None:
         return f"`処理: 反映 {rest}` が指すパターンが無い（{PATTERN_DIR}/{rest}.md）"
-    if ident not in sources:
+    if pathcase.fold(ident) not in {pathcase.fold(s) for s in sources}:
         return f"パターン {rest} の `sources` に観測元の ID（{ident}）が無い"
     return ""
 

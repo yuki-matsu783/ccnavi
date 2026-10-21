@@ -21,11 +21,12 @@ C に無くなった ID は記録から外す。通知済みの記録は `logs/s
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import time
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, pathcase, settings, tree
 from ..records import wiki, wiki_load
 from . import ops_stop_integrate
 
@@ -35,8 +36,13 @@ _SAFE = re.compile(r"[^A-Za-z0-9._-]")
 
 
 def state_path(conf: settings.Settings, name: str) -> str:
-    safe = _SAFE.sub("_", name or SELF_NAME)
-    return os.path.join(conf.state, NOTICE_DIR, safe + ".json")
+    # 名前は大文字小文字を区別せずに比べる（pathcase.fold）。ファイル名に使えない字や非 ASCII の字は
+    # `_` になるので、衝突しないよう fold した名前の短いハッシュを足す。
+    # ワークスペース自身とプロジェクトは別の鍵にする（`_self` という名前のプロジェクトと紛れない）。
+    key = pathcase.fold(name) if name else SELF_NAME
+    digest = hashlib.sha1((f"project:{key}" if name else "self").encode("utf-8")).hexdigest()[:8]
+    safe = _SAFE.sub("_", key)[:40]
+    return os.path.join(conf.state, NOTICE_DIR, f"{safe}-{digest}.json")
 
 
 def read_seen(path: str) -> dict[str, bool]:

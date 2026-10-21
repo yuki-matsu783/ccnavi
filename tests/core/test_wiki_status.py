@@ -150,6 +150,14 @@ class LearningsCliTest(unittest.TestCase):
         )
         self.assertNotEqual(done.returncode, 0)
 
+    def test_missing_root_is_an_error(self):
+        done = run_ccnavi(
+            ["--root", os.path.join(self.root, "nope"), "--learnings"],
+            cwd=ROOT,
+            env=dict(os.environ),
+        )
+        self.assertNotEqual(done.returncode, 0)
+
     def test_loader_reads_a_commit_without_checkout(self):
         import subprocess
 

@@ -142,6 +142,35 @@ class PendingTest(unittest.TestCase):
         self.commit()
         self.assertEqual(lr.pending(self.root).items, [])
 
+    def test_broken_pattern_does_not_count_as_reflected(self):
+        # type も target も無いパターンは --learnings が数えないので、反映済みとも見なさない
+        write(self.root, "docs/wiki/patterns/bad.md", "---\nsources: [c-01-01]\n---\n")
+        self.record("c-01-01", 1, SEC.format(t="a", p="- 処理: 反映 bad"))
+        self.commit()
+        self.assertIn("パターンが無い", lr.pending(self.root).items[0].why)
+
+    def test_names_are_compared_without_case(self):
+        self.pattern("Foo", "[C-01-01]")
+        self.record("c-01-01", 1, SEC.format(t="a", p="- 処理: 反映 foo"))
+        self.commit()
+        self.assertEqual(lr.pending(self.root).items, [])
+
+    def test_fullwidth_space_in_the_process_line(self):
+        self.record("c-01-01", 1, SEC.format(t="a", p="- 処理:　対象外　環境の都合"))
+        self.commit()
+        found = lr.pending(self.root)
+        self.assertEqual((found.items, found.inconsistent), ([], []))
+
+    def test_any_file_in_the_inbox_counts_except_gitkeep(self):
+        write(self.root, "docs/wiki/inbox/.gitkeep", "")
+        write(self.root, "docs/wiki/inbox/note.txt", "x\n")
+        write(self.root, "docs/wiki/inbox/NOTE.MD", "x\n")
+        self.commit()
+        self.assertEqual(
+            sorted(i.path for i in lr.pending(self.root).items),
+            ["docs/wiki/inbox/NOTE.MD", "docs/wiki/inbox/note.txt"],
+        )
+
     def test_pattern_name_cannot_escape(self):
         self.record("c-01-01", 1, SEC.format(t="a", p="- 処理: 反映 ../x"))
         self.commit()

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from typing import TextIO
 
 from ..infra import settings
@@ -132,6 +133,9 @@ def run(
     args: argparse.Namespace,
 ) -> int:
     """`--learnings`。ツリーの wiki を読んで一覧を書く。"""
+    if not os.path.isdir(root):
+        stderr.write(f"ccnavi: --root {root} はディレクトリではない\n")
+        return EXIT_ERROR
     try:
         found = wiki_load.load_tree(root)
     except OSError as exc:

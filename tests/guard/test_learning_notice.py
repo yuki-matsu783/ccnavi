@@ -135,6 +135,15 @@ class NoticeTest(unittest.TestCase):
         with open(path, encoding="utf-8") as f:
             self.assertEqual(f.read(), before)
 
+    def test_state_names_do_not_collide(self):
+        conf, _ = settings.load(self.root)
+        names = ["", "学習", "調査", "a b", "a_b", "a:b", "_self"]
+        paths = {learning_notice.state_path(conf, n) for n in names}
+        self.assertEqual(len(paths), len(names))
+        self.assertEqual(
+            learning_notice.state_path(conf, "Foo"), learning_notice.state_path(conf, "foo")
+        )
+
     def test_unreadable_record_is_treated_as_empty(self):
         self.ws.patterns([f"p{i}" for i in range(5)])
         self.assertTrue(self.notice())

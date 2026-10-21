@@ -172,7 +172,12 @@ def _reject_of(
     if rule is not None:
         origin = f"{ORIGIN_RULE} {rules.record_name(rule)}（レイヤー {rule.source or '?'}）"
         return Reject(t.ticket, entry.decision, entry.glob, rule.spoken_message(), origin)
-    if parent is not None and parent.decide(probe) not in (rules.ALLOW, rules.ASK):
+    # 統合の子には親の範囲の上限を当てない（phase_scope.scope_verdict と同じ）。
+    if (
+        parent is not None
+        and not t.is_consolidate
+        and parent.decide(probe) not in (rules.ALLOW, rules.ASK)
+    ):
         return Reject(
             t.ticket,
             entry.decision,

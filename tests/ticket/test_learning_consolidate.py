@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import unittest
 
+from ccnavi.infra import settings
 from ccnavi.policy import rules
 from ccnavi.tickets import (
     agree_candidates,
@@ -216,6 +217,17 @@ class ConsolidateFlowTest(FlowHarness):
         again = self.consolidate()
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertIn("i0001-00-02", again.stdout)
+
+
+class SessionRejectsTest(FlowHarness):
+    def test_the_fixed_scope_is_not_reported_as_outside_the_parent(self):
+        from ccnavi.tickets import session_rejects
+
+        self.setup_family()
+        self.assertEqual(self.consolidate().returncode, 0)
+        conf, _ = settings.load(self.root)
+        found = session_rejects.find_all(conf, self.root)
+        self.assertEqual([r for r in found.rejects if r.ticket == CONS and "親" in r.origin], [])
 
 
 class StructureTest(unittest.TestCase):
