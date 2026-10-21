@@ -1,0 +1,70 @@
+{
+  "id": "08",
+  "title": "親子を一括で送り、子の1枚（p1-01-02）だけが確認の手順を欠く",
+  "final": "flawed",
+  "judge": "ai",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [
+        "issue #15"
+      ],
+      "targets": [
+        "stop",
+        "proposal:p1"
+      ],
+      "routes": {
+        "p1": "sent"
+      },
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ],
+        [
+          "R2",
+          "proposal:p1"
+        ],
+        [
+          "R4",
+          "proposal:p1"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "pass"
+        },
+        "R3": {
+          "stop": "pass"
+        },
+        "R2": {
+          "proposal:p1": "fail"
+        },
+        "R4": {
+          "proposal:p1": "pass"
+        }
+      },
+      "must_contain": [
+        "--- wip/proposals/todo/p1.md ---",
+        "--- wip/proposals/todo/p1-01-01.md ---",
+        "--- wip/proposals/todo/p1-01-02.md ---",
+        "# 子 2: クライアントのリトライ",
+        "親の「期限切れ時の挙動を統一する」のクライアント側。",
+        "issue #15",
+        "route=sent"
+      ],
+      "reply_ok": false,
+      "reply_contains": [
+        "R2"
+      ],
+      "state": "sent_back",
+      "final": "flawed",
+      "judge": "ai"
+    }
+  ]
+}
