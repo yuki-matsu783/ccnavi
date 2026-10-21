@@ -193,6 +193,7 @@ BARE_YES = "\x00bare"
 # 打ったユーザは反映されたと思う。
 _NOT_WITH_DOCS = (
     "--lint",
+    "--learnings",
     "--handoff",
     "--test",
     "--test-expectations",
@@ -258,9 +259,14 @@ def _docs_flags_given(args: argparse.Namespace) -> list[str]:
     return [flag for flag, name, absent in DOCS_FLAGS if getattr(args, name) != absent]
 
 
-def _not_with_docs(args: argparse.Namespace) -> str:
-    """`--docs` に添えられた、ほかの経路のフラグ（最初の 1 つ）。無ければ空。"""
+def _not_with_docs(args: argparse.Namespace, own: str = "") -> str:
+    """`--docs` に添えられた、ほかの経路のフラグ（最初の 1 つ）。無ければ空。
+
+    `own` は、いま調べている経路自身のフラグ（`--learnings`）。数えない。
+    """
     for flag in _NOT_WITH_DOCS:
+        if flag == own:
+            continue
         name = flag[2:].replace("-", "_")
         value = getattr(args, name)
         # `is` で比べる。`--reviewed 0` の 0 は False と等しいので、`in` だと見落とす。
@@ -391,6 +397,7 @@ _HELP_FLAGS = (
     ("explain", lambda a: a.explain),
     ("docs", lambda a: a.docs),
     ("templates", lambda a: a.templates),
+    ("learnings", lambda a: a.learnings),
     ("logs", lambda a: a.prune or a.suggest),
     ("agree", lambda a: a.agree or a.plan_order is not None or a.fill_phases),
     (

@@ -48,6 +48,7 @@ from . import (
     lint_project,
     lint_templates,
     lint_ticket,
+    lint_wiki,
     version,
 )
 
@@ -467,6 +468,7 @@ def check(
     problems.extend(lint_places._ticket_places(conf, root))
     problems.extend(lint_places._projectless_worktrees(conf, root))
     problems.extend(lint_direct._direct(conf, root))
+    problems.extend(lint_wiki._wiki(conf, root))
     problems.extend(lint_project._local_settings(root))
     problems.extend(lint_layers._sync(conf, root))
     return problems
