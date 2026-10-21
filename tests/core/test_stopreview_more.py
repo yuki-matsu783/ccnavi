@@ -156,6 +156,18 @@ class RefsAndSubmittedTest(Base):
         for label in plan["refs"]:
             self.assertIn(label, out.getvalue())
 
+    def test_a_background_notification_does_not_move_the_turn_start_or_the_refs(self):
+        self._prompt("#12 と !5 を実装して")
+        start = stopops.turn_start(self.state, "s1")
+        refs = stopops.session_refs(self.state, "s1")
+        self.assertGreater(start, 0)
+        self.assertEqual(len(refs), 2)
+        time.sleep(0.02)  # 書き直されたなら、開始時刻が変わるだけの間を置く
+        self._prompt("<task-notification>ビルドが終わった #99 と !77 の結果</task-notification>")
+        self.assertEqual(stopops.turn_start(self.state, "s1"), start)
+        self.assertEqual(stopops.session_refs(self.state, "s1"), refs)
+        self.assertEqual(len(self.plan()["refs"]), 2)
+
     def test_no_reference_is_said_plainly(self):
         plan = self.plan()
         self.assertEqual(plan["refs"], [])
@@ -860,6 +872,161 @@ class OrderingAndIsolationTest(Base):
             events.decide_at_stop(io.StringIO(), io.StringIO(), self.conf, self.root, again,
                                   audit.Record(), mode=modes.ENABLE)  # fmt: skip
         self.assertEqual(seen, [True])  # 継続でなければ、これまでどおり stop_hook_active が真のまま
+
+
+class NudgeOverlapTest(Base):
+    """AI 判定の差し戻し・計画が、ほかの hook の継続や既存の促しと重なる。"""
+
+    def setUp(self):
+        super().setUp()
+        self.conf.stop_review = "enable"
+
+    def _append(self, uuid):
+        """新しいアシスタント行を足す（共有キーが変わる）。"""
+        with open(self.transcript, "a", encoding="utf-8") as handle:
+            row = {"type": "assistant", "uuid": uuid, "message": {"content": "直した"}}
+            handle.write(json.dumps(row) + "\n")
+        self.key = sr.shared_key("s1", self.transcript)
+        return self.key
+
+    def _stop(self, payload, finish="", request="", integrate="", rules=""):
+        """促し 4 つを差し替えて decide_at_stop を通す。(促しが見た stop_hook_active の列, 標準出力)。"""
+        from unittest import mock
+
+        seen = []
+
+        def spy(reason):
+            def call(_stderr, _conf, _root, called, _record, *_rest):
+                seen.append(called.stop_hook_active)
+                return reason
+
+            return call
+
+        out = io.StringIO()
+        with (
+            mock.patch.object(events, "_finish_nudge", side_effect=spy(finish)),
+            mock.patch.object(events, "_request_nudge", side_effect=spy(request)),
+            mock.patch.object(
+                events, "_integrate_nudge", side_effect=lambda *a: (spy(integrate)(*a), "")
+            ),
+            mock.patch.object(events, "stop_rules_nudge", side_effect=spy(rules)),
+        ):
+            events.decide_at_stop(out, io.StringIO(), self.conf, self.root, payload,
+                                  audit.Record(), mode=modes.ENABLE)  # fmt: skip
+        return seen, out.getvalue()
+
+    def _continued(self):
+        return hookio.Input(
+            event=hookio.STOP, session_id="s1", transcript_path=self.transcript,
+            cwd=self.root, stop_hook_active=True,
+        )  # fmt: skip
+
+    def _attempts(self):
+        found = []
+        for name in sorted(os.listdir(self.state)):
+            if name.startswith("stopreview-attempt-"):
+                with open(os.path.join(self.state, name), encoding="utf-8") as handle:
+                    found.append(json.load(handle))
+        return found
+
+    def _flaw(self, aid):
+        return {
+            "attempt_id": aid,
+            "classification": sr.CLASS_TICKET_WORK,
+            "results": [
+                {
+                    "criterion": sr.R1,
+                    "target": sr.STOP_TARGET,
+                    "result": sr.FAIL,
+                    "locations": [{"kind": "final_answer", "text": "作る?"}],
+                    "fixes": [{"kind": "write_proposal", "text": "提案を書いて送る"}],
+                },
+                {"criterion": sr.R3, "target": sr.STOP_TARGET, "result": sr.PASS},
+            ],
+        }
+
+    def test_a_sent_back_stop_then_two_hook_continuations(self):
+        # Stop1: AI が不備を受理して差し戻す。既存の促しは止めない。
+        seen1, out1 = self._stop(self.payload)
+        self.assertEqual(seen1, [False] * 4)
+        self.assertNotIn("block", out1)
+        plan1 = sr.read_plan(self.state, self.key)
+        aid = plan1["attempt_id"]
+        self.assertEqual(sr.begin(self.state, self.key)[0], "candidate")
+        sent = sr.accept(
+            self.state, self.key, self._flaw(aid), material_version=sr.material_version()
+        )
+        self.assertFalse(sent["ok"])
+        self.assertIn(aid, sent["reason"])
+        self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.SENT_BACK)
+        self.assertTrue(sr.last_stop(self.state, "s1")["sent_back"])
+
+        # Stop2: 差し戻しで続いた回。1 回だけ AI による継続として消費され、既存の促しは偽で動く。
+        key2 = self._append("a2")
+        seen2, out2 = self._stop(self._continued())
+        self.assertEqual(seen2, [False] * 4)
+        self.assertNotIn("block", out2)
+        self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.CONSUMED)
+        plan2 = sr.read_plan(self.state, key2)
+        self.assertTrue(plan2["is_candidate"])
+        self.assertEqual((plan2["rejudge"], plan2["original"]), (True, aid))
+        self.assertEqual(sr.read_attempt(self.state, plan2["attempt_id"])["state"], sr.PENDING)
+        self.assertNotIn("suspected_unrecorded_stop", self.events_text())  # 差し戻しで説明がつく
+
+        # Stop3: ほかの hook がもう一度継続させた。AI による継続ではなく、既存の促しは黙る。
+        key3 = self._append("a3")
+        seen3, out3 = self._stop(self._continued())
+        self.assertEqual(seen3, [True] * 4)
+        self.assertNotIn("block", out3)
+        plan3 = sr.read_plan(self.state, key3)
+        self.assertFalse(plan3["is_candidate"])
+        self.assertEqual((plan3["reason"], plan3["rejudge"]), ("stop_hook_active", False))
+        attempt3 = sr.read_attempt(self.state, plan3["attempt_id"])
+        self.assertEqual(
+            (attempt3["state"], attempt3["final"], attempt3["judge"]),
+            (sr.DONE, sr.FINAL_SKIPPED, sr.JUDGE_CCNAVI),
+        )
+        self.assertEqual(sr.begin(self.state, key3)[0], "not_candidate")
+        self.assertIsNone(sr.consume_continuation(self.state, "s1"))
+        self.assertEqual([a for a in self._attempts() if a["state"] == sr.SENT_BACK], [])
+        self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.CONSUMED)
+        # 前の Stop（Stop2）に促しも差し戻しも無いので、記録外の停止の疑いとして 1 回だけ数える。
+        self.assertEqual(self.events_text().count("suspected_unrecorded_stop"), 1)
+
+    def _assert_stopped_by_existing_nudge(self, reason, out):
+        self.assertIn(reason, out)
+        self.assertIn("block", out)
+        plan = sr.read_plan(self.state, self.key)
+        self.assertFalse(plan["is_candidate"])
+        self.assertEqual((plan["reason"], plan["final"]), ("existing_nudge", sr.FINAL_OUT_OF_SCOPE))
+        attempt = sr.read_attempt(self.state, plan["attempt_id"])
+        self.assertEqual(
+            (attempt["state"], attempt["final"], attempt["judge"]),
+            (sr.DONE, sr.FINAL_OUT_OF_SCOPE, sr.JUDGE_CCNAVI),
+        )
+        self.assertEqual(sr.begin(self.state, self.key)[0], "not_candidate")
+
+    def test_the_integrate_nudge_makes_the_stop_out_of_scope(self):
+        _, out = self._stop(self.payload, integrate="統合の手順を確かめてください")
+        self._assert_stopped_by_existing_nudge("統合の手順を確かめてください", out)
+
+    def test_the_rules_nudge_makes_the_stop_out_of_scope(self):
+        _, out = self._stop(self.payload, rules="振り返りだけをしてください")
+        self._assert_stopped_by_existing_nudge("振り返りだけをしてください", out)
+
+    def _material_first(self, **nudge):
+        self.assertEqual(sr.begin(self.state, self.key, now=time.time()), ("wait", None))
+        aid = sr.attempt_id(self.key)
+        self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.PLAN_WAIT)
+        _, out = self._stop(self.payload, **nudge)
+        self._assert_stopped_by_existing_nudge(next(iter(nudge.values())), out)
+        self.assertEqual(sr.read_plan(self.state, self.key)["attempt_id"], aid)
+
+    def test_material_before_the_integrate_nudge_plan_is_finalised_out_of_scope(self):
+        self._material_first(integrate="統合の手順を確かめてください")
+
+    def test_material_before_the_rules_nudge_plan_is_finalised_out_of_scope(self):
+        self._material_first(rules="振り返りだけをしてください")
 
 
 if __name__ == "__main__":

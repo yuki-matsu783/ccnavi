@@ -175,16 +175,17 @@ class PlanAtStopTest(unittest.TestCase):
     def test_candidate_plan_written_once(self):
         self._plan()
         plan = sr.read_plan(self.state, self.key)
-        if plan is None:  # チケット制御が無効な作りのときは候補にならない
-            self.skipTest("tickets disabled in this settings")
+        self.assertIsNotNone(plan)
+        self.assertTrue(plan["is_candidate"])
         self.assertEqual(plan["targets"], [sr.STOP_TARGET])
         self.assertEqual(plan["effective"], modes.DRY_RUN)
 
     def test_existing_nudge_is_out_of_scope_by_ccnavi(self):
         self._plan(nudged=True)
         plan = sr.read_plan(self.state, self.key)
-        if plan is None:
-            self.skipTest("tickets disabled in this settings")
+        self.assertIsNotNone(plan)
+        self.assertFalse(plan["is_candidate"])
+        self.assertEqual(plan["reason"], "existing_nudge")
         attempt = sr.read_attempt(self.state, plan["attempt_id"])
         self.assertEqual(
             (attempt["final"], attempt["judge"]), (sr.FINAL_OUT_OF_SCOPE, sr.JUDGE_CCNAVI)
@@ -193,9 +194,11 @@ class PlanAtStopTest(unittest.TestCase):
     def test_stop_hook_active_without_continuation_is_skipped(self):
         self._plan(payload=dataclasses.replace(self.payload, stop_hook_active=True))
         plan = sr.read_plan(self.state, self.key)
-        if plan is not None:
-            attempt = sr.read_attempt(self.state, plan["attempt_id"])
-            self.assertEqual(attempt["final"], sr.FINAL_SKIPPED)
+        self.assertIsNotNone(plan)  # 候補でなくても、検査省略の計画は書く（判定役を待たせない）
+        self.assertFalse(plan["is_candidate"])
+        self.assertEqual(plan["reason"], "stop_hook_active")
+        attempt = sr.read_attempt(self.state, plan["attempt_id"])
+        self.assertEqual((attempt["final"], attempt["judge"]), (sr.FINAL_SKIPPED, sr.JUDGE_CCNAVI))
 
     def test_ai_continuation_requires_registration_and_sent_back(self):
         payload = dataclasses.replace(self.payload, stop_hook_active=True)
