@@ -158,11 +158,11 @@ class RefsAndSubmittedTest(Base):
 
     def test_a_background_notification_does_not_move_the_turn_start_or_the_refs(self):
         self._prompt("#12 と !5 を実装して")
-        start = stopops.turn_start(self.state, "s1")
         refs = stopops.session_refs(self.state, "s1")
-        self.assertGreater(start, 0)
+        self.assertGreater(stopops.turn_start(self.state, "s1"), 0)
         self.assertEqual(len(refs), 2)
-        time.sleep(0.02)  # 書き直されたときに開始時刻が変わるよう、少し間を置く
+        start = 1.0  # 書き直されたら必ず変わるよう、過去の時刻を置く
+        stopops.start_turn(self.state, "s1", start)
         self._prompt("<task-notification>ビルドが終わった #99 と !77 の結果</task-notification>")
         self.assertEqual(stopops.turn_start(self.state, "s1"), start)
         self.assertEqual(stopops.session_refs(self.state, "s1"), refs)

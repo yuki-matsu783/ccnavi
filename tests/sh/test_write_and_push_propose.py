@@ -190,7 +190,7 @@ class ProposeTest(WriteAndPushHarness):
         """`sh -c '<ccnavi-ticket.sh> propose <親> | head -n 1'`。出力を先頭の1行で切る。"""
         script = shlex.quote(os.path.join(self.scripts, "ccnavi-ticket.sh"))
         return subprocess.run(
-            [SHELL, "-c", f"{SHELL} {script} propose {PARENT} | head -n 1"],
+            [SHELL, "-c", f"{shlex.quote(SHELL)} {script} propose {PARENT} | head -n 1"],
             cwd=self.ws,
             env=self.env(),
             capture_output=True,
@@ -211,6 +211,7 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(row["commit"], head)
         self.assertIn(f"file={self.sha(self.tree, f'HEAD:{rel}')} {rel}", row["text"])
 
+    @unittest.skipUnless(os.name == "posix", "SIGPIPE の終わり方は POSIX の sh を前提にする")
     def test_a_propose_with_its_output_cut_after_the_push_is_failed_after(self):
         # pushが済んだ後の「次:」の出力を、切られたパイプへ書こうとして失敗する（SIGPIPE）。
         # 終了コードが0でなくなる。
@@ -224,6 +225,7 @@ class ProposeTest(WriteAndPushHarness):
 
     # 実装では、push済みのproposeの出力が切られるとsentではなくfailed_afterになる。
     @unittest.expectedFailure
+    @unittest.skipUnless(os.name == "posix", "SIGPIPE の終わり方は POSIX の sh を前提にする")
     def test_a_propose_with_its_output_cut_is_still_recorded_as_sent(self):
         self.put(f"{self.TODO}/{PARENT}.md")
         self.piped_propose()
