@@ -1,6 +1,6 @@
 {
   "id": "02",
-  "title": "issue を指定した依頼で、提案を書かずに作成の許可を求める",
+  "title": "issueを指定した依頼で、提案を書かずに作成の許可を求める",
   "final": "flawed",
   "judge": "ai",
   "stops": [

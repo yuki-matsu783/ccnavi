@@ -138,10 +138,11 @@ class ProposeTest(WriteAndPushHarness):
         self.put(f"{self.TODO}/{PARENT}.md")
         self.assertEqual(self.ticket("propose", PARENT).returncode, 0)
         sent = self.sha(self.tree, "HEAD")
-        again = self.ticket("propose", PARENT)  # 変更も未 push のコミットも無い打ち直し
+        again = self.ticket("propose", PARENT)  # 変更も未pushのコミットも無い状態での打ち直し
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(self.sha(self.tree, "HEAD"), sent)
-        # 結果ファイルの名前は開始秒と pid なので、同じ秒の 2 つは順番が決まらない。道で見分ける。
+        # 結果ファイルの名前は開始秒とpidで決まるため、同じ秒の2つは順番が決まらない。
+        # 経路で見分ける。
         by_route = {r["route"]: r for r in self.results()}
         self.assertEqual(sorted(by_route), ["sent", "unchanged"])
         unchanged = by_route["unchanged"]
@@ -154,7 +155,7 @@ class ProposeTest(WriteAndPushHarness):
         git(self.ws, "remote", "remove", "origin")
         rel = self.put(f"{self.TODO}/{PARENT}.md")
         head = self.sha(self.tree, "HEAD")
-        remote = git(self.remote, "rev-parse", f"refs/heads/{PARENT}").stdout  # origin を外した後
+        remote = git(self.remote, "rev-parse", f"refs/heads/{PARENT}").stdout  # originを外した後
         result = self.ticket("propose", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.sha(self.tree, "HEAD"), head)  # 送らず、コミットもしない
@@ -166,7 +167,7 @@ class ProposeTest(WriteAndPushHarness):
         self.assertNotIn("commit", row)
 
     def test_the_result_file_records_stopped_without_a_parent_worktree(self):
-        # 親のワークツリーが無い親子のチケットは、sh が何も書かずに止める（target stop）。
+        # 親のワークツリーが無い親子のチケットは、shが何も書かずにtarget stopで止める。
         result = self.ticket("propose", "i0099")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("書かずに止めた", result.stderr)
@@ -175,7 +176,8 @@ class ProposeTest(WriteAndPushHarness):
         self.assertNotIn("commit", row)
 
     def test_no_proposal_and_a_user_decision_are_failed_before_not_stopped(self):
-        # 送る提案が無い・未送信のユーザの判断がある止め方は、stopped ではなく送る前の失敗になる。
+        # 送る提案が無い場合や、未送信のユーザの判断がある場合は、
+        # stoppedではなく送る前の失敗になる。
         self.assertEqual(self.ticket("propose", PARENT).returncode, 1)
         self.put(f"{self.TODO}/{PARENT}.md")
         write(os.path.join(self.tree, *APPROVED.split("/"), "done", "zzz.md"), "x\n")
@@ -185,7 +187,7 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual([r["rc"] for r in rows], ["1", "1"])
 
     def piped_propose(self):
-        """`sh -c '<ccnavi-ticket.sh> propose <親> | head -n 1'`。出力を先頭の 1 行で切る。"""
+        """`sh -c '<ccnavi-ticket.sh> propose <親> | head -n 1'`。出力を先頭の1行で切る。"""
         script = shlex.quote(os.path.join(self.scripts, "ccnavi-ticket.sh"))
         return subprocess.run(
             [SHELL, "-c", f"{SHELL} {script} propose {PARENT} | head -n 1"],
@@ -210,8 +212,9 @@ class ProposeTest(WriteAndPushHarness):
         self.assertIn(f"file={self.sha(self.tree, f'HEAD:{rel}')} {rel}", row["text"])
 
     def test_a_propose_with_its_output_cut_after_the_push_is_failed_after(self):
-        # push が済んだ後の「次:」の出力が切られた口に当たり（SIGPIPE）、終了コードが 0 でない。
-        # propose は push の後に実行ファイルを呼ばないので、failed_after を作れた道はこれだけ。
+        # pushが済んだ後の「次:」の出力を、切られたパイプへ書こうとして失敗する（SIGPIPE）。
+        # 終了コードが0でなくなる。
+        # proposeはpushの後に実行ファイルを呼ばないので、failed_afterになる経路はこれだけ。
         self.put(f"{self.TODO}/{PARENT}.md")
         self.piped_propose()
         (row,) = self.results()
@@ -219,7 +222,7 @@ class ProposeTest(WriteAndPushHarness):
         self.assertNotEqual(row["rc"], "0")
         self.assertEqual(row["commit"], self.remote_sha())
 
-    # 実装は push 済みの propose を、出力を切られると sent ではなく failed_after にする
+    # 実装では、push済みのproposeの出力が切られるとsentではなくfailed_afterになる。
     @unittest.expectedFailure
     def test_a_propose_with_its_output_cut_is_still_recorded_as_sent(self):
         self.put(f"{self.TODO}/{PARENT}.md")

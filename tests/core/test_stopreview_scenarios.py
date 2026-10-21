@@ -1,25 +1,25 @@
-"""Stop の AI 判定の受入シナリオ 13 件を、場面データから決定的に確かめる。
+"""StopのAI判定の受入シナリオ13件を、場面データから決定的に確かめる。
 
-場面データは tests/fixtures/stop_review/scenarios/ にある。実機のモデルは呼ばない。
-各場面について、場面データから state・transcript・提案を組み、hook と同じ経路
-（`events._plan_stop_review`・`cli_stopreview` の material と record）を通して、次を確かめる。
+場面データはtests/fixtures/stop_review/scenarios/にある。実機のモデルは呼ばない。
+各場面について、場面データからstate・transcript・提案を組み、hookと同じ経路
+（`events._plan_stop_review`・`cli_stopreview` のmaterialとrecord）を通して、次を確かめる。
 
 - 候補になるか、計画の対象と必要な基準（`sr.required`）が期待と合うか
-- 判定役に渡る材料に、`must_contain` の文字列がすべて含まれるか（判定役が根拠を受け取れること）
-- 判定結果を record に渡したときの、返り値・試行の状態・最終分類・再判定の結果。判定結果は
+- 判定役に渡る材料に、`must_contain` の文字列がすべて含まれるか。これで判定役が根拠を受け取れる
+- recordに判定結果を渡したときの、返り値・試行の状態・最終分類・再判定の結果。判定結果は
   場面データの `judge_result*.json`、無ければ `expected.json` の基準ごとの期待から組んだもの
 
 検査しないもの: 判定役が正しく判定すること。基準ごとの期待は、正しい判定役が出すはずの結果として
-record に渡す入力であり、ここで確かめるのは ccnavi 側の確定の規則だけ。
+recordに渡す入力であり、ここで確かめるのはccnavi側の確定の規則だけ。
 
-場面の置き方。1 回の Stop の場面は場面の直下、2 回の Stop は `stop-1/`・`stop-2/` に分ける。
+場面の置き方。1回のStopの場面は場面の直下、2回のStopは `stop-1/`・`stop-2/` に分ける。
 
-- `transcript.jsonl`: その Stop の時点の会話
-- `proposals/<識別子>.txt`: Write で書いた提案（`wip/proposals/todo/<識別子>.md` に置く）
-- `propose.kv`: propose の結果ファイル。`{now}`・`{commit}`・`{blob:<パス>}` を置き換える。
+- `transcript.jsonl`: そのStopの時点の会話
+- `proposals/<識別子>.txt`: Writeで書いた提案（`wip/proposals/todo/<識別子>.md` に置く）
+- `propose.kv`: proposeの結果ファイル。`{now}`・`{commit}`・`{blob:<パス>}` を置き換える。
   あれば `proposals/` の提案をコミットして、送った版にする
 - `judge_result*.json`: 判定役の結果を模したもの。`$ATTEMPT`・`$PROPOSAL:<識別子>` を置き換える
-- `settings.json`（場面の直下）: `stop_review` の値。無ければ enable
+- `settings.json`（場面の直下）: `stop_review` の値。無ければenable
 - `expected.json`（場面の直下）: 期待
 """
 
@@ -67,7 +67,7 @@ def scene_names():
 
 
 def _prompts(path):
-    """transcript の中のユーザの発言（ツールの結果と通知を除く）。UserPromptSubmit の足跡に使う。"""
+    """transcriptの中のユーザの発言から、ツールの結果と通知を除いたもの。UserPromptSubmitの足跡に使う。"""
     found = []
     for line in _read(path).splitlines():
         row = json.loads(line)
@@ -82,7 +82,7 @@ def _prompts(path):
 
 
 class Play:
-    """場面を最初から再生する。Stop ごとに hook の足跡を作り、計画・材料・判定結果を通す。"""
+    """場面を最初から再生する。Stopごとにhookの足跡を作り、計画・材料・判定結果を通す。"""
 
     def __init__(self, case, name):
         self.directory = os.path.join(SCENES, name)
@@ -114,7 +114,7 @@ class Play:
         self.calls = 0
         self.repo = False
 
-    # ---- hook の足跡
+    # ---- hookの足跡
 
     def _hook(self, event, **fields):
         fields.setdefault("session_id", SESSION)
@@ -144,7 +144,7 @@ class Play:
         )
 
     def stage(self, folder):
-        """この Stop までに起きたこと（ユーザの発言・提案の書き込み・propose の実行）を再現する。"""
+        """このStopまでに起きたこと（ユーザの発言・提案の書き込み・proposeの実行）を再現する。"""
         shutil.copyfile(os.path.join(folder, "transcript.jsonl"), self.transcript)
         prompts = _prompts(self.transcript)
         for text in prompts[self.prompted :]:
@@ -177,7 +177,7 @@ class Play:
                 handle.write(body)
             self._hook(hookio.POST_TOOL_USE, **call)
 
-    # ---- Stop の計画・材料・判定結果
+    # ---- Stopの計画・材料・判定結果
 
     def plan(self, continued):
         payload = hookio.Input(
@@ -209,7 +209,7 @@ class Play:
         return json.loads(self._cli("record", result_text))
 
     def judge_text(self, plan, text):
-        """判定結果の雛形に、試行 ID と提案の対象キーを入れる。"""
+        """判定結果の雛形に、試行IDと提案の対象キーを入れる。"""
         keys = {p["ident"]: p["key"] for p in plan.get("proposals") or []}
         text = text.replace("$ATTEMPT", plan["attempt_id"])
         return re.sub(r"\$PROPOSAL:([\w.-]+)", lambda m: keys[m.group(1)], text)
@@ -249,8 +249,8 @@ class Record(NamedTuple):
     material: str
     reply: dict[str, Any]
     want: dict[str, Any]
-    attempt: dict[str, Any]  # record の直後の試行（次の Stop で状態が進む前）
-    original: dict[str, Any] | None  # 再判定なら、record の直後の元の試行
+    attempt: dict[str, Any]  # recordの直後の試行（次のStopで状態が進む前）
+    original: dict[str, Any] | None  # 再判定なら、recordの直後の元の試行
 
 
 @unittest.skipIf(GIT is None, "git が無い")
@@ -261,7 +261,7 @@ class ScenarioTest(unittest.TestCase):
         self.addCleanup(patch.stop)
 
     def _judge_text(self, play, folder, plan, want, choice=None):
-        """record に渡す判定結果。場面データのファイルがあればそれ、無ければ期待から組む。"""
+        """recordに渡す判定結果。場面データのファイルがあればそれ、無ければ期待から組む。"""
         path = os.path.join(folder, choice or "judge_result.json")
         if os.path.isfile(path):
             return play.judge_text(plan, _read(path))
@@ -269,7 +269,7 @@ class ScenarioTest(unittest.TestCase):
         return ideal_result(plan, want["criteria"])
 
     def _play(self, name, override=None):
-        """場面を再生する。`override` は (Stop の番号, 判定結果のファイル)。その Stop で止める。"""
+        """場面を再生する。`override` は (Stopの番号, 判定結果のファイル)。そのStopで止める。"""
         play = Play(self, name)
         records = []
         for index, folder in enumerate(play.stops):
@@ -334,7 +334,7 @@ class ScenarioTest(unittest.TestCase):
             label = f"{name}: {alt['name']}"
             record = self._play(name, (len(records) - 1, alt["judge_result"]))[-1]
             self._assert_outcome(record, alt, label)
-            # 再判定・dry-run の不備検出では差し戻しが残らない（次の Stop で消費されるものが無い）。
+            # 再判定やdry-runの不備検出では差し戻しが残らない。次のStopで消費されるものが無いため。
             self.assertIsNone(sr.consume_continuation(record.play.state, SESSION), label)
 
 
@@ -372,7 +372,7 @@ class SceneDataTest(unittest.TestCase):
                     self.assertTrue(all(isinstance(s, str) and s for s in stop["must_contain"]))
 
     def test_the_judge_result_files_agree_with_the_expected_criteria(self):
-        # 場面データの判定結果が、expected.json の基準ごとの期待と食い違っていないこと。
+        # 場面データの判定結果が、expected.jsonの基準ごとの期待と食い違っていないこと。
         for name in scene_names():
             expected = _load(os.path.join(SCENES, name, "expected.json"))
             for folder, want in zip(_folders(name), expected["stops"], strict=True):

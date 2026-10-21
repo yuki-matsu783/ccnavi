@@ -1,6 +1,6 @@
 {
   "id": "10",
-  "title": "差し戻しを受けて提案を書いて送り直し、再び終える（2 回の Stop）",
+  "title": "差し戻しを受けて提案を書いて送り直し、再び終える（2回のStop）",
   "final": "ok",
   "judge": "ai",
   "rejudge": "resolved",

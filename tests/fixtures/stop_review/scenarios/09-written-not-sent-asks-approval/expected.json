@@ -1,6 +1,6 @@
 {
   "id": "09",
-  "title": "提案を todo/ に書いたが送らずに承認を求める",
+  "title": "提案をtodo/に書いたが送らずに承認を求める",
   "final": "flawed",
   "judge": "ai",
   "stops": [

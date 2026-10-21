@@ -209,7 +209,9 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(sr.begin(self.state, KEY)[0], "candidate")
         self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.RUNNING)
         ttl = sr.DEFAULT_TTL_SECONDS
-        self.assertEqual(sr.expire_overdue(self.state, now=ttl - 1.0), [])  # 期限の内
+        self.assertEqual(
+            sr.expire_overdue(self.state, now=ttl - 1.0), []
+        )  # 期限内は期限切れにならない
         self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.RUNNING)
         self.assertEqual(sr.expire_overdue(self.state, now=ttl + 1.0), [aid])
         attempt = sr.read_attempt(self.state, aid)
@@ -228,7 +230,10 @@ class StateMachineTest(unittest.TestCase):
             ],
         }
         flawed = _flawed(aid)
-        for late in (result, flawed):  # 終了可でも不備検出でも、遅れた record は受理しない
+        for late in (
+            result,
+            flawed,
+        ):  # 遅れて届いたrecordは、終了可の結果でも不備の検出でも受理しない
             out = sr.accept(self.state, KEY, late, effective=modes.ENABLE, material_version=VERSION)
             self.assertEqual(out, {"ok": True})
             attempt = sr.read_attempt(self.state, aid)

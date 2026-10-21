@@ -162,7 +162,7 @@ class RefsAndSubmittedTest(Base):
         refs = stopops.session_refs(self.state, "s1")
         self.assertGreater(start, 0)
         self.assertEqual(len(refs), 2)
-        time.sleep(0.02)  # 書き直されたなら、開始時刻が変わるだけの間を置く
+        time.sleep(0.02)  # 書き直されたときに開始時刻が変わるよう、少し間を置く
         self._prompt("<task-notification>ビルドが終わった #99 と !77 の結果</task-notification>")
         self.assertEqual(stopops.turn_start(self.state, "s1"), start)
         self.assertEqual(stopops.session_refs(self.state, "s1"), refs)
@@ -875,14 +875,14 @@ class OrderingAndIsolationTest(Base):
 
 
 class NudgeOverlapTest(Base):
-    """AI 判定の差し戻し・計画が、ほかの hook の継続や既存の促しと重なる。"""
+    """AI判定の差し戻しと計画が、ほかのhookの継続や既存の促しと重なる場面。"""
 
     def setUp(self):
         super().setUp()
         self.conf.stop_review = "enable"
 
     def _append(self, uuid):
-        """新しいアシスタント行を足す（共有キーが変わる）。"""
+        """新しいアシスタント行を足す。これで共有キーが変わる。"""
         with open(self.transcript, "a", encoding="utf-8") as handle:
             row = {"type": "assistant", "uuid": uuid, "message": {"content": "直した"}}
             handle.write(json.dumps(row) + "\n")
@@ -890,7 +890,7 @@ class NudgeOverlapTest(Base):
         return self.key
 
     def _stop(self, payload, finish="", request="", integrate="", rules=""):
-        """促し 4 つを差し替えて decide_at_stop を通す。(促しが見た stop_hook_active, 標準出力)。"""
+        """促し4つを差し替えてdecide_at_stopを通す。返すのは、促しが見たstop_hook_activeと標準出力。"""
         from unittest import mock
 
         seen = []
@@ -946,7 +946,7 @@ class NudgeOverlapTest(Base):
         }
 
     def test_a_sent_back_stop_then_two_hook_continuations(self):
-        # Stop1: AI が不備を受理して差し戻す。既存の促しは止めない。
+        # Stop1: AIが不備を受理して差し戻す。既存の促しは止めない。
         seen1, out1 = self._stop(self.payload)
         self.assertEqual(seen1, [False] * 4)
         self.assertNotIn("block", out1)
@@ -961,7 +961,8 @@ class NudgeOverlapTest(Base):
         self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.SENT_BACK)
         self.assertTrue(sr.last_stop(self.state, "s1")["sent_back"])
 
-        # Stop2: 差し戻しで続いた回。1 回だけ AI による継続として消費され、既存の促しは偽で動く。
+        # Stop2: 差し戻しで続いた回。AIによる継続として1回だけ消費され、
+        #        既存の促しにはstop_hook_activeが偽で渡る。
         key2 = self._append("a2")
         seen2, out2 = self._stop(self._continued())
         self.assertEqual(seen2, [False] * 4)
@@ -971,9 +972,9 @@ class NudgeOverlapTest(Base):
         self.assertTrue(plan2["is_candidate"])
         self.assertEqual((plan2["rejudge"], plan2["original"]), (True, aid))
         self.assertEqual(sr.read_attempt(self.state, plan2["attempt_id"])["state"], sr.PENDING)
-        self.assertNotIn("suspected_unrecorded_stop", self.events_text())  # 差し戻しで説明がつく
+        self.assertNotIn("suspected_unrecorded_stop", self.events_text())  # 差し戻しで説明できる
 
-        # Stop3: ほかの hook がもう一度継続させた。AI による継続ではなく、既存の促しは黙る。
+        # Stop3: ほかのhookがもう一度継続させた。AIによる継続ではないので、既存の促しは出ない。
         key3 = self._append("a3")
         seen3, out3 = self._stop(self._continued())
         self.assertEqual(seen3, [True] * 4)
@@ -990,7 +991,7 @@ class NudgeOverlapTest(Base):
         self.assertIsNone(sr.consume_continuation(self.state, "s1"))
         self.assertEqual([a for a in self._attempts() if a["state"] == sr.SENT_BACK], [])
         self.assertEqual(sr.read_attempt(self.state, aid)["state"], sr.CONSUMED)
-        # 前の Stop（Stop2）に促しも差し戻しも無いので、記録外の停止の疑いとして 1 回だけ数える。
+        # 前のStop（Stop2）に促しも差し戻しも無いので、記録外の停止の疑いとして1回だけ数える。
         self.assertEqual(self.events_text().count("suspected_unrecorded_stop"), 1)
 
     def _assert_stopped_by_existing_nudge(self, reason, out):

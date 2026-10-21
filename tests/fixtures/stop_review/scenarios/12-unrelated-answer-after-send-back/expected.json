@@ -1,6 +1,6 @@
 {
   "id": "12",
-  "title": "差し戻しの後の Stop が、チケットと無関係な質問への回答（2 回の Stop）。解消とは言えず、2 回目の差し戻しは無い",
+  "title": "差し戻しの後のStopが、チケットと無関係な質問への回答（2回のStop）。解消とは言えず、2回目の差し戻しは無い",
   "final": "out_of_scope",
   "judge": "ai",
   "rejudge": "inconclusive",

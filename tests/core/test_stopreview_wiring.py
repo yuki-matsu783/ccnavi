@@ -194,7 +194,7 @@ class PlanAtStopTest(unittest.TestCase):
     def test_stop_hook_active_without_continuation_is_skipped(self):
         self._plan(payload=dataclasses.replace(self.payload, stop_hook_active=True))
         plan = sr.read_plan(self.state, self.key)
-        self.assertIsNotNone(plan)  # 候補でなくても、検査省略の計画は書く（判定役を待たせない）
+        self.assertIsNotNone(plan)  # 候補でなくても、検査省略の計画は書く。判定役を待たせないため。
         self.assertFalse(plan["is_candidate"])
         self.assertEqual(plan["reason"], "stop_hook_active")
         attempt = sr.read_attempt(self.state, plan["attempt_id"])

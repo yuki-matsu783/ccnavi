@@ -49,8 +49,8 @@ class IdentTest(unittest.TestCase):
                 self.assertEqual(stopops.propose_ident(list(words)), want)
 
     def test_a_pipe_around_propose_still_registers_the_call(self):
-        # 出力を切るパイプ（`| head`）の左右にある propose も、コマンドの語として読んで登録する。
-        # `sh -c '…'` は引数 1 本の文字列で、中を読まないので登録しない（実装の読み方）。
+        # `| head` のように出力を切るパイプの左右にあるproposeも、コマンドの語として読んで登録する。
+        # `sh -c '…'` は引数1本の文字列で、実装は中を読まないので登録しない。
         cases = {
             "sh ccnavi-ticket.sh propose p1 | head -1": True,
             "sh .ccnavi/scripts/ccnavi-ticket.sh propose p1 2>&1 | tail -n 3": True,
