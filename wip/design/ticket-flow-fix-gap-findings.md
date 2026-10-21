@@ -30,7 +30,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 
 - 根拠:
   - 拡張は組み立てのときに `version.py` の `COMPAT` を埋め込む（`extensions/chrome/ccnavi-approval/scripts/build.js:60-88`、`src/background/main.ts:48` の `compat`）。
-  - 比べる相手は、ワークスペースの統合先にある `.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT`（`py/ccnavi_chrome.py` の `_compat`、1043 行付近）。完全一致でなければ「表示のみ」で、承認・レビュー済みの書き込みは受けない（`_write_refusal`、728 行付近。`protocol.ts` の `startGuard`、338 行付近は「始める」を断る）。
+  - 比べる相手は、ワークスペースの統合先にある `.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT`（`py/ccnavi_chrome.py` の `_compat`、1043 行付近）。完全一致でなければ「表示のみ」で、承認・レビュー済みの書き込みは受けない（`_write_refusal`、735 行付近。`protocol.ts` の `startGuard`、340 行付近は「始める」を断る）。
   - 比べるのは「拡張」対「リポジトリの sh」の 2 者で、手元の実行ファイル（`ccnavi`）の版とは比べない。実行ファイルの版を見るのは sh 側（`ccnavi-common.sh` の `ccnavi_compat_skew`、231 行付近）と `--lint`（`lint._sh_compat`）。
 - 勧める対応: 現状のまま。文書（`docs/design/` か ADR）に「拡張が比べるのは統合先の sh で、手元の実行ファイルではない」と 1 行書く。
 
@@ -40,7 +40,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 
 - 根拠:
   - `manual_settle.assess`（`tickets/manual_settle.py`）は、`finished_to: review` の子が `done/` にあり `settled_by` が無ければ手動とみなす。誰が動かしたか（コミットの作者・メッセージ・`via`）は見ない。依頼のマーカーがあり、移動が共有済みなら READY になる。
-  - ただし、古い Chrome は子の移動とレビュー済みのマーカーを 1 コミットで書く（`write.ts` の `settleRace`・コミットの説明 513 行付近）。`assess` は冒頭で、reviewed マーカーがあれば `Manual()`（NONE）を返す（`MARK_REVIEWED in ph.marks`）。だから通常の経路では手動移動と判定されない。
+  - ただし、古い Chrome は子の移動とレビュー済みのマーカーを 1 コミットで書く（`write.ts` の `settleRace`・コミットの説明 538 行付近）。`assess` は冒頭で、reviewed マーカーがあれば `Manual()`（NONE）を返す（`MARK_REVIEWED in ph.marks`）。だから通常の経路では手動移動と判定されない。
   - 判定されるのは、古い Chrome の書き込みの途中で子の移動だけが残った場合、またはマーカーだけが後で消えた場合に限る。
 - 勧める対応: 拡張を `COMPAT` と同じ版に更新する案内（1-3）を優先する。判定を堅くするなら、Chrome の書き込みのコミットに付く「Chrome 拡張 <版>」の行（`write.ts` の `commitMessage`、57 行付近）を `assess` が読んで除く手がある。今は読んでいない。
 
@@ -109,7 +109,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
   - `hook/subagent.py` 241 行の `phase_scope.scope_findings`: SubagentStop で、親のツリーから起動したときは子の数だけ繰り返す。子のワークツリーから起動したときは 1 回。
   - `review._unseen_commits`: CLI の `request`・`confirm` だけ。
 - Stop と UserPromptSubmit の回数は、子の総数ではなく、手で動かした子の数に比例する（3 回 × 動かした子の数）。動かした子が無ければ git は呼ばない（ファイルの走査だけ）。
-- 結論: 一部。PreToolUse は対応済み。Stop と UserPromptSubmit は `gitcmd.run` を内部の期限なしで呼ぶ（`run_until` を使っていない）ので、git が止まると 1 回 5 秒まで待つ。複数の子を手で動かした親で git が重いと、hook の期限（10 秒）に近づく。
+- 結論: 一部。PreToolUse は対応済み。Stop と UserPromptSubmit は `gitcmd.run` を内部の期限なしで呼ぶ（`run_until` を使っていない）ので、git が止まると 1 回 5 秒まで待つ。複数の子を手で動かした親で git が重いと、hook の期限（`settings.json` の timeout は 10 秒。内部の期限は `judge.DEADLINE_SECONDS` の 3 秒）に近づく。
 - 勧める対応: `_shared` を `gitcmd.run_until` に換えて期限を渡す。子ごとの 3 回を 1 回の `git log --name-status` に畳む。
 
 ## 4. 複数プロジェクト（`projects/<名前>/`）
@@ -131,7 +131,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 
 結論: 対応済み
 
-- 根拠: `review_close.close_early` は MR（`_result_with_mr`）を要り、依頼のマーカーは要らない。終わっていて reviewed が無いフェーズ（`unreviewed`）は「済んだ扱い」として、子を `settled_by: close-early` で done/ へ動かし、`{"by": "close-early", "accepted": []}` の reviewed マーカーを置く（`_settle`、565-625 行）。ユーザには y/N の前に一覧で見せる（`_show_leftovers`、「レビューが済んでいない → 済んだ扱い」）。MR が無い親（依頼もしていない親）では、`_result_with_mr` が断るため close-early は打てない。
+- 根拠: `review_close.close_early` は MR（`review._result_with_mr`、`review.py` 878 行付近）を要り、依頼のマーカーは要らない。終わっていて reviewed が無いフェーズ（`unreviewed`）は「済んだ扱い」として、子を `settled_by: close-early` で done/ へ動かし、`{"by": "close-early", "accepted": []}` の reviewed マーカーを置く（`_settle`、565-625 行）。ユーザには y/N の前に一覧で見せる（`_show_leftovers`、「レビューが済んでいない → 済んだ扱い」）。MR が無い親（依頼もしていない親）では、`_result_with_mr` が断るため close-early は打てない。
 - 勧める対応: MR が無い親でも早めに閉じたい要望があれば別に決める。
 
 ### 5-2 延期を引き受けたフェーズで一部だけ手で動かした場合
@@ -213,3 +213,29 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 | `test_write_and_push_post_fail.py` `test_a_post_response_without_a_url_is_not_reported_as_success` | GitLab の `id` 無しの 201 応答で comment が「記録した」と言い `sent` にする（`ccnavi-common-review.sh` が `.id | tostring` で URL を組む） | AT21 |
 
 その他の設計との違い: AT28 の `.outcome` 保存失敗は標準エラーに書いて続行し、`unchecked` にはしない（従来の差し戻し無視の経路で担保）。`unchecked_scope` が親に知らせた時点で「促した」印を付けるため、知らせの後は Stop が重ねて促さない。AT33 は、keep だけで追加の指摘が残ると子は動かず、マーカーも置かれない（fix を選んだときだけ `settled_by: decide` で動き、依頼のマーカーも消える）。
+
+## 9. 横展開と文書の更新漏れ（調査の追加分。直していない）
+
+### 9-1 同じ原因が別の経路にある（確実。実地の頻度は低いと推測）
+
+- GitLab の応答に `id` が無いと URL が `#note_null` になり、送信済みにされる。8 節の AT21 と同じ原因が次にもある。
+  - `ccnavi-user-lib-review.sh` 217 行付近 `issue_note()`（呼び元 315 行付近は `.url` が空でなければ sent）
+  - `ccnavi-common-review.sh` 303 行付近 `comment()`（request・ready の補助・comment・decide の note・close-early が通る）
+  - 照合側 `ccnavi-review.sh` 429 行付近 `find_posted()`、`ccnavi-common-review.sh` 345 行付近
+  - Chrome 拡張の読み側 `core/gitlab.ts` 383・385・392 行付近（実害は要確認）
+  - GitHub は `.html_url // ""` で、空なら unknown にするので同じ形ではない。
+- 操作IDのロックを取らないのは decide の `--resume` だけではない。`post_staged`（`ccnavi-user-lib-review.sh` 258 行付近）は decide の投稿すべて（新規の decide と `--resume`）に使われ、ロックを取らない。ロックを取るのは `staged_send`（`ccnavi-common-review.sh` 385 行付近）だけ。`ccnavi ops begin` が失敗すると、記録もロックも無しで直接送る（393-397 行付近）。`oplog.locked` は本番から呼ばれていない。ADR-0151 の「同じ操作の単発の投稿は操作IDのロックで直列にする」と、decide の投稿が合っているかは文言次第（要確認）。
+- `ccnavi_op` は `approval_ops.py` 318 行付近で書くだけで、読む箇所が無い（AT13）。
+- 勧める対応: 欠けた `id` は成功と扱わない形に揃える。decide の投稿にもロックを取らせるか、ADR-0151 を実装に合わせる。
+
+### 9-2 文書の更新漏れ（確実）
+
+- `docs/design/limits.md` 12.1 に無い項目（7 節の補足）: ホストの時計との差（余裕 10 分）、手動移動で未解決のスレッドが残ること（GitLab のマージ制限）、別の PC からの送信が 1 回きりとは限らないこと、判定できないときの緩和、担当の子が分からない SubagentStop の扱い、全文の範囲が最初のコメントだけであること。
+- `.ccnavi/docs/ticket-flow.md` 130-139 行付近の告知に、古い下書きの取り込み（`resume_legacy_drafts`）と、`DECIDE_VERSION` 2 で版 1 のボードを断ることが無い（2 節の補足）。
+- `.claude/skills/commit/references/test-groups.md` 21 行付近は「`test_write_and_push_*.py` の 6 本」と書くが、実数は 7 本（本ブランチの `test_write_and_push_post_fail.py` を含む）。この依頼では本番・文書を変えないため直していない。
+- expectedFailure で実装の欠陥を固定する運用は、どの文書にも書かれていない。8 節の 6 件が最初の例になる。
+
+### 9-3 テストの残り（作らなかったもの）
+
+- AT21 の欠けた `id` は comment の 1 経路だけ確かめた。`issue_note`・`find_posted` は未確認。
+- AT4 は、判定できないときの未知のツール名と空のツール名を、モードごとに確かめていない（Grep・Glob・PowerShell は足した）。
