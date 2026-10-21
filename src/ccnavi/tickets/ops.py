@@ -267,6 +267,9 @@ def finish(
         return 1
     if learning.record_missing(stderr, root, conf, found):
         return 1
+    # 親は、学び以外の検査をすべて通したあとに、親の今の HEAD で気づきの処理の証跡を照合する。
+    if learning.parent_blocked(stderr, root, conf, found):
+        return 1
     # 子は、閉じる前に実績のリスクを数える（risk.py）。定性項目の判定が揃わなければ閉じない。
     scored = _score_child(stdout, stderr, root, conf, found)
     if scored is None:
@@ -347,6 +350,9 @@ def _needs_review(root: str, conf: settings.Settings, found: ticket_model.Ticket
     宣言に関わらず上がった分も入る。
     """
     if not found.is_child or found.phase is None:
+        return False
+    if found.is_consolidate:
+        # 統合の子は必ずレビュー不要。done/ へ移す。
         return False
     for ph in phase.phases_of(root, conf, found.parent):
         if ph.number != found.phase:
@@ -540,7 +546,8 @@ def _score_child(
 
     返すのは、閉じたあとに出す行（点と内訳）。
     """
-    if not found.is_child:
+    if not found.is_child or found.is_consolidate:
+        # 統合の子は実績リスクを測らない（定性の判定も求めない）。
         return []
     worktree = tree.worktree_path(root, found.ticket)
     definition = risk.load_definition(conf, root, _project_of(conf, root, found))

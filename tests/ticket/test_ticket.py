@@ -140,6 +140,8 @@ class TicketTest(unittest.TestCase):
     def ccnavi(self, *args, stdin="", env=None):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
+        # 学びの蓄積の既定は enable。このテストは学びを扱わないので切る（扱うテストは env で渡す）。
+        environment["CCNAVI_LEARNING"] = "disable"
         environment.update(env or {})
         args = self.as_write_and_push(args)
         return run_ccnavi(

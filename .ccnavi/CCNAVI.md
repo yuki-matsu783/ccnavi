@@ -50,6 +50,7 @@
 | md に frontmatter を付ける・直す、索引で引く | `.ccnavi/docs/frontmatter.md` |
 | フィードバックが届いた、`.claude/skills/` を直す | `.ccnavi/docs/skill-review.md` |
 | スキルの振り返りで知識を溜める・読む、工程スキル（process-*）の reference を引く・足す、スキルを新しく作る | `.ccnavi/docs/skill-wiki.md`、`skill-processes.md` |
+| 学びの提案を頼まれた、SessionStart で学びの候補が知らされた、親の finish が気づきの処理で止まった | `.ccnavi/docs/learning-propose.md` |
 | ルール・フェーズ・リスク・計画テンプレート・工程スキルが育つ流れを確かめる | `.ccnavi/docs/grow.md` |
 
 <!-- ccnavi:if tickets -->

@@ -315,7 +315,9 @@ def phases_of(
     seen: set[str] = set()
     for pool in (closed_copies, review_copies, open_copies):
         for t in approval_checks.children_of(pool, parent_id):
-            if t.phase is None or t.ticket in seen:
+            # 統合の子（phase 0）は計画に載らないので、フェーズの進行・レビュー待ちの集計・
+            # レビュー依頼の対象に含めない。
+            if t.phase is None or t.ticket in seen or t.is_consolidate:
                 continue
             seen.add(t.ticket)
             phase = by_number.setdefault(t.phase, Phase(parent_id, t.phase))

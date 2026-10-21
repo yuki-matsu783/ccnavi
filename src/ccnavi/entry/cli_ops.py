@@ -17,6 +17,7 @@ from typing import TextIO
 from ..infra import fsio, gitcmd, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
+    consolidate,
     core,
     learning,
     next_id,
@@ -210,6 +211,10 @@ def operate(
             code = ops.finish(stdout, stderr, root, conf, target)
         else:
             code = ops.cancel(stdout, stderr, root, conf, target, args.reason)
+    elif kind == "ticket" and verb == "consolidate" and target:
+        # ticket consolidate <親>。統合の子を doing/ に作る。コミットと push は sh
+        # （ccnavi-ticket.sh consolidate）が write-and-push の手順で行う。
+        code = consolidate.run(stdout, stderr, root, conf, target)
     elif kind == "ticket" and verb == "learn" and len(words) <= 3:
         # ticket learn [<識別子>] [--note <本文> [--target <種類>] [--signal <信号>]]。
         # 気づきの記録の雛形と要約、または気づき 1 件の追記（直接作業では受信箱）。
@@ -403,6 +408,7 @@ def _write_and_push_bypass(
             "finish",
             "cancel",
             "propose",
+            "consolidate",
         )
     ):
         family_id = write_and_push.family_of(words[2])

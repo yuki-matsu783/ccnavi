@@ -19,6 +19,7 @@ from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, parent_text
 
 EN = {"CCNAVI_LEARNING": "enable"}
+DIS = {"CCNAVI_LEARNING": "disable"}
 PH = (
     "version: 1\nphases:\n  work:\n    kind: work\n    title: 作業\n"
     "    review: none\n    scope: inherit\n{extra}"
@@ -55,7 +56,7 @@ class LearningFlowTest(PhaseHarness):
         self.assertIn("git commit", started.stdout)
 
     def test_start_is_silent_when_disabled(self):
-        _, started = self.setup_family(env=None)
+        _, started = self.setup_family(env=DIS)
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         self.assertNotIn("学びの蓄積", started.stdout)
 

@@ -73,7 +73,9 @@ def scope_verdict(
         return ScopeVerdict(rules.DENY, LIMIT_BLOCKED, pt)
     verdict = child.decide(rel)
     limit = LIMIT_TICKET if verdict in _OUTSIDE else ""
-    if parent is not None:
+    # 統合の子は親の範囲の上限を当てない。上限は ccnavi の中に固定した定義（`type_for` が返す）と
+    # 子の `allow` だけ。固定の定義より広く書いてあっても、定義で切り詰める。
+    if parent is not None and not child.is_consolidate:
         verdict = ticket_mod.combine(verdict, parent.decide(rel))
         if not limit and verdict in _OUTSIDE:
             limit = LIMIT_PARENT
@@ -104,6 +106,8 @@ def type_for(
     （`blocked`）ので、定義で切り詰めずに通る形は残らない。計画を持たない親は `ticket start` が
     止まるので、その子の範囲を引くのは、止まる前に着手していた親だけ（番号だけ。定義で切り詰めない）。
     """
+    if child.is_consolidate:
+        return phasetypes.consolidate_type()
     item = plan_item(child, parent)
     if item is None or parent is None:
         return None
