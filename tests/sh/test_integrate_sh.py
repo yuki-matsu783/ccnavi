@@ -1124,7 +1124,9 @@ class IntegrateGapsTest(Fixture):
         for kind in ("s", "t", "c", "k"):
             self.assertEqual("", self.ref(kind), kind)
 
-    def stage_stops_then_resumes(self, match, wt=True, tmp=True, branch=True):
+    def stage_stops_then_resumes(
+        self, match, wt=True, tmp=True, branch=True, stopped_before_refs=True
+    ):
         """止めた段までの片付けが済み、その先が残っていることを確かめてから、打ち直して完了させる。"""
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))
@@ -1135,6 +1137,10 @@ class IntegrateGapsTest(Fixture):
         self.assertEqual(tmp, os.path.exists(self.tmp_wt()))
         self.assertEqual(branch, self.has_branch())
         self.assertTrue(os.path.isfile(self.marker()))
+        if stopped_before_refs:
+            for kind in ("s", "t", "c", "k"):
+                self.assertTrue(self.ref(kind), kind)
+            self.assertTrue(os.path.isfile(self.record()))
         again = self.run_git_sh("integrate-done", "wt")
         self.assertOk(again)
         self.assert_fully_cleaned(before, k)
@@ -1180,7 +1186,11 @@ class IntegrateGapsTest(Fixture):
     @unittest.expectedFailure
     def test_a_stop_at_the_dedicated_refs_resumes(self):
         self.stage_stops_then_resumes(
-            "update-ref -d refs/ccnavi/direct/wt/", wt=False, tmp=False, branch=False
+            "update-ref -d refs/ccnavi/direct/wt/",
+            wt=False,
+            tmp=False,
+            branch=False,
+            stopped_before_refs=False,
         )
 
     def test_a_marker_put_back_after_completion_is_dropped_without_moving_head(self):
@@ -1230,6 +1240,14 @@ class IntegrateGapsTest(Fixture):
         self.assertIn("残したもの", r.stdout)
         self.assertIn("residue.local", r.stdout)
         self.assertEqual("somebody's ignored file\n", read(left))
+        self.assertFalse(os.path.exists(self.wt))
+        self.assertTrue(os.path.isfile(self.marker()))
+        # 残りをユーザが消せば、打ち直しで完了する。
+        os.remove(left)
+        self.assertOk(self.run_git_sh("integrate-done", "wt"))
+        self.assertFalse(os.path.exists(self.tmp_wt()))
+        self.assertFalse(self.has_branch())
+        self.assertFalse(os.path.exists(self.marker()))
 
     def test_abort_keeps_an_ignored_file_left_in_the_temp_worktree(self):
         self.work_in_branch()
