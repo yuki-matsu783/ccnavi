@@ -13,6 +13,13 @@ keywords: [チケット, 親, 子, 手順, 流れ, propose, start, finish, reque
 直接作業の手順は[direct-flow.md](direct-flow.md)。合流と片付けの細部は[worktree-merge.md](worktree-merge.md)と[worktree-cleanup.md](worktree-cleanup.md)、ワークツリーの切り方は[worktree.md](worktree.md)。
 `start`・`finish`・`cancel`・`propose`・`request`・`confirm`・`decide`・`ready` など状態を動かす操作は、サブエージェントからは hook が止める。打つのはメインのエージェント（`decide` はユーザ）。
 
+## ユーザ確認までの進め方
+
+- 判断に必要な質問・問題がない限り、ユーザ確認地点まで作業を続ける。「次へ進めてよいか」だけの確認では止まらない。ユーザが停止・待機・相談を求めた場合や、操作が拒否された場合は止まり、理由を報告する
+- まず提案を書き、`ccnavi-ticket.sh propose <識別子>` で送る。内容と承認方法をユーザに案内して、承認を待つ
+- 承認後は、承認範囲内の作業・検証・子の `finish`・合流確認・ELI5 作成・レビュー依頼（`ccnavi-review.sh request`）まで進める。レビュー先と ELI5 をユーザに案内して、レビュー完了を待つ
+- 承認待ち・レビュー待ちの関門を越えて作業を進めない
+
 ## 全体の流れ
 
 ```mermaid

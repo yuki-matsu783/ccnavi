@@ -167,6 +167,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.ticket_guard",
                 "tickets.ticket_ids",
                 "tickets.ticket_model",
+                "tickets.proposal_form",
                 "tickets.ticket_places",
             }
         ),

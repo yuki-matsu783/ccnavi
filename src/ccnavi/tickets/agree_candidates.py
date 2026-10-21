@@ -15,6 +15,7 @@ from . import (
     approval_ops,
     phase,
     phasetypes,
+    proposal_form,
     standing,
     ticket_ids,
     ticket_model,
@@ -109,6 +110,7 @@ def candidates(
         t.workflow = workflow.compute(t)
         types = phasetypes.types_of(t)
         complaints = _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
+        complaints += proposal_form.form_problems(t, revision=True)
         complaints += revision_problems(root, conf, t, current, config)
         complaints += approval_checks.family_problems(conf, root, t, fams)
         complaints += approval_checks.mr_problems(t)
@@ -144,6 +146,7 @@ def candidates(
             missing = parent_elsewhere_text(root, conf, t)
         complaints, overflow = validate(t, pool, config, missing=missing)
         complaints += _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
+        complaints += proposal_form.form_problems(t)
         complaints += approval_checks.project_problems(t, pool, conf)
         complaints += approval_checks.place_problems(root, conf, t)
         complaints += approval_checks.family_problems(conf, root, t, fams)

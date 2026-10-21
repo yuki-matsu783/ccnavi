@@ -127,8 +127,11 @@ def _parent_text(name, plan, feedback, allow, issue):
     lines.append("allow:")
     for g in allow:
         lines += ["  - match: Write|Edit", f'    glob: "{g}"']
-    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
-    return "\n".join(lines) + "\n"
+    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", ""]
+    # 親の必須の見出し（形式検査が見る）。中身は短い一言にして、目印は残さない。
+    for heading in ("目的", "範囲", "対象外", "完了の確かめ方", "計画の理由"):
+        lines += [f"## {heading}", "", "本文", ""]
+    return "\n".join(lines)
 
 
 def child_text(name, parent, phase, allow, review=True):

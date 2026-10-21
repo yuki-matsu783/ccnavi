@@ -99,7 +99,10 @@ base_sha: ""
   子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
 - 親の提案の雛形は `ccnavi ticket new <識別子> --title <題> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) [--issue N]` で作る（`tickets/scaffold.py`。
   REQ-TKT-56）。識別子と同名のワークツリーの中から打つと、`<提案の置き場>/todo/<識別子>.md` に書く。生成物は
-  `version` `ticket` `issue`（`--issue` があれば）`title` `phases` `plan` `rationale` `allow` と本文の見出し。
+  `version` `ticket` `issue`（`--issue` があれば）`title` `phases` `plan` `rationale` `allow` と、本文の見出し
+  `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由`（この順。Stop の判定が親の提案に求める内容に
+  そろえた。「背景」は「目的」にまとめ、「計画の理由」は計画の説明として残す）。rationale と各見出しの下には空欄の目印
+  （`（ここに〜を書く）`）を 1 行ずつ置く。目印は `tickets/proposal_form.py` が持つ
   - `allow` は plan の順に各型の `scope` を集め、重複を除いた `match: Write|Edit` の項にする（案 A。判定側で `wip/` を
     既定で許すことはしない。承認していない範囲が黙って広がるため）。項が 20 件を超えれば止める
   - `plan` は各項が前の項を `after` に書いた一直線（終端が 1 つになり、承認の検査を通る）。並行させたい項はユーザが `after` を直す
@@ -113,6 +116,14 @@ base_sha: ""
     `--with-feedback` は `--template` と一緒にだけ使え、付けたときだけ `feedback:` を書く。既定ではフィードバック計画を書かない
     （最初の提案に入れると、全体計画を改版で直せなくなるため。全体計画のレビューを見てから改版で足す）。
     同じ識別子の提案、子の識別子の提案・フロー・フロー下書きが在れば上書きせず断る。詳しくは 9.15
+  - 提案の形式検査（`proposal_form.form_problems`。文字列を調べるだけで、ファイルも git も読まない）。承認の候補（`agree_candidates.candidates()`）は
+    改版と新規の両方でこの検査を通すので、承認・`--agree --preview --verify`・`--lint` の結果は同じになる。
+    判定側（`blocked`・範囲の判定）には入れず、承認済みチケットへの書き込みは止めない
+    - 空欄の目印が rationale か本文に残っている: 新規は error、改版は warn（改版は承認済みチケットの写しなので、古い残りで止めない）。
+      残っている目印と、rationale・本文のどちらにあるかを名指しする
+    - 親の必須の見出しが本文に欠けている: 親の新規の提案だけ warn で 1 件にまとめて挙げる。子と改版には言わない。
+      見出しはコードフェンス（行頭が ``` か ~~~）の外にある `## <名前>` の行で、名前が前後の空白を除いてちょうど一致するものだけ数える
+      （`###` など深さの違う見出しは数えない）
   - `ccnavi-ticket.sh` は `new` を通さない（保護対象の sh を直さないため）。`--fill-phases` と同じく実行ファイルを直接打つ。
     `new` は承認ではなく、`todo/` に書くだけなので、組み込みの止め（9.2）には当たらない
 - `started_at` `completed_at` `base_sha` `merged_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが

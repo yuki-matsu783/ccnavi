@@ -57,15 +57,13 @@ from . import (
     phasetypes,
     plan_phases,
     plan_templates,
+    proposal_form,
     standing,
     template_use,
     ticket_ids,
     ticket_model,
 )
 from . import ticket as ticket_mod
-
-# 雛形に添える、ユーザが書く欄の目印。
-RATIONALE_TODO = "（ここにこの作業をする理由を書く）"
 
 # `allow` に書く項の `match`。判定に使われるのは Write / Edit / NotebookEdit を含む項だけ。
 ALLOW_MATCH = "Write|Edit"
@@ -190,20 +188,14 @@ def render_items(
         lines.append("feedback:")
         lines.extend(_item_line(item) for item in feedback)
     lines.append("rationale: |")
-    lines.append(f"  {RATIONALE_TODO}")
+    lines.append(f"  {proposal_form.RATIONALE_TODO}")
     lines.append("allow:")
     for glob in allow:
         lines.append(f"  - match: {ALLOW_MATCH}")
         lines.append(f"    glob: {_quote(glob)}")
     lines.append(ticket_model.FENCE)
-    lines += [
-        "## 背景",
-        "",
-        "## 変更の内容",
-        "",
-        "## 計画の理由",
-        "",
-    ]
+    for heading in proposal_form.PARENT_HEADINGS:
+        lines += [f"## {heading}", "", proposal_form.HEADING_TODO[heading], ""]
     return "\n".join(lines)
 
 
@@ -407,7 +399,9 @@ def run(
     # ccnavi を PATH に持たない環境でも、そのまま打てるように、起動の sh 経由で書く
     launcher = settings.script_command(root, "ccnavi-launcher.sh")
     stdout.write(
-        f"次: {path} に rationale と本文を書き、allow を実際の作業に合わせて絞る・足す。{tail}"
+        f"次: {path} の rationale と、見出しの下の目印（「（ここに〜を書く）」）を実際の内容に"
+        "書き換える。目印が残っていると承認で止まる。"
+        f"allow を実際の作業に合わせて絞る・足す。{tail}"
         f"書けたら '{launcher} --lint' で確かめ、"
         f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
         f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {ident}' で"
