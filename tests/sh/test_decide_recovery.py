@@ -18,7 +18,6 @@ import json
 import os
 import subprocess
 import unittest
-from concurrent.futures import ThreadPoolExecutor
 
 from ccnavi.tickets import oplog
 from tests.sh import test_decide_ops as ops
@@ -229,26 +228,21 @@ class DecideRecoveryShTest(unittest.TestCase):
     # ---- AT20
 
     def test_two_resumes_of_the_same_operation_do_not_post_twice(self):
-        """AT20"""
+        """AT20: 操作IDのロック中の --resume は、投稿せずに断る（同時実行の代わりの決定的な形）"""
         STORE["reject"].add("issue")
         self.assertEqual(self.choose().returncode, 0)
         record = self.record()
         STORE["reject"].clear()
         self.age(record["id"], "issue")
-        # 道具の置き場を先に作る（同時に作ると取り合う）
-        self.assertEqual(self.run_decide("x").returncode, 2)
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            runs = [
-                pool.submit(self.run_decide, "--resume", stdin="y\n", STUB_SLOW_PENDING="3")
-                for _ in range(2)
-            ]
-            results = [r.result() for r in runs]
-        self.assertGreaterEqual(len(STORE["issues"]), 1, [r.stderr for r in results])
-        self.assertEqual(len(STORE["issues"]), 1, "同じ issue を 2 回作った")
-        self.assertEqual(len(STORE["notes"]), 1)
+        # もう一方の --resume が実行中の状態（新しいロックファイル）を作る
+        with oplog.locked(self.state, record["id"]):
+            result = self.run_decide("--resume", stdin="y\n")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(len(STORE["issues"]), 0, "ロック中なのに issue を作った")
+        self.assertEqual(len(STORE["notes"]), 0)
 
     # decide の --resume は操作IDのロックを取らない（post_staged は staged_send を通らず、
-    # oplog.locked はどこからも呼ばれない）。両方が「未送信」と読み、両方が投稿する
+    # oplog.locked はどこからも呼ばれない）。ロック中でも投稿する
     test_two_resumes_of_the_same_operation_do_not_post_twice = unittest.expectedFailure(
         test_two_resumes_of_the_same_operation_do_not_post_twice
     )
