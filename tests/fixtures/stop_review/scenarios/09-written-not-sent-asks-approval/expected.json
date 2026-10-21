@@ -1,0 +1,69 @@
+{
+  "id": "09",
+  "title": "提案を todo/ に書いたが送らずに承認を求める",
+  "final": "flawed",
+  "judge": "ai",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [
+        "issue #8"
+      ],
+      "targets": [
+        "stop",
+        "proposal:p1"
+      ],
+      "routes": {
+        "p1": "unsent"
+      },
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ],
+        [
+          "R2",
+          "proposal:p1"
+        ],
+        [
+          "R4",
+          "proposal:p1"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "pass"
+        },
+        "R3": {
+          "stop": "pass"
+        },
+        "R2": {
+          "proposal:p1": "pass"
+        },
+        "R4": {
+          "proposal:p1": "fail"
+        }
+      },
+      "must_contain": [
+        "<data kind=proposal target=proposal:p1:unsent route=unsent",
+        "（未送信）",
+        "# 検索結果の並び順を直す",
+        "更新日の降順になることを確かめる",
+        "内容を見て、承認してください",
+        "issue #8"
+      ],
+      "reply_ok": false,
+      "reply_contains": [
+        "R4"
+      ],
+      "state": "sent_back",
+      "final": "flawed",
+      "judge": "ai"
+    }
+  ]
+}

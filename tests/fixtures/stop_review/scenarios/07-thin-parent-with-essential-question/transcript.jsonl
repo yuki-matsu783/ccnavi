@@ -1,0 +1,8 @@
+{"type": "user", "message": {"role": "user", "content": "ログイン画面の不具合を直したい"}}
+{"type": "assistant", "uuid": "a1", "message": {"role": "assistant", "content": [{"type": "text", "text": "原因を調べます。"}]}}
+{"type": "user", "message": {"role": "user", "content": "チケット作業で進めて。提案を書いて送って"}}
+{"type": "assistant", "uuid": "a2", "message": {"role": "assistant", "content": [{"type": "text", "text": "提案 p1 を書いて送ります。"}, {"type": "tool_use", "id": "w1", "name": "Write", "input": {"file_path": "wip/proposals/todo/p1.md"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "w1", "content": "File created"}]}}
+{"type": "assistant", "uuid": "a3", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "b1", "name": "Bash", "input": {"command": "sh .ccnavi/scripts/ccnavi-ticket.sh propose p1"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "b1", "content": "提案: wip/proposals/todo/p1.md\n次: ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない"}]}}
+{"type": "assistant", "uuid": "a4", "message": {"role": "assistant", "content": [{"type": "text", "text": "提案 p1 を送りました。ただし、認証方式（OAuth か SAML か）が決まらないと範囲を決められません。どちらを使いますか？"}]}}

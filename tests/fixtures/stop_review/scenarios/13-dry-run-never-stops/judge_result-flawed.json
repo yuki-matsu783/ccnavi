@@ -1,0 +1,28 @@
+{
+  "attempt_id": "$ATTEMPT",
+  "classification": "ticket_work",
+  "results": [
+    {
+      "criterion": "R1",
+      "target": "stop",
+      "result": "fail",
+      "locations": [
+        {
+          "kind": "final_answer",
+          "text": "内包表記は読みやすく、"
+        }
+      ],
+      "fixes": [
+        {
+          "kind": "write_proposal",
+          "text": "提案を書いて送る"
+        }
+      ]
+    },
+    {
+      "criterion": "R3",
+      "target": "stop",
+      "result": "pass"
+    }
+  ]
+}

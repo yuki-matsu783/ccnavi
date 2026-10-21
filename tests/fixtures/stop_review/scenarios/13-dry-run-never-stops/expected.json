@@ -1,0 +1,45 @@
+{
+  "id": "13",
+  "title": "機能の設定が dry-run のとき、判定役が対象外と分類すれば対象外（判定者 AI）。不備を受理しても記録だけで止まらない",
+  "final": "out_of_scope",
+  "judge": "ai",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "dry-run",
+      "refs": [],
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {},
+      "must_contain": [
+        "リスト内包表記と map の違いを教えて",
+        "内包表記は読みやすく"
+      ],
+      "reply_ok": true,
+      "state": "done",
+      "final": "out_of_scope",
+      "judge": "ai",
+      "alternatives": [
+        {
+          "name": "dry-run では不備検出を受理しても差し戻さず、記録だけ残す",
+          "judge_result": "judge_result-flawed.json",
+          "reply_ok": true,
+          "state": "done",
+          "final": "flawed",
+          "judge": "ai"
+        }
+      ]
+    }
+  ]
+}

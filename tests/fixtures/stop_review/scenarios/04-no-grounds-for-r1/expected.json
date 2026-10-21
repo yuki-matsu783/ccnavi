@@ -1,0 +1,44 @@
+{
+  "id": "04",
+  "title": "根拠が材料の中に無いまま、作成の許可を求める（R1 が判定不能）",
+  "final": "unchecked",
+  "judge": "ai",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [],
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "unknown"
+        },
+        "R3": {
+          "stop": "pass"
+        }
+      },
+      "must_contain": [
+        "前に決めた方針で続けて",
+        "（候補なし",
+        "insufficient: False",
+        "チケットを作成してよいですか"
+      ],
+      "reply_ok": true,
+      "state": "done",
+      "final": "unchecked",
+      "judge": "ai"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "id": "02",
+  "title": "issue を指定した依頼で、提案を書かずに作成の許可を求める",
+  "final": "flawed",
+  "judge": "ai",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [
+        "issue #42"
+      ],
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "fail"
+        },
+        "R3": {
+          "stop": "fail"
+        }
+      },
+      "must_contain": [
+        "#42 を実装して",
+        "<data kind=issue_mr_refs>",
+        "issue #42",
+        "チケットを作成してよいですか"
+      ],
+      "reply_ok": false,
+      "reply_contains": [
+        "R1"
+      ],
+      "state": "sent_back",
+      "final": "flawed",
+      "judge": "ai"
+    }
+  ]
+}

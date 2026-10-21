@@ -1,0 +1,89 @@
+{
+  "id": "12",
+  "title": "差し戻しの後の Stop が、チケットと無関係な質問への回答（2 回の Stop）。解消とは言えず、2 回目の差し戻しは無い",
+  "final": "out_of_scope",
+  "judge": "ai",
+  "rejudge": "inconclusive",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [],
+      "must_contain": [
+        "このバグ修正はチケット作業で進めます",
+        "リスト内包表記と map の違いも教えて",
+        "チケットを作ってよいですか"
+      ],
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "fail"
+        },
+        "R3": {
+          "stop": "fail"
+        }
+      },
+      "reply_ok": false,
+      "reply_contains": [
+        "R1",
+        "本当にユーザの判断が要る問い"
+      ],
+      "state": "sent_back",
+      "final": "flawed",
+      "judge": "ai"
+    },
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [],
+      "is_rejudge": true,
+      "original_state": "consumed",
+      "rejudge_result": "inconclusive",
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {},
+      "must_contain": [
+        "rejudge: True",
+        "リスト内包表記と map の違いです。内包表記は読みやすく"
+      ],
+      "reply_ok": true,
+      "state": "done",
+      "final": "out_of_scope",
+      "judge": "ai",
+      "alternatives": [
+        {
+          "name": "同じ Stop で不備が再び検出されても差し戻さない",
+          "judge_result": "judge_result-flawed.json",
+          "reply_ok": true,
+          "state": "done",
+          "final": "flawed",
+          "judge": "ai",
+          "rejudge_result": "unresolved"
+        }
+      ]
+    }
+  ]
+}

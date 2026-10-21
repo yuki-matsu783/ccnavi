@@ -1,0 +1,44 @@
+{
+  "id": "03",
+  "title": "指定が無い依頼で、直接作業かチケット作業かを確認する",
+  "final": "ok",
+  "judge": "ai",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [],
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "pass"
+        },
+        "R3": {
+          "stop": "pass"
+        }
+      },
+      "must_contain": [
+        "ログインの文言を直して",
+        "直接作業で進めますか、チケット作業で進めますか",
+        "（候補なし",
+        "（指定なし）"
+      ],
+      "reply_ok": true,
+      "state": "done",
+      "final": "ok",
+      "judge": "ai"
+    }
+  ]
+}

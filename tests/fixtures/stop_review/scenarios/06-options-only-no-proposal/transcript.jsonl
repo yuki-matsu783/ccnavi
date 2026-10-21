@@ -1,0 +1,4 @@
+{"type": "user", "message": {"role": "user", "content": "この件はチケット作業で進めます。まだ提案は書かず、選択肢だけ出して"}}
+{"type": "assistant", "uuid": "a1", "message": {"role": "assistant", "content": [{"type": "text", "text": "了解です。"}]}}
+{"type": "user", "message": {"role": "user", "content": "まず選択肢を見せて"}}
+{"type": "assistant", "uuid": "a2", "message": {"role": "assistant", "content": [{"type": "text", "text": "選択肢は次の 2 つです。A: 既存の認証を直す。B: 認証を作り直す。どちらで進めますか？"}]}}

@@ -1,0 +1,86 @@
+{
+  "id": "11",
+  "title": "差し戻しを受けても提案は書かず、不可欠な問いを書き直して終える（2 回の Stop）。再判定で解消",
+  "final": "ok",
+  "judge": "ai",
+  "rejudge": "resolved",
+  "stops": [
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [],
+      "must_contain": [
+        "このログイン改修はチケット作業で進めます",
+        "[ticket_work]",
+        "チケットを作ってよいですか"
+      ],
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "fail"
+        },
+        "R3": {
+          "stop": "fail"
+        }
+      },
+      "reply_ok": false,
+      "reply_contains": [
+        "R1",
+        "本当にユーザの判断が要る問い"
+      ],
+      "state": "sent_back",
+      "final": "flawed",
+      "judge": "ai"
+    },
+    {
+      "candidate": true,
+      "effective": "enable",
+      "refs": [],
+      "is_rejudge": true,
+      "original_state": "consumed",
+      "rejudge_result": "resolved",
+      "targets": [
+        "stop"
+      ],
+      "required": [
+        [
+          "R1",
+          "stop"
+        ],
+        [
+          "R3",
+          "stop"
+        ]
+      ],
+      "criteria": {
+        "R1": {
+          "stop": "pass"
+        },
+        "R3": {
+          "stop": "pass"
+        }
+      },
+      "must_contain": [
+        "rejudge: True",
+        "認証方式（OAuth か SAML か）で、提案の範囲が変わります",
+        "チケットを作ってよいですか"
+      ],
+      "reply_ok": true,
+      "state": "done",
+      "final": "ok",
+      "judge": "ai"
+    }
+  ]
+}

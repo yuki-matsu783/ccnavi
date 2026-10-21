@@ -1,0 +1,6 @@
+{"type": "user", "message": {"role": "user", "content": "#15 をチケット作業で進めて。親と子 2 つに分けて提案を送って"}}
+{"type": "assistant", "uuid": "a1", "message": {"role": "assistant", "content": [{"type": "text", "text": "親 1 つと子 2 つの提案を書きます。"}, {"type": "tool_use", "id": "w1", "name": "Write", "input": {"file_path": "wip/proposals/todo/p1.md"}}, {"type": "tool_use", "id": "w2", "name": "Write", "input": {"file_path": "wip/proposals/todo/p1-01-01.md"}}, {"type": "tool_use", "id": "w3", "name": "Write", "input": {"file_path": "wip/proposals/todo/p1-01-02.md"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "w1", "content": "File created"}, {"type": "tool_result", "tool_use_id": "w2", "content": "File created"}, {"type": "tool_result", "tool_use_id": "w3", "content": "File created"}]}}
+{"type": "assistant", "uuid": "a2", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "b1", "name": "Bash", "input": {"command": "sh .ccnavi/scripts/ccnavi-ticket.sh propose p1"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "b1", "content": "提案: wip/proposals/todo/p1.md\n次: ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない"}]}}
+{"type": "assistant", "uuid": "a3", "message": {"role": "assistant", "content": [{"type": "text", "text": "親 p1 と子 p1-01-01、p1-01-02 を一括で送りました。承認をお待ちします。"}]}}
