@@ -233,6 +233,8 @@ class WriteAndPushHarness(unittest.TestCase):
             {
                 "CCNAVI_BIN_PATH": self.bin,
                 "CCNAVI_LOCK_WAIT": "2",
+                # 学びの蓄積の既定は enable。学びを扱わないテストは切る。
+                "CCNAVI_LEARNING": "disable",
             }
         )
         env.update(extra)
