@@ -1,9 +1,9 @@
 ---
 type: guide
 title: 実行環境とADRの扱い
-description: ccnaviの開発で対応する実行環境（Windows、macOS、Linux）と、sh・Pythonを書くときの決まり、文書やコメントでのADRへの触れ方
+description: ccnaviの開発で対応する実行環境（Windows、macOS、Linux）と、sh・Pythonを書くときの決まり、実測で分かった環境固有の落とし穴、文書やコメントでのADRへの触れ方
 tags: [sh-scripts, environment]
-keywords: [大文字小文字, casefold, normcase, pathcase, 実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
+keywords: [落とし穴, uv, jq, CP932, Docker, PyInstaller, gitdir, 大文字小文字, casefold, normcase, pathcase, 実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
 ---
 
 # 実行環境とADRの扱い
@@ -24,6 +24,25 @@ keywords: [大文字小文字, casefold, normcase, pathcase, 実行環境, 環�
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
   `uv run --with pyinstaller python build.py`でビルドする。ビルドしていないとランチャーが終了コード127で終わり、
   hookは何もしない
+
+## 実測で分かった環境固有の落とし穴
+
+Claude Codeの振る舞いについて測った前提は設計書の付録C（[appendix.md](../design/appendix.md)）にある。ここには環境ごとの落とし穴を置く。
+
+- **ワークツリーが消せない（Windows）。** uvのハードリンクで`.venv`の`_yaml.*.pyd`が全ツリーで同じ実体になり、
+  誰かのテストが読み込んでいる間は消せない。`pyproject.toml`の`link-mode = "copy"`で分けてあるが、
+  ハードリンクで作った`.venv`はそのままなので、テストが走っていないときに作り直す。自分のテストが走っている間は残る。
+  失敗したら残ったディレクトリを`mv`で`.claude/worktrees/`の外へ出して`git worktree prune`。
+  先に`sh .ccnavi/scripts/ccnavi-clean.sh <名前>`で生成物を消すとnode_modulesで止まる分は避けられる
+- **PyInstallerは指定したスクリプトをパッケージの外で走らせる。** 相対importが解けないので、絶対importの`main.py`を渡す
+- **Pythonの識別子に空白は入らない。** `def test_warn は…`のように英字と日本語の間に空白を入れると構文エラー
+- **Windowsのコンソール経由で日本語を引数に渡すとCP932になり、`jq --arg`がUTF-8でないJSONを作る。** 本文はファイルで渡す。
+  `jq`の実体は`C:\Program Files\jq\jq`で、`"$JQ"`と引用しないと空白で分かれる
+- **Windowsの`gitdir:`の表記**（git 2.39.2、Git BashとPowerShell）。絶対パス、区切りは`/`、ドライブレターは大文字、
+  `gitdir:`の後ろは半角空白1個。`ccnavi_project`（sh）と`tree.py`がこれを前提にしている
+- **Docker Desktopを起動すると`restart=unless-stopped`のGitLabが勝手に上がり、2GBのVMではengineごと異常終了する。**
+  GitLab CEには4GB要る
+- `dist/`、`build/`、`logs/`はgit管理外。記録には絶対パスとコマンド全文が入るのでコミットしない
 
 ## パスと名前の大文字小文字
 
