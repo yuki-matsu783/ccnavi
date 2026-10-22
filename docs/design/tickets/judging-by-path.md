@@ -45,6 +45,12 @@ rule: <id> (<allow|ask>) lets this through, but the ticket for this worktree nar
 ticket entry: deny <書かれた表記>
 ```
 
+ルールを狭めた回は、記録から次のように拾える。
+
+```sh
+jq -r 'select(.rules[0]? == "builtin:ticket-scope" and (.rules | length) > 1) | .subject' logs/decisions.jsonl
+```
+
 ルールの `additionalContext` は、どちらが判定を決めても載せる。承認済みチケットの走査は 1 回の判定で 1 度だけで、
 プロジェクトの食い違いの点検と同じ一覧を使う。承認画面の親の見出し「このチケットで編集可能な範囲」の下と、
 `--explain` のチケットの節の頭に、範囲がルールの `allow` / `ask` より強いことを 1 行で書く。
