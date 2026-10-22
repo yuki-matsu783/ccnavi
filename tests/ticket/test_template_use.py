@@ -22,7 +22,14 @@ import os
 import textwrap
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree_candidates, flow, phasetypes, plan_templates, workflow
+from ccnavi.tickets import (
+    agree_candidates,
+    flow,
+    phasetypes,
+    plan_templates,
+    proposal_form,
+    workflow,
+)
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_template_drafts import FLOW_IMPL, Drafts, target_rel
@@ -147,6 +154,12 @@ class ProposalTest(Use):
         config = phasetypes.load_types(self.conf, self.root, "")
         found = agree_candidates.plan_problems(parsed, config)
         self.assertEqual([p.detail for p in found if p.severity == "error"], [])
+        # 雛形の空欄の目印は、書き換えるまで承認の検査が止める
+        text = self.written()
+        for mark in proposal_form.PLACEHOLDERS:
+            text = text.replace(mark, "書いた内容")
+        with open(self.todo, "w", encoding="utf-8") as f:
+            f.write(text)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "--quiet", "-m", "scaffold")
         lint = self.ccnavi("--lint", "--mode", "enable")

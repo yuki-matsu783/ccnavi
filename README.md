@@ -1930,7 +1930,7 @@ feedback:                              # フィードバック計画。レビュ
 - **提案の雛形は `ccnavi ticket new` で作る。** 識別子と同名のワークツリーの中で
   `ccnavi ticket new <識別子> --title <題> --plan "design,acceptance,implement" [--issue N]` と打つと、
   `wip/proposals/todo/<識別子>.md` に、選んだフェーズの `scope` を `phases.yml` から集めた `allow`（重複なし）、
-  各項が前の項を待つ一直線の `plan`、`phases:` の写しを持つ親の提案を書く。対象は親だけ。`phases.yml` が無いとき、
+  各項が前の項を待つ一直線の `plan`、`phases:` の写し、本文の見出し（`目的`・`範囲`・`対象外`・`完了の確かめ方`・`計画の理由`。それぞれの下と rationale に空欄の目印）を持つ親の提案を書く。目印が残った新規の提案は承認と `--lint` が止める（改版は警告）。見出しの欠けは警告。対象は親だけ。`phases.yml` が無いとき、
   `inherit` の型だけで `allow` が空になるとき、既に同じ識別子の提案があるときは、何も書かずに理由を言う。書いたあと、`allow` の項が計画のどのフェーズ定義の `scope` とも重ならないとき（例: `--plan implement --scope "docs/**"`）は、「承認しても書けない」と名指しする（警告で、書いた提案は残る。承認の確認 `--agree --preview --verify` も同じ文を出す）。子はその項に書けないので、`--plan quick-work` に切り替える。計画に `scope: inherit` の型が 1 つでもあれば、上限が無いので何も言わない。`quick-work` のような `scope: inherit` の型は範囲を持たないので、今回触るファイルを `--scope <glob>`（繰り返せる。ワークツリーのルートからの相対）で渡す（例: `--plan quick-work --scope src/ui/error.ts`）。渡さずに止まったときの案内は、範囲を持つ型を足すのではなく `--scope` を示す。
   `ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ（`--fill-phases` と同じ）。書いたあとは rationale と本文を埋め、
   `--lint` で確かめてから承認を頼む。`--plan` の代わりに `--template <名前> [--layer <名前>] [--with-feedback]` を渡すと、溜めた
@@ -3423,6 +3423,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/plan_order.py` | 計画の番号の振り直しと、提案への書き戻し（`--plan-order <親>`）。書き換えた全文を読み直す検査はここにまとめる |
 | `src/ccnavi/tickets/plan_phases.py` | 計画が使うフェーズ定義を、親の提案の `phases:` に写す（`--plan-order <親> --fill-phases`） |
 | `src/ccnavi/tickets/scaffold.py` | 親の提案の雛形を作る（`ticket new`）。選んだフェーズの `scope` を集めて `allow` に書き、一直線の `plan`（`--template` ならテンプレートの計画）と `phases:` の写しを入れる |
+| `src/ccnavi/tickets/proposal_form.py` | 提案の形式検査（最小版）。雛形の空欄の目印と親の必須の見出しの定数、目印の残りと見出しの欠けの検査（`form_problems`）。`scaffold.py` と `agree_candidates.py` の両方が読む |
 | `src/ccnavi/tickets/template_use.py` | テンプレートを使う側。名前で引く（使えるものだけ）・`after` を提案の絶対番号に付け直す・子のフローの下書きの識別子と文面を組む |
 | `src/ccnavi/tickets/learning.py` | 学びの蓄積の記録（気づきの記録・受信箱・判定記録の要約）と、`ticket learn`、子を閉じる前の記録の検査 |
 | `src/ccnavi/tickets/propose.py` | 親子の承認待ちの提案（`todo/`）と子のフローの下書き（`flows/`）を、書いたパスの一覧に載せる（`ticket propose`）。コミットと push は sh が write-and-push の手順で行う |
