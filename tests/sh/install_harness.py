@@ -114,6 +114,8 @@ class Env(unittest.TestCase):
 
     def fake_git(self) -> None:
         """ふつうの git に委ねるが、通信するものだけ偽物にする。挙動は ctl の値で決める。"""
+        leaked = "fatal: https://h/x?private_token=abc12345xyz ghp_abcdefghijkl"
+        leaked += " glrt-abcdefghij12 s3cr3tvalue99"
         refused = "fatal: unable to access 'https://u:tok@host/g/p.git/': Could not resolve host"
         body = f"""case "$*" in
 *ls-remote*)
@@ -121,6 +123,7 @@ class Env(unittest.TestCase):
 	case "$mode" in
 	ok) printf 'abc\\tHEAD\\n'; exit 0 ;;
 	empty) exit 2 ;;
+	leak) printf '%s\\n' "{leaked}" >&2; exit 128 ;;
 	fail) printf '%s\\n' "{refused}" >&2; exit 128 ;;
 	sleep) sleep "$(cat "{self.ctl_ref("ls_sleep")}")" & wait; exit 0 ;;
 	esac

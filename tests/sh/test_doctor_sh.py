@@ -461,9 +461,50 @@ class DoctorTest(Env):
         start = time.time()
         done = self.doctor(env=env)
         self.assertLess(time.time() - start, 15)
-        self.assertEqual(checks(done.stdout)["glab"][:2], ("todo", "too-old"))
+        # 応答しない glab を「古い」とは言わない
+        self.assertEqual(checks(done.stdout)["glab"][:2], ("todo", "timeout"))
         self.assertEqual(self.wait_gone("sleep 7312"), [])
         self.assertEqual(self.wait_gone("sleep 2.717"), [])
+
+    def test_child_that_ignores_term_is_killed(self):
+        self.fake("glab", "trap '' TERM\nsleep 7315 &\nwait")
+        env = self.env(CCNAVI_DOCTOR_GIT_LIMIT="2.716")
+        start = time.time()
+        done = self.run_sh(
+            [DOCTOR, "--workspace", self.ws, "--from", self.src], env=env, timeout=40
+        )
+        self.assertLess(time.time() - start, 20)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.wait_gone("sleep 7315"), [])
+
+    def test_failing_glab_is_unavailable_not_too_old(self):
+        self.fake("glab", "exit 3")
+        self.assertEqual(checks(self.doctor().stdout)["glab"][:2], ("todo", "unavailable"))
+
+    def test_failure_text_hides_token_shapes_and_the_env_token(self):
+        self.ctl_set("ls", "leak")
+        done = self.online(GITLAB_TOKEN="s3cr3tvalue99")
+        for secret in ("abc12345xyz", "ghp_abcdefghijkl", "glrt-abcdefghij12", "s3cr3tvalue99"):
+            self.assertNotIn(secret, done.stdout + done.stderr)
+        self.assertEqual(checks(done.stdout)["remote"][:2], ("todo", "unreachable"))
+
+    def test_limits_must_be_numbers(self):
+        bad = self.doctor(env=self.env(CCNAVI_DOCTOR_GIT_LIMIT="abc"))
+        self.assertEqual(bad.returncode, 2)
+        bad = self.doctor(env=self.env(CCNAVI_DOCTOR_CURL_LIMIT="2.5"))
+        self.assertEqual(bad.returncode, 2)
+
+    def test_inside_dot_git_is_not_a_work_tree(self):
+        done = self.run_sh(
+            [DOCTOR, "--workspace", os.path.join(self.ws, ".git")] + ["--from", self.src]
+        )
+        self.assertEqual(checks(done.stdout)["workspace"][:2], ("warn", "not-git"))
+
+    def test_dash_named_workspace_is_found(self):
+        odd = os.path.join(self.tmpdir, "-odd")
+        os.makedirs(odd)
+        done = self.run_sh([DOCTOR, "--workspace", "-odd", "--from", self.src], cwd=self.tmpdir)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def signal_run(self, sig: int, needle: str) -> subprocess.Popen:
         env = self.slow_env(needle, limit="30.123")

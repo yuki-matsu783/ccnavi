@@ -216,6 +216,50 @@ class PackageTest(unittest.TestCase):
         self.assertFalse([m for m in self.members() if "ccnavi-approval" in m])
         self.assertIn("互換の版", done.stdout)
 
+    def test_chrome_compat_is_matched_by_whole_number(self):
+        # COMPAT=18 に対して compat:180 は別の版
+        bundle = os.path.join(self.root, self.CHROME, "dist", "background.js")
+        write(bundle, "x({compat:180});\n")
+        self.package()
+        self.assertFalse([m for m in self.members() if "ccnavi-approval" in m])
+
+    def test_reusing_out_does_not_append_to_the_old_zip(self):
+        self.package()
+        os.remove(os.path.join(self.root, "dist", "ccnavi-board-0.1.0.vsix"))
+        done = self.package()
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertFalse([m for m in self.members() if m.endswith(".vsix")])
+
+    def test_secrets_and_runtime_junk_in_copied_dirs_are_left_out(self):
+        junk = (
+            ".ccnavi/scripts/.env",
+            ".ccnavi/docs/server.pem",
+            ".claude/skills/s/credentials.json",
+            ".claude/skills/s/logs/run.log",
+            ".ccnavi/docs/wip/draft.md",
+        )
+        for rel in junk:
+            write(os.path.join(self.root, rel), "secret\n")
+        # 実行ファイルが使う証明書の束は残す
+        write(os.path.join(self.root, "dist", "ccnavi", "_internal", "cacert.pem"), "ca\n")
+        done = self.package()
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        got = set(self.members())
+        for rel in junk:
+            self.assertNotIn(rel, got)
+        self.assertIn("dist/ccnavi/_internal/cacert.pem", got)
+
+    def test_dash_named_out_is_taken_as_a_path(self):
+        done = subprocess.run(
+            ["sh", os.path.join(self.root, "scripts", "ccnavi-package.sh"), "--out", "-dd"],
+            cwd=self.base,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertTrue(os.path.isdir(os.path.join(self.base, "-dd")))
+
     def test_vsix_with_other_compat_is_left_out(self):
         vsc = os.path.join(self.root, "extensions", "vscode", "ccnavi-board")
         write(os.path.join(vsc, self.VSC_VERSION_TS), "export const EXTENSION_COMPAT = 17;\n")

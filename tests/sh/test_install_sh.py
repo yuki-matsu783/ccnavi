@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import stat
@@ -157,6 +158,21 @@ class InstallTest(Env):
         done = self.install("--from", self.src, "--check", ws=self.src)
         self.assertEqual(done.returncode, 3)
 
+    def test_workspace_that_is_a_link_to_or_inside_the_source_is_3(self):
+        link = os.path.join(self.tmpdir, "link-to-src")
+        os.symlink(self.src, link)
+        before = snapshot(self.src)
+        for ws in (link, os.path.join(self.src, "scripts")):
+            done = self.install("--from", self.src, ws=ws)
+            self.assertEqual(done.returncode, 3, ws + done.stdout)
+            self.one_next(done)
+        self.assertEqual(snapshot(self.src), before)
+
+    def test_source_unpacked_inside_the_workspace_is_fine(self):
+        inner = self.make_src(os.path.join(self.ws, "unpacked"))
+        done = self.install("--from", inner, "--check")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
     def test_argument_errors_are_2(self):
         self.assertEqual(self.install("--nope").returncode, 2)
         self.assertEqual(self.install("--mode", "disable", "--from", self.src).returncode, 2)
@@ -262,6 +278,25 @@ class InstallTest(Env):
         self.assertEqual(self.setup_calls(), [])
         done = self.install("--from", self.src, "--check", env=self.env(CLAUDECODE="1"))
         self.assertEqual(done.returncode, 3)
+
+    def test_anything_but_dry_run_counts_as_enable_inside_claude_code(self):
+        # ccnavi は dry-run 以外の値を enable として扱う
+        for value in ("enable ", "ENABLE", "enabled", "disable", "on"):
+            self.write_settings("settings.json", mode_settings(value))
+            done = self.install("--from", self.src, "--check", env=self.env(CLAUDECODE="1"))
+            self.assertEqual(done.returncode, 3, value)
+        for value in ("dry-run", " dry-run "):
+            self.write_settings("settings.json", mode_settings(value))
+            done = self.install("--from", self.src, "--check", env=self.env(CLAUDECODE="1"))
+            self.assertEqual(done.returncode, 0, value + done.stdout)
+
+    def test_no_stored_value_goes_on_but_the_environment_value_counts(self):
+        env = self.env(CLAUDECODE="1")
+        self.assertEqual(self.install("--from", self.src, "--check", env=env).returncode, 0)
+        env = self.env(CLAUDECODE="1", CCNAVI_MODE="enable")
+        self.assertEqual(self.install("--from", self.src, "--check", env=env).returncode, 3)
+        env = self.env(CLAUDECODE="1", CCNAVI_MODE="dry-run")
+        self.assertEqual(self.install("--from", self.src, "--check", env=env).returncode, 0)
 
     def test_enable_outside_claude_code_goes_on(self):
         self.write_settings("settings.json", '{"env":{"CCNAVI_MODE":"enable"}}')
@@ -430,17 +465,40 @@ class InstallTest(Env):
         self.assertEqual((first.returncode, second.returncode), (0, 0), second.stdout)
         self.assertEqual(len(self.backups()), 2)
 
-    def test_existing_backup_place_stops_with_4(self):
+    def test_unusable_backup_place_stops_with_4_before_setup(self):
         self.prepare_installed()
-        self.fake("date", "echo 20260101-000000")
-        pid_dirs = []
+        cache = os.path.join(self.home, ".cache", "ccnavi")
+        os.makedirs(os.path.dirname(cache))
+        with open(cache, "w", encoding="utf-8") as f:
+            f.write("a file where the directory should be\n")
         done = self.install("--from", self.src, "--force")
-        pid_dirs = self.backups()
-        self.assertEqual(len(pid_dirs), 1)
-        self.assertEqual(done.returncode, 0)
-        # PID は毎回違うので、置き場がぶつかるのは、同じ名前の置き場が既にあるときだけ
-        name = os.path.basename(pid_dirs[0])
-        self.assertIn("-20260101-000000-", name)
+        self.assertEqual(done.returncode, 4)
+        self.assertEqual(self.setup_calls(), [])
+        self.one_next(done)
+
+    def test_relative_cache_place_is_refused(self):
+        self.prepare_installed()
+        env = self.env(XDG_CACHE_HOME="cache")
+        done = self.run_sh([INSTALL, self.ws, "--from", self.src, "--force"], env=env, cwd=self.ws)
+        self.assertEqual(done.returncode, 4)
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "cache")))
+        self.assertEqual(self.setup_calls(), [])
+
+    def test_backup_keeps_the_content_behind_symlinks(self):
+        self.prepare_installed()
+        shared = os.path.join(self.tmpdir, "shared-scripts")
+        os.makedirs(shared)
+        with open(os.path.join(shared, "keep.sh"), "w", encoding="utf-8") as f:
+            f.write("shared\n")
+        scripts = os.path.join(self.ws, ".ccnavi", "scripts")
+        shutil.rmtree(scripts)
+        os.symlink(shared, scripts)
+        done = self.install("--from", self.src, "--force")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        saved = os.path.join(self.backups()[0], ".ccnavi", "scripts")
+        self.assertFalse(os.path.islink(saved))
+        with open(os.path.join(saved, "keep.sh"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "shared\n")
 
     # ---- 入れたあと
 
@@ -529,6 +587,10 @@ class InstallTest(Env):
     def test_credentials_never_appear(self):
         done = self.install("--from", self.src, "--check")
         self.assertNotIn("tok", done.stdout + done.stderr)
+
+
+def mode_settings(value: str) -> str:
+    return json.dumps({"env": {"CCNAVI_MODE": value}})
 
 
 def shell_quote(text: str) -> str:
