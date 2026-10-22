@@ -210,7 +210,7 @@ ccnavi を登録した hook:
   Stop
   SubagentStart
   SubagentStop
-登録した hook（セッション開始時の取り込み。不要なら --no-fetch）:
+登録した hook（セッション開始時の取り込みと一覧。不要なら --no-fetch）:
   SessionStart（.ccnavi/scripts/ccnavi-session-start.sh。セッション開始時の取り込みと一覧）
 足した .vscode/settings.json:
   git.detectWorktrees

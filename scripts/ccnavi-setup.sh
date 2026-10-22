@@ -140,7 +140,8 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、残った指摘の対応方針・
 # 早めに閉じる判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、
 # ユーザの判断をホストに書く部品（読む 2 本より先に配る）。
-# ccnavi-fetch.sh はセッション開始時に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh はユーザが実行する
+# ccnavi-session-start.sh はセッション開始時の入口（FETCH_COMMAND）。中で、取り込みの ccnavi-fetch.sh と
+# 直下のディレクトリ一覧の ccnavi-dirs.sh を順に呼ぶ。ccnavi-sync.sh はユーザが実行する
 # 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、片付けの記録の読み出し）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを片付ける前に生成物を消すもの。Windows では
@@ -199,7 +200,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
   --no-fetch                セッション開始時の入口（ccnavi-session-start.sh）を hook に登録しない。
-                            取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する
+                            取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する（ディレクトリ一覧も出なくなる）
 
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 3 本（.ccnavi/config/common/rules.yml、
@@ -1106,7 +1107,7 @@ report() {
 		printf '%s\n' "$missing_hooks" | sed 's/^/  /'
 	fi
 	if [ -n "$missing_fetch" ]; then
-		printf '%s hook（セッション開始時の取り込み。不要なら --no-fetch）:\n' "$4"
+		printf '%s hook（セッション開始時の取り込みと一覧。不要なら --no-fetch）:\n' "$4"
 		printf '%s\n' "$missing_fetch" | sed 's/^/  /'
 	fi
 	if [ -n "$replacing_env" ]; then
