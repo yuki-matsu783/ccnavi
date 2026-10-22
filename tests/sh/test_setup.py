@@ -92,7 +92,7 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 # セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する。
 # デフォルトブランチを ff で進め、ワークツリーの起点を新しくする。
-FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
+FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh"'
 # --deploy が配る代わりに通る sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側にほかに取れる方法がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
@@ -118,6 +118,7 @@ DEPLOY_SCRIPTS = (
     "ccnavi-user-clean-branch.sh",
     "ccnavi-fetch.sh",
     "ccnavi-dirs.sh",
+    "ccnavi-session-start.sh",
     "ccnavi-sync.sh",
     "ccnavi-clean.sh",
     "ccnavi-clean.js",
@@ -173,6 +174,7 @@ NO_TEMPLATES_FILES = [
             "ccnavi-git.sh",
             "ccnavi-launcher.sh",
             "ccnavi-review.sh",
+            "ccnavi-session-start.sh",
             "ccnavi-stage.sh",
             "ccnavi-start.sh",
             "ccnavi-sync.sh",
@@ -209,7 +211,7 @@ ccnavi を登録した hook:
   SubagentStart
   SubagentStop
 登録した hook（セッション開始時の取り込み。不要なら --no-fetch）:
-  SessionStart（.ccnavi/scripts/ccnavi-fetch.sh。セッション開始時の取り込み）
+  SessionStart（.ccnavi/scripts/ccnavi-session-start.sh。セッション開始時の取り込みと一覧）
 足した .vscode/settings.json:
   git.detectWorktrees
   git.repositoryScanMaxDepth
@@ -239,6 +241,7 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-user-clean-branch.sh
   .ccnavi/scripts/ccnavi-fetch.sh
   .ccnavi/scripts/ccnavi-dirs.sh
+  .ccnavi/scripts/ccnavi-session-start.sh
   .ccnavi/scripts/ccnavi-sync.sh
   .ccnavi/scripts/ccnavi-clean.sh
   .ccnavi/scripts/ccnavi-clean.js

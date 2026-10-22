@@ -36,13 +36,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh\"",
             "timeout": 60
-          },
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-dirs.sh\"",
-            "timeout": 10
           },
           {
             "type": "command",

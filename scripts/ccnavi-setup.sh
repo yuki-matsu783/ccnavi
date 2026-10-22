@@ -14,7 +14,7 @@
 #                            配るときも、配布先に既にあるものを入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
 #   --no-vscode              .vscode/settings.json には触らない
-#   --no-fetch               セッション開始時の取り込み（ccnavi-fetch.sh）を hook に登録しない
+#   --no-fetch               セッション開始時の入口（ccnavi-session-start.sh）を hook に登録しない
 #
 # 何度実行しても同じ結果になる。既に登録されている hook は足さず、既にある env には
 # 触らない。ccnavi と関係のない hook や設定はそのまま残す。
@@ -82,7 +82,7 @@ EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure 
 # 取得しないと、別の機械で承認したものが反映されず、古い main からブランチを切ることになる。
 # 通信するので、要らないプロジェクトは --no-fetch で外す。上限は、sh の中の
 # タイムアウト監視（1 回 15 秒）が重なっても収まる長さにしてある。
-FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
+FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh"'
 FETCH_TIMEOUT=60
 
 DEFAULT_MODE="dry-run"
@@ -155,7 +155,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-fetch.sh ccnavi-dirs.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-fetch.sh ccnavi-dirs.sh ccnavi-session-start.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 mode="$DEFAULT_MODE"
 # 明示されたかどうかを別の変数で持つ。--force で置き換えてよいのは、ユーザがこの実行で
@@ -198,7 +198,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             配るときも、配布先に既にあるものを入れ替える
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
-  --no-fetch                セッション開始時の取り込み（ccnavi-fetch.sh）を hook に登録しない。
+  --no-fetch                セッション開始時の入口（ccnavi-session-start.sh）を hook に登録しない。
                             取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する
 
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
@@ -878,13 +878,13 @@ forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length 
 # 登録されている（other）、登録が無い（none）。足すのは none だけ。other は足さずにユーザへ知らせる。
 # 表記はプロジェクトごとに違うので、どちらが正しいかをここでは決められない。
 # 知らせずに足すと判定が 2 回走り、知らせずに飛ばすとそのイベントは登録されないままになる。
-# セッション開始時の取り込み（ccnavi-fetch.sh）は本体ではないので、other に数えない。数えると、
+# セッション開始時の入口（ccnavi-session-start.sh）は本体ではないので、other に数えない。数えると、
 # 取り込みだけが登録された設定で、本体の SessionStart が「別の表記がある」と見なされて足されない。
-# 取り込みのほうは、表記を問わず ccnavi-fetch を含む command があれば登録済みとする（fetching）。
+# 取り込みのほうは、表記を問わず ccnavi-session-start を含む command があれば登録済みとする（fetching）。
 REGISTERED='def commands($ev): [ (.hooks[$ev] // [])[] | (.hooks // [])[] | .command // "" ];
 	def exact($ev; $cmd): [ commands($ev)[] | select(. == $cmd) ] | length > 0;
-	def fetching($ev): [ commands($ev)[] | select(test("ccnavi-fetch")) ] | length > 0;
-	def looks($ev): [ commands($ev)[] | ascii_downcase | select(test("ccnavi-fetch") | not)
+	def fetching($ev): [ commands($ev)[] | select(test("ccnavi-session-start")) ] | length > 0;
+	def looks($ev): [ commands($ev)[] | ascii_downcase | select(test("ccnavi-session-start") | not)
 		| select(test("(^|[^a-z0-9])ccnavi([^a-z0-9]|$)")) ] | length > 0;'
 
 missing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" '
@@ -930,7 +930,7 @@ missing_fetch=""
 if [ "$fetch" = yes ]; then
 	missing_fetch=$(printf '%s' "$current" | jq -r "
 		$REGISTERED
-		if fetching(\"SessionStart\") then empty else \"SessionStart（.ccnavi/scripts/ccnavi-fetch.sh。セッション開始時の取り込み）\" end
+		if fetching(\"SessionStart\") then empty else \"SessionStart（.ccnavi/scripts/ccnavi-session-start.sh。セッション開始時の取り込みと一覧）\" end
 	")
 fi
 
@@ -1656,8 +1656,14 @@ for name in $DEPLOY_SCRIPTS; do
 		ccnavi-user-*.sh)
 			why="ユーザが端末で実行する操作の sh"
 			;;
+		ccnavi-session-start.sh)
+			why="セッション開始時に走らせる sh の入口"
+			;;
 		ccnavi-fetch.sh)
 			why="セッション開始時の取り込み"
+			;;
+		ccnavi-dirs.sh)
+			why="セッション開始時のディレクトリ一覧"
 			;;
 		ccnavi-sync.sh)
 			why="ユーザが実行する取り込みと、親のブランチが消えたかの確認"
