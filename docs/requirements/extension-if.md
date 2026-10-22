@@ -78,6 +78,7 @@ JSON の欄の形は README の「[ボードの JSON](../../README.md#ボード�
 「[lint の JSON](../../README.md#lint-の-json)」「[候補の JSON](../../README.md#候補の-json)」にある。どの JSON も形の版
 （`version`。版の JSON は `schema`）を持ち、拡張は知らない版を読まない。ボード・承認・試験・候補の JSON は、拡張の
 `test/fixtures/` の実例と同じ例で本体のテストが形を確かめる。
+各 JSON の欄の一覧は [json-shapes.md](json-shapes.md) にまとめてある。
 
 REQ-EXT-14 の経路をエージェントがシェルから打つ形は、組み込みの deny が止める（REQ-APV-07・REQ-APV-12）。
 REQ-EXT-15 の答えが最後の行なのは、sh が実行ファイルの答えに投稿の結果（`issue_url`・`warning`）を足して最後に書き、
