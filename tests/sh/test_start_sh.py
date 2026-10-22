@@ -921,7 +921,7 @@ class StartShGitLabTest(StartShTest):
         self.gitlab_routes(created=False)
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("GitLab APIに接続できず", done.stdout)
+        self.assertIn("GitLab APIが応答しないか要求を拒み", done.stdout)
         self.assertIn("手で行う手順", done.stdout)
         self.assertIn("Closes #152", done.stdout)
         self.assertNotIn("mcp__github__", done.stdout)
@@ -984,7 +984,7 @@ exec '{self.bin}/curl' -X "$method" "https://gitlab.com/api/v4/$path"
     def test_gitlab_unreachable_at_search_has_no_mcp(self):
         done = self.run_sh("--issue", "152", token=False)
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("GitLab APIに接続できず", done.stdout)
+        self.assertIn("GitLab APIが応答しないか要求を拒み", done.stdout)
         self.assertNotIn("mcp__github__", done.stdout)
 
     def test_gitlab_issue_not_found_exits_2(self):

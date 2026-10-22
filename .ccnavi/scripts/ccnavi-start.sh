@@ -67,11 +67,12 @@ sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <�
                 MCP などで確かめたあとに付ける
 
   ホストを見られないときは、既存の MR を見落として重複を作らないよう新規作成に進まず止める（手元の候補がちょうど 1 件なら続ける）。
-  GitHub の API に届かないとき（Claude remote など）は、MCP で代行する手順を標準出力に出して終了コード 4 で止まる。
+  GitHub の API に届かない・断られたとき（Claude remote など）は、MCP で代行する手順を標準出力に出して終了コード 4 で止まる。
+  GitLab は、届かない・断られた理由（HTTP の番号と本文）と手で行う手順を出して終了コード 4 で止まる。
   代行したあと同じコマンドを再実行すると、完了済みの処理をスキップし、未完了の処理から再開します。
   冪等。cwd のリポジトリ（ワークスペース・projects/<名前>）を対象にする。
 
-終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数 / 4 ホストに届かず代行が必要です
+終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数 / 4 ホストに届かない・断られて代行が必要です
 USAGE
 }
 
@@ -244,7 +245,7 @@ host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
 	# ホストが HTTP のエラーを返したなら、その番号も残す（届いてはいるのか、届かないのかを見分けるため）。
 	# curl は「returned error: 404」、gh は「(HTTP 404)」、glab は「404 Not Found」の形
-	printf '%s' "$3" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' -e 's/.*HTTP ([0-9]{3}).*/\1/p' | head -n 1 >"$host_err.status"
+	printf '%s' "$3" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' -e 's/.*HTTP ([0-9]{3}).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) [A-Z][a-z]+.*/\1/p' | head -n 1 >"$host_err.status"
 	# ホストの返事の本文（先頭 200 文字、1 行）。原因を絞り込めるように文面へ出す。トークンはここに載らない
 	printf '%s' "$3" | tr '\r\n\t' '   ' | cut -c 1-200 >"$host_err.body"
 }
@@ -443,10 +444,10 @@ stop_host() {
 		esac
 	else
 		case "$sh_stage" in
-		search) printf 'ccnavi-start: GitLab APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。\n' "$what" "$number" "$sh_why" ;;
-		title) printf 'ccnavi-start: GitLab APIに接続できず、issue #%s を読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
-		merged) printf 'ccnavi-start: GitLab APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。\n' "$stop_branch" "$sh_why" ;;
-		*) printf 'ccnavi-start: GitLab APIに接続できず、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
+		search) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。\n' "$what" "$number" "$sh_why" ;;
+		title) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、issue #%s を読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
+		merged) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。\n' "$stop_branch" "$sh_why" ;;
+		*) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
 		esac
 		printf '完了済みの処理:\n'
 		if [ "$sh_stage" = create ]; then
@@ -458,7 +459,7 @@ stop_host() {
 		printf '手で行う手順（GitLab には MCP の案内がありません）:\n'
 		case "$sh_why" in
 		*"。HTTP "[0-9][0-9][0-9]:*)
-			printf '  1. 理由に出たホストの返事（HTTP の番号と本文）を読む。401・403 以外は認証の問題ではない。原因を直すか、ユーザに伝える。直ったら同じコマンドを再実行する: %s\n' "$sh_cmd"
+			printf '  1. 理由に出たホストの返事（HTTP の番号と本文）を読む。401・403 は認証、404 は番号かアクセス権（非公開は 404 で返ることがある）、それ以外は要求の中身か ccnavi の不具合を疑う。原因を直すか、ユーザに伝える。直ったら同じコマンドを再実行する: %s\n' "$sh_cmd"
 			;;
 		*)
 			printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
