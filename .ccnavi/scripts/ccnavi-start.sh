@@ -188,6 +188,7 @@ if [ -n "$opt_repo" ]; then
 	here_repo=$(repo_of_url "$here_origin")
 	if [ -n "$here_repo" ] && [ "$(fold_repo "$here_repo")" != "$(fold_repo "$opt_repo")" ]; then
 		found_dir=""
+		scripts_abs="$root/.ccnavi/scripts"
 		for cand in "$root"/projects/*/; do
 			[ -e "${cand}.git" ] || continue
 			cand_repo=$(repo_of_url "$(git -C "$cand" remote get-url origin 2>/dev/null || :)")
@@ -197,7 +198,7 @@ if [ -n "$opt_repo" ]; then
 			fi
 		done
 		if [ -n "$found_dir" ]; then
-			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${found_dir}/ に移動して実行し直してください: cd ${found_dir} && sh .ccnavi/scripts/ccnavi-start.sh ${orig_args}" 1
+			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${found_dir}/ に移動して実行し直してください: cd ${found_dir} && sh ${scripts_abs}/ccnavi-start.sh ${orig_args}" 1
 		fi
 		fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${opt_repo} を origin に持つプロジェクトは projects/ に見つかりません（まだ clone していないなど）。ユーザに伝えて止まってください。" 1
 	fi
@@ -424,7 +425,7 @@ stop_host() {
 		fail host-unknown "ホストを読めない（${sh_why}）。origin を確かめてください。"
 	fi
 	# ホストが HTTP の返事を返していたなら、「接続できず」とは言わない（届いてはいる）
-	if [ -s "$host_err.status" ]; then
+	if [ -s "$host_err.status" ] && ! grep -Eq '^40[13]$' "$host_err.status"; then
 		sh_conn="がエラーを返し"
 	else
 		sh_conn="に接続できず"
@@ -497,7 +498,7 @@ stop_host() {
 		fi
 		[ -z "$stop_local" ] || printf '  手元の候補: %s\n' "$stop_local"
 		printf '手で行う手順（GitLab には MCP の案内がありません）:\n'
-		if [ -s "$host_err.status" ]; then
+		if [ -s "$host_err.status" ] && ! grep -Eq '^40[13]$' "$host_err.status"; then
 			printf '  1. ホストは返事をしたので認証や接続の問題ではない。上の HTTP ステータスと本文から、リポジトリのパス（%s）・番号・権限を確かめる。直ったら同じコマンドを再実行する: %s\n' "$ccnavi_h_path" "$sh_cmd"
 		else
 			printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"

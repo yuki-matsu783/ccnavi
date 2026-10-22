@@ -578,7 +578,8 @@ class StartShTest(unittest.TestCase):
         git(proj, "remote", "add", "origin", "https://github.com/Acme/Tour.git")
         done = self.run_sh("--issue", "2", "--repo", "acme/tour")
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("cd projects/tour && sh .ccnavi/scripts/ccnavi-start.sh", done.stderr)
+        self.assertIn("cd projects/tour && sh ", done.stderr)
+        self.assertIn("/.ccnavi/scripts/ccnavi-start.sh '--issue' '2'", done.stderr)
         self.assertEqual(self.requests(), [])
         self.assertEqual(self.local_branches(), ["main"])
         # 同じリポジトリ（大文字小文字違い）なら止めない
