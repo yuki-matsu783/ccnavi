@@ -119,12 +119,12 @@ unchecked() {
 	log_info ホストを見ていない -- "kind=$kind" "reason=$2"
 }
 
-# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
+# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
 	# ホストが HTTPのエラーを返したときは、その番号と本文（先頭200文字、1行）も残す
-	printf '%s' "$3" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/.*HTTP ([0-9]{3}).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) [A-Z][a-z]+.*/\1/p' | head -n 1 >"$host_err.status"
-	printf '%s' "$3" | tr '\r\n\t' '   ' | cut -c 1-200 >"$host_err.body"
+	ccnavi_host_fail_status "$3" >"$host_err.status"
+	ccnavi_host_fail_body "$3" >"$host_err.body"
 }
 
 api_failed_reason() {

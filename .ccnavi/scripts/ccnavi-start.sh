@@ -240,14 +240,14 @@ host_open() {
 	return 0
 }
 
-# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
+# API が失敗したら、どの呼び出しかと、ホストの返事（HTTP の番号と本文）を覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
 	# ホストが HTTP のエラーを返したなら、その番号も残す（届いてはいるのか、届かないのかを見分けるため）。
 	# curl は「returned error: 404」、gh は「(HTTP 404)」、glab は「404 Not Found」の形
-	printf '%s' "$3" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' -e 's/.*HTTP ([0-9]{3}).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) [A-Z][a-z]+.*/\1/p' | head -n 1 >"$host_err.status"
-	# ホストの返事の本文（先頭200文字、1行）。原因を絞り込めるよう、文面に出す。トークンは含めない
-	printf '%s' "$3" | tr '\r\n\t' '   ' | cut -c 1-200 >"$host_err.body"
+	ccnavi_host_fail_status "$3" >"$host_err.status"
+	# ホストの返事の本文（先頭200文字、1行）。原因を絞り込めるよう、文面に出す。トークンは伏せる
+	ccnavi_host_fail_body "$3" >"$host_err.body"
 }
 api_failed_reason() {
 	what_failed=$(cat "$host_err" 2>/dev/null || :)
