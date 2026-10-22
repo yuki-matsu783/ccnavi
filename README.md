@@ -1112,7 +1112,7 @@ grep の allow は後ろの `git push` まで通さない。外側のコマン�
 
 | 書きたいもの | 止まる書き方 | 通る書き方 |
 |---|---|---|
-| 本文にバッククォートを含む issue やマージリクエスト | ``gh issue create --body "use `git push` here"``（`DENY_BACKQUOTE`） | 単一引用で包む、`` \` `` で書く、`--body-file <ファイル>` |
+| 本文にバッククォートを含む issue やマージリクエスト | ``glab issue create --description "use `git push` here"``（`DENY_BACKQUOTE`。gh なら `--body`） | 単一引用で包む、`` \` `` で書く、`--description-file <ファイル>`（gh なら `--body-file`） |
 | 複数行のコミットメッセージ | `commit -m "$(cat <<'EOF' … EOF)"`（heredoc のルール） | 本文を Write で置いて `commit -F <ファイル>`、改行を含む `-m "…"` |
 | git の値を使うコマンド | `cd "$(git rev-parse --show-toplevel)"` | ラッパースクリプトで値を出して読み、次のコマンドにその値を書く |
 | 今の場所を渡す検索 | `grep -rn foo "$(pwd)"`（allow から外れて確認になる） | 値をそのまま書く |
@@ -1191,7 +1191,7 @@ perl や python は縮退の対象に入れていない（`perl -pi -e 's/git pu
 
 バッククォートは二重引用の中でも、区切りを引用しないヒアドキュメントの中でも実行される。ccnavi は中身を読まず、
 コード `DENY_BACKQUOTE` で止める。コマンド置換なら `$( )` で書く。文字として渡したいなら（issue やマージリクエストの本文の
-Markdown など）、単一引用で包むか、`` \` `` と書くか、`--body-file <ファイル>` で渡す。単一引用の中、`` \` ``、
+Markdown など）、単一引用で包むか、`` \` `` と書くか、`--description-file <ファイル>`（gh なら `--body-file`）で渡す。単一引用の中、`` \` ``、
 引用付きヒアドキュメントの本文、コメントのバッククォートは止まらない。
 
 #### シェルで読みが割れる形は素直な形で書く

@@ -360,7 +360,8 @@ def inside_quotes(git: str | None = None) -> str:
         "注: このルールは二重引用符の中、または引用しないヒアドキュメントの中のコマンドに"
         "当たりました。そこではシェルが $( ) とバッククォートを実行します。文字として書くだけでは"
         "ありません。文字のまま渡すには、シングルクォートで囲むか、\\$( と \\` と書くか、"
-        f"文面をファイルから渡してください（{_commit_file(git)}gh --body-file <file>）。"
+        f"文面をファイルから渡してください（{_commit_file(git)}"
+        "glab --description-file <file>、gh なら --body-file <file>）。"
         "git のリビジョンのような値を使うには、先に 1 つのコマンドで値を出力し、"
         "次のコマンドに値を書いてください。"
     )
@@ -630,7 +631,7 @@ _REWRITE_TEXT = {
         "コマンド置換には `$( )` を使ってください。"
         "バッククォートを文字として残すなら（Issue や PR 本文の Markdown など）、"
         "シングルクォートで囲むか、1 つずつ \\` とエスケープするか、ファイルから渡してください"
-        "（`gh --body-file <ファイル>`{commit}）。",
+        "（`glab --description-file <ファイル>`、gh なら `--body-file`{commit}）。",
     ),
     shellread.FORM_AMBIGUOUS: (
         "読みが分かれる形",
