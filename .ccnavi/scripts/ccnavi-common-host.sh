@@ -192,10 +192,11 @@ ccnavi_host_api() {
 	ccnavi_ha_body="${3:-}"
 	case "$ccnavi_h_transport" in
 	gh | glab)
-		# 標準エラー（更新の知らせなど）は応答に混ぜない。失敗したときだけ本文と一緒に渡す
+		# 標準エラー（更新の知らせなど）は応答に混ぜない。失敗したときだけ本文と一緒に渡す。
+		# 本文を送るときは Content-Typeを付ける（付けないと、GitLabはHTTP 415で拒む）
 		ccnavi_ha_err="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-host-err-$$"
 		if [ -n "$ccnavi_ha_body" ]; then
-			ccnavi_ha_out=$(printf '%s' "$ccnavi_ha_body" | "$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" --input - "$ccnavi_ha_rel" 2>"$ccnavi_ha_err") || {
+			ccnavi_ha_out=$(printf '%s' "$ccnavi_ha_body" | "$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" --header 'Content-Type: application/json' --input - "$ccnavi_ha_rel" 2>"$ccnavi_ha_err") || {
 				ccnavi_host_failed "$ccnavi_ha_out$(cat "$ccnavi_ha_err" 2>/dev/null)"
 				rm -f "$ccnavi_ha_err"
 				return 1
@@ -237,6 +238,23 @@ ccnavi_host_failed() {
 	"$ccnavi_h_on_fail" "$ccnavi_ha_method" "$ccnavi_ha_rel" "$1"
 }
 
+# 失敗の返事（本文と標準エラー）から HTTP の番号を取り出す。取れなければ何も出さない。
+# 本文の中の数字に引かれないよう、まず形の決まった書き方（curl の returned error・gh の (HTTP nnn)・glab の行）だけを全体から探し、
+# 無ければ最後の行（gh / glab の標準エラー）だけを緩い式で読む。
+ccnavi_host_fail_status() {
+	ccnavi_hs_val=$(printf '%s' "$1" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^glab: HTTP ([0-9]{3})$/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' | head -n 1)
+	if [ -z "$ccnavi_hs_val" ]; then
+		ccnavi_hs_val=$(printf '%s\n' "$1" | sed '/^$/d' | tail -n 1 | sed -n -E -e 's/.*HTTP ([0-9]{3}).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) [A-Z][a-z]+.*/\1/p' | head -n 1)
+	fi
+	printf '%s' "$ccnavi_hs_val"
+}
+
+# 失敗の返事の本文を、画面に出せる形（1 行・制御文字なし・先頭 200 文字・トークンは伏せる）にして出す。
+# 文字数は jq で数える（cut -c は環境によってバイトで切り、日本語の途中で壊れる）。
+ccnavi_host_fail_body() {
+	printf '%s' "$1" | "$ccnavi_h_jq" -Rjs --arg t "${ccnavi_h_token:-}" '(if $t == "" then . else split($t) | join("***") end) | gsub("[\u0000-\u001f\u007f]+"; " ") | .[0:200]'
+}
+
 ccnavi_host_pages() {
 	ccnavi_hg_rel="$1"
 	ccnavi_hg_page=1
@@ -248,7 +266,10 @@ ccnavi_host_pages() {
 	while :; do
 		# 呼び手が `|| ...` で受けると set -e が有効にならないので、失敗したらここで 1 を返す（配列でない答えも）
 		ccnavi_hg_chunk=$(ccnavi_host_api GET "$ccnavi_hg_rel${ccnavi_hg_sep}per_page=100&page=$ccnavi_hg_page") || return 1
-		ccnavi_hg_n=$(printf '%s' "$ccnavi_hg_chunk" | "$ccnavi_h_jq" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || return 1
+		ccnavi_hg_n=$(printf '%s' "$ccnavi_hg_chunk" | "$ccnavi_h_jq" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || {
+			ccnavi_host_failed "$ccnavi_hg_chunk"
+			return 1
+		}
 		ccnavi_hg_all=$(printf '%s\n%s' "$ccnavi_hg_all" "$ccnavi_hg_chunk" | "$ccnavi_h_jq" -s '.[0] + .[1]')
 		[ "$ccnavi_hg_n" -lt 100 ] && break
 		ccnavi_hg_page=$((ccnavi_hg_page + 1))

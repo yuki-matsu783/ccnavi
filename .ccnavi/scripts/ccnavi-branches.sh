@@ -94,7 +94,7 @@ state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 result="$state/branches-host-$$.json"
 host_err="$state/branches-host-err-$$"
-trap 'rm -f "$result" "$host_err"' EXIT
+trap 'rm -f "$result" "$host_err" "$host_err.status" "$host_err.body"' EXIT
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if bin=$(ccnavi_bin "$root"); then
@@ -119,14 +119,23 @@ unchecked() {
 	log_info ホストを見ていない -- "kind=$kind" "reason=$2"
 }
 
-# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
+# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
+	# ホストが HTTPのエラーを返したときは、その番号と本文（先頭200文字、1行）も残す
+	ccnavi_host_fail_status "$3" >"$host_err.status"
+	ccnavi_host_fail_body "$3" >"$host_err.body"
 }
 
 api_failed_reason() {
 	what=$(cat "$host_err" 2>/dev/null || :)
-	printf 'ホストの API が失敗した（%s）。番号が無いか、権限が足りないか、ホストに届かない' "${what:-?}"
+	af_status=$(cat "$host_err.status" 2>/dev/null || :)
+	af_body=$(cat "$host_err.body" 2>/dev/null || :)
+	if [ -n "$af_status" ]; then
+		printf 'ホストの API が失敗した（%s）。HTTP %s: %s' "${what:-?}" "$af_status" "${af_body:-（本文なし）}"
+	else
+		printf 'ホストの API が失敗した（%s）。番号が無いか、権限が足りないか、ホストに届かない' "${what:-?}"
+	fi
 }
 
 # write_checked <mrs の JSON 配列> 見た結果を書く。
