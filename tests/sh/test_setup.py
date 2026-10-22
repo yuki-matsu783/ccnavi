@@ -117,6 +117,7 @@ DEPLOY_SCRIPTS = (
     "ccnavi-user-close-early.sh",
     "ccnavi-user-clean-branch.sh",
     "ccnavi-fetch.sh",
+    "ccnavi-dirs.sh",
     "ccnavi-sync.sh",
     "ccnavi-clean.sh",
     "ccnavi-clean.js",
@@ -167,6 +168,7 @@ NO_TEMPLATES_FILES = [
             "ccnavi-common-state.sh",
             "ccnavi-common-write-and-push.sh",
             "ccnavi-common.sh",
+            "ccnavi-dirs.sh",
             "ccnavi-fetch.sh",
             "ccnavi-git.sh",
             "ccnavi-launcher.sh",
@@ -236,6 +238,7 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-user-close-early.sh
   .ccnavi/scripts/ccnavi-user-clean-branch.sh
   .ccnavi/scripts/ccnavi-fetch.sh
+  .ccnavi/scripts/ccnavi-dirs.sh
   .ccnavi/scripts/ccnavi-sync.sh
   .ccnavi/scripts/ccnavi-clean.sh
   .ccnavi/scripts/ccnavi-clean.js
