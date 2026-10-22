@@ -41,7 +41,7 @@
           },
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
           }
         ]
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
           }
         ]
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
           }
         ]
@@ -95,7 +95,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
           }
         ]
@@ -106,7 +106,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
           }
         ]
@@ -117,7 +117,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
           }
         ]
@@ -128,7 +128,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
           }
         ]
