@@ -164,7 +164,10 @@ ccnavi_fetch_auth_note() {
 	if [ "$ccnavi_an_kind" = gitlab ]; then
 		ccnavi_an_how="glab でログイン済みなら自動で通る。無ければユーザに glab auth login --hostname ${ccnavi_an_host} を頼む。"
 	elif [ "$ccnavi_an_kind" = github ]; then
-		ccnavi_an_how="gh でログイン済みなら自動で通る。無ければユーザに gh auth login を頼む。"
+		# github.com 以外（GHE.com）は、ホストを指定しないと github.com にログインしてしまう。
+		ccnavi_an_gh_host=""
+		[ "$ccnavi_an_host" = github.com ] || ccnavi_an_gh_host=" --hostname ${ccnavi_an_host}"
+		ccnavi_an_how="gh でログイン済みなら自動で通る。無ければユーザに gh auth login${ccnavi_an_gh_host} を頼む。"
 	else
 		ccnavi_an_how="glab でログイン済みなら自動で通る（GitHub なら gh）。無ければユーザに glab auth login（GitHub なら gh auth login）を頼む。"
 	fi

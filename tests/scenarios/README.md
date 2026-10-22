@@ -69,7 +69,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
   - `subject`: 対象のパスかコマンド。シナリオでは `subject_contains` で「含む」を比べる
 - シナリオは普段のワークスペースルートで回す。ccnavi 本体にはブランチ・コミット・MR・issue を作らず、そういう作業は `projects/test-repo` で行う
 - `setup` の `files` は、回す前に作り、回したあとに消すファイル（ワークスペースルートからのパス → 中身）
-- `setup` の `issue`（`repo`・`title`・`body`・`close`）は、回すたびに `repo` へ issue を新しく作り、prompt の `{issue}` を番号に置き換える。`close: true` なら回したあとに閉じる。
+- `setup` の `issue`（`repo`・`title`・`body`・`close`）は、回すたびに `repo` へ issue を新しく作り（origin が GitLab なら glab、GitHub なら gh。番号は作成の出力の URL の行から取る）、prompt の `{issue}` を番号に置き換える。`close: true` なら回したあとに閉じる。
   作った番号は `state.json` の `issue_no` に残る。report の入力プロンプトには `{issue}` のまま出る
 - `state` は、全 step が終わったあとに打つコマンドと、出力に含まれるべき文字列
 - step の欄 `expect_after`（`decisions`・`state` を `expect` と同じ書き方で書く。満たさなければ後続の step に進まず止める）

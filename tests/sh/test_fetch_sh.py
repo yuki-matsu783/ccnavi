@@ -451,7 +451,7 @@ class FetchTest(unittest.TestCase):
         done = self.fetch(LANG="ja_JP.UTF-8", LC_ALL="ja_JP.UTF-8")
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertIn("認証に失敗した", done.stdout)
-        self.assertIn("gh auth login", done.stdout)
+        self.assertIn("gh auth login を頼む", done.stdout)
         self.assertNotIn("glab", done.stdout)
         self.assertIn("git fetch origin", done.stdout)
 
@@ -473,6 +473,24 @@ class FetchTest(unittest.TestCase):
         )
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertIn("glab auth login（GitHub なら gh auth login）", done.stdout)
+
+    def test_an_authentication_failure_on_ghe_names_the_host(self):
+        """GHE.com の origin は、gh auth login にホストを付ける。"""
+        script = posix(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-fetch.sh"))
+        probe = (
+            '. "$(dirname "$0")/ccnavi-common.sh"; '
+            'eval "$(sed -n "/^ccnavi_fetch_auth_note()/,/^}/p" "$0")"; '
+            "git remote set-url origin https://acme.ghe.com/o/r.git; ccnavi_fetch_auth_note ."
+        )
+        done = subprocess.run(
+            [SHELL, "-c", probe, script],
+            cwd=self.ws,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertIn("gh auth login --hostname acme.ghe.com", done.stdout)
         self.assertIn("git fetch origin", done.stdout)
 
     def test_a_hanging_remote_is_cut_off(self):
