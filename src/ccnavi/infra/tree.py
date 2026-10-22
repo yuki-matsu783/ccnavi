@@ -371,8 +371,8 @@ def origin_repo(repo_root: str) -> str:
 
 def _repo_of_url(url: str) -> str:
     rest = url.split("://", 1)[1] if "://" in url else url
-    # `git@host:group/proj`（ssh の短い形）は `:` の後ろが、`host/group/proj` は最初の `/` の後ろが
-    # パス
+    # `git@host:group/proj`（ssh の短い形）は `:` の後ろが、`host/group/proj` は
+    # 最初の `/` の後ろがパス。
     if "://" not in url and ":" in rest.split("/", 1)[0]:
         path = rest.split(":", 1)[1]
     else:

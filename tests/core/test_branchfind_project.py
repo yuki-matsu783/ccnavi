@@ -1,4 +1,4 @@
-"""依頼文の URL のリポジトリ（`Ref.repo`）を projects/ のプロジェクトに照らす。"""
+"""依頼文の URL のリポジトリ（`Ref.repo`）を projects/ のプロジェクトと比べる。"""
 
 from __future__ import annotations
 

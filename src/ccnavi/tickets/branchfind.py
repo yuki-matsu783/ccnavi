@@ -255,7 +255,7 @@ def project_of_repo(conf: settings.Settings, root: str, repo: str) -> str | None
     """`owner/repo` を origin に持つ場所。自身なら空文字、プロジェクトなら名前、無ければ None。
 
     ワークスペースと projects/ の各プロジェクトの origin のパス（最後の 2 段）を、
-    大文字小文字を区別せずに照らす。
+    大文字小文字を区別せずに比べる。
     """
     want = pathcase.fold(repo)
     if pathcase.fold(tree.origin_repo(tree.main_tree(root).root)) == want:
@@ -273,14 +273,14 @@ def _start_lines(conf: settings.Settings, root: str, refs: list[Ref]) -> list[st
     lines = [
         f"[ccnavi] 依頼に {labels} の指定がある。"
         "開始の前に、次を実行します。既存の候補を探し、無ければ Draft MR・ワークツリー"
-        "・ブランチを作る。URL でリポジトリが示されているものは、"
-        "そのプロジェクトに cd した 1 行で実行します。"
+        "・ブランチを作る。依頼の URL がリポジトリを示すものは、"
+        "そのプロジェクトに cd してから 1 行で実行します。"
     ]
     for r in refs:
         where = project_of_repo(conf, root, r.repo) if r.repo else ""
         if where is None:
             lines.append(
-                f"- {r.label()} のリポジトリ {r.repo} は projects/ のどこにも無い"
+                f"- {r.label()} のリポジトリ {r.repo} は projects/ の中に無い"
                 "（まだ clone していない）。"
                 "ccnavi-start.sh は実行せず、clone が要ることをユーザに伝えて止まる"
             )

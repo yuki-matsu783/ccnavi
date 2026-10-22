@@ -176,7 +176,7 @@ top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
 
 # ---- 依頼のリポジトリと、実行した場所のリポジトリが違えば、ホストに問い合わせる前に止める。
-# origin のパスの最後の 2 段を、大文字小文字を区別せずに比べる（ccnavi_host_parse は使わない。ホストに繋がない）。
+# origin のパスの最後の 2 段を、大文字小文字を区別せずに比べる（ccnavi_host_parse は使わない。ホストには接続しない）。
 repo_of_url() {
 	printf '%s' "$1" | sed -E -e 's#^[A-Za-z][A-Za-z0-9+.-]*://##' -e 's#^[^/@]*@##' -e 's#^[^/:]*[:/]##' -e 's#/+$##' -e 's#\.git$##' | tr -d '\r' | awk -F/ 'NF>=2{print $(NF-1) "/" $NF}'
 }
@@ -499,7 +499,7 @@ stop_host() {
 		[ -z "$stop_local" ] || printf '  手元の候補: %s\n' "$stop_local"
 		printf '手で行う手順（GitLab には MCP の案内がありません）:\n'
 		if [ -s "$host_err.status" ] && ! grep -Eq '^40[13]$' "$host_err.status"; then
-			printf '  1. ホストは返事をしたので認証や接続の問題ではない。上の HTTP ステータスと本文から、リポジトリのパス（%s）・番号・権限を確かめる。直ったら同じコマンドを再実行する: %s\n' "$ccnavi_h_path" "$sh_cmd"
+			printf '  1. ホストは返事をしたので認証や接続の問題ではない。上の HTTP ステータスと本文から、リポジトリのパス（%s）・番号・権限を確かめる。原因を直したら同じコマンドを再実行する: %s\n' "$ccnavi_h_path" "$sh_cmd"
 		else
 			printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
 		fi
