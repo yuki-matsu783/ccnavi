@@ -64,6 +64,10 @@ class IssueCommandTest(unittest.TestCase):
         out = "Creating issue in g/p\n\nhttps://gitlab.example.com/g/p/-/issues/34\nopen it later\n"
         self.assertEqual(runner.issue_number(out), 34)
 
+    def test_issue_number_ignores_other_urls(self):
+        out = "https://gl.example.com/g/p/-/issues/12\nsee https://docs.example.com/9\n"
+        self.assertEqual(runner.issue_number(out), 12)
+
     def test_issue_number_rejects_output_without_url(self):
         with self.assertRaises(RuntimeError):
             runner.issue_number("created 5\n")

@@ -483,7 +483,7 @@ def issue_number(url):
     """
     for line in reversed(url.strip().splitlines()):
         tail = line.strip().rstrip("/").rsplit("/", 1)[-1]
-        if "://" in line and tail.isdigit():
+        if "://" in line and "/issues/" in line and tail.isdigit():
             return int(tail)
     raise RuntimeError(f"issue の番号が取れない: {url.strip()}")
 
@@ -527,7 +527,9 @@ def make_issue(issue, root):
     """setup の issue の欄どおりに、test-repo へ issue を新しく 1 つ作る。番号を返す。"""
     repo = Path(root) / issue["repo"]
     args = issue_create_args(repo_host_kind(repo), issue)
-    r = subprocess.run(args, cwd=repo, capture_output=True, text=True, timeout=120)
+    r = subprocess.run(
+        args, cwd=repo, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL
+    )
     if r.returncode != 0:
         raise RuntimeError(f"{' '.join(args[:3])} が終了コード {r.returncode}: {r.stderr.strip()}")
     return issue_number(r.stdout)
