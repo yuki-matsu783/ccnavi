@@ -1112,7 +1112,7 @@ grep の allow は後ろの `git push` まで通さない。外側のコマン�
 
 | 書きたいもの | 止まる書き方 | 通る書き方 |
 |---|---|---|
-| 本文にバッククォートを含む issue やマージリクエスト | ``gh issue create --body "use `git push` here"``（`DENY_BACKQUOTE`） | 単一引用で包む、`` \` `` で書く、`--body-file <ファイル>` |
+| 本文にバッククォートを含む issue やマージリクエスト | ``glab issue create --description "use `git push` here"``（`DENY_BACKQUOTE`。gh なら `--body`） | 単一引用で包む、`` \` `` で書く、`--description-file <ファイル>`（gh なら `--body-file`） |
 | 複数行のコミットメッセージ | `commit -m "$(cat <<'EOF' … EOF)"`（heredoc のルール） | 本文を Write で置いて `commit -F <ファイル>`、改行を含む `-m "…"` |
 | git の値を使うコマンド | `cd "$(git rev-parse --show-toplevel)"` | ラッパースクリプトで値を出して読み、次のコマンドにその値を書く |
 | 今の場所を渡す検索 | `grep -rn foo "$(pwd)"`（allow から外れて確認になる） | 値をそのまま書く |
