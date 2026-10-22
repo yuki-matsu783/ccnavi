@@ -193,7 +193,7 @@ ccnavi_host_api() {
 	case "$ccnavi_h_transport" in
 	gh | glab)
 		# 標準エラー（更新の知らせなど）は応答に混ぜない。失敗したときだけ本文と一緒に渡す。
-		# 本文を送るときは Content-Type を付ける（付けないと GitLab は HTTP 415 で拒む）
+		# 本文を送るときは Content-Typeを付ける（付けないと、GitLabはHTTP 415で拒む）
 		ccnavi_ha_err="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-host-err-$$"
 		if [ -n "$ccnavi_ha_body" ]; then
 			ccnavi_ha_out=$(printf '%s' "$ccnavi_ha_body" | "$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" --header 'Content-Type: application/json' --input - "$ccnavi_ha_rel" 2>"$ccnavi_ha_err") || {

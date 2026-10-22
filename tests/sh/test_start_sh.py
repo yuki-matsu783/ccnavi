@@ -931,8 +931,8 @@ class StartShGitLabTest(StartShTest):
         self.assertEqual(len(self.posts()), 2)
 
     def install_glab(self):
-        """認証済みの glab の代役。本文付きで Content-Type が無ければ GitLab と同じく HTTP 415。
-        それ以外は curl の代役（ルート表）へ回す"""
+        """認証済みのglabの代役。本文付きでContent-Typeが無いと、GitLabと同じくHTTP 415を返す。
+        それ以外はcurlの代役（ルート表）へ回す"""
         text = f"""#!/bin/sh
 method=GET; ct=""; input=""; path=""
 while [ $# -gt 0 ]; do
