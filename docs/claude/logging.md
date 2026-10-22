@@ -25,7 +25,7 @@ loggerとは関係なく今のまま出し、loggerに置き換えない。文�
 - hookの標準エラー（`ccnavi: …`）とexit 2の差し戻し、hookの標準出力のJSON
 - `ccnavi-git.sh`の`reject`の文面と、結果の1行目（`ok  git …` / `fail  git …`）
 - `ccnavi-review.sh`の`fail`の文面と`OK: …`の結果行
-- `ccnavi-fetch.sh`の標準出力。モデルの文脈に入る
+- `ccnavi-fetch.sh`・`ccnavi-dirs.sh`の標準出力（SessionStartの入口`ccnavi-session-start.sh`が呼ぶ）。モデルの文脈に入る
 - 判定の記録`logs/decisions.jsonl`（audit）と、`ccnavi-git.sh`が全量を残す`logs/git-*.log`
 
 これらを出した箇所で、同じ出来事を診断ログにも書いてよい。`reject`と`fail`はそうしている。

@@ -114,6 +114,8 @@ class SetupTest(unittest.TestCase):
             "ccnavi-user-close-early.sh",
             "ccnavi-user-clean-branch.sh",
             "ccnavi-fetch.sh",
+            "ccnavi-dirs.sh",
+            "ccnavi-session-start.sh",
             "ccnavi-sync.sh",
             "ccnavi-clean.sh",
             "ccnavi-clean.js",

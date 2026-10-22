@@ -311,8 +311,8 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 なり、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
 ところだけを見たいときは `--check` を付ける。`--all` も受けるが、今は足すものが無い（置き場の env は廃止した）。
 同じ 1 回で `.vscode/settings.json` も見る（次の節）。触ってほしくないときは `--no-vscode`。
-セッション開始時の取り込み（`ccnavi-fetch.sh`）も `SessionStart` に別の 1 行で登録する。
-1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す。
+セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、直下のディレクトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も `SessionStart` に別の 1 行で登録する。
+1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（ディレクトリ一覧も出なくなる）。
 
 既にある値は置き換えず、違えば並べて見せる。置き換えるのは `--mode` か `--ticket-control` を
 名指しして `--force` を付けたときだけで、名指ししていない値はそのままにする。
@@ -346,7 +346,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
         { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
       ]},
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh\"", "timeout": 60 }
+        { "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh\"", "timeout": 60 }
       ]}
     ],
     "UserPromptSubmit": [
@@ -397,7 +397,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 
 同じ実行ファイルを上の 8 つのイベントに登録する。payload にイベント名が入っているので、どれを走らせるかは ccnavi が選ぶ。
 `matcher` は絞らない。絞ると、書かなかったツールで hook 自体が起動しなくなる。
-`SessionStart` の 2 本目は取り込みの sh（`ccnavi-fetch.sh`）で、承認済みチケットと
+`SessionStart` の 2 本目は入口の sh（`ccnavi-session-start.sh`。中で `ccnavi-fetch.sh` を呼ぶ）で、承認済みチケットと
 マーカー（親ブランチに乗って届く）と、ワークツリーの起点になる統合先ブランチを fast-forward で
 取ってくる。登録しないと、別の機械で承認したものが反映されず、古い `main` からブランチを切ることになる。
 
@@ -3493,6 +3493,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-user-agree.sh` | 承認し、`ccnavi-user-push-approved.sh` でコミットして push する。ユーザが端末で打つ。本体は `ccnavi user agree` |
 | `.ccnavi/scripts/ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。ユーザが打つ（エージェントからは止まる）。端末の `ccnavi-user-agree.sh`・ボードの承認とフローの保存・ユーザの判断の入口のあとに呼ばれる。`[<親>...]` で親子のチケットを限る。取り込み済みの親子のチケットはロックを取り、取り込んでから送る |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になる統合先ブランチを取ってくる。進めるのは fast-forward だけ |
+| `.ccnavi/scripts/ccnavi-session-start.sh` | セッション開始時の入口。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ。SessionStart にはこれを登録する |
+| `.ccnavi/scripts/ccnavi-dirs.sh` | セッション開始時に、プロジェクト直下のディレクトリを更新が新しい順に最大 10 件出す。超えるときは `ls` を案内する |
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを診断する（閉じたかはホストの MR で決める） |
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
