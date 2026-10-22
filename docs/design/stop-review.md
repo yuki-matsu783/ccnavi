@@ -28,7 +28,7 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 
 - 材料を取る側: 計画を最大 5 秒待ち、材料を区切ったデータとして返す。材料は、今回のターン、直前 8 件のユーザ発言、判定用 Markdown（`.ccnavi/config/stop-review.md`、無ければ組み込み）、issue／MR の指定、提出済みの提案と承認状態、提案の版ごとの本文（送ったコミットから読む。未送信は書いたファイルの中身）。本文に区切りの文字列があっても無害にする。判定に渡した材料は伏せ字にして `logs/stop-review/material/` に保存する。
 - 結果を渡す側: 構造を検証し（試行 ID・対象・基準・種別つきの問題箇所と修正・必要な基準の網羅）、材料の版と承認状態を確かめ直し、最終分類を確定する。enable で不備検出のときだけ `{"ok": false, "reason": …}`。差し戻しの文に、試行 ID、基準 ID・問題箇所・修正、「本当にユーザの判断が要る問いなら、修正の後にその問いを最後に書き直して終える」の一文を必ず含める。再判定は差し戻さない。
-- 評価の集計（ユーザ向け。使い方は README）。基準ごとの検査カバー率・見逃し率・誤差し戻し率・不要介入率・修正率と、分けて数えるものを出す。独立した評価は `logs/stop-review/labels.jsonl` に書く。
+- 評価の集計（ユーザ向け。使い方は [記録と振り返り](../guide/records.md)）。基準ごとの検査カバー率・見逃し率・誤差し戻し率・不要介入率・修正率と、分けて数えるものを出す。独立した評価は `logs/stop-review/labels.jsonl` に書く。
 
 最終分類は、AI が「チケット作業の依頼ではない」→ 対象外（判定者 AI）、材料不足 → 未検査、R1・R2・R4 に受理された不備 → 不備検出、必要な基準に判定不能 → 未検査、それ以外 → 終了可。出力の検証は構造だけを確かめる。指摘が正しいことは保証しない。
 
@@ -47,6 +47,14 @@ Stop ─┬─ command hook（ccnavi）: 既存の促しを実行 → 共有キ�
 
 - `scripts/ccnavi-stop-review.sh register|unregister|check`: `.claude/settings.json` に agent 型の Stop hook を 1 件（prompt の先頭行 `[ccnavi-stop-review]` が目印）と `CCNAVI_STOP_REVIEW_AGENT=1` を足す・外す・点検する。他の hook・env は保持し、重複は 1 件に直す。
 - `ccnavi --lint`: `CCNAVI_STOP_REVIEW` の値、印と hook の食い違い、agent hook の重複、enable で判定役を見分ける値が無いこと。
+
+## 使い方の仕様
+
+- **登録の既定。** 判定役のモデルは `haiku`、タイムアウトは 60 秒で、`register --model <名前>` で変えられる。既定では登録されず、登録しても `CCNAVI_STOP_REVIEW` の既定は `dry-run`（記録だけ残して止めない）。`ccnavi-stop-review.sh` は `--root <ワークスペース>` も受ける。
+- **効き方。** `CCNAVI_STOP_REVIEW` は `dry-run` / `enable` / `disable`。`enable` のときは、検証に通った不備検出だけを 1 回差し戻す。差し戻しの次の Stop では、既存の促しを 1 回通常どおり動かし、修正後の材料で 1 回だけ再判定する。
+- **判定の基準。** 組み込みの基準を、ワークスペースの `.ccnavi/config/stop-review.md` があればそれで置き換える（無ければ組み込み）。ファイルが読めない・空のときは、別の基準を推測せず未検査にする。
+- **独立した評価。** 人が付ける正否は `logs/stop-review/labels.jsonl` に 1 行 1 件の JSON `{"attempt_id", "criterion", "target", "truth": "flaw"|"ok"}` で書く。評価が無い指標は集計に「不明」と出る（`ccnavi stop-review report`）。
+- **1 Stop あたりの追加。** 待ち時間は約 10 秒、費用は約 0.0025 ドル（実測値。下の「測定結果」）。
 
 ## 記録の置き場と後始末
 
