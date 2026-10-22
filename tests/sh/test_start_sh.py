@@ -930,6 +930,57 @@ class StartShGitLabTest(StartShTest):
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(len(self.posts()), 2)
 
+    def install_glab(self):
+        """認証済みの glab の代役。本文付きで Content-Type が無ければ GitLab と同じく HTTP 415。
+        それ以外は curl の代役（ルート表）へ回す"""
+        text = f"""#!/bin/sh
+method=GET; ct=""; input=""; path=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+  api) ;;
+  --hostname) shift ;;
+  --method) method="$2"; shift ;;
+  --header) case "$2" in 'Content-Type: application/json') ct=1 ;; esac; shift ;;
+  --input) input=1; shift ;;
+  *) path="$1" ;;
+  esac
+  shift
+done
+if [ -n "$input" ] && [ -z "$ct" ]; then
+  cat >/dev/null
+  echo '{{"error":"The provided content-type '"''"' is not supported."}}'
+  echo 'glab: HTTP 415' >&2
+  exit 1
+fi
+if [ -n "$input" ]; then
+  exec '{self.bin}/curl' -X "$method" --data-binary @- "https://gitlab.com/api/v4/$path"
+fi
+exec '{self.bin}/curl' -X "$method" "https://gitlab.com/api/v4/$path"
+"""
+        os.chmod(write(os.path.join(self.bin, "glab"), text), 0o755)
+
+    def test_gitlab_glab_sends_content_type_for_create(self):
+        self.install_glab()
+        self.gitlab_routes()
+        done = self.run_sh("--issue", "152", token=False)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(
+            self.fields(done.stdout)["MR"], "https://gitlab.com/acme/widgets/-/merge_requests/9"
+        )
+        (body,) = self.posts()
+        self.assertEqual(body["title"], "Draft: Add login")
+
+    def test_gitlab_failure_shows_http_status_and_body(self):
+        self.gitlab_routes(created=False)
+        with open(self.routes, encoding="utf-8") as f:
+            routes = json.load(f)
+        routes[f"POST {GITLAB}/merge_requests"] = [415, {"error": "unsupported content-type"}]
+        self.route(routes)
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("HTTP 415", done.stdout)
+        self.assertNotIn("glab を", done.stdout)
+
     def test_gitlab_unreachable_at_search_has_no_mcp(self):
         done = self.run_sh("--issue", "152", token=False)
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)

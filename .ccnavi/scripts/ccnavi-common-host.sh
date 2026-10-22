@@ -195,7 +195,7 @@ ccnavi_host_api() {
 		# 標準エラー（更新の知らせなど）は応答に混ぜない。失敗したときだけ本文と一緒に渡す
 		ccnavi_ha_err="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-host-err-$$"
 		if [ -n "$ccnavi_ha_body" ]; then
-			ccnavi_ha_out=$(printf '%s' "$ccnavi_ha_body" | "$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" --input - "$ccnavi_ha_rel" 2>"$ccnavi_ha_err") || {
+			ccnavi_ha_out=$(printf '%s' "$ccnavi_ha_body" | "$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" --header 'Content-Type: application/json' --input - "$ccnavi_ha_rel" 2>"$ccnavi_ha_err") || {
 				ccnavi_host_failed "$ccnavi_ha_out$(cat "$ccnavi_ha_err" 2>/dev/null)"
 				rm -f "$ccnavi_ha_err"
 				return 1

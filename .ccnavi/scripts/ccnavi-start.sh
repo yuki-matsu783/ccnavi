@@ -172,7 +172,7 @@ scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
 heads_file="$state/start-heads-$$"
-trap 'rm -f "$host_err" "$host_err.status" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err"' EXIT
+trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err"' EXIT
 log_info 始めた -- "kind=$what" "number=$number" "dry=${dry:-no}"
 
 # ---- ccnavi-git.sh 経由の git。成功は何も出さず、失敗は出力を標準エラーへ出して 1 を返す（cwd で動く）。
@@ -244,11 +244,20 @@ host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
 	# ホストが HTTP のエラーを返したなら、その番号も残す（届いてはいるのか、届かないのかを見分けるため）。
 	# curl は「returned error: 404」、gh は「(HTTP 404)」、glab は「404 Not Found」の形
-	printf '%s' "$3" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' | head -n 1 >"$host_err.status"
+	printf '%s' "$3" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' -e 's/.*HTTP ([0-9]{3}).*/\1/p' | head -n 1 >"$host_err.status"
+	# ホストの返事の本文（先頭 200 文字、1 行）。原因を絞り込めるように文面へ出す。トークンはここに載らない
+	printf '%s' "$3" | tr '\r\n\t' '   ' | cut -c 1-200 >"$host_err.body"
 }
 api_failed_reason() {
 	what_failed=$(cat "$host_err" 2>/dev/null || :)
-	printf 'ホストの API が失敗した（%s）' "${what_failed:-?}"
+	af_status=$(cat "$host_err.status" 2>/dev/null || :)
+	af_body=$(cat "$host_err.body" 2>/dev/null || :)
+	if [ -n "$af_status" ]; then
+		# 届いたうえでホストが断った。接続や認証の問題とは限らない
+		printf 'ホストの API が失敗した（%s）。HTTP %s: %s' "${what_failed:-?}" "$af_status" "${af_body:-（本文なし）}"
+	else
+		printf 'ホストの API が失敗した（%s）%s' "${what_failed:-?}" "${af_body:+。ホストの返事: $af_body}"
+	fi
 }
 
 # 親のシェルで呼ぶ。結果は issue_title_read（題。1 行、制御文字は空白）と issue_why（失敗の理由）に入れる。
@@ -258,7 +267,7 @@ issue_why=""
 issue_title_get() {
 	issue_title_read=""
 	issue_why=""
-	rm -f "$host_err" "$host_err.status"
+	rm -f "$host_err" "$host_err.status" "$host_err.body"
 	if [ "$ccnavi_h_kind" = github ]; then
 		it_path="repos/$ccnavi_h_path/issues/$number"
 	else
@@ -447,7 +456,14 @@ stop_host() {
 		fi
 		[ -z "$stop_local" ] || printf '  手元の候補: %s\n' "$stop_local"
 		printf '手で行う手順（GitLab には MCP の案内がありません）:\n'
-		printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
+		case "$sh_why" in
+		*"。HTTP "[0-9][0-9][0-9]:*)
+			printf '  1. 理由に出たホストの返事（HTTP の番号と本文）を読む。401・403 以外は認証の問題ではない。原因を直すか、ユーザに伝える。直ったら同じコマンドを再実行する: %s\n' "$sh_cmd"
+			;;
+		*)
+			printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
+			;;
+		esac
 		case "$sh_stage" in
 		create)
 			printf '  2. 再実行できないなら、ブラウザで %s の MR を手で作り、再実行します。ソース: %s、ターゲット: %s、題: Draft: %s、説明: Closes #%s\n' "$ccnavi_h_path" "$stop_branch" "$stop_target" "$stop_title" "$number"
