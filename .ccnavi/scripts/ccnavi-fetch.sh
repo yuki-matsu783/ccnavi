@@ -150,6 +150,30 @@ ccnavi_fetch_git() {
 	return 0
 }
 
+# 認証に失敗したときに添える案内を、origin のホストに合わせて 1 行出す。<ツリー>
+#
+# ホストの見分けは ccnavi_host_parse に任せる（規則を二重に持たない）。呼び手の ccnavi_h_* を壊さないよう
+# サブシェルで読み、ホストへは新たに通信しない。origin が読めなければ glab を先に書く。
+ccnavi_fetch_auth_note() {
+	ccnavi_an_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
+	ccnavi_an_info=$(ccnavi_host_parse "$ccnavi_an_url" >/dev/null 2>&1 && printf '%s %s' "$ccnavi_h_kind" "$ccnavi_h_host") || ccnavi_an_info=""
+	ccnavi_an_kind="${ccnavi_an_info%% *}"
+	ccnavi_an_host="${ccnavi_an_info#* }"
+	ccnavi_an_head='  認証に失敗した（資格情報が無いか、切れているか、権限がありません）。hook は資格情報の入力を求めない。'
+	ccnavi_an_tail="または、ユーザに端末で一度 'git fetch origin' を実行して認証を済ませてもらう。そうすれば次のセッションから通る"
+	if [ "$ccnavi_an_kind" = gitlab ]; then
+		ccnavi_an_how="glab でログイン済みなら自動で通る。無ければユーザに glab auth login --hostname ${ccnavi_an_host} を頼む。"
+	elif [ "$ccnavi_an_kind" = github ]; then
+		# github.com 以外（GHE.com）は、ホストを指定しないと github.com にログインしてしまう。
+		ccnavi_an_gh_host=""
+		[ "$ccnavi_an_host" = github.com ] || ccnavi_an_gh_host=" --hostname ${ccnavi_an_host}"
+		ccnavi_an_how="gh でログイン済みなら自動で通る。無ければユーザに gh auth login${ccnavi_an_gh_host} を頼む。"
+	else
+		ccnavi_an_how="glab でログイン済みなら自動で通る（GitHub なら gh）。無ければユーザに glab auth login（GitHub なら gh auth login）を頼む。"
+	fi
+	printf '%s\n' "${ccnavi_an_head}${ccnavi_an_how}${ccnavi_an_tail}"
+}
+
 # 取りに行く。取れたら 0。<ツリー> <ブランチ> <失敗したときの 1 行> [<リモートに無いときの 1 行>]
 #
 # 失敗したときの 1 行は、その origin で初めて失敗したときだけ出す。同じ origin の 2 件目は
@@ -169,7 +193,7 @@ ccnavi_fetch_or_note() {
 		return 1
 	fi
 	printf '%s\n' "$3"
-	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証に失敗した（資格情報が無いか、切れているか、権限がありません）。hook は資格情報の入力を求めない。gh / glab でログイン済みなら自動で通るので、無ければユーザに gh auth login（GitLab は glab auth login）を頼む。または、ユーザに端末で一度 'git fetch origin' を実行して認証を済ませてもらう。そうすれば次のセッションから通る"
+	[ "$ccnavi_fn_rc" -eq 3 ] && ccnavi_fetch_auth_note "$1"
 	return 1
 }
 
