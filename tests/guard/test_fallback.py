@@ -30,7 +30,10 @@ def run(root, payload, env=None):
     `logs/state` のバックアップが書き戻される。組み込みの既定はこの設定に依らず入るので、
     見たいものは変わらない。
     """
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.update(env or {})
     return run_ccnavi(
@@ -118,26 +121,39 @@ class FallbackTest(unittest.TestCase):
                 out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
-    def test_既定は設定の修復を妨げない(self):
-        # 要件が「読み取りと設定自身の修復を妨げない」と書いている意味。
-        # ここを止めると直す方法が 1 つも残らない。
-        #
-        # Write / Edit は Claude Code の権限モードに従う。妨げてはいないが、ガードが機能していない
-        # あいだにガードの設定を書き換える操作なので、ユーザが 1 度見る側に置く。
-        for tool in ("Read", "Write", "Edit"):
+    def test_既定は読み取りを妨げず_修復は下書きとユーザの取り込みに限る(self):
+        # 要件の「読み取りと設定自身の修復を妨げない」は、修復の道が残っていることを言う。
+        # 直接 Write / Edit で直す道は通さない
+        # （builtin:guard-ccnavi-config は、読めない間も外れない）。
+        # 残る道は 1 つで、wip/handoff/ に下書きを置き、ユーザが ccnavi user handoff で取り込む。
+        rules_file = os.path.join(self.root, ".ccnavi", "config", "common", "rules.yml")
+        draft = os.path.join(
+            self.root, "wip", "handoff", ".ccnavi", "config", "common", "rules.yml"
+        )
+        # 自己防衛を切ると、名前で書くツールの 4 本は足されない。ここでは有効にして見る
+        # （ワークスペースルートは一時ディレクトリなので、バックアップがリポジトリを汚さない）。
+        guard = {"CCNAVI_GUARD_CORE_FILES": "enable"}
+        result = run(self.root, pre_tool_use("Read", "file_path", rules_file), guard)
+        self.assertNotEqual(out_of(self, result).get("permissionDecision"), "deny", "読めない")
+        for tool in ("Write", "Edit"):
             with self.subTest(tool=tool):
-                result = run(
-                    self.root, pre_tool_use(tool, "file_path", ".ccnavi/config/common/rules.yml")
+                out = out_of(
+                    self, run(self.root, pre_tool_use(tool, "file_path", rules_file), guard)
                 )
+                self.assertEqual(out.get("permissionDecision"), "deny", f"{tool} で直せてしまう")
+                reason = out["permissionDecisionReason"]
+                self.assertIn("builtin:guard-ccnavi-config", reason)
+                self.assertIn("wip/handoff/.ccnavi/config/common/rules.yml", reason)
+                self.assertIn("ccnavi user handoff", reason)
+                out = out_of(self, run(self.root, pre_tool_use(tool, "file_path", draft), guard))
                 self.assertNotEqual(
-                    out_of(self, result).get("permissionDecision"),
-                    "deny",
-                    f"{tool} による修復を止めた",
+                    out.get("permissionDecision"), "deny", f"{tool} で下書きを置けない"
                 )
 
     def test_既定はシェルから設定を書き換えさせない(self):
         # 上と対になっている。ここを通すと、シェルでルールを壊し、その結果
-        # 緩んだ既定に戻る、という順路ができる。壊す側と直す側で経路を分ける。
+        # 緩んだ既定に戻る、という順路ができる。壊す側（シェル）と、直す側（下書きと
+        # ユーザの取り込み）を分ける。
         out = out_of(
             self,
             run(
@@ -148,7 +164,11 @@ class FallbackTest(unittest.TestCase):
 
         self.assertEqual(out.get("permissionDecision"), "deny")
         # 止めた先に別の方法が無いと、拒否されたまま進めなくなる。
-        self.assertIn("Write", out["permissionDecisionReason"])
+        self.assertIn(
+            "wip/handoff/.ccnavi/config/common/rules.yml", out["permissionDecisionReason"]
+        )
+        self.assertIn("ccnavi user handoff", out["permissionDecisionReason"])
+        self.assertNotIn("Write か Edit のツールで書いてください", out["permissionDecisionReason"])
 
     def test_既定でもシェルからの書き込みは表記を変えても止まる(self):
         for command in [

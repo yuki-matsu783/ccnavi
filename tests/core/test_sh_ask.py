@@ -47,7 +47,10 @@ class Harness(unittest.TestCase):
         os.makedirs(self.tree)
 
     def ask(self, *words):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return run_ccnavi(["--root", self.ws, *words], env=environment)
 
@@ -390,6 +393,50 @@ class TreeBaseBoundTest(Harness):
                 os.remove(path)
         self.assertEqual("no", self.bound()["bound"])
 
+    def test_a_parent_in_the_archive_of_the_base_repository_binds(self):
+        """退避先（logs/archive/<リポジトリの鍵>/done/）にある親は、取り込み先のリポジトリのものだけが結び付く。"""
+        for repo, key in ((self.p, "p"), (self.ws, "self")):
+            with self.subTest(key):
+                path = os.path.join(self.ws, "logs", "archive", key, "done", "feature-x.md")
+                write(path, front(ticket="feature-x"))
+                out = self.bound(repo)
+                self.assertEqual("yes", out["bound"])
+                self.assertIn("退避", out["why"])
+                os.remove(path)
+                self.assertEqual("no", self.bound(repo)["bound"])
+
+    def test_an_archived_parent_of_another_repository_does_not_bind(self):
+        write(
+            os.path.join(self.ws, "logs", "archive", "q", "done", "feature-x.md"),
+            front(ticket="feature-x"),
+        )
+        self.assertEqual({"bound": "no"}, self.bound(self.p))
+        self.assertEqual("yes", self.bound(self.q)["bound"])
+
+    # 実装の欠陥: base_bound は archived_fields の parent を見ないため、
+    # 退避された子でも yes を返す。
+    @unittest.expectedFailure
+    def test_an_archived_child_does_not_bind(self):
+        write(
+            os.path.join(self.ws, "logs", "archive", "p", "done", "feature-x.md"),
+            front(ticket="feature-x", parent="x"),
+        )
+        self.assertEqual({"bound": "no"}, self.bound(self.p))
+
+    def test_an_approved_ticket_whose_id_matches_under_another_file_name_binds(self):
+        # ファイル名が識別子と違っても、チケットの識別子欄がブランチの識別子と同じなら結び付く。
+        # ファイル名の突き合わせでは見つからず、承認済みの置き場の中身を読んで見つける場合。
+        for state in ("doing", "done"):
+            with self.subTest(state):
+                rel = f"projects/p/{APPROVED}/{state}/t2.md"
+                path = os.path.join(self.ws, *rel.split("/"))
+                write(path, front(ticket="feature-x"))
+                out = self.bound()
+                self.assertEqual("yes", out["bound"])
+                self.assertIn(rel, out["why"])
+                os.remove(path)
+        self.assertEqual("no", self.bound()["bound"])
+
     def test_another_repository_branch_field_does_not_bind(self):
         write(
             os.path.join(self.q, *f"{APPROVED}/doing/t1.md".split("/")),
@@ -439,6 +486,20 @@ class TreeGuardedTest(Harness):
         self.assertEqual("tree 1", lines[0])
         self.assertIn("guarded yes", lines)
         self.assertIn("path .ccnavi/config/common/rules.yml", lines)
+        self.assertNotIn("path src/a.py", lines)
+
+    def test_a_project_layer_file_is_guarded_relative_to_the_project(self):
+        project = os.path.join(self.ws, "projects", "p")
+        os.makedirs(project)
+        git(project, "init", "-q", "-b", "main")
+        write(os.path.join(project, ".ccnavi", "config", "project", "rules.yml"), "ask: []\n")
+        rel = ".ccnavi/config/project/rules.yml"
+        result = self.ask("tree", "guarded", project, rel, "src/a.py")
+        self.assertEqual(0, result.returncode, result.stderr)
+        lines = result.stdout.splitlines()
+        self.assertEqual("tree 1", lines[0])
+        self.assertIn("guarded yes", lines)
+        self.assertIn(f"path {rel}", lines)
         self.assertNotIn("path src/a.py", lines)
 
     def test_an_ordinary_path_is_not_guarded(self):

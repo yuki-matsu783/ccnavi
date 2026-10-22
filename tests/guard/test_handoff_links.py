@@ -2,10 +2,10 @@
 （src/ccnavi/policy/selfguard_shell.py の `builtin:guard-handoff-links`・
 `builtin:guard-handoff-ln`）。
 
-1. 名指しのツール: ルールファイルの `guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・
-   `guard-settings` は、置き場の中を `except` の式で外す。式はファイルを見ないので、守る場所と
-   ハードリンクでつながった写しへの Write も外れていた。組み込みの 1 本が、置き場の中の
-   つながった対象だけを止める。ふつうの写しへの Write は止めない
+1. 名指しのツール: 利用者がルールファイルに書く保護は、置き場の中を `except` の式で外せる。
+   式はファイルを見ないので、守る場所とハードリンクでつながった写しへの Write も外れる。
+   組み込みの 1 本が、置き場の中のつながった対象だけを止める。ふつうの写しへの Write は止めない
+   （ccnavi 自身の保護の `builtin:guard-hooks` などは、つながった写しを外さない）
 2. シェル: 置き場の中にリンク（シンボリックリンク・ハードリンク）を作る `ln`・`link`・
    リンクを作る `cp` を止める。置き場の外のリンクと、ふつうの `cp` は止めない
 """
@@ -22,6 +22,17 @@ from tests import ROOT, common_path, requires_symlink
 from tests.inproc import run_ccnavi
 
 LINKS = "builtin:guard-handoff-links"
+MINIMAL_RULES = {
+    "version": 1,
+    "deny": [
+        {
+            "id": "blocked-fetch",
+            "match": "WebFetch",
+            "glob": "*://blocked.example/*",
+            "message": "x",
+        }
+    ],
+}
 LN = "builtin:guard-handoff-ln"
 
 
@@ -35,12 +46,10 @@ class HandoffLinksTest(unittest.TestCase):
     def setUp(self):
         self.root = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-handoff-links-"))
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
-        # 本物の共通のルール（guard-hooks などの wip/handoff の except を持つ）で見る。
-        os.makedirs(os.path.dirname(common_path(self.root, "rules")))
-        shutil.copy(
-            os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"),
-            common_path(self.root, "rules"),
-        )
+        # 共通のルールはテスト用の最小の組にする。ccnavi 自身の保護は組み込み
+        # （builtin:guard-hooks など。書き込みの例外は handoff_write_exempt）にあり、
+        # ルールファイルに依らない。
+        write(common_path(self.root, "rules"), json.dumps(MINIMAL_RULES))
         write(self.at(".claude/hooks/guard.sh"), "#!/bin/sh\n")
         write(self.at(".claude/settings.json"), "{}\n")
         self.pad = self.at("wip/handoff")
@@ -57,7 +66,10 @@ class HandoffLinksTest(unittest.TestCase):
             "session_id": "s1",
             "cwd": self.root if cwd is None else cwd,
         }
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         result = run_ccnavi(
             ["--root", self.root, "--mode", "enable"],

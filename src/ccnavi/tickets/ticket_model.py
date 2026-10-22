@@ -62,6 +62,15 @@ SCRIPT_FIELDS = (
 # `feedback-plan` は古い版がフィードバック計画の承認で書いた値。新しくは書かず、読める値として残す。
 SETTLED_BY_VALUES = ("confirm", "decide", "close-early", "feedback-plan", "chrome")
 
+# 保守用の子の印（frontmatter の `maintenance:`）。印から決まる例外は、統合の子かどうかを決める
+# `Ticket.is_consolidate` の 1 か所から当てる。識別子の形や名前から推定しない。
+MAINTENANCE_KEY = "maintenance"
+MAINTENANCE_CONSOLIDATE = "learning-consolidate"
+# 統合の子のフェーズ番号。親の計画には載らない番号（計画の番号は 1 から）。
+CONSOLIDATE_PHASE = 0
+# 統合の子が書ける場所の上限（ccnavi の中に固定した定義）。子の `allow` も同じ範囲で作る。
+CONSOLIDATE_SCOPE = ("docs/wiki/patterns/*", "docs/wiki/inbox/*")
+
 # glob のワイルドカード。これより前が字義どおりの前置。
 _WILDCARDS = "*?["
 
@@ -265,10 +274,55 @@ class Ticket:
     # 当てずに止める（phase_scope.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
     # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--agree` を通らない）。
     blocked: str = ""
+    # maintenance は保守用の子の印の、書かれたままの値（欄が無ければ None）。値の正しさは見ない
+    # （`maintenance_problem`）。
+    maintenance: object = None
 
     @property
     def is_child(self) -> bool:
         return bool(self.parent)
+
+    @property
+    def has_maintenance(self) -> bool:
+        """`maintenance:` の欄を持つ（値は問わない）。"""
+        return self.maintenance is not None
+
+    @property
+    def is_consolidate(self) -> bool:
+        """統合の子か。子で、`phase: 0` で、`maintenance: learning-consolidate` の 3 つがそろう。
+
+        統合の子だけに当てる例外（計画への所属・範囲・学び・リスク・レビュー）は、すべてこの判定から
+        決める。組み合わせのおかしいもの（`maintenance_problem`）はここで偽になり、構造エラーで止まる。
+        """
+        return (
+            self.is_child
+            and self.phase == CONSOLIDATE_PHASE
+            and self.maintenance == MAINTENANCE_CONSOLIDATE
+        )
+
+    def maintenance_problem(self) -> str:
+        """印の構造エラーの理由。無ければ空。
+
+        - 子でないのに印を持つ
+        - 印があるのに `phase` が 0 でない
+        - 値が `learning-consolidate` 以外
+        印の無い `phase: 0` の子はここでは言わない（今までどおり、計画に無い番号として止まる）。
+        """
+        if not self.has_maintenance:
+            return ""
+        if not self.is_child:
+            return f"親に `{MAINTENANCE_KEY}:` の印がある。印は統合の子だけが持つ"
+        if self.maintenance != MAINTENANCE_CONSOLIDATE:
+            return (
+                f"`{MAINTENANCE_KEY}: {self.maintenance}` は知らない値"
+                f"（読めるのは `{MAINTENANCE_CONSOLIDATE}` だけ）"
+            )
+        if self.phase != CONSOLIDATE_PHASE:
+            return (
+                f"`{MAINTENANCE_KEY}: {MAINTENANCE_CONSOLIDATE}` の子は `phase: "
+                f"{CONSOLIDATE_PHASE}` でなければならない（今は `phase: {self.phase}`）"
+            )
+        return ""
 
     @property
     def has_plan(self) -> bool:

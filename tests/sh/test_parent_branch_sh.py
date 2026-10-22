@@ -4,7 +4,7 @@ HEAD から読む。
 
 使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-git.sh・ccnavi-sync.sh・
 ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルはこのツリーのソースを
-`python -m ccnavi` で起こす（tests/sh/test_write_and_push_sh.py と同じ形）。
+`python -m ccnavi` で起動する（tests/sh/write_and_push_harness.py と同じ形）。
 ユーザが既に作ったブランチ
 `feature/123-login` を、`.claude/worktrees/feature-123-login` が直接チェックアウトする。
 
@@ -138,7 +138,10 @@ class ParentBranchShTest(unittest.TestCase):
     # ---- 道具
 
     def env(self, **extra):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(
             {

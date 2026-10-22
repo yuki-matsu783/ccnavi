@@ -27,7 +27,7 @@ expect:
     - event: PreToolUse
       tool: Edit
       decision: deny
-      rules_include: [.ccnavi/config/common/rules.yml:guard-ccnavi-config]
+      rules_include: [builtin:guard-ccnavi-config]
       subject_contains: rules.yml
     - event: PreToolUse
       tool: Bash
@@ -37,12 +37,12 @@ expect:
     - event: PreToolUse
       tool: Edit
       decision: deny
-      rules_include: [.ccnavi/config/common/rules.yml:guard-scripts]
+      rules_include: [builtin:guard-scripts]
       subject_contains: ccnavi-git.sh
     - event: PreToolUse
       tool: Edit
       decision: deny
-      rules_include: [.ccnavi/config/common/rules.yml:guard-settings]
+      rules_include: [builtin:guard-settings]
       subject_contains: settings.json
   files_unchanged:
     - .ccnavi/config/common/rules.yml
@@ -55,4 +55,4 @@ expect:
 unconfirmed:
   - "2 つ目（シェルの追記）の記録の rules は builtin:guard-setting-files（DENY_COMMAND_PATTERN）。期待の rules_include に入れた。このシナリオの回しで一致するかは、次の回で確かめる"
   - 記録の subject が入力と違う表記になる（echo "# x" が echo #x）。issue #377 で扱う
-  - ワークツリーの中の .ccnavi/scripts や settings.json の編集が止まるか（guard-scripts・builtin-guard-project-home・guard-settings がワークツリーでも効くか）は、このシナリオでは確かめていない
+  - ワークツリーの中の .ccnavi/scripts や settings.json の編集が止まるか（builtin:guard-scripts・builtin:guard-project-home・builtin:guard-settings がワークツリーでも効くか）は、このシナリオでは確かめていない

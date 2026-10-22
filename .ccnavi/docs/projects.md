@@ -64,7 +64,7 @@ statusが言うとおりユーザに`ccnavi-user-push-approved.sh <親>`を打�
 チケットは1つのファイルで、`wip/proposals/todo/`（承認待ち。エージェントが`ccnavi-ticket.sh propose`で親のブランチへ送る）→`.ccnavi/approved/doing/`（ユーザが承認）→
 `wip/proposals/review/`（`ticket finish`。レビューが要るとき）→`.ccnavi/approved/done/`（ユーザがレビュー）の順に
 移る。`.ccnavi/approved/`へ移すのはユーザ、`wip/proposals/`へ移すのはエージェントで、
-エージェントは`ccnavi-ticket.sh`を使う。レビューで残った指摘は、ユーザが`decide`で指摘ごとに扱いを決める。`decide`はボードの「決める」か端末の`ccnavi-user-decide.sh <N>`から使う。
+エージェントは`ccnavi-ticket.sh`を使う。レビューで残った指摘は、ユーザが`decide`で指摘ごとに扱いを決める。`decide`はボードの［レビュー完了］か端末の`ccnavi-user-decide.sh <N>`から使う。
 選べるのは「対応しない」「このフェーズで直す」「issueに回す」の3つ。「このフェーズで直す」は続きの子チケットを`doing/`に作る。
 
 ラッパースクリプトは、記録のパスをcwdから開ける形で出す。そのまま`sed -n`などで開けばよい。

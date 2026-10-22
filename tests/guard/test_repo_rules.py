@@ -53,7 +53,10 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルのパスから
     当てる形を作るので、振り分けの sh を指したときの判定はこれで見る。
     """
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment.pop("CLAUDE_PROJECT_DIR", None)
     if bin_path:
         environment["CCNAVI_BIN_PATH"] = bin_path
@@ -160,13 +163,13 @@ class RepoRulesTest(unittest.TestCase):
         )
 
     def test_ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める(self):
-        # 組み込みの保護も同じ入力を止める。判定だけでは取りこぼすので、当たったルールの id で見る。
+        # 止めるのは組み込みの builtin:guard-ccnavi-config。当たったルールの id で見る。
         for name in ("rules", "phases", "risks"):
             with self.subTest(name=name):
                 path = f"/repo/.claude/worktrees/x/.ccnavi/config/common/{name}.yml"
                 body = judge("Edit", path)
                 self.assertEqual(body["verdict"], "deny", body["response"])
-                self.assertIn("guard-ccnavi-config", hit(body), body["rules"])
+                self.assertIn("builtin:guard-ccnavi-config", hit(body), body["rules"])
 
     def test_テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる(self):
         # 共通・プロジェクトのテンプレートは 3 本の個別の保護には入れず、
@@ -643,6 +646,13 @@ class MovedJudgeTest(LauncherJudgeTest):
                 self.assertEqual(blocking(self.judge(subject)), set(), subject)
 
 
+# 再帰的な強制削除は組み込み（builtin:recursive-delete）にあり、共通の rules.yml から外した。
+# 外す前の rules.yml（ユーザが handoff で取り込むまでの間）は同じ式を `recursive-delete` の id で
+# 持ち、土台の組み込みはその下に落ちて当たった id に出ない。取り込みの前後どちらでも通るよう、
+# 外す前の id も受ける。
+LEGACY_IDS = {"builtin:recursive-delete": "recursive-delete"}
+
+
 class SubstRepoRulesTest(unittest.TestCase):
     """コマンド置換・改行・プロセス置換を読んだあとの判定。
 
@@ -659,7 +669,10 @@ class SubstRepoRulesTest(unittest.TestCase):
                 self.assertTrue(body["known"])
                 self.assertEqual(body["verdict"], want, body["response"])
                 if rule_id:
-                    self.assertIn(rule_id, hit(body), body["rules"])
+                    self.assertTrue(
+                        {rule_id, LEGACY_IDS.get(rule_id, rule_id)} & set(hit(body)),
+                        (rule_id, body["rules"]),
+                    )
                 elif want != "skip":
                     self.assertEqual(hit(body), [], body["rules"])
                 if code:
@@ -673,8 +686,10 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ('echo "$(git push origin main)"', "deny", "builtin:guard-raw-git", ""),
                 ('grep -n "$(git push)" f', "deny", "builtin:guard-raw-git", ""),
                 ('h="$(git rev-parse HEAD)"', "deny", "builtin:guard-raw-git", ""),
-                ('echo "$(rm -rf /tmp/x)"', "deny", "recursive-delete", ""),
-                ("cat <<EOF\nuse $(rm -rf /tmp/x)\nEOF", "deny", "recursive-delete", ""),
+                ('echo "$(rm -rf /tmp/x)"', "deny", "builtin:recursive-delete", ""),
+                ('echo start\necho "$(rm -rf /tmp/x)"', "deny", "builtin:recursive-delete", ""),
+                # ヒアドキュメントは heredoc が止める。中の置換の読みは上の 2 件で見る。
+                ("cat <<EOF\nuse $(rm -rf /tmp/x)\nEOF", "deny", "heredoc", ""),
             ]
         )
 
@@ -695,7 +710,12 @@ class SubstRepoRulesTest(unittest.TestCase):
             [
                 ("find $(pwd) -name x -delete", "deny", "find-writes", ""),
                 ("echo a#; git push origin main", "deny", "builtin:guard-raw-git", ""),
-                ("curl https://example.com/#top; rm -rf /tmp/x", "deny", "recursive-delete", ""),
+                (
+                    "curl https://example.com/#top; rm -rf /tmp/x",
+                    "deny",
+                    "builtin:recursive-delete",
+                    "",
+                ),
                 ("ls\nfind . -delete", "deny", "find-writes", ""),
                 ("echo hi\ncurl https://example.com", "ask", "prefer-webfetch", ""),
                 ("if true; then find . -delete; fi", "deny", "find-writes", ""),
@@ -931,7 +951,7 @@ class SubstRepoRulesTest(unittest.TestCase):
             [
                 ("$'git' push origin main", "deny", "builtin:guard-raw-git", ""),
                 ("git $'push' origin main", "deny", "builtin:guard-raw-git", ""),
-                ("rm $'-rf' /tmp/x", "deny", "recursive-delete", ""),
+                ("rm $'-rf' /tmp/x", "deny", "builtin:recursive-delete", ""),
                 ("echo $'a\\ngit push'", "ask", "", "PARSE_UNCERTAIN"),
             ]
         )

@@ -1,0 +1,64 @@
+# 組み込みへ寄せる前の、共通の rules.yml にあった保護のルール（そのまま写した）。
+# 実行後の保護範囲が、旧ルールの保護対象と handoff の写しの例外を失っていないことを、
+# 代表パスの表で比べるための固定データ（tests/guard/test_named_guards_post.py）。
+# 今のルールではない。ここを直しても判定は変わらない。
+version: 1
+deny:
+- id: guard-hooks
+  match: Write|Edit
+  glob: '*/.claude/hooks/*'
+  except:
+  - regex: ^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]
+  message: hook 本体です。エージェントの判断で書き換えず、理由を 伝えてユーザに変更を依頼してください。
+- id: guard-scripts
+  match: Write|Edit
+  glob: '*/.ccnavi/scripts/*'
+  except:
+  - regex: ^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]
+  message: 事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。 エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
+- id: guard-ccnavi-config
+  match: Write|Edit|NotebookEdit
+  regex: '[\\/]\.ccnavi[\\/]config[\\/]common[\\/](rules|phases|risks)\.yml$'
+  except:
+  - regex: ^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]
+  message: ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。エージェントの判断で 書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください （/ccnavi-config）
+- id: credentials
+  match: Bash
+  regex: (^|[ \\/])\.(env|dev\.vars|netrc|npmrc|pypirc)\b|(^|[ \\/])\.(aws|ssh)[\\/]|[\w\-\\/]\.(pem|key)\b|[\\/]secrets[\\/]|[\\/]credentials([\\/]|\.json\b)|\b(id_rsa|id_ed25519)\b
+  message: 認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。
+- id: credentials-files
+  match: Read|Write|Edit|NotebookEdit
+  when:
+    any:
+    - all:
+      - regex: (^|[ \\/])\.env\b
+      - not:
+          any:
+          - regex: (^|[\\/])\.env\.example\Z
+          - regex: (^|[\\/])\.env\.sample\Z
+          - regex: (^|[\\/])\.env\.template\Z
+    - regex: (^|[ \\/])\.dev\.vars\b
+    - regex: (^|[ \\/])\.netrc\b
+    - regex: (^|[ \\/])\.npmrc\b
+    - regex: (^|[ \\/])\.pypirc\b
+    - regex: (^|[ \\/])\.aws[\\/]
+    - regex: (^|[ \\/])\.ssh[\\/]
+    - regex: '[\w\-\\/]\.(pem|key)\b'
+    - regex: '[\\/]secrets[\\/]'
+    - regex: '[\\/]credentials([\\/]|\.json\b)'
+    - regex: \b(id_rsa|id_ed25519)\b
+  message: 認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。 値を持たない見本（.env.example / .env.sample / .env.template）は除いています。
+- id: recursive-delete
+  match: Bash
+  regex: (?:^|\x00)(?>(?:[^\x00]*?[^\w.\x00-])??rm(?:\.exe)?\s)\s*+(?:(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqstuvwxyz]*+[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00rf][^\s\x00]*+|[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:(?:-[a-eg-qs-z]*+r[a-eg-z]*+|--r[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqrstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqrstuvwxyz]*+[f][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00f][^\s\x00]*+|[f][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+|(?:-[a-eg-qs-z]*+f[a-qs-z]*+|--f[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdefghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdefghijklmnopqstuvwxyz]*+[r][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00r][^\s\x00]*+|[r][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+)?--(?:\s++[^\s\x00]++)*?\s++(?:[^\s\x00]*?[^\w\s\x00.-])??rm(?:\.exe)?\s++)*+(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqstuvwxyz]*+[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00rf][^\s\x00]*+|[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:-[a-eg-qs-z]*+(?:r[a-eg-z]*+f|f[a-qs-z]*+r)[a-z]*+(?:[\s\x00]|$)|(?:-[a-qs-z]*+r[a-z]*+|--r[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqrstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqrstuvwxyz]*+[f][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00f][^\s\x00]*+|[f][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)(?:[\s\x00]|$)|(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdefghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdefghijklmnopqstuvwxyz]*+[r][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00r][^\s\x00]*+|[r][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:-[a-qs-z]*+r[a-z]*+|--r[a-z]*+)(?:[\s\x00]|$))
+  message: 再帰的な強制削除です。消す対象を 1 つずつ名指しするか、git の管理下なら 'ccnavi-git.sh rm <パス>' を使ってください。git が中身を持っているので戻せます。
+- id: guard-approved-tickets
+  match: Write|Edit|NotebookEdit
+  glob: '*/.ccnavi/approved/*'
+  message: 承認済みチケットです。承認はユーザが VS Code のボード・Chrome のボード・ 端末の 'ccnavi user agree'・置き場のファイルの移動のどれかで行います。 承認が済んだかどうかは 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh status' で確かめてください。 置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。 作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh finish <識別子>' で レビュー待ち（wip/proposals/review/）へ動かしてください。 範囲を変えたいなら wip/proposals/todo/ に新しい提案を書き、{root}/.ccnavi/scripts/ccnavi-ticket.sh propose <識別子> で送ってから承認を依頼してください。
+- id: guard-settings
+  match: Write|Edit|NotebookEdit
+  regex: '[\\/]\.claude[\\/]settings(\.local)?\.json$'
+  except:
+  - regex: ^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]
+  message: hook の登録そのものです。ワークツリー側の設定も統合で統合先の設定になります。 エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。

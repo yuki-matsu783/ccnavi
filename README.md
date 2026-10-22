@@ -311,8 +311,8 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 なり、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
 ところだけを見たいときは `--check` を付ける。`--all` も受けるが、今は足すものが無い（置き場の env は廃止した）。
 同じ 1 回で `.vscode/settings.json` も見る（次の節）。触ってほしくないときは `--no-vscode`。
-セッション開始時の取り込み（`ccnavi-fetch.sh`）も `SessionStart` に別の 1 行で登録する。
-1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す。
+セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、直下のディレクトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も `SessionStart` に別の 1 行で登録する。
+1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（ディレクトリ一覧も出なくなる）。
 
 既にある値は置き換えず、違えば並べて見せる。置き換えるのは `--mode` か `--ticket-control` を
 名指しして `--force` を付けたときだけで、名指ししていない値はそのままにする。
@@ -346,7 +346,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
         { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
       ]},
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh\"", "timeout": 60 }
+        { "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh\"", "timeout": 60 }
       ]}
     ],
     "UserPromptSubmit": [
@@ -397,7 +397,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 
 同じ実行ファイルを上の 8 つのイベントに登録する。payload にイベント名が入っているので、どれを走らせるかは ccnavi が選ぶ。
 `matcher` は絞らない。絞ると、書かなかったツールで hook 自体が起動しなくなる。
-`SessionStart` の 2 本目は取り込みの sh（`ccnavi-fetch.sh`）で、承認済みチケットと
+`SessionStart` の 2 本目は入口の sh（`ccnavi-session-start.sh`。中で `ccnavi-fetch.sh` を呼ぶ）で、承認済みチケットと
 マーカー（親ブランチに乗って届く）と、ワークツリーの起点になる統合先ブランチを fast-forward で
 取ってくる。登録しないと、別の機械で承認したものが反映されず、古い `main` からブランチを切ることになる。
 
@@ -480,7 +480,9 @@ hook からの判定と `ticket` / `review` などのサブコマンドに渡す
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `ccnavi user` の操作と `ticket` / `review` のサブコマンドは動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `user …` の入口 / `ticket …` / `review …` 付きで打つ形と、`ccnavi-user-*.sh` を打つ形を止め（`DENY_TICKET_APPROVAL_CLI`。古い形の `--agree` / `--reviewed` / `--close-early` なども止める）、`user agree` と `user reviewed` と `user close-early` と `user prune` と、書くとき（`--yes`）の `user handoff` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-user-decide.sh`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
-| `CCNAVI_LEARNING` | 学びの蓄積（learning-wiki。`docs/design/tickets/learning-wiki.md`）を使うか。`enable` / `disable`、既定 `disable`。`enable` にすると、子チケットを閉じるときに気づきの記録（`wip/handoff/learnings/<子>.md`）を求め、`ticket learn` が使える |
+| `CCNAVI_LEARNING` | 学びの蓄積（learning-wiki。`docs/design/tickets/learning-wiki.md`）を使うか。`enable` / `disable`、既定 `enable`。子チケットを閉じるときに気づきの記録（`wip/handoff/learnings/<子>.md`）を求め、親を閉じるときに気づきの処理の証跡を確かめる |
+| `CCNAVI_LEARNING_SOURCES` | パターンの観測元の数が何以上なら提案に足りるか。既定 3 |
+| `CCNAVI_LEARNING_NOTICE_COUNT` | 提案の候補が何件溜まったら SessionStart で知らせるか。既定 5 |
 
 `${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。
 `env` には相対パスを書く。値の変更はセッションを開き直すまで反映されない。
@@ -1318,7 +1320,7 @@ docs/../.env
 判定に届かない。`Grep(path=<git プロジェクトルート>)` は `.env` や `secrets/` の中身を返しうるが、
 ルールは起点にしか当たらない。
 
-だから共通レイヤーの `credentials` ルールの `match` は `Bash|Read|Write|Edit|NotebookEdit` で、
+だから組み込みの `builtin:credentials` の `match` は `Bash|Read|Write|Edit|NotebookEdit` で、
 `Grep` と `Glob` を含めていない。
 
 `Grep` と `Glob` は ccnavi が受け持たない。探すツールが読むファイルを見るのは、下の表の上 2 つ。
@@ -1351,7 +1353,7 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。
 - 降りた先に `.git` があれば、そこから下はそのリポジトリの `.gitignore` が適用される。ワークスペース
   ルートが git 管理下でなくても適用される。`.git` がファイル（ワークツリーの gitdir ポインタ）でも同じ
 - 隠しファイルは弾かれない。ドットで始まるものも、ignore されていなければ `Grep` が読む（素の `rg` の既定とは違う）
-- `Read` ツールは `credentials` ルールと `Read()` の `deny` が見る
+- `Read` ツールは `builtin:credentials` と `Read()` の `deny` が見る
 
 `.ignore`・`.rgignore`・`.git/info/exclude`・git のグローバルな除外（`core.excludesFile`、既定では
 `~/.config/git/ignore`）も ripgrep は読む。どれも弾く側に働く。
@@ -1563,7 +1565,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 | `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
 
 - `.ccnavi/approved/` へ動かすのはユーザ、`wip/proposals/` へ動かすのはエージェント
-- `review/` への直接の作成・移動は誰がやっても止まる（`builtin:ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリを守る組み込みのルールが止める
+- `review/` への直接の作成・移動は誰がやっても止まる（`builtin:ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリを守る組み込みのルールと `builtin:ticket-approved` が止める
 - 動かすスクリプトと push はサブエージェントには打てない（`DENY_SUBAGENT_TICKET_OP`）。子チケットのワークツリーからの push は
   git のラッパースクリプトが拒む。サブエージェントは子のワークツリーで手元にコミットするだけで、親のワークツリーへの merge・commit・書き込みも
   hook が止める（`DENY_SUBAGENT_PARENT_TREE`。子のワークツリーでのコミットと、衝突を解くための親のブランチの merge は通る）。
@@ -1930,7 +1932,7 @@ feedback:                              # フィードバック計画。レビュ
 - **提案の雛形は `ccnavi ticket new` で作る。** 識別子と同名のワークツリーの中で
   `ccnavi ticket new <識別子> --title <題> --plan "design,acceptance,implement" [--issue N]` と打つと、
   `wip/proposals/todo/<識別子>.md` に、選んだフェーズの `scope` を `phases.yml` から集めた `allow`（重複なし）、
-  各項が前の項を待つ一直線の `plan`、`phases:` の写しを持つ親の提案を書く。対象は親だけ。`phases.yml` が無いとき、
+  各項が前の項を待つ一直線の `plan`、`phases:` の写し、本文の見出し（`目的`・`範囲`・`対象外`・`完了の確かめ方`・`計画の理由`。それぞれの下と rationale に空欄の目印）を持つ親の提案を書く。目印が残った新規の提案は承認と `--lint` が止める（改版は警告）。見出しの欠けは警告。対象は親だけ。`phases.yml` が無いとき、
   `inherit` の型だけで `allow` が空になるとき、既に同じ識別子の提案があるときは、何も書かずに理由を言う。書いたあと、`allow` の項が計画のどのフェーズ定義の `scope` とも重ならないとき（例: `--plan implement --scope "docs/**"`）は、「承認しても書けない」と名指しする（警告で、書いた提案は残る。承認の確認 `--agree --preview --verify` も同じ文を出す）。子はその項に書けないので、`--plan quick-work` に切り替える。計画に `scope: inherit` の型が 1 つでもあれば、上限が無いので何も言わない。`quick-work` のような `scope: inherit` の型は範囲を持たないので、今回触るファイルを `--scope <glob>`（繰り返せる。ワークツリーのルートからの相対）で渡す（例: `--plan quick-work --scope src/ui/error.ts`）。渡さずに止まったときの案内は、範囲を持つ型を足すのではなく `--scope` を示す。
   `ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ（`--fill-phases` と同じ）。書いたあとは rationale と本文を埋め、
   `--lint` で確かめてから承認を頼む。`--plan` の代わりに `--template <名前> [--layer <名前>] [--with-feedback]` を渡すと、溜めた
@@ -2414,7 +2416,7 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 
 ```
 ■ rules 共通レイヤー（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
-  deny  guard-hooks                  Write|Edit|NotebookEdit            */.claude/hooks/*
+  deny  workspace-root               Write|Edit|NotebookEdit            ^{root}[\\/]
 ■ rules ワークスペースのレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
   allow self:worktrees               Write|Edit                         */.claude/worktrees/*
 ■ rules lib（projects/lib/.ccnavi/config/project/rules.yml、deny 1 / ask 0 / allow 0）
@@ -2583,7 +2585,7 @@ error 3 件、warn 1 件、info 0 件
 | warn | 守る働きを持つ設定が止めない値になっている（`CCNAVI_GUARD_CORE_FILES` と `CCNAVI_RESTORE_IF_DENY` が `disable` か `dry-run`、`CCNAVI_GUARD_UNWATCHED` と `CCNAVI_GUARD_TICKET_APPROVAL` が `disable`） |
 | warn | 上書き設定ファイル `ccnavi.settings.local.json` が読めない。このファイルを読むのは ccnavi 自身のソースツリーだけ（設計 4.3） |
 | warn | `CCNAVI_TICKET_CONTROL=disable`（チケットの範囲も HITL ポイントも適用されない） |
-| warn | `CCNAVI_LEARNING` が `enable` / `disable` 以外の値（空白つきも）。`disable` として動く |
+| warn | `CCNAVI_LEARNING` が `enable` / `disable` 以外の値（空白つきも）。`enable` として動く |
 
 `CCNAVI_BIN_PATH` が実行できるかは POSIX でだけ見る。Windows は実行ビットを持たないため。パスは `env` に書いたとおりに見て、`.exe` は補わない。
 
@@ -3162,21 +3164,22 @@ plan（3 項）: 1 research / 2 design（待つ 1・defer） / 3 implement（待
 
 | 区分 | 内容 | 条件 |
 |---|---|---|
-| ccnavi のコードが実行する | 判定ログ（`logs/decisions.jsonl`）の記録、ローテート、後始末。`ticket learn` の雛形と判定ログの要約（`.digest.json`）。子を閉じるときの気づきの記録の確認（`ticket finish` が拒む）。`ccnavi --suggest` の候補生成と検証（`ask` の下書きと、繰り返し止めた `deny` の文面見直し。何も書かない）。完了した親の計画・子のフローからテンプレートの下書きを作る処理（`--draft`）。ターンの終わりの振り返りの促し（`Stop` のルール。共通レイヤーの既定では 10 回に 1 度） | 学びの蓄積の記録・確認は `CCNAVI_LEARNING=enable`（既定 `disable`）。判定ログ・`--suggest`・振り返りの促しはこの設定によらない |
+| ccnavi のコードが実行する | 判定ログ（`logs/decisions.jsonl`）の記録、ローテート、後始末。`ticket learn` の雛形と判定ログの要約（`.digest.json`）。子を閉じるときの気づきの記録の確認（`ticket finish` が拒む）。`ccnavi --suggest` の候補生成と検証（`ask` の下書きと、繰り返し止めた `deny` の文面見直し。何も書かない）。完了した親の計画・子のフローからテンプレートの下書きを作る処理（`--draft`）。ターンの終わりの振り返りの促し（`Stop` のルール。共通レイヤーの既定では 10 回に 1 度） | 学びの蓄積の記録・確認は `CCNAVI_LEARNING`（既定 `enable`。`disable` で切れる）。判定ログ・`--suggest`・振り返りの促しはこの設定によらない |
 | スキルや案内に従ってエージェントが行う | 気づきを書く（`/learn`、`ticket learn --note`）。振り返りで一般化し、スキルの改善候補を `wip/handoff/skill-candidates.md` や提案チケットにまとめる。学びの統合・反映フェーズで learning-wiki（`docs/wiki/`）を書き、反映の提案を作る | 統合・反映は人間とエージェントの運用で、wiki を機械が自動で書くことはない |
 | 人間が判断して採用する | ルール・配点・フェーズ定義・スキル・文書への反映、`--suggest` の候補の採否、保護対象の取り込み（`user handoff`。ユーザが直接起動する） | ルール・配点・フェーズ定義の設定ファイルは、エージェントからの書き換えを組み込みの deny が止める |
-| 構想・未実装 | パターンの再発回数の機械的な数え上げと閾値の案内、`--learnings`・`--learning-decide` などの採否の機械処理、`CCNAVI_LEARNING` の既定を `enable` にすること | 要件 2.14 と設計 9.16 に「実装の範囲」がある |
+| 構想・未実装 | 今ある wiki の移行（`target`・`sources` の無い既存のパターン） | 要件 2.14 と設計 9.16 に「実装の範囲」がある |
 
 改善の全体は完全な自動ではない。候補の発見と提案までと、採否の判断は別である。
 
 チケット作業で拾った気づきを、ルール・配点・フェーズ定義・テンプレート・スキル・文書への提案として育てる。
 集める・溜める・提案するまでがエージェントで、反映を受け入れるのは人間。設計は `docs/design/tickets/learning-wiki.md`（9.16）。
 
-- 有効にするのは `CCNAVI_LEARNING=enable`（既定は `disable`）。フェーズ定義の `learning: off` で、その定義の子だけ外せる
+- `CCNAVI_LEARNING` の既定は `enable`（`disable` で切れる）。フェーズ定義の `learning: off` で、その定義の子だけ外せる
 - 子は閉じる前に `sh .ccnavi/scripts/ccnavi-ticket.sh learn` を打つ。気づきの記録（`wip/handoff/learnings/<子>.md`）の雛形と、判定記録の要約（`.digest.json`）ができる。記録をコミットしないと `ticket finish` が拒む。気づきが無ければ `learnings: none` のままでよい
 - 対話の中で「覚えておいて」と言うときは `/learn <内容>`（中身は `ticket learn [<識別子>] --note <本文> [--target <種類>] [--signal <信号>]`）。チケットに結び付いたワークツリーでは子の記録に追記し、直接作業のワークツリーでは `docs/wiki/inbox/` に、ワークスペースルートとプロジェクトのルートでは `wip/handoff/inbox/` に 1 件 1 ファイルで書く。識別子を付けるときはオプションの前に置く
 - 本文は秘密の形を伏せ、2000 字で切る。判定記録の要約はパスとコマンドの全文と環境変数の値を持たない
-- 親のフィードバック計画で、統合（`learning-consolidate`）が learning-wiki（`docs/wiki/`）を作り、反映（`learning-apply`）が提案を作る。ルール・配点・フェーズ定義は下書きまでで、ユーザが置く
+- 親を閉じる前に、親の HEAD にあるすべての気づきを判定する。親の `finish` が、処理されていない気づきで止まり、`ccnavi-ticket.sh consolidate <親>` を案内する。作られる統合の子（`<親>-00-NN`、`maintenance: learning-consolidate`）が、気づきごとに `処理: 反映 <パターン>` か `処理: 対象外 <理由>` を書き、パターン（`docs/wiki/patterns/`）の `sources` に観測元の ID を足す
+- `ccnavi --learnings [--json]` がパターンごとの状態（提案中・候補・決着）と観測元の数を出す。SessionStart で、提案の候補が溜まる・閾値（`CCNAVI_LEARNING_SOURCES`、既定 3）に届くと、ユーザにだけ知らせる（`CCNAVI_LEARNING_NOTICE_COUNT`、既定 5）。提案はエージェントに頼み、手順は `.ccnavi/docs/learning-propose.md`。採否は MR のマージで決まる。ルール・配点・フェーズ定義は下書きまでで、ユーザが置く
 - `type: learning-wiki` の文書は、`ccnavi --docs --type learning-wiki` と明示したときだけ引ける（作業のセッションに渡さない）
 
 ## ドキュメントの索引
@@ -3423,8 +3426,13 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/plan_order.py` | 計画の番号の振り直しと、提案への書き戻し（`--plan-order <親>`）。書き換えた全文を読み直す検査はここにまとめる |
 | `src/ccnavi/tickets/plan_phases.py` | 計画が使うフェーズ定義を、親の提案の `phases:` に写す（`--plan-order <親> --fill-phases`） |
 | `src/ccnavi/tickets/scaffold.py` | 親の提案の雛形を作る（`ticket new`）。選んだフェーズの `scope` を集めて `allow` に書き、一直線の `plan`（`--template` ならテンプレートの計画）と `phases:` の写しを入れる |
+| `src/ccnavi/tickets/proposal_form.py` | 提案の形式検査（最小版）。雛形の空欄の目印と親の必須の見出しの定数、目印の残りと見出しの欠けの検査（`form_problems`）。`scaffold.py` と `agree_candidates.py` の両方が読む |
 | `src/ccnavi/tickets/template_use.py` | テンプレートを使う側。名前で引く（使えるものだけ）・`after` を提案の絶対番号に付け直す・子のフローの下書きの識別子と文面を組む |
-| `src/ccnavi/tickets/learning.py` | 学びの蓄積の記録（気づきの記録・受信箱・判定記録の要約）と、`ticket learn`、子を閉じる前の記録の検査 |
+| `src/ccnavi/tickets/learning.py` | 学びの蓄積の記録（気づきの記録・受信箱・判定記録の要約）と、`ticket learn`、子を閉じる前の記録の検査、親の `finish` の検査 |
+| `src/ccnavi/tickets/learning_records.py` | 気づきの記録の読み取りと、処理すべきものの判定 |
+| `src/ccnavi/tickets/consolidate.py` | `ticket consolidate`（統合の子を作る） |
+| `src/ccnavi/tickets/learning_notice.py` | SessionStart の学びの通知 |
+| `src/ccnavi/records/wiki.py` | パターン・採否の記録の読み取りとパターンの状態 |
 | `src/ccnavi/tickets/propose.py` | 親子の承認待ちの提案（`todo/`）と子のフローの下書き（`flows/`）を、書いたパスの一覧に載せる（`ticket propose`）。コミットと push は sh が write-and-push の手順で行う |
 | `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `src/ccnavi/tickets/ops_close.py` | チケットを引いて動かしてよいかの検査。置き場の引き当て、取り込み済みの親子の停止、着手の前（親・先行）と終了の前（親を閉じられる・成果物）の検査 |
@@ -3485,6 +3493,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-user-agree.sh` | 承認し、`ccnavi-user-push-approved.sh` でコミットして push する。ユーザが端末で打つ。本体は `ccnavi user agree` |
 | `.ccnavi/scripts/ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。ユーザが打つ（エージェントからは止まる）。端末の `ccnavi-user-agree.sh`・ボードの承認とフローの保存・ユーザの判断の入口のあとに呼ばれる。`[<親>...]` で親子のチケットを限る。取り込み済みの親子のチケットはロックを取り、取り込んでから送る |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になる統合先ブランチを取ってくる。進めるのは fast-forward だけ |
+| `.ccnavi/scripts/ccnavi-session-start.sh` | セッション開始時の入口。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ。SessionStart にはこれを登録する |
+| `.ccnavi/scripts/ccnavi-dirs.sh` | セッション開始時に、プロジェクト直下のディレクトリを更新が新しい順に最大 10 件出す。超えるときは `ls` を案内する |
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを診断する（閉じたかはホストの MR で決める） |
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |

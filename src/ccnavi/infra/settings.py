@@ -91,7 +91,8 @@ BIN_SUFFIXES = (".exe",)
 # 置き場のパス（承認済みチケットの置き場）とは分けてある。パスが在ることと機能を切ることは別の話。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # LEARNING_ENV は、学びの蓄積（learning-wiki。docs/design/tickets/learning-wiki.md）を使うか。
-# enable / disable の 2 値。既定は disable（子を閉じる操作が新しく止まるため）。
+# enable / disable の 2 値。既定は enable（何も設定しなくても気づきが溜まるように）。
+# 読めない値は enable として扱う（`--lint` が warn で言う）。
 LEARNING_ENV = "CCNAVI_LEARNING"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
 # つけるか（repeat）。既定は 3。判定は変わらず、文面とユーザへの報告が変わるだけ。
@@ -100,6 +101,13 @@ DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
 # 「資料を検索する」案内を出すか（failstreak）。既定は 3。0 なら数えも案内もしない。
 # 読めない値と負数は既定に戻る。判定は変わらない。
 FAIL_STREAK_COUNT_ENV = "CCNAVI_FAIL_STREAK_COUNT"
+# LEARNING_SOURCES_ENV は、パターンの観測元の数がいくつ以上なら「提案に足りる」とみなすか。
+# 既定は 3。`--learnings` の印と、SessionStart の通知の条件に使う。読めない値と 1 未満は既定に戻る。
+LEARNING_SOURCES_ENV = "CCNAVI_LEARNING_SOURCES"
+# LEARNING_NOTICE_COUNT_ENV は、提案の候補のパターンが何件溜まったら SessionStart で知らせるか。
+# 既定は 5。観測元の数が閾値以上の候補が 1 件でもあれば、件数によらず知らせる。
+# 読めない値と 1 未満は既定に戻る。
+LEARNING_NOTICE_COUNT_ENV = "CCNAVI_LEARNING_NOTICE_COUNT"
 # 個人の上書き設定。Claude Code が `env` を起こしたプロセスに渡す。
 LOCAL_CLAUDE_SETTINGS = os.path.join(".claude", "settings.local.json")
 # 共有の設定。`env` に書いた値は、Claude Code が起こしたプロセスに渡る。
@@ -372,6 +380,8 @@ class Settings:
     # 失敗・拒否が何回続いたら資料を引く案内を出すか。
     # 書かれたままの値で、読むのは failstreak.threshold。
     fail_streak_count: str = ""
+    learning_sources: str = ""
+    learning_notice_count: str = ""
     # 戻す働きの 2 つ。どちらも mode と同じ enable / dry-run / disable を取る。
     #
     # restore_if_deny は、ルールが `deny` と宣言した場所が副作用で変わったときに
@@ -464,8 +474,8 @@ class Settings:
 
     @property
     def learning_enabled(self) -> bool:
-        """学びの蓄積を使うか。enable と書かれたときだけ真。空・disable・読めない値は偽。"""
-        return self.learning == "enable"
+        """学びの蓄積を使うか。disable と書かれたときだけ偽。空・enable・読めない値は真。"""
+        return self.learning != "disable"
 
 
 # ticket_control の値。modes / selfguard と同じ表記だが、settings は両方より下に
@@ -497,6 +507,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         guard_unwatched=os.environ.get(GUARD_UNWATCHED_ENV, ""),
         deny_repeat=os.environ.get(DENY_REPEAT_ENV, ""),
         fail_streak_count=os.environ.get(FAIL_STREAK_COUNT_ENV, ""),
+        learning_sources=os.environ.get(LEARNING_SOURCES_ENV, ""),
+        learning_notice_count=os.environ.get(LEARNING_NOTICE_COUNT_ENV, ""),
         ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         learning=os.environ.get(LEARNING_ENV, ""),

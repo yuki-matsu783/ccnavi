@@ -27,9 +27,9 @@ import time
 from dataclasses import dataclass, field
 
 from ..infra import settings, tree
-from ..policy import builtin, ruleload, rules
+from ..policy import builtin, ruleload, rules, selfguard, selfguard_shell
 from ..records import audit
-from . import approval, approval_checks, phase_scope, phasetypes, ticket_model
+from . import approval, approval_checks, phase_scope, phasetypes, ticket_guard, ticket_model
 
 # 当てるツール。チケットの範囲が効くのは書き込み系で、項はツールを持たない。
 _TOOLS = ("Write", "Edit", "NotebookEdit")
@@ -93,6 +93,13 @@ def _rule_set(conf: settings.Settings, root: str, target: tree.Tree) -> rules.Ru
     rule_set, _ = ruleload.load_rules(quiet, conf, record, root)
     if record.fallback != builtin.FALLBACK:
         ruleload.add_layers(quiet, rule_set, ruleload.layer_for(conf, root, target), root, record)
+    # ccnavi 自身の保護は組み込みにある（ルールファイルには無い）。実行後の保護範囲
+    # （`events.watched_for`）と同じ条件で足す。足さないと、hooks・settings・scripts・共通の設定と
+    # 承認済みの置き場が、退けた項として出なくなる。
+    if conf.guard_core_files != selfguard.DISABLE:
+        selfguard_shell.add_named_rules(rule_set, conf.project_home, root)
+    if conf.tickets_enabled:
+        rule_set.deny.append(ticket_guard.approved_write_rule(conf.approved, root))
     return rule_set
 
 
@@ -165,7 +172,12 @@ def _reject_of(
     if rule is not None:
         origin = f"{ORIGIN_RULE} {rules.record_name(rule)}（レイヤー {rule.source or '?'}）"
         return Reject(t.ticket, entry.decision, entry.glob, rule.spoken_message(), origin)
-    if parent is not None and parent.decide(probe) not in (rules.ALLOW, rules.ASK):
+    # 統合の子には親の範囲の上限を当てない（phase_scope.scope_verdict と同じ）。
+    if (
+        parent is not None
+        and not t.is_consolidate
+        and parent.decide(probe) not in (rules.ALLOW, rules.ASK)
+    ):
         return Reject(
             t.ticket,
             entry.decision,

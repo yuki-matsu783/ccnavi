@@ -79,7 +79,10 @@ class SuggestTest(unittest.TestCase):
             f.write("\n".join(lines) + "\n")
 
     def _suggest(self, *extra: str):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         return run_ccnavi(["--root", self.ws, "--suggest", *extra], env=env, cwd=self.ws)
 
     def _json(self) -> dict:

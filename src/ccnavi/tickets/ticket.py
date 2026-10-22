@@ -265,6 +265,12 @@ def parse(text: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
     for read in (_read_identity, _read_relations, _read_review, _read_scope):
         if read(ticket, front, problems):
             return None, problems
+    # 保守用の子の印。値の正しさはここで見ない（落とすと承認済みチケットが索引に入らず、
+    # 判定がその親を知らないまま範囲を当てなくなる）。構造の誤りは `maintenance_problem` が
+    # 承認と判定の両方で言う。
+    if ticket_model.MAINTENANCE_KEY in front:
+        value = front[ticket_model.MAINTENANCE_KEY]
+        ticket.maintenance = "" if value is None else value
     return ticket, problems
 
 

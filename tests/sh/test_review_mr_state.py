@@ -171,7 +171,10 @@ class MrStateTest(unittest.TestCase):
         write(os.path.join(self.bin, "curl.err"), err)
 
     def run_sh(self, *args, token=TOKEN, path=None, cwd=None):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("GITHUB_TOKEN", None)
         env.pop("GITLAB_TOKEN", None)
         if token:
@@ -362,7 +365,10 @@ class MrStateTest(unittest.TestCase):
     def test_merged_keeps_its_own_output(self):
         """merged 副命令（ccnavi-sync.sh が読む）の出力と終了コードは変えない。"""
         self.says("not json")
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env[self.token_name] = TOKEN
         env["PATH"] = os.pathsep.join([self.bin, os.environ.get("PATH", "")])
         done = subprocess.run(

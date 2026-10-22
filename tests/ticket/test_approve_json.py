@@ -99,7 +99,10 @@ class ApproveJsonTest(PhaseHarness):
                 *only,
             ],
         )
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         out, err = io.StringIO(), io.StringIO()
         with contextlib.ExitStack() as stack:
@@ -573,7 +576,10 @@ class ApproveJsonTest(PhaseHarness):
                 "--json",
             ],
         )
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         out, err = io.StringIO(), io.StringIO()
         with mock.patch.dict(os.environ, env, clear=True):

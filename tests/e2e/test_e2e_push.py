@@ -99,7 +99,10 @@ class ApproveAndPushTest(unittest.TestCase):
     # ---- 道具
 
     def run_sh(self, name, *args, cwd=None, stdin="", env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         return subprocess.run(
@@ -121,7 +124,10 @@ class ApproveAndPushTest(unittest.TestCase):
         """組み立て済みの実行ファイルを直に呼ぶ。ボードの拡張が打つ形。"""
         name = "ccnavi.exe" if os.name == "nt" else "ccnavi"
         exe = os.path.join(self.ws, "dist", "ccnavi", name)
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return subprocess.run(
             [exe, "--root", self.ws, *args],

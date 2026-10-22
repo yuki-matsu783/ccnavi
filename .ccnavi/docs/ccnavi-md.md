@@ -63,7 +63,7 @@ mdでは`<!-- ccnavi:if has_docker -->`と書く。
 - 関数は`名前() { … }`の形で書く（`function`は使わない。shはdashのこともある）。名前は英数字・`-`・`_`。組み込みと同じ名前の関数は使わない
 - mdで使っている名前の関数だけを走らせる。cwdはワークスペースルート
 - 状況は環境変数で受け取る: `CCNAVI_ROOT`（ワークスペースルート）、`CCNAVI_DOCS`（索引の案内を出す回なら1）、`CCNAVI_DENY_IDS`（ルールのdenyのidを空白区切り）、`CCNAVI_MODE`
-- shの置き場は他のshと同じ`.ccnavi/scripts/`なので、エージェントのWrite / Editは止まる（ルール`guard-scripts`）。セッションの頭に載る文面を、エージェントが条件の側から書き換えられない。足す・直すのはユーザ
+- shの置き場は他のshと同じ`.ccnavi/scripts/`なので、エージェントのWrite / Editは止まる（組み込みの`builtin:guard-scripts`）。セッションの頭に載る文面を、エージェントが条件の側から書き換えられない。足す・直すのはユーザ
 
 ## 差し込みの名前
 

@@ -69,7 +69,10 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
 
         `flags` を渡したときだけ、そのフラグを足す（フラグが残っていることを確かめる側）。
         """
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         return run_ccnavi(

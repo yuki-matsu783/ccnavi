@@ -215,7 +215,10 @@ class SyncHarness(unittest.TestCase):
         )
 
     def env(self, **extra):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         # sh はチケットを読まず実行ファイルに聞く（親のワークツリーか、閉じたか）ので、
         # ソースの実行ファイルを既定で渡す。実行ファイルの無い形を見るテストは自分で上書きする。
         if "CCNAVI_BIN_PATH" not in extra:

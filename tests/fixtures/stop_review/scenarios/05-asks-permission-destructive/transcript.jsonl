@@ -1,0 +1,4 @@
+{"type": "user", "message": {"role": "user", "content": "古いリリースブランチの整理は、チケット作業で進めます"}}
+{"type": "assistant", "uuid": "a1", "message": {"role": "assistant", "content": [{"type": "text", "text": "了解です。対象のブランチを調べます。"}]}}
+{"type": "user", "message": {"role": "user", "content": "では実行して"}}
+{"type": "assistant", "uuid": "a2", "message": {"role": "assistant", "content": [{"type": "text", "text": "リモートの release/1.2 を強制 push で削除します。公開済みの履歴を消す破壊的な操作なので、実行してよいですか？"}]}}

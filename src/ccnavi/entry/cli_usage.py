@@ -182,6 +182,20 @@ phases.yml にないタイプがある場合、--plan も指定された場合�
 提案またはフローの下書きがすでに存在する場合。提案は、通常の承認を経る必要があります。
 """
 
+_LEARNINGS = """\
+学びの蓄積の wiki（docs/wiki/）のパターンごとの状態と観測元の数を一覧するには、
+次のコマンドを実行します（読み取り専用で、何も書き込みません）。
+
+    ccnavi --learnings [--json]
+
+--root で指したツリー（省くと、いまのツリー）の docs/wiki/patterns/ と docs/wiki/impact/ を読み、
+パターンごとの状態（提案中・候補・決着）と観測元の数、候補の件数と target ごとの内訳、
+観測元の数が閾値以上かどうか、承認待ちの提案の一覧を出します。閾値は環境変数
+CCNAVI_LEARNING_SOURCES（既定 3）です。frontmatter が壊れたパターンと採否の記録は、
+ファイル名を挙げて数えません（--lint も同じファイルを名指しします）。
+--json は機械が読む形です。--docs・--lint など、ほかの経路のフラグとは併用できません。
+"""
+
 _LOGS = """\
 判定ログをローテーションし、古いログや終了したセッションの状態データを削除するには、
 次のコマンドを実行してください（SessionStartでも自動的に同じ処理が行われます）。
@@ -321,6 +335,9 @@ _TICKET = """\
 レビューを依頼します。スクリプトは次を呼び出します。
 
     ccnavi ticket start|finish|cancel <id> [--reason <why>]
+    ccnavi ticket consolidate <親>
+        （親の finish が「判定されていない気づきがある」と止めたときに打つ。処理する統合の子
+         <親>-00-NN を doing/ に作る。処理すべきものが無いとき、disable のときは作らない）
         （start は、基点を .ccnavi/approved/doing/<id>.md に書き込みます。finish は、
          フェーズがレビュー対象の場合は wip/proposals/review/ に、それ以外は
          .ccnavi/approved/done/ に移動します。cancel は .ccnavi/approved/done/ に移動します）
@@ -340,7 +357,10 @@ _TICKET = """\
          書き込みます。そのワークツリーの中で実行してください。選択したフェーズの範囲を
          phases.yml から集めて allow に入れ、--scope の glob（この作業が触れるファイル。
          ワークツリーのルートからの相対パス。複数指定可）を追加し、計画を直線状につなぎ、
-         phases: を補完します。quick-work のような scope: inherit のタイプは、それ自体では
+         phases: を補完します。本文の見出しは、目的・範囲・対象外・完了の確かめ方・計画の理由
+         の順で、rationale と各見出しの下に空欄の目印「（ここに〜を書く）」が入ります。目印が
+         残った新規の提案は、承認と --lint が止めるので書き換えてください。
+         quick-work のような scope: inherit のタイプは、それ自体では
          何も集めないため、--scope を指定してください。--mr N は親のブランチのマージ
          リクエストの番号（ccnavi-start.sh が出す。親の提案の mr: に書く）で、省くと
          mr: を書かずに雛形を作ります（承認の前に書き足してください）。phases.yml が
@@ -547,6 +567,7 @@ TOPICS = (
     ("explain", "ccnavi --explain", "チケットとその置き場を、機械が読める形で一覧する", _EXPLAIN),
     ("docs", "ccnavi --docs", "md の frontmatter の索引を引く", _DOCS),
     ("templates", "ccnavi --templates", "作業・レビュー計画のテンプレートを扱う", _TEMPLATES),
+    ("learnings", "ccnavi --learnings", "学びの蓄積のパターンの状態を一覧する", _LEARNINGS),
     ("logs", "ccnavi user prune / --suggest", "判定ログを整理し、ルールの候補を作る", _LOGS),
     ("agree", "ccnavi user agree / --plan-order", "提案の承認と、計画の順序", _AGREE),
     ("ticket", "ccnavi ticket", "チケットの開始・終了・状態・雛形", _TICKET),

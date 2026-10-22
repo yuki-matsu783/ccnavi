@@ -306,7 +306,10 @@ class WorktreeOptionTest(unittest.TestCase):
         write(os.path.join(self.top, "node_modules", "x.js"))
 
     def run_clean(self, *args, cwd=None, name="ccnavi-clean.sh"):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env["CCNAVI_BIN_PATH"] = self.bin
         script = os.path.join(self.ws, ".ccnavi", "scripts", name).replace(os.sep, "/")

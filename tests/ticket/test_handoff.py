@@ -98,7 +98,10 @@ class HandoffCase(unittest.TestCase):
     # ---- 起動
 
     def run_handoff(self, *args, guard="disable", env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment[settings.GUARD_TICKET_APPROVAL_ENV] = guard
         environment.update(env or {})
@@ -704,6 +707,43 @@ class RouteTest(HandoffCase):
         result = run_ccnavi(["--root", self.root, "--handoff"], cwd=ROOT)
         self.assertEqual(result.returncode, 2)
         self.assertIn("ccnavi user handoff", result.stderr)
+
+
+class BrokenRulesRepairTest(HandoffCase):
+    """共通の rules.yml が読めない間の修復。
+
+    エージェントは直接直せず（`builtin:guard-ccnavi-config` が Write / Edit を止める）、
+    `wip/handoff/` に下書きを置いて、ユーザが端末の `ccnavi user handoff` で取り込む。
+    今の中身が読めない rules.yml の取り込みは、確かめられないので端末に限る。"""
+
+    RULES_REL = ".ccnavi/config/common/rules.yml"
+
+    def setUp(self):
+        super().setUp()
+        self.broken = b"deny:\n  - id: [unclosed\n<<<<<<< HEAD\n"
+        write(common_path(self.root, "rules"), self.broken.decode())
+        self.fixed = json.dumps(RULES).encode()
+        self.stage(self.RULES_REL, self.fixed)
+
+    def test_the_draft_is_listed_and_is_terminal_only(self):
+        row = self.entry(self.view(), self.RULES_REL)
+        self.assertEqual(row["kind"], "layer-config")
+        self.assertFalse(row["board"], row)
+
+    def test_the_board_refuses_it(self):
+        expect = self.view()["expect"]
+        result = self.run_handoff(
+            "--yes", "--expect", expect, "--via", "board", "--json", guard="enable"
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("端末", json.loads(result.stdout)["error"])
+        self.assertEqual(slurp(self.target(self.RULES_REL)), self.broken)
+
+    def test_the_terminal_takes_it(self):
+        result = self.take()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(slurp(self.target(self.RULES_REL)), self.fixed)
+        self.assertFalse(os.path.exists(self.draft_path(self.RULES_REL)))
 
 
 class BoardDefenseRulesTest(HandoffCase):

@@ -28,7 +28,10 @@ def run(root, payload, mode="enable"):
 
 
 def run_raw(root, text, mode="enable"):
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.pop("CLAUDE_PROJECT_DIR", None)
     return run_ccnavi(["--root", root, "--mode", mode], input=text, cwd=ROOT, env=environment)
@@ -185,7 +188,10 @@ class InternalErrorTest(unittest.TestCase):
 
     def test_failure_while_loading_settings_outside_the_hook_is_raised(self):
         """hook でない経路（打った人が見られる経路）は、例外のまま伝える。"""
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         with (
             mock.patch.object(settings, "load", side_effect=RecursionError("深い")),
             self.assertRaises(RecursionError),
@@ -220,7 +226,10 @@ class InternalErrorTest(unittest.TestCase):
         self.assertEqual(missing, set())
 
     def test_unusable_payload_says_what_to_do(self):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         result = run_ccnavi(
             ["--root", self.root, "--log", "", "--mode", "enable"],
             input="not json",
@@ -400,6 +409,31 @@ class DeadlineTextTest(unittest.TestCase):
         self.assertIn("went through", result.stderr)
         self.assertNotIn("so it stopped it", result.stderr)
         self.assertEqual(row["reason"], "deadline-exceeded")
+
+    def test_the_deadline_follows_the_tool_kind(self):
+        """AT4：期限切れの結論もツールで決まる。Write は止め、安全な読み取りは通す。"""
+        cases = (
+            ("Write", {"file_path": "/tmp/x"}, 2),
+            ("Edit", {"file_path": "/tmp/x"}, 2),
+            ("Agent", {"description": "d"}, 2),
+            ("Read", {"file_path": "/tmp/notes.md"}, 0),
+            ("Read", {"file_path": "/home/u/.env"}, 2),
+            ("Grep", {"pattern": "x", "path": "/tmp/notes"}, 0),
+            ("Grep", {"pattern": "x", "path": "/home/u/.env"}, 2),
+            ("Glob", {"pattern": "/tmp/notes/*.md"}, 0),
+            ("PowerShell", {"command": "echo hi"}, 2),
+            ("Bash", {"command": "ls"}, 0),
+            ("Bash", {"command": "echo hi"}, 2),
+            ("Bash", {"command": "cat .env"}, 2),
+        )
+        for tool, tool_input, expected in cases:
+            for mode in ("enable", "dry-run"):
+                with self.subTest(tool=tool, tool_input=tool_input, mode=mode):
+                    payload = {**PRE, "tool_name": tool, "tool_input": tool_input, "cwd": self.root}
+                    with mock.patch.object(judge, "DEADLINE_SECONDS", -1):
+                        result, row = run(self.root, payload, mode)
+                    self.assertEqual(result.returncode, expected, result.stderr)
+                    self.assertEqual(row["reason"], "deadline-exceeded")
 
 
 if __name__ == "__main__":

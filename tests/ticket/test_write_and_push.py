@@ -5,7 +5,7 @@ write-and-push は、親子のチケットで状態を書く操作を
 実行ファイルは対象かの見分けと書いたパスの一覧だけを持ち、git の操作は sh が持つ。
 
 見るのは 4 つ。sh の側（ロック・取り込み・コミット・push・戻し）は
-tests/sh/test_write_and_push_sh.py が見る。
+tests/sh/test_write_and_push_*.py（道具は tests/sh/write_and_push_harness.py）が見る。
 
 1. `ccnavi write-and-push family <識別子>`: 親子のチケット（子なら親）と、write-and-push の対象か。
    origin の無い親のワークツリーと置き場が絶対パスの親子のチケットは対象外

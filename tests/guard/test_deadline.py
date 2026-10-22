@@ -70,7 +70,10 @@ class DeadlineTest(unittest.TestCase):
         shutil.copyfile(os.path.join(ROOT, "tests", "fixtures", "rules.yml"), target)
 
     def run_with(self, command, clock, mode="enable"):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
         environment.pop("CLAUDE_PROJECT_DIR", None)
         with (
@@ -151,7 +154,10 @@ class RealTimeTest(unittest.TestCase):
         shutil.copyfile(os.path.join(ROOT, "tests", "fixtures", "rules.yml"), target)
 
     def timed(self, command):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
         environment.pop("CLAUDE_PROJECT_DIR", None)
         start = time.perf_counter()

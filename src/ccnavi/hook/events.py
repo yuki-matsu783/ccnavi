@@ -19,13 +19,22 @@ from typing import TextIO
 
 from ..infra import directrec, fsio, hookio, modes, pathcase, settings, shellread, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
-from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
+from ..policy import (
+    builtin,
+    ctxfile,
+    ruleload,
+    rules,
+    selfguard,
+    selfguard_shell,
+    selfguard_targets,
+)
 from ..records import audit, busy, failstreak, prune, repeat, stopops, stopreview
 from ..tickets import (
     approval,
     approval_checks,
     branchfind,
     direct_candidates,
+    learning_notice,
     ops_stop,
     ops_stop_integrate,
     ops_stop_request,
@@ -34,6 +43,7 @@ from ..tickets import (
     phase,
     session_rejects,
     skillsync,
+    ticket_guard,
 )
 from . import (
     ccnavimd,
@@ -147,6 +157,14 @@ def watched_for(
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
     ルールの引き方は実行前チェックと同じで、共通レイヤーにそのツリーのレイヤーを足した和。
     別に書くと、実行前に通った書き込みがターンの終わりに報告される。
+
+    ガード自身の保護は、実行前と同じ関数から足す。自己防衛の設定（`CCNAVI_GUARD_CORE_FILES`）が
+    disable でなければ、hook・settings・scripts・共通の設定 3 本の名前で書くツール用の 4 本
+    （`selfguard_shell.add_named_rules`）を、各ツリーのルールの組に足す。共通のルールファイルが
+    読めない間も同じ。チケット制御が有効なら、承認済みの置き場の名前で書くツール用の 1 本
+    （`ticket_guard.approved_write_rule`）も足す。自己防衛の値には依らない。
+    `guard-project-home` 全体は足さない。範囲を広げると、ccnavi ディレクトリの下の正規の
+    書き込みが報告に並ぶ。
     """
     ws = tree.main_tree(root)
     # 横で作業する指定が有効なメインのチェックアウトは、触ったツリーによらず毎回見る
@@ -163,6 +181,7 @@ def watched_for(
             trees.append(t)
         have = {pathcase.fold(x.root) for x in trees}
         trees += [x for x in sbs if pathcase.fold(x.root) not in have]
+    core_on = conf.guard_core_files != selfguard.DISABLE
     loaded: dict[str, tuple[rules.RuleSet, str]] = {}
     out = []
     for t in trees:
@@ -176,6 +195,10 @@ def watched_for(
                 ruleload.add_layers(
                     stderr, rule_set, ruleload.layer_for(conf, root, t), root, record
                 )
+            if core_on:
+                selfguard_shell.add_named_rules(rule_set, conf.project_home, root)
+            if conf.tickets_enabled:
+                rule_set.deny.append(ticket_guard.approved_write_rule(conf.approved, root))
             loaded[t.project] = (rule_set, source)
         rule_set, source = loaded[t.project]
         out.append(post.Watched(t, rule_set, source, pathcase.fold(t.root) in sbs_keys))
@@ -982,18 +1005,20 @@ def decide_at_start(
         texts.append(rejects)
     if pending:
         texts.append(pending)
+    # 学びの蓄積の提案の候補が新しく現れたら、ユーザにだけ知らせる（モデルの文脈には入れない）。
+    learning = "" if payload.agent_id else learning_notice.notice(conf, root, deadline)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
         texts.append(skills)
     if docs:
         texts.append(docs)
-    if texts:
+    if texts or learning:
         hookio.write_context(
             stdout,
             hookio.SESSION_START,
             "\n\n".join(texts),
-            system="\n\n".join(p for p in (rejects, pending) if p),
+            system="\n\n".join(p for p in (rejects, pending, learning) if p),
         )
     return EXIT_OK
 

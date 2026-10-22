@@ -137,7 +137,10 @@ class SelfGuardTest(unittest.TestCase):
         if permission_mode:
             body["permission_mode"] = permission_mode
         payload = json.dumps(body)
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         if bin:
             environment["CCNAVI_BIN_PATH"] = bin
         environment.update(extra_env or {})

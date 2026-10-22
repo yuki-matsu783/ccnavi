@@ -19,7 +19,7 @@ import os
 
 import yaml
 
-from ccnavi.tickets import ops, ticket_model
+from ccnavi.tickets import ops, proposal_form, ticket_model
 from tests import config_path
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_phases import PhaseHarness
@@ -48,6 +48,14 @@ class TicketNewTestBase(PhaseHarness):
         with open(self.todo, encoding="utf-8") as f:
             return f.read()
 
+    def fill_placeholders(self):
+        """雛形の空欄の目印を、実際の内容に書き換える（目印が残ると承認の検査が止める）。"""
+        text = self.written()
+        for mark in proposal_form.PLACEHOLDERS:
+            text = text.replace(mark, "書いた内容")
+        with open(self.todo, "w", encoding="utf-8") as f:
+            f.write(text)
+
 
 class TicketNewTest(TicketNewTestBase):
     def test_the_scaffold_passes_lint_and_the_approval_check(self):
@@ -57,6 +65,7 @@ class TicketNewTest(TicketNewTestBase):
         self.assertEqual(front["ticket"], IDENT)
         self.assertEqual(front["issue"], 9)
         self.assertEqual(front["title"], "雛形の見本")
+        self.fill_placeholders()
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "--quiet", "-m", "scaffold")
         lint = self.ccnavi("--lint", "--mode", "enable")
@@ -67,6 +76,45 @@ class TicketNewTest(TicketNewTestBase):
         self.assertTrue(all("承認待ち" in x or "チケットがありません" in x for x in about), about)
         verify = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
+
+    def test_the_body_headings_follow_the_parent_headings_with_a_placeholder_each(self):
+        self.assertEqual(self.new("--mr", "5").returncode, 0)
+        body = self.written().split("---\n", 2)[2]
+        headings = [x[3:] for x in body.splitlines() if x.startswith("## ")]
+        self.assertEqual(headings, list(proposal_form.PARENT_HEADINGS))
+        for name in proposal_form.PARENT_HEADINGS:
+            self.assertIn(f"## {name}\n\n{proposal_form.HEADING_TODO[name]}\n", body)
+
+    def test_a_fresh_scaffold_is_refused_for_the_placeholders_left(self):
+        self.assertEqual(self.new("--mr", "5").returncode, 0)
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "--quiet", "-m", "scaffold")
+        verify = self.ccnavi("--agree", "--preview", "--verify")
+        self.assertEqual(verify.returncode, 3, verify.stdout + verify.stderr)
+        self.assertIn("空欄の目印が残っている", verify.stdout + verify.stderr)
+
+    def test_a_missing_heading_is_only_a_warning_for_the_approval_check(self):
+        self.assertEqual(self.new("--mr", "5").returncode, 0)
+        self.fill_placeholders()
+        text = self.written().replace("## 範囲\n", "### 範囲\n")
+        with open(self.todo, "w", encoding="utf-8") as f:
+            f.write(text)
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "--quiet", "-m", "scaffold")
+        verify = self.ccnavi("--agree", "--preview", "--verify")
+        self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
+        self.assertIn("見出しが欠けている", verify.stdout + verify.stderr)
+        self.assertIn("## 範囲", verify.stdout + verify.stderr)
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
+        self.assertIn("見出しが欠けている", lint.stdout)
+
+    def test_the_next_line_tells_to_replace_the_placeholders(self):
+        result = self.new("--mr", "5")
+        nexts = [x for x in result.stdout.splitlines() if x.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, result.stdout)
+        self.assertIn("目印", nexts[0])
+        self.assertIn("承認で止まる", nexts[0])
 
     def test_the_mr_comes_from_the_flag_only(self):
         self.assertEqual(self.new("--mr", "5").returncode, 0)
@@ -239,6 +287,7 @@ class TicketNewScopeTest(TicketNewTestBase):
         self.assertIn("quick-work", result.stdout)
         self.assertIn("案内: 承認しても書けない", result.stdout)
         self.assertNotIn("`src/*` は計画", result.stdout)
+        self.fill_placeholders()
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-qm", "proposal")
         verify = self.ccnavi("--agree", "--preview", "--verify", "--cwd", self.tree)

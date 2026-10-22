@@ -15,6 +15,7 @@ from . import (
     approval_ops,
     phase,
     phasetypes,
+    proposal_form,
     standing,
     ticket_ids,
     ticket_model,
@@ -109,6 +110,7 @@ def candidates(
         t.workflow = workflow.compute(t)
         types = phasetypes.types_of(t)
         complaints = _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
+        complaints += proposal_form.form_problems(t, revision=True)
         complaints += revision_problems(root, conf, t, current, config)
         complaints += approval_checks.family_problems(conf, root, t, fams)
         complaints += approval_checks.mr_problems(t)
@@ -144,6 +146,7 @@ def candidates(
             missing = parent_elsewhere_text(root, conf, t)
         complaints, overflow = validate(t, pool, config, missing=missing)
         complaints += _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
+        complaints += proposal_form.form_problems(t)
         complaints += approval_checks.project_problems(t, pool, conf)
         complaints += approval_checks.place_problems(root, conf, t)
         complaints += approval_checks.family_problems(conf, root, t, fams)
@@ -777,7 +780,21 @@ def validate(
     """
     problems: list[rules.Problem] = []
     overflow: list[rules.Problem] = []
+    if t.has_maintenance and not approved:
+        # 保守用の子の印は、通常の提案・承認の経路では使えない（`ticket consolidate` が
+        # 承認済みの置き場へ直に作る）。印を持つ提案は承認しない。
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"`{ticket_model.MAINTENANCE_KEY}:` は通常の提案・承認の経路では使えない印。"
+                "提案から欄を消す（統合の子は `ccnavi-ticket.sh consolidate <親>` が作る）",
+            )
+        ], overflow
     if not t.is_child:
+        mark = t.maintenance_problem()
+        if mark:
+            return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, mark)], overflow
         # 承認済みの親は写しが固定で、言われても直せない（改版が要る）。承認の前に言えば足りる
         if t.has_plan and not approved:
             overflow.extend(phasetypes.parent_scope_problems(t))
@@ -786,6 +803,11 @@ def validate(
     parent = pool.get(t.parent)
     problems.extend(approval_checks.child_problems(t, parent, missing))
     if parent is None or parent.is_child:
+        return problems, overflow
+    if t.is_consolidate:
+        # 統合の子の範囲の上限は、ccnavi の中に固定した定義（親の範囲は当てない）。
+        if not problems:
+            overflow.extend(phasetypes.scope_problems(t, phasetypes.consolidate_type()))
         return problems, overflow
     overflow.extend(ticket_mod.subset_problems(t, parent))
     if problems:

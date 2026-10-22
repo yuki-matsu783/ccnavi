@@ -14,8 +14,8 @@
 ## 定義はユーザが持つ
 
 エージェントが定義を書けると、レビュー不要の定義を作ってから使える。だから置き場は
-ルールの `guard-ccnavi-config` の内側で、ワークツリー側の設定も含めてエージェントの Write は
-止まる。組み込みの既定は持たない。
+組み込みの `builtin:guard-ccnavi-config` の内側で、ワークツリー側の設定も含めてエージェントの
+Write は止まる。組み込みの既定は持たない。
 既定を組み込むと、意図せずレビューの要否が決まる。ファイルが無ければ、フェーズは
 番号だけの今までの挙動で、親の `plan` も読めない。
 
@@ -370,6 +370,30 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_model.Entry], l
             continue
         entries.append(ticket_model.Entry(decision=rules.ALLOW, glob=glob, compiled=compiled))
     return entries, problems
+
+
+_CONSOLIDATE_TYPE: PhaseType | None = None
+
+
+def consolidate_type() -> PhaseType:
+    """統合の子の範囲の上限を持つ、ccnavi の中に固定した定義。
+
+    `phases.yml` にも親の写し（`phases:`）にも置かない。統合の子は親の計画に載らず、親の範囲の上限
+    も当てないので（`phase_scope.scope_verdict`）、範囲を切り詰めるのはこの定義と子の `allow` だけ。
+    """
+    global _CONSOLIDATE_TYPE
+    if _CONSOLIDATE_TYPE is None:
+        entries, _ = _globs("learning-consolidate", "scope", list(ticket_model.CONSOLIDATE_SCOPE))
+        _CONSOLIDATE_TYPE = PhaseType(
+            id=ticket_model.MAINTENANCE_CONSOLIDATE,
+            title="学びの統合",
+            kind=KIND_FEEDBACK,
+            review=REVIEW_NONE,
+            scope=entries,
+            scope_globs=[e.glob for e in entries],
+            learning=LEARNING_OFF,
+        )
+    return _CONSOLIDATE_TYPE
 
 
 def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:

@@ -138,8 +138,13 @@ class TicketTest(unittest.TestCase):
         return path
 
     def ccnavi(self, *args, stdin="", env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
+        # 学びの蓄積の既定は enable。このテストは学びを扱わないので切る（扱うテストは env で渡す）。
+        environment["CCNAVI_LEARNING"] = "disable"
         environment.update(env or {})
         args = self.as_write_and_push(args)
         return run_ccnavi(
@@ -3758,6 +3763,103 @@ class TicketTest(unittest.TestCase):
         self.assertIn("worktree-unreadable", said)
         self.assertIn("sub-err", said)
         self.assertIn("内部エラー", said)
+
+    def _stop_payload(self):
+        return {"hook_event_name": "Stop", "cwd": self.parent_tree, "session_id": "s1"}
+
+    def test_a_check_that_raises_is_unchecked_and_reaches_the_parent_and_stop(self):
+        """AT27: 範囲の検査が例外を起こした回は `unchecked` で記録し、親へ知らせ、Stop が促す。"""
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        stop = {
+            "hook_event_name": "SubagentStop",
+            "cwd": child,
+            "session_id": "s1",
+            "agent_id": "sub-raise",
+        }
+        with mock.patch.object(phase_scope, "scope_findings", side_effect=RuntimeError("x")):
+            self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        found = self._outcome_of("sub-raise")
+        self.assertEqual((found["outcome"], found["final"]), ("unchecked", True))
+        # 親が先にツールを使うと、そこで知らせて「促した」ことにする（Stop で繰り返さない）
+        said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
+        self.assertIn("sub-raise", said)
+        self.assertIn("worktree-unreadable", said)
+        for _ in range(4):
+            out = self.ccnavi("--mode", "enable", stdin=json.dumps(self._stop_payload())).stdout
+            self.assertNotIn("SUBAGENT_OUTCOME", out)
+
+    def test_stop_nudges_once_for_an_unchecked_subagent_the_parent_did_not_hear_of(self):
+        """AT27: 親が知らせを受けないまま Stop に来たら、Stop が 1 回だけ促す。"""
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        stop = {
+            "hook_event_name": "SubagentStop",
+            "cwd": child,
+            "session_id": "s1",
+            "agent_id": "sub-raise",
+        }
+        with mock.patch.object(phase_scope, "scope_findings", side_effect=RuntimeError("x")):
+            self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        seen = [
+            "SUBAGENT_OUTCOME"
+            in self.ccnavi("--mode", "enable", stdin=json.dumps(self._stop_payload())).stdout
+            for _ in range(4)
+        ]
+        self.assertEqual(seen.count(True), 1, seen)
+
+    def test_a_nested_agent_does_not_swallow_the_parents_notice(self):
+        """AT27（入れ子）: 入れ子の体（agent_id あり）の PostToolUse は、親向けの知らせを読まず、
+        通知済みにもしない。親が次にツールを使ったときに届く。"""
+        self.family()
+        self._stray()
+        self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-u")
+        inside = self.hook("PostToolUse", "Bash", self.parent_tree, agent_id="sub-n", command="ls")
+        self.assertNotIn("SUBAGENT_UNATTRIBUTED", self.reason(inside))
+        self.assertFalse(self._outcome_of("sub-u")["notified"])
+        first = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("SUBAGENT_UNATTRIBUTED", self.reason(first))
+        self.assertTrue(self._outcome_of("sub-u")["notified"])
+
+    def test_a_notice_cut_off_while_writing_is_not_marked_and_comes_again(self):
+        """AT28: 知らせを書く途中で失敗したら「通知済み」の印を付けず、次の PostToolUse で
+        同じ結果IDの知らせがもう一度出る。"""
+        self.family()
+        self._stray()
+        self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-u")
+        before = self._outcome_of("sub-u")
+        with mock.patch("ccnavi.infra.hookio.write_context", side_effect=OSError("cut")):
+            self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertFalse(self._outcome_of("sub-u")["notified"])
+        again = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("SUBAGENT_UNATTRIBUTED", self.reason(again))
+        after = self._outcome_of("sub-u")
+        self.assertTrue(after["notified"])
+        self.assertEqual(after["id"], before["id"])
+
+    def test_an_outcome_that_cannot_be_saved_is_not_treated_as_normal(self):
+        """AT28: `.outcome` を保存できないとき、記録は残らない（言うのは標準エラーだけ）が、
+        差し戻しを無視して終わった体は、記録が無いときの従来の経路で親に「差し戻されたまま」と
+        言われる。正常（言わない）には扱われない。"""
+        from ccnavi.infra import fsio
+
+        self.family()
+        child, _ = self._stray()
+        real = fsio.write_json_atomic
+
+        def fail_outcome(path, *args, **kwargs):
+            if str(path).endswith(".outcome"):
+                return "disk full"
+            return real(path, *args, **kwargs)
+
+        with mock.patch.object(fsio, "write_json_atomic", side_effect=fail_outcome):
+            first = self.hook("SubagentStop", "", child, agent_id="sub-w")
+            second = self.hook("SubagentStop", "", child, agent_id="sub-w")
+        self.assertEqual(first.returncode, 2)
+        self.assertIn("保存できませんでした", second.stderr)
+        state = os.path.join(self.root, "logs", "state")
+        self.assertFalse(os.path.exists(os.path.join(state, "subagent-s1-sub-w.outcome")))
+        self.assertIn("差し戻されたまま", self.reason(self._agent_done("sub-w")))
 
     # ---- 診断
 

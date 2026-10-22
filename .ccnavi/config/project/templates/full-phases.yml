@@ -26,15 +26,9 @@ feedback:
 - type: implement-feedback
   after:
   - 1
-- type: learning-consolidate
-  after:
-  - 2
-- type: learning-apply
-  after:
-  - 3
 - type: skill-improve
   after:
-  - 4
+  - 2
 flows:
   1:
     id: dev-sweep-review

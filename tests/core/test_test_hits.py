@@ -64,7 +64,10 @@ class TestHitsTest(unittest.TestCase):
         self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(ALLOW_ALL))
 
     def ccnavi(self, *args: str, rules: str = "", env: dict | None = None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         return run_ccnavi(
@@ -190,7 +193,10 @@ class TestHitsTest(unittest.TestCase):
                     ],
                     input="",
                     cwd=ROOT,
-                    env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+                    env={
+                        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+                        "CCNAVI_LEARNING": "disable",
+                    },
                 )
                 body = json.loads(done.stdout)
                 self.assertEqual(body["verdict"], "deny", done.stderr)

@@ -63,7 +63,10 @@ class StopRulesTest(unittest.TestCase):
         self.addCleanup(self.dir.cleanup)
 
     def env(self) -> dict:
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return environment
 

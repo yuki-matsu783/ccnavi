@@ -51,7 +51,10 @@ class ProjectSkillsTest(unittest.TestCase):
 
     def context(self, event: str, cwd: str, state: str = "", **extra) -> str:
         payload = {"hook_event_name": event, "session_id": "s1", "cwd": cwd, **extra}
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         done = run_ccnavi(
             [

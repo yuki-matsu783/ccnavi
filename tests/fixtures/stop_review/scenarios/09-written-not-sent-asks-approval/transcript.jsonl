@@ -1,0 +1,4 @@
+{"type": "user", "message": {"role": "user", "content": "#8 をチケット作業で進めて"}}
+{"type": "assistant", "uuid": "a1", "message": {"role": "assistant", "content": [{"type": "text", "text": "提案を書きます。"}, {"type": "tool_use", "id": "w1", "name": "Write", "input": {"file_path": "wip/proposals/todo/p1.md"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "w1", "content": "File created"}]}}
+{"type": "assistant", "uuid": "a2", "message": {"role": "assistant", "content": [{"type": "text", "text": "提案 p1 を wip/proposals/todo/p1.md に書きました。内容を見て、承認してください。"}]}}

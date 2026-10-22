@@ -18,7 +18,7 @@ keywords: [置き場, 提案, 承認済みチケット, マーカー, wip/propos
 | 親のマーカー | 同 `phases/<親>/ready.json` / `close-early.json` / `closed.json` | レビューのスクリプト、`ticket finish <親>`、ユーザ | 親のブランチにコミット。`ready` は Draft を外す前に、閉じた親子のチケットと一緒にワークスペースの `logs/archive/<リポジトリ>/phases/<親>/` へ退避する（ブランチでは他の機械へ届かなくなる） |
 | 閉じたチケットの退避 | ワークスペースの `logs/archive/<リポジトリ>/`（承認済みの領域と同じ構成）と、ready のマーカー `ready/<親>.json` | `ccnavi-review.sh ready`（実行ファイルの `review ready`）だけ。エージェントの書き込みは記録の保護が止める | 入れない（`logs/` は git が追跡しない） |
 | 子の記録 | 同 `phases/<親>/<子>.risk.json` / `.judge.json` / `.flow.json`（着手のときのフローのハッシュ。9.3.1） | `ticket finish` / `ticket record-risk` / `ticket start` | 親のブランチにコミット |
-| 気づきの記録 | 子（と親）のワークツリーの `wip/handoff/learnings/<識別子>.md` と `.digest.json`（9.16）。直接作業は `docs/wiki/inbox/`、ルートは `wip/handoff/inbox/` | `ticket learn`、子のセッション | 子の合流で親のブランチへ届く。`wip/handoff/` の分は統合で外れる |
+| 気づきの記録 | 子（と親）のワークツリーの `wip/handoff/learnings/<識別子>.md` と `.digest.json`（9.16）。直接作業は `docs/wiki/inbox/`（ルートには書かない） | `ticket learn`、子のセッション | 子の合流で親のブランチへ届く。`wip/handoff/` の分は統合で外れる |
 | 子のフロー | 同 `flows/<子>.yml`（9.3.1） | ユーザ（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-user-push-approved.sh` が置き場ごとコミットして push する） |
 | 子のフローの下書き | フローと同じツリーの `wip/proposals/flows/<子>.yml`（9.3.1。効力は無い） | 頼まれたエージェント。ユーザがフロー編集画面で取り込み、保存が成功したら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-user-push-approved.sh` がフローと一緒にコミットして push する |
 | テンプレートの下書き | `wip/handoff/` の下の、反映する先と同じ相対パス（例: `wip/handoff/.ccnavi/config/project/templates/<名前>.yml`。そのツリーの。プロジェクトのツリーならそのプロジェクトの下。9.15、9.19。効力は無い） | 頼まれたエージェント（`ccnavi --templates --draft <親>` か直接）。ユーザが `ccnavi user handoff` で取り込み、書けたら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んだ結果は、そのツリーのブランチの変更として残る |
@@ -40,7 +40,7 @@ keywords: [置き場, 提案, 承認済みチケット, マーカー, wip/propos
 
 `review/` への直接の作成・移動は、`Write` でもシェルでも、誰がやっても組み込みが止める
 （`Write` 系は `builtin:ticket-state`、シェルは `builtin:ticket-state-shell`）。`.ccnavi/approved/` は
-ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`）が止める。`todo/` への作成と編集は自由。
+ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`）と、チケット制御が有効な間の `builtin:ticket-approved`（実行後の保護範囲にも足す）が止める。`todo/` への作成と編集は自由。
 シェルの `cp` `ln` `install` は、組み込みの保護（11.6）と同じ部品で行き先を読む（`-t <dir>` の値か、選択肢でない
 最後の引数）。`cp -t wip/proposals/review <提案>` も、行き先のあとに選択肢を回した形も止まり、置き場から外へ写すだけの形は止めない。
 提案の置き場そのものを行き先にして、元の名前が状態の名前（`review`）か名前の決まらない形（`cp -r /tmp/review wip/proposals/`）も止める。

@@ -81,7 +81,10 @@ def cases(big: bool) -> list[tuple[str, str, dict[str, str]]]:
 
 def one(ws: str, tool: str, tool_input: dict[str, str]) -> tuple[float, int, str, str]:
     """1 回動かして (秒, 終了コード, decision, reason)。"""
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.pop("CLAUDE_PROJECT_DIR", None)
     payload = json.dumps(

@@ -167,7 +167,10 @@ class Workspace(unittest.TestCase):
         return write(os.path.join(tree, *APPROVED.split("/"), ticket + ".md"), "approved\n")
 
     def env(self, **extra):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env["CCNAVI_BIN_PATH"] = posix(self.write_and_push_stub)
         env.update(extra)
         return env

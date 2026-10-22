@@ -57,8 +57,8 @@ ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --log "" 
 
 守られているかも期待する判定で見る。rules.yml・phases.yml・risks.yml、承認済みチケットの置き場、
 settings.json への Write / Edit を deny の期待に置いて回す。ワークスペースルート直下と、実在するワークツリーの
-名前での設定の両方（このリポジトリでは `guard-ccnavi-config` と `guard-settings` が止める）。出るのはルールの判定だけで、
-組み込みの保護（実行後に戻す働き）は出ない。allow に見えたものは「ルールでは止めていない」として報告する。
+名前での設定の両方（このリポジトリでは組み込みの `builtin:guard-ccnavi-config` と `builtin:guard-settings` が止める）。出るのは実行前の判定（組み込みの保護を含む）で、
+実行後に戻す働きは出ない。allow に見えたものは「止めていない」として報告する。
 
 ## 3. phases: 計画と噛み合うか
 

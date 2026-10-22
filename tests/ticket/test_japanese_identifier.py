@@ -51,7 +51,10 @@ class JapaneseIdentifierTest(unittest.TestCase):
         return path
 
     def ccnavi(self, *args, stdin=""):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return run_ccnavi(
             userform.place(

@@ -66,7 +66,10 @@ class SessionConventionsTest(unittest.TestCase):
 
     def start(self, *extra, **payload_extra) -> str:
         payload = {"hook_event_name": "SessionStart", "session_id": "s1", **payload_extra}
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         result = run_ccnavi(
             ["--root", self.root, "--rules", self.rules, *extra],

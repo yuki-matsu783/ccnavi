@@ -618,7 +618,13 @@ def child_problems(
 
     定義は親の写しから読み、`phases.yml` は読まない。`phases.yml` が壊れていても、承認のあとに
     直されても、進行中の親とその子はここで止まらない。
+
+    保守用の子の印（`maintenance:`）の構造エラーもここで言う。統合の子（子・`phase: 0`・印の 3 つが
+    そろうもの）だけは、`phase: 0` を親の計画の項と照合しない。
     """
+    mark = t.maintenance_problem()
+    if mark:
+        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, mark)]
     if parent is None:
         # 文面だけは呼び手が差し替える。承認のときは「まだ承認されていない」しか起きないが、
         # 判定のときは「承認されたが閉じた」も同じ検査に当たる。検査は同じで、読むユーザの
@@ -631,7 +637,12 @@ def child_problems(
                 rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} 自身が子。深さは 2 段まで"
             )
         ]
-    if parent.has_plan and t.phase is not None and parent.item_at(t.phase) is None:
+    if (
+        parent.has_plan
+        and t.phase is not None
+        and not t.is_consolidate
+        and parent.item_at(t.phase) is None
+    ):
         return [
             rules.Problem(
                 rules.SEVERITY_ERROR,
@@ -690,6 +701,9 @@ def blocking_problems(
     """
     problems = list(project_problems(t, pool, conf))
     problems.extend(content_problems(t))
+    if not t.is_child and t.maintenance_problem():
+        # 子の印の誤りは `child_problems` が言う。親が印を持つ形はここで止める。
+        problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.maintenance_problem()))
     if t.is_child:
         missing = f"親 {t.parent} の承認済みチケットが作業中にありません（未承認か、閉じている）"
         problems.extend(child_problems(t, pool.get(t.parent), missing))

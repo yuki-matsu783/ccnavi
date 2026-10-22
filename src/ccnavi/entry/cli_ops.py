@@ -17,6 +17,7 @@ from typing import TextIO
 from ..infra import fsio, gitcmd, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
+    consolidate,
     core,
     learning,
     next_id,
@@ -48,7 +49,8 @@ def operate(
 ) -> int:
     """チケットの状態とレビューの操作を振り分ける。
 
-    `ticket start|finish|cancel|propose <識別子>`、`ticket new <識別子> ...`（親の提案の雛形）、
+    `ticket start|finish|cancel|propose|consolidate <識別子>`、
+    `ticket new <識別子> ...`（親の提案の雛形）、
     `review prepare|requested|confirm`、それに
     ユーザが打つ `--reviewed` と `--close-early`。
     リモートから取得した結果は `--result <json>` で受け取る。
@@ -210,6 +212,10 @@ def operate(
             code = ops.finish(stdout, stderr, root, conf, target)
         else:
             code = ops.cancel(stdout, stderr, root, conf, target, args.reason)
+    elif kind == "ticket" and verb == "consolidate" and target:
+        # ticket consolidate <親>。統合の子を doing/ に作る。コミットと push は sh
+        # （ccnavi-ticket.sh consolidate）が write-and-push の手順で行う。
+        code = consolidate.run(stdout, stderr, root, conf, target)
     elif kind == "ticket" and verb == "learn" and len(words) <= 3:
         # ticket learn [<識別子>] [--note <本文> [--target <種類>] [--signal <信号>]]。
         # 気づきの記録の雛形と要約、または気づき 1 件の追記（直接作業では受信箱）。
@@ -383,7 +389,8 @@ def _write_and_push_bypass(
     """write-and-push を通らずに、取り込み済みの親子のチケットの状態を書こうとしているなら、
     その親の識別子。無ければ空。
 
-    状態の操作（`ticket start|finish|cancel|propose`、`review requested|confirm|ready`、残った指摘の
+    状態の操作（`ticket start|finish|cancel|propose|consolidate`、
+    `review requested|confirm|ready`、残った指摘の
     行き先の `--reviewed N --accept-unresolved`）は、write-and-push の対象の親子のチケットでは sh が
     `--record-tree` を付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで
     write-and-push を通っていない。
@@ -403,6 +410,7 @@ def _write_and_push_bypass(
             "finish",
             "cancel",
             "propose",
+            "consolidate",
         )
     ):
         family_id = write_and_push.family_of(words[2])

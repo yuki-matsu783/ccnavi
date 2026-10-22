@@ -110,7 +110,10 @@ class OrdinaryFailuresStaySilentTest(unittest.TestCase):
         )
 
     def test_a_rest_failure_does_not_print_the_graphql_hint(self):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env["CCNAVI_BIN_PATH"] = sys.executable
         env["GITLAB_TOKEN"] = "x"
         env["GITHUB_TOKEN"] = "x"

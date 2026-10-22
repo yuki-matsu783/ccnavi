@@ -92,7 +92,7 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 # セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する。
 # デフォルトブランチを ff で進め、ワークツリーの起点を新しくする。
-FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
+FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh"'
 # --deploy が配る代わりに通る sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側にほかに取れる方法がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
@@ -117,6 +117,8 @@ DEPLOY_SCRIPTS = (
     "ccnavi-user-close-early.sh",
     "ccnavi-user-clean-branch.sh",
     "ccnavi-fetch.sh",
+    "ccnavi-dirs.sh",
+    "ccnavi-session-start.sh",
     "ccnavi-sync.sh",
     "ccnavi-clean.sh",
     "ccnavi-clean.js",
@@ -167,10 +169,12 @@ NO_TEMPLATES_FILES = [
             "ccnavi-common-state.sh",
             "ccnavi-common-write-and-push.sh",
             "ccnavi-common.sh",
+            "ccnavi-dirs.sh",
             "ccnavi-fetch.sh",
             "ccnavi-git.sh",
             "ccnavi-launcher.sh",
             "ccnavi-review.sh",
+            "ccnavi-session-start.sh",
             "ccnavi-stage.sh",
             "ccnavi-start.sh",
             "ccnavi-sync.sh",
@@ -206,8 +210,8 @@ ccnavi を登録した hook:
   Stop
   SubagentStart
   SubagentStop
-登録した hook（セッション開始時の取り込み。不要なら --no-fetch）:
-  SessionStart（.ccnavi/scripts/ccnavi-fetch.sh。セッション開始時の取り込み）
+登録した hook（セッション開始時の取り込みと一覧。不要なら --no-fetch）:
+  SessionStart（.ccnavi/scripts/ccnavi-session-start.sh。セッション開始時の取り込みと一覧）
 足した .vscode/settings.json:
   git.detectWorktrees
   git.repositoryScanMaxDepth
@@ -236,6 +240,8 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-user-close-early.sh
   .ccnavi/scripts/ccnavi-user-clean-branch.sh
   .ccnavi/scripts/ccnavi-fetch.sh
+  .ccnavi/scripts/ccnavi-dirs.sh
+  .ccnavi/scripts/ccnavi-session-start.sh
   .ccnavi/scripts/ccnavi-sync.sh
   .ccnavi/scripts/ccnavi-clean.sh
   .ccnavi/scripts/ccnavi-clean.js
@@ -289,7 +295,10 @@ def clean_env(**extra):
     テストを回すのは ccnavi が入ったセッションで、その env には CCNAVI_* が並んでいる。
     持ち込むと、テストが「コードのこと」ではなく「走らせた人のセッション」を報告しうる。
     """
-    env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    env = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     env.update(extra)
     return env
 

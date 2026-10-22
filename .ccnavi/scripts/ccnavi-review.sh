@@ -7,6 +7,7 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N> --preview （残った指摘の一覧を JSON で見るだけ。ボードも読む）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged [<番号>]       （MR がマージ済みか。番号で聞くこともできる。ccnavi-sync.sh が使う）
+#   sh .ccnavi/scripts/ccnavi-review.sh mr-state <番号>       （MR の今の状態を読むだけ。ボードの「マージ状況を確認」が使う）
 #   sh .ccnavi/scripts/ccnavi-review.sh ready [--parent <親>]                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #
@@ -59,12 +60,24 @@
 # 外（ワークスペースルートなど）からも打てる。外から打てば、Draft を外したあとに親のワークツリーも消える。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り /
 #             3 merged だけ: MR がマージ済みかを確かめられなかった（"unknown" を出す。推定せずに止める）
+#
+# mr-state <番号>: 読むだけ。何も書かず、実行ファイルも起こさない。標準出力は 2 行で、機械が読む。
+# 区切りは空白 1 つ。1 行目は版 `mr-state 1`、2 行目は次のどれか。
+#   open <番号> <yes|no> <URL>        開いている（3 つめは Draft か）
+#   merged <番号> <URL>               マージ済み
+#   closed <番号> <URL>               マージせずに閉じた
+#   unknown <種類> <理由>             確かめられなかった。種類は no-tool（jq・gh/glab・curl が無い）/
+#                                     auth（トークンが無い、認証に失敗した）/ network（ホストに届かない）/
+#                                     api（API の失敗、答えを読めなかった）/ not-found（MR・リポジトリ・origin が無い）。
+#                                     理由は 1 行の日本語で、資格情報は含まない
+# 終了コードは、状態が分かれば 0、unknown なら 1、引数の誤りは 2（標準出力は空で、標準エラーに理由）。
+# 番号は 1 から始まる数字だけ。merged 副命令の出力と終了コード（3）は変えない。
 
 set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|origin|merged> [--phase <N>] [--body-file <path>] [--eli5 <html>] [--parent <親>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>] [--eli5 <html>] [--parent <親>]
 
   request      --phase <N> --body-file <依頼文> --eli5 <HTML>
                                                   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。
@@ -80,6 +93,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の URL）
   merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha> <元ブランチ>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が閉じたかを確かめる）
+  mr-state <番号>                                 マージリクエストの今の状態を読むだけ。1 行目 "mr-state 1"、2 行目は "open <番号> <yes|no> <URL>"（yes は Draft）・"merged <番号> <URL>"・"closed <番号> <URL>"・"unknown <種類> <理由>"（終了コード 1。種類は no-tool / auth / network / api / not-found）。ボードの「マージ状況を確認」が使う
 
 ユーザが端末で実行する操作は別の sh:
   ccnavi-user-decide.sh <N>          指摘の対応方針を選んで置く（対応しない・このフェーズで直す・issue に回す）
@@ -105,7 +119,7 @@ shift
 # 診断ログに残す引数の数（サブコマンドを除いた、読む前の数）。
 args_n=$#
 case "$sub" in
-request | confirm | comment | decide | ready | fetch | origin | merged) ;;
+request | confirm | comment | decide | ready | fetch | origin | merged | mr-state) ;;
 close-early)
 	# ユーザ専用の sh に移した。何も動かさずに案内する。
 	fail close-early-moved "close-early は ccnavi-user-close-early.sh に移りました。何もしていません。早めに閉じるなら、ユーザが sh $(dirname "$0")/ccnavi-user-close-early.sh --reason <理由> [--no-issue] を実行します（エージェントは実行しません）。" 2
@@ -115,7 +129,7 @@ close-early)
 	exit 0
 	;;
 *)
-	fail unknown-sub "$sub は使用できません。使えるのは request / confirm / comment / decide / ready / fetch / origin / merged です。" 2
+	fail unknown-sub "$sub は使用できません。使えるのは request / confirm / comment / decide / ready / fetch / origin / merged / mr-state です。" 2
 	;;
 esac
 
@@ -144,7 +158,195 @@ if [ "$sub" = decide ]; then
 	[ "$preview" -eq 1 ] || decide_moved
 fi
 
+# ---- mr-state <番号>。MR の今の状態を、機械が読む 2 行で答える（読むだけ）。
+#
+# 番号は 1 から始まる数字だけ（9 桁まで）。誤りは標準出力に何も出さず、標準エラーに理由を書いて 2 で終わる。
+mr_state_number=""
+if [ "$sub" = mr-state ]; then
+	[ "$#" -eq 1 ] || fail mr-state-args "mr-state には MR の番号を 1 つだけ渡してください。" 2
+	case "$1" in
+	'' | 0* | *[!0-9]*) fail mr-state-number "mr-state の MR の番号 (${1}) は 1 から始まる数字で渡してください。" 2 ;;
+	esac
+	[ "${#1}" -le 9 ] || fail mr-state-number "mr-state の MR の番号 (${1}) が大きすぎます。" 2
+	mr_state_number="$1"
+fi
+
+# 答えの 2 行目を出して終わる。理由は 1 行にそろえる（制御文字を空白にし、空白の連続を 1 つにする）。
+# 理由には資格情報を入れない（ホストの返事の本文も写さず、決まった言葉と状態コードだけで組む）。
+mr_state_emit() {
+	printf 'mr-state 1\n%s\n' "$1"
+}
+
+mr_state_unknown() {
+	mrs_reason=$(printf '%s' "$2" | tr '\001-\037\177' ' ' | sed -e 's/  */ /g' -e 's/^ //' -e 's/ $//')
+	[ -n "$mrs_reason" ] || mrs_reason="理由は取れなかった"
+	log_info mr-stateを答えた -- "state=unknown" "kind=$1" "exit=1"
+	mr_state_emit "unknown $1 $mrs_reason"
+	exit 1
+}
+
+mr_state_known() {
+	log_info mr-stateを答えた -- "state=$1" "exit=0"
+	mr_state_emit "$2"
+	exit 0
+}
+
+# API の失敗の本文（gh / glab / curl の出力）から、種類（mrs_kind）と理由（mrs_why）を決める。
+# 本文は理由に写さない。ネットワークの失敗を先に見て（curl は 404 などを "error: 404" と書く）、次に状態コード。
+mr_state_classify() {
+	mrs_low=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
+	mrs_code=$(printf '%s' "$mrs_low" | grep -o -E '(http |error: |: )[0-9]{3}( |$)' | head -n 1 | grep -o -E '[0-9]{3}' | head -n 1 || :)
+	mrs_with=""
+	[ -z "$mrs_code" ] || mrs_with="（HTTP ${mrs_code}）"
+	case "$mrs_low" in
+	*"could not resolve"* | *"couldn't resolve"* | *"no such host"* | *"failed to connect"* | *"couldn't connect"* | *"connection refused"* | *"connection reset"* | *"timed out"* | *"timeout"* | *"network is unreachable"* | *"dial tcp"* | *"i/o timeout"* | *"curl: (6)"* | *"curl: (7)"* | *"curl: (28)"* | *"curl: (35)"* | *"curl: (52)"* | *"curl: (56)"* | *"curl: (60)"*)
+		mrs_kind=network
+		mrs_why="ホストに届かない（ネットワークか、ホスト名を引けない）"
+		return 0
+		;;
+	*"rate limit"*)
+		mrs_kind=api
+		mrs_why="ホストの API の利用上限に達した${mrs_with}"
+		return 0
+		;;
+	esac
+	case "$mrs_code" in
+	404)
+		mrs_kind=not-found
+		mrs_why="MR #${mrs_n} が見つからない（番号か、リポジトリへの権限を確かめる）${mrs_with}"
+		return 0
+		;;
+	401 | 403)
+		mrs_kind=auth
+		mrs_why="認証に失敗した（トークンか gh / glab の認証を確かめる）${mrs_with}"
+		return 0
+		;;
+	esac
+	case "$mrs_low" in
+	*"not found"*)
+		mrs_kind=not-found
+		mrs_why="MR #${mrs_n} が見つからない（番号か、リポジトリへの権限を確かめる）"
+		;;
+	*"bad credentials"* | *"unauthorized"* | *"forbidden"* | *"authentication"*)
+		mrs_kind=auth
+		mrs_why="認証に失敗した（トークンか gh / glab の認証を確かめる）"
+		;;
+	*)
+		mrs_kind=api
+		mrs_why="ホストの API が失敗した${mrs_with}"
+		;;
+	esac
+}
+
+# 失敗の本文を受ける置き場。ccnavi_host_api は部分シェルの中で失敗を知らせるので、ファイルで受け渡す。
+mr_state_note() {
+	printf '%s' "$3" >"$mrs_err" 2>/dev/null || :
+}
+
+# URL を 1 語にそろえる。空・空白や制御文字を含む・読めないときは、ホスト名とパスから組む。
+mr_state_url() {
+	mrs_url=$(ccnavi_mask_url "$1")
+	mrs_clean=$(printf '%s' "$mrs_url" | tr -d '\001-\040\177')
+	if [ -z "$mrs_clean" ] || [ "$mrs_clean" != "$mrs_url" ]; then
+		if [ "$ccnavi_h_kind" = github ]; then
+			mrs_url="$ccnavi_h_scheme://$ccnavi_h_host/$ccnavi_h_path/pull/$mrs_n"
+		else
+			mrs_url="$ccnavi_h_scheme://$ccnavi_h_host/$ccnavi_h_path/-/merge_requests/$mrs_n"
+		fi
+	fi
+}
+
+mr_state() {
+	mrs_n="$1"
+	# ホストの返事の読み方は ccnavi-common-host.sh と同じ。ここは失敗を、決まった種類に分けて答えるだけ。
+	origin=$(git remote get-url origin 2>/dev/null || :)
+	[ -n "$origin" ] || mr_state_unknown not-found "origin がありません"
+	mrs_rc=0
+	ccnavi_host_parse "$origin" || mrs_rc=$?
+	case "$mrs_rc" in
+	0) ;;
+	4) mr_state_unknown not-found "${ccnavi_h_parse_why}" ;;
+	*) mr_state_unknown not-found "origin からホストかプロジェクトのパスを読めない" ;;
+	esac
+	mrs_rc=0
+	ccnavi_host_connect || mrs_rc=$?
+	case "$mrs_rc" in
+	0) ;;
+	3) mr_state_unknown no-tool "jq が見つからない" ;;
+	4)
+		if [ -n "${ccnavi_h_cli:-}" ]; then
+			mr_state_unknown auth "${ccnavi_h_cli_name} が ${ccnavi_h_host} で使えず（未認証か、ホストに届かない）、${ccnavi_h_token_name} もない"
+		fi
+		mr_state_unknown auth "${ccnavi_h_cli_name} が無く、${ccnavi_h_token_name} もない"
+		;;
+	*) mr_state_unknown no-tool "${ccnavi_h_cli_name} も curl も使えない" ;;
+	esac
+
+	# 失敗の本文の置き場。state が書けなければ TMPDIR。終わるときに消す。
+	mkdir -p "$state" 2>/dev/null || :
+	if [ -d "$state" ] && [ -w "$state" ]; then
+		mrs_tmp="$state"
+	else
+		mrs_tmp="${TMPDIR:-/tmp}"
+	fi
+	mrs_err="$mrs_tmp/ccnavi-mr-state-err-$$"
+	trap 'rm -f "$mrs_err" 2>/dev/null || :' EXIT
+	ccnavi_h_tmp="$mrs_tmp"
+	ccnavi_h_on_fail=mr_state_note
+	ccnavi_h_max_time=30
+
+	if [ "$ccnavi_h_kind" = github ]; then
+		mrs_rel="repos/$ccnavi_h_path/pulls/$mrs_n"
+		mrs_jq='if type == "object" then "\(.number // "-") \(.state // "-") \(.merged == true or (.merged_at // null) != null) \(.draft == true) \(.html_url // "")" else empty end'
+	else
+		mrs_rel="projects/$(ccnavi_host_encoded_path)/merge_requests/$mrs_n"
+		mrs_jq='if type == "object" then "\(.iid // "-") \(.state // "-") \(.state == "merged") \((.draft // .work_in_progress) == true) \(.web_url // "")" else empty end'
+	fi
+	mrs_rc=0
+	mrs_answer=$(ccnavi_host_api GET "$mrs_rel") || mrs_rc=$?
+	if [ "$mrs_rc" -ne 0 ]; then
+		mrs_body=$(cat "$mrs_err" 2>/dev/null || :)
+		mr_state_classify "$mrs_body"
+		mr_state_unknown "$mrs_kind" "$mrs_why"
+	fi
+	mrs_line=$(printf '%s' "$mrs_answer" | "$ccnavi_h_jq" -r "$mrs_jq" 2>/dev/null) || mrs_line=""
+	[ -n "$mrs_line" ] || mr_state_unknown api "ホストの答えを読めなかった"
+
+	# 空白で 5 つに分ける（URL は最後。展開を避けるため、パラメータ展開だけで切る）。
+	mrs_number="${mrs_line%% *}"
+	mrs_line="${mrs_line#* }"
+	mrs_st="${mrs_line%% *}"
+	mrs_line="${mrs_line#* }"
+	mrs_merged="${mrs_line%% *}"
+	mrs_line="${mrs_line#* }"
+	mrs_draft="${mrs_line%% *}"
+	mrs_raw_url="${mrs_line#* }"
+	[ "$mrs_raw_url" != "$mrs_line" ] || mrs_raw_url=""
+	[ "$mrs_number" = "$mrs_n" ] || mr_state_unknown api "ホストが別の MR（${mrs_number}）を返した"
+	mr_state_url "$mrs_raw_url"
+	if [ "$mrs_merged" = true ]; then
+		mr_state_known merged "merged $mrs_n $mrs_url"
+	fi
+	case "$mrs_st" in
+	open | opened)
+		if [ "$mrs_draft" = true ]; then
+			mrs_yes=yes
+		else
+			mrs_yes=no
+		fi
+		mr_state_known open "open $mrs_n $mrs_yes $mrs_url"
+		;;
+	closed) mr_state_known closed "closed $mrs_n $mrs_url" ;;
+	locked) mr_state_unknown api "MR #${mrs_n} はマージの途中（locked）" ;;
+	*) mr_state_unknown api "ホストが想定外の state（${mrs_st}）を返した" ;;
+	esac
+}
+
 review_place
+
+if [ "$sub" = mr-state ]; then
+	mr_state "$mr_state_number"
+fi
 
 # ---- ready --parent <親>。親のワークツリーの外（ワークスペースルートなど）から打つ形。
 #

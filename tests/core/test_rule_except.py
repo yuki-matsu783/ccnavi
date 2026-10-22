@@ -297,7 +297,10 @@ class JudgeTest(unittest.TestCase):
                 "tool_input": tool_input,
             }
         )
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         done = run_ccnavi(
             [
                 "--root",

@@ -49,7 +49,10 @@ class AdditionalContextTest(unittest.TestCase):
         return write(common_path(self.root, "rules"), json.dumps(body))
 
     def run_ccnavi(self, *args: str, payload: str = "") -> subprocess.CompletedProcess:
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         return run_ccnavi(
             [
                 "--root",

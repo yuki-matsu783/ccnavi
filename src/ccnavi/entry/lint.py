@@ -48,6 +48,7 @@ from . import (
     lint_project,
     lint_templates,
     lint_ticket,
+    lint_wiki,
     version,
 )
 
@@ -251,7 +252,7 @@ def report(
                 f"今は {selfguard.ENABLE} として動いている",
             )
         )
-    # 学びの蓄積の切り替えも 2 値。書き誤りは disable として動くので、書いたユーザが「効いている」と
+    # 学びの蓄積の切り替えも 2 値。書き誤りは enable として動くので、書いたユーザが「効いている」と
     # 思い続けないよう warn で言う。
     learning_declared = conf.learning_declared or ""
     if learning_declared and learning_declared not in ("enable", "disable"):
@@ -260,7 +261,7 @@ def report(
                 SEVERITY_WARN,
                 "(learning)",
                 f"{settings.LEARNING_ENV}={learning_declared}。enable か disable しか受け付けない。"
-                "今は disable として動いている",
+                "今は enable として動いている",
             )
         )
     # 切ってあること自体は設定として正しい。それでも言うのは、切れている状態が
@@ -467,6 +468,7 @@ def check(
     problems.extend(lint_places._ticket_places(conf, root))
     problems.extend(lint_places._projectless_worktrees(conf, root))
     problems.extend(lint_direct._direct(conf, root))
+    problems.extend(lint_wiki._wiki(conf, root))
     problems.extend(lint_project._local_settings(root))
     problems.extend(lint_layers._sync(conf, root))
     return problems

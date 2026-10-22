@@ -79,7 +79,10 @@ class EveryTest(unittest.TestCase):
     def run_ccnavi(
         self, *args: str, payload: str = "", state: str | None = None
     ) -> subprocess.CompletedProcess:
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         return run_ccnavi(
             [
                 "--root",
