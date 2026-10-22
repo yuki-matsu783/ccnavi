@@ -122,7 +122,10 @@ class CloseNoticeTest(ReadyHarness):
     def test_the_notice_names_a_command_that_works_and_then_goes_quiet(self):
         self.closable()
         self.assertEqual(len(notice_lines(self.parent_closed)), 1)
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         made = run_ccnavi(
             ["--root", self.root, "--templates", "--draft", "i0001"], env=env, cwd=ROOT

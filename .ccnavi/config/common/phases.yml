@@ -73,22 +73,3 @@ phases:
     review: mr
     scope: inherit
     when: フィードバック計画の最後に置き、ほかの対応を受ける
-
-  # 学びの蓄積（docs/design/tickets/learning-wiki.md）。親のフィードバック計画に置く。
-  # 子の気づきの記録（wip/handoff/learnings/）と受信箱（docs/wiki/inbox/）を learning-wiki に統合する。
-  # wiki の共有ファイル（index.md・log.md・skill-impact.md）を直すのはこの子だけ。
-  learning-consolidate:
-    kind: feedback
-    title: 学びの統合
-    review: mr
-    scope: ["docs/wiki/*"]
-    when: "子の気づきの記録に learnings: none でないものがあるか、受信箱にファイルがあるとき。全部 none で受信箱が空なら置かない"
-
-  # 統合したパターンの提案を、反映先ごとに出す。スキル・文書は子が直し、ルール・配点・フェーズ定義・
-  # テンプレートは下書きを wip/handoff/ に置いてユーザが置く。
-  learning-apply:
-    kind: feedback
-    title: 学びの反映
-    review: mr
-    scope: [".claude/skills/*", "docs/wiki/*"]
-    when: 統合したパターンに提案の時期（再発の回数が閾値以上）のものがあるか、ユーザが提案を頼んだとき

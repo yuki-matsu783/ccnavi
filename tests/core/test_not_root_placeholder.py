@@ -498,7 +498,10 @@ class NotRootJudgeTest(unittest.TestCase):
                 "tool_input": {"file_path": path},
             }
         )
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         done = run_ccnavi(
             [
                 "--root",

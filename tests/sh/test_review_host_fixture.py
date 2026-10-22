@@ -157,7 +157,10 @@ class HostFixtureTest(unittest.TestCase):
         os.chmod(self.exe, 0o755)
 
     def review(self, scene, *args, **extra):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("GITLAB_TOKEN", None)
         env.update(
             {
@@ -539,7 +542,10 @@ class GitLabHostFixtureTest(unittest.TestCase):
         os.chmod(self.exe, 0o755)
 
     def review(self, scene, *args, cwd=None, **extra):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("GITHUB_TOKEN", None)
         env.update(
             {

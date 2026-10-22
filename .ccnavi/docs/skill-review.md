@@ -3,7 +3,7 @@ type: guide
 title: スキルの振り返り
 description: ccnaviが振り返りを求めたときに拾うもの・拾わないもの・スキルのどこに足すか
 tags: [skills, feedback]
-keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, references, 候補, 提案, フィードバック, 訂正, wiki, パターン, skill-impact, 知識, 蓄積]
+keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, references, 候補, 提案, フィードバック, 訂正, wiki, パターン, impact, 知識, 蓄積]
 ---
 
 # スキルの振り返り
@@ -42,7 +42,7 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
 
 ## wiki 層
 
-候補を書く前に、拾ったものを `docs/wiki/` に溜め、`index.md` と `skill-impact.md`（却下された提案の記録）を読む。
+候補を書く前に、`ccnavi --learnings` の一覧と `docs/wiki/impact/`（採否の記録。却下された提案も残る）を読む。
 置き場、ファイルの中身、読む場面、書き換える場面は `.ccnavi/docs/skill-wiki.md`。
 
 ## どこに足すか
@@ -128,7 +128,7 @@ allow:
   - match: Write|Edit
     glob: ".claude/skills/commit/*"
 ---
-対象の SKILL.md（と references/）の差分か、新しく作るなら全文の下書き。動機になった wiki のパターンと、wiki（`patterns/`・`skill-impact.md`・`log.md`）に入れる差分も書く。
+対象の SKILL.md（と references/）の差分か、新しく作るなら全文の下書き。動機になった wiki のパターンと、採否の記録（`impact/<提案>.md`、`承認待ち`）も同じチケットに入れる。
 `allow` には `docs/wiki/*` も足す。
 ```
 

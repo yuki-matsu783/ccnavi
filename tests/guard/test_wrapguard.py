@@ -133,7 +133,10 @@ class EnvHookTest(unittest.TestCase):
             "permission_mode": "default",
             "tool_input": {"command": command},
         }
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(extra_env)
         result = run_ccnavi(
@@ -243,7 +246,10 @@ class ChildPushTest(unittest.TestCase):
             "session_id": "s1",
             "tool_input": {"command": command},
         }
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         result = run_ccnavi(
             [
@@ -354,7 +360,10 @@ class SubagentParentTreeTest(unittest.TestCase):
         }
         if agent:
             payload["agent_id"] = agent
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         result = run_ccnavi(
             ["--root", self.root, "--mode", "enable"],
@@ -622,7 +631,10 @@ class ShAgreesTest(unittest.TestCase):
         )
 
     def run_sh(self, cwd, sub):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(GIT_ENV)
         # シェルは起動時の PWD を論理の居場所として引き継ぐ。端末から symlink 越しに cd した形。
@@ -677,7 +689,10 @@ class ShAgreesTest(unittest.TestCase):
         parent = self.trees["i0001"]
         child = self.trees["i0001-01-01"]
         write(os.path.join(parent, "only-in-parent.txt"), "x\n")
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(GIT_ENV)
         env["PWD"] = child
@@ -784,7 +799,10 @@ class CorePathTest(unittest.TestCase):
             "permission_mode": "default",
             "tool_input": {"command": command},
         }
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(extra_env)
         result = run_ccnavi(
@@ -1046,7 +1064,10 @@ class CorePathShAgreesTest(unittest.TestCase):
             subprocess.run(git + args, cwd=self.root, check=True, capture_output=True)
 
     def run_sh(self, args):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(GIT_ENV)
         env["PWD"] = self.root

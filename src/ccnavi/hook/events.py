@@ -34,6 +34,7 @@ from ..tickets import (
     approval_checks,
     branchfind,
     direct_candidates,
+    learning_notice,
     ops_stop,
     ops_stop_integrate,
     ops_stop_request,
@@ -1004,18 +1005,20 @@ def decide_at_start(
         texts.append(rejects)
     if pending:
         texts.append(pending)
+    # 学びの蓄積の提案の候補が新しく現れたら、ユーザにだけ知らせる（モデルの文脈には入れない）。
+    learning = "" if payload.agent_id else learning_notice.notice(conf, root, deadline)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
         texts.append(skills)
     if docs:
         texts.append(docs)
-    if texts:
+    if texts or learning:
         hookio.write_context(
             stdout,
             hookio.SESSION_START,
             "\n\n".join(texts),
-            system="\n\n".join(p for p in (rejects, pending) if p),
+            system="\n\n".join(p for p in (rejects, pending, learning) if p),
         )
     return EXIT_OK
 

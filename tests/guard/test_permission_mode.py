@@ -26,7 +26,10 @@ def run(permission_mode, command=UNDECLARED_COMMAND, mode="enable", guard_unwatc
     コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     切らないと、作業ツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
     """
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     if guard_unwatched:
         environment["CCNAVI_GUARD_UNWATCHED"] = guard_unwatched

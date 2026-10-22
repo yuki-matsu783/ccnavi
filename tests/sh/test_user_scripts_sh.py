@@ -164,7 +164,10 @@ class EntryTest(unittest.TestCase):
         os.chmod(self.bin, 0o755)
 
     def run_sh(self, name, *args):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.update(CCNAVI_WORKSPACE=self.ws, CCNAVI_BIN_PATH=self.bin)
         return subprocess.run(
             [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", name), *args],

@@ -30,7 +30,10 @@ class EmptyEnvStillWritesTheRecordTest(unittest.TestCase):
         subprocess.run(["git", "init", "-q"], cwd=self.ws, check=True, capture_output=True)
 
     def hook(self, event, tool, env):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env)
         payload = {

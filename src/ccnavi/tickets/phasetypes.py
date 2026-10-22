@@ -372,6 +372,30 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_model.Entry], l
     return entries, problems
 
 
+_CONSOLIDATE_TYPE: PhaseType | None = None
+
+
+def consolidate_type() -> PhaseType:
+    """統合の子の範囲の上限を持つ、ccnavi の中に固定した定義。
+
+    `phases.yml` にも親の写し（`phases:`）にも置かない。統合の子は親の計画に載らず、親の範囲の上限
+    も当てないので（`phase_scope.scope_verdict`）、範囲を切り詰めるのはこの定義と子の `allow` だけ。
+    """
+    global _CONSOLIDATE_TYPE
+    if _CONSOLIDATE_TYPE is None:
+        entries, _ = _globs("learning-consolidate", "scope", list(ticket_model.CONSOLIDATE_SCOPE))
+        _CONSOLIDATE_TYPE = PhaseType(
+            id=ticket_model.MAINTENANCE_CONSOLIDATE,
+            title="学びの統合",
+            kind=KIND_FEEDBACK,
+            review=REVIEW_NONE,
+            scope=entries,
+            scope_globs=[e.glob for e in entries],
+            learning=LEARNING_OFF,
+        )
+    return _CONSOLIDATE_TYPE
+
+
 def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
     """子の範囲が定義の上限を超えている項を名指しする。子 ⊆ 定義。
 

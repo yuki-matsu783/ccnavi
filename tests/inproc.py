@@ -45,10 +45,19 @@ def run_ccnavi(
 ) -> subprocess.CompletedProcess[str]:
     """`python -m ccnavi *args` を同じプロセスの中で動かし、CompletedProcess の形で返す。"""
     argv = list(args)
+    # 学びの蓄積の既定は enable。学びを扱わないテストの子の finish が記録で止まらないよう、呼び手が
+    # 指定しなければ切る（扱うテストは env で CCNAVI_LEARNING を渡す。既定そのものは settings を
+    # 直に読んで見る）。
+    if env is not None and "CCNAVI_LEARNING" not in env:
+        env = {**env, "CCNAVI_LEARNING": "disable"}
     built = os.environ.get("CCNAVI_TEST_EXE", "")
     if built:
         # 組み立て済みの実行ファイルで動かす（`CCNAVI_TEST_EXE=<パス>`）。配る物を測る。
-        merged = {**os.environ, **GIT_ENV} if env is None else {**GIT_ENV, **env}
+        merged = (
+            {"CCNAVI_LEARNING": "disable", **os.environ, **GIT_ENV}
+            if env is None
+            else {**GIT_ENV, **env}
+        )
         done = subprocess.run(
             [built, *argv],
             input=input or "",
@@ -64,6 +73,12 @@ def run_ccnavi(
     stdout = io.StringIO()
     stderr = io.StringIO()
     with contextlib.ExitStack() as stack:
+        if env is None:
+            stack.enter_context(
+                mock.patch.dict(
+                    os.environ, {"CCNAVI_LEARNING": os.environ.get("CCNAVI_LEARNING", "disable")}
+                )
+            )
         if env is not None:
             # 走った機械の git の設定を締め出す分（tests.GIT_ENV）は、環境を空にしても
             # 残す。ccnavi は判定の中で git を起こす（src/ccnavi/infra/gitcmd.py）ので、ここで

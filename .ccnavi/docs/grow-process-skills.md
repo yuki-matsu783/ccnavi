@@ -19,7 +19,7 @@ keywords: [工程スキル, reference, 育つ, 全体像, 振り返り, wiki, sk
 |---|---|---|---|
 | きっかけ | ユーザの訂正、時間をかけて分かった落とし穴、操作の失敗と回避策、読んだスキルの誤り。サブエージェントは報告の「スキル候補」の節で返す | エージェント（ターンの終わりの振り返り） | `.ccnavi/docs/skill-review.md` |
 | 下書き | 拾ったものを `docs/wiki/` に溜める（パターンと採否の記録）。その上で、対象の工程の `references/` への追記を候補にする。振り返りの最中は `.claude/skills/` を書き換えない | エージェント | `wip/handoff/skill-candidates.md`、`.ccnavi/docs/skill-wiki.md` |
-| 検証 | 既存と重複しないか、他のプロジェクトでも使えるか（`common/` か `project/` か）を決める。却下済みの提案を根拠なしに出し直さない | エージェント | wiki の `index.md` と `skill-impact.md` |
+| 検証 | 既存と重複しないか、他のプロジェクトでも使えるか（`common/` か `project/` か）を決める。却下済みの提案を根拠なしに出し直さない | エージェント | `ccnavi --learnings` の一覧と wiki の `impact/` |
 | 承認 | 親の下ではフィードバック計画の `skill-improve` フェーズ、それ以外は提案チケット。ユーザが承認し、子の MR で差分を見る | ユーザ | `ticket`、MR |
 | 効く | reference を追加・追記する。工程スキルの reference は `type: skill-reference`、`tags` に工程名を入れる | エージェント（承認した子の中） | `ccnavi --docs --type skill-reference --tag <工程>` |
 | 配る | `common/` は親の `ticket start` がプロジェクトの `skills/<工程>/` へ写す（共通側から消えた `.md` も消える）。`project/` は写されない | ccnavi | 親の `ticket start` |

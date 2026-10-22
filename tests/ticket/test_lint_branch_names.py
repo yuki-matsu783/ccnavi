@@ -309,7 +309,10 @@ class LintBranchNamesTest(unittest.TestCase):
         )
 
     def lint(self, *extra, env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         result = run_ccnavi(

@@ -227,12 +227,17 @@ class WriteAndPushHarness(unittest.TestCase):
         git(self.tree, "commit", "-q", "-m", "approve")
 
     def env(self, **extra):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(
             {
                 "CCNAVI_BIN_PATH": self.bin,
                 "CCNAVI_LOCK_WAIT": "2",
+                # 学びの蓄積の既定は enable。学びを扱わないテストは切る。
+                "CCNAVI_LEARNING": "disable",
             }
         )
         env.update(extra)

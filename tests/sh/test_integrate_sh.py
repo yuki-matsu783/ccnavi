@@ -121,7 +121,10 @@ class Fixture(unittest.TestCase):
         return wt
 
     def run_git_sh(self, *args, cwd=None, env_extra=None):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env["CCNAVI_BIN_PATH"] = self.bin
         env.update(env_extra or {})

@@ -133,7 +133,10 @@ class WorktreeShTest(unittest.TestCase):
 
     def run_sh(self, *args, fail_fetch=False, cwd=None, **extra):
         """fail_fetch が文字列なら、fetch はその文で失敗する。真なら名前が引けない失敗。"""
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(
             {
@@ -908,7 +911,10 @@ class WorktreeShTest(unittest.TestCase):
     def test_integrate_without_a_record_points_to_adopt_and_it_works_after_adopting(self):
         self.uncorded_worktree()
         gitsh = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh")
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env["CCNAVI_BIN_PATH"] = self.exe
         env["PATH"] = os.pathsep.join([self.bin, os.environ["PATH"]])
 

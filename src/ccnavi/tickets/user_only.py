@@ -202,6 +202,7 @@ SUBS: tuple[Sub, ...] = (
             "finish",
             "cancel",
             "propose",
+            "consolidate",
             "record-risk",
             "prepare",
             "requested",

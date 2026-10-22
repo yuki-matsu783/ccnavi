@@ -66,7 +66,10 @@ class HandoffLinksTest(unittest.TestCase):
             "session_id": "s1",
             "cwd": self.root if cwd is None else cwd,
         }
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         result = run_ccnavi(
             ["--root", self.root, "--mode", "enable"],

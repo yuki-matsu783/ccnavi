@@ -505,7 +505,10 @@ class ConfigUnionHarness(unittest.TestCase):
         「`projects/` を数えない」を言いたいテストは、`projects/` を動かして無くす
         （置き場は固定で、空文字で言う口は無い）。
         """
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         return run_ccnavi(

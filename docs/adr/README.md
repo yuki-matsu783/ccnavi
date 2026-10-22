@@ -211,6 +211,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0134](0134-template-edit-from-board.md) | テンプレート管理画面から下書きの保存と、取り込み済みの改名・移動・削除をできるようにする（0130 の「カードからの入口は作らない」を改める） |
 | [0149](0149-template-edit-writes-directly-from-board.md) | テンプレート管理画面は、ユーザが図で直したテンプレートを拡張が直接保存する（書くのは拡張だが、保存の前に実行ファイルが読んで確かめる） |
 | [0135](0135-learning-wiki-grows-through-tickets.md) | 気づきを子ごとの記録に溜め、learning-wiki で統合し、反映先ごとの提案にして人間が承認する |
+| [0159](0159-learning-judged-before-parent-closes.md) | 気づきを親を閉じる前に統合の子で判定し、観測元の数と MR のマージで提案を決着する |
 | [0136](0136-handoff-across-pcs-and-parent-branch-authority.md) | 親ブランチを正本にして、PC をまたいだ引き継ぎを決める（0102 の `branch:` キーと 0103 の `switch` の手順を置き換える） |
 | [0137](0137-merge-child-at-finish.md) | 子の成果の合流を finish で行い、状態と 1 つのマージコミットにして push する |
 | [0138](0138-tidy-up-when-parent-closes.md) | 親を閉じるときの片付けを ccnavi が行い、消すのは成果が失われないと確かめられたものだけにする |

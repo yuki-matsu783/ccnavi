@@ -120,7 +120,10 @@ class FetchTest(unittest.TestCase):
 
     def fetch(self, cwd=None, **extra):
         script = posix(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-fetch.sh"))
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         # 親のワークツリーかは実行ファイルに聞く（sh はチケットを読まない）。
         # ソースの実行ファイルを渡す。
         env["CCNAVI_BIN_PATH"] = self.source_exe()

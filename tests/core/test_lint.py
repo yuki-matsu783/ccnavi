@@ -88,7 +88,10 @@ def ccnavi(root: str, *args: str, env: dict | None = None) -> subprocess.Complet
     仕掛けているので、テストを走らせるセッションが既に設定を持っている。
     それを読むテストは、コードではなく走った機械のことを報告してしまう。
     """
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     environment.update(env or {})
     return run_ccnavi(
         ["--root", root, *args],
@@ -602,7 +605,10 @@ class LintTest(unittest.TestCase):
             ["--root", self.root, "--mode", "enable"],
             input=payload,
             cwd=ROOT,
-            env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            env={
+                **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+                "CCNAVI_LEARNING": "disable",
+            },
         )
 
         self.assertIn("組み立て不能", checked.stdout)

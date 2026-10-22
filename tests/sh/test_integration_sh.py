@@ -62,7 +62,10 @@ class IntegrationTest(unittest.TestCase):
         seed(self.ws)
 
     def run_sh(self, script, tree, **env):
-        full = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        full = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         full.update(env)
         # `$0` に入口のパスを渡す。保護済み sh と同じく、部品は `$0` のディレクトリから読む。
         common = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-common.sh")

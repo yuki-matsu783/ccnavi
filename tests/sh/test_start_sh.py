@@ -186,7 +186,10 @@ class StartShTest(unittest.TestCase):
         write(self.routes, json.dumps(routes))
 
     def run_sh(self, *args, token=True, cwd=None, **extra):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         for name in ("GITHUB_TOKEN", "GITLAB_TOKEN", "CLAUDE_PROJECT_DIR"):
             env.pop(name, None)
         if token:

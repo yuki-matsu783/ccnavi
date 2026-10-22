@@ -38,7 +38,10 @@ class NextIdTest(unittest.TestCase):
         )
 
     def next_id(self, *words, env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.update(env or {})
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return run_ccnavi(

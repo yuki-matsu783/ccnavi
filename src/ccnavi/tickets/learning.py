@@ -17,11 +17,18 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
 from ..records import audit, redact
-from . import approval, approval_checks, approval_marks, phase, phasetypes, ticket_model
+from . import (
+    approval,
+    approval_checks,
+    approval_marks,
+    learning_records,
+    phase,
+    phasetypes,
+    ticket_model,
+)
 
 LEARNING_DIR = "wip/handoff/learnings"
 INBOX_DIR = "docs/wiki/inbox"
-INBOX_DIR_ROOT = "wip/handoff/inbox"
 TARGETS = ("rule", "risk", "phase", "template", "skill", "docs")
 UNDECIDED = "未定"
 SIGNALS = ("訂正", "落とし穴", "失敗と回避", "誤り")
@@ -41,8 +48,8 @@ def digest_rel(ident: str) -> str:
     return f"{LEARNING_DIR}/{ident}.digest.json"
 
 
-def inbox_rel(ident: str, stamp14: str, root: bool = False, n: int = 0) -> str:
-    directory = INBOX_DIR_ROOT if root else INBOX_DIR
+def inbox_rel(ident: str, stamp14: str, n: int = 0) -> str:
+    directory = INBOX_DIR
     suffix = f"-{n}" if n > 0 else ""
     return f"{directory}/{ident}-{stamp14}{suffix}.md"
 
@@ -349,7 +356,12 @@ def phase_off(root: str, conf: settings.Settings, found: ticket_model.Ticket) ->
 
 def applies(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
     """学びの蓄積がこの子に効くか。全体が enable で、子で、フェーズ定義が off でない。"""
-    return conf.learning_enabled and found.is_child and not phase_off(root, conf, found)
+    return (
+        conf.learning_enabled
+        and found.is_child
+        and not found.is_consolidate
+        and not phase_off(root, conf, found)
+    )
 
 
 def record_missing(
@@ -370,6 +382,64 @@ def record_missing(
         "（気づきが無ければ learnings: none のままでよい）\n"
     )
     return True
+
+
+def parent_blocked(
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
+) -> bool:
+    """親の `finish` の学びの検査。止めたなら理由を出して True。
+
+    学び以外の検査をすべて通したあと、親の今の HEAD で次を見る。統合を済ませた後も毎回、
+    今の HEAD で検査し直す。
+    - 記録・パターン・受信箱の置き場に、未コミットか未追跡の変更がある
+    - 読み取れない記録か、整合の検査に当たる記録がある
+    - 処理すべきものがある（`consolidate` を案内する）
+    全部の記録が `none` で受信箱も空なら通る。
+    """
+    if found.is_child or not conf.learning_enabled:
+        return False
+    parent_tree = tree.worktree_path(root, found.ticket)
+    if not os.path.isdir(parent_tree):
+        return False
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    dirty = learning_records.uncommitted(parent_tree)
+    if dirty:
+        stderr.write(
+            f"ccnavi: {found.ticket} の学びの置き場に未コミットか未追跡の変更がある: "
+            f"{', '.join(dirty)}。コミットしてから '{ticket_sh} finish {found.ticket}' "
+            "を打ち直してください\n"
+        )
+        return True
+    found_items = learning_records.pending(parent_tree)
+    if found_items.broken:
+        write_broken(stderr, found_items)
+        return True
+    if found_items.items:
+        stderr.write(
+            f"ccnavi: {found.ticket} には、判定されていない気づきがある"
+            f"（{len(found_items.items)} 件）:\n"
+        )
+        for item in found_items.items:
+            stderr.write(f"  - {item.describe()}\n")
+        stderr.write(
+            f"  '{ticket_sh} consolidate {found.ticket}' で統合の子を作り、"
+            f"その子を処理して閉じたあと、"
+            f"'{ticket_sh} finish {found.ticket}' を打ち直してください\n"
+        )
+        return True
+    return False
+
+
+def write_broken(stderr: TextIO, found: learning_records.Pending) -> None:
+    """読み取れない記録と整合の検査に当たる記録を名指しする。統合では直せない。"""
+    for path, why in found.unreadable:
+        stderr.write(f"ccnavi: 気づきの記録 {path} を読み取れない: {why}\n")
+    for path, why in found.inconsistent:
+        stderr.write(f"ccnavi: 気づきの記録 {path} が整合の検査に当たる: {why}\n")
+    stderr.write(
+        "  統合では直せない。記録を直して（訂正や追加は新しい節を足す。処理済みの節の本文は"
+        "書き換えない）コミットしてから打ち直してください\n"
+    )
 
 
 def _bound_ticket(root: str, conf: settings.Settings, name: str) -> ticket_model.Ticket | None:
@@ -395,21 +465,18 @@ def run(
 
     here = phase.worktree_at(root, conf, cwd)
     if here is None:
-        proj = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
-        if proj is not None and proj.name:
-            ident = f"project-{proj.name}"
-            tree_root = root
-            tree_name = proj.name
-        else:
-            ident = "root"
-            tree_root = root
-            tree_name = ""
-        bound = None
-    else:
-        ident = here.name
-        tree_root = here.root
-        tree_name = here.name
-        bound = _bound_ticket(root, conf, here.name)
+        # ワークスペースルートとプロジェクトのルートには書かない（追跡されず、誰がまとめるかも
+        # 決まらない置き場になる）。ワークツリーを切って、その中で打ち直す。
+        worktree_sh = settings.script_command(root, "ccnavi-worktree.sh")
+        stderr.write(
+            "ccnavi: ワークスペースルートとプロジェクトのルートには気づきを書けない。"
+            f"'{worktree_sh} <名前>' でワークツリーを切り、その中で打ち直してください\n"
+        )
+        return 1
+    ident = here.name
+    tree_root = here.root
+    tree_name = here.name
+    bound = _bound_ticket(root, conf, here.name)
 
     if ident_arg and ident_arg != ident:
         stderr.write(
@@ -500,8 +567,7 @@ def run(
         stdout.write(f"追記した: {record_rel(ident)}\n")
         return 0
 
-    inbox_dir = INBOX_DIR if here is not None else INBOX_DIR_ROOT
-    bad = unsafe_path(tree_root, inbox_dir)
+    bad = unsafe_path(tree_root, INBOX_DIR)
     if bad:
         stderr.write(
             f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので反映しません\n"
@@ -509,7 +575,7 @@ def run(
         return 1
     stamp = utc14()
     for n in range(INBOX_TRIES):
-        rel = inbox_rel(ident, stamp, root=here is None, n=n)
+        rel = inbox_rel(ident, stamp, n=n)
         msg = write_new(os.path.join(tree_root, rel), inbox_text(ident, entry, now_text))
         if msg == "exists":
             continue

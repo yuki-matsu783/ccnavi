@@ -68,7 +68,10 @@ def gitdir_of(worktree: str) -> str:
 
 
 def ccnavi(root: str, *args: str) -> subprocess.CompletedProcess:
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     return run_ccnavi(["--root", root, *args], input="", cwd=ROOT, env=environment)
 
 

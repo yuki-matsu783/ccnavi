@@ -5,6 +5,7 @@
 #   sh .ccnavi/scripts/ccnavi-ticket.sh next-id     [<先頭の語> <slug>]
 #   sh .ccnavi/scripts/ccnavi-ticket.sh learn      [--note <本文>] [--target <種類>] [--signal <信号>]
 #   sh .ccnavi/scripts/ccnavi-ticket.sh propose     <識別子>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh start       <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh finish      <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh cancel      <識別子> --reason <理由>
@@ -15,6 +16,10 @@
 # 提案を書く親のワークツリーで足りる（親子の識別子を渡す）。送るのは親子の提案だけ。サブエージェントからは打てない。
 # 親のブランチに未 push のコード（承認済みの置き場と提案の置き場の外）の変更があれば、一緒に公開しないよう止める。
 # 送れなかったときも、書いた提案は作業ツリーに残す（戻すのは自分のコミットだけ）。
+#
+# consolidate は、親の finish が「判定されていない気づきがある」と止めたときに打つ。処理する統合の子
+# （<親>-00-<連番>。phase: 0、maintenance: learning-consolidate）を doing/ に作り、親のブランチへ
+# コミットして push する（学びの蓄積が enable のときだけ。開いている統合の子があれば作らない）。
 #
 # record-risk は、実績のリスクの定性項目（risks.yml の `judge:`）の判定を記録する。判断するのは
 # サブエージェント、記録するのは親。判定が揃うまで、その子は finish で閉じられない。
@@ -34,7 +39,7 @@
 # .ccnavi/approved/done/。ユーザが動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
 # wip/proposals/ へ。エージェントの側を動かすのはこのスクリプトだけで、直接ファイルを
 # 作ったり動かしたりするのは ccnavi が止める。
-# サブエージェントからの start・finish・cancel・propose・record-risk は ccnavi の hook が止める（判定がサブエージェントの
+# サブエージェントからの start・finish・cancel・propose・consolidate・record-risk は ccnavi の hook が止める（判定がサブエージェントの
 # 呼び出しを見分ける。実行ファイルとこのスクリプトは呼び手を知らない）。
 #
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
@@ -42,7 +47,7 @@
 # ソースツリーの `python -m ccnavi`。
 #
 # 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）の
-# start・finish・cancel・propose は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
+# start・finish・cancel・propose・consolidate は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk のコミットと送信は、その子の finish が行う。
@@ -69,6 +74,7 @@ usage() {
 sh .ccnavi/scripts/ccnavi-ticket.sh status [<親>]
 sh .ccnavi/scripts/ccnavi-ticket.sh next-id [<先頭の語> <slug>]
 sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel|propose> <識別子> [--reason <理由>]
+sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親>
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] [--signal <信号>]
 （親の提案の雛形はこのスクリプトに無い: ccnavi ticket new <識別子> --title <題> --plan <型,…>）
@@ -85,6 +91,9 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
   propose      承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を親のブランチへ
                コミットして push する。別のPCで承認できるように、承認を頼む前に打つ（親のワークツリーが必要です）。
                変わっていない提案は、未 push のコミットがあればそれだけを送る。未 push のコードの変更があれば止まる
+  consolidate  親の finish が止めた気づきを処理する統合の子を doing/ に作り、親のブランチへ push する。
+               打つのは親の finish の学び以外の検査を通ったあと。処理すべきものが無い・開いている統合の子がある
+               ときは作らない
   start        .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
                ワークツリー .claude/worktrees/<識別子> が必要です。承認済みチケットは置き場を移らない
   finish       doing/ -> wip/proposals/review/（フェーズがレビュー必須）か .ccnavi/approved/done/（不要）。
@@ -128,9 +137,9 @@ status | next-id | learn) ;;
 	;;
 esac
 case "$1" in
-status | next-id | start | finish | cancel | propose | record-risk | learn) ;;
+status | next-id | start | finish | cancel | propose | consolidate | record-risk | learn) ;;
 *)
-	printf 'ccnavi-ticket: 未対応のサブコマンドです：%s。使用できるサブコマンドは status / next-id / start / finish / cancel / propose / record-risk / learn です。\n' "$1" >&2
+	printf 'ccnavi-ticket: 未対応のサブコマンドです：%s。使用できるサブコマンドは status / next-id / start / finish / cancel / propose / consolidate / record-risk / learn です。\n' "$1" >&2
 	[ "$1" != new ] || printf '親の提案の雛形は、このスクリプトではなく実行ファイルが作ります: ccnavi ticket new <識別子> --title <題> --plan <型,…> [--scope <glob>] [--mr <番号>]（識別子のワークツリーの中で打つ。識別子は next-id で決める）。\n' >&2
 	exit 2
 	;;
@@ -295,7 +304,7 @@ ensure_child_worktree() {
 
 # write-and-push（親子のチケットの start・finish・cancel）。
 case "$1" in
-start | finish | cancel | propose)
+start | finish | cancel | propose | consolidate)
 	ccnavi_log_root="$root"
 	ccnavi_wap_root="$root"
 	ccnavi_wap_label=ccnavi-ticket
@@ -320,6 +329,7 @@ start | finish | cancel | propose)
 		start) wap_words="$wap_id に着手" ;;
 		finish) wap_words="$wap_id の作業を終えた" ;;
 		propose) wap_words="$wap_id の提案を送る" ;;
+		consolidate) wap_words="$wap_id の学びの統合の子を作る" ;;
 		*) wap_words="$wap_id を取り消した" ;;
 		esac
 		ccnavi_wap_begin || exit 1

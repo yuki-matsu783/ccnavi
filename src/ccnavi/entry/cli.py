@@ -40,6 +40,7 @@ from ..tickets import (
 from . import (
     cli_args,
     cli_handoff,
+    cli_learnings,
     cli_ops,
     cli_plan,
     cli_stopreview,
@@ -311,6 +312,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--format", default=None)
     parser.add_argument("--no-refresh", action="store_true")
+    # 学びの蓄積の wiki のパターンごとの状態と観測元の数の一覧。読むだけ（`--json` で機械可読）。
+    parser.add_argument("--learnings", action="store_true")
     # 作業・レビュー計画のテンプレートの一覧・検索（`--keyword`）・表示（`--show`）。読むだけ。
     # `--layer` は統合結果の相手のレイヤー（self かプロジェクト名。既定は self）。
     parser.add_argument("--templates", action="store_true")
@@ -676,6 +679,11 @@ def _parsed(
         if refused:
             stderr.write(f"ccnavi: {refused}\n")
             return EXIT_ERROR
+    if cli_learnings.asked(args):
+        refused = cli_learnings.usage_problem(args)
+        if refused:
+            stderr.write(f"ccnavi: {refused}\n")
+            return EXIT_ERROR
     # `--docs` に添えたほかの経路のフラグは、気づかれないまま無視せずに止める。
     # レイヤーの置き場の差し替えはこの後で無視され、`--ticket-control` などは
     # 設定に重ねられるので、その前に見る。
@@ -744,6 +752,8 @@ def _parsed(
         return cli_handoff.run(stdin, stdout, stderr, parser, conf, root, args)
     if args.templates:
         return cli_templates.run(stdout, stderr, conf, root, args)
+    if args.learnings:
+        return cli_learnings.run(stdout, stderr, conf, root, args)
     if not args.docs:
         stray = cli_args._docs_flags_given(args)
         if stray:
@@ -1066,6 +1076,7 @@ def _hook_route(args: argparse.Namespace) -> bool:
     """
     return not (
         args.docs
+        or args.learnings
         or args.handoff
         or cli_args._diagnosing(args)
         or args.prune

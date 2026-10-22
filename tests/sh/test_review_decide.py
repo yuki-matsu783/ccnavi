@@ -278,7 +278,10 @@ class ReviewDecideShTest(unittest.TestCase):
         """ccnavi-user-decide.sh を打つ。script="ccnavi-review.sh" なら ccnavi-review.sh decide。"""
         shell = shell or SHELL
         assert shell is not None
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         # gh / glab を PATH から外し、curl とトークンの経路を通す
         tools = os.path.join(self.work, "bin")
         os.makedirs(tools, exist_ok=True)

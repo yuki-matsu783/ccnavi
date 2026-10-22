@@ -42,7 +42,10 @@ class HookCase(unittest.TestCase):
         }
         if agent:
             payload["agent_id"] = agent
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(env_extra)
         result = run_ccnavi(

@@ -72,7 +72,10 @@ class ReviewMergedTest(unittest.TestCase):
         os.chmod(path, 0o755)
 
     def merged(self, token="t", *args):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("GITHUB_TOKEN", None)
         env.pop("GITLAB_TOKEN", None)
         if token:
@@ -191,7 +194,10 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
         os.chmod(path, 0o755)
 
     def merged(self, token="t", *args):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         env.pop("GITHUB_TOKEN", None)
         env.pop("GITLAB_TOKEN", None)
         if token:

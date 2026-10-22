@@ -88,7 +88,10 @@ class CrossRepositoryTest(unittest.TestCase):
         return root
 
     def lint(self):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return run_ccnavi(
             [
@@ -226,7 +229,10 @@ class ProjectsCollisionTest(unittest.TestCase):
         return root
 
     def lint(self):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
         result = run_ccnavi(
             ["--root", self.ws, "--lint", "--json", "--mode", "enable"],
@@ -360,7 +366,10 @@ class ProjectsCollisionTest(unittest.TestCase):
     def test_empty_projects_flag_does_not_crash_the_lint(self):
         """`--projects ""`（診断のフラグ）でも `--lint` は失敗せず、置き場の苦情は出さない。"""
         self.no_tracking()
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
 
         result = run_ccnavi(
@@ -395,7 +404,10 @@ class ProjectsCollisionTest(unittest.TestCase):
                 raise ValueError("path is on mount 'D:', start on mount 'C:'")
             return real(path, *args, **kwargs)
 
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+        }
         environment.pop("CLAUDE_PROJECT_DIR", None)
 
         with mock.patch("os.path.relpath", relpath):

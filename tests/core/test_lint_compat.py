@@ -20,7 +20,10 @@ from tests.inproc import run_ccnavi
 
 
 def ccnavi(*args: str, root: str) -> subprocess.CompletedProcess:
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment = {
+        **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        "CCNAVI_LEARNING": "disable",
+    }
     return run_ccnavi(["--root", root, *args], input="", cwd=ROOT, env=environment)
 
 
