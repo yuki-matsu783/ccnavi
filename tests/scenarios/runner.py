@@ -494,7 +494,7 @@ def host_cli(kind):
         return "gh"
     if kind == "gitlab":
         return "glab"
-    raise RuntimeError("origin からホストの種類を読めない")
+    raise RuntimeError("origin からホストの種類を判別できない")
 
 
 def issue_create_args(kind, issue):

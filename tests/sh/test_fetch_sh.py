@@ -457,7 +457,7 @@ class FetchTest(unittest.TestCase):
 
     def test_an_authentication_failure_with_unreadable_origin_lists_glab_first(self):
         """origin の表記が読めないときは、glab を先に、GitHub なら gh と書く。"""
-        # 読めない origin の案内は、認証の失敗を作れないので ccnavi_fetch_auth_note に直接聞く。
+        # 読めない origin では認証の失敗を起こせないので、ccnavi_fetch_auth_note を直接呼ぶ。
         script = posix(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-fetch.sh"))
         probe = (
             '. "$(dirname "$0")/ccnavi-common.sh"; '

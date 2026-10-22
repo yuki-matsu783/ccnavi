@@ -631,7 +631,7 @@ _REWRITE_TEXT = {
         "コマンド置換には `$( )` を使ってください。"
         "バッククォートを文字として残すなら（Issue や PR 本文の Markdown など）、"
         "シングルクォートで囲むか、1 つずつ \\` とエスケープするか、ファイルから渡してください"
-        "（`glab --description-file <ファイル>`（gh なら `--body-file`）{commit}）。",
+        "（`glab --description-file <ファイル>`、gh なら `--body-file`{commit}）。",
     ),
     shellread.FORM_AMBIGUOUS: (
         "読みが分かれる形",

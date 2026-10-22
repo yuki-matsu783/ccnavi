@@ -153,7 +153,7 @@ ccnavi_fetch_git() {
 # 認証に失敗したときに添える案内を、origin のホストに合わせて 1 行出す。<ツリー>
 #
 # ホストの見分けは ccnavi_host_parse に任せる（規則を二重に持たない）。呼び手の ccnavi_h_* を壊さないよう
-# 副シェルで読み、ホストへは新しく通信しない。origin が読めなければ glab を先に書く。
+# サブシェルで読み、ホストへは新たに通信しない。origin が読めなければ glab を先に書く。
 ccnavi_fetch_auth_note() {
 	ccnavi_an_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
 	ccnavi_an_info=$(ccnavi_host_parse "$ccnavi_an_url" >/dev/null 2>&1 && printf '%s %s' "$ccnavi_h_kind" "$ccnavi_h_host") || ccnavi_an_info=""
