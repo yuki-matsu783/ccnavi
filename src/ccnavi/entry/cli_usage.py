@@ -17,7 +17,7 @@ _VERSION = """\
 バージョン、ビルド元のコミット（ソースから実行した場合は "unknown"）、.ccnavi/scripts/
 のスクリプトとVS Code拡張機能が自身の値と照合する互換バージョン、
 受け付けるすべてのオプションを出力します。ペイロードも設定も読み込みません。--json の形式は
-README.md（「版の JSON」）に記載しています。
+docs/requirements/json-shapes.md（「版の JSON」）に記載しています。
 """
 
 _LINT = """\
@@ -26,7 +26,7 @@ _LINT = """\
     ccnavi --lint [--json]
 
 ペイロードは読み込みません。ガードを無効にしうる事項をエラーまたは警告として報告し、
-エラーを報告した場合は0以外の終了コードで終了します。--json で出力される形式は README.md（「lint
+エラーを報告した場合は0以外の終了コードで終了します。--json で出力される形式は docs/requirements/json-shapes.md（「lint
 の JSON」）に記載しており、VS Code拡張機能がこれを読み込みます。
 
 1つのレイヤーのフェーズ定義も同じ方法で渡します（self はワークスペース自身のレイヤーです。
@@ -65,7 +65,7 @@ _TEST = """\
     ccnavi --test Bash "git push" [--json]
     ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml [--json]
 
-どちらもフックと同じ判定処理を通ります。--json で出力される形式は README.md（「試験の
+どちらもフックと同じ判定処理を通ります。--json で出力される形式は docs/requirements/json-shapes.md（「試験の
 JSON」）に記載しており、VS Code拡張機能がこれを読み込みます。--test は、
 ワークスペースルートから、権限モードなし・メインセッションとして呼び出しを試験します。
 別の呼び出し条件で試験するには、次を追加します。
@@ -85,7 +85,7 @@ _EXPLAIN = """\
 
     ccnavi --explain --json
 
-ペイロードは読み込まず、リモートにも接続しません。形式は README.md（「ボードの
+ペイロードは読み込まず、リモートにも接続しません。形式は docs/requirements/json-shapes.md（「ボードの
 JSON」）に記載しています。
 """
 
@@ -113,7 +113,7 @@ ccnavi-index.jsonl を最新の状態に更新します。更新するのは、g
 初回は全マークダウンファイルの先頭部分を読み込み、
 2回目以降は更新日時が変わったファイルのみを読み込みます。--no-refresh を指定すると、
 既存の索引をそのまま再利用します。--json は --format json と同じです。各行の形式は
-README.md（「ドキュメントの索引」）に記載しています。これらのフィルターは --docs 専用です。
+docs/design/diagnostics.md（10.1）に記載しています。これらのフィルターは --docs 専用です。
 ほかの実行で指定すると、終了コード1で停止します。他の実行用のフラグを --docs
 に指定した場合も同様に停止します。
 """
@@ -135,7 +135,7 @@ _TEMPLATES = """\
 （何も書き込みません。保存前の確かめ用で、--show・--draft・--keyword とは併用できません）。
 両方のレイヤーに同じ名前で内容の異なるテンプレートがある場合はエラーとなり、
 そのレイヤー側のテンプレートは使用されません。--json は、ボード画面が描画する完全な応答で、
-README.md（「作業・レビュー計画のテンプレート」）に記載しています。--keyword は --docs
+docs/design/tickets/templates.mdに記載しています。--keyword は --docs
 と共通で、それ以外では拒否されます。--docs のその他のフィルターはここでは拒否されます。--lint
 でも同じ検査を報告します。
 
@@ -216,7 +216,7 @@ decisions.*.jsonl）からルールの候補を作成するには、次のコマ
 繰り返しユーザーに判断が委ねられた呼び出しと、同じ呼び出しを繰り返し止めた deny（その message
 を見直してください）が対象です。各候補は --lint および --test-expectations
 と同じ検査を通過しています。通過しなかったものは件数のみ表示され、候補からは除外されます。
-何も書き込みません。--json で出力される形式は README.md（「候補の JSON」）に記載しており、VS
+何も書き込みません。--json で出力される形式は docs/requirements/json-shapes.md（「候補の JSON」）に記載しており、VS
 Code拡張機能がこれを読み込みます。
 """
 

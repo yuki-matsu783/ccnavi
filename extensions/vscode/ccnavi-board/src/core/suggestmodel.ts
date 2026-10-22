@@ -1,6 +1,6 @@
 /**
  * `ccnavi --suggest --json`（候補の JSON）が出す形。実行ファイルと拡張の契約で、形の定義は
- * ccnavi の README「候補の JSON」。
+ * ccnavi の docs/requirements/json-shapes.md「候補の JSON」。
  *
  * 候補は実行ファイルが記録から起こし、`--lint` と `--test-expectations` と同じ検査を通したものだけ。
  * 拡張はそれを並べるだけで、候補を自分で起こさず、ルールにも足さない（置くのはユーザ）。

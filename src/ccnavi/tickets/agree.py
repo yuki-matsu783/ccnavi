@@ -346,7 +346,7 @@ class Applied:
     """承認済みチケットを置いた結果。途中で止まったときに、どこまで置いたかを呼び手へ返す。
 
     置いたものは戻さない（戻す途中でまた失敗する）。代わりに、どこで止まって何が置かれたかを
-    そのまま返し、拡張がユーザに伝える（README「承認の JSON」の `partial`）。
+    そのまま返し、拡張がユーザに伝える（docs/requirements/json-shapes.md「承認の JSON」の `partial`）。
     """
 
     code: int

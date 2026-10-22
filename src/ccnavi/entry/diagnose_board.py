@@ -43,7 +43,7 @@ def board(
     mode_flag: str = "",
     ticket_control_flag: str = "",
 ) -> dict:
-    """ボードの中身。形は README「ボードの JSON」に書いてある。"""
+    """ボードの中身。形は docs/requirements/json-shapes.md「ボードの JSON」に書いてある。"""
     mode, ticket_control = hook_settings(conf, root, stderr, mode_flag, ticket_control_flag)
     # ボードの中身も、hook が受け取るはずのチケット制御で組む。settings に出す値と食い違わせない
     conf = dataclasses.replace(conf, ticket_control=ticket_control)

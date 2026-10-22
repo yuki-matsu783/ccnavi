@@ -13,8 +13,8 @@ keywords: [設計書, 実装, 脅威モデル, 判定, ルール, hook, チケ�
 | 知りたいこと | 読む場所 |
 |---|---|
 | 外から観測できる約束 | [requirements.md](requirements.md) |
-| 使い方と設定、ルールの書き方、記録の読み方 | [README.md](../README.md) |
-| 開発の手順、実測で分かった落とし穴 | [README.md](../README.md#開発) |
+| 使い方と設定、ルールの書き方、記録の読み方 | [README.md](../README.md)、[guide/index.md](guide/index.md) |
+| 開発の手順、実測で分かった落とし穴 | [development.md](development.md)、[設計の付録 C](design/appendix.md) |
 | 判断の理由、採らなかった案 | [docs/adr/](adr/README.md) |
 | 用語 | [CONTEXT.md](CONTEXT.md) |
 

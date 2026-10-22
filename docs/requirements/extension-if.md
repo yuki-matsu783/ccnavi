@@ -18,7 +18,7 @@ Python の関数を直接呼ぶ。
 この節には、ccnavi が拡張に約束することだけを書く。拡張が画面でどうふるまうかは、各拡張の要件書
 （VS Code は [ccnavi ボードの要件](../../extensions/vscode/ccnavi-board/docs/requirements.md) の REQ-VSC、
 Chrome は [ccnavi 承認ボードの要件](../../extensions/chrome/ccnavi-approval/docs/requirements.md) の REQ-CHR）にある。
-JSON の欄の細かい形は README の各 JSON の節と [設計 10](../design/diagnostics.md) に置き、ここからはそこを指す。
+JSON の欄の細かい形は [json-shapes.md](json-shapes.md) の各 JSON の節と [設計 10](../design/diagnostics.md) に置き、ここからはそこを指す。
 
 ### 2.13.1 共通
 
@@ -44,7 +44,7 @@ REQ-EXT-03 の UTF-8 は、実行ファイルの入口（`hookio.rebind_streams`
 念のため `PYTHONUTF8=1`・`PYTHONIOENCODING=utf-8` も渡す。
 
 REQ-EXT-05 の 3 か所は `tests/sh/test_compat_skew.py` が突き合わせる。Chrome 拡張は、互換の版を
-組み立てのときに REQ-EXT-06 の行から埋め込む。版の JSON の形と、食い違ったときの直し方は README「[版の JSON](../../README.md#版の-json)」にある。
+組み立てのときに REQ-EXT-06 の行から埋め込む。版の JSON の形と、食い違ったときの直し方は json-shapes.md「[版の JSON](json-shapes.md#版の-json)」にある。
 
 REQ-EXT-07 の文言は、`--version` を知らない古い実行ファイルを VS Code 拡張が見分けるのに使う。新しいフラグを知っているかは
 `--version --json` の `flags` で見る（REQ-EXT-04）。
@@ -73,9 +73,9 @@ sh は `<ワークスペースルート>/.ccnavi/scripts/` のものを絶対パ
 | REQ-EXT-24 | 常時 | ccnavi は、レイヤーのファイル（`rules.yml`・`risks.yml`・`phases.yml`）を YAML 1.1（PyYAML の safe な読み手）で読み、頭の `version:` が読める書式の版（`--version --json` の `formats`）でなければ error にすること。拡張が書いたファイルも、hook と同じ読み手で読むこと |
 | REQ-EXT-25 | 常時 | ccnavi は、子のフローを正とする側のツリーの `.ccnavi/approved/flows/<子>.yml`（YAML、256 KiB まで）から読み、ファイルかツリーのルートからそこまでの途中がシンボリックリンクなら読まないこと。下書き `wip/proposals/flows/<子>.yml` には効力を持たせないこと。`ccnavi-user-push-approved.sh` は `flows/` の下の `.*.tmp` をコミットしないこと |
 
-JSON の欄の形は README の「[ボードの JSON](../../README.md#ボードの-json)」「[承認の JSON](../../README.md#承認の-json)」
-「[残った指摘の JSON](../../README.md#残った指摘の-json)」「[試験の JSON](../../README.md#試験の-json)」
-「[lint の JSON](../../README.md#lint-の-json)」「[候補の JSON](../../README.md#候補の-json)」にある。どの JSON も形の版
+JSON の欄の形は json-shapes.md の「[ボードの JSON](json-shapes.md#ボードの-json)」「[承認の JSON](json-shapes.md#承認の-json)」
+「[残った指摘の JSON](json-shapes.md#残った指摘の-json)」「[試験の JSON](json-shapes.md#試験の-json)」
+「[lint の JSON](json-shapes.md#lint-の-json)」「[候補の JSON](json-shapes.md#候補の-json)」にある。どの JSON も形の版
 （`version`。版の JSON は `schema`）を持ち、拡張は知らない版を読まない。ボード・承認・試験・候補の JSON は、拡張の
 `test/fixtures/` の実例と同じ例で本体のテストが形を確かめる。
 各 JSON の欄の一覧は [json-shapes.md](json-shapes.md) にまとめてある。
@@ -121,7 +121,7 @@ Chrome 拡張だけが動かなくなる。上げた互換の版は統合先の 
 たとえば `approval_refusal_code` と、`confirm` の戻り値の `code` を足したときは、古い拡張はそれを引かず読み飛ばすだけなので、互換の版を上げていない。
 `tests/ticket/test_swap_points.py` は、手元の承認・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
 
-REQ-EXT-29 のダイジェストが覆うものは README「[承認の JSON](../../README.md#承認の-json)」と同じ（提案の識別子の一覧と各提案ファイルのバイト列全体だけ）。
+REQ-EXT-29 のダイジェストが覆うものは json-shapes.md「[承認の JSON](json-shapes.md#承認の-json)」と同じ（提案の識別子の一覧と各提案ファイルのバイト列全体だけ）。
 違いがあれば拡張は書かずに「内容が更新されました」と最新を表示し直す。書いてよいのは、`batch` があり、`gathered.refused` も `mismatch` も無いときだけで、Chrome 拡張の入口は
 そのときだけ `plan` を呼ぶ。書く先のブランチと互換の版で断るのは拡張の側（REQ-CHR-03・REQ-CHR-04）。
 

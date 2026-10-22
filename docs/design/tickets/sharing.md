@@ -11,7 +11,7 @@ keywords: [複数人, 別PC, 別セッション, 引き継ぎ, 同期, fetch, sy
 ### 9.17 複数人・別 PC・別セッションでの作業
 
 ここは、チケット単位の分担という使い方の意図と、実装が実際に同期し状態を更新する単位との対応を書く。
-要求は [要件 REQ-TKT](../../requirements/tickets.md)。利用者向けの説明は README の「複数人・別 PC・別セッションで進める」。
+要求は [要件 REQ-TKT](../../requirements/tickets.md)。利用者向けの説明は [docs/guide/multi-pc.md](../../guide/multi-pc.md)。
 
 #### 利用の前提
 

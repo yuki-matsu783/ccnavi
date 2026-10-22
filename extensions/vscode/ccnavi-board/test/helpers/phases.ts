@@ -16,7 +16,7 @@ import { loadPage, type DomPage, type LoadOptions } from "./dom.js";
 export const NONCE = "TEST-NONCE-123";
 
 /**
- * 見本の定義（5 件。README「フェーズ定義と計画」の例）。画面のテストの多くがこれを開く。
+ * 見本の定義（5 件。docs/design/tickets/phases.md「フェーズ定義と計画」の例）。画面のテストの多くがこれを開く。
  * 拡張がファイルを作るときの雛形だったが、共通レイヤーに雛形を置くとレイヤーの同じ id と中身が食い違うので、
  * 画面から作る方法ごと無くし、テストの見本としてだけ残す。
  *

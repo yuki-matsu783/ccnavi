@@ -249,7 +249,7 @@ subAgentFlows:             # 無くてよい
 
 **確かめるのは実行ファイル。** `ccnavi --lint --flow <パス>`（10 章）が、`SubagentStart` と同じ読み手・同じ検査
 （`flow.load`）で 1 本を読み、読めなければ `(flow)` の error で言う。`--json` なら読めた中身も `flow.data` に
-載せる（`flow.as_json`）。JSON にそのまま載らない値は鍵 `$ccnavi` を持つオブジェクトで表す（README「lint の JSON」）。ボードのフロー編集画面は、
+載せる（`flow.as_json`）。JSON にそのまま載らない値は鍵 `$ccnavi` を持つオブジェクトで表す（docs/requirements/json-shapes.md「lint の JSON」）。ボードのフロー編集画面は、
 開くときは読んだバイトを、保存の前は書き出す本文を、呼ぶたびに別の名前の一時ファイルに書いてこれで確かめ、
 error があれば理由を出して開かない・保存しない。
 

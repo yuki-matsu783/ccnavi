@@ -21,9 +21,9 @@ state を内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 | `--explain [--json]` | タイプごとのルール、プロジェクトの一覧とルールの可否、権限モードの扱い（権限モード × 読めたか読み切れないかの結末を、判定と同じ `judge.undeclared_verdict` で組む）、チケット制御の値、元のプロジェクトが無いワークツリー（節「■ 元のプロジェクトが無いワークツリー」。該当があるときだけ。11.3）、承認済みチケットの一覧、親の局面、フェーズごとの状態・マーカー・止まっているか・リスク、上位の設定に却下された要求（節「■ 上位の設定に却下された要求」。全件を 1 件 1 行で、該当があるときだけ。REQ-SES-02） | 0 |
 | `--lint [--json]` | 判定を行わず、防御を無効化しうる記述を error と warn に分けて報告。ルール・フェーズ定義・配点・settings.json の登録・チケット・プロジェクトを見る | error があれば 1 |
 | `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-expectations.yml` の形の下書きで出す。どのルールも言及せず何度も渡った形は `ask` のルールの候補、同じ呼び出しを N 回以上止めた `deny` は `message` を見直す候補。候補ごとに `--lint` と同じ読みと `--test-expectations` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通レイヤーのコピーに足した一時ファイルで試す） | 常に 0 |
-| `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・受け付けるフラグ（引数の定義から引く）・読む書式の版。設定もワークスペースも読まない（README「版の JSON」） | 0 |
+| `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・受け付けるフラグ（引数の定義から引く）・読む書式の版。設定もワークスペースも読まない（docs/requirements/json-shapes.md「版の JSON」） | 0 |
 | `--lint [--json] --flow <パス>` | 上に加えて、子のフロー 1 本（9.3.1）を `SubagentStart` と同じ読み手・同じ検査で読み、読めなければ場所 `(flow)` の error で言う。読めたフローの構造と名前の怪しいところは warn。`--json` なら読めた中身を `flow.data`、渡る手順の行を `flow.rendered` に載せ（読めなければどちらも `null`）、選べる名前を `flow.candidates` に載せる。パスは起動した場所からの相対でよい | error があれば 1 |
-| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く。ただし `.ccnavi/docs/` は載せる）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` はそのまま残し、実体がツリーの外に出るディレクトリは対象外にする。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は README「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
+| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く。ただし `.ccnavi/docs/` は載せる）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` はそのまま残し、実体がツリーの外に出るディレクトリは対象外にする。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は docs/design/diagnostics.md の 10.1「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
 
 **レイヤーの置き場を動かすフラグは 8 本あり、どれも診断でだけ有効になる**。共通レイヤーの中身は
 `--rules` / `--phases` / `--risk`、レイヤーを探す先は `--projects`（プロジェクトのレイヤーの置き場）と
@@ -51,7 +51,7 @@ write-and-push の書いたパスの一覧（`--record-writes`）も、診断の
 `--flow <パス>` も診断でだけ有効で、読むのは `--lint` だけ。`--test` / `--test-expectations` / `--explain` に渡すと
 「`--lint` でだけ読む」と言って無視する。判定にも採点にも使われない（9.3.1）。
 
-JSON の形は README の「試験の JSON」「lint の JSON」「ボードの JSON」「候補の JSON」に定める。拡張はこれを並べるだけで、
+JSON の形は docs/requirements/json-shapes.md「試験の JSON」「lint の JSON」「ボードの JSON」「候補の JSON」に定める。拡張はこれを並べるだけで、
 止まっているか・
 承認待ち・ワークツリーの有無は、判定と承認が使う関数をそのまま呼んで載せる。
 
@@ -71,7 +71,7 @@ hook の判定の経路（`load`）はこの重ねを使わず、プロセスに
 出す。動いた表示は次に何かが動くまで残す。それを覚えているのは拡張ホスト。
 残った指摘の対応方針（`decide`）も拡張の中で決める。オーバーレイが `ccnavi-review.sh decide <N> --preview` で
 指摘とダイジェストを見せ、ユーザが指摘ごとに選んで押したら `ccnavi-user-decide.sh <N> --choices … --digest …` を子プロセスで打つ
-（形は README「残った指摘の JSON」）。`close-early` はボードに置かない。
+（形は docs/requirements/json-shapes.md「残った指摘の JSON」）。`close-early` はボードに置かない。
 ［レビュー完了］は、まず `decide <N> --preview` で残った指摘を読む。この読み取りは厳しく検証し（親・フェーズ・MR の番号が頼んだものと同じ、
 `digest` が `v2.` で始まる、`threads` が配列でスレッドの要素がすべて正しい、など）、1 つでも外れれば「指摘を読み取れませんでした（理由）」と
 言って確定のボタンを出さない。0 件なら「フェーズ N に未解決の指摘はありません」と［レビュー済みにする］、1 件以上なら対応方針の画面になる。

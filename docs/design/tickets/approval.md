@@ -85,7 +85,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 **承認する場所は 4 つある。** 端末の `user agree`、VS Code 拡張のボードのオーバーレイ、Chrome 拡張のボード、そして
 置き場を動かすこと。
 オーバーレイは `--agree --preview --json [<識別子>...]` で一覧を読み、ユーザが押したら
-`user agree --yes <識別子,…> --digest <値> --json` を子プロセスで打つ（形は README「承認の JSON」）。
+`user agree --yes <識別子,…> --digest <値> --json` を子プロセスで打つ（形は docs/requirements/json-shapes.md「承認の JSON」）。
 どちらも承認の対象を同じ関数で求めるので、見せたものと承認するものが食い違わない。
 
 | 経路 | 誰が打つ | ユーザが押したことの証拠 |
