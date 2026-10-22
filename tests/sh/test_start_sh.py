@@ -571,6 +571,26 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(again.returncode, 2, again.stdout + again.stderr)
         self.assertEqual(self.local_branches(), ["main"])
 
+    def test_a_repo_that_differs_from_cwd_stops_before_asking_the_host(self):
+        proj = os.path.join(self.ws, "projects", "tour")
+        os.makedirs(proj)
+        git(proj, "init", "-q", "-b", "main")
+        git(proj, "remote", "add", "origin", "https://github.com/Acme/Tour.git")
+        done = self.run_sh("--issue", "2", "--repo", "acme/tour")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("cd projects/tour && sh .ccnavi/scripts/ccnavi-start.sh", done.stderr)
+        self.assertEqual(self.requests(), [])
+        self.assertEqual(self.local_branches(), ["main"])
+        # 同じリポジトリ（大文字小文字違い）なら止めない
+        same = self.run_sh("--issue", "152", "--repo", "ACME/Widgets", "--dry-run")
+        self.assertNotIn("が違います", same.stderr)
+        os.remove(self.log)
+        # projects/ に無いリポジトリは、移動先を案内せず止める
+        gone = self.run_sh("--issue", "2", "--repo", "acme/none")
+        self.assertEqual(gone.returncode, 1, gone.stdout + gone.stderr)
+        self.assertIn("projects/ に見つかりません", gone.stderr)
+        self.assertEqual(self.requests(), [])
+
     def test_the_target_repository_is_reported(self):
         self.github_new()
         done = self.run_sh("--issue", "152")
@@ -921,7 +941,10 @@ class StartShGitLabTest(StartShTest):
         self.gitlab_routes(created=False)
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("GitLab APIに接続できず", done.stdout)
+        # ホストが 404 を返した失敗は、接続や認証の問題とは言わず、HTTP ステータスを出す
+        self.assertIn("GitLab APIがエラーを返し", done.stdout)
+        self.assertIn("HTTP 404", done.stdout)
+        self.assertNotIn("GITLAB_TOKEN を置く", done.stdout)
         self.assertIn("手で行う手順", done.stdout)
         self.assertIn("Closes #152", done.stdout)
         self.assertNotIn("mcp__github__", done.stdout)
