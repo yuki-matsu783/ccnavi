@@ -286,8 +286,12 @@ def _start_lines(conf: settings.Settings, root: str, refs: list[Ref]) -> list[st
             )
             continue
         args = f"--{r.kind} {r.number}" + (f" --repo {r.repo}" if r.repo else "")
-        cd = f"cd projects/{where} && " if where else ""
-        lines.append(f"- {cd}{sh} {args}" if cd else f"- '{sh} {args}'")
+        if r.repo:
+            # 実行する場所を絶対パスで名指しする（cwd がどこでも届く）。ワークスペース自身も同じ形
+            place = os.path.join(conf.projects, where) if where else root
+            lines.append(f"- cd {settings.shell_path(place)} && {sh} {args}")
+        else:
+            lines.append(f"- '{sh} {args}'")
     lines += [
         "終了コード 0 なら、出たワークツリーのパスで作業を続ける。"
         "出力に「次:」の行があれば、その一手に従う（提案づくりなら、承認を受けるまで実装はしない）。"

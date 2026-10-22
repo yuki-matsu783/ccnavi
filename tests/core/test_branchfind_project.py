@@ -55,11 +55,16 @@ class ProjectOfRepoTest(unittest.TestCase):
     def test_the_guidance_names_the_project_and_cds_into_it(self):
         said = self.lines(Ref(ISSUE, 2, "y-taniyama/guided-setup-tour-extension"))
         sh = settings.script_command(self.root, "ccnavi-start.sh")
+        proj = os.path.join(self.root, "projects", "guided-setup-tour-extension")
         self.assertIn(
-            f"- cd projects/guided-setup-tour-extension && {sh} --issue 2"
+            f"- cd {settings.shell_path(proj)} && {sh} --issue 2"
             " --repo y-taniyama/guided-setup-tour-extension",
             said,
         )
+
+    def test_the_workspace_own_repo_cds_to_the_root(self):
+        said = self.lines(Ref(ISSUE, 2, "ryutec/claudecode-navi"))
+        self.assertIn(f"- cd {settings.shell_path(self.root)} && ", said)
 
     def test_the_guidance_refuses_to_run_when_the_project_is_not_cloned(self):
         said = self.lines(Ref(ISSUE, 2, "acme/widgets"))

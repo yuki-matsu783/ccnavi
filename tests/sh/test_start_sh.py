@@ -578,14 +578,19 @@ class StartShTest(unittest.TestCase):
         git(proj, "remote", "add", "origin", "https://github.com/Acme/Tour.git")
         done = self.run_sh("--issue", "2", "--repo", "acme/tour")
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("cd projects/tour && sh ", done.stderr)
-        self.assertIn("/.ccnavi/scripts/ccnavi-start.sh '--issue' '2'", done.stderr)
+        self.assertIn("/projects/tour' && sh '", done.stderr)
+        self.assertIn("/.ccnavi/scripts/ccnavi-start.sh' '--issue' '2'", done.stderr)
         self.assertEqual(self.requests(), [])
         self.assertEqual(self.local_branches(), ["main"])
         # 同じリポジトリ（大文字小文字違い）なら止めない
         same = self.run_sh("--issue", "152", "--repo", "ACME/Widgets", "--dry-run")
         self.assertNotIn("が違います", same.stderr)
         os.remove(self.log)
+        # projects/ の中から、ワークスペース自身のリポジトリを頼むと、ルートへの移動を案内する
+        up = self.run_sh("--issue", "152", "--repo", "acme/widgets", cwd=proj)
+        self.assertEqual(up.returncode, 1, up.stdout + up.stderr)
+        self.assertIn("ワークスペースルートに移動", up.stderr)
+        os.remove(self.log) if os.path.exists(self.log) else None
         # projects/ に無いリポジトリは、移動先を案内せず止める
         gone = self.run_sh("--issue", "2", "--repo", "acme/none")
         self.assertEqual(gone.returncode, 1, gone.stdout + gone.stderr)

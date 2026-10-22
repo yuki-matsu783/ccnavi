@@ -189,6 +189,9 @@ if [ -n "$opt_repo" ]; then
 	if [ -n "$here_repo" ] && [ "$(fold_repo "$here_repo")" != "$(fold_repo "$opt_repo")" ]; then
 		found_dir=""
 		scripts_abs="$root/.ccnavi/scripts"
+		if [ "$(fold_repo "$(repo_of_url "$(git -C "$root" remote get-url origin 2>/dev/null || :)")")" = "$(fold_repo "$opt_repo")" ]; then
+			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。ワークスペースルートに移動して実行し直してください: cd $(ccnavi_sh_quote "$root") && sh $(ccnavi_sh_quote "$scripts_abs/ccnavi-start.sh") ${orig_args}" 1
+		fi
 		for cand in "$root"/projects/*/; do
 			[ -e "${cand}.git" ] || continue
 			cand_repo=$(repo_of_url "$(git -C "$cand" remote get-url origin 2>/dev/null || :)")
@@ -198,7 +201,7 @@ if [ -n "$opt_repo" ]; then
 			fi
 		done
 		if [ -n "$found_dir" ]; then
-			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${found_dir}/ に移動して実行し直してください: cd ${found_dir} && sh ${scripts_abs}/ccnavi-start.sh ${orig_args}" 1
+			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${found_dir}/ に移動して実行し直してください: cd $(ccnavi_sh_quote "$root/$found_dir") && sh $(ccnavi_sh_quote "$scripts_abs/ccnavi-start.sh") ${orig_args}" 1
 		fi
 		fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${opt_repo} を origin に持つプロジェクトは projects/ に見つかりません（まだ clone していないなど）。ユーザに伝えて止まってください。" 1
 	fi
@@ -284,13 +287,26 @@ host_api_failed() {
 	printf '%s' "$3" | LC_ALL=C tr -d '\000' | head -c 2000 >"$host_err.body"
 	printf '%s' "$3" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^[^0-9]*([45][0-9]{2}) [A-Z][A-Za-z ]+.*/\1/p' | head -n 1 >"$host_err.status"
 }
+# ホストが「このリクエストが悪い」と返した失敗か（404・410・415 など）。401・403（認証）・429（制限）・5xx（障害）は、
+# 接続や認証の側として扱う
+host_answered() {
+	ha_status=$(cat "$host_err.status" 2>/dev/null || :)
+	case "$ha_status" in
+	401 | 403 | 429 | 5?? | '') return 1 ;;
+	esac
+	return 0
+}
 api_failed_reason() {
 	what_failed=$(cat "$host_err" 2>/dev/null || :)
 	fail_status=$(cat "$host_err.status" 2>/dev/null || :)
-	if [ -n "$fail_status" ]; then
+	if host_answered; then
 		# ホストは返事をした。接続や認証の問題ではないので、HTTP ステータスと本文の頭を出す
 		fail_body=$(tr -d '\r' <"$host_err.body" 2>/dev/null | tr '\001-\037\177' ' ' | cut -c1-200)
 		printf 'ホストが HTTP %s を返した（%s）%s' "$fail_status" "${what_failed:-?}" "${fail_body:+: $fail_body}"
+		return 0
+	fi
+	if [ -n "$fail_status" ]; then
+		printf 'ホストの API が失敗した（%s。HTTP %s）' "${what_failed:-?}" "$fail_status"
 		return 0
 	fi
 	printf 'ホストの API が失敗した（%s）' "${what_failed:-?}"
@@ -425,7 +441,7 @@ stop_host() {
 		fail host-unknown "ホストを読めない（${sh_why}）。origin を確かめてください。"
 	fi
 	# ホストが HTTP の返事を返していたなら、「接続できず」とは言わない（届いてはいる）
-	if [ -s "$host_err.status" ] && ! grep -Eq '^40[13]$' "$host_err.status"; then
+	if host_answered; then
 		sh_conn="がエラーを返し"
 	else
 		sh_conn="に接続できず"
@@ -498,7 +514,7 @@ stop_host() {
 		fi
 		[ -z "$stop_local" ] || printf '  手元の候補: %s\n' "$stop_local"
 		printf '手で行う手順（GitLab には MCP の案内がありません）:\n'
-		if [ -s "$host_err.status" ] && ! grep -Eq '^40[13]$' "$host_err.status"; then
+		if host_answered; then
 			printf '  1. ホストは返事をしたので認証や接続の問題ではない。上の HTTP ステータスと本文から、リポジトリのパス（%s）・番号・権限を確かめる。原因を直したら同じコマンドを再実行する: %s\n' "$ccnavi_h_path" "$sh_cmd"
 		else
 			printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
