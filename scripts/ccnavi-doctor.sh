@@ -11,7 +11,10 @@
 #   --workspace <ws>         入れる先。既定は現在の作業ディレクトリ
 #   --from <配布元>          展開済みのフォルダ（build ではソース）。zip は受けない。
 #                            既定はこのスクリプトの 1 つ上
-#   --online                 origin と API に届くかを実際に確かめる（通信する）
+#   --online                 origin と API に届くかを実際に確かめる（通信する）。git を打つので、
+#                            そのリポジトリの git の設定（core.sshCommand など）が実行される。
+#                            信頼できるリポジトリでだけ指定する。環境変数 GITLAB_TOKEN は、
+#                            origin のホストの API にだけ送られる（ccnavi の host 部品と同じ）
 #   --no-next                末尾の「案内:」「次:」を出さない（ccnavi-install.sh が呼ぶときに使う）
 #
 # 出力は `check: <項目> <ok|warn|todo|ng> <コード> <詳細>`。
@@ -80,10 +83,22 @@ doctor_clean() {
 # 同じ規則（`scheme://` の後ろから最後の `@` まで。scheme の無い `user:pass@host` も）。違いは、
 # ここでは文の途中の URL にも当てることと、glab のトークンの形（glpat-…）も伏せること。
 doctor_mask() {
+	# 最後の awk は、環境の GITLAB_TOKEN・GITHUB_TOKEN の値そのものを伏せる。
 	printf '%s' "$1" | sed -E \
 		-e 's#([A-Za-z][A-Za-z0-9+.-]*://)[^/ ]*@#\1<伏せた>@#g' \
 		-e 's#(^|[ (])[^/: @]*:[^/@ ]*@#\1<伏せた>@#g' \
-		-e 's#glpat-[A-Za-z0-9_-]+#<伏せた>#g'
+		-e 's#gl[a-z]{1,6}-[A-Za-z0-9_-]{8,}#<伏せた>#g' \
+		-e 's#gh[pousr]_[A-Za-z0-9]{8,}#<伏せた>#g' \
+		-e 's#github_pat_[A-Za-z0-9_]+#<伏せた>#g' \
+		-e 's#((private|access)_token=)[^& ]+#\1<伏せた>#g' |
+		awk '{
+			for (k = 1; k <= 2; k++) {
+				t = ENVIRON[(k == 1) ? "GITLAB_TOKEN" : "GITHUB_TOKEN"]
+				while (length(t) >= 6 && (i = index($0, t)) > 0)
+					$0 = substr($0, 1, i - 1) "<伏せた>" substr($0, i + length(t))
+			}
+			print
+		}'
 }
 
 # 1 行目だけを、伏せて、きれいにして出す。
@@ -109,7 +124,7 @@ doctor_quote() {
 
 # 絶対パスにする。Git Bash では Windows 形式（pwd -W）にそろえる。
 doctor_abs() {
-	(cd "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
+	(cd -- "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
 }
 
 # 項目の結果を控える。出力は最後にまとめて、doctor_print が決まった順で出す。
@@ -170,18 +185,13 @@ doctor_kill_tree() {
 	# shellcheck disable=SC2086
 	kill -TERM $kt_live 2>/dev/null || :
 	[ "${2:-0}" = 1 ] || return 0
-	# 根は呼んだ側がまだ wait していない（ゾンビで kill -0 が通る）ので、子孫だけを見る。
-	kt_rest=""
-	for kt_p in $kt_live; do
-		[ "$kt_p" != "$1" ] || continue
-		if kill -0 "$kt_p" 2>/dev/null; then
-			kt_rest="$kt_rest $kt_p"
-		fi
-	done
-	[ -n "$kt_rest" ] || return 0
+	# TERM を無視する子もいる。少し待って、残っているものには根も含めて KILL を送る。
+	# 根は呼んだ側がまだ wait していないので、止まっていてもゾンビとして見える。ゾンビへの KILL は無害。
 	sleep 1
-	for kt_p in $kt_rest; do
-		kill -0 "$kt_p" 2>/dev/null && kill -KILL "$kt_p" 2>/dev/null || :
+	for kt_p in $kt_live; do
+		if kill -0 "$kt_p" 2>/dev/null; then
+			kill -KILL "$kt_p" 2>/dev/null || :
+		fi
 	done
 	return 0
 }
@@ -441,8 +451,12 @@ doctor_glab_local() {
 	if printf '%s\n' "$gl_help" | grep -q 'git-credential'; then
 		glab_level=ok
 		glab_code=installed
+	elif [ "$gl_rc" -eq 124 ]; then
+		# 応答しない glab を「古い」とは言わない。
+		glab_code=timeout
+	elif [ "$gl_rc" -ne 0 ] && [ -z "$(printf '%s' "$gl_help" | tr -d '[:space:]')" ]; then
+		glab_code=unavailable
 	else
-		glab_level=todo
 		glab_code=too-old
 	fi
 }
@@ -465,7 +479,9 @@ doctor_curl() {
 
 doctor_workspace() {
 	have_ws_git=no
-	if [ "$have_git" = yes ] && git -C "$workspace" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+	# .git の中では --is-inside-work-tree が false を出して 0 で終わる。出力も見る。
+	ws_inside=$(git -C "$workspace" rev-parse --is-inside-work-tree 2>/dev/null || :)
+	if [ "$have_git" = yes ] && [ "$ws_inside" = true ]; then
 		have_ws_git=yes
 		res workspace ok ok
 	else
@@ -552,6 +568,8 @@ doctor_probe_remote() {
 	export GIT_TERMINAL_PROMPT GCM_INTERACTIVE LC_ALL
 	pr_rc=0
 	git -C "$1" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 ls-remote --exit-code origin HEAD || pr_rc=$?
+	# git が終わった印。終了コード 2（HEAD が無い）が、シェル自身の失敗の 2 と取り違えられないようにする。
+	printf 'doctor-rc:%s\n' "$pr_rc"
 	return "$pr_rc"
 }
 
@@ -563,7 +581,14 @@ doctor_check_remote() {
 	doctor_timed "$DOCTOR_GIT_LIMIT" "$doctor_tmp/$cr_name.out" "$doctor_tmp/$cr_name.err" doctor_probe_remote "$2" || cr_rc=$?
 	case "$cr_rc" in
 	0) res "$cr_name" ok readable "読めるだけで、push の権限は確かめていない" ;;
-	2) res "$cr_name" ok readable "リモートに HEAD が無い（空のリポジトリ）。push の権限は確かめていない" ;;
+	2)
+		if grep -q '^doctor-rc:2$' "$doctor_tmp/$cr_name.out" 2>/dev/null; then
+			res "$cr_name" ok readable "リモートに HEAD が無い（空のリポジトリ）。push の権限は確かめていない"
+		else
+			cr_msg=$(doctor_first_line "$(cat "$doctor_tmp/$cr_name.err" 2>/dev/null || :)")
+			res "$cr_name" todo unreachable "${cr_msg:-git ls-remote を実行できなかった}"
+		fi
+		;;
 	124) res "$cr_name" todo timeout "${DOCTOR_GIT_LIMIT} 秒で応答が無かった" ;;
 	*)
 		cr_msg=$(doctor_first_line "$(cat "$doctor_tmp/$cr_name.err" 2>/dev/null || :)")
@@ -917,6 +942,13 @@ main() {
 	case "$mode" in
 	prebuilt | build) ;;
 	*) die "--mode に使えるのは prebuilt か build です。" ;;
+	esac
+	# 時間の上限は、数字（小数も可）だけ。それ以外は sleep と算術を壊す。
+	case "$DOCTOR_GIT_LIMIT$DOCTOR_CURL_LIMIT" in
+	*[!0-9.]*) die "CCNAVI_DOCTOR_GIT_LIMIT と CCNAVI_DOCTOR_CURL_LIMIT は数字で指定してください。" ;;
+	esac
+	case "$DOCTOR_CURL_LIMIT" in
+	*.*) die "CCNAVI_DOCTOR_CURL_LIMIT は整数で指定してください。" ;;
 	esac
 	if [ -z "$workspace" ]; then
 		workspace=.

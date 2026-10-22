@@ -72,7 +72,12 @@ iq() {
 
 # 絶対パスにする。Git Bash では Windows 形式（pwd -W）にそろえる。
 iabs() {
-	(cd "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
+	(cd -- "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
+}
+
+# リンクを解いた物理パス。同じ場所かどうかの比較専用（pwd は論理パスで、リンク経由だと別の綴りになる）。
+iphys() {
+	(cd -- "$1" 2>/dev/null && pwd -P)
 }
 
 # 大文字小文字と区切りを区別せずに比べるための形（比べる専用。開くときは元の表記を使う）。
@@ -116,7 +121,7 @@ istored_mode() {
 		set:*) sm_value=${sm_got#set:} ;;
 		esac
 	done
-	printf '%s' "$sm_value" | tr 'A-Z' 'a-z'
+	printf '%s' "$sm_value" | tr 'A-Z' 'a-z' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 
 # 配布元を決める。<起点> → 標準出力に配布元。戻り値: 0 / 3 決められない（標準出力に理由）
@@ -154,7 +159,12 @@ itodos() {
 # <ws> <配布元>
 ibackup() {
 	bk_cache=${XDG_CACHE_HOME:-${HOME:-}/.cache}
-	[ -n "$bk_cache" ] || return 1
+	# 絶対パスだけ受ける。相対パスは、入れる先の中を指すことがあり、HOME が空なら /.cache になる。
+	case "$bk_cache" in
+	/* | [A-Za-z]:[/\\]*) ;;
+	*) return 1 ;;
+	esac
+	[ -n "${XDG_CACHE_HOME:-}" ] || [ -n "${HOME:-}" ] || return 1
 	bk_hash=$(printf '%s' "$(ifold "$1")" | cksum | sed 's/ .*//')
 	bk_stamp=$(date +%Y%m%d-%H%M%S)
 	bk_dir="$bk_cache/ccnavi/backup/$bk_hash-$bk_stamp-$$"
@@ -171,14 +181,15 @@ ibackup() {
 	for bk_rel in $bk_items; do
 		[ -e "$1/$bk_rel" ] || continue
 		(umask 077 && mkdir -p "$bk_dir/$(dirname "$bk_rel")") || return 1
-		cp -RPp "$1/$bk_rel" "$bk_dir/$bk_rel" || return 1
+		# -L: リンクは実体を写す（リンクのまま写すと、リンク先が書き換わったあとに戻す元が無くなる）。
+		cp -RLp "$1/$bk_rel" "$bk_dir/$bk_rel" || return 1
 	done
 	for bk_skill in "$2"/.claude/skills/*/; do
 		[ -d "$bk_skill" ] || continue
 		bk_name=$(basename "$bk_skill")
 		[ -e "$1/.claude/skills/$bk_name" ] || continue
 		(umask 077 && mkdir -p "$bk_dir/.claude/skills") || return 1
-		cp -RPp "$1/.claude/skills/$bk_name" "$bk_dir/.claude/skills/$bk_name" || return 1
+		cp -RLp "$1/.claude/skills/$bk_name" "$bk_dir/.claude/skills/$bk_name" || return 1
 	done
 	printf '%s' "$bk_dir"
 }
@@ -233,13 +244,6 @@ ibuild() {
 	fi
 	inext "$(printf 'sh %s %s --from %s --check' "$(iq "$b_src/scripts/ccnavi-install.sh")" "$(iq "$b_ws")" "$(iq "$b_src")")"
 	return 0
-}
-
-iprebuilt_check() {
-	# <ws> <配布元>。setup に --check を付けて打ち、終了コードで次を決める。
-	pc_rc=0
-	sh "$2/scripts/ccnavi-setup.sh" "$@" >"$install_tmp/setup.out" 2>"$install_tmp/setup.err" || pc_rc=$?
-	return "$pc_rc"
 }
 
 # ---- main
@@ -347,7 +351,13 @@ main() {
 	ws=$(iabs "$ws")
 
 	install_tmp=${TMPDIR:-/tmp}/ccnavi-install.$$
-	(umask 077 && mkdir "$install_tmp") || die "作業用のディレクトリを作れません。" 4
+	install_try=0
+	while ! (umask 077 && mkdir "$install_tmp") 2>/dev/null; do
+		install_try=$((install_try + 1))
+		install_tmp=""
+		[ "$install_try" -lt 20 ] || die "作業用のディレクトリを作れません。" 4
+		install_tmp=${TMPDIR:-/tmp}/ccnavi-install.$$.$install_try
+	done
 	trap cleanup EXIT
 	trap 'exit 130' INT
 	trap 'exit 143' TERM
@@ -375,11 +385,17 @@ main() {
 			return 3
 		fi
 	fi
-	if [ "$(ifold "$src")" = "$(ifold "$ws")" ]; then
-		printf '案内: 入れる先が配布元（%s）と同じ\n' "$src"
-		inext "入れる先に別のフォルダを指して打ち直す"
+	# 入れる先が配布元そのもの、または配布元の中であってはならない（配布元を書き換えてしまう）。
+	# リンクを経た別の綴りも同じ場所と見るため、物理パスで比べる。
+	src_phys=$(ifold "$(iphys "$src")")
+	ws_phys=$(ifold "$(iphys "$ws")")
+	case "$ws_phys/" in
+	"$src_phys"/*)
+		printf '案内: 入れる先（%s）が配布元（%s）と同じか、配布元の中にある\n' "$ws" "$src"
+		inext "入れる先に、配布元の外の別のフォルダを指して打ち直す"
 		return 3
-	fi
+		;;
+	esac
 	[ -f "$src/scripts/ccnavi-doctor.sh" ] || {
 		printf '案内: %s/scripts/ccnavi-doctor.sh が無い\n' "$src"
 		inext "配布元を受け取り直してもらう（scripts/ccnavi-doctor.sh が入っていない）"
@@ -402,8 +418,18 @@ main() {
 		fi
 		# CLAUDECODE は、Claude Code の Bash ツールの中で打たれていることの目印。誤操作を防ぐためのもので、
 		# 守りではない（環境変数は消せる）。保護された設定を、Claude Code の中から enable のまま書き換えさせない。
-		if [ "$stored" = enable ] && [ -n "${CLAUDECODE:-}" ]; then
-			printf '案内: 入れる先は CCNAVI_MODE=enable で、ccnavi の保護が効いている。Claude Code の中からは入れない\n'
+		# ccnavi は dry-run 以外の値（enable・enabled・disable・空白つき・読めない値）を enable として扱う。
+		# 値が無いときは、ccnavi がまだ入っていないので止めない。起動した環境の CCNAVI_MODE も見る。
+		env_mode=$(printf '%s' "${CCNAVI_MODE:-}" | tr 'A-Z' 'a-z' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+		protected=no
+		if [ -n "$stored" ] && [ "$stored" != dry-run ]; then
+			protected=yes
+		fi
+		if [ -n "$env_mode" ] && [ "$env_mode" != dry-run ]; then
+			protected=yes
+		fi
+		if [ "$protected" = yes ] && [ -n "${CLAUDECODE:-}" ]; then
+			printf '案内: 入れる先は CCNAVI_MODE が dry-run ではなく（enable として扱われる）、ccnavi の保護が効いている。Claude Code の中からは入れない\n'
 			inext "ユーザに、Claude Code の外の端末で同じコマンドを打ってもらう（sh $(iq "$0")${install_argline}）"
 			return 3
 		fi

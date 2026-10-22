@@ -62,12 +62,13 @@ pq() {
 }
 
 pabs() {
-	(cd "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
+	(cd -- "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
 }
 
-# 値を JSON から読む（jq）。<ファイル> <jq の式>
+# 値を JSON から読む（jq）。<ファイル> <jq の式>。読めなければ 1（壊れた JSON を「無い」に化けさせない）
 pjq() {
-	jq -r "$2" "$1" | tr -d '\r'
+	pj_out=$(jq -r "$2" "$1") || return 1
+	printf '%s\n' "$pj_out" | tr -d '\r'
 }
 
 # INSTALL.md を書く。<出力先> <zip 名> <target> <コミット>
@@ -200,7 +201,7 @@ main() {
 	if [ -z "$out" ]; then
 		out_dir=$pkg_root
 	else
-		mkdir -p "$out" || die "$out を作れません。" 4
+		mkdir -p -- "$out" || die "$out を作れません。" 4
 		out_dir=$(pabs "$out")
 	fi
 	stage="$pkg_root/$name"
@@ -232,7 +233,8 @@ main() {
 	# VS Code 拡張
 	vsc_dir="$root/extensions/vscode/ccnavi-board"
 	vsc_version=""
-	[ ! -f "$vsc_dir/package.json" ] || vsc_version=$(pjq "$vsc_dir/package.json" '.version // empty')
+	[ ! -f "$vsc_dir/package.json" ] || vsc_version=$(pjq "$vsc_dir/package.json" '.version // empty') ||
+		die "$vsc_dir/package.json を JSON として読めません。"
 	vsc_compat=$(sed -n 's/^export const EXTENSION_COMPAT = \([0-9][0-9]*\);.*$/\1/p' "$vsc_dir/src/core/version.ts" 2>/dev/null | sed -n 1p)
 	vsix="$root/dist/ccnavi-board-$vsc_version.vsix"
 	if [ -z "$vsc_version" ] || [ ! -f "$vsix" ]; then
@@ -246,14 +248,16 @@ main() {
 	# Chrome 拡張
 	chr_dir="$root/extensions/chrome/ccnavi-approval"
 	chr_version=""
-	[ ! -f "$chr_dir/package.json" ] || chr_version=$(pjq "$chr_dir/package.json" '.version // empty')
+	[ ! -f "$chr_dir/package.json" ] || chr_version=$(pjq "$chr_dir/package.json" '.version // empty') ||
+		die "$chr_dir/package.json を JSON として読めません。"
 	chr_built=""
-	[ ! -f "$chr_dir/dist/manifest.json" ] || chr_built=$(pjq "$chr_dir/dist/manifest.json" '.version // empty')
+	[ ! -f "$chr_dir/dist/manifest.json" ] || chr_built=$(pjq "$chr_dir/dist/manifest.json" '.version // empty') ||
+		die "$chr_dir/dist/manifest.json を JSON として読めません。"
 	if [ -z "$chr_built" ]; then
 		printf '案内: Chrome 拡張（extensions/chrome/ccnavi-approval/dist/）が無いので入れていない。scripts/ccnavi-build-install.sh で作れる\n'
 	elif [ "$chr_built" != "$chr_version" ]; then
 		printf '案内: Chrome 拡張の組み立て済みの版（%s）がソースの版（%s）と違うので入れていない。組み立て直すこと\n' "$chr_built" "$chr_version"
-	elif [ -z "$py_compat" ] || ! grep -qF "compat:$py_compat" "$chr_dir/dist/background.js" 2>/dev/null; then
+	elif [ -z "$py_compat" ] || ! grep -Eq "compat:${py_compat}([^0-9]|\$)" "$chr_dir/dist/background.js" 2>/dev/null; then
 		printf '案内: Chrome 拡張の組み込みの互換の版が実行ファイルの互換の版（%s）と合わない（または読めない）ので入れていない。組み立て直すこと\n' "${py_compat:-不明}"
 	else
 		copy_into extensions/chrome/ccnavi-approval/dist extensions/chrome/ccnavi-approval/dist || die "Chrome 拡張を写せません。" 4
@@ -261,11 +265,23 @@ main() {
 
 	# 入れないもの（写したものの中に紛れたものを除く）
 	find "$stage" \( -name ccnavi-index.jsonl -o -name .DS_Store \) -exec rm -f {} + || die "不要なファイルを除けません。" 4
+	# 作業ツリーをそのまま写すので、追跡されていない物や無視された物が紛れうる。鍵・認証情報の置き場と、
+	# 実行時の記録（logs・wip）、古い vsix は入れない。
+	# dist/ccnavi の中の *.pem（証明書の束）は実行ファイルが使うので、鍵の掃除は .ccnavi と .claude だけに掛ける。
+	find "$stage/.ccnavi" "$stage/.claude" -type f \( -name '.env' -o -name '.env.*' -o -name '*.pem' \
+		-o -name '*.key' -o -name 'credentials*.json' -o -name 'secrets.y*ml' -o -name 'id_rsa' \
+		-o -name 'id_ed25519' \) -exec rm -f {} + || die "不要なファイルを除けません。" 4
+	find "$stage/.ccnavi" "$stage/.claude" \( -name logs -o -name wip \) -type d -prune -exec rm -rf {} + ||
+		die "不要なディレクトリを除けません。" 4
+	find "$stage/dist" -maxdepth 2 -type f -name 'ccnavi-board-*.vsix' ! -name "ccnavi-board-$vsc_version.vsix" \
+		-exec rm -f {} + || die "不要なファイルを除けません。" 4
 
 	printf '%s\n' "$exe_version" "commit: $head_commit" "target: $target" "compat: ${exe_compat:-不明}" "dirty: $dirty" >"$stage/VERSION" || die "VERSION を書けません。" 4
 	write_install_md "$stage/INSTALL.md" "$name" "$target" "$short" || die "INSTALL.md を書けません。" 4
 
 	zip_path="$out_dir/$name.zip"
+	# 同じ名前の zip があると、zip は追記する。前回の中身を残さない。
+	rm -f "$zip_path" "$zip_path.sha256"
 	if command -v zip >/dev/null 2>&1; then
 		if ! (cd "$pkg_root" && zip -r -y -q "$zip_path" "$name"); then
 			die "zip を作れませんでした。" 4
