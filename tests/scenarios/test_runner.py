@@ -26,6 +26,53 @@ EXPECT_KEYS = {
 }
 
 
+class IssueCommandTest(unittest.TestCase):
+    ISSUE = {"title": "題", "body": "本文", "repo": "projects/test-repo"}
+
+    def test_gitlab_uses_glab(self):
+        self.assertEqual(
+            runner.issue_create_args("gitlab", self.ISSUE),
+            ["glab", "issue", "create", "--title", "題", "--description", "本文", "--yes"],
+        )
+        self.assertEqual(runner.issue_close_args("gitlab", 12), ["glab", "issue", "close", "12"])
+
+    def test_github_uses_gh(self):
+        self.assertEqual(
+            runner.issue_create_args("github", self.ISSUE),
+            ["gh", "issue", "create", "--title", "題", "--body", "本文"],
+        )
+        self.assertEqual(runner.issue_close_args("github", 12), ["gh", "issue", "close", "12"])
+
+    def test_missing_body_is_empty(self):
+        args = runner.issue_create_args("gitlab", {"title": "t"})
+        self.assertEqual(args[args.index("--description") + 1], "")
+
+    def test_unreadable_origin_is_an_error(self):
+        with self.assertRaises(RuntimeError):
+            runner.issue_create_args("", self.ISSUE)
+        with self.assertRaises(RuntimeError):
+            runner.issue_close_args("", 1)
+
+    def test_issue_number_from_github_url(self):
+        self.assertEqual(runner.issue_number("https://github.com/o/r/issues/7\n"), 7)
+
+    def test_issue_number_from_gitlab_url(self):
+        url = "https://gitlab.example.com/g/p/-/issues/12"
+        self.assertEqual(runner.issue_number(url + "\n"), 12)
+
+    def test_issue_number_finds_the_url_line(self):
+        out = "Creating issue in g/p\n\nhttps://gitlab.example.com/g/p/-/issues/34\nopen it later\n"
+        self.assertEqual(runner.issue_number(out), 34)
+
+    def test_issue_number_ignores_other_urls(self):
+        out = "https://gl.example.com/g/p/-/issues/12\nsee https://docs.example.com/9\n"
+        self.assertEqual(runner.issue_number(out), 12)
+
+    def test_issue_number_rejects_output_without_url(self):
+        with self.assertRaises(RuntimeError):
+            runner.issue_number("created 5\n")
+
+
 def rec(**kw):
     base = {"event": "PreToolUse", "tool": "Bash", "session": "s1"}
     base.update(kw)

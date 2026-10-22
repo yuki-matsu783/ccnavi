@@ -418,6 +418,80 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
         self.assertIn("認証に失敗した", done.stdout)
         self.assertIn("git fetch origin", done.stdout)
+        # 手元のサーバは GitLab として扱われる（未知のホスト）。glab を案内し、gh は言わない。
+        self.assertIn(
+            f"glab auth login --hostname 127.0.0.1:{server.server_address[1]}", done.stdout
+        )
+        self.assertNotIn("gh auth login", done.stdout)
+
+    def serve_unauthorized(self):
+        class Unauthorized(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(401)
+                self.send_header("WWW-Authenticate", 'Basic realm="ccnavi"')
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), Unauthorized)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        return server.server_address[1]
+
+    def test_an_authentication_failure_on_github_points_to_gh(self):
+        """origin が GitHub のホスト名のときは、gh を案内する（glab は言わない）。"""
+        port = self.serve_unauthorized()
+        # github.com:<ポート> を手元のサーバに向ける。ホストへ実際には通信しない。
+        git(self.ws, "remote", "set-url", "origin", f"http://github.com:{port}/o/r.git")
+        git(self.ws, "config", "http.curloptResolve", f"github.com:{port}:127.0.0.1")
+        self.leave_main()
+        done = self.fetch(LANG="ja_JP.UTF-8", LC_ALL="ja_JP.UTF-8")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertIn("認証に失敗した", done.stdout)
+        self.assertIn("gh auth login を頼む", done.stdout)
+        self.assertNotIn("glab", done.stdout)
+        self.assertIn("git fetch origin", done.stdout)
+
+    def test_an_authentication_failure_with_unreadable_origin_lists_glab_first(self):
+        """origin の表記が読めないときは、glab を先に、GitHub なら gh と書く。"""
+        # 読めない origin では認証の失敗を起こせないので、ccnavi_fetch_auth_note を直接呼ぶ。
+        script = posix(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-fetch.sh"))
+        probe = (
+            '. "$(dirname "$0")/ccnavi-common.sh"; '
+            'eval "$(sed -n "/^ccnavi_fetch_auth_note()/,/^}/p" "$0")"; '
+            "git remote set-url origin junk; ccnavi_fetch_auth_note ."
+        )
+        done = subprocess.run(
+            [SHELL, "-c", probe, script],
+            cwd=self.ws,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertIn("glab auth login（GitHub なら gh auth login）", done.stdout)
+
+    def test_an_authentication_failure_on_ghe_names_the_host(self):
+        """GHE.com の origin は、gh auth login にホストを付ける。"""
+        script = posix(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-fetch.sh"))
+        probe = (
+            '. "$(dirname "$0")/ccnavi-common.sh"; '
+            'eval "$(sed -n "/^ccnavi_fetch_auth_note()/,/^}/p" "$0")"; '
+            "git remote set-url origin https://acme.ghe.com/o/r.git; ccnavi_fetch_auth_note ."
+        )
+        done = subprocess.run(
+            [SHELL, "-c", probe, script],
+            cwd=self.ws,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertIn("gh auth login --hostname acme.ghe.com", done.stdout)
+        self.assertIn("git fetch origin", done.stdout)
 
     def test_a_hanging_remote_is_cut_off(self):
         """応答しないリモートは CCNAVI_FETCH_TIMEOUT 秒で切る。hook の上限まで待たない。"""
