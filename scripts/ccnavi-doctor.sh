@@ -27,7 +27,7 @@
 # 読む。共通の入口 ccnavi-common.sh は使わない。入口は部品を `dirname "$0"` で探すので、
 # 別のディレクトリのこのスクリプトから読むと部品が見つからず 1 で終わる。host 部品を単体で読むのは
 # 「部品は単体では読まない」という既存の決まりの外の使い方になる。host 部品が他の部品の関数に頼るように
-# なったら、tests/sh/test_doctor_host_load.py が落ちて気づける。
+# なったら、tests/sh/test_doctor_sh.py の HostPartLoadTest が落ちて気づける。
 #
 # 通信する確認（git・glab・curl）はすべて時間の上限を付ける。時間を測るのは doctor_timed の 1 つ。
 # ccnavi_git_timed（.ccnavi/scripts/ccnavi-common-state.sh）のやり方に倣い、さらに、時間切れと
