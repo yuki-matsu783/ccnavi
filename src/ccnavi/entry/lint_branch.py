@@ -151,13 +151,8 @@ def _number_problems(everyone: list, fresh: list, prefixes, serial: int) -> list
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket}: 識別子の番号 {number} が {', '.join(others)} と重なる。"
-                    "issue の番号と通し番号が同じ数になっていないか確かめる。"
-                    + (
-                        f"issue が無いなら次の通し番号は {serial}（親のブランチ名の規則）"
-                        if serial
-                        else "通し番号は数えきれなかったので、ユーザに確かめる"
-                        "（親のブランチ名の規則）"
-                    ),
+                    "別のリポジトリの issue や直接作業の通し番号と同じ数になっていないか確かめる"
+                    "（親のブランチ名の規則）",
                 )
             )
     return problems

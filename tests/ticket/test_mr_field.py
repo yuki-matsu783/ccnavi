@@ -23,6 +23,8 @@ def parent_text(mr=None, child=False):
     lines = ["---", "version: 1", "ticket: top-01-01" if child else "ticket: login"]
     if child:
         lines += ["parent: top", "phase: 1"]
+    if not child:
+        lines.append("issue: 12")
     lines += ["title: ログイン", "plan: [research]"]
     if mr is not None:
         lines.append(f"mr: {mr}")

@@ -34,7 +34,7 @@ from tests.ticketsample import child_text, parent_text
 def closed_text(name, parent="", phase=None, predecessors=()):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if not parent:
-        lines.append("mr: 1")
+        lines += ["mr: 1", "issue: 1"]
     if parent:
         lines += [f"parent: {parent}", f"phase: {phase or 1}"]
     if predecessors:

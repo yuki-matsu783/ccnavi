@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -41,6 +42,10 @@ def ticket_text(name, *, parent="", issue=None, approved=False):
     lines = ["---", "version: 1", f"ticket: {name}", "title: t"]
     if not parent:
         lines.append("mr: 1")
+        if issue is None:
+            # issue の欄は必須。識別子の番号があればそれに合わせる（番号の食い違いを見るテストの邪魔をしない）
+            found = re.match(r"^[a-z]+-(\d+)-", name)
+            issue = int(found.group(1)) if found else 1
     if parent:
         lines += [f"parent: {parent}", "phase: 1"]
     if issue is not None:
@@ -118,23 +123,19 @@ class BranchNameRulesTest(unittest.TestCase):
         """新しい親は `<先頭の語>-<番号>-<slug>`。前の形とユーザが付けた名前は warn。"""
         for name, issue, word in (
             ("i0131", 131, "`feature-131-<slug>`"),
-            ("I0131", None, "通し番号"),
+            ("I0131", None, "issue の番号"),
             ("web-i0012", 12, "`feature-12-<slug>`"),
-            ("login-form", None, "通し番号"),
+            ("login-form", None, "issue の番号"),
             ("login", 12, "`feature-12-<slug>`"),
-            ("feature-login", None, "通し番号"),
-            ("Feature-1-x", None, "通し番号"),
-            ("feature-01-x", None, "通し番号"),
-            ("spike-1-x", None, "通し番号"),
+            ("feature-login", None, "issue の番号"),
+            ("Feature-1-x", None, "issue の番号"),
+            ("feature-01-x", None, "issue の番号"),
+            ("spike-1-x", None, "issue の番号"),
         ):
             with self.subTest(name=name):
                 found = self.problems(name, issue=issue)
                 self.assertEqual(1, len(found), found)
                 self.assertIn(word, found[0])
-
-    def test_the_next_serial_is_suggested(self):
-        found = self.problems("login", serial=72)
-        self.assertIn("次の通し番号は 72", found[0])
 
     def test_the_prefixes_can_be_changed(self):
         self.assertEqual([], self.problems("spike-1-x", prefixes=("feature", "spike")))
@@ -343,9 +344,8 @@ class LintBranchNamesTest(unittest.TestCase):
         self.assertNotIn("feature-132-x:", joined)
         self.assertIn("develop: 識別子が統合先", joined)
         self.assertIn("feature-1-fix..it: 識別子に `..`", joined)
-        # 次の通し番号（番号を持つ識別子の最大 + 1）を添える
         self.assertIn("develop: 親の識別子は", joined)
-        self.assertIn("次の通し番号は 133", joined)
+        self.assertNotIn("通し番号は", joined)
 
     def test_a_japanese_identifier_passes(self):
         self.propose("feature-64-統合先の解決")

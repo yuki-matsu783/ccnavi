@@ -91,6 +91,10 @@ class Use(Drafts):
         args = ["ticket", "new", ident, "--title", title]
         if template is not None:
             args += ["--template", template]
+        # 親の提案は issue と MR のセット。渡さないテストのために既定を足す（渡したものが優先）
+        for flag, value in (("--issue", "9"), ("--mr", "5")):
+            if flag not in extra:
+                args += [flag, value]
         args += [*extra, "--cwd", cwd or self.tree]
         return self.ccnavi(*args)
 

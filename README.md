@@ -2242,11 +2242,22 @@ factors:
 着手の前に `ccnavi-start.sh` を打つよう、エージェントに指示を足す。
 指示を足すだけ。コードブロックの中、`# 見出し`、色の `#fff`、`C#` などは拾わない。チケット制御が disable なら足さない。
 
-エージェントが打つのは次の 1 本。既存の候補（下の `ccnavi-branches.sh` が探す）が無ければ、Draft MR・ワークツリー・ブランチを作る。
+チケット作業は必ず issue と MR のセットで進める。最初に、ホストの API（認証・リポジトリの有無・書き込みの権限）と git のリモートが使える状態かを確かめる。
 
 ```sh
-sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152   # MR なら --mr 5
+sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --check   # 0 使える / 1 不備 / 4 確かめられない項目がある
 ```
+
+そのうえで次の 1 本を打つ。既存の候補（下の `ccnavi-branches.sh` が探す）が無ければ、Draft MR・ワークツリー・ブランチを作る。
+
+```sh
+sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152   # MR なら --mr 5。両方も渡せる
+```
+
+終了コード 0 で終わったら、採用した MR と、その MR が**閉じる** issue と、元ブランチが確定している（出力の「必須」の行の `issue:` と `mr:` を提案に書く。
+どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める）。MR の無い候補（作りかけの再開を除く）は成功させず、終了コード 3 で一覧を出す。
+ホストに届かないときは、`--issue`・`--mr`・`--branch` の 3 つと `--mcp-checked` がそろうときだけ、ホストを見ずに成功する。
+`ccnavi-ticket.sh` の `start`・`finish`・`propose`・`consolidate` も、ロックの前に同じ確認（API と git）を自動で行う（直接作業では確かめない）。
 
 候補を探すのは `ccnavi-branches.sh`（読むだけ。`--json` で JSON）で、出すのは、MR の元ブランチ、issue を参照している開いた MR の元ブランチ（ホストは `ccnavi-review.sh` と同じく gh / glab か、
 curl と `GITHUB_TOKEN` / `GITLAB_TOKEN` で読む）、名前に番号を含むブランチ（手元と origin）、`issue: 152` を持つチケットの親のブランチ。

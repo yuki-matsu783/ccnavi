@@ -104,22 +104,36 @@ def family_problems(
 
 
 def mr_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
-    """親チケットに `mr:`（親ブランチのマージリクエストの番号）が記録されているか。
+    """親チケットに `issue:` と `mr:`（親ブランチのマージリクエストの番号）が記録されているか。
 
-    親の作成と承認の前提の 1 つ。番号は `ccnavi-start.sh` が出す。子には要らない。
+    親の作成と承認の前提。チケット作業は issue と MR のセットで進める。値は `ccnavi-start.sh` が
+    「必須」の行で出す。子には要らない。
     """
-    if t.is_child or t.mr:
+    if t.is_child:
         return []
-    return [
-        rules.Problem(
-            rules.SEVERITY_ERROR,
-            t.ticket,
-            f"親チケット {t.ticket} に mr: が記録されていない。`ccnavi-start.sh` が出したマージ"
-            "リクエストの番号を mr: に書いてください（例 `mr: 12`）。"
-            "親のブランチのマージリクエストが"
-            "無いと、レビューの依頼も正の特定もできない",
+    out: list[rules.Problem] = []
+    if t.issue is None:
+        out.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"親チケット {t.ticket} に issue: が記録されていない。`ccnavi-start.sh` が出した "
+                "issue を issue: に書いてください（例 `issue: 12`、別のリポジトリなら "
+                "`issue: owner/repo#12`）。チケット作業は issue と MR のセットで進める",
+            )
         )
-    ]
+    if not t.mr:
+        out.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"親チケット {t.ticket} に mr: が記録されていない。`ccnavi-start.sh` が出したマージ"
+                "リクエストの番号を mr: に書いてください（例 `mr: 12`）。"
+                "親のブランチのマージリクエストが"
+                "無いと、レビューの依頼も正の特定もできない",
+            )
+        )
+    return out
 
 
 def branch_problems(

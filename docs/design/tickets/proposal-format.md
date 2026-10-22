@@ -18,7 +18,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 ---
 version: 1
 ticket: feature-50-settings-split-02-01
-issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
+issue: 50                # 親だけ。必須。この MR が閉じる issue（別のリポジトリなら owner/repo#50）
 mr: 12                   # 親だけ。仕事を載せる MR の番号（同じリポジトリ）。必須。依頼文の MR の番号をこのチケットに結び付ける
 project: lib             # 置き場と同じ名前。省ける（決めるのは置き場。11）
 parent: feature-50-settings-split  # 子だけ
@@ -133,8 +133,8 @@ base_sha: ""
   `owner/repo` の形や 0・数でないものは error、子に書くと warn で無視する。`issue` と並べて検索に使い、
   UserPromptSubmit の hook（`branchfind`）が依頼文の MR の番号を「すでにあるチケットに結び付く」と判定する
   （提案も承認済みも対象）。親には必須で、書いていない親の承認と `--lint` は止まる。書くのは (1) 提案者
-  （`ccnavi-start.sh` が MR を採用するか Draft MR を作ると、出力が「必須:」の行で「提案の frontmatter に `mr: <番号>` を書く」と案内する。
-  `ccnavi ticket new --mr <番号>` が書く）、(2) 承認のあとの `review request` が、親ブランチの MR の番号を確かめたとき、
+  （`ccnavi-start.sh` が MR を採用するか Draft MR を作ると、出力が「必須:」の行で「提案の frontmatter に `issue: <値>` と `mr: <番号>` を書く」と案内する。
+  `ccnavi ticket new --issue <値> --mr <番号>` が書く。`issue` も親には必須で、書いていない親は同じく止まる）、(2) 承認のあとの `review request` が、親ブランチの MR の番号を確かめたとき、
   ccnavi が親の承認済みチケットの **空の `mr:` にだけ**書き足す。同じ値なら何もせず、違う値が既にあれば上書きせず警告する。スクリプトだけが書く欄（`SCRIPT_FIELDS`）では
   ないので、提案に書いてよく、承認はそのまま写す。改版の不変検査は、承認済みと改版の両方に値があって違うときだけ error
   （書き足しの後に、書き足す前の写しで改版しても弾かない）

@@ -162,7 +162,7 @@ def identifier_number(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> i
 def next_serial(
     names, prefixes=settings.DEFAULT_BRANCH_PREFIXES, skip_children: bool = True
 ) -> int:
-    """issue の無い提案に使う、次の通し番号。番号を持つ識別子の最大 + 1。
+    """直接作業のワークツリー名に付ける、次の通し番号。番号を持つ識別子の最大 + 1。
 
     数えるのは親の識別子だけ（子は親の番号を持つ）。先頭の語が違っても同じ通し番号を使う。
     番号を持つものが無ければ 1。`skip_children` が偽なら、子の形の名前も数える（手元のブランチと
@@ -408,7 +408,7 @@ def _form_problems(
     - `issue:`（同じリポジトリの課題）があれば、番号が issue と同じか。プロジェクトの issue なら
       slug の頭が `<プロジェクト名>-` か
     - 別のリポジトリの課題（`owner/repo#N`）は番号を比べない（その番号はこのリポジトリの issue と
-      紛れるので、通し番号を使う）
+      紛れるので、このリポジトリの番号とは重ねない）
     - 長さが勧める上限（`SUGGESTED_ID_LENGTH`）を超えるか
     """
     name = t.ticket
@@ -420,8 +420,10 @@ def _form_problems(
         if own_issue:
             want = f"feature-{t.issue}-" + (f"{t.project}-" if t.project else "") + "<slug>"
             return [f"親の識別子は {shape} にする。`issue: {t.issue}` から始めるなら `{want}` など"]
-        hint = f"次の通し番号は {serial}" if serial else "番号は既にある識別子の番号の続き"
-        return [f"親の識別子は {shape} にする。issue が無ければ ccnavi の通し番号を使う（{hint}）"]
+        return [
+            f"親の識別子は {shape} にする。番号は issue の番号"
+            "（`ccnavi-start.sh --issue <番号>` が決める名前にする）"
+        ]
     found: list[str] = []
     number = int(matched.group("num"))
     prefix = matched.group("prefix")

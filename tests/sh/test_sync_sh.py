@@ -64,7 +64,7 @@ def copy_text(name=PARENT, base_sha=BASE_SHA, started_at=STARTED_AT, extra="", b
     `mr` は親のブランチの MR の番号（空なら欄を書かない）。ccnavi-sync.sh が MR がマージ済みかを
     聞くときの番号で、前は手元の取り込み記録に保存していた。
     """
-    head = f"---\nversion: 1\nticket: {name}\n" + (f"mr: {mr}\n" if mr else "") + ALLOW
+    head = f"---\nversion: 1\nticket: {name}\n" + (f"mr: {mr}\nissue: 1\n" if mr else "") + ALLOW
     fields = f"base_sha: {base_sha}\n" if base_sha else ""
     fields += f"started_at: '{started_at}'\n" if started_at else ""
     return f"{head}{fields}{extra}---\n{body}"

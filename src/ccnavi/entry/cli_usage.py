@@ -163,7 +163,7 @@ ccnavi user handoff で行います（見るだけの形も含めてユーザー
 エージェントも実行できます（フローの下書きも効力を持ちません）。
 
     ccnavi ticket new ID --title TITLE --template NAME [--layer self|PROJECT]
-                         [--with-feedback] [--issue N]
+                         [--with-feedback] --issue <N|owner/repo#N> --mr <N>
 
 ID という名前のワークツリーに wip/proposals/todo/ID.md を書き込みます。plan:
 はテンプレートから取得し（after は、計画内の位置から提案側の番号へ振り直されます）、続けて
@@ -352,7 +352,7 @@ _TICKET = """\
          docs/wiki/inbox/ に書き込みます。
          <id> はオプションの前に指定します）
     ccnavi ticket new <id> --title <title> --plan <type,type,...> [--scope <glob>]...
-                           [--issue N] [--mr N]
+                           --issue <N|owner/repo#N> --mr <N>
         （<id> という名前のワークツリーの wip/proposals/todo/<id>.md に、親の提案の雛形を
          書き込みます。そのワークツリーの中で実行してください。選択したフェーズの範囲を
          phases.yml から集めて allow に入れ、--scope の glob（この作業が触れるファイル。
@@ -361,16 +361,17 @@ _TICKET = """\
          の順で、rationale と各見出しの下に空欄の目印「（ここに〜を書く）」が入ります。目印が
          残った新規の提案は、承認と --lint が止めるので書き換えてください。
          quick-work のような scope: inherit のタイプは、それ自体では
-         何も集めないため、--scope を指定してください。--mr N は親のブランチのマージ
-         リクエストの番号（ccnavi-start.sh が出す。親の提案の mr: に書く）で、省くと
-         mr: を書かずに雛形を作ります（承認の前に書き足してください）。phases.yml が
+         何も集めないため、--scope を指定してください。--issue と --mr は必須で、
+         ccnavi-start.sh が「必須」の行で出す値（issue は番号か owner/repo#番号。MR は親のブランチの
+         マージリクエストの番号）。親の提案の issue: と mr: に書き、足りなければ停止
+         します。phases.yml が
          ない場合、子のidを指定した場合、または allow が空になる場合は停止します。
          allow の項が計画のどのフェーズの範囲とも重ならないときは、停止せず
          「承認しても書けない」と警告します
          （scope: inherit のタイプが計画にあれば警告しません）。
          ccnavi を直接実行します（sh のラッパーは使いません））
     ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
-                           [--with-feedback] [--issue N]
+                           [--with-feedback] --issue <N|owner/repo#N> --mr <N>
         （上と同じですが、計画と子フローの下書きは --plan の代わりにテンプレートから取得します。
          フィードバック計画は --with-feedback を指定した場合のみ書き込まれます。
          上記の --templates の節を参照してください）
@@ -379,7 +380,7 @@ _TICKET = """\
          （ローカルのリモート追跡参照に基づく）、停止している理由、次の手順を表示します。
          サブエージェントも実行できます）
     ccnavi ticket next-id [<prefix> <slug>]
-        （読み取り専用。issueのない親の次の連番、またはそれから組み立てた
+        （読み取り専用。直接作業のワークツリー名に付ける次の連番、またはそれから組み立てた
          識別子 <prefix>-<number>-<slug> を表示します。サブエージェントも実行できます。
          チケット制御が無効でも使えます。手元のブランチとワークツリーの名前も数え、
          数えきれなかったときは番号を出さず、終了コード 2 で理由を標準エラーへ出します）

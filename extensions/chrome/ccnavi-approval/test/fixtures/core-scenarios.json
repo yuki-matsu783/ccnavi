@@ -9,7 +9,7 @@
       "path": ".ccnavi/approved/doing/i0001-01-01.md"
      },
      {
-      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
       "op": "create",
       "path": ".ccnavi/approved/doing/i0001.md"
      },
@@ -24,7 +24,7 @@
     ]
    },
    "code": null,
-   "digest": "cece3ae634f4e87e05c19664099a844638e8e137a3fad152b536d32743b9c327",
+   "digest": "15364e690f89b0ce349ad2ba00600e123405e6dd612b49408c25fe9cfe04ae01",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -38,7 +38,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    このチケットでは、以下に示す場所のみ編集できるようになります。allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可されていても、このチケットの範囲外では編集できません。ルールの deny はこの範囲の中でも止まる\n    allow: wip/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。先行フェーズの終了と必要なレビューの完了を確認するまで、このフェーズの子チケットは承認できません。\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係（計画の各項目の after で決まります。承認後に phases.yml を変更しても変わりません）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。承認後に phases.yml を変更しても、この親チケットの編集可能範囲・確認対象・成果物は変わりません。\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: にない）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: wip/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
+   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    このチケットでは、以下に示す場所のみ編集できるようになります。allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可されていても、このチケットの範囲外では編集できません。ルールの deny はこの範囲の中でも止まる\n    allow: wip/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。先行フェーズの終了と必要なレビューの完了を確認するまで、このフェーズの子チケットは承認できません。\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係（計画の各項目の after で決まります。承認後に phases.yml を変更しても変わりません）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。承認後に phases.yml を変更しても、この親チケットの編集可能範囲・確認対象・成果物は変わりません。\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: にない）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ 課題: #1\n    この親のマージリクエストの本文に Closes として記載する番号。マージされると、このIssueもクローズされます。\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: wip/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
   },
   "request": {
    "family": "i0001",
@@ -50,7 +50,7 @@
      "i0001": {
       "files": {
        "wip/proposals/todo/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: false\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/research/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
-       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n"
+       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },
@@ -122,7 +122,7 @@
      "i0001": {
       "files": {
        ".ccnavi/approved/doing/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
        ".ccnavi/approved/phases/i0001/1.requested": "{\"at\": \"x\"}",
        ".ccnavi/approved/phases/i0001/1.reviewed": "{\"at\": \"x\"}",
        "wip/proposals/todo/i0001-01-02.md": "---\nversion: 1\nticket: i0001-01-02\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-02\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
@@ -152,7 +152,7 @@
    "changes": {
     "i0001": [
      {
-      "content": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"e5f224794d7436f61a780d3ad04ac4ea9b19ecb7\"\nfinished_to: \"review\"\nmerged_sha: \"ce58b85a460802b8e760a833aa1fc5821906d396\"\nsettled_by: \"chrome\"\n---\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"78b96fd8fc5bd844542fb75b98d81ef980fa1cee\"\nfinished_to: \"review\"\nmerged_sha: \"b8d4564b2406cffcdc8a1bb234ea99355611ed73\"\nsettled_by: \"chrome\"\n---\n\n本文\n",
       "op": "create",
       "path": ".ccnavi/approved/done/i0001-01-01.md"
      },
@@ -179,11 +179,11 @@
   },
   "request": {
    "compare": {
-    "base": "8b6c42d7e004a45d77c899e6021a2f5748e4383d",
+    "base": "7491b686dc92e7f0545f4d75c432325de937ddfb",
     "files": [
      ".ccnavi/approved/phases/i0001/1.requested"
     ],
-    "head": "696e836a787b739a28fe1bddabaabb4908b85be2"
+    "head": "8eb346aa0eaa136ba34d066fd7694a11b056e707"
    },
    "family": "i0001",
    "op": "confirm",
@@ -203,18 +203,18 @@
     "branches": {
      "i0001": {
       "files": {
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"e5f224794d7436f61a780d3ad04ac4ea9b19ecb7\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
-       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"8b6c42d7e004a45d77c899e6021a2f5748e4383d\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"78b96fd8fc5bd844542fb75b98d81ef980fa1cee\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"7491b686dc92e7f0545f4d75c432325de937ddfb\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
        ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-09-29T12:00:00+0900\"\n}\n",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"ce58b85a460802b8e760a833aa1fc5821906d396\",\n \"base\": \"e5f224794d7436f61a780d3ad04ac4ea9b19ecb7\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
-       "wip/proposals/review/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"e5f224794d7436f61a780d3ad04ac4ea9b19ecb7\"\nfinished_to: \"review\"\nmerged_sha: \"ce58b85a460802b8e760a833aa1fc5821906d396\"\n---\n\n本文\n"
+       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"b8d4564b2406cffcdc8a1bb234ea99355611ed73\",\n \"base\": \"78b96fd8fc5bd844542fb75b98d81ef980fa1cee\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
+       "wip/proposals/review/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"78b96fd8fc5bd844542fb75b98d81ef980fa1cee\"\nfinished_to: \"review\"\nmerged_sha: \"b8d4564b2406cffcdc8a1bb234ea99355611ed73\"\n---\n\n本文\n"
       },
-      "head": "696e836a787b739a28fe1bddabaabb4908b85be2"
+      "head": "8eb346aa0eaa136ba34d066fd7694a11b056e707"
      },
      "i0001-01-01": {
       "files": {
        ".ccnavi/approved/doing/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n"
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },
@@ -241,7 +241,7 @@
    "changes": {
     "i0001": [
      {
-      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n- design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: 2026-09-29T12:00:00+0900\ncompleted_at: ''\nbase_sha: e5f224794d7436f61a780d3ad04ac4ea9b19ecb7\nfeedback: []\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n- design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: 2026-09-29T12:00:00+0900\ncompleted_at: ''\nbase_sha: 78b96fd8fc5bd844542fb75b98d81ef980fa1cee\nfeedback: []\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
       "op": "update",
       "path": ".ccnavi/approved/doing/i0001.md"
      },
@@ -252,7 +252,7 @@
     ]
    },
    "code": null,
-   "digest": "c74104af5cc79b8722898a5ff8a74a088c47aab2913a47019b60c8e4b15e4689",
+   "digest": "3a70c4c0b7f2b683f06991d866ed689be4a725734e885fb58a5aab1501c4f874",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -277,13 +277,13 @@
     "branches": {
      "i0001": {
       "files": {
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"e5f224794d7436f61a780d3ad04ac4ea9b19ecb7\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
-       ".ccnavi/approved/done/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"e5f224794d7436f61a780d3ad04ac4ea9b19ecb7\"\nfinished_to: \"review\"\nmerged_sha: \"ce58b85a460802b8e760a833aa1fc5821906d396\"\nsettled_by: \"confirm\"\n---\n\n本文\n",
-       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"8b6c42d7e004a45d77c899e6021a2f5748e4383d\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"78b96fd8fc5bd844542fb75b98d81ef980fa1cee\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+       ".ccnavi/approved/done/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"78b96fd8fc5bd844542fb75b98d81ef980fa1cee\"\nfinished_to: \"review\"\nmerged_sha: \"b8d4564b2406cffcdc8a1bb234ea99355611ed73\"\nsettled_by: \"confirm\"\n---\n\n本文\n",
+       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"7491b686dc92e7f0545f4d75c432325de937ddfb\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
        ".ccnavi/approved/phases/i0001/1.reviewed": "{\"mr\": 7, \"accepted\": [], \"at\": \"2026-09-29T12:00:00+0900\"}",
        ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-09-29T12:00:00+0900\"\n}\n",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"ce58b85a460802b8e760a833aa1fc5821906d396\",\n \"base\": \"e5f224794d7436f61a780d3ad04ac4ea9b19ecb7\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
-       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nfeedback: []\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n"
+       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"b8d4564b2406cffcdc8a1bb234ea99355611ed73\",\n \"base\": \"78b96fd8fc5bd844542fb75b98d81ef980fa1cee\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
+       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nfeedback: []\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },
@@ -352,7 +352,7 @@
     "branches": {
      "i0001": {
       "files": {
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\nplan:\n  - research\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\nplan:\n  - research\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
        ".ccnavi/approved/done/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: false\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/research/*\"\nstarted_at: \"\"\ncompleted_at: \"2026-01-01T00:00:00+0000\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
@@ -360,14 +360,14 @@
      "i0002": {
       "files": {
        ".ccnavi/approved/doing/i0002-01-02.md": "---\nversion: 1\nticket: i0002-01-02\nparent: i0002\nphase: 1\nhuman_review:\n  required: false\n  reason: t\ntitle: 子 i0002-01-02\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/research/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
-       ".ccnavi/approved/doing/i0002.md": "---\nversion: 1\nticket: i0002\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\nplan:\n  - research\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+       ".ccnavi/approved/doing/i0002.md": "---\nversion: 1\nticket: i0002\nmr: 1\nissue: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\nplan:\n  - research\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
        ".ccnavi/approved/done/i0002-01-01.md": "---\nversion: 1\nticket: i0002-01-01\nparent: i0002\nphase: 1\npredecessors: [\"i0001-01-01\"]\nhuman_review:\n  required: false\n  reason: t\ntitle: 子 i0002-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/research/*\"\nstarted_at: \"\"\ncompleted_at: \"2026-01-01T00:00:00+0000\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },
      "i0003": {
       "files": {
-       ".ccnavi/approved/doing/i0003.md": "---\nversion: 1\nticket: i0003\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\nplan:\n  - research\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+       ".ccnavi/approved/doing/i0003.md": "---\nversion: 1\nticket: i0003\nmr: 1\nissue: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\nplan:\n  - research\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
        "wip/proposals/todo/i0003-01-01.md": "---\nversion: 1\nticket: i0003-01-01\nparent: i0003\nphase: 1\npredecessors: [\"i0002-01-01\"]\nhuman_review:\n  required: false\n  reason: t\ntitle: 子 i0003-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/research/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
        "wip/proposals/todo/i0003-01-02.md": "---\nversion: 1\nticket: i0003-01-02\nparent: i0003\nphase: 1\npredecessors: [\"i0002-01-02\"]\nhuman_review:\n  required: false\n  reason: t\ntitle: 子 i0003-01-02\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/research/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
@@ -396,7 +396,7 @@
    "changes": {
     "i0001": [
      {
-      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope:\n    - tests/*\nplan:\n- research\n- type: design\n  after:\n  - 1\n- type: acceptance\n  after:\n  - 2\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: ''\ncompleted_at: ''\nbase_sha: ''\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope:\n    - tests/*\nplan:\n- research\n- type: design\n  after:\n  - 1\n- type: acceptance\n  after:\n  - 2\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: ''\ncompleted_at: ''\nbase_sha: ''\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
       "op": "update",
       "path": ".ccnavi/approved/doing/i0001.md"
      },
@@ -407,7 +407,7 @@
     ]
    },
    "code": null,
-   "digest": "89fa0c8eafcd5876d54c91bf0ac325f078a1e5101281e44ba2f9a8b33ecf7c19",
+   "digest": "c3786a3f5b4b93840329c1b2d3d6f2bb3c0d5e1e2572569305762a4d84bfc0df",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -432,8 +432,8 @@
     "branches": {
      "i0001": {
       "files": {
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
-       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope:\n    - tests/*\nplan:\n  - research\n  - {type: design, after: [1]}\n  - {type: acceptance, after: [2]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n"
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope:\n    - wip/research/*\n    deliverables:\n    - wip/research/summary.md\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope:\n    - tests/*\nplan:\n  - research\n  - {type: design, after: [1]}\n  - {type: acceptance, after: [2]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },

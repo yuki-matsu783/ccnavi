@@ -276,7 +276,7 @@ def ticket_text(
     project は行き先のレイヤーを決める。"""
     lines = ["---", "version: 1", f"ticket: {name}"]
     if not parent:
-        lines.append("mr: 1")
+        lines += ["mr: 1", "issue: 1"]
     if project:
         lines.append(f"project: {project}")
     if parent:

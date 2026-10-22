@@ -194,6 +194,14 @@ def _issue_ref(raw) -> tuple[str, int | None]:
     return "", _issue_number(raw)
 
 
+def issue_text(raw) -> str:
+    """`issue:` に書く値（`12` か `owner/repo#12`）。読めなければ空。`ticket new` が使う。"""
+    repo, number = _issue_ref(raw)
+    if number is None:
+        return ""
+    return f"{repo}#{number}" if repo else str(number)
+
+
 def issue_label(t: ticket_model.Ticket) -> str:
     """課題の表記（`#12`・`owner/repo#12`）。MR の `Closes` と承認の画面が使う。無ければ空。"""
     if t.issue is None:
