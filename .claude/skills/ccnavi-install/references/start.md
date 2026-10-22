@@ -47,5 +47,5 @@ macOS の Finder と `unzip` は、zip の中のシンボリックリンクを�
 zip の名前は `ccnavi-<短いコミット>-<os>-<arch>[-dirty].zip`。`<os>-<arch>` が、この機械（doctor の `machine` 行）と同じか確かめる。
 
 - 違うときは、この機械向けの zip を頼むか、ソースからのビルド（`--build`）にするかを聞く。
-- arm64 の macOS と Windows は、x86_64 の組み立てを変換して動かせる（Rosetta 2・Windows on Arm）。自分向けが無いときはそちらで足りる。
+- arm64 の macOS と Windows は、x86_64 向けの zip を変換して動かせる（Rosetta 2・Windows on Arm）。自分向けが無いときはそちらで足りる。
 - 名前に `-dirty` が付いた zip は、未コミットの状態から作られている。配る側に、コミットして作り直したものを頼む。

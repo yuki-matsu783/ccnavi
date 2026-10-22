@@ -19,7 +19,7 @@ ccnavi を入れる作業を、状況の調査 → 足りないものの案内 �
 ## スクリプトの場所
 
 スクリプトは**配布元**（展開した zip のフォルダ。ビルドからなら ccnavi のソース）の `scripts/` にある。
-このスキルの置き場からは決めない。以下 `<配布元>` はそのフォルダ、`<ws>` は入れる先のワークスペースルート。
+このスキルを置いた場所からは決まらない。以下 `<配布元>` はそのフォルダ、`<ws>` は入れる先のワークスペースルート。
 
 | スクリプト | 役目 |
 |---|---|
@@ -40,7 +40,7 @@ ccnavi を入れる作業を、状況の調査 → 足りないものの案内 �
 3. **直してもらう**: `ng` は必ず、`todo` は入れる前か、遅くとも使い始める前に直す。**入れるのはユーザ**。
    PATH が変わる操作のあとは、Claude Code を終了して新しい端末から起動し直してもらう（Bash ツールの環境は起動時のまま変わらない）。
    認証まで済んだら `--online` を付けて打ち直し、`remote` と `host-api` を確かめる。
-4. **ビルドから**のとき: `install <ws> --build --check` で副作用を見せて了承を得てから `--build` を打ち、出力の `次:` に従う（手順 5 へ）。
+4. **ビルドから**のとき: `sh <ソース>/scripts/ccnavi-install.sh <ws> --build --check` で副作用を見せて了承を得てから `--build` を打ち、出力の `次:` に従う（手順 5 へ）。
 5. **何が変わるかを見せる**: `sh <配布元>/scripts/ccnavi-install.sh <ws> --from <配布元> --check` の一覧を見せて、了承を得る。
 6. **入れる**: `--check` を外して打つ。終了コード 5（lint に error）なら ccnavi-config へ回す。
 7. **終わったら**: install の最後の案内に従う。README の「導入」の進め方（dry-run で記録を読む → ルールを直す → enable へ切り替える）を伝える。
@@ -59,6 +59,7 @@ ccnavi を入れる作業を、状況の調査 → 足りないものの案内 �
 | `package` が ng | `wrong-target` なら、この機械の `<os>-<arch>` 向けの zip を頼むか `--build` にするかを聞く。`missing`・`no-executable` なら、zip を受け取り直してもらう |
 | `package` が warn quarantined | `--clear-quarantine` の意味（ダウンロードしたものを信頼して隔離の印を外す）を伝え、ユーザが決める |
 | `existing` が warn enable | 自分では install を打たない。コマンドを示し、Claude Code の外の端末でユーザに打ってもらう |
+| `existing` が warn other | 保存された `CCNAVI_MODE` の値が読めない。ccnavi は読めない値を enable として扱うので、`warn enable` と同じに扱う |
 | `existing` が warn unchecked / invalid | jq を入れるか JSON を直すまで、install に進まない |
 
 ## 絶対ルール

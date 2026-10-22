@@ -13,10 +13,10 @@ doctor の `remote`・`host-api`・`source-remote` が todo のとき、`origin`
 
 ## ccnavi の仕組み
 
-- **git の認証**: origin が http か https のとき、ccnavi は git の資格情報の取り手に glab（GitHub 系は gh）を足す。
-  足し方は環境変数で、`.gitconfig` と origin の URL は書き換えない。ユーザがもともと持っている取り手が先に使われる。
+- **git の認証**: origin が http か https のとき、ccnavi は git の資格情報ヘルパーに glab（GitHub 系は gh）を足す。
+  足し方は環境変数で、`.gitconfig` と origin の URL は書き換えない。ユーザがもともと持っているヘルパーが先に使われる。
   glab は絶対パスで解ける必要があり、パスに `"`・`$`・`` ` ``・`\` を含むと足さない。
-  **ログインしているかは確かめない**。ログインしていなければ、取り手を足しても git の認証は通らない
+  **ログインしているかは確かめない**。ログインしていなければ、ヘルパーを足しても git の認証は通らない
 - **API の認証**: ccnavi はまず `glab api` でプロジェクトを読んでみる。通らなければ curl に切り替える。
   curl のときは、curl と環境変数 `GITLAB_TOKEN` があるかしか見ない（通信して確かめない）。
   doctor の `host-api` は、curl のときは API を実際に打って確かめる
@@ -51,7 +51,7 @@ glab を入れられない・入れたくないとき、次で足りる。
 2. **レビュー（API）**: curl と環境変数 `GITLAB_TOKEN` が要る
 3. 確かめる: `doctor --online` で `remote` と `host-api` が ok になれば、glab は入れなくてよい。`glab` 行は `warn … optional:` になる
 
-注意:
+注意点は次のとおり。
 
 - `remote` の ok は「**読める**」ことだけを意味する。push の権限は確かめていない。最初の push で分かる
 - `host-api` のコードは、`unauthorized`（トークンが通らない）、`not-found`（パスか権限）、`unreachable`（接続・TLS）、`timeout`、`token-missing`（`GITLAB_TOKEN` が無い）、`no-curl`、`no-jq`
