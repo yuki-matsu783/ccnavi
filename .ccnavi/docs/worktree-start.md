@@ -14,7 +14,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
 
 - issueやMRを指定して作業を頼まれたら（`#152`・`!5`・URLなど）、ワークツリーを切る前に
   `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue <番号>`（MRなら`--mr <番号>`）を打つ。
-  紐づくブランチを`ccnavi-branches.sh`で探し、結果に応じて進める。プロジェクトのissue・MRは`projects/<名前>`に`cd`してから打つ。
+  紐づくブランチを`ccnavi-branches.sh`で探し、結果に応じて進める。プロジェクトのissue・MRは`projects/<名前>`に`cd`してから打つ。依頼にURLがあるときは`--repo <owner/repo>`を付ける。実行した場所のoriginと違えば、ホストに問い合わせる前に止まり、移動先を案内する。ホストがHTTPの返事を返した失敗（404・403・415など）は、接続や認証の問題とは別に、ステータスと本文の頭を出す。
   `--slug <語>`・`--prefix <語>`・`--title <題>`で名前と題を指定でき、`--dry-run`なら何も作らず予定だけ出す（リモートは読むだけ）
 
   | 結果 | 終了コード | エージェントの動き |
