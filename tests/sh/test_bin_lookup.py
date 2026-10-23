@@ -85,6 +85,29 @@ class BinLookupTest(unittest.TestCase):
         self.assertIn("実行ファイルが見つかりません", result.stderr)
         self.assertIn(".ccnavi/bin/", result.stderr)
 
+    def put_path_build(self):
+        place = os.path.join(self.ws, "on-path")
+        write(os.path.join(place, "ccnavi"), STUB.format(name="path"))
+        return place
+
+    def test_a_workspace_without_bin_or_source_uses_the_ccnavi_on_path(self):
+        place = self.put_path_build()
+        result = self.run_ticket(PATH=place + os.pathsep + os.environ["PATH"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout.startswith("path "), result.stdout)
+
+    def test_the_machine_build_wins_over_the_ccnavi_on_path(self):
+        self.put_machine_build()
+        place = self.put_path_build()
+        result = self.run_ticket(PATH=place + os.pathsep + os.environ["PATH"])
+        self.assertTrue(result.stdout.startswith("bin "), result.stdout + result.stderr)
+
+    def test_a_relative_path_entry_is_not_used(self):
+        self.put_path_build()
+        result = self.run_ticket(PATH="on-path" + os.pathsep + os.environ["PATH"])
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("実行ファイルが見つかりません", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

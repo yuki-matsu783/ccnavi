@@ -1428,6 +1428,64 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(read(exe), "ELF fake executable\n")
 
+    # bin/ に実体が無く、PATH の ccnavi が起動される形。PATH の置き場はワークスペースの外に
+    # 在るものとして、使い捨ての別ディレクトリに置く。
+
+    def path_layout(self):
+        """振り分けの sh だけを置き、実体は PATH の置き場に置く。
+
+        返すのは (sh の相対パス, 実体, PATH を足す env)。
+        """
+        spelled = "/".join([".ccnavi", "scripts", LAUNCHER_NAME])
+        write(os.path.join(self.repo, ".ccnavi", "scripts", LAUNCHER_NAME), "#!/bin/sh\n")
+        outside = tempfile.mkdtemp(prefix="ccnavi-onpath-")
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        exe = os.path.join(outside, "local", "bin", "ccnavi")
+        write(exe, "ELF fake on path\n")
+        os.chmod(exe, 0o755)
+        env = {"PATH": os.path.dirname(exe) + os.pathsep + os.environ.get("PATH", "")}
+        return spelled, exe, env
+
+    def test_bin_に実体が無いとき_PATH_の実体もセッション開始でバックアップし実行後に戻す(self):
+        spelled, exe, env = self.path_layout()
+
+        self.run_hook("SessionStart", bin=spelled, extra_env=env)
+        write(exe, "ELF replaced on path\n")
+        result = self.run_hook("PostToolUse", bin=spelled, extra_env=env)
+
+        self.assertEqual(read(exe), "ELF fake on path\n")
+        self.assertIn("restored", result.stdout)
+
+    def test_PATH_の実体への書き込みは名指しのツールから止まる(self):
+        spelled, exe, env = self.path_layout()
+
+        result = self.run_hook(
+            "PreToolUse", bin=spelled, extra_env=env, tool="Write", file_path=exe
+        )
+
+        self.assertIn("deny", result.stdout)
+
+    def test_PATH_の実体を差し替えるシェルの書き込みは止まり_別の_bin_ccnavi_は止まらない(self):
+        spelled, exe, env = self.path_layout()
+        exe_dir = os.path.dirname(exe).replace("\\", "/")
+
+        denied = self.run_hook(
+            "PreToolUse", bin=spelled, extra_env=env, command=f"cp /tmp/x {exe_dir}/ccnavi"
+        )
+        other = self.run_hook(
+            "PreToolUse", bin=spelled, extra_env=env, command="cp /tmp/x ./bin/ccnavi"
+        )
+
+        self.assertIn("deny", denied.stdout)
+        self.assertNotIn("deny", other.stdout)
+
+    def test_PATH_に_ccnavi_が無ければ守る対象も増えない(self):
+        spelled, _, _ = self.path_layout()
+
+        result = self.run_hook("PreToolUse", bin=spelled, command="cp /tmp/x ./bin/ccnavi")
+
+        self.assertNotIn("deny", result.stdout)
+
     def test_ツールを呼ぶ前に外で作り直された実行ファイルは新しい版として取り直す(self):
         # ccnavi の外での再ビルドは、次のツール呼び出しの前に基準になる。
         # 大きさで変化を見るので、差し替えの内容は元と大きさを変える（同じ大きさは見分けられない）。

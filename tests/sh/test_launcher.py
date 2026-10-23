@@ -56,6 +56,40 @@ class HostTargetTest(unittest.TestCase):
         self.assertEqual(platformtag.runnable_targets("linux-arm64"), ("linux-arm64",))
 
 
+class PathExecutableTest(unittest.TestCase):
+    """PATH の ccnavi。sh（ccnavi_launcher_path）と同じ規則。
+
+    絶対パスの項目だけを順に見て、実行できるものを返す。
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ccnavi-pathexe-")
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+
+    def place(self, name, *, mode=0o755):
+        path = os.path.join(self.dir, name, "ccnavi")
+        write(path, "x\n", mode)
+        return os.path.dirname(path)
+
+    def test_first_entry_in_path_order_wins(self):
+        first, second = self.place("a"), self.place("b")
+        found = platformtag.path_executable(first + os.pathsep + second)
+        self.assertEqual(found, os.path.join(first, "ccnavi"))
+
+    def test_skips_relative_and_empty_entries(self):
+        self.place("a")
+        raw = os.pathsep.join(["a", "", ".", os.path.join("..", "a")])
+        self.assertEqual(platformtag.path_executable(raw), "")
+
+    @unittest.skipIf(os.name == "nt", "実行ビットは POSIX の話")
+    def test_skips_a_file_that_is_not_executable(self):
+        plain = self.place("a", mode=0o644)
+        self.assertEqual(platformtag.path_executable(plain), "")
+
+    def test_is_empty_when_path_is_empty(self):
+        self.assertEqual(platformtag.path_executable(""), "")
+
+
 class LaunchedExecutableTest(unittest.TestCase):
     """探す順。`scripts/ccnavi-launcher.sh` から `../bin/<os>-<arch>/` を、sh と同じ順で探す。"""
 
@@ -174,10 +208,12 @@ class LauncherTest(unittest.TestCase):
     def pretend(self, uname_sm):
         write(os.path.join(self.fake, "uname"), f'#!/bin/sh\necho "{uname_sm}"\n')
 
-    def run_launcher(self, *args, stdin="{}", fake=True, argv=None, cwd=None):
+    def run_launcher(self, *args, stdin="{}", fake=True, argv=None, cwd=None, path_dirs=()):
         env = dict(os.environ)
         if fake:
             env["PATH"] = self.fake + os.pathsep + env.get("PATH", "")
+        if path_dirs:
+            env["PATH"] = os.pathsep.join([*path_dirs, env.get("PATH", "")])
         return subprocess.run(
             [*(argv or [self.launcher]), *args],
             input=stdin,
@@ -323,6 +359,87 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(result.returncode, 127)
         self.assertIn("unknown-unknown", result.stderr)
         self.assertIn(self.scripts + "/../bin/", result.stderr)
+
+    # L6: bin/ に無いときだけ PATH の ccnavi を使う
+
+    def on_path(self, name="ccnavi", where="from-path"):
+        """PATH に置く組み立ての代わり。置き場を返す。"""
+        place = os.path.join(self.dir, "on-path")
+        write(
+            os.path.join(place, name),
+            f'#!/bin/sh\nprintf "%s|%s" "{where}" "$*"\n',
+        )
+        return place
+
+    def test_falls_back_to_the_ccnavi_on_path_when_bin_has_no_build(self):
+        self.pretend("Linux x86_64")
+        place = self.on_path()
+        result = self.run_launcher("x", path_dirs=[place])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "from-path|x")
+
+    def test_bin_wins_over_the_ccnavi_on_path(self):
+        self.pretend("Linux x86_64")
+        self.build("linux-x86_64")
+        place = self.on_path()
+        result = self.run_launcher(path_dirs=[place])
+        self.assertTrue(result.stdout.startswith("bin/linux-x86_64/"), result.stdout)
+
+    def test_finds_the_exe_spelling_on_path(self):
+        self.pretend("Linux x86_64")
+        place = self.on_path("ccnavi.exe", "exe-on-path")
+        result = self.run_launcher(path_dirs=[place])
+        self.assertEqual(result.stdout, "exe-on-path|")
+
+    def test_skips_relative_and_empty_path_entries(self):
+        """cwd に置かれた ccnavi を拾わない。相対の項目と空の項目は結果が cwd で変わる。"""
+        self.pretend("Linux x86_64")
+        write(os.path.join(self.dir, "evil", "ccnavi"), '#!/bin/sh\nprintf "evil"\n')
+        for entry in ("evil", "", "."):
+            with self.subTest(entry=entry):
+                result = self.run_launcher(path_dirs=[entry], cwd=self.dir)
+                self.assertEqual(result.returncode, 127, result.stdout)
+                self.assertEqual(result.stdout, "")
+
+    def test_skips_a_ccnavi_that_is_the_launcher_itself(self):
+        """ccnavi という名前で張ったリンクを起動すると自分に戻る。同じファイルは飛ばす。"""
+        self.pretend("Linux x86_64")
+        place = os.path.join(self.dir, "on-path")
+        os.makedirs(place)
+        try:
+            os.symlink(self.launcher, os.path.join(place, "ccnavi"))
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+        result = subprocess.run(
+            [os.path.join(place, "ccnavi")],
+            input="{}",
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env={
+                **os.environ,
+                "PATH": self.fake + os.pathsep + place + os.pathsep + os.environ["PATH"],
+            },
+            timeout=20,
+        )
+        self.assertEqual(result.returncode, 127, result.stdout + result.stderr)
+
+    def test_the_127_message_says_path_was_looked_at_too(self):
+        self.pretend("Linux x86_64")
+        result = self.run_launcher()
+        self.assertEqual(result.returncode, 127)
+        self.assertIn("PATH", result.stderr)
+
+    def test_keeps_ifs_and_globbing_for_the_rest_of_the_script(self):
+        """PATH の探索で IFS と set -f を変える。戻さないと次の呼び出しの語分割が壊れる。"""
+        self.pretend("Linux x86_64")
+        place = self.on_path()
+        self.assertTrue(os.path.isdir(place))
+        # 空白を含む PATH の項目でも探せる（項目は : だけで分ける）。
+        spaced = os.path.join(self.dir, "a b")
+        write(os.path.join(spaced, "ccnavi"), '#!/bin/sh\nprintf "spaced"\n')
+        result = self.run_launcher(path_dirs=[spaced])
+        self.assertEqual(result.stdout, "spaced")
 
 
 if __name__ == "__main__":

@@ -26,6 +26,26 @@ from ccnavi.infra import settings as _settings  # noqa: E402
 # 他の OS では実パスと同じで、何も変わらない。
 _tempfile.tempdir = os.path.realpath(_tempfile.gettempdir())
 
+
+def _drop_ccnavi_from_path() -> None:
+    """走らせた人の PATH にある ccnavi を、テストから見えなくする。
+
+    振り分けの sh と自己防衛は、bin/ に実体が無いと PATH の ccnavi を使う。PATH に ccnavi を
+    通している機械では、「実体が無い」ことを見るテストの答えが、誰の機械で走らせたかで変わる。
+    PATH を使うテストは、自分で置き場を作って PATH に足す。
+    """
+    kept = []
+    for place in os.environ.get("PATH", "").split(os.pathsep):
+        has = place and any(
+            os.path.isfile(os.path.join(place, name)) for name in ("ccnavi", "ccnavi.exe")
+        )
+        if not has:
+            kept.append(place)
+    os.environ["PATH"] = os.pathsep.join(kept)
+
+
+_drop_ccnavi_from_path()
+
 # 共通レイヤーの 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
 # hook の判定とチケット・レビューのサブコマンドには届かない。
