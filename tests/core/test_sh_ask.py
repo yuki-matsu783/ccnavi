@@ -413,9 +413,6 @@ class TreeBaseBoundTest(Harness):
         self.assertEqual({"bound": "no"}, self.bound(self.p))
         self.assertEqual("yes", self.bound(self.q)["bound"])
 
-    # 実装の欠陥: base_bound は archived_fields の parent を見ないため、
-    # 退避された子でも yes を返す。
-    @unittest.expectedFailure
     def test_an_archived_child_does_not_bind(self):
         write(
             os.path.join(self.ws, "logs", "archive", "p", "done", "feature-x.md"),

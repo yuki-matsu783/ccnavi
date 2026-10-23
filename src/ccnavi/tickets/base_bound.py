@@ -73,7 +73,8 @@ def base_bound(root: str, conf: settings.Settings, main_root: str, branch: str) 
             if found:
                 rel = os.path.relpath(found, root).replace(os.sep, "/")
                 return YES, f"チケットか提案（{rel}）の名前がブランチの識別子と同じ"
-    if archive.archived_fields(root, owner.project, ident) is not None:
+    archived = archive.archived_fields(root, owner.project, ident)
+    if archived is not None and not archived.parent:
         return YES, "取り込み先のリポジトリの退避（ready 済み）に同じ名前の親がある"
     approved = settings.approved_dir(conf, owner.root)
     unsure = False
