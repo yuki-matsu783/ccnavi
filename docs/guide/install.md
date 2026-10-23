@@ -11,6 +11,19 @@ keywords: [導入, dry-run, enable, ccnavi-setup.sh, 配布, 実行ファイル,
 どんなコマンドが打たれ、ルールが何に当たるかは、動かしてみるまで分からない。`dry-run` で導入し、記録を読みながらルールを直し、記録が落ち着いてから `enable` に切り替える。
 このページは、その手順と、導入スクリプトで配布先に設定と道具を置く方法を書く。入口は[手引きの目次](index.md)にある。
 
+## 入口: Claude Code に「ccnavi を入れて」と頼む
+
+配る側が `sh scripts/ccnavi-package.sh --build` で zip（と `.sha256`）を作り、共有フォルダに置く。使う側は zip を
+受け取ってチェックサムを確かめ、自分で展開し、展開したフォルダで `claude` を起動して「ccnavi を入れて」と頼む
+（`ccnavi-install` スキル）。スキルは `scripts/ccnavi-doctor.sh` で OS・git・jq・curl・GitLab の認証・既存の導入を調べ、
+足りないものは入れ方を案内してから、`scripts/ccnavi-install.sh <入れる先> --check` を打ち、続けて本番を打つ。glab は必須ではなく、
+無くても git の資格情報と `GITLAB_TOKEN` で足りる。
+
+ソースから使うときは `--build` を付けて実行ファイルを組み立てる（`--build --check` で副作用を見てから）。
+更新は `--force` で行い、バックアップは入れる先の外に取られる。手順は
+[`.claude/skills/ccnavi-install/`](../../.claude/skills/ccnavi-install/SKILL.md) と、展開した zip の `INSTALL.md`。
+下の 1 以降は、入ったあとの進め方を説明する。
+
 ## 1. dry-run で立てる
 
 実行ファイルを組み立て、8 つのイベントに登録する（[設定](settings.md)。導入スクリプトが書く）。

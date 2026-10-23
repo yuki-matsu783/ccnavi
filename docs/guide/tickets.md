@@ -285,6 +285,8 @@ Draft は親が片付けて push したあとの `ready` で外す。
 sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152   # MR なら --mr 5
 ```
 
+依頼の URL のリポジトリが `projects/<名前>` のものなら、そこに `cd` して `--repo <owner/repo>` を付けて打つ。実行した場所の origin と違えば、ホストに問い合わせる前に止まって移動先を案内する。
+
 候補が複数あるときは、エージェントが一覧を見せて「既存のブランチで続ける・新しく `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞くので、答える。
 ホストに届かないときは、出力の案内どおりに進む。ほかの終了コードや候補の探し方は [設計 9.13](../design/tickets/branch-lookup.md) と [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md)。
 

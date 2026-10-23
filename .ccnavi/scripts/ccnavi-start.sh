@@ -2,7 +2,7 @@
 # ccnavi-start issue・MR を指定して作業を頼まれたとき、既存のものを確かめ、無ければ Draft MR・ワークツリー・
 # feature ブランチを先に作る。
 #
-#   sh .ccnavi/scripts/ccnavi-start.sh --issue <番号> [--slug <語>] [--prefix <語>] [--title <題>] [--dry-run] [--mcp-checked]
+#   sh .ccnavi/scripts/ccnavi-start.sh --issue <番号> [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked]
 #   sh .ccnavi/scripts/ccnavi-start.sh --mr <番号> [--dry-run]
 #
 # 流れ（.ccnavi/docs/worktree-start.md）:
@@ -42,7 +42,7 @@ fail() {
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <語>] [--prefix <語>] [--title <題>] [--dry-run] [--mcp-checked]
+sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked]
 
   issue・MR に紐づくブランチを探し（ccnavi-branches.sh）、候補に応じて進める。
   候補が 1 件   そのブランチで続ける。ワークツリーが無ければ .claude/worktrees/<識別子> に、ブランチを直接
@@ -62,16 +62,20 @@ sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <�
                 作り方。ccnavi の実行ファイルに聞く）
   --prefix <語> 先頭の語（既定 feature）
   --title <題>  MR の題。省くと issue の題、読めなければ「#<番号> <slug>」
+  --repo <owner/repo>
+                依頼の URL が示すリポジトリ。cwd の origin と違えば、ホストに問い合わせる前に止めて、移動先
+                （projects/<名前>/）を案内する（終了コード 1）。大文字小文字は区別しない
   --dry-run     何も作らず、作る予定の内容だけ出す（リモートは読むだけ）
   --mcp-checked ホストの API に届かず、既存の MR がないこと（採用する MR のブランチと同じ名前のマージ済み MR がないこと）を
                 MCP などで確かめたあとに付ける
 
   ホストを見られないときは、既存の MR を見落として重複を作らないよう新規作成に進まず止める（手元の候補がちょうど 1 件なら続ける）。
-  GitHub の API に届かないとき（Claude remote など）は、MCP で代行する手順を標準出力に出して終了コード 4 で止まる。
+  GitHubのAPIに届かない・断られたとき（Claude remoteなど）は、MCPで代行する手順を標準出力に出して終了コード4で止まる。
+  GitLabは、届かない・断られた理由（HTTPの番号と本文）と、手で行う手順を出して終了コード4で止まる。
   代行したあと同じコマンドを再実行すると、完了済みの処理をスキップし、未完了の処理から再開します。
   冪等。cwd のリポジトリ（ワークスペース・projects/<名前>）を対象にする。
 
-終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数 / 4 ホストに届かず代行が必要です
+終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数 / 4 ホストに届かないか、断られて代行が必要です
 USAGE
 }
 
@@ -80,6 +84,7 @@ number=""
 opt_slug=""
 opt_prefix="feature"
 opt_title=""
+opt_repo=""
 dry=""
 mcp_checked=""
 # 打ち直しの案内に使う。引数ごとに ' で包み（中の ' は '\''）、そのまま打てば同じ引数になるようにする。
@@ -109,12 +114,13 @@ while [ "$#" -gt 0 ]; do
 		number="$2"
 		shift 2
 		;;
-	--slug | --prefix | --title)
+	--slug | --prefix | --title | --repo)
 		[ "$#" -ge 2 ] || fail no-value "$1 の後ろに値を渡してください。" 2
 		case "$1" in
 		--slug) opt_slug="$2" ;;
 		--prefix) opt_prefix="$2" ;;
 		--title) opt_title="$2" ;;
+		--repo) opt_repo="$2" ;;
 		esac
 		shift 2
 		;;
@@ -157,6 +163,10 @@ if [ "$what" = mr ] && { [ -n "$opt_slug" ] || [ -n "$opt_title" ]; }; then
 	fail mr-with-new "--mr には --slug と --title を付けられません（既存の MR の元ブランチで続けるだけです）。" 2
 fi
 
+if [ -n "$opt_repo" ]; then
+	printf '%s' "$opt_repo" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || fail bad-repo "--repo は owner/repo の形で書いてください（${opt_repo}）。" 2
+fi
+
 command -v jq >/dev/null 2>&1 || fail no-jq "jqが見つかりません。候補の JSON を解析できません。" 2
 
 root=$(ccnavi_workspace) ||
@@ -166,13 +176,44 @@ here="$(pwd -W 2>/dev/null || pwd)"
 top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -n "$top" ] ||
 	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
+# ---- 依頼のリポジトリと、実行した場所のリポジトリが違えば、ホストに問い合わせる前に止める。
+# origin のパスの最後の 2 段を、大文字小文字を区別せずに比べる（ccnavi_host_parse は使わない。ホストには接続しない）。
+repo_of_url() {
+	printf '%s' "$1" | sed -E -e 's#^[A-Za-z][A-Za-z0-9+.-]*://##' -e 's#^[^/@]*@##' -e 's#^[^/:]*[:/]##' -e 's#/+$##' -e 's#\.git$##' | tr -d '\r' | awk -F/ 'NF>=2{print $(NF-1) "/" $NF}'
+}
+fold_repo() {
+	printf '%s' "$1" | tr 'A-Z' 'a-z'
+}
+if [ -n "$opt_repo" ]; then
+	here_origin=$(git remote get-url origin 2>/dev/null || :)
+	here_repo=$(repo_of_url "$here_origin")
+	if [ -n "$here_repo" ] && [ "$(fold_repo "$here_repo")" != "$(fold_repo "$opt_repo")" ]; then
+		found_dir=""
+		scripts_abs="$root/.ccnavi/scripts"
+		if [ "$(fold_repo "$(repo_of_url "$(git -C "$root" remote get-url origin 2>/dev/null || :)")")" = "$(fold_repo "$opt_repo")" ]; then
+			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。ワークスペースルートに移動して実行し直してください: cd $(ccnavi_sh_quote "$root") && sh $(ccnavi_sh_quote "$scripts_abs/ccnavi-start.sh") ${orig_args}" 1
+		fi
+		for cand in "$root"/projects/*/; do
+			[ -e "${cand}.git" ] || continue
+			cand_repo=$(repo_of_url "$(git -C "$cand" remote get-url origin 2>/dev/null || :)")
+			if [ -n "$cand_repo" ] && [ "$(fold_repo "$cand_repo")" = "$(fold_repo "$opt_repo")" ]; then
+				found_dir="projects/$(basename "$cand")"
+				break
+			fi
+		done
+		if [ -n "$found_dir" ]; then
+			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${found_dir}/ に移動して実行し直してください: cd $(ccnavi_sh_quote "$root/$found_dir") && sh $(ccnavi_sh_quote "$scripts_abs/ccnavi-start.sh") ${orig_args}" 1
+		fi
+		fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${opt_repo} を origin に持つプロジェクトは projects/ に見つかりません（まだ clone していないなど）。ユーザに伝えて止まってください。" 1
+	fi
+fi
 state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
 heads_file="$state/start-heads-$$"
-trap 'rm -f "$host_err" "$host_err.status" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err"' EXIT
+trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err"' EXIT
 log_info 始めた -- "kind=$what" "number=$number" "dry=${dry:-no}"
 
 # ---- ccnavi-git.sh 経由の git。成功は何も出さず、失敗は出力を標準エラーへ出して 1 を返す（cwd で動く）。
@@ -239,16 +280,25 @@ host_open() {
 	return 0
 }
 
-# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
+# API が失敗したら、どの呼び出しかと、ホストの返事（HTTP の番号と本文）を覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
 	# ホストが HTTP のエラーを返したなら、その番号も残す（届いてはいるのか、届かないのかを見分けるため）。
 	# curl は「returned error: 404」、gh は「(HTTP 404)」、glab は「404 Not Found」の形
-	printf '%s' "$3" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' | head -n 1 >"$host_err.status"
+	ccnavi_host_fail_status "$3" >"$host_err.status"
+	# ホストの返事の本文（先頭200文字、1行）。原因を絞り込めるよう、文面に出す。トークンは伏せる
+	ccnavi_host_fail_body "$3" >"$host_err.body"
 }
 api_failed_reason() {
 	what_failed=$(cat "$host_err" 2>/dev/null || :)
-	printf 'ホストの API が失敗した（%s）' "${what_failed:-?}"
+	af_status=$(cat "$host_err.status" 2>/dev/null || :)
+	af_body=$(cat "$host_err.body" 2>/dev/null || :)
+	if [ -n "$af_status" ]; then
+		# 届いたうえでホストが断った。接続や認証の問題とは限らない
+		printf 'ホストの API が失敗した（%s）。HTTP %s: %s' "${what_failed:-?}" "$af_status" "${af_body:-（本文なし）}"
+	else
+		printf 'ホストの API が失敗した（%s）%s' "${what_failed:-?}" "${af_body:+。ホストの返事: $af_body}"
+	fi
 }
 
 # 親のシェルで呼ぶ。結果は issue_title_read（題。1 行、制御文字は空白）と issue_why（失敗の理由）に入れる。
@@ -258,7 +308,7 @@ issue_why=""
 issue_title_get() {
 	issue_title_read=""
 	issue_why=""
-	rm -f "$host_err" "$host_err.status"
+	rm -f "$host_err" "$host_err.status" "$host_err.body"
 	if [ "$ccnavi_h_kind" = github ]; then
 		it_path="repos/$ccnavi_h_path/issues/$number"
 	else
@@ -434,10 +484,10 @@ stop_host() {
 		esac
 	else
 		case "$sh_stage" in
-		search) printf 'ccnavi-start: GitLab APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。\n' "$what" "$number" "$sh_why" ;;
-		title) printf 'ccnavi-start: GitLab APIに接続できず、issue #%s を読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
-		merged) printf 'ccnavi-start: GitLab APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。\n' "$stop_branch" "$sh_why" ;;
-		*) printf 'ccnavi-start: GitLab APIに接続できず、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
+		search) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、%s #%sに紐づく既存のMRを確かめられなかった（%s）。既存のMRを見落として重複を作らないため、何も作成せずに処理を中断しました。\n' "$what" "$number" "$sh_why" ;;
+		title) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、issue #%sを読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
+		merged) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。\n' "$stop_branch" "$sh_why" ;;
+		*) printf 'ccnavi-start: GitLab APIが応答しないか要求を拒み、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
 		esac
 		printf '完了済みの処理:\n'
 		if [ "$sh_stage" = create ]; then
@@ -447,7 +497,14 @@ stop_host() {
 		fi
 		[ -z "$stop_local" ] || printf '  手元の候補: %s\n' "$stop_local"
 		printf '手で行う手順（GitLab には MCP の案内がありません）:\n'
-		printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
+		case "$sh_why" in
+		*"。HTTP "[0-9][0-9][0-9]:*)
+			printf '  1. 理由に出たホストの返事（HTTPの番号と本文）を読む。401・403は認証、404は番号かアクセス権（非公開は404で返ることがある）、それ以外は要求の中身かccnaviの不具合を疑う。原因を直すか、ユーザに伝える。直ったら同じコマンドを再実行する: %s\n' "$sh_cmd"
+			;;
+		*)
+			printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
+			;;
+		esac
 		case "$sh_stage" in
 		create)
 			printf '  2. 再実行できないなら、ブラウザで %s の MR を手で作り、再実行します。ソース: %s、ターゲット: %s、題: Draft: %s、説明: Closes #%s\n' "$ccnavi_h_path" "$stop_branch" "$stop_target" "$stop_title" "$number"
