@@ -184,7 +184,7 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
    ターンを終える。sh は crit を起動しない（crit は閉じるまで戻らない）
 4. ユーザはツリーのルート（か、同じブランチのチェックアウトのルート）で `crit review <相対パス>` を開き、HTML のソースの行に指摘を付けて、
    `crit push <番号>` で送る。`crit <相対パス>` だけだと描画のプレビューになり、そこで付けたピンは `crit push` で送られない（crit v0.21.0 で確認）。crit push は GitHub では `gh`、GitLab では `glab` を使い、マージリクエストの差分にあるファイルの行にだけ送れる。
-   **実測したこと（GitHub、2026-10-12、1 アカウントだけ）:** 手で組んだ `POST pulls/<番号>/reviews`（`event: COMMENT` と `comments[]` の
+   **実測で確かめたこと（GitHub、1 アカウントだけ）:** 手で組んだ `POST pulls/<番号>/reviews`（`event: COMMENT` と `comments[]` の
    `path`・`line`・`side`。crit が送ると見た JSON と同じ欄）は実物が受け付け、行のスレッドになって sh の `fetch` / `confirm` が未解決として数える。
    差分に無い行・ファイルへのレビューは 422（`Line could not be resolved` / `Path could not be resolved`）で拒まれ、レビューは作られない。
    手順は `tests/manual/github/probe_github.py`（crit 自身は起動していない）。

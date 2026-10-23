@@ -13,7 +13,7 @@
  * 通ったときは、実行ファイルが読んだ中身（`flow.data`）を返す。画面はそれを自分の中身と見比べる
  * （`flow-match.ts`）。あわせて、実行ファイルがそのフローについて言ったこと（`(flow)` の warn、担当に渡る手順
  * `rendered`、選べる名前 `candidates`）を `FlowChecks` にまとめて返す。warn も一時ファイルのパスで出るのでパスを直す。答えに `flow` が無ければ、実行ファイルが本当にフローを見たか分からないので通さない
- * （`--flow` を知らない古い実行ファイルと同じ扱い）。
+ * （確かめられないときと同じ扱い）。
  *
  * VS Code の API は使わない（単体テストで確かめる。実行ファイルの答えは偽物を渡す）。
  */
@@ -78,7 +78,7 @@ export async function lintFlowText(
     if (flow === undefined || flow.data === null || flow.data === undefined) {
       return {
         ok: false,
-        error: "実行ファイル（--lint --flow）が、読んだ中身（flow）を返しません（古い版です）。確認できないため、先へ進めません。実行ファイルを更新してください",
+        error: "実行ファイル（--lint --flow）が、読んだ中身（flow）を返しません。確認できないため、先へ進めません。実行ファイルを更新してください",
       };
     }
     const checks: FlowChecks = {

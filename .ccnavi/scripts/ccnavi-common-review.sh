@@ -95,22 +95,6 @@ review_no_bin() {
 	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 }
 
-# 実行ファイルがそのフラグを知っているか（`--version --json` の flags で見る）。
-# 知らない古い実行ファイルには `--actor`・`--via` を渡さない（渡すと引数の誤りで失敗する。マーカーは前と同じ中身になる）。
-# 答えは 1 度だけ引いて覚えておく。`$( )` の中から呼ぶと覚えた値が親に残らないので、親で呼ぶ。
-exe_flags=""
-exe_flags_read=""
-exe_knows() {
-	if [ -z "$exe_flags_read" ]; then
-		exe_flags_read=1
-		exe_flags=$(ccnavi --version --json </dev/null 2>/dev/null | tr -d '\r') || exe_flags=""
-	fi
-	case "$exe_flags" in
-	*"\"$1\""*) return 0 ;;
-	esac
-	return 1
-}
-
 # ---- リモート。origin の URL でホストを見分ける。
 review_host() {
 	origin=$(git remote get-url origin 2>/dev/null || :)

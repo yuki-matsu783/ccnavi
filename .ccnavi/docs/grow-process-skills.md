@@ -11,9 +11,7 @@ keywords: [工程スキル, reference, 育つ, 全体像, 振り返り, wiki, sk
 工程スキル（`process-design` `process-research` `process-implement` `process-test` `process-debug` `process-review` `process-release`）の SKILL.md は薄い入口に保ち、育つのは `references/` の側。
 スキルの `name` と `description` は常に文脈に入るため、増やすのは reference だけにして、必要なときに `ccnavi --docs` で引く。
 
-```
-きっかけ → 下書き → 検証 → 承認 → 効く → 配る
-```
+[共通の 6 段](grow.md)のうち、この対象の中身を表にする。
 
 | 段階 | 何が起きるか | 誰が | 使うもの |
 |---|---|---|---|

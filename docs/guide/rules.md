@@ -129,7 +129,7 @@ ccnaviディレクトリの下（既定なら`.ccnavi/`。共通レイヤーの`
 `additionalContext`は、そのルールに当たったときにモデルへ渡す文。`message`が止められた側への言葉なのに対し、
 こちらは「通すが、これを踏まえて進めろ」を書く。どのタイプにも書ける。
 
-| タイプ | どう届くか（Claude Code 2.1 で実測） |
+| タイプ | どう届くか |
 |---|---|
 | `allow` | 応答の`additionalContext`として届く。判定の理由は無いので、これだけが届く |
 | `ask` | ユーザがYesを押したときだけ`additionalContext`が届く。Noなら拒否の定型文だけが届いてターンが終わり、文は届かない。ダイアログには`[ccnavi] RULE_ASK (rule: …)`とsubjectが出る |

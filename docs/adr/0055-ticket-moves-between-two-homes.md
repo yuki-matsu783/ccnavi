@@ -35,49 +35,16 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 チケットは **1 本のファイル**にする。このファイルは、**ユーザが動かすときは `.ccnavi/approved/` へ、エージェントが動かす
 ときは `wip/proposals/` へ**、という規則で 2 つの置き場を行き来する。
 
-```
-  wip/proposals/todo ──ユーザが承認──→ .ccnavi/approved/doing
-                                          │
-                              エージェントが done（レビュー要）
-                                          ▼
-  wip/proposals/review ──ユーザがレビュー──→ .ccnavi/approved/done
-                                          ▲
-                              エージェントが done（レビュー不要）／cancel
-```
+置き場（`wip/proposals/{todo,review}/` と `.ccnavi/approved/{doing,done}/`）の意味、状態の遷移の図、誰が書くかは、設計書の [9.2 置き場](../design/tickets/places.md) と [9.6 状態遷移](../design/tickets/state-transitions.md) にある。決めたのは、次の 2 点。
 
-| 置き場 | 意味 | 動かす者 |
-|---|---|---|
-| `wip/proposals/todo/` | 承認待ちの提案。エージェントが自由に書く | エージェント（`Write` / `Edit`） |
-| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | ユーザ（`ccnavi --approve`、ボード）。ユーザが続きの子を起こすときもここに直に置かれる |
-| `wip/proposals/review/` | 作業が終わり、ユーザのレビューを待っている | エージェント（`ccnavi-ticket.sh done`） |
-| `.ccnavi/approved/done/` | ユーザが見て閉じた。取り消しも `cancelled_at` を持ってここに入る | ユーザ（`check` / `accept` / `--reviewed --chat` / `wrapup`）、レビュー不要の `done`、`cancel` |
+- ユーザが動かすときは `.ccnavi/approved/` へ、エージェントが動かすときは `wip/proposals/` へ動かす。`approved/` にはエージェントが書けず、判定が範囲を読むのは `approved/doing/` だけ
+- レビュー待ちは `wip/proposals/review/` に置く。取り消しは `cancelled_at` を持って `approved/done/` に入る（`cancelled/` を持たない）
 
 承認の意味は変えない。ユーザが読んで合意したものが `.ccnavi/approved/` に入り、エージェントは
 そこに書けない。変わるのは、承認のときにファイルを「コピーする」のではなく「動かす」ようになることである。
 
-**現行との変化点**
-
-| 項目 | 前 | 後 |
-|---|---|---|
-| ファイルの本数 | 提案 + 承認済みチケット（コピー）の 2 本 | 1 本が動く |
-| 提案の置き場の状態 | `todo` / `doing` / `done` / `cancelled` | `todo` / `review` |
-| 承認済みチケットの置き場 | `.ccnavi/tickets/`（開は直下、閉は `closed/`） | `.ccnavi/approved/`（`doing/` / `done/`） |
-| 承認 | 承認済みチケットを書く。提案は `todo/` に残る | `todo/` から `approved/doing/` へ動かす（`ccnavi_approved` を足す） |
-| 改版（計画の変更） | `todo/` の提案を書き換えて承認 | 同じ識別子の提案を `todo/` に書く。承認で `doing/` の側の計画だけ差し替え、`todo/` の側は消す |
-| `ticket start` | `todo/` → `doing/`、着手のキーを書く | 置き場は動かさず、`approved/doing/` のキー（`started_at` / `base_sha`）だけを書く |
-| `ticket done`（子） | `doing/` → `done/`。承認済みチケットは `closed/` へ | フェーズがレビュー要（延期を含む）なら `wip/proposals/review/` へ、不要なら `approved/done/` へ |
-| `ticket done`（親） | 同上 | `approved/done/` へ |
-| `ticket cancel` | `todo/` か `doing/` → `cancelled/` | `approved/doing/` → `approved/done/`（`cancelled_at` / `cancel_reason` を書く）。未承認の提案は消せばよい |
-| レビュー済み（`check` / `accept` / `--reviewed --chat` / `wrapup`） | `reviewed` のマーカーを置く | マーカーを置き、そのフェーズ（延期を引き受けた分を含む）の `review/` の子を `approved/done/` へ動かす |
-| 未解決の指摘を残す判断（`accept`、`--chat`） | 受け入れて進むだけ | 受け入れて進むか、**続きの子チケットを `approved/doing/` に起こす**かをユーザが端末で選ぶ。起こした子は同じフェーズの番号で、範囲は見た子の和、本文に指摘を書き出す。承認はユーザが選んだことで済んでいる |
-| フェーズが終わった | `todo/` にも `doing/` にも無く `done/` が 1 枚以上 | `doing/` に無く、`review/` か `done/`（取り消しでない）が 1 枚以上 |
-| 状態を守る組み込み | `doing/` `done/` `cancelled/` への直接の作成・移動を止める | `review/` への直接の作成・移動を止める。`approved/` は今までどおり ccnavi ディレクトリの保護が止める |
-| `--lint` | 古い置き場（`wip/tickets/`）の残りを名指し | 加えて `.ccnavi/tickets/` と `wip/proposals/{doing,done,cancelled}/` の残りも名指し |
-| 承認の push（`ccnavi-push-approved.sh`） | 承認済みチケットの置き場だけをコミット | 加えて `todo/` から消えた提案（追跡されていたもの）もコミットに入れる |
-
-置き場のパスは今までどおり env（`CCNAVI_TICKETS_PROPOSAL` / `CCNAVI_TICKETS_APPROVED`）で決められる。
-既定値は `.ccnavi/tickets` から `.ccnavi/approved` に変わる。マーカーと子の記録（`phases/<親>/`）は
-`.ccnavi/approved/phases/` に移るだけで形は変えない。
+承認はコピーではなく移動になる（`todo/` から `approved/doing/` へ動かす）。`ticket start` は置き場を動かさず、`approved/doing/` のキーだけを書く。
+未解決の指摘を残す判断では、受け入れて進むか、続きの子チケットを `approved/doing/` に起こすかをユーザが端末で選ぶ。
 
 親子とフェーズの仕組み（9.7〜9.9）は変えない。「レビュー対象か」を決めるのは今までどおり
 フェーズの見る場所（種類・計画の項・子の宣言・実績のリスク）で、子ごとに `review/` へ行くかどうかは
@@ -102,9 +69,6 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 - 得たもの: `phase.sync`（提案のキーの値を承認済みチケットにコピーする・閉じたら `closed/` へ動かす）が要らなくなる
 - 失ったもの: **承認済みチケットと提案の diff が取れない。** 承認したあとに何を書き足したかは、
   git の履歴で見ることになる（提案は承認で `todo/` から消え、その削除がコミットに入る）
-- 失ったもの: **既定のまま使っていたツリーは移行が要る。** `.ccnavi/tickets/` を
-  `.ccnavi/approved/` に改名し（`closed/` は `done/` に）、`wip/proposals/{doing,done,cancelled}/` の
-  残りは片付ける。`--lint` が名指しするだけで、自動では動かさない
 - 失ったもの: 記録の `source_path` が指す提案は、承認のあとは無い。承認の出所は git の履歴で辿る
 - 失ったもの: 続きの子チケットをユーザが起こす形は、エージェントが書く提案より本文が薄い
   （指摘の一覧と範囲だけ）。設計の相談が要る指摘には向かない。そのときは今までどおり

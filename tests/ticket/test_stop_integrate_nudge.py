@@ -230,14 +230,15 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         self.assertIn("保存していない編集", reason)
         self.assert_not_asked(self.stop(path))
 
-    def test_an_old_marker_also_asks_for_integrate_done_or_abort(self):
+    def test_a_marker_of_unknown_version_asks_the_user_without_commands(self):
         path = self.direct(commit=True)
         gitdir = os.path.join(
             self.root, git(self.root, "rev-parse", "--git-path", "ccnavi-integrate").strip()
         )
         write(os.path.join(gitdir, "scratch", "marker"), "state staged\nbranch_sha x\n")
         reason = self.asked(self.stop(path))
-        self.assertIn("integrate-done scratch", reason)
+        self.assertIn("版を知りません", reason)
+        self.assertNotIn("integrate-done scratch", reason)
 
     def test_a_done_copy_with_the_same_head_means_it_already_went_ahead(self):
         path = self.direct(commit=True)

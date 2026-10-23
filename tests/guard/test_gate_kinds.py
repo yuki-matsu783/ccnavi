@@ -376,7 +376,7 @@ class DryRunSelfApprovalTest(HookCase):
         "ccnavi user agree --yes",
         "ccnavi --agree --yes i0001",
         "uv run python -m ccnavi --agree --yes x",
-        "sh .ccnavi/scripts/ccnavi-agree.sh",
+        "sh .ccnavi/scripts/ccnavi-user-agree.sh",
     )
 
     def test_the_main_agent_cannot_type_them_in_dry_run(self):

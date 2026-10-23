@@ -282,7 +282,7 @@ class HumanEntryGuardTest(AuthorityHarness):
         for command in (
             "sh .ccnavi/scripts/ccnavi-review.sh close-early --reason r",
             # シェルに選択肢を付けた形も同じ
-            "sh -x .ccnavi/scripts/ccnavi-push-approved.sh",
+            "sh -x .ccnavi/scripts/ccnavi-user-push-approved.sh",
             "ccnavi worktree retire --abandon i0001",
         ):
             result = self.ccnavi(

@@ -42,8 +42,6 @@ WRITERS = (
     "post_decision",
     "carry_human",
 )
-# 前の版にあったユーザ専用の sh の名前（今は ccnavi-user-*.sh）。
-OLD_NAMES = ("ccnavi-agree.sh", "ccnavi-approve.sh", "ccnavi-push-approved.sh")
 DEFINITION = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(\)\s*\{", re.MULTILINE)
 
 
@@ -129,12 +127,6 @@ class PlacementTest(unittest.TestCase):
         for name in user_scripts():
             with self.subTest(name=name):
                 self.assertTrue(pattern.search(f"sh .ccnavi/scripts/{name} x"), name)
-
-    def test_the_old_names_are_in_the_table(self):
-        """古い名前は、hook が古い形として止める表（user_only.SCRIPTS）にある。"""
-        listed = {f"{n}.sh" for row in user_only.SCRIPTS for n in row.names}
-        for name in OLD_NAMES:
-            self.assertIn(name, listed)
 
     def test_user_scripts_call_the_executable_through_the_user_entry(self):
         """ユーザ専用の操作は `user <操作>` の形で呼ぶ（`user` の外の形は実行ファイルが断る）。"""

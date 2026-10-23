@@ -254,16 +254,10 @@ Draft は親が片付けて push したあとの `ready` で外す。
 
 ### ワークツリーは ccnavi が片付ける
 
-マージを待たずに片付ける。
-
-- 閉じた子のワークツリーは、完了でも取り消しでも消す。残るのは作業中（`doing/`）とレビュー待ち（`review/`。見返す場所）の子のワークツリー
-- `ready` が Draft を外したあとの最後に、子と親を片付ける。Draft を外す前と、外せなかったときは消さない。未コミットの変更や git が無視しているファイルがあるワークツリーは、理由を出して残す
-- 子の手元のブランチは、合流した子なら条件を確かめてから消す。取り消した子は、一覧を出すだけで、消すのはユーザである。消してよければユーザが先頭に `!` を付けて `ccnavi-user-clean-branch.sh <子の識別子> --confirmed` を打つ
-- 親の手元のブランチは MR がマージされるまで残す
-- cwd が消す対象の中にあるときは消さず、外に出てから打つ 1 本（`sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）を出す
-- この 1 本が Claude Code の自動モードの分類器に止められたら、ユーザに許可を頼むか、ユーザのホームの `~/.claude/settings.json` の `permissions.allow` に操作ごとに絞った許可（例 `Bash(sh <ワークスペース>/.ccnavi/scripts/ccnavi-clean.sh --worktree *)`）を足す。分類器はプロジェクトの `.claude/settings.json` を読まない。`ccnavi-git.sh *` のような広い許可は push まで通すので勧めない
-
-片付けの条件の詳細は [.ccnavi/docs/worktree-cleanup.md](../../.ccnavi/docs/worktree-cleanup.md) にある。
+マージを待たずに片付ける。閉じた子のワークツリーは完了でも取り消しでも消し、`ready` が Draft を外したあとの最後に、子と親を片付ける。
+未コミットの変更や git が無視しているファイルがあるワークツリーは、理由を出して残す。親の手元のブランチは MR がマージされるまで残す。
+取り消した子の手元のブランチは一覧を出すだけで、消すのはユーザ（先頭に `!` を付けて `ccnavi-user-clean-branch.sh <子の識別子> --confirmed`）。
+条件、cwd が中にあるとき、自動モードの分類器に止められたときの許可は [.ccnavi/docs/worktree-cleanup.md](../../.ccnavi/docs/worktree-cleanup.md) にある。
 
 ### 閉じたチケットは既定のブランチに残らない
 
@@ -294,14 +288,8 @@ sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152 
 ```
 
 終了コード 0 で終わったら、採用した MR と、その MR が閉じる issue と、元ブランチが確定している。出力の「必須」の行の `issue:` と `mr:` を提案に書く。どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める。
-MR の無い候補（作りかけの再開を除く）は成功させず、終了コード 3 で一覧を出す。
-ホストに届かないとき、既存の MR を採用するなら `--issue`・`--mr`・`--branch` の 3 つと `--mcp-checked` がそろっているときだけ、ホストを見ずに成功する。新規作成（候補が無く `--issue` だけ）は、MCP で確かめたあとに `--mcp-checked` を付けて打ち直せば進む。
-`ccnavi-ticket.sh` の `start`・`finish`・`propose`・`consolidate` も、ロックの前に同じ確認（API と git）を自動で行う。直接作業では確かめない。
-
-依頼の URL のリポジトリが `projects/<名前>` のものなら、そこに `cd` して `--repo <owner/repo>` を付けて打つ。実行した場所の origin と違えば、ホストに問い合わせる前に止まって移動先を案内する。
-
 候補が複数あるときは、エージェントが一覧を見せて「既存のブランチで続ける・新しく `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞くので、答える。
-ホストに届かないときは、出力の案内どおりに進む。ほかの終了コードや候補の探し方は [設計 9.13](../design/tickets/branch-lookup.md) と [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md)。
+終了コード、ホストに届かないときの MCP での代行、`projects/<名前>` の依頼（`--repo`）、候補の探し方は [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md) と [設計 9.13](../design/tickets/branch-lookup.md)。
 
 ## プロジェクトのスキル
 
@@ -322,76 +310,5 @@ Claude Code はそこをスキルとして読まないので、ccnavi が目録�
 
 ## 作業・レビュー計画のテンプレート
 
-完了した作業の計画とフローを、次の作業で使い回すためのひな形である。1 ファイル（`<名前>.yml`）に、親の作業・レビュー計画と、各子のフローの本文を入れる。
-一覧・検索・表示は読むだけで、何も書かないので、エージェントが打ってよい。
-
-```sh
-ccnavi --templates                          # 一覧（名前・層・説明・いつ使うか）
-ccnavi --templates --keyword 調査            # name・description・when の検索（語を重ねるとどれか）
-ccnavi --templates --show feature           # 1 本の中身（計画・フロー・検査・ファイルの本文）
-ccnavi --templates --layer lib --json       # 共通 + プロジェクト lib の統合結果。画面向けの完全な答え
-ccnavi --templates --draft <親> [--name <名前>] [--to common|project] [--layer <名前>]
-                                            # 完了した親から下書きを wip/handoff/ に作る（エージェントが打ってよい）
-ccnavi user handoff [<相対パス>…]            # 下書きの一覧と差分（何も書かない。ユーザ専用）
-ccnavi user handoff <相対パス>… --yes --expect <ハッシュ>
-                                            # 取り込む（ユーザ専用）
-```
-
-置き場は 2 層で、使うのは共通と 1 つのレイヤーの和である。
-
-| 層 | 置き場 |
-|---|---|
-| 共通 | `.ccnavi/config/common/templates/<名前>.yml` |
-| プロジェクト（`self` かプロジェクト名） | `.ccnavi/config/project/templates/<名前>.yml` |
-
-置き場が無いのは正常。同名のテンプレートが両方に在るときは、全欄が同じならレイヤーの側を捨てて info、中身が違えばレイヤーの側だけを使わず error になる（どちらが効くかを黙って決めない）。
-形と検査の規則は [設計 9.15](../design/tickets/templates.md)。
-
-### 下書きを作って取り込む
-
-溜める流れは「完了した親 → 下書き（効力なし）→ ユーザが差分を読んで取り込む」である。
-
-1. **下書きを作る**（エージェントが打ってよい）。`ccnavi --templates --draft <親>` は、完了した親（`done/` に在る）の計画と各子のフローを 1 ファイルに写し、`wip/handoff/` の下に書く。名前の既定は親の識別子、`--to` の既定は `project`（`common` は他のプロジェクトへ配られる）
-2. **`ready` の前に作る。** 計画を持つ親を `ticket finish` で閉じると、出力の最後に下書きを作る合図が出る。`ready` で閉じると下書きの材料は退避されて拾えない。取り込んでいない下書きは `ready` を止めるので、取り込むか消してから `ready` を打つ
-3. **下書きには効力が無い。** 固有名の一般化は機械ではやらない。`description` と `when` の `TODO` の印をエージェントが消す
-4. **取り込む**（ユーザ専用）。`ccnavi user handoff` で対象の一覧と差分を見て、`--yes --expect <ハッシュ>` を付けて書く。書くときは端末の前のユーザが打つ。取り込めたら下書きは消える
-
-取り込みの規則（conflict・検査・制御文字の見え方）は [設計 9.19](../design/tickets/handoff.md)。エージェント向けの手順は [.ccnavi/docs/templates.md](../../.ccnavi/docs/templates.md)。
-
-### テンプレートから親の提案を作る
-
-エージェントが、識別子と同名のワークツリーの中で打つ。
-
-```sh
-ccnavi ticket new <識別子> --title <題> --template <名前> [--layer <名前>] [--with-feedback] --issue <N|owner/repo#N> --mr <N>
-```
-
-`wip/proposals/todo/<識別子>.md` に、テンプレートの項から計画を書いた親の提案ができる。
-
-- フィードバック計画は既定では書かない。全体計画の最後のレビューを見て、改版で 1 回だけ足す決まりだからである。最初から入れたいときだけ `--with-feedback` を付ける
-- 子の提案の足場は作らない（子の提案は手で書く）。子のフローの下書きだけを `wip/proposals/flows/` に書く。下書きに効力は無く、ユーザがフロー編集画面で読んで取り込むまで効かない
-- 同じ識別子の提案・承認済みチケットなどが在れば、何も書かずに断る
-
-出力の例は次のとおり。
-
-```text
-feature-9-from-template の提案を .../wip/proposals/todo/feature-9-from-template.md に書いた（テンプレート feature、common の .ccnavi/config/common/templates/feature.yml）
-plan（3 項）: 1 research / 2 design（待つ 1・defer） / 3 implement（待つ 2）
-テンプレートにはフィードバック計画（2 項）がある。全体計画のレビューを見てから足すなら、`--with-feedback` を付けて作り直すか、提案を改版で足す
-フローの下書き 1 件:
-  計画の 3 番目 -> feature-9-from-template-03-01: .../wip/proposals/flows/feature-9-from-template-03-01.yml
-下書きには効力が無い。フローの文は子への案内文になるので、ユーザがフロー編集画面で読んで取り込むまで効かない。...
-```
-
-書いたあとは、rationale と本文、テンプレートの固有名の残りを直し、`ccnavi --lint` で確かめてから承認をユーザに頼む。
-
-### テンプレート管理画面
-
-VS Code 拡張の「テンプレート管理画面」で、テンプレートの一覧・検索・表示ができる。対象は共通の設定、ワークスペースの設定、プロジェクトの設定の 3 種で、「設定」の欄で切り替える。
-一覧は「統合結果」（共通と選んだ層で実際に使われる結果）と「層ごと」（層ごとの生の中身）を切り替えて見られる。
-開いている対象の層のテンプレートは、行の「編集」で、計画の項と線を図で、子のフローをフロー編集と同じ図で直して保存できる（「作る」で新規も作れる）。下書きは読むだけで、取り込みは取り込み待ち画面で行う。
-
-下書きの取り込みは「取り込み待ち」の画面で行う。`wip/handoff/` の下書きのうち、テンプレート・設定（`rules.yml` など）・文書の種類を一覧にし、差分を読んでから取り込む。
-防御のファイル（`.ccnavi/scripts/`・hook・`settings.json`）は一覧に出るが、ボードからは取り込めず、端末で打つコマンドを案内する。
-作業中のチケットがあると、テンプレートと設定の取り込みは止まる（共通とワークスペースの設定は、どのツリーの作業中でも止まる）。
-`CCNAVI_TICKET_CONTROL` が `disable` なら入口ごと出ない。
+完了した作業の計画とフローを、次の作業で使い回すひな形である。下書きはエージェントが作り、ユーザが `ccnavi user handoff` か VS Code 拡張の「取り込み待ち」「テンプレート管理」で読んで取り込む。
+一覧・下書き・取り込み・提案の作り方・画面・古くなったときの扱いは [.ccnavi/docs/templates.md](../../.ccnavi/docs/templates.md)、形と検査の規則は [設計 9.15](../design/tickets/templates.md)、取り込みの規則は [設計 9.19](../design/tickets/handoff.md)にある。

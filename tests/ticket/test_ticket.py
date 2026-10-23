@@ -2356,7 +2356,7 @@ class TicketTest(unittest.TestCase):
         for args in (
             ("--close", "--reason", "x", "--result", "r.json"),
             ("--review", "1", "--chat"),
-            ("--approv", "--yes", "i0001"),
+            ("--agre", "--yes", "i0001"),
         ):
             # argparse の断りは sys.stderr に直に出る（同じプロセスで動かすので、受け取りの外）。
             refused = io.StringIO()
@@ -2382,12 +2382,12 @@ class TicketTest(unittest.TestCase):
             "ccnavi --agree --preview --yes i0001 --json",
             "ccnavi --agree --yes i0001 --preview",
             # 承認のスクリプトもユーザの経路。中身は --agree と承認済みチケットの push。
-            "sh .ccnavi/scripts/ccnavi-agree.sh",
+            "sh .ccnavi/scripts/ccnavi-user-agree.sh",
             # 承認の push の sh もユーザが打つ。push は外へ出す操作で、時機はユーザが決める
             # （設計 approve-carry 1.6）。
-            "sh .ccnavi/scripts/ccnavi-push-approved.sh",
-            "bash /abs/.ccnavi/scripts/ccnavi-push-approved.sh",
-            "ls; sh .ccnavi/scripts/ccnavi-push-approved.sh",
+            "sh .ccnavi/scripts/ccnavi-user-push-approved.sh",
+            "bash /abs/.ccnavi/scripts/ccnavi-user-push-approved.sh",
+            "ls; sh .ccnavi/scripts/ccnavi-user-push-approved.sh",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -2399,7 +2399,7 @@ class TicketTest(unittest.TestCase):
             self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
             if "push-approved" in command:
                 # 止めた理由に、承認の push の sh もユーザが打つことを書く。
-                self.assertIn("ccnavi-push-approved.sh", self.reason(result), command)
+                self.assertIn("ccnavi-user-push-approved.sh", self.reason(result), command)
         # 読むだけの形と、スクリプト経由は通る。
         for command in (
             "ccnavi --explain",
@@ -2479,7 +2479,7 @@ class TicketTest(unittest.TestCase):
             "S=decide; sh .ccnavi/scripts/ccnavi-review.sh $S 1 --choices x --digest y",
             "cp .ccnavi/scripts/ccnavi-review.sh /tmp/r.sh; "
             "sh /tmp/r.sh decide 1 --choices x --digest y",
-            "/tmp/cc --y\"\"es --appr''ove",
+            "/tmp/cc --y\"\"es --ag''ree",
             # コミットの文面でも、コマンド置換の中は実行される
             'sh .ccnavi/scripts/ccnavi-git.sh commit -m "$(/tmp/cc --agree --yes x)"',
         ):
@@ -2827,9 +2827,9 @@ class TicketTest(unittest.TestCase):
         「ユーザが確かめて実行します」は実際の動きと合わない。
         """
         for command in (
-            "sh .ccnavi/scripts/CCNAVI-PUSH-APPROVED.sh",
-            "SH .ccnavi/scripts/ccnavi-push-approved.sh",
-            "sh .ccnavi/scripts/CCNAVI-APPROVE.sh",
+            "sh .ccnavi/scripts/CCNAVI-USER-PUSH-APPROVED.sh",
+            "SH .ccnavi/scripts/ccnavi-user-push-approved.sh",
+            "sh .ccnavi/scripts/CCNAVI-USER-AGREE.sh",
         ):
             with self.subTest(command):
                 result = self.hook(
@@ -2931,7 +2931,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("HEAD が動いている", check.stderr)
 
     def commit_markers(self, push=True):
-        """ccnavi 自身の置き場だけをコミットする。ccnavi-push-approved.sh と同じ範囲。"""
+        """ccnavi 自身の置き場だけをコミットする。ccnavi-user-push-approved.sh と同じ範囲。"""
         git(self.parent_tree, "add", "--", ".ccnavi/approved")
         git(
             self.parent_tree,
@@ -3010,7 +3010,7 @@ class TicketTest(unittest.TestCase):
     # 動かし方。どれも「依頼の前」か「依頼の後」のコピーから始まる。
 
     def move_markers_unpushed_before_request(self, fixture):
-        # ccnavi-push-approved.sh は push が失敗してもコミットを残す。ユーザの承認が失敗した形。
+        # ccnavi-user-push-approved.sh は push が失敗してもコミットを残す。ユーザの承認が失敗した形。
         write(os.path.join(self.approved, "doing", "unrelated.md"), "承認が落ちた形\n")
         git(self.parent_tree, "add", "--", ".ccnavi/approved")
         git(self.parent_tree, "commit", "--quiet", "-m", "ccnavi: 承認済みチケットを更新")
@@ -3404,10 +3404,6 @@ class TicketTest(unittest.TestCase):
         data["threads"][0]["resolved"] = False
         write(fixture, json.dumps(data))
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
-        self.assertNotEqual(self.confirm(fixture).returncode, 0)
-
-        # 以前の版が置いた accepted.json は読まない（あっても数えない向きに働かない）
-        write(kept, json.dumps({"threads": ["u1"], "phases": {}}))
         self.assertNotEqual(self.confirm(fixture).returncode, 0)
 
     def test_prepare_writes_only_the_request_body_and_never_a_merge_request_draft(self):

@@ -444,7 +444,7 @@ def _settle_children(
 ) -> bool:
     """レビューが済んだフェーズ（延期を引き受けた分を含む）のレビュー待ちの子を `done/` へ動かす。
 
-    `by` は動かした経路（`ticket_model.SETTLED_BY_VALUES`）。子の `settled_by` に書く。
+    `by` は動かした経路（confirm・decide・close-early・chrome）。子の `settled_by` に書く。
 
     ユーザが見たことの記録はマーカーで、場所の移動はそれに合わせたもの。
     動かせなければ言って False。

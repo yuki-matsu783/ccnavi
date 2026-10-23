@@ -571,9 +571,8 @@ confirm)
 		--actor | --actor=*) fail confirm-actor "confirm は --actor を受けない。マーカーに記すアカウントは、トークンの持ち主をホストに問い合わせて入れる。" 2 ;;
 		esac
 	done
-	# マーカーに残すアカウント。ロックを取る前に引く（引けなくても止めない。前と同じマーカーになる）
-	actor=""
-	exe_knows --actor && actor=$(account || :)
+	# マーカーに残すアカウント。ロックを取る前に引く（引けなくても止めず、マーカーにアカウントを入れない）
+	actor=$(account || :)
 	log_debug マーカーのアカウント -- "actor=${actor:+set}"
 	[ -z "$actor" ] || set -- "$@" "--actor=$actor"
 	confirm_phase=""

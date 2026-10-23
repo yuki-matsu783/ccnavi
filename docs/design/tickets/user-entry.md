@@ -22,9 +22,9 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 |---|---|
 | `OPS` | 操作。何をする操作か（`what`）と、実行ファイルが端末を求めるときに標準エラーへ出す表示名（`terminal`。`user agree` の形） |
 | `FLAGS` | 実行ファイル（`where` が空）と sh スクリプトのオプション。どの止めに入るか（`cli`・`script`）、所属するグループ、`user` の外で断るか（`gated`）、断らない条件（`unless`。`preview` は `--preview` と一緒のとき、`no-yes` は `--yes` が無いとき） |
-| `SCRIPTS` | コマンドの位置で止める sh。前の名前が残っていれば並べる |
+| `SCRIPTS` | コマンドの位置で止める sh（`ccnavi-review.sh close-early`・`ccnavi-clean.sh`） |
 | `SUBS` | 実行ファイルを直に呼ぶ形のサブコマンド（`ticket`・`review`・`sync`・`worktree`・`ops`。`ops` は書き込む副命令だけを止め、読むだけの `pending`・`show`・`reconcile` は通す） |
-| `BOARD_COMBOS` | ボードで押した操作の、オプションの組み合わせ。どのグループからも 1 つずつがコマンド行に並んだら止める。語のグループ `user-board-verb` に `handoff` を含み、古い `templates` の組み合わせは `legacy` のグループに残す。`--via`（グループ `via`）と `board` の語（グループ `board`）の組は、`user` を伴わなくても止める |
+| `BOARD_COMBOS` | ボードで押した操作の、オプションの組み合わせ。どのグループからも 1 つずつがコマンド行に並んだら止める。語のグループ `user-board-verb` に `handoff` を含む。`--via`（グループ `via`）と `board` の語（グループ `board`）の組は、`user` を伴わなくても止める |
 | `VERBS` | `ccnavi user <操作>` の読み替え。操作の語、読み替えた先の内部のオプション、値を取るか |
 | `WRAPPER_OPTIONS` | sh と拡張が先に付ける値つきのオプション（`--root`・`--cwd`・`--record-writes`・`--record-tree`） |
 
@@ -93,8 +93,8 @@ hook の止めは表から作る。ユーザ専用の入口の止めは `DENY_TI
 |---|---|
 | `user` の入口 | 実行ファイルの呼び出しで、`WRAPPER_OPTIONS` を読み飛ばした後の最初の語が `user`（`user_entry_forms`）。`--` を挟んだ形も止める。変数・glob・コマンド置換で `user` になりうる語も止める（`hidden_user_entry`）。`prune` は別の deny（`prune_form`）が止める。実行ファイルの呼び出しとして読む表記は、名前（`ccnavi`・`ccnavi.exe`・実行ファイルのパス・`ccnavi-launcher.sh`）と、Python から走らせる形（`python[版]`・`py` に、`-u`・`-I`・`-OO`・`-3`・`-W x`・`-X utf8` などの選択肢を挟み、`-m ccnavi`・`-mccnavi`・`-m ccnavi.__main__`・`main.py` で入る。前に `uv run`・`poetry run`・`pipenv run` を置いてもよい） |
 | `ccnavi-user-*.sh` | コマンド行のどこに名前が出ても止める（`user_script_pattern`。`human_path_form`）。引数に依らない。表示・検索・閲覧の道具だけが並ぶ行は通す |
-| 古い形 | 古いオプション（`--agree`・`--reviewed`・`--close-early` など。実行ファイルから外したテンプレート専用のオプション `--import`・`--save-draft`・`--delete-draft`・`--rename-template`・`--move-template`・`--delete-template` も、古い実行ファイルが手元に残るときのために止め続ける）、古い sh の名前（`ccnavi-agree.sh`・`ccnavi-push-approved.sh`・`ccnavi-approve.sh`）、古い sh の中のユーザ専用のモード（`ccnavi-review.sh close-early`・`ccnavi-clean.sh --branch`）。古い実行ファイルと sh が手元に残るときのために残る |
-| 名前に依らない文字列検査 | 端末を求めない操作（`user agree`・`user reviewed`・`user handoff` と `--yes` の組、`--choices` と `--digest` の組、`user` を伴わない単独の `--via board` / `--via=board`、古い形の組）と、端末要求を切る形（`CCNAVI_GUARD_TICKET_APPROVAL`、`CCNAVI_` で始まる名前の途中に展開が混じる形（`env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable`）、`--guard-ticket-approval`）。名前を変えたコピー・`python -c`・`awk` の `system()` でも止まる。暫定の止めとして、単独の語の `user` があるコマンド行で、`--` で始まる語に展開（`$`・バッククォート）が混じれば止める（`--y${X}es`・`--y$(echo es)`。入口の表記を読めない形のため。無関係の語の展開まで止める側に広がる） |
+| 直接打つ形 | 実行ファイルのオプション（`--agree`・`--reviewed`・`--close-early` など）を `user` の外で直に打つ形と、sh の中のユーザ専用のモード（`ccnavi-review.sh close-early`・`ccnavi-clean.sh --branch`） |
+| 名前に依らない文字列検査 | 端末を求めない操作（`user agree`・`user reviewed`・`user handoff` と `--yes` の組、`--choices` と `--digest` の組、`user` を伴わない単独の `--via board` / `--via=board`）と、端末要求を切る形（`CCNAVI_GUARD_TICKET_APPROVAL`、`CCNAVI_` で始まる名前の途中に展開が混じる形（`env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable`）、`--guard-ticket-approval`）。名前を変えたコピー・`python -c`・`awk` の `system()` でも止まる。暫定の止めとして、単独の語の `user` があるコマンド行で、`--` で始まる語に展開（`$`・バッククォート）が混じれば止める（`--y${X}es`・`--y$(echo es)`。入口の表記を読めない形のため。無関係の語の展開まで止める側に広がる） |
 | sh から呼ぶだけの操作 | `SUBS` の `ticket start/finish/…`・`review confirm/…`・`sync tidy`・`worktree retire/branch` を実行ファイルで直に打つ形 |
 
 エージェントが sh で打てるのは `ccnavi-ticket.sh`・`ccnavi-review.sh`・`ccnavi-git.sh`（`AGENT_SCRIPTS`）で、サブエージェントは

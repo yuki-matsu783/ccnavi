@@ -9,7 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { FLOW_TEMP_PREFIX, lintFlowText, type FlowLintRun } from "../../src/core/flow-lint.js";
-import { FLOW_WHERE, parseLintJson, problemsOfFlow, unknownOption, type LintJson } from "../../src/core/lintmodel.js";
+import { FLOW_WHERE, parseLintJson, problemsOfFlow, type LintJson } from "../../src/core/lintmodel.js";
 
 const SHOWN = ".ccnavi/approved/flows/i0001-01-01.yml";
 
@@ -99,7 +99,7 @@ test("CB-T243 (flow) の error があれば、実行ファイルの理由を対�
   }
 });
 
-test("CB-T244 lint の JSON から (flow) の苦情だけを引き、古い実行ファイルの「知らないオプション」を見分ける", () => {
+test("CB-T244 lint の JSON から (flow) の苦情だけを引く", () => {
   const lint = answer([
     { severity: "error", where: "(flow)", detail: "a" },
     { severity: "error", where: "(flow) x", detail: "b" },
@@ -109,11 +109,6 @@ test("CB-T244 lint の JSON から (flow) の苦情だけを引き、古い実�
     problemsOfFlow(lint).map((p) => p.detail),
     ["a"],
   );
-  const stderr = "usage: ccnavi [--root ROOT] ...\n              [command ...]\nccnavi: error: unrecognized arguments: --flow\n";
-  assert.equal(unknownOption(stderr, "--flow"), true);
-  assert.equal(unknownOption(stderr, "--risk"), false);
-  // usage の行に出る表記（[--flow FLOW]）は数えない
-  assert.equal(unknownOption("usage: ccnavi [--flow FLOW]\nccnavi: error: something else\n", "--flow"), false);
 });
 
 test("CB-T246 一時ファイルは呼ぶたびに別の名前で書き、終われば削除する。重なった呼び出しでも互いの本文を読み違えない", async () => {
@@ -164,7 +159,7 @@ test("CB-T247 答えに読んだ中身（flow）がなければ通さない（�
     for (const flow of [ABSENT, { path: "/x" }, { path: "/x", data: null }]) {
       const verdict = await lintFlowText("nodes: []\n", dir, SHOWN, async () => ({ ok: true, value: answer([], flow) }));
       assert.equal(verdict.ok, false, String(flow === ABSENT ? "absent" : JSON.stringify(flow)));
-      assert.match(verdict.ok ? "" : verdict.error, /flow）を返しません（古い版です）/);
+      assert.match(verdict.ok ? "" : verdict.error, /flow）を返しません/);
     }
     // lint の JSON の読み手は flow を持ち越す。無ければ欄ごと無い
     assert.deepEqual(answer([], { path: "/p", data: { a: 1 } }).flow, { path: "/p", data: { a: 1 } });

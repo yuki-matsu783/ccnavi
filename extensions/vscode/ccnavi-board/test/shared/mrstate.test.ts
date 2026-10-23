@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { interpretMrState, isUnknownSubcommand, parseRetired, projectOfRepo, repoDirOf, type Ran } from "../../src/core/mrstate.js";
+import { interpretMrState, parseRetired, projectOfRepo, repoDirOf, type Ran } from "../../src/core/mrstate.js";
 
 function ran(stdout: string, over: Partial<Ran> = {}): Ran {
   return { code: 0, stdout, stderr: "", killed: false, ...over };
@@ -94,25 +94,11 @@ test("CB-T623 mr-state: URL が http(s) でなくても状態は出す（リン�
   assert.match(refused.kind === "unknown" ? refused.detail : "", /終了コード 2 で終わりました/);
 });
 
-test("CB-T624 古い sh: 頭の行が mr-state 1 でなく、知らない副命令の形（終了コード 2・「mr-state は使用できません」）のときだけ「配り直してください」", () => {
-  const oldSh = ran("", {
-    code: 2,
-    stderr: "ccnavi-review: mr-state は使用できません。使えるのは request / confirm / comment / decide / ready / fetch / origin / merged です。",
-  });
-  assert.equal(isUnknownSubcommand(oldSh), true);
-  assert.deepEqual(interpretMrState(oldSh, 12), { kind: "unknown", reason: "old-sh", detail: "sh が古い版です。配り直してください" });
-  // 引数の誤り（新しい sh の終了コード 2）は文言が違うので、古いとは言わない
+test("CB-T624 引数の誤り（終了コード 2）は、実行できなかったこととして sh の言葉を添える", () => {
   const badArg = ran("", { code: 2, stderr: "ccnavi-review: mr-state の MR の番号 (abc) は 1 から始まる数字で渡してください。" });
-  assert.equal(isUnknownSubcommand(badArg), false);
   const bad = interpretMrState(badArg, 12);
-  assert.equal(bad.kind === "unknown" ? bad.reason : "", "failed", "引数の誤りは古い sh ではない。実行できなかったこととして、sh の言葉を添える");
+  assert.equal(bad.kind === "unknown" ? bad.reason : "", "failed");
   assert.match(bad.kind === "unknown" ? bad.detail : "", /番号 \(abc\) は 1 から始まる数字/);
-  // 頭の行が mr-state 1 なら、標準エラーに同じ文があっても古いとは言わない
-  assert.equal(isUnknownSubcommand(ran("mr-state 1\nmerged 12 x\n", { code: 2, stderr: "mr-state は使用できません。使えるのは" })), false);
-  // 終了コードが 2 でなければ古いとは言わない
-  assert.equal(isUnknownSubcommand(ran("", { code: 1, stderr: "mr-state は使用できません。使えるのは" })), false);
-  // 別の副命令を知らないという文では、古いとは言わない
-  assert.equal(isUnknownSubcommand(ran("", { code: 2, stderr: "ccnavi-review: foo は使用できません。使えるのは request / … です。" })), false);
 });
 
 const HEAD = "retired 1\n";

@@ -368,66 +368,6 @@ class HostFixtureTest(unittest.TestCase):
                 self.assertIn("--accept-unresolved", self.passed())
                 self.assertFalse(any(a.startswith(("--actor", "--via")) for a in self.passed()))
 
-    def old_exe(self, flags):
-        """古い実行ファイルの代役。知らないフラグ（--actor・--via）を渡されると引数の誤りで失敗する。
-
-        `flags` が None なら `--version --json` を知らない（`--actor` を入れる前の版）。
-        387d4a6 の実行ファイルは
-        `--actor` を知っていて `--via` を知らない（`["--actor"]`）。
-        """
-        known = " ".join(flags or [])
-        answer = (
-            "exit 2"
-            if flags is None
-            else 'printf \'{"compat": %s, "flags": [%s]}\\n\' '
-            + str(version.COMPAT)
-            + " '"
-            + ", ".join(f'"{f}"' for f in flags or [])
-            + "'; exit 0"
-        )
-        path = write(
-            os.path.join(self._tmp.name, "old", "ccnavi"),
-            "#!/bin/sh\n"
-            'case " $* " in\n'
-            f'*" --version --json "*) {answer} ;;\n'
-            f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
-            '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
-            "no\\n'; exit 0 ;;\n"
-            "esac\n"
-            'for a in "$@"; do case "$a" in --actor*|--via*)\n'
-            f'  case " {known} " in *" ${{a%%=*}} "*) ;;\n'
-            '  *) echo "unrecognized $a" >&2; exit 2 ;; esac ;;\n'
-            "esac; done\n"
-            'prev=""\n'
-            'for a in "$@"; do case "$prev" in\n'
-            '  --choose-out) printf \'{"choices": {}, "digest": "d"}\\n\' >"$a" ;;\n'
-            '  --accept-plan) printf \'{"version": 1, "threads": []}\\n\' >"$a" ;;\n'
-            'esac; prev="$a"; done\n'
-            f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{self.args}'\n"
-            "exit 0\n",
-        )
-        os.chmod(path, 0o755)
-        return path
-
-    def test_an_old_exe_gets_only_the_flags_it_knows(self):
-        """`--version --json` の flags に無いフラグは渡さない（古いものが失敗する）。"""
-        for flags, confirm_actor in ((None, False), (["--actor"], True)):
-            with self.subTest(flags=flags):
-                exe = self.old_exe(flags)
-                for args in (
-                    ["confirm", "--phase", "1"],
-                    ["decide", "1", "--choices", "{}", "--digest", "d"],
-                    ["decide", "1"],
-                ):
-                    if os.path.exists(self.args):
-                        os.remove(self.args)
-                    done = self.review("resolved", *args, CCNAVI_BIN_PATH=exe)
-                    self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-                    passed = self.passed()
-                    self.assertFalse(any(a.startswith("--via") for a in passed), args)
-                    want = confirm_actor and args[0] == "confirm"
-                    self.assertEqual(any(a.startswith("--actor") for a in passed), want, args)
-
     NODE = "PRRT_kwDOAbCdEs5AAAAB"
 
     def accept_plan(self, *nodes):

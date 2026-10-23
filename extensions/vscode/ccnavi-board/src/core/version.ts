@@ -8,8 +8,6 @@
  *   拡張は起動のときに自分の `EXTENSION_COMPAT` と比べ、違えばどちらを新しくするかを名指しする
  * - 受け付けるフラグ（`flags`）。新しいフラグ（`--flow` など）を使う前に、実行ファイルが知っているかを見る。
  *   前は渡してみて argparse の「知らないオプション」の苦情で見分けていた（フラグごとに渡してみる形）
- *
- * `--version` を知らない実行ファイルは、この仕組みより前の古い版として扱う。
  */
 
 /** 拡張が読める版の JSON の形の版（`schema`） */
@@ -29,17 +27,15 @@ export interface VersionInfo {
   readonly built: boolean;
   readonly compat: number;
   readonly flags: readonly string[];
-  /** オプションから読めない振る舞い（JSON の欄の有無など）。`features` を持たない古い実行ファイルは空 */
+  /** オプションから読めない振る舞い（JSON の欄の有無など） */
   readonly features: readonly string[];
 }
 
 /**
  * 実行ファイルに `--version --json` を聞いた結果。
- * `old` は `--version` を知らない（この仕組みより前の）実行ファイル。
  */
 export type VersionProbe =
   | { readonly kind: "ok"; readonly info: VersionInfo }
-  | { readonly kind: "old" }
   | { readonly kind: "failed"; readonly error: string };
 
 export type ParsedVersion = { readonly ok: true; readonly value: VersionInfo } | { readonly ok: false; readonly error: string };
@@ -100,9 +96,6 @@ function named(info: VersionInfo): string {
  * （起動の知らせは食い違いだけにする。実行ファイルが無い・破損しているは画面を開いたときに言う）
  */
 export function skewMessage(probe: VersionProbe, fromSource: boolean): string | undefined {
-  if (probe.kind === "old") {
-    return `ccnavi の実行ファイルが古い版です（--version に対応していません）。${rebuildHint(fromSource)}`;
-  }
   if (probe.kind === "failed") {
     return undefined;
   }
@@ -124,9 +117,6 @@ export function missingFlags(probe: VersionProbe, flags: readonly string[], what
   if (probe.kind === "failed") {
     return `実行ファイルの版を確認できないので ${what} を使いません: ${probe.error}`;
   }
-  if (probe.kind === "old") {
-    return `実行ファイルが古い版です（--version に対応していません）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
-  }
   const missing = flags.filter((flag) => !probe.info.flags.includes(flag));
   if (missing.length === 0) {
     return undefined;
@@ -141,9 +131,6 @@ export function missingFlags(probe: VersionProbe, flags: readonly string[], what
 export function missingFeatures(probe: VersionProbe, features: readonly string[], what: string, fromSource: boolean): string | undefined {
   if (probe.kind === "failed") {
     return `実行ファイルの版を確認できないので ${what} を使いません: ${probe.error}`;
-  }
-  if (probe.kind === "old") {
-    return `実行ファイルが古い版です（--version に対応していません）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
   }
   const missing = features.filter((feature) => !probe.info.features.includes(feature));
   if (missing.length === 0) {

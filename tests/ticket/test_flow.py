@@ -2,7 +2,7 @@
 
 見るのは 8 つ。
 
-1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は何も言わず無視する
+1. 置き場は承認済みの領域の `flows/<子>.yml` に固定
 2. エージェントの書き込みは、どのツリーの置き場でも組み込みの保護が止める。ユーザが保存したフローを
    実行後チェックが範囲外の変更として報告しない（H1）
 3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も除かない。
@@ -109,7 +109,7 @@ def child_ticket(started: bool = False) -> ticket_model.Ticket:
 
 
 class FlowPlaceTest(unittest.TestCase):
-    """置き場は承認済みの領域に固定。以前の `flow:` の欄は読まない。"""
+    """置き場は承認済みの領域に固定。"""
 
     def test_the_place_is_fixed_under_the_approved_area(self):
         self.assertEqual(
@@ -120,14 +120,6 @@ class FlowPlaceTest(unittest.TestCase):
             flow.flow_file(conf_with(), "/w", CHILD),
             os.path.normpath(os.path.join("/w", ".ccnavi", "approved", "flows", "i0001-01-01.yml")),
         )
-
-    def test_the_old_flow_field_is_silently_ignored(self):
-        text = child_text(CHILD, "i0001", 1, ("wip/research/*",))
-        for value in ("references/i0001-01-01/flow.json", "../../etc/passwd", "[1, 2]"):
-            t, problems = ticket.parse(text.replace("\nphase:", f"\nflow: {value}\nphase:", 1))
-            self.assertIsNotNone(t, problems)
-            self.assertEqual(problems, [])
-            self.assertFalse(hasattr(t, "flow"))
 
     def test_locate_reads_both_spellings_and_folds_case(self):
         root = tempfile.mkdtemp(prefix="ccnavi-flow-")

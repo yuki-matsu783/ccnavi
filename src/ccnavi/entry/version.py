@@ -74,16 +74,9 @@ SCHEMA = 1
 # 実行ファイルが持つ振る舞い。オプションや JSON の欄の有無を `flags` から読めないものを足す。
 # 足すだけなら COMPAT は上げない。
 FEATURES: tuple[str, ...] = (
-    "templates.draft-text",
     "user-entry",
-    # 保護対象の下書きの取り込み（`ccnavi user handoff`）。テンプレート専用の取り込み・編集
-    # （前の `templates.edit`・`board.template-draft`）の代わり。
+    # 保護対象の下書きの取り込み（`ccnavi user handoff`）。
     "handoff",
-    # 直接作業の取り込み先がチケットに結び付くかの問い合わせ（`tree base-bound`）。
-    "tree.base-bound",
-    # 取り込みが自己防衛の対象を含むかと、取り込んでいない下書きの問い合わせ。
-    "tree.guarded",
-    "tree.handoff-pending",
 )
 # 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"

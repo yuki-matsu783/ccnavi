@@ -134,7 +134,7 @@ branch: feature/123-login
    統合先への push の拒否（`ccnavi_integration`）は壊さない
 3. sh が識別子とブランチ名の対応を知る手段は、実行ファイルの `ccnavi write-and-push family <識別子>` の答えに足した `branch <名前>`。
    `ccnavi-sync.sh` の引数は識別子。取り込み状態の鍵は識別子のまま（`/` を state の置き場のパスに入れない）。互換の版
-   `CCNAVI_COMPAT` を上げる（統合先で ADR-0101 が子の形の変更で 3 から 4 に上げていたので、取り込むときに 5 にした）。
+   `CCNAVI_COMPAT` を上げる。
    Chrome 拡張も「親子のチケット = ブランチ名」の前提を直し、`branch:` を読む
 4. `branch:` は承認画面に出し、承認のダイジェストに入れる。承認の後に書き換えても効かない（改版は `branch:` の書き換えを断る。
    `issue:` と同じ扱い）

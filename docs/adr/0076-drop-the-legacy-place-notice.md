@@ -28,9 +28,7 @@ warn で名指しする案内を一緒に置いた（`lint._legacy_tickets`）�
 `_left_behind`、古いパスの定数 4 つ、検査のテスト 6 本。要求（REQ-TKT-24）からも古い置き場の
 一文を落とし、設計書と README と 引き継ぎ文書（いまは廃止）から移行の案内を落とす。
 
-移行そのものは変わらない。古い置き場に残っているものはユーザが手で動かす（`.ccnavi/tickets` を
-`.ccnavi/approved` に、`closed/` は `done/` に、提案の `doing/` `done/` `cancelled/` は閉じたものを
-消して途中のものを `.ccnavi/approved/doing/` へ）。自動で移す仕組みは元から無い。
+古い置き場に残っているものを自動で移す仕組みは元から無い。
 
 ## 理由
 

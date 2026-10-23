@@ -62,11 +62,10 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 
 共通のルールファイルが読めない間の修復は、エージェントが `Write` / `Edit` で直接直す形では通さない（ADR-0158。ADR-0012 を覆す）。読めない間も `builtin:guard-ccnavi-config` は外れない。直し方は 1 つで、エージェントが `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、ユーザが端末の `ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない `rules.yml` の取り込みは、`handoff._defense_change` が「確かめられないので端末に限る」と扱う。そのため、ボードからの取り込みは断られる。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
 
-同じ設定が有効な間、`ccnavi user prune`（古い形は `ccnavi --prune` の `--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
+同じ設定が有効な間、`ccnavi user prune` をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
 擬似端末（`script -qc`）を使えば満たせてしまい、チケット制御を切ったワークスペースでは端末要求を切る変数も止まらないため。
-見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と `user prune`（`user` の次の語が `prune`）か単独の語の `--prune` が並べば止める。
-免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ古い形だけ（`user prune` に免除は無い）。
+見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と `user prune`（`user` の次の語が `prune`）が並べば止める。免除は無い。
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
 

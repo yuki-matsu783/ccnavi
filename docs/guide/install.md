@@ -20,7 +20,7 @@ keywords: [導入, dry-run, enable, ccnavi-setup.sh, 配布, 実行ファイル,
 無くても git の資格情報と `GITLAB_TOKEN` で足りる。
 
 ソースから使うときは `--build` を付けて実行ファイルを組み立てる（`--build --check` で副作用を見てから）。
-更新は `--force` で行い、バックアップは入れる先の外に取られる。更新したときの変更点は [release-notes](../release-notes.md)。手順は
+更新は `--force` で行い、バックアップは入れる先の外に取られる。手順は
 [`.claude/skills/ccnavi-install/`](../../.claude/skills/ccnavi-install/SKILL.md) と、展開した zip の `INSTALL.md`。
 下の 1 以降は、入ったあとの進め方を説明する。
 
@@ -135,8 +135,7 @@ sh scripts/ccnavi-setup.sh <ワークスペースルート>
 
 このスクリプトが hook と `env` を書く。書く形は[設定](settings.md)の例にある。何度打っても同じ形に
 なり、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
-ところだけを見たいときは `--check` を付ける。`--all` も受けるが、今は足すものが無い（置き場の env は廃止した）。
-同じ 1 回で `.vscode/settings.json` にも書く（[VS Code からワークツリーを見る](#vs-code-からワークツリーを見る)）。触ってほしくないときは `--no-vscode`。
+ところだけを見たいときは `--check` を付ける。同じ 1 回で `.vscode/settings.json` にも書く（[VS Code からワークツリーを見る](#vs-code-からワークツリーを見る)）。触ってほしくないときは `--no-vscode`。
 セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、直下のディレクトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も `SessionStart` に別の 1 行で登録する。
 1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（ディレクトリ一覧も出なくなる）。
 
@@ -157,7 +156,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 入れ終わったところで、ワークスペースの git の索引に `projects/` の下が載っていないかも見る。
 問題があれば直し方を案内するだけで、止めず、終了コードも変えない。索引も `.gitignore` も変えない（直すのはユーザ）。
 
-置き場の env は書かない（置き場は固定で、書いても読まれない。[設定](settings.md)の「置き場」）。
+置き場は固定で env には書かない（[設定](settings.md)の「置き場」）。
 細部は[導入スクリプトと配布の細部](../design/startup-config.md)にある。
 
 ## 実行ファイルとルールを配る
@@ -194,7 +193,7 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 
 別の機械向けの組み立てでも、その機械の置き場に入るだけなので配る。Windows と WSL で同じフォルダを開くなら、
 それぞれの機械で打てば両方が並ぶ。この機械で動くものが無ければ、1 行の出力と最後の「まだ無いもの」の一覧で知らせる。
-どこにも合う実行ファイルが無ければ sh は、この機械の `<os>-<arch>` と探した置き場を名指しして終了コード 127 で終わる。実行できないときは 126。
+合う実行ファイルが無いとき（127）と実行できないとき（126）は[つまずきやすい点](troubleshooting.md)。
 目印が無いか読めない配布元からは配らない。名指しの `--deploy` なら終了コード 2 で断り、
 既定の配布元なら理由を出して設定だけ書く。振り分けの仕組みと代償は[導入と配布の設計](../design/startup-config.md)にある。
 

@@ -132,8 +132,7 @@ sequenceDiagram
 - ホストへの送信（decide の返信・issue・コメント、close-early、request、comment、ready の補助コメント）は、`logs/state/ops/` の操作記録に段階ごとに載る。途中で失敗したら、`ccnavi-ticket.sh status` が「引き継ぎ未完了」として出す。decide は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る。送ったか確定できない段階は自動では送り直さず、ホストで目印 `ccnavi:op=<操作ID>` を探して確かめる
 - ユーザが子を `review/` から `done/` へ手で動かして commit・push すると、`ccnavi-ticket.sh status` が「レビュー完了確認待ち」と言い、Stop が `ccnavi-review.sh confirm --phase N` を 1 回だけ促す（`STEP_CONFIRM`）。confirm は移動の前に付いた未解決の指摘だけを、版つきで `phases/<親>/accepted.json` に受け入れる（ホストのスレッドは解決しない）。移動の後に付いた指摘や変更要求があれば確定しない。未コミット・未 push の移動は「移動が未共有」と言って確定しない
 
-## 更新したときの変更点
+## 操作記録と dry-run
 
-- 旧い子（`finished_to` が無い。更新より前に閉じた子）は、`review/` から `done/` へ手で動かしても確定できない。`ccnavi-review.sh confirm` か `decide` を使う
 - 未完了の操作記録（`logs/state/ops/`）は、prune で消えない。`ccnavi-ticket.sh status` で見つけて、上の送信の段落のとおりに続ける
 - `dry-run` でも、チケットの操作（状態の操作）と、承認済みの置き場・操作記録への書き込みは止まる。一般のルールの `deny`・`ask` だけは止まらず、報告になる

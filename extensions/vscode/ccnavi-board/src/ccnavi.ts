@@ -70,7 +70,7 @@ import {
   type DecideOutcome,
   type DecidePreview,
 } from "./core/decidemodel.js";
-import { parseLintJson, unknownOption, type LintJson } from "./core/lintmodel.js";
+import { parseLintJson, type LintJson } from "./core/lintmodel.js";
 import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
 import { interpretMrState, parseRetired, type MrStateResult, type RetiredParse } from "./core/mrstate.js";
@@ -417,7 +417,7 @@ export async function runSyncRetired(root: string, setting: string): Promise<Ret
 
 /**
  * 1 件の MR の状況を聞く（`ccnavi-review.sh mr-state <番号>`。読むだけ）。cwd は片付けの記録が指すリポジトリ。
- * 答えは `interpretMrState` が厳しく検証する。実行できなかった（シェルが無いなど）・期限切れ・古い sh は、
+ * 答えは `interpretMrState` が厳しく検証する。実行できなかった（シェルが無いなど）・期限切れは、
  * その親の「確認できない」にとどめる（ほかの親は続ける）
  */
 export async function runMrState(root: string, shell: string, cwd: string, number: number): Promise<MrStateResult> {
@@ -517,7 +517,7 @@ export async function runExpectations(
 /**
  * 記録からルールの候補を起こす（`--suggest --json`、docs/requirements/json-shapes.md「候補の JSON」）。読むのは保存済みの
  * ルールと記録で、編集中の内容は渡さない。候補は実行ファイルが `--lint` と期待する判定の確認で確かめたものだけ。
- * 記録を読むので `--log ""` は付けない（state の置き場は実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
+ * 記録を読むので `--log ""` は付けない（state の置き場は実行ファイルが外す）。
  */
 export async function runSuggest(root: string, setting: string): Promise<RunResult<SuggestJson>> {
   const launcher = findLauncher(root, setting);
@@ -529,9 +529,6 @@ export async function runSuggest(root: string, setting: string): Promise<RunResu
     return { ok: false, error: cutOff("ccnavi --suggest --json", DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    if (unknownOption(ran.stderr, "--suggest")) {
-      return { ok: false, error: "実行ファイルが --suggest に対応していません（古い版です）。実行ファイルを更新してください" };
-    }
     return { ok: false, error: `ccnavi --suggest --json が失敗しました: ${firstLine(ran.stderr)}` };
   }
   const parsed = parseSuggestJson(ran.stdout);
@@ -576,8 +573,8 @@ export async function runLintJson(root: string, setting: string): Promise<RunRes
  * 子チケットのフロー 1 本を実行ファイルに確かめさせる（`--lint --json --flow <パス>`）。
  * フロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルに書いて渡す。読み手と検査は
  * SubagentStart と同じもので、答えは `(flow)` の苦情（`problemsOfFlow`）。
- * 先に `--version --json` で `--flow` を知っているかを見る。知らない古い実行ファイル（`--version` も
- * 知らないものを含む）は、確かめられないとして失敗にする（開かない・保存しない側）。
+ * 先に `--version --json` で `--flow` を知っているかを見る。知らない、または確かめられないときは
+ * 失敗にする（開かない・保存しない側）。
  */
 export async function runFlowLint(root: string, setting: string, flowPath: string): Promise<RunResult<LintJson>> {
   const what = "ccnavi --lint --json --flow";
@@ -594,8 +591,6 @@ export async function runFlowLint(root: string, setting: string, flowPath: strin
 
 /**
  * 実行ファイルに版を聞く（`--version --json`）。実行ファイルが見つからなければ undefined。
- * `--version` を知らない古い実行ファイルは argparse の「知らないオプション」で見分けて `old` にする
- * （見分けにこの苦情を使うのは、ここの 1 か所だけ）。
  */
 export async function probeVersion(root: string, setting: string): Promise<VersionProbe | undefined> {
   const launcher = findLauncher(root, setting);
@@ -607,9 +602,6 @@ export async function probeVersion(root: string, setting: string): Promise<Versi
     return { kind: "failed", error: cutOff("ccnavi --version --json", DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    if (unknownOption(ran.stderr, "--version")) {
-      return { kind: "old" };
-    }
     return { kind: "failed", error: `ccnavi --version --json が失敗しました: ${firstLine(ran.stderr)}` };
   }
   const parsed = parseVersionJson(ran.stdout);

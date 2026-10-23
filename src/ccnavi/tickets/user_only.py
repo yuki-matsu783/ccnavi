@@ -11,8 +11,6 @@ hook の止め（`phase_forms`）と、実行ファイルの端末要求（`entr
   表示するコマンド名（`terminal`）を持つ
 - `FLAGS`: オプション。実行ファイル（`where` が空）か sh スクリプト（`where` がスクリプトの名前）の
   オプションで、どの止めに入るか（`cli`・`script`）と、所属するグループ（`groups`）を持つ。
-  `legacy` の行は、今の実行ファイルではもう受け付けないが、古い実行ファイルが手元に残っていれば
-  通ってしまう形。hook は止め続ける
 - `SCRIPTS`・`SUBS`: コマンドの位置で止める sh スクリプトと、実行ファイルのサブコマンド
 - `BOARD_COMBOS`: ボードで押した操作用のオプションの組み合わせ。コマンド行に全部並んだら止める
 
@@ -62,9 +60,6 @@ class Flag:
     # 断らない場合。"preview" は `--preview` と一緒のとき、"no-yes" は `--yes` が無いとき。
     # 空なら、`user` の外では必ず断る。
     unless: str = ""
-    # 今の実行ファイルは受け付けない前の形。古い実行ファイルが手元に残るときのため、
-    # hook は止め続ける。
-    legacy: bool = False
 
 
 @dataclass(frozen=True)
@@ -89,7 +84,6 @@ class Sub:
 
 OPS: tuple[Op, ...] = (
     Op("approve", "承認", terminal="user agree"),
-    Op("push-approved", "承認済みチケットのコミットと push"),
     Op("reviewed", "レビュー済みの記録", terminal="user reviewed"),
     Op("close-early", "早めに閉じる", terminal="user close-early"),
     Op("decide", "残った指摘の対応方針（ボードの経路）"),
@@ -97,9 +91,6 @@ OPS: tuple[Op, ...] = (
     Op("tidy", "親を閉じたときの片付け"),
     Op("clean-branch", "残った子のブランチの削除"),
     Op("handoff", "保護対象の下書きの取り込み", terminal="user handoff --yes"),
-    # 前の形（テンプレート専用の取り込み・改名・移動・削除・下書きの保存）。
-    # 今の実行ファイルには無い。
-    Op("template", "テンプレートの取り込み・改名・移動・削除・下書きの保存（前の形）"),
     Op("prune", "記録と state の削除", terminal="user prune"),
     Op("state-direct", "チケットの状態とレビューの操作を実行ファイルで直に呼ぶ形"),
     Op("guard-off", "端末要求を切る設定"),
@@ -118,9 +109,6 @@ FLAGS: tuple[Flag, ...] = (
         unless="preview",
         groups=("approval",),
     ),
-    # 前の名前。実行ファイルはもう受け付けないが、古い実行ファイルが手元に残っていれば通ってしまう。
-    # 止める側にだけ広がる。
-    Flag("--approve", "approve", preview_exempt=True, groups=("approval",)),
     # 見るだけの形（`--reviewed … --accept-unresolved --preview`）は、
     # `ccnavi-review.sh decide <N> --preview` が内部で呼ぶので、`user` の外でも断らない。
     Flag("--reviewed", "reviewed", gated=True, unless="preview", groups=("approval",)),
@@ -139,35 +127,6 @@ FLAGS: tuple[Flag, ...] = (
     # ユーザ専用で、エージェントには打たせない（エージェントは `ccnavi-stage.sh --commands` で
     # 下書きの状態を見られる）。
     Flag("--handoff", "handoff", gated=True, groups=("handoff",)),
-    # ここから前の形（テンプレート専用の取り込み・編集）。取り込み・編集は `user handoff` に
-    # まとめたので今の実行ファイルは受け付けないが、古い実行ファイルが手元に残れば通るので、
-    # hook は止め続ける。`--import` は下見だけの形（`--yes` なし）も止めていた。`--save-draft` は
-    # `--body-file` に任意のパスを渡して、読んだ中身を下見の出力に出せるため止めていた。
-    Flag("--import", "template", legacy=True, groups=("legacy-import", "template-write")),
-    Flag("--rename-template", "template", legacy=True, groups=("legacy-edit", "template-write")),
-    Flag("--move-template", "template", legacy=True, groups=("legacy-edit", "template-write")),
-    Flag("--delete-template", "template", legacy=True, groups=("legacy-edit", "template-write")),
-    Flag(
-        "--save-draft",
-        "template",
-        legacy=True,
-        groups=("legacy-edit", "legacy-save-draft", "template-write"),
-    ),
-    # 下書きの置き場の中だけを消すので、`--yes` の付かない下見は止めていなかった。
-    Flag(
-        "--delete-draft",
-        "template",
-        cli=False,
-        legacy=True,
-        groups=("legacy-edit", "template-write"),
-    ),
-    # 前の形の取り込み・編集に添えたオプション。単独では止めない。
-    Flag("--replace", "template", cli=False, legacy=True, groups=("legacy-companion",)),
-    Flag("--new-name", "template", cli=False, legacy=True, groups=("legacy-companion",)),
-    Flag("--on", "template", cli=False, legacy=True, groups=("legacy-companion",)),
-    Flag("--to-layer", "template", cli=False, legacy=True, groups=("legacy-companion",)),
-    # 単独では止めない（一覧・検索・表示は今もある）。前の形のボードの組み合わせの相手になるだけ。
-    Flag("--templates", "template", cli=False, groups=("templates",)),
     Flag("--guard-ticket-approval", "guard-off", cli=False, groups=("guard",)),
     # ボードの経路の印（`--via board`・`--via=board`）。ボードの子プロセスだけが付け、端末を
     # 求めない経路を選ぶ。単独では止めないが、`board` の語と並べば、操作の語や `--yes` が
@@ -183,9 +142,6 @@ FLAGS: tuple[Flag, ...] = (
 )
 
 SCRIPTS: tuple[Script, ...] = (
-    # `ccnavi-approve.sh` は `ccnavi-agree.sh` の前の名前。古いコピーが残っていても止める。
-    Script(("ccnavi-agree", "ccnavi-approve"), "approve"),
-    Script(("ccnavi-push-approved",), "push-approved"),
     # ユーザの判断に使うスクリプト。中で `--close-early` を呼び、最後に承認の push を呼ぶ。
     Script((_REVIEW,), "close-early", subcommand="close-early"),
     # 親を閉じたときに残した子のブランチを消す入口（中身は実行ファイルの `worktree branch`）。
@@ -229,10 +185,6 @@ SUBS: tuple[Sub, ...] = (
 BOARD_COMBOS: tuple[tuple[str, ...], ...] = (
     ("approval", "yes"),
     ("user", "user-board-verb", "yes"),
-    # 前の形（テンプレート専用の取り込み・編集）。古い実行ファイルが手元に残るときのため。
-    ("templates", "legacy-import", "yes"),
-    ("templates", "legacy-edit", "yes"),
-    ("templates", "legacy-save-draft"),
     ("choices", "digest"),
     # ボードの経路の印だけで止める。`user` も操作の語も伴わない形（名前を変えたコピーに
     # `--via board` だけを渡す、`--yes` を展開で隠す）も、ボードの経路として止める。
@@ -273,8 +225,8 @@ WRAPPER_OPTIONS: tuple[str, ...] = ("--root", "--cwd", "--record-writes", "--rec
 # ボードの組み合わせに使うためのグループ。
 WORD_GROUPS: dict[str, tuple[str, ...]] = {
     "user": (USER_WORD,),
-    # 端末を求めない経路（`--yes`）を持つ操作。`templates` は前の形（古い実行ファイルのため）。
-    "user-board-verb": ("agree", "reviewed", "handoff", "templates"),
+    # 端末を求めない経路（`--yes`）を持つ操作。
+    "user-board-verb": ("agree", "reviewed", "handoff"),
     # `--via` の値のうち、端末を求めない経路を選ぶもの。
     "board": ("board",),
 }
@@ -556,11 +508,6 @@ def user_verb_forms(verb: str) -> str:
     options = "|".join(re.escape(o) for o in WRAPPER_OPTIONS)
     skip = rf"(?:(?:{options})(?:=\S*|\s+{value})\s+)*"
     return rf"\s+{skip}(?:--\s+)?{USER_WORD}\s+{re.escape(verb)}\b"
-
-
-def legacy_names() -> tuple[str, ...]:
-    """今の実行ファイルが受け付けない前の形のオプション（`legacy` の行）。"""
-    return tuple(row.name for row in FLAGS if row.legacy and not row.where)
 
 
 def user_script_pattern() -> re.Pattern[str]:

@@ -7,7 +7,6 @@
 git とファイルシステムに残ったものだけ。
 
 記録（`ccnavi-direct/<名前>`）は `ccnavi-worktree.sh` が書く形を、このテストが同じ形で書く。
-版の無い marker（旧形式）は、旧来の abort と確定にだけ回る。
 
 実行ファイル（`tree base-bound`・`tree guarded`・`tree handoff-pending`・`worktree drop`）の
 代わりに、このツリーのソースを起こす（CCNAVI_BIN_PATH）。
@@ -982,49 +981,28 @@ class IntegrateReviewTest(Fixture):
 
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
-class OldMarkerTest(Fixture):
-    """版の無い marker（旧形式）は、旧来の abort と確定にだけ回る。"""
+class UnknownMarkerTest(Fixture):
+    """版が 4 でない marker（版の無いものを含む）は、どの入口も「版を知りません」で止まる。"""
 
-    def old_integrate(self):
-        """旧形式の取り込み: squash で staged にして、marker を書く。"""
+    def unknown_marker(self, text="state staged\nbranch wt\n"):
         self.work_in_branch()
-        base = self.head()
-        git(self.ws, "merge", "--squash", "wt")
-        tree = git(self.ws, "write-tree").strip()
-        changed = git(self.ws, "diff", "--cached", "--no-renames", "--name-only", "HEAD")
-        write(os.path.join(os.path.dirname(self.marker()), "paths"), changed)
-        write(
-            self.marker(),
-            "state staged\nbranch wt\n"
-            f"branch_sha {git(self.ws, 'rev-parse', 'wt').strip()}\n"
-            f"base {base}\ntree {tree}\nintegration main\ncreated 0\n",
-        )
-        return base
+        write(self.marker(), text)
 
-    def test_integrate_on_an_old_marker_is_refused_with_guidance(self):
-        self.old_integrate()
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("旧来の取り込み", r.stderr)
-        self.assertIn("integrate --abort wt", r.stderr)
+    def test_every_entry_refuses_a_marker_without_a_version(self):
+        self.unknown_marker()
+        for args in (("integrate", "wt"), ("integrate", "--abort", "wt"), ("integrate-done", "wt")):
+            r = self.run_git_sh(*args)
+            self.assertOk(r, 2)
+            self.assertIn("版（無し）を知りません", r.stderr)
+        self.assertTrue(os.path.exists(self.marker()))
+        self.assertTrue(self.has_branch())
 
-    @unittest.skipUnless(git_supports_v4(), "git 2.40 以上が要る")
-    def test_old_done_commits_and_cleans(self):
-        base = self.old_integrate()
-        done = self.run_git_sh("integrate-done", "wt", "-m", "feat: 旧")
-        self.assertOk(done)
-        self.assertEqual([base], git(self.ws, "log", "-1", "--format=%P").split())
-        self.assertEqual("", self.status())
-        self.assertFalse(self.has_branch())
-        self.assertFalse(os.path.exists(self.marker()))
-
-    def test_old_abort_restores_the_root(self):
-        base = self.old_integrate()
-        r = self.run_git_sh("integrate", "--abort", "wt")
-        self.assertOk(r)
-        self.assertEqual("", self.status())
-        self.assertEqual(base, self.head())
-        self.assertFalse(os.path.exists(self.marker()))
+    def test_every_entry_refuses_a_marker_of_another_version(self):
+        self.unknown_marker("version 3\nhead x\n")
+        for args in (("integrate", "wt"), ("integrate", "--abort", "wt"), ("integrate-done", "wt")):
+            r = self.run_git_sh(*args)
+            self.assertOk(r, 2)
+            self.assertIn("版（3）を知りません", r.stderr)
 
     def test_done_without_a_marker_is_refused(self):
         self.work_in_branch()

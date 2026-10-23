@@ -45,50 +45,15 @@ class TableTest(unittest.TestCase):
     def test_unknown_operation_is_an_error(self):
         with self.assertRaises(KeyError):
             user_only.terminal("decide")
-        # 前の形のテンプレートの取り込みは、今の実行ファイルには無い（端末を求める操作でもない）。
-        with self.assertRaises(KeyError):
-            user_only.terminal("template")
 
-    def test_legacy_options_are_not_read_by_the_executable_but_still_listed(self):
+    def test_handoff_is_a_board_verb(self):
+        self.assertIn("handoff", user_only.WORD_GROUPS["user-board-verb"])
         flags = set(json.loads(run_ccnavi(["--version", "--json"]).stdout)["flags"])
-        legacy = [row for row in user_only.FLAGS if row.legacy]
-        self.assertEqual(
-            sorted(row.name for row in legacy),
-            sorted(
-                [
-                    "--import",
-                    "--replace",
-                    "--save-draft",
-                    "--delete-draft",
-                    "--rename-template",
-                    "--move-template",
-                    "--delete-template",
-                    "--new-name",
-                    "--on",
-                    "--to-layer",
-                ]
-            ),
-        )
-        for row in legacy:
-            with self.subTest(option=row.name):
-                self.assertNotIn(row.name, flags)
-                self.assertFalse(row.gated)
         self.assertIn("--handoff", flags)
 
-    def test_handoff_is_a_board_verb_and_the_old_combinations_stay(self):
-        self.assertIn("handoff", user_only.WORD_GROUPS["user-board-verb"])
-        groups = {g for combo in user_only.BOARD_COMBOS for g in combo}
-        self.assertTrue({"legacy-import", "legacy-edit", "legacy-save-draft"} <= groups)
-        for group in ("legacy-import", "legacy-edit", "legacy-save-draft"):
-            names = user_only.names(group)
-            self.assertTrue(all(row.legacy for row in user_only.FLAGS if row.name in names), group)
-
-    def test_version_says_handoff_and_no_longer_the_template_edit(self):
+    def test_version_says_handoff(self):
         features = json.loads(run_ccnavi(["--version", "--json"]).stdout)["features"]
         self.assertIn("handoff", features)
-        self.assertIn("templates.draft-text", features)
-        self.assertNotIn("templates.edit", features)
-        self.assertNotIn("board.template-draft", features)
 
 
 class RewriteTest(unittest.TestCase):
@@ -122,9 +87,6 @@ class RewriteTest(unittest.TestCase):
         rewritten, entry = user_only.rewrite(["user", "handoff", "a.md", "b.md", "--json"])
         self.assertEqual(rewritten, ["--handoff", "a.md", "b.md", "--json"])
         self.assertEqual(entry.op, "handoff")
-        # 前の形（`user templates import`）は、もう入口に無い。
-        with self.assertRaises(user_only.UserEntryError):
-            user_only.rewrite(["user", "templates", "import", "d1"])
 
     def test_only_ascii_letters_are_folded(self):
         # `casefold` は `ſ`（U+017F）を `s` に、`ﬀ`（U+FB00）を `ff` にする。ASCII の綴りだけを
@@ -144,7 +106,7 @@ class RewriteTest(unittest.TestCase):
         self.assertEqual(user_only.rewrite(["ユーザ", "agree"]), (["ユーザ", "agree"], None))
 
     def test_mistakes_say_what_is_wrong(self):
-        for argv in (["user"], ["user", "bogus"], ["user", "templates"], ["user", "reviewed"]):
+        for argv in (["user"], ["user", "bogus"], ["user", "reviewed"]):
             with self.subTest(argv=argv), self.assertRaises(user_only.UserEntryError):
                 user_only.rewrite(argv)
 
@@ -188,18 +150,6 @@ class ExecutableTest(unittest.TestCase):
                 self.assertEqual(result.returncode, EXIT_BLOCK, result.stderr)
                 self.assertIn("user", result.stderr)
 
-    def test_the_old_template_options_are_unknown_to_the_executable(self):
-        for argv in (
-            ["--templates", "--import", "d", "--to", "common"],
-            ["--templates", "--save-draft", "d", "--body-file", "x"],
-            ["--templates", "--delete-draft", "d"],
-            ["--templates", "--rename-template", "d", "--new-name", "e", "--on", "common"],
-        ):
-            with self.subTest(argv=argv):
-                result = run_ccnavi(argv)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertNotIn("ユーザ専用", result.stderr)
-
     def test_a_non_ascii_spelling_of_the_entry_is_refused(self):
         for argv in (["u\u017fer", "handoff"], ["user", "hando\ufb00"]):
             with self.subTest(argv=argv):
@@ -231,10 +181,6 @@ class HookTest(HookCase):
         "python -m ccnavi user handoff .ccnavi/docs/a.md --yes --expect x",
         "ccnavi --cwd /y user handoff .claude/settings.json",
         "ccnavi --handoff --json",
-        # 前の形。今の実行ファイルは受け付けないが、古い実行ファイルが残れば通るので止める。
-        "ccnavi --templates --import d1 --to common",
-        "ccnavi --templates --save-draft d1 --body-file /tmp/x",
-        "ccnavi user templates import d1 --to common",
         "uv run python -m ccnavi user close-early",
         ".ccnavi/bin/ccnavi -- user agree",
         "sh .ccnavi/scripts/ccnavi-launcher.sh user agree",
@@ -290,10 +236,8 @@ class HookTest(HookCase):
             "uv run python main.py user agree --yes i1 --digest d",
             "flock /tmp/l ccnavi user reviewed 3 --accept-unresolved --yes 1",
             "python3 -c \"import subprocess;subprocess.run(['c','user','agree','--yes','i1'])\"",
-            "/tmp/x user templates import d1 --to common --yes --via board",
             "/tmp/x user handoff a.md --yes --expect h --via board --json",
             "python3 -c \"import subprocess;subprocess.run(['c','user','handoff','--yes'])\"",
-            "/tmp/x --templates --import d1 --to common --yes",
             "/tmp/x --agree --yes i1 --digest d",
         ):
             with self.subTest(command=command):

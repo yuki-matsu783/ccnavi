@@ -76,7 +76,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
   全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `ccnavi user` の操作と `ticket` / `review` の
   サブコマンドは動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする。
 - `CCNAVI_GUARD_TICKET_APPROVAL`: enable なら、シェルから ccnavi の実行ファイルを `user …` の入口 / `ticket …` / `review …` 付きで打つ形と、
-  `ccnavi-user-*.sh` を打つ形を止める（`DENY_TICKET_APPROVAL_CLI`。古い形の `--agree` / `--reviewed` / `--close-early` なども止める）。
+  `ccnavi-user-*.sh` を打つ形を止める（`DENY_TICKET_APPROVAL_CLI`）。
   `user agree` と `user reviewed` と `user close-early` と `user prune` と、書くとき（`--yes`）の `user handoff` は標準入力が端末であることを求める。
   エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も
   同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-user-decide.sh`・実行ファイルの `--yes`）に、
@@ -98,10 +98,7 @@ ccnavi ディレクトリを動かしても動かず、別の場所を指せる�
 hook からの判定と `ticket` / `review` などのサブコマンドに渡すと無視し、標準エラーに出す。`.ccnavi/scripts/` の sh は受け取った
 引数を実行ファイルへそのまま渡すので、診断の外でも効くと、記録を止める・置き場を差し替えるといった形でサブコマンドを動かせてしまうため。
 
-以前は 6 つの環境変数（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・
-`CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）で置き場を動かせたが、廃止した。
-`settings.json` の `env` に残っていても読まない（外す処理も、指摘する処理も無い）。
-「記録しない」「state を保存しない」「プロジェクトを数えない」も指定できない。プロジェクトを数えたくなければ
+置き場を動かす環境変数は無い。「記録しない」「state を保存しない」「プロジェクトを数えない」も指定できない。プロジェクトを数えたくなければ
 `projects/` を作らない。
 
 ### 4.4 動作モード
@@ -266,7 +263,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 
 **設定の書き方。**
 
-- `--check` を付けると、書かずに揃っていないところだけを見る。`--all` も受けるが、今は足すものが無い（置き場の env は廃止した）。
+- `--check` を付けると、書かずに揃っていないところだけを見る。`--all` も受けるが、今は足すものが無い。
 - 同じ 1 回で `.vscode/settings.json` も見る。触ってほしくないときは `--no-vscode`。
   `.vscode/settings.json` にコメントや末尾のカンマがあると（`jq` が読めない）、何を足せばよいかだけを出し、`.claude/settings.json` は書く。
   VS Code の他の設定は残し、`false` と書いてあれば変えずに並べて見せる。

@@ -328,7 +328,7 @@ ccnavi --version --json
 
 ```json
 {"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 18,
- "features": ["handoff", "templates.draft-text", "…"],
+ "features": ["user-entry", "handoff"],
  "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}
 ```
@@ -342,7 +342,7 @@ ccnavi --version --json
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
 | `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
 | `formats` | 読む書式の版。レイヤーのファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
-| `features` | オプションから読めない振る舞いの名前（文字列の配列）。現在の名前は `templates.draft-text`（テンプレートの下書きの本文）、`user-entry`（ユーザ専用の入口 `user <操作>`）、`handoff`（保護対象の取り込み）、`tree.base-bound`（直接作業の取り込み先がチケットに結び付くかの問い合わせ）、`tree.guarded`（取り込みが自己防衛の対象を含むかの問い合わせ）、`tree.handoff-pending`（取り込んでいない下書きの問い合わせ）。古い実行ファイルと見分けるためのもので、足しても `compat` は上げない |
+| `features` | オプションから読めない振る舞いの名前（文字列の配列）。現在の名前は `user-entry`（ユーザ専用の入口 `user <操作>`）、`handoff`（保護対象の取り込み）。呼ぶ側が振る舞いの有無を見分けるためのもので、足しても `compat` は上げない |
 
 **互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。

@@ -1,7 +1,7 @@
 """手で動かした子の判定。ユーザが GitHubの画面などで子を `review/` から `done/` へ動かしたことを、
 レビュー完了の意思として読む。
 
-ccnavi が子を動かす経路（confirm・decide・close-early・chrome。古い版は feedback-plan も書いた）は、
+ccnavi が子を動かす経路（confirm・decide・close-early・chrome）は、
 動かした子に `settled_by` を書く。
 `finished_to: review` の子が `done/` にあって `settled_by` を持たなければ、
 置き場の移動を誰かが手でしたことになる。

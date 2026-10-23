@@ -7,7 +7,7 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 ---
 # ADR-0104: 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す
 
-状態: 採用（2026-10-04 にユーザが相談事項を決めた（下の「ユーザが決めたこと」）。実装は 3 回に分けて入れる。ADR-0058 の「欄は承認の記録」と承認済みチケットへの `project:` の書き足し、ADR-0086 の承認の時刻の出どころ、ADR-0088 の続きの子の目印の置き場、ADR-0040 の「承認したことは hook が伝える」、ADR-0093 の取り込みでの「閉じた」の照合と取り下げの条件、設計 9.4 の「承認されたことは hook が伝える」を改める。承認済みの置き場を運ぶのがユーザであること（設計 9.4、ADR-0043）は改めない。待ち方のファイル（`phases/<親>/workflow.yml`）とそれに伴う書き込み・取り下げ・write-and-push・手で動かした承認の読み方は ADR-0109 が改める。古い形（`ccnavi_approved`）を読む分岐と「移行はしない」の扱いは ADR-0115 が改め、読む分岐ごと消した。追記: 承認の時刻の「状態の履歴を先に読む」は ADR-0141 が履歴ごとやめた。今は `doing/` に足したコミットの時刻だけを引く。追記: 取り込み済みの親子の統合先の `done/` のコピーと比べる照合（`_closed_in_integration`）は、取り込み状態ごとやめた ADR-0142 が改める）
+状態: 採用（2026-10-04 にユーザが相談事項を決めた（下の「ユーザが決めたこと」）。ADR-0058 の「欄は承認の記録」と承認済みチケットへの `project:` の書き足し、ADR-0086 の承認の時刻の出どころ、ADR-0088 の続きの子の目印の置き場、ADR-0040 の「承認したことは hook が伝える」、ADR-0093 の取り込みでの「閉じた」の照合と取り下げの条件、設計 9.4 の「承認されたことは hook が伝える」を改める。承認済みの置き場を運ぶのがユーザであること（設計 9.4、ADR-0043）は改めない。待ち方のファイル（`phases/<親>/workflow.yml`）とそれに伴う書き込み・取り下げ・write-and-push・手で動かした承認の読み方は ADR-0109 が改める。古い形（`ccnavi_approved`）を読む分岐と「移行はしない」の扱いは ADR-0115 が改め、読む分岐ごと消した。追記: 承認の時刻の「状態の履歴を先に読む」は ADR-0141 が履歴ごとやめた。今は `doing/` に足したコミットの時刻だけを引く。追記: 取り込み済みの親子の統合先の `done/` のコピーと比べる照合（`_closed_in_integration`）は、取り込み状態ごとやめた ADR-0142 が改める）
 
 ## 状況
 
@@ -108,28 +108,11 @@ keywords: [承認, ccnavi_approved, approved_at, source_path, revised_at, follow
 | `agree.news` / `agree.baseline` と記録 `<state>/approved-<session>-<agent>.json`、`UserPromptSubmit`（`hook/events.py`）・`PreToolUse`（`hook/judge.py`）・`SessionStart`（`hook/events.py`）からの呼び出しを消す。`ctxfile` の古い `approved-` ファイルの掃除は、残ったファイルを消すために残す | 知らせを残し、起点の取り方を直す | 知らせが確実に効くのはセッションの途中の承認だけで、開始時の取り込みで届いた承認は起点に含まれて取りこぼす。ボードの承認は拡張が同じ文（`--agree --yes` の `prompt`）をクリップボードか新しいセッションで渡す（`extensions/vscode/ccnavi-board/src/prompt-handover.ts`）。端末・GitHub・Chrome の承認では、ユーザがそのあとセッションに一言送るので、status で足りる |
 | 承認を伝える文 `agree_screen.approved_text` は残す（`--agree --yes` の `prompt` が使う）。提案を書いた回に承認の前の確認を勧める文（`ticket_guard.propose_notice`、REQ-APV-14）は、同じ `PreToolUse` の `additionalContext` の経路で今までどおり渡す | 一緒に外す | 確認の案内は承認の知らせと経路を共有しているだけで、役目は別 |
 
-### 互換の版と取り込む順序
+### 互換の版
 
 | 決めたこと | 採らなかった側 | なぜ |
 |---|---|---|
 | 互換の版（COMPAT）を上げる。`entry/version.py` の説明に「データの形（待ち方の置き場・取り下げの条件など）が変わるときも上げる」を足す | 上げない（フラグも JSON の欄も消していない） | 新しい sh は古い実行ファイルにない `ticket status` を呼ぶ（古い実行ファイルは argparse で落ちる）。待ち方の置き場と取り下げの条件が変わり、古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が新しい形の承認済みチケットを読むと、待ち方を一直線と読み、取り下げを「承認の記録が無い」で止める。今の説明は「呼ぶ側が頼っているフラグや出力の形」だけを挙げていて、データの形が変わるときに上げることが書かれていない |
-
-取り込む順序と、その間に起きること。互換の版の食い違いで止めるのは Chrome 拡張だけで、sh と VS Code 拡張は知らせて進む。
-sh で止める変更は、この ADR ではしない。
-
-1. 統合先に、実行ファイルのソース・`.ccnavi/scripts/` の sh（`ccnavi-ticket.sh`・`ccnavi-sync.sh`・`ccnavi-common.sh` の
-   `CCNAVI_COMPAT`）・VS Code 拡張の `EXTENSION_COMPAT` を同じ変更で入れる。`.ccnavi/scripts/` は保護された場所なので、
-   sh の書き換えは人の手で入れる
-2. 実行ファイルを `build.py` で組み直す。組み直すまでは、sh（`ccnavi-common.sh` の `ccnavi_compat_skew`、
-   `ccnavi-ticket.sh` は 91 行付近で呼ぶ）が食い違いを標準エラーに 1 行出して、そのまま古い実行ファイルを呼ぶ。
-   `status` は古い実行ファイルが知らないので argparse の苦情で落ちる。ほかのサブコマンドは古い実行ファイルの動きのまま進む
-   （古い実行ファイルは承認で欄を書き、待ち方を承認済みチケットに書く）
-3. VS Code 拡張を入れ直す。入れ直すまでは、古い拡張が起動のときに食い違いを知らせるだけで、止めはしない
-   （`extensions/vscode/ccnavi-board/src/version-check.ts`）
-4. Chrome 拡張を配り直す。配り直すまでは、同梱の互換の版が古い Chrome 拡張は、統合先の版が上がった時点で
-   承認・取り下げ・「始める」を拒み、表示だけになる（ADR-0093 の 7.3 の設計どおり。ADR-0099 の「失ったもの」と同じ）
-- sh だけが古いワークスペース（統合先から sh を取り込んでいない手元）では、`ccnavi-sync.sh` の
-  `closed_in_integration` が `approved_at` だけを読むので、新しい形の親を「閉じていない」と読み続ける（止まる側）
 
 ## ユーザが決めたこと
 
@@ -185,27 +168,6 @@ sh で止める変更は、この ADR ではしない。
 - ADR-0093: 取り込み済みの親子の「閉じた」の照合（Python と `ccnavi-sync.sh`）を `approved_at` から着手と取り消しの欄に
   変える。取り下げの条件（8.8）を中身の一致に変える。Chrome 拡張が書く承認も中身を変えない形になる
 - 設計 9.4: 「承認されたことは hook が伝える」を消す。承認済みの置き場を運ぶのがユーザであることは変えない
-
-## 波及するもの（実装のときに直す）
-
-- 要件 REQ-APV-08（承認を次の機会に 1 度伝える）は消さず、「承認したことは、拡張が渡す文と status で伝わる」に書き換える。
-  REQ-APV-16（取り下げの条件）を中身の一致と待ち方のファイルに改める。REQ-APV-05（承認した内容を書き換えられない場所に残す）は
-  「承認の経路が時刻…」の文言を、欄を書かない形に揃える
-- 設計 9.4（承認済みチケットの欄）、設計 9.4 と README.md 2224 行（指紋の「`ccnavi_approved` は除く」）、
-  設計 9.4（承認の確認の経路と「承認されたことは hook が伝える」）、設計 9.6（状態遷移の表の書く欄）。
-  `docs/guide/tickets.md` の承認の節と、`docs/requirements/json-shapes.md` の `copy.approved_at`
-- コードの注記: `tickets/ops.py` 4 行の「サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）」は
-  事実でない。止めているのは hook の判定（`hook/judge.py` が `phase_forms.forbidden` で `DENY_SUBAGENT_TICKET_OP`）で、
-  `cli.py` は `agent_id` を見ていない。`ccnavi-ticket.sh` 17 行の同じ趣旨の注記も同様
-- 保護された sh: `ccnavi-ticket.sh` は通すサブコマンドの一覧（`start | finish | cancel | record-risk`）に `status` を足し、
-  引数の数の検査（`[ "$#" -ge 2 ]`）を `status` だけ 1 個で通すように直す。`ccnavi-sync.sh` は `closed_in_integration` を
-  上の順の照合に替え、`sed` を frontmatter の行頭に限る
-- テスト（`ccnavi_approved` を前提にしているもの）: `tests/sh/test_push_approved_sh.py`・`tests/sh/test_sync_sh.py`・
-  `tests/ticket/test_lint_places.py`・`tests/ticket/test_sync_authority.py`・`tests/ticket/test_lint_branch_names.py`・
-  `tests/ticket/test_ticket.py`・`tests/e2e/test_e2e_push.py`・`tests/core/test_lint.py`。知らせに関わるもの:
-  `tests/ticket/test_approval_news.py`・`tests/guard/test_post.py`・`tests/ticket/test_ticket_rule_merge.py`・
-  `tests/core/test_state_writes.py`・`tests/core/test_prune.py`。Chrome 拡張のフィクスチャ（`test/fixtures/core-scenarios.json`・
-  `test/fixtures/repo.ts`・`test/write.test.ts` 87 行と 201 行）、VS Code 拡張の `test/fixtures/board.json`
 
 ## 得たもの・失ったもの
 

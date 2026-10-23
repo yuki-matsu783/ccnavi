@@ -8,7 +8,6 @@
 4. まとめて承認するとき、フィードバック計画の初回の改版と、同じ親の全体計画の番号の子が同じ承認に
    入っていたら、親の改版と該当する子を両方拒む。無関係の親子は通り、フィードバック計画のフェーズの
    子との同時承認は許す。絞り込みの有無で結果は変わらない
-5. 古い版が書いた `reviewed` の `by: feedback-plan` は読めるまま残り、`--lint` が info で一覧にする
 """
 
 from __future__ import annotations
@@ -218,21 +217,3 @@ class FeedbackPlanApprovalTest(PhaseHarness):
         refused = sorted(r["ticket"] for r in shown["rejected"])
         self.assertEqual(refused, ["i0001", "i0001-01-02"])
         self.assertNotIn("i0002", refused)
-
-    # ---- 5. 古い印は読めて、lint が info で言う
-
-    def test_an_old_feedback_plan_marker_is_still_read_and_lint_lists_it(self):
-        fixture = self.requested()
-        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
-        mark = os.path.join(self.phase_dir(), "1.reviewed")
-        body = read_json(mark)
-        body["by"] = "feedback-plan"
-        write(mark, json.dumps(body))
-        self.commit_parent("old marker")
-        self.assertEqual(
-            approval_marks.read_mark(self.approved, "i0001", 1, "reviewed")["by"], "feedback-plan"
-        )
-        lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn("feedback-plan", lint.stdout)
-        self.assertIn("info", lint.stdout)
-        self.assertIn("i0001", lint.stdout)

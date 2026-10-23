@@ -22,22 +22,10 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, d
 | `e2e` | 本物のワークスペースを組み立てて sh を外から実行する。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
 
 ```sh
-uv run python -m unittest discover -s tests/core -t .    # 1 グループ
-uv run python -m unittest discover -s tests -t .         # 全件（1 本。数十分かかるので使わない。下記）
+uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複数は 1 つずつ続けて回す。`discover -s` は 1 か所しか取らない）
 ```
 
-**全件を `discover -s tests` の 1 本で回さない。** 数十分かかり、時間の上限（セッションの 30 分など）で途中で打ち切られて、結果が残らない。グループごとに分けて回すか、下の `python -m tests` を使う。分けて回すときは、グループごとに別のプロセスで同時に走らせ、それぞれの終了コードを残す。
-
-複数のグループは 1 つずつ続けて回す（`discover -s` は 1 か所しか取らない）。
-時間の目安は並行セッションがあると数倍になる。続けて回すと長いので、全件は下の `python -m tests`（同時実行）を勧める。
-
-全件は `python -m tests`（`tests/__main__.py`）のほうが速い（モジュールごとに別プロセスで同時に回す。中身は discover と同じ）。
-
-```sh
-uv run python -m tests                 # 全件
-uv run python -m tests tests/ticket    # グループを名指し（複数書ける）
-uv run python -m tests --plan          # 何をどの順で回すか出すだけ
-```
+全件は `uv run python -m tests`（同時実行）で回す。`discover -s tests` の 1 本は使わない。理由と手順は[テストを回す](../../../../docs/claude/testing.md)。時間の目安は並行セッションがあると数倍になる。
 
 実行ファイル（`.ccnavi/bin/`）が無い環境（Claude Code on the web、ビルド前）では、ランチャー経由の `--lint` と `ccnavi` コマンドが動かない。
 `python main.py --lint` で代える（ランチャーが実行ファイルを探して失敗するため）。

@@ -56,7 +56,7 @@ uv run python -m unittest discover -s tests/<グループ> -t .
 ```
 
 回すグループは、変えたファイルを [references/test-groups.md](references/test-groups.md) の表に当てて決める。
-表に当たらない変更や、統合先に取り込む前・MR に出す前は全件（`discover -s tests -t .`）を回す。
+表に当たらない変更や、統合先に取り込む前・MR に出す前は全件（`uv run python -m tests`。[テストを回す](../../../docs/claude/testing.md)）を回す。
 worktree で作業しているときは、そのツリーの中で実行する（`pyproject.toml` はツリーごと）。
 
 拡張（`extensions/vscode/ccnavi-board`）のファイルが変わっているなら、そのぶんも通す。

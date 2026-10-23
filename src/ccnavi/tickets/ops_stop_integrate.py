@@ -102,7 +102,7 @@ class Direct:
     base: str = ""
     # 記録が無い（更新前に切った・手で切った）。integrateは断るので、`--adopt` を案内する。
     no_record: bool = False
-    # 取り込みの途中のmarker。"" なし、"v4" 新形式、"old" 旧形式。
+    # 取り込みの途中のmarker。"" なし、"v4" 版 4、"unknown" 版を知らない（壊れた記録）。
     marker: str = ""
     # 手元の取り込み先より `origin/<取り込み先>` が先に進んでいるコミットの数。
     origin_ahead: int = 0
@@ -332,12 +332,12 @@ def direct_record(owner: str, name: str) -> dict[str, str] | None:
 
 
 def marker_kind(marks: str, name: str) -> str:
-    """`ccnavi-integrate/<名前>/` のmarkerの種類。無ければ空、版 4 なら "v4"、ほかは "old"。"""
+    """`ccnavi-integrate/<名前>/` のmarkerの種類。無ければ空、版 4 なら "v4"、ほかは "unknown"。"""
     folder = os.path.join(marks, name)
     if not os.path.lexists(folder):
         return ""
     fields = directrec.parse(fsio.read_text(os.path.join(folder, "marker"), errors="replace") or "")
-    return "v4" if fields.get("version") == directrec.VERSION else "old"
+    return "v4" if fields.get("version") == directrec.VERSION else "unknown"
 
 
 def _origin_ahead(owner: str, base: str, deadline: float | None) -> int:
@@ -772,6 +772,15 @@ def integrate_nudge(root: str, found: Direct) -> str:
     work = settings.shell_path(found.worktree)
     integ = settings.shell_path(found.integ_tree)
     lines = [f"[ccnavi] {CODE_INTEGRATE_NUDGE} (worktree: {n})"]
+    if found.marker == "unknown":
+        return "\n".join(
+            [
+                *lines,
+                f"ワークツリー .claude/worktrees/{n} の取り込みの記録"
+                f"（{integ} の ccnavi-integrate/{n}/marker）の版を知りません。"
+                "操作せず、ユーザに確かめてください。",
+            ]
+        )
     if found.marker:
         lines += [
             f"ワークツリー .claude/worktrees/{n} の取り込み（integrate {n}）が、"

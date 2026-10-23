@@ -699,10 +699,9 @@ class ManualSettleGapsTest(PhaseHarness):
 
     # ---- AT18
 
-    def test_old_accepted_keys_and_a_feedback_plan_mark_do_not_hide_a_thread(self):
+    def test_old_accepted_keys_do_not_hide_a_thread(self):
         marks = {
             "keys only": {"mr": 7, "accepted": ["https://h/c/1"]},
-            "feedback-plan": {"by": "feedback-plan", "accepted": []},
         }
         for name, mark in marks.items():
             with self.subTest(name=name):

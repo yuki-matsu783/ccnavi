@@ -54,8 +54,6 @@ HELD_TOOLS = (*modes.AGENT_TOOLS, *SHELL_TOOLS)
 # ccnavi 自身の実行ファイルを、ユーザの判断の経路に使う形。`--agree` `--reviewed`
 # `--close-early` と、状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
-# 前の名前 `--approve` も同じに止める。実行ファイルはもう受け付けないが、古い実行ファイルが
-# 手元に残っていれば通ってしまう。止める側にだけ広がる。
 # `--agree --preview` は一覧を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
 # `--agree` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
 # 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
@@ -121,7 +119,7 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 #    `--agree` / `--reviewed` と `--yes` の組み合わせ、
 #    sh の `--choices` と `--digest` の組み合わせ、
 #    `user handoff` と `--yes` の組み合わせ（保護対象の下書きの取り込み。
-#    ボードの画面だけが `--via board` で呼ぶ）、前の形の `--templates` と `--import` と `--yes`
+#    ボードの画面だけが `--via board` で呼ぶ）
 #
 # 実行ファイルを呼ぶ表記は追い切れない（`uv run -m ccnavi`、名前を変えたコピー、
 # `awk` の `system()`、`python -c` に引数のリストで渡す形）。だからコマンドの位置は見ず、
@@ -278,12 +276,9 @@ def board_form_message(found: str) -> str:
     decided = (
         "保護対象の下書きの取り込み（`ccnavi user handoff`）は、ユーザがボードか端末で"
         "下書きの差分を読んでから決めます。"
-        if "handoff" in lowered or "--import" in lowered or "templates" in lowered
+        if "handoff" in lowered
         else "`--via board` は、ボードの画面から押した操作を拡張が実行するときだけ付ける印です。"
         if lowered.startswith("--via")
-        else "下書きの保存は、ユーザが実行する前の形です"
-        "（`--body-file` の中身が出力に出るため）。下書きは Write で直接編集してください。"
-        if "--save-draft" in lowered
         else "承認はユーザが端末・ボード・置き場のファイルの移動で行い、"
         "残った指摘の対応方針はユーザが VS Code のボードか端末で決めます。"
     )
@@ -362,10 +357,7 @@ _OPEN_PART = re.compile(
 )
 _APPROVAL_FLAGS = user_only.names("approval")
 _YES_FLAGS = user_only.names("yes")
-_IMPORT_FLAGS = user_only.names("template-write", "handoff")
-# 今の実行ファイルは受け付けない前の形のオプション。古い実行ファイルが手元に残れば読まれるので、
-# 「実行ファイルの知らないオプション」には数えない（止める側に倒す）。
-_LEGACY_OPTIONS = frozenset(user_only.legacy_names())
+_IMPORT_FLAGS = user_only.names("handoff")
 _GUARD_FLAGS = user_only.names("guard")
 _ABANDON_FLAGS = user_only.names("abandon")
 _CHOICES_FLAGS = user_only.names("choices", where="ccnavi-review")
@@ -576,7 +568,7 @@ def _hidden_args(kind: str, args: list[str]) -> str:
             break
         head.append(arg)
     flags = {a.partition("=")[0] for a in head if a.startswith("-") and a != "-"}
-    if flags & _EXE_DIAGNOSES or flags - EXE_OPTIONS - _LEGACY_OPTIONS:
+    if flags & _EXE_DIAGNOSES or flags - EXE_OPTIONS:
         return ""
     if {"--agree", "--preview"} <= flags:
         return ""
@@ -587,7 +579,7 @@ def _hidden_args(kind: str, args: list[str]) -> str:
     abandon = _abandon_word(args, opened)
     if abandon:
         return abandon
-    # 下書きの取り込み（`--handoff` と、前の形の `--import` と、`--yes`）も、承認と同じく、
+    # 下書きの取り込み（`--handoff` と `--yes`）も、承認と同じく、
     # 組み合わせを読めない形にして隠せる。
     if any(_could_be(a, _APPROVAL_FLAGS + _IMPORT_FLAGS) for a in args) and any(
         _could_be(a, _YES_FLAGS) for a in args

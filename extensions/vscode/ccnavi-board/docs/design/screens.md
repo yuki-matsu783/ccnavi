@@ -73,7 +73,7 @@ keywords: [設計, 画面, approval-machine, 状態の札, あなたの番, 詳�
 
 遷移は `core/merge.ts` の 1 か所にまとめてある（承認の遷移と同じ形。VS Code に触れないので単体で試せる）。「いまの状態 ＋ 入力 → 次の状態 ＋ やること」で、`board-panel.ts` が持ち直し、描き直し、効果を行う。結果はパネルの状態として拡張ホストが持つ（ボードが開いている間だけ）。頼んだ状態でなければ受けない: 確認ごとに世代（`token`）を振り、閉じたボードへ遅れて返った結果や、前の確認の遅れた答えは捨てる。確認中の「確認」は受けない。
 
-読み取り（`loadList`＝`ccnavi sync retired`、`loadState`＝`ccnavi-review.sh mr-state`）と、書き込み（`sendRetire`＝ターミナルへ送る）は、効果の種類で分ける。送る効果が返るのは、確認のダイアログで「実行する」と答えたあとだけで、`test/shared/read-only.test.ts` がソースの形でその線を保つ。答えの検証は `core/mrstate.ts`（形が想定外なら「出力の形が想定外」、古い sh なら「sh が古い版です。配り直してください」、期限切れは拡張の側だけの種類 `timeout`）。互換の版は上げない（`mr-state` は追加だけで、実行ファイルを起こさない）。
+読み取り（`loadList`＝`ccnavi sync retired`、`loadState`＝`ccnavi-review.sh mr-state`）と、書き込み（`sendRetire`＝ターミナルへ送る）は、効果の種類で分ける。送る効果が返るのは、確認のダイアログで「実行する」と答えたあとだけで、`test/shared/read-only.test.ts` がソースの形でその線を保つ。答えの検証は `core/mrstate.ts`（形が想定外なら「出力の形が想定外」、期限切れは拡張の側だけの種類 `timeout`）。互換の版は上げない（`mr-state` は追加だけで、実行ファイルを起こさない）。
 
 ## 見た目
 

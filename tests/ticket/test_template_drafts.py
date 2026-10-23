@@ -9,8 +9,7 @@
    作業中・退避済み・取り消した親は読めないと言う
 3. 下書きの効力: `--templates` の統合結果にも `templates[]` にも入らない。
    `--lint` は error にしない。一覧に件数、`--json` に `drafts[]`
-4. 取り込みの前の形（`--import`・`--save-draft` など）は今の実行ファイルに無く、hook は止め続ける。
-   `--draft` と読む側はエージェントが打てる。下書きの置き場への Write は判定が変わらず止まらない
+4. `--draft` と読む側はエージェントが打てる。下書きの置き場への Write は判定が変わらず止まらない
 """
 
 from __future__ import annotations
@@ -596,15 +595,6 @@ class UserOnlyTest(Drafts):
             "ccnavi --handoff",
             "./.ccnavi/bin/ccnavi --root /x user handoff --json",
             "uv run python -m ccnavi user handoff",
-            # 前の形。今の実行ファイルには無いが、古い実行ファイルが残れば通るので止める。
-            "ccnavi --templates --import i0001 --to common",
-            "ccnavi --templates --import i0001 --to common --yes --expect abc",
-            "ccnavi --import i0001 --to common --templates",
-            "ccnavi --templates --im''port x --to common",
-            "ccnavi --templates --import=x --to common",
-            "ccnavi --templates --save-draft x --body-file /tmp/x",
-            "ccnavi --templates --rename-template x --new-name y --on common",
-            "ccnavi --templates --import i0001 --to common $X",
             "ccnavi --templates ${A} --yes",
         ):
             self.assertTrue(self.denied(command), command)
