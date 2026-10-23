@@ -571,6 +571,32 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(again.returncode, 2, again.stdout + again.stderr)
         self.assertEqual(self.local_branches(), ["main"])
 
+    def test_a_repo_that_differs_from_cwd_stops_before_asking_the_host(self):
+        proj = os.path.join(self.ws, "projects", "tour")
+        os.makedirs(proj)
+        git(proj, "init", "-q", "-b", "main")
+        git(proj, "remote", "add", "origin", "https://github.com/Acme/Tour.git")
+        done = self.run_sh("--issue", "2", "--repo", "acme/tour")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("/projects/tour' && sh '", done.stderr)
+        self.assertIn("/.ccnavi/scripts/ccnavi-start.sh' '--issue' '2'", done.stderr)
+        self.assertEqual(self.requests(), [])
+        self.assertEqual(self.local_branches(), ["main"])
+        # 同じリポジトリ（大文字小文字違い）なら止めない
+        same = self.run_sh("--issue", "152", "--repo", "ACME/Widgets", "--dry-run")
+        self.assertNotIn("が違います", same.stderr)
+        os.remove(self.log)
+        # projects/ の中から、ワークスペース自身のリポジトリを頼むと、ルートへの移動を案内する
+        up = self.run_sh("--issue", "152", "--repo", "acme/widgets", cwd=proj)
+        self.assertEqual(up.returncode, 1, up.stdout + up.stderr)
+        self.assertIn("ワークスペースルートに移動", up.stderr)
+        os.remove(self.log) if os.path.exists(self.log) else None
+        # projects/ に無いリポジトリは、移動先を案内せず止める
+        gone = self.run_sh("--issue", "2", "--repo", "acme/none")
+        self.assertEqual(gone.returncode, 1, gone.stdout + gone.stderr)
+        self.assertIn("projects/ に見つかりません", gone.stderr)
+        self.assertEqual(self.requests(), [])
+
     def test_the_target_repository_is_reported(self):
         self.github_new()
         done = self.run_sh("--issue", "152")

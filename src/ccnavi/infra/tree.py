@@ -341,6 +341,46 @@ def has_origin(repo_root: str) -> bool:
         return False
 
 
+def origin_repo(repo_root: str) -> str:
+    """そのリポジトリの `origin` の URL が指す `owner/repo`（パスの最後の 2 段）。読めなければ空。
+
+    設定ファイルだけを読む（git は走らせない）。GitLab の入れ子のグループは最後の 2 段に縮める
+    （依頼文の URL から読む `Ref.repo` と同じ形）。
+    """
+    gitdir = git_dir(repo_root)
+    if gitdir is None:
+        return ""
+    try:
+        common = os.path.join(gitdir, "commondir")
+        if os.path.exists(common):
+            with open(common, encoding="utf-8") as f:
+                gitdir = os.path.normpath(os.path.join(gitdir, f.read().strip()))
+        with open(os.path.join(gitdir, "config"), encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except (OSError, ValueError):
+        return ""
+    in_origin = False
+    for line in lines:
+        text = line.strip()
+        if text.startswith("["):
+            in_origin = text.replace(" ", "") == '[remote"origin"]'
+        elif in_origin and text.replace(" ", "").startswith("url="):
+            return _repo_of_url(text.split("=", 1)[1].strip())
+    return ""
+
+
+def _repo_of_url(url: str) -> str:
+    rest = url.split("://", 1)[1] if "://" in url else url
+    # `git@host:group/proj`（ssh の短い形）は `:` の後ろが、`host/group/proj` は
+    # 最初の `/` の後ろがパス。
+    if "://" not in url and ":" in rest.split("/", 1)[0]:
+        path = rest.split(":", 1)[1]
+    else:
+        path = rest.split("/", 1)[1] if "/" in rest else ""
+    parts = [p for p in path.removesuffix("/").removesuffix(".git").split("/") if p]
+    return "/".join(parts[-2:]) if len(parts) >= 2 else ""
+
+
 def origin_head(repo_root: str) -> str:
     """そのリポジトリの `origin/HEAD` が指すブランチ名（`refs/remotes/origin/HEAD` の中身）。
     無ければ空。

@@ -2261,6 +2261,8 @@ factors:
 sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152   # MR なら --mr 5
 ```
 
+依頼の URL のリポジトリが `projects/<名前>` のものなら、そこに `cd` して `--repo <owner/repo>` を付けて打つ。実行した場所の origin と違えば、ホストに問い合わせる前に止まって移動先を案内する。
+
 候補を探すのは `ccnavi-branches.sh`（読むだけ。`--json` で JSON）で、出すのは、MR の元ブランチ、issue を参照している開いた MR の元ブランチ（ホストは `ccnavi-review.sh` と同じく gh / glab か、
 curl と `GITHUB_TOKEN` / `GITLAB_TOKEN` で読む）、名前に番号を含むブランチ（手元と origin）、`issue: 152` を持つチケットの親のブランチ。
 1 候補 1 行で、チェックアウトしているワークツリーと結び付くチケットを添える。ホストに繋げなければ手元の候補だけを出し、

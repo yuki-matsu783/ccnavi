@@ -2,7 +2,7 @@
 # ccnavi-start issue・MR を指定して作業を頼まれたとき、既存のものを確かめ、無ければ Draft MR・ワークツリー・
 # feature ブランチを先に作る。
 #
-#   sh .ccnavi/scripts/ccnavi-start.sh --issue <番号> [--slug <語>] [--prefix <語>] [--title <題>] [--dry-run] [--mcp-checked]
+#   sh .ccnavi/scripts/ccnavi-start.sh --issue <番号> [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked]
 #   sh .ccnavi/scripts/ccnavi-start.sh --mr <番号> [--dry-run]
 #
 # 流れ（.ccnavi/docs/worktree-start.md）:
@@ -42,7 +42,7 @@ fail() {
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <語>] [--prefix <語>] [--title <題>] [--dry-run] [--mcp-checked]
+sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked]
 
   issue・MR に紐づくブランチを探し（ccnavi-branches.sh）、候補に応じて進める。
   候補が 1 件   そのブランチで続ける。ワークツリーが無ければ .claude/worktrees/<識別子> に、ブランチを直接
@@ -62,6 +62,9 @@ sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <�
                 作り方。ccnavi の実行ファイルに聞く）
   --prefix <語> 先頭の語（既定 feature）
   --title <題>  MR の題。省くと issue の題、読めなければ「#<番号> <slug>」
+  --repo <owner/repo>
+                依頼の URL が示すリポジトリ。cwd の origin と違えば、ホストに問い合わせる前に止めて、移動先
+                （projects/<名前>/）を案内する（終了コード 1）。大文字小文字は区別しない
   --dry-run     何も作らず、作る予定の内容だけ出す（リモートは読むだけ）
   --mcp-checked ホストの API に届かず、既存の MR がないこと（採用する MR のブランチと同じ名前のマージ済み MR がないこと）を
                 MCP などで確かめたあとに付ける
@@ -81,6 +84,7 @@ number=""
 opt_slug=""
 opt_prefix="feature"
 opt_title=""
+opt_repo=""
 dry=""
 mcp_checked=""
 # 打ち直しの案内に使う。引数ごとに ' で包み（中の ' は '\''）、そのまま打てば同じ引数になるようにする。
@@ -110,12 +114,13 @@ while [ "$#" -gt 0 ]; do
 		number="$2"
 		shift 2
 		;;
-	--slug | --prefix | --title)
+	--slug | --prefix | --title | --repo)
 		[ "$#" -ge 2 ] || fail no-value "$1 の後ろに値を渡してください。" 2
 		case "$1" in
 		--slug) opt_slug="$2" ;;
 		--prefix) opt_prefix="$2" ;;
 		--title) opt_title="$2" ;;
+		--repo) opt_repo="$2" ;;
 		esac
 		shift 2
 		;;
@@ -158,6 +163,10 @@ if [ "$what" = mr ] && { [ -n "$opt_slug" ] || [ -n "$opt_title" ]; }; then
 	fail mr-with-new "--mr には --slug と --title を付けられません（既存の MR の元ブランチで続けるだけです）。" 2
 fi
 
+if [ -n "$opt_repo" ]; then
+	printf '%s' "$opt_repo" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || fail bad-repo "--repo は owner/repo の形で書いてください（${opt_repo}）。" 2
+fi
+
 command -v jq >/dev/null 2>&1 || fail no-jq "jqが見つかりません。候補の JSON を解析できません。" 2
 
 root=$(ccnavi_workspace) ||
@@ -167,6 +176,37 @@ here="$(pwd -W 2>/dev/null || pwd)"
 top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -n "$top" ] ||
 	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
+# ---- 依頼のリポジトリと、実行した場所のリポジトリが違えば、ホストに問い合わせる前に止める。
+# origin のパスの最後の 2 段を、大文字小文字を区別せずに比べる（ccnavi_host_parse は使わない。ホストには接続しない）。
+repo_of_url() {
+	printf '%s' "$1" | sed -E -e 's#^[A-Za-z][A-Za-z0-9+.-]*://##' -e 's#^[^/@]*@##' -e 's#^[^/:]*[:/]##' -e 's#/+$##' -e 's#\.git$##' | tr -d '\r' | awk -F/ 'NF>=2{print $(NF-1) "/" $NF}'
+}
+fold_repo() {
+	printf '%s' "$1" | tr 'A-Z' 'a-z'
+}
+if [ -n "$opt_repo" ]; then
+	here_origin=$(git remote get-url origin 2>/dev/null || :)
+	here_repo=$(repo_of_url "$here_origin")
+	if [ -n "$here_repo" ] && [ "$(fold_repo "$here_repo")" != "$(fold_repo "$opt_repo")" ]; then
+		found_dir=""
+		scripts_abs="$root/.ccnavi/scripts"
+		if [ "$(fold_repo "$(repo_of_url "$(git -C "$root" remote get-url origin 2>/dev/null || :)")")" = "$(fold_repo "$opt_repo")" ]; then
+			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。ワークスペースルートに移動して実行し直してください: cd $(ccnavi_sh_quote "$root") && sh $(ccnavi_sh_quote "$scripts_abs/ccnavi-start.sh") ${orig_args}" 1
+		fi
+		for cand in "$root"/projects/*/; do
+			[ -e "${cand}.git" ] || continue
+			cand_repo=$(repo_of_url "$(git -C "$cand" remote get-url origin 2>/dev/null || :)")
+			if [ -n "$cand_repo" ] && [ "$(fold_repo "$cand_repo")" = "$(fold_repo "$opt_repo")" ]; then
+				found_dir="projects/$(basename "$cand")"
+				break
+			fi
+		done
+		if [ -n "$found_dir" ]; then
+			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${found_dir}/ に移動して実行し直してください: cd $(ccnavi_sh_quote "$root/$found_dir") && sh $(ccnavi_sh_quote "$scripts_abs/ccnavi-start.sh") ${orig_args}" 1
+		fi
+		fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。${opt_repo} を origin に持つプロジェクトは projects/ に見つかりません（まだ clone していないなど）。ユーザに伝えて止まってください。" 1
+	fi
+fi
 state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 scripts="$root/.ccnavi/scripts"
