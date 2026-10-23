@@ -282,3 +282,56 @@ error で、足すのも外すのも自由。同じ定義を固定した番号�
 `phases:` があれば、全部が「使われていない定義」として warn になる。子（`parent:` を持つ）に `phases:` があれば error
 （子の `phase:` と名前が似ていて取り違えやすい）。どちらの誤りもチケットを読む段では落とさず、判定の `blocked` の
 理由にする（読む段で落とすと承認済みチケットが索引に入らず、判定がその親を知らないまま範囲を当てなくなる）。
+
+
+### 見本（フェーズ定義と親の計画）
+
+version: 1
+phases:
+  research:
+    kind: work            # work は全体計画に、feedback はフィードバック計画にだけ置ける
+    title: 調査           # id と title はどちらも一意
+    review: none          # none | mr。既定であって上限ではない
+    scope: ["wip/research/*"]          # 子の範囲の上限（20 件まで）。省略か inherit なら親の範囲
+    deliverables: ["wip/research/summary.md"]   # 閉じる前に在って追跡されているべきもの（20 件まで）
+    agent: explorer       # .claude/agents/<名前>.md。案内。判定には使わない
+    when: 既存の振る舞いが分からないとき          # 案内。判定には使わない
+  implement:
+    kind: work
+    title: 実装とテスト
+    review: mr
+    scope: ["src/*", "tests/*"]
+    when: 振る舞いを変えるとき。受入テスト作成を先に置く
+  acceptance:
+    kind: work
+    title: 受入テスト作成
+    review: mr
+    scope: ["tests/*"]
+  implement-feedback:
+    kind: feedback
+    title: 実装フィードバック対応
+    review: mr                         # feedback に none は書けない
+    scope: inherit
+    when: フィードバック計画の最後に置き、ほかの対応を受ける
+```
+
+フェーズ定義は順序を持たない。順序は親の計画の項の `after` が決める。
+
+```yaml
+# 親チケット
+ticket: i0001
+issue: 1
+phases:                                # 計画が使う定義の写し。ccnavi --plan-order i0001 --fill-phases で差し込む
+  research: {kind: work, title: 調査, review: none, scope: ["wip/research/*"], deliverables: ["wip/research/summary.md"]}
+  acceptance: {kind: work, title: 受入テスト作成, review: mr, scope: ["tests/*"]}
+  implement: {kind: work, title: 実装とテスト, review: mr, scope: ["src/*", "tests/*"]}
+plan:                                  # 全体計画。user agree が通ることが合意
+  - research                           # 1。何も待たない
+  - {type: acceptance, after: [1], review: defer}   # 2。レビューを後ろと一緒に見る（延期。省略ではない）
+  - {type: implement, after: [1, 2]}   # 3。終端（ほかの全部を待つ）
+feedback:                              # フィードバック計画。レビューのあと改版で足す。空でも出す
+  - implement-feedback                 # 4。after はフィードバック計画の番号だけを指せる
+```
+
+子は `phase: N`。N 番目のフェーズ定義は親の計画で決まる。番号は全体計画が 1 から、フィードバック計画がその続き。
+
