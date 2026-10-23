@@ -136,7 +136,7 @@ function cutOff(what: string, ms: number): string {
 }
 
 const NOT_FOUND =
-  "ccnavi の実行ファイルが見つかりません（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、src/ccnavi/__main__.py のどれもありません）。設定 ccnaviBoard.binPath で指定できます";
+  "ccnavi の実行ファイルが見つかりません（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、src/ccnavi/__main__.py、PATH の ccnavi のどれもありません）。設定 ccnaviBoard.binPath で指定できます";
 
 /** 見るのはルールだけ。チケット制御と state の置き場は外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
@@ -156,6 +156,14 @@ export function findLauncher(root: string, setting: string): Launcher | undefine
     },
     join: path.join,
     isAbsolute: path.isAbsolute,
+    pathDirs: (process.env.PATH ?? "").split(path.delimiter),
+    sameFile: (a, b) => {
+      try {
+        return fs.realpathSync(a) === fs.realpathSync(b);
+      } catch {
+        return false;
+      }
+    },
   });
 }
 

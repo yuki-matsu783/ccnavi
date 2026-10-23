@@ -6,9 +6,11 @@
  *   3. `dist/ccnavi/ccnavi`
  *   4. `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh。scripts/ccnavi-setup.sh が配る）
  *   5. ソースがあれば `uv run python -m ccnavi`
+ *   6. PATH の `ccnavi`（`ccnavi.exe`）
  *
- * 振り分けの sh は、bin/ に合うものが無いと PATH の ccnavi を起動するが、拡張は PATH を見ない
- * （bin/ が無く PATH にだけある機械では、hook は動き、拡張は見つけられない）。
+ * 振り分けの sh は、bin/ に合うものが無いと PATH の ccnavi を起動する。拡張も同じ規則で、最後に PATH を見る
+ * （ソースが先なのは、保護済み sh の ccnavi_bin と同じ）。見るのは絶対パスの項目だけ。振り分けの sh と
+ * 同じファイル（`ccnavi` という名前で張ったリンク）は飛ばす。
  *
  * どれも相対ならワークスペースルートからの相対。Windows の `.exe` はパスに付いていなくても試す。
  *
@@ -34,6 +36,10 @@ export interface LocateInput {
   /** パスの結合。テストでは "/" 結合を渡し、拡張では path.join を渡す */
   readonly join: (...parts: string[]) => string;
   readonly isAbsolute: (filePath: string) => boolean;
+  /** PATH の項目（区切りで分けたもの）。省くと PATH は見ない。絶対パスでない項目は飛ばす */
+  readonly pathDirs?: readonly string[];
+  /** 同じファイルか（リンクを解いて比べる）。省くと比べない。PATH のリンクが振り分けの sh を指すのを飛ばす */
+  readonly sameFile?: (a: string, b: string) => boolean;
 }
 
 export const DEFAULT_BINS = [
@@ -112,6 +118,27 @@ export function locate(input: LocateInput): Launcher | undefined {
   }
   if (input.exists(input.join(input.root, SOURCE_MARKER))) {
     return { kind: "uv", root: input.root };
+  }
+  return onPath(input);
+}
+
+/** PATH の ccnavi。振り分けの sh（ccnavi_launcher_path）と同じ規則 */
+function onPath(input: LocateInput): Launcher | undefined {
+  const launcher = input.join(input.root, DEFAULT_BINS[1]);
+  for (const dir of input.pathDirs ?? []) {
+    if (dir === "" || !input.isAbsolute(dir)) {
+      continue;
+    }
+    for (const name of EXECUTABLE_NAMES) {
+      const filePath = input.join(dir, name);
+      if (!input.exists(filePath)) {
+        continue;
+      }
+      if (input.sameFile?.(filePath, launcher) === true) {
+        continue;
+      }
+      return { kind: "exe", path: filePath };
+    }
   }
   return undefined;
 }
