@@ -89,7 +89,7 @@ keywords: [フェーズ, グラフ, DAG, requires, overlap, 置き場所, id]
 - `test/helpers/dom.ts` に大きさの偽物（`measure`）を足した。happy-dom の `ResizeObserver` は
   `observe()` が何もしないので、**細工をしないと React Flow は点を隠したまま線を 1 本も描かず、
   テストは空の絵のまま通る**。偽るのは大きさだけで、置き場所は偽らない（線の経路は単体では見られない。
-  拡張の README の手動確認に回す）
+  拡張の手動確認（`extensions/vscode/ccnavi-board/docs/design/manual-checks.md`）に回す）
 - **ドラッグのためだけに jsdom を足した**（`test/helpers/jsdom.ts`、CB-D80）。happy-dom では
   d3-drag の待ちが終わらず、DOM のテストが**固まる**（実測。90 秒で打ち切り）。jsdom なら同じ操作が
   通る。この切り替えは `dom.ts` に元から書いてあった方針で、使うのはこの 1 本だけ。jsdom に無い
