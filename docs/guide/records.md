@@ -28,7 +28,7 @@ ccnaviは判定した呼び出しを記録し、その記録から次のルー�
 | `decision` | `allow` `ask` `deny` `handover` `skip`（Stopで促した回は`nudge`）。`handover`は権限モードに委ねた回 |
 | `enforced` | 実際に適用したか。`dry-run`は、一般の保護では`false`、関門と補助の保護で止めた回は`true` |
 | `code` | 判定の根拠の種別。一覧は [設計 付録A](../design/appendix.md)。よく出るのは`DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は`POST_VIOLATION`などで、複数の件が当たった回は強いほう 1 つ |
-| `reason` | `skip`の行だけ。判定まで進まなかった理由（`mode-disabled`、`no-turn-baseline`、`internal-error`など 10 種。一覧は [設計 付録B](../design/appendix.md#付録-b-記録の-1-行)） |
+| `reason` | 主に`skip`の行。判定まで進まなかった理由（`mode-disabled`、`no-turn-baseline`、`internal-error`など 11 種。一覧は [設計 付録B](../design/appendix.md#付録-b-記録の-1-行)）。Stopの判定役まわりでは`allow`・`deny`の行にも付く（`stop-review-judge`、`stop-review-worker`） |
 | `rules` | 当たったルールの名前（ルールファイル由来は`<相対パス>:<id>`、組み込みはid）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review`など。判定ごとに分かれる） |
 | `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前 |
 

@@ -20,7 +20,7 @@ keywords: [導入, dry-run, enable, ccnavi-setup.sh, 配布, 実行ファイル,
 無くても git の資格情報と `GITLAB_TOKEN` で足りる。
 
 ソースから使うときは `--build` を付けて実行ファイルを組み立てる（`--build --check` で副作用を見てから）。
-更新は `--force` で行い、バックアップは入れる先の外に取られる。手順は
+更新は `--force` で行い、バックアップは入れる先の外に取られる。更新したときの変更点は [release-notes](../release-notes.md)。手順は
 [`.claude/skills/ccnavi-install/`](../../.claude/skills/ccnavi-install/SKILL.md) と、展開した zip の `INSTALL.md`。
 下の 1 以降は、入ったあとの進め方を説明する。
 

@@ -37,5 +37,3 @@ keywords: [フェーズ, フェーズ定義, phases.yml, 育つ, 全体像, plan
 | 読むとき | 開くファイル |
 |---|---|
 | 計画ごと使い回したい | `.ccnavi/docs/templates.md` |
-
-定義の欄・フェーズ管理の全体・共通と config の足し算の設計は、ccnavi のリポジトリの `docs/design/tickets/phases.md` と `docs/design/tickets/phase-management.md`。

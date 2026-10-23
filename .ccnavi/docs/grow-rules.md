@@ -37,5 +37,6 @@ keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, te
 
 | 読むとき | 開くファイル |
 |---|---|
-| 書式・記法の細部 | `.claude/skills/ccnavi-config/references/add.md`（設計は ccnavi のリポジトリの `docs/design/rules.md`） |
+| 書式・記法の細部 | `.claude/skills/ccnavi-config/references/add.md` |
 | 確かめ方 | `.claude/skills/ccnavi-config/references/check.md` |
+| 共通レイヤーの配り方 | `.ccnavi/docs/grow-phases.md`（「配る」の行） |

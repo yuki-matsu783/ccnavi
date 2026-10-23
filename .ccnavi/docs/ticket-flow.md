@@ -131,4 +131,6 @@ sequenceDiagram
 
 ## 更新したときの変更点
 
-ccnavi を更新したときの変更点は、ccnavi のリポジトリの `docs/release-notes.md`。
+- 旧い子（`finished_to` が無い。更新より前に閉じた子）は、`review/` から `done/` へ手で動かしても確定できない。`ccnavi-review.sh confirm` か `decide` を使う
+- 未完了の操作記録（`logs/state/ops/`）は、prune で消えない。`ccnavi-ticket.sh status` で見つけて、上の送信の段落のとおりに続ける
+- `dry-run` でも、チケットの操作（状態の操作）と、承認済みの置き場・操作記録への書き込みは止まる。一般のルールの `deny`・`ask` だけは止まらず、報告になる

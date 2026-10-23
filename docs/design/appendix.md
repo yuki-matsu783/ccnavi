@@ -50,7 +50,9 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 記録の `skip` の理由: `mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、
 `payload-unusable`、`deadline-exceeded`、`internal-error`（ccnavi 自身の例外。4.5）、`tool-cannot-write`、
 `worktree-unreadable`（実行後チェックと、`SubagentStop` で子のワークツリーを読めず範囲を確かめられなかった回。9.12）、
-`no-turn-baseline`。
+`no-turn-baseline`、`stop-review-judge`（Stop の AI 判定役の呼び出し。ほかの hook の副作用を動かさず飛ばした回）の 11 種。
+`reason` は `skip` の行だけに付くとは限らない。`stop-review-judge` は、判定役の呼び出しを許した行（`allow`）と、
+決まった形でないので止めた行（`deny`）にも付き、`stop-review-worker`（作業側が判定役の入口を使おうとして止めた回）は `deny` の行にだけ付く。
 
 組み込みの判定で止めた文は、先頭の行に理由コードと記録の `rules` と同じ識別子を
 `[ccnavi] <コード> (組み込みのルール: <識別子>)` の形で並べる（`builtin:script-env` など）。
@@ -100,7 +102,7 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | `enforced` | 実際に適用したか。`dry-run` は、一般の保護では `false`、関門と補助の保護で止めた回は `true` |
 | `code` | 判定の根拠の種別。一覧は付録 A。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は `POST_VIOLATION` などで、件が混ざった回は強いほう 1 つ |
 | `rules` | 当たったルールの名前（ルールファイル由来は `<相対パス>:<id>`、組み込みは id）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
-| `reason` | `skip` の理由（上の一覧）。`worktree-unreadable` は `detail` に理由 |
+| `reason` | `skip` の理由（上の一覧）。`stop-review-judge` は `allow`・`deny` の行にも、`stop-review-worker` は `deny` の行に付く。`worktree-unreadable` は `detail` に理由 |
 | `hinted` | この呼び出しで `additionalContextOnce` の案内を渡した回だけ `true`。渡した後の呼び出しと、毎回渡す案内だけの呼び出しには出ない（案内がどの呼び出しに付いたかは hook の応答から分からないので残す） |
 | `guarded` | ccnavi 自身の設定ファイルについて、その回に起きたことの配列。要素は `<対象>:<動き>`。動きは `saved`（バックアップを取った）・`restored`（バックアップから戻した）・`restored-from-git`（git から戻した）・`would-restore`（予行で言うだけ）・`rebased`（大きい対象が変わったので基準を取り直した）・`accepted`（ユーザの発言で消えたことを受け入れた）・`left-as-repair`（読めないルールファイルへの修復なので戻さなかった）・`missing`・`failed`。変わっていない回は残さない |
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
