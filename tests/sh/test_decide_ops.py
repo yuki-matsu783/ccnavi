@@ -244,7 +244,7 @@ class DecideOpsShTest(unittest.TestCase):
         }
         full.update(
             CCNAVI_WORKSPACE=self.ws,
-            CCNAVI_BIN_PATH=self.stub,
+            CCNAVI_ENTRY_PATH=self.stub,
             GITLAB_TOKEN=base.TOKEN,
             STUB_LOG=self.log,
             STUB_PLAN="",

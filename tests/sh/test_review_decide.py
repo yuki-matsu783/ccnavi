@@ -308,7 +308,7 @@ class ReviewDecideShTest(unittest.TestCase):
                 put_tool(found, os.path.join(tools, name))
         env.update(
             CCNAVI_WORKSPACE=self.ws,
-            CCNAVI_BIN_PATH=self.stub,
+            CCNAVI_ENTRY_PATH=self.stub,
             GITLAB_TOKEN=TOKEN,
             STUB_LOG=self.log,
             STUB_PLAN="",

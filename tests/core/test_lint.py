@@ -639,7 +639,7 @@ class LintTest(unittest.TestCase):
                 {
                     "hooks": {
                         "PostToolUse": [
-                            {"hooks": [{"command": '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'}]}
+                            {"hooks": [{"command": '"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}"'}]}
                         ]
                     }
                 }
@@ -670,7 +670,7 @@ class LintTest(unittest.TestCase):
         spelled = ".ccnavi/scripts/ccnavi-launcher.sh"
         launcher = write(self.root, os.path.join(".ccnavi", "scripts", "ccnavi-launcher.sh"), "")
         rules_path = rules_file(self.root, SOUND)
-        self.project_env(CCNAVI_BIN_PATH=spelled)
+        self.project_env(CCNAVI_ENTRY_PATH=spelled)
 
         os.chmod(launcher, 0o755)
         runnable = lint(self.root, rules_path)

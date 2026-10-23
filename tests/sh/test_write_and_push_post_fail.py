@@ -98,7 +98,7 @@ class PostFailureTest(WriteAndPushHostHarness):
         cases = {
             "request": (self.request_args(), {}),
             "comment": (("comment", "--body-file", comment_body), {}),
-            "ready": (("ready",), {"CCNAVI_BIN_PATH": self.ready_exe()}),
+            "ready": (("ready",), {"CCNAVI_ENTRY_PATH": self.ready_exe()}),
         }
         for name, bad in BAD_POSTS:
             for kind, (args, extra) in cases.items():
@@ -148,7 +148,7 @@ class PostFailureTest(WriteAndPushHostHarness):
             with self.subTest(post=name), mock.patch.object(Host, "do_POST", bad):
                 Host.notes = []
                 done = self.review(
-                    "comment", "--body-file", comment_body, **{"CCNAVI_BIN_PATH": no_begin}
+                    "comment", "--body-file", comment_body, **{"CCNAVI_ENTRY_PATH": no_begin}
                 )
                 self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
                 self.assertNotIn("OK: 記録した", done.stdout)

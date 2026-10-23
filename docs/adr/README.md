@@ -89,7 +89,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0007](0007-mode-names.md) | モードの名前を `enable` / `dry-run` / `disable` にする |
 | [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する（置き換え（ADR-0044）） |
 | [0042](0042-ccnavi-home.md) | 共通レイヤーの設定は `.ccnavi/config/common/` に、記録と state は `logs/` に置く |
-| [0044](0044-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する |
+| [0044](0044-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する（追記: `bin/` に無いときだけ PATH の `ccnavi` を使う） |
 | [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの state をセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
 | [0092](0092-rename-decision-records.md) | 判定の記録のファイル名を `logs/decisions.jsonl` にする |
 | [0099](0099-subpackages-by-role-and-agree.md) | `ccnavi/` を役割ごとの 6 つのサブパッケージに分け、置き場（approval）と合意の手続き（agree）を分けて循環を無くし、承認の CLI を `--agree` に改名する（判定のコアと write-and-push の見分けの置き場は ADR-0117 が改める） |

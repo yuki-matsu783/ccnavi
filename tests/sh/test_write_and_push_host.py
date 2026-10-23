@@ -57,13 +57,13 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
         )
-        confirmed = self.review("confirm", "--phase", "1", CCNAVI_BIN_PATH=logger)
+        confirmed = self.review("confirm", "--phase", "1", CCNAVI_ENTRY_PATH=logger)
         self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
         # done/ へ動いた子のワークツリーの片付けを、送った後に実行ファイルへ頼む
         with open(log, encoding="utf-8") as f:
             self.assertIn(f"worktree tidy {PARENT} --phase 1", f.read())
-        ready = self.review("ready", CCNAVI_BIN_PATH=logger)
+        ready = self.review("ready", CCNAVI_ENTRY_PATH=logger)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/ready.json")
         # 最後に親のワークツリーを消そうとするが、cwd が中にあるので消さず、外から打つ 1 本を出す
@@ -104,7 +104,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
         )
-        ready = self.review("ready", CCNAVI_BIN_PATH=mover)
+        ready = self.review("ready", CCNAVI_ENTRY_PATH=mover)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("Draft を解除した", ready.stdout)
         self.carried(old)
@@ -122,7 +122,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             cwd=self.ws,
             PATH=self.path,
             GITLAB_TOKEN="t0k",
-            CCNAVI_BIN_PATH=self.half,
+            CCNAVI_ENTRY_PATH=self.half,
             HALF_TREE=self.tree,
         )
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
@@ -152,7 +152,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             cwd=self.ws,
             PATH=self.path,
             GITLAB_TOKEN="t0k",
-            CCNAVI_BIN_PATH=self.half,
+            CCNAVI_ENTRY_PATH=self.half,
             HALF_TREE=self.tree,
         )
         self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
@@ -171,7 +171,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         git(self.tree, "commit", "-q", "-m", "no scripts here")
         git(self.tree, "push", "-q", "origin", PARENT)
         env = self.env(
-            PATH=self.path, GITLAB_TOKEN="t0k", CCNAVI_BIN_PATH=self.half, HALF_TREE=self.tree
+            PATH=self.path, GITLAB_TOKEN="t0k", CCNAVI_ENTRY_PATH=self.half, HALF_TREE=self.tree
         )
         ready = subprocess.run(
             [SHELL, ".ccnavi/scripts/ccnavi-review.sh", "ready", "--parent", PARENT],
@@ -206,7 +206,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
                     cwd=self.ws,
                     PATH=self.path,
                     GITLAB_TOKEN="t0k",
-                    CCNAVI_BIN_PATH=self.half,
+                    CCNAVI_ENTRY_PATH=self.half,
                     HALF_TREE=self.tree,
                 )
                 self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
@@ -239,7 +239,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
         )
-        ready = self.review("ready", CCNAVI_BIN_PATH=mover)
+        ready = self.review("ready", CCNAVI_ENTRY_PATH=mover)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("wip/ の追跡済みのファイルを削除しました（1 件", ready.stdout)
         self.assertIn(head[:12], ready.stdout)
@@ -287,7 +287,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             os.path.join(self.remote, "hooks", "pre-receive"),
             f"#!/bin/sh\n[ -e '{once}' ] && exit 0\n: >'{once}'\necho refused >&2\nexit 1\n",
         )
-        ready = self.review("ready", CCNAVI_BIN_PATH=self.bin)
+        ready = self.review("ready", CCNAVI_ENTRY_PATH=self.bin)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertTrue(os.path.exists(once))
         self.assertIn("push が通らなかった", ready.stderr)
@@ -348,7 +348,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
         )
-        done = self.review("1", script="ccnavi-user-decide.sh", CCNAVI_BIN_PATH=chooser)
+        done = self.review("1", script="ccnavi-user-decide.sh", CCNAVI_ENTRY_PATH=chooser)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("行き先を置いて送った", done.stdout)
         self.assertNotIn("LOCKED-WHILE-CHOOSING", done.stderr)
@@ -395,7 +395,7 @@ class WriteAndPushReviewTest(WriteAndPushHarness):
             cwd=self.tree,
             PATH=self.path,
             GITLAB_TOKEN="t0k",
-            CCNAVI_BIN_PATH=self.half,
+            CCNAVI_ENTRY_PATH=self.half,
         )
 
     def test_decide_is_carried_and_the_answer_stays_json(self):

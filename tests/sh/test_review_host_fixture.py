@@ -168,7 +168,7 @@ class HostFixtureTest(unittest.TestCase):
                 "PATH": os.pathsep.join([self.bin, os.environ.get("PATH", "")]),
                 "FAKE_GITHUB_SCENE": scene,
                 "FAKE_GITHUB_STATE": os.path.join(self._tmp.name, "comments.json"),
-                "CCNAVI_BIN_PATH": self.exe,
+                "CCNAVI_ENTRY_PATH": self.exe,
                 **extra,
             }
         )
@@ -492,7 +492,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 "GITLAB_TOKEN": "glpat-t0k",
                 "PATH": os.pathsep.join([self.bin, os.environ.get("PATH", "")]),
                 "FAKE_GITLAB_SCENE": scene,
-                "CCNAVI_BIN_PATH": self.exe,
+                "CCNAVI_ENTRY_PATH": self.exe,
                 **extra,
             }
         )
@@ -632,7 +632,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         stub = self.request_stub(out)
         html = self.eli5()
         state = os.path.join(self._tmp.name, "notes.json")
-        extra = {"CCNAVI_BIN_PATH": stub, "FAKE_GITLAB_STATE": state}
+        extra = {"CCNAVI_ENTRY_PATH": stub, "FAKE_GITLAB_STATE": state}
         for _ in range(2):
             done = self.review(
                 "resolved", "request", "--phase", "1", "--body-file", "x", "--eli5", html, **extra
@@ -674,7 +674,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         done = self.review(
             "resolved",
             *("request", "--phase", "1", "--body-file", "x", "--eli5", html),
-            CCNAVI_BIN_PATH=stub,
+            CCNAVI_ENTRY_PATH=stub,
             PATH=path,
             FAKE_GITLAB_STATE=os.path.join(self._tmp.name, "notes.json"),
             cwd=cwd,
@@ -759,7 +759,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)
         state = os.path.join(self._tmp.name, "notes.json")
-        extra = {"CCNAVI_BIN_PATH": stub, "FAKE_GITLAB_STATE": state}
+        extra = {"CCNAVI_ENTRY_PATH": stub, "FAKE_GITLAB_STATE": state}
         blank = self.eli5("wip/eli5/blank.html", " \n\t\n")
         notes = self.eli5("wip/eli5/eli5.md", "# やさしい説明\n")
         docs = self.eli5("docs/eli5.html")
@@ -864,7 +864,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             "--body-file",
             "x",
             f"--eli5={ELI5}",
-            CCNAVI_BIN_PATH=stub,
+            CCNAVI_ENTRY_PATH=stub,
             FAKE_GITLAB_STATE=state,
         )
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
@@ -910,7 +910,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             "--body-file",
             "x",
             f"--eli5={ELI5}",
-            CCNAVI_BIN_PATH=stub,
+            CCNAVI_ENTRY_PATH=stub,
             FAKE_GITLAB_STATE=state,
         )
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)

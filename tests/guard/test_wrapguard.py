@@ -52,13 +52,13 @@ class EnvTest(unittest.TestCase):
         for command in (
             "CCNAVI_TICKETS_APPROVED=/x sh .ccnavi/scripts/ccnavi-git.sh push",
             "env CCNAVI_PROJECTS=/x sh .ccnavi/scripts/ccnavi-git.sh push",
-            "env -u CCNAVI_BIN_PATH sh .ccnavi/scripts/ccnavi-ticket.sh finish a",
+            "env -u CCNAVI_ENTRY_PATH sh .ccnavi/scripts/ccnavi-ticket.sh finish a",
             "export CCNAVI_WORKSPACE=/x; sh .ccnavi/scripts/ccnavi-git.sh push",
             "CCNAVI_STATE=/x; sh .ccnavi/scripts/ccnavi-review.sh confirm",
             "unset CCNAVI_TICKETS_PROPOSAL && sh .ccnavi/scripts/ccnavi-git.sh push",
             "sudo env CLAUDE_PROJECT_DIR=/x bash .ccnavi/scripts/ccnavi-review.sh confirm",
             "CCNAVI_NEW_THING=1 ../../../.ccnavi/scripts/ccnavi-git.sh status",
-            "cd a && CCNAVI_BIN_PATH=f sh ../.ccnavi/scripts/ccnavi-user-agree.sh",
+            "cd a && CCNAVI_ENTRY_PATH=f sh ../.ccnavi/scripts/ccnavi-user-agree.sh",
             # 関数の定義の本体。頭（`f()`・`function f`）を名前と読み違えると見落とす。
             "f() { CCNAVI_TICKETS_APPROVED=/x sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
             "f(){ CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
@@ -88,8 +88,8 @@ class EnvTest(unittest.TestCase):
             # 作者の名前と出力の形だけを変える git の変数は置ける。
             "GIT_AUTHOR_NAME=a GIT_PAGER=cat sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
             # 保護済みの sh を呼ばないなら、ここの話ではない。
-            "CCNAVI_BIN_PATH=x uv run python -m ccnavi --lint",
-            "echo CCNAVI_BIN_PATH=x && sh .ccnavi/scripts/ccnavi-git.sh status",
+            "CCNAVI_ENTRY_PATH=x uv run python -m ccnavi --lint",
+            "echo CCNAVI_ENTRY_PATH=x && sh .ccnavi/scripts/ccnavi-git.sh status",
             # 読み切れない形はここでは見ない。allow が当たらずに確認になる。
             "sh -c 'CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push'",
         ):

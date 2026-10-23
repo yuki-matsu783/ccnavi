@@ -50,7 +50,7 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     承認済みチケットと state は外し、記録も残さない。組み込みの selfguard（設定ファイルの保護）は
     既定のまま有効にする。4 の表はそれを含めた判定なので。
 
-    `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルのパスから
+    `bin_path` を渡すと `CCNAVI_ENTRY_PATH` に置く。承認のルールは実行ファイルのパスから
     当てる形を作るので、振り分けの sh を指したときの判定はこれで見る。
     """
     environment = {
@@ -59,7 +59,7 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     }
     environment.pop("CLAUDE_PROJECT_DIR", None)
     if bin_path:
-        environment["CCNAVI_BIN_PATH"] = bin_path
+        environment["CCNAVI_ENTRY_PATH"] = bin_path
     done = run_ccnavi(
         [
             "--root",
@@ -293,7 +293,7 @@ class RepoRulesTest(unittest.TestCase):
 
 
 class LauncherJudgeTest(unittest.TestCase):
-    """`CCNAVI_BIN_PATH` が振り分けの sh を指すときの判定。"""
+    """`CCNAVI_ENTRY_PATH` が振り分けの sh を指すときの判定。"""
 
     def judge(self, subject: str) -> dict:
         body = judge("Bash", subject, bin_path=LAUNCHER)

@@ -27,7 +27,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 
 全件は `uv run python -m tests`（同時実行）で回す。`discover -s tests` の 1 本は使わない。理由と手順は[テストを回す](../../../../docs/claude/testing.md)。時間の目安は並行セッションがあると数倍になる。
 
-実行ファイル（`.ccnavi/bin/`）が無い環境（Claude Code on the web、ビルド前）では、ランチャー経由の `--lint` と `ccnavi` コマンドが動かない。
+実行ファイル（`.ccnavi/bin/`、無ければ PATH の `ccnavi`）が無い環境（Claude Code on the web、ビルド前）では、ランチャー経由の `--lint` と `ccnavi` コマンドが動かない。
 `python main.py --lint` で代える（ランチャーが実行ファイルを探して失敗するため）。
 
 落ちたら新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。ターンの終わりの hook はこれを使わない。

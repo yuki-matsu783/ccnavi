@@ -114,7 +114,7 @@ class OrdinaryFailuresStaySilentTest(unittest.TestCase):
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
         }
-        env["CCNAVI_BIN_PATH"] = sys.executable
+        env["CCNAVI_ENTRY_PATH"] = sys.executable
         env["GITLAB_TOKEN"] = "x"
         env["GITHUB_TOKEN"] = "x"
         result = subprocess.run(

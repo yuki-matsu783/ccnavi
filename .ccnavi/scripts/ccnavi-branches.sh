@@ -103,7 +103,7 @@ if bin=$(ccnavi_bin "$root"); then
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
-	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
+	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 fi
 
 # ---- ホスト。読めなければ理由を書いて、手元の候補だけにする。

@@ -307,7 +307,7 @@ ask:
     subject: "/repo/.claude/worktrees/x/pyproject.toml"
     why: 実行時の依存が変わる。main の側は deny なのでワークツリーで見る
   - tool: Bash
-    subject: "jq -r '.hooks.PostToolUse[0].hooks[0].command, .env.CCNAVI_BIN_PATH' .claude/settings.json"
+    subject: "jq -r '.hooks.PostToolUse[0].hooks[0].command, .env.CCNAVI_ENTRY_PATH' .claude/settings.json"
     why: >-
       jq のフィールド参照 `.env` は認証情報のファイル名ではない。credentials に
       当てると、設定を読むだけの操作が「中身を読むな」と止まる。どのルールにも

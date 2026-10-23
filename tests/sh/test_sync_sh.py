@@ -221,8 +221,8 @@ class SyncHarness(unittest.TestCase):
         }
         # sh はチケットを読まず実行ファイルに聞く（親のワークツリーか、閉じたか）ので、
         # ソースの実行ファイルを既定で渡す。実行ファイルの無い形を見るテストは自分で上書きする。
-        if "CCNAVI_BIN_PATH" not in extra:
-            env["CCNAVI_BIN_PATH"] = self.source_exe()
+        if "CCNAVI_ENTRY_PATH" not in extra:
+            env["CCNAVI_ENTRY_PATH"] = self.source_exe()
         env.update(extra)
         return env
 
@@ -404,7 +404,7 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(1, done.stdout.count(f"{PARENT}: リモートと同じ"), done.stdout)
         # 実行ファイルが無ければ、親のワークツリーかを確かめられないので取り込まない。
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=os.path.join(self._tmp.name, "nowhere"))
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=os.path.join(self._tmp.name, "nowhere"))
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("実行ファイルに確かめられなかった", done.stdout)
 
@@ -412,7 +412,7 @@ class SyncTest(SyncHarness):
 
     def test_the_check_reports_an_error_and_a_later_run_clears_it(self):
         launcher = self.launcher()
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=launcher)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         # 元ツリーに未コミットで残った子チケット（親のワークツリーの外）。
         # 検査が error を言い、終了コードが 1 になる。状態は何も書かない。
@@ -420,7 +420,7 @@ class SyncTest(SyncHarness):
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=launcher)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("取り込みの後の検査で止める理由がある", done.stdout)
         self.assertIn("ワークツリーの外", done.stdout)
@@ -428,7 +428,7 @@ class SyncTest(SyncHarness):
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         # 理由を片付けて打ち直せば、検査し直して通る。
         os.remove(stray)
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=launcher)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertNotIn("検査で止める", done.stdout)
 
@@ -446,7 +446,7 @@ class SyncTest(SyncHarness):
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=old)
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=old)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("検査を実行できなかった", done.stdout)
 
@@ -461,7 +461,7 @@ class SyncTest(SyncHarness):
             f'exec "{self.launcher()}" "$@"\n',
         )
         os.chmod(fake, 0o755)
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=fake)
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=fake)
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("注意: 層がずれている", done.stdout)
         self.assertIn("- 正とする側が合わない", done.stdout)
@@ -474,7 +474,7 @@ class SyncTest(SyncHarness):
             f'exec "{self.launcher()}" "$@"\n',
         )
         os.chmod(warn_only, 0o755)
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=warn_only)
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=warn_only)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("注意: 層がずれている", done.stdout)
 
@@ -495,7 +495,7 @@ class SyncTest(SyncHarness):
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=holder, CCNAVI_LOCK_WAIT="0")
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=holder, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertNotIn("まだ止まっていない", done.stdout)
 
@@ -507,7 +507,7 @@ class SyncTest(SyncHarness):
         )
         self.review_says("none")
         self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=self.launcher())
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=self.launcher())
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("戻し方 1", done.stdout)
         self.assertNotIn("検査", done.stdout)
@@ -963,7 +963,7 @@ class SyncTest(SyncHarness):
     def test_a_failing_executable_stops_instead_of_using_the_default(self):
         # 実行ファイルが在るのに答えなければ、統合先を何も言わずに既定に戻さない。
         launcher = self.launcher("#!/bin/sh\necho broken >&2\nexit 1\n")
-        done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=launcher)
         self.assertEqual(2, done.returncode, done.stdout + done.stderr)
         self.assertIn("返さなかった", done.stderr)
 
@@ -987,7 +987,7 @@ class SyncTest(SyncHarness):
             '#!/bin/sh\nif [ "$3" = sync ] && [ "$4" = paths ]; then exit 0; fi\n'
             f'PYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n'
         )
-        done = self.sync(CCNAVI_BIN_PATH=self.launcher(body))
+        done = self.sync(CCNAVI_ENTRY_PATH=self.launcher(body))
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(head, self.sha(self.tree, "HEAD"))
         self.assertIn("i0002: リモートと同じ", done.stdout)

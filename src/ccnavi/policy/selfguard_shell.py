@@ -411,7 +411,8 @@ def _home_name(project_home: str) -> str:
 def binary_clause(bin_path: str, *, copy: bool = False) -> str:
     """実行ファイルのパスを、当てる形に直す。
 
-    末尾の 2 要素だけを使う。絶対で書かれても相対で書かれても同じ形に当たり、
+    末尾の 2 要素だけを使う（PATH の実体だけは 3 要素。`bin/ccnavi` では別の道具に当たりすぎる）。
+    絶対で書かれても相対で書かれても同じ形に当たり、
     ファイル名だけに絞ると、同じ名前の無関係なファイルまで拾う。
     区切りはどちらの表記にも当てる。ルールは 1 回書いてどの機械でも同じ意味で
     なければならない、という globmatch と同じ約束をここでも守る。
@@ -445,17 +446,46 @@ def binary_clause(bin_path: str, *, copy: bool = False) -> str:
     if parts[-1] == platformtag.LAUNCHER_NAME:
         sh = r"[\\/]".join(re.escape(p) for p in parts[-2:])
         home = re.escape(parts[-3]) + r"[\\/]" if len(parts) >= 3 else ""
+        # PATH の ccnavi（bin/ に実体が無いとき sh が起動するもの）。末尾 3 要素で当てる。
+        # 2 要素（`bin/ccnavi`）だと別のプロジェクトの `./bin/ccnavi` にまで当たる。
+        spellings = _path_spellings(bin_path)
+        on_path = "".join(f"|{p}" for p in spellings)
+        on_path_copy = "".join(f"|{p}{_COPY_TAIL}" for p in spellings)
+        built = rf"{home}bin[\\/]{_BUILD_DIR}"
         if copy:
-            return rf"{_IN_WORD}(?:{sh}{_COPY_TAIL}|{home}bin[\\/]{_BUILD_DIR}{_COPY_END})"
-        return rf"(?:{sh}|{home}bin[\\/]{_BUILD_DIR}(?:[\\/][^\x00]*)?)"
+            return rf"{_IN_WORD}(?:{sh}{_COPY_TAIL}|{built}{_COPY_END}{on_path_copy})"
+        return rf"(?:{sh}|{built}(?:[\\/][^\x00]*)?{on_path})"
     plain = r"[\\/]".join(re.escape(p) for p in parts[-2:])
     return _IN_WORD + plain + _COPY_TAIL if copy else plain
+
+
+def _path_spellings(launcher: str = "") -> list[str]:
+    """PATH の ccnavi を当てる形（末尾 3 要素）。書かれたパスと、リンクを解いた先の両方。
+
+    置き場のディレクトリ（`~/.local/bin` 全体）は守らない。無関係な道具を入れる操作まで止まる。
+    PATH に無ければ空。
+    """
+    exe = platformtag.path_executable(skip=launcher)
+    if not exe:
+        return []
+    found = []
+    for path in (exe, os.path.realpath(exe)):
+        every = [p for p in re.split(r"[\\/]", path) if p and p not in (".", "..")]
+        spelled = r"[\\/]".join(re.escape(p) for p in every[-3:])
+        if len(every) <= 3:
+            # 浅い実体（`/bin/ccnavi`）は、区切りで始まる形だけに当てる。
+            # 付けないと、別のプロジェクトの `./bin/ccnavi` にも当たる。
+            spelled = r"(?<![\w.~-])[\\/]" + spelled
+        if every and spelled not in found:
+            found.append(spelled)
+    return found
 
 
 def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
     """実行ファイルが入っているディレクトリと、その中の名前（holder_regex に渡す組）。
 
-    binary_clause と同じ末尾 2 要素で読む。`cp /tmp/ccnavi dist/` のように、行き先を
+    binary_clause と同じ末尾 2 要素で読む。PATH の実体のディレクトリは足さない（`~/.local/bin` 全体を
+    守ると、無関係な道具の導入まで止まる）。`cp /tmp/ccnavi dist/` のように、行き先を
     実行ファイルの入っているディレクトリにした形を止める。振り分けの sh なら、sh の入っている
     ディレクトリと、組み立ての置き場（`<親>/bin/` の下の `<os>-<arch>`、`<親>` の下の `bin`）。
     ディレクトリの表記が無い名前だけの表記（`ccnavi`）は、入っている場所が決まらないので足さない。

@@ -1,7 +1,7 @@
 """保護済み sh が起動する実行ファイルを探す順（.ccnavi/scripts/ccnavi-common.sh の ccnavi_bin）。
 
 ユーザが端末から `ccnavi-ticket.sh` などを打つ場面では settings.json の env が反映されず、
-CCNAVI_BIN_PATH は無いのが普通。配布先には `dist/` もソースも無く、実行ファイルは
+CCNAVI_ENTRY_PATH は無いのが普通。配布先には `dist/` もソースも無く、実行ファイルは
 `.ccnavi/bin/<os>-<arch>/` にしか無い。そこを見ないと、配布先では必ず
 「実行ファイルが見つかりません」で止まる。
 
@@ -43,7 +43,7 @@ class BinLookupTest(unittest.TestCase):
         self.target = platformtag.host_target()
 
     def run_ticket(self, **env):
-        full = {k: v for k, v in os.environ.items() if k != "CCNAVI_BIN_PATH"}
+        full = {k: v for k, v in os.environ.items() if k != "CCNAVI_ENTRY_PATH"}
         full.update(env)
         full.pop("CCNAVI_WORKSPACE", None)
         return subprocess.run(
@@ -76,7 +76,7 @@ class BinLookupTest(unittest.TestCase):
     def test_the_env_wins_when_it_is_set(self):
         self.put_machine_build()
         write(os.path.join(self.ws, "other", "ccnavi"), STUB.format(name="env"))
-        result = self.run_ticket(CCNAVI_BIN_PATH="other/ccnavi")
+        result = self.run_ticket(CCNAVI_ENTRY_PATH="other/ccnavi")
         self.assertTrue(result.stdout.startswith("env "), result.stdout + result.stderr)
 
     def test_nothing_to_run_says_where_it_looked(self):
@@ -84,6 +84,42 @@ class BinLookupTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("実行ファイルが見つかりません", result.stderr)
         self.assertIn(".ccnavi/bin/", result.stderr)
+
+    def put_path_build(self):
+        place = os.path.join(self.ws, "on-path")
+        write(os.path.join(place, "ccnavi"), STUB.format(name="path"))
+        return place
+
+    def test_a_workspace_without_bin_or_source_uses_the_ccnavi_on_path(self):
+        place = self.put_path_build()
+        result = self.run_ticket(PATH=place + os.pathsep + os.environ["PATH"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout.startswith("path "), result.stdout)
+
+    def test_the_machine_build_wins_over_the_ccnavi_on_path(self):
+        self.put_machine_build()
+        place = self.put_path_build()
+        result = self.run_ticket(PATH=place + os.pathsep + os.environ["PATH"])
+        self.assertTrue(result.stdout.startswith("bin "), result.stdout + result.stderr)
+
+    def test_a_link_to_the_launcher_on_path_is_not_a_build(self):
+        """ccnavi という名前で張った launcher へのリンクは、起動すると自分に戻る。無いものとして扱う。"""
+        place = os.path.join(self.ws, "on-path")
+        os.makedirs(place)
+        launcher = os.path.join(self.ws, ".ccnavi", "scripts", platformtag.LAUNCHER_NAME)
+        try:
+            os.symlink(launcher, os.path.join(place, "ccnavi"))
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+        result = self.run_ticket(PATH=place + os.pathsep + os.environ["PATH"])
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("実行ファイルが見つかりません", result.stderr)
+
+    def test_a_relative_path_entry_is_not_used(self):
+        self.put_path_build()
+        result = self.run_ticket(PATH="on-path" + os.pathsep + os.environ["PATH"])
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("実行ファイルが見つかりません", result.stderr)
 
 
 if __name__ == "__main__":

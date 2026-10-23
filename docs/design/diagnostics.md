@@ -99,7 +99,7 @@ hook の判定の経路（`load`）はこの重ねを使わず、プロセスに
 `--lint` の登録の検査は `.claude/settings.json` しか見ず、モードがどこから来たかを示す。`rules.yml` に
 error がある間は配点もフェーズ定義も保存できない。
 
-`--lint` は `.claude/settings.json` の env の `CCNAVI_BIN_PATH` も見る（`lint_project._bin_path`）。指す先が在るのに
+`--lint` は `.claude/settings.json` の env の `CCNAVI_ENTRY_PATH` も見る（`lint_project._bin_path`）。指す先が在るのに
 実行できなければ error（hook が起動しない）。POSIX でだけ見る（`os.access(X_OK)`）。パスは書いたとおりに見て、
 `.exe` を補わない。指す先が無いときは言わない（自己防衛が missing と言う）。
 

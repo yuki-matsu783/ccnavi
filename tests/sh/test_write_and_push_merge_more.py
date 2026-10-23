@@ -205,7 +205,7 @@ class WriteAndPushMergeMoreTest(WriteAndPushMergeHarness):
             "esac\n"
             f"exec '{self.bin}' \"$@\"\n",
         )
-        result = self.ticket("finish", CHILD, CCNAVI_BIN_PATH=wrap)
+        result = self.ticket("finish", CHILD, CCNAVI_ENTRY_PATH=wrap)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotEqual(self.sha(tree, "HEAD"), planned)
         review = self.read(os.path.join(self.tree, "wip", "proposals", "review", CHILD + ".md"))

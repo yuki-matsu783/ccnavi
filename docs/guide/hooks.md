@@ -111,11 +111,11 @@ undo: rm -- ".ccnavi/config/common/probe.json"
 | 共通レイヤーのファイル（`.ccnavi/config/common/{rules,phases,risks}.yml`） | 判定の中身そのもの |
 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml`（自身のレイヤーの 3 本） | 同上 |
 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml`（各プロジェクトのレイヤーの 3 本） | 同上 |
-| `CCNAVI_BIN_PATH`が指すファイル（既定の配置では振り分けのsh）と、この機械の実行ファイル | 判定器の実体 |
+| `CCNAVI_ENTRY_PATH`が指すファイル（既定の配置では振り分けのsh）と、この機械の実行ファイル | 判定器の実体 |
 
 - 設定ファイルは、ツール実行前と、ユーザの発言時にバックアップを取る。実行後に変わっていればバックアップから戻す（未コミットの編集は残る）
 - ユーザの発言（`UserPromptSubmit`）では、その時点の状態を基準に取り直す。ターンの間にユーザが直した・消したものは戻さない。`UserPromptSubmit`に登録しないと、この受け入れが働かず、消したものが次の呼び出しで戻る
-- 実行ファイルはセッション開始でバックアップする。`SessionStart`に登録しないと守られない。`CCNAVI_BIN_PATH`を指定しなければ対象に入らない
+- 実行ファイルはセッション開始でバックアップする。`SessionStart`に登録しないと守られない。`CCNAVI_ENTRY_PATH`を指定しなければ対象に入らない。`CCNAVI_ENTRY_PATH`が振り分けのshのときは、PATHにある`ccnavi`の実体も同じように守る
 - gitが追跡しているものは、ワークツリーが持つ同じファイルも対象に入る（統合すればそのまま反映されるため）。実行ファイルは除く
 - 無いファイルは対象から外れる。無かったところに現れた場合は報告するが、消さない
 - `.ccnavi/scripts/`のスクリプトはこの一式に入れない。組み込みの`deny`（`*/.ccnavi/*`）と`CCNAVI_RESTORE_IF_DENY`が受け持つ

@@ -95,7 +95,7 @@ class OriginSubcommandTest(unittest.TestCase):
         }
         env.update(extra_env or {})
         # `origin` は exe を呼ばない。在ることだけ見るので、確実に在る実行ファイルを指す。
-        env["CCNAVI_BIN_PATH"] = sys.executable
+        env["CCNAVI_ENTRY_PATH"] = sys.executable
         env["GITLAB_TOKEN"] = "x"
         env["GITHUB_TOKEN"] = "x"
         return subprocess.run(

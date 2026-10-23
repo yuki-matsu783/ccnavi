@@ -160,7 +160,7 @@ class EntryTest(unittest.TestCase):
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
         }
-        env.update(CCNAVI_WORKSPACE=self.ws, CCNAVI_BIN_PATH=self.bin)
+        env.update(CCNAVI_WORKSPACE=self.ws, CCNAVI_ENTRY_PATH=self.bin)
         return subprocess.run(
             [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", name), *args],
             cwd=self.ws,

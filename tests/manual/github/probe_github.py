@@ -18,11 +18,11 @@ GraphQL を直に呼ぶ）で行う。sh と同じ道具を使わないほうが
   同じ読みをやり直して確かめる。gh は `GH_TOKEN` > `GITHUB_TOKEN` > 保存済みの認証の順で使うので、
   別のアカウントに化けないよう、この probe は `GH_TOKEN` と `GITHUB_TOKEN` に
   同じトークンを置いて走らせる
-- 組み立て済みの exe。`CCNAVI_BIN_PATH` で絶対パスを渡す（無ければ `dist/ccnavi/ccnavi`）。
+- 組み立て済みの exe。`CCNAVI_ENTRY_PATH` で絶対パスを渡す（無ければ `dist/ccnavi/ccnavi`）。
   このチェックアウトより古い exe だと食い違うので、起動時に版を出す
 - jq と curl（sh が使う）
 
-    CCNAVI_BIN_PATH=/path/to/ccnavi uv run python tests/manual/github/probe_github.py
+    CCNAVI_ENTRY_PATH=/path/to/ccnavi uv run python tests/manual/github/probe_github.py
 
 ## 一人では確かめられないもの
 
@@ -104,14 +104,14 @@ if not TOKEN:
 
 
 def _exe() -> str:
-    given = os.environ.get("CCNAVI_BIN_PATH", "")
+    given = os.environ.get("CCNAVI_ENTRY_PATH", "")
     if given and os.path.isabs(given):
         return given
     base = os.path.join(ROOT_OF_CCNAVI, given or os.path.join("dist", "ccnavi", "ccnavi"))
     for candidate in (base, base + ".exe"):
         if os.path.isfile(candidate):
             return candidate
-    sys.exit(f"exe が無い ({base})。CCNAVI_BIN_PATH に絶対パスを渡すか、build.py で組み立てる")
+    sys.exit(f"exe が無い ({base})。CCNAVI_ENTRY_PATH に絶対パスを渡すか、build.py で組み立てる")
 
 
 EXE = _exe()
@@ -193,7 +193,7 @@ def env_for() -> dict[str, str]:
         {
             "GITHUB_TOKEN": TOKEN,
             "GH_TOKEN": TOKEN,
-            "CCNAVI_BIN_PATH": EXE,
+            "CCNAVI_ENTRY_PATH": EXE,
             "CCNAVI_GUARD_TICKET_APPROVAL": "disable",
             "CCNAVI_MODE": "enable",
             "CCNAVI_GUARD_CORE_FILES": "disable",
