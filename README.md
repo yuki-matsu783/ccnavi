@@ -1611,7 +1611,7 @@ frontmatter は rules.yml と同じタイプ（`deny` / `ask` / `allow`）。適
 ---
 version: 1
 ticket: feature-50-settings-split-02-01
-issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
+issue: 50                # 親だけ。必須。この MR が閉じる issue（別のリポジトリなら owner/repo#50）
 project: lib             # 置き場と同じ名前。省ける（提案を置いた場所が決める）
 parent: feature-50-settings-split  # 子だけ。親は書かない
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つのまとまり
@@ -1639,7 +1639,7 @@ base_sha: ""
   親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、
   `hotfix-64-統合先の解決`）。先頭の語は既定で `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs` のどれかで、
   チャットで「hotfix で」と言えばエージェントがその語で書く。リストを変えるときだけ `.claude/settings.json` の `env` に
-  `CCNAVI_BRANCH_PREFIXES=feature,hotfix,fix` のように書く。番号は issue があれば issue の番号、無ければ通し番号
+  `CCNAVI_BRANCH_PREFIXES=feature,hotfix,fix` のように書く。番号は issue の番号（通し番号は直接作業のワークツリー名だけに使う）
   （`ccnavi --lint` の warn が次の番号を示す）。slug には日本語（ひらがな・カタカナ・漢字）も使える。形に合わないものと、
   末尾が `-<2 桁>` の親は `--lint` の warn に留める
 - ワークツリーの名前は識別子と同じ。`.claude/worktrees/feature-50-settings-split-02-01/`
@@ -1943,7 +1943,7 @@ feedback:                              # フィードバック計画。レビュ
 - **待ち方は持たない。** 承認済みチケットの計画から読むたびに計算する。手で `doing/` へ動かした親も計画の `after` で読み、
   壊れた計画（`after` の形・終端・延期の引き受け手）の親は判定で止まり、子も止まる
 - **提案の雛形は `ccnavi ticket new` で作る。** 識別子と同名のワークツリーの中で
-  `ccnavi ticket new <識別子> --title <題> --plan "design,acceptance,implement" [--issue N]` と打つと、
+  `ccnavi ticket new <識別子> --title <題> --plan "design,acceptance,implement" --issue <N|owner/repo#N> --mr <N>` と打つと、
   `wip/proposals/todo/<識別子>.md` に、選んだフェーズの `scope` を `phases.yml` から集めた `allow`（重複なし）、
   各項が前の項を待つ一直線の `plan`、`phases:` の写し、本文の見出し（`目的`・`範囲`・`対象外`・`完了の確かめ方`・`計画の理由`。それぞれの下と rationale に空欄の目印）を持つ親の提案を書く。目印が残った新規の提案は承認と `--lint` が止める（改版は警告）。見出しの欠けは警告。対象は親だけ。`phases.yml` が無いとき、
   `inherit` の型だけで `allow` が空になるとき、既に同じ識別子の提案があるときは、何も書かずに理由を言う。書いたあと、`allow` の項が計画のどのフェーズ定義の `scope` とも重ならないとき（例: `--plan implement --scope "docs/**"`）は、「承認しても書けない」と名指しする（警告で、書いた提案は残る。承認の確認 `--agree --preview --verify` も同じ文を出す）。子はその項に書けないので、`--plan quick-work` に切り替える。計画に `scope: inherit` の型が 1 つでもあれば、上限が無いので何も言わない。`quick-work` のような `scope: inherit` の型は範囲を持たないので、今回触るファイルを `--scope <glob>`（繰り返せる。ワークツリーのルートからの相対）で渡す（例: `--plan quick-work --scope src/ui/error.ts`）。渡さずに止まったときの案内は、範囲を持つ型を足すのではなく `--scope` を示す。
@@ -3136,7 +3136,7 @@ warn にとどめる（定義は後から変わるので、使うときの承認
 ### 使う（`ticket new --template`）
 
 ```sh
-ccnavi ticket new <識別子> --title <題> --template <名前> [--layer <名前>] [--with-feedback] [--issue N]
+ccnavi ticket new <識別子> --title <題> --template <名前> [--layer <名前>] [--with-feedback] --issue <N|owner/repo#N> --mr <N>
 ```
 
 識別子と同名のワークツリーの中で打つ（`--plan` の雛形と同じ。`ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ）。

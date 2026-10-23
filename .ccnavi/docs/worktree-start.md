@@ -86,7 +86,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
 - 既にある`feature/123-login`のような`/`を含むブランチで親チケットの作業をするときも、`ccnavi-start.sh`が
   `.claude/worktrees/feature-123-login`に`feature/123-login`を直接チェックアウトして作る
   （手で切るときは`worktree add .claude/worktrees/feature-123-login feature/123-login`）。親の識別子はブランチ名の
-  `/`を`-`に置き換えたもの（`feature-123-login`）で、提案の`ticket:`にそれを書き、`mr: <番号>`も書く。
+  `/`を`-`に置き換えたもの（`feature-123-login`）で、提案の`ticket:`にそれを書き、`issue: <値>`と`mr: <番号>`も書く。
   提案にブランチ名を書く欄は無い（`branch:`の欄があればエラー）。ccnaviは親のブランチ名を、
   親のワークツリーのHEADから読む。HEADのブランチ名を変換した識別子がフォルダ名と合わないと、取り込み・早送りの対象にならない。
   子のブランチは子の識別子で、起点は親のブランチ
