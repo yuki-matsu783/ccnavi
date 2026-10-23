@@ -1196,6 +1196,50 @@ class StartShTest(unittest.TestCase):
                 done = self.run_sh("--mr", "5")
                 self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
                 self.assertIn("mcp__github__issue_read", done.stdout)
+                # 理由が空（「?」）にならない
+                self.assertIn("紐づく issue を読めなかった", done.stdout)
+
+    def test_the_guided_rerun_after_an_unreadable_closing_link_succeeds(self):
+        # 閉じる issue だけ読めない（GraphQL が errors）。案内の 3 引数で打ち直せば確定する
+        self.mr_branch(**{GRAPHQL: [200, {"errors": [{"message": "boom"}], "data": None}]})
+        first = self.run_sh("--mr", "5")
+        self.assertEqual(first.returncode, 4, first.stdout + first.stderr)
+        again = self.run_sh(
+            "--mr", "5", "--issue", "152", "--branch", "fix-152-other", "--mcp-checked"
+        )  # fmt: skip
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertIn("必須: 提案の frontmatter に issue: 152 と mr: 5 を書く", again.stdout)
+        self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
+
+    def test_branch_with_no_candidate_on_a_reachable_host_stops(self):
+        self.github_new()
+        done = self.run_sh(
+            "--issue", "152", "--branch", "other-152-x", "--mcp-checked"
+        )  # fmt: skip
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("--branch", done.stderr)
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.posts(), [])
+
+    def test_a_resumed_start_checks_the_issue_before_the_worktree(self):
+        tip = git(
+            self.ws,
+            "commit-tree",
+            "-p",
+            "main",
+            "-m",
+            "chore: #152 の作業を開始する",
+            "main^{tree}",
+        )
+        git(self.ws, "branch", BRANCH, tip)
+        git(self.ws, "push", "-q", self.bare, f"{BRANCH}:refs/heads/{BRANCH}")
+        # issue 152 は 404（既定の routes に無い）。作りかけでも、実在しない issue の MR は作らない
+        self.route({PULLS: [200, []], **closed_pulls(BRANCH)})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("issue #152 が見つからない", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt(BRANCH)))
+        self.assertEqual(self.posts(), [])
 
     def test_a_candidate_without_an_mr_is_not_a_success(self):
         tip = git(self.ws, "commit-tree", "-p", "main", "-m", "work", "main^{tree}")

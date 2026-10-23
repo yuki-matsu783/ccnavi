@@ -363,7 +363,8 @@ start | finish | cancel | propose | consolidate)
 		consolidate) wap_words="$wap_id の学びの統合の子を作る" ;;
 		*) wap_words="$wap_id を取り消した" ;;
 		esac
-		ticket_preflight || exit 1
+		# 取り消しは事前確認しない（ホストに届かない・権限が足りないときでも、取り消せるようにする）
+		[ "$1" = cancel ] || ticket_preflight || exit 1
 		ccnavi_wap_begin || exit 1
 		# 子の finish は、親のブランチへ合流してから push する。合流してよいかをここで確かめる。
 		if [ "$1" = finish ] && [ "$wap_id" != "$ccnavi_wap_family_id" ]; then

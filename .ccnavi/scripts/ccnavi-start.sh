@@ -285,7 +285,7 @@ scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
 heads_file="$state/start-heads-$$"
-trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err"' EXIT
+trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err"' EXIT
 log_info 始めた -- "kind=${what:-check}" "number=$number" "dry=${dry:-no}"
 
 # origin のパス（owner/repo）。issue の値の正規化に使う。読めなければ空（host_open が理由を言う）
@@ -443,9 +443,11 @@ host_api_failed() {
 	# ホストの返事の本文（先頭200文字、1行）。原因を絞り込めるよう、文面に出す。トークンは伏せる
 	ccnavi_host_fail_body "$3" >"$host_err.body"
 }
+# mr_linked_issues は $( ) の中で呼ばれるので、理由はファイル（$host_err.why）で受け渡す
 ml_why=""
 api_failed_reason() {
 	what_failed=$(cat "$host_err" 2>/dev/null || :)
+	ml_why=$(cat "$host_err.why" 2>/dev/null || :)
 	if [ -z "$what_failed" ] && [ -n "$ml_why" ]; then
 		printf '%s' "$ml_why"
 		return 0
@@ -575,6 +577,7 @@ create_mr() {
 mr_linked_issues() {
 	ml_mr="$1"
 	ml_why=""
+	rm -f "$host_err.why" || :
 	if [ "$ccnavi_h_kind" = github ]; then
 		ml_owner="${ccnavi_h_path%%/*}"
 		ml_name="${ccnavi_h_path#*/}"
@@ -586,7 +589,7 @@ mr_linked_issues() {
 				'{query: "query($o:String!,$n:String!,$num:Int!,$c:String){repository(owner:$o,name:$n){pullRequest(number:$num){closingIssuesReferences(first:100,after:$c){nodes{number repository{nameWithOwner}} pageInfo{hasNextPage endCursor}}}}}", variables: {o: $o, n: $n, num: $num, c: $c}}')
 			ml_got=$(ccnavi_host_api POST graphql "$ml_payload") || return 1
 			if ! printf '%s' "$ml_got" | "$ccnavi_h_jq" -e '(.errors // null) == null and (.data.repository.pullRequest.closingIssuesReferences.nodes | type) == "array"' >/dev/null 2>&1; then
-				ml_why="紐づく issue を読めなかった（GraphQL の応答に errors があるか、MR が見つからない）"
+				printf '%s' "紐づく issue を読めなかった（GraphQL の応答に errors があるか、MR が見つからない）" >"$host_err.why"
 				return 1
 			fi
 			printf '%s' "$ml_got" | "$ccnavi_h_jq" -r '.data.repository.pullRequest.closingIssuesReferences.nodes[] | "\(.repository.nameWithOwner)#\(.number)"'
@@ -594,7 +597,7 @@ mr_linked_issues() {
 				return 0
 			fi
 			if [ "$ml_page" -ge 5 ]; then
-				ml_why="紐づく issue が多すぎて読み切れない（5 ページを超えた）"
+				printf '%s' "紐づく issue が多すぎて読み切れない（5 ページを超えた）" >"$host_err.why"
 				return 2
 			fi
 			ml_cursor=$(printf '%s' "$ml_got" | "$ccnavi_h_jq" '.data.repository.pullRequest.closingIssuesReferences.pageInfo.endCursor')
@@ -603,7 +606,7 @@ mr_linked_issues() {
 		ml_rc=0
 		ml_got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/merge_requests/$ml_mr/closes_issues") || ml_rc=$?
 		if [ "$ml_rc" -eq 2 ]; then
-			ml_why="紐づく issue が多すぎて読み切れない"
+			printf '%s' "紐づく issue が多すぎて読み切れない" >"$host_err.why"
 			return 2
 		fi
 		[ "$ml_rc" -eq 0 ] || return 1
@@ -621,7 +624,16 @@ resolve_issue() {
 	ri_rc=0
 	ri_raw=$(mr_linked_issues "$ri_mr") || ri_rc=$?
 	if [ "$ri_rc" -ne 0 ]; then
-		stop_host issue-link "$([ "$ri_rc" -eq 2 ] && printf '%s' "${ml_why:-読み切れない}" || api_failed_reason)"
+		# エージェントが MCP で確かめ、issue・MR・元ブランチの 3 つを渡して打ち直したとき（ホストの別の API は読めても、
+		# 閉じる issue だけ読めない場合を含む）は、渡された値で確定する
+		if [ -n "$mcp_checked" ] && [ -n "$issue_arg" ] && [ -n "$mr_arg" ] && [ -n "$branch_arg" ]; then
+			final_issue=$(issue_show "$issue_r" "$issue_n")
+			final_mr="$ri_mr"
+			host_unseen=1
+			log_info 閉じる issue を MCP で確かめ済みとして決めた -- "mr=$ri_mr"
+			return 0
+		fi
+		stop_host issue-link "$(api_failed_reason)"
 	fi
 	# 大文字小文字を区別せず重複を除く（先に出た表記を残す）
 	ri_list=$(printf '%s\n' "$ri_raw" | awk 'NF && !seen[tolower($0)]++')
@@ -715,13 +727,13 @@ stop_host() {
 		search)
 			if [ "$what" = issue ]; then
 				printf '  1. mcp__github__search_pull_requests を query=「repo:%s/%s is:pr is:open %s」で呼ぶ。題・本文に #%s を含むか、元ブランチの名前に %s を含む PR が、この issue に紐づく MR\n' "$sh_owner" "$sh_repo" "$number" "$number" "$number"
-				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら .ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順）\n'
+				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら、その PR の元ブランチ（head.ref）と本文の Closes を確かめ、--mr <その PR の番号> --issue <閉じる issue> --branch <head.ref> --mcp-checked を付けて打ち直す）\n'
 				printf '  3. 紐づく PR が無いと確かめたら、mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することも確かめる（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
 				printf '  4. 実在を確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
 			else
 				printf '  1. mcp__github__pull_request_read を method=get owner=%s repo=%s pullNumber=%s で呼び、head.ref（元ブランチ）と head.repo.full_name を読む\n' "$sh_owner" "$sh_repo" "$number"
 				printf '  2. head.repo.full_name が %s/%s と違えばフォークの MR。元ブランチがこのリポジトリに無いので作業を始められない。ユーザに伝えて止める\n' "$sh_owner" "$sh_repo"
-				printf '  3. 同じなら head.ref のブランチで、.ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順どおりにワークツリーを切る\n'
+				printf '  3. 同じなら head.ref を元ブランチとし、本文の Closes で閉じる issue を確かめ（mcp__github__issue_read で実在も確かめる）、--mr %s --issue <閉じる issue> --branch <head.ref> --mcp-checked を付けて打ち直す\n' "$number"
 			fi
 			;;
 		merged)
@@ -1232,6 +1244,11 @@ if [ "$total" -eq 0 ]; then
 		fi
 		stop_host search "${host_reason:-$host_why}"
 	fi
+	if [ -n "$branch_arg" ]; then
+		# --branch は既存の MR の元ブランチを指す。ホストを見られないなら 3 つそろえる案内、見られたのに MR が無ければ止める
+		[ -z "$unchecked" ] || stop_host mcp-args "${host_reason:-ホストを見られない}"
+		fail branch-no-mr "--branch ${branch_arg} を元ブランチに持つ開いた MR は見つかりません（issue #${number} に紐づく候補が 0 件）。ブランチ名を確かめるか、--branch を外して新しく始めてください。" 1
+	fi
 	# ---- 2. 新規作成（--issue だけ。MR の本文に Closes #<番号> を入れるので、issue と MR の組は作った時点で確定する）
 	host_rc=0
 	host_open || host_rc=$?
@@ -1372,7 +1389,7 @@ if [ "$c_mrs" -eq 0 ]; then
 	if [ -z "$resume" ]; then
 		# MR の無い候補は成功させない（issue と MR のセットが確定しない）
 		show_list
-		printf 'ccnavi-start: 候補 %s には開いた MR がありません。issue と MR のセットが確定しないため、何も作成せずに処理を中断しました。このブランチで続けるなら、ユーザに MR（説明欄に Closes #%s）を作ってもらい、--mr <番号> を付けて打ち直します。新しく切るか・やめるかも含め、ユーザに聞いて返事を待ってください。\n' "$cb" "$number"
+		printf 'ccnavi-start: 候補 %s には開いた MR がありません。issue と MR のセットが確定しないため、何も作成せずに処理を中断しました。このブランチで続けるなら、ユーザに MR（説明欄に Closes #%s）を作ってもらい、--mr <番号> を付けて打ち直します。新しく切るか・やめるかも含め、ユーザに聞いて返事を待ってください。\n' "$cb" "${issue_n:-<番号>}"
 		log_info MR の無い候補 -- "branch=$cb"
 		exit "$EXIT_MULTI"
 	fi
@@ -1409,13 +1426,17 @@ if [ -n "$dry" ]; then
 fi
 
 if [ -n "$resume" ]; then
-	# 作りかけ。ワークツリーを出して、残りの段を続ける
+	# 作りかけ。ワークツリーを切る前に、issue の実在と同名のマージ済み MR を確かめる（新規作成の道と同じ）
+	issue_rc=0
+	issue_title_get || issue_rc=$?
+	case "$issue_rc" in
+	2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。何も作成せずに中断しました。ユーザに確かめてください。issue が無ければ、ユーザに作ってもらい、その番号で打ち直します。" 2 ;;
+	3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
+	esac
+	merged_check "$cb"
 	fetch_branch "$cb"
 	ensure_worktree "$cb"
 	fast_forward "$cb"
-	if [ -z "$opt_title" ]; then
-		issue_title_get || :
-	fi
 	ensure_initial_commit
 	ensure_push "$cb"
 	next_title=$(make_title "$cb")

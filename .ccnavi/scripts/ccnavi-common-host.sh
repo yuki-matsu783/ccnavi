@@ -636,7 +636,10 @@ ccnavi_preflight() {
 			case "$ccnavi_pf_crc" in
 			0)
 				ccnavi_pf_auth_source="$ccnavi_h_transport"
-				[ "$ccnavi_pf_auth_source" != gh ] && [ "$ccnavi_pf_auth_source" != glab ] || ccnavi_pf_auth_source=cli
+				case "$ccnavi_pf_auth_source" in
+				gh | glab) ccnavi_pf_auth_source=cli ;;
+				curl) ccnavi_pf_auth_source=token ;;
+				esac
 				ccnavi_host_probe
 				case "$ccnavi_h_probe" in
 				ok) ccnavi_pf_api=ok ;;
@@ -707,7 +710,7 @@ ccnavi_preflight() {
 		else
 			ccnavi_pf_gtext=$(tr -d '\r' <"$ccnavi_pf_err" 2>/dev/null | head -n 3 | tr '\n' ' ')
 			case "$ccnavi_pf_gtext" in
-			*"Authentication failed"* | *"could not read Username"* | *"Permission denied"* | *403*)
+			*"Authentication failed"* | *"could not read Username"* | *"Permission denied"* | *"error: 403"* | *"HTTP 403"* | *"returned error: 403"*)
 				ccnavi_pf_git=ng
 				ccnavi_pf_git_why="git のリモートへの認証が通らない"
 				;;

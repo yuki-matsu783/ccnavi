@@ -138,6 +138,17 @@ class TicketPreflightTest(WriteAndPushHarness):
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn("確認: access: NG", result.stderr)
 
+    def test_consolidate_is_checked_but_cancel_is_not(self):
+        self.set_routes(
+            {**GOOD, f"GET {host_stub.PROJECT}/members/all/5": [200, {"access_level": 20}]}
+        )
+        consolidate = self.ticket("consolidate", PARENT, token="t0k")
+        self.assertEqual(consolidate.returncode, 1, consolidate.stdout + consolidate.stderr)
+        self.assertIn("確認: access: NG", consolidate.stderr)
+        # 取り消しは、権限が足りないときでも事前確認で止めない
+        cancel = self.ticket("cancel", PARENT, "--reason", "やめた", token="t0k")
+        self.assertNotIn("確認:", cancel.stderr)
+
     def test_status_and_next_id_do_not_check(self):
         self.set_routes(GOOD)
         self.ticket("status", PARENT, token="t0k")
