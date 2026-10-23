@@ -1,4 +1,6 @@
-"""親チケットの提案の雛形を作る（`ccnavi ticket new <識別子> --title <題> --plan <型,型,...>`）。
+"""親チケットの提案の雛形を作る。
+
+`ccnavi ticket new <識別子> --title <題> --plan <型,型,...> --issue <値> --mr <番号>`。
 
 提案を手で書くと frontmatter の形を間違えやすく、とくにフェーズ定義の `scope` を `allow` に
 写し忘れて、`design` フェーズの子が `wip/design/*` に書けず詰まる。この雛形の生成は、選んだ
@@ -131,7 +133,7 @@ def render(
     title: str,
     plan: list[str],
     allow: list[str],
-    issue: int | None,
+    issue: str | None,
     mr: int | None = None,
 ) -> str:
     """雛形の全文。`phases:` は書かない（書いたあとに `plan_phases.fill` が差し込む）。"""
@@ -171,10 +173,11 @@ def render_items(
     plan: list[plan_templates.Item],
     feedback: list[plan_templates.Item],
     allow: list[str],
-    issue: int | None,
+    issue: str | None,
     mr: int | None = None,
 ) -> str:
-    """雛形の全文。`mr` は親のブランチのマージリクエストの番号（親の作成と承認の前提）。
+    """雛形の全文。`issue` は `12` か `owner/repo#12`。`mr` は親のブランチのマージリクエストの番号
+    （どちらも親の作成と承認の前提）。
     `after` は提案の絶対番号（フィードバック計画は全体計画の続き）で渡す。"""
     lines = [ticket_model.FENCE, f"version: {ticket_model.VERSION}", f"ticket: {ident}"]
     if issue is not None:
@@ -213,7 +216,7 @@ def run(
     ident: str,
     title: str,
     plan_text: str,
-    issue: int | None,
+    issue: str | None,
     template: str = "",
     layer: str = "",
     with_feedback: bool = False,
@@ -249,9 +252,18 @@ def run(
         return refuse(
             f"--title {stripped!r} は案内の仮の値。実際の題（issue や MR の題）に置き換える"
         )
-    if issue is not None and issue <= 0:
-        return refuse("--issue には正の整数を渡す")
-    if mr is not None and mr <= 0:
+    # チケット作業は issue と MR のセット。どちらかが無い親の提案は作らない
+    if issue is None:
+        return refuse(
+            "--issue <番号> が必要です（別のリポジトリなら owner/repo#番号）。"
+            "ccnavi-start.sh が「必須」の行で出す"
+        )
+    if mr is None:
+        return refuse("--mr <番号> が必要です。ccnavi-start.sh が「必須」の行で出す")
+    issue = ticket_mod.issue_text(issue)
+    if not issue:
+        return refuse("--issue には正の整数か owner/repo#番号 を渡す")
+    if mr <= 0:
         return refuse("--mr には正の整数を渡す")
     plan = parse_plan(plan_text)
     if template:

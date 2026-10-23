@@ -192,7 +192,7 @@ class ProposeTest(WriteAndPushHarness):
         return subprocess.run(
             [SHELL, "-c", f"{shlex.quote(SHELL)} {script} propose {PARENT} | head -n 1"],
             cwd=self.ws,
-            env=self.env(),
+            env=self.ticket_env(),
             capture_output=True,
             text=True,
             encoding="utf-8",

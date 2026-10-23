@@ -284,7 +284,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         running = subprocess.Popen(
             [SHELL, os.path.join(self.scripts, "ccnavi-ticket.sh"), "start", PARENT],
             cwd=self.ws,
-            env=self.env(),
+            env=self.ticket_env(),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -438,7 +438,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
                 PARENT,
             ],
             cwd=linked,
-            env=self.env(),
+            env=self.ticket_env(),
             capture_output=True,
             text=True,
             encoding="utf-8",

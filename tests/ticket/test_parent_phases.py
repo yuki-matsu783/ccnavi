@@ -132,7 +132,7 @@ class CopyAgreeTest(PhaseHarness):
         from ccnavi.tickets import agree_candidates
 
         text = "\n".join(
-            ["---", "version: 1", "ticket: i0001", "title: t", "mr: 1", "allow:"]
+            ["---", "version: 1", "ticket: i0001", "title: t", "mr: 1", "issue: 1", "allow:"]
             + ["- {glob: 'src/*', match: 'Write|Edit'}", "---", ""]
         )
         t, _ = ticket_mod.parse(text)

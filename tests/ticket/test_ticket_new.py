@@ -35,8 +35,20 @@ class TicketNewTestBase(PhaseHarness):
         self.tree = self.worktree(IDENT, "main")
         self.todo = os.path.join(self.tree, "wip", "proposals", "todo", IDENT + ".md")
 
-    def new(self, *extra, ident=IDENT, cwd=None, title="雛形の見本", plan="research,design"):
+    def new(
+        self,
+        *extra,
+        ident=IDENT,
+        cwd=None,
+        title="雛形の見本",
+        plan="research,design",
+        nodefault=(),
+    ):
         args = ["ticket", "new", ident, *extra]
+        # 親の提案は issue と MR のセット。渡さないテストのために既定を足す（渡したものが優先）
+        for flag, value in (("--issue", "9"), ("--mr", "5")):
+            if flag not in extra and flag not in nodefault:
+                args += [flag, value]
         if title is not None:
             args += ["--title", title]
         if plan is not None:
@@ -120,11 +132,29 @@ class TicketNewTest(TicketNewTestBase):
         self.assertEqual(self.new("--mr", "5").returncode, 0)
         self.assertEqual(front_of(self.written())["mr"], 5)
         os.remove(self.todo)
-        # 指定が無ければ書かない（承認は mr: が無いことで止まる）。取り込みの記録からは引かない
+        # 指定が無ければ作らない。取り込みの記録からは引かない
         record = os.path.join(self.state, "sync", "self", "families", IDENT)
         write(record, f"remote origin\nbranch {IDENT}\nsha 0\nfetched_at 1\nstate present\nmr 7\n")
-        self.assertEqual(self.new().returncode, 0)
-        self.assertNotIn("mr", front_of(self.written()))
+        done = self.new(nodefault=("--mr",))
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("--mr <番号> が必要", done.stderr)
+        self.assertFalse(os.path.exists(self.todo))
+
+    def test_the_issue_and_the_mr_are_both_required(self):
+        for flag in ("--issue", "--mr"):
+            with self.subTest(flag=flag):
+                done = self.new(nodefault=(flag,))
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(f"{flag} <番号> が必要", done.stderr)
+                self.assertFalse(os.path.exists(self.todo))
+
+    def test_the_issue_may_name_another_repository(self):
+        self.assertEqual(self.new("--issue", "other/repo#12").returncode, 0)
+        self.assertEqual(front_of(self.written())["issue"], "other/repo#12")
+        os.remove(self.todo)
+        done = self.new("--issue", "other/repo#x")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("--issue には", done.stderr)
 
     def test_a_plan_with_design_puts_the_design_scope_in_allow(self):
         self.assertEqual(self.new(plan="design,implement").returncode, 0)

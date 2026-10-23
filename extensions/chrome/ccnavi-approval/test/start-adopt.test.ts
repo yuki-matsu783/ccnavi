@@ -2,7 +2,7 @@
  * 「始める」は `ccnavi-start.sh` と同じ手順にそろえる（既存の MR を探して採用する、無ければブランチと Draft の MR を作る）。
  * 模擬の GitHub・GitLab と Node の上の Pyodide で回す。
  *
- * - issue に紐づく開いた MR が 1 本あれば、その元ブランチを採用する。ブランチも MR も作らない
+ * - issue を閉じる開いた MR が 1 本あれば、その元ブランチを採用する。ブランチも MR も作らない
  * - 採用の確認: open・フォークでない・マージ先が統合先・ブランチ名が保護されていない・識別子が使える・
  *   同じ識別子になる別のブランチが無い・同じブランチ名のマージ済み MR が無い。引っかかったら何も作らずに止める
  * - 2 本以上あれば、何も作らずに一覧を出して止める
@@ -21,7 +21,7 @@ import { dispatch, type Deps } from "../src/core/protocol.js";
 import { py as pyOps, type PyCall } from "../src/core/py.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, Reader, readIntegration } from "../src/core/snapshot.js";
-import { mentionsIssue, startIssue, type StartOutcome } from "../src/core/start.js";
+import { closesIssue, startIssue, type StartOutcome } from "../src/core/start.js";
 import type { WriteDeps } from "../src/core/write.js";
 import { fixture, NOW } from "./fixtures/repo.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats, OPTIONS } from "./helpers/host.js";
@@ -65,9 +65,9 @@ const HOSTS_UNDER_TEST = [
   ["gitlab.com", () => new MockGitLab(fixture())],
 ] as const;
 
-/** issue 20 に紐づく開いた MR を 1 本置く（元ブランチも作る）。over で上書き */
+/** issue 20 を閉じる開いた MR を 1 本置く（元ブランチも作る）。over で上書き */
 function withMr(mock: MockGitHub, over: Partial<MockMr> = {}): MockMr {
-  const mr: MockMr = { number: 5, branch: "feature/20-login", base: "main", title: "ログイン #20", body: "", state: "open", fork: false, ...over };
+  const mr: MockMr = { number: 5, branch: "feature/20-login", base: "main", title: "ログイン", body: "Closes #20", state: "open", fork: false, ...over };
   if (!mock.head(mr.branch)) mock.branch(mr.branch, "main");
   mock.mrs.push(mr);
   return mr;
@@ -84,19 +84,51 @@ function message(out: StartOutcome): string {
   return out.kind === "refused" || out.kind === "failed" ? out.message : "";
 }
 
-test("CX-T251 issue に紐づく MR は、題・本文の #番号 か issues/番号、元ブランチの名前の番号で見つける。番号が長い別の issue は拾わない", () => {
-  const mr = (title: string, body = "", branch = "x") => ({ title, body, branch });
-  assert.equal(mentionsIssue(mr("直す #20"), 20), true);
-  assert.equal(mentionsIssue(mr("直す", "Closes #20\n"), 20), true);
-  assert.equal(mentionsIssue(mr("直す", "https://github.com/a/b/issues/20"), 20), true);
-  assert.equal(mentionsIssue(mr("直す", "", "feature/20-login"), 20), true);
-  assert.equal(mentionsIssue(mr("直す #200"), 20), false);
-  assert.equal(mentionsIssue(mr("直す a#20"), 20), false);
-  assert.equal(mentionsIssue(mr("直す", "", "feature-120-x"), 20), false);
-  assert.equal(mentionsIssue(mr("直す", "", "fix-20"), 20), true);
+test("CX-T251 issue を閉じる MR は、閉じる語に続くこのリポジトリの #番号 か issues/番号 で見つける。参照だけ・別のリポジトリ・コードや引用の中・否定・番号が長い別の issue は拾わない", () => {
+  const mr = (title: string, body = "") => ({ title, body });
+  const ok = (m: { title: string; body: string }) => closesIssue(m, 20, "acme/widgets");
+  assert.equal(ok(mr("直す Closes #20")), true);
+  assert.equal(ok(mr("直す", "closes #20\n")), true);
+  assert.equal(ok(mr("直す", "Fixes: #20")), true);
+  assert.equal(ok(mr("直す", "Resolved ACME/Widgets#20")), true);
+  assert.equal(ok(mr("直す", "Closes https://github.com/acme/widgets/issues/20")), true);
+  assert.equal(ok(mr("直す", "**Closes** #20")), true);
+  assert.equal(ok(mr("直す", "Closes #20.")), true);
+  assert.equal(ok(mr("直す #20")), false);
+  assert.equal(ok(mr("直す", "See #20")), false);
+  assert.equal(ok(mr("直す", "https://github.com/acme/widgets/issues/20")), false);
+  assert.equal(ok(mr("直す", "Closes #200")), false);
+  assert.equal(ok(mr("直す", "Closes #20abc")), false);
+  assert.equal(ok(mr("直す", "Closes a#20")), false);
+  assert.equal(ok(mr("直す", "Enclosed #20")), false);
+  // 別のリポジトリの issue を閉じる MR は、この issue の MR ではない
+  assert.equal(ok(mr("直す", "Closes other/repo#20")), false);
+  assert.equal(ok(mr("直す", "Closes: other/repo#20")), false);
+  assert.equal(ok(mr("直す", "Closes https://github.com/other/repo/issues/20")), false);
+  // コードブロック・インラインコード・引用の中、否定は閉じない
+  assert.equal(ok(mr("直す", "```\nCloses #20\n```")), false);
+  assert.equal(ok(mr("直す", "`Closes #20`")), false);
+  assert.equal(ok(mr("直す", "> Closes #20")), false);
+  assert.equal(ok(mr("直す", "Does not fix #20")), false);
+  assert.equal(ok(mr("直す", "This doesn't close #20")), false);
+  // 閉じる語 1 つにつき、直後の指定だけ
+  assert.equal(ok(mr("直す", "Closes #21, #20")), false);
+  assert.equal(ok(mr("直す", "Closes #21, closes #20")), true);
+  // GitLab の入れ子のグループ
+  assert.equal(closesIssue(mr("直す", "Closes group/sub/proj#20"), 20, "group/sub/proj"), true);
 });
 
-test("CX-T252 issue に紐づく開いた MR が 1 本あれば、その元ブランチを採用する。ブランチも MR も作らない（GitHub と GitLab）", async () => {
+test("CX-T251b 参照しているだけの MR（本文が #番号 の言及だけ・元ブランチの名前に番号がある）は採用せず、新しく作る", async () => {
+  for (const [host, make] of HOSTS_UNDER_TEST) {
+    const mock = make();
+    withMr(mock, { title: "ログイン #20", body: "see #20", branch: "feature/20-login" });
+    const out = await start(mock, host);
+    assert.equal(out.kind, "started", host);
+    assert.equal(mock.createdMrs.length, 1, host);
+  }
+});
+
+test("CX-T252 issue を閉じる開いた MR が 1 本あれば、その元ブランチを採用する。ブランチも MR も作らない（GitHub と GitLab）", async () => {
   for (const [host, make] of HOSTS_UNDER_TEST) {
     const mock = make();
     withMr(mock);
@@ -138,7 +170,7 @@ test("CX-T253 採用の確認に引っかかったら、何も作らずに止め
   }
 });
 
-test("CX-T254 紐づく開いた MR が複数あれば、何も作らずに一覧を出して止める", async () => {
+test("CX-T254 issue を閉じる開いた MR が複数あれば、何も作らずに一覧を出して止める", async () => {
   for (const [host, make] of HOSTS_UNDER_TEST) {
     const mock = make();
     withMr(mock);

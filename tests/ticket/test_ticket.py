@@ -88,6 +88,8 @@ def ticket_text(
     lines = ["---", "version: 1", f"ticket: {name}"]
     if not parent:
         lines.append("mr: 1")
+        if issue is None:
+            issue = 1
     if issue is not None:
         lines.append(f"issue: {issue}")
     if parent:

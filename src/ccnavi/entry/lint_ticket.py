@@ -185,6 +185,11 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(_stale_problems(root, conf, stale, index, done))
 
     problems.extend(_copy_problems(root, conf, copies, index, closed, raw))
+    # 閉じた・レビュー待ちの親にも issue と MR のセットを求める
+    # （doing の親は _copy_problems が見る）
+    for t in review + closed:
+        for p in approval_checks.mr_problems(t):
+            problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {p.detail}"))
 
     # 承認済みの親が phases.yml を読めないことは error にしない。判定は親の写しを読み、
     # 写しと今の phases.yml の食い違い（読めないことも含む）は `validate` が warn で言う

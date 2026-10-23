@@ -1,4 +1,7 @@
-"""`ccnavi ticket next-id [<先頭の語> <slug>]`。issue の無い親の提案に使う識別子を答える。
+"""`ccnavi ticket next-id [<先頭の語> <slug>]`。直接作業のワークツリー名に付ける識別子を答える。
+
+親チケットには使わない。チケット作業は issue と MR のセットで、親の識別子は issue の番号から決まる
+（`ccnavi-start.sh --issue`）。通し番号は、直接作業のワークツリーとブランチの名前にだけ残る。
 
 次の通し番号を知るために、`--lint` の warn を出させる回り道をなくす。番号は、呼んだ時点で今ある
 名前の番号の最大 + 1（`ticket_ids.next_serial`）。数える名前は `serial_names` が集める。予約は

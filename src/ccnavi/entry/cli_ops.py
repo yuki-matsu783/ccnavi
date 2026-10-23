@@ -229,7 +229,7 @@ def operate(
         if len(words) != 3:
             stderr.write(
                 "ccnavi: ticket new <識別子> --title <題> --plan <型,型,...>"
-                " [--scope <glob>] [--issue N] [--mr N]"
+                " [--scope <glob>] --issue <N|owner/repo#N> --mr <N>"
                 " か --template <名前> [--layer <名前>] [--with-feedback]\n"
             )
         else:

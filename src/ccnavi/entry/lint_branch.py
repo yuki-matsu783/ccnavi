@@ -126,8 +126,8 @@ def _branch_name_problems(
 def _number_problems(everyone: list, fresh: list, prefixes, serial: int) -> list[Problem]:
     """新規の提案の親の識別子の番号が、同じリポジトリの別の親と重なるか（warn）。
 
-    番号は issue の番号か ccnavi の通し番号で、両方が同じ数になりうる。issue の番号はリポジトリ
-    ごとなので、比べるのは同じリポジトリ（`project`）の親どうしだけ。
+    番号は issue の番号で、別のリポジトリの issue や直接作業の通し番号と同じ数になりうる。
+    issue の番号はリポジトリごとなので、比べるのは同じリポジトリ（`project`）の親どうしだけ。
     数えるのは `<先頭の語>-<番号>-<slug>` の形の番号だけ。
     """
     problems: list[Problem] = []
@@ -151,13 +151,8 @@ def _number_problems(everyone: list, fresh: list, prefixes, serial: int) -> list
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket}: 識別子の番号 {number} が {', '.join(others)} と重なる。"
-                    "issue の番号と通し番号が同じ数になっていないか確かめる。"
-                    + (
-                        f"issue が無いなら次の通し番号は {serial}（親のブランチ名の規則）"
-                        if serial
-                        else "通し番号は数えきれなかったので、ユーザに確かめる"
-                        "（親のブランチ名の規則）"
-                    ),
+                    "別のリポジトリの issue や直接作業の通し番号と同じ数になっていないか確かめる"
+                    "（親のブランチ名の規則）",
                 )
             )
     return problems

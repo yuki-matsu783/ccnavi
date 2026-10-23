@@ -247,7 +247,15 @@ def _bound_line(ref: Ref, b: Bound) -> str:
     return (
         f"[ccnavi] 依頼の {ref.label()} は、すでに {'・'.join(b.tickets)}（ブランチ {b.branch}）に"
         f"結び付いている。ccnavi-start.sh は実行せず、{where}。"
-        "別の MR/issue を指す依頼なら、番号を言い直してもらう。"
+        "別の MR/issue を指す依頼なら、番号を言い直してもらう。" + _check_sentence()
+    )
+
+
+def _check_sentence() -> str:
+    """チケット作業の入口で最初に事前確認を打たせる一文（`ccnavi-start.sh --check`）。"""
+    return (
+        "最初に ccnavi-start.sh --check を打つ。終了コードが 0 以外なら、結果と「次:」を"
+        "ユーザに伝えて止まる（4 で GitHub なら MCP で代行してよい）。"
     )
 
 
@@ -275,6 +283,8 @@ def _start_lines(conf: settings.Settings, root: str, refs: list[Ref]) -> list[st
         "開始の前に、次を実行します。既存の候補を探し、無ければ Draft MR・ワークツリー"
         "・ブランチを作る。依頼の URL がリポジトリを示すものは、"
         "そのプロジェクトに cd してから 1 行で実行します。"
+        f"最初に '{sh} --check' を打つ。終了コードが 0 以外なら、結果と「次:」を"
+        "ユーザに伝えて止まる（4 で GitHub なら MCP で代行してよい）。"
     ]
     for r in refs:
         where = project_of_repo(conf, root, r.repo) if r.repo else ""

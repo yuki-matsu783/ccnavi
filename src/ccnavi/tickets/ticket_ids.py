@@ -50,7 +50,7 @@ MAX_ADOPT_ID_LENGTH = MAX_ID_LENGTH - 6
 
 # 新しい親の識別子の形。`<先頭の語>-<番号>-<slug>`。先頭の語は使えるリスト
 # （`settings.branch_prefixes`。既定は feature・hotfix・fix など）にあるものだけを形に合うと読む。
-# 番号は issue の番号か ccnavi の通し番号。
+# 番号は issue の番号（通し番号は直接作業のワークツリー名だけに使う）。
 _FORM = re.compile(
     rf"^(?P<prefix>[a-z][a-z0-9]*)-(?P<num>[1-9][0-9]*)-"
     rf"(?P<slug>[A-Za-z0-9{JA_CHARS}][{ID_CHARS}]*)\Z"
@@ -162,7 +162,7 @@ def identifier_number(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> i
 def next_serial(
     names, prefixes=settings.DEFAULT_BRANCH_PREFIXES, skip_children: bool = True
 ) -> int:
-    """issue の無い提案に使う、次の通し番号。番号を持つ識別子の最大 + 1。
+    """直接作業のワークツリー名に付ける、次の通し番号。番号を持つ識別子の最大 + 1。
 
     数えるのは親の識別子だけ（子は親の番号を持つ）。先頭の語が違っても同じ通し番号を使う。
     番号を持つものが無ければ 1。`skip_children` が偽なら、子の形の名前も数える（手元のブランチと
@@ -362,8 +362,8 @@ def branch_name_problems(
     """新規の提案の識別子が、親のブランチ名の規則に合わないところ。
 
     規則は、ref として安全な形（`..` を含まない、`.lock` や `.` で終わらない）、統合先や保護された
-    ブランチの名前を使わない、新しい親は `<先頭の語>-<番号>-<slug>` の形で、番号は `issue:` の番号か
-    ccnavi の通し番号、親は `-<2 桁>` で終わらない（`-<2 桁>-<2 桁>` で終われば子の識別子そのもの、
+    ブランチの名前を使わない、新しい親は `<先頭の語>-<番号>-<slug>` の形で、番号は `issue:` の番号、
+    親は `-<2 桁>` で終わらない（`-<2 桁>-<2 桁>` で終われば子の識別子そのもの、
     `-<2 桁>` だけでも子の識別子の途中の `<親>-<フェーズ番号>` と紛れる）。
 
     見るのは識別子と `issue:` だけ。返すのはユーザに見せる文で、
@@ -408,7 +408,7 @@ def _form_problems(
     - `issue:`（同じリポジトリの課題）があれば、番号が issue と同じか。プロジェクトの issue なら
       slug の頭が `<プロジェクト名>-` か
     - 別のリポジトリの課題（`owner/repo#N`）は番号を比べない（その番号はこのリポジトリの issue と
-      紛れるので、通し番号を使う）
+      紛れるので、このリポジトリの番号とは重ねない）
     - 長さが勧める上限（`SUGGESTED_ID_LENGTH`）を超えるか
     """
     name = t.ticket
@@ -420,8 +420,10 @@ def _form_problems(
         if own_issue:
             want = f"feature-{t.issue}-" + (f"{t.project}-" if t.project else "") + "<slug>"
             return [f"親の識別子は {shape} にする。`issue: {t.issue}` から始めるなら `{want}` など"]
-        hint = f"次の通し番号は {serial}" if serial else "番号は既にある識別子の番号の続き"
-        return [f"親の識別子は {shape} にする。issue が無ければ ccnavi の通し番号を使う（{hint}）"]
+        return [
+            f"親の識別子は {shape} にする。番号は issue の番号"
+            "（`ccnavi-start.sh --issue <番号>` が決める名前にする）"
+        ]
     found: list[str] = []
     number = int(matched.group("num"))
     prefix = matched.group("prefix")

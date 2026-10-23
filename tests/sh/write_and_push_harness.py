@@ -52,6 +52,7 @@ import time
 import unittest
 
 from tests import ROOT, common_path, config_path
+from tests.sh import host_stub
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -198,6 +199,8 @@ class WriteAndPushHarness(unittest.TestCase):
             EXE.format(root=ROOT, python=sys.executable),
         )
         self.state = os.path.join(self.ws, "logs", "state")
+        # ホストの代役（git remote get-url だけがホストの形を答える。本物のネットワークには出ない）
+        self.hostbin, self.routes, self.requests_log = host_stub.build(base, sys.executable)
         self.tree = self.parent_tree()
         self.approve_family()
         git(self.tree, "push", "-q", "-u", "origin", PARENT)
@@ -232,6 +235,10 @@ class WriteAndPushHarness(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
+        # API を使わないテストはトークンを渡さない
+        # （ホストの API は「確かめられなかった」になり、そのまま進む）
+        for name in ("GITHUB_TOKEN", "GITLAB_TOKEN"):
+            env.pop(name, None)
         env.update(
             {
                 "CCNAVI_BIN_PATH": self.bin,
@@ -256,6 +263,8 @@ class WriteAndPushHarness(unittest.TestCase):
         )
 
     def sh(self, name, *args, cwd=None, stdin=None, **extra):
+        if name == "ccnavi-ticket.sh" and "FAKE_ORIGIN_URL" not in extra:
+            extra = self.host_env(extra)
         return subprocess.run(
             [SHELL, os.path.join(self.scripts, name), *args],
             cwd=cwd or self.ws,
@@ -270,8 +279,29 @@ class WriteAndPushHarness(unittest.TestCase):
     def sync(self, *args):
         return self.sh("ccnavi-sync.sh", *args)
 
-    def ticket(self, *args, **extra):
-        return self.sh("ccnavi-ticket.sh", *args, **extra)
+    def host_env(self, extra, token=None):
+        """`ccnavi-ticket.sh` に渡す環境。ホストの代役の置き場を PATH の先頭に足す。"""
+        merged = dict(extra)
+        merged.update(
+            host_stub.env(
+                self.hostbin,
+                self.routes,
+                self.requests_log,
+                path=extra.get("PATH"),
+                token=token or extra.get("GITLAB_TOKEN"),
+            )
+        )
+        return merged
+
+    def ticket_env(self, **extra):
+        """`self.env()` にホストの代役を足したもの。`ccnavi-ticket.sh` を直接起こすテストが使う。"""
+        return self.env(**self.host_env(extra))
+
+    def set_routes(self, routes):
+        host_stub.write_routes(self.routes, routes)
+
+    def ticket(self, *args, token=None, **extra):
+        return self.sh("ccnavi-ticket.sh", *args, **self.host_env(extra, token))
 
     def sha(self, tree, ref):
         done = git(tree, "rev-parse", "--verify", "-q", ref, check=False)
@@ -676,7 +706,7 @@ class WriteAndPushMergeHarness(WriteAndPushHarness):
         running = subprocess.Popen(
             [SHELL, os.path.join(self.scripts, "ccnavi-ticket.sh"), "finish", CHILD],
             cwd=self.ws,
-            env=self.env(PATH=path),
+            env=self.ticket_env(PATH=path),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

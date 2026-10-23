@@ -24,6 +24,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 | `案内:` | 補足と注意。次の一手ではない | 必要なだけ |
 | `次の手:` | 次の一手が1つに決まらないときの、番号つきの選択肢の見出し | 1つ |
 | `MCP で行う手順:` | ホストに届かないときの、MCPでの代行手順（`ccnavi-start.sh`など） | 1つ |
+| `確認:` | 事前確認の項目ごとの結果（`ccnavi-start.sh --check` は標準出力、`ccnavi-ticket.sh` の自動の確認は標準エラーに、ok でない項目だけ） | 項目ごとに1行 |
 
 ## 決まり
 
@@ -65,6 +66,8 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 | `ccnavi-start.sh` の成功、親チケットも提案も無い | `ccnavi-launcher.sh ticket new …`（識別子・題・issue・MRを埋める） | `ccnavi-start.sh` の `next_ticket_lines` |
 | `ccnavi-start.sh` の成功、チケットが既にある | `ccnavi-ticket.sh status <識別子>` | `ccnavi-start.sh` の `report` |
 | `ccnavi-start.sh` の成功、取り込みが他の理由で止まった | 理由を直して `ccnavi-sync.sh` を打ち直す | `ccnavi-start.sh` の `run_sync` |
+| `ccnavi-start.sh --check` | 結果に応じた一手（ユーザに認証や権限を頼む、MCPで代行する、など。ok なら出さない） | `ccnavi-common-host.sh` の `ccnavi_pf_next` |
+| `ccnavi-ticket.sh` の start・finish・propose・consolidate の事前確認 | 同上（標準エラーに `確認:` と `次:` を出す。標準出力には何も足さない） | `ccnavi-ticket.sh` の `ticket_preflight` |
 | `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
 | `ccnavi-stage.sh` | 下書きを編集し、ユーザに `ccnavi user handoff` での取り込みを案内する | `ccnavi-stage.sh` |
 | `ccnavi-review.sh` の早めに閉じた | 親に閉じて片付け、`ready` を打たせる | `ccnavi-review.sh` |

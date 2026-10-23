@@ -58,6 +58,7 @@ function parent(id: string, title: string, body: string, plan = ["research", "de
     "version: 1",
     `ticket: ${id}`,
     "mr: 1",
+    "issue: 1",
     ...phasesLines(plan),
     "plan:",
     ...planLines(plan),

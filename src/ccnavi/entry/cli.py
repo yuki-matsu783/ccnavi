@@ -342,7 +342,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # `ticket new` の引数。題・計画の型（カンマ区切り）・issue の番号。
     parser.add_argument("--title", default="")
     parser.add_argument("--plan", default="")
-    parser.add_argument("--issue", type=int, default=None)
+    parser.add_argument("--issue", default=None)
     # 親のブランチのマージリクエストの番号（`ccnavi-start.sh` が出す）。親の提案の `mr:` に書く。
     parser.add_argument("--mr", type=int, default=None)
     # `ticket new --scope <glob>`（繰り返せる）。今回の作業の範囲。`inherit` の型の許可を作る。

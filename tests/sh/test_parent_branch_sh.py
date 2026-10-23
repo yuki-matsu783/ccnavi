@@ -36,6 +36,7 @@ import tempfile
 import unittest
 
 from tests import ROOT, SRC, common_path, config_path
+from tests.sh import host_stub
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -129,6 +130,8 @@ class ParentBranchShTest(unittest.TestCase):
         write(self.bin, EXE.format(src=SRC, python=sys.executable))
         os.chmod(self.bin, os.stat(self.bin).st_mode | stat.S_IXUSR | stat.S_IXGRP)
         self.state = os.path.join(self.ws, "logs", "state")
+        # ホストの代役（git remote get-url だけがホストの形を答える。本物のネットワークには出ない）
+        self.hostbin, self.routes, self.requests_log = host_stub.build(base, sys.executable)
         self.tree = os.path.join(self.ws, ".claude", "worktrees", PARENT)
         # ユーザが既に作って送ってあるブランチ（`/` を含む）。
         self.remote_commit("src/login.py", "print('login')\n", branch=BRANCH, start="main")
@@ -164,10 +167,13 @@ class ParentBranchShTest(unittest.TestCase):
         )
 
     def sh(self, name, *args, cwd=None):
+        extra = {}
+        if name == "ccnavi-ticket.sh":
+            extra = host_stub.env(self.hostbin, self.routes, self.requests_log)
         return subprocess.run(
             [SHELL, os.path.join(self.scripts, name), *args],
             cwd=cwd or self.ws,
-            env=self.env(),
+            env=self.env(**extra),
             capture_output=True,
             text=True,
             encoding="utf-8",

@@ -28,7 +28,7 @@
 # 次の一手を ccnavi が判断して出す。ネットワークには出ない（push 済みかは手元のリモート追跡の ref で見る）。
 # サブエージェントも呼べる。状態を動かすコマンドを出す行には「親（メインエージェント）だけが実行する」と書く。
 #
-# next-id も読むだけ。issue の無い親の提案に使う次の通し番号（引数なし）か、識別子
+# next-id も読むだけ。直接作業のワークツリー名に付ける次の通し番号（引数なし）か、識別子
 # `<先頭の語>-<番号>-<slug>`（先頭の語と slug を渡す）を 1 行で出す。形に合わなければ理由を言って止まる。
 # `--lint` の warn を出させて番号を知る回り道の代わり。サブエージェントも呼べる。
 # チケット制御が disable でも使える。手元のブランチとワークツリーの名前も数える。全部を数えられなかったときは番号を出さず、
@@ -45,6 +45,9 @@
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
 # 探す順は、環境変数 CCNAVI_BIN_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
 # ソースツリーの `python -m ccnavi`。
+#
+# start・finish・propose・consolidate は、ロックの前に事前確認（ホストの API と git のリモートが使える状態か）を打つ。
+#   直接作業では確かめない。標準出力には何も足さず、ok でない項目だけを標準エラーに出す（ticket_preflight）。
 #
 # 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）の
 # start・finish・cancel・propose・consolidate は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
@@ -77,16 +80,17 @@ sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel|propose> <識別子> [-
 sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親>
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] [--signal <信号>]
-（親の提案の雛形はこのスクリプトに無い: ccnavi ticket new <識別子> --title <題> --plan <型,…>）
+（親の提案の雛形はこのスクリプトに無い: ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>）
 
   status      承認済みチケットの状態を聞く（読むだけ。サブエージェントからも実行できます）。親を省けば
                作業中・レビュー待ち・承認待ちのチケットがある親子を全部。ファイルを読んで推測せず、これを実行する
 
-  next-id      issue の無い親の提案に使う識別子を決める（読むだけ。サブエージェントからも実行できます）。引数なしなら
+  next-id      直接作業のワークツリー名に付ける通し番号と識別子を決める（親チケットには使わない。読むだけ。サブエージェントからも実行できます）。引数なしなら
                次の通し番号、<先頭の語> <slug> を渡せば <先頭の語>-<番号>-<slug> を 1 行で出す。
                末尾が -<2 桁> になる slug や、推奨される長さを超える slug を指定すると、理由を表示して終了します。
-               決めた識別子の提案の雛形は、実行ファイルの `ccnavi ticket new <識別子> --title <題> --plan <型,…>` が
-               識別子のワークツリーの中で作る（このスクリプトに new は無い。手で書かない）
+               親チケットの識別子は issue から決まる（ccnavi-start.sh --issue）。提案の雛形は、実行ファイルの
+               `ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>` が識別子のワークツリーの中で作る
+               （このスクリプトに new は無い。手で書かない）
 
   propose      承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を親のブランチへ
                コミットして push する。別のPCで承認できるように、承認を頼む前に打つ（親のワークツリーが必要です）。
@@ -140,7 +144,7 @@ case "$1" in
 status | next-id | start | finish | cancel | propose | consolidate | record-risk | learn) ;;
 *)
 	printf 'ccnavi-ticket: 未対応のサブコマンドです：%s。使用できるサブコマンドは status / next-id / start / finish / cancel / propose / consolidate / record-risk / learn です。\n' "$1" >&2
-	[ "$1" != new ] || printf '親の提案の雛形は、このスクリプトではなく実行ファイルが作ります: ccnavi ticket new <識別子> --title <題> --plan <型,…> [--scope <glob>] [--mr <番号>]（識別子のワークツリーの中で打つ。識別子は next-id で決める）。\n' >&2
+	[ "$1" != new ] || printf '親の提案の雛形は、このスクリプトではなく実行ファイルが作ります: ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <番号> --mr <番号> [--scope <glob>]（識別子のワークツリーの中で打つ。チケット作業は issue と MR のセット。issue の番号をユーザに聞き（無ければユーザに作ってもらい）、ccnavi-start.sh --issue <番号> でワークツリーと MR を作ると、識別子と --issue・--mr の値が出る）。\n' >&2
 	exit 2
 	;;
 esac
@@ -302,6 +306,33 @@ ensure_child_worktree() {
 	log_info 子のワークツリーを作った -- "child=$wap_id" "parent=$ccnavi_wap_family_id"
 }
 
+# 事前確認（ホストの API と git のリモートが使える状態か）。標準出力には何も足さず、ok でない項目だけを
+# 1 項目 1 行と `次:` 1 本で標準エラーに出す。ok なら何も出さない。
+# 続けるのは、全体が ok か、ng が無く「api が確かめられず、権限は省略、git が ok」のときだけ（後者は注意を添える）。
+# それ以外は何も書かずに止める。事前確認は保証ではない（通ったあとの取り込みや push の関門で止まることはある）。
+# propose は外側と内側の 2 回起動するので、呼ぶのは内側（ここ）だけ。
+ticket_preflight() {
+	ccnavi_preflight "${ccnavi_wap_tree:-$here}"
+	[ "$ccnavi_pf_result" != ok ] || return 0
+	for tp_item in tools origin integration api access git; do
+		eval "tp_kind=\$ccnavi_pf_$tp_item"
+		[ "$tp_kind" != ok ] || { [ "$tp_item" = access ] && [ -n "$ccnavi_pf_access_unknown" ]; } || continue
+		ccnavi_pf_line "$tp_item"
+		ccnavi_wap_say "確認: $ccnavi_pf_line_text"
+	done
+	ccnavi_pf_top="${ccnavi_wap_tree:-$here}"
+	ccnavi_pf_next
+	[ -z "$ccnavi_pf_next_text" ] || ccnavi_wap_say "次: $ccnavi_pf_next_text"
+	if [ "$ccnavi_pf_result" = unverified ] && [ "$ccnavi_pf_api" = unverified ] &&
+		[ "$ccnavi_pf_access" = skipped ] && [ "$ccnavi_pf_git" = ok ]; then
+		ccnavi_wap_say "注意: ホストの API を確かめられなかったが、続ける。このあとの request・confirm・ready はホストの API が要る"
+		log_info 事前確認で注意して続ける -- "fix=${ccnavi_pf_fix:-none}" "auth=${ccnavi_pf_auth_source:-none}"
+		return 0
+	fi
+	log_info 事前確認で止めた -- "result=$ccnavi_pf_result" "fix=${ccnavi_pf_fix:-none}" "auth=${ccnavi_pf_auth_source:-none}"
+	return 1
+}
+
 # write-and-push（親子のチケットの start・finish・cancel）。
 case "$1" in
 start | finish | cancel | propose | consolidate)
@@ -332,6 +363,8 @@ start | finish | cancel | propose | consolidate)
 		consolidate) wap_words="$wap_id の学びの統合の子を作る" ;;
 		*) wap_words="$wap_id を取り消した" ;;
 		esac
+		# 取り消しは事前確認しない（ホストに届かない・権限が足りないときでも、取り消せるようにする）
+		[ "$1" = cancel ] || ticket_preflight || exit 1
 		ccnavi_wap_begin || exit 1
 		# 子の finish は、親のブランチへ合流してから push する。合流してよいかをここで確かめる。
 		if [ "$1" = finish ] && [ "$wap_id" != "$ccnavi_wap_family_id" ]; then
