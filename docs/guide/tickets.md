@@ -29,6 +29,8 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 
 どちらで進めるかはモデルが決める。ccnavi はセッション開始時に、作業の進め方を `.ccnavi/CCNAVI.md` から渡す（サブエージェントには渡さない）。
 渡す内容は [.ccnavi/docs/ticket-work.md](../../.ccnavi/docs/ticket-work.md) と [.ccnavi/docs/ccnavi-md.md](../../.ccnavi/docs/ccnavi-md.md) にある。
+「作業の進め方」の末尾にある現状の一文（`dry_run` の条件）は、`CCNAVI_MODE` が `dry-run` のときだけ出る。内容は「一般の deny は止まらないが、チケットの関門と補助の保護で止まる。通ったことを許可と読まず、表示された案内に従う」である。
+それ以外の手順（レビューの sh、`review: mr`、配点の書き方、後工程）は、必要になった場所で改めて届く。
 
 ## 置き場と状態
 

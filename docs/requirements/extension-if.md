@@ -56,7 +56,7 @@ sh は `<ワークスペースルート>/.ccnavi/scripts/` のものを絶対パ
 
 | ID | 型 | 要求 |
 |---|---|---|
-| REQ-EXT-12 | 事象 | `--explain --json` を求められたとき、ccnavi は、`version`・`root`・`generated_at`・`settings`・`trees`・`layers`・`projects`・`problems`・`pending_approval`・`tickets`・`parents`・`archived` を必ず載せた JSON を返し、0 で終わること（REQ-DIA-06） |
+| REQ-EXT-12 | 事象 | `--explain --json` を求められたとき、ccnavi は、`version`・`root`・`generated_at`・`settings`・`trees`・`layers`・`sums`・`projects`・`problems`・`pending_approval`・`tickets`・`parents`・`archived` を必ず載せた JSON を返し、0 で終わること（REQ-DIA-06） |
 | REQ-EXT-13 | 事象 | `--agree --preview --json [<絞り>...]` を求められたとき、ccnavi は、`version`・`batch`・`text`・`digest`・`rejected`・`problems` を載せた JSON を返し、承認済みチケットを置かないこと。承認の対象にしない提案があっても 0 で終わること（REQ-DIA-10） |
 | REQ-EXT-14 | 事象 | `user agree --yes <識別子,…> --digest <値> --json [<絞り>...]` を求められたとき、ccnavi は、標準入力が端末であることを求めず、REQ-APV-09 の照合が通るときだけ承認済みチケットを置き、`version`・`approved`・`copies`・`written`（この承認で書いた・消したパス）・`worktrees`（承認した子のワークツリーの計画）・`lines`・`prompt` を返して 0 で終わること。照合が通らなければ何も置かずに `mismatch`（呼び手が「内容が更新されました」と最新を表示し直す）を、置いている途中で止まれば置けたパス（`partial.paths`）と書いた・消したパス（`partial.written`）を載せた `partial` を返し、どちらも終了コード 1 で終わること。状態の履歴の経路は `board` とすること |
 | REQ-EXT-15 | 事象 | `ccnavi-review.sh decide <N> --preview` を求められたとき、ccnavi は、何も置かずに `version`・`parent`・`phase`・`mr`・`can_issue`・`threads`・`digest`（`v2.` で始まる不透明な文字列。指摘ごとの版を含む）を返すこと。`ccnavi-user-decide.sh <N> --choices <JSON> --digest <値>` を求められたときは、答えの JSON を標準出力の最後の行に書き、見せた指摘のうち変わった・消えたものがあれば何も置かずに `mismatch` と `changed` を返して 1 で終わること（見せたあとに増えた指摘は止めず、結果の `pending_extra` に未対応として載せる。版が 2 でなければボードは断る。REQ-TKT-18） |
