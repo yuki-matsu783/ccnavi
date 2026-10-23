@@ -703,6 +703,11 @@ stop_host() {
 	mcp-args) sh_cmd="sh .ccnavi/scripts/ccnavi-start.sh --issue ${issue_arg:-<issue の番号>} --mr ${mr_arg:-<MR の番号>} --branch ${branch_arg:-<元ブランチ>} --mcp-checked" ;;
 	*) sh_cmd="sh .ccnavi/scripts/ccnavi-start.sh $orig_args" ;;
 	esac
+	# search・merged は、新規作成なら元の引数に --mcp-checked を足すだけで進む。既存の候補や MR を採用する道
+	# （手元の候補がある・--mr が指定されている）は、issue・MR・元ブランチの 3 つがそろわないと進めない。
+	sh_adopt=""
+	{ [ "${total:-0}" -ge 1 ] || [ "$what" = mr ] || [ -n "$mr_arg" ]; } && sh_adopt=1
+	sh_adopt_cmd="sh .ccnavi/scripts/ccnavi-start.sh --issue ${issue_arg:-<issue の番号>} --mr ${mr_arg:-<MR の番号>} --branch ${branch_arg:-$sh_branch_v} --mcp-checked"
 	if [ "$sh_stage" = mcp-args ]; then
 		sh_missing=""
 		[ -n "$issue_arg" ] || sh_missing="$sh_missing --issue"
@@ -739,7 +744,11 @@ stop_host() {
 				printf '  1. mcp__github__search_pull_requests を query=「repo:%s/%s is:pr is:open %s」で呼ぶ。題・本文に #%s を含むか、元ブランチの名前に %s を含む PR が、この issue に紐づく MR\n' "$sh_owner" "$sh_repo" "$number" "$number" "$number"
 				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら、その PR の元ブランチ（head.ref）と本文の Closes を確かめ、--mr <その PR の番号> --issue <閉じる issue> --branch <head.ref> --mcp-checked を付けて打ち直す）\n'
 				printf '  3. 紐づく PR が無いと確かめたら、mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することも確かめる（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
-				printf '  4. 実在を確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
+				if [ -n "$sh_adopt" ]; then
+					printf '  4. 手元に候補があるので、--mcp-checked を足すだけでは進めない。紐づく PR が見つからないときは、ユーザに相談して止まる\n'
+				else
+					printf '  4. 実在を確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
+				fi
 			else
 				printf '  1. mcp__github__pull_request_read を method=get owner=%s repo=%s pullNumber=%s で呼び、head.ref（元ブランチ）と head.repo.full_name を読む\n' "$sh_owner" "$sh_repo" "$number"
 				printf '  2. head.repo.full_name が %s/%s と違えばフォークの MR。元ブランチがこのリポジトリに無いので作業を始められない。ユーザに伝えて止める\n' "$sh_owner" "$sh_repo"
@@ -750,7 +759,11 @@ stop_host() {
 			printf '  1. mcp__github__list_pull_requests を owner=%s repo=%s head=%s:%s state=closed で呼び、マージ済み（merged_at がある）の PR が無いことを確かめる\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
 			printf '     mcp__github__* がセッションに無いときは gh で代行する: gh api -X GET repos/%s/%s/pulls -f state=closed -f per_page=100 -f head=%s:%s（-X GET を付ける。-f だけだと POST になる。-f なら gh が値をエンコードする）\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
 			printf '  2. あれば、マージ済みのブランチは再利用できない。ユーザに伝えて止める\n'
-			printf '  3. 無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
+			if [ -n "$sh_adopt" ]; then
+				printf '  3. 無いと確かめたら、既存の MR を採用する形で、issue・MR・元ブランチの 3 つをそろえて打ち直す（値が確かめられないときは、ユーザに相談して止まる）: %s\n' "$sh_adopt_cmd"
+			else
+				printf '  3. 無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
+			fi
 			;;
 		title)
 				printf '  1. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することを確かめて題を読む（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
@@ -795,11 +808,19 @@ stop_host() {
 			printf '  2. 再実行できないなら、ブラウザで MR !%s の説明欄と元ブランチを読み、閉じる issue（Closes #<番号>）を確かめ、打ち直す: %s\n' "$stop_mr" "$sh_cmd"
 			;;
 		search)
-			printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR があるか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$what" "$number"
+			if [ -n "$sh_adopt" ]; then
+				printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR の番号と元ブランチ、閉じる issue を確かめ、3 つそろえて打ち直します（確かめられないときは、ユーザに相談して止まる）: %s\n' "$ccnavi_h_path" "$what" "$number" "$sh_adopt_cmd"
+			else
+				printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR があるか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$what" "$number"
+			fi
 			;;
 		merged)
-			printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$stop_branch"
-				;;
+			if [ -n "$sh_adopt" ]; then
+				printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いか確かめ、無ければ issue・MR・元ブランチの 3 つをそろえて打ち直します（確かめられないときは、ユーザに相談して止まる）: %s\n' "$ccnavi_h_path" "$stop_branch" "$sh_adopt_cmd"
+			else
+				printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$stop_branch"
+			fi
+			;;
 		title)
 			printf '  2. 再実行できないなら、ブラウザで issue #%s の題を読み、%s --slug <語> --title '"'"'<題>'"'"' と実行します（issue が実在すると確かめたあとに限り、--mcp-checked を付ける）。\n' "$number" "$sh_cmd"
 			;;
