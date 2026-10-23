@@ -916,11 +916,14 @@ class FlowLockTest(FlowHarness):
         self.assertIn("[fancyNewNode] 未来の種類", text)
         # askUserQuestion: 止まってメインに返す。
         self.assertIn("問いと選択肢を添えてメインに返して", text)
-        # subAgent: 入れ子で起こし、担当の子・ワークツリー・範囲を必ず書く。Agent が無ければ返す。
-        self.assertIn(f"担当の子チケット {CHILD}", text)
+        # subAgent: 入れ子で起こし、担当の子の識別子を 1 つだけ書く（ccnavi がその子のワークツリーで
+        # 起動する）。担当以外の子とパスは書かず、isolation は使わない。Agent が無ければ返す。
+        self.assertIn(f"担当の子の識別子 {CHILD} を 1 つだけ書き", text)
+        self.assertIn("ccnavi が範囲とフローの案内を書き足す", text)
+        self.assertIn("担当以外の子の識別子とワークツリーのパスは書かないでください", text)
+        self.assertIn("isolation は使いません", text)
         self.assertIn(child_tree, text)
         self.assertIn("wip/research/*", text)
-        self.assertIn("他の子のワークツリーには触れない", text)
         self.assertIn("Agent ツールが無ければ", text)
         self.assertIn("起動してほしいエージェントの種類・プロンプト", text)
 

@@ -381,7 +381,7 @@ class RecordTest(unittest.TestCase):
             "enable",
             pre_tool_use("Bash", "command", "git push origin main"),
             pre_tool_use("Bash", "command", "go build ./..."),
-            pre_tool_use("Task", "prompt", "something"),
+            pre_tool_use("WebSearch", "query", "something"),
             json.dumps({"hook_event_name": "SessionStart"}),
             json.dumps({"hook_event_name": "PreCompact"}),
         )

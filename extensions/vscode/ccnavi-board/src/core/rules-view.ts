@@ -53,6 +53,7 @@ export const KNOWN_TOOLS = [
   "NotebookEdit",
   "Skill",
   "Agent",
+  "Task",
   "WebFetch",
 ] as const;
 

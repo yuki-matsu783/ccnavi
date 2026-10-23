@@ -30,7 +30,15 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_RECORDS_PRUNE` | 記録と state を消す `ccnavi user prune`（古い形の `ccnavi --prune`。`--preview` なしのもの）をシェルから打った。チケット制御に依らない |
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルの `user` の入口（古い形の承認用のオプション付きを含む）か `ccnavi-user-*.sh` を打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も。端末を求めない入口に、止める操作（`user agree` などと `--yes`・`ccnavi-user-decide.sh`・`worktree retire --abandon`・`decide --choices`・`--guard-ticket-approval`）を組み立てうる読み切れない引数（変数・置換・glob・`xargs`）を渡した形と、標準入力から読むシェルに入口の名前を含む文字列を流す形も（9.5、9.18） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
-| `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く、基準点より先に自分のコミットがある。同じ HEAD では 1 回だけ止めて `finish` か続ける理由を促す（9.6）。記録の `decision` は `nudge` |
+| `DENY_AGENT_ISOLATION` | `Agent`・`Task` に `isolation` のキーがある（値によらない）。作業場所は ccnavi が決め、isolation のワークツリー（`.claude/worktrees/agent-<id>`）にはチケットの範囲が当たらない。補助で、チケット制御が無効でも dry-run でも止める。`CCNAVI_MODE=disable` だけ通す（9.12） |
+| `DENY_AGENT_NO_CHILD` | 親のワークツリーから、担当の子を指さずに編集する種類のサブエージェントを起動した。作業中の子の識別子を最大 5 件並べる。関門。読み取り専用の種類は止めない（9.12） |
+| `DENY_AGENT_MULTI_TARGET` | プロンプトが違うワークツリーを 2 つ以上指している（「触れない」と書いた子も数える）。関門。チケット制御が無効のときも、パスが 2 つ以上なら止める（補助。9.12） |
+| `DENY_AGENT_PARENT_TREE` | プロンプトが親のワークツリーだけを指している。関門（9.12） |
+| `DENY_AGENT_CHILD_UNAVAILABLE` | 指した子が担当にできない（閉じた・レビュー待ち・blocked・未着手・ワークツリーが無い・プロジェクトの食い違い）。未着手とワークツリーが無い場合だけ `start` の打ち方を示す。関門（9.12） |
+| `DENY_AGENT_TARGET_INVALID` | プロンプトのワークツリーのパスが使えない（このワークスペースの外・`..`・シンボリックリンク・登録が無い・名前が無い）。補助（9.12） |
+| `DENY_AGENT_CWD_CONFLICT` | `tool_input` の cwd が、プロンプトで決まった担当先と違う。補助（9.12） |
+| `NUDGE_TICKET_FEEDBACK` | メインエージェントの `Stop` で、cwd のツリーが承認済みで着手済みの親子に結び付き、親が blocked でなく、親の局面が「フィードバック計画待ち」。同じ状態（親・HEAD・改版を提案済みか）では 1 回だけ止めて、改版を書いて `propose` で送りユーザに承認を頼むよう促す。実行中のサブエージェントが居る間は出ない（9.12）。記録の `decision` は `nudge` |
+| `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く、基準点より先に自分のコミットがある。同じ HEAD では 1 回だけ止めて `finish` か続ける理由を促す（9.6）。記録の `decision` は `nudge`。実行中のサブエージェントが居る間は出ない（9.12） |
 | `NUDGE_TICKET_REQUEST` | メインエージェントの `Stop` で、承認済みの親に作業中の子が残っているか、子が全部閉じたのにレビューを要するフェーズの `requested` が無い。同じ状態では 1 回だけ止めて、次の一手（`finish`・合流・ELI5・`request`）を促す（9.6）。`finish` の促しと重なった回は出ない。実行中のサブエージェントが居る間は出ない（9.12）。記録の `decision` は `nudge` |
 | `NUDGE_SUBAGENT_OUTCOME` | メインエージェントの `Stop` で、終わったサブエージェントの結果（`logs/state/subagent-<セッション>-<agent_id>.outcome`）が `outside`（範囲外の変更を残したまま終わった）か `unchecked`（範囲を確かめられなかった）で、まだ促していない。止めて、結果ごとの 1 行と「合流（finish）の前に確かめて直すか、ユーザに伝える」を渡す。同じ結果では 1 回だけ。`unattributed` と正常な終了（`ok`・`fixed`）では出ない。順序は `finish` → 依頼までの道 → この促し → `integrate` → ルール。実行中のサブエージェントが居る間は出ない（9.12）。記録の `decision` は `nudge` |
 | `NUDGE_INTEGRATE` | メインエージェントの `Stop` で、チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`）に未コミットの変更か取り込み先に入っていないコミット（直接作業の記録の起点Sからの `S..先頭`。記録が無ければ統合先で数える）があり、取り込み中のmarkerが無いときに出る。markerは、メインのチェックアウトのgitディレクトリの `ccnavi-integrate/<名前>/` に置く。旧形式の取り込み済みの写し `ccnavi-integrate-done/<名前>` は、branch_shaが今のHEADと同じで、未コミットの変更が無いときだけ記録とみなす。cwdのツリーのほか、このセッションが書き込んだ直接作業のツリー（`logs/state/direct-<セッション>.json`）も調べる。チケット制御の有無は問わない。同じ状態では 1 回だけ止めて、`integrate` の打ち方と、一時ワークツリーに展開した取り込み結果をユーザに確かめてもらう手順（`integrate-done`・`integrate --abort`）を、1 行で完結するコマンドで促す。hookは `integrate` を打たない。取り込み先が切り替わった、メインのチェックアウトに途中の操作がある、記録が壊れている、などのときは、止めずに理由を `systemMessage` で言う。メインのチェックアウトの書きかけでは止めない。記録が無いワークツリーには `--adopt` を案内する。`finish`・依頼までの道の促しと重なった回は出ない。実行中のサブエージェントが居る間も出ない。記録の `decision` は `nudge` |
@@ -80,6 +88,7 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | `builtin:ticket-project` | `DENY_TICKET_PROJECT_MISMATCH` |
 | `builtin:ticket-flow-lock` | `DENY_TICKET_FLOW_LOCKED` |
 | `builtin:phase-review` | `DENY_PHASE_REVIEW` |
+| `builtin:agent-isolation` / `builtin:agent-no-child` / `builtin:agent-multi-target` / `builtin:agent-parent-tree` / `builtin:agent-child-unavailable` / `builtin:agent-target-invalid` / `builtin:agent-cwd-conflict` | `DENY_AGENT_ISOLATION` / `DENY_AGENT_NO_CHILD` / `DENY_AGENT_MULTI_TARGET` / `DENY_AGENT_PARENT_TREE` / `DENY_AGENT_CHILD_UNAVAILABLE` / `DENY_AGENT_TARGET_INVALID` / `DENY_AGENT_CWD_CONFLICT`（`hook.agentlaunch`） |
 | `builtin:subagent-ticket-op` | `DENY_SUBAGENT_TICKET_OP` |
 | `builtin:redirect-limit` | `DENY_REDIRECT_LIMIT` |
 
@@ -154,7 +163,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 | 複合コマンドの 1 つの区間が読めないとき | 全体が縮退する。安全側なのでそのまま |
 | `SubagentStart` の `additionalContext` がサブエージェントに届くか | 未実測。届かなければ、サブエージェント内の最初の `PreToolUse` で渡す形に変える |
 | `SubagentStart` の payload に `tools` が来るか | 未実測。来れば編集するサブエージェントかの見分けに使い、来なければ `.claude/agents` の定義と組み込みの一覧で見分ける（`hook/agentkind.py`）。同じ作業ツリーの案内（9.12）も、上の行のとおり `additionalContext` が届くことを前提にする |
-| `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd` | 未実測。止めるかどうかは cwd で親を引くので、受け取る cwd によって止まるかどうかが分かれる |
+| `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd` | 未実測。`isolation` は値にも cwd にもよらず起動の PreToolUse で止める（`DENY_AGENT_ISOLATION`）ので、この実測は止める判定に影響しない |
 
 `shlex` は引用・`#`・改行・行継続・`<<` の扱いがシェルと違う。`shellread.py` は先に原文を走査してから語の分割だけを
 shlex に任せる。走査か shlex のどちらかに手を入れたら `tests/core/test_shellread.py` の `SHELL_CASES`（bash 3.2 と zsh で実測）を回す。
@@ -200,7 +209,7 @@ shlex に任せる。走査か shlex のどちらかに手を入れたら `tests
 
 | | 弱点 | 今の扱い |
 |---|---|---|
-| G2 | 孫の `cwd` が親のワークツリーなので、`SubagentStart` が親の子を全部並べ、`SubagentStop` が兄弟の子の変更でも差し戻す | フローの案内が、入れ子のプロンプトに担当の子・ワークツリー・範囲を書かせる（9.12）。緩和であって、防いではいない |
+| G2 | 孫の `cwd` が親のワークツリーなので、`SubagentStart` が親の子を全部並べ、`SubagentStop` が兄弟の子の変更でも差し戻す | 入れ子の起動では担当の子の識別子を 1 つ書かせ、担当の案内（子・ワークツリー・範囲）を起動前にプロンプトへ書き足す（9.12）。緩和であって、防いではいない |
 | G3 | 孫は、兄弟の子のワークツリーにもその範囲の中なら書ける | 同上 |
 | G4 | 差し戻しを無視した知らせが、起動した子にしか届かない | 入れ子の起動なら `systemMessage` にも載せる（9.12） |
 | G5 | Bash の実行後チェックは `cwd` のツリーだけを見る | そのまま |

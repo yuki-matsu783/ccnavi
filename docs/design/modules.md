@@ -125,6 +125,7 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 | `src/ccnavi/tickets/ops_stop_integrate.py` | Stop で、チケットに結び付かない直接作業が `integrate` まで進んでいないことを見つけ、打ち方を促す判定（統合先のツリーが綺麗でないときは促さず理由を言う） |
 | `src/ccnavi/tickets/base_bound.py` | `ccnavi tree base-bound`。直接作業の取り込み先のブランチがチケットに結び付くか（識別子の衝突はワークスペース全体、取り込み先との結び付きは取り込み先のリポジトリだけを見る） |
 | `src/ccnavi/tickets/ops_stop_request.py` | Stop でレビュー依頼までの道（`finish`・すべての子が合流済みかの確認・ELI5・`request`）の途中を見つけ、次の一手を促す判定 |
+| `src/ccnavi/tickets/ops_stop_feedback.py` | Stop で、親の局面が「フィードバック計画待ち」のまま終えようとしたとき、改版を書いて送るよう 1 回だけ促す（`NUDGE_TICKET_FEEDBACK`）。改版を提案済みかで文面を分ける |
 | `src/ccnavi/tickets/core.py` | 承認・レビュー済みの判定のコアの入口。名前を束ね直すだけで、`entry/cli.py` と Chrome 拡張（Pyodide）はここを引く |
 | `src/ccnavi/tickets/core_base.py` | 判定のコアの共通部分。入力（`Snapshot`）・承認の判定（`judge_approval`）・書くもの（`Changes`）・ディスクへの書き込み |
 | `src/ccnavi/tickets/core_approve.py` | 判定のコアを通す手元の承認の入口（`user agree` の 4 つの枝） |
@@ -147,6 +148,8 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 | `src/ccnavi/hook/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、同じ作業ツリーで編集する別のサブエージェントの案内、範囲外の変更の差し戻し |
 | `src/ccnavi/hook/subagent_outcome.py` | サブエージェントの終了結果（`ok`・`fixed`・`outside`・`unchecked`・`unattributed`）の記録（`.outcome`）、親への 1 度きりの知らせ、Stop の促しの文 |
 | `src/ccnavi/hook/agentkind.py` | サブエージェントが編集するものか、読み取り専用かの見分け |
+| `src/ccnavi/hook/agentlaunch.py` | 起動ツール（`Agent`・`Task`）の PreToolUse で、プロンプトの言及（子の識別子・ワークツリーのパス）から担当を決める。止める理由（`DENY_AGENT_*`）か、プロンプトに書き足す担当の案内の計画を返すだけで、応答は書かない |
+| `src/ccnavi/hook/childnote.py` | 子 1 本の担当の案内（ワークツリー・先行・範囲・フロー）と親の局面の行を組む。`SubagentStart` の文と、起動前にプロンプトへ書き足す案内が共有する |
 | `src/ccnavi/hook/docsearch.py` | `--docs` と `SessionStart` の入口。索引を置く場所（ワークスペースとプロジェクト）を決めて集め、引き方を案内する |
 | `src/ccnavi/hook/docsearch_index.py` | md の frontmatter の索引（`ccnavi-index.jsonl`）を組む。変わった md だけを読み直す |
 | `src/ccnavi/hook/docsearch_query.py` | 索引の引き方。`--docs` の問いの検査、当たり、並べ方と表 |

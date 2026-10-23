@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 
-from ..infra import settings, shellread, shellread_words
+from ..infra import modes, settings, shellread, shellread_words
 from ..policy import rules, selfguard_shell
 from . import user_only
 
@@ -49,7 +49,7 @@ _FORBIDDEN_COMMAND = re.compile(
 SHELL_TOOLS = ("Bash", "PowerShell")
 
 # レビューが済むまで止めるツール。
-HELD_TOOLS = ("Agent", *SHELL_TOOLS)
+HELD_TOOLS = (*modes.AGENT_TOOLS, *SHELL_TOOLS)
 
 # ccnavi 自身の実行ファイルを、ユーザの判断の経路に使う形。`--agree` `--reviewed`
 # `--close-early` と、状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを

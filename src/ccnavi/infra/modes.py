@@ -125,8 +125,14 @@ def holds_in_dry_run(kind: str) -> bool:
     return kind in (GATE, AUX)
 
 
+# サブエージェントの起動ツール。Claude Code の版によって Agent か Task で来る。
+AGENT_TOOLS = ("Agent", "Task")
+# サブエージェントが親へ報告を返すためのツール。判定に達せなかったときも止めない
+# （止めると、体が報告を返せずに終われない）。
+REPORT_TOOLS = ("SubagentHandback", "StructuredOutput")
+
 # ツールの種類ごとの、判定に達せなかったときの扱い。
-STRICT_TOOLS = ("Write", "Edit", "NotebookEdit", "Agent")
+STRICT_TOOLS = ("Write", "Edit", "NotebookEdit", *AGENT_TOOLS)
 READ_TOOLS = ("Read", "Grep", "Glob")
 SHELL_TOOLS = ("Bash", "PowerShell")
 
@@ -142,13 +148,18 @@ def fail_closed(mode: str, tool: str | None = None, *, safe: bool = False) -> in
     確かめた呼び出し（`hook.failsafe`）。
 
     - 空（payload が読めずツールが分からない）: 止める
-    - Write・Edit・NotebookEdit・Agent: dry-run でも止める
+    - 報告用のツール（`REPORT_TOOLS`）: モードに関係なく通す
+    - Write・Edit・NotebookEdit・Agent・Task: dry-run でも止める
     - Read・Grep・Glob・Bash・PowerShell: `safe` のときだけ通す。dry-run でも同じ
     - 知らないツール: enable は止め、dry-run は通す
     """
     if tool is None:
         return EXIT_OK if mode == DRY_RUN else EXIT_BLOCK
-    if tool == "" or tool in STRICT_TOOLS:
+    if tool == "":
+        return EXIT_BLOCK
+    if tool in REPORT_TOOLS:
+        return EXIT_OK
+    if tool in STRICT_TOOLS:
         return EXIT_BLOCK
     if tool in READ_TOOLS or tool in SHELL_TOOLS:
         return EXIT_OK if safe else EXIT_BLOCK
