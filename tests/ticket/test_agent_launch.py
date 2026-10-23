@@ -21,7 +21,7 @@
 13. 既存の判定との合成
 14. チケット制御が無効のとき
 15. 入れ子
-17. 案内の組み立て（偽の囲み、上限）
+16. 案内の組み立て（偽の囲み、上限）
 """
 
 from __future__ import annotations
@@ -429,7 +429,7 @@ class CompositionTest(LaunchHarness):
         if "permissionDecision" not in out:
             self.assertIn("updatedInput", out)
         else:
-            # 権限モードによっては確認（ask）に倒れる。そのときも入力の更新を添える
+            # 権限モードによっては確認（ask）になる。そのときも入力の更新を添える
             self.assertEqual(out["permissionDecision"], "ask")
             self.assertIn("updatedInput", out)
 

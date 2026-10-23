@@ -52,7 +52,7 @@ keywords: [Agent, Task, cwd, updatedInput, SubagentStart, additionalContext, iso
 
 ## 分かったこと（段階2の設計に効く）
 
-- この版では、Agent の `cwd` は、hook が足しても Agent の引数として使われない（PostToolUse の tool_input にも出ない）。依頼文の前提は、別の版か別の条件の観測の可能性がある
+- この版では、Agent の `cwd` は、hook が足しても Agent の引数として使われない（PostToolUse の tool_input にも出ない）。依頼文の前提は、別の版か別の条件での観測である可能性がある
 - prompt の書き替え（E-2 の経路）は permissionDecision 無しで効く
 - 体の hook の cwd は、起動時のメインの cwd のまま（前提の表と一致）
 - isolation の拒否は、メインが外して起動し直す（B の文面で足りる）
