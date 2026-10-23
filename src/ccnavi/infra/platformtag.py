@@ -72,10 +72,10 @@ def path_executable(path_env: str | None = None) -> str:
 
     振り分けの sh が `bin/` に何も見つけなかったときに起動するもの
     （ccnavi-launcher.sh の ccnavi_launcher_path）。sh と同じ規則で探す: 絶対パスの項目だけを、
-    PATH に書かれた順に見て、通常ファイルで実行できるものを最初に当たったところで返す。
+    PATH に書かれた順に見て、通常ファイルで実行できる最初のものを返す。
     空と相対の項目は cwd で結果が変わるので飛ばす。リンクは解かない（書かれたとおりのパスを返す）。
 
-    引数はテストで PATH を差し替えるためにある。省くと、走っている環境の PATH を読む。
+    引数は、テストで PATH を差し替えるためにある。省くと、実行中の環境の PATH を読む。
     """
     raw = os.environ.get("PATH", "") if path_env is None else path_env
     for place in raw.split(os.pathsep):

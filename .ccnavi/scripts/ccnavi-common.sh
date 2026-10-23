@@ -255,7 +255,7 @@ ccnavi_compat_skew() {
 }
 
 # PATH の ccnavi。振り分けの sh（ccnavi-launcher.sh の ccnavi_launcher_path）と同じ規則:
-# 絶対パスの項目だけを見て、通常ファイルで実行できるものを最初に当たった順に返す。
+# 絶対パスの項目だけを見て、通常ファイルで実行できる最初のものを返す。
 ccnavi_bin_path() {
 	ccnavi_bp_ifs=$IFS
 	set -f

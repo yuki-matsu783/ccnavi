@@ -363,7 +363,7 @@ class LauncherTest(unittest.TestCase):
     # L6: bin/ に無いときだけ PATH の ccnavi を使う
 
     def on_path(self, name="ccnavi", where="from-path"):
-        """PATH に置く組み立ての代わり。置き場を返す。"""
+        """PATH に通す置き場を作って返す。"""
         place = os.path.join(self.dir, "on-path")
         write(
             os.path.join(place, name),
