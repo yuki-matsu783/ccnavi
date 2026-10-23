@@ -38,6 +38,8 @@ READ_TOOLS = (
     "todowrite",
     "agent",
     "task",
+    "subagenthandback",
+    "structuredoutput",
 )
 
 # 定義の frontmatter を読む長さの上限（バイト）。

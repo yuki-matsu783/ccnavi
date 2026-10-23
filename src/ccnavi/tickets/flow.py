@@ -872,8 +872,7 @@ def briefing(
     lines.append(FENCE_OPEN)
     lines.extend(f"      {s}" for s in steps)
     lines.append(FENCE_CLOSE)
-    worktree = flow_text.clean(tree.worktree_path(root, child.ticket))
-    ticket, scope = flow_text.clean(child.ticket), flow_text.clean(scope) or "(空)"
+    ticket = flow_text.clean(child.ticket)
     if flow_shape.ASK in kinds:
         lines.append(
             f"    {flow_shape.ASK} のノード: サブエージェントはユーザに聞けない"
@@ -890,12 +889,12 @@ def briefing(
     if kinds & set(SPAWN):
         lines.append(
             "    subAgent / subAgentFlow のノード: Agent ツールがあれば入れ子の"
-            "サブエージェントとして起動してください。そのプロンプトには必ず、担当の子チケット "
-            f"{ticket}、ワークツリー {worktree}、範囲 {scope} を書き、"
-            "他の子のワークツリーには触れないことを書いてください。"
+            "サブエージェントとして起動してください。そのプロンプトには担当の子の識別子 "
+            f"{ticket} を 1 つだけ書き（ccnavi が範囲とフローの案内を書き足す）、"
+            "担当以外の子の識別子とワークツリーのパスは書かないでください。isolation は使いません。"
             "Agent ツールが無ければ（入れ子の上限）、"
             "そのノードで手を止め、起動してほしいエージェントの種類・プロンプト・担当の子チケットの"
-            "ワークツリーと範囲を添えてメインに返してください。メインがそのとおり起動し、結果を持って"
+            "識別子を添えてメインに返してください。メインがそのとおり起動し、結果を持って"
             "同じサブエージェントを再開させる。"
         )
     return lines

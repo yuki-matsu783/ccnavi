@@ -515,7 +515,7 @@ class LintTest(unittest.TestCase):
                 self.root,
                 dict(SOUND, id="重複"),
                 dict(SOUND, id="重複", glob="*rm -rf *"),
-                dict(SOUND, id="当たらないツール", match="Task|Bash"),
+                dict(SOUND, id="当たらないツール", match="Mystery|Bash"),
             ),
         )
 
@@ -527,7 +527,7 @@ class LintTest(unittest.TestCase):
         # （test_rule_record_name の IdRequiredTest）。
         self.assertEqual(warns, 2, result.stdout)
         self.assertIn("id が重複", result.stdout)
-        self.assertIn("Task", result.stdout)
+        self.assertIn("Mystery", result.stdout)
 
     def test_権限ルールの名前で書いたmatchは指摘しない(self):
         # Claude Code の権限ルール `ToolName(指定子)` の括弧の中を除いた名前は、
@@ -542,17 +542,17 @@ class LintTest(unittest.TestCase):
                 dict(SOUND, id="search", match="Grep|Glob", glob="*/secrets/*"),
                 dict(SOUND, id="skill", match="Skill", glob="deploy*"),
                 dict(SOUND, id="fetch", match="WebFetch", glob="*://example.com/*"),
-                dict(SOUND, id="gone", match="WebSearch|Task", glob="*"),
+                dict(SOUND, id="gone", match="WebSearch|Mystery", glob="*"),
             ),
         )
         self.assertEqual(result.returncode, 0)
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
-        # WebSearch は指定子を持たず、Task は今の Claude Code に無い。
+        # WebSearch は指定子を持たず、Mystery は Claude Code に無いツール。
         # どちらも対象を取り出せないので、この 2 つだけを名前ごとに報告する。
         self.assertEqual(warns, 2, result.stdout)
         self.assertIn("WebSearch", result.stdout)
-        self.assertIn("Task", result.stdout)
+        self.assertIn("Mystery", result.stdout)
 
     def test_止めないモードはwarnとして報告される(self):
         result = lint(self.root, rules_file(self.root, SOUND), mode="dry-run")

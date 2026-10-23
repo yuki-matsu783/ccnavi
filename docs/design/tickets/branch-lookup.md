@@ -15,14 +15,11 @@ keywords: [issue, MR, ブランチ, ccnavi-branches.sh, 着手]
 
 **UserPromptSubmit。** チケット制御が有効なら、依頼文（payload の `prompt`）から issue・MR の指定を探す
 （`branchfind.prompt_refs`。`#152`・`issue 152`・`/issues/152`、`!5`・`MR 5`・`PR #12`・`/pull/5`・`/-/merge_requests/5`）。
-囲みのコードブロックの中、`C#`・`&#123;`・`##12`・`# 見出し`・`#fff`・0 で始まる番号・CSS の色の値・`すごい!5` は拾わない。
-見つけたら、指定ごとに `'{root}/.ccnavi/scripts/ccnavi-start.sh --issue N'`（`--mr N`）を打たせる。`ccnavi-start.sh` は既存の候補を
-探し、無ければ Draft MR・ワークツリー・ブランチを作る。終了コードの扱いも添える。候補探しは番号の言及でも拾うが、採用してよいかは `ccnavi-start.sh` が MR の閉じる issue（ホストのリンク）で確かめる。3（候補が複数、MR の無い候補、MR が閉じる issue が複数）は何も作られていないので、
-一覧をユーザに見せて「既存のブランチで続ける（既存のチケットに結び付くならそのチケットで続け、そうでなければ
-`worktree add .claude/worktrees/<ブランチ名の `/` を `-` にしたもの> <ブランチ>` でブランチを直接チェックアウトする）・新しく
-`<先頭の語>-<番号>-<slug>` を切る・やめる」を聞いて返事を待つ。4（ホストに届かない、MR が閉じる issue を読み切れない）は出力の案内どおり MCP で代行し、
-案内された引数で打ち直す。新規作成では `--mcp-checked` を足すだけで、既存の MR を採用するときは 3 つの引数をそろえる。1・2 は出力の理由をユーザに伝える、という文を `additionalContext` で渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの
-絶対パス）。
+囲みのコードブロックとインラインコード（`` `…` ``）の中、番号が別の語の一部のとき（`手順#2`・`issue 2つ目`・`PR 3本`。番号の直後は行末・空白・ASCII の句読点と閉じ括弧・引用符・`、` `。`・助詞のときだけ読む）、`C#`・`&#123;`・`##12`・`# 見出し`・`#fff`・0 で始まる番号・CSS の色の値・`すごい!5` は拾わない。
+見つけたら、次の短い指示を `additionalContext` で渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの絶対パス）。
+実装の依頼なら、着手前に `ccnavi-start.sh --check`、続けて指定ごとに `'{root}/.ccnavi/scripts/ccnavi-start.sh --issue N'`（`--mr N`）を打ち、出力の「次:」に従う。URL が別のリポジトリを示すときは `cd <プロジェクト> && … --repo <owner/repo>` の形にする。調べ・質問に答えるだけなら、チケット作業にせずそのまま答えてよい。
+`ccnavi-start.sh` は既存の候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る。候補探しは番号の言及でも拾うが、採用してよいかは `ccnavi-start.sh` が MR の閉じる issue（ホストのリンク）で確かめる。終了コード（3 の候補が複数・4 のホストに届かない・1・2）ごとの扱いは指示に書かず、`ccnavi-start.sh` の出力の「次:」に任せる。
+すでにチケットに結び付く番号は、`ccnavi-start.sh` を勧めず、そのチケットのワークツリーで続ける（実装の依頼なら `--check` を最初に打つ。説明・調査だけなら作業場所を変えない）。
 dry-run でも渡す。
 
 **`ccnavi-branches.sh (--issue N | --mr N) [--json]`。** cwd のリポジトリ（ワークスペース・`projects/<名前>`・そのワークツリー）

@@ -35,7 +35,7 @@ import os
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from ..infra import settings, tree
+from ..infra import modes, settings, tree
 from ..policy import rules
 from . import (
     approval,
@@ -417,7 +417,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
     言っても次に何をすればよいかが分からないので、段ごとにやることを書き分ける。
     """
     review_sh = settings.script_command(root, "ccnavi-review.sh")
-    what = "サブエージェントの起動" if tool == "Agent" else "このシェル実行"
+    what = "サブエージェントの起動" if tool in modes.AGENT_TOOLS else "このシェル実行"
     n = phase.number
     why = (
         "人間レビューが必要な子を含みます" if not phase.planned else "レビューが必要なフェーズです"
@@ -450,7 +450,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             f"レビュー済みのマーカーが置かれるまで、{what}を止めます。",
             todo,
             PARALLEL_REQUEST_NOTE,
-            *([] if tool == "Agent" else [phase_forms.EXEMPT_NOTE]),
+            *([] if tool in modes.AGENT_TOOLS else [phase_forms.EXEMPT_NOTE]),
         ]
     )
 

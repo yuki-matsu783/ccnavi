@@ -56,24 +56,27 @@ class PromptHintTest(PhaseHarness):
         self.assertIn(f"'{sh} --issue 152'", said)
         self.assertIn(f"'{sh} --mr 5'", said)
         self.assertIn(os.path.realpath(self.root).replace("\\", "/"), said)
-        # ユーザに確かめて返事を待つこと、選べる 3 つ
-        self.assertIn("返事を待つ", said)
-        self.assertIn("既存のブランチで続ける", said)
-        self.assertIn("<先頭の語>-<番号>-<slug>", said)
-        self.assertIn("やめる", said)
-        self.assertNotIn("branch:", said)
-        self.assertIn("ccnavi-git.sh", said)
-        # 最初に事前確認を打たせる。0 以外なら結果と「次:」を伝えて止まる
-        self.assertIn(f"最初に '{sh} --check' を打つ", said)
-        self.assertIn("結果と「次:」をユーザに伝えて止まる", said)
-        self.assertIn("終了コード 3（候補が複数）", said)
-        self.assertIn("終了コード 4（ホストに届かない）", said)
-        self.assertIn("MCP で代行し、案内された引数で打ち直します", said)
-        self.assertIn("終了コード 1・2 なら、出力の理由をユーザに伝える", said)
-        # 出力の「次:」（提案づくり）に従い、承認までは実装せず、直接実装へ切り替えない
-        self.assertIn("出力に「次:」の行があれば、その一手に従う", said)
-        self.assertIn("詰まっても直接実装に切り替えない", said)
+        # 短い指示。終了コードごとの説明は ccnavi-start.sh の出力の「次:」に任せる
+        self.assertIn(f"着手前に '{sh} --check'、続けて", said)
+        self.assertIn("出力の「次:」に従う", said)
+        self.assertIn("Draft MR とワークツリーができる", said)
+        # 実装と調査の両方の分岐が入る
+        self.assertIn("実装の依頼なら", said)
+        self.assertIn("調べ・質問に答えるだけなら、チケット作業にせずそのまま答えてよい", said)
+        self.assertIn("どちらか分からなければ、ユーザに聞く", said)
+        for gone in ("終了コード 3", "終了コード 4", "返事を待つ", "<先頭の語>-<番号>-<slug>"):
+            self.assertNotIn(gone, said)
         self.assertNotIn("ccnavi-branches.sh", said)
+
+    def test_a_number_inside_a_word_gets_no_instruction(self):
+        self.assertEqual(self.prompt("手順#2を見直して"), "")
+        self.assertEqual(self.prompt("`#12` を直して", session="s2"), "")
+
+    def test_the_short_instruction_has_both_branches(self):
+        said = self.prompt("#1 を直して")
+        self.assertIn("実装の依頼なら", said)
+        self.assertIn("調べ・質問に答えるだけなら", said)
+        self.assertLess(len(said.splitlines()), 4)
 
     def test_a_ccnavi_notice_is_not_a_reference(self):
         notice = "[ccnavi] 取り込み済み: https://example.com/acme/widgets/pull/296 を閉じた\n"
@@ -101,10 +104,10 @@ class PromptHintTest(PhaseHarness):
         self.approve()
         said = self.prompt("#152 を直して")
         self.assertIn("すでに feature-152-login(doing)", said)
-        self.assertIn("最初に ccnavi-start.sh --check を打つ", said)
+        self.assertIn("--check を最初に打つ", said)
         self.assertIn("結び付いている", said)
-        self.assertIn("ワークツリー", said)
-        self.assertIn("言い直してもらう", said)
+        self.assertIn("実装の依頼なら、そのチケットのワークツリー（", said)
+        self.assertIn("説明・調査だけなら、作業場所を変えずに答えてよい", said)
         self.assertNotIn("ccnavi-start.sh --issue", said)
         # 結び付かない番号は今までどおり
         self.assertIn("--issue 9", self.prompt("#9 を直して", session="s5"))

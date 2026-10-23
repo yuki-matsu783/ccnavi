@@ -18,6 +18,7 @@ from unittest import mock
 from ccnavi.entry import cli_args
 from ccnavi.hook import events, judge
 from ccnavi.infra import hookio, modes, settings
+from ccnavi.policy import selfguard
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -315,6 +316,7 @@ class FailClosedByToolTest(unittest.TestCase):
             ("Edit", {"file_path": "/tmp/x"}),
             ("NotebookEdit", {"notebook_path": "/tmp/x.ipynb"}),
             ("Agent", {"description": "d"}),
+            ("Task", {"description": "d"}),
         ):
             with self.subTest(tool=tool, mode="dry-run"):
                 self.assertEqual(self.crash(tool, tool_input, "dry-run"), 2)
@@ -379,6 +381,84 @@ class FailClosedByToolTest(unittest.TestCase):
     def test_unknown_tools_stop_in_enable_and_pass_in_dry_run(self):
         self.assertEqual(self.crash("Mystery", {}), 2)
         self.assertEqual(self.crash("Mystery", {}, "dry-run"), 0)
+
+
+REPORT_TOOLS = ("SubagentHandback", "StructuredOutput")
+
+
+class ReportToolTest(unittest.TestCase):
+    """サブエージェントの報告用のツールは、ccnavi の内部エラーで止めない。
+
+    体が報告を返せないと、終われずに続けることになる。知らないツール全般を通す変更ではなく、
+    `modes.REPORT_TOOLS` の名前だけ。入力を読めない障害までは通すと約束しない。
+    """
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = directory.name
+
+    def payload(self, tool):
+        return {
+            "hook_event_name": "PreToolUse",
+            "tool_name": tool,
+            "tool_input": {"result": "ok"},
+            "cwd": self.root,
+        }
+
+    def test_a_crash_in_the_judgement_does_not_stop_a_report(self):
+        for tool in REPORT_TOOLS:
+            for mode in ("enable", "dry-run"):
+                with self.subTest(tool=tool, mode=mode):
+                    with mock.patch.object(judge, "decide_before", side_effect=boom):
+                        result, row = run(self.root, self.payload(tool), mode)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    # 通したことは言い、記録も残す
+                    self.assertIn("[ccnavi] internal-error", result.stderr)
+                    self.assertEqual(row["reason"], "internal-error")
+
+    def test_a_crash_in_the_self_guard_does_not_stop_a_report(self):
+        for tool in REPORT_TOOLS:
+            with self.subTest(tool=tool):
+                with mock.patch.object(selfguard, "before", side_effect=boom):
+                    result, row = run(self.root, self.payload(tool))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(row["reason"], "internal-error")
+
+    def test_a_failure_while_recording_does_not_stop_a_report(self):
+        for tool in REPORT_TOOLS:
+            with self.subTest(tool=tool):
+                with mock.patch.object(cli_args, "_record", side_effect=boom):
+                    result = run_raw(self.root, json.dumps(self.payload(tool)))
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_an_unknown_tool_still_stops_on_the_same_paths(self):
+        for crash in (
+            mock.patch.object(judge, "decide_before", side_effect=boom),
+            mock.patch.object(selfguard, "before", side_effect=boom),
+        ):
+            with self.subTest(crash=crash.attribute):
+                with crash:
+                    result, _ = run(self.root, self.payload("UnknownTool"))
+                self.assertEqual(result.returncode, 2, result.stderr)
+        with mock.patch.object(cli_args, "_record", side_effect=boom):
+            result = run_raw(self.root, json.dumps(self.payload("UnknownTool")))
+        self.assertEqual(result.returncode, 2, result.stderr)
+
+    def test_the_failsafe_and_fail_closed_agree(self):
+        from ccnavi.hook import failsafe
+
+        for tool in REPORT_TOOLS:
+            self.assertEqual(modes.fail_closed(modes.ENABLE, tool), 0)
+            self.assertEqual(modes.fail_closed(modes.DRY_RUN, tool), 0)
+            self.assertTrue(
+                failsafe.is_safe(hookio.Input(event="PreToolUse", tool_name=tool), self.root)
+            )
+        self.assertEqual(modes.fail_closed(modes.ENABLE, "UnknownTool"), 2)
+        self.assertEqual(modes.fail_closed(modes.ENABLE, ""), 2)
+        self.assertFalse(
+            failsafe.is_safe(hookio.Input(event="PreToolUse", tool_name="UnknownTool"), self.root)
+        )
 
 
 class DeadlineTextTest(unittest.TestCase):

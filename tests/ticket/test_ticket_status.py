@@ -70,7 +70,9 @@ class TicketStatusTest(PhaseHarness):
         out = self.ccnavi("--explain").stdout
         self.assertIn("dry-run のときに止めるもの", out)
         self.assertIn("判定に達せなかったとき", out)
-        self.assertIn("Write・Edit・NotebookEdit・Agent: enable は止める、dry-run は止める", out)
+        self.assertIn(
+            "Write・Edit・NotebookEdit・Agent・Task: enable は止める、dry-run は止める", out
+        )
 
     def test_lint_reports_an_unfinished_operation(self):
         self.by_hand()

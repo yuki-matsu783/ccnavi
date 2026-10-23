@@ -207,7 +207,11 @@ class RequestNudgeTest(base.StopNudgeTest):
         """レビューが要らないフェーズ（省略）は、依頼を打たない。"""
         self.family(review=(False, False))
         self.close_children(work=False)
-        self.assert_not_asked(self.stop(self.parent_tree))
+        # 全部のフェーズが済んでいるので、次はフィードバック計画（test_stop_feedback_nudge.py）。
+        # 依頼の促しは出ない。
+        body = self.body(self.stop(self.parent_tree))
+        self.assertNotIn(CODE, json.dumps(body, ensure_ascii=False))
+        self.assertIn("NUDGE_TICKET_FEEDBACK", body.get("reason", ""))
 
     def test_the_marker_dropped_by_a_new_child_is_asked_again(self):
         """子を足すと依頼のマーカーが外れる。足した子を閉じたあとの、依頼し直しの前も止める。"""
