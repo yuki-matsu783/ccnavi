@@ -68,7 +68,7 @@ class PromptHintTest(PhaseHarness):
         self.assertIn("結果と「次:」をユーザに伝えて止まる", said)
         self.assertIn("終了コード 3（候補が複数）", said)
         self.assertIn("終了コード 4（ホストに届かない）", said)
-        self.assertIn("MCP で代行し、同じコマンドを再実行します。", said)
+        self.assertIn("MCP で代行し、案内された引数で打ち直します", said)
         self.assertIn("終了コード 1・2 なら、出力の理由をユーザに伝える", said)
         # 出力の「次:」（提案づくり）に従い、承認までは実装せず、直接実装へ切り替えない
         self.assertIn("出力に「次:」の行があれば、その一手に従う", said)

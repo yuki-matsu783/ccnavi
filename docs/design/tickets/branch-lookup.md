@@ -21,7 +21,7 @@ keywords: [issue, MR, ブランチ, ccnavi-branches.sh, 着手]
 一覧をユーザに見せて「既存のブランチで続ける（既存のチケットに結び付くならそのチケットで続け、そうでなければ
 `worktree add .claude/worktrees/<ブランチ名の `/` を `-` にしたもの> <ブランチ>` でブランチを直接チェックアウトする）・新しく
 `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞いて返事を待つ。4（ホストに届かない、MR が閉じる issue を読み切れない）は出力の案内どおり MCP で代行し、
-同じコマンドを打ち直す。1・2 は出力の理由をユーザに伝える、という文を `additionalContext` で渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの
+案内された引数で打ち直す。新規作成では `--mcp-checked` を足すだけで、既存の MR を採用するときは 3 つの引数をそろえる。1・2 は出力の理由をユーザに伝える、という文を `additionalContext` で渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの
 絶対パス）。
 dry-run でも渡す。
 
