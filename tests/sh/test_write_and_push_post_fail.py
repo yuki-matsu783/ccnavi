@@ -133,6 +133,27 @@ class PostFailureTest(WriteAndPushHostHarness):
         self.assertNotIn("note_null", done.stdout + done.stderr)
         self.assertIn("unknown", self.stage_states("comment"))
 
+    def test_a_direct_post_without_an_op_record_does_not_report_a_failed_api_as_success(self):
+        """ops begin が失敗する直接投稿でも、API が失敗したら成功と言わない。"""
+        comment_body = write(os.path.join(self._base, "comment.md"), "コメント\n")
+        no_begin = executable(
+            os.path.join(self._base, "bin", "nobegin"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            '*" ops begin "*) exit 1 ;;\n'
+            "esac\n"
+            f"exec '{self.half}' \"$@\"\n",
+        )
+        for name, bad in BAD_POSTS:
+            with self.subTest(post=name), mock.patch.object(Host, "do_POST", bad):
+                Host.notes = []
+                done = self.review(
+                    "comment", "--body-file", comment_body, **{"CCNAVI_BIN_PATH": no_begin}
+                )
+                self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertNotIn("OK: 記録した", done.stdout)
+                self.assertEqual(Host.notes, [])
+
     # ---- AT41: 操作記録を失った後の request の打ち直し
 
     def test_a_request_retyped_after_losing_the_op_record_is_not_posted_twice(self):
