@@ -22,7 +22,7 @@ keywords: [落とし穴, uv, jq, CP932, Docker, PyInstaller, gitdir, 大文字�
   `gh`・`glab`・`curl`を使う。無ければ何を用意すればよいかを案内して止まる。ソースで動かしているccnaviのリポジトリでは、
   shが実行ファイルの代わりに`uv run python -m ccnavi`で起こすことがある（`uv`が無ければその道は使わない）
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
-  `uv run --with pyinstaller python build.py`でビルドする。ビルドしていないとランチャーが終了コード127で終わり、
+  `uv run --with pyinstaller python build.py`でビルドする。ビルドしていない（PATHにも`ccnavi`が無い）とランチャーが終了コード127で終わり、
   hookは何もしない
 
 ## 実測で分かった環境固有の落とし穴

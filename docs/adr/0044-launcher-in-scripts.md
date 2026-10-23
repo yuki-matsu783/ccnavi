@@ -10,6 +10,8 @@ keywords: [launcher, sh, .ccnavi/scripts, 振り分け, 配置]
 
 状態: 採用
 
+追記（2026-10-23）: 「見つからなければ 127」は、`bin/` に合う実行ファイルが無いときに PATH の `ccnavi` を探し、それも無いときに変わった。`bin/` が先で、PATH は絶対パスの項目だけを見る。自己防衛は PATH の実体も守る。仕様は `docs/design/startup-config.md` の 4.1 にある。拡張（`locate.ts`）も、探す順の最後に PATH の `ccnavi` を見る。環境変数は `CCNAVI_BIN_PATH` から `CCNAVI_ENTRY_PATH` に改めた（本文の旧い名前は当時のまま）。
+
 ## 状況
 
 ADR-0041 で、実行ファイルを機械ごとの置き場に並べ、hook は振り分けの sh を起動する形にした。その時点の置き場は次のとおり。
@@ -18,7 +20,7 @@ ADR-0041 で、実行ファイルを機械ごとの置き場に並べ、hook は
 |---|---|---|
 | 振り分けの sh | 原本 `scripts/ccnavi-launcher.sh` | `.ccnavi/bin/ccnavi`（導入スクリプトの `--bin` で動く） |
 | 実行ファイル | `dist/ccnavi/`（組み立ての出力） | sh の隣の `<os>-<arch>/` |
-| `CCNAVI_BIN_PATH` | `dist/ccnavi/ccnavi` | `.ccnavi/bin/ccnavi` |
+| `CCNAVI_ENTRY_PATH` | `dist/ccnavi/ccnavi` | `.ccnavi/bin/ccnavi` |
 
 これには 3 つの食い違いがあった（2026-09-13 に確かめた）。
 
@@ -36,19 +38,19 @@ ADR-0041 で、実行ファイルを機械ごとの置き場に並べ、hook は
 |---|---|---|
 | 振り分けの sh | `.ccnavi/scripts/ccnavi-launcher.sh`（追跡。モード 100755） | 同じパス（導入スクリプトが配る） |
 | 実行ファイル | `dist/ccnavi/`（組み立ての出力）と、`build.py` がそこからコピーする `.ccnavi/bin/<os>-<arch>/`（無視） | `.ccnavi/bin/<os>-<arch>/`（導入スクリプトが配る。無視） |
-| `CCNAVI_BIN_PATH` | `.ccnavi/scripts/ccnavi-launcher.sh` | 同じ |
+| `CCNAVI_ENTRY_PATH` | `.ccnavi/scripts/ccnavi-launcher.sh` | 同じ |
 
 - **sh は自分の隣ではなく `../bin/` を探す。** 隣（`.ccnavi/scripts/<os>-<arch>/`）は配る場所ではないので探さない。
   見つからなければ 127 で終わり、文面にこの機械の `<os>-<arch>` と探した場所を出す。探す順（`uname -sm` を 1 回、
   arm64 の macOS と Windows は自分向けが無いときだけ x86_64）は ADR-0041 のまま
 - **導入スクリプトの `--bin` を廃止する。** 渡されたら終了コード 2 で断り、何も書かない
 - **sh を追跡し、実行ビットを git のモードで共有する。** 導入スクリプトは sh を配る回に `chmod +x` を付け直す。
-  設定 lint は、`CCNAVI_BIN_PATH` の指す先が在るのに実行できなければ error（POSIX だけ）、前の既定のパスなら warn を出す
-- **自己防衛の `binary_clause` と `launched_executable` は、`CCNAVI_BIN_PATH` の名前が `ccnavi-launcher.sh` なら `../bin/` を、
+  設定 lint は、`CCNAVI_ENTRY_PATH` の指す先が在るのに実行できなければ error（POSIX だけ）、前の既定のパスなら warn を出す
+- **自己防衛の `binary_clause` と `launched_executable` は、`CCNAVI_ENTRY_PATH` の名前が `ccnavi-launcher.sh` なら `../bin/` を、
   それ以外なら前の形（隣の `<os>-<arch>/`）を見る。** 切り替えの条件は名前だけで、2 つで揃える。前の形は、
   導入スクリプトを打ち直すまでの配布先のために残す
 
-**移し替え。** 導入スクリプトは `CCNAVI_BIN_PATH` を次のように扱う。
+**移し替え。** 導入スクリプトは `CCNAVI_ENTRY_PATH` を次のように扱う。
 
 | 今の値 | 動き |
 |---|---|
@@ -62,11 +64,11 @@ ADR-0041 で、実行ファイルを機械ごとの置き場に並べ、hook は
 同じ置き場の `<os>-<arch>/` は新しい置き場そのものなので触らない。
 
 1. リンクでない、通常のファイルとして在る
-2. この回に `CCNAVI_BIN_PATH` を前の既定から書き換えた、または既に新しいパスを指している。
+2. この回に `CCNAVI_ENTRY_PATH` を前の既定から書き換えた、または既に新しいパスを指している。
    env が無かった回と既定でないパスの回は消さない
-3. 書き終えたあとの `CCNAVI_BIN_PATH` がそこを指さない
+3. 書き終えたあとの `CCNAVI_ENTRY_PATH` がそこを指さない
 4. 新しい置き場で hook が起動できる
-5. 導入スクリプトを打ったセッションの env の `CCNAVI_BIN_PATH` がそこを指さない。指していれば消さず、
+5. 導入スクリプトを打ったセッションの env の `CCNAVI_ENTRY_PATH` がそこを指さない。指していれば消さず、
    開き直してから打ち直すよう 1 行出す（ADR-0041 と同じ扱い）
 
 機械ごとに並べる、sh が起動のたびに選ぶ、語を `platformtag.py`・sh・導入スクリプト・拡張で揃える、は ADR-0041 から引き継ぐ。
@@ -112,7 +114,7 @@ env が無かった回に消さないのは、その sh を何が起動してい
 - 失ったもの: 前の `.ccnavi/bin/ccnavi` を消すのは戻せない。消すのは前の版の導入スクリプトが配った、無視されている
   生成物だけで、前の版で配り直せる
 - 失ったもの: このリポジトリの切り替えは、エージェントの範囲の外の手順になった。ユーザが sh を `.ccnavi/scripts/` にコピーし、
-  `.gitignore` に `/.ccnavi/bin/` を足し、スキルの中のパスと `CCNAVI_BIN_PATH` を直し、ワークスペースルートで組み立ててから
+  `.gitignore` に `/.ccnavi/bin/` を足し、スキルの中のパスと `CCNAVI_ENTRY_PATH` を直し、ワークスペースルートで組み立ててから
   開き直す。順を誤ると hook が 126 か 127 で起動しない
 
 ## 採らなかった案
@@ -122,7 +124,7 @@ env が無かった回に消さないのは、その sh を何が起動してい
 - hook の `command` を `sh "…"` にする。実行ビットは要らなくなるが、登録済みの hook の書き換えと見分けが要り、範囲が広がる
 - 配布先では sh を無視し、機械ごとに配る。同じ置き場に追跡するものと無視するものが混ざる
 - `--bin` を受けて無視し、1 行出す。打ったユーザが指した場所に置いたつもりで進む
-- 名前が `ccnavi-launcher.sh` でない `CCNAVI_BIN_PATH` の「隣を探す」形を消す。打ち直すまでの間、隣の実体の保護とバックアップが外れる
+- 名前が `ccnavi-launcher.sh` でない `CCNAVI_ENTRY_PATH` の「隣を探す」形を消す。打ち直すまでの間、隣の実体の保護とバックアップが外れる
 - `bin/<os>-<arch>` を位置を問わず守り、浅いパスの相対の書き込みも止める。どのディレクトリの `bin/linux-x86_64` にも当たり、
   1 段のパス（`../bin/`）はそれでも止められない
 - 前の `.ccnavi/bin/ccnavi` を「この回に書き換えたとき」だけ消す。打ったセッションの env のために消さなかった前の sh が、

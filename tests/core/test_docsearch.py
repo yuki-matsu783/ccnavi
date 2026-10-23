@@ -771,7 +771,7 @@ class SessionStartTest(Repo):
             ["--root", root, "--mode", "enable"],
             input=json.dumps(payload),
             cwd=root,
-            env=clean_env(CCNAVI_BIN_PATH=".ccnavi/scripts/ccnavi-launcher.sh"),
+            env=clean_env(CCNAVI_ENTRY_PATH=".ccnavi/scripts/ccnavi-launcher.sh"),
         )
         self.assertEqual(done.returncode, 0, done.stderr)
         if not done.stdout.strip():

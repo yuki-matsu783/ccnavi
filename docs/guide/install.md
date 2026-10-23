@@ -162,8 +162,8 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 
 ## 実行ファイルとルールを配る
 
-`CCNAVI_BIN_PATH` が指す実行ファイル、`rules.yml`、拒否の文面が案内する sh が、対象プロジェクトの中に要る。
-`dist/` は `.gitignore` に入っていて、`CCNAVI_BIN_PATH` は絶対パスも `..` も受け付けないので、
+`CCNAVI_ENTRY_PATH` が指す実行ファイル、`rules.yml`、拒否の文面が案内する sh が、対象プロジェクトの中に要る。
+`dist/` は `.gitignore` に入っていて、`CCNAVI_ENTRY_PATH` は絶対パスも `..` も受け付けないので、
 設定を書く 1 回で配布物も置く。
 
 ```sh
@@ -180,10 +180,10 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 実行ファイルは組み立てた機械の OS と CPU でしか動かないが、`settings.json` は Windows・WSL・Linux・macOS で
 共有し、hook の `command` は 1 行しか書けない。そこで実行ファイルは機械ごとに置き場を分け、hook は振り分けの sh
 （`.ccnavi/scripts/ccnavi-launcher.sh`）を起動する。sh は起動のたびに `uname` を 1 回読み、自分の 1 つ上の
-`bin/<os>-<arch>/` から合う実行ファイルを選んで、引数と標準入力をそのまま渡す。
+`bin/<os>-<arch>/` から合う実行ファイルを選んで、引数と標準入力をそのまま渡す。`bin/` に合うものが無いときだけ、PATH の `ccnavi`（`ccnavi.exe`）を使う（絶対パスの項目だけを見る）。
 
 ```
-.ccnavi/scripts/ccnavi-launcher.sh      ← CCNAVI_BIN_PATH が指す振り分けの sh（追跡する）
+.ccnavi/scripts/ccnavi-launcher.sh      ← CCNAVI_ENTRY_PATH が指す振り分けの sh（追跡する）
 .ccnavi/scripts/ccnavi-ticket.sh など   ← 代わりに通る sh（同じ置き場）
 .ccnavi/bin/darwin-arm64/ccnavi         ← 機械ごとの組み立て（_internal/ も同じ置き場。無視する）
 .ccnavi/bin/linux-x86_64/ccnavi
@@ -193,8 +193,8 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 置き場は 2 つとも固定で、原本と配布先で同じパスになる。`.ccnavi/bin/` には実行ファイルだけが並ぶ。
 
 別の機械向けの組み立てでも、その機械の置き場に入るだけなので配る。Windows と WSL で同じフォルダを開くなら、
-それぞれの機械で打てば両方が並ぶ。この機械で動くものが無ければ、1 行の出力と最後の「まだ無いもの」の一覧で知らせる。
-どこにも合う実行ファイルが無ければ sh は、この機械の `<os>-<arch>` と探した置き場を名指しして終了コード 127 で終わる。実行できないときは 126。
+それぞれの機械で打てば両方が並ぶ。この機械で動くものが（`bin/` にも PATH にも）無ければ、1 行の出力と最後の「まだ無いもの」の一覧で知らせる。
+`bin/` にも PATH にも合う実行ファイルが無ければ sh は、この機械の `<os>-<arch>` と探した置き場を示して終了コード 127 で終わる。PATH に通すのは、隣に `_internal/` がある `dist/ccnavi/` かそこへのリンクで、実行ファイル単体のコピーは動かない。実行できないときは 126。
 目印が無いか読めない配布元からは配らない。名指しの `--deploy` なら終了コード 2 で断り、
 既定の配布元なら理由を出して設定だけ書く。振り分けの仕組みと代償は[導入と配布の設計](../design/startup-config.md)にある。
 

@@ -126,7 +126,7 @@ class FetchTest(unittest.TestCase):
         }
         # 親のワークツリーかは実行ファイルに聞く（sh はチケットを読まない）。
         # ソースの実行ファイルを渡す。
-        env["CCNAVI_BIN_PATH"] = self.source_exe()
+        env["CCNAVI_ENTRY_PATH"] = self.source_exe()
         env.update(extra)
         return subprocess.run(
             [SHELL, script],

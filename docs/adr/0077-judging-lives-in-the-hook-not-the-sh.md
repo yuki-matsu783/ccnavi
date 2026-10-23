@@ -12,7 +12,7 @@ keywords: [判定, hook, sh, 子ワークツリー, push, 環境変数, 検査]
 
 追記（2026-10-11）: チケット制御が有効な間は生の git を組み込みで止め、git の入口を `ccnavi-git.sh` の 1 本に寄せた（ADR-0114）。生の git を組み込みで止め、入口を ccnavi-git.sh 1 本に寄せたので、そのラッパーの中の可否の判定は一次の判定として sh に置いてよい例外になる。例外の書き方は別の ADR で決める。
 
-追記（2026-09-24）: 決定の表で「採らなかった側」の根拠に挙げた「`CCNAVI_PROJECTS` を変えた配布先」は、ADR-0098 で置き場の env 6 つを廃止したので想定しなくなった。`DENY_SCRIPT_ENV_OVERRIDE` は残す。`CCNAVI_BIN_PATH` など、sh が読む変数はまだある。
+追記（2026-09-24）: 決定の表で「採らなかった側」の根拠に挙げた「`CCNAVI_PROJECTS` を変えた配布先」は、ADR-0098 で置き場の env 6 つを廃止したので想定しなくなった。`DENY_SCRIPT_ENV_OVERRIDE` は残す。`CCNAVI_ENTRY_PATH` など、sh が読む変数はまだある。
 
 追記（2026-10-11）: 入口を sh 1 本に寄せたラッパー（`ccnavi-git.sh`）の中の可否の判定（`integrate-ticket`・統合先と消えた親のブランチへの push の拒否・承認済みの `branch:` へ移る前提の確認）と、`integrate` / `integrate-done` の状態操作は、ADR-0118 で P13 の例外にした。条件は、生の操作が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと。
 
@@ -40,7 +40,7 @@ keywords: [判定, hook, sh, 子ワークツリー, push, 環境変数, 検査]
    作るので、ワークスペースを symlink 越しに開くと（macOS の `/tmp` → `/private/tmp` など）比較が外れた
 
 最初の案は「sh が実行ファイルに問い合わせる（`ccnavi tree --json`）」形だった。Sonnet と Opus の
-敵対的レビューで、次の理由から捨てた。sh は実行ファイルを `CCNAVI_BIN_PATH` の環境変数から探すので、
+敵対的レビューで、次の理由から捨てた。sh は実行ファイルを `CCNAVI_ENTRY_PATH` の環境変数から探すので、
 エージェントが置いた偽物を指せば検査が外れる（ADR-0028 が無くした `--review-fixture` と同じ形）。
 加えて Python の読み方（`approval.scan`）は sh より狭く、そちらに合わせると止まっていたものが通るようになる。
 

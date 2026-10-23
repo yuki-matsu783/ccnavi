@@ -137,10 +137,46 @@ test("CB-T24 機械の語は src/ccnavi/infra/platformtag.py と揃える", () =
   assert.deepEqual(runnableTargets("linux-arm64"), ["linux-arm64"]);
 });
 
-test("CB-T22 settings.json の env.CCNAVI_BIN_PATH を読む", () => {
-  assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_BIN_PATH: "dist/x" } })), "dist/x");
-  assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_BIN_PATH: "" } })), undefined);
+test("CB-T22 settings.json の env.CCNAVI_ENTRY_PATH を読む", () => {
+  assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_ENTRY_PATH: "dist/x" } })), "dist/x");
+  assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_ENTRY_PATH: "" } })), undefined);
   assert.equal(binFromSettingsJson(JSON.stringify({ env: {} })), undefined);
   assert.equal(binFromSettingsJson("{"), undefined);
   assert.equal(binFromSettingsJson("[]"), undefined);
+});
+
+test("CB-T1153 PATH の ccnavi は最後に見る。絶対パスの項目だけで、ソースが先", () => {
+  const pathDirs = ["", "rel", "/usr/local/bin", "/opt/bin"];
+  assert.deepEqual(locate(input(["/opt/bin/ccnavi"], { pathDirs })), {
+    kind: "exe",
+    path: "/opt/bin/ccnavi",
+  });
+  assert.deepEqual(locate(input(["/usr/local/bin/ccnavi", "/opt/bin/ccnavi"], { pathDirs })), {
+    kind: "exe",
+    path: "/usr/local/bin/ccnavi",
+  });
+  // 相対と空の項目は飛ばす（"rel/ccnavi" は "/ws" の外の cwd で変わる）。
+  assert.equal(locate(input(["rel/ccnavi", "/ccnavi"], { pathDirs })), undefined);
+  // ソースが先。bin/ の実体も PATH より先。
+  assert.deepEqual(locate(input(["/opt/bin/ccnavi", "/ws/src/ccnavi/__main__.py"], { pathDirs })), {
+    kind: "uv",
+    root: "/ws",
+  });
+  assert.deepEqual(
+    locate(input(["/opt/bin/ccnavi", "/ws/.ccnavi/bin/linux-x86_64/ccnavi"], { pathDirs })),
+    { kind: "exe", path: "/ws/.ccnavi/bin/linux-x86_64/ccnavi" },
+  );
+  // pathDirs を渡さなければ PATH は見ない。
+  assert.equal(locate(input(["/opt/bin/ccnavi"])), undefined);
+});
+
+test("CB-T1154 PATH の ccnavi が振り分けの sh と同じファイルなら飛ばして次へ進む", () => {
+  const pathDirs = ["/linked", "/real"];
+  const sameFile = (a: string, b: string) =>
+    a === "/linked/ccnavi" && b === "/ws/.ccnavi/scripts/ccnavi-launcher.sh";
+  assert.deepEqual(
+    locate(input(["/linked/ccnavi", "/real/ccnavi"], { pathDirs, sameFile })),
+    { kind: "exe", path: "/real/ccnavi" },
+  );
+  assert.equal(locate(input(["/linked/ccnavi"], { pathDirs, sameFile })), undefined);
 });

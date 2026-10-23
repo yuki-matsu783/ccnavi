@@ -141,7 +141,7 @@ class WorktreeShTest(unittest.TestCase):
         env.update(
             {
                 "PATH": os.pathsep.join([self.bin, os.environ.get("PATH", "")]),
-                "CCNAVI_BIN_PATH": self.exe,
+                "CCNAVI_ENTRY_PATH": self.exe,
                 "FAKE_ORIGIN_URL": ORIGIN_URL,
             }
         )
@@ -637,7 +637,7 @@ class WorktreeShTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.wt("topic")))
 
     def test_an_unanswered_base_bound_is_refused(self):
-        result = self.run_sh("topic", CCNAVI_BIN_PATH=os.path.join(self._tmp.name, "none"))
+        result = self.run_sh("topic", CCNAVI_ENTRY_PATH=os.path.join(self._tmp.name, "none"))
         self.assertEqual(1, result.returncode, result.stdout + result.stderr)
         self.assertFalse(os.path.exists(self.wt("topic")))
 
@@ -897,7 +897,7 @@ class WorktreeShTest(unittest.TestCase):
 
     def test_adopt_is_refused_when_the_base_bound_cannot_be_answered(self):
         self.uncorded_worktree()
-        result = self.run_sh("topic", "--adopt", "--base", "main", CCNAVI_BIN_PATH="/nonexistent")
+        result = self.run_sh("topic", "--adopt", "--base", "main", CCNAVI_ENTRY_PATH="/nonexistent")
         self.assertEqual(1, result.returncode, result.stdout + result.stderr)
         self.assertFalse(os.path.exists(self.record_path("topic")))
 
@@ -915,7 +915,7 @@ class WorktreeShTest(unittest.TestCase):
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
         }
-        env["CCNAVI_BIN_PATH"] = self.exe
+        env["CCNAVI_ENTRY_PATH"] = self.exe
         env["PATH"] = os.pathsep.join([self.bin, os.environ["PATH"]])
 
         def integrate():

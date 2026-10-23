@@ -76,11 +76,11 @@ GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 #
 # この切り替えの環境変数に dry-run は無い。止めずに報告する段は CCNAVI_MODE=dry-run が持つ。
 GUARD_UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
-# BIN_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
+# ENTRY_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
 # ルールを 1 行も変えずに判定を差し替えられる。既定は持たない。置き場は
 # プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
 # 守ることになる。hook の登録に書いたパスをそのまま渡してもらう。
-BIN_ENV = "CCNAVI_BIN_PATH"
+ENTRY_ENV = "CCNAVI_ENTRY_PATH"
 # BIN_SUFFIXES は、書かれたパスに無いときだけ継ぎ足して探す拡張子。
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
@@ -240,7 +240,7 @@ def _quoted(path: str) -> str:
 
 
 def bin_command(bin_path: str) -> str:
-    """文面で案内する ccnavi 自身のパス。設定（CCNAVI_BIN_PATH）が指すものを打てる形にする。
+    """文面で案内する ccnavi 自身のパス。設定（CCNAVI_ENTRY_PATH）が指すものを打てる形にする。
 
     案内したパスをそのまま打てないと、案内は「そういうものが在るらしい」で終わる。
     hook が起動しているのと同じパスを案内するのが、いちばん確かめようがある。
@@ -526,7 +526,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     # ディレクトリ）はこの表に無い。env でも上書き設定ファイルでも動かず、既定のまま。
     # 動かせるのはフラグだけで、そちらは cli_args._override が重ねる。
     # 残る `bin` は hook が起動する実行ファイルの指定で、既定を持たない。
-    overrides = (("bin", BIN_ENV, _resolve_bin),)
+    overrides = (("bin", ENTRY_ENV, _resolve_bin),)
     for name, env, read in overrides:
         if os.environ.get(env):
             setattr(settings, name, read(root, os.environ[env]))

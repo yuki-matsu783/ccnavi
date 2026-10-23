@@ -254,7 +254,7 @@ GitLab でも 4.1〜4.3 と同じ操作を行い、加えて次を確かめま�
 | X7 | レート制限 | 当てるのは難しいので、当たったときだけ記録する。拡張は原因と回復の時刻を示し、Retry-After が 60 秒以内なら 1 回だけ待ち直す | 画面の文面、`x-ratelimit-*`・`retry-after` のヘッダ |
 | X8 | PAT を失効させてからボードを開く | 401 で差し替えを促す | 画面の文面 |
 | X9 | 権限の足りない PAT（例 Pull requests を外す）で開く | 権限が原因だと示す | 画面の文面、応答 |
-| X11 | 古い実行ファイルと新しい sh の組み合わせ: `--version --json` を知らない古い実行ファイルか、flags に `--via` の無い実行ファイルを `CCNAVI_BIN_PATH` で指し、手元で `ccnavi-review.sh confirm --phase <N>` と `ccnavi-user-decide.sh decide <N>` を打つ | どちらも失敗せず、`--actor`・`--via` を渡さずに前と同じマーカーを置く（`actor` が無い） | マーカーの中身、sh の出力 |
+| X11 | 古い実行ファイルと新しい sh の組み合わせ: `--version --json` を知らない古い実行ファイルか、flags に `--via` の無い実行ファイルを `CCNAVI_ENTRY_PATH` で指し、手元で `ccnavi-review.sh confirm --phase <N>` と `ccnavi-user-decide.sh decide <N>` を打つ | どちらも失敗せず、`--actor`・`--via` を渡さずに前と同じマーカーを置く（`actor` が無い） | マーカーの中身、sh の出力 |
 | X12 | Windows の Git Bash を 2 つ開き、片方で `sh -c 'echo $$; exec sleep 300'` を打って pid を記録し、もう一方から `kill -0 <pid>; echo $?` を打つ。`sleep` が終わった後にもう一度打つ | 生きている間は 0、終わった後は 0 以外（ロックの持ち主が生きているかを sh が見分けられる） | 2 回の終了コード |
 | X10 | GitHub の stale の外しにパスの除外があるか、GitLab の Code Owners で `.ccnavi/approved/` を外せるか | ホストの設定画面で確かめる（拡張の操作ではない） | 見つけた設定の名前、無ければ「無い」 |
 

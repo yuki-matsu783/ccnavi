@@ -162,7 +162,7 @@ class BranchesShTest(unittest.TestCase):
         env.update(
             {
                 "PATH": os.pathsep.join([self.bin, os.environ.get("PATH", "")]),
-                "CCNAVI_BIN_PATH": self.exe,
+                "CCNAVI_ENTRY_PATH": self.exe,
                 "FAKE_ROUTES": self.routes,
                 "FAKE_LOG": self.log,
                 **extra,

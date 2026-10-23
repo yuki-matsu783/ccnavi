@@ -25,7 +25,7 @@ keywords: [コアファイル, 保護, hook, ルール, 設定, 権限, ガー�
 | `.claude/settings.json` / `.claude/settings.local.json` | hook の登録そのもの | ツール実行前 |
 | `CCNAVI_RULES` が指すファイル | 判定の中身そのもの | ツール実行前 |
 | 各プロジェクトの `config/rules.yml` | 同上（ADR-0033 で足した） | ツール実行前 |
-| `CCNAVI_BIN_PATH` が指すファイル | 判定器の実体 | セッション開始 |
+| `CCNAVI_ENTRY_PATH` が指すファイル | 判定器の実体 | セッション開始 |
 
 止める側と戻す側の両方を持つ。コアファイルの保護が有効な間、対象へシェルから書き込む形はルールに
 書いていなくても拒否し、実行ファイルとプロジェクトのルールは `Write` / `Edit` からも拒否する。

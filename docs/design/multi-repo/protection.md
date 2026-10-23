@@ -19,7 +19,7 @@ keywords: [コアファイル, 保護, 共通レイヤー, ミラー, プロジ�
 | 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/{rules,phases,risks}.yml`（11.12。単体 clone では共通レイヤーとして読まれる） |
 | 自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` |
 | プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` |
-| 実行ファイル | `CCNAVI_BIN_PATH`（振り分けの sh）と、sh が起動する実体（8.2） |
+| 実行ファイル | `CCNAVI_ENTRY_PATH`（振り分けの sh）と、sh が起動する実体（8.2） |
 | ワークツリー側の設定 | 上の各ファイルのうち追跡されているものについて、**その元リポジトリから切った**ワークツリーが持つ同じファイル |
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/<名前>.yml`）は、`*/.ccnavi/*` の一般の保護で、Write / Edit もシェルからの書き込みも止める。

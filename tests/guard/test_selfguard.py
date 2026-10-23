@@ -142,7 +142,7 @@ class SelfGuardTest(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         if bin:
-            environment["CCNAVI_BIN_PATH"] = bin
+            environment["CCNAVI_ENTRY_PATH"] = bin
         environment.update(extra_env or {})
         return run_ccnavi(
             [
@@ -1069,7 +1069,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("builtin:guard-binary", result.stdout)
 
     def test_指していなければ実行ファイルのパスは当たらない(self):
-        # CCNAVI_BIN_PATH が空なら、そこは守る対象ではない。パスを推測して
+        # CCNAVI_ENTRY_PATH が空なら、そこは守る対象ではない。パスを推測して
         # 守ると、そこに在る別のファイルを実体として扱うことになる。
         self.binary()
 
@@ -1278,7 +1278,7 @@ class SelfGuardTest(unittest.TestCase):
 
         result = self.run_hook("SessionStart", bin=missing)
 
-        self.assertIn("CCNAVI_BIN_PATH", result.stdout)
+        self.assertIn("CCNAVI_ENTRY_PATH", result.stdout)
 
     def test_拡張子を書かないパスでも実行ファイルに当たる(self):
         # hook の登録は 3 つの環境で同じ 1 行を使う。PyInstaller が Windows で
@@ -1315,7 +1315,7 @@ class SelfGuardTest(unittest.TestCase):
     def scripts_layout(self, place=(".ccnavi",)):
         """sh を `<place>/scripts/`、実体を `<place>/bin/<この機械>/` に置く。
 
-        返すのは (CCNAVI_BIN_PATH に書く相対パス, sh の絶対パス, 実体の絶対パス)。
+        返すのは (CCNAVI_ENTRY_PATH に書く相対パス, sh の絶対パス, 実体の絶対パス)。
         place を空にすると、ワークスペースルートの直下に `scripts/` と `bin/` が並ぶ。
         """
         spelled = "/".join([*place, "scripts", LAUNCHER_NAME])
@@ -1427,6 +1427,102 @@ class SelfGuardTest(unittest.TestCase):
         self.run_hook("PostToolUse", bin=spelled)
 
         self.assertEqual(read(exe), "ELF fake executable\n")
+
+    # bin/ に実体が無く、PATH の ccnavi が起動される形。PATH の置き場はワークスペースの外に
+    # 在るものとして、使い捨ての別ディレクトリに置く。
+
+    def path_layout(self):
+        """振り分けの sh だけを置き、実体は PATH の置き場に置く。
+
+        返すのは (sh の相対パス, 実体, PATH を足す env)。
+        """
+        spelled = "/".join([".ccnavi", "scripts", LAUNCHER_NAME])
+        write(os.path.join(self.repo, ".ccnavi", "scripts", LAUNCHER_NAME), "#!/bin/sh\n")
+        outside = tempfile.mkdtemp(prefix="ccnavi-onpath-")
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        exe = os.path.join(outside, "local", "bin", "ccnavi")
+        write(exe, "ELF fake on path\n")
+        os.chmod(exe, 0o755)
+        env = {"PATH": os.path.dirname(exe) + os.pathsep + os.environ.get("PATH", "")}
+        return spelled, exe, env
+
+    def test_bin_に実体が無いとき_PATH_の実体もセッション開始でバックアップし実行後に戻す(self):
+        spelled, exe, env = self.path_layout()
+
+        self.run_hook("SessionStart", bin=spelled, extra_env=env)
+        write(exe, "ELF replaced on path\n")
+        result = self.run_hook("PostToolUse", bin=spelled, extra_env=env)
+
+        self.assertEqual(read(exe), "ELF fake on path\n")
+        self.assertIn("restored", result.stdout)
+
+    def test_PATH_の実体への書き込みは名指しのツールから止まる(self):
+        spelled, exe, env = self.path_layout()
+
+        result = self.run_hook(
+            "PreToolUse", bin=spelled, extra_env=env, tool="Write", file_path=exe
+        )
+
+        self.assertIn("deny", result.stdout)
+
+    def test_PATH_の実体を差し替えるシェルの書き込みは止まり_別の_bin_ccnavi_は止まらない(self):
+        spelled, exe, env = self.path_layout()
+        exe_dir = os.path.dirname(exe).replace("\\", "/")
+
+        denied = self.run_hook(
+            "PreToolUse", bin=spelled, extra_env=env, command=f"cp /tmp/x {exe_dir}/ccnavi"
+        )
+        other = self.run_hook(
+            "PreToolUse", bin=spelled, extra_env=env, command="cp /tmp/x ./bin/ccnavi"
+        )
+
+        self.assertIn("deny", denied.stdout)
+        self.assertNotIn("deny", other.stdout)
+
+    def test_PATH_の先頭が_launcher_へのリンクでも_実際に走る実体を守る(self):
+        # sh は自分と同じファイルを飛ばして次の項目の実体を起動する。守る対象も同じ実体にする。
+        spelled, exe, env = self.path_layout()
+        os.chmod(os.path.join(self.repo, spelled), 0o755)  # 実行できなければ候補に入らない
+        linked = tempfile.mkdtemp(prefix="ccnavi-linked-")
+        self.addCleanup(shutil.rmtree, linked, ignore_errors=True)
+        try:
+            os.symlink(os.path.join(self.repo, spelled), os.path.join(linked, "ccnavi"))
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+        env = {"PATH": linked + os.pathsep + env["PATH"]}
+
+        self.run_hook("SessionStart", bin=spelled, extra_env=env)
+        write(exe, "ELF replaced on path\n")
+        self.run_hook("PostToolUse", bin=spelled, extra_env=env)
+
+        self.assertEqual(read(exe), "ELF fake on path\n")
+
+    def test_セッション開始のあとに現れた_PATH_の実体も最初に見た版を基準に守る(self):
+        spelled, exe, env = self.path_layout()
+
+        self.run_hook("SessionStart", bin=spelled)  # 開始時は PATH に無かった
+        self.run_hook("PreToolUse", bin=spelled, extra_env=env)  # 基準を取る
+        write(exe, "ELF replaced on path\n")
+        self.run_hook("PostToolUse", bin=spelled, extra_env=env)
+
+        self.assertEqual(read(exe), "ELF fake on path\n")
+
+    def test_浅い_PATH_の実体は区切りで始まる形だけに当て_別の_bin_ccnavi_は止めない(self):
+        # `/bin/ccnavi` を末尾 2 要素で当てると、別のプロジェクトの `./bin/ccnavi` にも当たる。
+        shallow = os.path.join(os.sep, "bin", "ccnavi")
+        with mock.patch.object(platformtag, "path_executable", return_value=shallow):
+            regex = selfguard_shell.binary_clause("/ws/.ccnavi/scripts/ccnavi-launcher.sh")
+
+        self.assertTrue(re.search(regex, "cp x /bin/ccnavi"))
+        self.assertFalse(re.search(regex, "cp x ./bin/ccnavi"))
+        self.assertFalse(re.search(regex, "cp x vendor/bin/ccnavi-old"))
+
+    def test_PATH_に_ccnavi_が無ければ守る対象も増えない(self):
+        spelled, _, _ = self.path_layout()
+
+        result = self.run_hook("PreToolUse", bin=spelled, command="cp /tmp/x ./bin/ccnavi")
+
+        self.assertNotIn("deny", result.stdout)
 
     def test_ツールを呼ぶ前に外で作り直された実行ファイルは新しい版として取り直す(self):
         # ccnavi の外での再ビルドは、次のツール呼び出しの前に基準になる。

@@ -20,7 +20,7 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 | `.claude/settings.json` / `.claude/settings.local.json` | hook の登録そのもの | ツール実行前と、ユーザの発言時 |
 | 共通レイヤーのファイル（`.ccnavi/config/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前と、ユーザの発言時 |
 | 自身のレイヤーと各プロジェクトのレイヤーの `.ccnavi/config/project/{rules,phases,risks}.yml` | 同上 | ツール実行前と、ユーザの発言時 |
-| `CCNAVI_BIN_PATH` が指すファイル（振り分けの sh）と、sh がこの機械で起動する実行ファイル | 判定器の実体 | セッション開始 |
+| `CCNAVI_ENTRY_PATH` が指すファイル（振り分けの sh）と、sh がこの機械で起動する実行ファイル | 判定器の実体 | セッション開始 |
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/`）は、この表に足さない。`*/.ccnavi/*` の一般の保護で止める。
 
@@ -37,7 +37,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 | id | 足すとき | 止めるもの |
 |---|---|---|
 | `builtin:guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、レイヤーの設定 3 本と ccnavi ディレクトリ、共通レイヤーの 3 本（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
-| `builtin:guard-binary` | `CCNAVI_BIN_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
+| `builtin:guard-binary` | `CCNAVI_ENTRY_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
 | `builtin:guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
 | `builtin:guard-common-layer` | 共通レイヤーの 3 本の置き場が決まっているとき（11.6） | 同上 |
 | `builtin:guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
@@ -88,7 +88,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 - 既定の配置では、`builtin:guard-setting-files` の `.ccnavi` のパスと `builtin:guard-project-home` でも二重に止まる
 
 判定に渡るパスはワークスペースルートを継ぎ足した絶対パス（`settings._resolve_bin`）なので、名指しのツールは浅いパスでも止まる。
-相対で書いたシェルのコマンドは守らない（`CCNAVI_BIN_PATH=scripts/ccnavi-launcher.sh` での `rm -rf bin/linux-x86_64`、
+相対で書いたシェルのコマンドは守らない（`CCNAVI_ENTRY_PATH=scripts/ccnavi-launcher.sh` での `rm -rf bin/linux-x86_64`、
 `ccnavi-launcher.sh` での `rm -rf ../bin/linux-x86_64` は `builtin:guard-binary` に当たらない）。導入スクリプトはこのパスを作らない。
 実行後のバックアップと復元（8.3）は、どのパスでも働く。
 
@@ -209,11 +209,11 @@ hook 自身は settings.json の env で起動するので、ここで見る代�
 `Write` / `Edit` / `NotebookEdit` でそのファイルを書いたときに限る。判断は実行前の中身で行う。シェルからの書き込み、
 他の設定ファイル、ワークツリー側の設定は戻す。戻さなかったことは `left-as-repair` として報告し、直した中身をユーザが確かめるよう促す。
 
-実行ファイルは `SessionStart` でバックアップする（ツール呼び出しの外で変わったら、次の発言か実行前に取り直す）。バックアップするのは `CCNAVI_BIN_PATH` が指す sh（バックアップの鍵 `bin`）と、
+実行ファイルは `SessionStart` でバックアップする（ツール呼び出しの外で変わったら、次の発言か実行前に取り直す）。バックアップするのは `CCNAVI_ENTRY_PATH` が指す sh（バックアップの鍵 `bin`）と、
 sh がこの機械で起動する実体（`bin-launched`）の 2 つ。実体は `platformtag.launched_executable` が sh と同じ順で探し、
 名前が `ccnavi-launcher.sh` なら `../bin/`、それ以外は隣を見る（8.2 と同じ条件）。見つからなければ足さない。
 実体は中身のハッシュで名前を付けて `state/selfguard/store/` へ 1 本だけ置き、セッションの側は参照（ハッシュ・大きさ・更新時刻）だけ
-持つ。比べるのは大きさと更新時刻。3 日より長く触られていないセッションのバックアップは、次のセッション開始で消す。
+持つ。比べるのは大きさと更新時刻。`CCNAVI_ENTRY_PATH` が振り分けの sh のときは、PATH にある `ccnavi`（`platformtag.path_executable`。絶対パスの項目だけを、sh と同じ順で見る）の実体も、`bin/` の有無に関わらず守る。自分と同じファイル（`ccnavi` という名前で張った launcher へのリンク）は sh と同じく飛ばす。PATH の実体はセッション開始のあとに現れることもあるので、参照が無いまま現れたら、実行前に最初に見た版を基準に取る（`_rebase_if_changed`）。鍵は `bin-path-<実パスの印>` で、PATH が変わって指す先が替わっても、古い実体の参照を新しい実体に当てない。止める正規表現は実体のパスの末尾 3 要素で当て（要素が 3 以下の浅い実体は、区切りで始まる形だけに当てる）、置き場のディレクトリ全体は守らない（`~/.local/bin` への無関係な導入まで止まるため）。3 日より長く触られていないセッションのバックアップは、次のセッション開始で消す。
 
 実行前にも見るのは、`PostToolUse` の登録を消されるとその次の呼び出しから実行後チェックが動かないため。`PreToolUse` の
 登録ごと消された場合は ccnavi が一切動かない（12.3）。

@@ -148,7 +148,7 @@ class ParentBranchShTest(unittest.TestCase):
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(
             {
-                "CCNAVI_BIN_PATH": self.bin,
+                "CCNAVI_ENTRY_PATH": self.bin,
                 "CCNAVI_LOCK_WAIT": "2",
             }
         )

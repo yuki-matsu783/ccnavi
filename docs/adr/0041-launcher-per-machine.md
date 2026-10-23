@@ -12,7 +12,7 @@ keywords: [実行ファイル, launcher, 機械, 置き場, hook, 振り分け]
 
 ## 状況
 
-導入スクリプトは実行ファイルを `.claude/ccnavi/` に直に置き、`CCNAVI_BIN_PATH` をそこへ向けていた。
+導入スクリプトは実行ファイルを `.claude/ccnavi/` に直に置き、`CCNAVI_ENTRY_PATH` をそこへ向けていた。
 PyInstaller の実行ファイルは組み立てた機械の OS と CPU でしか動かないので、配る前に組み立て先のファイル
 （`dist/ccnavi.target`）と `uname` を比べ、食い違えば配らなかった。
 
@@ -23,13 +23,13 @@ PyInstaller の実行ファイルは組み立てた機械の OS と CPU でし�
 ## 決定
 
 配布先を `.ccnavi/bin/` にし、その下に `<os>-<arch>/` のディレクトリを作って組み立てを並べる。
-`CCNAVI_BIN_PATH` は `.ccnavi/bin/ccnavi` を指し、そこには振り分けの sh
+`CCNAVI_ENTRY_PATH` は `.ccnavi/bin/ccnavi` を指し、そこには振り分けの sh
 （`scripts/ccnavi-launcher.sh`）を置く。sh は起動のたびに `uname -sm` を 1 回読み、合う置き場の
 実行ファイルへ `exec` で引数と標準入力を渡す。arm64 の macOS と Windows は、自分向けが無ければ
 x86_64 の組み立てへ回る。どこにも無ければ 127 で終わる。
 
 導入スクリプトは、別の機械向けの組み立てでも、その機械の置き場へ配る。前の置き場は、新しい置き場で
-hook が起動できるようになってから消し、`CCNAVI_BIN_PATH` が前の既定のパスなら書き換える。
+hook が起動できるようになってから消し、`CCNAVI_ENTRY_PATH` が前の既定のパスなら書き換える。
 
 語（`darwin-arm64` など）は `ccnavi/platformtag.py`・sh・導入スクリプトの 3 か所で揃える。
 `build.py` は platformtag から組み立て先のファイルを書く。
@@ -37,12 +37,12 @@ hook が起動できるようになってから消し、`CCNAVI_BIN_PATH` が前
 ## 理由
 
 どの実行ファイルを起動するかを決められるのは、起動した機械だけ。`settings.json` に機械ごとのパスを
-書く案（導入スクリプトが `CCNAVI_BIN_PATH` に `.ccnavi/bin/darwin-arm64/ccnavi` を書く）は、起動の
+書く案（導入スクリプトが `CCNAVI_ENTRY_PATH` に `.ccnavi/bin/darwin-arm64/ccnavi` を書く）は、起動の
 コストが増えない代わりに、設定が 1 つの機械に固定される。`settings.local.json` に移しても、
 Windows と WSL で同じフォルダを開く形は解けない。
 
 `command` の中で `$(uname …)` を展開する案も採らなかった。`uname` の出力のままでは表記が揃わず、
-「守る対象（`CCNAVI_BIN_PATH`）と起動する実体を 1 か所に寄せる」という ADR-0005 の決定が崩れる。
+「守る対象（`CCNAVI_ENTRY_PATH`）と起動する実体を 1 か所に寄せる」という ADR-0005 の決定が崩れる。
 
 別の機械向けを配るようにしたのは、置き場を分けたことで、配っても今の機械の実行ファイルを上書き
 しなくなったから。前の形で配らなかったのは、同じ場所に入れると hook が起動できなくなるためだった。
@@ -58,8 +58,8 @@ Windows と WSL で同じフォルダを開く形は解けない。
   シェルからの書き込みは、sh の親の下の `<os>-<arch>/` にも当てる
 - VS Code 拡張は sh を通さず、隣の実体を自分で選ぶ。Windows では sh を直接起動できないため。
   語を拡張の側（`locate.ts`）でも持つことになり、揃える場所が 4 つになる
-- 前の置き場を消すのは戻せない。消した時点で開いているセッションは、env の `CCNAVI_BIN_PATH` が
+- 前の置き場を消すのは戻せない。消した時点で開いているセッションは、env の `CCNAVI_ENTRY_PATH` が
   開き直すまで前のパスのままなので、hook が起動しない。導入スクリプトを打ったセッション自身がそう
   なる形だけは、env を見て消さずに待つ。それ以外のセッションは、出力の 1 行で開き直しを促すだけ
-- `CCNAVI_BIN_PATH` が前の既定のパスなら、名指しも `--force` も無しに書き換える。「既にある env は
+- `CCNAVI_ENTRY_PATH` が前の既定のパスなら、名指しも `--force` も無しに書き換える。「既にある env は
   触らない」の例外になる。ユーザが意図して前のパスを書いていても区別できない

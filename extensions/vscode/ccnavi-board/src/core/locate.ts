@@ -2,10 +2,15 @@
  * ccnavi の実行ファイルの探し方。.ccnavi/scripts/*.sh と同じ順で探す。
  *
  *   1. 拡張の設定 `ccnaviBoard.binPath`
- *   2. `.claude/settings.json` の env `CCNAVI_BIN_PATH`
+ *   2. `.claude/settings.json` の env `CCNAVI_ENTRY_PATH`
  *   3. `dist/ccnavi/ccnavi`
  *   4. `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh。scripts/ccnavi-setup.sh が配る）
  *   5. ソースがあれば `uv run python -m ccnavi`
+ *   6. PATH の `ccnavi`（`ccnavi.exe`）
+ *
+ * 振り分けの sh は、bin/ に合うものが無いと PATH の ccnavi を起動する。拡張も同じ規則で、最後に PATH を見る
+ * （ソースが先なのは、保護済み sh の ccnavi_bin と同じ）。見るのは絶対パスの項目だけ。振り分けの sh と
+ * 同じファイル（`ccnavi` という名前で張ったリンク）は飛ばす。
  *
  * どれも相対ならワークスペースルートからの相対。Windows の `.exe` はパスに付いていなくても試す。
  *
@@ -23,7 +28,7 @@ export interface LocateInput {
   readonly root: string;
   /** 拡張の設定。空なら見ない */
   readonly setting: string;
-  /** .claude/settings.json の env.CCNAVI_BIN_PATH。無ければ undefined */
+  /** .claude/settings.json の env.CCNAVI_ENTRY_PATH。無ければ undefined */
   readonly settingsEnvBin: string | undefined;
   /** この機械の `<os>-<arch>`。hostTarget で作る */
   readonly hostTarget: string;
@@ -31,6 +36,10 @@ export interface LocateInput {
   /** パスの結合。テストでは "/" 結合を渡し、拡張では path.join を渡す */
   readonly join: (...parts: string[]) => string;
   readonly isAbsolute: (filePath: string) => boolean;
+  /** PATH の項目（区切りで分けたもの）。省くと PATH は見ない。絶対パスでない項目は飛ばす */
+  readonly pathDirs?: readonly string[];
+  /** 同じファイルか（リンクを解いて比べる）。省くと比べない。PATH のリンクが振り分けの sh を指すのを飛ばす */
+  readonly sameFile?: (a: string, b: string) => boolean;
 }
 
 export const DEFAULT_BINS = [
@@ -110,10 +119,31 @@ export function locate(input: LocateInput): Launcher | undefined {
   if (input.exists(input.join(input.root, SOURCE_MARKER))) {
     return { kind: "uv", root: input.root };
   }
+  return onPath(input);
+}
+
+/** PATH の ccnavi。振り分けの sh（ccnavi_launcher_path）と同じ規則 */
+function onPath(input: LocateInput): Launcher | undefined {
+  const launcher = input.join(input.root, DEFAULT_BINS[1]);
+  for (const dir of input.pathDirs ?? []) {
+    if (dir === "" || !input.isAbsolute(dir)) {
+      continue;
+    }
+    for (const name of EXECUTABLE_NAMES) {
+      const filePath = input.join(dir, name);
+      if (!input.exists(filePath)) {
+        continue;
+      }
+      if (input.sameFile?.(filePath, launcher) === true) {
+        continue;
+      }
+      return { kind: "exe", path: filePath };
+    }
+  }
   return undefined;
 }
 
-/** `.claude/settings.json` の本文から env.CCNAVI_BIN_PATH を取り出す。読めなければ undefined */
+/** `.claude/settings.json` の本文から env.CCNAVI_ENTRY_PATH を取り出す。読めなければ undefined */
 export function binFromSettingsJson(text: string): string | undefined {
   let raw: unknown;
   try {
@@ -128,6 +158,6 @@ export function binFromSettingsJson(text: string): string | undefined {
   if (typeof env !== "object" || env === null) {
     return undefined;
   }
-  const value = (env as { CCNAVI_BIN_PATH?: unknown }).CCNAVI_BIN_PATH;
+  const value = (env as { CCNAVI_ENTRY_PATH?: unknown }).CCNAVI_ENTRY_PATH;
   return typeof value === "string" && value !== "" ? value : undefined;
 }

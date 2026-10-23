@@ -85,9 +85,9 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 - `CCNAVI_STOP_REVIEW`: Stop の AI 判定（agent 型 Stop hook）の効き方。全体のモードと掛け合わせる（4.4）。登録は `scripts/ccnavi-stop-review.sh` で行う（構成は [stop-review.md](stop-review.md)）。
 - `CCNAVI_STOP_REVIEW_AGENT`: `1` のとき、Stop で判定計画を作る。agent hook を登録したワークスペースに置かれる（`scripts/ccnavi-stop-review.sh register` が書く）。
   無ければ何も作らない。評価の集計は `ccnavi stop-review report`。
-- `CCNAVI_BIN_PATH`: hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは振り分けの sh
+- `CCNAVI_ENTRY_PATH`: hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは振り分けの sh
   `.ccnavi/scripts/ccnavi-launcher.sh` と書き、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に入る。4.6）。拡張子は書かない。Windows の `.exe` は ccnavi が補う。
-  hook の `command` を `${CCNAVI_BIN_PATH}` で書くのは、守る対象と起動する実体を 1 か所にまとめるため（shell form なので環境変数は shell が展開する）。
+  hook の `command` を `${CCNAVI_ENTRY_PATH}` で書くのは、守る対象と起動する実体を 1 か所にまとめるため（shell form なので環境変数は shell が展開する）。
   その代わり、`env` からこの 1 行が消えると hook が起動しなくなる。
 - `GITHUB_TOKEN` / `GITLAB_TOKEN`: レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる。
 
@@ -171,7 +171,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 
 | 書くもの | 中身 |
 |---|---|
-| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場の env は書かない（置き場は固定。残っていても読まない） |
+| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_ENTRY_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場の env は書かない（置き場は固定。残っていても読まない） |
 | `.claude/settings.json` の `hooks` | 8 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true` と `git.repositoryScanMaxDepth: 2`。足りないキーだけを足す。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,fetch,dirs,session-start,sync,clean,branches,start,stage,worktree,launcher}.sh`、ユーザ専用の `ccnavi-user-{agree,push-approved,close-early,decide,clean-branch,lib-review}.sh`、共通部の部品 `ccnavi-common-{state,lock,write-and-push,host,log,review}.sh` と `ccnavi-clean.js`。入口（`ccnavi-session-start.sh`。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない）。使い方の文書は配布元の `.ccnavi/docs/*.md` を全部 `.ccnavi/docs/` へ配る（`--docs` の索引はここだけ `.ccnavi/` の下でも載せる。配布先の既にあるものは `--force` のときだけ入れ替える）。配布元に `.ccnavi/docs/` が無ければ「配布元に無くて配れないもの」に挙げる。共通の作業・レビュー計画のテンプレートは配布元の `.ccnavi/config/common/templates/*.yml` を 1 本ずつ同じ場所へ配る（既にあるものは `--force` のときだけ入れ替える。配布元に置き場や `*.yml` が無ければ何もせず、何も言わない）。共通の工程スキルは、配布元の `.claude/skills/<名前>/SKILL.md` の frontmatter に `process: true` を持つものについて、`SKILL.md` と `references/common/` の下の `.md` を同じ場所へ 1 ファイルずつ配る（`.DS_Store` や `ccnavi-index.jsonl` のような生成物は配らない。`process: true` の読み方は親チケットの着手が写す判定に寄せ、CRLF の改行と、行末の `# コメント`は許し、閉じの `---` が無いものは配らない。配布先の道にディレクトリでないものがあるときは、そのファイルだけ配らずに挙げる）（既にあるものは `--force` のときだけ入れ替える。親チケットの着手がプロジェクトへ写す元になる。`.ccnavi/docs/skill-processes.md`）。配布元に該当するスキルが無ければ何もせず、何も言わない |
@@ -180,7 +180,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 置き場は 2 つに分けて固定する。
 
 ```
-.ccnavi/scripts/ccnavi-launcher.sh      ← CCNAVI_BIN_PATH が指す振り分けの sh（追跡する）
+.ccnavi/scripts/ccnavi-launcher.sh      ← CCNAVI_ENTRY_PATH が指す振り分けの sh（追跡する）
 .ccnavi/scripts/ccnavi-ticket.sh など   ← 代わりに通る sh
 .ccnavi/bin/darwin-arm64/ccnavi         ← 機械ごとの組み立て（_internal/ も同じ置き場。無視する）
 .ccnavi/bin/linux-x86_64/ccnavi
@@ -198,7 +198,11 @@ sh の探し方: `here=${0%/*}`（`$0` に `/` が無ければ `.`）から `bin
 
 - 隣（`.ccnavi/scripts/<os>-<arch>/`）は探さない。自己防衛のパス（8.2）が当たらない置き場になるため
 - `bin_dir` は `..` を含むまま使い、正規化しない。シンボリックリンクも解かない
-- 見つからなければ終了コード 127 で、文面に `<os>-<arch>` と探した `bin_dir` を出す。在るが実行できなければ `exec` が失敗して 126
+- `bin/` に何も見つからなければ、PATH の `ccnavi`（`ccnavi.exe`）を探す（`ccnavi_launcher_path`）。`bin/` が先で、PATH はそのときだけ。見るのは絶対パスの項目だけで、空と相対の項目（`.`、`~/bin`）は cwd や展開の有無で結果が変わるので飛ばす。PATH の順に、通常ファイルで実行できる最初のものを `exec` する。自分と同じファイル（`ccnavi` という名前で張ったリンク）は、自分に戻って終わらなくなるので飛ばす（`-ef`）。`exec` に失敗しても次の項目へは進まない（`bin/` と同じ。126）。launcher のコピーが PATH に 2 つあると互いを起動し合うので、置かない
+- PATH の実行ファイルは隣に onedir の `_internal/` が要る。単体のコピーは動かない。`dist/ccnavi/` を PATH に通すか、そこへのリンクを置く。版は sh と揃えない（食い違いは `ccnavi_compat_skew` が端末の操作で言う。hook では見ない）
+- 見つからなければ終了コード 127 で、文面に `<os>-<arch>` と探した `bin_dir`、PATH も見たことを出す。在るが実行できなければ `exec` が失敗して 126
+- 保護済み sh の `ccnavi_bin` は、`bin/` もソースも無い配布先でだけ PATH の `ccnavi` を返す（無ければ 1 のまま。呼び手の「実行ファイルが無い」の分岐を保つ）。ソースのリポジトリではソースが先
+- 自己防衛は PATH の実体も守る。`bin/` の有無に関わらず、PATH に在れば `bin-path-<パスの印>` の key でバックアップして、同じ形で戻す。key にパスの印を付けるのは、PATH が変わって指す先が替わったとき、古い実体の参照を新しい実体に当てないため。止める正規表現は実体のパスの末尾 3 要素で当てる（2 要素だと別の `./bin/ccnavi` まで当たる）。置き場のディレクトリ全体は守らない。PATH が `/usr/local/bin` のように書けない場所なら、戻しは失敗（`failed`）と報告する
 
 hook は sh を直に起動するので、sh に実行ビットが要る。ccnavi のリポジトリでは追跡するモードを 100755 にする。配布先では
 導入スクリプトが付け、付いていなければ `--lint` が error で言う（10 章）。
@@ -216,9 +220,9 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 - 組み立て直すと、セッション開始で取った実行ファイルのバックアップ（8.3）と食い違う。ツール呼び出しの外で変わった版は、`enable` なら次のツール呼び出しの前に基準へ取り込む（`selfguard._rebase_if_changed`）。そのあとは、
   ツール呼び出しの中で変わった版だけを、呼び出しの直前の版に戻す（`selfguard._check_heavy`）。戻す前に、書かれていた版は `state/aside/` に退避する。`dry-run` は取り込まず、「このツール呼び出しで変わった」と言う
 
-既定でないパス: 導入スクリプトは、`.claude/settings.json` にいま書かれている `CCNAVI_BIN_PATH` で動きを決める。
+既定でないパス: 導入スクリプトは、`.claude/settings.json` にいま書かれている `CCNAVI_ENTRY_PATH` で動きを決める。
 
-| いまの `CCNAVI_BIN_PATH` | 動き |
+| いまの `CCNAVI_ENTRY_PATH` | 動き |
 |---|---|
 | 無い | `.ccnavi/scripts/ccnavi-launcher.sh` を書く |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | 何もしない |
@@ -235,7 +239,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 
 | 場所 | 中身 |
 |---|---|
-| `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
+| `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ PATH の `ccnavi`、それも無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。状態を聞く `status` と、気づきの記録を書く `learn` は、サブエージェントも呼べる。本体は `ccnavi ticket`。取り込み済みの親子のチケットでは write-and-push（取り込んでから書き、書いたパスだけをコミットして push するまで完了にしない） |
 | `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review`。状態を書くサブコマンドは write-and-push の対象の親子のチケットで write-and-push。`decide <N> --preview`（見るだけ）もここにある。ユーザ専用の `close-early`・`decide` は `ccnavi-user-close-early.sh`・`ccnavi-user-decide.sh` に分かれている |

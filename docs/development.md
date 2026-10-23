@@ -3,7 +3,7 @@ title: 開発の入口
 type: guide
 description: ccnavi 自身を開発する人向けの入口。開発環境、テストと整形のコマンド、開発用 hook の登録、build と配布物、配布する sh の確かめ方、条件の足し方、文書の案内表
 tags: [development, build, test]
-keywords: [開発, 開発環境, テスト, unittest, ruff, build.py, PyInstaller, onedir, lint-py, test-py, mark-ext, test-ext, settings.local.json, CCNAVI_BIN_PATH, CCNAVI_SH_DIR, 配布物, 条件の足し方, ccnavimd]
+keywords: [開発, 開発環境, テスト, unittest, ruff, build.py, PyInstaller, onedir, lint-py, test-py, mark-ext, test-ext, settings.local.json, CCNAVI_ENTRY_PATH, CCNAVI_SH_DIR, 配布物, 条件の足し方, ccnavimd]
 ---
 
 # 開発の入口
@@ -110,10 +110,14 @@ dist/ は新しい。.ccnavi/bin/<target>/ は前のまま
 `CCNAVI_GUARD_CORE_FILES` が `enable` なら次のツール呼び出しのあとでバックアップの版に戻される（`dry-run` なら報告だけ）。
 ワークスペースルートで組み立てたら、セッションを開き直す。仕組みは[導入と配布の設計](design/startup-config.md)の 4.6 にある。
 
-`dist/` を直に起動したいときは、`.claude/settings.local.json`（追跡しない）の `env` で `CCNAVI_BIN_PATH` を
+`bin/` に実行ファイルが無いときは、振り分けの sh が PATH の `ccnavi` を起動する（`bin/` が先）。`dist/ccnavi/`
+を PATH に通すと、組み立てたあとのコピーなしで hook が動く。実行ファイル単体のコピーは動かない（隣に `_internal/` が要る）。
+PATH の実行ファイルも自己防衛が守る。テストは `tests/__init__.py` が PATH から ccnavi を外して回す。
+
+`dist/` を直に起動したいときは、`.claude/settings.local.json`（追跡しない）の `env` で `CCNAVI_ENTRY_PATH` を
 `dist/ccnavi/ccnavi` にする。自己防衛も同じ env を読むので、守る実体と起動する実体は食い違わない。代償は、その機械では
 振り分けの sh の不具合に気づけないこと。`ccnavi.settings.local.json` のキー `bin` でも
-`CCNAVI_BIN_PATH` を上書きできるが、変わるのは自己防衛が何を守るかだけで、hook が何を起動するかは変わらない。
+`CCNAVI_ENTRY_PATH` を上書きできるが、変わるのは自己防衛が何を守るかだけで、hook が何を起動するかは変わらない。
 
 配布物は PyInstaller の onedir で組み立てる。Windows なら `dist/ccnavi/ccnavi.exe`、
 Linux なら `dist/ccnavi/ccnavi`。onefile は起動のたびにランタイムを展開して遅いので使わない
@@ -164,7 +168,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
 | `.claude/skills/` | このリポジトリのスキル。設定 3 本を足す・確かめる `ccnavi-config`、ccnavi を入れる・更新する `ccnavi-install`、コミットの手順 `commit`、気づきを記録に足す `learn`、図解の説明 `eli5` / `eli10`、文章の推敲 `yomiyasu`、工程の考え方の入口 `process-*`（`process: true` のものは `scripts/ccnavi-setup.sh` が配る） |
-| `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
+| `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ PATH の `ccnavi`、それも無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。状態を聞く `status` と、気づきの記録を書く `learn` は、サブエージェントも呼べる。本体は `ccnavi ticket`。取り込み済みの親子のチケットでは write-and-push（取り込んでから書き、書いたパスだけをコミットして push するまで完了にしない） |
 | `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review`。状態を書くサブコマンドは write-and-push の対象の親子のチケットで write-and-push。`decide <N> --preview`（見るだけ）もここにある。ユーザ専用の `close-early`・`decide` は `ccnavi-user-close-early.sh`・`ccnavi-user-decide.sh` に分かれている |

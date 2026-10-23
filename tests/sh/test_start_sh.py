@@ -246,7 +246,7 @@ class StartShTest(unittest.TestCase):
         env.update(
             {
                 "PATH": os.pathsep.join([self.bin, os.environ.get("PATH", "")]),
-                "CCNAVI_BIN_PATH": self.exe,
+                "CCNAVI_ENTRY_PATH": self.exe,
                 "FAKE_ROUTES": self.routes,
                 "FAKE_LOG": self.log,
                 "FAKE_ORIGIN_URL": self.origin_url,
@@ -851,7 +851,7 @@ class StartShTest(unittest.TestCase):
             f"exec '{self.exe}' \"$@\"\n",
         )
         os.chmod(old, 0o755)
-        done = self.run_sh("--mr", "5", CCNAVI_BIN_PATH=old)
+        done = self.run_sh("--mr", "5", CCNAVI_ENTRY_PATH=old)
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn("確かめられない", done.stderr)
         self.assertFalse(os.path.isdir(self.wt("topic-x")))

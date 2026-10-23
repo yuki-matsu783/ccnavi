@@ -278,7 +278,7 @@ class CleanCases:
 class WorktreeOptionTest(unittest.TestCase):
     """`--worktree <名前>`。掃除とワークツリーの削除を実行ファイル（`worktree drop`）に任せる。
 
-    実行ファイルの代わりに、このツリーのソースを起こす（CCNAVI_BIN_PATH）。
+    実行ファイルの代わりに、このツリーのソースを起こす（CCNAVI_ENTRY_PATH）。
     """
 
     def setUp(self):
@@ -311,7 +311,7 @@ class WorktreeOptionTest(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
-        env["CCNAVI_BIN_PATH"] = self.bin
+        env["CCNAVI_ENTRY_PATH"] = self.bin
         script = os.path.join(self.ws, ".ccnavi", "scripts", name).replace(os.sep, "/")
         return subprocess.run(
             [SHELL, script, *args],

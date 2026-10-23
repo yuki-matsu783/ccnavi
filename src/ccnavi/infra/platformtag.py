@@ -3,7 +3,8 @@
 PyInstaller の実行ファイルは、組み立てた機械の OS と CPU でしか動かない。配布先では
 この語をディレクトリ名にして、機械ごとの組み立てを並べて置く（`.ccnavi/bin/<語>/`）。
 hook が起動するのは `.ccnavi/scripts/ccnavi-launcher.sh` に置いた振り分けの sh で、sh が
-自分の機械の語を読んで、`../bin/` の合うディレクトリへ渡す。
+自分の機械の語を読んで、`../bin/` の合うディレクトリへ渡す。合うものが無いときだけ、PATH の
+`ccnavi` を起動する（`path_executable`）。
 
 語は 4 か所で揃える。ここ、scripts/ccnavi-setup.sh の host_target、
 .ccnavi/scripts/ccnavi-launcher.sh、VS Code 拡張の src/core/locate.ts の hostTarget。
@@ -59,6 +60,45 @@ def runnable_targets(host: str) -> tuple[str, ...]:
     """
     fallback = {"darwin-arm64": "darwin-x86_64", "windows-arm64": "windows-x86_64"}.get(host)
     return (host, fallback) if fallback else (host,)
+
+
+def is_launcher(path: str) -> bool:
+    """このパスが振り分けの sh か（名前だけで決める。launched_executable と同じ条件）。"""
+    return os.path.basename(path) == LAUNCHER_NAME
+
+
+def path_executable(path_env: str | None = None, skip: str = "") -> str:
+    """PATH から見つかる ccnavi の実行ファイル。無ければ空文字。
+
+    振り分けの sh が `bin/` に何も見つけなかったときに起動するもの
+    （ccnavi-launcher.sh の ccnavi_launcher_path）。sh と同じ規則で探す: 絶対パスの項目だけを、
+    PATH に書かれた順に見て、通常ファイルで実行できる最初のものを返す。
+    空と相対の項目は cwd で結果が変わるので飛ばす。リンクは解かない（書かれたとおりのパスを返す）。
+
+    skip は振り分けの sh のパス。sh と同じ規則で、これと同じファイル（`ccnavi` という名前で
+    張ったリンクなど）は飛ばす。起動すると自分に戻る。
+
+    path_env は、テストで PATH を差し替えるためにある。省くと、実行中の環境の PATH を読む。
+    """
+    raw = os.environ.get("PATH", "") if path_env is None else path_env
+    for place in raw.split(os.pathsep):
+        if not place or not os.path.isabs(place):
+            continue
+        for name in EXECUTABLE_NAMES:
+            found = os.path.join(place, name)
+            if not (os.path.isfile(found) and os.access(found, os.X_OK)):
+                continue
+            if skip and _same_file(found, skip):
+                continue
+            return found
+    return ""
+
+
+def _same_file(a: str, b: str) -> bool:
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
 
 
 def launched_executable(launcher: str, host: str | None = None) -> str:
