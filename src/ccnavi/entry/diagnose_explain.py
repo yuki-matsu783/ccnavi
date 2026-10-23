@@ -199,11 +199,12 @@ def _explain_modes(stdout: TextIO, conf: settings.Settings) -> None:
             f"  {settings.TICKET_CONTROL_ENV}=disable なので、関門と補助の保護も効いていない\n"
         )
     stdout.write("\n■ 判定に達せなかったとき（内部の例外・期限切れ・payload が読めない）\n")
-    for tool in ("", "Write", "Read", "Bash", "Foo"):
+    for tool in ("", "Write", "Read", "Bash", "SubagentHandback", "Foo"):
         label = {
             "": "ツールが分からない",
-            "Write": "Write・Edit・NotebookEdit・Agent",
+            "Write": "Write・Edit・NotebookEdit・Agent・Task",
             "Read": "Read・Grep・Glob",
+            "SubagentHandback": "サブエージェントの報告用（SubagentHandback・StructuredOutput）",
             "Bash": "Bash",
             "Foo": "知らないツール",
         }[tool]

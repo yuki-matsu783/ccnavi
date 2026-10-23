@@ -39,8 +39,16 @@ MAX_REFS = 5
 MAX_PROMPT = 20000
 # 番号。0 で始まるもの（`#000`・`#012345` のような色や連番）は issue・MR の番号として読まない。
 _NUM = r"([1-9][0-9]{0,8})(?![0-9A-Za-z_])"
-# 囲みのコードブロック。貼り付けたコードやログの `#123` を拾わない。
+# 本文の形（語のあとの番号・`#N`・`!N`）で、番号の直後に許す文字。行末・空白・ASCII の句読点
+# （`_` は除く）・閉じ括弧・`、` `。`・助詞。`手順#2を見直して` や `issue 2つ目` のように、
+# 番号が別の語の一部のときは読まない。URL の番号は今のまま（`_NUM`）。
+_AFTER = r"(?=\Z|\s|[!-/:-@\[\\\]^`{-~]|[)」』）、。]|[をのがにはでともへや])"
+_BODY_NUM = r"([1-9][0-9]{0,8})" + _AFTER
+# 囲みのコードブロックとインラインコード。貼り付けたコードやログの `#123` を拾わない。
 _FENCE = re.compile(r"```.*?(?:```|\Z)", re.S)
+_INLINE_CODE = re.compile(r"`[^`\n]*`")
+# `#N`・`!N` の直前。行頭・空白・開き括弧・引用符・読点（`手順#2` のように語の直後は読まない）。
+_BEFORE = r"(?:^|(?<=[\s(\[（「『、。,\"']))"
 # URL。GitHub の `/issues/N`・`/pull/N`、GitLab の `/-/issues/N`・`/-/merge_requests/N`。
 # 前の 2 段（`owner/repo`。GitLab の入れ子のグループはその最後の 2 段）を、
 # どのリポジトリかの手がかりに残す。
@@ -49,19 +57,18 @@ _URL_MR = re.compile(
     r"(?:([\w.-]{1,100}/[\w.-]{1,100})/)?(?:-/)?(?:pull|pulls|merge_requests)/" + _NUM
 )
 # 語のあとの番号。`issue 152`・`issue #152`・`Issue: 152`・`issue-152`。
-_WORD_ISSUE = re.compile(r"(?<![A-Za-z0-9_])issues?[ \t]*[:：#＃-]?[ \t]*" + _NUM, re.I)
+_WORD_ISSUE = re.compile(r"(?<![A-Za-z0-9_])issues?[ \t]*[:：#＃-]?[ \t]*" + _BODY_NUM, re.I)
 _WORD_MR = re.compile(
     r"(?<![A-Za-z0-9_])"
     r"(?:MR|PR|merge[ \t]+request|pull[ \t]+request|マージリクエスト|プルリクエスト|プルリク)"
-    r"[ \t]*[:：#＃!-]?[ \t]*" + _NUM,
+    r"[ \t]*[:：#＃!-]?[ \t]*" + _BODY_NUM,
     re.I,
 )
-# `#152`。前が英数字・`_`・`&`（`&#123;`）・`#`（`##`）・`/`（URL の断片）なら読まない。
-# `C#`・`F#` は前が英字で外れ、`#fff` は番号でないので外れ、`# 見出し` は `#` の後ろが
-# 空白なので外れる。
-_HASH = re.compile(r"(?<![A-Za-z0-9_&#/\\])[#＃]" + _NUM)
-# `!5`（GitLab の MR）。前が行頭・空白・開き括弧・句読点のときだけ。`すごい!5` や `!!5` を拾わない。
-_BANG = re.compile(r"(?:^|(?<=[\s(\[（「、。,]))!" + _NUM)
+# `#152`。前が `_BEFORE` のときだけ。`手順#2`・`C#`・`&#123;`・`##`・URL の断片は読まない。
+# `#fff` は番号でないので外れ、`# 見出し` は `#` の後ろが空白なので外れる。
+_HASH = re.compile(_BEFORE + r"[#＃]" + _BODY_NUM)
+# `!5`（GitLab の MR）。前が `_BEFORE` のときだけ。`すごい!5` や `!!5` を拾わない。
+_BANG = re.compile(_BEFORE + "!" + _BODY_NUM)
 # `#` の前がこれなら CSS の色として読む（`color: #333333`）。
 _CSS_BEFORE = re.compile(
     r"(?:color|background|border|fill|stroke|outline|shadow)[-a-z]*\s*:\s*$", re.I
@@ -89,7 +96,7 @@ def prompt_refs(text: str) -> list[Ref]:
     """依頼文の中の issue・MR の指定。見つけた順に、同じ種類と番号は 1 つにまとめる。"""
     if not isinstance(text, str) or not text:
         return []
-    body = _drop_noise(_FENCE.sub(" ", text[:MAX_PROMPT]))
+    body = _drop_noise(_INLINE_CODE.sub(" ", _FENCE.sub(" ", text[:MAX_PROMPT])))
     found: list[tuple[int, Ref]] = []
     for pattern, kind in ((_URL_ISSUE, ISSUE), (_URL_MR, MR)):
         for m in pattern.finditer(body):
@@ -246,16 +253,8 @@ def _bound_line(ref: Ref, b: Bound) -> str:
     )
     return (
         f"[ccnavi] 依頼の {ref.label()} は、すでに {'・'.join(b.tickets)}（ブランチ {b.branch}）に"
-        f"結び付いている。ccnavi-start.sh は実行せず、{where}。"
-        "別の MR/issue を指す依頼なら、番号を言い直してもらう。" + _check_sentence()
-    )
-
-
-def _check_sentence() -> str:
-    """チケット作業の入口で最初に事前確認を打たせる一文（`ccnavi-start.sh --check`）。"""
-    return (
-        "最初に ccnavi-start.sh --check を打つ。終了コードが 0 以外なら、結果と「次:」を"
-        "ユーザに伝えて止まる（4 で GitHub なら MCP で代行してよい）。"
+        f"結び付いている。実装の依頼なら、{where}。--check を最初に打つ。"
+        "説明・調査だけなら、作業場所を変えずに答えてよい。"
     )
 
 
@@ -276,49 +275,36 @@ def project_of_repo(conf: settings.Settings, root: str, repo: str) -> str | None
 
 def _start_lines(conf: settings.Settings, root: str, refs: list[Ref]) -> list[str]:
     sh = settings.script_command(root, "ccnavi-start.sh")
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
     labels = "・".join(r.label() for r in refs)
-    lines = [
-        f"[ccnavi] 依頼に {labels} の指定がある。"
-        "開始の前に、次を実行します。既存の候補を探し、無ければ Draft MR・ワークツリー"
-        "・ブランチを作る。依頼の URL がリポジトリを示すものは、"
-        "そのプロジェクトに cd してから 1 行で実行します。"
-        f"最初に '{sh} --check' を打つ。終了コードが 0 以外なら、結果と「次:」を"
-        "ユーザに伝えて止まる（4 で GitHub なら MCP で代行してよい）。"
-    ]
+    starts: list[str] = []
+    notes: list[str] = []
     for r in refs:
         where = project_of_repo(conf, root, r.repo) if r.repo else ""
         if where is None:
-            lines.append(
-                f"- {r.label()} のリポジトリ {r.repo} は projects/ の中に無い"
+            notes.append(
+                f"{r.label()} のリポジトリ {r.repo} は projects/ の中に無い"
                 "（まだ clone していない）。"
-                "ccnavi-start.sh は実行せず、clone が要ることをユーザに伝えて止まる"
+                "ccnavi-start.sh は実行せず、clone が要ることをユーザに伝えて止まる。"
             )
             continue
         args = f"--{r.kind} {r.number}" + (f" --repo {r.repo}" if r.repo else "")
         if r.repo:
             # 実行する場所を絶対パスで名指しする（cwd がどこでも届く）。ワークスペース自身も同じ形
             place = os.path.join(conf.projects, where) if where else root
-            lines.append(f"- cd {settings.shell_path(place)} && {sh} {args}")
+            starts.append(f"'cd {settings.shell_path(place)} && {sh} {args}'")
         else:
-            lines.append(f"- '{sh} {args}'")
-    lines += [
-        "終了コード 0 なら、出たワークツリーのパスで作業を続ける。"
-        "出力に「次:」の行があれば、その一手に従う（提案づくりなら、承認を受けるまで実装はしない）。"
-        "詰まっても直接実装に切り替えない（ユーザに報告して止まる）。",
-        "終了コード 3（候補が複数）なら、何も作られていない。"
-        "一覧をユーザに見せ、次のどれにするかを聞いて返事を待つ。",
-        "1. 既存のブランチで続ける（既存のチケットに結び付くならそのチケットで続ける。"
-        "そうでなければ、ブランチを直接チェックアウトしたワークツリーを"
-        f" '{git_sh} worktree add .claude/worktrees/<ID> <ブランチ>'で出す"
-        "（<ID> はブランチ名の / を - に置き換えた名前。識別子のブランチは作らない））",
-        "2. 新しく <先頭の語>-<番号>-<slug> のブランチを切る",
-        "3. やめる",
-        "終了コード 4（ホストに届かない）なら、"
-        "出力の案内どおり MCP で代行し、同じコマンドを再実行します。",
-        "終了コード 1・2 なら、出力の理由をユーザに伝える。",
-        "このセッションで同じ番号を既に処理してユーザの返事を得ていれば、繰り返さなくてよい。",
-    ]
+            starts.append(f"'{sh} {args}'")
+    lines = [f"[ccnavi] 依頼に {labels} の指定がある。"]
+    if starts:
+        lines.append(
+            f"実装の依頼なら、着手前に '{sh} --check'、続けて {'・'.join(starts)} を打ち、"
+            "出力の「次:」に従う。Draft MR とワークツリーができる。"
+        )
+    lines.extend(notes)
+    lines.append(
+        "調べ・質問に答えるだけなら、チケット作業にせずそのまま答えてよい。"
+        "どちらか分からなければ、ユーザに聞く。"
+    )
     return lines
 
 

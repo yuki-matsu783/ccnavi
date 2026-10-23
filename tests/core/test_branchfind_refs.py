@@ -42,6 +42,13 @@ class PromptRefsTest(unittest.TestCase):
             "マージリクエスト!4": [(MR, 4)],
             "プルリク 8 の続き": [(MR, 8)],
             "#3 と !4": [(ISSUE, 3), (MR, 4)],
+            # 番号の直後が助詞・括弧・読点のときも拾う
+            "#152を直して": [(ISSUE, 152)],
+            "「#152」の件": [(ISSUE, 152)],
+            "issue 152 を対応": [(ISSUE, 152)],
+            "!5 の指摘": [(MR, 5)],
+            "#12、#13。": [(ISSUE, 12), (ISSUE, 13)],
+            "PR #12": [(MR, 12)],
         }
         for text, want in cases.items():
             with self.subTest(text=text):
@@ -66,10 +73,24 @@ class PromptRefsTest(unittest.TestCase):
             "issue を探して",
             "#12a",
             "",
+            # 番号が別の語の一部（直前が語、直後が助詞以外の文字）
+            "手順#2を見直して",
+            "issue 2つ目",
+            "PR 3本",
+            "MR 3件",
+            "#2つ目",
+            # インラインコード
+            "`#12` は設定の例",
+            "`!5` と `issue 7`",
         ]
         for text in cases:
             with self.subTest(text=text):
                 self.assertEqual(refs(text), [])
+
+    def test_a_number_before_a_particle_is_read_even_in_a_longer_phrase(self):
+        # 「2 のうち 1 つ」の意図は読み分けられない。今の挙動（番号の直後が助詞なので issue 2 を
+        # 拾う）を固定する。拾ってもユーザに確かめる指示が足されるだけで、作業は止まらない。
+        self.assertEqual(refs("issue 2のうち1つ"), [(ISSUE, 2)])
 
     def test_a_url_is_read_once(self):
         # URL の断片（#issuecomment-…）や URL の中の番号を、語や `#` としてもう 1 度数えない

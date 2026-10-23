@@ -101,6 +101,25 @@ class StopNudgeTest(TicketTest):
         self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01-01").returncode, 0)
         self.assert_quiet(self.stop(tree))
 
+    def test_a_running_subagent_holds_the_nudge_without_using_it_up(self):
+        """実行中のサブエージェントが居る間は、委任して待つ回なので促さない。
+
+        見送った回は「1 回だけ」を進めないので、終わったあとの Stop でまた促せる。防ぐのは誤った
+        促しだけで、メインが自分から早く finish を打つことは防がない。
+        """
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        started = self.hook("SubagentStart", "", tree, agent_id="a1")
+        self.assertEqual(started.returncode, 0, started.stderr)
+        self.assert_quiet(self.stop(tree))
+        self.assert_quiet(self.stop(tree))
+        self.assertEqual(self.hook("SubagentStop", "", tree, agent_id="a1").returncode, 0)
+        body = self.body(self.stop(tree))
+        self.assertEqual(body.get("decision"), "block")
+        self.assertIn(CODE, body["reason"])
+        self.assert_quiet(self.stop(tree))
+
     def test_dry_run_blocks_too(self):
         """促しは dry-run でも止める。止めないと文がモデルに届かない。"""
         self.family()

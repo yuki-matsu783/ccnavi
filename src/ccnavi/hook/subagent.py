@@ -16,9 +16,16 @@ from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import ctxfile, rules
 from ..records import audit
-from ..tickets import approval, approval_checks, flow, phase, phase_scope, phasetypes, ticket_model
-from ..tickets import ticket as ticket_mod
-from . import agentkind, judge, post, post_findings, projskills, reasons, subagent_outcome
+from ..tickets import approval, approval_checks, flow, phase_scope, ticket_model
+from . import (
+    agentkind,
+    childnote,
+    post,
+    post_findings,
+    projskills,
+    reasons,
+    subagent_outcome,
+)
 
 # サブエージェントには Stop の振り返り（`match: Stop` のルールの文）が届かないので、
 # 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（.ccnavi/docs/skill-review.md）。
@@ -73,12 +80,7 @@ def at_start(
     children = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
     if not children:
         return _say(stdout, skills)
-    closed, _ = approval.scan(conf, root, closed=True)
-    review, _ = approval.scan_review(conf, root)
-    proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ。
-    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals)
-    approval_checks.align_imported(conf, root, preds)
+    preds = childnote.predecessors(conf, root, copies)
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"
         "書き込みは行き先のワークツリーのチケットで判定される。"
@@ -91,87 +93,25 @@ def at_start(
     listed = False
     changed: list[str] = []
     for t in sorted(children, key=lambda x: x.ticket):
-        where = tree.worktree_path(root, t.ticket)
-        state = (
-            "ワークツリーあり"
-            if os.path.isdir(where)
-            else "ワークツリー無し（範囲は有効にならない）"
-        )
-        waiting = [f"{p.ticket}（{p.label}）" for p in approval_checks.unmet_predecessors(t, preds)]
-        label = str(t.phase)
-        hint = ""
-        parent = index.get(t.parent)
-        item = parent.item_at(t.phase) if parent is not None and t.phase is not None else None
-        # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は読まない。
-        pt = phasetypes.types_of(parent).get(item.type) if item is not None else None
-        if pt is not None:
-            label = f"{t.phase}: {pt.title}"
-            if pt.agent:
-                hint = f" 定義の案内: エージェント {pt.agent}"
-        lines.append(
-            f"  {t.ticket}（親 {t.parent}、フェーズ {label}）: {where} [{state}]"
-            + (f" 先行が未完了: {', '.join(waiting)}" if waiting else "")
-            + hint
-        )
-        for name in rules.SECTIONS:
-            paths = t.paths(name)
-            if paths:
-                lines.append(f"    {name}: " + ", ".join(paths))
-        # 子のフロー。在ればファイルを名指しし、手順を並べる。
-        # フローは人やエージェントが書くデータで、不正でも 1 行の知らせにして、
-        # 残りの子と範囲は渡す。
-        scope = ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))
-        try:
-            brief = flow.briefing(conf, root, t, scope, budget, full=full)
-        except Exception as exc:  # noqa: BLE001  不正なフローで SubagentStart を失敗させない
-            brief = [f"    フローを読めない（{type(exc).__name__}）。ユーザが確かめてください"]
-        budget -= sum(len(line) for line in brief)
-        listed = listed or bool(brief)
-        lines.extend(brief)
-        notice = flow.changed_notice(conf, root, t)
-        if notice:
-            changed.append(notice)
-    lines.extend(_stage_lines(conf, root, index, children))
+        block = childnote.child_block(conf, root, t, index, preds, budget, full)
+        lines.extend(block.lines)
+        budget -= sum(len(line) for line in block.brief)
+        listed = listed or bool(block.brief)
+        if block.notice:
+            changed.append(block.notice)
+    lines.extend(childnote.stage_lines(conf, root, index, children))
     if listed and not full:
         lines.append(
             "  フロー: 自分の担当の子チケットのフローだけを読んで従ってください。"
             "他の子のフローには従わないでください。担当が分からなければ、読まずにメインに聞いてください"
         )
+    lines.extend(childnote.RULE_LINES)
     lines.extend(changed)
     text = "\n".join(lines)
     if skills:
         text = f"{skills}\n\n{text}"
     hookio.write_context(stdout, hookio.SUBAGENT_START, text, system="\n".join(changed))
     return EXIT_OK
-
-
-def _stage_lines(
-    conf: settings.Settings,
-    root: str,
-    index: dict[str, ticket_model.Ticket],
-    children: list[ticket_model.Ticket],
-) -> list[str]:
-    """子の親ごとに、親の局面を 1 行ずつ返す（局面の名前は `phase.stage` のまま）。
-
-    局面は案内であって判定ではない。局面を組めない（置き場を読めないなど）ときや、
-    計画の無い親（空文字）には何も出さず、SubagentStart は失敗させない。
-    """
-    parents: list[ticket_model.Ticket] = []
-    for child in sorted(children, key=lambda x: x.ticket):
-        parent = index.get(child.parent)
-        if parent is not None and parent not in parents:
-            parents.append(parent)
-    lines: list[str] = []
-    try:
-        # 承認済みチケットの置き場は 1 度だけ読む。
-        raw = approval.read_raw(conf, root)
-        for parent in parents:
-            text = phase.stage(root, conf, parent, raw)
-            if text:
-                lines.append(f"  親 {parent.ticket} の局面: {text}")
-    except Exception:  # noqa: BLE001  局面を組めなくても SubagentStart を失敗させない
-        return []
-    return lines
 
 
 def _say(stdout: TextIO, text: str) -> int:
@@ -625,7 +565,7 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
     言うのは、終了結果が `outside`（直らないまま終わった）のときだけ。差し戻しの後に直った
     （`fixed`）なら言わない。結果の記録が無い体（記録を入れる前の終了）は今までどおり言う。
     """
-    if payload.tool_name != judge.AGENT_TOOL:
+    if payload.tool_name not in modes.AGENT_TOOLS:
         return ""
     agent_id = str(payload.tool_response.get("agentId") or "")
     if not agent_id or not _bounced(state_dir, payload.session_id, agent_id):
@@ -661,7 +601,7 @@ def unchecked_scope(state_dir: str, payload: hookio.Input) -> str:
     if not state_dir:
         return ""
     paths: list[tuple[str, str]] = []
-    if payload.tool_name == judge.AGENT_TOOL:
+    if payload.tool_name in modes.AGENT_TOOLS:
         agent_id = str(payload.tool_response.get("agentId") or "")
         if agent_id:
             paths.append((agent_id, _unchecked_path(state_dir, payload.session_id, agent_id)))
