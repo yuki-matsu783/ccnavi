@@ -22,7 +22,8 @@
 #
 # 語は src/ccnavi/infra/platformtag.py と scripts/ccnavi-setup.sh の host_target と揃える。
 #
-# 見つからなければ 127 で終わる。実行ファイルそのものが無いときにシェルが返すのと
+# bin/ に無ければ PATH の ccnavi を探す（下の ccnavi_launcher_path）。
+# どちらにも見つからなければ 127 で終わる。実行ファイルそのものが無いときにシェルが返すのと
 # 同じ値で、hook からは「起動できなかった」として扱われる。
 
 here=${0%/*}
@@ -61,5 +62,34 @@ for target in $targets; do
 	done
 done
 
-printf 'ccnavi: この機械（%s-%s）で動く実行ファイルが %s/ にありません。ccnavi のリポジトリでは build.py を実行すると置かれます。配布先では、この機械で組み立てたものを scripts/ccnavi-setup.sh で配ってください。\n' "$os" "$arch" "$bin_dir" >&2
+# bin/ に無いときだけ、PATH の ccnavi を使う。bin/ が先なので、配布先の挙動は変わらない。
+# 見るのは絶対パスの項目だけ。空の項目と相対の項目（`.` や `~/bin`）は cwd や展開の有無で
+# 結果が変わるので飛ばす。自分自身（ccnavi という名前で張ったリンク）を起動すると
+# 自分に戻って終わらないので、自分と同じファイルも飛ばす。
+# PyInstaller の onedir は実行ファイルの隣に _internal/ が要る。単体のコピーは動かない。
+# 実行ファイルの隣に _internal/ があるフォルダを PATH に通すか、そこへのリンクを置く。
+ccnavi_launcher_path() {
+	ccnavi_ifs=$IFS
+	set -f
+	IFS=:
+	for dir in $PATH; do
+		case "$dir" in
+		/*) ;;
+		*) continue ;;
+		esac
+		for name in ccnavi ccnavi.exe; do
+			if [ -f "$dir/$name" ] && [ -x "$dir/$name" ] && ! [ "$dir/$name" -ef "$0" ]; then
+				IFS=$ccnavi_ifs
+				set +f
+				exec "$dir/$name" "$@"
+			fi
+		done
+	done
+	IFS=$ccnavi_ifs
+	set +f
+	return 1
+}
+ccnavi_launcher_path "$@"
+
+printf 'ccnavi: この機械（%s-%s）で動く実行ファイルが %s/ にも PATH（絶対パスの項目だけ見ます）にもありません。ccnavi のリポジトリでは build.py を実行すると置かれます。配布先では、この機械で組み立てたものを scripts/ccnavi-setup.sh で配ってください。\n' "$os" "$arch" "$bin_dir" >&2
 exit 127

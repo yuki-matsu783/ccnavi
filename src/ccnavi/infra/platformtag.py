@@ -61,6 +61,32 @@ def runnable_targets(host: str) -> tuple[str, ...]:
     return (host, fallback) if fallback else (host,)
 
 
+def is_launcher(path: str) -> bool:
+    """このパスが振り分けの sh か（名前だけで決める。launched_executable と同じ条件）。"""
+    return os.path.basename(path) == LAUNCHER_NAME
+
+
+def path_executable(path_env: str | None = None) -> str:
+    """PATH から見つかる ccnavi の実行ファイル。無ければ空文字。
+
+    振り分けの sh が `bin/` に何も見つけなかったときに起動するもの
+    （ccnavi-launcher.sh の ccnavi_launcher_path）。sh と同じ規則で探す: 絶対パスの項目だけを、
+    PATH に書かれた順に見て、通常ファイルで実行できるものを最初に当たったところで返す。
+    空と相対の項目は cwd で結果が変わるので飛ばす。リンクは解かない（書かれたとおりのパスを返す）。
+
+    引数はテストで PATH を差し替えるためにある。省くと、走っている環境の PATH を読む。
+    """
+    raw = os.environ.get("PATH", "") if path_env is None else path_env
+    for place in raw.split(os.pathsep):
+        if not place or not os.path.isabs(place):
+            continue
+        for name in EXECUTABLE_NAMES:
+            found = os.path.join(place, name)
+            if os.path.isfile(found) and os.access(found, os.X_OK):
+                return found
+    return ""
+
+
 def launched_executable(launcher: str, host: str | None = None) -> str:
     """振り分けの sh が、この機械で起動する実行ファイル。無ければ空文字。
 

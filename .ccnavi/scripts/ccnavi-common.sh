@@ -206,15 +206,22 @@ ccnavi_workspace() {
 # 無いのが普通。そのときは ccnavi のリポジトリの組み立て（dist/ccnavi/ccnavi）、次に
 # hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの sh は
 # .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
-# 「実行ファイルが無い」で止まる。
+# 「実行ファイルが無い」で止まる。bin/ もソースも無い配布先では、PATH の ccnavi を返す（無ければ 1）。
 #
 # それぞれ `.exe` を付けた名前も見る（Windows の組み立て）。
 ccnavi_bin() {
 	case "${CCNAVI_BIN_PATH:-}" in
 	'')
 		ccnavi_bin_try "$1/dist/ccnavi/ccnavi" && return 0
-		[ -d "$1/.ccnavi/bin" ] || return 1
-		ccnavi_bin_try "$1/.ccnavi/scripts/ccnavi-launcher.sh"
+		if [ -d "$1/.ccnavi/bin" ]; then
+			ccnavi_bin_try "$1/.ccnavi/scripts/ccnavi-launcher.sh"
+		elif [ ! -f "$1/src/ccnavi/__main__.py" ]; then
+			# bin/ もソースも無い配布先。PATH の ccnavi があればそれを返す（振り分けの sh と同じ規則）。
+			# 無ければ 1 を返すので、呼び手の「実行ファイルが無い」の分岐は今までと同じ。
+			ccnavi_bin_path
+		else
+			return 1
+		fi
 		;;
 	/* | [A-Za-z]:*) ccnavi_bin_try "$CCNAVI_BIN_PATH" ;;
 	*) ccnavi_bin_try "$1/$CCNAVI_BIN_PATH" ;;
@@ -244,6 +251,31 @@ ccnavi_compat_skew() {
 	fi
 	[ "$ccnavi_cs_have" = "$CCNAVI_COMPAT" ] && return 0
 	printf '実行ファイル %s は互換 %s、sh は互換 %s で食い違っています。%s。\n' "$2" "$ccnavi_cs_have" "$CCNAVI_COMPAT" "$ccnavi_cs_fix"
+	return 1
+}
+
+# PATH の ccnavi。振り分けの sh（ccnavi-launcher.sh の ccnavi_launcher_path）と同じ規則:
+# 絶対パスの項目だけを見て、通常ファイルで実行できるものを最初に当たった順に返す。
+ccnavi_bin_path() {
+	ccnavi_bp_ifs=$IFS
+	set -f
+	IFS=:
+	for ccnavi_bp_dir in $PATH; do
+		case "$ccnavi_bp_dir" in
+		/*) ;;
+		*) continue ;;
+		esac
+		for ccnavi_bp_name in ccnavi ccnavi.exe; do
+			if [ -f "$ccnavi_bp_dir/$ccnavi_bp_name" ] && [ -x "$ccnavi_bp_dir/$ccnavi_bp_name" ]; then
+				IFS=$ccnavi_bp_ifs
+				set +f
+				printf '%s\n' "$ccnavi_bp_dir/$ccnavi_bp_name"
+				return 0
+			fi
+		done
+	done
+	IFS=$ccnavi_bp_ifs
+	set +f
 	return 1
 }
 

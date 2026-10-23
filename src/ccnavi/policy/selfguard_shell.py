@@ -445,11 +445,34 @@ def binary_clause(bin_path: str, *, copy: bool = False) -> str:
     if parts[-1] == platformtag.LAUNCHER_NAME:
         sh = r"[\\/]".join(re.escape(p) for p in parts[-2:])
         home = re.escape(parts[-3]) + r"[\\/]" if len(parts) >= 3 else ""
+        # PATH の ccnavi（bin/ に実体が無いとき sh が起動するもの）。末尾 3 要素で当てる。
+        # 2 要素（`bin/ccnavi`）だと別のプロジェクトの `./bin/ccnavi` にまで当たる。
+        on_path = "".join(f"|{p}" for p in _path_spellings())
+        on_path_copy = "".join(f"|{p}{_COPY_TAIL}" for p in _path_spellings())
+        built = rf"{home}bin[\\/]{_BUILD_DIR}"
         if copy:
-            return rf"{_IN_WORD}(?:{sh}{_COPY_TAIL}|{home}bin[\\/]{_BUILD_DIR}{_COPY_END})"
-        return rf"(?:{sh}|{home}bin[\\/]{_BUILD_DIR}(?:[\\/][^\x00]*)?)"
+            return rf"{_IN_WORD}(?:{sh}{_COPY_TAIL}|{built}{_COPY_END}{on_path_copy})"
+        return rf"(?:{sh}|{built}(?:[\\/][^\x00]*)?{on_path})"
     plain = r"[\\/]".join(re.escape(p) for p in parts[-2:])
     return _IN_WORD + plain + _COPY_TAIL if copy else plain
+
+
+def _path_spellings() -> list[str]:
+    """PATH の ccnavi を当てる形（末尾 3 要素）。書かれたパスと、リンクを解いた先の両方。
+
+    置き場のディレクトリ（`~/.local/bin` 全体）は守らない。無関係な道具を入れる操作まで止まる。
+    PATH に無ければ空。
+    """
+    exe = platformtag.path_executable()
+    if not exe:
+        return []
+    found = []
+    for path in (exe, os.path.realpath(exe)):
+        parts = [p for p in re.split(r"[\\/]", path) if p and p not in (".", "..")][-3:]
+        spelled = r"[\\/]".join(re.escape(p) for p in parts)
+        if parts and spelled not in found:
+            found.append(spelled)
+    return found
 
 
 def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
