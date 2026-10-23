@@ -34,6 +34,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "handoff";
+const TITLE = "ccnavi 取り込み待ち";
 
 type Loaded =
   | {
@@ -75,10 +76,6 @@ interface PanelState {
 /** 開いているパネル。種類ごとに 1 枚 */
 let state: PanelState | undefined;
 
-function titleOf(key: string): string {
-  return `ccnavi 取り込み待ち: ${keyLabel(key)}`;
-}
-
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
@@ -109,14 +106,14 @@ export async function openHandoff(key: string = MAIN_TREE_KEY): Promise<void> {
 
   // タブは読む前に作る（押しても何も起きないように見えて、押し直されるのを避けるため）。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
-  const panel = vscode.window.createWebviewPanel("ccnaviHandoff", titleOf(key), vscode.ViewColumn.One, {
+  const panel = vscode.window.createWebviewPanel("ccnaviHandoff", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
     // 選んだ対象や開いた行を持つので、タブを非表示にしても捨てない。
     retainContextWhenHidden: true,
   });
-  showLoading(panel, titleOf(key), SCREEN, keyLabel(key));
+  showLoading(panel, TITLE, SCREEN, keyLabel(key));
   const current: PanelState = {
     key,
     panel,
@@ -138,7 +135,6 @@ export async function openHandoff(key: string = MAIN_TREE_KEY): Promise<void> {
 /** 開いているタブのツリーを入れ替える。読み終えるまでは前のツリーの中身を消して「読み込み中」を見せ、操作も受けない */
 async function switchTree(current: PanelState, key: string): Promise<void> {
   current.key = key;
-  current.panel.title = titleOf(key);
   current.loaded = undefined;
   current.error = undefined;
   if (current.timer !== undefined) {
