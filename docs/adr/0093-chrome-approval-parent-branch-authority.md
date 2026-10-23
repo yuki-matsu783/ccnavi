@@ -508,7 +508,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 - **`record-risk`** は write-and-push にしない。書いた `<子>.judge.json` はその子の `finish` の write-and-push がコミットして push する（`finish` はこの判定を入力として読むので、記録レイヤーが読んだ入力として一覧に足す）。
   record-risk を別の write-and-push にする形は採らない
 - **push する先は `P` だけ**。子のブランチは送らない（`ccnavi-git.sh:562` と同じ）
-- **REQ-APV-11** が止めているのは「承認済みチケットをコミットして push する sh をエージェントが起こすこと」です。補足の文を事実に合わせて直します（設計書と要件に反映済み）:
+- **REQ-APV-11** が止めているのは「承認済みチケットをコミットして push する sh をエージェントが起こすこと」です。補足の文を事実に合わせて直します（設計書と要件に反映済み）。直した文は次のとおり。
   > write-and-push の push は `P` の未送信のコミットをすべて送る（git push の性質）。コードのコミットはエージェントが `ccnavi-git.sh push` で送れる範囲と同じ。
   > 置き場について送るのは、状態の操作がこの実行で書いたパスと、ccnavi が書いたと内容で分かるパス（4.4 の (b)）だけで、
   > それ以外の置き場の変更が未送信なら write-and-push は送らずに止める（4.3 の 5）
@@ -920,7 +920,7 @@ Chrome は ccnavi の .pyc を同梱するので、手元の ccnavi と版がず
    - レビュー済みのコミットで、マージリクエストの Approve が「新しいコミットで外す」設定のとき外れること（8.10。画面の注意が合っているか）
    - レビューの一覧に書きかけ（PENDING）が出るのはトークンの持ち主のものだけか、`submitted_at` が無いか
    - 投稿の答え（GitHub の issue のコメントの `user.login`、GitLab の note の `author.id`）と、GitLab の discussions の `notes[0].author.id`
-9. 段階 5で使う GitLab と「始める」の応答の形。見本（`test/fixtures/host/gitlab/`）と模擬の GitLab は本物の形に合わせて手で組んだもので、本物からは録っていない（PAT が無い）
+9. 段階 5 で使う GitLab と「始める」の応答の形。見本（`test/fixtures/host/gitlab/`）と模擬の GitLab は本物の形に合わせて手で組んだもので、本物からは録っていない（PAT が無い）
    - `merge_requests/:iid/discussions` の `notes[].resolvable`・`resolved`・`position.new_path`・`new_line`・`author.id`、
      マージリクエストの一般のコメント（依頼の投稿）が `resolvable: true` になるか、システムのノートが `resolvable: false` か
    - `merge_requests/:iid/reviewers` の `state`（`unreviewed`・`reviewed`・`requested_changes`・`approved`）と `updated_at` の有無。

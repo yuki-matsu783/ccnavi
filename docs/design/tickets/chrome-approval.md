@@ -12,7 +12,7 @@ keywords: [Chrome拡張, PAT, Pyodide, MV3, CSP, createCommitOnBranch, expectedH
 
 承認者の機械に clone も ccnavi も無い場合に、承認者がブラウザと PAT だけで、リモートの親のブランチ（`P`）へ承認を書くための拡張（`extensions/chrome/ccnavi-approval/`）。
 判定は同梱の ccnavi を Pyodide で動かして出し、拡張は判定を自分で書かない。要求は [承認の要件](../../requirements/approval.md)（REQ-APV）と [拡張の入口](../../requirements/extension-if.md)。
-本物とするチケットを `P` の上のものだけにする規則は [9.5](judging-by-path.md)、共有の全体は [9.17](sharing.md)。決めた理由は ADR-0093 にある。
+有効とするチケットを `P` の上のものだけに限る規則は [9.5](judging-by-path.md)、共有の全体は [9.17](sharing.md)。決めた理由は ADR-0093 にある。
 
 #### 形
 
@@ -82,7 +82,7 @@ issue の一覧に「始める」を出し、`P`（`i<番号>`、プロジェク
 
 開発者と承認者が別の人のとき、マージリクエストを見てスレッドを片付けるのは承認者側なので、Chrome に「レビュー済み」を置く。`ccnavi-review.sh confirm` は手元用で、どちらも同じコアの `confirm` と `reviewed_mark` を使う。
 
-マーカー `phases/<親>/<N>.reviewed` の中身:
+マーカー `phases/<親>/<N>.reviewed` の中身は次のとおり。
 
 ```json
 {"mr": 42, "accepted": [], "actor": "<ホストのアカウント名>", "via": "chrome", "at": "<時刻>"}

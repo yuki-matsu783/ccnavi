@@ -182,7 +182,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0086](0086-state-history-is-an-append-only-aid.md) | 状態の履歴を、チケットごとの追記専用のファイルに残す。状態は今までどおり置き場で決まる（承認の時刻の出どころは ADR-0104 が改める）。置き換え（ADR-0141） |
 | [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
 | [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ（続きの子の目印の置き場は ADR-0104 が改める。`closed` で満たす道は 0142 が廃止、`--reviewed --chat` は 0132 が廃止） |
-| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する（「閉じた」の照合と取り下げの条件は ADR-0104 が、共通レイヤーを写す前提（D28・D34）は ADR-0107 が、待ち方を運ぶファイルは ADR-0109 が、通信先を設定画面で足さない D24 は ADR-0128 が、統合先の名前の D30 は ADR-0148 が、取り込み状態は ADR-0142 が、チャットは ADR-0132 が、ワークツリー名の大文字小文字は ADR-0140 が改める。承認の取り下げ（D14）は ADR-0155 が廃止） |
+| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、有効とするチケットは親のブランチ上のものだけに固定する（「閉じた」の照合と取り下げの条件は ADR-0104 が、共通レイヤーを写す前提（D28・D34）は ADR-0107 が、待ち方を運ぶファイルは ADR-0109 が、通信先を設定画面で足さない D24 は ADR-0128 が、統合先の名前の D30 は ADR-0148 が、取り込み状態は ADR-0142 が、チャットは ADR-0132 が、ワークツリー名の大文字小文字は ADR-0140 が改める。承認の取り下げ（D14）は ADR-0155 が廃止） |
 | [0128](0128-extension-hosts-added-in-settings.md) | 通信先を設定画面で足せるようにする（ADR-0093 の D24 を改める。足したホストの許可と、CSP の connect-src の広がり） |
 | [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、ユーザは crit で見る（置き場と指摘の書き出し方は置き換え（ADR-0095）） |
 | [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘はユーザが crit push で送る（範囲と依頼し直しの扱いは置き換え（ADR-0096）） |
