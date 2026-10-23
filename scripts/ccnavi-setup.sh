@@ -756,7 +756,8 @@ if [ -n "$deploy" ] && [ -f "$root/$BIN_PATH" ] && [ ! -x "$root/$BIN_PATH" ]; t
 	esac
 fi
 
-# この機械で動く実行ファイルが、実行ファイルの置き場にあるか。振り分けの sh と同じ順で探す。
+# この機械で動く実行ファイルがあるか。振り分けの sh と同じ順で探す: 実行ファイルの置き場、
+# 無ければ PATH の ccnavi（絶対パスの項目だけ。振り分けの sh と同じファイルは飛ばす）。
 runnable_there() {
 	for runnable_target in $runnable; do
 		for runnable_name in ccnavi ccnavi.exe; do
@@ -765,6 +766,25 @@ runnable_there() {
 			fi
 		done
 	done
+	runnable_ifs=$IFS
+	set -f
+	IFS=:
+	for runnable_dir in $PATH; do
+		case "$runnable_dir" in
+		/*) ;;
+		*) continue ;;
+		esac
+		for runnable_name in ccnavi ccnavi.exe; do
+			runnable_file=$runnable_dir/$runnable_name
+			if [ -f "$runnable_file" ] && [ -x "$runnable_file" ] && ! [ "$runnable_file" -ef "$root/$BIN_PATH" ]; then
+				IFS=$runnable_ifs
+				set +f
+				return 0
+			fi
+		done
+	done
+	IFS=$runnable_ifs
+	set +f
 	return 1
 }
 
@@ -1610,7 +1630,7 @@ fi
 # 配布元に無かったか、配布先に別のものが既にあって配っていないか、のどれか。
 #
 # 実行ファイルは、振り分けの sh と同じ順で、
-# この機械で動くものの置き場を探す。
+# この機械で動くものを探す（置き場、無ければ PATH）。
 missing_parts=""
 note_missing() {
 	missing_parts="$missing_parts  $1
@@ -1620,7 +1640,7 @@ case "$host" in
 unknown-* | *-unknown) ;;
 *)
 	if ! runnable_there; then
-		note_missing "${BUILD_ROOT}/${host}/ccnavi（この機械で動く実行ファイル。この機械で build.py を実行して組み立ててから配る）"
+		note_missing "${BUILD_ROOT}/${host}/ccnavi（この機械で動く実行ファイル。PATH にも無い。この機械で build.py を実行して組み立ててから配る）"
 	fi
 	;;
 esac
