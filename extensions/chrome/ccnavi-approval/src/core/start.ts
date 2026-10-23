@@ -1,7 +1,8 @@
 /**
  * 「始める」。`ccnavi-start.sh` と同じ手順で、issue から作業を始める。
  *
- *   1. issue に紐づく開いた MR を探す（題・本文の `#<番号>` か `issues/<番号>`、元ブランチの名前の番号）
+ *   1. issue を閉じる開いた MR を探す（題・本文の `Closes #<番号>` など、閉じる語に続く issue の指定。
+ *      参照しているだけの MR は採用しない）
  *   2. 1 本あれば、その元ブランチを親として採用する。ブランチも MR も作らない
  *      （採用の確認: MR が open・フォークでない・マージ先が統合先・ブランチ名が保護されていない・識別子が使える・
  *       同じ識別子になる別のブランチが無い・同じブランチ名のマージ済み MR が無い。引っかかったら止める）
@@ -55,13 +56,18 @@ export async function listIssues(repo: RepoConfig, deps: Deps): Promise<Issue[]>
 }
 
 /**
- * その issue に紐づく MR か。題・本文の `#<番号>`（英数字・`_`・`&`・`/` が前に付かないもの）か `issues/<番号>`、
- * または元ブランチの名前に番号が単独で入っているもの。`ccnavi-branches.sh` の `github_issue` と同じ見方
+ * その issue を**閉じる** MR か。題・本文に、閉じる語（close・closes・closed・closing、fix・fixes・fixed・fixing、
+ * resolve・resolves・resolved・resolving）の直後に `#<番号>`（同じリポジトリ）か `<owner/repo>#<番号>`、または
+ * `issues/<番号>` の URL が続くもの。参照しているだけ（`#<番号>` の言及・元ブランチの名前の番号）の MR は
+ * 含めない。`ccnavi-start.sh` が MR の閉じる issue（ホストのリンク）で採用を決めるのと同じ考え方で、
+ * ここは題・本文の語から見る（拡張はホストの閉じるリンクを読まない）
  */
-export function mentionsIssue(mr: Pick<Mr, "title" | "body" | "branch">, issue: number): boolean {
+export function closesIssue(mr: Pick<Mr, "title" | "body">, issue: number): boolean {
   const n = String(issue);
-  const text = `${mr.title} ${mr.body}`;
-  return new RegExp(`(^|[^0-9A-Za-z_&/])#${n}([^0-9]|$)`).test(text) || new RegExp(`issues/${n}([^0-9]|$)`).test(text) || new RegExp(`(^|[^0-9])${n}([^0-9]|$)`).test(mr.branch);
+  const text = `${mr.title}\n${mr.body}`;
+  const keyword = "(?:close[sd]?|closing|fix(?:e[sd])?|fixing|resolve[sd]?|resolving)";
+  const target = `(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#${n}(?![0-9])|\\S*/issues/${n}(?![0-9])`;
+  return new RegExp(`(?:^|[^0-9A-Za-z_])${keyword}:?\\s+(?:${target})`, "i").test(text);
 }
 
 /**
@@ -88,12 +94,12 @@ export async function startIssue(
     };
     // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る
     const all = (await deps.call("branchNames", [repo.owner, repo.repo])) as string[];
-    // 1. issue に紐づく開いた MR を探す。見落として重複を作らないため、読めなければ（例外は）止める
-    const open = ((await deps.call("listOpenMrs", [repo.owner, repo.repo])) as Mr[]).filter((m) => mentionsIssue(m, issue.number));
+    // 1. issue を閉じる開いた MR を探す。見落として重複を作らないため、読めなければ（例外は）止める
+    const open = ((await deps.call("listOpenMrs", [repo.owner, repo.repo])) as Mr[]).filter((m) => closesIssue(m, issue.number));
     if (open.length > 1) {
       return {
         kind: "refused",
-        message: `Issue #${issue.number} に紐づく開いたマージリクエストが ${open.length} 本あります（${open.map((m) => `!${m.number} ${m.branch}`).join("、")}）。どれで続けるかを決めてから、手元で ccnavi-start.sh --mr <番号> を実行してください。`,
+        message: `Issue #${issue.number} を閉じる開いたマージリクエストが ${open.length} 本あります（${open.map((m) => `!${m.number} ${m.branch}`).join("、")}）。どれで続けるかを決めてから、手元で ccnavi-start.sh --mr <番号> を実行してください。`,
       };
     }
     if (open.length === 1) {

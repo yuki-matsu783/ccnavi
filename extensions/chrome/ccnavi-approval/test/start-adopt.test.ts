@@ -21,7 +21,7 @@ import { dispatch, type Deps } from "../src/core/protocol.js";
 import { py as pyOps, type PyCall } from "../src/core/py.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, Reader, readIntegration } from "../src/core/snapshot.js";
-import { mentionsIssue, startIssue, type StartOutcome } from "../src/core/start.js";
+import { closesIssue, startIssue, type StartOutcome } from "../src/core/start.js";
 import type { WriteDeps } from "../src/core/write.js";
 import { fixture, NOW } from "./fixtures/repo.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats, OPTIONS } from "./helpers/host.js";
@@ -67,7 +67,7 @@ const HOSTS_UNDER_TEST = [
 
 /** issue 20 に紐づく開いた MR を 1 本置く（元ブランチも作る）。over で上書き */
 function withMr(mock: MockGitHub, over: Partial<MockMr> = {}): MockMr {
-  const mr: MockMr = { number: 5, branch: "feature/20-login", base: "main", title: "ログイン #20", body: "", state: "open", fork: false, ...over };
+  const mr: MockMr = { number: 5, branch: "feature/20-login", base: "main", title: "ログイン", body: "Closes #20", state: "open", fork: false, ...over };
   if (!mock.head(mr.branch)) mock.branch(mr.branch, "main");
   mock.mrs.push(mr);
   return mr;
@@ -84,16 +84,19 @@ function message(out: StartOutcome): string {
   return out.kind === "refused" || out.kind === "failed" ? out.message : "";
 }
 
-test("CX-T251 issue に紐づく MR は、題・本文の #番号 か issues/番号、元ブランチの名前の番号で見つける。番号が長い別の issue は拾わない", () => {
-  const mr = (title: string, body = "", branch = "x") => ({ title, body, branch });
-  assert.equal(mentionsIssue(mr("直す #20"), 20), true);
-  assert.equal(mentionsIssue(mr("直す", "Closes #20\n"), 20), true);
-  assert.equal(mentionsIssue(mr("直す", "https://github.com/a/b/issues/20"), 20), true);
-  assert.equal(mentionsIssue(mr("直す", "", "feature/20-login"), 20), true);
-  assert.equal(mentionsIssue(mr("直す #200"), 20), false);
-  assert.equal(mentionsIssue(mr("直す a#20"), 20), false);
-  assert.equal(mentionsIssue(mr("直す", "", "feature-120-x"), 20), false);
-  assert.equal(mentionsIssue(mr("直す", "", "fix-20"), 20), true);
+test("CX-T251 issue を閉じる MR は、題・本文の閉じる語に続く #番号 か issues/番号 で見つける。参照しているだけ・元ブランチの番号だけ・番号が長い別の issue は拾わない", () => {
+  const mr = (title: string, body = "") => ({ title, body });
+  assert.equal(closesIssue(mr("直す Closes #20"), 20), true);
+  assert.equal(closesIssue(mr("直す", "closes #20\n"), 20), true);
+  assert.equal(closesIssue(mr("直す", "Fixes: #20"), 20), true);
+  assert.equal(closesIssue(mr("直す", "Resolved acme/widgets#20"), 20), true);
+  assert.equal(closesIssue(mr("直す", "Closes https://github.com/a/b/issues/20"), 20), true);
+  assert.equal(closesIssue(mr("直す #20"), 20), false);
+  assert.equal(closesIssue(mr("直す", "See #20"), 20), false);
+  assert.equal(closesIssue(mr("直す", "https://github.com/a/b/issues/20"), 20), false);
+  assert.equal(closesIssue(mr("直す", "Closes #200"), 20), false);
+  assert.equal(closesIssue(mr("直す", "Closes a#20"), 20), false);
+  assert.equal(closesIssue(mr("直す", "Enclosed #20"), 20), false);
 });
 
 test("CX-T252 issue に紐づく開いた MR が 1 本あれば、その元ブランチを採用する。ブランチも MR も作らない（GitHub と GitLab）", async () => {
