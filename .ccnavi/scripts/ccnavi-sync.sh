@@ -52,8 +52,7 @@
 # `ccnavi sync check <P> <リポジトリ>` で判定し直す（どのチケットを正とするかの検査と、承認済みチケットの
 # 判定し直し）。`error ...` の行があれば表示して終了コード 1 にする（状態は書かない）。`warn ...` の行は表示だけ。
 # 直してから同じ P でこの sh を打ち直すと、検査し直す。実行ファイルが検査を実行できなかった
-# （古い実行ファイルが `sync check` を知らない、など。答えの頭に `check 1` が無い）ときは、警告だけ出す
-# （検査の error とは分ける）。
+# （失敗した。答えの頭に `check 1` が無い）ときは、警告だけ出す（検査の error とは分ける）。
 #
 # 実行ファイルはネットワークに出ない。ここが git で取ってくる。
 # 置き場のパスは実行ファイル（`ccnavi sync paths`）に、チケットの YAML が要る
@@ -341,7 +340,7 @@ load_retired() {
 	run_ccnavi sync retired >"$scratch/retired-raw" 2>/dev/null || :
 	tr -d '\r' <"$scratch/retired-raw" >"$scratch/retired-out"
 	if [ "$(head -n 1 "$scratch/retired-out")" != "retired 1" ]; then
-		printf '案内: 実行ファイルが片付けの記録の一覧（sync retired）に答えなかった（実行ファイルが古い可能性）。ready の後の親の片付けは列挙できない。実行ファイルを新しくして再実行してください\n'
+		printf '案内: 実行ファイルが片付けの記録の一覧（sync retired）に答えなかった。ready の後の親の片付けは列挙できない。再実行してください\n'
 		return 0
 	fi
 	awk 'BEGIN { OFS = "\t" } $1 == "retired" && NF >= 5 { print $2, $3, $4, $5 }' "$scratch/retired-out" >"$scratch/retired-all"
@@ -409,7 +408,7 @@ if [ "$#" -gt 0 ]; then
 			continue
 			;;
 		2)
-			printf '%s: .claude/worktrees/%s に親チケットか提案があるかを実行ファイルに確かめられなかった（実行ファイルが無い・古い、またはチケットの frontmatter を読めない）。取り込まない\n' "$want" "$want"
+			printf '%s: .claude/worktrees/%s に親チケットか提案があるかを実行ファイルに確かめられなかった（実行ファイルが無い、またはチケットの frontmatter を読めない）。取り込まない\n' "$want" "$want"
 			fail_note
 			continue
 			;;
@@ -646,9 +645,6 @@ split_merged() {
 # MR の番号が無いときの 1 行。<添える語>
 no_mr_note() {
 	printf '%s: 親チケットの mr 欄に MR の番号が無いので、閉じたか（MR がマージ済みか）判断できない%s\n' "$P" "$1"
-	if [ -z "$ccnavi_pi_hasmr" ]; then
-		printf '案内: %s: 実行ファイルの答えに mr の行が無かった（実行ファイルが古い可能性）。親チケットに mr 欄があるなら、実行ファイルを新しくして再実行してください\n' "$P"
-	fi
 }
 
 # MR がマージ済みと分かった後の手元の片付け。<MR の先頭の sha>
@@ -830,9 +826,8 @@ check_family() {
 	run_ccnavi sync check "$1" "$2" >"$scratch/check-raw" 2>"$scratch/check-err" || cf_rc=$?
 	tr -d '\r' <"$scratch/check-raw" >"$scratch/check"
 	if [ "$(head -n 1 "$scratch/check" 2>/dev/null)" != "check 1" ]; then
-		# 検査を実行できなかった（古い実行ファイルがサブコマンドを知らない、失敗した）。検査の error ではない
-		# ので親子のチケットは止めない。この検査が入る前と同じ動き。
-		printf '%s: 注意: 取り込みの後の検査を実行できなかった（%s）。実行ファイルを新しくして再実行してください\n' \
+		# 検査を実行できなかった（失敗した）。検査の error ではないので親子のチケットは止めない。
+		printf '%s: 注意: 取り込みの後の検査を実行できなかった（%s）。再実行してください\n' \
 			"$1" "$(head -n 1 "$scratch/check-err" 2>/dev/null)"
 		log_warn 取り込みの後の検査を実行できなかった -- "family=$1" "rc=$cf_rc"
 		return 0

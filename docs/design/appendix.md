@@ -27,7 +27,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_TICKET_PROJECT_MISMATCH` | 行き先のプロジェクトと承認済みチケットの `project:` が違う |
 | `DENY_TICKET_FLOW_LOCKED` | 着手中の子のフロー（承認済みの領域の `flows/<子>.yml`。ハードリンクの別名も）に書こうとした。ルールより先に止める（9.3.1） |
 | `NOTICE_TICKET_FLOW_CHANGED` | 着手中の子のフローが、着手のときに記録したハッシュから変わっている。`SubagentStart` / `SubagentStop` が知らせるだけで、止めない（9.3.1） |
-| `DENY_RECORDS_PRUNE` | 記録と state を消す `ccnavi user prune`をシェルから打った。チケット制御に依らない |
+| `DENY_RECORDS_PRUNE` | 記録と state を消す `ccnavi user prune` をシェルから打った。チケット制御に依らない |
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルの `user` の入口か `ccnavi-user-*.sh` を打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も。端末を求めない入口に、止める操作（`user agree` などと `--yes`・`ccnavi-user-decide.sh`・`worktree retire --abandon`・`decide --choices`・`--guard-ticket-approval`）を組み立てうる読み切れない引数（変数・置換・glob・`xargs`）を渡した形と、標準入力から読むシェルに入口の名前を含む文字列を流す形も（9.5、9.18） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
 | `DENY_AGENT_ISOLATION` | `Agent`・`Task` に `isolation` のキーがある（値によらない）。作業場所は ccnavi が決め、isolation のワークツリー（`.claude/worktrees/agent-<id>`）にはチケットの範囲が当たらない。補助で、チケット制御が無効でも dry-run でも止める。`CCNAVI_MODE=disable` だけ通す（9.12） |

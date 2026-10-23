@@ -17,9 +17,9 @@ keywords: [レビュー, request, confirm, decide, comment, ELI5, crit, crit rev
 エージェントが打つ 3 本は次のとおり。
 
 ```sh
-sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md --eli5 wip/eli5/phase-2.html
+sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file scratchpad/request.md --eli5 wip/eli5/phase-2.html
 sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
-sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
+sh .ccnavi/scripts/ccnavi-review.sh comment --body-file scratchpad/decision.md
 ```
 
 - `request` は、前提（フェーズが終わっている・レビューが延期されていない・すべての子が親に合流済み・未コミット無し・push 済み・未依頼）を確かめ、1 つでも欠けたら全件を列挙して何もしない。通れば依頼コメントを投稿する。マージリクエストは作らない（親のブランチの open の MR が無ければ止まる。作るのは `ccnavi-start.sh`）

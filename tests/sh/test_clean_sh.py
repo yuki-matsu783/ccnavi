@@ -30,7 +30,7 @@ SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scri
 SCRIPTS = (
     "ccnavi-clean.sh",
     "ccnavi-clean.js",
-    # 残った子のブランチを消す入口。前は ccnavi-clean.sh の --branch だった
+    # 残った子のブランチを消す入口
     "ccnavi-user-clean-branch.sh",
     *common_sh(SH_DIR),
 )
@@ -373,25 +373,6 @@ class WorktreeOptionTest(unittest.TestCase):
             with self.subTest(args=args):
                 result = self.clean_branch(*args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-
-    def test_the_old_branch_mode_moves_to_the_user_script(self):
-        # ccnavi-clean.sh の --branch と --confirmed は、何も動かさずに 2 で新しい sh を案内する。
-        for args in (
-            ("--branch", "wt"),
-            ("--branch", "wt", "--confirmed"),
-            ("--confirmed", "wt"),
-            ("wt", "--branch"),
-        ):
-            with self.subTest(args=args):
-                result = self.run_clean(*args)
-                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertIn("ccnavi-user-clean-branch.sh", result.stderr)
-                self.assertIn("何もしていません", result.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.top, "node_modules", "x.js")))
-        branches = subprocess.run(
-            ["git", "branch", "--list", "wt"], cwd=self.ws, capture_output=True, text=True
-        )
-        self.assertEqual(branches.stdout.strip().lstrip("+ ").strip(), "wt")
 
 
 @unittest.skipUnless(SHELL and NODE, "sh と node が要る")

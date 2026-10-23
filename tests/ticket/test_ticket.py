@@ -2285,9 +2285,9 @@ class TicketTest(unittest.TestCase):
     def test_subagent_stop_bounces_each_worktree_when_no_agent_id_is_given(self):
         """`agent_id` が来ない payload でも、別の子で作業する相手を巻き込まない。
 
-        以前は記録の名前が `unknown` 1 つで、最初の 1 体が差し戻されたあと、
-        同じ置き場を見るサブエージェントが誰も差し戻されなくなった。しかも
-        `agent_id` を持たない記録は `ignored_bounce` が消せないので、消えなかった。
+        記録の名前を `unknown` 1 つにまとめると、最初の 1 体が差し戻されたあと、
+        同じ置き場を見るサブエージェントが誰も差し戻されなくなる。しかも
+        `agent_id` を持たない記録は `ignored_bounce` が消せない。名前は置き場ごとに分ける。
         """
         self.family()
         first_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")

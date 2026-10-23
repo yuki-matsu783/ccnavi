@@ -1,8 +1,7 @@
 """ユーザだけが打つ操作の表。どの操作をユーザ専用にするかを、ここ 1 か所に宣言する。
 
-hook の止め（`phase_forms`）と、実行ファイルの端末要求（`entry/cli*.py`）は、以前は操作を足すたびに
-別々の正規表現やオプションの一覧を直していた。今は、この表を正本にする。`phase_forms` が正規表現と
-オプションの一覧をここから組み立て、実行ファイルは `terminal()` で、端末を求めるときに表示する
+この表が、hook の止め（`phase_forms`）と実行ファイルの端末要求（`entry/cli*.py`）の正本。
+`phase_forms` が正規表現とオプションの一覧をここから組み立て、実行ファイルは `terminal()` で、端末を求めるときに表示する
 操作の名前（`user agree` の形）を引く。操作を足す・外すときは、この表の行を直す。
 
 表は 4 つ。
@@ -66,7 +65,7 @@ class Flag:
 class Script:
     """コマンドの位置で止める sh スクリプト。"""
 
-    # 拡張子なしの名前。前の名前が残っていれば並べる。
+    # 拡張子なしの名前。
     names: tuple[str, ...]
     op: str
     # 空でなければ、1 つ目の引数がこの語のときだけ止める。
@@ -89,7 +88,6 @@ OPS: tuple[Op, ...] = (
     Op("decide", "残った指摘の対応方針（ボードの経路）"),
     Op("confirm-yes", "ボードで押した操作の確定（--yes）"),
     Op("tidy", "親を閉じたときの片付け"),
-    Op("clean-branch", "残った子のブランチの削除"),
     Op("handoff", "保護対象の下書きの取り込み", terminal="user handoff --yes"),
     Op("prune", "記録と state の削除", terminal="user prune"),
     Op("state-direct", "チケットの状態とレビューの操作を実行ファイルで直に呼ぶ形"),
@@ -97,7 +95,6 @@ OPS: tuple[Op, ...] = (
 )
 
 _REVIEW = "ccnavi-review"
-_CLEAN = "ccnavi-clean"
 
 FLAGS: tuple[Flag, ...] = (
     Flag("--yes", "confirm-yes", gated=True, groups=("yes",)),
@@ -137,18 +134,10 @@ FLAGS: tuple[Flag, ...] = (
     Flag("--abandon", "tidy", cli=False, groups=("abandon",)),
     Flag("--choices", "decide", where=_REVIEW, cli=False, groups=("choices",)),
     Flag("--digest", "decide", where=_REVIEW, cli=False, groups=("digest",)),
-    Flag("--branch", "clean-branch", where=_CLEAN, cli=False, script=True),
-    Flag("--confirmed", "clean-branch", where=_CLEAN, cli=False, script=True),
 )
 
-SCRIPTS: tuple[Script, ...] = (
-    # ユーザの判断に使うスクリプト。中で `--close-early` を呼び、最後に承認の push を呼ぶ。
-    Script((_REVIEW,), "close-early", subcommand="close-early"),
-    # 親を閉じたときに残した子のブランチを消す入口（中身は実行ファイルの `worktree branch`）。
-    # ユーザが `!` を付けて打つ。エージェントが `--confirmed` を単なる語として添えても、
-    # 取り消した子のブランチを確認なしで消せないようにする。
-    Script((_CLEAN,), "clean-branch"),
-)
+# 今は行が無い（ユーザ専用の sh は `ccnavi-user-*.sh` の名前で一括して止める。`script_forms`）。
+SCRIPTS: tuple[Script, ...] = ()
 
 SUBS: tuple[Sub, ...] = (
     Sub(

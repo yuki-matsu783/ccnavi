@@ -425,12 +425,6 @@ class MakeTest(Drafts):
         self.assertIn("ccnavi-stage.sh", result.stderr)
         self.assertFalse(os.path.exists(self.draft_path()))
 
-    def test_the_old_import_options_are_gone(self):
-        self.done_parent(["design"])
-        for extra in (("--expect", "x"), ("--yes",), ("--replace",), ("--import", "x")):
-            with self.subTest(extra=extra):
-                self.assertNotEqual(self.draft("i0001", *extra).returncode, 0)
-
     def test_the_draft_is_taken_by_handoff_and_then_used(self):
         self.done_parent(["design", "implement"], flows={"i0001-02-01": FLOW_IMPL})
         self.assertEqual(self.draft().returncode, 0)
@@ -572,7 +566,7 @@ class CheckTest(Drafts):
 
 
 class UserOnlyTest(Drafts):
-    """取り込みはユーザ専用。前の形（`--import` など）も止め続ける。`--draft` と読む側は通る。"""
+    """取り込みはユーザ専用。`--draft` と読む側は通る。"""
 
     def denied(self, command) -> bool:
         payload = {
@@ -623,13 +617,9 @@ class UserOnlyTest(Drafts):
             "--mode", "enable", "--guard-ticket-approval", "enable", stdin=json.dumps(payload)
         )
         self.assertIn("ccnavi user handoff", self.reason(result))
-        self.assertNotIn("--templates --import", self.reason(result))
 
     def test_the_board_forms_are_denied_whatever_the_launcher(self):
-        tails = (
-            "user handoff X --yes --expect " + "a" * 64 + " --via board --json",
-            "--templates --import X --to common --yes --expect " + "a" * 64 + " --via board",
-        )
+        tails = ("user handoff X --yes --expect " + "a" * 64 + " --via board --json",)
         heads = (
             "/tmp/copy ",
             "python3 -u -m ccnavi ",
@@ -646,7 +636,7 @@ class UserOnlyTest(Drafts):
     def test_a_reader_may_mention_the_forms(self):
         for command in (
             'grep -rn -- "user handoff X --yes" README.md',
-            'rg -n "templates --import .* --yes" docs',
+            'rg -n "user handoff .* --yes" docs',
         ):
             self.assertFalse(self.denied(command), command)
 

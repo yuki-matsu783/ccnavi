@@ -5,8 +5,7 @@
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>  ボードでユーザが押した選択を置く
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]                    止まった判断の続きを送る
 #
-# 前は `ccnavi-review.sh decide <N> [--choices … --digest …]` だった。ユーザだけが打つ sh は ccnavi-user-*.sh に
-# 分けてあり、エージェントからは hook が名前で止める。一覧を見るだけの形（`ccnavi-review.sh decide <N> --preview`）は
+# ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、エージェントからは hook が名前で止める。一覧を見るだけの形（`ccnavi-review.sh decide <N> --preview`）は
 # エージェントも使うので、ccnavi-review.sh に残してある。
 #
 # ここが取ってくる → `ccnavi user reviewed N --accept-unresolved` がユーザに見せ、指摘ごとに

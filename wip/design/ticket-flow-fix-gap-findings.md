@@ -76,7 +76,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 |---|---|---|
 | `finished_to` の無い review/ の子 | review/ にある間は何も変わりません（`waiting` に数えます）。confirm・decide は今までどおり子を done/ へ動かし `settled_by` を書きます。ユーザが手で done/ へ動かすと ROUTE_UNKNOWN（`manual_settle.py`）になり、手動移動としては確定しません | 手で動かさず、confirm か decide を使います。手で動かしたなら confirm（未解決が無ければ通ります）か decide を使います。`--lint` が info で並べます |
 | 依頼済みでレビュー待ちのフェーズ | 依頼のマーカーはそのまま有効です。confirm・decide・close-early は変わらず使えます。手で動かした子がすべて `finished_to: review` なら、そこから手動移動の経路に入ります | 特になし。古い子と新しい子が混ざるときは、古い子を confirm か decide で動かします |
-| 古い下書き（`review-decide-*.md`・`review-issue-*.md`） | prune は消しません（`records/prune.py` 25 行付近）。`ccnavi-user-decide.sh --resume` は、未完了の判断が無いときに下書きを見つけ、y/N のあと操作記録の段階に載せて送り、送れたものを消します（`resume_legacy_drafts`、167-217 行） | `ccnavi-user-decide.sh --resume` を打ちます。未完了の判断が 1 件以上あると下書きの取り込みに入らない（`resume_prepare` 113-127 行）ので、先にその判断を終えてから打ち直します |
+| 古い下書き（`review-decide-*.md`・`review-issue-*.md`） | prune は消しません（`records/prune.py` 25 行付近）。下書きを取り込んで送る処理（`resume_legacy_drafts`）は、配布前の整理で削除した。`ccnavi-user-decide.sh --resume` は、操作記録に残った止まった判断の続きだけを送る | 下書きは取り込めない。必要なら中身を見て、判断を打ち直す |
 | dry-run を使っていたワークスペース | チケット制御が有効なら、dry-run でも、サブエージェントの状態操作・承認済みの置き場と `logs/state/ops/` への書き込み・親のツリーへの書き込みは拒否されます。一般のルールの deny・ask だけが報告になります | dry-run を前提に、エージェントが承認済みの置き場へ直接書く運用があれば止めます。`ccnavi --explain` の「dry-run のときに止めるもの」で確かめます |
 
 ### `.ccnavi/docs/ticket-flow.md` の告知で足りているか
@@ -178,7 +178,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 
 結論: 対応済み（経路は無くなりました。設計どおりです）
 
-- 根拠: `src/` に `feedback-plan` を書く処理はありません。残るのは、読める値としての定義（`ticket_model.SETTLED_BY_VALUES`）と、古い reviewed マーカーの `by: feedback-plan` を info で並べる lint（`lint_ticket.py` 248-276 行）だけです。判定には使いません。
+- 根拠: `src/` に `feedback-plan` を書く処理はありません。読める値としての定義（`ticket_model.SETTLED_BY_VALUES`）と、古い reviewed マーカーの `by: feedback-plan` を info で並べる lint は、配布前の整理で削除した（互換のための読み取りで、今回の整理で消した）。
 
 ### 6-4 `test_phases.py` の `--accept-done` が「計画のほかに未解決の指摘が残っている」で断るテスト
 
@@ -238,7 +238,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 ### 9-2 文書の更新漏れ（確実）
 
 - `docs/design/limits.md` 12.1 に無い項目（7 節の補足）: ホストの時計との差（余裕 10 分）、手動移動で未解決のスレッドが残ること（GitLab のマージ制限）、別の PC からの送信が 1 回きりとは限らないこと、判定できないときの緩和、担当の子が分からない SubagentStop の扱い、全文の範囲が最初のコメントだけであること。
-- `.ccnavi/docs/ticket-flow.md` 130-139 行付近の告知に、古い下書きの取り込み（`resume_legacy_drafts`）と、`DECIDE_VERSION` 2 で版 1 のボードを断ることがありません（2 節の補足）。
+- `.ccnavi/docs/ticket-flow.md` 130-139 行付近の告知に、`DECIDE_VERSION` 2 で版 1 のボードを断ることがありません（2 節の補足）。古い下書きの取り込み（`resume_legacy_drafts`）は、今回の整理で削除した。
 - `.claude/skills/commit/references/test-groups.md` 21 行付近は「`test_write_and_push_*.py` の 6 本」と書いていますが、実数は 7 本です（本ブランチの `test_write_and_push_post_fail.py` を含みます）。この依頼では本番・文書を変えないため、直していません。
 - expectedFailure で実装の欠陥を固定する運用は、どの文書にも書かれていません。8 節の 6 件が最初の例になります。
 

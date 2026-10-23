@@ -87,13 +87,13 @@ test("CB-T1103 下書きの欄が古い形（sha・importable・text・exists_in
   assert.equal(Object.keys(draft).includes("importable"), false);
 });
 
-test("CB-T535 drafts 欄がない答えは、古い実行ファイルの文で失敗する", () => {
+test("CB-T535 drafts 欄がない答えは、配列でない欄の文で失敗する", () => {
   const text = fixtureWith((raw) => {
     delete raw.drafts;
   });
   assert.deepEqual(parseTemplates(text), {
     ok: false,
-    error: "drafts 欄がありません。ccnavi が古い可能性があります。実行ファイルを更新してください",
+    error: "テンプレートの JSON の drafts 欄が配列ではありません",
   });
 });
 

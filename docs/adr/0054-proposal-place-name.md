@@ -8,7 +8,7 @@ keywords: [提案, wip/proposals, チケット, 置き場, 既定, env, 移行]
 
 # ADR-0054: 提案の置き場の既定を `wip/proposals` にする
 
-状態: 採用
+状態: 採用（旧置き場に残った提案を `--lint` が warn で名指しする点は、ADR-0076 が廃止した）
 
 ## 状況
 

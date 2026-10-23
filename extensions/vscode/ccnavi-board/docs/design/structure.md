@@ -36,10 +36,10 @@ src/
     planordermodel.ts --plan-order <親> --json の答えの形（実行ファイルとの契約）と読み取り。plans は承認の preview と同じ読み方。保存の答えをパネルが読む形（書いた・変わらない・外で変わった・書かなかった）
     testmodel.ts      試験の JSON の形（--test --json / --test-expectations --json）と読み取り
     suggestmodel.ts   候補の JSON の形（--suggest --json）と読み取り。allow の候補は並べない
-    lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情とフローの苦情（(flow)）の抜き出し、古い実行ファイルの「知らないオプション」の見分け
+    lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情とフローの苦情（(flow)）の抜き出し
     board.ts          列とカードへの組み立て、操作の有無（親の提案のカードの「計画編集」は提案の has_plan から）。状態の札とフェーズ行の一言を JSON の欄から付ける。マージ状況の帯の題を引く archivedTitleOf
     status.ts         カードの状態の札（statusOf）とフェーズ行の状態の一言（phaseStatusOf）。上から最初に当たったものを採る純粋な関数で、JSON の判定済みの欄を表示の言葉に置き換えるだけ
-    mrstate.ts        マージ状況の確認が読む 2 つの答え（ccnavi-review.sh mr-state <番号>、ccnavi sync retired）の厳しい検証と、古い sh の見分け、リポジトリのディレクトリの引き方
+    mrstate.ts        マージ状況の確認が読む 2 つの答え（ccnavi-review.sh mr-state <番号>、ccnavi sync retired）の厳しい検証と、リポジトリのディレクトリの引き方
     merge.ts          マージ状況の確認の遷移（いまの状態 ＋ 入力 → 次の状態 ＋ やること）と、画面に渡す形 MergeView。世代（token）で遅れた答えを捨て、確認中の再押下・片付けの再入を受けない。外へ出る仕事は返すだけで、行うのは board-panel
     board-moved.ts    前の読み直しから列が変わったカードと、新しく現れたカード（いまの状態 ＋ 読めたボード → 次の状態）。持ち直すのは board-panel。VS Code に触れないので単体で試せる
     board-view.ts     ボードの拡張ホストと画面の契約（見せる中身 BoardData、押した操作 BoardMessage、承認のオーバーレイの状態）

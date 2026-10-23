@@ -233,5 +233,5 @@ look_at_host
 # ---- 手元の候補と合わせて出す（実行ファイル）。
 set -- branches "$kind" "$number" --result "$result"
 [ -z "$json" ] || set -- "$@" --json
-ccnavi "$@" || fail exe-failed "実行ファイルが候補を出せなかった（上の文面を見てください。古い実行ファイルは branches に未対応なので、組み立て直すか配り直してください）。" 1
+ccnavi "$@" || fail exe-failed "実行ファイルが候補を出せなかった（上の文面を見てください）。" 1
 log_info 候補を出した -- "kind=$kind"

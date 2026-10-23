@@ -106,7 +106,7 @@ test("CB-T632 一覧の形式の異常は「ありません」とは言わず、
   assert.equal(view?.checkedAt, AT);
 });
 
-test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら終える。期限切れ・古い sh もその親だけの結果", () => {
+test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら終える。期限切れ・sh の失敗もその親だけの結果", () => {
   const started = step(MERGE_IDLE, { kind: "check" }).state;
   let state = step(started, {
     kind: "listed",

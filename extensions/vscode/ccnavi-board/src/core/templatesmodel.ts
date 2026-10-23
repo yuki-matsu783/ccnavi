@@ -39,10 +39,6 @@ export function parseTemplates(text: string): TemplatesParse {
   if (raw.version !== TEMPLATES_VERSION) {
     return { ok: false, error: versionMismatch(raw.version) };
   }
-  // 版は同じでも、下書きの欄が無いのは古い実行ファイル。専用の文で言う
-  if (raw.drafts === undefined) {
-    return { ok: false, error: "drafts 欄がありません。ccnavi が古い可能性があります。実行ファイルを更新してください" };
-  }
   for (const key of ["templates", "layers", "sums", "drafts"] as const) {
     if (!Array.isArray(raw[key])) {
       return { ok: false, error: `テンプレートの JSON の ${key} 欄が配列ではありません` };

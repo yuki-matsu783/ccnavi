@@ -63,13 +63,13 @@ class PendingIntegrateTest(TicketTest):
         self.assertEqual(self.notice(), "")
         self.assertNotIn(HEAD, self.start().stdout)
 
-    def test_a_marker_without_a_version_is_told_as_broken_without_raising(self):
+    def test_a_marker_that_is_not_version_4_is_told_as_broken_without_raising(self):
         head = self.head()
         self.marker("w4", state="staged", branch="w4", branch_sha=head, base=head)
         text = self.notice()
         self.assertIn(HEAD, text)
         self.assertIn("w4（取り込み先のツリー", text)
-        self.assertIn("記録の版（無し）を知りません", text)
+        self.assertIn("を知りません", text)
         self.assertIn("操作せず", text)
         self.assertNotIn("integrate-done", text)
 
@@ -83,7 +83,7 @@ class PendingIntegrateTest(TicketTest):
         os.makedirs(os.path.join(self.root, ".git", "ccnavi-integrate", "w9"))
         text = self.notice()
         self.assertIn("w9（取り込み先のツリー", text)
-        self.assertIn("記録の版（無し）を知りません", text)
+        self.assertIn("を知りません", text)
 
     def test_an_expired_deadline_starts_no_git_and_says_so(self):
         head = self.head()

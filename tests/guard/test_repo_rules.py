@@ -183,7 +183,7 @@ class RepoRulesTest(unittest.TestCase):
                     self.assertEqual(body["verdict"], "deny", body["response"])
                     self.assertIn("builtin:guard-project-home", hit(body), body["rules"])
             for command in (
-                f"cp {tree}/wip/proposals/templates/feature.yml {place}",
+                f"cp {tree}/wip/handoff/.ccnavi/config/common/templates/feature.yml {place}",
                 f"tee {place}",
                 f"echo x > {place}",
             ):
@@ -193,9 +193,11 @@ class RepoRulesTest(unittest.TestCase):
                     self.assertIn(SETTING_FILES, hit(body), body["rules"])
 
     def test_テンプレートの下書きの_write_は止まらない(self):
-        # 下書きの置き場（`wip/proposals/templates/`）はフローの下書きと同じ扱いで、
-        # ワークツリーの中なら通る。
-        body = judge("Write", "/repo/.claude/worktrees/x/wip/proposals/templates/feature.yml")
+        # 下書きの置き場（`wip/handoff/`）は、ワークツリーの中なら通る。
+        body = judge(
+            "Write",
+            "/repo/.claude/worktrees/x/wip/handoff/.ccnavi/config/common/templates/feature.yml",
+        )
         self.assertEqual(body["verdict"], "allow", body["response"])
         self.assertNotIn("builtin:guard-project-home", hit(body), body["rules"])
 

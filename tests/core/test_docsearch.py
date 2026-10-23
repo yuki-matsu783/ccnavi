@@ -598,7 +598,7 @@ class CliTest(Repo):
         self.assertEqual(done.returncode, 1)
         self.assertIn("ccnavi: --type は --docs でだけ使える", done.stderr)
         self.assertIn("ccnavi: --limit は --docs でだけ使える", done.stderr)
-        # 以前は argparse が知らないフラグとして止めていた打ち間違い。失敗にして進めない。
+        # 別の副命令に --limit を付ける打ち間違いは、失敗にして進めない。
         done = self.ccnavi("ticket", "start", "i0001", "--limit", "3")
         self.assertEqual(done.returncode, 1)
         self.assertIn("--limit は --docs でだけ使える", done.stderr)

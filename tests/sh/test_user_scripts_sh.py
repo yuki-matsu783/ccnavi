@@ -189,29 +189,6 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(done.stdout, "")
         self.assertFalse(os.path.exists(self.called))
 
-    def test_old_entries_refuse_and_point_to_the_new_scripts(self):
-        for name, args, new in (
-            ("ccnavi-review.sh", ("close-early", "--reason", "r"), "ccnavi-user-close-early.sh"),
-            ("ccnavi-review.sh", ("decide", "1"), "ccnavi-user-decide.sh"),
-            (
-                "ccnavi-review.sh",
-                ("decide", "1", "--choices", "{}", "--digest", "d"),
-                "ccnavi-user-decide.sh",
-            ),
-            ("ccnavi-clean.sh", ("--branch", "i0001-01-01"), "ccnavi-user-clean-branch.sh"),
-            (
-                "ccnavi-clean.sh",
-                ("--branch", "i0001-01-01", "--confirmed"),
-                "ccnavi-user-clean-branch.sh",
-            ),
-        ):
-            with self.subTest(name=name, args=args):
-                refused = self.run_sh(name, *args)
-                self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
-                self.assertIn(new, refused.stderr)
-                self.assertIn("何もしていません", refused.stderr)
-        self.assertFalse(os.path.exists(self.called), "古い入口は実行ファイルを起こさない")
-
     def test_review_usage_names_the_user_scripts(self):
         shown = self.run_sh("ccnavi-review.sh", "--help")
         self.assertEqual(shown.returncode, 0, shown.stderr)

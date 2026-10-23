@@ -40,7 +40,7 @@ Claude Code の hook でツール呼び出しを止め、止めた理由と代�
 1. `dry-run` で立てる。実行ファイルを組み立て、hook を登録し、`CCNAVI_MODE` を `dry-run` にする
 2. 普段どおり開発する。ccnavi は判定だけを記録し、呼び出しには手を出さない
 3. 記録（`logs/decisions.jsonl`）を読む。止めた回、どこにも当たらなかった回、通した回を数える
-4. ルールを直す。直したら `ccnavi --lint` と `ccnavi --test` で確かめる
+4. ルールを直す。直したら `ccnavi --lint` と `ccnavi --test-expectations` で確かめる
 5. 記録が落ち着いたら `CCNAVI_MODE` を `enable` にして、セッションを開き直す
 
 手順の詳細と記録を読む `jq` の例は [docs/guide/install.md](docs/guide/install.md) にある。

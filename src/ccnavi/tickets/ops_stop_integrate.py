@@ -20,8 +20,8 @@ hook自身は `integrate` を打たない。促すだけ。
   `S..先頭` で数える。
   記録が無いときは統合先（`origin/HEAD`）で数え、`integrate` が断るので `--adopt` を案内する
 - 取り込みの途中のmarker（`ccnavi-integrate/<名前>/`）が無い。あれば「`integrate-done` か
-  `integrate --abort`」を促す。片付けた記録の写し（`ccnavi-integrate-done/<名前>`）は、旧形式の
-  写しの `branch_sha` が今のHEADと同じで未コミットの変更が無い、という形では無い
+  `integrate --abort`」を促す。片付けた記録の写し（`ccnavi-integrate-done/<名前>`）は、写しの
+  `branch_sha` が今のHEADと同じで未コミットの変更が無い、という形では無い
   （名前を使い直した作業を、前の写しで黙らせない）
 
 ## 3 つの結果

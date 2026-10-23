@@ -1,4 +1,4 @@
-"""ccnavi-user-push-approved.sh の受入テスト（前の名前は ccnavi-push-approved.sh）。
+"""ccnavi-user-push-approved.sh の受入テスト。
 使い捨てのワークスペースを組み立てて sh を外から呼ぶ。
 
 設計 wip/design/approve-carry.md 1 と 6.3。確かめるのは次のとおり。
@@ -762,88 +762,6 @@ class PushApprovedTest(Workspace):
         os.makedirs(outside)
         lost = self.push(cwd=outside)
         self.assertEqual(lost.returncode, 2, lost.stdout + lost.stderr)
-
-
-@unittest.skipUnless(SHELL and GIT, "sh と git が要る")
-class TemplateDraftCarryTest(Workspace):
-    """取り込んで消えたテンプレートの下書き（`wip/proposals/templates/`）は、フローの下書きと同じ形で
-    コミットして push する。
-
-    `.ccnavi/scripts/` の版で走らせる。この版は、消えた下書きを拾ってコミットに入れる。
-    """
-
-    drafts = "wip/proposals/templates"
-
-    def track(self, tree, *rels):
-        for rel in rels:
-            write(os.path.join(tree, *rel.split("/")), "name: x\n")
-        git(tree, "add", "--", *rels)
-        git(tree, "commit", "-q", "-m", "drafts")
-
-    def test_a_removed_template_draft_is_carried_with_the_approved_place(self):
-        tree = self.worktree("i0001")
-        taken = f"{self.drafts}/feature.yml"
-        rewritten = f"{self.drafts}/research.yml"
-        untracked = f"{self.drafts}/local.yml"
-        self.track(tree, taken, rewritten)
-        os.remove(os.path.join(tree, *taken.split("/")))
-        write(os.path.join(tree, *rewritten.split("/")), "name: x\nplan: [y]\n")
-        write(os.path.join(tree, *untracked.split("/")), "name: x\n")
-        self.place(tree)
-
-        result = self.push()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        # 同じ中身の削除と新規が改名に見えないよう、2 つのパスで見る。
-        out = git(tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
-        self.assertEqual(sorted(out.split()), sorted([f"{APPROVED}/i0001.md", taken]))
-        # 書き直された下書き・追跡していない下書きには触れない。
-        self.assertTrue(self.dirty(tree, rewritten))
-        self.assertTrue(self.dirty(tree, untracked))
-        self.assertEqual(self.dirty(tree, taken), "")
-        self.assertEqual(self.staged(tree), "")
-        self.assertEqual(self.remote_head("i0001"), self.head(tree))
-
-    def test_flow_and_template_drafts_are_carried_together(self):
-        tree = self.worktree("i0001")
-        flow = "wip/proposals/flows/i0001-01-01.yml"
-        template = f"{self.drafts}/feature.yml"
-        self.track(tree, flow, template)
-        os.remove(os.path.join(tree, *flow.split("/")))
-        os.remove(os.path.join(tree, *template.split("/")))
-        self.place(tree)
-
-        result = self.push()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        out = git(tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
-        self.assertEqual(sorted(out.split()), sorted([f"{APPROVED}/i0001.md", flow, template]))
-
-    def test_template_drafts_alone_are_not_carried(self):
-        """承認済みチケットの置き場に変更が無ければ、下書きの削除だけではコミットしない。"""
-        tree = self.worktree("i0001")
-        taken = f"{self.drafts}/feature.yml"
-        self.track(tree, taken)
-        os.remove(os.path.join(tree, *taken.split("/")))
-        before = self.head(tree)
-
-        result = self.push()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(NOTHING, result.stdout)
-        self.assertEqual(self.head(tree), before)
-
-    def test_the_places_of_other_trees_are_not_touched(self):
-        """置き場の外（`wip/proposals/` の下の別の場所）で消えたものは運ばない。"""
-        tree = self.worktree("i0001")
-        other = "wip/proposals/notes/x.md"
-        template = f"{self.drafts}/feature.yml"
-        self.track(tree, other, template)
-        os.remove(os.path.join(tree, *other.split("/")))
-        os.remove(os.path.join(tree, *template.split("/")))
-        self.place(tree)
-
-        result = self.push()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.committed(tree), sorted([f"{APPROVED}/i0001.md", template]))
-        self.assertTrue(self.dirty(tree, other))
 
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")

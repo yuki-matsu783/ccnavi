@@ -844,14 +844,14 @@ class StartShTest(unittest.TestCase):
         """実行ファイルが答えなければ、sh で代わりに数えず「確かめられない」と止める。"""
         git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic/x")
         self.route({f"GET {GITHUB}/pulls/5": [200, pr(5, "topic/x")], **closed_pulls("topic/x")})
-        # `worktree id` にだけ答えない実行ファイル（古い版）
-        old = write(
-            os.path.join(self._tmp.name, "old", "ccnavi"),
+        # `worktree id` にだけ答えない実行ファイル
+        silent = write(
+            os.path.join(self._tmp.name, "silent", "ccnavi"),
             '#!/bin/sh\ncase " $* " in *" worktree id "*) exit 0 ;; esac\n'
             f"exec '{self.exe}' \"$@\"\n",
         )
-        os.chmod(old, 0o755)
-        done = self.run_sh("--mr", "5", CCNAVI_ENTRY_PATH=old)
+        os.chmod(silent, 0o755)
+        done = self.run_sh("--mr", "5", CCNAVI_ENTRY_PATH=silent)
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn("確かめられない", done.stderr)
         self.assertFalse(os.path.isdir(self.wt("topic-x")))

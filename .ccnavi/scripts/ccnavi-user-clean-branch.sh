@@ -3,8 +3,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-user-clean-branch.sh <子の識別子> [--confirmed]
 #
-# 前は `ccnavi-clean.sh --branch <子の識別子> [--confirmed]` だった。ユーザだけが打つ sh は ccnavi-user-*.sh に
-# 分けてあり、エージェントからは hook が名前で止める（エージェントが --confirmed を単なる語として添えても、
+# ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、エージェントからは hook が名前で止める（エージェントが --confirmed を単なる語として添えても、
 # 取り消した子のブランチを確認なしで消せないようにする）。
 #
 # 中身は実行ファイルの `worktree branch <名前> [confirmed]`。親を閉じたときに ccnavi が片付ける子として記録した

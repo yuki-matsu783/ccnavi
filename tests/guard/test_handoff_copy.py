@@ -5,9 +5,8 @@
 .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh` のように同じ名前で写す形まで止まる。
 その形だけを通し、置き場を足場にして守る場所へ書く形は通さないことを確かめる。
 
-以前は保護の式に否定先読みを足して通していた。ルールの読み込みは先読みを受け付けないので、
-保護の 1 本がまるごと外れ、`echo x > .ccnavi/config/common/rules.yml` まで通っていた。
-`test_the_guard_itself_still_stops_writes` はその戻りを見る。
+保護の式に否定先読みを足して通すと、ルールの読み込みが先読みを受け付けず、保護の 1 本がまるごと外れて
+`echo x > .ccnavi/config/common/rules.yml` まで通る。`test_the_guard_itself_still_stops_writes` はそれを見る。
 """
 
 from __future__ import annotations

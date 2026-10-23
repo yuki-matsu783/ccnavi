@@ -359,8 +359,6 @@ class MrStateTest(unittest.TestCase):
                 self.assertEqual(2, done.returncode, done.stdout + done.stderr)
                 self.assertEqual("", done.stdout)
                 self.assertNotEqual("", done.stderr.strip())
-                # 古い sh の「知らない副命令」の文面と見分けが付くこと
-                self.assertNotIn("は使用できません", done.stderr)
 
     def test_merged_keeps_its_own_output(self):
         """merged 副命令（ccnavi-sync.sh が読む）の出力と終了コードは変えない。"""
