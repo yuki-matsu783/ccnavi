@@ -80,7 +80,15 @@ with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as log:
         log.write("BODY " + " ".join(body.split("\n")) + "\n")
 with open(os.environ["FAKE_ROUTES"], encoding="utf-8") as f:
     routes = json.load(f)
-status, payload = routes.get(f"{method} {url}", [404, {"message": "Not Found"}])
+key = f"{method} {url}"
+if key not in routes:
+    # MR の番号だけが違う closes_issues は、番号の所に * を書いた route で受ける
+    import re
+    key = re.sub(r"/merge_requests/\d+/closes_issues", "/merge_requests/*/closes_issues", key)
+if os.environ.get("FAKE_SLEEP"):
+    import time
+    time.sleep(float(os.environ["FAKE_SLEEP"]))
+status, payload = routes.get(key, [404, {"message": "Not Found"}])
 if status >= 400:
     sys.stderr.write(f"curl: (22) The requested URL returned error: {status}\n")
     sys.exit(22)
@@ -90,7 +98,9 @@ sys.stdout.write(json.dumps(payload))
 GH_URL = "https://github.com/acme/widgets.git"
 GL_URL = "https://gitlab.com/acme/widgets.git"
 GITHUB = "https://api.github.com/repos/acme/widgets"
+GL_API = "https://gitlab.com/api/v4"
 GITLAB = "https://gitlab.com/api/v4/projects/acme%2Fwidgets"
+GRAPHQL = "POST https://api.github.com/graphql"
 PULLS = f"GET {GITHUB}/pulls?state=open&per_page=100&page=1"
 BRANCH = "feature-152-add-login"
 CLOSED = "state=closed&head=acme%3A{branch}&per_page=100&page=1"
@@ -123,6 +133,25 @@ def pr(number, ref, full_name="acme/widgets", body=""):
         "html_url": f"https://github.com/acme/widgets/pull/{number}",
         "head": {"ref": ref, "repo": {"full_name": full_name}},
         "base": {"ref": "main"},
+    }
+
+
+def closing(issues, more=False):
+    """GitHub の GraphQL（closingIssuesReferences）の答え。issues は (番号, リポジトリ) の並び。"""
+    return {
+        "data": {
+            "repository": {
+                "pullRequest": {
+                    "closingIssuesReferences": {
+                        "nodes": [
+                            {"number": n, "repository": {"nameWithOwner": repo}}
+                            for n, repo in issues
+                        ],
+                        "pageInfo": {"hasNextPage": more, "endCursor": "c" if more else None},
+                    }
+                }
+            }
+        }
     }
 
 
@@ -182,8 +211,28 @@ class StartShTest(unittest.TestCase):
         self.log = os.path.join(base, "requests.log")
         self.route({})
 
+    def default_routes(self):
+        """ホストの代役の既定の答え。probe と、書き込みの権限と、紐づく issue。"""
+        if self.origin_url == GL_URL:
+            return {
+                f"GET {GITLAB}": [
+                    200,
+                    {"id": 77, "permissions": {"project_access": {"access_level": 40}}},
+                ],
+                f"GET {GL_API}/user": [200, {"id": 5}],
+                f"GET {GITLAB}/members/all/5": [200, {"access_level": 40}],
+                f"GET {GITLAB}/merge_requests/*/closes_issues?per_page=100&page=1": [
+                    200,
+                    [{"iid": 152, "references": {"full": "acme/widgets#152"}}],
+                ],
+            }
+        return {
+            f"GET {GITHUB}": [200, {"id": 1, "permissions": {"push": True}}],
+            GRAPHQL: [200, closing([(152, "acme/widgets")])],
+        }
+
     def route(self, routes):
-        write(self.routes, json.dumps(routes))
+        write(self.routes, json.dumps({**self.default_routes(), **routes}))
 
     def run_sh(self, *args, token=True, cwd=None, **extra):
         env = {
@@ -225,7 +274,10 @@ class StartShTest(unittest.TestCase):
         return [
             json.loads(lines[i + 1][5:])
             for i, line in enumerate(lines)
-            if line.startswith("POST ") and i + 1 < len(lines) and lines[i + 1].startswith("BODY ")
+            if line.startswith("POST ")
+            and not line.endswith("/graphql")
+            and i + 1 < len(lines)
+            and lines[i + 1].startswith("BODY ")
         ]
 
     def wt(self, name):
@@ -283,7 +335,7 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(body["body"], "Closes #152")
         self.assertTrue(body["draft"])
         # 提案に MR の番号を書く（必須。チケットの `mr:` で、この MR の番号がチケットに結び付く）
-        self.assertIn("必須: 提案の frontmatter に mr: 7 を書く", done.stdout)
+        self.assertIn("必須: 提案の frontmatter に issue: 152 と mr: 7 を書く", done.stdout)
         # 親チケットも提案も無いので、提案を作る次の一手を、埋められる値を埋めて出す
         nexts = [line for line in done.stdout.splitlines() if line.startswith("次: ")]
         self.assertEqual(len(nexts), 1, done.stdout)
@@ -301,7 +353,7 @@ class StartShTest(unittest.TestCase):
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         # 既存の MR で続ける枝にも同じ案内
-        self.assertIn("必須: 提案の frontmatter に mr: 7 を書く", done.stdout)
+        self.assertIn("必須: 提案の frontmatter に issue: 152 と mr: 7 を書く", done.stdout)
         self.assertIn("次: ワークツリーの中で sh ", done.stdout)
         self.assertIn(f"ticket new {BRANCH} --title ", done.stdout)
         self.assertEqual(self.fields(done.stdout)["ブランチ"], BRANCH)
@@ -336,7 +388,13 @@ class StartShTest(unittest.TestCase):
             "origin/main",
         )
         git(self.wt("fix-152-other"), "commit", "-q", "--allow-empty", "-m", "work")
-        self.route({PULLS: [200, []]})
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/fix-152-other")
+        self.route(
+            {
+                PULLS: [200, [pr(3, "fix-152-other", body="Closes #152")]],
+                **closed_pulls("fix-152-other"),
+            }
+        )
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertTrue(
@@ -369,12 +427,14 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(self.local_branches(), ["main"])
         self.assertFalse(os.path.isdir(os.path.join(self.ws, ".claude", "worktrees")))
 
-    def test_unchecked_host_with_one_local_candidate_continues_and_says_so(self):
+    def test_unchecked_host_with_one_local_candidate_stops_with_exit_4(self):
+        # ホストを見られないときは、手元の候補が 1 件でも続けない
+        # （既存の MR も閉じる issue も確かめられない）
         git(self.ws, "branch", "fix-152-other", "origin/main")
         done = self.run_sh("--issue", "152", token=False)
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("ホストは見ていない", done.stdout + done.stderr)
-        self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("既存の MR を確かめられなかった", done.stdout)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
 
     def test_title_unreadable_prints_issue_read_guidance(self):
         # API が失敗した（500）。ホストには届いていないので MCP の案内と終了コード 4
@@ -499,7 +559,7 @@ class StartShTest(unittest.TestCase):
             "body: Closes #152",
             "draft: true",
             "push 済み",
-            "同じコマンドを再実行する",
+            "--mr <作った番号> --branch",
         ):
             self.assertIn(word, done.stdout)
         self.assertIn(BRANCH, self.remote_branches())
@@ -525,38 +585,37 @@ class StartShTest(unittest.TestCase):
         self.fail(f"{marker} の行が無い: {out}")
 
     def test_rerun_after_mcp_made_the_mr_follows_the_guided_commands(self):
-        # 案内どおりの流れ。search 段 → --mcp-checked で打ち直す → create 段
-        # → MCP で PR を作った想定 → 案内のコマンドを打ち直す
-        search = self.run_sh("--issue", "152", "--slug", "login", token=False)
-        self.assertEqual(search.returncode, 4, search.stdout + search.stderr)
-        _, args = self.guided_args(search.stdout, "再実行する: ")
-        self.assertIn("--mcp-checked", args)
-        create = self.run_sh(*args, token=False)
+        # チケットが無く、API に届かない状態から: 新規作成 → create 段で 4 → MCP で MR を作った想定
+        # → 案内のコマンド（--issue M --mr N --branch <ブランチ> --mcp-checked）を打ち直して 0
+        create = self.run_sh("--issue", "152", "--slug", "login", "--mcp-checked", token=False)
         self.assertEqual(create.returncode, 4, create.stdout + create.stderr)
         self.assertIn("mcp__github__create_pull_request", create.stdout)
         self.assertEqual(self.posts(), [])
-        cmd, args = self.guided_args(create.stdout, "再実行する: ")
-        self.assertNotIn("--mcp-checked", cmd)
-        self.assertEqual(args[:4], ["--issue", "152", "--slug", "login"])
-        # エージェントが MCP で PR を作った。ホストは見られないまま、案内のコマンドを打つ
+        cmd, args = self.guided_args(create.stdout, "打ち直す: ")
+        self.assertEqual(
+            args,
+            ["--issue", "152", "--mr", "<作った番号>", "--branch", "feature-152-login"]
+            + ["--mcp-checked"],
+        )
+        # エージェントが MCP で PR（7 番）を作った。ホストは見られないまま、案内のコマンドを打つ
+        args[args.index("--mr") + 1] = "7"
         done = self.run_sh(*args, token=False)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertTrue(
             self.fields(done.stdout)["ワークツリー"].endswith("worktrees/feature-152-login")
         )
+        self.assertIn("必須: 提案の frontmatter に issue: 152 と mr: 7 を書く", done.stdout)
+        self.assertIn("ホストは見ていない（MCP などで確認済みとして扱った）", done.stdout)
+        self.assertIn("--issue 152 --mr 7", done.stdout)
         self.assertEqual(self.posts(), [])
 
     def test_guided_command_keeps_quoting(self):
         title = 'It\'s $HOME  "x" `a`'
-        first = self.run_sh(
-            "--issue", "152", "--slug", "login", "--title", title, "--mcp-checked", token=False
-        )
+        first = self.run_sh("--issue", "152", "--title", title, token=False)
         self.assertEqual(first.returncode, 4, first.stdout + first.stderr)
         cmd, args = self.guided_args(first.stdout, "再実行する: ")
-        self.assertEqual(args, ["--issue", "152", "--slug", "login", "--title", title])
+        self.assertEqual(args, ["--issue", "152", "--title", title, "--mcp-checked"])
         self.assertIn("'It'\\''s $HOME  \"x\" `a`'", cmd)
-        again = self.run_sh(*args, token=False)
-        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
 
     def test_issue_not_found_exits_2_with_reason(self):
         # 404 はホストには届いている。MCP へ回さず、番号を確かめてもらう
@@ -611,8 +670,8 @@ class StartShTest(unittest.TestCase):
         done = self.run_sh("--issue", "999", "--slug", "memo", "--title", "メモアプリ")
         self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
         self.assertIn("issue #999 が見つからない", done.stderr)
-        self.assertIn("ccnavi-ticket.sh next-id", done.stderr)
-        self.assertIn("ccnavi ticket new", done.stderr)
+        self.assertNotIn("next-id", done.stderr)
+        self.assertIn("ユーザに作ってもらい", done.stderr)
         self.assertEqual(self.local_branches(), ["main"])
         self.assertEqual(self.posts(), [])
 
@@ -850,15 +909,23 @@ class StartShTest(unittest.TestCase):
         with open(os.path.join(wt, "ign.txt"), encoding="utf-8") as f:
             self.assertEqual("手元の ignored\n", f.read())
 
-    def test_unreachable_remote_continues_and_says_unchecked(self):
+    def test_unreachable_remote_stops_when_the_mr_is_adopted(self):
+        # 候補には必ず MR がある（MR の無い候補は成功させない）。
+        # MR を採用するときは origin の全ブランチで
+        # 識別子の重なりを確かめるので、git のリモートに届かないと止まる
         tip = git(self.ws, "commit-tree", "-p", "main", "-m", "work", "main^{tree}")
         git(self.ws, "branch", "fix-152-other", tip)
-        self.route({PULLS: [200, []]})
+        self.route(
+            {
+                PULLS: [200, [pr(3, "fix-152-other", body="Closes #152")]],
+                **closed_pulls("fix-152-other"),
+            }
+        )
         shutil.rmtree(self.bare)
         done = self.run_sh("--issue", "152")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("リモート未確認", done.stdout)
-        self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("origin のブランチ一覧を取れなかった", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
 
     def test_dry_run_creates_nothing(self):
         self.github_new()
@@ -896,13 +963,329 @@ class StartShTest(unittest.TestCase):
             (),
             ("--issue",),
             ("--issue", "0"),
-            ("--issue", "1", "--mr", "2"),
+            ("--issue", "1", "--mr", "x"),
+            ("--issue", "a/b#c"),
             ("--issue", "1", "--slug", "Bad Slug"),
+            ("--branch", "x", "--issue", "1"),
+            ("--branch", "x", "--mr", "1"),
+            ("--check", "--issue", "1"),
+            ("--check", "--dry-run"),
             ("--mr", "1", "--slug", "x"),
             ("--nope",),
         ):
             with self.subTest(args=args):
                 self.assertEqual(self.run_sh(*args).returncode, 2)
+
+    # ---- 7. 事前確認（--check）と権限
+
+    def check(self, *routes, token=True, **extra):
+        if routes:
+            self.route(routes[0])
+        return self.run_sh("--check", token=token, **extra)
+
+    def labels(self, out):
+        got = {}
+        for line in out.splitlines():
+            if line.startswith("確認: "):
+                name, _, rest = line[len("確認: ") :].partition(": ")
+                got[name] = rest.split(" ")[0].split("（")[0]
+        return got
+
+    def test_check_all_ok_creates_nothing(self):
+        done = self.check()
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertTrue(done.stdout.startswith("対象リポジトリ: acme/widgets"), done.stdout)
+        self.assertEqual(
+            self.labels(done.stdout),
+            {k: "OK" for k in ("tools", "origin", "integration", "api", "access", "git")},
+        )
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.remote_branches(), ["main"])
+        self.assertFalse(os.path.isdir(os.path.join(self.ws, ".claude", "worktrees")))
+        self.assertNotIn("t0k", done.stdout + done.stderr)
+
+    def test_check_probe_401_and_404_are_ng(self):
+        for status, fix in ((401, "auth login"), (404, "origin のパス")):
+            with self.subTest(status=status):
+                done = self.check({f"GET {GITHUB}": [status, {"message": "x"}]})
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertEqual(self.labels(done.stdout)["api"], "NG")
+                self.assertEqual(self.labels(done.stdout)["access"], "省略")
+                self.assertIn(fix, done.stdout)
+                # git のリモートは API の結果によらず確かめる
+                self.assertEqual(self.labels(done.stdout)["git"], "OK")
+                self.assertNotIn("t0k", done.stdout + done.stderr)
+
+    def test_check_probe_500_is_unverified(self):
+        done = self.check({f"GET {GITHUB}": [500, {"message": "boom"}]})
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["api"], "未確認")
+        self.assertIn("MCP", done.stdout)
+
+    def test_check_without_a_token_is_unverified_and_still_checks_git(self):
+        done = self.check(token=False)
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        got = self.labels(done.stdout)
+        self.assertEqual((got["api"], got["access"], got["git"]), ("未確認", "省略", "OK"))
+        self.assertIn("GITHUB_TOKEN", done.stdout)
+
+    def test_check_github_push_false_is_ng(self):
+        done = self.check({f"GET {GITHUB}": [200, {"permissions": {"push": False}}]})
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["access"], "NG")
+        self.assertIn("書き込みの権限", done.stdout)
+
+    def test_check_local_path_origin_is_ng(self):
+        git(self.ws, "remote", "set-url", "origin", self.bare)
+        done = self.check()
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["origin"], "NG")
+        self.assertEqual(self.labels(done.stdout)["api"], "省略")
+
+    def test_check_must_stand_alone(self):
+        for extra in (("--issue", "1"), ("--dry-run",), ("--mr", "1")):
+            with self.subTest(extra=extra):
+                self.assertEqual(self.run_sh("--check", *extra).returncode, 2)
+
+    def test_check_times_out_on_a_hanging_curl(self):
+        done = self.check(token=True, FAKE_SLEEP="30", CCNAVI_PREFLIGHT_TIMEOUT="2")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["api"], "未確認")
+
+    def test_check_times_out_on_a_hanging_gh(self):
+        write(os.path.join(self.bin, "gh"), "#!/bin/sh\nsleep 30\n")
+        os.chmod(os.path.join(self.bin, "gh"), 0o755)
+        done = self.check(token=False, CCNAVI_PREFLIGHT_TIMEOUT="2")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["api"], "未確認")
+
+    def test_insufficient_role_stops_before_anything_is_made(self):
+        self.github_new()
+        self.route(
+            {
+                PULLS: [200, []],
+                f"GET {GITHUB}/issues/152": [200, {"title": "Add login"}],
+                f"GET {GITHUB}": [200, {"permissions": {"push": False}}],
+                **closed_pulls(BRANCH),
+            }
+        )
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("書き込みの権限が足りない", done.stderr)
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.remote_branches(), ["main"])
+        self.assertEqual(self.posts(), [])
+        self.assertFalse(os.path.isdir(self.wt(BRANCH)))
+
+    def test_insufficient_role_stops_a_resumed_start_before_the_worktree(self):
+        # 作りかけ（初期コミットだけ・MR が無い）の再開も、ワークツリーを切る前に止める
+        git(self.ws, "branch", BRANCH, "origin/main")
+        git(self.ws, "commit-tree", "-p", "main", "-m", "x", "main^{tree}")
+        tip = git(
+            self.ws,
+            "commit-tree",
+            "-p",
+            "main",
+            "-m",
+            "chore: #152 の作業を開始する",
+            "main^{tree}",
+        )
+        git(self.ws, "branch", "-f", BRANCH, tip)
+        git(self.ws, "push", "-q", self.bare, f"{BRANCH}:refs/heads/{BRANCH}")
+        self.route(
+            {
+                PULLS: [200, []],
+                f"GET {GITHUB}": [200, {"permissions": {"push": False}}],
+                **closed_pulls(BRANCH),
+            }
+        )
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("書き込みの権限が足りない", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt(BRANCH)))
+        self.assertEqual(self.posts(), [])
+
+    # ---- 8. issue と MR のセット
+
+    def mr_branch(self, name="fix-152-other", number=5, **routes):
+        git(self.ws, "push", "-q", self.bare, f"main:refs/heads/{name}")
+        self.route(
+            {
+                f"GET {GITHUB}/pulls/{number}": [200, pr(number, name)],
+                PULLS: [200, [pr(number, name)]],
+                **closed_pulls(name),
+                **routes,
+            }
+        )
+
+    def test_issue_adopting_an_mr_that_does_not_close_it_stops(self):
+        self.mr_branch(**{GRAPHQL: [200, closing([])]})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("閉じるリンクを持たない", done.stderr)
+        self.assertIn("Closes #152", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
+
+    def test_mr_with_no_linked_issue_stops(self):
+        self.mr_branch(**{GRAPHQL: [200, closing([])]})
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("Closes #<番号>", done.stderr)
+
+    def test_mr_with_one_linked_issue_reports_issue_and_mr(self):
+        self.mr_branch(**{GRAPHQL: [200, closing([(12, "acme/widgets")])]})
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("必須: 提案の frontmatter に issue: 12 と mr: 5 を書く", done.stdout)
+        self.assertIn("--issue 12 --mr 5", done.stdout)
+
+    def test_mr_with_a_different_issue_stops(self):
+        self.mr_branch(**{GRAPHQL: [200, closing([(12, "acme/widgets")])]})
+        done = self.run_sh("--mr", "5", "--issue", "13")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("閉じるリンクを持たない", done.stderr)
+
+    def test_mr_with_two_linked_issues_needs_a_choice(self):
+        self.mr_branch(**{GRAPHQL: [200, closing([(12, "acme/widgets"), (13, "acme/widgets")])]})
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("acme/widgets#12", done.stdout)
+        self.assertIn("acme/widgets#13", done.stdout)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
+
+    def test_issue_in_the_list_passes_and_order_of_arguments_does_not_matter(self):
+        self.mr_branch(**{GRAPHQL: [200, closing([(12, "acme/widgets"), (13, "acme/widgets")])]})
+        for args in (("--mr", "5", "--issue", "13"), ("--issue", "13", "--mr", "5")):
+            with self.subTest(args=args):
+                done = self.run_sh(*args)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn("issue: 13 と mr: 5", done.stdout)
+        # 一覧に無いものは 1
+        self.assertEqual(self.run_sh("--mr", "5", "--issue", "14").returncode, 1)
+
+    def test_issue_forms_are_the_same_issue_ignoring_case(self):
+        self.mr_branch(**{GRAPHQL: [200, closing([(12, "acme/widgets")])]})
+        for value in ("12", "acme/Widgets#12", "ACME/WIDGETS#12"):
+            with self.subTest(value=value):
+                done = self.run_sh("--mr", "5", "--issue", value)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn("issue: 12 と mr: 5", done.stdout)
+
+    def test_issue_in_another_repository_is_shown_with_its_repository(self):
+        self.mr_branch(**{GRAPHQL: [200, closing([(3, "other/repo")])]})
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("issue: other/repo#3 と mr: 5", done.stdout)
+        self.assertIn("--issue other/repo#3 --mr 5", done.stdout)
+
+    def test_linked_issues_needing_a_sixth_page_stop_with_exit_4(self):
+        self.mr_branch(**{GRAPHQL: [200, closing([(12, "acme/widgets")], more=True)]})
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("mcp__github__pull_request_read", done.stdout)
+        self.assertIn("--mr 5 --issue <issue の番号> --branch", done.stdout)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
+
+    def test_graphql_errors_and_null_pull_request_are_not_zero_linked_issues(self):
+        for payload in (
+            {"errors": [{"message": "boom"}], "data": None},
+            {"data": {"repository": {"pullRequest": None}}},
+        ):
+            with self.subTest(payload=payload):
+                self.mr_branch(**{GRAPHQL: [200, payload]})
+                done = self.run_sh("--mr", "5")
+                self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+                self.assertIn("mcp__github__issue_read", done.stdout)
+                # 理由が空（「?」）にならない
+                self.assertIn("紐づく issue を読めなかった", done.stdout)
+
+    def test_the_guided_rerun_after_an_unreadable_closing_link_succeeds(self):
+        # 閉じる issue だけ読めない（GraphQL が errors）。案内の 3 引数で打ち直せば確定する
+        self.mr_branch(
+            **{
+                GRAPHQL: [200, {"errors": [{"message": "boom"}], "data": None}],
+                f"GET {GITHUB}/issues/152": [200, {"title": "Add login"}],
+            }
+        )
+        first = self.run_sh("--mr", "5")
+        self.assertEqual(first.returncode, 4, first.stdout + first.stderr)
+        again = self.run_sh(
+            "--mr", "5", "--issue", "152", "--branch", "fix-152-other", "--mcp-checked"
+        )  # fmt: skip
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertIn("必須: 提案の frontmatter に issue: 152 と mr: 5 を書く", again.stdout)
+        self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
+
+    def test_the_guided_rerun_does_not_pass_an_issue_that_does_not_exist(self):
+        self.mr_branch(**{GRAPHQL: [200, {"errors": [{"message": "boom"}], "data": None}]})
+        done = self.run_sh(
+            "--mr", "5", "--issue", "999", "--branch", "fix-152-other", "--mcp-checked"
+        )  # fmt: skip
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("issue #999 が見つからない", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
+
+    def test_branch_with_no_candidate_on_a_reachable_host_stops(self):
+        self.github_new()
+        done = self.run_sh(
+            "--issue", "152", "--branch", "other-152-x", "--mcp-checked"
+        )  # fmt: skip
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("--branch", done.stderr)
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.posts(), [])
+
+    def test_a_resumed_start_checks_the_issue_before_the_worktree(self):
+        tip = git(
+            self.ws,
+            "commit-tree",
+            "-p",
+            "main",
+            "-m",
+            "chore: #152 の作業を開始する",
+            "main^{tree}",
+        )
+        git(self.ws, "branch", BRANCH, tip)
+        git(self.ws, "push", "-q", self.bare, f"{BRANCH}:refs/heads/{BRANCH}")
+        # issue 152 は 404（既定の routes に無い）。作りかけでも、実在しない issue の MR は作らない
+        self.route({PULLS: [200, []], **closed_pulls(BRANCH)})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("issue #152 が見つからない", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt(BRANCH)))
+        self.assertEqual(self.posts(), [])
+
+    def test_a_candidate_without_an_mr_is_not_a_success(self):
+        tip = git(self.ws, "commit-tree", "-p", "main", "-m", "work", "main^{tree}")
+        git(self.ws, "branch", "fix-152-other", tip)
+        git(self.ws, "push", "-q", self.bare, "fix-152-other:refs/heads/fix-152-other")
+        self.route({PULLS: [200, []]})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("fix-152-other", done.stdout)
+        self.assertIn("Closes #152", done.stdout)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
+
+    def test_mcp_checked_without_branch_stops_with_exit_4(self):
+        done = self.run_sh("--issue", "152", "--mr", "7", "--mcp-checked", token=False)
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("--branch", done.stdout)
+
+    def test_mcp_checked_with_a_missing_branch_stops(self):
+        done = self.run_sh(
+            "--issue", "152", "--mr", "7", "--branch", "nope-152-x", "--mcp-checked", token=False
+        )
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("nope-152-x", done.stderr)
+
+    def test_branch_that_differs_from_the_mr_source_branch_stops(self):
+        self.mr_branch()
+        done = self.run_sh(
+            "--mr", "5", "--issue", "152", "--branch", "other-152-x", "--mcp-checked"
+        )
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("--branch", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
 
     def test_help(self):
         done = self.run_sh("--help")
@@ -1022,6 +1405,51 @@ exec '{self.bin}/curl' -X "$method" "https://gitlab.com/api/v4/$path"
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
         self.assertIn("issue #152 が見つからない", done.stderr)
+
+    def test_gitlab_check_access_levels(self):
+        project = f"GET {GITLAB}"
+        members = f"GET {GITLAB}/members/all/5"
+        cases = (
+            # (routes, 終了コード, access の表示)
+            ({members: [200, {"access_level": 20}]}, 1, "NG"),
+            ({members: [200, {"access_level": 30}]}, 0, "OK"),
+            (
+                {
+                    members: [404, {"message": "x"}],
+                    project: [
+                        200,
+                        {"id": 42, "permissions": {"group_access": {"access_level": 30}}},
+                    ],
+                },
+                0,
+                "OK",
+            ),
+            (
+                {f"GET {GL_API}/user": [404, {"message": "x"}], project: [200, {"id": 42}]},
+                0,
+                "注意",
+            ),
+        )
+        for routes, code, shown in cases:
+            with self.subTest(shown=shown, code=code):
+                done = self.check(routes)
+                self.assertEqual(done.returncode, code, done.stdout + done.stderr)
+                self.assertEqual(self.labels(done.stdout)["access"], shown)
+        self.assertIn("権限を判定できない", done.stdout)
+
+    def test_gitlab_check_without_a_token_suggests_glab_login(self):
+        done = self.check(token=False)
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        got = self.labels(done.stdout)
+        self.assertEqual((got["api"], got["access"], got["git"]), ("未確認", "省略", "OK"))
+        self.assertIn("glab auth login --hostname gitlab.com", done.stdout)
+
+    def test_gitlab_check_times_out_on_a_hanging_glab(self):
+        write(os.path.join(self.bin, "glab"), "#!/bin/sh\nsleep 30\n")
+        os.chmod(os.path.join(self.bin, "glab"), 0o755)
+        done = self.check(token=False, CCNAVI_PREFLIGHT_TIMEOUT="2")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertEqual(self.labels(done.stdout)["api"], "未確認")
 
     def gitlab_mr(self, **over):
         return {

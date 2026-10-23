@@ -264,3 +264,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0155](0155-abolish-chrome-withdraw.md) | Chrome 拡張の承認の取り下げを廃止し、子は取り消して出し直し、親は改版か取り消しにする |
 | [0156](0156-review-operation-state-and-guidance-fixes.md) | レビュー運用の状態遷移と案内の修正（ホストの分類・依頼コメントへの返信・案内の出し分け）をまとめて互換の版 18 で出す |
 | [0157](0157-feedback-plan-approval-does-not-settle-the-review.md) | フィードバック計画の承認でレビューの状態を変えず、issue に回すをいつでも選べるようにする |
+| [0160](0160-ticket-work-is-issue-mr-pair-with-preflight.md) | チケット作業を issue と MR のセットに限り、入口でホストの API と git のリモートの使える状態を確かめる |

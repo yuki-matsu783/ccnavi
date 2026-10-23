@@ -18,7 +18,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 ---
 version: 1
 ticket: feature-50-settings-split-02-01
-issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
+issue: 50                # 親だけ。必須。この MR が閉じる issue（別のリポジトリなら owner/repo#50）
 mr: 12                   # 親だけ。仕事を載せる MR の番号（同じリポジトリ）。必須。依頼文の MR の番号をこのチケットに結び付ける
 project: lib             # 置き場と同じ名前。省ける（決めるのは置き場。11）
 parent: feature-50-settings-split  # 子だけ
@@ -60,7 +60,7 @@ base_sha: ""
   長音記号・CJK 統合漢字・々（先頭は ASCII の英数字）。NFC に限り、64 文字まで
 - 新しい親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、`feature-64-統合先の解決`）。
   先頭の語は `CCNAVI_BRANCH_PREFIXES` のリスト（既定は `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs`）の
-  どれか。番号は、`issue:` があれば issue の番号を使う。無ければ通し番号を使う。通し番号は、呼んだ時点で今ある名前の番号の最大値に 1 を足したものである。親チケットと提案に加え、手元のブランチとワークツリーの名前も数える。プロジェクトの
+  どれか。番号は issue の番号を使う（親は `issue:` が必須。通し番号は直接作業のワークツリー名だけに使う）。通し番号は、呼んだ時点で今ある名前の番号の最大値に 1 を足したものである。親チケットと提案に加え、手元のブランチとワークツリーの名前も数える。プロジェクトの
   issue なら slug の頭を `<プロジェクト名>-` にする。形に合わない新規の提案、issue と番号の食い違い、同じリポジトリの
   番号の重なり、48 文字を超える長さ、既にあるブランチと同じ名前、末尾が `-<2 桁>` の親は `--lint` の warn（承認は
   止めない）。前の形（`i0055` など）の承認済みチケットはそのまま読む
@@ -98,7 +98,7 @@ base_sha: ""
   承認のあとの判定は写しを読み、`phases.yml` を読まない。`phases.yml` を直したら、承認待ちの提案は `--fill-phases` を
   打ち直す。改版の提案では、子が承認された番号が使う定義は承認済みチケットの値のまま（`--fill-phases` がそう差し込む）。
   子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
-- 親の提案の雛形は `ccnavi ticket new <識別子> --title <題> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) [--issue N]` で作る（`tickets/scaffold.py`。
+- 親の提案の雛形は `ccnavi ticket new <識別子> --title <題> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) --issue <N|owner/repo#N> --mr <N>` で作る（`tickets/scaffold.py`。
   REQ-TKT-56）。識別子と同名のワークツリーの中から打つと、`<提案の置き場>/todo/<識別子>.md` に書く。生成物は
   `version` `ticket` `issue`（`--issue` があれば）`title` `phases` `plan` `rationale` `allow` と、本文の見出し
   `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由`（この順。Stop の判定が親の提案に求める内容に
@@ -136,8 +136,8 @@ base_sha: ""
   `owner/repo` の形や 0・数でないものは error、子に書くと warn で無視する。`issue` と並べて検索に使い、
   UserPromptSubmit の hook（`branchfind`）が依頼文の MR の番号を「すでにあるチケットに結び付く」と判定する
   （提案も承認済みも対象）。親には必須で、書いていない親の承認と `--lint` は止まる。書くのは (1) 提案者
-  （`ccnavi-start.sh` が MR を採用するか Draft MR を作ると、出力が「必須:」の行で「提案の frontmatter に `mr: <番号>` を書く」と案内する。
-  `ccnavi ticket new --mr <番号>` が書く）、(2) 承認のあとの `review request` が、親ブランチの MR の番号を確かめたとき、
+  （`ccnavi-start.sh` が MR を採用するか Draft MR を作ると、出力が「必須:」の行で「提案の frontmatter に `issue: <値>` と `mr: <番号>` を書く」と案内する。
+  `ccnavi ticket new --issue <値> --mr <番号>` が書く。`issue` も親には必須で、書いていない親は同じく止まる）、(2) 承認のあとの `review request` が、親ブランチの MR の番号を確かめたとき、
   ccnavi が親の承認済みチケットの **空の `mr:` にだけ**書き足す。同じ値なら何もせず、違う値が既にあれば上書きせず警告する。スクリプトだけが書く欄（`SCRIPT_FIELDS`）では
   ないので、提案に書いてよく、承認はそのまま写す。改版の不変検査は、承認済みと改版の両方に値があって違うときだけ error
   （書き足しの後に、書き足す前の写しで改版しても弾かない）

@@ -551,7 +551,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     }
     case "listOpenMrs":
-      // 「始める」: issue に紐づく開いた MR を探す。読むだけ
+      // 「始める」: issue を閉じる開いた MR を探す。読むだけ
       value = await x.listOpenMrs(client, o, r);
       break;
     case "listMergedMrs":

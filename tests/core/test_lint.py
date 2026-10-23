@@ -68,6 +68,8 @@ COPY = """---
 version: 1
 ticket: {name}
 title: t
+issue: 1
+mr: 1
 ccnavi_approved: {{approved_at: "2026-01-01T00:00:00Z", source_tree: "", source_path: p}}
 allow:
 - {{glob: "src/*", match: "Write|Edit"}}

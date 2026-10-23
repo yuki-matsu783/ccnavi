@@ -770,7 +770,7 @@ export interface MrInfo {
   readonly fork: boolean;
 }
 
-/** 開いた MR（PR）の全部。issue に紐づく MR の探索と、採用の確認に使う。読むだけ */
+/** 開いた MR（PR）の全部。issue を閉じる MR の探索と、採用の確認に使う。読むだけ */
 export async function listOpenMrs(client: Client, owner: string, repo: string): Promise<MrInfo[]> {
   const { items, more } = await restPages(client, `${repoPath(owner, repo)}/pulls?state=open&per_page=100`, MR_PAGES);
   if (more) throw new HostError("開いたマージリクエストが多すぎて読み切れない。既存の MR を見落とさないよう、「始める」は手元で行ってください");

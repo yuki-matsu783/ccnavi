@@ -1,6 +1,6 @@
 /**
  * 「始める」の欄（`[data-testid=start]`）。issue は押されてから読む（ボードを開くたびには読まない）。
- * issue の題は素の文字列（textContent）。押すと、紐づく開いたマージリクエストがあればその元ブランチを採用し、無ければ親のブランチを統合先の先頭から作って Draft のマージリクエストを作る（`Actions.start`）。
+ * issue の題は素の文字列（textContent）。押すと、issue を閉じる開いたマージリクエストがあればその元ブランチを採用し、無ければ親のブランチを統合先の先頭から作って Draft のマージリクエストを作る（`Actions.start`）。
  */
 import type { JSX } from "react";
 
@@ -11,7 +11,7 @@ import { ActionButton, Link, Notice } from "./parts.js";
 export function Start({ board, actions, issues }: { board: RepoBoard; actions: Actions; issues?: IssueList }): JSX.Element {
   return (
     <section className="start" data-testid="start">
-      <h3>Issueから作業を開始（紐づく開いたマージリクエストがあればその元ブランチを採用し、無ければ統合先ブランチの最新コミットを起点に、親ブランチと Draft のマージリクエストを作成します）</h3>
+      <h3>Issueから作業を開始（issue を閉じる開いたマージリクエストがあればその元ブランチを採用し、無ければ統合先ブランチの最新コミットを起点に、親ブランチと Draft のマージリクエストを作成します）</h3>
       {!issues ? (
         <ActionButton action="issues" onClick={() => actions.loadIssues?.(board)}>
           Issue一覧を取得

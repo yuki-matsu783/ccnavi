@@ -11,6 +11,8 @@ keywords: [識別子, ブランチ名, feature, hotfix, 先頭の語, CCNAVI_BRA
 
 改訂（2026-10-19）: 統合先の名前の決め方（`CCNAVI_INTEGRATION_BRANCH` と `integration_local` への言及）は ADR-0148 が改める。統合先は各リポジトリの `origin/HEAD` だけで決め、環境変数 `CCNAVI_INTEGRATION_BRANCH`・`settings.local.json` の env・`--integration-branch` は廃止した。本文は当時の記述として残す。
 
+改訂（2026-10-22）: 通し番号（`ccnavi-ticket.sh next-id`）を親チケットに使う用途はやめた。チケット作業は issue と MR のセットで、親の識別子は issue の番号から決まる（ADR-0160）。通し番号は直接作業のワークツリー名にだけ残る。識別子の形と動きは変えない。
+
 改訂（2026-10-14）: 5 章の `branch:` キーと承認後の `switch` の手順は、ADR-0136 が置き換えた。親の識別子はブランチ名の `/` を `-` に置き換えたもので、`branch:` があればエラーになる。
 
 ## 1. 状況

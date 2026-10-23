@@ -28,7 +28,7 @@ CODE_PARENT_KEY = "NOTICE_PROPOSAL_PARENT_KEY"
 CODE_PARENT_FIELDS = "NOTICE_PROPOSAL_PARENT_FIELDS"
 
 # 親の提案が持つ欄。`project:` は置き場が決めるので数えない。
-PARENT_FIELDS = ("mr", "plan", "phases")
+PARENT_FIELDS = ("issue", "mr", "plan", "phases")
 
 
 def hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
@@ -70,7 +70,8 @@ def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
         return (
             f"[ccnavi] {CODE_PARENT_KEY} ({rel}) 識別子 {name} は子の形ではないのに `parent:` が"
             "あります。親の提案なら `parent:` と `phase:` の行を消してください"
-            "（子だけの欄）。雛形は `ccnavi ticket new <識別子> --title <題> --plan <型,…>`"
+            "（子だけの欄）。雛形は"
+            " `ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>`"
             " が作ります。"
         )
     missing = [key for key in PARENT_FIELDS if not front.get(key)]
@@ -78,7 +79,8 @@ def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
         return ""
     return (
         f"[ccnavi] {CODE_PARENT_FIELDS} ({rel}) 親の提案に {'・'.join(f'`{k}:`' for k in missing)}"
-        " がありません。手で足さず、`ccnavi ticket new <識別子> --title <題> --plan <型,…>`"
+        " がありません。手で足さず、"
+        "`ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>`"
         " で雛形を作るか、`ccnavi --plan-order <親> --fill-phases` で"
         " `phases:` を差し込んでください。書式は docs/design/tickets/proposal-format.md。"
     )

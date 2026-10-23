@@ -63,6 +63,9 @@ class PromptHintTest(PhaseHarness):
         self.assertIn("やめる", said)
         self.assertNotIn("branch:", said)
         self.assertIn("ccnavi-git.sh", said)
+        # 最初に事前確認を打たせる。0 以外なら結果と「次:」を伝えて止まる
+        self.assertIn(f"最初に '{sh} --check' を打つ", said)
+        self.assertIn("結果と「次:」をユーザに伝えて止まる", said)
         self.assertIn("終了コード 3（候補が複数）", said)
         self.assertIn("終了コード 4（ホストに届かない）", said)
         self.assertIn("MCP で代行し、同じコマンドを再実行します。", said)
@@ -98,6 +101,7 @@ class PromptHintTest(PhaseHarness):
         self.approve()
         said = self.prompt("#152 を直して")
         self.assertIn("すでに feature-152-login(doing)", said)
+        self.assertIn("最初に ccnavi-start.sh --check を打つ", said)
         self.assertIn("結び付いている", said)
         self.assertIn("ワークツリー", said)
         self.assertIn("言い直してもらう", said)

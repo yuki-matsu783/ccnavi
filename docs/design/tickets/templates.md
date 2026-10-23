@@ -176,7 +176,7 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 #### 使う側
 
 溜めたテンプレートから、新しい親の提案とその子のフローの下書きを起こす。`ccnavi ticket new <識別子> --title <題> --template <名前>
-[--layer <名前>] [--with-feedback] [--issue N]`（`tickets/scaffold.py` の `--plan` の足場と同じ入口。`--plan` とは併用できない）。判定・組み込みの保護・
+[--layer <名前>] [--with-feedback] --issue <N|owner/repo#N> --mr <N>`（`tickets/scaffold.py` の `--plan` の足場と同じ入口。`--plan` とは併用できない）。判定・組み込みの保護・
 `rules.yml` は変えない。`ticket new` は元から `phase_forms._CLI_FORMS` に無く、書くのは `todo/` の提案と下書きの置き場だけなので、
 エージェントが打ってよい。`ccnavi-ticket.sh` は `new` を通さず（実行ファイルを直接打つ）、`--template` のために sh を直す必要は無い。
 `--template` と `--with-feedback` は実行ファイルの新しいオプションなので `EXE_OPTIONS` に足した。`ticket new` では `--layer` をテンプレートを引くレイヤーとして読む。

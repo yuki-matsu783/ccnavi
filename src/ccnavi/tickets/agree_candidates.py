@@ -364,8 +364,8 @@ def plan_problems(
                     t.ticket,
                     "親の提案に計画（`plan:`）がありません。計画の無い親は承認しても"
                     "`ticket start` が止まります。"
-                    "`ccnavi ticket new <識別子> --title <題> --plan <型,…>`"
-                    " の雛形に揃えてください",
+                    "`ccnavi ticket new <識別子> --title <題> --plan <型,…>"
+                    " --issue <値> --mr <番号>` の雛形に揃えてください",
                 )
             )
         return problems

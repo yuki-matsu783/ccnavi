@@ -35,7 +35,7 @@
 
 下の例は子の提案。親の提案は `parent:` と `phase:` を書かず、`mr:`・`plan:`・`phases:` を持つ
 （全体の書式は docs/design/tickets/proposal-format.md）。手で書かず、
-`ccnavi ticket new <識別子> --title <題> --plan <型,…>` で雛形を作る。
+`ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>` で雛形を作る。
 
     ---
     version: 1
@@ -194,6 +194,14 @@ def _issue_ref(raw) -> tuple[str, int | None]:
     return "", _issue_number(raw)
 
 
+def issue_text(raw) -> str:
+    """`issue:` に書く値（`12` か `owner/repo#12`）。読めなければ空。`ticket new` が使う。"""
+    repo, number = _issue_ref(raw)
+    if number is None:
+        return ""
+    return f"{repo}#{number}" if repo else str(number)
+
+
 def issue_label(t: ticket_model.Ticket) -> str:
     """課題の表記（`#12`・`owner/repo#12`）。MR の `Closes` と承認の画面が使う。無ければ空。"""
     if t.issue is None:
@@ -314,7 +322,8 @@ def _read_identity(ticket: ticket_model.Ticket, front: dict, problems: list[Prob
                         f" の形で書く（フェーズ 5 の 1 枚目なら `{example}`）。"
                         "親の提案を書いているなら、`parent:` と `phase:` の行を消す"
                         "（この 2 つは子だけの欄）。雛形は "
-                        "`ccnavi ticket new <識別子> --title <題> --plan <型,…>` が作る",
+                        "`ccnavi ticket new <識別子> --title <題> --plan <型,…>"
+                        " --issue <値> --mr <番号>` が作る",
                     )
                 )
                 return True

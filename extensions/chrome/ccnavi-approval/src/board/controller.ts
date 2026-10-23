@@ -353,7 +353,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     },
     start(repoBoard, issue) {
       void act(async () => {
-        if (!env.confirm(`Issue #${issue.number} から作業を始めます。issue に紐づく開いたマージリクエストがあれば、その元ブランチを採用します（ブランチもマージリクエストも作りません）。無ければ、統合先 ${repoBoard.integration?.name ?? ""} の最新コミットを起点に、親ブランチと Draft のマージリクエストを作成します。`)) return false;
+        if (!env.confirm(`Issue #${issue.number} から作業を始めます。issue を閉じる開いたマージリクエストがあれば、その元ブランチを採用します（ブランチもマージリクエストも作りません）。無ければ、統合先 ${repoBoard.integration?.name ?? ""} の最新コミットを起点に、親ブランチと Draft のマージリクエストを作成します。`)) return false;
         const deps = await writeDeps(repoBoard.repo);
         const taken = [...repoBoard.candidates, ...repoBoard.families.map((f) => f.family.name)];
         const out = await ops.startIssue(repoBoard.repo, issue, repoBoard.seen ?? null, taken, deps);
@@ -364,9 +364,9 @@ export function createBoardController(env: BoardEnv): BoardController {
             className: `notice ${done ? "ok" : "error"}`,
             text:
               out.kind === "started"
-                ? `親ブランチ ${out.name} と Draft のマージリクエスト !${out.mr.number} を作成しました（${out.head.slice(0, 7)}）。親の提案の frontmatter に mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
+                ? `親ブランチ ${out.name} と Draft のマージリクエスト !${out.mr.number} を作成しました（${out.head.slice(0, 7)}）。親の提案の frontmatter に issue: ${issue.number} と mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
                 : out.kind === "adopted"
-                  ? `既存のマージリクエスト !${out.mr.number} の元ブランチ ${out.name}（識別子 ${out.identifier}）を採用しました。ブランチもマージリクエストも作っていません。親の提案の frontmatter に mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
+                  ? `既存のマージリクエスト !${out.mr.number} の元ブランチ ${out.name}（識別子 ${out.identifier}）を採用しました。ブランチもマージリクエストも作っていません。親の提案の frontmatter に issue: ${issue.number} と mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
                   : `作業を開始できませんでした：${out.message}`,
           },
         });

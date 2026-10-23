@@ -119,7 +119,7 @@ def ticket_text(name, *, parent="", phase=None, allow=(), ask=(), deny=()):
     """提案の文面。tests/ticket/test_ticket.py の雛形に `deny` を足したもの。"""
     lines = ["---", "version: 1", f"ticket: {name}"]
     if not parent:
-        lines.append("mr: 1")
+        lines += ["mr: 1", "issue: 1"]
     if parent:
         lines += [f"parent: {parent}", f"phase: {phase}"]
     lines += [

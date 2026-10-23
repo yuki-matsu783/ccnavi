@@ -65,7 +65,7 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 
 - 親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、`hotfix-64-統合先の解決`）。先頭の語は既定で `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs` のどれか。チャットで「hotfix で」と言えばエージェントがその語で書く
 - リストを変えるときだけ `.claude/settings.json` の `env` に `CCNAVI_BRANCH_PREFIXES=feature,hotfix,fix` のように書く
-- 番号は issue があれば issue の番号、無ければ通し番号（`ccnavi --lint` の warn が次の番号を示す）。slug には日本語も使える
+- 番号は issue の番号（通し番号は直接作業のワークツリー名だけに使う）。slug には日本語も使える
 - 子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。ワークツリーの名前は識別子と同じ
 
 提案の書式、親のワークツリーの扱い、深さと件数の上限は [設計 9.3](../design/tickets/proposal-format.md)。ワークツリーの名前の決まりは [.ccnavi/docs/worktree.md](../../.ccnavi/docs/worktree.md)。
@@ -281,11 +281,22 @@ Draft は親が片付けて push したあとの `ready` で外す。
 「#152 を直して」「!5 の指摘に対応して」のように issue や MR を指定して頼むと、ccnavi が依頼文から指定（`#152`・`issue 152`・`.../issues/152`、`!5`・`MR 5`・`PR #12`・`.../pull/5`・`.../-/merge_requests/5`）を見つけ、
 着手の前に `ccnavi-start.sh` を打つよう、エージェントに指示を足す。指示を足すだけである。チケット制御が disable なら足さない。
 
-エージェントが打つのは次の 1 本。既存の候補が無ければ、Draft MR・ワークツリー・ブランチを作る。
+チケット作業は必ず issue と MR のセットで進める。最初に、ホストの API（認証・リポジトリの有無・書き込みの権限）と git のリモートが使える状態かを確かめる。
 
 ```sh
-sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152   # MR なら --mr 5
+sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --check   # 0 使える / 1 不備 / 4 確かめられない項目がある
 ```
+
+そのうえで次の 1 本を打つ。既存の候補が無ければ、Draft MR・ワークツリー・ブランチを作る。
+
+```sh
+sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152   # MR なら --mr 5。両方も渡せる
+```
+
+終了コード 0 で終わったら、採用した MR と、その MR が閉じる issue と、元ブランチが確定している。出力の「必須」の行の `issue:` と `mr:` を提案に書く。どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める。
+MR の無い候補（作りかけの再開を除く）は成功させず、終了コード 3 で一覧を出す。
+ホストに届かないときは、`--issue`・`--mr`・`--branch` の 3 つと `--mcp-checked` がそろうときだけ、ホストを見ずに成功する。
+`ccnavi-ticket.sh` の `start`・`finish`・`propose`・`consolidate` も、ロックの前に同じ確認（API と git）を自動で行う。直接作業では確かめない。
 
 依頼の URL のリポジトリが `projects/<名前>` のものなら、そこに `cd` して `--repo <owner/repo>` を付けて打つ。実行した場所の origin と違えば、ホストに問い合わせる前に止まって移動先を案内する。
 
@@ -345,7 +356,7 @@ ccnavi user handoff <相対パス>… --yes --expect <ハッシュ>
 エージェントが、識別子と同名のワークツリーの中で打つ。
 
 ```sh
-ccnavi ticket new <識別子> --title <題> --template <名前> [--layer <名前>] [--with-feedback] [--issue N]
+ccnavi ticket new <識別子> --title <題> --template <名前> [--layer <名前>] [--with-feedback] --issue <N|owner/repo#N> --mr <N>
 ```
 
 `wip/proposals/todo/<識別子>.md` に、テンプレートの項から計画を書いた親の提案ができる。
