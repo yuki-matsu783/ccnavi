@@ -1184,9 +1184,6 @@ class IntegrateGapsTest(Fixture):
     def test_a_stop_at_the_branch_resumes(self):
         self.stage_stops_then_resumes("update-ref -d refs/heads/wt", wt=False, tmp=False)
 
-    # 実装の欠陥: d4_refs_drop は失敗を捨てて先へ進むため、止まらず終了コード 0 になり、ref が残る。
-    # 打ち直しも「片付け済み」と答えて、ref を消さない。
-    @unittest.expectedFailure
     def test_a_stop_at_the_dedicated_refs_resumes(self):
         self.stage_stops_then_resumes(
             "update-ref -d refs/ccnavi/direct/wt/",
@@ -1195,6 +1192,31 @@ class IntegrateGapsTest(Fixture):
             branch=False,
             stopped_before_refs=False,
         )
+
+    def test_a_stop_in_the_middle_of_the_dedicated_refs_resumes(self):
+        # 消す順は t c k s pending。c だけ失敗させると、t は消え、c 以降の消せるものも消える。
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        self.install_failing_git()
+        before, r = self.done_stopped_at("update-ref -d refs/ccnavi/direct/wt/c")
+        k = self.assert_landed_once(before, r)
+        self.assertIn("残したもの", r.stdout)
+        self.assertEqual("", self.ref("t"))
+        self.assertTrue(self.ref("c"))
+        self.assertTrue(os.path.isfile(self.marker()))
+        self.assertTrue(os.path.isfile(self.record()))
+        again = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(again)
+        self.assert_fully_cleaned(before, k)
+
+    def test_a_missing_dedicated_ref_counts_as_dropped(self):
+        self.work_in_branch()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        git(self.ws, "update-ref", "-d", "refs/ccnavi/direct/wt/t")
+        before = self.head()
+        done = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
+        self.assertOk(done)
+        self.assert_fully_cleaned(before, self.head())
 
     def test_a_marker_put_back_after_completion_is_dropped_without_moving_head(self):
         self.work_in_branch()

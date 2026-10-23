@@ -51,6 +51,7 @@ def post_without_id(self):
 BAD_POSTS = (
     ("http-500", post_http_500),
     ("not-json", post_not_json),
+    ("no-id", post_without_id),
 )
 
 
@@ -122,8 +123,6 @@ class PostFailureTest(WriteAndPushHostHarness):
                             "投稿が失敗したのに依頼済みのマーカーを置いた",
                         )
 
-    # 実装の欠陥: id の無い 201 応答でも url が "#note_null" になり送信済みにされる
-    @unittest.expectedFailure
     def test_a_post_response_without_a_url_is_not_reported_as_success(self):
         """AT21: 応答が JSON でも投稿の URL を作れない（id が無い）ときは、成功と言わない。"""
         comment_body = write(os.path.join(self._base, "comment.md"), "コメント\n")
@@ -131,6 +130,8 @@ class PostFailureTest(WriteAndPushHostHarness):
             done = self.review("comment", "--body-file", comment_body)
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("sent", self.stage_states("comment"))
+        self.assertNotIn("note_null", done.stdout + done.stderr)
+        self.assertIn("unknown", self.stage_states("comment"))
 
     # ---- AT41: 操作記録を失った後の request の打ち直し
 

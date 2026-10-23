@@ -212,26 +212,15 @@ class ProposeTest(WriteAndPushHarness):
         self.assertIn(f"file={self.sha(self.tree, f'HEAD:{rel}')} {rel}", row["text"])
 
     @unittest.skipUnless(os.name == "posix", "SIGPIPE の終わり方は POSIX の sh を前提にする")
-    def test_a_propose_with_its_output_cut_after_the_push_is_failed_after(self):
-        # pushが済んだ後の「次:」の出力を、切られたパイプへ書こうとして失敗する（SIGPIPE）。
-        # 終了コードが0でなくなる。
-        # proposeはpushの後に実行ファイルを呼ばないので、failed_afterになる経路はこれだけ。
-        self.put(f"{self.TODO}/{PARENT}.md")
-        self.piped_propose()
-        (row,) = self.results()
-        self.assertEqual(row["route"], "failed_after")
-        self.assertNotEqual(row["rc"], "0")
-        self.assertEqual(row["commit"], self.remote_sha())
-
-    # 実装では、push済みのproposeの出力が切られるとsentではなくfailed_afterになる。
-    @unittest.expectedFailure
-    @unittest.skipUnless(os.name == "posix", "SIGPIPE の終わり方は POSIX の sh を前提にする")
     def test_a_propose_with_its_output_cut_is_still_recorded_as_sent(self):
+        # pushが済んだ後の「次:」の出力先が閉じていても、送った結果は sent・rc=0 のまま。
         self.put(f"{self.TODO}/{PARENT}.md")
-        self.piped_propose()
+        done = self.piped_propose()
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         (row,) = self.results()
         self.assertEqual(self.remote_sha(), row["commit"])
         self.assertEqual(row["route"], "sent")
+        self.assertEqual(row["rc"], "0")
 
     def reject_pushes(self):
         """リモートの push をすべて断る（pre-receive が 1 で終わる）。"""
