@@ -80,7 +80,6 @@ DRY_RUN_HOLDS_NOTE = (
 SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # ルールを当てる欄の表と選び方は `policy.subjects` にある（ルールファイルの検査も同じ表を読む）。
-AGENT_TOOL = subjects.AGENT_TOOL
 SUBJECT_FIELDS = subjects.SUBJECT_FIELDS
 PATH_TOOLS = subjects.PATH_TOOLS
 SEARCH_TOOLS = subjects.SEARCH_TOOLS

@@ -13,7 +13,6 @@ from . import ruleload
 # サブエージェントの起動ツール（Agent・Task）。レビューが済むまで止める対象で、対象の文字列を
 # 持たないので見出しだけを subject にする。一覧は infra.modes が持つ。
 AGENT_TOOLS = modes.AGENT_TOOLS
-AGENT_TOOL = AGENT_TOOLS[0]
 
 # ツールごとに、ルールを当てる欄。ここに無いツールは対象を持たず、判定に届かない
 # まま通る。名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を

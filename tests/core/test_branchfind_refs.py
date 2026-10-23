@@ -79,6 +79,8 @@ class PromptRefsTest(unittest.TestCase):
             "PR 3本",
             "MR 3件",
             "#2つ目",
+            "#2-3 の範囲",
+            "issue 152(仮)",
             # インラインコード
             "`#12` は設定の例",
             "`!5` と `issue 7`",
