@@ -28,7 +28,7 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 
 | type | 対象 | 現状 |
 |---|---|---|
-| `guide` | 使い方と作業の手引き。`.ccnavi/docs/*.md`、`docs/claude/*.md`、`docs/adr/README.md`、`docs/guide/*.md`（利用者向け）、`docs/development.md`（開発者向けの入口） | 付いている。ルートの`README.md`と拡張の`README.md`（`extensions/**`）には付けていない（理由は表の下） |
+| `guide` | 使い方と作業の手引き。`.ccnavi/docs/*.md`、`docs/claude/*.md`、`docs/adr/README.md`、`docs/guide/*.md`（利用者向け）、`docs/development.md`（開発者向けの入口）、`docs/release-notes.md` | 付いている。ルートの`README.md`と拡張の`README.md`（`extensions/**`）には付けていない（理由は表の下） |
 | `rule` | 常に守る決まり。`CLAUDE.md` | 付けていない（理由は表の下）。`--type rule`では何も出ない |
 | `design` | 現在の実装の説明。`docs/design.md`・`docs/design/**`、`wip/design/**`の設計メモ | `docs/design.md`・`docs/design/**`に付いている |
 | `requirements` | 外から観測できる約束。`docs/requirements.md`・`docs/requirements/**` | 付いている |

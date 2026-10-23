@@ -2,7 +2,7 @@
 title: 開発の入口
 type: guide
 description: ccnavi 自身を開発する人向けの入口。開発環境、テストと整形のコマンド、開発用 hook の登録、build と配布物、配布する sh の確かめ方、条件の足し方、文書の案内表
-tags: [user-guide, development, build, test]
+tags: [development, build, test]
 keywords: [開発, 開発環境, テスト, unittest, ruff, build.py, PyInstaller, onedir, lint-py, test-py, mark-ext, test-ext, settings.local.json, CCNAVI_BIN_PATH, CCNAVI_SH_DIR, 配布物, 条件の足し方, ccnavimd]
 ---
 
@@ -15,6 +15,7 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 | 知りたいこと | 読む場所 |
 |---|---|
 | 用語 | [CONTEXT.md](CONTEXT.md) |
+| 更新したときの変更点 | [release-notes.md](release-notes.md) |
 | 外から観測できる約束 | [requirements.md](requirements.md) |
 | 実行ファイルと拡張の JSON の形 | [requirements/json-shapes.md](requirements/json-shapes.md) |
 | いまの実装の作り | [design.md](design.md) |
