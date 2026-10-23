@@ -55,7 +55,7 @@ ccnavi_run_timed() {
 	ccnavi_rt_err="$4"
 	shift 4
 	ccnavi_rt_flag="$ccnavi_rt_out.timeout"
-	rm -f "$ccnavi_rt_flag"
+	rm -f "$ccnavi_rt_flag" || :
 	"$@" <"$ccnavi_rt_in" >"$ccnavi_rt_out" 2>"$ccnavi_rt_err" &
 	ccnavi_rt_pid=$!
 	(
@@ -77,7 +77,7 @@ ccnavi_run_timed() {
 	kill "$ccnavi_rt_dog" 2>/dev/null || :
 	wait "$ccnavi_rt_dog" 2>/dev/null || :
 	if [ -e "$ccnavi_rt_flag" ]; then
-		rm -f "$ccnavi_rt_flag"
+		rm -f "$ccnavi_rt_flag" || :
 		return 124
 	fi
 	return "$ccnavi_rt_rc"
@@ -199,7 +199,7 @@ ccnavi_host_cli_ping() {
 	ccnavi_cp_rc=0
 	ccnavi_run_timed "$ccnavi_h_max_time" /dev/null "$ccnavi_cp_base.out" "$ccnavi_cp_base.err" \
 		"$ccnavi_h_cli" api --hostname "$ccnavi_h_host" "$1" || ccnavi_cp_rc=$?
-	rm -f "$ccnavi_cp_base.out" "$ccnavi_cp_base.err"
+	rm -f "$ccnavi_cp_base.out" "$ccnavi_cp_base.err" || :
 	return "$ccnavi_cp_rc"
 }
 
@@ -261,10 +261,10 @@ ccnavi_host_api() {
 		ccnavi_ha_out=$(cat "$ccnavi_ha_base.out" 2>/dev/null || :)
 		if [ "$ccnavi_ha_rc" -ne 0 ]; then
 			ccnavi_host_failed "$ccnavi_ha_out$(cat "$ccnavi_ha_err" 2>/dev/null)"
-			rm -f "$ccnavi_ha_base.in" "$ccnavi_ha_base.out" "$ccnavi_ha_err"
+			rm -f "$ccnavi_ha_base.in" "$ccnavi_ha_base.out" "$ccnavi_ha_err" || :
 			return 1
 		fi
-		rm -f "$ccnavi_ha_base.in" "$ccnavi_ha_base.out" "$ccnavi_ha_err"
+		rm -f "$ccnavi_ha_base.in" "$ccnavi_ha_base.out" "$ccnavi_ha_err" || :
 		;;
 	curl)
 		if [ "$ccnavi_h_kind" = github ]; then
@@ -287,10 +287,10 @@ ccnavi_host_api() {
 		ccnavi_ha_out=$(cat "$ccnavi_ha_base.out" 2>/dev/null || :)
 		if [ "$ccnavi_ha_rc" -ne 0 ]; then
 			ccnavi_host_failed "$ccnavi_ha_out$(cat "$ccnavi_ha_err" 2>/dev/null)"
-			rm -f "$ccnavi_ha_base.in" "$ccnavi_ha_base.out" "$ccnavi_ha_err"
+			rm -f "$ccnavi_ha_base.in" "$ccnavi_ha_base.out" "$ccnavi_ha_err" || :
 			return 1
 		fi
-		rm -f "$ccnavi_ha_base.in" "$ccnavi_ha_base.out" "$ccnavi_ha_err"
+		rm -f "$ccnavi_ha_base.in" "$ccnavi_ha_base.out" "$ccnavi_ha_err" || :
 		;;
 	*) return 1 ;;
 	esac
@@ -459,7 +459,7 @@ ccnavi_host_probe() {
 	ccnavi_host_api GET "$ccnavi_hq_rel" >"$ccnavi_hq_file" || ccnavi_hq_rc=$?
 	ccnavi_h_on_fail="$ccnavi_hq_prev"
 	if [ "$ccnavi_hq_rc" -ne 0 ]; then
-		rm -f "$ccnavi_hq_file"
+		rm -f "$ccnavi_hq_file" || :
 		case "$(ccnavi_host_status "$ccnavi_hq_text")" in
 		401 | 403) ccnavi_h_probe=auth ;;
 		404) ccnavi_h_probe=notfound ;;
@@ -468,7 +468,7 @@ ccnavi_host_probe() {
 		return 0
 	fi
 	ccnavi_h_project_json=$(cat "$ccnavi_hq_file")
-	rm -f "$ccnavi_hq_file"
+	rm -f "$ccnavi_hq_file" || :
 	if printf '%s' "$ccnavi_h_project_json" | "$ccnavi_h_jq" -e 'type == "object"' >/dev/null 2>&1; then
 		ccnavi_h_probe=ok
 	else
@@ -519,7 +519,7 @@ ccnavi_host_access() {
 		ccnavi_hc_level=$(printf '%s' "$ccnavi_h_project_json" | "$ccnavi_h_jq" -r '[.permissions.project_access.access_level, .permissions.group_access.access_level] | map(select(. != null)) | if length == 0 then empty else max end' 2>/dev/null || :)
 		;;
 	esac
-	rm -f "$ccnavi_hc_file"
+	rm -f "$ccnavi_hc_file" || :
 	ccnavi_h_on_fail="$ccnavi_hc_prev"
 	case "$ccnavi_hc_level" in
 	'' | *[!0-9]*)
@@ -703,7 +703,7 @@ ccnavi_preflight() {
 			esac
 		fi
 	fi
-	[ "$ccnavi_pf_dir" = "${TMPDIR:-/tmp}" ] || rm -rf "$ccnavi_pf_dir"
+	[ "$ccnavi_pf_dir" = "${TMPDIR:-/tmp}" ] || rm -rf "$ccnavi_pf_dir" || :
 
 	# まとめ
 	ccnavi_pf_result=ok

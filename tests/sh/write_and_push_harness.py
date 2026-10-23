@@ -263,6 +263,8 @@ class WriteAndPushHarness(unittest.TestCase):
         )
 
     def sh(self, name, *args, cwd=None, stdin=None, **extra):
+        if name == "ccnavi-ticket.sh" and "FAKE_ORIGIN_URL" not in extra:
+            extra = self.host_env(extra)
         return subprocess.run(
             [SHELL, os.path.join(self.scripts, name), *args],
             cwd=cwd or self.ws,
@@ -290,6 +292,10 @@ class WriteAndPushHarness(unittest.TestCase):
             )
         )
         return merged
+
+    def ticket_env(self, **extra):
+        """`self.env()` に、ホストの代役を足したもの。`ccnavi-ticket.sh` を直接起こすテストが使う。"""
+        return self.env(**self.host_env(extra))
 
     def set_routes(self, routes):
         host_stub.write_routes(self.routes, routes)

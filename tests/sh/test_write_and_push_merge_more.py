@@ -118,7 +118,7 @@ class WriteAndPushMergeMoreTest(WriteAndPushMergeHarness):
         running = subprocess.Popen(
             [SHELL, os.path.join(self.scripts, "ccnavi-ticket.sh"), "finish", CHILD],
             cwd=self.ws,
-            env=self.env(),
+            env=self.ticket_env(),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
