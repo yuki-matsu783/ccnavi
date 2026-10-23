@@ -132,10 +132,10 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 ## 作業の決まりに条件を足す
 
 `SessionStart` で渡す作業の決まり（`.ccnavi/CCNAVI.md`）の書き方と、配布先で条件を足す方法は
-[`.ccnavi/docs/ccnavi-md.md`](../.ccnavi/docs/ccnavi-md.md) にある。ここには、ccnavi の実行ファイル側で条件を足す手順を書く。
+[`.ccnavi/docs/ccnavi-md.md`](../.ccnavi/docs/ccnavi-md.md) にある。ここには、ccnavi の実行ファイル側で条件を足す手順を書く（実行ファイルを触らず、配布先だけで足すときは、配布先の `.ccnavi/scripts/ccnavimd.sh` に関数 `ccnavi_cond_<名前>` を書く。足し方の 2 経路のうち後者で、実行ファイルのコードは変えない）。
 
 1. `src/ccnavi/hook/ccnavimd.py` に、`(ctx: Context) -> bool` の関数を 1 つ書く。判定に要る状況が `Context` に無ければ、フィールドを足して `flags_for` で渡す。
-2. 関数を `CONDITIONS` に登録する。名前は md に書くもの（`-` 区切り）。
+2. 関数を `CONDITIONS` に登録する。名前は md に書くもの。英数字と `_` だけ（先頭は数字でない。`-` は `--lint` が error にする）。組み込みと同じ名前を `ccnavimd.sh` の関数に使わない。
 3. `.ccnavi/CCNAVI.md` で `<!-- ccnavi:if 名前 -->` … `<!-- ccnavi:endif -->` で行を囲む。
 4. `.ccnavi/docs/ccnavi-md.md` の条件の表に 1 行足す。判定の関数のテストを `tests/core/test_ccnavimd.py` に足す。
 
@@ -194,7 +194,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `scripts/ccnavi-package.sh` | 配る側が ccnavi の配布用の zip を作る。ソースのリポジトリで打つ |
 | `scripts/ccnavi-build-install.sh` | ccnavi・VS Code 拡張・Chrome 拡張をビルドし、ccnavi と VS Code 拡張をこの機械に入れる |
 | `scripts/ccnavi-stop-review.sh` | Stop の AI 判定の agent 型 Stop hook を `.claude/settings.json` に登録・解除・点検する |
-| `scripts/check_rules.py` | 期待する判定を全部判定に掛けて食い違いを並べる薄いラッパースクリプト（`ccnavi --test-expectations` を呼ぶ）。`/ccnavi-config` スキルが呼ぶ |
+| `scripts/check_rules.py` | このリポジトリの共通レイヤーの `rules.yml` と `rule-expectations.yml` で `ccnavi --test-expectations` を呼ぶだけの薄いラッパースクリプト。引数でルールファイル（下書き）を差し替えられる。`CCNAVI_*` を外した環境で、承認済みチケット・state・記録を使わずに回し、終了コードは実行ファイルのまま返す（食い違いがあれば 1）。判定は実行ファイル側で行い、ここでは作らない。全件テスト（`tests/core/test_check_rules.py`）も同じ引数を使う。配布先には無く、そこでは `ccnavi --test-expectations` を直接打つ。`/ccnavi-config` スキルが呼ぶ |
 | `extensions/` | VS Code 拡張（`vscode/ccnavi-board`）と Chrome 拡張（`chrome/ccnavi-approval`）、共有の設定（`shared/`） |
 | `docs/` | 設計・要件・ADR・手引き（`guide/`）・ccnavi の開発の決まり（`claude/`） |
 | `wip/` | 作業中の下書き（`design/`・`handoff/`・`proposals/`） |
@@ -205,6 +205,5 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `.ccnavi/config/common/rules.yml` / `phases.yml` / `risks.yml` | このリポジトリ自身の共通レイヤーの設定（`phases.yml` はどのプロジェクトでも使える定義） |
 | `.ccnavi/config/project/phases.yml` | このリポジトリ自身のレイヤーのフェーズ定義（このリポジトリのレイアウトに依存する定義） |
 | `.ccnavi/config/common/rule-expectations.yml` | ルールが何を止めて何を通すかの期待する判定 |
-| `scripts/check_rules.py` | 期待する判定をぜんぶ判定に掛ける |
 | `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
 | `docs/adr/` | 設計判断の記録 |

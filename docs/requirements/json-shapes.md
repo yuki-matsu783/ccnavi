@@ -243,6 +243,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | 鍵 | 何 |
 |---|---|
 | `verify.ok` | 真偽。`user agree` を打てば、指定したもの（指定が無ければ承認待ち全部）がそのまま承認の対象に入るか |
+| `branch_warnings[]` | 新規の親の識別子と同じ名前のブランチが手元か origin に既にあるときの説明（文字列の配列、無ければ `[]`）。承認は止めず、答えも変えない |
 | `verify.reason` | 答えの理由の名前。全部入るなら `ok`、入らないなら `refused`（絞りが通らない）/ `nothing-pending`（承認待ちが 1 件も無い）/ `rejected`（承認の対象にしない提案がある）。読めない提案（`problems[]`）はここに出ない |
 
 `--verify` は、`user agree` が承認を止めない範囲の超過（`batch[].overflow`）と読めない提案（`problems[]`）では「いいえ」にしない。どちらも本文には出す。
@@ -255,9 +256,11 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | `version` | 同上 |
 | `approved[]` / `copies[]` | 承認した識別子と、置いた承認済みチケットのパス |
 | `lines[]` | 端末なら標準出力に出ていた行（マーカーを消したことなど） |
+| `written[]` | この承認で書いた・消したパス（ワークスペースルートからの相対）。ボードはこれだけを `ccnavi-user-push-approved.sh --path` でコミット・push させる |
+| `worktrees[]` | 承認した子それぞれのワークツリーの計画。`{ticket, parent, path, branch, base, state}`。`state` は `create`（親のワークツリーが在り子のはまだ無い。承認の後に拡張が作る。`base` は親のワークツリーがチェックアウトしているブランチ）/ `exists`（既に在る）/ `no-parent`（親のワークツリーが無く作れない）/ `project`（プロジェクトの子。承認の後には作らない）。親だけの承認では空 |
 | `prompt` | Claude Code に渡す文。拡張がオーバーレイの 2 ボタンで渡す。hook は承認を伝えない |
-| `mismatch` | 見せたあとに提案が更新されたとき（一覧が増減した、提案ファイルのバイト列が変わった）。`{expected[], current[]}`、ダイジェストが違えば `digest: {expected, current}`。このとき承認済みチケットは置かれず、終了コードは 1。呼び手は「内容が更新されました」と伝えて最新を表示し直し、もう一度押してもらう |
-| `partial` | 置いている途中で止まったとき（書けない、など）。`{placed[], paths[], ticket, reason}`。`placed[]` はそこまでに承認済みチケットに入ったぶんの識別子（新規は置いた、改版は書き換えた）、`paths[]` はそのうち実際に書けたパス、`ticket` は止まったところ（書けなかった提案）、`reason` は理由、`lines[]` は止まるまでに出た行（端末なら標準出力に出ていたぶん）。**置いたものは戻さない**ので、どこまで進んだかをそのまま返す。終了コードは 1。ボードは書けた分（`placed[]` が空でないとき）だけを `ccnavi-user-push-approved.sh` で統合ターミナルへ送り、書けなかった `ticket` と未送信かどうかを画面に出す |
+| `mismatch` | 見せたあとに提案が更新されたとき（一覧が増減した、提案ファイルのバイト列が変わった）。`{expected[], current[], digest: {expected, current}}`（`digest` は常に付く。一覧が同じでダイジェストだけ違う場合も同じ形）。答えは `{version, mismatch}` だけで、`approved[]` などは付かない。このとき承認済みチケットは置かれず、終了コードは 1。呼び手は「内容が更新されました」と伝えて最新を表示し直し、もう一度押してもらう |
+| `partial` | 置いている途中で止まったとき（書けない、など）。`{placed[], paths[], written[], ticket, reason, lines[]}`。`placed[]` はそこまでに承認済みチケットに入ったぶんの識別子（新規は置いた、改版は書き換えた）、`paths[]` はそのうち実際に書けたパス、`written[]` は止まるまでに書いた・消したパス（成功時の `written[]` と同じ。ボードが送るパスはこれ）、`ticket` は止まったところ（書けなかった提案）、`reason` は理由、`lines[]` は止まるまでに出た行（端末なら標準出力に出ていたぶん）。**置いたものは戻さない**ので、どこまで進んだかをそのまま返す。終了コードは 1。ボードは書けた分（`placed[]` が空でないとき）の `written[]` のパスだけを `ccnavi-user-push-approved.sh` で統合ターミナルへ送り、書けなかった `ticket` と未送信かどうかを画面に出す |
 
 - `--yes` は端末を求めない代わりに、見せた一覧と今の一覧が同じで、`--digest` の値（大文字小文字は問わない）が承認の直前に読み直した提案のダイジェストと
   合うことを求める。`--digest` が無ければ承認せず、終了コードは 1
@@ -323,6 +326,7 @@ ccnavi --version --json
 
 ```json
 {"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 18,
+ "features": ["handoff", "templates.draft-text", "…"],
  "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}
 ```
@@ -336,7 +340,7 @@ ccnavi --version --json
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
 | `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
 | `formats` | 読む書式の版。レイヤーのファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
-| `features` | オプションから読めない振る舞いの名前（文字列の配列）。テンプレートの下書きの本文は `templates.draft-text`、保護対象の取り込みは `handoff`。古い実行ファイルと見分けるためのもので、足しても `compat` は上げない |
+| `features` | オプションから読めない振る舞いの名前（文字列の配列）。現在の名前は `templates.draft-text`（テンプレートの下書きの本文）、`user-entry`（ユーザ専用の入口 `user <操作>`）、`handoff`（保護対象の取り込み）、`tree.base-bound`（直接作業の取り込み先がチケットに結び付くかの問い合わせ）、`tree.guarded`（取り込みが自己防衛の対象を含むかの問い合わせ）、`tree.handoff-pending`（取り込んでいない下書きの問い合わせ）。古い実行ファイルと見分けるためのもので、足しても `compat` は上げない |
 
 **互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
