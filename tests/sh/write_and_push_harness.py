@@ -294,7 +294,7 @@ class WriteAndPushHarness(unittest.TestCase):
         return merged
 
     def ticket_env(self, **extra):
-        """`self.env()` に、ホストの代役を足したもの。`ccnavi-ticket.sh` を直接起こすテストが使う。"""
+        """`self.env()` にホストの代役を足したもの。`ccnavi-ticket.sh` を直接起こすテストが使う。"""
         return self.env(**self.host_env(extra))
 
     def set_routes(self, routes):
@@ -706,7 +706,7 @@ class WriteAndPushMergeHarness(WriteAndPushHarness):
         running = subprocess.Popen(
             [SHELL, os.path.join(self.scripts, "ccnavi-ticket.sh"), "finish", CHILD],
             cwd=self.ws,
-            env=self.env(PATH=path),
+            env=self.ticket_env(PATH=path),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

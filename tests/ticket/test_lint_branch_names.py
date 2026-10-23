@@ -43,7 +43,8 @@ def ticket_text(name, *, parent="", issue=None, approved=False):
     if not parent:
         lines.append("mr: 1")
         if issue is None:
-            # issue の欄は必須。識別子の番号があればそれに合わせる（番号の食い違いを見るテストの邪魔をしない）
+            # issue の欄は必須。識別子の番号があればそれに合わせる
+            # （番号の食い違いを見るテストを妨げない）
             found = re.match(r"^[a-z]+-(\d+)-", name)
             issue = int(found.group(1)) if found else 1
     if parent:
