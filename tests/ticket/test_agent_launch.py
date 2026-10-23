@@ -218,6 +218,42 @@ class AssignmentTest(LaunchHarness):
         self.assertIn(f"担当の子: {CHILD}", self.updated(out)["prompt"])
 
 
+class MentionEdgeTest(LaunchHarness):
+    def test_a_sentence_ending_dot_does_not_hide_a_second_target(self):
+        self.two_children()
+        for prompt in (f"{CHILD} と {CHILD2}.", f"{CHILD}. と {CHILD2}"):
+            with self.subTest(prompt=prompt):
+                out = self.call(self.root, description="d", prompt=prompt)
+                self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
+        # 識別子の文字が続くものは、別の識別子の一部のまま数えない
+        out = self.call(self.root, description="d", prompt=f"{CHILD}.x と {CHILD2}_x")
+        self.assertEqual(out, {})
+
+    def test_many_paths_are_refused_without_checking_each(self):
+        self.one_child()
+        words = " ".join(f".claude/worktrees/n{i}" for i in range(agentlaunch.MAX_PATHS + 5))
+        out = self.call(self.root, description="d", prompt=words)
+        self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
+        self.assertIn("多すぎます", out["permissionDecisionReason"])
+
+    def test_the_refusal_text_stays_short(self):
+        self.one_child()
+        huge = ".claude/worktrees/" + "a" * 200000
+        out = self.call(self.root, description="d", prompt=huge)
+        self.assert_stopped(out, "DENY_AGENT_TARGET_INVALID")
+        self.assertLess(len(out["permissionDecisionReason"]), 2000)
+
+    def test_a_cwd_that_is_not_a_string_conflicts(self):
+        self.one_child()
+        out = self.call(self.root, description="d", prompt=f"{CHILD} を直す", cwd=["x"])
+        self.assert_stopped(out, "DENY_AGENT_CWD_CONFLICT")
+
+    def test_stripping_does_not_leave_a_rebuilt_close(self):
+        close = agentlaunch.GUIDE_CLOSE
+        text = agentlaunch.strip_guide("x" + close[:-3] + close + close[-3:])
+        self.assertNotIn(close, text)
+
+
 class ParentTreeTest(LaunchHarness):
     def test_an_editing_agent_from_the_parent_tree_needs_a_child(self):
         self.one_child()

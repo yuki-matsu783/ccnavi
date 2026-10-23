@@ -49,6 +49,12 @@ class PromptRefsTest(unittest.TestCase):
             "!5 の指摘": [(MR, 5)],
             "#12、#13。": [(ISSUE, 12), (ISSUE, 13)],
             "PR #12": [(MR, 12)],
+            # 助詞・全角の句読点・語尾。助詞の直後の `#` も読む
+            "#152から着手": [(ISSUE, 152)],
+            "#152です": [(ISSUE, 152)],
+            "#152！": [(ISSUE, 152)],
+            "これは#152です": [(ISSUE, 152)],
+            "#152と#153": [(ISSUE, 152), (ISSUE, 153)],
         }
         for text, want in cases.items():
             with self.subTest(text=text):

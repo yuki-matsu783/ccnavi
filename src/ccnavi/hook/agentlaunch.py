@@ -48,6 +48,10 @@ INJECT_CWD = False
 
 # 案内の長さの上限（文字）。
 GUIDE_LIMIT = 4000
+# 1 回のプロンプトから検証するパスの数の上限。止める理由に写す表記の長さと件数の上限も別にある。
+MAX_PATHS = 20
+MAX_SHOWN = 5
+MAX_SHOWN_CHARS = 120
 GUIDE_OPEN = "[ccnavi] 担当の案内（ここから）"
 GUIDE_CLOSE = "[ccnavi] 担当の案内（ここまで）"
 
@@ -56,7 +60,7 @@ ASSIGN_NOTE = "1 体に担当は 1 つだけ割り当てる。担当以外の子
 # 子の識別子に使われる文字。言及は語として一致するものだけ（前後がこの文字でないこと）。
 _ID_CHARS = "A-Za-z0-9._-"
 # プロンプトを語に分ける区切り（パスの候補を拾うため）。
-_SPLIT = re.compile(r"[\s'\"`<>()（）「」『』\[\]{},、。;]+")
+_SPLIT = re.compile(r"[\s'\"`<>()（）「」『』\[\]{},、。;*：！？…]+")
 _FOLDER = ".claude/worktrees"
 _ABSOLUTE = re.compile(r"^(?:/|[A-Za-z]:[/\\])")
 
@@ -214,13 +218,13 @@ def decide(
                 return Result(stop=_child_unavailable(root, target, why))
         # 5. 既にある cwd が決めた担当先と違う。
         given = tool_input.get("cwd")
-        if (
-            isinstance(given, str)
-            and given
-            and target.worktree is not None
-            and pathcase.fold(_real(given)) != pathcase.fold(_real(target.worktree.root))
-        ):
-            return Result(stop=_cwd_conflict(given, target))
+        if given is not None and target.worktree is not None:
+            same = isinstance(given, str) and (
+                not given
+                or pathcase.fold(_real(given)) == pathcase.fold(_real(target.worktree.root))
+            )
+            if not same:
+                return Result(stop=_cwd_conflict(str(given)[:MAX_SHOWN_CHARS], target))
         return Result(plan=_plan(conf, root, prompt, target, book))
 
     # 6. 言及が 0 件。親のワークツリーから、編集する種類を起こす（呼び手が子の体なら決まっている）。
@@ -251,7 +255,18 @@ def mentions(conf: settings.Settings, root: str, prompt: str, book: Book | None)
             if _word_in(child.ticket, prompt):
                 found.append(Mention("child", child.ticket, name=child.ticket))
     trees = tree.worktrees(root, conf.projects) if _FOLDER.replace("/", os.sep) else []
-    for text in _path_tokens(prompt):
+    tokens = _path_tokens(prompt)
+    if len(tokens) > MAX_PATHS:
+        # 数百のパスを 1 つずつ検証して期限を使い切らない。担当は 1 つだけ書く。
+        found.append(
+            Mention(
+                "path",
+                tokens[0],
+                invalid=f"パスの指定が {len(tokens)} 件あり、多すぎます（上限 {MAX_PATHS} 件）",
+            )
+        )
+        return found
+    for text in tokens:
         mention = Mention("path", text)
         _check_path(root, mention, trees)
         found.append(mention)
@@ -260,13 +275,16 @@ def mentions(conf: settings.Settings, root: str, prompt: str, book: Book | None)
 
 def _word_in(ident: str, prompt: str) -> bool:
     """識別子が語として現れるか。前後の文字が識別子に使う文字でないこと。大文字小文字は区別しない。"""
-    pattern = rf"(?<![{_ID_CHARS}]){re.escape(ident)}(?![{_ID_CHARS}])"
+    # 後ろは識別子の文字が続かないこと。ただし文末の `.` は識別子の一部と読まない
+    # （`C-1 と C-2.` の C-2 を落として、担当が 2 つあるのを 1 つと読まないため）。
+    pattern = rf"(?<![{_ID_CHARS}]){re.escape(ident)}(?![A-Za-z0-9_-])(?!\.[A-Za-z0-9_-])"
     return re.search(pattern, prompt, re.IGNORECASE) is not None
 
 
 def _path_tokens(prompt: str) -> list[str]:
     """プロンプトの中の、`.claude/worktrees/` を含む語。元の表記のまま、重複は 1 つにする。"""
     out: list[str] = []
+    seen: set[str] = set()
     for token in _SPLIT.split(prompt):
         flat = token.replace("\\", "/")
         at = flat.casefold().find(_FOLDER)
@@ -276,7 +294,8 @@ def _path_tokens(prompt: str) -> list[str]:
         eq = token.rfind("=", 0, at)
         text = token[eq + 1 :] if eq >= 0 else token
         text = text.rstrip(".:!?…")
-        if text and text not in out:
+        if text and text not in seen:
+            seen.add(text)
             out.append(text)
     return out
 
@@ -446,7 +465,12 @@ def _isolation() -> Stop:
 
 def _target_invalid(bad: list[Mention]) -> Stop:
     lines = ["プロンプトに書かれたワークツリーのパスが使えません。"]
-    lines.extend(f"  {m.text}: {m.invalid}" for m in bad)
+    for m in bad[:MAX_SHOWN]:
+        shown = m.text if len(m.text) <= MAX_SHOWN_CHARS else m.text[:MAX_SHOWN_CHARS] + "…"
+        lines.append(f"  {shown}: {m.invalid}")
+    if len(bad) > MAX_SHOWN:
+        lines.append(f"  ほか {len(bad) - MAX_SHOWN} 件")
+    lines.append("パスの前後は空白で区切って書いてください（日本語や記号に続けて書かない）。")
     lines.append(
         "チケットの子の作業なら、パスではなく子の識別子を 1 つ書いて起動し直してください。"
         "直接作業なら、ccnavi-worktree.sh で切ったワークツリーのパスを書いてください。"
@@ -566,7 +590,10 @@ def strip_guide(prompt: str) -> str:
         start = text.index(GUIDE_OPEN)
         end = text.find(GUIDE_CLOSE, start + len(GUIDE_OPEN))
         text = text[:start] if end < 0 else text[:start] + text[end + len(GUIDE_CLOSE) :]
-    return text.replace(GUIDE_CLOSE, "").rstrip()
+    # 除いたあとの連結で、偽の閉じが新しくできないように、残らなくなるまで繰り返す。
+    while GUIDE_CLOSE in text:
+        text = text.replace(GUIDE_CLOSE, "")
+    return text.rstrip()
 
 
 def guidance(conf: settings.Settings, root: str, target: Target, book: Book) -> str:
