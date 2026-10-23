@@ -572,6 +572,44 @@ class WritesTheExpectedShape(SetupTest):
         for name in DEPLOY_SCRIPTS:
             self.assertTrue(names(missing, f".ccnavi/scripts/{name}"), name)
 
+    def with_ccnavi_on_path(self, *, link_to=None):
+        """PATH の先頭に ccnavi を置いた環境。`link_to` があればそのファイルへのリンクにする。"""
+        place = tempfile.mkdtemp(prefix="ccnavi-setup-onpath-")
+        self.addCleanup(shutil.rmtree, place, ignore_errors=True)
+        target = os.path.join(place, "ccnavi")
+        if link_to:
+            try:
+                os.symlink(link_to, target)
+            except (OSError, NotImplementedError):
+                self.skipTest("シンボリックリンクを作れない")
+        else:
+            with open(target, "w", encoding="utf-8", newline="\n") as f:
+                f.write("#!/bin/sh\n")
+            os.chmod(target, 0o755)
+        env = clean_env()
+        env["PATH"] = place + os.pathsep + env.get("PATH", "")
+        return env
+
+    @unittest.skipIf(os.name == "nt", "実行ビットは POSIX の話")
+    def test_a_ccnavi_on_path_counts_as_a_runnable_build(self):
+        """bin/ に実行ファイルが無くても、振り分けの sh が PATH の ccnavi を起動するので「まだ無いもの」に出さない。"""
+        result = self.run_setup(env=self.with_ccnavi_on_path())
+        missing = section(result.stdout, "まだ無いもの")
+        self.assertFalse(names(missing, f".ccnavi/bin/{THIS_MACHINE}/ccnavi"), result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "実行ビットは POSIX の話")
+    def test_a_link_to_the_launcher_on_path_is_not_a_runnable_build(self):
+        """ccnavi という名前で張った振り分けの sh へのリンクは、起動すると自分に戻る。無いものとして数える。"""
+        launcher = os.path.join(self.dir, *BIN_PATH.split("/"))
+        os.makedirs(os.path.dirname(launcher))
+        with open(launcher, "w", encoding="utf-8", newline="\n") as f:
+            f.write("#!/bin/sh\n")
+        os.chmod(launcher, 0o755)
+        env = self.with_ccnavi_on_path(link_to=launcher)
+        result = self.run_setup(env=env)
+        missing = section(result.stdout, "まだ無いもの")
+        self.assertTrue(names(missing, f".ccnavi/bin/{THIS_MACHINE}/ccnavi"), result.stdout)
+
 
 @unittest.skipUnless(shutil.which("git"), "git が見つからない")
 class TellsAboutAProjectsCollision(SetupTest):
