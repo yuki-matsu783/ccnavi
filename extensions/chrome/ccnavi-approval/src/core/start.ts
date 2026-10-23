@@ -57,17 +57,32 @@ export async function listIssues(repo: RepoConfig, deps: Deps): Promise<Issue[]>
 
 /**
  * その issue を**閉じる** MR か。題・本文に、閉じる語（close・closes・closed・closing、fix・fixes・fixed・fixing、
- * resolve・resolves・resolved・resolving）の直後に `#<番号>`（同じリポジトリ）か `<owner/repo>#<番号>`、または
- * `issues/<番号>` の URL が続くもの。参照しているだけ（`#<番号>` の言及・元ブランチの名前の番号）の MR は
- * 含めない。`ccnavi-start.sh` が MR の閉じる issue（ホストのリンク）で採用を決めるのと同じ考え方で、
- * ここは題・本文の語から見る（拡張はホストの閉じるリンクを読まない）
+ * resolve・resolves・resolved・resolving）の直後に、この issue の指定（`#<番号>`、`<owner/repo>#<番号>`、
+ * `.../issues/<番号>` の URL）が続くもの。指定が別のリポジトリの issue なら閉じない（`repoPath` は
+ * `<owner>/<repo>`。大文字小文字は区別しない）。参照しているだけ（`#<番号>` の言及・元ブランチの名前の番号）、
+ * コードブロック・インラインコード・引用（先頭が `>` の行）の中、閉じる語の直前に否定（not・n't・never）が
+ * あるものは含めない。`ccnavi-start.sh` が MR の閉じる issue をホストのリンクで確かめて採用を決めるのと
+ * 同じ考え方で、ここは題・本文の語から見る（拡張はホストの閉じるリンクを読まない）。閉じる語 1 つにつき、
+ * 直後の 1 つの指定だけを見る（`Closes #21, #20` の `#20` は閉じない）
  */
-export function closesIssue(mr: Pick<Mr, "title" | "body">, issue: number): boolean {
-  const n = String(issue);
-  const text = `${mr.title}\n${mr.body}`;
-  const keyword = "(?:close[sd]?|closing|fix(?:e[sd])?|fixing|resolve[sd]?|resolving)";
-  const target = `(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#${n}(?![0-9])|\\S*/issues/${n}(?![0-9])`;
-  return new RegExp(`(?:^|[^0-9A-Za-z_])${keyword}:?\\s+(?:${target})`, "i").test(text);
+export function closesIssue(mr: Pick<Mr, "title" | "body">, issue: number, repoPath: string): boolean {
+  const text = `${mr.title}\n${mr.body}`
+    .replace(/```[\s\S]*?(?:```|$)/g, " ")
+    .replace(/`[^`\n]*`/g, " ")
+    .replace(/^[ \t]*>.*$/gm, " ");
+  const keyword = /(?<![A-Za-z0-9_])(?:clos(?:e[sd]?|ing)|fix(?:e[sd]|ing)?|resolv(?:e[sd]?|ing))(?![A-Za-z])[:\s*_]*/gi;
+  const ref = /^[(\[]*(?:https?:\/\/[^\s/]+\/([\w.-]+(?:\/[\w.-]+)*?)\/(?:-\/)?issues\/(\d+)|([\w.-]+(?:\/[\w.-]+)+)?#(\d+))(?![\w-])/;
+  const own = repoPath.toLowerCase();
+  for (const m of text.matchAll(keyword)) {
+    const before = text.slice(Math.max(0, m.index - 12), m.index);
+    if (/(?:\b(?:not|never)|n['\u2019]t)\s+$/i.test(before)) continue;
+    const r = ref.exec(text.slice(m.index + m[0].length));
+    if (!r) continue;
+    const path = (r[1] ?? r[3] ?? repoPath).toLowerCase();
+    const number = r[2] ?? r[4];
+    if (number === String(issue) && path === own) return true;
+  }
+  return false;
 }
 
 /**
@@ -95,7 +110,7 @@ export async function startIssue(
     // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る
     const all = (await deps.call("branchNames", [repo.owner, repo.repo])) as string[];
     // 1. issue を閉じる開いた MR を探す。見落として重複を作らないため、読めなければ（例外は）止める
-    const open = ((await deps.call("listOpenMrs", [repo.owner, repo.repo])) as Mr[]).filter((m) => closesIssue(m, issue.number));
+    const open = ((await deps.call("listOpenMrs", [repo.owner, repo.repo])) as Mr[]).filter((m) => closesIssue(m, issue.number, `${repo.owner}/${repo.repo}`));
     if (open.length > 1) {
       return {
         kind: "refused",

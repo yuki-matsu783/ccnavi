@@ -467,13 +467,14 @@ api_failed_reason() {
 issue_title_read=""
 issue_why=""
 issue_title_get() {
+	it_num="${1:-$number}"
 	issue_title_read=""
 	issue_why=""
 	rm -f "$host_err" "$host_err.status" "$host_err.body"
 	if [ "$ccnavi_h_kind" = github ]; then
-		it_path="repos/$ccnavi_h_path/issues/$number"
+		it_path="repos/$ccnavi_h_path/issues/$it_num"
 	else
-		it_path="projects/$(ccnavi_host_encoded_path)/issues/$number"
+		it_path="projects/$(ccnavi_host_encoded_path)/issues/$it_num"
 	fi
 	it_got=$(ccnavi_host_api GET "$it_path") || {
 		it_status=$(cat "$host_err.status" 2>/dev/null || :)
@@ -577,7 +578,7 @@ create_mr() {
 mr_linked_issues() {
 	ml_mr="$1"
 	ml_why=""
-	rm -f "$host_err.why" || :
+	rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.why" || :
 	if [ "$ccnavi_h_kind" = github ]; then
 		ml_owner="${ccnavi_h_path%%/*}"
 		ml_name="${ccnavi_h_path#*/}"
@@ -627,9 +628,18 @@ resolve_issue() {
 		# エージェントが MCP で確かめ、issue・MR・元ブランチの 3 つを渡して打ち直したとき（ホストの別の API は読めても、
 		# 閉じる issue だけ読めない場合を含む）は、渡された値で確定する
 		if [ -n "$mcp_checked" ] && [ -n "$issue_arg" ] && [ -n "$mr_arg" ] && [ -n "$branch_arg" ]; then
+			# ホストに届いているなら、渡された issue の実在だけは確かめる（無関係な番号を通さない）
+			if [ "$host_tried" = 1 ] && [ "$host_rc" -eq 0 ]; then
+				ri_irc=0
+				issue_title_get "$issue_n" || ri_irc=$?
+				case "$ri_irc" in
+				2) fail issue-missing "issue #${issue_n} が見つからない、または読む権限がありません（${issue_why}）。ユーザに確かめてください。" 1 ;;
+				3) fail issue-is-pr "#${issue_n} は issue ではなく PR です。" 1 ;;
+				esac
+			fi
 			final_issue=$(issue_show "$issue_r" "$issue_n")
 			final_mr="$ri_mr"
-			host_unseen=1
+			[ "$host_tried" = 1 ] && [ "$host_rc" -eq 0 ] || host_unseen=1
 			log_info 閉じる issue を MCP で確かめ済みとして決めた -- "mr=$ri_mr"
 			return 0
 		fi

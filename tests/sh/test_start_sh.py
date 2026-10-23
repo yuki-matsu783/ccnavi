@@ -1201,7 +1201,12 @@ class StartShTest(unittest.TestCase):
 
     def test_the_guided_rerun_after_an_unreadable_closing_link_succeeds(self):
         # 閉じる issue だけ読めない（GraphQL が errors）。案内の 3 引数で打ち直せば確定する
-        self.mr_branch(**{GRAPHQL: [200, {"errors": [{"message": "boom"}], "data": None}]})
+        self.mr_branch(
+            **{
+                GRAPHQL: [200, {"errors": [{"message": "boom"}], "data": None}],
+                f"GET {GITHUB}/issues/152": [200, {"title": "Add login"}],
+            }
+        )
         first = self.run_sh("--mr", "5")
         self.assertEqual(first.returncode, 4, first.stdout + first.stderr)
         again = self.run_sh(
@@ -1210,6 +1215,15 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertIn("必須: 提案の frontmatter に issue: 152 と mr: 5 を書く", again.stdout)
         self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
+
+    def test_the_guided_rerun_does_not_pass_an_issue_that_does_not_exist(self):
+        self.mr_branch(**{GRAPHQL: [200, {"errors": [{"message": "boom"}], "data": None}]})
+        done = self.run_sh(
+            "--mr", "5", "--issue", "999", "--branch", "fix-152-other", "--mcp-checked"
+        )  # fmt: skip
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("issue #999 が見つからない", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
 
     def test_branch_with_no_candidate_on_a_reachable_host_stops(self):
         self.github_new()

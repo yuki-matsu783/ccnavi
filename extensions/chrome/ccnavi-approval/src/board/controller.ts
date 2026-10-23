@@ -364,9 +364,9 @@ export function createBoardController(env: BoardEnv): BoardController {
             className: `notice ${done ? "ok" : "error"}`,
             text:
               out.kind === "started"
-                ? `親ブランチ ${out.name} と Draft のマージリクエスト !${out.mr.number} を作成しました（${out.head.slice(0, 7)}）。親の提案の frontmatter に mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
+                ? `親ブランチ ${out.name} と Draft のマージリクエスト !${out.mr.number} を作成しました（${out.head.slice(0, 7)}）。親の提案の frontmatter に issue: ${issue.number} と mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
                 : out.kind === "adopted"
-                  ? `既存のマージリクエスト !${out.mr.number} の元ブランチ ${out.name}（識別子 ${out.identifier}）を採用しました。ブランチもマージリクエストも作っていません。親の提案の frontmatter に mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
+                  ? `既存のマージリクエスト !${out.mr.number} の元ブランチ ${out.name}（識別子 ${out.identifier}）を採用しました。ブランチもマージリクエストも作っていません。親の提案の frontmatter に issue: ${issue.number} と mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
                   : `作業を開始できませんでした：${out.message}`,
           },
         });
