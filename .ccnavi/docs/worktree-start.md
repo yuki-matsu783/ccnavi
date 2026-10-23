@@ -33,8 +33,6 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す
 - 識別子はブランチ名の`/`を`-`に置き換えたもの（`feature/123-login`は`feature-123-login`）。ワークツリーは`.claude/worktrees/<識別子>`に、
   `worktree add .claude/worktrees/<識別子> <ブランチ>`でそのブランチを直接チェックアウトする。識別子の名前のブランチは作らない。
-  変換は`ccnavi_branch_to_id`（sh）・`ticket_ids.branch_to_id`（Python）・拡張の`branchToId`（TS）に同じものがあり、
-  `tests/fixtures/branch-to-id.json`の同じ表で一致を確かめている
 - 既存のMRを採用するときの確認（引っかかったら何も作らずに止まる）
   - MRがopenである。閉じた・マージ済みのMRのブランチでは続けない
   - フォークのMRでない（元ブランチがこのリポジトリに無い）

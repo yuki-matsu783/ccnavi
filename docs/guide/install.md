@@ -226,7 +226,7 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 ### .gitignore
 
 配布先が git のリポジトリなら、配った組み立ての置き場を `.gitignore` にも足す（入れると履歴から消すのが難しい）。
-置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/ccnavi-index.jsonl` も足す（[ドキュメントの索引](docs-search.md)）。
+置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/ccnavi-index.jsonl` も足す（[ドキュメントの索引](docs-search.md)）。あわせて、使い捨ての置き場 `/scratchpad` と、実行時の記録の置き場 `/logs/` も足す。
 
 ```
 # ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
@@ -234,11 +234,17 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 
 # ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）
 **/ccnavi-index.jsonl
+
+# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）
+/scratchpad
+
+# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）
+/logs/
 ```
 
 足すのはワークスペースの `.gitignore` だけ。`projects/<名前>/` の各プロジェクトには触らない。
 `.ccnavi/` を丸ごと無視すると sh と `rules.yml` が git から消えるため、足すのは `/.ccnavi/bin/<os>-<arch>/` だけにしてある。
-同等の行が既にあるとき、`ccnavi-index.jsonl` を `!` で否定する行があるとき（ユーザが除外しているとみなす）は足さない。細部は[導入と配布の設計](../design/startup-config.md)にある。
+同等の行が既にあるとき、索引・`scratchpad`・`logs` を `!` で否定する行があるとき（ユーザが追跡すると決めているとみなす）は足さない。細部は[導入と配布の設計](../design/startup-config.md)にある。
 
 ### 失敗したとき
 

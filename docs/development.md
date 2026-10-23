@@ -30,17 +30,16 @@ Python 3.12 以降。実行時の依存は PyYAML 1 本だけ。
 組み立てと検査の道具（PyInstaller、ruff）は開発時にしか要らない。
 
 ```sh
-uv run python -m unittest discover -s tests -t .   # テスト
-uv run python -m unittest discover -s tests/core -t .  # 1 グループ（core guard config ticket sh e2e）
-uv run python -m tests                             # 全件を別プロセスで同時に回す（中身は discover と同じ）
+uv run python -m tests                             # 全件を別プロセスで同時に回す
+uv run python -m tests tests/core                  # 1 グループ（core guard config ticket sh e2e）
 uv run --with ruff ruff check .                    # 静的検査
 uv run --with ruff ruff format .                   # 整形
 uv run --with ruff ruff format --check .           # 整形の確認だけ
 uv run --with pyinstaller python build.py          # 実行ファイルの組み立て
 ```
 
-テストは `python -m unittest` で回す。ファイルを直接実行すると `tests` パッケージを import できずに失敗する。
-全件を `discover` の 1 本で回すと時間切れになるので、全件は `python -m tests` で回す（理由と手順は[テストを回す](claude/testing.md)）。
+テストは `python -m tests` か `python -m unittest` で回す。ファイルを直接実行すると `tests` パッケージを import できずに失敗する。
+全件を `unittest discover` の 1 本で回さない（時間切れになる）。全件は `python -m tests` で回す（理由と手順は[テストを回す](claude/testing.md)）。
 回すグループは `.claude/skills/commit/references/test-groups.md` の表で決める。
 
 `knowledge/` は参照専用の資料で git 管理外。Claude Code の hook にまつわる実測が入っている。
@@ -140,12 +139,20 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 3. `.ccnavi/CCNAVI.md` で `<!-- ccnavi:if 名前 -->` … `<!-- ccnavi:endif -->` で行を囲む。
 4. `.ccnavi/docs/ccnavi-md.md` の条件の表に 1 行足す。判定の関数のテストを `tests/core/test_ccnavimd.py` に足す。
 
+### 条件の判定の仕組み
+
+条件の判定は、名前ごとに独立した関数が持つ。
+
+- 関数は、そのセッションの状況（設定・ワークスペースルート・`--docs`を出す回か・ルールのdenyのid・動作モード）を受け取り、真偽を返す。1つの関数は1つの名前だけを判定する
+- 読み込みのたびに、全部の関数を呼んで、真になった名前の集合を作る。判定はmdを読む前に済む
+- mdを上から読み、`ccnavi:if`で囲まれた行は、囲みの名前がすべて集合に入っているときだけ載る
+- 載せる行が決まったら、`{{名前}}`を値に置き換え、続く空行をまとめて1つの文にする
+- 組み込みにも`ccnavimd.sh`の関数にも無い名前は、判定できないので真にして囲んだ行を出す。`ccnavi --lint`が警告する。差し込みの一覧に無い`{{名前}}`は、そのまま残る（書き間違いが見える形で届く）
+
 ## ディレクトリ構成（トップレベル）
 
 モジュールごとの表は [design/modules.md](design/modules.md)。
 
-| 場所 | 中身 |
-|---|---|
 | 場所 | 中身 |
 |---|---|
 | `main.py` | 配布物の入口。PyInstaller が渡すスクリプト |
@@ -155,7 +162,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
-| `.claude/skills/ccnavi-config/` / `commit/` / `learn/` | 設定 3 本を足す・確かめるスキルと、コミットの手順と、気づきを記録に足す `/learn` |
+| `.claude/skills/` | このリポジトリのスキル。設定 3 本を足す・確かめる `ccnavi-config`、ccnavi を入れる・更新する `ccnavi-install`、コミットの手順 `commit`、気づきを記録に足す `learn`、図解の説明 `eli5` / `eli10`、文章の推敲 `yomiyasu`、工程の考え方の入口 `process-*`（`process: true` のものは `scripts/ccnavi-setup.sh` が配る） |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。状態を聞く `status` と、気づきの記録を書く `learn` は、サブエージェントも呼べる。本体は `ccnavi ticket`。取り込み済みの親子のチケットでは write-and-push（取り込んでから書き、書いたパスだけをコミットして push するまで完了にしない） |
@@ -171,6 +178,26 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `.ccnavi/scripts/ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先（メインのチェックアウトが開いているブランチ）から切る。ずれが無ければ確認なしで取り込み先のHEADから切る。cwdのブランチ違い・取り込み先が統合先でない・`origin/<取り込み先>` とのずれ（遅れ・進み・分岐・無い・リモート未確認）・書きかけがあるときは、切らずに終了コード 3 で状態・勧め・リスク・確認コードを出す。ユーザの了承を得て `--base`・`--accept`・`--copy-wip`/`--no-wip` を付けて打ち直す。`--side-by-side` で、横で作業する間の自動復元を緩める（`ask` ルールで確認が出る）。記録は共通のgitディレクトリの `ccnavi-direct/<名前>`。`--offline`・`--from-origin` は廃止 |
 | `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層。cwd が `.claude/worktrees/<名前>` の中ならそのワークツリーの `wip/handoff/`）へ `cp` する。`--commands` は編集済みの下書きの状態を出す（端末の前のユーザは `mv` の代わりに `ccnavi user handoff` で取り込める）。取り込むのはユーザ |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。子のブランチを消す `--branch` は `ccnavi-user-clean-branch.sh` に分かれている。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
+| `.ccnavi/scripts/ccnavi-user-clean-branch.sh` | 親を閉じたときに残した子の手元のブランチを、条件を確かめ直して消す。ユーザが端末で打つ（エージェントからは止まる）。本体は `ccnavi worktree branch` |
+| `.ccnavi/scripts/ccnavi-user-close-early.sh` | 残りがあるまま親を早めに閉じる判断を置く。ユーザが端末で打つ。残りを issue に書き出し、コメントを投稿する。本体は `ccnavi user close-early` |
+| `.ccnavi/scripts/ccnavi-user-decide.sh` | 残った指摘（未解決のスレッド）の対応方針を決めて置く。ユーザが端末で打つ（ボードが押した選択を送る形も同じ）。本体は `ccnavi user reviewed` |
+| `.ccnavi/scripts/ccnavi-user-lib-review.sh` | ユーザ専用のレビューの sh（`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`）が共有する、ユーザの判断をホストに書く部品（指摘のスレッドへの返信と解決、issue の作成）。単体では動かない |
+| `.ccnavi/scripts/ccnavi-common.sh` | 保護済み sh が共有する部分の入口。単体では動かない。パスの絶対化・ワークスペースルート・実行ファイルの場所・互換の版の食い違い・識別子とブランチ名の書き方の確かめを持ち、下の部品を最後に読み込む |
+| `.ccnavi/scripts/ccnavi-common-state.sh` | `ccnavi-common.sh` の部品。state の置き場、統合先、親ブランチの push の関門、タイムアウト監視つきの git |
+| `.ccnavi/scripts/ccnavi-common-lock.sh` | `ccnavi-common.sh` の部品。親子のチケットのロック |
+| `.ccnavi/scripts/ccnavi-common-write-and-push.sh` | `ccnavi-common.sh` の部品。write-and-push。チケットの状態を書く一連の操作を 1 つにまとめる |
+| `.ccnavi/scripts/ccnavi-common-host.sh` | `ccnavi-common.sh` の部品。ホスト（GitHub / GitLab）への接続 |
+| `.ccnavi/scripts/ccnavi-common-log.sh` | `ccnavi-common.sh` の部品。診断ログ（`log_debug` / `log_info` / `log_warn` / `log_error`）。`logs/diag/<出どころ>.log` に 1 行足すだけ |
+| `.ccnavi/scripts/ccnavi-common-review.sh` | レビューの sh が共有する、ホストのマージリクエストを読む部品。`ccnavi-common.sh` は読まず、レビューの sh だけが読む |
+| `scripts/ccnavi-install.sh` | ccnavi を入れる入口。状況を調べ（`ccnavi-doctor.sh`）、入れる先に配り（`ccnavi-setup.sh`）、最後に lint で確かめる |
+| `scripts/ccnavi-doctor.sh` | 入れる前に、この機械の状況を調べて 1 項目 1 行で報告する。何も書き換えない |
+| `scripts/ccnavi-package.sh` | 配る側が ccnavi の配布用の zip を作る。ソースのリポジトリで打つ |
+| `scripts/ccnavi-build-install.sh` | ccnavi・VS Code 拡張・Chrome 拡張をビルドし、ccnavi と VS Code 拡張をこの機械に入れる |
+| `scripts/ccnavi-stop-review.sh` | Stop の AI 判定の agent 型 Stop hook を `.claude/settings.json` に登録・解除・点検する |
+| `scripts/check_rules.py` | 期待する判定を全部判定に掛けて食い違いを並べる薄いラッパースクリプト（`ccnavi --test-expectations` を呼ぶ）。`/ccnavi-config` スキルが呼ぶ |
+| `extensions/` | VS Code 拡張（`vscode/ccnavi-board`）と Chrome 拡張（`chrome/ccnavi-approval`）、共有の設定（`shared/`） |
+| `docs/` | 設計・要件・ADR・手引き（`guide/`）・ccnavi の開発の決まり（`claude/`） |
+| `wip/` | 作業中の下書き（`design/`・`handoff/`・`proposals/`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |
 | `tests/manual/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、ユーザが手で回す道具。自動テストは呼ばない |

@@ -8,7 +8,7 @@ keywords: [設計, VS Code 拡張, 構成, 拡張ホスト, webview, React, core
 
 # ccnavi ボードの設計
 
-VS Code 拡張「ccnavi ボード」の作りを書く。拡張ホスト（`src/`）が ccnavi の実行ファイルを子プロセスで呼んで中身を組み、画面（`src/webview/`、React）がそれを描く。何をするかは [requirements.md](requirements.md)、使い方と組み立ては [README](../README.md) にある。
+VS Code 拡張「ccnavi ボード」の作りを書く。拡張ホスト（`src/`）が ccnavi の実行ファイルを子プロセスで呼んで中身を組み、画面（`src/webview/`、React）がそれを描く。何をするかは [requirements.md](requirements.md)、使い方と組み立ては [README](../README.md)、拡張開発ホストでの動かし方と手動確認は [design/manual-checks.md](design/manual-checks.md) にある。
 
 拡張が呼ぶ実行ファイルのコマンドと読む JSON の形、互換の版は本体側の取り決めで、本体の [要件書](../../../../docs/requirements.md) と [設計](../../../../docs/design.md) に書く。
 
@@ -18,6 +18,7 @@ VS Code 拡張「ccnavi ボード」の作りを書く。拡張ホスト（`src/
 |---|---|
 | ファイルの置き場と役目（`src/`・`media/`・`test/`・`scripts/`）、テストの ID の決まり | [design/structure.md](design/structure.md) |
 | 承認のオーバーレイの遷移、カードの組み立て（状態の札・あなたの番・詳細）、ボタンの見た目、レビュー完了の流れ、マージ状況の確認、見た目の実装、ボードや画面に機能を足すときに触る場所、画面に中身を渡す段取り | [design/screens.md](design/screens.md) |
+| 拡張開発ホストでの動かし方、単体テストの対象外の部分（`*-panel.ts` など）を手で確かめる項目の表 | [design/manual-checks.md](design/manual-checks.md) |
 
 ## 拡張ホストと画面の境目
 

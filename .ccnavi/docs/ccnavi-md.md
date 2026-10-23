@@ -1,7 +1,7 @@
 ---
 title: CCNAVI.md の書き方
 type: guide
-description: .ccnavi/CCNAVI.md の条件（ccnavi:if / else / endif）と差し込み（{{名前}}）の書き方、条件の名前の一覧、判定の仕組み
+description: .ccnavi/CCNAVI.md の条件（ccnavi:if / else / endif）と差し込み（{{名前}}）の書き方、条件の名前の一覧
 tags: [ccnavi-md, session-start]
 keywords: [CCNAVI.md, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み, 入れ子, 判定, ccnavi-md, lint, SessionStart]
 ---
@@ -77,16 +77,6 @@ mdでは`<!-- ccnavi:if has_docker -->`と書く。
 | `projects` | プロジェクトの置き場（ワークスペースルートからの相対） |
 | `tickets_dir` / `approved_dir` | 提案の置き場 / 承認済みチケットの置き場 |
 | `mode_env` | `CCNAVI_MODE` |
-
-## 判定の仕組み
-
-条件の判定は、名前ごとに独立した関数が持つ。
-
-- 関数は、そのセッションの状況（設定・ワークスペースルート・`--docs`を出す回か・ルールのdenyのid・動作モード）を受け取り、真偽を返す。1つの関数は1つの名前だけを判定する
-- 読み込みのたびに、全部の関数を呼んで、真になった名前の集合を作る。判定はmdを読む前に済む
-- mdを上から読み、`ccnavi:if`で囲まれた行は、囲みの名前がすべて集合に入っているときだけ載る
-- 載せる行が決まったら、`{{名前}}`を値に置き換え、続く空行をまとめて1つの文にする
-- 組み込みにも`ccnavimd.sh`の関数にも無い名前は、判定できないので真にして囲んだ行を出す。`ccnavi --lint`が警告する。差し込みの一覧に無い`{{名前}}`は、そのまま残る（書き間違いが見える形で届く）
 
 ## 壊れたときと lint
 

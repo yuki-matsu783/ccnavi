@@ -68,7 +68,9 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_B
     "CCNAVI_BIN_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_GUARD_CORE_FILES": "dry-run",
-    "CCNAVI_GUARD_TICKET_APPROVAL": "enable"
+    "CCNAVI_GUARD_TICKET_APPROVAL": "enable",
+    "CCNAVI_GUARD_UNWATCHED": "enable",
+    "CCNAVI_TICKET_CONTROL": "enable"
   }
 }
 ```
@@ -80,7 +82,7 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_B
 
 同じ実行ファイルを上の 8 つのイベントに登録する。payload にイベント名が入っているので、どれを走らせるかは ccnavi が選ぶ。
 `matcher` は絞らない。絞ると、書かなかったツールで hook 自体が起動しなくなる。
-`SessionStart` の 2 本目は入口の sh（`ccnavi-session-start.sh`。中で `ccnavi-fetch.sh` を呼ぶ）で、承認済みチケットと
+`SessionStart` の 2 本目は入口の sh（`ccnavi-session-start.sh`。中で `ccnavi-fetch.sh` と、直下のディレクトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）で、承認済みチケットと
 マーカー（親ブランチに乗って届く）と、ワークツリーの起点になる統合先ブランチを fast-forward で
 取ってくる。登録しないと、別の機械で承認したものが反映されず、古い `main` からブランチを切ることになる。
 
@@ -88,12 +90,12 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_B
 
 | イベント | 登録しないと |
 |---|---|
-| `SessionStart` | 実行ファイルが差し替えられても戻せない。モデルが、ccnavi の決まりと、チケットを起こす時点を知らないまま進む |
+| `SessionStart` | 実行ファイルが差し替えられても戻せない。モデルが、ccnavi の決まりと、チケットを起こす時点を知らないまま進む。承認済みチケットの要求が上位の設定に却下されていても知らされない。ドキュメントの索引が新しくならず、引き方の案内も出ない。古い記録の後始末も走らない |
 | `UserPromptSubmit` | ターンの終わりの報告が出ない（コミットに入った変更も見えない） |
 | `PreToolUse` | 判定そのものが働かない |
-| `PostToolUse` | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない |
+| `PostToolUse` | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない。frontmatter の無い md を新しく作っても、書き方の案内が出ない |
 | `PostToolUseFailure` | 失敗の連続を数えられず、案内が出ない |
-| `Stop` | 変更がユーザの目に触れない。閉じ忘れたチケットが作業中に残る。ターンの終わりの促しが届かない |
+| `Stop` | 変更がユーザの目に触れない。閉じ忘れたチケットが作業中に残る。同じ呼び出しを繰り返し止めたことがユーザに伝わらない。ターンの終わりの促しが届かない |
 | `SubagentStart` | サブエージェントが自分の範囲を知らずに始める |
 | `SubagentStop` | 範囲外のコミット済みの変更が親に届く |
 
@@ -108,7 +110,7 @@ md の構成は、考え方（コンテキストを清潔に保つ・判断す�
 （ワークツリー・git の入口・下書きの置き場・保護対象の直し方・`projects/`・`status`・`--docs`）、チケット制御を使っているときの
 作業の進め方（直接作業とチケット作業の使い分け）。詳しいことは名指しした入口（`--help`、拒否の案内、`status`、`--docs`）に聞く。
 
-md の書き方（条件 `ccnavi:if` / `ccnavi:else`、差し込み `{{名前}}`）と、条件の判定の仕組み、条件の足し方は、配布先にも配る [`.ccnavi/docs/ccnavi-md.md`](../../.ccnavi/docs/ccnavi-md.md) に書いてある。
+md の書き方（条件 `ccnavi:if` / `ccnavi:else`、差し込み `{{名前}}`）と、条件の足し方は、配布先にも配る [`.ccnavi/docs/ccnavi-md.md`](../../.ccnavi/docs/ccnavi-md.md) に書いてある。条件の判定の仕組みは [開発の入口](../development.md) にある。
 ccnavi の実行ファイル側で条件を足す手順は[開発の入口](../development.md)にある。
 
 ## 置き場

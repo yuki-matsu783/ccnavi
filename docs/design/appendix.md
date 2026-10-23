@@ -101,6 +101,8 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | `code` | 判定の根拠の種別。一覧は付録 A。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は `POST_VIOLATION` などで、件が混ざった回は強いほう 1 つ |
 | `rules` | 当たったルールの名前（ルールファイル由来は `<相対パス>:<id>`、組み込みは id）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
 | `reason` | `skip` の理由（上の一覧）。`worktree-unreadable` は `detail` に理由 |
+| `hinted` | この呼び出しで `additionalContextOnce` の案内を渡した回だけ `true`。渡した後の呼び出しと、毎回渡す案内だけの呼び出しには出ない（案内がどの呼び出しに付いたかは hook の応答から分からないので残す） |
+| `guarded` | ccnavi 自身の設定ファイルについて、その回に起きたことの配列。要素は `<対象>:<動き>`。動きは `saved`（バックアップを取った）・`restored`（バックアップから戻した）・`restored-from-git`（git から戻した）・`would-restore`（予行で言うだけ）・`rebased`（大きい対象が変わったので基準を取り直した）・`accepted`（ユーザの発言で消えたことを受け入れた）・`left-as-repair`（読めないルールファイルへの修復なので戻さなかった）・`missing`・`failed`。変わっていない回は残さない |
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
 | `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |
 | `paths` | 実行後チェックが検知した「種類とパス」 |

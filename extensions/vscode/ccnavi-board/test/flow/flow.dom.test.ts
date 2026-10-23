@@ -2,7 +2,7 @@
  * フロー編集画面（React）を happy-dom で動かす。図・目印・錠・保存・注意を見る。
  *
  * 図は大きさの偽物（`openPage` が渡す `measure`）で描かせる。見るのは「点と線がその数あるか」
- * 「押すと何が起きるか」まで。線の経路とドラッグは README の手動確認に回す。
+ * 「押すと何が起きるか」まで。線の経路とドラッグは docs/design/manual-checks.md の手動確認に回す。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
