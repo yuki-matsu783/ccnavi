@@ -2267,10 +2267,10 @@ sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --check   # 
 sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152   # MR なら --mr 5。両方も渡せる
 ```
 
-終了コード 0 で終わったら、採用した MR と、その MR が**閉じる** issue と、元ブランチが確定している（出力の「必須」の行の `issue:` と `mr:` を提案に書く。
-どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める）。MR の無い候補（作りかけの再開を除く）は成功させず、終了コード 3 で一覧を出す。
+終了コード 0 で終わったら、採用した MR と、その MR が**閉じる** issue と、元ブランチが確定している。出力の「必須」の行の `issue:` と `mr:` を提案に書く。どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める。
+MR の無い候補（作りかけの再開を除く）は成功させず、終了コード 3 で一覧を出す。
 ホストに届かないときは、`--issue`・`--mr`・`--branch` の 3 つと `--mcp-checked` がそろうときだけ、ホストを見ずに成功する。
-`ccnavi-ticket.sh` の `start`・`finish`・`propose`・`consolidate` も、ロックの前に同じ確認（API と git）を自動で行う（直接作業では確かめない）。
+`ccnavi-ticket.sh` の `start`・`finish`・`propose`・`consolidate` も、ロックの前に同じ確認（API と git）を自動で行う。直接作業では確かめない。
 
 依頼の URL のリポジトリが `projects/<名前>` のものなら、そこに `cd` して `--repo <owner/repo>` を付けて打つ。実行した場所の origin と違えば、ホストに問い合わせる前に止まって移動先を案内する。
 

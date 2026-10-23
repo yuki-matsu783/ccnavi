@@ -256,8 +256,7 @@ class SessionConventionsTest(unittest.TestCase):
         body = block(self.start("--mode", "dry-run")).replace(self.root, "<root>")
 
         self.assertIn("--docs で", body)
-        # issue と MR のセットと入口の事前確認の一文を足したぶん、上限を 100 字広げた
-        self.assertLess(len(body), 3100, body)
+        self.assertLess(len(body), 3000, body)
 
 
 if __name__ == "__main__":
