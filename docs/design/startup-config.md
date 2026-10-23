@@ -198,7 +198,11 @@ sh の探し方: `here=${0%/*}`（`$0` に `/` が無ければ `.`）から `bin
 
 - 隣（`.ccnavi/scripts/<os>-<arch>/`）は探さない。自己防衛のパス（8.2）が当たらない置き場になるため
 - `bin_dir` は `..` を含むまま使い、正規化しない。シンボリックリンクも解かない
-- 見つからなければ終了コード 127 で、文面に `<os>-<arch>` と探した `bin_dir` を出す。在るが実行できなければ `exec` が失敗して 126
+- `bin/` に何も見つからなければ、PATH の `ccnavi`（`ccnavi.exe`）を探す（`ccnavi_launcher_path`）。`bin/` が先で、PATH はそのときだけ。見るのは絶対パスの項目だけで、空と相対の項目（`.`、`~/bin`）は cwd や展開の有無で結果が変わるので飛ばす。通常ファイルで実行できるものを PATH の順に最初に当たった所で `exec` する。自分と同じファイル（`ccnavi` という名前で張ったリンク）は、自分に戻って終わらなくなるので飛ばす
+- PATH の実行ファイルは onedir の `_internal/` を隣に要る。単体のコピーは動かない。`dist/ccnavi/` を PATH に通すか、そこへのリンクを置く。版は sh と揃えない（食い違いは `ccnavi_compat_skew` が端末の操作で言う。hook では見ない）
+- 見つからなければ終了コード 127 で、文面に `<os>-<arch>` と探した `bin_dir`、PATH も見たことを出す。在るが実行できなければ `exec` が失敗して 126
+- 保護済み sh の `ccnavi_bin` は、`bin/` もソースも無い配布先でだけ PATH の `ccnavi` を返す（無ければ 1 のまま。呼び手の「実行ファイルが無い」の分岐を保つ）。ソースのリポジトリではソースが先
+- 自己防衛は PATH の実体も守る。`bin/` の有無に関わらず、PATH に在れば `bin-path-<パスの印>` の key でバックアップして、同じ形で戻す。key にパスの印を付けるのは、PATH が変わって指す先が替わったとき、古い実体の参照を新しい実体に当てないため。止める正規表現は実体のパスの末尾 3 要素で当てる（2 要素だと別の `./bin/ccnavi` まで当たる）。置き場のディレクトリ全体は守らない。PATH が `/usr/local/bin` のように書けない場所なら、戻しは失敗（`failed`）と報告する
 
 hook は sh を直に起動するので、sh に実行ビットが要る。ccnavi のリポジトリでは追跡するモードを 100755 にする。配布先では
 導入スクリプトが付け、付いていなければ `--lint` が error で言う（10 章）。
@@ -235,7 +239,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 
 | 場所 | 中身 |
 |---|---|
-| `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
+| `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ PATH の `ccnavi`、それも無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。状態を聞く `status` と、気づきの記録を書く `learn` は、サブエージェントも呼べる。本体は `ccnavi ticket`。取り込み済みの親子のチケットでは write-and-push（取り込んでから書き、書いたパスだけをコミットして push するまで完了にしない） |
 | `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review`。状態を書くサブコマンドは write-and-push の対象の親子のチケットで write-and-push。`decide <N> --preview`（見るだけ）もここにある。ユーザ専用の `close-early`・`decide` は `ccnavi-user-close-early.sh`・`ccnavi-user-decide.sh` に分かれている |
