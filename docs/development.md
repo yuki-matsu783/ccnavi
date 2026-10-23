@@ -3,7 +3,7 @@ title: 開発の入口
 type: guide
 description: ccnavi 自身を開発する人向けの入口。開発環境、テストと整形のコマンド、開発用 hook の登録、build と配布物、配布する sh の確かめ方、条件の足し方、文書の案内表
 tags: [development, build, test]
-keywords: [開発, 開発環境, テスト, unittest, ruff, build.py, PyInstaller, onedir, lint-py, test-py, mark-ext, test-ext, settings.local.json, CCNAVI_BIN_PATH, CCNAVI_SH_DIR, 配布物, 条件の足し方, ccnavimd]
+keywords: [開発, 開発環境, テスト, unittest, ruff, build.py, PyInstaller, onedir, lint-py, test-py, mark-ext, test-ext, settings.local.json, CCNAVI_ENTRY_PATH, CCNAVI_SH_DIR, 配布物, 条件の足し方, ccnavimd]
 ---
 
 # 開発の入口
@@ -114,10 +114,10 @@ dist/ は新しい。.ccnavi/bin/<target>/ は前のまま
 を PATH に通すと、組み立てたあとのコピーなしで hook が動く。実行ファイル単体のコピーは動かない（隣に `_internal/` が要る）。
 PATH の実行ファイルも自己防衛が守る。テストは `tests/__init__.py` が PATH から ccnavi を外して回す。
 
-`dist/` を直に起動したいときは、`.claude/settings.local.json`（追跡しない）の `env` で `CCNAVI_BIN_PATH` を
+`dist/` を直に起動したいときは、`.claude/settings.local.json`（追跡しない）の `env` で `CCNAVI_ENTRY_PATH` を
 `dist/ccnavi/ccnavi` にする。自己防衛も同じ env を読むので、守る実体と起動する実体は食い違わない。代償は、その機械では
 振り分けの sh の不具合に気づけないこと。`ccnavi.settings.local.json` のキー `bin` でも
-`CCNAVI_BIN_PATH` を上書きできるが、変わるのは自己防衛が何を守るかだけで、hook が何を起動するかは変わらない。
+`CCNAVI_ENTRY_PATH` を上書きできるが、変わるのは自己防衛が何を守るかだけで、hook が何を起動するかは変わらない。
 
 配布物は PyInstaller の onedir で組み立てる。Windows なら `dist/ccnavi/ccnavi.exe`、
 Linux なら `dist/ccnavi/ccnavi`。onefile は起動のたびにランタイムを展開して遅いので使わない

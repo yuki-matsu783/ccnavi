@@ -57,7 +57,7 @@ REQ-DIA-03 が無いと、報告するだけのモードや試験の結果が、
 |---|---|
 | error | `.claude/settings.json` の `env` が `CCNAVI_MODE=disable` を宣言している |
 | error | `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_TICKET_CONTROL` が 2 値として読めない値（`enable` として扱って動く） |
-| error | `.claude/settings.json` の `env` の `CCNAVI_BIN_PATH` が指す先は在るが、実行できない。hook が 126 で起動せず、何も判定していない |
+| error | `.claude/settings.json` の `env` の `CCNAVI_ENTRY_PATH` が指す先は在るが、実行できない。hook が 126 で起動せず、何も判定していない |
 | warn | モードが `disable` / `dry-run`、あるいはモードとして読めない値 |
 | warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |
 | warn | 読めない `CCNAVI_STOP_REVIEW` の値（`dry-run` として動く） |
@@ -68,7 +68,7 @@ REQ-DIA-03 が無いと、報告するだけのモードや試験の結果が、
 | warn | `CCNAVI_TICKET_CONTROL=disable`（チケットの範囲も HITL ポイントも適用されない） |
 | warn | `CCNAVI_LEARNING` が `enable` / `disable` 以外の値（空白つきも）。`enable` として動く |
 
-`CCNAVI_BIN_PATH` が実行できるかは POSIX でだけ見る。Windows は実行ビットを持たないため。パスは `env` に書いたとおりに見て、`.exe` は補わない。
+`CCNAVI_ENTRY_PATH` が実行できるかは POSIX でだけ見る。Windows は実行ビットを持たないため。パスは `env` に書いたとおりに見て、`.exe` は補わない。
 
 #### レイヤー
 
@@ -131,7 +131,7 @@ REQ-DIA-03 が無いと、報告するだけのモードや試験の結果が、
 
 | 深刻度 | 拾うもの |
 |---|---|
-| error | `.claude/settings.local.json` の `env` に承認と判定に影響する値（チケット制御・承認の保護・ccnavi 自身の設定の保護・戻す働き・確かめられないモードの止め・同じ理由の拒否の数え方・モード）がある。例外は無い。`CCNAVI_BIN_PATH`・診断ログ・タイムアウト監視の秒は答えを変えないので指摘しない |
+| error | `.claude/settings.local.json` の `env` に承認と判定に影響する値（チケット制御・承認の保護・ccnavi 自身の設定の保護・戻す働き・確かめられないモードの止め・同じ理由の拒否の数え方・モード）がある。例外は無い。`CCNAVI_ENTRY_PATH`・診断ログ・タイムアウト監視の秒は答えを変えないので指摘しない |
 | warn | 名前が親の識別子の親のワークツリーが、別のブランチをチェックアウトしている（取り込みと正とする側の検査は、同じ名前のブランチだけを見る） |
 | error | 親子のチケットが決まらない（`ccnavi sync check` で言う）: 親のワークツリーが無いか HEAD が別のブランチ、途中の操作がある、など。承認・状態の操作・実行前チェックがその親子のチケットを止める。解き方を添える |
 | error | 承認済みチケットが、親のワークツリーの外にしか無い（元ツリーに未コミットで残ったチケットなど。信じないので止まる）。親の承認済みチケットに `mr:` が無いのも error |

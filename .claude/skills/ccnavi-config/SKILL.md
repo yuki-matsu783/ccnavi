@@ -62,7 +62,7 @@ config にあると `--lint` が error で、config の側のその定義だけ�
 ## ccnavi の打ち方
 
 以下で `ccnavi` と書いたら、このリポジトリでは `uv run python -m ccnavi`。配布先の
-プロジェクトでは settings.json の `CCNAVI_BIN_PATH` が指す `.ccnavi/scripts/ccnavi-launcher.sh`。
+プロジェクトでは settings.json の `CCNAVI_ENTRY_PATH` が指す `.ccnavi/scripts/ccnavi-launcher.sh`。
 
 診断のときは記録と state を外す（`--log "" --state ""`）。
 

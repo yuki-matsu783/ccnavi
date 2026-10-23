@@ -101,7 +101,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 - 処理と場所: `ccnavi-common.sh:195-205` の `ccnavi_bin`、`:214-235` の `ccnavi_compat_skew`、`ccnavi-launcher.sh:50-65`
 - ワークスペース内 clone・単体 clone: `.ccnavi/bin/` は setup が `.gitignore` に入れるので、どの fresh clone にも無い。単体 clone に限らない
-- 起きること: 全 hook が exit 127 で終わり、ガードは働かない（`docs/design/startup-config.md` の「見つからなければ終了コード 127」）。`CCNAVI_BIN_PATH` が設定されているとランチャーの sh はあるので `ccnavi_bin` は成功し、`ccnavi-ticket.sh status` は「ランチャーは `--version` で互換の版を返しません（古い版です）。build.py を実行し `ccnavi-setup.sh <このワークスペース> --force` で配り直してください」と出す。原因は「この機械向けの実行ファイルが無い」ことで、案内が違う。`ccnavi-worktree.sh` は別の文面（id-unchecked）、`ccnavi-fetch.sh` は無言で終了し、`ccnavi-git.sh worktree add` は通る
+- 起きること: 全 hook が exit 127 で終わり、ガードは働かない（`docs/design/startup-config.md` の「見つからなければ終了コード 127」）。`CCNAVI_ENTRY_PATH` が設定されているとランチャーの sh はあるので `ccnavi_bin` は成功し、`ccnavi-ticket.sh status` は「ランチャーは `--version` で互換の版を返しません（古い版です）。build.py を実行し `ccnavi-setup.sh <このワークスペース> --force` で配り直してください」と出す。原因は「この機械向けの実行ファイルが無い」ことで、案内が違う。`ccnavi-worktree.sh` は別の文面（id-unchecked）、`ccnavi-fetch.sh` は無言で終了し、`ccnavi-git.sh worktree add` は通る
 - 追記（2026-10-23）: `bin/` に無いときは PATH の `ccnavi` を起動する。`bin/` もソースも無い配布先の `ccnavi_bin` も PATH の `ccnavi` を返す。PATH にも無ければ、以下は変わらない
 - 確認: 実行で確認
 - 直し方の案: 「ランチャーが指す `bin/<os>-<arch>/` が空」を専用の文面で案内し、単体 clone の導入手順（プロジェクトに setup を実行する）を入れる。未決（「未決」の単体の初回導入）

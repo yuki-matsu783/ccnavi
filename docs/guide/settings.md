@@ -3,7 +3,7 @@ title: 設定
 type: guide
 description: .claude/settings.json に書く hook の登録と env の例、置き場の一覧、環境変数の表。値と既定を引くためのページ
 tags: [user-guide, settings, env, hook]
-keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_BIN_PATH, CCNAVI_RESTORE_IF_DENY, CCNAVI_GUARD_CORE_FILES, CCNAVI_TICKET_CONTROL, 置き場, 8 つのイベント, matcher, CLAUDE_PROJECT_DIR]
+keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_ENTRY_PATH, CCNAVI_RESTORE_IF_DENY, CCNAVI_GUARD_CORE_FILES, CCNAVI_TICKET_CONTROL, 置き場, 8 つのイベント, matcher, CLAUDE_PROJECT_DIR]
 ---
 
 # 設定
@@ -21,7 +21,7 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_B
   "hooks": {
     "SessionStart": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
       ]},
       { "matcher": "", "hooks": [
         { "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh\"", "timeout": 60 }
@@ -29,43 +29,43 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_B
     ],
     "UserPromptSubmit": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
       ]}
     ],
     "PreToolUse": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
       ]}
     ],
     "PostToolUse": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
       ]}
     ],
     "PostToolUseFailure": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
       ]}
     ],
     "Stop": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
       ]}
     ],
     "SubagentStart": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
       ]}
     ],
     "SubagentStop": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
       ]}
     ]
   },
   "env": {
     "CCNAVI_MODE": "dry-run",
-    "CCNAVI_BIN_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
+    "CCNAVI_ENTRY_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_GUARD_CORE_FILES": "dry-run",
     "CCNAVI_GUARD_TICKET_APPROVAL": "enable",
@@ -75,7 +75,7 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_B
 }
 ```
 
-`command` を `${CCNAVI_BIN_PATH}` で書くのは、守る対象と起動する実体を 1 か所にまとめるため。
+`command` を `${CCNAVI_ENTRY_PATH}` で書くのは、守る対象と起動する実体を 1 か所にまとめるため。
 その代わり、`env` からこの 1 行が消えると hook が起動しなくなる（[つまずきやすい点](troubleshooting.md)）。
 
 ## hook の 8 つのイベント
@@ -153,7 +153,7 @@ ccnavi の実行ファイル側で条件を足す手順は[開発の入口](../d
 | `CCNAVI_DENY_REPEAT` | 同じ理由で同じ呼び出しを何回止めたら、拒否の文面に「言い換えずにユーザに相談する」一文を足し、ターンの終わりにユーザへ報告するか。既定は `3`。2 未満と読めない値は既定に戻る。判定は変わらない（[ルールの書き方](rules.md)の「同じ呼び出しを繰り返し止めたとき」） |
 | `CCNAVI_FAIL_STREAK_COUNT` | ツール呼び出しの失敗か ccnavi の拒否が何回続けて起きたら、資料を引く案内（`--docs` で索引を引く）を出すか。既定は `3`。`0` なら数えも案内もしない。負数と読めない値は既定に戻る。判定は変わらない（[ルールの書き方](rules.md)の「失敗や拒否が続いたとき」） |
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。ユーザにも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（[ルールが言及していない呼び出し](rules.md)）。`dry-run` は無く、それ以外の値は `enable` として動き、`--lint` が指摘する |
-| `CCNAVI_BIN_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い。導入スクリプトは `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh）と書き、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に入る。無ければ PATH の `ccnavi` を使う（[導入と配布](install.md)）。拡張子は書かない。Windows の `.exe` は ccnavi が補う |
+| `CCNAVI_ENTRY_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い。導入スクリプトは `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh）と書き、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に入る。無ければ PATH の `ccnavi` を使う（[導入と配布](install.md)）。拡張子は書かない。Windows の `.exe` は ccnavi が補う |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。`disable` なら `ccnavi user` の操作と `ticket` / `review` のサブコマンドは動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `user …` の入口 / `ticket …` / `review …` 付きで打つ形と、`ccnavi-user-*.sh` を打つ形を止め（`DENY_TICKET_APPROVAL_CLI`。古い形の `--agree` / `--reviewed` / `--close-early` なども止める）、`user agree` と `user reviewed` と `user close-early` と `user prune` と、書くとき（`--yes`）の `user handoff` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-user-decide.sh`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |

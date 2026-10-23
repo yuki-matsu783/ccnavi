@@ -162,8 +162,8 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 
 ## 実行ファイルとルールを配る
 
-`CCNAVI_BIN_PATH` が指す実行ファイル、`rules.yml`、拒否の文面が案内する sh が、対象プロジェクトの中に要る。
-`dist/` は `.gitignore` に入っていて、`CCNAVI_BIN_PATH` は絶対パスも `..` も受け付けないので、
+`CCNAVI_ENTRY_PATH` が指す実行ファイル、`rules.yml`、拒否の文面が案内する sh が、対象プロジェクトの中に要る。
+`dist/` は `.gitignore` に入っていて、`CCNAVI_ENTRY_PATH` は絶対パスも `..` も受け付けないので、
 設定を書く 1 回で配布物も置く。
 
 ```sh
@@ -183,7 +183,7 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 `bin/<os>-<arch>/` から合う実行ファイルを選んで、引数と標準入力をそのまま渡す。`bin/` に合うものが無いときだけ、PATH の `ccnavi`（`ccnavi.exe`）を使う（絶対パスの項目だけを見る）。
 
 ```
-.ccnavi/scripts/ccnavi-launcher.sh      ← CCNAVI_BIN_PATH が指す振り分けの sh（追跡する）
+.ccnavi/scripts/ccnavi-launcher.sh      ← CCNAVI_ENTRY_PATH が指す振り分けの sh（追跡する）
 .ccnavi/scripts/ccnavi-ticket.sh など   ← 代わりに通る sh（同じ置き場）
 .ccnavi/bin/darwin-arm64/ccnavi         ← 機械ごとの組み立て（_internal/ も同じ置き場。無視する）
 .ccnavi/bin/linux-x86_64/ccnavi

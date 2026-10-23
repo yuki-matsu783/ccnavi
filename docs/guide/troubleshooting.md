@@ -3,7 +3,7 @@ title: つまずきやすい点
 type: guide
 description: 導入や設定でつまずきやすい点と直し方。hook が動かない、env が反映されない、ワークツリーが消せない、実行ファイルが見つからないなど
 tags: [user-guide, troubleshooting, settings]
-keywords: [つまずき, トラブル, hook が動かない, env, 再読み込み, CLAUDE_PROJECT_DIR, CCNAVI_BIN_PATH, 127, 126, 実行ビット, Windows, ワークツリーが消せない, matcher, projects, 未知のキー]
+keywords: [つまずき, トラブル, hook が動かない, env, 再読み込み, CLAUDE_PROJECT_DIR, CCNAVI_ENTRY_PATH, 127, 126, 実行ビット, Windows, ワークツリーが消せない, matcher, projects, 未知のキー]
 ---
 
 # つまずきやすい点
@@ -20,7 +20,7 @@ keywords: [つまずき, トラブル, hook が動かない, env, 再読み込�
 
 ## hook が動かない
 
-- hook が起動しない。`env` から `CCNAVI_BIN_PATH` の 1 行が消えると、hook が起動しなくなる。`sh scripts/ccnavi-setup.sh <ワークスペースルート> --check` で揃っていないところを見る（[導入と配布](install.md)）
+- hook が起動しない。`env` から `CCNAVI_ENTRY_PATH` の 1 行が消えると、hook が起動しなくなる。`sh scripts/ccnavi-setup.sh <ワークスペースルート> --check` で揃っていないところを見る（[導入と配布](install.md)）
 - 一部のツールで hook が起動しない。`matcher` を絞ると、書かなかったツールで hook 自体が起動しなくなる。`matcher` は絞らない（[設定](settings.md)）
 - `projects/` のプロジェクトの中で hook が動かない。プロジェクトの中で Claude Code を起動すると `CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれない。ワークスペースルートで起動して `cd` で入る
 - `ccnavi` を端末で直接打ったら、意図しない場所が根と見なされた。`CLAUDE_PROJECT_DIR` が無い端末や Bash ツールから `.claude/` を持つプロジェクトの中で打つと、`--root` を渡さない限りそのプロジェクトが根になる。`--root` を付けるか、sh のラッパーを通す

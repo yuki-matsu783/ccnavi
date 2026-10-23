@@ -24,7 +24,7 @@ JSON の欄の細かい形は [json-shapes.md](json-shapes.md) の各 JSON の�
 
 | ID | 型 | 要求 |
 |---|---|---|
-| REQ-EXT-01 | 常時 | ccnavi は、振り分けの sh の名前を `ccnavi-launcher.sh` とし、その名前の sh が起動する実行ファイルを、sh の置き場の親の `bin/<os>-<arch>/ccnavi`（Windows は `ccnavi.exe`）に置くこと。`<os>` は `darwin`・`linux`・`windows`、`<arch>` は `x86_64`・`arm64` とすること。arm64 の macOS と Windows では、自分向けが無いときだけ `x86_64` の実行ファイルを起動すること。配布先では sh を `.ccnavi/scripts/ccnavi-launcher.sh` に置き、`.claude/settings.json` の env `CCNAVI_BIN_PATH` にそのパスを書くこと |
+| REQ-EXT-01 | 常時 | ccnavi は、振り分けの sh の名前を `ccnavi-launcher.sh` とし、その名前の sh が起動する実行ファイルを、sh の置き場の親の `bin/<os>-<arch>/ccnavi`（Windows は `ccnavi.exe`）に置くこと。`<os>` は `darwin`・`linux`・`windows`、`<arch>` は `x86_64`・`arm64` とすること。arm64 の macOS と Windows では、自分向けが無いときだけ `x86_64` の実行ファイルを起動すること。配布先では sh を `.ccnavi/scripts/ccnavi-launcher.sh` に置き、`.claude/settings.json` の env `CCNAVI_ENTRY_PATH` にそのパスを書くこと |
 | REQ-EXT-02 | 事象 | `--root <パス>` を受けたとき、ccnavi は、そのパスをワークスペースルートとして読むこと。`--root` が 2 度渡されたときは、標準エラーに理由を出して何もしないこと。ただし `--version` は `--root` を読まずに版を返すこと（REQ-EXT-04） |
 | REQ-EXT-03 | 常時 | ccnavi は、標準出力と標準エラーを、コンソールの文字コードによらず UTF-8・改行 LF で書くこと。`--explain --json`・`--test --json`・`--test-expectations --json`・`--lint --json`・`--suggest --json`・`--version --json` の JSON は ASCII に変換して（ASCII でない字は `\u` で）書き、承認の JSON（`user agree … --json`）と残った指摘の JSON は UTF-8 の字のまま書くこと |
 | REQ-EXT-04 | 事象 | `--version --json` を求められたとき、ccnavi は、設定もワークスペースも読まず、`schema`・`version`・`commit`・`built`・`compat`・`features`・`flags`・`formats` を返して 0 で終わること。`flags` は引数の定義から引き、足したフラグがそのまま並ぶこと。`features` はオプションから読めない振る舞いの名前で、足しても互換の版は上げないこと |
@@ -38,7 +38,7 @@ JSON の欄の細かい形は [json-shapes.md](json-shapes.md) の各 JSON の�
 
 振り分けの sh は、`bin/<os>-<arch>/` に合う実行ファイルが無いときだけ、PATH の `ccnavi`（`ccnavi.exe`）を起動すること（絶対パスの項目だけを見る）。拡張も、探す順の最後（ソースの次）に PATH の `ccnavi` を見る（絶対パスの項目だけ。振り分けの sh と同じファイルは飛ばす）。
 
-REQ-EXT-01 の探す順（拡張の設定 → `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi` → 振り分けの sh → ソースなら `uv run python -m ccnavi` → PATH の `ccnavi`）は
+REQ-EXT-01 の探す順（拡張の設定 → `CCNAVI_ENTRY_PATH` → `dist/ccnavi/ccnavi` → 振り分けの sh → ソースなら `uv run python -m ccnavi` → PATH の `ccnavi`）は
 VS Code 拡張が決める。ccnavi が約束するのは置き場と名前と `<os>-<arch>` の語で、語は `src/ccnavi/infra/platformtag.py`・
 `scripts/ccnavi-setup.sh`・`.ccnavi/scripts/ccnavi-launcher.sh`・拡張の `src/core/locate.ts` で揃える。
 
