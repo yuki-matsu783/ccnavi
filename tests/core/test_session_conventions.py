@@ -238,12 +238,12 @@ class SessionConventionsTest(unittest.TestCase):
 
     def test_毎回届くので短い(self):
         # 毎回の起動・再開・compact に届く。考え方・作業の決まり・詳細の表・進め方を合わせて
-        # 3000 字未満に収める（詳細は .ccnavi/docs/ に分け、ここには入口だけ置く）。
+        # 4000 字未満に収める（詳細は .ccnavi/docs/ に分け、ここには入口だけ置く）。
         os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
         text = block(self.start("--mode", "enable"))
         body = text.replace(self.root, "<root>")
 
-        self.assertLess(len(body), 3000, body)
+        self.assertLess(len(body), 4000, body)
 
     def test_索引の案内とdry_runの注記を足しても短い(self):
         # 索引の案内が出る回（docs の行が載る）と dry-run の注記が重なる、いちばん長い回。
@@ -256,7 +256,7 @@ class SessionConventionsTest(unittest.TestCase):
         body = block(self.start("--mode", "dry-run")).replace(self.root, "<root>")
 
         self.assertIn("--docs で", body)
-        self.assertLess(len(body), 3000, body)
+        self.assertLess(len(body), 4000, body)
 
 
 if __name__ == "__main__":

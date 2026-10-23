@@ -12,6 +12,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
 
 ## issue・MRの指定を受けたとき
 
+- ホスト（issue・MRなど）の操作は、ccnaviのスクリプト（`ccnavi-start.sh`・`ccnavi-review.sh`など）がある操作ならスクリプトを優先する。ない操作はglabを基本にし、ghはoriginがGitHubのときだけ使う。
 - チケット作業は必ずissueとMRのセットで進める。issueが無ければユーザに作ってもらう（エージェントが作るのは頼まれたときだけ）。
   最初に`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --check`を打ち、ホストのAPIとgitのリモートが使える状態かを確かめる（下の「事前確認」）。
 - issueやMRを指定して作業を頼まれたら（`#152`・`!5`・URLなど）、ワークツリーを切る前に
