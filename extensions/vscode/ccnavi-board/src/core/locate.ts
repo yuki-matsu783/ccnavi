@@ -2,7 +2,7 @@
  * ccnavi の実行ファイルの探し方。.ccnavi/scripts/*.sh と同じ順で探す。
  *
  *   1. 拡張の設定 `ccnaviBoard.binPath`
- *   2. `.claude/settings.json` の env `CCNAVI_BIN_PATH`
+ *   2. `.claude/settings.json` の env `CCNAVI_ENTRY_PATH`
  *   3. `dist/ccnavi/ccnavi`
  *   4. `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh。scripts/ccnavi-setup.sh が配る）
  *   5. ソースがあれば `uv run python -m ccnavi`
@@ -28,7 +28,7 @@ export interface LocateInput {
   readonly root: string;
   /** 拡張の設定。空なら見ない */
   readonly setting: string;
-  /** .claude/settings.json の env.CCNAVI_BIN_PATH。無ければ undefined */
+  /** .claude/settings.json の env.CCNAVI_ENTRY_PATH。無ければ undefined */
   readonly settingsEnvBin: string | undefined;
   /** この機械の `<os>-<arch>`。hostTarget で作る */
   readonly hostTarget: string;
@@ -143,7 +143,7 @@ function onPath(input: LocateInput): Launcher | undefined {
   return undefined;
 }
 
-/** `.claude/settings.json` の本文から env.CCNAVI_BIN_PATH を取り出す。読めなければ undefined */
+/** `.claude/settings.json` の本文から env.CCNAVI_ENTRY_PATH を取り出す。読めなければ undefined */
 export function binFromSettingsJson(text: string): string | undefined {
   let raw: unknown;
   try {
@@ -158,6 +158,6 @@ export function binFromSettingsJson(text: string): string | undefined {
   if (typeof env !== "object" || env === null) {
     return undefined;
   }
-  const value = (env as { CCNAVI_BIN_PATH?: unknown }).CCNAVI_BIN_PATH;
+  const value = (env as { CCNAVI_ENTRY_PATH?: unknown }).CCNAVI_ENTRY_PATH;
   return typeof value === "string" && value !== "" ? value : undefined;
 }

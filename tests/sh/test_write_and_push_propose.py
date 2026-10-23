@@ -319,14 +319,14 @@ class TidyAfterFinishTest(WriteAndPushHarness):
             "esac\n"
             f"exec '{self.bin}' \"$@\"\n",
         )
-        self.assertEqual(self.ticket("start", PARENT, CCNAVI_BIN_PATH=logger).returncode, 0)
+        self.assertEqual(self.ticket("start", PARENT, CCNAVI_ENTRY_PATH=logger).returncode, 0)
         self.assertFalse(os.path.exists(log))
         tree = self.child_tree()
-        self.assertEqual(self.ticket("start", CHILD, CCNAVI_BIN_PATH=logger).returncode, 0)
+        self.assertEqual(self.ticket("start", CHILD, CCNAVI_ENTRY_PATH=logger).returncode, 0)
         write(os.path.join(tree, "wip", "design", "a.md"), "a\n")
         git(tree, "add", "-A")
         git(tree, "commit", "-q", "-m", "work")
-        result = self.ticket("finish", CHILD, CCNAVI_BIN_PATH=logger)
+        result = self.ticket("finish", CHILD, CCNAVI_ENTRY_PATH=logger)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         with open(log, encoding="utf-8") as f:

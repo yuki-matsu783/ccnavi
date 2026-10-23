@@ -12,7 +12,7 @@ sh と同じ道具を使わないほうが、片方の不具合がもう片方�
 - トークン 2 本。
   `docker exec -i gitlab gitlab-rails runner - < tests/manual/gitlab/make_gitlab_tokens.rb` が
   `GITLAB_TOKEN`（root、エージェント役）と `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役）を出す
-- 組み立て済みの exe（`dist/ccnavi/ccnavi`）。`CCNAVI_BIN_PATH` で差し替えられる
+- 組み立て済みの exe（`dist/ccnavi/ccnavi`）。`CCNAVI_ENTRY_PATH` で差し替えられる
 - jq と curl（sh が使う）
 
     GITLAB_TOKEN=... CCNAVI_PROBE_REVIEWER_TOKEN=... \
@@ -63,7 +63,7 @@ if not ROOT_TOKEN or not REVIEWER_TOKEN:
 
 
 def _exe() -> str:
-    given = os.environ.get("CCNAVI_BIN_PATH", "")
+    given = os.environ.get("CCNAVI_ENTRY_PATH", "")
     if given and os.path.isabs(given):
         return given
     base = os.path.join(ROOT_OF_CCNAVI, given or os.path.join("dist", "ccnavi", "ccnavi"))
@@ -118,7 +118,7 @@ def env_for() -> dict[str, str]:
     env.update(
         {
             "GITLAB_TOKEN": ROOT_TOKEN,
-            "CCNAVI_BIN_PATH": EXE,
+            "CCNAVI_ENTRY_PATH": EXE,
             "CCNAVI_GUARD_TICKET_APPROVAL": "disable",
             "CCNAVI_MODE": "enable",
             "CCNAVI_GUARD_CORE_FILES": "disable",

@@ -30,7 +30,7 @@ SH_DIR = (
 
 
 def with_exe(environment):
-    """ソースの実行ファイルを起こすものを CCNAVI_BIN_PATH に渡す。走らせた機械の値は使わない。
+    """ソースの実行ファイルを起こすものを CCNAVI_ENTRY_PATH に渡す。走らせた機械の値は使わない。
 
     sh は親のワークツリーかをチケットを読まずに実行ファイル（`tree parent`）に聞く。
     テストのワークスペースには組み立てた実行ファイルもソースも無いので、ここで渡す。
@@ -43,7 +43,7 @@ def with_exe(environment):
             f.write(f'#!/bin/sh\nPYTHONPATH="{ROOT}/src" exec "{sys.executable}" -m ccnavi "$@"\n')
         os.chmod(path, 0o755)
         _EXE.append(path)
-    environment["CCNAVI_BIN_PATH"] = _EXE[0]
+    environment["CCNAVI_ENTRY_PATH"] = _EXE[0]
     return environment
 
 
@@ -1365,7 +1365,7 @@ class ParentPushGateTest(GitWrapperTest):
 
     def test_no_executable_decides_by_the_reference_alone(self):
         """実行ファイルが無いときは、参照の形跡だけで決める。参照が無ければ初回として通す。"""
-        approved_only = {"CCNAVI_BIN_PATH": os.path.join(self.dir, "no-such-ccnavi")}
+        approved_only = {"CCNAVI_ENTRY_PATH": os.path.join(self.dir, "no-such-ccnavi")}
         self.approve(started=True)
         result = self.run_in_tree(approved_only)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)

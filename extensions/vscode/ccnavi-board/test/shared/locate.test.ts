@@ -137,9 +137,9 @@ test("CB-T24 機械の語は src/ccnavi/infra/platformtag.py と揃える", () =
   assert.deepEqual(runnableTargets("linux-arm64"), ["linux-arm64"]);
 });
 
-test("CB-T22 settings.json の env.CCNAVI_BIN_PATH を読む", () => {
-  assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_BIN_PATH: "dist/x" } })), "dist/x");
-  assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_BIN_PATH: "" } })), undefined);
+test("CB-T22 settings.json の env.CCNAVI_ENTRY_PATH を読む", () => {
+  assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_ENTRY_PATH: "dist/x" } })), "dist/x");
+  assert.equal(binFromSettingsJson(JSON.stringify({ env: { CCNAVI_ENTRY_PATH: "" } })), undefined);
   assert.equal(binFromSettingsJson(JSON.stringify({ env: {} })), undefined);
   assert.equal(binFromSettingsJson("{"), undefined);
   assert.equal(binFromSettingsJson("[]"), undefined);

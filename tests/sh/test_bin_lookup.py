@@ -1,7 +1,7 @@
 """保護済み sh が起動する実行ファイルを探す順（.ccnavi/scripts/ccnavi-common.sh の ccnavi_bin）。
 
 ユーザが端末から `ccnavi-ticket.sh` などを打つ場面では settings.json の env が反映されず、
-CCNAVI_BIN_PATH は無いのが普通。配布先には `dist/` もソースも無く、実行ファイルは
+CCNAVI_ENTRY_PATH は無いのが普通。配布先には `dist/` もソースも無く、実行ファイルは
 `.ccnavi/bin/<os>-<arch>/` にしか無い。そこを見ないと、配布先では必ず
 「実行ファイルが見つかりません」で止まる。
 
@@ -43,7 +43,7 @@ class BinLookupTest(unittest.TestCase):
         self.target = platformtag.host_target()
 
     def run_ticket(self, **env):
-        full = {k: v for k, v in os.environ.items() if k != "CCNAVI_BIN_PATH"}
+        full = {k: v for k, v in os.environ.items() if k != "CCNAVI_ENTRY_PATH"}
         full.update(env)
         full.pop("CCNAVI_WORKSPACE", None)
         return subprocess.run(
@@ -76,7 +76,7 @@ class BinLookupTest(unittest.TestCase):
     def test_the_env_wins_when_it_is_set(self):
         self.put_machine_build()
         write(os.path.join(self.ws, "other", "ccnavi"), STUB.format(name="env"))
-        result = self.run_ticket(CCNAVI_BIN_PATH="other/ccnavi")
+        result = self.run_ticket(CCNAVI_ENTRY_PATH="other/ccnavi")
         self.assertTrue(result.stdout.startswith("env "), result.stdout + result.stderr)
 
     def test_nothing_to_run_says_where_it_looked(self):

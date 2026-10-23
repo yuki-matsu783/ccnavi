@@ -43,7 +43,7 @@
 # 呼び出しを見分ける。実行ファイルとこのスクリプトは呼び手を知らない）。
 #
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
-# 探す順は、環境変数 CCNAVI_BIN_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
+# 探す順は、環境変数 CCNAVI_ENTRY_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
 # ソースツリーの `python -m ccnavi`。
 #
 # start・finish・propose・consolidate は、ロックの前に事前確認（ホストの API と git のリモートが使える状態か）を打つ。
@@ -217,7 +217,7 @@ if ccnavi_wap_use_exe "$root"; then
 		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
 	fi
 else
-	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
 

@@ -241,7 +241,7 @@ class WriteAndPushHarness(unittest.TestCase):
             env.pop(name, None)
         env.update(
             {
-                "CCNAVI_BIN_PATH": self.bin,
+                "CCNAVI_ENTRY_PATH": self.bin,
                 "CCNAVI_LOCK_WAIT": "2",
                 # 学びの蓄積の既定は enable。学びを扱わないテストは切る。
                 "CCNAVI_LEARNING": "disable",
@@ -602,7 +602,7 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
         env = {
             "PATH": self.path,
             "GITLAB_TOKEN": "t0k",
-            "CCNAVI_BIN_PATH": self.half,
+            "CCNAVI_ENTRY_PATH": self.half,
             "HALF_TREE": self.tree,
         }
         env.update(extra)

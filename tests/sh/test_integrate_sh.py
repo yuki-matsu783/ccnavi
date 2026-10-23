@@ -10,7 +10,7 @@ git とファイルシステムに残ったものだけ。
 版の無い marker（旧形式）は、旧来の abort と確定にだけ回る。
 
 実行ファイル（`tree base-bound`・`tree guarded`・`tree handoff-pending`・`worktree drop`）の
-代わりに、このツリーのソースを起こす（CCNAVI_BIN_PATH）。
+代わりに、このツリーのソースを起こす（CCNAVI_ENTRY_PATH）。
 """
 
 from __future__ import annotations
@@ -126,7 +126,7 @@ class Fixture(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
-        env["CCNAVI_BIN_PATH"] = self.bin
+        env["CCNAVI_ENTRY_PATH"] = self.bin
         env.update(env_extra or {})
         if self.path is not None:
             env["PATH"] = self.path
@@ -328,7 +328,7 @@ class IntegrateTest(Fixture):
 
     def test_the_exe_that_cannot_answer_refuses(self):
         self.work_in_branch()
-        r = self.run_git_sh("integrate", "wt", env_extra={"CCNAVI_BIN_PATH": "/nonexistent/ccnavi"})
+        r = self.run_git_sh("integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": "/nonexistent/ccnavi"})
         self.assertOk(r, 2)
         self.assertIn("確かめられない", r.stderr)
 
@@ -706,7 +706,7 @@ class IntegrateTest(Fixture):
                 "feat: x",
             ],
             cwd=self.ws,
-            env={**os.environ, "CCNAVI_BIN_PATH": self.bin},
+            env={**os.environ, "CCNAVI_ENTRY_PATH": self.bin},
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

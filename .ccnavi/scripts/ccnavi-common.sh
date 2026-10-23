@@ -202,7 +202,7 @@ ccnavi_workspace() {
 
 # 起動する実行ファイルのパス。見つからなければ 1 を返す（ソースで動かすかは呼ぶ側が決める）。
 #
-# ユーザが端末から打つ場面では settings.json の env が反映されないので、CCNAVI_BIN_PATH が
+# ユーザが端末から打つ場面では settings.json の env が反映されないので、CCNAVI_ENTRY_PATH が
 # 無いのが普通。そのときは ccnavi のリポジトリの組み立て（dist/ccnavi/ccnavi）、次に
 # hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの sh は
 # .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
@@ -210,7 +210,7 @@ ccnavi_workspace() {
 #
 # それぞれ `.exe` を付けた名前も見る（Windows の組み立て）。
 ccnavi_bin() {
-	case "${CCNAVI_BIN_PATH:-}" in
+	case "${CCNAVI_ENTRY_PATH:-}" in
 	'')
 		ccnavi_bin_try "$1/dist/ccnavi/ccnavi" && return 0
 		if [ -d "$1/.ccnavi/bin" ]; then
@@ -223,8 +223,8 @@ ccnavi_bin() {
 			return 1
 		fi
 		;;
-	/* | [A-Za-z]:*) ccnavi_bin_try "$CCNAVI_BIN_PATH" ;;
-	*) ccnavi_bin_try "$1/$CCNAVI_BIN_PATH" ;;
+	/* | [A-Za-z]:*) ccnavi_bin_try "$CCNAVI_ENTRY_PATH" ;;
+	*) ccnavi_bin_try "$1/$CCNAVI_ENTRY_PATH" ;;
 	esac
 }
 

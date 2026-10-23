@@ -142,7 +142,7 @@ class SelfGuardTest(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         if bin:
-            environment["CCNAVI_BIN_PATH"] = bin
+            environment["CCNAVI_ENTRY_PATH"] = bin
         environment.update(extra_env or {})
         return run_ccnavi(
             [
@@ -1069,7 +1069,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("builtin:guard-binary", result.stdout)
 
     def test_指していなければ実行ファイルのパスは当たらない(self):
-        # CCNAVI_BIN_PATH が空なら、そこは守る対象ではない。パスを推測して
+        # CCNAVI_ENTRY_PATH が空なら、そこは守る対象ではない。パスを推測して
         # 守ると、そこに在る別のファイルを実体として扱うことになる。
         self.binary()
 
@@ -1278,7 +1278,7 @@ class SelfGuardTest(unittest.TestCase):
 
         result = self.run_hook("SessionStart", bin=missing)
 
-        self.assertIn("CCNAVI_BIN_PATH", result.stdout)
+        self.assertIn("CCNAVI_ENTRY_PATH", result.stdout)
 
     def test_拡張子を書かないパスでも実行ファイルに当たる(self):
         # hook の登録は 3 つの環境で同じ 1 行を使う。PyInstaller が Windows で
@@ -1315,7 +1315,7 @@ class SelfGuardTest(unittest.TestCase):
     def scripts_layout(self, place=(".ccnavi",)):
         """sh を `<place>/scripts/`、実体を `<place>/bin/<この機械>/` に置く。
 
-        返すのは (CCNAVI_BIN_PATH に書く相対パス, sh の絶対パス, 実体の絶対パス)。
+        返すのは (CCNAVI_ENTRY_PATH に書く相対パス, sh の絶対パス, 実体の絶対パス)。
         place を空にすると、ワークスペースルートの直下に `scripts/` と `bin/` が並ぶ。
         """
         spelled = "/".join([*place, "scripts", LAUNCHER_NAME])

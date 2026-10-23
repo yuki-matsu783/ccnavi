@@ -74,7 +74,7 @@ EVENTS = (
     "SubagentStart",
     "SubagentStop",
 )
-REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_BIN_PATH")
+REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_ENTRY_PATH")
 # `projects/` がワークスペースの git に追跡されているときの知らせの先頭の句。`--lint` の
 # `(projects)` の warn と同じ句で始まる（VS Code 拡張が見分けに使う）。
 TRACKED_LEAD = "`projects/` はワークスペースの git が追跡している"
@@ -88,8 +88,8 @@ UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # チケット制御を使うか（settings.py の TICKET_CONTROL_ENV）。プロジェクトが導入のときに決める。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # hook に登録される 1 行。docs/guide/settings.md「settings.json の例」と対になる。表記が変わると、
-# ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものが食い違う。
-HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
+# ccnavi 自身が守る対象（CCNAVI_ENTRY_PATH）と実際に起動するものが食い違う。
+HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}"'
 # セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する。
 # デフォルトブランチを ff で進め、ワークツリーの起点を新しくする。
 FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh"'
@@ -195,7 +195,7 @@ NO_TEMPLATES_STDOUT = """\
 <T>/.claude/settings.json
 足した env:
   CCNAVI_MODE
-  CCNAVI_BIN_PATH
+  CCNAVI_ENTRY_PATH
   CCNAVI_RESTORE_IF_DENY
   CCNAVI_GUARD_CORE_FILES
   CCNAVI_GUARD_TICKET_APPROVAL
@@ -253,7 +253,7 @@ ccnavi を登録した hook:
 env の値は、セッションを開き直すまで反映されません。
 """
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
-# CCNAVI_BIN_PATH に書くパス。固定。
+# CCNAVI_ENTRY_PATH に書くパス。固定。
 BIN_PATH = "/".join(LAUNCHER_PARTS)
 # 配布先の .gitignore に足す `--docs` の索引の 1 行と見出し。docsearch は git がそこの
 # ccnavi-index.jsonl を無視しているときだけ書く（docs/design/diagnostics.md の 10.1「ドキュメントの索引」）。
@@ -412,7 +412,7 @@ class WritesTheExpectedShape(SetupTest):
 
         「ccnavi という字が入っている」だけを見ていると、表記を取り違えても
         テストが通ってしまう。この 1 行は、何を起動するかと、ccnavi が何を
-        守るか（CCNAVI_BIN_PATH）を同時に決めている。
+        守るか（CCNAVI_ENTRY_PATH）を同時に決めている。
         """
         self.run_setup()
         data = self.read_settings()
@@ -467,7 +467,7 @@ class WritesTheExpectedShape(SetupTest):
         self.run_setup("--mode", "enable")
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_MODE"], "enable")
-        self.assertEqual(env["CCNAVI_BIN_PATH"], BIN_PATH)
+        self.assertEqual(env["CCNAVI_ENTRY_PATH"], BIN_PATH)
 
     def test_does_not_write_the_common_layer_paths(self):
         """共通レイヤーの 3 本は `.ccnavi/config/common/` 固定なので、env には書かない。
@@ -489,7 +489,7 @@ class WritesTheExpectedShape(SetupTest):
         設定に機械の語や `.exe` が入ると、その 1 行が 1 つの環境でしか当たらなくなる。
         """
         self.run_setup()
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_ENTRY_PATH"], BIN_PATH)
 
     def test_writes_the_guards_at_the_same_strength_as_the_mode(self):
         """戻す働きの 2 つは CCNAVI_MODE と同じ値で並ぶ。
@@ -943,7 +943,7 @@ class TellsWhatItDidNotChange(SetupTest):
         """--check は書かない。揃っていなければ終了コードで言う。"""
         result = self.run_setup("--check")
         self.assertEqual(result.returncode, 1)
-        self.assertIn("CCNAVI_BIN_PATH", result.stdout)
+        self.assertIn("CCNAVI_ENTRY_PATH", result.stdout)
         self.assertIn("SubagentStop", result.stdout)
         self.assertFalse(os.path.exists(self.settings_path()))
 
@@ -1164,7 +1164,7 @@ class WritesWithoutLeavingTraces(SetupTest):
 class DeploysWhatTheProjectNeeds(SetupTest):
     """`--deploy` が、設定だけでは動かないものを配布元から配る。
 
-    `dist/` は .gitignore に入っていて git では渡らず、`CCNAVI_BIN_PATH` は相対で
+    `dist/` は .gitignore に入っていて git では渡らず、`CCNAVI_ENTRY_PATH` は相対で
     しか書けない。よそで組んだ実行ファイルを指すこともできないので、対象
     プロジェクトの中に実体を置く経路がこのスクリプトに要る。
     """
@@ -1662,7 +1662,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_ENTRY_PATH"], BIN_PATH)
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "_internal", "base_library.zip")))
         self.assertEqual(sorted(os.listdir(self.deployed(*BIN_DIR_PARTS))), [THIS_MACHINE])
@@ -2369,7 +2369,7 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
 
 
 class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
-    """既定でない CCNAVI_BIN_PATH（ユーザが決めたパス）は書き換えず、名指しする。"""
+    """既定でない CCNAVI_ENTRY_PATH（ユーザが決めたパス）は書き換えず、名指しする。"""
 
     def test_leaves_a_path_it_did_not_write_and_names_it(self):
         """既定でないパスは書き換えず、名指しで 1 行出す。終了コードは 0（S10）。
@@ -2378,11 +2378,11 @@ class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
         案内は settings.json の値の直し方。
         """
         custom = "dist/ccnavi/ccnavi"
-        self.write_settings({"env": {"CCNAVI_BIN_PATH": custom}})
+        self.write_settings({"env": {"CCNAVI_ENTRY_PATH": custom}})
         result = self.run_setup("--deploy", self.make_source())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], custom)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_ENTRY_PATH"], custom)
         self.assertTrue(
             any(custom in line and BIN_PATH in line for line in result.stdout.splitlines()),
             result.stdout,
@@ -2397,12 +2397,12 @@ class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
         self.assertEqual(settled.returncode, 0, settled.stdout)
 
         data = self.read_settings()
-        data["env"]["CCNAVI_BIN_PATH"] = "dist/ccnavi/ccnavi"
+        data["env"]["CCNAVI_ENTRY_PATH"] = "dist/ccnavi/ccnavi"
         self.write_settings(data)
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("dist/ccnavi/ccnavi", result.stdout)
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], "dist/ccnavi/ccnavi")
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_ENTRY_PATH"], "dist/ccnavi/ccnavi")
 
 
 class WritesTheVscodeSettings(SetupTest):
@@ -2465,7 +2465,7 @@ class WritesTheVscodeSettings(SetupTest):
         self.assertIn(".vscode/settings.json", result.stdout)
         self.assertIn("--no-vscode", result.stdout)
         # 肝心の登録は済んでいる。
-        self.assertIn("CCNAVI_BIN_PATH", self.read_settings()["env"])
+        self.assertIn("CCNAVI_ENTRY_PATH", self.read_settings()["env"])
 
     def test_no_vscode_leaves_it_alone(self):
         result = self.run_setup("--no-vscode")

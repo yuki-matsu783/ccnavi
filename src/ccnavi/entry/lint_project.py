@@ -86,7 +86,7 @@ def _registered(root: str, event: str = hookio.POST_TOOL_USE) -> bool | None:
         for hook in entry.get("hooks", []) if isinstance(entry, dict) else []:
             command = hook.get("command") if isinstance(hook, dict) else None
             # 大文字小文字を無視する。実行ファイルの位置を環境変数から取る形
-            # （`${CCNAVI_BIN_PATH}`）が普通にあり、そこでは名前が大文字で書かれる。
+            # （`${CCNAVI_ENTRY_PATH}`）が普通にあり、そこでは名前が大文字で書かれる。
             # 区別すると、正しく登録されている設定に「登録されていない」と言う。
             if isinstance(command, str) and "ccnavi" in command.lower():
                 return True
@@ -140,7 +140,7 @@ def _project_settings(root: str) -> list[Problem]:
                     f"モードとして読めない。{modes.ENABLE} として扱う",
                 )
             )
-    problems.extend(_bin_path(root, env.get(settings.BIN_ENV)))
+    problems.extend(_bin_path(root, env.get(settings.ENTRY_ENV)))
     return problems
 
 
@@ -156,7 +156,7 @@ LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 # 同じ理由の拒否の数え方）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
 # 他の機械で、同じ親子のチケットに掛かる保護が別になる。入れないのは、判定の答えを変えない
 # 次の値だけ。
-# 実行ファイルのパス（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
+# 実行ファイルのパス（`CCNAVI_ENTRY_PATH`。hook の起動のために手元で差し替える。README の
 # 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、タイムアウト監視と待ちの秒（`CCNAVI_*_TIMEOUT`・
 # `CCNAVI_LOCK_WAIT`）。
 _LOCAL_FORBIDDEN = (
@@ -211,7 +211,7 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
     """`.claude/settings.json` の env の実行ファイルのパスを見る。
 
     設定ファイルを読む。hook が起動するのは、ここに書いたパス
-    （`"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"`）だから。
+    （`"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}"`）だから。
 
     - 指す先が在るのに実行できなければ error。hook は sh を直に起動するので 126 で起動せず、
       判定そのものが動いていない。無いときは言わない。組み立ての前や、ユーザごとの設定で
@@ -227,7 +227,7 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
             Problem(
                 SEVERITY_ERROR,
                 "(project)",
-                f"{PROJECT_SETTINGS} の env の {settings.BIN_ENV}={declared} は在るが実行できない。"
+                f"{PROJECT_SETTINGS} の env の {settings.ENTRY_ENV}={declared} は在るが実行できない。"
                 "hook が起動しないので何も判定していない。実行ビットを付ける"
                 f"（chmod +x {declared}）か、scripts/ccnavi-setup.sh を再実行してください",
             )

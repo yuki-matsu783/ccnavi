@@ -195,7 +195,7 @@ class FallbackTest(unittest.TestCase):
         # 絶対パスは `/` で書いて shlex.quote で引用する。bash は引用されない `\` を取り除くので、
         # `\` の表記のまま埋め込むと、ガードが見る行き先が変わる。
         for env, command in [
-            ({"CCNAVI_BIN_PATH": "tools/guard/ccnavi"}, "cp /tmp/x tools/guard/ccnavi"),
+            ({"CCNAVI_ENTRY_PATH": "tools/guard/ccnavi"}, "cp /tmp/x tools/guard/ccnavi"),
             ({}, f"echo x > {shlex.quote(self.broken.replace(os.sep, '/'))}"),
         ]:
             with self.subTest(command=command):

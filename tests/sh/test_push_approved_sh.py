@@ -171,7 +171,7 @@ class Workspace(unittest.TestCase):
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
         }
-        env["CCNAVI_BIN_PATH"] = posix(self.write_and_push_stub)
+        env["CCNAVI_ENTRY_PATH"] = posix(self.write_and_push_stub)
         env.update(extra)
         return env
 
@@ -864,7 +864,7 @@ class ApproveCarriesTest(Workspace):
 
     def approve(self, *ids, **extra):
         env = self.env(
-            CCNAVI_BIN_PATH=posix(self.stub),
+            CCNAVI_ENTRY_PATH=posix(self.stub),
             **{k: posix(v) if k in ("STUB_TREE", "STUB_ARGS") else v for k, v in extra.items()},
         )
         return self.run_sh("ccnavi-user-agree.sh", *ids, env=env)
@@ -1043,7 +1043,7 @@ class ApproveCarriesTest(Workspace):
         os.chmod(uv, 0o755)
         inner = os.path.join(self.ws, "docs")
         os.makedirs(inner)
-        env = self.env(CCNAVI_BIN_PATH=posix(os.path.join(self._tmp.name, "none")))
+        env = self.env(CCNAVI_ENTRY_PATH=posix(os.path.join(self._tmp.name, "none")))
         env["PATH"] = os.pathsep.join([os.path.dirname(uv), env.get("PATH", "")])
         result = self.run_sh("ccnavi-user-agree.sh", cwd=inner, env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

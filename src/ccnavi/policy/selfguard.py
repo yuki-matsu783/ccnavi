@@ -519,7 +519,7 @@ def at_start(
                     Outcome(
                         target,
                         ACTION_MISSING,
-                        "実行ファイルが見つからない。CCNAVI_BIN_PATH のパスを確かめてください",
+                        "実行ファイルが見つからない。CCNAVI_ENTRY_PATH のパスを確かめてください",
                     )
                 )
                 continue

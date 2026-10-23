@@ -28,7 +28,7 @@
 #
 # 配布物は、ccnavi を組み立てた場所（ccnavi のリポジトリ）から対象プロジェクトへコピーする。
 # 設定を書くだけでは動かないのに、実行ファイルを置く手段がどこにも無かった。`dist/` は
-# .gitignore に入っているので git では渡らない。CCNAVI_BIN_PATH は相対パスでしか書けないので、
+# .gitignore に入っているので git では渡らない。CCNAVI_ENTRY_PATH は相対パスでしか書けないので、
 # よそで組み立てた実行ファイルを指すこともできない。対象プロジェクトの中に実体を置く経路が
 # ここに要る。
 #
@@ -41,14 +41,14 @@
 # 理由を 1 行出し、settings.json は書く。指定された `--deploy` が使えないときだけ 2 で止める。
 # ユーザが指定したものが無いのは、環境の誤りとして扱う。
 #
-# 置き場は 2 つに分けて固定する。CCNAVI_BIN_PATH が指すのは
+# 置き場は 2 つに分けて固定する。CCNAVI_ENTRY_PATH が指すのは
 # .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh。代わりに通る sh と同じ置き場）で、
 # 実行ファイルは機械ごとに .ccnavi/bin/<os>-<arch>/ に置く。振り分けの sh は、自分の 1 つ上の
 # bin/ から、hook を起動した機械に合うものを選ぶ。settings.json は Windows・WSL・Linux・macOS で
 # 同じファイルを開く。1 行の command から機械ごとに違う実体を起動するには、sh の中で選ぶしかない。
 # 置き場は動かないので、置き場を指定するオプションは持たない。
 #
-# CCNAVI_BIN_PATH が既定でないパスなら書き換えず、そのパスを挙げて知らせるだけにする。
+# CCNAVI_ENTRY_PATH が既定でないパスなら書き換えず、そのパスを挙げて知らせるだけにする。
 #
 # 配布先に既にあるものには触らない。入れ替えるのは `--force` を付けたときだけ。
 # ルールファイルも代わりに通る sh も、入れた先で手直しされている前提のもの。断りなく上書き
@@ -72,7 +72,7 @@ VSCODE_REL=".vscode/settings.json"
 VSCODE_KEYS='{"git.detectWorktrees": true, "git.repositoryScanMaxDepth": 2}'
 # hook はこの 1 行だけを登録する。どのイベントの処理を走らせるかは、payload にある
 # イベント名を見て ccnavi 自身が選ぶ。
-HOOK_COMMAND='"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
+HOOK_COMMAND='"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}"'
 HOOK_TIMEOUT=10
 # 8 つのイベントすべてに登録する。1 つでも欠けると、そのイベントでしかできない処理が、
 # 気づかないうちに行われなくなる。何が行われなくなるかは docs/guide/settings.md「設定」の表にある。
@@ -86,7 +86,7 @@ FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh
 FETCH_TIMEOUT=60
 
 DEFAULT_MODE="dry-run"
-# CCNAVI_BIN_PATH に書くパス。hook が起動する振り分けの sh で、固定。
+# CCNAVI_ENTRY_PATH に書くパス。hook が起動する振り分けの sh で、固定。
 # ccnavi ディレクトリ（.ccnavi/）の下に置けば、ccnavi ディレクトリを守るルールが、
 # そのまま sh にも実行ファイルにも適用される。
 BIN_PATH=".ccnavi/scripts/ccnavi-launcher.sh"
@@ -202,7 +202,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --no-fetch                セッション開始時の入口（ccnavi-session-start.sh）を hook に登録しない。
                             取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する（ディレクトリ一覧も出なくなる）
 
-CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
+CCNAVI_ENTRY_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 3 本（.ccnavi/config/common/rules.yml、
 .ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
 配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
@@ -811,7 +811,7 @@ shape=$(printf '%s' "$current" | jq -r '
 ')
 [ -z "$shape" ] || die "$SETTINGS_REL の構造を扱えません: ${shape}。直してから、もう一度実行してください。"
 
-# 必ず書く env。既定値を持たない CCNAVI_BIN_PATH と、保護の設定項目。設定ファイルを
+# 必ず書く env。既定値を持たない CCNAVI_ENTRY_PATH と、保護の設定項目。設定ファイルを
 # 見るだけで、何を起動するかと、どこまで止まるかが分かるようにする。
 #
 # 戻す働きを持つ 2 つは CCNAVI_MODE に合わせる。設定が無ければ enable で動くので、
@@ -841,7 +841,7 @@ shape=$(printf '%s' "$current" | jq -r '
 # オプションとしては受ける。
 env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "$ticket_control" '{
 	CCNAVI_MODE: $mode,
-	CCNAVI_BIN_PATH: $bin,
+	CCNAVI_ENTRY_PATH: $bin,
 	CCNAVI_RESTORE_IF_DENY: $mode,
 	CCNAVI_GUARD_CORE_FILES: $mode,
 	CCNAVI_GUARD_TICKET_APPROVAL: "enable",
@@ -851,12 +851,12 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# 既定でない CCNAVI_BIN_PATH（ユーザが決めたパス）は書き換えず、そのパスを挙げた 1 行を出す。
+# 既定でない CCNAVI_ENTRY_PATH（ユーザが決めたパス）は書き換えず、そのパスを挙げた 1 行を出す。
 # 導入は止めず、終了コードも変えない（--check では「揃っていない」に数える）。
-current_bin=$(printf '%s' "$current" | jq -r '(.env // {}).CCNAVI_BIN_PATH // "" | if type == "string" then . else "" end')
+current_bin=$(printf '%s' "$current" | jq -r '(.env // {}).CCNAVI_ENTRY_PATH // "" | if type == "string" then . else "" end')
 bin_custom=""
 if [ -n "$current_bin" ] && [ "$current_bin" != "$BIN_PATH" ]; then
-	bin_custom="CCNAVI_BIN_PATH は既定と違う値（${current_bin}）です。書き換えていません。揃えるなら .claude/settings.json の値を ${BIN_PATH} に直してください。"
+	bin_custom="CCNAVI_ENTRY_PATH は既定と違う値（${current_bin}）です。書き換えていません。揃えるなら .claude/settings.json の値を ${BIN_PATH} に直してください。"
 fi
 
 # --force で置き換えてよいキー。ユーザがこの実行で指定した 2 つだけ。
@@ -900,7 +900,7 @@ replacing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" --argjs
 	| select(.key as $k | $forced | index($k) != null)
 	| "\(.key): \($cur[.key]) -> \(.value)"
 ')
-# CCNAVI_BIN_PATH は、既定でないパスのときに専用の 1 行で知らせる。ここに並べると、
+# CCNAVI_ENTRY_PATH は、既定でないパスのときに専用の 1 行で知らせる。ここに並べると、
 # --force で置き換えられるかのような見出しの下に表示される。
 bin_named=no
 if [ -n "$bin_custom" ]; then
@@ -910,7 +910,7 @@ differing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" --argjs
 	(.env // {}) as $cur | $env | to_entries[]
 	| select($cur[.key] != null and $cur[.key] != .value)
 	| select(.key as $k | $forced | index($k) == null)
-	| select(($bin_named == "yes" and .key == "CCNAVI_BIN_PATH") | not)
+	| select(($bin_named == "yes" and .key == "CCNAVI_ENTRY_PATH") | not)
 	| "\(.key): \($cur[.key])（このスクリプトが書くのは \(.value)）"
 ')
 # 根を $root に取っておいてから回す。イベント名が `.` に入ったまま関数を呼ぶと、
