@@ -36,7 +36,7 @@ from ..tickets import (
     ticket_model,
     ticket_places,
 )
-from . import docsearch, failsafe, parentwrite, projskills, reasons, wrapguard
+from . import agentlaunch, docsearch, failsafe, parentwrite, projskills, reasons, wrapguard
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
 # それより先に自前の判定を出し終えることが、遅い判定が何も返さないまま許可として扱われて
@@ -80,7 +80,6 @@ DRY_RUN_HOLDS_NOTE = (
 SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # ルールを当てる欄の表と選び方は `policy.subjects` にある（ルールファイルの検査も同じ表を読む）。
-AGENT_TOOL = subjects.AGENT_TOOL
 SUBJECT_FIELDS = subjects.SUBJECT_FIELDS
 PATH_TOOLS = subjects.PATH_TOOLS
 SEARCH_TOOLS = subjects.SEARCH_TOOLS
@@ -527,6 +526,32 @@ def decide_before(
                 kind=GATE,
             )
 
+    # サブエージェントの起動。プロンプトの言及から担当を決める。決まらないときの止めは、ここ
+    # （レビュー待ちの止めのあと、ルールの照合の前）で返す。決まったときの更新の計画（担当の案内を
+    # プロンプトに書き足す）は持ったまま判定を進め、最後の応答で 1 つの JSON に合成する。
+    # ルールには書き足す前の入力を当てる。
+    launch = agentlaunch.Result()
+    if payload.tool_name in modes.AGENT_TOOLS:
+        launch = agentlaunch.decide(conf, root, payload, raw)
+        if launch.stop is not None:
+            record.code, record.rules = launch.stop.code, [launch.stop.rule]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        launch.stop.code, launch.stop.rule, display_subject, launch.stop.text
+                    )
+                ],
+                conf=conf,
+                root=root,
+                kind=launch.stop.kind,
+            )
+    updated = launch.plan.apply(payload.tool_input) if launch.plan else None
+
     # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
     # チケットの範囲の判定の両方が引く。走査は 1 回で数百ミリ秒かかるので、1 回の判定で
     # 1 度だけ読んで両方に渡す。ワークスペースルートへの書き込みとシェルでは読まない。
@@ -783,15 +808,14 @@ def decide_before(
 
     if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
-        if notices or context:
+        if notices or context or updated is not None:
             # 通した回にも言う。ガードが今なにを見ていないのかを言わないでいると、
             # 誰も知らないまま作業が進む。呼び出しごとに出るのでうるさいが、
             # うるさいのが正しい。不正な設定と未承認のチケットはどちらも
             # 短命であるべきで、気づかないうちに残り続けるより気づかれたほうがよい。
             # ルールの additionalContext も同じ経路で、通す代わりに一言添える。
-            hookio.write_context(
-                stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices + ([context] if context else []))
-            )
+            # 起動の入力の更新（担当の案内）は判定を付けずに同じ JSON へ載せる。
+            _write_pass(stdout, "\n\n".join(notices + ([context] if context else [])), updated)
         return EXIT_OK
 
     # どちらの文面を返すかは、判定を決めた側で分ける。ルールが当たっていても、
@@ -907,10 +931,8 @@ def decide_before(
         record.decision, record.enforced = audit.HANDOVER, False
         # 1 度だけ渡す文（提案を書いた回の確認、プロジェクトのスキルの目録）は、渡す回にも言う。
         # 言わないと、その文を伝える機会が権限モードに渡す呼び出しの分だけ遅れる。
-        if notices or told:
-            hookio.write_context(
-                stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices + ([told] if told else []))
-            )
+        if notices or told or updated is not None:
+            _write_pass(stdout, "\n\n".join(notices + ([told] if told else [])), updated)
         return EXIT_OK
 
     return refuse(
@@ -923,7 +945,19 @@ def decide_before(
         conf=conf,
         root=root,
         kind=final_kind(conf, hit_ids, ticket_reason, capped),
+        updated_input=updated,
     )
+
+
+def _write_pass(stdout: TextIO, text: str, updated: dict | None) -> None:
+    """通す・渡す回の応答。文があれば additionalContext、入力の更新があれば updatedInput。
+
+    判定（permissionDecision）は付けない。付けると権限の確認を飛ばす（allow）ことになる。
+    """
+    if updated is None:
+        hookio.write_context(stdout, hookio.PRE_TOOL_USE, text)
+        return
+    hookio.write_pre_tool_use(stdout, context=text, updated_input=updated)
 
 
 # 一般の保護とは別に、dry-run でも止める関門のルール。チケット制御が有効なときだけ足されるので、
@@ -1002,6 +1036,7 @@ def refuse(
     root: str = "",
     *,
     kind: str,
+    updated_input: dict | None = None,
 ) -> int:
     """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。
 
@@ -1016,6 +1051,10 @@ def refuse(
     conf があれば、止めた回を数える（repeat）。同じ理由で同じ呼び出しを N 回止めたら、
     文面の末尾に「言い換えずに相談する」一文を足す。判定は変えない。数えるのは実際に
     止めた回（enable の deny）だけで、dry-run と確認は数えない。
+
+    updated_input は起動の入力の更新（担当の案内）。確認（ask）に添えて返す。強制される拒否には
+    添えない。dry-run で報告だけにする回は、呼び出しが進むので添える（案内であって、
+    緩めることではない）。
 
     拒否は、失敗の連続（failstreak）にも数える。こちらは dry-run の deny も数える（dry-run は
     判定を変えないので、案内を出してよい）。連続が閾値に達した回は、文面の末尾に資料を引く案内を足す。
@@ -1037,7 +1076,7 @@ def refuse(
             text += "\n\n" + streak
         if context:
             text += "\n\n" + context
-        hookio.write_context(stdout, hookio.PRE_TOOL_USE, text)
+        _write_pass(stdout, text, updated_input)
         return EXIT_OK
 
     record.decision, record.enforced = decision, True
@@ -1047,6 +1086,15 @@ def refuse(
             reason += "\n\n" + repeat.note(repeat.rule_of(record), n)
         if streak:
             reason += "\n\n" + streak
+    if verdict != rules.DENY and updated_input is not None:
+        hookio.write_pre_tool_use(
+            stdout,
+            decision=hookio.ASK,
+            reason=reason,
+            context=context,
+            updated_input=updated_input,
+        )
+        return EXIT_OK
     hookio.write_verdict(
         stdout, hookio.DENY if verdict == rules.DENY else hookio.ASK, reason, context
     )

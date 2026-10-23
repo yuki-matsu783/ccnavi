@@ -7,12 +7,12 @@
 
 from __future__ import annotations
 
-from ..infra import fsio, hookio
+from ..infra import fsio, hookio, modes
 from . import ruleload
 
-# サブエージェントの起動ツール。レビューが済むまで止める対象で、対象の文字列を持たないので
-# 見出しだけを subject にする。
-AGENT_TOOL = "Agent"
+# サブエージェントの起動ツール（Agent・Task）。レビューが済むまで止める対象で、対象の文字列を
+# 持たないので見出しだけを subject にする。一覧は infra.modes が持つ。
+AGENT_TOOLS = modes.AGENT_TOOLS
 
 # ツールごとに、ルールを当てる欄。ここに無いツールは対象を持たず、判定に届かない
 # まま通る。名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を
@@ -31,7 +31,8 @@ SUBJECT_FIELDS: dict[str, str] = {
     "Write": "file_path",
     "NotebookEdit": "notebook_path",
     "Skill": "skill",
-    AGENT_TOOL: "description",
+    "Agent": "description",
+    "Task": "description",
     "WebFetch": "url",
 }
 
@@ -51,7 +52,7 @@ def subject_of(payload: hookio.Input) -> str:
     field = SUBJECT_FIELDS.get(tool)
     if field is None:
         return ""
-    if tool == AGENT_TOOL:
+    if tool in AGENT_TOOLS:
         # 起動には対象の文字列が無い。レビューが済むまで止める対象なので、見出しを subject に
         # して判定に入れる。
         return payload.field_value(field) or payload.field_value("prompt") or "(agent)"

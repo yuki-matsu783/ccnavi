@@ -36,6 +36,7 @@ from ..tickets import (
     direct_candidates,
     learning_notice,
     ops_stop,
+    ops_stop_feedback,
     ops_stop_integrate,
     ops_stop_request,
     overview,
@@ -237,18 +238,23 @@ def decide_at_prompt(
 ) -> int:
     """ユーザが何か言ったとき。ターンの基準をここで取る。
 
-    何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
-    まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
-    ターンの終わりに「このターンで何が変わったか」を言えるようにする記録だけ。
+    基準を取るだけの回は何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
+    まだ何も起きていない時点で文を足さないためで、返すのは次の 5 種類の文だけ。空でない文は
+    空行で区切って 1 つの `additionalContext` にまとめる。
 
-    承認されたことも伝えない。ボードの承認は拡張が承認の文（`agree_screen.approved_text`）を渡し、
+    1. 設定ファイルの変更の知らせ（`guard`）。ユーザの発言ではない回（バックグラウンド作業の
+       完了通知など）に、ターンの間に動いた設定ファイルを戻した旨を言う
+    2. 依頼文の issue・MR の指定への指示（`branchfind.prompt_context`）。着手の前に紐づく
+       ブランチを探してユーザに確かめる
+    3. 終わったサブエージェントの子の範囲を確かめられなかった印（`subagent.unchecked_scope`）
+    4. 終わったサブエージェントの結果の知らせ（`subagent.outcome_notices`）
+    5. 手作業で確かめる旨（`_manual_confirm_note`）
+
+    どれも文を足すだけで、作業は止めない。
+
+    承認されたことは伝えない。ボードの承認は拡張が承認の文（`agree_screen.approved_text`）を渡し、
     ほかの経路の承認は、エージェントが `ccnavi-ticket.sh status` で聞く。hook が起点を取って
     増えた承認を数える形は、セッションの開始時の取り込みで届いた承認を起点に含めて取りこぼした。
-
-    例外は 2 つ。依頼文に issue・MR の指定（`#152`・`!5` など）があるとき。着手の前に紐づく
-    ブランチを探してユーザに確かめる指示を足す。もう 1 つは、終わったサブエージェントの子の
-    範囲を確かめられなかった印が残っているとき（`subagent.unchecked_scope`）。どちらも文を
-    足すだけで、作業は止めない。
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）に渡す。
 
@@ -434,6 +440,8 @@ def decide_at_stop(
     if not nudge:
         # finish の促しで止める回は、依頼までの道の促しを出しも数えもしない。
         nudge = _request_nudge(stderr, conf, root, asked, record, raw)
+    if not nudge:
+        nudge = _feedback_nudge(stderr, conf, root, asked, record, raw)
     if not nudge:
         nudge = _subagent_nudge(conf, payload, record)
     if not nudge:
@@ -790,10 +798,17 @@ def _finish_nudge(
     何もしない。state の置き場が無い（`--state ""`）か、記録を書けないときは促さない。
     覚えられないまま止めると、ターンの終わりのたびに止まるので、何も言わない側を採る。
     チケット制御が disable なら何もしない。
+    このセッションに実行中のサブエージェントが居る間（`subagent.running`。記録を読めないときも）は
+    促さず、「1 回だけ」の記録も進めない。
 
     `raw` は呼び手が同じ hook の中で `approval.read_raw` で読んだ置き場（`decide_at_stop`）。
     """
     if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
+        return ""
+    # 実行中のサブエージェントが居る間は、委任して待つ回なので促さない（`_request_nudge` と同じ）。
+    # ここで返すので「1 回だけ」の記録は進まず、終わったあとの Stop でまた促せる。防ぐのは誤った
+    # 促しだけで、メインが自分から早く finish を打つことは防がない。
+    if subagent.running(conf.state, payload.session_id):
         return ""
     found = ops_stop.unfinished_at_stop(root, conf, payload.cwd, raw)
     if found is None or ops_stop.nudged_before(conf.state, payload.session_id, found):
@@ -847,6 +862,38 @@ def _request_nudge(
     record.enforced = True
     record.tree = found.parent.ticket
     return ops_stop_request.request_nudge(root, found)
+
+
+def _feedback_nudge(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    raw: approval.Raw | None = None,
+) -> str:
+    """フィードバック計画待ちのまま終えようとしたとき、次の一手を促す文。促さないなら空文字。
+
+    止めない回と止め方は `_request_nudge` と同じ（`stop_hook_active`・サブエージェント・
+    state の置き場・実行中のサブエージェントを見る。`dry-run` でも止める）。同じ状態（親・HEAD・
+    改版を提案済みか）では 1 回だけで、記録は `nudged-<セッション>.json` の `feedback:` で
+    始まる鍵。判定は `ops_stop_feedback.waiting_at_stop`。
+    """
+    if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
+        return ""
+    if subagent.running(conf.state, payload.session_id):
+        return ""
+    found = ops_stop_feedback.waiting_at_stop(root, conf, payload.cwd, raw)
+    if found is None or ops_stop_feedback.nudged_before(conf.state, payload.session_id, found):
+        return ""
+    failed = ops_stop_feedback.remember_nudge(conf.state, payload.session_id, found)
+    if failed:
+        stderr.write(f"ccnavi: フィードバック計画を促した記録を残せないので、促さない: {failed}\n")
+        return ""
+    record.decision, record.code = audit.NUDGE, ops_stop_feedback.CODE_FEEDBACK_NUDGE
+    record.enforced = True
+    record.tree = found.parent.ticket
+    return ops_stop_feedback.feedback_nudge(root, found)
 
 
 def _subagent_nudge(conf: settings.Settings, payload: hookio.Input, record: audit.Record) -> str:

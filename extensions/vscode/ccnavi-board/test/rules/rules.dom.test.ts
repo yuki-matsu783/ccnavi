@@ -534,7 +534,7 @@ test("CB-T69 タイプごとに畳むボタンを出す", async () => {
 test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名前（括弧の中を除いたもの）で並ぶ", async () => {
   // 判定が対象を取り出せるツールだけ。WebSearch は取り出せないので載せない。
   assert.deepEqual([...KNOWN_TOOLS], [
-    "Bash", "PowerShell", "Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit", "Skill", "Agent", "WebFetch",
+    "Bash", "PowerShell", "Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit", "Skill", "Agent", "Task", "WebFetch",
   ]);
   const dom = await openRules();
   try {

@@ -7,6 +7,7 @@
   当たらなければ通す。この評価もできなければ通さない
 - Bash・PowerShell は、読み切れて、連結・置換・リダイレクト・glob を含まない単独のコマンドで、
   下の許可リストに当たるときだけ通す
+- 報告用のツール（`modes.REPORT_TOOLS`）は通す（体が報告を返せなくなるのを避ける）
 - それ以外のツールは通さない（呼び出し側が `modes.fail_closed` で扱いを決める）
 
 `phase_forms._READERS` は流用しない。あれは区切りで分けた各コマンドの先頭の語しか見ず、
@@ -19,7 +20,7 @@ from __future__ import annotations
 import os
 import re
 
-from ..infra import hookio, pathcase, shellread
+from ..infra import hookio, modes, pathcase, shellread
 
 READ_TOOLS = ("Read", "Grep", "Glob")
 SHELL_TOOLS = ("Bash", "PowerShell")
@@ -122,6 +123,8 @@ def shell_is_safe(payload: hookio.Input, root: str = "") -> bool:
 
 def is_safe(payload: hookio.Input, root: str = "") -> bool:
     """判定に達せなかった呼び出しのうち、通してよいもの。"""
+    if payload.tool_name in modes.REPORT_TOOLS:
+        return True
     if payload.tool_name in READ_TOOLS:
         return read_is_safe(payload)
     if payload.tool_name in SHELL_TOOLS:

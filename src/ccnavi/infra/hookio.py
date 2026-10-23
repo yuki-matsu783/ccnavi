@@ -226,6 +226,32 @@ def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "")
     _write(stream, payload)
 
 
+def write_pre_tool_use(
+    stream: TextIO,
+    *,
+    decision: str = "",
+    reason: str = "",
+    context: str = "",
+    updated_input: dict[str, Any] | None = None,
+) -> None:
+    """PreToolUse の応答を 1 つの JSON に組む。判定・理由・文・入力の書き換えのどれも空にできる。
+
+    入力の書き換え（`updatedInput`）は、判定（`permissionDecision`）と別に持つ。判定を付けなければ
+    権限の確認の結末は変わらず、書き換えた入力でそのまま進む。判定を付けると、`allow` は確認を
+    飛ばし、`ask` は書き換えた入力をユーザに見せる。呼び手が判定を渡したときだけ付ける。
+    起動ツールの担当の案内（`hook.agentlaunch`）が使う。
+    """
+    body: dict[str, Any] = {"hookEventName": PRE_TOOL_USE}
+    if decision:
+        body["permissionDecision"] = decision
+        body["permissionDecisionReason"] = reason
+    if context:
+        body["additionalContext"] = context
+    if updated_input is not None:
+        body["updatedInput"] = updated_input
+    _write(stream, body)
+
+
 def write_context(stream: TextIO, event: str, text: str, system: str = "") -> None:
     """判定を返さないとき、モデルに届く文を書き出す。
 

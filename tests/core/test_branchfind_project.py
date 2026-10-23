@@ -57,14 +57,14 @@ class ProjectOfRepoTest(unittest.TestCase):
         sh = settings.script_command(self.root, "ccnavi-start.sh")
         proj = os.path.join(self.root, "projects", "guided-setup-tour-extension")
         self.assertIn(
-            f"- cd {settings.shell_path(proj)} && {sh} --issue 2"
-            " --repo y-taniyama/guided-setup-tour-extension",
+            f"'cd {settings.shell_path(proj)} && {sh} --issue 2"
+            " --repo y-taniyama/guided-setup-tour-extension'",
             said,
         )
 
     def test_the_workspace_own_repo_cds_to_the_root(self):
         said = self.lines(Ref(ISSUE, 2, "ryutec/claudecode-navi"))
-        self.assertIn(f"- cd {settings.shell_path(self.root)} && ", said)
+        self.assertIn(f"'cd {settings.shell_path(self.root)} && ", said)
 
     def test_the_guidance_refuses_to_run_when_the_project_is_not_cloned(self):
         said = self.lines(Ref(ISSUE, 2, "acme/widgets"))
@@ -74,7 +74,7 @@ class ProjectOfRepoTest(unittest.TestCase):
     def test_a_ref_without_a_repo_keeps_the_plain_command(self):
         said = self.lines(Ref(ISSUE, 2))
         sh = settings.script_command(self.root, "ccnavi-start.sh")
-        self.assertIn(f"- '{sh} --issue 2'", said)
+        self.assertIn(f"'{sh} --issue 2'", said)
 
 
 if __name__ == "__main__":
