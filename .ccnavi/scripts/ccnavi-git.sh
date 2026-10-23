@@ -1194,10 +1194,15 @@ d4_tmp_note() {
 }
 
 # 専用のrefを消す。<種類>...
+# 全部に当たってから、消せなかったものがあれば 1 を返し、その種類を d4_rd_failed に入れる。
+# すでに無い ref は消せたものと同じ（update-ref -d は 0）。準備と abort は戻り値を見ない（|| :）。
+d4_rd_failed=""
 d4_refs_drop() {
+	d4_rd_failed=""
 	for d4_rd in "$@"; do
-		git update-ref -d "$d4_ref/$d4_rd" 2>/dev/null || :
+		git update-ref -d "$d4_ref/$d4_rd" 2>/dev/null || d4_rd_failed="${d4_rd_failed:+$d4_rd_failed }$d4_rd"
 	done
+	[ -z "$d4_rd_failed" ]
 }
 
 # 下書きの条件（6.2）を作業ワークツリーについて確かめる。満たさなければ理由をd4_draft_whyに入れて 1。<S>
@@ -1427,7 +1432,7 @@ ig_integrate() {
 			reject integrate-tmp-left "前の一時ワークツリー ${d4_tmp} を片付けられません（${d4_tmp_why}）。中身はユーザのものかもしれないので、黙って消しません。ユーザに確かめてください。"
 		fi
 	fi
-	d4_refs_drop t c k
+	d4_refs_drop t c k || :
 	# TとCを計算する。
 	# 基準は、ふつう起点 S。作業ブランチが取り込み先を取り込んでいる（先頭と HEAD の共通祖先 M が、記録した
 	# 確認時点の HEAD より新しい）ときは M にする。S のままだと、取り込み先側と同じ箇所を直した解決結果が
@@ -1554,7 +1559,7 @@ ig_abort() {
 	if ! d4_tmp_remove "${d4_a_c:-none}" "${d4_a_ktree:-none}"; then
 		d4_a_left=yes
 	fi
-	d4_refs_drop t c k
+	d4_refs_drop t c k || :
 	ig_drop_mark ||
 		reject integrate-abort-marker "取り込みの記録（${ig_mark}）を削除できませんでした。ユーザに伝えてください。"
 	printf 'ok  git integrate  %s の取り込みをやめた（作業ワークツリーとメインのチェックアウトは変えていない）\n' "$ig_n"
@@ -1638,7 +1643,8 @@ d4_finish() {
 		ig_did="${ig_did}ブランチ $ig_n を削除しました（先頭は $(ig_short "$d4_m_tip")）。"
 	fi
 	# ⑤ 専用のrefと直接作業の記録
-	d4_refs_drop t c k s pending
+	d4_refs_drop t c k s pending ||
+		d4_stop "専用の ref（$d4_ref/ の $d4_rd_failed）を削除できませんでした。直接作業の記録と取り込みの記録は残しています" refs
 	rm -f "$d4_rec" 2>/dev/null || :
 	rmdir "$d4_common/ccnavi-direct" 2>/dev/null || :
 	# ⑥ marker

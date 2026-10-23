@@ -51,6 +51,7 @@ def post_without_id(self):
 BAD_POSTS = (
     ("http-500", post_http_500),
     ("not-json", post_not_json),
+    ("no-id", post_without_id),
 )
 
 
@@ -122,8 +123,6 @@ class PostFailureTest(WriteAndPushHostHarness):
                             "投稿が失敗したのに依頼済みのマーカーを置いた",
                         )
 
-    # 実装の欠陥: id の無い 201 応答でも url が "#note_null" になり送信済みにされる
-    @unittest.expectedFailure
     def test_a_post_response_without_a_url_is_not_reported_as_success(self):
         """AT21: 応答が JSON でも投稿の URL を作れない（id が無い）ときは、成功と言わない。"""
         comment_body = write(os.path.join(self._base, "comment.md"), "コメント\n")
@@ -131,6 +130,29 @@ class PostFailureTest(WriteAndPushHostHarness):
             done = self.review("comment", "--body-file", comment_body)
         self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("sent", self.stage_states("comment"))
+        self.assertNotIn("note_null", done.stdout + done.stderr)
+        self.assertIn("unknown", self.stage_states("comment"))
+
+    def test_a_direct_post_without_an_op_record_does_not_report_a_failed_api_as_success(self):
+        """ops begin が失敗する直接投稿でも、API が失敗したら成功と言わない。"""
+        comment_body = write(os.path.join(self._base, "comment.md"), "コメント\n")
+        no_begin = executable(
+            os.path.join(self._base, "bin", "nobegin"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            '*" ops begin "*) exit 1 ;;\n'
+            "esac\n"
+            f"exec '{self.half}' \"$@\"\n",
+        )
+        for name, bad in BAD_POSTS:
+            with self.subTest(post=name), mock.patch.object(Host, "do_POST", bad):
+                Host.notes = []
+                done = self.review(
+                    "comment", "--body-file", comment_body, **{"CCNAVI_BIN_PATH": no_begin}
+                )
+                self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertNotIn("OK: 記録した", done.stdout)
+                self.assertEqual(Host.notes, [])
 
     # ---- AT41: 操作記録を失った後の request の打ち直し
 

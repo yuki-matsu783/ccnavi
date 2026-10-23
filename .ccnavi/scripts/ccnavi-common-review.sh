@@ -296,11 +296,13 @@ comment() {
 	mr_url="$2"
 	body_json=$("$JQ" -Rs '{body: .}' <"$3")
 	if [ "$kind" = github ]; then
+		# 応答に URL（GitLab は id）が無ければ、投稿できたと読める出力をせず、jq の非 0 で終える
+		# （パイプの終了コードは最後の jq のもの）。呼び出し元は、終了コードでも .url の有無でも失敗と読む。
 		api POST "repos/$path/issues/$mr_number/comments" "$body_json" |
-			"$JQ" '{url: (.html_url // ""), created_at: (.created_at // ""), author: (.user.login // "")}'
+			"$JQ" 'if ((.html_url // "") == "") then error("no html_url") else {url: .html_url, created_at: (.created_at // ""), author: (.user.login // "")} end'
 	else
 		api POST "projects/$(encoded_path)/merge_requests/$mr_number/notes" "$body_json" |
-			"$JQ" --arg u "$mr_url" '{url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: ((.author.id // "") | tostring)}'
+			"$JQ" --arg u "$mr_url" 'if .id == null then error("no note id") else {url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: ((.author.id // "") | tostring)} end'
 	fi
 }
 
