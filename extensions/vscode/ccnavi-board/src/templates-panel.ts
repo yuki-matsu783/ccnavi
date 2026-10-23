@@ -55,6 +55,8 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "templates";
+const TITLE = "ccnavi テンプレート管理";
+
 /** 1 枚の画面の「どの対象か」を画面の欄の値に写すための、対象の一覧の既定（共通の設定の欄の kind） */
 const COMMON_KIND = "workspace";
 
@@ -105,18 +107,7 @@ function sameTarget(a: TemplatesTarget, b: TemplatesTarget): boolean {
   return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
 }
 
-function titleOf(target: TemplatesTarget): string {
-  switch (target.kind) {
-    case "workspace":
-      return "ccnavi テンプレート管理: 共通の設定";
-    case "self":
-      return "ccnavi テンプレート管理: ワークスペース";
-    case "project":
-      return `ccnavi テンプレート管理: プロジェクト ${target.name}`;
-  }
-}
-
-/** 読み込み中の一言で「何を」読んでいるか（`titleOf` から題を外した短い言い方） */
+/** 読み込み中の一言で使う対象の名前 */
 function whatOf(target: TemplatesTarget): string {
   switch (target.kind) {
     case "workspace":
@@ -162,14 +153,14 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
   // タブは読む前に作る。実行ファイルに聞く間に、押しても何も起きないように見えるのを避けるため。
   // `state` を先に設定するので、読んでいる間に押し直しても上の `reveal` に入る。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
-  const panel = vscode.window.createWebviewPanel("ccnaviTemplates", titleOf(target), vscode.ViewColumn.One, {
+  const panel = vscode.window.createWebviewPanel("ccnaviTemplates", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
     // 開いたテンプレートの行や本文を持つので、タブを非表示にしても捨てない。
     retainContextWhenHidden: true,
   });
-  showLoading(panel, titleOf(target), SCREEN, whatOf(target));
+  showLoading(panel, TITLE, SCREEN, whatOf(target));
   const current: PanelState = {
     target,
     panel,
@@ -192,7 +183,6 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
  */
 async function switchTarget(current: PanelState, target: TemplatesTarget): Promise<void> {
   current.target = target;
-  current.panel.title = titleOf(target);
   current.loaded = undefined;
   current.error = undefined;
   // 前の対象のファイルの監視は外す。切り替え先が読めたら `reload` が張り直す。読めずにエラーのままなら、

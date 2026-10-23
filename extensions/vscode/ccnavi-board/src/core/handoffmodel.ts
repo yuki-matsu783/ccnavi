@@ -192,7 +192,7 @@ function treeLabel(tree: TreeJson): string {
   return keyLabel(treeKey(tree));
 }
 
-/** `key` から表示名を作る。ボードを読む前（タブの題と読み込み中の一言）にも使う。`main:` はワークスペース */
+/** `key` から表示名を作る。ボードを読む前（読み込み中の一言）にも使う。`main:` はワークスペース */
 export function keyLabel(key: string): string {
   const at = key.indexOf(":");
   const kind = at < 0 ? key : key.slice(0, at);
