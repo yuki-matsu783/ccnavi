@@ -16,6 +16,7 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 |---|---|
 | 用語 | [CONTEXT.md](CONTEXT.md) |
 | 外から観測できる約束 | [requirements.md](requirements.md) |
+| 実行ファイルと拡張の JSON の形 | [requirements/json-shapes.md](requirements/json-shapes.md) |
 | いまの実装の作り | [design.md](design.md) |
 | ディレクトリ構成（モジュールごとの表） | [design/modules.md](design/modules.md) |
 | 判断の理由と経緯、採らなかった案 | [adr/README.md](adr/README.md) |

@@ -17,8 +17,8 @@ ccnavi は、Claude Code を使った開発を、ルール・チケット・必�
 |---|---|---|
 | ルールによる作業のガードとガイド | ツール実行とファイル操作をルールに照らして判定し、止める・確認する・注意点を伝える。拒否には代わりの手段を添える。判定は hook の処理がモデルのコンテキストの外で行い、関係する場面で理由・注意点・手順を届ける | REQ-PRE・REQ-HNT・REQ-RUL・REQ-PST・REQ-SLF・REQ-SES |
 | チケットによる作業・レビュー管理 | 作業の目的・範囲・計画を承認、フェーズ、先行、分担、レビュー、指摘への対応で、合意した作業をレビューまで進める。リスク評価と計画テンプレートの利用を含む。複数人・別 PC・別セッションでの作業とレビューを想定する | REQ-APV・REQ-RSK・REQ-TKT・REQ-MLT・REQ-EXT |
-| ドキュメント・スキルの検索と必要時の参照 | 文書とスキルの本文は最初から渡さず、frontmatter の索引と目録で読む対象を絞り、本文は必要なときに読む | REQ-SES-06（開始時に引き方を示す）。検索そのもの（`ccnavi --docs`）には個別の REQ が無く、挙動は README と設計に書く |
-| 記録と振り返りによるルール・作業手順の改善 | 判定ログ・気づき・振り返りから改善候補を見つけて提案し、人間が採ったものを次に活かす。AI モデル自体の学習ではない | REQ-LRN（一部実装済み）。判定ログからの候補生成（`--suggest`）には個別の REQ が無く、README に書く |
+| ドキュメント・スキルの検索と必要時の参照 | 文書とスキルの本文は最初から渡さず、frontmatter の索引と目録で読む対象を絞り、本文は必要なときに読む | REQ-SES-06（開始時に引き方を示す）。検索そのもの（`ccnavi --docs`）には個別の REQ が無く、挙動は [利用者向けの手引き](guide/docs-search.md)と設計に書く |
+| 記録と振り返りによるルール・作業手順の改善 | 判定ログ・気づき・振り返りから改善候補を見つけて提案し、人間が採ったものを次に活かす。AI モデル自体の学習ではない | REQ-LRN（一部実装済み）。判定ログからの候補生成（`--suggest`）には個別の REQ が無く、[手引き](guide/records.md)に書く |
 
 コア機能に共通する原則が 3 つある。必要な情報を必要なタイミングで届ける（開始時には作業の前提と入口だけを渡し、具体的な案内は関係する場面で、詳しい資料は必要なときに引く）。
 人間の判断を残し、その経路を守る（承認・レビュー・改善の採否をエージェントが代行できる形を作らない）。
@@ -106,6 +106,7 @@ ccnavi は Claude Code の hook から呼ばれる。1 回の呼び出しは、�
 | 2.11 並行するチケット | REQ-TKT | [requirements/tickets.md](requirements/tickets.md) | 複数のチケットを別々のワークツリーで並行して進めることについての要件 |
 | 2.12 複数のリポジトリ | REQ-MLT | [requirements/multi-repo.md](requirements/multi-repo.md) | ワークスペースと、その下に clone したプロジェクトのリポジトリを扱うことについての要件 |
 | 2.13 拡張との取り決め | REQ-EXT | [requirements/extension-if.md](requirements/extension-if.md) | ccnavi が VS Code 拡張と Chrome 拡張に約束すること（実行ファイルの探し方・互換の版・出力の形・Python の API） |
+| 2.13.1 JSON の形 | REQ-EXT | [requirements/json-shapes.md](requirements/json-shapes.md) | extension-if.md が指す、候補・試験・lint・ボード・承認・残った指摘・版の JSON の欄の形 |
 | 2.14 学びの蓄積 | REQ-LRN | [requirements/learning-wiki.md](requirements/learning-wiki.md) | 子チケットの気づきを集め、learning-wiki に溜め、反映先への提案として育てることについての要件（提案まではエージェント、採るのは人間。一部実装済み） |
 | 3 正常な流れ | — | [requirements/flows.md](requirements/flows.md) | 承認からセッション開始、ツール呼び出し、範囲外、フェーズの正常な流れ |
 | 4 適用範囲外 | — | [requirements/out-of-scope.md](requirements/out-of-scope.md) | ccnavi が約束しないこと（適用範囲外） |

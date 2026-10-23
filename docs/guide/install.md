@@ -189,7 +189,7 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 
 | 配布元 | 配布先 |
 |---|---|
-| `dist/ccnavi/`（中身ごと） | `.ccnavi/bin/<os>-<arch>/`（`<os>-<arch>` は `dist/ccnavi.target` の目印） |
+| `dist/ccnavi/`（中身ごと） | `.ccnavi/bin/<os>-<arch>/`（`<os>-<arch>` は組み立てた機械で決まる） |
 | `.ccnavi/config/common/rules.yml` | 同じパス |
 | `.ccnavi/config/common/risks.yml` | 同じパス |
 | `.ccnavi/config/common/phases.yml` | 同じパス |

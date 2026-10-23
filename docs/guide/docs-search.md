@@ -51,8 +51,8 @@ git で決める（統合した後は統合先の索引に入るため）。
 | `--type <値>` | `frontmatter.type` | 完全一致 |
 | `--tag <値>` | `frontmatter.tags` の要素（スカラーでも 1 要素のリストとして扱う） | 完全一致 |
 | `--keyword <値>` | `frontmatter.keywords` の要素 | 完全一致 |
-| `--path <部分>` | `concept_id` | 部分一致 |
-| `--text <部分>` | `concept_id`・`mtime`・frontmatter のすべてのスカラーの値（キー名は含まない） | 部分一致 |
+| `--path <部分>` | 文書のパス | 部分一致 |
+| `--text <部分>` | 文書のパス・更新日時・frontmatter のすべてのスカラーの値（キー名は含まない） | 部分一致 |
 | `--since <日時>` / `--until <日時>` | `mtime`（`YYYY-MM-DD[THH[:MM[:SS]]]`。在る日時だけ受ける）。`--until` は書いた桁の終わりまで（日付だけなら `T23:59:59`、`THH` なら `:59:59`、`THH:MM` なら `:59`） | 以上 / 以下 |
 
 同じオプションの繰り返しは OR、違うオプションどうしは AND。大文字小文字は区別せず、文字列は NFC に揃えてから比べる。

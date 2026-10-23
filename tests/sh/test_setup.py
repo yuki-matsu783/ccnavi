@@ -63,7 +63,7 @@ ANOTHER_MACHINE = "haiku-riscv64"
 SHELL = shutil.which("sh") or shutil.which("bash")
 HAS_JQ = shutil.which("jq") is not None
 
-# 登録されていることを確かめる 8 つ。docs/guide/settings.md「設定」の表と対になる。
+# 登録されていることを確かめる 8 つ。docs/guide/settings.md「hook の 8 つのイベント」の表と対になる。
 EVENTS = (
     "SessionStart",
     "UserPromptSubmit",
@@ -87,7 +87,7 @@ TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # チケット制御を使うか（settings.py の TICKET_CONTROL_ENV）。プロジェクトが導入のときに決める。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
-# hook に登録される 1 行。docs/guide/settings.md「設定」の見本と対になる。表記が変わると、
+# hook に登録される 1 行。docs/guide/settings.md「settings.json の例」と対になる。表記が変わると、
 # ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものが食い違う。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 # セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する。
@@ -2406,7 +2406,7 @@ class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
 
 
 class WritesTheVscodeSettings(SetupTest):
-    """VS Code へ渡す設定。docs/guide/install.md「ワークツリーを VS Code から見えるようにする」と対になる。
+    """VS Code へ渡す設定。docs/guide/install.md「VS Code からワークツリーを見る」と対になる。
 
     ccnavi は作業を .claude/worktrees/ の中でさせる。この 1 行が無いと、
     エディタからはワークスペースルートのブランチしか見えないまま作業が進む。

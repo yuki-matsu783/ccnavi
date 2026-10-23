@@ -65,7 +65,7 @@ set -eu
 SETTINGS_REL=".claude/settings.json"
 # VS Code へ渡す設定。値ではなくキーがあるかどうかを見て、足りないものだけを足す。
 # `git.detectWorktrees` は、.claude/worktrees/ の中のワークツリーをソース管理の
-# ビューに表示する（docs/guide/install.md「ワークツリーを VS Code から見えるようにする」）。
+# ビューに表示する（docs/guide/install.md「VS Code からワークツリーを見る」）。
 # `git.repositoryScanMaxDepth` は、projects/<名前>/ のようにワークスペースルートから 2 階層下の
 # リポジトリを見つけるために 2 にする（既定は 1 で、ルートの直下の階層までしか探さない）。
 VSCODE_REL=".vscode/settings.json"
