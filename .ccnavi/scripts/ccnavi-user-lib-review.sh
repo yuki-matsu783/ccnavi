@@ -211,10 +211,11 @@ create_issue() {
 issue_note() {
 	in_body=$("$JQ" -Rs '{body: .}' <"$3")
 	if [ "$kind" = github ]; then
-		api POST "repos/$path/issues/$1/comments" "$in_body" | "$JQ" '{url: (.html_url // "")}'
+		api POST "repos/$path/issues/$1/comments" "$in_body" |
+			"$JQ" 'if ((.html_url // "") == "") then error("no html_url") else {url: .html_url} end'
 	else
 		api POST "projects/$(encoded_path)/issues/$1/notes" "$in_body" |
-			"$JQ" --arg u "$2" '{url: ($u + "#note_" + (.id | tostring))}'
+			"$JQ" --arg u "$2" 'if .id == null then error("no note id") else {url: ($u + "#note_" + (.id | tostring))} end'
 	fi
 }
 
