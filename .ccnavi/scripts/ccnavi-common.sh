@@ -218,7 +218,7 @@ ccnavi_bin() {
 		elif [ ! -f "$1/src/ccnavi/__main__.py" ]; then
 			# bin/ もソースも無い配布先。PATH の ccnavi があればそれを返す（振り分けの sh と同じ規則）。
 			# 無ければ 1 を返すので、呼び手の「実行ファイルが無い」の分岐は今までと同じ。
-			ccnavi_bin_path
+			ccnavi_bin_path "$1/.ccnavi/scripts/ccnavi-launcher.sh"
 		else
 			return 1
 		fi
@@ -255,9 +255,11 @@ ccnavi_compat_skew() {
 }
 
 # PATH の ccnavi。振り分けの sh（ccnavi-launcher.sh の ccnavi_launcher_path）と同じ規則:
-# 絶対パスの項目だけを見て、通常ファイルで実行できる最初のものを返す。
+# 絶対パスの項目だけを見て、通常ファイルで実行できる最初のものを返す。$1 は振り分けの sh のパス。
+# これと同じファイル（ccnavi という名前で張ったリンク）は、起動すると自分に戻るので飛ばす。
 ccnavi_bin_path() {
 	ccnavi_bp_ifs=$IFS
+	case $- in *f*) ccnavi_bp_noglob=1 ;; *) ccnavi_bp_noglob=0 ;; esac
 	set -f
 	IFS=:
 	for ccnavi_bp_dir in $PATH; do
@@ -266,16 +268,17 @@ ccnavi_bin_path() {
 		*) continue ;;
 		esac
 		for ccnavi_bp_name in ccnavi ccnavi.exe; do
-			if [ -f "$ccnavi_bp_dir/$ccnavi_bp_name" ] && [ -x "$ccnavi_bp_dir/$ccnavi_bp_name" ]; then
+			ccnavi_bp_file=$ccnavi_bp_dir/$ccnavi_bp_name
+			if [ -f "$ccnavi_bp_file" ] && [ -x "$ccnavi_bp_file" ] && ! [ "$ccnavi_bp_file" -ef "${1:-}" ]; then
 				IFS=$ccnavi_bp_ifs
-				set +f
-				printf '%s\n' "$ccnavi_bp_dir/$ccnavi_bp_name"
+				[ "$ccnavi_bp_noglob" = 1 ] || set +f
+				printf '%s\n' "$ccnavi_bp_file"
 				return 0
 			fi
 		done
 	done
 	IFS=$ccnavi_bp_ifs
-	set +f
+	[ "$ccnavi_bp_noglob" = 1 ] || set +f
 	return 1
 }
 

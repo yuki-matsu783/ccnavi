@@ -67,7 +67,7 @@ def is_launcher(path: str) -> bool:
     return os.path.basename(path) == LAUNCHER_NAME
 
 
-def path_executable(path_env: str | None = None) -> str:
+def path_executable(path_env: str | None = None, skip: str = "") -> str:
     """PATH から見つかる ccnavi の実行ファイル。無ければ空文字。
 
     振り分けの sh が `bin/` に何も見つけなかったときに起動するもの
@@ -75,7 +75,10 @@ def path_executable(path_env: str | None = None) -> str:
     PATH に書かれた順に見て、通常ファイルで実行できる最初のものを返す。
     空と相対の項目は cwd で結果が変わるので飛ばす。リンクは解かない（書かれたとおりのパスを返す）。
 
-    引数は、テストで PATH を差し替えるためにある。省くと、実行中の環境の PATH を読む。
+    skip は振り分けの sh のパス。sh と同じ規則で、これと同じファイル（`ccnavi` という名前で
+    張ったリンクなど）は飛ばす。起動すると自分に戻る。
+
+    path_env は、テストで PATH を差し替えるためにある。省くと、実行中の環境の PATH を読む。
     """
     raw = os.environ.get("PATH", "") if path_env is None else path_env
     for place in raw.split(os.pathsep):
@@ -83,9 +86,19 @@ def path_executable(path_env: str | None = None) -> str:
             continue
         for name in EXECUTABLE_NAMES:
             found = os.path.join(place, name)
-            if os.path.isfile(found) and os.access(found, os.X_OK):
-                return found
+            if not (os.path.isfile(found) and os.access(found, os.X_OK)):
+                continue
+            if skip and _same_file(found, skip):
+                continue
+            return found
     return ""
+
+
+def _same_file(a: str, b: str) -> bool:
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
 
 
 def launched_executable(launcher: str, host: str | None = None) -> str:

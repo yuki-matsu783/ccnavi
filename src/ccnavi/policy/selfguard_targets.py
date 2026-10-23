@@ -17,6 +17,9 @@ _SETTINGS_FILES = (
     ("settings-local", os.path.join(".claude", "settings.local.json")),
 )
 
+# PATH の ccnavi の実体の key の頭。パスの印が続く。
+PATH_KEY = "bin-path-"
+
 
 @dataclass
 class Target:
@@ -93,12 +96,14 @@ def targets(
         # セッションの途中で bin/ が現れたり消えたりしても、守る対象の組が変わらないため。
         # key にパスの印を付ける。固定の key だと、PATH が変わって指す先が替わったとき、古い実体の
         # 参照を新しい実体に当てて、間違った中身を書き戻す。
-        on_path = platformtag.path_executable() if platformtag.is_launcher(bin_path) else ""
+        on_path = (
+            platformtag.path_executable(skip=bin_path) if platformtag.is_launcher(bin_path) else ""
+        )
         if on_path:
             real = os.path.realpath(on_path)
             if all(real != t.path for t in found):
                 mark = hashlib.sha1(pathcase.fold(real).encode("utf-8")).hexdigest()[:8]
-                found.append(Target(key=f"bin-path-{mark}", path=real, label=real, heavy=True))
+                found.append(Target(key=f"{PATH_KEY}{mark}", path=real, label=real, heavy=True))
     found.extend(_worktree_copies(root, projects_dir, places))
     return found
 

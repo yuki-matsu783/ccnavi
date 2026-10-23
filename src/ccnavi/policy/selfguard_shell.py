@@ -448,8 +448,9 @@ def binary_clause(bin_path: str, *, copy: bool = False) -> str:
         home = re.escape(parts[-3]) + r"[\\/]" if len(parts) >= 3 else ""
         # PATH の ccnavi（bin/ に実体が無いとき sh が起動するもの）。末尾 3 要素で当てる。
         # 2 要素（`bin/ccnavi`）だと別のプロジェクトの `./bin/ccnavi` にまで当たる。
-        on_path = "".join(f"|{p}" for p in _path_spellings())
-        on_path_copy = "".join(f"|{p}{_COPY_TAIL}" for p in _path_spellings())
+        spellings = _path_spellings(bin_path)
+        on_path = "".join(f"|{p}" for p in spellings)
+        on_path_copy = "".join(f"|{p}{_COPY_TAIL}" for p in spellings)
         built = rf"{home}bin[\\/]{_BUILD_DIR}"
         if copy:
             return rf"{_IN_WORD}(?:{sh}{_COPY_TAIL}|{built}{_COPY_END}{on_path_copy})"
@@ -458,20 +459,24 @@ def binary_clause(bin_path: str, *, copy: bool = False) -> str:
     return _IN_WORD + plain + _COPY_TAIL if copy else plain
 
 
-def _path_spellings() -> list[str]:
+def _path_spellings(launcher: str = "") -> list[str]:
     """PATH の ccnavi を当てる形（末尾 3 要素）。書かれたパスと、リンクを解いた先の両方。
 
     置き場のディレクトリ（`~/.local/bin` 全体）は守らない。無関係な道具を入れる操作まで止まる。
     PATH に無ければ空。
     """
-    exe = platformtag.path_executable()
+    exe = platformtag.path_executable(skip=launcher)
     if not exe:
         return []
     found = []
     for path in (exe, os.path.realpath(exe)):
-        parts = [p for p in re.split(r"[\\/]", path) if p and p not in (".", "..")][-3:]
-        spelled = r"[\\/]".join(re.escape(p) for p in parts)
-        if parts and spelled not in found:
+        every = [p for p in re.split(r"[\\/]", path) if p and p not in (".", "..")]
+        spelled = r"[\\/]".join(re.escape(p) for p in every[-3:])
+        if len(every) <= 3:
+            # 浅い実体（`/bin/ccnavi`）は、区切りで始まる形だけに当てる。
+            # 付けないと、別のプロジェクトの `./bin/ccnavi` にも当たる。
+            spelled = r"(?<![\w.~-])[\\/]" + spelled
+        if every and spelled not in found:
             found.append(spelled)
     return found
 

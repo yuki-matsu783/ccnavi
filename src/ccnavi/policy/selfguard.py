@@ -778,6 +778,11 @@ def _rebase_if_changed(
         if _absent_noted(state_dir, session, target) and os.path.exists(target.path):
             _clear_absent(state_dir, session, target)
             return _rebase_heavy(state_dir, session, target)
+        # PATH の実体は hook の環境で決まるので、セッション開始のあとに現れることがある
+        # （開始時は PATH に無かった、PATH が変わった）。参照が無いままだと守れないので、
+        # 最初に見た版を基準にする。
+        if target.key.startswith(selfguard_targets.PATH_KEY) and os.path.exists(target.path):
+            return _rebase_heavy(state_dir, session, target)
         return None
     _, size, mtime = ref
     if _same_shape(target.path, size, mtime) or not os.path.exists(target.path):
