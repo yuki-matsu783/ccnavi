@@ -58,7 +58,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - ワークスペース内 clone: ワークスペース内のプロジェクト p で Claude Code を起動する（`CLAUDE_PROJECT_DIR=<ws>/projects/p`）と、hook は根を p にして `p/logs/` に書く。sh は根をワークスペースにして `ws/logs/` に書き、ワークツリーも `ws/.claude/worktrees/` に切る
 - 単体 clone: 根は p だけで、食い違わない
 - 起きること: hook の拒否文は `sh p/.ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/<名前> ...` と案内する。打つと sh が「ワークスペースの外に出ます」と断る。この拒否文は自己修正の案内を含む。ログと state の置き場が割れる
-- 前提: 文書上の前提は、ワークスペースから起動して `cd` で入る形（`to-measure.md`、README）。一方で、プロジェクトで起動するとそのプロジェクトの hook が使われると書いてあり（[複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../adr/0033-projects.md)の追記）、この形は否定されていない
+- 前提: 文書上の前提は、ワークスペースから起動して `cd` で入る形（`to-measure.md`、手引き）。一方で、プロジェクトで起動するとそのプロジェクトの hook が使われると書いてあり（[複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../adr/0033-projects.md)の追記）、この形は否定されていない
 - 直し方の案: sh も `CLAUDE_PROJECT_DIR` を第一候補にする案は採れない。理由: Bash ツールの環境に `CLAUDE_PROJECT_DIR` は来ない（`docs/design/appendix.md:102`）。コマンド行に付けて渡すことも `wrapguard.py:67` が止める。別の案は未決（「未決」の根の決め方）
 
 #### A2 `CLAUDE_PROJECT_DIR` が無い端末の直打ちで、Python が根を取り違える（major）
@@ -222,7 +222,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 #### N4 起動場所の説明が、文書同士で食い違っていた（文書。直した）
 
-- 内容: `.ccnavi/docs/terms.md` と README の「プロジェクトの中で起動すると hook が動かない」が、[複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../adr/0033-projects.md)の追記と `to-measure.md`（プロジェクトの hook が使われる）と食い違っていた。ワークスペースの hook は動かず、プロジェクトが自前の `.claude/` を持てばその hook とスキルが使われる、に直した
+- 内容: `.ccnavi/docs/terms.md` と [手引き](../../guide/troubleshooting.md)の「`projects/` のプロジェクトの中で hook が動かない」が、[複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../adr/0033-projects.md)の追記と `to-measure.md`（プロジェクトの hook が使われる）と食い違っていた。ワークスペースの hook は動かず、プロジェクトが自前の `.claude/` を持てばその hook とスキルが使われる、に直した
 
 ## 未決
 

@@ -78,7 +78,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 テンプレート管理の画面は、一覧・検索・表示のほか、ユーザが図で直したテンプレートを拡張が直接保存する（実行ファイルは読むだけの `--templates --check-file` で保存前に検査する。取り込み済みの本文を書くのはこの保存と、ユーザの手作業だけ）。下書きの取り込みは取り込み待ちの画面。ボードの rules・phases・risks の画面は、拡張が直接書くまま。
 
 **表と互換。** `user_only.py` の表が `handoff` の操作と `--handoff` を持つ。テンプレート専用の書き込みのオプション（`--import` など）は、実行ファイルがもう受け付けない。
-表ではそれらを `legacy` の行とし、古い実行ファイルが手元に残るときのために hook は止め続ける。互換の版（`compat`）は 15 のまま。`--version --json` の `features` に `handoff` を持つ。
+表ではそれらを `legacy` の行とし、古い実行ファイルが手元に残るときのために hook は止め続ける。互換の版（`compat`）は、この変更では上げていない（いまの値は `--version` で見る）。`--version --json` の `features` に `handoff` を持つ。
 
 #### `--draft` と `ready`
 

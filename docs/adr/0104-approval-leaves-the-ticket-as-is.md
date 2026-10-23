@@ -193,7 +193,7 @@ sh で止める変更は、この ADR ではしない。
   「承認の経路が時刻…」の文言を、欄を書かない形に揃える
 - 設計 9.4（承認済みチケットの欄）、設計 9.4 と README.md 2224 行（指紋の「`ccnavi_approved` は除く」）、
   設計 9.4（承認の確認の経路と「承認されたことは hook が伝える」）、設計 9.6（状態遷移の表の書く欄）。
-  README.md の承認の節と `copy.approved_at`（2152 行付近）
+  `docs/guide/tickets.md` の承認の節と、`docs/requirements/json-shapes.md` の `copy.approved_at`
 - コードの注記: `tickets/ops.py` 4 行の「サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）」は
   事実でない。止めているのは hook の判定（`hook/judge.py` が `phase_forms.forbidden` で `DENY_SUBAGENT_TICKET_OP`）で、
   `cli.py` は `agent_id` を見ていない。`ccnavi-ticket.sh` 17 行の同じ趣旨の注記も同様

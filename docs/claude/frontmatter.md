@@ -19,6 +19,7 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 |---|---|---|
 | `design-doc` | 設計文書（`docs/design.md`・`docs/design/**`・`docs/requirements.md`・`docs/requirements/**`・`wip/design/**`）、ADRの書き方や置き場についての文書、画面の構成や状態遷移などの設計を決めたADR | `design`は使わない。`design-doc`に統合した |
 | `settings` | Claude Codeの`settings.json`（hookの登録・`env`・`permissions`）と、そこで渡す環境変数 | ccnavi自身の設定ファイル |
+| `user-guide` | `docs/guide/*.md`（人間の利用者が読む手引き）。`type`は`guide`のまま、読み手の区別だけに使う | `docs/development.md`と`.ccnavi/docs/*.md` |
 | `config` | ccnaviの設定ファイル（`.ccnavi/config/common/`の`rules.yml`・`risks.yml`と、`.ccnavi/config/project/`の`phases.yml`など）の形・読み方・レイヤー | `settings.json`と環境変数 |
 
 `settings.json`の`env`でccnaviの設定ファイルの置き場を渡す話のように両方にまたがるときだけ、両方を付ける。
@@ -27,7 +28,7 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 
 | type | 対象 | 現状 |
 |---|---|---|
-| `guide` | 使い方と作業の手引き。`.ccnavi/docs/*.md`、`docs/claude/*.md`、`docs/adr/README.md` | 付いている。ルートの`README.md`と拡張の`README.md`（`extensions/**`）には付けていない（理由は表の下） |
+| `guide` | 使い方と作業の手引き。`.ccnavi/docs/*.md`、`docs/claude/*.md`、`docs/adr/README.md`、`docs/guide/*.md`（利用者向け）、`docs/development.md`（開発者向けの入口）、`docs/release-notes.md` | 付いている。ルートの`README.md`と拡張の`README.md`（`extensions/**`）には付けていない（理由は表の下） |
 | `rule` | 常に守る決まり。`CLAUDE.md` | 付けていない（理由は表の下）。`--type rule`では何も出ない |
 | `design` | 現在の実装の説明。`docs/design.md`・`docs/design/**`、`wip/design/**`の設計メモ | `docs/design.md`・`docs/design/**`に付いている |
 | `requirements` | 外から観測できる約束。`docs/requirements.md`・`docs/requirements/**` | 付いている |

@@ -28,6 +28,8 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | `additionalContextFile` / `additionalContextOnceFile` | 文に続けて本文を渡すファイル。探す起点からの相対（順は 6.6） |
 | `every` | 「渡す回」の刻み。当たった回数がこの倍数になった回だけが渡す回になる。既定は 1（6.6） |
 
+`glob` と `regex` の値は引用符で囲む。囲まないと YAML が先に解釈する（`<<` はマージキー、`*` はエイリアス、`&` はアンカー、`!` はタグ）。
+
 `ask` と `allow` に `message` を書くと `--lint` が error にする（ask の文面はユーザの確認ダイアログにしか出ず、allow の文面は
 どこにも出ない。付録 C）。組み立てられないルールは外して名指しし、他のルールはそのまま使う。
 
@@ -47,9 +49,12 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 `glob` も `regex` も大文字小文字を区別しない。どの機械でも同じで、`*/.ccnavi/*` は `.Ccnavi/config/project/rules.yml` にも当たる（11.4）。
 区別させたい部分は `(?-i:...)` で囲む。
 
+`glob` が文字列全体に当たることの帰結: `git push` は素の `git push` にしか当たらず、`cd /repo && git push` には当たらない（`*git push*` と書けば当たる）。
+語の切れ目は入らない。`*sed*` は `sedate` にも当たる。右側だけなら `*sed *` と空白を書いて切れ目を表せる。左側は書けない（`*git push*` は `legit push` にも当たり、`* git push*` は行頭の `git push` が外れる）。
+
 `{root}` は、読み込み時にワークスペースルートの実パスへ置き換わる。regex では区切りが `[\\/]` になる。
-ルートを渡さずに読むと error。文面（`message` / `additionalContext` / `additionalContextOnce`）の `{root}` は、
-モデルへ渡すときに、実パス（区切りは `/`）へ置き換える（`rules.fill_text`）。`{script:<名前>}` は `settings.script_command` の値に置き換える。ルートが渡されない読み方では、置き換えない。
+ルートは hook なら `CLAUDE_PROJECT_DIR`、端末なら `--root` の実パス。区切りは `/` と `\` のどちらにも当たり、大文字小文字は区別しない。ルートを渡さずに読むと error。文面（`message` / `additionalContext` / `additionalContextOnce`）の `{root}` は、
+モデルへ渡すときに、実パス（区切りは `/`）へ置き換える（`rules.fill_text`）。`{script:<名前>}` は `settings.script_command` の値に置き換える。ルートが渡されない読み方では、置き換えない。`<名前>` は `[A-Za-z0-9._-]+` だけで、形が違うものは置き換えず、スクリプトが無いものは置き換える。どちらも `--lint` が warn する。`--explain` と `--test` は書いた表記のまま `{root}` を出す。
 
 先読み・後読み・後方参照を弾くのは、ルールがエンジンをまたいでも同じ意味になり、組み合わせ爆発を起こしうる書き方を受け付けないため
 （Python の `re` に時間制限は無い）。

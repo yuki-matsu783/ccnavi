@@ -36,6 +36,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `NUDGE_INTEGRATE` | メインエージェントの `Stop` で、チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`）に未コミットの変更か取り込み先に入っていないコミット（直接作業の記録の起点Sからの `S..先頭`。記録が無ければ統合先で数える）があり、取り込み中のmarkerが無いときに出る。markerは、メインのチェックアウトのgitディレクトリの `ccnavi-integrate/<名前>/` に置く。旧形式の取り込み済みの写し `ccnavi-integrate-done/<名前>` は、branch_shaが今のHEADと同じで、未コミットの変更が無いときだけ記録とみなす。cwdのツリーのほか、このセッションが書き込んだ直接作業のツリー（`logs/state/direct-<セッション>.json`）も調べる。チケット制御の有無は問わない。同じ状態では 1 回だけ止めて、`integrate` の打ち方と、一時ワークツリーに展開した取り込み結果をユーザに確かめてもらう手順（`integrate-done`・`integrate --abort`）を、1 行で完結するコマンドで促す。hookは `integrate` を打たない。取り込み先が切り替わった、メインのチェックアウトに途中の操作がある、記録が壊れている、などのときは、止めずに理由を `systemMessage` で言う。メインのチェックアウトの書きかけでは止めない。記録が無いワークツリーには `--adopt` を案内する。`finish`・依頼までの道の促しと重なった回は出ない。実行中のサブエージェントが居る間も出ない。記録の `decision` は `nudge` |
 | `NUDGE_STOP_RULE` | メインエージェントの `Stop` で、`match: Stop` の `allow` のルールが渡す回になった（`every` の刻み）。止めて、ルールの文を渡す。`finish` の促しと重なった回は出ない（6.6）。記録の `decision` は `nudge` |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントが、役割の表（`user_only.SUBAGENT_ROLES`）で許されていない操作（チケットの状態・レビュー・push・開始や片付けの sh）を打とうとした |
+| `DENY_SUBAGENT_PARENT_TREE` | サブエージェントが、親のワークツリーへの merge・commit・書き込みをしようとした。子のワークツリーでのコミットと、衝突を解くための親のブランチの merge は通す。親のワークツリーかは、そのワークツリー自身のチケットで決める（9.12） |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ。補助の保護で、`CCNAVI_GUARD_CORE_FILES` では切れず、`dry-run` でも止める（8.2） |
 | `DENY_WRAPPER_CORE_PATH` | `ccnavi-git.sh` の `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象か承認済みチケットの置き場かレビュー待ちの置き場（`wip/proposals/review/`。置き場に何かがある間はその親も）を消す・別のコミットの中身に戻そうとした。対象を読み切れない形（変数・置換・居場所の読めない `cd` / `pushd` の後の相対パス）、サブコマンドが文字どおりの語でない形、標準入力から読むシェルに流す文字列の中の呼び出し、走査が読み切れず名前の直後に文字どおりのサブコマンドが無い形と、索引の中身に戻す `checkout -- <パス>` も（8.2） |
@@ -49,7 +50,9 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 記録の `skip` の理由: `mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、
 `payload-unusable`、`deadline-exceeded`、`internal-error`（ccnavi 自身の例外。4.5）、`tool-cannot-write`、
 `worktree-unreadable`（実行後チェックと、`SubagentStop` で子のワークツリーを読めず範囲を確かめられなかった回。9.12）、
-`no-turn-baseline`。
+`no-turn-baseline`、`stop-review-judge`（Stop の AI 判定役の呼び出し。ほかの hook の副作用を動かさず飛ばした回）の 11 種。
+`reason` は `skip` の行だけに付くとは限らない。`stop-review-judge` は、判定役の呼び出しを許した行（`allow`）と、
+決まった形でないので止めた行（`deny`）にも付き、`stop-review-worker`（作業側が判定役の入口を使おうとして止めた回）は `deny` の行にだけ付く。
 
 組み込みの判定で止めた文は、先頭の行に理由コードと記録の `rules` と同じ識別子を
 `[ccnavi] <コード> (組み込みのルール: <識別子>)` の形で並べる（`builtin:script-env` など）。
@@ -91,6 +94,37 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 `Stop` の 1 行は、ターンの終わりの報告（7.4）と促し（`NUDGE_*`）が重なると、止めた促しの `decision`・`code`・`rules` になる。
 報告の `code` と `rules` は `detail` に `report POST_VIOLATION <id>,<id>` の形で残し、`paths` は報告の変わったパスのまま。
 
+#### 各欄の読み方
+
+| 欄 | 中身 |
+|---|---|
+| `decision` | `allow` `ask` `deny` `handover` `skip`（促した回は `nudge`）。`handover` は権限モードに委ねた回 |
+| `enforced` | 実際に適用したか。`dry-run` は、一般の保護では `false`、関門と補助の保護で止めた回は `true` |
+| `code` | 判定の根拠の種別。一覧は付録 A。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は `POST_VIOLATION` などで、件が混ざった回は強いほう 1 つ |
+| `rules` | 当たったルールの名前（ルールファイル由来は `<相対パス>:<id>`、組み込みは id）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
+| `reason` | `skip` の理由（上の一覧）。`stop-review-judge` は `allow`・`deny` の行にも、`stop-review-worker` は `deny` の行に付く。`worktree-unreadable` は `detail` に理由 |
+| `hinted` | この呼び出しで `additionalContextOnce` の案内を渡した回だけ `true`。渡した後の呼び出しと、毎回渡す案内だけの呼び出しには出ない（案内がどの呼び出しに付いたかは hook の応答から分からないので残す） |
+| `guarded` | ccnavi 自身の設定ファイルについて、その回に起きたことの配列。要素は `<対象>:<動き>`。動きは `saved`（バックアップを取った）・`restored`（バックアップから戻した）・`restored-from-git`（git から戻した）・`would-restore`（予行で言うだけ）・`rebased`（大きい対象が変わったので基準を取り直した）・`accepted`（ユーザの発言で消えたことを受け入れた）・`left-as-repair`（読めないルールファイルへの修復なので戻さなかった）・`missing`・`failed`。変わっていない回は残さない |
+| `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
+| `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |
+| `paths` | 実行後チェックが検知した「種類とパス」 |
+| `detail` | 実行後チェックでは `preexisting`・`known`・`restored`（予行では `would-restore`）の件数と、`code` が混ざった回の内訳（`codes POST_VIOLATION 2, POST_TICKET_SCOPE 1`）。`Stop` で促しと報告が重なった回は報告の `report <code> <id,…>` |
+| `degraded` | コマンドを読み切れずに生の文字列で判定した回。`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution`、`backquote`（後ろの 2 つは `DENY_AMBIGUOUS_FORM` / `DENY_BACKQUOTE` で止めた回） |
+| `quoted` | 引用の中から切り出したコマンドにだけ当たったルールの id |
+| `unwrapped` | 実行役のコマンド（`env`・`sudo`・`sh -c` など）の中のコマンド、または `cd` で移った先から見たパス（6.3.2）で当たったときの、そのコマンド。複数なら `\x00` でつなぐ |
+| `fallback` | ルールファイルを読めず組み込みの既定で判定した回（`detail` にパス）。自身のレイヤーやプロジェクトのレイヤーが読めなかった回は、そのレイヤーの名前（`self`、`lib` など）が入り、そのレイヤーを空として判定している |
+| `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前。`rules` の名前にはレイヤーの前置きが付かない（相対パスで出どころが分かる） |
+
+チケットの子ごとの記録（`.ccnavi/approved/phases/<親>/<子>.risk.json` と `.judge.json`）にも項目ごとに `source` が入る。
+フェーズ定義を根拠に置くフェーズのマーカーには、そのフェーズ定義のレイヤーが入る。
+
+#### 秘密の伏せ方
+
+`subject`・`unwrapped`・`detail` は、書く直前に秘密の形（`Authorization:` / `Cookie:` の値、`token=` / `password=` /
+`SECRET_KEY=` / `MYSQL_PWD=` などの値、`ghp_…` / `glpat-…` / `AKIA…` / `sk-…` / `AIza…` / `npm_…` / JWT などのトークン、
+URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、redis-cli の `-a` など）を伏せる（4.7）。
+18 字未満の値は `***`、それより長い値は先頭 6 字と末尾 4 字を残す（`ghp_Ab***Q7r8`）。判定は伏せる前の文字列で下す。
+
 ## 付録 C. 実測で確かめた前提
 
 設計の前提にしている Claude Code の振る舞い。版が変わったら測り直す。
@@ -116,9 +150,29 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | `shlex` は二重引用の中の `$( )` を区切るか | 区切らない。引用の中を 1 語として返す |
 | `shlex` は語の途中の `#` をどう読むか | コメントの始まりにする（`echo a#b c` → `echo a`）。bash は `a#b c` と出す |
 | `shlex` は行継続を知っているか | 知らない。`\` と改行をトークンの中に残す |
+| `$( )` の中の `case` は bash 3.2 と zsh で同じに読まれるか | 読みが分かれる。`case` が現れたら縮退させている（許容した誤検知） |
+| 複合コマンドの 1 つの区間が読めないとき | 全体が縮退する。安全側なのでそのまま |
 | `SubagentStart` の `additionalContext` がサブエージェントに届くか | 未実測。届かなければ、サブエージェント内の最初の `PreToolUse` で渡す形に変える |
 | `SubagentStart` の payload に `tools` が来るか | 未実測。来れば編集するサブエージェントかの見分けに使い、来なければ `.claude/agents` の定義と組み込みの一覧で見分ける（`hook/agentkind.py`）。同じ作業ツリーの案内（9.12）も、上の行のとおり `additionalContext` が届くことを前提にする |
 | `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd` | 未実測。止めるかどうかは cwd で親を引くので、受け取る cwd によって止まるかどうかが分かれる |
+
+`shlex` は引用・`#`・改行・行継続・`<<` の扱いがシェルと違う。`shellread.py` は先に原文を走査してから語の分割だけを
+shlex に任せる。走査か shlex のどちらかに手を入れたら `tests/core/test_shellread.py` の `SHELL_CASES`（bash 3.2 と zsh で実測）を回す。
+引用された `<<` による縮退は許容する誤検知（6.3、12.2）。
+
+### 探すツールと `.gitignore`（ripgrep の既定の挙動）
+
+`Grep` が読むファイルは ripgrep の既定の挙動に従い、ccnavi の側では変えられない。判断の経緯は ADR-0050。
+
+| 前提 | 実測 |
+|---|---|
+| 起点に指定したパスそのものに `.gitignore` は当たるか | 当たらない。ignore されたディレクトリやファイルを `path` に渡すと、その中は読まれる |
+| `.git` が無いディレクトリで `.gitignore` は読まれるか | 読まれない（ripgrep の `--require-git`）。clone していない置き場、git 化していない `projects/<名前>/` が該当する |
+| 降りた先に `.git` があるとき | そこから下はそのリポジトリの `.gitignore` が適用される。ワークスペースルートが git 管理下でなくても、`.git` がファイル（ワークツリーの gitdir ポインタ）でも同じ |
+| 隠しファイル（ドット始まり）は弾かれるか | 弾かれない。ignore されていなければ `Grep` が読む（素の `rg` の既定とは違う） |
+| `.ignore`・`.rgignore`・`.git/info/exclude`・`core.excludesFile`（既定では `~/.config/git/ignore`）は読まれるか | 読まれる。どれも弾く側に働く |
+| ワークスペースルートが git 管理下で `.gitignore` に `/projects/` があるとき、ルートからの `Grep` は `projects/` へ降りるか | 降りない。起点に指定した場所には ignore が当たらないので、`cd projects/<名前>` してから呼ぶと探せる |
+| `Read` ツールに `.gitignore` は関係するか | しない。`builtin:credentials` と `Read()` の `deny` が見る |
 
 ### 入れ子のサブエージェント（Claude Code 2.1.282）
 
@@ -150,3 +204,15 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | G3 | 孫は、兄弟の子のワークツリーにもその範囲の中なら書ける | 同上 |
 | G4 | 差し戻しを無視した知らせが、起動した子にしか届かない | 入れ子の起動なら `systemMessage` にも載せる（9.12） |
 | G5 | Bash の実行後チェックは `cwd` のツリーだけを見る | そのまま |
+
+### GitLab の実物（CE 18.5.4）
+
+GitLab の実物で分かったこと。
+
+| 分かったこと | どうしたか |
+|---|---|
+| 変更要求（`POST .../request_changes`）は EE 限定 | 当てられない。CE の `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
+| URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh はユーザの情報を除いて伏せる。実行ファイルの `remote_kind` も読み飛ばす |
+| ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を引き継がないので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く。ただし gh / glab で認証済みなら、ccnavi が `ccnavi_git_auth` でその helper を足す（利用者の環境変数での差し替えは効かない）。probe はリポジトリの `credential.helper` を空にしてから足す |
+| トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tests/manual/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
+| 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |

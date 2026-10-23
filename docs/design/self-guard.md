@@ -26,7 +26,8 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 
 名指しのツール（Write / Edit）の保護には、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下を除く例外がある。守る場所の写し（`wip/handoff/.ccnavi/scripts/x.sh` など）は、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。例外が効くのは、`..` の段が無く、リンクを解いた実パスが綴りと同じで、既にあるファイルがハードリンクでつながっていないとき。`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。組み込みの保護（`builtin:guard-project-home` と、名前で書くツールの 4 本 `builtin:guard-hooks`・`builtin:guard-settings`・`builtin:guard-scripts`・`builtin:guard-ccnavi-config`。どれも `selfguard_shell.handoff_write_exempt`）が同じ範囲を除く。この関数は、ハードリンクでつながった写しを除かない。利用者がリポジトリのルールに `except` で同じ範囲を除く場合、`except` は式なのでファイルを見ず、ハードリンクの写しも除いてしまう。そこで、置き場の中のリンクを通る対象・ハードリンクでつながった対象・`..` を含む対象への書き込みは、組み込みの `builtin:guard-handoff-links`（`selfguard_shell.handoff_link_target`）が別に止める。置き場の中にリンクを作るシェルの形も `builtin:guard-handoff-ln` が止める（8.2）。シェルからの書き込みの保護は、ほかは変えない。
 
-上のうち追跡されているものは、その元リポジトリから切ったワークツリー側の設定も対象に入る（11.6）。
+上のうち追跡されているものは、その元リポジトリから切ったワークツリー側の設定も対象に入る（11.6）。実行ファイルは除く。
+無いファイルは対象から外れる。無かったところに現れた場合は報告するが、消さない。`.ccnavi/scripts/` のスクリプトはこの一式に入れない。組み込みの `deny`（`*/.ccnavi/*`）と `CCNAVI_RESTORE_IF_DENY` が受け持つ。
 hook スクリプトと保護済みスクリプトは、この表の対象（バックアップと復元）には無い。名前で書くツールからの書き込みは、組み込みの 4 本（8.2）が実行前に止め、実行後の保護範囲（`events.watched_for`）が未コミットの変更を検知する。ccnavi ディレクトリの下のスクリプトも同じで、`builtin:guard-project-home` も止める。
 
 ### 8.2 止める側
@@ -92,6 +93,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 実行後のバックアップと復元（8.3）は、どのパスでも働く。
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat rules.yml` も `git add <パス>` も通る）。
+パスは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる。場所のパスは大文字小文字を区別せずに当てる。コマンドの名前（`rm` / `cp`）も区別しない。止める側が広がるだけなので問題にしない。
 
 下書きの置き場（ワークスペースルートの `wip/handoff/`。ワークツリーの中の `wip/handoff/` は含まない。`ccnavi-stage.sh` は sh の中で写すので、この例外には頼らない）へ写す cp は、行き先の最後の語に守る名前があっても
 `builtin:guard-setting-files` から外す（`selfguard_shell.handoff_copy_exempt`）。守る場所を直すときは、置き場へ写して

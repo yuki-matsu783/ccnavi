@@ -1,6 +1,6 @@
 /**
  * プロジェクト管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API と子プロセスに触れるので単体テストの対象外。README の手動確認の手順で確かめる。
+ * VS Code の API と子プロセスに触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
  *
  * 画面は React（`src/webview/projects/`）で、ここが渡すのは「いま何を見せるか」（`ProjectsData`）だけ。
  * 渡し方（送る・入れ物ごと・作り直し中で見送る）は `core/screen-host.ts` が決める。この画面は

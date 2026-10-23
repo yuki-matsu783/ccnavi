@@ -99,7 +99,7 @@ function main(argv) {
 		console.error(
 			"ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）は" +
 				"どのワークツリーからも削除できません。テストが終わるのを待って再実行するか、ディレクトリごと mv で" +
-				" .claude/worktrees/ の外へ出してください（README.md の「実測で分かった落とし穴」）。",
+				" .claude/worktrees/ の外へ出し、`git worktree prune` を打ってください。",
 		);
 		return 1;
 	}

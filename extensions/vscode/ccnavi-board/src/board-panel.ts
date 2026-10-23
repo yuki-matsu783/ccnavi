@@ -1,6 +1,6 @@
 /**
  * Webview パネルの生成・更新・破棄と、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
+ * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -785,7 +785,7 @@ function openTicket(current: PanelState, filePath: string): void {
 /**
  * チケットは Markdown なので、素のテキストではなくプレビューで見せる。
  * プレビューは組み込みの Markdown 拡張のもので、無いファイルを渡しても失敗を返さない前提で書いている
- * （ここからは確かめられないので、README の手動確認で見る）。だから先に在るかを確かめ、無ければ
+ * （ここからは確かめられないので、docs/design/manual-checks.md の手動確認で見る）。だから先に在るかを確かめ、無ければ
  * 呼び手に失敗を返す（通知して、ボードを読み直す）。確かめてから描くまでに消えた場合は拾えない。
  * プレビューのコマンドが無い環境（組み込みの Markdown 拡張が無効）では、これまでどおりエディタで開く。
  */

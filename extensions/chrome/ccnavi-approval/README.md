@@ -5,7 +5,7 @@ issue から親のブランチを始める拡張。GitHub と GitLab の、ワ�
 GitLab での ccnavi の書き込みどうしの競合の検出は、実際の GitLab で前提を確かめるまで未実装。
 
 承認者の操作を、作業者の開発環境やセッションの外に置くための入口で、判定のコアは手元の ccnavi と同じ Python を同梱して使う。
-同期はリアルタイムではなく、書いた結果は作業側の次の fetch / sync で届く（ccnavi の README「複数人・別 PC・別セッションで進める」）。
+同期はリアルタイムではなく、書いた結果は作業側の次の fetch / sync で届く（ccnavi の docs/guide/multi-pc.md）。
 
 何をするか（ふるまい）は [docs/requirements.md](docs/requirements.md)、構成は [docs/design.md](docs/design.md) にある。この README には、組み立てと試験の手順だけを書く。
 

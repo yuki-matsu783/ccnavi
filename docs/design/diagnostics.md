@@ -21,9 +21,9 @@ state を内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 | `--explain [--json]` | タイプごとのルール、プロジェクトの一覧とルールの可否、権限モードの扱い（権限モード × 読めたか読み切れないかの結末を、判定と同じ `judge.undeclared_verdict` で組む）、チケット制御の値、元のプロジェクトが無いワークツリー（節「■ 元のプロジェクトが無いワークツリー」。該当があるときだけ。11.3）、承認済みチケットの一覧、親の局面、フェーズごとの状態・マーカー・止まっているか・リスク、上位の設定に却下された要求（節「■ 上位の設定に却下された要求」。全件を 1 件 1 行で、該当があるときだけ。REQ-SES-02） | 0 |
 | `--lint [--json]` | 判定を行わず、防御を無効化しうる記述を error と warn に分けて報告。ルール・フェーズ定義・配点・settings.json の登録・チケット・プロジェクトを見る | error があれば 1 |
 | `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-expectations.yml` の形の下書きで出す。どのルールも言及せず何度も渡った形は `ask` のルールの候補、同じ呼び出しを N 回以上止めた `deny` は `message` を見直す候補。候補ごとに `--lint` と同じ読みと `--test-expectations` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通レイヤーのコピーに足した一時ファイルで試す） | 常に 0 |
-| `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・受け付けるフラグ（引数の定義から引く）・読む書式の版。設定もワークスペースも読まない（README「版の JSON」） | 0 |
+| `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・受け付けるフラグ（引数の定義から引く）・読む書式の版。設定もワークスペースも読まない（docs/requirements/json-shapes.md「版の JSON」） | 0 |
 | `--lint [--json] --flow <パス>` | 上に加えて、子のフロー 1 本（9.3.1）を `SubagentStart` と同じ読み手・同じ検査で読み、読めなければ場所 `(flow)` の error で言う。読めたフローの構造と名前の怪しいところは warn。`--json` なら読めた中身を `flow.data`、渡る手順の行を `flow.rendered` に載せ（読めなければどちらも `null`）、選べる名前を `flow.candidates` に載せる。パスは起動した場所からの相対でよい | error があれば 1 |
-| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く。ただし `.ccnavi/docs/` は載せる）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` はそのまま残し、実体がツリーの外に出るディレクトリは対象外にする。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は README「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
+| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く。ただし `.ccnavi/docs/` は載せる）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` はそのまま残し、実体がツリーの外に出るディレクトリは対象外にする。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は docs/design/diagnostics.md の 10.1「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
 
 **レイヤーの置き場を動かすフラグは 8 本あり、どれも診断でだけ有効になる**。共通レイヤーの中身は
 `--rules` / `--phases` / `--risk`、レイヤーを探す先は `--projects`（プロジェクトのレイヤーの置き場）と
@@ -51,7 +51,7 @@ write-and-push の書いたパスの一覧（`--record-writes`）も、診断の
 `--flow <パス>` も診断でだけ有効で、読むのは `--lint` だけ。`--test` / `--test-expectations` / `--explain` に渡すと
 「`--lint` でだけ読む」と言って無視する。判定にも採点にも使われない（9.3.1）。
 
-JSON の形は README の「試験の JSON」「lint の JSON」「ボードの JSON」「候補の JSON」に定める。拡張はこれを並べるだけで、
+JSON の形は docs/requirements/json-shapes.md「試験の JSON」「lint の JSON」「ボードの JSON」「候補の JSON」に定める。拡張はこれを並べるだけで、
 止まっているか・
 承認待ち・ワークツリーの有無は、判定と承認が使う関数をそのまま呼んで載せる。
 
@@ -71,7 +71,7 @@ hook の判定の経路（`load`）はこの重ねを使わず、プロセスに
 出す。動いた表示は次に何かが動くまで残す。それを覚えているのは拡張ホスト。
 残った指摘の対応方針（`decide`）も拡張の中で決める。オーバーレイが `ccnavi-review.sh decide <N> --preview` で
 指摘とダイジェストを見せ、ユーザが指摘ごとに選んで押したら `ccnavi-user-decide.sh <N> --choices … --digest …` を子プロセスで打つ
-（形は README「残った指摘の JSON」）。`close-early` はボードに置かない。
+（形は docs/requirements/json-shapes.md「残った指摘の JSON」）。`close-early` はボードに置かない。
 ［レビュー完了］は、まず `decide <N> --preview` で残った指摘を読む。この読み取りは厳しく検証し（親・フェーズ・MR の番号が頼んだものと同じ、
 `digest` が `v2.` で始まる、`threads` が配列でスレッドの要素がすべて正しい、など）、1 つでも外れれば「指摘を読み取れませんでした（理由）」と
 言って確定のボタンを出さない。0 件なら「フェーズ N に未解決の指摘はありません」と［レビュー済みにする］、1 件以上なら対応方針の画面になる。
@@ -116,3 +116,77 @@ error がある間は配点もフェーズ定義も保存できない。
   `tests/core/test_diaglog.py` が 3 つの行を突き合わせる
 - Chrome 拡張は `src/ccnavi/` を Pyodide で import して、判定のコア（`tickets/core.py`（実体は `core_base`・`core_approve`・`core_review`）の
   Snapshot → 判定 → Changes）と `cli.run` を直に呼ぶ。呼ぶ名前の一覧は REQ-EXT-27 の表にある
+
+### 10.1 `--docs` の索引
+
+使い方は [ドキュメントの索引の使い方](../guide/docs-search.md)。ここは索引の作り方と形を書く。
+
+引くのはワークスペースと、プロジェクトの置き場の直下の各プロジェクト（それぞれ別の git）を合わせたもの。どこから打っても同じで、
+パス（`concept_id`）はワークスペースルートから書く（`projects/lib/docs/x`）。`--path projects/lib` で 1 つのプロジェクトに絞れる。
+どのツリーもルートに `.git` を持つものだけで、`.git` の無い `projects/<名前>/` は `--docs` が標準エラーで名指しする。
+それぞれの `git ls-files --cached --others --exclude-standard` のうち `*.md` を載せ、実体の無いもの（消してまだステージしていないもの）、
+シンボリックリンク、ccnavi ディレクトリ（`.ccnavi/`）の下（`.ccnavi/docs/` を除く）は載せない。ワークスペースの一覧からはプロジェクトの置き場を外す。
+実体のパスがそのツリーの外に出るディレクトリ（ジャンクションやシンボリックリンク越し）は読みも書きもしない。
+同じ `concept_id`（NFC で揃えて同じもの）は 1 本にまとめる。
+
+frontmatter は md の頭の 64 KiB までを UTF-8 として読む（それより後ろで閉じる frontmatter と、UTF-8 でない md は読めない）。
+frontmatter の無い md は頭の 4 KiB だけで止める。
+
+引く前に、md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を新しくする（`--no-refresh` で省く）。`concept_id` と `mtime` が
+同じ行は読み直さずに使い回し、中身が変わらなければ書かない。初めての回は md を全部読むので、md が数千本あるツリーでは
+数秒かかる。2 回目からは `mtime` の変わった md だけを読む。
+
+- **書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけ。** md を持つディレクトリのどれでも無視されていないツリー
+  （ワークスペースかプロジェクト）は索引の対象外にし、引かずに標準エラーで名指しする。ただし、足せるツリーは書く前に実行ファイルの `ccnavi` が自分で足す。`.gitignore` の末尾に `**/ccnavi-index.jsonl` を 1 行足して（ファイルが無ければ作る。既存の行は変えない）確かめ直し、足したことは標準エラーと `SessionStart` の案内で名指しする（未コミットの差分が残る）。
+  足すのは書き込める回だけで、`--no-refresh` では足さない。同じ行が既にあれば足さず、`!` で索引を否定する行があれば（ユーザが追跡している）足さない。足せない・足しても無視されない（追跡されているなど）ときは対象外のまま。
+  ワークスペースには導入スクリプト `scripts/ccnavi-setup.sh` も配るときに足す。一部のディレクトリだけが無視されていない（追跡されている
+  `ccnavi-index.jsonl` がある）なら、そこは書かずに行だけを組む
+- **ccnavi の形でない `ccnavi-index.jsonl` は上書きも削除もしない。** 空か、空でない行が全部下の 4 つの鍵を持つ行として読めるときだけを
+  ccnavi のものとみなす。それ以外（よその道具のファイル、破損した行、リンク、16 MiB を超えるもの、入れ子が 32 段より深い行、
+  `NaN`・`Infinity` を持つ行）は触らず、行だけを組んで引き、`--docs` は標準エラーで、`SessionStart` は 1 行で名指しする。
+  行は `\n` だけで割る（値の中の U+2028・U+2029・U+0085 では割らない。行末の `\r` は除く）
+- 書くときは git のディレクトリ（`.git/`、submodule なら指す先）に一時ファイルを排他で作り、置き換える。作業ツリーの
+  `git status` には出ない。打ち切りで残った一時ファイル（`ccnavi-index-*.tmp`）は、10 分より古ければ次の回に消す。
+  `.git` が作業ツリーと別のファイルシステムにある（置き換えが EXDEV で失敗する）ときは、そのディレクトリの下に
+  `.ccnavi-tmp-<番号>/ccnavi-index.jsonl` を作って置き換え、ディレクトリごと消す。この名前が git に無視される（`**/ccnavi-index.jsonl` で当たる）
+  ことを先に確かめ、無視されなければ書かない。残骸は 10 分より古く、中身が `ccnavi-index.jsonl` だけのものに限って消す
+- git への問い合わせの失敗（git が無い・期限切れ・破損したリポジトリ）は、`.git` が無いのとも無視されていないのとも別に扱う。
+  `--docs` は「git への問い合わせに失敗したので引かない」とそのツリーを名指しし、`SessionStart` は何も出さない。
+  git にはユーザの環境の pathspec の読み方（`GIT_LITERAL_PATHSPECS` など）を外して聞き、`:(exclude)` のような名前の
+  ディレクトリも字どおりに扱う
+
+`SessionStart` はサブエージェントでなければ、ワークスペースとプロジェクトの索引を同じ手順で新しくし、引き方の 1 行（frontmatter の
+決まりの文書があれば、その引き方の 1 文）を `additionalContext` につける。対象外にしたツリーと書き換えなかった `ccnavi-index.jsonl` があれば短く名指しする。
+md が 1 本も無い・git の外なら何も出さない。新しくするのに使うのは 3 秒（`docsearch.START_SECONDS`）と hook の判定の期限の
+残りの小さいほうまで。まず全部のディレクトリで使い回せる行を見て、読み直しの要る md を、待つ本数の少ないディレクトリから
+1 本ずつ期限を見ながら読む。過ぎたら読むのをやめ、どのディレクトリも「読めた md の新しい行と、読めなかった md の既存の行」で
+書く（読めなかった md は次の回に読む）。大きなディレクトリも回を重ねれば埋まり、小さなディレクトリはその後ろで待たない。
+残りが 0.5 秒（`MIN_REFRESH_SECONDS`）に満たない（期限が既に切れている）ときは新しくせず、md を読まず書かずに既存の
+`ccnavi-index.jsonl` の行だけで案内する（git には 1 秒だけ与える。それも間に合わなければ、ワークスペースルートに md があれば
+引き方だけを出す）。`--docs` は引く前に期限なしで新しくする。何が起きてもセッションの開始は最後まで進む。
+
+絞り込みのフラグ（`--type` から `--no-refresh` まで）を `--docs` の外で渡すと、その旨を出して 1 で終わる（このフラグが無かったころに
+argparse が止めていた打ち間違いを、知らせずに通さないため）。`--docs` にほかの経路のフラグ（`--lint` `--yes` `--preview` `--result`
+`--tickets` `--flow` など）と、判定やチケットの経路の設定・sh が渡すフラグ（`--cwd` `--mode` `--approved` `--rules` `--phases`
+`--risk` `--projects` `--project-home` `--ticket-control` `--guard-core-files` `--guard-ticket-approval` `--restore-if-deny`
+`--record-writes` `--choose-out` `--actor` `--via` など）を付けたときも、無視せずに 1 で終わる。
+使われるのは引く場所の `--root` と、記録の置き場の `--log` / `--state`（`--docs` は何も記録しないので結果は変わらない）だけ。
+
+`ccnavi-index.jsonl` と `--format jsonl` の 1 行、`--format json` の配列の要素は同じ形。
+
+```json
+{"concept_id":".ccnavi/docs/worktree","directory":".ccnavi/docs","frontmatter":{"type":"guide","tags":["worktree","git"]},"mtime":"2026-09-27T19:56:23"}
+```
+
+| 鍵 | 何 |
+|---|---|
+| `concept_id` | 引いた結果ではワークスペースルートからの相対パス（`/` 区切り）から `.md` を除いたもの。`ccnavi-index.jsonl` に書く行は、そのリポジトリのルートから（プロジェクトの頭の `projects/<名前>/` が無い） |
+| `directory` | そのファイルがあるディレクトリ（`concept_id` と同じ基準。リポジトリのルート直下は `.`、プロジェクトのルート直下は `projects/<名前>`） |
+| `frontmatter` | 頭の `---` から `---`（か `...`）までを YAML（SafeLoader、別名は拒む）で読んだもの。無い・読めない・マッピングでない・JSON に書けない（桁の多すぎる整数など）なら `null`。日付などの JSON に無い値は文字列 |
+| `mtime` | ファイルの更新日時。ローカル時刻の `YYYY-MM-DDTHH:MM:SS` |
+
+**古い `ccnavi-index.jsonl` が残る条件。** md が全部消えたディレクトリの `ccnavi-index.jsonl` を消すのは、そこに追跡されている md が
+あった（`git ls-files --cached` に出るが実体が無い）ときだけで、しかも ccnavi の形で、git に無視されているものに限る。
+追跡されていない md だけを持っていたディレクトリ、ディレクトリごと消えたもの、`.gitignore` に入ったディレクトリ、索引の対象外に
+なったツリーの `ccnavi-index.jsonl` は残る。残ったものは読まない（引くのは、いま md を持つディレクトリの分だけ）ので結果は変わらない。
+`mtime` は秒で比べるので、同じ秒の中で 2 度書き換えた md は次に `mtime` が変わるまで古い行のままになる。

@@ -8,7 +8,7 @@ keywords: [リスク, risks.yml, 配点, 育つ, 全体像, risk.json, 実績, l
 
 # リスクの配点が育つ流れ
 
-リスクは宣言ではなく実績で測る。子を `ticket finish` で閉じるとき、差分を数えて点を付け、`phases/<親>/<子>.risk.json` に残す（ADR-0027）。
+リスクは宣言ではなく実績で測る。子を `ticket finish` で閉じるとき、差分を数えて点を付け、`phases/<親>/<子>.risk.json` に残す。
 配点（`risks.yml`）は、その測り方が実際の重さに合っているかを見て直す。
 
 ```
@@ -43,6 +43,4 @@ keywords: [リスク, risks.yml, 配点, 育つ, 全体像, risk.json, 実績, l
 
 | 読むとき | 開くファイル |
 |---|---|
-| 配点の仕様 | `docs/design/tickets/risk.md` |
-| なぜ実績で測るか | `docs/adr/0027-risk-by-result.md` |
 | 書き方・確かめ方 | `.claude/skills/ccnavi-config/references/add.md` と `check.md` |

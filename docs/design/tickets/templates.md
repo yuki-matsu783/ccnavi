@@ -71,8 +71,46 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 `--show <名前>`・`--check-file <パス>`（任意のパスのテンプレートを置き場に入れずに検査する。読み返した中身 `data`・計画の図の中身 `plans`・選べる型 `types` を返す。拡張の編集欄が保存の前に呼ぶ）・`--layer`・`--json`。`--layer` は統合結果の相手のレイヤー（既定は自身）で、一覧と `--show` のほか、`--draft`（`--to project` の取り込み先）と
 `ticket new --template`（テンプレートを引くレイヤー）にもある。読むだけなのでエージェントが打ってよい。失敗（`--show` の無い名前、不明な `--layer`）は、
 `--json` なら `--draft` と同じく `{version, ok: false, error}` を標準出力に出す（終了コードは 1）。`--docs` の絞り込みのうち `--keyword` だけを共有し、
-ほかは `--docs` でだけ使えるまま断る。`--docs` や、判定・チケットの経路のフラグとは並べられない。答えの形は README の
-「作業・レビュー計画のテンプレート」と `tests/fixtures/templates-json.json`。画面は判定を自分で出さず、この答えをそのまま描く（`--check-file` の答えの形は `tests/fixtures/templates-check-json.json`）。
+ほかは `--docs` でだけ使えるまま断る。`--docs` や、判定・チケットの経路のフラグとは並べられない。答えの形は下の表と `tests/fixtures/templates-json.json`（見本で固定している）。画面は判定を自分で出さず、この答えをそのまま描く（`--check-file` の答えの形は `tests/fixtures/templates-check-json.json`）。
+
+`--templates --json` は、画面がそのまま描ける完全な答えを返す。
+
+| 鍵 | 何 |
+|---|---|
+| `version` / `root` | 形の版（いま 1）/ ワークスペースルート |
+| `layer` / `keywords` | 一覧の対象のレイヤー（`--layer`、既定 `self`）/ 検索の語 |
+| `templates[]` | 共通 + `layer` の統合結果（`keywords` で絞る）。共通の側の検査は、統合結果のフェーズ定義で行う |
+| `layers[]` | 共通・`self`・各プロジェクトの生の中身。`{name, path, exists, unreadable, writable, problems[], templates[]}`。検査はそのレイヤーのフェーズ定義（共通は共通だけ）で行う |
+| `sums[]` | レイヤーごとの統合結果の索引。`{name, layers[], templates[{name, layer, effective, dropped}]}` |
+| `errors` / `warns` / `infos` | 全レイヤーの苦情の件数 |
+| `drafts[]` | 下書き（効力なし。`templates[]` にも統合結果にも入らない。`keywords` で絞る）。下の表 |
+
+`templates[]` と `layers[].templates[]` の 1 件。
+
+| 鍵 | 何 |
+|---|---|
+| `name` / `layer` / `path` | 名前 / `common` かレイヤーの名前 / ワークスペースルートからの相対パス（`/` 区切り） |
+| `sha` | ファイルの中身の SHA-256。保存のときの `--expect` に使う（`--plan-order` の `source_sha` と同じ流儀） |
+| `valid` | 読めたか。読めなければ下の中身は空で、理由は `problems` と `dropped.detail` |
+| `description` / `when` | 説明 / 選ぶ手がかり |
+| `plan[]` / `feedback[]` | 項 `{index, number, type, review, after}`。`index` は計画の中の添字、`number` は提案に写したときの番号（フィードバック計画は全体計画の続き）、`after` は計画の中の添字 |
+| `has_flows` / `flows[]` | フローの有無 / `{index, name, nodes, connections, node_types}`（`index` は全体計画の添字） |
+| `effective` | 統合結果で使われるか。読めないもの・衝突で捨てたものは `false` |
+| `dropped` | 使われない理由 `{reason, detail}`。`reason` は `invalid`（読めない）/ `duplicate`（共通と全欄が同じ）/ `conflict`（共通と中身が違う）。使われるなら `null` |
+| `usable` | 使われていて、error も無い |
+| `writable` | 書き換えてよいか。共通は、親の着手が写したミラー（承認済みの親のワークツリーの中）では `false` |
+| `problems[]` | 検査の結果 `{severity, detail}`。`severity` は `error` / `warn` / `info` |
+
+`drafts[]` の 1 件。画面が取り込みを出せる形で、`name`・`path`（ツリーからの相対）・`sha`・`valid`・`description`・`when`・`plan[]`・
+`feedback[]`・`has_flows`・`flows[]`・`problems[]` は上の表と同じ。足すのは次の欄。
+
+| 鍵 | 何 |
+|---|---|
+| `tree` | 下書きが在るツリーの名前。ワークスペースルートは空 |
+| `checked_with` | 検査に使ったフェーズ定義の層（`self` かプロジェクト名）。`templates[].layer`（ファイルが在る層）とは別 |
+| `importable` | 読めて、error が無い（取り込みの前提。取り込み先の定義での検査は `user handoff` が行う） |
+| `exists_in` | 同じ名前のテンプレートが在るレイヤー（`common` を含む）。在れば `--draft` は断る（既存を直すときは `ccnavi-stage.sh` で写して編集する） |
+| `also_in` | 同じ中身の下書きを持つほかのツリー（`tree` と同じ表記。ワークスペースルートは空。親のブランチに乗った下書きは子のワークツリーにも在る） |
 
 **画面での編集。** ユーザは拡張の編集欄で、計画の項と線・子のフローを図で直して保存できる。保存は、`--check-file` に error が無く、読み返した中身が書こうとした中身と同じで、開いたときからファイルが外で変わっておらず、作業中のチケットが無いときだけ、拡張が一時ファイルの入れ替えで書く。作業中の錠は取り込み待ち画面と同じ決まりで、拡張の画面だけが持つ。エージェントは通れない。
 
@@ -209,3 +247,23 @@ Draft を外し済みの親には出さない。前者は `wip/` を消す手順
 最後の点検は、配布元にあるテンプレートが配布先に無ければ「まだ無いもの」に挙げる。ファイル名は `[A-Za-z0-9._-]` だけで英数字で始まるもの
 （`plan_templates.NAME_RE` と同じ範囲）に限り、空白や glob の文字を含む名前は、単語分割で `cp` が失敗して配布が半端に止まるのを避けるため配らず、
 「名前に使えない文字があるので配っていないテンプレート」として出力で言う。共通のテンプレートが無い配布元では、配るファイルも出力も、これまでの版と変わらない（テストが配るファイルの一覧と標準出力・標準エラーを固定している）。
+
+
+### 見本（テンプレートの YAML）
+
+```yaml
+name: feature                 # ファイル名（拡張子を除く）と同じ。英数字で始め、英数字と . _ - だけ
+description: 機能を設計から実装まで進める   # 一覧に出す説明（必須）
+when: 新しい機能を足すとき     # 選ぶ手がかり（省いてよい）
+plan:                         # 全体計画。項は定義の名前か {type, review, after}
+  - design
+  - {type: implement, after: [1]}   # after はこの計画の中の添字（1 始まり）
+feedback:                     # フィードバック計画（省いてよい）。after は feedback の中の添字
+  - implement-feedback
+flows:                        # 全体計画の項の添字 → 子のフローの本文（フローのファイルと同じ形）
+  2:
+    id: wf-impl
+    name: 実装の手順
+    nodes: [...]
+    connections: [...]
+```

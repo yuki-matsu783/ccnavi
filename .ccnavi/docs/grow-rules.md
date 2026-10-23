@@ -31,12 +31,12 @@ keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, te
 - 条件を 1 本の regex に詰めない。「除く」は `except:`、組み合わせは `when:` で書く（先読みを受け付けないため、詰めると 1 文字ずつの場合分けになる）
 - `deny` の `message` は「なぜ止めたか＋代わりに何をするか」。止められたエージェントがそれだけで次の一手を選べるようにする
 - 共通レイヤーのルールが壊れていても、組み込みの `deny` は残る。壊れた設定が防御を消さないため
-- ミラーは誰も編集しない写し。プロジェクト固有のルールは `.ccnavi/config/project/` に置く（ADR-0107）
+- ミラーは誰も編集しない写し。プロジェクト固有のルールは `.ccnavi/config/project/` に置く
 
 ## 次に読む
 
 | 読むとき | 開くファイル |
 |---|---|
-| 書式・記法の細部 | `docs/design/rules.md`、`.claude/skills/ccnavi-config/references/add.md` |
+| 書式・記法の細部 | `.claude/skills/ccnavi-config/references/add.md` |
 | 確かめ方 | `.claude/skills/ccnavi-config/references/check.md` |
-| 共通レイヤーの配り方 | `docs/adr/0107-common-layer-is-mirrored-and-phases-live-in-config.md` |
+| 共通レイヤーの配り方 | `.ccnavi/docs/grow-phases.md`（「配る」の行） |

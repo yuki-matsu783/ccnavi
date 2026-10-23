@@ -55,7 +55,7 @@
 # すると、そのプロジェクトが何を止めるかが、1 回の実行し直しで配布元の内容へ戻る。
 #
 # `disable` は受け付けない。監視される側が書けるファイルで監視を止めることになるので、
-# ccnavi 自身がそれを error として報告する（README「設定の検証」）。止めたいときは、
+# ccnavi 自身がそれを error として報告する（docs/requirements/diagnostics.md の 2.10.1「設定の検証」）。止めたいときは、
 # セッションを起動する側の環境から渡す。
 #
 # 終了コード: 0 成功 / 1 --check で揃っていない / 2 引数か環境の誤り
@@ -65,7 +65,7 @@ set -eu
 SETTINGS_REL=".claude/settings.json"
 # VS Code へ渡す設定。値ではなくキーがあるかどうかを見て、足りないものだけを足す。
 # `git.detectWorktrees` は、.claude/worktrees/ の中のワークツリーをソース管理の
-# ビューに表示する（README「ワークツリーを VS Code から見えるようにする」）。
+# ビューに表示する（docs/guide/install.md「VS Code からワークツリーを見る」）。
 # `git.repositoryScanMaxDepth` は、projects/<名前>/ のようにワークスペースルートから 2 階層下の
 # リポジトリを見つけるために 2 にする（既定は 1 で、ルートの直下の階層までしか探さない）。
 VSCODE_REL=".vscode/settings.json"
@@ -75,7 +75,7 @@ VSCODE_KEYS='{"git.detectWorktrees": true, "git.repositoryScanMaxDepth": 2}'
 HOOK_COMMAND='"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 HOOK_TIMEOUT=10
 # 8 つのイベントすべてに登録する。1 つでも欠けると、そのイベントでしかできない処理が、
-# 気づかないうちに行われなくなる。何が行われなくなるかは README「設定」の表にある。
+# 気づかないうちに行われなくなる。何が行われなくなるかは docs/guide/settings.md「設定」の表にある。
 EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure Stop SubagentStart SubagentStop"
 # セッションの開始時に、承認済みチケットとマーカー（親ブランチに含まれて届く）と、ワークツリーの
 # 起点になる統合先ブランチを取得する sh。本体とは別の 1 行として SessionStart に登録する。
@@ -948,7 +948,7 @@ fi
 # ぶんが足される。
 #
 # 配った実行ファイルの `--docs` は、md のあるディレクトリごとに ccnavi-index.jsonl を書く。ただし書くのは
-# git がそのファイルを無視しているときだけなので（README「ドキュメントの索引」）、無視する
+# git がそのファイルを無視しているときだけなので（docs/design/diagnostics.md の 10.1「ドキュメントの索引」）、無視する
 # 行が無い配布先では索引が作られない。そこで、実行ファイルと同じ回に `**/ccnavi-index.jsonl` も足す。
 # 見出しは実行ファイルの塊と分ける。同じ見出しの下に置くと、何のための行かが分からなくなる。
 # `/` を含まない `ccnavi-index.jsonl` もどの階層にも当てはまるので、その行が既にあれば足さない。

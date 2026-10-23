@@ -18,7 +18,7 @@ Python の関数を直接呼ぶ。
 この節には、ccnavi が拡張に約束することだけを書く。拡張が画面でどうふるまうかは、各拡張の要件書
 （VS Code は [ccnavi ボードの要件](../../extensions/vscode/ccnavi-board/docs/requirements.md) の REQ-VSC、
 Chrome は [ccnavi 承認ボードの要件](../../extensions/chrome/ccnavi-approval/docs/requirements.md) の REQ-CHR）にある。
-JSON の欄の細かい形は README の各 JSON の節と [設計 10](../design/diagnostics.md) に置き、ここからはそこを指す。
+JSON の欄の細かい形は [json-shapes.md](json-shapes.md) の各 JSON の節と [設計 10](../design/diagnostics.md) に置き、ここからはそこを指す。
 
 ### 2.13.1 共通
 
@@ -27,7 +27,7 @@ JSON の欄の細かい形は README の各 JSON の節と [設計 10](../design
 | REQ-EXT-01 | 常時 | ccnavi は、振り分けの sh の名前を `ccnavi-launcher.sh` とし、その名前の sh が起動する実行ファイルを、sh の置き場の親の `bin/<os>-<arch>/ccnavi`（Windows は `ccnavi.exe`）に置くこと。`<os>` は `darwin`・`linux`・`windows`、`<arch>` は `x86_64`・`arm64` とすること。arm64 の macOS と Windows では、自分向けが無いときだけ `x86_64` の実行ファイルを起動すること。配布先では sh を `.ccnavi/scripts/ccnavi-launcher.sh` に置き、`.claude/settings.json` の env `CCNAVI_BIN_PATH` にそのパスを書くこと |
 | REQ-EXT-02 | 事象 | `--root <パス>` を受けたとき、ccnavi は、そのパスをワークスペースルートとして読むこと。`--root` が 2 度渡されたときは、標準エラーに理由を出して何もしないこと。ただし `--version` は `--root` を読まずに版を返すこと（REQ-EXT-04） |
 | REQ-EXT-03 | 常時 | ccnavi は、標準出力と標準エラーを、コンソールの文字コードによらず UTF-8・改行 LF で書くこと。`--explain --json`・`--test --json`・`--test-expectations --json`・`--lint --json`・`--suggest --json`・`--version --json` の JSON は ASCII に変換して（ASCII でない字は `\u` で）書き、承認の JSON（`user agree … --json`）と残った指摘の JSON は UTF-8 の字のまま書くこと |
-| REQ-EXT-04 | 事象 | `--version --json` を求められたとき、ccnavi は、設定もワークスペースも読まず、`schema`・`version`・`commit`・`built`・`compat`・`flags`・`formats` を返して 0 で終わること。`flags` は引数の定義から引き、足したフラグがそのまま並ぶこと |
+| REQ-EXT-04 | 事象 | `--version --json` を求められたとき、ccnavi は、設定もワークスペースも読まず、`schema`・`version`・`commit`・`built`・`compat`・`features`・`flags`・`formats` を返して 0 で終わること。`flags` は引数の定義から引き、足したフラグがそのまま並ぶこと。`features` はオプションから読めない振る舞いの名前で、足しても互換の版は上げないこと |
 | REQ-EXT-05 | 常時 | ccnavi は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh、VS Code 拡張、Chrome 拡張）の契約の版（互換の版）を持ち、実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）・sh（`.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT`）・VS Code 拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）に同じ値を書くこと。呼ぶ側が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたとき、データの形（承認済みの置き場に置くものの並び、待ち方の置き場など）を変えたとき、sh が古い実行ファイルの知らないサブコマンドを呼ぶようになったときに 1 上げること。フラグや欄を足すだけでデータの形も変わらないなら上げないこと |
 | REQ-EXT-06 | 常時 | ccnavi は、互換の版を、`src/ccnavi/entry/version.py` では行頭から行末までの 1 行 `COMPAT = <整数>`（`^COMPAT = N$`）で、`.ccnavi/scripts/ccnavi-common.sh` では行頭から始まる 1 行 `CCNAVI_COMPAT=<整数>`（`^CCNAVI_COMPAT=N$`）で書くこと。Chrome 拡張の組み立ては前者を、Chrome 拡張は統合先の後者を、それぞれ正規表現で読む |
 | REQ-EXT-07 | 異常時 | 知らないオプションを渡されたなら、ccnavi は、何もせずに argparse の文言（`ccnavi: error: unrecognized arguments: <オプション>`）を標準エラーに出し、終了コード 1 で終わること |
@@ -44,7 +44,7 @@ REQ-EXT-03 の UTF-8 は、実行ファイルの入口（`hookio.rebind_streams`
 念のため `PYTHONUTF8=1`・`PYTHONIOENCODING=utf-8` も渡す。
 
 REQ-EXT-05 の 3 か所は `tests/sh/test_compat_skew.py` が突き合わせる。Chrome 拡張は、互換の版を
-組み立てのときに REQ-EXT-06 の行から埋め込む。版の JSON の形と、食い違ったときの直し方は README「[版の JSON](../../README.md#版の-json)」にある。
+組み立てのときに REQ-EXT-06 の行から埋め込む。版の JSON の形と、食い違ったときの直し方は json-shapes.md「[版の JSON](json-shapes.md#版の-json)」にある。
 
 REQ-EXT-07 の文言は、`--version` を知らない古い実行ファイルを VS Code 拡張が見分けるのに使う。新しいフラグを知っているかは
 `--version --json` の `flags` で見る（REQ-EXT-04）。
@@ -56,9 +56,9 @@ sh は `<ワークスペースルート>/.ccnavi/scripts/` のものを絶対パ
 
 | ID | 型 | 要求 |
 |---|---|---|
-| REQ-EXT-12 | 事象 | `--explain --json` を求められたとき、ccnavi は、`version`・`root`・`generated_at`・`settings`・`trees`・`layers`・`projects`・`problems`・`pending_approval`・`tickets`・`parents`・`archived` を必ず載せた JSON を返し、0 で終わること（REQ-DIA-06） |
+| REQ-EXT-12 | 事象 | `--explain --json` を求められたとき、ccnavi は、`version`・`root`・`generated_at`・`settings`・`trees`・`layers`・`sums`・`projects`・`problems`・`pending_approval`・`tickets`・`parents`・`archived` を必ず載せた JSON を返し、0 で終わること（REQ-DIA-06） |
 | REQ-EXT-13 | 事象 | `--agree --preview --json [<絞り>...]` を求められたとき、ccnavi は、`version`・`batch`・`text`・`digest`・`rejected`・`problems` を載せた JSON を返し、承認済みチケットを置かないこと。承認の対象にしない提案があっても 0 で終わること（REQ-DIA-10） |
-| REQ-EXT-14 | 事象 | `user agree --yes <識別子,…> --digest <値> --json [<絞り>...]` を求められたとき、ccnavi は、標準入力が端末であることを求めず、REQ-APV-09 の照合が通るときだけ承認済みチケットを置き、`version`・`approved`・`copies`・`written`（この承認で書いた・消したパス）・`lines`・`prompt` を返して 0 で終わること。照合が通らなければ何も置かずに `mismatch`（呼び手が「内容が更新されました」と最新を表示し直す）を、置いている途中で止まれば置けたパス（`partial.paths`）と書いた・消したパス（`partial.written`）を載せた `partial` を返し、どちらも終了コード 1 で終わること。状態の履歴の経路は `board` とすること |
+| REQ-EXT-14 | 事象 | `user agree --yes <識別子,…> --digest <値> --json [<絞り>...]` を求められたとき、ccnavi は、標準入力が端末であることを求めず、REQ-APV-09 の照合が通るときだけ承認済みチケットを置き、`version`・`approved`・`copies`・`written`（この承認で書いた・消したパス）・`worktrees`（承認した子のワークツリーの計画）・`lines`・`prompt` を返して 0 で終わること。照合が通らなければ何も置かずに `mismatch`（呼び手が「内容が更新されました」と最新を表示し直す）を、置いている途中で止まれば置けたパス（`partial.paths`）と書いた・消したパス（`partial.written`）を載せた `partial` を返し、どちらも終了コード 1 で終わること。状態の履歴の経路は `board` とすること |
 | REQ-EXT-15 | 事象 | `ccnavi-review.sh decide <N> --preview` を求められたとき、ccnavi は、何も置かずに `version`・`parent`・`phase`・`mr`・`can_issue`・`threads`・`digest`（`v2.` で始まる不透明な文字列。指摘ごとの版を含む）を返すこと。`ccnavi-user-decide.sh <N> --choices <JSON> --digest <値>` を求められたときは、答えの JSON を標準出力の最後の行に書き、見せた指摘のうち変わった・消えたものがあれば何も置かずに `mismatch` と `changed` を返して 1 で終わること（見せたあとに増えた指摘は止めず、結果の `pending_extra` に未対応として載せる。版が 2 でなければボードは断る。REQ-TKT-18） |
 | REQ-EXT-16 | 事象 | `--test <ツール> <対象> --json` を求められたとき、ccnavi は、操作を実行せずに判定を JSON で返し、常に 0 で終わること。`--test-expectations <期待> --json` は常に 0、期待のファイルが読めなければ 1 で終わること。どちらも `--ticket-control disable --state "" --log ""` と、`--rules <パス>`・`--project-rules-file <名前\|self>=<パス>` の差し替えを受けること（REQ-DIA-02・REQ-DIA-09） |
 | REQ-EXT-17 | 事象 | `--lint` か `--lint --json` を求められたとき、ccnavi は、error があれば 1、無ければ 0 で終わること。`--rules`・`--risk`・`--phases`・`--project-rules-file`・`--project-phases-file`・`--project-risk-file` の差し替えを、hook と同じ読み手で検証すること。`--json` の苦情は `{severity, where, detail}` で、置き場の苦情は `where` を `(projects)`・`(projects/<名前>)` にすること。`--flow <パス>` を足したときは、そのフローを `SubagentStart` と同じ読み手で読み、読めた中身を `flow` に載せ、苦情の場所を `(flow)` にすること（REQ-DIA-04・REQ-DIA-08） |
@@ -73,11 +73,12 @@ sh は `<ワークスペースルート>/.ccnavi/scripts/` のものを絶対パ
 | REQ-EXT-24 | 常時 | ccnavi は、レイヤーのファイル（`rules.yml`・`risks.yml`・`phases.yml`）を YAML 1.1（PyYAML の safe な読み手）で読み、頭の `version:` が読める書式の版（`--version --json` の `formats`）でなければ error にすること。拡張が書いたファイルも、hook と同じ読み手で読むこと |
 | REQ-EXT-25 | 常時 | ccnavi は、子のフローを正とする側のツリーの `.ccnavi/approved/flows/<子>.yml`（YAML、256 KiB まで）から読み、ファイルかツリーのルートからそこまでの途中がシンボリックリンクなら読まないこと。下書き `wip/proposals/flows/<子>.yml` には効力を持たせないこと。`ccnavi-user-push-approved.sh` は `flows/` の下の `.*.tmp` をコミットしないこと |
 
-JSON の欄の形は README の「[ボードの JSON](../../README.md#ボードの-json)」「[承認の JSON](../../README.md#承認の-json)」
-「[残った指摘の JSON](../../README.md#残った指摘の-json)」「[試験の JSON](../../README.md#試験の-json)」
-「[lint の JSON](../../README.md#lint-の-json)」「[候補の JSON](../../README.md#候補の-json)」にある。どの JSON も形の版
+JSON の欄の形は json-shapes.md の「[ボードの JSON](json-shapes.md#ボードの-json)」「[承認の JSON](json-shapes.md#承認の-json)」
+「[残った指摘の JSON](json-shapes.md#残った指摘の-json)」「[試験の JSON](json-shapes.md#試験の-json)」
+「[lint の JSON](json-shapes.md#lint-の-json)」「[候補の JSON](json-shapes.md#候補の-json)」にある。どの JSON も形の版
 （`version`。版の JSON は `schema`）を持ち、拡張は知らない版を読まない。ボード・承認・試験・候補の JSON は、拡張の
 `test/fixtures/` の実例と同じ例で本体のテストが形を確かめる。
+各 JSON の欄の一覧は [json-shapes.md](json-shapes.md) にまとめてある。
 
 REQ-EXT-14 の経路をエージェントがシェルから打つ形は、組み込みの deny が止める（REQ-APV-07・REQ-APV-12）。
 REQ-EXT-15 の答えが最後の行なのは、sh が実行ファイルの答えに投稿の結果（`issue_url`・`warning`）を足して最後に書き、
@@ -120,7 +121,7 @@ Chrome 拡張だけが動かなくなる。上げた互換の版は統合先の 
 たとえば `approval_refusal_code` と、`confirm` の戻り値の `code` を足したときは、古い拡張はそれを引かず読み飛ばすだけなので、互換の版を上げていない。
 `tests/ticket/test_swap_points.py` は、手元の承認・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
 
-REQ-EXT-29 のダイジェストが覆うものは README「[承認の JSON](../../README.md#承認の-json)」と同じ（提案の識別子の一覧と各提案ファイルのバイト列全体だけ）。
+REQ-EXT-29 のダイジェストが覆うものは json-shapes.md「[承認の JSON](json-shapes.md#承認の-json)」と同じ（提案の識別子の一覧と各提案ファイルのバイト列全体だけ）。
 違いがあれば拡張は書かずに「内容が更新されました」と最新を表示し直す。書いてよいのは、`batch` があり、`gathered.refused` も `mismatch` も無いときだけで、Chrome 拡張の入口は
 そのときだけ `plan` を呼ぶ。書く先のブランチと互換の版で断るのは拡張の側（REQ-CHR-03・REQ-CHR-04）。
 

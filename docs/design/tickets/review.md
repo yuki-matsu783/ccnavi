@@ -199,7 +199,7 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
    `confirm` は止まらず、`request` の打ち直しも要らない（打つと「依頼済み」で止まる）。**代わりに、直した ELI5 をユーザが見直す保証は無い。**
    直す前の行に付いたスレッドは未解決のまま残るので、ユーザが resolve する（か `decide` で決める）。ELI5 とほかのファイルを一緒に変えた
    コミットは今までどおり動いたと数え、打ち直しを求める
-7. `wip/` は `ready` の前に丸ごと消してコミットする（`ready` の前提）。ELI5 もここで消え、squash した成果物には残らない
+7. `wip/` は `ready` の前に丸ごと消してコミットする（`ready` の前提）。ELI5 もここで消え、squash した成果物には残らない。`ready` の前提は大文字小文字を区別せず（`WIP/` も）、名前が `wip\` で始まる 1 ファイルも残りとして止める
 
 **`confirm`** は `requested` が無ければ拒む。依頼のマーカーにあるホストとマージリクエストの番号が承認済みチケットと
 一致しなければ拒む。依頼時の HEAD と今の HEAD が同じで push 済みであることを求める。ただし
@@ -257,6 +257,13 @@ GitLab。上の「ホストの分類」）、`gh` / `glab` がそのホストで
 URL に埋めた資格情報は読み飛ばして出力では伏せる。実行ファイルの側も同じ規則で origin を読み、
 `--lint` が sh の道具が揃っているかを warn で言う。見るのは有無だけで、PATH に `jq` があるか、`gh` / `glab` か `curl` があるか、
 `curl` を使う形ならホストに合うトークンの環境変数が空でないか。確かめるのはこの空でないかだけで、ホストへは通信しないので、認証が通るかやトークンが有効かは確かめない（実行ファイルはネットワークに出ない）。
+
+**push の認証。** gh / glab でログイン済みならそのまま通る。origin が http(s) のとき、`ccnavi_git_auth`（`ccnavi-common-host.sh`）が
+`gh auth git-credential` / `glab auth git-credential` を origin のホストだけに環境変数で足す（git 2.31 以上。origin と `.gitconfig` は書き換えず、既存の `credential.helper` が先に使われる）。
+それ以外は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは `GIT_CONFIG_COUNT` を外し
+`GIT_TERMINAL_PROMPT=0` で動くので、環境変数での差し替えも認証画面も使えない。GitLab の実物で分かった注意点は[付録 C](../appendix.md)、
+確かめ直すための道具は `tests/manual/gitlab/probe_gitlab.py`。`--result` を実行ファイルに直接渡せるのはユーザの手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）で、
+エージェントはスクリプト 2 本を通す。
 
 push は親だけが行う。hook は子チケットのワークツリーからの `ccnavi-git.sh push` を、誰が打っても拒み
 （`DENY_CHILD_PUSH`）、サブエージェントからの `ccnavi-git.sh push` はどこからでも拒む。リモートに置く枝は

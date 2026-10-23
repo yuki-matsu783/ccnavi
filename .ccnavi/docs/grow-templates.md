@@ -40,5 +40,4 @@ keywords: [テンプレート, 育つ, 全体像, 作業・レビュー計画, d
 | 読むとき | 開くファイル |
 |---|---|
 | 手順の細部とオプション | `.ccnavi/docs/templates.md` |
-| 設計（置き場・足し算・検査） | `docs/design/tickets/templates.md` |
 | 計画の型 | `.ccnavi/docs/grow-phases.md`（フェーズが育つ流れ） |

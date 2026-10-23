@@ -355,7 +355,7 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     except (AttributeError, ValueError):
         pass
     # 切り方（CCNAVI_GUARD_TICKET_APPROVAL）は文面に書かない。読むのはエージェントで、書けば
-    # ユーザの判断を自分で出す方法を教えることになる。切り方は README の設定の表にある。
+    # ユーザの判断を自分で出す方法を教えることになる。切り方は docs/guide/settings.md の環境変数の表にある。
     stderr.write(
         f"ccnavi: {flag} はユーザーがターミナルから実行する必要があります。"
         "標準入力がターミナルではないため、実行できません。"

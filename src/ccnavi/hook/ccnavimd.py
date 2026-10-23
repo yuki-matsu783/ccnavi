@@ -248,7 +248,7 @@ def script_path(conf: settings.Settings, root: str) -> str:
 
 
 def script_names(conf: settings.Settings, root: str) -> set[str]:
-    """`ccnavimd.sh` に関数として書かれている条件の名前（`-` は `_`。組み込みと同じ名前は除く）。"""
+    """`ccnavimd.sh` に関数として書かれている条件の名前（名前は英数字と `_` だけ。組み込みと同じ名前は除く）。"""
     try:
         with open(script_path(conf, root), encoding="utf-8") as f:
             text = f.read()
