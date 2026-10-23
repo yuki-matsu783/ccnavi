@@ -102,7 +102,7 @@ if ccnavi_wap_use_exe "$root"; then
 	fi
 	set -- ccnavi_wap_exe --record-writes "$written" user agree --placed-out "$report" "$@"
 else
-	printf 'ccnavi-user-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+	printf 'ccnavi-user-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
 

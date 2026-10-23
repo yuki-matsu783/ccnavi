@@ -217,7 +217,7 @@ if ccnavi_wap_use_exe "$root"; then
 		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
 	fi
 else
-	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
 

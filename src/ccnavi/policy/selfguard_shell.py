@@ -411,7 +411,8 @@ def _home_name(project_home: str) -> str:
 def binary_clause(bin_path: str, *, copy: bool = False) -> str:
     """実行ファイルのパスを、当てる形に直す。
 
-    末尾の 2 要素だけを使う。絶対で書かれても相対で書かれても同じ形に当たり、
+    末尾の 2 要素だけを使う（PATH の実体だけは 3 要素。`bin/ccnavi` では別の道具に当たりすぎる）。
+    絶対で書かれても相対で書かれても同じ形に当たり、
     ファイル名だけに絞ると、同じ名前の無関係なファイルまで拾う。
     区切りはどちらの表記にも当てる。ルールは 1 回書いてどの機械でも同じ意味で
     なければならない、という globmatch と同じ約束をここでも守る。
@@ -478,7 +479,8 @@ def _path_spellings() -> list[str]:
 def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
     """実行ファイルが入っているディレクトリと、その中の名前（holder_regex に渡す組）。
 
-    binary_clause と同じ末尾 2 要素で読む。`cp /tmp/ccnavi dist/` のように、行き先を
+    binary_clause と同じ末尾 2 要素で読む。PATH の実体のディレクトリは足さない（`~/.local/bin` 全体を
+    守ると、無関係な道具の導入まで止まる）。`cp /tmp/ccnavi dist/` のように、行き先を
     実行ファイルの入っているディレクトリにした形を止める。振り分けの sh なら、sh の入っている
     ディレクトリと、組み立ての置き場（`<親>/bin/` の下の `<os>-<arch>`、`<親>` の下の `bin`）。
     ディレクトリの表記が無い名前だけの表記（`ccnavi`）は、入っている場所が決まらないので足さない。

@@ -7,6 +7,9 @@
  *   4. `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh。scripts/ccnavi-setup.sh が配る）
  *   5. ソースがあれば `uv run python -m ccnavi`
  *
+ * 振り分けの sh は、bin/ に合うものが無いと PATH の ccnavi を起動するが、拡張は PATH を見ない
+ * （bin/ が無く PATH にだけある機械では、hook は動き、拡張は見つけられない）。
+ *
  * どれも相対ならワークスペースルートからの相対。Windows の `.exe` はパスに付いていなくても試す。
  *
  * 指す先が振り分けの sh（名前が `ccnavi-launcher.sh`）なら、実体は sh の置き場の親の
