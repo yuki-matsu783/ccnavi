@@ -919,7 +919,7 @@ class FlowLockTest(FlowHarness):
         # subAgent: 入れ子で起こし、担当の子の識別子を 1 つだけ書く（ccnavi がその子のワークツリーで
         # 起動する）。担当以外の子とパスは書かず、isolation は使わない。Agent が無ければ返す。
         self.assertIn(f"担当の子の識別子 {CHILD} を 1 つだけ書き", text)
-        self.assertIn("ccnavi がその子のワークツリーで起動し、範囲とフローを渡す", text)
+        self.assertIn("ccnavi が範囲とフローの案内を書き足す", text)
         self.assertIn("担当以外の子の識別子とワークツリーのパスは書かないでください", text)
         self.assertIn("isolation は使いません", text)
         self.assertIn(child_tree, text)
