@@ -57,7 +57,7 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 ## 開発用の hook
 
 Python のファイルを編集するたびに `.claude/hooks/lint-py.sh`（`PostToolUse` の
-`Write|Edit|NotebookEdit`）が整形と検査をかける。テストはそこでは走らせない。
+`Write|Edit|NotebookEdit`）が整形と検査を走らせる。テストはそこでは走らせない。
 
 テストは `.claude/hooks/test-py.sh` で、`Stop` に登録してターンの終わりに 1 回だけ回す。
 失敗していたら差し戻すが、差し戻しは 3 回まで。上限に達したら止まらせて判断をユーザへ返す。

@@ -123,7 +123,7 @@ sh scripts/ccnavi-setup.sh <ワークスペースルート>
 このスクリプトが hook と `env` を書く。書く形は[設定](settings.md)の例にある。何度打っても同じ形に
 なり、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
 ところだけを見たいときは `--check` を付ける。`--all` も受けるが、今は足すものが無い（置き場の env は廃止した）。
-同じ 1 回で `.vscode/settings.json` も見る（[VS Code からワークツリーを見る](#vs-code-からワークツリーを見る)）。触ってほしくないときは `--no-vscode`。
+同じ 1 回で `.vscode/settings.json` にも書く（[VS Code からワークツリーを見る](#vs-code-からワークツリーを見る)）。触ってほしくないときは `--no-vscode`。
 セッション開始時の入口（`ccnavi-session-start.sh`。取り込みの `ccnavi-fetch.sh` と、直下のディレクトリ一覧の `ccnavi-dirs.sh` を順に呼ぶ）も `SessionStart` に別の 1 行で登録する。
 1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す（ディレクトリ一覧も出なくなる）。
 

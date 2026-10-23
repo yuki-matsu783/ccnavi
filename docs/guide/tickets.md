@@ -48,7 +48,7 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 | 置き場 | 意味 | 動かすもの |
 |---|---|---|
 | `wip/proposals/todo/` | 承認待ち | 親が書く。作成と編集は自由 |
-| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `ccnavi user agree`（ユーザ）、ボード、置き場のファイルの移動。続きの子をユーザが起こすときも直にここ |
+| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `ccnavi user agree`（ユーザ）、ボード、置き場のファイルの移動。続きの子をユーザが起こすときも、ここに直接置く |
 | `wip/proposals/review/` | 作業が終わり、ユーザのレビューを待つ | `sh .ccnavi/scripts/ccnavi-ticket.sh finish <識別子>`（フェーズがレビュー要のとき） |
 | `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
 
@@ -97,7 +97,7 @@ ccnavi user agree i0002 i0002-01-01   # 並べた識別子だけを承認の対�
 | 経路 | 形 |
 |---|---|
 | 端末 | `sh .ccnavi/scripts/ccnavi-user-agree.sh [<識別子>...]`。一覧を見せて y/N を取り、y のあとに提案が更新されていれば「内容が更新されました」と最新を表示し直して確認し直す。通れば `ccnavi-user-push-approved.sh` でコミットして push する。一部だけ書けたときも、書けた分をコミットして push し、書けなかった提案と未送信のパスを言う |
-| ボード | VS Code のボードで承認の一覧を見て、押して承認する。見せたあとに提案が更新されていれば承認せず、「内容が更新されました」と最新に読み直す。1 件以上書けたら `ccnavi-user-push-approved.sh` を統合ターミナルへ送る |
+| ボード | VS Code のボードで承認の一覧から選んで承認する。見せたあとに提案が更新されていれば承認せず、「内容が更新されました」と最新に読み直す。1 件以上書けたら `ccnavi-user-push-approved.sh` を統合ターミナルへ送る |
 | Chrome 拡張のボード | ブラウザと PAT だけで、リモートのブランチの承認待ちを見て承認する。承認は 1 コミットとしてリモートのブランチに書かれる（[拡張の README](../../extensions/chrome/ccnavi-approval/README.md)） |
 | ファイルを動かす | 提案を `.ccnavi/approved/doing/` へ動かす。GitLab や GitHub の画面しか使えないユーザ向け。承認の画面を通らないぶん、構造の検査は判定のときに行い、引っかかれば `DENY_TICKET_BLOCKED` で止まる（`--lint` でも分かる） |
 
@@ -183,7 +183,7 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 
 ## フェーズとレビュー
 
-フェーズの終わりは、ユーザの手が入るところ（HITL ポイント）の 1 つ。ユーザの手は範囲の承認・レビュー・未解決の受け入れの 3 か所にまとめてある。
+フェーズの終わりは、ユーザの手が入るところ（HITL ポイント）の 1 つ。ユーザが関わるのは、範囲の承認・レビュー・未解決の受け入れの 3 か所にまとめてある。
 同じ親の同じ `phase` の子が `doing/` に 1 枚も無く、`review/` か `done/` に 1 枚以上あれば、そのフェーズは終わり。取り消しだけのフェーズは終わらない。
 設計は [9.8](../design/tickets/hitl.md)。
 
@@ -239,7 +239,7 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 親を閉じられる状態（全フェーズが終わり、フィードバック計画が承認され、レビューが済んでいる）になったら、順は「親を `finish` で閉じる → push → `ready`」である。
 `ready` は Draft を外す（「マージに進んでよい」の合図）。Draft を外すのは親で、**マージはユーザ**である。取り込みは squash（GitLab ではマージリクエストの `squash` を有効にする）。
 
-- 最後のレビューが済んだあと、この順までは、ユーザがレビュー済みにした時点で合意の範囲に入る。エージェントは push と Draft を外す前にユーザへ確認を取り直さない
+- 最後のレビューが済んだあとは、ユーザがレビュー済みにした時点で、この順の操作まで合意に含まれる。エージェントは push と Draft を外す前にユーザへ確認を取り直さない
 - `ready` は、親の承認済みチケットが `done/` にあること、`wip/` に未追跡のファイルが無いこと、未コミットが無いこと、push 済みであることを求める。`wip/` の追跡済みのファイルは `ready` が消す。未追跡のものは履歴から戻せないので、あれば消さずに名指しして止まる
 - `ready` は親のワークツリーの中からも、外から `ready --parent <親>` でも打てる
 

@@ -144,7 +144,7 @@ ccnavi の実行ファイル側で条件を足す手順は[開発の入口](../d
 | `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と知らせる。横で作業する記録が有効なメインのチェックアウトの変更は、`enable` でも戻さず報告するだけにする |
-| `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、バックアップして戻す側の両方が切り替わる。承認済みの置き場と操作記録への書き込み、保護済みの sh への環境変数の指定の止めは、この値では切れない |
+| `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、バックアップして戻す側の両方が切り替わる。承認済みの置き場と操作記録への書き込み、保護済みの sh への環境変数の指定は、この値に関係なく止める |
 | `CCNAVI_STOP_REVIEW` | `dry-run`（既定）、`enable`、`disable`。Stop の AI 判定の効き方。全体のモードと掛け合わせる（全体が dry-run なら dry-run、disable なら disable）。`dry-run` は記録だけで止めず、`enable` は検証に通った不備検出だけを差し戻す。登録は `scripts/ccnavi-stop-review.sh` で行う（[Stop の AI 判定](records.md)） |
 | `CCNAVI_STOP_REVIEW_AGENT` | `1` のとき、Stop で判定計画を作る。agent hook を登録したワークスペースに置かれる（`scripts/ccnavi-stop-review.sh register` が書く）。無ければ何も作らない。評価の集計は `ccnavi stop-review report` |
 | `CCNAVI_STOP_REVIEW_KEEP_DAYS` | 判定の再評価用の材料（`logs/stop-review/`）を残す日数。既定は `90`。`0` にすると消さない |

@@ -16,8 +16,8 @@ sh .ccnavi/scripts/ccnavi-git.sh log -p
 sh .ccnavi/scripts/ccnavi-git.sh --help    # 通す形と通さない形の一覧
 ```
 
-- **出力がコンテキストに丸ごと載るのを止める。** 全量は `logs/` に残し、標準出力へは要約 1 行と先頭 40 行だけを返す
-- **オプションの抜け道を、入口を 1 本にして防ぐ。** `permissions.allow` の `Bash(git diff:*)` は前方一致でしかないので、サブコマンドごとに使ってよい形をここで決める
+- 出力がコンテキストに丸ごと載るのを止める。全量は `logs/` に残し、標準出力へは要約 1 行と先頭 40 行だけを返す
+- オプションの抜け道を、入口を 1 本にして防ぐ。`permissions.allow` の `Bash(git diff:*)` は前方一致でしかないので、サブコマンドごとに使ってよい形をここで決める
 
 ```
 $ sh .ccnavi/scripts/ccnavi-git.sh log -p
