@@ -1479,6 +1479,44 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", denied.stdout)
         self.assertNotIn("deny", other.stdout)
 
+    def test_PATH_の先頭が_launcher_へのリンクでも_実際に走る実体を守る(self):
+        # sh は自分と同じファイルを飛ばして次の項目の実体を起動する。守る対象も同じ実体にする。
+        spelled, exe, env = self.path_layout()
+        os.chmod(os.path.join(self.repo, spelled), 0o755)  # 実行できなければ候補に入らない
+        linked = tempfile.mkdtemp(prefix="ccnavi-linked-")
+        self.addCleanup(shutil.rmtree, linked, ignore_errors=True)
+        try:
+            os.symlink(os.path.join(self.repo, spelled), os.path.join(linked, "ccnavi"))
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+        env = {"PATH": linked + os.pathsep + env["PATH"]}
+
+        self.run_hook("SessionStart", bin=spelled, extra_env=env)
+        write(exe, "ELF replaced on path\n")
+        self.run_hook("PostToolUse", bin=spelled, extra_env=env)
+
+        self.assertEqual(read(exe), "ELF fake on path\n")
+
+    def test_セッション開始のあとに現れた_PATH_の実体も最初に見た版を基準に守る(self):
+        spelled, exe, env = self.path_layout()
+
+        self.run_hook("SessionStart", bin=spelled)  # 開始時は PATH に無かった
+        self.run_hook("PreToolUse", bin=spelled, extra_env=env)  # 基準を取る
+        write(exe, "ELF replaced on path\n")
+        self.run_hook("PostToolUse", bin=spelled, extra_env=env)
+
+        self.assertEqual(read(exe), "ELF fake on path\n")
+
+    def test_浅い_PATH_の実体は区切りで始まる形だけに当て_別の_bin_ccnavi_は止めない(self):
+        # `/bin/ccnavi` を末尾 2 要素で当てると、別のプロジェクトの `./bin/ccnavi` にも当たる。
+        shallow = os.path.join(os.sep, "bin", "ccnavi")
+        with mock.patch.object(platformtag, "path_executable", return_value=shallow):
+            regex = selfguard_shell.binary_clause("/ws/.ccnavi/scripts/ccnavi-launcher.sh")
+
+        self.assertTrue(re.search(regex, "cp x /bin/ccnavi"))
+        self.assertFalse(re.search(regex, "cp x ./bin/ccnavi"))
+        self.assertFalse(re.search(regex, "cp x vendor/bin/ccnavi-old"))
+
     def test_PATH_に_ccnavi_が無ければ守る対象も増えない(self):
         spelled, _, _ = self.path_layout()
 

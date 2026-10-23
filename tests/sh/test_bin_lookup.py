@@ -102,6 +102,19 @@ class BinLookupTest(unittest.TestCase):
         result = self.run_ticket(PATH=place + os.pathsep + os.environ["PATH"])
         self.assertTrue(result.stdout.startswith("bin "), result.stdout + result.stderr)
 
+    def test_a_link_to_the_launcher_on_path_is_not_a_build(self):
+        """ccnavi という名前で張った launcher へのリンクは、起動すると自分に戻る。無いものとして扱う。"""
+        place = os.path.join(self.ws, "on-path")
+        os.makedirs(place)
+        launcher = os.path.join(self.ws, ".ccnavi", "scripts", platformtag.LAUNCHER_NAME)
+        try:
+            os.symlink(launcher, os.path.join(place, "ccnavi"))
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+        result = self.run_ticket(PATH=place + os.pathsep + os.environ["PATH"])
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("実行ファイルが見つかりません", result.stderr)
+
     def test_a_relative_path_entry_is_not_used(self):
         self.put_path_build()
         result = self.run_ticket(PATH="on-path" + os.pathsep + os.environ["PATH"])

@@ -33,14 +33,26 @@ def _drop_ccnavi_from_path() -> None:
     振り分けの sh と自己防衛は、bin/ に実体が無いと PATH の ccnavi を使う。PATH に ccnavi を
     通している機械では、「実体が無い」ことを見るテストの答えが、どの機械で走らせるかで変わる。
     PATH を使うテストは、自分で置き場を作って PATH に足す。
+
+    ccnavi があるディレクトリは、ccnavi 以外の中身（`uv` や `git` など）を残すため、
+    それらへのリンクだけを並べた使い捨てのディレクトリに置き換える。
     """
     kept = []
     for place in os.environ.get("PATH", "").split(os.pathsep):
-        has = place and any(
-            os.path.isfile(os.path.join(place, name)) for name in ("ccnavi", "ccnavi.exe")
-        )
-        if not has:
+        names = ("ccnavi", "ccnavi.exe")
+        if not place or not any(os.path.isfile(os.path.join(place, n)) for n in names):
             kept.append(place)
+            continue
+        shim = _tempfile.mkdtemp(prefix="ccnavi-path-shim-")
+        _atexit.register(_shutil.rmtree, shim, ignore_errors=True)
+        for entry in os.listdir(place):
+            if entry in names:
+                continue
+            try:
+                os.symlink(os.path.join(place, entry), os.path.join(shim, entry))
+            except OSError:
+                pass
+        kept.append(shim)
     os.environ["PATH"] = os.pathsep.join(kept)
 
 

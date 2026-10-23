@@ -89,6 +89,23 @@ class PathExecutableTest(unittest.TestCase):
     def test_is_empty_when_path_is_empty(self):
         self.assertEqual(platformtag.path_executable(""), "")
 
+    def test_skips_a_link_to_the_launcher_and_takes_the_next_entry(self):
+        """sh（ccnavi_launcher_path）と同じ規則。自分に戻るファイルは飛ばして次の項目へ進む。"""
+        launcher = os.path.join(self.dir, "scripts", platformtag.LAUNCHER_NAME)
+        write(launcher, "#!/bin/sh\n")
+        linked = os.path.join(self.dir, "linked")
+        os.makedirs(linked)
+        try:
+            os.symlink(launcher, os.path.join(linked, "ccnavi"))
+        except (OSError, NotImplementedError):
+            self.skipTest("シンボリックリンクを作れない")
+        real = self.place("real")
+        raw = linked + os.pathsep + real
+        self.assertEqual(
+            platformtag.path_executable(raw, skip=launcher), os.path.join(real, "ccnavi")
+        )
+        self.assertEqual(platformtag.path_executable(raw), os.path.join(linked, "ccnavi"))
+
 
 class LaunchedExecutableTest(unittest.TestCase):
     """探す順。`scripts/ccnavi-launcher.sh` から `../bin/<os>-<arch>/` を、sh と同じ順で探す。"""
