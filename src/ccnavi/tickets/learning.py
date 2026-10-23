@@ -145,38 +145,6 @@ def entry_text(body: str, target: str, signal: str, now_text: str) -> str:
     )
 
 
-_LEARNINGS_LINE = re.compile(r"^learnings:[ \t]*(\S*)")
-
-
-def bump_count(text: str) -> str:
-    lines = text.splitlines(keepends=True)
-    if not lines or lines[0].strip() != "---":
-        return text
-    end = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end = i
-            break
-    if end is None:
-        return text
-    for i in range(1, end):
-        line = lines[i]
-        m = _LEARNINGS_LINE.match(line)
-        if m is None:
-            continue
-        value = m.group(1)
-        if value == "none":
-            new = "1"
-        elif re.fullmatch(r"\d+", value):
-            new = str(int(value) + 1)
-        else:
-            return text
-        eol = line[len(line.rstrip("\r\n")) :]
-        lines[i] = f"learnings: {new}{eol}"
-        return "".join(lines)
-    return text
-
-
 def _frontmatter_end(lines: list[str]) -> int | None:
     """行の並びの frontmatter の閉じ `---` の位置。frontmatter が無ければ None。"""
     if not lines or lines[0].strip() != "---":

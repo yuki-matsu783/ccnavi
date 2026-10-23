@@ -164,7 +164,7 @@ def copy_paths(conf: settings.Settings, root: str, batch: list, ids: list[str]) 
         t = by_id.get(ident)
         if t is None:
             continue
-        home = approval.home_dir(conf, root, t.ticket, t.parent, t.tree_root, project=t.project)
+        home = approval.home_dir(conf, root, t.ticket, t.parent, project=t.project)
         out.append(approval.copy_path(home, t.ticket))
     return out
 
@@ -469,7 +469,7 @@ def approve_yes(
         "approved": [t.ticket for t in tickets],
         "copies": [
             approval.copy_path(
-                approval.home_dir(conf, root, t.ticket, t.parent, t.tree_root, project=t.project),
+                approval.home_dir(conf, root, t.ticket, t.parent, project=t.project),
                 t.ticket,
             )
             for t in tickets

@@ -585,7 +585,6 @@ def home_dir(
     root: str,
     ticket_id: str,
     parent: str,
-    fallback_root: str = "",
     project: str | None = None,
 ) -> str:
     """この識別子の承認済みチケットを置くツリーの置き場。親のワークツリーの置き場だけ。
@@ -597,7 +596,7 @@ def home_dir(
 
     `project` はチケットのリポジトリ（ワークスペース自身なら空）。分からなければ None で、
     同じ名前の親のワークツリーのあるリポジトリを全部探す（同じ識別子が 2 つの
-    リポジトリにあれば決めない）。`fallback_root` は使わない（互換のために引数だけ残す）。
+    リポジトリにあれば決めない）。
     """
     home = parent or ticket_id
     st = standing.standing_any(conf, root, home, project)

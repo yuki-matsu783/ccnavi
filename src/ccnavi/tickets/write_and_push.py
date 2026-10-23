@@ -306,12 +306,6 @@ def _read(path: str) -> tuple[bytes | None, bool]:
 _NUMBER = re.compile(r"[0-9]+")
 
 
-def _lf(data: bytes) -> bytes:
-    """改行を LF に揃える（autocrlf で作業ツリーだけ CRLF になった形跡を、
-    コミット済みと比べる）。"""
-    return data.replace(b"\r\n", b"\n")
-
-
 def _hook_mark(parts: list[str], parent: str, now: bytes | None, before: bytes | None) -> bool:
     """その親子のチケットの `phases/<親>/<N>.(pending|skipped)` で、変更前は無く、
     中身が hook の欄だけ。

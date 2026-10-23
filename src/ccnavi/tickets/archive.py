@@ -68,15 +68,6 @@ def base_dir(root: str, project: str) -> str:
     return os.path.join(top(root), tree.repo_key(project))
 
 
-def is_archived_path(root: str, path: str) -> bool:
-    """パスが退避の置き場の下か。"""
-    if not root or not path:
-        return False
-    here = pathcase.fold(os.path.abspath(top(root)))
-    there = pathcase.fold(os.path.abspath(path))
-    return there.startswith(here + os.sep)
-
-
 def _linked(root: str, parts: tuple[str, ...]) -> bool | None:
     """ルートの下の parts を順に lstat して、リンクがあれば True。途中で無ければ None。"""
     path = root

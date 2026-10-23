@@ -33,8 +33,6 @@ UNCHECKED = "unchecked"
 UNATTRIBUTED = "unattributed"
 OUTCOMES = (OK, FIXED, OUTSIDE, UNCHECKED, UNATTRIBUTED)
 
-# 親に言う結果。ok と fixed は記録するだけで言わない。
-NOTICE = (OUTSIDE, UNCHECKED, UNATTRIBUTED)
 # Stop が促す結果。
 NUDGE = (OUTSIDE, UNCHECKED)
 

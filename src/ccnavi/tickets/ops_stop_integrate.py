@@ -163,13 +163,6 @@ def _run(
     return gitcmd.run_until(cwd, args, deadline, timeout)
 
 
-def _out(cwd: str, args: list[str], deadline: float | None = None) -> tuple[int, str]:
-    done = _run(cwd, args, deadline)
-    if done.failure:
-        return 1, ""
-    return done.code, done.out
-
-
 def direct_at_stop(
     root: str,
     conf: settings.Settings,

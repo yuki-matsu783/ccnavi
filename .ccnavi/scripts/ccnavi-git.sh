@@ -1644,7 +1644,7 @@ d4_finish() {
 	fi
 	# ⑤ 専用のrefと直接作業の記録
 	d4_refs_drop t c k s pending ||
-		d4_stop "専用の ref（$d4_ref/ の $d4_rd_failed）を削除できませんでした。直接作業の記録と取り込みの記録は残しています" refs
+		d4_stop "専用の ref（${d4_ref}/ の ${d4_rd_failed}）を削除できませんでした。直接作業の記録と取り込みの記録は残しています" refs
 	rm -f "$d4_rec" 2>/dev/null || :
 	rmdir "$d4_common/ccnavi-direct" 2>/dev/null || :
 	# ⑥ marker

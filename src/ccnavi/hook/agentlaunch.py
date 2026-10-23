@@ -55,8 +55,6 @@ MAX_SHOWN_CHARS = 120
 GUIDE_OPEN = "[ccnavi] 担当の案内（ここから）"
 GUIDE_CLOSE = "[ccnavi] 担当の案内（ここまで）"
 
-# 止める理由に添える、担当を決めるための共通の 1 文。
-ASSIGN_NOTE = "1 体に担当は 1 つだけ割り当てる。担当以外の子の識別子とワークツリーのパスは書かない"
 # 子の識別子に使われる文字。言及は語として一致するものだけ（前後がこの文字でないこと）。
 _ID_CHARS = "A-Za-z0-9._-"
 # プロンプトを語に分ける区切り（パスの候補を拾うため）。
@@ -411,21 +409,6 @@ def unavailable(conf: settings.Settings, root: str, target: Target) -> str:
         return "未着手の子です"
     if target.worktree is None:
         return "ワークツリーがありません"
-    return ""
-
-
-def _project_mismatch(book: Book, target: Target) -> str:
-    """親の `project:` と、ワークツリーの元リポジトリが食い違うときの説明。"""
-    t = target.ticket
-    parent = book.find(t.parent)[0] if t is not None else None
-    if parent is None or target.worktree is None:
-        return ""
-    if pathcase.fold(parent.project) != pathcase.fold(target.worktree.project):
-        return (
-            f"親 {parent.ticket} のプロジェクト（{parent.project or '(ワークスペース)'}）と"
-            f"ワークツリーの元リポジトリ（{target.worktree.project or '(ワークスペース)'}）が"
-            "食い違っています"
-        )
     return ""
 
 
