@@ -36,6 +36,8 @@ JSON の欄の細かい形は [json-shapes.md](json-shapes.md) の各 JSON の�
 | REQ-EXT-10 | 常時 | ccnavi は、時刻を次の形で書くこと。マーカーと記録の時刻は現地時刻とオフセット（`YYYY-MM-DDThh:mm:ss+hhmm`。`fsio.stamp`）、診断ログは現地時刻とコロン付きのオフセット（`+hh:mm`）。時刻を固定する `fsio.clock` は `fsio.stamp` の形でない値を受けないこと |
 | REQ-EXT-11 | 常時 | ccnavi は、置き場（提案 `wip/proposals/`、承認済みチケット `.ccnavi/approved/`、共通レイヤー `.ccnavi/config/common/`、記録と state `logs/`、プロジェクト `projects/`、自身のレイヤーとプロジェクトのレイヤー `.ccnavi/config/project/`）を既定のパスに固定し、環境変数でも上書き設定ファイルでも動かさないこと。別の場所を指せるのは診断のフラグだけとすること |
 
+振り分けの sh は、`bin/<os>-<arch>/` に合う実行ファイルが無いときだけ、PATH の `ccnavi`（`ccnavi.exe`）を起動すること（絶対パスの項目だけを見る）。拡張は PATH を見ない。
+
 REQ-EXT-01 の探す順（拡張の設定 → `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi` → 振り分けの sh → ソースなら `uv run python -m ccnavi`）は
 VS Code 拡張が決める。ccnavi が約束するのは置き場と名前と `<os>-<arch>` の語で、語は `src/ccnavi/infra/platformtag.py`・
 `scripts/ccnavi-setup.sh`・`.ccnavi/scripts/ccnavi-launcher.sh`・拡張の `src/core/locate.ts` で揃える。

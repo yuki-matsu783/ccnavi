@@ -39,7 +39,7 @@ uv run python -m tests tests/ticket    # グループを名指し（複数書け
 uv run python -m tests --plan          # 何をどの順で回すか出すだけ
 ```
 
-実行ファイル（`.ccnavi/bin/`）が無い環境（Claude Code on the web、ビルド前）では、ランチャー経由の `--lint` と `ccnavi` コマンドが動かない。
+実行ファイル（`.ccnavi/bin/`、無ければ PATH の `ccnavi`）が無い環境（Claude Code on the web、ビルド前）では、ランチャー経由の `--lint` と `ccnavi` コマンドが動かない。
 `python main.py --lint` で代える（ランチャーが実行ファイルを探して失敗するため）。
 
 落ちたら新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。ターンの終わりの hook はこれを使わない。
