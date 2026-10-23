@@ -53,6 +53,7 @@ const DEFAULT_RULES = ".ccnavi/config/common/rules.yml";
 const DEFAULT_EXPECTATIONS =".ccnavi/config/common/rule-expectations.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "rules";
+const TITLE = "ccnavi ルール管理";
 
 interface Loaded {
   /** 読んだ対象。往復の間に切り替わったかを `stale` が見る */
@@ -123,14 +124,15 @@ function projectOf(target: RulesTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
 
-function titleOf(target: RulesTarget): string {
+/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.ts の label）と揃える */
+function targetLabelOf(target: RulesTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "ccnavi ルール管理";
+      return "共通の設定";
     case "self":
-      return "ccnavi ルール管理: ワークスペース";
+      return "ワークスペース";
     case "project":
-      return `ccnavi ルール管理: プロジェクト ${target.name}`;
+      return `プロジェクト ${target.name}`;
   }
 }
 
@@ -181,14 +183,14 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
   // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間に、押しても何も起きないように見えるのを避けるため。
   // `state` を先に設定するので、読んでいる間に押し直しても上の `reveal` に入る。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
-  const panel = vscode.window.createWebviewPanel("ccnaviRules", titleOf(target), vscode.ViewColumn.One, {
+  const panel = vscode.window.createWebviewPanel("ccnaviRules", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
     // 編集の途中を持つので、タブを非表示にしても捨てない。
     retainContextWhenHidden: true,
   });
-  showLoading(panel, titleOf(target), SCREEN, whatOf(target));
+  showLoading(panel, TITLE, SCREEN, whatOf(target));
   const current: PanelState = {
     target,
     panel,
@@ -225,7 +227,7 @@ async function switchTarget(current: PanelState, target: RulesTarget): Promise<v
     }
     current.asking = true;
     const choice = await vscode.window.showWarningMessage(
-      `未保存の変更があります。破棄して「${titleOf(target)}」に切り替えますか？`,
+      `未保存の変更があります。破棄して「${targetLabelOf(target)}」に切り替えますか？`,
       { modal: true },
       "切り替える",
     );
@@ -236,7 +238,6 @@ async function switchTarget(current: PanelState, target: RulesTarget): Promise<v
     }
   }
   current.target = target;
-  current.panel.title = titleOf(target);
   current.loaded = undefined;
   current.error = undefined;
   current.dirty = false;
