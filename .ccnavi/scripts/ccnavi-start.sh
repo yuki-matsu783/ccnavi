@@ -2,7 +2,7 @@
 # ccnavi-start issue・MR を指定して作業を頼まれたとき、既存のものを確かめ、無ければ Draft MR・ワークツリー・
 # feature ブランチを先に作る。
 #
-#   sh .ccnavi/scripts/ccnavi-start.sh --issue <番号> [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked]
+#   sh .ccnavi/scripts/ccnavi-start.sh --issue <値> [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked]
 #   sh .ccnavi/scripts/ccnavi-start.sh --mr <番号> [--issue <値>] [--repo <owner/repo>] [--dry-run]
 #   sh .ccnavi/scripts/ccnavi-start.sh --issue <値> --mr <番号> --branch <元ブランチ> --mcp-checked
 #   sh .ccnavi/scripts/ccnavi-start.sh --check

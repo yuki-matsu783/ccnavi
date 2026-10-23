@@ -1,4 +1,6 @@
-"""親チケットの提案の雛形を作る（`ccnavi ticket new <識別子> --title <題> --plan <型,型,...>`）。
+"""親チケットの提案の雛形を作る。
+
+`ccnavi ticket new <識別子> --title <題> --plan <型,型,...> --issue <値> --mr <番号>`。
 
 提案を手で書くと frontmatter の形を間違えやすく、とくにフェーズ定義の `scope` を `allow` に
 写し忘れて、`design` フェーズの子が `wip/design/*` に書けず詰まる。この雛形の生成は、選んだ

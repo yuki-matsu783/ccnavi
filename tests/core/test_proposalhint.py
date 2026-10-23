@@ -20,7 +20,9 @@ from ccnavi.infra import hookio, settings
 
 PARENT_WRONG = "---\nversion: 1\nticket: feature-1-memo\nparent: feature-1-memo\nphase: 0\n---\n"
 PARENT_BARE = "---\nversion: 1\nticket: feature-1-memo\ntitle: t\nmr: 3\n---\n"
-PARENT_FULL = "---\nversion: 1\nticket: feature-1-memo\nmr: 3\nplan: [a]\nphases: {a: {}}\n---\n"
+PARENT_FULL = (
+    "---\nversion: 1\nticket: feature-1-memo\nissue: 1\nmr: 3\nplan: [a]\nphases: {a: {}}\n---\n"
+)
 CHILD = "---\nversion: 1\nticket: feature-1-memo-01-01\nparent: feature-1-memo\nphase: 1\n---\n"
 
 
@@ -58,6 +60,11 @@ class ProposalHintTest(unittest.TestCase):
         self.assertIn(proposalhint.CODE_PARENT_FIELDS, got)
         self.assertIn("`plan:`・`phases:`", got)
         self.assertNotIn("`mr:`", got)
+
+    def test_a_missing_issue_is_told(self):
+        text = PARENT_FULL.replace("issue: 1\n", "")
+        got = self.hint("wip/proposals/todo/feature-1-memo.md", text)
+        self.assertIn("`issue:`", got)
 
     def test_an_empty_plan_counts_as_missing(self):
         text = PARENT_FULL.replace("plan: [a]", "plan: []")

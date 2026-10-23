@@ -559,7 +559,7 @@ ccnavi_host_access() {
 #     ccnavi_pf_<項目>_why   理由
 #     ccnavi_pf_fix          勧める対処の種類（tool origin integration auth notfound access git-auth network。無ければ空）
 #     ccnavi_pf_auth_source  認証の出どころの種類（cli / token / none。値は入れない）
-# 1 回の問い合わせは 15 秒（CCNAVI_PREFLIGHT_TIMEOUT で変える。テスト用）、全体は 60 秒まで。全体を過ぎたら残りは skipped。
+# 1 回の問い合わせは 15 秒、git の確認は 30 秒（どちらも CCNAVI_PREFLIGHT_TIMEOUT で変える。テスト用）、全体は 60 秒まで。全体を過ぎたら残りは skipped。
 # キャッシュはしない。毎回確かめる。
 ccnavi_pf_late() {
 	[ $(($(date +%s) - ccnavi_pf_t0)) -lt "${CCNAVI_PREFLIGHT_TOTAL:-60}" ] && return 1

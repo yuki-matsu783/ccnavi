@@ -126,8 +126,8 @@ def _branch_name_problems(
 def _number_problems(everyone: list, fresh: list, prefixes, serial: int) -> list[Problem]:
     """新規の提案の親の識別子の番号が、同じリポジトリの別の親と重なるか（warn）。
 
-    番号は issue の番号か ccnavi の通し番号で、両方が同じ数になりうる。issue の番号はリポジトリ
-    ごとなので、比べるのは同じリポジトリ（`project`）の親どうしだけ。
+    番号は issue の番号で、別のリポジトリの issue や直接作業の通し番号と同じ数になりうる。
+    issue の番号はリポジトリごとなので、比べるのは同じリポジトリ（`project`）の親どうしだけ。
     数えるのは `<先頭の語>-<番号>-<slug>` の形の番号だけ。
     """
     problems: list[Problem] = []
