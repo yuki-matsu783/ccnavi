@@ -32,7 +32,7 @@
 #   ccnavi_host_encode <文字列> クエリの値に入れる文字列（ブランチ名など）のパーセントエンコード
 #   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
 #   ccnavi_run_timed <秒> <stdin> <stdout> <stderr> <コマンド>...  時間を区切って実行する（timeout コマンドに頼らない）
-#   ccnavi_host_status <ホストの返事の文>  curl・gh・glab の失敗の文から HTTP の番号を取り出す
+#   ccnavi_host_fail_status <ホストの返事の文>  curl・gh・glab の失敗の文から HTTP の番号を取り出す
 #   ccnavi_host_probe           プロジェクトを 1 回読む。結果は ccnavi_h_probe と ccnavi_h_project_json
 #   ccnavi_host_access          書き込みの権限を判定する（0 足りる / 1 足りない / 2 判定できない）
 #   ccnavi_preflight <top>      チケット作業の事前確認（下の説明）
@@ -245,7 +245,8 @@ ccnavi_host_api() {
 	ccnavi_ha_body="${3:-}"
 	case "$ccnavi_h_transport" in
 	gh | glab)
-		# 標準エラー（更新の知らせなど）は応答に混ぜない。失敗したときだけ本文と一緒に渡す
+		# 標準エラー（更新の知らせなど）は応答に混ぜない。失敗したときだけ本文と一緒に渡す。
+		# 本文を送るときは Content-Type を付ける（付けないと、GitLab は HTTP 415 で拒む）
 		# 上限（ccnavi_h_max_time）で切る。本文は一時ファイル経由で stdin に渡す
 		ccnavi_ha_base="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-host-$$"
 		ccnavi_ha_err="$ccnavi_ha_base.err"
@@ -253,7 +254,7 @@ ccnavi_host_api() {
 		if [ -n "$ccnavi_ha_body" ]; then
 			printf '%s' "$ccnavi_ha_body" >"$ccnavi_ha_base.in"
 			ccnavi_run_timed "$ccnavi_h_max_time" "$ccnavi_ha_base.in" "$ccnavi_ha_base.out" "$ccnavi_ha_err" \
-				"$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" --input - "$ccnavi_ha_rel" || ccnavi_ha_rc=$?
+				"$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" --header 'Content-Type: application/json' --input - "$ccnavi_ha_rel" || ccnavi_ha_rc=$?
 		else
 			ccnavi_run_timed "$ccnavi_h_max_time" /dev/null "$ccnavi_ha_base.out" "$ccnavi_ha_err" \
 				"$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" "$ccnavi_ha_rel" || ccnavi_ha_rc=$?
@@ -302,6 +303,23 @@ ccnavi_host_failed() {
 	"$ccnavi_h_on_fail" "$ccnavi_ha_method" "$ccnavi_ha_rel" "$1"
 }
 
+# 失敗の返事（本文と標準エラー）から HTTP の番号を取り出す。取れなければ何も出さない。
+# 本文の中の数字に引かれないよう、まず形の決まった書き方（curl の returned error・gh の (HTTP nnn)・glab の行）だけを全体から探し、
+# 無ければ最後の行（gh / glab の標準エラー）だけを緩い式で読む。
+ccnavi_host_fail_status() {
+	ccnavi_hs_val=$(printf '%s' "$1" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^glab: HTTP ([0-9]{3})$/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' | head -n 1)
+	if [ -z "$ccnavi_hs_val" ]; then
+		ccnavi_hs_val=$(printf '%s\n' "$1" | sed '/^$/d' | tail -n 1 | sed -n -E -e 's/.*HTTP ([0-9]{3}).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) [A-Z][a-z]+.*/\1/p' | head -n 1)
+	fi
+	printf '%s' "$ccnavi_hs_val"
+}
+
+# 失敗の返事の本文を、画面に出せる形（1 行・制御文字なし・先頭 200 文字・トークンは伏せる）にして出す。
+# 文字数は jq で数える（cut -c は環境によってバイトで切り、日本語の途中で壊れる）。
+ccnavi_host_fail_body() {
+	printf '%s' "$1" | "$ccnavi_h_jq" -Rjs --arg t "${ccnavi_h_token:-}" '(if $t == "" then . else split($t) | join("***") end) | gsub("[\u0000-\u001f\u007f]+"; " ") | .[0:200]'
+}
+
 ccnavi_host_pages() {
 	ccnavi_hg_rel="$1"
 	ccnavi_hg_page=1
@@ -313,7 +331,10 @@ ccnavi_host_pages() {
 	while :; do
 		# 呼び手が `|| ...` で受けると set -e が有効にならないので、失敗したらここで 1 を返す（配列でない答えも）
 		ccnavi_hg_chunk=$(ccnavi_host_api GET "$ccnavi_hg_rel${ccnavi_hg_sep}per_page=100&page=$ccnavi_hg_page") || return 1
-		ccnavi_hg_n=$(printf '%s' "$ccnavi_hg_chunk" | "$ccnavi_h_jq" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || return 1
+		ccnavi_hg_n=$(printf '%s' "$ccnavi_hg_chunk" | "$ccnavi_h_jq" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || {
+			ccnavi_host_failed "$ccnavi_hg_chunk"
+			return 1
+		}
 		ccnavi_hg_all=$(printf '%s\n%s' "$ccnavi_hg_all" "$ccnavi_hg_chunk" | "$ccnavi_h_jq" -s '.[0] + .[1]')
 		[ "$ccnavi_hg_n" -lt 100 ] && break
 		ccnavi_hg_page=$((ccnavi_hg_page + 1))
@@ -426,12 +447,6 @@ ccnavi_git_auth() {
 # ホストの API と git のリモートが使える状態かを確かめる。ここの関数はユーザ向けの文面を出さず、
 # 結果・理由・勧める対処を変数で返す。文面と `次:` の行は呼ぶ側が組み立てる（docs/claude/script-output.md）。
 
-# curl・gh・glab の失敗の文から HTTP の番号を取り出す（無ければ空）。
-# curl は「returned error: 404」、gh は「(HTTP 404)」、glab は「404 Not Found」の形。
-ccnavi_host_status() {
-	printf '%s' "$1" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' | head -n 1
-}
-
 # ccnavi_host_connect の後に呼ぶ。経路によらずプロジェクトを 1 回読む（GitHub は repos/<パス>、GitLab は projects/<パス>）。
 #   ccnavi_h_project_json  応答の JSON
 #   ccnavi_h_probe         ok / auth（401・403）/ notfound（404）/ network（通信の失敗・時間切れ・5xx）/ badjson
@@ -460,7 +475,7 @@ ccnavi_host_probe() {
 	ccnavi_h_on_fail="$ccnavi_hq_prev"
 	if [ "$ccnavi_hq_rc" -ne 0 ]; then
 		rm -f "$ccnavi_hq_file" || :
-		case "$(ccnavi_host_status "$ccnavi_hq_text")" in
+		case "$(ccnavi_host_fail_status "$ccnavi_hq_text")" in
 		401 | 403) ccnavi_h_probe=auth ;;
 		404) ccnavi_h_probe=notfound ;;
 		*) ccnavi_h_probe=network ;;

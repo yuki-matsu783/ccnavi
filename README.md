@@ -65,6 +65,19 @@ Claude Code の hook でツール呼び出しを止め、止めた理由と代�
 どんなコマンドが打たれ、ルールが何に当たるかは、動かしてみるまで分からない。`dry-run` で導入し、記録を読みながら
 ルールを直し、記録が落ち着いてから `enable` に切り替える。
 
+### 入口: Claude Code に「ccnavi を入れて」と頼む
+
+配る側が `sh scripts/ccnavi-package.sh --build` で zip（と `.sha256`）を作り、共有フォルダに置く。使う側は zip を
+受け取ってチェックサムを確かめ、自分で展開し、展開したフォルダで `claude` を起動して「ccnavi を入れて」と頼む
+（`ccnavi-install` スキル）。スキルは `scripts/ccnavi-doctor.sh` で OS・git・jq・curl・GitLab の認証・既存の導入を調べ、
+足りないものは入れ方を案内してから、`scripts/ccnavi-install.sh <入れる先> --check` を打ち、続けて本番を打つ。glab は必須ではなく、
+無くても git の資格情報と `GITLAB_TOKEN` で足りる。
+
+ソースから使うときは `--build` を付けて実行ファイルを組み立てる（`--build --check` で副作用を見てから）。
+更新は `--force` で行い、バックアップは入れる先の外に取られる。手順は
+[`.claude/skills/ccnavi-install/`](.claude/skills/ccnavi-install/SKILL.md) と、展開した zip の `INSTALL.md`。
+下の 1 以降は、入ったあとの進め方を説明する。
+
 ### 1. dry-run で立てる
 
 実行ファイルを組み立て、8 つのイベントに登録する（「設定」の節。導入スクリプトが書く）。
@@ -1112,7 +1125,7 @@ grep の allow は後ろの `git push` まで通さない。外側のコマン�
 
 | 書きたいもの | 止まる書き方 | 通る書き方 |
 |---|---|---|
-| 本文にバッククォートを含む issue やマージリクエスト | ``gh issue create --body "use `git push` here"``（`DENY_BACKQUOTE`） | 単一引用で包む、`` \` `` で書く、`--body-file <ファイル>` |
+| 本文にバッククォートを含む issue やマージリクエスト | ``glab issue create --description "use `git push` here"``（`DENY_BACKQUOTE`。gh なら `--body`） | 単一引用で包む、`` \` `` で書く、`--description-file <ファイル>`（gh なら `--body-file`） |
 | 複数行のコミットメッセージ | `commit -m "$(cat <<'EOF' … EOF)"`（heredoc のルール） | 本文を Write で置いて `commit -F <ファイル>`、改行を含む `-m "…"` |
 | git の値を使うコマンド | `cd "$(git rev-parse --show-toplevel)"` | ラッパースクリプトで値を出して読み、次のコマンドにその値を書く |
 | 今の場所を渡す検索 | `grep -rn foo "$(pwd)"`（allow から外れて確認になる） | 値をそのまま書く |
@@ -1191,7 +1204,7 @@ perl や python は縮退の対象に入れていない（`perl -pi -e 's/git pu
 
 バッククォートは二重引用の中でも、区切りを引用しないヒアドキュメントの中でも実行される。ccnavi は中身を読まず、
 コード `DENY_BACKQUOTE` で止める。コマンド置換なら `$( )` で書く。文字として渡したいなら（issue やマージリクエストの本文の
-Markdown など）、単一引用で包むか、`` \` `` と書くか、`--body-file <ファイル>` で渡す。単一引用の中、`` \` ``、
+Markdown など）、単一引用で包むか、`` \` `` と書くか、`--description-file <ファイル>`（gh なら `--body-file`）で渡す。単一引用の中、`` \` ``、
 引用付きヒアドキュメントの本文、コメントのバッククォートは止まらない。
 
 #### シェルで読みが割れる形は素直な形で書く
@@ -2258,6 +2271,8 @@ sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152 
 どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める）。MR の無い候補（作りかけの再開を除く）は成功させず、終了コード 3 で一覧を出す。
 ホストに届かないときは、`--issue`・`--mr`・`--branch` の 3 つと `--mcp-checked` がそろうときだけ、ホストを見ずに成功する。
 `ccnavi-ticket.sh` の `start`・`finish`・`propose`・`consolidate` も、ロックの前に同じ確認（API と git）を自動で行う（直接作業では確かめない）。
+
+依頼の URL のリポジトリが `projects/<名前>` のものなら、そこに `cd` して `--repo <owner/repo>` を付けて打つ。実行した場所の origin と違えば、ホストに問い合わせる前に止まって移動先を案内する。
 
 候補を探すのは `ccnavi-branches.sh`（読むだけ。`--json` で JSON）で、出すのは、MR の元ブランチ、issue を参照している開いた MR の元ブランチ（ホストは `ccnavi-review.sh` と同じく gh / glab か、
 curl と `GITHUB_TOKEN` / `GITLAB_TOKEN` で読む）、名前に番号を含むブランチ（手元と origin）、`issue: 152` を持つチケットの親のブランチ。

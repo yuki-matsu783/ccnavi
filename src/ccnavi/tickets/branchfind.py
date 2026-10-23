@@ -24,7 +24,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, pathcase, settings, tree
 from ..policy import ctxfile
 from . import approval, ticket_ids, ticket_model
 from . import ticket as ticket_mod
@@ -230,7 +230,7 @@ def prompt_context(
     refs = [r for r in refs if all(r is not x for x, _ in bound)]
     lines = [_bound_line(r, b) for r, b in bound]
     if refs:
-        lines += ([""] if lines else []) + _start_lines(root, refs)
+        lines += ([""] if lines else []) + _start_lines(conf, root, refs)
     if told is not None:
         told |= {_mark(r) for r, _ in bound} | {_mark(r) for r in refs}
         ctxfile.remember_refs(err, conf.state, session, told)
@@ -259,20 +259,49 @@ def _check_sentence() -> str:
     )
 
 
-def _start_lines(root: str, refs: list[Ref]) -> list[str]:
+def project_of_repo(conf: settings.Settings, root: str, repo: str) -> str | None:
+    """`owner/repo` を origin に持つ場所。自身なら空文字、プロジェクトなら名前、無ければ None。
+
+    ワークスペースと projects/ の各プロジェクトの origin のパス（最後の 2 段）を、
+    大文字小文字を区別せずに比べる。
+    """
+    want = pathcase.fold(repo)
+    if pathcase.fold(tree.origin_repo(tree.main_tree(root).root)) == want:
+        return ""
+    for t in tree.projects(conf.projects):
+        if pathcase.fold(tree.origin_repo(t.root)) == want:
+            return t.project
+    return None
+
+
+def _start_lines(conf: settings.Settings, root: str, refs: list[Ref]) -> list[str]:
     sh = settings.script_command(root, "ccnavi-start.sh")
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     labels = "・".join(r.label() for r in refs)
     lines = [
         f"[ccnavi] 依頼に {labels} の指定がある。"
         "開始の前に、次を実行します。既存の候補を探し、無ければ Draft MR・ワークツリー"
-        "・ブランチを作る"
-        "（プロジェクトの issue・MR なら projects/<名前>/ に cd してから実行します）。"
+        "・ブランチを作る。依頼の URL がリポジトリを示すものは、"
+        "そのプロジェクトに cd してから 1 行で実行します。"
         f"最初に '{sh} --check' を打つ。終了コードが 0 以外なら、結果と「次:」を"
         "ユーザに伝えて止まる（4 で GitHub なら MCP で代行してよい）。"
     ]
     for r in refs:
-        lines.append(f"- '{sh} --{r.kind} {r.number}'")
+        where = project_of_repo(conf, root, r.repo) if r.repo else ""
+        if where is None:
+            lines.append(
+                f"- {r.label()} のリポジトリ {r.repo} は projects/ の中に無い"
+                "（まだ clone していない）。"
+                "ccnavi-start.sh は実行せず、clone が要ることをユーザに伝えて止まる"
+            )
+            continue
+        args = f"--{r.kind} {r.number}" + (f" --repo {r.repo}" if r.repo else "")
+        if r.repo:
+            # 実行する場所を絶対パスで名指しする（cwd がどこでも届く）。ワークスペース自身も同じ形
+            place = os.path.join(conf.projects, where) if where else root
+            lines.append(f"- cd {settings.shell_path(place)} && {sh} {args}")
+        else:
+            lines.append(f"- '{sh} {args}'")
     lines += [
         "終了コード 0 なら、出たワークツリーのパスで作業を続ける。"
         "出力に「次:」の行があれば、その一手に従う（提案づくりなら、承認を受けるまで実装はしない）。"

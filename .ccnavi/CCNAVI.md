@@ -21,6 +21,7 @@
 <!-- ccnavi:else -->
   - git は直接呼ばない。止められたら迂回せず、出力の案内に従う。git の操作が要るときはユーザに頼む。
 <!-- ccnavi:endif -->
+- ホスト（issue・MR など）の操作は glab を基本にする。gh は origin が GitHub のリポジトリでだけ使う。ccnavi のスクリプト（ccnavi-start.sh・ccnavi-review.sh など）がある操作はスクリプトを優先する。認証で止まったら、ユーザに glab auth login（GitHub なら gh auth login）を頼む。
 - 下書きの置き場は 2 つ。ユーザに渡す物は {{handoff}}/（追跡される。integrate が外し、ready が消す）、一時的な物・コミットしたくない物はワークスペースルート直下の {{scratch}}/（追跡されない。終わったら自分で消す）。セッションのスクラッチパッドには置かない。使い分けは `.ccnavi/docs/scratchpad.md`。
 - 書き込みを止められている場所（保護対象など）は、{{stage_sh}} <元のパス> で {{handoff}}/ に写して編集する。複数あるときはすべて写してからターンを終える。対話セッションでは、ユーザに `ccnavi user handoff` での取り込みを案内してターンを終える。非対話セッションでは、編集済みの下書きを push し、確認と取り込みをユーザに頼んでターンを終える。
 <!-- ccnavi:if projects -->
