@@ -40,7 +40,7 @@ test("CX-T245 足すホストの誤り: 種類・URL の形・http（loopback �
     ["bitbucket", "https://x.example.com", /GitHub か GitLab/],
     ["gitlab", "", /URL を入れてください/],
     ["gitlab", "not a url", /Invalid URL/],
-    ["gitlab", "http://gitlab.example.com", /https に限る/],
+    ["gitlab", "http://gitlab.example.com", /https のみ指定できます/],
     ["gitlab", "https://u:p@gitlab.example.com", /資格情報/],
     ["gitlab", "https://gitlab.example.com/?x=1", /資格情報・クエリ/],
     ["gitlab", "https://gitlab.example.com/gitlab", /オリジンのみ/],

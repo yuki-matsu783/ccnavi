@@ -345,7 +345,7 @@ export function createBoardController(env: BoardEnv): BoardController {
         try {
           got = { list: await ops.listIssues(repoBoard.repo, await writeDeps(repoBoard.repo)), error: "" };
         } catch (err) {
-          got = { list: null, error: `Issue一覧を取得できませんでした：${(err as Error).message ?? String(err)}` };
+          got = { list: null, error: `Issue 一覧を取得できませんでした：${(err as Error).message ?? String(err)}` };
         }
         set({ issues: new Map(snap.issues).set(key, got) });
         drawRepo(snap.boards.get(key) ?? repoBoard, await readAttention());

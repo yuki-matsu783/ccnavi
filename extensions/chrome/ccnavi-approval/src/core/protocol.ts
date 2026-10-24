@@ -147,10 +147,10 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
   try {
     const msg = message as Request;
     if (!msg || typeof msg !== "object" || typeof msg.kind !== "string") {
-      return { ok: false, error: "要求の形が正しくない" };
+      return { ok: false, error: "要求の形が正しくありません" };
     }
     if (!trustedSender(sender, deps.extensionId, deps.base, msg.kind === "token.set" || msg.kind === "token.clear")) {
-      return { ok: false, error: "この送り手からの要求は受け付けない" };
+      return { ok: false, error: "この送り手からの要求は受け付けません" };
     }
     if (msg.kind === "host" && WRITE_OPS.has(String(msg.op)) && !fromBoard(sender)) {
       return { ok: false, error: "書き込みの要求はボードからのみ受け付けます" };
@@ -159,7 +159,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
     switch (msg.kind) {
       case "token.set": {
         if (typeof msg.token !== "string" || !TOKEN.test(msg.token)) {
-          return { ok: false, error: "PAT の形が正しくない（英数字と _ - . で 8〜255 字）" };
+          return { ok: false, error: "PAT の形が正しくありません（英数字と _ - . で 8〜255 字）" };
         }
         const manual = msg.expires === undefined || msg.expires === "" ? "" : parseManual(msg.expires);
         if (msg.expires !== undefined && msg.expires !== "" && !manual) {
@@ -192,7 +192,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
 
 async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Promise<Response> {
   if (!Array.isArray(args)) {
-    return { ok: false, error: "args が配列でない" };
+    return { ok: false, error: "args が配列ではありません" };
   }
   const token = await deps.getToken(host.id);
   if (!token) {
@@ -258,7 +258,7 @@ function commitArgs(args: unknown[]) {
   const adds: Addition[] = additions.map((x: unknown) => {
     const e = x as { path?: unknown; contents?: unknown; op?: unknown; last?: unknown };
     if (typeof e.contents !== "string" || e.contents.length > MAX_CONTENTS || !BASE64.test(e.contents)) {
-      throw new Error("contents が base64 でないか大きすぎる");
+      throw new Error("contents が base64 ではないか、大きすぎます");
     }
     if (e.op !== undefined && e.op !== "create" && e.op !== "update") throw new Error("op は create か update");
     return { path: github.checkPath(e.path), contents: e.contents, ...(e.op ? { op: e.op } : {}), ...(e.last !== undefined ? { last: github.checkOid(e.last) } : {}) };
@@ -266,7 +266,7 @@ function commitArgs(args: unknown[]) {
   const dels = deletions.map((p: unknown) =>
     typeof p === "string" ? { path: github.checkPath(p) } : { path: github.checkPath((p as { path?: unknown })?.path), last: github.checkOid((p as { last?: unknown })?.last) },
   );
-  if (typeof body !== "string" || body.length > MAX_BODY) throw new Error(`コミットの本文は ${MAX_BODY} 字までの文字列`);
+  if (typeof body !== "string" || body.length > MAX_BODY) throw new Error(`コミットの本文は ${MAX_BODY} 字までの文字列にしてください`);
   return { name, expected: github.checkOid(expected), headline: text(headline, "コミットの見出し", MAX_HEADLINE), body, adds, dels };
 }
 
@@ -383,7 +383,7 @@ function startName(name: unknown, cfg: RepoConfig): string {
     (cfg.project ? slug.startsWith(`${cfg.project}-`) : true);
   if (!ok) {
     throw new Error(
-      `${branch} は、issue から作る親のブランチの名前の形（${cfg.project ? `<先頭の語>-<番号>-${cfg.project}-<slug>` : "<先頭の語>-<番号>-<slug>"}）になっていない`,
+      `${branch} は、issue から作る親のブランチの名前の形（${cfg.project ? `<先頭の語>-<番号>-${cfg.project}-<slug>` : "<先頭の語>-<番号>-<slug>"}）になっていません`,
     );
   }
   return branch;
@@ -419,7 +419,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     case "recentRefs": {
       if (typeof a !== "string" || Number.isNaN(Date.parse(a))) {
-        return { ok: false, error: "since が日時でない" };
+        return { ok: false, error: "since が日時ではありません" };
       }
       value = await x.recentRefs(client, o, r, new Date(a));
       break;
@@ -439,7 +439,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     case "blobs": {
       if (!Array.isArray(a)) {
-        return { ok: false, error: "oids が配列でない" };
+        return { ok: false, error: "oids が配列ではありません" };
       }
       value = await x.blobs(client, o, r, a.map(github.checkOid));
       break;
@@ -499,16 +499,16 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     case "reviewCopy":
       // レビュー済み: MR のスレッドとレビューを取得する。読むだけ。登録したリポジトリだけ
-      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
       value = await x.reviewCopy(client, o, r, github.checkBranch(a));
       break;
     case "compareFiles":
-      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
       value = await x.compareFiles(client, o, r, github.checkOid(a), github.checkOid(b));
       break;
     case "pathCommitTime":
       // 手で done/ に動かした子の移動の時刻: ブランチ a のパス b を最初に加えたコミットの時刻。読むだけ
-      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
       value = await x.pathCommitTime(client, o, r, github.checkBranch(a), github.checkPath(b));
       break;
     case "branchNames":
@@ -516,13 +516,13 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     case "issues":
       // 「始める」: 開いた issue の一覧。読むだけ。登録したリポジトリだけ
-      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読まない` };
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
       value = await x.issues(client, o, r);
       break;
     case "createBranch": {
       // 「始める」: 親のブランチを統合先の今の先頭から作る。初期コミットと Draft の MR は別の操作（startCommit・createDraftMr）
       const cfg = await registeredRepo(deps, client, o, r);
-      if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなのでブランチを作らない`);
+      if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなのでブランチを作りません`);
       let name: string;
       try {
         name = startName(a, cfg);
@@ -531,7 +531,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
       if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
-        return refuse(`${name} は保護されたブランチか統合先の名前なので作らない`);
+        return refuse(`${name} は保護されたブランチか統合先の名前なので作りません`);
       }
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに見つかりません`);
@@ -539,7 +539,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       // 統合先の今の先頭で確かめ直す（Python の答えを信頼しない）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
       const folded = fold(name);
       const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);
-      if (same.length > 0) return refuse(`${name} は既にある（${same.join(", ")}）`);
+      if (same.length > 0) return refuse(`${name} は既にあります（${same.join(", ")}）`);
       let guard: string;
       try {
         guard = await startGuard(deps, client, cfg, integ, head, name);
@@ -569,11 +569,11 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
       if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
-        return refuse(`${name} は保護されたブランチか統合先の名前なので書き込まない`);
+        return refuse(`${name} は保護されたブランチか統合先の名前なので書き込みません`);
       }
       // 積んでよいのは、作ったばかりの（統合先の先頭のまま動いていない）ブランチだけ
       const now = await x.branchHead(client, o, r, name);
-      if (now === null || now !== github.checkOid(b)) return refuse(`${name} の先頭が作った時点から動いているため、初期コミットを積まない`);
+      if (now === null || now !== github.checkOid(b)) return refuse(`${name} の先頭が作った時点から動いているため、初期コミットを積みません`);
       value = await x.startCommit(client, o, r, name, "chore: 作業を開始する");
       break;
     }
@@ -588,7 +588,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
       if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
-        return refuse(`${name} は保護されたブランチか統合先の名前なので MR を作らない`);
+        return refuse(`${name} は保護されたブランチか統合先の名前なので MR を作りません`);
       }
       if (b !== integ) return refuse(`MR のマージ先は統合先 ${integ} に限ります（${String(b)} は断る）`);
       const title = text(c, "MR の題", 250);
@@ -598,7 +598,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     }
     default:
-      return { ok: false, error: `未対応の操作:${String(op)}` };
+      return { ok: false, error: `未対応の操作です：${String(op)}` };
   }
   return { ok: true, value, counter };
 }

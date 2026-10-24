@@ -104,7 +104,7 @@ export function Tokens({ revision }: { readonly revision: number }): JSX.Element
             登録
           </button>
           <button type="button" id="token-clear" className="action" onClick={() => void clear()}>
-            保存済みPATを削除
+            保存済み PAT を削除
           </button>
         </div>
       </form>

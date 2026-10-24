@@ -55,7 +55,7 @@ export function customHost(kind: unknown, value: unknown): Host {
   // https と http・ポートの違いで別の id になる（PAT の鍵 `token:<id>` が別の送り先と重ならない）
   const id = url.hostname + (url.port ? `_${url.port}` : "") + (url.protocol === "http:" ? "_http" : "");
   if (!CUSTOM_ID.test(id)) {
-    throw new Error(`ホストの名前が使えない形: ${id}`);
+    throw new Error(`ホストの名前が使えない形です：${id}`);
   }
   // 種類はユーザが明示したものを保つ（自動判定より優先）。GitHub として登録した *.ghe.com だけは、
   // 画面と API の origin が違う（https://api.<ホスト>）。それ以外の GitHub は Enterprise Server（/api/v3）

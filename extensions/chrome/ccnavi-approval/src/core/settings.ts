@@ -39,7 +39,7 @@ export function repoKey(r: Pick<RepoConfig, "host" | "owner" | "repo">): string 
 export function checkRecentDays(value: unknown): number {
   const days = Number(value);
   if (!Number.isInteger(days) || days < 0 || days > MAX_RECENT_DAYS) {
-    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS}の整数を入力してください。`);
+    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS} の整数を入力してください。`);
   }
   return days;
 }
@@ -109,7 +109,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 /** 1 つのリポジトリの直近の日数を書き換える（ボードの入力欄）。外れた値は投げて、何も書かない */
 export async function saveRecentDays(area: StorageArea, hosts: readonly Host[], key: string, value: unknown): Promise<number> {
   if (typeof value === "string" && value.trim() === "") {
-    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS}の整数を入力してください。`);
+    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS} の整数を入力してください。`);
   }
   const days = checkRecentDays(typeof value === "string" ? value.trim() : value);
   const got = await area.get("repos");

@@ -63,7 +63,7 @@ export function classifyOrigin(origin: string): HostClass {
   }
   if (isGheHost(host)) {
     if (port !== "") {
-      return { kind: "github", host, api: "", graphql: "", path, problem: `GHE.com のホスト ${host} にポート :${port} が付いているので、API の URL（https://api.${host}）を組めない` };
+      return { kind: "github", host, api: "", graphql: "", path, problem: `GHE.com のホスト ${host} にポート :${port} が付いているので、API の URL（https://api.${host}）を組めません` };
     }
     const api = `https://api.${host}`;
     return { kind: "github", host, api, graphql: `${api}/graphql`, path, problem: "" };

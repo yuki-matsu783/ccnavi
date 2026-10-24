@@ -335,9 +335,9 @@ def _rival_problem(snap: dict, place: dict, name: str, ident: str) -> str:
     if not others:
         return ""
     return (
-        f"親子のチケット {ident} になるブランチが 1 本でない"
+        f"親子のチケット {ident} になるブランチが 1 本ではありません"
         f"（{', '.join([name, *others])}。どれも変換すると識別子が同じで、その上に同じ識別子の"
-        "親チケットがある）。どれを正とするか決まらないので、この親子のチケットは判定しない"
+        "親チケットがある）。どれを正とするか決まらないので、この親子のチケットは判定しません"
     )
 
 
@@ -347,8 +347,8 @@ def _ambiguous_problem(closure: dict) -> str:
         return ""
     return (
         f"先行の親子のチケット（{', '.join(closure['ambiguous'])}）"
-        "になるブランチが 1 本でない。"
-        "どれを正とするか決まらないので、この親子のチケットは判定しない"
+        "になるブランチが 1 本ではありません。"
+        "どれを正とするか決まらないので、この親子のチケットは判定しません"
     )
 
 
@@ -554,10 +554,10 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
             continue
         ident = _tree_ident(snap, place, name)
         if not ticket_ids.is_valid_id(ident):
-            raise Refused(f"親子のチケットの識別子が識別子の形でない: {ident!r}")
+            raise Refused(f"親子のチケットの識別子が識別子の形ではありません：{ident!r}")
         if name != ident and ticket_ids.branch_problem(name):
             raise Refused(
-                f"親のブランチ名が使えない: {name!r}（{ticket_ids.branch_problem(name)}）"
+                f"親のブランチ名が使えません：{name!r}（{ticket_ids.branch_problem(name)}）"
             )
         tree = os.path.join(root, *WORKTREES.split("/"), ident)
         os.makedirs(tree, exist_ok=True)
