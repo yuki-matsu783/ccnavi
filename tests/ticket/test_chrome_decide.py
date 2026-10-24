@@ -456,6 +456,19 @@ class IssueMarkTest(ChromeDecideHarness):
         self.assertTrue(issue["comments"])
         self.assertTrue(issue["body"].startswith("<!-- ccnavi:issue op="))
 
+    def test_every_piece_leaves_room_for_the_extension_to_add_its_marker(self):
+        # 拡張は 1 回に 60,000 字まで書く。続きのコメントには印の行（約 80 字）を足す
+        extension_cap = 60000
+        marker_room = 200
+        for size in (
+            review_decide.ISSUE_BODY_LIMIT - 5,
+            review_decide.ISSUE_BODY_LIMIT + 5,
+            150000,
+        ):
+            issue = self.issue_of([thread("t1", "あ" * size)], "u-t1")
+            for piece in [issue["body"], *issue["comments"]]:
+                self.assertLessEqual(len(piece) + marker_room, extension_cap, size)
+
 
 class FollowupIdTest(ChromeDecideHarness):
     def test_the_next_id_skips_the_existing_children_of_the_phase(self):

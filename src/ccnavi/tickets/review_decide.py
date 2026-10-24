@@ -49,9 +49,10 @@ CHOICES = (CHOICE_KEEP, CHOICE_FIX, CHOICE_ISSUE)
 DECIDE_VERSION = 2
 # ダイジェストの前置き。版 1 のダイジェスト（64 桁の 16 進）と見分ける。
 DIGEST_PREFIX = "v2."
-# issue の本文の字数の上限（GitHub は 65,536 字）。余裕を見て、この字数を超えたら
-# 目次と続きのコメントに分ける。
-ISSUE_BODY_LIMIT = 60000
+# issue の本文の字数の上限（GitHub は 65,536 字）。この字数を超えたら目次と続きのコメントに分ける。
+# 拡張が 1 回に書く本文は 60,000 字までで、そこに操作 ID の印の行（約 80 字）を足す。
+# 余裕を 1,000 字見て、足した後も収まるようにする。
+ISSUE_BODY_LIMIT = 59000
 # ターミナルで打つ 1 文字と、画面に出す呼び名。
 _CHOICE_KEYS = {"k": CHOICE_KEEP, "f": CHOICE_FIX, "i": CHOICE_ISSUE}
 CHOICE_LABELS = {
@@ -982,8 +983,11 @@ def _split_block(block: str) -> list[str]:
     pieces: list[str] = []
     current: list[str] = []
     size = 0
+    room = ISSUE_BODY_LIMIT - 2 * len(quote) - 40
+    # 改行の無い長い行は、行の切れ目では収まらないので字数で分ける
+    lines = [ln[i : i + room] for ln in lines for i in range(0, max(len(ln), 1), room)]
     for line in lines:
-        if size + len(line) + 1 > ISSUE_BODY_LIMIT - 2 * len(quote) - 40 and current:
+        if size + len(line) + 1 > room and current:
             pieces.append("\n".join(current) + f"\n{quote}\n")
             current, size = [f"{quote}text"], len(quote) + 4
         current.append(line)
