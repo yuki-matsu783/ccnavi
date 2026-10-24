@@ -285,6 +285,13 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertIn("--docs で", body)
         self.assertLess(len(body), 4000, body)
 
+        # 非対話の注記が重なる、いちばん長い回。
+        self.attended = "0"
+        body = block(self.start("--mode", "dry-run")).replace(self.root, "<root>")
+
+        self.assertIn("このセッションは非対話", body)
+        self.assertLess(len(body), 4000, body)
+
 
 if __name__ == "__main__":
     unittest.main()
