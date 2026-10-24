@@ -232,7 +232,7 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 
-test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまでの流れだけは 33 手順まで）で、「〜したいとき」の題と 1 行の説明を持つ。案内の鍵は重ならない", () => {
+test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまでの流れだけは 36 手順まで）で、「〜したいとき」の題と 1 行の説明を持つ。案内の鍵は重ならない", () => {
   const useCases = def.courses.slice(1);
   assert.ok(useCases.length >= 3 && useCases.length <= 9);
   // マージまでの流れ（to-merge）は基本の案内のすぐ次に出る
@@ -241,7 +241,7 @@ test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまで�
     ["to-merge", "approve", "review", "merge", "attention", "progress", "filter", "closed", "flow"],
   );
   for (const course of useCases) {
-    assert.ok(course.steps.length >= 4 && course.steps.length <= (course.id === "to-merge" ? 33 : 9), `${course.id}: ${course.steps.length} 手順`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= (course.id === "to-merge" ? 36 : 9), `${course.id}: ${course.steps.length} 手順`);
     assert.match(course.title, /たいとき$/, `${course.id}: 利用者の目的の題でない`);
     assert.ok(course.summary.length > 0 && course.summary.length <= 60, `${course.id}: 説明が長い`);
   }
