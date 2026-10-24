@@ -98,7 +98,7 @@ function decidePreview(canIssue: boolean): DecidePreview {
   };
 }
 
-test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選ぶまで決められない。選んだ対応方針を鍵ごとに送る", async () => {
+test("CB-T205 残った指摘は既定で全部「このフェーズで直す」。1 件ずつ・一括で選び直せる。選んだ対応方針を鍵ごとに送る", async () => {
   const page = await openBoard(fixture(), {
     approval: { kind: "decidePreview", preview: decidePreview(false), tree: "/w/.claude/worktrees/i0001" },
   });
@@ -126,22 +126,29 @@ test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選
     assert.equal(page.all('input[data-choice="issue"]').length, 2);
     assert.ok(!texts(page, ".approval-note").join(" ").includes("フィードバック計画"));
     assert.equal(page.all('input[data-choice="keep"]').length, 2);
-    const confirm = page.one<HTMLButtonElement>('button[data-action="decide-confirm"]');
-    assert.equal(confirm.disabled, true);
+    // 何も選ばなければ全部「このフェーズで直す」で、そのまま確定できる
+    const checked = (sel: string): boolean => (page.one(sel) as unknown as { checked: boolean }).checked;
+    assert.equal(checked('li[data-key="u1"] input[data-choice="fix"]'), true);
+    assert.equal(checked('li[data-key="u2"] input[data-choice="fix"]'), true);
+    assert.equal(page.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, false);
     page.click(page.one('li[data-key="u1"] input[data-choice="keep"]'));
     await page.settle();
-    assert.equal(page.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true);
     page.click(consult);
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "decideConsult" });
-    assert.equal((page.one('li[data-key="u1"] input[data-choice="keep"]') as unknown as { checked: boolean }).checked, true, "選びかけの対応方針は保たれる");
-    page.click(page.one('li[data-key="u2"] input[data-choice="fix"]'));
+    assert.equal(checked('li[data-key="u1"] input[data-choice="keep"]'), true, "選びかけの対応方針は保たれる");
+    // 一括: 全部を同じ対応方針にする（個別の選択は上書きされる）
+    page.click(page.one('button[data-bulk="issue"]'));
+    await page.settle();
+    assert.equal(checked('li[data-key="u1"] input[data-choice="issue"]'), true);
+    assert.equal(checked('li[data-key="u2"] input[data-choice="issue"]'), true);
+    page.click(page.one('li[data-key="u2"] input[data-choice="keep"]'));
     await page.settle();
     const ready = page.one<HTMLButtonElement>('button[data-action="decide-confirm"]');
     assert.equal(ready.disabled, false);
     page.click(ready);
     await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "decideConfirm", choices: { u1: "keep", u2: "fix" } });
+    assert.deepEqual(page.posted.at(-1), { type: "decideConfirm", choices: { u1: "issue", u2: "keep" } });
   } finally {
     await page.close();
   }

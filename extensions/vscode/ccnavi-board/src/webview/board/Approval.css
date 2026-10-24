@@ -29,6 +29,11 @@
 .plan-family-actions { display: flex; justify-content: flex-end; margin: 4px 0; }
 
 /* 残った指摘の行き先（`Decide.tsx`）。指摘 1 件ずつに場所・要旨・行き先の選択を並べる */
+/* 一括の行。文字だけの小さなボタンで、一覧の邪魔をしない */
+.decide-bulk { display: flex; align-items: center; gap: var(--gap-4); justify-content: flex-end; margin: 0 0 4px; font-size: var(--font-md); color: var(--vscode-descriptionForeground); }
+.decide-bulk-button { background: none; border: none; padding: 2px 4px; font: inherit; color: var(--vscode-textLink-foreground); cursor: pointer; }
+.decide-bulk-button:hover, .decide-bulk-button:focus-visible { text-decoration: underline; color: var(--vscode-textLink-activeForeground); }
+.decide-bulk-button:disabled { opacity: .5; cursor: not-allowed; text-decoration: none; }
 .decide-threads { margin: 0; padding-left: 22px; }
 .decide-thread { padding: 6px 0; border-bottom: 1px solid var(--vscode-panel-border); }
 .decide-where { display: flex; gap: var(--gap-4); flex-wrap: wrap; font-size: var(--font-md); }

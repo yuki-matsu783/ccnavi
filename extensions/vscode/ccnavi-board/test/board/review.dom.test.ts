@@ -71,14 +71,14 @@ test("CB-D731 対応方針の画面: URL は http(s) のときだけリンク。
 test("CB-D732 相談のプロンプトのコピーの知らせ: できたら短く、できなかったら失敗と言う。選びかけの対応方針は保たれ、オーバーレイは閉じない", async () => {
   const page = await openBoard(fixture(), { approval: { kind: "decidePreview", preview: preview(), tree: "/w" } });
   try {
-    page.click(page.one('li[data-key="u1"] input[data-choice="fix"]'));
+    page.click(page.one('li[data-key="u1"] input[data-choice="keep"]'));
     await page.settle();
     // できた（拡張ホストが同じ指摘のまま、コピーの結果を渡し直す）
     await page.send({ type: "data", data: { kind: "board", board: (await import("../../src/core/board.js")).buildBoard(fixture()), approval: { kind: "decidePreview", preview: preview(), tree: "/w", consult: { ok: true, text: "相談のプロンプトをコピーしました。エージェントに貼って送ってください" } } } });
     const ok = page.one('[data-consult="ok"]');
     assert.equal(ok.textContent, "相談のプロンプトをコピーしました。エージェントに貼って送ってください");
     assert.equal(ok.getAttribute("role"), "status");
-    assert.equal((page.one('li[data-key="u1"] input[data-choice="fix"]') as unknown as { checked: boolean }).checked, true, "選びかけが保たれる");
+    assert.equal((page.one('li[data-key="u1"] input[data-choice="keep"]') as unknown as { checked: boolean }).checked, true, "選びかけが保たれる");
     assert.equal(page.all(".approval-backdrop").length, 1);
     // できなかった
     await page.send({ type: "data", data: { kind: "board", board: (await import("../../src/core/board.js")).buildBoard(fixture()), approval: { kind: "decidePreview", preview: preview(), tree: "/w", consult: { ok: false, text: "コピーできませんでした（クリップボードが使えません）" } } } });
@@ -86,7 +86,7 @@ test("CB-D732 相談のプロンプトのコピーの知らせ: できたら短�
     assert.match(ng.textContent, /コピーできませんでした/);
     assert.ok(ng.classList.contains("error"));
     assert.equal(page.all('[data-consult="ok"]').length, 0);
-    assert.equal((page.one('li[data-key="u1"] input[data-choice="fix"]') as unknown as { checked: boolean }).checked, true, "選びかけが保たれる");
+    assert.equal((page.one('li[data-key="u1"] input[data-choice="keep"]') as unknown as { checked: boolean }).checked, true, "選びかけが保たれる");
   } finally {
     await page.close();
   }
