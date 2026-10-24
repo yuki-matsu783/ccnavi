@@ -42,11 +42,11 @@ export function Review({ ticket, answer, onConfirm, onCancel, focus = true }: Re
   return (
     <Dialog titleId="save-review-title" backdropClass="workflow-review-backdrop" cardClass="workflow-review" id="save-review">
       <h2 id="save-review-title">この順序に決める</h2>
-      <p className="dim small">ccnavi が {ticket} の提案の計画（plan: / feedback:）と、番号の変わる項を指す子の提案を変更します。承認はしません。</p>
+      <p className="dim small">ccnavi が {ticket} の提案の計画（plan: / feedback:）と、番号の変わるステップを指す子の提案を変更します。承認はしません。</p>
       <div data-tour="review-numbers">
-        <h3>番号が変わる項（{moved.length}）</h3>
+        <h3>番号が変わるステップ（{moved.length}）</h3>
         {moved.length === 0 ? (
-          <p className="dim small">番号は変わりません（待ちだけが変わります）。</p>
+          <p className="dim small">番号は変わりません（先行だけが変わります）。</p>
         ) : (
           <ul id="review-numbers">
             {moved.map((item) => (

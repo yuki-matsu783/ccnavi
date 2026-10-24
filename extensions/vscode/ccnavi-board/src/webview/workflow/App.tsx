@@ -419,7 +419,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
           </span>
         </div>
         <div className="controls" data-tour="controls">
-          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="今の線で点の置き場所を組み直します（番号は変わりません）" onClick={relayout}>
+          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="今の線で点の置き場所を並べ直します（番号は変わりません）" onClick={relayout}>
             並べ直す
           </button>
           <button
@@ -443,7 +443,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             data-action="save"
             data-tour="save"
             disabled={shownBusy || blocker !== ""}
-            title={blocker === "" ? "提案の計画と、番号の変わる項を指す子の提案を変更します（承認はしません）" : blocker}
+            title={blocker === "" ? "提案の計画と、番号の変わるステップを指す子の提案を変更します（承認はしません）" : blocker}
             onClick={() => {
               if (!touring) {
                 setReview(true);
@@ -456,11 +456,11 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       </ScreenHeader>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">
-        項の右の点から別の項の左の点へドラッグすると、線の先の項が元の項を待ちます（逆向きでも引けます）。線の真ん中の × で待たなくなります。線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
+        ステップの右の点から別のステップの左の点へドラッグすると、線の先のステップに、元のステップが先行します（逆向きでも引けます）。線の真ん中の × で先行を外せます。線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
       </p>
       {moved.length > 0 && (
         <p id="workflow-renumbered" className="small" data-tour="renumbered">
-          番号が変わる項: {moved.map((item) => `${item.title} ${item.from} → ${item.number}`).join("、")}
+          番号が変わるステップ: {moved.map((item) => `${item.title} ${item.from} → ${item.number}`).join("、")}
         </p>
       )}
       {notes.length > 0 && (

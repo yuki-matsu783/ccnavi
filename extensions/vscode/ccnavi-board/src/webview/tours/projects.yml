@@ -19,7 +19,7 @@ courses:
         body: ワークスペースの projects/ の直下にある git リポジトリが、プロジェクトとして並びます。ここに件数と置き場のフォルダが出ます。
       - target: clone
         title: リポジトリを clone する
-        body: URL を入れて clone を押すと、projects/ の直下に取り込みます。名前は URL から自動で入り、手で直せます。git clone は「ccnavi」ターミナルで動くので、認証が必要ときはそこで入力します。
+        body: URL を入れて clone を押すと、projects/ の直下に取り込みます。名前は URL から自動で入り、手で直せます。git clone は「ccnavi」ターミナルで動くので、認証が必要なときはそこで入力します。
       - target: list
         title: プロジェクトの一覧
         body: プロジェクトごとに、origin・設定のルール・ワークツリー・チケット・検証の結果をカードで見られます。
@@ -48,7 +48,7 @@ courses:
         body: projects/ の下に作るフォルダの名前です。URL の末尾から自動で入ります。変えたいときだけ直します。
       - target: clone-run
         title: clone を実行する
-        body: 押すと「ccnavi」ターミナルで git clone が走ります。終わると一覧に新しいカードが出ます。
+        body: 押すと「ccnavi」ターミナルで git clone が実行されます。終わると一覧に新しいカードが出ます。
       - target: refresh
         title: 手で移したときは更新
         body: 既存のリポジトリを projects/ の直下へ自分で移したときは、更新を押すと一覧に出ます。ワークスペース直下などにあって認識されないリポジトリは、一覧の下に別枠で出ます。

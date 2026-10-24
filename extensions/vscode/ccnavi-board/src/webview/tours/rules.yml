@@ -244,7 +244,7 @@ courses:
         scene: { tab: rules, open: protect-env, when: r }
       - target: when-graph
         title: 点を選んで直す
-        body: ノードをクリックすると選択され、下の編集欄でそのノードの条件を変更できます。ここでは .env 系に当てる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
+        body: ノードをクリックすると選択され、下の編集欄でそのノードの条件を変更できます。ここでは .env 系に一致させる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
         scene: { tab: rules, open: protect-env, when: r.0 }
       - target: when-inspector
         title: 子を追加する・削除
@@ -273,7 +273,7 @@ courses:
     steps:
       - target: add-deny
         title: 追加するタイプを選ぶ
-        body: ルールは deny（止める）・ask（確認する）・allow（通す）のどれかに追加します。タイプの見出しにある「＋ ルールを追加」を押すと、空の行が開いた状態で末尾に追加され、id の欄に焦点が移ります。id はルールの名前で、判定の結果や記録にも出ます。タイプはあとから行の中の「タイプ」で替えられます。
+        body: ルールは deny（止める）・ask（確認する）・allow（通す）のどれかに追加します。タイプの見出しにある「＋ ルールを追加」を押すと、空の行が開いた状態で末尾に追加され、id の欄にカーソルが移ります。id はルールの名前で、判定の結果や記録にも出ます。タイプはあとから行の中の「タイプ」で替えられます。
         scene: { tab: rules }
       - target: rule-git-push-match
         title: ツールを決める
@@ -293,7 +293,7 @@ courses:
         scene: { tab: rules, open: git-push }
       - target: judge-form
         title: 判定で確認する
-        body: 入力したら「判定を試す」で、止めたい例（git push origin main）を入力します。保存しなくても、編集中のルールでどのルールに当たり、どのメッセージを返すかを実行ファイルが返します。
+        body: 入力したら「判定を試す」で、止めたい例（git push origin main）を入力します。保存しなくても、編集中のルールでどのルールに当たり、どのメッセージが返るかを実行ファイルが調べて表示します。
         scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
       - target: save
         title: 保存
@@ -322,7 +322,7 @@ courses:
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-deps-change-once
         title: 最初の 1 回だけ届く文
-        body: additionalContextOnce は、セッションで最初に渡す回にだけ届く文で、長い背景の説明に向きます。additionalContext と両方入力すると、初回は 2 つを空行で並べて届き、2 回目からは additionalContext だけが届きます。every を添えると、1 回目ではなく N 回目に届きます。
+        body: additionalContextOnce は、セッションで最初に渡す回にだけ届く文で、長い背景の説明に向きます。additionalContext と両方入力すると、初回は 2 つを空行で並べて届き、2 回目からは additionalContext だけが届きます。every を指定すると、1 回目ではなく N 回目に届きます。
         scene: { tab: rules, open: deps-change, more: true }
       - target: rule-deps-change-file
         title: 長い文はファイルで渡す
@@ -364,26 +364,26 @@ courses:
 
   - id: suggest-rule
     title: 記録から候補を出して、下書きをルールにしたいとき
-    summary: 判定の記録から deny / ask の下書きを起こし、ルールに写して確認する
+    summary: 判定の記録から deny / ask の下書きを作り、ルールに転記して確認する
     steps:
       - target: suggest
         title: 記録から候補を出す
-        body: 「記録から候補を出す」は、判定の記録（logs/decisions.jsonl）を数えて、deny / ask のルールの下書きを出します。どのルールにも当たらず権限モードへ渡った呼び出しが同じ形で 5 回以上あると、その形にルールを追加する候補になります。保存済みのルールで確認するので、編集中の内容は使いません。
+        body: 「記録から候補を出す」は、判定の記録（logs/decisions.jsonl）を集計して、deny / ask のルールの下書きを作ります。どのルールにも当たらず権限モードへ渡った呼び出しが同じ形で 5 回以上あると、その形にルールを追加する候補になります。保存済みのルールで確認するので、編集中の内容は使いません。
         scene: { tab: judge }
       - target: suggest-result
         title: 結果の読み方
-        body: 読んだ記録の本数と行数、候補の数が出ます。「検証を通らず除いたもの」は、lint と期待する判定を通らず出さなかった数です。候補はすべて下書きです。確認して設定に反映するのはユーザーです。
+        body: 読んだ記録の本数と行数、候補の数が出ます。「検証を通らず除いたもの」は、lint と期待する判定を通らず出さなかった数です。候補はすべて下書きです。確認して設定に反映するのはユーザです。
         scene: { tab: judge, suggested: true }
       - target: suggest-candidate
         title: 候補 1 件の中身
         body: '候補は、種類（ルールを追加する・message を見直す）・タイプ・id と、根拠の一言、下書きの YAML です。下書きは、rules.yml に追加する rules: と、期待する判定のファイルに追加する expectations: の組です。ルールを追加する候補は ask で出ます（記録から通す側は勧めません）。message を見直す候補は、同じ呼び出しを deny が繰り返し止めたときに出ます。'
         scene: { tab: judge, suggested: true }
       - target: add-ask
-        title: 下書きをルールに写す
-        body: 下書きは自動では保存されません。「＋ ルールを追加」で行を追加し、下書きの id・ツール・パターンを写します。置き先は候補に示されたレイヤーのファイルなので、いま編集している設定と同じかを確認します。ふさわしくなければ置かなくて構いません。
+        title: 下書きをルールに転記する
+        body: 下書きは自動では保存されません。「＋ ルールを追加」で行を追加し、下書きの id・ツール・パターンを転記します。置き先は候補に示されたレイヤーのファイルなので、いま編集している設定と同じかを確認します。ふさわしくなければ追加しなくて構いません。
         scene: { tab: rules }
       - target: judge-form
-        title: 写したら判定で確認する
+        title: 転記したら判定で確認する
         body: 下書きの例（npm install left-pad）を「判定を試す」に入力し、期待したタイプ（ask）で当たるかを確認します。
         scene: { tab: judge, tool: Bash, subject: npm install left-pad, judge: npm-install }
       - target: open-expectations
@@ -434,11 +434,11 @@ courses:
     steps:
       - target: sum
         title: 統合結果とは
-        body: 判定に効くルールは、共通の設定と、ひとつの設定（ワークスペースかプロジェクト）のルールの和です。「統合結果」の枠は、その和を実行ファイルが出した結果のまま見せます。読み取り専用で、保存済みの内容の和なので、編集中の内容は含みません。
+        body: 判定に効くルールは、共通の設定と、ひとつの設定（ワークスペースかプロジェクト）のルールの和です。「統合結果」の枠は、その和を実行ファイルが出した結果のまま表示します。読み取り専用で、保存済みの内容の和なので、編集中の内容は含みません。
         scene: { tab: rules, sum: web }
       - target: sum-pick
         title: 統合結果を選ぶ
-        body: 選ぶ欄で、統合結果（共通 + ワークスペース）と、プロジェクトの統合結果（共通の設定 + そのプロジェクトの設定）を切り替えます。パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を合算した和ではありません。
+        body: 選ぶ欄で、統合結果（共通 + ワークスペース）と、プロジェクトの統合結果（共通の設定 + そのプロジェクトの設定）を切り替えます。パスを持たないツール（Bash など）に適用されるのは、全プロジェクトの設定を合算した和ではありません。
         scene: { tab: rules, sum: web }
       - target: sum-count
         title: 件数と追加されたレイヤー
@@ -475,7 +475,7 @@ courses:
         scene: { tab: rules, fold: allow }
       - target: order-hint
         title: 判定の強さ
-        body: 判定は強い順に deny > ask > allow です。1 件でも deny に当たれば拒否で、弱いタイプは見に行きません。行の並びが強さを決めるのではなく、タイプが決めます。
+        body: 判定は強い順に deny > ask > allow です。1 件でも deny に当たれば拒否で、弱いタイプは確認しません。行の並びが強さを決めるのではなく、タイプが決めます。
         scene: { tab: rules }
       - target: rule-no-rm-rf-buttons
         title: 同じタイプの中の順

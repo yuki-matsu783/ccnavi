@@ -31,7 +31,7 @@ test("CB-D324 一覧は開いている対象の層のテンプレートだけを
       ["self/ends", "self/feature", "self/local", "self/research"],
     );
     assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"]')), /捨てた: 共通と同じ中身/);
-    assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"]')), /使えない/);
+    assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"]')), /無効/);
     assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /捨てた: 共通と食い違います/);
     assert.equal(dom.all('button[data-action="view-sum"], button[data-action="view-raw"]').length, 0);
     assert.equal(dom.all("details#sum").length, 1);

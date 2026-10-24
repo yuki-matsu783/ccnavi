@@ -113,10 +113,10 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     const plain = dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "";
     assert.match(plain, /すぐ始まる: 1/);
     assert.match(plain, /延期したレビュー: 2 は 4 と一緒に/);
-    assert.doesNotMatch(plain, /最後の項が待たない/);
+    assert.doesNotMatch(plain, /最後のステップの先行になっていない/);
     const notes = dom.one('.plan-graph[data-part="feedback"] .plan-graph-notes').textContent ?? "";
     assert.match(notes, /すぐ始まる: 5, 6/);
-    assert.match(notes, /最後の項が待たない: 6。最後の項へ線を引くか、合流の項を置いてください/);
+    assert.match(notes, /最後のステップの先行になっていない: 6。最後のステップへ線を引くか、合流のステップを置いてください/);
     assert.match(notes, /フィードバック計画の最後の項（7）が 6 を待っていない/);
   } finally {
     await dom.close();

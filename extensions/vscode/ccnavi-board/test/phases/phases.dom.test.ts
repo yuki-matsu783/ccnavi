@@ -330,7 +330,7 @@ test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後ま�
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
     // 1 番目の手順で、順序は親チケットの計画で決めることを言う
-    assert.match(dom.one(".tour-bubble").textContent ?? "", /順序（どのフェーズがどれを待つか）は、親チケットの計画の項の after で決めます/);
+    assert.match(dom.one(".tour-bubble").textContent ?? "", /順序（どのフェーズにどのフェーズが先行するか）は、親チケットの計画のステップの after で決めます/);
     const titles = [dom.one("#tour-title").textContent];
     for (let i = 0; i < 4; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
@@ -439,7 +439,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
-    assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズがどれを待つか）はこのファイルには記載しません。親チケットの計画の項に after で先行を指定します/);
+    assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに after で先行を指定します/);
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));

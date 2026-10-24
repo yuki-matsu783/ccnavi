@@ -395,7 +395,7 @@ test("CB-D186 線を変えたら、答えを待つ間も拡張ホストに「確
 test("CB-D187 項を押すと右の欄に詳細を出す。欄は畳め、畳んだことは覚える", async () => {
   const dom = await openWorkflow();
   try {
-    assert.ok(dom.one('.plan-graph[data-part="plan"] .plan-detail-empty').textContent?.includes("項を押すと"));
+    assert.ok(dom.one('.plan-graph[data-part="plan"] .plan-detail-empty').textContent?.includes("ステップを押すと"));
     dom.click(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"]'));
     await dom.settle();
     const detail = dom.one('.plan-graph[data-part="plan"] .plan-detail-list');

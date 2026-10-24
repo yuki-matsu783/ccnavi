@@ -70,9 +70,9 @@ test("CB-T373 外で提案が変わったときの差分。番号ごとに、定
   const before = planOrderSample("open").plans;
   const after = planOrderSample("reverse").plans;
   assert.deepEqual(planDiff(before, after), [
-    { part: "plan", number: 2, before: "設計（design）: 待つ 1", after: "実装とテスト（implement）: 待つ 1" },
-    { part: "plan", number: 3, before: "実装とテスト（implement）: 待つ 1", after: "設計（design）: 待つ 1, 2" },
-    { part: "plan", number: 4, before: "docs（docs）: 待つ 2, 3", after: "docs（docs）: 待つ 3" },
+    { part: "plan", number: 2, before: "設計（design）: 先行 1", after: "実装とテスト（implement）: 先行 1" },
+    { part: "plan", number: 3, before: "実装とテスト（implement）: 先行 1", after: "設計（design）: 先行 1, 2" },
+    { part: "plan", number: 4, before: "docs（docs）: 先行 2, 3", after: "docs（docs）: 先行 3" },
   ]);
   // 項が増えた・減った（フィードバック計画が無くなった）
   const dropped = planDiff(before, [before[0]]);

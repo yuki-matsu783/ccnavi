@@ -80,7 +80,7 @@ test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っ
   assert.equal(card("sample-a").copyStatus, "none");
   assert.equal(card("sample-a").status.label, "承認待ち");
   assert.equal(card("sample-b-03-01").status.label, "承認待ち");
-  // レビュー待ち: 親のフェーズ行に［MR を開く］［レビュー完了］、子のカードはあなたの番に同じ操作。札はどちらも「レビュー待ち」
+  // レビュー待ち: 親のフェーズ行に［MR を開く］［レビュー完了］、子のカードはユーザ待ちに同じ操作。札はどちらも「レビュー待ち」
   const chip = card("sample-c").phases[0];
   assert.ok(chip.reviewWaiting && chip.gateClosed && chip.status === "レビュー待ち" && chip.actions.some((a) => a.kind === "review"));
   assert.equal(card("sample-c").mrNumber, 12);
@@ -223,7 +223,7 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   }
   const intro = def.courses[0];
   assert.equal(intro.id, INTRO_ID);
-  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態の札", "あなたの番", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
+  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態の札", "ユーザ待ち", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 

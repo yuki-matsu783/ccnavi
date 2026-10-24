@@ -173,7 +173,7 @@ test("CB-T1110 取り込めない対象には理由を言う。端末のみ・co
   assert.match(refusalReason(entry({ state: "rejected" })), /rejected/);
   assert.match(refusalReason(entry({ state: "unchanged" })), /同じ内容/);
   assert.match(refusalReason(entry({ errors: ["x"] })), /error/);
-  assert.match(refusalReason(entry({ state: "later" })), /知らない状態です（later）/);
+  assert.match(refusalReason(entry({ state: "later" })), /未知の状態です（later）/);
   // 端末のみの対象は、状態より先に端末で取り込むことを言う
   assert.match(refusalReason(entry({ board: false, state: "conflict" })), /端末で取り込みます/);
 });

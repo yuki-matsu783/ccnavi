@@ -1,5 +1,5 @@
 /**
- * カード 1 枚が何を描くか（React の画面を happy-dom で動かす）。上から 見出し（ID・題・状態の札）・位置・あなたの番・
+ * カード 1 枚が何を描くか（React の画面を happy-dom で動かす）。上から 見出し（ID・題・状態の札）・位置・ユーザ待ち・
  * 注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。札の決め方は status.test.ts、ここは構造・操作・ボタンの規則・押したときの動き。
  * 寸法と見た目は拡張開発ホストでの手動確認（docs/design/manual-checks.md の表）に回す。
  */
@@ -49,11 +49,11 @@ function scene(): BoardJson {
   );
 }
 
-test("CB-D700 カードは 見出し（ID・題・状態の札）→ 位置 → あなたの番 → 注意 → フェーズ行 → 補助の操作 → 詳細 の順に並ぶ", async () => {
+test("CB-D700 カードは 見出し（ID・題・状態の札）→ 位置 → ユーザ待ち → 注意 → フェーズ行 → 補助の操作 → 詳細 の順に並ぶ", async () => {
   const page = await openBoard(scene());
   try {
     const kindsOf = (id: string): string[] => Array.from(page.one(card(page, id)).children).map((el) => el.className.split(" ")[0]);
-    // 親（承認待ち・計画あり）: 見出し・あなたの番・補助（計画編集）・詳細（人間レビューの要否はいつも詳細にある）。注意は出すものが無い
+    // 親（承認待ち・計画あり）: 見出し・ユーザ待ち・補助（計画編集）・詳細（人間レビューの要否はいつも詳細にある）。注意は出すものが無い
     assert.deepEqual(kindsOf("fresh"), ["card-head", "turn", "card-actions", "card-details"]);
     const parent = page.one(card(page, "busy"));
     assert.deepEqual(kindsOf("busy"), ["card-head", "stage", "badges", "phases", "card-details"]);
@@ -96,7 +96,7 @@ test("CB-D701 札は見出しの右端に 1 つ。言葉とツールチップは
   }
 });
 
-test("CB-D702 あなたの番: 親の承認待ちは「内容を確認して承認してください」と［承認］（主ボタン）。子の承認待ちは［承認］だけ。要確認の札でも承認は出る", async () => {
+test("CB-D702 ユーザ待ち: 親の承認待ちは「内容を確認して承認してください」と［承認］（主ボタン）。子の承認待ちは［承認］だけ。要確認の札でも承認は出る", async () => {
   const page = await openBoard(
     pendingOf(
       boardOf([
@@ -109,7 +109,7 @@ test("CB-D702 あなたの番: 親の承認待ちは「内容を確認して承�
   );
   try {
     const parent = card(page, "p");
-    assert.equal(textOf(page, `${parent} .turn-head`), "あなたの番");
+    assert.equal(textOf(page, `${parent} .turn-head`), "ユーザ待ち");
     assert.equal(textOf(page, `${parent} .turn-text`), "内容を確認して承認してください");
     const approve = page.one(`${parent} button[data-action="approve-one"]`);
     assert.equal(approve.textContent, "承認");
@@ -128,7 +128,7 @@ test("CB-D702 あなたの番: 親の承認待ちは「内容を確認して承�
   }
 });
 
-test("CB-D703 あなたの番: 札が「レビュー待ち」の子には［MR を開く］（リンク）と［レビュー完了］（主ボタン）。押すとレビュー完了の流れに入る。ほかの子には出さない", async () => {
+test("CB-D703 ユーザ待ち: 札が「レビュー待ち」の子には［MR を開く］（リンク）と［レビュー完了］（主ボタン）。押すとレビュー完了の流れに入る。ほかの子には出さない", async () => {
   const page = await openBoard(scene());
   try {
     const child = card(page, "busy-02-01");
@@ -234,7 +234,7 @@ test("CB-D705 操作のまとまりごとに主ボタンは 1 つ以下。操作
     for (const a of inDetails) {
       assert.ok(!a.classList.contains("card-button"));
     }
-    // 操作のまとまりごとに主ボタンは 1 つ以下: あなたの番・各フェーズ行・補助の操作
+    // 操作のまとまりごとに主ボタンは 1 つ以下: ユーザ待ち・各フェーズ行・補助の操作
     const groups = page.all("li.card .turn, li.card .phase, li.card .card-actions");
     assert.ok(groups.length >= 5);
     for (const g of groups) {
@@ -242,7 +242,7 @@ test("CB-D705 操作のまとまりごとに主ボタンは 1 つ以下。操作
     }
     // 補助の操作は通常の色（主ボタンにしない）
     assert.equal(page.all("li.card .card-actions .primary").length, 0);
-    // 親の「あなたの番」は承認の 1 つだけ、フェーズ行の［レビュー完了］は行ごと
+    // 親の「ユーザ待ち」は承認の 1 つだけ、フェーズ行の［レビュー完了］は行ごと
     assert.equal(page.all(`${card(page, "rev")} .turn button.primary`).length, 1);
     assert.equal(page.all(`${card(page, "rev")} .phase button.primary`).length, 2);
     // 補助の操作が 3 つ種類とも出る

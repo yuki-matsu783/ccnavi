@@ -314,7 +314,7 @@ test("CB-D378 更新はそのまま refresh を送り、ツリーの切り替え
 });
 
 test("CB-D379 実行ファイルが handoff を持たない版のとき、画面を無効にして古い版であることを言う。一覧は出さない", async () => {
-  const reason = "実行ファイル（0.1.0 abc）が handoff の機能を持ちません（古い版です）。取り込み待ち画面 で確認できないので進めません。build.py を実行して組み立て直してください";
+  const reason = "実行ファイル（0.1.0 abc）が handoff の機能に対応していません（古い版です）。取り込み待ち画面 で確認できないので進めません。build.py を実行して組み立て直してください";
   const dom = await openPage({ kind: "disabled", reason });
   try {
     assert.match(text(dom.one("#handoff-disabled")), /使えません/);
