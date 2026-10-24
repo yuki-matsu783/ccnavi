@@ -53,6 +53,8 @@ def block(text: str) -> str:
 
 
 class SessionConventionsTest(unittest.TestCase):
+    attended: str | None = None
+
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -71,6 +73,10 @@ class SessionConventionsTest(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         environment.pop("CLAUDE_PROJECT_DIR", None)
+        # 非対話の判定は環境変数を読む。`claude -p` の中で回しても揺れないよう、毎回決める。
+        environment.pop("CLAUDE_CODE_SESSION_ATTENDED", None)
+        if self.attended is not None:
+            environment["CLAUDE_CODE_SESSION_ATTENDED"] = self.attended
         result = run_ccnavi(
             ["--root", self.root, "--rules", self.rules, *extra],
             input=json.dumps(payload),
@@ -233,6 +239,27 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertIn(HEAD, text)
         self.assertNotIn("（現状:", text)
 
+    def test_非対話のときだけ非対話の注記が載る(self):
+        self.attended = "0"
+        noninteractive = block(self.start("--mode", "enable"))
+        self.assertIn("このセッションは非対話", noninteractive)
+        self.assertIn("前景で起動し", noninteractive)
+        self.assertIn("リモートへ反映する", noninteractive)
+
+        for value in ("1", None):
+            with self.subTest(attended=value):
+                self.attended = value
+                text = block(self.start("--mode", "enable"))
+                self.assertNotIn("このセッションは非対話", text)
+                self.assertNotIn("前景で起動し", text)
+
+    def test_非対話でもチケット制御がdisableなら反映の注記は出ない(self):
+        self.attended = "0"
+        text = block(self.start("--mode", "enable", "--ticket-control", "disable"))
+
+        self.assertIn("前景で起動し", text)
+        self.assertNotIn("リモートへ反映する", text)
+
     def test_サブエージェントには出さない(self):
         self.assertEqual(block(self.start("--mode", "enable", agent_id="a1")), "")
 
@@ -256,6 +283,13 @@ class SessionConventionsTest(unittest.TestCase):
         body = block(self.start("--mode", "dry-run")).replace(self.root, "<root>")
 
         self.assertIn("--docs で", body)
+        self.assertLess(len(body), 4000, body)
+
+        # 非対話の注記が重なる、いちばん長い回。
+        self.attended = "0"
+        body = block(self.start("--mode", "dry-run")).replace(self.root, "<root>")
+
+        self.assertIn("このセッションは非対話", body)
         self.assertLess(len(body), 4000, body)
 
 
