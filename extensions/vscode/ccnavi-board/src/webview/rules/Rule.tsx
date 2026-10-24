@@ -22,15 +22,15 @@ type TextKey = "id" | "match" | "pattern" | "every" | "additionalContextFile" | 
 type AreaKey = "message" | "additionalContext" | "additionalContextOnce";
 
 export interface RuleProps {
-  /** 画面の中だけの鍵（`state.ts`）。行を名指しするために `data-key` へ出す */
+  /** 画面の中だけのキー（`state.ts`）。行を名指しするために `data-key` へ出す */
   readonly ruleKey: string;
   readonly section: Section;
   readonly rule: RuleForm;
-  /** 絞り込みが当てる文字列（`data-find`）。当たらなければ `hidden` */
+  /** 絞り込みが適用する文字列（`data-find`）。ヒットしなければ `hidden` */
   readonly find: string;
   readonly hidden: boolean;
   readonly open: boolean;
-  /** 直前の判定で当たった行。折りたたんだままでも分かるように縁を付ける */
+  /** 直前の判定でヒットした行。折りたたんだままでも分かるように縁を付ける */
   readonly hit: boolean;
   /** ツールの選択肢が開いているか。開くのは画面ぜんたいで 1 つだけ */
   readonly pickerOpen: boolean;
@@ -180,7 +180,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 data-action="to-when"
                 data-tour={tour("to-when")}
                 disabled={blocker !== undefined}
-                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に変換する。除外は not の中へ移る"}
+                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に変換します。除外は not の中へ移ります"}
                 onClick={() => props.onChange(toWhen(rule))}
               >
                 組み合わせ条件に変換
@@ -198,7 +198,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 </div>
               ))}
               <span className="dim">
-                {rule.when !== undefined ? "組み合わせ条件に当たっても" : "パターンに当たっても"}、これに当たれば当たらない扱い。画面では編集しません。ルールファイルで直すか、
+                {rule.when !== undefined ? "組み合わせ条件にヒットしても" : "パターンにヒットしても"}、これにヒットすればヒットしない扱いになります。画面では編集できません。ルールファイルで直すか、
                 {rule.when !== undefined ? "組み合わせ条件の not に移してください" : "「組み合わせ条件に変換」で組み合わせ条件の中へ移してください"}
               </span>
             </div>
@@ -206,7 +206,7 @@ export function Rule(props: RuleProps): JSX.Element {
         )}
         {section === "deny" ? (
           <Captioned name="メッセージ" yamlKey="message" tour={tour("message")}>
-            {area("message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）")}
+            {area("message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届きます）")}
           </Captioned>
         ) : (
           rule.message !== "" && (
@@ -230,7 +230,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 type は text（number ではない）。数でない値を空にしてしまうと、読み込めない値を
                 見せて直させるという欄の目的が消える */}
             <Captioned name="every" yamlKey="every" tour={tour("every")}>
-              {text("every", "f-every", "5（空なら毎回渡す）")}
+              {text("every", "f-every", "5（空なら毎回渡します）")}
             </Captioned>
             <Captioned name="additionalContext" yamlKey="additionalContext" tour={tour("text")}>
               {area("additionalContext", "f-context", "ヒットしたときにモデルへ渡すプロンプト")}
@@ -275,11 +275,11 @@ function toWhen(rule: RuleForm): RuleForm {
 
 /**
  * ツールの選択肢。`match` はツール名を `|` で並べたもので、判定は名前をそのまま突き合わせるので
- * 打ち間違えると気づかないうちに当たらなくなる。書かせずに選ばせる。ファイルに書いてある知らない名前
+ * 打ち間違えると気づかないうちにヒットしなくなる。書かせずに選ばせる。ファイルに書いてある知らない名前
  * （MCP のツールなど）も、消さずにそのまま選択肢にして出す（開いただけで消えたように見えないように）。
  *
  * 一覧にない新しいツールは、欄に名前を打って足す。形は `isToolName` で確かめる。一覧にない名前は、
- * ccnavi がそのツールの対象を取り出せないため、判定には届かず当たらない（`lint` が warn で言う）。
+ * ccnavi がそのツールの対象を取り出せないため、判定には届かずヒットしない（`lint` が warn で言う）。
  */
 function Picker({
   rule,

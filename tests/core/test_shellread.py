@@ -331,7 +331,7 @@ class UnwrappedTest(unittest.TestCase):
                 self.assertEqual(self.layers(src), want)
 
     def test_途中の層も並ぶ(self):
-        # U1。承認のルールの `script` の枝は `sh …approve.sh` の層に当たる。外側から内側へ並ぶ。
+        # U1。承認のルールの `script` の枝は `sh …approve.sh` の層にヒットする。外側から内側へ並ぶ。
         cases = {
             "env sh .ccnavi/scripts/ccnavi-user-agree.sh": [
                 "sh .ccnavi/scripts/ccnavi-user-agree.sh",
@@ -591,7 +591,7 @@ class MovedTest(unittest.TestCase):
 
     def test_書かれた表記は動かさない(self):
         # ここが要。ルールは表記に固定して書かれているので、書かれた側に継ぎ足すと
-        # いま当たっているものが外れる（サブエージェントの禁止の `…ccnavi-ticket.sh start`、
+        # いまヒットしているものが外れる（サブエージェントの禁止の `…ccnavi-ticket.sh start`、
         # コマンドの頭に固定した組み込みの保護）。
         cases = {
             "cd .claude && echo x > settings.json": "cd .claude" + SEP + "echo x > settings.json",
@@ -602,7 +602,7 @@ class MovedTest(unittest.TestCase):
                 self.assertEqual(show(read(src).text), show(want))
 
     def test_コマンドの位置の語には継ぎ足さない(self):
-        # `rm` が `.ccnavi/rm` になると `(^|\x00)rm` が当たらなくなる。
+        # `rm` が `.ccnavi/rm` になると `(^|\x00)rm` がヒットしなくなる。
         for command in self.moved("cd .ccnavi && rm -rf common"):
             self.assertTrue(command.startswith("rm "), f"名前に継ぎ足した: {command!r}")
 
@@ -611,7 +611,7 @@ class MovedTest(unittest.TestCase):
             "echo x > .ccnavi/config/common/rules.yml",
             "ls -la",
             "rm -rf /tmp/x",
-            # `cd` 自身は書き込みではないので、当てる先に並べても止めるものが無い。
+            # `cd` 自身は書き込みではないので、適用する先に並べても止めるものが無い。
             "cd .claude",
             "cd .ccnavi && cd common",
             # 絶対パスの引数は継ぎ足す先が無い。
@@ -633,7 +633,7 @@ class MovedTest(unittest.TestCase):
                 "cd a && rm ../../x": "rm ../x",
                 # 絶対パスはそのまま。そこから先の行き先になる。
                 "cd /tmp && rm x": "rm /tmp/x",
-                # 末尾の区切りは残す（名前がそこで終わる形に当てる保護のため）。
+                # 末尾の区切りは残す（名前がそこで終わる形に適用する保護のため）。
                 "cd .claude && rm -rf hooks/": "rm -rf .claude/hooks/",
             }
         )
@@ -783,7 +783,7 @@ class MovedTest(unittest.TestCase):
         spent = time.monotonic() - started
 
         self.assertLess(spent, 1.0, f"{spent:.2f} 秒かかった")
-        self.assertLess(len(result.moved), 100_000, "当てる先が大きくなりすぎる")
+        self.assertLess(len(result.moved), 100_000, "適用する先が大きくなりすぎる")
         # 上限を越えたら継ぎ足さない。読み自体は今までどおり。
         self.assertFalse(result.degraded)
 

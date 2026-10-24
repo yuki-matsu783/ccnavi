@@ -17,7 +17,7 @@ import { listIssues, startIssue } from "../core/start.js";
 import { approveFamily, confirmPhase, type Outcome, type WriteDeps } from "../core/write.js";
 import type { PyWorker } from "./py-client.js";
 
-/** 親子のチケットごとの「要確認」（リポジトリの鍵 → 親のブランチ名 → 文面）。`chrome.storage.local` の `attention` */
+/** 親子のチケットごとの「要確認」（リポジトリのキー → 親のブランチ名 → 文面）。`chrome.storage.local` の `attention` */
 export type Attention = Record<string, Record<string, string>>;
 
 /** 読んだ issue の一覧（「始める」） */
@@ -345,7 +345,7 @@ export function createBoardController(env: BoardEnv): BoardController {
         try {
           got = { list: await ops.listIssues(repoBoard.repo, await writeDeps(repoBoard.repo)), error: "" };
         } catch (err) {
-          got = { list: null, error: `Issue一覧を取得できませんでした：${(err as Error).message ?? String(err)}` };
+          got = { list: null, error: `Issue 一覧を取得できませんでした：${(err as Error).message ?? String(err)}` };
         }
         set({ issues: new Map(snap.issues).set(key, got) });
         drawRepo(snap.boards.get(key) ?? repoBoard, await readAttention());

@@ -72,7 +72,7 @@ export function targetOption(kind: string, name: string, label: string): TargetO
 
 /**
  * `--templates --check-file` の答えの見本（リポジトリルートの `tests/fixtures/templates-check-json.json`）。`expect` が答えで、
- * plan 2 項（実装は設計を待つ）・feedback 1 項・全体計画の 2 番にフロー 1 本。
+ * plan 2 ステップ（実装に設計が先行する）・feedback 1 ステップ・全体計画の 2 番にフロー 1 本。
  */
 export const TEMPLATES_CHECK_FIXTURE_PATH = path.join(__dirname, "..", "..", "..", "..", "..", "..", "tests", "fixtures", "templates-check-json.json");
 

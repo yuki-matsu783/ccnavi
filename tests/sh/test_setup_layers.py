@@ -30,7 +30,7 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 HAS_JQ = shutil.which("jq") is not None
 HOME = ".ccnavi"
 
-# 配布元に置くひな形。導入スクリプトは中身を読まずに写すので、形だけ整えてある。
+# 配布元に置くひな形。導入スクリプトは中身を読まずにコピーするので、形だけ整えてある。
 COMMON_RISK = "version: 1\nlevels: {medium: 20, high: 40, critical: 70}\nfactors: {}\n"
 COMMON_PHASES = (
     "version: 1\nphases:\n  implement:\n    kind: work\n    title: 実装とテスト\n"
@@ -93,7 +93,7 @@ class SetupTest(unittest.TestCase):
         # セッションの開始で渡す作業の決まりと、使い方の文書も配るもの。
         write(os.path.join(src, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")
         write(os.path.join(src, ".ccnavi", "docs", "worktree.md"), "# ワークツリー\n")
-        # 承認の push の sh と、端末で承認する sh も配るもの。
+        # 承認の push の sh と、ターミナルで承認する sh も配るもの。
         # 無いと「まだ無いもの」に名前が出る。
         for name in (
             "ccnavi-ticket.sh",

@@ -2,7 +2,7 @@
 
 道具を外から動かす。実際の git リポジトリを一時ディレクトリに作り、そこを
 汚してから payload を渡し、返ってきた文と終了コードと記録だけを読む。
-作業ツリーの実物を見るのがこのチェックの要点なので、git を差し替えると、
+ワークツリーの実物を見るのがこのチェックの要点なので、git を差し替えると、
 テストが通ることとチェックが動くことが別の話になる。
 """
 
@@ -145,7 +145,7 @@ class Harness:
         }
         args = ["--mode", mode]
         if mode == "disable":
-            # disable だけはフラグから言えない。作業ツリーの中から来た disable は
+            # disable だけはフラグから言えない。ワークツリーの中から来た disable は
             # 名指しで無視される仕様なので、環境から渡す。
             environment["CCNAVI_MODE"] = "disable"
             args = []
@@ -290,7 +290,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 2, "中身が変わったことと消えたことは別の出来事")
         self.assertIn("gone", result.stderr)
 
-    def test_記録に変更したパスと当たったルールが残る(self):
+    def test_記録に変更したパスとヒットしたルールが残る(self):
         self.run_hook(command="ls")
         self.dirty()
         self.run_hook(command="python build.py")
@@ -391,7 +391,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
             self.assertEqual(f.read(), "committed\n")
 
     def test_受け入れたユーザの編集のうえにエージェントが書いたら言うが戻さない(self):
-        # 報告済みの記録の鍵は種類とパスだけ。指紋で見分けないと、受け入れたファイルへの
+        # 報告済みの記録のキーは種類とパスだけ。指紋で見分けないと、受け入れたファイルへの
         # 以降の書き込みが全部素通しになる。一方、戻す先のコミット済みの内容はユーザの編集より
         # 古いので、戻すとその編集まで消える。だから言うだけにする。
         self.run_hook(event="SessionStart", source="startup")
@@ -652,7 +652,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("protected/keep.txt", json.loads(result.stdout)["systemMessage"])
 
     def test_dry_run_でもターンの終わりには報告する(self):
-        # 見えたことを言うだけで、呼び出しにも作業ツリーにも手を出さない。
+        # 見えたことを言うだけで、呼び出しにもワークツリーにも手を出さない。
         self.run_hook(mode="dry-run", event="UserPromptSubmit")
         self.dirty()
 
@@ -662,7 +662,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
     # 見えないとき
 
-    def test_ツールが作業ツリーを変えようがないときは見ない(self):
+    def test_ツールがワークツリーを変えようがないときは見ない(self):
         self.run_hook(command="ls")
         self.dirty()
 
@@ -671,7 +671,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(self.records()[-1]["reason"], "tool-cannot-write")
 
-    def test_git_の作業ツリーでなければ何も言わずに通す(self):
+    def test_git_のワークツリーでなければ何も言わずに通す(self):
         outside = tempfile.mkdtemp(prefix="ccnavi-plain-")
         self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
         self.repo = outside
@@ -824,7 +824,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
     def integrate_and_finish(self):
         """`integrate` と `integrate-done` の後の形を作る。
 
-        squash のコミット、片付け（ブランチを消す）、記録の写し。
+        squash のコミット、片付け（ブランチを消す）、記録のコピー。
         """
         home = git(self.repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
         git(self.repo, "checkout", "--quiet", "-b", "feat")
@@ -868,7 +868,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("protected/later.txt", message)
         self.assertNotIn("protected/keep.txt", message, "取り込みの分は外す")
 
-    def test_記録の写しが無い取り込みのコミットは並べる(self):
+    def test_記録のコピーが無い取り込みのコミットは並べる(self):
         # 記録が無ければ squash と確かめられないので、今までどおり報告する。
         self.run_hook(event="UserPromptSubmit")
         self.integrate_and_finish()

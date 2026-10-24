@@ -1,4 +1,4 @@
-"""フェーズ定義の欄 `learning`（on / off）の読み方・写しの往復・同じ定義かの判定を見る。"""
+"""フェーズ定義の欄 `learning`（on / off）の読み方・コピーの往復・同じ定義かの判定を見る。"""
 
 from __future__ import annotations
 

@@ -3,7 +3,7 @@
  *
  * `ccnavi-review.sh decide <N> --preview` が残った指摘とダイジェストを見せ、
  * `ccnavi-user-decide.sh decide <N> --choices <JSON> --digest <ダイジェスト>` がユーザの選んだ行き先を置く。
- * 拡張は見せられた指摘をそのまま並べ、選んだ行き先を鍵ごとに返すだけ
+ * 拡張は見せられた指摘をそのまま並べ、選んだ行き先をキーごとに返すだけ
  * （マージリクエストを読むのは sh、判断するのは実行ファイル）。
  */
 
@@ -22,13 +22,13 @@ export const DECIDE_LABELS: Readonly<Record<DecideChoice, string>> = {
 };
 
 export interface DecideThread {
-  /** 選択を結ぶ鍵（URL か、無ければスレッドの id） */
+  /** 選択を結ぶキー（URL か、無ければスレッドの id） */
   readonly key: string;
   readonly url: string;
   readonly path: string;
   readonly line: number;
   readonly body: string;
-  /** 指摘の版（鍵と最初のコメントの本文から決まる）。画面は見せるだけで、解釈しない */
+  /** 指摘の版（キーと最初のコメントの本文から決まる）。画面は見せるだけで、解釈しない */
   readonly version: string;
   /** 最後のコメント（再提起を見分ける）。取れなければ空 */
   readonly last_comment: { readonly id: string; readonly at: string; readonly author: string };
@@ -51,7 +51,7 @@ export interface DecideResult {
   readonly phase: number;
   /** レビュー済みになったか（直す指摘も見せたあとに増えた指摘も無ければ真） */
   readonly reviewed: boolean;
-  /** 見せたあとに追加された指摘（今回の判断の対象外。未対応として残る）の鍵 */
+  /** 見せたあとに追加された指摘（今回の判断の対象外。未対応として残る）のキー */
   readonly pending_extra: readonly string[];
   /** 起こした続きの子の識別子。起こしていなければ空 */
   readonly followup: string;
@@ -87,14 +87,14 @@ export interface DecideExpect {
  * 「指摘を読み取れなかった」として扱う（呼び手は確定のボタンを出さない）。「未解決は 0 件」と読み間違えると、
  * 指摘が残っているフェーズを「レビュー済みにする」と見せてしまうため。
  *
- * - JSON でない、最上位が辞書でない、`version` が想定外
+ * - JSON でない、最上位がマップでない、`version` が想定外
  * - `parent` が文字列でない、または頼んだものと違う
  * - `phase` が整数でない、または頼んだものと違う
  * - `mr.number` が整数でない、または頼んだ MR の番号（分かるとき）と違う
  * - `digest` が無い、文字列でない、`v2.` で始まらない
  * - `threads` が無い、または配列でない
- * - スレッドの要素が辞書でない、`key` が空・文字列でない・重複している、`body`・`url`・`path` が文字列でない、`line` が整数でない
- *   （不正な要素は捨てずに、全体をエラーにする）
+ * - スレッドの要素がマップでない、`key` が空・文字列でない・重複している、`body`・`url`・`path` が文字列でない、`line` が整数でない
+ *   （不正な要素は破棄せずに、全体をエラーにする）
  *
  * URL が http(s) でないことはエラーにしない（画面がリンクにしないだけ）。
  * `expect` を渡さなければ、頼んだものとの照合だけを省く（型の検査はする）
@@ -239,7 +239,7 @@ function parseTop(text: string): Top {
 function thread(item: unknown, index: number): DecideThread | string {
   const at = `threads[${index}]`;
   if (!isRecord(item)) {
-    return `${at} が辞書ではありません`;
+    return `${at} がマップではありません`;
   }
   if (typeof item.key !== "string" || item.key === "") {
     return `${at} の key が空か、文字列ではありません`;

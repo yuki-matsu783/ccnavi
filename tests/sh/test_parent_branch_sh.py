@@ -54,7 +54,7 @@ APPROVED = ".ccnavi/approved"
 TODO = "wip/proposals/todo"
 
 # 実行ファイルの代わり。このツリーのソースを起こす。`user` の入口は、ラッパーのオプション
-# （--root など）の後の最初の語なので、端末要求を切るオプションは `user` の呼び出しでは
+# （--root など）の後の最初の語なので、ターミナル要求を切るオプションは `user` の呼び出しでは
 # 後ろに付ける。
 EXE = """#!/bin/sh
 skip=""; first=""
@@ -405,7 +405,7 @@ class ParentBranchShTest(unittest.TestCase):
         self.add_parent_tree()
         self.write_approved_copy("origin/main")
         lint = self.exe("--lint")
-        self.assertIn("`branch` は使えない欄", lint.stdout)
+        self.assertIn("`branch` は指定できない欄", lint.stdout)
 
     # ---- HEAD が合わない
 
@@ -453,7 +453,7 @@ class ParentBranchShTest(unittest.TestCase):
         synced = self.sh("ccnavi-sync.sh", PARENT)
         self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
         self.assertIn("戻し方 1", synced.stdout)
-        # ユーザが端末で、生の git で元の名前に戻す。
+        # ユーザがターミナルで、生の git で元の名前に戻す。
         git(self.tree, "push", "-q", "origin", BRANCH)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))

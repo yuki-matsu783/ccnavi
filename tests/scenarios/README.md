@@ -16,7 +16,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 
 | 層 | 機能 | 主な要件 | 中心とみなす理由 |
 |---|---|---|---|
-| 1 | ツール実行前のガード: ルールに当てて拒否・確認・許可を返し、止めた理由と代わりの手を返す | REQ-PRE, REQ-HNT, REQ-RUL | 他の機能は、この判定を前提に積んである。止まらなければ何も守れない |
+| 1 | ツール実行前のガード: ルールに適用して拒否・確認・許可を返し、止めた理由と代わりの手を返す | REQ-PRE, REQ-HNT, REQ-RUL | 他の機能は、この判定を前提に積んである。止まらなければ何も守れない |
 | 2 | 自己防衛と作業の入口: ルール・hook・承認済みチケットの書き換え防止。ワークツリーと `ccnavi-git.sh` の入口。直接作業の取り込み | REQ-SLF, REQ-PRE-05 | ガードが外されると層 1 が意味を失う。エージェントが毎日通る道でもある |
 | 3 | チケット作業: 提案 → 承認 → 着手 → 範囲の判定 → 完了 → レビュー | REQ-APV, REQ-TKT, REQ-RSK | 「それ以外は作業チケットに委譲する」側。権限を作業ごとに絞る |
 | 4 | 見守り: 実行後チェック、ターンの終わりの促し、セッション開始の提示 | REQ-PST, REQ-PRE-17・18, REQ-SES | ガードをすり抜けた変更の検知と、決まった道へ戻す |
@@ -64,7 +64,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
   - `tool`: ツール名（`Bash`・`Edit` など）
   - `decision`: `deny` / `ask` / `allow` / `handover`（ルールが言及せず権限モードに委ねた）/ `skip`
   - `code`: `DENY_PATH` / `DENY_COMMAND_PATTERN` / `DENY_COMMAND_NAME_EXPANSION` / `UNDECLARED` など
-  - `rules`: 当たったルールの id の配列。シナリオでは `rules_include` で「含む」を比べる
+  - `rules`: ヒットしたルールの id の配列。シナリオでは `rules_include` で「含む」を比べる
   - `hinted`: その呼び出しで `additionalContextOnce` の案内を渡したとき true（付かない行は false 扱い）。シナリオでは `hinted: true` / `hinted: false` で比べる
   - `subject`: 対象のパスかコマンド。シナリオでは `subject_contains` で「含む」を比べる
 - シナリオは普段のワークスペースルートで回す。ccnavi 本体にはブランチ・コミット・MR・issue を作らず、そういう作業は `projects/test-repo` で行う

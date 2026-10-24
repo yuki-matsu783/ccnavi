@@ -5,7 +5,7 @@
 承認済みチケットとルールからの再計算。REQ-SES-03（上限を超えた許可を区別して示す）は作らない
 ので、ここでは見ない。見るのは 7 つ。
 
-1. 項がルールの deny に当たる: 書かれた glob・deny の message・ルールの id が出る
+1. 項がルールの deny にヒットする: 書かれた glob・deny の message・ルールの id が出る
    （allow と ask の両方）
 2. 子の項が親の範囲を超える: 出所は「親 <親>」。
    フェーズ定義の上限を超える: 出所は「フェーズ定義 <名前>」
@@ -95,16 +95,16 @@ class SessionRejectsTest(PhaseHarness):
         self.start_parent(name)
 
     def reject_by_deny(self):
-        """親の項が deny に当たる状態。"""
+        """親の項が deny にヒットする状態。"""
         self.approved_parent(("src/*", "wip/*", SECRET))
 
     def shown(self, cwd=None):
         _, system, context = self.session(cwd)
         return system, context
 
-    # ---- 1. deny に当たる
+    # ---- 1. deny にヒットする
 
-    def test_denyに当たる項は要求と理由と出所が出る(self):
+    def test_denyにヒットする項は要求と理由と出所が出る(self):
         self.reject_by_deny()
 
         system, context = self.shown()
@@ -115,7 +115,7 @@ class SessionRejectsTest(PhaseHarness):
             self.assertIn(MESSAGE, text)  # 理由（deny の message）
             self.assertIn("no-secret", text)  # 出所（ルールの id）
 
-    def test_askの項がdenyに当たるときも出る(self):
+    def test_askの項がdenyにヒットするときも出る(self):
         self.propose("i0001", with_ask(parent_text("i0001", ["research", "design"]), SECRET))
         self.commit_parent()
         self.approve_all("i0001")
@@ -243,7 +243,7 @@ class SessionRejectsTest(PhaseHarness):
         self.assertEqual(code, 0)
         self.assertTrue(system and context, "systemMessage と additionalContext の両方に出す")
 
-    def test_案内を出してもdenyに当たる書き込みは止まる(self):
+    def test_案内を出してもdenyにヒットする書き込みは止まる(self):
         self.reject_by_deny()
         self.session()
 

@@ -85,7 +85,7 @@ CHROME="extensions/chrome/ccnavi-approval"
 # VS Code 拡張は、shared を読む画面のグループを test-groups.js が import（@ccnavi/shared/...）を辿って決める。
 # Chrome 拡張は、設定画面とボードの style.css が @ccnavi/shared/styles/*.css を @import し、
 # scripts/build.js がバンドルするので、ファイル名の変更や削除でビルドが壊れる
-# sed は 1 行に s を続けて当てると、前の s が書き換えた行を次の s が読む。shared は 2 つの拡張へ振るので、
+# sed は 1 行に s を続けて適用すると、前の s が書き換えた行を次の s が読む。shared は 2 つの拡張へ振るので、
 # 元の行を 2 度読む。sed を 2 回に分ける
 {
 	sed -n \

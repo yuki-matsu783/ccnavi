@@ -1,6 +1,6 @@
 # テンプレート管理画面の案内。`sample:` は案内の間だけ画面に出す見本（実際のテンプレートではない）。
 #   path       見本の層の置き場（画面には「（見本）」を付けて出す）
-#   templates  見本の層（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（捨てた理由。あれば「使われない」）・text（本文）
+#   templates  見本の層（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（破棄した理由。あれば「使われない」）・text（本文）
 #   drafts     見本の下書き。name・description・problems・plan・feedback・flows
 #   sums       「統合結果」の見本。実行ファイルが出す索引の形（共通の設定 + 1 つの設定の和）
 # `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
@@ -124,7 +124,7 @@ diagrams:
       - id: write
         from: ccnavi
         to: wip/handoff/
-        text: 親の計画と子のフローを、取り込み先と同じ相対パスに写す
+        text: 親の計画と子のフローを、取り込み先と同じ相対パスにコピーする
         value: wip/handoff/.ccnavi/config/project/templates/login.yml
       - id: todo
         from: ccnavi
@@ -184,7 +184,7 @@ diagrams:
       - id: list
         from: エージェント
         to: ccnavi
-        text: 使えるテンプレートを探す
+        text: 利用できるテンプレートを探す
         value: ccnavi --templates --keyword 機能
       - id: found
         from: ccnavi
@@ -202,7 +202,7 @@ diagrams:
       - id: read
         from: ccnavi
         to: templates/
-        text: 名前で引く。捨てられた・error がある・種類が phases.yml に無いときは、何も書かずに止まる
+        text: 名前で引く。破棄された・error がある・種類が phases.yml に無いときは、何も書かずに止まる
         value: .ccnavi/config/project/templates/feature.yml
       - id: write
         from: ccnavi
@@ -210,13 +210,13 @@ diagrams:
         text: 親の提案と、子のフローの下書きを書く
         value: |-
           wip/proposals/todo/signup.md
-          plan（2 項）: 1 design / 2 implement（待つ 1）
+          plan（2 ステップ）: 1 design / 2 implement（先行 1）
           wip/proposals/flows/signup-<NN>-01.yml（フローの下書き）
       - id: skip
         from: ccnavi
         to: エージェント
         text: フィードバック計画は書かず、あることだけ知らせる
-        value: テンプレートにはフィードバック計画（1 項）がある。…`--with-feedback` を付けて作り直すか、提案を改版で追加します。
+        value: テンプレートにはフィードバック計画（1 ステップ）がある。…`--with-feedback` を付けて作り直すか、提案を改版で追加します。
       - id: approve
         from: エージェント
         text: 提案は通常どおり承認を通る。フローの下書きは、ユーザがフロー編集画面で取り込むまで子に渡らない
@@ -235,11 +235,11 @@ diagrams:
         to: wip/proposals/
         text: 全体計画に続けて、フィードバック計画も書く
         value: |-
-          plan（2 項）: 1 design / 2 implement（待つ 1）
-          feedback（1 項）: 3 fix
+          plan（2 ステップ）: 1 design / 2 implement（先行 1）
+          feedback（1 ステップ）: 3 fix
       - id: number
         from: ccnavi
-        text: フィードバック計画の番号は、全体計画の続きになる（2 項のあとなので 3）
+        text: フィードバック計画の番号は、全体計画の続きになる（2 ステップのあとなので 3）
 
 courses:
   - id: intro
@@ -248,7 +248,7 @@ courses:
     steps:
       - target: summary
         title: 件数と検査の結果
-        body: テンプレートと下書きの数、そして検査の error・warn・info の数が出ます。error があるテンプレートは使えません。
+        body: テンプレートと下書きの数、そして検査の error・warn・info の数が出ます。error があるテンプレートは無効になります。
         scene: {}
       - target: target
         title: 対象を切り替える
@@ -256,7 +256,7 @@ courses:
         scene: {}
       - target: list
         title: テンプレートの一覧
-        body: 選んだ層のテンプレートが並びます。各テンプレートに、使用可否を示すラベルや、適用対象から除外された理由が表示されます。捨てた理由は、同じ中身があるか、読み込めないかなどです。
+        body: 選んだ層のテンプレートが並びます。各テンプレートに、有効・無効を示すラベルや、適用対象から除外された理由が表示されます。破棄した理由は、同じ中身があるか、読み込めないかなどです。
         scene: {}
       - target: template
         title: 1 件を開く
@@ -266,7 +266,7 @@ courses:
           body: true
       - target: sum
         title: 統合結果
-        body: 実際に使われるのは、共通の設定と選んだ層の和です。枠を開くと、どの名前がどの層から使われ、どれが捨てられたかの一覧が出ます。読み取り専用で、中身は上の一覧で読みます。
+        body: 実際に使われるのは、共通の設定と選んだ層の和です。枠を開くと、どの名前がどの層から使われ、どれが破棄されたかの一覧が出ます。読み取り専用で、中身は上の一覧で読みます。
         scene:
           sum: self
       - target: drafts
@@ -334,26 +334,26 @@ courses:
     summary: テンプレートがいつ、どう引かれて、提案に何が書かれるか。値の例つきの図で見る
     steps:
       - target: list
-        title: 使えるテンプレートを探す
+        title: 利用できるテンプレートを探す
         body: エージェントは ccnavi --templates で、共通の設定と自分の層の和を引きます。この画面の一覧と統合結果と同じ答えです。名前・説明・使う場面で絞れます。
         scene: {}
         diagram: template-propose
         focus: list,found
       - target: template
         title: 使う場面は when に書く
-        body: 「新しい機能を追加するとき」のように、when に書いた場面でテンプレートを選びます。使えるのは、統合結果で使われていて、error の無いものだけです。
+        body: 「新しい機能を追加するとき」のように、when に書いた場面でテンプレートを選びます。利用できるのは、統合結果で使われていて、error の無いものだけです。
         scene: { open: feature }
         diagram: template-propose
         focus: found
       - target: template
         title: テンプレートを指して提案を始める
-        body: ccnavi ticket new に --template と名前を渡すと、親の提案を始められます。捨てられたテンプレートや、error のあるテンプレート、phases.yml に無い種類を含むテンプレートでは、何も書かずに止まります。
+        body: ccnavi ticket new に --template と名前を渡すと、親の提案を始められます。破棄されたテンプレートや、error のあるテンプレート、phases.yml に無い種類を含むテンプレートでは、何も書かずに止まります。
         scene: { open: feature }
         diagram: template-propose
         focus: new,read
       - target: template
         title: 計画と子のフローの下書きが書かれる
-        body: 全体計画（plan）はテンプレートから写し、待つ項の番号は提案の番号に付け直されます。子のフローは下書きとして書かれ、ユーザがフロー編集画面で取り込むまで効きません。
+        body: 全体計画（plan）はテンプレートからコピーし、先行ステップの番号は提案の番号に付け直されます。子のフローは下書きとして書かれ、ユーザがフロー編集画面で取り込むまで効きません。
         scene: { open: feature }
         diagram: template-propose
         focus: write
@@ -370,14 +370,14 @@ courses:
         diagram: template-propose-feedback
         focus: write,number
       - target: sum
-        title: 捨てられたものは引けない
-        body: 統合結果で捨てられたテンプレートは使われません。引けるかどうかは、表の「捨てた理由」で確かめます。
+        title: 破棄されたものは引けない
+        body: 統合結果で破棄されたテンプレートは使われません。引けるかどうかは、表の「破棄した理由」で確かめます。
         scene:
           sum: self
 
   - id: read-sum
     title: 統合結果を確認するとき
-    summary: どの名前が使われ、どれが捨てられたかを見る
+    summary: どの名前が使われ、どれが破棄されたかを見る
     steps:
       - target: sum
         title: 統合結果の枠
@@ -395,8 +395,8 @@ courses:
         scene:
           sum: self
       - target: sum-table
-        title: 由来と捨てた理由
-        body: 名前ごとに、どの層のものか、使われるか、捨てられたときの理由が出ます。同じ名前で中身が違うと、共通の側が使われます。
+        title: 由来と破棄した理由
+        body: 名前ごとに、どの層のものか、使われるか、破棄されたときの理由が出ます。同じ名前で中身が違うと、共通の側が使われます。
         scene:
           sum: self
 

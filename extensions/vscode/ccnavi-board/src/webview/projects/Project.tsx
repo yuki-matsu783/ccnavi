@@ -88,7 +88,7 @@ export function Project({ row, ticketsEnabled, tour = false, mirror, act }: Proj
         </div>
         {mirror !== undefined && act !== undefined && (
           <div className="field wide mirror">
-            <dt>ミラー（共通レイヤーの写し）</dt>
+            <dt>ミラー（共通レイヤーのコピー）</dt>
             <dd>
               <MirrorField mirror={mirror} name={row.name} act={act} />
             </dd>

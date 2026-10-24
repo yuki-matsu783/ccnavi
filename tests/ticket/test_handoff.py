@@ -2,8 +2,9 @@
 
 見るのは次のとおり。
 
-1. 取り込み先の表（許可リスト）: 表に当たる下書きだけが対象になり、当たらないものは対象外として
-   件数だけを数える。パスは全要素を NFC と fold にそろえてから当てる。表と docs が食い違わない
+1. 取り込み先の表（許可リスト）: 表にヒットする下書きだけが対象になり、
+ヒットしないものは対象外として
+   件数だけを数える。パスは全要素を NFC と fold にそろえてから適用する。表と docs が食い違わない
 2. 断る形: リンク（途中も）・ふつうのファイルでない・ハードリンク・`.git` で始まる要素・
    同じ取り込み先に落ちる 2 本・バイナリ・新規作成を許さない種類・引数の絶対パスと `..`
 3. `--expect`: 定義どおりの値。下書き・取り込み先・`.orig` のどれが変わっても値が変わり、
@@ -12,7 +13,8 @@
 5. 差分の見え方: CRLF・BOM・末尾の改行・ゼロ幅の文字を見える形にする。見えない違いは断る
 6. 書き込み: 一時ファイル → fsync → 差し替え。書く直前の確かめ直し。途中で失敗したら元に戻す。
    下書きと `.orig` は、取り込んだものと同じときだけ消す
-7. 経路: 書くには端末か `--via board`（`--expect` と `--json` が要る）。`defense` はボードから断る
+7. 経路: 書くにはターミナルか `--via board`（`--expect` と `--json` が要る）。
+`defense` はボードから断る
 8. 中身の検査: レイヤーの設定は `--lint` と同じ関数で、同じ回の対象を取り込んだあとの状態で見る。
    テンプレートの検査、`defense` の `.sh` と `settings*.json`
 9. `ready` の止め: 取り込んでいない下書きが残っていれば止める
@@ -86,7 +88,7 @@ class HandoffCase(unittest.TestCase):
         return os.path.join(self.root, "wip", "handoff", *rel.split("/"))
 
     def stage(self, rel: str, data: bytes | None = None) -> str:
-        """`ccnavi-stage.sh` と同じく、元を下書きと `.orig` に写し、下書きを `data` にする。"""
+        """`ccnavi-stage.sh` と同じく、元を下書きと `.orig` にコピーし、下書きを `data` にする。"""
         current = slurp(self.target(rel)) if os.path.exists(self.target(rel)) else None
         path = self.draft_path(rel)
         if current is not None:
@@ -139,7 +141,7 @@ class AllowListTest(HandoffCase):
             ("projects/lib/.ccnavi/config/project/risks.yml", handoff.KIND_LAYER_CONFIG),
             (".ccnavi/docs/a/b.md", handoff.KIND_DOCS),
             (".ccnavi/CCNAVI.md", handoff.KIND_DOCS),
-            # スキルの frontmatter は権限や hook を持てるので、防御として端末でだけ取り込む。
+            # スキルの frontmatter は権限や hook を持てるので、防御としてターミナルでだけ取り込む。
             (".claude/skills/x/SKILL.md", handoff.KIND_DEFENSE),
             (".ccnavi/scripts/ccnavi-git.sh", handoff.KIND_DEFENSE),
             (".claude/hooks/lint-py.sh", handoff.KIND_DEFENSE),
@@ -649,7 +651,7 @@ class RouteTest(HandoffCase):
         answer = json.loads(result.stdout)
         self.assertFalse(answer["ok"])
         self.assertIn("defense", answer["error"])
-        self.assertIn("端末", answer["error"])
+        self.assertIn("ターミナル", answer["error"])
         self.assertEqual(slurp(self.target(SCRIPT)), b"#!/bin/sh\necho old\n")
 
     def test_the_board_route_needs_expect_and_json(self):
@@ -710,8 +712,8 @@ class BrokenRulesRepairTest(HandoffCase):
     """共通の rules.yml が読めない間の修復。
 
     エージェントは直接直せず（`builtin:guard-ccnavi-config` が Write / Edit を止める）、
-    `wip/handoff/` に下書きを置いて、ユーザが端末の `ccnavi user handoff` で取り込む。
-    今の中身が読めない rules.yml の取り込みは、確かめられないので端末に限る。"""
+    `wip/handoff/` に下書きを置いて、ユーザがターミナルの `ccnavi user handoff` で取り込む。
+    今の中身が読めない rules.yml の取り込みは、確かめられないのでターミナルに限る。"""
 
     RULES_REL = ".ccnavi/config/common/rules.yml"
 
@@ -733,7 +735,7 @@ class BrokenRulesRepairTest(HandoffCase):
             "--yes", "--expect", expect, "--via", "board", "--json", guard="enable"
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("端末", json.loads(result.stdout)["error"])
+        self.assertIn("ターミナル", json.loads(result.stdout)["error"])
         self.assertEqual(slurp(self.target(self.RULES_REL)), self.broken)
 
     def test_the_terminal_takes_it(self):
@@ -745,7 +747,7 @@ class BrokenRulesRepairTest(HandoffCase):
 
 class BoardDefenseRulesTest(HandoffCase):
     """`rules.yml` の取り込みのうち、防御の記述（`guard-*` と今ある deny）を動かすものは
-    端末に限る。"""
+    ターミナルに限る。"""
 
     RULES_REL = ".ccnavi/config/common/rules.yml"
 
@@ -774,9 +776,9 @@ class BoardDefenseRulesTest(HandoffCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         answer = json.loads(result.stdout)
         self.assertIn("防御の記述", answer["error"])
-        self.assertIn("端末", answer["error"])
+        self.assertIn("ターミナル", answer["error"])
         self.assertEqual(slurp(self.target(self.RULES_REL)), before)
-        # 端末の前のユーザなら取り込める。
+        # ターミナルの前のユーザなら取り込める。
         self.assertEqual(self.take().returncode, 0)
 
     def test_changing_the_except_of_a_guard_rule_is_terminal_only(self):
@@ -820,7 +822,7 @@ class BoardDefenseRulesTest(HandoffCase):
         rules["deny"] = rules["deny"][:1]
         self.stage(self.RULES_REL, json.dumps(rules).encode())
         result = self.run_handoff()
-        self.assertIn("端末のみ", result.stdout)
+        self.assertIn("ターミナルのみ", result.stdout)
         self.assertIn("keep-out", result.stdout)
 
     def test_a_skill_is_defense_and_refused_from_the_board(self):

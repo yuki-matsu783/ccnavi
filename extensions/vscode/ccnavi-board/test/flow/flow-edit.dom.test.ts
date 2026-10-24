@@ -348,7 +348,7 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
     const asked = checksAsked(dom);
     assert.equal(asked.length, 1);
     assert.equal(asked[0].doc.nodes.length, 3);
-    // 古い番号の答えは捨てる
+    // 古い番号の答えは破棄する
     await dom.send({ type: "checked", seq: asked[0].seq - 1, checks: { warns: ["古い"], rendered: [] } });
     assert.equal(dom.all("#flow-preview-checking").length, 1);
     assert.doesNotMatch(dom.one("#flow-notices").textContent ?? "", /古い/);

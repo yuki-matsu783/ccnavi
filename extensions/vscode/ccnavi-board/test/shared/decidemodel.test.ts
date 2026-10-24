@@ -65,7 +65,7 @@ test("CB-T206 残った指摘の一覧を読む。正しく読めたものは版
   assert.ok(odd.ok && odd.value.threads[0].url === "javascript:alert(1)");
 });
 
-test("CB-T206b 読み取りの検証: JSON でない・最上位が辞書でない・版が違うものは、件数を出さずにエラーにする", () => {
+test("CB-T206b 読み取りの検証: JSON でない・最上位がマップでない・版が違うものは、件数を出さずにエラーにする", () => {
   assert.match(errorOf("not json"), /JSON として解釈できません/);
   assert.match(errorOf(""), /JSON として解釈できません/);
   assert.match(errorOf("[]"), /最上位がオブジェクトではありません/);
@@ -101,14 +101,14 @@ test("CB-T206d 読み取りの検証: digest は無い・文字列でない・v2
   assert.ok(parseDecidePreview(previewJson({ digest: "v2.任意/の+文字列=" }), ASKED).ok);
 });
 
-test("CB-T206e 読み取りの検証: threads は無い・配列でないとエラー。要素が不正なら捨てずに全体をエラーにする（0 件と読み間違えない）", () => {
+test("CB-T206e 読み取りの検証: threads は無い・配列でないとエラー。要素が不正なら破棄せずに全体をエラーにする（0 件と読み間違えない）", () => {
   assert.match(errorOf(previewJson({ threads: undefined })), /threads が配列ではありません/);
   assert.match(errorOf(previewJson({ threads: {} })), /threads が配列ではありません/);
   assert.match(errorOf(previewJson({ threads: null })), /threads が配列ではありません/);
   const bad = (t: unknown) => errorOf(previewJson({ threads: [thread({ key: "ok" }), t] }));
-  assert.match(bad("x"), /threads\[1\] が辞書ではありません/);
-  assert.match(bad(null), /threads\[1\] が辞書ではありません/);
-  assert.match(bad([]), /threads\[1\] が辞書ではありません/);
+  assert.match(bad("x"), /threads\[1\] がマップではありません/);
+  assert.match(bad(null), /threads\[1\] がマップではありません/);
+  assert.match(bad([]), /threads\[1\] がマップではありません/);
   assert.match(bad(thread({ key: "" })), /threads\[1\] の key が空か、文字列ではありません/);
   assert.match(bad(thread({ key: 5 })), /key が空か、文字列ではありません/);
   assert.match(bad(thread({ key: undefined })), /key が空か、文字列ではありません/);

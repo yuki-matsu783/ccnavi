@@ -19,7 +19,7 @@ RULES = {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
             "glob": "*/.ccnavi/*",
-            # 守る場所の写しを置く wip/handoff/ の中は、本物のルールと同じく除く
+            # 守る場所のコピーを置く wip/handoff/ の中は、本物のルールと同じく除く
             "except": [{"regex": r"[\\/]wip[\\/]handoff[\\/]"}],
             "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。",
         }
@@ -72,11 +72,13 @@ phases:
 
 
 def plan_item_lines(items, start=1) -> list[str]:
-    """計画の項を YAML の行にする。`start` はその計画の最初の番号（フィードバック計画は続き）。
+    """計画のステップを YAML の行にする。
 
-    項は定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
-    `after` を書かない項は、すぐ前の項を待つ（一直線）。最初の項は何も待たない。
-    並行にしたい見本は辞書で `after` を明記する（`[]` なら何も待たない）。
+    `start` はその計画の最初の番号（フィードバック計画は続き）。
+
+    ステップは定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
+    `after` を書かないステップは、すぐ前のステップが先行する（一直線）。最初のステップは先行なし。
+    並行にしたい見本はマップで `after` を明記する（`[]` なら先行なし）。
     """
     lines = []
     for i, item in enumerate(items):
@@ -103,8 +105,8 @@ def parent_text(
 ):
     """親の提案の本文。
 
-    `copy` は計画が使う定義を写す元の `phases.yml`（None なら `phases:` を書かない）。
-    計画を持つ親は、計画が使う定義の写し（`phases:`）を持つ。`phases.yml` を書き換えるテストは、
+    `copy` は計画が使う定義をコピーする元の `phases.yml`（None なら `phases:` を書かない）。
+    計画を持つ親は、計画が使う定義のコピー（`phases:`）を持つ。`phases.yml` を書き換えるテストは、
     同じ本文を `copy` に渡す。
     """
     text = _parent_text(name, plan, feedback, allow, issue)
@@ -168,7 +170,7 @@ def load_chrome():
 
 
 # `plan` を持たない親は `ticket start` が止まるので、計画の中身を問わないテストの親は
-# この最小の計画（`work` の項を並べただけ。項は互いに待たない）を持つ。
+# この最小の計画（`work` のステップを並べただけ。ステップは互いに先行しない）を持つ。
 PLAIN_PHASES = """
 version: 1
 phases:
@@ -186,9 +188,12 @@ phases:
 
 
 def plain_plan_lines(plan=1) -> list[str]:
-    """`plan:` の行。`plan` は `work` の項の数か定義名の並び。最後の項だけが前の全部を待つ。"""
+    """`plan:` の行。`plan` は `work` のステップの数か定義名の並び。
+
+    最後のステップだけに前の全部が先行する。
+    """
     names = ["work"] * plan if isinstance(plan, int) else list(plan)
-    # 終端は 1 つ（最後の項がほかの全部を待つ）にしないと承認が通らない。
+    # 終端は 1 つ（最後のステップにほかの全部が先行する）にしないと承認が通らない。
     last = len(names)
     return ["plan:"] + [
         f"  - {{type: {n}, after: [{', '.join(str(k) for k in range(1, last))}]}}"
@@ -199,7 +204,8 @@ def plain_plan_lines(plan=1) -> list[str]:
 
 
 def plain_parent(text: str, plan=1) -> str:
-    """計画を持たない親の本文に、最小の計画（`work` を `plan` 個、または定義名の並び）と写しを足す。
+    """計画を持たない親の本文に、最小の計画（`work` を `plan` 個、
+    または定義名の並び）とコピーを足す。
 
     `plan` が 0 か空なら、子（`parent:` を持つ）と、すでに `plan:` がある本文と同じくそのまま返す。
     """
@@ -212,7 +218,8 @@ def plain_parent(text: str, plan=1) -> str:
 
 
 def write_plain_phases(root: str) -> str:
-    """`PLAIN_PHASES` をそのルートの config の `phases.yml` に書く（親の承認が写しを確かめる）。"""
+    """`PLAIN_PHASES` をそのルートの config の `phases.yml` に書く
+    （親の承認がコピーを確かめる）。"""
     path = config_path(root, "phases")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:

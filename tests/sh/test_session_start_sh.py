@@ -1,4 +1,5 @@
-"""ccnavi-session-start.sh と ccnavi-dirs.sh の受入テスト。使い捨ての木に sh を写して外から呼ぶ。
+"""ccnavi-session-start.sh と ccnavi-dirs.sh の受入テスト。
+使い捨ての木に sh をコピーして外から呼ぶ。
 
 見るのは次の 4 つ。
 

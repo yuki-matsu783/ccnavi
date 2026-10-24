@@ -94,7 +94,7 @@
    "tool": "Bash",
    "subject": "git push --force",
    "resolved_subject": "git push --force",
-   "why": "食い違いの期待する判定。deny に当たるので allow の期待とずれる",
+   "why": "食い違いの期待する判定。deny にヒットするので allow の期待とずれる",
    "known": true,
    "verdict": "deny",
    "code": "DENY_COMMAND_PATTERN",

@@ -45,13 +45,13 @@ GIT_TIMEOUT_SECONDS = 10.0
 TMP_PREFIX = "ccnavi-index-"
 TMP_SUFFIX = ".tmp"
 TMP_STALE_SECONDS = 10 * 60
-# 作業ツリーの側に置く一時ファイルのディレクトリの名前（`.git` が別のファイルシステムのとき）。
+# ワークツリーの側に置く一時ファイルのディレクトリの名前（`.git` が別のファイルシステムのとき）。
 # 中の `ccnavi-index.jsonl` は `**/ccnavi-index.jsonl` で無視される。
 LOCAL_TMP_PREFIX = ".ccnavi-tmp-"
 # frontmatter と索引の行の入れ子の深さの上限。`--format json` の字下げは再帰で書くので、
 # これより深いものは書けないものとして扱う。
 MAX_DEPTH = 32
-# 索引の 1 行が持つ鍵。
+# 索引の 1 行が持つキー。
 ROW_KEYS = ("concept_id", "directory", "frontmatter", "mtime")
 # ルート直下のファイルの `directory`（参考と同じ）。
 ROOT_DIRECTORY = "."
@@ -83,7 +83,7 @@ class Built:
     problems: list[str] = field(default_factory=list)
     # md を持つディレクトリの ccnavi-index.jsonl がどれも無視されていない（索引の対象外）。
     unignored: bool = False
-    # md を持ち、索引の対象になるツリーだった（打ち切りで rows が空でも、引けば当たるもの）。
+    # md を持ち、索引の対象になるツリーだった（打ち切りで rows が空でも、引けばヒットするもの）。
     indexable: bool = False
     # 期限を過ぎて、読み直しの要る md を読み残した。
     timed_out: bool = False
@@ -381,7 +381,7 @@ def _write_atomic(path: str, text: str, temporary: str) -> None:
 
 
 def _sweep_beside(parent: str) -> None:
-    """作業ツリーの側に残った古い一時ディレクトリを消す。
+    """ワークツリーの側に残った古い一時ディレクトリを消す。
 
     消すのは名前が LOCAL_TMP_PREFIX で始まり、リンクでないディレクトリで、古く、中身が
     ふつうのファイルの `ccnavi-index.jsonl` だけ（か空）のものに限る。
@@ -417,8 +417,8 @@ def _sweep_beside(parent: str) -> None:
 class _Writer:
     """ccnavi-index.jsonl を置き換える。一時ファイルはふだん git のディレクトリに作る。
 
-    `.git` が作業ツリーと別のファイルシステムにあると `os.replace` が EXDEV で失敗するので、
-    そのときは作業ツリーの同じディレクトリの下に
+    `.git` がワークツリーと別のファイルシステムにあると `os.replace` が EXDEV で失敗するので、
+    そのときはワークツリーの同じディレクトリの下に
     `.ccnavi-tmp-*/ccnavi-index.jsonl` を作って置き換える。
     そのパスが git に無視されることを先に確かめ、`git status` を汚さない。
     """
@@ -504,7 +504,7 @@ def build(
     parse: bool = True,
     kept_dirs: tuple[str, ...] = (),
 ) -> Built:
-    """1 つの git の作業ツリー（base）の md の索引を組み、無視されている索引を差分で書く。
+    """1 つの git のワークツリー（base）の md の索引を組み、無視されている索引を差分で書く。
 
     md を持つディレクトリの `ccnavi-index.jsonl` がどれも無視されていなければ、書く前にツリーの
     ルートの `.gitignore` へ `**/ccnavi-index.jsonl` を 1 行足して（`ignore_added`）確かめ直す。

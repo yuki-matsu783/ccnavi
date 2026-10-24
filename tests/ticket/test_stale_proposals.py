@@ -62,7 +62,7 @@ class StaleProposalTest(PhaseHarness):
         lines = self.lint_lines("i0001")
         self.assertTrue(
             any(
-                "計画・写し・範囲の違う提案" in line
+                "計画・コピー・範囲の違う提案" in line
                 and ".claude/worktrees/i0001-01-07/wip/proposals/todo/i0001.md" in line
                 and "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き" in line
                 for line in lines
@@ -100,7 +100,7 @@ class StaleProposalTest(PhaseHarness):
         lines = self.lint_lines("i0001")
         self.assertTrue(
             any(
-                "計画・写し・範囲の違う提案" in line
+                "計画・コピー・範囲の違う提案" in line
                 and "wip/proposals/todo/i0001.md" in line
                 and "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き" in line
                 for line in lines
@@ -218,7 +218,7 @@ class StaleProposalTest(PhaseHarness):
         self.assertEqual(self.pending(), ["i0001"])
         lines = self.lint_lines("i0001-01-07/wip/proposals/todo/i0001.md")
         self.assertEqual(len(lines), 1, lines)
-        self.assertIn("計画・写し・範囲の違う提案", lines[0])
+        self.assertIn("計画・コピー・範囲の違う提案", lines[0])
 
 
 class ImportedFamilyTest(AuthorityHarness):

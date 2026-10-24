@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from tests.ticket.test_phases import PHASES, PhaseHarness
 
-# 調査の定義だけ学びの蓄積を切る。写しは phases.yml から取るので、両方に書く。
+# 調査の定義だけ学びの蓄積を切る。コピーは phases.yml から取るので、両方に書く。
 PHASES_LEARNING_OFF = PHASES.replace(
     "    agent: explorer\n", "    agent: explorer\n    learning: off\n", 1
 )

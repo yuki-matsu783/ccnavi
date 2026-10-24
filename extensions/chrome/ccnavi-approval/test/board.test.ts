@@ -178,5 +178,5 @@ test("CX-T180 ブランチ名の / を - に置き換えた識別子の親チケ
   delete rival.i0001;
   const two = await run(rival);
   const g = family(two.board, "feature/1-login");
-  assert.match(g?.error ?? "", /1 本でない/);
+  assert.match(g?.error ?? "", /1 本ではありません/);
 });

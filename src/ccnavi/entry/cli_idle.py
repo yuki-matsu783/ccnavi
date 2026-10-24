@@ -8,7 +8,7 @@
 payload は標準入力（`notice`・`start`・`reset`）。どれも終了コード 0 で終わる。促しの失敗が作業を
 止めてはならないため。判断は `records.idlehandoff`、待機（`sleep`）は sh が受け持つ。
 
-`start` の標準出力は 1 行 1 項目（`<鍵> <値>`。sh は jq を使わない）。始めるときは `wait`・
+`start` の標準出力は 1 行 1 項目（`<キー> <値>`。sh は jq を使わない）。始めるときは `wait`・
 `session`・`token` の 3 行、始めないときは `skip <理由>` の 1 行。
 `check` は 1 行目が `fire` か `skip`。`fire` のときは 2 行目以降が起こすときの指示。
 `notice` は、出すときだけ `{"systemMessage": …}` の JSON を 1 行書く（ユーザに見える）。

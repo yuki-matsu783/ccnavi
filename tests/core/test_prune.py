@@ -2,11 +2,11 @@
 
 見るのは 4 つ。
 
-1. 記録は上限を超えたときだけ `decisions.<日時>.jsonl` へ名前を変え、中身を捨てない
+1. 記録は上限を超えたときだけ `decisions.<日時>.jsonl` へ名前を変え、中身を破棄しない
 2. ローテートした記録は保持日数を過ぎたものだけを消し、いま書いている記録は消さない
 3. 記録はセッションごとにまとめて判断する。どれか 1 つでも新しければ全部を残し、
    いま始まったセッションと、セッションを名前に持たないものは消さない
-4. 入口の 2 つ。`ccnavi --prune` は `--preview` なら動かさずに並べ、そうでなければ端末を
+4. 入口の 2 つ。`ccnavi --prune` は `--preview` なら動かさずに並べ、そうでなければターミナルを
    求める。セッションの開始でも走り、動かした数を記録に残し、失敗しても開始を止めない
 """
 
@@ -346,7 +346,8 @@ class StatePruneTest(_Base):
         self.assertTrue(os.path.exists(new))
 
     def test_turn_marker_and_mirror_signature_are_pruned(self):
-        # ターン中の印はセッションの記録として、ミラーの指紋は親の識別子ごと（セッションに依らない）に、
+        # ターン中の印はセッションの記録として、
+        # ミラーの指紋は親の識別子ごと（セッションに依らない）に、
         # それ自身の日付で消す。
         old_turn = _write(os.path.join(self.state, f"turn-{S_OLD}.json"), age_days=20)
         new_turn = _write(os.path.join(self.state, f"turn-{S_LIVE}.json"), age_days=1)
@@ -398,7 +399,7 @@ class EntryTest(_Base):
         old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
         proc = run_ccnavi(["user", "prune"], env=self.env(), cwd=self.root)
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("user prune はユーザーがターミナルから実行する必要があります", proc.stderr)
+        self.assertIn("user prune はユーザがターミナルから実行する必要があります", proc.stderr)
         self.assertTrue(os.path.exists(old))
 
     def test_prune_removes_and_says_so(self):
@@ -445,7 +446,7 @@ class EntryTest(_Base):
         with open(self.log, encoding="utf-8") as f:
             (line,) = [json.loads(x) for x in f]
         self.assertEqual(line["event"], "SessionStart")
-        # 読めなかったツリーの注記（この一時リポジトリは git の作業ツリーではない）は残し、
+        # 読めなかったツリーの注記（この一時リポジトリは git のワークツリーではない）は残し、
         # 後始末の結果はそのあとに続く。
         self.assertTrue(line["detail"].endswith("pruned rotated=0 logs=1 state=1"))
 
@@ -463,8 +464,8 @@ class EntryTest(_Base):
 class HookTest(_Base):
     """エージェントが Bash から `ccnavi --prune` を打つ形は、実行前チェックで止まること。
 
-    実行ファイルの端末要求は、擬似端末（`script -qc`）でも、チケット制御を切った
-    ワークスペースで端末要求を切る変数を並べても抜けられる。チケット制御に依らず止める。
+    実行ファイルのターミナル要求は、擬似ターミナル（`script -qc`）でも、チケット制御を切った
+    ワークスペースでターミナル要求を切る変数を並べても抜けられる。チケット制御に依らず止める。
     """
 
     def pre_tool_use(self, command: str, tool: str = "Bash", **env: str):

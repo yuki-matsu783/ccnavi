@@ -164,8 +164,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         """ワークスペースルートから相対パス（`sh .ccnavi/scripts/ccnavi-review.sh`）で打っても、
         親のワークツリーへ移った後に write-and-push の取り込み（ccnavi-sync.sh）を見失わない。
 
-        親のワークツリーにはスクリプトの写しを置かない（相対パスがそこで解かれると、見失うか、
-        ワークツリーの古い写しを使う）。
+        親のワークツリーにはスクリプトのコピーを置かない（相対パスがそこで解かれると、見失うか、
+        ワークツリーの古いコピーを使う）。
         """
         git(self.tree, "rm", "-r", "-q", ".ccnavi/scripts")
         git(self.tree, "commit", "-q", "-m", "no scripts here")
@@ -318,7 +318,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.carried(f"{APPROVED}/phases/{PARENT}/1.requested")
 
     def test_terminal_decide_chooses_outside_write_and_push_and_writes_inside(self):
-        """端末の decide は、選ぶのを write-and-push の外で済ませ、write-and-push の中では
+        """ターミナルの decide は、選ぶのを write-and-push の外で済ませ、write-and-push の中では
         --yes で書くだけ。"""
         chooser = executable(
             os.path.join(self._base, "bin", "chooser"),

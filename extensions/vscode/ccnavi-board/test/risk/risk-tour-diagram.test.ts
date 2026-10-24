@@ -1,6 +1,6 @@
 /**
  * リスク管理の案内の時系列の図（`tours/risk.yml` の `diagrams:`）の検査。図の中の値（差分・点・合計・レベル・境目の点）が、
- * 見本の配点（`sample:`）をそのとおりに当てた結果と一致していること、新しい 2 本の案内の形を見る。
+ * 見本の配点（`sample:`）をそのとおりに適用した結果と一致していること、新しい 2 本の案内の形を見る。
  * 点を数えるのは実行ファイルで、ここでは `risk.py` の `evaluate` と同じ数え方を小さく書き直して、図の数字と突き合わせる。
  */
 import { test } from "node:test";
@@ -112,10 +112,10 @@ function levelsText(levels: { medium: number; high: number; critical: number }):
   return `levels: {medium: ${levels.medium}, high: ${levels.high}, critical: ${levels.critical}}`;
 }
 
-test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベル・境目）は、見本の配点を当てた結果と一致する", () => {
+test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベル・境目）は、見本の配点を適用した結果と一致する", () => {
   const rules = commonRules();
 
-  // 4 ファイルの子: big-diff（src/** から src/generated/** を外す）と ci が当たり、judge が yes で HIGH
+  // 4 ファイルの子: big-diff（src/** から src/generated/** を外す）と ci がヒットし、judge が yes で HIGH
   const big: Change[] = [
     { path: "src/auth/login.py", added: 190, deleted: 60 },
     { path: "src/auth/session.py", added: 70, deleted: 10 },
@@ -133,7 +133,7 @@ test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベ�
   const counted = big.filter((change) => change.path.startsWith("src/") && !change.path.startsWith("src/generated/")).map((change) => change.added + change.deleted);
   assert.equal(valueOf("risk-score-high", "c-lines"), `${counted.join(" + ")} = ${counted.reduce((a, b) => a + b, 0)} 行 > ${rules.get("big-diff")!.value}\n→ +${hits["big-diff"]}`);
   assert.ok(valueOf("risk-score-high", "c-glob").endsWith(`→ +${hits.ci}`));
-  assert.ok(big.length <= Number(rules.get("many-files")!.value), "many-files は当たらない例");
+  assert.ok(big.length <= Number(rules.get("many-files")!.value), "many-files はヒットしない例");
   assert.ok(valueOf("risk-score-high", "c-skip").includes(`${big.length} ファイル ≤ ${rules.get("many-files")!.value}`));
   assert.equal(valueOf("risk-score-high", "sum"), `${Object.values(hits).join(" + ")} = ${total}\n${total} ≥ ${SAMPLE_LEVELS.high} かつ ${total} < ${SAMPLE_LEVELS.critical} → HIGH`);
   assert.ok(valueOf("risk-score-high", "write").includes(`points: ${total}, level: HIGH`));
@@ -142,7 +142,7 @@ test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベ�
   assert.equal(valueOf("risk-high-review", "record"), `phases/親/子.risk.json  points: ${total}, level: HIGH`);
   assert.ok(valueOf("risk-high-review", "request").includes(`${total} (HIGH)`));
 
-  // 小さな変更: どの項目にも当たらず 0 点で LOW
+  // 小さな変更: どの項目にもヒットせず 0 点で LOW
   const small: Change[] = [{ path: "src/auth/login.py", added: 9, deleted: 3 }];
   assert.deepEqual(score(rules, small, { "no-tests": 0 }), {});
   assert.equal(levelOf(0, SAMPLE_LEVELS), "LOW");

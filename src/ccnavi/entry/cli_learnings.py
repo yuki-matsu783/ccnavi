@@ -35,12 +35,12 @@ def usage_problem(args: argparse.Namespace) -> str:
     """`--learnings` の組み合わせの誤り。正しければ空。設定を読む前に見る。"""
     refused = cli_args._not_with_docs(args, "--learnings")
     if refused:
-        return f"--learnings は {refused} と一緒に使えない"
+        return f"--learnings は {refused} と同時に指定できない"
     if args.docs or args.templates:
-        return f"--learnings は {'--docs' if args.docs else '--templates'} と一緒に使えない"
+        return f"--learnings は {'--docs' if args.docs else '--templates'} と同時に指定できない"
     for flag, name, absent in cli_args.DOCS_FLAGS:
         if getattr(args, name) != absent:
-            return f"{flag} は --docs でだけ使える"
+            return f"{flag} は --docs でだけ指定できる"
     if args.command:
         return f"--learnings にはフラグ以外の語を付けられない（{' '.join(args.command)}）"
     return ""

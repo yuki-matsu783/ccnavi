@@ -1,7 +1,7 @@
 """`ccnavi-git.sh integrate` / `integrate --abort` / `integrate-done` の受入テスト。
 
 直接作業（チケットを起こさない）のワークツリーの成果を、切ったときの取り込み先のブランチへ
-1 コミットで載せる流れ。確認している間、メインのチェックアウトの index と作業ツリーには書かず、
+1 コミットで載せる流れ。確認している間、メインのチェックアウトの index とワークツリーには書かず、
 一時ワークツリーで取り込み結果を作り、最後に `merge --ff-only --no-overwrite-ignore` で載せる。
 使い捨てのワークスペースを毎回組み、sh を外から呼ぶ。読み返すのは終了コード・出力と、
 git とファイルシステムに残ったものだけ。
@@ -188,7 +188,7 @@ class Fixture(unittest.TestCase):
         return git(self.ws, "rev-parse", "HEAD").strip()
 
     def snapshot(self):
-        """ルートの HEAD・index・作業ツリーの状態。確認の間は変わらない。"""
+        """ルートの HEAD・index・ワークツリーの状態。確認の間は変わらない。"""
         return (
             self.head(),
             git(self.ws, "write-tree").strip(),
@@ -621,7 +621,7 @@ class IntegrateTest(Fixture):
         head = self.head()
         done = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
         self.assertOk(done, 2)
-        self.assertIn("端末", done.stderr)
+        self.assertIn("ターミナル", done.stderr)
         self.assertEqual(head, self.head())
 
     def test_a_cleanup_keeps_the_branch_when_it_moved(self):
@@ -1083,7 +1083,7 @@ class IntegrateGapsTest(Fixture):
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
 
     def done_stopped_at(self, match, name="wt", cwd=None, base=None):
-        """integrate まで進めたうえで、match に当たる git が失敗する状態にして、
+        """integrate まで進めたうえで、match にヒットする git が失敗する状態にして、
         integrate-done -m を実行する。
 
         K は載り、片付けは途中で止まる。戻り値は K が載る前の HEAD で、代役は外してから返す。
@@ -1237,7 +1237,7 @@ class IntegrateGapsTest(Fixture):
         head = git(project, "rev-parse", "HEAD").strip()
         done = self.run_git_sh("integrate-done", "pwt", "-m", "feat: p", cwd=project)
         self.assertOk(done, 2)
-        self.assertIn("端末", done.stderr)
+        self.assertIn("ターミナル", done.stderr)
         self.assertEqual(head, git(project, "rev-parse", "HEAD").strip())
 
     # ---- 5: 一時ワークツリーに残った ignored のファイル

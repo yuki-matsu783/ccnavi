@@ -28,14 +28,14 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 | ID | 処理 | 重さ | 確認 |
 |---|---|---|---|
 | A1 | プロジェクトで起動したときの、hook と sh の根の食い違い | 中 | 実行（sh 側）、読み（hook 側） |
-| A2 | `CLAUDE_PROJECT_DIR` が無い端末の直打ちで、Python が根を取り違える | major | 実行 |
+| A2 | `CLAUDE_PROJECT_DIR` が無いターミナルの直打ちで、Python が根を取り違える | major | 実行 |
 | A3 | `.claude/` を持つ祖先の下に置いた単体 clone で、祖先が根になる | minor | 実行 |
 | A4 | sh の `*/projects` 判定が大文字小文字を区別する | minor | 読み（Linux では再現できない） |
 | C1 | 単体 clone の直後は `.ccnavi/bin/` が無く、案内が合わない | 初回は blocker（単体 clone 固有ではない） | 実行 |
 | C2 | プロジェクトのスキルの目録が、単体 clone で出ない | major | 実行 |
 | C3 | setup が `/.claude/worktrees/` を `.gitignore` に足さない | minor から中 | 実行 |
 | C4 | `.git` がファイルの clone で、ワークツリーが認識されない | 中 | 実行 |
-| D1 | ワークスペースの発言のときの同期が、プロジェクトのミラーと写しを上書きする | minor から中（設計上の緊張） | 実行 |
+| D1 | ワークスペースの発言のときの同期が、プロジェクトのミラーとコピーを上書きする | minor から中（設計上の緊張） | 実行 |
 | D2 | ワークスペースの SessionStart が、プロジェクトの `.gitignore` に追記する | minor | 実行 |
 | E1 | ルールの `{root}` が、プロジェクトのレイヤーでもワークスペースルートを指す | info | 読み |
 | E2 | `--lint` のレビュー経路の検査が、ワークスペースの origin しか見ない | minor | 読み |
@@ -59,7 +59,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - 前提: 文書上の前提は、ワークスペースから起動して `cd` で入る形（`to-measure.md`、手引き）。一方で、プロジェクトで起動するとそのプロジェクトの hook が使われると書いてあり（[複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../adr/0033-projects.md)の追記）、この形は否定されていない
 - 直し方の案: sh も `CLAUDE_PROJECT_DIR` を第一候補にする案は採れない。理由: Bash ツールの環境に `CLAUDE_PROJECT_DIR` は来ない（`docs/design/appendix.md:102`）。コマンド行に付けて渡すことも `wrapguard.py:67` が止める。別の案は未決（「未決」の根の決め方）
 
-#### A2 `CLAUDE_PROJECT_DIR` が無い端末の直打ちで、Python が根を取り違える（major）
+#### A2 `CLAUDE_PROJECT_DIR` が無いターミナルの直打ちで、Python が根を取り違える（major）
 
 - 処理と場所: `src/ccnavi/entry/cli.py:1326-1343` の `_find_project_root` は、最も近い `.claude/` を持つ祖先を根にする。プロジェクトが `.claude/` を持つのは通常の形なので、プロジェクト自身が根になる
 - ワークスペース内 clone: `ws/projects/proj1` に入り、`CLAUDE_PROJECT_DIR` 無しで `ccnavi ticket status` や `--agree --preview` を打つと、根がプロジェクトになる。提案とワークツリーは `<WS>/.claude/worktrees/` と `<WS>/wip/` にあるので、「チケットはありません」「承認待ちはありません」と出る。`sh ../../.ccnavi/scripts/ccnavi-ticket.sh status` は正しく出る（sh は `projects/` の親を根にする）。壊れるのは、`ccnavi user handoff` や `ccnavi user agree` の直打ち。`.ccnavi/CCNAVI.md` はこの直打ちを案内している
@@ -73,7 +73,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - 処理と場所: A2 と同じ `_find_project_root`
 - ワークスペース内 clone: 関係しない
 - 単体 clone: 単体 clone が `.claude/` を持たず、`.claude/` のある祖先（`$HOME` など）の下にあると、その祖先を根に取り、祖先の `.ccnavi/config/common/rules.yml` を読む。`~/.claude` は利用者の `$HOME` にあるので、`.claude` を持たないリポジトリは `$HOME` を根に取る
-- 起きること: 端末から直接打ったときだけ。hook には常に `CLAUDE_PROJECT_DIR` が来る
+- 起きること: ターミナルから直接打ったときだけ。hook には常に `CLAUDE_PROJECT_DIR` が来る
 - 直し方の案: 目印を `.ccnavi/scripts/ccnavi-common.sh` の存在にする。未決
 
 #### A4 sh の `*/projects` 判定が大文字小文字を区別する（minor）
@@ -99,10 +99,10 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 - 処理と場所: `src/ccnavi/hook/projskills.py:101-108` の `project_of` は、MAIN のツリーでは `t.project` が空なので `""` を返す。呼び出しは `hook/events.py:624`、`hook/subagent.py:59`、`hook/judge.py:709`。目録を出す hook はワークスペースの `.claude` にしか無い
 - ワークスペース内 clone: ワークスペースから `cwd=projects/proj1` の SessionStart を呼ぶと、目録が入る
-- 単体 clone: `skills/<名前>/SKILL.md` は git に入るが、SessionStart、SubagentStart、最初の PreToolUse のどこでも目録は渡らない。`skillsync` が写した工程スキルの入口（`skills/<工程>/SKILL.md`）も同じ。reference は `ccnavi --docs` で引ける（`--root B --docs --type skill-reference` で再現した）。単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほうである
-- 起きること: `project_of` は単体 clone を検出せず、黙って空を返す。[ワークスペース内 clone と単体 clone の両方で動かす](../../adr/0145-work-in-workspace-and-standalone-clone.md)の「縮退して動く」の定義（頼るものが無いことを検出し、決めた小さい振る舞いに落とす）には当たらない。工程スキルの写しを決めたときの採らなかった案に「単体 clone で目録に載らない」があるが、実装はこれを満たしていない
+- 単体 clone: `skills/<名前>/SKILL.md` は git に入るが、SessionStart、SubagentStart、最初の PreToolUse のどこでも目録は渡らない。`skillsync` がコピーした工程スキルの入口（`skills/<工程>/SKILL.md`）も同じ。reference は `ccnavi --docs` で引ける（`--root B --docs --type skill-reference` で再現した）。単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほうである
+- 起きること: `project_of` は単体 clone を検出せず、黙って空を返す。[ワークスペース内 clone と単体 clone の両方で動かす](../../adr/0145-work-in-workspace-and-standalone-clone.md)の「縮退して動く」の定義（頼るものが無いことを検出し、決めた小さい振る舞いに落とす）には該当しない。工程スキルのコピーを決めたときの採らなかった案に「単体 clone で目録に載らない」があるが、実装はこれを満たしていない
 - 確認: 実行で確認
-- 直し方の案: MAIN のツリー（`project == ""`）でも `root/skills` があれば目録を出す。工程スキルがワークスペース内 clone で目録と `--docs` に二重に出る例外（`--docs` は 2 件に当たる）との整理も要る。未決
+- 直し方の案: MAIN のツリー（`project == ""`）でも `root/skills` があれば目録を出す。工程スキルがワークスペース内 clone で目録と `--docs` に二重に出る例外（`--docs` は 2 件に該当する）との整理も要る。未決
 
 #### C3 setup が `/.claude/worktrees/` を `.gitignore` に足さない（minor から中）
 
@@ -122,13 +122,13 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 ## D. 別リポジトリへの書き込み・上書き
 
-#### D1 ワークスペースの発言のときの同期が、プロジェクトのミラーと写しを上書きする（minor から中。設計上の緊張）
+#### D1 ワークスペースの発言のときの同期が、プロジェクトのミラーとコピーを上書きする（minor から中。設計上の緊張）
 
-- 処理と場所: `src/ccnavi/tickets/promptsync.py` の `sync`、および `configsync.py`、`skillsync.py`。プロジェクトの `.ccnavi/config/common/` と `skills/<工程>/` を、共通レイヤーと工程スキルの写しで上書きする
+- 処理と場所: `src/ccnavi/tickets/promptsync.py` の `sync`、および `configsync.py`、`skillsync.py`。プロジェクトの `.ccnavi/config/common/` と `skills/<工程>/` を、共通レイヤーと工程スキルのコピーで上書きする
 - ワークスペース内 clone: プロジェクトの `config/common/rules.yml` に 1 行足してコミットしておくと、「共通レイヤーの中身に揃えた: rules.yml（上書き）」と書き換える。書き換えるのは親のワークツリーで、差分はマージリクエストに出る。静かにデータが消えるわけではない
-- 単体 clone: `found.project` が空で写しは動かず、このミラーが共通レイヤーそのものになる。`user handoff` の取り込み先（`handoff.py` の `KINDS`）に `.ccnavi/config/common/…` が入っているので、単体の利用者は編集できる。ミラーは誰も編集しないという前提が単体 clone では成り立たず、更新の手段もワークスペースの発言のときの同期か setup だけ
+- 単体 clone: `found.project` が空でコピーは動かず、このミラーが共通レイヤーそのものになる。`user handoff` の取り込み先（`handoff.py` の `KINDS`）に `.ccnavi/config/common/…` が入っているので、単体の利用者は編集できる。ミラーは誰も編集しないという前提が単体 clone では成り立たず、更新の手段もワークスペースの発言のときの同期か setup だけ
 - 確認: 実行で確認
-- 直し方の案: 単体用とワークスペース用の写しを印（指紋）で見分ける。または、ミラーがワークスペースの共通と違うときは上書きせず、差を warn して止める。未決（「未決」のミラーの指紋）
+- 直し方の案: 単体用とワークスペース用のコピーを印（指紋）で見分ける。または、ミラーがワークスペースの共通と違うときは上書きせず、差を warn して止める。未決（「未決」のミラーの指紋）
 
 #### D2 ワークスペースの SessionStart が、プロジェクトの `.gitignore` に追記する（minor）
 
@@ -178,7 +178,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 #### E6 案内文が一方の形を前提にしている（nit）
 
-- 場所と内容: `src/ccnavi/entry/lint.py:374-386` の `compat_fix` が「ccnavi-setup.sh <このワークスペース> --force」と案内する。単体 clone の利用者には当たらない
+- 場所と内容: `src/ccnavi/entry/lint.py:374-386` の `compat_fix` が「ccnavi-setup.sh <このワークスペース> --force」と案内する。単体 clone の利用者には該当しない
 - 設計済みで、不都合に数えないもの: cwd が `projects/p` のとき `worktree add` が一度断られることは、`.ccnavi/docs/worktree.md:68` が設計済みで、拒否文は正しいパスを教える。`_misplaced_worktrees` は単体の `.claude/worktrees/` では 0 件で、`projects/` の下の各プロジェクトにだけ出る
 - 確認: 実行と読み
 
@@ -215,6 +215,6 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 - 根の決め方（A1、A2、A3、N1）: 次の 3 つの選択肢がある。(a) いまのまま、hook は `CLAUDE_PROJECT_DIR` を採り、Python は `.claude/` を持つ最も近い祖先を採る。(b) 祖先をたどるとき、`<親>/projects/<名前>` の形で親が ccnavi の根なら親を採り、sh と揃える。(c) 根の目印を `.claude/` ではなく `.ccnavi/scripts/ccnavi-common.sh` にする。sh に `CLAUDE_PROJECT_DIR` を読ませる案は、Bash ツールの環境に来ないので選択肢にならない
 - 分岐名の接頭辞の設定（N2）: `CCNAVI_BRANCH_PREFIXES` をプロジェクトごとに持つかどうか
-- ミラーの指紋（D1）: 単体用とワークスペース用の写しを印で見分けるか、ワークスペースの共通と違うときは上書きせず差を warn して止めるか
+- ミラーの指紋（D1）: 単体用とワークスペース用のコピーを印で見分けるか、ワークスペースの共通と違うときは上書きせず差を warn して止めるか
 - 単体 clone の初回導入（C1）: 実行ファイルが無いときの専用の案内と、単体 clone に setup を実行する手順を、どこに置くか
 - 単体 clone での縮退の中身（C2）: 目録を MAIN のツリーでも出すか、別の形に落とすか。工程スキルがワークスペース内 clone で二重に出る例外をどうするか

@@ -74,7 +74,7 @@ export function staleSaved(saved: Readonly<Record<string, string>>, todoParents:
     .sort();
 }
 
-/** 今の帳面の写し */
+/** 今の帳面のコピー */
 export function workflowTabs(): WorkflowTabs {
   return { unsaved: [...unsaved].sort(), saved: Object.fromEntries(saved) };
 }

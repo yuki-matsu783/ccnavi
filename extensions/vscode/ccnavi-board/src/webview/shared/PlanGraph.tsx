@@ -3,22 +3,22 @@
  * 中身は実行ファイルが返す計画 1 つぶん（`plans` の 1 件）で、点・線・置き場所は `core/plan-graph.ts` が組む。
  * 見た目と React Flow の扱いはフロー編集画面の図（`flow/Canvas.tsx`）に揃えてある。
  *
- * 終端に当たらない項（`loose`）・すぐ始まる項（`ready`）・延期の引き受け手（`review_at`）・
+ * 終端に届かないステップ（`loose`）・すぐ始まるステップ（`ready`）・延期の引き受け手（`review_at`）・
  * 順序の検査の理由（`problems`）は実行ファイルの答えをそのまま描く。図の下の一言も、その値を並べるだけ。
  *
  * **`editable` が偽なら読むだけ。** 線を引けず、点も線も選べず、点を動かせない（`Canvas.tsx` の読むだけの扱いと
- * 同じ）。拡大・縮小と全体表示はできる。`editable` が真なら、項から項へ線を引ける（計画編集タブ）。
+ * 同じ）。拡大・縮小と全体表示はできる。`editable` が真なら、ステップからステップへ線を引ける（計画編集タブ）。
  * 引いている最中に、引けない線（自分へ・start と end に触れる・固定した番号へ入る・循環になる）を
  * `canConnect` で断る（放しても線はできない）。引けた線は `onConnect` で呼び手に返すだけで、図は描き直さない
  * （呼び手が計画を作り直して渡し直す。番号の振り直しの正は実行ファイル）。`onDisconnect` を渡せば、消せる線
- * （項どうしの線で、固定した番号へ入らないもの。`canDisconnect`）の真ん中に × を出し、押したら呼び手に返す。
+ * （ステップどうしの線で、固定した番号へ入らないもの。`canDisconnect`）の真ん中に × を出し、押したら呼び手に返す。
  *
- * **置き場所。** `layout` を渡せば、項をその場所に置く（振り直す前の番号 `from` で覚えた場所。`core/plan-graph.ts` の
+ * **置き場所。** `layout` を渡せば、ステップをその場所に置く（振り直す前の番号 `from` で覚えた場所。`core/plan-graph.ts` の
  * `withLayout`）。計画編集タブは、番号が振り直っても点を動かさないためにこれを使う。開いたときの見え方
  * （全体を枠に収める）は `fitKey` が変わったときだけ合わせ直す（渡さなければ計画が替わるたび）。
  *
- * **`detail` が真なら、項を押すと右に詳細の欄を出す**（計画編集タブ）。番号・定義・題・見る場所・延期先・固定・
- * 先行と後続・すぐ始まるか・終端に当たらないかを、実行ファイルの値のまま読むだけで出す（直すのは線）。欄は畳める
+ * **`detail` が真なら、ステップを押すと右に詳細の欄を出す**（計画編集タブ）。番号・定義・題・見る場所・延期先・固定・
+ * 先行と後続・すぐ始まるか・終端に届かないかを、実行ファイルの値のまま読むだけで出す（直すのは線）。欄は畳める
  * （畳んだかは画面が覚える）。
  *
  * 見た目は `PlanGraph.css`。React Flow の CSS は `--xy-*` の変数で出来ているので、そこを `--vscode-*` で上書きする。
@@ -86,17 +86,17 @@ function reviewText(review: string): string {
   }
 }
 
-/** 延期した項の言葉。本文の待ちの一覧（「レビューは 4 と一緒に」）と同じ言い方 */
+/** 延期したステップの言葉。本文の先行の一覧（「レビューは 4 と一緒に」）と同じ言い方 */
 function deferText(reviewAt: number | null): string {
-  return reviewAt === null ? "レビューを引き受ける項がありません" : `レビューは ${reviewAt} と一緒に`;
+  return reviewAt === null ? "レビューを受け持つステップがありません" : `レビューは ${reviewAt} と一緒に`;
 }
 
-/** 項の点。番号・定義の題・見る場所と、延期・固定・終端に当たらない印 */
+/** ステップの点。番号・定義の題・見る場所と、延期・固定・終端に届かない印 */
 function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
   const { node, editable } = data;
   const title = [
     node.type,
-    node.loose ? "最後の項が待たない（終端に当たらない）" : "",
+    node.loose ? "最後のステップの先行になっていない（終端に届かない）" : "",
     node.locked ? "子が承認された番号です。入る線は変えられません" : "",
   ]
     .filter((part) => part !== "")
@@ -115,7 +115,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
       <span className="plan-node-number">{node.number}</span>
       <span className="plan-node-title">{node.label}</span>
       <span className="plan-node-tags">
-        {/* 延期した項は見る場所を出さず、引き受け手を言う（本文も延期した項に見る場所を書かない） */}
+        {/* 延期したステップは見る場所を出さず、引き受け手を言う（本文も延期したステップに見る場所を書かない） */}
         {node.deferred ? (
           <span className="tag deferred">{deferText(node.reviewAt)}</span>
         ) : (
@@ -132,7 +132,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
 
 /**
  * start と end の仮の点。名前だけ。線は図が引くので、取っ手から線は引けない。
- * end は、終端に当たらない項からの線を下の取っ手で受ける。左の取っ手で受けると、最後の項からの線と
+ * end は、終端に届かないステップからの線を下の取っ手で受ける。左の取っ手で受けると、最後のステップからの線と
  * end の手前で重なり、どちらが注意の線か見分けられない
  */
 function EndView({ data }: NodeProps<EndNode>): JSX.Element {
@@ -147,7 +147,7 @@ function EndView({ data }: NodeProps<EndNode>): JSX.Element {
   );
 }
 
-/** end の取っ手。ふつうの線は左、終端に当たらない項からの線は下 */
+/** end の取っ手。ふつうの線は左、終端に届かないステップからの線は下 */
 const END_IN = "in";
 const END_LOOSE = "loose";
 
@@ -172,8 +172,8 @@ function RemovableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
             className="plan-remove nodrag nopan"
             data-action="plan-remove-edge"
             data-edge={id}
-            aria-label="この線を削除（待たなくする）"
-            title="この線を削除（待たなくする）"
+            aria-label="この線を削除（先行を外す）"
+            title="この線を削除（先行を外す）"
             onMouseDown={stop}
             onPointerDown={stop}
             onClick={(event) => {
@@ -264,7 +264,7 @@ function headingOf(plan: ApprovePlan): string {
 
 /** 図の下の一言。実行ファイルの値を並べるだけ */
 function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
-  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number} は引き受ける項がありません` : `${item.number} は ${item.review_at} と一緒に`));
+  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number} はレビューを受け持つステップがありません` : `${item.number} は ${item.review_at} と一緒に`));
   const lines: { readonly text: string; readonly warn: boolean }[] = [];
   if (plan.ready.length > 0) {
     lines.push({ text: `すぐ始まる: ${plan.ready.join(", ")}`, warn: false });
@@ -273,8 +273,8 @@ function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
     lines.push({ text: `延期したレビュー: ${deferred.join("、")}`, warn: false });
   }
   if (plan.loose.length > 0) {
-    // 本文の待ちの一覧（「最後の項が待たない: …」）と同じ言い方に、直し方を添える
-    lines.push({ text: `最後の項が待たない: ${plan.loose.join(", ")}。最後の項へ線を引くか、合流の項を置く`, warn: true });
+    // 本文の先行の一覧（「最後のステップの先行になっていない: …」）と同じ言い方に、直し方を添える
+    lines.push({ text: `最後のステップの先行になっていない: ${plan.loose.join(", ")}。最後のステップへ線を引くか、合流のステップを置いてください`, warn: true });
   }
   for (const problem of plan.problems) {
     lines.push({ text: problem, warn: true });
@@ -293,7 +293,7 @@ function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
   );
 }
 
-/** 線が引けたときに呼び手へ返すもの。`from` を `to` が待つ（番号） */
+/** 線が引けたときに呼び手へ返すもの。`from` が `to` の先行になる（番号） */
 export type PlanConnect = (from: number, to: number) => void;
 
 /**
@@ -325,11 +325,11 @@ function useDetailFolded(): boolean {
   );
 }
 
-/** 押した項の詳細。実行ファイルの値を並べるだけ（判定しない） */
+/** 押したステップの詳細。実行ファイルの値を並べるだけ（判定しない） */
 function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly graph: Graph; readonly id: string | undefined }): JSX.Element {
   const node = id === undefined ? undefined : graph.nodes.find((n) => n.id === id);
   if (node === undefined || node.number === null) {
-    return <p className="dim small plan-detail-empty">項を押すと、ここに詳細を出します。</p>;
+    return <p className="dim small plan-detail-empty">ステップを押すと、ここに詳細を表示します。</p>;
   }
   const number = node.number;
   const numberOfNode = (nodeId: string): number | undefined => graph.nodes.find((n) => n.id === nodeId)?.number ?? undefined;
@@ -345,11 +345,11 @@ function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly grap
     ["題", node.label],
     ["定義", node.type],
     ["見る場所", node.deferred ? deferText(node.reviewAt) : reviewText(node.review)],
-    ["待つ項（先行）", listOf(before)],
-    ["待たれる項（後続）", listOf(after)],
+    ["先行ステップ", listOf(before)],
+    ["後続ステップ", listOf(after)],
     ["すぐ始まる", plan.ready.includes(number) ? "はい" : "いいえ"],
-    ["最後の項が待たない", node.loose ? "はい（終端に当たらない）" : "いいえ"],
-    ["番号の固定", node.locked ? "固定（子が承認済み。入る線は変えられない）" : "なし"],
+    ["最後のステップの先行になっていない", node.loose ? "はい（終端に届かない）" : "いいえ"],
+    ["番号の固定", node.locked ? "固定（子が承認済み。入る線は変えられません）" : "なし"],
   ];
   return (
     <dl className="plan-detail-list" data-number={number}>
@@ -365,13 +365,13 @@ function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly grap
 
 export interface PlanGraphProps {
   readonly plan: ApprovePlan;
-  /** 真なら、項を押すと右に詳細の欄を出す（畳める）。承認のオーバーレイは狭いので出さない */
+  /** 真なら、ステップを押すと右に詳細の欄を出す（畳める）。承認のオーバーレイは狭いので出さない */
   readonly detail?: boolean;
   readonly editable?: boolean;
   readonly onConnect?: PlanConnect;
-  /** 線を消したときに呼ぶ。`from` を `to` が待たなくなる（番号）。渡したときだけ × を出す */
+  /** 線を消したときに呼ぶ。`from` が `to` の先行でなくなる（番号）。渡したときだけ × を出す */
   readonly onDisconnect?: PlanConnect;
-  /** 項の置き場所（振り直す前の番号で覚えたもの）。無ければ `planGraphOf` が組んだ場所 */
+  /** ステップの置き場所（振り直す前の番号で覚えたもの）。無ければ `planGraphOf` が組んだ場所 */
   readonly layout?: PlanLayout;
   /** 開いたときの見え方を合わせ直す合図。変わったときだけ全体を枠に収める。無ければ計画が替わるたび */
   readonly fitKey?: unknown;
@@ -456,7 +456,7 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
         <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />
       </div>
       {detail && (
-        <aside className="plan-detail" id="plan-detail" aria-label="項の詳細" data-folded={folded ? "1" : "0"}>
+        <aside className="plan-detail" id="plan-detail" aria-label="ステップの詳細" data-folded={folded ? "1" : "0"}>
           <button
             type="button"
             className="action small plan-detail-toggle"

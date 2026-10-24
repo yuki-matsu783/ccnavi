@@ -11,7 +11,7 @@ from collections.abc import Iterator
 
 # 動かした経路。
 #   cli       エージェントが sh（ccnavi-ticket.sh / ccnavi-review.sh）から打ったサブコマンド
-#   terminal  ユーザが端末で打った判断（--agree / --reviewed / --close-early）
+#   terminal  ユーザがターミナルで打った判断（--agree / --reviewed / --close-early）
 #   board     VS Code のボードから押した判断（--agree --yes / --reviewed --yes）
 #   hook      hook（フェーズの終わりの告知が置くマーカー）
 VIA_CLI = "cli"

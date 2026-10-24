@@ -122,7 +122,7 @@ class SuggestTest(unittest.TestCase):
         self.assertTrue(all(s["subject"].startswith("/repo/docs/") for s in found["expectations"]))
 
     def test_candidates_that_fail_the_expectations_are_dropped(self):
-        """いまのルールで ask にならない形（deny に当たる）は、検証で除いて数だけ言う。"""
+        """いまのルールで ask にならない形（deny にヒットする）は、検証で除いて数だけ言う。"""
         self._write("decisions.jsonl", [_handover("Bash", "git push --force") for _ in range(5)])
         body = self._json()
         self.assertEqual([], body["candidates"])
@@ -172,7 +172,7 @@ class SuggestTest(unittest.TestCase):
         self.assertEqual("suggest-npm-ci", docs[0]["rules"]["ask"][0]["id"])
 
     def test_extension_fixture_has_the_same_keys(self):
-        """VS Code 拡張が読む例（test/fixtures/suggest.json）は、いまの出力と同じ鍵を持つ。"""
+        """VS Code 拡張が読む例（test/fixtures/suggest.json）は、いまの出力と同じキーを持つ。"""
         self._write(
             "decisions.jsonl",
             [_handover("Bash", "npm ci") for _ in range(5)] + [_deny("git push") for _ in range(3)],

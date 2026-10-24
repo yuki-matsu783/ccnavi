@@ -1,10 +1,10 @@
 """ccnavi 自身の保護と認証情報の保護が組み込みにあることの受入テスト（実行前）。
 
 共通のルールは、テスト用の最小の組（残す側のルールも入れない）にする。止める側は組み込みだけなので、
-当たったルールの id を、集合と順序で確かめる。「deny された」だけで済ませない。
+ヒットしたルールの id を、集合と順序で確かめる。「deny された」だけで済ませない。
 
 1. 名前で書くツールの 4 本（`builtin:guard-hooks`・`-settings`・`-scripts`・`-ccnavi-config`）:
-   4 種類のツリー、書き込みの例外（直下の `wip/handoff/` の普通の写し）、自己防衛を切ったとき、
+   4 種類のツリー、書き込みの例外（直下の `wip/handoff/` の普通のコピー）、自己防衛を切ったとき、
    通常時の並び（専用の id が `guard-project-home` / `guard-common-layer` より前で、二重に入らない）
 2. 共通のルールファイルが読めない・無い間: 4 本は外れない。直し方は下書きの案内
 3. 認証情報（`builtin:credentials`）: 5 つのツールで止まり、Grep / Glob / PowerShell は対象外。
@@ -35,7 +35,7 @@ LINKS = "builtin:guard-handoff-links"
 CREDENTIALS = "builtin:credentials"
 NAMED = (HOOKS, SETTINGS, SCRIPTS, CONFIG)
 
-# テスト用の最小の共通ルール。ここにある deny は、この検査のどの入力にも当たらない。
+# テスト用の最小の共通ルール。ここにある deny は、この検査のどの入力にもヒットしない。
 MINIMAL_RULES = {
     "version": 1,
     "deny": [
@@ -71,7 +71,7 @@ class Workspace(unittest.TestCase):
         return os.path.join(self.root, *rel.split("/")) if rel else self.root
 
     def hook(self, tool, tool_input, *, guard="enable", cwd=None, mode="enable", tickets=None):
-        """(判定, 理由, 当たったルールの id の並び)。"""
+        """(判定, 理由, ヒットしたルールの id の並び)。"""
         body = {
             "hook_event_name": "PreToolUse",
             "tool_name": tool,
@@ -114,7 +114,7 @@ class Workspace(unittest.TestCase):
 
 
 def expected(tree, rel):
-    """通常時に、この書き込みで当たるはずの組み込みの id の並び。"""
+    """通常時に、この書き込みでヒットするはずの組み込みの id の並び。"""
     if rel.startswith(".claude/hooks/"):
         return [HOOKS]
     if rel.startswith(".claude/settings"):

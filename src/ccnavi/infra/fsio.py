@@ -74,17 +74,17 @@ def slashed(path: str) -> str:
 def full_path(path: str, cwd: str) -> str:
     """ファイルのパスを、行き着く先が 1 つに決まるパスに直す。
 
-    来たままの文字列に当てると、同じ場所を別の表記で書くだけでルールを外せる。
+    来たままの文字列に適用すると、同じ場所を別の表記で書くだけでルールを外せる。
     相対パスは呼び出し側の作業ディレクトリ次第で意味が変わるし、`..` を挟めば
     `secrets/` を通らないパスで `secrets/` の中に届く。シンボリックリンクなら
     名前を 1 つ増やすだけで済む。守る対象は名前ではなく場所なので、
-    場所まで解いてから当てる。
+    場所まで解いてから適用する。
 
     解けなかったときも、絶対パスにして `..` を取り除くところまではやる。
     まだ存在しないファイルへの書き込みがこれにあたる。
 
     実行前チェック（judge）と実行後チェック（gitstate）が同じパスに直す。別々に持つと、
-    同じ場所が 2 通りのパスで当たり、実行前に通った書き込みが実行後に報告される。
+    同じ場所が 2 通りのパスでヒットし、実行前に通った書き込みが実行後に報告される。
     """
     if not path:
         return ""
@@ -99,8 +99,8 @@ def full_path(path: str, cwd: str) -> str:
 def spelled_path(path: str, cwd: str) -> str:
     """ファイルのパスを、リンクを解かずに絶対パスに直す。`..` は取り除く。
 
-    `full_path` は行き着く先に直すので、リンクそのもののパスが消える。置き場のパスに当てる
-    止める向きの検査（フローのロック）は、解いた先と解く前の両方に当てるためにこちらも使う。
+    `full_path` は行き着く先に直すので、リンクそのもののパスが消える。置き場のパスに適用する
+    止める向きの検査（フローのロック）は、解いた先と解く前の両方に適用するためにこちらも使う。
     """
     if not path:
         return ""
@@ -196,7 +196,7 @@ def write_text(path: str, text: str, newline: str | None = None) -> str:
 def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
     """本文を、読む側に途中を見せずに書く。書けたら空文字、駄目なら理由。
 
-    `write_text` の `open(path, "w")` は、開いた時点で中身を捨てる。書き終える
+    `write_text` の `open(path, "w")` は、開いた時点で中身を破棄する。書き終える
     までのあいだファイルは空で、そこを誰かに読まれれば「空だった」ことになるし、
     途中で異常終了すれば空のまま残る。取り合いになる記録と、途中で異常終了したものを次の
     起動に拾わせたくない記録は、こちらで書く。
@@ -215,7 +215,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
     のコミットが
     運ばないため（どちらも `.<名前>.part*` の形を除く）。元の名前と拡張子を残すのは、
     異常終了して残った一時ファイルを、本番と同じ名前の条件（`ctxfile.forget` と `prune` は
-    先頭の `.` を外してから当てる。`temp_origin`）で掃除できるようにするため。
+    先頭の `.` を外してから適用する。`temp_origin`）で掃除できるようにするため。
 
     守るのは「同時に読む側」までで、電源断は守らない。差し替えの前に
     `fsync` をしていないので、ディスクへ実際に届く順はファイルシステム任せ。
@@ -254,7 +254,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
             os.replace(part, path)
         except BaseException:
             # 差し替えまで行けなかった一時ファイルは置いていかない。消せなくても
-            # 名前が本番と同じ条件に当たるので、次の掃除で消える。
+            # 名前が本番と同じ条件にヒットするので、次の掃除で消える。
             with contextlib.suppress(OSError):
                 os.remove(part)
             raise
@@ -270,7 +270,7 @@ _ATOMIC_TEMP = re.compile(r"^\.(?P<stem>.+)\.[^.]+\.part(?P<suffix>\.[^.]*)?$")
 def temp_origin(name: str) -> str:
     """`write_text_atomic` の一時ファイルの名前なら、先頭の `.` を外した名前。違えばそのまま。
 
-    掃除する側が、本番と同じ「先頭と拡張子」の条件を当てられるようにする
+    掃除する側が、本番と同じ「先頭と拡張子」の条件を適用されるようにする
     （`.once-a-b.x1y2.part.json` → `once-a-b.x1y2.part.json`）。
     """
     return name[1:] if is_temp_name(name) else name
@@ -280,7 +280,7 @@ def is_temp_name(name: str) -> bool:
     """途中を見せない書き方が異常終了して残した一時ファイルの名前か。
 
     `write_bytes_atomic` などの `.<名前>.<一意>.part` と、`write_text_atomic` の
-    `.<名前>.<一意>.part<拡張子>` の形。先頭が `.` でない名前は当たらない。
+    `.<名前>.<一意>.part<拡張子>` の形。先頭が `.` でない名前はヒットしない。
     """
     return bool(_ATOMIC_TEMP.match(name))
 
@@ -315,8 +315,8 @@ def write_bytes(path: str, content: bytes) -> str:
 def write_bytes_atomic(path: str, content: bytes) -> str:
     """中身をそのまま、途中を見せず電源断にも耐える形で書く。書けたら空文字、駄目なら理由。
 
-    承認済みチケット（`doing/<識別子>.md`）と、それと組になる待ち方・戻す提案を書く。
-    `write_bytes` の `open(path, "wb")` は開いた時点で中身を捨てるので、途中で異常終了すると
+    承認済みチケット（`doing/<識別子>.md`）と、それと組になる先行関係・戻す提案を書く。
+    `write_bytes` の `open(path, "wb")` は開いた時点で中身を破棄するので、途中で異常終了すると
     空か書きかけのチケットが残る。承認済みチケットは判定が範囲を読む元で、承認は提案と
     バイト単位で同じことが条件なので、破損したものが残ると取り返しが付かない。
 
@@ -493,7 +493,7 @@ def read_json(path: str) -> tuple[Any, Exception | None]:
 
 
 def read_dict(path: str) -> dict | None:
-    """JSON の辞書。読めなければ None、読めたが辞書でなければ空の辞書。"""
+    """JSON のマップ。読めなければ None、読めたがマップでなければ空のマップ。"""
     data, failed = read_json(path)
     if failed is not None:
         return None
@@ -506,7 +506,7 @@ def write_json_atomic(path: str, data: Any, indent: int | None = None) -> str:
 
 
 def read_line(stream: Any) -> str:
-    """ユーザの答えを 1 行読む。読めなければ空文字（端末が閉じている、など）。"""
+    """ユーザの答えを 1 行読む。読めなければ空文字（ターミナルが閉じている、など）。"""
     try:
         return stream.readline()
     except (OSError, ValueError):
@@ -527,7 +527,7 @@ def remove(path: str) -> None:
 def put_back(pairs: tuple[tuple[str, bytes | None], ...]) -> None:
     """パスごとに前の中身へ戻す（中身が None なら消す）。戻せなくても何も出さない。
 
-    戻すのは承認で書いた待ち方などなので、承認済みチケットと同じ書き方（`write_bytes_atomic`）で戻す。
+    戻すのは承認で書いた先行関係などなので、承認済みチケットと同じ書き方（`write_bytes_atomic`）で戻す。
     """
     for path, data in pairs:
         if data is None:
@@ -734,7 +734,7 @@ def note_input(path: str) -> None:
 def note_removed(path: str) -> None:
     """もう無いパスを、消したものとして一覧に載せる（無いときだけ）。
 
-    `ready` が `wip/` を片付けるとき、作業ツリーから先に消えていた追跡済みのファイルの削除も
+    `ready` が `wip/` を片付けるとき、ワークツリーから先に消えていた追跡済みのファイルの削除も
     write-and-push のコミットに含めるため。
     """
     if _RECORDERS and not os.path.lexists(path):

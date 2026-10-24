@@ -450,7 +450,7 @@ deny:
   const out2 = doc.apply(withWhen(doc.model.sections, removeAt(swapped, [1])));
   assert.ok(!out2.includes("B の理由"), out2);
   assert.ok(!out2.includes("C の理由"), out2);
-  // 直しただけ（数が同じ）なら、位置のとおりに当てる
+  // 直しただけ（数が同じ）なら、位置のとおりに適用する
   const renamed = doc.apply(withWhen(doc.model.sections, setPattern(tree, [1], "*/vault/*")));
   assert.ok(renamed.includes("        # B の理由\n        - glob: '*/vault/*'\n"), renamed);
 });

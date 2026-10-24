@@ -1,4 +1,4 @@
-"""守る対象の一覧。設定ファイル・層の 3 本・実行ファイルと、ワークツリー側の写しを集める。
+"""守る対象の一覧。設定ファイル・層の 3 本・実行ファイルと、ワークツリー側のコピーを集める。
 
 パスを解いて並べる。selfguard から分けた。
 """
@@ -78,7 +78,7 @@ def targets(
     3. 実行ファイル（`bin_path`）を heavy な対象にする。振り分けの sh なら、その先の実体も足す
     4. 振り分けの sh の形なら、PATH の ccnavi の実体を、パスの印つきの key で足す
        （同じ実体が既に在れば足さない）
-    5. `_worktree_copies` で、ワークツリー側の写しを足す
+    5. `_worktree_copies` で、ワークツリー側のコピーを足す
     """
     places = _places(root, projects_dir, rules_path, layers)
     found = [
@@ -100,7 +100,7 @@ def targets(
         # bin/ に実体が無いとき、sh は PATH の ccnavi を起動する。bin/ があるときも守るのは、
         # セッションの途中で bin/ が現れたり消えたりしても、守る対象の組が変わらないため。
         # key にパスの印を付ける。固定の key だと、PATH が変わって指す先が替わったとき、古い実体の
-        # 参照を新しい実体に当てて、間違った中身を書き戻す。
+        # 参照を新しい実体に適用して、間違った中身を書き戻す。
         on_path = (
             platformtag.path_executable(skip=bin_path) if platformtag.is_launcher(bin_path) else ""
         )
@@ -125,7 +125,7 @@ def _places(
     どの git に聞くか（プロジェクトのレイヤーはそのプロジェクト自身の git）と、ワークツリー側の
     設定をどこからの相対で組むか（元リポジトリから）。
 
-    同じ key が二度来たら後ろを捨てる。バックアップの名前が key で決まるので、重なったまま
+    同じ key が二度来たら後ろを破棄する。バックアップの名前が key で決まるので、重なったまま
     並べると、2 つの対象が同じバックアップを書き換え合う。
     """
     found = [(key, root, os.path.join(root, rel)) for key, rel in _SETTINGS_FILES]
@@ -215,7 +215,7 @@ def _worktree_copies(
     切れて、中に入っているワークツリー側の設定は元リポジトリが追跡しているものだけになる。
     lib から切ったツリーに `.claude/settings.json` は無いし、lib のレイヤーのパスは
     `projects/lib/.ccnavi/config/project/rules.yml` ではなく `.ccnavi/config/project/rules.yml`。
-    ワークスペースルートからの相対で組むと、どちらの向きにも当たらない。
+    ワークスペースルートからの相対で組むと、どちらの向きにもヒットしない。
 
     設定の置き場は設定で動く。元リポジトリの外を指しているなら、ワークツリーの中に
     対応するものは無いので、そこは対象から外れる。

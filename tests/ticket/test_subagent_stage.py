@@ -29,7 +29,7 @@ PARENT = "i0001"
 CHILD1 = "i0001-01-01"
 CHILD2 = "i0001-02-02"
 LINE = f"親 {PARENT} の局面: "
-# 調査と設計は並行し、実装が両方を待つ（終端は 1 つ）。
+# 調査と設計は並行し、実装に両方が先行する（終端は 1 つ）。
 PARALLEL = [
     {"type": "research", "after": []},
     {"type": "design", "after": []},

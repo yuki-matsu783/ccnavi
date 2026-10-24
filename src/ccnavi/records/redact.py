@@ -1,7 +1,7 @@
 """記録に残す文字列から、秘密の形をした部分を伏せる。
 
 判定には使わない。止める・通すは伏せる前の文字列で決め、伏せるのは `logs/decisions.jsonl` に
-書く 1 行だけ（audit）。判定の側で伏せると、伏せた形にルールを当てることになり、
+書く 1 行だけ（audit）。判定の側で伏せると、伏せた形にルールを適用することになり、
 `curl -H 'Authorization: …' …` のような呼び出しの読みが変わる。
 
 記録にはコマンドの全文が入る。`curl -H 'Authorization: Bearer …'`、`mysql -p<パスワード>`、
@@ -42,10 +42,10 @@ _KEY_WORDS = (
     r"token|password|passwd|[_-]pwd|secret|secret[_-]?key|api[_-]?key|apikey|access[_-]?key|"
     r"private[_-]?key|client[_-]?secret|auth[_-]?token|credentials?|cookie"
 )
-# 名前の頭は長さを限り、名前の途中から始めない（前の字が名前の字なら当てない）。どちらかが
+# 名前の頭は長さを限り、名前の途中から始めない（前の字が名前の字なら適用しない）。どちらかが
 # 無いと、`-` や `_` が続くだけの文字列で、始まりの位置ごとに末尾まで読み進めては戻る形になり、
 # 手間が長さの 2 乗で増える（1.5 万字で 10 秒）。記録は実行前チェックの期限の中で書くので、
-# 期限を過ぎると hook の拒否ごと捨てられる。これより長い名前は取りこぼす。
+# 期限を過ぎると hook の拒否ごと破棄される。これより長い名前は取りこぼす。
 _NAME_HEAD = r"[A-Za-z0-9_.-]{0,64}"
 _ASSIGN = re.compile(
     r"(?<![A-Za-z0-9_.-])" + _NAME_HEAD + r"(?:" + _KEY_WORDS + r")[\"']?\s*[=:]\s*" + _VALUE,
@@ -81,13 +81,13 @@ _TOKENS = re.compile(
     r"|glpat-[A-Za-z0-9_-]{20,}"  # GitLab の個人アクセストークン
     r"|xox[abprs]-[A-Za-z0-9-]{10,}"  # Slack のトークン
     r"|sk-[A-Za-z0-9_-]{20,}"  # OpenAI / Anthropic の API キー（`sk-ant-…`、`sk-proj-…` を含む）
-    r"|[sr]k_(?:live|test)_[A-Za-z0-9]{10,}"  # Stripe の秘密鍵と制限付き鍵
+    r"|[sr]k_(?:live|test)_[A-Za-z0-9]{10,}"  # Stripe の秘密キーと制限付きキー
     r"|AIza[0-9A-Za-z_-]{30,}"  # Google の API キー
     r"|npm_[A-Za-z0-9]{30,}"  # npm のアクセストークン
     r"|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"  # JWT
     r")(?![A-Za-z0-9])"
 )
-# 秘密鍵の本文。見出しと結びの行は残し、あいだを伏せる。
+# 秘密キーの本文。見出しと結びの行は残し、あいだを伏せる。
 _PRIVATE_KEY = re.compile(
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?P<bare>.*?)(?:-----END [A-Z ]*PRIVATE KEY-----|$)",
     re.DOTALL,
@@ -164,7 +164,7 @@ def mask(value: str) -> str:
 def _spans(text: str) -> list[tuple[int, int]]:
     """伏せる範囲を、重なりをまとめて前から並べる。
 
-    同じ値に 2 つの形が当たる（`GITHUB_TOKEN=ghp_…` は名前でもトークンの形でも当たる）ので、
+    同じ値に 2 つの形がヒットする（`GITHUB_TOKEN=ghp_…` は名前でもトークンの形でもヒットする）ので、
     範囲を先に集めてから 1 度だけ伏せる。形ごとに順に置き換えると、伏せた後の文字列を
     次の形がもう 1 度伏せ、残した頭と尻まで消える。
     """
@@ -194,7 +194,7 @@ def _spans(text: str) -> list[tuple[int, int]]:
 
 
 def _value_spans(pattern: re.Pattern[str], text: str, offset: int) -> list[tuple[int, int]]:
-    """当たった値の範囲。変数を指すだけの値と空の値は外す。"""
+    """ヒットした値の範囲。変数を指すだけの値と空の値は外す。"""
     out = []
     for m in pattern.finditer(text):
         for name in ("sq", "dq", "bare"):

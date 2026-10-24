@@ -100,11 +100,11 @@ def serial_now(conf: settings.Settings, root: str) -> tuple[int, list[str]]:
 def identifier_problem(prefix: str, slug: str, serial: int, prefixes) -> str:
     """`<先頭の語>-<番号>-<slug>` を親の識別子にできない理由。できれば空。"""
     if prefix not in prefixes:
-        return f"先頭の語 {prefix} は使えない（使えるのは {', '.join(prefixes)}）"
+        return f"先頭の語 {prefix} は指定できない（指定できるのは {', '.join(prefixes)}）"
     ident = f"{prefix}-{serial}-{slug}"
     if ticket_ids.form_of(ident, prefixes) is None:
         return (
-            f"slug {slug} は使えない（先頭は英数字か日本語の字、続きは識別子に使える字。"
+            f"slug {slug} は指定できない（先頭は英数字か日本語の字、続きは識別子に使える字。"
             "空白と `/` は書けない）"
         )
     if ticket_ids.child_tail_pattern().search(ident):

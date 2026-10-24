@@ -1,13 +1,13 @@
 ---
 type: adr
 title: 公開前なので、移行のための読み取りと掃除をすべて外す
-description: 承認記録の古い形・待ち方ファイルの名残り・古い識別子・古い索引名・古い承認の知らせの掃除など、過去データを読むための処理を消す
+description: 承認記録の古い形・先行関係ファイルの名残り・古い識別子・古い索引名・古い承認の知らせの掃除など、過去データを読むための処理を消す
 tags: [approval, ticket, records, compat]
 keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflow.yml, i<番号>, index.jsonl, approved-, COMPAT, 互換の版]
 ---
 # ADR-0115: 公開前なので、移行のための読み取りと掃除をすべて外す
 
-状態: 採用（ADR-0104 の「既存の承認済みチケットに残る欄は消さない。移行はしない」「古い形も読む」、ADR-0109 の「前の版が書いた待ち方のファイルは読まない（`--lint` が warn で言う）」を改める）
+状態: 採用（ADR-0104 の「既存の承認済みチケットに残る欄は消さない。移行はしない」「古い形も読む」、ADR-0109 の「前の版が書いた先行関係のファイルは読まない（`--lint` が warn で言う）」を改める）
 
 ## 状況
 
@@ -17,7 +17,7 @@ ccnavi はまだ外部に公開しておらず、過去のデータを持つの�
 - 承認の記録 `ccnavi_approved`（`approved_at`・`source_tree`・`source_path`）を持つ古い承認済みチケットの読み取り。
   取り下げの分岐、承認の時刻の出どころ、取り込み済みの親子の「閉じた」の照合（Python と `ccnavi-sync.sh`）、
   退避との照合、`--lint` の warn
-- 前の版が書いた待ち方のファイル `phases/<親>/workflow.yml` が残っていることの warn、
+- 前の版が書いた先行関係のファイル `phases/<親>/workflow.yml` が残っていることの warn、
   `load_copy` が互換のためだけに受けていた `approved_dir`、`waits_of` の読まない `types`
 - 前の形の識別子 `i<番号>`・`<名前>-i<番号>`（通し番号の数えと lint の文面）
 - 古い索引名 `index.jsonl` を新しい名前に移るときに消す処理

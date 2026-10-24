@@ -2,11 +2,11 @@
 
 見るのは 5 つ。
 
-1. allow に当たったルールの文が `additionalContext` でモデルに渡る
+1. allow にヒットしたルールの文が `additionalContext` でモデルに渡る
 2. deny と ask では、理由（`permissionDecisionReason`）と一緒に `additionalContext` が付く。
    両方が届くことは Claude Code 2.1 で実際に確かめた
 3. dry-run でも文は届く（判定の代わりの文に続く）
-4. 書いていないルールでは鍵ごと出ない
+4. 書いていないルールではキーごと出ない
 5. `--lint` は広い allow（何にでもヒットする、選択肢が 3 つ以上）に書いた文を warn にし、
    狭い allow には何も言わない。`--test` は理由と文の両方を見せる
 """

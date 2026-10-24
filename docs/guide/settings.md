@@ -193,7 +193,7 @@ ccnavi の実行ファイル側で条件を足す手順は[開発の入口](../d
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。ユーザにも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（[ルールが言及していない呼び出し](rules.md)）。`dry-run` は無く、それ以外の値は `enable` として動き、`--lint` が指摘する |
 | `CCNAVI_ENTRY_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い。導入スクリプトは `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh）と書き、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に入る。無ければ PATH の `ccnavi` を使う（[導入と配布](install.md)）。拡張子は書かない。Windows の `.exe` は ccnavi が補う |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。`disable` なら `ccnavi user` の操作と `ticket` / `review` のサブコマンドは動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
-| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `user …` の入口 / `ticket …` / `review …` 付きで打つ形と、`ccnavi-user-*.sh` を打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`user agree` と `user reviewed` と `user close-early` と `user prune` と、書くとき（`--yes`）の `user handoff` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-user-decide.sh`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
+| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `user …` の入口 / `ticket …` / `review …` 付きで打つ形と、`ccnavi-user-*.sh` を打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`user agree` と `user reviewed` と `user close-early` と `user prune` と、書くとき（`--yes`）の `user handoff` は標準入力がターミナルであることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。ターミナルを求めない入口（`ccnavi-user-decide.sh`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストやターミナルの無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 | `CCNAVI_LEARNING` | 学びの蓄積を使うか。`enable` / `disable`、既定 `enable`。子チケットを閉じるときに気づきの記録（`wip/handoff/learnings/<子>.md`）を求め、親を閉じるときに気づきの処理の証跡を確かめる（[記録](records.md)の「学びの蓄積」） |
 | `CCNAVI_LEARNING_SOURCES` | パターンの観測元の数が何以上なら提案に足りるか。既定 3 |
@@ -216,7 +216,7 @@ ccnavi の実行ファイル側で条件を足す手順は[開発の入口](../d
 | `CCNAVI_GIT_MAX_LINES` | `ccnavi-git.sh` が返す本文の行数の上限。既定は `40`。超えたぶんは `logs/` にだけ残る |
 | `CCNAVI_GIT_FAIL_LINES` | `ccnavi-git.sh` が、失敗したときに返す末尾の行数。既定は `30` |
 | `CCNAVI_GIT_KEEP_LOGS` | `ccnavi-git.sh` が残す記録の本数。既定は `50` |
-| `CCNAVI_WORKSPACE` | ワークスペースルートの絶対パス。hook の外（端末など）から ccnavi の sh を打つとき、sh がルートを探せなければ渡す。ワークスペースルートの `.ccnavi/scripts/ccnavi-common.sh` が在るパスでなければ使われない |
+| `CCNAVI_WORKSPACE` | ワークスペースルートの絶対パス。hook の外（ターミナルなど）から ccnavi の sh を打つとき、sh がルートを探せなければ渡す。ワークスペースルートの `.ccnavi/scripts/ccnavi-common.sh` が在るパスでなければ使われない |
 | `CCNAVI_BRANCH_PREFIXES` | 親の識別子の先頭の語のリスト（カンマ区切り）。既定は `feature,hotfix,fix,bugfix,chore,refactor,docs`。`main` `master` `develop` `release` は使えない（[チケット](tickets.md)の「識別子とブランチ名」） |
 | `CCNAVI_LOG_LEVEL` | 診断ログ（`logs/diag/`）に出すレベル。`DEBUG` `INFO` `WARN` `ERROR`（大文字小文字は問わない）。既定と読めない値は `INFO` |
 
@@ -234,4 +234,4 @@ ccnavi の実行ファイル側で条件を足す手順は[開発の入口](../d
 `.claude` を探して決める。ワークツリー（`.claude/worktrees/<名前>`）は自分も `.claude` を
 持つが、ワークスペースルートとは数えず飛ばして親へ辿る。
 
-`CLAUDE_PROJECT_DIR` が無い端末や Bash ツールから、`.claude/` を持つプロジェクトの中で `ccnavi` を直接打つと、`--root` を渡さない限りそのプロジェクトが根と見なされる。`--root` を付けるか、sh のラッパーを通す。未解決の洗い出しは[単体 clone の洗い出し](../design/multi-repo/standalone-clone-gaps.md)にある。
+`CLAUDE_PROJECT_DIR` が無いターミナルや Bash ツールから、`.claude/` を持つプロジェクトの中で `ccnavi` を直接打つと、`--root` を渡さない限りそのプロジェクトが根と見なされる。`--root` を付けるか、sh のラッパーを通す。未解決の洗い出しは[単体 clone の洗い出し](../design/multi-repo/standalone-clone-gaps.md)にある。

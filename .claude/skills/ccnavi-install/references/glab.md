@@ -33,8 +33,8 @@ glab は必須ではない。入れられない・入れたくない人は、[au
 | 行 | 案内 |
 |---|---|
 | `todo not-installed` | 上の表で入れる。または代わりの道 |
-| `todo not-on-path <パス>` | doctor が見つけたパスを示す。Claude Code を終了して新しい端末から起動し直す。それでも見つからなければ、そのフォルダを PATH に足す |
+| `todo not-on-path <パス>` | doctor が見つけたパスを示す。Claude Code を終了して新しいターミナルから起動し直す。それでも見つからなければ、そのフォルダを PATH に足す |
 | `todo too-old <版>` | 入れたときと同じ方法で上げる。古い glab は `glab auth git-credential` を持たず、ccnavi が git に資格情報を渡せない |
 | `warn … optional:` | glab 無しで origin と API に届いている。入れなくてよい |
 
-入れたあとは、PATH が変わるので Claude Code を終了して新しい端末から起動し直してもらう。そのあとで認証（[auth.md](auth.md)）に進む。
+入れたあとは、PATH が変わるので Claude Code を終了して新しいターミナルから起動し直してもらう。そのあとで認証（[auth.md](auth.md)）に進む。

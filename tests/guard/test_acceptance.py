@@ -24,7 +24,7 @@ def run(mode="enable", payload=""):
     それを読むテストは、コードではなく走った機械のことを報告してしまう。
 
     コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
-    切らないと、作業ツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
+    切らないと、ワークツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
     """
     environment = {
         **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
@@ -82,7 +82,7 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout, "", "通る呼び出しでは標準出力は空")
 
-    def test_当たった理由はまとめて返る(self):
+    def test_ヒットした理由はまとめて返る(self):
         result = run(payload=pre_tool_use("Bash", "command", "sed -i s/a/b/ .env"))
 
         reason = verdict(self, result)["permissionDecisionReason"]
@@ -165,7 +165,7 @@ class ReasonTest(unittest.TestCase):
         got = reasons(self, run(payload=pre_tool_use("Bash", "command", "git push origin main")))
 
         self.assertEqual(len(got), 1)
-        self.assertIn("git push origin main", got[0], "何に当たったのかが無い")
+        self.assertIn("git push origin main", got[0], "何にヒットしたのかが無い")
         self.assertIn("DENY_COMMAND_PATTERN", got[0], "理由コードが無い")
         self.assertIn(
             "rule: .ccnavi/config/common/rules.yml:git-push",
@@ -179,8 +179,8 @@ class ReasonTest(unittest.TestCase):
         )
 
     def test_ファイルの理由は行き着く先を対象として名指しする(self):
-        # 当てたのは来たままのパスではなく解いた先なので、対象もそちらを言う。
-        # 来たままのパスを見せると、当たった理由と対象が食い違って読めなくなる。
+        # 適用したのは来たままのパスではなく解いた先なので、対象もそちらを言う。
+        # 来たままのパスを見せると、ヒットした理由と対象が食い違って読めなくなる。
         got = reasons(self, run(payload=pre_tool_use("Read", "file_path", "docs/../.env")))
 
         self.assertEqual(len(got), 1)
@@ -189,12 +189,12 @@ class ReasonTest(unittest.TestCase):
         self.assertIn("rule: .ccnavi/config/common/rules.yml:dotenv", got[0])
 
     def test_複数返った理由は一件ずつ単独で読んで成立する(self):
-        # 同じ出来事に複数の判定が同時に当たるとき、そのうちどれがユーザの目に
+        # 同じ出来事に複数の判定が同時にヒットするとき、そのうちどれがユーザの目に
         # 入るかは決まらない。上の 1 行を下の全部が参照する形は、1 件だけが
         # 切り出されて見えた時点で意味を失う。
         got = reasons(self, run(payload=pre_tool_use("Bash", "command", "sed -i s/a/b/ .env")))
 
-        self.assertEqual(len(got), 2, "2 つのルールに当たったはず")
+        self.assertEqual(len(got), 2, "2 つのルールにヒットしたはず")
         for i, part in enumerate(got):
             with self.subTest(reason=i):
                 self.assertIn("sed -i s/a/b/ .env", part, "対象を他の件に預けている")
@@ -278,7 +278,7 @@ class ReadingTest(unittest.TestCase):
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
     def test_読めなかった拒否は読めなかったと書く(self):
-        # 文字列をコードとして実行する呼び出しは読めないので、生の文字列に当てる。
+        # 文字列をコードとして実行する呼び出しは読めないので、生の文字列に適用する。
         # それを言うことが「禁止されたコマンドを実行した」と
         # 「その語がどこかにある」の違いで、次の一手を残すのは後者だけ。
         unread = verdict(
@@ -427,8 +427,8 @@ class RecordTest(unittest.TestCase):
     @unittest.skipUnless(
         hasattr(shellread_scan, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち"
     )
-    def test_引用の中から切り出したコマンドに当たったことを記録する(self):
-        # 書いた側が文字のつもりでいた場所に当たった判定を、あとから数えられるように
+    def test_引用の中から切り出したコマンドにヒットしたことを記録する(self):
+        # 書いた側が文字のつもりでいた場所にヒットした判定を、あとから数えられるように
         # （wip/design/shellread-subst.md 1.4）。
         got = self.logged(
             "enable",

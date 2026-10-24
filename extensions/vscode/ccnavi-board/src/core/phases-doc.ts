@@ -9,7 +9,7 @@
  * 実行ファイル（phasetypes.py）の仕事で、書式の検証も `--lint --phases <一時ファイル>` に聞く。
  * 画面の欄は文字のまま持ち、リストの欄（scope / deliverables）は文字の配列で持つ。
  *
- * 順序は親チケットの計画の項の `after` で決めるので、定義は順序の欄を持たない。
+ * 順序は親チケットの計画のステップの `after` で決めるので、定義は順序の欄を持たない。
  *
  * 組み込みの既定は持たない（実行ファイルも持たない。既定を組み込むと、意図せずレビューの
  * 要否が決まる）。雛形も持たない（共通レイヤーに雛形を置くと、レイヤーの同じ id と中身が食い違い、そのレイヤーが
@@ -51,7 +51,7 @@ export function readPhases(text: string): PhasesDocument {
     problems.push(`YAML として解釈できません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは読み込めません。保存すると中身を捨てて空のマップから始めます");
+    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは読み込めません。保存すると中身を破棄して空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
@@ -63,9 +63,9 @@ export function readPhases(text: string): PhasesDocument {
   const phases: PhaseForm[] = [];
   const raw = doc.get("phases", true);
   if (raw === undefined || raw === null) {
-    problems.push("phases がありません。実行ファイルは「`phases` がないか空か、辞書ではない」と報告します。定義を 1 つ以上追加して保存してください");
+    problems.push("phases がありません。実行ファイルは「`phases` がないか空か、マップではない」と報告します。定義を 1 つ以上追加して保存してください");
   } else if (!isMap(raw)) {
-    problems.push("phases がマップ（キーと値の組の集まり）ではありません。定義は画面に出しません。保存すると中身を捨てて空のマップから始めます");
+    problems.push("phases がマップ（キーと値の組の集まり）ではありません。定義は画面に出しません。保存すると中身を破棄して空のマップから始めます");
   } else {
     raw.items.forEach((pair, index) => {
       const id = keyText(pair);
@@ -76,7 +76,7 @@ export function readPhases(text: string): PhasesDocument {
       phases.push(formOf(index, id, pair.value, problems));
     });
     if (phases.length === 0 && problems.length === 0) {
-      problems.push("定義が 1 つもありません。実行ファイルは「`phases` がないか空か、辞書ではない」と報告します");
+      problems.push("定義が 1 つもありません。実行ファイルは「`phases` がないか空か、マップではない」と報告します");
     }
   }
 
@@ -195,7 +195,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     }
   }
 
-  // 空か、最上位が対応表でないファイルは、中身を捨てて対応表から始める（読み込みの苦情で言ってある）。
+  // 空か、最上位が対応表でないファイルは、中身を破棄して対応表から始める（読み込みの苦情で言ってある）。
   const top: YAMLMap = isMap(doc.contents) ? doc.contents : new YAMLMap();
   if (doc.contents !== top) {
     doc.contents = top;

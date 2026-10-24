@@ -88,7 +88,7 @@ class LayerDriftTest(unittest.TestCase):
     def test_a_file_only_here_or_only_there_is_told_which(self):
         os.remove(os.path.join(self.root, LAYER))
         (gone,) = self.drift()
-        self.assertIn("作業ツリーにありません", gone.detail)
+        self.assertIn("ワークツリーにありません", gone.detail)
         write(os.path.join(self.root, LAYER), "version: 1\n")
         git(self.root, "rm", "-q", "--cached", LAYER)
         git(self.root, "commit", "-q", "-m", "drop")

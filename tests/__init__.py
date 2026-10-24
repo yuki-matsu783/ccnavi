@@ -87,7 +87,7 @@ def _block_host_git_config() -> dict[str, str]:
 
     どちらも「テストが緩む」ではなく「テストの答えが機械で変わる」問題で、
     同じチケットがどの環境でも同じ場所で止まるという設計（regex も大文字小文字を
-    区別せずに当て、機械で答えを割らない。ticket.py）と
+    区別せずに適用し、機械で答えを割らない。ticket.py）と
     合わない。
 
     空の設定ではなく `init.defaultBranch` を書いた設定を指すのは、git 自身の
@@ -264,7 +264,7 @@ def common_sh(scripts_dir: str = SH_SCRIPTS) -> tuple[str, ...]:
     """保護済み sh が起動して最初に `.` で読む共通部のファイル名。
 
     入口の `ccnavi-common.sh` と、入口が同じディレクトリから読む部品（`ccnavi-common-*.sh`）。
-    sh を使い捨ての木へ写すテストは、名前を並べずにこれで全部を一緒に写す。
+    sh を使い捨ての木へコピーするテストは、名前を並べずにこれで全部を一緒にコピーする。
     部品は入口が `$0` のディレクトリから読むので、1 本でも欠けると sh は起動の段で失敗する。
     共通部が 1 本のままでも、部品に分かれていても同じ書き方で済む。
     """
@@ -280,7 +280,7 @@ def common_sh(scripts_dir: str = SH_SCRIPTS) -> tuple[str, ...]:
 
 
 def put_ccnavi_md(root: str) -> str:
-    """作業ディレクトリに、このリポジトリの `.ccnavi/CCNAVI.md` を写す。
+    """作業ディレクトリに、このリポジトリの `.ccnavi/CCNAVI.md` をコピーする。
 
     セッション開始で渡す作業の決まりの原本。
     """

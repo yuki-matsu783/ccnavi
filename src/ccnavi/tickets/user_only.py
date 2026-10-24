@@ -1,12 +1,13 @@
 """ユーザだけが打つ操作の表。どの操作をユーザ専用にするかを、ここ 1 か所に宣言する。
 
-この表が、hook の止め（`phase_forms`）と実行ファイルの端末要求（`entry/cli*.py`）の正本。
+この表が、hook の止め（`phase_forms`）と実行ファイルのターミナル要求（`entry/cli*.py`）の正本。
 `phase_forms` が正規表現とオプションの一覧をここから組み立て、実行ファイルは `terminal()` で、
-端末を求めるときに表示する操作の名前（`user agree` の形）を引く。操作を足す・外すときは、この表の行を直す。
+ターミナルを求めるときに表示する操作の名前（`user agree` の形）を引く。操作を足す・外すときは、
+この表の行を直す。
 
 表は 4 つ。
 
-- `OPS`: 操作。何をする操作か（`what`）と、実行ファイルが端末の前のユーザを求めるときに
+- `OPS`: 操作。何をする操作か（`what`）と、実行ファイルがターミナルの前のユーザを求めるときに
   表示するコマンド名（`terminal`）を持つ
 - `FLAGS`: オプション。実行ファイル（`where` が空）か sh スクリプト（`where` がスクリプトの名前）の
   オプションで、どの止めに入るか（`cli`・`script`）と、所属するグループ（`groups`）を持つ。
@@ -34,7 +35,8 @@ class Op:
     id: str
     # 文面と、表の読み手のための短い名前。
     what: str
-    # 実行ファイルが標準入力に端末を求める操作の、標準エラーに出す表示名（`user <操作>` の形）。
+    # 実行ファイルが標準入力にターミナルを求める操作の、
+    # 標準エラーに出す表示名（`user <操作>` の形）。
     # 空なら求めない。
     terminal: str = ""
 
@@ -92,7 +94,7 @@ OPS: tuple[Op, ...] = (
     Op("mirror", "共通レイヤーのミラーの同期", terminal="user mirror --yes"),
     Op("prune", "記録と state の削除", terminal="user prune"),
     Op("state-direct", "チケットの状態とレビューの操作を実行ファイルで直に呼ぶ形"),
-    Op("guard-off", "端末要求を切る設定"),
+    Op("guard-off", "ターミナル要求を切る設定"),
 )
 
 _REVIEW = "ccnavi-review"
@@ -130,7 +132,7 @@ FLAGS: tuple[Flag, ...] = (
     # 取り込みと同じグループで見る。
     Flag("--mirror", "mirror", gated=True, groups=("handoff",)),
     Flag("--guard-ticket-approval", "guard-off", cli=False, groups=("guard",)),
-    # ボードの経路の印（`--via board`・`--via=board`）。ボードの子プロセスだけが付け、端末を
+    # ボードの経路の印（`--via board`・`--via=board`）。ボードの子プロセスだけが付け、ターミナルを
     # 求めない経路を選ぶ。単独では止めないが、`board` の語と並べば、操作の語や `--yes` が
     # 読めない形（展開で組み立てた `--yes` など）でも止める（BOARD_COMBOS）。
     Flag("--via", "confirm-yes", cli=False, groups=("via",)),
@@ -175,7 +177,8 @@ SUBS: tuple[Sub, ...] = (
 
 # ボードで押した操作の、オプションの組み合わせ。グループの名前を並べ、どのグループからも
 # 1 つずつがコマンド行に並んだら止める。並びの順に見て、最初に揃った組み合わせで文面を決める。
-# 名前に依らず止めるので、名前を変えたコピーも止まる。端末を求めない経路は、これが唯一の防御になる。
+# 名前に依らず止めるので、名前を変えたコピーも止まる。ターミナルを求めない経路は、
+# これが唯一の防御になる。
 BOARD_COMBOS: tuple[tuple[str, ...], ...] = (
     ("approval", "yes"),
     ("user", "user-board-verb", "yes"),
@@ -221,9 +224,9 @@ WRAPPER_OPTIONS: tuple[str, ...] = ("--root", "--cwd", "--record-writes", "--rec
 # ボードの組み合わせに使うためのグループ。
 WORD_GROUPS: dict[str, tuple[str, ...]] = {
     "user": (USER_WORD,),
-    # 端末を求めない経路（`--yes`）を持つ操作。
+    # ターミナルを求めない経路（`--yes`）を持つ操作。
     "user-board-verb": ("agree", "reviewed", "handoff", "mirror"),
-    # `--via` の値のうち、端末を求めない経路を選ぶもの。
+    # `--via` の値のうち、ターミナルを求めない経路を選ぶもの。
     "board": ("board",),
 }
 
@@ -244,10 +247,10 @@ def op(op_id: str) -> Op:
 
 
 def terminal(op_id: str) -> str:
-    """実行ファイルが端末を求める操作の、標準エラーに出す表示名（`user agree` の形）。"""
+    """実行ファイルがターミナルを求める操作の、標準エラーに出す表示名（`user agree` の形）。"""
     shown = op(op_id).terminal
     if not shown:
-        raise KeyError(f"{op_id} は端末を求める操作ではない")
+        raise KeyError(f"{op_id} はターミナルを求める操作ではない")
     return shown
 
 
@@ -256,7 +259,7 @@ def names(*groups: str, where: str | None = "") -> tuple[str, ...]:
 
     `where` はオプションの置き場。空は実行ファイル、スクリプトの名前はそのスクリプト、
     None はどこでも。グループにオプションが 1 つも無いのは表の書き間違いなので、空では返さず
-    KeyError にする。空のまま組み合わせを作ると、何にでも当たる正規表現になるため。
+    KeyError にする。空のまま組み合わせを作ると、何にでもヒットする正規表現になるため。
     """
     found: list[str] = []
     for group in groups:
@@ -280,7 +283,7 @@ def cli_forms(not_preview: str) -> str:
 
     `not_preview` は、`--preview` が単独の語として隣に無いことを言う後読みの断片。
     `preview_exempt` のオプションにだけ付ける。承認を行う `--yes` は独立したオプションで、
-    必ず当てる。
+    必ず適用する。
     """
     parts: list[str] = []
     exempt = [r.name for r in FLAGS if r.cli and r.preview_exempt and not r.where]
@@ -509,5 +512,5 @@ def user_verb_forms(verb: str) -> str:
 
 
 def user_script_pattern() -> re.Pattern[str]:
-    """ユーザ専用の sh の名前。コマンド行のどこに出ても当てる。"""
+    """ユーザ専用の sh の名前。コマンド行のどこに出ても適用する。"""
     return re.compile(rf"(?<![\w-]){re.escape(USER_SCRIPT_PREFIX)}[\w-]+\.sh", re.IGNORECASE)

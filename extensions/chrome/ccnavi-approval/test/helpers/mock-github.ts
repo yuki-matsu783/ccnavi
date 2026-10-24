@@ -90,7 +90,7 @@ export class MockGitHub {
   readonly truncatedBlobs = new Set<string>();
   /** シンボリックリンク（tree の mode 120000）として返すパス */
   readonly linkPaths = new Set<string>();
-  /** 次の要求（`match` に当たるもの）をレート制限で断る（1 回ずつ消える） */
+  /** 次の要求（`match` にヒットするもの）をレート制限で断る（1 回ずつ消える） */
   readonly limits: { match: RegExp; status: number; headers: Record<string, string>; graphql?: boolean }[] = [];
   /** 要求を受けるたびに呼ぶ（試験が割り込みの書き手を作る） */
   onRequest: ((method: string, url: URL) => void) | null = null;

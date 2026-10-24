@@ -28,13 +28,13 @@ interface PlanItem {
   readonly after: number[];
 }
 
-/** 図に書いた計画（`plan:` の値）を、項の型と待つ番号にする。名前だけの項は何も待たない */
+/** 図に書いた計画（`plan:` の値）を、ステップの型と先行の番号にする。名前だけのステップは先行なし */
 function planOf(text: string): PlanItem[] {
   const list = (parse(text) as { plan: Array<string | { type: string; after?: number[] }> }).plan;
   return list.map((item) => (typeof item === "string" ? { type: item, after: [] } : { type: item.type, after: item.after ?? [] }));
 }
 
-/** `after` を推移的に辿った、項（1 始まり）が待つ番号 */
+/** `after` を推移的に辿った、ステップ（1 始まり）の先行の番号 */
 function waits(items: readonly PlanItem[], number: number): number[] {
   const seen = new Set<number>();
   const walk = (n: number): void => {
@@ -49,7 +49,7 @@ function waits(items: readonly PlanItem[], number: number): number[] {
   return [...seen].sort((a, b) => a - b);
 }
 
-test("CB-T1190 図の中の値は、見本の定義（research・design など）と一致する。直した定義・写し・review の例のどれも", () => {
+test("CB-T1190 図の中の値は、見本の定義（research・design など）と一致する。直した定義・コピー・review の例のどれも", () => {
   const research = sample.research;
   // 保存の図: 直す定義は見本の research と同じ値
   assert.deepEqual(parse(value("phase-save", "edit")), { review: research.review, scope: research.scope, deliverables: research.deliverables });
@@ -57,17 +57,17 @@ test("CB-T1190 図の中の値は、見本の定義（research・design など�
   assert.match(value("phase-save", "save"), /feedback/);
   assert.equal(sample["design-feedback"].kind, "feedback", "保存の図の例（feedback に none）が成り立つ定義");
 
-  // 写しの図: 写す定義は、見本の review と scope のまま
+  // コピーの図: コピーする定義は、見本の review と scope のまま
   const copied = (parse(value("phase-fill", "write")) as { phases: Record<string, { review: string; scope: unknown }> }).phases;
   const plan = planOf(value("phase-fill", "plan"));
-  assert.deepEqual(Object.keys(copied).sort(), [...new Set(plan.map((item) => item.type))].sort(), "写しは計画の項が使う定義だけ");
+  assert.deepEqual(Object.keys(copied).sort(), [...new Set(plan.map((item) => item.type))].sort(), "コピーは計画のステップが使う定義だけ");
   for (const [id, entry] of Object.entries(copied)) {
-    assert.deepEqual(entry, { review: sample[id].review, scope: sample[id].scope }, `${id} の写し`);
+    assert.deepEqual(entry, { review: sample[id].review, scope: sample[id].scope }, `${id} のコピー`);
   }
-  assert.ok(!Object.keys(copied).includes("design-feedback"), "使わない定義は写さない");
+  assert.ok(!Object.keys(copied).includes("design-feedback"), "使わない定義はコピーしない");
   assert.match(value("phase-fill", "write"), /design-feedback/);
 
-  // review の図: 定義が none の research に、計画の項の mr を足す
+  // review の図: 定義が none の research に、計画のステップの mr を足す
   assert.equal(research.review, "none");
   assert.deepEqual(parse(value("phase-review-up", "def")), { review: research.review });
   assert.deepEqual(parse(value("phase-review-up", "plan")), [{ type: "research", review: "mr" }]);
@@ -82,35 +82,35 @@ test("CB-T1190 図の中の値は、見本の定義（research・design など�
   assert.match(value("phase-end-mr", "ended"), new RegExp(`review: ${sample.design.review}`));
 });
 
-test("CB-T1191 計画の番号と待ちは、図どうしで揃う。項は work の定義、after は小さい番号だけ、最後の項が全部を待つ", () => {
+test("CB-T1191 計画の番号と先行は、図どうしで揃う。ステップは work の定義、after は小さい番号だけ、最後のステップに全部が先行する", () => {
   const plan = planOf(value("phase-fill", "plan"));
   for (const [index, item] of plan.entries()) {
-    assert.equal(sample[item.type]?.kind, "work", `${index + 1} 番目の項 ${item.type} は work の定義`);
+    assert.equal(sample[item.type]?.kind, "work", `${index + 1} 番目のステップ ${item.type} は work の定義`);
     assert.ok(item.after.every((n) => Number.isInteger(n) && n >= 1 && n < index + 1), `${index + 1} 番目の after は自分より小さい番号だけ`);
   }
   assert.deepEqual(
     waits(plan, plan.length),
     plan.slice(0, -1).map((_, index) => index + 1),
-    "最後の項（終端）が、前の全部を推移的に待つ",
+    "最後のステップ（終端）に、前の全部が推移的に先行する",
   );
 
-  // 順序の図は、同じ計画を「番号: 項」の形で書く
+  // 順序の図は、同じ計画を「番号: ステップ」の形で書く
   const ordered = parse(value("phase-order", "after")) as Record<string, string | { type: string; after?: number[] }>;
   assert.deepEqual(
     Object.values(ordered).map((item) => (typeof item === "string" ? { type: item, after: [] } : { type: item.type, after: item.after ?? [] })),
     plan,
-    "順序の図の計画が、写しの図の計画と違う",
+    "順序の図の計画が、コピーの図の計画と違う",
   );
   assert.deepEqual(Object.keys(ordered), plan.map((_, index) => String(index + 1)));
-  // 待ちの行（「N: 定義 — 待つ: a, b」）は、計画から計算した待ちと同じ
+  // 先行の行（「N: 定義 — 先行 a, b」）は、計画から計算した先行と同じ
   const lines = value("phase-order", "waits").split("\n");
   assert.ok(lines.length >= 2);
   for (const line of lines) {
-    const match = /^(\d+): (\S+) — 待つ: (.+)$/.exec(line);
-    assert.ok(match !== null, `待ちの行の形: ${line}`);
+    const match = /^(\d+): (\S+) — 先行 (.+)$/.exec(line);
+    assert.ok(match !== null, `先行の行の形: ${line}`);
     const number = Number(match[1]);
     assert.equal(plan[number - 1].type, match[2]);
-    assert.deepEqual(match[3].split(", ").map(Number), waits(plan, number), `${number} 番目の待ち`);
+    assert.deepEqual(match[3].split(", ").map(Number), waits(plan, number), `${number} 番目の先行`);
   }
   // 終わりの図が「N 番目のフェーズ（定義）」と呼ぶ番号と、レビューの依頼の --phase は、計画と同じ
   const numbered = (name: string, id: string): [number, string] => {
@@ -145,7 +145,7 @@ test("CB-T1192 図は登場者 2〜6 人で、値つきの矢印を持つ。足�
   assert.deepEqual(ids.slice(3), ["add-phase", "guide-agent", "feedback", "project", "save"], "既存の案内の ID と順");
   const titles = def.courses.slice(3).map((course) => course.title);
   assert.deepEqual(titles, [
-    "新しい工程の定義を追加して、計画に使えるようにしたいとき",
+    "新しい工程の定義を追加して、計画に利用できるようにしたいとき",
     "受入テスト作成などの使いどころを、エージェントに案内したいとき",
     "フィードバック対応の定義を使い分けたいとき",
     "プロジェクトごとの定義に切り替えたいとき",

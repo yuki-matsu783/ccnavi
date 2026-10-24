@@ -16,12 +16,12 @@
  * 見た目を見せたい手順は、画像（`image` と `alt`）も持てる。
  *
  *   target  `data-tour="…"` の値。空なら吹き出しを画面の中ほどに出して文だけを見せる
- *   scene   その手順で画面がとる様子（開く行・開くタブ・選ぶ点など）。鍵と値は画面ごとに決める。手順ごとに全部を書き直す
+ *   scene   その手順で画面がとる様子（開く行・開くタブ・選ぶ点など）。キーと値は画面ごとに決める。手順ごとに全部を書き直す
  *           （前の手順の様子を引き継がない）ので、「戻る」でも同じ様子になる。値は文字列・数・真偽だけ
  *   image   本文の下に出す画像の名前。`webview/tours/images/<名前>.png` に置き、`webview/tours/images.ts` に登録する。
  *           画像は読み込みを待つ間に吹き出しの高さが変わるので、指す先は空にして中ほどに出す
  *   alt     画像の代替文（`image` があるとき必須）
- *   diagram 本文の下に出す図の名前（`diagrams` の鍵）。`image` とは同時に書かない
+ *   diagram 本文の下に出す図の名前（`diagrams` のキー）。`image` とは同時に書かない
  *   focus   図の中で光らせる矢印の id（, で区切る）。ほかの矢印は薄く出す。書かなければ全部を同じ濃さで出す
  */
 
@@ -37,7 +37,7 @@ export interface TourStepDef {
   readonly image: string;
   /** 画像の代替文。画像が無ければ空 */
   readonly alt: string;
-  /** 図の名前（`TourDef.diagrams` の鍵）。無ければ空 */
+  /** 図の名前（`TourDef.diagrams` のキー）。無ければ空 */
   readonly diagram: string;
   /** 図の中で光らせる矢印の id */
   readonly focus: readonly string[];
@@ -73,7 +73,7 @@ export interface TourDef {
   readonly diagrams: Readonly<Record<string, DiagramDef>>;
 }
 
-/** 基本の案内の鍵。初回に自動で出る案内で、一覧の先頭に出る */
+/** 基本の案内のキー。初回に自動で出る案内で、一覧の先頭に出る */
 export const INTRO_ID = "intro";
 
 /** 見本の目印。画面は見本を出している間、この文を帯で出す */
@@ -91,7 +91,7 @@ const DIAGRAM_STEP_KEYS = ["id", "from", "to", "text", "value"];
 /** 図の登場者の数。列が狭くなりすぎない範囲 */
 const MAX_ACTORS = 6;
 
-/** 知らない鍵（綴り違い）を名指しする。黙って捨てると、空の指す先や空の様子に化ける */
+/** 知らないキー（綴り違い）を名指しする。黙って破棄すると、空の指す先や空の様子に化ける */
 function unknownKey(map: Record<string, unknown>, known: readonly string[]): string | undefined {
   return Object.keys(map).find((key) => !known.includes(key));
 }
@@ -127,7 +127,7 @@ function parseDiagrams(raw: unknown): { readonly ok: true; readonly value: Recor
     }
     const unknown = unknownKey(diagram, DIAGRAM_KEYS);
     if (unknown !== undefined) {
-      return { ok: false, error: `${at} に知らない鍵 ${unknown}（actors / steps だけ）` };
+      return { ok: false, error: `${at} に知らないキー ${unknown}（actors / steps だけ）` };
     }
     const actors = Array.isArray(diagram.actors) ? diagram.actors.map((actor) => text(actor)) : [];
     if (actors.length < 2 || actors.length > MAX_ACTORS || actors.some((actor) => actor === undefined) || new Set(actors).size !== actors.length) {
@@ -147,7 +147,7 @@ function parseDiagrams(raw: unknown): { readonly ok: true; readonly value: Recor
       }
       const stepUnknown = unknownKey(step, DIAGRAM_STEP_KEYS);
       if (stepUnknown !== undefined) {
-        return { ok: false, error: `${stepAt} に知らない鍵 ${stepUnknown}（id / from / to / text / value だけ）` };
+        return { ok: false, error: `${stepAt} に知らないキー ${stepUnknown}（id / from / to / text / value だけ）` };
       }
       const id = text(step.id);
       const from = text(step.from);
@@ -185,7 +185,7 @@ export function parseTour(raw: unknown): TourParsed {
   }
   const rootUnknown = unknownKey(root, ROOT_KEYS);
   if (rootUnknown !== undefined) {
-    return { ok: false, error: `知らない鍵 ${rootUnknown}（screen / sample / courses / diagrams だけ）` };
+    return { ok: false, error: `知らないキー ${rootUnknown}（screen / sample / courses / diagrams だけ）` };
   }
   const screen = text(root.screen);
   if (screen === undefined) {
@@ -208,14 +208,14 @@ export function parseTour(raw: unknown): TourParsed {
     }
     const courseUnknown = unknownKey(course, COURSE_KEYS);
     if (courseUnknown !== undefined) {
-      return { ok: false, error: `${at} に知らない鍵 ${courseUnknown}` };
+      return { ok: false, error: `${at} に未知のキー ${courseUnknown}` };
     }
     const id = text(course.id);
     if (id === undefined || !ID.test(id)) {
       return { ok: false, error: `${at}.id は小文字の英字で始まり、英小文字・数字・- だけにする` };
     }
     if (seen.has(id)) {
-      return { ok: false, error: `${at}.id「${id}」が重なっている` };
+      return { ok: false, error: `${at}.id「${id}」が重複している` };
     }
     seen.add(id);
     if (ci === 0 && id !== INTRO_ID) {
@@ -238,7 +238,7 @@ export function parseTour(raw: unknown): TourParsed {
       }
       const stepUnknown = unknownKey(step, STEP_KEYS);
       if (stepUnknown !== undefined) {
-        return { ok: false, error: `${stepAt} に知らない鍵 ${stepUnknown}` };
+        return { ok: false, error: `${stepAt} に未知のキー ${stepUnknown}` };
       }
       const stepTitle = text(step.title);
       const body = text(step.body);

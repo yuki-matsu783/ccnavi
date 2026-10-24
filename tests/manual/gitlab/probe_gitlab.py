@@ -1,4 +1,4 @@
-"""実物の GitLab に sh 3 本と exe を当てて 1 周する。ユーザが手で走らせる道具で、
+"""実物の GitLab に sh 3 本と exe を適用して 1 周する。ユーザが手で走らせる道具で、
 自動テストは呼ばない。
 
 tests/ticket/test_ticket.py と同じ形で一時リポジトリを作り、使い捨てのプロジェクトを
@@ -258,7 +258,7 @@ def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="�
         "  reason: 実測",
         f"title: {title}",
         "rationale: |",
-        "  実物の GitLab に当てる実測。",
+        "  実物の GitLab に適用する実測。",
     ]
     if allow:
         lines.append("allow:")

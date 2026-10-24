@@ -21,7 +21,7 @@ export function handoffEntryOf(reason: string | undefined): HandoffEntry {
   return { enabled: reason === undefined, reason: reason ?? "" };
 }
 
-/** 見ている設定の対象に合わせて開くツリーの鍵。プロジェクトの設定ならそのプロジェクトのツリー、それ以外はワークスペース */
+/** 見ている設定の対象に合わせて開くツリーのキー。プロジェクトの設定ならそのプロジェクトのツリー、それ以外はワークスペース */
 export function handoffTreeKey(target: { readonly kind: string; readonly name?: string }): string {
   return target.kind === "project" && target.name !== undefined ? `project:${target.name}` : MAIN_TREE_KEY;
 }

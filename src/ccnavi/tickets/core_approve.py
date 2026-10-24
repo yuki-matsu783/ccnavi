@@ -1,6 +1,6 @@
 """判定のコアを通す手元の承認の入口（`--agree` の 4 つの枝）。
 
-端末・ボードの `--yes`・`--preview`・`--verify` と、対話の承認。入力・判定・書き込みは
+ターミナル・ボードの `--yes`・`--preview`・`--verify` と、対話の承認。入力・判定・書き込みは
 `core_base`、再エクスポートは `core`。コアを通す入口をコアより下の段（agree）に置くと、
 import が循環する（tests/core/test_module_layers.py）。
 
@@ -37,7 +37,8 @@ CODE_APPROVE_NOTHING = "CORE_APPROVE_NOTHING"
 # 書く途中で止まった（置いたものは残る）。
 CODE_APPROVE_STOPPED = "CORE_APPROVE_STOPPED"
 
-# 見せたあとに承認待ちの提案が更新されたときに、利用者へ出す知らせ（端末・ボード・Chrome で共通）。
+# 見せたあとに承認待ちの提案が更新されたときに、
+# 利用者へ出す知らせ（ターミナル・ボード・Chrome で共通）。
 UPDATED_NOTICE = "内容が更新されました。"
 
 
@@ -59,7 +60,8 @@ def refusal_code(verdict: core_base.Verdict) -> str:
     return ""
 
 
-# ---- 手元の入口（`--agree`。端末・ボードの `--yes`・`--preview`・`--verify`） ------------------
+# ---- 手元の入口（`--agree`。
+# ターミナル・ボードの `--yes`・`--preview`・`--verify`） ------------------
 #
 # 前は approval.py にあった。コアを通す入口なので、コアより下の段（agree）には置かない
 # （agree → core → agree の循環になる。tests/core/test_module_layers.py）。
@@ -76,7 +78,7 @@ def approve(
 ) -> int:
     """未承認の提案をまとめてユーザに見せ、承認されたら承認済みチケットを置く。
 
-    エージェントではなくユーザが端末から打つ経路。承認は提案の中身を書き換えない。
+    エージェントではなくユーザがターミナルから打つ経路。承認は提案の中身を書き換えない。
     チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
     承認したユーザが承認したものの作者になる。
 
@@ -144,7 +146,7 @@ def approve(
     if applied.code == 0 and gathered.rejected:
         # 承認の対象の一部が失敗したときは、通ったぶんを置いてから失敗で終わる。置いたので
         # 繰り返してよく、失敗したものは上で名指ししてある。成功で終わると、
-        # 端末を見ていない側（スクリプト、CI）は全部通ったと読む。
+        # ターミナルを見ていない側（スクリプト、CI）は全部通ったと読む。
         stderr.write(
             f"ccnavi: {len(gathered.rejected)} 件は承認の対象にしなかった。"
             "直して出し直してください（通ったぶんの承認済みチケットは置いた）\n"
@@ -253,7 +255,8 @@ def preview(
     as_json: bool,
     only: list[str] | None = None,
 ) -> int:
-    """`--agree --preview`。一覧を見せるだけで、承認済みチケットは置かない。端末の確認は要らない。
+    """`--agree --preview`。一覧を見せるだけで、承認済みチケットは置かない。
+    ターミナルの確認は要らない。
 
     JSON の形は docs/requirements/json-shapes.md「承認の JSON」。一覧が空でも 0 で返す。
     拡張は `batch` が空なら「承認待ちは無い」と出す。
@@ -289,7 +292,7 @@ def verify(
     """`--agree --preview --verify`。いま `--agree` を打てば通るかを、置かずに返す。
 
     エージェントが提案を書いたあと、ユーザに承認を頼む前に自分で確かめるための枝。
-    置かないところも端末を求めないところも `--preview` と同じで、
+    置かないところもターミナルを求めないところも `--preview` と同じで、
     違うのは「通るかどうか」を終了コードと本文で言うこと。
 
     答えを `--preview` 自身に持たせない理由。読む側（VS Code のボード拡張）は 0 以外を
@@ -356,7 +359,7 @@ def approve_yes(
 
     拡張のオーバーレイで押した承認。
 
-    端末の確認は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
+    ターミナルの確認は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
     ものを承認する経路を使えなくするため。識別子に加えて、見せた各提案ファイルの元のバイト列全体の
     ダイジェスト（`digest`）も比べる。識別子が同じでも、見せたあとに提案の本文・改行・BOM が
@@ -460,7 +463,8 @@ def approve_yes(
                     "written": written,
                     "ticket": applied.stopped_at,
                     "reason": applied.reason,
-                    # 止まるまでに出た行（マーカーを消した、改版した）。端末は stdout で見えるが、
+                    # 止まるまでに出た行（マーカーを消した、改版した）。
+                    # ターミナルは stdout で見えるが、
                     # 拡張はこの JSON しか見ないので、同じものを渡す。
                     "lines": [line for line in lines.getvalue().splitlines() if line.strip()],
                 },

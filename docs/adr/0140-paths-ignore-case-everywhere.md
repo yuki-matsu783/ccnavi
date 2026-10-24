@@ -1,7 +1,7 @@
 ---
 type: adr
 title: パスと名前の大文字小文字は、どの機械でも区別せず同じものとして扱う
-description: 大文字小文字だけが違うパス・名前を同一として比べ、両立させない。機械ごとの分岐（normcase・CASE_INSENSITIVE）をやめ、比べる鍵を pathcase.fold に一本化する
+description: 大文字小文字だけが違うパス・名前を同一として比べ、両立させない。機械ごとの分岐（normcase・CASE_INSENSITIVE）をやめ、比べるキーを pathcase.fold に一本化する
 tags: [environment, worktree]
 keywords: [大文字小文字, casefold, normcase, pathcase, CASE_INSENSITIVE, ワークツリー, 識別子]
 ---
@@ -21,8 +21,8 @@ Linux で区別し、Windows と macOS の既定では区別しないので、�
 
 大文字小文字だけが違うパス・名前は同じものとして扱い、両立させない。
 
-- 比べるときはどの機械でも区別しない。比べる鍵は`infra/pathcase.fold()`に一本化する（`normcase`の後に`casefold`）
-- 鍵はファイルを開く表記には使わない。表記は元のまま使い、比べて残りを取り出すときは`tree.parts_under()`を使う
+- 比べるときはどの機械でも区別しない。比べるキーは`infra/pathcase.fold()`に一本化する（`normcase`の後に`casefold`）
+- キーはファイルを開く表記には使わない。表記は元のまま使い、比べて残りを取り出すときは`tree.parts_under()`を使う
 - `CASE_INSENSITIVE`と、表記まで同じであることを求める`exact_name`をやめる。`worktree_path()`は在るディレクトリの実際の表記で返す
 - `wip/`の置き場（`wip/handoff/` `wip/eli5/`）も区別しない。範囲の除外も`ready`の片付けも同じ見方にそろえる
 - 例外: git が追跡する綴りに依る名前（状態のディレクトリ、ブランチ名、`.gitignore`の`/scratchpad`）は、git が区別するので綴りまで求める

@@ -382,7 +382,7 @@ class LintTest(unittest.TestCase):
     def test_BOMの付いた承認済みチケットはdoneに在ってもerrorになる(self):
         # 判定は閉じた承認済みチケットを読まないが、読めないファイルが置き場に残っている
         # こと自体は書いたユーザの思い違いで、承認済みチケットは親のブランチに乗って他の機械へ
-        # そのまま届く。閉じた側の苦情を捨てると、届いた先でも何も言われないままになる。
+        # そのまま届く。閉じた側の苦情を破棄すると、届いた先でも何も言われないままになる。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done"),
             "i0001.md",
@@ -398,7 +398,7 @@ class LintTest(unittest.TestCase):
     def test_承認の記録が無くても承認済みの置き場なら読む(self):
         # 承認の正とするのは置き場。`.ccnavi/approved/` は組み込みの保護が
         # エージェントの書き込みを止めるので、`ccnavi_approved` が無くても承認済みとして
-        # 読む。端末もボードも無いユーザが、置き場を動かすだけで承認できる方法。
+        # 読む。ターミナルもボードも無いユーザが、置き場を動かすだけで承認できる方法。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "doing"),
             "i0001.md",
@@ -440,7 +440,7 @@ class LintTest(unittest.TestCase):
                 self.root,
                 dict(SOUND, id="文面無し", message=""),
                 dict(SOUND, id="match無し", match=""),
-                dict(SOUND, id="当てるもの無し", glob="", regex=""),
+                dict(SOUND, id="適用するもの無し", glob="", regex=""),
                 dict(SOUND, id="二重指定", regex="git push"),
                 dict(SOUND, id="組み立て不能", glob="", regex="git push ("),
                 dict(SOUND, id="先読み", glob="", regex="git (?=push)"),
@@ -451,7 +451,7 @@ class LintTest(unittest.TestCase):
         for name in (
             "文面無し",
             "match無し",
-            "当てるもの無し",
+            "適用するもの無し",
             "二重指定",
             "組み立て不能",
             "先読み",
@@ -515,14 +515,14 @@ class LintTest(unittest.TestCase):
                 self.root,
                 dict(SOUND, id="重複"),
                 dict(SOUND, id="重複", glob="*rm -rf *"),
-                dict(SOUND, id="当たらないツール", match="Mystery|Bash"),
+                dict(SOUND, id="ヒットしないツール", match="Mystery|Bash"),
             ),
         )
 
         self.assertEqual(result.returncode, 0, "warn だけで非ゼロにしてはいけない")
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
-        # 重複が 1 件、当たらない match が 1 件。重複は 2 件目だけを報告する。1 件目は、
+        # 重複が 1 件、ヒットしない match が 1 件。重複は 2 件目だけを報告する。1 件目は、
         # 他に同じ id が無ければそのままで正しいルールだから。id の無いルールは error
         # （test_rule_record_name の IdRequiredTest）。
         self.assertEqual(warns, 2, result.stdout)
@@ -574,7 +574,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout), (0, 1))
         self.assertIn("blocking", result.stdout)
 
-    def test_作業ツリーの中に書かれたoffはerrorになる(self):
+    def test_ワークツリーの中に書かれたoffはerrorになる(self):
         # 監視される側が書けるファイルから監視を止める記述。判定の側には
         # ユーザが渡した off と見分ける手段が無いので、ここで見つけるしかない。
         write(
@@ -685,7 +685,7 @@ class LintTest(unittest.TestCase):
         ]
         self.assertTrue(named, f"実行できない sh を error で名指ししていない: {result.stdout}")
 
-    def test_git_の作業ツリーでなければ実行後チェックが何も見ないとwarnになる(self):
+    def test_git_のワークツリーでなければ実行後チェックが何も見ないとwarnになる(self):
         # 登録はされているのに見る先が無い状態。実行後チェックは git の差分で
         # 見るので、リポジトリでない場所では 1 件も検知しない。
         write(
@@ -698,7 +698,7 @@ class LintTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         self.assertEqual(counts(result.stdout), (0, 1))
-        self.assertIn("作業ツリーを読めない", result.stdout)
+        self.assertIn("ワークツリーを読めない", result.stdout)
 
     def test_設定ファイルが無ければ登録については何も言わない(self):
         # hook はユーザごとの設定にも書ける。そちらはここから見えないので、
@@ -708,7 +708,8 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout), (0, 0), result.stdout)
 
     def test_json_は同じ苦情を機械可読な形で返し終了コードも同じ(self):
-        # VS Code 拡張が読む形（docs/requirements/json-shapes.md「lint の JSON」）。文面の版と同じ判定を
+        # VS Code 拡張が読む形（docs/requirements/json-shapes.md「lint の JSON」）。
+        # 文面の版と同じ判定を
         # 同じ深刻度で返す。error があれば終了コードも同じく非ゼロ。
         path = write(self.root, "rules.yml", "version: 2\ndeny: [\n  - id: x\n")
 

@@ -227,14 +227,14 @@ class TurnWiringTest(unittest.TestCase):
 
         self.assertEqual(self.active(), [])
 
-    def test_再開で前のプロセスの印を捨てる(self):
+    def test_再開で前のプロセスの印を破棄する(self):
         self.run_hook("UserPromptSubmit", prompt="お願いします")
 
         self.run_hook("SessionStart", source="resume")
 
         self.assertEqual(self.active(), [])
 
-    def test_compact_では印を捨てない(self):
+    def test_compact_では印を破棄しない(self):
         # 同じプロセスで、ターンの途中に来ることがある。
         self.run_hook("UserPromptSubmit", prompt="お願いします")
 

@@ -23,7 +23,7 @@ def spawn(*args, payload=""):
         "CCNAVI_LEARNING": "disable",
     }
     # コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
-    # 切らないと、作業ツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
+    # 切らないと、ワークツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     # コンソールのコードページに関係なく UTF-8 で通ることを見たいので、
     # 親から Python の入出力の指定は渡さない。

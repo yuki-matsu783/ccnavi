@@ -49,7 +49,7 @@ test("CX-T023 truncated の tree と、本文が大きさと合わない blob �
   const oid = "b".repeat(40);
   await assert.rejects(
     gh.blobs(client(fake({ data: { repository: { b0: { text: "abc", isBinary: false, byteSize: 10 } } } })), "acme", "widgets", [oid]),
-    /取り切れていない/,
+    /取り切れていません/,
   );
   const bin = await gh.blobs(client(fake({ data: { repository: { b0: { text: null, isBinary: true, byteSize: 10 } } } })), "acme", "widgets", [oid]);
   assert.deepEqual(bin[oid], { text: null, binary: true });

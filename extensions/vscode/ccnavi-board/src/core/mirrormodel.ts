@@ -1,11 +1,11 @@
 /**
  * プロジェクト管理画面が読む、共通レイヤーのミラーの結果（`user mirror --json`）の読み取りと、画面の判断の部分。
  *
- * ミラーは、ワークスペースの `.ccnavi/config/common/`（共通レイヤー）を各プロジェクトの `.ccnavi/config/common/` に写したもの。
+ * ミラーは、ワークスペースの `.ccnavi/config/common/`（共通レイヤー）を各プロジェクトの `.ccnavi/config/common/` にコピーしたもの。
  * ずれの有無・中身・ハッシュ（`expect`）は実行ファイルが決めて返し、同期で書くのも実行ファイル。ここで決めるのは次の 3 つだけ。
  *
  * - 行と帯に出す文言（同期済み / ずれ N 件 / 調べられない、変更の種類の言い方、同期の結果の通知）
- * - ボタンを押せるか（実行ファイルが古い・読めない・同期中・写すものが無い・ずれが無い、のどれかなら押せない）
+ * - ボタンを押せるか（実行ファイルが古い・読めない・同期中・コピーするものが無い・ずれが無い、のどれかなら押せない）
  * - 「すべて同期」の対象（`state` が `differs` のプロジェクト）と、そのとき渡す `expect`（結果全体の `expect`）
  *
  * VS Code の API も DOM も node も読まない（単体で試せる。画面にもバンドルされる）。
@@ -20,7 +20,7 @@ export type MirrorAction = "update" | "create" | "delete" | (string & {});
 /** プロジェクトの状態。知らない値も通すが、同期できるのは `differs` だけ */
 export type MirrorState = "synced" | "differs" | "error" | (string & {});
 
-/** 写すと変わるファイル 1 本 */
+/** コピーすると変わるファイル 1 本 */
 export interface MirrorChange {
   /** プロジェクトのルートからの相対パス。`/` 区切り */
   readonly rel: string;
@@ -44,7 +44,7 @@ export interface MirrorList {
   /** 偽なら `error` に理由（共通レイヤーが読めないなど）。そのとき `projects` は空 */
   readonly ok: boolean;
   readonly error: string;
-  /** 共通レイヤーに写すものが無い。同期しても何も起きない（ミラーは消さない） */
+  /** 共通レイヤーにコピーするものが無い。同期しても何も起きない（ミラーは消さない） */
   readonly commonEmpty: boolean;
   readonly projects: readonly MirrorProject[];
   /** 差分のある全プロジェクトをまとめて同期するときに渡す `--expect` の値。差分が無ければ空 */
@@ -180,7 +180,7 @@ export function stateText(project: MirrorProject): string {
     case "error":
       return "調べられません";
     default:
-      return `知らない状態です（${project.state}）`;
+      return `未知の状態です（${project.state}）`;
   }
 }
 
@@ -235,7 +235,7 @@ function commonBlock(status: MirrorStatus, busy: boolean): string {
       if (!status.list.ok) {
         return "ミラーを調べられませんでした。「更新」で調べ直してください";
       }
-      return status.list.commonEmpty ? "共通レイヤーに写すものがありません" : "";
+      return status.list.commonEmpty ? "共通レイヤーにコピーするものがありません" : "";
   }
 }
 
@@ -293,7 +293,7 @@ export function syncNotice(result: MirrorResult): { readonly kind: "info" | "war
       const names = done.map((s) => s.name).join("、");
       return {
         kind: "error",
-        message: `ミラーを同期できなかったものがあります: ${result.error}。同期できたのは ${names} です（作業ツリーに書いただけで、コミットはしていません）`,
+        message: `ミラーを同期できなかったものがあります: ${result.error}。同期できたのは ${names} です（ワークツリーに書いただけで、コミットはしていません）`,
       };
     }
     return { kind: "error", message: `ミラーを同期できませんでした: ${result.error}` };
@@ -305,7 +305,7 @@ export function syncNotice(result: MirrorResult): { readonly kind: "info" | "war
   const names = result.synced.map((s) => s.name).join("、");
   return {
     kind: "info",
-    message: `${names} のミラーを同期しました（${files} ファイル）。書いたのは各プロジェクトの作業ツリーで、コミットはしていません。必要なら各プロジェクトでコミットしてください`,
+    message: `${names} のミラーを同期しました（${files} ファイル）。書いたのは各プロジェクトのワークツリーで、コミットはしていません。必要なら各プロジェクトでコミットしてください`,
   };
 }
 

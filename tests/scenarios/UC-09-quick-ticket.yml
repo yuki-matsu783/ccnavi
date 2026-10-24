@@ -15,7 +15,7 @@ setup:
 
 # 設計に触れる・ユーザのレビューが要る作業は、提案を書いて承認を受ける（docs/design/tickets/phases.md の「小さい作業」）。
 # 承認（`ccnavi user agree`）とマージリクエストのレビュー（ホスト上）は人間しかできないので、そこで止める。
-# 親は `plan: [quick]` の 1 項だけ、子は `phase: 1`。範囲は親の範囲そのまま。
+# 親は `plan: [quick]` の 1 ステップだけ、子は `phase: 1`。範囲は親の範囲そのまま。
 steps:
   - prompt: >-
       projects/test-repo の issue #{issue} を指定された小さい作業（README.md の末尾に「テスト 2」と 1 行足す）を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。

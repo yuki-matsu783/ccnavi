@@ -50,8 +50,8 @@ class BlocksTheHostConfigTest(unittest.TestCase):
         """`git config --global --list` に、締め出しの中身より多くが出てこない。
 
         走った機械の `~/.gitconfig` に何が入っているかは分からないので、内容では
-        なく「締め出しのファイルが持つ鍵だけか」で見る。`user.name` のような
-        よくある鍵を名指しすると、その鍵を持たない機械では何も確かめられない。
+        なく「締め出しのファイルが持つキーだけか」で見る。`user.name` のような
+        よくあるキーを名指しすると、そのキーを持たない機械では何も確かめられない。
         """
         listed = git_out(self.dir, "config", "--global", "--list")
         keys = {line.split("=", 1)[0] for line in listed.splitlines() if line}

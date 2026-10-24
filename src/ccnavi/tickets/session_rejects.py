@@ -5,15 +5,15 @@
 
 1. ルールの deny（`rules` > チケット）。出所はルールの id とレイヤー
 2. 親の範囲（子だけ）。出所は親の識別子
-3. フェーズ定義の上限（子だけ。親に固定した写し `phases:` から引く）。出所は定義の名前
+3. フェーズ定義の上限（子だけ。親に固定したコピー `phases:` から引く）。出所は定義の名前
 
 情報源は承認のときの記録ではなく、いまの承認済みチケットとルールからの再計算。承認は提案を
-バイト単位で写すだけで、超過をどこにも残さない。記録を足すと、承認のあとにルールや
+バイト単位でコピーするだけで、超過をどこにも残さない。記録を足すと、承認のあとにルールや
 フェーズ定義が変わったときに古い事実を示すことになる。
 
 glob 同士の包含は一般には決められないので、項を「字義どおりの前置 + 1 文字」のパスにして
-当てる（`ticket.subset_problems` と同じプローブ）。近似なので、項の一部だけが退けられる形
-（`src/*` のうち `src/secret/*` だけが deny）は拾わない。regex の項は当てるパスが作れないので
+適用する（`ticket.subset_problems` と同じプローブ）。近似なので、項の一部だけが退けられる形
+（`src/*` のうち `src/secret/*` だけが deny）は拾わない。regex の項は適用するパスが作れないので
 「確かめられない」として数えるだけにする。
 
 判定は変えない。ここは見せるだけ。
@@ -31,14 +31,14 @@ from ..policy import builtin, ruleload, rules, selfguard, selfguard_shell
 from ..records import audit
 from . import approval, approval_checks, phase_scope, phasetypes, ticket_guard, ticket_model
 
-# 当てるツール。チケットの範囲が効くのは書き込み系で、項はツールを持たない。
+# 適用するツール。チケットの範囲が効くのは書き込み系で、項はツールを持たない。
 _TOOLS = ("Write", "Edit", "NotebookEdit")
 # 文に出す却下の件数の上限。残りは件数で言い、`--explain` へ誘う（常駐の文脈を増やさない）。
 SHOWN = 3
 # 走査に使う時間の上限（秒）。SessionStart の期限（`judge.DEADLINE_SECONDS`）の残りと
 # 小さいほう。索引の更新（docsearch）に残りを渡すため、短く取る。
 BUDGET_SECONDS = 0.5
-# 1 回で当てる項の数の上限。承認済みチケット数 × 項数 × ルール数で伸びるので、ここで打ち切る。
+# 1 回で適用する項の数の上限。承認済みチケット数 × 項数 × ルール数で伸びるので、ここで打ち切る。
 MAX_ENTRIES = 500
 
 APPROXIMATE_NOTE = (
@@ -71,22 +71,22 @@ class Found:
     """走査の結果。"""
 
     rejects: list[Reject] = field(default_factory=list)
-    # regex の項（当てるパスが作れず、確かめられない）の数。
+    # regex の項（適用するパスが作れず、確かめられない）の数。
     unchecked: int = 0
     # 期限か件数の上限で打ち切った。
     truncated: bool = False
 
 
 def probe_of(entry: ticket_model.Entry) -> str:
-    """項を当てるパス。ワイルドカードがあれば前置に 1 文字足す（`ticket.subset_problems`）。"""
+    """項を適用するパス。ワイルドカードがあれば前置に 1 文字足す（`ticket.subset_problems`）。"""
     prefix = entry.prefix()
     return prefix + "x" if entry.glob != prefix else entry.glob
 
 
 def _rule_set(conf: settings.Settings, root: str, target: tree.Tree) -> rules.RuleSet:
-    """このツリーへの書き込みに当てるルール集合（共通レイヤーに行き先のレイヤーを足した和）。
+    """このツリーへの書き込みに適用するルール集合（共通レイヤーに行き先のレイヤーを足した和）。
 
-    苦情は判定の経路が言うので、ここでは読み捨てる。
+    苦情は判定の経路が言うので、ここでは読んで破棄する。
     """
     quiet = io.StringIO()
     record = audit.Record()
@@ -128,7 +128,7 @@ def check(
     index: dict[str, ticket_model.Ticket],
     deadline: float,
 ) -> Found:
-    """チケットごとに、項を退ける上位を判定と同じ順で当てる。"""
+    """チケットごとに、項を退ける上位を判定と同じ順で適用する。"""
     found = Found()
     loaded: dict[str, rules.RuleSet] = {}
     count = 0
@@ -166,13 +166,13 @@ def _reject_of(
     parent: ticket_model.Ticket | None,
     pt: phasetypes.PhaseType | None,
 ) -> Reject | None:
-    """1 つの項を、ルールの deny → 親 → 定義の順に当てる。最初に退けた側を名指しする。"""
+    """1 つの項を、ルールの deny → 親 → 定義の順に適用する。最初に退けた側を名指しする。"""
     probe = probe_of(entry)
     rule = _denied_by(rule_set, os.path.join(target.root, *probe.split("/")))
     if rule is not None:
         origin = f"{ORIGIN_RULE} {rules.record_name(rule)}（レイヤー {rule.source or '?'}）"
         return Reject(t.ticket, entry.decision, entry.glob, rule.spoken_message(), origin)
-    # 統合の子には親の範囲の上限を当てない（phase_scope.scope_verdict と同じ）。
+    # 統合の子には親の範囲の上限を適用しない（phase_scope.scope_verdict と同じ）。
     if (
         parent is not None
         and not t.is_consolidate

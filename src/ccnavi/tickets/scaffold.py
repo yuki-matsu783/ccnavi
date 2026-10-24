@@ -3,7 +3,7 @@
 `ccnavi ticket new <識別子> --title <題> --plan <型,型,...> --issue <値> --mr <番号>`。
 
 提案を手で書くと frontmatter の形を間違えやすく、とくにフェーズ定義の `scope` を `allow` に
-写し忘れて、`design` フェーズの子が `wip/design/*` に書けず詰まる。この雛形の生成は、選んだ
+コピーし忘れて、`design` フェーズの子が `wip/design/*` に書けず詰まる。この雛形の生成は、選んだ
 フェーズの `scope` を `phases.yml` から集め、重複を除いて `allow` に書く（判定側で `wip/` を
 既定許可にはしない。承認していない範囲が黙って広がるため）。
 
@@ -14,7 +14,8 @@
   中でなければ、切り方を案内して止まる
 - `phases.yml` が無いか読めないときは、承認の検査を通る plan を作れない（設計 9.7）ので止まる
 - plan の型は `work` の定義だけ（`feedback` の定義は `feedback:` に置く）
-- plan の `after` は一直線（各項が前の項を待つ。終端が 1 つになり、承認の検査を通る）
+- plan の `after` は一直線（前のステップが各ステップに先行する。終端が 1 つになり、
+承認の検査を通る）
 - `scope: inherit` の型だけで `allow` が空になるときは止める（`allow` か `ask` が 1 件は要る）。
   止めるときは、今回の範囲を `--scope` で渡し直すよう案内する（`quick-work` のような継ぐ型を
   選んだ人が、範囲を持つ型を足す回り道へ迷わないように）
@@ -23,18 +24,18 @@
 - 既にある提案・承認済みチケットは上書きしない
 - 書いたあと、`allow` の項が計画のどの定義の `scope` とも重ならないときは、「承認しても書けない」と
   警告する（子は書けない）。計画に `scope: inherit` の定義があれば上限が無いので言わない
-- 書いたあとに `plan_phases.fill` で `phases:`（定義の写し）を差し込む。無いと `--agree` が落ちる
+- 書いたあとに `plan_phases.fill` で `phases:`（定義のコピー）を差し込む。無いと `--agree` が落ちる
 
 ## テンプレートから作る（`--template <名前> [--layer <名前>]`）
 
 `--plan` の代わりに、溜めたテンプレート（`plan_templates`）の計画を使う（併用は断る）。引き方・
 `after` の付け直し・子のフローの下書きの組み方は `template_use`。ここは書く側:
 
-- 項は `type`・`review`・`after` をそのまま写す（`after` は提案の絶対番号。フィードバック計画は
-  全体計画の続き）。`allow` は計画とフィードバック計画の型の `scope` を集める
-- 書く前に、項の型が `phases.yml` に在ること・kind が置き場（plan は work、feedback は feedback）と
-  合うことを確かめる。書いたあとに承認の検査（`agree_candidates.plan_problems`）を当て、
-  error なら消す
+- ステップは `type`・`review`・`after` をそのままコピーする（`after` は提案の絶対番号。
+  フィードバック計画は全体計画の続き）。`allow` は計画とフィードバック計画の型の `scope` を集める
+- 書く前に、ステップの型が `phases.yml` に在ること・kind が置き場（plan は work、
+  feedback は feedback）と合うことを確かめる。
+  書いたあとに承認の検査（`agree_candidates.plan_problems`）を適用し、error なら消す
 - 子のフローの下書きを `<提案の置き場>/flows/<親>-<NN>-01.yml` に書く。
   下書きに効力は無い。同じ子の識別子の提案・フロー・下書きが在れば、何も書かずに断る。書き損じたら戻す
 
@@ -72,7 +73,7 @@ ALLOW_MATCH = "Write|Edit"
 
 
 def parse_plan(text: str) -> list[str]:
-    """`--plan design,acceptance,implement` を型の並びにする。空の要素は捨てる。"""
+    """`--plan design,acceptance,implement` を型の並びにする。空の要素は破棄する。"""
     return [part.strip() for part in (text or "").split(",") if part.strip()]
 
 
@@ -110,17 +111,17 @@ def parse_scope(values: list[str] | None) -> tuple[list[str], str]:
             if not glob:
                 continue
             if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in glob):
-                return [], f"--scope {glob!r} に改行や制御文字は使えない"
+                return [], f"--scope {glob!r} に改行や制御文字は指定できない"
             if "<" in glob or ">" in glob:
                 return [], (
-                    f"--scope {glob!r} に `<` `>` は使えない。"
+                    f"--scope {glob!r} に `<` `>` は指定できない。"
                     "`<触るファイルの glob>` のような案内の仮の値は、実際のパスに置き換える"
                 )
             norm = glob.replace("\\", "/")
             if norm.startswith("/") or re.match(r"[A-Za-z]:", norm) or ".." in norm.split("/"):
                 return [], (
                     f"--scope {glob!r} はワークツリーのルートからの相対の glob で書く"
-                    "（絶対パスと `..` は使えない）"
+                    "（絶対パスと `..` は指定できない）"
                 )
             if glob.lower() not in seen:
                 seen.add(glob.lower())
@@ -156,7 +157,7 @@ def _scalar(text: str) -> str:
 
 
 def _item_line(item: plan_templates.Item) -> str:
-    """計画の 1 項（`ticket.parse` が読める形。`PlanItem.as_raw` と同じ書き分け）。"""
+    """計画の 1 ステップ（`ticket.parse` が読める形。`PlanItem.as_raw` と同じ書き分け）。"""
     if not item.review and not item.after:
         return f"  - {_scalar(item.type)}"
     parts = [f"type: {_scalar(item.type)}"]
@@ -243,7 +244,7 @@ def run(
        `_flow_clash` で子の流れの衝突を見る。
     6. 雛形を `render`（テンプレートなら `render_items`）で作り、`fsio.write_new_durable`
        で新規に書く。既存は上書きしない。
-    7. `plan_phases.fill` で写し（phases:）を差し込み、`phasetypes.parent_scope_problems`
+    7. `plan_phases.fill` でコピー（phases:）を差し込み、`phasetypes.parent_scope_problems`
        で範囲が定義の上限を超えていないかを見る。
        超えていれば案内として出す（止めない）。テンプレートなら `_agree_problem` の検査を通し、
        子の流れを `_write_flows` で書く。
@@ -257,7 +258,7 @@ def run(
 
     problem = ticket_ids.id_problem(ident)
     if problem:
-        return refuse(f"識別子 {ident!r} が使えない（{problem}）")
+        return refuse(f"識別子 {ident!r} が指定できない（{problem}）")
     if ticket_ids.child_pattern().fullmatch(ident):
         return refuse(
             f"{ident} は子の識別子の形（<親>-<NN>-<NN>）。雛形を出すのは親だけ。"
@@ -266,7 +267,7 @@ def run(
     if not (title or "").strip():
         return refuse("--title <題> が必要です")
     if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in title):
-        return refuse("--title に改行や制御文字は使えない")
+        return refuse("--title に改行や制御文字は指定できない")
     stripped = title.strip()
     if stripped.startswith("<") and stripped.endswith(">"):
         return refuse(
@@ -288,7 +289,7 @@ def run(
     plan = parse_plan(plan_text)
     if template:
         if (plan_text or "").strip():
-            return refuse("--template と --plan は一緒に使えない（計画はテンプレートから作る）")
+            return refuse("--template と --plan は同時に指定できない（計画はテンプレートから作る）")
     elif layer:
         return refuse("--layer は --template と一緒に使う")
     elif with_feedback:
@@ -319,7 +320,7 @@ def run(
     if types is None:
         return refuse(
             f"フェーズ定義（{where.project or '自身'} のレイヤーの phases.yml）が無いか読めない。"
-            "plan の型の定義を読めず、承認の検査を通る plan と写し（phases:）を作れない"
+            "plan の型の定義を読めず、承認の検査を通る plan とコピー（phases:）を作れない"
             "（設計 9.7）。phases.yml を用意してから実行します。"
         )
     used: _Used | None = None
@@ -332,7 +333,7 @@ def run(
         unknown = [n for n in dict.fromkeys(plan) if n not in types]
         if unknown:
             return refuse(
-                f"plan の型 {', '.join(unknown)} が phases.yml にありません。使える型: "
+                f"plan の型 {', '.join(unknown)} が phases.yml にありません。指定できる型: "
                 + ", ".join(n for n, t in types.items() if t.kind == phasetypes.KIND_WORK)
             )
         feedback = [n for n in dict.fromkeys(plan) if types[n].kind != phasetypes.KIND_WORK]
@@ -353,7 +354,7 @@ def run(
         return refuse(
             f"plan の型（{', '.join(inherited)}）は scope: inherit のため、範囲を親の allow から"
             "継承します。今回の範囲が未指定で、allow が集まりません（allow か ask が 1 件は"
-            "必要です。設計 9.3）。ユーザーに今回編集するファイルを確認し、--scope <glob> で"
+            "必要です。設計 9.3）。ユーザに今回編集するファイルを確認し、--scope <glob> で"
             "指定して再実行してください"
             '（例: --plan quick-work --scope "src/ui/error.ts"）。'
             "範囲を持つ型を追加する必要はありません"
@@ -390,7 +391,7 @@ def run(
     if failed:
         return refuse(f"{path} に保存できませんでした（{failed}）")
 
-    # 写し（phases:）を差し込む。無いと --agree が「項の定義が写しに無い」で落ちる。
+    # コピー（phases:）を差し込む。無いと --agree が「ステップの定義がコピーに無い」で落ちる。
     target, _ = ticket_mod.load(path)
     done = plan_phases.Filled(why=f"{path} を親の提案として読めない") if target is None else None
     if target is not None:
@@ -400,12 +401,12 @@ def run(
         fsio.remove(path)
         return refuse(f"phases: を差し込めなかった（{done.why}）")
 
-    # 写しを差し込んだあとの提案を読み直して、allow が定義の上限を超えていないかを見る
+    # コピーを差し込んだあとの提案を読み直して、allow が定義の上限を超えていないかを見る
     filled, _ = ticket_mod.load(path)
     over = phasetypes.parent_scope_problems(filled) if filled is not None else []
     written: list[str] = []
     if used is not None:
-        # 承認の検査（定義の kind と置き場、順序）を、書いた提案に当てる。通らなければ書き戻す。
+        # 承認の検査（定義の kind と置き場、順序）を、書いた提案に適用する。通らなければ書き戻す。
         problem = _agree_problem(conf, root, path, where.project)
         if problem:
             fsio.remove(path)
@@ -419,7 +420,7 @@ def run(
 
     if used is None:
         stdout.write(f"{ident} の雛形を {path} に書いた\n")
-        stdout.write(f"plan: {' -> '.join(plan)}（各項は前の項を待つ一直線）\n")
+        stdout.write(f"plan: {' -> '.join(plan)}（前のステップが各ステップに先行する一直線）\n")
     else:
         _report(stdout, ident, path, used, written)
     stdout.write("allow（phases.yml の scope を集めた）:\n")
@@ -427,7 +428,11 @@ def run(
         stdout.write(f"  {ALLOW_MATCH} {glob}\n")
     for p in over:
         stdout.write(f"案内: 承認しても書けない: {p.detail}\n")
-    tail = "並行させたい項は after を直す。" if used is None else "計画の項と文の固有名を直す。"
+    tail = (
+        "並行させたいステップは after を直す。"
+        if used is None
+        else "計画のステップと文の固有名を直す。"
+    )
     # ccnavi を PATH に持たない環境でも、そのまま打てるように、起動の sh 経由で書く
     launcher = settings.script_command(root, "ccnavi-launcher.sh")
     stdout.write(
@@ -455,9 +460,10 @@ class _Used:
     found: template_use.Found
     plan: list[plan_templates.Item]
     feedback: list[plan_templates.Item]
-    # (子の識別子, 全体計画の項の添字, 文面)。
+    # (子の識別子, 全体計画のステップの添字, 文面)。
     drafts: list[tuple[str, int, str]]
-    # テンプレートにあるが書かなかったフィードバック計画の項数（`--with-feedback` なしのとき）。
+    # テンプレートにあるが書かなかったフィードバック計画のステップ数（`--with-feedback`
+    # なしのとき）。
     skipped_feedback: int = 0
 
 
@@ -476,9 +482,9 @@ def _from_template(
     処理フロー:
     1. `layer` が空なら、cwd のツリーのプロジェクト（無ければ自身のレイヤー）を使う。
     2. `template_use.resolve` でテンプレートを引く。無ければ理由を返して止める。
-    3. `template_use.absolute` で全体計画とフィードバック計画の項を組む。フィードバックは
-       `with_feedback` が無ければ捨て、その項数を `skipped` に残す。
-    4. 項の型（計画とフィードバックの両方）が `types` に全部在るかを見る。
+    3. `template_use.absolute` で全体計画とフィードバック計画のステップを組む。フィードバックは
+       `with_feedback` が無ければ破棄し、そのステップ数を `skipped` に残す。
+    4. ステップの型（計画とフィードバックの両方）が `types` に全部在るかを見る。
     5. 計画は work、フィードバックは feedback の kind の型だけかを見る。
     6. `template_use.child_problem` と `template_use.flow_drafts` で、
        子の提案と子のフローの下書きを組む。
@@ -497,7 +503,8 @@ def _from_template(
     missing = [n for n in dict.fromkeys(i.type for i in plan + feedback) if n not in types]
     if missing:
         return None, (
-            f"テンプレート {name!r} の項の定義 {', '.join(missing)} が phases.yml にありません"
+            f"テンプレート {name!r} のステップの定義 {', '.join(missing)} が "
+            "phases.yml にありません"
             f"（{where.project or '自身'} のレイヤー）。テンプレートを直すか、"
             "ユーザに phases.yml へ追加してもらう"
         )
@@ -556,7 +563,7 @@ def _write_flows(conf: settings.Settings, top: str, used: _Used, written: list[s
 
 
 def _agree_problem(conf: settings.Settings, root: str, path: str, project: str) -> str:
-    """書いた提案に承認の検査（`agree_candidates.plan_problems`）を当てた error。無ければ空。"""
+    """書いた提案に承認の検査（`agree_candidates.plan_problems`）を適用した error。無ければ空。"""
     target, _ = ticket_mod.load(path)
     if target is None:
         return "親の提案として読めない"
@@ -571,7 +578,7 @@ def _plan_text(items: list[plan_templates.Item], first: int) -> str:
     for number, item in enumerate(items, start=first):
         extra = []
         if item.after:
-            extra.append("待つ " + ",".join(str(n) for n in item.after))
+            extra.append("先行 " + ",".join(str(n) for n in item.after))
         if item.review:
             extra.append(item.review)
         parts.append(f"{number} {item.type}" + (f"（{'・'.join(extra)}）" if extra else ""))
@@ -585,13 +592,13 @@ def _report(stdout: TextIO, ident: str, path: str, used: _Used, written: list[st
         f"{ident} の提案を {path} に書いた"
         f"（テンプレート {found.template.name}、{found.entry.layer} の {found.entry.rel}）\n"
     )
-    stdout.write(f"plan（{len(used.plan)} 項）: {_plan_text(used.plan, 1)}\n")
+    stdout.write(f"plan（{len(used.plan)} ステップ）: {_plan_text(used.plan, 1)}\n")
     if used.feedback:
         text = _plan_text(used.feedback, len(used.plan) + 1)
-        stdout.write(f"feedback（{len(used.feedback)} 項）: {text}\n")
+        stdout.write(f"feedback（{len(used.feedback)} ステップ）: {text}\n")
     elif used.skipped_feedback:
         stdout.write(
-            f"テンプレートにはフィードバック計画（{used.skipped_feedback} 項）がある。"
+            f"テンプレートにはフィードバック計画（{used.skipped_feedback} ステップ）がある。"
             "全体計画のレビューを見てから追加するなら、`--with-feedback` を付けて作り直すか、"
             "提案を改版で追加します。\n"
         )

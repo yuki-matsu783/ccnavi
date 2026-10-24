@@ -1,4 +1,4 @@
-"""ユーザの発言のたびに、共通の工程スキルをプロジェクトの `skills/` へ写す。
+"""ユーザの発言のたびに、共通の工程スキルをプロジェクトの `skills/` へコピーする。
 
 fixture は tests/config/test_config_sync.py と同じ ConfigUnionHarness を使う。ワークスペースの
 `.claude/skills/` に工程スキル（`process: true`）と、そうでないスキルを置く。
@@ -7,9 +7,9 @@ fixture は tests/config/test_config_sync.py と同じ ConfigUnionHarness を使
 
 
 1. 発言が、工程スキルの `SKILL.md` と `references/common/` の `.md` を、着手済みの親の
-   ワークツリーの `skills/<工程>/` へ写す（`ticket start` は写さない）。`references/` の
-   それ以外(プロジェクト固有)と、`process: true` を持たないスキルは写さない
-2. `common/` は共通の写し。同じパスは共通の中身で上書きし、共通側に無くなった `.md` は消す
+   ワークツリーの `skills/<工程>/` へコピーする（`ticket start` はコピーしない）。`references/` の
+   それ以外(プロジェクト固有)と、`process: true` を持たないスキルはコピーしない
+2. `common/` は共通のコピー。同じパスは共通の中身で上書きし、共通側に無くなった `.md` は消す
    (空になったディレクトリも片付ける)。`references/` の common 以外(プロジェクト固有)は
    上書きも削除もしない
 3. 中身が同じなら何も書かず、知らせない
@@ -42,7 +42,7 @@ def plain_skill(name: str) -> str:
 
 
 class Started:
-    """`ticket start` と、その後の発言（工程スキルを写す）の結果をまとめたもの。"""
+    """`ticket start` と、その後の発言（工程スキルをコピーする）の結果をまとめたもの。"""
 
     def __init__(self, start, prompt, said):
         self.returncode = start.returncode
@@ -52,7 +52,7 @@ class Started:
 
 class SkillSyncTest(ConfigUnionHarness):
     def prompt(self, session="s1"):
-        """ユーザの発言を 1 件渡す（工程スキルを写す）。実行後チェックの基準も取る。"""
+        """ユーザの発言を 1 件渡す（工程スキルをコピーする）。実行後チェックの基準も取る。"""
         if getattr(self, "_began", None) != session:
             self._began = session
             start = {"hook_event_name": "SessionStart", "session_id": session, "source": "startup"}
@@ -83,7 +83,8 @@ class SkillSyncTest(ConfigUnionHarness):
         return tree, started
 
     def test_start_copies_only_process_skills(self):
-        """1: 工程スキルの SKILL.md と references を写し、process: true の無いスキルは写さない"""
+        """1: 工程スキルの SKILL.md と references をコピーし、
+        process: true の無いスキルはコピーしない"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         write(self.source("process-test", "references", "common", "unit", "basics.md"), "# 基本\n")
         write(self.source("process-test", "references", "common", "ccnavi-index.jsonl"), "{}\n")
@@ -162,7 +163,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(skillsync.processes(self.ws), ["process-test"])
 
     def test_symlink_under_a_process_stops_the_copy(self):
-        """2: 工程スキルの下にシンボリックリンクがあれば、何も写さず理由を返す"""
+        """2: 工程スキルの下にシンボリックリンクがあれば、何もコピーせず理由を返す"""
         from ccnavi.tickets import skillsync
 
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
@@ -175,7 +176,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertIn("シンボリックリンク", why)
 
     def test_the_start_does_not_copy_the_skills(self):
-        """1: `ticket start` 自身は工程スキルを写さない。写すのは次のユーザの発言"""
+        """1: `ticket start` 自身は工程スキルをコピーしない。コピーするのは次のユーザの発言"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         write(
@@ -199,7 +200,8 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertTrue(os.path.isfile(os.path.join(tree, "skills", "process-test", "SKILL.md")))
 
     def test_only_the_common_references_are_copied(self):
-        """1: references/ の common 以外(プロジェクト固有)は、ワークスペースにあっても写さない"""
+        """1: references/ の common 以外(プロジェクト固有)は、
+        ワークスペースにあってもコピーしない"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         write(self.source("process-test", "references", "common", "shared.md"), "共通\n")
         write(self.source("process-test", "references", "project", "workspace-only.md"), "固有\n")
@@ -213,7 +215,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(os.path.join(base, "loose.md")))
 
     def test_symlinked_common_dir_stops_the_copy(self):
-        """2: common/ そのものがシンボリックリンクなら、何も写さず理由を返す"""
+        """2: common/ そのものがシンボリックリンクなら、何もコピーせず理由を返す"""
         from ccnavi.tickets import skillsync
 
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))

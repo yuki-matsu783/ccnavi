@@ -48,7 +48,7 @@ test("CB-T420 ボードの見本は、実行ファイルの出力と同じ形を
   );
 });
 
-/** 読み取りは知らない鍵を黙って捨てる。見本の綴り違い（`worktee:` など）を、捨てられる前に見つける */
+/** 読み取りは知らないキーを黙って破棄する。見本の綴り違い（`worktee:` など）を、破棄される前に見つける */
 function lostKeys(raw: unknown, parsed: unknown, at: string, free: ReadonlySet<string>): string[] {
   if (Array.isArray(raw)) {
     return raw.flatMap((item, i) => lostKeys(item, (parsed as unknown[] | undefined)?.[i], `${at}[${i}]`, free));
@@ -65,11 +65,11 @@ function lostKeys(raw: unknown, parsed: unknown, at: string, free: ReadonlySet<s
   });
 }
 
-test("CB-T421 ボードの見本の鍵はどれも読み取りが読む（綴り違いが既定値へ黙って化けない）", () => {
+test("CB-T421 ボードの見本のキーはどれも読み取りが読む（綴り違いが既定値へ黙って化けない）", () => {
   const raw = (def.sample as { board: Record<string, unknown> }).board;
   const parsed = parseBoardJson(JSON.stringify({ version: 1, root: "/ws", generated_at: "x", ...raw }));
   assert.ok(parsed.ok);
-  // 中身を実行ファイルが決める自由な欄（計画の項・印・統合結果・リスクの内訳）は、鍵を数えない
+  // 中身を実行ファイルが決める自由な欄（計画のステップ・印・統合結果・リスクの内訳）は、キーを数えない
   const free = new Set(["plan", "marks", "states", "risk", "judge", "feedback", "ready", "close_early"]);
   assert.deepEqual(lostKeys(raw, parsed.ok ? parsed.board : undefined, "board", free), []);
 });
@@ -81,7 +81,7 @@ test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っ
   assert.equal(card("sample-a").copyStatus, "none");
   assert.equal(card("sample-a").status.label, "承認待ち");
   assert.equal(card("sample-b-03-01").status.label, "承認待ち");
-  // レビュー待ち: 親のフェーズ行に［MR を開く］［レビュー完了］、子のカードはあなたの番に同じ操作。札はどちらも「レビュー待ち」
+  // レビュー待ち: 親のフェーズ行に［MR を開く］［レビュー完了］、子のカードはユーザ待ちに同じ操作。札はどちらも「レビュー待ち」
   const chip = card("sample-c").phases[0];
   assert.ok(chip.reviewWaiting && chip.gateClosed && chip.status === "レビュー待ち" && chip.actions.some((a) => a.kind === "review"));
   assert.equal(card("sample-c").mrNumber, 12);
@@ -160,7 +160,7 @@ test("CB-T424 見本の読み取りは、列でない名前・オブジェクト
   assert.throws(() => parseBoardSample({ ...raw, merge: { rows: [{ state: "open" }] } }, "/ws", "t"), /parent/);
 });
 
-/** 案内の `scene` が読む鍵（`board.yml` の先頭のコメントと `board/App.tsx` が読むもの） */
+/** 案内の `scene` が読むキー（`board.yml` の先頭のコメントと `board/App.tsx` が読むもの） */
 const SCENE_KEYS = ["overlay", "project", "parent", "attention", "archived", "fold", "details", "merge"];
 
 test("CB-T425 ボードの案内の scene は、見本にある絞り込み・列・オーバーレイの名前だけを指し、絞り込んでも見本のカードが残る（綴り違いが既定へ黙って戻らない）", () => {
@@ -171,7 +171,7 @@ test("CB-T425 ボードの案内の scene は、見本にある絞り込み・�
       const at = `${course.id} の ${index + 1} 番目の手順`;
       const scene = step.scene;
       for (const key of Object.keys(scene)) {
-        assert.ok(SCENE_KEYS.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
+        assert.ok(SCENE_KEYS.includes(key), `${at}: scene のキー ${key} を画面は読まない`);
       }
       assert.ok(scene.overlay === undefined || (OVERLAY_NAMES as readonly string[]).includes(String(scene.overlay)), `${at}: overlay ${String(scene.overlay)}`);
       assert.ok(scene.project === undefined || scene.project === "" || sample.board.projects.includes(String(scene.project)), `${at}: project ${String(scene.project)} が見本にありません`);
@@ -228,11 +228,11 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   }
   const intro = def.courses[0];
   assert.equal(intro.id, INTRO_ID);
-  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態の札", "あなたの番", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
+  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態の札", "ユーザ待ち", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 
-test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまでの流れだけは 36 手順まで）で、「〜したいとき」の題と 1 行の説明を持つ。案内の鍵は重ならない", () => {
+test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまでの流れだけは 36 手順まで）で、「〜したいとき」の題と 1 行の説明を持つ。案内のキーは重ならない", () => {
   const useCases = def.courses.slice(1);
   assert.ok(useCases.length >= 3 && useCases.length <= 9);
   // マージまでの流れ（to-merge）は基本の案内のすぐ次に出る

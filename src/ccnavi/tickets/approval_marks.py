@@ -209,7 +209,7 @@ def read_ledger(approved_dir: str, parent: str) -> tuple[list[dict], str]:
 
 
 def add_ledger(approved_dir: str, parent: str, new: list[dict]) -> str:
-    """台帳に項目を足す（同じ鍵は置き換える）。書けなければ理由。読めない台帳には書かない。"""
+    """台帳に項目を足す（同じキーは置き換える）。書けなければ理由。読めない台帳には書かない。"""
     entries, problem = read_ledger(approved_dir, parent)
     if problem:
         return problem

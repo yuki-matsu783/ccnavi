@@ -1,7 +1,7 @@
 """`ccnavi tree parent` の約束。
 
 sh はチケットの YAML を自分で読まず、これに聞く。答えは頭の行のあとに 1 行 1 項目
-（`<鍵> <値>`）。読むだけで、何も書かない。
+（`<キー> <値>`）。読むだけで、何も書かない。
 """
 
 from __future__ import annotations
@@ -394,7 +394,7 @@ class TreeBaseBoundTest(Harness):
         self.assertEqual("no", self.bound()["bound"])
 
     def test_a_parent_in_the_archive_of_the_base_repository_binds(self):
-        """退避先（logs/archive/<リポジトリの鍵>/done/）にある親は、取り込み先のリポジトリのものだけが結び付く。"""
+        """退避先（logs/archive/<リポジトリのキー>/done/）にある親は、取り込み先のリポジトリのものだけが結び付く。"""
         for repo, key in ((self.p, "p"), (self.ws, "self")):
             with self.subTest(key):
                 path = os.path.join(self.ws, "logs", "archive", key, "done", "feature-x.md")
@@ -470,7 +470,7 @@ class TreeBaseBoundTest(Harness):
 
 
 class TreeGuardedTest(Harness):
-    """`tree guarded`: 守る対象（自己防衛）に当たるパスだけを挙げる。"""
+    """`tree guarded`: 守る対象（自己防衛）にヒットするパスだけを挙げる。"""
 
     def setUp(self):
         super().setUp()

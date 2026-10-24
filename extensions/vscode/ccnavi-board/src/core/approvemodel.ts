@@ -1,7 +1,7 @@
 /**
  * 承認の JSON の形（実行ファイルとの契約）と読み取り。docs/requirements/json-shapes.md「承認の JSON」。
  *
- * `--agree --preview --json` が承認待ちの一覧を見せ、`user agree --yes <識別子,…> --json` が承認する。
+ * `--agree --preview --json` が承認先行の一覧を見せ、`user agree --yes <識別子,…> --json` が承認する。
  * 拡張は一覧の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
  */
 
@@ -13,7 +13,7 @@ export interface ApproveBatchEntry {
   /** 子なら親の識別子。親なら null */
   readonly parent: string | null;
   readonly phase: number | null;
-  /** 親の改版（計画・写し・範囲の変更）か */
+  /** 親の改版（計画・コピー・範囲の変更）か */
   readonly revision: boolean;
   readonly tree: string;
   readonly path: string;
@@ -27,7 +27,7 @@ export interface ApproveRejected {
 }
 
 /**
- * 計画の図の項 1 つ（`plans[].items[]`）。値は実行ファイルが組んだもの。図は印を付けて描くだけで、
+ * 計画の図のステップ 1 つ（`plans[].items[]`）。値は実行ファイルが組んだもの。図は印を付けて描くだけで、
  * 見る場所・延期の引き受け手・固定したかを自分で決めない
  */
 export interface ApprovePlanItem {
@@ -39,9 +39,9 @@ export interface ApprovePlanItem {
   readonly type: string;
   /** 定義の題（親の `phases:` から） */
   readonly title: string;
-  /** 見る場所（`none` / `mr`。項の `review: mr` は `mr`） */
+  /** 見る場所（`none` / `mr`。ステップの `review: mr` は `mr`） */
   readonly review: string;
-  /** 項の `review: defer`（レビューを後ろの項へ延ばす） */
+  /** ステップの `review: defer`（レビューを後ろのステップへ延ばす） */
   readonly deferred: boolean;
   /** 延期したレビューを引き受ける番号。延期していなければ null */
   readonly review_at: number | null;
@@ -65,11 +65,11 @@ export interface ApprovePlan {
   readonly after: Readonly<Record<string, readonly number[]>>;
   /** 提案に書いてある直接の先行 */
   readonly proposed: Readonly<Record<string, readonly number[]>>;
-  /** 改版のとき、承認済みの待ち方から戻した直接の先行。改版でなければ null */
+  /** 改版のとき、承認済みの先行関係から戻した直接の先行。改版でなければ null */
   readonly current: Readonly<Record<string, readonly number[]>> | null;
-  /** 最後の項が待っていない項（終端に当たらない項） */
+  /** 最後のステップの先行になっていないステップ（終端に届かないステップ） */
   readonly loose: readonly number[];
-  /** 何も待たずにすぐ始まる項 */
+  /** 先行なしですぐ始まるステップ */
   readonly ready: readonly number[];
   /** 順序の検査の error（実行ファイルの文面そのまま） */
   readonly problems: readonly string[];
@@ -235,10 +235,10 @@ export function partialMessage(partial: ApprovePartial, carried = false): string
   const { placed, paths, ticket, reason, lines } = partial;
   const where = ticket === "" ? "" : placed.includes(ticket) ? `${ticket} の後始末で` : `${ticket} で`;
   const written = paths.length === 0 ? placed.join(", ") : paths.join(", ");
-  const failed = ticket === "" || placed.includes(ticket) ? "" : `書けなかった: ${ticket}。`;
+  const failed = ticket === "" || placed.includes(ticket) ? "" : `書き込めませんでした: ${ticket}。`;
   const sent = carried
-    ? "書けたぶんだけをコミット・pushするコマンドをターミナルに送信しました。結果はターミナルで確認してください（pushできていなければ未送信です）"
-    : "承認済みチケットをコミット・pushするコマンドは送信していません（push用のスクリプトがありません）。未送信です";
+    ? "書けたぶんだけをコミット・push するコマンドをターミナルに送信しました。結果はターミナルで確認してください（push できていなければ未送信です）"
+    : "承認済みチケットをコミット・push するコマンドは送信していません（push 用のスクリプトがありません）。未送信です";
   const what =
     placed.length === 0
       ? "承認済みになったチケットはありません"
@@ -388,7 +388,7 @@ function numbersBy(value: unknown): Record<string, number[]> {
 
 /**
  * `plans` の欄を読む。`--plan-order <親> --json` の答え（`planordermodel.ts`）も同じ形なので、同じ読み方を使う。
- * オブジェクトでない項は落とし、番号の無い項目も落とす
+ * オブジェクトでないステップは落とし、番号の無いステップも落とす
  */
 export function readPlans(value: unknown): ApprovePlan[] {
   return list(value).filter(isRecord).map(plan);

@@ -197,7 +197,7 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
     // 開いている deps は hidden-by-find でも表示は消えない（CSS の :not(.open)）
     assert.ok(dom.one("#tab-rules").classList.contains("finding"));
     assert.equal(dom.one('[data-count="deny"]').textContent, "1 / 2");
-    assert.equal(dom.one('[data-count="ask"]').textContent, "0 / 1（検索条件外の展開中項目：1件）");
+    assert.equal(dom.one('[data-count="ask"]').textContent, "0 / 1（検索条件外の展開中項目: 1 件）");
     assert.equal(dom.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
     // 空に戻すと元どおり
     dom.type(dom.one("#find"), "");
@@ -261,7 +261,7 @@ test("CB-D05 ツールの選択肢で選ぶと、欄と行の要約が同じ操�
   }
 });
 
-test("CB-D06 判定で当たった行はその場で開くが state には入らず、次の判定で畳まれる", async () => {
+test("CB-D06 判定でヒットした行はその場で開くが state には入らず、次の判定で畳まれる", async () => {
   const dom = await openRules();
   try {
     await dom.send(judged([hit("deny", "git-push")]));
@@ -273,15 +273,15 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
     await dom.send(judged([hit("deny", "no-rm")]));
     assert.ok(!dom.one(rowSelector("git-push")).classList.contains("open"));
     assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
-    // 絞り込み中に 2 件当たっても、両方開き、件数は一致した行だけを数える
+    // 絞り込み中に 2 件ヒットしても、両方開き、件数は一致した行だけを数える
     dom.type(dom.one("#find"), "pyproject");
     await dom.settle();
     await dom.send(judged([hit("deny", "git-push"), hit("deny", "no-rm")]));
     assert.ok(dom.one(rowSelector("git-push")).classList.contains("open"));
     assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
-    assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（検索条件外の展開中項目：2件）");
+    assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（検索条件外の展開中項目: 2 件）");
     assert.equal(dom.one('[data-count="ask"]').textContent, "1 / 1");
-    // 折りたたんだタイプの中のルールが当たれば、タイプが開いて矢印もそれに合う
+    // 折りたたんだタイプの中のルールがヒットすれば、タイプが開いて矢印もそれに合う
     dom.type(dom.one("#find"), "");
     await dom.settle();
     dom.click(dom.one('button[data-action="fold-section"][data-section="ask"]'));
@@ -403,7 +403,7 @@ test("CB-D69 additionalContextFile で選んだパスは、拡張ホストが名
   }
 });
 
-test("CB-D70 再読込は押した時点でボタンを止め、やめたら戻る。中身が届けば編集は捨てて入れ替わる", async () => {
+test("CB-D70 再読み込みは押した時点でボタンを止め、やめたら戻る。中身が届けば編集は破棄して入れ替わる", async () => {
   const dom = await openRules();
   try {
     dom.type(dom.one(`${rowSelector("git-push")} input.f-id`), "打ちかけ");
@@ -416,7 +416,7 @@ test("CB-D70 再読込は押した時点でボタンを止め、やめたら戻�
     await dom.send({ type: "cancelled" });
     assert.ok(!dom.one<HTMLButtonElement>('.controls button[data-action="reload"]').disabled);
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("打ちかけ")} input.f-id`).value, "打ちかけ");
-    // 中身が届いたら編集は捨てる
+    // 中身が届いたら編集は破棄する
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     assert.equal(dom.all(rowSelector("打ちかけ")).length, 0);
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "未保存が消えたので保存は押せない");
@@ -618,14 +618,14 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
     dom.type(dom.one(`${rowSelector("打ちかけ")} input.f-id`), "打ちかけ2");
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
-    // 別の対象へ切り替わった。前の対象の編集は捨てて、読み込み中を出す
+    // 別の対象へ切り替わった。前の対象の編集は破棄して、読み込み中を出す
     await dom.send({ type: "data", data: { kind: "loading", text: "web のルールを読み込み中…" } });
     assert.equal(dom.one("#ccnavi-loading").textContent, "web のルールを読み込み中…");
     assert.equal(dom.all(".rule").length, 0);
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
       [true, false],
-      "編集を捨てたことも伝える",
+      "編集を破棄したことも伝える",
     );
     await dom.send({ type: "data", data: { kind: "page", page: page({ rulesPath: "projects/web/.ccnavi/config/project/rules.yml" }) } });
     assert.equal(dom.all("#ccnavi-loading").length, 0);
@@ -859,7 +859,7 @@ test("CB-T310 統合結果は読み取り専用の表で出し、編集する 1 
     const select = dom.one<HTMLSelectElement>("select#sum-select");
     assert.equal(select.value, "lib");
     assert.deepEqual([...select.options].map((o) => o.textContent), ["統合結果（共通 + ワークスペース）", "統合結果（共通 + プロジェクト lib）"]);
-    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を合算した和ではありません/);
+    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bash など）が適用するのは、全プロジェクトの設定を合算した和ではありません/);
     const rows = (section: string) => dom.all(`#sum .sum-section[data-section="${section}"] tbody tr`).map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
     assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通の設定"], ["lib:no-tmp", "Write", "lib"]]);
     assert.deepEqual(rows("ask").map((r) => r[0]), ["lib:deps"]);

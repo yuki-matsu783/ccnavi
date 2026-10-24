@@ -6,7 +6,7 @@
  * だけを差し替える。ルールの入れ替え・タイプの移動は、元のノードをそのまま別のリストへ
  * 移すので、そのルールに付いていたコメントも一緒に動く。
  *
- * ルールの意味（当たる・当たらない）の判定は実行ファイルの仕事。
+ * ルールの意味（ヒットする・ヒットしない）の判定は実行ファイルの仕事。
  */
 import { isMap, isNode, isScalar, isSeq, Pair, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Node } from "yaml";
 
@@ -374,11 +374,11 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
  * 両方書いてしまった `glob` も、そのまま残す。報告するのは lint）。
  *
  * 変えたときは `glob` / `regex` を消し、組み合わせ条件を書く。元のノードは使い回す。子は、同じ中身のノードを先に
- * 拾い（消した・並べ替えた子のコメントが別の子へ付け替わらないように）、残りを似たノードに当てて
+ * 拾い（消した・並べ替えた子のコメントが別の子へ付け替わらないように）、残りを似たノードに適用して
  * 値だけを書き換える（patchChildren）。包む・not を外すときも元のノードを中で使い回す。新しい個別条件は単引用符で囲む。
  *
  * まだ `when:` が無い（「組み合わせ条件に変換」した）ときは、元の `glob` / `regex` と、移す `except:` の
- * 各要素を、変換した形（`all: [本体, not: {any: 除くもの}]`）に組んで元のノードとして当てる。
+ * 各要素を、変換した形（`all: [本体, not: {any: 除くもの}]`）に組んで元のノードとして適用する。
  * 書いてあったコメント（前置き・行末）が、対応する個別条件に付いたまま残る。
  */
 function writeWhen(doc: Document, node: YAMLMap, tree: CondNode, movingExcept: boolean): void {
@@ -536,7 +536,7 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
         pair.value = tree.child === null ? null : patchCond(doc, pair.value ?? undefined, tree.child);
         return existing as Node;
       }
-      // not で包んだ: 元のノードが中身に似ていれば中身に当てる
+      // not で包んだ: 元のノードが中身に似ていれば中身に適用する
       if (tree.child === null) {
         return mapOf(doc, "not", null);
       }
@@ -571,15 +571,15 @@ function wrapsInGroup(old: CondNode, next: CondNode): boolean {
 }
 
 /**
- * 演算子の子を書く。同じ中身の元のノードを先に当てる（並べ替え・消しただけなら、これで全部決まる）。
+ * 演算子の子を書く。同じ中身の元のノードを先に適用する（並べ替え・消しただけなら、これで全部決まる）。
  *
- * 残りの子（中身を直した・足した・包んだ子）は、前後で当たった子に挟まれた元のノードに当てる
- * （消されていない子は元の相対順のまま並ぶので、挟まれた範囲の外へは当てない）。挟まれた範囲で
- * 数が同じなら順に当てる（直しただけ。種類が違えば当てずに新しいノードにする。not や all / any で
+ * 残りの子（中身を直した・足した・包んだ子）は、前後でヒットした子に挟まれた元のノードに適用する
+ * （消されていない子は元の相対順のまま並ぶので、挟まれた範囲の外へは適用しない）。挟まれた範囲で
+ * 数が同じなら順に適用する（直しただけ。種類が違えば適用せずに新しいノードにする。not や all / any で
  * 包んだ・外したものは同じ種類に数える）。数が違うと、どれを消してどれを直したのかが位置では
- * 決まらない。位置で当てると消した子のコメントが別の子に付くので、似ているもの（個別条件なら文字が
- * 重なる）どうしだけを当て、似たものが無い子は新しいノードにする。最後に、範囲の外に残ったもの
- * （並べ替えてから直した子）も、似ているものどうしだけを当てる。
+ * 決まらない。位置で適用すると消した子のコメントが別の子に付くので、似ているもの（個別条件なら文字が
+ * 重なる）どうしだけを適用し、似たものが無い子は新しいノードにする。最後に、範囲の外に残ったもの
+ * （並べ替えてから直した子）も、似ているものどうしだけを適用する。
  */
 function patchChildren(doc: Document, olds: readonly unknown[], children: readonly CondNode[]): Node[] {
   const read = olds.map((item) => condOfYaml(item));
@@ -596,7 +596,7 @@ function patchChildren(doc: Document, olds: readonly unknown[], children: readon
     chosen[i] = k;
     used.add(k);
   };
-  // 似ている組から順に当てる。同じ似かたなら位置の近い組
+  // 似ている組から順に適用する。同じ似かたなら位置の近い組
   const pairUp = (rest: readonly number[], candidates: readonly number[]): void => {
     const pairs: { i: number; k: number; score: number }[] = [];
     for (const i of rest) {
@@ -614,7 +614,7 @@ function patchChildren(doc: Document, olds: readonly unknown[], children: readon
       }
     }
   };
-  // 同じ中身で当たった子のあいだに続く、当たっていない子の並び
+  // 同じ中身でヒットした子のあいだに続く、ヒットしていない子の並び
   const runs: number[][] = [];
   let run: number[] = [];
   children.forEach((_, i) => {
@@ -661,7 +661,7 @@ function patchChildren(doc: Document, olds: readonly unknown[], children: readon
  * not や all / any で包んだ・外した組は、中身の似かたの半分（0 から 1）。
  *
  * `strict` のときは、種類が同じでも中身が重ならなければ 0 にする（個別条件なら文字が前か後ろで 1 字も
- * 揃わない、演算子なら似た子が 1 つも無い）。位置で決まらない組を当てるときに使う。
+ * 揃わない、演算子なら似た子が 1 つも無い）。位置で決まらない組を適用するときに使う。
  */
 function likeness(old: CondNode, next: CondNode, strict: boolean): number {
   if (isLeaf(old) && isLeaf(next)) {

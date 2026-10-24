@@ -196,7 +196,7 @@ class SortTest(AuthorityHarness):
         self.assertEqual(found, {flow: "c", copy: "c", other: "d", review: "d"})
 
     def test_a_workflow_file_is_no_longer_a_user_decision(self):
-        """待ち方は承認済みチケットの計画から都度計算するので、承認は `phases/<親>/workflow.yml`
+        """先行関係は承認済みチケットの計画から都度計算するので、承認は `phases/<親>/workflow.yml`
         を書かない。置き場に現れたら、ユーザの判断が書くものではなく見分けられないもの（d）。"""
         held = f"{APPROVED}/phases/i0001/workflow.yml"
         self.put(held, "order: dag\nwaits:\n  1: []\nreview_at: {}\n")

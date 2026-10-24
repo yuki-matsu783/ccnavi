@@ -1,6 +1,6 @@
 /**
  * テンプレート管理画面の編集欄（React）を happy-dom で動かす。編集の開始と答え、直したときの読ませる依頼（editCheck）、
- * 計画の表の操作（項を足す・消す・動かす）、保存（editSave）と保存の答え、未保存のまま閉じる確認、始められなかったときの理由、
+ * 計画の表の操作（ステップを足す・消す・動かす）、保存（editSave）と保存の答え、未保存のまま閉じる確認、始められなかったときの理由、
  * 新しいテンプレートを作る入口を見る。読めるか・計画の図の中身は実行ファイルの答え（見本 `tests/fixtures/templates-check-json.json`）のまま。
  */
 import { test } from "node:test";
@@ -85,7 +85,7 @@ test("CB-D382 編集を押すと editOpen を送り、答えが届くまで読�
       ["3"],
       "フィードバック計画の番号は全体計画の続き",
     );
-    assert.equal(dom.all('section.tpl-edit-plan[data-part="plan"] .react-flow__node').length, 4, "start と end と 2 項");
+    assert.equal(dom.all('section.tpl-edit-plan[data-part="plan"] .react-flow__node').length, 4, "start と end と 2 ステップ");
     assert.equal(dom.all('section[data-role="flows"] li.row').length, 2);
     assert.match(text(dom.one('section[data-role="flows"] li[data-index="2"]')), /フロー: 実装の手順/);
     assert.equal(dom.all('[data-role="dirty"]').length, 0);
@@ -120,12 +120,12 @@ test("CB-D383 説明を直すと「未保存」が出て、少し待つと直し
   }
 });
 
-test("CB-D384 計画の表で項を足す・動かす・消す。足した項は前の末尾の項を待ち、全体計画の最後の 1 項は消せない。番号は全体計画の続きで振る", async () => {
+test("CB-D384 計画の表でステップを足す・動かす・消す。足したステップには前の末尾のステップが先行し、全体計画の最後の 1 ステップは消せない。番号は全体計画の続きで振る", async () => {
   const dom = await openList();
   try {
     await startEdit(dom);
     const rows = (part: string) => dom.all(`section.tpl-edit-plan[data-part="${part}"] tbody tr`);
-    // 足す: 全体計画に docs を末尾に足すと 3 項になり、待つ項は 2
+    // 足す: 全体計画に docs を末尾に足すと 3 ステップになり、先行ステップは 2
     dom.change(dom.one<HTMLSelectElement>('section.tpl-edit-plan[data-part="plan"] select.f-add-type'), "docs");
     await dom.settle();
     dom.click(dom.one('section.tpl-edit-plan[data-part="plan"] button[data-action="add-item"]'));
@@ -136,19 +136,19 @@ test("CB-D384 計画の表で項を足す・動かす・消す。足した項は
     // 動かす: 1 は 2 の先行なので前にも後ろにも動かせない。足した 3 は 2 の後続なので前へ動かせない
     assert.equal(rows("plan")[0].querySelector<HTMLButtonElement>('button[data-action="move-up"]')?.disabled, true);
     assert.equal(rows("plan")[2].querySelector<HTMLButtonElement>('button[data-action="move-up"]')?.disabled, true);
-    // 消す: 3 番を消すと 2 項に戻る
+    // 消す: 3 番を消すと 2 ステップに戻る
     dom.click(rows("plan")[2].querySelector<HTMLButtonElement>('button[data-action="remove-item"]') as HTMLButtonElement);
     await dom.settle();
     assert.equal(rows("plan").length, 2);
-    // 2 番を消すと 1 項だけになり、最後の 1 項は消せない
+    // 2 番を消すと 1 ステップだけになり、最後の 1 ステップは消せない
     dom.click(rows("plan")[1].querySelector<HTMLButtonElement>('button[data-action="remove-item"]') as HTMLButtonElement);
     await dom.settle();
     assert.equal(rows("plan").length, 1);
     assert.equal(rows("plan")[0].querySelector<HTMLButtonElement>('button[data-action="remove-item"]')?.disabled, true);
-    // 消した 2 番のフローは項と一緒になくなる
+    // 消した 2 番のフローはステップと一緒になくなる
     assert.equal(dom.all('section[data-role="flows"] li.row').length, 1);
     assert.match(text(dom.one('section[data-role="flows"] li[data-index="1"]')), /フローなし/);
-    // フィードバック計画の項は全部消せて、「作る」入口に戻る
+    // フィードバック計画のステップは全部消せて、「作る」入口に戻る
     dom.click(rows("feedback")[0].querySelector<HTMLButtonElement>('button[data-action="remove-item"]') as HTMLButtonElement);
     await dom.settle();
     assert.equal(rows("feedback").length, 0);
@@ -200,7 +200,7 @@ test("CB-D385 保存は editSave に開いたときのハッシュと書き出�
   }
 });
 
-test("CB-D386 未保存のまま閉じようとすると捨ててよいかを聞く。続ければ編集に戻り、捨てれば一覧に戻る。直していなければそのまま閉じる", async () => {
+test("CB-D386 未保存のまま閉じようとすると破棄してよいかを聞く。続ければ編集に戻り、破棄すれば一覧に戻る。直していなければそのまま閉じる", async () => {
   const dom = await openList();
   try {
     await startEdit(dom);
@@ -292,7 +292,7 @@ test("CB-D388 新しいテンプレートは名前を入れて作る。使えな
   }
 });
 
-test("CB-D389 項のフローは最初から図を開いていて、部品箱でノードを足すと未保存になり、答えを読み直す。「フローを足す」は雛形を置き、「フローを外す」で消える", async () => {
+test("CB-D389 ステップのフローは最初から図を開いていて、部品箱でノードを足すと未保存になり、答えを読み直す。「フローを足す」は雛形を置き、「フローを外す」で消える", async () => {
   const dom = await openList();
   try {
     await startEdit(dom);

@@ -108,7 +108,7 @@ test("CB-T443 リスクの案内の scene は、見本にある項目の id・�
       assert.ok(scene.missing === undefined || scene.missing === true, `${at}: missing`);
       assert.ok(scene.find === undefined || typeof scene.find === "string");
       for (const key of Object.keys(scene)) {
-        assert.ok(known.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
+        assert.ok(known.includes(key), `${at}: scene のキー ${key} を画面は読まない`);
       }
     }
   }

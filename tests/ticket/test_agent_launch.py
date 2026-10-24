@@ -97,10 +97,10 @@ class LaunchHarness(PhaseHarness):
         permission_mode="default",
         **tool_input,
     ):
-        """起動の PreToolUse を起こし、応答の hookSpecificOutput（無ければ空の辞書）を返す。
+        """起動の PreToolUse を起こし、応答の hookSpecificOutput（無ければ空のマップ）を返す。
 
         `where` は呼び手の cwd。tool_input の `cwd`（起動の引数）は tool_input として渡す。
-        どのルールにも当たらない回の結末は権限モードで変わる（default は ccnavi が渡す）。
+        どのルールにもヒットしない回の結末は権限モードで変わる（default は ccnavi が渡す）。
         """
         payload = {
             "hook_event_name": "PreToolUse",
@@ -486,7 +486,8 @@ class CompositionTest(LaunchHarness):
         self.assertIn(f"担当の子: {CHILD}", out["updatedInput"]["prompt"])
 
     def test_the_task_tool_meets_the_same_rules(self):
-        """Task は Agent と同じく description を対象にルールが当たる（判定に届かずに通らない）。"""
+        """Task は Agent と同じく description を対象にルールがヒットする
+        （判定に届かずに通らない）。"""
         out = self.call(self.root, "Task", description="denied", prompt=f"{CHILD} を直す")
         self.assertEqual(out.get("permissionDecision"), "deny", out)
         out = self.call(self.root, "Task", description="asked", prompt=f"{CHILD} を直す")

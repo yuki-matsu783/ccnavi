@@ -1,4 +1,4 @@
-"""ルールの `except:`（本体に当たっても、除くものに当たれば当たらない扱い）のテスト。
+"""ルールの `except:`（本体にヒットしても、除くものにヒットすればヒットしない扱い）のテスト。
 
 読み込み（書式と苦情）、判定（Rule.matches と hook の判定）、lint、レイヤーのマージ、
 提案が書き戻す形を見る。
@@ -62,7 +62,7 @@ class ParseTest(unittest.TestCase):
         self.assertTrue(rule.matches("Write", "/a/secret/key.pem"))
         self.assertFalse(rule.matches("Write", "/a/secret/public/key.pem"))
         self.assertFalse(rule.matches("Write", "/a/secret/README.MD"))  # 大文字小文字を区別しない
-        # glob の区切りは `\\` にも当たる（本体と同じ翻訳）
+        # glob の区切りは `\\` にもヒットする（本体と同じ翻訳）
         self.assertFalse(rule.matches("Write", r"C:\a\secret\public\key.pem"))
 
     def test_except_が無ければ今までどおり(self):
@@ -146,7 +146,7 @@ class ErrorTest(unittest.TestCase):
         self.check([{"match": "Write"}], "except[0]", "未対応のキー")
 
     def test_文字列でない値は誤り(self):
-        # 引用符の無い `on` は真偽値に読まれる。黙って 'True' として当てない
+        # 引用符の無い `on` は真偽値に読まれる。黙って 'True' として適用しない
         # （when の個別条件と同じ）
         for item in ({"glob": True}, {"regex": 5}, {"glob": ["*.md"]}, {"glob": None, "regex": 0}):
             self.check([item], "except[0]", "文字列ではない")
@@ -169,7 +169,7 @@ class ErrorTest(unittest.TestCase):
             "glob": "*.pem",
             "except": [{"regex": "^{!root}.*"}],
         }
-        # deny は except を外して当てる（止める側に外れる）
+        # deny は except を外して適用する（止める側に外れる）
         rule, problems = build({**raw, "message": "m"}, root=long_root)
         self.assertIsNotNone(rule)
         self.assertEqual(rule.excepts, [])
@@ -255,13 +255,13 @@ class WorkspaceRootTest(unittest.TestCase):
             with self.subTest(tail=tail):
                 self.assertTrue(self.hits(tail))
 
-    def test_ルートの外とルートそのものには当たらない(self):
+    def test_ルートの外とルートそのものにはヒットしない(self):
         self.assertFalse(self.rule.matches("Write", "/elsewhere/a.md"))
         self.assertFalse(self.rule.matches("Write", self.root))
 
 
 class JudgeTest(unittest.TestCase):
-    """hook の判定で except が効く。入れ子のコマンド（sudo の中）にも同じに当たる。"""
+    """hook の判定で except が効く。入れ子のコマンド（sudo の中）にも同じにヒットする。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -340,7 +340,7 @@ class JudgeTest(unittest.TestCase):
         # sudo が中で実行するコマンドにも、同じ except が効く
         self.assertEqual(says("sudo npm publish"), ("deny", True))
         self.assertEqual(says("sudo npm publish --dry-run"), ("ask", False))
-        # Bash ではコマンド列の全体に当てる（lint が warn で言う形）
+        # Bash ではコマンド列の全体に適用する（lint が warn で言う形）
         self.assertEqual(says("npm publish; npm publish --dry-run"), ("ask", False))
 
 
@@ -377,10 +377,10 @@ class LintTest(unittest.TestCase):
         found = self.details(self.lint([bad]), rules.SEVERITY_ERROR)
         self.assertTrue(any("workspace-root" in d and "except[0]" in d for d in found), found)
 
-    def test_何にでも当たる_except(self):
+    def test_何にでもヒットする_except(self):
         rule = {"id": "x", "match": "Write", "glob": "*.pem", "except": [{"glob": "*"}]}
         found = self.details(self.lint([{**rule, "message": "m"}]), rules.SEVERITY_WARN)
-        self.assertTrue(any("except[0] は何にでも当たる" in d for d in found), found)
+        self.assertTrue(any("except[0] は何にでもヒットする" in d for d in found), found)
 
     def test_コマンドの_except(self):
         rule = {
@@ -433,7 +433,7 @@ class MergeTest(unittest.TestCase):
         problems = ruleload.merge_rules(base, extra, "lib")
         self.assertEqual(len(base.deny), 2)
         self.assertEqual([p.severity for p in problems], [rules.SEVERITY_WARN])
-        # 全欄が同じなら後ろを捨てる
+        # 全欄が同じなら後ろを破棄する
         same = self.rule_set({**with_except, "except": [{"glob": "*.md"}]})
         problems = ruleload.merge_rules(base, same, "lib")
         self.assertEqual(len(base.deny), 2)

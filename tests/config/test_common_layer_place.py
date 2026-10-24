@@ -30,7 +30,7 @@ from tests import ROOT
 from tests.config.test_config_union import ConfigUnionHarness, write
 from tests.inproc import run_ccnavi
 
-# 共通レイヤーに置いてあるものとは別の中身。env かフラグがこちらを指したときだけ当たる。
+# 共通レイヤーに置いてあるものとは別の中身。env かフラグがこちらを指したときだけヒットする。
 OTHER_RULES = {
     "version": 1,
     "deny": [
@@ -158,7 +158,7 @@ class EnvDoesNotMoveTheCommonLayerTest(CommonLayerPlaceHarness):
         )
 
     def test_the_rules_the_env_names_are_not_applied(self):
-        """env が指したファイルの deny は当たらない。置き場だけでなく判定でも確かめる。"""
+        """env が指したファイルの deny はヒットしない。置き場だけでなく判定でも確かめる。"""
         result = self.decide(
             "Read",
             env={"CCNAVI_RULES": self.other_rules},
@@ -199,7 +199,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
     """
 
     def target(self):
-        """`OTHER_RULES` の `only-in-the-other-file` が当たる対象。"""
+        """`OTHER_RULES` の `only-in-the-other-file` がヒットする対象。"""
         return os.path.join(self.ws, "src", "a.py")
 
     def test_the_rules_flag_is_dropped_when_judging(self):

@@ -30,7 +30,7 @@ keywords: [deny, ask, restore, 保護領域, ルール, 報告, チケット]
 
 ## 決定
 
-- **戻すのは `deny` と宣言された場所だけ**（`post._restorable`）。当たったルールの `decision` が
+- **戻すのは `deny` と宣言された場所だけ**（`post._restorable`）。ヒットしたルールの `decision` が
   `deny` のものを 1 本でも含む finding に限る
 - **報告する範囲は変えない。** `post_findings._guarding` は `deny` と `ask` の両方を返したままにし、
   チケットの範囲の外も報告したまま

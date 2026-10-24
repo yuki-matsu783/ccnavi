@@ -373,7 +373,7 @@ class PredecessorTest(TicketTest):
         sed = "sed -i 's/predecessors.*//' .ccnavi/approved/doing/i0001-01-03.md"
         self.assertIn(bash(sed), ("", "ask", "deny"))
         self.assertEqual(bash(sed, "bypassPermissions"), "deny")
-        # 承認を自分で出す経路（端末の外からの --agree / --yes）も止まる。
+        # 承認を自分で出す経路（ターミナルの外からの --agree / --yes）も止まる。
         approve = self.hook(
             "PreToolUse",
             "Bash",

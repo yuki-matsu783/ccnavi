@@ -4,7 +4,7 @@
 
 1. フェーズ定義の検証（識別子と表示名の一意、フィードバック対応は mr 固定、参照先の有無）
 2. 全体計画の承認と、計画に合わない子の拒否（kind、無い番号）。範囲の上限の超過は拒まず見せる
-3. 順序は承認で止まる（待つ番号が閉じてレビューが済むまで承認しない。待たない番号は並行）
+3. 順序は承認で止まる（先行の番号が閉じてレビューが済むまで承認しない。先行のない番号は並行）
 4. 成果物が無ければフェーズの最後の子を閉じられない
 5. 延期したフェーズではレビューで止まらず、次の依頼に含まれる
 6. フィードバック計画は最後のレビューの後に 1 回だけ、空でも証跡になる
@@ -32,7 +32,7 @@ from tests.ticketsample import PHASES, RULES, child_text, parent_text, record_me
 class PhaseHarness(unittest.TestCase):
     """親と子を動かす道具。テストは持たない（他のテストが継いで使う）。"""
 
-    # 親の `phases:` に写す元の phases.yml の本文。phases.yml を差し替えるテストは上書きする。
+    # 親の `phases:` にコピーする元の phases.yml の本文。phases.yml を差し替えるテストは上書きする。
     phases_text = PHASES
     # sh（write-and-push）を通らずに状態の操作を直に起こすテストは、write-and-push
     # の印を付ける（`tests/write_and_push_flag.py`）。
@@ -434,7 +434,7 @@ class PhaseTest(PhaseHarness):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
 
     def test_items_that_do_not_wait_on_each_other_are_planned_together(self):
-        """`after` で待たない項は並行する（前の版の `overlap` の代わり）。"""
+        """`after` で先行しないステップは並行する（前の版の `overlap` の代わり）。"""
         plan = [
             "acceptance",
             {"type": "implement", "after": []},
@@ -548,7 +548,7 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
 
     def test_deliverable_tracked_but_deleted_from_the_worktree_is_missing(self):
-        """追跡済みでも作業ツリーから消えていれば、成果物は無いものとして閉じない。
+        """追跡済みでもワークツリーから消えていれば、成果物は無いものとして閉じない。
 
         `git ls-files` はインデックスを見るので、削除をステージするまでは名前が返る。
         """
@@ -1263,7 +1263,7 @@ class PhaseTest(PhaseHarness):
         self.assertFalse(os.path.exists(os.path.join(phases_dir, "1.pending")))
 
     def test_close_early_is_a_human_path(self):
-        """close-early は端末を求める。サブエージェントと直接の exe 呼び出しは止まる。"""
+        """close-early はターミナルを求める。サブエージェントと直接の exe 呼び出しは止まる。"""
         self.family(plan=["design"])
         fixture = self.remote()
         result = self.ccnavi(
@@ -1557,9 +1557,9 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("書くのはユーザ", started.stderr)
 
     def test_editing_phases_yml_does_not_change_the_cut_of_an_approved_child(self):
-        """12. 承認のあとの判定は親に固定した写し（`phases:`）の定義で切り詰める。
+        """12. 承認のあとの判定は親に固定したコピー（`phases:`）の定義で切り詰める。
 
-        `phases.yml` から定義を消しても、壊しても、判定は写しを読むので上限は変わらない。
+        `phases.yml` から定義を消しても、壊しても、判定はコピーを読むので上限は変わらない。
         """
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*", "docs/*"])
@@ -1603,7 +1603,7 @@ class ScopeLimitTest(PhaseHarness):
         self.break_phases_encoding()
         result = self.write_to(tree, "src/a/x.py")
         self.assert_answered(result)
-        # 判定は親に固定した写し（`phases:`）の定義で切り詰め、phases.yml は読まない。
+        # 判定は親に固定したコピー（`phases:`）の定義で切り詰め、phases.yml は読まない。
         self.assertEqual(self.decision(result), "deny", result.stdout)
         self.assertIn("limit: phase type 調査 (research)", self.reason(result))
         self.assertNotIn("切り詰めていない", self.reason(result))
@@ -1623,7 +1623,7 @@ class ScopeLimitTest(PhaseHarness):
                 self.assert_answered(self.hook("PreToolUse", "Bash", tree, command=command))
 
     def test_no_phases_file_with_a_plan_says_nothing_about_the_type(self):
-        """8. 承認のあとに phases.yml を消しても、判定は親に固定した写しの定義で切り詰める。
+        """8. 承認のあとに phases.yml を消しても、判定は親に固定したコピーの定義で切り詰める。
 
         判定は phases.yml を読まない。注記も出さない。
         """
@@ -1643,7 +1643,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotIn("切り詰めていない", self.reason(beyond))
 
     def test_regex_child_is_judged_by_the_real_path(self):
-        """14. regex の子: 実際のパスで親と定義に当てる。"""
+        """14. regex の子: 実際のパスで親と定義に適用する。"""
         tree = self.approved_child(
             scoped_child_text("i0001-01-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",))
         )
@@ -1673,7 +1673,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
 
     def test_regex_child_can_keep_the_distinction_with_an_inline_flag(self):
-        """14. regex の子: `(?-i:...)` で囲んだ範囲は書いた表記のとおりに当たる。
+        """14. regex の子: `(?-i:...)` で囲んだ範囲は書いた表記のとおりにヒットする。
 
         ルールの側（tests/config/test_config_union_holes.py）と同じ書き方が、
         チケットの範囲でも書けることを見る。
@@ -1685,7 +1685,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
 
-        # 定義の上限（glob）には当たる表記だが、子の範囲が区別するので止まる。
+        # 定義の上限（glob）にはヒットする表記だが、子の範囲が区別するので止まる。
         outside = self.write_to(tree, "wip/Research/x.md")
         self.assertEqual(self.decision(outside), "deny", outside.stdout)
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
