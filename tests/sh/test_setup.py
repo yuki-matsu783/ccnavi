@@ -1708,9 +1708,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertNotIn("まだ無いもの", result.stdout)
 
     def test_refuses_a_bin_value_it_does_not_know_and_writes_nothing(self):
-        """`--bin` が取るのは project か user だけ。パスは取らない。2 で断り、何も書かない。
+        """`--bin` が受け取るのは project か user だけ。パスは受け取らない。2 で断り、何も書かない。
 
-        置き場は固定なので、置き場のパスを名指しするオプションは無い。
+        配置先は固定なので、配置先のパスを名指しするオプションは無い。
         """
         src = self.make_source()
         for args, message in (
@@ -1731,7 +1731,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("--bin user と --no-deploy は同時に指定できません", result.stderr)
 
-    # ---- --bin user（ユーザの置き場に置く。端末で確認する）
+    # ---- --bin user（ホームディレクトリの下に置く。端末で確認する）
 
     def user_home(self):
         home = tempfile.mkdtemp(prefix="ccnavi-home-")
@@ -1739,7 +1739,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         return home
 
     def run_user_bin(self, home, *args, answer=None, **env_extra):
-        """`--bin user` で配る。answer があれば、端末（疑似端末）に答えを打つ。無ければ端末なし。"""
+        """`--bin user` で配る。answer があれば、端末（疑似端末）に答えを入力する。
+        無ければ端末なし。"""
         env = clean_env(HOME=home, **env_extra)
         argv = [SHELL, SCRIPT, self.dir, *args]
         if answer is None:
@@ -1774,7 +1775,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         return subprocess.CompletedProcess(argv, proc.returncode, out, err)
 
     def test_bin_user_without_a_terminal_writes_nothing(self):
-        """端末でなければ断る。答えを渡す指定は持たないので、エージェントは代わりに答えられない。"""
+        """端末でなければ断る。確認に自動で答えるオプションは無いので、エージェントは代わりに答えられない。"""
         src = self.make_source()
         self.make_git()
         home = self.user_home()
@@ -1797,11 +1798,12 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.path.isfile(os.path.join(share, "_internal", "base_library.zip")))
         self.assertTrue(os.path.islink(link))
         self.assertEqual(os.readlink(link), os.path.join(share, "ccnavi"))
-        # 配布先の .ccnavi/bin/ には置かず、無視する行も足さない。sh と設定は配る。
+        # 配布先の .ccnavi/bin/ には置かず、無視する行も追加しない。sh と設定は配る。
         self.assertFalse(os.path.exists(self.built(THIS_MACHINE)))
         self.assertTrue(os.path.isfile(self.deployed(*LAUNCHER_PARTS)))
         self.assertNotIn(".ccnavi/bin/", self.gitignore())
-        # リンクを置く場所が PATH に無ければ、足す行を知らせる。シェルの設定ファイルには書かない。
+        # リンクを置く場所が PATH に無ければ、追加する行を知らせる。
+        # シェルの設定ファイルには書かない。
         self.assertIn("PATH に入っていません", result.stdout)
         self.assertEqual(sorted(os.listdir(home)), [".local"])
         self.assertNotIn("まだ無いもの", result.stdout)
@@ -1839,7 +1841,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         with open(os.path.join(share, "_internal", "base_library.zip"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "新しい同梱物")
 
-    # ---- PATH の案内は、環境に合った足し方を言う
+    # ---- PATH の案内は、環境に合った追加の仕方を言う
 
     def path_without(self, *names):
         """PATH から、~/.local/bin を外した値。"""
@@ -1901,7 +1903,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertNotIn("PATH に入っていません", result.stdout)
 
     def fake_git_bash(self):
-        """uname が Git Bash（MINGW）の値を答える PATH の先頭の置き場。"""
+        """uname が Git Bash（MINGW）の値を答える代役のフォルダ。PATH の先頭に置く。"""
         shim = tempfile.mkdtemp(prefix="ccnavi-uname-")
         self.addCleanup(shutil.rmtree, shim, ignore_errors=True)
         uname = os.path.join(shim, "uname")
@@ -1927,7 +1929,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.path.isfile(os.path.join(share, "ccnavi.exe")))
         self.assertTrue(os.path.isfile(os.path.join(share, "_internal", "base_library.zip")))
         self.assertFalse(os.path.exists(os.path.join(home, ".local", "bin")))
-        # Windows の環境変数 Path に、実体のフォルダを足す手順を言う。rc には触れない。
+        # Windows の環境変数 Path に、実体のフォルダを追加する手順を言う。rc には触れない。
         self.assertIn("SetEnvironmentVariable", result.stdout)
         self.assertIn(share, result.stdout)
         self.assertNotIn(">> ~/.bashrc", result.stdout)
@@ -2085,7 +2087,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             f.write(text)
 
     def test_replaces_a_build_that_differs_from_the_source_without_force(self):
-        """組み立て直して中身が違えば、`--force` が無くても実行ファイルを入れ替える。
+        """組み立て直して中身が違えば、`--force` が無くても実行ファイルを置き換える。
 
         古いままだと、sh との互換の食い違いで hook が働かなくなる。
         前の組み立ての残りも持ち越さない。
@@ -2105,7 +2107,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertFalse(os.path.exists(stale))
 
     def test_does_not_replace_a_build_that_is_the_same_as_the_source(self):
-        """中身が同じなら入れ替えない。何度打っても同じ結果になる。"""
+        """中身が同じなら置き換えない。何度実行しても同じ結果になる。"""
         src = self.make_source()
         self.run_setup("--deploy", src)
         before = os.stat(self.built(THIS_MACHINE, "_internal", "base_library.zip")).st_mtime_ns
@@ -2117,7 +2119,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(before, after)
 
     def test_a_differing_build_does_not_replace_the_rules_the_project_edited(self):
-        """入れ替えるのは実行ファイルだけ。直されている前提のルールには触らない。"""
+        """置き換えるのは実行ファイルだけ。直されている前提のルールには触らない。"""
         src = self.make_source()
         self.run_setup("--deploy", src)
         with open(self.deployed(*RULES_PARTS), "w", encoding="utf-8") as f:

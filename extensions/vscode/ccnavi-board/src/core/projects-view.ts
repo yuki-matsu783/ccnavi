@@ -65,7 +65,7 @@ export interface ProjectsPage {
 }
 
 /**
- * 共通レイヤーのミラーの状態（`user mirror --json` の答え）。一覧（`ProjectsPage`）とは別に、拡張ホストが 5 分ごとに調べ直す。
+ * 共通レイヤーのミラーの状態（`user mirror --json` の結果）。一覧（`ProjectsPage`）とは別に、拡張ホストが 5 分ごとに調べ直す。
  * 状態の形とボタンの判断は `mirrormodel.ts` が持つ。
  */
 export interface MirrorData {
@@ -112,7 +112,7 @@ export type ProjectsMessage =
   | { readonly type: "clone"; readonly url: string; readonly name: string }
   /**
    * ミラーを同期する。`names` が空なら差分のある全プロジェクト（「すべて同期」）、1 つならそのプロジェクトだけ（「ミラーを同期」）。
-   * `expect` は画面が見せていた答えの値（全体なら答えの `expect`、単独ならそのプロジェクトの `expect`）。
+   * `expect` は画面が見せていた結果の値（全体なら結果の `expect`、単独ならそのプロジェクトの `expect`）。
    * 見せた後に内容が変わっていれば、実行ファイルは何も書かない
    */
   | { readonly type: "mirrorSync"; readonly names: readonly string[]; readonly expect: string }

@@ -106,7 +106,7 @@ export function handoffYesArgs(paths: readonly string[], expect: string): readon
 
 /**
  * `user mirror [<プロジェクト名>…] --json`。共通レイヤーのミラーのずれを見る（`--yes` を付けない。何も書かない）。
- * 名前を省くと全プロジェクト。答えの `expect` は差分のある全プロジェクトの、各プロジェクトの `expect` はそのプロジェクトだけのハッシュ。
+ * 名前を省くと全プロジェクト。結果の `expect` は差分のある全プロジェクトの、各プロジェクトの `expect` はそのプロジェクトだけのハッシュ。
  * `--root` は `run()` が付ける。
  */
 export function mirrorArgs(names: readonly string[] = []): readonly string[] {
@@ -115,7 +115,7 @@ export function mirrorArgs(names: readonly string[] = []): readonly string[] {
 
 /**
  * `user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json`。ミラーの同期。書くのは各プロジェクトの作業ツリーで、コミットはしない。
- * 名前を省くと差分のある全プロジェクト。`expect` は見るだけの答えの `expect`（全体）か、各プロジェクトの `expect`（単独）。
+ * 名前を省くと差分のある全プロジェクト。`expect` は見るだけの結果の `expect`（全体）か、各プロジェクトの `expect`（単独）。
  * 変わっていれば実行ファイルは何も書かない
  */
 export function mirrorYesArgs(names: readonly string[], expect: string): readonly string[] {

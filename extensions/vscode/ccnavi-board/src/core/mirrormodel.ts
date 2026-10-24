@@ -1,17 +1,17 @@
 /**
- * プロジェクト管理画面が読む、共通レイヤーのミラーの答え（`user mirror --json`）の読み取りと、画面の判断の部分。
+ * プロジェクト管理画面が読む、共通レイヤーのミラーの結果（`user mirror --json`）の読み取りと、画面の判断の部分。
  *
  * ミラーは、ワークスペースの `.ccnavi/config/common/`（共通レイヤー）を各プロジェクトの `.ccnavi/config/common/` に写したもの。
- * ずれの有無・中身・ハッシュ（`expect`）は実行ファイルが決めて答え、同期で書くのも実行ファイル。ここで決めるのは次の 3 つだけ。
+ * ずれの有無・中身・ハッシュ（`expect`）は実行ファイルが決めて返し、同期で書くのも実行ファイル。ここで決めるのは次の 3 つだけ。
  *
  * - 行と帯に出す文言（同期済み / ずれ N 件 / 調べられない、変更の種類の言い方、同期の結果の通知）
  * - ボタンを押せるか（実行ファイルが古い・読めない・同期中・写すものが無い・ずれが無い、のどれかなら押せない）
- * - 「すべて同期」の対象（`state` が `differs` のプロジェクト）と、そのとき渡す `expect`（答えの全体の `expect`）
+ * - 「すべて同期」の対象（`state` が `differs` のプロジェクト）と、そのとき渡す `expect`（結果全体の `expect`）
  *
  * VS Code の API も DOM も node も読まない（単体で試せる。画面にもバンドルされる）。
  */
 
-/** 答えの版。欄を足すだけなら上がらない */
+/** JSON の版。欄を追加するだけなら上がらない */
 export const MIRROR_VERSION = 1;
 
 /** 変更の種類。知らない値も通す（実行ファイルが種類を足しても、画面は止めない） */
@@ -27,7 +27,7 @@ export interface MirrorChange {
   readonly action: MirrorAction;
 }
 
-/** プロジェクト 1 件の答え */
+/** プロジェクト 1 件の結果 */
 export interface MirrorProject {
   readonly name: string;
   readonly state: MirrorState;
@@ -38,7 +38,7 @@ export interface MirrorProject {
   readonly expect: string;
 }
 
-/** 見るだけの答え（`user mirror [<名前>…] --json`）の全体 */
+/** 見るだけの結果（`user mirror [<名前>…] --json`）の全体 */
 export interface MirrorList {
   readonly version: number;
   /** 偽なら `error` に理由（共通レイヤーが読めないなど）。そのとき `projects` は空 */
@@ -57,7 +57,7 @@ export interface MirrorSynced {
   readonly files: readonly string[];
 }
 
-/** 同期の答え（`user mirror [<名前>…] --yes --expect <値> --via board --json`）。失敗は `error` に理由 */
+/** 同期の結果（`user mirror [<名前>…] --yes --expect <値> --via board --json`）。失敗は `error` に理由 */
 export type MirrorResult = { readonly ok: true; readonly synced: readonly MirrorSynced[] } | { readonly ok: false; readonly error: string };
 
 export type MirrorListParse = { readonly ok: true; readonly value: MirrorList } | { readonly ok: false; readonly error: string };
@@ -66,8 +66,8 @@ export type MirrorResultParse = { readonly ok: true; readonly value: MirrorResul
 // ---- 読み取り
 
 /**
- * 見るだけの答えを読む。版が違う・欄が足りないときは文面を返す。
- * `ok` が偽の答えは読み取りの失敗にしない（`ok: false` の一覧として返し、画面が理由を出す）。
+ * 見るだけの結果を読む。版が違う・欄が足りないときは文面を返す。
+ * `ok` が偽の結果は読み取りの失敗にしない（`ok: false` の一覧として返し、画面が理由を出す）。
  */
 export function parseMirrorList(text: string): MirrorListParse {
   const parsed = parseRecord(text);
@@ -113,7 +113,7 @@ export function parseMirrorList(text: string): MirrorListParse {
 }
 
 /**
- * 同期の答えを読む。失敗の答え（`{version, ok:false, error}`）は `ok:false` の結果として返す（読み取りの失敗ではない）。
+ * 同期の結果を読む。失敗の結果（`{version, ok:false, error}`）は `ok:false` の結果として返す（読み取りの失敗ではない）。
  */
 export function parseMirrorResult(text: string): MirrorResultParse {
   const parsed = parseRecord(text);
@@ -181,7 +181,7 @@ export function actionText(action: MirrorAction): string {
   }
 }
 
-/** 「すべて同期」の対象。`differs` のプロジェクトの名前を、答えの順で返す */
+/** 「すべて同期」の対象。`differs` のプロジェクトの名前を、結果の順で返す */
 export function syncAllTargets(list: MirrorList): string[] {
   return list.projects.filter((p) => p.state === "differs").map((p) => p.name);
 }
@@ -194,7 +194,7 @@ export interface SyncButton {
 
 /**
  * ミラーを調べた結果（`projects-view.ts` の `MirrorData` が持つ）。`waiting` はまだ調べていない、`unsupported` は実行ファイルが
- * `user mirror` を持たない、`failed` は調べられなかった（実行ファイルが無い・期限切れ・答えが読めない）
+ * `user mirror` を持たない、`failed` は調べられなかった（実行ファイルが無い・期限切れ・結果が読めない）
  */
 export type MirrorStatus =
   | { readonly kind: "waiting" }
@@ -260,7 +260,7 @@ export function syncAllButton(status: MirrorStatus, busy: boolean): SyncButton &
   return { enabled: true, reason: "", count };
 }
 
-/** 見せた内容と、同期する直前の内容がずれたという答えか（画面を読み直して、もう一度押してもらう） */
+/** 見せた内容と、同期する直前の内容がずれたという結果か（画面を読み直して、もう一度押してもらう） */
 export function isStale(error: string): boolean {
   return error.includes("内容が更新されました");
 }

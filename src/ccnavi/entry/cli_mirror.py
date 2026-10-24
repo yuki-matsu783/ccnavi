@@ -5,7 +5,7 @@
 
 見るだけの形を含めて、ユーザ専用（`user` の入口。hook が止める）。`--yes` で書くときは、標準入力が
 端末であることを求める。`--via board` は拡張の子プロセスの経路で、端末を求めない代わりに
-`--expect` と `--json` が揃うことを求める。書くのは作業ツリーだけで、コミットはしない。
+`--expect` と `--json` を付けて呼ぶことを求める。書くのは作業ツリーだけで、コミットはしない。
 中身は `tickets.mirrorsync`。cli を読まない。
 """
 
@@ -91,7 +91,7 @@ def run(
     処理フロー:
     1. `usage_problem` で組み合わせを検査する。
     2. `--yes` のときは、経路を決めてから揃える。ボードの経路（`--via board`）は端末を求めず、
-       端末の経路は `cli_args._from_terminal` で、端末の前のユーザであることを確かめる。
+       端末の経路は `cli_args._from_terminal` で、端末の前にいるユーザであることを確かめる。
        `mirrorsync.prepare` で今の差分を求め、`mirrorsync.apply` が `--expect` の一致を見て書く。
     3. `--yes` がないときは、`mirrorsync.prepare` の結果を表示する（書かない）。
     4. `--json` のときは JSON で、そうでなければ人が読む形で出す。
@@ -135,7 +135,7 @@ def run(
 
 
 def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None) -> None:
-    """ミラーの状態を人が読む形で書く。何も反映せず、揃えるときに打つコマンドを添える。"""
+    """ミラーの状態を人が読む形で書く。何も反映せず、揃えるときに実行するコマンドを添える。"""
     stdout.write("ccnavi: 共通レイヤーのミラー（各プロジェクトの .ccnavi/config/common/）\n")
     if not plan.projects:
         stdout.write("  プロジェクトはありません。\n")

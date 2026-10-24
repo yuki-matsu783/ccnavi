@@ -121,7 +121,7 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 `comment` / `fetch` / `origin` は sh だけの仕事なので当てていない。
 **hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`phase_forms.human_path_form`）。
 
-- ボードの経路。`user agree` / `user reviewed` / `user handoff` / `user mirror` と `--yes` の組（実行ファイルを直に打つ `--agree` / `--reviewed` と `--yes` の組も）、
+- ボードの経路。`user agree` / `user reviewed` / `user handoff` / `user mirror` と `--yes` の組（実行ファイルを直接実行する `--agree` / `--reviewed` と `--yes` の組も）、
   sh の `--choices` と `--digest` の組。`--yes` の経路は端末を求めないので、ここが唯一の保護になる。
   `ccnavi-review.sh decide <N> --preview` と `--agree --preview` は通す（何も置かない）
 - 端末要求を切る形。実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で端末要求を

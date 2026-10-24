@@ -193,7 +193,7 @@ def project_json(project: Project) -> dict:
 
 
 def plan_json(plan: Plan) -> dict:
-    """見るだけの結果の JSON。選ばれなかったプロジェクトも載せる（画面が全体を見せるため）。"""
+    """見るだけの結果の JSON。載せるのは選ばれたプロジェクトだけ（名前を渡さなければ全部）。"""
     if plan.error:
         return {
             "version": JSON_VERSION,

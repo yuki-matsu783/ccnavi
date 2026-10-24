@@ -349,10 +349,10 @@ ccnavi user mirror [<プロジェクト名>…] --yes --expect <値> --via board
 | `expect` | 差分のある全プロジェクトを揃えるときの `--expect` の値。差分が無ければ空 |
 
 全体の `expect` に入るのは、`differs` のプロジェクトだけ（`error` と `synced` は入らない）。`common_empty` が真のときは、`projects` は全部 `synced` で、`expect` は空。`changes[].action` は `create`・`update`・`delete` の 3 つだけ。
-名前は大文字小文字を区別せずに引き、答えには実際のディレクトリの綴りで返す。
-終了コードは、見るだけは 0（`projects` に `error` があっても 0）、全体の誤り（`ok` が偽）は 1。揃える形は、全部書けたとき 0、書けなかったもの・照合の不一致・対象が無いとき 1。どちらも標準出力の JSON を先に読む。
+名前は大文字小文字を区別せずに引き、結果には実際のディレクトリの綴りで返す。
+終了コードは、見るだけは 0（`projects` に `error` があっても 0）、全体の誤り（`ok` が偽）は 1。揃える形は、全部書けたとき 0、書けなかったもの・照合の不一致・対象が無いとき 1。どちらも、終了コードより先に標準出力の JSON を読む。
 
-揃える形の答えは `{"version": 1, "ok": true, "error": "", "synced": [{"name": "web", "files": ["…"]}]}`。
+揃える形の結果は `{"version": 1, "ok": true, "error": "", "synced": [{"name": "web", "files": ["…"]}]}`。
 `--expect` が今の差分と一致しないときは何も書かず、`ok` を偽にして `error` に「内容が更新されました」で始まる文を返す
 （呼ぶ側は画面を読み直して、もう一度押してもらう）。1 つのプロジェクトが書けなくても、ほかのプロジェクトは書き、
 書けた分を `synced` に、書けなかった理由を `error` に返す。
@@ -383,7 +383,7 @@ ccnavi --version --json
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
 | `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
 | `formats` | 読む書式の版。レイヤーのファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
-| `features` | オプションから読めない振る舞いの名前（文字列の配列）。現在の名前は `user-entry`（ユーザ専用の入口 `user <操作>`）、`handoff`（保護対象の取り込み）、`mirror`（共通レイヤーのミラーの同期）。呼ぶ側が振る舞いの有無を見分けるためのもので、足しても `compat` は上げない |
+| `features` | オプションから読めない振る舞いの名前（文字列の配列）。現在の名前は `user-entry`（ユーザ専用の入口 `user <操作>`）、`handoff`（保護対象の取り込み）、`mirror`（共通レイヤーのミラーの同期）。呼ぶ側が振る舞いの有無を見分けるためのもので、追加しても `compat` は上げない |
 
 **互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
@@ -401,5 +401,5 @@ sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと�
 | `ccnavi --lint` | sh の `CCNAVI_COMPAT` と比べ、`(version)` の warn を出す |
 
 直し方は、ccnavi のリポジトリ（`build.py` とソースがある）なら `uv run --with pyinstaller python build.py` で組み立て直し、
-配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース>` を打つ（実行ファイルは配布元と中身が違えば入れ替わる）。sh も配り直すなら `--force` を付ける。
+配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース>` を実行する（実行ファイルは配布元と中身が違えば置き換わる）。sh も配り直すなら `--force` を付ける。
 拡張のほうが古ければ拡張を入れ直す。sh は `--version` の答えから互換の版を読めなければ「不明」として食い違いに数える。拡張は版を聞けなかったとき、起動では何も言わず、フラグを使う前に理由を出して先へ進まない。

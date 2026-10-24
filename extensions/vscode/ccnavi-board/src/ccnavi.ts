@@ -13,7 +13,7 @@
  * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、`--templates --check-file <パス> --json`（編集中の 1 本を読ませる）、
  * `user handoff [<パス>…] --json`（`wip/handoff/` の下書きの一覧を見る。取り込み待ち画面が読む。`--root` で指したツリー 1 本だけを見る）と
  * `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ。
- * `expect` は取り込むパスを指して見るだけをもう一度呼んだ答えのもの）、
+ * `expect` は取り込むパスを指して見るだけをもう一度呼んだ結果のもの）、
  * `user mirror [<名前>…] --json`（共通レイヤーのミラーのずれを見る。プロジェクト管理画面が 5 分ごとに読む）と
  * `user mirror [<名前>…] --yes --expect <値> --via board --json`（ミラーの同期。書くのは実行ファイルで、各プロジェクトの作業ツリーへ。
  * ユーザが画面で押したときだけ）。
@@ -996,8 +996,8 @@ export async function runHandoffYes(workspace: string, setting: string, tree: st
 /**
  * 共通レイヤーのミラーのずれを見る（`user mirror [<名前>…] --json`）。何も書かない。
  * `--root` はワークスペースのルート（ミラーの元の共通レイヤーと、写す先の `projects/` を持つ側）。
- * 見るだけの答えは、プロジェクトにずれや error があっても終了コード 0 で返る。`ok` が偽の答え（共通レイヤーが読めないなど）も
- * 読めた答えとして返し、理由は呼び手が出す。古い実行ファイルかは呼び手が先に `checkMirror` で聞く
+ * 見るだけの結果は、プロジェクトにずれや error があっても終了コード 0 で返る。`ok` が偽の結果（共通レイヤーが読めないなど）も
+ * 読めた結果として返し、理由は呼び手が出す。古い実行ファイルかは呼び手が先に `checkMirror` で聞く
  */
 export async function runMirror(root: string, setting: string, names: readonly string[] = []): Promise<RunResult<MirrorList>> {
   const what = "ccnavi user mirror --json";
@@ -1012,7 +1012,7 @@ export async function runMirror(root: string, setting: string, names: readonly s
   return mirrorListOf(ran, what);
 }
 
-/** 見るだけの答えを読む。標準出力が読めればそれを、読めなければ失敗の理由を返す（`runMirror` の後半。単体で試すために分ける） */
+/** 見るだけの結果を読む。標準出力が読めればそれを、読めなければ失敗の理由を返す（`runMirror` の後半。単体で試すために分ける） */
 export function mirrorListOf(ran: { readonly code: number; readonly stdout: string; readonly stderr: string }, what = "ccnavi user mirror --json"): RunResult<MirrorList> {
   const parsed = parseMirrorList(ran.stdout);
   if (parsed.ok) {
@@ -1042,7 +1042,7 @@ export async function runMirrorYes(root: string, setting: string, names: readonl
   return mirrorResultOf(ran, what);
 }
 
-/** 同期の答えを読む（`runMirrorYes` の後半。単体で試すために分ける） */
+/** 同期の結果を読む（`runMirrorYes` の後半。単体で試すために分ける） */
 export function mirrorResultOf(ran: { readonly code: number; readonly stdout: string; readonly stderr: string }, what = "ccnavi user mirror --yes --json"): MirrorResult {
   const parsed = parseMirrorResult(ran.stdout);
   if (parsed.ok) {

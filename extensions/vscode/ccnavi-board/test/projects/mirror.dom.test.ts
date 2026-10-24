@@ -14,7 +14,7 @@ function text(element: { textContent: string | null } | null | undefined): strin
   return (element?.textContent ?? "").trim();
 }
 
-/** 実行ファイルとの取り決めの例と同じ答え */
+/** 実行ファイルとの取り決めの例と同じ結果 */
 function list(overrides: Record<string, unknown> = {}): MirrorList {
   const parsed = parseMirrorList(
     JSON.stringify({

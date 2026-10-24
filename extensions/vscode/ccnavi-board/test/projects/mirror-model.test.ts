@@ -1,8 +1,8 @@
 /**
- * プロジェクト管理画面が読む、共通レイヤーのミラーの答え（`user mirror --json`）の読み取りと、画面の判断
+ * プロジェクト管理画面が読む、共通レイヤーのミラーの結果（`user mirror --json`）の読み取りと、画面の判断
  * （`src/core/mirrormodel.ts`）、子プロセスに渡す引数（`src/core/commands.ts` の `mirror*Args`）、
  * 実行ファイルの出力の読み方（`src/ccnavi.ts` の `mirrorListOf` / `mirrorResultOf`）を確かめる。
- * 実行ファイルの実物は無くても試せる。答えは実行ファイルとの取り決めの例をそのまま使う。
+ * 実行ファイルの実物は無くても試せる。結果は実行ファイルとの取り決めの例をそのまま使う。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -27,7 +27,7 @@ import {
   type MirrorStatus,
 } from "../../src/core/mirrormodel.js";
 
-/** 取り決めの見るだけの答え（実行ファイルの標準出力と同じ文字列） */
+/** 取り決めの見るだけの結果（実行ファイルの標準出力と同じ文字列） */
 const LIST_TEXT = JSON.stringify({
   version: 1,
   ok: true,
@@ -51,7 +51,7 @@ const LIST_TEXT = JSON.stringify({
   expect: "all-sha",
 });
 
-/** 取り決めの同期の答え */
+/** 取り決めの同期の結果 */
 const RESULT_TEXT = JSON.stringify({ version: 1, ok: true, error: "", synced: [{ name: "web", files: [".ccnavi/config/common/rules.yml"] }] });
 
 function listOf(text: string = LIST_TEXT): MirrorList {
@@ -128,7 +128,7 @@ test("CB-T1159 実行ファイルの出力の読み方: 読める答えは終了
   assert.ok(!garbage.ok && /出力を読み込めません/.test(garbage.error));
 
   assert.deepEqual(mirrorResultOf({ code: 0, stdout: RESULT_TEXT, stderr: "" }), { ok: true, synced: [{ name: "web", files: [".ccnavi/config/common/rules.yml"] }] });
-  // 失敗の答えは非 0 で返っても、答えの error を使う
+  // 失敗の結果は非 0 で返っても、結果の error を使う
   const stale = JSON.stringify({ version: 1, ok: false, error: "内容が更新されました" });
   assert.deepEqual(mirrorResultOf({ code: 1, stdout: stale, stderr: "" }), { ok: false, error: "内容が更新されました" });
   const crashed = mirrorResultOf({ code: 1, stdout: "", stderr: "Traceback (most recent call last):" });

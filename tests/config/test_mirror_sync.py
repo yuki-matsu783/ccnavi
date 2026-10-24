@@ -13,7 +13,7 @@ fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ�
 2. 共通レイヤーに写すものが無いときは、ずれにせず、ミラーを消さない
 3. 揃える: 見せた差分の照合の値（expect）が今の差分と一致するときだけ書く。書くのはミラーだけで、
    プロジェクトの config には触れない。一致しなければ何も書かない
-4. 調べられないプロジェクト（ミラーの置き場がリンク）は error にして、まとめて揃える対象から外す
+4. 調べられないプロジェクト（ミラーがリンク）は error にして、まとめて揃える対象から外す
 5. 入口: JSON の形、組み合わせの誤り、端末なしの `--yes` の拒否
 """
 
@@ -34,7 +34,7 @@ from tests.config.test_config_union import (
 )
 
 MIRROR = (".ccnavi", "config", "common")
-# 共通レイヤーの中身を変える足し方（読める配点の項目）。
+# 共通レイヤーの中身を変えるための、配点の項目を 1 つ追加する行（読める形）。
 EXTRA_FACTOR = "  - {id: extra, points: 1, lines_over: 99, message: 足した}\n"
 
 
