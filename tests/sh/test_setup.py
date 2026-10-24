@@ -1935,6 +1935,31 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertNotIn(">> ~/.bashrc", result.stdout)
         self.assertNotIn("まだ無いもの", result.stdout)
 
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_warns_when_the_project_still_has_its_own_build(self):
+        """配布先の bin/ に残った実行ファイルが先に使われる。使われなくなることを知らせる。"""
+        src = self.make_source()
+        self.make_git()
+        self.run_setup("--deploy", src)
+        home = self.user_home()
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", answer="y")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("実行ファイルが残っています", result.stdout)
+        self.assertIn("先に使う", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_does_not_replace_a_directory_even_with_force(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        link = os.path.join(home, ".local", "bin", "ccnavi")
+        os.makedirs(os.path.join(link, "inside"))
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", "--force", answer="y")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.isdir(os.path.join(link, "inside")))
+        self.assertFalse(os.path.islink(link))
+        self.assertIn("ディレクトリがあるので、リンクを張れない", result.stdout)
+
     def test_check_with_bin_user_writes_nothing_and_does_not_ask(self):
         src = self.make_source()
         self.make_git()
@@ -2105,6 +2130,11 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "新しい同梱物")
         self.assertFalse(os.path.exists(stale))
+        # 新しい版を隣に作ってから入れ替えるので、途中の置き場を残さない。
+        left = [
+            n for n in os.listdir(os.path.dirname(self.built())) if ".new." in n or ".old." in n
+        ]
+        self.assertEqual(left, [])
 
     def test_does_not_replace_a_build_that_is_the_same_as_the_source(self):
         """中身が同じなら置き換えない。何度実行しても同じ結果になる。"""

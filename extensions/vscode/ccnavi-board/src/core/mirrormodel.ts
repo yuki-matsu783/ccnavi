@@ -58,7 +58,10 @@ export interface MirrorSynced {
 }
 
 /** 同期の結果（`user mirror [<名前>…] --yes --expect <値> --via board --json`）。失敗は `error` に理由 */
-export type MirrorResult = { readonly ok: true; readonly synced: readonly MirrorSynced[] } | { readonly ok: false; readonly error: string };
+export type MirrorResult =
+  | { readonly ok: true; readonly synced: readonly MirrorSynced[] }
+  // 一部のプロジェクトだけ書けなかったときは、書けた分を `synced` で返す
+  | { readonly ok: false; readonly error: string; readonly synced?: readonly MirrorSynced[] };
 
 export type MirrorListParse = { readonly ok: true; readonly value: MirrorList } | { readonly ok: false; readonly error: string };
 export type MirrorResultParse = { readonly ok: true; readonly value: MirrorResult } | { readonly ok: false; readonly error: string };
@@ -127,17 +130,22 @@ export function parseMirrorResult(text: string): MirrorResultParse {
   if (typeof raw.ok !== "boolean") {
     return { ok: false, error: "ミラーの同期の JSON の ok 欄が真偽値ではありません" };
   }
+  const readSynced = (value: unknown): readonly MirrorSynced[] =>
+    Array.isArray(value)
+      ? value
+          .filter(isRecord)
+          .map((s) => ({ name: str(s.name), files: list(s.files).filter((f): f is string => typeof f === "string") }))
+          .filter((s) => s.name !== "")
+      : [];
   if (!raw.ok) {
-    return { ok: true, value: { ok: false, error: str(raw.error) || "ミラーを同期できませんでした（理由は返りませんでした）" } };
+    const partial = readSynced(raw.synced);
+    const error = str(raw.error) || "ミラーを同期できませんでした（理由は返りませんでした）";
+    return { ok: true, value: partial.length > 0 ? { ok: false, error, synced: partial } : { ok: false, error } };
   }
   if (!Array.isArray(raw.synced)) {
     return { ok: false, error: "ミラーの同期の JSON の synced 欄が配列ではありません" };
   }
-  const synced = raw.synced
-    .filter(isRecord)
-    .map((s) => ({ name: str(s.name), files: list(s.files).filter((f): f is string => typeof f === "string") }))
-    .filter((s) => s.name !== "");
-  return { ok: true, value: { ok: true, synced } };
+  return { ok: true, value: { ok: true, synced: readSynced(raw.synced) } };
 }
 
 // ---- 画面の判断
@@ -151,6 +159,15 @@ function foldName(name: string): string {
 export function mirrorOf(list: MirrorList, name: string): MirrorProject | undefined {
   const key = foldName(name);
   return list.projects.find((p) => foldName(p.name) === key);
+}
+
+/**
+ * 同期の対象として受け取れない名前。`-` で始まるもの（実行ファイルのオプションに読まれる）と、いま見せている
+ * 一覧に無いもの。画面から届く値を、そのまま実行ファイルの引数にしないための確かめ
+ */
+export function unknownSyncNames(status: MirrorStatus | undefined, names: readonly string[]): readonly string[] {
+  const list = status !== undefined && status.kind === "ok" ? status.list : undefined;
+  return names.filter((n) => n.startsWith("-") || list === undefined || mirrorOf(list, n) === undefined);
 }
 
 /** 行に出す状態の一言 */
@@ -270,6 +287,14 @@ export function syncNotice(result: MirrorResult): { readonly kind: "info" | "war
   if (!result.ok) {
     if (isStale(result.error)) {
       return { kind: "warn", message: "表示した後でミラーの内容が変わったので、同期しませんでした。最新の状態を読み直したので、確かめてからもう一度押してください" };
+    }
+    const done = result.synced ?? [];
+    if (done.length > 0) {
+      const names = done.map((s) => s.name).join("、");
+      return {
+        kind: "error",
+        message: `ミラーを同期できなかったものがあります: ${result.error}。同期できたのは ${names} です（作業ツリーに書いただけで、コミットはしていません）`,
+      };
     }
     return { kind: "error", message: `ミラーを同期できませんでした: ${result.error}` };
   }

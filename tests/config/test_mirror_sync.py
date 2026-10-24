@@ -252,6 +252,21 @@ class MirrorSyncTest(ConfigUnionHarness):
         self.assertIn("ずれ", result.stdout)
         self.assertIn(f"user mirror --yes --expect {self.plan().expect}", result.stdout)
 
+    def test_the_text_view_quotes_names_and_shows_how_to_see_the_diff(self):
+        self.project("odd name")
+        result = self.user_mirror("odd name")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("user mirror 'odd name' --yes --expect", result.stdout)
+        self.assertIn("diff -ru", result.stdout)
+
+    def test_the_text_view_warns_when_an_update_overwrites_the_mirror(self):
+        self.sync_all()
+        write(mirror_of(self.lib, "risks.yml"), "version: 1\nlevels: {}\nfactors: []\n")
+        result = self.user_mirror()
+        self.assertIn("上書き・削除します", result.stdout)
+        fresh = self.user_mirror("app")
+        self.assertNotIn("上書き・削除します", fresh.stdout)
+
     def test_the_board_route_syncs_with_a_matching_expect(self):
         expect = self.plan(["lib"]).expect
         result = self.user_mirror("lib", "--yes", "--expect", expect, "--via", "board", "--json")
@@ -273,6 +288,7 @@ class MirrorSyncTest(ConfigUnionHarness):
     def test_combinations_that_make_no_sense_are_refused(self):
         for args in (
             ("--expect", "x"),
+            ("--yes",),
             ("--via", "board", "--json"),
             ("--yes", "--via", "board", "--json"),
             ("--via", "terminal", "--yes", "--expect", "x", "--json"),

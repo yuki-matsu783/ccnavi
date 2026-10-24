@@ -613,6 +613,8 @@ user_windows=no
 user_path_dir=""
 user_exe=""
 user_path_missing=no
+user_stale_bin=""
+user_link_dir_note=no
 if [ -n "$deploy" ]; then
 	build_dir_rel="$BUILD_ROOT/$built"
 	if [ "$bin_place" = project ]; then
@@ -672,6 +674,10 @@ if [ -n "$deploy" ]; then
 			# リンク。自分が張ったもの（実体を指す）なら何もしない。別のものが既にあれば、--force のときだけ置き換える。
 			if [ -L "$user_link" ] && [ "$(readlink "$user_link" 2>/dev/null)" = "$user_share/ccnavi" ]; then
 				user_link_verdict=same
+			elif [ -d "$user_link" ] && [ ! -L "$user_link" ]; then
+				# ディレクトリは、--force でも置き換えない（中身を消してしまうため）。
+				user_link_verdict=keep
+				user_link_dir_note=yes
 			elif [ -e "$user_link" ] || [ -L "$user_link" ]; then
 				if [ "$force" = yes ]; then
 					user_link_verdict=replace
@@ -681,12 +687,19 @@ if [ -n "$deploy" ]; then
 			else
 				user_link_verdict=copy
 			fi
-			if [ "$user_link_verdict" != same ]; then
+			if [ "$user_link_dir_note" = yes ]; then
+				note_deploy "$user_link_verdict" "${user_link}（ディレクトリがあるので、リンクを張れない）" "$DEPLOY_BIN_DIR"
+			elif [ "$user_link_verdict" != same ]; then
 				note_deploy "$user_link_verdict" "${user_link}（${user_share}/ccnavi へのリンク）" "$DEPLOY_BIN_DIR"
 			fi
 			case "$user_link_verdict" in
 			copy | replace) user_bin_work=yes ;;
 			esac
+		fi
+		# 配布先の .ccnavi/bin/ に、この機械の実行ファイルが残っていれば、振り分けの sh はそちらを先に使う
+		# （ホームディレクトリに置いたものは使われない）。残っていることを知らせる。
+		if [ -f "$root/$build_dir_rel/ccnavi" ] || [ -f "$root/$build_dir_rel/ccnavi.exe" ]; then
+			user_stale_bin="$root/$build_dir_rel"
 		fi
 		# 実体かリンクを置いたあとで PATH から見つかるか。見つからなければ、案内を出す（report_user_bin_path）。
 		case ":$PATH:" in
@@ -1202,6 +1215,31 @@ copy_tree() {
 	done
 }
 
+# 実行ファイルの置き場を、途中で失敗しても元の版が残る形で置き換える。新しい版を隣に作ってから、
+# フォルダごと名前を入れ替える（名前の変更が失敗すれば、元の版がそのまま残る）。Windows で実行中の
+# ファイルがあるときも同じ。1 つずつ消してから写すと、途中で止まったときに、実行ファイルだけが残り、
+# 同梱物が欠けた状態になる。
+replace_tree() {
+	# $1 配布元 / $2 配布先（既にある）
+	rt_new="$2.new.$$"
+	rt_old="$2.old.$$"
+	rm -rf "$rt_new" "$rt_old"
+	if ! copy_tree "$1" "$rt_new"; then
+		rm -rf "$rt_new"
+		return 1
+	fi
+	if ! mv "$2" "$rt_old"; then
+		rm -rf "$rt_new"
+		return 1
+	fi
+	if ! mv "$rt_new" "$2"; then
+		mv "$rt_old" "$2"
+		rm -rf "$rt_new"
+		return 1
+	fi
+	rm -rf "$rt_old"
+}
+
 copy_file() {
 	mkdir -p "$(dirname "$2")"
 	cp "$1" "$2"
@@ -1366,12 +1404,17 @@ report_deploy_plan() {
 #   macOS・Linux・WSL: 使っているシェルの設定ファイルに export の 1 行を追加する（zsh は ~/.zshrc、macOS の bash は
 #                      ~/.bash_profile、Linux の bash は ~/.bashrc、fish は fish_add_path、そのほかは ~/.profile）
 report_user_bin_path() {
+	if [ -n "$user_stale_bin" ]; then
+		printf '案内: 配布先の %s に実行ファイルが残っています。振り分けの sh は配布先の bin/ を先に使うので、ホームディレクトリに置いた実行ファイルは使われません。使わないなら、このフォルダを削除してください。\n' "$user_stale_bin"
+	fi
 	[ "$user_path_missing" = yes ] || return 0
 	printf '案内: %s が PATH に入っていません。次のとおり追加します（このスクリプトは書き換えません）。\n' "$user_path_dir"
 	if [ "$user_windows" = yes ]; then
 		path_win=$(cygpath -w "$user_path_dir" 2>/dev/null || printf '%s' "$user_path_dir")
+		# PowerShell の単引用符の中では、単引用符を 2 つ重ねて書く。
+		path_ps=$(printf '%s' "$path_win" | sed "s/'/''/g")
 		printf '案内: Windows のユーザの環境変数 Path に追加します。PowerShell で次を実行します:\n'
-		printf "案内:   [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ';%s', 'User')\\n" "$path_win"
+		printf "案内:   [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ';%s', 'User')\\n" "$path_ps"
 		printf '案内: 画面から追加するなら、「環境変数を編集」でユーザーの Path を開き、「新規」で %s を加えます。\n' "$path_win"
 		printf '案内: 追加したあと、Git Bash と Claude Code を開き直すと反映されます。\n'
 		return 0
@@ -1392,7 +1435,7 @@ report_user_bin_path() {
 		;;
 	*) path_rc='~/.profile' ;;
 	esac
-	printf '案内: %s の設定ファイル %s に 1 行追加します:\n' "${path_shell:-使っているシェル}" "$path_rc"
+	printf '案内: %sの設定ファイル %s に 1 行追加します:\n' "${path_shell:-使っているシェル}" "$path_rc"
 	printf '案内:   echo %s >> %s\n' "'export PATH=\"\$HOME/.local/bin:\$PATH\"'" "$path_rc"
 	printf '案内: 追加したあと、シェルを開き直すか、. %s を実行すると反映されます。\n' "$path_rc"
 }
@@ -1595,7 +1638,7 @@ if [ "$user_bin_work" = yes ]; then
 	esac
 	case "$user_link_verdict" in
 	copy) printf '  %s（%s/ccnavi へのリンクを新しく張る）\n' "$user_link" "$user_share" ;;
-	replace) printf '  %s（%s/ccnavi へのリンクに張り替える）\n' "$user_link" "$user_share" ;;
+	replace) printf '  %s（既にあるものを削除して、%s/ccnavi へのリンクに置き換える）\n' "$user_link" "$user_share" ;;
 	esac
 	printf '続けますか？ [y/N] '
 	user_answer=""
@@ -1727,7 +1770,12 @@ fi
 if [ "$deploy_work" = yes ]; then
 	case "$bin_verdict" in
 	copy | replace)
-		copy_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel"
+		if [ "$bin_verdict" = replace ]; then
+			replace_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel" ||
+				die "実行ファイルを置き換えられませんでした（使用中の可能性があります）。元の実行ファイルは残してあります: $root/$build_dir_rel"
+		else
+			copy_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel"
+		fi
 		# 実行ビットを付け直す。cp は元のモードを umask で削ってコピーするので、
 		# 配布元の置き方によっては実行ビットが外れる。外れていると、hook は
 		# 「実行ファイルが無い」ではなく「起動できない」という理由で、気づかないうちに失敗する。
@@ -1741,7 +1789,12 @@ if [ "$deploy_work" = yes ]; then
 	# ホームディレクトリの下の実体 → リンクの順に置く。リンクだけが先にあって実体が無い状態を作らない。
 	case "$user_bin_verdict" in
 	copy | replace)
-		copy_tree "$source_root/$DEPLOY_BIN_DIR" "$user_share"
+		if [ "$user_bin_verdict" = replace ]; then
+			replace_tree "$source_root/$DEPLOY_BIN_DIR" "$user_share" ||
+				die "実行ファイルを置き換えられませんでした（使用中の可能性があります）。元の実行ファイルは残してあります: $user_share"
+		else
+			copy_tree "$source_root/$DEPLOY_BIN_DIR" "$user_share"
+		fi
 		chmod +x "$user_share/ccnavi" "$user_share/ccnavi.exe" 2>/dev/null || true
 		;;
 	esac

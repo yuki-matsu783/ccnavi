@@ -56,6 +56,8 @@ class Project:
     error: str = ""
     # 選ばれたか（名前を渡したときは、渡したものだけ）。
     selected: bool = True
+    # ミラーの置き場（絶対）。中身の差を人が見るときの案内に使う。
+    mirror_path: str = ""
 
     @property
     def expect(self) -> str:
@@ -70,6 +72,8 @@ class Plan:
     error: str = ""
     # 共通レイヤーに写すものが無い（正常。揃えても何も起きない）。
     common_empty: bool = False
+    # ワークスペースの共通レイヤーの置き場（絶対）。
+    common_path: str = ""
 
     @property
     def chosen(self) -> list[Project]:
@@ -114,7 +118,7 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
        `error` にする
     4. 名前を渡されたときは、渡されたプロジェクトだけを選ぶ。無い名前があれば全体の誤り
     """
-    plan = Plan()
+    plan = Plan(common_path=configsync.common_dir(conf, root))
     found = tree.projects(conf.projects)
     # 名前は大文字小文字を区別せずに比べる（Windows と macOS では同じディレクトリのため）。
     names = {t.name.casefold() for t in found}
@@ -130,7 +134,12 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
         return plan
     plan.common_empty = not wanted_files
     for entry in found:
-        project = Project(entry.name, entry.root, selected=entry.name.casefold() in wanted_set)
+        project = Project(
+            entry.name,
+            entry.root,
+            selected=entry.name.casefold() in wanted_set,
+            mirror_path=configsync.mirror_dir(conf, entry.root),
+        )
         plan.projects.append(project)
         if plan.common_empty:
             continue

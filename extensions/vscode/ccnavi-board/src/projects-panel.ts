@@ -32,7 +32,7 @@ import * as vscode from "vscode";
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { checkMirror, loadBoard, runLintJson, runMirror, runMirrorYes } from "./ccnavi.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
-import { clockText, syncNotice, type MirrorStatus } from "./core/mirrormodel.js";
+import { clockText, syncNotice, unknownSyncNames, type MirrorStatus } from "./core/mirrormodel.js";
 import {
   buildProjectsPage,
   checkName,
@@ -588,6 +588,13 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
   } else if (message.type === "fixIgnore") {
     fixIgnore(current, page);
   } else if (message.type === "mirrorSync") {
+    const unknown = unknownSyncNames(current.mirror, message.names);
+    if (unknown.length > 0) {
+      // 画面が見せていない名前は、実行ファイルに渡さない。一覧を読み直して、もう一度押してもらう
+      void vscode.window.showWarningMessage(`同期の対象を確かめられませんでした: ${unknown.join("、")}。最新の状態を読み直します`);
+      void refreshMirror();
+      return;
+    }
     void syncMirror(current, message.names, message.expect);
   }
 }

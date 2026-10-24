@@ -23,6 +23,7 @@ import {
   syncAllButton,
   syncAllTargets,
   syncNotice,
+  unknownSyncNames,
   type MirrorList,
   type MirrorStatus,
 } from "../../src/core/mirrormodel.js";
@@ -208,4 +209,25 @@ test("CB-T1165 安全性: 5 分ごとの確認は読むだけ。同期（runMirr
   // 間隔は定数で持ち、setInterval で回さない（読み込み中の重なりを避ける）
   assert.match(source, /const MIRROR_INTERVAL_MS = 5 \* 60 \* 1000;/);
   assert.doesNotMatch(source, /setInterval\(/);
+});
+
+test("CB-T1166 同期の対象に受け取れない名前: - で始まるものと、見せている一覧に無いもの。大文字小文字は区別しない", () => {
+  const status = ok();
+  assert.deepEqual(unknownSyncNames(status, ["web", "APP"]), []);
+  assert.deepEqual(unknownSyncNames(status, ["web", "--root", "nothing"]), ["--root", "nothing"]);
+  assert.deepEqual(unknownSyncNames(status, []), []);
+  assert.deepEqual(unknownSyncNames(undefined, ["web"]), ["web"]);
+  assert.deepEqual(unknownSyncNames({ kind: "waiting" }, ["web"]), ["web"]);
+});
+
+test("CB-T1167 一部のプロジェクトだけ書けなかったとき、書けた分を捨てずに通知へ載せる", () => {
+  const text = JSON.stringify({ version: 1, ok: false, error: "web: 保存できませんでした", synced: [{ name: "lib", files: ["a"] }] });
+  const parsed = parseMirrorResult(text);
+  assert.ok(parsed.ok);
+  assert.deepEqual(parsed.value, { ok: false, error: "web: 保存できませんでした", synced: [{ name: "lib", files: ["a"] }] });
+  const notice = syncNotice(parsed.value);
+  assert.equal(notice.kind, "error");
+  assert.match(notice.message, /同期できなかったものがあります: web: 保存できませんでした/);
+  assert.match(notice.message, /同期できたのは lib です/);
+  assert.match(notice.message, /コミットはしていません/);
 });

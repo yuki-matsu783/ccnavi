@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from typing import TextIO
 
 from ..infra import settings
@@ -60,6 +61,8 @@ def usage_problem(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         return "--yes には値を付けられません（user mirror [<名前>…] --yes --expect <値>）"
     if args.expect is not None and not args.yes:
         return "--expect は --yes と一緒に指定してください"
+    if args.yes and args.expect is None:
+        return "--yes には --expect が必要です（user mirror を --yes なしで実行すると、値が出ます）"
     if args.via and args.via != via.VIA_BOARD:
         return "--via に渡せるのは board だけです"
     if args.via and (not args.yes or args.expect is None or not args.json):
@@ -153,17 +156,27 @@ def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None) 
             stdout.write(f"  [ずれ {len(project.changes)} 件] {project.name}\n")
             for change in project.changes:
                 stdout.write(f"      {_ACTION_TEXT[mirrorsync.action_of(change)]} {change.rel}\n")
+            if project.mirror_path and plan.common_path:
+                stdout.write(
+                    "      中身の差を見るには: diff -ru "
+                    f"{shlex.quote(project.mirror_path)} {shlex.quote(plan.common_path)}\n"
+                )
     chosen = plan.chosen
     if not chosen:
         stdout.write("揃えるミラーはありません。\n")
         return
-    names = " ".join(p.name for p in chosen) if wanted else ""
+    names = " ".join(shlex.quote(p.name) for p in chosen) if wanted else ""
     command = "ccnavi user mirror " + (names + " " if names else "")
     stdout.write(
         "何も反映していません。この内容で揃えるなら、次を実行します。作業ツリーに書くだけで、"
     )
     stdout.write("コミットはしません。\n")
     stdout.write(f"  {command}--yes --expect {plan.expect}\n")
+    if any(mirrorsync.action_of(c) != mirrorsync.ACTION_CREATE for p in chosen for c in p.changes):
+        stdout.write(
+            "更新と削除は、ミラーの今の中身を共通レイヤーの中身で上書き・削除します。"
+            "ミラーに手を入れていたなら、上の diff で確かめてから実行します。\n"
+        )
 
 
 def _applied_text(stdout: TextIO, done: mirrorsync.Applied) -> None:
