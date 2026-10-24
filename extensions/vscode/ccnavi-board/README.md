@@ -4,7 +4,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 
 この拡張は、チケットの状態を見て、承認などの人の操作を受ける入口です。判定は実行ファイルが行い、作業中のエージェントのセッションへプロンプトを送り込む手段は持ちません（ccnavi の README「複数人・別 PC・別セッションで進める」）。
 
-この拡張が何をするか（画面ごとのふるまい）は [docs/10_requirements.md](docs/10_requirements.md)、作り（構成・画面の段取り・テストの ID）は [docs/20_design.md](docs/20_design.md) に書いてある。この README には、必要なもの・組み立てと導入だけを書く。拡張開発ホストでの動かし方と手動確認の手順は [docs/21_design/manual-checks.md](docs/21_design/manual-checks.md) にある。
+この拡張が何をするか（画面ごとのふるまい）は [docs/requirements.md](docs/requirements.md)、作り（構成・画面の段取り・テストの ID）は [docs/design.md](docs/design.md) に書いてある。この README には、必要なもの・組み立てと導入だけを書く。拡張開発ホストでの動かし方と手動確認の手順は [docs/design/manual-checks.md](docs/design/manual-checks.md) にある。
 
 ## 必要なもの
 
@@ -58,8 +58,8 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 入れたときの `[DEP0169] DeprecationWarning: url.parse() ...` は `code` コマンド自身の警告で、拡張とは関係ない。`successfully installed` が出ていれば入っている。
 
-テストの分け方、tsconfig の 3 本、依存の理由、生成物の消し方（`pnpm run clean`）といった開発者向けの説明は [docs/21_design/development.md](docs/21_design/development.md) に書いてある。
+テストの分け方、tsconfig の 3 本、依存の理由、生成物の消し方（`pnpm run clean`）といった開発者向けの説明は [docs/design/development.md](docs/design/development.md) に書いてある。
 
 ## 拡張開発ホストでの動かし方と手動確認
 
-拡張開発ホストで動かす手順と、単体テストの対象外の部分を手で確かめる項目は [docs/21_design/manual-checks.md](docs/21_design/manual-checks.md) に書いてある。
+拡張開発ホストで動かす手順と、単体テストの対象外の部分を手で確かめる項目は [docs/design/manual-checks.md](docs/design/manual-checks.md) に書いてある。

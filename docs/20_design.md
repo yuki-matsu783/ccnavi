@@ -15,7 +15,7 @@ keywords: [設計書, 実装, 脅威モデル, 判定, ルール, hook, チケ�
 | 外から観測できる約束 | [10_requirements.md](10_requirements.md) |
 | 使い方と設定、ルールの書き方、記録の読み方 | [41_guide/index.md](41_guide/index.md) |
 | 開発の手順、実測で分かった落とし穴 | [40_development.md](40_development.md)、[設計の付録 C](21_design/appendix.md) |
-| 判断の理由、採らなかった案 | [docs/30_adr/](30_adr.md) |
+| 判断の理由、採らなかった案 | [docs/30_adr.md](30_adr.md) |
 | 用語 | [CONTEXT.md](CONTEXT.md) |
 
 実装と食い違いを見つけたら、要件書を優先して直す。

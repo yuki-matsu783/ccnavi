@@ -529,7 +529,7 @@ export async function runExpectations(
 }
 
 /**
- * 記録からルールの候補を起こす（`--suggest --json`、docs/11_requirements/json-shapes.md「候補の JSON」）。読むのは保存済みの
+ * 記録からルールの候補を起こす（`--suggest --json`、docs/requirements/json-shapes.md「候補の JSON」）。読むのは保存済みの
  * ルールと記録で、編集中の内容は渡さない。候補は実行ファイルが `--lint` と期待する判定の確認で確かめたものだけ。
  * 記録を読むので `--log ""` は付けない（state の置き場は実行ファイルが外す）。
  */
@@ -570,7 +570,7 @@ export async function runLint(
 }
 
 /**
- * 実運用の設定をそのまま検証し、苦情を JSON で受ける（docs/11_requirements/json-shapes.md「lint の JSON」）。
+ * 実運用の設定をそのまま検証し、苦情を JSON で受ける（docs/requirements/json-shapes.md「lint の JSON」）。
  * プロジェクト管理画面が、置き場とプロジェクトごとの warn を拾うために呼ぶ。
  * error があると終了コードが 1 になるが、それは JSON の中身で分かるので失敗にしない。
  */

@@ -1,5 +1,5 @@
 /**
- * 承認の JSON の形（実行ファイルとの契約）と読み取り。docs/11_requirements/json-shapes.md「承認の JSON」。
+ * 承認の JSON の形（実行ファイルとの契約）と読み取り。docs/requirements/json-shapes.md「承認の JSON」。
  *
  * `--agree --preview --json` が承認先行の一覧を見せ、`user agree --yes <識別子,…> --json` が承認する。
  * 拡張は一覧の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
@@ -51,7 +51,7 @@ export interface ApprovePlanItem {
 
 /**
  * 計画を持つ親の、計画 1 つぶん（全体計画かフィードバック計画）の図の中身。`--agree --preview --json` の
- * `plans` と `--plan-order <親> --json` の `plans` は実行ファイルの同じ関数が組む（docs/11_requirements/json-shapes.md「承認の JSON」）。
+ * `plans` と `--plan-order <親> --json` の `plans` は実行ファイルの同じ関数が組む（docs/requirements/json-shapes.md「承認の JSON」）。
  * 先行（`after`）は番号の文字列 → 直接の先行の番号のリスト
  */
 export interface ApprovePlan {
@@ -208,7 +208,7 @@ export type PreviewParse =
   | { readonly ok: false; readonly error: string };
 
 /**
- * 途中で止まった承認（docs/11_requirements/json-shapes.md「承認の JSON」の `partial`）。置いたものは戻らないので、
+ * 途中で止まった承認（docs/requirements/json-shapes.md「承認の JSON」の `partial`）。置いたものは戻らないので、
  * どこまで置いたかをそのまま受け取ってユーザに伝える。
  */
 export interface ApprovePartial {

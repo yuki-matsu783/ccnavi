@@ -1,7 +1,7 @@
 /**
  * カード 1 枚が何を描くか（React の画面を happy-dom で動かす）。上から 見出し（ID・題・状態の札）・位置・ユーザ待ち・
  * 注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。札の決め方は status.test.ts、ここは構造・操作・ボタンの規則・押したときの動き。
- * 寸法と見た目は拡張開発ホストでの手動確認（docs/21_design/manual-checks.md の表）に回す。
+ * 寸法と見た目は拡張開発ホストでの手動確認（docs/design/manual-checks.md の表）に回す。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

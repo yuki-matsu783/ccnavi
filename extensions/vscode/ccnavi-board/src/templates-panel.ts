@@ -1,6 +1,6 @@
 /**
  * テンプレート管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。docs/21_design/manual-checks.md の手動確認の手順で確かめる。
+ * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
  *
  * 画面は React（`src/webview/templates/`）で、ここが渡すのは「いま何を見せるか」（`TemplatesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は開いた行を持つので
@@ -387,7 +387,7 @@ function redraw(current: PanelState): void {
 function templatesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<TemplatesData> {
   if (panel.options.retainContextWhenHidden !== true) {
     // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
-    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/42_claude/logging.md）
+    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
     diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "templates", retainContextWhenHidden: false });
   }
   return retainedHost<TemplatesData>(

@@ -6,7 +6,7 @@
  * ここは実行ファイルの JSON が判定した欄（`gate_closed`・`review_waiting`・`blocked`・`pending_approval`・
  * マーカー）を表示の言葉に置き換えるだけで、レビューの要否・ゲートの条件・リスクは判定し直さない。
  *
- * 規則は上から見て、最初にヒットしたものを採る。表は `docs/21_design/screens.md` の「状態の札」と同じ。
+ * 規則は上から見て、最初にヒットしたものを採る。表は `docs/design/screens.md` の「状態の札」と同じ。
  */
 import type { CopyStatus, PhaseJson } from "./model.js";
 

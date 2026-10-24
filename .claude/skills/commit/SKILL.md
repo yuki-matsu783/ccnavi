@@ -79,7 +79,7 @@ hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査�
 | `fix` | `main.py` / `src/ccnavi/` / hook スクリプトのバグ修正 |
 | `refactor` | 挙動を変えないコード整理 |
 | `test` | `tests/*.py` / `tests/fixtures/` |
-| `docs` | `README.md` / `docs/10_requirements.md`・`docs/11_requirements/` / `docs/20_design.md`・`docs/21_design/` / `docs/CONTEXT.md` |
+| `docs` | `README.md` / `docs/10_requirements.md`・`docs/11_requirements/` / `docs/20_design.md`・`docs/21_design/` / `docs/30_adr.md`・`docs/30_adr/` / `docs/CONTEXT.md` |
 | `ai-asset` | `.claude/` 配下（settings.json / hooks / skills / ccnavi のルール）と `CLAUDE.md`・`.ccnavi/docs/`・`docs/42_claude/`。エージェント向けの指示は docs ではなくこちら |
 | `chore` | `.gitignore` / 雑務 |
 | `build` | `pyproject.toml` / `uv.lock` |
