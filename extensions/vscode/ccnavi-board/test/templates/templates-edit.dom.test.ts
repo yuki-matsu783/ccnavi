@@ -362,7 +362,7 @@ test("CB-D739 一覧の行は最初から開き、図の中身を求める（pre
     const asked = dom.posted.filter((m) => m.type === "preview" && m.name === "feature");
     assert.equal(asked.length, 1, "1 行につき 1 度だけ求める");
     assert.equal(asked[0].layer, "self");
-    // 答えが届くまでは表で出す
+    // 答えが届くまでは表で出す（読み込み中の表示）
     assert.equal(dom.all(`${row} table.tpl-plan`).length > 0, true);
     await dom.send({ type: "preview", name: "feature", layer: "self", check: fixtureCheck(), error: "" });
     await dom.settle();
@@ -386,14 +386,14 @@ test("CB-D739 一覧の行は最初から開き、図の中身を求める（pre
   }
 });
 
-test("CB-D740 図の中身を読めなかったときは、理由を言って表のまま出す", async () => {
+test("CB-D740 図の中身を読めなかったときは、理由を出す", async () => {
   const dom = await openList();
   try {
     const row = 'li.template[data-name="feature"][data-layer="self"]';
     await dom.send({ type: "preview", name: "feature", layer: "self", check: null, error: "検査できません" });
     await dom.settle();
     assert.match(text(dom.one(`${row} [data-role="preview-error"]`)), /検査できません/);
-    assert.equal(dom.all(`${row} table.tpl-plan`).length > 0, true);
+    assert.equal(dom.all(`${row} table.tpl-plan`).length, 0);
     assert.equal(dom.posted.filter((m) => m.type === "preview" && m.name === "feature").length, 1, "失敗しても求め直し続けない");
   } finally {
     await dom.close();

@@ -70,13 +70,12 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           <Problems problems={entry.problems} />
           {preview !== undefined ? (
             <Diagrams check={preview} />
+          ) : previewError !== "" ? (
+            <p className="status failed" data-role="preview-error">
+              図を出せません: {previewError}
+            </p>
           ) : (
             <>
-              {previewError !== "" && (
-                <p className="hint" data-role="preview-error">
-                  図は出せません（表で出しています）: {previewError}
-                </p>
-              )}
               <Plan title="全体計画" items={entry.plan} />
               <Plan title="フィードバック計画" items={entry.feedback} />
               <Flows flows={entry.flows} hasFlows={entry.has_flows} />
