@@ -291,7 +291,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
                         data-action="remove-flow"
                         onClick={() => {
                           update(removeFlow(tpl, index));
-                          setFolded(new Set());
+                          setFolded((f) => without(f, index));
                         }}
                       >
                         フローを外す

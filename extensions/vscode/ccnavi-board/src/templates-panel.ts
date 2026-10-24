@@ -728,7 +728,8 @@ async function preview(current: PanelState, name: string, layerName: string): Pr
     return;
   }
   const checked = await checkBytes(current, target, name, read.bytes);
-  if (abandoned(current, target, (e) => reply(null, e))) {
+  // 対象が切り替わっていたら答えない（切り替え先の同じ名前の行に、前の対象の理由が出ないよう。画面は読み直しで求め直す）
+  if (abandoned(current, target, () => undefined)) {
     return;
   }
   reply(checked.ok ? checked.check : null, checked.ok ? "" : checked.error);
