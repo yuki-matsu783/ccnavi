@@ -41,7 +41,7 @@ glab は [glab.md](glab.md)。
 
 ## 入れたあとに
 
-- **Claude Code を終了して、新しい端末から起動し直してもらう。** Claude Code の Bash ツールの環境（PATH など）は、起動した時点のまま変わらない。
+- **Claude Code を終了して、新しいターミナルから起動し直してもらう。** Claude Code の Bash ツールの環境（PATH など）は、起動した時点のまま変わらない。
   入れた直後に doctor を打ち直しても、道具は見つからない。
 - Windows の jq は、`Program Files` のように**パスに空白が入る**ことがある。ccnavi の sh はパスを引用して扱うので、
   そのまま使える。PATH に足すときは、フォルダ（`jq.exe` のある場所）を足す。

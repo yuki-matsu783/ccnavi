@@ -6,7 +6,7 @@ tags: [skills, feedback]
 keywords: [explain, lint, 診断, 走査, 置き場, copies, test_raw_share, test_lint_ops, 合流]
 ---
 
-# 診断に走査を足すと、読みの回数と既存の lint のテストに当たる
+# 診断に走査を足すと、読みの回数と既存の lint のテストにヒットする
 
 ## 説明
 
@@ -24,5 +24,5 @@ feature-207（#210）で `--explain` と `--lint` に元のプロジェクトが
 
 ## 回避策
 
-- 1 度読んだ写し（copies）を走査に引数で渡す
+- 1 度読んだコピー（copies）を走査に引数で渡す
 - 診断に警告を足したら、並行した子を合流した後に `tests/ticket` を全件回す

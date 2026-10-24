@@ -21,12 +21,12 @@ keywords: [--docs, 索引, frontmatter, type, tags, keywords, 検索, NOTICE_DOC
 **検索の実態。** `--docs` が見るのは frontmatter とパスと更新日時だけで、本文は読まない。種類・タグ・キーワード（完全一致）、パスと語（部分一致）、更新日時で絞る。
 本文の関連箇所の抽出、意味検索、自動要約、トークンの予算に応じた選別はしない。`--limit` は件数で切るだけである。
 索引の差分更新は、索引を新しくする手間を省くもので、モデルに渡す量を減らす仕組みではない。
-必要な文書が必ず見つかることも、渡す量が一定量減ることも保証しない。frontmatter が無い・合っていない文書は絞り込みに当たらない。
+必要な文書が必ず見つかることも、渡す量が一定量減ることも保証しない。frontmatter が無い・合っていない文書は絞り込みにヒットしない。
 
 **ガイドとの違い。** ガード・ガイド（コア機能 1）は、操作や作業の状況がきっかけで、必要な説明が届く。こちらは、エージェントが情報を必要としたときに、資料や手順を自分で探して読む。
 
 ```sh
-ccnavi --docs --text マージ --format detail           # 話題で当たりを付ける
+ccnavi --docs --text マージ --format detail           # 話題でヒットを付ける
 ccnavi --docs --type adr --sort mtime -r --limit 10     # 新しい ADR から 10 本
 ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグを持つもの（OR）のパスだけ
 ccnavi --docs --path .ccnavi/docs --format count         # 件数だけ
@@ -34,7 +34,7 @@ ccnavi --docs --path .ccnavi/docs --format count         # 件数だけ
 
 絞り方と出力の形式の一覧は `ccnavi --docs --help` で出る。`ccnavi --help` は話題の一覧だけを出し、話題ごとの節は `ccnavi <オプション> --help`（例: `ccnavi ticket --help`）か `ccnavi --help <話題>` で出す。全文は `ccnavi --help --all` で出る。SessionStart の案内もここを指す。
 
-md を本文ではなく頭の frontmatter で引く。grep は当たった行を返すので、そのファイルが何の文書かは開くまで分からず、
+md を本文ではなく頭の frontmatter で引く。grep はヒットした行を返すので、そのファイルが何の文書かは開くまで分からず、
 よそからの言及も同じ重みで混ざる。frontmatter の書き方は [.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)。
 
 `SessionStart` が渡すのは引き方の 1 行だけで、オプションの一覧と frontmatter の書き方は渡さない。書き方は、Write で新しく作った md に

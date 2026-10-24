@@ -50,14 +50,14 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
 上にあるものほど優先する。
 
 1. このセッションで読んだスキルを直す
-2. 工程スキル（`process-design` `process-research` `process-implement` `process-test` `process-debug` `process-review` `process-release`）に当たる作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `.ccnavi/docs/skill-processes.md`。SKILL.md は直さない
+2. 工程スキル（`process-design` `process-research` `process-implement` `process-test` `process-debug` `process-review` `process-release`）にヒットする作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `.ccnavi/docs/skill-processes.md`。SKILL.md は直さない
 3. 工程スキルの対象外の既存スキルに、節・落とし穴・使う場面を足して直す。そのスキルに `references/<話題>.md` を足すか広げ、SKILL.md に1行の案内を足してもよい
-4. どれにも当たらない作業が繰り返し出たときだけ、新しいスキルの入口を提案する。今日の作業名・チケット番号・エラー文を名前にしない。ユーザの承認を取る
+4. どれにもヒットしない作業が繰り返し出たときだけ、新しいスキルの入口を提案する。今日の作業名・チケット番号・エラー文を名前にしない。ユーザの承認を取る
 
 - 直す前に、対象の SKILL.md と、手を入れる references/ を読み直す。会話中の引用で済ませない
 - 1つの事実は1か所に書く。同じ規則がすでにあるなら、新しく足さずにその文を強めるか言い直す
 - 手順の流れに沿って書き、落とし穴は該当する手順に「規則 + なぜ（1 句）」で添える。日付・番号・ユーザの言葉の引用を中身にしない
-- yomiyasuスキルを `.ccnavi/docs/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `skills/`・`rules.yml` の `message` に当てるのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
+- yomiyasuスキルを `.ccnavi/docs/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `skills/`・`rules.yml` の `message` に適用するのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
 - 誤りを見つけたら、間違った文そのものを直す
 
 ## 対象のスキル
@@ -87,7 +87,7 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
 
    `feedback:` は最後のステップにほかの全部を `after` で先行させる形にする（終端は1つ）。後ろに足すだけだと承認で落ちるので、
    最後のステップの `after` に `skill-improve` の番号も足すか、`skill-improve` を最後に置いてほかの全部を先行させる。
-   定義は `ccnavi --plan-order <親> --fill-phases` で親の `phases:` に写す
+   定義は `ccnavi --plan-order <親> --fill-phases` で親の `phases:` にコピーする
 3. フィードバック計画が承認されたら、`skill-improve` のフェーズに子チケットを提案して承認を受け、その子でスキルを直してMRで見てもらう
 
 ## 提案チケット
@@ -132,7 +132,7 @@ allow:
 `allow` には `docs/wiki/*` も足す。
 ```
 
-この提案は親として書いている。親は `plan:` が無いと `start` が止まるので、上のように `plan:` と、そのステップが使うフェーズ定義の写し `phases:` を持つ。`phases:` は手で書かず、`ccnavi --plan-order <親> --fill-phases` で写してよい。`quick-work` の範囲は `scope: inherit` で、親の `allow`（ここでは `.claude/skills/commit/*` と `docs/wiki/*`）がそのまま作業の上限になる。`allow` を空のまま出すと、範囲が集まらず子を起こせない。
+この提案は親として書いている。親は `plan:` が無いと `start` が止まるので、上のように `plan:` と、そのステップが使うフェーズ定義のコピー `phases:` を持つ。`phases:` は手で書かず、`ccnavi --plan-order <親> --fill-phases` でコピーしてよい。`quick-work` の範囲は `scope: inherit` で、親の `allow`（ここでは `.claude/skills/commit/*` と `docs/wiki/*`）がそのまま作業の上限になる。`allow` を空のまま出すと、範囲が集まらず子を起こせない。
 
 プロジェクトのスキルについての提案は、そのプロジェクトの提案として書き、`allow` に `skills/<スキル>/*` を書く。
 パスはプロジェクトのルートからの相対で書く。

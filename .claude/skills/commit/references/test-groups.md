@@ -38,7 +38,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 
 ## 回すグループ
 
-`core` はいつも回す。そのうえで、変えたファイルを下の表に当てて、当たった行のグループを足す。
+`core` はいつも回す。そのうえで、変えたファイルを下の表に適用して、ヒットした行のグループを足す。
 
 | 変えたもの | 足すグループ |
 |---|---|
@@ -67,11 +67,11 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 
 全件を回すとき:
 
-- 表のどの行にも当たらないファイルを変えた
+- 表のどの行にもヒットしないファイルを変えた
 - `.ccnavi/scripts/ccnavi-common*.sh`（入口と部品）、`.ccnavi/config/common/`、`.ccnavi/config/project/`、`tests/__init__.py`、`tests/inproc.py`、
   `pyproject.toml`・`uv.lock` を変えた（ほぼ全グループが読む）
 - 統合先に取り込む前、MR に出す前（親の最後のフェーズの子を finish する前に済ませる。レビュー準備中はシェルの実行が止まるため）
-- どの行に当たるか迷った
+- どの行にヒットするか迷った
 
 `src/` の `--json` 出力のキーや CLI のオプションを変えるときは、`core` と `guard` の両方を回す。`extensions/vscode/ccnavi-board/test/fixtures/` を
 Python のテスト（`tests/core/test_test_json.py`・`tests/guard/test_suggest.py`）も読むので、fixtures の旧キーのままだと落ちる。

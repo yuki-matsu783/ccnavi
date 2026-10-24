@@ -97,12 +97,12 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    - 概要: 実行器が出す「受け入れシナリオ」の節（何をさせ、何を期待し、何が残るか、まだ確かめていない点）。確認の前に、人間がこれを読んで決める
    - ワークスペース状態: ワークスペースルートと `projects/test-repo` の `ccnavi-git.sh status`、origin との先行・遅れ、残っているワークツリーとブランチ、
      `projects/test-repo` の開いている MR と、回すシナリオの ID・作るもの（ブランチ・MR・ファイル）
-   - 確認事項 1: 作業ツリーに未コミットの変更がなく、origin と同期しているか（他のセッションが作業中の変更を含まないか）
+   - 確認事項 1: ワークツリーに未コミットの変更がなく、origin と同期しているか（他のセッションが作業中の変更を含まないか）
    - 確認事項 2: `projects/test-repo` にブランチや MR ができてよいか（`test_repo: true` のシナリオだけ）
    ccnavi 本体にブランチ・コミット・ワークツリーが残らないことは、問わない。実行器が回す前後の HEAD・ブランチ・ワークツリーを比べて、`repo` の判定で確かめる
    「いいえ」や条件が付いたときは、人間が整えるまで待つ（エージェントが勝手に整えない）
 2. **回す前の状態を確かめる。**
-   - ワークスペースルートと `projects/test-repo` の作業ツリーが clean である（`ccnavi-git.sh status`）。他のセッションが作業中のツリーでは回さない
+   - ワークスペースルートと `projects/test-repo` のワークツリーが clean である（`ccnavi-git.sh status`）。他のセッションが作業中のツリーでは回さない
    - 判定のモードが `enable` である。実行器が最初に `.claude/settings.json` の env と実行の環境変数の `CCNAVI_MODE` を確かめ、`enable` でなければ `--confirmed` があっても回さない（終了コード 3）。回したあとは `decisions.jsonl` の `enforced` が `true` であることも確かめる
    - ビルド済みの実行ファイル（`.ccnavi/bin/`）がある
    - `projects/test-repo` を使うシナリオは、統合先が origin と合っていて、前の回のワークツリーとブランチが残っていない
@@ -140,7 +140,7 @@ AI の出力を機械だけで判定することはできない。ccnavi の判�
 | 判定 | 意味 | 何で決まるか |
 |---|---|---|
 | `pass` / `fail` | 機械で比べた結果 | `decisions`（回した step のセッション ID の行だけを `logs/decisions.jsonl` から取り出して比べる）、`decisions_none`、`files_unchanged`、`state`、`transcript_forbidden` |
-| `inconclusive`（未成立） | 期待した呼び出し自体が記録に無い。`fail` にしない | `decisions` の `event`・`tool`・`subject_contains` に当たる行が無い。`expect_after` を満たさず止めた回も `inconclusive`(理由に満たさなかった欄が出る)。claude が終了コード 0 で終わらなかった・起動できなかった・時間切れのときも、その step で止めて `inconclusive`（`run` の行） |
+| `inconclusive`（未成立） | 期待した呼び出し自体が記録に無い。`fail` にしない | `decisions` の `event`・`tool`・`subject_contains` にヒットする行が無い。`expect_after` を満たさず止めた回も `inconclusive`(理由に満たさなかった欄が出る)。claude が終了コード 0 で終わらなかった・起動できなかった・時間切れのときも、その step で止めて `inconclusive`（`run` の行） |
 | `needs-review` | 意味で読む | `judge`。実行器が `evidence.md` に、機械判定の表・judge の基準・step ごとの入力プロンプト・ツール呼び出しと結果（成功とエラーは別の見出し。hook の拒否理由と同じ文のエラーは「hook の応答を参照」と書く）・hook の応答（拒否・確認・終了コードが 0 でないもの・停止・案内文・通知・Stop だけ。他は件数）・最後の報告・判定の行（step 列つきの表）を抜き出す。拒否の文面は全文を載せ、他を切るときは切ったことと全量の在りかを書く。別のエージェントが基準に照らして読み、`report.md` に結果を書く |
 
 全体の判定は `fail` > `inconclusive` > `needs-review` > `pass` の順で重い方を採る。`inconclusive` が出たら、
@@ -184,7 +184,7 @@ prompt を変えて呼び出しを打たせるか、期待を直すかを決め�
    - 期待と実際
    - 違った層（判定・最終状態・振る舞い）と、その根拠になるログの場所（`logs/decisions.jsonl` の該当行、stream-json のどの行か）
    - シナリオの誤りか ccnavi の誤りか、その判定の根拠
-5. **報告には、作った issue の番号を並べる。** 直した箇所があれば、どの issue に当たるかを書く
+5. **報告には、作った issue の番号を並べる。** 直した箇所があれば、どの issue にヒットするかを書く
 
 この手順は、シナリオを回した者が自分の判断で issue を作る決まりである。issue を作ったあとも、シナリオの期待を勝手に緩めない。
 期待どおりに止まらなかったときは、判定の結果を issue に残し、期待は変えない。

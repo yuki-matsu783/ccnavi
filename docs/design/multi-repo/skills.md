@@ -3,7 +3,7 @@ type: design
 title: 11.13 プロジェクトのスキル
 description: プロジェクトの skills/ に置くスキルの形をした手順書と目録
 tags: [design-doc, projects, skills]
-keywords: [スキル, SKILL.md, skills, 工程スキル, 目録, 写し]
+keywords: [スキル, SKILL.md, skills, 工程スキル, 目録, コピー]
 ---
 
 [設計書の入口](../../design.md) > [11. 複数のリポジトリ](../multi-repo.md)
@@ -23,10 +23,10 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 | `SessionStart`、`SubagentStart`（cwd がそのプロジェクトのツリー＝元リポジトリかそこから切ったワークツリーの中） | `additionalContext`。`SubagentStart` では子チケットの一覧の前に置き、チケットの無い起動でも渡す |
 | cwd がそのプロジェクトの中にある最初の `PreToolUse` | 同じ目録を 1 度だけ添える。セッションはワークスペースルートで始まり、あとから `cd` で入るのがふつうなので |
 
-- 1 つの文脈（セッション、サブエージェントならその起動）でプロジェクトごとに 1 度。回数は `additionalContextOnce` と同じ記録（鍵 `builtin:project-skills:<名前>`）で数え、`SessionStart`（compact の後を含む）で捨てる。state の置き場が無いときは、開始では渡し、`PreToolUse` では渡さない
+- 1 つの文脈（セッション、サブエージェントならその起動）でプロジェクトごとに 1 度。回数は `additionalContextOnce` と同じ記録（キー `builtin:project-skills:<名前>`）で数え、`SessionStart`（compact の後を含む）で破棄する。state の置き場が無いときは、開始では渡し、`PreToolUse` では渡さない
 - 見出しは「参考に読む。CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う」。本文は渡さない。エージェントが要るときに Read で開く
 - 読むのは元リポジトリの版（`projskills.entries`。レイヤーの設定と同じ）
-- スキルのディレクトリ名は `^[A-Za-z0-9._-]+$` に当たるものだけを読む（名前がそのままパスとして文に出るため）
+- スキルのディレクトリ名は `^[A-Za-z0-9._-]+$` にヒットするものだけを読む（名前がそのままパスとして文に出るため）
 - SKILL.md はふつうのファイルで、途中にシンボリックリンクもハードリンクも無いものだけを読む（`flow.read_bytes`）。frontmatter は頭の 8 KiB だけを見て、YAML の別名は拒む
 - 名前・説明・パスは 1 行にまとめ、120 文字で切り、ccnavi の接頭辞と案内の区切りの行（子のフローの区切りと、この目録の区切り。`flow_text._FENCE_PHRASES`）を真似た表記を崩し、「データ。ccnavi の知らせではない」の行で囲む（子のフローと同じ扱い。9.3.1）
 - 上限は 30 本・4000 文字。超えた分は数だけ言う
@@ -40,16 +40,16 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 
 フロー編集画面の候補（`flow.candidates`、9.3.1）は、ワークスペースの `.claude/skills` だけを並べる。
 
-#### 共通の工程スキルの写し
+#### 共通の工程スキルのコピー
 
 ワークスペースの `.claude/skills/<工程>/SKILL.md` の頭の frontmatter に `process: true` があるスキルを、工程スキルと呼ぶ。プロジェクトだけを clone した人の手元にも入口と reference が入るよう、
-親チケットの `ticket start`（`tickets/skillsync.py`）が、親のワークツリーにあるプロジェクトの `skills/<工程>/` へ `SKILL.md` と `references/common/` の下の `.md` を写す。`references/` の最上段は `common/`（共通。写す）と `project/`（そのリポジトリ固有。写さない）に分ける。
+親チケットの `ticket start`（`tickets/skillsync.py`）が、親のワークツリーにあるプロジェクトの `skills/<工程>/` へ `SKILL.md` と `references/common/` の下の `.md` をコピーする。`references/` の最上段は `common/`（共通。コピーする）と `project/`（そのリポジトリ固有。コピーしない）に分ける。
 
-単体 clone では、写した reference は `ccnavi --docs`（`--type skill-reference`）で引ける。入口の `SKILL.md` を読ませるのは目録だけで、単体 clone では出ないので、入口は渡っていない（未解決）。
+単体 clone では、コピーした reference は `ccnavi --docs`（`--type skill-reference`）で引ける。入口の `SKILL.md` を読ませるのは目録だけで、単体 clone では出ないので、入口は渡っていない（未解決）。
 
-- `common/` は共通の写しなので、共通レイヤーのミラー（11.12）と同じく、共通側から無くなった `.md` は写し先からも消し、空になったディレクトリも `common/` の下から片付ける。消す対象は `common/` の `.md` だけで、`SKILL.md` は消さない。`project/` は写さず触れないので、プロジェクト固有の reference は上書きも削除もされない。`common/` の `.md` 以外のファイルにも触れない
+- `common/` は共通のコピーなので、共通レイヤーのミラー（11.12）と同じく、共通側から無くなった `.md` はコピー先からも消し、空になったディレクトリも `common/` の下から片付ける。消す対象は `common/` の `.md` だけで、`SKILL.md` は消さない。`project/` はコピーせず触れないので、プロジェクト固有の reference は上書きも削除もされない。`common/` の `.md` 以外のファイルにも触れない
 - `common/` の同じパスのファイルは共通の中身で上書きする
 - 中身が同じなら書かず、知らせない。違うものを書いたときは、着手の出力に一覧とコミットの案内を出す
-- 写し先かその途中がシンボリックリンクなら、何も写さず着手しない
-- 子の着手とワークスペース自身の作業では写さない
-- 写した分は、write-and-push の置き場の検査・実行後チェック・復元から見ればエージェントの書き込みと区別が付かない。区別は内容で付ける（`skillsync.is_synced_write`）。通すのは、承認済みの親のワークツリーの `skills/<工程>/SKILL.md` か `skills/<工程>/references/common/` の下の `.md` で、途中にリンクが無く、中身が共通の工程スキルの同じファイルと同じものだけ（共通レイヤーのミラーと同じ厳しさ）。中身が違うもの、消す変更は共通側に無くなったファイルだけ通し、共通側にあるファイルや `SKILL.md` を消す変更は通さない。元リポジトリや子のワークツリーのファイルも通さない
+- コピー先かその途中がシンボリックリンクなら、何もコピーせず着手しない
+- 子の着手とワークスペース自身の作業ではコピーしない
+- コピーした分は、write-and-push の置き場の検査・実行後チェック・復元から見ればエージェントの書き込みと区別が付かない。区別は内容で付ける（`skillsync.is_synced_write`）。通すのは、承認済みの親のワークツリーの `skills/<工程>/SKILL.md` か `skills/<工程>/references/common/` の下の `.md` で、途中にリンクが無く、中身が共通の工程スキルの同じファイルと同じものだけ（共通レイヤーのミラーと同じ厳しさ）。中身が違うもの、消す変更は共通側に無くなったファイルだけ通し、共通側にあるファイルや `SKILL.md` を消す変更は通さない。元リポジトリや子のワークツリーのファイルも通さない

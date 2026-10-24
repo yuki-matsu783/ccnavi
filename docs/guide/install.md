@@ -8,7 +8,7 @@ keywords: [導入, dry-run, enable, ccnavi-setup.sh, 配布, 実行ファイル,
 
 # 導入と配布
 
-どんなコマンドが打たれ、ルールが何に当たるかは、動かしてみるまで分からない。`dry-run` で導入し、記録を読みながらルールを直し、記録が落ち着いてから `enable` に切り替える。
+どんなコマンドが打たれ、ルールが何にヒットするかは、動かしてみるまで分からない。`dry-run` で導入し、記録を読みながらルールを直し、記録が落ち着いてから `enable` に切り替える。
 このページは、その手順と、導入スクリプトで配布先に設定と道具を置く方法を書く。入口は[手引きの目次](index.md)にある。
 
 ## 入口: Claude Code に「ccnavi を入れて」と頼む
@@ -38,7 +38,7 @@ keywords: [導入, dry-run, enable, ccnavi-setup.sh, 配布, 実行ファイル,
 
 ルールファイルには、取り返しの付かない操作とガード自身の設定だけを `deny` に書いて始める
 （`rm -rf`、`git push`、`git reset --hard`、認証情報の置き場、`.claude/` の下）。組み込みの既定
-（[ルールファイルが読めないとき](records.md)）がちょうどその範囲なので、写して直すのが早い。
+（[ルールファイルが読めないとき](records.md)）がちょうどその範囲なので、コピーして直すのが早い。
 
 `allow` は空のままでよい。`dry-run` は一般の保護には手を出さないので作業は止まらず、ルールの抜けている箇所だけが記録に溜まる（チケット制御が有効なら、チケットの関門と補助の保護は `dry-run` でも止める）。
 モードごとの違いは[設定](settings.md)の「動作モード」にある。
@@ -70,11 +70,11 @@ jq -r '.decision' logs/decisions.jsonl | sort | uniq -c | sort -rn
 jq -r 'select(.decision=="deny")|[((.rules//[])|join(",")),(.subject|gsub("[ \t\n]+";" "))]|join("\t")' \
   logs/decisions.jsonl | sort | uniq -c | sort -rn
 
-# どこにも当たらなかった回。enable ではこれが全部、権限モードに渡る
+# どこにもヒットしなかった回。enable ではこれが全部、権限モードに渡る
 jq -r 'select(.code=="UNDECLARED")|(.subject|gsub("[ \t\n]+";" "))' \
   logs/decisions.jsonl | sort | uniq -c | sort -rn | head -30
 
-# 通した回を、当たったルール別に。広すぎる allow はここに出る
+# 通した回を、ヒットしたルール別に。広すぎる allow はここに出る
 jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join(",")),(.subject|gsub("[ \t\n]+";" "))]|join("\t")' \
   logs/decisions.jsonl | sort | uniq -c | sort -rn | head -30
 ```
@@ -94,13 +94,13 @@ jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join("
 |---|---|
 | 止めるつもりのなかったものが `deny` に出ている | ルールのパターンを絞る。語の切れ目が要るなら `regex` へ |
 | 同じ呼び出しが `UNDECLARED` で並ぶ | `allow` に足す。1 行足すたびにユーザが見なくなる範囲が広がる |
-| `allow` で通っているが止めたいものがある | `deny` か `ask` に足す。強いタイプが先に当たる |
+| `allow` で通っているが止めたいものがある | `deny` か `ask` に足す。強いタイプが先にヒットする |
 
 直したら、そのつど 3 つを回す。
 
 ```sh
 ccnavi --lint                              # 防御を無効化しうる記述が無いか
-ccnavi --test Bash "cd /repo && git push"  # 1 件が何に当たるか
+ccnavi --test Bash "cd /repo && git push"  # 1 件が何にヒットするか
 uv run python scripts/check_rules.py       # 期待する判定をまとめて回す
 ```
 
@@ -210,7 +210,7 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 sh scripts/ccnavi-setup.sh /path/to/project --bin user
 ```
 
-ホームディレクトリに書き込むので、端末で確認を求める（`続けますか？ [y/N]`）。端末でなければ、何も書かずに断る。確認を飛ばす指定は無い（`n` などで中止したときの終了コードは 1）。ただし、疑似端末で答えれば確認は通るので、エージェントに実行させない運用が前提になる。
+ホームディレクトリに書き込むので、ターミナルで確認を求める（`続けますか？ [y/N]`）。ターミナルでなければ、何も書かずに断る。確認を飛ばす指定は無い（`n` などで中止したときの終了コードは 1）。ただし、疑似ターミナルで答えれば確認は通るので、エージェントに実行させない運用が前提になる。
 中身が配布元と同じなら、確認なしで終わる。違えば、また確認して置き換える。`~/.local/bin/ccnavi` に別のファイルが既にあれば触らない（置き換えるなら `--force`。ディレクトリは `--force` でも置き換えない）。配布先の `.ccnavi/bin/` に実行ファイルが残っていると、振り分けの sh はそちらを先に使うので、残っていることを案内に出す。
 `--check` は書かず、確認も求めない。
 
@@ -226,7 +226,7 @@ PATH に通すフォルダ（macOS・Linux・WSL は `~/.local/bin`、Windows �
 | fish | `fish_add_path $HOME/.local/bin`（1 度実行すれば保存される） |
 | そのほか | `~/.profile` に同じ行を追加する |
 
-実体は隣に `_internal/` が要るので、単体のコピーは動かない。この実体は同じ機械の全プロジェクトが使うので、1 つのプロジェクトで再実行して置き換えると、ほかのプロジェクトにも効く。`--bin` は `ccnavi-install.sh` に渡せない（確認を端末に出す必要があるため）。`ccnavi-setup.sh` を直接実行する。macOS・Linux・WSL はリンクで張り、Windows は実体のフォルダを PATH に通す。
+実体は隣に `_internal/` が要るので、単体のコピーは動かない。この実体は同じ機械の全プロジェクトが使うので、1 つのプロジェクトで再実行して置き換えると、ほかのプロジェクトにも効く。`--bin` は `ccnavi-install.sh` に渡せない（確認をターミナルに出す必要があるため）。`ccnavi-setup.sh` を直接実行する。macOS・Linux・WSL はリンクで張り、Windows は実体のフォルダを PATH に通す。
 この機械で動く実行ファイルだけを置ける。
 
 ### 何がどこへ配られるか

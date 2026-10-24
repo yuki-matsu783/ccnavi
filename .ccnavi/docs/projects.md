@@ -15,7 +15,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 - プロジェクトで作業するときは、`cd projects/<名前>`してから`ccnavi-git.sh`を実行する。gitの操作はそのリポジトリに対して行われる
 - チケットは`project:`キーを持つ。値は`projects/`の下の名前で、ユーザが承認するときに決まる。エージェントが申告した値は判定に使われない
 - プロジェクトのissueから始める親の識別子は`feature-<番号>-<プロジェクト名>-<slug>`にする。issueの番号はリポジトリごとなので、slugの頭のプロジェクト名でワークスペースのissueと名前を分ける
-- 親の識別子は親のブランチ名の`/`を`-`に置き換えたもの。プロジェクトに既にある`/`を含むブランチで作業するときも、`ccnavi-start.sh`がそのブランチを直接チェックアウトしたワークツリーを作る。識別子・ファイル名・ワークツリー名・ロックの鍵は`/`を含まない。親のブランチ名は親のワークツリーのHEADから読む
+- 親の識別子は親のブランチ名の`/`を`-`に置き換えたもの。プロジェクトに既にある`/`を含むブランチで作業するときも、`ccnavi-start.sh`がそのブランチを直接チェックアウトしたワークツリーを作る。識別子・ファイル名・ワークツリー名・ロックのキーは`/`を含まない。親のブランチ名は親のワークツリーのHEADから読む
 
 ## 何がどこに置かれるか
 
@@ -31,7 +31,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
 | 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（`.ccnavi/docs/templates.md`） |
 | テンプレートの下書き（エージェントが書く。効力は無い） | 反映する先と同じ相対パスで`wip/handoff/`の下（`wip/handoff/.ccnavi/config/project/templates/<名前>.yml`など）。プロジェクト向けは`projects/<名前>/wip/handoff/…`。取り込むのはユーザ（`ccnavi user handoff`） |
-| ユーザに渡す物（保護対象を直した写しなど） | ワークスペースのワークツリーの`wip/handoff/`（追跡する。直接作業では`integrate`が取り込み結果から外す） |
+| ユーザに渡す物（保護対象を直したコピーなど） | ワークスペースのワークツリーの`wip/handoff/`（追跡する。直接作業では`integrate`が取り込み結果から外す） |
 | 使い捨てのファイル・コミットしたくないもの | ワークスペースルート直下の`scratchpad/`（`.gitignore`で追跡から外す。`.ccnavi/docs/scratchpad.md`）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の置き物もワークスペース側に置く |
 | ワークスペースのルール | 共通レイヤーの`.ccnavi/config/common/rules.yml`。リスクの配点とフェーズ定義（`phases.yml`）も同じ場所。レイアウトに依存するフェーズ定義は自身のレイヤーの`.ccnavi/config/project/phases.yml` |
 | プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手するとき、共通レイヤーはプロジェクトの`.ccnavi/config/common/`にミラーされる（設計11.12。ずれは`ccnavi user mirror`で見て、揃えるのはユーザ）。フェーズ定義は共通レイヤーと`config/project/`の和 |
@@ -64,7 +64,7 @@ statusが言うとおりユーザに`ccnavi-user-push-approved.sh <親>`を打�
 チケットは1つのファイルで、`wip/proposals/todo/`（承認待ち。エージェントが`ccnavi-ticket.sh propose`で親のブランチへ送る）→`.ccnavi/approved/doing/`（ユーザが承認）→
 `wip/proposals/review/`（`ticket finish`。レビューが要るとき）→`.ccnavi/approved/done/`（ユーザがレビュー）の順に
 移る。`.ccnavi/approved/`へ移すのはユーザ、`wip/proposals/`へ移すのはエージェントで、
-エージェントは`ccnavi-ticket.sh`を使う。レビューで残った指摘は、ユーザが`decide`で指摘ごとに扱いを決める。`decide`はボードの［レビュー完了］か端末の`ccnavi-user-decide.sh <N>`から使う。
+エージェントは`ccnavi-ticket.sh`を使う。レビューで残った指摘は、ユーザが`decide`で指摘ごとに扱いを決める。`decide`はボードの［レビュー完了］かターミナルの`ccnavi-user-decide.sh <N>`から使う。
 選べるのは「対応しない」「このフェーズで直す」「issueに回す」の3つ。「このフェーズで直す」は続きの子チケットを`doing/`に作る。
 
 ラッパースクリプトは、記録のパスをcwdから開ける形で出す。そのまま`sed -n`などで開けばよい。
