@@ -302,6 +302,11 @@ courses:
         image: gitlab-new-issue
         alt: GitLabの新しいissueの入力欄。種類・題・説明を書き、右下の「Create issue」で作成する
       - target: ""
+        title: 作った issue の番号を確かめる
+        body: 作成すると、issue の画面が開きます。画面上部の道筋の最後（「#1」など）と、URL の末尾が、issue の番号です。この番号が、親チケットの識別子の番号になります。次の手順で、この番号か URL を Claude Code に伝えます。
+        image: gitlab-issue-created
+        alt: GitLabの issue の画面。上部の道筋の最後に「#1」と出ていて、題・説明・タスクの一覧・コメント欄がある
+      - target: ""
         title: Claude Codeに作業を頼む
         body: 作ったissueの番号かURLを、Claude Codeの入力欄で伝えて作業を頼みます。issueをまだ作っていないときは、作業の内容だけを頼めます。その場合は、エージェントがissueを作ります（エージェントがGitLabに届かないときは、ユーザが作って番号を伝えます）。調査や小さな修正は、チケットを使わずに直接作業で進みます。設計に触れる作業、複数のフェーズに分かれる作業、ユーザのレビューが要る作業は、エージェントがチケット作業として提案を書き、MRを用意します。
         image: claude-code-prompt
