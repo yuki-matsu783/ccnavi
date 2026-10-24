@@ -1,8 +1,10 @@
-"""共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。書く時は `promptsync`（ユーザの発言）と `mirrorsync`（ユーザが押す入口）が決める。
+"""共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。
+書くときは `promptsync`（ユーザの発言）と `mirrorsync`（ユーザが押す入口）が決める。
 
 共通レイヤー（ワークスペースルートの `.ccnavi/config/common/`）はワークスペースの git にあるので、
 プロジェクトだけを clone したユーザからは見えない。そこでユーザの発言のたびに、
-共通レイヤーの中身を、着手済みの親のワークツリーにあるプロジェクトの `.ccnavi/config/common/` へ写す。
+共通レイヤーの中身を、着手済みの親のワークツリーにある
+プロジェクトの `.ccnavi/config/common/` へ写す。
 プロジェクトの `.ccnavi/config/project/` には触れない。
 
 - 共通レイヤーが無い、または空なら、何も配らず、ミラーは残す

@@ -848,7 +848,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
     return;
   }
   if (!(await confirmDuringTurn(lock))) {
-    reply("", "保存しません: ターン中です。ターンが終わってから保存してください");
+    reply("", "保存しません。ターン中です。ターンが終わってから保存してください");
     return;
   }
   if (abandoned(current, target, (e) => reply("", e))) {

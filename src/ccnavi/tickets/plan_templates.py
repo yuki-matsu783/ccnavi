@@ -964,7 +964,8 @@ def merge(common: LayerRead, extra: LayerRead) -> list[Problem]:
 def common_writable(conf: settings.Settings, root: str) -> bool:
     """共通レイヤーの置き場を書き換えてよいか。
 
-    発言のときの同期がプロジェクトの `config/common/` へ写したミラー（着手済みの親のワークツリーの中）は、
+    発言のときの同期がプロジェクトの `config/common/` へ写したミラー
+    （着手済みの親のワークツリーの中）は、
     共通レイヤーの写しで誰も編集しないので読み取り専用。ワークスペースルートの共通は書ける。
     """
 

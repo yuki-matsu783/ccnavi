@@ -122,7 +122,7 @@ def decide(
         hookio.POST_TOOL_USE,
         hookio.POST_TOOL_USE_FAILURE,
     ):
-        # ターン中の印の更新時刻を新しくする（サブエージェントの呼び出しも、同じターンの内）。
+        # ターン中の印の更新時刻を新しくする（サブエージェントの呼び出しも、同じターン内）。
         turn.touch(conf.state, payload.session_id)
     if payload.event == hookio.PRE_TOOL_USE:
         return judge.decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)

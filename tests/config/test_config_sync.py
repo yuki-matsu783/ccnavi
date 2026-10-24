@@ -2,7 +2,8 @@
 
 共通レイヤー（ワークスペースルートの `.ccnavi/config/common/`）はワークスペースの git にあり、
 プロジェクトだけを clone したユーザからは見えない。ユーザの発言（UserPromptSubmit）で、
-共通レイヤーの中身を、着手済みの親のワークツリーにあるプロジェクトの `.ccnavi/config/common/` へ写す。
+共通レイヤーの中身を、着手済みの親のワークツリーにある
+プロジェクトの `.ccnavi/config/common/` へ写す。
 プロジェクトの `.ccnavi/config/project/` には触れない。`ticket start` では写さない。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通レイヤーは
@@ -502,7 +503,8 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertEqual(read(config_of(tree, settings.KIND_PHASES)), LIB_PHASES)
 
     def test_a_common_phases_file_the_mirror_cannot_hold_is_reported_and_the_start_goes_on(self):
-        """3: フェーズ定義として読めない共通レイヤーの phases.yml は写さず、理由を言う（着手は止めない）。"""
+        """3: フェーズ定義として読めない共通レイヤーの phases.yml は写さず、
+        理由を言う（着手は止めない）。"""
         write(self.phases, "version: 1\nphases: [\n")
         self.propose(
             "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
@@ -630,7 +632,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
     def test_post_monitor_does_not_report_the_mirror(self):
         """4: 発言で写した分は受け入れの対象になり、繰り返し報告しない。
 
-        セッションの最初の実行後チェックは、基準を取ったあとに在った変更を 1 度だけ伝える
+        セッションの最初の実行後チェックは、基準を取ったあとにあった変更を 1 度だけ伝える
         （ユーザが発言の前に直した保護領域と同じ扱い）。2 回目からは伝えない。
         """
         tree, _ = self.start_parent()

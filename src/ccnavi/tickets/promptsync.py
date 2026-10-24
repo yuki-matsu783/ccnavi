@@ -1,7 +1,8 @@
 """ユーザの発言のたびに、共通レイヤーと工程スキルをプロジェクトへ写す。
 
-写し先は、`project:` を持つ着手済みの親チケットのワークツリー。プロジェクトのメインのチェックアウトは
-対象外で、ユーザが押す `ccnavi user mirror`（`mirrorsync`）が受け持つ。写すものと写し方は
+写し先は、`project:` を持つ着手済みの親チケットのワークツリー。
+プロジェクトのメインのチェックアウトは対象外で、
+ユーザが押す `ccnavi user mirror`（`mirrorsync`）が受け持つ。写すものと写し方は
 `configsync`（共通レイヤーのミラー `.ccnavi/config/common/`）と `skillsync`（工程スキルの
 `skills/<工程>/`）が決める。ここは、どのワークツリーに、いつ写すかだけを持つ。
 
@@ -126,7 +127,7 @@ def _sync_one(
         else:
             lines.append(
                 f"共通レイヤーとプロジェクト {project} のミラー（.ccnavi/config/common/）が"
-                "違っていたので、共通レイヤーの中身に揃えた:"
+                "違っていたので、共通レイヤーの中身に揃えた。変えたのは次のファイル。"
             )
             lines += _describe(changes)
             committable += [c.rel for c in changes]

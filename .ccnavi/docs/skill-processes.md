@@ -43,7 +43,7 @@ keywords: [工程スキル, reference, references, skill-reference, 入口, proc
   プロジェクトだけを clone した人の手元にも入口と reference が入るようにするため。写した分は同期の出力に出るので、その場でコミットする。単体 clone では、reference は`ccnavi --docs`で引ける。入口の`SKILL.md`を読ませる目録は出ない（未解決）
 - 共通の工程スキルは、SKILL.md の frontmatter に `process: true`（真偽値。文字列の `"true"` や BOM 付きの SKILL.md は写されない）を持つ。写されるのはこのスキルだけ。ディレクトリ名は `^[A-Za-z0-9._-]+$` にする。当たらない名前は、写されても目録に載らない
 - 工程スキルのディレクトリ自体や、その下にシンボリックリンクがあると、何も写さず着手しない
-- 写されたファイル（`SKILL.md` と `references/common/`）は共通側の写しなので、プロジェクトの中で直さない。直すと次の発言のときに上書きされる。共通を直したいときは、共通の置き場（`.claude/skills/<工程>/`）の提案にする
+- 写されたファイル（`SKILL.md` と `references/common/`）は共通側の写しなので、プロジェクトの中で直さない。直すと次の発言のときに上書きされる。共通を直したいときは、共通の置き場（`.claude/skills/<工程>/`）を直す提案をする
 - プロジェクト固有の reference は `references/project/` に置く。`project/` は写されず、上書きも削除もされない
 - 目録（cwd がそのプロジェクトの中にあるときに渡る、名前・説明・場所の一覧）に載るのは、プロジェクトの `skills/<名前>/SKILL.md`。写された工程スキルもここに載る
 
