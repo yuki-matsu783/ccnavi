@@ -44,7 +44,7 @@ test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内�
   }
 });
 
-test("CB-T1169 手順の image は名前（小文字・数字・-）で、alt と両方書くか両方書かない。書かなければ空", () => {
+test("CB-T1171 手順の image は名前（小文字・数字・-）で、alt と両方書くか両方書かない。書かなければ空", () => {
   const ok = parseTour({ screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, target: "", image: "shot-1", alt: "画面" }, STEP] })] });
   assert.ok(ok.ok);
   assert.deepEqual(ok.ok && ok.value.courses[0].steps.map((step) => [step.image, step.alt]), [["shot-1", "画面"], ["", ""]]);
