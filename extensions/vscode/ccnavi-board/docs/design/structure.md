@@ -76,7 +76,7 @@ src/
     flow-match.ts     画面の中身と実行ファイルが読んだ中身（flow.data）の見比べ（整数と浮動小数の揃え方、食い違った場所と両者の値の言い方）
     flow-history.ts   フロー編集（とテンプレートの編集）の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
-    tour-sidebar.ts   左パネルの案内（ウォークスルー）の ID と、段のボタンが動かす画面の並び（WALKTHROUGH_TOURS）、チケット制御が要る画面の印（TOUR_SCREENS）、開けない画面を外す処理（playableScreens）。DOM にも vscode にも触れないので、単体で試せる
+    tour-sidebar.ts   左パネルの案内（ウォークスルー）の ID と、段のボタンが動かす画面の並び、チケット制御が要る画面の印、開けない画面を外す処理。DOM にも vscode にも触れないので、単体で試せる
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
     tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。手順は target・題・本文・scene）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
     tour-rules.ts     ルール管理の案内の見本（tours/rules.yml の sample:）を RuleForm と実行ファイルの JSON の形にする。rules.yml と同じ書き方のルールを読む小さな読み取り（実際の readRules と同じ結果になることをテストが見る）
