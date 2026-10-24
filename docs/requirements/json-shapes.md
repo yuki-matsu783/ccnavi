@@ -361,7 +361,7 @@ ccnavi --entry board user mirror [<プロジェクト名>…] --yes --expect <�
 ## 版の JSON
 
 ```sh
-ccnavi --version          # 1 行 1 項目（`compat: 18` など。sh が読む）
+ccnavi --version          # 1 行 1 項目（`compat: 19` など。sh が読む）
 ccnavi --version --json
 ```
 
@@ -369,7 +369,7 @@ ccnavi --version --json
 `.ccnavi/scripts/` の sh で、どちらも起動のときに互換の版を自分のものと比べる。
 
 ```json
-{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 18,
+{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 19,
  "features": ["user-entry", "handoff", "mirror"],
  "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}

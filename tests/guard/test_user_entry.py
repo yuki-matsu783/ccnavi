@@ -299,6 +299,11 @@ class HookTest(HookCase):
         "ccnavi --root /x --entry board user mirror --json",
         "ccnavi --entry=sh user handoff .ccnavi/docs/a.md --yes --expect x",
         "ccnavi --entry sh user close-early --reason r --result /t.json",
+        # 値を空の引用符にしたラッパーのオプション（hook が読む前に引用符ごと消えて、`user` が値に見える）。
+        "ccnavi --entry sh --root '' user agree",
+        'ccnavi --root "" --entry board user mirror',
+        "ccnavi --cwd '' user agree",
+        "ccnavi --root '' user handoff --json",
     )
 
     def test_the_entry_is_stopped_whatever_the_form(self):

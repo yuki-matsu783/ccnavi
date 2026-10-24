@@ -43,6 +43,7 @@ root=$(ccnavi_workspace) || root=$(ccnavi_abs "$(dirname "$0")/../..") || {
 # 実行ファイルは、打った人の cwd のまま起こす（取り込み先のツリーと根は、実行ファイルが cwd から決める）。
 # ソースで動かすときだけ、uv にワークスペースルートのプロジェクトを教える。
 if bin=$(ccnavi_bin "$root"); then
+	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-user-prune: %s\n' "$skew" >&2
 	exec "$bin" --entry sh user prune "$@"
 elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
 	exec uv run --quiet --project "$root" python -m ccnavi --entry sh user prune "$@"

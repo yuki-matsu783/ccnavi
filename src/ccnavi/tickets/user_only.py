@@ -553,10 +553,13 @@ def user_entry_forms(excluding: str = "") -> str:
     ラッパーのオプションを読み飛ばした後の最初の語が `user`。`--` を挟んだ形も止める
     （実行ファイルは断るが、止める側に倒す）。`excluding` は、別の deny が止める操作の名前
     （`prune` は、チケット制御ではなくコアのファイルの保護の設定に従う）。
+
+    オプションの値は付けなくても読む。`--root ''` のように空の引用符で値を空にした形は、hook が読む前に
+    引用符ごと消えて `--root user agree` に見えるので、`user` を値と読んで入口を見逃さないため。
     """
     value = _quoted_or_word()
     options = "|".join(re.escape(o) for o in WRAPPER_OPTIONS)
-    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})\s+)*"
+    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})?\s+)*"
     rest = rf"(?!\s+{re.escape(excluding)}\b)" if excluding else ""
     return rf"\s+{skip}(?:--\s+)?{USER_WORD}\b{rest}"
 
@@ -565,7 +568,7 @@ def user_verb_forms(verb: str) -> str:
     """`user <verb>` の形の正規表現（`launcher` の後ろに続ける。`--` は読み飛ばさない）。"""
     value = _quoted_or_word()
     options = "|".join(re.escape(o) for o in WRAPPER_OPTIONS)
-    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})\s+)*"
+    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})?\s+)*"
     return rf"\s+{skip}(?:--\s+)?{USER_WORD}\s+{re.escape(verb)}\b"
 
 

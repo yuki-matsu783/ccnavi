@@ -60,7 +60,10 @@ VERSION = "0.1.0"
 # `decide` の issue をいつでも選べる（`can_issue` は常に真でダイジェストが変わる）、
 # GitLab の依頼コメントへの返信を指摘に数える（`own`・代表の note・`last_*`）、
 # GHE.com を GitHub と分類する、Chrome 拡張の取り下げを廃止する。
-COMPAT = 18
+# 19: `user <操作>` の入口に、呼び出し元の印（`--entry sh|board`）を求める。印の無い入口は断る。
+# 古い sh（印を付けない）は新しい実行ファイルに断られ、新しい sh は古い実行ファイルの
+# `--entry` を読めない。sh に `ccnavi-user-handoff.sh`・`-mirror.sh`・`-prune.sh` を足した。
+COMPAT = 19
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 実行ファイルが持つ振る舞い。オプションや JSON の欄の有無を `flags` から読めないものを足す。

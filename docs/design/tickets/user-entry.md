@@ -102,7 +102,7 @@ argparse が読んだ後、`entry` が空（`user` の外）で、`user_only.ref
 `unless` の条件に当たる形（`--agree --preview`、`--prune --preview`、`--reviewed … --preview`）は断らない。`--handoff` と `--mirror` は `--yes` の有無によらず断る。
 断りの文は、対応する sh（`ccnavi-user-agree.sh` など。`Verb` の `script`）と、見るだけの形があればそれを案内する。
 
-`--version --json` は互換の版（`compat`）18 を返し、`features` に `user-entry`・`entry-marker`・`handoff`・`mirror` を持つ。
+`--version --json` は互換の版（`compat`）19 を返し、`features` に `user-entry`・`entry-marker`・`handoff`・`mirror` を持つ。
 
 #### hook の止め
 
