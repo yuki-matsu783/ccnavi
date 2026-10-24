@@ -367,6 +367,11 @@ courses:
         body: 最後のフェーズのレビューが済むと、エージェントが親を閉じて、MRのDraftを外します。Draftを外すと、閉じたチケットは手元のlogs/archive/に移り、ボードでは「アーカイブ」の列に出ます。この列は、「アーカイブ済みチケットを表示」を入れたときだけ見えます。MRのマージは、ユーザがGitLabの画面で行います。
         scene: { archived: true }
       - target: ""
+        title: GitLabのMRの承認（Approval）
+        body: GitLabには、MRの承認（Approval）の設定があります。ccnaviで提案を承認することとは別のものです。承認の設定があるプロジェクトでは、必要な承認がそろうまで、マージがブロックされます。
+        image: gitlab-mr-approval
+        alt: GitLabのMRの画面（日本語）。「承認」ボタンと、必要な承認の一覧があり、承認がそろわないと「ブロックされたマージ」と出る
+      - target: ""
         title: Draftを外す（GitLab）
         body: MRがDraftのままだと、GitLabに「Merge blocked」と出て、マージできません。通常はエージェントがDraftを外しますが、まだ残っているときは「Mark as ready」を押して外します。
         image: gitlab-mark-ready
