@@ -43,6 +43,12 @@ function firstType(check: TemplateCheck): string {
   return (work.find((t) => t.id === "implement") ?? work[0])?.id ?? "implement";
 }
 
+function without(set: ReadonlySet<number>, index: number): ReadonlySet<number> {
+  const next = new Set(set);
+  next.delete(index);
+  return next;
+}
+
 function keyOf(template: EditTemplate): string {
   return JSON.stringify(toData(template));
 }
@@ -70,7 +76,8 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   const [savedKey, setSavedKey] = useState(() => (opened.created ? "" : keyOf(start ?? blankTemplate(opened.name, "implement"))));
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
-  const [openFlow, setOpenFlow] = useState<number | undefined>(undefined);
+  /** 畳んだフローの項の番号。フローは図を最初から見せるので、畳んだものだけを覚える */
+  const [folded, setFolded] = useState<ReadonlySet<number>>(() => new Set());
   const [confirmClose, setConfirmClose] = useState(false);
   const seq = useRef(0);
   const asked = useRef<{ readonly seq: number; readonly key: string }>({ seq: 0, key: "" });
@@ -154,10 +161,10 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     setTpl(next);
     setStatus(undefined);
   };
-  /** 計画の編集。フローのキーが振り直ったときは、開いているフローがどの項のものか分からなくなるので閉じる */
+  /** 計画の編集。フローのキーが振り直ったときは、畳んだフローがどの項のものか分からなくなるので畳みを戻す */
   const updatePlan = (next: EditTemplate, typing?: string): void => {
     if (next.flows !== tpl.flows) {
-      setOpenFlow(undefined);
+      setFolded(new Set());
     }
     update(next, typing);
   };
@@ -167,7 +174,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     }
     setHistory(moved.history);
     setTpl(moved.doc);
-    setOpenFlow(undefined);
+    setFolded(new Set());
     setStatus(undefined);
   };
 
@@ -255,7 +262,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
           {tpl.plan.map((item, i) => {
             const index = i + 1;
             const doc = tpl.flows[String(index)];
-            const open = openFlow === index && doc !== undefined;
+            const open = doc !== undefined && !folded.has(index);
             return (
               <li key={index} className={`row${open ? " open" : ""}`} data-index={index}>
                 <div className="row-head">
@@ -268,15 +275,15 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
                       data-action="add-flow"
                       onClick={() => {
                         update(setFlow(tpl, index, templateFlow(`${tpl.name}-${index}`, typeTitle(item.type))));
-                        setOpenFlow(index);
+                        setFolded((f) => without(f, index));
                       }}
                     >
                       フローを足す
                     </button>
                   ) : (
                     <>
-                      <button type="button" className="action small" data-action="toggle-flow" aria-expanded={open} onClick={() => setOpenFlow(open ? undefined : index)}>
-                        {open ? "畳む" : "編集"}
+                      <button type="button" className="action small" data-action="toggle-flow" aria-expanded={open} onClick={() => setFolded((f) => (open ? new Set(f).add(index) : without(f, index)))}>
+                        {open ? "畳む" : "図を開く"}
                       </button>
                       <button
                         type="button"
@@ -284,7 +291,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
                         data-action="remove-flow"
                         onClick={() => {
                           update(removeFlow(tpl, index));
-                          setOpenFlow(undefined);
+                          setFolded((f) => without(f, index));
                         }}
                       >
                         フローを外す

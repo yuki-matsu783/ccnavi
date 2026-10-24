@@ -23,3 +23,6 @@ span.tpl-layer { font-size: var(--font-sm); }
   .row.open > .tpl-body.row-body { padding: 8px 14px 10px 14px; }
   .tpl-dropped { padding-left: 14px; }
 }
+.tpl-diagram { margin: 0 0 12px; }
+.tpl-diagram h3 { margin: 6px 0; }
+.tpl-flow-view { display: block; }
