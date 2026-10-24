@@ -15,6 +15,12 @@ import * as path from "node:path";
 /** 承認の push の sh の、ワークスペースルートからのパス */
 export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-user-push-approved.sh";
 
+/**
+ * `user` の入口の前に付ける印。ボードの子プロセスから来たことを実行ファイルに伝える。印の無い
+ * `user …` は、実行ファイルを直に打った形として断られる（ユーザが打つ入口は sh にそろえてある）
+ */
+export const USER_ENTRY = ["--entry", "board"] as const;
+
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
 export type Launcher =
   | { readonly kind: "exe"; readonly path: string }
@@ -50,7 +56,7 @@ export function approveArgs(
   digest: string,
   only: readonly string[] = [],
 ): readonly string[] {
-  return ["user", "agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
+  return [...USER_ENTRY, "user", "agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
 /**
@@ -92,7 +98,7 @@ export function templatesDraftArgs(parent: string): readonly string[] {
  * `--root` は `run()` が付ける。
  */
 export function handoffArgs(paths: readonly string[] = []): readonly string[] {
-  return ["user", "handoff", ...paths, "--json"];
+  return [...USER_ENTRY, "user", "handoff", ...paths, "--json"];
 }
 
 /**
@@ -101,7 +107,7 @@ export function handoffArgs(paths: readonly string[] = []): readonly string[] {
  * `--via board` で、ボードから来た実行だと実行ファイルに伝える（`defense` の種類はこの経路では断られる）
  */
 export function handoffYesArgs(paths: readonly string[], expect: string): readonly string[] {
-  return ["user", "handoff", ...paths, "--yes", "--expect", expect, "--via", "board", "--json"];
+  return [...USER_ENTRY, "user", "handoff", ...paths, "--yes", "--expect", expect, "--via", "board", "--json"];
 }
 
 /**
@@ -110,7 +116,7 @@ export function handoffYesArgs(paths: readonly string[], expect: string): readon
  * `--root` は `run()` が付ける。
  */
 export function mirrorArgs(names: readonly string[] = []): readonly string[] {
-  return ["user", "mirror", ...names, "--json"];
+  return [...USER_ENTRY, "user", "mirror", ...names, "--json"];
 }
 
 /**
@@ -119,7 +125,7 @@ export function mirrorArgs(names: readonly string[] = []): readonly string[] {
  * 変わっていれば実行ファイルは何も書かない
  */
 export function mirrorYesArgs(names: readonly string[], expect: string): readonly string[] {
-  return ["user", "mirror", ...names, "--yes", "--expect", expect, "--via", "board", "--json"];
+  return [...USER_ENTRY, "user", "mirror", ...names, "--yes", "--expect", expect, "--via", "board", "--json"];
 }
 
 /**

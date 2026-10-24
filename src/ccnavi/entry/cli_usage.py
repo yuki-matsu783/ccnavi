@@ -150,25 +150,27 @@ projects/PROJECT/.ccnavi/config/project/templates/NAME.yml）。下書きは効�
     ccnavi --templates --draft PARENT [--name NAME] [--to common|project] [--layer NAME] [--json]
 
 下書きの取り込みは、ほかの保護対象（rules.yml・docs・hook など）と同じく、ユーザーが
-ccnavi user handoff で行います（見るだけの形も含めてユーザー専用です。実行ファイルは内部で
---handoff に読み替えます。--handoff を直接渡すと断ります）。テンプレートの
+ccnavi-user-handoff.sh で行います（見るだけの形も含めてユーザー専用です。実行ファイルは
+`user handoff` を内部で --handoff に読み替えます。sh が付ける入口の印（--entry sh）が無いと断り、
+--handoff を user の外で直接渡しても断ります）。テンプレートの
 改名・移動・削除は、ユーザーがファイルを直接操作します。
 
-    ccnavi user handoff [PATH...] [--json]
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] [--json]
         （見るだけ。PATH はツリーからの相対パスで、省くと下書き全部）
-    ccnavi user handoff [PATH...] --yes --expect HASH [--via board] [--json]
-        （取り込みます。--via board はボードの経路で、--json と一緒に使います）
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] --yes --expect HASH
+        （取り込みます。ボードは実行ファイルを --entry board --via board で呼びます）
 
 共通レイヤー（ワークスペースの .ccnavi/config/common/）のミラー（各プロジェクトの
 .ccnavi/config/common/）がずれていないかの確認と、ずれの同期は、ユーザーが
-ccnavi user mirror で行います（見るだけの形も含めてユーザー専用です。実行ファイルは内部で
---mirror に読み替えます）。同期は各プロジェクトの作業ツリーに書くだけで、コミットはしません。
+ccnavi-user-mirror.sh で行います（見るだけの形も含めてユーザー専用です。実行ファイルは
+`user mirror` を内部で --mirror に読み替えます。sh が付ける入口の印（--entry sh）が無いと
+断ります）。同期は各プロジェクトの作業ツリーに書くだけで、コミットはしません。
 
-    ccnavi user mirror [PROJECT...] [--json]
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] [--json]
         （見るだけ。PROJECT を省くと全プロジェクト。差分と --expect の値を出します）
-    ccnavi user mirror [PROJECT...] --yes --expect HASH [--via board] [--json]
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] --yes --expect HASH
         （差分のあるプロジェクトを揃えます。--expect が今の差分と違うときは何も書きません。
-        --via board はボードの経路で、--json と一緒に使います）
+        ボードは実行ファイルを --entry board --via board で呼びます）
 
 収集済みのテンプレートは、親の提案を開始するときに使用されます。
 エージェントも実行できます（フローの下書きも効力を持ちません）。
@@ -211,11 +213,12 @@ _LOGS = """\
 判定ログをローテーションし、古いログや終了したセッションの状態データを削除するには、
 次のコマンドを実行してください（SessionStartでも自動的に同じ処理が行われます）。
 
-    ccnavi user prune
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-prune.sh
     ccnavi --prune --preview
 
-ユーザーがターミナルから user prune を打ちます（実行ファイルは内部で --prune に読み替えます。
---prune を user の外で渡すと断ります）。--preview を指定すると、移動予定の項目のみを表示し、
+ユーザーがターミナルから ccnavi-user-prune.sh を打ちます（実行ファイルの `user prune` は、sh が
+付ける入口の印（--entry sh）が無いと断ります。--prune を user の外で渡すと断ります）。
+--preview を指定すると、移動予定の項目のみを表示し、
 実際の変更は行いません（エージェントも実行できます）。
 
 判定ログ（logs/decisions.jsonl と、ローテーション済みの
@@ -234,13 +237,15 @@ Code拡張機能がこれを読み込みます。
 _AGREE = """\
 承認待ちのチケットを確認し、提案された作業範囲を承認するには、次のコマンドを実行してください。
 
-    ccnavi user agree
-    ccnavi user agree i0002 i0002-01-01
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-agree.sh
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-agree.sh i0002 i0002-01-01
         （指定したチケットのみ。例: 絞り込んだボードから実行する場合。
          idはすべてのフラグの後ろに指定します）
 
-承認はユーザー専用で、ユーザーがターミナルから user agree を打ちます（実行ファイルは内部で
---agree に読み替えます。--agree を user の外で渡すと断ります。見るだけの --agree --preview は
+承認はユーザー専用で、ユーザーがターミナルから ccnavi-user-agree.sh を打ちます。承認のあと、承認済み
+チケットのコミットと push まで行います（実行ファイルの `user agree` は、sh が付ける入口の印
+（--entry sh）が無いと断ります。--agree を user の外で渡すと断ります。
+見るだけの --agree --preview は
 エージェントも実行できます）。
 
 すべてのワークツリーの wip/proposals/todo/ をスキャンし、各チケットが書き込み可能にする範囲と、
@@ -326,7 +331,7 @@ Codeのワークフロータブがこれを実行します。エージェント�
 VS Codeのボード拡張機能は、オーバーレイから承認します。
 
     ccnavi --agree --preview --json [<id>...]  （一括処理の内容を表示します。何も配置しません）
-    ccnavi user agree --yes <id,id,...> --digest <hex> --json [<id>...]
+    ccnavi --entry board user agree --yes <id,id,...> --digest <hex> --json [<id>...]
         （表示された内容そのものを承認します。--digest はプレビューの `digest`
          （提案の識別子の一覧と各提案ファイルのバイト列全体のダイジェスト）で、
          末尾のidは同じ絞り込みです）
@@ -554,7 +559,7 @@ ccnavi自身は、リモートに接続しません。スクリプトがマー�
 
 このコマンドはスレッドを取得し、次を実行します。
 
-    ccnavi user reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
+    ccnavi --entry sh user reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
         [--actor=<account> --via=terminal|board]
         （スクリプトは、読み取れる場合はトークンの所有者を渡します。レビュー済みの印には、
          アカウントと実行方法が記録されます。渡さなかった場合、印はこれまでどおりです）
@@ -567,7 +572,7 @@ ccnavi-review.sh decide N --preview が呼び、エージェントも実行で�
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-close-early.sh --reason <why>
 
-`ccnavi user close-early --reason <why> --result <json>` を実行した後、
+`ccnavi --entry sh user close-early --reason <why> --result <json>` を実行した後、
 マージリクエストのDraftを解除し、残った項目を新しいissueとして登録します。
 """
 
@@ -580,8 +585,8 @@ TOPICS = (
     ("docs", "ccnavi --docs", "md の frontmatter の索引を引く", _DOCS),
     ("templates", "ccnavi --templates", "作業・レビュー計画のテンプレートを扱う", _TEMPLATES),
     ("learnings", "ccnavi --learnings", "学びの蓄積のパターンの状態を一覧する", _LEARNINGS),
-    ("logs", "ccnavi user prune / --suggest", "判定ログを整理し、ルールの候補を作る", _LOGS),
-    ("agree", "ccnavi user agree / --plan-order", "提案の承認と、計画の順序", _AGREE),
+    ("logs", "ccnavi-user-prune.sh / --suggest", "判定ログを整理し、ルールの候補を作る", _LOGS),
+    ("agree", "ccnavi-user-agree.sh / --plan-order", "提案の承認と、計画の順序", _AGREE),
     ("ticket", "ccnavi ticket", "チケットの開始・終了・状態・雛形", _TICKET),
     (
         "scripts",

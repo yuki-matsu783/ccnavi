@@ -109,7 +109,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
   learn        子の気づきの記録の雛形と判定記録の要約を書く（--note なしの形）、または気づき 1 件を記録（直接作業では受信箱）に追加します（--note）。
 
   レビュー待ち（review/）から done/ へ動かすのはユーザ（ccnavi-review.sh confirm、ccnavi-user-decide.sh、
-  ccnavi user reviewed、Chrome 拡張のレビュー済み）。
+  ccnavi-user-decide.sh、Chrome 拡張のレビュー済み）。
 
   提案の plan に書くフェーズ定義は、共通の .ccnavi/config/common/phases.yml と、親の project: が
   指す config の phases.yml の和から選ぶ（自身のレイヤーは .ccnavi/config/project/phases.yml、

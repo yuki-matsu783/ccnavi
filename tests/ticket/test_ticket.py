@@ -1062,7 +1062,7 @@ class TicketTest(unittest.TestCase):
         refused = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01-01 の親 i0001 がまだ承認されていない（todo/）", refused.stderr)
-        self.assertIn("user agree", refused.stderr)
+        self.assertIn("ccnavi-user-agree.sh", refused.stderr)
 
     def test_a_child_without_any_parent_at_all_is_named(self):
         """親の提案がどこにも無い子は、親が無いと言って止めること。
@@ -2845,13 +2845,17 @@ class TicketTest(unittest.TestCase):
 
     def test_approve_and_reviewed_need_a_terminal_unless_disabled(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        refused = self.ccnavi("user", "agree", "--guard-ticket-approval", "enable", stdin="y\n")
+        refused = self.ccnavi(
+            "--entry", "sh", "user", "agree", "--guard-ticket-approval", "enable", stdin="y\n"
+        )
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         refused = self.ccnavi(
             "--cwd",
             self.parent_tree,
+            "--entry",
+            "sh",
             "user",
             "reviewed",
             "1",

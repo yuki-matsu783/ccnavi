@@ -67,6 +67,8 @@ SCHEMA = 1
 # 足すだけなら COMPAT は上げない。
 FEATURES: tuple[str, ...] = (
     "user-entry",
+    # `user` の入口の印（`--entry sh|board`）。印が無い `user …` は断る。
+    "entry-marker",
     # 保護対象の下書きの取り込み（`ccnavi user handoff`）。
     "handoff",
     # 共通レイヤーのミラーの同期（`ccnavi user mirror`）。

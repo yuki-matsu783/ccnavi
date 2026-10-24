@@ -150,14 +150,14 @@ class ScopeGuard:
                 + overflow
                 + "Send the output inside the parent's area, or, if the task genuinely needs "
                 "this path, tell the parent so it can propose a ticket whose parent covers it "
-                "and ask the user to run 'ccnavi user agree'."
+                "and ask the user to run 'ccnavi-user-agree.sh'."
             )
         else:
             message = (
                 f"This path is outside the work area that ticket {ticket.ticket} declares "
                 f"({area}) for worktree {t.name}. Send the output inside that area, or, if the "
                 "task genuinely needs this path, tell the parent so it can propose a ticket that "
-                "covers it and ask the user to run 'ccnavi user agree'."
+                "covers it and ask the user to run 'ccnavi-user-agree.sh'."
             )
         rule = rules.Rule(id=TICKET_SCOPE_RULE, message=message)
         # 出所はその承認済みチケット自身の場所。承認済みチケットはツリーごとに在るので、

@@ -133,11 +133,11 @@ def run(
         stdout.write(json.dumps(mirrorsync.plan_json(plan), ensure_ascii=True, indent=1))
         stdout.write("\n")
         return EXIT_OK
-    _plan_text(stdout, plan, wanted)
+    _plan_text(stdout, plan, wanted, root)
     return EXIT_OK
 
 
-def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None) -> None:
+def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None, root: str) -> None:
     """ミラーの状態を人が読む形で書く。何も反映せず、揃えるときに実行するコマンドを添える。"""
     stdout.write("ccnavi: 共通レイヤーのミラー（各プロジェクトの .ccnavi/config/common/）\n")
     if not plan.projects:
@@ -166,7 +166,8 @@ def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None) 
         stdout.write("揃えるミラーはありません。\n")
         return
     names = " ".join(shlex.quote(p.name) for p in chosen) if wanted else ""
-    command = "ccnavi user mirror " + (names + " " if names else "")
+    script = settings.script_command(root, "ccnavi-user-mirror.sh")
+    command = f"{script} " + (names + " " if names else "")
     stdout.write(
         "何も反映していません。この内容で揃えるなら、次を実行します。作業ツリーに書くだけで、"
     )

@@ -84,7 +84,7 @@ def start(
         stderr.write(
             f"ccnavi: {ticket_id} は承認済みの作業中ではない（いまは {found.state}/）。"
             + (
-                "先にユーザに 'ccnavi user agree' を通してもらってください"
+                "先にユーザに 'ccnavi-user-agree.sh' を通してもらってください"
                 if found.state == ticket_model.TODO
                 else ""
             )

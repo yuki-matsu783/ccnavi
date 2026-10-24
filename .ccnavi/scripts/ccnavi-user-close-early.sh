@@ -104,11 +104,11 @@ rm -f "$accept_plan"
 close_issue_flag=""
 [ "$make_issue" -eq 1 ] || close_issue_flag="--no-issue"
 # shellcheck disable=SC2086 # close_issue_flag は空か --no-issue
-ccnavi user close-early --reason "$reason" --result "$result" --accept-plan "$accept_plan" $close_issue_flag || exit $?
+ccnavi --entry sh user close-early --reason "$reason" --result "$result" --accept-plan "$accept_plan" $close_issue_flag || exit $?
 refetch
-ccnavi user close-early --reason "$reason" --result "$result" --accept-check "$accept_plan" || exit $?
+ccnavi --entry sh user close-early --reason "$reason" --result "$result" --accept-check "$accept_plan" || exit $?
 accept_execute "$accept_plan"
-ccnavi user close-early --reason "$reason" --result "$result" --accept-done "$accept_file" || exit $?
+ccnavi --entry sh user close-early --reason "$reason" --result "$result" --accept-done "$accept_file" || exit $?
 issue_draft="$state/review-close-early-issue-$family.md"
 noted="$state/review-close-early-note-$family.md"
 number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')

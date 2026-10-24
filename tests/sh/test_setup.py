@@ -122,6 +122,9 @@ DEPLOY_SCRIPTS = (
     "ccnavi-user-decide.sh",
     "ccnavi-user-close-early.sh",
     "ccnavi-user-clean-branch.sh",
+    "ccnavi-user-handoff.sh",
+    "ccnavi-user-mirror.sh",
+    "ccnavi-user-prune.sh",
     "ccnavi-fetch.sh",
     "ccnavi-dirs.sh",
     "ccnavi-session-start.sh",
@@ -191,7 +194,10 @@ NO_TEMPLATES_FILES = [
             "ccnavi-user-clean-branch.sh",
             "ccnavi-user-close-early.sh",
             "ccnavi-user-decide.sh",
+            "ccnavi-user-handoff.sh",
             "ccnavi-user-lib-review.sh",
+            "ccnavi-user-mirror.sh",
+            "ccnavi-user-prune.sh",
             "ccnavi-user-push-approved.sh",
             "ccnavi-worktree.sh",
         )
@@ -251,6 +257,9 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-user-decide.sh
   .ccnavi/scripts/ccnavi-user-close-early.sh
   .ccnavi/scripts/ccnavi-user-clean-branch.sh
+  .ccnavi/scripts/ccnavi-user-handoff.sh
+  .ccnavi/scripts/ccnavi-user-mirror.sh
+  .ccnavi/scripts/ccnavi-user-prune.sh
   .ccnavi/scripts/ccnavi-fetch.sh
   .ccnavi/scripts/ccnavi-dirs.sh
   .ccnavi/scripts/ccnavi-session-start.sh

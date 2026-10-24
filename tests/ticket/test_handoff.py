@@ -104,8 +104,12 @@ class HandoffCase(unittest.TestCase):
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment[settings.GUARD_TICKET_APPROVAL_ENV] = guard
         environment.update(env or {})
+        # ボードの経路（`--via board`）は拡張の子プロセスが呼ぶ形なので、印も board にする。
+        entry = "board" if "board" in args else "sh"
         return run_ccnavi(
-            ["--root", self.root, "user", "handoff", *args], env=environment, cwd=ROOT
+            ["--root", self.root, "--entry", entry, "user", "handoff", *args],
+            env=environment,
+            cwd=ROOT,
         )
 
     def view(self, *paths) -> dict:
@@ -481,7 +485,7 @@ class DiffTest(HandoffCase):
         self.assertIn("-古い文", result.stdout)
         self.assertIn("+新しい文", result.stdout)
         expect = self.view()["expect"]
-        self.assertIn(f"ccnavi user handoff --yes --expect {expect}", result.stdout)
+        self.assertIn(f"ccnavi-user-handoff.sh --yes --expect {expect}", result.stdout)
         self.assertIn("何も反映していません", result.stdout)
         self.assertNotIn("次:", result.stdout)
 
@@ -972,7 +976,7 @@ class ReadyTest(HandoffCase):
         problems = review._merge_problems(self.root, conf, self.root)
         said = [p for p in problems if "取り込んでいない保護対象の下書き" in p]
         self.assertEqual(len(said), 1, problems)
-        self.assertIn("ccnavi user handoff", said[0])
+        self.assertIn("ccnavi-user-handoff.sh", said[0])
         self.assertIn(f"wip/handoff/{DOCS}", said[0])
 
     def test_ready_does_not_name_untracked_drafts_twice(self):

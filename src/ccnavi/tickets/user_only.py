@@ -197,25 +197,42 @@ class Verb:
     op: str
     # 内部の最後のオプションが、操作の次の語を値に取る（`user reviewed 3` → `--reviewed 3`）。
     value: bool = False
+    # この操作をユーザが打つ入口の sh（`ccnavi-user-<script>.sh`）。
+    script: str = ""
 
 
 # 実行ファイルのユーザ専用の入口。読み替えた先は今の内部の形で、argparse の文法は変えない。
 VERBS: tuple[Verb, ...] = (
-    Verb(("agree",), ("--agree",), "approve"),
-    Verb(("reviewed",), ("--reviewed",), "reviewed", value=True),
-    Verb(("close-early",), ("--close-early",), "close-early"),
-    Verb(("prune",), ("--prune",), "prune"),
+    Verb(("agree",), ("--agree",), "approve", script="agree"),
+    Verb(("reviewed",), ("--reviewed",), "reviewed", value=True, script="decide"),
+    Verb(("close-early",), ("--close-early",), "close-early", script="close-early"),
+    Verb(("prune",), ("--prune",), "prune", script="prune"),
     # 続く語（ツリーからの相対パス）は、位置引数としてそのまま渡る。
-    Verb(("handoff",), ("--handoff",), "handoff"),
+    Verb(("handoff",), ("--handoff",), "handoff", script="handoff"),
     # 続く語（プロジェクトの名前）は、位置引数としてそのまま渡る。
-    Verb(("mirror",), ("--mirror",), "mirror"),
+    Verb(("mirror",), ("--mirror",), "mirror", script="mirror"),
 )
 
 # `user` の入口の名前。
 USER_WORD = "user"
 # sh と拡張が実行ファイルを呼ぶときに、先に付ける値つきのオプション。`user` はこれらを読み飛ばした
 # 後の最初の語。実行ファイルの読み飛ばしと hook の正規表現の両方がこの一覧から作る。
-WRAPPER_OPTIONS: tuple[str, ...] = ("--root", "--cwd", "--record-writes", "--record-tree")
+WRAPPER_OPTIONS: tuple[str, ...] = (
+    "--root",
+    "--cwd",
+    "--record-writes",
+    "--record-tree",
+    "--entry",
+)
+
+# `user` の入口を、どこから呼んだかの印（`--entry <値>`）。sh（`ccnavi-user-*.sh`）は `sh`、
+# 拡張のボードの子プロセスは `board` を、`user` の前に付ける。印が無い `user …` は、実行ファイルを
+# 直に打った形として断る（`direct_refusal`）。argparse の結果（`args`）には入れず、`take_entry` が
+# argv から外して別に持つ。
+ENTRY_OPTION = "--entry"
+ENTRY_SH = "sh"
+ENTRY_BOARD = "board"
+ENTRY_VALUES = (ENTRY_SH, ENTRY_BOARD)
 
 # 語のグループ。オプションではない語（`user agree --yes` の `user` と `agree`）を、
 # ボードの組み合わせに使うためのグループ。
@@ -410,6 +427,47 @@ def _ascii_lower(word: str) -> str:
 def _loose(word: str) -> str:
     """互換の読み（NFKC と casefold）。ASCII でない綴りが入口の語に化けるかを見るためだけに使う。"""
     return unicodedata.normalize("NFKC", word).casefold()
+
+
+def take_entry(argv: list[str]) -> tuple[list[str], str]:
+    """先頭のラッパーのオプションから `--entry <値>` を外し、argv と値（無ければ空）を返す。
+
+    `user` の入口の前に付けた形（`--entry sh user agree`・`--entry=board user mirror`）だけを読む。
+    ほかの位置の `--entry` は外さないので、argparse が知らないオプションとして断る。
+    値が `ENTRY_VALUES` に無い、2 度ある、`user` の入口でない、のいずれも `UserEntryError`。
+    """
+    kept: list[str] = []
+    marker = ""
+    at = 0
+    while at < len(argv) and _is_wrapper_option(argv[at]):
+        word = argv[at]
+        if word.partition("=")[0] != ENTRY_OPTION:
+            step = 1 if "=" in word else 2
+            kept += argv[at : at + step]
+            at += step
+            continue
+        if marker:
+            raise UserEntryError(f"{ENTRY_OPTION} は 1 度しか渡せない")
+        if "=" in word:
+            marker, at = word.partition("=")[2], at + 1
+        elif at + 1 < len(argv):
+            marker, at = argv[at + 1], at + 2
+        else:
+            raise UserEntryError(f"{ENTRY_OPTION} には値が要る")
+        if marker not in ENTRY_VALUES:
+            raise UserEntryError(f"{ENTRY_OPTION} に渡せるのは {' か '.join(ENTRY_VALUES)}")
+    if marker and not (at < len(argv) and _ascii_lower(argv[at]) == USER_WORD):
+        raise UserEntryError(f"{ENTRY_OPTION} は user の入口と一緒に渡す")
+    return kept + argv[at:], marker
+
+
+def direct_refusal(verb: Verb, script: str) -> str:
+    """印の無い `user <操作>`（直に打った形）の断り文。`script` は打つ sh の呼び方。"""
+    word = " ".join(verb.words)
+    return (
+        f"`ccnavi user {word}` は、実行ファイルを直に打つ入口ではありません。"
+        f"ユーザが `{script}` を打ちます（実行ファイルがしない後始末は、その sh が行います）。"
+    )
 
 
 def rewrite(argv: list[str]) -> tuple[list[str], Verb | None]:

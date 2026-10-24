@@ -100,7 +100,7 @@ if ccnavi_wap_use_exe "$root"; then
 	if [ -n "$ccnavi_wap_bin" ]; then
 		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-user-agree: %s\n' "$skew" >&2
 	fi
-	set -- ccnavi_wap_exe --record-writes "$written" user agree --placed-out "$report" "$@"
+	set -- ccnavi_wap_exe --record-writes "$written" --entry sh user agree --placed-out "$report" "$@"
 else
 	printf 'ccnavi-user-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2

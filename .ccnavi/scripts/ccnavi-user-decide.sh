@@ -179,7 +179,7 @@ accept_before_place() {
 		return 0
 	fi
 	accept_rc=0
-	accept_out=$(ccnavi user reviewed "$n" --accept-unresolved --yes "$1" --digest "$2" --json --result "$result" --accept-plan "$accept_plan") ||
+	accept_out=$(ccnavi --entry sh user reviewed "$n" --accept-unresolved --yes "$1" --digest "$2" --json --result "$result" --accept-plan "$accept_plan") ||
 		accept_rc=$?
 	if [ "$accept_rc" -ne 0 ]; then
 		[ -z "$accept_out" ] || printf '%s\n' "$accept_out"
@@ -280,7 +280,7 @@ if [ -n "$choices" ]; then
 	decide_rc=0
 	# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
 	wap_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
-		user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
+		--entry sh user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 		decide_rc=$?
 	out=$(cat "$ccnavi_wap_capture" 2>/dev/null || :)
 	rm -f "$ccnavi_wap_capture"
@@ -307,7 +307,7 @@ stop)
 esac
 # 1. ユーザが端末で選ぶ（何も置かない。選択とダイジェストを state の置き場に書くだけ）。
 chosen="$state/review-choose-$$.json"
-ccnavi user reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
+ccnavi --entry sh user reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
 	rm -f "$chosen"
 	exit 1
 }
@@ -334,7 +334,7 @@ yes)
 	decide_rc=0
 	# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
 	wap_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
-		user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
+		--entry sh user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 		decide_rc=$?
 	out=$(cat "$ccnavi_wap_capture" 2>/dev/null || :)
 	rm -f "$ccnavi_wap_capture"
@@ -349,7 +349,7 @@ yes)
 *)
 	decide_rc=0
 	# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-	out=$(ccnavi user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who) ||
+	out=$(ccnavi --entry sh user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who) ||
 		decide_rc=$?
 	if [ "$decide_rc" -ne 0 ]; then
 		unapply_local

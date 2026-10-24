@@ -144,7 +144,7 @@ class FallbackTest(unittest.TestCase):
                 reason = out["permissionDecisionReason"]
                 self.assertIn("builtin:guard-ccnavi-config", reason)
                 self.assertIn("wip/handoff/.ccnavi/config/common/rules.yml", reason)
-                self.assertIn("ccnavi user handoff", reason)
+                self.assertIn("ccnavi-user-handoff.sh", reason)
                 out = out_of(self, run(self.root, pre_tool_use(tool, "file_path", draft), guard))
                 self.assertNotEqual(
                     out.get("permissionDecision"), "deny", f"{tool} で下書きを置けない"
@@ -167,7 +167,7 @@ class FallbackTest(unittest.TestCase):
         self.assertIn(
             "wip/handoff/.ccnavi/config/common/rules.yml", out["permissionDecisionReason"]
         )
-        self.assertIn("ccnavi user handoff", out["permissionDecisionReason"])
+        self.assertIn("ccnavi-user-handoff.sh", out["permissionDecisionReason"])
         self.assertNotIn("Write か Edit のツールで書いてください", out["permissionDecisionReason"])
 
     def test_既定でもシェルからの書き込みは表記を変えても止まる(self):

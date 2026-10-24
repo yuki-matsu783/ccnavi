@@ -1269,6 +1269,8 @@ class PhaseTest(PhaseHarness):
         result = self.ccnavi(
             "--cwd",
             self.parent_tree,
+            "--entry",
+            "sh",
             "user",
             "close-early",
             "--reason",

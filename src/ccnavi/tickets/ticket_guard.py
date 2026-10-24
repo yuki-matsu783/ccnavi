@@ -174,7 +174,7 @@ def approved_message_for(root: str) -> str:
     return (
         "承認済みチケットの置き場です。承認・状態・レビューの記録は、ユーザの操作と"
         " ccnavi のスクリプトだけが動かします。直接書き込まないでください。"
-        "承認はユーザが、VS Code のボード・Chrome のボード・端末の 'ccnavi user agree'・"
+        "承認はユーザが、VS Code のボード・Chrome のボード・端末の 'ccnavi-user-agree.sh'・"
         "置き場のファイルの移動のどれかで行います。"
         f"承認が済んだかどうかは '{ticket} status' で確かめてください。"
         "置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。"

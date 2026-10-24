@@ -274,10 +274,10 @@ def board_form_message(found: str) -> str:
     # 取り込みの形は、承認と残った指摘の対応方針の文に当たらない。
     lowered = found.casefold()
     decided = (
-        "共通レイヤーのミラーの同期（`ccnavi user mirror`）は、ユーザがボードか端末で"
+        "共通レイヤーのミラーの同期（`ccnavi-user-mirror.sh`）は、ユーザがボードか端末で"
         "ミラーの差分を読んでから決めます。"
         if "mirror" in lowered
-        else "保護対象の下書きの取り込み（`ccnavi user handoff`）は、ユーザがボードか端末で"
+        else "保護対象の下書きの取り込み（`ccnavi-user-handoff.sh`）は、ユーザがボードか端末で"
         "下書きの差分を読んでから決めます。"
         if "handoff" in lowered
         else "`--via board` は、ボードの画面から押した操作を拡張が実行するときだけ付ける印です。"
@@ -943,7 +943,8 @@ def _previewed(text: str, cuts: set[int], start: int, end: int) -> bool:
 def prune_message() -> str:
     """`--prune` で止めた文。"""
     return (
-        "記録と state を削除する 'ccnavi user prune' は、ユーザが端末から実行するものです。記録は"
+        "記録と state を削除する 'ccnavi-user-prune.sh' は、"
+        "ユーザが端末から実行するものです。記録は"
         "「ccnavi が何を判定したか」を後から確かめるための材料なので、"
         "エージェントからは消しません。"
         "何が消える対象かを見るだけなら 'ccnavi --prune --preview' は通ります。"
@@ -1038,8 +1039,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "ユーザの判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-user-close-early.sh')}'）"
             "もユーザが実行します。"
-            "保護対象の下書き（wip/handoff/）の取り込み（'ccnavi user handoff'。"
-            "見るだけの形も含む）と、共通レイヤーのミラーの同期（'ccnavi user mirror'。"
+            "保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。"
+            "見るだけの形も含む）と、共通レイヤーのミラーの同期（'ccnavi-user-mirror.sh'。"
             "見るだけの形も含む）も、ユーザが実行します。"
             "親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・"
             "'ccnavi worktree branch'・"

@@ -197,7 +197,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """引数を読み、組み合わせを検査してから、実際の処理へ渡す。
 
     処理フロー:
-    1. `user_only.rewrite` で、ユーザ専用の入口（`ccnavi user <操作>`）を今の形に読み替える。
+    1. `user_only.take_entry` で入口の印（`--entry`）を外し、`user_only.rewrite` で、
+       ユーザ専用の入口（`ccnavi user <操作>`）を今の形に読み替える。印の無い入口は、
+       `_parsed` が設定を読んでから断る（テストの逃げ道を設定で見るため）。
     2. argparse のパーサを組み、`_take_test_words` などで `--test` の引数を整えて読む。
     3. `--help` なら `cli_args.help_text` を出して終わる。
     4. ユーザ専用のオプションを、`user` の入口の外では `user_only.refused` で断る。
@@ -212,6 +214,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # ユーザ専用の入口（`ccnavi user <操作>`）を、今の内部の形に読み替える。入口から来たかどうかは
     # argparse の結果（args）には入れない。オプションで偽装できないようにするため。
     try:
+        argv, marker = user_only.take_entry(argv)
         argv, entry = user_only.rewrite(argv)
     except user_only.UserEntryError as exc:
         stderr.write(f"ccnavi: {exc}\n")
@@ -466,9 +469,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             "ccnavi: --via board は --yes（ボードで押した選択）と一緒に指定してください。\n"
         )
         return EXIT_ERROR
+    unmarked = entry if entry is not None and not marker else None
     if args.record_writes and not args.version:
-        return _recorded_run(stdin, stdout, stderr, parser, args)
-    return _parsed(stdin, stdout, stderr, parser, args)
+        return _recorded_run(stdin, stdout, stderr, parser, args, unmarked)
+    return _parsed(stdin, stdout, stderr, parser, args, unmarked)
 
 
 def _recorded_run(
@@ -477,6 +481,7 @@ def _recorded_run(
     stderr: TextIO,
     parser: argparse.ArgumentParser,
     args: argparse.Namespace,
+    unmarked: user_only.Verb | None = None,
 ) -> int:
     """`--record-writes <ファイル>` つきの 1 回。書いたパスを集め、終わったら書き出す。
 
@@ -535,7 +540,7 @@ def _recorded_run(
         if conf_for_state.state:
             moved_state = cli_args._real(conf_for_state.state)
     with fsio.recording() as written:
-        code = _parsed(stdin, stdout, stderr, parser, args)
+        code = _parsed(stdin, stdout, stderr, parser, args, unmarked)
     lines = []
     reals = []
     for path in written:
@@ -662,6 +667,7 @@ def _parsed(
     stderr: TextIO,
     parser: argparse.ArgumentParser,
     args: argparse.Namespace,
+    unmarked: user_only.Verb | None = None,
 ) -> int:
     """解析済みの引数を、経路ごとの処理へ振り分ける。
 
@@ -672,7 +678,8 @@ def _parsed(
        ほかの経路では例外のまま伝える。
     4. 診断の経路かを決め（`_diagnosing`）、診断でない経路では差し替えの引数を捨てる
        （`_drop_outside_diagnosis`）。フラグの値を設定へ重ねてから（`_override`）、
-       ガードとチケット制御の切り替えを `selfguard.resolve` で解く。
+       ガードとチケット制御の切り替えを `selfguard.resolve` で解く。ガードを解いた直後に、
+       入口の印が無い `user` の入口を断る（`user_only.direct_refusal`。ガードが切れていれば通す）。
     5. 取り込み・テンプレート・学び・索引（`--docs`）の経路へ分ける。
     6. 検証（`--lint`）、診断（`--test`・`--test-expectations`・`--suggest`・`--explain`）、
        後始末（`--prune`）を順に見る。
@@ -745,6 +752,15 @@ def _parsed(
         settings.GUARD_TICKET_APPROVAL_ENV,
         selfguard.GATE_SETTINGS,
     )
+    # 入口の印（`--entry`）が無い `user <操作>` は、実行ファイルを直に打った形。ユーザが打つ入口は
+    # sh（`ccnavi-user-*.sh`）で、承認のあとの後始末はそこが行う。テストと端末の無い実行環境は、
+    # 端末要求と同じ切り替え（`CCNAVI_GUARD_TICKET_APPROVAL=disable`）で通す。
+    if unmarked is not None and conf.guard_ticket_approval != selfguard.DISABLE:
+        script = settings.script_command(
+            root, f"{user_only.USER_SCRIPT_PREFIX}{unmarked.script}.sh"
+        )
+        stderr.write(f"ccnavi: {user_only.direct_refusal(unmarked, script)}\n")
+        return EXIT_BLOCK
     # チケット制御も 2 値。読めない値は enable（使う側）として扱う。切ったつもりで
     # 値を書き誤った設定は、判定では有効なままになり、--lint が error で名指しする。
     if args.ticket_control:

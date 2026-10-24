@@ -62,7 +62,16 @@ class ApproveJsonTest(PhaseHarness):
         if digest is None:
             digest = self.preview(*extra)["digest"]
         return self.ccnavi(
-            "user", "agree", "--yes", ",".join(tickets), "--digest", digest, "--json", *extra
+            "--entry",
+            "board",
+            "user",
+            "agree",
+            "--yes",
+            ",".join(tickets),
+            "--digest",
+            digest,
+            "--json",
+            *extra,
         )
 
     def agree_editing(self, edit, answers=("y", "y"), only=()):
@@ -819,7 +828,9 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_does_not_need_a_terminal_but_plain_approve_still_does(self):
         self.pending_parent_and_child()
         # 壁を有効にしたまま。テストの標準入力は端末ではない。
-        refused = self.ccnavi("user", "agree", "--guard-ticket-approval", "enable", stdin="y\n")
+        refused = self.ccnavi(
+            "--entry", "sh", "user", "agree", "--guard-ticket-approval", "enable", stdin="y\n"
+        )
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(self.copy_exists("i0001"))

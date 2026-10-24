@@ -271,7 +271,7 @@ def copy_last_place(clause: str) -> str:
 # `logs/` は記録と state の置き場（`logs/decisions.jsonl` と `logs/state/`）。どちらも判定が読むので
 # 名前を絞って守る。ローテートした記録（`logs/decisions.<日時>.jsonl`、prune）も同じ形で守る。
 # 判定は読まないが、「記録が無い = 動かなかった」を読む元で、シェルから消せると自分の呼び出しの
-# 記録を消せる。消すのはセッションの開始と、端末から打つ `ccnavi user prune`
+# 記録を消せる。消すのはセッションの開始と、端末から打つ `ccnavi-user-prune.sh`
 # （内部は `--prune`）だけ。
 # `logs/` の下の git のラッパースクリプトの記録は、消しても判定に影響しないので守らない。
 _PLACES = (
@@ -1297,12 +1297,13 @@ def _stage_hint(root: str) -> str:
     """守る場所を直すときの案内の一文。ワークスペースの `ccnavi-stage.sh` を指す。"""
     if not root:
         return (
-            "wip/handoff/ に写しを置き、ユーザに ccnavi user handoff での取り込みを頼んでください。"
+            "wip/handoff/ に写しを置き、"
+            "ユーザに ccnavi-user-handoff.sh での取り込みを頼んでください。"
         )
     stage = settings.script_command(root, "ccnavi-stage.sh")
     return (
         f"直すときは '{stage} <パス>' で wip/handoff/ に写し、写しを直して、"
-        "ユーザに ccnavi user handoff での取り込みを頼んでください。"
+        "ユーザに ccnavi-user-handoff.sh での取り込みを頼んでください。"
     )
 
 
@@ -1329,7 +1330,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
     共通の設定 3 本（`builtin:guard-ccnavi-config`）は、ルートを固定せず、パスの末尾で当てる。
     `common_layer_regex` が追う範囲（設定で動かした置き場）と同じとは限らないので、仮定しない。
     ルールファイルが読めない間も外れない。直すときは `wip/handoff/.ccnavi/config/common/rules.yml`
-    に下書きを置き、ユーザが端末の `ccnavi user handoff` で取り込むか、手で直す。
+    に下書きを置き、ユーザが端末の `ccnavi-user-handoff.sh` で取り込むか、手で直す。
 
     ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない。
 

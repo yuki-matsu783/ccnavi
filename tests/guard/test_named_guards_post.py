@@ -534,7 +534,7 @@ class ApprovedPostTest(Fixture):
             f"{ticket} status",
             f"{ticket} finish",
             f"{ticket} propose",
-            "ccnavi user agree",
+            "ccnavi-user-agree.sh",
         ):
             self.assertIn(text, result.stderr)
 

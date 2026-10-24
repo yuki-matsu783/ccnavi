@@ -2,7 +2,7 @@
 
 読む側（`plan_templates`）が持つのは効力のある置き場（共通とレイヤー）だけ。ここは効力の無い
 下書きを扱う。下書きの置き場は、ほかの保護対象と同じ `wip/handoff/<取り込み先の相対パス>`
-（`handoff`）で、取り込みも `ccnavi user handoff` が行う。
+（`handoff`）で、取り込みも `ccnavi-user-handoff.sh` が行う。
 
 ## 下書きを作る（`make`）
 
@@ -177,7 +177,7 @@ def draft_json(draft: Draft, scanned: plan_templates.Scan) -> dict:
 
     `path` は下書き（ツリーからの相対。`wip/handoff/…`）、
     `target` は取り込み先（ツリーからの相対）、
-    `layer` は取り込み先のレイヤー。取り込みは `ccnavi user handoff <target>` で行う。
+    `layer` は取り込み先のレイヤー。取り込みは `ccnavi-user-handoff.sh <target>` で行う。
     `text` は読んだ下書きの本文そのまま（reveal はしない）。
     `importable` は読めて error が無いこと。`exists_in` は同じ名前のテンプレートが在るレイヤー。
     `problems` の深刻度は下書きの検査のままで、`--lint` は error も warn に下げて出す。
@@ -534,5 +534,5 @@ def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
         "テンプレートにするなら、`ready` の前に "
         f"`ccnavi --templates --draft {parent}` で下書きを作る"
         "（ready で閉じると下書きの材料は退避されて拾えない）。"
-        "下書きはユーザが `ccnavi user handoff` で取り込むか、削除してから ready\n"
+        "下書きはユーザが `ccnavi-user-handoff.sh` で取り込むか、削除してから ready\n"
     )

@@ -207,7 +207,8 @@ def parent_not_started(
     if parent.state == ticket_model.TODO:
         stderr.write(
             head
-            + "がまだ承認されていない（todo/）。先にユーザに 'ccnavi user agree' を通してもらい、"
+            + "がまだ承認されていない（todo/）。"
+            + "先にユーザに 'ccnavi-user-agree.sh' を通してもらい、"
             f"'{ticket_sh} start {found.parent}' で開始してください\n"
         )
         return True
