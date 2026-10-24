@@ -33,6 +33,10 @@ Bash なら実行される部分に絞る（6.3）── 何も残らない → 
 deny → ask → allow の順にルールを当てる（5.2）── deny に当たった → deny（6.4）
   │  deny と ask は中で実行されるコマンドにも当てる。allow は当てない
   │
+Bash の書き込み先がワークスペースルート直下 → deny（DENY_SHELL_WORKSPACE_ROOT）
+  │  deny に当たらなかった呼び出しだけ。書き込み先を `cd` をたどって絶対パスに解き、
+  │  ルールファイルの `workspace-root` に Write として当てる（`hook/rootwrite.py`）
+  │
 チケットの範囲（9.5）── 範囲外・範囲の deny → deny、範囲の ask → ask、範囲内 → allow
   │  ルールの判定と比べて強い側を採る。同じ強さならルール
   │

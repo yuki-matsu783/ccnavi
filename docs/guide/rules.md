@@ -340,7 +340,7 @@ ccnaviは判定を返さず、Claude Codeの権限モードに従う。
 文面（`message` / `additionalContext` / `additionalContextOnce`）に書いた`{root}`も、モデルへ渡すときに
 実パス（区切りは`/`）になる。拒否の文面でshを案内するときは`{script:ccnavi-git.sh}`のように`{script:<名前>}`と書く（`sh <引用したパス>`に置き換わる）。名前は`[A-Za-z0-9._-]+`だけである。形が違うものは置き換えず、スクリプトが無いものは置き換える。どちらも`--lint`がwarnする。`{root}`から書いてもよい。
 `--explain`と`--test`は書いた表記のまま`{root}`を出す。このリポジトリのルールでは、
-ワークスペースルート直下のWrite / Editを止める`workspace-root`がこれを使っている。
+ワークスペースルート直下のWrite / Editと、シェルの書き込み先を止める`workspace-root`がこれを使っている。
 
 ## `regex` の書き方
 

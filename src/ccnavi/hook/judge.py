@@ -36,7 +36,16 @@ from ..tickets import (
     ticket_model,
     ticket_places,
 )
-from . import agentlaunch, docsearch, failsafe, parentwrite, projskills, reasons, wrapguard
+from . import (
+    agentlaunch,
+    docsearch,
+    failsafe,
+    parentwrite,
+    projskills,
+    reasons,
+    rootwrite,
+    wrapguard,
+)
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
 # それより先に自前の判定を出し終えることが、遅い判定が何も返さないまま許可として扱われて
@@ -730,6 +739,41 @@ def decide_before(
     capped = capped and verdict != rules.DENY
     if capped:
         verdict = rules.DENY
+
+    # シェルからワークスペースルート直下へ書く形は、Write / Edit と同じ決まり（ルールファイルの
+    # `workspace-root`）に当てて止める。書き込み先を解いた絶対パスで当てるので、`cd` で移った先も
+    # たどる。ガード自身の保護など、ほかの deny に当たった呼び出しは、その文面で止まる。ここでは
+    # deny に当たらなかった呼び出しだけを見る。
+    if payload.tool_name == "Bash" and verdict != rules.DENY:
+        written, place, root_rule = rootwrite.check(
+            rule_set,
+            payload.cwd,
+            record.subject,
+            [layer.replace(shellread.SEP, "\n") for _, layer, _ in inner],
+        )
+        if written:
+            # 記録には、止めた決まり（ルールファイルの `workspace-root`）の名前を残す。`--test` が
+            # 式まで見せる際に読む `hits` と、位置・名前を揃える。
+            record.code, record.rules = rootwrite.CODE, [rules.record_name(root_rule)]
+            record.hits = [root_rule]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        rootwrite.CODE,
+                        rootwrite.RULE_ID,
+                        display_subject,
+                        rootwrite.message(root, written, place),
+                    )
+                ],
+                conf=conf,
+                root=root,
+                kind=GENERAL,
+            )
 
     record.rules = [rules.record_name(rule) for rule in group]
     # 当てたルールそのもの。診断（`--test`）が根拠を見せるのに読む。記録には書かない。

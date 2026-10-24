@@ -292,6 +292,14 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         git(self.root, "update-ref", "refs/remotes/origin/scratch", "scratch")
         self.assert_not_asked(self.stop(path, session="s2"))
 
+    def test_a_pushed_direct_worktree_with_a_record_is_still_asked(self):
+        """直接作業のブランチは `ccnavi-git.sh push` で origin へ送れる。記録（ccnavi-direct）が
+        あるワークツリーは、origin にあっても親とみなさず、促しを止めない。"""
+        path = self.direct(commit=True)
+        self.record()
+        git(self.root, "update-ref", "refs/remotes/origin/scratch", "scratch")
+        self.asked(self.stop(path))
+
     def test_a_branch_that_is_not_the_name_is_not_asked(self):
         path = self.direct(commit=True)
         git(path, "switch", "--quiet", "-c", "other")

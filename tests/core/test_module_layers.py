@@ -147,6 +147,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "hook.parentwrite",
+                "hook.rootwrite",
                 "hook.wrapguard",
                 "policy.builtin",
                 "policy.ctxfile",
