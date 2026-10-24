@@ -150,9 +150,9 @@ projects/PROJECT/.ccnavi/config/project/templates/NAME.yml）。下書きは効�
     ccnavi --templates --draft PARENT [--name NAME] [--to common|project] [--layer NAME] [--json]
 
 下書きの取り込みは、ほかの保護対象（rules.yml・docs・hook など）と同じく、ユーザーが
-ccnavi-user-handoff.sh で行います（見るだけの形も含めてユーザー専用です。実行ファイルは
+ccnavi-user-handoff.sh で行います。見るだけの形も含めてユーザー専用です。実行ファイルは
 `user handoff` を内部で --handoff に読み替えます。sh が付ける入口の印（--entry sh）が無いと断り、
---handoff を user の外で直接渡しても断ります）。テンプレートの
+--handoff を user の外で直接渡しても断ります。テンプレートの
 改名・移動・削除は、ユーザーがファイルを直接操作します。
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] [--json]
@@ -162,9 +162,9 @@ ccnavi-user-handoff.sh で行います（見るだけの形も含めてユーザ
 
 共通レイヤー（ワークスペースの .ccnavi/config/common/）のミラー（各プロジェクトの
 .ccnavi/config/common/）がずれていないかの確認と、ずれの同期は、ユーザーが
-ccnavi-user-mirror.sh で行います（見るだけの形も含めてユーザー専用です。実行ファイルは
+ccnavi-user-mirror.sh で行います。見るだけの形も含めてユーザー専用です。実行ファイルは
 `user mirror` を内部で --mirror に読み替えます。sh が付ける入口の印（--entry sh）が無いと
-断ります）。同期は各プロジェクトの作業ツリーに書くだけで、コミットはしません。
+断ります。同期は各プロジェクトの作業ツリーに書くだけで、コミットはしません。
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] [--json]
         （見るだけ。PROJECT を省くと全プロジェクト。差分と --expect の値を出します）
@@ -216,8 +216,8 @@ _LOGS = """\
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-prune.sh
     ccnavi --prune --preview
 
-ユーザーがターミナルから ccnavi-user-prune.sh を打ちます（実行ファイルの `user prune` は、sh が
-付ける入口の印（--entry sh）が無いと断ります。--prune を user の外で渡すと断ります）。
+ユーザーがターミナルから ccnavi-user-prune.sh を打ちます。実行ファイルの `user prune` は、sh が
+付ける入口の印（--entry sh）が無いと断ります。--prune を user の外で渡すと断ります。
 --preview を指定すると、移動予定の項目のみを表示し、
 実際の変更は行いません（エージェントも実行できます）。
 
@@ -243,10 +243,9 @@ _AGREE = """\
          idはすべてのフラグの後ろに指定します）
 
 承認はユーザー専用で、ユーザーがターミナルから ccnavi-user-agree.sh を打ちます。承認のあと、承認済み
-チケットのコミットと push まで行います（実行ファイルの `user agree` は、sh が付ける入口の印
+チケットのコミットと push まで行います。実行ファイルの `user agree` は、sh が付ける入口の印
 （--entry sh）が無いと断ります。--agree を user の外で渡すと断ります。
-見るだけの --agree --preview は
-エージェントも実行できます）。
+見るだけの --agree --preview は、エージェントも実行できます。
 
 すべてのワークツリーの wip/proposals/todo/ をスキャンし、各チケットが書き込み可能にする範囲と、
 人によるレビューが必要かどうかを表示します。そのうえで、承認したチケットを

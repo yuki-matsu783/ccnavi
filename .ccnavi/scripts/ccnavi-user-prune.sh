@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-user-prune 判定ログを整理して、動かしたものを出す。 ユーザが端末で打つ。
+# ccnavi-user-prune 判定ログを整理して、動かしたものを出す。ユーザが端末で打つ。
 #
 #   sh .ccnavi/scripts/ccnavi-user-prune.sh [--preview]
 #
@@ -21,7 +21,7 @@ usage() {
 sh .ccnavi/scripts/ccnavi-user-prune.sh [--preview]
 
   判定ログを整理して、動かしたものを出す。
-  実行ファイルの `user prune` を、入口の印つきで起こす。ユーザが端末で実行します。
+  実行ファイルの `user prune` を、入口の印を付けて起こす。ユーザが端末で実行します。
 USAGE
 }
 
@@ -34,7 +34,7 @@ if [ $# -eq 1 ]; then
 	esac
 fi
 
-# 端末をワークスペースの外で開いていても届くように、cwd から見つからなければ、この sh のある場所から決める。
+# ワークスペースの外で開いた端末からも動くように、cwd から見つからなければ、この sh のある場所からルートを決める。
 root=$(ccnavi_workspace) || root=$(ccnavi_abs "$(dirname "$0")/../..") || {
 	printf 'ccnavi-user-prune: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2

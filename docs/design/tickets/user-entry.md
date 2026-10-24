@@ -69,7 +69,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 | 承認済みチケットの push | `ccnavi-user-push-approved.sh` | 無し（git だけ） |
 | 子のブランチの削除 | `ccnavi-user-clean-branch.sh` | `worktree branch` |
 
-`handoff`・`mirror`・`prune` の sh は、実行ファイルを入口の印つきで起こすだけの薄い包み。引数はそのまま渡し、
+`handoff`・`mirror`・`prune` の sh は、実行ファイルを入口の印を付けて起こすだけの薄い包み。引数はそのまま渡し、
 実行ファイルは打った人の cwd のまま起こす（取り込み先のツリーと根は実行ファイルが cwd から決める）。
 `ccnavi-user-lib-review.sh` は `decide` と `close-early` が呼ぶ部品で、ユーザの判断をホストに書く。単独では打たない。
 

@@ -225,7 +225,7 @@ WRAPPER_OPTIONS: tuple[str, ...] = (
     "--entry",
 )
 
-# `user` の入口を、どこから呼んだかの印（`--entry <値>`）。sh（`ccnavi-user-*.sh`）は `sh`、
+# `user` の入口がどこから呼ばれたかを示す印は `--entry <値>` で、sh（`ccnavi-user-*.sh`）は `sh`、
 # 拡張のボードの子プロセスは `board` を、`user` の前に付ける。印が無い `user …` は、実行ファイルを
 # 直に打った形として断る（`direct_refusal`）。argparse の結果（`args`）には入れず、`take_entry` が
 # argv から外して別に持つ。
@@ -466,7 +466,7 @@ def direct_refusal(verb: Verb, script: str) -> str:
     word = " ".join(verb.words)
     return (
         f"`ccnavi user {word}` は、実行ファイルを直に打つ入口ではありません。"
-        f"ユーザが `{script}` を打ちます（実行ファイルがしない後始末は、その sh が行います）。"
+        f"ユーザが `{script}` を打ちます（実行ファイルが行わない後始末は、その sh が行います）。"
     )
 
 

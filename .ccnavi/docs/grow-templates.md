@@ -17,7 +17,7 @@ keywords: [テンプレート, 育つ, 全体像, 作業・レビュー計画, d
 | きっかけ | 計画を持つ親が閉じるとき、ccnavi が案内を 1 行出す | ccnavi | 親の `finish` |
 | 下書き | `ready` の前に下書きを作る。`ready` を打つと材料が退避されて拾えない | エージェント | `ccnavi --templates --draft <親>`、置き場は `wip/handoff/`（取り込み先と同じ相対パス） |
 | 整え | `description` と `when` の `TODO` の印を消す。固有名を一般化し、効かなかった手順を削る | エージェント | 下書きを直接編集 |
-| 検証 | `TODO` の残りは warn、制御文字を含む下書きは error。`ccnavi-user-handoff.sh` の下見が差分（既存があれば前後）を見せる | ccnavi | `ccnavi --lint`、`sh .ccnavi/scripts/ccnavi-user-handoff.sh`（`--yes` なし） |
+| 検証 | `TODO` の残りは warn、制御文字を含む下書きは error。`ccnavi-user-handoff.sh` で下見すると、差分（既存があれば前後）が出る | ccnavi | `ccnavi --lint`、`sh .ccnavi/scripts/ccnavi-user-handoff.sh`（`--yes` なし） |
 | 承認 | 下見を読み、表示された `--expect <ハッシュ>` を付けて `--yes` で書く。端末の前のユーザだけが打てる | ユーザ | `sh .ccnavi/scripts/ccnavi-user-handoff.sh <相対パス> --yes --expect <ハッシュ>` |
 | 効く | 次の親の提案を、テンプレートから始められる | エージェント | `ccnavi ticket new <識別子> --title <題> --template <名前> --issue <値> --mr <番号>` |
 | 配る | 共通は導入 sh が配布先へ配り、着手済みの親があるときのユーザの発言が、プロジェクトの `.ccnavi/config/common/` へ写す | ccnavi | `ccnavi-setup.sh`、ユーザの発言 |

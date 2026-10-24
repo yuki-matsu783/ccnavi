@@ -805,7 +805,7 @@ class ApproveCarriesTest(Workspace):
         # 実行ファイルには、書いたパスの一覧（--record-writes）と、書けたパスの報告の書き出し先
         # （--placed-out）も渡す
         self.assertEqual(got[2], "--record-writes", got)
-        # 承認は実行ファイルのユーザ専用の入口（`user agree`）を、入口の印（`--entry sh`）つきで呼ぶ
+        # 承認の入口（`user agree`）を、入口の印（`--entry sh`）を付けて呼ぶ
         self.assertEqual(got[4:6], ["--entry", "sh"], got)
         self.assertEqual(got[6:9], ["user", "agree", "--placed-out"], got)
         self.assertEqual(got[10:], ["i0002-01-03", "i0002-01-04"], got)

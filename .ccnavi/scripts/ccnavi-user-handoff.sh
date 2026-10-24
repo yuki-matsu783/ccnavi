@@ -21,7 +21,7 @@ usage() {
 sh .ccnavi/scripts/ccnavi-user-handoff.sh [--root <ツリー>] [<相対パス>…] [--yes --expect <ハッシュ>]
 
   wip/handoff/ の下書きを、保護対象の本来の場所へ取り込む。
-  実行ファイルの `user handoff` を、入口の印つきで起こす。ユーザが端末で実行します。
+  実行ファイルの `user handoff` を、入口の印を付けて起こす。ユーザが端末で実行します。
 USAGE
 }
 
@@ -42,7 +42,7 @@ if [ $# -eq 1 ]; then
 	esac
 fi
 
-# 端末をワークスペースの外で開いていても届くように、cwd から見つからなければ、この sh のある場所から決める。
+# ワークスペースの外で開いた端末からも動くように、cwd から見つからなければ、この sh のある場所からルートを決める。
 root=$(ccnavi_workspace) || root=$(ccnavi_abs "$(dirname "$0")/../..") || {
 	printf 'ccnavi-user-handoff: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
