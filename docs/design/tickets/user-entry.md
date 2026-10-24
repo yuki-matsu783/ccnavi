@@ -100,7 +100,7 @@ hook が止める。`--version --json` の `features` に `entry-marker` を持�
 argparse が読んだ後、`entry` が空（`user` の外）で、`user_only.refused(args)` が空でなければ、何も動かさず標準エラーに断りを書いて終了コード 2 で終わる。
 `refused` は `FLAGS` の `gated` の行を、argparse の結果で見る（argv の文字列を探さない）。`--yes` は、どの操作にも付くので最後に見る。
 `unless` の条件に当たる形（`--agree --preview`、`--prune --preview`、`--reviewed … --preview`）は断らない。`--handoff` と `--mirror` は `--yes` の有無によらず断る。
-断りの文は、対応する `user` の形（`ccnavi user agree` など）と、見るだけの形があればそれを案内する。
+断りの文は、対応する sh（`ccnavi-user-agree.sh` など。`Verb` の `script`）と、見るだけの形があればそれを案内する。
 
 `--version --json` は互換の版（`compat`）18 を返し、`features` に `user-entry`・`entry-marker`・`handoff`・`mirror` を持つ。
 
@@ -125,7 +125,7 @@ hook は擬似端末を作る実行役（`script`・`tmux`・`screen`・`expect`
 #### 端末要求の位置づけ
 
 実行ファイルは、`user agree`・`user reviewed`・`user close-early`・`user prune` と、書くとき（`--yes`）の `user handoff` と `user mirror` で、標準入力が端末のときだけ動く。
-端末を求めるときに標準エラーへ出すオプション名は `OPS` の `terminal`（`user_only.terminal`）が持つ。
+端末を求めるときに標準エラーへ出す名前は、ユーザが打つ sh の名前で、`OPS` の `terminal`（`user_only.terminal`）が持つ。
 
 端末を求めない経路（`--yes` の承認、ボードの指摘の対応方針、ボードからの handoff の取り込みとミラーの同期）では、hook の文字列検査が唯一の防御で、端末要求は 2 段目ではない。
 擬似端末を使えば端末要求は満たせる。

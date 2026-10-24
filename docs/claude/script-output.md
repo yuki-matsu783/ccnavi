@@ -71,7 +71,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 | `ccnavi-start.sh --check` | 結果に応じた一手（ユーザに認証や権限を頼む、MCPで代行する、など。ok なら出さない） | `ccnavi-common-host.sh` の `ccnavi_pf_next` |
 | `ccnavi-ticket.sh` の start・finish・propose・consolidate の事前確認 | 同上（標準エラーに `確認:` と `次:` を出す。標準出力には何も足さない） | `ccnavi-ticket.sh` の `ticket_preflight` |
 | `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
-| `ccnavi-stage.sh` | 下書きを編集し、ユーザに `ccnavi user handoff` での取り込みを案内する | `ccnavi-stage.sh` |
+| `ccnavi-stage.sh` | 下書きを編集し、ユーザに `ccnavi-user-handoff.sh` での取り込みを案内する | `ccnavi-stage.sh` |
 | `ccnavi-review.sh` の早めに閉じた | 親に閉じて片付け、`ready` を打たせる | `ccnavi-review.sh` |
 | `ccnavi ticket new` の成功 | 提案を書き、`--lint` と `--agree --preview --verify` を通し、`ccnavi-ticket.sh propose` で親のブランチへ送り、ユーザに承認を頼む | `tickets/scaffold.py` |
 | `ccnavi-ticket.sh propose` の成功 | ユーザに承認を頼んで返事を待つ | `ccnavi-ticket.sh` |
