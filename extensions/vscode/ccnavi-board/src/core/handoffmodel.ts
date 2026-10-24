@@ -265,22 +265,32 @@ export function reconcileSelection(previous: ReadonlyMap<string, string>, entrie
  * `tree` は見るだけの答えの `tree`（下書きがあるツリー）。実行ファイルは `--root` で指したツリーの
  * `wip/handoff/` だけを見るので、ユーザが別の場所で端末を開いていても同じツリーへ取り込むように付ける。空なら付けない。
  *
+ * 打つのは入口の sh（`ccnavi-user-handoff.sh`）。`workspace` はワークスペースルートで、sh の絶対パスを組むのに使う
+ * （端末をどこで開いていても届くように）。空ならルートからの相対パスのまま。`--root` は sh が実行ファイルへ渡す。
+ *
  * 引用は POSIX の sh の形（単引用符と `'\''`）。Windows の PowerShell は単引用符の中の `'` を `''` で表し、
  * `'\''` を読めないので、パスかツリーに `'` を含むときは、PowerShell では `'\''` を `''` に打ち直す。
  * 空白や `\` だけなら、単引用符で囲んだ形は PowerShell でも同じに読める。
  */
-export function terminalCommand(path: string, expect: string, tree = ""): string {
+export function terminalCommand(path: string, expect: string, tree = "", workspace = ""): string {
   const root = tree === "" ? "" : `--root ${quoteArg(tree)} `;
-  return `ccnavi ${root}user handoff ${quoteArg(path)} --yes --expect ${expect}`;
+  const base = workspace === "" ? "" : `${workspace.replace(/\\/g, "/").replace(/\/+$/, "")}/`;
+  return `sh ${quoteArg(`${base}${HANDOFF_SCRIPT}`)} ${root}${quoteArg(path)} --yes --expect ${expect}`;
 }
 
 /**
  * `terminalCommand` が組んだ形か。クリップボードへ写してよい文面の目印に使う（画面が出したコマンド以外は写さない）。
- * `ccnavi user handoff …` か、`ccnavi --root <ツリー> user handoff …`
+ * `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-user-handoff.sh [--root <ツリー>] <パス> --yes --expect …`
  */
 export function isTerminalCommand(text: string): boolean {
-  return /^ccnavi (?:--root (?:[A-Za-z0-9_./@%+=:,-]+|'(?:[^']|'\\'')*') )?user handoff /.test(text);
+  return TERMINAL_COMMAND.test(text);
 }
+
+/** 入口の sh の、ワークスペースルートからのパス */
+const HANDOFF_SCRIPT = ".ccnavi/scripts/ccnavi-user-handoff.sh";
+const SCRIPT_ARG = String.raw`(?:(?:[A-Za-z0-9_./@%+=:,-]*/)?\.ccnavi/scripts/ccnavi-user-handoff\.sh|'(?:(?:[^']|'\\'')*/)?\.ccnavi/scripts/ccnavi-user-handoff\.sh')`;
+const TREE_ARG = String.raw`(?:[A-Za-z0-9_./@%+=:,-]+|'(?:[^']|'\\'')*')`;
+const TERMINAL_COMMAND = new RegExp(`^sh ${SCRIPT_ARG} (?:--root ${TREE_ARG} )?`);
 
 /**
  * 空白や記号を含むときだけ単引用符で囲む（中の単引用符は `'\''` に置き換える）。

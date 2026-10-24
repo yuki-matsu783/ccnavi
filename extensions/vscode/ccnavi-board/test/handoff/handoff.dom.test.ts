@@ -194,7 +194,7 @@ test("CB-D373 defense は端末の案内を出す。「端末のコマンドを�
     dom.click(dom.one('[data-action="show-terminal"]'));
     await dom.settle();
     assert.deepEqual(dom.posted.filter((m) => m.type === "terminal"), [{ type: "terminal", path: HOOK }]);
-    const command = `ccnavi user handoff ${HOOK} --yes --expect ${"ab".repeat(32)}`;
+    const command = `sh .ccnavi/scripts/ccnavi-user-handoff.sh ${HOOK} --yes --expect ${"ab".repeat(32)}`;
     await dom.send({ type: "terminal", path: HOOK, command, error: "" });
     assert.equal(dom.one('[data-role="terminal-command"]').textContent, command);
     assert.equal(dom.all('[data-action="show-terminal"]').length, 0);

@@ -125,15 +125,15 @@ class RewriteTest(unittest.TestCase):
 class ExecutableTest(unittest.TestCase):
     def test_user_only_options_outside_the_entry_are_refused(self):
         for argv, shown in (
-            (["--agree"], "ccnavi user agree"),
-            (["--agree", "--yes", "i1"], "ccnavi user agree"),
-            (["--reviewed", "0"], "ccnavi user reviewed"),
-            (["--close-early"], "ccnavi user close-early"),
-            (["--prune"], "ccnavi user prune"),
-            (["--handoff"], "ccnavi user handoff"),
-            (["--handoff", "a.md", "--yes", "--expect", "x"], "ccnavi user handoff"),
-            (["--mirror"], "ccnavi user mirror"),
-            (["--mirror", "lib", "--yes", "--expect", "x"], "ccnavi user mirror"),
+            (["--agree"], "ccnavi-user-agree.sh"),
+            (["--agree", "--yes", "i1"], "ccnavi-user-agree.sh"),
+            (["--reviewed", "0"], "ccnavi-user-decide.sh"),
+            (["--close-early"], "ccnavi-user-close-early.sh"),
+            (["--prune"], "ccnavi-user-prune.sh"),
+            (["--handoff"], "ccnavi-user-handoff.sh"),
+            (["--handoff", "a.md", "--yes", "--expect", "x"], "ccnavi-user-handoff.sh"),
+            (["--mirror"], "ccnavi-user-mirror.sh"),
+            (["--mirror", "lib", "--yes", "--expect", "x"], "ccnavi-user-mirror.sh"),
             (["--yes", "i1"], "ユーザ専用"),
         ):
             with self.subTest(argv=argv):
@@ -174,20 +174,24 @@ class ExecutableTest(unittest.TestCase):
         result = run_ccnavi(["--entry", "sh", "user", "handoff", "--yes", "--expect", "x"])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "user handoff --yes はユーザーがターミナルから実行する必要があります", result.stderr
+            "ccnavi-user-handoff.sh --yes はユーザーがターミナルから実行する必要があります",
+            result.stderr,
         )
 
     def test_user_mirror_writing_needs_a_terminal(self):
         result = run_ccnavi(["--entry", "sh", "user", "mirror", "--yes", "--expect", "x"])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "user mirror --yes はユーザーがターミナルから実行する必要があります", result.stderr
+            "ccnavi-user-mirror.sh --yes はユーザーがターミナルから実行する必要があります",
+            result.stderr,
         )
 
     def test_user_prune_needs_a_terminal(self):
         result = run_ccnavi(["--entry", "sh", "user", "prune"])
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("user prune はユーザーがターミナルから実行する必要があります", result.stderr)
+        self.assertIn(
+            "ccnavi-user-prune.sh はユーザーがターミナルから実行する必要があります", result.stderr
+        )
 
 
 class EntryMarkTest(unittest.TestCase):

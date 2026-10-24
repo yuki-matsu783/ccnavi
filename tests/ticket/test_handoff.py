@@ -707,7 +707,7 @@ class RouteTest(HandoffCase):
     def test_outside_the_user_entry_it_is_refused(self):
         result = run_ccnavi(["--root", self.root, "--handoff"], cwd=ROOT)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("ccnavi user handoff", result.stderr)
+        self.assertIn("ccnavi-user-handoff.sh", result.stderr)
 
 
 class BrokenRulesRepairTest(HandoffCase):

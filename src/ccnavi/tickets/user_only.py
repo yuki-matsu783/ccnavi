@@ -82,15 +82,15 @@ class Sub:
 
 
 OPS: tuple[Op, ...] = (
-    Op("approve", "承認", terminal="user agree"),
-    Op("reviewed", "レビュー済みの記録", terminal="user reviewed"),
-    Op("close-early", "早めに閉じる", terminal="user close-early"),
+    Op("approve", "承認", terminal="ccnavi-user-agree.sh"),
+    Op("reviewed", "レビュー済みの記録", terminal="ccnavi-user-decide.sh"),
+    Op("close-early", "早めに閉じる", terminal="ccnavi-user-close-early.sh"),
     Op("decide", "残った指摘の対応方針（ボードの経路）"),
     Op("confirm-yes", "ボードで押した操作の確定（--yes）"),
     Op("tidy", "親を閉じたときの片付け"),
-    Op("handoff", "保護対象の下書きの取り込み", terminal="user handoff --yes"),
-    Op("mirror", "共通レイヤーのミラーの同期", terminal="user mirror --yes"),
-    Op("prune", "記録と state の削除", terminal="user prune"),
+    Op("handoff", "保護対象の下書きの取り込み", terminal="ccnavi-user-handoff.sh --yes"),
+    Op("mirror", "共通レイヤーのミラーの同期", terminal="ccnavi-user-mirror.sh --yes"),
+    Op("prune", "記録と state の削除", terminal="ccnavi-user-prune.sh"),
     Op("state-direct", "チケットの状態とレビューの操作を実行ファイルで直に呼ぶ形"),
     Op("guard-off", "端末要求を切る設定"),
 )
@@ -261,7 +261,7 @@ def op(op_id: str) -> Op:
 
 
 def terminal(op_id: str) -> str:
-    """実行ファイルが端末を求める操作の、標準エラーに出す表示名（`user agree` の形）。"""
+    """実行ファイルが端末を求める操作の、標準エラーに出す表示名（ユーザが打つ sh の名前）。"""
     shown = op(op_id).terminal
     if not shown:
         raise KeyError(f"{op_id} は端末を求める操作ではない")
@@ -530,13 +530,16 @@ def refused(args: object) -> str:
             continue
         if row.unless == "no-yes" and _unset(getattr(args, "yes", "")):
             continue
-        forms = [" ".join(v.words) for v in VERBS if v.internal[-1] == name]
-        if forms:
-            text = f"{name} はユーザ専用です。ユーザが `ccnavi user {forms[0]}` の形で打ちます。"
+        scripts = [v.script for v in VERBS if v.internal[-1] == name]
+        if scripts:
+            text = (
+                f"{name} はユーザ専用です。"
+                f"ユーザが `{USER_SCRIPT_PREFIX}{scripts[0]}.sh` で打ちます。"
+            )
             if row.unless == "preview":
                 text += f"見るだけなら {name} --preview を使います。"
             return text
-        return f"{name} はユーザ専用です（`ccnavi user` の操作と一緒に、ユーザが打ちます）。"
+        return f"{name} はユーザ専用です（ユーザが `{USER_SCRIPT_PREFIX}*.sh` で打ちます）。"
     return ""
 
 

@@ -34,7 +34,8 @@ if [ $# -eq 1 ]; then
 	esac
 fi
 
-root=$(ccnavi_workspace) || {
+# 端末をワークスペースの外で開いていても届くように、cwd から見つからなければ、この sh のある場所から決める。
+root=$(ccnavi_workspace) || root=$(ccnavi_abs "$(dirname "$0")/../..") || {
 	printf 'ccnavi-user-prune: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
