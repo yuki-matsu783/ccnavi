@@ -1,6 +1,6 @@
 """サブエージェントが、ファイルを編集するものかの見分け。
 
-同じ作業ツリーで別の編集するサブエージェントが動いていることを、新しく起動したサブエージェントに
+同じワークツリーで別の編集するサブエージェントが動いていることを、新しく起動したサブエージェントに
 案内するために使う（`subagent.at_start`）。編集する（`Write` / `Edit` / `NotebookEdit` を使える）
 サブエージェントだけを、案内の対象と相手に数える。
 
@@ -101,7 +101,7 @@ def _definition(roots: list[str], name: str) -> dict | None:
 
 
 def _front(path: str) -> dict | None:
-    """frontmatter を辞書で返す。無い・読めない・辞書でないなら None。"""
+    """frontmatter をマップで返す。無い・読めない・マップでないなら None。"""
     try:
         with open(path, "rb") as f:
             head = f.read(HEAD_LIMIT).decode("utf-8-sig", errors="replace")

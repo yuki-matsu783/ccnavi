@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-branches issue・MR に紐づくブランチを探す。読むだけで、作業ツリーにも git にも書かない。
+# ccnavi-branches issue・MR に紐づくブランチを探す。読むだけで、ワークツリーにも git にも書かない。
 #
 #   sh .ccnavi/scripts/ccnavi-branches.sh --issue <番号> [--json]
 #   sh .ccnavi/scripts/ccnavi-branches.sh --mr <番号> [--json]
@@ -206,11 +206,11 @@ look_at_host() {
 		return 0
 		;;
 	4)
-		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で使えず（未導入か未認証）、curl に付ける $ccnavi_h_token_name もありません" no-transport-token
+		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で利用できず（未導入か未認証）、curl に付ける $ccnavi_h_token_name もありません" no-transport-token
 		return 0
 		;;
 	*)
-		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl もありません" no-transport
+		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で利用できず、curl もありません" no-transport
 		return 0
 		;;
 	esac

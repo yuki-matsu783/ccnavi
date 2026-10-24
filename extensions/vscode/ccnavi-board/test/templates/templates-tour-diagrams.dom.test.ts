@@ -68,7 +68,7 @@ test("CB-D771 図の値は画面に等幅でそのまま出る（下書きを作
     ["how-drafts-flow", 1, "ccnavi --templates --draft login"],
     ["how-drafts-flow", 5, "ccnavi user handoff .ccnavi/config/project/templates/login.yml --yes --expect"],
     ["how-templates-used", 2, "ccnavi ticket new signup"],
-    ["how-templates-used", 5, "feedback（1 項）: 3 fix"],
+    ["how-templates-used", 5, "feedback（1 ステップ）: 3 fix"],
   ];
   for (const [id, index, text] of wanted) {
     const dom = await openTemplates();

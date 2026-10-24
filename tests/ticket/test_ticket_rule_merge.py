@@ -8,7 +8,7 @@
    範囲の外 / チケットが無い）の全組み合わせで、判定・理由コード・どちらの文面か・記録の欄
 2. 実行後チェック。シェルが書いたあとに報告するか、どのコードか
 3. チケットの置き場を範囲の外から外すこと。実行前・実行後・サブエージェント終了時で同じ答え
-4. チケットが当たらない場面と、ルールより先に見る点検
+4. チケットがヒットしない場面と、ルールより先に見る点検
 5. 診断の出力
 
 ルールはワークツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
@@ -66,7 +66,7 @@ EXPLAIN_NOTE = (
     "編集可能範囲の外への書き込みは拒否されます。"
 )
 
-# ルールが何も言わない列に置くルール。Write には当たらない。
+# ルールが何も言わない列に置くルール。Write にはヒットしない。
 SILENT = {
     "version": 1,
     "deny": [
@@ -321,7 +321,7 @@ class Workspace(unittest.TestCase):
 class PreToolUseTable(Workspace):
     """実行前チェック。"""
 
-    # (チケットの列の名前, 書き込み先のワークツリーを選ぶ鍵, 相対パス)
+    # (チケットの列の名前, 書き込み先のワークツリーを選ぶキー, 相対パス)
     COLUMNS = (
         ("deny", "child", TICKET_DENY),
         ("ask", "child", TICKET_ASK),
@@ -412,7 +412,7 @@ class PreToolUseTable(Workspace):
                     # 判定を下したのがレイヤーを持たないチケットなら、レイヤーの欄は空。
                     self.assertEqual(record.get("source", ""), "", record)
                     # 足す行は場面ごとに独立していて、重なれば（ルールを狭め、かつチケットの
-                    # deny に当たった）両方載る。
+                    # deny にヒットした）両方載る。
                     if rule_section in ("ask", "allow"):
                         # チケットがルールを狭めた回は、ルールの id も記録に残し、文面が名指しする。
                         self.assertIn(
@@ -432,7 +432,7 @@ class PreToolUseTable(Workspace):
                         self.assertNotIn("ticket entry:", reason)
 
                 if rule_section != "silent":
-                    # 当たったルールの additionalContext は、判定を決めた側に関わらず載る。
+                    # ヒットしたルールの additionalContext は、判定を決めた側に関わらず載る。
                     self.assertIn(NOTE, result.stdout)
 
     def test_rule_deny_is_always_strongest(self):
@@ -603,7 +603,7 @@ class TicketPlaces(Workspace):
 
 
 class HandoffPlace(Workspace):
-    """下書きの置き場（`wip/handoff/`）は、チケットの範囲を当てない。
+    """下書きの置き場（`wip/handoff/`）は、チケットの範囲を適用しない。
 
     追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
     サブエージェント終了時チェックも外す。外すのは `wip/handoff/` の下だけで、`wip/` の
@@ -680,7 +680,7 @@ class HandoffPlace(Workspace):
 
 
 class Eli5Place(Workspace):
-    """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を当てない。
+    """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を適用しない。
 
     追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
     サブエージェント終了時チェックも外す。外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所と
@@ -777,7 +777,7 @@ class Eli5Place(Workspace):
 
 
 class Boundaries(Workspace):
-    """チケットが当たらない場面と、ルールより先に見る点検。
+    """チケットがヒットしない場面と、ルールより先に見る点検。
 
     ルールはワークツリーを allow で開ける。
     """

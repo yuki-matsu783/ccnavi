@@ -80,14 +80,14 @@ keywords: [提案, 採否, 却下, 差分, commit, test-groups, testing, designi
 
 - 提案: `chore-210-skill-designing-scan-and-terms`
 - 対象: `.claude/skills/designing/references/project/diagnostic-scan.md`・`.claude/skills/designing/references/common/plain-terms.md`・各 `purpose.md`（すべて新規）
-- 要点: 診断の走査は 1 度読んだ写しを渡し、警告を足したら合流後に `tests/ticket` を回す。説明では内部の呼び名を使わず、状態を言葉で書く
+- 要点: 診断の走査は 1 度読んだコピーを渡し、警告を足したら合流後に `tests/ticket` を回す。説明では内部の呼び名を使わず、状態を言葉で書く
 - 動機のパターン: [diagnostic-scan-read-once](patterns/diagnostic-scan-read-once.md)、[internal-names-in-prose](patterns/internal-names-in-prose.md)
 - 採否: 承認待ち（採否はユーザが決める）
 
 差分（新規ファイルの本文。`project/diagnostic-scan.md`）:
 
 ```diff
-+- `--explain` と `--lint` に走査を足すときは、承認済みチケットの置き場を読み直さず、1 度読んだ写し（copies）を走査に引数で渡す。置き場は 1 回の起動で 1 度だけ読む約束で、`tests/ticket/test_raw_share.py` が読んだ回数を数えて固定しているため
++- `--explain` と `--lint` に走査を足すときは、承認済みチケットの置き場を読み直さず、1 度読んだコピー（copies）を走査に引数で渡す。置き場は 1 回の起動で 1 度だけ読む約束で、`tests/ticket/test_raw_share.py` が読んだ回数を数えて固定しているため
 +- 診断に新しい警告を足したら、並行した子を合流した後に `tests/ticket` を全件回す。`test_lint_ops` には名前で警告の行を拾うテストがあり、別の子の足した警告を取り違えて、合流後にだけ落ちるため
 ```
 

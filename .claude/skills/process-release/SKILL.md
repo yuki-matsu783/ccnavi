@@ -7,7 +7,7 @@ description: >-
 
 # process-release
 
-リリースの作業に入る前に、`ccnavi --docs --type skill-reference --tag process-release` で共通とプロジェクトの reference を引き、当たったものを読む。
+リリースの作業に入る前に、`ccnavi --docs --type skill-reference --tag process-release` で共通とプロジェクトの reference を引き、ヒットしたものを読む。
 
 ## 基本の考え方
 
@@ -18,7 +18,7 @@ description: >-
 
 ## reference の置き場
 
-- 共通: `.claude/skills/process-release/references/common/`（プロジェクトの `skills/process-release/references/common/` へ写される。プロジェクトの中では直さない）
-- そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/process-release/references/project/`、プロジェクトは `projects/<名前>/skills/process-release/references/project/`。写されない）
+- 共通: `.claude/skills/process-release/references/common/`（プロジェクトの `skills/process-release/references/common/` へコピーされる。プロジェクトの中では直さない）
+- そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/process-release/references/project/`、プロジェクトは `projects/<名前>/skills/process-release/references/project/`。コピーされない）
 
 中のディレクトリ構造は任意。足し方と書き方は `.ccnavi/docs/skill-processes.md`。

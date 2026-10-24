@@ -108,7 +108,7 @@ def summarize(state: str, log_dir: str) -> dict[str, Any]:
     events = _all_events(log_dir)
     labels = _jsonl(os.path.join(log_dir, "stop-review", LABELS_FILE))
 
-    # 試行の分類ごとの件数。分類は最初に当たった 1 つを数える（期限切れは未検査にも数える）。
+    # 試行の分類ごとの件数。分類は最初にヒットした 1 つを数える（期限切れは未検査にも数える）。
     # 拒否と汚染は、分類とは別に数える。
     counts = {
         "ccnavi_out_of_scope": 0,
@@ -212,7 +212,7 @@ def _units(attempts: list[dict[str, Any]]) -> dict[tuple[str, str, str], str]:
 
 
 def _clean_labels(labels: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """独立した評価を整える。形の違う行・不正な truth を捨て、同じ単位の重複を除く。
+    """独立した評価を整える。形の違う行・不正な truth を破棄し、同じ単位の重複を除く。
 
     対象と試行 ID は大文字小文字を区別せずに比べる。
     """

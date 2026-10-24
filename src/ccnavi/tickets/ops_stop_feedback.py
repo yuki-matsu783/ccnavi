@@ -12,7 +12,7 @@ cwd のツリーが、承認済みで着手済みの親子に結び付き、親�
 
 ## 1 回だけ
 
-鍵は `feedback:<親>`、値は状態の要約（親・HEAD・改版を提案済みか）。同じ要約では 1 回だけ止め、
+キーは `feedback:<親>`、値は状態の要約（親・HEAD・改版を提案済みか）。同じ要約では 1 回だけ止め、
 HEAD が進むか、未提案から提案済みに変わればまた止めてよい。記録は `nudged-<セッション>.json`
 に置く。
 
@@ -148,7 +148,8 @@ def feedback_nudge(root: str, found: Waiting) -> str:
             "全体計画のレビューが済み、親を閉じる前にフィードバック計画が要ります。"
             "指摘が無ければ feedback: [] を、あれば対応のフェーズを feedback: に並べた"
             f"親の改版を {found.todo} に書きます"
-            "（承認済みチケットを写し、スクリプトだけが書く欄 started_at・completed_at・base_sha・"
+            "（承認済みチケットをコピーし、スクリプトだけが書く欄 "
+            "started_at・completed_at・base_sha・"
             "merged_sha・cancelled_at・cancel_reason・finished_to・settled_by は空にする。"
             "手順は .ccnavi/docs/decisions.md）。"
             f"書いたら '{ticket_sh} propose {p.ticket}' で送り、ユーザに承認を頼みます。"

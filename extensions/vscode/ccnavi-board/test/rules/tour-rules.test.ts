@@ -62,7 +62,7 @@ test("CB-T407 ルールの案内の scene は、見本にあるタブ・行の i
       assert.ok(scene.when === undefined || /^r(\.\d+)*$/.test(String(scene.when)), `${at}: when`);
       const known = ["tab", "open", "when", "more", "find", "tool", "subject", "judge", "checked", "suggested", "fold", "sum", "error"];
       for (const key of Object.keys(scene)) {
-        assert.ok(known.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
+        assert.ok(known.includes(key), `${at}: scene のキー ${key} を画面は読まない`);
       }
     }
   }
@@ -141,8 +141,8 @@ test("CB-T523 一括確認の見本は、行の ok と件数・不一致の数�
   assert.equal(checked.mismatches, 1);
 });
 
-test("CB-T524 判定の見本は、当たったルールが見本の行（か候補の下書き）にあり、タイプが判定と同じ。一括確認の行も同じ", () => {
-  // 候補の下書きを写したあとの判定（suggest-rule の案内）もあるので、候補の id も数える
+test("CB-T524 判定の見本は、ヒットしたルールが見本の行（か候補の下書き）にあり、タイプが判定と同じ。一括確認の行も同じ", () => {
+  // 候補の下書きをコピーしたあとの判定（suggest-rule の案内）もあるので、候補の id も数える
   const byId = new Map<string, string>([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => [rule.id, rule.origin!.section]));
   for (const candidate of sample.suggested!.candidates) {
     byId.set(candidate.id, candidate.section);

@@ -134,7 +134,7 @@ def read_record(conf: settings.Settings, parent: str) -> dict:
 def _held_record(path: str) -> tuple[dict, str]:
     """前の回の記録と、読めなかった理由。無いのは普通なので `({}, "")`。
 
-    あるのに読めない（壊れている・辞書でない）ものは、上書きすると前の回の子の一覧と MR の
+    あるのに読めない（壊れている・マップでない）ものは、上書きすると前の回の子の一覧と MR の
     番号を失うので、呼び手は書かずに止める。
     """
     data, failed = fsio.read_json(path)
@@ -143,7 +143,7 @@ def _held_record(path: str) -> tuple[dict, str]:
             return {}, ""
         return {}, f"{failed}"
     if not isinstance(data, dict):
-        return {}, "JSON の辞書ではない"
+        return {}, "JSON のマップではない"
     if "children" in data and not isinstance(data["children"], list):
         return {}, "children が配列ではない"
     return data, ""
@@ -264,7 +264,7 @@ def entries(conf: settings.Settings) -> list[Entry]:
             continue
         data, failed = fsio.read_json(path)
         if failed is not None or not isinstance(data, dict):
-            reason = f"{failed}" if failed is not None else "JSON の辞書ではない"
+            reason = f"{failed}" if failed is not None else "JSON のマップではない"
             out.append(Entry(stem, incomplete=f"記録を読めない（{reason}）"))
             continue
         if not _same(str(data.get("parent") or ""), stem):
@@ -295,7 +295,7 @@ def run_abandon(
 
     記録を消すと、`ccnavi-sync.sh` はその親を片付け待ちとして知らせなくなる。親のワークツリーが
     残っている間は、まだ放棄していないとみなして断る（ワークツリーを片付けてから打つ）。
-    ユーザが端末で打つ。
+    ユーザがターミナルで打つ。
     """
     path = record_path(conf, parent)
     if not path:

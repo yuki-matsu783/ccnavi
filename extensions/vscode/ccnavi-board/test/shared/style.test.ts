@@ -105,15 +105,15 @@ function reachable(entries: string[]): Set<string> {
 }
 
 /**
- * その CSS が最初に当てる選択子。バンドルに入っているかを、パスではなく中身で見る。
- * `@import` を並べるだけの入口（`style.css`）は当てるものを持たないので undefined
+ * その CSS が最初に適用する選択子。バンドルに入っているかを、パスではなく中身で見る。
+ * `@import` を並べるだけの入口（`style.css`）は適用するものを持たないので undefined
  */
 function firstSelector(file: string): string | undefined {
   const text = fs
     .readFileSync(file, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/@import[^;]*;/g, "");
-  // 最初の `{` の手前が、最初に当てる選択子。1 行で書いたファイル（`.a { x: 1; }`）も同じに読む
+  // 最初の `{` の手前が、最初に適用する選択子。1 行で書いたファイル（`.a { x: 1; }`）も同じに読む
   const found = /([^{}]+)\{/.exec(text);
   return found === null ? undefined : found[1].trim().replace(/\s*\n\s*/g, " ");
 }
@@ -124,7 +124,7 @@ test("CB-T127 6 つの画面は同じ骨組みの CSS（ツールバー・帯・
   for (const [name, html] of reactPages()) {
     // 拡張が入れるのは、バンドルした 1 本（`out/webview/<名前>.css`）そのもの
     assert.ok(html.includes(screenStyle(name)), name);
-    // 規則は 1 行にまとめて見る（esbuild の並べ方が変わっても、当てるものと宣言が同じなら通す）
+    // 規則は 1 行にまとめて見る（esbuild の並べ方が変わっても、適用するものと宣言が同じなら通す）
     const style = flatStyle(html);
     assert.match(style, /\.toolbar \{ display: flex;/);
     assert.match(style, /\.banner\.warn \{ border-color:/);
@@ -192,8 +192,8 @@ test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ず�
     for (const file of reachable([path.join(WEBVIEW_SRC, name, "style.css")])) {
       const selector = firstSelector(file);
       if (selector === undefined) {
-        // `@import` を並べるだけの入口。それ以外が来たら、当てるものを持たない CSS を置いている
-        assert.equal(path.basename(file), "style.css", `当てるものが 1 つもない CSS: ${file}`);
+        // `@import` を並べるだけの入口。それ以外が来たら、適用するものを持たない CSS を置いている
+        assert.equal(path.basename(file), "style.css", `適用するものが 1 つもない CSS: ${file}`);
         skipped.push(file);
         continue;
       }
@@ -333,7 +333,7 @@ test("CB-T291 狭い幅（520px 以下）では一覧の欄を 1 列にして行
   assert.match(risk, /\.block h2 \{ display: flex; flex-wrap: wrap;/);
   const phases = flatStyle(phasesHtml({ kind: "page", page: phasesPage() }));
   assert.match(phases, /\.phase \.sum > \.clip\.mono \{ grid-row: 3; grid-column: 2 \/ -1; \}/);
-  // 全体計画の待ち方の選択は外したので、その欄の規則も無い
+  // 全体計画の先行関係の選択は外したので、その欄の規則も無い
   assert.doesNotMatch(phases, /\.order select/);
 });
 

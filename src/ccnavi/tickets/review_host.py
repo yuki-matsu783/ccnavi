@@ -162,15 +162,15 @@ class Result:
         """読んだ JSON の値から組む。Chrome は sh と同じ形の結果を組んで渡す。
 
         処理フロー:
-        1. 最上位が辞書でなければ、error を入れて返す。`error` の欄が在れば、その文を入れて返す。
-        2. `mr` が辞書で `number` が在れば MergeRequest にする。`draft` は bool のときだけ使い、
+        1. 最上位がマップでなければ、error を入れて返す。`error` の欄が在れば、その文を入れて返す。
+        2. `mr` がマップで `number` が在れば MergeRequest にする。`draft` は bool のときだけ使い、
         それ以外は None にする。
-        3. `threads`・`reviews` の項目を、辞書のものだけ読んで Thread・Review にする。
+        3. `threads`・`reviews` の項目を、マップのものだけ読んで Thread・Review にする。
         文字列・整数・真偽は型に合わせて整える。
         4. host・url・created_at・author を整えて返す。
         """
         if not isinstance(data, dict):
-            return cls(error="結果の最上位が辞書ではない")
+            return cls(error="結果の最上位がマップではない")
         if data.get("error"):
             return cls(error=str(data["error"]))
         mr = data.get("mr")
@@ -224,7 +224,7 @@ class Result:
 # 実行ファイルはネットワークに出ないので、受け入れたスレッドへの返信と解決は sh がする。
 # 置く前（マーカーを置く前）に済ませ、失敗したら受け入れは未完了として止める。
 # 形は `{"version": 1, "digest": <見せた指摘のダイジェスト。close-early は空>,
-#        "threads": [{"id": <スレッドの id>, "key": <鍵>, "reply": <返信の本文>}]}`。
+#        "threads": [{"id": <スレッドの id>, "key": <キー>, "reply": <返信の本文>}]}`。
 # `id` は GitHub ならレビューのスレッドの node id、GitLab なら discussion の id。
 # sh は `id` と `reply` だけを読む（`digest` と `key` は実行ファイルが置く側で読む）。
 ACCEPT_PLAN_VERSION = 1
@@ -259,7 +259,8 @@ def write_accept_plan(
 ) -> str:
     """計画を書く。`items` は (スレッド, 返信の本文)。書けなければ理由を返す。
 
-    `op` は操作記録の操作ID。sh が送信の段階を記録するときと、置く呼び出しが同じ記録を読むときの鍵。
+    `op` は操作記録の操作ID。sh が送信の段階を記録するときと、
+    置く呼び出しが同じ記録を読むときのキー。
     """
     body = {
         "version": ACCEPT_PLAN_VERSION,
@@ -296,7 +297,7 @@ def read_accept_plan(path: str) -> AcceptPlan | None:
 
 # ---- リモートに要る道具の有無。exe は使わないが、--lint が言う。
 
-# ホストにはポートが付く（`localhost:8929`）。ポートを捨てると、手元や社内に立てた
+# ホストにはポートが付く（`localhost:8929`）。ポートを破棄すると、手元や社内に立てた
 # GitLab を GitHub と見分ける判定まで誤る。ssh の `git@host:group/proj` の
 # `:` はパスの区切りなので、数字だけのときにポートと見なす。
 # `https://oauth2:token@host/` のユーザ情報は読み飛ばす。sh と同じく、authority の
@@ -322,7 +323,7 @@ class HostClass:
       `https://api.github.com`、GHE.com が `https://api.<ホスト>`。GraphQL はその根の `/graphql`。
       GHE.com の origin にポートが付いていると API の URL を組めないので `problem` を言う。
       GHE.com の API の URL の規則は、実物では未検証
-    - GitLab: 上のどれにも当たらないもの全部（`gitlab.com`・`*.aslead.cloud`・セルフホスト・
+    - GitLab: 上のどれにもヒットしないもの全部（`gitlab.com`・`*.aslead.cloud`・セルフホスト・
       未知のホスト）。接続先は origin の scheme・ホスト・ポートをそのまま保つ
 
     sh の `ccnavi_host_parse`（ccnavi-common-host.sh）と Chrome 拡張の `hostclass.ts` が同じ規則で、
@@ -411,14 +412,14 @@ def transport_problem(url: str) -> str:
 
 
 def thread_key(t: Thread) -> str:
-    """選択をスレッドに対応づける鍵。URL を先に使い、無ければスレッドの id。"""
+    """選択をスレッドに対応づけるキー。URL を先に使い、無ければスレッドの id。"""
     return t.url or t.id
 
 
 def thread_version(t: Thread) -> str:
-    """指摘の版。SHA-256(鍵 + 改行 + 正規化した最初のコメントの本文) の先頭 32 桁。
+    """指摘の版。SHA-256(キー + 改行 + 正規化した最初のコメントの本文) の先頭 32 桁。
 
-    正規化するのは改行コード（CRLF・CR を LF に）と Unicode の NFC だけ。本文が変わるか、鍵が
+    正規化するのは改行コード（CRLF・CR を LF に）と Unicode の NFC だけ。本文が変わるか、キーが
     変わると版が変わる。見せた指摘と、適用の直前に取り直した指摘、受け入れ台帳の項目が同じかを、
     この版で照合する。
     """
@@ -429,13 +430,13 @@ def thread_version(t: Thread) -> str:
 def _accepted_by_ledger(t: Thread, ledger: list[dict]) -> bool:
     """受け入れ台帳（`accepted.json`）が受け入れ済みとする指摘か。
 
-    鍵と版が台帳の項目と同じで、受け入れたときの最後のコメントから変わっていないとき（受け入れた
-    後に誰かがコメントを付けた指摘は、再提起として数える）。鍵か最後のコメントの id が取れていない
+    キーと版が台帳の項目と同じで、受け入れたときの最後のコメントから変わっていないとき（受け入れた
+    後に誰かがコメントを付けた指摘は、再提起として数える）。キーか最後のコメントの id が取れていない
     指摘は受け入れ済みにしない（隠さない側に倒す）。
     """
     key, version = thread_key(t), thread_version(t)
     if not key or not t.last_comment_id:
-        # 鍵か最後のコメントが分からない指摘は、再提起を見分けられないので受け入れ済みにしない
+        # キーか最後のコメントが分からない指摘は、再提起を見分けられないので受け入れ済みにしない
         return False
     for entry in ledger:
         if entry.get("key") != key or entry.get("version") != version:

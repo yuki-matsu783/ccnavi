@@ -1,17 +1,17 @@
 /**
  * フェーズ管理画面が編集中に持つもの。定義のコピー（`Draft`）と、開いている行。
- * 作りはリスク管理（`webview/risk/state.ts`）と同じで、鍵の表記だけ `p1`、`p2`、… と違う。
+ * 作りはリスク管理（`webview/risk/state.ts`）と同じで、キーの表記だけ `p1`、`p2`、… と違う。
  *
- * 契約の `PhasesForm` は配列だけを持つが、画面は行ごとに動かない鍵が要る（足す・消す・
+ * 契約の `PhasesForm` は配列だけを持つが、画面は行ごとに動かないキーが要る（足す・消す・
  * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id はユーザが打つもので、
- * 空にも重複にもなるので鍵には使えない（この画面は重複を保存前に止める）。
+ * 空にも重複にもなるのでキーには使えない（この画面は重複を保存前に止める）。
  *
  * 開いている行は Webview の state（`{ open: [id, …] }`）に残す。
  */
 import type { CommonPhase, PhaseForm, PhasesForm } from "../../core/phases-view.js";
 import { getState, setState } from "../vscode.js";
 
-/** 行 1 つ。`key` は画面の中だけの鍵で、拡張ホストへは渡さない */
+/** 行 1 つ。`key` は画面の中だけのキーで、拡張ホストへは渡さない */
 export interface Row {
   readonly key: string;
   readonly phase: PhaseForm;
@@ -21,7 +21,7 @@ export interface Draft {
   readonly rows: readonly Row[];
 }
 
-/** 鍵を配る。1 枚の画面の中で数え上げる（`p1`、`p2`、…） */
+/** キーを配る。1 枚の画面の中で数え上げる（`p1`、`p2`、…） */
 export function keyer(): () => string {
   let seq = 0;
   return () => {
@@ -34,7 +34,7 @@ export function draftOf(form: PhasesForm, nextKey: () => string): Draft {
   return { rows: form.phases.map((phase) => ({ key: nextKey(), phase })) };
 }
 
-/** 拡張ホストへ返す形に戻す。鍵は除く */
+/** 拡張ホストへ返す形に戻す。キーは除く */
 export function formOf(draft: Draft): PhasesForm {
   return { phases: draft.rows.map((row) => row.phase) };
 }
@@ -77,7 +77,7 @@ export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {
   setState({ ...((getState() ?? {}) as object), open: ids });
 }
 
-/** state に残してある id から、いまの行の鍵に直す */
+/** state に残してある id から、いまの行のキーに直す */
 export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlySet<string> {
   return new Set(draft.rows.filter((row) => row.phase.id !== "" && ids.has(row.phase.id)).map((row) => row.key));
 }

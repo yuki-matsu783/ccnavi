@@ -29,7 +29,7 @@ keywords: [Chrome拡張, PAT, Pyodide, MV3, CSP, createCommitOnBranch, expectedH
 - 読むのは置き場のサブツリーだけ。GitHub はパスで置き場の tree の sha を引き `?recursive=1` で取る。`truncated: true` なら error で止める。GitLab は `repository/tree`（`path`・`recursive`）をページングで取り切り、取り切れなければ error
 - blob は sha で引き、IndexedDB に保存する（sha が同じなら中身は同じなので失効が要らない）。ボードを開くたびに読むのは tree だけになる
 - まとめて取る: GitHub は GraphQL の別名（`f1: object(expression: "P:path") { ... on Blob { text } }`）で、IndexedDB に無い blob を 1 回に最大 50 件ほど取る。GitLab は REST の `repository/blobs/:sha` を 1 件ずつ引く
-- 統合先の `done/` は、判定が要るもの（閉包の先行、同じ識別子の検査で当たったもの）だけを取る。取らなかったものは `NOT_FETCHED` として判定に渡す
+- 統合先の `done/` は、判定が要るもの（閉包の先行、同じ識別子の検査でヒットしたもの）だけを取る。取らなかったものは `NOT_FETCHED` として判定に渡す
 
 初回の blob の数は、判定に入る親子のチケットの置き場のファイル数の和に統合先の `done/` の件数を足した数。GraphQL の呼び出しは ⌈blob の数 / 50⌉ + 1。2 回目以降は変わった blob の分だけ。GitHub の上限（REST・GraphQL とも 5,000 回（点）/時）に対して十分小さい。
 
@@ -66,7 +66,7 @@ GitLab は project access token（リポジトリを限れる）を勧めるが�
 
 issue の一覧に「始める」を出し、`P`（`i<番号>`、プロジェクトでは `<プロジェクト名>-i<番号>`）を統合先の先頭から作る。マージリクエストは作らない（差分 0 のブランチからは GitHub が作らせないので、最初の push の後に `ccnavi-review.sh request` が作る）。
 
-拒否する場合: 求めた識別子が統合先の `done/` にある、同じ名前のブランチが既にある（大文字小文字を区別しない）、開いた親子のチケットに同じ識別子がある、予約の名前に当たる。互換の版が違うときも断る。
+拒否する場合: 求めた識別子が統合先の `done/` にある、同じ名前のブランチが既にある（大文字小文字を区別しない）、開いた親子のチケットに同じ識別子がある、予約の名前にヒットする。互換の版が違うときも断る。
 
 #### `ccnavi-review.sh` との関係
 
@@ -102,7 +102,7 @@ issue の一覧に「始める」を出し、`P`（`i<番号>`、プロジェク
 | 未解決スレッドが無い | GitHub GraphQL の `reviewThreads.isResolved`、GitLab `discussions` の `resolved` |
 | レビュー待ちの子を `done/` へ | 同じ移動を `Changes` にして同じコミットに入れる |
 
-push 済みかの検査は手元だけに残す。ホストから取得した内容は、`ccnavi-review.sh` が組む JSON（`{host, mr, threads, reviews, fetched_at}`）と同じ形にして `Result.load` に渡す。未解決が残るときは Chrome では通さず、「解決するか、`decide`（端末・VS Code のボード）で受け入れる」と出す。
+push 済みかの検査は手元だけに残す。ホストから取得した内容は、`ccnavi-review.sh` が組む JSON（`{host, mr, threads, reviews, fetched_at}`）と同じ形にして `Result.load` に渡す。未解決が残るときは Chrome では通さず、「解決するか、`decide`（ターミナル・VS Code のボード）で受け入れる」と出す。
 
 sh と TS の二重実装は、本物のホストの応答の形に合わせて手で組んだ見本（拡張の `test/fixtures/host/<github|gitlab>/<場面>/`）と、「その見本から sh が組んだ JSON」の期待値 1 つで揃える。sh の試験と TS の試験の両方が期待値と突き合わせる。ホストの応答の形が変わったら、見本のうち形の変わったキーを直し、sh の試験を `CCNAVI_HOST_FIXTURE=1` で回して期待値を作り直し、TS の試験を回す。見本・期待値・sh・TS の変更は同じコミットに入れる（手順の詳細は拡張の README の「ホストの応答の見本」）。
 

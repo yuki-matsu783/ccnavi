@@ -104,14 +104,14 @@ export async function importSelected(deps: HandoffDeps, shown: HandoffList, path
   return { result: await deps.apply(wanted, expect), attempted: true };
 }
 
-/** 端末で取り込む案内の答え。`command` が空なら `error` に理由 */
+/** ターミナルで取り込む案内の答え。`command` が空なら `error` に理由 */
 export interface TerminalGuide {
   readonly command: string;
   readonly error: string;
 }
 
 /**
- * `board` が偽の対象（`defense`）を端末で取り込むときの、打つコマンドを作る。
+ * `board` が偽の対象（`defense`）をターミナルで取り込むときの、打つコマンドを作る。
  * ボードは取り込まない。`expect` は、そのパスだけを指して見るだけをもう一度呼んだ答えのもの。
  * 取り込めない状態（conflict・rejected・error・unchanged）の対象には、コマンドを出さず理由を返す。
  */
@@ -126,7 +126,7 @@ export async function terminalGuide(
     return { command: "", error: `一覧にない対象です: ${path}` };
   }
   if (entry.board) {
-    return { command: "", error: "この対象はボードから取り込めます（端末のコマンドは出しません）" };
+    return { command: "", error: "この対象はボードから取り込めます（ターミナルのコマンドは出しません）" };
   }
   const state = entry.state;
   if (state !== "new" && state !== "changed") {
@@ -152,7 +152,7 @@ export async function terminalGuide(
   return { command: terminalCommand(entry.path, viewed.value.expect, viewed.value.tree || shown.tree, workspace), error: "" };
 }
 
-/** 状態が取り込める形でない `board` 偽の対象の、取り込めない理由（`refusalReason` は「端末で取り込む」を先に言うので、状態の分だけ取り出す） */
+/** 状態が取り込める形でない `board` 偽の対象の、取り込めない理由（`refusalReason` は「ターミナルで取り込む」を先に言うので、状態の分だけ取り出す） */
 function refusalOfState(entry: HandoffEntry): string {
   return refusalReason({ ...entry, board: true });
 }

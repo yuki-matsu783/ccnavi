@@ -65,7 +65,7 @@ class StopNudgeTest(TicketTest):
         git(tree, "commit", "--quiet", "-m", "work")
 
     def assert_quiet(self, result):
-        """促していない。止める鍵も、促しの文も無い。"""
+        """促していない。止めるキーも、促しの文も無い。"""
         body = self.body(result)
         self.assertNotIn("decision", body)
         self.assertNotIn(CODE, result.stdout)

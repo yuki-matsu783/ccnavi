@@ -23,7 +23,7 @@ keywords: [つまずき, トラブル, hook が動かない, env, 再読み込�
 - hook が起動しない。`env` から `CCNAVI_ENTRY_PATH` の 1 行が消えると、hook が起動しなくなる。`sh scripts/ccnavi-setup.sh <ワークスペースルート> --check` で揃っていないところを見る（[導入と配布](install.md)）
 - 一部のツールで hook が起動しない。`matcher` を絞ると、書かなかったツールで hook 自体が起動しなくなる。`matcher` は絞らない（[設定](settings.md)）
 - `projects/` のプロジェクトの中で hook が動かない。プロジェクトの中で Claude Code を起動すると `CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれない。ワークスペースルートで起動して `cd` で入る
-- `ccnavi` を端末で直接打ったら、意図しない場所が根と見なされた。`CLAUDE_PROJECT_DIR` が無い端末や Bash ツールから `.claude/` を持つプロジェクトの中で打つと、`--root` を渡さない限りそのプロジェクトが根になる。`--root` を付けるか、sh のラッパーを通す
+- `ccnavi` をターミナルで直接打ったら、意図しない場所が根と見なされた。`CLAUDE_PROJECT_DIR` が無いターミナルや Bash ツールから `.claude/` を持つプロジェクトの中で打つと、`--root` を渡さない限りそのプロジェクトが根になる。`--root` を付けるか、sh のラッパーを通す
 
 ## 実行ファイルが見つからない・動かない
 
@@ -44,5 +44,5 @@ keywords: [つまずき, トラブル, hook が動かない, env, 再読み込�
 ## ルール
 
 - ワークツリーで直したルールが効かない。統合されるまで反映されない（[ルールの書き方](rules.md)）
-- 同じ `id` で中身が違うルールが両方当たる。`--lint` が warn で言う（[ルールの書き方](rules.md)）
+- 同じ `id` で中身が違うルールが両方ヒットする。`--lint` が warn で言う（[ルールの書き方](rules.md)）
 - YAML が読めない。引用符の注意は[ルールの書き方](rules.md)にある

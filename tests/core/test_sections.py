@@ -106,7 +106,7 @@ class SectionsTest(unittest.TestCase):
         # 繰り返しを止める先はルールの側。そこを言わないと同じ問いが出続ける。
         self.assertIn("allow section", reason)
 
-    def test_allow_に当たれば通る(self):
+    def test_allow_にヒットすれば通る(self):
         self.rules(
             deny=[rule("push", "Bash", "*git push*")],
             allow=[rule("ls", "Bash", "*ls *", message="")],
@@ -149,7 +149,7 @@ class SectionsTest(unittest.TestCase):
 
         self.assertEqual(out.get("permissionDecision"), "ask")
 
-    def test_タイプをまたいで当たっても強いほうだけを返す(self):
+    def test_タイプをまたいでヒットしても強いほうだけを返す(self):
         # 弱い側の文面まで返すと、拒否された呼び出しに「確認すれば通る」と
         # 読める文が並ぶ。次の一手が 2 つに分かれる。
         self.rules(
@@ -163,7 +163,7 @@ class SectionsTest(unittest.TestCase):
         self.assertIn("拒否の文面", reason)
         self.assertNotIn("確認の文面", reason)
 
-    def test_同じタイプで複数当たれば全部返す(self):
+    def test_同じタイプで複数ヒットすれば全部返す(self):
         # どれか 1 つを選ぶと、選ばれなかったルールの言い分は誰にも届かない。
         self.rules(
             deny=[

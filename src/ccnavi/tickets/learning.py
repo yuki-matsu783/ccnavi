@@ -81,7 +81,7 @@ def write_new(path: str, text: str) -> str:
 
 
 def unsafe_path(tree_root: str, rel: str) -> str:
-    """書く先に途中のリンクや、作業ツリーの外を指すものが在れば、そのパス。無ければ空文字。"""
+    """書く先に途中のリンクや、ワークツリーの外を指すものが在れば、そのパス。無ければ空文字。"""
     parts = [p for p in rel.split("/") if p]
     if not parts:
         return ""
@@ -315,7 +315,7 @@ def head_text(tree_root: str, rel: str) -> str | None:
 
 
 def phase_off(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
-    """この子のフェーズ定義（親に固定した写し）が learning: off か。"""
+    """この子のフェーズ定義（親に固定したコピー）が learning: off か。"""
     if not found.is_child or found.phase is None:
         return False
     copies, _ = approval.scan(conf, root)
@@ -365,7 +365,7 @@ def parent_blocked(
     学び以外の検査をすべて通したあと、親の今の HEAD で次を見る。統合を済ませた後も毎回、
     今の HEAD で検査し直す。
     - 記録・パターン・受信箱の置き場に、未コミットか未追跡の変更がある
-    - 読み取れない記録か、整合の検査に当たる記録がある
+    - 読み取れない記録か、整合の検査にヒットする記録がある
     - 処理すべきものがある（`consolidate` を案内する）
     全部の記録が `none` で受信箱も空なら通る。
     """
@@ -404,11 +404,11 @@ def parent_blocked(
 
 
 def write_broken(stderr: TextIO, found: learning_records.Pending) -> None:
-    """読み取れない記録と整合の検査に当たる記録を名指しする。統合では直せない。"""
+    """読み取れない記録と整合の検査にヒットする記録を名指しする。統合では直せない。"""
     for path, why in found.unreadable:
         stderr.write(f"ccnavi: 気づきの記録 {path} を読み取れない: {why}\n")
     for path, why in found.inconsistent:
-        stderr.write(f"ccnavi: 気づきの記録 {path} が整合の検査に当たる: {why}\n")
+        stderr.write(f"ccnavi: 気づきの記録 {path} が整合の検査にヒットする: {why}\n")
     stderr.write(
         "  統合では直せない。記録を直して（訂正や追加は新しい節を足す。処理済みの節の本文は"
         "書き換えない）コミットしてから打ち直してください\n"
@@ -476,14 +476,14 @@ def run(
     if not note.strip():
         if bound is None:
             stderr.write(
-                "ccnavi: チケットに結び付かない作業では --note だけ使える（受信箱に書く）\n"
+                "ccnavi: チケットに結び付かない作業では --note だけ指定できる（受信箱に書く）\n"
             )
             return 1
         parent = bound.parent if bound.is_child else ""
         bad = unsafe_path(tree_root, record_rel(ident)) or unsafe_path(tree_root, digest_rel(ident))
         if bad:
             stderr.write(
-                f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので反映しません\n"
+                f"ccnavi: {bad} はシンボリックリンクか、ワークツリーの外を指すので反映しません\n"
             )
             return 1
         rec_path = os.path.join(tree_root, record_rel(ident))
@@ -534,7 +534,7 @@ def run(
         bad = unsafe_path(tree_root, record_rel(ident))
         if bad:
             stderr.write(
-                f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので反映しません\n"
+                f"ccnavi: {bad} はシンボリックリンクか、ワークツリーの外を指すので反映しません\n"
             )
             return 1
         rec_path = os.path.join(tree_root, record_rel(ident))
@@ -559,7 +559,7 @@ def run(
     bad = unsafe_path(tree_root, INBOX_DIR)
     if bad:
         stderr.write(
-            f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので反映しません\n"
+            f"ccnavi: {bad} はシンボリックリンクか、ワークツリーの外を指すので反映しません\n"
         )
         return 1
     stamp = utc14()

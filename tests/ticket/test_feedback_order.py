@@ -1,13 +1,15 @@
 """フィードバック計画の順序の受入テスト。
 
-フィードバック計画も全体計画と同じく、項の `after` で待ち方が決まる。見るのは 4 つ。
+フィードバック計画も全体計画と同じく、ステップの `after` で先行関係が決まる。見るのは 4 つ。
 
-1. 待ち方: フィードバック計画の項は全体計画の番号を全部と、フィードバック計画の中で `after` を
-   推移的に辿った番号を待つ。`after` を書かない項はフィードバック計画の中では何も待たない
-2. 承認の検査: 終端は 1 つ（最後の項がほかの全部を待つ）、最後の項は延期できない、延期の引き受け手は
-   延期した項を待つ延期していない最小の番号。並行する 2 項を最後の項が受ける形は通り、
-   受けない形は落ちる
-3. 並行する 2 項の子は一緒に承認でき、合流の項の子は両方が閉じるまで承認しない
+1. 先行関係: フィードバック計画のステップには全体計画の番号が全部と、フィードバック計画の中で
+`after` を
+   推移的に辿った番号が先行する。`after` を書かないステップはフィードバック計画の中では先行なし
+2. 承認の検査: 終端は 1 つ（最後のステップにほかの全部が先行する）、最後のステップは延期できない、
+延期の引き受け手は
+   延期したステップが先行する延期していない最小の番号。並行する 2
+   ステップを最後のステップが受ける形は通り、受けない形は落ちる
+3. 並行する 2 ステップの子は一緒に承認でき、合流のステップの子は両方が閉じるまで承認しない
 4. 全体計画が終わったときの案内に、合流の書き方と `phases:` の差し込みを言う
 """
 
@@ -25,7 +27,7 @@ PLAN = [item("design"), item("docs", after=[1])]
 
 
 class FeedbackWaitsTest(unittest.TestCase):
-    """1・2. 待ち方と承認の検査（計算だけ）。"""
+    """1・2. 先行関係と承認の検査（計算だけ）。"""
 
     def problems(self, feedback):
         return [
@@ -45,8 +47,10 @@ class FeedbackWaitsTest(unittest.TestCase):
 
     def test_feedback_items_without_after_have_more_than_one_end(self):
         found = self.problems([item("fixup"), item("fixup")])
-        self.assertTrue(any("`feedback` の最後の項" in d and "待たない" in d for d in found), found)
-        self.assertTrue(any("最後に 1 項で受ける" in d for d in found), found)
+        self.assertTrue(
+            any("`feedback` の最後のステップ" in d and "先行していない" in d for d in found), found
+        )
+        self.assertTrue(any("最後に 1 ステップで受ける" in d for d in found), found)
 
     def test_a_straight_feedback_plan_still_passes(self):
         self.assertEqual(self.problems([item("fixup"), item("fixup", after=[3])]), [])
@@ -61,11 +65,11 @@ class FeedbackWaitsTest(unittest.TestCase):
 
     def test_a_deferred_feedback_item_without_a_taker_is_refused(self):
         found = self.problems([item("fixup", "defer"), item("fixup"), item("fixup", after=[4])])
-        self.assertTrue(any("延期を引き受ける項がありません" in d for d in found), found)
+        self.assertTrue(any("延期を引き受けるステップがありません" in d for d in found), found)
 
 
 class FeedbackFlowTest(PhaseHarness):
-    """2・3. 端末の承認で、フィードバック計画の並行と合流を通す。"""
+    """2・3. ターミナルの承認で、フィードバック計画の並行と合流を通す。"""
 
     FB = [
         "implement-feedback",
@@ -74,7 +78,10 @@ class FeedbackFlowTest(PhaseHarness):
     ]
 
     def plan_reviewed(self, confirm=True):
-        """全体計画（design 1 項）を閉じてレビューを済ませる（`confirm` が偽なら依頼まで）。"""
+        """全体計画（design 1 ステップ）を閉じてレビューを済ませる。
+
+        `confirm` が偽なら依頼まで。
+        """
         self.family(plan=["design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
@@ -99,8 +106,8 @@ class FeedbackFlowTest(PhaseHarness):
         self.commit_parent("feedback")
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0, refused.stdout + refused.stderr)
-        self.assertIn("`feedback` の最後の項", refused.stderr)
-        self.assertIn("最後に 1 項で受ける", refused.stderr)
+        self.assertIn("`feedback` の最後のステップ", refused.stderr)
+        self.assertIn("最後に 1 ステップで受ける", refused.stderr)
 
     def test_parallel_feedback_children_start_together_and_the_join_waits(self):
         self.plan_reviewed()
@@ -119,14 +126,14 @@ class FeedbackFlowTest(PhaseHarness):
         self.assertIn("閉じるまで承認しない", result.stderr)
         explained = self.ccnavi("--explain").stdout
         self.assertIn("フェーズ 3（実装フィードバック対応）", explained)
-        self.assertIn("待つ: 1", explained)
+        self.assertIn("先行 1", explained)
 
 
 class FeedbackRevisionTest(FeedbackFlowTest):
     """フィードバック計画を立てる改版と、同じ承認・あとの改版の扱い。"""
 
     def test_the_join_child_waits_even_when_approved_with_the_feedback_plan(self):
-        """フィードバック計画を立てる改版と子を一緒に出しても、合流の項の子は待つ。"""
+        """フィードバック計画を立てる改版と子を一緒に出しても、合流のステップの子は先行が閉じるまで承認されない。"""
         self.plan_reviewed()
         self.propose("i0001", parent_text("i0001", ["design"], feedback=self.FB))
         for n in (2, 3, 4):
@@ -182,8 +189,8 @@ class FeedbackHintTest(unittest.TestCase):
         text = phase._next_hint(parent, [], 1)
         self.assertIn("フィードバック計画", text)
         self.assertIn("after", text)
-        self.assertIn("最後の項", text)
-        self.assertIn("1 項で受ける", text)
+        self.assertIn("最後のステップ", text)
+        self.assertIn("1 ステップで受ける", text)
         self.assertIn("--plan-order i0001 --fill-phases", text)
 
 

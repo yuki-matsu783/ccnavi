@@ -9,7 +9,7 @@
 #                            CCNAVI_TICKET_CONTROL。チケット制御を使うか。既定は enable
 #   --deploy <ccnavi の根>   配布元。既定はこのスクリプトが入っている ccnavi の根
 #   --no-deploy              配布物を置かず、settings.json だけを書く
-#   --bin <project|user>     実行ファイルの置き方。既定は project（配布先の .ccnavi/bin/）。user はホームディレクトリの下に置き、端末で確認する
+#   --bin <project|user>     実行ファイルの置き方。既定は project（配布先の .ccnavi/bin/）。user はホームディレクトリの下に置き、ターミナルで確認する
 #   --all                    受け付けるが、今は足すものが無い（置き場の env は廃止した）
 #   --force                  明示した --mode / --ticket-control で、既にある値を置き換える。
 #                            配るときも、配布先に既にあるものを入れ替える
@@ -25,7 +25,7 @@
 #
 # .claude/settings.json と一緒に .vscode/settings.json も確かめる。ccnavi は .claude/worktrees/
 # の中で作業させるので、VS Code にそこを表示させる 1 行が無いと、エディタには main の
-# 作業ツリーしか表示されないまま作業が進む。
+# ワークツリーしか表示されないまま作業が進む。
 #
 # 配布物は、ccnavi を組み立てた場所（ccnavi のリポジトリ）から対象プロジェクトへコピーする。
 # 設定を書くだけでは動かないのに、実行ファイルを置く手段がどこにも無かった。`dist/` は
@@ -51,7 +51,7 @@
 # project（既定）は上の .ccnavi/bin/<os>-<arch>/。user は、実体を ~/.local/share/ccnavi/<os>-<arch>/ に置き、
 # PATH に通す ~/.local/bin/ccnavi からリンクを張る（振り分けの sh は、bin/ に無ければ PATH の ccnavi を使う）。
 # Windows の Git Bash はリンクを当てにせず、実体のフォルダ（ccnavi.exe と _internal/）を PATH に通す。
-# ホームディレクトリに書き込むので、端末で確認する。エージェントが代わりに答える指定は持たない。
+# ホームディレクトリに書き込むので、ターミナルで確認する。エージェントが代わりに答える指定は持たない。
 # PATH への追加は、シェルの設定ファイルも Windows の環境変数も書き換えずに、環境に合った追加の仕方を知らせるだけにする。
 #
 # CCNAVI_ENTRY_PATH が既定でないパスなら書き換えず、そのパスを挙げて知らせるだけにする。
@@ -140,7 +140,7 @@ DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # 共通の工程スキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true` を持つ
 # スキルだけを配る（.ccnavi/docs/skill-processes.md）。配るのは SKILL.md と references/common/ の下の .md。
 # references/project/ は配布元固有の事情なので配らない。ユーザの発言のときの同期は、ワークスペースのこの置き場から
-# プロジェクトの skills/<工程>/ へ写すので、配布先のワークスペースに無いと写す元が無い。
+# プロジェクトの skills/<工程>/ へコピーするので、配布先のワークスペースに無いとコピーする元が無い。
 # commit や yomiyasu のような `process: true` を持たないスキルは、配布元固有の手順や外部の取り込みなので配らない。
 # 配布元に置き場が無い、または該当するスキルが 1 つも無いのは正常で、何も言わずに飛ばす。
 DEPLOY_SKILLS_DIR=".claude/skills"
@@ -149,10 +149,10 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # 起動時にエラーで止まる。部品は入口より先に配る。途中で失敗したときに、部品を読む新しい入口だけが
 # あって部品が無い状態を作らないため。ccnavi-common-review.sh は、ccnavi-review.sh とユーザ専用のレビューの sh が
 # 読む、ホストのマージリクエストを読む側の部品（入口は読まない）。
-# ccnavi-user-*.sh は、ユーザだけが端末で打つ sh（エージェントからは hook が名前で止める）。
-# ccnavi-user-push-approved.sh は、ボードが承認のあとに端末へ送る 1 行の中身。
+# ccnavi-user-*.sh は、ユーザだけがターミナルで打つ sh（エージェントからは hook が名前で止める）。
+# ccnavi-user-push-approved.sh は、ボードが承認のあとにターミナルへ送る 1 行の中身。
 # 配らないと、配布先のボードは承認済みチケットをコミットして push できない。
-# ccnavi-user-agree.sh は端末から承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
+# ccnavi-user-agree.sh はターミナルから承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
 # 配らないと、案内どおりに実行しても動かない。ccnavi-user-decide.sh・
 # ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、残った指摘の対応方針・
 # 早めに閉じる判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、
@@ -219,7 +219,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --bin <project|user>      実行ファイルの置き方。project（既定）は配布先の .ccnavi/bin/<os>-<arch>/ に置く。
                             user は ~/.local/share/ccnavi/<os>-<arch>/ に置き、~/.local/bin/ccnavi からリンクする
                             （PATH から使う形。Windows の Git Bash はリンクを張らず、実体のフォルダを PATH に通す）。
-                            ホームディレクトリに書き込むので、端末での確認が要る。PATH への追加の仕方は環境に合わせて案内する
+                            ホームディレクトリに書き込むので、ターミナルでの確認が要る。PATH への追加の仕方は環境に合わせて案内する
   --all                     受け付けるが、今は足すものが無い（置き場の env は廃止した）
   --force                   明示した --mode / --ticket-control で、既にある値を置き換える。
                             配るときも、配布先に既にあるものを置き換える。ただし、この機械の実行ファイルは
@@ -320,7 +320,7 @@ while [ "$#" -gt 0 ]; do
 		shift
 		;;
 	-*)
-		die "$1 は使えないオプションです。使えるオプションは --help で確認できます。"
+		die "$1 は指定できないオプションです。指定できるオプションは --help で確認できます。"
 		;;
 	*)
 		# 空文字を「まだ受け取っていない」と見なすと、2 つ受け取れてしまう。そのため、
@@ -339,7 +339,7 @@ disable)
 	die "CCNAVI_MODE=disable は設定ファイルに書いても反映されません。止めたいときは、セッションを起動する側の環境から渡してください。"
 	;;
 *)
-	die "--mode に使えるのは enable か dry-run です。"
+	die "--mode に指定できるのは enable か dry-run です。"
 	;;
 esac
 
@@ -348,14 +348,14 @@ esac
 case "$ticket_control" in
 enable | disable) ;;
 *)
-	die "--ticket-control に使えるのは enable か disable です。"
+	die "--ticket-control に指定できるのは enable か disable です。"
 	;;
 esac
 
 case "$bin_place" in
 project | user) ;;
 *)
-	die "--bin に使えるのは project か user です。"
+	die "--bin に指定できるのは project か user です。"
 	;;
 esac
 [ "$bin_place" = project ] || [ "$deploy_off" = no ] ||
@@ -531,12 +531,12 @@ skills_skipped=""
 skills_blocked=""
 
 # 配布元のスキルが、frontmatter に `process: true` を持つか。先頭の `---` から閉じの `---` までの
-# 間に、その 1 行（行末の `# コメント`は可）があるものだけを当てる。ユーザの発言のときの同期が写す判定
+# 間に、その 1 行（行末の `# コメント`は可）があるものだけを適用する。ユーザの発言のときの同期がコピーする判定
 # （src/ccnavi/tickets/skillsync.py の _process_flag）に寄せてある。CRLF の改行と、`---` の前後の空白は
-# 許し、閉じの `---` が無いもの、BOM 付き、文字列の "true"、本文だけにあるものは当てない。
-# SKILL.md 自体がリンクのものは、skillsync と同じく当てない。
+# 許し、閉じの `---` が無いもの、BOM 付き、文字列の "true"、本文だけにあるものは適用しない。
+# SKILL.md 自体がリンクのものは、skillsync と同じく適用しない。
 # 書き方は文書どおりの `process: true` だけを見る。`process: yes` のような別の綴りは、skillsync は
-# 真と読むが、ここでは当てない（配り漏れは、まだ無いものにも出ない。文書は `process: true` と書く）。
+# 真と読むが、ここでは適用しない（配り漏れは、まだ無いものにも出ない。文書は `process: true` と書く）。
 is_process_skill() {
 	{ [ -f "$1" ] && [ ! -L "$1" ]; } || return 1
 	awk '
@@ -842,7 +842,7 @@ if [ -n "$deploy" ]; then
 			set -f
 			for skill_file in $skill_files; do
 				skill_rel="$skill_name/$skill_file"
-				# 配るのは .md だけ（ユーザの発言のときの同期が写すものと同じ）。.DS_Store や ccnavi-index.jsonl のような
+				# 配るのは .md だけ（ユーザの発言のときの同期がコピーするものと同じ）。.DS_Store や ccnavi-index.jsonl のような
 				# 生成物は配らない。名前の範囲はスキルのディレクトリ名と同じで、外れるファイルは、
 				# 単語分割や glob で配布を半端に止めるので配らない。
 				case "$skill_rel" in
@@ -973,7 +973,7 @@ else
 	current="{}"
 fi
 
-# 構造の検査。ここを通さずに進むと、想定と違う型に当たった jq が生のエラーを出して
+# 構造の検査。ここを通さずに進むと、想定と違う型にヒットした jq が生のエラーを出して
 # 終了コード 5 で止まる。5 はこのスクリプトが定めていない値なので、呼んだ側は
 # 引数の誤りなのか環境の不足なのかを区別できない。
 #
@@ -1147,7 +1147,7 @@ fi
 # git がそのファイルを無視しているときだけなので（docs/design/diagnostics.md の 10.1「ドキュメントの索引」）、無視する
 # 行が無い配布先では索引が作られない。そこで、実行ファイルと同じ回に `**/ccnavi-index.jsonl` も足す。
 # 見出しは実行ファイルの塊と分ける。同じ見出しの下に置くと、何のための行かが分からなくなる。
-# `/` を含まない `ccnavi-index.jsonl` もどの階層にも当てはまるので、その行が既にあれば足さない。
+# `/` を含まない `ccnavi-index.jsonl` もどの階層にも該当するので、その行が既にあれば足さない。
 # `ccnavi-index.jsonl` を否定する行（`!**/ccnavi-index.jsonl`、`!docs/ccnavi-index.jsonl` など）があれば、ユーザは
 # 索引を追跡すると決めている。後ろに足すと git は後の行を優先するので、その否定を無効にして
 # しまう。この場合は足さずに、その旨を伝える（「揃っていない」には数えない）。
@@ -1156,9 +1156,9 @@ INDEX_IGNORE_HEADER="# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh�
 INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
 # ワークスペースルート直下の scratchpad/ は、直接作業で一時的にユーザへ見せる物とコミットしたくない物の
 # 置き場（.ccnavi/docs/scratchpad.md）。追跡されると意味が無いので、実行ファイルと同じ回に足す。
-# `scratchpad/` はどの階層の同名にも当たるので、ルートに固定した `/scratchpad` が既にあるとき、
+# `scratchpad/` はどの階層の同名にもヒットするので、ルートに固定した `/scratchpad` が既にあるとき、
 # または同等以上の `/scratchpad/`・`scratchpad`・`scratchpad/` があるときは足さない。
-# 末尾に `/` を付けないのは、scratchpad が symlink でも当たるようにするため（`/scratchpad/` はディレクトリにしか当たらない）。
+# 末尾に `/` を付けないのは、scratchpad が symlink でもヒットするようにするため（`/scratchpad/` はディレクトリにしかヒットしない）。
 # `!/scratchpad` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
 SCRATCH_IGNORE_HEADER="# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
 SCRATCH_IGNORE_LINE="/scratchpad"
@@ -1248,7 +1248,7 @@ copy_tree() {
 
 # 実行ファイルの置き場を、途中で失敗しても元の版が残る形で置き換える。新しい版を隣に作ってから、
 # フォルダごと名前を入れ替える（名前の変更が失敗すれば、元の版がそのまま残る）。Windows で実行中の
-# ファイルがあるときも同じ。1 つずつ消してから写すと、途中で止まったときに、実行ファイルだけが残り、
+# ファイルがあるときも同じ。1 つずつ消してからコピーすると、途中で止まったときに、実行ファイルだけが残り、
 # 同梱物が欠けた状態になる。
 replace_tree() {
 	# $1 配布元 / $2 配布先（既にある）
@@ -1450,7 +1450,7 @@ report_user_bin_path() {
 		path_ps=$(printf '%s' "$path_win" | sed "s/'/''/g")
 		printf '案内: Windows のユーザの環境変数 Path に追加します。PowerShell で次を実行します:\n'
 		printf "案内:   [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ';%s', 'User')\\n" "$path_ps"
-		printf '案内: 画面から追加するなら、「環境変数を編集」でユーザーの Path を開き、「新規」で %s を加えます。\n' "$path_win"
+		printf '案内: 画面から追加するなら、「環境変数を編集」でユーザの Path を開き、「新規」で %s を加えます。\n' "$path_win"
 		printf '案内: 追加したあと、Git Bash と Claude Code を開き直すと反映されます。\n'
 		return 0
 	fi
@@ -1661,11 +1661,11 @@ if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no
 	exit 0
 fi
 
-# ホームディレクトリ（~/.local/）に書き込む前に、端末で確認する。エージェントが代わりに答えられる形
-# （--yes のような指定）は持たない。端末でなければ、何も書かずに断る。
+# ホームディレクトリ（~/.local/）に書き込む前に、ターミナルで確認する。エージェントが代わりに答えられる形
+# （--yes のような指定）は持たない。ターミナルでなければ、何も書かずに断る。
 if [ "$user_bin_work" = yes ]; then
 	[ -t 0 ] ||
-		die "--bin user は、ホームディレクトリ（${user_share}・${user_link}）に書き込むので、端末での確認が要ります。端末から実行してください。何も書いていません。"
+		die "--bin user は、ホームディレクトリ（${user_share}・${user_link}）に書き込むので、ターミナルでの確認が要ります。ターミナルから実行してください。何も書いていません。"
 	printf 'ホームディレクトリに次を書きます:\n'
 	case "$user_bin_verdict" in
 	copy) printf '  %s（実行ファイルの実体を新しく置く）\n' "$user_share" ;;
@@ -1689,7 +1689,7 @@ fi
 
 # 設定ファイルへの書き込みを 1 か所にまとめる。呼び出し元は .claude/settings.json と
 # .vscode/settings.json の 2 か所。「バックアップは最初の 1 回だけ取る」「リンクは切らない」という
-# 決まりを 2 か所に書き写すと、片方のコピーだけを直したときに、どちらの設定ファイルで正しく
+# 決まりを 2 か所にコピーして持つと、片方のコピーだけを直したときに、どちらの設定ファイルで正しく
 # 動かなくなるかが、どちらのコピーを直したかで変わる。
 #
 # 結果は backed_up と linked に入れる。呼び出し元はそれを settings_* と vscode_* に移し、
@@ -1990,16 +1990,16 @@ for name in $DEPLOY_SCRIPTS; do
 			why="hook が起動する振り分けの sh"
 			;;
 		ccnavi-user-push-approved.sh)
-			why="承認のあとにボードが端末で実行する、承認済みチケットのコミットと push"
+			why="承認のあとにボードがターミナルで実行する、承認済みチケットのコミットと push"
 			;;
 		ccnavi-user-agree.sh)
-			why="端末から承認するための sh"
+			why="ターミナルから承認するための sh"
 			;;
 		ccnavi-user-lib-review.sh)
 			why="ユーザ専用のレビューの sh が読む部品"
 			;;
 		ccnavi-user-*.sh)
-			why="ユーザが端末で実行する操作の sh"
+			why="ユーザがターミナルで実行する操作の sh"
 			;;
 		ccnavi-session-start.sh)
 			why="セッション開始時に走らせる sh の入口"
@@ -2065,7 +2065,7 @@ IFS='
 set -f
 for skill_rel in $skills_all; do
 	if [ ! -f "$root/$DEPLOY_SKILLS_DIR/$skill_rel" ]; then
-		note_missing "${DEPLOY_SKILLS_DIR}/${skill_rel}（共通の工程スキル。ユーザの発言のときの同期がプロジェクトへ写す元）"
+		note_missing "${DEPLOY_SKILLS_DIR}/${skill_rel}（共通の工程スキル。ユーザの発言のときの同期がプロジェクトへコピーする元）"
 	fi
 done
 set +f

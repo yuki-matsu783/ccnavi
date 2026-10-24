@@ -36,7 +36,7 @@ DENY = "deny"
 
 # tool_input のうち、判定が文字列として読む欄（judge.SUBJECT_FIELDS と、書き込みの中身の欄）。
 # ここが文字列でない payload は、欄が無いものとして読まずに止める。空として読むと、
-# `{"command": ["git", "push"]}` が「当たるルールが無い」で通る。
+# `{"command": ["git", "push"]}` が「ヒットするルールが無い」で通る。
 TOOL_INPUT_TEXT_FIELDS = (
     "command",
     "file_path",
@@ -89,8 +89,8 @@ class Input:
     cwd: str = ""
     permission_mode: str = ""
     tool_use_id: str = ""
-    # agent_id はサブエージェントの中で走った呼び出しにだけ付く。判定の鍵には
-    # 使わない（判定の鍵はファイルの行き先）。使うのは、サブエージェントに
+    # agent_id はサブエージェントの中で走った呼び出しにだけ付く。判定のキーには
+    # 使わない（判定のキーはファイルの行き先）。使うのは、サブエージェントに
     # 許さない操作を見分けるときと、差し戻しの回数を数えるときだけ。
     agent_id: str = ""
     agent_type: str = ""
@@ -107,7 +107,7 @@ class Input:
     # 続けさせた結果（連鎖の 2 回目以降）。促しを 1 回に留めるために読む。
     stop_hook_active: bool = False
     # source は SessionStart にだけ来る。`startup` / `resume` / `clear` / `compact`。Stop の促しの
-    # 数えを捨てるのは `startup` だけ（ctxfile.forget）。compact・再開・clear で捨てると、
+    # 数えを破棄するのは `startup` だけ（ctxfile.forget）。compact・再開・clear で破棄すると、
     # compact が N 回より先に来る長いセッションで一度も届かない。
     source: str = ""
     # prompt は UserPromptSubmit にだけ来る。ユーザの依頼文で、issue・MR の指定を探すのに読む
@@ -118,7 +118,7 @@ class Input:
     transcript_path: str = ""
     # busy は Stop にだけ来る。エージェントが動かしているバックグラウンド作業
     # （`background_tasks`）か、予約した繰り返し（`session_crons`）が残っているとき真。
-    # そのターンの終わりのあとにも、エージェントの手が作業ツリーに届きうる。
+    # そのターンの終わりのあとにも、エージェントの手がワークツリーに届きうる。
     busy: bool = False
 
     def from_background_task(self) -> bool:
@@ -151,9 +151,9 @@ def decode(stream: TextIO) -> Input:
     1. 入力を全部読む。空なら NoPayload で止める。
     2. JSON として読み、オブジェクトでなければ Unusable で止める。
     3. hook_event_name が空でない文字列であることを確かめる。
-    4. 判定の鍵になる欄（tool_name・session_id など）が、あれば文字列であることを確かめる。
+    4. 判定のキーになる欄（tool_name・session_id など）が、あれば文字列であることを確かめる。
     5. tool_input がオブジェクトで、TOOL_INPUT_TEXT_FIELDS の欄が文字列であることを確かめる。
-    6. 残りの欄は型を見て、違えば既定の値（空の文字列・空の辞書・偽）にして Input を組んで返す。
+    6. 残りの欄は型を見て、違えば既定の値（空の文字列・空のマップ・偽）にして Input を組んで返す。
     """
     raw = stream.read()
     if not raw.strip():
@@ -171,8 +171,8 @@ def decode(stream: TextIO) -> Input:
         raise Unusable("payload の hook_event_name が文字列ではない")
     if not event:
         raise Unusable("payload に hook_event_name がありません。")
-    # 判定の鍵になる欄が文字列でないなら、欄が無い payload として読まずに止める。
-    # 無いものとして読むと、ツールの名前が分からないまま「当たるルールが無い」で通る。
+    # 判定のキーになる欄が文字列でないなら、欄が無い payload として読まずに止める。
+    # 無いものとして読むと、ツールの名前が分からないまま「ヒットするルールが無い」で通る。
     for name in ("tool_name", "session_id", "cwd", "permission_mode", "tool_use_id"):
         value = data.get(name)
         if value is not None and not isinstance(value, str):
@@ -223,7 +223,7 @@ def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "")
 
     context はルールの `additionalContext`。判定と一緒に `additionalContext` として
     載せる。deny でも ask でも、理由と一緒にモデルへ届くことは実際に確かめた
-    （Claude Code 2.1）。空なら鍵ごと出さない。
+    （Claude Code 2.1）。空ならキーごと出さない。
     """
     payload: dict[str, Any] = {
         "hookEventName": PRE_TOOL_USE,
@@ -266,10 +266,10 @@ def write_context(stream: TextIO, event: str, text: str, system: str = "") -> No
 
     PostToolUse と SessionStart は判定自体ができないのでこの経路しかない。
     PreToolUse でも、ccnavi がこの呼び出しの判定を持たない（handover）ときや
-    dry-run で知らせるだけのときはこちらを使う。素の標準出力は捨てられる。
+    dry-run で知らせるだけのときはこちらを使う。素の標準出力は破棄される。
 
     system はユーザに見せる文（`systemMessage`）。同じ 1 つの JSON の一番外に並べる。
-    空なら鍵ごと出さない。
+    空ならキーごと出さない。
     """
     body: dict[str, Any] = {
         "hookSpecificOutput": {"hookEventName": event, "additionalContext": text}
@@ -299,7 +299,7 @@ def write_stop_block(stream: TextIO, reason: str, system: str = "") -> None:
 
     Stop の応答は一番外の `decision` / `reason` で返す。同じ Stop でユーザへの報告
     （`systemMessage`）も返したいので、1 つの JSON にまとめる（exit 2 だと標準出力の JSON は
-    読まれない）。空の `system` は鍵ごと出さない。
+    読まれない）。空の `system` はキーごと出さない。
     """
     body: dict[str, Any] = {"decision": "block", "reason": reason}
     if system:
@@ -332,5 +332,5 @@ def rebind_streams() -> None:
                 stream.reconfigure(encoding="utf-8", errors="replace")
             else:
                 # 出す改行は LF に固定する。Windows の既定（CRLF）だと、1 行 1 項目の答えを
-                # 読む sh（`sed -n 's/^鍵 //p'`）の値の末尾に CR が残る。
+                # 読む sh（`sed -n 's/^キー //p'`）の値の末尾に CR が残る。
                 stream.reconfigure(encoding="utf-8", errors="replace", newline="\n")

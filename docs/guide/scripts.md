@@ -12,7 +12,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 各 sh の引数・出力・終了コードの細かい決まりは、その sh の先頭の説明に書いてある。ここには役割と、誰が打つかだけを書く。
 打ち方の手引きがあるものは各ページ（[git](git.md)・[チケット](tickets.md)・[レビュー](review.md)）にある。
 
-「ユーザ」とあるものは、エージェントからは止まる。端末で人が打つか、ボードの操作が送る。
+「ユーザ」とあるものは、エージェントからは止まる。ターミナルで人が打つか、ボードの操作が送る。
 「hook」は settings.json に登録され、セッションの節目で自動で走る。
 
 ## hook が起動する
@@ -33,7 +33,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先から切る。状況にずれや書きかけがあれば、切らずに状態と確認コードを出し、ユーザの了承を得て打ち直す | エージェント |
 | `ccnavi-sync.sh` | 親のブランチをリモートから取り込む。リモートから消えた親のブランチを診断する | エージェント |
 | `ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`--worktree` で、掃除とワークツリーの削除を 1 本で行う | エージェント |
-| `ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/` へ写して、下書きで直せるようにする。元の場所へ取り込むのはユーザ（`sh .ccnavi/scripts/ccnavi-user-handoff.sh`） | エージェント |
+| `ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/` へコピーして、下書きで直せるようにする。元の場所へ取り込むのはユーザ（`sh .ccnavi/scripts/ccnavi-user-handoff.sh`） | エージェント |
 
 ## issue・MR・チケット・レビュー
 

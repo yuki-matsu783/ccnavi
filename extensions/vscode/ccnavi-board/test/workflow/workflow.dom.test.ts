@@ -73,7 +73,7 @@ test("CB-D167 線の × を押すと、元の番号での先行を送って答�
   }
 });
 
-test("CB-D168 答えが届いたら、実行ファイルが振り直した番号で描き直し、未保存にして番号の変わる項を出す。図の場所は動かさない", async () => {
+test("CB-D168 答えが届いたら、実行ファイルが振り直した番号で描き直し、未保存にして番号の変わるステップを出す。図の場所は動かさない", async () => {
   const dom = await openWorkflow();
   try {
     const placed = dom.one('.react-flow__node[data-id="n3"]').getAttribute("style");
@@ -88,7 +88,7 @@ test("CB-D168 答えが届いたら、実行ファイルが振り直した番号
     assert.equal(saveButton(dom).disabled, false);
     assert.equal(dom.one<HTMLButtonElement>('[data-action="revert"]').disabled, false);
     assert.equal(dom.all('.plan-graph[data-editable="1"]').length, 2);
-    // 未保存のまま閉じたときに戻すため、線の写しを拡張ホストに覚えさせる
+    // 未保存のまま閉じたときに戻すため、線のコピーを拡張ホストに覚えさせる
     await new Promise((resolve) => setTimeout(resolve, 400));
     await dom.settle();
     assert.deepEqual(lastPosted(dom, "draft")?.order, { plan: { "1": [], "2": [1, 3], "3": [1], "4": [2] } });
@@ -97,7 +97,7 @@ test("CB-D168 答えが届いたら、実行ファイルが振り直した番号
   }
 });
 
-test("CB-D169 断られた線（循環など）は引く前の形に戻し、理由を出す。古い頼みへの答えは捨てる", async () => {
+test("CB-D169 断られた線（循環など）は引く前の形に戻し、理由を出す。古い頼みへの答えは破棄する", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -118,13 +118,13 @@ test("CB-D169 断られた線（循環など）は引く前の形に戻し、理
   }
 });
 
-test("CB-D170 順序の検査に error がある答えは保存できない。理由（problems）は図の下に、終端に当たらない項の印は点に、実行ファイルの答えのまま出す", async () => {
+test("CB-D170 順序の検査に error がある答えは保存できない。理由（problems）は図の下に、終端に届かないステップの印は点に、実行ファイルの答えのまま出す", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-3-4");
     await dom.send({ type: "answer", seq, answer: planOrderSample("loose") });
     assert.equal(saveButton(dom).disabled, true);
-    assert.match(dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "", /最後の項/);
+    assert.match(dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "", /最後のステップ/);
     assert.match(saveButton(dom).getAttribute("title") ?? "", /順序の検査/);
     assert.equal(dom.one('.plan-node[data-number="3"]').getAttribute("data-loose"), "1");
   } finally {
@@ -132,7 +132,7 @@ test("CB-D170 順序の検査に error がある答えは保存できない。�
   }
 });
 
-test("CB-D171 保存の前に、番号の変わる項と付け替える子の提案（識別子と phase の前後）を見せ、保存すると開いたときのハッシュを添えて送る", async () => {
+test("CB-D171 保存の前に、番号の変わるステップと付け替える子の提案（識別子と phase の前後）を見せ、保存すると開いたときのハッシュを添えて送る", async () => {
   const dom = await openWorkflow({ answer: planOrderSample("open", "a".repeat(64)) });
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -247,7 +247,7 @@ test("CB-D174 提案が承認待ちから無くなったら（承認・取り下
   }
 });
 
-test("CB-D175 読み込めなければ理由と再読込、読み込み中は一言だけ。中身が届けば図を出す", async () => {
+test("CB-D175 読み込めなければ理由と再読み込み、読み込み中は一言だけ。中身が届けば図を出す", async () => {
   const dom = await openWorkflowData({ kind: "error", error: "ccnavi --plan-order が失敗しました: 親の提案がありません" });
   try {
     assert.match(dom.one(".load-error").textContent ?? "", /親の提案がありません/);
@@ -392,10 +392,10 @@ test("CB-D186 線を変えたら、答えを待つ間も拡張ホストに「確
   }
 });
 
-test("CB-D187 項を押すと右の欄に詳細を出す。欄は畳め、畳んだことは覚える", async () => {
+test("CB-D187 ステップを押すと右の欄に詳細を出す。欄は畳め、畳んだことは覚える", async () => {
   const dom = await openWorkflow();
   try {
-    assert.ok(dom.one('.plan-graph[data-part="plan"] .plan-detail-empty').textContent?.includes("項を押すと"));
+    assert.ok(dom.one('.plan-graph[data-part="plan"] .plan-detail-empty').textContent?.includes("ステップを押すと"));
     dom.click(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"]'));
     await dom.settle();
     const detail = dom.one('.plan-graph[data-part="plan"] .plan-detail-list');

@@ -135,7 +135,7 @@ class WriteAtomicTest(unittest.TestCase):
 
     見るのは 3 つ。書き切れなかったときに前の中身が残ること、一時ファイルを
     置いていかないこと、そして一時ファイルの名前が「同じ場所・一意・本番と同じ
-    条件に当たる」の 3 つを満たすこと。最後の 1 つが成り立たないと、直そうとした
+    条件にヒットする」の 3 つを満たすこと。最後の 1 つが成り立たないと、直そうとした
     問題（書きかけを読まれる・書きかけを差し替える）が形を変えて戻る。
     """
 
@@ -195,7 +195,7 @@ class WriteAtomicTest(unittest.TestCase):
         self.assertEqual(os.path.dirname(seen[0]), os.path.dirname(self.path))
 
     def test_temporary_names_are_unique_and_swept_by_the_same_sieve(self):
-        """一時ファイルの名前は毎回変わり、本番と同じ条件に当たる。
+        """一時ファイルの名前は毎回変わり、本番と同じ条件にヒットする。
 
         固定の名前（`<行き先>.part` など）だと、同時に書く 2 つが同じ一時
         ファイルを取り合い、片方の書きかけをもう片方が差し替える。
@@ -448,7 +448,7 @@ class WriteBytesAtomicTest(unittest.TestCase):
         self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o644)
 
     def test_temporary_name_is_hidden_and_not_read_as_a_ticket(self):
-        """一時ファイルは `.<元の名前>.<一意>.part`。`.md` で終わらず、運ぶ側の除外に当たる。"""
+        """一時ファイルは `.<元の名前>.<一意>.part`。`.md` で終わらず、運ぶ側の除外にヒットする。"""
         seen: list[str] = []
         real = tempfile.mkstemp
 

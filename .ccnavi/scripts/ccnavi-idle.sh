@@ -42,7 +42,7 @@ esac
 
 payload=$(cat)
 
-# 値の取り出し（1 行 1 項目の `<鍵> <値>`）。
+# 値の取り出し（1 行 1 項目の `<キー> <値>`）。
 pick() {
 	printf '%s\n' "$plan" | sed -n "s/^$1 //p" | head -n 1
 }

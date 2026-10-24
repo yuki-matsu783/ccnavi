@@ -4,9 +4,9 @@
 中の関数も変数も見ないので、書き方が変わってもテストは真であり続ける。
 
 使い捨ての git リポジトリを毎回作る。このリポジトリ自身で走らせると、
-テストが「コードのこと」ではなく「走った機械の作業ツリーのこと」を報告する。
+テストが「コードのこと」ではなく「走った機械のワークツリーのこと」を報告する。
 
-`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
@@ -187,7 +187,7 @@ class RejectTest(GitWrapperTest):
 
     def test_commit_checkout_and_pull_pass_but_their_escape_hatches_do_not(self):
         # commit / checkout / pull は通す。止めるのは、点検を飛ばす形と
-        # 作業ツリーの書きかけを捨てる形だけ。
+        # ワークツリーの書きかけを破棄する形だけ。
         for args in (
             ("commit", "--no-verify", "-m", "x"),
             ("commit", "-an", "-m", "x"),
@@ -908,7 +908,7 @@ class StoreRewindTest(GitWrapperTest):
 
     `checkout <ref> <パス>` と `restore --source <ref>` は置き場を別のコミットの中身に戻し、
     `restore --ours / --theirs` は置き場の衝突を片側にそろえる。どれも承認が無かったことにも、
-    消した承認が戻ったことにもなる。置き場に当たらないパスは今までどおり通す。
+    消した承認が戻ったことにもなる。置き場にヒットしないパスは今までどおり通す。
     """
 
     COPY = ".ccnavi/approved/doing/i0001.md"
@@ -999,8 +999,9 @@ class StoreRewindTest(GitWrapperTest):
     def test_the_store_does_not_move_with_the_environment(self):
         """置き場の env を入れても、既定の置き場を戻す形を止める（置き場は固定。A9）。
 
-        env で保護を外せないことを見る。`.ccnavi/scripts/` が写す版（i0064-10）になる前は失敗する。
-        写す前の sh（`ccnavi-git.sh` の `store_hit`）は `CCNAVI_TICKETS_APPROVED` と
+        env で保護を外せないことを見る。
+        `.ccnavi/scripts/` がコピーする版（i0064-10）になる前は失敗する。
+        コピーする前の sh（`ccnavi-git.sh` の `store_hit`）は `CCNAVI_TICKETS_APPROVED` と
         `CCNAVI_TICKETS_PROPOSAL` のパスを置き場と読み、既定の置き場の restore を止めないため。
         承認済みとレビュー待ちは別々に打つ（一緒に打つと、片方の保護だけで止まって
         もう片方が env で動くのを見逃すため）。
@@ -1237,7 +1238,7 @@ class ParentPushGateTest(GitWrapperTest):
     「一度は送った形跡」は、`refs/remotes/origin/<ブランチ>` と、
     実行ファイルが答える着手済み（承認済みの親チケットの started_at）・依頼のマーカー・
     手元の退避で見る。
-    形跡があるのにリモートに無ければ拒否し（改名・消し間違い・捨てた親子のチケットを、確かめずに作り直さない）、
+    形跡があるのにリモートに無ければ拒否し（改名・消し間違い・破棄した親子のチケットを、確かめずに作り直さない）、
     形跡が無ければ初回の push として通す。承認済みというだけでは形跡にしない
     （承認して最初に打つ push が通る）。確かめられないとき（ls-remote の失敗）は拒否する。
     親のワークツリーでないツリーと、origin 以外への push には掛けない。
@@ -1346,7 +1347,7 @@ class ParentPushGateTest(GitWrapperTest):
         self.assertIn("リモートに無い", result.stderr)
         self.assertIn("ユーザに元の名前で戻してもらい", result.stderr)
         self.assertEqual("", self.remote_sha())
-        # ユーザが端末で、生の git で元の名前に戻す。そのあとは通る。
+        # ユーザがターミナルで、生の git で元の名前に戻す。そのあとは通る。
         git(self.tree, "push", "-q", "origin", "i0001")
         write_text(os.path.join(self.tree, "again.txt"), "x\n")
         git(self.tree, "add", "again.txt")

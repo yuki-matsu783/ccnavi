@@ -5,7 +5,7 @@
  *
  * 結果は、ボードが開いている間だけ拡張ホストが持つ（パネルの状態）。タブを隠して画面が作り直されても残り、
  * ボードを閉じて開き直すと消える。**頼んだ状態でなければ受けない**: 確認ごとに世代（`token`）を振り、
- * 閉じたボードへ遅れて返った結果や、前の確認の遅れた答えは捨てる。確認中にもう一度押しても二重に走らせない。
+ * 閉じたボードへ遅れて返った結果や、前の確認の遅れた答えは破棄する。確認中にもう一度押しても二重に走らせない。
  *
  * ## ガード（消すとどうなるか）
  *
@@ -259,7 +259,7 @@ export interface MergeViewRow {
   /** 送れなかった理由。空なら無い */
   readonly sendError: string;
   /**
-   * closed のとき、捨てた親の記録を消すコマンド（`sh <ルート>/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon <親>`）。
+   * closed のとき、破棄した親の記録を消すコマンド（`sh <ルート>/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon <親>`）。
    * 見せるだけで、ボードからは送らない（コピーのボタンも拡張ホストが同じ関数で組み直したものをコピーする）
    */
   readonly abandon: string;
@@ -277,7 +277,7 @@ export interface MergeView {
 
 /**
  * 画面に渡す形にする。まだ一度も確認していなければ undefined（帯を出さない）。
- * `abandonOf` は捨てた親の記録を消すコマンドの組み方（`commands.ts` の `abandonCommand`。node を読む部品はここに入れない）
+ * `abandonOf` は破棄した親の記録を消すコマンドの組み方（`commands.ts` の `abandonCommand`。node を読む部品はここに入れない）
  */
 export function mergeView(state: MergeState, abandonOf: (parent: string) => string): MergeView | undefined {
   if (!state.checking && state.checkedAt === "" && state.list.kind === "none") {

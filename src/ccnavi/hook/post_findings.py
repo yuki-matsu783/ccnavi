@@ -1,4 +1,4 @@
-"""変わったファイルを、守ると宣言した場所とチケットの範囲に当てる。スクリプト自身の書き込みの見分け。
+"""変わったファイルを、守ると宣言した場所とチケットの範囲に適用する。スクリプト自身の書き込みの見分け。
 
 post から分けた。post を読まない。
 """
@@ -60,12 +60,12 @@ def codes_note(found: list[Finding]) -> str:
 
 @dataclass
 class ScopeGuard:
-    """承認された作業範囲を、実行後の側から当てるための持ち物。
+    """承認された作業範囲を、実行後の側から適用するための持ち物。
 
-    実行前チェックと同じ範囲・同じ当て方を使う。別に書くと、同じ書き込みが
+    実行前チェックと同じ範囲・同じ適用の仕方を使う。別に書くと、同じ書き込みが
     実行前は通って実行後に報告される（あるいはその逆）ことになり、
-    どちらが本当の範囲なのかを誰も言えなくなる。鍵はファイルの行き先で、
-    その行き先のワークツリーに結び付いた承認済みチケットの範囲を当てる。
+    どちらが本当の範囲なのかを誰も言えなくなる。キーはファイルの行き先で、
+    その行き先のワークツリーに結び付いた承認済みチケットの範囲を適用する。
     """
 
     root: str
@@ -106,7 +106,7 @@ class ScopeGuard:
         if ticket_places.is_handoff_place(rel) or ticket_places.is_eli5_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
-        # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は開かない。
+        # 定義は親に固定したコピー（`phases:`）から引く。`phases.yml` は開かない。
         pt = phase_scope.type_for(ticket, parent)
         found = phase_scope.scope_verdict(ticket, parent, pt, rel)
         if not found.outside:
@@ -179,12 +179,12 @@ class Finding:
     group: list[rules.Rule]
     source: str
     code: str
-    # どのツリーで見つけたか。ワークスペースルートなら空。記録の鍵と報告に使う。
+    # どのツリーで見つけたか。ワークスペースルートなら空。記録のキーと報告に使う。
     tree_name: str = ""
     tree_root: str = ""
 
     def key(self) -> str:
-        """記録の鍵。ツリーが違えば同じ相対パスでも別の変更。
+        """記録のキー。ツリーが違えば同じ相対パスでも別の変更。
 
         別のリポジトリに同じ名前のワークツリーがありうるので、名前だけでなくルートの場所も入れる。
         """
@@ -219,11 +219,11 @@ def _findings(
     `review request` がマーカーを置くたびに、ccnavi 自身の書き込みが
     「エージェントによる書き換え」として報告され、戻す設定では戻されて手順が進まない。
 
-    ルールの deny と ask に当たった変更は、範囲の外でもルールの側で報告する。
+    ルールの deny と ask にヒットした変更は、範囲の外でもルールの側で報告する。
     範囲を広げても済まない場所だから。ここで範囲の側の文面を返すと、
     「範囲を広げれば済む」と読ませて、済まないことを 1 往復あとに知らせる。
 
-    ルールの allow に当たる変更も、チケットの範囲は当てる。実行前チェックがルールと
+    ルールの allow にヒットする変更も、チケットの範囲は適用する。実行前チェックがルールと
     チケットの厳しい側を採るのと同じ。allow を理由に飛ばすと、実行前に
     止まる書き込みがシェルから入ったときに誰も言わない。
     """
@@ -361,7 +361,7 @@ def _script_writes(
     return out
 
 
-# `ccnavi-git.sh integrate-done` が片付けの直前に残す、取り込みの記録の写しの置き場（git-path）。
+# `ccnavi-git.sh integrate-done` が片付けの直前に残す、取り込みの記録のコピーの置き場（git-path）。
 INTEGRATE_DONE_DIR = "ccnavi-integrate-done"
 
 
@@ -373,7 +373,7 @@ def integrated_paths(top: str, base: str) -> set[str]:
     コミットしてからワークツリー・ブランチ・記録を片付ける。外さないと、正規の取り込みで変わった
     ワークスペースルートのファイルが、毎回ターンの報告に並ぶ。
 
-    手がかりは `integrate-done` が残す記録の写し（`<git-path ccnavi-integrate-done>/<名前>`）。
+    手がかりは `integrate-done` が残す記録のコピー（`<git-path ccnavi-integrate-done>/<名前>`）。
     `.git` の中にあってエージェントにも書けるので、**内容は信用せず git の状態で確かめる。**
     コミット C を squash とみなすのは、次の全部が揃ったときだけ。
 
@@ -558,7 +558,7 @@ def _ticket_bound(top: str, name: str) -> bool:
 
 
 def _read_record(path: str) -> dict[str, str]:
-    """`<鍵> <値>` を 1 行 1 項目で並べた記録を読む（sh の `ccnavi_record_get` と同じ形）。"""
+    """`<キー> <値>` を 1 行 1 項目で並べた記録を読む（sh の `ccnavi_record_get` と同じ形）。"""
     text = fsio.read_text(path, errors="replace")
     if text is None:
         return {}
@@ -616,7 +616,7 @@ def _mr_filled(before: str | None, now: str | None) -> tuple[str, ...]:
     `mr:` が `mr: 12` の 1 行だけの正の整数のときだけ省く。省いたうえで、ほかの欄・本文が
     1 文字も変わっていなければ外れる。ほかが変わっていれば `_shape` が食い違うので報告する。
     `mr:` の値の変更（整数から別の整数・整数から空）や、コミット済みの版が無い新規のチケットは、
-    ここに当たらず今までどおり報告する。
+    ここにヒットせず今までどおり報告する。
     """
     if before is None or now is None:
         return ()
@@ -642,8 +642,8 @@ def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:
     通っているので、あとから言う先がここしかない。
 
     `allow` は入れない。ルールとしては通してよいと宣言された場所なので、ルールの側から
-    報告することではない。チケットの範囲は `_findings` が別に当てる。`deny` や `ask` と
-    同じ場所に当たる `allow` があっても、強いほうを採る。当てる順は実行前チェックと同じ。
+    報告することではない。チケットの範囲は `_findings` が別に適用する。`deny` や `ask` と
+    同じ場所にヒットする `allow` があっても、強いほうを採る。適用する順は実行前チェックと同じ。
     """
     return rule_set.deny + rule_set.ask
 
@@ -651,8 +651,8 @@ def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:
 def _guards_writes(rule: rules.Rule, path: str) -> bool:
     """このルールがこのパスへの書き込みを禁じているか。
 
-    ルールの当て方は実行前チェックと同じ rule.matches に任せる。ここで別に
-    書くと、同じルールが実行前と実行後で違う場所に当たることになり、
+    ルールの適用の仕方は実行前チェックと同じ rule.matches に任せる。ここで別に
+    書くと、同じルールが実行前と実行後で違う場所にヒットすることになり、
     どちらが正しいのかを誰も言えなくなる。
     """
     return any(rule.matches(tool, path) for tool in WRITE_TOOLS)

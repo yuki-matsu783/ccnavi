@@ -4,20 +4,21 @@
 共通レイヤー（ワークスペースルートの `.ccnavi/config/common/`）はワークスペースの git にあるので、
 プロジェクトだけを clone したユーザからは見えない。そこでユーザの発言のたびに、
 共通レイヤーの中身を、着手済みの親のワークツリーにある
-プロジェクトの `.ccnavi/config/common/` へ写す。
+プロジェクトの `.ccnavi/config/common/` へコピーする。
 プロジェクトの `.ccnavi/config/project/` には触れない。
 
 - 共通レイヤーが無い、または空なら、何も配らず、ミラーは残す
-- 写すのは `rules.yml`・`phases.yml`・`risks.yml`・`rule-expectations.yml` と、配点の
+- コピーするのは `rules.yml`・`phases.yml`・`risks.yml`・`rule-expectations.yml` と、配点の
   `script:` が指す `.ccnavi/config/common/scripts/` の下と、作業・レビュー計画のテンプレート
   （`.ccnavi/config/common/templates/*.yml`）。中身の違うものだけ上書きし、
-  共通レイヤーから無くなったファイルはミラーからも消す。ミラーは共通レイヤーの写しで誰も編集しないので、失うものは無い
-- `script:` の値はそのまま写す。ミラーの置き場も `.ccnavi/config/common/scripts/` で、共通レイヤーと
+  共通レイヤーから無くなったファイルはミラーからも消す。ミラーは共通レイヤーのコピーで誰も編集しないので、失うものは無い
+- `script:` の値はそのままコピーする。ミラーの置き場も `.ccnavi/config/common/scripts/` で、
+共通レイヤーと
   同じ表記のまま指せる
-- 写す前に、ミラーとして（単体 clone では共通レイヤーとして）読めるかを確かめる。error が
-  あれば何も写さず、着手しない。ただしテンプレートは別で、error のある 1 本は飛ばし、置き場が
-  読めない（リンクなど）ときはテンプレートだけ写さず、ほかの設定の写しと着手は止めない
-- 写し先かその途中がシンボリックリンクなら止める
+- コピーする前に、ミラーとして（単体 clone では共通レイヤーとして）読めるかを確かめる。error が
+  あれば何もコピーせず、着手しない。ただしテンプレートは別で、error のある 1 本は飛ばし、置き場が
+  読めない（リンクなど）ときはテンプレートだけコピーせず、ほかの設定のコピーと着手は止めない
+- コピー先かその途中がシンボリックリンクなら止める
 - 上書きと削除は一時ファイルからの置き換えで行う。途中で止まれば、した分を元へ戻す
 
 ミラーを書くのは、ユーザの発言のとき（`promptsync`）とユーザが押す入口（`mirrorsync`）だけで、
@@ -70,9 +71,9 @@ def common_dir(conf: settings.Settings, root: str) -> str:
 
 
 def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
-    """共通レイヤーのうち、ミラーへ写すもの。ミラーの置き場からの相対 → 中身。
+    """共通レイヤーのうち、ミラーへコピーするもの。ミラーの置き場からの相対 → 中身。
 
-    読めなければ理由を返す（何も写さない）。
+    読めなければ理由を返す（何もコピーしない）。
     """
     base = common_dir(conf, root)
     out: dict[str, bytes] = {}
@@ -110,7 +111,7 @@ def _templates(conf: settings.Settings, root: str) -> dict[str, bytes]:
     """共通レイヤーの作業・レビュー計画のテンプレート。ミラーの置き場からの相対 → 中身。
 
     置き場（`templates/`）が無いのは正常で、何も返さない。置き場そのものが読めない（リンクなど）
-    ときも、理由は返さずテンプレートを 1 本も写さない（置き場がリンクなのは、dotfiles 管理などで
+    ときも、理由は返さずテンプレートを 1 本もコピーしない（置き場がリンクなのは、dotfiles 管理などで
     起こりうる）。error のあるテンプレートは 1 本ずつ飛ばす（`--lint` が error で知らせる）。
     """
     read = plan_templates.read_layer(
@@ -132,7 +133,7 @@ def _templates(conf: settings.Settings, root: str) -> dict[str, bytes]:
 
 
 def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Change], str]:
-    """ミラーに加える変更の一覧。写せない理由があれば、それを返す（何も写さない）。"""
+    """ミラーに加える変更の一覧。コピーできない理由があれば、それを返す（何もコピーしない）。"""
     wanted, why = sources(conf, root)
     if why:
         return [], why
@@ -142,7 +143,10 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Chang
         return [], ""
     base = mirror_dir(conf, tree_root)
     if not _inside(tree_root, base) or _linked(tree_root, base):
-        return [], f"{_rel_plain(tree_root, base)} がシンボリックリンクか、その下にある。写さない"
+        return (
+            [],
+            f"{_rel_plain(tree_root, base)} がシンボリックリンクか、その下にある。コピーしない",
+        )
     present, why = _scan(base)
     if why:
         return [], why
@@ -152,7 +156,8 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Chang
         if _linked(tree_root, target):
             return (
                 [],
-                f"{_rel_plain(tree_root, target)} がシンボリックリンクか、その下にある。写さない",
+                f"{_rel_plain(tree_root, target)} がシンボリックリンクか、"
+                "その下にある。コピーしない",
             )
         before, why = _read_strict(target)
         if why:
@@ -261,7 +266,7 @@ def _scan(base: str) -> tuple[list[str], str]:
             path = os.path.join(parent, name)
             if os.path.islink(path):
                 shown = _rel_plain(os.path.dirname(base), path)
-                return [], f"{shown} がシンボリックリンク。写さない"
+                return [], f"{shown} がシンボリックリンク。コピーしない"
         for name in names:
             found.append(os.path.relpath(os.path.join(parent, name), base).replace(os.sep, "/"))
     return found, ""
@@ -279,7 +284,7 @@ def _put(path: str, content: bytes | None) -> str:
     """1 本を書く（None なら消す）。駄目なら理由。
 
     書くのは一時ファイルからの置き換え。fsio を通す（write-and-push の記録層が、
-    写したものを「この実行で書いた
+    コピーしたものを「この実行で書いた
     パス」に数え、`start` の write-and-push でコミットする）。
     """
     if content is None:

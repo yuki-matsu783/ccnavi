@@ -1,6 +1,6 @@
 """ルールファイルの中身の検査。`--lint` と、保護対象の下書きの取り込み（`user handoff`）が呼ぶ。
 
-組み上がらないルール、止めないモード、どのツールにも当たらない match、広すぎる allow などを
+組み上がらないルール、止めないモード、どのツールにもヒットしない match、広すぎる allow などを
 名指しする。レイヤーのルールファイルも同じ読みで見る。提案（`suggest`）も候補をここに通す。
 入口は `file_problems`（ファイルのパスを受ける）。
 """
@@ -115,7 +115,7 @@ def file_problems(
 
 
 def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False) -> list[Problem]:
-    """ルール 1 件の中身。当たらない match、届かない message、指すファイル、広い allow。
+    """ルール 1 件の中身。ヒットしない match、届かない message、指すファイル、広い allow。
 
     処理フロー:
     1. `_inert` で、match のツールのうち対象を取り出せないものを warn にする
@@ -133,7 +133,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     for tool in _inert(rule.match):
         problems.append(
             Problem(
-                SEVERITY_WARN, name, f"match の {tool} には当てる対象がありません。何も止まらない"
+                SEVERITY_WARN, name, f"match の {tool} には適用する対象がありません。何も止まらない"
             )
         )
     problems.extend(_stop_problems(rule, name, project))
@@ -267,7 +267,7 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
     1. `deny` / `ask` に置いた。Stop で見るのは allow だけなので、`Stop` の部分は何も起きない
        （`Bash|Stop` なら `Bash` の部分はふつうに働く）
     2. プロジェクトのレイヤーに置いた。ターンの終わりには共通レイヤーと自身のレイヤーしか読まない
-    3. 当てる先の `(stop)` に当たらない glob / regex。何も起きない
+    3. 適用する先の `(stop)` にヒットしない glob / regex。何も起きない
     4. `every` が 2 より小さい。実行時にも使わない（ターンの終わりのたびに止まらないように）
     """
     wants = [want.strip() for want in rule.match.split("|") if want.strip()]
@@ -302,8 +302,8 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
                 SEVERITY_WARN,
                 name,
                 f"{rules.STOP_MATCH} のルールは呼び出しの文字列ではなく、"
-                f"固定の {rules.STOP_SUBJECT} に当てる。"
-                "この glob / regex / when はそれに当たらないので何も起きない。"
+                f"固定の {rules.STOP_SUBJECT} に適用する。"
+                "この glob / regex / when はそれにヒットしないので何も起きない。"
                 'glob: "*" と書いてください',
             )
         )
@@ -320,18 +320,18 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
     return problems
 
 
-# 当てる文字列にコマンド列の全体を使うツール。except はこの全体に当てるので、
+# 適用する文字列にコマンド列の全体を使うツール。except はこの全体に適用するので、
 # コマンドのどこかに除く語を足すだけでルールが外れる。
 _COMMAND_TOOLS = ("Bash", "PowerShell")
 
-# 「何にでも当たる」を見る文字列。空の文字列と、パスにもコマンドにも出ない制御文字の 1 字。
-# どちらにも当たる式は、当てる語を持たずに先頭で当たっている。
+# 「何にでもヒットする」を見る文字列。空の文字列と、パスにもコマンドにも出ない制御文字の 1 字。
+# どちらにもヒットする式は、適用する語を持たずに先頭でヒットしている。
 _ANYTHING_PROBES = ("", "\x02")
 
-# 「空でない文字列のどれにでも当たる」を見る文字列。共通の文字を持たない 3 つで、
+# 「空でない文字列のどれにでもヒットする」を見る文字列。共通の文字を持たない 3 つで、
 # パスにもコマンドにも出ない制御文字、記号 1 字、英字 1 字。判定は空の対象を見ないので、
 # deny の本体はこれで見る（`.` も拾う）。英字を入れるのは、`[^\w./ -]` のような
-# 記号だけに当たる式を「何にでも当たる」と言わないため。
+# 記号だけにヒットする式を「何にでもヒットする」と言わないため。
 # except と when の個別条件は空の文字列も見る _ANYTHING_PROBES のまま。
 _NONEMPTY_PROBES = ("\x02", "~", "a")
 
@@ -343,8 +343,8 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
 
     見るのは 2 つで、どちらも判定は書いたとおりに動いているので warn。
 
-    1. 何にでも当たる except。ルールが何にも当たらなくなり、書いてあるのに何も止めない
-    2. Bash / PowerShell を見る deny / ask の except。当てるのはコマンド列の全体なので、
+    1. 何にでもヒットする except。ルールが何にもヒットしなくなり、書いてあるのに何も止めない
+    2. Bash / PowerShell を見る deny / ask の except。適用するのはコマンド列の全体なので、
        `git push; echo wip/handoff/` のように除く語を足すだけで外れる
     """
     if not rule.excepts:
@@ -357,7 +357,7 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     name,
-                    f"except[{i}] は何にでも当たる。このルールはどの呼び出しにも当たらない",
+                    f"except[{i}] は何にでもヒットする。このルールはどの呼び出しにもヒットしない",
                 )
             )
     tools = [want.strip() for want in rule.match.split("|")]
@@ -367,7 +367,7 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 name,
-                f"{'|'.join(shells)} の except はコマンド列の全体に当たる。コマンドのどこかに"
+                f"{'|'.join(shells)} の except はコマンド列の全体にヒットする。コマンドのどこかに"
                 "除く語を追加するだけでこのルールが外れるので、except は語の位置まで狭く書くか、"
                 "ルールを分けてください",
             )
@@ -376,13 +376,13 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
 
 
 # 組み合わせ条件のノードを書き方だけから見積もった値。
-# 個別条件は「何にでも当たる」と言えるときだけ ALWAYS で、
-# それ以外は分からない（UNKNOWN）。何にも当たらない個別条件は書き方からは言えないので作らない。
+# 個別条件は「何にでもヒットする」と言えるときだけ ALWAYS で、
+# それ以外は分からない（UNKNOWN）。何にもヒットしない個別条件は書き方からは言えないので作らない。
 _ALWAYS, _NEVER, _UNKNOWN = "always", "never", "unknown"
 
 
 def _constant(node: rules.Condition) -> str:
-    """そのノードが、どの文字列にも当たる（ALWAYS）・どれにも当たらない（NEVER）と言えるか。"""
+    """そのノードが、どの文字列にもヒットする（ALWAYS）・どれにもヒットしない（NEVER）と言えるか。"""
     if node.is_leaf():
         compiled = node.compiled
         if compiled is not None and all(compiled.search(p) for p in _ANYTHING_PROBES):
@@ -401,17 +401,17 @@ def _constant(node: rules.Condition) -> str:
 
 
 def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
-    """glob / regex 1 つの deny の本体が、何にでも当たる。
+    """glob / regex 1 つの deny の本体が、何にでもヒットする。
 
     regex `''` や `.*` のような本体は、match のツールを丸ごと止める。狭く書いたつもりの式が
-    当てる語を持たずに当たっている形なので warn で言う。ツールを丸ごと止めると決めた書き方は
+    適用する語を持たずにヒットしている形なので warn で言う。ツールを丸ごと止めると決めた書き方は
     `glob: "*"` ちょうどで書く（no-powershell のように）。それは言わない。
 
-    判定は空の対象を見ない（Rule.matches）ので、`.` のように空でない文字列のどれにでも当たる
-    本体も同じ（_NONEMPTY_PROBES）。except を持つ deny は、本体が何にでも当たっても except で
+    判定は空の対象を見ない（Rule.matches）ので、`.` のように空でない文字列のどれにでもヒットする
+    本体も同じ（_NONEMPTY_PROBES）。except を持つ deny は、本体が何にでもヒットしても except で
     除いたものは止めないので、「丸ごと止める」とは言わず、除いたもの以外を止めると言う。
 
-    組み合わせ条件（when）の全体が何にでも当たる形は _when_problems が言う。
+    組み合わせ条件（when）の全体が何にでもヒットする形は _when_problems が言う。
     対象は deny で、ただし `{!root}` を組み立てられずに止める側へ倒した deny は、
     読み込みが別に言う。allow の広さは _broad が言う。
     """
@@ -431,8 +431,8 @@ def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
         Problem(
             SEVERITY_WARN,
             name,
-            f"本体の {kind} は何にでも当たる。{what}。ツールごと止めるつもりなら "
-            '`glob: "*"` と書き、そうでなければ当てる語を書いてください',
+            f"本体の {kind} は何にでもヒットする。{what}。ツールごと止めるつもりなら "
+            '`glob: "*"` と書き、そうでなければ適用する語を書いてください',
         )
     ]
 
@@ -443,11 +443,11 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
     書式の誤り（知らないキー・空のリスト・上限）は読み込み（rules._when）が error にするので、
     ここは意味の側を見る。どれも判定は書いたとおりに動いているので warn。
 
-    1. 何にでも当たる・何にも当たらないノード。`not` の下が何にでも当たる個別条件だけ、
-       `any` の中に何にでも当たる個別条件、のような形で、そのノードは書いても条件を絞らない。
+    1. 何にでもヒットする・何にもヒットしないノード。`not` の下が何にでもヒットする個別条件だけ、
+       `any` の中に何にでもヒットする個別条件、のような形で、そのノードは書いても条件を絞らない。
        いちばん外側の 1 つだけを言う（中を言っても直す場所は同じ）。
-       組み合わせ条件の全体なら、ルールがどの呼び出しにも当たる・当たらないことになる
-    2. Bash / PowerShell を見る deny / ask の `not`。当てるのはコマンド列の全体なので、
+       組み合わせ条件の全体なら、ルールがどの呼び出しにもヒットする・ヒットしないことになる
+    2. Bash / PowerShell を見る deny / ask の `not`。適用するのはコマンド列の全体なので、
        除く語をコマンドのどこかに足すだけで外れる（except と同じ理由）
     """
     tree = rule.when
@@ -455,7 +455,7 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
         return []
     problems: list[Problem] = []
 
-    # 何にでも当たる・何にも当たらないノードを外側から見て言う。
+    # 何にでもヒットする・何にもヒットしないノードを外側から見て言う。
     # 外側が中立（どちらとも言えない）のときだけ、中の子を見る。
     def look(node: rules.Condition) -> None:
         value = _constant(node)
@@ -464,11 +464,11 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
                 look(c)
             return
         where = node.where if node.is_leaf() else f"{node.where} の {node.kind}"
-        said = "何にでも当たる" if value == _ALWAYS else "何にも当たらない"
+        said = "何にでもヒットする" if value == _ALWAYS else "何にもヒットしない"
         whole = (
-            "。このルールはどの呼び出しにも当たる"
+            "。このルールはどの呼び出しにもヒットする"
             if value == _ALWAYS
-            else "。このルールはどの呼び出しにも当たらない"
+            else "。このルールはどの呼び出しにもヒットしない"
         )
         problems.append(
             Problem(
@@ -496,7 +496,7 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
         negated = {c.children[0].key() for c in items if c.kind == rules.WHEN_NOT}
         if not plain & negated:
             continue
-        result = "何にも当たらない" if node.kind == rules.WHEN_ALL else "何にでも当たる"
+        result = "何にもヒットしない" if node.kind == rules.WHEN_ALL else "何にでもヒットする"
         problems.append(
             Problem(
                 SEVERITY_WARN,
@@ -514,7 +514,8 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 name,
-                f"{'|'.join(shells)} の when の not はコマンド列の全体に当たる。コマンドのどこかに"
+                f"{'|'.join(shells)} の when の not はコマンド列の全体にヒットする。"
+                "コマンドのどこかに"
                 "除く語を追加するだけでこのルールが外れるので、not の下は語の位置まで狭く書くか、"
                 "ルールを分けてください",
             )
@@ -563,18 +564,18 @@ def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
 def _broad(rule: rules.Rule) -> str:
     """allow のルールが広いと言える理由。無ければ空。
 
-    additionalContext は当たった回ごとにモデルへ渡るので、広い allow に書くと
+    additionalContext はヒットした回ごとにモデルへ渡るので、広い allow に書くと
     ls のたびに同じ文が積まれる。「広い」の判定は 2 つで、どちらも書き方から
-    機械的に言えるものに限る。当たる頻度は記録を見ないと分からない。
+    機械的に言えるものに限る。ヒットする頻度は記録を見ないと分からない。
 
-    1. 何にでも当たる。翻訳後の式が、当てる語を含まない文字列にも当たる。
-       組み合わせ条件（when）は、書き方から何にでも当たると言えるとき（_constant）
+    1. 何にでもヒットする。翻訳後の式が、適用する語を含まない文字列にもヒットする。
+       組み合わせ条件（when）は、書き方から何にでもヒットすると言えるとき（_constant）
     2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような書き方は、それだけ多くの
        コマンドに同じ文を添えることになる
     """
     if rule.when is not None and rule.compiled is None:
-        # 組み合わせ条件は 1 つの文字列で試すと、`not: {regex: '^rm'}` のように "x" には当たるが
-        # 何にでも当たるわけではない形を取り違える。書き方から見積もる（_constant）。
+        # 組み合わせ条件は 1 つの文字列で試すと、`not: {regex: '^rm'}` のように "x" にはヒットするが
+        # 何にでもヒットするわけではない形を取り違える。書き方から見積もる（_constant）。
         if _constant(rule.when) == _ALWAYS:
             return "何にでもヒットする"
     elif rule.built() and rule.body_hits("x"):
@@ -606,11 +607,11 @@ def _alternatives(regex: str) -> int:
 def _inert(match: str) -> list[str]:
     """match に並んだツール名のうち、判定が対象を取り出せないものを返す。
 
-    ルールを当てる文字列を選ぶのは subjects.subject_of で、そこが知らないツール名では
+    ルールを適用する文字列を選ぶのは subjects.subject_of で、そこが知らないツール名では
     対象が空になり、rule.matches は必ず False を返す。つまりそのルールは
     書いてあるのに何も止めない。守っているつもりの穴なので warn で言う。
 
-    ツール名の一覧を持たずに subject_of を実際に呼んで確かめている。一覧を書き写すと、
+    ツール名の一覧を持たずに subject_of を実際に呼んで確かめている。一覧をコピーすると、
     判定側が扱うツールを増やしたときにこちらが気づかないうちに古くなり、正しいルールを
     誤って報告するようになる。差し込む欄の名前だけは subjects の表から借りる。
     """
@@ -620,7 +621,7 @@ def _inert(match: str) -> list[str]:
     for want in match.split("|"):
         tool = want.strip()
         if not tool or tool == rules.STOP_MATCH:
-            # ターンの終わりに当てる名前。当てる先は events.stop_rules_nudge が持つ。
+            # ターンの終わりに適用する名前。適用する先は events.stop_rules_nudge が持つ。
             continue
         probe = hookio.Input(tool_name=tool, tool_input=probe_input)
         if not subjects.subject_of(probe):

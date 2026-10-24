@@ -3,7 +3,7 @@
 VS Code 拡張のルール管理画面が読む形を、`--test` と同じ判定で組んでいることを
 確かめる。内部の関数は呼ばず、標準出力と終了コードだけを見る。見るのは 4 つ。
 
-1. `--test --json` が判定・根拠・当たったルール・返る文面を 1 つの JSON で出す
+1. `--test --json` が判定・根拠・ヒットしたルール・返る文面を 1 つの JSON で出す
 2. 判定が対象を取り出せないツールは `known` が偽で出る
 3. `--test-expectations` が期待する判定をタイプの期待と突き合わせ、食い違いを数える。
    文字で出すときは食い違いがあれば終了コード 1、JSON では常に 0
@@ -64,7 +64,7 @@ allow:
     why: 見るだけ
   - tool: Bash
     subject: "git push --force"
-    why: 食い違いの期待する判定。deny に当たるので allow の期待とずれる
+    why: 食い違いの期待する判定。deny にヒットするので allow の期待とずれる
   - tool: Bash
     subject: "# comment only"
     why: 何も走らないので判定に入らない
@@ -139,7 +139,7 @@ class TestJsonTest(unittest.TestCase):
                 self.assertEqual(body["verdict"], "deny", done.stdout + done.stderr)
 
     def test_rule_problems_are_said_once(self):
-        # 試験は判定と当たったルールの一覧で共通レイヤーを 2 度読み、期待は 1 件ずつ判定する。
+        # 試験は判定とヒットしたルールの一覧で共通レイヤーを 2 度読み、期待は 1 件ずつ判定する。
         # どちらでも、同じ苦情を 2 度出さない。
         silent = {"id": "silent", "match": "Bash", "glob": "*nothing matches*"}
         body = {**RULES, "deny": [*RULES["deny"], silent]}
@@ -194,7 +194,7 @@ class TestJsonTest(unittest.TestCase):
 
         PowerShell はコマンド、Grep / Glob は探す場所のパス、Skill はスキル名、
         WebFetch は URL が対象。欄の名前を取り違えると known でも対象が空になり、
-        ルールに当たらないまま通る。
+        ルールにヒットしないまま通る。
         """
         rules_path = write(
             self.tmp.name,

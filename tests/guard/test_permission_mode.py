@@ -16,7 +16,7 @@ from tests.inproc import run_ccnavi
 
 FIXTURE = "rules-undeclared.yml"
 
-# どのルールも言及しない呼び出し。allow にも deny にも ask にも当たらない。
+# どのルールも言及しない呼び出し。allow にも deny にも ask にもヒットしない。
 UNDECLARED_COMMAND = "docker run --rm alpine"
 
 
@@ -24,7 +24,7 @@ def run(permission_mode, command=UNDECLARED_COMMAND, mode="enable", guard_unwatc
     """道具を 1 回動かし、標準出力と記録の 1 行を返す。
 
     コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
-    切らないと、作業ツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
+    切らないと、ワークツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
     """
     environment = {
         **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
@@ -183,7 +183,7 @@ class UndeclaredTextTest(unittest.TestCase):
         self.assertIn("asking rather than deciding", reason)
         self.assertNotIn("will not get it through", reason)
 
-    def test_ルールに当たっていない回に_this_rule_と言わない(self):
+    def test_ルールにヒットしていない回に_this_rule_と言わない(self):
         for permission_mode in ("default", "bypassPermissions"):
             with self.subTest(permission_mode=permission_mode):
                 _, reason, _ = self.reason(permission_mode, self.UNREADABLE)

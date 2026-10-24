@@ -1,6 +1,6 @@
 """指摘の版・ダイジェスト・全文の転記（decide の版 2）を確かめる。
 
-- 版は鍵と本文（改行コードと Unicode の正規化だけを除いたもの）で決まる
+- 版はキーと本文（改行コードと Unicode の正規化だけを除いたもの）で決まる
 - 見せたあとに指摘が追加されただけなら食い違いに数えず、本文や位置が変わったら数える
 - 転記は最初のコメントの全文を、本文の中のバッククォートより長いフェンスで囲む
 - issue の本文が上限を超えたら、目次と続きのコメントに分ける
@@ -52,7 +52,7 @@ class ThreadVersionTest(unittest.TestCase):
         self.assertEqual(base, review.thread_version(thread("u1", decomposed)))
 
     def test_path_and_line_alone_do_not_change_it(self):
-        # 版は鍵と最初のコメントの本文だけで決まる（位置はホストが動かすことがある）。
+        # 版はキーと最初のコメントの本文だけで決まる（位置はホストが動かすことがある）。
         self.assertEqual(
             review.thread_version(thread("u1", "x", line=3)),
             review.thread_version(thread("u1", "x", line=9)),

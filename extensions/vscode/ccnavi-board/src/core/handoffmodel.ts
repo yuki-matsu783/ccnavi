@@ -7,7 +7,7 @@
  *
  * - どれを取り込めるか。`board` が真で、状態が `new` か `changed` で、error が無いもの。取り込めない対象には理由を言う
  * - 作業中のチケットが取り込みを止めるか。実行ファイルには錠が無く、`template` と `layer-config` の取り込みにだけ拡張が掛ける
- * - `board` が偽の対象（`defense`）を端末で取り込むときの案内
+ * - `board` が偽の対象（`defense`）をターミナルで取り込むときの案内
  *
  * VS Code の API も DOM も node も読まない（単体で試せる）。
  */
@@ -126,15 +126,15 @@ export function isImportable(entry: HandoffEntry): boolean {
 
 /**
  * 取り込めない理由。取り込めるなら空。
- * 順は、端末でだけ取り込む対象（`board` が偽）→ 状態 → error。複数当たるときは、ユーザが次にすることが変わる順に並べた最初の 1 つを言う。
+ * 順は、ターミナルでだけ取り込む対象（`board` が偽）→ 状態 → error。複数ヒットするときは、ユーザが次にすることが変わる順に並べた最初の 1 つを言う。
  */
 export function refusalReason(entry: HandoffEntry): string {
   if (!entry.board) {
-    return "ボードからは取り込めません。端末で取り込みます";
+    return "ボードからは取り込めません。ターミナルで取り込みます";
   }
   switch (entry.state) {
     case "conflict":
-      return "下書きを写したあとで、取り込み先が変わっています（conflict）。下書きを写し直してから、もう一度確かめてください";
+      return "下書きをコピーしたあとで、取り込み先が変わっています（conflict）。下書きをコピーし直してから、もう一度確かめてください";
     case "rejected":
       return "取り込み先として受け付けない対象です（rejected）。errors を直してください";
     case "unchanged":
@@ -143,7 +143,7 @@ export function refusalReason(entry: HandoffEntry): string {
     case "changed":
       return entry.errors.length > 0 ? "検査で error があります。直してから取り込みます" : "";
     default:
-      return `知らない状態です（${entry.state}）。実行ファイルを更新してください`;
+      return `未知の状態です（${entry.state}）。実行ファイルを更新してください`;
   }
 }
 
@@ -152,7 +152,7 @@ export function refusalReason(entry: HandoffEntry): string {
 /**
  * 作業中のチケットが取り込みを止める種類。設定と、設定を使うテンプレートは、hook が次の呼び出しから読み直すので、
  * 着手済みのチケットがある間に書くと判定が途中で変わる。`docs` はそうではないので掛けない。
- * `defense` はボードから取り込めない（端末のみ）ので、ここで掛ける意味が無い。
+ * `defense` はボードから取り込めない（ターミナルのみ）ので、ここで掛ける意味が無い。
  */
 export const LOCKED_KINDS: readonly HandoffKind[] = ["template", "layer-config"];
 
@@ -261,9 +261,9 @@ export function reconcileSelection(previous: ReadonlyMap<string, string>, entrie
 }
 
 /**
- * 端末で打つ取り込みのコマンド。`expect` は、そのパスを指して見るだけをもう一度呼んで返った値。
+ * ターミナルで打つ取り込みのコマンド。`expect` は、そのパスを指して見るだけをもう一度呼んで返った値。
  * `tree` は見るだけの答えの `tree`（下書きがあるツリー）。実行ファイルは `--root` で指したツリーの
- * `wip/handoff/` だけを見るので、ユーザが別の場所で端末を開いていても同じツリーへ取り込むように付ける。空なら付けない。
+ * `wip/handoff/` だけを見るので、ユーザが別の場所でターミナルを開いていても同じツリーへ取り込むように付ける。空なら付けない。
  *
  * 打つのは入口の sh（`ccnavi-user-handoff.sh`）。`workspace` はワークスペースルートで、sh の絶対パスを組むのに使う
  * （端末をどこで開いていても届くように）。空ならルートからの相対パスのまま。`--root` は sh が実行ファイルへ渡す。

@@ -23,7 +23,7 @@ keywords: [ccnavi-git.sh, git, ラッパースクリプト, push, fetch, pull, r
   `develop-v1.0.0` のような名前でもよい）へ直接は送れない。統合先が決まらなければ固定のリストだけで判定する。マージはユーザの側に残す。送り先が origin で、親のワークツリーのブランチなら、前の「push の関門」も通す
 - `fetch`・`pull` は**リモート名とブランチ名だけ**を通す。`:` か `+` を含む引数（refspec と URL）は通さない。
   `branch` の `-M`（強制の改名）と `-C`（強制の複製）も通さない。親のブランチを別のコミットへ移すと、親のブランチ上の承認済みチケットが差し替わるため
-- 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に当たるパスには、
+- 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）にヒットするパスには、
   `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、
   衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる
 - ccnavi 自身を守る場所（`.ccnavi/`・`.claude/settings*.json`・`.claude/hooks/`・記録と state・`ccnavi-git.sh`）には、
@@ -35,6 +35,6 @@ keywords: [ccnavi-git.sh, git, ラッパースクリプト, push, fetch, pull, r
 - サブコマンドより前のオプション（`git -c ...` など）は 1 つも受け取らない。`GIT_CONFIG_COUNT` と `GIT_EXTERNAL_DIFF` は実行前に消す
 
 これは事故と浪費を減らすためのもので、敵対的な回避への防御ではない。実行役のコマンドの一覧に無いもの（`python -c`・`ssh` など）に埋め込めば
-hook の文字列一致は当たらない。そこまで防ぐなら `permissions.deny` か sandbox が要る。
+hook の文字列一致はヒットしない。そこまで防ぐなら `permissions.deny` か sandbox が要る。
 
 記録は `logs/git-<日時>-<pid>.log` に成功でも失敗でも全量を書き、新しい順に 50 本だけ残す。`logs/` は `.gitignore` に入れ、コミットしない。

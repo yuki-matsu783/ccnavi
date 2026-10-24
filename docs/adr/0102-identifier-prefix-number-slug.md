@@ -7,7 +7,7 @@ keywords: [識別子, ブランチ名, feature, hotfix, 先頭の語, CCNAVI_BRA
 ---
 # ADR-0102: 親の識別子を <先頭の語>-<番号>-<slug> にし、日本語の字を使えるようにする
 
-状態: 採用（1〜5 章。5 章の `branch:` キーは 2026-10-04 に実装。取り込み状態の鍵や `syncstate` で引く処理への言及は、取り込み状態をやめた ADR-0142 が改める）
+状態: 採用（1〜5 章。5 章の `branch:` キーは 2026-10-04 に実装。取り込み状態のキーや `syncstate` で引く処理への言及は、取り込み状態をやめた ADR-0142 が改める）
 
 改訂（2026-10-19）: 統合先の名前の決め方（`CCNAVI_INTEGRATION_BRANCH` と `integration_local` への言及）は ADR-0148 が改める。統合先は各リポジトリの `origin/HEAD` だけで決め、環境変数 `CCNAVI_INTEGRATION_BRANCH`・`settings.local.json` の env・`--integration-branch` は廃止した。本文は当時の記述として残す。
 
@@ -44,8 +44,8 @@ issue から決めるときは `i` + 4 桁の 0 埋め（`i0131`）、issue が�
 |---|---|---|
 | 新しい親の形は `<先頭の語>-<番号>-<slug>`。先頭の語は英小文字で始まる英小文字と数字、番号は 0 で始まらない正の整数、slug の先頭は英数字か日本語の字 | 一覧で中身が読め、番号で issue と結べる。`-` 区切りなので識別子に `/` を入れずに済む（ファイル名とワークツリーの直下 1 段の置き場がそのまま使える） | `feature/123-x` を識別子にする（ファイル名とワークツリーの置き場が 2 段になる。5 章で別のキーとして扱う） |
 | 形は `--lint` の warn（新規の提案だけ）。承認は止めない | 前の段（ADR-0093 の 3.1 の 2・5・6）と同じ深刻度。承認済み・閉じたチケット（`i0055` など）は読めるまま残す | 承認で止める（既存の運用で書いた提案が一斉に止まる） |
-| 先頭の語のリストは `CCNAVI_BRANCH_PREFIXES`（カンマか空白区切り）。環境変数を先に見て、無ければ `.claude/settings.local.json`、`.claude/settings.json` の `env` を読む。無ければ既定のリスト | Claude Code が `env` を hook と Bash に渡すので、ほかの `CCNAVI_*` と同じ置き場で足りる。端末で打つ `ccnavi --lint` にも同じ値が効くよう、ファイルの `env` も読む（`CCNAVI_INTEGRATION_BRANCH` の `integration_local` と同じ考え） | 新しい設定ファイルを置く（ユーザの決定 5） |
-| リストに `release` と `main`・`master`・`develop` は入れられない（読まずに warn で名指しする） | 統合先や保護されたブランチの名前（`release-*`）に当たる | 黙って捨てる |
+| 先頭の語のリストは `CCNAVI_BRANCH_PREFIXES`（カンマか空白区切り）。環境変数を先に見て、無ければ `.claude/settings.local.json`、`.claude/settings.json` の `env` を読む。無ければ既定のリスト | Claude Code が `env` を hook と Bash に渡すので、ほかの `CCNAVI_*` と同じ置き場で足りる。ターミナルで打つ `ccnavi --lint` にも同じ値が効くよう、ファイルの `env` も読む（`CCNAVI_INTEGRATION_BRANCH` の `integration_local` と同じ考え） | 新しい設定ファイルを置く（ユーザの決定 5） |
+| リストに `release` と `main`・`master`・`develop` は入れられない（読まずに warn で名指しする） | 統合先や保護されたブランチの名前（`release-*`）にヒットする | 黙って破棄する |
 | 番号は issue の番号か通し番号。通し番号は、番号を持つ親の識別子（新しい形と、前の形 `i<番号>`・`<名前>-i<番号>`）の最大 + 1。先頭の語が違っても同じ通し番号を使う。`--lint` の形の warn と番号の重なりの warn が次の通し番号を添える | 新しいコマンドを足さずに、提案を書くエージェントが番号を知れる | 通し番号を出すコマンドを足す（ユーザとの IF が増える。要るなら後で足す） |
 | 同じリポジトリの親どうしで番号が重なれば warn（新規の提案が関わるときだけ） | issue の番号と通し番号は同じ数になりうる（ユーザの決定どおり warn で足りる）。issue の番号はリポジトリごとなので、比べるのは同じ `project` の中だけ | 番号の重なりで承認を止める |
 | `issue:` があるのに番号が違えば warn。プロジェクトの issue なら slug の頭が `<プロジェクト名>-` でなければ warn | 3.1 の 4・7 の考えを新しい形にチケットた | — |
@@ -68,7 +68,7 @@ issue の無いプロジェクトの提案は、通し番号がリポジトリ�
 `ticket_ids.issue_slug`: NFKC（全角英数を半角に、半角カナを全角に）→ ASCII の英字を小文字 → 英数字と日本語の字以外を `-` に
 まとめる → 前後の `-` を落とす → 長さで切る。末尾が `-<2 桁>` になるときはその部分を落とす（`release 01` →
 `feature-3-release`）。`-<2 桁>-<2 桁>` で終われば子の形（ADR-0101）そのもので、`-<2 桁>` だけでも子の識別子の途中
-（`<親>-<フェーズ番号>`）と紛れ、lint の warn に当たるため。何も残らなければ slug は `issue`（`feature-12-issue`）。
+（`<親>-<フェーズ番号>`）と紛れ、lint の warn にヒットするため。何も残らなければ slug は `issue`（`feature-12-issue`）。
 `feature-12` だけにすると、末尾が `-<2 桁>` になって同じく紛れるため。
 issue のタイトルは誰でも書けるので、Chrome 拡張の service worker も
 できあがった名前の字と形を確かめ直す（`protocol.startName`）。
@@ -133,7 +133,7 @@ branch: feature/123-login
 2. `ccnavi-git.sh` の push の節（取り込み状態をチェックアウト中のブランチ名で引いている箇所など）も、この作業で直す。
    統合先への push の拒否（`ccnavi_integration`）は壊さない
 3. sh が識別子とブランチ名の対応を知る手段は、実行ファイルの `ccnavi write-and-push family <識別子>` の答えに足した `branch <名前>`。
-   `ccnavi-sync.sh` の引数は識別子。取り込み状態の鍵は識別子のまま（`/` を state の置き場のパスに入れない）。互換の版
+   `ccnavi-sync.sh` の引数は識別子。取り込み状態のキーは識別子のまま（`/` を state の置き場のパスに入れない）。互換の版
    `CCNAVI_COMPAT` を上げる。
    Chrome 拡張も「親子のチケット = ブランチ名」の前提を直し、`branch:` を読む
 4. `branch:` は承認画面に出し、承認のダイジェストに入れる。承認の後に書き換えても効かない（改版は `branch:` の書き換えを断る。
@@ -158,10 +158,10 @@ branch: feature/123-login
 
 1. エージェント: 識別子のブランチで親のワークツリーを切る（`worktree add .claude/worktrees/<P> -b <P> <統合先>`）。
    提案に `branch: <B>` を書き、コミットする（承認前に push して Chrome で承認してもらってもよい）
-2. ユーザ: 承認する（端末か Chrome）。承認画面に「既存のブランチ <B> を使う」か「新しく切るブランチ」と出る
+2. ユーザ: 承認する（ターミナルか Chrome）。承認画面に「既存のブランチ <B> を使う」か「新しく切るブランチ」と出る
 3. エージェント: 親のワークツリーで `ccnavi-git.sh switch <B>`（`checkout <B>`・`-b`・`--create` も同じ）。
    承認済みチケットが `branch: <B>` を名乗るときだけ、次の 1 操作になる（`ccnavi-git.sh` の `co_carry`）
-   - 作業ツリーが綺麗で、途中の操作が無く、取り込み状態が無いか識別子のブランチの `present` のときだけ
+   - ワークツリーが綺麗で、途中の操作が無く、取り込み状態が無いか識別子のブランチの `present` のときだけ
    - `<B>` が無ければ今の先頭から切る。在れば（手元か origin）`<B>` へ移ってから識別子のブランチを merge し、
      承認済みチケットとマーカーを `<B>` に乗せる。merge が落ちたら取りやめて識別子のブランチへ戻る
    - 別の取り込み状態が `<B>` を親のブランチとしていれば移らない
@@ -243,21 +243,21 @@ sh はチケットを読まない（ADR-0093 の D33）。`ccnavi write-and-push
 | 承認 | `agree_screen.screen`・`_batch_entry` | 「■ ブランチ」と「既存のブランチ <名前> を使う」/「新しく切るブランチ」。JSON の `branch`・`existing_branch` |
 | 承認 | `agree_candidates.existing_branch_warnings`・`_written_on_own_branch` | `branch:` の親は warn しない。自分のブランチの上かは `branch_name` で見る。既にあるかは `tree.has_branch`（ファイルだけを読む） |
 | 承認 | `agree_candidates.revision_problems` | 改版で `branch:` を変えさせない |
-| 承認 | `approval.branch_problems` | 統合先の名前（`origin/HEAD` を含む）に当たる `branch:` と、2 つの親子のチケットが同じブランチを名乗る形を断る |
+| 承認 | `approval.branch_problems` | 統合先の名前（`origin/HEAD` を含む）にヒットする `branch:` と、2 つの親子のチケットが同じブランチを名乗る形を断る |
 | lint | `lint._parent_trees_off_branch` | 親のワークツリーが親のブランチの上に居るかを `Families.branch` で見る |
 | 実行ファイル | `write_and_push.family`・`cli` の `write-and-push sort` の版の検査 | 答えに `branch`（使えなければ `branch_refused`）を足す。`write-and-push sort` の版に `refs/remotes/origin/<親のブランチ>` を受ける |
 | 実行ファイル | `ops_stop._own_commits`（ADR-0087 の終える促しの取り込み元） | 子なら親のブランチ（`Families.branch`）の先を除く |
 | 実行ファイル | `ops.start` の案内、`review._followup_next` | ワークツリーを作る案内と子の起点に親のブランチ名を使う |
-| 取り込み状態 | `ccnavi_family_record`・`syncstate.family` | 鍵は識別子のまま、中の `branch` に親のブランチ名を書く（前の取り込み状態は識別子を書いている） |
+| 取り込み状態 | `ccnavi_family_record`・`syncstate.family` | キーは識別子のまま、中の `branch` に親のブランチ名を書く（前の取り込み状態は識別子を書いている） |
 | `ccnavi-git.sh` | worktree の節 | 行き先の名前（識別子）の親チケットが名乗る名前なら、`<行き先> <ブランチ>` と `<行き先> -b <ブランチ>` を通す |
 | `ccnavi-git.sh` | checkout・switch の節 | 親のワークツリーで許す移り先は親のブランチ（承認済みの `branch:` の値）だけ。識別子のブランチの上から承認済みの `branch:` のブランチへ移るのは `co_carry`（5.2 の 3）。移った後は識別子のブランチへも戻れない |
-| `ccnavi-git.sh` | push の節 | 消えた親子のチケットの検査は取り込み状態を `branch` の行で探す。最初の push の取り込み状態はワークツリーの名前（識別子）を鍵に、居るブランチが親のブランチのときだけ作る。子のワークツリーの見分けと統合先への push の拒否は変えない |
-| `ccnavi-sync.sh` | 引数・親子のチケットの集め方・取り込み・消えたかの確かめ・取り込み状態 | 引数は識別子。親のブランチ名が決まらなければ（引数なしでも）止めたと言って失敗に数える。移った後まだ送っていない親子のチケットは取り込みの後の検査をしない。ref（`refs/remotes/origin/<B>`）・`ls-remote` の一覧・fetch・merge の文・取り込み状態の `branch`・戻し方の案内は親のブランチ名、取り込み状態の鍵とロックは識別子 |
+| `ccnavi-git.sh` | push の節 | 消えた親子のチケットの検査は取り込み状態を `branch` の行で探す。最初の push の取り込み状態はワークツリーの名前（識別子）をキーに、居るブランチが親のブランチのときだけ作る。子のワークツリーの見分けと統合先への push の拒否は変えない |
+| `ccnavi-sync.sh` | 引数・親子のチケットの集め方・取り込み・消えたかの確かめ・取り込み状態 | 引数は識別子。親のブランチ名が決まらなければ（引数なしでも）止めたと言って失敗に数える。移った後まだ送っていない親子のチケットは取り込みの後の検査をしない。ref（`refs/remotes/origin/<B>`）・`ls-remote` の一覧・fetch・merge の文・取り込み状態の `branch`・戻し方の案内は親のブランチ名、取り込み状態のキーとロックは識別子 |
 | `ccnavi-common.sh` | write-and-push（`ccnavi_wap_prepare`・`ccnavi_wap_write`・`ccnavi_wap_undo`・`ccnavi_wap_sent`） | 未送信の比べ（`origin/<B>`）・push・`ls-remote`・`update-ref`・取り込み状態の `branch` は `ccnavi_wap_branch` |
 | `ccnavi-push-approved.sh` | 親のワークツリーの見分け、`carry_family` | ワークツリーの名前（識別子）で `write-and-push family` を聞く。送る ref は親のブランチ名 |
 | `ccnavi-fetch.sh` | 早送りの対象と ref | 取り込み状態の `branch` を親のブランチとして、居るブランチと比べ、`origin/<B>` に早送りする |
 | `ccnavi-review.sh` | MR の元ブランチ、write-and-push、下書きの名前 | MR は居るブランチ（親のブランチ）で探して作る（前のまま）。write-and-push の親子のチケットと下書きの名前（実行ファイルと揃える）は親のワークツリーの名前（識別子） |
-| Chrome（Python） | `_op_families`・`_closure`・`_build`・`records`・`_op_board`・`_family_tree`・`_op_confirm` | 要求の `family` はブランチ名のまま、親子のチケットの識別子は名乗る親チケットで決める（`_family_ident`。承認前の提案は識別子で名乗る `_claimed`）。仮のツリーは `.claude/worktrees/<識別子>` で HEAD は親のブランチ、取り込み状態は識別子の鍵に `branch`。名乗るブランチが 2 本以上なら、判定する親子のチケットでも閉包の先行の親子のチケット（`ambiguous`）でも止める。ホストに無い親子のチケットの識別子が識別子の形でなければ取り込み状態を書かずに止める |
+| Chrome（Python） | `_op_families`・`_closure`・`_build`・`records`・`_op_board`・`_family_tree`・`_op_confirm` | 要求の `family` はブランチ名のまま、親子のチケットの識別子は名乗る親チケットで決める（`_family_ident`。承認前の提案は識別子で名乗る `_claimed`）。仮のツリーは `.claude/worktrees/<識別子>` で HEAD は親のブランチ、取り込み状態は識別子のキーに `branch`。名乗るブランチが 2 本以上なら、判定する親子のチケットでも閉包の先行の親子のチケット（`ambiguous`）でも止める。ホストに無い親子のチケットの識別子が識別子の形でなければ取り込み状態を書かずに止める |
 | Chrome（TS） | `snapshot.ts`・`py.ts`・`render.ts` | 親子のチケットの一覧の `family`（識別子）・`conflict`、閉包の `idents`・`rivals`、先行の親子のチケットを読みに行く見当の `hints`。見出しに識別子も出す |
 
 変えなかったもの（識別子のまま正しいもの）: ワークツリーの名前と置き場の表記（`approval._authoritative`・`home_dir`・

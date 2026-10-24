@@ -3,7 +3,7 @@
 GitHub ではスレッドの解決状態（`threads`）と Draft 外し（`undraft`）が GraphQL でしか
 扱えない。GraphQL を制限する実行環境があり（Claude Code のセッションは REST だけ通す）、
 そこでは `confirm` / `fetch` / `ready` だけが 403 で止まる。curl の経路は `-f` が本文を
-捨てるので、画面に残るのは番号だけになり、認証の失敗と見分けが付かない。
+破棄するので、画面に残るのは番号だけになり、認証の失敗と見分けが付かない。
 
 案内そのものは `api_failed` の `graphql` の枝が出す。実際の GitHub の GraphQL を
 失敗させる環境は作れない（`remote_kind` はホスト名で github と読むので、127.0.0.1 に

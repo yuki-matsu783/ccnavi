@@ -19,7 +19,7 @@
 #   GitHub : github.com、ghe.com とそのサブドメイン（*.ghe.com）
 #            REST は github.com が https://api.github.com、GHE.com が https://api.<分類に使うホスト>。
 #            GraphQL はその REST の根の /graphql。GHE.com の API の URL の規則は実物では未検証
-#   GitLab : 上のどれにも当たらないもの全部（gitlab.com、*.aslead.cloud、セルフホスト、未知のホスト）。
+#   GitLab : 上のどれにもヒットしないもの全部（gitlab.com、*.aslead.cloud、セルフホスト、未知のホスト）。
 #            接続先は origin の scheme・ホスト・ポートをそのまま保つ（<scheme>://<ホスト[:ポート]>/api/v4）
 # Python の review_host.classify と、Chrome 拡張の hostclass.ts が同じ規則で、tests/fixtures/host-kinds.json の
 # 同じ表で突き合わせる。
@@ -88,9 +88,9 @@ ccnavi_host_parse() {
 	ccnavi_h_parse_why=""
 	ccnavi_h_project_json=""
 	# scheme は origin から取る（大文字小文字は区別しない）。https に決め打ちすると、社内や手元で
-	# 平文で立てた GitLab（`http://localhost:8929` のような形）に当たらない。ssh の形式には
+	# 平文で立てた GitLab（`http://localhost:8929` のような形）にヒットしない。ssh の形式には
 	# scheme が無いので、そこだけ https にする。
-	# host にはポートを残す（GitLab の接続先に使う）。省くと `:8929` のような立て方がすべて当たらなくなり、しかも
+	# host にはポートを残す（GitLab の接続先に使う）。省くと `:8929` のような立て方がすべてヒットしなくなり、しかも
 	# 省かれたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。分類にはポートを除いた
 	# ホスト（ccnavi_h_class_host）を使う。
 	case "$ccnavi_hp_origin" in
@@ -595,7 +595,7 @@ ccnavi_preflight() {
 		ccnavi_pf_tools_why="$ccnavi_pf_lack が見つからない"
 	else
 		ccnavi_pf_tools=ok
-		command -v curl >/dev/null 2>&1 || ccnavi_pf_tools_why="curl は無い（gh / glab が使えれば足りる）"
+		command -v curl >/dev/null 2>&1 || ccnavi_pf_tools_why="curl は無い（gh / glab が利用できれば足りる）"
 	fi
 
 	# 2. origin
@@ -669,13 +669,13 @@ ccnavi_preflight() {
 				ccnavi_pf_auth_source=none
 				ccnavi_pf_api=unverified
 				ccnavi_pf_api_kind=auth
-				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl に付ける $ccnavi_h_token_name もない"
+				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で利用できず、curl に付ける $ccnavi_h_token_name もない"
 				;;
 			*)
 				ccnavi_pf_auth_source=none
 				ccnavi_pf_api=unverified
 				ccnavi_pf_api_kind=tool
-				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl もない"
+				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で利用できず、curl もない"
 				;;
 			esac
 		fi
@@ -732,7 +732,7 @@ ccnavi_preflight() {
 		unverified | skipped) [ "$ccnavi_pf_result" = ng ] || ccnavi_pf_result=unverified ;;
 		esac
 	done
-	# 勧める対処: ng か unverified の項目のうち、次の順で最初に当たるもの
+	# 勧める対処: ng か unverified の項目のうち、次の順で最初にヒットするもの
 	ccnavi_pf_fix=""
 	if [ "$ccnavi_pf_tools" = ng ]; then
 		ccnavi_pf_fix=tool

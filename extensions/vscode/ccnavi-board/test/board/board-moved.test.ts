@@ -11,8 +11,8 @@ import { fixture } from "../helpers/fixture.js";
 
 test("CB-T192 列が変わったカードと新規起票のカードだけを出す。消えたカードは出さない", () => {
   // 見本のボードの置き場所。列は組み立て（board.ts）が決めたものをそのまま読む。
-  // `assert.deepEqual` は `asserts actual is T` なので、変数に当てると以後の型が literal に狭まる。
-  // 戻り値に直に当てて、`before` は `Placement` のままにする
+  // `assert.deepEqual` は `asserts actual is T` なので、変数に適用すると以後の型が literal に狭まる。
+  // 戻り値に直に適用して、`before` は `Placement` のままにする
   const board = buildBoard(fixture());
   const before = placementOf(board);
   assert.deepEqual(placementOf(board), {

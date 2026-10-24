@@ -1,5 +1,5 @@
 /**
- * テンプレートの編集の手元の写し（`src/core/template-edit.ts`）を確かめる。見本は `tests/fixtures/templates-check-json.json`
+ * テンプレートの編集の手元のコピー（`src/core/template-edit.ts`）を確かめる。見本は `tests/fixtures/templates-check-json.json`
  * の `data`（実行ファイルが読み返した中身）。編集はコピーを作り直すだけなので、期待値は手で書いた中身から決める。
  */
 import { test } from "node:test";
@@ -32,7 +32,7 @@ import { templatesCheckFixtureText } from "../helpers/templates.js";
 
 const FLOW = (id: string): FlowDoc => ({ id, name: id, nodes: [{ id: "s", type: "start", name: "開始" }], connections: [] });
 
-/** 4 項の全体計画（2 は 1 を、3 は 1 を、4 は 2 と 3 を待つ）と、2 番と 4 番のフロー、フィードバック計画 2 項 */
+/** 4 ステップの全体計画（2 に 1 が、3 に 1 が、4 に 2 と 3 が先行する）と、2 番と 4 番のフロー、フィードバック計画 2 ステップ */
 function sample(): EditTemplate {
   return {
     name: "t",
@@ -59,7 +59,7 @@ function fixtureData(): unknown {
   return parsed.value.data;
 }
 
-test("CB-T1139 実行ファイルが読み返した中身を編集の写しにして、書き出すと同じ中身に戻る（往復）。知らない欄も残る", () => {
+test("CB-T1139 実行ファイルが読み返した中身を編集のコピーにして、書き出すと同じ中身に戻る（往復）。知らない欄も残る", () => {
   const data = fixtureData();
   const read = fromData(data);
   assert.ok(read !== undefined);
@@ -73,7 +73,7 @@ test("CB-T1139 実行ファイルが読み返した中身を編集の写しに�
   assert.deepEqual(toData(extra as EditTemplate).note, "x");
 });
 
-test("CB-T1140 書き出した YAML を読み直すと書こうとした中身と同じになる。書き方（項の短い形・フィードバック計画とフローの省略）は実行ファイルと同じ", () => {
+test("CB-T1140 書き出した YAML を読み直すと書こうとした中身と同じになる。書き方（ステップの短い形・フィードバック計画とフローの省略）は実行ファイルと同じ", () => {
   const t = sample();
   const read = parse(serializeTemplate(t)) as Record<string, unknown>;
   assert.ok(sameData(toData(t), read));
@@ -89,7 +89,7 @@ test("CB-T1141 中身の見比べはキーの順を問わず、値の違いは�
   assert.ok(!sameData({ a: 1 }, null));
 });
 
-test("CB-T1142 項を消すと、後ろの項の添字・先行・全体計画のフローのキーを振り直す。最後の 1 項は消せない", () => {
+test("CB-T1142 ステップを消すと、後ろのステップの添字・先行・全体計画のフローのキーを振り直す。最後の 1 ステップは消せない", () => {
   const next = removeItem(sample(), "plan", 2);
   assert.deepEqual(
     next.plan.map((i) => [i.type, [...i.after]]),
@@ -99,10 +99,10 @@ test("CB-T1142 項を消すと、後ろの項の添字・先行・全体計画�
       ["acceptance", [1, 2]],
     ],
   );
-  // 途中の項を消しても、後ろの項は前の項を待ち続ける（並行して始まる項に変わらない）
+  // 途中のステップを消しても、後ろのステップは前のステップが先行のまま残る（並行して始まるステップに変わらない）
   const chain: EditTemplate = { ...sample(), plan: [{ type: "a", review: "", after: [] }, { type: "b", review: "", after: [1] }, { type: "c", review: "", after: [2] }], flows: {} };
   assert.deepEqual(removeItem(chain, "plan", 2).plan.map((i) => [i.type, [...i.after]]), [["a", []], ["c", [1]]]);
-  // 2 番のフローは項と一緒に消え、4 番のフローは 3 番になる（4 番は 2 を待っていたので、2 の先行の 1 を引き継ぐ。1 と 3 を待つ）
+  // 2 番のフローはステップと一緒に消え、4 番のフローは 3 番になる（4 番は 2 が先行だったので、2 の先行の 1 を引き継ぐ。先行は 1 と 3）
   assert.deepEqual(Object.keys(next.flows), ["3"]);
   assert.equal((next.flows["3"] as FlowDoc).id, "f4");
   assert.equal(removeItem({ ...sample(), plan: [sample().plan[0]], flows: {} }, "plan", 1).plan.length, 1);
@@ -110,9 +110,9 @@ test("CB-T1142 項を消すと、後ろの項の添字・先行・全体計画�
   assert.equal(removeItem(removeItem(sample(), "feedback", 2), "feedback", 1).feedback.length, 0);
 });
 
-test("CB-T1143 項は先行か後続を越えない動きだけ前後に動かせる。動かすとフローのキーと先行が合わせて入れ替わる", () => {
+test("CB-T1143 ステップは先行か後続を越えない動きだけ前後に動かせる。動かすとフローのキーと先行が合わせて入れ替わる", () => {
   const t = sample();
-  // 2 と 3 は互いに待たないので入れ替えられる。1 は 2 の先行なので 2 の前へは動かせない。4 は 2 と 3 の後続
+  // 2 と 3 は互いに先行しないので入れ替えられる。1 は 2 の先行なので 2 の前へは動かせない。4 は 2 と 3 の後続
   assert.ok(canMove(t, "plan", 3, -1));
   assert.ok(!canMove(t, "plan", 2, -1));
   assert.ok(!canMove(t, "plan", 4, -1));
@@ -127,14 +127,14 @@ test("CB-T1143 項は先行か後続を越えない動きだけ前後に動か�
   assert.equal(moveItem(t, "plan", 2, -1), t);
 });
 
-test("CB-T1144 線を引くと、先行が自分より小さい添字になるよう項を並べ直す。引けない線（自分へ・計画をまたぐ・同じ線）は何もしない", () => {
+test("CB-T1144 線を引くと、先行が自分より小さい添字になるようステップを並べ直す。引けない線（自分へ・計画をまたぐ・同じ線）は何もしない", () => {
   const t = sample();
-  // 図の番号 3（docs）を 2（implement）が待つ線。2 は 3 より前にあるので、docs を implement の前へ出す
+  // 図の番号 3（docs）が 2（implement）の先行になる線。2 は 3 より前にあるので、docs を implement の前へ出す
   const reordered = connectItems(t, 3, 2);
   assert.deepEqual(reordered.plan.map((i) => i.type), ["design", "docs", "implement", "acceptance"]);
   assert.deepEqual(reordered.plan[2].after, [1, 2]);
   assert.deepEqual(reordered.plan[3].after, [2, 3]);
-  // 並べ直しでフローのキーも項に付いて動く（2 番の implement は 3 番へ）
+  // 並べ直しでフローのキーもステップに付いて動く（2 番の implement は 3 番へ）
   assert.equal((reordered.flows["3"] as FlowDoc).id, "f2");
   assert.equal((reordered.flows["4"] as FlowDoc).id, "f4");
   // 並べ直さずに済む線は、先行を足すだけ
@@ -154,7 +154,7 @@ test("CB-T1144 線を引くと、先行が自分より小さい添字になる�
 
 test("CB-T1145 並べ直せない循環の線は引かない。先行の添字が崩れた計画は並べ直して満たす", () => {
   const t = sample();
-  // 設計（1）が受入（4）を待つと、4 は 2・3 を通って 1 を待つので循環する
+  // 受入（4）が設計（1）の先行になると、4 には 2・3 を通って 1 が先行するので循環する
   assert.equal(connectItems(t, 4, 1), t);
   const broken: EditTemplate = { ...t, plan: [{ type: "a", review: "", after: [2] }, { type: "b", review: "", after: [] }], flows: {} };
   const fixed = renumber(broken, "plan");
@@ -165,7 +165,7 @@ test("CB-T1145 並べ直せない循環の線は引かない。先行の添字�
   assert.equal(renumber(t, "plan"), t);
 });
 
-test("CB-T1146 項の足し方・型とレビューの差し替え・説明の差し替え・フローの置き外し", () => {
+test("CB-T1146 ステップの足し方・型とレビューの差し替え・説明の差し替え・フローの置き外し", () => {
   const t = sample();
   const added = addItem(t, "plan", "staging");
   assert.deepEqual(added.plan[4], { type: "staging", review: "", after: [4] });

@@ -42,10 +42,10 @@
 
 `lines_over` / `files_over` / `deleted_over` には、数えるパスを
 `include` / `exclude`（glob のリスト）で絞れる。どちらも既定は無指定で、無指定なら差分全体を数える。
-`include` があれば当たったパスだけ、`exclude` に当たったパスは `include` に当たっていても
+`include` があればヒットしたパスだけ、`exclude` にヒットしたパスは `include` にヒットしていても
 数えない。`exclude` だけなら、それ以外は全部数える。末尾が `/` の glob はディレクトリ
-（`src/` は `src/`）。rename / copy は元のパスも見て、`include` は旧新どちらかが当たれば数え、
-`exclude` は旧新の両方が当たったときだけ外す。
+（`src/` は `src/`）。rename / copy は元のパスも見て、`include` は旧新どちらかがヒットすれば数え、
+`exclude` は旧新の両方がヒットしたときだけ外す。
 バイナリの変更は行数 0 として数える（ファイル数と削除数には入る）。
 
 ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。破損していれば組み込みに戻り、
@@ -105,11 +105,11 @@ class Factor:
     kind: str
     # lines_over / files_over / deleted_over は int、glob / script / judge は str。
     value: object
-    # glob の上限。当たるごとに加点するので、無ければ青天井。
+    # glob の上限。ヒットするごとに加点するので、無ければ青天井。
     max: int | None = None
     compiled: re.Pattern | None = None
     # lines_over / files_over / deleted_over だけが持つ、数える対象のパス（glob）。
-    # include が空なら全パスが対象、あれば当たったパスだけ。exclude に当たったパスは常に外す。
+    # include が空なら全パスが対象、あればヒットしたパスだけ。exclude にヒットしたパスは常に外す。
     include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
     include_compiled: tuple[re.Pattern, ...] = ()
@@ -129,8 +129,8 @@ class Factor:
         """定量項目（行数・ファイル数・削除数）がこの変更を数えるか。
 
         rename / copy は元のパスも見る。新しいパスだけで見ると、対象の外へ動かしたファイルの
-        書き換えが数えから消え、リスクが軽い側へ倒れる。include はどちらかが当たれば数え、
-        exclude は両方が当たったときだけ外す。
+        書き換えが数えから消え、リスクが軽い側へ倒れる。include はどちらかがヒットすれば数え、
+        exclude は両方がヒットしたときだけ外す。
         """
         paths = [change.path] + ([change.old] if change.old else [])
         if self.include_compiled and not any(
@@ -147,7 +147,7 @@ class Factor:
         各レイヤーは `<ccnavi ディレクトリ>/scripts/` を指すので、
         同期で共通レイヤーをコピーした配点はパスが違う。パスで比べると同じ項目を
         `<レイヤー>:<id>` として 2 重に数える。中身まで見るのは、
-        名前だけ同じ別のスクリプトを同じ項目として捨てないため。
+        名前だけ同じ別のスクリプトを同じ項目として破棄しないため。
         """
         value = self.value
         if self.kind == KIND_SCRIPT:
@@ -167,7 +167,7 @@ class Factor:
 
 @dataclass
 class Definition:
-    # levels は書かれた鍵だけ。書かれていない鍵は DEFAULT_LEVELS で読む
+    # levels は書かれたキーだけ。書かれていないキーは DEFAULT_LEVELS で読む
     # （`level_of`）。既定で埋めて持つと、合成のときに「書いていないレイヤー」が
     # 共通レイヤーの緩めた境目の点を気づかないうちに戻すことになる。
     levels: dict[str, int] = field(default_factory=dict)
@@ -282,8 +282,9 @@ def parse(
     リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
 
     処理フロー:
-    1. `yamlread.safe_load` で読む。読めない・最上位が辞書でない・版（`VERSION`）が違うなら止める。
-    2. `levels` を読む。書かれた鍵だけを `levels` に入れ、既定は足さない。`ordered` で medium
+    1. `yamlread.safe_load` で読む。
+    読めない・最上位がマップでない・版（`VERSION`）が違うなら止める。
+    2. `levels` を読む。書かれたキーだけを `levels` に入れ、既定は足さない。`ordered` で medium
        <= high <= critical を見る。
     3. `factors` を `_factors` で読む。`script_homes` の外を指す `script:` はそこで error になる。
     4. error が 1 つでもあれば None を返す。warn だけなら定義と問題の列を返す。
@@ -295,7 +296,7 @@ def parse(
     except yaml.YAMLError as exc:
         return None, [Problem(SEVERITY_ERROR, where, f"YAML として読めない: {exc}")]
     if not isinstance(data, dict):
-        return None, [Problem(SEVERITY_ERROR, where, "最上位が辞書ではない")]
+        return None, [Problem(SEVERITY_ERROR, where, "最上位がマップではない")]
     if data.get("version") != VERSION:
         return None, [
             Problem(
@@ -304,15 +305,15 @@ def parse(
                 f"版 {data.get('version')!r} は扱えない（このビルドが読むのは {VERSION}）",
             )
         ]
-    # 書かれた鍵だけを持つ。既定で埋めると、合成のときに「書いていないレイヤー」が
+    # 書かれたキーだけを持つ。既定で埋めると、合成のときに「書いていないレイヤー」が
     # 共通レイヤーの緩めた境目の点を気づかないうちに戻す。
     # 順を見るときだけ既定で補う。
     levels: dict[str, int] = {}
-    # 境目の点。書かれた鍵だけを読む。
+    # 境目の点。書かれたキーだけを読む。
     raw_levels = data.get("levels")
     if raw_levels is not None:
         if not isinstance(raw_levels, dict):
-            return None, [Problem(SEVERITY_ERROR, where, "`levels` が辞書ではない")]
+            return None, [Problem(SEVERITY_ERROR, where, "`levels` がマップではない")]
         for name in ("medium", "high", "critical"):
             if name in raw_levels:
                 value = raw_levels[name]
@@ -345,12 +346,12 @@ def parse(
 
 
 def effective_levels(levels: dict[str, int]) -> dict[str, int]:
-    """書かれた鍵に既定を足した、実際に使われる境目の点。"""
+    """書かれたキーに既定を足した、実際に使われる境目の点。"""
     return {**DEFAULT_LEVELS, **levels}
 
 
 def ordered(levels: dict[str, int]) -> bool:
-    """`medium <= high <= critical` になっているか。書かれていない鍵は既定で読む。"""
+    """`medium <= high <= critical` になっているか。書かれていないキーは既定で読む。"""
     effective = effective_levels(levels)
     return effective["medium"] <= effective["high"] <= effective["critical"]
 
@@ -361,7 +362,7 @@ def _factors(
     """`factors:` の 1 項目ずつを Factor の列にする。外れた項目は Problem に積んで次へ進む。
 
     処理フロー:
-    1. 項目が辞書か、id の形と重複を見る（`_ID`・`seen`）。
+    1. 項目がマップか、id の形と重複を見る（`_ID`・`seen`）。
     2. `points` が 0 以上の整数かを見る。
     3. 加点条件（`KINDS` のどれか 1 つだけ）を見る。
     4. 条件の種類ごとに値を検証する。`glob` は `globmatch.translate` で式にし、`script` は
@@ -375,9 +376,9 @@ def _factors(
     factors: list[Factor] = []
     seen: set[str] = set()
     for i, item in enumerate(raw):
-        # 項目の形（辞書・id・重複・点数）を見る。
+        # 項目の形（マップ・id・重複・点数）を見る。
         if not isinstance(item, dict):
-            problems.append(Problem(SEVERITY_ERROR, where, f"`factors[{i}]` が辞書ではない"))
+            problems.append(Problem(SEVERITY_ERROR, where, f"`factors[{i}]` がマップではない"))
             continue
         ident = str(item.get("id") or "").strip()
         if ID_SEPARATOR in ident:
@@ -452,7 +453,7 @@ def _factors(
                 scope[name] = parsed
             if bad:
                 continue
-            # ワイルドカードの無い include はそのファイル名にしか当たらない。ディレクトリの
+            # ワイルドカードの無い include はそのファイル名にしかヒットしない。ディレクトリの
             # つもりで `src` と書くと、何も数えず点が 0 になる（気づかないうちに軽い側へ偏る）。
             for glob in scope["include"][0]:
                 if not any(ch in glob for ch in "*?["):
@@ -531,7 +532,8 @@ def _globs(raw: object) -> tuple[tuple[tuple[str, ...], tuple[re.Pattern, ...]],
     compiled: list[re.Pattern] = []
     for g in raw:
         glob = g.strip().replace("\\", "/")
-        # 末尾の `/` はディレクトリ。`src/` を `src/**` として読む（`src` だけでは何も当たらない）。
+        # 末尾の `/` はディレクトリ。
+        # `src/` を `src/**` として読む（`src` だけでは何もヒットしない）。
         glob = (
             glob.strip("/") + "/**" if glob.endswith("/") and glob.strip("/") else glob.strip("/")
         )
@@ -553,10 +555,10 @@ def mark_layer(definition: Definition, layer: str, home: str) -> None:
 def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition, list[Problem]]:
     """共通レイヤーの配点に、行き先のレイヤーの配点を足す。
 
-    `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを捨て（info）、
+    `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを破棄し（info）、
     中身が違えば両方を数え、後ろのレイヤーの項目を `<レイヤー>:<id>` という名前にする（warn）。
-    `levels` は書かれた鍵だけを合わせ、キーごとに小さいほうを採る。どのレイヤーも書いて
-    いない鍵は既定（`DEFAULT_LEVELS`）。
+    `levels` は書かれたキーだけを合わせ、キーごとに小さいほうを採る。どのレイヤーも書いて
+    いないキーは既定（`DEFAULT_LEVELS`）。
 
     同 `id` の衝突でレイヤーを空にしないのは、空にすると点が小さくなる側になるから。
     両方を数えれば、衝突は点を増やす向きにしか影響しない（ルールの同 `id` と同じ扱い）。
@@ -575,7 +577,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
                 Problem(
                     SEVERITY_INFO,
                     f.id,
-                    f"`{f.id}` は前のレイヤーと全欄が同じなので、{layer} の側を捨てた。"
+                    f"`{f.id}` は前のレイヤーと全欄が同じなので、{layer} の側を破棄した。"
                     "点は前のレイヤーの 1 本で数える",
                 )
             )
@@ -884,9 +886,9 @@ def evaluate(
     """差分と判定から点を出す。定性項目に判定が無ければ pending に積む。
 
     処理フロー:
-    1. 定義の項目を順に読み、種類ごとに当てる。行数・ファイル数・削除数は `scoped` で include /
+    1. 定義の項目を順に読み、種類ごとに適用する。行数・ファイル数・削除数は `scoped` で include /
        exclude に絞った差分を数える。
-    2. `glob` は当たったファイルの数だけ加点する。その項目に `max` があれば、その値で上限を切る。
+    2. `glob` はヒットしたファイルの数だけ加点する。その項目に `max` があれば、その値で上限を切る。
     3. `script` は `run_script` で測る。点が 0 なら何も積まない。
        測れなければ配点の全部を加点し、理由を `unmeasured` に積む（0
        件と数えて軽い側へ倒さない）。

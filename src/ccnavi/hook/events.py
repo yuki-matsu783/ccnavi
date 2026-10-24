@@ -97,7 +97,7 @@ def decide(
     4. イベントごとに 1 つの関数へ渡す（`judge.decide_before`・`decide_after`・
        `decide_after_failure`・`decide_at_start`・`decide_at_prompt`・`decide_at_stop`・
        `subagent.at_start`・`subagent.at_stop`）。
-    5. どれにも当たらないイベントは、判定をしないものとして記録して抜ける。
+    5. どれにもヒットしないイベントは、判定をしないものとして記録して抜ける。
     """
     if mode == modes.DISABLE:
         record.decision, record.reason = audit.SKIP, audit.REASON_MODE_DISABLED
@@ -153,7 +153,7 @@ def watch_context(
     record: audit.Record,
     raw: approval.Raw | None = None,
 ) -> tuple[list[post.Watched], post_findings.ScopeGuard | None]:
-    """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
+    """ターンの区切りでワークツリーを見る 2 つが、共通して使う持ち物。
 
     保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
     通った書き込みがターンの終わりに報告される（あるいはその逆）ことになり、
@@ -171,7 +171,7 @@ def watched_for(
     record: audit.Record,
     payload: hookio.Input | None = None,
 ) -> list[post.Watched]:
-    """実行後に見るツリーと、それぞれに当てるルール。
+    """実行後に見るツリーと、それぞれに適用するルール。
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
@@ -228,14 +228,14 @@ def watched_for(
 def scope_guard(
     conf: settings.Settings, root: str, raw: approval.Raw | None = None
 ) -> post_findings.ScopeGuard | None:
-    """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。
+    """承認済みチケットを、実行後の側から適用する持ち物。チケット制御が disable なら None。
 
     `raw` は呼び手が `approval.read_raw` で読んだもの。渡せば置き場を読み直さない。
     """
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root, raw=raw)
-    # 定義の上限は親に固定した写し（`phases:`）から引く（`phase_scope.type_for`）。
+    # 定義の上限は親に固定したコピー（`phases:`）から引く（`phase_scope.type_for`）。
     # `phases.yml` は読まない。
     return post_findings.ScopeGuard(
         root=root,
@@ -263,8 +263,8 @@ def decide_at_prompt(
 
     1. 設定ファイルの変更の知らせ（`guard`）。ユーザの発言ではない回（バックグラウンド作業の
        完了通知など）に、ターンの間に動いた設定ファイルを戻した旨を言う
-    2. 共通レイヤーと工程スキルをプロジェクトへ写した知らせ（`promptsync.sync`）。写した
-       ファイルのコミットを案内する。ユーザの発言のときだけ写す
+    2. 共通レイヤーと工程スキルをプロジェクトへコピーした知らせ（`promptsync.sync`）。コピーした
+       ファイルのコミットを案内する。ユーザの発言のときだけコピーする
     3. 依頼文の issue・MR の指定への指示（`branchfind.prompt_context`）。着手の前に紐づく
        ブランチを探してユーザに確かめる
     4. 終わったサブエージェントの子の範囲を確かめられなかった印（`subagent.unchecked_scope`）
@@ -279,8 +279,8 @@ def decide_at_prompt(
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）に渡す。
 
-    ユーザの発言なら、まず共通レイヤーと工程スキルをプロジェクトへ写す（`promptsync.sync`）。
-    写すのはツール呼び出しの外のここだけで、写した分もユーザの変更と同じに受け入れるので、
+    ユーザの発言なら、まず共通レイヤーと工程スキルをプロジェクトへコピーする（`promptsync.sync`）。
+    コピーするのはツール呼び出しの外のここだけで、コピーした分もユーザの変更と同じに受け入れるので、
     ミラーは実行後チェックとバックアップと復元から特別扱いされない。
 
     ユーザの発言なら、前のターンの終わりからここまでの変更を、ユーザの手によるものとして
@@ -301,7 +301,7 @@ def decide_at_prompt(
     by_user = not payload.from_background_task() and not busy.is_busy(
         conf.state, payload.session_id
     )
-    # 共通レイヤーと工程スキルの写しを、受け入れの前に書く。書いた分が受け入れの対象になり、
+    # 共通レイヤーと工程スキルのコピーを、受け入れの前に書く。書いた分が受け入れの対象になり、
     # 次のツール呼び出しが戻さない。
     mirrored = ""
     if by_user:
@@ -418,7 +418,7 @@ def decide_at_stop(
     報告のためには止めない。このイベントで止めることはターンを続けさせる意味になり、
     報告のために作業を終わらせない形になる。報告は言うだけにする。
 
-    dry-run でも報告する。ここは呼び出しにも作業ツリーにも手を
+    dry-run でも報告する。ここは呼び出しにもワークツリーにも手を
     出さず、見えたことを言うだけなので、モードが約束しているものを何ひとつ破らない。
     むしろ dry-run は「まだ何も適用していないが何が起きているか」を見るためのモードなので、
     ここが何も言わないと見る手立てが減る。
@@ -442,7 +442,8 @@ def decide_at_stop(
     （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と `finish` の促し
-    （`ops_stop.unfinished_at_stop`）の両方に渡す。間の `post.at_stop` は報告するだけで作業ツリーを
+    （`ops_stop.unfinished_at_stop`）の両方に渡す。
+    間の `post.at_stop` は報告するだけでワークツリーを
     戻さず、`repeat.at_stop` は state を読むだけなので、置き場のファイルは動かない。
     """
     # 動かしている作業が残っているか。次の発言での受け入れ（`decide_at_prompt`）が読む。
@@ -769,7 +770,7 @@ def stop_rules_nudge(
     """`match: Stop` の `allow` のルールが、このターンの終わりで止めて渡す文。
 
     書いたルールが無ければ空で、これまでどおり止めない。何を言うか・何回に 1 度かは
-    設定が持ち、ここは当てて数えるだけ（レビューの勧告と同じ分け方）。`every: 10` と書けば
+    設定が持ち、ここは適用して数えるだけ（レビューの勧告と同じ分け方）。`every: 10` と書けば
     「ターンの終わり 10 回に 1 度」止める。
 
     ルールは共通レイヤーとワークスペース自身のレイヤーからだけ引く（`ruleload.stop_rules`）。プロジェクトのレイヤーは
@@ -784,7 +785,7 @@ def stop_rules_nudge(
     - 数えを覚えられない（`--state ""`、記録を読めない・書けない）。覚えられないまま止めると
       ターンの終わりのたびに止まるので、何も言わない側を採る（`finish` の促しと同じ）
 
-    数えは `ctxfile.stop_path` に置き、compact・再開・clear では捨てない。渡す文の頭には
+    数えは `ctxfile.stop_path` に置き、compact・再開・clear では破棄しない。渡す文の頭には
     `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、ユーザへの問いで終わった
     ターンの問いが消えないように。記録の `rules` には、実際に渡したルールだけを残す。
     """
@@ -925,7 +926,7 @@ def _feedback_nudge(
     止めない回と止め方は `_request_nudge` と同じ（`stop_hook_active`・サブエージェント・
     state の置き場・実行中のサブエージェントを見る。`dry-run` でも止める）。同じ状態（親・HEAD・
     改版を提案済みか）では 1 回だけで、記録は `nudged-<セッション>.json` の `feedback:` で
-    始まる鍵。判定は `ops_stop_feedback.waiting_at_stop`。
+    始まるキー。判定は `ops_stop_feedback.waiting_at_stop`。
     """
     if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
         return ""
@@ -979,7 +980,7 @@ def _integrate_nudge(
     state の置き場を見て、モードは見ない。実行中のサブエージェントが居る間も止めず、
     「1 回だけ」の記録も進めない）。チケット制御の有無は見ない（直接作業はチケットに結び付かない）。
     同じ状態では促しも理由も 1 回だけで、記録は `nudged-<セッション>.json` の `integrate:` で
-    始まる鍵。`deadline`（`time.monotonic` の絶対時刻）を過ぎてから git を起こさない。
+    始まるキー。`deadline`（`time.monotonic` の絶対時刻）を過ぎてから git を起こさない。
     """
     if payload.stop_hook_active or payload.agent_id or not conf.state:
         return "", ""
@@ -1037,13 +1038,13 @@ def decide_at_start(
             root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
         ),
     )
-    # 渡した回の数えはここで捨てる。このイベントは起動だけでなく再開と compact の後にも
+    # 渡した回の数えはここで破棄する。このイベントは起動だけでなく再開と compact の後にも
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
-    # 実行中のサブエージェントの印は、起動（startup）と再開（resume）で捨てる。どちらも新しい
+    # 実行中のサブエージェントの印は、起動（startup）と再開（resume）で破棄する。どちらも新しい
     # プロセスで、前のプロセスのサブエージェントは生きていない。compact と clear は同じ
-    # プロセスなので、実行中の体が残りうる。Stop の数え（上）は起動だけで捨てる。
+    # プロセスなので、実行中の体が残りうる。Stop の数え（上）は起動だけで破棄する。
     if payload.source in ("startup", "resume"):
         subagent.forget_running(conf.state, payload.session_id)
         busy.clear(conf.state, payload.session_id)
@@ -1189,7 +1190,7 @@ def decide_after_failure(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """ツール自体が失敗した。作業ツリーを見て戻し、失敗の連続（failstreak）に数える。
+    """ツール自体が失敗した。ワークツリーを見て戻し、失敗の連続（failstreak）に数える。
 
     失敗した呼び出しも、失敗する前に設定ファイルや保護領域を変えていることがある
     （`rm …; false`、途中で落ちたビルドなど）。ここで実行後チェックを通さないと、その変更は
@@ -1271,14 +1272,15 @@ def _decide_after(
 
     期限を渡していない。実行前の期限は、遅い判定が気づかないうちに許可と同じ扱いになるのを
     防ぐためのもので、止められるイベントでしか意味を持たない。ここは
-    何も止めていないので、遅れは待ち時間にしかならない。作業ツリーを読む側は
+    何も止めていないので、遅れは待ち時間にしかならない。ワークツリーを読む側は
     自前の短い時間を持っていて、そこに達したら何も言わずに終わる。
 
     処理フロー:
     1. 失敗の連続を 0 に戻す（`failstreak.reset`）。
     2. 設定ファイルの保護を、ルールを読む前に戻す
        （`judge.guard_setting_files`・`selfguard.after`）。
-    3. 見る作業ツリーを決め（`watched_for`）、実行後チェック（`post.check`）で報告と差し戻しを得る。
+    3. 見るワークツリーを決め（`watched_for`）、
+    実行後チェック（`post.check`）で報告と差し戻しを得る。
     4. 差し戻しの有無によらず、フェーズの知らせ（`phase.announce`）とサブエージェントの知らせ
        （`subagent.ignored_bounce`・`subagent.unchecked_scope`・`subagent.outcome_notices`）を足す。
     5. 差し戻しの対象は、直前の実行が汚したと言える DENY だけ。ENABLE なら標準エラーに書いて
@@ -1339,7 +1341,7 @@ def _decide_after(
     bounced = ""
     told: list = []
     if conf.tickets_enabled:
-        # `post.check` が作業ツリーを戻そうとした回は、置き場のファイルも戻っていることが
+        # `post.check` がワークツリーを戻そうとした回は、置き場のファイルも戻っていることが
         # あるので読み直す。それ以外の回は、上で読んだ置き場をそのまま使う。
         parent, raw = phase.parent_at(root, conf, payload.cwd, None if restored else raw)
         said = phase.announce(stderr, root, conf, parent, raw) if parent is not None else ""

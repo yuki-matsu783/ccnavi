@@ -4,7 +4,7 @@
 --no-commit`）、完了の記録と一緒に 1 つのマージコミットにして push する。git を動かすのは sh
 （`ccnavi-common-write-and-push.sh`）で、実行ファイルはネットワークに出ず、コミットもしない。ここが答えるのは
 合流してよいかの判定と、衝突したときに誰のワークツリーで解くかの案内だけ。どちらも 1 行 1 項目
-（`<鍵> <値>`。sh は jq を使わない）。
+（`<キー> <値>`。sh は jq を使わない）。
 
 - `ccnavi write-and-push merge <子>`: 合流の前の検査
   - `skip <理由>`: 合流しない（親の finish、作業中でない子など）。sh は `ticket finish` へ進み、
@@ -112,7 +112,7 @@ def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
     if not (head and parent_head):
         _stop(stdout, f"子 {ident} の先頭を読めない。何も変えずに止めた", [])
         return 0
-    # 承認の写しから親のチケットを引き、子のコミットを調べる。
+    # 承認のコピーから親のチケットを引き、子のコミットを調べる。
     copies, _ = approval.scan(conf, root)
     parent = approval_checks.by_id(copies).get(parent_id)
     places, outside, why = phase_scope.merge_findings(root, conf, found, parent, head)

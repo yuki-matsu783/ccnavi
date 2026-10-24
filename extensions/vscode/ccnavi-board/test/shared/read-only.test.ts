@@ -66,7 +66,7 @@ test("CB-T642 ボード側: 読み取りの効果（loadList・loadState・loadD
   assert.equal(callers, 2, "ターミナルへ送るのは承認の push（carry）と片付け（sendRetire）の 2 か所だけ");
   assert.match(caseOf(panel, "carry"), /runInTerminal\(root, pushApprovedCommand/);
   assert.match(caseOf(panel, "sendRetire"), /runInTerminal\(root, retireCommand\(root, effect\.parent\)\)/);
-  // 捨てた親の記録を消すコマンドは、コピーするだけ（送らない）
+  // 破棄した親の記録を消すコマンドは、コピーするだけ（送らない）
   const abandon = bodyOf(panel, /async function copyAbandon\(/);
   assert.match(abandon, /copyCommand\(abandonCommand/);
   assert.doesNotMatch(abandon, /runInTerminal/);

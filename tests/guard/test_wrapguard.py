@@ -70,7 +70,7 @@ class EnvTest(unittest.TestCase):
             "env -C /tmp CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push",
             # ループの中では、後ろに書いた代入も次の回の呼び出しに届く。
             "for i in 1 2; do sh .ccnavi/scripts/ccnavi-git.sh push; CCNAVI_X=1; done",
-            # git が操作するリポジトリと作業ツリーを変える変数。子の居場所で親へコミットできる。
+            # git が操作するリポジトリとワークツリーを変える変数。子の居場所で親へコミットできる。
             "GIT_DIR=/p/.git GIT_WORK_TREE=/p sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
             "export GIT_WORK_TREE=/p; sh .ccnavi/scripts/ccnavi-git.sh add -A",
             "env GIT_INDEX_FILE=/p/.git/index sh .ccnavi/scripts/ccnavi-git.sh status",
@@ -90,7 +90,7 @@ class EnvTest(unittest.TestCase):
             # 保護済みの sh を呼ばないなら、ここの話ではない。
             "CCNAVI_ENTRY_PATH=x uv run python -m ccnavi --lint",
             "echo CCNAVI_ENTRY_PATH=x && sh .ccnavi/scripts/ccnavi-git.sh status",
-            # 読み切れない形はここでは見ない。allow が当たらずに確認になる。
+            # 読み切れない形はここでは見ない。allow がヒットせずに確認になる。
             "sh -c 'CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push'",
         ):
             with self.subTest(command=command):
@@ -112,7 +112,7 @@ class EnvHookTest(unittest.TestCase):
 
     COMMAND = "CCNAVI_WORKSPACE=/x sh .ccnavi/scripts/ccnavi-git.sh push"
 
-    # 同じコマンドを通す allow を置く。ルールが先に当たるなら通ってしまう。
+    # 同じコマンドを通す allow を置く。ルールが先にヒットするなら通ってしまう。
     RULES = {
         "version": 1,
         "allow": [{"id": "wrap", "match": "Bash", "regex": r"ccnavi-git\.sh"}],
@@ -168,7 +168,7 @@ class EnvHookTest(unittest.TestCase):
 
     def test_the_same_call_without_the_assignment_reaches_the_rule(self):
         decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh push")
-        # allow が当たって通る呼び出しは何も出さない。
+        # allow がヒットして通る呼び出しは何も出さない。
         self.assertEqual(decision, "")
         self.assertNotIn(wrapguard.CODE_ENV, reason)
 
@@ -600,7 +600,7 @@ class ShAgreesTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
         scripts = os.path.join(self.root, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        # 共通部（入口と部品）は 1 か所からまとめて写す。入口と部品の版が混ざらないように。
+        # 共通部（入口と部品）は 1 か所からまとめてコピーする。入口と部品の版が混ざらないように。
         common_dir = (
             self.SH_DIR
             if os.path.isfile(os.path.join(self.SH_DIR, "ccnavi-common.sh"))
@@ -637,7 +637,8 @@ class ShAgreesTest(unittest.TestCase):
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(GIT_ENV)
-        # シェルは起動時の PWD を論理の居場所として引き継ぐ。端末から symlink 越しに cd した形。
+        # シェルは起動時の PWD を論理の居場所として引き継ぐ。
+        # ターミナルから symlink 越しに cd した形。
         env["PWD"] = cwd
         return subprocess.run(
             [
@@ -777,7 +778,7 @@ class CorePathTest(unittest.TestCase):
         "wip/proposals/review/i0002.md",
         "wip/handoff/a.md",
     )
-    # 同じコマンドを通す allow を置く。ルールが先に当たるなら通ってしまう。
+    # 同じコマンドを通す allow を置く。ルールが先にヒットするなら通ってしまう。
     RULES = {
         "version": 1,
         "allow": [{"id": "wrap", "match": "Bash", "regex": r"ccnavi-git\.sh"}],
@@ -847,7 +848,7 @@ class CorePathTest(unittest.TestCase):
             ("cd src && sh ../.ccnavi/scripts/ccnavi-git.sh restore --source=HEAD -- ..", True),
             ("cd src && sh ../.ccnavi/scripts/ccnavi-git.sh rm ../.claude/settings.json", True),
             ("cd src && sh ../.ccnavi/scripts/ccnavi-git.sh rm a.py", False),
-            # 居場所が読めない。上へ出る語は当たる先を決められない。
+            # 居場所が読めない。上へ出る語はヒットする先を決められない。
             ('cd "$X" && sh /x/.ccnavi/scripts/ccnavi-git.sh rm ../a.py', True),
         ):
             with self.subTest(command=command):
@@ -869,7 +870,7 @@ class CorePathTest(unittest.TestCase):
             # （sh は `--no-dry-run` を許可リストで断る）。
             ("rm --dry-run --no-dry-run .claude/settings.json", "ccnavi 自身を守る場所"),
             ("rm -n --no-dry .claude/settings.json", "ccnavi 自身を守る場所"),
-            # レビュー済みのマーカーを消すのはユーザが端末で打つ手順（sh は通す）。
+            # レビュー済みのマーカーを消すのはユーザがターミナルで打つ手順（sh は通す）。
             ("rm .ccnavi/approved/phases/i0001/1.reviewed", "ユーザに依頼"),
         ):
             with self.subTest(args=args):
@@ -894,7 +895,7 @@ class CorePathTest(unittest.TestCase):
 
     def test_review_place(self):
         """レビュー待ちの置き場（wip/proposals/review/）は、承認済みチケットの置き場と同じく
-        エージェントのラッパーの呼び出しを止める。置き場の親を丸ごと消す形も当たる。"""
+        エージェントのラッパーの呼び出しを止める。置き場の親を丸ごと消す形もヒットする。"""
         target = os.path.join(self.root, "wip", "proposals", "review", "i0002.md")
         for command, stops in (
             ("sh .ccnavi/scripts/ccnavi-git.sh rm wip/proposals/review/i0002.md", True),
@@ -1092,7 +1093,7 @@ class CorePathShAgreesTest(unittest.TestCase):
                 result = self.run_sh(args)
                 if stops:
                     # ツリー全体（`./`）と承認済みチケットの置き場を含む指定は、sh の前からある
-                    # 拒否（restore-whole-tree・restore-store-source）が先に当たる。
+                    # 拒否（restore-whole-tree・restore-store-source）が先にヒットする。
                     self.assertEqual(result.returncode, 2, result.stderr)
                     said = ("ccnavi 自身を守る場所", "ツリー全体", "承認済みチケットの置き場")
                     self.assertTrue(any(s in result.stderr for s in said), result.stderr)
@@ -1105,7 +1106,8 @@ class CorePathShAgreesTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_review_place_is_left_to_the_user(self):
-        """レビュー待ちの置き場の `rm` は sh では止めない（ユーザが端末で打つ手順を塞がない）。
+        """レビュー待ちの置き場の `rm` は sh では止めない
+        （ユーザがターミナルで打つ手順を塞がない）。
         過去の中身に戻す形は、前からの置き場の検査（store_hit）が止める。"""
         for args in ("rm wip/proposals/review/i0002.md", "rm -r wip"):
             with self.subTest(args=args):

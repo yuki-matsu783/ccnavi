@@ -33,7 +33,7 @@ def _same(a: str, b: str) -> bool:
 
 
 def _owner(root: str, conf: settings.Settings, main_root: str) -> tree.Tree | None:
-    """メインのチェックアウトに当たる、ワークスペースかプロジェクト。どれでもなければ None。"""
+    """メインのチェックアウトにヒットする、ワークスペースかプロジェクト。どれでもなければ None。"""
     projects_dir = ""
     if conf.projects:
         projects_dir = (

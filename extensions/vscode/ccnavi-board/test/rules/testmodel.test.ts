@@ -61,7 +61,7 @@ test("CB-T39 版が違う・JSON でない・オブジェクトでないとき�
   assert.equal(notObject.ok, false);
 });
 
-test("CB-T40 欠けた項目は既定値で埋め、全体を捨てない", () => {
+test("CB-T40 欠けた項目は既定値で埋め、全体を破棄しない", () => {
   const parsed = parseTestJson(JSON.stringify({ version: TEST_VERSION, tool: "Bash" }));
   assert.equal(parsed.ok, true);
   if (parsed.ok) {
@@ -71,7 +71,7 @@ test("CB-T40 欠けた項目は既定値で埋め、全体を捨てない", () =
   }
 });
 
-test("CB-T396 当たったルールの source は file だけを file と読み、ほかは outside に倒す", () => {
+test("CB-T396 ヒットしたルールの source は file だけを file と読み、ほかは outside に倒す", () => {
   const rules = [
     { id: "a", source: "file" },
     { id: "builtin:ticket-state", source: "outside", section: "deny", kind: "regex", written: "x…（全 999 字）" },

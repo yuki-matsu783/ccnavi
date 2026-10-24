@@ -92,7 +92,7 @@ def child_block(
     hint = ""
     parent = index.get(t.parent)
     item = parent.item_at(t.phase) if parent is not None and t.phase is not None else None
-    # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は読まない。
+    # 定義は親に固定したコピー（`phases:`）から引く。`phases.yml` は読まない。
     pt = phasetypes.types_of(parent).get(item.type) if item is not None else None
     if pt is not None:
         label = f"{t.phase}: {pt.title}"

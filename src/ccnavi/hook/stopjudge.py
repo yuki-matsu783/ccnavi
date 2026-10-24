@@ -281,7 +281,8 @@ def before(
         hookio.write_verdict(
             stdout,
             hookio.DENY,
-            "ccnavi: Stop の判定役が使えるのは、次の形の 1 本だけです。連結・リダイレクトは付けず、"
+            "ccnavi: Stop の判定役が実行できるのは、次の形の 1 本だけです。"
+            "連結・リダイレクトは付けず、"
             "作業ディレクトリのまま実行してください: sh .ccnavi/scripts/ccnavi-launcher.sh "
             "stop-review material <session_id> <transcript_path>",
         )

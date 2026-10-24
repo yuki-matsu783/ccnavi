@@ -43,7 +43,7 @@ test("CB-T167 バンドルした CSS は、外の資源を読まない（url() �
 });
 
 /**
- * バンドルした画面が、CSP に止められるやり方でスタイルを当てていないこと。
+ * バンドルした画面が、CSP に止められるやり方でスタイルを適用していないこと。
  *
  * 画面の CSP は `style-src 'nonce-…'` だけで `'unsafe-inline'` が無い。この下では
  * `style` 属性（`setAttribute("style", …)` を含む）は気づかないうちに無効になる。例外は投げず、
@@ -55,15 +55,15 @@ test("CB-T167 バンドルした CSS は、外の資源を読まない（url() �
  * 確認ではない。増えたら、その部品が何をしているかを見てから通す。
  *
  * 見るのは `style` 属性を付けるやり方だけ。`el.style.cssText = …` は通る（Chromium で実際に確かめた。
- * CSSOM なので属性の禁止に当たらない）ので、ここでは見ない。`dangerouslySetInnerHTML` も見ない。
- * react-dom が属性の対応表に表記を持っているだけで、6 画面とも当たってしまう。
+ * CSSOM なので属性の禁止にヒットしない）ので、ここでは見ない。`dangerouslySetInnerHTML` も見ない。
+ * react-dom が属性の対応表に表記を持っているだけで、6 画面ともヒットしてしまう。
  *
  * 属性名を実行時に組み立てる書き方（`el.setAttribute(name, value)`）は、表記では見つけられない。
  * 名前で見るだけの検査で、そこまでは防げない。
  */
 const CSP_BLOCKED = [/setAttribute\(\s*["']style["']/];
 
-test("CB-T190 バンドルした画面は、CSP に止められるやり方でスタイルを当てない", () => {
+test("CB-T190 バンドルした画面は、CSP に止められるやり方でスタイルを適用しない", () => {
   for (const name of screenNames()) {
     const script = screenScript(name);
     for (const pattern of CSP_BLOCKED) {

@@ -36,7 +36,7 @@ OVERRIDES = (
     ("risk", True),
     ("projects", True),
 )
-# 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を除く。
+# ワークツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を除く。
 RELATIVE_OVERRIDES = ("tickets", "project_home")
 # レイヤーの置き場を動かすフラグと、「渡されなかった」ときの値。`--project-rules-file` と
 # 同じで診断の経路でだけ使われる。3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES /
@@ -185,12 +185,12 @@ DOCS_FLAGS = (
     ("--format", "format", None),
     ("--no-refresh", "no_refresh", False),
 )
-DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
+DOCS_ONLY = "ccnavi: {flag} は --docs でだけ指定できる\n"
 # 値なしで渡された `--yes`。取り込み（`user handoff --yes`）とミラーの同期
 # （`user mirror --yes`）だけが読む（ほかの経路の `--yes` は識別子を取る）。
 BARE_YES = "\x00bare"
-# `--docs` と一緒に使えないフラグ。ほかの経路と、その経路でだけ読むもの。何も出さずに無視すると、
-# 打ったユーザは反映されたと思う。
+# `--docs` と同時に指定できないフラグ。ほかの経路と、その経路でだけ読むもの。
+# 何も出さずに無視すると、打ったユーザは反映されたと思う。
 _NOT_WITH_DOCS = (
     "--lint",
     "--learnings",
@@ -325,7 +325,7 @@ def _prune(
 ) -> int:
     """記録と state の後始末を 1 度走らせ、動かしたものを出す。
 
-    消すのは記録なので、`--preview`（見るだけ）でなければ端末を求める。エージェントが
+    消すのは記録なので、`--preview`（見るだけ）でなければターミナルを求める。エージェントが
     Bash から打てると、しきい値の環境変数を 0 に近づけて前に並べるだけで、自分の呼び出しの
     記録を消せる。
     """
@@ -340,13 +340,13 @@ def _prune(
 
 
 def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:
-    """ユーザの判断の経路が、端末の前のユーザから打たれているか。
+    """ユーザの判断の経路が、ターミナルの前のユーザから打たれているか。
 
     `user agree`・`user reviewed`・`user close-early`（内部は `--agree` 等）は
     ユーザの合意そのもの。エージェントが
-    Bash から打てばその合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
+    Bash から打てばその合意を自分で出せる。標準入力がターミナルであることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん手間の少ない証拠になる。
-    CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。
+    CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、ターミナルを持たない実行環境のため）。
     """
     if conf.guard_ticket_approval == selfguard.DISABLE:
         return True
@@ -356,11 +356,12 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     except (AttributeError, ValueError):
         pass
     # 切り方（CCNAVI_GUARD_TICKET_APPROVAL）は文面に書かない。読むのはエージェントで、書けば
-    # ユーザの判断を自分で出す方法を教えることになる。切り方は docs/guide/settings.md の環境変数の表にある。
+    # ユーザの判断を自分で出す方法を教えることになる。
+    # 切り方は docs/guide/settings.md の環境変数の表にある。
     stderr.write(
-        f"ccnavi: {flag} はユーザーがターミナルから実行する必要があります。"
+        f"ccnavi: {flag} はユーザがターミナルから実行する必要があります。"
         "標準入力がターミナルではないため、実行できません。"
-        "ユーザーにターミナルでの実行を依頼してください。\n"
+        "ユーザにターミナルでの実行を依頼してください。\n"
     )
     return False
 
@@ -382,7 +383,7 @@ def _revision_ok(since: str) -> bool:
 
 
 def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
-    """1 行を書く。書けなかったことは報告して捨てる。
+    """1 行を書く。書けなかったことは報告して破棄する。
     書けなかったことでツールの実行可否を変えてはいけない。"""
     try:
         log.write(record)
@@ -390,7 +391,7 @@ def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
         stderr.write(f"ccnavi: ログを保存できませんでした：{exc}\n")
 
 
-# `--help` の話題を決めるオプション。先頭から順に見て、最初に当たったものを使う。
+# `--help` の話題を決めるオプション。先頭から順に見て、最初にヒットしたものを使う。
 _HELP_FLAGS = (
     ("version", lambda a: a.version),
     ("lint", lambda a: a.lint),

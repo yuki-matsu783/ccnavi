@@ -8,7 +8,7 @@
 構成（`src/*`・`tests/*` など）を前提にできる定義を置き、置き場の構成に依存する定義だけを
 レイヤーに置く。どちらが無くても正常（無い = 空）で、両方無いときだけ定義が無い。
 足すだけで、レイヤーが共通レイヤーの定義を上書きすることはない。同じ id で中身が違う定義と、
-`title` がレイヤーをまたいで重なる定義は error で、レイヤーの側のその定義だけを捨てる（`merge`）。
+`title` がレイヤーをまたいで重なる定義は error で、レイヤーの側のその定義だけを破棄する（`merge`）。
 定義は順序を持たないので、統合結果で整合を取る欄は id と `title` だけ。
 
 ## 定義はユーザが持つ
@@ -37,17 +37,17 @@ Write は止まる。組み込みの既定は持たない。
         agent: explorer       # 案内にだけ使う
         when: 既存の振る舞いが分からないとき   # 案内にだけ使う
 
-## 承認のあとは親の写しを読む
+## 承認のあとは親のコピーを読む
 
-計画を持つ親は、計画が使う定義だけの写しを frontmatter の `phases:` に持つ（`read_copy`・
+計画を持つ親は、計画が使う定義だけのコピーを frontmatter の `phases:` に持つ（`read_copy`・
 `types_of`・`copy_problems`）。`phases.yml` を読むのは提案の承認の検査・`--plan-order <親>
---fill-phases`・`--lint` の食い違いの warn だけで、承認のあとの判定は写しを読む。`scope` と
+--fill-phases`・`--lint` の食い違いの warn だけで、承認のあとの判定はコピーを読む。`scope` と
 `deliverables` は 20 件まで（`MAX_ENTRIES`）。
 
 ## 順序は定義に書かない
 
-どのフェーズがどれを待つかは、親の計画の項の `after` が決める（`workflow`）。定義には順序の欄を
-持たない。
+どのフェーズにどのフェーズが先行するかは、親の計画のステップの `after` が決める（`workflow`）。
+定義には順序の欄を持たない。
 """
 
 from __future__ import annotations
@@ -87,11 +87,11 @@ def stricter(a: str, b: str) -> str:
 
 
 class PhaseTypes(dict):
-    """定義の集合。id → 定義の辞書。"""
+    """定義の集合。id → 定義のマップ。"""
 
 
 # 定義の `scope` と `deliverables` の件数の上限。チケットの範囲と同じ。定義は親の `phases:` に
-# 写すので、ここで縛らないと親の大きさが縛れない。ユーザがレビューしきれない数を並べ、その中に
+# コピーするので、ここで縛らないと親の大きさが縛れない。ユーザがレビューしきれない数を並べ、その中に
 # 広い範囲を紛れ込ませる手口も防ぐ。
 MAX_ENTRIES = ticket_mod.MAX_SCOPE_ENTRIES
 
@@ -178,7 +178,7 @@ def parse(text: str, where: str = "(phases)") -> tuple[PhaseTypes | None, list[P
     except yaml.YAMLError as exc:
         return None, [Problem(SEVERITY_ERROR, where, f"YAML として読めない: {exc}")]
     if not isinstance(data, dict):
-        return None, [Problem(SEVERITY_ERROR, where, "最上位が辞書ではない")]
+        return None, [Problem(SEVERITY_ERROR, where, "最上位がマップではない")]
     if data.get("version") != VERSION:
         return None, [
             Problem(
@@ -189,7 +189,7 @@ def parse(text: str, where: str = "(phases)") -> tuple[PhaseTypes | None, list[P
         ]
     raw = data.get("phases")
     if not isinstance(raw, dict) or not raw:
-        return None, [Problem(SEVERITY_ERROR, where, "`phases` が無いか空か、辞書ではない")]
+        return None, [Problem(SEVERITY_ERROR, where, "`phases` が無いか空か、マップではない")]
 
     types = _read_defs(raw, problems)
 
@@ -199,7 +199,7 @@ def parse(text: str, where: str = "(phases)") -> tuple[PhaseTypes | None, list[P
 
 
 def _read_defs(raw: dict, problems: list[Problem]) -> PhaseTypes:
-    """定義の辞書（id → 欄）を読む。`phases.yml` の `phases` と、親の `phases:` の両方が使う。
+    """定義のマップ（id → 欄）を読む。`phases.yml` の `phases` と、親の `phases:` の両方が使う。
 
     読めない定義は入れずに苦情を足す。表示名も一意にする（ユーザは表示名で見るので、同じ名前が
     2 つあると承認画面で見分けられない）。
@@ -225,7 +225,7 @@ def _read_defs(raw: dict, problems: list[Problem]) -> PhaseTypes:
             problems.append(Problem(SEVERITY_ERROR, ident, "識別子に使えない文字がある"))
             continue
         if not isinstance(body, dict):
-            problems.append(Problem(SEVERITY_ERROR, ident, "定義の中身が辞書ではない"))
+            problems.append(Problem(SEVERITY_ERROR, ident, "定義の中身がマップではない"))
             continue
         pt, own = _one(ident, body)
         problems.extend(own)
@@ -252,7 +252,7 @@ def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
 
 
 def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
-    """定義 1 件（識別子と欄の辞書）を `PhaseType` にする。読めなければ None と苦情を返す。
+    """定義 1 件（識別子と欄のマップ）を `PhaseType` にする。読めなければ None と苦情を返す。
 
     戻り値は (定義, 苦情)。定義が None のときは、苦情に SEVERITY_ERROR が必ず 1 件以上ある。
     欄の既定値（表示名は識別子、種類は作業、レビューは MR）は、ここで入れる。
@@ -397,8 +397,9 @@ _CONSOLIDATE_TYPE: PhaseType | None = None
 def consolidate_type() -> PhaseType:
     """統合の子の範囲の上限を持つ、ccnavi の中に固定した定義。
 
-    `phases.yml` にも親の写し（`phases:`）にも置かない。統合の子は親の計画に載らず、親の範囲の上限
-    も当てないので（`phase_scope.scope_verdict`）、範囲を切り詰めるのはこの定義と子の `allow` だけ。
+    `phases.yml` にも親のコピー（`phases:`）にも置かない。統合の子は親の計画に載らず、親の範囲の上限
+    も適用しないので（`phase_scope.scope_verdict`）、
+    範囲を切り詰めるのはこの定義と子の `allow` だけ。
     """
     global _CONSOLIDATE_TYPE
     if _CONSOLIDATE_TYPE is None:
@@ -476,7 +477,8 @@ def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
     気づくので、親を作るときと承認の確認（`--verify`）で言う。計画に `scope: inherit` の定義が
     あれば上限が無いので、何も言わない。それ以外は warn で言う。
     """
-    # 見るのは plan の項の定義だけ。feedback の定義は多くが `inherit` で、混ぜると警告が効かなくなる
+    # 見るのは plan のステップの定義だけ。feedback の定義は多くが `inherit` で、
+    # 混ぜると警告が効かなくなる
     defs = types_of(parent)
     types = [defs[item.type] for item in parent.plan if item.type in defs]
     if not types or any(pt.inherits_scope for pt in types):
@@ -501,16 +503,16 @@ def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
 
 # ---- 親に固定する定義（親の `phases:`）
 #
-# 計画を持つ親は、計画（`plan:` / `feedback:`）が使う定義**だけ**の写しを frontmatter の
-# `phases:` に持つ。欄は `phases.yml` の定義と同じで、定義の id をキーにした辞書。承認したときの
-# 定義が親に固定され、承認のあとの判定は写しを読み、`phases.yml` を読まない（直しても進行中の親の
-# 範囲・見る場所・成果物は変わらない）。写しが `phases.yml` と同じかを確かめるのは承認
-# （`agree_candidates.plan_problems`）で、手で動かした承認ではその検査は働かず写しがそのまま効く
+# 計画を持つ親は、計画（`plan:` / `feedback:`）が使う定義**だけ**のコピーを frontmatter の
+# `phases:` に持つ。欄は `phases.yml` の定義と同じで、定義の id をキーにしたマップ。承認したときの
+# 定義が親に固定され、承認のあとの判定はコピーを読み、`phases.yml` を読まない（直しても進行中の親の
+# 範囲・見る場所・成果物は変わらない）。コピーが `phases.yml` と同じかを確かめるのは承認
+# （`agree_candidates.plan_problems`）で、手で動かした承認ではその検査は働かずコピーがそのまま効く
 # （承認を本物とするのは置き場で、置き場へ動かしたユーザが中身を承認したと読む）。
 
 COPY_KEY = ticket_mod.PHASES_KEY
 
-# 写しの欄の名前。`PhaseType.key()` の並びと同じ（`id` を除く）。
+# コピーの欄の名前。`PhaseType.key()` の並びと同じ（`id` を除く）。
 _KEY_FIELDS = ("title", "kind", "review", "scope", "deliverables", "agent", "when", "learning")
 
 
@@ -518,7 +520,7 @@ def read_copy(raw) -> tuple[PhaseTypes, list[Problem]]:
     """親の `phases:` を定義に読む。読めない定義は入れずに苦情を返す。
 
     読み方は `phases.yml` の定義と同じ関数（`_read_defs`）で、形の誤りも同じ文で言う。苦情の
-    `rule` は定義の id（辞書でないときは `(phases)`）。読み込みでは落とさない（判定の `blocked` の
+    `rule` は定義の id（マップでないときは `(phases)`）。読み込みでは落とさない（判定の `blocked` の
     理由にする。`copy_problems`）。
     """
     if not isinstance(raw, dict):
@@ -526,7 +528,7 @@ def read_copy(raw) -> tuple[PhaseTypes, list[Problem]]:
             Problem(
                 SEVERITY_ERROR,
                 "(phases)",
-                "`phases:` は定義の id をキーにした辞書で書く（欄は phases.yml の定義と同じ）",
+                "`phases:` は定義の id をキーにしたマップで書く（欄は phases.yml の定義と同じ）",
             )
         ]
     problems: list[Problem] = []
@@ -534,28 +536,28 @@ def read_copy(raw) -> tuple[PhaseTypes, list[Problem]]:
 
 
 def types_of(t: ticket_model.Ticket) -> dict[str, PhaseType]:
-    """チケットの写しの定義（id → 定義）。写しが無ければ空。
+    """チケットのコピーの定義（id → 定義）。コピーが無ければ空。
 
     読んだものは `t.phase_types` に持たせて使い回す（読み込みの state 層は生の値しか持たない）。
-    子に渡すと、子の写し（子に `phases:` は書けないので普通は空）を返す。
+    子に渡すと、子のコピー（子に `phases:` は書けないので普通は空）を返す。
     """
     if t.phase_types is None:
         t.phase_types = read_copy(t.phases_raw)[0] if t.phases_raw is not None else PhaseTypes()
-    # 出どころのレイヤーは、写しの元の `phases.yml`（親の `project:` が指すレイヤー）。記録の
+    # 出どころのレイヤーは、コピーの元の `phases.yml`（親の `project:` が指すレイヤー）。記録の
     # `source` になる。`project` は読んだあとに置き場から入るので、引くたびに付け直す。
-    # 写しは出どころを持たないので、共通レイヤーの定義と同じかはマーカーを置くところで見る
+    # コピーは出どころを持たないので、共通レイヤーの定義と同じかはマーカーを置くところで見る
     # （`origin`）。
     mark_source(t.phase_types, t.project or settings.LAYER_SELF)
     return t.phase_types
 
 
 def origin(pt: PhaseType, common: dict[str, PhaseType] | None) -> str:
-    """写しの定義の出どころのレイヤー。記録の `source` に書く。
+    """コピーの定義の出どころのレイヤー。記録の `source` に書く。
 
-    写しは出どころを持たないので、`types_of` は親の `project:` のレイヤーを付ける。共通レイヤーに
+    コピーは出どころを持たないので、`types_of` は親の `project:` のレイヤーを付ける。共通レイヤーに
     同じ `id` で読んだ形も同じ定義があれば、その定義は共通レイヤーから来たと読む（和を組むときも、
     全欄が同じ定義は共通の側が残る。`--explain --json` の `source` と揃う）。承認のあとに共通の
-    定義が直されていれば、写しはもう共通の定義と同じでないので、親のレイヤーのままにする。
+    定義が直されていれば、コピーはもう共通の定義と同じでないので、親のレイヤーのままにする。
     """
     found = (common or {}).get(pt.id)
     if found is not None and same(found, pt):
@@ -580,7 +582,7 @@ def differing(a: PhaseType, b: PhaseType) -> list[str]:
 
 
 def as_copy(pt: PhaseType) -> dict:
-    """写しに書く形。読み直すと同じ定義になる欄に戻す。"""
+    """コピーに書く形。読み直すと同じ定義になる欄に戻す。"""
     out: dict = {
         "kind": pt.kind,
         "title": pt.title,
@@ -599,14 +601,15 @@ def as_copy(pt: PhaseType) -> dict:
 
 
 def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
-    """チケットだけを読んで済む、写しの誤り。判定（`approval_checks.blocking_problems`）・承認・
+    """チケットだけを読んで済む、コピーの誤り。判定（`approval_checks.blocking_problems`）・承認・
     `--lint` が同じ答えを引く。`phases.yml` は読まない（承認のあとに直しても進行中の親を止めない）。
 
     - 子に `phases:` がある（error）。子の `phase:`（番号）と名前が似ていて取り違えやすい
-    - 写しの定義の形の誤り（error。`phases.yml` の定義と同じ検査）
-    - 計画を持つのに `phases:` が無い、項が `phases:` に無い定義名を使う（error）
+    - コピーの定義の形の誤り（error。`phases.yml` の定義と同じ検査）
+    - 計画を持つのに `phases:` が無い、ステップが `phases:` に無い定義名を使う（error）
     - 定義の `kind` が置いた計画と合わない（error）
-    - `phases:` にあって、どの項も使わない定義（warn。判定はどの項からも引かないので、範囲・
+    - `phases:` にあって、どのステップも使わない定義（warn。判定はどのステップからも引かないので、
+    範囲・
       見る場所・成果物は変わらない）
     """
     found: list[Problem] = []
@@ -618,8 +621,8 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
     if t.is_child:
         if COPY_KEY in t.raw:
             error(
-                "`phases:` は親だけの欄（計画が使うフェーズ定義の写し）。子は `phase:`（番号）で"
-                "親の計画の項を指す。子の `phases:` は削除してください"
+                "`phases:` は親だけの欄（計画が使うフェーズ定義のコピー）。子は `phase:`（番号）で"
+                "親の計画のステップを指す。子の `phases:` は削除してください"
             )
         return found
     fill = f"`ccnavi --plan-order {name} --fill-phases`"
@@ -630,7 +633,7 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
     types = types_of(t)
     if t.has_plan and not has_copy(t):
         error(
-            "計画（plan / feedback）があるのに、計画が使うフェーズ定義の写し `phases:`"
+            "計画（plan / feedback）があるのに、計画が使うフェーズ定義のコピー `phases:`"
             " がありません。"
             f"提案なら {fill} で差し込む。承認済みチケットなら、ユーザが `phases:` を追加するか、"
             "取り消して出し直す"
@@ -649,7 +652,7 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
                 if item.type not in named:
                     error(
                         f"`{key}[{i}]` の定義 `{item.type}` が `phases:` にありません"
-                        f"（計画が使う定義は `phases:` に写して書く。{fill} で差し込める）"
+                        f"（計画が使う定義は `phases:` にコピーして書く。{fill} で差し込める）"
                     )
                 continue
             if pt.kind != kind:
@@ -661,7 +664,8 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     name,
-                    f"`phases:` の `{ident}` はどの項も使っていない（消し忘れなら {fill} で外す）",
+                    f"`phases:` の `{ident}` はどのステップも使っていない"
+                    f"（消し忘れなら {fill} で外す）",
                 )
             )
     return found
@@ -706,14 +710,14 @@ def merge(
     """共通レイヤーの定義に、行き先のレイヤーの定義を id ごとに足す。
 
     足すだけで、レイヤーが共通レイヤーの定義を上書きすることはない。同じ `id` で全欄が一致する
-    ものは重複とみなしてレイヤーの側を捨て（info）、中身が違えば error。`title` の重なりも
+    ものは重複とみなしてレイヤーの側を破棄し（info）、中身が違えば error。`title` の重なりも
     レイヤーをまたいで error（ユーザは表示名で見るので、承認画面で見分けられない）。
 
-    error になった定義だけを捨て、共通レイヤーの定義を使う。そのレイヤーのほかの定義は足す。
+    error になった定義だけを破棄し、共通レイヤーの定義を使う。そのレイヤーのほかの定義は足す。
     同じ `id` なら共通レイヤーの定義が残り、`title` の重なりならレイヤーの定義が無いのと同じになる。
-    捨てる側をいつもレイヤーにするのは、共通レイヤーの定義は全プロジェクトで同じに読まれるべきで、
+    破棄する側をいつもレイヤーにするのは、共通レイヤーの定義は全プロジェクトで同じに読まれるべきで、
     1 つのレイヤーの書き方でその中身が変わらないようにするため。error は出すので、ユーザは
-    `--lint` で捨てた定義を知る。
+    `--lint` で破棄した定義を知る。
     """
     base = PhaseTypes(common or {})
     problems: list[Problem] = []
@@ -728,7 +732,7 @@ def merge(
                     Problem(
                         SEVERITY_INFO,
                         ident,
-                        f"`{ident}` は共通レイヤーと全欄が同じなので、{layer} の側を捨てた。"
+                        f"`{ident}` は共通レイヤーと全欄が同じなので、{layer} の側を破棄した。"
                         "共通レイヤーの 1 本を使う",
                     )
                 )

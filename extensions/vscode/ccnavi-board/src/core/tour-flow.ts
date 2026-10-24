@@ -7,7 +7,7 @@
  * 実行ファイル（`--lint --json --flow`）が言うこと（`checks`）も、同じ形（`FlowChecks`）で YAML に書く。画面は判定し直さず、そのまま描く。
  *
  * 案内の間は、この見本だけを描く。実際の編集内容・履歴・選択・保存・エージェントの下書きには触れない。
- * 手順ごとの様子（`scene`）の読み方もここに置く（`sceneOf`）。鍵の一覧は `flow.yml` の頭に書いてある。
+ * 手順ごとの様子（`scene`）の読み方もここに置く（`sceneOf`）。キーの一覧は `flow.yml` の頭に書いてある。
  */
 import { asFlowDoc, connectionId, connectionsOf, isGroup, type FlowDoc } from "./flow-doc.js";
 import { flowRequestPrompt, type FlowChecks, type FlowOffer, type FlowProposal } from "./flow-view.js";
@@ -146,7 +146,7 @@ export function parseFlowSample(raw: unknown): FlowSample {
 /** 図の外から見た「いま選んでいるもの」。`webview/flow/Canvas.tsx` の `Selection` と同じ形 */
 export type SceneSelect = { readonly kind: "node"; readonly id: string } | { readonly kind: "edge"; readonly index: number };
 
-/** `scene` の鍵。画面はこれだけを読む（`flow.yml` の頭に意味を書いてある） */
+/** `scene` のキー。画面はこれだけを読む（`flow.yml` の頭に意味を書いてある） */
 export const SCENE_KEYS = ["doc", "select", "pick", "base", "dirty", "history", "clip", "minimap", "lock", "changed", "offer", "review", "proposal", "requestText", "checking"] as const;
 const FLAG_KEYS = ["dirty", "history", "clip", "minimap", "lock", "changed", "offer", "review", "proposal", "requestText", "checking"] as const;
 
@@ -217,11 +217,11 @@ export function sceneOf(sample: FlowSample, scene: Scene): FlowScene {
   };
 }
 
-/** 画面が読めない `scene`（知らない鍵・見本に無い名前や id・型違い）の理由。読めれば undefined。テストが全手順で確かめる */
+/** 画面が読めない `scene`（知らないキー・見本に無い名前や id・型違い）の理由。読めれば undefined。テストが全手順で確かめる */
 export function sceneProblem(sample: FlowSample, scene: Scene): string | undefined {
   for (const key of Object.keys(scene)) {
     if (!(SCENE_KEYS as readonly string[]).includes(key)) {
-      return `scene の鍵 ${key} を画面は読まない`;
+      return `scene のキー ${key} を画面は読まない`;
     }
   }
   for (const key of ["doc", "base"] as const) {

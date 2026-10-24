@@ -21,7 +21,7 @@ VS Code からワークツリーを見えるようにする設定は[導入と�
 
 ## VS Code の ccnavi ボード
 
-必要なもの（VS Code の版、ccnavi の実行ファイルを探す順、設定の鍵）は[拡張の README](../../extensions/vscode/ccnavi-board/README.md)の「必要なもの」にある。
+必要なもの（VS Code の版、ccnavi の実行ファイルを探す順、設定のキー）は[拡張の README](../../extensions/vscode/ccnavi-board/README.md)の「必要なもの」にある。
 入れ方は同じ README の「組み立てと導入」にある。
 
 チケットがどのワークツリーでどこまで進んでいるかは、この拡張で見られる。拡張は `ccnavi --explain --json` の出力を並べるだけである。
@@ -41,7 +41,7 @@ VS Code からワークツリーを見えるようにする設定は[導入と�
 レビューで残った指摘は、フェーズ行の［レビュー完了］で指摘ごとに対応方針を選ぶ。拡張が `ccnavi-user-decide.sh` を子プロセスで打つ。
 形は[JSON の形](../requirements/json-shapes.md)の「残った指摘の JSON」にある。レビューの流れは[レビュー](review.md)にある。
 
-`close-early` はボードに置かない。端末で `ccnavi-user-close-early.sh` を打つ。
+`close-early` はボードに置かない。ターミナルで `ccnavi-user-close-early.sh` を打つ。
 
 ### ルール管理画面
 

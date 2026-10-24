@@ -22,20 +22,21 @@ PROPOSE_RULE_ID = "builtin:ticket-propose"
 # ルールファイルからは書けない（予約の接頭辞 `builtin:guard-`）。
 RAW_GIT_RULE_ID = "builtin:guard-raw-git"
 
-# `git` がコマンドの位置に立つ形。glob の `*git*` だと誘導先の `ccnavi-git.sh` にも当たって
+# `git` がコマンドの位置に立つ形。glob の `*git*` だと誘導先の `ccnavi-git.sh` にもヒットして
 # 出口ごと塞がるので、前後の切れ目を見る。
 #
-# 当てるのは、引用とコメントを外してコマンドの切れ目に `\x00` を置いた読み（shellread）なので、
+# 適用するのは、引用とコメントを外してコマンドの切れ目に `\x00` を置いた読み（shellread）なので、
 # コマンドの位置は行頭か `\x00` の直後になる。`env` `sudo` `command` `xargs` `nohup` `time` などの
-# 前置きは、読みが外した中のコマンド（`git status`）の層に当てて止める。`grep git README.md` の
-# ような引数の `git` には当てない。読み切れずに生の文字列に当てる回のために、シェルの区切り
+# 前置きは、読みが外した中のコマンド（`git status`）の層に適用して止める。`grep git README.md` の
+# ような引数の `git` には適用しない。読み切れずに生の文字列に適用する回のために、シェルの区切り
 # （改行 `;` `&` `|` `(` `{` `` ` `` `!`）の後ろも位置に数え、その直後に続く `then` `do` などの
 # 予約語も読み飛ばす（`echo to do git` の `do` は区切りの直後ではないので数えない）。
 # パス付き（`/usr/bin/git`・`C:\Git\git.exe`）と `git.exe` も同じ。パスの途中の字に区切りを
-# 入れないのは、区切りの字ごとに残りを読み直さないため（区切りの後ろからは、その区切りで当たる）。
+# 入れないのは、区切りの字ごとに残りを読み直さないため（区切りの後ろからは、
+# その区切りでヒットする）。
 # 引用しない `C:\Git\git.exe` はシェルが `\` を外して `C:Gitgit.exe` と読むので、ドライブ名
 # （`C:`）で始まり `git` / `git.exe` で終わる語も止める（実際には走らない形だが、止める側に倒す）。
-# 共通レイヤーの見本（位置を問わず当てる `raw-git`）は削除した（ADR-0131）。
+# 共通レイヤーの見本（位置を問わず適用する `raw-git`）は削除した（ADR-0131）。
 # その結果、コマンドの位置に無い git は止まらなくなった。
 _SEPARATOR = r"[\x00\n;&|({`!]"
 _KEYWORD = r"(?:then|do|else|elif|if|while|until|time)\s++"
@@ -47,7 +48,7 @@ RAW_GIT_REGEX = (
 
 
 def _place(tickets_rel: str) -> str:
-    """置き場のパスに当たる式。プロジェクトの名前を挟んだ形（`wip/<name>/proposals`）にも当たる。"""
+    """置き場のパスにヒットする式。プロジェクトの名前を挟んだ形（`wip/<name>/proposals`）にもヒットする。"""
     parts = [re.escape(p) for p in tickets_rel.split("/") if p]
     optional = r"(?:[^\\/\s\x00]+[\\/])?"
     if len(parts) < 2:
@@ -56,7 +57,7 @@ def _place(tickets_rel: str) -> str:
 
 
 def state_dir_regex(tickets_rel: str) -> str:
-    """直接の作成・移動を止める置き場に当たる式。パス用。"""
+    """直接の作成・移動を止める置き場にヒットする式。パス用。"""
     return rf"(^|[\\/]){_place(tickets_rel)}[\\/]({'|'.join(ticket_model.GUARDED_STATES)})[\\/]"
 
 
@@ -64,7 +65,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     """状態の置き場を守るルール。組み込みで、ルールファイルには書かない。
 
     通るのは状態を動かすスクリプトだけ。そのスクリプトの呼び出し文字列には
-    置き場のパスが現れないので、ここに当たらない。root は文面の sh のパスに使う。
+    置き場のパスが現れないので、ここにヒットしない。root は文面の sh のパスに使う。
     """
     place = state_dir_regex(tickets_rel)
     message = (
@@ -79,16 +80,16 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
         message=message,
         decision=rules.DENY,
     )
-    # `DONE/` も同じ場所として当てる（どの機械でも区別しない）。状態の名前を大文字で書く
+    # `DONE/` も同じ場所として適用する（どの機械でも区別しない）。状態の名前を大文字で書く
     # 正当な用事は無い。
     write_rule.compiled = re.compile(place, re.IGNORECASE)
     # シェルの側は前の区切りを求めない。コマンドの引数は空白で区切られていて、
     # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無いパス
-    # （`mv x wip/proposals/done`）でも当てる。
+    # （`mv x wip/proposals/done`）でも適用する。
     states = "|".join(ticket_model.GUARDED_STATES)
     review = _place(tickets_rel) + rf"[\\/]({states})"
     loose = review + r"([\\/]|\s|$)"
-    # コピーする動詞は行き先だけで当てる。置き場から外へコピーする読み向きの cp は通す。行き先の
+    # コピーする動詞は行き先だけで適用する。置き場から外へコピーする読み向きの cp は通す。行き先の
     # 読み方（`-t` の値か、選択肢でない最後の引数）は組み込みの保護と同じ部品を使う。
     # ここで別に書くと、
     # `cp -t <置き場> <提案>` のように片方だけが読む書き方が通る。
@@ -132,7 +133,8 @@ def _dir_rules(
     loose = place + r"([\\/]|\s|$)"
     # 書き込み動詞の列挙（リダイレクト、mv・rm・tee・dd・sed -i、cp の行き先）に加えて、
     # 置き場の名前を引数に取る作成・変更・展開の道具と、コードを走らせる道具も止める。
-    # 置き場の名前が現れるだけで当たるので、読み取りの道具（cat・grep・ls・head）は巻き込まない。
+    # 置き場の名前が現れるだけでヒットするので、
+    # 読み取りの道具（cat・grep・ls・head）は巻き込まない。
     also = (
         r"(^|\x00|[;&|]\s*)(touch|mkdir|chmod|chown|rsync|sponge|unzip|tar|python3?|node|perl|ruby"
         r"|Set-Content|Add-Content|New-Item|Copy-Item|Move-Item|Remove-Item|Out-File)\b"
@@ -174,7 +176,7 @@ def approved_message_for(root: str) -> str:
     return (
         "承認済みチケットの置き場です。承認・状態・レビューの記録は、ユーザの操作と"
         " ccnavi のスクリプトだけが動かします。直接書き込まないでください。"
-        "承認はユーザが、VS Code のボード・Chrome のボード・端末の 'ccnavi-user-agree.sh'・"
+        "承認はユーザが、VS Code のボード・Chrome のボード・ターミナルの 'ccnavi-user-agree.sh'・"
         "置き場のファイルの移動のどれかで行います。"
         f"承認が済んだかどうかは '{ticket} status' で確かめてください。"
         "置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。"
@@ -188,7 +190,7 @@ def approved_message_for(root: str) -> str:
 def approved_write_rule(approved_rel: str, root: str) -> rules.Rule:
     """承認済みの置き場を名前で書くツールから守る 1 本（`builtin:ticket-approved`）。
 
-    実行後の保護範囲（`events.watched_for`）に足す。シェル版は足さない。実行後は作業ツリーの
+    実行後の保護範囲（`events.watched_for`）に足す。シェル版は足さない。実行後はワークツリーの
     変更を見るため。実行前の関門（`gate_rules`）と同じ式・同じ文面。
     """
     return _dir_rules(
@@ -229,7 +231,7 @@ def raw_git_rule(root: str) -> rules.Rule:
     ラッパーが無いワークスペースでも止める。そのときは誘導先が無いので、文面は
     ユーザに頼む形にする（`git` の形を案内すると、それも止まる）。
 
-    土台（`base`）として扱う。ほかのレイヤーの deny にも当たった回は、
+    土台（`base`）として扱う。ほかのレイヤーの deny にもヒットした回は、
     そちらだけを言う（拒否は変わらない）。
     """
     if settings.has_git_wrapper(root):
@@ -266,7 +268,7 @@ def propose_notice(
 ) -> str:
     """提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文。空なら渡さない。
 
-    承認できない提案のままユーザに承認を頼むと、通らなかったことを知るのが端末に座ったユーザになり、
+    承認できない提案のままユーザに承認を頼むと、通らなかったことを知るのがターミナルに座ったユーザになり、
     往復が 1 回増える。確かめる手立て（`--agree --preview --verify`）は在るので、
     書いた直後に、要る場所で言う。
 
@@ -277,7 +279,7 @@ def propose_notice(
     - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの扱い
       （`judge.undeclared_verdict`）を通らなくなる。確認できる者が居ないモードの deny も、
       知らない表記のモードを ask として扱う既定も、そこだけ外れる
-    - 判定は強いタイプから見て最初に当たった段で決まるので、提案の置き場に `deny` か
+    - 判定は強いタイプから見て最初にヒットした段で決まるので、提案の置き場に `deny` か
       `ask` を書いているワークスペースには文が届かない。 承認の流れをいちばん
       気にしているところにだけ届かない、という向きになる
     - 組み込みで持つのは、ガード自身を守るものと取り返しの付かない操作だけ。
@@ -299,10 +301,10 @@ def propose_notice(
 
 
 def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
-    """承認待ちの置き場に当たる式。ワークスペースの中に限る。
+    """承認待ちの置き場にヒットする式。ワークスペースの中に限る。
 
-    `guard_rules` は前を問わない形（`(^|[\\/])`）で当てるが、あれは deny なので、余分に
-    当たるぶんは止めすぎる側へ外れるだけ。文を渡す側を同じ形で当てると、ワークスペースの
+    `guard_rules` は前を問わない形（`(^|[\\/])`）で適用するが、あれは deny なので、余分に
+    ヒットするぶんは止めすぎる側へ外れるだけ。文を渡す側を同じ形で適用すると、ワークスペースの
     外に `wip/proposals/todo/` という構成のディレクトリを作っただけの場所でも
     「提案を書いた」と読む。
     ツリー（ワークツリー・プロジェクト）はどれもワークスペースルートの下
@@ -318,7 +320,7 @@ def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
 
 
 def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
-    """文と、数えの鍵になる id を持つ入れ物。表には入れない（`propose_notice` だけが持つ）。"""
+    """文と、数えのキーになる id を持つ入れ物。表には入れない（`propose_notice` だけが持つ）。"""
     return rules.Rule(
         id=PROPOSE_RULE_ID,
         additional_context_once=(

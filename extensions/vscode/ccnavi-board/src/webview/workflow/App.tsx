@@ -11,14 +11,14 @@
  * 図の部品が引いている最中に断る（`core/plan-graph.ts` の `canConnect`）。
  *
  * **未保存は答えから決める**（`isDirty`）。案に戻すは、往復せずに開いたときの答えへ戻す。未保存の間は、
- * 線の写しを拡張ホストに覚えさせる（未保存のまま閉じられたときに戻すため）。
+ * 線のコピーを拡張ホストに覚えさせる（未保存のまま閉じられたときに戻すため）。
  *
  * **置き場所は動かさない。** 番号が振り直っても点の名札の番号だけが変わる。置き場所は振り直す前の番号で覚え
  * （`layoutOf`）、「並べ直す」で今の線から組み直す。
  *
  * **案内**（`Tour.tsx`）は図が出てから始める。案内の間は今の計画ではなく、案内用の見本（`tours/workflow.yml` の `sample:`。実行ファイルの
  * 答えの形）を描く。見本は名前を付けた答えの束で、手順の `scene` が描く答えを選ぶ。画面の state（実際の答え・未保存の線・置き場所・
- * 保存の確かめ）と拡張ホストへの送信（線の頼み・保存・再読込）には触れない。案内の間は、線も保存も効かない。
+ * 保存の確かめ）と拡張ホストへの送信（線の頼み・保存・再読み込み）には触れない。案内の間は、線も保存も効かない。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -48,7 +48,7 @@ import { post } from "./post.js";
 import { Review } from "./Review.js";
 import { useGraphMarks } from "./tour-marks.js";
 
-/** 未保存の線の写しを拡張ホストへ送るまでの間（線を変えるたびに送らない） */
+/** 未保存の線のコピーを拡張ホストへ送るまでの間（線を変えるたびに送らない） */
 const DRAFT_MS = 300;
 
 interface Status {
@@ -111,7 +111,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   const [review, setReview] = useState(false);
   const seq = useRef(0);
   /**
-   * 案内の間は見本の答えを描き、手順ごとの様子（描く答え・開く確かめ・選ぶ項など）は `scene` に入れる。
+   * 案内の間は見本の答えを描き、手順ごとの様子（描く答え・開く確かめ・選ぶステップなど）は `scene` に入れる。
    * 実際の答え・未保存の線・置き場所・確かめは動かさないので、閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -128,11 +128,11 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   const touring = tour.touring;
   const shownName = sampleName(scene.answer);
   const picked = typeof scene.pick === "number" ? scene.pick : undefined;
-  // 見本の図は、描く答え・並べ直した図か・選んだ項が変わるたびに作り直す（選んだ項や置き場所を前の手順から持ち越さない）
+  // 見本の図は、描く答え・並べ直した図か・選んだステップが変わるたびに作り直す（選んだステップや置き場所を前の手順から持ち越さない）
   const sceneKey = `${shownName}|${scene.tidy === true ? "tidy" : "kept"}|${picked ?? ""}`;
   useGraphMarks(graphs, touring, picked, sceneKey);
 
-  /** 線を変えた先行で答えを頼む。前の頼みへの答えは、届いても捨てる */
+  /** 線を変えた先行で答えを頼む。前の頼みへの答えは、届いても破棄する */
   const ask = useCallback((order: PlanOrder) => {
     seq.current += 1;
     setPending(true);
@@ -217,7 +217,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     }
   }, [dirty, pending]);
 
-  // 未保存の線の写しを、止まってから拡張ホストに覚えさせる。未保存でなくなったら消させる
+  // 未保存の線のコピーを、止まってから拡張ホストに覚えさせる。未保存でなくなったら消させる
   const sentDraft = useRef(false);
   useEffect(() => {
     if (!dirty || answer === undefined) {
@@ -246,10 +246,10 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   if (data.kind === "error" || answer === undefined) {
     return (
       <>
-        <p className="empty">計画編集タブを読み込めませんでした。原因を直してから「再読込」を押してください。</p>
+        <p className="empty">計画編集タブを読み込めませんでした。原因を直してから「再読み込み」を押してください。</p>
         <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
-          再読込
+          再読み込み
         </button>
       </>
     );
@@ -349,7 +349,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
           <span className="workflow-banner-text">
             {shownDiff
               ? "提案が外で変わりました（エージェントが変更した可能性があります）。下の差分を見て、取り込むか編集を続けるかを選んでください。"
-              : "提案が外で変わったため、保存できません。「取り込む」で新しい提案から始めてください（いまの編集は捨てます）。"}
+              : "提案が外で変わったため、保存できません。「取り込む」で新しい提案から始めてください（いまの編集は破棄します）。"}
           </span>
           <button
             type="button"
@@ -363,7 +363,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
               }
             }}
           >
-            {shownDirty ? "取り込む（編集を捨てる）" : "取り込む"}
+            {shownDirty ? "取り込む（編集を破棄する）" : "取り込む"}
           </button>
           {shownDiff && (
             <button
@@ -419,7 +419,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
           </span>
         </div>
         <div className="controls" data-tour="controls">
-          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="今の線で点の置き場所を組み直します（番号は変わりません）" onClick={relayout}>
+          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="今の線で点の置き場所を並べ直します（番号は変わりません）" onClick={relayout}>
             並べ直す
           </button>
           <button
@@ -434,7 +434,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             案に戻す
           </button>
           <button type="button" className="action" data-action="reload" data-tour="reload" disabled={shownBusy} onClick={reload}>
-            再読込
+            再読み込み
           </button>
           <button
             type="button"
@@ -443,7 +443,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             data-action="save"
             data-tour="save"
             disabled={shownBusy || blocker !== ""}
-            title={blocker === "" ? "提案の計画と、番号の変わる項を指す子の提案を変更します（承認はしません）" : blocker}
+            title={blocker === "" ? "提案の計画と、番号の変わるステップを指す子の提案を変更します（承認はしません）" : blocker}
             onClick={() => {
               if (!touring) {
                 setReview(true);
@@ -456,11 +456,11 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       </ScreenHeader>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">
-        項の右の点から別の項の左の点へドラッグすると、線の先の項が元の項を待ちます（逆向きでも引けます）。線の真ん中の × で待たなくなります。線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
+        ステップの右の点から別のステップの左の点へドラッグすると、線の先のステップに、元のステップが先行します（逆向きでも引けます）。線の真ん中の × で先行を外せます。線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
       </p>
       {moved.length > 0 && (
         <p id="workflow-renumbered" className="small" data-tour="renumbered">
-          番号が変わる項: {moved.map((item) => `${item.title} ${item.from} → ${item.number}`).join("、")}
+          番号が変わるステップ: {moved.map((item) => `${item.title} ${item.from} → ${item.number}`).join("、")}
         </p>
       )}
       {notes.length > 0 && (

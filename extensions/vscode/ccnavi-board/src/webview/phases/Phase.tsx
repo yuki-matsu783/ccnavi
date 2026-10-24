@@ -4,8 +4,8 @@
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
  * 出番の少ない 2 欄（補足。agent / when）は見出し 1 行に折りたたみ、値がある定義だけ最初から開く。
  *
- * **ほかの定義との関係の欄（overlap / requires / after）は出さない。** 順序（どのフェーズがどれを待つか）は
- * フェーズ定義ではなく親チケットの計画の項の `after` で決める。
+ * **ほかの定義との関係の欄（overlap / requires / after）は出さない。** 順序（どのフェーズにどのフェーズが先行するか）は
+ * フェーズ定義ではなく親チケットの計画のステップの `after` で決める。
  */
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
@@ -13,7 +13,7 @@ import { KIND_LABELS, PHASE_KINDS, REVIEWS, REVIEW_LABELS, type PhaseForm, type 
 import { moreNote, scopeText, scopeTitle, splitList } from "./text.js";
 
 export interface PhaseProps {
-  /** 画面の中だけの鍵（`state.ts`）。行を名指しするために `data-key` へ出す */
+  /** 画面の中だけのキー（`state.ts`）。行を名指しするために `data-key` へ出す */
   readonly phaseKey: string;
   readonly phase: PhaseForm;
   readonly find: string;
@@ -102,10 +102,10 @@ export function Phase(props: PhaseProps): JSX.Element {
       </div>
       <div className="row-body">
         <Captioned name="id" yamlKey="id" tour={mark("phase-id")}>
-          {text("id", "f-id narrow", "implement（英数字で始まり、使えるのは英数字と . _ -）")}
+          {text("id", "f-id narrow", "implement（英数字で始まり、指定できるのは英数字と . _ -）")}
         </Captioned>
         <Captioned name="タイトル" yamlKey="title" tour={mark("phase-title")}>
-          {text("title", "f-title narrow", "実装とテスト（空なら id をそのまま使う）")}
+          {text("title", "f-title narrow", "実装とテスト（空なら id をそのまま使います）")}
         </Captioned>
         <Captioned name="区分" yamlKey="kind" tour={mark("phase-kind")}>
           <select
@@ -146,7 +146,7 @@ export function Phase(props: PhaseProps): JSX.Element {
               <option value="inherit">inherit（親チケットの編集可能範囲を引き継ぐ）</option>
               <option value="globs">上限を指定する（glob のリスト）</option>
             </select>
-            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの編集可能な範囲はこの中に収める）")}
+            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの編集可能な範囲はこの中に収めます）")}
           </div>
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
@@ -174,10 +174,10 @@ export function Phase(props: PhaseProps): JSX.Element {
           </summary>
           <div className="sub">
             <Captioned name="案内するエージェント" yamlKey="agent" tour={mark("phase-agent")}>
-              {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしない）")}
+              {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしません）")}
             </Captioned>
             <Captioned name="使う場面" yamlKey="when" tour={mark("phase-when")}>
-              {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使う）")}
+              {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使います）")}
             </Captioned>
           </div>
         </details>
@@ -203,8 +203,8 @@ export function Phase(props: PhaseProps): JSX.Element {
  * 打っている途中の文字は欄が持つ。 リストに直したものをそのまま欄へ戻すと、`a, ` と打った
  * ところで `a` に縮む（区切りの直後が打てない）。
  *
- * 外から中身が入れ替わったとき（再読込・保存）は、行の鍵が配り直されてこの部品ごと作り直されるので、
- * 欄は新しい値で始まる。下の `useEffect` はその経路を通らない保険で、鍵を保つ書き方に変えたときに
+ * 外から中身が入れ替わったとき（再読み込み・保存）は、行のキーが配り直されてこの部品ごと作り直されるので、
+ * 欄は新しい値で始まる。下の `useEffect` はその経路を通らない保険で、キーを保つ書き方に変えたときに
  * 欄が古いまま残らないように置いてある。
  */
 function ListInput({

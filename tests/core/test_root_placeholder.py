@@ -34,8 +34,8 @@ class WorkspaceRootRealRuleTest(unittest.TestCase):
 
     通すのは wip/handoff/・scratchpad/・.claude/worktrees/。
 
-    判定と同じ読み方（rules.parse）で組み立てて当てる。ルールは 1 本の regex でも、
-    `except:` で置き場を除く形でも書けるので、式を取り出して当てると書き方に縛られる。
+    判定と同じ読み方（rules.parse）で組み立てて適用する。ルールは 1 本の regex でも、
+    `except:` で置き場を除く形でも書けるので、式を取り出して適用すると書き方に縛られる。
     大文字小文字は判定と同じく区別しない。
     """
 
@@ -189,10 +189,10 @@ class RootPlaceholderTest(unittest.TestCase):
     def test_glob_form_and_spelling_of_the_root(self):
         out = self.judge("Write", os.path.join(self.root, "wip", "a.md"))
         self.assertIn("wip", out.get("permissionDecisionReason", ""))
-        # 表記を変えても行き着く先で当たる。`..` と、大文字小文字。
+        # 表記を変えても行き着く先でヒットする。`..` と、大文字小文字。
         detour = os.path.join(self.root, "docs", "..", "README.md")
         self.assertEqual(self.judge("Write", detour).get("permissionDecision"), "deny")
-        # ワークスペースルートのパスも、どの機械でも区別せずに当てる。区別する機械では
+        # ワークスペースルートのパスも、どの機械でも区別せずに適用する。区別する機械では
         # 別の場所を指すパスだが、それでも止める側を採る（`{root}` を機械で変えない）。
         swapped = os.path.join(self.root.swapcase(), "README.md")
         self.assertEqual(self.judge("Write", swapped).get("permissionDecision"), "deny")

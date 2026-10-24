@@ -26,7 +26,8 @@ _LINT = """\
     ccnavi --lint [--json]
 
 ペイロードは読み込みません。ガードを無効にしうる事項をエラーまたは警告として報告し、
-エラーを報告した場合は0以外の終了コードで終了します。--json で出力される形式は docs/requirements/json-shapes.md（「lint
+エラーを報告した場合は0以外の終了コードで終了します。
+--json で出力される形式は docs/requirements/json-shapes.md（「lint
 の JSON」）に記載しており、VS Code拡張機能がこれを読み込みます。
 
 1つのレイヤーのフェーズ定義も同じ方法で渡します（self はワークスペース自身のレイヤーです。
@@ -65,7 +66,8 @@ _TEST = """\
     ccnavi --test Bash "git push" [--json]
     ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml [--json]
 
-どちらもフックと同じ判定処理を通ります。--json で出力される形式は docs/requirements/json-shapes.md（「試験の
+どちらもフックと同じ判定処理を通ります。
+--json で出力される形式は docs/requirements/json-shapes.md（「試験の
 JSON」）に記載しており、VS Code拡張機能がこれを読み込みます。--test は、
 ワークスペースルートから、権限モードなし・メインセッションとして呼び出しを試験します。
 別の呼び出し条件で試験するには、次を追加します。
@@ -85,7 +87,8 @@ _EXPLAIN = """\
 
     ccnavi --explain --json
 
-ペイロードは読み込まず、リモートにも接続しません。形式は docs/requirements/json-shapes.md（「ボードの
+ペイロードは読み込まず、リモートにも接続しません。
+形式は docs/requirements/json-shapes.md（「ボードの
 JSON」）に記載しています。
 """
 
@@ -149,11 +152,11 @@ projects/PROJECT/.ccnavi/config/project/templates/NAME.yml）。下書きは効�
 
     ccnavi --templates --draft PARENT [--name NAME] [--to common|project] [--layer NAME] [--json]
 
-下書きの取り込みは、ほかの保護対象（rules.yml・docs・hook など）と同じく、ユーザーが
-ccnavi-user-handoff.sh で行います。見るだけの形も含めてユーザー専用です。実行ファイルは
-`user handoff` を内部で --handoff に読み替えます。sh が付ける入口の印（--entry sh）が無いと断り、
---handoff を user の外で直接渡しても断ります。テンプレートの
-改名・移動・削除は、ユーザーがファイルを直接操作します。
+下書きの取り込みは、ほかの保護対象（rules.yml・docs・hook など）と同じく、ユーザが
+ccnavi-user-handoff.sh で行います（見るだけの形も含めてユーザ専用です。実行ファイルは内部で
+--handoff に読み替えます。--handoff を直接渡すと断ります。sh が付ける入口の印（--entry sh）が
+ない user handoff も断ります）。テンプレートの
+改名・移動・削除は、ユーザがファイルを直接操作します。
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] [--json]
         （見るだけ。PATH はツリーからの相対パスで、省くと下書き全部）
@@ -161,10 +164,9 @@ ccnavi-user-handoff.sh で行います。見るだけの形も含めてユーザ
         （取り込みます。ボードは実行ファイルを --entry board --via board で呼びます）
 
 共通レイヤー（ワークスペースの .ccnavi/config/common/）のミラー（各プロジェクトの
-.ccnavi/config/common/）がずれていないかの確認と、ずれの同期は、ユーザーが
-ccnavi-user-mirror.sh で行います。見るだけの形も含めてユーザー専用です。実行ファイルは
-`user mirror` を内部で --mirror に読み替えます。sh が付ける入口の印（--entry sh）が無いと
-断ります。同期は各プロジェクトの作業ツリーに書くだけで、コミットはしません。
+.ccnavi/config/common/）がずれていないかの確認と、ずれの同期は、ユーザが
+ccnavi-user-mirror.sh で行います（見るだけの形も含めてユーザ専用です。実行ファイルは内部で
+--mirror に読み替えます。sh が付ける入口の印（--entry sh）がない user mirror は断ります）。同期は各プロジェクトのワークツリーに書くだけで、コミットはしません。
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] [--json]
         （見るだけ。PROJECT を省くと全プロジェクト。差分と --expect の値を出します）
@@ -185,9 +187,9 @@ phases: を補完します。feedback: は --with-feedback
 指定しない場合は、テンプレートにフィードバック計画があることが出力に表示されます。
 フィードバック計画は、メイン計画の最後のレビューの後に、改訂によって1回だけ追加されます。
 最初の提案に書いてしまうと、承認後にメイン計画を改訂できなくなるためです。--with-feedback は、
-ticket new --template 以外で指定すると拒否されます。n番目の計画項目のフローは
+ticket new --template 以外で指定すると拒否されます。n番目の計画のステップのフローは
 wip/proposals/flows/ID-NN-01.yml に出力されます。これは下書きで、
-ユーザーがフローエディターで取り込むまで効力を持ちません。NAME は、
+ユーザがフローエディターで取り込むまで効力を持ちません。NAME は、
 共通レイヤーと1つのレイヤー（--layer を指定しない場合は、
 ワークツリー自身のレイヤー）から検索されます。次の場合は、何も書き込まずに停止します。
 テンプレートが存在しない、または使用できない（エラーがある、または重複により除外された）場合、
@@ -216,9 +218,8 @@ _LOGS = """\
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-prune.sh
     ccnavi --prune --preview
 
-ユーザーがターミナルから ccnavi-user-prune.sh を打ちます。実行ファイルの `user prune` は、sh が
-付ける入口の印（--entry sh）が無いと断ります。--prune を user の外で渡すと断ります。
---preview を指定すると、移動予定の項目のみを表示し、
+ユーザがターミナルから ccnavi-user-prune.sh を打ちます（実行ファイルは内部で --prune に読み替えます。sh が付ける入口の印（--entry sh）がない user prune は断ります。
+--prune を user の外で渡すと断ります）。--preview を指定すると、移動予定の項目のみを表示し、
 実際の変更は行いません（エージェントも実行できます）。
 
 判定ログ（logs/decisions.jsonl と、ローテーション済みの
@@ -227,10 +228,11 @@ decisions.*.jsonl）からルールの候補を作成するには、次のコマ
     ccnavi --suggest [--json]
 
 出力されるのは deny/ask の候補のみです。どのルールにも一致せず、
-繰り返しユーザーに判断が委ねられた呼び出しと、同じ呼び出しを繰り返し止めた deny（その message
+繰り返しユーザに判断が委ねられた呼び出しと、同じ呼び出しを繰り返し止めた deny（その message
 を見直してください）が対象です。各候補は --lint および --test-expectations
 と同じ検査を通過しています。通過しなかったものは件数のみ表示され、候補からは除外されます。
-何も書き込みません。--json で出力される形式は docs/requirements/json-shapes.md（「候補の JSON」）に記載しており、VS
+何も書き込みません。
+--json で出力される形式は docs/requirements/json-shapes.md（「候補の JSON」）に記載しており、VS
 Code拡張機能がこれを読み込みます。
 """
 
@@ -242,10 +244,10 @@ _AGREE = """\
         （指定したチケットのみ。例: 絞り込んだボードから実行する場合。
          idはすべてのフラグの後ろに指定します）
 
-承認はユーザー専用で、ユーザーがターミナルから ccnavi-user-agree.sh を打ちます。承認のあと、承認済み
-チケットのコミットと push まで行います。実行ファイルの `user agree` は、sh が付ける入口の印
-（--entry sh）が無いと断ります。--agree を user の外で渡すと断ります。
-見るだけの --agree --preview は、エージェントも実行できます。
+承認はユーザ専用で、ユーザがターミナルから ccnavi-user-agree.sh を打ちます（実行ファイルは内部で
+--agree に読み替えます。sh が付ける入口の印（--entry sh）がない user agree は断ります。承認のあと、
+承認済みチケットのコミットと push まで行います。--agree を user の外で渡すと断ります。見るだけの --agree --preview は
+エージェントも実行できます）。
 
 すべてのワークツリーの wip/proposals/todo/ をスキャンし、各チケットが書き込み可能にする範囲と、
 人によるレビューが必要かどうかを表示します。そのうえで、承認したチケットを
@@ -254,14 +256,14 @@ _AGREE = """\
 は一括処理の対象を絞り込むだけです。承認待ちでない id や、
 承認待ちの親（またはその親の承認待ちの改訂）がない状態で指定された子は、何も承認されません。
 
-エージェントは、ユーザーに承認を求める前に、
+エージェントは、ユーザに承認を求める前に、
 書いたばかりの提案が承認可能な状態であることを検証します。
 
     ccnavi --agree --preview --verify [--json] [<id>...]
 
 確認だけを行い、ターミナルも不要です。終了コード0は「可」を表します。指定したすべてのチケット（id
 を指定しない場合は承認待ちのすべてのチケット）が、現在の状態のまま一括処理の対象に含まれるため、
-ユーザーに承認を求められます。終了コード3は「不可」を表します。承認待ちでない id、
+ユーザに承認を求められます。終了コード3は「不可」を表します。承認待ちでない id、
 承認待ちのチケットが1件もない場合、または承認で除外される提案がある場合です。
 理由はチケットごとに表示されます。終了コード1は、ほかの実行と同じく使い方や設定のエラーであり、
 判定結果ではありません。そのため、綴りの誤りが、
@@ -290,17 +292,17 @@ Codeのワークフロータブがこれを実行します。エージェント�
     ccnavi --plan-order <parent> --order <JSON> --expect <sha> --write [--json]
         （番号を振り直した計画を提案に書き戻します）
 
---order は、各項目の直接の先行を、現在の提案に書かれている番号で指定します: {"plan": {"1": [],
+--order は、各ステップの直接の先行を、現在の提案に書かれている番号で指定します: {"plan": {"1": [],
 "2": [3], "3": [1]}, "feedback": {...}}。渡された部分は、
-すべての番号の先行をそこから取得します（省略された番号は何も待ちません）。渡されなかった部分は、
-提案のままです。項目は、先行がすべて配置済みのもののうち現在の番号が最小のものから順に、
+すべての番号の先行をそこから取得します（省略された番号は先行なしです）。渡されなかった部分は、
+提案のままです。ステップは、先行がすべて配置済みのもののうち現在の番号が最小のものから順に、
 トポロジカル順に番号が振り直されます。`after` は新しい番号に追従し、`review: defer`
-は項目とともに移動します。改訂の場合、承認済みの子がすでにある番号はそのまま残り、
-それ以外の項目は空いている番号に割り当てられます。循環を生む線、
+はステップとともに移動します。改訂の場合、承認済みの子がすでにある番号はそのまま残り、
+それ以外のステップは空いている番号に割り当てられます。循環を生む線、
 固定された番号の先行を変更する線、固定された番号を避けて詰められない線は拒否され（`refused`）、
 番号は一切振り直されません。
 
-応答には次の項目が含まれます。`plans`（部分ごとに1つ。各項目の `number` と `from`、
+応答には次のステップが含まれます。`plans`（部分ごとに1つ。各ステップの `number` と `from`、
 新しい番号での `after`、`proposed`、`current`、`loose`、`ready`、`problems`）、
 `source_sha`（親の提案、承認待ちの子、および `predecessors`
 でそれらを指定している承認待ちの子）、順序の `problems`、`loose`、`refused`、
@@ -397,7 +399,7 @@ _TICKET = """\
     ccnavi ticket next-id [<prefix> <slug>]
         （読み取り専用。直接作業のワークツリー名に付ける次の連番、またはそれから組み立てた
          識別子 <prefix>-<number>-<slug> を表示します。サブエージェントも実行できます。
-         チケット制御が無効でも使えます。手元のブランチとワークツリーの名前も数え、
+         チケット制御が無効でも利用できます。手元のブランチとワークツリーの名前も数え、
          数えきれなかったときは番号を出さず、終了コード 2 で理由を標準エラーへ出します）
 """
 
@@ -461,20 +463,20 @@ _SCRIPTS = """\
          未保存の下書きがあるものです。該当がなければ何も表示しません）
     ccnavi worktree retire --abandon <parent>
         （放棄した親（MR をマージせずに閉じた親）の片付けの記録 state/retire/<parent>.json を
-         消します。親のワークツリーが残っている間は断ります。ユーザーが端末で打ちます。
+         消します。親のワークツリーが残っている間は断ります。ユーザがターミナルで打ちます。
          エージェントからは打てません）
     ccnavi worktree retire <parent> [--cwd <dir>]
         （ready が Draft を外した後に、親を閉じる片付けを行います。閉じた子のワークツリーと、
          子の手元のブランチ（合流した子: 先頭が merged_sha と同じで、それが push 済みの親に含まれる
          場合のみ）、親のワークツリーを削除します。取り消した子のブランチは一覧表示のみで、
-         ユーザーが確認した後に、ユーザーが ! を付けて
+         ユーザが確認した後に、ユーザが ! を付けて
          ccnavi-user-clean-branch.sh <name> --confirmed を打って削除します。
          ccnavi-review.sh ready が中で呼びます。エージェントからは打てません。
          未コミットの変更や、git が無視しているファイルがあるワークツリーは理由を出して残します）
     ccnavi worktree branch <name> [confirmed]
         （retire が記録した子のブランチだけを、条件を確かめ直して削除します。記録の子が
          チケットの parent: でもその親の子であることを確かめます。取り消した子は confirmed が
-         要ります。ユーザーが ! を付けて打つコマンドで、エージェントからは打てません）
+         要ります。ユーザが ! を付けて打つコマンドで、エージェントからは打てません）
     ccnavi sync tidy <parent> <repo> <branch> <sha>
         （ccnavi-sync.sh 用。親の MR がマージ済みと分かった後に、親のワークツリーと
          手元のブランチを、<branch> が親のブランチで、手元の先頭が push 済みの先頭
@@ -518,15 +520,18 @@ _SCRIPTS = """\
          "why <理由>" を出力します。結び付きは取り込み先のリポジトリだけを見ます）
     ccnavi tree guarded <main-checkout> <path>...
         （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"guarded yes|no"（パスが自己防衛の
-         守る対象に当たるか。当たると integrate-done は端末から打つよう案内します）、
-         当たるパスごとに "path <パス>" を出力します。パスはメインのチェックアウトからの相対です）
+         守る対象にヒットするか。
+         ヒットすると integrate-done はターミナルから打つよう案内します）、
+         ヒットするパスごとに "path <パス>" を出力します。
+         パスはメインのチェックアウトからの相対です）
     ccnavi tree handoff-pending <tree>
         （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"pending <件数>"（取り込んでいない
          wip/handoff/ の下書きの数）と、1 件ごとに "path <パス>" を出力します）
     ccnavi worktree id <branch>
         （スクリプト用。"id <識別子>"（ブランチ名の / を - に置き換えたもの）に続いて、
          親に採用できなければ "problem <理由>"（58文字以内・末尾が -2桁でない・字の種類・NFC）、
-         直接作業や子のワークツリーに使えなければ "direct <理由>"（64文字以内・字の種類・NFC）、
+         直接作業や子のワークツリーの名前に指定できなければ
+         "direct <理由>"（64文字以内・字の種類・NFC）、
          子の識別子の形なら "child yes" を出力します）
     ccnavi worktree issue-id <number> <prefix> [<project>] --title <title>
         （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" を
@@ -548,7 +553,7 @@ _SCRIPTS = """\
 ccnavi自身は、リモートに接続しません。スクリプトがマージリクエストとそのスレッド、
 レビューを取得し、--result <json> として渡します。
 
-未解決のレビュースレッドは、人が親のワークツリーの端末から、次のコマンドで受け入れます
+未解決のレビュースレッドは、人が親のワークツリーのターミナルから、次のコマンドで受け入れます
 （VS Code のボードの「決める」も、同じ判定を通ります）。
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-decide.sh N

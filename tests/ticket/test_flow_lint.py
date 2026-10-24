@@ -311,7 +311,7 @@ class FlowStructureTest(unittest.TestCase):
     def test_branch_and_question_exits_without_lines(self):
         text = STRUCTURE_BASE.replace("  - {id: c3, from: q, to: p1, fromPort: branch-1}\n", "")
         self.assertEqual(self.problems(text), ["問い q（方針） の出口に線が無い: 大きく"])
-        # 分岐は項目の id でも出口を当てる。
+        # 分岐は項目の id でも出口を適用する。
         branch = """\
 nodes:
   - {id: s, type: start}

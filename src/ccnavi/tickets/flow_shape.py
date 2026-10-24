@@ -75,7 +75,8 @@ _NOT_STEP = (GROUP,)
 
 
 def _step_nodes(data) -> list[dict]:
-    """構造を見るノード。辞書で `id` を持ち、グループでないもの（重なった `id` は最初の 1 つ）。"""
+    """構造を見るノード。
+    マップで `id` を持ち、グループでないもの（重なった `id` は最初の 1 つ）。"""
     nodes: list[dict] = []
     seen: set[str] = set()
     for n in flow_text._list(flow_text._dict(data).get("nodes")):

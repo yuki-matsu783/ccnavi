@@ -6,7 +6,7 @@
  * 経路になる。歯止めはユーザがここで読むことなので、変わった欄の名前だけでなく、値の前と後を並べる。
  *
  * 「取り込む」は編集中の内容に入れるだけで、書かない（保存はいつもの経路）。着手中（錠）は押せない。未保存の変更が
- * あれば、それを捨てて取り込むことを文とボタンの言葉で確かめる。
+ * あれば、それを破棄して取り込むことを文とボタンの言葉で確かめる。
  */
 import { useEffect, useRef, type JSX } from "react";
 
@@ -99,7 +99,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
         <>
           <p className="dim small">
             下書き {view.proposal.draftPath} と、いまのフローとの違いです。フローの文は担当のサブエージェントへの案内になります。
-            外部の道具を使わせる指示などが紛れていないか、文を読んでから取り込んでください。
+            外部のツールを使わせる指示などが紛れていないか、文を読んでから取り込んでください。
           </p>
           {diff?.problem !== undefined && (
             <p className="proposal-error" id="proposal-problem">

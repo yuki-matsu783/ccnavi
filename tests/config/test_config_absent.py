@@ -2,7 +2,7 @@
 
 ファイルが無いのは「設定が無い」正常で、ルール・リスクの配点・フェーズ定義のすべてで空として扱う。
 記録の `fallback` にも `--lint` にも出さない。不正なときだけ `fallback` を残す。
-組み込みの deny は、共通レイヤーと config の有無・状態によらず常に当たる。
+組み込みの deny は、共通レイヤーと config の有無・状態によらず常にヒットする。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。
 """
@@ -58,7 +58,7 @@ class AbsentRulesTest(ConfigUnionHarness):
         self.assertNotIn("built-in defaults", self.reason(denied))
 
     def test_builtin_deny_stays_on_without_the_common_layer(self):
-        """共通レイヤーが無くても、組み込みの deny（取り返しの付かない操作）は当たる。"""
+        """共通レイヤーが無くても、組み込みの deny（取り返しの付かない操作）はヒットする。"""
         self.remove_common_rules()
 
         for tool, field, value in (
@@ -97,7 +97,7 @@ class AbsentRulesTest(ConfigUnionHarness):
                 self.assertNotIn("builtin:credentials", self.last_record().get("rules", []))
 
     def test_builtin_deny_stays_on_under_the_common_layer(self):
-        """共通レイヤーが在っても、組み込みの deny は土台として当たる。"""
+        """共通レイヤーが在っても、組み込みの deny は土台としてヒットする。"""
         denied = self.hook("Bash", self.ws, command="git reset --hard HEAD~1")
 
         self.assert_denied(denied, "builtin:git-reset-hard")
@@ -217,7 +217,7 @@ BUILTIN_DENIED = (
     (f"{GIT} -c remote.origin.url=github.com push", "builtin:git-push"),
     (f"{GIT} -C gitlab reset --hard", "builtin:git-reset-hard"),
     (f"{GIT} -C gi push", "builtin:git-push"),
-    # `--` の後ろはオペランド。その前に揃っていれば当たる。
+    # `--` の後ろはオペランド。その前に揃っていればヒットする。
     ("rm -rf -- x", "builtin:recursive-delete"),
     ("rm -r -f -- x", "builtin:recursive-delete"),
     (f"{GIT} reset --hard -- x", "builtin:git-reset-hard"),
@@ -250,7 +250,7 @@ BUILTIN_PASSED = (
     f"{GIT} -c x=push status",
 )
 
-# 照合の後戻りが長引く形だった入力。どれも当たらない。
+# 照合の後戻りが長引く形だった入力。どれもヒットしない。
 SLOW_BEFORE = (
     "rm " * 8000,
     "git -c " * 8000,
@@ -359,7 +359,7 @@ class BuiltinFormsTest(ConfigUnionHarness):
         for command in BUILTIN_PASSED:
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, command=command)
-                # 生の git は組み込みで常に止まる。ほかの土台の deny に当たっていないことを見る。
+                # 生の git は組み込みで常に止まる。ほかの土台の deny にヒットしていないことを見る。
                 if self.decision(result) == "deny":
                     self.assert_denied(result, RAW_GIT_BUILTIN)
 
@@ -531,7 +531,7 @@ class BuiltinGitDirTest(ConfigUnionHarness):
 
     名指しのツール（Write / Edit / NotebookEdit）は `.git/` の下と `.git` そのもの、
     シェルは守る場所と同じ書き込みの形で見る。読むだけと、`.gitignore`・`.github/` は
-    止めない。git のラッパーの呼び出しは、`.git` がコマンド文字列に出ないので当たらない。
+    止めない。git のラッパーの呼び出しは、`.git` がコマンド文字列に出ないのでヒットしない。
     """
 
     def check(self):
@@ -773,7 +773,7 @@ class StandaloneCloneTest(ConfigUnionHarness):
 
     def setUp(self):
         super().setUp()
-        # lib を単体の clone に見立てる。ミラーは共通レイヤーの写し。
+        # lib を単体の clone に見立てる。ミラーは共通レイヤーのコピー。
         self.mirror = os.path.join(self.lib, ".ccnavi", "config", "common")
         write(os.path.join(self.mirror, "rules.yml"), json.dumps(COMMON_RULES))
         write(os.path.join(self.mirror, "risks.yml"), COMMON_RISK)
@@ -782,7 +782,7 @@ class StandaloneCloneTest(ConfigUnionHarness):
         self.log = os.path.join(self.lib, "logs", "decisions.jsonl")
 
     def test_the_mirror_is_the_common_layer_and_the_config_is_the_own_layer(self):
-        """ミラーのルールは裸の id、config のルールは `self:` の id で当たる。"""
+        """ミラーのルールは裸の id、config のルールは `self:` の id でヒットする。"""
         env = self.hook("Write", self.lib, file_path=os.path.join(self.lib, ".env"))
         self.assert_denied(env, "credentials")
         self.assertEqual(self.hit_rules(), ["credentials"])
@@ -883,7 +883,7 @@ class ExplainSumsTest(ConfigUnionHarness):
         body = json.loads(self.ccnavi("--explain", "--json").stdout)
         sums = {s["name"]: s for s in body["sums"]}
 
-        # どちらの和も共通レイヤーの定義だけ（全欄一致の重複は後ろを捨てる）。
+        # どちらの和も共通レイヤーの定義だけ（全欄一致の重複は後ろを破棄する）。
         self.assertEqual(
             [r["id"] for r in sums["lib"]["rules"]["deny"]],
             [r["id"] for r in COMMON_RULES["deny"]],
@@ -911,7 +911,8 @@ class ExplainSumsTest(ConfigUnionHarness):
         )
         self.assertEqual(sums["app"]["phases"]["types"], [])
         self.assertEqual(sums["app"]["phases"]["unreadable"], "")
-        # 定義は順序を持たない。待ち方は計画の項の `after` から読むので、待ち方の欄は渡さない。
+        # 定義は順序を持たない。先行関係は計画のステップの `after` から読むので、
+        # 先行関係の欄は渡さない。
         self.assertNotIn("order", sums["lib"]["phases"])
 
     def test_a_missing_or_broken_layer_is_said_in_its_own_sum(self):

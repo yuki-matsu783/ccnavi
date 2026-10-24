@@ -34,11 +34,11 @@ test("CB-T369 答えの線を、元の番号での直接の先行（--order の�
 
 test("CB-T370 図で線を追加する・削除すると、見えている番号を元の番号に直して --order を組む。提案と同じ計画は渡さない", () => {
   const open = planOrderSample("open");
-  // 3 番が 2 番を待つ線を足す（見えている番号 = 元の番号）。フィードバック計画は変えていないので渡さない
+  // 2 番が 3 番の先行になる線を足す（見えている番号 = 元の番号）。フィードバック計画は変えていないので渡さない
   assert.deepEqual(editedOrder(open, { part: "plan", from: 2, to: 3, add: true }), { plan: { "1": [], "2": [1], "3": [1, 2], "4": [2, 3] } });
   // 1 → 3 の線を消す
   assert.deepEqual(editedOrder(open, { part: "plan", from: 1, to: 3, add: false }), { plan: { "1": [], "2": [1], "3": [], "4": [2, 3] } });
-  // 振り直した答えの上では、見えている番号（2 番 = 元の 3）を元の番号に直す。3 番（元の 2）が 2 番（元の 3）を待つ線を消す
+  // 振り直した答えの上では、見えている番号（2 番 = 元の 3）を元の番号に直す。2 番（元の 3）が 3 番（元の 2）の先行である線を消す
   const reverse = planOrderSample("reverse");
   assert.deepEqual(editedOrder(reverse, { part: "plan", from: 2, to: 3, add: false }), { plan: { "1": [], "2": [1], "3": [1], "4": [2] } });
   assert.deepEqual(editedOrder(open, { part: "feedback", from: 5, to: 6, add: false }), { feedback: { "5": [], "6": [] } });
@@ -53,12 +53,12 @@ test("CB-T371 未保存は、答えの線が提案に書いてある先行と違
   assert.equal(isDirty(planOrderSample("open")), false);
   assert.equal(isDirty(planOrderSample("reverse")), true);
   assert.equal(isDirty(planOrderSample("loose")), true);
-  // 保存と未保存の写しに渡すのは、提案と違う計画だけ
+  // 保存と未保存のコピーに渡すのは、提案と違う計画だけ
   assert.deepEqual(changedOrder(planOrderSample("reverse")), { plan: { "1": [], "2": [1, 3], "3": [1], "4": [2] } });
   assert.deepEqual(changedOrder(planOrderSample("open")), {});
 });
 
-test("CB-T372 番号の変わる項を並べる（保存の前に見せる）。変わらない項は並べない", () => {
+test("CB-T372 番号の変わるステップを並べる（保存の前に見せる）。変わらないステップは並べない", () => {
   assert.deepEqual(renumbered(planOrderSample("reverse")), [
     { part: "plan", title: "実装とテスト", from: 3, number: 2 },
     { part: "plan", title: "設計", from: 2, number: 3 },
@@ -66,15 +66,15 @@ test("CB-T372 番号の変わる項を並べる（保存の前に見せる）。
   assert.deepEqual(renumbered(planOrderSample("open")), []);
 });
 
-test("CB-T373 外で提案が変わったときの差分。番号ごとに、定義と待ちの前後を並べる。変わらない番号は並べない", () => {
+test("CB-T373 外で提案が変わったときの差分。番号ごとに、定義と先行の前後を並べる。変わらない番号は並べない", () => {
   const before = planOrderSample("open").plans;
   const after = planOrderSample("reverse").plans;
   assert.deepEqual(planDiff(before, after), [
-    { part: "plan", number: 2, before: "設計（design）: 待つ 1", after: "実装とテスト（implement）: 待つ 1" },
-    { part: "plan", number: 3, before: "実装とテスト（implement）: 待つ 1", after: "設計（design）: 待つ 1, 2" },
-    { part: "plan", number: 4, before: "docs（docs）: 待つ 2, 3", after: "docs（docs）: 待つ 3" },
+    { part: "plan", number: 2, before: "設計（design）: 先行 1", after: "実装とテスト（implement）: 先行 1" },
+    { part: "plan", number: 3, before: "実装とテスト（implement）: 先行 1", after: "設計（design）: 先行 1, 2" },
+    { part: "plan", number: 4, before: "docs（docs）: 先行 2, 3", after: "docs（docs）: 先行 3" },
   ]);
-  // 項が増えた・減った（フィードバック計画が無くなった）
+  // ステップが増えた・減った（フィードバック計画が無くなった）
   const dropped = planDiff(before, [before[0]]);
   assert.deepEqual(dropped.map((row) => [row.part, row.number, row.after]), [
     ["feedback", 5, "（なし）"],
@@ -101,7 +101,7 @@ test("CB-T375 タブの題は未保存の間だけ頭に ● を付ける", () =
   assert.equal(workflowTitle("i0001", true), "● ccnavi 計画編集: i0001");
 });
 
-test("CB-T376 画面から届いたものを確認する。形が崩れていれば捨てる（保存の中身が読み込めないものを渡さない）", () => {
+test("CB-T376 画面から届いたものを確認する。形が崩れていれば破棄する（保存の中身が読み込めないものを渡さない）", () => {
   const order = { plan: { "1": [], "2": [1] } };
   assert.deepEqual(asWorkflowMessage({ type: "ready" }), { type: "ready" });
   assert.deepEqual(asWorkflowMessage({ type: "adopt" }), { type: "adopt" });
@@ -154,7 +154,7 @@ test("CB-T387 提案が承認待ちから無くなった理由。新規の親は
   assert.match(goneReasonOf("i0001", true, { proposal: "review", approved: true }) ?? "", /承認されたか/);
 });
 
-test("CB-T388 閉じた後に戻すかを聞くのは、未保存で写しがあり、読み込めていて、保存の途中でないときだけ", () => {
+test("CB-T388 閉じた後に戻すかを聞くのは、未保存でコピーがあり、読み込めていて、保存の途中でないときだけ", () => {
   const base = { dirty: true, draft: true, loaded: true, saving: false };
   assert.equal(restoreAsked(base), true);
   assert.equal(restoreAsked({ ...base, saving: true }), false, "保存を押してすぐ閉じた（書き込みは通る）");

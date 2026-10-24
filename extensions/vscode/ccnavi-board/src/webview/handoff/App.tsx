@@ -2,7 +2,7 @@
  * 取り込み待ち画面の本体。帯・件数の要約・対象の一覧・取り込みの確認と結果。
  *
  * 見せる中身は拡張ホストが渡す（`HandoffData`）。画面が自分で持つのは、ユーザが触って決めるもの
- * （選んだ対象、開いている行、確認の帯、直近の結果、端末の案内）だけ。種類・状態・検査・差分・ハッシュは実行ファイルの答えを読むだけで、
+ * （選んだ対象、開いている行、確認の帯、直近の結果、ターミナルの案内）だけ。種類・状態・検査・差分・ハッシュは実行ファイルの答えを読むだけで、
  * 取り込めるか・取り込めない理由は `core/handoffmodel.ts` の判断をそのまま使う。
  * 取り込む手順（見るだけをもう一度呼んで `expect` を取る、錠を取り直す）は拡張ホストが持つ（`core/handoff-import.ts`）。
  */
@@ -36,7 +36,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
   const [busy, setBusy] = useState(false);
   /** 直近の取り込みの結果 */
   const [outcome, setOutcome] = useState<HandoffOutcome | undefined>(undefined);
-  /** 端末で打つコマンドの案内（パス → 答え）。読み直すと古くなるので捨てる */
+  /** ターミナルで打つコマンドの案内（パス → 答え）。読み直すと古くなるので破棄する */
   const [terminals, setTerminals] = useState<Readonly<Record<string, TerminalState>>>({});
   /** 届いたメッセージの中で「いまの一覧」を見るための ref（setState の更新関数の中から読むため） */
   const pageOfRef = useRef<HandoffPage | undefined>(pageOf(data));
@@ -98,7 +98,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
     return (
       <>
         <p className="empty" id="handoff-disabled">
-          取り込み待ち画面は使えません。
+          取り込み待ち画面は利用できません。
         </p>
         <pre className="load-error" data-role="disabled-reason">
           {data.reason}
@@ -213,7 +213,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
         </p>
         {entries.length === 0 ? (
           <p className="empty" data-role="empty">
-            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.sh で wip/handoff/ に写して編集します。
+            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.sh で wip/handoff/ にコピーして編集します。
           </p>
         ) : (
           <>

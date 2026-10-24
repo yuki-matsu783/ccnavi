@@ -46,7 +46,7 @@ test("CB-D21 編集可能な範囲を inherit に変えると glob の欄が消�
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "research");
     await dom.settle();
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
-    assert.match(dom.one("#status").textContent ?? "", /IDが重複しています（research）/);
+    assert.match(dom.one("#status").textContent ?? "", /ID が重複しています（research）/);
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p2")} input.f-id`).classList.contains("duplicate"));
     // 直せば保存できるようになり、文面も消える
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "design2");
@@ -58,15 +58,15 @@ test("CB-D21 編集可能な範囲を inherit に変えると glob の欄が消�
   }
 });
 
-test("CB-D22 絞り込みは title と scope にも当たり、開いている行は隠さず、一致した行だけを数える。追加した定義は開いて焦点が id に来る", async () => {
+test("CB-D22 絞り込みは title と scope にもヒットし、開いている行は隠さず、一致した行だけを数える。追加した定義は開いて焦点が id に来る", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
     dom.type(dom.one("#find"), "設計");
     await dom.settle();
-    // design は題で、acceptance は when（「設計と並行してよく」）で当たる
-    assert.equal(dom.one("#phase-count").textContent, "2 / 5（検索条件外の展開中項目：1件）", "開いている research は一致しないので数えず、開いたままの数として添える");
+    // design は題で、acceptance は when（「設計と並行してよく」）でヒットする
+    assert.equal(dom.one("#phase-count").textContent, "2 / 5（検索条件外の展開中項目: 1 件）", "開いている research は一致しないので数えず、開いたままの数として添える");
     assert.ok(dom.one(rowSelector("p1")).classList.contains("hidden-by-find"));
     assert.ok(dom.one(rowSelector("p1")).classList.contains("open"));
     assert.ok(!dom.one(rowSelector("p2")).classList.contains("hidden-by-find"));
@@ -173,7 +173,7 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
     await dom.send({ type: "changed" });
     assert.ok(!dom.one("#changed").classList.contains("hidden"));
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).value, "調べる", "帯が出ても編集は消さない");
-    // 再読込が通ったら、その中身で描き直す
+    // 再読み込みが通ったら、その中身で描き直す
     await dom.send({ type: "data", data: { kind: "page", page: page({ phasesPath: ".ccnavi/config/project/phases.yml" }) } });
     assert.ok(dom.one("#changed").classList.contains("hidden"));
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
@@ -201,7 +201,7 @@ test("CB-D63 定義がないファイルは、保存する前に追加すると�
     lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] },
   });
   try {
-    assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルはccnaviで読み込めません/);
+    assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルは ccnavi で読み込めません/);
     assert.match(dom.one(".problems").textContent, /phases がマップ（キーと値の組の集まり）ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
@@ -226,7 +226,7 @@ test("CB-D67 補足は、最後の値を削除しても畳まれない（打っ�
   }
 });
 
-test("CB-D68 往復の間は帯の再読込も止め、再読込を押した時点で欄を止める", async () => {
+test("CB-D68 往復の間は帯の再読み込みも止め、再読み込みを押した時点で欄を止める", async () => {
   const dom = await openPhases();
   try {
     await dom.send({ type: "changed" });
@@ -237,7 +237,7 @@ test("CB-D68 往復の間は帯の再読込も止め、再読込を押した時�
     dom.click(dom.one("#save"));
     await dom.settle();
     for (const button of dom.all<HTMLButtonElement>('button[data-action="reload"]')) {
-      assert.ok(button.disabled, "保存の往復の間はどの再読込も押せない");
+      assert.ok(button.disabled, "保存の往復の間はどの再読み込みも押せない");
     }
     await dom.send({ type: "failed", message: "lint error" });
     dom.click(dom.one('#changed button[data-action="reload"]'));
@@ -269,7 +269,7 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
       [true, false],
-      "編集を捨てたことも伝える",
+      "編集を破棄したことも伝える",
     );
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     assert.equal(dom.all("#ccnavi-loading").length, 0);
@@ -304,12 +304,12 @@ test("CB-D85 関係の欄（overlap・requires・after）と、その id を選�
   }
 });
 
-test("CB-D86 図・一覧と図の切り替え・全体計画の待ち方の選択は出ない。state に前の図の表示や点の位置が残っていても一覧で開き、定義を追加できば追加した行が見える", async () => {
+test("CB-D86 図・一覧と図の切り替え・全体計画の先行関係の選択は出ない。state に前の図の表示や点の位置が残っていても一覧で開き、定義を追加できば追加した行が見える", async () => {
   const dom = await openPhases({}, { view: "graph", spots: { design: { x: 40, y: 80 } } });
   try {
     assert.equal(dom.all("#phase-graph, .react-flow, .graph, .graph-legend, .graph-note").length, 0, "図が残っている");
     assert.equal(dom.all('[data-action="show-graph"], [data-action="show-list"], .tabs').length, 0, "一覧と図の切り替えが残っている");
-    assert.equal(dom.all('#f-order, [data-yaml-key="order"], label.order').length, 0, "待ち方の選択が残っている");
+    assert.equal(dom.all('#f-order, [data-yaml-key="order"], label.order').length, 0, "先行関係の選択が残っている");
     assert.ok(!dom.one("#phases").classList.contains("hidden"), "一覧が隠れている");
     dom.click(dom.one('button[data-action="add"]'));
     await dom.settle();
@@ -322,7 +322,7 @@ test("CB-D86 図・一覧と図の切り替え・全体計画の待ち方の選�
   }
 });
 
-test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後まで進めると閉じて tourDone を返す。案内の間は見本を描き、閉じたら実際の定義に戻る。図・関係の欄・待ち方の手順はありません", async () => {
+test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後まで進めると閉じて tourDone を返す。案内の間は見本を描き、閉じたら実際の定義に戻る。図・関係の欄・先行関係の手順はありません", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
@@ -330,7 +330,7 @@ test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後ま�
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
     // 1 番目の手順で、順序は親チケットの計画で決めることを言う
-    assert.match(dom.one(".tour-bubble").textContent ?? "", /順序（どのフェーズがどれを待つか）は、親チケットの計画の項の after で決めます/);
+    assert.match(dom.one(".tour-bubble").textContent ?? "", /順序（どのフェーズにどのフェーズが先行するか）は、親チケットの計画のステップの after で決めます/);
     const titles = [dom.one("#tour-title").textContent];
     for (let i = 0; i < 4; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
@@ -439,7 +439,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
-    assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズがどれを待つか）はこのファイルには記載しません。親チケットの計画の項に after で先行を指定します/);
+    assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに after で先行を指定します/);
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));

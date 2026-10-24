@@ -1,7 +1,7 @@
 /**
  * 取り込み待ち画面が読む実行ファイルの答え（`user handoff --json`）の読み取りと、画面の判断
  * （`src/core/handoffmodel.ts`）を確かめる。実行ファイルが無くても試せる。
- * 取り込めるか・錠・端末の案内・選択の引き継ぎは、手で書いた答えから決める。
+ * 取り込めるか・錠・ターミナルの案内・選択の引き継ぎは、手で書いた答えから決める。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -166,16 +166,16 @@ test("CB-T1109 取り込めるのは board が真・状態が new か changed・
   assert.equal(isImportable(entry({ warnings: ["TODO"] })), true);
 });
 
-test("CB-T1110 取り込めない対象には理由を言う。端末のみ・conflict・rejected・unchanged・error・知らない状態", () => {
+test("CB-T1110 取り込めない対象には理由を言う。ターミナルのみ・conflict・rejected・unchanged・error・知らない状態", () => {
   assert.equal(refusalReason(entry()), "");
-  assert.match(refusalReason(entry({ board: false, kind: "defense" })), /ボードからは取り込めません。端末で取り込みます/);
+  assert.match(refusalReason(entry({ board: false, kind: "defense" })), /ボードからは取り込めません。ターミナルで取り込みます/);
   assert.match(refusalReason(entry({ state: "conflict" })), /conflict/);
   assert.match(refusalReason(entry({ state: "rejected" })), /rejected/);
   assert.match(refusalReason(entry({ state: "unchanged" })), /同じ内容/);
   assert.match(refusalReason(entry({ errors: ["x"] })), /error/);
-  assert.match(refusalReason(entry({ state: "later" })), /知らない状態です（later）/);
-  // 端末のみの対象は、状態より先に端末で取り込むことを言う
-  assert.match(refusalReason(entry({ board: false, state: "conflict" })), /端末で取り込みます/);
+  assert.match(refusalReason(entry({ state: "later" })), /未知の状態です（later）/);
+  // ターミナルのみの対象は、状態より先にターミナルで取り込むことを言う
+  assert.match(refusalReason(entry({ board: false, state: "conflict" })), /ターミナルで取り込みます/);
 });
 
 test("CB-T1111 作業中の錠は template と layer-config にだけ掛かる。docs と defense には掛けない", () => {

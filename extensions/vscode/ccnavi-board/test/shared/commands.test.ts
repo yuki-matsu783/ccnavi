@@ -196,7 +196,7 @@ test("CB-T19e マージ状況の引数と片付けのコマンド。mr-state と
   );
   // Windows の区切りは / にそろえ、末尾の区切りは落とす
   assert.equal(retireCommand("C:\\Users\\me\\ws\\", "i0001"), "cd 'C:/Users/me/ws' && sh 'C:/Users/me/ws/.ccnavi/scripts/ccnavi-sync.sh' 'i0001'");
-  // 捨てた親の記録を消すコマンドは、ボードが送らずコピーするだけ。引用の規則は文面の sh と同じ
+  // 破棄した親の記録を消すコマンドは、ボードが送らずコピーするだけ。引用の規則は文面の sh と同じ
   assert.equal(abandonCommand("/ws", "i0001"), "sh /ws/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon i0001");
   assert.equal(abandonCommand("/my ws", "i0001"), 'sh "/my ws/.ccnavi/scripts/ccnavi-launcher.sh" worktree retire --abandon i0001');
   // ダイアログは sync が何をするかを先に言う

@@ -5,7 +5,7 @@
 1. 下書きの置き場: 親のツリーの `wip/handoff/<取り込み先の相対パス>`。取り込み先は `--to`
    （既定は project）と `--layer` で決まる。取り込みは `ccnavi user handoff`（test_handoff.py）
 2. `--templates --draft <親>`: 完了した親の計画から下書きを作る。`after` を計画の中の添字に直し、
-   子のフローを写し、同名の下書きは上書きせず断る。取り込み先に同名のテンプレートがあれば断る。
+   子のフローをコピーし、同名の下書きは上書きせず断る。取り込み先に同名のテンプレートがあれば断る。
    作業中・退避済み・取り消した親は読めないと言う
 3. 下書きの効力: `--templates` の統合結果にも `templates[]` にも入らない。
    `--lint` は error にしない。一覧に件数、`--json` に `drafts[]`
@@ -63,7 +63,7 @@ class Drafts(PhaseHarness):
 
         PhaseHarness.ccnavi が足す判定のオプションは付けない。
 
-        `guard` は端末の確かめ（CCNAVI_GUARD_TICKET_APPROVAL）。`--templates`
+        `guard` はターミナルの確かめ（CCNAVI_GUARD_TICKET_APPROVAL）。`--templates`
         はオプションでは渡せない。
         """
         env = {
@@ -191,7 +191,9 @@ class MakeTest(Drafts):
         self.assertIn(
             "ccnavi-user-handoff.sh .ccnavi/config/project/templates/i0001.yml", result.stdout
         )
-        self.assertIn("全体計画 3 項 / フィードバック計画 2 項 / フロー 1 本", result.stdout)
+        self.assertIn(
+            "全体計画 3 ステップ / フィードバック計画 2 ステップ / フロー 1 本", result.stdout
+        )
         template = self.drafted()
         self.assertEqual(template.name, "i0001")
         self.assertEqual([i.type for i in template.plan], ["research", "design", "implement"])
@@ -261,7 +263,7 @@ class MakeTest(Drafts):
         result = self.draft()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.drafted().flows, {})
-        self.assertIn("フィードバック計画の子のフローは写さない", result.stdout)
+        self.assertIn("フィードバック計画の子のフローはコピーしない", result.stdout)
 
     def test_the_description_carries_a_todo_mark_and_the_check_warns(self):
         self.done_parent(["design"])
@@ -665,16 +667,16 @@ class JudgmentUnchangedTest(Drafts):
 
     def test_the_draft_place_under_the_ccnavi_directory_can_be_edited(self):
         # テンプレートの下書きは `wip/handoff/.ccnavi/config/…` に置く。パスに `.ccnavi/` が入って
-        # いても、ツリー直下の `wip/handoff/` の中は守る場所の写しなので、組み込みの保護
+        # いても、ツリー直下の `wip/handoff/` の中は守る場所のコピーなので、組み込みの保護
         # （ccnavi ディレクトリの下を名指しのツールで止める glob）の例外になる。
-        # 写しにはルールとしての効力が無く、ユーザが取り込むまで何も変わらない。
+        # コピーにはルールとしての効力が無く、ユーザが取り込むまで何も変わらない。
         for tool in ("Write", "Edit"):
             result = self.write_to(self.draft_path("x"), tool)
             self.assertNotEqual(self.decision(result), "deny", (tool, result.stdout))
             self.assertNotIn("builtin:guard-project-home", result.stdout)
 
     def test_a_look_alike_of_the_draft_place_stays_protected(self):
-        # ツリーの直下でない綴りは、守る場所の写しではないので除かない
+        # ツリーの直下でない綴りは、守る場所のコピーではないので除かない
         path = os.path.join(
             self.parent_tree, "docs", "wip", "handoff", ".ccnavi", "config", "x.yml"
         )

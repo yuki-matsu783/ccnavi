@@ -460,7 +460,7 @@ class PushApprovedTest(Workspace):
         self.assertIn("親のブランチ i0001 がリモートに無い", result.stderr)
         self.assertIn("ccnavi-sync.sh i0001", result.stderr)
         self.assertIn("コミットはローカルに残っている", result.stderr)
-        # ユーザが端末で元の名前に戻せば、打ち直して送れる。
+        # ユーザがターミナルで元の名前に戻せば、打ち直して送れる。
         git(tree, "push", "-q", "origin", "i0001")
         write(os.path.join(tree, *APPROVED.split("/"), "i0002.md"), "approved\n")
         result = self.push(env=env)
@@ -823,7 +823,8 @@ class ApproveCarriesTest(Workspace):
     def test_approve_refuses_words_that_are_not_ids(self):
         """識別子でない語は断り、実行ファイルを呼ばない。
 
-        `--yes` や `--root` を混ぜると、端末の y/N を経ない経路や別のワークスペースになってしまう。
+        `--yes` や `--root` を混ぜると、
+        ターミナルの y/N を経ない経路や別のワークスペースになってしまう。
         """
         tree = self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")
@@ -843,7 +844,7 @@ class ApproveCarriesTest(Workspace):
                 self.assertIn("<識別子>", result.stdout)
 
     def test_approve_help_next_to_ids_is_an_id(self):
-        """使い方を出すのは語が 1 つのときだけ。識別子と並んだ `help` を何も言わずに捨てない。"""
+        """使い方を出すのは語が 1 つのときだけ。識別子と並んだ `help` を何も言わずに破棄しない。"""
         self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")
         result = self.approve("help", "i0002-01-01", STUB_ARGS=args)

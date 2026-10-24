@@ -117,7 +117,7 @@ class CleanupFormsTest(HookCase):
                     self.assertIn("! を付けて", reason)
 
     def test_the_scripts_that_call_it_are_not_stopped_by_it(self):
-        # sh の中から実行ファイルを呼ぶ分は hook を通らない。sh を打つ形はこの止めに当たらない。
+        # sh の中から実行ファイルを呼ぶ分は hook を通らない。sh を打つ形はこの止めにヒットしない。
         for command in self.PASSED:
             with self.subTest(command=command):
                 _, reason = self.hook(command)
