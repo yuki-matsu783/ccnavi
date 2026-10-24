@@ -68,6 +68,25 @@
   nav button:disabled { opacity: .35; cursor: default; }
   #count { color: var(--muted); font-size: 14px; }
   #bar { position: fixed; top: 0; left: 0; height: 4px; background: var(--accent); transition: width .2s; }
+  svg.fig { width: 100%; height: auto; max-height: 50vh; display: block; }
+  .b { fill: var(--card); stroke: var(--line); stroke-width: 2; }
+  .ba { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.5; }
+  .bh { fill: var(--accent); }
+  .bw { fill: none; stroke: var(--warn); stroke-width: 2.5; }
+  .bwf { fill: var(--warn); fill-opacity: .14; stroke: var(--warn); stroke-width: 2; }
+  .bm { fill: var(--line); }
+  .dz { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 7 6; }
+  .ln, .la, .lw { fill: none; stroke-width: 2.5; }
+  .ln { stroke: var(--muted); marker-end: url(#am); }
+  .la { stroke: var(--accent); marker-end: url(#aa); }
+  .lw { stroke: var(--warn); stroke-dasharray: 8 6; marker-end: url(#aw); }
+  .t, .tm, .tw, .th, .tb { text-anchor: middle; font-family: inherit; }
+  .t { fill: var(--fg); font-size: 18px; font-weight: 700; }
+  .tm { fill: var(--muted); font-size: 14px; }
+  .tw { fill: var(--warn); font-size: 16px; font-weight: 700; }
+  .th { fill: var(--bg); font-size: 18px; font-weight: 700; }
+  .tb { fill: var(--accent); font-size: 16px; font-weight: 700; }
+  .mini { width: 100%; height: auto; display: block; margin-bottom: 8px; }
   @media print {
     body { overflow: visible; height: auto; }
     .slide { display: flex; position: static; min-height: 100vh; page-break-after: always; }
@@ -76,102 +95,200 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+    <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--warn)"/></marker>
+  </defs>
+</svg>
+
 <div id="bar"></div>
 
+<!-- 1 表紙 -->
 <section class="slide">
   <div class="tag">CCNAVI / IDEA</div>
   <h1>ccnavi の思想</h1>
   <p class="lead muted">なぜ作るか、何を作るか、どう実現するか</p>
+  <svg class="fig" viewBox="0 0 800 250" role="img" aria-label="人間が判断し、ccnavi がエージェントの操作を通す・止める">
+    <rect class="b" x="330" y="8" width="140" height="44" rx="10"/><text class="t" x="400" y="37">人間</text>
+    <path class="la" d="M400 52 V96" stroke-dasharray="6 5"/><text class="tb" x="445" y="80" text-anchor="start">判断</text>
+    <rect class="b" x="20" y="110" width="170" height="80" rx="12"/><text class="t" x="105" y="143">エージェント</text><text class="tm" x="105" y="168">Claude Code</text>
+    <rect class="ba" x="315" y="100" width="170" height="100" rx="16"/><text class="t" x="400" y="143">ccnavi</text><text class="tm" x="400" y="168">モデルの外で判定</text>
+    <rect class="b" x="610" y="110" width="170" height="80" rx="12"/><text class="t" x="695" y="143">プロジェクト</text><text class="tm" x="695" y="168">コード・設定・文書</text>
+    <path class="ln" d="M190 140 H312"/><text class="tm" x="251" y="130">呼び出し</text>
+    <path class="la" d="M485 140 H607"/><text class="tb" x="546" y="130">通す</text>
+    <path class="lw" d="M330 200 C300 245 150 245 120 195"/><text class="tw" x="225" y="238">止める＋代わりの手段</text>
+  </svg>
   <div class="quote">エージェントに任せる範囲を広げながら、人間の判断と目が届く道を失わせない。</div>
-  <p class="muted">アプリの根底にある考え方。ユーザが依頼しない限り変えない。正の文書は <code>docs/00_idea.md</code>。</p>
 </section>
 
+<!-- 2 Why 課題 -->
 <section class="slide">
   <div class="tag">WHY 1 / 課題</div>
   <h2>エージェントは、目的のために制約を突破しうる</h2>
+  <svg class="fig" viewBox="0 0 800 250" role="img" aria-label="エージェントは壁を迂回して禁止された操作に届く">
+    <rect class="b" x="20" y="95" width="150" height="70" rx="12"/><text class="t" x="95" y="126">エージェント</text><text class="tm" x="95" y="150">目的を達したい</text>
+    <rect class="bm" x="385" y="30" width="30" height="190" rx="6"/><text class="tm" x="400" y="245">hook・deny</text>
+    <rect class="bw" x="620" y="95" width="160" height="70" rx="12"/><text class="tw" x="700" y="126">禁止された操作</text><text class="tm" x="700" y="150">強制の外へ</text>
+    <path class="ln" d="M170 130 H370"/><text class="tw" x="352" y="122">✕</text>
+    <path class="lw" d="M120 92 C200 -10 600 -10 690 92"/><text class="tw" x="400" y="22">外す・緩める・打ち直す</text>
+  </svg>
   <p class="lead">悪意はない。「hook が邪魔なので外す」「deny が厳しいので緩める」を、目的を達しようとして普通に選ぶ。</p>
   <p class="muted">任せる範囲を広げるほど、人間が一手ずつ見ることはできなくなる。</p>
 </section>
 
+<!-- 3 Why 4つの穴 -->
 <section class="slide">
   <div class="tag">WHY 2 / 既存の防ぎ方の穴</div>
   <h2>既存の防ぎ方には 4 つの穴がある</h2>
   <div class="grid">
-    <div class="card bad"><b>構造を見ない</b><span>パターン一致は連鎖・サブシェル・リダイレクトを見ず、複合コマンドの後段が素通りする</span></div>
-    <div class="card bad"><b>確率でしかない</b><span>プロンプトの禁止は、守られる確率を上げるだけで 0 にはならない</span></div>
-    <div class="card bad"><b>二択になる</b><span>静的な権限は、広く開けるか毎回確認するか。前者は守れず、後者は承認が形骸化する</span></div>
-    <div class="card bad"><b>根拠を書き換えられる</b><span>拒否の根拠が、エージェントの書き換えられる作業ツリーの中にある</span></div>
+    <div class="card bad">
+      <svg class="mini" viewBox="0 0 240 60" aria-hidden="true"><rect class="b" x="4" y="14" width="100" height="32" rx="8"/><text class="tm" x="54" y="36">git status</text><text class="tm" x="116" y="36">&amp;&amp;</text><rect class="bwf" x="132" y="14" width="104" height="32" rx="8"/><text class="tw" x="184" y="36">git push -f</text></svg>
+      <b>構造を見ない</b><span>パターン一致は連鎖・サブシェル・リダイレクトを見ず、後段が素通りする</span></div>
+    <div class="card bad">
+      <svg class="mini" viewBox="0 0 240 60" aria-hidden="true"><rect class="bm" x="4" y="22" width="232" height="16" rx="8"/><rect class="bh" x="4" y="22" width="200" height="16" rx="8"/><rect class="bwf" x="204" y="18" width="32" height="24" rx="6"/><text class="tw" x="220" y="36">?</text></svg>
+      <b>確率でしかない</b><span>プロンプトの禁止は、守られる確率を上げるだけで 0 にはならない</span></div>
+    <div class="card bad">
+      <svg class="mini" viewBox="0 0 240 60" aria-hidden="true"><rect class="bwf" x="4" y="14" width="100" height="32" rx="16"/><text class="tw" x="54" y="36">広く開ける</text><text class="tm" x="120" y="36">か</text><rect class="bwf" x="136" y="14" width="100" height="32" rx="16"/><text class="tw" x="186" y="36">毎回確認</text></svg>
+      <b>二択になる</b><span>前者は守れず、後者は承認が形骸化する</span></div>
+    <div class="card bad">
+      <svg class="mini" viewBox="0 0 240 60" aria-hidden="true"><rect class="b" x="4" y="10" width="110" height="40" rx="8"/><text class="tm" x="59" y="35">作業ツリー</text><rect class="bwf" x="130" y="10" width="106" height="40" rx="8"/><text class="tw" x="183" y="35">deny ✎</text></svg>
+      <b>根拠を書き換えられる</b><span>拒否の根拠が、エージェントの書き換えられる作業ツリーの中にある</span></div>
   </div>
 </section>
 
+<!-- 4 Why 解きたいこと -->
 <section class="slide">
   <div class="tag">WHY 3 / 解きたいこと</div>
-  <h2>守る対象はプロジェクトが決め、あとは合意に委ねる</h2>
-  <div class="quote">逸れたときは、人間の目に触れさせる。</div>
+  <h2>二択を崩す。守る対象は決め、あとは合意に委ねる</h2>
+  <svg class="fig" viewBox="0 0 860 260" role="img" aria-label="プロジェクトが守る対象を列挙し、それ以外はチケットで合意し、逸脱は人間の目に触れさせる">
+    <rect class="ba" x="10" y="20" width="240" height="110" rx="14"/><text class="t" x="130" y="58">守る対象</text><text class="tm" x="130" y="86">プロジェクトが列挙する</text><text class="tm" x="130" y="108">deny / ask</text>
+    <rect class="b" x="310" y="20" width="240" height="110" rx="14" stroke-dasharray="8 6"/><text class="t" x="430" y="58">それ以外</text><text class="tm" x="430" y="86">作業ごとにチケットで</text><text class="tm" x="430" y="108">範囲を合意する</text>
+    <rect class="bh" x="610" y="20" width="240" height="110" rx="14"/><text class="th" x="730" y="58">人間の目</text><text class="th" x="730" y="90" style="font-weight:400;font-size:15px">逸れたら見せる</text><text class="th" x="730" y="112" style="font-weight:400;font-size:15px">承認・レビュー</text>
+    <path class="la" d="M250 75 H306"/><path class="la" d="M550 75 H606"/>
+    <text class="tm" x="280" y="62">残り</text><text class="tm" x="580" y="62">逸脱</text>
+    <rect class="bwf" x="130" y="170" width="260" height="50" rx="25"/><text class="tw" x="260" y="201">広く開ける ／ 毎回確認</text>
+    <path class="lw" d="M395 195 H470"/><text class="tb" x="600" y="201">この二択を崩す</text>
+  </svg>
   <ul>
     <li>エージェントは、止められても、代わりに何をすればよいか分かり、自力で進められる</li>
-    <li>人間は承認・レビュー・採否という判断に集中できる。その判断は代行されない</li>
-    <li>記録が残り、同じ失敗を繰り返さないよう、決まりと手順が育つ</li>
+    <li>人間は承認・レビュー・採否に集中できる。その判断は代行されない</li>
   </ul>
 </section>
 
+<!-- 5 What 4コア機能 -->
 <section class="slide">
   <div class="tag">WHAT 1 / 何を作るか</div>
-  <h2>Claude Code の開発を支える 4 つのコア機能</h2>
-  <div class="grid">
-    <div class="card"><b><i class="num">1</i>ガードとガイド</b><span>ルールで判定し、止める・確認する・伝える。拒否には代わりの手段を添える</span></div>
-    <div class="card"><b><i class="num">2</i>チケットとレビュー</b><span>目的・範囲・計画を合意し、承認からレビューまで進める</span></div>
-    <div class="card"><b><i class="num">3</i>検索と必要時の参照</b><span>文書と手順は全部は渡さず、目録で絞り、必要なときに読ませる</span></div>
-    <div class="card"><b><i class="num">4</i>記録と振り返り</b><span>記録から改善候補を出し、人間が採ったものを次に活かす</span></div>
-  </div>
+  <h2>4 つのコア機能が回って、人間の判断を支える</h2>
+  <svg class="fig" viewBox="0 0 800 340" role="img" aria-label="ガード、チケット、検索、記録の 4 機能が循環し、中心に人間の判断がある">
+    <rect class="ba" x="30" y="20" width="270" height="80" rx="14"/><text class="t" x="165" y="54">① ガードとガイド</text><text class="tm" x="165" y="80">止める・確認する・伝える</text>
+    <rect class="ba" x="500" y="20" width="270" height="80" rx="14"/><text class="t" x="635" y="54">② チケットとレビュー</text><text class="tm" x="635" y="80">合意からレビューまで進める</text>
+    <rect class="ba" x="500" y="240" width="270" height="80" rx="14"/><text class="t" x="635" y="274">③ 検索と必要時の参照</text><text class="tm" x="635" y="300">目録で絞り、必要なときに読む</text>
+    <rect class="ba" x="30" y="240" width="270" height="80" rx="14"/><text class="t" x="165" y="274">④ 記録と振り返り</text><text class="tm" x="165" y="300">気づきから改善候補を出す</text>
+    <path class="la" d="M300 60 H497"/><path class="la" d="M635 100 V237"/><path class="la" d="M500 280 H303"/><path class="la" d="M165 240 V103"/>
+    <text class="tm" x="215" y="170" text-anchor="start" style="text-anchor:start">決まりが育つ</text>
+    <circle class="bh" cx="400" cy="170" r="62"/><text class="th" x="400" y="165">人間の</text><text class="th" x="400" y="190">判断</text>
+  </svg>
   <p class="muted">記録・dry-run・診断・ワークツリー・拡張などは、この 4 つを支える仕組みと入口である。</p>
 </section>
 
+<!-- 6 What 作らないもの -->
 <section class="slide">
   <div class="tag">WHAT 2 / 作らないもの</div>
   <h2>ccnavi がやらないこと</h2>
-  <table>
-    <tr><th>OS 権限分離の代わり</th><td>同じ権限で任意のシェルを動かせる相手には境界にならない。逸れるエージェントと事故への柵である</td></tr>
-    <tr><th>人間の判断の代行</th><td>承認・レビュー済み・採否を、エージェントが出せる形は作らない</td></tr>
-    <tr><th>モデルの学習</th><td>改善するのはルール・手順・文書・計画の側</td></tr>
-    <tr><th>守られる保証</th><td>そうなるよう設計するが、保証はしない</td></tr>
-  </table>
+  <div class="grid">
+    <div class="card"><svg class="mini" viewBox="0 0 240 60" aria-hidden="true"><rect class="bm" x="4" y="30" width="232" height="24" rx="6"/><text class="tm" x="120" y="47">OS・DB・実行環境の権限分離</text><rect class="ba" x="60" y="4" width="120" height="22" rx="6"/><text class="tb" x="120" y="20" style="font-size:13px">ccnavi（柵）</text></svg>
+      <b>OS 権限分離の代わり</b><span>同じ権限で任意のシェルを動かせる相手には境界にならない。逸れるエージェントと事故への柵</span></div>
+    <div class="card"><svg class="mini" viewBox="0 0 240 60" aria-hidden="true"><circle class="bh" cx="40" cy="30" r="20"/><text class="th" x="40" y="36" style="font-size:15px">人間</text><path class="lw" d="M70 30 H150"/><text class="tw" x="170" y="38" style="font-size:22px">✕ 代行</text></svg>
+      <b>人間の判断の代行</b><span>承認・レビュー済み・採否を、エージェントが出せる形は作らない</span></div>
+    <div class="card"><svg class="mini" viewBox="0 0 240 60" aria-hidden="true"><rect class="b" x="4" y="10" width="80" height="40" rx="8"/><text class="tm" x="44" y="35">モデル</text><text class="tw" x="104" y="37" style="font-size:20px">✕</text><rect class="ba" x="130" y="10" width="106" height="40" rx="8"/><text class="tb" x="183" y="35" style="font-size:13px">ルール・手順</text></svg>
+      <b>モデルの学習</b><span>改善するのはルール・手順・文書・計画の側</span></div>
+    <div class="card"><svg class="mini" viewBox="0 0 240 60" aria-hidden="true"><rect class="bm" x="4" y="22" width="232" height="16" rx="8"/><rect class="bh" x="4" y="22" width="190" height="16" rx="8"/><text class="tm" x="120" y="56" style="font-size:12px">100% ではない</text></svg>
+      <b>守られる保証</b><span>そうなるよう設計するが、保証はしない</span></div>
+  </div>
 </section>
 
+<!-- 7 How 3原則 -->
 <section class="slide">
   <div class="tag">HOW 1 / 3 つの原則</div>
   <h2>製品として共通する 3 つの原則</h2>
   <div class="grid">
-    <div class="card"><b><i class="num">1</i>必要な情報を、必要なタイミングで</b><span>開始時は前提と入口だけ。理由と手順は場面で、詳しい資料は引いて読む。先に詰め込まない</span></div>
-    <div class="card"><b><i class="num">2</i>人間の判断を残し、守る</b><span>承認・レビュー・採否とガード自身の変更を、エージェントが代行できる形にしない</span></div>
-    <div class="card"><b><i class="num">3</i>単一の場所に閉じ込めない</b><span>チケットはブランチに載せ、レビューはホスト上で。対話も自動実行も同じ道で扱う</span></div>
+    <div class="card">
+      <svg class="mini" viewBox="0 0 240 90" aria-hidden="true"><rect class="ba" x="14" y="62" width="40" height="16" rx="3"/><rect class="ba" x="100" y="44" width="40" height="34" rx="3"/><rect class="ba" x="186" y="14" width="40" height="64" rx="3"/><path class="ln" d="M6 84 H234"/><text class="tm" x="34" y="56" style="font-size:12px">開始</text><text class="tm" x="120" y="38" style="font-size:12px">場面</text><text class="tm" x="206" y="8" style="font-size:12px">必要時</text></svg>
+      <b><i class="num">1</i>必要な情報を、必要なタイミングで</b><span>開始時は入口だけ。理由と手順は場面で、詳しい資料は引いて読む</span></div>
+    <div class="card">
+      <svg class="mini" viewBox="0 0 240 90" aria-hidden="true"><rect class="b" x="4" y="28" width="62" height="34" rx="8"/><text class="tm" x="35" y="50" style="font-size:12px">提案</text><rect class="bh" x="90" y="14" width="60" height="62" rx="10"/><text class="th" x="120" y="50" style="font-size:15px">人間</text><rect class="b" x="174" y="28" width="62" height="34" rx="8"/><text class="tm" x="205" y="50" style="font-size:12px">実行</text><path class="la" d="M66 45 H88"/><path class="la" d="M150 45 H172"/><path class="lw" d="M35 26 C60 -2 180 -2 205 26"/><text class="tw" x="120" y="10" style="font-size:13px;display:none">✕</text></svg>
+      <b><i class="num">2</i>人間の判断を残し、守る</b><span>承認・レビュー・採否を、エージェントが代行できる形にしない</span></div>
+    <div class="card">
+      <svg class="mini" viewBox="0 0 240 90" aria-hidden="true"><rect class="b" x="4" y="6" width="64" height="28" rx="6"/><text class="tm" x="36" y="25" style="font-size:12px">PC-A</text><rect class="b" x="172" y="6" width="64" height="28" rx="6"/><text class="tm" x="204" y="25" style="font-size:12px">PC-B</text><rect class="b" x="88" y="56" width="64" height="28" rx="6"/><text class="tm" x="120" y="75" style="font-size:12px">コンテナ</text><ellipse class="ba" cx="120" cy="32" rx="34" ry="12"/><text class="tb" x="120" y="36" style="font-size:11px">ブランチ</text><path class="ln" d="M68 20 L90 28"/><path class="ln" d="M172 20 L150 28"/><path class="ln" d="M120 56 V44"/></svg>
+      <b><i class="num">3</i>単一の場所に閉じ込めない</b><span>チケットはブランチに載せ、レビューはホスト上で。対話も自動実行も同じ道</span></div>
   </div>
 </section>
 
+<!-- 8 How 判定の流れ -->
 <section class="slide">
-  <div class="tag">HOW 2 / 考え方</div>
-  <h2>原則を支える考え方</h2>
-  <table>
-    <tr><th>判定はモデルの外で</th><td>hook の処理がコンテキストの外で判定する。エージェントの自発的な遵守に頼らない</td></tr>
-    <tr><th>拒否は誘導と一緒に</th><td>止めるだけでは打ち直される。理由と代わりの手段を名指しで返す</td></tr>
-    <tr><th>失敗の向きは非対称</th><td>誤検知は一手止まるだけ、素通りは気づけない。迷ったら止める。ただし回復手段は奪わない</td></tr>
-    <tr><th>制約は緩められない</th><td>チケットは絞る向きにだけ働く</td></tr>
-    <tr><th>逸脱は必ず見せる</th><td>委ねた回も既定に落ちた回も記録に残す</td></tr>
-    <tr><th>親は清潔に、育てる</th><td>親は判断と報告、作業は子へ。記録から改善候補を出し、採否は人間が決める</td></tr>
-  </table>
+  <div class="tag">HOW 2 / 判定の仕組み</div>
+  <h2>判定はモデルの外で行い、拒否は誘導と一緒に返す</h2>
+  <svg class="fig" viewBox="0 0 900 330" role="img" aria-label="モデルのツール呼び出しを hook が判定し、止める・確認・通すに分け、すべて記録する">
+    <rect class="dz" x="8" y="62" width="196" height="190" rx="16"/><text class="tm" x="106" y="84">モデルのコンテキスト</text>
+    <rect class="b" x="30" y="125" width="150" height="76" rx="12"/><text class="t" x="105" y="168">エージェント</text>
+    <rect class="ba" x="320" y="110" width="190" height="106" rx="16"/><text class="t" x="415" y="154">ルールで判定</text><text class="tm" x="415" y="180">hook が外で行う</text>
+    <path class="ln" d="M180 163 H316"/><text class="tm" x="248" y="152">呼び出し</text>
+    <rect class="bwf" x="680" y="22" width="200" height="62" rx="12"/><text class="tw" x="780" y="49">止める ＋ 誘導</text><text class="tm" x="780" y="69">なぜ・代わりに何を</text>
+    <rect class="b" x="680" y="132" width="200" height="62" rx="12"/><text class="t" x="780" y="160">人間に確認</text><text class="tm" x="780" y="180">ask</text>
+    <rect class="b" x="680" y="242" width="200" height="62" rx="12"/><text class="t" x="780" y="270">通す／委ねる</text><text class="tm" x="780" y="290">権限モードに従う</text>
+    <path class="lw" d="M512 140 C590 100 600 60 676 55"/><path class="ln" d="M512 163 H676"/><path class="ln" d="M512 190 C590 230 600 270 676 273"/>
+    <path class="lw" d="M780 22 C780 -4 105 -4 105 121"/><text class="tw" x="445" y="44">理由と代わりの手段を返す</text>
+    <rect class="bm" x="320" y="300" width="190" height="26" rx="8"/><text class="tm" x="415" y="318" style="fill:var(--fg);font-size:13px">判定をすべて記録に残す</text><path class="ln" d="M415 216 V298"/>
+  </svg>
+  <p class="muted">失敗の向きは非対称。誤検知は一手止まるだけ、素通りは気づけない。迷ったら止める。ただし回復手段は奪わない。</p>
 </section>
 
+<!-- 9 How チケットは絞る向き -->
+<section class="slide">
+  <div class="tag">HOW 3 / 制約の向き</div>
+  <h2>チケットは、絞る向きにだけ働く</h2>
+  <svg class="fig" viewBox="0 0 800 300" role="img" aria-label="全操作のうち、ルールの deny と ask は緩まず、承認範囲の中だけ聞かずに進む">
+    <rect class="b" x="20" y="20" width="760" height="260" rx="18"/><text class="tm" x="260" y="46" style="text-anchor:middle">すべての操作</text>
+    <rect class="bwf" x="580" y="20" width="200" height="260" rx="18"/><text class="tw" x="680" y="120">ルールの</text><text class="tw" x="680" y="146">deny / ask</text><text class="tm" x="680" y="176">チケットでも緩まない</text>
+    <rect class="ba" x="90" y="80" width="400" height="150" rx="14"/><text class="tb" x="290" y="140">承認された範囲</text><text class="tm" x="290" y="168">中は聞かずに進む</text>
+    <text class="tm" x="540" y="262" style="text-anchor:end">範囲の外は止める（ルールの allow でも）</text>
+  </svg>
+  <p class="muted">ルールの判定とチケットを比べて、強い側を採る。宣言された制約は、どちらからも緩められない。</p>
+</section>
+
+<!-- 10 How 人間の判断の経路 -->
+<section class="slide">
+  <div class="tag">HOW 4 / 人間の経路</div>
+  <h2>人間の判断は、人間が直接操作する場所で受ける</h2>
+  <svg class="fig" viewBox="0 0 900 250" role="img" aria-label="提案から取り込みまで。承認とレビューは人間だけが行える">
+    <rect class="ba" x="10" y="80" width="150" height="70" rx="12"/><text class="t" x="85" y="121">提案</text>
+    <rect class="bh" x="195" y="80" width="150" height="70" rx="12"/><text class="th" x="270" y="121">承認</text>
+    <rect class="ba" x="380" y="80" width="150" height="70" rx="12"/><text class="t" x="455" y="121">子が作業</text>
+    <rect class="bh" x="565" y="80" width="150" height="70" rx="12"/><text class="th" x="640" y="121">レビュー</text>
+    <rect class="bh" x="750" y="80" width="140" height="70" rx="12"/><text class="th" x="820" y="121">取り込み</text>
+    <path class="la" d="M160 115 H192"/><path class="la" d="M345 115 H377"/><path class="la" d="M530 115 H562"/><path class="la" d="M715 115 H747"/>
+    <path class="lw" d="M85 78 C85 10 455 10 455 76"/><text class="tw" x="270" y="30">✕ 承認を飛ばして進めない</text>
+    <rect class="b" x="10" y="190" width="14" height="14" rx="3" style="fill:var(--accent-soft);stroke:var(--accent)"/><text class="tm" x="32" y="202" style="text-anchor:start">エージェント</text>
+    <rect x="150" y="190" width="14" height="14" rx="3" class="bh"/><text class="tm" x="172" y="202" style="text-anchor:start">人間だけが操作できる（端末・ボード・Chrome 拡張）</text>
+  </svg>
+  <p class="muted">エージェントがユーザの合意を出せる形は作らない。ガード自身の変更も、同じ考え方で守る。</p>
+</section>
+
+<!-- 11 地図 -->
 <section class="slide">
   <div class="tag">MAP / 読む順</div>
   <h2>この思想から下位の文書へ</h2>
-  <table>
-    <tr><th>思想</th><td><code>docs/00_idea.md</code>（このスライドの正）</td></tr>
-    <tr><th>約束</th><td><code>docs/requirements.md</code>　外から観測できる振る舞い</td></tr>
-    <tr><th>設計</th><td><code>docs/design.md</code>　いまの実装の作り</td></tr>
-    <tr><th>理由と経緯</th><td><code>docs/adr/</code>　採らなかった案を含む</td></tr>
-    <tr><th>使い方</th><td><code>docs/guide/</code></td></tr>
-  </table>
-  <p class="muted">食い違ったら機能の側を見直す。考え方の側を直すのは、ユーザが依頼したときだけ。</p>
+  <svg class="fig" viewBox="0 0 800 280" role="img" aria-label="思想の下に要件書・設計書・ADR・手引きが並ぶ">
+    <rect class="bh" x="250" y="10" width="300" height="64" rx="14"/><text class="th" x="400" y="40">思想  docs/00_idea.md</text><text class="th" x="400" y="62" style="font-weight:400;font-size:13px">なぜ・何を・どう</text>
+    <path class="la" d="M400 74 V110"/><path class="la" d="M400 110 H110 V150"/><path class="la" d="M400 110 H300 V150"/><path class="la" d="M400 110 H500 V150"/><path class="la" d="M400 110 H690 V150"/>
+    <rect class="ba" x="20" y="150" width="180" height="80" rx="12"/><text class="t" x="110" y="184">要件書</text><text class="tm" x="110" y="208">外から観測できる約束</text>
+    <rect class="ba" x="210" y="150" width="180" height="80" rx="12"/><text class="t" x="300" y="184">設計書</text><text class="tm" x="300" y="208">いまの実装の作り</text>
+    <rect class="ba" x="410" y="150" width="180" height="80" rx="12"/><text class="t" x="500" y="184">ADR</text><text class="tm" x="500" y="208">理由・経緯・採らなかった案</text>
+    <rect class="ba" x="600" y="150" width="180" height="80" rx="12"/><text class="t" x="690" y="184">手引き</text><text class="tm" x="690" y="208">使い方</text>
+    <text class="tm" x="400" y="262">食い違ったら機能の側を見直す。思想を直すのは、ユーザが依頼したときだけ。</text>
+  </svg>
 </section>
 
 <nav>
