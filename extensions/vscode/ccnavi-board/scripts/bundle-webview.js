@@ -91,7 +91,7 @@ esbuild
     // localResourceRoots を空のままにする方針と両立しないため。代わりに React 一式が
     // 画面ごとに重複する（1 画面あたり 200KB 強）。図を描く画面（フロー編集と、承認のオーバーレイに
     // 計画の図を出すボード）は React Flow も持つので、さらに 180KB ほど重い（ボードは約 300KB から
-    // 約 490KB になった）。図は承認のときにしか出ないが、ボードの 1 本に入る。計画編集タブ（workflow）も
+    // 約 490KB になった。案内の画像を入れた今は、PNG が base64 で約 620KB 増えて 1.2MB 前後）。図は承認のときにしか出ないが、ボードの 1 本に入る。計画編集タブ（workflow）も
     // 同じ図の部品（shared/PlanGraph.tsx）を持つので約 420KB あるが、タブを開いたときにしか読まない。
     // 図の部品は画面ごとのバンドルにそれぞれ入る（共有の置き場は src/webview/shared/ で、分割はしない）
     entryPoints: found.map((screen) => ({ in: screen.entry, out: screen.name })),

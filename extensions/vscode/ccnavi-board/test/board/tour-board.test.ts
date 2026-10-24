@@ -10,6 +10,7 @@ import { archivedTitleOf, COLUMNS, type Board, type Card } from "../../src/core/
 import { parseBoardJson } from "../../src/core/model.js";
 import { OVERLAY_NAMES, parseBoardSample } from "../../src/core/tour-board.js";
 import { INTRO_ID } from "../../src/core/tour-def.js";
+import { boardPage } from "../helpers/board.js";
 import { loadTour } from "../helpers/tour.js";
 
 const def = loadTour("board");
@@ -259,4 +260,10 @@ test("CB-T1172 マージまでの流れの案内は、issue の作り方（GitLa
     targets.filter((target) => ["approval-batch", "decide-threads", "decide-confirm", "column-done", "merge-check", "merge-retire"].includes(target)),
     ["approval-batch", "decide-threads", "decide-confirm", "column-done", "merge-check", "merge-retire"],
   );
+});
+
+test("CB-T1174 ボードの入れ物の CSP は、画像を data: だけに許し、外の URL は許さない", () => {
+  const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(boardPage({ kind: "board", board: sample.board }))?.[1] ?? "";
+  assert.match(csp, /default-src 'none'/);
+  assert.deepEqual(csp.match(/img-src [^;]*/g), ["img-src data:"]);
 });

@@ -248,6 +248,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0083](0083-tour-on-every-screen-with-samples.md) | 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す |
 | [0091](0091-project-skills-in-docs-skills.md) | プロジェクトのスキルは `docs/skills/` に置き、ccnavi は目録だけを渡す（置き場は ADR-0111 が `skills/` に改める） |
 | [0124](0124-tour-courses-in-yaml.md) | 案内を使い方ごとの案内（ユースケース）に分け、見本と手順を YAML で定義する |
+| [0169](0169-tour-images-as-data-urls.md) | 案内の画像は data: の URL でバンドルに入れ、ボードの CSP だけ img-src data: を許す |
 | [0127](0127-plan-called-work-and-review-plan.md) | 親の計画とフィードバック計画をまとめて「作業・レビュー計画」と呼び、ワークフローの呼び名をやめる |
 | [0145](0145-work-in-workspace-and-standalone-clone.md) | ワークスペース内 clone と単体 clone の両方で動かす |
 
@@ -273,4 +274,3 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0166](0166-mirror-sync-at-prompt-to-parent-worktrees.md) | 共通レイヤーのミラーは、ユーザの発言のたびに着手済みの親のワークツリーへ写す |
 | [0167](0167-idle-handoff-before-cache-expires.md) | 大きな会話の放置は、キャッシュが切れる前に引き継ぎ文書を書かせる |
 | [0168](0168-print-mode-background-work-waits-within-ceiling.md) | claude -p は、ターン終了後のバックグラウンド作業を待ち上限の範囲で待つように見える。待ちを消す環境変数に注意する |
-| [0169](0169-tour-images-as-data-urls.md) | 案内の画像は data: の URL でバンドルに入れ、ボードの CSP だけ img-src data: を許す |

@@ -54,6 +54,7 @@ test("CB-T1171 手順の image は名前（小文字・数字・-）で、alt �
     ["image の名前に大文字", { image: "Shot", alt: "a" }],
     ["alt が無い", { image: "shot" }],
     ["image が無いのに alt", { alt: "a" }],
+    ["image があるのに target がある", { target: "save", image: "shot", alt: "a" }],
   ];
   for (const [name, extra] of bad) {
     const parsed = parseTour({ screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, ...extra }] })] });
@@ -95,4 +96,12 @@ test("CB-T1170 案内の手順が引く画像は、images/ に PNG があり、i
   }
   const files = fs.readdirSync(dir).filter((file) => file.endsWith(".png")).map((file) => file.slice(0, -4));
   assert.deepEqual([...files].sort(), [...used].sort(), "どの手順も使っていない画像、または画像のない手順の名前があります");
+});
+
+test("CB-T1173 画像を使う案内はボード画面だけ（画像の表を渡すのも CSP に img-src data: を足すのもボードだけ）", () => {
+  for (const screen of tourScreens().filter((name) => name !== "board")) {
+    for (const course of loadTour(screen).courses) {
+      assert.ok(course.steps.every((step) => step.image === ""), `${screen}/${course.id}: 画像のある手順は、その画面が画像の表と CSP を持ってから足す`);
+    }
+  }
 });

@@ -27,4 +27,4 @@ Webview は `localResourceRoots` を空にし、CSP を `default-src 'none'` と
 ## 得たもの・失ったもの
 
 - 得たもの: ボードの外の画面を、案内の中で見せられる。外へ出る手段（`localResourceRoots`・外の URL）は増えない。
-- 失ったもの: 画像のぶん、ボードのバンドルが大きくなる（PNG の約 1.4 倍。8 枚で約 450KB）。画像は GitLab・Claude Code の見た目に依るので、画面が変われば撮り直す。
+- 失ったもの: 画像のぶん、ボードのバンドルが大きくなる（PNG 8 枚の合計は約 450KB。base64 で入るので、バンドルは約 600KB 増える）。画像は GitLab・Claude Code の見た目に依るので、画面が変われば撮り直す。

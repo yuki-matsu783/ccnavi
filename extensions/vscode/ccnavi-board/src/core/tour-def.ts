@@ -152,6 +152,9 @@ export function parseTour(raw: unknown): TourParsed {
       if (alt === undefined || (image !== "" && alt === "") || (image === "" && alt !== "")) {
         return { ok: false, error: `${stepAt} は image と alt を両方書くか、両方書かない` };
       }
+      if (image !== "" && step.target !== undefined && step.target !== "") {
+        return { ok: false, error: `${stepAt} は image があるので target は空にする（画像の読み込みで吹き出しの高さが変わる）` };
+      }
       const scene: Record<string, SceneValue> = {};
       if (step.scene !== undefined) {
         const given = object(step.scene);
