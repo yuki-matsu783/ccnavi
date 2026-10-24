@@ -620,7 +620,8 @@ def _plan_stop_review_inner(
     stopreview.configure_log(conf.state, stopreview.logs_dir(conf.log))
     key = stopreview.shared_key(payload.session_id, payload.transcript_path)
     if not key:
-        # 共有キーを導けない Stop は、未検査（キーなし）として数える（S1 の不一致率の分子）。
+        # 共有キーを導けない Stop は、未検査（キーなし）として数える。
+        # `stop-review report` の「共有キーを導けなかった Stop」の件数になる。
         stopreview.log_event(conf.state, "no_key", {"reason": "hook"})
         return
     effective = stopreview.setting(mode, conf.stop_review)

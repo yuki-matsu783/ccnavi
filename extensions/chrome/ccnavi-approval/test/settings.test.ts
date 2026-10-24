@@ -7,7 +7,7 @@ import { JSDOM } from "jsdom";
 
 import { renderBoard, renderBoards } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
-import { DEFAULT_RECENT_DAYS, MAX_RECENT_DAYS, readRepos, saveRecentDays, type RepoConfig, type StorageArea } from "../src/core/settings.js";
+import { DEFAULT_RECENT_DAYS, MAX_RECENT_DAYS, normalizeRepo, readRepos, saveRecentDays, type RepoConfig, type StorageArea } from "../src/core/settings.js";
 import type { RepoBoard } from "../src/core/snapshot.js";
 import { HOSTS } from "./helpers/host.js";
 
@@ -28,8 +28,9 @@ function storage(initial: Record<string, unknown> = {}): StorageArea & { data: R
 const row = (repo: string, recentDays?: number) => ({ host: "github.com", owner: "acme", repo, integration: "", ...(recentDays === undefined ? {} : { recentDays }), extraBranches: [], project: "", workspace: "" });
 const days = (repos: RepoConfig[]) => repos.map((r) => r.recentDays);
 
-test("CX-T210 検索期間の既定は 7 日", () => {
+test("CX-T210 既定は 7 日。recentDays が欠けた形式は 7 日で読む", () => {
   assert.equal(DEFAULT_RECENT_DAYS, 7);
+  assert.equal(normalizeRepo({ host: "github.com", owner: "acme", repo: "w" }, HOSTS).recentDays, 7);
 });
 
 test("CX-T211 ボードの入力欄からの保存: 範囲の中なら保存し、外れた値・空・小数はエラーで保存しない", async () => {

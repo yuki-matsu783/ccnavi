@@ -374,6 +374,26 @@ class WorktreeOptionTest(unittest.TestCase):
                 result = self.clean_branch(*args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
 
+    def test_the_old_branch_mode_is_refused_as_an_unknown_option(self):
+        # hook の止めが ask に下がっても、ccnavi-clean.sh の --branch と --confirmed は
+        # 未知のオプションとして 2 で拒否し、何も消さない。
+        for args in (
+            ("--branch", "wt"),
+            ("--branch", "wt", "--confirmed"),
+            ("--confirmed", "wt"),
+            ("--confirmed",),
+            ("wt", "--branch"),
+        ):
+            with self.subTest(args=args):
+                result = self.run_clean(*args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("は使用できません", result.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.top, "node_modules", "x.js")))
+        branches = subprocess.run(
+            ["git", "branch", "--list", "wt"], cwd=self.ws, capture_output=True, text=True
+        )
+        self.assertEqual(branches.stdout.strip().lstrip("+ ").strip(), "wt")
+
 
 @unittest.skipUnless(SHELL and NODE, "sh と node が要る")
 class CleanWithNodeTest(CleanCases, unittest.TestCase):

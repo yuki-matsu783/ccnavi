@@ -71,6 +71,8 @@ class PendingIntegrateTest(TicketTest):
         self.assertIn("w4（取り込み先のツリー", text)
         self.assertIn("を知りません", text)
         self.assertIn("操作せず", text)
+        self.assertIn("git reset --merge", text)
+        self.assertIn("ccnavi-integrate/w4", text)
         self.assertNotIn("integrate-done", text)
 
     def test_a_marker_with_another_version_is_told_as_broken(self):

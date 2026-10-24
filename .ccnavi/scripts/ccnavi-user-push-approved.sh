@@ -465,7 +465,7 @@ $proposals/todo"
 		fi
 		# 取り込んで消えたフローとテンプレートの下書き。追跡されていたものの削除だけを、1 件ずつのパスで入れる。
 		# 置き場ごと pathspec に並べると、書き直されて残っている下書きまでコミットに入るため。
-		drafts=$(git -C "$tree" ls-files --deleted -z -- "$proposals/flows" "$proposals/templates" 2>/dev/null | tr '\000' '\n' || :)
+		drafts=$(git -C "$tree" ls-files --deleted -z -- "$proposals/flows" 2>/dev/null | tr '\000' '\n' || :)
 		if [ -n "$drafts" ]; then
 			printf '%s\n' "$drafts" | while IFS= read -r removed; do
 				[ -n "$removed" ] || continue

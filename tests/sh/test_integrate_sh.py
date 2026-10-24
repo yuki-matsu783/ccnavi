@@ -984,7 +984,7 @@ class IntegrateReviewTest(Fixture):
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
 class UnknownMarkerTest(Fixture):
-    """版が 4 でない marker は、版を知らない壊れた記録として、どの入口も「版を知りません」で止まる。"""
+    """版が 4 でない marker は壊れた記録として、どの入口も「版を知りません」で止まる。"""
 
     def unknown_marker(self, text="state staged\nbranch wt\n"):
         self.work_in_branch()
@@ -996,6 +996,8 @@ class UnknownMarkerTest(Fixture):
             r = self.run_git_sh(*args)
             self.assertOk(r, 2)
             self.assertIn("を知りません", r.stderr)
+            self.assertIn("git reset --merge", r.stderr)
+            self.assertIn(os.path.dirname(self.marker()).replace(os.sep, "/"), r.stderr)
         self.assertTrue(os.path.exists(self.marker()))
         self.assertTrue(self.has_branch())
 

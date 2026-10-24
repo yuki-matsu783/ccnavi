@@ -7,12 +7,15 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import unittest
 
 from ccnavi.hook import post_findings
+from ccnavi.infra import gitstate, tree
+from ccnavi.policy import rules
 
 
 def git(repo, *args):
@@ -66,6 +69,54 @@ class SameButHandoffTest(unittest.TestCase):
         self.assertFalse(post_findings._same_but_handoff(self.repo, left, also_proposal))
         self.assertFalse(post_findings._same_but_handoff(self.repo, left, "0" * 40))
         self.assertFalse(post_findings._same_but_handoff(self.repo, left, ""))
+
+
+class StagedInTargetTest(unittest.TestCase):
+    """統合先のツリーに staged の変更が残る状態は、保護領域の変更として報告される。
+
+    `integrate` は結果を統合先に staged で置いて止まる。その staged を外す記録の読みは無いので、
+    保護領域に当たるものは、書いたのが誰でも通常の変更と同じに報告する。
+    """
+
+    def setUp(self):
+        self.repo = os.path.realpath(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.repo, True)
+        git(self.repo, "init", "-q", "-b", "main")
+        write(self.repo, "a.txt", "a\n")
+        write(self.repo, "guarded/g.txt", "g\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "init")
+        guard = rules.Rule(id="guarded", match="Write|Edit", decision=rules.DENY)
+        guard.compiled = re.compile(r"/guarded/")
+        self.rule_set = rules.RuleSet(deny=[guard])
+
+    def found(self):
+        changes, error = gitstate.read(self.repo)
+        self.assertEqual(error, "")
+        return post_findings._findings(
+            changes,
+            self.rule_set,
+            (),
+            "rules.yml",
+            None,
+            tree.Tree("", self.repo),
+            top=self.repo,
+        )
+
+    def test_staged_changes_in_a_guarded_place_are_reported(self):
+        write(self.repo, "guarded/g.txt", "g2\n")
+        write(self.repo, "guarded/new.txt", "new\n")
+        write(self.repo, "a.txt", "a2\n")
+        git(self.repo, "add", ".")
+        got = self.found()
+        self.assertEqual({f.change.path for f in got}, {"guarded/g.txt", "guarded/new.txt"})
+        self.assertTrue(all(f.change.staged for f in got))
+        self.assertEqual([r.id for f in got for r in f.group], ["guarded", "guarded"])
+
+    def test_staged_changes_outside_the_guarded_places_are_not_reported(self):
+        write(self.repo, "a.txt", "a2\n")
+        git(self.repo, "add", ".")
+        self.assertEqual(self.found(), [])
 
 
 @unittest.skipUnless(merge_tree_available(), "git merge-tree --write-tree (git 2.38+) is needed")

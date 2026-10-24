@@ -189,6 +189,22 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(done.stdout, "")
         self.assertFalse(os.path.exists(self.called))
 
+    def test_old_review_entries_are_refused_by_the_script(self):
+        # hook の止めが ask に下がっても、ccnavi-review.sh 自身が拒否する。
+        # 実行側の拒否が唯一の守りになる。
+        for args, message in (
+            (("close-early", "--reason", "r"), "close-early は使用できません"),
+            (
+                ("decide", "1", "--choices", "{}", "--digest", "d"),
+                "decide は --choices を受けない",
+            ),
+        ):
+            with self.subTest(args=args):
+                refused = self.run_sh("ccnavi-review.sh", *args)
+                self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
+                self.assertIn(message, refused.stderr)
+        self.assertFalse(os.path.exists(self.called), "古い入口は実行ファイルを起こさない")
+
     def test_review_usage_names_the_user_scripts(self):
         shown = self.run_sh("ccnavi-review.sh", "--help")
         self.assertEqual(shown.returncode, 0, shown.stderr)

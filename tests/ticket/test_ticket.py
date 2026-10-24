@@ -3010,7 +3010,8 @@ class TicketTest(unittest.TestCase):
     # 動かし方。どれも「依頼の前」か「依頼の後」のコピーから始まる。
 
     def move_markers_unpushed_before_request(self, fixture):
-        # ccnavi-user-push-approved.sh は push が失敗してもコミットを残す。ユーザの承認が失敗した形。
+        # ccnavi-user-push-approved.sh は push が失敗してもコミットを残す。
+        # ユーザの承認が失敗した形。
         write(os.path.join(self.approved, "doing", "unrelated.md"), "承認が落ちた形\n")
         git(self.parent_tree, "add", "--", ".ccnavi/approved")
         git(self.parent_tree, "commit", "--quiet", "-m", "ccnavi: 承認済みチケットを更新")

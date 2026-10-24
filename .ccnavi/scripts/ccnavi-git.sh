@@ -782,6 +782,11 @@ d4_probe() {
 	fi
 }
 
+# 版を知らない記録で止まる。ccnavi が読めない記録なので、エージェントは触らず、ユーザが統合先を確かめて戻す。<名前>
+d4_unknown_marker() {
+	reject integrate-marker "取り込みの記録（${d4_g0}/${1}/marker）の版（${d4_pv}）を知りません。版 4 でない記録は ccnavi が読めません。ユーザが git status で統合先の staged を確かめ、不要なら git reset --merge で戻してから、${d4_g0}/${1} を手で消してください。エージェントは操作しません。"
+}
+
 # 共通部。名前・場所・記録の置き場を決める（ロックは取らない）。<名前>
 #
 # メインのチェックアウト（git worktree listの先頭）で打たれていることを求める。markerは
@@ -1082,7 +1087,7 @@ ig_integrate() {
 	d4_probe "$1"
 	case "$d4_pv" in
 	4 | none) ;;
-	*) reject integrate-marker "取り込みの記録（${d4_g0}/${1}/marker）の版（${d4_pv}）を知りません。ユーザに確かめてください。" ;;
+	*) d4_unknown_marker "$1" ;;
 	esac
 	d4_begin "$1"
 	log_info 受け付けた -- "sub=integrate" "name=$ig_n"
@@ -1262,7 +1267,7 @@ ig_abort() {
 	d4_probe "$1"
 	case "$d4_pv" in
 	4 | none) ;;
-	*) reject integrate-marker "取り込みの記録（${d4_g0}/${1}/marker）の版（${d4_pv}）を知りません。ユーザに確かめてください。" ;;
+	*) d4_unknown_marker "$1" ;;
 	esac
 	d4_begin "$1"
 	log_info 受け付けた -- "sub=integrate" "action=abort" "name=$ig_n"
@@ -1402,7 +1407,7 @@ ig_done() {
 		reject integrate-done-no-marker "$ig_n の取り込みの記録がありません。先に $SELF_Q integrate $ig_n で取り込み結果を用意し、中身を確かめてから実行してください（記録の無いブランチは、取り込んだことを確かめずには消しません）。"
 		;;
 	4) ;;
-	*) reject integrate-marker "取り込みの記録の版（${d4_pv}）を知りません。ユーザに確かめてください。" ;;
+	*) d4_unknown_marker "$ig_n" ;;
 	esac
 	d4_begin "$ig_n"
 	log_info 受け付けた -- "sub=integrate-done" "name=$ig_n" "message=$ig_has_msg"

@@ -778,7 +778,9 @@ def integrate_nudge(root: str, found: Direct) -> str:
                 *lines,
                 f"ワークツリー .claude/worktrees/{n} の取り込みの記録"
                 f"（{integ} の ccnavi-integrate/{n}/marker）の版を知りません。"
-                "操作せず、ユーザに確かめてください。",
+                "版 4 でない記録は ccnavi が読めません。操作せず、ユーザが統合先の staged を"
+                "git status で確かめ、不要なら git reset --merge で戻してから、記録のディレクトリを"
+                "手で消します。",
             ]
         )
     if found.marker:

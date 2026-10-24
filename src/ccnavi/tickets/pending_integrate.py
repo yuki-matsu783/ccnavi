@@ -63,7 +63,10 @@ def _unknown_line(root: str, top: str, name: str, version: str) -> str:
     cd = f"cd {t} && {git_sh}"
     return (
         f"{name}（取り込み先のツリー {t}）: 記録の版（{version or '無し'}）を知りません。操作せず、"
-        f"`{cd} status` の結果をユーザに見せて確かめてください"
+        f"`{cd} status` の結果をユーザに見せて確かめてください。"
+        "版 4 でない記録は ccnavi が読めません。"
+        f"不要なら、ユーザが git reset --merge で統合先の staged を戻し、"
+        f"ccnavi-integrate/{name} を手で消します"
     )
 
 

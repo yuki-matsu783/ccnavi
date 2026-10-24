@@ -238,6 +238,7 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         write(os.path.join(gitdir, "scratch", "marker"), "state staged\nbranch_sha x\n")
         reason = self.asked(self.stop(path))
         self.assertIn("版を知りません", reason)
+        self.assertIn("git reset --merge", reason)
         self.assertNotIn("integrate-done scratch", reason)
 
     def test_a_done_copy_with_the_same_head_means_it_already_went_ahead(self):

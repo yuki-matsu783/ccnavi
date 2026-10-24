@@ -120,7 +120,9 @@ def _markers(root: str, main: tree.Tree, common: str, label: str) -> list[Proble
                     SEVERITY_WARN,
                     where,
                     f"取り込みの marker（ccnavi-integrate/{name}）の版を知りません。"
-                    "integrate は断ります。ユーザに確かめてから、記録を片付けます",
+                    "integrate は断ります。版 4 でない記録は ccnavi が読めません。ユーザが統合先の"
+                    "staged を git status で確かめ、不要なら git reset --merge で戻してから、"
+                    "記録のディレクトリを手で消します",
                 )
             )
         elif kind == "v4":

@@ -105,6 +105,7 @@ class LintDirectTest(base.StopNudgeTest):
     def test_a_marker_of_unknown_version_is_warn(self):
         write(os.path.join(self.common(), "ccnavi-integrate", "o1", "marker"), "state staged\n")
         self.said(SEVERITY_WARN, "版を知りません")
+        self.said(SEVERITY_WARN, "git reset --merge")
 
 
 if __name__ == "__main__":
