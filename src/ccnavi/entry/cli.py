@@ -41,6 +41,7 @@ from . import (
     cli_args,
     cli_handoff,
     cli_learnings,
+    cli_mirror,
     cli_ops,
     cli_plan,
     cli_stopreview,
@@ -328,6 +329,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 保護対象の下書きの取り込み（`ccnavi user handoff [<パス>…]`）。ユーザ専用で、`user` の入口が
     # 読み替える。パスは位置引数（`command`）で受ける。`--yes` と `--expect` が揃ったときだけ書く。
     parser.add_argument("--handoff", action="store_true")
+    # 共通レイヤーのミラーを揃える（`ccnavi user mirror [<プロジェクト名>…]`）。ユーザ専用で、
+    # `user` の入口が読み替える。名前は位置引数（`command`）で受ける。`--yes` と `--expect` が
+    # 揃ったときだけ書く。
+    parser.add_argument("--mirror", action="store_true")
     # チケットの状態とレビューの操作。ユーザか、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
@@ -420,8 +425,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if refused:
         stderr.write(f"ccnavi: {refused}\n")
         return EXIT_ERROR
-    if args.yes == cli_args.BARE_YES and not args.handoff:
-        stderr.write("ccnavi: --yes には識別子を渡す（値なしの --yes は user handoff だけ）\n")
+    if args.yes == cli_args.BARE_YES and not (args.handoff or args.mirror):
+        stderr.write(
+            "ccnavi: --yes には識別子を渡す（値なしの --yes は user handoff と user mirror だけ）\n"
+        )
         return EXIT_ERROR
     if args.record_tree and not args.record_writes:
         stderr.write("ccnavi: --record-tree は --record-writes と一緒に指定してください。\n")
@@ -443,7 +450,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
     # 取り込みを書く形（`user handoff --yes`）は、拡張の子プロセスから board で呼ぶ。`--via` の
     # 組み合わせは取り込みの入口（cli_handoff.usage_problem）が見る（`--json` なら JSON で答える）。
-    if args.handoff:
+    # ミラーを揃える形（`user mirror --yes`）も同じ作り（cli_mirror.usage_problem）。
+    if args.handoff or args.mirror:
         pass
     elif args.via and (not args.actor or not cli_ops._decide_writes(args)):
         stderr.write("ccnavi: --via は decide の --actor と一緒に指定してください。\n")
@@ -454,7 +462,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
     # --yes はボードの押した選択と、write-and-push の中の端末の decide（選ぶのを先に済ませた形）
     # の両方が通る
-    if args.via == via.VIA_BOARD and not args.yes and not args.handoff:
+    if args.via == via.VIA_BOARD and not args.yes and not (args.handoff or args.mirror):
         stderr.write(
             "ccnavi: --via board は --yes（ボードで押した選択）と一緒に指定してください。\n"
         )
@@ -770,6 +778,10 @@ def _parsed(
     # ボードの経路（`--via board`）は端末を持たないので、`--expect` の一致と hook の止めに置く。
     if args.handoff:
         return cli_handoff.run(stdin, stdout, stderr, parser, conf, root, args)
+    # ミラーを揃える（`user mirror`）も同じ。書くとき（`--yes`）は端末の前のユーザを確かめ、
+    # ボードの経路は `--expect` の一致と hook の止めに置く。
+    if args.mirror:
+        return cli_mirror.run(stdin, stdout, stderr, parser, conf, root, args)
     if args.templates:
         return cli_templates.run(stdout, stderr, conf, root, args)
     if args.learnings:
@@ -1098,6 +1110,7 @@ def _hook_route(args: argparse.Namespace) -> bool:
         args.docs
         or args.learnings
         or args.handoff
+        or args.mirror
         or cli_args._diagnosing(args)
         or args.prune
         or args.plan_order is not None

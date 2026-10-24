@@ -1912,7 +1912,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
     @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
     def test_bin_user_on_git_bash_puts_the_folder_on_the_path_and_makes_no_link(self):
-        """Git Bash はリンクを当てにしない。ccnavi.exe と _internal/ が並ぶフォルダを PATH に通す。"""
+        """Git Bash はリンクを使わず、ccnavi.exe と _internal/ が並ぶフォルダを PATH に通す。"""
         src = self.make_source(target="windows-x86_64")
         with open(os.path.join(src, "dist", "ccnavi", "ccnavi.exe"), "w", encoding="utf-8") as f:
             f.write("exe")

@@ -89,6 +89,7 @@ OPS: tuple[Op, ...] = (
     Op("confirm-yes", "ボードで押した操作の確定（--yes）"),
     Op("tidy", "親を閉じたときの片付け"),
     Op("handoff", "保護対象の下書きの取り込み", terminal="user handoff --yes"),
+    Op("mirror", "共通レイヤーのミラーの同期", terminal="user mirror --yes"),
     Op("prune", "記録と state の削除", terminal="user prune"),
     Op("state-direct", "チケットの状態とレビューの操作を実行ファイルで直に呼ぶ形"),
     Op("guard-off", "端末要求を切る設定"),
@@ -124,6 +125,10 @@ FLAGS: tuple[Flag, ...] = (
     # ユーザ専用で、エージェントには打たせない（エージェントは `ccnavi-stage.sh --commands` で
     # 下書きの状態を見られる）。
     Flag("--handoff", "handoff", gated=True, groups=("handoff",)),
+    # 共通レイヤーのミラーの同期（`user mirror`）。取り込みと同じ扱いで、見るだけの形
+    # （`--yes` なし）もユーザ専用にする。`--yes` との組み合わせを隠す形の判定は、
+    # 取り込みと同じグループで見る。
+    Flag("--mirror", "mirror", gated=True, groups=("handoff",)),
     Flag("--guard-ticket-approval", "guard-off", cli=False, groups=("guard",)),
     # ボードの経路の印（`--via board`・`--via=board`）。ボードの子プロセスだけが付け、端末を
     # 求めない経路を選ぶ。単独では止めないが、`board` の語と並べば、操作の語や `--yes` が
@@ -202,6 +207,8 @@ VERBS: tuple[Verb, ...] = (
     Verb(("prune",), ("--prune",), "prune"),
     # 続く語（ツリーからの相対パス）は、位置引数としてそのまま渡る。
     Verb(("handoff",), ("--handoff",), "handoff"),
+    # 続く語（プロジェクトの名前）は、位置引数としてそのまま渡る。
+    Verb(("mirror",), ("--mirror",), "mirror"),
 )
 
 # `user` の入口の名前。
@@ -215,7 +222,7 @@ WRAPPER_OPTIONS: tuple[str, ...] = ("--root", "--cwd", "--record-writes", "--rec
 WORD_GROUPS: dict[str, tuple[str, ...]] = {
     "user": (USER_WORD,),
     # 端末を求めない経路（`--yes`）を持つ操作。
-    "user-board-verb": ("agree", "reviewed", "handoff"),
+    "user-board-verb": ("agree", "reviewed", "handoff", "mirror"),
     # `--via` の値のうち、端末を求めない経路を選ぶもの。
     "board": ("board",),
 }
