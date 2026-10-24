@@ -3,11 +3,17 @@
  * 画像は data: の URL としてバンドルに入る（Webview はファイルを読まない）。足したら、ここに 1 行足す（テストが突き合わせる）。
  */
 import claudeCodePrompt from "./images/claude-code-prompt.png";
+import gitlabIssuesList from "./images/gitlab-issues-list.png";
+import gitlabIssuesMenu from "./images/gitlab-issues-menu.png";
 import gitlabLineComment from "./images/gitlab-line-comment.png";
+import gitlabNewIssue from "./images/gitlab-new-issue.png";
 import gitlabStartThread from "./images/gitlab-start-thread.png";
 
 export const TOUR_IMAGES: Readonly<Record<string, string>> = {
   "claude-code-prompt": claudeCodePrompt,
+  "gitlab-issues-list": gitlabIssuesList,
+  "gitlab-issues-menu": gitlabIssuesMenu,
+  "gitlab-new-issue": gitlabNewIssue,
   "gitlab-line-comment": gitlabLineComment,
   "gitlab-start-thread": gitlabStartThread,
 };

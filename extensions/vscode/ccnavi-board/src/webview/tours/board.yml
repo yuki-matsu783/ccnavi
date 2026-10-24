@@ -287,8 +287,23 @@ courses:
         title: 全体の流れ
         body: 作業は「Claude Code に頼む → 提案を承認する → エージェントが作業する → MR でレビューする → 親を閉じてマージする → 片付ける」の順に進みます。ボードは、この間のユーザの番（承認・レビュー・片付け）を見つけて進める場所です。この案内で全体をたどります。
       - target: ""
+        title: まず issue を用意する（2 通り）
+        body: チケット作業は issue と MR のセットで進むので、最初に issue を用意します。作り方は 2 通りです。「人が GitLab で作る」（この次の 2 手順）か、「Claude Code に頼んで作ってもらう」（その次の手順）です。人が作るときは、プロジェクトのサイドバーで「Plan」を開き、「Issues」を選びます。
+        image: gitlab-issues-menu
+        alt: GitLab のプロジェクトのサイドバー。「Plan」の下に「Issues」「Issue boards」「Milestones」「Wiki」が並んでいる
+      - target: ""
+        title: 人が作る：「New item」を押す
+        body: issue の一覧が開きます。右上の「New item」を押すと、新しい issue の入力欄が開きます。
+        image: gitlab-issues-list
+        alt: GitLab の issue の一覧。右上に青い「New item」ボタンがある
+      - target: ""
+        title: 人が作る：題と説明を書いて作成する
+        body: 種類は「Issue」のまま、題（Title）と説明（Description）を書いて「Create issue」を押します。説明には、困っていることや目的を書きます。作った issue の番号が、親チケットの識別子の番号になります。
+        image: gitlab-new-issue
+        alt: GitLab の新しい issue の入力欄。種類・題・説明を書き、右下の「Create issue」で作成する
+      - target: ""
         title: Claude Code に作業を頼む
-        body: 作業は、Claude Code の入力欄に頼むところから始まります。調査や小さな修正は、チケットを使わない直接作業で進みます。設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る作業は、エージェントがチケット作業として提案を書き、issue と MR を用意します。
+        body: 作った issue の番号か URL を、Claude Code の入力欄で伝えて作業を頼みます。issue をまだ作っていないときは、作業の内容だけを頼めば、エージェントが issue を作ります。調査や小さな修正は、チケットを使わない直接作業で進みます。設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る作業は、エージェントがチケット作業として提案を書き、MR を用意します。
         image: claude-code-prompt
         alt: Claude Code の画面。下部の入力欄に作業を頼むプロンプトを入力して送る
       - target: card-sample-a

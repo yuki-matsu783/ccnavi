@@ -11,7 +11,7 @@ keywords: [案内, ツアー, 画像, PNG, data URL, CSP, img-src, localResource
 
 ## 状況
 
-ボードの案内に、作業を頼んでからマージするまでの流れを回る案内を足す。流れには、ボードの外の画面（Claude Code の入力欄、GitLab の差分に指摘を付ける吹き出しと、コメントの種類を選ぶ「Start thread」）が含まれる。ボードは外の画面を描けないので、画面を保存した画像で見せたい。
+ボードの案内に、作業を頼んでからマージするまでの流れを回る案内を足す。流れには、ボードの外の画面（GitLab の issue の作成、Claude Code の入力欄、GitLab の差分に指摘を付ける吹き出しと、コメントの種類を選ぶ「Start thread」）が含まれる。ボードは外の画面を描けないので、画面を保存した画像で見せたい。
 
 Webview は `localResourceRoots` を空にし、CSP を `default-src 'none'` と nonce だけにした、外部資源に依存しない 1 枚の HTML として組んである。画像はそのままでは読めない。
 
@@ -27,4 +27,4 @@ Webview は `localResourceRoots` を空にし、CSP を `default-src 'none'` と
 ## 得たもの・失ったもの
 
 - 得たもの: ボードの外の画面を、案内の中で見せられる。外へ出る手段（`localResourceRoots`・外の URL）は増えない。
-- 失ったもの: 画像のぶん、ボードのバンドルが大きくなる（PNG の約 1.4 倍。3 枚で約 150KB）。画像は GitLab・Claude Code の見た目に依るので、画面が変われば撮り直す。
+- 失ったもの: 画像のぶん、ボードのバンドルが大きくなる（PNG の約 1.4 倍。6 枚で約 300KB）。画像は GitLab・Claude Code の見た目に依るので、画面が変われば撮り直す。
