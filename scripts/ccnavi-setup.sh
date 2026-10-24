@@ -1587,10 +1587,12 @@ if [ "$user_bin_work" = yes ]; then
 		die "--bin user は、ユーザの置き場（${user_share}・${user_link}）に書くので、端末での確認が要ります。端末から実行してください。何も書いていません。"
 	printf 'ユーザの置き場に次を書きます:\n'
 	case "$user_bin_verdict" in
-	copy | replace) printf '  %s（実行ファイルの実体。%s）\n' "$user_share" "$user_bin_verdict" ;;
+	copy) printf '  %s（実行ファイルの実体を新しく置く）\n' "$user_share" ;;
+	replace) printf '  %s（実行ファイルの実体を入れ替える）\n' "$user_share" ;;
 	esac
 	case "$user_link_verdict" in
-	copy | replace) printf '  %s（%s/ccnavi へのリンク。%s）\n' "$user_link" "$user_share" "$user_link_verdict" ;;
+	copy) printf '  %s（%s/ccnavi へのリンクを新しく張る）\n' "$user_link" "$user_share" ;;
+	replace) printf '  %s（%s/ccnavi へのリンクに張り替える）\n' "$user_link" "$user_share" ;;
 	esac
 	printf '続けますか？ [y/N] '
 	user_answer=""
