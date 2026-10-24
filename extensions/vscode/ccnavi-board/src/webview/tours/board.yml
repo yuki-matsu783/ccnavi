@@ -366,6 +366,11 @@ courses:
         title: 親を閉じてマージする
         body: 最後のフェーズのレビューが済むと、エージェントが親を閉じて、MRのDraftを外します。親のカードは「完了」の列に並びます。MRのマージは、ユーザがGitLabの画面で行います。
       - target: ""
+        title: Draftを外す（GitLab）
+        body: MRがDraftのままだと、GitLabに「Merge blocked」と出て、マージできません。通常はエージェントがDraftを外しますが、まだ残っているときは「Mark as ready」を押して外します。
+        image: gitlab-mark-ready
+        alt: "GitLabのMRの画面。「Merge blocked: Select Mark as ready to remove it from Draft status.」と出ていて、右に青い「Mark as ready」ボタンがある"
+      - target: ""
         title: MRの画面でマージする（GitLab）
         body: マージは、GitLabのMRの画面で、ユーザが「Merge」ボタンを押して行います。マージの前に、Draftが外れていることと、レビューの指摘が片付いていることを確かめます。
         image: gitlab-mr-merge
