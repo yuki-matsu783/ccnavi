@@ -24,7 +24,7 @@ decide は、ホストへの返信・issue 作成・コメント投稿を行う�
 - decide の判断（digest）は版 2。指摘ごとの版を持ち、確認の間に増えた指摘は保留のまま残す。指摘の最初のコメントは
   全文を転記する
 - decide は `ccnavi-user-decide.sh --resume <操作ID>` で、保存した選択と記録から続きを送れる
-- エージェントの単発の投稿（request・comment・ready・close-early）は、鍵から決めた操作IDの記録に載せる
+- エージェントの単発の投稿（request・comment・ready・close-early）は、キーから決めた操作IDの記録に載せる
 - `ccnavi ops` の書き込み系（begin・stage-set・applied・done）はエージェントから直接打てない。未完了の記録は `status` が出す
 
 - 返信は、スレッドごとに「送る前」「送れた後」を記録の applied に残す。試して結果が分からないスレッドは、

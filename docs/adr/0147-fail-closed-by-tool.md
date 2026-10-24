@@ -1,7 +1,7 @@
 ---
 type: adr
 title: 判定に達せなかったときは、ツールの種類で決める
-description: 内部例外・期限切れ・payload が読めない回の結論を、ツールごとに決める。読み取りは最低限の deny を当てて通し、書き込みは止める
+description: 内部例外・期限切れ・payload が読めない回の結論を、ツールごとに決める。読み取りは最低限の deny を適用して通し、書き込みは止める
 tags: [hook, rules, selfguard]
 keywords: [fail-closed, 内部エラー, 期限切れ, payload, 許可リスト, Read, Bash, dry-run, failsafe]
 ---
@@ -24,7 +24,7 @@ dry-run では通していた。書き込みやサブエージェントの起動
 |---|---|
 | payload が読めない（ツールが分からない） | 止める（dry-run でも） |
 | Write・Edit・NotebookEdit・Agent | 止める（dry-run でも） |
-| Read・Grep・Glob | 最低限の deny に当たらなければ通す。評価できなければ止める。最低限の deny は、通常の判定の `credentials` が止める認証情報の形（`.env`・`.ssh`・`.aws`・`*.pem`・`credentials.json`・`secrets/` など）と、通常の判定にはない独自の追加として `.git` の中と `logs/state/ops/` |
+| Read・Grep・Glob | 最低限の deny にヒットしなければ通す。評価できなければ止める。最低限の deny は、通常の判定の `credentials` が止める認証情報の形（`.env`・`.ssh`・`.aws`・`*.pem`・`credentials.json`・`secrets/` など）と、通常の判定にはない独自の追加として `.git` の中と `logs/state/ops/` |
 | Bash | 狭い許可リストだけ通す。読み切れて、連結・置換・リダイレクト・glob を含まない単独の `pwd`・`ls`・`cat` / `head` / `tail` / `wc` の 1 パス（オプションは取らず、パスは `-` で始めず、`/dev/`・`/proc/` は除く）と、このワークスペースの `ccnavi-ticket.sh` の `status` / `--help`（別の場所に置かれた同名のスクリプトは通さない） |
 | PowerShell | 止める（読めない） |
 | 未知のツール | enable は止め、dry-run は通す |
