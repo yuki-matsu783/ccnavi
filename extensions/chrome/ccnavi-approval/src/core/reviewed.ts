@@ -79,11 +79,11 @@ export async function askConfirm(call: PyCall, ask: Ask, input: ConfirmInput): P
 
 export interface DecideInput extends ConfirmInput {
   readonly mode: "preview" | "apply";
-  /** apply のとき。指摘の鍵 → 行き先 */
+  /** apply のとき。指摘のキー → 行き先 */
   readonly choices?: Readonly<Record<string, DecideChoice>>;
   /** apply のとき。preview が返した digest */
   readonly digest?: string;
-  /** ホストで受け入れ済みと確かめた鍵（`fix` は入れない） */
+  /** ホストで受け入れ済みと確かめたキー（`fix` は入れない） */
   readonly carry?: readonly string[];
 }
 
@@ -135,7 +135,7 @@ export const DECIDE_LABELS: Readonly<Record<DecideChoice, string>> = {
 };
 
 export interface DecideThread {
-  /** 選択を結ぶ鍵（URL か、無ければスレッドの id） */
+  /** 選択を結ぶキー（URL か、無ければスレッドの id） */
   readonly key: string;
   readonly url: string;
   readonly path: string;

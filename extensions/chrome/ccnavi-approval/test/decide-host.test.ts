@@ -2,7 +2,7 @@
  * decide のホスト書き込み層。模擬の GitHub・GitLab（test/helpers/mock-write.ts）に service worker の `dispatch` 経由で書く。
  *
  * - 順序（issue → 返信 → 解決 → コメント）、`{issue_url}`・`{issue_links}` の置き換え、続きのコメント
- * - 途中で失敗したらそこで止まり、済んだ分と理由を返す。同じ鍵は二度書かない
+ * - 途中で失敗したらそこで止まり、済んだ分と理由を返す。同じキーは二度書かない
  * - 事前検査: 権限不足・Chrome で扱えない種類のスレッドなら何も書かない
  * - 操作 ID の印で issue を再利用する。他人が書いた印は拾わない
  * - 権限ごとの 403 の文面、protocol の検査（拒否される引数）、issue に assignee などを入れない
@@ -54,7 +54,7 @@ const reply = (key: string, id: string, issue = false) => ({
   body: `<!-- ccnavi:accept -->\nccnavi: 受け入れて進める。${issue ? `別の issue に回した: ${"{issue_url}"}。` : ""}\n`,
 });
 
-/** issue 2 件（鍵 k1・k2）、k3 は対応しない。返信 3 件、解決 3 件、コメント */
+/** issue 2 件（キー k1・k2）、k3 は対応しない。返信 3 件、解決 3 件、コメント */
 function plan(ids: [string, string, string] = [T1, T2, T3]): HostPlan {
   return {
     issues: [
@@ -71,7 +71,7 @@ function plan(ids: [string, string, string] = [T1, T2, T3]): HostPlan {
   };
 }
 
-test("CX-T320 順序は issue → 返信 → 解決 → コメント。返信の {issue_url} は同じ鍵の issue の URL に、コメントの {issue_links} は一覧に置き換わる（GitHub）", async () => {
+test("CX-T320 順序は issue → 返信 → 解決 → コメント。返信の {issue_url} は同じキーの issue の URL に、コメントの {issue_links} は一覧に置き換わる（GitHub）", async () => {
   const { mock, ops } = hub();
   const events: HostStepEvent[] = [];
   const out = await runHostPlan(ops, REPO, 7, plan(), (e) => void events.push(e));
@@ -127,7 +127,7 @@ test("CX-T322 issue には題と本文だけを送る（assignee・labels・mile
   assert.equal(oneLine("a".repeat(400)).length, 255);
 });
 
-test("CX-T323 途中で失敗したらそこで止まり、済んだ分（作った issue・返信・解決の済んだ鍵）と理由を返す。例外にしない。止まった先は書かない", async () => {
+test("CX-T323 途中で失敗したらそこで止まり、済んだ分（作った issue・返信・解決の済んだキー）と理由を返す。例外にしない。止まった先は書かない", async () => {
   // 2 件目の返信で失敗: issue は 2 件作成済み、返信は 1 件、解決は 0、コメントなし
   const a = hub();
   a.mock.w.failures.push({ op: "reply", status: 502, nth: 2, message: "bad gateway" });
@@ -167,23 +167,23 @@ test("CX-T323 途中で失敗したらそこで止まり、済んだ分（作っ
   assert.deepEqual([r5.failed?.step, r5.resolved.length, r5.commented], ["comment", 3, false]);
 });
 
-test("CX-T324 同じ鍵・同じスレッドを二度書かない（重なった計画は何も書かずに止める）。形の悪い計画も同じ", async () => {
+test("CX-T324 同じキー・同じスレッドを二度書かない（重なった計画は何も書かずに止める）。形の悪い計画も同じ", async () => {
   const { mock, ops } = hub();
   const dup = plan();
   const bad: HostPlan = { ...dup, replies: [...dup.replies, reply("k1", T2)] };
   const out = await runHostPlan(ops, REPO, 7, bad);
   assert.deepEqual([out.ok, out.failed?.step, mock.w.log.length], [false, "plan", 0]);
-  assert.match(out.failed?.reason ?? "", /返信が重なっている/);
+  assert.match(out.failed?.reason ?? "", /返信が重なっています/);
   const cases: [Partial<Record<keyof HostPlan, unknown>>, RegExp][] = [
     [{ issues: [{ key: "k", title: "t", body: "印が無い" }] }, /操作 ID の印/],
-    [{ issues: [{ key: "k", op: "x", title: "t", body: `${MARK1}\nb` }] }, /操作 ID が本文の印と違う/],
-    [{ issues: [{ key: "k", title: "t", body: `${MARK1}\nb` }, { key: "k", title: "u", body: `${MARK2}\nb` }] }, /鍵が重なっている/],
-    [{ issues: [{ key: "k", title: "t", body: `${MARK1}\nb` }, { key: "j", title: "u", body: `${MARK1}\nb` }] }, /操作 ID が重なっている/],
-    [{ replies: [{ key: "z", thread_id: T1, body: "{issue_url}" }] }, /同じ鍵の issue が計画にない/],
+    [{ issues: [{ key: "k", op: "x", title: "t", body: `${MARK1}\nb` }] }, /操作 ID が本文の印と違います/],
+    [{ issues: [{ key: "k", title: "t", body: `${MARK1}\nb` }, { key: "k", title: "u", body: `${MARK2}\nb` }] }, /キーが重なっています/],
+    [{ issues: [{ key: "k", title: "t", body: `${MARK1}\nb` }, { key: "j", title: "u", body: `${MARK1}\nb` }] }, /操作 ID が重なっています/],
+    [{ replies: [{ key: "z", thread_id: T1, body: "{issue_url}" }] }, /同じキーの issue が計画にありません/],
     [{ replies: [{ key: "z", thread_id: "a b", body: "x" }] }, /スレッドの id の形/],
-    [{ resolves: [{ key: "z", thread_id: T1 }, { key: "y", thread_id: T1 }] }, /解決が重なっている/],
+    [{ resolves: [{ key: "z", thread_id: T1 }, { key: "y", thread_id: T1 }] }, /解決が重なっています/],
     [{ comment: "" }, /コメントが空/],
-    [{ replies: [{ key: "z", thread_id: T1, body: "x".repeat(60001) }] }, /返信の本文が空か長すぎる/],
+    [{ replies: [{ key: "z", thread_id: T1, body: "x".repeat(60001) }] }, /返信の本文が空か長すぎます/],
   ];
   for (const [patch, want] of cases) {
     const p = { issues: [], replies: [], resolves: [], comment: null, ...patch };

@@ -47,7 +47,7 @@ export interface MockThread {
   body?: string;
   /** 解決した後、取得したスレッド（reviewThreads・discussions）にまだ映らない回数（ホストの読み取りの遅れ） */
   stale?: number;
-  /** GitLab: 代表のノートの id（url の鍵になる）。既定は 100 */
+  /** GitLab: 代表のノートの id（url のキーになる）。既定は 100 */
   noteId?: number;
   /** GitHub: スレッドが属するリポジトリと PR の番号（既定は acme/widgets の 7） */
   repo?: string;

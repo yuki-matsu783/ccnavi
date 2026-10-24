@@ -586,7 +586,7 @@ const DECIDE_MISMATCH = "CORE_DECIDE_MISMATCH";
 /** Python の `CORE_DECIDE_CHOICES`（選択の形が合わない。`carry` が読み直した結果で解決済みでないときも） */
 const DECIDE_CHOICES = "CORE_DECIDE_CHOICES";
 
-/** 指摘の鍵（URL か、無ければスレッドの id）→ ホストのスレッドの id。同じ鍵が複数あれば null（取り違えない） */
+/** 指摘のキー（URL か、無ければスレッドの id）→ ホストのスレッドの id。同じキーが複数あれば null（取り違えない） */
 function threadIds(copy: ReviewCopy): Map<string, string | null> {
   const out = new Map<string, string | null>();
   for (const t of copy.threads) {
@@ -648,7 +648,7 @@ function afterHost(out: Exclude<Outcome, { readonly kind: "written" }>, note: st
   return { ...out, message: `${note}${out.message}`, hostWritten: true };
 }
 
-/** 書き終えた keep・issue の鍵を `carry` にしたとき、Python が読み直した結果で解決済みと確かめる回数 */
+/** 書き終えた keep・issue のキーを `carry` にしたとき、Python が読み直した結果で解決済みと確かめる回数 */
 const CARRY_TRIES = 3;
 
 /**
@@ -659,7 +659,7 @@ const CARRY_TRIES = 3;
  * - (1)(2) で通らなければ何も書かない。(3) で止まればコミットせず、済んだ分と理由を返す。
  *   止まった後は、ボードを読み直して未解決の指摘だけ決め直せば続きが進む
  * - (4) のループはホストに書かない。先頭が動いて再試行しても、issue・返信・解決は重ならない。
- *   ホストで書き終えた `keep`・`issue` の鍵は `carry` で渡し、読み直した結果で解決済みであることを Python が確かめる。
+ *   ホストで書き終えた `keep`・`issue` のキーは `carry` で渡し、読み直した結果で解決済みであることを Python が確かめる。
  *   ホストの読み取りが遅れて確かめが通らないときだけ、短く待って取り直す
  * - 指摘が 0 件（`choices` が空）なら、ホストには書かず「レビュー済みにする」と同じコミットを積む。コメントも投稿しない
  *   （従来の「レビュー済みにする」は MR への書き込み権限を要らなかった）
@@ -747,7 +747,7 @@ export async function decidePhase(
       const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
       mr = copy.mr.number;
       res = await askDecide(deps.py, ask, { ...base, snapshot: read.input, copy, stamp, carry });
-      // 書き終えた鍵が、読み直した結果でまだ解決済みに見えない（ホストの読み取りの遅れ）ときだけ、待って取り直す
+      // 書き終えたキーが、読み直した結果でまだ解決済みに見えない（ホストの読み取りの遅れ）ときだけ、待って取り直す
       if (carry.length === 0 || res.code !== DECIDE_CHOICES) break;
       if (attempt < CARRY_TRIES) await sleep(VERIFY_WAIT_MS);
       else {

@@ -390,7 +390,7 @@ function decideActions(): Actions {
 const radio = (key: string, choice: DecideChoice) => $<HTMLInputElement>(`li[data-key=${key}] input[data-choice=${choice}]`);
 const checkedOf = (key: string) => [...doc.querySelectorAll<HTMLInputElement>(`li[data-key=${key}] input`)].find((i) => i.checked)?.dataset.choice;
 
-test("CX-T270 決める画面: 既定は全件 fix で確定が押せる。一括で全件が切り替わり、個別の選び直しが一括を上書きする。確定は鍵→行き先とダイジェストを渡す", async () => {
+test("CX-T270 決める画面: 既定は全件 fix で確定が押せる。一括で全件が切り替わり、個別の選び直しが一括を上書きする。確定はキー→行き先とダイジェストを渡す", async () => {
   decided.length = 0;
   const fakeActions = decideActions();
   const f = fake({ sections: sections(withThreads(2)), state: "done" });

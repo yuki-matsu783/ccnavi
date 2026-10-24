@@ -34,7 +34,7 @@ export interface Actions {
   review?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
   /** 残った指摘の行き先を決める画面を開く（プレビューを読む）。渡さなければ画面を出さない */
   decideOpen?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
-  /** 選んだ行き先（鍵 → 行き先）と、見せたダイジェストで確定する */
+  /** 選んだ行き先（キー → 行き先）と、見せたダイジェストで確定する */
   decideConfirm?(repo: RepoBoard, family: FamilyBoard, phase: number, choices: Readonly<Record<string, DecideChoice>>, digest: string): void;
   /** 決める画面を閉じる */
   decideCancel?(): void;
@@ -79,7 +79,7 @@ export interface BannerLine {
 
 /** 決める画面の状態。`preview` は読み込み中は null。読み込みの失敗は `notice` に出す */
 export interface DecideState {
-  /** リポジトリの鍵（`repoKey`）。同じ名前の親が別のリポジトリにあっても取り違えない */
+  /** リポジトリのキー（`repoKey`）。同じ名前の親が別のリポジトリにあっても取り違えない */
   readonly repo: string;
   /** 開くたびに増える番号。遅れて届いた読み取りの結果が、開き直した画面に付かないようにする */
   readonly token: number;
@@ -90,7 +90,7 @@ export interface DecideState {
   readonly deciding: boolean;
   /** 画面に出す一言（見せた指摘が変わった・読めなかった・断られた理由） */
   readonly notice: string;
-  /** 見せ直したとき、鍵と版が同じ指摘から引き継いだ選択（画面は新しいダイジェストの初期値にする） */
+  /** 見せ直したとき、キーと版が同じ指摘から引き継いだ選択（画面は新しいダイジェストの初期値にする） */
   readonly inherited?: Readonly<Record<string, DecideChoice>>;
 }
 
@@ -253,12 +253,12 @@ function decideMessage(family: string, phase: number, choices: Readonly<Record<s
   return `${family} のフェーズ ${phase} の残った指摘の行き先を反映します（${parts}）。${fix}issue の作成、スレッドへの返信、スレッドの解決の順にホストへ書いてから、親のブランチへ1つのコミットとして反映します。${warn}`;
 }
 
-/** 読み取った指摘の鍵が空か重複していれば理由を返す（行き先を結ぶ鍵として使えない） */
+/** 読み取った指摘のキーが空か重複していれば理由を返す（行き先を結ぶキーとして使えない） */
 function previewProblem(preview: DecidePreview): string {
   const seen = new Set<string>();
   for (const t of preview.threads) {
-    if (typeof t.key !== "string" || t.key === "") return "指摘の鍵が空です";
-    if (seen.has(t.key)) return `指摘の鍵が重複しています（${t.key}）`;
+    if (typeof t.key !== "string" || t.key === "") return "指摘のキーが空です";
+    if (seen.has(t.key)) return `指摘のキーが重複しています（${t.key}）`;
     seen.add(t.key);
   }
   return "";
@@ -574,7 +574,7 @@ export function createBoardController(env: BoardEnv): BoardController {
       }
       if (out.kind === "attention") await noteAttention(repoBoard.repo, name, out);
       if (out.kind === "mismatch" && !out.hostWritten) {
-        // 見せた指摘が変わった。読み直して選び直させる（鍵と版が同じ指摘の選択は引き継ぐ）
+        // 見せた指摘が変わった。読み直して選び直させる（キーと版が同じ指摘の選択は引き継ぐ）
         try {
           const next = await decidePreview(repoBoard.repo, name, phase, deps);
           const problem = previewProblem(next);

@@ -6,7 +6,7 @@
  * 探すのが失敗したら作り直さずに止める。続きのコメントには `part=<i>` の印を付け、使い回した issue でも足りない分だけ付ける）、
  * (2) 全返信（`{issue_url}` を作った issue の URL に置き換える。末尾に操作 ID の印を付け、同じ印の返信が既にあるスレッドには付けない）、
  * (3) 全解決、(4) MR へのコメント（`{issue_links}` を作った issue の URL の一覧に置き換える）。どこかで
- * 失敗したら、その時点で止めて、済ませたことと失敗の理由を返す（例外にしない）。同じ鍵は二度書かない。
+ * 失敗したら、その時点で止めて、済ませたことと失敗の理由を返す（例外にしない）。同じキーは二度書かない。
  *
  * 呼ぶ側の約束: 1 回の確定につき 1 度だけ呼ぶ（`writeLoop` の周の中では呼ばない）。操作の記録は持たない。
  * 止まったら、読み直した未解決のスレッドだけを決め直して押せば続きが進む。書く前に `precheckHostPlan` で
@@ -39,7 +39,7 @@ export interface PlanIssue {
 export interface PlanReply {
   readonly key: string;
   readonly thread_id: string;
-  /** `{issue_url}` を含みうる（同じ鍵の issue を作った後に置き換える） */
+  /** `{issue_url}` を含みうる（同じキーの issue を作った後に置き換える） */
   readonly body: string;
 }
 
@@ -119,7 +119,7 @@ export function partMarker(op: string, part: number): string {
   return `<!-- ccnavi:issue op=${op} part=${part} -->`;
 }
 
-/** 返信の印の操作 ID（鍵・スレッド・送る本文から決まる。同じ返信を打ち直しても同じ） */
+/** 返信の印の操作 ID（キー・スレッド・送る本文から決まる。同じ返信を打ち直しても同じ） */
 async function replyOp(key: string, threadId: string, body: string): Promise<string> {
   const bytes = new TextEncoder().encode(`reply\0${key}\0${threadId}\0${body}`);
   const digest = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", bytes));
@@ -140,44 +140,44 @@ export function planProblems(plan: unknown): string[] {
   const ops = new Set<string>();
   for (const i of p.issues as Partial<PlanIssue>[]) {
     if (!plainKey(i?.key)) {
-      out.push("issue の鍵が文字列でない");
+      out.push("issue のキーが文字列ではありません");
       continue;
     }
-    if (issueKeys.has(i.key)) out.push(`issue の鍵が重なっている: ${i.key}`);
+    if (issueKeys.has(i.key)) out.push(`issue のキーが重なっています: ${i.key}`);
     issueKeys.add(i.key);
-    if (typeof i.title !== "string" || oneLine(i.title) === "") out.push(`issue の題が空: ${i.key}`);
+    if (typeof i.title !== "string" || oneLine(i.title) === "") out.push(`issue の題が空です: ${i.key}`);
     if (!text(i.body)) {
-      out.push(`issue の本文が空か長すぎる: ${i.key}`);
+      out.push(`issue の本文が空か長すぎます: ${i.key}`);
       continue;
     }
     const op = markerOf(i.body);
-    if (op === "") out.push(`issue の本文の 1 行目に操作 ID の印（<!-- ccnavi:issue op=… -->）が無い: ${i.key}`);
-    else if (i.op !== undefined && i.op !== op) out.push(`issue の操作 ID が本文の印と違う: ${i.key}`);
-    else if (ops.has(op)) out.push(`issue の操作 ID が重なっている: ${i.key}`);
+    if (op === "") out.push(`issue の本文の 1 行目に操作 ID の印（<!-- ccnavi:issue op=… -->）がありません: ${i.key}`);
+    else if (i.op !== undefined && i.op !== op) out.push(`issue の操作 ID が本文の印と違います: ${i.key}`);
+    else if (ops.has(op)) out.push(`issue の操作 ID が重なっています: ${i.key}`);
     ops.add(op);
-    if (i.comments !== undefined && (!Array.isArray(i.comments) || !i.comments.every(text))) out.push(`issue の続きのコメントが文字列の配列でない: ${i.key}`);
+    if (i.comments !== undefined && (!Array.isArray(i.comments) || !i.comments.every(text))) out.push(`issue の続きのコメントが文字列の配列ではありません: ${i.key}`);
   }
   const replied = new Set<string>();
   const repliedThreads = new Set<string>();
   for (const r of p.replies as Partial<PlanReply>[]) {
     if (!plainKey(r?.key) || typeof r.thread_id !== "string" || !THREAD_ID.test(r.thread_id)) {
-      out.push(`返信の鍵かスレッドの id の形が正しくない: ${String(r?.key)}`);
+      out.push(`返信のキーかスレッドの id の形が正しくありません: ${String(r?.key)}`);
       continue;
     }
-    if (replied.has(r.key) || repliedThreads.has(r.thread_id)) out.push(`返信が重なっている: ${r.key}`);
+    if (replied.has(r.key) || repliedThreads.has(r.thread_id)) out.push(`返信が重なっています: ${r.key}`);
     replied.add(r.key);
     repliedThreads.add(r.thread_id);
-    if (!text(r.body) || r.body.length > MAX_REPLY) out.push(`返信の本文が空か長すぎる: ${r.key}`);
-    else if (r.body.includes(ISSUE_URL_SLOT) && !issueKeys.has(r.key)) out.push(`返信が issue の URL を求めているが、同じ鍵の issue が計画にない: ${r.key}`);
+    if (!text(r.body) || r.body.length > MAX_REPLY) out.push(`返信の本文が空か長すぎます: ${r.key}`);
+    else if (r.body.includes(ISSUE_URL_SLOT) && !issueKeys.has(r.key)) out.push(`返信が issue の URL を求めているが、同じキーの issue が計画にありません: ${r.key}`);
   }
   const resolved = new Set<string>();
   const resolvedThreads = new Set<string>();
   for (const r of p.resolves as Partial<PlanResolve>[]) {
     if (!plainKey(r?.key) || typeof r.thread_id !== "string" || !THREAD_ID.test(r.thread_id)) {
-      out.push(`解決の鍵かスレッドの id の形が正しくない: ${String(r?.key)}`);
+      out.push(`解決のキーかスレッドの id の形が正しくありません: ${String(r?.key)}`);
       continue;
     }
-    if (resolved.has(r.key) || resolvedThreads.has(r.thread_id)) out.push(`解決が重なっている: ${r.key}`);
+    if (resolved.has(r.key) || resolvedThreads.has(r.thread_id)) out.push(`解決が重なっています: ${r.key}`);
     resolved.add(r.key);
     resolvedThreads.add(r.thread_id);
   }
@@ -196,7 +196,7 @@ export type Precheck =
       readonly reason: string;
       /** 足りない権限の名前（permission のとき） */
       readonly missing: readonly string[];
-      /** 問題のあった鍵 */
+      /** 問題のあったキー */
       readonly keys: readonly string[];
     };
 
@@ -302,7 +302,7 @@ export type HostStepName = "plan" | "issue" | "issue-comment" | "reply" | "resol
 
 export interface HostStepFailure {
   readonly step: HostStepName;
-  /** 失敗した対象の鍵（コメントや計画全体なら null） */
+  /** 失敗した対象のキー（コメントや計画全体なら null） */
   readonly key: string | null;
   readonly reason: string;
   readonly status?: number;
@@ -312,9 +312,9 @@ export interface HostStepFailure {
 export interface HostStepResult {
   readonly ok: boolean;
   readonly issues: readonly HostStepIssue[];
-  /** 返信の済んだ鍵（同じ返信の印が既にあって飛ばした分も含む） */
+  /** 返信の済んだキー（同じ返信の印が既にあって飛ばした分も含む） */
   readonly replied: readonly string[];
-  /** 解決の済んだ鍵 */
+  /** 解決の済んだキー */
   readonly resolved: readonly string[];
   readonly commented: boolean;
   /** issue の検索が上限まで読んでも見つからず、探し切れていない（既に作った issue があれば重複する） */
@@ -423,7 +423,7 @@ export async function runHostPlan(ops: HostOps, repo: RepoRef, mr: number, plan:
       notify("reply", reply.key, "start");
       try {
         const url = urlOf.get(reply.key);
-        if (reply.body.includes(ISSUE_URL_SLOT) && url === undefined) throw new Error("返信に入れる issue の URL がない");
+        if (reply.body.includes(ISSUE_URL_SLOT) && url === undefined) throw new Error("返信に入れる issue の URL がありません");
         const base = reply.body.split(ISSUE_URL_SLOT).join(url ?? "").trimEnd();
         const op = await replyOp(reply.key, reply.thread_id, base);
         if (!(known.get(reply.thread_id) ?? []).includes(op)) {

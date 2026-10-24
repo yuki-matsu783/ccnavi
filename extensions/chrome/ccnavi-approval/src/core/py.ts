@@ -190,7 +190,7 @@ export interface DecideResult extends ConfirmResult {
   readonly reviewed: boolean;
   /** 起こす続きの子の識別子（無ければ ""） */
   readonly followup: string;
-  /** 見せたあとに増えた指摘の鍵（未対応で残す） */
+  /** 見せたあとに増えた指摘のキー（未対応で残す） */
   readonly pending_extra: readonly string[];
   /** 見せた指摘と今の指摘の食い違い（`CORE_DECIDE_MISMATCH` のとき） */
   readonly mismatch: unknown;
@@ -277,11 +277,11 @@ export const py = {
       phase: number;
       result: unknown;
       mode: "preview" | "apply";
-      /** apply のとき必須。指摘の鍵 → 行き先 */
+      /** apply のとき必須。指摘のキー → 行き先 */
       choices?: Readonly<Record<string, string>>;
       /** apply のとき必須。preview が返した digest */
       shown_digest?: string;
-      /** ホストで受け入れ済み（返信して解決済み）と確かめた鍵 */
+      /** ホストで受け入れ済み（返信して解決済み）と確かめたキー */
       carry?: readonly string[];
       compare?: Compare;
       manual_moved_at?: number;

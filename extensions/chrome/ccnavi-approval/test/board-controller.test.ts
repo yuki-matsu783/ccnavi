@@ -350,7 +350,7 @@ const PREVIEW = {
   threads: [{ key: "k0", url: "", path: "a.ts", line: 1, body: "指摘", version: "v", last_comment: { id: "", at: "", author: "" } }],
 };
 
-test("CX-T273 決める: 開くとプレビューを読み、確定は鍵→行き先とダイジェストを ops.decide に渡す。成功の一言と画面の閉じ方", async () => {
+test("CX-T273 決める: 開くとプレビューを読み、確定はキー→行き先とダイジェストを ops.decide に渡す。成功の一言と画面の閉じ方", async () => {
   const seen: unknown[][] = [];
   let out: DecideOutcome = { kind: "written", oid: "0123456789abcdef", reviewed: false, followup: "i0001-f1", issues: ["https://example.test/issues/9"] };
   const h = harness({
@@ -452,7 +452,7 @@ test("CX-T275 決める: 既定で実物に配線され、入口の操作が付�
   assert.equal(typeof w.c.actions.decideOpen, "function");
 });
 
-test("CX-T276 決める: 開くたびの番号で、遅れて届いた読み取りの結果と失敗を、開き直した画面や別のフェーズに付けない。状態はリポジトリの鍵を持つ", async () => {
+test("CX-T276 決める: 開くたびの番号で、遅れて届いた読み取りの結果と失敗を、開き直した画面や別のフェーズに付けない。状態はリポジトリのキーを持つ", async () => {
   const waits: { resolve: (p: typeof PREVIEW) => void; reject: (e: Error) => void }[] = [];
   const h = harness({
     ops: {
@@ -502,7 +502,7 @@ test("CX-T277 決める: 確認文に内訳と続きの子の注意が入る。0
   const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
   h.c.actions.decideOpen?.(b, family(), 1);
   await until(() => h.c.snapshot().decide?.preview !== null, "プレビュー");
-  // 未知の鍵・足りない鍵は ops に渡さない
+  // 未知のキー・足りないキーは ops に渡さない
   h.c.actions.decideConfirm?.(b, family(), 1, { a: "fix", b: "keep", z: "issue" }, "v2.aaa");
   await until(() => settled(h), "照合");
   assert.deepEqual(called, []);
@@ -530,7 +530,7 @@ test("CX-T277 決める: 確認文に内訳と続きの子の注意が入る。0
   await until(() => h.c.snapshot().decide === undefined && h.c.snapshot().result.kind === "refused", "要確認");
 });
 
-test("CX-T278 決める: 鍵が空・重複の指摘は画面を出さず読み取り不能。見せ直しで鍵と版が同じ指摘の選択を引き継ぐ", async () => {
+test("CX-T278 決める: キーが空・重複の指摘は画面を出さず読み取り不能。見せ直しでキーと版が同じ指摘の選択を引き継ぐ", async () => {
   let shown = previewOf({ threads: [PREVIEW.threads[0], PREVIEW.threads[0]] });
   let out: DecideOutcome = { kind: "mismatch", message: "増えた" };
   const h = harness({ ops: { decidePreview: async () => shown, decide: async () => out } });
@@ -539,7 +539,7 @@ test("CX-T278 決める: 鍵が空・重複の指摘は画面を出さず読み�
   h.c.actions.decideOpen?.(b, family(), 1);
   await until(() => (h.c.snapshot().decide?.notice ?? "") !== "", "重複");
   assert.equal(h.c.snapshot().decide?.preview, null);
-  assert.match(h.c.snapshot().decide?.notice ?? "", /鍵が重複/);
+  assert.match(h.c.snapshot().decide?.notice ?? "", /キーが重複/);
   h.c.actions.decideCancel?.();
   const t = (key: string, version: string) => ({ ...PREVIEW.threads[0], key, version });
   shown = previewOf({ threads: [t("a", "1"), t("b", "1")] });

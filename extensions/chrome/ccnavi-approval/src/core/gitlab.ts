@@ -729,7 +729,7 @@ const DISCUSSION_ID = /^[0-9a-f]{8,64}$/;
 
 /** discussion の id（GitLab は 40 桁の 16 進）。経路に使うので、この字に限る */
 export function checkDiscussionId(value: unknown): string {
-  if (typeof value !== "string" || !DISCUSSION_ID.test(value)) throw new HostError(`discussion の id の形が正しくない: ${String(value)}`);
+  if (typeof value !== "string" || !DISCUSSION_ID.test(value)) throw new HostError(`discussion の id の形が正しくありません: ${String(value)}`);
   return value;
 }
 
@@ -748,7 +748,7 @@ export async function replyDiscussion(client: Client, owner: string, repo: strin
   if (res.status === 404) throw new HostError("返信できませんでした（404）。discussion が見えないか、PAT のロールが足りません（Developer 以上・api スコープ）", 404);
   if (res.status < 200 || res.status >= 300) throw failure("GitLab が返信を受け付けなかった", res);
   const id = (res.body as { id?: unknown } | null)?.id;
-  if (typeof id !== "number") throw new HostError("GitLab が作ったノートの id を返さなかった");
+  if (typeof id !== "number") throw new HostError("GitLab が作ったノートの id を返しませんでした");
   return { url: "" };
 }
 
@@ -760,7 +760,7 @@ export async function resolveDiscussion(client: Client, owner: string, repo: str
   const notes = (res.body as { notes?: unknown } | null)?.notes;
   const resolvable = (Array.isArray(notes) ? (notes as Note[]) : []).filter((n) => n?.system !== true && alt(n?.resolvable, false) !== false);
   if (resolvable.length === 0 || !resolvable.every((n) => alt(n.resolved, false) !== false)) {
-    throw new HostError("GitLab の応答が、discussion の解決済みを示していない");
+    throw new HostError("GitLab の応答が、discussion の解決済みを示していません");
   }
 }
 
@@ -784,7 +784,7 @@ export async function findIssueByMarker(client: Client, owner: string, repo: str
   for (let page = 1; page <= FIND_PAGES; page += 1) {
     const { status, body } = await get(client, `${project(owner, repo)}/issues?state=all&order_by=created_at&sort=desc&per_page=100&page=${page}`);
     if (status === 404) return { issue: null, truncated: false };
-    if (!Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} の Issue の一覧の応答が配列でない`);
+    if (!Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} の Issue の一覧の応答が配列ではありません`);
     for (const i of body as { iid?: unknown; web_url?: unknown; description?: unknown; author?: { id?: unknown } | null }[]) {
       if (markerLine(i.description) !== m) continue;
       if (typeof i.author?.id !== "number" || i.author.id !== me) continue;

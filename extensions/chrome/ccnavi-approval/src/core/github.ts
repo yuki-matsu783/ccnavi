@@ -884,13 +884,13 @@ export const ISSUE_MARKER = /^<!-- ccnavi:issue op=[A-Za-z0-9._:-]{1,100} -->$/;
 
 /** GraphQL の node id（スレッドの id）。経路にも変数にも使える字に限る */
 export function checkThreadId(value: unknown): string {
-  if (typeof value !== "string" || !THREAD_ID.test(value)) throw new HostError(`スレッドの id の形が正しくない: ${String(value)}`);
+  if (typeof value !== "string" || !THREAD_ID.test(value)) throw new HostError(`スレッドの id の形が正しくありません: ${String(value)}`);
   return value;
 }
 
 /** PR・MR の番号 */
 export function checkNumber(value: unknown, what = "番号"): number {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 999_999_999) throw new HostError(`${what} の形が正しくない: ${String(value)}`);
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 999_999_999) throw new HostError(`${what} の形が正しくありません: ${String(value)}`);
   return value;
 }
 
@@ -944,7 +944,7 @@ export function neutralize(text: string, gitlab: boolean): string {
 }
 
 export function checkMarker(value: unknown): string {
-  if (typeof value !== "string" || !ISSUE_MARKER.test(value)) throw new HostError("issue の操作 ID の印の形が正しくない");
+  if (typeof value !== "string" || !ISSUE_MARKER.test(value)) throw new HostError("issue の操作 ID の印の形が正しくありません");
   return value;
 }
 
@@ -1022,7 +1022,7 @@ const REPLY_THREAD = `mutation($input: AddPullRequestReviewThreadReplyInput!) {
 export async function replyThread(client: Client, threadId: string, body: string): Promise<{ url: string }> {
   const data = await graphql(client, REPLY_THREAD, { input: { pullRequestReviewThreadId: checkThreadId(threadId), body: checkWriteText(body, "返信の本文") } }, "Pull requests");
   const comment = (data.addPullRequestReviewThreadReply as { comment?: { id?: unknown; url?: unknown } | null } | null)?.comment;
-  if (!comment || typeof comment.id !== "string") throw new HostError("GitHub がスレッドへの返信を受け付けなかった（返信が作られていない。保留中のレビューのスレッドは返信できないことがあります）");
+  if (!comment || typeof comment.id !== "string") throw new HostError("GitHub がスレッドへの返信を受け付けませんでした（返信が作られていません。保留中のレビューのスレッドは返信できないことがあります）");
   return { url: typeof comment.url === "string" ? comment.url : "" };
 }
 
@@ -1034,7 +1034,7 @@ const RESOLVE_THREAD = `mutation($input: ResolveReviewThreadInput!) {
 export async function resolveThread(client: Client, threadId: string): Promise<void> {
   const data = await graphql(client, RESOLVE_THREAD, { input: { threadId: checkThreadId(threadId) } }, "Pull requests");
   const thread = (data.resolveReviewThread as { thread?: { isResolved?: unknown } | null } | null)?.thread;
-  if (!thread || thread.isResolved !== true) throw new HostError("GitHub がスレッドを解決済みにしなかった（応答が解決済みを示していない）");
+  if (!thread || thread.isResolved !== true) throw new HostError("GitHub がスレッドを解決済みにしませんでした（応答が解決済みを示していません）");
 }
 
 /**
@@ -1048,7 +1048,7 @@ export async function createIssue(client: Client, owner: string, repo: string, t
   if (res.status === 404) throw new HostError(`issue を作れませんでした（404）。リポジトリ ${owner}/${repo} が見えないか、PAT に ${NEED_TEXT.Issues} の権限がありません`, 404);
   if (res.status < 200 || res.status >= 300) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitHub が issue を作らなかった（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+    throw new HostError(`GitHub が issue を作りませんでした（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
   }
   const made = (res.body ?? {}) as { number?: unknown; html_url?: unknown };
   if (typeof made.number !== "number" || !Number.isInteger(made.number) || made.number <= 0) throw new HostError("作った issue の番号を取得できません");
@@ -1075,7 +1075,7 @@ export async function findIssueByMarker(client: Client, owner: string, repo: str
   for (let page = 1; page <= FIND_PAGES; page += 1) {
     const { status, body } = await rest(client, `${repoPath(owner, repo)}/issues?state=all&sort=created&direction=desc&per_page=100&page=${page}`);
     if (status === 404) return { issue: null, truncated: false };
-    if (!Array.isArray(body)) throw new HostError(`リポジトリ ${owner}/${repo} の Issue の一覧の応答が配列でない`);
+    if (!Array.isArray(body)) throw new HostError(`リポジトリ ${owner}/${repo} の Issue の一覧の応答が配列ではありません`);
     for (const i of body as { number?: unknown; html_url?: unknown; body?: unknown; pull_request?: unknown; user?: { login?: unknown } | null }[]) {
       if (i.pull_request !== undefined && i.pull_request !== null) continue;
       if (markerLine(i.body) !== m) continue;
@@ -1122,7 +1122,7 @@ export async function issueComment(client: Client, owner: string, repo: string, 
   if (res.status === 404) throw new HostError(`コメントを付けられませんでした（404）。${target === "pr" ? "PR" : "issue"} #${number} が見えないか、PAT に ${NEED_TEXT[need]} の権限がありません`, 404);
   if (res.status < 200 || res.status >= 300) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitHub がコメントを受け付けなかった（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+    throw new HostError(`GitHub がコメントを受け付けませんでした（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
   }
   const url = (res.body as { html_url?: unknown } | null)?.html_url;
   return { url: typeof url === "string" ? checkWebUrl(client, url) : "" };
@@ -1173,7 +1173,7 @@ export async function writeInfo(client: Client, owner: string, repo: string, num
       threads.push({ id: String(t.id), kind: pending ? "pending" : "ok", canReply: t.viewerCanReply === true, canResolve: t.viewerCanResolve === true, replyOps: replyOpsOf(recent) });
     }
     if (!conn.pageInfo.hasNextPage) break;
-    if (page + 1 > THREAD_PAGES) throw new HostError("reviewThreads が多すぎて読み切れない");
+    if (page + 1 > THREAD_PAGES) throw new HostError("reviewThreads が多すぎて読み切れません");
     after = conn.pageInfo.endCursor;
   }
   const scopes = client.seen?.scopes;

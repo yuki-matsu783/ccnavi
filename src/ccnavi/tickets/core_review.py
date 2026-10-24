@@ -407,7 +407,7 @@ def moved_detail_on_host(
 CODE_DECIDE_NO_DIGEST = "CORE_DECIDE_NO_DIGEST"
 # 見せた指摘と今の指摘が違う。
 CODE_DECIDE_MISMATCH = "CORE_DECIDE_MISMATCH"
-# 選択（か受け入れ済みの鍵）の形が、見せた指摘と合わない。
+# 選択（か受け入れ済みのキー）の形が、見せた指摘と合わない。
 CODE_DECIDE_CHOICES = "CORE_DECIDE_CHOICES"
 # 返信と解決をするスレッドの id が無いか、API の経路に使えない。
 CODE_DECIDE_THREAD_ID = "CORE_DECIDE_THREAD_ID"
@@ -449,7 +449,7 @@ class Decided(core_base.Checked):
 
     `host_plan` はホストへの書き込みの計画（JSON にできる辞書）。形は `decide` の docstring。
     `reviewed` はレビュー済みのマーカーを置くか、`followup` は起こす続きの子の識別子（無ければ空）、
-    `pending_extra` は見せたあとに増えた指摘の鍵（今回は扱わず、未対応として残す）、
+    `pending_extra` は見せたあとに増えた指摘のキー（今回は扱わず、未対応として残す）、
     `mismatch` は見せた指摘と今の指摘が違うときの中身。
     """
 
@@ -486,7 +486,7 @@ def _decision(
     止める条件と並びは `confirm` と同じ（親・フェーズ・レビュー済み・依頼の記録・動いたか・
     結果の照合）に、変更要求のレビューを足したもの。未解決のスレッドが残っていても止めない
     （それを決めるのが decide）。
-    `carry` は受け入れ済み（ホストで解決済み）の鍵。解決済みでも、見せた指摘の一部として数える。
+    `carry` は受け入れ済み（ホストで解決済み）のキー。解決済みでも、見せた指摘の一部として数える。
     """
     conf, root = snapshot.conf, snapshot.root
     parent = _open_parent(root, conf, parent_id)
@@ -577,12 +577,12 @@ def decide(
     ネットワークに出ない）。呼び手が `host_plan` をホストに書いてから、`changes` を親のブランチへ
     1 コミットにする。
 
-    - `choices`: 見せた指摘の鍵 → `keep`（対応しない）/ `fix`（このフェーズで直す）/
+    - `choices`: 見せた指摘のキー → `keep`（対応しない）/ `fix`（このフェーズで直す）/
       `issue`（issue に回す）。見せた指摘の全部に選択が要る
     - `shown_digest`: `decide_preview` が返したダイジェスト。無い・読めない・今の指摘と違うなら
       何も積まない。見せたあとに増えた指摘は食い違いに数えず、未対応として残す（`pending_extra`）
-    - `carry`: ホストで受け入れ済み（返信して解決済み）と確かめた鍵。見せた指摘から外れていても
-      食い違いに数えない。結果ではホストで解決済みでなければならず、`fix` の鍵は入れられない。
+    - `carry`: ホストで受け入れ済み（返信して解決済み）と確かめたキー。見せた指摘から外れていても
+      食い違いに数えない。結果ではホストで解決済みでなければならず、`fix` のキーは入れられない。
       `host_plan` からは外れる（もう書かない）
 
     `host_plan` は JSON にできる辞書:
@@ -592,16 +592,16 @@ def decide(
          "resolves": [{"key", "thread_id"}],
          "comment":  "<決めた内容のコメント>"}
 
-    issue は `issue` を選んだ指摘 1 件につき 1 つ。`op` は親・フェーズ・鍵・指摘の版から決まる操作ID
-    （本文の頭の隠しコメント `MARKER_ISSUE` にも入る）。`comments` は本文が長いときの
+    issue は `issue` を選んだ指摘 1 件につき 1 つ。`op` は親・フェーズ・キー・指摘の版から決まる
+    操作ID（本文の頭の隠しコメント `MARKER_ISSUE` にも入る）。`comments` は本文が長いときの
     続きのコメント。
     `replies` と `resolves` は `keep` と `issue` だけ。`issue` の返信の本文は `ISSUE_URL_SLOT`
-    を含み、同じ鍵の issue を作った URL に置き換える。`comment` の `ISSUE_LINKS_SLOT` は作った
+    を含み、同じキーの issue を作った URL に置き換える。`comment` の `ISSUE_LINKS_SLOT` は作った
     issue の URL の一覧に置き換える（issue に回す指摘が無ければ枠は入らない）。
 
     続きの子（`fix`）を起こすときは、親のブランチ上の既存のチケットだけを見て識別子を決める
     （手元の退避は見ない）。直す指摘が無く、追加分も無ければレビュー済みのマーカーを置く。
-    続きの子に書く操作ID は、親・フェーズ・直す指摘の鍵と版から決まる（MR の番号は入らない）。
+    続きの子に書く操作ID は、親・フェーズ・直す指摘のキーと版から決まる（MR の番号は入らない）。
 
     決まりごと:
     - `carry` の確認は「取り直した結果で、今ホストで解決済み」だけを見る。ccnavi の受け入れ返信が
@@ -623,8 +623,8 @@ def decide(
         return _refused_decided(
             CODE_DECIDE_NO_DIGEST,
             [
-                "ccnavi: 見せた指摘のダイジェストが無いか読めない。指摘を見せ直してください。"
-                "何も積んでいない"
+                "ccnavi: 見せた指摘のダイジェストが無いか、読めません。指摘を見せ直してください。"
+                "何も積んでいません"
             ],
         )
     base, versions = want
@@ -633,9 +633,9 @@ def decide(
     ):
         return _refused_decided(
             CODE_DECIDE_CHOICES,
-            [f"ccnavi: 選択は {{鍵: {' / '.join(review_decide.CHOICES)}}} の形で渡す"],
+            [f"ccnavi: 選択は {{キー: {' / '.join(review_decide.CHOICES)}}} の形で渡してください"],
         )
-    # 受け入れ済みの鍵は、ホストの結果で解決済みでなければならない（取り直した実状態で確かめる）
+    # 受け入れ済みのキーは、ホストの結果で解決済みでなければならない（取り直した実状態で確かめる）
     by_key = {review_host.thread_key(t): t for t in result.threads}
     for key in sorted(carry):
         thread = by_key.get(key)
@@ -649,7 +649,7 @@ def decide(
     if differs:
         return _refused_decided(
             CODE_DECIDE_MISMATCH,
-            ["ccnavi: 見せた指摘と今の指摘が違う。何も積んでいない"],
+            ["ccnavi: 見せた指摘と今の指摘が違います。何も積んでいません"],
             {"digest": {"expected": shown_digest, "current": current}, "changed": differs},
         )
     shown = set(versions)
@@ -658,7 +658,7 @@ def decide(
     if set(choices) != shown:
         return _refused_decided(
             CODE_DECIDE_CHOICES,
-            ["ccnavi: 選択が見せた指摘と揃っていない（足りないか、余分がある）"],
+            ["ccnavi: 選択が見せた指摘と揃っていません（足りないか、余分があります）"],
         )
     picked = {
         c: [t for t in d.unresolved if choices.get(review_host.thread_key(t)) == c]
@@ -668,8 +668,8 @@ def decide(
         return _refused_decided(
             CODE_DECIDE_CHOICES,
             [
-                f"ccnavi: issue に回す指摘が {len(picked[review_decide.CHOICE_ISSUE])} 件ある。"
-                f"1 回で回せるのは {MAX_ISSUES} 件まで。選び直してください。何も積んでいない"
+                f"ccnavi: issue に回す指摘が {len(picked[review_decide.CHOICE_ISSUE])} 件あります。"
+                f"1 回で回せるのは {MAX_ISSUES} 件まで。選び直してください。何も積んでいません"
             ],
         )
     fix = picked[review_decide.CHOICE_FIX]
@@ -678,7 +678,7 @@ def decide(
     problem = review_host.accept_plan_problem(to_write)
     if problem:
         return _refused_decided(
-            CODE_DECIDE_THREAD_ID, [f"ccnavi: 受け入れを始められない: {problem}"]
+            CODE_DECIDE_THREAD_ID, [f"ccnavi: 受け入れを始められません: {problem}"]
         )
     fix_op = oplog.id_for(
         "chrome-decide-fix",
@@ -802,7 +802,7 @@ def _stage_decision(
 
 
 def _issue_title(d: review_decide.Decision, head: str, t: review_host.Thread) -> str:
-    """指摘 1 件の issue の題。出どころの題に、指摘の位置（無ければ鍵）を添える。"""
+    """指摘 1 件の issue の題。出どころの題に、指摘の位置（無ければキー）を添える。"""
     where = ""
     if t.path:
         where = f"{t.path}:{t.line}" if t.line else t.path
@@ -837,7 +837,7 @@ def _host_plan(
     """ホストへの書き込みの計画。返信と解決は `accepted`（受け入れる指摘）からだけ組む。
 
     順は issue の作成、返信、解決。`accepted` は、ホストにまだ書いていない分
-    （受け入れ済みの鍵を除いた分）。issue は、`issue` を選んだうちその分だけ作る。
+    （受け入れ済みのキーを除いた分）。issue は、`issue` を選んだうちその分だけ作る。
     """
     why = f"フェーズ {d.ph.number} の未解決の指摘を、ユーザが decide で決めた"
     by_key = {review_host.thread_key(t): t for t in d.unresolved}

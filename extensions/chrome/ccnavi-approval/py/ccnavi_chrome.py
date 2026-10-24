@@ -22,7 +22,8 @@
 - 判定の入力に読めない（バイナリの）ファイルがあれば、何も判定せず「決まらない」で止める
   （取っていないファイルと同じく、無いとも空とも読ませない）
 
-書く操作（`plan`・`confirm`）は、同梱の互換の版が統合先の `CCNAVI_COMPAT` と違えば受けない。
+書く操作（`plan`・`confirm`・`decide`）は、同梱の互換の版が統合先の `CCNAVI_COMPAT` と違えば
+受けない。
 互換の違う判定をリモートに乗せると、手元で判定し直したときに答えが分かれるため。
 書く先は親チケットのブランチ `P` だけで、予約の名前・統合先の名前は受けない。
 
@@ -1019,12 +1020,13 @@ def _op_decide(req: dict, root: str) -> dict:
     `compare`・`manual_moved_at`）に、次を足す。
 
         "mode":         "preview" | "apply"           （必須）
-        "choices":      {"<指摘の鍵>": "keep" | "fix" | "issue"}   （apply のとき必須）
+        "choices":      {"<指摘のキー>": "keep" | "fix" | "issue"}   （apply のとき必須）
         "shown_digest": "<preview が返した digest>"   （apply のとき必須）
-        "carry":        ["<指摘の鍵>", ...]            （任意。既定は空）
+        "carry":        ["<指摘のキー>", ...]            （任意。既定は空）
 
-    `carry` は、ホストで受け入れ済み（返信して解決済み）と拡張が確かめた鍵。取り直した `result` で
-    解決済みでなければならず、`fix` の鍵は入れられない。見せた指摘から外れていても食い違いに数えず、
+    `carry` は、ホストで受け入れ済み（返信して解決済み）と拡張が確かめたキー。取り直した `result` で
+    解決済みでなければならず、`fix` のキーは入れられない。見せた指摘から外れていても
+    食い違いに数えず、
     `host_plan` には入らない（もう書かない）。
 
     答え（`schema` は `handle` が足す）:
@@ -1039,7 +1041,7 @@ def _op_decide(req: dict, root: str) -> dict:
           "host_plan": {...} | null,                       # mode=apply のときだけ
           "reviewed": false,                               # apply で通ったとき、マーカーを置くか
           "followup": "",                                  # 起こす続きの子の識別子（無ければ ""）
-          "pending_extra": ["<鍵>", ...],                  # 見せたあとに増えた指摘（未対応で残す）
+          "pending_extra": ["<キー>", ...],                # 見せたあとに増えた指摘（未対応で残す）
           "mismatch": null | {"digest": {"expected", "current"}, "changed": [...]},
           "changes": {"<ブランチ>": [{"op", "path", "content"|"base64"}]} | null,
           "lines": [...], "stopped": null | {"ticket", "reason"}
@@ -1056,19 +1058,19 @@ def _op_decide(req: dict, root: str) -> dict:
            "resolves": [{"key", "thread_id"}],
            "comment":  "<MR に書く、決めた内容のコメント>"}
 
-      `issues` は `issue` を選んだ指摘 1 件につき 1 つ（`carry` の鍵を除く）。`op` は親・フェーズ・
-      鍵・指摘の版から決まる操作IDで、`body` の頭の隠しコメント
+      `issues` は `issue` を選んだ指摘 1 件につき 1 つ（`carry` のキーを除く）。`op` は
+      親・フェーズ・キー・指摘の版から決まる操作IDで、`body` の頭の隠しコメント
       `<!-- ccnavi:issue op=<op> -->` にも入る。
       作成の前に同じ印の issue を検索して、重複を避ける。`comments` は本文が長いときの続き
       （issue を作ったあと、順にコメントする）。
       `replies` と `resolves` は `keep` と `issue` の指摘だけ（`fix` は入らない。
       返信も解決もしない）。
-      `issue` の返信の本文は `{issue_url}` を含み、同じ鍵の issue の URL に置き換えてから送る。
+      `issue` の返信の本文は `{issue_url}` を含み、同じキーの issue の URL に置き換えてから送る。
       `comment` は `issue` を選んだ指摘があるときだけ末尾に `{issue_links}` を含み、作った issue の
       URL の一覧（1 行 1 件）に置き換えてから送る。
       書く順は、issues、replies、resolves、そのあと changes のコミット、最後に comment。
     - `preview` と `host_plan` は、通らなければ null（`code` に種別が入る）。
-      `mode` でない側の鍵は付かない
+      `mode` でない側のキーは付かない
     - `code`: confirm と同じ `CORE_CONFIRM_*`（親・フェーズ・レビュー済み・依頼の記録・動いた・
       結果の照合・変更要求）に加え、`CORE_DECIDE_NO_DIGEST`（ダイジェストが無い・読めない）、
       `CORE_DECIDE_MISMATCH`（見せた指摘と今の指摘が違う。`mismatch` が付く。何も積まない）、
@@ -1091,7 +1093,7 @@ def _op_decide(req: dict, root: str) -> dict:
     - レビュー済みのマーカーを置いたあとは `CORE_CONFIRM_ALREADY_REVIEWED` で断る。
       コミットが成功し comment だけが失敗したときの再送は、この入口では受けない
       （拡張が独立に扱う）
-    - 続きの子の操作ID は、親・フェーズ・直す指摘の鍵と版から決まる（MR の番号は入らない）
+    - 続きの子の操作ID は、親・フェーズ・直す指摘のキーと版から決まる（MR の番号は入らない）
 
     `manual_moved_at` と `need_manual` は `confirm` と同じ手順で答えるが、decide の判断は
     手で動かした子を使わない。
@@ -1103,13 +1105,13 @@ def _op_decide(req: dict, root: str) -> dict:
     if mode == "apply" and not (
         isinstance(choices, dict) and all(isinstance(k, str) for k in choices)
     ):
-        raise Refused("choices は {指摘の鍵: keep | fix | issue}")
+        raise Refused("choices は {指摘のキー: keep | fix | issue}")
     shown_digest = req.get("shown_digest")
     if mode == "apply" and not isinstance(shown_digest, str):
         raise Refused("shown_digest は見せた指摘のダイジェスト（文字列）")
     carry = req.get("carry", [])
     if not (isinstance(carry, list) and all(isinstance(k, str) for k in carry)):
-        raise Refused("carry は指摘の鍵のリスト")
+        raise Refused("carry は指摘のキーのリスト")
     snap, place, family, closure = _family_tree(req, root)
     _writable(snap, family)
     ident = closure["idents"][family]
@@ -1122,7 +1124,7 @@ def _op_decide(req: dict, root: str) -> dict:
     head = str(snap["branches"][family].get("head") or "")
     compare = req.get("compare")
     idle = {"reviewed": False, "followup": "", "pending_extra": [], "mismatch": None}
-    # mode の側の鍵は、どの答えにも付ける（有無を揃える）
+    # mode の側のキーは、どの答えにも付ける（有無を揃える）
     idle["preview" if mode == "preview" else "host_plan"] = None
     with _environ():
         snapshot = _core_snapshot(req, root)

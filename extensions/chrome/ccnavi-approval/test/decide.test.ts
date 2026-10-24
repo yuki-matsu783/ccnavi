@@ -90,7 +90,7 @@ function ids(kind: Kind): string[] {
   return kind === "github" ? ["PRRT_A", "PRRT_B", "PRRT_C", "PRRT_D"] : ["a1".repeat(20), "b2".repeat(20), "c3".repeat(20), "d4".repeat(20)];
 }
 
-/** 未解決の指摘 n 件（A から）。GitLab は代表のノートの id が鍵になるので変える */
+/** 未解決の指摘 n 件（A から）。GitLab は代表のノートの id がキーになるので変える */
 function threadsOf(kind: Kind, n = 3): MockThread[] {
   const names = ids(kind);
   return ["A", "B", "C", "D"].slice(0, n).map((x, i) => thread(names[i], { body: `${x} の指摘`, noteId: 101 + i }));
