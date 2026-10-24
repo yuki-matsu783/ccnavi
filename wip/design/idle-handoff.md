@@ -3,7 +3,7 @@ type: design
 title: 放置セッションの引き継ぎ促し 設計案
 description: 文脈が閾値以上のセッションで、キャッシュの失効前に次セッションへの引き継ぎ文書を書かせる仕組みの設計案。合意前の下書き
 tags: [design-doc, settings]
-keywords: [引き継ぎ, キャッシュ, TTL, asyncRewake, Stop, UserPromptSubmit, CCNAVI_HANDOFF_PROMPT_TOKENS, scratchpad, 放置]
+keywords: [引き継ぎ, キャッシュ, TTL, asyncRewake, Stop, UserPromptSubmit, CCNAVI_HANDOFF_SUGGEST_TOKENS, scratchpad, 放置]
 ---
 
 # 放置セッションの引き継ぎ促し 設計案
@@ -22,7 +22,7 @@ keywords: [引き継ぎ, キャッシュ, TTL, asyncRewake, Stop, UserPromptSubm
 
 | 名前 | 意味 | 既定 |
 |---|---|---|
-| `CCNAVI_HANDOFF_PROMPT_TOKENS` | 文脈がこの値以上なら、次セッションへの引き継ぎを促す。0 で無効 | 400000（有効） |
+| `CCNAVI_HANDOFF_SUGGEST_TOKENS` | 文脈がこの値以上なら、次セッションへの引き継ぎを促す。0 で無効 | 400000（有効） |
 
 ### 文脈の大きさ
 
@@ -89,7 +89,6 @@ A と C は独立です。A の促しの有無に関係なく、C は動きま�
 
 ## 決まっていないこと
 
-- 環境変数名（仮に `CCNAVI_HANDOFF_PROMPT_TOKENS`。ほかの案は `CCNAVI_HANDOFF_CONTEXT_TOKENS`）。
 - 実行ファイルのサブコマンド名と、状態ファイルの置き場。
 - 配布先へ配るか。`ccnavi-setup.sh` が書く登録の変更と ADR が要る。
 - 5 分 TTL のとき、4 分待ちの武装が閾値以上の全ターンで走る。頻度は許容できるか。
