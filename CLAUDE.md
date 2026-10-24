@@ -25,7 +25,8 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 |---|---|
 | ccnavi の開発の入口（環境・テスト・build・構成・文書の置き場）を確かめる、利用者向けの手引き（`docs/guide/`）を足す・直す | `docs/development.md` |
 | ccnavi のリポジトリの md に付ける frontmatter の `type` の値を確かめる | `docs/claude/frontmatter.md`（付け方は `.ccnavi/docs/frontmatter.md`） |
-| 思想（`docs/00_idea.md`・`docs/01_idea/`。ユーザが依頼しない限り直さない）、要件書・設計書・ADR（`docs/requirements`・`docs/design`・`docs/adr`）を書く・直す、これらの文書から別の文書を指す | `docs/claude/docs-writing.md` |
+| 思想（`docs/00_idea.md`・`docs/01_idea/`）を書く・直す（ユーザが依頼しない限り直さない） | `docs/claude/idea-writing.md` |
+| 要件書・設計書・ADR（`docs/requirements`・`docs/design`・`docs/adr`）を書く・直す、これらの文書から別の文書を指す | `docs/claude/docs-writing.md` |
 | sh やスクリプトを書く、パス・名前を比べる、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `docs/claude/environment.md` |
 | ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
 | sh・Python・TS でログを書く、logger を直す | `docs/claude/logging.md` |
