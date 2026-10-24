@@ -110,7 +110,7 @@ export function Tokens({ revision }: { readonly revision: number }): JSX.Element
       </form>
       <Status id="token-msg" said={said} />
       <p className="hint">
-        PAT は、承認とレビュー完了の状態を親ブランチに反映するときと、「始める」で Issue から親ブランチを作成するときに使います。GitHub では fine-grained token を作り、対象のリポジトリを限定して、Contents: Read and write（ブランチの作成にも使用）・Metadata: Read-only・Pull requests: Read-only・Issues: Read-only を選びます。GitLab では api スコープを選びます（Commits API は write_repository では書き込めないため）。プロジェクトアクセストークンを使用できる場合は、アクセス対象をそのプロジェクトに限定できます。使えない場合は個人の PAT になり、プロジェクトを限定できません。期限は 90 日を選びます。エージェント用のトークンとは別に作ります。PAT は、このブラウザのプロファイル内に暗号化されずに保存され、同じ OS ユーザーのプロセスから読み取れます。リポジトリを限定した最小権限のトークンにしてください。期限はホストの応答から取得します。取得できない場合は上の欄の日付を使用し、有効期限の7日前から、ボードと拡張機能のアイコンで通知します。
+        PAT は、承認とレビュー完了の状態を親ブランチに反映するときと、「始める」で Issue から親ブランチを作成するときに使います。GitHub では fine-grained token を作り、対象のリポジトリを限定して、Contents: Read and write（ブランチの作成にも使用）・Metadata: Read-only・Pull requests: Read-only・Issues: Read-only を選びます。GitLab では api スコープを選びます（Commits API は write_repository では書き込めないため）。プロジェクトアクセストークンを作成できる場合は、アクセス対象をそのプロジェクトに限定できます。作成できない場合は個人の PAT になり、プロジェクトを限定できません。期限は 90 日を選びます。エージェント用のトークンとは別に作ります。PAT は、このブラウザのプロファイル内に暗号化されずに保存され、同じ OS ユーザーのプロセスから読み取れます。リポジトリを限定した最小権限のトークンにしてください。期限はホストの応答から取得します。取得できない場合は上の欄の日付を使用し、有効期限の7日前から、ボードと拡張機能のアイコンで通知します。
       </p>
       <ul id="token-links" className="links">
         {hosts.map((h) => (

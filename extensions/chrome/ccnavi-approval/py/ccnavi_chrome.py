@@ -557,7 +557,7 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
             raise Refused(f"親子のチケットの識別子が識別子の形ではありません：{ident!r}")
         if name != ident and ticket_ids.branch_problem(name):
             raise Refused(
-                f"親のブランチ名が使えません：{name!r}（{ticket_ids.branch_problem(name)}）"
+                f"親のブランチ名に指定できません：{name!r}（{ticket_ids.branch_problem(name)}）"
             )
         tree = os.path.join(root, *WORKTREES.split("/"), ident)
         os.makedirs(tree, exist_ok=True)
@@ -1163,7 +1163,7 @@ def _op_adopt(req: dict, root: str) -> dict:
         problems.append(f"ブランチ {branch} は採用できません（{why}）")
     why = ticket_ids.adoption_id_problem(branch)
     if why:
-        problems.append(f"識別子 {ident} は使えません（{why}）")
+        problems.append(f"識別子 {ident} は指定できません（{why}）")
     folded = ident.casefold()
     clash = sorted(
         {n for n in names if n != branch and ticket_ids.branch_to_id(n).casefold() == folded}

@@ -590,7 +590,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
         return refuse(`${name} は保護されたブランチか統合先の名前なので MR を作りません`);
       }
-      if (b !== integ) return refuse(`MR のマージ先は統合先 ${integ} に限ります（${String(b)} は断る）`);
+      if (b !== integ) return refuse(`MR のマージ先は統合先 ${integ} に限ります（${String(b)} は指定できません）`);
       const title = text(c, "MR の題", 250);
       const body = (args as unknown[])[5];
       if (typeof body !== "string" || !/^Closes #[1-9][0-9]{0,8}$/.test(body)) return refuse("MR の本文は Closes #<issue の番号> に限ります");
