@@ -36,6 +36,7 @@ keywords: [CCNAVI.md, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み
 | `tickets` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL`が`disable`でない） |
 | `docs` | mdの索引の案内（`--docs`）を出す回 |
 | `dry_run` | `CCNAVI_MODE`が`dry-run` |
+| `non_interactive` | 環境変数`CLAUDE_CODE_SESSION_ATTENDED`が`0`（付き添いなし。`claude -p`など）。未設定・`1`・その他の値は成り立たない。この変数はClaude Codeが文書にしていない |
 
 ワークツリーとgitの行は、それを支えるdenyがあるときだけ出す。ルールが無いワークスペースで出すと、文と判定が食い違う。
 共通レイヤーが読めずに組み込みの既定に戻ったときも出ない（既定にはこの2つのidが無い）。
