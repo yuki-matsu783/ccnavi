@@ -3,7 +3,7 @@ title: ccnavi ボードの計画編集タブ
 type: requirements
 description: 親の提案の計画の順序（ステップどうしの先行）を図で引き直すタブのふるまい
 tags: [design-doc, extension, board]
-keywords: [要件, ワークフロー, 作業・レビュー計画, 計画編集, 計画, plan, feedback, after, 先行, 順序, 振り直し, plan-order, 図, 保存, 未保存, 提案]
+keywords: [要件, 作業・レビュー計画, 計画編集, 計画, plan, feedback, after, 先行, 順序, 振り直し, plan-order, 図, 保存, 未保存, 提案]
 ---
 
 # 計画編集タブ

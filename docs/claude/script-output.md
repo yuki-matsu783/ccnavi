@@ -1,9 +1,9 @@
 ---
 type: guide
 title: スクリプトの出力に次の一手を書く
-description: ワークフローを進めるshと実行ファイルの出力で、次の一手を「次:」で始まる行に出す決まり。行頭の語の使い分け、書き方、出さない場面、テストの型
+description: チケット作業を進めるshと実行ファイルの出力で、次の一手を「次:」で始まる行に出す決まり。行頭の語の使い分け、書き方、出さない場面、テストの型
 tags: [sh-scripts, exe-boundary]
-keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワークフロー, ccnavi-start.sh, ticket new, printf, stdout]
+keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チケット作業, ccnavi-start.sh, ticket new, printf, stdout]
 ---
 
 # スクリプトの出力に次の一手を書く
@@ -13,7 +13,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 `ccnavi-start.sh --issue` が「親チケットか提案が出来たら…打ち直す」としか言わず、提案を作る `ccnavi ticket new` を示さなかったために、
 提案を手書きして詰まり、直接実装に進んだ事故があった。
 
-ワークフローを進めるsh（`.ccnavi/scripts/`）と実行ファイル（`src/ccnavi/`）の出力は、次の決まりで書く。
+チケット作業を進めるsh（`.ccnavi/scripts/`）と実行ファイル（`src/ccnavi/`）の出力は、次の決まりで書く。
 
 ## 行頭の語
 
