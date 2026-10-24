@@ -1464,3 +1464,32 @@ test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・再読
 test("CB-D391 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
   await checkHandoffLink((handoff) => openRules({ handoff }));
 });
+
+test("CB-D742 図のある手順は、本文の下に時系列の図を出し、focus の矢印だけを光らせてほかを薄くする。値は等幅で出る", async () => {
+  const def = loadTour("rules");
+  const course = def.courses.find((c) => c.id === "how-it-works")!;
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-course"][data-course="how-it-works"]'));
+    await dom.settle();
+    for (const [index, step] of course.steps.entries()) {
+      await dom.settle();
+      const diagram = dom.one(".tour-bubble .tour-diagram");
+      const spec = def.diagrams[step.diagram];
+      assert.equal(diagram.getAttribute("data-diagram"), step.diagram, `${index + 1} 番目`);
+      assert.equal(dom.all(".tour-bubble .tour-diagram-step").length, spec.steps.length);
+      assert.equal(dom.all(".tour-bubble .tour-diagram-actor").length, spec.actors.length);
+      const lit = dom.all(".tour-bubble .tour-diagram-step.focus").map((el) => el.getAttribute("data-step"));
+      assert.deepEqual(lit, spec.steps.map((entry) => entry.id).filter((id) => step.focus.includes(id)), `${index + 1} 番目の光る矢印`);
+      assert.equal(dom.all(".tour-bubble .tour-diagram-step.dim").length, step.focus.length === 0 ? 0 : spec.steps.length - lit.length);
+      assert.equal(dom.all(".tour-bubble code.tour-diagram-value").length, spec.steps.filter((entry) => entry.value !== "").length);
+      if (index < course.steps.length - 1) {
+        dom.click(dom.one('[data-action="tour-next"]'));
+      }
+    }
+  } finally {
+    await dom.close();
+  }
+});
