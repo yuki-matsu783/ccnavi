@@ -247,7 +247,7 @@ test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまで�
   assert.equal(new Set(def.courses.map((c) => c.id)).size, def.courses.length);
 });
 
-test("CB-T1168 マージまでの流れの案内は、issue の作り方（GitLab）・Claude Code の入力欄・MR の作成・GitLab の差分とスレッド・マージの画像を、この順で持つ", () => {
+test("CB-T1172 マージまでの流れの案内は、issue の作り方（GitLab）・Claude Code の入力欄・MR の作成・GitLab の差分とスレッド・マージの画像を、この順で持つ", () => {
   const course = def.courses.find((c) => c.id === "to-merge");
   assert.ok(course, "to-merge の案内がありません");
   const withImage = course.steps.filter((step) => step.image !== "");

@@ -235,7 +235,7 @@ test("CB-D206 案内の間に実際の承認のオーバーレイが出たら案
   }
 });
 
-test("CB-D739 画像のある手順は、本文の下に data: の画像を出し、吹き出しを中ほどに広く出す。画像のない手順は出さない", async () => {
+test("CB-D741 画像のある手順は、本文の下に data: の画像を出し、吹き出しを中ほどに広く出す。画像のない手順は出さない", async () => {
   const course = def.courses.find((c) => c.id === "to-merge")!;
   const dom = await openBoard(fixture(), { measure: true });
   try {
