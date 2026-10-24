@@ -85,8 +85,8 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
    - `skill-improve` のフェーズ定義がある
    - 親の範囲に、対象のスキルの置き場が入っている
 
-   `feedback:` は最後の項がほかの全部を `after` で待つ形にする（終端は1つ）。後ろに足すだけだと承認で落ちるので、
-   最後の項の `after` に `skill-improve` の番号も足すか、`skill-improve` を最後に置いてほかの全部を待たせる。
+   `feedback:` は最後のステップにほかの全部を `after` で先行させる形にする（終端は1つ）。後ろに足すだけだと承認で落ちるので、
+   最後のステップの `after` に `skill-improve` の番号も足すか、`skill-improve` を最後に置いてほかの全部を先行させる。
    定義は `ccnavi --plan-order <親> --fill-phases` で親の `phases:` に写す
 3. フィードバック計画が承認されたら、`skill-improve` のフェーズに子チケットを提案して承認を受け、その子でスキルを直してMRで見てもらう
 
@@ -132,7 +132,7 @@ allow:
 `allow` には `docs/wiki/*` も足す。
 ```
 
-この提案は親として書いている。親は `plan:` が無いと `start` が止まるので、上のように `plan:` と、その項が使うフェーズ定義の写し `phases:` を持つ。`phases:` は手で書かず、`ccnavi --plan-order <親> --fill-phases` で写してよい。`quick-work` の範囲は `scope: inherit` で、親の `allow`（ここでは `.claude/skills/commit/*` と `docs/wiki/*`）がそのまま作業の上限になる。`allow` を空のまま出すと、範囲が集まらず子を起こせない。
+この提案は親として書いている。親は `plan:` が無いと `start` が止まるので、上のように `plan:` と、そのステップが使うフェーズ定義の写し `phases:` を持つ。`phases:` は手で書かず、`ccnavi --plan-order <親> --fill-phases` で写してよい。`quick-work` の範囲は `scope: inherit` で、親の `allow`（ここでは `.claude/skills/commit/*` と `docs/wiki/*`）がそのまま作業の上限になる。`allow` を空のまま出すと、範囲が集まらず子を起こせない。
 
 プロジェクトのスキルについての提案は、そのプロジェクトの提案として書き、`allow` に `skills/<スキル>/*` を書く。
 パスはプロジェクトのルートからの相対で書く。

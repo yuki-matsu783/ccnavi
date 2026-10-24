@@ -34,7 +34,7 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | 無し → `todo` | 親が `Write` / `Edit` で作る | 無し | ― |
 | `todo` → `doing` | `ccnavi user agree`（ユーザ）、ボード、Chrome 拡張 | 9.4。同じ識別子がどの置き場にも無い | ―（中身は変えない。待ち方は承認済みチケットの計画から都度計算する） |
 | `todo` → `doing`（手で） | ユーザが hook の外で動かす | 無し。動かせること自体が条件（その置き場にエージェントは書けない）。承認の検査は判定が当てる | ― |
-| `todo`（改版）→ 消える | `ccnavi user agree`（ユーザ） | 同じ識別子が `doing/` にあり、計画・`phases:`・範囲のどれかが違う。`doing/` の側の計画・写し・範囲を差し替える | `plan` / `feedback`（項の `after` ごと）・`phases:`・`allow` / `ask` / `deny` |
+| `todo`（改版）→ 消える | `ccnavi user agree`（ユーザ） | 同じ識別子が `doing/` にあり、計画・`phases:`・範囲のどれかが違う。`doing/` の側の計画・写し・範囲を差し替える | `plan` / `feedback`（ステップの `after` ごと）・`phases:`・`allow` / `ask` / `deny` |
 | `doing` のまま | `ccnavi-ticket.sh start` | 着手の欄が空。`.claude/worktrees/<識別子>/` がワークツリーとして在り、元リポジトリが承認済みチケットの `project` と合い。子なら親が `doing/` に在って着手済みで、先行が全部 `done/` に在って取り消しでない | `started_at`、`base_sha`（そのワークツリーの HEAD） |
 | `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。フェーズ定義の成果物が在り、定性のリスク判定が揃っている（9.9） | `completed_at` |
 | `doing` → `done` | `ccnavi-ticket.sh finish` | 着手済み。子ならフェーズがレビュー不要。親なら開いている子が無く、レビューで止まっておらず、計画があればフィードバック計画が承認済みで全フェーズが終わっている（早めに閉じていれば子だけ） | `completed_at` |

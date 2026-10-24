@@ -16,7 +16,7 @@ keywords: [フェーズ, フェーズ定義, phases.yml, 育つ, 全体像, plan
 | 段階 | フェーズ定義での中身 | 使うもの |
 |---|---|---|
 | きっかけ | 計画を書こうとして使える定義が無い、`scope` が実際の置き場に合わない、レビューの見る場所を変えたい | 計画の提案、`ccnavi --lint` |
-| 下書き | 定義を 1 つ足す・直す。`kind` `title` `review` `scope` `deliverables` を決める。順序は定義でなく親の計画の項の `after` で書く | `/ccnavi-config` |
+| 下書き | 定義を 1 つ足す・直す。`kind` `title` `review` `scope` `deliverables` を決める。順序は定義でなく親の計画のステップの `after` で書く | `/ccnavi-config` |
 | 検証 | `id` と `title` の重複、`scope` が親の外に出ないか、件数の上限。`--phases` で下書きを差し替える | `ccnavi --lint --phases <下書き>` |
 | 効く | 親の提案を承認するとき、計画が使う定義だけを親の `phases:` に写して固定する。承認のあとの判定は写しを読む | `ccnavi --plan-order <親> --fill-phases` |
 | 配る | 共通の `phases.yml` はミラーに加え、導入 sh が配布先へも配る | `ccnavi-setup.sh` |

@@ -81,6 +81,6 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 上の`wip/handoff/`は、ユーザが差し替える前提の写しの置き場。チケットの承認を通して保護済みファイルを直すときは、別の経路になる。
 `implement`フェーズは保護済みファイル（`.ccnavi/scripts/`・`.claude/hooks/`・`rules.yml`）を承認しない。承認の対象になるのは`staging`フェーズだけ。
 
-- 親の計画に`staging`の項を置き、その前に受入テスト作成の項を置く（`.ccnavi/config/project/phases.yml`の`staging`の定義）
+- 親の計画に`staging`のステップを置き、その前に受入テスト作成のステップを置く（`.ccnavi/config/project/phases.yml`の`staging`の定義）
 - `staging`の子では、完成品を`wip/design/scripts/`に全文で置く。元のファイルは書き換えない
 - 差し替えはユーザが行う。写す順は`ccnavi-common.sh`が先（起動時に読むスクリプトがこれに依るため。Issue #212）
