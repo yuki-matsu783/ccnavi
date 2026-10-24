@@ -60,7 +60,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 - 一般の保護と同じ扱いで、`dry-run` では報告だけにする。実行後は、`CCNAVI_RESTORE_IF_DENY` を全体モードと掛け合わせた実効値（`modes.effective_setting`）が `enable` なら未コミットの変更を復元し、全体モードが `dry-run` なら報告だけにする。`Stop` は報告だけで復元しない。`UserPromptSubmit` と `SessionStart` は同じ保護範囲で基準を取り、前からある変更とユーザが受け入れた変更を戻さない
 - `disable` のときは、実行前にも実行後にも足さない。ワークスペースルートの `.claude/hooks/` と `.claude/settings*.json` は、ルールの `workspace-root` が実行前に止める
 
-共通のルールファイルが読めない間の修復は、エージェントが `Write` / `Edit` で直接直す形では通さない（ADR-0158。ADR-0012 を覆す）。読めない間も `builtin:guard-ccnavi-config` は外れない。直し方は 1 つで、エージェントが `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、ユーザが端末の `ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない `rules.yml` の取り込みは、`handoff._defense_change` が「確かめられないので端末に限る」と扱う。そのため、ボードからの取り込みは断られる。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
+共通のルールファイルが読めない間の修復は、エージェントが `Write` / `Edit` で直接直す形では通さない（読めない間だけ例外にすると、その例外が攻める入口になるため）。読めない間も `builtin:guard-ccnavi-config` は外れない。直し方は 1 つで、エージェントが `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、ユーザが端末の `ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない `rules.yml` の取り込みは、`handoff._defense_change` が「確かめられないので端末に限る」と扱う。そのため、ボードからの取り込みは断られる。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
 
 同じ設定が有効な間、`ccnavi user prune` をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
@@ -165,7 +165,7 @@ hook 自身は settings.json の env で起動するので、ここで見る代�
 
 例外的な場面（共通のルールファイルが読めない、など）のために判定の経路が複雑になるときは、仕組みで解かない。
 判定の例外を足すと、その例外が攻める入口になり、読み手も経路を追い切れなくなる。止めて、人間に直してもらう案内にする
-（読めない間の修復は、下書きとユーザの取り込み。ADR-0158）。保護の実装中に、想定していない複雑さが見つかったときも、
+（読めない間の修復は、下書きとユーザの取り込み）。保護の実装中に、想定していない複雑さが見つかったときも、
 実装で抱え込まず、報告して判断を仰ぐ。
 
 ### 8.3 戻す側
