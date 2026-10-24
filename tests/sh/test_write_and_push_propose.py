@@ -20,6 +20,7 @@ from tests.sh.write_and_push_harness import (
     git,
     write,
 )
+from tests.ticketsample import parent_text
 
 
 class ProposeTest(WriteAndPushHarness):
@@ -51,6 +52,31 @@ class ProposeTest(WriteAndPushHarness):
             ["次: ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない"],
         )
         self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def test_a_parent_never_pushed_stops_with_the_options_and_writes_nothing(self):
+        """ccnavi-start.sh を通さずに手で切った親。内部のエラーでなく、事実と次の手で止まる。"""
+        tree = os.path.join(self.ws, ".claude", "worktrees", "i0002")
+        git(self.ws, "worktree", "add", "-q", tree, "-b", "i0002", "main")
+        write(
+            os.path.join(tree, *f"{self.TODO}/i0002.md".split("/")),
+            parent_text("i0002", ["design"], allow=("src/*", "wip/*")),
+        )
+        before = self.sha(tree, "HEAD")
+        result = self.sh("ccnavi-ticket.sh", "propose", "i0002", cwd=tree, **self.host_env({}))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        err = result.stderr
+        self.assertIn("親のブランチ i0002 はリモートにありません", err)
+        self.assertIn("何も反映していません", err)
+        self.assertEqual([x for x in err.splitlines() if x.startswith("次の手: ")].__len__(), 1)
+        self.assertIn("その MR のブランチで作業するかを聞く", err)
+        self.assertIn("ccnavi-start.sh' --issue <番号> で新しく切る", err)
+        self.assertIn("git push -u origin i0002", err)
+        self.assertIn("直接実装には切り替えない", err)
+        self.assertNotIn("bad revision", err)
+        self.assertNotIn("差分を読めない", err)
+        self.assertEqual(self.sha(tree, "HEAD"), before)
+        self.assertEqual(self.remote_sha("i0002"), "")
+        self.assertFalse(os.path.exists(os.path.join(self.state, "locks", "self", "i0002")))
 
     def test_other_families_and_template_drafts_stay_out(self):
         mine = self.put(f"{self.TODO}/{PARENT}.md")

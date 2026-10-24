@@ -68,6 +68,8 @@ ccnavi_wap_merge_child=""
 ccnavi_wap_merging=""
 ccnavi_wap_merging_h0=""
 ccnavi_wap_merging_list=""
+# 親のブランチが一度も送られていないために止めたら 1。呼び出し元が次の一手を足す（共通関数は事実だけを言う）。
+ccnavi_wap_unsent_parent=""
 
 ccnavi_wap_say() {
 	printf '%s: %s\n' "$ccnavi_wap_label" "$*" >&2
@@ -300,6 +302,17 @@ ccnavi_wap_prepare() {
 		if [ "$ccnavi_cp_gate" -ne 0 ]; then
 			ccnavi_wap_say "${ccnavi_pg_why}。何も反映していません"
 			log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=push-gate" "gate=$ccnavi_cp_gate"
+			return 1
+		fi
+		# 親のブランチが一度も送られていない（ccnavi-start.sh を通さずに手で切った親）。5 の見分けは
+		# origin の参照を基点にするので、参照が無いと差分を読めずに内部のエラーで終わる。先に事実を言って止める。
+		# 送った形跡があるのに参照が無い親は、上の push の関門と ccnavi-sync.sh の判定に任せる。
+		ccnavi_parent_info "$ccnavi_wap_tree" "$ccnavi_wap_family_id" || :
+		if [ "$ccnavi_pi_parent" != no ] && [ "$ccnavi_pi_approved" != unreadable ] &&
+			! ccnavi_parent_trace "$ccnavi_wap_tree" "$ccnavi_wap_branch"; then
+			ccnavi_wap_unsent_parent=1
+			ccnavi_wap_say "親のブランチ ${ccnavi_wap_branch} はリモートにありません。ccnavi-start.sh を通さずに切った親です。何も反映していません"
+			log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=parent-never-pushed"
 			return 1
 		fi
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める。

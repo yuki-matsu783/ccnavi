@@ -88,7 +88,7 @@ sh .ccnavi/scripts/ccnavi-start.sh --check
                 依頼の URL が示すリポジトリ。cwd の origin と違えば、ホストに問い合わせる前に止めて、移動先
                 （projects/<名前>/）を案内する（終了コード 1）。大文字小文字は区別しない
   --dry-run     何も作らず、作る予定の内容だけ出す（リモートは読むだけ）
-  --mcp-checked ホストの API に届かず、エージェントが別の手段（MCP など）で確かめたあとに付ける
+  --mcp-checked ホストの API に届かず、MCP またはユーザがブラウザで確かめたあとに付ける（エージェントが確かめずに付けない）
   --branch <元ブランチ>
                 --mcp-checked と一緒のときだけ使える。ホストに届かないとき、候補の探索の代わりにこのブランチを使う
                 （--issue・--mr・--branch の 3 つがそろえば、ホストを見ずに続ける）。ホストに届くときは普通に確かめ、
@@ -714,7 +714,11 @@ stop_host() {
 		[ -n "$mr_arg" ] || sh_missing="$sh_missing --mr"
 		[ -n "$branch_arg" ] || sh_missing="$sh_missing --branch"
 		printf 'ccnavi-start: ホストを見られない間は、--mcp-checked は --issue・--mr・--branch の 3 つがそろうときだけ使えます（足りない:%s）。何も作成せずに処理を中断しました。\n' "$sh_missing"
-		printf '次: MCP などで MR の元ブランチと、その MR が閉じる issue を確かめ、3 つそろえて打ち直す: %s\n' "$sh_cmd"
+		if [ "$ccnavi_h_kind" = github ]; then
+			printf '次: MCP などで MR の元ブランチと、その MR が閉じる issue を確かめ、3 つそろえて打ち直す: %s\n' "$sh_cmd"
+		else
+			printf '次: ユーザに、ブラウザで MR の元ブランチと、その MR が閉じる issue を伝えてもらい、返事を待つ。3 つそろえて打ち直す: %s。聞けなければ、直接実装にも切り替えず、ユーザに報告して止まる\n' "$sh_cmd"
+		fi
 		exit "$EXIT_HOST"
 	fi
 	if [ "$ccnavi_h_kind" = github ]; then
@@ -802,27 +806,27 @@ stop_host() {
 		esac
 		case "$sh_stage" in
 		create)
-			printf '  2. 再実行できないなら、ブラウザで %s の MR を手で作る。ソース: %s、ターゲット: %s、題: Draft: %s、説明: Closes #%s。作れたら、その番号を <作った番号> に入れて打ち直す: %s\n' "$ccnavi_h_path" "$stop_branch" "$stop_target" "$stop_title" "$number" "$sh_cmd"
+			printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR を手で作ってもらう。ソース: %s、ターゲット: %s、題: Draft: %s、説明: Closes #%s。作れたら、ユーザから聞いたその番号を <作った番号> に入れて打ち直す: %s。番号が聞けなければ、作り話の番号で打たず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$stop_branch" "$stop_target" "$stop_title" "$number" "$sh_cmd"
 			;;
 		issue-link)
-			printf '  2. 再実行できないなら、ブラウザで MR !%s の説明欄と元ブランチを読み、閉じる issue（Closes #<番号>）を確かめ、打ち直す: %s\n' "$stop_mr" "$sh_cmd"
+			printf '  2. 再実行できないなら、ユーザに、ブラウザで MR !%s の説明欄と元ブランチを読み、閉じる issue（Closes #<番号>）を伝えてもらい、返事を待つ。聞いた値で打ち直す: %s。値が聞けなければ、作り話の値で打たず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$stop_mr" "$sh_cmd"
 			;;
 		search)
 			if [ -n "$sh_adopt" ]; then
-				printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR の番号と元ブランチ、閉じる issue を確かめ、3 つそろえて打ち直します（確かめられないときは、ユーザに相談して止まる）: %s\n' "$ccnavi_h_path" "$what" "$number" "$sh_adopt_cmd"
+				printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR の番号と元ブランチ、閉じる issue を伝えてもらい、返事を待つ。3 つそろえて打ち直す: %s。確かめられなければ、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$what" "$number" "$sh_adopt_cmd"
 			else
-				printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR があるか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$what" "$number"
+				printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR が無いと確かめてもらい、返事を待つ。無いと分かったときだけ %s --mcp-checked を打つ。確かめられなければ、付けず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$what" "$number" "$sh_cmd"
 			fi
 			;;
 		merged)
 			if [ -n "$sh_adopt" ]; then
-				printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いか確かめ、無ければ issue・MR・元ブランチの 3 つをそろえて打ち直します（確かめられないときは、ユーザに相談して止まる）: %s\n' "$ccnavi_h_path" "$stop_branch" "$sh_adopt_cmd"
+				printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いと確かめてもらい、返事を待つ。無いと分かったときだけ、issue・MR・元ブランチの 3 つをそろえて打ち直す: %s。確かめられなければ、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$stop_branch" "$sh_adopt_cmd"
 			else
-				printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$stop_branch"
+				printf '  2. 再実行できないなら、ユーザに、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いと確かめてもらい、返事を待つ。無いと分かったときだけ %s --mcp-checked を打つ。確かめられなければ、付けず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$ccnavi_h_path" "$stop_branch" "$sh_cmd"
 			fi
 			;;
 		title)
-			printf '  2. 再実行できないなら、ブラウザで issue #%s の題を読み、%s --slug <語> --title '"'"'<題>'"'"' と実行します（issue が実在すると確かめたあとに限り、--mcp-checked を付ける）。\n' "$number" "$sh_cmd"
+			printf '  2. 再実行できないなら、ユーザに、ブラウザで issue #%s の題を伝えてもらい、返事を待つ。実在と題が分かったときだけ %s --slug <語> --title '"'"'<題>'"'"' --mcp-checked を打つ。確かめられなければ、付けず、直接実装にも切り替えず、ユーザに報告して止まる\n' "$number" "$sh_cmd"
 			;;
 		esac
 	fi

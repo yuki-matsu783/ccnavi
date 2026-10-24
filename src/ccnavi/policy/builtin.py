@@ -338,7 +338,11 @@ def _deny(root: str) -> list[dict]:
             "match": "Bash",
             "regex": GIT_PUSH_REGEX,
             "message": (
-                "エージェントは git push を実行しません。"
+                f"git push は直接実行しません。親のワークツリーのブランチは {git} push で送ります。"
+                "子のワークツリーのブランチは送らず、親が取り込んでから親のワークツリーで送ります。"
+                f"統合先への送りはユーザが打ちます。通る形は {git} の --help を見てください。"
+                if wrapper
+                else "エージェントは git push を実行しません。"
                 "ブランチはそのままにして、push はユーザに頼んでください。"
             ),
         },
