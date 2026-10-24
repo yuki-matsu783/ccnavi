@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { basicTourScreens, SIDEBAR_WALKTHROUGH } from "../../src/core/tour-sidebar.js";
+import { playableScreens, SIDEBAR_WALKTHROUGH, TOUR_SCREENS, WALKTHROUGH_TOURS } from "../../src/core/tour-sidebar.js";
 import { tourScreens } from "../helpers/tour.js";
 
 const ROOT = path.join(__dirname, "..", "..", "..");
@@ -15,6 +15,7 @@ interface Step {
   readonly id: string;
   readonly description: string;
   readonly media: { readonly markdown: string };
+  readonly when?: string;
 }
 interface Manifest {
   readonly contributes: {
@@ -25,10 +26,13 @@ interface Manifest {
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")) as Manifest;
 
-test("CB-T1168 基本の案内はプロジェクト管理 → チケット管理の順。チケット制御が無効ならプロジェクト管理だけ。どちらも案内の定義がある画面", () => {
-  assert.deepEqual(basicTourScreens(true), ["projects", "board"]);
-  assert.deepEqual(basicTourScreens(false), ["projects"]);
-  for (const screen of basicTourScreens(true)) {
+test("CB-T1168 案内の順は、プロジェクト管理 → チケット管理 → ルール → リスク → フェーズ → テンプレート。チケット制御が無効なら開けない画面を外す。どれも案内の定義がある画面", () => {
+  assert.deepEqual(Object.values(WALKTHROUGH_TOURS).flat(), ["projects", "board", "rules", "risk", "phases", "templates"]);
+  assert.deepEqual(playableScreens(WALKTHROUGH_TOURS["ccnaviBoard.tourBasics"], true), ["projects", "board"]);
+  assert.deepEqual(playableScreens(WALKTHROUGH_TOURS["ccnaviBoard.tourBasics"], false), ["projects"]);
+  assert.deepEqual(playableScreens(WALKTHROUGH_TOURS["ccnaviBoard.tourRules"], false), ["rules"]);
+  assert.deepEqual(playableScreens(WALKTHROUGH_TOURS["ccnaviBoard.tourRisk"], false), []);
+  for (const screen of Object.keys(TOUR_SCREENS)) {
     assert.ok(tourScreens().includes(screen), `${screen} の案内の定義が無い`);
   }
 });
@@ -45,8 +49,13 @@ test("CB-T1169 左パネルのウォークスルーが宣言され、各段の�
       assert.ok(commands.has(match[1]) || builtin.has(match[1]), `${step.id}: コマンド ${match[1]} が宣言されていない`);
     }
   }
-  const basics = walkthrough.steps.map((step) => step.description).join("\n");
-  for (const command of ["ccnaviBoard.tourProjects", "ccnaviBoard.tourBoard", "ccnaviBoard.tourBasics"]) {
-    assert.ok(basics.includes(`command:${command}`), `${command} へのリンクが無い`);
+  // 段の並びは、ボタンが呼ぶコマンドの並びと同じ（ウォークスルーの段 = 左パネル、続けて見る、ルール、リスク、フェーズ、テンプレート）
+  const linked = walkthrough.steps.map((step) => /\(command:(ccnaviBoard\.tour[A-Za-z]+)\)/.exec(step.description)?.[1]);
+  assert.deepEqual(linked, [undefined, ...Object.keys(WALKTHROUGH_TOURS)]);
+  assert.equal(new Set(walkthrough.steps.map((step) => step.id)).size, walkthrough.steps.length, "段の id が重なっている");
+  // 開けない画面の段は、チケット制御が無効なら出さない
+  for (const [index, command] of Object.keys(WALKTHROUGH_TOURS).entries()) {
+    const needs = WALKTHROUGH_TOURS[command].every((screen) => TOUR_SCREENS[screen].needsTickets);
+    assert.equal(walkthrough.steps[index + 1].when !== undefined, needs, `${command} の段の when`);
   }
 });

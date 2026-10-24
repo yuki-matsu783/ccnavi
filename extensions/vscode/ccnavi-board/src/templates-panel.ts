@@ -50,7 +50,7 @@ import { WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
-import { markTourSeen, tourSeen } from "./tour.js";
+import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { confirmDuringTurn } from "./turn-confirm.js";
 
@@ -138,6 +138,10 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
     state.panel.reveal(state.panel.viewColumn);
     if (!sameTarget(state.target, target)) {
       await switchTarget(state, target);
+    }
+    // 開いたままのタブに案内を頼まれたとき（左パネルの案内から）。組み上がりの `ready` は来ない
+    if (tourDue(SCREEN) && state !== undefined) {
+      state.host.post({ type: "tour" } satisfies ToTemplates);
     }
     return;
   }
@@ -241,6 +245,7 @@ function registerPanelHandlers(current: PanelState): void {
   });
 
   panel.onDidDispose(() => {
+    tourPanelClosed(SCREEN);
     if (current.timer !== undefined) {
       clearTimeout(current.timer);
     }
@@ -442,7 +447,7 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     redraw(current);
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は中身が出てから始め、閉じたら `tourDone` を返す
-    if (!tourSeen(SCREEN)) {
+    if (tourDue(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToTemplates);
     }
     return;

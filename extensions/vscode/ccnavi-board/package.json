@@ -82,15 +82,23 @@
       },
       {
         "command": "ccnaviBoard.tourBasics",
-        "title": "ccnavi ボード: 基本の案内を続けて見る（プロジェクト管理 → チケット管理。チケット制御が無効ならプロジェクト管理だけ）"
+        "title": "ccnavi ボード: プロジェクト管理とチケット管理の案内を続けて見る（チケット制御が無効ならプロジェクト管理だけ）"
       },
       {
-        "command": "ccnaviBoard.tourProjects",
-        "title": "ccnavi ボード: プロジェクト管理の基本の案内を見る"
+        "command": "ccnaviBoard.tourRules",
+        "title": "ccnavi ボード: ルール管理の案内を見る"
       },
       {
-        "command": "ccnaviBoard.tourBoard",
-        "title": "ccnavi ボード: チケット管理の基本の案内を見る"
+        "command": "ccnaviBoard.tourRisk",
+        "title": "ccnavi ボード: リスク管理の案内を見る"
+      },
+      {
+        "command": "ccnaviBoard.tourPhases",
+        "title": "ccnavi ボード: フェーズ管理の案内を見る"
+      },
+      {
+        "command": "ccnaviBoard.tourTemplates",
+        "title": "ccnavi ボード: テンプレート管理の案内を見る"
       }
     ],
     "menus": {
@@ -132,7 +140,15 @@
           "when": "false"
         },
         {
-          "command": "ccnaviBoard.tourBoard",
+          "command": "ccnaviBoard.tourRisk",
+          "when": "ccnaviBoard.ticketControl == 'enable'"
+        },
+        {
+          "command": "ccnaviBoard.tourPhases",
+          "when": "ccnaviBoard.ticketControl == 'enable'"
+        },
+        {
+          "command": "ccnaviBoard.tourTemplates",
           "when": "ccnaviBoard.ticketControl == 'enable'"
         }
       ]
@@ -180,48 +196,58 @@
     "walkthroughs": [
       {
         "id": "ccnaviBoard.sidebar",
-        "title": "ccnavi の左パネルの案内",
-        "description": "左パネルに並ぶ画面の入口と、最初に見る 2 つの画面（プロジェクト管理・チケット管理）の基本を順に説明します。",
+        "title": "ccnavi の使い方",
+        "description": "ccnavi は、Claude Code の作業をルールとチケットで管理する仕組みです。左パネルの入口を、使う順に見ていきます。",
         "steps": [
           {
             "id": "ccnaviBoard.tour.panel",
             "title": "左パネルを開く",
-            "description": "アクティビティバーの ccnavi を押すと、画面の入口が一覧で並びます。行にマウスを重ねると説明が出ます。\n[左パネルを開く](command:workbench.view.extension.ccnavi)",
+            "description": "ccnavi は、Claude Code が危険な操作をしないようルールで止め、作業をチケットにして、承認とレビューを通して進める仕組みです。左のアクティビティバーの ccnavi を押すと、そのための画面の入口が並びます。\n[左パネルを開く](command:workbench.view.extension.ccnavi)",
             "media": {
               "markdown": "media/tour/panel.md"
             }
           },
           {
-            "id": "ccnaviBoard.tour.projects",
-            "title": "プロジェクト管理",
-            "description": "projects/ の一覧と、clone・fetch・pull の実行を説明します。基本は画面の吹き出しの案内で示します。\n[プロジェクト管理の基本の案内を見る](command:ccnaviBoard.tourProjects)",
-            "media": {
-              "markdown": "media/tour/projects.md"
-            }
-          },
-          {
-            "id": "ccnaviBoard.tour.board",
-            "title": "チケット管理",
-            "description": "チケットのカンバンと、承認・レビューの進め方を説明します。基本は画面の吹き出しの案内で示します。\n[チケット管理の基本の案内を見る](command:ccnaviBoard.tourBoard)",
-            "media": {
-              "markdown": "media/tour/board.md"
-            },
-            "when": "ccnaviBoard.ticketControl == 'enable'"
-          },
-          {
             "id": "ccnaviBoard.tour.basics",
-            "title": "基本の案内を続けて見る",
-            "description": "プロジェクト管理 → チケット管理の順に、基本の案内を続けて動かします。\n[続けて見る](command:ccnaviBoard.tourBasics)",
+            "title": "プロジェクトを clone してチケットで進捗を管理する",
+            "description": "プロジェクト管理で projects/ に clone し、チケット管理で作業の提案・承認・進み具合・レビューをカンバンで見ます。2 つの画面の基本の案内を続けて見られます。\n[ツアー実行](command:ccnaviBoard.tourBasics)",
             "media": {
               "markdown": "media/tour/basics.md"
             }
           },
           {
-            "id": "ccnaviBoard.tour.more",
-            "title": "ほかの画面と見た目",
-            "description": "ルール・リスク・フェーズ・テンプレートの各画面にも、初めて開いたときに案内が出ます。見直したいときは各画面の右上の ? を押します。\n[見た目を切り替える](command:ccnaviBoard.appearance)",
+            "id": "ccnaviBoard.tour.rules",
+            "title": "ルールを管理する",
+            "description": "Claude Code のツール呼び出しを、止める（deny）・確認する（ask）・通す（allow）に分けるルールを、画面で直して判定を試します。\n[ツアー実行](command:ccnaviBoard.tourRules)",
             "media": {
-              "markdown": "media/tour/more.md"
+              "markdown": "media/tour/rules.md"
+            }
+          },
+          {
+            "id": "ccnaviBoard.tour.risk",
+            "title": "リスクを管理する",
+            "description": "実際の変更内容から、チケットのリスクを点数で測る配点を直します。境目の点を超えた変更は、レビューを必須にできます。\n[ツアー実行](command:ccnaviBoard.tourRisk)",
+            "when": "ccnaviBoard.ticketControl == 'enable'",
+            "media": {
+              "markdown": "media/tour/risk.md"
+            }
+          },
+          {
+            "id": "ccnaviBoard.tour.phases",
+            "title": "フェーズを管理する",
+            "description": "計画に並べる工程の型(フェーズ)を定義します。工程ごとに編集できる範囲の上限と、レビューの既定を決めます。\n[ツアー実行](command:ccnaviBoard.tourPhases)",
+            "when": "ccnaviBoard.ticketControl == 'enable'",
+            "media": {
+              "markdown": "media/tour/phases.md"
+            }
+          },
+          {
+            "id": "ccnaviBoard.tour.templates",
+            "title": "テンプレートを管理する",
+            "description": "作業とレビューの計画のひな形(テンプレート)と、下書きを見て直します。同じ種類の作業を、同じ計画で始められます。\n[ツアー実行](command:ccnaviBoard.tourTemplates)",
+            "when": "ccnaviBoard.ticketControl == 'enable'",
+            "media": {
+              "markdown": "media/tour/templates.md"
             }
           }
         ]

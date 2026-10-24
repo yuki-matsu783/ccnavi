@@ -53,7 +53,7 @@ import { targetOptions, type TargetOption } from "./core/targets.js";
 import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
-import { markTourSeen, tourSeen } from "./tour.js";
+import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { confirmDuringTurn } from "./turn-confirm.js";
 
@@ -186,6 +186,10 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
     state.panel.reveal(state.panel.viewColumn);
     if (!sameTarget(state.target, target)) {
       await switchTarget(state, target);
+    }
+    // 開いたままのタブに案内を頼まれたとき（左パネルの案内から）。組み上がりの `ready` は来ない
+    if (tourDue(SCREEN) && state !== undefined) {
+      state.host.post({ type: "tour" } satisfies ToPhases);
     }
     return;
   }
@@ -371,6 +375,7 @@ function registerPanelHandlers(current: PanelState): void {
   });
 
   panel.onDidDispose(() => {
+    tourPanelClosed(SCREEN);
     for (const timer of [current.timer, current.lockTimer]) {
       if (timer !== undefined) {
         clearTimeout(timer);
@@ -644,7 +649,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は定義の中身が出てから始め、閉じたら `tourDone` を返す。
     // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
-    if (!tourSeen(SCREEN)) {
+    if (tourDue(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToPhases);
     }
     return;

@@ -14,7 +14,7 @@
 import * as vscode from "vscode";
 
 import { screens } from "./core/screens.js";
-import { basicTourScreens, SIDEBAR_WALKTHROUGH } from "./core/tour-sidebar.js";
+import { playableScreens, SIDEBAR_WALKTHROUGH, TOUR_SCREENS, WALKTHROUGH_TOURS } from "./core/tour-sidebar.js";
 import { ticketControl } from "./ticket-control.js";
 
 let memento: vscode.Memento | undefined;
@@ -70,19 +70,32 @@ export function forceTour(screen: string): void {
 
 /** 基本の案内を動かせる画面を、開けるときだけ開く。ワークスペースが無い・チケット制御が無効のとき開く入口は何も開かないので、先に見て false を返す */
 async function openScreen(screen: string): Promise<boolean> {
-  if (vscode.workspace.workspaceFolders?.[0] === undefined) {
+  if (vscode.workspace.workspaceFolders?.[0] === undefined || (TOUR_SCREENS[screen]?.needsTickets === true && ticketControl() !== "enable")) {
     return false;
   }
   const open = screens();
-  if (screen === "projects") {
-    await open.projects();
-    return true;
+  switch (screen) {
+    case "projects":
+      await open.projects();
+      return true;
+    case "board":
+      await open.board();
+      return true;
+    case "rules":
+      await open.rules({ kind: "workspace" });
+      return true;
+    case "risk":
+      await open.risk({ kind: "workspace" });
+      return true;
+    case "phases":
+      await open.phases({ kind: "self" });
+      return true;
+    case "templates":
+      await open.templates({ kind: "self" });
+      return true;
+    default:
+      return false;
   }
-  if (screen === "board" && ticketControl() === "enable") {
-    await open.board();
-    return true;
-  }
-  return false;
 }
 
 /** 続けて見るのを始めるとき、前の続きと頼みを捨てる */
@@ -108,17 +121,11 @@ function openNext(): void {
 }
 
 /**
- * プロジェクト管理 → チケット管理の順に、基本の案内を続けて動かす。前の案内を閉じる（最後まで見るか、やめる）と次を開く。
- * チケット制御が無効のワークスペースではチケット管理を開けないので、プロジェクト管理だけにする
+ * ウォークスルーの段のボタン（`WALKTHROUGH_TOURS` のコマンド）が動かす画面の案内を、順に続けて動かす。
+ * 前の案内を閉じる（最後まで見るか、やめる）と次を開く。チケット制御が無効のワークスペースでは、開けない画面を外す
  */
-export function runBasicTours(): void {
-  resetChain(basicTourScreens(ticketControl() === "enable"));
-  openNext();
-}
-
-/** 1 つの画面の基本の案内だけを動かす（ウォークスルーの各段のボタン） */
-export function runScreenTour(screen: string): void {
-  resetChain([screen]);
+export function runTours(command: string): void {
+  resetChain(playableScreens(WALKTHROUGH_TOURS[command] ?? [], ticketControl() === "enable"));
   openNext();
 }
 
