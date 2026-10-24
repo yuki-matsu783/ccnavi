@@ -74,6 +74,9 @@ class PlacementTest(unittest.TestCase):
             "ccnavi-user-decide.sh",
             "ccnavi-user-close-early.sh",
             "ccnavi-user-clean-branch.sh",
+            "ccnavi-user-handoff.sh",
+            "ccnavi-user-mirror.sh",
+            "ccnavi-user-prune.sh",
         ):
             self.assertIn(want, names)
 

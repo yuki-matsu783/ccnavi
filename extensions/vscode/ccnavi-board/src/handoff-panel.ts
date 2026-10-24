@@ -452,7 +452,7 @@ async function handleMessage(current: PanelState, message: HandoffMessage | unde
     if (loaded?.kind !== "page") {
       return;
     }
-    const guide = await terminalGuide(depsOf(current, loaded), loaded.list, message.path);
+    const guide = await terminalGuide(depsOf(current, loaded), loaded.list, message.path, current.folder.uri.fsPath);
     if (!alive(current)) {
       return;
     }

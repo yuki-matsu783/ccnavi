@@ -496,7 +496,7 @@ def _proposal_problems(
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{t.ticket} は承認待ち（{t.tree or '(ワークスペースルート)'} の todo/）。"
-                "'ccnavi user agree' を通すまで範囲は有効にならない",
+                "'ccnavi-user-agree.sh' を通すまで範囲は有効にならない",
             )
         )
     for t in index.values():

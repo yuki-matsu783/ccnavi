@@ -250,13 +250,13 @@ class MirrorSyncTest(ConfigUnionHarness):
         result = self.user_mirror()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("ずれ", result.stdout)
-        self.assertIn(f"user mirror --yes --expect {self.plan().expect}", result.stdout)
+        self.assertIn(f"ccnavi-user-mirror.sh --yes --expect {self.plan().expect}", result.stdout)
 
     def test_the_text_view_quotes_names_and_shows_how_to_see_the_diff(self):
         self.project("odd name")
         result = self.user_mirror("odd name")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("user mirror 'odd name' --yes --expect", result.stdout)
+        self.assertIn("ccnavi-user-mirror.sh 'odd name' --yes --expect", result.stdout)
         self.assertIn("diff -ru", result.stdout)
 
     def test_the_text_view_warns_when_an_update_overwrites_the_mirror(self):

@@ -70,7 +70,7 @@ loggerとは関係なく今のまま出し、loggerに置き換えない。文�
   TSは`openSync`のmodeで指定する。既にあるファイルの権限は変えない
 - 出力するレベルは`CCNAVI_LOG_LEVEL`に`DEBUG`/`INFO`/`WARN`/`ERROR`で指定する。大文字小文字は問わない。
   空のときと解釈できない値のときは`INFO`になる
-- 古いログの片付けは`src/ccnavi/records/prune.py`の`_prune_diag`が行い、セッションの開始時と`ccnavi user prune`の実行時に動く。
+- 古いログの片付けは`src/ccnavi/records/prune.py`の`_prune_diag`が行い、セッションの開始時と`ccnavi-user-prune.sh`の実行時に動く。
   しきい値は判定の記録と同じものを使う。`CCNAVI_LOG_ROTATE_MB`を超えたファイルは`<出どころ>.<日時>.log`に
   名前を変え、`CCNAVI_LOG_KEEP_DAYS`の日数のあいだ更新されていない`*.log`は消す。その回に名前を変えたファイルは、
   その回には消さない。`--prune --preview`も同じ結果を表示する

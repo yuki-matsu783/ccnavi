@@ -84,15 +84,15 @@ class Sub:
 
 
 OPS: tuple[Op, ...] = (
-    Op("approve", "承認", terminal="user agree"),
-    Op("reviewed", "レビュー済みの記録", terminal="user reviewed"),
-    Op("close-early", "早めに閉じる", terminal="user close-early"),
+    Op("approve", "承認", terminal="ccnavi-user-agree.sh"),
+    Op("reviewed", "レビュー済みの記録", terminal="ccnavi-user-decide.sh"),
+    Op("close-early", "早めに閉じる", terminal="ccnavi-user-close-early.sh"),
     Op("decide", "残った指摘の対応方針（ボードの経路）"),
     Op("confirm-yes", "ボードで押した操作の確定（--yes）"),
     Op("tidy", "親を閉じたときの片付け"),
-    Op("handoff", "保護対象の下書きの取り込み", terminal="user handoff --yes"),
-    Op("mirror", "共通レイヤーのミラーの同期", terminal="user mirror --yes"),
-    Op("prune", "記録と state の削除", terminal="user prune"),
+    Op("handoff", "保護対象の下書きの取り込み", terminal="ccnavi-user-handoff.sh --yes"),
+    Op("mirror", "共通レイヤーのミラーの同期", terminal="ccnavi-user-mirror.sh --yes"),
+    Op("prune", "記録と state の削除", terminal="ccnavi-user-prune.sh"),
     Op("state-direct", "チケットの状態とレビューの操作を実行ファイルで直に呼ぶ形"),
     Op("guard-off", "ターミナル要求を切る設定"),
 )
@@ -200,25 +200,42 @@ class Verb:
     op: str
     # 内部の最後のオプションが、操作の次の語を値に取る（`user reviewed 3` → `--reviewed 3`）。
     value: bool = False
+    # この操作をユーザが打つ入口の sh（`ccnavi-user-<script>.sh`）。
+    script: str = ""
 
 
 # 実行ファイルのユーザ専用の入口。読み替えた先は今の内部の形で、argparse の文法は変えない。
 VERBS: tuple[Verb, ...] = (
-    Verb(("agree",), ("--agree",), "approve"),
-    Verb(("reviewed",), ("--reviewed",), "reviewed", value=True),
-    Verb(("close-early",), ("--close-early",), "close-early"),
-    Verb(("prune",), ("--prune",), "prune"),
+    Verb(("agree",), ("--agree",), "approve", script="agree"),
+    Verb(("reviewed",), ("--reviewed",), "reviewed", value=True, script="decide"),
+    Verb(("close-early",), ("--close-early",), "close-early", script="close-early"),
+    Verb(("prune",), ("--prune",), "prune", script="prune"),
     # 続く語（ツリーからの相対パス）は、位置引数としてそのまま渡る。
-    Verb(("handoff",), ("--handoff",), "handoff"),
+    Verb(("handoff",), ("--handoff",), "handoff", script="handoff"),
     # 続く語（プロジェクトの名前）は、位置引数としてそのまま渡る。
-    Verb(("mirror",), ("--mirror",), "mirror"),
+    Verb(("mirror",), ("--mirror",), "mirror", script="mirror"),
 )
 
 # `user` の入口の名前。
 USER_WORD = "user"
 # sh と拡張が実行ファイルを呼ぶときに、先に付ける値つきのオプション。`user` はこれらを読み飛ばした
 # 後の最初の語。実行ファイルの読み飛ばしと hook の正規表現の両方がこの一覧から作る。
-WRAPPER_OPTIONS: tuple[str, ...] = ("--root", "--cwd", "--record-writes", "--record-tree")
+WRAPPER_OPTIONS: tuple[str, ...] = (
+    "--root",
+    "--cwd",
+    "--record-writes",
+    "--record-tree",
+    "--entry",
+)
+
+# `user` の入口がどこから呼ばれたかを示す印は `--entry <値>` で、sh（`ccnavi-user-*.sh`）は `sh`、
+# 拡張のボードの子プロセスは `board` を、`user` の前に付ける。印が無い `user …` は、実行ファイルを
+# 直に打った形として断る（`direct_refusal`）。argparse の結果（`args`）には入れず、`take_entry` が
+# argv から外して別に持つ。
+ENTRY_OPTION = "--entry"
+ENTRY_SH = "sh"
+ENTRY_BOARD = "board"
+ENTRY_VALUES = (ENTRY_SH, ENTRY_BOARD)
 
 # 語のグループ。オプションではない語（`user agree --yes` の `user` と `agree`）を、
 # ボードの組み合わせに使うためのグループ。
@@ -247,7 +264,7 @@ def op(op_id: str) -> Op:
 
 
 def terminal(op_id: str) -> str:
-    """実行ファイルがターミナルを求める操作の、標準エラーに出す表示名（`user agree` の形）。"""
+    """実行ファイルがターミナルを求める操作の、標準エラーに出す表示名（ユーザが打つ sh の名前）。"""
     shown = op(op_id).terminal
     if not shown:
         raise KeyError(f"{op_id} はターミナルを求める操作ではない")
@@ -415,6 +432,47 @@ def _loose(word: str) -> str:
     return unicodedata.normalize("NFKC", word).casefold()
 
 
+def take_entry(argv: list[str]) -> tuple[list[str], str]:
+    """先頭のラッパーのオプションから `--entry <値>` を外し、argv と値（無ければ空）を返す。
+
+    `user` の入口の前に付けた形（`--entry sh user agree`・`--entry=board user mirror`）だけを読む。
+    ほかの位置の `--entry` は外さないので、argparse が知らないオプションとして断る。
+    値が `ENTRY_VALUES` に無い、2 度ある、`user` の入口でない、のいずれも `UserEntryError`。
+    """
+    kept: list[str] = []
+    marker = ""
+    at = 0
+    while at < len(argv) and _is_wrapper_option(argv[at]):
+        word = argv[at]
+        if word.partition("=")[0] != ENTRY_OPTION:
+            step = 1 if "=" in word else 2
+            kept += argv[at : at + step]
+            at += step
+            continue
+        if marker:
+            raise UserEntryError(f"{ENTRY_OPTION} は 1 度しか渡せない")
+        if "=" in word:
+            marker, at = word.partition("=")[2], at + 1
+        elif at + 1 < len(argv):
+            marker, at = argv[at + 1], at + 2
+        else:
+            raise UserEntryError(f"{ENTRY_OPTION} には値が要る")
+        if marker not in ENTRY_VALUES:
+            raise UserEntryError(f"{ENTRY_OPTION} に渡せるのは {' か '.join(ENTRY_VALUES)}")
+    if marker and not (at < len(argv) and _ascii_lower(argv[at]) == USER_WORD):
+        raise UserEntryError(f"{ENTRY_OPTION} は user の入口と一緒に渡す")
+    return kept + argv[at:], marker
+
+
+def direct_refusal(verb: Verb, script: str) -> str:
+    """印の無い `user <操作>`（直に打った形）の断り文。`script` は打つ sh の呼び方。"""
+    word = " ".join(verb.words)
+    return (
+        f"`ccnavi user {word}` は、実行ファイルを直に打つ入口ではありません。"
+        f"ユーザが `{script}` を打ちます（実行ファイルが行わない後始末は、その sh が行います）。"
+    )
+
+
 def rewrite(argv: list[str]) -> tuple[list[str], Verb | None]:
     """`user <操作> …` を内部の形に読み替える。`user` で始まらなければそのまま返す。
 
@@ -475,13 +533,16 @@ def refused(args: object) -> str:
             continue
         if row.unless == "no-yes" and _unset(getattr(args, "yes", "")):
             continue
-        forms = [" ".join(v.words) for v in VERBS if v.internal[-1] == name]
-        if forms:
-            text = f"{name} はユーザ専用です。ユーザが `ccnavi user {forms[0]}` の形で打ちます。"
+        scripts = [v.script for v in VERBS if v.internal[-1] == name]
+        if scripts:
+            text = (
+                f"{name} はユーザ専用です。"
+                f"ユーザが `{USER_SCRIPT_PREFIX}{scripts[0]}.sh` で打ちます。"
+            )
             if row.unless == "preview":
                 text += f"見るだけなら {name} --preview を使います。"
             return text
-        return f"{name} はユーザ専用です（`ccnavi user` の操作と一緒に、ユーザが打ちます）。"
+        return f"{name} はユーザ専用です（ユーザが `{USER_SCRIPT_PREFIX}*.sh` で打ちます）。"
     return ""
 
 
@@ -495,10 +556,13 @@ def user_entry_forms(excluding: str = "") -> str:
     ラッパーのオプションを読み飛ばした後の最初の語が `user`。`--` を挟んだ形も止める
     （実行ファイルは断るが、止める側に倒す）。`excluding` は、別の deny が止める操作の名前
     （`prune` は、チケット制御ではなくコアのファイルの保護の設定に従う）。
+
+    オプションの値は付けなくても読む。`--root ''` のように空の引用符で値を空にした形は、hook が読む前に
+    引用符ごと消えて `--root user agree` に見えるので、`user` を値と読んで入口を見逃さないため。
     """
     value = _quoted_or_word()
     options = "|".join(re.escape(o) for o in WRAPPER_OPTIONS)
-    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})\s+)*"
+    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})?\s+)*"
     rest = rf"(?!\s+{re.escape(excluding)}\b)" if excluding else ""
     return rf"\s+{skip}(?:--\s+)?{USER_WORD}\b{rest}"
 
@@ -507,7 +571,7 @@ def user_verb_forms(verb: str) -> str:
     """`user <verb>` の形の正規表現（`launcher` の後ろに続ける。`--` は読み飛ばさない）。"""
     value = _quoted_or_word()
     options = "|".join(re.escape(o) for o in WRAPPER_OPTIONS)
-    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})\s+)*"
+    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})?\s+)*"
     return rf"\s+{skip}(?:--\s+)?{USER_WORD}\s+{re.escape(verb)}\b"
 
 

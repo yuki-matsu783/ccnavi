@@ -397,9 +397,11 @@ class EntryTest(_Base):
 
     def test_prune_needs_a_terminal(self):
         old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
-        proc = run_ccnavi(["user", "prune"], env=self.env(), cwd=self.root)
+        proc = run_ccnavi(["--entry", "sh", "user", "prune"], env=self.env(), cwd=self.root)
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("user prune はユーザがターミナルから実行する必要があります", proc.stderr)
+        self.assertIn(
+            "ccnavi-user-prune.sh はユーザがターミナルから実行する必要があります", proc.stderr
+        )
         self.assertTrue(os.path.exists(old))
 
     def test_prune_removes_and_says_so(self):

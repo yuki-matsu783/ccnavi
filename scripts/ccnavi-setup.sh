@@ -157,6 +157,8 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、残った指摘の対応方針・
 # 早めに閉じる判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、
 # ユーザの判断をホストに書く部品（読む 2 本より先に配る）。
+# ccnavi-user-handoff.sh・ccnavi-user-mirror.sh・ccnavi-user-prune.sh は、実行ファイルの `user handoff` / `user mirror` /
+# `user prune` を入口の印つきで起こす薄い sh。印が無い `user` の入口は実行ファイルが断るので、配らないと打つ手が無くなる。
 # ccnavi-session-start.sh はセッション開始時の入口（FETCH_COMMAND）。中で、取り込みの ccnavi-fetch.sh と
 # 直下のディレクトリ一覧の ccnavi-dirs.sh を順に呼ぶ。ccnavi-sync.sh はユーザが実行する
 # 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、片付けの記録の読み出し）。
@@ -173,7 +175,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-fetch.sh ccnavi-dirs.sh ccnavi-session-start.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-idle.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-user-handoff.sh ccnavi-user-mirror.sh ccnavi-user-prune.sh ccnavi-fetch.sh ccnavi-dirs.sh ccnavi-session-start.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-idle.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 mode="$DEFAULT_MODE"
 # 明示されたかどうかを別の変数で持つ。--force で置き換えてよいのは、ユーザがこの実行で

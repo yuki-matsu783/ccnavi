@@ -189,7 +189,7 @@ class MakeTest(Drafts):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("wip/handoff/.ccnavi/config/project/templates/i0001.yml", result.stdout)
         self.assertIn(
-            "ccnavi user handoff .ccnavi/config/project/templates/i0001.yml", result.stdout
+            "ccnavi-user-handoff.sh .ccnavi/config/project/templates/i0001.yml", result.stdout
         )
         self.assertIn(
             "全体計画 3 ステップ / フィードバック計画 2 ステップ / フロー 1 本", result.stdout
@@ -618,7 +618,7 @@ class UserOnlyTest(Drafts):
         result = self.ccnavi(
             "--mode", "enable", "--guard-ticket-approval", "enable", stdin=json.dumps(payload)
         )
-        self.assertIn("ccnavi user handoff", self.reason(result))
+        self.assertIn("ccnavi-user-handoff.sh", self.reason(result))
 
     def test_the_board_forms_are_denied_whatever_the_launcher(self):
         tails = ("user handoff X --yes --expect " + "a" * 64 + " --via board --json",)

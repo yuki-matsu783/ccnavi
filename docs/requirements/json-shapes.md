@@ -217,7 +217,7 @@ VS Code のボードは、`gate_closed`・`review_waiting`・`marks` を次の�
 ```sh
 ccnavi --agree --preview --json [<絞り>...]           # 一覧を見る（承認済みチケットは置かない）
 ccnavi --agree --preview --verify --json [<絞り>...]  # 承認できる状態かを確かめる（同上）
-ccnavi user agree --yes <識別子,…> --digest <値> --json [<絞り>...]    # 見せた提案（識別子の一覧と各ファイルのバイト列）が今も同じなら承認する
+ccnavi --entry board user agree --yes <識別子,…> --digest <値> --json [<絞り>...]    # 見せた提案（識別子の一覧と各ファイルのバイト列）が今も同じなら承認する
 ```
 
 VS Code の拡張が、承認をボードのオーバーレイで行うための形。承認の対象を組むのは `user agree` と同じ関数で、`--explain --json` の
@@ -320,8 +320,8 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ## ミラーの JSON
 
 ```sh
-ccnavi user mirror [<プロジェクト名>…] --json                                   # 見るだけ
-ccnavi user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json   # 揃える
+ccnavi --entry board user mirror [<プロジェクト名>…] --json                                   # 見るだけ
+ccnavi --entry board user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json   # 揃える
 ```
 
 ワークスペースの共通レイヤーと、各プロジェクトのメインのチェックアウトにあるミラー
@@ -361,7 +361,7 @@ ccnavi user mirror [<プロジェクト名>…] --yes --expect <値> --via board
 ## 版の JSON
 
 ```sh
-ccnavi --version          # 1 行 1 項目（`compat: 18` など。sh が読む）
+ccnavi --version          # 1 行 1 項目（`compat: 19` など。sh が読む）
 ccnavi --version --json
 ```
 
@@ -369,7 +369,7 @@ ccnavi --version --json
 `.ccnavi/scripts/` の sh で、どちらも起動のときに互換の版を自分のものと比べる。
 
 ```json
-{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 18,
+{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 19,
  "features": ["user-entry", "handoff", "mirror"],
  "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}

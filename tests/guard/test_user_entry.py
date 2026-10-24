@@ -10,10 +10,12 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 
-from ccnavi.infra.modes import EXIT_BLOCK
+from ccnavi.infra.modes import EXIT_BLOCK, EXIT_ERROR
 from ccnavi.tickets import phase_forms, user_only
+from tests import ROOT
 from tests.guard.test_cleanup_forms import HookCase
 from tests.inproc import run_ccnavi
 
@@ -123,15 +125,15 @@ class RewriteTest(unittest.TestCase):
 class ExecutableTest(unittest.TestCase):
     def test_user_only_options_outside_the_entry_are_refused(self):
         for argv, shown in (
-            (["--agree"], "ccnavi user agree"),
-            (["--agree", "--yes", "i1"], "ccnavi user agree"),
-            (["--reviewed", "0"], "ccnavi user reviewed"),
-            (["--close-early"], "ccnavi user close-early"),
-            (["--prune"], "ccnavi user prune"),
-            (["--handoff"], "ccnavi user handoff"),
-            (["--handoff", "a.md", "--yes", "--expect", "x"], "ccnavi user handoff"),
-            (["--mirror"], "ccnavi user mirror"),
-            (["--mirror", "lib", "--yes", "--expect", "x"], "ccnavi user mirror"),
+            (["--agree"], "ccnavi-user-agree.sh"),
+            (["--agree", "--yes", "i1"], "ccnavi-user-agree.sh"),
+            (["--reviewed", "0"], "ccnavi-user-decide.sh"),
+            (["--close-early"], "ccnavi-user-close-early.sh"),
+            (["--prune"], "ccnavi-user-prune.sh"),
+            (["--handoff"], "ccnavi-user-handoff.sh"),
+            (["--handoff", "a.md", "--yes", "--expect", "x"], "ccnavi-user-handoff.sh"),
+            (["--mirror"], "ccnavi-user-mirror.sh"),
+            (["--mirror", "lib", "--yes", "--expect", "x"], "ccnavi-user-mirror.sh"),
             (["--yes", "i1"], "ユーザ専用"),
         ):
             with self.subTest(argv=argv):
@@ -169,23 +171,107 @@ class ExecutableTest(unittest.TestCase):
                 self.assertIn("ASCII", result.stderr)
 
     def test_user_handoff_writing_needs_a_terminal(self):
-        result = run_ccnavi(["user", "handoff", "--yes", "--expect", "x"])
+        result = run_ccnavi(["--entry", "sh", "user", "handoff", "--yes", "--expect", "x"])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "user handoff --yes はユーザがターミナルから実行する必要があります", result.stderr
+            "ccnavi-user-handoff.sh --yes はユーザがターミナルから実行する必要があります",
+            result.stderr,
         )
 
     def test_user_mirror_writing_needs_a_terminal(self):
-        result = run_ccnavi(["user", "mirror", "--yes", "--expect", "x"])
+        result = run_ccnavi(["--entry", "sh", "user", "mirror", "--yes", "--expect", "x"])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "user mirror --yes はユーザがターミナルから実行する必要があります", result.stderr
+            "ccnavi-user-mirror.sh --yes はユーザがターミナルから実行する必要があります",
+            result.stderr,
         )
 
     def test_user_prune_needs_a_terminal(self):
-        result = run_ccnavi(["user", "prune"])
+        result = run_ccnavi(["--entry", "sh", "user", "prune"])
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("user prune はユーザがターミナルから実行する必要があります", result.stderr)
+        self.assertIn(
+            "ccnavi-user-prune.sh はユーザがターミナルから実行する必要があります", result.stderr
+        )
+
+
+class EntryMarkTest(unittest.TestCase):
+    """入口の印（`--entry sh|board`）。印の無い `user <操作>` は、直に打った形として断る。"""
+
+    def test_the_mark_is_taken_out_of_the_leading_wrapper_options(self):
+        for argv, rest, mark in (
+            (["--entry", "sh", "user", "agree"], ["user", "agree"], "sh"),
+            (["--entry=board", "user", "mirror"], ["user", "mirror"], "board"),
+            (
+                ["--root", "R", "--entry", "sh", "--cwd", "C", "user", "agree", "i1"],
+                ["--root", "R", "--cwd", "C", "user", "agree", "i1"],
+                "sh",
+            ),
+            (["user", "agree"], ["user", "agree"], ""),
+            (["--agree", "--preview"], ["--agree", "--preview"], ""),
+        ):
+            with self.subTest(argv=argv):
+                self.assertEqual(user_only.take_entry(argv), (rest, mark))
+
+    def test_a_mark_in_another_place_is_left_for_argparse(self):
+        argv = ["user", "agree", "--entry", "sh"]
+        self.assertEqual(user_only.take_entry(argv), (argv, ""))
+        result = run_ccnavi(["--entry", "sh", "user", "prune", "--entry", "sh"])
+        self.assertEqual(result.returncode, EXIT_ERROR, result.stderr)
+
+    def test_a_bad_mark_is_an_error(self):
+        for argv in (
+            ["--entry", "terminal", "user", "agree"],
+            ["--entry"],
+            ["--entry", "sh"],
+            ["--entry", "sh", "agree"],
+            ["--entry", "sh", "--entry", "board", "user", "agree"],
+        ):
+            with self.subTest(argv=argv):
+                with self.assertRaises(user_only.UserEntryError):
+                    user_only.take_entry(argv)
+                self.assertEqual(run_ccnavi(argv).returncode, EXIT_BLOCK)
+
+    def test_every_operation_without_a_mark_names_its_script(self):
+        for words, script in (
+            (["agree"], "ccnavi-user-agree.sh"),
+            (["reviewed", "3"], "ccnavi-user-decide.sh"),
+            (["close-early"], "ccnavi-user-close-early.sh"),
+            (["prune"], "ccnavi-user-prune.sh"),
+            (["handoff"], "ccnavi-user-handoff.sh"),
+            (["mirror"], "ccnavi-user-mirror.sh"),
+            (["handoff", "--json"], "ccnavi-user-handoff.sh"),
+            (["agree", "--yes", "i1", "--digest", "x", "--json"], "ccnavi-user-agree.sh"),
+        ):
+            with self.subTest(words=words):
+                result = run_ccnavi(["user", *words])
+                self.assertEqual(result.returncode, EXIT_BLOCK, result.stderr)
+                self.assertIn(script, result.stderr)
+                self.assertIn("直に打つ入口ではありません", result.stderr)
+
+    def test_every_verb_has_a_script_that_exists(self):
+        for verb in user_only.VERBS:
+            with self.subTest(verb=verb.words):
+                self.assertTrue(verb.script)
+                path = os.path.join(ROOT, ".ccnavi", "scripts", f"ccnavi-user-{verb.script}.sh")
+                self.assertTrue(os.path.isfile(path), path)
+
+    def test_a_marked_entry_goes_on(self):
+        for mark in ("sh", "board"):
+            result = run_ccnavi(["--entry", mark, "user", "prune"])
+            with self.subTest(mark=mark):
+                self.assertNotIn("直に打つ入口ではありません", result.stderr)
+                self.assertIn("ターミナル", result.stderr)
+
+    def test_the_guard_switch_lets_the_tests_type_the_entry_directly(self):
+        env = {**os.environ, "CCNAVI_GUARD_TICKET_APPROVAL": "disable"}
+        result = run_ccnavi(["user", "prune", "--preview"], env=env)
+        self.assertNotIn("直に打つ入口ではありません", result.stderr)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_the_version_says_the_mark(self):
+        self.assertIn(
+            "entry-marker", json.loads(run_ccnavi(["--version", "--json"]).stdout)["features"]
+        )
 
 
 class HookTest(HookCase):
@@ -208,6 +294,16 @@ class HookTest(HookCase):
         "sh .ccnavi/scripts/ccnavi-launcher.sh user agree",
         "echo ok && ccnavi us''er agree",
         'ccnavi "user" agree',
+        # 入口の印を付けても、エージェントが打つ形は止まる（印は案内のための印で、守りではない）。
+        "ccnavi --entry sh user agree",
+        "ccnavi --root /x --entry board user mirror --json",
+        "ccnavi --entry=sh user handoff .ccnavi/docs/a.md --yes --expect x",
+        "ccnavi --entry sh user close-early --reason r --result /t.json",
+        # 値を空の引用符にしたラッパーのオプション（hook が読む前に引用符ごと消えて、`user` が値に見える）。
+        "ccnavi --entry sh --root '' user agree",
+        'ccnavi --root "" --entry board user mirror',
+        "ccnavi --cwd '' user agree",
+        "ccnavi --root '' user handoff --json",
     )
 
     def test_the_entry_is_stopped_whatever_the_form(self):

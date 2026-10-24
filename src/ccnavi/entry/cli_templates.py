@@ -10,7 +10,7 @@
 （保存の前の確かめ用）。
 `--draft` は完了した親から下書きを `wip/handoff/<取り込み先の相対パス>`
 に書くだけで、下書きに効力は無いので、エージェントが打ってよい。取り込みはほかの保護対象と同じく、
-ユーザが `ccnavi user handoff` で行う（テンプレート専用の取り込み・改名・移動・削除は無い。
+ユーザが `ccnavi-user-handoff.sh` で行う（テンプレート専用の取り込み・改名・移動・削除は無い。
 改名・移動・削除は、ユーザがファイルを直接操作する）。cli を読まない。
 """
 
@@ -56,7 +56,9 @@ def _storing_problem(args: argparse.Namespace) -> str:
             ("--yes", bool(args.yes)),
         ):
             if given:
-                return f"{flag} は --draft と同時に指定できない（取り込みは ccnavi user handoff）"
+                return (
+                    f"{flag} は --draft と同時に指定できない（取り込みは ccnavi-user-handoff.sh）"
+                )
         if args.show is not None or args.keyword:
             return "--draft は --show・--keyword と同時に指定できない"
         if not args.draft.strip():
@@ -72,7 +74,9 @@ def _storing_problem(args: argparse.Namespace) -> str:
         return "--to は --draft でだけ指定できる"
     for flag, given in (("--expect", args.expect is not None), ("--yes", bool(args.yes))):
         if given:
-            return f"{flag} は --templates と同時に指定できない（取り込みは ccnavi user handoff）"
+            return (
+                f"{flag} は --templates と同時に指定できない（取り込みは ccnavi-user-handoff.sh）"
+            )
     return ""
 
 
@@ -328,7 +332,7 @@ def _draft(
         "次: description と when を固有名の無い言い方に直し、計画とフローの不要な手順を削る。"
         "効力が無い下書きで、取り込む（利用できるようにする）のはユーザ\n"
         f"案内: 取り込みは、ユーザがこのツリー（{made.tree_root}）で "
-        f"`ccnavi user handoff {made.target}` を打って行う\n"
+        f"`ccnavi-user-handoff.sh {made.target}` を打って行う\n"
         "案内: 下書きは未追跡のファイルで、残っていると親の ready が止まる。取り込むか、"
         "ready の前に下書きを削除します（またはコミットする）\n"
     )

@@ -28,7 +28,7 @@ block なので、ファイルを置く前に hook を登録した時点でセ�
 読めない間も `builtin:guard-ccnavi-config` は外れず、Write / Edit は止まる。直し方は 1 つで、
 `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（置き場は例外で書ける）、
 ユーザがターミナルの
-`ccnavi user handoff` で取り込むか、手で直す。今の中身が読めない rules.yml の取り込みは、
+`ccnavi-user-handoff.sh` で取り込むか、手で直す。今の中身が読めない rules.yml の取り込みは、
 `handoff._defense_change` が「確かめられないのでターミナルに限る」と扱う。そのため、
 ボードからの取り込みは断られる。
 ルールを書き換えて保護の甘い既定に戻す手順は、シェルからも名前で書くツールからも成り立たない。
@@ -150,7 +150,7 @@ def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dic
             "シェルで書き込むのは適切ではありません。"
             "共通のルールファイルは Write / Edit でも直せません。"
             "wip/handoff/.ccnavi/config/common/rules.yml に下書きを置き、"
-            "ユーザにターミナルの 'ccnavi user handoff' での取り込みを頼んでください。"
+            "ユーザにターミナルの 'ccnavi-user-handoff.sh' での取り込みを頼んでください。"
             "ユーザが差分を見て取り込めば直せます。" + resolve
         ),
     }

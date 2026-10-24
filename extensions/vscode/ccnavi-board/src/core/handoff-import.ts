@@ -115,7 +115,12 @@ export interface TerminalGuide {
  * ボードは取り込まない。`expect` は、そのパスだけを指して見るだけをもう一度呼んだ答えのもの。
  * 取り込めない状態（conflict・rejected・error・unchanged）の対象には、コマンドを出さず理由を返す。
  */
-export async function terminalGuide(deps: Pick<HandoffDeps, "view">, shown: HandoffList, path: string): Promise<TerminalGuide> {
+export async function terminalGuide(
+  deps: Pick<HandoffDeps, "view">,
+  shown: HandoffList,
+  path: string,
+  workspace = "",
+): Promise<TerminalGuide> {
   const entry = entryOf(shown.entries, path);
   if (entry === undefined) {
     return { command: "", error: `一覧にない対象です: ${path}` };
@@ -144,7 +149,7 @@ export async function terminalGuide(deps: Pick<HandoffDeps, "view">, shown: Hand
   if (!viewed.value.ok || viewed.value.expect === "") {
     return { command: "", error: "検査を通らないので、取り込めません" };
   }
-  return { command: terminalCommand(entry.path, viewed.value.expect, viewed.value.tree || shown.tree), error: "" };
+  return { command: terminalCommand(entry.path, viewed.value.expect, viewed.value.tree || shown.tree, workspace), error: "" };
 }
 
 /** 状態が取り込める形でない `board` 偽の対象の、取り込めない理由（`refusalReason` は「ターミナルで取り込む」を先に言うので、状態の分だけ取り出す） */

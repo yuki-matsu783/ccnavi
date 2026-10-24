@@ -285,19 +285,19 @@ ask:
     subject: "/repo/wip/handoff/.ccnavi/scripts/ccnavi-x.sh"
     why: >-
       守る場所のコピー。ccnavi-stage.sh が元と同じ相対パスでコピーするので、パスに .ccnavi/ が入る。
-      コピーにはルールとしての効力が無く、ユーザが ccnavi user handoff で取り込むまで何も変わらない。
+      コピーにはルールとしての効力が無く、ユーザが ccnavi-user-handoff.sh で取り込むまで何も変わらない。
       builtin:guard-scripts と builtin:guard-project-home が除く。止めないが allow にも無いので、
       権限モードに渡る
   - tool: Edit
     subject: "/repo/wip/handoff/.claude/settings.json"
     why: >-
-      hook の登録のコピー。builtin:guard-settings が除く。ユーザが ccnavi user handoff で取り込むまで
+      hook の登録のコピー。builtin:guard-settings が除く。ユーザが ccnavi-user-handoff.sh で取り込むまで
       何も変わらない。権限モードに渡る
   - tool: Write
     subject: "/repo/wip/handoff/.ccnavi/config/common/rules.yml"
     why: >-
       ルールの下書き。builtin:guard-ccnavi-config と builtin:guard-project-home が除く。
-      検査は取り込むときに ccnavi user handoff が行う。権限モードに渡る
+      検査は取り込むときに ccnavi-user-handoff.sh が行う。権限モードに渡る
   - tool: Write
     subject: "/repo/scratchpad/a.md"
     why: >-

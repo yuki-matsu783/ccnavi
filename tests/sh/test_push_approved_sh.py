@@ -805,9 +805,10 @@ class ApproveCarriesTest(Workspace):
         # 実行ファイルには、書いたパスの一覧（--record-writes）と、書けたパスの報告の書き出し先
         # （--placed-out）も渡す
         self.assertEqual(got[2], "--record-writes", got)
-        # 承認は実行ファイルのユーザ専用の入口（`user agree`）で呼ぶ
-        self.assertEqual(got[4:7], ["user", "agree", "--placed-out"], got)
-        self.assertEqual(got[8:], ["i0002-01-03", "i0002-01-04"], got)
+        # 承認の入口（`user agree`）を、入口の印（`--entry sh`）を付けて呼ぶ
+        self.assertEqual(got[4:6], ["--entry", "sh"], got)
+        self.assertEqual(got[6:9], ["user", "agree", "--placed-out"], got)
+        self.assertEqual(got[10:], ["i0002-01-03", "i0002-01-04"], got)
 
     def test_approve_without_ids_takes_all_pending(self):
         self.worktree("i0001")
@@ -815,8 +816,9 @@ class ApproveCarriesTest(Workspace):
         result = self.approve(STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
-        self.assertEqual(got[4:7], ["user", "agree", "--placed-out"], got)
-        self.assertEqual(got[8:], [])
+        self.assertEqual(got[4:6], ["--entry", "sh"], got)
+        self.assertEqual(got[6:9], ["user", "agree", "--placed-out"], got)
+        self.assertEqual(got[10:], [])
 
     def test_approve_refuses_words_that_are_not_ids(self):
         """識別子でない語は断り、実行ファイルを呼ばない。
@@ -848,8 +850,9 @@ class ApproveCarriesTest(Workspace):
         result = self.approve("help", "i0002-01-01", STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
-        self.assertEqual(got[4:7], ["user", "agree", "--placed-out"])
-        self.assertEqual(got[8:], ["help", "i0002-01-01"])
+        self.assertEqual(got[4:6], ["--entry", "sh"])
+        self.assertEqual(got[6:9], ["user", "agree", "--placed-out"])
+        self.assertEqual(got[10:], ["help", "i0002-01-01"])
         refused = self.approve("--help", "i0002-01-01")
         self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
 

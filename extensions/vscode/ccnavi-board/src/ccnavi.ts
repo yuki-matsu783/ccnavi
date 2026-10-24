@@ -678,19 +678,19 @@ const TEMPLATE_EDIT_FLAGS = ["--templates", "--check-file"] as const;
  * 取り込み待ち画面が求める機能（`ccnavi user handoff` を実行ファイルが持つ）。持たない古い実行ファイルは `user handoff` を知らず、
  * argparse の苦情（不明瞭な断り）で返すので、画面を開くときに見て「古い版です」と言い、画面を無効にする
  */
-const HANDOFF_FEATURES = ["handoff"] as const;
+const HANDOFF_FEATURES = ["handoff", "entry-marker"] as const;
 
 /**
  * プロジェクト管理画面のミラーの表示と同期が求める機能（`ccnavi user mirror` を実行ファイルが持つ）。持たない古い実行ファイルは
  * `user mirror` を知らず、argparse の苦情で返すので、調べる前に見て「古い版です」と言い、ボタンを無効にする
  */
-const MIRROR_FEATURES = ["mirror"] as const;
+const MIRROR_FEATURES = ["mirror", "entry-marker"] as const;
 
 /**
  * ユーザ専用の入口（`ccnavi user <操作>`）を実行ファイルが持つことを示す機能名。持たない古い実行ファイルは
  * `user` を知らず、argparse の苦情（不明瞭な断り）で返すので、打つ前に見て「古い版です」と言う
  */
-const USER_ENTRY_FEATURES = ["user-entry"] as const;
+const USER_ENTRY_FEATURES = ["user-entry", "entry-marker"] as const;
 
 /**
  * ユーザ専用の操作（承認・対応方針）を打つ前に、実行ファイルが `user-entry` を持つかを聞く。

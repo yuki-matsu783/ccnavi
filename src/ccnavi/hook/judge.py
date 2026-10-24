@@ -323,7 +323,7 @@ def decide_before(
                 kind=GENERAL,
             )
 
-    # 記録と state を消す `ccnavi user prune`（内部は `--prune`。`--preview` の無い形）は、
+    # 記録と state を消す `ccnavi-user-prune.sh`（内部は `--prune`。`--preview` の無い形）は、
     # チケット制御に依らず止める
     # （phase_forms.prune_form）。実行ファイルのターミナル要求は擬似ターミナルを使えば通れる。
     # 記録と state の
@@ -1549,7 +1549,7 @@ def ticket_verdict(
             "This path is outside the work area the ticket for this worktree declares. Do the "
             "work inside that area, or, if the task genuinely needs this path, tell the parent "
             "so it can propose a ticket that covers it and ask the user to agree to it (from the "
-            "ccnavi board in VS Code or Chrome, with 'ccnavi user agree' in a terminal, or by "
+            "ccnavi board in VS Code or Chrome, with 'ccnavi-user-agree.sh' in a terminal, or by "
             "moving the proposal file from todo/ to doing/). "
             "Editing a proposal alone changes nothing."
         )

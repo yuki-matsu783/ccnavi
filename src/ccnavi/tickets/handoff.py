@@ -881,7 +881,7 @@ def board_refused(plan: Plan) -> str:
     why = f"{first.kind.id} の種類で" if not first.kind.board else f"{first.defense}ので"
     return (
         f"{paths} は {why}、ボードからは取り込めない。"
-        "ターミナルで `ccnavi user handoff <パス> --yes --expect <ハッシュ>` を打つ"
+        "ターミナルで `ccnavi-user-handoff.sh <パス> --yes --expect <ハッシュ>` を打つ"
     )
 
 

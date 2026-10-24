@@ -1148,7 +1148,7 @@ ig_integrate() {
 		reject integrate-source-dirty "ワークツリー .claude/worktrees/$ig_n に未コミットの変更があります。取り込むのはコミットした分だけなので、ワークツリーの中でコミットしてから再実行してください。変更（先頭 10 件）: $(printf '%s' "$ig_wdirty" | tr '\n' ' ')"
 	fi
 	if ! d4_draft_check "$d4_s"; then
-		reject integrate-draft "${d4_draft_why}。ユーザに cd $(ccnavi_sh_quote "$ig_wt") && ccnavi user handoff を頼み、取り込んだ変更を作業ワークツリーでコミットしてください。要らない下書きは消してコミットします。"
+		reject integrate-draft "${d4_draft_why}。ユーザに cd $(ccnavi_sh_quote "$ig_wt") && ccnavi-user-handoff.sh を頼み、取り込んだ変更を作業ワークツリーでコミットしてください。要らない下書きは消してコミットします。"
 	fi
 	d4_tip=$(git rev-parse --verify "refs/heads/$ig_n^{commit}")
 	if git ls-tree -r "$d4_tip" 2>/dev/null | grep -q '^160000 '; then
@@ -1456,7 +1456,7 @@ ig_done() {
 		fi
 		d4_ss0=$(git rev-parse --verify --quiet "$d4_ref/s^{commit}" 2>/dev/null || :)
 		if [ -d "$ig_wt" ] && ! d4_draft_check "${d4_ss0:-$d4_m_head}"; then
-			reject integrate-done-draft "${d4_draft_why}。ユーザに cd $(ccnavi_sh_quote "$ig_wt") && ccnavi user handoff を頼み、取り込んだ変更をコミットしてから、integrate を打ち直してください。"
+			reject integrate-done-draft "${d4_draft_why}。ユーザに cd $(ccnavi_sh_quote "$ig_wt") && ccnavi-user-handoff.sh を頼み、取り込んだ変更をコミットしてから、integrate を打ち直してください。"
 		fi
 		if [ "$d4_m_empty" = yes ]; then
 			d4_finish

@@ -133,7 +133,7 @@ def fallen_back(rules_path: str) -> str:
         "The project's own rules are not in force right now. Neither the shell nor "
         "the Write or Edit tool can write to that file while the defaults are in "
         "force. Put a draft at wip/handoff/.ccnavi/config/common/rules.yml and ask "
-        "the user to import it with 'ccnavi user handoff' (or to fix the file by hand)."
+        "the user to import it with 'ccnavi-user-handoff.sh' (or to fix the file by hand)."
     )
 
 

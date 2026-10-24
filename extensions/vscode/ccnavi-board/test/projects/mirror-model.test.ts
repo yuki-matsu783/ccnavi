@@ -66,11 +66,11 @@ function ok(list: MirrorList = listOf()): MirrorStatus {
 }
 
 test("CB-T1155 見るだけの引数は user mirror [<名前>…] --json、同期は --yes --expect <値> --via board --json を足す", () => {
-  assert.deepEqual(mirrorArgs(), ["user", "mirror", "--json"]);
-  assert.deepEqual(mirrorArgs(["web", "app"]), ["user", "mirror", "web", "app", "--json"]);
+  assert.deepEqual(mirrorArgs(), ["--entry", "board", "user", "mirror", "--json"]);
+  assert.deepEqual(mirrorArgs(["web", "app"]), ["--entry", "board", "user", "mirror", "web", "app", "--json"]);
   assert.equal(mirrorArgs(["web"]).includes("--yes"), false);
-  assert.deepEqual(mirrorYesArgs([], "all-sha"), ["user", "mirror", "--yes", "--expect", "all-sha", "--via", "board", "--json"]);
-  assert.deepEqual(mirrorYesArgs(["web"], "web-sha"), ["user", "mirror", "web", "--yes", "--expect", "web-sha", "--via", "board", "--json"]);
+  assert.deepEqual(mirrorYesArgs([], "all-sha"), ["--entry", "board", "user", "mirror", "--yes", "--expect", "all-sha", "--via", "board", "--json"]);
+  assert.deepEqual(mirrorYesArgs(["web"], "web-sha"), ["--entry", "board", "user", "mirror", "web", "--yes", "--expect", "web-sha", "--via", "board", "--json"]);
 });
 
 test("CB-T1156 見るだけの答えを取り決めのとおりに読む。状態・変更・理由・expect を落とさない", () => {

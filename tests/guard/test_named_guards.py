@@ -271,7 +271,7 @@ class UnreadableRulesTest(Workspace):
                 self.assertEqual(ids[0], CONFIG)
                 # 下書きに置いてユーザに取り込みを頼む、と言う。
                 self.assertIn(self.DRAFT, reason)
-                self.assertIn("ccnavi user handoff", reason)
+                self.assertIn("ccnavi-user-handoff.sh", reason)
 
     def test_the_draft_can_be_written_while_the_rules_are_broken(self):
         self.broken()
@@ -289,7 +289,7 @@ class UnreadableRulesTest(Workspace):
         # 「Write か Edit で書いてください」とは言わない。下書きとユーザの取り込みを案内する。
         self.assertNotIn("Write か Edit のツールで書いて", reason)
         self.assertIn(self.DRAFT, reason)
-        self.assertIn("ccnavi user handoff", reason)
+        self.assertIn("ccnavi-user-handoff.sh", reason)
 
     def test_the_four_hold_without_the_common_rules(self):
         self.absent()
@@ -468,7 +468,7 @@ class ApprovedPreTest(Workspace):
             f"{ticket} status",
             f"{ticket} finish <識別子>",
             f"{ticket} propose <識別子>",
-            "ccnavi user agree",
+            "ccnavi-user-agree.sh",
             "wip/proposals/todo/",
         ):
             self.assertIn(text, reason)

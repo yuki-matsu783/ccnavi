@@ -216,21 +216,27 @@ test("CB-T1113 読み直したあとの選択は、同じパスで entry_sha が
   assert.equal(reconcileSelection(before, entries, LOCKED).size, 0);
 });
 
-test("CB-T1114 ターミナルで打つコマンドは ccnavi user handoff <パス> --yes --expect <ハッシュ>。空白や記号のあるパスは単引用符で囲む", () => {
-  assert.equal(terminalCommand(".claude/hooks/guard.sh", "ab".repeat(32)), `ccnavi user handoff .claude/hooks/guard.sh --yes --expect ${"ab".repeat(32)}`);
-  assert.equal(terminalCommand(".claude/hooks/my guard.sh", "h"), "ccnavi user handoff '.claude/hooks/my guard.sh' --yes --expect h");
-  assert.equal(terminalCommand(".claude/it's.sh", "h"), "ccnavi user handoff '.claude/it'\\''s.sh' --yes --expect h");
+test("CB-T1114 端末で打つコマンドは sh .ccnavi/scripts/ccnavi-user-handoff.sh <パス> --yes --expect <ハッシュ>。空白や記号のあるパスは単引用符で囲む", () => {
+  assert.equal(terminalCommand(".claude/hooks/guard.sh", "ab".repeat(32)), `sh .ccnavi/scripts/ccnavi-user-handoff.sh .claude/hooks/guard.sh --yes --expect ${"ab".repeat(32)}`);
+  assert.equal(terminalCommand(".claude/hooks/my guard.sh", "h"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh '.claude/hooks/my guard.sh' --yes --expect h");
+  assert.equal(terminalCommand(".claude/it's.sh", "h"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh '.claude/it'\\''s.sh' --yes --expect h");
 });
 
-test("CB-T1138 ターミナルのコマンドは --root で下書きのあるツリーを指す。空白・単引用符のあるツリーは POSIX の形で囲む", () => {
-  assert.equal(terminalCommand(".claude/hooks/guard.sh", "h", "/ws/.claude/worktrees/a"), "ccnavi --root /ws/.claude/worktrees/a user handoff .claude/hooks/guard.sh --yes --expect h");
-  assert.equal(terminalCommand("x.sh", "h", "C:\\Users\\me\\ws"), "ccnavi --root 'C:\\Users\\me\\ws' user handoff x.sh --yes --expect h");
-  assert.equal(terminalCommand("x.sh", "h", "/w's"), "ccnavi --root '/w'\\''s' user handoff x.sh --yes --expect h");
+test("CB-T1138 端末のコマンドは --root で下書きのあるツリーを指す。入口の sh は、ワークスペースルートを渡せば絶対パスで書く。空白・単引用符のあるツリーは POSIX の形で囲む", () => {
+  assert.equal(terminalCommand(".claude/hooks/guard.sh", "h", "/ws/.claude/worktrees/a"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh --root /ws/.claude/worktrees/a .claude/hooks/guard.sh --yes --expect h");
+  assert.equal(terminalCommand("x.sh", "h", "C:\\Users\\me\\ws"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh --root 'C:\\Users\\me\\ws' x.sh --yes --expect h");
+  assert.equal(terminalCommand("x.sh", "h", "/w's"), "sh .ccnavi/scripts/ccnavi-user-handoff.sh --root '/w'\\''s' x.sh --yes --expect h");
+  assert.equal(terminalCommand("x.sh", "h", "/ws", "/home/me/ws"), "sh /home/me/ws/.ccnavi/scripts/ccnavi-user-handoff.sh --root /ws x.sh --yes --expect h");
+  assert.equal(terminalCommand("x.sh", "h", "", "C:\\Users\\me\\ws\\"), "sh C:/Users/me/ws/.ccnavi/scripts/ccnavi-user-handoff.sh x.sh --yes --expect h");
   for (const tree of ["", "/ws", "/my ws", "/w's"]) {
-    assert.ok(isTerminalCommand(terminalCommand("a b.sh", "h", tree)), tree);
+    for (const workspace of ["", "/home/me/ws", "/home/me/my ws", "C:\\Users\\me\\ws"]) {
+      assert.ok(isTerminalCommand(terminalCommand("a b.sh", "h", tree, workspace)), `${tree} / ${workspace}`);
+    }
   }
-  assert.ok(!isTerminalCommand("rm -rf / ; ccnavi user handoff x"));
-  assert.ok(!isTerminalCommand("ccnavi --root /ws; rm x user handoff y"));
+  assert.ok(!isTerminalCommand("rm -rf / ; sh .ccnavi/scripts/ccnavi-user-handoff.sh x"));
+  assert.ok(!isTerminalCommand("sh .ccnavi/scripts/ccnavi-user-handoff.sh; rm x"));
+  assert.ok(!isTerminalCommand("sh /tmp/evil.sh --root /ws x"));
+  assert.ok(!isTerminalCommand("ccnavi user handoff x --yes --expect h"), "実行ファイルを直に打つ形は、断られるので写さない");
 });
 
 test("CB-T1115 パスは大文字小文字と NFC/NFD の違いを無視して比べる", () => {

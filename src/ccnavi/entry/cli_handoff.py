@@ -127,16 +127,16 @@ def run(
         stdout.write(json.dumps(handoff.plan_json(plan), ensure_ascii=True, indent=1))
         stdout.write("\n")
         return EXIT_OK
-    _plan_text(stdout, plan, wanted)
+    _plan_text(stdout, plan, wanted, root)
     return EXIT_OK
 
 
-def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> None:
+def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None, root: str) -> None:
     """取り込みの計画を人が読む形で書く。何も反映せず、次に打つコマンドを添える。
 
     下書きの 1 件ごとに、選ばれたか・状態・error と warn・ターミナルのみの理由・conflict を出す。
     選ばれた下書きが無いか、error か conflict があれば、取り込めない理由を言って終える。
-    取り込めるときだけ、`--expect` の値を含む `ccnavi user handoff` の行を出す。
+    取り込めるときだけ、`--expect` の値を含む `ccnavi-user-handoff.sh` の行を出す。
     ボードからは取り込めない種類を含むときは、ターミナルで実行するよう添える。
     """
     stdout.write(f"ccnavi: 保護対象の下書き（{plan.tree} の {handoff.HANDOFF_REL}/）\n")
@@ -173,7 +173,8 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> 
         )
         return
     paths = " ".join(e.rel for e in chosen) if wanted else ""
-    command = "ccnavi user handoff " + (paths + " " if paths else "")
+    script = settings.script_command(root, "ccnavi-user-handoff.sh")
+    command = f"{script} " + (paths + " " if paths else "")
     stdout.write("何も反映していません。この内容で取り込むなら、次を実行します。\n")
     stdout.write(f"  {command}--yes --expect {plan.expect}\n")
     if any(not e.board for e in chosen):
