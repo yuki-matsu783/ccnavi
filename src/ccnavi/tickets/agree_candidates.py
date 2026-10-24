@@ -41,7 +41,7 @@ class Candidate:
     # 改版なら、いま使われている承認済みチケット。
     current: ticket_model.Ticket | None = None
     # このチケットに使うフェーズ定義。親のコピー（`phases:`）を読んだもの。
-    # 親ならその提案のコピーし、
+    # 親ならその提案のコピー、
     # 子なら親（承認済みか、同じ承認で通る提案）のコピー。承認画面はこれで題と見る場所を出す。
     types: dict | None = None
     # 承認したときの `phases.yml`（共通レイヤー + 親の `project:` が指すレイヤーの和）。コピーが
@@ -309,7 +309,7 @@ def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
 
 
 def types_from(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> dict:
-    """このチケットに使う定義。親ならそのコピーし、子なら親のコピー（親が引けなければ空）。
+    """このチケットに使う定義。親ならそのコピー、子なら親のコピー（親が引けなければ空）。
 
     親は承認済みならその承認済みチケット、同じ承認で通る提案ならその提案（`pool` に入っている）。
     `phases.yml` からは引かない。承認のあとに `phases.yml` から定義を消す・名前を変えても、

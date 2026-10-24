@@ -51,7 +51,7 @@ find_code() {
     return
   fi
   # PATH に無ければ、VS Code の既定のインストール先を順に探す。
-  # 上から Windows（ユーザ単位・全ユーザ）、WSL、macOS（全ユーザ・ユーザ単位）。
+  # 上から Windows（ユーザー単位・全ユーザー）、WSL、macOS（全ユーザ・ユーザ単位）。
   for c in \
     "$HOME/AppData/Local/Programs/Microsoft VS Code/bin/code" \
     "/c/Program Files/Microsoft VS Code/bin/code" \

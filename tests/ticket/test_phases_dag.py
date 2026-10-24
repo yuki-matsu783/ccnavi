@@ -456,7 +456,7 @@ class LockTest(unittest.TestCase):
             item("docs", after=[3]),
         ]
         found = self.lock(self.CURRENT, revised, {1, 3})
-        self.assertTrue(any("3" in d and "先行" in d for d in found), found)
+        self.assertTrue(any("3" in d and "先行を変えられない" in d for d in found), found)
 
     def test_copying_the_transitive_waits_into_a_fixed_number_passes(self):
         """固定した番号の先行は推移的な形で比べる。「先行 1, 2, 3」をコピーしても通す。"""

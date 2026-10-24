@@ -5,7 +5,7 @@
  * **大きさの偽物が要る**（`openBoard` の `measure`）。React Flow は点の大きさを測れないと線を 1 本も描かず、
  * テストは空の絵を見て通ってしまう（`test/helpers/dom.ts` の `LoadOptions`）。
  *
- * 図は判定をしない。終端にヒットしないステップ（`loose`）・すぐ始まるステップ（`ready`）・延期の引き受け手（`review_at`）・
+ * 図は判定をしない。終端に届かないステップ（`loose`）・すぐ始まるステップ（`ready`）・延期の引き受け手（`review_at`）・
  * 順序の検査の理由（`problems`）は実行ファイルの答えをそのまま出す。
  */
 import { test } from "node:test";
@@ -23,7 +23,7 @@ import { buildBoard } from "../../src/core/board.js";
 const DIAMOND: readonly RawItem[] = ["research", { type: "design", after: [1] }, { type: "acceptance", after: [1] }, { type: "implement", after: [2, 3] }];
 const FEEDBACK: readonly RawItem[] = ["design-feedback", "skill-improve", { type: "implement-feedback", after: [5] }];
 
-/** 全体計画（1〜4。1 は子が承認済み、2 は延期で 4 が引き受ける）と、終端にヒットしないステップのあるフィードバック計画（5〜7） */
+/** 全体計画（1〜4。1 は子が承認済み、2 は延期で 4 が引き受ける）と、終端に届かないステップのあるフィードバック計画（5〜7） */
 function samplePlans(): ApprovePlan[] {
   const [main, feedback] = plansOf(DIAMOND, FEEDBACK, [1]);
   return [
@@ -61,7 +61,7 @@ function edgeIds(dom: DomPage, part: string): string[] {
     .sort();
 }
 
-test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図を読むだけで出す。start・end の仮の点、延期の引き受け手、固定した番号、終端にヒットしないステップ、すぐ始まるステップ、順序の検査の理由は実行ファイルの答えのまま", async () => {
+test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図を読むだけで出す。start・end の仮の点、延期の引き受け手、固定した番号、終端に届かないステップ、すぐ始まるステップ、順序の検査の理由は実行ファイルの答えのまま", async () => {
   const dom = await openOverlay(samplePlans());
   try {
     const graphs = dom.all(".approval .plan-graph");
@@ -100,7 +100,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.match(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n3"] .plan-node').textContent ?? "", /レビュー必須（MR）/);
     assert.equal(n2.getAttribute("data-locked"), "0");
 
-    // 終端にヒットしないステップは、実行ファイルが言ったものだけに印。そのステップから end への線も
+    // 終端に届かないステップは、実行ファイルが言ったものだけに印。そのステップから end への線も
     assert.deepEqual(
       dom.all('.plan-graph[data-part="feedback"] .plan-node[data-loose="1"]').map((node) => node.getAttribute("data-number")),
       ["6"],
@@ -109,7 +109,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.ok(dom.one('.plan-graph[data-part="feedback"] .react-flow__edge[data-id="end-6"]').classList.contains("loose"));
     assert.ok(!dom.one('.plan-graph[data-part="feedback"] .react-flow__edge[data-id="end-7"]').classList.contains("loose"));
 
-    // 図の下。すぐ始まるステップ・終端にヒットしないステップ・順序の検査の理由
+    // 図の下。すぐ始まるステップ・終端に届かないステップ・順序の検査の理由
     const plain = dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "";
     assert.match(plain, /すぐ始まる: 1/);
     assert.match(plain, /延期したレビュー: 2 は 4 と一緒に/);

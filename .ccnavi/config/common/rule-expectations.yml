@@ -29,7 +29,7 @@ deny:
     why: ノートブックの編集も同じ（session-scratchpad）
   - tool: Write
     subject: "/repo/README.md"
-    why: main のワークツリーでは編集しない。作業はワークツリーの中で
+    why: main のチェックアウトでは編集しない。作業はワークツリーの中で
   - tool: Edit
     subject: "/repo/src/ccnavi/cli.py"
     why: 同上。ソースも main では触らない

@@ -50,7 +50,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.deepEqual(preview.problems, []);
 });
 
-test("CB-T354 承認の preview の plans を読む（計画を持つ親の図の中身。実行ファイルが組んだ番号・先行・終端にヒットしないステップ・すぐ始まるステップ・延期の引き受け手をそのまま）", () => {
+test("CB-T354 承認の preview の plans を読む（計画を持つ親の図の中身。実行ファイルが組んだ番号・先行・終端に届かないステップ・すぐ始まるステップ・延期の引き受け手をそのまま）", () => {
   const parsed = parseApprovePreview(fixtureText("approve-preview.json"));
   assert.ok(parsed.ok);
   if (!parsed.ok) {

@@ -3,7 +3,7 @@
  * 点・線・置き場所を組む純関数。描くのは共有の図の部品（`webview/shared/PlanGraph.tsx`）で、承認のオーバーレイは
  * 読むだけで、計画編集タブは線を引き直して使う。
  *
- * どのステップが終端にヒットしないか（`loose`）、すぐ始まるか（`ready`）、延期を誰が引き受けるか
+ * どのステップが終端に届かないか（`loose`）、すぐ始まるか（`ready`）、延期を誰が引き受けるか
  * （`review_at`）、順序の検査の理由（`problems`）は実行ファイルが決めて返し、ここは印を付けるだけ。
  * ここが組むのは、線と点だけで決まる形の扱いに限る。
  *
@@ -51,7 +51,7 @@ export interface PlanGraphNode {
   readonly reviewAt: number | null;
   /** 固定した番号（子が承認された番号）。入る線を変えられない */
   readonly locked: boolean;
-  /** 終端にヒットしないステップ（実行ファイルの `loose` に入っている） */
+  /** 終端に届かないステップ（実行ファイルの `loose` に入っている） */
   readonly loose: boolean;
   /** start からの最長の段数。start が 0 */
   readonly column: number;
@@ -68,7 +68,7 @@ export interface PlanGraphEdge {
   readonly source: string;
   readonly target: string;
   readonly kind: PlanEdgeKind;
-  /** 終端にヒットしないステップから end への線 */
+  /** 終端に届かないステップから end への線 */
   readonly loose: boolean;
 }
 

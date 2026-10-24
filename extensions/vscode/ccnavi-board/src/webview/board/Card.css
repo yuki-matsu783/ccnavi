@@ -37,7 +37,7 @@
 .num { font-weight: 600; font-variant-numeric: tabular-nums; }
 .title { flex: 1 1 8em; min-width: 0; overflow-wrap: anywhere; }
 /* 状態の札。色だけに頼らず、言葉を必ず出す。文字と枠の色は文字用の色（`App.css` の `--board-*-text`）で、地に対して 4.5:1 以上。
-   ユーザの番（承認待ち・レビュー待ち）は塗り、確認が要るもの（要確認）は警告の色、それ以外は枠だけ */
+   ユーザ待ち（承認待ち・レビュー待ち）は塗り、確認が要るもの（要確認）は警告の色、それ以外は枠だけ */
 .status {
   margin-left: auto; flex: 0 0 auto; white-space: nowrap;
   font-size: var(--font-xs); padding: 0 8px; border-radius: var(--radius-chip);

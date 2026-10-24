@@ -3,7 +3,7 @@
  * 中身は実行ファイルが返す計画 1 つぶん（`plans` の 1 件）で、点・線・置き場所は `core/plan-graph.ts` が組む。
  * 見た目と React Flow の扱いはフロー編集画面の図（`flow/Canvas.tsx`）に揃えてある。
  *
- * 終端にヒットしないステップ（`loose`）・すぐ始まるステップ（`ready`）・延期の引き受け手（`review_at`）・
+ * 終端に届かないステップ（`loose`）・すぐ始まるステップ（`ready`）・延期の引き受け手（`review_at`）・
  * 順序の検査の理由（`problems`）は実行ファイルの答えをそのまま描く。図の下の一言も、その値を並べるだけ。
  *
  * **`editable` が偽なら読むだけ。** 線を引けず、点も線も選べず、点を動かせない（`Canvas.tsx` の読むだけの扱いと
@@ -18,7 +18,7 @@
  * （全体を枠に収める）は `fitKey` が変わったときだけ合わせ直す（渡さなければ計画が替わるたび）。
  *
  * **`detail` が真なら、ステップを押すと右に詳細の欄を出す**（計画編集タブ）。番号・定義・題・見る場所・延期先・固定・
- * 先行と後続・すぐ始まるか・終端にヒットしないかを、実行ファイルの値のまま読むだけで出す（直すのは線）。欄は畳める
+ * 先行と後続・すぐ始まるか・終端に届かないかを、実行ファイルの値のまま読むだけで出す（直すのは線）。欄は畳める
  * （畳んだかは画面が覚える）。
  *
  * 見た目は `PlanGraph.css`。React Flow の CSS は `--xy-*` の変数で出来ているので、そこを `--vscode-*` で上書きする。
@@ -91,12 +91,12 @@ function deferText(reviewAt: number | null): string {
   return reviewAt === null ? "レビューを受け持つステップがありません" : `レビューは ${reviewAt} と一緒に`;
 }
 
-/** ステップの点。番号・定義の題・見る場所と、延期・固定・終端にヒットしない印 */
+/** ステップの点。番号・定義の題・見る場所と、延期・固定・終端に届かない印 */
 function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
   const { node, editable } = data;
   const title = [
     node.type,
-    node.loose ? "最後のステップの先行になっていない（終端にヒットしない）" : "",
+    node.loose ? "最後のステップの先行になっていない（終端に届かない）" : "",
     node.locked ? "子が承認された番号です。入る線は変えられません" : "",
   ]
     .filter((part) => part !== "")
@@ -132,7 +132,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
 
 /**
  * start と end の仮の点。名前だけ。線は図が引くので、取っ手から線は引けない。
- * end は、終端にヒットしないステップからの線を下の取っ手で受ける。左の取っ手で受けると、最後のステップからの線と
+ * end は、終端に届かないステップからの線を下の取っ手で受ける。左の取っ手で受けると、最後のステップからの線と
  * end の手前で重なり、どちらが注意の線か見分けられない
  */
 function EndView({ data }: NodeProps<EndNode>): JSX.Element {
@@ -147,7 +147,7 @@ function EndView({ data }: NodeProps<EndNode>): JSX.Element {
   );
 }
 
-/** end の取っ手。ふつうの線は左、終端にヒットしないステップからの線は下 */
+/** end の取っ手。ふつうの線は左、終端に届かないステップからの線は下 */
 const END_IN = "in";
 const END_LOOSE = "loose";
 
@@ -348,7 +348,7 @@ function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly grap
     ["先行ステップ", listOf(before)],
     ["後続ステップ", listOf(after)],
     ["すぐ始まる", plan.ready.includes(number) ? "はい" : "いいえ"],
-    ["最後のステップの先行になっていない", node.loose ? "はい（終端にヒットしない）" : "いいえ"],
+    ["最後のステップの先行になっていない", node.loose ? "はい（終端に届かない）" : "いいえ"],
     ["番号の固定", node.locked ? "固定（子が承認済み。入る線は変えられません）" : "なし"],
   ];
   return (

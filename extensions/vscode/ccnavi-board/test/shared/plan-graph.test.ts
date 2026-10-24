@@ -2,7 +2,7 @@
  * 計画の図の中身（`src/core/plan-graph.ts`）。承認のオーバーレイと計画編集タブが共有する図の部品
  * （`webview/shared/PlanGraph.tsx`）は、これが組んだ点と線をそのまま描く。DOM に触れないので単体で試す。
  *
- * 図は判定をしない。どのステップが終端にヒットしないか（`loose`）、すぐ始まるか（`ready`）、延期を誰が引き受けるか
+ * 図は判定をしない。どのステップが終端に届かないか（`loose`）、すぐ始まるか（`ready`）、延期を誰が引き受けるか
  * （`review_at`）は実行ファイルが `plans` に入れて返し、図は印を付けるだけ。図が自分で組むのは、線と点だけで
  * 決まる形（start・end の仮の点と線、置き場所、引けない線）まで。
  */
@@ -62,13 +62,13 @@ test("CB-T356 フィードバック計画の start は「全体計画のレビ�
   assert.deepEqual(lines(graph), ["n2->n4", "n3->n4", "n4->end", "start->n2", "start->n3"].sort());
 });
 
-test("CB-T357 終端にヒットしないステップは実行ファイルの loose どおりに印を付け、そのステップから end への線も印を付ける。loose が空なら形が同じでも付けない", () => {
+test("CB-T357 終端に届かないステップは実行ファイルの loose どおりに印を付け、そのステップから end への線も印を付ける。loose が空なら形が同じでも付けない", () => {
   const items: readonly RawItem[] = ["research", "design", { type: "implement", after: [1] }];
   const marked = planGraphOf(plan(items, { loose: [2] }));
   assert.deepEqual(marked.nodes.filter((node) => node.loose).map((node) => node.id), ["n2"]);
   assert.deepEqual(marked.edges.filter((edge) => edge.loose).map((edge) => `${edge.source}->${edge.target}`), ["n2->end"]);
   assert.deepEqual(lines(marked), ["n1->n3", "n2->end", "n3->end", "start->n1", "start->n2"].sort());
-  // 図は自分で「どれが終端にヒットしないか」を決めない。実行ファイルが言わなければ印は無い
+  // 図は自分で「どれが終端に届かないか」を決めない。実行ファイルが言わなければ印は無い
   const plain = planGraphOf(plan(items, { loose: [] }));
   assert.deepEqual(plain.nodes.filter((node) => node.loose), []);
   assert.deepEqual(plain.edges.filter((edge) => edge.loose), []);

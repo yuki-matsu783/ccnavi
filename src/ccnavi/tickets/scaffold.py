@@ -3,7 +3,7 @@
 `ccnavi ticket new <識別子> --title <題> --plan <型,型,...> --issue <値> --mr <番号>`。
 
 提案を手で書くと frontmatter の形を間違えやすく、とくにフェーズ定義の `scope` を `allow` に
-コピー忘れて、`design` フェーズの子が `wip/design/*` に書けず詰まる。この雛形の生成は、選んだ
+コピーし忘れて、`design` フェーズの子が `wip/design/*` に書けず詰まる。この雛形の生成は、選んだ
 フェーズの `scope` を `phases.yml` から集め、重複を除いて `allow` に書く（判定側で `wip/` を
 既定許可にはしない。承認していない範囲が黙って広がるため）。
 

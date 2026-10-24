@@ -134,7 +134,7 @@ test("CB-T501 見本の open は、実例の open と同じ線・番号・見る
   const mask = (plans: readonly ApprovePlan[]): unknown =>
     plans.map((plan) => ({ ...plan, ticket: "", source_sha: "", items: plan.items.map((item) => ({ ...item, title: "", review: "" })) }));
   assert.equal(sample.ticket, "sample-a");
-  assert.deepEqual(mask(sample.answers.open.answer.plans), mask(real.plans), "見本が実例とずれた。plan-order.json を書き出し直したら workflow.yml の見本もコピー直す");
+  assert.deepEqual(mask(sample.answers.open.answer.plans), mask(real.plans), "見本が実例とずれた。plan-order.json を書き出し直したら workflow.yml の見本もコピーし直す");
   const { plans: _a, ticket: _b, source_sha: _c, ...restSample } = sample.answers.open.answer;
   const { plans: _d, ticket: _e, source_sha: _f, ...restReal } = real;
   assert.deepEqual(restSample, restReal);

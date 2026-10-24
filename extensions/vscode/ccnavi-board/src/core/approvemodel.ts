@@ -17,7 +17,7 @@ export interface ApproveBatchEntry {
   readonly revision: boolean;
   readonly tree: string;
   readonly path: string;
-  /** チケットで編集対象としているが、書き込めない場所（親の範囲・定義の上限を超えたステップ）。承認は止めない。無ければ空 */
+  /** チケットで編集対象としているが、書き込めない場所（親の範囲・定義の上限を超えた項）。承認は止めない。無ければ空 */
   readonly overflow: readonly string[];
 }
 
@@ -67,7 +67,7 @@ export interface ApprovePlan {
   readonly proposed: Readonly<Record<string, readonly number[]>>;
   /** 改版のとき、承認済みの先行関係から戻した直接の先行。改版でなければ null */
   readonly current: Readonly<Record<string, readonly number[]>> | null;
-  /** 最後のステップの先行になっていないステップ（終端にヒットしないステップ） */
+  /** 最後のステップの先行になっていないステップ（終端に届かないステップ） */
   readonly loose: readonly number[];
   /** 先行なしですぐ始まるステップ */
   readonly ready: readonly number[];

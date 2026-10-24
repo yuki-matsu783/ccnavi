@@ -496,10 +496,10 @@ def predecessor_problems(
             )
         elif p.state in (PRED_SELF, PRED_ANCESTOR, PRED_CYCLE):
             why = {
-                PRED_SELF: "自分自身を先行に挙げている。自分が先行になることはできない",
+                PRED_SELF: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
                 PRED_ANCESTOR: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、"
                 "待っても満たされない",
-                PRED_CYCLE: f"先行が循環している（{p.where}）。どれも他の先行になっているので、"
+                PRED_CYCLE: f"先行が循環している（{p.where}）。どれも他が閉じるのを待つので、"
                 "待っても満たされない",
             }[p.state]
             problems.append(

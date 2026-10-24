@@ -118,7 +118,7 @@ test("CB-D169 断られた線（循環など）は引く前の形に戻し、理
   }
 });
 
-test("CB-D170 順序の検査に error がある答えは保存できない。理由（problems）は図の下に、終端にヒットしないステップの印は点に、実行ファイルの答えのまま出す", async () => {
+test("CB-D170 順序の検査に error がある答えは保存できない。理由（problems）は図の下に、終端に届かないステップの印は点に、実行ファイルの答えのまま出す", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-3-4");

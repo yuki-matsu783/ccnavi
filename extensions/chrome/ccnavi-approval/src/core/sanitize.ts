@@ -30,7 +30,7 @@ const CONFIG: Config = {
   FORBID_TAGS,
   FORBID_ATTR: [
     "style", "srcset", "action", "formaction", "background", "poster", "ping",
-    // 隠す・色で消す・見た目を変える属性。class と id は拡張の CSS にヒットしうる
+    // 隠す・色で消す・見た目を変える属性。class と id は拡張の CSS に一致しうる
     "hidden", "class", "id", "name", "color", "bgcolor", "face", "size", "width", "height", "align", "dir", "open", "inert", "popover",
   ],
   ALLOWED_URI_REGEXP: ALLOWED_URI,
