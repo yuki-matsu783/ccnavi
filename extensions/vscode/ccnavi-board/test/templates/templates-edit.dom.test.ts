@@ -292,7 +292,7 @@ test("CB-D388 新しいテンプレートは名前を入れて作る。使えな
   }
 });
 
-test("CB-D389 項のフローは最初から図を開いていて、部品箱でノードを足すと未保存になって読ませる。「フローを足す」は雛形を置き、「フローを外す」で消える", async () => {
+test("CB-D389 項のフローは最初から図を開いていて、部品箱でノードを足すと未保存になり、答えを読み直す。「フローを足す」は雛形を置き、「フローを外す」で消える", async () => {
   const dom = await openList();
   try {
     await startEdit(dom);
@@ -394,7 +394,7 @@ test("CB-D740 図の中身を読めなかったときは、理由を出す", asy
     await dom.settle();
     assert.match(text(dom.one(`${row} [data-role="preview-error"]`)), /検査できません/);
     assert.equal(dom.all(`${row} table.tpl-plan`).length, 0);
-    assert.equal(dom.posted.filter((m) => m.type === "preview" && m.name === "feature").length, 1, "失敗しても求め直し続けない");
+    assert.equal(dom.posted.filter((m) => m.type === "preview" && m.name === "feature").length, 1, "失敗しても頼み直さない");
   } finally {
     await dom.close();
   }
