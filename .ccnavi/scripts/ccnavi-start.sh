@@ -348,7 +348,7 @@ scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
 heads_file="$state/start-heads-$$"
-trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err" "$host_err.items" "$host_err.issues" "$host_err.mrs"' EXIT
+trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err" "$host_err.items" "$host_err.issues" "$host_err.mrs"' EXIT
 log_info 始めた -- "kind=${what:-${check:+check}${list_open:+list-open}${new_issue_title:+new-issue}}" "number=$number" "dry=${dry:-no}"
 
 # origin のパス（owner/repo）。issue の値の正規化に使う。読めなければ空（host_open が理由を言う）
@@ -506,6 +506,11 @@ host_api_failed() {
 	ccnavi_host_fail_status "$3" >"$host_err.status"
 	# ホストの返事の本文（先頭200文字、1行）。原因を絞り込めるよう、文面に出す。トークンは伏せる
 	ccnavi_host_fail_body "$3" >"$host_err.body"
+	# GraphQL を使えない環境（Claude Code のクラウド）の 403 か。mr_linked_issues が REST に替えるかを決める
+	rm -f "$host_err.blocked" || :
+	if ccnavi_host_graphql_blocked "$3"; then
+		: >"$host_err.blocked"
+	fi
 }
 # mr_linked_issues は $( ) の中で呼ばれるので、理由はファイル（$host_err.why）で受け渡す
 ml_why=""
@@ -714,12 +719,22 @@ new_issue_post() {
 	fi
 }
 
+# GraphQL を使えない環境で、MR の本文の閉じるキーワード（close・fix・resolve の各形。大文字小文字不問）に続く
+# `#n` と `<owner>/<repo>#n` を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>
+# GitHub の closingIssuesReferences の代わり。本文だけを読む（コミットメッセージのキーワードや、手で付けたリンクは拾わない）。
+# 戻り値: 0 読めた / 1 API の失敗
+mr_linked_issues_body() {
+	mb_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$1") || return 1
+	printf '%s' "$mb_got" | "$ccnavi_h_jq" -r --arg p "$ccnavi_h_path" \
+		'(.body // "") | scan("\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+((?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)"; "i") | .[0] | if startswith("#") then $p + . else . end' || return 1
+}
+
 # その MR が閉じる issue を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>
 # 戻り値: 0 読めた / 1 API の失敗（応答の errors・null を含む） / 2 読み切れない（件数の上限を超えた）。理由は ml_why
 mr_linked_issues() {
 	ml_mr="$1"
 	ml_why=""
-	rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.why" || :
+	rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" || :
 	if [ "$ccnavi_h_kind" = github ]; then
 		ml_owner="${ccnavi_h_path%%/*}"
 		ml_name="${ccnavi_h_path#*/}"
@@ -729,7 +744,16 @@ mr_linked_issues() {
 			ml_page=$((ml_page + 1))
 			ml_payload=$("$ccnavi_h_jq" -n --arg o "$ml_owner" --arg n "$ml_name" --argjson num "$ml_mr" --argjson c "$ml_cursor" \
 				'{query: "query($o:String!,$n:String!,$num:Int!,$c:String){repository(owner:$o,name:$n){pullRequest(number:$num){closingIssuesReferences(first:100,after:$c){nodes{number repository{nameWithOwner}} pageInfo{hasNextPage endCursor}}}}}", variables: {o: $o, n: $n, num: $num, c: $c}}')
-			ml_got=$(ccnavi_host_api POST graphql "$ml_payload") || return 1
+			ml_rc=0
+			ml_got=$(ccnavi_host_api POST graphql "$ml_payload") || ml_rc=$?
+			if [ "$ml_rc" -ne 0 ]; then
+				# GraphQL を使えない環境の 403 だけ、MR の本文の `Closes #n` を読む形に落とす（通常の環境は変わらない）
+				if [ "$ml_page" -eq 1 ] && [ -e "$host_err.blocked" ]; then
+					mr_linked_issues_body "$ml_mr"
+					return
+				fi
+				return 1
+			fi
 			if ! printf '%s' "$ml_got" | "$ccnavi_h_jq" -e '(.errors // null) == null and (.data.repository.pullRequest.closingIssuesReferences.nodes | type) == "array"' >/dev/null 2>&1; then
 				printf '%s' "紐づく issue を読めなかった（GraphQL の応答に errors があるか、MR が見つからない）" >"$host_err.why"
 				return 1

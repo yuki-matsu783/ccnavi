@@ -23,7 +23,9 @@ accept_file=""
 #
 # 実行ファイルが書いた計画（`--accept-plan`。{version, digest, threads: [{id, key, reply}]}）のスレッドを、
 # 全部に返信してから、全部を解決する（解決に失敗しても返信が重ならない順）。id は GitHub ならレビューの
-# スレッドの node id（GraphQL）、GitLab なら discussion の id。
+# スレッドの node id（GraphQL）か、GraphQL が 403 の環境では先頭コメントの id（数字。REST）、GitLab なら discussion の id。
+# GitHub の道は id の形で選ぶ（数字だけなら REST、でなければ GraphQL）。id は取り直した結果にあるものだけを
+# 通すので、取った道と書く道は同じになる（1 回の実行の中で混ざらない）。REST の返信は、そのスレッドの先頭コメントへの返信。
 # 呼ぶのは置く前（マーカーを置く前）。1 件でもできなければ受け入れは未完了として止める。
 #
 # ホストに書く前に、計画の id が API の経路に使える字で（GitLab は 16 進）、取り直した結果に
@@ -63,6 +65,15 @@ accept_reply() {
 	accept_id="$1"
 	accept_text="$2"
 	if [ "$kind" = github ]; then
+		case "$accept_id" in
+		"" | *[!0-9]*) ;;
+		*)
+			accept_body=$("$JQ" -n --arg b "$accept_text" '{body: $b}')
+			accept_res=$(api POST "repos/$path/pulls/$3/comments/$accept_id/replies" "$accept_body") || return 1
+			[ -n "$(printf '%s' "$accept_res" | "$JQ" -r '.id // empty' 2>/dev/null)" ]
+			return
+			;;
+		esac
 		accept_query=$("$JQ" -n --arg id "$accept_id" --arg b "$accept_text" '{
 			query: "mutation($id:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$b}){comment{id}}}",
 			variables: {id: $id, b: $b}}')
@@ -78,6 +89,13 @@ accept_reply() {
 accept_resolve() {
 	accept_id="$1"
 	if [ "$kind" = github ]; then
+		case "$accept_id" in
+		"" | *[!0-9]*) ;;
+		*)
+			accept_res=$(api POST "repos/$path/pulls/$2/ccr/comments/$accept_id/resolve") || return 1
+			return 0
+			;;
+		esac
 		accept_query=$("$JQ" -n --arg id "$accept_id" '{
 			query: "mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}",
 			variables: {id: $id}}')

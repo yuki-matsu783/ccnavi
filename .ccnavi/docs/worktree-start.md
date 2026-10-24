@@ -37,7 +37,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
 
   成功の条件: 開始の操作（`--check`・`--help`・`--dry-run`を除く）が終了コード0で終わったら、採用したMRと、そのMRが閉じるissue（リポジトリと番号）と、元ブランチが確定している。`--dry-run`は予定を示すだけで、開始の完了ではない。出力には「必須」の行（`issue: <値>`と`mr: <番号>`を提案のfrontmatterに書く）が必ず出る。issueの値は、MRと同じリポジトリなら`<番号>`、違えば`<owner/repo>#<番号>`で、大文字小文字は区別しない。
   - `--issue M`で新しくMRを作るときは、本文に`Closes #M`を入れるので、組は作った時点で確定する
-  - 既存のMRを採用するとき（`--issue M`でも`--mr N`でも）は、MRの採用の確認のあとで、そのMRが**閉じる**issueを読む（GitHubはGraphQLの`closingIssuesReferences`、GitLabは`closes_issues`）。`--issue`があれば、それが含まれること（参照しているだけでは足りない。説明欄に`Closes #M`を書くようユーザに頼む）。無ければ、ちょうど1件に決まること（0件は終了コード1、2件以上は一覧を出して3）。読めなければ（GraphQLの`errors`・`pullRequest: null`・件数の上限を含む）終了コード4で、MCPなどで確かめて打ち直す
+  - 既存のMRを採用するとき（`--issue M`でも`--mr N`でも）は、MRの採用の確認のあとで、そのMRが**閉じる**issueを読む（GitHubはGraphQLの`closingIssuesReferences`。GraphQLが使えない環境（Claude Codeのクラウド）ではMR本文の`Closes #n`・`Fixes #n`・`Resolves #n`を読む。GitLabは`closes_issues`）。`--issue`があれば、それが含まれること（参照しているだけでは足りない。説明欄に`Closes #M`を書くようユーザに頼む）。無ければ、ちょうど1件に決まること（0件は終了コード1、2件以上は一覧を出して3）。読めなければ（GraphQLの`errors`・`pullRequest: null`・件数の上限を含む）終了コード4で、MCPなどで確かめて打ち直す
   - 作りかけ（初期コミットだけで、MRが無い）の再開は、MRを作って続ける。それ以外の、MRの無い候補は成功させない
 
   事前確認（`ccnavi-start.sh --check`。単独で使う）: 先頭の行は`対象リポジトリ: …`、続けて1項目1行で`確認: <項目>: OK|NG|未確認|省略|注意 (<理由>)`、最後に結論の1行と、必要なら`次:`を1本出す。項目はtools（git・jq）・origin（ホストのURLで読める）・integration（統合先が決まる）・api（認証とリポジトリの有無）・access（書き込みの権限）・git（`ls-remote`が通る）。
