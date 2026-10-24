@@ -936,7 +936,7 @@ test("CB-T177d 確定した結果は実行ファイルの答えに従う。revie
   assert.match(odd?.note ?? "", /レビュー済みになっていません/);
 });
 
-test("CB-T178 文を渡したら閉じる。コピーと新しいセッションで、呼び名は同じ文に付く", () => {
+test("CB-T178 文を渡したら閉じる。コピー・新しいセッション・ターミナルで実行で、呼び名は同じ文に付く", () => {
   const done = toDone(approvalStep);
   const copied = approvalStep(done, { kind: "handOver", how: "promptCopy" });
   assert.equal(copied.state.overlay, undefined);
@@ -947,6 +947,16 @@ test("CB-T178 文を渡したら閉じる。コピーと新しいセッション
   const opened = approvalStep(prompt, { kind: "handOver", how: "promptOpen" });
   assert.equal(opened.state.overlay, undefined);
   assert.deepEqual(kinds(opened.effects), ["openSession"]);
+  // ターミナルで実行も、同じ文を渡して閉じる（文は拡張ホストが持っている分）
+  const ran = approvalStep(done, { kind: "handOver", how: "promptRun" });
+  assert.equal(ran.state.overlay, undefined);
+  assert.deepEqual(ran.effects, [{ kind: "runClaude", prompt: "承認の文" }]);
+  // 文の無い状態（閉じている）では渡さない
+  assert.deepEqual(approvalStep(CLOSED, { kind: "handOver", how: "promptRun" }).effects, []);
+  // 決めた結果のプロンプトからも、同じく文を渡して実行する（how の取り違えを守る）
+  const ranPrompt = approvalStep(prompt, { kind: "handOver", how: "promptRun" });
+  assert.equal(ranPrompt.state.overlay, undefined);
+  assert.deepEqual(kinds(ranPrompt.effects), ["runClaude"]);
   const copiedPrompt = approvalStep(prompt, { kind: "handOver", how: "promptCopy" });
   assert.equal(
     copiedPrompt.effects[0]?.kind === "copy" ? copiedPrompt.effects[0].what : "",

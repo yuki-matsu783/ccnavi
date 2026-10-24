@@ -138,7 +138,7 @@ export type ApprovalInput =
   /** 「やめる」「閉じる」を押した（画面の Esc も同じ） */
   | { readonly kind: "cancel" }
   /** 承認のプロンプト・決めた結果のプロンプトを渡した */
-  | { readonly kind: "handOver"; readonly how: "promptCopy" | "promptOpen" }
+  | { readonly kind: "handOver"; readonly how: "promptCopy" | "promptOpen" | "promptRun" }
   /**
    * ［レビュー完了］を押した。`tree` と `chip` はボードから引くので、無いことがある（古いボード）
    */
@@ -207,6 +207,8 @@ export type ApprovalEffect =
   | { readonly kind: "copyConsult"; readonly prompt: string }
   /** プロンプトを埋めて新しいセッションで開く */
   | { readonly kind: "openSession"; readonly prompt: string }
+  /** プロンプトを `claude -p` でボードのターミナルから実行する（止めるには、ターミナルで Ctrl+C を押す。結果は取り込まない） */
+  | { readonly kind: "runClaude"; readonly prompt: string }
   /** 親の計画編集タブを開く（`screens().workflow`） */
   | { readonly kind: "openWorkflow"; readonly ticket: string }
   /** ユーザに言う（警告） */
@@ -447,7 +449,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
  * プロンプトを Claude Code に渡す。プロンプトは拡張ホストが持っている分を使う（画面から届いたものは使わない）。
  * 渡したらオーバーレイを閉じる
  */
-function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen"): ApprovalStep {
+function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen" | "promptRun"): ApprovalStep {
   const overlay = state.overlay;
   // 渡すプロンプトがあるのは、承認した（done）ときと決めた結果（prompt）のときだけ
   if (overlay?.kind !== "done" && overlay?.kind !== "prompt") {
@@ -458,7 +460,11 @@ function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen"): App
   return move(
     state,
     CLOSED,
-    how === "promptCopy" ? { kind: "copy", prompt, what } : { kind: "openSession", prompt },
+    how === "promptCopy"
+      ? { kind: "copy", prompt, what }
+      : how === "promptOpen"
+        ? { kind: "openSession", prompt }
+        : { kind: "runClaude", prompt },
   );
 }
 
@@ -642,7 +648,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     }
     const extra = value.pending_extra.length;
     const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
-    const handover = " Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。";
+    const handover = " Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。「ターミナルで実行」は、押すとすぐ確認なしで実行されます。";
     const overlay = state.overlay;
     const where = overlay?.kind === "deciding" ? { parent: overlay.preview.parent, phase: overlay.preview.phase } : { parent: value.parent, phase: value.phase };
     let title: string;
