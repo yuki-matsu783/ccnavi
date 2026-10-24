@@ -507,7 +507,7 @@ timed() {
 	shift 2
 	"$@" </dev/null >"$timed_out" 2>/dev/null &
 	timed_pid=$!
-	# sleep は背景で起こして wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
+	# sleep はバックグラウンドで起こして wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
 	(
 		exec </dev/null >/dev/null 2>&1
 		timed_sleep=""

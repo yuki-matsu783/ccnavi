@@ -348,7 +348,7 @@ ccnavi_git_timed() {
 	fi
 	ccnavi_gt_pid=$!
 	# タイムアウト監視の中で標準入出力を先に閉じる（呼ぶ側のパイプを開いたまま残らないように）。
-	# sleep は背景で起こして wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
+	# sleep はバックグラウンドで起こして wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
 	(
 		exec </dev/null >/dev/null 2>&1
 		ccnavi_gt_sleep=""
