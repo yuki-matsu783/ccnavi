@@ -1,0 +1,15 @@
+/*
+ * 共通レイヤーのミラーの表示（`Mirror.tsx`）。カードの「ミラー」の欄（状態と「ミラーを同期」の 1 行、畳んだずれの一覧）と、
+ * 上部の最終確認の時刻。帯は骨組みの `.banner` のまま。
+ */
+.mirror-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-2) var(--gap-4); }
+.mirror-state { min-width: 0; overflow-wrap: anywhere; }
+.mirror-changes { margin-top: 4px; font-size: var(--font-sm); }
+.mirror-changes > summary { cursor: pointer; color: var(--vscode-descriptionForeground); }
+.mirror-changes ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--gap-1); }
+.mirror-changes li { overflow-wrap: anywhere; }
+/* 変更の種類。文字は前景色へ混ぜた意味の色、縁だけ素の意味の色（`.badge.warn` と同じ書き方） */
+.badge.mirror-update { color: var(--warn-text); border-color: var(--vscode-editorWarning-foreground); }
+.badge.mirror-create { color: var(--ok-text); border-color: var(--vscode-charts-green); }
+.badge.mirror-delete { color: var(--error-text); border-color: var(--vscode-editorError-foreground); }
+.summary .mirror-checked { font-weight: 400; }

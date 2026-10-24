@@ -10,6 +10,7 @@
  */
 import type { AppearanceMessage } from "./appearance.js";
 import type { LintProblem } from "./lintmodel.js";
+import type { MirrorStatus } from "./mirrormodel.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
 // ---- 画面に見せる形
@@ -63,14 +64,27 @@ export interface ProjectsPage {
   readonly existingNames: readonly string[];
 }
 
+/**
+ * 共通レイヤーのミラーの状態（`user mirror --json` の結果）。一覧（`ProjectsPage`）とは別に、拡張ホストが 5 分ごとに調べ直す。
+ * 状態の形とボタンの判断は `mirrormodel.ts` が持つ。
+ */
+export interface MirrorData {
+  readonly status: MirrorStatus;
+  /** 同期しているか、同期の後の調べ直しがまだ終わっていない。真の間、画面は同期のボタンを押せなくする */
+  readonly busy: boolean;
+  /** 最後に調べ終えた時刻（`HH:MM`）。まだ調べていなければ空 */
+  readonly checkedAt: string;
+}
+
 // ---- やり取り
 
 /**
  * 画面に見せる中身。読み直せなかったときは一覧の代わりに文面を渡す（`kind: "error"`）。
- * ボードと同じ形で、画面はどちらでも 1 枚を描く。
+ * ボードと同じ形で、画面はどちらでも 1 枚を描く。`mirror` が無ければ、まだミラーを調べていない
+ * （画面はミラーの欄もボタンも出さない）。
  */
 export type ProjectsData =
-  | { readonly kind: "page"; readonly page: ProjectsPage }
+  | { readonly kind: "page"; readonly page: ProjectsPage; readonly mirror?: MirrorData }
   | { readonly kind: "error"; readonly error: string };
 
 /**
@@ -96,6 +110,12 @@ export type ProjectsMessage =
   | { readonly type: "refresh" }
   | { readonly type: "fixIgnore" }
   | { readonly type: "clone"; readonly url: string; readonly name: string }
+  /**
+   * ミラーを同期する。`names` が空なら差分のある全プロジェクト（「すべて同期」）、1 つならそのプロジェクトだけ（「ミラーを同期」）。
+   * `expect` は画面が見せていた結果の値（全体なら結果の `expect`、単独ならそのプロジェクトの `expect`）。
+   * 見せた後に内容が変わっていれば、実行ファイルは何も書かない
+   */
+  | { readonly type: "mirrorSync"; readonly names: readonly string[]; readonly expect: string }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" };
 

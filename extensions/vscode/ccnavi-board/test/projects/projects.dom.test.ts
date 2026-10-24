@@ -81,7 +81,7 @@ test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は�
   }
 });
 
-test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤーは本体の枠に出す。操作のボタンはありません", async () => {
+test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤーは本体の枠に出す。ミラーを調べる前は操作のボタンはありません", async () => {
   const dom = await openProjects([
     row({ name: "app", rel: "projects/app", rulesRel: "projects/app/.ccnavi/config/project/rules.yml" }),
     row({ rulesExists: false }),

@@ -9,6 +9,7 @@
 #                            CCNAVI_TICKET_CONTROL。チケット制御を使うか。既定は enable
 #   --deploy <ccnavi の根>   配布元。既定はこのスクリプトが入っている ccnavi の根
 #   --no-deploy              配布物を置かず、settings.json だけを書く
+#   --bin <project|user>     実行ファイルの置き方。既定は project（配布先の .ccnavi/bin/）。user はホームディレクトリの下に置き、端末で確認する
 #   --all                    受け付けるが、今は足すものが無い（置き場の env は廃止した）
 #   --force                  明示した --mode / --ticket-control で、既にある値を置き換える。
 #                            配るときも、配布先に既にあるものを入れ替える
@@ -46,19 +47,26 @@
 # 実行ファイルは機械ごとに .ccnavi/bin/<os>-<arch>/ に置く。振り分けの sh は、自分の 1 つ上の
 # bin/ から、hook を起動した機械に合うものを選ぶ。settings.json は Windows・WSL・Linux・macOS で
 # 同じファイルを開く。1 行の command から機械ごとに違う実体を起動するには、sh の中で選ぶしかない。
-# 置き場は動かないので、置き場を指定するオプションは持たない。
+# 配置先は動かないので、配置先のパスを指定するオプションは持たない。持つのは置き方の選択（--bin）だけ。
+# project（既定）は上の .ccnavi/bin/<os>-<arch>/。user は、実体を ~/.local/share/ccnavi/<os>-<arch>/ に置き、
+# PATH に通す ~/.local/bin/ccnavi からリンクを張る（振り分けの sh は、bin/ に無ければ PATH の ccnavi を使う）。
+# Windows の Git Bash はリンクを当てにせず、実体のフォルダ（ccnavi.exe と _internal/）を PATH に通す。
+# ホームディレクトリに書き込むので、端末で確認する。エージェントが代わりに答える指定は持たない。
+# PATH への追加は、シェルの設定ファイルも Windows の環境変数も書き換えずに、環境に合った追加の仕方を知らせるだけにする。
 #
 # CCNAVI_ENTRY_PATH が既定でないパスなら書き換えず、そのパスを挙げて知らせるだけにする。
 #
 # 配布先に既にあるものには触らない。入れ替えるのは `--force` を付けたときだけ。
 # ルールファイルも代わりに通る sh も、入れた先で手直しされている前提のもの。断りなく上書き
 # すると、そのプロジェクトが何を止めるかが、1 回の実行し直しで配布元の内容へ戻る。
+# ただし、この機械の実行ファイル（.ccnavi/bin/<os>-<arch>/）は、配布先で手直しされるものではない。
+# 配布元と中身が違えば、`--force` が無くても置き換える。
 #
 # `disable` は受け付けない。監視される側が書けるファイルで監視を止めることになるので、
 # ccnavi 自身がそれを error として報告する（docs/requirements/diagnostics.md の 2.10.1「設定の検証」）。止めたいときは、
 # セッションを起動する側の環境から渡す。
 #
-# 終了コード: 0 成功 / 1 --check で揃っていない / 2 引数か環境の誤り
+# 終了コード: 0 成功 / 1 --check で揃っていない・ユーザが確認で中止した / 2 引数か環境の誤り
 
 set -eu
 
@@ -180,6 +188,8 @@ target=""
 deploy=""
 deploy_given=no
 deploy_off=no
+# 実行ファイルの置き方。project は配布先の .ccnavi/bin/、user はホームディレクトリの下（~/.local/）に置いて PATH から使う。
+bin_place="project"
 # 既定の配布元が使えなかった理由。空でなければ 1 行出す。
 deploy_skipped=""
 
@@ -194,9 +204,14 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             使うか。全体ルールだけで足りるプロジェクトは disable。既定は enable
   --deploy <ccnavi の根>    配布元。既定はこのスクリプトが入っている ccnavi の根
   --no-deploy               配布物を置かず、settings.json だけを書く
+  --bin <project|user>      実行ファイルの置き方。project（既定）は配布先の .ccnavi/bin/<os>-<arch>/ に置く。
+                            user は ~/.local/share/ccnavi/<os>-<arch>/ に置き、~/.local/bin/ccnavi からリンクする
+                            （PATH から使う形。Windows の Git Bash はリンクを張らず、実体のフォルダを PATH に通す）。
+                            ホームディレクトリに書き込むので、端末での確認が要る。PATH への追加の仕方は環境に合わせて案内する
   --all                     受け付けるが、今は足すものが無い（置き場の env は廃止した）
   --force                   明示した --mode / --ticket-control で、既にある値を置き換える。
-                            配るときも、配布先に既にあるものを入れ替える
+                            配るときも、配布先に既にあるものを置き換える。ただし、この機械の実行ファイルは
+                            --force が無くても、配布元と中身が違えば置き換える
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
   --no-fetch                セッション開始時の入口（ccnavi-session-start.sh）を hook に登録しない。
@@ -247,6 +262,11 @@ while [ "$#" -gt 0 ]; do
 	--no-deploy)
 		deploy_off=yes
 		shift
+		;;
+	--bin)
+		[ "$#" -ge 2 ] || die "--bin に値がありません。project か user を指定します。"
+		bin_place="$2"
+		shift 2
 		;;
 	--all)
 		all=yes
@@ -311,6 +331,15 @@ enable | disable) ;;
 	die "--ticket-control に使えるのは enable か disable です。"
 	;;
 esac
+
+case "$bin_place" in
+project | user) ;;
+*)
+	die "--bin に使えるのは project か user です。"
+	;;
+esac
+[ "$bin_place" = project ] || [ "$deploy_off" = no ] ||
+	die "--bin user と --no-deploy は同時に指定できません。--bin user は実行ファイルを配る置き方です。"
 
 command -v jq >/dev/null 2>&1 || die "jq が必要です。"
 
@@ -455,7 +484,8 @@ if [ -n "$deploy" ]; then
 fi
 
 # 配るものを決める。配布先に既にあるものには触らない。入れ替えるのは --force の
-# ときだけで、そのときも配布元にあるものだけを動かす。
+# ときだけで、そのときも配布元にあるものだけを動かす。例外は実行ファイル（.ccnavi/bin/<この機械>/）で、
+# 配布元と中身が違えば --force が無くても置き換える。
 #
 # 「配布元に無い」ものを、何も言わずに飛ばさない。ルールファイルや代わりに通る sh が
 # 欠けた配布元から配ると、判定するものだけが入り、何を止めるかが入らない。その状態は
@@ -531,6 +561,24 @@ verdict() {
 	fi
 }
 
+# 配布元の中身が、配布先の同じ名前のものと違えば 0。copy_tree が動かす単位（配布元の直下の
+# 1 つずつ）で比べる。配布先にだけあるファイルは、配布元の名前の下にあるものだけを見る
+# （前の組み立ての残りは置き換えのときに消える）。比べられないとき（diff が無い、読めない）は
+# 違わないものとして扱う。確かめられないまま、動いている実行ファイルを置き換えない。
+tree_differs() {
+	# $1 配布元の絶対パス / $2 配布先の絶対パス
+	command -v diff >/dev/null 2>&1 || return 1
+	for entry in "$1"/*; do
+		[ -e "$entry" ] || continue
+		name=$(basename "$entry")
+		[ -e "$2/$name" ] || return 0
+		tree_rc=0
+		diff -rq "$entry" "$2/$name" >/dev/null 2>&1 || tree_rc=$?
+		[ "$tree_rc" -ne 1 ] || return 0
+	done
+	return 1
+}
+
 note_deploy() {
 	# $1 verdict / $2 配布先のパス / $3 配布元のパス
 	case "$1" in
@@ -555,16 +603,110 @@ note_deploy() {
 
 # 振り分けの sh の行き先も、組み立ての置き場も固定。振り分けの sh は自分の 1 つ上の bin/ を探すので、
 # 2 つの置き場が決まっていれば、設定に書くパスと実体を置く場所は食い違わない。
+user_share=""
+user_link_dir=""
+user_link=""
+user_bin_verdict=""
+user_link_verdict=""
+user_bin_work=no
+user_windows=no
+user_path_dir=""
+user_exe=""
+user_path_missing=no
+user_stale_bin=""
+user_link_dir_note=no
 if [ -n "$deploy" ]; then
 	build_dir_rel="$BUILD_ROOT/$built"
-	# あるかどうかは 2 つの名前で確かめる。PyInstaller は Windows でだけ .exe を付けるため。
-	if [ -f "$root/$build_dir_rel/ccnavi" ] || [ -f "$root/$build_dir_rel/ccnavi.exe" ]; then
-		bin_there=yes
+	if [ "$bin_place" = project ]; then
+		# あるかどうかは 2 つの名前で確かめる。PyInstaller は Windows でだけ .exe を付けるため。
+		if [ -f "$root/$build_dir_rel/ccnavi" ] || [ -f "$root/$build_dir_rel/ccnavi.exe" ]; then
+			bin_there=yes
+		else
+			bin_there=no
+		fi
+		bin_verdict=$(verdict "$source_root/$DEPLOY_BIN_DIR" "$bin_there")
+		# 実行ファイルは、配布先で手直しされるものではない。配布元と中身が違えば、--force が無くても
+		# 置き換える（組み立て直したのに古いまま残ると、sh との互換の食い違いで hook が働かなくなる）。
+		if [ "$bin_verdict" = keep ] && tree_differs "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel"; then
+			bin_verdict=replace
+		fi
+		note_deploy "$bin_verdict" "$build_dir_rel" "$DEPLOY_BIN_DIR"
 	else
-		bin_there=no
+		# ホームディレクトリの下に置く。実体（PyInstaller の同梱物ごと）は ~/.local/share/ccnavi/<os>-<arch>/ に置き、
+		# PATH に通す ~/.local/bin/ccnavi からそこへリンクを張る。PATH に通すのは、隣に _internal/ がある
+		# 実行ファイルでなければならず、単体のコピーは動かないため。
+		# 配布先の .ccnavi/bin/ には何も置かない。振り分けの sh は、bin/ に無ければ PATH の ccnavi を使う。
+		[ -n "${HOME:-}" ] || die "--bin user には HOME が要ります。"
+		runs_here "$built" "$runnable" ||
+			die "--bin user で置けるのは、この機械（${host}）で動く実行ファイルだけです。配布元の実行ファイルは ${built} 向けです。"
+		user_share="$HOME/.local/share/ccnavi/$built"
+		case "$host" in
+		windows-*)
+			# Git Bash ではリンクを当てにしない（張れないことがある）。PATH に通すのは、実体のフォルダそのもの
+			# （ccnavi.exe と _internal/ が並ぶフォルダ）。振り分けの sh は、PATH のフォルダの ccnavi.exe を見つける。
+			user_windows=yes
+			user_path_dir="$user_share"
+			user_exe="$user_share/ccnavi.exe"
+			user_link_verdict=none
+			;;
+		*)
+			user_windows=no
+			user_link_dir="$HOME/.local/bin"
+			user_link="$user_link_dir/ccnavi"
+			user_path_dir="$user_link_dir"
+			user_exe="$user_link"
+			;;
+		esac
+		if [ -f "$user_share/ccnavi" ] || [ -f "$user_share/ccnavi.exe" ]; then
+			user_there=yes
+		else
+			user_there=no
+		fi
+		user_bin_verdict=$(verdict "$source_root/$DEPLOY_BIN_DIR" "$user_there")
+		if [ "$user_bin_verdict" = keep ] && tree_differs "$source_root/$DEPLOY_BIN_DIR" "$user_share"; then
+			user_bin_verdict=replace
+		fi
+		note_deploy "$user_bin_verdict" "$user_share" "$DEPLOY_BIN_DIR"
+		case "$user_bin_verdict" in
+		copy | replace) user_bin_work=yes ;;
+		esac
+		if [ "$user_windows" = no ]; then
+			# リンク。自分が張ったもの（実体を指す）なら何もしない。別のものが既にあれば、--force のときだけ置き換える。
+			if [ -L "$user_link" ] && [ "$(readlink "$user_link" 2>/dev/null)" = "$user_share/ccnavi" ]; then
+				user_link_verdict=same
+			elif [ -d "$user_link" ] && [ ! -L "$user_link" ]; then
+				# ディレクトリは、--force でも置き換えない（中身を消してしまうため）。
+				user_link_verdict=keep
+				user_link_dir_note=yes
+			elif [ -e "$user_link" ] || [ -L "$user_link" ]; then
+				if [ "$force" = yes ]; then
+					user_link_verdict=replace
+				else
+					user_link_verdict=keep
+				fi
+			else
+				user_link_verdict=copy
+			fi
+			if [ "$user_link_dir_note" = yes ]; then
+				note_deploy "$user_link_verdict" "${user_link}（ディレクトリがあるので、リンクを張れない）" "$DEPLOY_BIN_DIR"
+			elif [ "$user_link_verdict" != same ]; then
+				note_deploy "$user_link_verdict" "${user_link}（${user_share}/ccnavi へのリンク）" "$DEPLOY_BIN_DIR"
+			fi
+			case "$user_link_verdict" in
+			copy | replace) user_bin_work=yes ;;
+			esac
+		fi
+		# 配布先の .ccnavi/bin/ に、この機械の実行ファイルが残っていれば、振り分けの sh はそちらを先に使う
+		# （ホームディレクトリに置いたものは使われない）。残っていることを知らせる。
+		if [ -f "$root/$build_dir_rel/ccnavi" ] || [ -f "$root/$build_dir_rel/ccnavi.exe" ]; then
+			user_stale_bin="$root/$build_dir_rel"
+		fi
+		# 実体かリンクを置いたあとで PATH から見つかるか。見つからなければ、案内を出す（report_user_bin_path）。
+		case ":$PATH:" in
+		*":$user_path_dir:"*) ;;
+		*) user_path_missing=yes ;;
+		esac
 	fi
-	bin_verdict=$(verdict "$source_root/$DEPLOY_BIN_DIR" "$bin_there")
-	note_deploy "$bin_verdict" "$build_dir_rel" "$DEPLOY_BIN_DIR"
 
 	if [ -e "$root/$DEPLOY_RULES" ]; then
 		rules_there=yes
@@ -759,6 +901,9 @@ fi
 # この機械で動く実行ファイルがあるか。振り分けの sh と同じ順で探す: 実行ファイルの置き場、
 # 無ければ PATH の ccnavi（絶対パスの項目だけ。振り分けの sh と同じファイルは飛ばす）。
 runnable_there() {
+	if [ -n "$user_exe" ] && [ -f "$user_exe" ] && [ -x "$user_exe" ]; then
+		return 0
+	fi
 	for runnable_target in $runnable; do
 		for runnable_name in ccnavi ccnavi.exe; do
 			if [ -f "$root/$BUILD_ROOT/$runnable_target/$runnable_name" ]; then
@@ -1022,7 +1167,8 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		done
 		return 1
 	}
-	if ! ignored_already "/$BUILD_ROOT/$built/"; then
+	# ホームディレクトリに置くときは、配布先に実行ファイルを置かないので、無視する行も追加しない。
+	if [ "$bin_place" = project ] && ! ignored_already "/$BUILD_ROOT/$built/"; then
 		ignore_bin_todo="/$BUILD_ROOT/$built/
 "
 	fi
@@ -1067,6 +1213,31 @@ copy_tree() {
 		rm -rf "$2/$name"
 		cp -R "$entry" "$2/$name"
 	done
+}
+
+# 実行ファイルの置き場を、途中で失敗しても元の版が残る形で置き換える。新しい版を隣に作ってから、
+# フォルダごと名前を入れ替える（名前の変更が失敗すれば、元の版がそのまま残る）。Windows で実行中の
+# ファイルがあるときも同じ。1 つずつ消してから写すと、途中で止まったときに、実行ファイルだけが残り、
+# 同梱物が欠けた状態になる。
+replace_tree() {
+	# $1 配布元 / $2 配布先（既にある）
+	rt_new="$2.new.$$"
+	rt_old="$2.old.$$"
+	rm -rf "$rt_new" "$rt_old"
+	if ! copy_tree "$1" "$rt_new"; then
+		rm -rf "$rt_new"
+		return 1
+	fi
+	if ! mv "$2" "$rt_old"; then
+		rm -rf "$rt_new"
+		return 1
+	fi
+	if ! mv "$rt_new" "$2"; then
+		mv "$rt_old" "$2"
+		rm -rf "$rt_new"
+		return 1
+	fi
+	rm -rf "$rt_old"
 }
 
 copy_file() {
@@ -1227,6 +1398,48 @@ report_deploy_plan() {
 	report_deploy '配る' '入れ替える' '.gitignore に足す' '実行ビットを付ける'
 }
 
+# --bin user のとき、PATH に通すフォルダが PATH に入っていなければ、環境に合った追加の仕方を知らせる。
+# シェルの設定ファイルも Windows の環境変数も書き換えない（環境ごとに場所が違い、壊したときの被害が大きい）。
+#   Windows（Git Bash）: ユーザの環境変数 Path に追加する。Git Bash の rc に書くだけだと、Git Bash を経ない起動から見えない
+#   macOS・Linux・WSL: 使っているシェルの設定ファイルに export の 1 行を追加する（zsh は ~/.zshrc、macOS の bash は
+#                      ~/.bash_profile、Linux の bash は ~/.bashrc、fish は fish_add_path、そのほかは ~/.profile）
+report_user_bin_path() {
+	if [ -n "$user_stale_bin" ]; then
+		printf '案内: 配布先の %s に実行ファイルが残っています。振り分けの sh は配布先の bin/ を先に使うので、ホームディレクトリに置いた実行ファイルは使われません。使わないなら、このフォルダを削除してください。\n' "$user_stale_bin"
+	fi
+	[ "$user_path_missing" = yes ] || return 0
+	printf '案内: %s が PATH に入っていません。次のとおり追加します（このスクリプトは書き換えません）。\n' "$user_path_dir"
+	if [ "$user_windows" = yes ]; then
+		path_win=$(cygpath -w "$user_path_dir" 2>/dev/null || printf '%s' "$user_path_dir")
+		# PowerShell の単引用符の中では、単引用符を 2 つ重ねて書く。
+		path_ps=$(printf '%s' "$path_win" | sed "s/'/''/g")
+		printf '案内: Windows のユーザの環境変数 Path に追加します。PowerShell で次を実行します:\n'
+		printf "案内:   [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ';%s', 'User')\\n" "$path_ps"
+		printf '案内: 画面から追加するなら、「環境変数を編集」でユーザーの Path を開き、「新規」で %s を加えます。\n' "$path_win"
+		printf '案内: 追加したあと、Git Bash と Claude Code を開き直すと反映されます。\n'
+		return 0
+	fi
+	path_shell=$(basename "${SHELL:-}")
+	case "$path_shell" in
+	fish)
+		printf '案内: fish は次を 1 度実行します（設定が保存され、開き直さなくても反映されます）:\n'
+		printf '案内:   fish_add_path $HOME/.local/bin\n'
+		return 0
+		;;
+	zsh) path_rc='~/.zshrc' ;;
+	bash)
+		case "$host" in
+		darwin-*) path_rc='~/.bash_profile' ;;
+		*) path_rc='~/.bashrc' ;;
+		esac
+		;;
+	*) path_rc='~/.profile' ;;
+	esac
+	printf '案内: %sの設定ファイル %s に 1 行追加します:\n' "${path_shell:-使っているシェル}" "$path_rc"
+	printf '案内:   echo %s >> %s\n' "'export PATH=\"\$HOME/.local/bin:\$PATH\"'" "$path_rc"
+	printf '案内: 追加したあと、シェルを開き直すか、. %s を実行すると反映されます。\n' "$path_rc"
+}
+
 # 揃っているかを判定する。値の違いと、別の表記での登録も「揃っていない」に数える。
 # 不足の 2 つだけで決めると、CCNAVI_MODE=disable が書かれた設定に --check を
 # 実行しても「揃っています」と表示することになる。
@@ -1372,6 +1585,7 @@ if [ "$check" = yes ]; then
 	printf '%s\n' "$settings"
 	report_missing
 	report_deploy_plan
+	report_user_bin_path
 	report_projects
 	if [ "$settled" = yes ]; then
 		if [ "$vscode" = yes ]; then
@@ -1407,8 +1621,35 @@ if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no
 	printf '書き足すものはありません。\n'
 	report_missing
 	report_deploy_plan
+	report_user_bin_path
 	report_projects
 	exit 0
+fi
+
+# ホームディレクトリ（~/.local/）に書き込む前に、端末で確認する。エージェントが代わりに答えられる形
+# （--yes のような指定）は持たない。端末でなければ、何も書かずに断る。
+if [ "$user_bin_work" = yes ]; then
+	[ -t 0 ] ||
+		die "--bin user は、ホームディレクトリ（${user_share}・${user_link}）に書き込むので、端末での確認が要ります。端末から実行してください。何も書いていません。"
+	printf 'ホームディレクトリに次を書きます:\n'
+	case "$user_bin_verdict" in
+	copy) printf '  %s（実行ファイルの実体を新しく置く）\n' "$user_share" ;;
+	replace) printf '  %s（実行ファイルの実体を置き換える）\n' "$user_share" ;;
+	esac
+	case "$user_link_verdict" in
+	copy) printf '  %s（%s/ccnavi へのリンクを新しく張る）\n' "$user_link" "$user_share" ;;
+	replace) printf '  %s（既にあるものを削除して、%s/ccnavi へのリンクに置き換える）\n' "$user_link" "$user_share" ;;
+	esac
+	printf '続けますか？ [y/N] '
+	user_answer=""
+	read -r user_answer || user_answer=""
+	case "$user_answer" in
+	y | Y | yes | YES) ;;
+	*)
+		printf "ccnavi-setup: 中止しました。何も書いていません。\n" >&2
+		exit 1
+		;;
+	esac
 fi
 
 # 設定ファイルへの書き込みを 1 か所にまとめる。呼び出し元は .claude/settings.json と
@@ -1529,7 +1770,12 @@ fi
 if [ "$deploy_work" = yes ]; then
 	case "$bin_verdict" in
 	copy | replace)
-		copy_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel"
+		if [ "$bin_verdict" = replace ]; then
+			replace_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel" ||
+				die "実行ファイルを置き換えられませんでした（使用中の可能性があります）。元の実行ファイルは残してあります: $root/$build_dir_rel"
+		else
+			copy_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel"
+		fi
 		# 実行ビットを付け直す。cp は元のモードを umask で削ってコピーするので、
 		# 配布元の置き方によっては実行ビットが外れる。外れていると、hook は
 		# 「実行ファイルが無い」ではなく「起動できない」という理由で、気づかないうちに失敗する。
@@ -1538,6 +1784,26 @@ if [ "$deploy_work" = yes ]; then
 				chmod +x "$spelling" 2>/dev/null || true
 			fi
 		done
+		;;
+	esac
+	# ホームディレクトリの下の実体 → リンクの順に置く。リンクだけが先にあって実体が無い状態を作らない。
+	case "$user_bin_verdict" in
+	copy | replace)
+		if [ "$user_bin_verdict" = replace ]; then
+			replace_tree "$source_root/$DEPLOY_BIN_DIR" "$user_share" ||
+				die "実行ファイルを置き換えられませんでした（使用中の可能性があります）。元の実行ファイルは残してあります: $user_share"
+		else
+			copy_tree "$source_root/$DEPLOY_BIN_DIR" "$user_share"
+		fi
+		chmod +x "$user_share/ccnavi" "$user_share/ccnavi.exe" 2>/dev/null || true
+		;;
+	esac
+	case "$user_link_verdict" in
+	copy | replace)
+		mkdir -p "$user_link_dir" || die "$user_link_dir を作れません。実体は $user_share に置いてあります。"
+		rm -f "$user_link"
+		ln -s "$user_share/ccnavi" "$user_link" ||
+			die "$user_link にリンクを張れません。実体は $user_share に置いてあります。"
 		;;
 	esac
 	case "$rules_verdict" in
@@ -1620,6 +1886,7 @@ if [ "$deploy_work" = yes ]; then
 fi
 
 report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'
+report_user_bin_path
 if [ -n "$launcher_mode_failed" ]; then
 	printf '実行ビットを付けられなかった振り分けの sh（hook が起動しません。chmod +x で付けてください）:\n'
 	printf '%s' "$launcher_mode_failed" | sed 's/^/  /'

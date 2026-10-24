@@ -316,6 +316,47 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
   返して 1 で終わる。`changed` は食い違った指摘の鍵（親・フェーズ・マージリクエスト・`can_issue` が変わったときは `target`）
 - 操作の途中で失敗した送信は、`ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`）
 
+## ミラーの JSON
+
+```sh
+ccnavi user mirror [<プロジェクト名>…] --json                                   # 見るだけ
+ccnavi user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json   # 揃える
+```
+
+ワークスペースの共通レイヤーと、各プロジェクトのメインのチェックアウトにあるミラー
+（`.ccnavi/config/common/`）のずれを調べる（見るだけ）形と、ずれを揃える形。揃える形は作業ツリーに書き、
+コミットはしない。読み手は VS Code 拡張のプロジェクト管理画面。
+
+```json
+{"version": 1, "ok": true, "error": "", "common_empty": false,
+ "projects": [
+   {"name": "app", "state": "synced", "changes": [], "error": "", "expect": ""},
+   {"name": "web", "state": "differs",
+    "changes": [{"rel": ".ccnavi/config/common/rules.yml", "action": "update"}],
+    "error": "", "expect": "…"},
+   {"name": "x", "state": "error", "changes": [], "error": "理由", "expect": ""}
+ ],
+ "expect": "…"}
+```
+
+| 鍵 | 何 |
+|---|---|
+| `ok` / `error` | 全体の成否と理由。偽のとき（共通レイヤーが読めない、渡した名前がプロジェクトに無い）は `projects` が空 |
+| `common_empty` | 共通レイヤーに写すものが無い。揃えても何も起きず、ミラーは消さない |
+| `projects[].state` | `synced`（ずれなし）、`differs`（ずれあり）、`error`（調べられない。理由は `error`） |
+| `projects[].changes` | ずれの中身。`rel` はプロジェクトのルートからの相対、`action` は `create`・`update`・`delete` |
+| `projects[].expect` | そのプロジェクトだけを揃えるときの `--expect` の値。ずれが無ければ空 |
+| `expect` | 差分のある全プロジェクトを揃えるときの `--expect` の値。差分が無ければ空 |
+
+全体の `expect` に入るのは、`differs` のプロジェクトだけ（`error` と `synced` は入らない）。`common_empty` が真のときは、`projects` は全部 `synced` で、`expect` は空。`changes[].action` は `create`・`update`・`delete` の 3 つだけ。
+名前は大文字小文字を区別せずに引き、結果には実際のディレクトリの綴りで返す。
+終了コードは、見るだけは 0（`projects` に `error` があっても 0）、全体の誤り（`ok` が偽）は 1。揃える形は、全部書けたとき 0、書けなかったもの・照合の不一致・対象が無いとき 1。どちらも、終了コードより先に標準出力の JSON を読む。
+
+揃える形の結果は `{"version": 1, "ok": true, "error": "", "synced": [{"name": "web", "files": ["…"]}]}`。
+`--expect` が今の差分と一致しないときは何も書かず、`ok` を偽にして `error` に「内容が更新されました」で始まる文を返す
+（呼ぶ側は画面を読み直して、もう一度押してもらう）。1 つのプロジェクトが書けなくても、ほかのプロジェクトは書き、
+書けた分を `synced` に、書けなかった理由を `error` に返す。
+
 ## 版の JSON
 
 ```sh
@@ -328,7 +369,7 @@ ccnavi --version --json
 
 ```json
 {"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 18,
- "features": ["user-entry", "handoff"],
+ "features": ["user-entry", "handoff", "mirror"],
  "flags": ["--accept-unresolved", "--agree", "…", "--version", "--yes"],
  "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}
 ```
@@ -342,7 +383,7 @@ ccnavi --version --json
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
 | `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
 | `formats` | 読む書式の版。レイヤーのファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
-| `features` | オプションから読めない振る舞いの名前（文字列の配列）。現在の名前は `user-entry`（ユーザ専用の入口 `user <操作>`）、`handoff`（保護対象の取り込み）。呼ぶ側が振る舞いの有無を見分けるためのもので、足しても `compat` は上げない |
+| `features` | オプションから読めない振る舞いの名前（文字列の配列）。現在の名前は `user-entry`（ユーザ専用の入口 `user <操作>`）、`handoff`（保護対象の取り込み）、`mirror`（共通レイヤーのミラーの同期）。呼ぶ側が振る舞いの有無を見分けるためのもので、追加しても `compat` は上げない |
 
 **互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
@@ -360,5 +401,5 @@ sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと�
 | `ccnavi --lint` | sh の `CCNAVI_COMPAT` と比べ、`(version)` の warn を出す |
 
 直し方は、ccnavi のリポジトリ（`build.py` とソースがある）なら `uv run --with pyinstaller python build.py` で組み立て直し、
-配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース> --force` で実行ファイルと sh を配り直す。
+配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース>` を実行する（実行ファイルは配布元と中身が違えば置き換わる）。sh も配り直すなら `--force` を付ける。
 拡張のほうが古ければ拡張を入れ直す。sh は `--version` の答えから互換の版を読めなければ「不明」として食い違いに数える。拡張は版を聞けなかったとき、起動では何も言わず、フラグを使う前に理由を出して先へ進まない。

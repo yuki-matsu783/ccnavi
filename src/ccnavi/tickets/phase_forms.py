@@ -274,7 +274,10 @@ def board_form_message(found: str) -> str:
     # 取り込みの形は、承認と残った指摘の対応方針の文に当たらない。
     lowered = found.casefold()
     decided = (
-        "保護対象の下書きの取り込み（`ccnavi user handoff`）は、ユーザがボードか端末で"
+        "共通レイヤーのミラーの同期（`ccnavi user mirror`）は、ユーザがボードか端末で"
+        "ミラーの差分を読んでから決めます。"
+        if "mirror" in lowered
+        else "保護対象の下書きの取り込み（`ccnavi user handoff`）は、ユーザがボードか端末で"
         "下書きの差分を読んでから決めます。"
         if "handoff" in lowered
         else "`--via board` は、ボードの画面から押した操作を拡張が実行するときだけ付ける印です。"
@@ -390,7 +393,8 @@ EXE_OPTIONS = frozenset(
         "--explain", "--fill-phases", "--flow", "--format", "--guard-core-files",
         "--guard-ticket-approval", "--handoff", "--help", "--issue",
         "--json",
-        "--keyword", "--layer", "--learnings", "--limit", "--lint", "--log", "--mode", "--mr",
+        "--keyword", "--layer", "--learnings", "--limit", "--lint", "--log", "--mirror",
+        "--mode", "--mr",
         "--name",
         "--no-issue",
         "--no-refresh",
@@ -1035,6 +1039,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"（'{settings.script_command(root, 'ccnavi-user-close-early.sh')}'）"
             "もユーザが実行します。"
             "保護対象の下書き（wip/handoff/）の取り込み（'ccnavi user handoff'。"
+            "見るだけの形も含む）と、共通レイヤーのミラーの同期（'ccnavi user mirror'。"
             "見るだけの形も含む）も、ユーザが実行します。"
             "親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・"
             "'ccnavi worktree branch'・"
@@ -1048,7 +1053,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} status' で確かめます。"
             "置き場のファイルを自分で探さず、承認を頼み直す前に status を実行してください。"
             "ユーザ専用の操作は 'ccnavi user <操作>'（agree・reviewed・close-early・prune・"
-            "handoff）にまとめてあり、エージェントは実行しません。"
+            "handoff・mirror）にまとめてあり、エージェントは実行しません。"
             "下書きの状態を見るだけなら "
             f"'{settings.script_command(root, 'ccnavi-stage.sh')} --commands <パス>' を使います。"
             "承認待ちの一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"

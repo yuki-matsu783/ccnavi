@@ -7,16 +7,21 @@
 import type { JSX } from "react";
 
 import type { LintProblem } from "../../core/lintmodel.js";
-import type { ProjectRow } from "../../core/projects-view.js";
+import type { MirrorData, ProjectRow, ProjectsMessage } from "../../core/projects-view.js";
+import { MirrorField } from "./Mirror.js";
 
 export interface ProjectProps {
   readonly row: ProjectRow;
   readonly ticketsEnabled: boolean;
   /** 案内が指す先にする（一覧の最初のカードだけ） */
   readonly tour?: boolean;
+  /** ミラーの状態。無ければ（まだ調べていない）「ミラー」の欄を出さない */
+  readonly mirror?: MirrorData;
+  /** 拡張ホストへの送信（案内の間は送らないもの） */
+  readonly act?: (message: ProjectsMessage) => void;
 }
 
-export function Project({ row, ticketsEnabled, tour = false }: ProjectProps): JSX.Element {
+export function Project({ row, ticketsEnabled, tour = false, mirror, act }: ProjectProps): JSX.Element {
   const problems = row.problems;
   const flags = [
     row.doing > 0 ? { key: "doing", className: "badge doing", text: `作業中 ${row.doing}` } : undefined,
@@ -81,6 +86,14 @@ export function Project({ row, ticketsEnabled, tour = false }: ProjectProps): JS
           <dt>検証</dt>
           <dd>{problems.length === 0 ? <span className="ok">問題なし</span> : <Problems problems={problems} />}</dd>
         </div>
+        {mirror !== undefined && act !== undefined && (
+          <div className="field wide mirror">
+            <dt>ミラー（共通レイヤーの写し）</dt>
+            <dd>
+              <MirrorField mirror={mirror} name={row.name} act={act} />
+            </dd>
+          </div>
+        )}
       </dl>
     </li>
   );

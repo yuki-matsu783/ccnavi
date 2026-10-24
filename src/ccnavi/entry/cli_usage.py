@@ -159,6 +159,17 @@ ccnavi user handoff で行います（見るだけの形も含めてユーザー
     ccnavi user handoff [PATH...] --yes --expect HASH [--via board] [--json]
         （取り込みます。--via board はボードの経路で、--json と一緒に使います）
 
+共通レイヤー（ワークスペースの .ccnavi/config/common/）のミラー（各プロジェクトの
+.ccnavi/config/common/）がずれていないかの確認と、ずれの同期は、ユーザーが
+ccnavi user mirror で行います（見るだけの形も含めてユーザー専用です。実行ファイルは内部で
+--mirror に読み替えます）。同期は各プロジェクトの作業ツリーに書くだけで、コミットはしません。
+
+    ccnavi user mirror [PROJECT...] [--json]
+        （見るだけ。PROJECT を省くと全プロジェクト。差分と --expect の値を出します）
+    ccnavi user mirror [PROJECT...] --yes --expect HASH [--via board] [--json]
+        （差分のあるプロジェクトを揃えます。--expect が今の差分と違うときは何も書きません。
+        --via board はボードの経路で、--json と一緒に使います）
+
 収集済みのテンプレートは、親の提案を開始するときに使用されます。
 エージェントも実行できます（フローの下書きも効力を持ちません）。
 

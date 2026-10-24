@@ -33,7 +33,7 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../re
 
 個別の不都合は [11.14 単体 clone で不都合な処理の一覧](multi-repo/standalone-clone-gaps.md) にまとめた。
 
-「モード A / モード B」は、手引きと sh のコメントなどで使う、ワークスペース全体の形（`projects/` の有無）の呼び分けで、この設計書には定義が無い。ワークスペース内 clone は、モード B でそのプロジェクト 1 つを指す呼び方になる。単体 clone にはワークスペースが無いので、どちらでもない。ワークスペース内 clone でも、プロジェクトのディレクトリで Claude Code を起動すると、ワークスペースの hook は動かず、ccnavi の見え方は単体 clone に近くなる。この扱いは決めていない。
+「モード A / モード B」は、手引きと sh のコメントなどで使う、ワークスペース全体の形（`projects/` の有無）の呼び分けで、この設計書には定義が無い。ワークスペース内 clone は、モード B でそのプロジェクト 1 つを指す呼び方になる。単体 clone にはワークスペースが無いので、どちらでもない。ワークスペース内 clone でも、プロジェクトのディレクトリで Claude Code を起動すると、ワークスペースの hook は動かず、ccnavi の見え方は単体 clone に近くなる。この形も対象に含む。前提は要件書の「想定する使い方」にある。ルートの決め方が食い違うなど、まだ直っていない点は [11.14](multi-repo/standalone-clone-gaps.md) にある。
 
 ### 11.1 何を解くか
 
@@ -58,6 +58,6 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../re
 | 11.9 | [multi-repo/diagnostics.md](multi-repo/diagnostics.md) | レイヤーごとの診断と記録 |
 | 11.10 | [multi-repo/to-measure.md](multi-repo/to-measure.md) | 実装時に実測するもの |
 | 11.11 | [multi-repo/out-of-scope.md](multi-repo/out-of-scope.md) | 見ないもの、入れないもの |
-| 11.12 | [multi-repo/distribute-common.md](multi-repo/distribute-common.md) | 共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする |
+| 11.12 | [multi-repo/distribute-common.md](multi-repo/distribute-common.md) | 共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。ずれの確認と同期は `user mirror` |
 | 11.13 | [multi-repo/skills.md](multi-repo/skills.md) | プロジェクトのスキルの置き場と目録 |
 | 11.14 | [multi-repo/standalone-clone-gaps.md](multi-repo/standalone-clone-gaps.md) | 単体 clone で不都合な処理の一覧（調査の記録。直し方は未決） |
