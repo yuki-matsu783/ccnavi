@@ -109,17 +109,18 @@
    |---|---|---|
    | Contents | Read and write | 読み取り（tree・blob・commits・compare・branches）、`createCommitOnBranch`、「始める」の `POST /git/refs` |
    | Metadata | Read-only | 選ぶと必ず付く。リポジトリの読み取り |
-   | Pull requests | Read-only | 開いた PR・レビュー・`reviewThreads`、Approve の有無 |
-   | Issues | Read-only | 「始める」の issue の一覧 |
+   | Pull requests | Read and write | 開いた PR・レビュー・`reviewThreads`、Approve の有無（読み取り）。残った指摘の行き先を決めるときの、スレッドへの返信（`addPullRequestReviewThreadReply`）・解決（`resolveReviewThread`）・PR へのコメント |
+   | Issues | Read and write | 「始める」の issue の一覧（読み取り）。残った指摘を issue に回すときの issue の作成・検索とコメント |
 
-   これより広い権限は付けません。足りずに断られたら、その文面を記録します（4.7 の X9）。
+   これより広い権限は付けません。classic の PAT なら `repo` スコープです。足りずに断られたら、その文面を記録します（4.7 の X9、4.8 の D1〜D3）。
+   Pull requests と Issues の書き込みが fine-grained の PAT で足りるか、`resolveReviewThread` がこの組で通るかは、実機でしか確かめられません（4.8 の D2）。
 
 ### 3.2 GitLab
 
 1. まず project access token を試します。プロジェクトの Settings → Access tokens を開き、作れるかを記録します。
-   GitLab.com の無料版では作れない見込みです（確信中）。作れれば role は Developer 以上、スコープは `api` にします。
+   GitLab.com の無料版では作れない見込みです（確信中）。作れれば role は Developer 以上（スレッドの解決に要ります）、スコープは `api` にします。
 2. 作れなければ、設定画面の「PAT」の下のリンク（`https://gitlab.com/-/user_settings/personal_access_tokens`）から個人の PAT を作ります。
-   スコープは `api` です（Commits API は `write_repository` では書けません）。個人の PAT はプロジェクトを限れないので、期限を短くし、
+   スコープは `api` です（Commits API は `write_repository` では書けません。スレッドへの返信・解決・issue の作成にも `api` が要ります）。ロールは Developer 以上にします。個人の PAT はプロジェクトを限れないので、期限を短くし、
    使い捨てのリポジトリしか持たないテスト用のアカウントで作るのが安全です。
 3. どちらも Expiration date を入れます。
 
@@ -185,6 +186,7 @@ Approve の付いた PR を試すには、PR の作者と別のアカウント�
 | V6 | 書きかけ（PENDING）のレビューを別のアカウントで残す | 結論が変わらない | `reviews` の応答に PENDING が出るか |
 | V7 | 手元で `ccnavi-review.sh confirm --phase <N>` と `ccnavi-user-decide.sh decide <N>` を（別の親子のチケットで）打つ | マーカーに `actor`（`gh`・`glab`・curl のどれでもトークンの持ち主）が入る | マーカーの中身 |
 | V8 | `GET /pulls?state=open&head=<owner>%3A<branch>` が `:` のままと同じ答えになるか | 同じ PR を返す | 応答 |
+| V9 | 未解決のスレッドが 2 件以上ある間にボードを開き、「残った指摘の行き先を決める」を押す | 全件「このフェーズで直す」が選ばれ、確定を押せる。「すべて: …」の行で全件が切り替わり、個別に選び直せる。本文は消毒して描かれ、URL は http(s) のときだけリンクになる。解決できない種類のスレッドは選択肢が出ず「Chrome では扱えません。VS Code で」と理由が出て、確定が出ない。確定中は全部押せない | 画面の見た目（スクリーンショット） |
 
 ### 4.4 GitLab
 
@@ -257,6 +259,26 @@ GitLab でも 4.1〜4.3 と同じ操作を行い、加えて次を確かめま�
 | X11 | 古い実行ファイルと新しい sh の組み合わせ: flags に `--via` の無い古い実行ファイルを `CCNAVI_ENTRY_PATH` で指し、手元で `ccnavi-review.sh confirm --phase <N>` と `ccnavi-user-decide.sh decide <N>` を打つ | sh は `--via` を常に渡すので、実行ファイルが知らないオプションとして失敗し、前と同じマーカーは置かない。互換の版が食い違っていれば、標準エラーに直し方（組み立て直し・配り直し）が出る | マーカーの中身、sh の出力 |
 | X12 | Windows の Git Bash を 2 つ開き、片方で `sh -c 'echo $$; exec sleep 300'` を打って pid を記録し、もう一方から `kill -0 <pid>; echo $?` を打つ。`sleep` が終わった後にもう一度打つ | 生きている間は 0、終わった後は 0 以外（ロックの持ち主が生きているかを sh が見分けられる） | 2 回の終了コード |
 | X10 | GitHub の stale の外しにパスの除外があるか、GitLab の Code Owners で `.ccnavi/approved/` を外せるか | ホストの設定画面で確かめる（拡張の操作ではない） | 見つけた設定の名前、無ければ「無い」 |
+
+### 4.8 decide のホスト書き込み（実機で確かめる）
+
+残った指摘の行き先を確定する操作が、ホストへ書く層を通ることを確かめます。模擬のホストでは、権限の組と保留中のレビューの挙動を確かめられません。
+未解決のスレッドが 3 件以上ある MR を用意し、使い捨てのリポジトリだけで行います。
+
+| # | 操作 | 期待する結果 | 記録するもの |
+|---|---|---|---|
+| D1 | GitHub: fine-grained の PAT に Pull requests と Issues を Read-only だけにして、行き先を決めて確定する（1 件は「issue に回す」） | 何も書かれず（返信も issue も無い）、足りない権限の名前（`Pull requests: Read and write` など）が出て止まる。書く前の確かめで足りないと分からなくても、最初の書き込みの 403/404 で権限の名前が出る | 画面の文面、MR と issue の一覧に何も増えていないこと、Network の最初に断られた要求の状態コードと `x-accepted-github-permissions` |
+| D2 | GitHub: fine-grained の PAT に Pull requests と Issues を Read and write（Contents は Read and write のまま）にして、「対応しない」「issue に回す」「このフェーズで直す」を 1 件ずつ選んで確定する | issue が作られ、「対応しない」と「issue に回す」のスレッドに返信が付いて解決済みになる。返信の issue の URL が作った issue を指す。「このフェーズで直す」のスレッドは返信も解決もされない。MR に決めた内容のコメントが付く。**`resolveReviewThread` がこの権限の組で通るか**が本題（GraphQL で `Resource not accessible by personal access token` が出れば、必要な権限の組を記録する） | 通ったか、断られたなら応答の `errors` の文面と、足したら通った権限 |
+| D3 | GitHub: classic の PAT（`repo` スコープ）で D2 と同じことをする | D2 と同じ結果。応答ヘッダ `x-oauth-scopes` が読まれ、`repo` が無ければ書く前に止まる | 結果、`x-oauth-scopes` の値 |
+| D4 | GitHub: 自分の保留中（PENDING）のレビューに属するスレッドを含めて確定する | 保留中のレビューのスレッドは「Chrome では扱えない。VS Code で」と出て、何も書かない。**保留中のスレッドが GraphQL の `reviewThreads` に出るか、`viewerCanReply`・最初のコメントの `state: PENDING` で見分けられるか**を記録する（見分けられなければ、返信が公開されるまで他の人に見えない形で付くかを記録する） | 画面の文面、`reviewThreads` の応答の抜粋（欄の名前と値） |
+| D5 | GitHub: 他のユーザが作ったスレッド・自分の PR のスレッドで、`viewerCanResolve` がそれぞれ何になるか | 書き込み権限のあるリポジトリでは真。権限の無いスレッドは偽で、権限の名前つきで止まる | 応答の抜粋 |
+| D6 | GitLab: スコープ `api`・role Developer の PAT で、差分への指摘 2 件と、MR 全体への discussion 1 件（差分に紐づかない）を用意して確定する | 差分以外の discussion が含まれると「Chrome では扱えない。VS Code で」と出て、何も書かない。差分への指摘だけなら返信が付いて解決済みになり、issue が作られ、MR にメモが付く | 画面の文面、discussion の `notes[].type`・`resolvable` の値 |
+| D7 | GitLab: スコープ `read_api` の PAT と、role Reporter の PAT で確定する | `read_api` は「api スコープ」が足りないと出て何も書かない。Reporter は「スレッドの解決は Developer 以上」と出て何も書かない。`GET /personal_access_tokens/self` の `scopes` が読めるか（project access token では 404 になるか）も記録する | 画面の文面、`personal_access_tokens/self` の応答の抜粋 |
+| D8 | 確定の途中で止める: issue の作成後に PAT を失効させる（または ネットワークを切る） | 止まった時点で、作った issue の番号と URL、返信・解決の済んだ分、失敗の理由が出る。MR を読み直して残った指摘を決め直すと、同じ操作 ID の issue は作り直されず使われ、続きのコメントは足りない分（`part=<i>` の印が無い分）だけ付き、返信済みのスレッド（`<!-- ccnavi:reply op=… -->` の印がある）には返信が重ならない。**GitHub の issue の一覧が作った直後に新しい順で見えるか**（見えなければ重複する）を記録する | 画面の文面、issue の一覧 |
+| D10 | 権限の見立てが実際と合うかを確かめる: GitLab の Reporter の MR 作者・グループから継承したメンバー・GitHub の fine-grained の PAT で、書く前の確かめの結果と、実際に書いたときの結果を比べる | 書く前に「足りない」と出たのに実際は書けるもの（偽陽性。Reporter の MR 作者は自分の MR の discussion を解決できる）、書く前に通ったのに実際は断られるもの（偽陰性。fine-grained の権限は書く前に読めない）を見つける | 食い違った組み合わせと画面の文面 |
+| D11 | GitLab: 依頼コメントと ccnavi の返信（`<!-- ccnavi:accept -->` など）を別のアカウントが書いた場合の、未解決の数え | 目印で始まるノートの書き手が全部同じスレッドだけを機構自身のものと見るので、別アカウントが書いた返信が混ざったスレッドは未解決に数えられる。数えられて確認が止まる場合は、その組み合わせを記録する | 書き手のアカウント、スレッドの `notes[].author`、確認の結果 |
+| D9 | 作った issue をホストで開く | assignee・labels・milestone が空。本文の先頭に `<!-- ccnavi:issue op=… -->` の印がある（画面では見えない） | issue の見え方 |
+| D12 | D2 の確定の直後に、画面の結果の欄を見る。続けて「このフェーズで直す」だけを選んだ別のフェーズで確定する | 1 回目はコミットの短い sha と作った issue の URL が出る。2 回目は issue もコメントの失敗も無いのに、MR に決めた内容のコメントが 1 件だけ付く。どちらも親のブランチのコミットは 1 件で、続きの子が `doing/` に出来ている | 画面の文面、親のブランチのコミットの数 |
 
 ## 5. 結果の返し方
 
