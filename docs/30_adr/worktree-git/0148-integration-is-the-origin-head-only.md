@@ -47,5 +47,5 @@ keywords: [統合先, origin/HEAD, CCNAVI_INTEGRATION_BRANCH, --integration-bran
 ## 関係する ADR
 
 - [ADR-0060](0060-default-branch-at-session-start.md): ワークツリーの起点になる既定ブランチをセッションの頭で進める。`origin/HEAD` が無いときの推測と `set-head` での直し方は、この ADR が引き継ぐ
-- [ADR-0093](0093-chrome-approval-parent-branch-authority.md): `--integration-branch` を導入した経緯。この ADR で廃止する
-- [ADR-0118](0118-wrapper-sh-judging-is-an-exception.md): sh の判定が統合先の名前を使う件。名前の決め方が `origin/HEAD` だけになる
+- [ADR-0093](../extension/0093-chrome-approval-parent-branch-authority.md): `--integration-branch` を導入した経緯。この ADR で廃止する
+- [ADR-0118](../rules/0118-wrapper-sh-judging-is-an-exception.md): sh の判定が統合先の名前を使う件。名前の決め方が `origin/HEAD` だけになる

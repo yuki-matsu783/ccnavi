@@ -10,7 +10,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 ### 11.14 単体 clone で不都合な処理の一覧
 
-[ワークスペース内 clone と単体 clone の両方で動かす](../../30_adr/0145-work-in-workspace-and-standalone-clone.md)考え方に沿って、ワークスペースにあるものに頼る処理を洗い出した記録。
+[ワークスペース内 clone と単体 clone の両方で動かす](../../30_adr/config/0145-work-in-workspace-and-standalone-clone.md)考え方に沿って、ワークスペースにあるものに頼る処理を洗い出した記録。
 この文書は未解決の項目だけを残した現状の記述で、直し方は決めていない。「直し方の案」は選択肢で、採用するかどうかは機能ごとに決める。「未決」の節に、設計判断が要る点の選択肢を並べた。
 
 ## 調査の範囲
@@ -56,7 +56,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - ワークスペース内 clone: ワークスペース内のプロジェクト p で Claude Code を起動する（`CLAUDE_PROJECT_DIR=<ws>/projects/p`）と、hook は根を p にして `p/logs/` に書く。sh は根をワークスペースにして `ws/logs/` に書き、ワークツリーも `ws/.claude/worktrees/` に切る
 - 単体 clone: 根は p だけで、食い違わない
 - 起きること: hook の拒否文は `sh p/.ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/<名前> ...` と案内する。打つと sh が「ワークスペースの外に出ます」と断る。この拒否文は自己修正の案内を含む。ログと state の置き場が割れる
-- 前提: 文書上の前提は、ワークスペースから起動して `cd` で入る形（`to-measure.md`、手引き）。一方で、プロジェクトで起動するとそのプロジェクトの hook が使われると書いてあり（[複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../30_adr/0033-projects.md)の追記）、この形は否定されていない
+- 前提: 文書上の前提は、ワークスペースから起動して `cd` で入る形（`to-measure.md`、手引き）。一方で、プロジェクトで起動するとそのプロジェクトの hook が使われると書いてあり（[複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../30_adr/config/0033-projects.md)の追記）、この形は否定されていない
 - 直し方の案: sh も `CLAUDE_PROJECT_DIR` を第一候補にする案は採れない。理由: Bash ツールの環境に `CLAUDE_PROJECT_DIR` は来ない（`docs/21_design/appendix.md:102`）。コマンド行に付けて渡すことも `wrapguard.py:67` が止める。別の案は未決（「未決」の根の決め方）
 
 #### A2 `CLAUDE_PROJECT_DIR` が無いターミナルの直打ちで、Python が根を取り違える（major）
@@ -100,7 +100,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - 処理と場所: `src/ccnavi/hook/projskills.py:101-108` の `project_of` は、MAIN のツリーでは `t.project` が空なので `""` を返す。呼び出しは `hook/events.py:624`、`hook/subagent.py:59`、`hook/judge.py:709`。目録を出す hook はワークスペースの `.claude` にしか無い
 - ワークスペース内 clone: ワークスペースから `cwd=projects/proj1` の SessionStart を呼ぶと、目録が入る
 - 単体 clone: `skills/<名前>/SKILL.md` は git に入るが、SessionStart、SubagentStart、最初の PreToolUse のどこでも目録は渡らない。`skillsync` がコピーした工程スキルの入口（`skills/<工程>/SKILL.md`）も同じ。reference は `ccnavi --docs` で引ける（`--root B --docs --type skill-reference` で再現した）。単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほうである
-- 起きること: `project_of` は単体 clone を検出せず、黙って空を返す。[ワークスペース内 clone と単体 clone の両方で動かす](../../30_adr/0145-work-in-workspace-and-standalone-clone.md)の「縮退して動く」の定義（頼るものが無いことを検出し、決めた小さい振る舞いに落とす）には該当しない。工程スキルのコピーを決めたときの採らなかった案に「単体 clone で目録に載らない」があるが、実装はこれを満たしていない
+- 起きること: `project_of` は単体 clone を検出せず、黙って空を返す。[ワークスペース内 clone と単体 clone の両方で動かす](../../30_adr/config/0145-work-in-workspace-and-standalone-clone.md)の「縮退して動く」の定義（頼るものが無いことを検出し、決めた小さい振る舞いに落とす）には該当しない。工程スキルのコピーを決めたときの採らなかった案に「単体 clone で目録に載らない」があるが、実装はこれを満たしていない
 - 確認: 実行で確認
 - 直し方の案: MAIN のツリー（`project == ""`）でも `root/skills` があれば目録を出す。工程スキルがワークスペース内 clone で目録と `--docs` に二重に出る例外（`--docs` は 2 件に該当する）との整理も要る。未決
 
@@ -194,7 +194,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 - 処理と場所: A1 と同じ原因。`src/ccnavi/entry/cli.py:1309-1311` の `default_root` が `CLAUDE_PROJECT_DIR` をそのまま返す
 - ワークスペース内 clone・単体 clone: Claude Code をワークツリー（`.claude/worktrees/<id>`）の中で起動すると、`CLAUDE_PROJECT_DIR` がそのワークツリーになり、ログと state がワークツリーの中にできる
-- 起きること: [複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../30_adr/0033-projects.md)の追記に書いた起動形で、A1 より起きやすい
+- 起きること: [複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../30_adr/config/0033-projects.md)の追記に書いた起動形で、A1 より起きやすい
 - 確認: 実行で確認
 - 直し方の案: 未決（根の決め方）
 

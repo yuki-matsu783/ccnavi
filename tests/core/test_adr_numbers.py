@@ -4,14 +4,13 @@
 `ADR-00NN` がどちらの決定を指すか読めない。実際に 3 組（0051・0058・0060）が
 重なっていて、うち 1 枚は題に番号を書いていなかった。
 
-一覧（`docs/30_adr/README.md`）は人が手で書き足す形なので、1 枚足したときに
+一覧（`docs/30_adr.md`）は人が手で書き足す形なので、1 枚足したときに
 番号を取り違えても誰も言わない。テストの ID に同じ検査を置いた回
 （issue #88、`test/shared/test-ids.test.ts`）と同じ形で、見るのは 3 つ。
 
 1. 番号が重複しない
 2. 題が `# ADR-<番号>:` で始まり、その番号がファイル名と合う
-3. 一覧が、置いてある ADR を 1 回ずつ載せ、番号とリンク先が合っている
-   （既存の行は題を縮めてある）
+3. ADR が、`docs/30_adr.md` の「置き場と分け方」の表にあるディレクトリに置かれている
 
 止められるのは合流の後。 ADR を足しただけのコミットではこのテストは回らない
 （`.claude/skills/commit/references/test-groups.md` の「`docs/30_adr/` → `core`」で
@@ -27,13 +26,13 @@ from __future__ import annotations
 import os
 import re
 import unittest
-from collections import Counter
 
 from tests import ROOT
 
 ADR_DIR = os.path.join(ROOT, "docs", "30_adr")
+ADR_INDEX = os.path.join(ROOT, "docs", "30_adr.md")
 
-# `0064-extension-board-in-react.md` → 0064。README.md は番号を持たないので外れる。
+# `0064-extension-board-in-react.md` → 0064。番号を持たないファイルは外れる。
 FILE_NAME = re.compile(r"^(\d{4})-.+\.md$")
 
 # 題の 1 行目。`# ADR-0001: 言語を Go から Python に移す` の形。
@@ -42,20 +41,26 @@ FILE_NAME = re.compile(r"^(\d{4})-.+\.md$")
 # 数えられるため。README の「引かれている数」は grep で数え直せる形にしてある。
 TITLE = re.compile(r"^# ADR-(\d{4}): \S")
 
-# 一覧の 1 行。`| [0064](0064-extension-board-in-react.md) | ボードの画面を… |`
-#
-# 旧番号の表はリンクにしていないので、ここには入らない（入れると
-# 「1 回ずつ」が数えられなくなる）。
-LINK = re.compile(r"\[(\d{4})\]\((\d{4}-[^)]+\.md)\)")
+# 入口の表の 1 行。`| `30_adr/rules/` | 判定とルール… |`
+TOPIC_ROW = re.compile(r"^\| `30_adr/([\w-]+)/` \|", re.M)
 
 
 def sheets() -> list[str]:
-    """`docs/30_adr/` に置いてある ADR のファイル名。番号の順に並べる。"""
-    return sorted(f for f in os.listdir(ADR_DIR) if FILE_NAME.match(f))
+    """`docs/30_adr/<主題>/` に置いてある ADR のパス（`<主題>/<ファイル名>`）。番号の順に並べる。"""
+    found = []
+    for topic in os.listdir(ADR_DIR):
+        folder = os.path.join(ADR_DIR, topic)
+        if os.path.isdir(folder):
+            found.extend(f"{topic}/{f}" for f in os.listdir(folder) if FILE_NAME.match(f))
+    return sorted(found, key=os.path.basename)
 
 
-def read(name: str) -> str:
-    with open(os.path.join(ADR_DIR, name), encoding="utf-8") as f:
+def number(path: str) -> str:
+    return os.path.basename(path)[:4]
+
+
+def read(path: str) -> str:
+    with open(os.path.join(ADR_DIR, path), encoding="utf-8") as f:
         return f.read()
 
 
@@ -69,7 +74,7 @@ class AdrNumbersTest(unittest.TestCase):
         """番号は重複しない。足すときは最後尾の次を採る。"""
         where: dict[str, list[str]] = {}
         for name in self.sheets:
-            where.setdefault(name[:4], []).append(name)
+            where.setdefault(number(name), []).append(name)
         duplicated = sorted(
             f"{num}: {' / '.join(names)}" for num, names in where.items() if len(names) > 1
         )
@@ -77,7 +82,7 @@ class AdrNumbersTest(unittest.TestCase):
             [],
             duplicated,
             "同じ番号が 2 枚にある。引かれている数が少ないほうを空き番号へ動かし、"
-            "旧番号を docs/30_adr/README.md の表に残す",
+            "旧番号を docs/30_adr.md の表に残す",
         )
 
     def test_title_carries_its_own_number(self):
@@ -94,23 +99,21 @@ class AdrNumbersTest(unittest.TestCase):
             found = TITLE.match(first)
             if found is None:
                 wrong.append(f"{name}: 題が `# ADR-<番号>: <題>` の形でない（{first[:40]}）")
-            elif found.group(1) != name[:4]:
+            elif found.group(1) != number(name):
                 wrong.append(f"{name}: 題の番号が ADR-{found.group(1)} でファイル名と違う")
         self.assertEqual([], wrong)
 
-    def test_index_lists_every_sheet_once(self):
-        """一覧は、置いてある ADR を 1 回ずつ載せ、番号とリンク先が合っている。"""
-        linked = LINK.findall(read("README.md"))
-        listed = [target for _, target in linked]
+    def test_every_sheet_sits_in_a_listed_topic(self):
+        """ADR は、入口の表にあるディレクトリのどれかに置かれている。"""
+        with open(ADR_INDEX, encoding="utf-8") as f:
+            listed = set(TOPIC_ROW.findall(f.read()))
+        self.assertTrue(listed, f"入口の表からディレクトリを読めない（{ADR_INDEX}）")
+        unlisted = sorted({n.split("/")[0] for n in self.sheets} - listed)
+        self.assertEqual([], unlisted, "表に無いディレクトリがある。docs/30_adr.md の表に 1 行足す")
+        empty = sorted(t for t in listed if not os.path.isdir(os.path.join(ADR_DIR, t)))
+        self.assertEqual([], empty, "表にあって置かれていないディレクトリがある")
 
-        missing = [name for name in self.sheets if name not in set(listed)]
-        self.assertEqual([], missing, "一覧に無い ADR がある（docs/30_adr/README.md）")
-
-        phantom = [target for target in listed if target not in set(self.sheets)]
-        self.assertEqual([], phantom, "一覧が指している ADR が置かれていない")
-
-        twice = sorted(name for name, count in Counter(listed).items() if count > 1)
-        self.assertEqual([], twice, "一覧に 2 回載っている ADR がある")
-
-        mismatched = [f"[{num}]({target})" for num, target in linked if not target.startswith(num)]
-        self.assertEqual([], mismatched, "一覧の番号とリンク先の番号が違う")
+    def test_no_sheet_sits_at_the_top(self):
+        """ADR を主題のディレクトリの外（`docs/30_adr/` 直下）に置かない。"""
+        top = sorted(f for f in os.listdir(ADR_DIR) if FILE_NAME.match(f))
+        self.assertEqual([], top)

@@ -20,7 +20,7 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 | 実行ファイルと拡張の JSON の形 | [11_requirements/json-shapes.md](11_requirements/json-shapes.md) |
 | いまの実装の作り | [20_design.md](20_design.md) |
 | ディレクトリ構成（サブパッケージごとの表） | [21_design/modules.md](21_design/modules.md) |
-| 判断の理由と経緯、採らなかった案 | [30_adr/README.md](30_adr/README.md) |
+| 判断の理由と経緯、採らなかった案 | [30_adr.md](30_adr.md) |
 | 実測で確かめた前提と、環境固有の落とし穴 | [設計の付録 C](21_design/appendix.md)、[42_claude/environment.md](42_claude/environment.md) |
 | 開発で常に守る決まり（テストの回し方、ログ、sh、出力の案内など） | `docs/42_claude/`（入口は [CLAUDE.md](../CLAUDE.md) の「詳細」の表） |
 | ccnavi の使い方 | [41_guide/index.md](41_guide/index.md) |
@@ -177,4 +177,4 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `.ccnavi/config/project/phases.yml` | このリポジトリ自身のレイヤーのフェーズ定義（このリポジトリのレイアウトに依存する定義） |
 | `.ccnavi/config/common/rule-expectations.yml` | ルールが何を止めて何を通すかの期待する判定 |
 | `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
-| `docs/30_adr/` | 設計判断の記録 |
+| `docs/30_adr/<主題>/` | 設計判断の記録。分け方は [30_adr.md](30_adr.md) |

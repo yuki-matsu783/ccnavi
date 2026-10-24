@@ -57,7 +57,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `tests/fixtures/` | `guard` `ticket` |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `extensions/chrome/ccnavi-approval/`（`py/`・`test/fixtures/`） | `ticket` `sh`（Chrome の入口を手元のコアと突き合わせる） |
-| `docs/30_adr/`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
+| `docs/30_adr/`・`docs/30_adr.md`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
 自動テストで中身を確かめられないもの（変えたら手で動かして確かめる）:

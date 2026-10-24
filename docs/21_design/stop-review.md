@@ -8,7 +8,7 @@ keywords: [Stop, agent hook, AI 判定, 判定役, 共有キー, 試行, 判定�
 
 # Stop の AI 判定（agent 型 Stop フック）
 
-決めた理由は [docs/30_adr/0153-ai-review-at-stop.md](../30_adr/0153-ai-review-at-stop.md)。ここは現在の実装の構成だけを書く。
+決めた理由は [docs/30_adr/rules/0153-ai-review-at-stop.md](../30_adr/rules/0153-ai-review-at-stop.md)。ここは現在の実装の構成だけを書く。
 
 ## 構成
 

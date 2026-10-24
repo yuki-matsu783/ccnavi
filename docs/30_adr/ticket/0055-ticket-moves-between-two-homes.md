@@ -35,7 +35,7 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 チケットは **1 本のファイル**にする。このファイルは、**ユーザが動かすときは `.ccnavi/approved/` へ、エージェントが動かす
 ときは `wip/proposals/` へ**、という規則で 2 つの置き場を行き来する。
 
-置き場（`wip/proposals/{todo,review}/` と `.ccnavi/approved/{doing,done}/`）の意味、状態の遷移の図、誰が書くかは、設計書の [9.2 置き場](../21_design/tickets/places.md) と [9.6 状態遷移](../21_design/tickets/state-transitions.md) にある。決めたのは、次の 2 点。
+置き場（`wip/proposals/{todo,review}/` と `.ccnavi/approved/{doing,done}/`）の意味、状態の遷移の図、誰が書くかは、設計書の [9.2 置き場](../../21_design/tickets/places.md) と [9.6 状態遷移](../../21_design/tickets/state-transitions.md) にある。決めたのは、次の 2 点。
 
 - ユーザが動かすときは `.ccnavi/approved/` へ、エージェントが動かすときは `wip/proposals/` へ動かす。`approved/` にはエージェントが書けず、判定が範囲を読むのは `approved/doing/` だけ
 - レビュー待ちは `wip/proposals/review/` に置く。取り消しは `cancelled_at` を持って `approved/done/` に入る（`cancelled/` を持たない）

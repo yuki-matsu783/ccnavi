@@ -29,7 +29,7 @@ Claude Code の hook でツール呼び出しを止め、止めた理由と代�
 設計原則とコア機能を支える仕組みは[設計書の 1.1.1](docs/20_design.md)にある。
 
 用語は [CONTEXT.md](docs/CONTEXT.md)、要求は [requirements.md](docs/10_requirements.md)、設計は
-[docs/20_design.md](docs/20_design.md)、判断の理由と経緯は [docs/30_adr/](docs/30_adr/README.md) にある。
+[docs/20_design.md](docs/20_design.md)、判断の理由と経緯は [docs/30_adr/](docs/30_adr.md) にある。
 「承認済みチケット」「マーカー」「ワークツリー」「直接作業」のような呼び名は用語集で定義している。
 
 ## 導入

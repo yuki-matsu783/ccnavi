@@ -229,7 +229,7 @@ issue「決済の金額が合わない」に、ブランチ fix-payment とマ�
 |---|---|
 | 外から観測できる約束 | [10_requirements.md](10_requirements.md) |
 | いまの実装の作り | [20_design.md](20_design.md) |
-| 判断の理由と経緯、採らなかった案 | [30_adr/README.md](30_adr/README.md) |
+| 判断の理由と経緯、採らなかった案 | [30_adr.md](30_adr.md) |
 | 用語 | [CONTEXT.md](CONTEXT.md) |
 | 使い方 | [41_guide/index.md](41_guide/index.md) |
 

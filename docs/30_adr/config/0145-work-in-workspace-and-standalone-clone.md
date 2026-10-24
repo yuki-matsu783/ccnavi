@@ -57,7 +57,7 @@ ccnavi を導入したプロジェクト（git リポジトリ）は、2 通り�
 次のことは、この ADR では決めない。
 
 - 縮退の中身。機能ごとに、足すとき、または不都合を直すときに決める
-- 個別の不都合の直し方。洗い出しは [単体 clone で不都合な処理の一覧](../21_design/multi-repo/standalone-clone-gaps.md)
+- 個別の不都合の直し方。洗い出しは [単体 clone で不都合な処理の一覧](../../21_design/multi-repo/standalone-clone-gaps.md)
 
 ## 現状の単体 clone（2026-10-18 時点）
 
@@ -70,7 +70,7 @@ ccnavi を導入したプロジェクト（git リポジトリ）は、2 通り�
 | プロジェクトのスキル（`skills/`） | 縮退。未解決 | git に入るだけで、目録は出ない。理由は上と同じ |
 | ルート探索（Python） | 未解決 | `CLAUDE_PROJECT_DIR` が無いと、`.claude/` を持つ最も近い祖先を根に取る。ワークスペース内のプロジェクトでは、そのプロジェクトを根と取り違える。`--root` を付けるか、sh のラッパーを通すと避けられる |
 
-個別の不都合の一覧と重さは [単体 clone で不都合な処理の一覧](../21_design/multi-repo/standalone-clone-gaps.md) にある。
+個別の不都合の一覧と重さは [単体 clone で不都合な処理の一覧](../../21_design/multi-repo/standalone-clone-gaps.md) にある。
 
 ## 帰結
 

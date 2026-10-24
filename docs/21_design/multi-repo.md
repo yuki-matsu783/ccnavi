@@ -23,7 +23,7 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../11
 
 ### 11.0 使い方は 2 通りある
 
-プロジェクトは、ワークスペースの `projects/<名前>/` に clone して使う形（ワークスペース内 clone）と、そのリポジトリだけを clone して使う形（単体 clone）のどちらでも使われる。ccnavi はどちらでも動かす。判断の経緯は [ワークスペース内 clone と単体 clone の両方で動かす](../30_adr/0145-work-in-workspace-and-standalone-clone.md)。
+プロジェクトは、ワークスペースの `projects/<名前>/` に clone して使う形（ワークスペース内 clone）と、そのリポジトリだけを clone して使う形（単体 clone）のどちらでも使われる。ccnavi はどちらでも動かす。判断の経緯は [ワークスペース内 clone と単体 clone の両方で動かす](../30_adr/config/0145-work-in-workspace-and-standalone-clone.md)。
 
 ワークスペースにあるものに頼る機能は、単体 clone で「動く」「縮退して動く」「動かない」のどれになるかを、足すときに決める。いまの状態は次のとおり。
 
