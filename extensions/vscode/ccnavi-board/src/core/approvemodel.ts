@@ -388,7 +388,7 @@ function numbersBy(value: unknown): Record<string, number[]> {
 
 /**
  * `plans` の欄を読む。`--plan-order <親> --json` の答え（`planordermodel.ts`）も同じ形なので、同じ読み方を使う。
- * オブジェクトでないステップは落とし、番号の無い項目も落とす
+ * オブジェクトでないステップは落とし、番号の無いステップも落とす
  */
 export function readPlans(value: unknown): ApprovePlan[] {
   return list(value).filter(isRecord).map(plan);

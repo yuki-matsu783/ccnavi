@@ -388,7 +388,7 @@ courses:
         scene: { tab: judge, tool: Bash, subject: npm install left-pad, judge: npm-install }
       - target: open-expectations
         title: 期待する例も追加する
-        body: '下書きの expectations: は、期待する判定のファイルをエディタで開いて追加します。あとで「期待する判定を一括で確認する」に使えます。'
+        body: '下書きの expectations: は、期待する判定のファイルをエディタで開いて追加します。あとで「期待する判定を一括で確認する」に利用できます。'
         scene: { tab: judge, suggested: true }
       - target: save
         title: 保存

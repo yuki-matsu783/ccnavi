@@ -501,7 +501,7 @@ def _dirty(tree_root: str, rels: list[str]) -> tuple[set[str], set[str]] | None:
         if item[:2] == "??" or item[0] in "ARC":
             added.add(item[3:])
         if item[0] in "RC":
-            # 改名と複写は、元のパスが次の欄に続く。
+            # 改名とコピーは、元のパスが次の欄に続く。
             if i < len(fields):
                 found.add(fields[i])
             i += 1

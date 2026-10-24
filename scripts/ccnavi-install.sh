@@ -325,7 +325,7 @@ main() {
 			return 0
 			;;
 		-*)
-			die "$1 は使えないオプションです。使えるものは --help で確認できます。"
+			die "$1 は指定できないオプションです。指定できるものは --help で確認できます。"
 			;;
 		*)
 			[ -z "$ws" ] || die "ワークスペースルートは 1 つだけ指定してください。"
@@ -339,19 +339,19 @@ main() {
 	if [ "$build" = yes ]; then
 		if [ -n "$from" ] || [ -n "$mode_opt" ] || [ -n "$ticket_opt" ] || [ "$force" = yes ] ||
 			[ "$no_vscode" = yes ] || [ "$no_fetch" = yes ] || [ "$no_idle" = yes ] || [ "$clear_q" = yes ]; then
-			die "--build は --from・--mode・--ticket-control・--force・--no-vscode・--no-fetch・--no-idle・--clear-quarantine と同時に使えません。"
+			die "--build は --from・--mode・--ticket-control・--force・--no-vscode・--no-fetch・--no-idle・--clear-quarantine と同時に指定できません。"
 		fi
 	else
-		[ "$with_extensions" = no ] || die "--with-extensions は --build のときだけ使えます。"
-		[ -z "$source" ] || die "--source は --build のときだけ使えます。"
+		[ "$with_extensions" = no ] || die "--with-extensions は --build のときだけ指定できます。"
+		[ -z "$source" ] || die "--source は --build のときだけ指定できます。"
 	fi
 	case "$mode_opt" in
 	'' | enable | dry-run) ;;
-	*) die "--mode に使えるのは enable か dry-run です。" ;;
+	*) die "--mode に指定できるのは enable か dry-run です。" ;;
 	esac
 	case "$ticket_opt" in
 	'' | enable | disable) ;;
-	*) die "--ticket-control に使えるのは enable か disable です。" ;;
+	*) die "--ticket-control に指定できるのは enable か disable です。" ;;
 	esac
 	[ -d "$ws" ] || die "$ws というディレクトリがありません。"
 	ws=$(iabs "$ws")

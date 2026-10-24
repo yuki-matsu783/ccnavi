@@ -24,7 +24,7 @@ async function openRow(dom: DomPage, selector: string): Promise<void> {
   await dom.settle();
 }
 
-test("CB-D324 一覧は開いている対象の層のテンプレートだけを出し、破棄した理由と使えない札を行に出す。統合結果の枠は別に出す", async () => {
+test("CB-D324 一覧は開いている対象の層のテンプレートだけを出し、破棄した理由と無効の札を行に出す。統合結果の枠は別に出す", async () => {
   const dom = await openTemplates();
   try {
     // 対象は self。一覧は self の層の 4 件（ends / feature / local / research）だけで、共通の層の行は出さない

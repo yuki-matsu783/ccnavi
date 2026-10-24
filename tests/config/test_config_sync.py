@@ -303,7 +303,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         self.assertFalse(os.path.exists(mirror_of(tree, "templates/feature.yml")))
-        # ほかの設定のミラーは写る。
+        # ほかの設定のミラーはコピーされる。
         self.assertTrue(os.path.isfile(mirror_of(tree, "rules.yml")))
 
     def test_a_script_shared_by_two_factors_is_mirrored_once(self):
@@ -410,7 +410,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         self.assertFalse(os.path.exists(mirror_of(child, "rules.yml")))
-        # 親のワークツリーには、発言で写る。
+        # 親のワークツリーには、発言でコピーされる。
         self.assertTrue(os.path.isfile(mirror_of(parent, "rules.yml")))
 
     def test_uncommitted_edits_in_the_mirror_are_overwritten(self):

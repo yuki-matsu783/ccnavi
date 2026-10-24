@@ -8,7 +8,7 @@ keywords: [git, jq, curl, unzip, uv, node, pnpm, winget, scoop, brew, apt, dnf, 
 
 # glab 以外の道具
 
-入れるのはユーザ。コマンドを示して打ってもらう。どのパッケージマネージャーが使えるかは、doctor の `pkg-manager` 行で分かる。
+入れるのはユーザ。コマンドを示して打ってもらう。どのパッケージマネージャーが利用できるかは、doctor の `pkg-manager` 行で分かる。
 glab は [glab.md](glab.md)。
 
 ## 必要な道具
@@ -37,7 +37,7 @@ glab は [glab.md](glab.md)。
 - uv（Linux・WSL）: uv の公式の導入手順（https://docs.astral.sh/uv/getting-started/installation/ ）に従う。`pipx install uv` でも入る。
 - Node.js（Linux・WSL）: ディストリビューションの版は古いことが多い。Node.js 22 以上を、公式の配布か nvm で入れる。
 - pnpm: Node.js を入れたあと、`corepack enable`（Node.js 22 に同梱）か `npm install -g pnpm`。
-- パッケージマネージャーも使えない、管理者権限も無い、外のサイトから取れないときは、社内の配布手順か管理者に頼んでもらう。
+- パッケージマネージャーも利用できない、管理者権限も無い、外のサイトから取れないときは、社内の配布手順か管理者に頼んでもらう。
 
 ## 入れたあとに
 

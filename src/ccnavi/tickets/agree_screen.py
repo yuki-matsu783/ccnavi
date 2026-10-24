@@ -293,7 +293,7 @@ def _workflow_lines(t: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[s
     if not found:
         return []
     return [
-        "■ フェーズ間の依存関係（計画の各項目の after で決まります。"
+        "■ フェーズ間の依存関係（計画の各ステップの after で決まります。"
         "承認後に phases.yml を変更しても変わりません）",
         *("    " + x for x in found),
     ]

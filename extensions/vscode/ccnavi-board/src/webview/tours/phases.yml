@@ -26,7 +26,7 @@ screen: phases
 sample:
   path: .ccnavi/config/project/phases.yml
   lock: 作業中のチケットがあります（2026-10-03-search-api）。変更すると整合性が失われるため保存はできません。先に現在の作業をすべて完了させてください。
-  error: 定義 design-feedback は feedback なので review は mr にしてください（none は使えません）
+  error: 定義 design-feedback は feedback なので review は mr にしてください（none は指定できません）
   phases:
     version: 1
     phases:
@@ -130,7 +130,7 @@ courses:
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
 
   - id: add-phase
-    title: 新しい工程の定義を追加して、計画に使えるようにしたいとき
+    title: 新しい工程の定義を追加して、計画に利用できるようにしたいとき
     summary: 定義を追加し、id・区分・範囲・成果物を決めて保存する
     steps:
       - target: add

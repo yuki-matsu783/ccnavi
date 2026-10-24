@@ -98,7 +98,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
     return (
       <>
         <p className="empty" id="handoff-disabled">
-          取り込み待ち画面は使えません。
+          取り込み待ち画面は利用できません。
         </p>
         <pre className="load-error" data-role="disabled-reason">
           {data.reason}

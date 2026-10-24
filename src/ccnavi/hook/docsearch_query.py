@@ -60,9 +60,11 @@ def problems_of(query: Query) -> list[str]:
     """使い方の誤り。空なら引ける。"""
     found = []
     if query.sort not in SORTS:
-        found.append(f"--sort は {' / '.join(SORTS)} のどれか（{query.sort!r} は使えない）")
+        found.append(f"--sort は {' / '.join(SORTS)} のどれか（{query.sort!r} は指定できない）")
     if query.format not in FORMATS:
-        found.append(f"--format は {' / '.join(FORMATS)} のどれか（{query.format!r} は使えない）")
+        found.append(
+            f"--format は {' / '.join(FORMATS)} のどれか（{query.format!r} は指定できない）"
+        )
     for flag, value in (("--since", query.since), ("--until", query.until)):
         if value and not _valid_when(value):
             found.append(

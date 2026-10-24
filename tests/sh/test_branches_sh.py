@@ -260,7 +260,7 @@ class BranchesShTest(unittest.TestCase):
     def test_without_a_token_only_local_candidates_and_says_so(self):
         self.origin("https://github.com/acme/widgets.git")
         text = self.ok("--issue", "152")
-        self.assertIn("ホストは見ていない（gh が github.com で使えず", text)
+        self.assertIn("ホストは見ていない（gh が github.com で利用できず", text)
         self.assertIn("GITHUB_TOKEN もありません", text)
         self.assertEqual(list(self.candidates(text)), ["feature-152-login"])
 

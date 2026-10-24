@@ -68,7 +68,7 @@ test("CB-T461 追加した定義の見本は、実際の読み取りと同じ形
   assert.deepEqual(real.problems, []);
   assert.equal(real.form.phases.length, 1);
   assert.deepEqual(sample.added, { ...real.form.phases[0], origin: null });
-  // 足した定義は、計画に使えるよう id・タイトル・範囲・成果物・補足まで書いてある
+  // 足した定義は、計画に利用できるよう id・タイトル・範囲・成果物・補足まで書いてある
   assert.ok(sample.added.id !== "" && sample.added.title !== "" && sample.added.scope.length > 0 && sample.added.deliverables.length > 0);
   assert.ok(sample.added.agent !== "" && sample.added.when !== "");
   assert.ok(!sample.page.model.form.phases.some((phase) => phase.id === sample.added.id), "追加した定義が見本の一覧にもある");

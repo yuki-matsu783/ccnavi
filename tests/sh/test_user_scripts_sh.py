@@ -193,7 +193,7 @@ class EntryTest(unittest.TestCase):
         # hook の止めが ask に下がっても、ccnavi-review.sh 自身が拒否する。
         # 実行側の拒否が唯一の守りになる。
         for args, message in (
-            (("close-early", "--reason", "r"), "close-early は使用できません"),
+            (("close-early", "--reason", "r"), "close-early は指定できません"),
             (
                 ("decide", "1", "--choices", "{}", "--digest", "d"),
                 "decide は --choices を受けない",

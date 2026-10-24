@@ -768,7 +768,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
                 "",
                 f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
                 f"書式は `{'` `'.join(SECTIONS)}` の 3 タイプで、"
-                "照合に使えるのは `glob` か `regex`。"
+                "照合に指定できるのは `glob` か `regex`。"
                 "`glob` は fnmatch の glob で、文字列全体と一致したときだけヒットするので、"
                 "部分一致が必要なら前後に `*` を書く",
             )
@@ -1063,7 +1063,9 @@ def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
     if regex:
         unsupported = _unsupported(regex)
         if unsupported:
-            return _Built(error=Problem(SEVERITY_ERROR, name, f"{label}{unsupported}は使えない"))
+            return _Built(
+                error=Problem(SEVERITY_ERROR, name, f"{label}{unsupported}は利用できない")
+            )
         expression = regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else regex
         if uses_not_root:
             expanded, refused = _expand_not_root(expression, root)

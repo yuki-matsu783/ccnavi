@@ -317,7 +317,7 @@ test("CB-D379 実行ファイルが handoff を持たない版のとき、画面
   const reason = "実行ファイル（0.1.0 abc）が handoff の機能に対応していません（古い版です）。取り込み待ち画面 で確認できないので進めません。build.py を実行して組み立て直してください";
   const dom = await openPage({ kind: "disabled", reason });
   try {
-    assert.match(text(dom.one("#handoff-disabled")), /使えません/);
+    assert.match(text(dom.one("#handoff-disabled")), /利用できません/);
     assert.equal(text(dom.one('[data-role="disabled-reason"]')), reason);
     assert.match(text(dom.one('[data-role="disabled-reason"]')), /古い版です/);
     assert.match(text(dom.one('[data-role="disabled-reason"]')), /組み立て直してください/);

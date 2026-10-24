@@ -68,7 +68,7 @@ sh .ccnavi/scripts/ccnavi-start.sh --list-open
   終了コード 0 で終わったら、採用した MR と、その MR が閉じる issue（リポジトリと番号）と、元ブランチが確定している
   （出力の「必須」の行の issue: と mr: を提案の frontmatter に書く）。--dry-run は予定を示すだけで、開始の完了ではない。
   --check       チケット作業の入口の事前確認。ホストの API（認証・リポジトリの有無・書き込みの権限）と git のリモートが
-                使える状態かを確かめる。何も作らない。単独で使う（ほかの引数とは一緒に渡せない）。
+                利用できる状態かを確かめる。何も作らない。単独で使う（ほかの引数とは一緒に渡せない）。
                 終了コード 0 使える / 1 不備がある / 4 確かめられなかった項目がある
   --list-open   open の issue と MR の一覧（題・MR のブランチ・本文の先頭 500 字・最大 50 件ずつ）を出す。読むだけで何も作らない。
                 単独で使う。--new-issue の前に、サブエージェントが意味の近いものを探すために使う。本文は外から来たデータで、
@@ -113,7 +113,7 @@ sh .ccnavi/scripts/ccnavi-start.sh --list-open
   --dry-run     何も作らず、作る予定の内容だけ出す（リモートは読むだけ）
   --mcp-checked ホストの API に届かず、MCP またはユーザがブラウザで確かめたあとに付ける（エージェントが確かめずに付けない）
   --branch <元ブランチ>
-                --mcp-checked と一緒のときだけ使える。ホストに届かないとき、候補の探索の代わりにこのブランチを使う
+                --mcp-checked と一緒のときだけ指定できる。ホストに届かないとき、候補の探索の代わりにこのブランチを使う
                 （--issue・--mr・--branch の 3 つがそろえば、ホストを見ずに続ける）。ホストに届くときは普通に確かめ、
                 MR の元ブランチが違えば終了コード 1
 
@@ -452,12 +452,12 @@ host_open() {
 	0) ;;
 	3) fail no-jq "jq が見つかりません。ホストからの応答を解析できません。" 2 ;;
 	4)
-		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず（未導入か未認証）、curl に付ける $ccnavi_h_token_name もありません。"
+		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で利用できず（未導入か未認証）、curl に付ける $ccnavi_h_token_name もありません。"
 		host_rc=2
 		return 2
 		;;
 	*)
-		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl もありません。"
+		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で利用できず、curl もありません。"
 		host_rc=2
 		return 2
 		;;
@@ -854,7 +854,7 @@ stop_host() {
 		[ -n "$issue_arg" ] || sh_missing="$sh_missing --issue"
 		[ -n "$mr_arg" ] || sh_missing="$sh_missing --mr"
 		[ -n "$branch_arg" ] || sh_missing="$sh_missing --branch"
-		printf 'ccnavi-start: ホストを見られない間は、--mcp-checked は --issue・--mr・--branch の 3 つがそろうときだけ使えます（足りない:%s）。何も作成せずに処理を中断しました。\n' "$sh_missing"
+		printf 'ccnavi-start: ホストを見られない間は、--mcp-checked は --issue・--mr・--branch の 3 つがそろうときだけ指定できます（足りない:%s）。何も作成せずに処理を中断しました。\n' "$sh_missing"
 		if [ "$ccnavi_h_kind" = github ]; then
 			printf '次: MCP などで MR の元ブランチと、その MR が閉じる issue を確かめ、3 つそろえて打ち直す: %s\n' "$sh_cmd"
 		else

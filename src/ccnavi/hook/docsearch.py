@@ -1,6 +1,6 @@
 """md の frontmatter の索引を組み、それを引く（`ccnavi --docs`）。
 
-索引を組む側は `docsearch_index`、引く側（問いの検査・当たり・並べ方・表）は `docsearch_query` に
+索引を組む側は `docsearch_index`、引く側（問いの検査・ヒット・並べ方・表）は `docsearch_query` に
 分けてある。どちらも docsearch を読まない。
 
 ドキュメントを探すエージェントは、ふだん grep や Glob で本文を端から探す。ヒットするのは行で、

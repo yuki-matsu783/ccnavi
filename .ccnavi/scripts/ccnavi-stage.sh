@@ -57,7 +57,7 @@ case "${1:-}" in
 	shift
 	;;
 -*)
-	printf 'ccnavi-stage: %s は使用できません。使えるのは --commands だけです。\n' "$1" >&2
+	printf 'ccnavi-stage: %s は指定できません。指定できるのは --commands だけです。\n' "$1" >&2
 	exit 2
 	;;
 esac

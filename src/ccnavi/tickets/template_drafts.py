@@ -442,7 +442,8 @@ def make(
     if not plan_templates.NAME_RE.match(name) or len(name) > plan_templates.NAME_LIMIT:
         return Made(
             False,
-            error=f"下書きの名前 {_line(name)!r} は使えない（英数字で始め、英数字と `._-` だけ。"
+            error=f"下書きの名前 {_line(name)!r} は指定できない"
+            "（英数字で始め、英数字と `._-` だけ。"
             f"{plan_templates.NAME_LIMIT} 字まで）。--name で付ける",
         )
     target_rel, target_layer, why = _target_of(conf, root, found, name, to or TO_PROJECT, layer)

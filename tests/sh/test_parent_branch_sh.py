@@ -405,7 +405,7 @@ class ParentBranchShTest(unittest.TestCase):
         self.add_parent_tree()
         self.write_approved_copy("origin/main")
         lint = self.exe("--lint")
-        self.assertIn("`branch` は使えない欄", lint.stdout)
+        self.assertIn("`branch` は指定できない欄", lint.stdout)
 
     # ---- HEAD が合わない
 

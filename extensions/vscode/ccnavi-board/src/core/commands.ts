@@ -276,7 +276,7 @@ export function gitScriptCommand(root: string): string {
  * `parents` を渡すとその親子のチケットだけをコミットして push する（取り込み済みのものだけが送られ、
  * そうでないものは今どおりユーザがコミットする）。
  * `paths`（ワークスペースルートからの相対）を渡すと、置き場の変更のうちそのパスだけを送る（`--path`）。
- * 承認が書いた・消したパスを渡し、承認と無関係な変更を承認のコミットに入れない。`parents` とは一緒に使えない
+ * 承認が書いた・消したパスを渡し、承認と無関係な変更を承認のコミットに入れない。`parents` とは同時に指定できない
  */
 export function pushApprovedCommand(
   root: string,

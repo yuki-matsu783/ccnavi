@@ -810,7 +810,7 @@ def validate(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"`{ticket_model.MAINTENANCE_KEY}:` は通常の提案・承認の経路では使えない印。"
+                f"`{ticket_model.MAINTENANCE_KEY}:` は通常の提案・承認の経路では指定できない印。"
                 "提案から欄を消す（統合の子は `ccnavi-ticket.sh consolidate <親>` が作る）",
             )
         ], overflow

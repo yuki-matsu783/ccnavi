@@ -787,7 +787,7 @@ class WorktreeShTest(unittest.TestCase):
             with self.subTest(name=name):
                 result = self.run_sh(name)
                 self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-                self.assertIn("使えません", result.stderr)
+                self.assertIn("指定できません", result.stderr)
                 self.assertFalse(os.path.exists(self.wt(name)))
 
     def test_existing_directory_that_is_not_the_worktree_is_refused(self):

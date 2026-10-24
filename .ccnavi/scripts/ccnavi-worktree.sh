@@ -172,8 +172,8 @@ root=$(ccnavi_workspace) ||
 ccnavi_log_root="$root"
 # 名前の字の種類・NFC・長さは実行ファイルに聞く（sh の検査は ASCII の外のバイトを通す）
 ccnavi_id_ask "$root" "$name" ||
-	fail id-unchecked "名前（${name}）が使えるか（字の種類・64 文字以内）を確かめられない（ccnavi の実行ファイルが答えない）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
-[ -z "$ccnavi_id_direct" ] || fail bad-name "名前（${name}）は使えません（${ccnavi_id_direct}）。" 2
+	fail id-unchecked "名前（${name}）を指定できるか（字の種類・64 文字以内）を確かめられない（ccnavi の実行ファイルが答えない）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
+[ -z "$ccnavi_id_direct" ] || fail bad-name "名前（${name}）は指定できません（${ccnavi_id_direct}）。" 2
 top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -n "$top" ] ||
 	fail not-git "cwd が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
@@ -293,7 +293,7 @@ if [ -n "$adopt" ]; then
 	[ -n "$base_arg" ] ||
 		fail adopt-no-base "--adopt には --base <取り込み先> が要ります（今のメインのチェックアウトのブランチは ${target}）。ユーザに取り込み先を確かめてから付けてください。" 2
 	[ -z "$wip_mode" ] ||
-		fail adopt-wip "--adopt では --copy-wip / --no-wip は使えません（書きかけはコピーしない。起点は merge-base から決める）。" 2
+		fail adopt-wip "--adopt では --copy-wip / --no-wip は指定できません（書きかけはコピーしない。起点は merge-base から決める）。" 2
 	ad_common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
 	[ -n "$ad_common" ] || fail no-common-dir "git の共通ディレクトリを読めません。"
 	ad_common=$(ccnavi_phys "$ad_common")

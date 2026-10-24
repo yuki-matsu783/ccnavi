@@ -51,7 +51,7 @@ def usage_problem(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         if action.dest in _WITH_HANDOFF or not action.option_strings:
             continue
         if getattr(args, action.dest, action.default) != action.default:
-            return f"{action.option_strings[-1]} は user handoff と一緒には使えません"
+            return f"{action.option_strings[-1]} は user handoff と同時には指定できません"
     if args.yes not in ("", cli_args.BARE_YES):
         return "--yes には値を付けられません（user handoff <パス>… --yes --expect <ハッシュ>）"
     if args.expect is not None and not args.yes:

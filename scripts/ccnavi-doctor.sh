@@ -935,13 +935,13 @@ main() {
 			return 0
 			;;
 		*)
-			die "$1 は使えない引数です。使えるものは --help で確認できます。"
+			die "$1 は指定できない引数です。指定できるものは --help で確認できます。"
 			;;
 		esac
 	done
 	case "$mode" in
 	prebuilt | build) ;;
-	*) die "--mode に使えるのは prebuilt か build です。" ;;
+	*) die "--mode に指定できるのは prebuilt か build です。" ;;
 	esac
 	# 時間の上限は、数字（小数も可）だけ。それ以外は sleep と算術を壊す。
 	case "$DOCTOR_GIT_LIMIT$DOCTOR_CURL_LIMIT" in
@@ -966,7 +966,7 @@ main() {
 	doctor_host_sh="$from/.ccnavi/scripts/ccnavi-common-host.sh"
 	[ -f "$doctor_host_sh" ] || die "$from は ccnavi の配布元に見えません（.ccnavi/scripts/ccnavi-common-host.sh が無い）。"
 	if [ "$with_extensions" = yes ] && [ "$mode" != build ]; then
-		die "--with-extensions は --mode build のときだけ使えます。"
+		die "--with-extensions は --mode build のときだけ指定できます。"
 	fi
 
 	doctor_os=$(uname -s 2>/dev/null || :)

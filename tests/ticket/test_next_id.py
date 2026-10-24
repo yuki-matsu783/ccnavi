@@ -77,9 +77,9 @@ class NextIdTest(unittest.TestCase):
 
     def test_refuses_unusable_forms(self):
         for words, why in (
-            (("zzz", "x"), "先頭の語 zzz は使えない"),
+            (("zzz", "x"), "先頭の語 zzz は指定できない"),
             (("feature", "bad-12"), "末尾が `-<2 桁>`"),
-            (("feature", "a/b"), "slug a/b は使えない"),
+            (("feature", "a/b"), "slug a/b は指定できない"),
             (("feature", "ab..c"), ".."),
             (("feature", "a."), "."),
             (("feature", "x.lock"), ".lock"),

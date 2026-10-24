@@ -60,7 +60,7 @@ def resolve(conf, root: str, layer: str, name: str) -> tuple[Found | None, str]:
         usable = sorted(e.name for e in plan_templates.adopted(scanned, layer) if e.usable)
         listed = ", ".join(usable) or "無い"
         return None, (
-            f"テンプレート {name!r} がありません（{layer} に使えるもの: {listed}）。"
+            f"テンプレート {name!r} がありません（{layer} で利用できるもの: {listed}）。"
             "一覧は 'ccnavi --templates'"
         )
     if entry.effective and entry.layer == plan_templates.LAYER_COMMON:
@@ -69,7 +69,7 @@ def resolve(conf, root: str, layer: str, name: str) -> tuple[Found | None, str]:
         entry = plan_templates.recheck(entry, types, scanned.candidates)
     if not entry.effective or entry.template is None:
         why = entry.dropped_detail or "読めない"
-        return None, f"テンプレート {name!r}（{entry.rel}）は使えない: {why}"
+        return None, f"テンプレート {name!r}（{entry.rel}）は利用できない: {why}"
     errors = [p.detail for p in entry.problems if p.severity == SEVERITY_ERROR]
     if errors:
         return None, (
@@ -118,7 +118,7 @@ def child_problem(parent: str, template: plan_templates.Template) -> str:
     for index in sorted(template.flows):
         why = ticket_ids.id_problem(child_id(parent, index))
         if why:
-            return f"子の識別子 {child_id(parent, index)} が使えない（{why}）。短い識別子にする"
+            return f"子の識別子 {child_id(parent, index)} が指定できない（{why}）。短い識別子にする"
     return ""
 
 

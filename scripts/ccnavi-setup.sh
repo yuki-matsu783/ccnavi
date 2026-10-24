@@ -318,7 +318,7 @@ while [ "$#" -gt 0 ]; do
 		shift
 		;;
 	-*)
-		die "$1 は使えないオプションです。使えるオプションは --help で確認できます。"
+		die "$1 は指定できないオプションです。指定できるオプションは --help で確認できます。"
 		;;
 	*)
 		# 空文字を「まだ受け取っていない」と見なすと、2 つ受け取れてしまう。そのため、
@@ -337,7 +337,7 @@ disable)
 	die "CCNAVI_MODE=disable は設定ファイルに書いても反映されません。止めたいときは、セッションを起動する側の環境から渡してください。"
 	;;
 *)
-	die "--mode に使えるのは enable か dry-run です。"
+	die "--mode に指定できるのは enable か dry-run です。"
 	;;
 esac
 
@@ -346,14 +346,14 @@ esac
 case "$ticket_control" in
 enable | disable) ;;
 *)
-	die "--ticket-control に使えるのは enable か disable です。"
+	die "--ticket-control に指定できるのは enable か disable です。"
 	;;
 esac
 
 case "$bin_place" in
 project | user) ;;
 *)
-	die "--bin に使えるのは project か user です。"
+	die "--bin に指定できるのは project か user です。"
 	;;
 esac
 [ "$bin_place" = project ] || [ "$deploy_off" = no ] ||

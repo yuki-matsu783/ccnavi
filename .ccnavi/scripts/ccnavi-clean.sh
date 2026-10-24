@@ -69,7 +69,7 @@ for arg in "$@"; do
 		whole=1
 		;;
 	-*)
-		printf 'ccnavi-clean: %s は使用できません。使えるのは --dry-run・--worktree だけです。\n' "$arg" >&2
+		printf 'ccnavi-clean: %s は指定できません。指定できるのは --dry-run・--worktree だけです。\n' "$arg" >&2
 		exit 2
 		;;
 	*)
@@ -103,7 +103,7 @@ root=$(ccnavi_workspace) || {
 # 生成物の掃除・worktree remove）。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if [ -n "$whole" ]; then
 	if [ -n "$dry" ]; then
-		printf 'ccnavi-clean: --worktree と --dry-run は一緒に使えません（削除するものを見るだけなら --dry-run だけで実行します）。\n' >&2
+		printf 'ccnavi-clean: --worktree と --dry-run は同時に指定できません（削除するものを見るだけなら --dry-run だけで実行します）。\n' >&2
 		exit 2
 	fi
 	here="$(pwd -W 2>/dev/null || pwd)"

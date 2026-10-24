@@ -146,7 +146,7 @@ def _test_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> st
     if args.test is None:
         if args.permission_mode or args.agent_id:
             flag = "--permission-mode" if args.permission_mode else "--agent-id"
-            return f"{flag} は --test でだけ使える"
+            return f"{flag} は --test でだけ指定できる"
         return ""
     known = parser._option_string_actions
     for word in args.test:
@@ -163,14 +163,14 @@ def _test_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> st
 def _plan_order_usage(args: argparse.Namespace, reordering: bool) -> str:
     """`--plan-order` の組み合わせの誤り。正しければ空。"""
     if args.agree:
-        return "--plan-order は --agree と一緒に使えない（承認の外の補助）"
+        return "--plan-order は --agree と同時に指定できない（承認の外の補助）"
     if args.plan_order is None:
         if args.fill_phases:
             return "--fill-phases は --plan-order <親> と一緒に使う"
         return "--order・--write・--expect は --plan-order <親> と一緒に使う"
     if args.fill_phases:
         if reordering or args.json:
-            return "--fill-phases は --json・--order・--write・--expect と一緒に使えない"
+            return "--fill-phases は --json・--order・--write・--expect と同時に指定できない"
         return ""
     if args.write:
         if args.order is None:
@@ -713,7 +713,7 @@ def _parsed(
     if args.docs:
         refused = cli_args._not_with_docs(args)
         if refused:
-            stderr.write(f"ccnavi: --docs は {refused} と一緒に使えない\n")
+            stderr.write(f"ccnavi: --docs は {refused} と同時に指定できない\n")
             return EXIT_ERROR
 
     root = args.root if args.root is not None else default_root()

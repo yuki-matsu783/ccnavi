@@ -286,7 +286,7 @@ class StructureTest(unittest.TestCase):
         t = self.parse(cons_text())
         problems, _ = agree_candidates.validate(t, {"i0001": parent})
         self.assertTrue(problems)
-        self.assertIn("通常の提案・承認の経路では使えない", problems[0].detail)
+        self.assertIn("通常の提案・承認の経路では指定できない", problems[0].detail)
 
 
 def _conf():

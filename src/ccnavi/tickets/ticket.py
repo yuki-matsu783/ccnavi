@@ -484,7 +484,7 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
             Problem(
                 SEVERITY_ERROR,
                 name,
-                "`branch` は使えない欄。親のブランチ名は親のワークツリーの HEAD から読み、"
+                "`branch` は指定できない欄。親のブランチ名は親のワークツリーの HEAD から読み、"
                 "親の識別子はその `/` を `-` に置き換えたもの。欄を消す",
             )
         )

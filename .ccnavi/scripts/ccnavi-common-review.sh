@@ -126,8 +126,8 @@ review_host() {
 	ccnavi_host_connect || {
 		case "$?" in
 		3) fail no-jq "jqが見つかりません。結果の JSON を作成できません。" 2 ;;
-		4) fail no-transport-token "$ccnavi_h_cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name もありません。$token_name を置くか、$ccnavi_h_cli_name を $host に認証してください。" 2 ;;
-		*) fail no-transport "$ccnavi_h_cli_name が $host で使えず、curl もありません。どちらかを用意するか、スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけなので、エージェントは JSON を作らずに止まり、ユーザに頼んでください（ユーザが MCP などでリモートを読める道具でスレッドとレビューを JSON にし、ターミナルで 'ccnavi review confirm --phase <N> --result <json>' を実行します）。" 2 ;;
+		4) fail no-transport-token "$ccnavi_h_cli_name が $host で利用できず（未導入か未認証）、curl に付ける $token_name もありません。$token_name を置くか、$ccnavi_h_cli_name を $host に認証してください。" 2 ;;
+		*) fail no-transport "$ccnavi_h_cli_name が $host で利用できず、curl もありません。どちらかを用意するか、スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけなので、エージェントは JSON を作らずに止まり、ユーザに頼んでください（ユーザが MCP などでリモートを読める道具でスレッドとレビューを JSON にし、ターミナルで 'ccnavi review confirm --phase <N> --result <json>' を実行します）。" 2 ;;
 		esac
 	}
 	JQ="$ccnavi_h_jq"
@@ -172,7 +172,7 @@ api_failed() {
 	case "$2" in
 	graphql)
 		printf '%s: %s\n' "$review_label" \
-			"GraphQL を使えない環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけです。エージェントは JSON を作らず、実行せずに止まり、ユーザに次を頼んでください: MCP などリモートを読める道具でスレッドとレビューを fetch_all と同じ形 {host, mr, threads, reviews, fetched_at} の JSON にし、ターミナルで 'ccnavi review confirm --phase <N> --result <json>' を実行します。Draft 外しもユーザにその道具の側で行ってもらってください。" >&2
+			"GraphQL を利用できない環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけです。エージェントは JSON を作らず、実行せずに止まり、ユーザに次を頼んでください: MCP などリモートを読める道具でスレッドとレビューを fetch_all と同じ形 {host, mr, threads, reviews, fetched_at} の JSON にし、ターミナルで 'ccnavi review confirm --phase <N> --result <json>' を実行します。Draft 外しもユーザにその道具の側で行ってもらってください。" >&2
 		;;
 	esac
 }

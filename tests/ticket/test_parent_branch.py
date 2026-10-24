@@ -113,7 +113,9 @@ class BranchFieldParseTest(unittest.TestCase):
         t, problems = ticket_mod.parse(with_branch(parent_text(PARENT, ["design"]), BRANCH))
         self.assertIsNone(t)
         self.assertTrue(
-            any(p.severity == "error" and "`branch` は使えない欄" in p.detail for p in problems),
+            any(
+                p.severity == "error" and "`branch` は指定できない欄" in p.detail for p in problems
+            ),
             problems,
         )
 
@@ -123,7 +125,7 @@ class BranchFieldParseTest(unittest.TestCase):
         lines.insert(3, f"branch: {BRANCH}")
         t, problems = ticket_mod.parse("\n".join(lines))
         self.assertIsNone(t)
-        self.assertTrue(any("`branch` は使えない欄" in p.detail for p in problems), problems)
+        self.assertTrue(any("`branch` は指定できない欄" in p.detail for p in problems), problems)
 
 
 class ParentBranchTest(unittest.TestCase):
@@ -259,7 +261,7 @@ class ParentBranchTest(unittest.TestCase):
             with_branch(parent_text(PARENT, ["design"], allow=("src/*", "wip/*")), BRANCH),
         )
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn("`branch` は使えない欄", lint.stdout)
+        self.assertIn("`branch` は指定できない欄", lint.stdout)
 
     def test_lint_does_not_say_the_name_form_of_an_adopted_parent(self):
         """既存のブランチを採用した親（ワークツリーが在り、HEAD が合う）は名前の形式を言わない。"""

@@ -476,7 +476,7 @@ def run(
     if not note.strip():
         if bound is None:
             stderr.write(
-                "ccnavi: チケットに結び付かない作業では --note だけ使える（受信箱に書く）\n"
+                "ccnavi: チケットに結び付かない作業では --note だけ指定できる（受信箱に書く）\n"
             )
             return 1
         parent = bound.parent if bound.is_child else ""

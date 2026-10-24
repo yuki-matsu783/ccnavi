@@ -111,17 +111,17 @@ def parse_scope(values: list[str] | None) -> tuple[list[str], str]:
             if not glob:
                 continue
             if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in glob):
-                return [], f"--scope {glob!r} に改行や制御文字は使えない"
+                return [], f"--scope {glob!r} に改行や制御文字は指定できない"
             if "<" in glob or ">" in glob:
                 return [], (
-                    f"--scope {glob!r} に `<` `>` は使えない。"
+                    f"--scope {glob!r} に `<` `>` は指定できない。"
                     "`<触るファイルの glob>` のような案内の仮の値は、実際のパスに置き換える"
                 )
             norm = glob.replace("\\", "/")
             if norm.startswith("/") or re.match(r"[A-Za-z]:", norm) or ".." in norm.split("/"):
                 return [], (
                     f"--scope {glob!r} はワークツリーのルートからの相対の glob で書く"
-                    "（絶対パスと `..` は使えない）"
+                    "（絶対パスと `..` は指定できない）"
                 )
             if glob.lower() not in seen:
                 seen.add(glob.lower())
@@ -258,7 +258,7 @@ def run(
 
     problem = ticket_ids.id_problem(ident)
     if problem:
-        return refuse(f"識別子 {ident!r} が使えない（{problem}）")
+        return refuse(f"識別子 {ident!r} が指定できない（{problem}）")
     if ticket_ids.child_pattern().fullmatch(ident):
         return refuse(
             f"{ident} は子の識別子の形（<親>-<NN>-<NN>）。雛形を出すのは親だけ。"
@@ -267,7 +267,7 @@ def run(
     if not (title or "").strip():
         return refuse("--title <題> が必要です")
     if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in title):
-        return refuse("--title に改行や制御文字は使えない")
+        return refuse("--title に改行や制御文字は指定できない")
     stripped = title.strip()
     if stripped.startswith("<") and stripped.endswith(">"):
         return refuse(
@@ -289,7 +289,7 @@ def run(
     plan = parse_plan(plan_text)
     if template:
         if (plan_text or "").strip():
-            return refuse("--template と --plan は一緒に使えない（計画はテンプレートから作る）")
+            return refuse("--template と --plan は同時に指定できない（計画はテンプレートから作る）")
     elif layer:
         return refuse("--layer は --template と一緒に使う")
     elif with_feedback:
@@ -333,7 +333,7 @@ def run(
         unknown = [n for n in dict.fromkeys(plan) if n not in types]
         if unknown:
             return refuse(
-                f"plan の型 {', '.join(unknown)} が phases.yml にありません。使える型: "
+                f"plan の型 {', '.join(unknown)} が phases.yml にありません。指定できる型: "
                 + ", ".join(n for n, t in types.items() if t.kind == phasetypes.KIND_WORK)
             )
         feedback = [n for n in dict.fromkeys(plan) if types[n].kind != phasetypes.KIND_WORK]

@@ -133,7 +133,7 @@ def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dic
     resolve = (
         "マージの衝突を解くことは止めていません。"
         f"{git} add <パス>、{git} restore --ours -- <パス>（または --theirs）は、"
-        "コミット済みの版を戻すだけなので使えます。"
+        "コミット済みの版を戻すだけなので実行できます。"
         if wrapper
         else "マージの衝突を解くことは、ここではエージェントが git を実行しないため、"
         "ユーザに頼んでください。"

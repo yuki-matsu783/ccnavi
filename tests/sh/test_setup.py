@@ -1733,7 +1733,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """
         src = self.make_source()
         for args, message in (
-            (("--bin", BIN_PATH), "--bin に使えるのは project か user です"),
+            (("--bin", BIN_PATH), "--bin に指定できるのは project か user です"),
             (("--bin",), "--bin に値がありません"),
         ):
             with self.subTest(args=args):

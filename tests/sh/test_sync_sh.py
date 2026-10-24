@@ -753,7 +753,7 @@ class SyncTest(SyncHarness):
         for args in ((), (PARENT,)):
             done = self.sync(*args)
             self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-            self.assertIn("片付けの記録（retire/i0001.json）が使えない", done.stdout)
+            self.assertIn("片付けの記録（retire/i0001.json）が利用できない", done.stdout)
             self.assertIn("mr", done.stdout)
         self.assertFalse(os.path.exists(log), "番号が無いのにホストへ聞いた")
         self.assertTrue(os.path.exists(record))

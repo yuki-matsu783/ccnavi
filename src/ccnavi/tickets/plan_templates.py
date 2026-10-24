@@ -358,7 +358,7 @@ def parse_template(raw: bytes, stem: str = "") -> tuple[Template | None, list[Pr
     name = name.strip()
     if name and (not NAME_RE.match(name) or len(name) > NAME_LIMIT):
         error(
-            f"`name` の `{_line(name)}` は使えない（英数字で始め、英数字と `.` `_` `-` だけ。"
+            f"`name` の `{_line(name)}` は指定できない（英数字で始め、英数字と `.` `_` `-` だけ。"
             f"{NAME_LIMIT} 字まで）"
         )
     elif stem and name and name != stem:

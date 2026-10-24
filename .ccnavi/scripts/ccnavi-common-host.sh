@@ -595,7 +595,7 @@ ccnavi_preflight() {
 		ccnavi_pf_tools_why="$ccnavi_pf_lack が見つからない"
 	else
 		ccnavi_pf_tools=ok
-		command -v curl >/dev/null 2>&1 || ccnavi_pf_tools_why="curl は無い（gh / glab が使えれば足りる）"
+		command -v curl >/dev/null 2>&1 || ccnavi_pf_tools_why="curl は無い（gh / glab が利用できれば足りる）"
 	fi
 
 	# 2. origin
@@ -669,13 +669,13 @@ ccnavi_preflight() {
 				ccnavi_pf_auth_source=none
 				ccnavi_pf_api=unverified
 				ccnavi_pf_api_kind=auth
-				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl に付ける $ccnavi_h_token_name もない"
+				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で利用できず、curl に付ける $ccnavi_h_token_name もない"
 				;;
 			*)
 				ccnavi_pf_auth_source=none
 				ccnavi_pf_api=unverified
 				ccnavi_pf_api_kind=tool
-				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl もない"
+				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で利用できず、curl もない"
 				;;
 			esac
 		fi

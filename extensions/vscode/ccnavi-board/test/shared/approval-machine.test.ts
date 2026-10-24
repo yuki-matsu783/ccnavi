@@ -894,10 +894,10 @@ test("CB-T177c 相談のプロンプトのコピー: オーバーレイを閉じ
   assert.deepEqual(ok.state.overlay?.kind === "decidePreview" ? ok.state.overlay.consult?.ok : undefined, true);
   assert.equal(ok.state.overlay?.kind === "decidePreview" ? ok.state.overlay.preview : undefined, shown.overlay?.kind === "decidePreview" ? shown.overlay.preview : null);
   // できなかった: 失敗と言う（できたとは言わない）
-  const ng = approvalStep(shown, { kind: "consultCopied", error: "クリップボードが使えません" });
+  const ng = approvalStep(shown, { kind: "consultCopied", error: "クリップボードを利用できません" });
   const consult = ng.state.overlay?.kind === "decidePreview" ? ng.state.overlay.consult : undefined;
   assert.equal(consult?.ok, false);
-  assert.match(consult?.text ?? "", /コピーできませんでした（クリップボードが使えません）/);
+  assert.match(consult?.text ?? "", /コピーできませんでした（クリップボードを利用できません）/);
   assert.doesNotMatch(consult?.text ?? "", /コピーしました/);
   // 確定中は組まない・結果も受けない
   const deciding = toDeciding(approvalStep);

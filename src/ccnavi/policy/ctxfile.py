@@ -37,9 +37,9 @@ def bad_path(rel: str) -> str:
         return ""
     slashed = rel.replace("\\", "/")
     if os.path.isabs(rel) or slashed.startswith("/") or (len(slashed) > 1 and slashed[1] == ":"):
-        return "絶対パスは使えない。ルートからの相対パスで書く"
+        return "絶対パスは指定できない。ルートからの相対パスで書く"
     if any(part == ".." for part in slashed.split("/")):
-        return "`..` で上に出るパスは使えない"
+        return "`..` で上に出るパスは指定できない"
     return ""
 
 

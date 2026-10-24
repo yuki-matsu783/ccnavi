@@ -107,10 +107,10 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             checkout / switch (ブランチを移る形だけ。-f・checkout -B・switch -C と -- <パス> は不可。
                   親のワークツリーでは別のブランチへ移れない)
             承認済みチケットの置き場 (.ccnavi/approved/ と wip/proposals/review/) には
-                  restore --source / --ours / --theirs と checkout <ref> <パス> を使えない
+                  restore --source / --ours / --theirs と checkout <ref> <パス> を利用できない
             ccnavi 自身を守る場所 (.ccnavi/ .claude/settings*.json .claude/hooks/ logs/ の記録と state
-                  ccnavi-git.sh) には rm と restore --source と checkout <ref> <パス> を使えない
-                  (衝突の解決の restore --ours / --theirs は使える。変更が必要ならユーザに依頼する)
+                  ccnavi-git.sh) には rm と restore --source と checkout <ref> <パス> を利用できない
+                  (衝突の解決の restore --ours / --theirs は利用できる。変更が必要ならユーザに依頼する)
             stash (list show push pop apply)
             merge (-X ours / -s ours / --no-verify は不可)
             merge-file -p (標準出力に出す形だけ。ファイルへは書かない)
@@ -1102,7 +1102,7 @@ ig_integrate() {
 		reject integrate-no-record "$ig_n の直接作業の記録がありません（ccnavi-direct/${ig_n}）。更新前に切ったワークツリーや、手で切ったワークツリーは、ユーザの確認を経て $WT_SH_Q $ig_n --adopt --base <取り込み先> で引き取ります。"
 	d4_common_check
 	d4_git_ge 2 40 ||
-		reject integrate-old-git "git が古く（$(git version 2>/dev/null)）、merge-tree --merge-base（git 2.40 から）が使えません。git を 2.40 以上にしてから再実行してください。"
+		reject integrate-old-git "git が古く（$(git version 2>/dev/null)）、merge-tree --merge-base（git 2.40 から）が利用できません。git を 2.40 以上にしてから再実行してください。"
 	d4_base=$(ccnavi_record_get "$d4_rec" base_branch)
 	d4_s_rec=$(ccnavi_record_get "$d4_rec" snap_sha)
 	[ -n "$d4_base" ] && [ -n "$d4_s_rec" ] ||
@@ -1775,7 +1775,7 @@ worktree)
 				wt_id_problem="$ccnavi_id_problem"
 			fi
 			[ -z "$wt_id_problem" ] ||
-				reject worktree-id "worktree add $wt_dest $wt_base は使えません。$wt_base から作る識別子 $ccnavi_id_ident は親のワークツリーに使えません（${wt_id_problem}）。既にあるブランチを親にするときは $START --mr <MR の番号> で始めてください（採用してよいかを確かめてから出します）。"
+				reject worktree-id "worktree add $wt_dest $wt_base は指定できません。$wt_base から作る識別子 $ccnavi_id_ident は親のワークツリーに指定できません（${wt_id_problem}）。既にあるブランチを親にするときは $START --mr <MR の番号> で始めてください（採用してよいかを確かめてから出します）。"
 		fi
 		# 統合先から切るなら、起点が古くないか確かめる（名前の検査を通ったあと）。
 		wt_fresh
@@ -1801,7 +1801,7 @@ worktree)
 		}
 		wt_walk ${1+"$@"}
 		;;
-	*) reject worktree-action "worktree $action は使用できません。使えるのは list / add / prune / remove です。" ;;
+	*) reject worktree-action "worktree $action は指定できません。指定できるのは list / add / prune / remove です。" ;;
 	esac
 	;;
 
@@ -1812,7 +1812,7 @@ stash)
 	drop | clear)
 		reject stash-drop "stash $action は退避した変更を破棄します。中身を $SELF stash show -p で確かめ、不要と判断した理由をユーザに伝えてください。"
 		;;
-	*) reject stash-action "stash $action は使用できません。使えるのは list / show / push / pop / apply です。" ;;
+	*) reject stash-action "stash $action は指定できません。指定できるのは list / show / push / pop / apply です。" ;;
 	esac
 	;;
 
@@ -2305,7 +2305,7 @@ push)
 			ccnavi_push_gate "$push_top" "$push_branch" "${push_top##*/}" "$push_root" "$push_gate_secs" || push_gate_rc=$?
 			case "$push_gate_rc" in
 			0) ;;
-			1) reject push-parent-missing "${ccnavi_pg_why}。エージェントは戻せない（生の git は使えない）ので、ユーザに伝えて止まってください。" ;;
+			1) reject push-parent-missing "${ccnavi_pg_why}。エージェントは戻せない（生の git は利用できない）ので、ユーザに伝えて止まってください。" ;;
 			*) reject push-parent-unverified "${ccnavi_pg_why}。直せなければユーザに伝えて止まってください（生の git で押し通さない）。" ;;
 			esac
 			;;
@@ -2339,7 +2339,7 @@ clone | submodule | lfs)
 	reject import "$sub は外から中身を持ち込みます。使用できません。ユーザに依頼してください。"
 	;;
 *)
-	reject not-allowed "$sub は許可リストにありません。使える形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
+	reject not-allowed "$sub は許可リストにありません。指定できる形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
 	;;
 esac
 

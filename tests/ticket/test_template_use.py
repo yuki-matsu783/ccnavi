@@ -312,7 +312,7 @@ class RefusalTest(Use):
         self.put("odd", variant("other"))
         result = self.new(template="odd")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("使えない", result.stderr)
+        self.assertIn("利用できない", result.stderr)
         self.nothing_written()
 
     def test_a_type_missing_from_phases_yml_is_refused_without_writing(self):

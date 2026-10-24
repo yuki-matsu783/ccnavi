@@ -279,7 +279,7 @@ class TestHitsTest(unittest.TestCase):
                 with self.subTest(route=route, flag=flag):
                     done = self.ccnavi(route, flag, "default")
                     self.assertEqual(done.returncode, 1)
-                    self.assertIn(f"{flag} は --test でだけ使える", done.stderr)
+                    self.assertIn(f"{flag} は --test でだけ指定できる", done.stderr)
 
     def test_flags_between_tool_and_subject_and_extra_words_are_refused(self):
         """オプションを TOOL と SUBJECT の間に置いた形と、余った語は、黙って破棄せずに断る。"""

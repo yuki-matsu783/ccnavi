@@ -1,6 +1,6 @@
 /**
  * テンプレート 1 件。見出しに名前・層・状態の札・説明を出し、最初から開いていて、計画とフローの図・本文の取り出しを出す（畳める）。
- * 判定（使える・使われない・破棄した理由・読めない）は実行ファイルの答えのまま出す。
+ * 判定（有効・無効・使われない・破棄した理由・読めない）は実行ファイルの答えのまま出す。
  */
 import { useEffect, type JSX } from "react";
 
@@ -117,7 +117,7 @@ function detailMatches(detail: TemplateDetail, entry: TemplateEntry): boolean {
   return detail.layer === entry.layer && (entry.sha === "" || detail.sha === entry.sha);
 }
 
-/** 状態の札。使える・使われない・破棄した理由・読み取り専用・読めない。色と文字の両方で出す */
+/** 状態の札。有効・無効・使われない・破棄した理由・読み取り専用・読めない。色と文字の両方で出す */
 function StateTags({ entry }: { readonly entry: TemplateEntry }): JSX.Element {
   return (
     <>

@@ -168,8 +168,8 @@ def _prefix_setting_problems(conf: settings.Settings) -> list[Problem]:
             SEVERITY_WARN,
             "(settings)",
             f"{settings.BRANCH_PREFIXES_ENV} の {', '.join(conf.branch_prefixes_rejected)} は"
-            "先頭の語に使えないので読まない（英小文字で始まり、英小文字と数字だけでできた語。main・master・"
-            "develop・release は使えない）。"
+            "先頭の語に指定できないので読まない（英小文字で始まり、英小文字と数字だけでできた語。main・master・"
+            "develop・release は指定できない）。"
             f"使うリストは {', '.join(conf.branch_prefixes)}（親のブランチ名の規則）",
         )
     ]

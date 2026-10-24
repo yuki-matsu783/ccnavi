@@ -369,7 +369,7 @@ say_retired_bad() {
 	ensure_retired
 	sb_line=$(awk -v p="$1" '$1 == p { print; exit }' "$scratch/retired-bad")
 	[ -n "$sb_line" ] || return 1
-	printf '%s: ready の後の片付けの記録（retire/%s.json）が使えない（%s）。閉じたか判断できないので手元は片付けない。MR がマージ済みならブランチとログを手で片付け、破棄した親ならユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消してください\n' \
+	printf '%s: ready の後の片付けの記録（retire/%s.json）が利用できない（%s）。閉じたか判断できないので手元は片付けない。MR がマージ済みならブランチとログを手で片付け、破棄した親ならユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消してください\n' \
 		"$1" "$1" "${sb_line#"$1" }" "$here_sh" "$1"
 	return 0
 }

@@ -408,7 +408,7 @@ class LockTest(unittest.TestCase):
             for p in agree_candidates.lock_problems(parent_of(revised), parent_of(current), fixed)
         ]
 
-    # 承認済み: a(1)・b(2)・c(3)・d(4)。b と c は a を待ち、d は b と c を待つ。1 と 3 に子がある。
+    # 承認済み: a(1)・b(2)・c(3)・d(4)。b と c の先行は a、d の先行は b と c。1 と 3 に子がある。
     CURRENT = [
         item("design"),
         item("acceptance", after=[1]),

@@ -86,7 +86,7 @@ def probe_of(entry: ticket_model.Entry) -> str:
 def _rule_set(conf: settings.Settings, root: str, target: tree.Tree) -> rules.RuleSet:
     """このツリーへの書き込みに適用するルール集合（共通レイヤーに行き先のレイヤーを足した和）。
 
-    苦情は判定の経路が言うので、ここでは読み捨てる。
+    苦情は判定の経路が言うので、ここでは読んで破棄する。
     """
     quiet = io.StringIO()
     record = audit.Record()

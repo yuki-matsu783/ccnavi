@@ -340,7 +340,7 @@ def _check_path(root: str, mention: Mention, trees: list[tree.Tree]) -> None:
     text = mention.text
     parts = _parts(text)
     if ".." in parts:
-        mention.invalid = "`..` を含むので使えません"
+        mention.invalid = "`..` を含むので指定できません"
         return
     full = text if _ABSOLUTE.match(text) else os.path.join(root, text)
     rest = _lexical_rest(root, full)
@@ -461,7 +461,7 @@ def _isolation() -> Stop:
 
 
 def _target_invalid(bad: list[Mention]) -> Stop:
-    lines = ["プロンプトに書かれたワークツリーのパスが使えません。"]
+    lines = ["プロンプトに書かれたワークツリーのパスは利用できません。"]
     for m in bad[:MAX_SHOWN]:
         shown = m.text if len(m.text) <= MAX_SHOWN_CHARS else m.text[:MAX_SHOWN_CHARS] + "…"
         lines.append(f"  {shown}: {m.invalid}")

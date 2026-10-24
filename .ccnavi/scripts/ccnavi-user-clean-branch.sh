@@ -42,7 +42,7 @@ for arg in "$@"; do
 		confirmed=1
 		;;
 	-*)
-		printf 'ccnavi-user-clean-branch: %s は受け付けません。使えるのは --confirmed だけです。\n' "$arg" >&2
+		printf 'ccnavi-user-clean-branch: %s は受け付けません。指定できるのは --confirmed だけです。\n' "$arg" >&2
 		exit 2
 		;;
 	*)

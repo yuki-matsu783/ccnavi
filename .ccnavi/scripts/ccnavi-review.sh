@@ -122,7 +122,7 @@ request | confirm | comment | decide | ready | fetch | origin | merged | mr-stat
 	exit 0
 	;;
 *)
-	fail unknown-sub "$sub は使用できません。使えるのは request / confirm / comment / decide / ready / fetch / origin / merged / mr-state です。" 2
+	fail unknown-sub "$sub は指定できません。指定できるのは request / confirm / comment / decide / ready / fetch / origin / merged / mr-state です。" 2
 	;;
 esac
 
@@ -263,11 +263,11 @@ mr_state() {
 	3) mr_state_unknown no-tool "jq が見つからない" ;;
 	4)
 		if [ -n "${ccnavi_h_cli:-}" ]; then
-			mr_state_unknown auth "${ccnavi_h_cli_name} が ${ccnavi_h_host} で使えず（未認証か、ホストに届かない）、${ccnavi_h_token_name} もない"
+			mr_state_unknown auth "${ccnavi_h_cli_name} が ${ccnavi_h_host} で利用できず（未認証か、ホストに届かない）、${ccnavi_h_token_name} もない"
 		fi
 		mr_state_unknown auth "${ccnavi_h_cli_name} が無く、${ccnavi_h_token_name} もない"
 		;;
-	*) mr_state_unknown no-tool "${ccnavi_h_cli_name} も curl も使えない" ;;
+	*) mr_state_unknown no-tool "${ccnavi_h_cli_name} も curl も利用できない" ;;
 	esac
 
 	# 失敗の本文の置き場。state が書けなければ TMPDIR。終わるときに消す。
