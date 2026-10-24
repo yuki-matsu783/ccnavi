@@ -12,7 +12,7 @@ VS Code の計画編集タブが打つ経路。タブは図で引いた線（元
 5. 改版では子が承認された番号を動かさず、改版の錠に落ちる形は書かない
 6. 書き換えたあとの一覧で承認が通り、書き換えの前のダイジェストでは止まる。`--agree --preview
    --json` の `plans` は `--plan-order <親> --json` と同じ関数で作る
-7. エージェントが打っても組み込みの止めに当たらない
+7. エージェントが打っても組み込みの止めにヒットしない
 8. 承認を渡す文は、計画を持つ親とその子に「番号は承認済みチケットで読み直す」と添える
 """
 
@@ -341,7 +341,7 @@ class PlanOrderJsonTest(PlanOrderHarness):
         self.assertNotEqual(self.body()["source_sha"], before)
 
     def test_the_agent_may_type_plan_order(self):
-        """7. `--agree` の外の独立したフラグなので、組み込みの止めに当たらない。"""
+        """7. `--agree` の外の独立したフラグなので、組み込みの止めにヒットしない。"""
         rule = phase_forms.ticket_approval_rule("", self.root)
         order = json.dumps(REVERSE)
         for command in (

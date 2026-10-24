@@ -101,7 +101,7 @@ def ready(
             stderr.write(f"  - {p}\n")
         stderr.write(
             "全部片付けてから再実行してください。"
-            "まだ残るものを承知で早めに閉じるなら、ユーザが端末で "
+            "まだ残るものを承知で早めに閉じるなら、ユーザがターミナルで "
             f"'{settings.script_command(root, 'ccnavi-user-close-early.sh')} --reason <理由>' "
             "を実行します。\n"
         )
@@ -330,7 +330,7 @@ def close_early(
     plan_check: str = "",
     no_issue: bool = False,
 ) -> int:
-    """ユーザが端末で打つ。「まだ残っているが、キリの良いところまでやった」と早めに閉じる。
+    """ユーザがターミナルで打つ。「まだ残っているが、キリの良いところまでやった」と早めに閉じる。
 
     残っているもの（未着手の子、子の無いフェーズ、終わっていないレビュー、
     未計画のフィードバック、未解決のスレッド）を全部見せてから y/N。y なら、
@@ -379,7 +379,7 @@ def close_early(
     ):
         stderr.write(
             f"ccnavi: {review_host.changes_requested_note(result.host)}。"
-            "端末からも通せない。変更要求があるため、レビュー済みにはできません。"
+            "ターミナルからも通せない。変更要求があるため、レビュー済みにはできません。"
             "修正する場合は同じフェーズに新しい子を提案し、ユーザの承認を受けてください\n"
         )
         return 1
@@ -424,7 +424,7 @@ def close_early(
         by_id = {t.id: t for t in result.threads if t.id}
         left.unresolved = [by_id[i] for i in planned.ids]
     else:
-        # 端末で残りを見せて y/N を聞く（plan_out の段もここを通る）。
+        # ターミナルで残りを見せて y/N を聞く（plan_out の段もここを通る）。
         _show_leftovers(stdout, parent, left)
         if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
             stderr.write("ccnavi: 早めに閉じなかった\n")
@@ -464,8 +464,8 @@ def close_early(
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
-    # 次に打つ手順を端末に案内する。
-    # 下書きのパスは標準出力に出さない。ここはユーザの端末に向いていて、sh は
+    # 次に打つ手順をターミナルに案内する。
+    # 下書きのパスは標準出力に出さない。ここはユーザのターミナルに向いていて、sh は
     # state の置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
         f"OK: {parent.ticket} を早めに閉じた。あとは親に、状態の移動をコミットし、"

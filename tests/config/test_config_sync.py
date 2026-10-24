@@ -2,7 +2,7 @@
 
 共通レイヤー（ワークスペースルートの `.ccnavi/config/common/`）はワークスペースの git にあり、
 プロジェクトだけを clone したユーザからは見えない。プロジェクト向けの親の `ticket start` で、
-共通レイヤーの中身を、親のワークツリーにあるプロジェクトの `.ccnavi/config/common/` へ写す。
+共通レイヤーの中身を、親のワークツリーにあるプロジェクトの `.ccnavi/config/common/` へコピーする。
 プロジェクトの `.ccnavi/config/project/` には触れない。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通レイヤーは
@@ -11,11 +11,12 @@ app は `.ccnavi/` を持たない。
 
 見るのは 5 つ。
 
-1. 親の `ticket start` が、共通レイヤーの中身を親のワークツリーのミラーへ写し、config には触れない。
+1. 親の `ticket start` が、共通レイヤーの中身を親のワークツリーのミラーへコピーし、
+config には触れない。
    共通レイヤーから無くなったファイルはミラーからも消す。`script:` の値は書き換えない
-2. 子の着手とワークスペース自身の作業では写さない
-3. 写せない形（読めない・リンク・書き込みの失敗）では何も写さず、着手しない。
-   error のあるテンプレートだけは1本ずつ写さずに飛ばし、着手は止めない。
+2. 子の着手とワークスペース自身の作業ではコピーしない
+3. コピーできない形（読めない・リンク・書き込みの失敗）では何もコピーせず、着手しない。
+   error のあるテンプレートだけは1本ずつコピーせずに飛ばし、着手は止めない。
    上書きの記録・知らせ・閉じるのを止める処理は無い
 4. ミラーの書き込みを、実行後チェックとバックアップと復元が戻さず、報告もしない。条件は 3 つ
    （承認済みの親のワークツリーの
@@ -99,7 +100,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         write(os.path.join(self.ws, ".ccnavi", "config", "common", "scripts", "count.sh"), COUNT_SH)
 
     def test_parent_start_mirrors_the_common_layer_and_leaves_config_alone(self):
-        """1: 共通レイヤーの中身を親のワークツリーの `.ccnavi/config/common/` へ写す。config
+        """1: 共通レイヤーの中身を親のワークツリーの `.ccnavi/config/common/` へコピーする。config
         は触らない"""
         write(
             os.path.join(self.ws, ".ccnavi", "config", "common", "rule-expectations.yml"),
@@ -170,7 +171,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         return write(os.path.join(directory, name + ".yml"), text)
 
     def test_a_common_template_is_mirrored_and_kept_by_the_next_plan(self):
-        """1: 共通のテンプレートも写す。ミラーに置いたものが次の着手で消されない。"""
+        """1: 共通のテンプレートもコピーする。ミラーに置いたものが次の着手で消されない。"""
         conf = self.settings()
         self.add_template()
         write(
@@ -186,7 +187,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertEqual(read(mirror_of(tree, "templates/feature.yml")), FEATURE_TEMPLATE)
         self.assertIn(".ccnavi/config/common/templates/feature.yml", started.stdout)
-        # `.yml` でないものと、`.` で始まるものは、テンプレートとして読まれないので写さない。
+        # `.yml` でないものと、`.` で始まるものは、テンプレートとして読まれないのでコピーしない。
         self.assertFalse(os.path.exists(mirror_of(tree, "templates/notes.txt")))
         self.assertFalse(os.path.exists(mirror_of(tree, "templates/.hidden.yml")))
         self.assertTrue(
@@ -198,7 +199,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
                 conf, self.ws, mirror_of(tree, "templates/feature.yml"), b"name: feature\n"
             )
         )
-        # 写し終えたあとの次の計画は、何も変えない（ミラーに在るテンプレートを消さない）。
+        # コピー終えたあとの次の計画は、何も変えない（ミラーに在るテンプレートを消さない）。
         changes, why = configsync.plan(conf, self.ws, tree)
         self.assertEqual((changes, why), ([], ""))
 
@@ -240,7 +241,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertIn("削除した", started.stdout)
 
     def skipped_template_keeps_the_start(self, text):
-        """3: error のあるテンプレートは写さずに飛ばす。そのために着手は止めない。"""
+        """3: error のあるテンプレートはコピーせずに飛ばす。そのために着手は止めない。"""
         self.add_template(text=text)
 
         tree, started = self.start_parent()
@@ -258,7 +259,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         )
 
     def test_a_template_with_only_warnings_is_mirrored(self):
-        """3: 定義に無い型は warn にとどまる（定義は後から変わる）。止めずに写す。"""
+        """3: 定義に無い型は warn にとどまる（定義は後から変わる）。止めずにコピーする。"""
         self.add_template(text=FEATURE_TEMPLATE.replace("design", "nothing-like-it"))
 
         tree, _ = self.start_parent()
@@ -266,7 +267,8 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertTrue(os.path.isfile(mirror_of(tree, "templates/feature.yml")))
 
     def test_a_symlinked_templates_place_skips_only_the_templates(self):
-        """3: 共通のテンプレートの置き場がリンクなら、テンプレートだけ写さず、着手は止まらない。"""
+        """3: 共通のテンプレートの置き場がリンクなら、テンプレートだけコピーせず、
+        着手は止まらない。"""
         real = os.path.join(self.ws, "elsewhere")
         write(os.path.join(real, "feature.yml"), FEATURE_TEMPLATE)
         link = os.path.join(self.ws, ".ccnavi", "config", "common", "templates")
@@ -285,7 +287,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertTrue(os.path.isfile(mirror_of(tree, "rules.yml")))
 
     def test_a_script_shared_by_two_factors_is_mirrored_once(self):
-        """1: 2 つの項目が同じスクリプトを指しても、写すのは 1 回。"""
+        """1: 2 つの項目が同じスクリプトを指しても、コピーするのは 1 回。"""
         self.add_script()
         write(
             self.risk,
@@ -356,7 +358,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertTrue(os.path.isfile(config_of(tree, "rules")))
 
     def test_workspace_tickets_are_not_mirrored(self):
-        """2: ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるので写さない。"""
+        """2: ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるのでコピーしない。"""
         tree, started = self.start_parent(project="")
 
         self.assertNotIn("ミラー", started.stdout)
@@ -366,7 +368,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         )
 
     def test_child_start_does_not_mirror(self):
-        """2: 子は親のブランチに乗るので、子の着手では写さない。"""
+        """2: 子は親のブランチに乗るので、子の着手ではコピーしない。"""
         self.propose(
             "i0001",
             ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE),
@@ -431,7 +433,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         )
 
     def test_a_common_layer_the_mirror_cannot_hold_stops_the_start(self):
-        """3: ミラーとして読めない共通レイヤーは写さず、着手しない。"""
+        """3: ミラーとして読めない共通レイヤーはコピーせず、着手しない。"""
         write(self.risk, "version: 1\nfactors: [\n")
         self.propose(
             "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
@@ -467,7 +469,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertEqual(read(config_of(tree, settings.KIND_PHASES)), LIB_PHASES)
 
     def test_a_common_phases_file_is_mirrored(self):
-        """1: 共通レイヤーの phases.yml もミラーへ写す。config の phases.yml には触れない。"""
+        """1: 共通レイヤーの phases.yml もミラーへコピーする。config の phases.yml には触れない。"""
         write(self.phases, COMMON_PHASES)
         self.propose(
             "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
@@ -482,7 +484,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertEqual(read(config_of(tree, settings.KIND_PHASES)), LIB_PHASES)
 
     def test_a_common_phases_file_the_mirror_cannot_hold_stops_the_start(self):
-        """3: フェーズ定義として読めない共通レイヤーの phases.yml は写さず、着手しない。"""
+        """3: フェーズ定義として読めない共通レイヤーの phases.yml はコピーせず、着手しない。"""
         write(self.phases, "version: 1\nphases: [\n")
         self.propose(
             "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
@@ -512,7 +514,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(mirror_of(tree, "rules.yml")))
 
     def test_a_common_file_that_vanishes_after_listing_stops_the_plan(self):
-        """3: 読む前に消えた共通レイヤーのスクリプトは、空として写さずに止める。"""
+        """3: 読む前に消えた共通レイヤーのスクリプトは、空としてコピーせずに止める。"""
         conf = self.settings()
         self.add_script()
         self.propose(
@@ -544,7 +546,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
             self.skipTest(f"シンボリックリンクが作れない: {error}")
 
     def test_a_symlinked_target_stops_the_start(self):
-        """3: コピー先がシンボリックリンクなら、写さずに着手を止める。"""
+        """3: コピー先がシンボリックリンクなら、コピーせずに着手を止める。"""
         self.propose(
             "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
         )

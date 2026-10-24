@@ -1,7 +1,7 @@
 """直接作業の記録（`ccnavi-direct/<名前>`）を読む。読むだけで、書かない。
 
 記録は対象リポジトリの git の共通ディレクトリの `ccnavi-direct/<名前>` にある（書くのは
-`ccnavi-worktree.sh`）。1 行 1 項目の `<鍵> <値>` で、頭は `version 4`。
+`ccnavi-worktree.sh`）。1 行 1 項目の `<キー> <値>` で、頭は `version 4`。
 
 ここが答えるのは「横で作業する指定が、いま有効か」だけ。有効な記録は次をすべて満たす。
 
@@ -37,7 +37,7 @@ class Record:
 
 
 def parse(text: str) -> dict[str, str]:
-    """`<鍵> <値>` の行を辞書にする。空行と形の違う行は飛ばす。同じ鍵は後が勝つ。"""
+    """`<キー> <値>` の行をマップにする。空行と形の違う行は飛ばす。同じキーは後が勝つ。"""
     out: dict[str, str] = {}
     for line in text.splitlines():
         key, _, value = line.strip().partition(" ")

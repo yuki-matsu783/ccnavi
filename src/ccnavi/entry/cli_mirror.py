@@ -4,8 +4,8 @@
     ccnavi user mirror [<プロジェクト名>…] --yes --expect <値> [--via board] [--json]   揃える
 
 見るだけの形を含めて、ユーザ専用（`user` の入口。hook が止める）。`--yes` で書くときは、標準入力が
-端末であることを求める。`--via board` は拡張の子プロセスの経路で、端末を求めない代わりに
-`--expect` と `--json` を付けて呼ぶことを求める。書くのは作業ツリーだけで、コミットはしない。
+ターミナルであることを求める。`--via board` は拡張の子プロセスの経路で、ターミナルを求めない代わりに
+`--expect` と `--json` を付けて呼ぶことを求める。書くのはワークツリーだけで、コミットはしない。
 中身は `tickets.mirrorsync`。cli を読まない。
 """
 
@@ -93,8 +93,9 @@ def run(
 
     処理フロー:
     1. `usage_problem` で組み合わせを検査する。
-    2. `--yes` のときは、経路を決めてから揃える。ボードの経路（`--via board`）は端末を求めず、
-       端末の経路は `cli_args._from_terminal` で、端末の前にいるユーザであることを確かめる。
+    2. `--yes` のときは、経路を決めてから揃える。ボードの経路（`--via board`）はターミナルを求めず、
+       ターミナルの経路は `cli_args._from_terminal` で、
+       ターミナルの前にいるユーザであることを確かめる。
        `mirrorsync.prepare` で今の差分を求め、`mirrorsync.apply` が `--expect` の一致を見て書く。
     3. `--yes` がないときは、`mirrorsync.prepare` の結果を表示する（書かない）。
     4. `--json` のときは JSON で、そうでなければ人が読む形で出す。
@@ -144,7 +145,9 @@ def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None) 
         stdout.write("  プロジェクトはありません。\n")
         return
     if plan.common_empty:
-        stdout.write("  共通レイヤーに写すものがありません。ミラーは消さず、何も揃えません。\n")
+        stdout.write(
+            "  共通レイヤーにコピーするものがありません。ミラーは消さず、何も揃えません。\n"
+        )
     for project in plan.projects:
         if not project.selected:
             continue
@@ -168,7 +171,7 @@ def _plan_text(stdout: TextIO, plan: mirrorsync.Plan, wanted: list[str] | None) 
     names = " ".join(shlex.quote(p.name) for p in chosen) if wanted else ""
     command = "ccnavi user mirror " + (names + " " if names else "")
     stdout.write(
-        "何も反映していません。この内容で揃えるなら、次を実行します。作業ツリーに書くだけで、"
+        "何も反映していません。この内容で揃えるなら、次を実行します。ワークツリーに書くだけで、"
     )
     stdout.write("コミットはしません。\n")
     stdout.write(f"  {command}--yes --expect {plan.expect}\n")

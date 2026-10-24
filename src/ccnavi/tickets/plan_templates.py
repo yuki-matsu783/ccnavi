@@ -11,7 +11,8 @@
 
 置き場は `settings.common_templates_dir` / `settings.layer_templates_dir`。使うのは共通と、
 1 つのレイヤー（自身のレイヤーかプロジェクト）の和。フェーズ定義（`phasetypes.merge`）と同じ衝突の
-扱いにする。同名で全欄が同じなら info でレイヤーの側を捨て、中身が違えば error でレイヤーの側だけを
+扱いにする。同名で全欄が同じなら info でレイヤーの側を破棄し、
+中身が違えば error でレイヤーの側だけを
 使わない。共通が壊れていれば共通を空として扱い、レイヤーの側は使う。
 
 ## 書式
@@ -28,7 +29,7 @@
       2: {id: ..., nodes: [...], connections: [...]}
 
 `after` は**その計画の中の添字**（1 始まり）。フィードバック計画の `after` も、フィードバック計画の
-中の添字で書く。提案に写すときの番号（フィードバック計画は全体計画の続き）への付け直しは、
+中の添字で書く。提案にコピーするときの番号（フィードバック計画は全体計画の続き）への付け直しは、
 使う側が行う。未知の欄は warn で、`extra` に持って書き戻しでも落とさない。
 
 ## 読み方
@@ -39,7 +40,8 @@ UTF-8（BOM は 1 つ外す）で、例外は外に出さない。
 
 ## 検査
 
-計画は、合成した frontmatter を `ticket.parse` に渡して得た `Ticket` に、承認の検査の関数を当てる。
+計画は、合成した frontmatter を `ticket.parse` に渡して得た `Ticket` に、
+承認の検査の関数を適用する。
 
 - 順序（`after` の範囲・循環・終端が 1 つ・最後のステップの延期・延期の引き受け手）は error
 - 型 id が使うフェーズ定義（共通 + レイヤーの `phases.yml`）に無い、`kind` が置き場と合わない、
@@ -173,7 +175,7 @@ class Entry:
     notes: list[Problem] = field(default_factory=list)
     # 計画とフローの検査の苦情（フェーズ定義が変われば変わるので、notes と分ける）。
     checks: list[Problem] = field(default_factory=list)
-    # 統合結果で取り込まれたか。読めないもの・衝突で捨てたものは False。
+    # 統合結果で取り込まれたか。読めないもの・衝突で破棄したものは False。
     effective: bool = True
     dropped: str = ""
     dropped_detail: str = ""
@@ -410,7 +412,7 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
     空の文字列は苦情
     3. マッピングは、知らない欄を警告にして読まない。`type` は必須
     4. `review` は文字列に限る。`after` は整数の添字のリストに限り、重複は警告にして整える
-    5. 苦情のあるステップは捨てる。読めたステップを `Item` にして返す
+    5. 苦情のあるステップは破棄する。読めたステップを `Item` にして返す
     """
 
     def error(text: str) -> None:
@@ -903,9 +905,9 @@ def read_layer(layer: str, root: str, directory: str, writable: bool = True) -> 
 
 
 def merge(common: LayerRead, extra: LayerRead) -> list[Problem]:
-    """共通にレイヤーを足す。レイヤーの側の `Entry` に取り込まれたか・捨てた理由を付ける。
+    """共通にレイヤーを足す。レイヤーの側の `Entry` に取り込まれたか・破棄した理由を付ける。
 
-    同名で全欄が同じならレイヤーの側を捨てて info、中身が違えば error でレイヤーの側を使わない。
+    同名で全欄が同じならレイヤーの側を破棄して info、中身が違えば error でレイヤーの側を使わない。
     共通の側が読めていないもの（壊れた共通）は無いものとして扱い、レイヤーの側を使う。
     苦情は返し、レイヤーの側の `Entry.notes` にも足す。
     """
@@ -920,7 +922,8 @@ def merge(common: LayerRead, extra: LayerRead) -> list[Problem]:
             problem = Problem(
                 SEVERITY_INFO,
                 entry.name,
-                f"`{entry.name}` は共通と全欄が同じなので、{layer} の側を捨てた。共通の 1 本を使う",
+                f"`{entry.name}` は共通と全欄が同じなので、{layer} の側を破棄した。"
+                "共通の 1 本を使う",
             )
             entry.dropped = DROP_DUPLICATE
         else:
@@ -966,8 +969,8 @@ def merge(common: LayerRead, extra: LayerRead) -> list[Problem]:
 def common_writable(conf: settings.Settings, root: str) -> bool:
     """共通レイヤーの置き場を書き換えてよいか。
 
-    着手がプロジェクトの `config/common/` へ写したミラー（承認済みの親のワークツリーの中）は、
-    共通レイヤーの写しで誰も編集しないので読み取り専用。ワークスペースルートの共通は書ける。
+    着手がプロジェクトの `config/common/` へコピーしたミラー（承認済みの親のワークツリーの中）は、
+    共通レイヤーのコピーで誰も編集しないので読み取り専用。ワークスペースルートの共通は書ける。
     """
 
     where = tree.tree_of(root, root, conf.projects)
@@ -985,7 +988,7 @@ def types_for(conf: settings.Settings, root: str, layer: str):
 
 
 def recheck(entry: Entry, types, candidates: dict | None) -> Entry:
-    """別のフェーズ定義（統合結果）で、検査をやり直した写し。読むときの苦情は残す。"""
+    """別のフェーズ定義（統合結果）で、検査をやり直したコピー。読むときの苦情は残す。"""
     if entry.template is None or not entry.effective:
         return entry
     return dataclasses.replace(entry, checks=check(entry.template, types, candidates))
@@ -996,7 +999,7 @@ def scan(conf: settings.Settings, root: str) -> Scan:
 
     各 `Entry` の検査は、そのレイヤーのフェーズ定義（共通は共通だけ、レイヤーは共通 + レイヤー）で
     行う。統合結果（`merge`）の印は、レイヤーの側の `Entry` に付く。承認済みチケットの置き場は
-    読まない（`--lint` が 1 度読んだ写しを渡す走査とは別で、ここは設定の置き場だけを読む）。
+    読まない（`--lint` が 1 度読んだコピーを渡す走査とは別で、ここは設定の置き場だけを読む）。
     """
     candidates = flow.catalog(root)
     common = read_layer(
@@ -1022,7 +1025,7 @@ def scan(conf: settings.Settings, root: str) -> Scan:
 
 
 def adopted(scan_: Scan, layer: str) -> list[Entry]:
-    """`layer` を足したときの、取り込まれた・捨てた全部（共通が先、名前順）。
+    """`layer` を足したときの、取り込まれた・破棄した全部（共通が先、名前順）。
 
     読み込み済みの `Entry` を並べるだけ。共通の側の検査は共通だけのフェーズ定義で済んでいて、
     統合結果の定義でやり直す（`recheck`）のは呼び出し側。
@@ -1151,7 +1154,8 @@ def as_json(
     """`ccnavi --templates --json` の答え。
 
     - `layer`: 一覧の対象のレイヤー（`templates` がその統合結果）
-    - `templates`: 共通 + その 1 レイヤー。取り込まれたか（`effective`）・捨てた理由（`dropped`）・
+    - `templates`: 共通 + その 1 レイヤー。
+    取り込まれたか（`effective`）・破棄した理由（`dropped`）・
       検査（`problems`。統合結果のフェーズ定義で検査した）つき。`keywords` で絞る
     - `layers`: 共通と各レイヤーの生の中身（そのレイヤーのフェーズ定義で検査した）
     - `sums`: レイヤーごとの統合結果の索引（どれが効いているか）
@@ -1198,7 +1202,7 @@ def as_json(
 def check_file(conf: settings.Settings, root: str, path: str, layer: str = LAYER_SELF) -> dict:
     """任意のパスのテンプレートを検査した答え（`--templates --check-file`）。書かない。
 
-    名前の期待値はファイル名から拡張子を除いたもの。`data` は読んだ中身の写し（読めなければ
+    名前の期待値はファイル名から拡張子を除いたもの。`data` は読んだ中身のコピー（読めなければ
     null）で、
     呼び手が「書こうとした中身を実行ファイルがそのまま読んだか」を見るのに使う。
     `types` はこのレイヤーで使えるフェーズ定義（共通 + レイヤー）。
@@ -1247,7 +1251,7 @@ def check_file(conf: settings.Settings, root: str, path: str, layer: str = LAYER
 
 
 def find(scan_: Scan, layer: str, name: str) -> Entry | None:
-    """名前の `Entry`。取り込まれたものを先に、捨てたものは最後に探す。"""
+    """名前の `Entry`。取り込まれたものを先に、破棄したものは最後に探す。"""
     found = [e for e in adopted(scan_, layer) if e.name == name]
     found.sort(key=lambda e: not e.effective)
     return found[0] if found else None

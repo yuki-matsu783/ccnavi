@@ -8,7 +8,7 @@
 hook が受け取る環境はセッション開始時に固定されるので、あとから設定ファイルを
 直してもセッションを開き直すまで反映されない。その古さは不便だが、同時に、
 エージェントが自分を監視するものを緩めるのを防いでいる唯一の仕組みでもある。
-設定ファイルは作業ツリーの中にあってエージェントが書けるので、そこから読んだ
+設定ファイルはワークツリーの中にあってエージェントが書けるので、そこから読んだ
 値は次のツール呼び出しから反映されてしまう。
 
 例外は ccnavi 自身を開発しているときだけ。own_source_tree を参照。
@@ -59,7 +59,7 @@ STOP_REVIEW_AGENT_ENV = "CCNAVI_STOP_REVIEW_AGENT"
 GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # GUARD_TICKET_APPROVAL_ENV は、チケットの承認の経路を守るか。enable（既定）なら、
 # シェルから、ユーザ専用の入口（`ccnavi user <操作>` と `ccnavi-user-*.sh`）と、実行ファイルへの
-# `ticket` `review` の呼び出しを止め、`user` の入口は標準入力が端末でなければ拒む。
+# `ticket` `review` の呼び出しを止め、`user` の入口は標準入力がターミナルでなければ拒む。
 # ユーザ専用の操作の表は tickets/user_only.py にある（ADR-0143）。
 # テストは disable にする。
 #
@@ -117,10 +117,11 @@ SHARED_CLAUDE_SETTINGS = os.path.join(".claude", "settings.json")
 # 既定のリストで足り、リストを変えたい人だけが settings.json（か settings.local.json）の
 # `env` に書く。
 BRANCH_PREFIXES_ENV = "CCNAVI_BRANCH_PREFIXES"
-# 既定の先頭の語。`release` は統合先や保護されたブランチの名前（`release-*`）に当たるので入れない。
+# 既定の先頭の語。
+# `release` は統合先や保護されたブランチの名前（`release-*`）にヒットするので入れない。
 DEFAULT_BRANCH_PREFIXES = ("feature", "hotfix", "fix", "bugfix", "chore", "refactor", "docs")
 # 先頭の語に使えない名前（`ticket_ids.RESERVED_BRANCH_IDS` と同じリスト。infra は tickets を
-# 読めないので写しを持つ。一致は tests/core/test_reserved_branch_names.py が見る）。
+# 読めないのでコピーを持つ。一致は tests/core/test_reserved_branch_names.py が見る）。
 _RESERVED_PREFIXES = ("main", "master", "develop", "release")
 _PREFIX = re.compile(r"^[a-z][a-z0-9]*\Z")
 
@@ -147,9 +148,9 @@ DEFAULT_RULES = os.path.join(".ccnavi", "config", "common", "rules.yml")
 # state はセッションごとの一時的な状態なので、記録とは分けてまとめておく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join("logs", "state")
-# 提案は各作業ツリーの `wip/proposals/` に置く。ユーザが読み、ユーザが承認するものなので、
+# 提案は各ワークツリーの `wip/proposals/` に置く。ユーザが読み、ユーザが承認するものなので、
 # 目に入る場所に出しておく。
-# 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
+# 区切りは "/" で持つ。ワークツリーのルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_TICKETS = "wip/proposals"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ツリーごとに置くのは、
@@ -185,8 +186,8 @@ def script_command(root: str, name: str) -> str:
     区切りは `/` にそろえる（Git Bash は `C:/...` を読める）。
 
     空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に分け、止めている間の例外と
-    サブエージェントの禁止（`\\S*ccnavi-...`）にも当たらない。引用すれば shellread が中の空白を
-    区切りと別の目印にするので、どちらにも当たる。文面は案内を `'...'` で囲むので、引用は
+    サブエージェントの禁止（`\\S*ccnavi-...`）にもヒットしない。引用すれば shellread が中の空白を
+    区切りと別の目印にするので、どちらにもヒットする。文面は案内を `'...'` で囲むので、引用は
     まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符にする。
     """
     base = os.path.realpath(root).replace("\\", "/").rstrip("/")
@@ -269,7 +270,7 @@ LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
 # 作業・レビュー計画のテンプレートの置き場（`config/common/` と `config/project/` の下）。
 # ファイル 1 本ではなくディレクトリなので、3 本を回す `LAYER_KINDS` には入れない。
 TEMPLATES_DIR = "templates"
-# レイヤーの設定のファイル名。kind は記録と `--explain --json` の鍵の表記なので、
+# レイヤーの設定のファイル名。kind は記録と `--explain --json` のキーの表記なので、
 # ファイル名とは別に持つ。
 LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RISK: "risks.yml"}
 # レイヤーの名前。記録の `source` と id の前置きに使う表記。ruleload が
@@ -363,7 +364,7 @@ class Settings:
     mode: str = ""
     # mode_declared_in_file は設定ファイルが求めたモード、
     # mode_from_environment はプロセスが渡されたモード。
-    # 2 つを分けて持つことで、呼び手が「作業ツリーの中に書かれた値」と
+    # 2 つを分けて持つことで、呼び手が「ワークツリーの中に書かれた値」と
     # 「セッションを起動したユーザが渡した値」を見分けられる。
     mode_declared_in_file: str = ""
     mode_from_environment: str = ""
@@ -421,7 +422,7 @@ class Settings:
     learning: str = ""
     learning_declared: str = ""
 
-    # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
+    # tickets は提案の置き場（各ワークツリーのルートからの相対、"/" 区切り）、
     # approved は承認済みチケットの置き場（各ツリーのルートからの相対、"/" 区切り）。
     # 絶対で 1 か所を指さないのは、そのツリーの git に乗って他の PC に届くから。判定が読むのは
     # approved だけ。
@@ -539,7 +540,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         return settings, []
 
     # ccnavi 自身を触っている場合。ここでファイルを読むと、編集が次のセッション
-    # ではなく次のツール呼び出しから反映される。道具を自分自身に当てて試すには
+    # ではなく次のツール呼び出しから反映される。道具を自分自身に適用して試すには
     # これが要る。開発のための便宜であって、安全境界ではない。反映されるのはここだけで、
     # このファイルに `disable` と書いてもモードの解決で無視され、判定は止まらない。
     conf, problems = _read_local(root)
@@ -676,7 +677,7 @@ def _resolve_bin(root: str, path: str) -> str:
     書かれたとおりに在れば、それを使う。`.exe` まで書いてある設定が Windows で
     そのまま通るのはこの経路になる。無いときだけ、付くかもしれない拡張子を
     継ぎ足して探す。hook の登録に書いた `dist/ccnavi/ccnavi` の 1 行が、
-    Windows では `ccnavi.exe` に、Linux ではそのまま当たる。PyInstaller が
+    Windows では `ccnavi.exe` に、Linux ではそのままヒットする。PyInstaller が
     Windows でだけ `.exe` を付けるので、3 つの環境で同じ 1 行を使うと、
     設定のパスとファイルのパスがここで食い違う。
 
@@ -766,7 +767,8 @@ def branch_prefixes(root: str) -> tuple[tuple, tuple]:
     """親の識別子の先頭の語のリスト。答えは（使うリスト, 使えない語）。
 
     環境変数 `CCNAVI_BRANCH_PREFIXES` を先に見る（Claude Code が settings.json の `env` を渡す）。
-    無ければ、ユーザが端末で打つときのために `.claude/settings.local.json`、`.claude/settings.json`
+    無ければ、ユーザがターミナルで打つときのために `.claude/settings.local.json`、
+    `.claude/settings.json`
     の `env` の順に読む。どこにも無ければ既定のリスト。
     """
     if BRANCH_PREFIXES_ENV in os.environ:

@@ -51,7 +51,7 @@ FENCE_CLOSE = "  ---- 目録ここまで ----"
 # 目録に載せるスキルのディレクトリ名。これ以外（改行・空白・括弧・区切りに似た文など）を持つ
 # 名前は読まない。パスは文にそのまま出るので、名前で文を組み立てさせない。
 NAME = re.compile(r"^[A-Za-z0-9._-]+$")
-# 1 度だけ渡す文の数えの鍵（`ctxfile` の記録）。プロジェクトごとに分ける。
+# 1 度だけ渡す文の数えのキー（`ctxfile` の記録）。プロジェクトごとに分ける。
 ONCE_ID = "builtin:project-skills"
 
 
@@ -149,7 +149,7 @@ def index(conf: settings.Settings, root: str, cwd: str) -> str:
         return ""
     head = (
         f"[ccnavi] プロジェクト {project} のスキル（{home} からの相対）。"
-        "作業に当てはまるものは本文を Read で開き、参考に読んでください。"
+        "作業に該当するものは本文を Read で開き、参考に読んでください。"
         "CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従ってください。"
     )
     lines = [head, FENCE_OPEN]

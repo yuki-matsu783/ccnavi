@@ -17,7 +17,7 @@
 #   ccnavi-user-close-early.sh --reason <理由> [--no-issue]               まだ残っているが早めに閉じる
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
-# ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・マーカー）
+# ネットワークに出ない。実行ファイルが見るのはワークツリーの中（フェーズ・ブランチ・マーカー）
 # だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。ホストを読む関数と write-and-push の支度は
 # ccnavi-common-review.sh にあり、ユーザ専用のレビューの sh と共有する。
 #
@@ -92,7 +92,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|
   merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha> <元ブランチ>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が閉じたかを確かめる）
   mr-state <番号>                                 マージリクエストの今の状態を読むだけ。1 行目 "mr-state 1"、2 行目は "open <番号> <yes|no> <URL>"（yes は Draft）・"merged <番号> <URL>"・"closed <番号> <URL>"・"unknown <種類> <理由>"（終了コード 1。種類は no-tool / auth / network / api / not-found）。ボードの「マージ状況を確認」が使う
 
-ユーザが端末で実行する操作は別の sh:
+ユーザがターミナルで実行する操作は別の sh:
   ccnavi-user-decide.sh <N>          指摘の対応方針を選んで置く（対応しない・このフェーズで直す・issue に回す）
   ccnavi-user-close-early.sh --reason <理由> [--no-issue]
                                      まだ残っているが早めに閉じる。残りを issue に書き出す。Draft は親が ready で外す
@@ -160,7 +160,7 @@ if [ "$sub" = mr-state ]; then
 fi
 
 # 答えの 2 行目を出して終わる。理由は 1 行にそろえる（制御文字を空白にし、空白の連続を 1 つにする）。
-# 理由には資格情報を入れない（ホストの返事の本文も写さず、決まった言葉と状態コードだけで組む）。
+# 理由には資格情報を入れない（ホストの返事の本文もコピーせず、決まった言葉と状態コードだけで組む）。
 mr_state_emit() {
 	printf 'mr-state 1\n%s\n' "$1"
 }
@@ -180,7 +180,7 @@ mr_state_known() {
 }
 
 # API の失敗の本文（gh / glab / curl の出力）から、種類（mrs_kind）と理由（mrs_why）を決める。
-# 本文は理由に写さない。ネットワークの失敗を先に見て（curl は 404 などを "error: 404" と書く）、次に状態コード。
+# 本文は理由にコピーしない。ネットワークの失敗を先に見て（curl は 404 などを "error: 404" と書く）、次に状態コード。
 mr_state_classify() {
 	mrs_low=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
 	mrs_code=$(printf '%s' "$mrs_low" | grep -o -E '(http |error: |: )[0-9]{3}( |$)' | head -n 1 | grep -o -E '[0-9]{3}' | head -n 1 || :)
@@ -473,7 +473,7 @@ review_wap
 
 case "$sub" in
 origin)
-	# origin をどう読んだか。当たらないときに、どこで読み違えたかを見るための出力。
+	# origin をどう読んだか。ヒットしないときに、どこで読み違えたかを見るための出力。
 	# URL に埋まった資格情報は伏せる（`ccnavi_mask_url` が作る `origin_shown`）。
 	# ここの出力はエージェントの文脈と記録に残る。
 	printf 'origin=%s\nkind=%s\nscheme=%s\nhost=%s\npath=%s\napi_base=%s\nbranch=%s\ntransport=%s\n' \
@@ -705,7 +705,7 @@ ${eli5_how}"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
-	# 段 2: 投稿。同じ目印（親・フェーズ・鍵）の依頼が既にあれば投稿し直さない（打ち直しや write-and-push の
+	# 段 2: 投稿。同じ目印（親・フェーズ・キー）の依頼が既にあれば投稿し直さない（打ち直しや write-and-push の
 	# やり直しで依頼を二重にしない）。
 	request_marker=$(head -n 1 "$file" | tr -d '\r')
 	posted=$(find_posted "$number" "$url" "$request_marker") ||
@@ -743,10 +743,10 @@ ${eli5_how}"
 	# （打ったユーザのシェルで 1 語のまま、展開されない）。相対パスは上で字を絞ってあるので包まない。
 	eli5_shown="'$(printf '%s' "$eli5_top" | sed "s/'/'\\\\''/g")'"
 	eli5_rel_shown="$eli5_rel"
-	printf 'ELI5 を見る: ユーザが端末で cd %s してから crit review %s を実行し、ソースの行に付けた指摘を crit push %s でマージリクエストに送る（描画は crit %s で見られるが、そこで付けたピンは送られない）\n' \
+	printf 'ELI5 を見る: ユーザがターミナルで cd %s してから crit review %s を実行し、ソースの行に付けた指摘を crit push %s でマージリクエストに送る（描画は crit %s で見られるが、そこで付けたピンは送られない）\n' \
 		"$eli5_shown" "$eli5_rel_shown" "$number" "$eli5_rel_shown"
 	command -v crit >/dev/null 2>&1 ||
-		printf '（この環境の PATH に crit はありません。ユーザの手元の端末で実行します）\n'
+		printf '（この環境の PATH に crit はありません。ユーザの手元のターミナルで実行します）\n'
 	if [ "$kind" = github ]; then eli5_forge=gh; else eli5_forge=glab; fi
 	command -v "$eli5_forge" >/dev/null 2>&1 ||
 		printf '（この環境の PATH に %s はありません。crit push はユーザの手元で認証済みの %s を使う）\n' "$eli5_forge" "$eli5_forge"

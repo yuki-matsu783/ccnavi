@@ -19,7 +19,7 @@ RULES = {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
             "glob": "*/.ccnavi/*",
-            # 守る場所の写しを置く wip/handoff/ の中は、本物のルールと同じく除く
+            # 守る場所のコピーを置く wip/handoff/ の中は、本物のルールと同じく除く
             "except": [{"regex": r"[\\/]wip[\\/]handoff[\\/]"}],
             "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。",
         }
@@ -78,7 +78,7 @@ def plan_item_lines(items, start=1) -> list[str]:
 
     ステップは定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
     `after` を書かないステップは、すぐ前のステップが先行する（一直線）。最初のステップは先行なし。
-    並行にしたい見本は辞書で `after` を明記する（`[]` なら先行なし）。
+    並行にしたい見本はマップで `after` を明記する（`[]` なら先行なし）。
     """
     lines = []
     for i, item in enumerate(items):
@@ -105,8 +105,8 @@ def parent_text(
 ):
     """親の提案の本文。
 
-    `copy` は計画が使う定義を写す元の `phases.yml`（None なら `phases:` を書かない）。
-    計画を持つ親は、計画が使う定義の写し（`phases:`）を持つ。`phases.yml` を書き換えるテストは、
+    `copy` は計画が使う定義をコピーする元の `phases.yml`（None なら `phases:` を書かない）。
+    計画を持つ親は、計画が使う定義のコピー（`phases:`）を持つ。`phases.yml` を書き換えるテストは、
     同じ本文を `copy` に渡す。
     """
     text = _parent_text(name, plan, feedback, allow, issue)
@@ -204,7 +204,8 @@ def plain_plan_lines(plan=1) -> list[str]:
 
 
 def plain_parent(text: str, plan=1) -> str:
-    """計画を持たない親の本文に、最小の計画（`work` を `plan` 個、または定義名の並び）と写しを足す。
+    """計画を持たない親の本文に、最小の計画（`work` を `plan` 個、
+    または定義名の並び）とコピーを足す。
 
     `plan` が 0 か空なら、子（`parent:` を持つ）と、すでに `plan:` がある本文と同じくそのまま返す。
     """
@@ -217,7 +218,8 @@ def plain_parent(text: str, plan=1) -> str:
 
 
 def write_plain_phases(root: str) -> str:
-    """`PLAIN_PHASES` をそのルートの config の `phases.yml` に書く（親の承認が写しを確かめる）。"""
+    """`PLAIN_PHASES` をそのルートの config の `phases.yml` に書く
+    （親の承認がコピーを確かめる）。"""
     path = config_path(root, "phases")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:

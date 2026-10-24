@@ -47,7 +47,7 @@ from . import (
     wrapguard,
 )
 
-# 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
+# 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を破棄するので、
 # それより先に自前の判定を出し終えることが、遅い判定が何も返さないまま許可として扱われて
 # しまうのを防ぐ。
 DEADLINE_SECONDS = 3.0
@@ -82,13 +82,13 @@ DRY_RUN_HOLDS_NOTE = (
     "protections that keep them from being bypassed are enforced in every mode except disable."
 )
 
-# 範囲の中かどうかを問うツール。作業ツリーを書き換えるものだけ。
+# 範囲の中かどうかを問うツール。ワークツリーを書き換えるものだけ。
 # Bash は入れていない。コマンド文字列に現れるパスは追えないので、ここで
-# 当てると当たったり当たらなかったりする判定になる。シェル経由の書き込みは
-# 実行後チェックが作業ツリーの実物を見て拾う。
+# 適用するとヒットしたりヒットしなかったりする判定になる。シェル経由の書き込みは
+# 実行後チェックがワークツリーの実物を見て拾う。
 SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# ルールを当てる欄の表と選び方は `policy.subjects` にある（ルールファイルの検査も同じ表を読む）。
+# ルールを適用する欄の表と選び方は `policy.subjects` にある（ルールファイルの検査も同じ表を読む）。
 SUBJECT_FIELDS = subjects.SUBJECT_FIELDS
 PATH_TOOLS = subjects.PATH_TOOLS
 SEARCH_TOOLS = subjects.SEARCH_TOOLS
@@ -98,7 +98,7 @@ SEARCH_TOOLS = subjects.SEARCH_TOOLS
 # ガード自身の設定を守る 1 本は、ルールファイルが読める間は selfguard_shell が足し、読めずに
 # 組み込みの既定に戻った間は builtin が持つ。
 # チケットの状態の置き場を守る 1 本は、チケット制御が有効なときに足す。
-# 生の文字列の `>` が上限を超えたときは、これらを生の文字列に当てない（decide_before）。
+# 生の文字列の `>` が上限を超えたときは、これらを生の文字列に適用しない（decide_before）。
 # `.git` の中を守る土台の 1 本（builtin.GIT_DIR_SHELL_RULE_ID）は入れない。リダイレクトの行き先を
 # `>` をまたがずに読むので、照合が長さに比例して終わる（selfguard_shell.git_dir_shell_regex）。
 SHELL_GUARD_RULE_IDS = (
@@ -160,7 +160,7 @@ def decide_before(
     3. ルールを読み、この呼び出しの行き先のツリーを決める（`ruleload.rules_for`）。
     4. 組み込みの保護をルールに足す（`selfguard_shell`・`ticket_guard`・`phase_forms`）。
     5. 主題を読み直す（`screen`）。実行される部分が残らなければ記録して抜ける。
-    6. 組み込みの止めを、順に当てる。当たれば `refuse` で返す。順に、環境変数の指定
+    6. 組み込みの止めを、順に適用する。ヒットすれば `refuse` で返す。順に、環境変数の指定
        （`wrapguard.check_env`）・自己防衛のパス（`wrapguard.check_core_paths`）・記録の削除
        （`phase_forms.prune_form`）・ユーザの判断の経路（`phase_forms`）・子の push
        （`wrapguard.check_child_push`）・サブエージェントの禁止（`phase_forms.forbidden`）・
@@ -168,16 +168,16 @@ def decide_before(
        レビュー待ちの止め（`phase.held_phase`）・サブエージェントの起動（`agentlaunch.decide`）・
        プロジェクトの食い違い（`project_mismatch`）・着手中の子のロック（`flow_lock`）。
     7. 書き直しを求める形（`rewrites`）は、読み分けずに止めて書き直し方を返す。
-    8. ルールを deny・ask・allow の順に当てる（`rules.SECTIONS`）。読み切れない形には
-       allow を当てない。期限を過ぎたら、ツールの種類で決めた結論を返す。
-    9. deny に当たらなかった Bash は、ワークスペースルート直下への書き込みを `rootwrite.check` で
-       当てる。当たれば `refuse` で返す。
-    10. 当たりを記録し、チケットの判定（`ticket_verdict`）と強さを比べて強い側を採る。
+    8. ルールを deny・ask・allow の順に適用する（`rules.SECTIONS`）。読み切れない形には
+       allow を適用しない。期限を過ぎたら、ツールの種類で決めた結論を返す。
+    9. deny にヒットしなかった Bash は、ワークスペースルート直下への書き込みを `rootwrite.check` で
+       適用する。ヒットすれば `refuse` で返す。
+    10. ヒットを記録し、チケットの判定（`ticket_verdict`）と強さを比べて強い側を採る。
     11. 文面を組み、通す・渡す（`HANDOVER`）・拒否・確認の応答を返す（`refuse`・`_write_pass`）。
     """
     # バックアップを取るのは判定より先。ここで取る断面が、この呼び出しが何かを書き換えて
     # しまったときに戻る先になる。判定で弾かれた呼び出しでも先に取っておくのは、
-    # 弾けなかったものだけが作業ツリーに届くので、届いた側から見れば
+    # 弾けなかったものだけがワークツリーに届くので、届いた側から見れば
     # 「直前」は判定の前だから。
     guard = guard_setting_files(mode, conf, root, payload, record, selfguard.before)
 
@@ -190,7 +190,7 @@ def decide_before(
     # ルールを読み、この呼び出しの行き先のツリーを決める。
     rule_set, source, target = ruleload.rules_for(stderr, conf, root, payload, record)
     # チケットの範囲を引く行き先。下で cwd のツリーに置き換える前の、対象のパスそのものの
-    # ツリー。ワークスペースの外へ書くときに cwd のワークツリーの範囲を当てないため。
+    # ツリー。ワークスペースの外へ書くときに cwd のワークツリーの範囲を適用しないため。
     dest = target
     if target is None and payload.cwd:
         # Bash には行き先が無い。記録には cwd のツリーをつける。判定には使わない。
@@ -200,7 +200,7 @@ def decide_before(
     # 設定ファイルを守る側が有効なら、そこへシェルから書き込む形を止める
     # ルールを judgment に足す。戻せるだけでは足りないので、同じ場所を
     # 実行前にも止める。既定を使っているときは `add_rules` を足さない。組み込みの既定が
-    # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
+    # 同じ形を既に持っていて、二重にヒットすると同じ話が 2 度返る。
     # 名前で書くツールの 4 本（`add_named_rules`）は既定を使っている間も足す。組み込みの既定は
     # 持っていないので、二重にならない。読めない間も共通の設定への Write / Edit は止まる。
     # 組み込みの保護（設定ファイル・チケットの置き場・シェルの形）をルールに足す。
@@ -246,7 +246,7 @@ def decide_before(
 
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
-        # これにあたる。ルールを当てる先が無いので、どのタイプにも当たらず
+        # これにあたる。ルールを適用する先が無いので、どのタイプにもヒットせず
         # 権限モードへ渡る先になるが、何も走らないものについて誰かの判断を
         # 求める意味は無い。
         record.decision, record.reason = audit.SKIP, audit.REASON_NOTHING_TO_RUN
@@ -325,7 +325,8 @@ def decide_before(
 
     # 記録と state を消す `ccnavi user prune`（内部は `--prune`。`--preview` の無い形）は、
     # チケット制御に依らず止める
-    # （phase_forms.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の
+    # （phase_forms.prune_form）。実行ファイルのターミナル要求は擬似ターミナルを使えば通れる。
+    # 記録と state の
     # 置き場をシェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
     if (
         payload.tool_name in phase_forms.SHELL_TOOLS
@@ -356,7 +357,8 @@ def decide_before(
                 kind=GENERAL,
             )
 
-    # ユーザの判断の経路のうち、hook のほかに保護が無い形（端末要求を切る形、ボードの経路の形）は
+    # ユーザの判断の経路のうち、hook のほかに保護が無い形（ターミナル要求を切る形、
+    # ボードの経路の形）は
     # 止める。実行ファイルを呼ぶ表記は追い切れないので、呼び方ではなく文字列の組で見る
     # （phase_forms.human_path_form）。
     if (
@@ -456,7 +458,7 @@ def decide_before(
         and payload.tool_name in phase_forms.SHELL_TOOLS
         and phase_forms.forbidden(subject, shellread.SEP.join(layer for _, layer, _ in inner))
     ):
-        # 禁止は中で実行されるコマンドにも当てる。`env sh …ccnavi-ticket.sh start` を
+        # 禁止は中で実行されるコマンドにも適用する。`env sh …ccnavi-ticket.sh start` を
         # 元の形だけで見ると、先頭の `sh` に固定した形が外れて止まらずに通る。
         runner, layer = ("", "")
         if not phase_forms.forbidden(subject):
@@ -564,7 +566,7 @@ def decide_before(
     # サブエージェントの起動。プロンプトの言及から担当を決める。決まらないときの止めは、ここ
     # （レビュー待ちの止めのあと、ルールの照合の前）で返す。決まったときの更新の計画（担当の案内を
     # プロンプトに書き足す）は持ったまま判定を進め、最後の応答で 1 つの JSON に合成する。
-    # ルールには書き足す前の入力を当てる。
+    # ルールには書き足す前の入力を適用する。
     launch = agentlaunch.Result()
     if payload.tool_name in modes.AGENT_TOOLS:
         launch = agentlaunch.decide(conf, root, payload, raw)
@@ -627,7 +629,7 @@ def decide_before(
 
     # 着手中の子のフローは書き換えさせない。ルールより先に見る。
     # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの保護でも止まる。ロックは
-    # その保護を切った設定でも当てはまり、止めた理由（着手中）を名指しする（厳しくする向きだけ）。
+    # その保護を切った設定でも該当すり、止めた理由（着手中）を名指しする（厳しくする向きだけ）。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         locked, scanned = flow_lock(conf, root, payload, record.subject, scanned)
         if index is None and scanned is not None:
@@ -646,9 +648,10 @@ def decide_before(
             )
 
     # 書き直しを求める形は、ルールより先に止める（読み分けずに止めて書き直しを案内する）。
-    # ブレース展開と、実行するときに決まるコマンド名は、ルールを当てる読みと実行されるものが
+    # ブレース展開と、実行するときに決まるコマンド名は、ルールを適用する読みと実行されるものが
     # 食い違う。
-    # `{git,push,origin,main}` も `c=git; $c push origin main` も、生の git に当たらないまま push を
+    # `{git,push,origin,main}` も `c=git; $c push origin main` も、
+    # 生の git にヒットしないまま push を
     # 実行する。バッククォートとシェルで読みが分かれる形は、読み分けると規則が増え、読み違えると
     # 止まらずに通る。どれも書き直す方法が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
     # 1 回で返す。
@@ -681,13 +684,13 @@ def decide_before(
     # 書き込む形の保護の照合が `>` の個数 × 尾の長さで遅くなる（selfguard_shell.REDIRECT_LIMIT）。
     # 期限を越えると判定に達せず、enable では block（終了コード 2）で止まるだけになり、
     # 何が起きたかも言えない。そのときはその保護（SHELL_GUARD_RULE_IDS）だけを生の文字列に
-    # 当てず、ほかの deny と ask のルールを当てたうえで、権限モードに依らず拒否にし、理由と
+    # 適用せず、ほかの deny と ask のルールを適用したうえで、権限モードに依らず拒否にし、理由と
     # 書き直し方を返す。期限切れの block と同じく止める側に置き、確認には回さない。照合を
     # 飛ばして通すと、上限の後ろに書いた保護対象への書き込みが素通りする。ルールの deny に
-    # 当たる形は、そのルールの deny のまま返す。allow は当てない
-    # （保護を当てていないので、通す根拠にならない）。中で実行されるコマンドと `cd` の行き先は
-    # 読み解けた形なので、保護もそのまま当てる。
-    # 外す保護がこのツールに当たらないなら（既定の組み込みの 1 本は Bash だけ）、上限も掛けない。
+    # ヒットする形は、そのルールの deny のまま返す。allow は適用しない
+    # （保護を適用していないので、通す根拠にならない）。中で実行されるコマンドと `cd` の行き先は
+    # 読み解けた形なので、保護もそのまま適用する。
+    # 外す保護がこのツールにヒットしないなら（既定の組み込みの 1 本は Bash だけ）、上限も掛けない。
     unread = bool(record.degraded) or (
         payload.tool_name in phase_forms.SHELL_TOOLS and payload.tool_name != "Bash"
     )
@@ -699,27 +702,28 @@ def decide_before(
             for rule in rule_set.deny
         )
     )
-    # ルールを deny・ask・allow の順に当てる。最初に当たった区分で判定が決まる。
+    # ルールを deny・ask・allow の順に適用する。最初にヒットした区分で判定が決まる。
     verdict, group = "", []
-    # group と同じリストで、中で実行されるコマンドで当たったときの
+    # group と同じリストで、中で実行されるコマンドでヒットしたときの
     # （実行役のコマンド, そのコマンド, 引用の中から切り出したコマンドの層か）。
-    # 元の形で当たったルールは ("", "", False)。
+    # 元の形でヒットしたルールは ("", "", False)。
     via: list[tuple[str, str, bool]] = []
     for name in rules.SECTIONS:
         if name == rules.ALLOW and (record.degraded or capped):
-            # 読み切れなかったコマンドに allow は当てない。当てる先は
+            # 読み切れなかったコマンドに allow は適用しない。適用する先は
             # 実行される部分ではなく生の文字列なので、そこで許可を出すのは
             # 「読めなかった文字列にそう書いてあった」を根拠に通すことになる。
-            # deny と ask は当てたままにする。生の文字列に当たりすぎるぶんは
+            # deny と ask は適用したままにする。生の文字列にヒットしすぎるぶんは
             # 厳しい側へ外れるだけで、そのことは文面が断る。
             break
-        # 中で実行されるコマンドは deny と ask にだけ当てる。止める側に足す当て先なので、
-        # レイヤーを読み違えても当たるはずのものが当たらないだけで、元の形の判定は消えない。
-        # allow に当てると逆になる。`sudo -u me cat /etc/hosts` は元の形では確認になるが、
-        # 中の `cat …` が読み取りの allow に当たって通るようになる。
+        # 中で実行されるコマンドは deny と ask にだけ適用する。止める側に足す適用先なので、
+        # レイヤーを読み違えてもヒットするはずのものがヒットしないだけで、元の形の判定は消えない。
+        # allow に適用すると逆になる。`sudo -u me cat /etc/hosts` は元の形では確認になるが、
+        # 中の `cat …` が読み取りの allow にヒットして通るようになる。
         #
-        # 引用の外のレイヤーを先に見る。同じルールが引用の中と外の両方に当たるなら、外で当たった
-        # ことにする。引用の中の断りは、引用の中にだけ当たったときに付けるものなので。
+        # 引用の外のレイヤーを先に見る。同じルールが引用の中と外の両方にヒットするなら、
+        # 外でヒットした
+        # ことにする。引用の中の断りは、引用の中にだけヒットしたときに付けるものなので。
         layers = sorted(inner, key=lambda x: x[2]) if name != rules.ALLOW else []
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
@@ -752,25 +756,26 @@ def decide_before(
             verdict = name
             break
     # 土台（base）の deny を落とす前の id。分類（dry-run でも止めるか）は落とす前の組で決める。
-    # 層の deny が同時に当たっても、生の git の補助止めの分類を失わない。
+    # 層の deny が同時にヒットしても、生の git の補助止めの分類を失わない。
     hit_ids = {rule.id for rule in group}
     if verdict == rules.DENY and any(rule.base for rule in group):
-        # 組み込みの deny（土台）は常に当たるが、レイヤーの deny にも当たったなら、
+        # 組み込みの deny（土台）は常にヒットするが、レイヤーの deny にもヒットしたなら、
         # そちらだけを言う。拒否は変わらない。同じ拒否を 2 つの文面で返さないため。
         kept = [i for i, rule in enumerate(group) if not rule.base]
         if kept:
             group = [group[i] for i in kept]
             via = [via[i] for i in kept]
-    # 保護を当てなかったぶん、ルールの deny に当たっていなければ拒否に上げる。権限モードでも
+    # 保護を適用しなかったぶん、ルールの deny にヒットしていなければ拒否に上げる。権限モードでも
     # CCNAVI_GUARD_UNWATCHED でも分けない（保護の照合を終えていないので、委ねる先が無い）。
     capped = capped and verdict != rules.DENY
     if capped:
         verdict = rules.DENY
 
     # シェルからワークスペースルート直下へ書く形は、Write / Edit と同じ決まり（ルールファイルの
-    # `workspace-root`）に当てて止める。書き込み先を解いた絶対パスで当てるので、`cd` で移った先も
-    # たどる。ガード自身の保護など、ほかの deny に当たった呼び出しは、その文面で止まる。ここでは
-    # deny に当たらなかった呼び出しだけを見る。
+    # `workspace-root`）に適用して止める。書き込み先を解いた絶対パスで適用するので、
+    # `cd` で移った先も
+    # たどる。ガード自身の保護など、ほかの deny にヒットした呼び出しは、その文面で止まる。ここでは
+    # deny にヒットしなかった呼び出しだけを見る。
     if payload.tool_name == "Bash" and verdict != rules.DENY:
         written, place, root_rule = rootwrite.check(
             rule_set,
@@ -802,24 +807,24 @@ def decide_before(
                 kind=GENERAL,
             )
 
-    # 記録に、当たったルールと判定の根拠を残す。
+    # 記録に、ヒットしたルールと判定の根拠を残す。
     record.rules = [rules.record_name(rule) for rule in group]
-    # 当てたルールそのもの。診断（`--test`）が根拠を見せるのに読む。記録には書かない。
+    # 適用したルールそのもの。診断（`--test`）が根拠を見せるのに読む。記録には書かない。
     record.hits = list(group)
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
-    # 判定を下したのは最初に当たったルール。そのレイヤーを 1 欄で残す。
+    # 判定を下したのは最初にヒットしたルール。そのレイヤーを 1 欄で残す。
     # id の前置きからも読めるが、欄にしておくと記録をレイヤーで数えられる。ルールファイルの
     # 外から足したルール（組み込みの保護、チケット）はレイヤーを持たないので空のまま。
     if group:
         record.source = group[0].source
 
-    # 止めた・聞いたルールのうち、引用の中から切り出したコマンドにだけ当たったもの。
+    # 止めた・聞いたルールのうち、引用の中から切り出したコマンドにだけヒットしたもの。
     # 書いた側は文字を書いただけのつもりでいるので、回避策を知らせないと、
-    # 同じ形を書き直しては止まる。どこに当たったかは一致位置から推し量らず、
-    # 引用の中の中身を除いた読み（bare）に当て直して、当たらなければそうだとする。
+    # 同じ形を書き直しては止まる。どこにヒットしたかは一致位置から推し量らず、
+    # 引用の中の中身を除いた読み（bare）に適用し直して、ヒットしなければそうだとする。
     # こうするとルールの書き方（glob / regex、`^` / `(^|\x00)`）に依らない。
-    # 中で実行されるコマンドで当たったルールは、bare に当て直せない（bare は元の形の読み）。
-    # そちらは、当たったレイヤーが引用の中から切り出したコマンドのものかどうかで決める。
+    # 中で実行されるコマンドでヒットしたルールは、bare に適用し直せない（bare は元の形の読み）。
+    # そちらは、ヒットしたレイヤーが引用の中から切り出したコマンドのものかどうかで決める。
     inside = [False] * len(group)
     if verdict in (rules.DENY, rules.ASK):
         inside = [
@@ -830,7 +835,7 @@ def decide_before(
 
     # ルールの判定とチケットの判定を合わせ、強い側を採る。同じ強さならルール。
     # ルールの deny はどう書いても最も強いので、そのときはチケットを見ない。
-    # チケットが当てはまるのは閉じる向きだけ（範囲の外・deny・ask）。ユーザが書いたルールの allow を
+    # チケットが該当するのは閉じる向きだけ（範囲の外・deny・ask）。ユーザが書いたルールの allow を
     # 作業 1 本のあいだ狭めることはあっても、ルールの deny や ask を緩めることは無い。
     # チケットが判定に使われるのはユーザが承認したあとだけで、承認画面が
     # 「ルールの allow も範囲の外では止まる」と言う。
@@ -848,7 +853,7 @@ def decide_before(
             if ticket_reason:
                 # 判定を下したのはレイヤーを持たないチケット。狭められたルールの id は後ろに残し、
                 # 「ルールは通したのにチケットが止めた」回を記録から数えられるようにする。
-                # チケット自体が信頼できずに止めた回（DENY_TICKET_BLOCKED）は範囲を当てて
+                # チケット自体が信頼できずに止めた回（DENY_TICKET_BLOCKED）は範囲を適用して
                 # いないので、範囲の名前（TICKET_RULE）と分ける。
                 decided_by = {
                     reasons.CODE_TICKET_BLOCKED: reasons.TICKET_BLOCKED_RULE,
@@ -858,7 +863,7 @@ def decide_before(
                 record.source = ""
 
     # モデルへの文脈（ルールの文・提案の確認・スキルの目録）を組む。
-    # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
+    # ヒットしたルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
     # 別の経路（additionalContext）で届く。
     context, record.hinted = ctxfile.deliver(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
@@ -892,10 +897,10 @@ def decide_before(
             _write_pass(stdout, "\n\n".join(notices + ([context] if context else [])), updated)
         return EXIT_OK
 
-    # どちらの文面を返すかは、判定を決めた側で分ける。ルールが当たっていても、
+    # どちらの文面を返すかは、判定を決めた側で分ける。ルールがヒットしていても、
     # チケットが強かった回はチケットの文面になる（ticket_reason があるのはその回だけ）。
     if verdict == rules.DENY and capped:
-        # `>` の上限で止めた。当たった ask のルールがあれば、その文も後ろに並べる。
+        # `>` の上限で止めた。ヒットした ask のルールがあれば、その文も後ろに並べる。
         texts = [
             reasons.builtin_refusal(
                 reasons.CODE_REDIRECT_LIMIT_DENY,
@@ -924,7 +929,7 @@ def decide_before(
         # 残すと、ルールファイルのルールが止めたように読める。チケットが止めた回と同じく空にする。
         record.source = ""
     elif verdict == rules.DENY and not ticket_reason:
-        # ルールの deny。当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
+        # ルールの deny。ヒットした理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
         texts = [
             reasons.reason_for(
@@ -940,7 +945,7 @@ def decide_before(
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
-        # 全部が中で実行されるコマンドで当たったなら、当てた先は読み直したコマンドであって
+        # 全部が中で実行されるコマンドでヒットしたなら、適用した先は読み直したコマンドであって
         # 生の文字列ではない。読み切れなかったことを根拠のコードにしない。
         read_through = all(layer for _, layer, _ in via)
         record.code = reasons.code_for(payload.tool_name, "" if read_through else record.degraded)
@@ -948,7 +953,7 @@ def decide_before(
             record.code = phase_forms.CODE_TICKET_APPROVAL
     elif verdict == rules.DENY:
         # チケットが止めた。範囲の外かチケットの deny で、ルールは何も言わないか、
-        # allow / ask に当たっている（そのときは文面がルールの id を名指しする）。
+        # allow / ask にヒットしている（そのときは文面がルールの id を名指しする）。
         texts = [ticket_reason]
         record.code = ticket_code or reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and not ticket_reason:
@@ -969,7 +974,7 @@ def decide_before(
         record.code = reasons.CODE_RULE_ASK
     elif verdict == rules.ASK:
         # チケットが ask と書いた場所。ユーザが 1 度見る場所として宣言されている。
-        # ルールは何も言わないか、allow に当たっている。
+        # ルールは何も言わないか、allow にヒットしている。
         texts = [ticket_reason]
         record.code = reasons.CODE_TICKET_ASK
     else:
@@ -1036,7 +1041,7 @@ def _write_pass(stdout: TextIO, text: str, updated: dict | None) -> None:
 
 
 # 一般の保護とは別に、dry-run でも止める関門のルール。チケット制御が有効なときだけ足されるので、
-# 当たったならそのまま関門として数える。
+# ヒットしたならそのまま関門として数える。
 GATE_RULE_IDS = (
     ticket_guard.STATE_RULE_ID,
     ticket_guard.STATE_SHELL_RULE_ID,
@@ -1051,12 +1056,12 @@ GATE_RULE_IDS = (
 def final_kind(conf: settings.Settings, ids: set[str], ticket_reason: str, capped: bool) -> str:
     """ルールとチケットの判定を拒否にした回の分類。dry-run でも止めるかを決める。
 
-    ids は当たったルールの id（土台を落とす前の組）。関門（GATE）が優先、次が補助（AUX）、
+    ids はヒットしたルールの id（土台を落とす前の組）。関門（GATE）が優先、次が補助（AUX）、
     それ以外は一般。チケット制御が無効なら関門は足されていない。生の git はそのときでも止めるが、
     一般の保護として扱う。
 
     `>` の数の上限で上げた拒否は、シェルから書き込む形の保護（関門の置き場を守る 2 本を含む）を
-    生の文字列に当てていない代わりの拒否。関門の穴にならないよう、チケット制御が有効なら関門にする。
+    生の文字列に適用していない代わりの拒否。関門の穴にならないよう、チケット制御が有効なら関門にする。
     """
     if capped:
         return GATE if conf.tickets_enabled else GENERAL
@@ -1190,7 +1195,7 @@ def fail_streak_hint(conf: settings.Settings, root: str, record: audit.Record) -
 
 
 def subject_of(payload: hookio.Input) -> str:
-    """このツールでルールを当てる欄を選ぶ（`policy.subjects.subject_of`）。"""
+    """このツールでルールを適用する欄を選ぶ（`policy.subjects.subject_of`）。"""
     return subjects.subject_of(payload)
 
 
@@ -1200,7 +1205,7 @@ def screen(
     """シェルのコマンドを、実際に実行される部分まで絞る。読み切れなかったときは
     record にそう書き残す。
 
-    返すのは 4 つ。1 つめはルールを当てる読み。2 つめはそこから引用の中で切り出した
+    返すのは 4 つ。1 つめはルールを適用する読み。2 つめはそこから引用の中で切り出した
     コマンドを除いた読み（shellread.Reading.bare）で、文面の断りを決めるためだけに使う。
     シェルでないツールと読み切れなかったコマンドでは、1 つめと 2 つめは同じになる。
 
@@ -1216,7 +1221,7 @@ def screen(
     1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出した
     コマンドの層か）。読み切れないコマンドでもトークンに分けられる限り返る。Bash 以外は空。
     `cd` で移った先から見たパス（`shellread.Reading.moved`）も、実行役のコマンドの名前を
-    `shellread.MOVED` にしてここに並ぶ。どちらも止める側のルールにだけ当てる。
+    `shellread.MOVED` にしてここに並ぶ。どちらも止める側のルールにだけ適用する。
 
     4 つめは、書き直しを求める形の（形, 表記）のリスト（shellread.Reading.rewrites）。
     Bash 以外は空。
@@ -1235,8 +1240,8 @@ def screen(
             )
         )
     # `cd` で移った先から見たパスも、中で実行されるコマンドと同じリストに足す。
-    # 書かれた表記の当たり方は動かさず、当てる先を足すだけにする。止める側のルールにしか
-    # 当たらないので、`cd` を読み違えても、当たるはずのものが当たらなくなることはない。
+    # 書かれた表記のヒットの仕方は動かさず、適用する先を足すだけにする。止める側のルールにしか
+    # ヒットしないので、`cd` を読み違えても、ヒットするはずのものがヒットしなくなることはない。
     inner += [
         (shellread.MOVED, command, False)
         for command in reading.moved.split(shellread.SEP)
@@ -1304,9 +1309,9 @@ def flow_lock(
 ) -> tuple[str, list[ticket_model.Ticket] | None]:
     """着手中の子のフローへの書き込みなら、その理由の文。と、読んだ承認済みチケットのリスト。
 
-    当てるのは解いたパス（`full`）と、解く前のパス（payload のパスを cwd から繋いで `..` を
+    適用するのは解いたパス（`full`）と、解く前のパス（payload のパスを cwd から繋いで `..` を
     整えただけのもの）と、ディレクトリだけを解いたパスの 3 通り。フローのファイルかその途中が
-    リンクでも、どれかのパスが置き場に当たれば止める（止める向きだけ）。承認済みの領域の
+    リンクでも、どれかのパスが置き場にヒットすれば止める（止める向きだけ）。承認済みの領域の
     `flows/` の下でなければ承認済みチケットを読まない。リストは識別子でまとめる前のもので、
     どのツリー上のチケットでも着手中なら止める。
     """
@@ -1327,7 +1332,7 @@ def flow_lock(
         child = flow.lock_hit(copies, found[1], found[0])
         if child is not None:
             return flow.locked_message(conf, child, path), copies
-    # ハードリンクはパスに置き場が出ないので `locate` では当たらない。書き込み先が在って
+    # ハードリンクはパスに置き場が出ないので `locate` ではヒットしない。書き込み先が在って
     # 名前が 2 つ以上あるときだけ、着手中の子のフローと同じ中身（inode）かを見る。
     target = full or spelled
     if target and flow.hard_linked(target):
@@ -1358,7 +1363,7 @@ def ticket_verdict(
     コードは空のことが多い。記録に残す文面を呼び手が決められないとき（範囲の外ではなく
     チケット自体が信頼できないとき）だけ、ここが返す。
 
-    鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
+    キーはファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
     同じ識別子の承認済みチケットで判定する。ワークスペースルートの直下ならチケットは無く、ルールだけで判定する。
     呼び出し元の cwd も agent_id も使わない。
 
@@ -1369,7 +1374,7 @@ def ticket_verdict(
     名指しする。ルールの判定と比べて強い側を採るのは呼び手。
 
     注記はいまは付けない（前は、子の番号の定義が `phases.yml` から読めないときに「定義では
-    切り詰めていない」と添えていた。定義は親の写しから引くようになり、写しに無ければ親も子も
+    切り詰めていない」と添えていた。定義は親のコピーから引くようになり、コピーに無ければ親も子も
     止まるので、その形は無くなった）。返す形は変えない。
 
     t は full の行き先のツリー（`ruleload.rules_for` が返したもの。cwd で置き換える前）。
@@ -1380,7 +1385,7 @@ def ticket_verdict(
     プロジェクトの食い違いの点検と共有して渡す。t がワークツリーなら、呼び手は同じ t で
     索引を読んである。
 
-    rule_hit は、ルールが当たっていたときの (ルールの id, タイプ)。チケットがそれより
+    rule_hit は、ルールがヒットしていたときの (ルールの id, タイプ)。チケットがそれより
     厳しい判定を返すときは文面で名指しする。ルールは通しているのに止まった理由が
     読めないと、受け取った側はルールファイルを探しに行って見つけられない。
 
@@ -1442,8 +1447,8 @@ def ticket_verdict(
             reasons.CODE_TICKET_PARENT,
         )
     parent = index.get(ticket.parent) if ticket.is_child else None
-    # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は開かない（承認のあとに直しても
-    # 進行中の親の子の範囲は変わらない）。写しに定義が無い親は判定の側の検査で止まり、
+    # 定義は親に固定したコピー（`phases:`）から引く。`phases.yml` は開かない（承認のあとに直しても
+    # 進行中の親の子の範囲は変わらない）。コピーに定義が無い親は判定の側の検査で止まり、
     # 子も `blocked` で止まる。
     notice = ""
     pt = phase_scope.type_for(ticket, parent)
@@ -1488,7 +1493,7 @@ def ticket_verdict(
             "but the ticket for this worktree narrows it"
         )
     if found.verdict == rules.DENY:
-        # 範囲の外ではなく、チケットが deny と書いた項に当たったなら、どの項かを名指しする。
+        # 範囲の外ではなく、チケットが deny と書いた項にヒットしたなら、どの項かを名指しする。
         for owner in (ticket, parent):
             entry = owner.entry_for(rel) if owner is not None else None
             if entry is not None and entry.decision == rules.DENY:

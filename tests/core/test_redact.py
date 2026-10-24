@@ -232,7 +232,7 @@ class SpeedTest(unittest.TestCase):
 
     記録は実行前チェックの期限の中で書く。名前の形（`_ASSIGN`）の頭が長さを限らずに
     文字を読み進めると、`-` や `_` が続くだけの 1.5 万字で 10 秒を超え、期限を過ぎた hook の拒否が
-    捨てられる（止められずに通る）。
+    破棄される（止められずに通る）。
     """
 
     LIMIT_SECONDS = 0.5
@@ -303,7 +303,7 @@ class RecordTest(unittest.TestCase):
         self.assertNotIn(LONG[:10], line["subject"][len(pad) + 9 :])
 
     def test_judgement_sees_the_unredacted_command(self):
-        # ルールが秘密の値そのものに当たるなら、伏せた記録ではなく伏せる前の文字列で当たる。
+        # ルールが秘密の値そのものにヒットするなら、伏せた記録ではなく伏せる前の文字列でヒットする。
         rules = os.path.join(self.dir, ".ccnavi", "config", "common", "rules.yml")
         os.makedirs(os.path.dirname(rules))
         with open(rules, "w", encoding="utf-8") as f:

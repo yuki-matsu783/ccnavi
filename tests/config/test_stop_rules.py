@@ -10,8 +10,8 @@
 3. `stop_hook_active` が真の回は止めず、数えも進めない。サブエージェント（`agent_id`）も同じ
 4. 数えを覚えられない（`--state ""`）ときは止めない
 5. `dry-run` でも同じ回に止める（止めないと文がモデルに届かない）
-6. cwd がプロジェクトの中でも同じルールが当たる。プロジェクトのレイヤーのルールも当たる
-7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` に当たらない表記、`every` の無いものを
+6. cwd がプロジェクトの中でも同じルールがヒットする。プロジェクトのレイヤーのルールもヒットする
+7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` にヒットしない表記、`every` の無いものを
    warn で言う
 
 `finish` の促しと重なったときの順は tests/ticket/test_stop_nudge.py。
@@ -226,7 +226,7 @@ class StopRulesTest(unittest.TestCase):
         self.assertEqual(last.get("rules"), [".ccnavi/config/common/rules.yml:two"])
         self.assertEqual(last.get("code"), CODE)
 
-    # --- 5c. compact・再開では数えを捨てない -------------------------------------------
+    # --- 5c. compact・再開では数えを破棄しない -------------------------------------------
 
     def session_start(self, source: str) -> None:
         payload = {
@@ -285,7 +285,7 @@ class StopRulesTest(unittest.TestCase):
             self.assertEqual(self.blocked(self.stop(cwd=cwd)), "")
 
     def test_a_stale_project_copy_of_the_common_rule_is_not_counted_twice(self):
-        """プロジェクトのレイヤーへ写した共通レイヤーが古くなって `every` が違っても、
+        """プロジェクトのレイヤーへコピーした共通レイヤーが古くなって `every` が違っても、
         数えるのは共通レイヤーの 1 本。
 
         共通レイヤーは親の着手でプロジェクトのレイヤーへコピーするので、コピーしたレイヤーが古いまま残ることがある。

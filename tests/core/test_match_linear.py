@@ -1,6 +1,6 @@
 """長い入力でも照合が線形で終わること（#241）。
 
-時間そのものは機械で変わるので、同じ式を長さ n と 4n に当てた比で見る。
+時間そのものは機械で変わるので、同じ式を長さ n と 4n に適用した比で見る。
 2 乗なら 16 倍、線形なら 4 倍前後になる。閾値は余裕を見て 10 倍にしてある。
 """
 
@@ -34,7 +34,7 @@ class LinearTest(unittest.TestCase):
         self.assertEqual(problems, [])
         self.assert_linear(rule.compiled, lambda n: "echo " + "a" * n, n=5000)
 
-    def test_glob_先頭に星の無い書き方は文字列の途中に当たらない(self):
+    def test_glob_先頭に星の無い書き方は文字列の途中にヒットしない(self):
         rule, _ = rules._build(
             {"id": "t", "match": "Bash", "glob": "git push", "message": "m"}, "ask", 0
         )
@@ -45,7 +45,7 @@ class LinearTest(unittest.TestCase):
         pattern = re.compile(rf"{selfguard_shell._WRITE_VERBS}(\.ccnavi/x)")
         self.assert_linear(pattern, lambda n: "sed -i" + " -i" * n + " x", n=4000)
 
-    def test_sed_の枝の当たり方は変わらない(self):
+    def test_sed_の枝のヒットの仕方は変わらない(self):
         pattern = re.compile(rf"{selfguard_shell._WRITE_VERBS}(\.ccnavi/x)")
         for subject, want in (
             ("sed -i s/a/b/ .ccnavi/x", True),
@@ -54,7 +54,7 @@ class LinearTest(unittest.TestCase):
             ("sed s/a/b/ -i .ccnavi/x", True),
             ("sed --i s/a/b/ .ccnavi/x", True),
             ("sed -i s/a/b/ other", False),
-            # `where` が `-i` の語の途中から始まる形も、これまでどおり当たる。
+            # `where` が `-i` の語の途中から始まる形も、これまでどおりヒットする。
             ("sed -i.ccnavi/x f", True),
             ("sed s/a/b/ .ccnavi/x", False),
             ("sed -i s/a/b/\x00cat .ccnavi/x", False),

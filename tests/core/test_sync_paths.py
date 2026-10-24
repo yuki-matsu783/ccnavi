@@ -1,7 +1,7 @@
 """`ccnavi sync paths` の約束。
 
 `ccnavi-sync.sh` は jq を使わず JSON も読まない。置き場のパスを、
-実行ファイルが 1 行 1 項目（`<鍵> <値>`）で返す。
+実行ファイルが 1 行 1 項目（`<キー> <値>`）で返す。
 統合先の名前は返さない（sh が各リポジトリの `origin/HEAD` で決める）。
 置き場は固定で、env では動かない（設計 wip/design/i0064-fixed-places.md）。
 """

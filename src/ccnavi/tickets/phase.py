@@ -1,7 +1,7 @@
 """フェーズの終わりと HITL ポイント（Human In The Loop。ユーザの手が入るところ）。
 
 ユーザだけが打つコマンドの形の見分けは `phase_forms`（phase を読まない）、子チケットの範囲の
-当て方は `phase_scope`（phase を読む）に分けてある。
+適用の仕方は `phase_scope`（phase を読む）に分けてある。
 
 子チケットのまとまりが終わったときに何をするかと、ユーザを待たずに進もうとしたら止めること。
 
@@ -15,7 +15,7 @@
 サブエージェントの起動とシェルを止める。
 無ければ省略のマーカーを置いて進ませる。
 
-## 止めるときの鍵は cwd
+## 止めるときのキーは cwd
 
 書き込みは書き込み先のパスで親を決めるが、起動とシェルには書き込み先が無い。止めるかどうかは
 呼び出しの `cwd` がどの親のワークツリーにあるかで親を引く。`cd` を 1 回打てば判定から外れるが、
@@ -290,12 +290,13 @@ def phases_of(
     if owner is None and proposed is not None and proposed.ticket == parent_id:
         owner = proposed
     if owner is not None and owner.has_plan:
-        # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は読まない（承認のあとに
+        # 定義は親に固定したコピー（`phases:`）から引く。`phases.yml` は読まない（承認のあとに
         # 直しても、進行中の親のフェーズの題・見る場所・案内は変わらない）。提案の親（`proposed`）は
-        # その提案の写しから引く。
+        # その提案のコピーから引く。
         types = phasetypes.types_of(owner)
         if owner.workflow is None:
-            # 承認前の提案など、待ち方を入れていない親。承認済みと同じ計算（計画の `after`）で読む。
+            # 承認前の提案など、先行関係を入れていない親。
+            # 承認済みと同じ計算（計画の `after`）で読む。
             owner = replace(owner, workflow=workflow.compute(owner))
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
@@ -460,7 +461,7 @@ def _type_source(phase: Phase, common: dict[str, phasetypes.PhaseType] | None) -
 
     `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは定義を見ずに置くので、
     レイヤーを書いても根拠にならない。定義の無いフェーズでは欄そのものを置かない。
-    写しの定義が共通レイヤーの定義と同じなら `common`（`phasetypes.origin`）。
+    コピーの定義が共通レイヤーの定義と同じなら `common`（`phasetypes.origin`）。
     """
     if phase.type is None:
         return {}
@@ -494,7 +495,7 @@ def announce(
     except approval.NoParentWorktree:
         return ""
     phases = phases_of(root, conf, parent.ticket, raw=raw)
-    # マーカーの `source` を決めるためだけに読む。判定は写しを読む。
+    # マーカーの `source` を決めるためだけに読む。判定はコピーを読む。
     # 読むのはマーカーを置くフェーズがあるときだけ。
     common: dict[str, phasetypes.PhaseType] | None = None
     if any(p.ended and not p.marks and not p.deferred for p in phases):
@@ -769,7 +770,7 @@ def resumed_review(
     閉じ直したときにレビューが要らないフェーズ（定義が `review: none` で、この子も
     `human_review` を求めていない）と、レビューが要らない引き受け手は、マーカーが残っていても
     止める条件に入らないので言わない。
-    引き受け手 M は、ゲートと同じく計画から計算した待ち方で引く `review_at`（`N.skipped` の
+    引き受け手 M は、ゲートと同じく計画から計算した先行関係で引く `review_at`（`N.skipped` の
     `deferred_to` ではない。書いたあとに改版で引き受け手が動けば、skipped は古くなる）。
     文には子の識別子を入れない（呼び手が前に付ける）。
     """
@@ -863,7 +864,7 @@ def order_problems(
 ) -> list[rules.Problem]:
     """N 番目の子を承認してよいか。先行のフェーズが閉じてレビューが済んでいるか。
 
-    先行の番号は親の待ち方（`workflow`。計画のステップの `after` を推移的に辿ったもの）が決める。
+    先行の番号は親の先行関係（`workflow`。計画のステップの `after` を推移的に辿ったもの）が決める。
     親の計画が壊れていれば（`workflow.errors`）、壊れた先行で順序を数えずに落とす。
 
     ここで出す苦情は `rules.KIND_NOT_YET`。承認は通さないが、書いた側に直すものは無く、

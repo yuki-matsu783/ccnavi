@@ -85,7 +85,7 @@ class ScopeLockTest(unittest.TestCase):
 
 
 class GlobRegexTest(unittest.TestCase):
-    """glob と regex は文字列が同じでも当たる範囲が違う。差分から隠さない。"""
+    """glob と regex は文字列が同じでもヒットする範囲が違う。差分から隠さない。"""
 
     def read_entry(self, entry):
         text = (

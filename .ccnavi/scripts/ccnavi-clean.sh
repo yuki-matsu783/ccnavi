@@ -172,7 +172,7 @@ clean_with_sh() {
 	fi
 
 	# 決まった名前はそこで降りるのをやめる（-prune）。out は package.json の隣かどうかを
-	# 後で見るので、ここでは降りる。読めないディレクトリは探さない（find のエラー出力は捨てる）。
+	# 後で見るので、ここでは降りる。読めないディレクトリは探さない（find のエラー出力は破棄する）。
 	cw_found=$(cd "$cw_top" && {
 		find . -name .git -prune \
 			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) \

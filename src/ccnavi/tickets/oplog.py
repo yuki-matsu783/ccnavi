@@ -89,7 +89,7 @@ def id_for(*parts: str) -> str:
     """内容から決まる操作ID（32 桁の 16 進）。
 
     エージェントの操作（request・comment・ready）は、同じ操作を打ち直して復旧する。打ち直しが
-    同じ記録に当たるよう、操作の鍵（種類・親・MR・本文の鍵など）から ID を決める。
+    同じ記録にヒットするよう、操作のキー（種類・親・MR・本文のキーなど）から ID を決める。
     """
     joined = "\x1f".join(parts)
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:32]

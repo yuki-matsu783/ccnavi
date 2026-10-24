@@ -1,9 +1,9 @@
-"""親チケットの見本に `phases:`（計画が使うフェーズ定義の写し）を差し込む道具。
+"""親チケットの見本に `phases:`（計画が使うフェーズ定義のコピー）を差し込む道具。
 
-計画を持つ親は、計画が使う定義だけを `phases.yml` から写した `phases:` を持つ。
-見本の親を書くテストが、それぞれ定義を手で写さずに済むように
-ここに置く。写すのは、計画（`plan:` / `feedback:`）のステップが使う定義だけ。前の版の順序の欄
-（`order` `after` `overlap` `requires`）は写さない。
+計画を持つ親は、計画が使う定義だけを `phases.yml` からコピーした `phases:` を持つ。
+見本の親を書くテストが、それぞれ定義を手でコピーせずに済むように
+ここに置く。コピーするのは、計画（`plan:` / `feedback:`）のステップが使う定義だけ。前の版の順序の欄
+（`order` `after` `overlap` `requires`）はコピーしない。
 
 実行ファイルの `--plan-order <親> --fill-phases` と同じことをテストの側で行う。実行ファイルの
 関数を呼ばないのは、見本が実装の書き方に引きずられないようにするため。
@@ -15,7 +15,7 @@ import yaml
 
 
 def definitions(phases_yml: str) -> dict:
-    """`phases.yml` の本文から、定義の id → 欄の辞書。"""
+    """`phases.yml` の本文から、定義の id → 欄のマップ。"""
     try:
         data = yaml.safe_load(phases_yml) or {}
     except yaml.YAMLError:
@@ -32,7 +32,7 @@ def definitions(phases_yml: str) -> dict:
 def combined(*phases_ymls: str) -> str:
     """共通レイヤーとレイヤーの `phases.yml` を足した本文。同じ id は前のものを残す。
 
-    判定は共通レイヤー + 親の `project:` が指すレイヤーの和を読むので、写しもその和から取る。
+    判定は共通レイヤー + 親の `project:` が指すレイヤーの和を読むので、コピーもその和から取る。
     """
     merged: dict = {}
     for text in phases_ymls:
@@ -60,7 +60,7 @@ def used_types(front: dict) -> list[str]:
 
 
 def block(phases_yml: str, names: list[str]) -> str:
-    """`phases:` の行（末尾の改行つき）。`phases.yml` に無い名前は写さない。"""
+    """`phases:` の行（末尾の改行つき）。`phases.yml` に無い名前はコピーしない。"""
     defs = definitions(phases_yml)
     picked = {name: defs[name] for name in names if name in defs}
     return yaml.safe_dump(

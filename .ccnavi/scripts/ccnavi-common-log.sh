@@ -17,11 +17,11 @@
 # `[A-Za-z0-9_-]` 以外の文字があれば書かない（パスの区切りや `..` を名前に入れさせない）。
 #
 # シンボリックリンクはたどらない。 `logs`・`logs/diag`・書き込み先のファイルのどれかが
-# シンボリックリンクなら書かずに捨てる。リンク先へ追記すると、置き場の外のファイル（判定の記録など）を書き換えてしまう。
+# シンボリックリンクなら書かずに破棄する。リンク先へ追記すると、置き場の外のファイル（判定の記録など）を書き換えてしまう。
 # ファイルを新しく作るときは umask 077 のサブシェルで作り、持ち主だけが読める 0600 にする。
 #
 # 標準出力と標準エラーには何も出さず、何があっても 0 を返す。 書けない（置き場が
-# 作れない・権限・容量）ときは何も出さずに捨てる。`set -eu` の下で呼んでも、呼ぶ側を止めない。
+# 作れない・権限・容量）ときは何も出さずに破棄する。`set -eu` の下で呼んでも、呼ぶ側を止めない。
 # 契約として決まっている出力（reject / fail の標準エラー、ok / fail の 1 行目）とは分けてあり、
 # そちらは変えない。
 #
@@ -78,7 +78,7 @@ log_error() {
 }
 
 # 書き込み先。1 度求めたら覚える。出どころが使えない字を含むか、ワークスペースルートが
-# 見つからなければ 1 を返す（捨てる）。
+# 見つからなければ 1 を返す（破棄する）。
 ccnavi_log_target() {
 	[ -z "$ccnavi_log_file" ] || return 0
 	ccnavi_lt_name="${CCNAVI_LOG_NAME:-}"
@@ -147,7 +147,7 @@ ccnavi_log_emit() {
 
 	ccnavi_le_line="$ccnavi_le_now $ccnavi_le_level ${ccnavi_log_name}[$$] $ccnavi_le_msg$ccnavi_le_fields"
 	ccnavi_le_dir="${ccnavi_log_file%/*}"
-	# シンボリックリンクはたどらない。logs・logs/diag・書き込み先のどれかがリンクなら捨てる。
+	# シンボリックリンクはたどらない。logs・logs/diag・書き込み先のどれかがリンクなら破棄する。
 	if [ -L "${ccnavi_le_dir%/*}" ] || [ -L "$ccnavi_le_dir" ] || [ -L "$ccnavi_log_file" ]; then
 		return 0
 	fi
@@ -168,7 +168,7 @@ ccnavi_log_emit() {
 }
 
 # 文字列の中の $2 を、すべて $3 に置き換える。結果は ccnavi_log_out に入る。
-# $2 が空なら何も置き換えない（空を探すと、いつまでも当たり続けて抜けない）。
+# $2 が空なら何も置き換えない（空を探すと、いつまでもヒットし続けて抜けない）。
 ccnavi_log_replace() {
 	ccnavi_log_out="$1"
 	[ -n "$2" ] || return 0
@@ -241,7 +241,7 @@ ccnavi_log_mask() {
 	while [ -n "$ccnavi_lm_rest" ]; do
 		ccnavi_lm_word="${ccnavi_lm_rest%%[$ccnavi_log_space]*}"
 		if [ -z "$ccnavi_lm_word" ]; then
-			# 頭が切れ目の字（1 バイト）。そのまま写す。
+			# 頭が切れ目の字（1 バイト）。そのままコピーする。
 			ccnavi_lm_tail="${ccnavi_lm_rest#?}"
 			ccnavi_log_out="$ccnavi_log_out${ccnavi_lm_rest%"$ccnavi_lm_tail"}"
 			ccnavi_lm_rest="$ccnavi_lm_tail"

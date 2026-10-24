@@ -1,18 +1,20 @@
-"""着手の前に、共通の工程スキルをプロジェクトの `skills/` へ写す。
+"""着手の前に、共通の工程スキルをプロジェクトの `skills/` へコピーする。
 
 工程スキルは、ワークスペースの `.claude/skills/<工程>/` にある、頭の frontmatter に
-`process: true` を持つスキルで、`SKILL.md` と `references/common/` の下の `.md` が写す中身になる。
-`references/` の最上段は `common/`（共通。写す）とそれ以外（プロジェクト固有。写さない）に分かれる。
+`process: true` を持つスキルで、
+`SKILL.md` と `references/common/` の下の `.md` がコピーする中身になる。
+`references/` の最上段は `common/`（共通。コピーする）とそれ以外（プロジェクト固有。
+コピーしない）に分かれる。
 プロジェクトだけを clone したユーザからは見えないので、親チケットの `ticket start` で
-親のワークツリーにあるプロジェクトの `skills/<工程>/` へ写す。
+親のワークツリーにあるプロジェクトの `skills/<工程>/` へコピーする。
 
-写すのは `references/common/` だけで、`references/` のそれ以外（プロジェクト固有）には触れない
+コピーするのは `references/common/` だけで、`references/` のそれ以外（プロジェクト固有）には触れない
 ので、プロジェクトが育てたファイルは上書きも削除もされない（`.ccnavi/docs/skill-processes.md`）。
-`common/` は共通の写しなので、共通側から無くなった `.md` は写し先からも消す（共通レイヤーの
+`common/` は共通のコピーなので、共通側から無くなった `.md` はコピー先からも消す（共通レイヤーの
 ミラーと同じ）。消えて空になったディレクトリは、`common/` の下から片付ける。`SKILL.md` は
 消さない（共通側に必ずある）。
 
-写し先は ccnavi ディレクトリ（`.ccnavi/`）の外なので、保護は関わらない。写し先かその途中が
+コピー先は ccnavi ディレクトリ（`.ccnavi/`）の外なので、保護は関わらない。コピー先かその途中が
 シンボリックリンクなら止める。上書きは一時ファイルからの置き換えで行い、途中で止まれば
 した分を元へ戻す（`configsync.apply`）。
 """
@@ -28,9 +30,9 @@ from . import configsync, flow
 
 PROCESS_KEY = "process"
 SKILL_FILE = "SKILL.md"
-# `references/` の最上段で、共通として写すディレクトリ。それ以外は写さず、触れない。
+# `references/` の最上段で、共通としてコピーするディレクトリ。それ以外はコピーせず、触れない。
 COMMON_REFS = ("references", "common")
-# 写し先の、プロジェクトのルートからの相対。目録（`hook.projskills`）の読み先と同じ。
+# コピー先の、プロジェクトのルートからの相対。目録（`hook.projskills`）の読み先と同じ。
 SKILLS_DIR = "skills"
 # 共通の置き場の、ワークスペースルートからの相対。
 SOURCE_DIR = ".claude/skills"
@@ -72,7 +74,7 @@ def _process_flag(raw: bytes) -> bool:
 
 
 def is_shared(parts: list[str]) -> bool:
-    """工程スキルのディレクトリからの相対（"/" で割ったもの）が、写す対象の形か。
+    """工程スキルのディレクトリからの相対（"/" で割ったもの）が、コピーする対象の形か。
 
     `SKILL.md` と、`references/common/` の下の `.md`。
     """
@@ -87,23 +89,24 @@ def is_shared(parts: list[str]) -> bool:
 
 
 def sources(root: str) -> tuple[dict[str, bytes], str]:
-    """写すもの。プロジェクトの `skills/` からの相対 → 中身。読めなければ理由（何も写さない）。"""
+    """コピーするもの。プロジェクトの `skills/` からの相対 → 中身。
+    読めなければ理由（何もコピーしない）。"""
     out: dict[str, bytes] = {}
     base = os.path.join(root, *SOURCE_DIR.split("/"))
     for name in processes(root):
         top = os.path.join(base, name)
         files = [os.path.join(top, SKILL_FILE)]
         shared = os.path.join(top, *COMMON_REFS)
-        # `references` や `common` そのものがリンクなら、外を指して写せてしまう。
+        # `references` や `common` そのものがリンクなら、外を指してコピーできてしまう。
         for chain in (os.path.join(top, COMMON_REFS[0]), shared):
             if os.path.islink(chain):
-                return {}, f"{_shown(root, chain)} がシンボリックリンク。写さない"
+                return {}, f"{_shown(root, chain)} がシンボリックリンク。コピーしない"
         for parent, dirs, names in os.walk(shared):
             dirs.sort()
             for entry in [*dirs, *names]:
                 if os.path.islink(os.path.join(parent, entry)):
                     linked = _shown(root, os.path.join(parent, entry))
-                    return {}, f"{linked} がシンボリックリンク。写さない"
+                    return {}, f"{linked} がシンボリックリンク。コピーしない"
             files.extend(os.path.join(parent, f) for f in sorted(names))
         for path in files:
             if not is_shared(os.path.relpath(path, top).split(os.sep)):
@@ -120,7 +123,7 @@ def _shown(root: str, path: str) -> str:
 
 
 def plan(root: str, tree_root: str) -> tuple[list[configsync.Change], str]:
-    """プロジェクトの `skills/` に加える変更の一覧。写せない理由があれば、それを返す。"""
+    """プロジェクトの `skills/` に加える変更の一覧。コピーできない理由があれば、それを返す。"""
     wanted, why = sources(root)
     if why:
         return [], why
@@ -130,7 +133,7 @@ def plan(root: str, tree_root: str) -> tuple[list[configsync.Change], str]:
         target = os.path.join(base, rel.replace("/", os.sep))
         if configsync._linked(tree_root, target):
             shown = configsync._rel_plain(tree_root, target)
-            return [], f"{shown} がシンボリックリンクか、その下にある。写さない"
+            return [], f"{shown} がシンボリックリンクか、その下にある。コピーしない"
         before, why = configsync._read_strict(target)
         if why:
             return [], f"{configsync._rel(tree_root, target)} を読めない ({why})"
@@ -148,7 +151,7 @@ def plan(root: str, tree_root: str) -> tuple[list[configsync.Change], str]:
 def _stale(
     root: str, tree_root: str, base: str, wanted: dict[str, bytes]
 ) -> tuple[list[configsync.Change], str]:
-    """写し先の `common/` にあって、共通側に無くなった `.md`（消す変更）。"""
+    """コピー先の `common/` にあって、共通側に無くなった `.md`（消す変更）。"""
     out: list[configsync.Change] = []
     for name in processes(root):
         common = os.path.join(base, name, *COMMON_REFS)
@@ -156,7 +159,7 @@ def _stale(
             continue
         if configsync._linked(tree_root, common):
             shown = configsync._rel_plain(tree_root, common)
-            return [], f"{shown} がシンボリックリンクか、その下にある。写さない"
+            return [], f"{shown} がシンボリックリンクか、その下にある。コピーしない"
         present, why = configsync._scan(common)
         if why:
             return [], why
@@ -187,7 +190,7 @@ def apply(changes: list[configsync.Change]) -> str:
 
 
 def _common_of(target: str) -> str:
-    """その写し先のファイルが属する `references/common/` のディレクトリ。無ければ空。"""
+    """そのコピー先のファイルが属する `references/common/` のディレクトリ。無ければ空。"""
     parts = target.split(os.sep)
     for i in range(len(parts) - 1):
         if tuple(parts[i : i + len(COMMON_REFS)]) == COMMON_REFS:
@@ -212,9 +215,9 @@ def is_synced_write(
     path: str,
     content: bytes | None | object = configsync.UNSET,
 ) -> bool:
-    """その変更が、親の着手がミラーか工程スキルの写しとして配った書き込みだと読めるか。
+    """その変更が、親の着手がミラーか工程スキルのコピーとして配った書き込みだと読めるか。
 
-    `configsync.is_synced_write`（共通レイヤーのミラー）に、工程スキルの写しを足した答え。
+    `configsync.is_synced_write`（共通レイヤーのミラー）に、工程スキルのコピーを足した答え。
     write-and-push の置き場の検査と、実行後チェック、バックアップの復元が使う。
     """
     if configsync.is_synced_write(conf, root, path, content):
@@ -225,7 +228,7 @@ def is_synced_write(
 def _is_copied_skill(
     conf: settings.Settings, root: str, path: str, content: bytes | None | object
 ) -> bool:
-    """工程スキルの写しとして読めるか。次が全部揃ったときだけ。
+    """工程スキルのコピーとして読めるか。次が全部揃ったときだけ。
 
     1. 置き場が、プロジェクトから切った承認済みの親チケットのワークツリーの
        `skills/<工程>/SKILL.md` か `skills/<工程>/references/common/` の下の `.md`

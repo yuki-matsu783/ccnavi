@@ -46,7 +46,7 @@ export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
 # 番号を数えて消す必要はない。GIT_CONFIG_COUNT を消せば全部読まれない。
 # 例外は、このあと実行直前に ccnavi_git_auth が足す gh / glab の credential helper だけ（利用者の環境変数は引き継がない）。
 unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || true
-# git が操作するリポジトリと作業ツリーを、居場所（cwd）でなく環境変数で決める経路も閉じる。
+# git が操作するリポジトリとワークツリーを、居場所（cwd）でなく環境変数で決める経路も閉じる。
 # `GIT_DIR=<親>/.git GIT_WORK_TREE=<親> sh ccnavi-git.sh commit` を子のワークツリーで打つと、
 # 居場所の検査（hook と、下の子のワークツリーの検査）は子を見るのに、git は親へコミットする。
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_NAMESPACE \
@@ -63,7 +63,7 @@ SYNC="sh $(dirname "$0")/ccnavi-sync.sh"
 START="sh $(dirname "$0")/ccnavi-start.sh"
 
 # reject <識別子> <文面>。文面は標準エラーへ出す契約。識別子は拒否の種類を表す短い語で、
-# 診断ログにだけ残す。文面にはユーザの引数（URL など）が入るので、ログには写さない。
+# 診断ログにだけ残す。文面にはユーザの引数（URL など）が入るので、ログにはコピーしない。
 reject() {
 	printf 'ccnavi-git: %s\n' "$2" >&2
 	# 診断ログ。上の文面は契約として決まっている出力で、診断ログはそれとは別に残すだけ。
@@ -123,11 +123,11 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                    origin/main・origin/master) へ直接は送れない。
                    子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る。
                    リモートから消えた親のブランチへは送れない。親のワークツリーは push の前に
-                   リモートに在るかを確かめる。捨てた親ならワークツリーを片付ける)
+                   リモートに在るかを確かめる。破棄した親ならワークツリーを片付ける)
   取り込み  直接作業(チケットを起こさない)のワークツリーを、切ったときの取り込み先のブランチへ 1 コミットで載せる。
             取り込み先をチェックアウトしているメインのチェックアウトで実行します。チケットの作業は対象外(マージリクエストで出す)
             integrate <名前>          取り込み結果を計算して一時ワークツリー(logs/direct-tmp/)に展開し、差分と変わるファイルを
-                                      出して止まる。メインのチェックアウトの index と作業ツリーには書かない。
+                                      出して止まる。メインのチェックアウトの index とワークツリーには書かない。
                                       wip/handoff/ の下書きは取り込まない
             integrate --abort <名前>  取り込みをやめる(一時ワークツリーと記録を消す。作業ワークツリーには触らない)
             integrate-done <名前> -m <メッセージ>
@@ -195,7 +195,7 @@ for arg in ${1+"$@"}; do
 		;;
 	--?*)
 		# 略した表記（`--outp=x`・`--upload-p=...`）。parse-options を使うサブコマンドは長いオプションの
-		# 略を受けるので、止める名前の頭に当たる表記も止める。
+		# 略を受けるので、止める名前の頭にヒットする表記も止める。
 		# `--text`（diff の正式な名前）だけは textconv の頭でも通す。
 		gl_name="${arg#--}"
 		gl_name="${gl_name%%=*}"
@@ -357,7 +357,7 @@ ow_spec() {
 }
 
 # 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に
-# 当たるパスかを見る。当たれば in_store=yes。
+# ヒットするパスかを見る。ヒットすれば in_store=yes。
 #
 # `checkout <ref> <パス>`・`restore --source <ref>` で置き場を過去の中身に戻す形と、
 # `restore --ours / --theirs` で置き場の衝突を片側の中身で解く形を止めるために使う。
@@ -365,8 +365,8 @@ ow_spec() {
 # 無かったことにも、承認が戻ったことにもなる。
 #
 # 比べるのは git のトップからのパス。cwd からの相対（`approved/doing/x.md` を `.ccnavi/` の中で打つ）も
-# `..` を取り除いてから比べる。置き場の親（`.ccnavi`・`wip`・`.`）も置き場ごと戻すので当たる。
-# `*` `?` `[` と `:` で始まる pathspec は、どこに当たるかをここで決められないので当たるとみなす。
+# `..` を取り除いてから比べる。置き場の親（`.ccnavi`・`wip`・`.`）も置き場ごと戻すのでヒットする。
+# `*` `?` `[` と `:` で始まる pathspec は、どこにヒットするかをここで決められないのでヒットするとみなす。
 # 大文字小文字はそろえる（Windows と macOS の既定のファイルシステムは区別しない）。
 store_hit() {
 	in_store=no
@@ -389,7 +389,7 @@ store_hit() {
 		sh_path="$(git rev-parse --show-prefix 2>/dev/null || :)$sh_arg"
 		;;
 	esac
-	# `.` と `..` を取り除く。トップより上に出たら、このリポジトリの外なので当たらない。
+	# `.` と `..` を取り除く。トップより上に出たら、このリポジトリの外なのでヒットしない。
 	sh_norm=""
 	sh_out=no
 	sh_ifs="$IFS"
@@ -442,20 +442,20 @@ store_hit() {
 	return 0
 }
 
-# ccnavi 自身を守る場所（自己防衛の対象）に当たるパスかを見る。当たれば in_core=yes。
+# ccnavi 自身を守る場所（自己防衛の対象）にヒットするパスかを見る。ヒットすれば in_core=yes。
 #
 # `rm`・`restore --source`・`checkout <ref> <パス>` で、hook の登録・設定・保護済みのスクリプト・
 # 実行ファイル・記録を消す・別のコミットの中身に戻す形を止めるために使う。シェルの rm と Write / Edit は
 # hook の自己防衛が止める場所で、このスクリプト自身を消すと生の git の止めも外れる。止めるのは hook が先
 # （DENY_WRAPPER_CORE_PATH）で、ここは 2 重目。見るのは既定の置き場の名前だけ（動かした置き場は hook が見る）。
 #
-# 当たるとみなすのは、`.ccnavi/` の下・`.claude/settings*.json`・`.claude/hooks/`・ワークスペースルートの
+# ヒットするとみなすのは、`.ccnavi/` の下・`.claude/settings*.json`・`.claude/hooks/`・ワークスペースルートの
 # `logs/` の記録と state と退避・`ccnavi-git.sh`、それらを中に含むディレクトリ（ツリーの頂上と、`.ccnavi`・
 # `.claude`・`.git` を直に、または 1 つ下に持つディレクトリ）。`:` で始まる pathspec と、グロブの前に固定の
-# ディレクトリが無い指定は、どこに当たるかを決められないので当たるとみなす。大文字小文字はそろえる。
+# ディレクトリが無い指定は、どこにヒットするかを決められないのでヒットするとみなす。大文字小文字はそろえる。
 #
 # レビュー済みのマーカーを消す
-# `rm` はユーザが端末で打つ手順で、過去の中身に戻す形は store_hit が止める。エージェントの呼び出しは
+# `rm` はユーザがターミナルで打つ手順で、過去の中身に戻す形は store_hit が止める。エージェントの呼び出しは
 # hook が止める（DENY_WRAPPER_CORE_PATH）。
 core_hit() {
 	in_core=no
@@ -466,7 +466,7 @@ core_hit() {
 		return 0
 		;;
 	*'*'* | *'?'* | *'['*)
-		# グロブは / もまたぐので、グロブの前の固定のディレクトリより下のどこにでも当たる。
+		# グロブは / もまたぐので、グロブの前の固定のディレクトリより下のどこにでもヒットする。
 		ch_arg=$(printf '%s' "$ch_arg" | sed 's/[][*?].*//')
 		case "$ch_arg" in
 		*/*) ch_arg="${ch_arg%/*}" ;;
@@ -543,7 +543,7 @@ core_hit() {
 	return 0
 }
 core_reject() {
-	reject core-path "$sub で ccnavi 自身を守る場所 ($1) を削除するか、別のコミットの中身に戻す形は使用できません。hook の登録・ルールとフェーズの設定・保護済みのスクリプト・実行ファイル・判定の記録があり、削除したり古い中身に戻したりすると ccnavi の止めが外れます。変更が必要なら、何をなぜ変えたいのかを伝えてユーザに依頼してください。衝突の解決の $SELF restore --ours / --theirs -- <パス> と、索引だけを戻す $SELF restore --staged <パス> は通ります（*?[ や : で始まる指定・--pathspec-from-file は、守る場所に当たるかを確かめられないので使用できません。ファイルを 1 つずつ名指ししてください）。"
+	reject core-path "$sub で ccnavi 自身を守る場所 ($1) を削除するか、別のコミットの中身に戻す形は使用できません。hook の登録・ルールとフェーズの設定・保護済みのスクリプト・実行ファイル・判定の記録があり、削除したり古い中身に戻したりすると ccnavi の止めが外れます。変更が必要なら、何をなぜ変えたいのかを伝えてユーザに依頼してください。衝突の解決の $SELF restore --ours / --theirs -- <パス> と、索引だけを戻す $SELF restore --staged <パス> は通ります（*?[ や : で始まる指定・--pathspec-from-file は、守る場所にヒットするかを確かめられないので使用できません。ファイルを 1 つずつ名指ししてください）。"
 }
 
 # ---- worktree add の起点が古くないか（P14。hook は git もネットワークも起こさない決まりなので、判定はこの sh の中）
@@ -634,7 +634,7 @@ wt_fresh() {
 #
 # チケットを起こさない直接作業のワークツリー（.claude/worktrees/<名前>。ブランチも同じ名前）を、
 # 切った時点でメインのチェックアウトが開いていたブランチ（取り込み先）へ 1 コミットで載せる。
-# 現在の形（版 4）は、下のd4_ 系の関数が受け持つ。確認の間はメインのチェックアウトのindexと作業ツリーに
+# 現在の形（版 4）は、下のd4_ 系の関数が受け持つ。確認の間はメインのチェックアウトのindexとワークツリーに
 # 書かず、一時ワークツリーで作ったコミットを `merge --ff-only --no-overwrite-ignore` で載せる。
 # チケットの作業は今までどおりマージリクエストで出すので、チケットに結び付くワークツリーは断る。
 #
@@ -727,7 +727,7 @@ ig_done_args() {
 # ---- 直接作業の取り込み（取り込み先へ 1 コミットで載せる形。記録はversion 4）
 #
 # 切ったときの記録（ccnavi-worktree.shがgitの共通ディレクトリのccnavi-direct/<名前> に書く）から、
-# 取り込み先のブランチと起点Sを読む。確認している間、メインのチェックアウトのindexと作業ツリーには書かない。
+# 取り込み先のブランチと起点Sを読む。確認している間、メインのチェックアウトのindexとワークツリーには書かない。
 #
 #   integrate <名前>      作業ブランチの先頭の木からwip/handoff/ の差分をSに戻してTとし、
 #                         merge-tree --write-tree --merge-base=S HEAD TでC（取り込み結果の木）を計算する。
@@ -821,7 +821,7 @@ d4_begin() {
 	ig_head=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
 }
 
-# ロックを取る（鍵はlogs/state/locks/<repo>/.integrate）。取れなければ断る。
+# ロックを取る（キーはlogs/state/locks/<repo>/.integrate）。取れなければ断る。
 d4_lock() {
 	ccnavi_lock_take "$WS" "$d4_repo" .integrate 0 ||
 		reject integrate-locked "別の integrate か integrate-done が動いています（ロック: logs/state/locks/${d4_repo}/.integrate）。終わってから再実行してください。"
@@ -927,7 +927,7 @@ d4_tmp_note() {
 }
 
 # 専用のrefを消す。<種類>...
-# 全部に当たってから、消せなかったものがあれば 1 を返し、その種類を d4_rd_failed に入れる。
+# 全部にヒットしてから、消せなかったものがあれば 1 を返し、その種類を d4_rd_failed に入れる。
 # すでに無い ref は消せたものと同じ（update-ref -d は 0）。準備と abort は戻り値を見ない（|| :）。
 d4_rd_failed=""
 d4_refs_drop() {
@@ -940,7 +940,7 @@ d4_refs_drop() {
 
 # 下書きの条件（6.2）を作業ワークツリーについて確かめる。満たさなければ理由をd4_draft_whyに入れて 1。<S>
 #
-# - 許可リストに当たる下書きは、取り込み済み（実行ファイルのtree handoff-pendingが 0 件）
+# - 許可リストにヒットする下書きは、取り込み済み（実行ファイルのtree handoff-pendingが 0 件）
 # - wip/handoff/ に今あるファイルのうち、Sに無いもの・中身が違うものが無い（消えた下書きは数えない）
 d4_draft_why=""
 d4_draft_check() {
@@ -984,8 +984,8 @@ EOF
 # <基準> <先頭> [<S> <S0>]
 #
 # <S> <S0> を渡すと（作業ブランチが取り込み先を取り込んでいて、基準が S ではなく共通祖先のとき）、
-# 写した書きかけ（S0..S の差分）のうち、エージェントが S から変えていないパスも<基準>の版に戻す。
-# 写した書きかけそのものは成果に含めない。
+# コピーした書きかけ（S0..S の差分）のうち、エージェントが S から変えていないパスも<基準>の版に戻す。
+# コピーした書きかけそのものは成果に含めない。
 #
 # パスは -z で読む（引用符・バックスラッシュ・タブを含む名前を、引用符つきで受け取らない）。
 # 改行を含む名前だけは扱えない。
@@ -1051,7 +1051,7 @@ d4_names() {
 }
 
 # パスの一覧（1 行 1 本）が自己防衛の対象を含むか、実行ファイルに聞く。d4_guard（yes / no / unknown）と
-# d4_guard_pathsに入れる。聞けなければunknown（端末からの確定を求める側に倒す）。<パスの一覧>
+# d4_guard_pathsに入れる。聞けなければunknown（ターミナルからの確定を求める側に倒す）。<パスの一覧>
 d4_guard_ask() {
 	d4_guard=unknown
 	d4_guard_paths=""
@@ -1244,11 +1244,11 @@ EOF
 	printf '変わるファイル:\n'
 	printf '%s\n' "$d4_changed" | head -n "$MAX_LINES" | sed 's/^/  /'
 	printf '案内: このファイルをエディタで開いて保存していない編集があれば、integrate-done の前に保存してもらう\n'
-	printf '案内: 取り込み結果は一時ワークツリーで検証できる: cd %s && <テストやビルド>。ここは編集しない。プロジェクトのレイヤーのルールが通常どおり当たる場所ではない\n' "$(ccnavi_sh_quote "$d4_tmp")"
+	printf '案内: 取り込み結果は一時ワークツリーで検証できる: cd %s && <テストやビルド>。ここは編集しない。プロジェクトのレイヤーのルールが通常どおりヒットする場所ではない\n' "$(ccnavi_sh_quote "$d4_tmp")"
 	[ -z "$d4_overlap" ] ||
 		printf '案内: 取り込みで増えるパスが、メインのチェックアウトの ignored のファイルと重なっている（%s）。integrate-done の fast-forward は上書きせずに止まる。ユーザに退避を頼む\n' "${d4_overlap# }"
 	if [ "$d4_guard" != no ]; then
-		printf '案内: 自己防衛の対象（%s）を含む。integrate-done はユーザが端末で、エージェントのターンが終わってから打つ\n' "${d4_guard_paths:-対象を確かめられなかった}"
+		printf '案内: 自己防衛の対象（%s）を含む。integrate-done はユーザがターミナルで、エージェントのターンが終わってから打つ\n' "${d4_guard_paths:-対象を確かめられなかった}"
 	fi
 	if d4_origin_behind "$d4_base"; then
 		printf '案内: origin/%s が手元より進んでいる。先に合わせると、古い上に載せずに済む（cd %s && git pull --ff-only origin %s）\n' \
@@ -1325,7 +1325,7 @@ d4_finish() {
 	d4_ss=$(git rev-parse --verify --quiet "$d4_ref/s" 2>/dev/null || :)
 	if ! ccnavi_record_write "$d4_done_file" version 4 k "${d4_m_k:--}" s "${d4_ss:--}" t "${d4_ts:--}" c_tree "$d4_m_ctree" \
 		head "$d4_m_head" base_branch "$d4_base" common_dir "$d4_common" created "$(date +%s)"; then
-		log_info 取り込みの写しを残せなかった -- "name=$ig_n"
+		log_info 取り込みのコピーを残せなかった -- "name=$ig_n"
 	fi
 	# ブランチの先頭が動いていたら、作業ワークツリー（②）を消す前に止める。消してからでは、積まれた
 	# コミットを作業ワークツリーから確かめられなくなる。
@@ -1386,7 +1386,7 @@ d4_finish() {
 	log_info 取り込みを片付けた -- "name=$ig_n"
 	# 8: pushはユーザが打つ。
 	if [ -n "$d4_m_k" ] && d4_origin_ahead "$d4_base"; then
-		printf '次: ユーザに端末で %s をリモートへ送るよう頼む（cd %s && git push origin %s）。ccnavi-git.sh push は取り込み先へ送らない\n' \
+		printf '次: ユーザにターミナルで %s をリモートへ送るよう頼む（cd %s && git push origin %s）。ccnavi-git.sh push は取り込み先へ送らない\n' \
 			"$d4_base" "$(ccnavi_sh_quote "$ig_top")" "$d4_base"
 	fi
 	exit 0
@@ -1470,7 +1470,7 @@ ig_done() {
 		d4_changed=$(d4_names "HEAD^{tree}" "$d4_m_ctree" || :)
 		d4_guard_ask "$d4_changed"
 		if [ "$d4_guard" != no ] && [ ! -t 0 ]; then
-			reject integrate-done-terminal "自己防衛の対象（${d4_guard_paths:-対象を確かめられなかった}）を含む取り込みは、ユーザが端末で、エージェントのターンが終わってから打ちます（fast-forward で設定ファイルが書き換わると、ターンの終わりの照合が元に戻してしまうため）。ユーザに $SELF_Q integrate-done $ig_n -m '<メッセージ>' を頼んでください。"
+			reject integrate-done-terminal "自己防衛の対象（${d4_guard_paths:-対象を確かめられなかった}）を含む取り込みは、ユーザがターミナルで、エージェントのターンが終わってから打ちます（fast-forward で設定ファイルが書き換わると、ターンの終わりの照合が元に戻してしまうため）。ユーザに $SELF_Q integrate-done $ig_n -m '<メッセージ>' を頼んでください。"
 		fi
 		# K を commit したあと、記録する前に落ちた打ち直しは、一時ワークツリーの HEAD が既に K になっている。
 		# 親が head、木が c_tree ならそれを採用して記録する（commit し直さない）。
@@ -1553,7 +1553,7 @@ cat-file)
 	;;
 
 grep)
-	# `-O` / `--open-files-in-pager` は当たったファイルを外部コマンドで開く。まとめた短いオプション（`-iO`）と略も見る。
+	# `-O` / `--open-files-in-pager` はヒットしたファイルを外部コマンドで開く。まとめた短いオプション（`-iO`）と略も見る。
 	# 値を取る短いオプション（-e -f -A -B -C -m）より後ろの字は値なので数えない。
 	for arg in ${1+"$@"}; do
 		case "$arg" in
@@ -1810,14 +1810,14 @@ stash)
 	case "$action" in
 	list | show | push | save | pop | apply | -*) ;;
 	drop | clear)
-		reject stash-drop "stash $action は退避した変更を捨てます。中身を $SELF stash show -p で確かめ、不要と判断した理由をユーザに伝えてください。"
+		reject stash-drop "stash $action は退避した変更を破棄します。中身を $SELF stash show -p で確かめ、不要と判断した理由をユーザに伝えてください。"
 		;;
 	*) reject stash-action "stash $action は使用できません。使えるのは list / show / push / pop / apply です。" ;;
 	esac
 	;;
 
 add)
-	: # 索引を変えるだけ。作業ツリーは損なわれない
+	: # 索引を変えるだけ。ワークツリーは損なわれない
 	;;
 
 rm)
@@ -1864,7 +1864,7 @@ rm)
 	;;
 
 restore)
-	# 作業中の変更を捨てる側。rules.yml が reset --hard の代わりに名指しで勧める
+	# 作業中の変更を破棄する側。rules.yml が reset --hard の代わりに名指しで勧める
 	# 経路でもあるので、対象を 1 つずつ名指しさせる形だけ通す。
 	#
 	# --ours / --theirs もここを通る。衝突したパスにしか使えない（普段は
@@ -1874,7 +1874,7 @@ restore)
 	# 既定もこの形は止めない（src/ccnavi/policy/builtin.py）。
 	#
 	# 別のコミットの中身で戻す形（--source）と、衝突を片側の中身で解く形（--ours / --theirs）は、
-	# 承認済みチケットの置き場に当たるパスには使わせない。
+	# 承認済みチケットの置き場にヒットするパスには使わせない。
 	# 置き場を過去の中身に戻すと、承認が無かったことにも、消えたマーカーが戻ったことにもなる。
 	# 置き場の衝突は、どちらの承認を採るかをユーザが決める。オプションは許可リストで読む。
 	[ "$#" -eq 0 ] && reject restore-no-path "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
@@ -1915,10 +1915,10 @@ restore)
 	opt_walk restore_cb ${1+"$@"}
 	if [ -n "$rs_paths" ]; then
 		if [ "$rs_side" = yes ]; then
-			reject restore-store-side "restore --ours / --theirs で承認済みチケットの置き場に当たるパス ($rs_paths) の衝突を片側の内容で解決する形は使用できません。置き場の衝突は、どちらの承認を採るかをユーザが決めます。$SELF merge --abort で取り込みをやめ、衝突したパスをユーザに伝えてください。"
+			reject restore-store-side "restore --ours / --theirs で承認済みチケットの置き場にヒットするパス ($rs_paths) の衝突を片側の内容で解決する形は使用できません。置き場の衝突は、どちらの承認を採るかをユーザが決めます。$SELF merge --abort で取り込みをやめ、衝突したパスをユーザに伝えてください。"
 		fi
 		if [ "$rs_source" = yes ]; then
-			reject restore-store-source "restore --source で承認済みチケットの置き場に当たるパス ($rs_paths) を別のコミットの中身に戻す形は使用できません。置き場を動かすのはユーザと ccnavi のスクリプトです。置き場の中身が食い違っているなら、ユーザに伝えてください（*?[ や: で始まる指定は、置き場に当たるかを確かめられないので同じく使用できません。ファイルを1つずつ名指ししてください）。"
+			reject restore-store-source "restore --source で承認済みチケットの置き場にヒットするパス ($rs_paths) を別のコミットの中身に戻す形は使用できません。置き場を動かすのはユーザと ccnavi のスクリプトです。置き場の中身が食い違っているなら、ユーザに伝えてください（*?[ や: で始まる指定は、置き場にヒットするかを確かめられないので同じく使用できません。ファイルを1つずつ名指ししてください）。"
 		fi
 	fi
 	# 別のコミットの中身で戻す形は、ccnavi 自身を守る場所にも使わせない。索引の中身に戻す形
@@ -1934,7 +1934,7 @@ merge)
 	# 枝分かれした時点でブランチが永久に統合されない。衝突の解消はメインの仕事で、
 	# 解こうとする操作をラッパースクリプトが止めてしまうと、先に進む方法が無くなる。
 	#
-	# 止めるのは、衝突をユーザが見ないまま片側を捨てる形だけ。`-X ours` と `-s ours` は
+	# 止めるのは、衝突をユーザが見ないまま片側を破棄する形だけ。`-X ours` と `-s ours` は
 	# もう一方の変更を気づかないうちに消す。並行して動いている他セッションの書きかけが
 	# そこに入っていることがあり、消えたことは差分にも記録にも残らない。
 	# オプションは許可リストで読む（略した --strategy-o=ours・まとめた -sours も同じに読む）。
@@ -1944,7 +1944,7 @@ merge)
 		[ "$1" = opt ] || return 0
 		case "$2:${3:-}" in
 		--strategy:ours | --strategy:theirs | -s:ours | -s:theirs | --strategy-option:ours | --strategy-option:theirs | -X:ours | -X:theirs)
-			reject merge-discard-side "$2 $3 を使うと、衝突の片側が気づかないうちに捨てられます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
+			reject merge-discard-side "$2 $3 を使うと、衝突の片側が気づかないうちに破棄されます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
 			;;
 		--no-verify:*)
 			reject merge-no-verify "$2 はマージ前の検査を飛ばします。検査が失敗するなら、その原因を直してください。"
@@ -2016,7 +2016,7 @@ commit)
 	;;
 
 checkout | switch)
-	# ブランチを移る形は通す。作業ツリーの中身を捨てる形だけ止める。
+	# ブランチを移る形は通す。ワークツリーの中身を破棄する形だけ止める。
 	# `git checkout -- .` は、書きかけを何も言わずに消す。取り返せない。
 	#
 	# オプションは許可リストで読む。略した長い
@@ -2027,7 +2027,7 @@ checkout | switch)
 	# 親のブランチを移すと、承認済みチケットの置き場ごと別の中身になる。
 	#
 	# `checkout <ref> <パス>` は `--` が無くてもパスを別のコミットの中身に戻す。承認済みチケットの
-	# 置き場に当たるパスは通さない。オプションでない最初の語が行き先か起点で、2 つ目からがパス。
+	# 置き場にヒットするパスは通さない。オプションでない最初の語が行き先か起点で、2 つ目からがパス。
 	if [ "$sub" = checkout ]; then
 		ow_spec "quiet progress no-progress detach track no-track guess no-guess merge overlay no-overlay recurse-submodules no-recurse-submodules ignore-skip-worktree-bits force ours theirs" \
 			"orphan conflict pathspec-from-file" "track recurse-submodules" "qmtlf" "bB"
@@ -2057,7 +2057,7 @@ checkout | switch)
 			fi
 			store_hit "$2"
 			if [ "$in_store" = yes ]; then
-				reject checkout-store "$sub <ref> <パス> で承認済みチケットの置き場に当たるパス ($2) を別のコミットの中身に戻す形は使用できません。置き場を動かすのはユーザと ccnavi のスクリプトです。置き場の中身が食い違っているなら、ユーザに伝えてください（*?[ や: で始まる指定は、置き場に当たるかを確かめられないので同じく使用できません）。"
+				reject checkout-store "$sub <ref> <パス> で承認済みチケットの置き場にヒットするパス ($2) を別のコミットの中身に戻す形は使用できません。置き場を動かすのはユーザと ccnavi のスクリプトです。置き場の中身が食い違っているなら、ユーザに伝えてください（*?[ や: で始まる指定は、置き場にヒットするかを確かめられないので同じく使用できません）。"
 			fi
 			core_hit "$2"
 			[ "$in_core" = yes ] && core_reject "$2"
@@ -2065,10 +2065,10 @@ checkout | switch)
 		opt)
 			case "$sub:$2" in
 			*:--force | *:-f)
-				reject checkout-force "$sub の $2 (--force) は作業中の変更を捨てるので使用できません。退避は $SELF stash push -u です。"
+				reject checkout-force "$sub の $2 (--force) は作業中の変更を破棄するので使用できません。退避は $SELF stash push -u です。"
 				;;
 			switch:--discard-changes | checkout:--ours | checkout:--theirs)
-				reject checkout-discard "$2 は作業中の変更を捨てます。退避は $SELF stash push -u です。"
+				reject checkout-discard "$2 は作業中の変更を破棄します。退避は $SELF stash push -u です。"
 				;;
 			checkout:-B | switch:-C | switch:--force-create)
 				reject checkout-force-branch "$sub $2 は、同じ名前の既存のブランチを別のコミットへ移します。そのブランチにしか無いコミットが気づかないうちに外れ、親のブランチなら承認済みチケットの置き場ごと中身が変わります。リモートに合わせるなら、親のブランチは $SYNC <P>、ほかのブランチは $SELF merge <リモート>/<ブランチ> です。分かれていて進めないならユーザに伝えてください。新しいブランチは -b（switch は --create）で切ります。"
@@ -2275,7 +2275,7 @@ push)
 		esac
 	done
 	# リモートから消えた親のブランチへは送らない（push の関門。write-and-push・ccnavi-user-push-approved.sh と同じ）。
-	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子のチケット）を確かめないまま親子のチケットが
+	# 普通の push で作り直すと、消えた理由（改名・消し間違い・破棄した親子のチケット）を確かめないまま親子のチケットが
 	# 動き出す。送り先が origin のときだけ見る。送り先は git と同じ順で解く: 引数のリモート →
 	# branch.<b>.pushRemote → remote.pushDefault → branch.<b>.remote → origin。
 	push_dest="${push_seen_remote:-}"
@@ -2355,7 +2355,7 @@ log_debug 判定の材料 -- "sub=$sub" "action=${action:-}" "top=$root" "cwd=$P
 
 # 記録はワークスペースの下にまとめる（git のトップとワークスペースルートは別で、モード B では異なるため）。git のトップに書くと、
 # モード B ではプロジェクトのリポジトリの中に出る。ワークスペースの .gitignore の
-# /logs/ はワークスペースルート起点なので当てはまらず、public のリポジトリに運用の痕跡が入る。
+# /logs/ はワークスペースルート起点なので該当せず、public のリポジトリに運用の痕跡が入る。
 logproject=$(ccnavi_project "$(pwd)" "$WS")
 if [ -n "$logproject" ]; then
 	logdir="$WS/logs/$logproject"
@@ -2365,7 +2365,7 @@ fi
 mkdir -p "$logdir"
 logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
 
-# 全量を必ず残す。成功でも書く。捨てると「あのとき何が出ていたか」を後から
+# 全量を必ず残す。成功でも書く。破棄すると「あのとき何が出ていたか」を後から
 # 確かめられない。logs/ は .gitignore に入っていて、コミット対象にならない。
 {
 	printf '# %s  cwd=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$(pwd)"

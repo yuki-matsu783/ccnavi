@@ -389,7 +389,7 @@ class SearchTest(unittest.TestCase):
             ids(docsearch_query.Query(types=["adr"])), ["docs/adr/0001-git", "docs/adr/0002-ticket"]
         )
         self.assertEqual(ids(docsearch_query.Query(types=["ad"])), [])
-        # スカラーの tags も 1 要素のリストとして当たる。
+        # スカラーの tags も 1 要素のリストとしてヒットする。
         self.assertEqual(
             ids(docsearch_query.Query(tags=["WORKTREE"])),
             ["docs/adr/0001-git", "docs/claude/worktree"],
@@ -422,7 +422,7 @@ class SearchTest(unittest.TestCase):
         self.assertEqual(ids(docsearch_query.Query(paths=["CLAUDE/"])), ["docs/claude/worktree"])
 
     def test_text_looks_at_values_not_keys(self):
-        # キー名（title・tags・description）には当たらない。当たると全件になる。
+        # キー名（title・tags・description）にはヒットしない。ヒットすると全件になる。
         self.assertEqual(ids(docsearch_query.Query(texts=["title"])), [])
         self.assertEqual(ids(docsearch_query.Query(texts=["tags"])), [])
         self.assertEqual(ids(docsearch_query.Query(texts=["description"])), ["README"])
@@ -1358,7 +1358,7 @@ class LineSeparatorTest(Repo):
 
 
 class CrossDeviceTest(Repo):
-    """`.git` が別のファイルシステムでも、作業ツリーの側の一時ファイルで書く。"""
+    """`.git` が別のファイルシステムでも、ワークツリーの側の一時ファイルで書く。"""
 
     def exdev(self):
         real = os.replace

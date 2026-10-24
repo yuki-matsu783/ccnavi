@@ -1,7 +1,7 @@
 """計画の番号の振り直しと、提案への書き戻し（`ccnavi --plan-order <親>`）。
 
 VS Code の計画編集タブは、図で引いた線を「元の番号（いま提案に書いてある番号）での直接の
-先行」として `--order` に付けて渡す。ここで番号を振り直し、待ち方を計算して検査し、図に描く中身
+先行」として `--order` に付けて渡す。ここで番号を振り直し、先行関係を計算して検査し、図に描く中身
 （`plans`）を返す。保存（`--write`）では親の提案の `plan:` / `feedback:` の値だけを書き換える。
 振り直しの正はここ 1 か所で、画面は同じ決まりで仮の番号を出すだけ。決まりの見張りは画面と共有する
 見本の表（`tests/fixtures/plan-reorder.json`）。
@@ -21,12 +21,12 @@ VS Code の計画編集タブは、図で引いた線を「元の番号（いま
 ## 書き戻し
 
 書くのは親の提案（`todo/`。エージェントも書ける置き場）だけ。書き換えたあとの
-承認はダイジェストで縛られる。書く前に次を確かめ、どれかに当たれば何も書かない。
+承認はダイジェストで縛られる。書く前に次を確かめ、どれかにヒットすれば何も書かない。
 
 - 開いたときのハッシュ（`--expect`）が、親の提案と、その親の `todo/` の子の提案をまとめた今の
   ハッシュ（`source_sha`）と同じ
 - 断った線が無く、振り直した計画の順序の検査（`workflow.problems`）に error が無く、改版なら
-  改版の錠（`agree_candidates.lock_problems`）に当たらない
+  改版の錠（`agree_candidates.lock_problems`）にヒットしない
 - 組んだ全文を読み直し、`plan` / `feedback` / `phases` のほかの欄と本文が、読んだ形で元と同じ
   （値にアンカーがあり、ほかの欄が別名で指しているときなど）
 
@@ -122,7 +122,7 @@ def parse_order(text: str, parent: ticket_model.Ticket) -> tuple[Order | None, s
         if key not in ranges:
             return None, "提案にフィードバック計画（feedback）がありません。"
         if not isinstance(value, dict):
-            return None, f"`{key}` は番号 → 先行の番号のリストの辞書で渡す"
+            return None, f"`{key}` は番号 → 先行の番号のリストのマップで渡す"
         numbers = ranges[key]
         part: dict[int, list[int]] = {}
         for name, preds in value.items():
@@ -162,13 +162,13 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
 
     処理フロー:
     1. 計画の部（全体計画・フィードバック計画）ごとに、ステップの番号の範囲を `_parts` で得る
-    2. 線を渡さない部は、番号もステップも提案のまま写す
+    2. 線を渡さない部は、番号もステップも提案のままコピーする
     3. 固定した番号に入る線が変わっていれば断る（`REFUSED_LOCKED`）。`_cycle` で循環を
        見つけたら断る（`REFUSED_CYCLE`）
     4. 断らない部は、先行が全部前に並んだステップを元の番号の小さい順に空いた番号へ置く。
        固定した番号は動かさず、詰められなければ断る（`REFUSED_UNPACKABLE`）
     5. 置けた部は、`after` を新しい番号に付け替えて `built` に入れる
-    6. 断りが 1 件でもあれば、親の計画を写した `Renumbered`（番号は恒等）を返す。無ければ
+    6. 断りが 1 件でもあれば、親の計画をコピーした `Renumbered`（番号は恒等）を返す。無ければ
        振り直した計画を返す
     """
     order = order or {}
@@ -656,7 +656,7 @@ def plans(ans: Answer) -> list[dict]:
 def _direct(
     current: ticket_model.Ticket, wf: ticket_model.Workflow, part: str
 ) -> dict[str, list[int]]:
-    """承認済みの待ち方から戻した直接の先行（推移的に辿れる線を除く）。その計画の番号だけ。"""
+    """承認済みの先行関係から戻した直接の先行（推移的に辿れる線を除く）。その計画の番号だけ。"""
     for key, first, items in _parts(current):
         if key != part:
             continue
@@ -959,7 +959,7 @@ def pick(proposals: list[ticket_model.Ticket], name: str) -> tuple[ticket_model.
 
     同じ識別子の提案が 2 つ以上のツリーに残っていれば（本物とするツリーが決まらない）、打った
     ツリー（cwd を含むツリー）の側だけを採る。ほかのツリーは別のセッションの作業かもしれないので
-    書かない。cwd がどのツリーにも当たらなければ、何も決めずに理由を返す。
+    書かない。cwd がどのツリーにもヒットしなければ、何も決めずに理由を返す。
     """
     found = [
         t

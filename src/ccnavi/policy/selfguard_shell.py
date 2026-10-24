@@ -20,7 +20,7 @@ from . import rules, selfguard_targets
 # 実行後のイベントごと消されると、戻す機会が来ない。だから同じ場所を実行前にも
 # 止める。止めるのが基本で、戻すのは止めきれなかったぶんの備えになる。
 #
-# 前半の括弧が書き込みの形で、後ろに続く場所と組で当たる。場所の名前が出ただけでは
+# 前半の括弧が書き込みの形で、後ろに続く場所と組でヒットする。場所の名前が出ただけでは
 # 止めない。`cat .ccnavi/config/common/rules.yml` も `git add <パス>` も、中身を書かない。
 # 名前で止める形にすると、いちばんガードを直したいときにいちばん多く止められる。
 #
@@ -32,15 +32,15 @@ from . import rules, selfguard_targets
 #      空白は 1 つにつき目印 1 つ、演算子の文字（`(` `)` `&` `;` など）は両側に目印 1 つずつ
 #      になるので、`"a  b/.ccnavi/..."` や `"New folder (2)/.ccnavi/..."` は目印が 2 つ続く。
 #      照合の手数を増やさないため、3 つ決めてある。
-#        - 当て始めは `>` の並び（`[>|&]` の続き）の頭だけ。並びの途中の `>` から当て直すと、
-#          `>` が n 個続く入力で当て始めが n 通りに増え、それぞれが行き先の語を読み直す。
+#        - 適用し始めは `>` の並び（`[>|&]` の続き）の頭だけ。並びの途中の `>` から適用し直すと、
+#          `>` が n 個続く入力で適用し始めが n 通りに増え、それぞれが行き先の語を読み直す。
 #          後読みはルールの regex で使えない（rules._UNSUPPORTED）ので、手前の 1 文字
-#          （`[>|&]` でない文字か文字列の頭）ごと当てる
+#          （`[>|&]` でない文字か文字列の頭）ごと適用する
 #        - 行き先の語は `>` `|` `&` で始めない。shellread は演算子のあとに必ず空白を置くので、
 #          語の頭にこの文字は来ない。並びと語が同じ文字を取り合うと、割り方が並びの長さの
 #          ぶんだけ増える
 #        - 語は「頭の 1 文字、目印も含めた途中、終わりの 1 文字」の形で書き、目印ごとに
-#          区切った繰り返しにしない。どちらも同じ語に当たるが、繰り返しの形は語の終わりを
+#          区切った繰り返しにしない。どちらも同じ語にヒットするが、繰り返しの形は語の終わりを
 #          探し直すたびに繰り返しの出入りを試すので、手数が倍ほどになる
 #   2. 名指ししたところを必ず書き換えるコマンド。`\x00` はコマンドの切れ目に
 #      shellread が置く目印で、`(^|\x00)` はコマンドの先頭を意味する。
@@ -60,14 +60,14 @@ from . import rules, selfguard_targets
 #     そのあとには後ろに回した選択肢（_COPY_OPTIONS）だけが続き、引数の並びの終わり
 #     （_COPY_STOP）に届く
 #
-# 実行前チェックはルールの regex で当てる（rules._build を通る、組み込みのルールの 1 本）。
+# 実行前チェックはルールの regex で適用する（rules._build を通る、組み込みのルールの 1 本）。
 # 語のリストを Python で解くと、ルールの外に判定の経路がもう 1 本できて、組み込みの既定
 # （builtin）と `--lint` の期待する判定（check_rules）から見えなくなる。shellread が語を空白で、
 # コマンドを `\x00` で、引用がつないだ空白を WORD_SEP で区切って渡すので、語の並びは
 # regex でも読める。2 つの枝は「または」で並ぶので、読み違えて両方を見る形は止まる側に倒れる。
 # 読み違えて両方を見落とす形が無いように、語の分け方を _COPY_TARGET と _COPY_LAST で揃える。
 _NOT_A_WORD = re.escape(shellread.SEP) + re.escape(shellread.WORD_SEP)
-# 1 のリダイレクトと行き先の語。手数の約束（当て始めと語の頭）はテストが形で確かめるので、
+# 1 のリダイレクトと行き先の語。手数の約束（適用し始めと語の頭）はテストが形で確かめるので、
 # 名前を分けてある。
 _REDIRECT = (
     rf"(?:^|[^>|&])[|&]*>[>|&]* ?"
@@ -75,7 +75,7 @@ _REDIRECT = (
 )
 # `sed` の枝は、最初の `-i`（その語の最初の `i` まで）で決め打ちする（`(?>...)`）。語の残りと
 # 2 つ目以降の `-i` は後ろの `[^\x00]*` が飲み込めるので、`where` を試せる位置は変わらず、
-# 当たる集合は変わらない（先読みは rules が受け付けないので使わない）。決め打ちしないと `-i` が
+# ヒットする集合は変わらない（先読みは rules が受け付けないので使わない）。決め打ちしないと `-i` が
 # 出るたびに末尾まで読み直し、長さの 2 乗で遅くなる（#241）。
 _VERB_WRITE = r"(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
 _SED_WRITE = r"(^|\x00)sed\b(?>[^\x00]*?[ \x01](-[A-Za-z]*?i|--i))[^\x00]*"
@@ -100,7 +100,7 @@ _COPY_NAME = r"(^|\x00)(cp|ln|install)\b"
 #   値を取らない文字だけの束（後ろに英字でない残りが付いてよい）、`-` だけ、`--t` 以外の長い名前
 #
 # _DIR_WORD と _NOT_DIR は重ならない。_VALUED の次の語が _DIR_WORD のときだけ組で読むので、
-# 語の並びの割り方は 1 通りに決まる。割り方が何通りもあると、当たらない長い並び
+# 語の並びの割り方は 1 通りに決まる。割り方が何通りもあると、ヒットしない長い並び
 # （`-S -S -S …`）で照合の手数が語の数に対して指数的に増え、判定の期限を使い切る。
 _FLAGS = r"[a-fh-lnp-su-zA-RT-Z]"
 _DIR_HEAD = rf"(?:-(?-i:{_FLAGS}*t)|--(?-i:t))"
@@ -116,12 +116,12 @@ _NOT_DIR = rf"(?:[^- \x00][^ \x00]*|{_DASH_NOT_DIR})?"
 
 # 行き先を前に出す書き方。値は同じ語に続けても（`-t.ccnavi`・`--target-directory=x`）、
 # 次の語にしても（`-t .ccnavi`）よい。値の前に来てよいのは空白を含まない並びだけ。
-# 値の後ろには元の引数が続くので、場所は書き込み用の表記（空白で閉じる）で当てる。
+# 値の後ろには元の引数が続くので、場所は書き込み用の表記（空白で閉じる）で適用する。
 _COPY_TARGET = rf"{_COPY_VERBS} (?:-(?-i:{_FLAGS}*t)|--(?-i:t)[a-z-]*)[= ]?[^ \x00]*"
 # 最後の引数の手前まで。`-t` を持たない語の並びと、最後の引数の前の空白。値を取る選択肢の
 # 値に出た `-t`（`-S -t`）は選択肢ではない。`--` のあとは選択肢を読まないので、何が来てもよい。
-# 空白までで止め、最後の引数の中は場所の表記（_COPY_PLACES など）が語の頭から当てる。
-# 場所の表記が語の途中から始められると、共通レイヤーの表記のように前の 1 文字から当てる形が
+# 空白までで止め、最後の引数の中は場所の表記（_COPY_PLACES など）が語の頭から適用する。
+# 場所の表記が語の途中から始められると、共通レイヤーの表記のように前の 1 文字から適用する形が
 # 空白をまたいで手前の語に戻り、`-t` を持つ並びまで最後の引数の側で読んでしまう。
 _COPY_LAST = (
     _COPY_NAME + rf"(?: (?:{_VALUED} {_DIR_WORD}|{_NOT_DIR}))*" + r"(?: --(?: [^ \x00]*)*)?" + " "
@@ -138,9 +138,9 @@ _IN_WORD = r"[^ \x00]*"
 # パスが通る。
 _TERM = rf"(?:[ {_NOT_A_WORD}]|$)"
 # 区切りが続く形と、そこで終わる形の両方。`.ccnavi/config/project/x` にも `.ccnavi` にも
-# 当たり、`.ccnavixyz` のような別名には当たらない。
+# ヒットし、`.ccnavixyz` のような別名にはヒットしない。
 _END = rf"(?:[\\/ {_NOT_A_WORD}]|$)"
-# 元と行き先がある cp / ln / install のための終わり。行き先（最後の引数）だけに当てるので、
+# 元と行き先がある cp / ln / install のための終わり。行き先（最後の引数）だけに適用するので、
 # 名前のあとに語の残りが続き、そのまま引数の並びの終わりに届く形に絞る。
 #
 # - _COPY_OPTIONS: 行き先のあとに回した選択肢。GNU は選択肢を引数の後ろにも置けるので
@@ -154,7 +154,7 @@ _END = rf"(?:[\\/ {_NOT_A_WORD}]|$)"
 # - _COPY_END: 区切りが続くか、そこで終わる。どちらも最後の引数
 #
 # 空白を語の終わりに数えないので、`cp .ccnavi /tmp/x` のように ccnavi ディレクトリから外へ
-# 写すだけの読みは通る。切れ目とリダイレクトまで含めるので、`cp /tmp/x .ccnavi && echo` や
+# コピーするだけの読みは通る。切れ目とリダイレクトまで含めるので、`cp /tmp/x .ccnavi && echo` や
 # `cp /tmp/x .ccnavi > /dev/null` のように後ろに何か続けた形も止まる。
 _COPY_OPTIONS = (
     rf"(?: (?:{_VALUED} (?:(?:[^- \x00][^ \x00]*)?|{_DIR_WORD})|{_DASH_NOT_DIR}))*(?: --)?"
@@ -165,7 +165,7 @@ _COPY_TAIL = r"[^ \x00]*" + _COPY_TERM
 _COPY_END = r"(?:[\\/]" + _COPY_TAIL + r"|" + _COPY_TERM + r")"
 
 # 行き先を、守るものが入っているディレクトリにした形（`cp /tmp/decisions.jsonl logs/`）。
-# 行き先の表記に守るファイルの名前が出ないので、上の場所の表記では当たらない。
+# 行き先の表記に守るファイルの名前が出ないので、上の場所の表記ではヒットしない。
 #
 # 止めるのは、元の側に「そこへ置くと守るものと同じ名前になる」語があるときだけ
 # （holder_regex）。行き先がディレクトリというだけで止めると、`cp /tmp/notes.txt logs/` のように
@@ -181,13 +181,14 @@ _COPY_END = r"(?:[\\/]" + _COPY_TAIL + r"|" + _COPY_TERM + r")"
 #   - 行き先をディレクトリと見ない選択肢（`-T` / `--no-target-directory`）。`cp -rT /tmp/d logs` は
 #     d の中身を logs の直下に置く
 #
-# 動詞には mv も入れる。mv は書き込みの側で名指ししたところに当てるが、行き先がディレクトリ
+# 動詞には mv も入れる。mv は書き込みの側で名指ししたところに適用するが、行き先がディレクトリ
 # だけの形は名指ししないので、ここで拾う。
 #
 # 語の並びの読み方は _COPY_LAST / _COPY_TARGET と同じ。元の語は並びのどこにあってもよいので、
-# 割り方は「どの語を元の語と見るか」の数だけある。当たらない長い並びで照合の手数がその数だけ
+# 割り方は「どの語を元の語と見るか」の数だけある。ヒットしない長い並びで照合の手数がその数だけ
 # 増えないように、最初に見つかった元の語で決め打ちする（`(?>...)`、後戻りしない括り）。
-# 後ろの語で当たるなら、前の語から読んでも同じ並びを通って当たるので、決め打ちで外す形は無い。
+# 後ろの語でヒットするなら、前の語から読んでも同じ並びを通ってヒットするので、
+# 決め打ちで外す形は無い。
 # 元の語の終わり（空白）も括りの中に入れる。入れないと `decisions.jsonl.bak` の頭だけで決め打ちし、
 # 後ろに並べた実際の名前を見落とす。
 _HOLD_NAME = r"(^|\x00)(cp|ln|install|mv)\b"
@@ -203,24 +204,25 @@ _DIR_TAIL = r"(?:[\\/]\.?)*"
 
 
 def under(directory: str) -> str:
-    """ディレクトリの表記を、語の頭からでも置き場の下からでも当たる行き先の形にする。
+    """ディレクトリの表記を、語の頭からでも置き場の下からでもヒットする行き先の形にする。
 
-    `logs` なら `logs`・`./logs`・`/abs/logs` に当たり、`mylogs` には当たらない。
+    `logs` なら `logs`・`./logs`・`/abs/logs` にヒットし、`mylogs` にはヒットしない。
     """
     return r"(?:[^ \x00]*[\\/])?" + directory
 
 
 def holder_regex(directory: str, names: str, *, named_only: bool = False) -> str:
-    """守るものが入っているディレクトリを行き先にした cp / ln / install / mv に当たる式。
+    """守るものが入っているディレクトリを行き先にした cp / ln / install / mv にヒットする式。
 
-    directory は行き先の語全体に当てる表記（under で組むか、`\\.` のように語そのもの）、
+    directory は行き先の語全体に適用する表記（under で組むか、`\\.` のように語そのもの）、
     names は守るものの名前（区切りを含まない）。元の側に names の語か、名前の決まらない語が
-    あるときだけ当たる（上の _HOLD_NAME の説明）。行き先は _COPY_LAST / _COPY_TARGET と同じく、
+    あるときだけヒットする（上の _HOLD_NAME の説明）。行き先は _COPY_LAST / _COPY_TARGET と同じく、
     `-t` の値か、選択肢でない最後の引数。
 
-    named_only を立てると、元の側に names の語があるときだけ当たる（名前の決まらない語と、
-    行き先をディレクトリと見ない選択肢には当たらない）。常に当たる土台（`.git` の 1 本）で使う。
-    土台は保護を切った設定でも当たるので、`cp ../src/*.py .` のような日常の写しを、守るものと
+    named_only を立てると、元の側に names の語があるときだけヒットする（名前の決まらない語と、
+    行き先をディレクトリと見ない選択肢にはヒットしない）。
+    常にヒットする土台（`.git` の 1 本）で使う。
+    土台は保護を切った設定でもヒットするので、`cp ../src/*.py .` のような日常のコピーを、守るものと
     関係の無い文面で止めないため。
     """
     source = rf"(?:{_HEAD}(?:{names})[\\/]*|{_UNKNOWN})"
@@ -243,16 +245,16 @@ def holder_regex(directory: str, names: str, *, named_only: bool = False) -> str
 
 
 def copy_destination_regex(last_place: str, target_place: str) -> str:
-    """cp / ln / install の行き先に当たる式。
+    """cp / ln / install の行き先にヒットする式。
 
-    last_place は最後の引数の語の頭から当てる表記（copy_last_place で組む）、target_place は
-    `-t` の値に当てる表記で、値の語の中のどこから当ててもよい。
+    last_place は最後の引数の語の頭から適用する表記（copy_last_place で組む）、target_place は
+    `-t` の値に適用する表記で、値の語の中のどこから適用してもよい。
     """
     return rf"{_COPY_LAST}{last_place}|{_COPY_TARGET}{target_place}"
 
 
 def copy_last_place(clause: str) -> str:
-    """場所の表記を、最後の引数の語として当てる形にする。名前がそこで終わる形も、下も当たる。"""
+    """場所の表記を、最後の引数の語として適用する形にする。名前がそこで終わる形も、下もヒットする。"""
     return _IN_WORD + clause + _COPY_END
 
 
@@ -264,14 +266,15 @@ def copy_last_place(clause: str) -> str:
 # `.claude` の側は、その下の名前を絞ってある（`worktrees/` は守る対象ではない）。
 # だから ccnavi ディレクトリと違って、名前がそこで終わる形は `_TERM` で閉じる。`_END` にすると
 # `.claude/` に続くパス全部が入り、ワークツリーの片付けまで止まる。区切り 1 つで終わる形
-# （`.claude/`）は `.claude` そのものなので当てる。当てないと `mv /tmp/settings.json .claude/` や
+# （`.claude/`）は `.claude` そのものなので適用する。
+# 適用しないと `mv /tmp/settings.json .claude/` や
 # `cp -t .claude/ /tmp/settings.json` のように、行き先をディレクトリにしただけで通る。
 # チケットの sh は `.ccnavi/scripts/` にあるので、`.claude` の側で守るのは hook と設定ファイルだけ。
 #
 # `logs/` は記録と state の置き場（`logs/decisions.jsonl` と `logs/state/`）。どちらも判定が読むので
 # 名前を絞って守る。ローテートした記録（`logs/decisions.<日時>.jsonl`、prune）も同じ形で守る。
 # 判定は読まないが、「記録が無い = 動かなかった」を読む元で、シェルから消せると自分の呼び出しの
-# 記録を消せる。消すのはセッションの開始と、端末から打つ `ccnavi user prune`
+# 記録を消せる。消すのはセッションの開始と、ターミナルから打つ `ccnavi user prune`
 # （内部は `--prune`）だけ。
 # `logs/` の下の git のラッパースクリプトの記録は、消しても判定に影響しないので守らない。
 _PLACES = (
@@ -295,8 +298,8 @@ _COPY_PLACES = (
 #
 # ROOT_NAMES はワークスペースルートの直下に置く、守るものを含む名前。`cp -r /tmp/.ccnavi .` は
 # ccnavi ディレクトリの全体を置き換える。行き先はルートを指す表記（`.` と、ルートの絶対パス）
-# だけで見る（_moved_holders がルートの表記と組む）。`.` は居場所がルートでなくても当たるが、
-# そこへ `.ccnavi` や `.claude` を写す用事は無い。
+# だけで見る（_moved_holders がルートの表記と組む）。`.` は居場所がルートでなくてもヒットするが、
+# そこへ `.ccnavi` や `.claude` をコピーする用事は無い。
 _HOLDERS = ((under(r"logs"), r"decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state|archive"),)
 ROOT_NAMES = (r"\.ccnavi", r"\.claude", r"logs")
 
@@ -321,11 +324,12 @@ def shell_write_regex(
 
     3 つに分けるのは、閉じ方が違うから。
 
-    - 書き込み用は空白で閉じる。同じパスを cp / ln / install に足すと、元の側に出ただけで当たる
+    - 書き込み用は空白で閉じる。同じパスを cp / ln / install に足すと、元の側に出ただけでヒットする
     - 最後の引数用は引数の列の終わりで閉じる（_COPY_END / _COPY_TERM）
     - `-t` の値は後ろに元の引数が続くので、書き込み用の閉じ方を使う。ただし値の 1 語の中で
-      当たるパスに限る。共通レイヤーの 3 本のパスは前の 1 文字（空白でもよい）から当てるので、
-      `-t /tmp/out <共通レイヤーの 1 本>` の元の側に当たってしまう。`-t` の値はディレクトリなので、
+      ヒットするパスに限る。共通レイヤーの 3 本のパスは前の 1 文字（空白でもよい）から適用するので、
+      `-t /tmp/out <共通レイヤーの 1 本>` の元の側にヒットしてしまう。
+      `-t` の値はディレクトリなので、
       ファイルを指す共通レイヤーのパスは `-t` の側には足さない。
       `-t <共通レイヤーの入っているディレクトリ>` は
       holders の側で、元の名前と組で止める
@@ -360,12 +364,12 @@ def _folded(clause: str) -> str:
     大文字小文字を区別しない機械では `.Ccnavi/scripts/count.sh` は
     `.ccnavi/scripts/count.sh` そのもので、消せば実際のファイルも消える。区別すると、表記を
     1 文字変えるだけで ccnavi ディレクトリの中が書ける。
-    区別する機械でも区別せずに当てる。ルールの glob とチケットの範囲はどの機械でも
+    区別する機械でも区別せずに適用する。ルールの glob とチケットの範囲はどの機械でも
     区別しないので、
-    保護だけが機械で当たり方を変えると、同じパスの扱いがルールと保護で食い違う。
+    保護だけが機械でヒットの仕方を変えると、同じパスの扱いがルールと保護で食い違う。
 
     ここで囲むのは場所のパスだけだが、組み込みの保護も `rules._build` を通るので、
-    式全体が `re.IGNORECASE` で当たる（regex も glob と同じく大文字小文字を区別しない）。
+    式全体が `re.IGNORECASE` でヒットする（regex も glob と同じく大文字小文字を区別しない）。
     コマンドの名前（`rm` / `cp`）も結果として区別されなくなる。`RM` が走る保証は無いので
     保護が増えるわけではないが、`deny` が広がる側なので、そのままにしてある。区別が要るルールは
     `(?-i:...)` で囲む。
@@ -374,16 +378,18 @@ def _folded(clause: str) -> str:
 
 
 def project_home_clause(project_home: str, *, copy: bool = False) -> str:
-    """ccnavi ディレクトリのパスを、シェルの書き込みに当てる形に直す。
+    """ccnavi ディレクトリのパスを、シェルの書き込みに適用する形に直す。
 
     ccnavi ディレクトリの下はすべて守る。レイヤーの設定 3 本も、配点が呼ぶスクリプトも、そこに入る。
     既定の名前（`.ccnavi`）は _PLACES が持っているので、ここが返すのは動かして
-    ある場合のパス。区切りはどちらの表記にも当て、名前がそこで終わる形（ccnavi ディレクトリごと
-    消す・退かす）にも当てる。
+    ある場合のパス。区切りはどちらの表記にも適用し、名前がそこで終わる形（ccnavi ディレクトリごと
+    消す・退かす）にも適用する。
 
-    copy を立てると、cp / ln / install の行き先（最後の引数）にだけ当てる形を返す。最後の引数の
-    語の頭から当て（_IN_WORD）、既定の名前の写す側（_COPY_PLACES）と同じ `_COPY_END` で閉じるので、
-    `cp <ccnavi ディレクトリ>/config/project/rules.yml /tmp/x` のように外へ写すだけの読みは通り、
+    copy を立てると、cp / ln / install の行き先（最後の引数）にだけ適用する形を返す。最後の引数の
+    語の頭から適用し（_IN_WORD）、
+    既定の名前のコピーする側（_COPY_PLACES）と同じ `_COPY_END` で閉じるので、
+    `cp <ccnavi ディレクトリ>/config/project/rules.yml /tmp/x` のように
+    外へコピーするだけの読みは通り、
     行き先が ccnavi ディレクトリそのものかその下なら止まる。
     """
     parts = [re.escape(p) for p in _home_name(project_home).split("/") if p]
@@ -409,33 +415,33 @@ def _home_name(project_home: str) -> str:
 
 
 def binary_clause(bin_path: str, *, copy: bool = False) -> str:
-    """実行ファイルのパスを、当てる形に直す。
+    """実行ファイルのパスを、適用する形に直す。
 
-    末尾の 2 要素だけを使う（PATH の実体だけは 3 要素。`bin/ccnavi` では別の道具に当たりすぎる）。
-    絶対で書かれても相対で書かれても同じ形に当たり、
+    末尾の 2 要素だけを使う（PATH の実体だけは 3 要素。`bin/ccnavi` では別の道具にヒットしすぎる）。
+    絶対で書かれても相対で書かれても同じ形にヒットし、
     ファイル名だけに絞ると、同じ名前の無関係なファイルまで拾う。
-    区切りはどちらの表記にも当てる。ルールは 1 回書いてどの機械でも同じ意味で
+    区切りはどちらの表記にも適用する。ルールは 1 回書いてどの機械でも同じ意味で
     なければならない、という globmatch と同じ約束をここでも守る。
 
     指す先は振り分けの sh で、hook が実際に走らせるのは実体のほう（platformtag）。
-    sh だけを守ると、実体を差し替えれば判定が入れ替わるので、組み立ての置き場にも当てる。
+    sh だけを守ると、実体を差し替えれば判定が入れ替わるので、組み立ての置き場にも適用する。
     どこを置き場と読むかは sh の名前だけで決め、platformtag.launched_executable と揃える。
     段の数など別の条件を足すと、守る場所とバックアップする場所が食い違う。
 
     - 名前が LAUNCHER_NAME なら、sh の末尾 2 要素（`scripts/ccnavi-launcher.sh`）と、
       その 1 つ上の親の下の `bin/<os>-<arch>/`。sh の隣の `<os>-<arch>/` は sh が探さない
-      ので当てない。親が無い浅いパスでは `bin/<os>-<arch>/` を親を問わずに当てる。判定に
+      ので適用しない。親が無い浅いパスでは `bin/<os>-<arch>/` を親を問わずに適用する。判定に
       渡るパスは絶対パスなので、名指しのツールはそれでも止まる
-    - それ以外の名前は実行ファイルそのもの。末尾 2 要素だけに当てる
+    - それ以外の名前は実行ファイルそのもの。末尾 2 要素だけに適用する
 
     既定の置き場（`.ccnavi/`）は ccnavi ディレクトリを守るルールでも止まるが、ccnavi
     ディレクトリを動かしたときや、既定でないパスを指したときはここでしか止まらない。
 
-    copy を立てると、cp / ln / install の行き先（最後の引数）にだけ当てる形を返す。最後の引数の
-    語の頭から当て（_IN_WORD）、名前の後ろは引数の残り（_COPY_TAIL）で閉じ、組み立ての置き場の
+    copy を立てると、cp / ln / install の行き先（最後の引数）にだけ適用する形を返す。最後の引数の
+    語の頭から適用し（_IN_WORD）、名前の後ろは引数の残り（_COPY_TAIL）で閉じ、組み立ての置き場の
     下も空白をまたがない。
     書き込み用の形は終わりを決めないので、`(?:[\\/][^\x00]*)?` が空白をまたいで
-    `cp <置き場>/bin/<os>-<arch>/ccnavi /tmp/x` のような外へコピーするだけの読みにも当たる。
+    `cp <置き場>/bin/<os>-<arch>/ccnavi /tmp/x` のような外へコピーするだけの読みにもヒットする。
     名指しのツール（BINARY_RULE_ID）は書き込み用の形に `$` を足して使う。
     """
     if not bin_path:
@@ -446,8 +452,8 @@ def binary_clause(bin_path: str, *, copy: bool = False) -> str:
     if parts[-1] == platformtag.LAUNCHER_NAME:
         sh = r"[\\/]".join(re.escape(p) for p in parts[-2:])
         home = re.escape(parts[-3]) + r"[\\/]" if len(parts) >= 3 else ""
-        # PATH の ccnavi（bin/ に実体が無いとき sh が起動するもの）。末尾 3 要素で当てる。
-        # 2 要素（`bin/ccnavi`）だと別のプロジェクトの `./bin/ccnavi` にまで当たる。
+        # PATH の ccnavi（bin/ に実体が無いとき sh が起動するもの）。末尾 3 要素で適用する。
+        # 2 要素（`bin/ccnavi`）だと別のプロジェクトの `./bin/ccnavi` にまでヒットする。
         spellings = _path_spellings(bin_path)
         on_path = "".join(f"|{p}" for p in spellings)
         on_path_copy = "".join(f"|{p}{_COPY_TAIL}" for p in spellings)
@@ -460,7 +466,7 @@ def binary_clause(bin_path: str, *, copy: bool = False) -> str:
 
 
 def _path_spellings(launcher: str = "") -> list[str]:
-    """PATH の ccnavi を当てる形（末尾 3 要素）。書かれたパスと、リンクを解いた先の両方。
+    """PATH の ccnavi を適用する形（末尾 3 要素）。書かれたパスと、リンクを解いた先の両方。
 
     置き場のディレクトリ（`~/.local/bin` 全体）は守らない。無関係な道具を入れる操作まで止まる。
     PATH に無ければ空。
@@ -473,8 +479,8 @@ def _path_spellings(launcher: str = "") -> list[str]:
         every = [p for p in re.split(r"[\\/]", path) if p and p not in (".", "..")]
         spelled = r"[\\/]".join(re.escape(p) for p in every[-3:])
         if len(every) <= 3:
-            # 浅い実体（`/bin/ccnavi`）は、区切りで始まる形だけに当てる。
-            # 付けないと、別のプロジェクトの `./bin/ccnavi` にも当たる。
+            # 浅い実体（`/bin/ccnavi`）は、区切りで始まる形だけに適用する。
+            # 付けないと、別のプロジェクトの `./bin/ccnavi` にもヒットする。
             spelled = r"(?<![\w.~-])[\\/]" + spelled
         if every and spelled not in found:
             found.append(spelled)
@@ -505,10 +511,10 @@ def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
 # 機械ごとの組み立ての置き場。`bin/` の下に並ぶ。
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
-# 守る場所を写して直すための下書きの置き場（.ccnavi/docs/scratchpad.md）。
+# 守る場所をコピーして直すための下書きの置き場（.ccnavi/docs/scratchpad.md）。
 # ワークスペースルートからの相対。
 HANDOFF = ("wip", "handoff")
-# 行き先の下書きの置き場へ写すときに通すコマンド。`ln` は外す。置き場にリンクを作れると、
+# 行き先の下書きの置き場へコピーするときに通すコマンド。`ln` は外す。置き場にリンクを作れると、
 # 次の 1 本でリンクの先（守る場所）へ書ける。
 _HANDOFF_COPIERS = ("cp", "install")
 # 1 語の中にあると、行き先を表記どおりに読めない文字。変数・置換・グロブ・ブレース・引用・
@@ -519,13 +525,14 @@ _HANDOFF_UNREAD = set("$`*?[]{}()<>|;&'\"\n~") | {shellread.SEP, shellread.WORD_
 # `-` で始まる語が 1 つでもあれば例外にしない。止めるものを並べる形にすると、GNU の長い選択肢の
 # 省略（`--target` は `--target-directory`、`--sym` は `--symbolic-link`）や知らない選択肢に負ける。
 # `-t` は行き先を最後の語から動かし、`-s` `-l` はリンクを作り、`-P` `-d` `-a` `-r` はリンクを
-# リンクのまま写す。どれも許す側に入れない。
+# リンクのままコピーする。どれも許す側に入れない。
 _HANDOFF_SHORT_ALLOWED = set("fpvnu")
 
 
 def _handoff_place(root: str) -> re.Pattern[str]:
     """ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`、その中の
-    ワークツリー）の直下の `wip/handoff/` の下に当たる式。当てる先は fold して `/` 区切りにした
+    ワークツリー）の直下の `wip/handoff/` の下にヒットする式。
+    適用する先は fold して `/` 区切りにした
     絶対パス。"""
     base = pathcase.fold(os.path.realpath(root)).replace("\\", "/")
     return re.compile(
@@ -555,9 +562,9 @@ def _handoff_linked(subject: str, spelled: str) -> bool:
 def handoff_write_exempt(root: str) -> Callable[[str], str] | None:
     """名指しのツール（Write / Edit）の保護から、下書きの置き場（`wip/handoff/`）の中を外す関数。
 
-    守る場所のファイルを直すときは、置き場へ写して写しを直す（.ccnavi/docs/scratchpad.md）。
-    写しは守る場所と同じ相対パス（`wip/handoff/.ccnavi/scripts/x.sh` など）に置くので、
-    パスに `.ccnavi/` や `.claude/` が入っていて、守る場所の式に当たる。写しにはルールとしての
+    守る場所のファイルを直すときは、置き場へコピーしてコピーを直す（.ccnavi/docs/scratchpad.md）。
+    コピーは守る場所と同じ相対パス（`wip/handoff/.ccnavi/scripts/x.sh` など）に置くので、
+    パスに `.ccnavi/` や `.claude/` が入っていて、守る場所の式にヒットする。コピーにはルールとしての
     効力が無く、ユーザが取り込むまで何も変わらないので、書けるようにする。
 
     外すのは、次をすべて満たすときだけ。1 つでも外れれば対象をそのまま返す。
@@ -588,12 +595,12 @@ def handoff_link_target(root: str) -> Callable[[str], str] | None:
     """名指しのツールで、置き場（`wip/handoff/`）の中のリンク・ハードリンクに書く形だけを残す関数。
 
     名指しのツールの保護のうち、`except` の式で置き場の中を外すものは、式がファイルを見ないので、
-    守る場所とハードリンクでつながった写しへの書き込みも外れる（`rules.yml` に利用者が書く
+    守る場所とハードリンクでつながったコピーへの書き込みも外れる（`rules.yml` に利用者が書く
     ルールの `except` がこれにあたる）。組み込みの 4 本（`add_named_rules`）は
-    `handoff_write_exempt` でつながった写しを外さないが、利用者のルールには効かない。
+    `handoff_write_exempt` でつながったコピーを外さないが、利用者のルールには効かない。
     組み込みの 1 本（HANDOFF_LINK_RULE_ID）が
-    この関数で、置き場の中のつながった対象だけを残して止める。つながっていない写しと、置き場の外は
-    空を返す（当てない）。
+    この関数で、置き場の中のつながった対象だけを残して止める。つながっていないコピーと、置き場の外は
+    空を返す（適用しない）。
     """
     if not root:
         return None
@@ -652,7 +659,7 @@ def handoff_link_command(root: str, cwd: str = "") -> Callable[[str], str] | Non
     """シェルで、置き場（`wip/handoff/`）の中にリンクを作る形だけを残す関数。
 
     置き場に守る場所へのリンク（シンボリックリンクもハードリンクも）を置くと、次の 1 本で
-    リンクの先へ書ける（写しの例外は名指しのツールのパスで決めるため）。`ln`・`link`・リンクを
+    リンクの先へ書ける（コピーの例外は名指しのツールのパスで決めるため）。`ln`・`link`・リンクを
     作る `cp` があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中なら残す
     （止める）。行き先は変数や `cd` で組み立てられるので、読み分けず止める側に倒す。
     """
@@ -674,11 +681,11 @@ def handoff_link_command(root: str, cwd: str = "") -> Callable[[str], str] | Non
 
 
 def handoff_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None:
-    """シェルから書き込む形の保護から、下書きの置き場（`wip/handoff/`）へ写す cp を外す関数。
+    """シェルから書き込む形の保護から、下書きの置き場（`wip/handoff/`）へコピーする cp を外す関数。
 
-    守る場所のファイルを直したいときは、置き場へ写して写しを直す（.ccnavi/docs/scratchpad.md）。
-    保護の式は行き先の最後の語に守る名前があれば当たるので、`cp .ccnavi/scripts/ccnavi-git.sh
-    wip/handoff/ccnavi-git.sh` のように同じ名前で写すと止まる。その 1 本を通す。
+    守る場所のファイルを直したいときは、置き場へコピーしてコピーを直す（.ccnavi/docs/scratchpad.md）。
+    保護の式は行き先の最後の語に守る名前があればヒットするので、`cp .ccnavi/scripts/ccnavi-git.sh
+    wip/handoff/ccnavi-git.sh` のように同じ名前でコピーすると止まる。その 1 本を通す。
 
     式の中では決めない。式は先読みを使えず（rules._UNSUPPORTED）、使えたとしても `.*` の先読みは
     後ろに続く別のコマンドの表記で外れる。ここでは行き先を実際のパスに解き、置き場の中に
@@ -698,7 +705,7 @@ def handoff_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None
         return None
     spelled = os.path.join(os.path.realpath(root), *HANDOFF)
     # 置き場（`wip/` か `wip/handoff/`）そのものがリンクなら、例外を使わない。リンクの先が
-    # 守る場所なら、置き場の中へ写すことが守る場所へ書くことになる。
+    # 守る場所なら、置き場の中へコピーすることが守る場所へ書くことになる。
     if os.path.realpath(spelled) != spelled:
         return None
     pad = pathcase.fold(spelled)
@@ -829,7 +836,7 @@ def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:
 
 
 def common_shell_clause(root: str, path: str, *, copy: bool = False) -> str:
-    """共通レイヤーの 1 本を、シェルの書き込みに当てる形に直す。
+    """共通レイヤーの 1 本を、シェルの書き込みに適用する形に直す。
 
     既定の置き場（`.ccnavi/config/common/`）は _PLACES が持っているが、`--rules` / `--phases` /
     `--risk` のフラグは任意の場所を指せる。そこを名前で拾えないと、共通レイヤーを動かした
@@ -840,17 +847,17 @@ def common_shell_clause(root: str, path: str, *, copy: bool = False) -> str:
     env（`CCNAVI_RULES` など）は使われず、置き場を指せるのは診断のためのフラグだけ。
     置き場が完全には固定されていないので、この節も残す。
 
-    ワークスペースルートの下ならその相対、外なら書かれたパスと行き着く先の両方で当てる。
+    ワークスペースルートの下ならその相対、外なら書かれたパスと行き着く先の両方で適用する。
     パスの前には名前の途中でないことを求める。`rules.yml` を直下に置いたワークスペースで、
     `myrules.yml` への書き込みまで止めないため。ルールの regex は後読みを受けない
-    （rules._UNSUPPORTED）ので、前の 1 文字も含めて当てる形で書く。行き先の前には必ず 1 文字ある。
+    （rules._UNSUPPORTED）ので、前の 1 文字も含めて適用する形で書く。行き先の前には必ず 1 文字ある。
     shellread がリダイレクトを `> 行き先` にそろえ、コマンドの語は空白で区切られている。
 
-    copy を立てると、cp / ln / install の行き先（最後の引数）にだけ当てる形を返す。
+    copy を立てると、cp / ln / install の行き先（最後の引数）にだけ適用する形を返す。
     `_COPY_TERM` で閉じるので、`cp <共通レイヤーの 1 本> /tmp/x` のように元の側に出ただけの
     読みは通る。前の 1 文字は最後の引数の語の中に限る。語の頭なら前の文字は要らない
     （_COPY_LAST が手前の空白まで読んである）。前の 1 文字に空白を許すと、手前の語に戻って
-    当たる。`-t` の値（ディレクトリ）には足さない（shell_write_regex）。
+    ヒットする。`-t` の値（ディレクトリ）には足さない（shell_write_regex）。
     """
     if not path:
         return ""
@@ -866,10 +873,10 @@ def common_shell_clause(root: str, path: str, *, copy: bool = False) -> str:
 
 
 def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
-    """共通レイヤーの 3 本を、名指しのツールに当てる形に直す。
+    """共通レイヤーの 3 本を、名指しのツールに適用する形に直す。
 
-    当てる先は解決済みの絶対パス。ワークスペースルートの下に在るなら、ワークスペースと、
-    そこから切ったワークツリー（`.claude/worktrees/<名前>/`）の同じ相対に当てる。ワークツリー側の
+    適用する先は解決済みの絶対パス。ワークスペースルートの下に在るなら、ワークスペースと、
+    そこから切ったワークツリー（`.claude/worktrees/<名前>/`）の同じ相対に適用する。ワークツリー側の
     設定は統合で統合先の設定になる経路がある。ワークスペースルートより上で閉じないと、
     同じ名前のファイル（`tests/fixtures/rules.yml` など）まで止まる。
     """
@@ -892,18 +899,18 @@ def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
 
 
 # 記録と state の置き場の既定のパス（`_PLACES` の `logs/` の節と同じ場所）を、名指しのツールに
-# 当てる形。当てる先は解決済みの絶対パスなので、末尾で閉じる。
+# 適用する形。適用する先は解決済みの絶対パスなので、末尾で閉じる。
 _RECORDS_PLACES = r"[\\/]logs[\\/](?:decisions(?:\.[^\\/]*)?\.jsonl$|(?:state|archive)(?:[\\/]|$))"
 
 
 def records_regex(log_path: str = "", state_dir: str = "") -> str:
-    """記録と state の置き場を、名指しのツールに当てる形。
+    """記録と state の置き場を、名指しのツールに適用する形。
 
     シェルの書き込みの側（`_PLACES`）と同じ `logs/decisions*.jsonl` と `logs/state/` のパスに
     加えて、診断のフラグで動かした置き場（`--log` / `--state`）にも
-    当てる。
+    適用する。
     記録はいま書いている 1 本と、同じディレクトリのローテートした分（`<名前>.<日時><拡張子>`）。
-    書かれたパスと行き着く先の両方で当てる。
+    書かれたパスと行き着く先の両方で適用する。
     """
     alternatives = [_RECORDS_PLACES]
     if log_path:
@@ -926,13 +933,13 @@ def records_regex(log_path: str = "", state_dir: str = "") -> str:
 
 
 # git の管理ディレクトリ（`.git/` とその中身、ワークツリーの `.git` ファイル）を、名指しのツールに
-# 当てる形。当てる先は解決済みの絶対パスなので、前は区切りで閉じる。`.gitignore` や `.github/`
-# のように `.git` の後ろに名前が続くものには当たらない。
+# 適用する形。適用する先は解決済みの絶対パスなので、前は区切りで閉じる。`.gitignore` や `.github/`
+# のように `.git` の後ろに名前が続くものにはヒットしない。
 # 名前の後ろの `.` と空白は、Windows が名前を開くときに落とす（`.git.` も `.git ` も `.git`）。
 GIT_DIR_PATH_REGEX = r"[\\/]\.git[. ]*(?:[\\/]|$)"
 
 # シェルの側で `.git` の前に来てよいのは、語の頭（空白）、引用がつないだ空白、パスの区切り、
-# `--opt=` の `=`。`repo.git/` や URL の中の `.git` には当たらない。
+# `--opt=` の `=`。`repo.git/` や URL の中の `.git` にはヒットしない。
 # 名前の後ろの `.` は名指しのツールと同じ理由で飛ばす。空白は引用がつないだ空白（_END）で閉じる。
 _GIT_DIR_NAME = r"\.git\.*" + _END
 # 語の中で `.git` の手前に来てよい前置き。区切りで終わる並びに限る。
@@ -949,7 +956,7 @@ _GIT_DD_WRITE = r"(^|\x00)dd\b[^\x00]*[ \x01]of=(?:[^ \x00]*[\\/])?"
 # 前（`sed -i s/a/b/ f`）にも後ろ（`sed -e s/a/b/ -i f`）にも置ける。`-e` で式を渡すと式の語は
 # `-e` の値になり、最初の選択肢でない語は式そのものかファイルになる。どちらでも後ろの語は
 # 書き先なので、止める側に倒れるだけ（`sed -i -e s/a/b/ -e s/c/.git/ f` は止まる）。
-# 前置きと選択肢の並びは `(?>...)` で決め打ちし、当たらない長い並びで読み直さない。
+# 前置きと選択肢の並びは `(?>...)` で決め打ちし、ヒットしない長い並びで読み直さない。
 _SED_SCRIPT = r"(?>(?: -[^ \x00]*)* [^- \x00][^ \x00]*)"
 _SED_IN_PLACE = r"[ \x01](?:-[A-Za-z]*?i|--i)"
 _GIT_SED_FILE = r"[^\x00]*?[ \x01]" + _GIT_DIR_PREFIX + _GIT_DIR_NAME
@@ -962,9 +969,9 @@ _GIT_SED_WRITE = (
 )
 # 開始点に `.git`（とその下）を置き、消す・コマンドを走らせる述語を持つ `find`。開始点は
 # 選択肢（`-H` `-L` `-P`）のあとの、`-` `!` `(` で始まらない語の並び。`find . -path ./.git
-# -prune -o … -delete` の `./.git` は述語の値なので当たらない。最初の `.git` の開始点で
+# -prune -o … -delete` の `./.git` は述語の値なのでヒットしない。最初の `.git` の開始点で
 # 決め打ちする。それより後ろの述語の並びは、最初のものの後ろに含まれる。
-# `-exec` を持つ形は読み切れない形（command-taken-as-code）になり、生の文字列で当てるので、
+# `-exec` を持つ形は読み切れない形（command-taken-as-code）になり、生の文字列で適用するので、
 # 切れ目は生の `|` `;` `&` 改行も数え、`.git` の前後の引用符も許す。
 _GIT_FIND_WRITE = (
     r"(?:^|[\x00|;&\n]) *find(?: -[HLP])*"
@@ -972,7 +979,7 @@ _GIT_FIND_WRITE = (
     r"(?:[^\x00]*[ \x01])?(?:-delete|-exec|-execdir|-ok|-okdir)\b"
 )
 # 前のコマンドが `.git` を名指しし、その出力を `xargs` が書き込む動詞に渡す形。`xargs` を含む
-# コマンドは読み切れない形（shellread の command-taken-as-code）になり、生の文字列で当てるので、
+# コマンドは読み切れない形（shellread の command-taken-as-code）になり、生の文字列で適用するので、
 # 切れ目は `\x00` のほかに生の `|` `;` 改行も数え、`.git` の前後には引用符も数える。
 # コマンドの頭から最初の `.git` で決め打ちし、`.git` の数だけ尾を読み直さない。
 _GIT_XARGS_WRITE = (
@@ -991,7 +998,7 @@ def git_dir_shell_regex() -> str:
     外した `.git` 用の形で読み、`find` の開始点と `xargs` に渡す前のコマンドも見る。
     場所の名前が出ただけでは止めない。`cat .git/config` も
     `cp .git/config /tmp/x` も読むだけなので通る。git のラッパー（`ccnavi-git.sh`）の中で行う
-    `.git` への書き込みは、外側のコマンド文字列に `.git` が出ないので当たらない。
+    `.git` への書き込みは、外側のコマンド文字列に `.git` が出ないのでヒットしない。
 
     守る場所の表記と違い、`.git` の前に区切りを求める。`.git` は URL や
     裸のリポジトリの名前（`repo.git`）にも出るので、前を閉じないと `sed -i` の置換式まで止まる。
@@ -999,7 +1006,7 @@ def git_dir_shell_regex() -> str:
     前置きを何でも食うので、ここでは使わない）。`-t` の値は `_COPY_TARGET` が値の頭を食うので
     前を閉じられない。止める側に倒れるだけなので、そのままにする。
 
-    いま居る場所（`.`）へ `.git` を写す形（`cp -r /tmp/x/.git .`）は holder_regex で止める。
+    いま居る場所（`.`）へ `.git` をコピーする形（`cp -r /tmp/x/.git .`）は holder_regex で止める。
     元の名前が決まらない語（`cp ../src/*.py .`）は数えない（named_only）。
     """
     # 前置きは `>` をまたがない。読みはリダイレクトを `> 行き先` にそろえるので、行き先の語に `>` は
@@ -1022,15 +1029,15 @@ def git_dir_shell_regex() -> str:
 
 
 def _spelled(path: str) -> str:
-    """パスを、区切りをどちらの表記でも当てる形にする。"""
+    """パスを、区切りをどちらの表記でも適用する形にする。"""
     return r"[\\/]".join(re.escape(part) for part in re.split(r"[\\/]", path))
 
 
 # 足すルールの id。どれも rules.RESERVED_ID_PREFIX で始まり、ルールファイルからは
-# 書けない。同じ名前のルールと重なることが無いので、当たった id を名指しされたユーザは
+# 書けない。同じ名前のルールと重なることが無いので、ヒットした id を名指しされたユーザは
 # 組み込みのルールだと分かる。
 SHELL_RULE_ID = "builtin:guard-setting-files"
-# シェルから書き込む形の 1 本を当てるツール（`add_rules`）。
+# シェルから書き込む形の 1 本を適用するツール（`add_rules`）。
 SHELL_MATCH = "Bash"
 
 SHELL_MESSAGE = (
@@ -1042,10 +1049,10 @@ SHELL_MESSAGE = (
 )
 
 # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に、シェルから書き込む形の保護を
-# 当ててよい `>` の個数の上限。
+# 適用してよい `>` の個数の上限。
 #
-# 生の文字列にはリダイレクトの目印が無いので、_WRITE_VERBS の `>` は引用の中の `>` にも当たり、
-# 当たるたびにその後ろの空白の無い語を読む。手数は `>` の個数 × 語の長さで、`>` を並べるほど
+# 生の文字列にはリダイレクトの目印が無いので、_WRITE_VERBS の `>` は引用の中の `>` にもヒットし、
+# ヒットするたびにその後ろの空白の無い語を読む。手数は `>` の個数 × 語の長さで、`>` を並べるほど
 # 長さの 2 乗に近づく（`echo "` + `>a` を 4000 個で、この 1 本が約 2.7 秒、チケットの置き場を守る
 # 1 本と合わせて 3 秒を超える）。上限の下では `>` 50 個 × 尾の長さの線形に収まる（`>a` 49 個の
 # 後ろに空白の無い尾を続けて、2 本の照合が 100KB で約 0.5 秒、400KB で約 1.8 秒）。判定の期限は
@@ -1057,9 +1064,9 @@ SHELL_MESSAGE = (
 # 超えたら照合を飛ばし、権限モードに依らず拒否にする（judge.decide_before）。期限を超えた
 # block と同じく止める側に置いたまま、理由と書き直し方を付けて返すためのもの。確認には回さない。
 # 確認に回すと、確認に答える者が居ないモードでは誰も答えないまま通り、居るモードでも保護を
-# 当てていない呼び出しの判断をユーザに預けることになる。数えるのは `>` の文字数で、`>>` も
+# 適用していない呼び出しの判断をユーザに預けることになる。数えるのは `>` の文字数で、`>>` も
 # `2>&1` も単純に足す。読み解けた形には掛けない。シェルの読みがリダイレクトを `> 行き先` に
-# そろえてあり、引用の中の `>` に当たらないので、この遅さは出ない。
+# そろえてあり、引用の中の `>` にヒットしないので、この遅さは出ない。
 REDIRECT_LIMIT = 50
 
 # 生の文字列の長さの上限。`>` が 1 個でもあれば、その後ろの空白の無い尾を読むので、`>` を上限の
@@ -1083,8 +1090,8 @@ def too_many_redirects(subject: str) -> bool:
 
 
 # 実行ファイルを名指しのツールから守るルールの id。Bash 側とは別に持つ。
-# 当てる先が違う（あちらはコマンド文字列、こちらはパス）ので、1 件にまとめると
-# どちらの読みで当たったのかが報告から消える。
+# 適用する先が違う（あちらはコマンド文字列、こちらはパス）ので、1 件にまとめると
+# どちらの読みでヒットしたのかが報告から消える。
 BINARY_RULE_ID = "builtin:guard-binary"
 
 BINARY_MESSAGE = (
@@ -1119,7 +1126,7 @@ HANDOFF_LINK_RULE_ID = "builtin:guard-handoff-links"
 HANDOFF_LINK_MESSAGE = (
     "下書きの置き場（wip/handoff/）の中の、リンクかハードリンクでほかの場所とつながったファイルです。"
     "書くとつながった先（守る場所のことがあります）も書き換わるので、止めました。"
-    "写しは ccnavi-stage.sh <パス> で作り直してください（中身を写すので、つながりません）。"
+    "コピーは ccnavi-stage.sh <パス> で作り直してください（中身をコピーするので、つながりません）。"
 )
 
 HANDOFF_LN_RULE_ID = "builtin:guard-handoff-ln"
@@ -1127,7 +1134,7 @@ HANDOFF_LN_RULE_ID = "builtin:guard-handoff-ln"
 HANDOFF_LN_MESSAGE = (
     "下書きの置き場（wip/handoff/）にリンクを作る形です。置き場の中のリンクは、守る場所への"
     "書き込みの入口になるので、エージェントは作りません。守る場所を直すときは"
-    " ccnavi-stage.sh <パス> で中身を写し、写しを Write / Edit で直してください。"
+    " ccnavi-stage.sh <パス> で中身をコピーし、コピーを Write / Edit で直してください。"
 )
 
 PROJECT_HOME_MESSAGE = (
@@ -1175,21 +1182,21 @@ def add_rules(
     ルールファイルに書けないので、同じ id の重なりは起きない（書けるとどうなるかは
     RESERVED_ID_PREFIX の側に書いてある）。
 
-    `tool` は判定するツール名。渡せば、シェルから書き込む形の 1 本は、その名前に当たる
+    `tool` は判定するツール名。渡せば、シェルから書き込む形の 1 本は、その名前にヒットする
     ときだけ組み立てる。式は大きく（守る先のパスを全部並べる）、組み立てとコンパイルが
-    判定 1 回の時間の多くを占める。`match: Bash` に当たらないツールでは
+    判定 1 回の時間の多くを占める。`match: Bash` にヒットしないツールでは
     `rules.Rule.matches` が式を見ずに外すので、足さなくても判定は同じになる。
-    当たるかどうかは `rules.tool_matches` で決め、`Rule.matches` と同じ答えを引く。
+    ヒットするかどうかは `rules.tool_matches` で決め、`Rule.matches` と同じ答えを引く。
     None なら（ツールを決めずに並べる呼び手）これまでどおり足す。
 
     処理フロー:
-    1. シェルから書き込む形（`guard_shell_regex`）を、`tool` が当たるときだけ足す
+    1. シェルから書き込む形（`guard_shell_regex`）を、`tool` がヒットするときだけ足す
     2. 実行ファイルの書き込み（`binary_clause`）があれば足す
     3. ccnavi ディレクトリの下（`project_home_glob`）を足す
     4. `root` があれば、下書きの置き場へのリンク（名指しのツール・シェルの 2 本）を足す
     5. 記録の置き場（`records_regex`）と、共通レイヤーの 3 ファイルを 1 本の式にして足す
        （`common_layer_regex`）
-    各 `_insert` は判定の先頭に挿すので、後に足したものほど先に当たる。
+    各 `_insert` は判定の先頭に挿すので、後に足したものほど先にヒットする。
     """
     if tool is None or rules.tool_matches(SHELL_MATCH, tool):
         _insert(
@@ -1210,7 +1217,7 @@ def add_rules(
             {
                 "id": BINARY_RULE_ID,
                 "match": "Write|Edit|NotebookEdit",
-                # 当てる先は解決済みの絶対パスなので、末尾で閉じる。
+                # 適用する先は解決済みの絶対パスなので、末尾で閉じる。
                 "regex": clause + "$",
                 "message": BINARY_MESSAGE,
             },
@@ -1224,9 +1231,9 @@ def add_rules(
                 "id": PROJECT_HOME_RULE_ID,
                 "match": "Write|Edit|NotebookEdit",
                 # ccnavi ディレクトリの下はすべて守る。レイヤーの設定 3 本だけを名指しすると、
-                # 配点が呼ぶスクリプトが外れる。当てる先は解決済みの絶対パスなので、
+                # 配点が呼ぶスクリプトが外れる。適用する先は解決済みの絶対パスなので、
                 # どの ccnavi ディレクトリ（ワークスペース、プロジェクト、ワークツリー）にも
-                # 同じ 1 本が当たる。
+                # 同じ 1 本がヒットする。
                 "glob": home_glob,
                 "message": PROJECT_HOME_MESSAGE,
             },
@@ -1239,14 +1246,14 @@ def add_rules(
             {
                 "id": HANDOFF_LINK_RULE_ID,
                 "match": "Write|Edit|NotebookEdit",
-                # 当てる対象は関数が決める（置き場の中のつながった対象だけが残る）。
+                # 適用する対象は関数が決める（置き場の中のつながった対象だけが残る）。
                 "regex": ".",
                 "message": HANDOFF_LINK_MESSAGE,
             },
             root,
             exempt=handoff_link_target(root),
         )
-        # 式は 1 文字で組み立てが軽いので、ツールに依らず足す（当てる対象は関数が決める）。
+        # 式は 1 文字で組み立てが軽いので、ツールに依らず足す（適用する対象は関数が決める）。
         _insert(
             rule_set,
             {
@@ -1270,7 +1277,7 @@ def add_rules(
     )
     common = common_layer_regex(root, common_files)
     if common:
-        # 先頭に挿すので、後に足したこちらが ccnavi ディレクトリの 1 本より先に当たる。
+        # 先頭に挿すので、後に足したこちらが ccnavi ディレクトリの 1 本より先にヒットする。
         _insert(
             rule_set,
             {
@@ -1297,11 +1304,12 @@ def _stage_hint(root: str) -> str:
     """守る場所を直すときの案内の一文。ワークスペースの `ccnavi-stage.sh` を指す。"""
     if not root:
         return (
-            "wip/handoff/ に写しを置き、ユーザに ccnavi user handoff での取り込みを頼んでください。"
+            "wip/handoff/ にコピーを置き、"
+            "ユーザに ccnavi user handoff での取り込みを頼んでください。"
         )
     stage = settings.script_command(root, "ccnavi-stage.sh")
     return (
-        f"直すときは '{stage} <パス>' で wip/handoff/ に写し、写しを直して、"
+        f"直すときは '{stage} <パス>' で wip/handoff/ にコピーし、コピーを直して、"
         "ユーザに ccnavi user handoff での取り込みを頼んでください。"
     )
 
@@ -1323,13 +1331,13 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
     実行前の通常時は `add_rules` の後に呼ぶ（`_insert` は先頭に挿すので、この 4 本の専用の文面が
     `guard-project-home` / `guard-common-layer` より先に並ぶ）。`add_rules` の中身には触れない。
 
-    下書きの置き場（各ツリー直下の `wip/handoff/`）の中は、守る場所の写しなので
-    `handoff_write_exempt` で外す。ハードリンクでつながった写しは外さない。
+    下書きの置き場（各ツリー直下の `wip/handoff/`）の中は、守る場所のコピーなので
+    `handoff_write_exempt` で外す。ハードリンクでつながったコピーは外さない。
 
-    共通の設定 3 本（`builtin:guard-ccnavi-config`）は、ルートを固定せず、パスの末尾で当てる。
+    共通の設定 3 本（`builtin:guard-ccnavi-config`）は、ルートを固定せず、パスの末尾で適用する。
     `common_layer_regex` が追う範囲（設定で動かした置き場）と同じとは限らないので、仮定しない。
     ルールファイルが読めない間も外れない。直すときは `wip/handoff/.ccnavi/config/common/rules.yml`
-    に下書きを置き、ユーザが端末の `ccnavi user handoff` で取り込むか、手で直す。
+    に下書きを置き、ユーザがターミナルの `ccnavi user handoff` で取り込むか、手で直す。
 
     ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない。
 

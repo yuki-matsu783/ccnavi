@@ -23,9 +23,9 @@
 保護がエージェントの書き込みを止める。
 
 正とするのはこの置き場で、チケットの中の欄ではない。 そこに置けたのは書ける権限を持つ
-ユーザだけだから。だから提案を手で `doing/` へ動かすことが、端末・ボード・Chrome に続く承認の
-経路になる。その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
-`blocking_problems` が判定の側で当てる。
+ユーザだけだから。だから提案を手で `doing/` へ動かすことが、ターミナル・ボード・Chrome に続く承認の
+経路になる。その経路は承認の画面を通らないので、承認のときにしかヒットしなかった構造の検査は
+`blocking_problems` が判定の側で適用する。
 
 承認はチケットの中身を変えない。提案のバイト列（改行も BOM も）をそのまま `doing/` へ動かし、
 欄を書き足さない。
@@ -50,13 +50,13 @@
 `phases/<親>/<N>.<種類>` に、依頼・レビュー済み・省略・通知済みのマーカーを置く。
 レビューが済むまで止める判定（phase.py）はこれを見る。中身は JSON 1 つで、いつ誰が置いたかが入る。
 
-## 待ち方は計画から都度計算する
+## 先行関係は計画から都度計算する
 
-計画を持つ親の待ち方（`workflow.compute` の結果）は、承認済みチケットを読むたびに計画のステップの
+計画を持つ親の先行関係（`workflow.compute` の結果）は、承認済みチケットを読むたびに計画のステップの
 `after` から計算して `Ticket.workflow` に入れる（`load_copy`）。ファイルにもチケットの欄にも
 持たない。承認済みチケットの計画は承認済みの置き場にあり、変えられるのは改版（`--agree`）と
 ユーザの手だけなので、計算の元も固定されている。`phases.yml` は計算の入力にならないので、承認の
-あとに直しても進行中の親の待ち方は変わらない。手で動かした承認も同じに計画の `after` で読む。
+あとに直しても進行中の親の先行関係は変わらない。手で動かした承認も同じに計画の `after` で読む。
 """
 
 from __future__ import annotations
@@ -180,7 +180,7 @@ def load_copy(path: str, require_record: bool = False) -> tuple[ticket_model.Tic
     `completed_at` を 2 つめの保護として求める（`review_all`）。保護が 1 つしか無い置き場で
     欄まで外すと、組み込みの deny に止められずに置かれたファイルが承認済みとして読まれる。
 
-    計画を持つ親には、計画のステップの `after` から計算した待ち方（`workflow.compute`）と、
+    計画を持つ親には、計画のステップの `after` から計算した先行関係（`workflow.compute`）と、
     親に固定したフェーズ定義（`phases:` を読んだもの。`phasetypes.types_of`）を入れる。
     チケットの中に `workflow:` 欄があれば `blocking_problems` が止める。
     """
@@ -189,7 +189,7 @@ def load_copy(path: str, require_record: bool = False) -> tuple[ticket_model.Tic
         detail = problems[0].detail if problems else "チケットとして読めない"
         return None, detail
     # 承認を正とするのは置き場で、`.ccnavi/approved/` は組み込みの保護がエージェントの書き込みを
-    # 止める。欄は無いので、親子・計画・置き場の検査は `blocking_problems` が判定の側で当てる。
+    # 止める。欄は無いので、親子・計画・置き場の検査は `blocking_problems` が判定の側で適用する。
     if require_record and not ticket.completed_at:
         return None, "`completed_at` がありません。`finish` を通っていない"
     if not ticket.is_child and ticket.has_plan:
@@ -295,7 +295,7 @@ def scan(
     あるときだけ、見つかった側を全部残す（`ticket_fold.fold` と同じ順・同じ条件）。
 
     返す前に `mark_blocked` が「信頼できない理由」を付ける。承認のときにしか
-    当たらなかった構造の検査を、判定の側でも当てるため（置き場を手で動かす承認は
+    ヒットしなかった構造の検査を、判定の側でも適用するため（置き場を手で動かす承認は
     `--agree` を通らない）。
 
     `raw` は呼び手が `read_raw` で読んだもの。渡せば置き場を読み直さない。
@@ -414,12 +414,12 @@ def _same_todo(t: ticket_model.Ticket, u: ticket_model.Ticket) -> bool:
 
 
 def revision_elsewhere(t: ticket_model.Ticket, current: ticket_model.Ticket | None) -> bool:
-    """正とするツリーの外の `todo/` にある提案が、計画・写し・範囲の違う親の版かどうか。
+    """正とするツリーの外の `todo/` にある提案が、計画・コピー・範囲の違う親の版かどうか。
 
     場所違いの改版か、巻き戻しの元。
 
     条件は承認の改版（`agree.waiting`）と同じく、作業中の承認済みチケットがある親で、計画・
-    フィードバック計画・写し（`phases:`）・範囲のどれかが違うもの（`plan_differs`）。
+    フィードバック計画・コピー（`phases:`）・範囲のどれかが違うもの（`plan_differs`）。
     """
     return current is not None and not t.is_child and t.has_plan and plan_differs(t, current)
 
@@ -428,7 +428,7 @@ def plan_signature(t: ticket_model.Ticket, part: str) -> tuple | None:
     """計画の比べる形。ステップごとの「定義・`review`・推移的に辿った先行（`workflow.compute`）」の並び。
 
     `after` の書き方が違っても先行が同じなら違いにしない（`PlanItem.__eq__` も `after` を見ない）。
-    `after: [2]` と、`--explain` の「先行 1, 2」を写した `after: [1, 2]` は同じ先行。
+    `after: [2]` と、`--explain` の「先行 1, 2」をコピーした `after: [1, 2]` は同じ先行。
     `part` は `plan` か `feedback`。フィードバック計画が無い（None）ことと空（`[]`）は分ける。
     """
     if part == "feedback" and t.feedback is None:
@@ -443,10 +443,10 @@ def plan_signature(t: ticket_model.Ticket, part: str) -> tuple | None:
 
 
 def phases_signature(t: ticket_model.Ticket) -> tuple | None:
-    """親の写し（`phases:`）の比べる形。定義を読んだ形（`PhaseType.key()`）を id の順に並べる。
+    """親のコピー（`phases:`）の比べる形。定義を読んだ形（`PhaseType.key()`）を id の順に並べる。
 
     YAML の書き方・キーの順・既定値を省いた書き方の違いは違いにしない。読めない定義があれば、
-    読んだままの値で比べる（形の誤りを直しただけの提案も違いとして拾う）。写しが無ければ None。
+    読んだままの値で比べる（形の誤りを直しただけの提案も違いとして拾う）。コピーが無ければ None。
     """
     if not phasetypes.has_copy(t):
         return None
@@ -462,11 +462,11 @@ def scope_signature(t: ticket_model.Ticket) -> tuple:
 
 
 def plan_differs(proposal: ticket_model.Ticket, current: ticket_model.Ticket) -> bool:
-    """提案の計画（全体計画かフィードバック計画）・写し（`phases:`）・範囲が承認済みチケットと違うか。
+    """提案の計画（全体計画かフィードバック計画）・コピー（`phases:`）・範囲が承認済みチケットと違うか。
     改版の条件。
 
-    計画は `plan_signature` で比べる。待ち方は計画から決まるので、待ち方だけの改版は無い。
-    写しは `phases_signature` で比べる。計画が同じで写しだけが違う提案も改版の候補にする
+    計画は `plan_signature` で比べる。先行関係は計画から決まるので、先行関係だけの改版は無い。
+    コピーは `phases_signature` で比べる。計画が同じでコピーだけが違う提案も改版の候補にする
     （`--plan-order <親> --fill-phases` で今の `phases.yml` に揃えた提案を出せるように）。
     範囲は `scope_signature` で比べる。範囲だけが違う提案も改版の候補にする。
     """
@@ -487,7 +487,7 @@ def revision_elsewhere_text(
     where: str,
     fams: standing.Families | None = None,
 ) -> str:
-    """正とするツリーの外に在る計画・写し・範囲の違う版の案内。ファイルの場所と、改版を書く置き場を名指しする。
+    """正とするツリーの外に在る計画・コピー・範囲の違う版の案内。ファイルの場所と、改版を書く置き場を名指しする。
 
     場所はどちらもワークスペースルートからのパスで出す（ツリーの名前ではなく、
     `.claude/worktrees/<親>` や `projects/<名前>`）。`--lint` と `--agree`（`--verify` も）が
@@ -500,7 +500,7 @@ def revision_elsewhere_text(
     place = tree_path(conf, root, where, t.project)
     todo = f"{conf.tickets}/{ticket_model.TODO}/"
     text = (
-        f"{t.ticket} の計画・写し・範囲の違う提案が {rel} に在るが、"
+        f"{t.ticket} の計画・コピー・範囲の違う提案が {rel} に在るが、"
         f"正とするツリー（{place}）の外なので承認の対象にならない。"
         f"改版なら {place} の {todo} に書き、古い版なら削除してください"
     )

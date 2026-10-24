@@ -7,7 +7,7 @@
 
 ## レイヤーは 3 種
 
-- 共通レイヤー: `.ccnavi/config/common/rules.yml`。どのツリーにも当てはまる。
+- 共通レイヤー: `.ccnavi/config/common/rules.yml`。どのツリーにも該当する。
   置き場は固定で、env では動かない。プロジェクトを単体で clone したときは、そのプロジェクトの
   `.ccnavi/config/common/`（ミラー）がこれになる。ワークスペースの中では、プロジェクトのミラーは読まない
 - 自身のレイヤー: ワークスペースルートの `.ccnavi/config/project/rules.yml`
@@ -129,7 +129,7 @@ def add_base(rule_set: rules.RuleSet, stderr: TextIO | None = None, root: str = 
 def bare(conf: settings.Settings, record: audit.Record, chosen: list[Layer]) -> bool:
     """共通レイヤーも足すレイヤーも、ルールのファイルが 1 本も無いか（組み込みの既定だけの形）。
 
-    共通レイヤーが破損しているとき（`fallback`）は、既に組み込みの既定を使っているので当てはまらない。
+    共通レイヤーが破損しているとき（`fallback`）は、既に組み込みの既定を使っているので該当しない。
     """
     if record.fallback == builtin.FALLBACK:
         return False
@@ -248,7 +248,7 @@ def add_layers(
 ) -> None:
     """共通レイヤーの上にレイヤーを順に足す。破損したレイヤーは空として扱い、記録に残す。
 
-    レイヤーをまたいだ苦情（重複を捨てた info、同 id で中身が違う warn）は読み捨てる。
+    レイヤーをまたいだ苦情（重複を破棄した info、同 id で中身が違う warn）は読み捨てる。
     判定の経路で呼び出しのたびに言うと、同じ話が毎回モデルへ届く。言う場所は `--lint`。
     """
     broken = []
@@ -274,10 +274,10 @@ def add_layers(
 
 
 def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[Problem]:
-    """後ろのレイヤーを前の集合に足す。重複は捨て、同 id で中身が違うものは両方残す。
+    """後ろのレイヤーを前の集合に足す。重複は破棄し、同 id で中身が違うものは両方残す。
 
     裸の `id` が同じで `{root}` 置換後の全欄が一致する定義は、同じルールの重複と
-    みなして後ろを捨てる（info）。見本をコピーして始めたプロジェクトが共通レイヤーと同じ行を
+    みなして後ろを破棄する（info）。見本をコピーして始めたプロジェクトが共通レイヤーと同じ行を
     持つのは普通の形で、それを衝突と呼ぶと本当の衝突が見落とされる。
 
     中身が違えば両方判定に使う（warn）。rules は足すだけの設定なので、`deny` と `ask` は
@@ -294,7 +294,8 @@ def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[P
                     Problem(
                         SEVERITY_INFO,
                         rule.id,
-                        f"`{rule.bare_id}` は前のレイヤーと全欄が同じなので、{layer} の側を捨てた。"
+                        f"`{rule.bare_id}` は前のレイヤーと全欄が同じなので、"
+                        f"{layer} の側を破棄した。"
                         "判定は前のレイヤーの 1 本で行う",
                     )
                 )
@@ -321,7 +322,7 @@ class LayerView:
 
     name: str
     path: str
-    # rule_set はこのレイヤーから実際に判定へ入ったぶん。重複で捨てた定義は入っていない。
+    # rule_set はこのレイヤーから実際に判定へ入ったぶん。重複で破棄した定義は入っていない。
     rule_set: rules.RuleSet
     # unreadable は読めなかった理由。空なら読めた（無いレイヤーも空として読めた扱い）。
     unreadable: str = ""
@@ -335,7 +336,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
     """共通レイヤーと各レイヤーを、判定と同じ順・同じ読み方で読む。
     診断（`--explain` / `--lint`）用。
 
-    返すのはレイヤーごとの「実際に判定に使われているルール」。重複で捨てた定義は入らないので、
+    返すのはレイヤーごとの「実際に判定に使われているルール」。重複で破棄した定義は入らないので、
     ここを並べたものが、Bash の和に入っているものと一致する。判定の側は
     `rules_for` を通る。読み方を 2 つ持たないために、重ね方はどちらも
     `merge_rules` の 1 本にまとめてある。
@@ -345,7 +346,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
     2. 共通レイヤーの rules を、重ねる先の `merged` に入れる
     3. `layers` の順に各レイヤーを読む。無いものは `missing`、共通が壊れていれば足さない
     4. 読めたレイヤーは `mark_file` と `prefix_ids` を通し、`merge_rules` で `merged` に重ねる
-    5. 重ねて増えた分だけを、そのレイヤーの `rule_set` にする（捨てられた重複は入らない）
+    5. 重ねて増えた分だけを、そのレイヤーの `rule_set` にする（破棄された重複は入らない）
     """
     record = audit.Record()
     common = read_common(stderr, conf, record, root)
@@ -387,7 +388,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
 def sum_view(stderr: TextIO, conf: settings.Settings, root: str, layer: Layer) -> LayerView:
     """共通レイヤーに 1 つのレイヤーを足した和を、判定と同じ読み方で読む。診断用。
 
-    `survey` は全レイヤーを順に重ねる（先のレイヤーと全欄が同じ定義は後ろを捨てる）ので、
+    `survey` は全レイヤーを順に重ねる（先のレイヤーと全欄が同じ定義は後ろを破棄する）ので、
     後ろのプロジェクトの欄は、他のレイヤーの定義に引かれて欠ける。
     ここは「共通 + そのレイヤー」だけで重ね、パスを持つツールの判定と同じ和を返す。
     返す `rule_set` は共通レイヤーを含む和で、組み込みの deny の土台は別に足される。

@@ -9,19 +9,19 @@
 #   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> --adopt --base <ブランチ> [--accept <確認コード>] [--side-by-side]
 #
 # 取り込み先は、切った時点でメインのチェックアウト（`git worktree list` の先頭）が開いているブランチ。
-# 起点Sは、書きかけを写すとき（--copy-wip）は確認した時点の書きかけを含むスナップショット、それ以外は
-# 取り込み先のHEAD。ルートのindexと作業ツリーには書かない（スナップショットは一時的なindexで作る）。
+# 起点Sは、書きかけをコピーするとき（--copy-wip）は確認した時点の書きかけを含むスナップショット、それ以外は
+# 取り込み先のHEAD。ルートのindexとワークツリーには書かない（スナップショットは一時的なindexで作る）。
 # 手元の取り込み先は進めない（進めるのはセッション開始時のccnavi-fetch.shだけ）。originからも切らない。
 #
-# 次のどれかに当たるとき、ワークツリーを切らずに終了コード 3 で止まり、状態・勧め・リスク・選択肢・確認コードを
+# 次のどれかにヒットするとき、ワークツリーを切らずに終了コード 3 で止まり、状態・勧め・リスク・選択肢・確認コードを
 # 出す。報告をユーザに伝え、了承を得てから --base / --acceptなどを付けて打ち直す。
 #   C4 cwdのブランチと取り込み先が違う（--base <取り込み先> が要る）
 #   C5 取り込み先が統合先（origin/HEAD）でない
 #   C6 origin/<取り込み先> より遅れている・進んでいる・分岐している・originに無い・リモート未確認
 #   C7 メインのチェックアウトに書きかけ（追跡済みの変更・新規ファイル）がある（--copy-wipか --no-wipが要る）
-#   C5〜C7 のどれかに当たるときは --accept <確認コード> も要る。確認コードは今の状態から決まるので、
+#   C5〜C7 のどれかにヒットするときは --accept <確認コード> も要る。確認コードは今の状態から決まるので、
 #   状態が動けば報告からやり直しになる。
-# 当たらないときは確認なしでS = 取り込み先のHEADから切る。--side-by-sideだけはaskルールがユーザの確認を取る。
+# ヒットしないときは確認なしでS = 取り込み先のHEADから切る。--side-by-sideだけはaskルールがユーザの確認を取る。
 #
 # 先に断るもの: メインのチェックアウトがdetached HEAD（C1）、取り込み先がチケットに結び付く・結び付くかを
 # 確かめられない（C2。実行ファイルの `tree base-bound`）、gitが 2.40 未満（C3）。
@@ -38,7 +38,7 @@
 # 答えが無ければ「確かめられない」と止まる。
 #
 # 記録はgitの共通ディレクトリのccnavi-direct/<名前>（version 4）に書く。Sはrefs/ccnavi/direct/<名前>/sに置く。
-# 書きかけを写す候補は確認が要るときにrefs/ccnavi/direct/<名前>/pendingに置き、切ったら消す。
+# 書きかけをコピーする候補は確認が要るときにrefs/ccnavi/direct/<名前>/pendingに置き、切ったら消す。
 #
 # --dry-runは何も作らず、調べた結果と予定だけを出す（fetchもしない）。
 # --offline / --from-originは廃止（終了コード 2）。--acceptで代わりができる。--adoptは記録の無い既存のワークツリーを引き取る（2 回の呼び出しで確認コードを使う）。
@@ -75,7 +75,7 @@ sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept
   --accept <確認コード>
                   報告したずれ（取り込み先・origin との関係・書きかけ）を、ユーザが了承して進める
   --copy-wip / --no-wip
-                  書きかけを写して切るか、写さず HEAD から切るか（書きかけがあるときはどちらかが要る）
+                  書きかけをコピーして切るか、コピーせず HEAD から切るか（書きかけがあるときはどちらかが要る）
   --side-by-side  このワークツリーが残っている間、メインのチェックアウトで見つかった変更を自動で戻さず報告にする
                   （ccnavi の設定ファイルは戻す）
   --adopt         記録の無い既存の直接作業のワークツリー（.claude/worktrees/<名前>）を引き取る。--base <取り込み先> が要る。
@@ -293,7 +293,7 @@ if [ -n "$adopt" ]; then
 	[ -n "$base_arg" ] ||
 		fail adopt-no-base "--adopt には --base <取り込み先> が要ります（今のメインのチェックアウトのブランチは ${target}）。ユーザに取り込み先を確かめてから付けてください。" 2
 	[ -z "$wip_mode" ] ||
-		fail adopt-wip "--adopt では --copy-wip / --no-wip は使えません（書きかけは写さない。起点は merge-base から決める）。" 2
+		fail adopt-wip "--adopt では --copy-wip / --no-wip は使えません（書きかけはコピーしない。起点は merge-base から決める）。" 2
 	ad_common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
 	[ -n "$ad_common" ] || fail no-common-dir "git の共通ディレクトリを読めません。"
 	ad_common=$(ccnavi_phys "$ad_common")
@@ -419,7 +419,7 @@ wip_staged=$(git -C "$main_tree" diff --cached --name-only 2>/dev/null | grep -c
 c7=no
 [ "$wip_changed" -eq 0 ] && [ "$wip_new" -eq 0 ] || c7=yes
 
-# 書きかけを含むスナップショット。ユーザのindexと作業ツリーには触れない（一時的なindexで作る）。
+# 書きかけを含むスナップショット。ユーザのindexとワークツリーには触れない（一時的なindexで作る）。
 # 日付と名前を固定するので、木と親が同じなら同じshaになる（確認コードに入れて、確認したあとの編集を検出する）。
 make_candidate() {
 	rm -f "$cand_index"
@@ -547,7 +547,7 @@ report_and_stop() {
 	unverified) printf '  リモート未確認（%s）\n' "${remote_why:-origin に届かない}" ;;
 	esac
 	[ "$c5" = no ] || printf '  取り込み先がデフォルトブランチ（%s）でない\n' "$integ"
-	[ "$c7" = no ] || printf '  書きかけ: 変更 %s・新規 %s（staged %s。写す場合、staged かどうかは区別されない）\n' "$wip_changed" "$wip_new" "$wip_staged"
+	[ "$c7" = no ] || printf '  書きかけ: 変更 %s・新規 %s（staged %s。コピーする場合、staged かどうかは区別されない）\n' "$wip_changed" "$wip_new" "$wip_staged"
 	[ "$wip_staged" -eq 0 ] || [ "$c7" = yes ] || printf '  staged %s（情報）\n' "$wip_staged"
 	rs_main_q=$(ccnavi_sh_quote "$main_tree")
 	rs_target_q=$(ccnavi_sh_quote "$target")
@@ -587,9 +587,9 @@ report_and_stop() {
 	printf '選択肢:\n'
 	if [ "$c7" = yes ]; then
 		printf '  書きかけの扱い\n'
-		printf '    A. 写さない (--no-wip) : 書きかけはルートだけに残り、エージェントは HEAD から作業する\n'
-		printf '    B. 写す (--copy-wip) : いま確認した時点の書きかけを写す。このあとの編集は写らない。\n'
-		printf '       写した書きかけそのものは成果に含めない。それに依存する変更は、取り込み結果だけでは動かないことがある\n'
+		printf '    A. コピーしない (--no-wip) : 書きかけはルートだけに残り、エージェントは HEAD から作業する\n'
+		printf '    B. コピーする (--copy-wip) : いま確認した時点の書きかけをコピーする。このあとの編集はコピーされない。\n'
+		printf '       コピーした書きかけそのものは成果に含めない。それに依存する変更は、取り込み結果だけでは動かないことがある\n'
 	fi
 	printf '  横で作業するか (--side-by-side)\n'
 	printf '    このワークツリーが残っている間は、%s で見つかった変更（エージェントが Bash で書き換えた分も含む）を\n' "$main_tree"
@@ -668,7 +668,7 @@ printf 'ワークツリーを切った: %s\n' "$dest"
 printf 'ブランチ: %s（起点 %s）\n' "$name" "$s_short"
 printf '取り込み先: %s（%s）\n' "$target" "$main_tree"
 if [ "$s_wip" = yes ]; then
-	printf '起点: %s（確認した時点の書きかけを含む。確認したあとの編集は写らない）\n' "$s_short"
+	printf '起点: %s（確認した時点の書きかけを含む。確認したあとの編集はコピーされない）\n' "$s_short"
 else
 	printf '起点: %s（%s の HEAD。書きかけは含まない）\n' "$s_short" "$target"
 fi

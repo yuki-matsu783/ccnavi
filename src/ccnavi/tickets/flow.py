@@ -83,7 +83,7 @@ error で言う。ボードのフロー編集画面は、開くときと保存�
 書き換えられる。着手中（`started_at` があり、`completed_at` も `cancelled_at` も無い）は、
 読んでいる手順が作業の途中で変わらないよう、実行前チェックが Write / Edit / NotebookEdit を
 止める（`lock_hit`）。エージェントの書き込みは承認済みの領域の保護でも止まるが、ロックは
-その保護を切った設定でも当てはまり、止めた理由を名指しする。ボードも着手中は保存しない。
+その保護を切った設定でも該当すり、止めた理由を名指しする。ボードも着手中は保存しない。
 """
 
 from __future__ import annotations
@@ -110,7 +110,7 @@ LOCK_RULE = "builtin:ticket-flow-lock"
 # 置き場。承認済みチケットの置き場の下の `flows/<子>.yml`。
 FLOWS_DIR = "flows"
 SUFFIX = ".yml"
-# 置き場が絶対パスで、どのツリーにも共通のとき。どのプロジェクトの子にも当てる。
+# 置き場が絶対パスで、どのツリーにも共通のとき。どのプロジェクトの子にも適用する。
 ANY_PROJECT = "*"
 
 # 読むファイルの大きさの上限（バイト）。超えたら読まずに知らせる。
@@ -167,7 +167,7 @@ def _place_rel(raw: str) -> str:
 def approved_rel(conf: settings.Settings) -> str:
     """承認済みチケットの置き場のパス（"/" 区切り、前後の区切りなし）。絶対なら絶対のまま。
 
-    `./`・`//`・`x/..` は整える。整えないと、判定が整えたパスに当てたときに
+    `./`・`//`・`x/..` は整える。整えないと、判定が整えたパスに適用したときに
     置き場のパスと食い違い、ロックが外れる。
     """
     return _place_rel(conf.approved or settings.DEFAULT_APPROVED)
@@ -312,7 +312,7 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
     shared = absolute
     if not absolute and (rel == ".." or rel.startswith("../")):
         # ツリーの外（`../shared/approved`）を指す置き場。ツリーをまたいで 1 か所になりうるので、
-        # `..` を除いた残りのパスで当て、どのプロジェクトの子でも止める（止める向き）。
+        # `..` を除いた残りのパスで適用し、どのプロジェクトの子でも止める（止める向き）。
         rel = "/".join(p for p in rel.split("/") if p != "..")
         shared = True
     marker = _fold(rel if absolute else f"/{rel}" if rel else "") + f"/{FLOWS_DIR}/"
@@ -323,7 +323,7 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
     if not name:
         return None
     if shared:
-        # 置き場がどのツリーにも共通の 1 か所。どのプロジェクトの子でも当てる（止める向き）。
+        # 置き場がどのツリーにも共通の 1 か所。どのプロジェクトの子でも適用する（止める向き）。
         return name, ANY_PROJECT
     owner = tree.tree_of(root, norm[:at] or os.sep, conf.projects)
     return name, (owner.project if owner is not None else None)
@@ -366,7 +366,7 @@ def inode_hit(
 ) -> ticket_model.Ticket | None:
     """書き込み先が、着手中の子のフローとハードリンクで同じ中身なら、その子。無ければ None。
 
-    ハードリンクはパスに置き場が出ないので `locate` では当たらない。書き込み先が
+    ハードリンクはパスに置き場が出ないので `locate` ではヒットしない。書き込み先が
     在って、名前が 2 つ以上あるときだけ、着手中の子のフロー（どのツリー上のチケットの置き場も）と
     (デバイス, inode) を比べて、同じなら止めるだけ。
     """
@@ -556,7 +556,7 @@ def parse_yaml(raw: bytes) -> tuple[object, str]:
 
 NOT_UTF8 = "UTF-8 として読めない"
 
-# `as_json` の目印の鍵。JSON にそのまま載らない値（下）をこの鍵を持つオブジェクトで表す。
+# `as_json` の目印のキー。JSON にそのまま載らない値（下）をこのキーを持つオブジェクトで表す。
 JSON_MARK = "$ccnavi"
 # JSON の数として拡張（JavaScript）が崩さずに読める整数の範囲
 _SAFE_INT = 2**53 - 1
@@ -567,14 +567,14 @@ def as_json(value):
 
     VS Code 拡張のフロー編集画面は、自分の YAML の読み手（1.2）が読んだ中身とこれを見比べ、
     食い違えば開かない・保存しない（読みの答えは実行ファイルが持つ）。
-    文字列・真偽値・null・配列・文字列をキーとする辞書と、`±(2**53 - 1)` までの整数は
+    文字列・真偽値・null・配列・文字列をキーとするマップと、`±(2**53 - 1)` までの整数は
     そのまま載せる。ほかは `{"$ccnavi": <種類>, ...}` の目印にする。
 
     - 浮動小数は `{"$ccnavi": "float", "value": <数>}`
       （JSON では 1 と 1.0 の区別が消えるので包む）。
       有限でなければ `"text"` に `inf` / `-inf` / `nan`
     - 範囲の外の整数は `{"$ccnavi": "int", "text": <十進>}`
-    - キーが文字列でない辞書と、鍵 `$ccnavi` を持つ辞書は
+    - キーが文字列でないマップと、キー `$ccnavi` を持つマップは
       `{"$ccnavi": "map", "items": [[キー, 値], ...]}`
     - 日付・日時・バイト列（`!!binary`）・集合（`!!set`）・組（`!!omap` / `!!pairs` の 1 件）・
       そのほかは

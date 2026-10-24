@@ -1,8 +1,8 @@
-"""守る場所のファイルを、下書きの置き場（`wip/handoff/`）へ写す cp を通すことの受入テスト。
+"""守る場所のファイルを、下書きの置き場（`wip/handoff/`）へコピーする cp を通すことの受入テスト。
 
-守る場所を直したいときは、置き場へ写して写しを直す（.ccnavi/docs/scratchpad.md）。シェルから
+守る場所を直したいときは、置き場へコピーしてコピーを直す（.ccnavi/docs/scratchpad.md）。シェルから
 書き込む形の保護は、cp の行き先の最後の語に守る名前があれば止めるので、`cp
-.ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh` のように同じ名前で写す形まで止まる。
+.ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh` のように同じ名前でコピーする形まで止まる。
 その形だけを通し、置き場を足場にして守る場所へ書く形は通さないことを確かめる。
 
 保護の式に否定先読みを足して通すと、ルールの読み込みが先読みを受け付けず、
@@ -49,7 +49,7 @@ class HandoffCopyTest(unittest.TestCase):
         self.pad = os.path.join(self.repo, "wip", "handoff")
 
     def decide(self, command, cwd=None):
-        """当たった組み込みの保護の id を返す。当たらなければ空。"""
+        """ヒットした組み込みの保護の id を返す。ヒットしなければ空。"""
         body = {
             "hook_event_name": "PreToolUse",
             "tool_name": "Bash",
@@ -109,7 +109,7 @@ class HandoffCopyTest(unittest.TestCase):
             "cp /tmp/x wip/handoff/../../.ccnavi/config/common/rules.yml",
             # 置き場の中のリンクを通って守る場所へ書く
             "cp /tmp/x wip/handoff/link/scripts/ccnavi-git.sh",
-            # リンクを作る・リンクのまま写す・行き先を -t で動かす
+            # リンクを作る・リンクのままコピーする・行き先を -t で動かす
             "cp -l .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh",
             "cp -s .ccnavi wip/handoff/.ccnavi",
             "cp -a .ccnavi wip/handoff/.ccnavi",
@@ -124,7 +124,7 @@ class HandoffCopyTest(unittest.TestCase):
             "cp --rec .ccnavi wip/handoff/ccnavi-git.sh",
             "install --dir .ccnavi wip/handoff/ccnavi-git.sh",
             "cp -x .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh",
-            # 1 本目で置き場へ写し、続くコマンドで守る場所へ書く
+            # 1 本目で置き場へコピーし、続くコマンドで守る場所へ書く
             "cp a wip/handoff/ccnavi-git.sh && cp /tmp/x .ccnavi/config/common/rules.yml",
             "cp a wip/handoff/ccnavi-git.sh; echo x > .ccnavi/config/common/rules.yml",
             "cp a wip/handoff/ccnavi-git.sh > .ccnavi/config/common/rules.yml",
@@ -141,7 +141,7 @@ class HandoffCopyTest(unittest.TestCase):
         self.assertEqual(RULE_ID, self.decide("cp /tmp/x ~/.claude/settings.json", cwd=self.pad))
 
     def test_a_hard_linked_destination_is_not_exempt(self):
-        # 置き場の写しが守る場所のファイルとつながっていれば、上書きは守る場所も書き換える。
+        # 置き場のコピーが守る場所のファイルとつながっていれば、上書きは守る場所も書き換える。
         original = os.path.join(self.repo, ".ccnavi", "scripts", "ccnavi-git.sh")
         try:
             os.link(original, os.path.join(self.pad, "ccnavi-git.sh"))
@@ -150,7 +150,7 @@ class HandoffCopyTest(unittest.TestCase):
         self.assertEqual(RULE_ID, self.decide("cp /tmp/x wip/handoff/ccnavi-git.sh"))
 
     def test_a_linked_scratchpad_is_not_exempt(self):
-        # 置き場そのものが守る場所へのリンクなら、置き場へ写すことが守る場所へ書くことになる。
+        # 置き場そのものが守る場所へのリンクなら、置き場へコピーすることが守る場所へ書くことになる。
         shutil.rmtree(self.pad)
         try:
             os.symlink(

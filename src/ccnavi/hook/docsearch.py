@@ -3,7 +3,7 @@
 索引を組む側は `docsearch_index`、引く側（問いの検査・当たり・並べ方・表）は `docsearch_query` に
 分けてある。どちらも docsearch を読まない。
 
-ドキュメントを探すエージェントは、ふだん grep や Glob で本文を端から探す。当たるのは行で、
+ドキュメントを探すエージェントは、ふだん grep や Glob で本文を端から探す。ヒットするのは行で、
 そのファイルが何の文書かは開くまで分からず、よそからの言及も同じ重みで混ざる。
 頭の frontmatter（`type` `title` `description` `tags` `keywords`）を索引にしておけば、
 「何の文書か」で引ける。形は参考にした運用（`参考/MR-driven-workflow` の
@@ -26,11 +26,11 @@
   `directory` は `.`
 - `concept_id` と `mtime` が既存の行と同じなら、その行を使い回す。
   書くのは一時ファイルに書いて置き換える形で、中身が同じなら書かない。一時ファイルは
-  git のディレクトリ（`.git/`）の中に排他で作る（作業ツリーの `git status` に出さない）。
+  git のディレクトリ（`.git/`）の中に排他で作る（ワークツリーの `git status` に出さない）。
   `.git` が別のファイルシステムなら、そのディレクトリの下の `.ccnavi-tmp-*/ccnavi-index.jsonl`
   （git に無視されることを確かめてから）に作る
 - 期限（SessionStart）を過ぎたら md を読むのをやめるが、どのディレクトリも読めた分までは書く
-- 書くのは、git がそこの `ccnavi-index.jsonl` を無視しているときだけ。作業ツリーに追跡されて
+- 書くのは、git がそこの `ccnavi-index.jsonl` を無視しているときだけ。ワークツリーに追跡されて
   いないファイルを置くと、`git status`・実行後チェック・`worktree remove` のどれにも出る。
   md を持つディレクトリのどれでも無視されていないツリーは、書く前に、そのツリーのルートの
   `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して確かめ直す（ワークスペースも
@@ -41,7 +41,7 @@
   一部のディレクトリだけが無視されていないなら（追跡されている ccnavi-index.jsonl など）、
   足さず、そこは書かずに行だけを組む
 - ccnavi が書いた形でない ccnavi-index.jsonl は、上書きも削除もしない。空か、空でない行が
-  全部この 4 つの鍵を持つ行として読めるときだけを ccnavi のものとみなす。よその道具が
+  全部この 4 つのキーを持つ行として読めるときだけを ccnavi のものとみなす。よその道具が
   同じ名前で置いたファイルを壊さない
 - md が全部消えたディレクトリ（追跡はされているが実体が無い）の `ccnavi-index.jsonl` は、上の条件で
   消す。それ以外の経路で残った古い `ccnavi-index.jsonl` は読まない
@@ -91,7 +91,7 @@ def _rel(path: str, root: str) -> str:
 
 @dataclass
 class Place:
-    """索引を組む 1 つの git の作業ツリー。prefix は concept_id の頭に付ける文字列。"""
+    """索引を組む 1 つの git のワークツリー。prefix は concept_id の頭に付ける文字列。"""
 
     name: str
     base: str
@@ -255,7 +255,7 @@ IGNORE_ADDED = "に `**/ccnavi-index.jsonl` を追加しました（未コミッ
 # SessionStart で索引を新しくするのに使ってよい時間（秒）の上限。実際には hook の判定の
 # 期限（events.decide が持つ deadline）の残りと小さいほう。過ぎたら残りは次の回に回す。
 # 使い回せていれば数百本の md でも 1 秒に届かない。初めての大きなプロジェクトだけが
-# ここに当たり、書けたディレクトリの分は次のセッションで使い回される。
+# ここにヒットし、書けたディレクトリの分は次のセッションで使い回される。
 START_SECONDS = 3.0
 # 残りがこれに満たなければ新しくしない（既存の ccnavi-index.jsonl だけで案内する）。
 MIN_REFRESH_SECONDS = 0.5

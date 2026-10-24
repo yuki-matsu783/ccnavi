@@ -31,7 +31,7 @@ review_label="${review_label:-ccnavi-review}"
 sub="${sub:-}"
 
 # fail <識別子> <文面> [終了コード]。文面は標準エラーへ出す契約。識別子は止めた理由の種類を
-# 表す短い語で、診断ログにだけ残す。文面には origin やパスが入るので、ログには写さない。
+# 表す短い語で、診断ログにだけ残す。文面には origin やパスが入るので、ログにはコピーしない。
 fail() {
 	printf '%s: %s\n' "$review_label" "$2" >&2
 	# 診断ログ。上の文面は契約として決まっている出力で、診断ログはそれとは別に残すだけ。
@@ -52,7 +52,7 @@ review_place() {
 	here="$(pwd -W 2>/dev/null || pwd)"
 	state="$root/logs/state" # 固定
 	# このスクリプトの置き場（絶対パス）。`ready --parent` は親のワークツリーへ cd するので、相対の `$0`
-	# （`sh .ccnavi/scripts/ccnavi-review.sh`）をその後で解くと、親のワークツリーの中の写しを指すか、見失う。
+	# （`sh .ccnavi/scripts/ccnavi-review.sh`）をその後で解くと、親のワークツリーの中のコピーを指すか、見失う。
 	# cd の前に解いておき、以降はこれを使う。
 	script_dir=$(cd "$(dirname "$0")" && pwd)
 	# 実行ファイルに渡す cwd（どの親かを引く場所）。ふつうは打った場所で、`ready --parent <親>` のときだけ
@@ -127,7 +127,7 @@ review_host() {
 		case "$?" in
 		3) fail no-jq "jqが見つかりません。結果の JSON を作成できません。" 2 ;;
 		4) fail no-transport-token "$ccnavi_h_cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name もありません。$token_name を置くか、$ccnavi_h_cli_name を $host に認証してください。" 2 ;;
-		*) fail no-transport "$ccnavi_h_cli_name が $host で使えず、curl もありません。どちらかを用意するか、スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけなので、エージェントは JSON を作らずに止まり、ユーザに頼んでください（ユーザが MCP などでリモートを読める道具でスレッドとレビューを JSON にし、端末で 'ccnavi review confirm --phase <N> --result <json>' を実行します）。" 2 ;;
+		*) fail no-transport "$ccnavi_h_cli_name が $host で使えず、curl もありません。どちらかを用意するか、スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけなので、エージェントは JSON を作らずに止まり、ユーザに頼んでください（ユーザが MCP などでリモートを読める道具でスレッドとレビューを JSON にし、ターミナルで 'ccnavi review confirm --phase <N> --result <json>' を実行します）。" 2 ;;
 		esac
 	}
 	JQ="$ccnavi_h_jq"
@@ -166,13 +166,13 @@ api_failed() {
 	printf '%s: %s への %s %s が失敗した:\n%s\n' "$review_label" "$host" "$1" "$2" "$3" >&2
 	# GraphQL を制限している実行環境がある（Claude Code のセッションは REST だけ通す）。
 	# GitHub ではスレッドの解決状態（threads）と Draft 外し（undraft）が GraphQL でしか
-	# 扱えないので、そこだけが 403 で止まる。curl の経路は -f が本文を捨てるため、
+	# 扱えないので、そこだけが 403 で止まる。curl の経路は -f が本文を破棄するため、
 	# 画面に残るのは番号だけになり、認証の失敗と見分けが付かない。止まったその場で
 	# 代わりの方法を名指しする。書き方は transport を選ぶところの案内と揃える。
 	case "$2" in
 	graphql)
 		printf '%s: %s\n' "$review_label" \
-			"GraphQL を使えない環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけです。エージェントは JSON を作らず、実行せずに止まり、ユーザに次を頼んでください: MCP などリモートを読める道具でスレッドとレビューを fetch_all と同じ形 {host, mr, threads, reviews, fetched_at} の JSON にし、端末で 'ccnavi review confirm --phase <N> --result <json>' を実行します。Draft 外しもユーザにその道具の側で行ってもらってください。" >&2
+			"GraphQL を使えない環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけです。エージェントは JSON を作らず、実行せずに止まり、ユーザに次を頼んでください: MCP などリモートを読める道具でスレッドとレビューを fetch_all と同じ形 {host, mr, threads, reviews, fetched_at} の JSON にし、ターミナルで 'ccnavi review confirm --phase <N> --result <json>' を実行します。Draft 外しもユーザにその道具の側で行ってもらってください。" >&2
 		;;
 	esac
 }
@@ -340,8 +340,8 @@ find_marked() {
 # ---- エージェントの単発の投稿（request・comment・ready の補助コメント、close-early の issue とコメント）を、
 # 操作記録に載せて送る。
 #
-# staged_send <操作の種類> <鍵> <段階ID> <note|issue> <MR の番号> <MR の URL> <本文のファイル>
-# 操作ID は種類・親・MR・鍵から決まる（打ち直しが同じ記録に当たる）。段階は issue と comment の 2 つを
+# staged_send <操作の種類> <キー> <段階ID> <note|issue> <MR の番号> <MR の URL> <本文のファイル>
+# 操作ID は種類・親・MR・キーから決まる（打ち直しが同じ記録にヒットする）。段階は issue と comment の 2 つを
 # 記録に持つ。note は MR へのコメント、issue は issue の作成（create_issue が要る。本文の 1 行目が題）。
 # 標準出力は note なら `comment`、issue なら `create_issue` と同じ形の JSON（送り済みと分かったときは
 # {url}、issue はそれに {number}）。送り済みなら送らず、前に試した形跡があれば先にホストを目印で照合する。
@@ -480,7 +480,7 @@ staged_send_locked() {
 	printf '%s\n' "$cs_out"
 }
 
-# MR へのコメント 1 つを送る（staged_send の note）。<操作の種類> <鍵> <MR の番号> <MR の URL> <本文のファイル>
+# MR へのコメント 1 つを送る（staged_send の note）。<操作の種類> <キー> <MR の番号> <MR の URL> <本文のファイル>
 comment_staged() {
 	staged_send "$1" "$2" comment note "$3" "$4" "$5"
 }
@@ -500,7 +500,7 @@ refetch() {
 
 account_max_time="${CCNAVI_REVIEW_ACCOUNT_TIMEOUT:-15}"
 
-# timed <秒> <書き先> <コマンド>... 標準出力を書き先へ、標準エラーは捨てる。時間を過ぎたら止めて 1。
+# timed <秒> <書き先> <コマンド>... 標準出力を書き先へ、標準エラーは破棄する。時間を過ぎたら止めて 1。
 timed() {
 	timed_limit="$1"
 	timed_out="$2"
@@ -545,7 +545,7 @@ account() {
 	who=$("$JQ" -r --arg f "$field" '.[$f] // empty' <"$account_out" 2>/dev/null | tr -d '\r') || who=""
 	rm -f "$account_out"
 	[ -n "$who" ] || return 0
-	# 形は C ロケールで見る（ロケールによって [A-Za-z] が英字の外に当たらないように）
+	# 形は C ロケールで見る（ロケールによって [A-Za-z] が英字の外にヒットしないように）
 	if printf '%s\n' "$who" | LC_ALL=C grep -q '[^A-Za-z0-9_.-]'; then return 0; fi
 	case "$who" in
 	-*) return 0 ;;

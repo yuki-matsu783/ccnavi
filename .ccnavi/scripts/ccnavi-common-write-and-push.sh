@@ -21,7 +21,7 @@
 # 衝突したら merge を取りやめて何も変えずに止める。入れたら 7（完了の記録と子の merged_sha）を書き、8 は
 # 合流と状態を 1 つのマージコミットにする（commit --only は合流の途中では使えないので、書いたパスを add して commit）。
 # 9 以降（push・届いたかの確かめ・戻し）は同じ。戻す範囲は「元の先頭から最終の先頭まで」で、
-# `git diff --name-only <元の先頭> <コミット>` のパスの索引と作業ツリーを戻す。コミットの前に失敗・中断したときは
+# `git diff --name-only <元の先頭> <コミット>` のパスの索引とワークツリーを戻す。コミットの前に失敗・中断したときは
 # merge --abort と書いたものの復元で、合流ごと元に戻す。
 # 呼ぶ側が先に決めるもの。
 #   ccnavi_wap_root   ワークスペースルート
@@ -36,7 +36,7 @@
 # 出し（`write-and-push family`・`write-and-push sort`・`--record-writes`）、取り込み（ccnavi-sync.sh を入れ子のロックで起こす）・
 # コミット（`commit --only`。ほかのステージ済みの変更を巻き込まない）・push・届いたかの確かめ・戻し（比較つきの update-ref。reset は
 # 使わない）はここが持つ。git は ccnavi-git.sh を通らずに直に呼ぶ。ccnavi-git.sh はエージェントの入口の
-# 保護で、ここの戻し（`restore --source` など）には当てない。
+# 保護で、ここの戻し（`restore --source` など）には適用しない。
 #
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_WRITE_AND_PUSH_TIMEOUT（push・ls-remote 1 回の
 #   タイムアウトの秒、既定 60）/ CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT（コミット 1 回のタイムアウトの秒、既定 60）
@@ -93,7 +93,7 @@ ccnavi_wap_number() {
 # `--root <ルート>` つきで起こす。どちらも無ければ、ccnavi_wap_exe は 1 を返すだけの関数にして 1 を返す
 # （止めるかどうかと文面は呼ぶ側が決める）。見つけた実行ファイルのパスは ccnavi_wap_bin に入れる
 # （ソースで動かすときは空。互換の版を比べるのは実行ファイルのときだけ）。
-# 各 sh が同じ定義を写して持たないように、ここに 1 つだけ置く。
+# 各 sh が同じ定義をコピーして持たないように、ここに 1 つだけ置く。
 ccnavi_wap_bin=""
 ccnavi_wap_exe_root=""
 ccnavi_wap_use_exe() {
@@ -391,7 +391,7 @@ ccnavi_wap_unstage() {
 	done <"$1"
 }
 
-# 書いた一覧のうち、この実行で書いたパスの作業ツリーの中身を <版> に戻す（無ければ消す）。<一覧> <版>
+# 書いた一覧のうち、この実行で書いたパスのワークツリーの中身を <版> に戻す（無ければ消す）。<一覧> <版>
 # record-risk の記録など、この実行の前から未コミットだったもの（keep）は触らない。
 # ccnavi_wap_keep_worktree が空でなければ何も戻さない。呼ぶ側が書いたものではなく、利用者の書いた入力
 # （propose の提案）を一覧に載せている操作で使う。戻すと、送れなかったときに提案そのものが消える。

@@ -198,7 +198,7 @@ class NoParentTreeTest(AuthorityHarness):
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("親のワークツリー", finished.stderr)
         self.assertIn("がありません", finished.stderr)
-        # 解き方は、切り直すか、捨てた親子なら片付ければよい（`--forget` は無い）。
+        # 解き方は、切り直すか、破棄した親子なら片付ければよい（`--forget` は無い）。
         self.assertIn("切り直してください", finished.stderr)
         self.assertIn("片付ければよい", finished.stderr)
         self.assertNotIn("--forget", finished.stderr)
@@ -234,7 +234,7 @@ class NoParentTreeTest(AuthorityHarness):
         text = "\n".join(standing.guidance(self.root, st))
         self.assertIn("ccnavi-git.sh", text)
         self.assertIn("worktree add .claude/worktrees/i0001", text)
-        self.assertIn("捨てた親子のチケットなら、親のワークツリーを片付ければよい", text)
+        self.assertIn("破棄した親子のチケットなら、親のワークツリーを片付ければよい", text)
         self.assertNotIn("--forget", text)
 
 
@@ -371,8 +371,8 @@ class UnreadableChildTest(AuthorityHarness):
     def test_the_unreadable_child_is_not_given_the_range_of_the_parent(self):
         """読めない子のワークツリーで、親の範囲を借りて書けることはない。
 
-        子のワークツリー自身に読める写しがあれば、親のワークツリーの外にしか無いチケットとして
-        止まる（deny）。その写しも読めなければ、チケットのないツリーと同じ扱い（ccnavi の判定は
+        子のワークツリー自身に読めるコピーがあれば、親のワークツリーの外にしか無いチケットとして
+        止まる（deny）。そのコピーも読めなければ、チケットのないツリーと同じ扱い（ccnavi の判定は
         undeclared で、親の範囲では許さない）。
         """
         second = self.start_second_child()

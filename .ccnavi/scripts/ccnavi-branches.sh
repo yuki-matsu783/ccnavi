@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-branches issue・MR に紐づくブランチを探す。読むだけで、作業ツリーにも git にも書かない。
+# ccnavi-branches issue・MR に紐づくブランチを探す。読むだけで、ワークツリーにも git にも書かない。
 #
 #   sh .ccnavi/scripts/ccnavi-branches.sh --issue <番号> [--json]
 #   sh .ccnavi/scripts/ccnavi-branches.sh --mr <番号> [--json]

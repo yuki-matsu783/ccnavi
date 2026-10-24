@@ -149,7 +149,7 @@ def _drop_noise(text: str) -> str:
 
 
 def _blank(text: str, *patterns: re.Pattern) -> str:
-    """当たった範囲を同じ長さの空白に置き換える（位置は変えない）。"""
+    """ヒットした範囲を同じ長さの空白に置き換える（位置は変えない）。"""
     for pattern in patterns:
         text = pattern.sub(lambda m: " " * len(m.group(0)), text)
     return text
@@ -397,7 +397,7 @@ def _clean(value, limit: int = 200) -> str:
 def read_host(path: str) -> Host:
     """sh が書いたホストの結果。無い・読めない・形が違うなら「見ていない」として理由を付ける。
 
-    形は `checked`（ホストを見たら true）・`reason`・`host`・`repo`・`mrs` の鍵を持つ JSON。
+    形は `checked`（ホストを見たら true）・`reason`・`host`・`repo`・`mrs` のキーを持つ JSON。
     """
     if not path:
         return Host(reason="ホストの結果が渡されていない（--result がありません）")
@@ -512,7 +512,7 @@ def _branch_of_ticket(t: ticket_model.Ticket, names: set[str]) -> str:
 def collect(
     conf: settings.Settings, root: str, cwd: str, kind: str, number: int, host: Host
 ) -> tuple[dict, str]:
-    """候補を集める。返すのは JSON の形の辞書と、止める理由（あれば）。
+    """候補を集める。返すのは JSON の形のマップと、止める理由（あれば）。
 
     処理フロー:
     1. リポジトリ・プロジェクト・手元と origin のブランチ・チェックアウト先を読む

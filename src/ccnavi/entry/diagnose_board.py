@@ -1,6 +1,6 @@
 """ボードの中身（`--explain --json`）。
 
-ルール・フェーズ定義・リスク・チケットを 1 つの辞書にまとめる。
+ルール・フェーズ定義・リスク・チケットを 1 つのマップにまとめる。
 """
 
 from __future__ import annotations
@@ -216,7 +216,7 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
     """レイヤーごとの宣言。
     順序は 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）。
 
-    rules は重複を捨てたあとの、そのレイヤーから実際に判定へ入ったぶん。phases と risk は
+    rules は重複を破棄したあとの、そのレイヤーから実際に判定へ入ったぶん。phases と risk は
     そのレイヤーのファイルに書いてあるぶんで、合成の結果は `sums` と親のフェーズの
     側に出る。読めないレイヤーは `unreadable` に理由が入り、中身は空になる。
     """
@@ -263,7 +263,7 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
         risk     共通 + そのレイヤーの配点。levels（実際に使う境目の点）・factors・
                  problems・fallback
         phases   共通 + そのレイヤーの定義。path・unreadable（そのレイヤーのファイル）・types
-                 （各定義の source が出どころのレイヤー。定義は順序を持たないので、待ち方の欄は
+                 （各定義の source が出どころのレイヤー。定義は順序を持たないので、先行関係の欄は
                  無い。順序は親の計画のステップの `after`）。足すときの衝突は `--lint` が言う
 
     判定の合成と同じ関数（`ruleload.sum_view` / `risk.layer_definition` /
@@ -358,7 +358,7 @@ def _where(t: ticket_model.Ticket) -> dict:
 def _one_per_file(found: list[ticket_model.Ticket]) -> list[ticket_model.Ticket]:
     """同じツリーで同じファイルを 2 度読んだぶんをまとめる。順序は見つけた順で、先を残す。
 
-    鍵にツリーを入れるのは、まとめるのを「1 つの走査の重なり」に限るため。2 つのツリーが
+    キーにツリーを入れるのは、まとめるのを「1 つの走査の重なり」に限るため。2 つのツリーが
     同じ実体を指す形（`projects/<名前>` がワークスペース自身への symlink など）は
     同じチケットが 2 つのツリーに在るのと同じで、判定の側（`approval._authoritative`）もまとめない。
     ここだけまとめると、ボードに何も出ていないのに操作が止まる。
@@ -426,7 +426,7 @@ def _ticket_record(
 
     処理フロー:
     1. 状態（`status`）は承認済みチケットの置き場で決める（review・open・closed、どちらにも無ければ
-       none）。項目は提案があれば提案を、無ければ承認済みの写し（`copy`）を使う。
+       none）。項目は提案があれば提案を、無ければ承認済みのコピー（`copy`）を使う。
     2. `tree.lookup` でワークツリーを引き、親なら MR の番号・ブランチ・リモートとの差を載せる。
     3. 満たしていない先行（`approval_checks.unmet_predecessors`）と、ブロックの理由を載せる。
     4. 承認の時刻（`approval_times`）、フロー（`flow.info`）、完了した親の下書きの入口を載せる。

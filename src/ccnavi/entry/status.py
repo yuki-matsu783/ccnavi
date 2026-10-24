@@ -258,7 +258,7 @@ class _Family:
                 f"- {e.ident}  {role}  {t.title}".rstrip(),
                 f"    置き場: 複数の場所にある（{where}）",
                 "    止まっている理由: 正しいチケットを特定できないため、状態を変更できません。",
-                "    次の操作: ユーザーにチケットの重複を解消してもらってください。"
+                "    次の操作: ユーザにチケットの重複を解消してもらってください。"
                 "進行した側の変更をマージするか、不要なワークツリーを整理します。",
             ]
         lines = [
@@ -271,7 +271,7 @@ class _Family:
         if t.state == ticket_model.TODO:
             lines.append(f"    置き場のファイル: {file_state.label()}")
             lines.append(
-                "    次の操作: ユーザの承認を待つ（VS Code のボード、Chrome のボード、端末の "
+                "    次の操作: ユーザの承認を待つ（VS Code のボード、Chrome のボード、ターミナルの "
                 "ccnavi-user-agree.sh、GitLab や GitHub の画面などで doing/ へ動かす、のどれか）"
             )
             return lines

@@ -143,7 +143,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     ),
     (
         "state",
-        "作業ツリーとチケットの、いまの形を読む",
+        "ワークツリーとチケットの、いまの形を読む",
         frozenset(
             {
                 "hook.parentwrite",

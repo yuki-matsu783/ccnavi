@@ -282,7 +282,7 @@ class ProposeTest(WriteAndPushHarness):
         os.chmod(hook, 0o755)
 
     def test_a_rejected_push_keeps_the_proposals_the_user_wrote(self):
-        """送れなかったときに戻すのは自分のコミットだけ。書いた提案は作業ツリーに残る。"""
+        """送れなかったときに戻すのは自分のコミットだけ。書いた提案はワークツリーに残る。"""
         new = self.put(f"{self.TODO}/{PARENT}.md", "v1\n")
         flow = self.put(f"{self.FLOWS}/{CHILD}.yml", "flow\n")
         self.reject_pushes()
@@ -334,7 +334,7 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(self.dirty(), "")
 
     def test_it_reads_only_the_parent_worktree(self):
-        # ワークスペースルートに写しがあっても、親のワークツリーに無ければ送らない。
+        # ワークスペースルートにコピーがあっても、親のワークツリーに無ければ送らない。
         write(os.path.join(self.ws, "wip", "proposals", "todo", PARENT + ".md"), "x\n")
         result = self.ticket("propose", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)

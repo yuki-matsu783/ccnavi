@@ -143,7 +143,7 @@ class RestoreTest(GuardHarness):
         """ワークスペースから切ったワークツリー側の、共通レイヤーの設定も対象（既存の穴）。
 
         共通レイヤーの 3 本はワークスペースの git が追跡しているので、ワークツリー側の設定もできる。
-        直す前は、そこがルールの allow `worktrees` に当たって書けてしまい、戻りもしなかった。
+        直す前は、そこがルールの allow `worktrees` にヒットして書けてしまい、戻りもしなかった。
         """
         tree = self.worktree(self.ws, "w3")
         for name in ("rules.yml", "phases.yml", "risks.yml"):
@@ -178,7 +178,7 @@ class RestoreTest(GuardHarness):
         self.assertEqual(result.stderr, "", self.said(result))
 
     def test_record_names_the_layer_that_was_restored(self):
-        """記録の `guarded` に、レイヤーの名前付きの鍵で何をしたかが残る。"""
+        """記録の `guarded` に、レイヤーの名前付きのキーで何をしたかが残る。"""
         self.break_and_restore(layer_path(self.lib, "phases"))
         with open(self.log, encoding="utf-8") as f:
             line = json.loads([ln for ln in f if ln.strip()][-1])
@@ -242,7 +242,7 @@ class DenyTest(GuardHarness):
     def test_a_rule_named_like_a_builtin_does_not_replace_it(self):
         """組み込みの名前（`builtin:guard-`）のルールは読み込まず、組み込みは常に足す。
 
-        以前は何にも当たらない 1 本をこの名前で書くだけで、
+        以前は何にもヒットしない 1 本をこの名前で書くだけで、
         共通レイヤーの保護が気づかないうちに消えた。
         """
         decoy = dict(
@@ -353,7 +353,7 @@ class DenyTest(GuardHarness):
     def test_common_layer_deny_names_only_those_files(self):
         """同じ名前の別のファイルは止めない。
 
-        当てるのはワークスペースルートと、そこから切ったワークツリーの下の同じ相対だけ。
+        適用するのはワークスペースルートと、そこから切ったワークツリーの下の同じ相対だけ。
         """
         for path in (
             os.path.join(self.ws, "src", "rules.yml"),
@@ -366,7 +366,7 @@ class DenyTest(GuardHarness):
         """共通レイヤーの 3 本へのシェルからの書き込みは組み込みで止まる。
 
         置き場は `.ccnavi/config/common/` に固定なので、ccnavi ディレクトリを丸ごと拾う 1 本
-        （`_PLACES` の `\\.ccnavi`）が当てる。動かした置き場は
+        （`_PLACES` の `\\.ccnavi`）が適用する。動かした置き場は
         `test_shell_writes_into_a_moved_common_layer_are_denied` が見る。
         """
         for command in (
@@ -377,7 +377,7 @@ class DenyTest(GuardHarness):
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, guard="enable", command=command)
                 self.assert_denied(result, "builtin:guard-setting-files")
-        # 名前の途中で当たったものは別のファイル。
+        # 名前の途中でヒットしたものは別のファイル。
         result = self.hook(
             "Bash", self.ws, guard="enable", command="echo x > myccnavi/common/rules.yml"
         )
@@ -387,7 +387,7 @@ class DenyTest(GuardHarness):
         """共通レイヤーの 3 本が cp / ln / install の元の側にだけ出る形は、
         読むだけなので通る。
 
-        写す側は行き先（最後の引数か `-t` の値）だけを見る。元の側で当たると、
+        コピーする側は行き先（最後の引数か `-t` の値）だけを見る。元の側でヒットすると、
         バックアップを取るだけの `cp` まで止まる（rule-expectations.yml の期待する判定）。
         """
         absolute = os.path.dirname(self.rules).replace(os.sep, "/")
@@ -410,7 +410,7 @@ class DenyTest(GuardHarness):
 
         後ろに別のコマンドをつないだ形、前につないだ形、引用でつないだ語、
         `-t` で行き先を前に出した形も同じ。元の側に出ただけの形を通すために、
-        行き先の当て方まで緩んでいないことを見る。
+        行き先の適用の仕方まで緩んでいないことを見る。
         """
         absolute = os.path.dirname(self.rules).replace(os.sep, "/")
         for name in ("rules.yml", "phases.yml", "risks.yml"):
@@ -466,7 +466,7 @@ class DenyTest(GuardHarness):
                     self.assert_denied(result, "builtin:guard-setting-files")
 
     def judged(self, command, *flags, guard="enable"):
-        """`--test --json` で 1 本判定し、当たったルールの id を返す。
+        """`--test --json` で 1 本判定し、ヒットしたルールの id を返す。
 
         hook の payload では共通レイヤーを動かせない（`--rules` は診断でだけ有効）。
         試験は判定そのものを実運用と同じ関数に通す経路なので、動かした先を保護が
@@ -505,7 +505,7 @@ class DenyTest(GuardHarness):
         ):
             with self.subTest(command=command):
                 self.assertIn("builtin:guard-setting-files", self.judged(command, *moved))
-        # 名前の途中で当たったものは別のファイル。前と後ろの両方を見る。
+        # 名前の途中でヒットしたものは別のファイル。前と後ろの両方を見る。
         for command in (
             "echo x > otherpolicy/rules.yml",
             "echo x > policy/rules.yml.bak",
@@ -514,10 +514,10 @@ class DenyTest(GuardHarness):
                 self.assertNotIn("builtin:guard-setting-files", self.judged(command, *moved))
 
     def test_copies_of_a_moved_common_layer_look_only_at_the_destination(self):
-        """動かした共通レイヤーの 3 本も、cp / ln / install は行き先の側だけで当てる。
+        """動かした共通レイヤーの 3 本も、cp / ln / install は行き先の側だけで適用する。
 
         動かした先の表記（`common_shell_clause`）は書き込み用とコピー用に分けて足す。
-        書き込み用（空白で閉じる）をそのまま写す側に足すと、元の側に出ただけで当たる。
+        書き込み用（空白で閉じる）をそのままコピーする側に足すと、元の側に出ただけでヒットする。
         """
         moved_flags = []
         moved_paths = []
@@ -566,7 +566,7 @@ class DenyTest(GuardHarness):
             ):
                 with self.subTest(command=command):
                     self.assertIn("builtin:guard-setting-files", self.judged(command, *moved_flags))
-        # 名前の途中や続きで当たったものは別のファイル。
+        # 名前の途中や続きでヒットしたものは別のファイル。
         for command in (
             "cp /tmp/x otherpolicy/rules.yml",
             "cp /tmp/x policy/rules.yml.bak",

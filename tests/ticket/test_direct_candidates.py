@@ -1,7 +1,7 @@
 """直接作業の候補の記録（direct_candidates）と、それを使う Stop の促しの受入テスト。
 
 登録は成功した Write・Edit・NotebookEdit の書き込み先で、git を呼ばない。確かめるのは Stop で、
-cwd のツリーのあとに、記録の候補を `checked` の古い順に調べる。外すのは「当たらない」と確認できた
+cwd のツリーのあとに、記録の候補を `checked` の古い順に調べる。外すのは「ヒットしない」と確認できた
 ものだけで、期限不足・git の失敗などの「不明」は外さない。
 道具は IntegrateNudgeTest のものを借りる（借りたテストは走らせない）。
 """
@@ -312,7 +312,7 @@ class DirectCandidatesTest(base.IntegrateNudgeTest):
         self.assertIsNone(ops_stop_integrate._recorded(self.root, "scratch", head, None))
         self.assertTrue(ops_stop_integrate._recorded(self.root, "scratch", head, False))
         self.assertFalse(ops_stop_integrate._recorded(self.root, "scratch", head, True))
-        # 写しを読めなければ「記録なし」（促す側）。
+        # コピーを読めなければ「記録なし」（促す側）。
         write(os.path.join(gitdir, "scratch"), "")
         self.assertFalse(ops_stop_integrate._recorded(self.root, "scratch", head, False))
 

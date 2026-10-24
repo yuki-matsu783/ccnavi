@@ -274,7 +274,7 @@ class InstallTest(Env):
         done = self.install("--from", self.src, env=self.env(CLAUDECODE="1"))
         self.assertEqual(done.returncode, 3)
         self.one_next(done)
-        self.assertIn("Claude Code の外の端末で同じコマンドを打ってもらう", done.stdout)
+        self.assertIn("Claude Code の外のターミナルで同じコマンドを打ってもらう", done.stdout)
         self.assertEqual(self.setup_calls(), [])
         done = self.install("--from", self.src, "--check", env=self.env(CLAUDECODE="1"))
         self.assertEqual(done.returncode, 3)

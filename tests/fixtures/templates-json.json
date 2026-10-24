@@ -1,5 +1,5 @@
 {
- "about": "`ccnavi --templates --json` の答えの見本。ワークスペースは tests/ticket/test_plan_templates.py の showcase（共通に feature / research / broken、自身のレイヤーに feature（共通と同じ）/ research（共通と中身が違う）/ local（定義に無い型）/ ends（終端が 2 つ）/ notes.txt、プロジェクト lib に lib、下書きの置き場 wip/handoff/.ccnavi/config/project/templates/ に login（TODO が残っている）/ research（共通と同名）/ broken）。root は <root> に置き換える。欄: version、root、layer（一覧の対象のレイヤー）、keywords、templates（共通 + layer の統合結果。各テンプレートの name・layer・path・sha・valid・description・when・plan / feedback（index は計画の中の添字、number は提案に写したときの番号、after は計画の中の添字）・has_flows・flows（index・name・nodes・connections・node_types）・effective（統合結果で使われるか）・usable（使われ、error も無い）・dropped（捨てた理由 reason = invalid / duplicate / conflict と detail）・writable・problems（severity と detail））、layers（共通と各レイヤーの生の中身。path・exists・unreadable・writable・problems・templates）、sums（レイヤーごとの統合結果の索引。各テンプレートの name・layer・effective・dropped。dropped は templates と同じ {reason, detail} か null）、errors / warns / infos、drafts（下書き。効力は無く、templates にも統合結果にも入らない。各下書きの name・tree（置かれたツリー。ワークスペースルートは空）・path（下書きの、ツリーからの相対。wip/handoff/…）・target（取り込み先の、ツリーからの相対。取り込みは ccnavi user handoff <target>）・layer（取り込み先のレイヤー）・sha（下書きのハッシュ）・text（下書きの本文そのまま）・valid・importable（読めて error が無い）・checked_with（検査に使ったフェーズ定義の層。templates の layer＝ファイルが在る層とは別）・exists_in（同じ名前のテンプレートが在るレイヤー。取り込むと置き換えになる）・also_in（同じ中身の下書きを持つほかのツリー。表記は tree と同じで、ワークスペースルートは空）・description・when・plan / feedback / has_flows / flows（templates と同じ）・problems（深刻度は下書きの検査のまま。--lint は error も warn に下げる））。失敗（--show の無い名前、不明な --layer、--draft の失敗）は、この形ではなく {version, ok: false, error} を標準出力に出して終了コード 1。同じ中身の下書きが 2 つのツリー（ワークスペースルートと lib）にあるときは、先に見つけた 1 つにまとめ、もう一方を also_in に入れる。VS Code 拡張のテンプレート管理画面はこの形をそのまま描く。形を変えたらこの見本も一緒に直す",
+ "about": "`ccnavi --templates --json` の答えの見本。ワークスペースは tests/ticket/test_plan_templates.py の showcase（共通に feature / research / broken、自身のレイヤーに feature（共通と同じ）/ research（共通と中身が違う）/ local（定義に無い型）/ ends（終端が 2 つ）/ notes.txt、プロジェクト lib に lib、下書きの置き場 wip/handoff/.ccnavi/config/project/templates/ に login（TODO が残っている）/ research（共通と同名）/ broken）。root は <root> に置き換える。欄: version、root、layer（一覧の対象のレイヤー）、keywords、templates（共通 + layer の統合結果。各テンプレートの name・layer・path・sha・valid・description・when・plan / feedback（index は計画の中の添字、number は提案にコピーしたときの番号、after は計画の中の添字）・has_flows・flows（index・name・nodes・connections・node_types）・effective（統合結果で使われるか）・usable（使われ、error も無い）・dropped（破棄した理由 reason = invalid / duplicate / conflict と detail）・writable・problems（severity と detail））、layers（共通と各レイヤーの生の中身。path・exists・unreadable・writable・problems・templates）、sums（レイヤーごとの統合結果の索引。各テンプレートの name・layer・effective・dropped。dropped は templates と同じ {reason, detail} か null）、errors / warns / infos、drafts（下書き。効力は無く、templates にも統合結果にも入らない。各下書きの name・tree（置かれたツリー。ワークスペースルートは空）・path（下書きの、ツリーからの相対。wip/handoff/…）・target（取り込み先の、ツリーからの相対。取り込みは ccnavi user handoff <target>）・layer（取り込み先のレイヤー）・sha（下書きのハッシュ）・text（下書きの本文そのまま）・valid・importable（読めて error が無い）・checked_with（検査に使ったフェーズ定義の層。templates の layer＝ファイルが在る層とは別）・exists_in（同じ名前のテンプレートが在るレイヤー。取り込むと置き換えになる）・also_in（同じ中身の下書きを持つほかのツリー。表記は tree と同じで、ワークスペースルートは空）・description・when・plan / feedback / has_flows / flows（templates と同じ）・problems（深刻度は下書きの検査のまま。--lint は error も warn に下げる））。失敗（--show の無い名前、不明な --layer、--draft の失敗）は、この形ではなく {version, ok: false, error} を標準出力に出して終了コード 1。同じ中身の下書きが 2 つのツリー（ワークスペースルートと lib）にあるときは、先に見つけた 1 つにまとめ、もう一方を also_in に入れる。VS Code 拡張のテンプレート管理画面はこの形をそのまま描く。形を変えたらこの見本も一緒に直す",
  "expect": {
   "version": 1,
   "root": "<root>",
@@ -213,13 +213,13 @@
     "usable": false,
     "dropped": {
      "reason": "duplicate",
-     "detail": "`feature` は共通と全欄が同じなので、self の側を捨てた。共通の 1 本を使う"
+     "detail": "`feature` は共通と全欄が同じなので、self の側を破棄した。共通の 1 本を使う"
     },
     "writable": true,
     "problems": [
      {
       "severity": "info",
-      "detail": "`feature` は共通と全欄が同じなので、self の側を捨てた。共通の 1 本を使う"
+      "detail": "`feature` は共通と全欄が同じなので、self の側を破棄した。共通の 1 本を使う"
      }
     ]
    },
@@ -529,13 +529,13 @@
       "usable": false,
       "dropped": {
        "reason": "duplicate",
-       "detail": "`feature` は共通と全欄が同じなので、self の側を捨てた。共通の 1 本を使う"
+       "detail": "`feature` は共通と全欄が同じなので、self の側を破棄した。共通の 1 本を使う"
       },
       "writable": true,
       "problems": [
        {
         "severity": "info",
-        "detail": "`feature` は共通と全欄が同じなので、self の側を捨てた。共通の 1 本を使う"
+        "detail": "`feature` は共通と全欄が同じなので、self の側を破棄した。共通の 1 本を使う"
        }
       ]
      },
@@ -693,7 +693,7 @@
       "effective": false,
       "dropped": {
        "reason": "duplicate",
-       "detail": "`feature` は共通と全欄が同じなので、self の側を捨てた。共通の 1 本を使う"
+       "detail": "`feature` は共通と全欄が同じなので、self の側を破棄した。共通の 1 本を使う"
       }
      },
      {

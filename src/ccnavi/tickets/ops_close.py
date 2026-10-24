@@ -230,7 +230,8 @@ def predecessors_unmet(
 ) -> bool:
     """子の先行が全部 `done/` に在って取り消しでないか。欠けていれば止めて言う。
 
-    承認でも同じ検査を当てるが、承認のあとに先行が動くこと（ユーザが `done/` から戻す）と、置き場を
+    承認でも同じ検査を適用するが、承認のあとに先行が動くこと（ユーザが `done/` から戻す）と、
+    置き場を
     手で動かして承認する進め方があるので、着手の手前でもう一度見る。どの先行が何の
     状態か、どうすればよいかを 1 本ずつ言う。
     """
@@ -267,7 +268,7 @@ def parent_still_busy(
 ) -> bool:
     """親を閉じてよいか。開いている子やレビュー待ちのフェーズがある間は閉じさせない。
 
-    親の承認済みチケットが閉じると止めるときの鍵（cwd から引く親）が消え、レビュー要の
+    親の承認済みチケットが閉じると止めるときのキー（cwd から引く親）が消え、レビュー要の
     フェーズが終わっていても誰も止めなくなる。
     """
     if found.is_child:
@@ -354,7 +355,7 @@ def deliverables_missing(
     if parent is None or not parent.has_plan:
         return False
     item = parent.item_at(found.phase)
-    # 成果物は親に固定した写し（`phases:`）の定義から読む。`phases.yml` は読まない（承認のあとに
+    # 成果物は親に固定したコピー（`phases:`）の定義から読む。`phases.yml` は読まない（承認のあとに
     # 直しても、進行中のフェーズの成果物は変わらない）。
     pt = phasetypes.types_of(parent).get(item.type) if item is not None else None
     if pt is None or not pt.deliverables:
@@ -385,10 +386,10 @@ def deliverables_missing(
 
 
 def _tracked(worktree: str, glob: str) -> bool:
-    """この glob に当たる追跡済みで、作業ツリーにも在るファイルが 1 つでもあるか。
+    """この glob にヒットする追跡済みで、ワークツリーにも在るファイルが 1 つでもあるか。
 
     ワークツリーが無ければ無い。`ls-files` はインデックスを見るので、追跡済みのファイルを
-    消しても `git add` するまでは名前が返る。作業ツリーから消えたもの（`--deleted`）を除く。
+    消しても `git add` するまでは名前が返る。ワークツリーから消えたもの（`--deleted`）を除く。
     名前は同じ読み方の 2 つの出力どうしで比べ、ファイルシステムには聞かない（非 UTF-8 の名前を
     置換文字で読んでも食い違わない）。
     """

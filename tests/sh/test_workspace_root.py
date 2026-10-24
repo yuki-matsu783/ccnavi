@@ -1,7 +1,8 @@
-"""ccnavi_workspace が、プロジェクトの写しではなくワークスペースルートを選ぶこと。
+"""ccnavi_workspace が、プロジェクトのコピーではなくワークスペースルートを選ぶこと。
 
-プロジェクト（projects/<名前>/）が `.ccnavi/scripts/` の写しを持っていても、cwd がその中なら、
-cwd から登って最初に当たるのはプロジェクトになる。そのまま根にすると logs/ や state がプロジェクトの
+プロジェクト（projects/<名前>/）が `.ccnavi/scripts/` のコピーを持っていても、cwd がその中なら、
+cwd から登って最初にヒットするのはプロジェクトになる。
+そのまま根にすると logs/ や state がプロジェクトの
 中にできるので、`projects/` の親にもワークスペースがあれば、そちらを根にする。
 """
 
@@ -75,7 +76,7 @@ class WorkspaceRootIsNotAProjectCopy(unittest.TestCase):
         self.assertEqual(self.root_from(copy, tree), self.ws)
 
     def test_a_directory_that_merely_has_projects_in_its_path(self):
-        # `projects/` の下でも、親にワークスペースが無ければ、最初に当たった写しが根のまま。
+        # `projects/` の下でも、親にワークスペースが無ければ、最初にヒットしたコピーが根のまま。
         other = os.path.join(self.ws, "projects", "p", "projects", "q")
         os.makedirs(other)
         put_scripts(other)

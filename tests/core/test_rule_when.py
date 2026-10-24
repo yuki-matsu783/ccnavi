@@ -20,7 +20,7 @@ from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 # 「*.crt か、vault/ の下で .md でないもの」。組み込みの認証情報の土台（builtin:credentials）に
-# 当たらない名前にしてある（土台は設定で切れず、当たると when の検査が土台の deny に紛れる）。
+# ヒットしない名前にしてある（土台は設定で切れず、ヒットすると when の検査が土台の deny に紛れる）。
 VAULT = {
     "id": "vault",
     "match": "Write|Edit",
@@ -30,7 +30,7 @@ VAULT = {
             {"all": [{"glob": "*/vault/*"}, {"not": {"glob": "*.md"}}]},
         ]
     },
-    "message": "鍵は書かない",
+    "message": "キーは書かない",
 }
 
 
@@ -174,7 +174,7 @@ class ErrorTest(unittest.TestCase):
         self.check({"glob": "{!root}/x"}, "when.glob の ", "`glob` には書けない")
         self.check({"regex": "x{!root}"}, "^")
 
-    def test_except_の誤りもルールごと捨てる(self):
+    def test_except_の誤りもルールごと破棄する(self):
         self.check({"glob": "*"}, "except", "空", **{"except": []})
 
 
@@ -265,7 +265,8 @@ class NotRootRefusedTest(unittest.TestCase):
 
 
 class JudgeTest(unittest.TestCase):
-    """hook の判定で when が効く。Bash はコマンド列の全体に当て、入れ子のコマンドにも当たる。"""
+    """hook の判定で when が効く。Bash はコマンド列の全体に適用し、
+    入れ子のコマンドにもヒットする。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -346,7 +347,7 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(self.says("npm publish --dry-run"), ("ask", False))
         self.assertEqual(self.says("sudo npm publish"), ("deny", True))
         self.assertEqual(self.says("sudo npm publish --dry-run"), ("ask", False))
-        # コマンド列の全体に当てる（lint が warn で言う形）
+        # コマンド列の全体に適用する（lint が warn で言う形）
         self.assertEqual(self.says("npm publish; echo --dry-run"), ("ask", False))
 
 
@@ -385,27 +386,27 @@ class LintTest(unittest.TestCase):
         found = [f"{p.rule} {p.detail}" for p in problems if p.severity == rules.SEVERITY_ERROR]
         self.assertTrue(any("deny:x" in d and "when の all が空" in d for d in found), found)
 
-    def test_not_の下が何にでも当たる(self):
+    def test_not_の下が何にでもヒットする(self):
         found = self.warns(
             self.lint([self.deny({"all": [{"glob": "*.py"}, {"not": {"glob": "*"}}]})])
         )
         self.assertTrue(
-            any("when の all は何にも当たらない。このルールは" in d for d in found), found
+            any("when の all は何にもヒットしない。このルールは" in d for d in found), found
         )
 
-    def test_any_の中に何にでも当たる個別条件(self):
+    def test_any_の中に何にでもヒットする個別条件(self):
         found = self.warns(self.lint([self.deny({"any": [{"glob": "*.py"}, {"regex": "^"}]})]))
-        self.assertTrue(any("when の any は何にでも当たる" in d for d in found), found)
+        self.assertTrue(any("when の any は何にでもヒットする" in d for d in found), found)
 
     def test_中のノードは条件を絞っていないと言う(self):
         when = {"all": [{"glob": "*.py"}, {"any": [{"glob": "*.md"}, {"glob": "*"}]}]}
         found = self.warns(self.lint([self.deny(when)]))
         self.assertTrue(
-            any("when.all[1] の any は何にでも当たる。条件を" in d for d in found), found
+            any("when.all[1] の any は何にでもヒットする。条件を" in d for d in found), found
         )
         when = {"any": [{"glob": "*.py"}, {"not": {"regex": ".*"}}]}
         found = self.warns(self.lint([self.deny(when)]))
-        self.assertTrue(any("when.any[1] の not は何にも当たらない" in d for d in found), found)
+        self.assertTrue(any("when.any[1] の not は何にもヒットしない" in d for d in found), found)
 
     def test_同じ個別条件が肯定と否定で並ぶと打ち消し合うと言う(self):
         when = {"all": [{"glob": "*.py"}, {"not": {"glob": "*.py"}}]}
@@ -413,8 +414,8 @@ class LintTest(unittest.TestCase):
         self.assertTrue(
             any("when の all に、同じ個別条件が肯定と否定で並んでいる" in d for d in found), found
         )
-        self.assertTrue(any("この all は何にも当たらない" in d for d in found), found)
-        # any なら何にでも当たる。同じ演算子の入れ子は開いて見る
+        self.assertTrue(any("この all は何にもヒットしない" in d for d in found), found)
+        # any なら何にでもヒットする。同じ演算子の入れ子は開いて見る
         when = {"any": [{"glob": "*.md"}, {"any": [{"regex": "^a"}, {"not": {"regex": "^a"}}]}]}
         found = self.warns(self.lint([self.deny(when)]))
         self.assertTrue(any("when の any に、同じ個別条件が" in d for d in found), found)
@@ -437,7 +438,7 @@ class LintTest(unittest.TestCase):
         found = self.warns(self.lint([VAULT], [allow]))
         self.assertFalse(any("when の not" in d for d in found), found)
 
-    def test_stop_に当たらない組み合わせ条件(self):
+    def test_stop_にヒットしない組み合わせ条件(self):
         stop = {
             "id": "nudge",
             "match": "Stop",
@@ -449,10 +450,10 @@ class LintTest(unittest.TestCase):
         self.assertTrue(any("(stop)" in d and "when" in d for d in found), found)
         ok = {**stop, "when": {"any": [{"glob": "*"}]}}
         found = self.warns(self.lint([VAULT], [ok]))
-        self.assertFalse(any("(stop)" in d and "当たらないので" in d for d in found), found)
+        self.assertFalse(any("(stop)" in d and "ヒットしないので" in d for d in found), found)
 
     def test_広い_allow_は組み合わせ条件の書き方から見積もる(self):
-        # `not: {regex: '^rm'}` は "x" に当たるが、何にでも当たるわけではない
+        # `not: {regex: '^rm'}` は "x" にヒットするが、何にでもヒットするわけではない
         narrow = {
             "id": "not-rm",
             "match": "Bash",
@@ -471,7 +472,7 @@ class LintTest(unittest.TestCase):
             any(d.startswith("all 広い allow") and "何にでもヒットする" in d for d in found), found
         )
 
-    def test_何にでも当たる単体の_deny(self):
+    def test_何にでもヒットする単体の_deny(self):
         def deny(rid: str, **body) -> dict:
             return {"id": rid, "match": "Bash", "message": "m", **body}
 
@@ -486,26 +487,26 @@ class LintTest(unittest.TestCase):
                 ]
             )
         )
-        said = [d.split(" ")[0] for d in found if "本体の" in d and "何にでも当たる" in d]
+        said = [d.split(" ")[0] for d in found if "本体の" in d and "何にでもヒットする" in d]
         self.assertEqual(sorted(said), ["caret", "dot-star", "stars"], found)
         # ask と allow には言わない
         found = self.warns(self.lint([VAULT], [{"id": "any", "match": "Bash", "regex": ".*"}]))
         self.assertFalse(any("本体の" in d for d in found), found)
 
-    def test_空文字以外のすべてに当たる本体も言う(self):
-        # 判定は空の対象を見ない（Rule.matches）ので、`.` は何にでも当たるのと同じ
+    def test_空文字以外のすべてにヒットする本体も言う(self):
+        # 判定は空の対象を見ない（Rule.matches）ので、`.` は何にでもヒットするのと同じ
         found = self.warns(
             self.lint([{"id": "dot", "match": "Bash", "regex": ".", "message": "m"}])
         )
         self.assertTrue(
-            any(d.startswith("dot ") and "本体の regex は何にでも当たる" in d for d in found),
+            any(d.startswith("dot ") and "本体の regex は何にでもヒットする" in d for d in found),
             found,
         )
         found = self.warns(self.lint([{"id": "x", "match": "Bash", "regex": "x", "message": "m"}]))
         self.assertFalse(any("本体の" in d for d in found), found)
 
-    def test_記号だけに当たる本体は何にでも当たると言わない(self):
-        # 英字を含む文字列には当たらないので、何にでも当たるわけではない
+    def test_記号だけにヒットする本体は何にでもヒットすると言わない(self):
+        # 英字を含む文字列にはヒットしないので、何にでもヒットするわけではない
         for written in ({"regex": "[^\\w./ -]"}, {"regex": "\\W"}, {"glob": "*[!a-z]*"}):
             rule = {"id": "sym", "match": "Bash", "message": "m", **written}
             found = self.warns(self.lint([rule]))
@@ -535,7 +536,7 @@ class LintTest(unittest.TestCase):
     def test_共通の_rules_yml_の_no_powershell_は言わない(self):
         problems = rule_lint.file_problems(common_path(ROOT, "rules"), ROOT)
         found = self.warns(problems)
-        self.assertFalse(any("本体の" in d and "何にでも当たる" in d for d in found), found)
+        self.assertFalse(any("本体の" in d and "何にでもヒットする" in d for d in found), found)
 
     def test_id_の無いルールは_error_で読まない(self):
         raw = {k: v for k, v in VAULT.items() if k != "id"}
@@ -571,7 +572,7 @@ class MergeTest(unittest.TestCase):
         swapped = {**VAULT, "when": {"all": [{"glob": "*.crt"}, {"glob": "*/vault/*"}]}}
         problems = ruleload.merge_rules(base, self.rule_set(swapped), "lib")
         self.assertEqual(len(base.deny), 3)
-        # 全欄が同じなら後ろを捨てる
+        # 全欄が同じなら後ろを破棄する
         problems = ruleload.merge_rules(base, self.rule_set(VAULT), "lib")
         self.assertEqual(len(base.deny), 3)
         self.assertEqual([p.severity for p in problems], [rules.SEVERITY_INFO])
@@ -665,7 +666,7 @@ class CommandLineTest(unittest.TestCase):
             json.dump(
                 {
                     "deny": [
-                        {"tool": "Write", "subject": "/repo/k.crt", "why": "鍵"},
+                        {"tool": "Write", "subject": "/repo/k.crt", "why": "キー"},
                         {"tool": "Write", "subject": "/repo/vault/token", "why": "秘密"},
                     ],
                     "ask": [

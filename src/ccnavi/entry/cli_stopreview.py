@@ -59,7 +59,7 @@ def run(
        それ以外は 0 で終える。
     4. 状態の置き場が無いときは、`material` なら候補なし（`_not_candidate`）、`record` は
        `_ok` で終える。
-    5. 共有の鍵（`stopreview.shared_key`）を作り、作れなければ記録して、同じように終える。
+    5. 共有のキー（`stopreview.shared_key`）を作り、作れなければ記録して、同じように終える。
     6. 期限切れを片付け（`stopreview.expire_overdue`）、`material` は `_material`、`record` は
        `_record` へ渡す。例外は、判定役が作業を止めないように決まった形で終える。
     """
@@ -146,7 +146,7 @@ def _unsent_body(root: str, proposal: dict) -> str:
 
 
 def _body(root: str, proposal: dict) -> str:
-    """送った版の提案の本文。送ったコミットから読む（作業ツリーの現在の姿ではなく、送った版）。
+    """送った版の提案の本文。送ったコミットから読む（ワークツリーの現在の姿ではなく、送った版）。
 
     読めないときは空文字（材料に本文が無いと示す）。送った提案のファイルは `todo/` の下の md。
     """

@@ -2,13 +2,14 @@
 
 エージェントが書けない保護対象（テンプレート・レイヤーの設定・docs・hook とラッパーの sh など）は、
 `wip/handoff/<ツリーからの相対パス>` に下書きを置き、ユーザがこの取り込みで元の場所へ書く。
-下書きを作るのは `ccnavi-stage.sh`（元のファイルを写し、`<下書き>.orig` に写した時点の元を残す）か、
+下書きを作るのは `ccnavi-stage.sh`（元のファイルをコピーし、
+`<下書き>.orig` にコピーした時点の元を残す）か、
 テンプレートなら `ccnavi --templates --draft`。
 
 ## 取り込み先（許可リスト）
 
 取り込み先は、下書きがあるツリー（`--root`）の同じ相対パス。取り込めるのは種類の表（`KINDS`）に
-当たるものだけで、パスは全要素を NFC と `pathcase.fold` にそろえてから当てる。表に当たらない
+ヒットするものだけで、パスは全要素を NFC と `pathcase.fold` にそろえてから適用する。表にヒットしない
 下書きは対象外として件数だけを数え、error にはしない（`wip/handoff/` には学びの雛形や再現用の
 スクリプトも置かれる）。表を直すときは、行を足し、docs の表も直す（テストが食い違いを見る）。
 
@@ -19,7 +20,7 @@
   両方を断る
 - バイナリ（NUL を含む）と、UTF-8 として読めないもの
 - 種類の表で新規作成を許さない種類の、取り込み先に無いもの
-- 写した時点の元（`.orig`）と今の取り込み先が違うもの（`conflict`）
+- コピーした時点の元（`.orig`）と今の取り込み先が違うもの（`conflict`）
 
 選んだ対象に 1 つでも error か `conflict` があれば、何も書かない。
 
@@ -65,7 +66,7 @@ JSON_VERSION = 1
 # 下書きの置き場（ツリーのルートからの相対）。
 HANDOFF_PARTS = (ticket_places.WIP_ROOT, "handoff")
 HANDOFF_REL = "/".join(HANDOFF_PARTS)
-# `ccnavi-stage.sh` が写した時点の元を残す名前の後ろ。
+# `ccnavi-stage.sh` がコピーした時点の元を残す名前の後ろ。
 ORIG_SUFFIX = ".orig"
 
 KIND_TEMPLATE = "template"
@@ -94,7 +95,7 @@ class Kind:
     id: str
     # docs に載せる形（ツリーからの相対）。表と docs の食い違いの検出が読む。
     shown: tuple[str, ...]
-    # 全要素を NFC と fold にそろえた相対パス（"/" 区切り）に当てる式。
+    # 全要素を NFC と fold にそろえた相対パス（"/" 区切り）に適用する式。
     patterns: tuple[str, ...]
     # 取り込み先に無いファイルを新しく作れるか。
     new: bool
@@ -163,7 +164,7 @@ KINDS: tuple[Kind, ...] = (
             r"\.claude/settings\.json",
             r"\.claude/settings\.local\.json",
             # スキルの frontmatter は、使えるツール（allowed-tools）や hook を持てるので、
-            # 権限を広げる記述になりうる。docs ではなく防御として、端末でだけ取り込む。
+            # 権限を広げる記述になりうる。docs ではなく防御として、ターミナルでだけ取り込む。
             rf"\.claude/skills/{_DEEP}\.md",
         ),
         new=False,
@@ -180,12 +181,12 @@ def fold_part(name: str) -> str:
 
 
 def key_of(rel: str) -> str:
-    """相対パス（"/" 区切り）を、表に当てて比べるための形にする。"""
+    """相対パス（"/" 区切り）を、表に適用して比べるための形にする。"""
     return "/".join(fold_part(part) for part in rel.split("/"))
 
 
 def kind_of(key: str) -> Kind | None:
-    """そろえた相対パスが当たる種類。どれにも当たらなければ None（対象外）。"""
+    """そろえた相対パスがヒットする種類。どれにもヒットしなければ None（対象外）。"""
     for kind in KINDS:
         if kind.matches(key):
             return kind
@@ -235,10 +236,10 @@ class Found:
 
 
 def walk(tree_root: str) -> tuple[list[Found], int, str]:
-    """置き場の下書き（ふつうのファイルとリンク）と、表に当たらない数と、置き場そのものの苦情。
+    """置き場の下書き（ふつうのファイルとリンク）と、表にヒットしない数と、置き場そのものの苦情。
 
     リンクのディレクトリの中へは降りない（降りないので、その中の下書きは取り込まれない）。
-    `.orig`（写した時点の元）と、途中を見せない書き方の残した一時ファイルは下書きに数えない。
+    `.orig`（コピーした時点の元）と、途中を見せない書き方の残した一時ファイルは下書きに数えない。
     """
     base = handoff_dir(tree_root)
     if not os.path.lexists(base):
@@ -322,7 +323,7 @@ class Entry:
     conflict: bool = False
     diff: str = ""
     selected: bool = False
-    # 種類はボードで取り込めるが、中身が防御の記述を動かすので、端末に限る理由
+    # 種類はボードで取り込めるが、中身が防御の記述を動かすので、ターミナルに限る理由
     # （`rules.yml` の `guard-*` の変更や deny の削除。_defense_change）。空なら種類のまま。
     defense: str = ""
 
@@ -421,14 +422,14 @@ def wanted_key(arg: str) -> tuple[str, str]:
 def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None) -> Plan:
     """下書きを読み、検査し、取り込み先との差分を作る。何も書かない。
 
-    `wanted` は引数で指したパス（ツリーからの相対）。None なら、表に当たって `unchanged` でない
+    `wanted` は引数で指したパス（ツリーからの相対）。None なら、表にヒットして `unchanged` でない
     もの全部を選ぶ。
 
     処理フロー:
     1. `walk` で下書きを集める。拒否があれば、その理由を入れて返す。
     2. 同じ取り込み先に落ちる下書きが複数ないかを数える。複数なら、どちらにも理由を足す。
     3. 各下書きを `_read` で読み、`Entry` にする。
-    4. `wanted` が None なら、未変更でないものを選ぶ。指定があれば `wanted_key` で引き当て、
+    4. `wanted` が None なら、未変更でないものを選ぶ。指定があれば `wanted_key` で引き適用し、
        表に無ければ理由を入れて返す。
     5. `_check_contents` で中身を検査し、`_make_diff` で取り込み先との差分を作る。
     """
@@ -463,7 +464,7 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
             if hit is None:
                 plan.error = (
                     f"{_line(arg)} の下書きが {HANDOFF_REL}/ に無いか、"
-                    "取り込める種類の表に当たらない"
+                    "取り込める種類の表にヒットしない"
                 )
                 return plan
             hit.selected = True
@@ -482,7 +483,7 @@ def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
     3. `_locate_layer` で下書きのレイヤーを求め、`spelled` で取り込み先を決める。
     4. 取り込み先の途中にリンクがあるか、ツリーの外を指すなら断る。
     5. 取り込み先があれば読む。無いのに種類が新しく作れないものなら断る。
-    6. `.orig` があれば読み、写したあとに取り込み先が変わっていれば `conflict` を立てる。
+    6. `.orig` があれば読み、コピーしたあとに取り込み先が変わっていれば `conflict` を立てる。
     """
     parts = entry.key.split("/")
     if any(part.startswith(".git") for part in parts):
@@ -522,11 +523,11 @@ def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
         entry.has_orig = True
         orig, why = flow.read_bytes(entry.orig_path, root)
         if orig is None:
-            entry.errors.append(f"写した時点の元（{ORIG_SUFFIX}）を読めない（{why}）")
+            entry.errors.append(f"コピーした時点の元（{ORIG_SUFFIX}）を読めない（{why}）")
             return
         entry.orig = orig
         if entry.current != orig:
-            # 写したあとに取り込み先が変わった。取り込むと、その変更を黙って上書きする。
+            # コピーしたあとに取り込み先が変わった。取り込むと、その変更を黙って上書きする。
             entry.conflict = True
 
 
@@ -559,7 +560,7 @@ def _locate_layer(conf: settings.Settings, root: str, entry: Entry) -> None:
         entry.layer = settings.LAYER_COMMON
         if not plan_templates.common_writable(conf, root):
             entry.errors.append(
-                "このツリーの `.ccnavi/config/common/` は共通レイヤーの写し（ミラー）なので"
+                "このツリーの `.ccnavi/config/common/` は共通レイヤーのコピー（ミラー）なので"
                 "書かない。"
                 "ワークスペースのツリーで取り込む"
             )
@@ -638,7 +639,7 @@ _DECISIONS = ("deny", "ask", "allow")
 def _rule_rows(raw: bytes | None) -> dict[tuple[str, str], tuple[str, ...]] | None:
     """ルールファイルの各ルールを、(判定, id) → 中身（キーを並べた JSON）の組にする。
 
-    id の無いルールは中身そのものを鍵にする。読めなければ None。
+    id の無いルールは中身そのものをキーにする。読めなければ None。
     """
     if raw is None:
         return {}
@@ -664,11 +665,11 @@ def _rule_rows(raw: bytes | None) -> dict[tuple[str, str], tuple[str, ...]] | No
 
 
 def _defense_change(current: bytes | None, raw: bytes | None) -> str:
-    """`rules.yml` の下書きが防御の記述を動かすなら、端末に限る理由。動かさなければ空。
+    """`rules.yml` の下書きが防御の記述を動かすなら、ターミナルに限る理由。動かさなければ空。
 
     防御の記述とみなすのは、`guard-` で始まる id のルール（足す・消す・判定を移す・`except` を
     含む中身を変える）と、今ある deny（消す・中身を変える）。deny を足すのは止める側への変更なので
-    数えない。どちらかが読めなければ、確かめられないので端末に限る。
+    数えない。どちらかが読めなければ、確かめられないのでターミナルに限る。
     """
     before = _rule_rows(current)
     after = _rule_rows(raw)
@@ -880,7 +881,7 @@ def board_refused(plan: Plan) -> str:
     why = f"{first.kind.id} の種類で" if not first.kind.board else f"{first.defense}ので"
     return (
         f"{paths} は {why}、ボードからは取り込めない。"
-        "端末で `ccnavi user handoff <パス> --yes --expect <ハッシュ>` を打つ"
+        "ターミナルで `ccnavi user handoff <パス> --yes --expect <ハッシュ>` を打つ"
     )
 
 
@@ -890,7 +891,7 @@ def not_ok_reason(plan: Plan) -> str:
         return plan.error
     bad = [e for e in plan.selected if e.state in (STATE_REJECTED, STATE_CONFLICT)]
     named = "、".join(
-        f"{e.rel}（{e.errors[0] if e.errors else '写したあとに取り込み先が変わった'}）"
+        f"{e.rel}（{e.errors[0] if e.errors else 'コピーしたあとに取り込み先が変わった'}）"
         for e in bad[:10]
     )
     return f"選んだ対象に error か conflict がある: {named}。何も書いていません"
@@ -1039,7 +1040,7 @@ def _clean_draft(root: str, entry: Entry, done: Applied) -> None:
 
 
 def pending(tree_root: str) -> list[str]:
-    """表に当たる下書きのうち、取り込み先と中身が違うもの（取り込んでいないもの）の相対パス。
+    """表にヒットする下書きのうち、取り込み先と中身が違うもの（取り込んでいないもの）の相対パス。
 
     `ready` は `wip/` を消すので、取り込んでいない下書きが残っていれば止める。読めない下書きと
     取り込み先も「違う」に数える（止める側）。共通の置き場がミラーかどうかは見ない。

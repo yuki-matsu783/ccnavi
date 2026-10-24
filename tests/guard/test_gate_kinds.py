@@ -102,7 +102,7 @@ class ClassificationTest(HookCase):
     """分類を決める分岐ごとに、dry-run で止まるか報告だけかを固定する。"""
 
     def test_a_raw_git_stays_an_aux_stop_when_a_layer_rule_also_hits(self):
-        # 層の deny（認証情報）と同時に当たっても、生の git の補助止めは dry-run で効く。
+        # 層の deny（認証情報）と同時にヒットしても、生の git の補助止めは dry-run で効く。
         decision, text = self.bash("git status; cat .env", mode="dry-run")
         self.assertEqual(decision, "deny", text)
         self.assertIn("still applies", text)

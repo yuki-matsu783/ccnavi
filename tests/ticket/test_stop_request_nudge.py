@@ -364,7 +364,7 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assert_not_asked(self.stop(self.parent_tree, session="s2"))
 
     def test_a_start_without_agent_id_leaves_no_mark(self):
-        """鍵が決まらないので印は置かない。その体は数えられず、促しが出うる（制限）。"""
+        """キーが決まらないので印は置かない。その体は数えられず、促しが出うる（制限）。"""
         self.family()
         result = self.hook("SubagentStart", "", self.parent_tree)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -413,7 +413,7 @@ class RequestNudgeTest(base.StopNudgeTest):
             self.session_start(source)
             self.assertFalse(os.path.exists(self.running_file("a1")), source)
             self.asked(self.stop(self.parent_tree))
-            # 次の回の前提を揃える（促しの記録を捨てる）。
+            # 次の回の前提を揃える（促しの記録を破棄する）。
             os.remove(ops_stop.nudge_path(self.state, "s1"))
 
     def test_startup_and_resume_keep_the_mark_of_a_session_with_the_same_prefix(self):

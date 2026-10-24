@@ -1,4 +1,4 @@
-"""着手の前に共通の工程スキルをプロジェクトの `skills/` へ写す。
+"""着手の前に共通の工程スキルをプロジェクトの `skills/` へコピーする。
 
 fixture は tests/config/test_config_sync.py と同じ ConfigUnionHarness を使う。ワークスペースの
 `.claude/skills/` に工程スキル（`process: true`）と、そうでないスキルを置く。
@@ -7,11 +7,11 @@ fixture は tests/config/test_config_sync.py と同じ ConfigUnionHarness を使
 
 
 1. 親の `ticket start` が、工程スキルの `SKILL.md` と `references/common/` の `.md` を
-   親のワークツリーの `skills/<工程>/` へ写す。`references/` のそれ以外(プロジェクト固有)と、
-   `process: true` を持たないスキルは写さない
-2. `common/` は共通の写し。同じパスは共通の中身で上書きし、共通側に無くなった `.md` は消す
+   親のワークツリーの `skills/<工程>/` へコピーする。`references/` のそれ以外(プロジェクト固有)と、
+   `process: true` を持たないスキルはコピーしない
+2. `common/` は共通のコピー。同じパスは共通の中身で上書きし、共通側に無くなった `.md` は消す
    (空になったディレクトリも片付ける)。`references/` の common 以外(プロジェクト固有)は
-   上書きも削除もしない。消す変更も、写しとして例外に通すのは共通側に無いファイルだけ
+   上書きも削除もしない。消す変更も、コピーとして例外に通すのは共通側に無いファイルだけ
 3. 中身が同じなら何も書かず、知らせない
 """
 
@@ -56,7 +56,8 @@ class SkillSyncTest(ConfigUnionHarness):
         return tree, started
 
     def test_start_copies_only_process_skills(self):
-        """1: 工程スキルの SKILL.md と references を写し、process: true の無いスキルは写さない"""
+        """1: 工程スキルの SKILL.md と references をコピーし、
+        process: true の無いスキルはコピーしない"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         write(self.source("process-test", "references", "common", "unit", "basics.md"), "# 基本\n")
         write(self.source("process-test", "references", "common", "ccnavi-index.jsonl"), "{}\n")
@@ -135,7 +136,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(skillsync.processes(self.ws), ["process-test"])
 
     def test_symlink_under_a_process_stops_the_copy(self):
-        """2: 工程スキルの下にシンボリックリンクがあれば、何も写さず理由を返す"""
+        """2: 工程スキルの下にシンボリックリンクがあれば、何もコピーせず理由を返す"""
         from ccnavi.tickets import skillsync
 
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
@@ -148,7 +149,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertIn("シンボリックリンク", why)
 
     def test_the_start_write_and_push_carries_the_copied_skills(self):
-        """1: 書いたパスの一覧(基点は親のワークツリー)で、写した工程スキルは外でも通す"""
+        """1: 書いたパスの一覧(基点は親のワークツリー)で、コピーした工程スキルは外でも通す"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         write(self.source("process-test", "references", "common", "unit", "basics.md"), "# 基本\n")
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
@@ -171,7 +172,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertNotIn("置き場の外", started.stderr)
 
     def test_only_an_exact_copy_in_an_approved_parent_reads_as_synced(self):
-        """1: 中身が違う、元リポジトリ、工程スキルでないスキル、消す変更は写しと読まない"""
+        """1: 中身が違う、元リポジトリ、工程スキルでないスキル、消す変更はコピーと読まない"""
         from ccnavi.infra import settings
         from ccnavi.tickets import skillsync
 
@@ -187,7 +188,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertTrue(
             skillsync.is_synced_write(conf, self.ws, copied, process_skill("process-test").encode())
         )
-        # 消す変更は写しではない。
+        # 消す変更はコピーではない。
         self.assertFalse(skillsync.is_synced_write(conf, self.ws, copied, None))
         # 工程スキルでないものと、工程スキルの外のファイルは外す。
         other = os.path.join(tree, "skills", "commit", "SKILL.md")
@@ -202,7 +203,8 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertFalse(skillsync.is_synced_write(conf, self.ws, main_copy))
 
     def test_only_the_common_references_are_copied(self):
-        """1: references/ の common 以外(プロジェクト固有)は、ワークスペースにあっても写さない"""
+        """1: references/ の common 以外(プロジェクト固有)は、
+        ワークスペースにあってもコピーしない"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         write(self.source("process-test", "references", "common", "shared.md"), "共通\n")
         write(self.source("process-test", "references", "project", "workspace-only.md"), "固有\n")
@@ -216,7 +218,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(os.path.join(base, "loose.md")))
 
     def test_a_copy_outside_common_does_not_read_as_synced(self):
-        """1: 中身が共通と同じでも、references/ の common 以外は写しと読まない"""
+        """1: 中身が共通と同じでも、references/ の common 以外はコピーと読まない"""
         from ccnavi.infra import settings
         from ccnavi.tickets import skillsync
 
@@ -235,7 +237,7 @@ class SkillSyncTest(ConfigUnionHarness):
         )
 
     def test_symlinked_common_dir_stops_the_copy(self):
-        """2: common/ そのものがシンボリックリンクなら、何も写さず理由を返す"""
+        """2: common/ そのものがシンボリックリンクなら、何もコピーせず理由を返す"""
         from ccnavi.tickets import skillsync
 
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
@@ -292,7 +294,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertNotIn("置き場の外", started.stderr)
 
     def test_deletions_read_as_synced_only_for_files_gone_from_the_source(self):
-        """1: 消す変更を写しと読むのは、共通側に無い common/ の .md だけ"""
+        """1: 消す変更をコピーと読むのは、共通側に無い common/ の .md だけ"""
         from ccnavi.infra import settings
         from ccnavi.tickets import skillsync
 

@@ -406,11 +406,12 @@ class ChromeBranchFieldTest(unittest.TestCase):
             PARENT: {"head": HEAD, "files": rival},
         }
         found = self.ask("families", candidates=[BRANCH, PARENT], branches=branches)
-        self.assertTrue(all("1 本でない" in f["conflict"] for f in found["families"]), found)
+        conflicts = [f["conflict"] for f in found["families"]]
+        self.assertTrue(all("1 本ではありません" in c for c in conflicts), found)
         board = self.ask("board", branches=branches, absent=[])
-        self.assertIn("1 本でない", board.get("undecided", ""), board)
+        self.assertIn("1 本ではありません", board.get("undecided", ""), board)
         plan = self.ask("plan", branches=branches, absent=[], ids=[CHILD])
-        self.assertIn("1 本でない", plan.get("error", ""), plan)
+        self.assertIn("1 本ではありません", plan.get("error", ""), plan)
 
     def test_a_predecessor_family_with_two_branches_is_not_judged(self):
         other = "feature-20-dep"
@@ -424,7 +425,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
         self.assertEqual(closure["ambiguous"], [other])
         board = self.ask("board", branches=branches)
         self.assertIn(
-            "先行の親子のチケット（feature-20-dep）になるブランチが 1 本でない",
+            "先行の親子のチケット（feature-20-dep）になるブランチが 1 本ではありません",
             board["undecided"],
         )
 

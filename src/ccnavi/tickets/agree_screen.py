@@ -1,4 +1,4 @@
-"""承認の画面。候補ごとに、計画・待ち方・フェーズと、改版の差分を並べる文面。
+"""承認の画面。候補ごとに、計画・先行関係・フェーズと、改版の差分を並べる文面。
 
 agree から分けた。agree を読まない。
 """
@@ -37,7 +37,7 @@ def approved_text(
     lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
     for t in tickets:
         if t.ticket in revisions:
-            where = "親の改版。計画・写し・範囲のどれかが新しくなった"
+            where = "親の改版。計画・コピー・範囲のどれかが新しくなった"
         elif t.is_child:
             where = f"親 {t.parent}、フェーズ {t.phase}"
         else:
@@ -150,7 +150,7 @@ def screen(
     3. 親なら、編集できる範囲（allow・ask・deny の意味を添える）を出す
     4. 範囲の下に、チケットが宣言したが書き込めない場所（`cand.overflow`）を出す
     5. 子は人間レビューと先行、親は計画・フェーズ間の先行（`_plan_lines`・
-       `_workflow_lines`）・写しの定義（`_copy_lines`）を出す
+       `_workflow_lines`）・コピーの定義（`_copy_lines`）を出す
     6. 課題・理由・出どころ（`_origin_line`）を出し、判定に使われない記述（警告）を末尾に置く
     """
     lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
@@ -303,7 +303,7 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
     """親に固定する定義を 3 つに分けて出す（この親が使う定義・使われていない定義・
     `phases.yml` にあってこの親では使わない定義）。
 
-    写しの中身は `phases.yml` と同じ（承認が確かめる）ので、ユーザが読むのは「どの定義をこの親に
+    コピーの中身は `phases.yml` と同じ（承認が確かめる）ので、ユーザが読むのは「どの定義をこの親に
     固定し、どれを外したか」。
     """
     types = types or {}
@@ -315,7 +315,7 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
     if used:
         lines.append("■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）")
         lines.append(
-            "    承認したときの phases.yml と同じ中身を親に写して固定する。"
+            "    承認したときの phases.yml と同じ中身を親にコピーして固定する。"
             "承認後に phases.yml を変更しても、この親チケットの編集可能範囲・"
             "確認対象・成果物は変わりません。"
         )
@@ -372,8 +372,8 @@ def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket
 def _scope_items(t: ticket_model.Ticket, name: str) -> list[tuple[str, str]]:
     """差分で比べる項。`(種別, 式)` の組で、同じ項の重複は 1 つにまとめる。
 
-    glob `src/app` と regex `src/app` は文字列が同じでも当たる範囲が違う（regex は先頭一致で、
-    `src/application.py` にも当たる）。文字列だけで比べると、署名が違うのに差分が空になり、
+    glob `src/app` と regex `src/app` は文字列が同じでもヒットする範囲が違う（regex は先頭一致で、
+    `src/application.py` にもヒットする）。文字列だけで比べると、署名が違うのに差分が空になり、
     承認する人には範囲の広がりが見えなくなる。種別を組に入れて比べ、表示のときだけ書き分ける。
     """
     items = [
@@ -389,7 +389,7 @@ def _shown(item: tuple[str, str]) -> str:
 
 def _copy_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:
     """改版の `phases:` の差分。改版が実際に書く frontmatter（`agree_digest.revised_front` と同じ
-    差し替え。写しは提案の値）と承認済みチケットの写しを比べる。足した・外した・変わった定義。"""
+    差し替え。コピーは提案の値）と承認済みチケットのコピーを比べる。足した・外した・変わった定義。"""
     before = phasetypes.types_of(current)
     written = agree_digest.revised_front(current, revised).get(phasetypes.COPY_KEY)
     after = phasetypes.read_copy(written)[0] if written is not None else {}

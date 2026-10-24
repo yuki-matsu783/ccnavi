@@ -32,33 +32,34 @@
 
 ## 強さ
 
-同じ呼び出しに複数のタイプが当たることがある。強い順に `deny` `ask` `allow`。
-1 件でも `deny` に当たれば拒否で、`ask` があれば確認、どちらも無く `allow` に
-当たれば許可になる。どこにも当たらなければ、ccnavi は判定を持たず、
+同じ呼び出しに複数のタイプがヒットすることがある。強い順に `deny` `ask` `allow`。
+1 件でも `deny` にヒットすれば拒否で、`ask` があれば確認、どちらも無く `allow` に
+ヒットすれば許可になる。どこにもヒットしなければ、ccnavi は判定を持たず、
 Claude Code の権限モードに従う（判定は cli.py）。
 
 強い側を先に見るのは、緩める側のルールを 1 行足しただけで保護が消える形を
 作らないため。`allow` は「まだ何も言われていない場所」に許可を置くもので、
 `deny` に例外を作る手段ではない。
 
-`allow` に当たっても、Claude Code へ「許可」は返さない。判定を返すのは `deny` と
-`ask` のときだけで（judge.refuse）、`allow` は記録に残して終わる。当たって変わるのは、
+`allow` にヒットしても、Claude Code へ「許可」は返さない。判定を返すのは `deny` と
+`ask` のときだけで（judge.refuse）、`allow` は記録に残して終わる。ヒットして変わるのは、
 ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` / `bypassPermissions`）を
-起こさないことと、`additionalContext` を当てる先になること。Claude Code 側の権限の
+起こさないことと、`additionalContext` を適用する先になること。Claude Code 側の権限の
 扱いはルールファイルからは変えられない。
 
 ## 表記の大文字小文字
 
-`glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。`*/.ccnavi/*` は
-`.Ccnavi/config/project/rules.yml` にも当たる。当たり方が機械で変わると、同じルールファイルが
+`glob` も `regex` も、どの機械でも大文字小文字を区別せずに適用する。`*/.ccnavi/*` は
+`.Ccnavi/config/project/rules.yml` にもヒットする。ヒットの仕方が機械で変わると、
+同じルールファイルが
 ある機械では止め、別の機械では通す（risk.py と phasetypes.py の範囲も同じ）。
 区別が要る `regex` は `(?-i:...)` で囲む。囲むのは区別したい部分だけでよく、
-否定の文字クラス（`[^c]` のような除外）を持つルールは、区別せずに当てると除外の側が
+否定の文字クラス（`[^c]` のような除外）を持つルールは、区別せずに適用すると除外の側が
 広がるのでそこを囲む。
 
 ## ワークスペースルートの合言葉
 
-`{root}` はワークスペースルート（hook なら CLAUDE_PROJECT_DIR、端末なら --root）の実パスに
+`{root}` はワークスペースルート（hook なら CLAUDE_PROJECT_DIR、ターミナルなら --root）の実パスに
 読み込み時に置き換わる。「ワークスペースの下」を絶対パスの直書きなしに書くための
 もので、Windows と WSL と Linux で表記が分かれない。glob なら `{root}/wip/*`、regex なら
 `^{root}[\\/]` のように書く。ワークスペースルートが渡らない読み方をしたルールは error で名指しする。
@@ -66,8 +67,8 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 ## 除く（except）
 
 ルールは省略できるキー `except:` を持てる。値はリストで、各要素は `glob` か `regex` の
-どちらか 1 つだけを持つマッピング。本体の `glob` / `regex` に当たっても、`except` の
-どれかに当たれば、そのルールは当たらない扱いになる。`match`（ツール名）の見方は変わらない。
+どちらか 1 つだけを持つマッピング。本体の `glob` / `regex` にヒットしても、`except` の
+どれかにヒットすれば、そのルールはヒットしない扱いになる。`match`（ツール名）の見方は変わらない。
 
     deny:
       - id: workspace-root
@@ -82,7 +83,7 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 先読みを禁じているので、「A だが B は除く」を 1 本の regex で書くと 1 文字ずつの
 場合分けになる。`except` はそれを 2 本の式に分けて書くためのもの。各パターンには本体と
 同じ読み方（`{root}` の置き換え、`{!root}` の扱い、大文字小文字の無視、先読み・後方参照の
-禁止、glob の翻訳）を当てる。当てる文字列も本体と同じで、Bash ならコマンド列の全体。
+禁止、glob の翻訳）を適用する。適用する文字列も本体と同じで、Bash ならコマンド列の全体。
 コマンドのどこかに除く語を足すだけで外れるので、Bash の `deny` / `ask` に付けるときは
 狭く書く（lint が warn で言う）。
 
@@ -96,9 +97,9 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 
     glob: '<glob>'          個別条件。本体の glob と同じ読み方
     regex: '<regex>'        個別条件。本体の regex と同じ読み方
-    all: [ノード, ...]       全部に当たれば当たる（1 個以上）
-    any: [ノード, ...]       どれかに当たれば当たる（1 個以上）
-    not: ノード              当たらなければ当たる
+    all: [ノード, ...]       全部にヒットすればヒットする（1 個以上）
+    any: [ノード, ...]       どれかにヒットすればヒットする（1 個以上）
+    not: ノード              ヒットしなければヒットする
 
     deny:
       - id: secrets
@@ -112,12 +113,13 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
         message: ...
 
 個別条件には本体と同じ読み方（`{root}`、`{!root}`、大文字小文字の無視、先読み・後方参照の禁止、
-glob の翻訳）を当て、当てる文字列も本体と同じ（Bash ならコマンド列の全体）。`except:` と
+glob の翻訳）を適用し、適用する文字列も本体と同じ（Bash ならコマンド列の全体）。`except:` と
 併せて書けて、意味は `all: [when, not: {any: except}]`。
 
 判定が重くならないように、入れ子は 8 段、ノードは 64 個まで。知らないキー、キーが 0 個・
 2 個以上のノード、空のリスト、型の違う値と合わせて、ルールごと読み込まずに error で名指しする。
-個別条件の `{!root}` を組み立てられないときは、本体と同じく `deny` / `ask` は `match` の全部に当てて
+個別条件の `{!root}` を組み立てられないときは、
+本体と同じく `deny` / `ask` は `match` の全部に適用して
 止め、`allow` はルールごと使わない。
 
 「除く」だけなら `except` のほうが読みやすい。`when` は「A か B」「A かつ B」のように、
@@ -144,7 +146,7 @@ VERSION = 1
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
 # info は「そう書いてあるとおりに判定に使われているが、書いたユーザが知りたいはずのこと」。
-# レイヤーをまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる。
+# レイヤーをまたいで同じ定義が重複していて後ろを破棄した、がこれにあたる。
 # warn と分けるのは、重複は普通の形（見本から始めたプロジェクト）で、これを warn に
 # 混ぜると本当に緩んでいる warn が見落とされるため。
 SEVERITY_INFO = "info"
@@ -155,17 +157,17 @@ ASK = "ask"
 ALLOW = "allow"
 SECTIONS = (DENY, ASK, ALLOW)
 
-# `match` に書ける、ツールではない名前。メインエージェントのターンの終わり（Stop）に当たる。
+# `match` に書ける、ツールではない名前。メインエージェントのターンの終わり（Stop）にヒットする。
 # 見るのは `allow` だけで、渡す回（`every`）にだけ Stop を止めて文を渡す。
-# 名前をイベント名と同じにしたのは、ツール名と取り違えないため。当てる先の文字列は
-# 無いので固定の文字列に当て、ルールは `glob: "*"` と書く。
+# 名前をイベント名と同じにしたのは、ツール名と取り違えないため。適用する先の文字列は
+# 無いので固定の文字列に適用し、ルールは `glob: "*"` と書く。
 STOP_MATCH = "Stop"
 STOP_SUBJECT = "(stop)"
 
 # 文面が要るタイプ。deny だけ。ask の文面はユーザの確認ダイアログにしか出ず、allow は
 # 通すだけで届く先が無い（どちらも実際に動かして確かめた）。モデルに渡す文は
 # additionalContext に書く。ask と allow に書いた文面は lint が error にするが、
-# ここで捨てるとその文面のせいでルールごと外れて通ってしまうので、読み込みは通す。
+# ここで破棄するとその文面のせいでルールごと外れて通ってしまうので、読み込みは通す。
 _NEEDS_MESSAGE = (DENY,)
 
 # Python の正規表現エンジンは後方参照と先読みを扱えるが、ルールファイルの契約は
@@ -188,7 +190,7 @@ ROOT_PLACEHOLDER = "{root}"
 NOT_ROOT_PLACEHOLDER = "{!root}"
 
 # 展開の最内と、各段の「ここで文字列が終わる」に置く表記。`$` ではなく `\Z` なのは、
-# `$` が末尾の改行の直前にも当たるため。言いたいのは「終わる」であって「行末」ではない。
+# `$` が末尾の改行の直前にもヒットするため。言いたいのは「終わる」であって「行末」ではない。
 _NOT_ROOT_END = r"\Z"
 
 # ルートがこの長さ以上なら展開しない。Python 3.12（再帰の上限 1000）では、この形の
@@ -201,7 +203,7 @@ _NOT_ROOT_END = r"\Z"
 # bench_not_root.py を回して測り直すこと。
 MAX_ROOT_LEN = 256
 
-# 生成できなかった `deny` / `ask` に持たせる式。どの文字列にも当たるので、そのルールが
+# 生成できなかった `deny` / `ask` に持たせる式。どの文字列にもヒットするので、そのルールが
 # 見るツールの呼び出しは全部止まる。保護が消えるより止まるほうがよい、という向きを
 # 採るために使う。
 _MATCH_EVERYTHING = "^"
@@ -210,17 +212,17 @@ _MATCH_EVERYTHING = "^"
 # 掛け直すだけでは「繰り返しを含まない」ことを確かめられない。
 #
 # `?` は入れていない。生成した式は捕獲しないグループ `(?:` を使うので、`?` を量化子と
-# 数えると式自身の構造に当たってしまう。ルートの文字は `re.escape` を通るため、
-# `*` と `+` がルートの名前に含まれていても `\*` `\+` になり、この式には当たらない。
+# 数えると式自身の構造にヒットしてしまう。ルートの文字は `re.escape` を通るため、
+# `*` と `+` がルートの名前に含まれていても `\*` `\+` になり、この式にはヒットしない。
 _GENERATED_QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
 
 # `{!root}` の直後に続けてよい書き始め。生成した式が読み終える位置はパスの区切りとは
 # 限らないので、任意の位置まで進む書き方で受けていないものは warn で伝える。
 _SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
 
-# ルールの本体に当たっても、ここに並べたどれかに当たれば当たらない扱いにするキー。
+# ルールの本体にヒットしても、ここに並べたどれかにヒットすればヒットしない扱いにするキー。
 # 各要素は `glob` か `regex` のどちらか 1 つだけを持つマッピングで、`when:` の個別条件と同じ形。
-# 書き方を 1 つにしておけば、except から when へ書き換えるときに個別条件を写すだけで済む。
+# 書き方を 1 つにしておけば、except から when へ書き換えるときに個別条件をコピーするだけで済む。
 EXCEPT_KEY = "except"
 EXCEPT_FIELDS = ("glob", "regex")
 
@@ -249,7 +251,7 @@ KIND_NOT_YET = "not-yet"
 
 # 組み込みルールの名前の頭（`builtin:` で始まる id は全部組み込み）。ルールファイルからは書けない
 # （読み込まずに error）。
-# 同じ id で書いたルールがあると組み込みを足さない形にすると、何にも当たらない 1 本を
+# 同じ id で書いたルールがあると組み込みを足さない形にすると、何にもヒットしない 1 本を
 # その名前で書くだけで組み込みの保護を気づかれないうちに消せてしまう。ルールファイルの記述に依らず
 # 足すのが組み込みの役目なので、置き換える経路をなくす。外したいなら env でその保護ごと切る。
 RESERVED_ID_PREFIX = "builtin:"
@@ -258,9 +260,9 @@ RESERVED_ID_PREFIX = "builtin:"
 def root_pattern(root: str) -> str:
     """ワークスペースルートの実パスを、regex に埋めて安全な形にする。
 
-    区切りは `/` と `\\` のどちらにも当たる形にする。当てる対象は行き着く先まで
+    区切りは `/` と `\\` のどちらにもヒットする形にする。適用する対象は行き着く先まで
     解いたパス（judge.full_path）で、Windows では `\\` になるが、ルールを書くユーザは
-    `/` で考える。大文字小文字は式ごと区別せずに当てるので（_build）、ここでは機械を
+    `/` で考える。大文字小文字は式ごと区別せずに適用するので（_build）、ここでは機械を
     見ない。見ると `c:` と `C:` の扱いが機械で分かれる。
     """
     return "".join(_same(ch) for ch in real_root(root))
@@ -269,7 +271,7 @@ def root_pattern(root: str) -> str:
 def root_glob(root: str) -> str:
     """ワークスペースルートの実パスを、glob に埋める形にする。
 
-    区切りは `/` にそろえ、翻訳の側が両方に当てる。
+    区切りは `/` にそろえ、翻訳の側が両方に適用する。
     """
     return os.path.realpath(root).replace("\\", "/").rstrip("/")
 
@@ -288,12 +290,12 @@ def real_root(root: str) -> str:
 
 
 def _differs(ch: str) -> str:
-    """その 1 文字と一致しない文字に当たる文字クラス。区切りは両方の書き方を除く。"""
+    """その 1 文字と一致しない文字にヒットする文字クラス。区切りは両方の書き方を除く。"""
     return r"[^\\/]" if ch in "\\/" else "[^" + re.escape(ch) + "]"
 
 
 def _same(ch: str) -> str:
-    """その 1 文字に当たる式。区切りは `\\` と `/` のどちらにも当たるようにする。"""
+    """その 1 文字にヒットする式。区切りは `\\` と `/` のどちらにもヒットするようにする。"""
     return r"[\\/]" if ch in "\\/" else re.escape(ch)
 
 
@@ -368,7 +370,7 @@ def fill_root(text: str, root: str) -> str:
     return text.replace(ROOT_PLACEHOLDER, root_glob(root))
 
 
-# every を書かなかったときの刻み。当たるたびが渡す回になる。
+# every を書かなかったときの刻み。ヒットするたびが渡す回になる。
 EVERY_DEFAULT = 1
 
 
@@ -489,7 +491,7 @@ class Rule:
     # レイヤーの和では `lib:schema` のようにレイヤーの名前が前に付く（ruleload.prefix_ids）。
     id: str = ""
     # bare_id は書かれたままの id。レイヤーの名前をつける前の表記で、レイヤーをまたいで
-    # 同じルールかどうかを見るときの鍵になる。
+    # 同じルールかどうかを見るときのキーになる。
     # id から前置きを取り除いて求める形にすると、`:` を含む id を書いたユーザの定義が
     # 取り除かれる側になるので、書いたときの表記をそのまま持つ。
     bare_id: str = ""
@@ -498,7 +500,7 @@ class Rule:
     source: str = ""
     # match は対象のツール名を "|" で並べたもの。"Write|Edit" など。
     match: str = ""
-    # glob は fnmatch と同じ意味の glob。文字列全体に当たるので、部分一致が
+    # glob は fnmatch と同じ意味の glob。文字列全体にヒットするので、部分一致が
     # 欲しければ前後に "*" を自分で書く。"*git push*"、"*.pem"、"*/secrets/*" など。
     # 詳しくは globmatch.translate を参照。
     glob: str = ""
@@ -508,12 +510,12 @@ class Rule:
     regex: str = ""
     # message は、なぜ止めたかと、代わりに何をすればよいかを言う。
     message: str = ""
-    # additionalContext は、当たったときにモデルへ渡す文。message と違って
+    # additionalContext は、ヒットしたときにモデルへ渡す文。message と違って
     # 止められた側ではなく進む側に向けた言葉で、allow でも ask でも deny でも
     # 応答の `additionalContext` に載る。通すが踏まえてほしいことを書く。
     additional_context: str = ""
     # additionalContextOnce は、1 つの文脈（セッション、サブエージェントならその 1 回の
-    # 起動）で最初に当たったときだけ渡す文。セッションの開始（起動・再開・compact の後）で
+    # 起動）で最初にヒットしたときだけ渡す文。セッションの開始（起動・再開・compact の後）で
     # 忘れる。毎回読ませる必要が無い長い説明のために。additionalContext と両方あれば、
     # 初回は両方を並べ、2 回目からは additionalContext だけを渡す。
     additional_context_once: str = ""
@@ -523,22 +525,22 @@ class Rule:
     # ctxfile.MAX_CHARS で切り、切ったことを本文の末尾につける。
     additional_context_file: str = ""
     additional_context_once_file: str = ""
-    # every は「渡す回」の刻み。当たった回数がこの倍数になった回だけが渡す回になり、
+    # every は「渡す回」の刻み。ヒットした回数がこの倍数になった回だけが渡す回になり、
     # additionalContext は渡す回のたび、additionalContextOnce は渡す回の最初の 1 回に
-    # 渡る（ctxfile.for_rules）。既定は 1 で、これは「当たるたびが渡す回」＝ every を
+    # 渡る（ctxfile.for_rules）。既定は 1 で、これは「ヒットするたびが渡す回」＝ every を
     # 書かないときと同じ。書いていないときの場合分けをどこにも持たないための既定値。
     every: int = 1
     # every_written は書かれたままの値。読めない値（0・負・整数でない）でもルールは
-    # 組み上げ、every は 1（毎回渡す）として扱う。ここで受け付けずにルールごと捨てると、--lint の
+    # 組み上げ、every は 1（毎回渡す）として扱う。ここで受け付けずにルールごと破棄すると、--lint の
     # 名指しが `allow[3]` の形になり、どの id を直せばよいかを言えなくなる。指摘するのは
     # --lint の仕事で、そのために書かれた値をそのまま持つ。書いていなければ None。
     every_written: object = None
-    # base は、共通レイヤーと config の有無・状態によらず常に当たる組み込みの deny（土台）で
-    # あること（`builtin.load_base`）。同じ呼び出しがレイヤーの deny にも当たったときは、そちらを
+    # base は、共通レイヤーと config の有無・状態によらず常にヒットする組み込みの deny（土台）で
+    # あること（`builtin.load_base`）。同じ呼び出しがレイヤーの deny にもヒットしたときは、そちらを
     # 文面と記録に載せ、土台は載せない（同じ拒否を 2 度言わない。拒否は変わらない。
     # `judge.decide_before`）。
     base: bool = False
-    # decision はこのルールが置かれていたタイプ。当たったルールを 1 件だけ
+    # decision はこのルールが置かれていたタイプ。ヒットしたルールを 1 件だけ
     # 取り出しても、それがどの判定だったのかを言えるようにする。
     decision: str = ""
     # root は読んだときのワークスペースルート。文面の `{root}` を、モデルへ渡すときに
@@ -547,7 +549,7 @@ class Rule:
     root: str = ""
     # from_file は、ルールファイル（共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）から
     # 読んだルールであること。組み込み（土台・退避した既定・設定ファイルの保護・チケットの保護）は
-    # 偽。`--test` が当たったルールを「ルールファイルの中」と「外から来た根拠」に分けるのに読む。
+    # 偽。`--test` がヒットしたルールを「ルールファイルの中」と「外から来た根拠」に分けるのに読む。
     # id の前置きでは分けられない（`builtin:ticket-*` のように `builtin:guard-` で始まらない
     # 組み込みがある）し、`source` でも分けられない（退避した既定は共通レイヤーの名前を持つ）。
     from_file: bool = field(default=False, compare=False)
@@ -562,19 +564,20 @@ class Rule:
     degraded_message: str = ""
 
     compiled: re.Pattern | None = None
-    # exempt は、式を当てる前に対象から外すものを決める関数。組み込みの保護だけが持ち、
+    # exempt は、式を適用する前に対象から外すものを決める関数。組み込みの保護だけが持ち、
     # ルールファイルからは書けない。式は先読みを使えないので、「この形の中でも、これだけは
-    # 通す」は式の外で決める（selfguard_shell.handoff_copy_exempt）。返すのは式を当てる
+    # 通す」は式の外で決める（selfguard_shell.handoff_copy_exempt）。返すのは式を適用する
     # 対象で、外すものが無ければ受け取ったまま返す。
     exempt: Callable[[str], str] | None = field(default=None, repr=False, compare=False)
 
-    # excepts は `except:` の各パターン。本体（compiled）に当たっても、どれかに当たれば
-    # このルールは当たらない。当てる文字列は本体と同じ（Bash ならコマンド列の全体）。
+    # excepts は `except:` の各パターン。本体（compiled）にヒットしても、どれかにヒットすれば
+    # このルールはヒットしない。適用する文字列は本体と同じ（Bash ならコマンド列の全体）。
     excepts: list[Exclusion] = field(default_factory=list)
 
     # when は `when:` で書いた本体（組み合わせ条件）。glob / regex で書いたルールでは None。
     # `when` のルールの compiled はふつう None で、個別条件を組み立てられずに止める側へ倒した
-    # deny / ask だけが、何にでも当たる式を compiled に持つ（そちらを先に見る）。組み合わせ条件は
+    # deny / ask だけが、何にでもヒットする式を compiled に持つ（そちらを先に見る）。
+    # 組み合わせ条件は
     # 書いた表記を出すために残す。
     when: Condition | None = None
 
@@ -601,7 +604,7 @@ class Rule:
         return fill_text(self.message, self.root)
 
     def key(self) -> tuple:
-        """レイヤーをまたいで「同じ定義」と言えるかどうかの鍵。
+        """レイヤーをまたいで「同じ定義」と言えるかどうかのキー。
 
         比べるのは書いた表記ではなく、`{root}` を置き換えたあとの式。共通レイヤーと
         プロジェクトのレイヤーに同じ `{root}/...` を書いた定義は、置き換え先が同じ
@@ -615,7 +618,7 @@ class Rule:
             # 組み合わせ条件。個別条件の式と組み方の両方を比べる。
             self.when.key() if self.when is not None else (),
             # 除くものが違えば別の定義。比べないと、except だけが違う後ろのレイヤーの 1 本を
-            # 重複として捨て、前のレイヤーの except で通るはずのないものが通ってしまう。
+            # 重複として破棄し、前のレイヤーの except で通るはずのないものが通ってしまう。
             tuple(e.compiled.pattern if e.compiled else "" for e in self.excepts),
             self.message,
             self.additional_context,
@@ -631,7 +634,7 @@ class Rule:
         )
 
     def matches(self, tool: str, subject: str) -> bool:
-        """このルールがこのツールと対象に当たるかどうか。"""
+        """このルールがこのツールと対象にヒットするかどうか。"""
         if not self.built() or not subject:
             return False
         if tool_matches(self.match, tool):
@@ -641,16 +644,16 @@ class Rule:
         return False
 
     def hits(self, subject: str) -> bool:
-        """ツール名を見ずに、対象の文字列だけで当たるか。
+        """ツール名を見ずに、対象の文字列だけでヒットするか。
 
-        本体に当たり、except のどれにも当たらないときに当たる。
+        本体にヒットし、except のどれにもヒットしないときにヒットする。
         """
         if not self.body_hits(subject):
             return False
         return not any(e.compiled is not None and e.compiled.search(subject) for e in self.excepts)
 
     def body_hits(self, subject: str) -> bool:
-        """本体（glob / regex / when）だけで当たるか。"""
+        """本体（glob / regex / when）だけでヒットするか。"""
         if self.compiled is not None:
             return self.compiled.search(subject) is not None
         return self.when is not None and self.when.hits(subject)
@@ -670,7 +673,7 @@ def record_name(rule: Rule) -> str:
 def tool_matches(match: str, tool: str) -> bool:
     """`match:`（`|` 区切り）がこのツール名を含むか。大文字小文字を区別した完全一致。
 
-    `Rule.matches` のツール名の側。組み込みの保護を、当たりようの無いツールで組み立てずに
+    `Rule.matches` のツール名の側。組み込みの保護を、ヒットしようの無いツールで組み立てずに
     済ませる判断（`selfguard_shell.add_rules`）も、同じこの 1 本で決める。
     """
     return any(want.strip() == tool for want in match.split("|"))
@@ -782,7 +785,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
             rule, found = _build(raw, name, i, root, builtin)
             # 苦情とルールは同時に返りうる。`{!root}` を組み立てられなかった deny / ask が
             # これで、「報告する」と「保護を消さない」を両立させる唯一の方法。
-            # 捨てるだけにすると、生成に失敗した deny が気づかないうちに消えて、
+            # 破棄するだけにすると、生成に失敗した deny が気づかないうちに消えて、
             # 止められずに通るようになる。
             problems.extend(found)
             if rule is not None:
@@ -801,8 +804,8 @@ def _build(
     - `(rule, [])`        組み立てられた
     - `(None, problems)`  受け付けられない。判定に使わない
     - `(rule, problems)`  苦情はあるが判定には使う。`{!root}` を組み立てられなかった
-      `deny` / `ask` がこれで、`match` の全部に当たる式を持って止める側になる。
-      捨てると「ワークスペースの外の全部」が止められずに通るので、報告だけでは足りない。
+      `deny` / `ask` がこれで、`match` の全部にヒットする式を持って止める側になる。
+      破棄すると「ワークスペースの外の全部」が止められずに通るので、報告だけでは足りない。
       `{!root}` の後ろの書き方への warn もここに入る
 
     苦情をリストにしてあるのは、本体と `except` の各パターンがそれぞれ warn を出しうるため。
@@ -949,7 +952,7 @@ def _build(
         rule.when = tree
         if refused:
             # 個別条件を 1 つでも組み立てられなければ、組み合わせ条件の意味が決まらない。
-            # `not` の下の個別条件なら外すと当たる範囲が狭まり、上なら広がるので、
+            # `not` の下の個別条件なら外すとヒットする範囲が狭まり、上なら広がるので、
             # 個別条件だけ外す形は向きが定まらない。
             # 本体を組み立てられなかったときと同じく、deny / ask は全部止め、allow は使わない。
             degraded, refused_problem = _ungeneratable(rule, section, name, refused)
@@ -961,7 +964,7 @@ def _build(
         if built.note is not None:
             problems.append(built.note)
         if built.refused:
-            # 本体を組み立てられなかった deny / ask は、`match` の全部に当てて止める。
+            # 本体を組み立てられなかった deny / ask は、`match` の全部に適用して止める。
             # except は付けない。付けると「全部止める」に穴が空き、保護を消さないための形が崩れる。
             degraded, refused_problem = _ungeneratable(rule, section, name, built.refused)
             return degraded, problems + [refused_problem]
@@ -976,7 +979,7 @@ def _build(
             problems.append(part.note)
         if part.refused:
             # except を組み立てられないときは、その except を持たないルールとして使う。deny / ask は
-            # 当たる範囲が広がる（止める側に外れる）。allow は広がると通す範囲が増えるので、
+            # ヒットする範囲が広がる（止める側に外れる）。allow は広がると通す範囲が増えるので、
             # ルールごと判定に使わない。
             problems.append(Problem(SEVERITY_ERROR, name, label + part.refused))
             if section == ALLOW:
@@ -1068,15 +1071,16 @@ def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
                 return _Built(note=note, refused=refused)
             expression = expanded
     else:
-        # glob は文字列全体に当たる約束なので、先頭に固定する。固定しないと search が当て始めの
+        # glob は文字列全体にヒットする約束なので、先頭に固定する。
+        # 固定しないと search が適用し始めの
         # 位置ごとに末尾まで読み、`*git push*` のような式が入力の長さの 2 乗で遅くなる（#241）。
-        # 先頭に `*` を書かない glob が文字列の途中に当たることも、この約束どおりに無くなる。
+        # 先頭に `*` を書かない glob が文字列の途中にヒットすることも、この約束どおりに無くなる。
         expression = "^" + translate(
             glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else glob
         )
 
-    # `glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。区別するかを機械で
-    # 変えると、同じルールが Windows では当たり Linux では当たらない。`*/.ccnavi/*` と書いた
+    # `glob` も `regex` も、どの機械でも大文字小文字を区別せずに適用する。区別するかを機械で
+    # 変えると、同じルールが Windows ではヒットし Linux ではヒットしない。`*/.ccnavi/*` と書いた
     # 保護を `.Ccnavi/` と書くだけで止められずに通せ、どの機械でも区別しないチケットの範囲とも
     # 食い違う。
     # ルールはユーザが宣言する場所の意図なので、機械の都合ではなく書かれたパスの意味で読む
@@ -1143,7 +1147,7 @@ def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | Non
                 f"書けるのは `{'` か `'.join(EXCEPT_FIELDS)}` の 1 つだけ",
             )
         # 書いた値は文字列だけを受け取る。引用符の無い `on` は PyYAML が真偽値に読むので、
-        # 文字にすると 'True' に当てる except になってしまう（when の個別条件と同じ扱い）
+        # 文字にすると 'True' に適用する except になってしまう（when の個別条件と同じ扱い）
         for key in EXCEPT_FIELDS:
             if key in item and not isinstance(item[key], str):
                 return [], Problem(
@@ -1173,7 +1177,7 @@ def _when(written: object, name: str) -> tuple[Condition | None, Problem | None]
     """`when:` を読んで組み合わせ条件にする。個別条件の式はまだ組み立てない（_build が組み立てる）。
 
     書式の誤りは最初の 1 件を返す。書いたユーザは条件を書いたつもりでいるので、
-    読めないノードを黙って外すと、当たる範囲が書いたものと気づかないうちに食い違う。
+    読めないノードを黙って外すと、ヒットする範囲が書いたものと気づかないうちに食い違う。
 
     処理フロー:
     1. `node` を根から再帰で読む。入れ子の段数（`MAX_WHEN_DEPTH`）と
@@ -1253,7 +1257,7 @@ def _not_root_placement(expression: str) -> str:
             "前に何かを置くと意味を持たない"
         )
     # 直後の量化子は error。`?` や `{0}` を付けると展開結果ごと省略できるようになり、
-    # 「外だけを止める」はずのルールがどの対象にも当たる式になってしまう。
+    # 「外だけを止める」はずのルールがどの対象にもヒットする式になってしまう。
     # ワークスペースの中への書き込みまで止まるので、warn では済ませない。
     rest = expression[len("^" + NOT_ROOT_PLACEHOLDER) :]
     if rest[:1] in ("?", "*", "+", "{"):
@@ -1310,23 +1314,23 @@ def _expand_not_root(expression: str, root: str) -> tuple[str, str]:
 def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Rule | None, Problem]:
     """`{!root}` を組み立てられなかったときの扱い。
 
-    強い側を採る。`deny` と `ask` は `match` の全部に当てて止め、`allow` は
-    どれにも当てない。`allow` を当たる扱いにすると ccnavi が判定を返さない範囲が広がるので、
+    強い側を採る。`deny` と `ask` は `match` の全部に適用して止め、`allow` は
+    どれにも適用しない。`allow` をヒットする扱いにすると ccnavi が判定を返さない範囲が広がるので、
     そこだけ逆になる。
 
     これは `{!root}` の生成失敗に限った扱い。 正規表現の書き損じなど既存の
-    失敗の扱いは今までどおり「報告して捨てる」のまま。ここだけ特別なのは、
+    失敗の扱いは今までどおり「報告して破棄する」のまま。ここだけ特別なのは、
     守られなくなる範囲が「ワークスペースの外の全部」に広がるから。
 
     ## 設計から変えた 2 点（実装フェーズの判断。文書に反映すること）
 
     - 記録に `root-too-long` の欄は足さない。`audit` の
       `REASON_*` は「判定に至らなかった理由」で、ここは判定に至っている（deny する）。
-      記録には `deny` と当たったルールの id が既に残り、なぜ止めたかはこの文面が言う。
+      記録には `deny` とヒットしたルールの id が既に残り、なぜ止めたかはこの文面が言う。
       新しい名前を足すと、判定に至らなかったものと同じ欄に別の意味が混ざる
     - SessionStart では何も言わない。
-      256 字のルートは Windows の MAX_PATH の外で実用にならず、当てはまるユーザはまずいない。
-      当てはまったときはこの文面が理由と直し方を言う。めったに起きないことのために
+      256 字のルートは Windows の MAX_PATH の外で実用にならず、該当するユーザはまずいない。
+      該当したときはこの文面が理由と直し方を言う。めったに起きないことのために
       SessionStart を毎回重くしない
     """
     problem = Problem(SEVERITY_ERROR, name, detail)
@@ -1334,7 +1338,7 @@ def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Ru
         return None, problem
     rule.compiled = re.compile(_MATCH_EVERYTHING)
     # 書いた文面（message）は残す。`--explain` と記録が書いた表記を出す約束は、
-    # glob / regex だけでなく文面にも当てはまる（Rule の message のコメント）。
+    # glob / regex だけでなく文面にも該当する（Rule の message のコメント）。
     rule.degraded_message = (
         f"{detail}。保護が消えるのを避けるため、ルール '{DEGRADED_RULE_NAME}' が見るツール"
         f"（{rule.match}）を止めています。ワークスペースをもっと浅い場所へ移すか、"

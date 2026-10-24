@@ -11,8 +11,8 @@ MR がマージ済みかで「閉じた」か「消えた」かを言う。親�
 読み返すのは終了コード・標準出力と、git に残った ref、片付けの記録（logs/state/retire/）の有無だけ。
 MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答えを決めた代役の sh に差し替える。
 
-`CCNAVI_SH_DIR` で、写す sh（`SCRIPTS` の 3 本）の出どころを差し替えられる。既定はこのツリーの
-`.ccnavi/scripts/`（テストしているソースそのもの）。`.ccnavi/scripts/` に写す前の版
+`CCNAVI_SH_DIR` で、コピーする sh（`SCRIPTS` の 3 本）の出どころを差し替えられる。既定はこのツリーの
+`.ccnavi/scripts/`（テストしているソースそのもの）。`.ccnavi/scripts/` にコピーする前の版
 （`wip/design/scripts/` など）を確かめるときに使う（`tests/sh/test_gitwrap.py` と同じ）。
 """
 
@@ -1182,7 +1182,7 @@ class SyncTest(SyncHarness):
         while not os.path.exists(owner) and time.monotonic() < deadline:
             time.sleep(0.1)
         self.assertTrue(os.path.isdir(lock), "ロックを取る前に終わった")
-        # 端末の Ctrl-C と同じく、プロセスのまとまりへ送る（子も止まり、sh の trap が走る）。
+        # ターミナルの Ctrl-C と同じく、プロセスのまとまりへ送る（子も止まり、sh の trap が走る）。
         os.killpg(proc.pid, signal.SIGTERM)
         proc.wait(timeout=20)
         self.assertFalse(os.path.exists(lock), "TERM で終わったのにロックが残っている")

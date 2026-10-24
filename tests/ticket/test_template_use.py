@@ -2,9 +2,11 @@
 
 見るのは次のとおり。
 
-1. 親の提案: テンプレートのステップ（`type`・`review`・`after`）を `plan:` / `feedback:` に写す。
+1. 親の提案: テンプレートのステップ（`type`・`review`・`after`）を
+   `plan:` / `feedback:` にコピーする。
    `after` は計画の中の添字から提案の絶対番号に付け直す
-   （フィードバック計画は全体のステップ数を足す）。`phases:` の写しが入り、`--lint` と承認の確認（`--agree --preview --verify`）、
+   （フィードバック計画は全体のステップ数を足す）。`phases:` のコピーが入り、
+   `--lint` と承認の確認（`--agree --preview --verify`）、
    承認の検査（`agree_candidates.plan_problems`）が error にならない
 2. 往復: 完了した親から `--templates --draft` で作った下書きを `user handoff` で取り込み、
    `--template` で使うと、元の計画と同じ形・同じフローになる

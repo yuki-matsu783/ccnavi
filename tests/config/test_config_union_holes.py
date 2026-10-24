@@ -1,10 +1,10 @@
 """`.ccnavi/` の組み込み deny とレイヤーの名前を、表記を変えて回避できないことの受入テスト。
 
 どれも、直さないと組み込み deny が「守っている」と言いながら回避できる形。
-`.claude/` の側も同じ当て方で守られる。
+`.claude/` の側も同じ適用の仕方で守られる。
 
 - 大文字小文字: `glob` と `regex` で書いたルールと組み込みの保護を、どの機械でも
-  区別せずに当てる。区別が要る `regex` は `(?-i:...)` で囲む
+  区別せずに適用する。区別が要る `regex` は `(?-i:...)` で囲む
 - 区切りが続かないパス: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
 - 生の `id` のコロン: レイヤーの名前をつけた形と見分けが付かないものを error にする
 - `self` の予約: `projects/Self/` も `self` と同じに扱って数えない
@@ -48,8 +48,9 @@ from tests.config.test_config_union import (
 from tests.config.test_config_union_guard import GuardHarness
 
 # 大文字小文字の的。`glob` と `regex` と、区別を取り戻した `regex` を 1 本ずつ持つ。
-# `glob` も `regex` も組み込みの保護も、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
-# 同じルールが Windows では当たり Linux では当たらず、区別しないチケットの範囲とも食い違う。
+# `glob` も `regex` も組み込みの保護も、どの機械でも大文字小文字を区別せずにヒットする。
+# 機械で変えると、
+# 同じルールが Windows ではヒットし Linux ではヒットせず、区別しないチケットの範囲とも食い違う。
 # 区別が要るときだけ、書いたユーザが `(?-i:...)` で囲む。
 CASE_RULES = {
     "version": 1,
@@ -70,7 +71,7 @@ CASE_RULES = {
             "id": "regex-exact",
             "match": "Write|Edit",
             "regex": r"[\\/](?-i:strict)[\\/]",
-            "message": "strict は書いた表記のとおりに当てる。",
+            "message": "strict は書いた表記のとおりに適用する。",
         },
     ],
     "allow": [{"id": "anything-read", "match": "Read", "regex": "."}],
@@ -106,7 +107,7 @@ factors:
   - {id: "lib:schema", points: 5, glob: "schema/**", message: スキーマに触った}
 """
 
-# `self` の予約の的。`projects/Self/` のレイヤーに置く deny。数えないので、当たってはいけない。
+# `self` の予約の的。`projects/Self/` のレイヤーに置く deny。数えないので、ヒットしてはいけない。
 SELF_PROJECT_RULES = {
     "version": 1,
     "deny": [
@@ -120,7 +121,7 @@ SELF_PROJECT_RULES = {
 }
 
 # 穴 1 の的。ワークスペース自身のレイヤーに置く、広い allow と 1 本の deny。
-# 予約名のプロジェクトのレイヤーを名前で引くとこのレイヤーに当たるので、そのプロジェクトへの
+# 予約名のプロジェクトのレイヤーを名前で引くとこのレイヤーにヒットするので、そのプロジェクトへの
 # Write がここの allow で通り、ここの deny で止まる。どちらも起きてはいけない。
 WIDE_OWN_RULES = {
     "version": 1,
@@ -135,8 +136,8 @@ WIDE_OWN_RULES = {
     "allow": [{"id": "wide", "match": "Write|Edit", "glob": "*"}],
 }
 
-# 穴 1 の的。予約名のプロジェクトのレイヤーに置く deny。レイヤーとして数えないので当たらない。
-# 当たらないことは「緩い」のではない。共通レイヤーだけで判定するので、allow も無い。
+# 穴 1 の的。予約名のプロジェクトのレイヤーに置く deny。レイヤーとして数えないのでヒットしない。
+# ヒットしないことは「緩い」のではない。共通レイヤーだけで判定するので、allow も無い。
 RESERVED_PROJECT_RULES = {
     "version": 1,
     "deny": [
@@ -180,7 +181,7 @@ class GlobCaseTest(ConfigUnionHarness):
     """大文字小文字: ルールに書いたパスの扱い。
 
     `glob` も `regex` も、`risk.py` / `phasetypes.py` / `ticket.py` の範囲と同じく、
-    どの機械でも大文字小文字を区別せずに当たる。区別すると、`.ccnavi/` を `.Ccnavi/` の
+    どの機械でも大文字小文字を区別せずにヒットする。区別すると、`.ccnavi/` を `.Ccnavi/` の
     パスで作って deny に止められずに通れる。区別が要るときは `(?-i:...)` で囲む。
     """
 
@@ -189,20 +190,20 @@ class GlobCaseTest(ConfigUnionHarness):
         write(self.rules, json.dumps(CASE_RULES))
 
     def test_glob_ignores_case_on_every_machine(self):
-        """`glob` の deny は、どの機械でも大文字小文字を区別せずに当たる。"""
+        """`glob` の deny は、どの機械でも大文字小文字を区別せずにヒットする。"""
         # 実体があると、区別しない機械では `os.path.realpath` がパスをディスクの側へ
-        # 補正してしまい、この問い自体が消える（フラグ無しでも当たる）。
+        # 補正してしまい、この問い自体が消える（フラグ無しでもヒットする）。
         self.assertFalse(os.path.exists(os.path.join(self.ws, "secret")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "secret", "x.txt"))
         self.assert_denied(exact, "glob-secret")
 
-        # 区別する機械では `SECRET/` は本当に別のディレクトリだが、それでも当てる。
-        # 同じルールが機械によって当たったり当たらなかったりしないことを優先する。
+        # 区別する機械では `SECRET/` は本当に別のディレクトリだが、それでも適用する。
+        # 同じルールが機械によってヒットしたりヒットしなかったりしないことを優先する。
         swapped = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "SECRET", "x.txt"))
         self.assert_denied(swapped, "glob-secret")
 
     def test_regex_ignores_case_on_every_machine(self):
-        """`regex` の deny も、どの機械でも大文字小文字を区別せずに当たる。
+        """`regex` の deny も、どの機械でも大文字小文字を区別せずにヒットする。
 
         区別すると、`Write` の経路だけが表記違いで外れる。同じ場所へシェルから書く形は
         組み込みの保護（selfguard_shell._folded）が表記の違いを無視して止めるので、経路で答えが分かれる。
@@ -215,7 +216,7 @@ class GlobCaseTest(ConfigUnionHarness):
         self.assert_denied(swapped, "regex-token")
 
     def test_regex_can_keep_the_distinction_with_an_inline_flag(self):
-        """区別が要る `regex` は `(?-i:...)` で囲めば書いたとおりに当たる。"""
+        """区別が要る `regex` は `(?-i:...)` で囲めば書いたとおりにヒットする。"""
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "strict", "x.txt"))
         self.assert_denied(exact, "regex-exact")
 
@@ -224,7 +225,7 @@ class GlobCaseTest(ConfigUnionHarness):
 
 
 class BuiltinGlobCaseTest(GuardHarness):
-    """組み込みの `*/.ccnavi/*` も、どの機械でも大文字小文字を区別せずに当たる（穴そのもの）。
+    """組み込みの `*/.ccnavi/*` も、どの機械でも大文字小文字を区別せずにヒットする（穴そのもの）。
 
     的は app のレイヤー。fixture の app は `.ccnavi/` を持たないので、`.Ccnavi/` は
     ディスクに無く、`os.path.realpath` がパスを補正しない。「まだ無いところを
@@ -241,7 +242,7 @@ class BuiltinGlobCaseTest(GuardHarness):
             self.guarded_hook("Write", self.ws, file_path=exact), "builtin:guard-project-home"
         )
 
-        # 区別する機械でも止める。組み込みの保護だけが機械で当たり方を変えると、
+        # 区別する機械でも止める。組み込みの保護だけが機械でヒットの仕方を変えると、
         # どの機械でも区別しないルールの glob やチケットの範囲と食い違う。
         swapped = os.path.join(self.app, ".Ccnavi", "config", "project", "rules.yml")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
@@ -273,7 +274,7 @@ class ShellPlaceTest(GuardHarness):
                 self.assert_denied(result, "builtin:guard-setting-files")
 
     def test_other_names_are_not_denied(self):
-        """当たる範囲が広がっても、別名には当たらない。
+        """ヒットする範囲が広がっても、別名にはヒットしない。
 
         `.claudexyz` や `.ccnavi-notes.md` は別のファイル。`.claude/worktrees/` は
         守る対象ではないので、片付けは通る（`.claude` の側を ccnavi ディレクトリと同じ `_END` で
@@ -296,7 +297,7 @@ class ShellPlaceTest(GuardHarness):
         """共通レイヤーの 1 本をコピー元に書いただけの読みは通る。
 
         共通レイヤーの節をコピーする側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
-        数えるのでコピー元に当たり、`cp .ccnavi/config/common/rules.yml /tmp/x` が止まっていた。
+        数えるのでコピー元にヒットし、`cp .ccnavi/config/common/rules.yml /tmp/x` が止まっていた。
         """
         for name in ("rules.yml", "phases.yml", "risks.yml"):
             for command in (
@@ -327,7 +328,7 @@ class ShellPlaceTest(GuardHarness):
     def test_the_default_umbrella_is_closed_after_a_joined_command(self):
         """既定の名前でも、行き先のあとに別のコマンドをつないだ形は止まる。
 
-        写す側の終わり（`_COPY_END`）がコマンドの切れ目を数えないと、
+        コピーする側の終わり（`_COPY_END`）がコマンドの切れ目を数えないと、
         `cp -r /tmp/scripts .ccnavi && echo` のようにつなぐだけで ccnavi ディレクトリの中身を
         差し替えられる。
         """
@@ -344,7 +345,7 @@ class ShellPlaceTest(GuardHarness):
 
 
 class CopyDestinationTest(GuardHarness):
-    """cp / ln / install は行き先だけで当てる（`_COPY_TARGET` / `_COPY_PLACES`）。
+    """cp / ln / install は行き先だけで適用する（`_COPY_TARGET` / `_COPY_PLACES`）。
 
     行き先は `-t <dir>` / `--target-directory` の値か、選択肢でない最後の引数。元の側に
     出ただけの守る場所は読まれるだけなので止めず、行き先になる形は書き方を変えても止める。
@@ -505,7 +506,7 @@ class CopyDestinationTest(GuardHarness):
                 self.assert_guarded(command)
 
     def test_skipping_options_does_not_blow_up(self):
-        """後ろの選択肢の割り方は 1 通り。当たらない長い並びでもすぐ返る。"""
+        """後ろの選択肢の割り方は 1 通り。ヒットしない長い並びでもすぐ返る。"""
         regex = re.compile(selfguard_shell.guard_shell_regex(self.ws), re.IGNORECASE)
         for tail in (" -S" * 60, " -S -" * 60, " --suffix" * 60, " -m x" * 60):
             text = shellread.read(
@@ -520,7 +521,7 @@ class CopyDestinationTest(GuardHarness):
 class HolderDestinationTest(GuardHarness):
     """守るものが入っているディレクトリを行き先にした形（`selfguard_shell.holder_regex`）。
 
-    行き先の表記に守るファイルの名前が出ないので、場所の表記では当たらない。元の側に
+    行き先の表記に守るファイルの名前が出ないので、場所の表記ではヒットしない。元の側に
     守る名前の語か、名前の決まらない語があるときだけ止め、別の名前を置くだけの形は止めない。
     """
 
@@ -603,7 +604,7 @@ class HolderDestinationTest(GuardHarness):
                 self.assert_guarded(command)
 
     def test_the_workspace_root_as_a_destination_is_denied(self):
-        """ルート直下の守る名前（`.ccnavi` `.claude` `logs`）を、ルートへ写す形。"""
+        """ルート直下の守る名前（`.ccnavi` `.claude` `logs`）を、ルートへコピーする形。"""
         root = self.ws.replace(os.sep, "/")
         for command in (
             "cp -r /tmp/.ccnavi .",
@@ -619,7 +620,7 @@ class HolderDestinationTest(GuardHarness):
                 self.assert_guarded(command)
 
     def test_other_names_and_reading_copies_pass_through_the_guard(self):
-        """別の名前を置くだけの形と、守る場所から外へ写すだけの形は組み込みの保護では止めない。"""
+        """別の名前を置くだけの形と、守る場所から外へコピーするだけの形は組み込みの保護では止めない。"""
         for command in (
             "cp /tmp/notes.txt logs/",
             "mv /tmp/notes.txt logs/",
@@ -642,7 +643,7 @@ class HolderDestinationTest(GuardHarness):
                 self.assert_not_guarded(command)
 
     def test_scanning_many_sources_does_not_blow_up(self):
-        """元の語は最初に見つかったもので決め打ちする。当たらない長い並びでもすぐ返る。"""
+        """元の語は最初に見つかったもので決め打ちする。ヒットしない長い並びでもすぐ返る。"""
         regex = re.compile(selfguard_shell.guard_shell_regex(self.ws), re.IGNORECASE)
         for tail in (
             " /tmp/decisions.jsonl" * 300,
@@ -677,10 +678,10 @@ class ColonIdTest(ConfigUnionHarness):
 
     def test_a_rule_with_a_colon_in_its_id_does_not_judge(self):
         """そのルールを除いて名指しする側を採る。
-        何も言わずに当てると、どのファイルを直すのか決まらない。
+        何も言わずに適用すると、どのファイルを直すのか決まらない。
 
         1 件の不備でガード全体は止めない（rules.load）ので、他のルールは有効なまま。
-        代償は、その 1 本が当たらなくなること。`--lint` が error で言うことでそれを補う。
+        代償は、その 1 本がヒットしなくなること。`--lint` が error で言うことでそれを補う。
         """
         write(self.rules, json.dumps(COLON_RULES))
         self.assert_not_denied(
@@ -740,9 +741,9 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         write_layer(self.ws, rules=WIDE_OWN_RULES)
 
     def assert_the_wide_allow_is_alive(self):
-        """前提の確認。広い allow は実在して、ワークスペースのツリーには当たる。
+        """前提の確認。広い allow は実在して、ワークスペースのツリーにはヒットする。
 
-        これが無いと、あとの「当たらない」が「そもそもルールが有効になっていない」と
+        これが無いと、あとの「ヒットしない」が「そもそもルールが有効になっていない」と
         区別できない。
         """
         allowed = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "secret", "x.txt"))
@@ -768,7 +769,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.assertNotIn(f"{name}:secret", record.get("rules", []), record)
 
     def check_the_workspace_deny_does_not_reach(self, name):
-        """ワークスペース自身のレイヤーの deny も、予約名のプロジェクトには当たらないこと。"""
+        """ワークスペース自身のレイヤーの deny も、予約名のプロジェクトにはヒットしないこと。"""
         project = self.project(name, rules=RESERVED_PROJECT_RULES)
         # 前提。同じパスはワークスペースのツリーでは止まる。
         self.assert_denied(
@@ -798,7 +799,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.check_no_layer_is_borrowed(settings.LAYER_COMMON)
 
     def test_the_workspace_layer_deny_does_not_reach_projects_self(self):
-        """レイヤーを借りないので、ワークスペースのレイヤーの deny も当たらない。"""
+        """レイヤーを借りないので、ワークスペースのレイヤーの deny もヒットしない。"""
         self.check_the_workspace_deny_does_not_reach(settings.LAYER_SELF)
 
     def test_a_project_whose_name_is_not_reserved_still_works(self):
@@ -807,7 +808,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
             self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql")),
             "lib:schema",
         )
-        # 広い allow は行き先の 1 レイヤーにしか足さないので、lib には当たらない。
+        # 広い allow は行き先の 1 レイヤーにしか足さないので、lib にはヒットしない。
         self.assertNotIn("self:wide", [layer_id(n) for n in self.last_record().get("rules", [])])
         self.assert_denied(self.hook("Bash", self.ws, command="psql -c 'select 1'"), "lib:raw-psql")
 
@@ -956,7 +957,7 @@ class ScriptTamperTest(GuardHarness):
                     "builtin:guard-project-home",
                 )
         # どの機械でも止める。区別しない機械では、このパスで書けば実際のファイルが書き換わる。
-        # 区別する機械では別のファイルだが、組み込みの保護の当たり方を機械で変えない。
+        # 区別する機械では別のファイルだが、組み込みの保護のヒットの仕方を機械で変えない。
         # 補正が無い形（ccnavi ディレクトリがまだ無いところを表記違いで作る）は
         # BuiltinGlobCaseTest。
         swapped = os.path.join(self.lib, ".Ccnavi", "scripts", "count.sh")
@@ -976,7 +977,7 @@ class ScriptTamperTest(GuardHarness):
                     self.guarded_hook("Bash", self.ws, command=command),
                     "builtin:guard-setting-files",
                 )
-        # シェルの側も、場所のパスはどの機械でも区別せずに当てる（selfguard_shell._folded）。
+        # シェルの側も、場所のパスはどの機械でも区別せずに適用する（selfguard_shell._folded）。
         swapped = "rm -rf projects/lib/.Ccnavi/scripts/count.sh"
         result = self.guarded_hook("Bash", self.ws, command=swapped)
         self.assert_denied(result, "builtin:guard-setting-files")

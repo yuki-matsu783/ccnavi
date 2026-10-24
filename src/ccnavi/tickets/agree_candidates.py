@@ -40,10 +40,11 @@ class Candidate:
     overflow: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま使われている承認済みチケット。
     current: ticket_model.Ticket | None = None
-    # このチケットに使うフェーズ定義。親の写し（`phases:`）を読んだもの。親ならその提案の写し、
-    # 子なら親（承認済みか、同じ承認で通る提案）の写し。承認画面はこれで題と見る場所を出す。
+    # このチケットに使うフェーズ定義。親のコピー（`phases:`）を読んだもの。
+    # 親ならその提案のコピーし、
+    # 子なら親（承認済みか、同じ承認で通る提案）のコピー。承認画面はこれで題と見る場所を出す。
     types: dict | None = None
-    # 承認したときの `phases.yml`（共通レイヤー + 親の `project:` が指すレイヤーの和）。写しが
+    # 承認したときの `phases.yml`（共通レイヤー + 親の `project:` が指すレイヤーの和）。コピーが
     # これと同じかを確かめ、承認画面に「この親では使わない定義」を出すのに使う。
     config: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
@@ -74,7 +75,7 @@ def candidates(
 
     承認（`agree`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
     ここを通る。承認で外れるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
-    （実際に `--lint` は `validate` だけを当てていて、順序で外れる子に何も言わなかった）。
+    （実際に `--lint` は `validate` だけを適用していて、順序で外れる子に何も言わなかった）。
 
     処理フロー:
     1. 承認済みを対応表（`pool`）に入れ、設定と先行の対応表の入れ物を用意する
@@ -89,14 +90,14 @@ def candidates(
     open_index = approval_checks.by_id(approved)
     # 親子を引く対応表は、承認済みチケットと、今回の承認で通ったものだけ。外れた親を対応表に残すと、
     # 承認されない親の範囲で子が検証され、親の承認を経ずに子の承認済みチケットができる。
-    # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
+    # pending は親が子より前に並ぶ（並べ替えのキーが親の識別子）ので、子が引くときには
     # 親の通過が決まっている。
     pool = approval_checks.by_id(approved)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_model.Ticket, list[rules.Problem]]] = []
     # レイヤーごとの `phases.yml` の読み込みは 1 プロジェクト 1 回。承認の対象に同じレイヤーの
-    # チケットが何件あっても、ファイルを読むのはそのレイヤーにつき 1 度で足りる。読むのは写しを
-    # 確かめるためで、子の定義は親の写しから引く（`phases.yml` からは引かない）。
+    # チケットが何件あっても、ファイルを読むのはそのレイヤーにつき 1 度で足りる。読むのはコピーを
+    # 確かめるためで、子の定義は親のコピーから引く（`phases.yml` からは引かない）。
     cache: dict[str, dict | None] = {}
     # 先行を引く対応表。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_model.Ticket]] | None = None
@@ -116,7 +117,7 @@ def candidates(
     for t in sorted(revisions, key=lambda x: x.ticket):
         current = open_index[t.ticket]
         config = config_for(t)
-        # 提案の待ち方と写しの定義も承認済みと同じ関数で入れる（計画のステップの `after` と
+        # 提案の先行関係とコピーの定義も承認済みと同じ関数で入れる（計画のステップの `after` と
         # `phases:`）。
         t.workflow = workflow.compute(t)
         types = phasetypes.types_of(t)
@@ -244,8 +245,8 @@ def _mixed_problem(
 
 
 def _workflow_field(t: ticket_model.Ticket) -> list[rules.Problem]:
-    """提案に待ち方の欄（`workflow:`）が書いてあれば拒む。欄は読まないので、書いてあると
-    効くと読み手に思わせる。待ち方は計画のステップの `after` から計算する。"""
+    """提案に先行関係の欄（`workflow:`）が書いてあれば拒む。欄は読まないので、書いてあると
+    効くと読み手に思わせる。先行関係は計画のステップの `after` から計算する。"""
     if ticket_model.WORKFLOW_KEY not in t.raw:
         return []
     return [
@@ -253,7 +254,7 @@ def _workflow_field(t: ticket_model.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"`{ticket_model.WORKFLOW_KEY}` の欄は提案に書かない（読まない）。"
-            "待ち方は計画のステップの `after` から決まる",
+            "先行関係は計画のステップの `after` から決まる",
         )
     ]
 
@@ -278,7 +279,7 @@ def script_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"{names} はスクリプト（ccnavi-ticket.sh）だけが書く欄。"
-            "提案には値を書かない（空にするか削除します）。改版の提案では、承認済みチケットを写したときに"
+            "提案には値を書かない（空にするか削除します）。改版の提案では、承認済みチケットをコピーしたときに"
             "入る started_at・completed_at・base_sha・merged_sha・cancelled_at・cancel_reason・"
             "finished_to・settled_by を"
             "空にする"
@@ -302,13 +303,13 @@ def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"{names} は続きの子を起こすレビューの行き先だけが残すもの。"
-            "提案には書かない（改版の提案で承認済みチケットを写したときも削除します）",
+            "提案には書かない（改版の提案で承認済みチケットをコピーしたときも削除します）",
         )
     ]
 
 
 def types_from(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> dict:
-    """このチケットに使う定義。親ならその写し、子なら親の写し（親が引けなければ空）。
+    """このチケットに使う定義。親ならそのコピーし、子なら親のコピー（親が引けなければ空）。
 
     親は承認済みならその承認済みチケット、同じ承認で通る提案ならその提案（`pool` に入っている）。
     `phases.yml` からは引かない。承認のあとに `phases.yml` から定義を消す・名前を変えても、
@@ -352,16 +353,17 @@ def plan_problems(
     held: dict[str, phasetypes.PhaseType] | None = None,
     approved: bool = False,
 ) -> list[rules.Problem]:
-    """親の計画と写し（`phases:`）が組めるか。
+    """親の計画とコピー（`phases:`）が組めるか。
 
-    写しだけを読んで済むもの（写しが無い、ステップの定義が写しに無い、定義の形と `kind`、使われて
+    コピーだけを読んで済むもの（コピーが無い、ステップの定義がコピーに無い、定義の形と `kind`、
+    使われて
     いない定義）は `phasetypes.copy_problems`、順序（`after` の形・終端・最後のステップの延期・
-    延期の引き受け手とそのレビュー）は `workflow.problems` が当てる。
-    どちらも判定の側が同じものを当てる。延期できる定義か（レビュー不要の定義は延期するものが無い）はここで見る。
+    延期の引き受け手とそのレビュー）は `workflow.problems` が適用する。
+    どちらも判定の側が同じものを適用する。延期できる定義か（レビュー不要の定義は延期するものが無い）はここで見る。
 
-    `config` は承認したときの `phases.yml`。写しの各定義がその同じ名前の定義と読んだ形で同じかを
+    `config` は承認したときの `phases.yml`。コピーの各定義がその同じ名前の定義と読んだ形で同じかを
     確かめる（`copy_config_problems`）。`held` は改版で、子が承認された番号が使う定義
-    （承認済みチケットの写しの値）。`approved` は承認済みチケットに当てる（`--lint`）ときで、
+    （承認済みチケットのコピーの値）。`approved` は承認済みチケットに適用する（`--lint`）ときで、
     `phases.yml` との食い違いは warn にする（進行中の親には効かないのが決まり）。
     """
     problems = list(phasetypes.copy_problems(t))
@@ -404,15 +406,15 @@ def copy_config_problems(
     held: dict[str, phasetypes.PhaseType] | None = None,
     approved: bool = False,
 ) -> list[rules.Problem]:
-    """写し（`phases:`）の各定義が、承認したときの `phases.yml` の同じ名前の定義と同じか。
+    """コピー（`phases:`）の各定義が、承認したときの `phases.yml` の同じ名前の定義と同じか。
 
-    読んだ形で比べる（`phasetypes.same`）。`phases.yml` にあって写しに無い定義は何も言わない
+    読んだ形で比べる（`phasetypes.same`）。`phases.yml` にあってコピーに無い定義は何も言わない
     （この親では使わないだけ）。`held` に入っている定義（改版で、子が承認された番号が使う定義）は
-    `phases.yml` ではなく承認済みチケットの写しの値と比べる。進んでいるフェーズの範囲・見る場所・
+    `phases.yml` ではなく承認済みチケットのコピーの値と比べる。進んでいるフェーズの範囲・見る場所・
     成果物を改版で変えないため。
 
     `approved` なら承認済みチケットの食い違いとして warn で言う（`--lint`）。進行中の親には
-    効かない（判定は写しを読む）。
+    効かない（判定はコピーを読む）。
     """
     if not phasetypes.has_copy(t) or not t.has_plan:
         return []
@@ -424,7 +426,7 @@ def copy_config_problems(
                 severity,
                 t.ticket,
                 "`plan` があるのにフェーズ定義（phases.yml）が読めない。"
-                "写し（`phases:`）が phases.yml と同じかを確かめられない",
+                "コピー（`phases:`）が phases.yml と同じかを確かめられない",
             )
         ]
     problems: list[rules.Problem] = []
@@ -457,7 +459,7 @@ def copy_config_problems(
                         severity,
                         t.ticket,
                         f"`phases:` の `{ident}` が{what}。進行中の親には反映されない（判定は"
-                        "承認済みチケットの写しを読む）。反映するには、子の無い番号の定義なら"
+                        "承認済みチケットのコピーを読む）。反映するには、子の無い番号の定義なら"
                         f" {fill} を実行した改版を出す（計画が同じでも改版になる）。子が承認された"
                         "番号の定義なら、ユーザが承認済みチケットの `phases:` を直す",
                     )
@@ -476,7 +478,7 @@ def copy_config_problems(
                     t.ticket,
                     f"`phases:` の `{ident}` が phases.yml の定義と違う"
                     f"（違う欄: {', '.join(phasetypes.differing(pt, ref))}）。"
-                    f"{fill} で写し直す",
+                    f"{fill} でコピー直す",
                 )
             )
     return problems
@@ -491,12 +493,13 @@ def revision_problems(
 ) -> list[rules.Problem]:
     """親の改版を受けてよいか。
 
-    変えてよいのは計画（`plan:` / `feedback:`）・写し（`phases:`）・範囲。写しは、子が承認された番号
+    変えてよいのは計画（`plan:` / `feedback:`）・コピー（`phases:`）・範囲。コピーは、
+    子が承認された番号
     （固定した番号）が使う定義だけ承認済みチケットの値のまま（`phases.yml` と違っていてよい）、
     ほかは今の `phases.yml` と同じ。足すのも外すのも自由。
 
     処理フロー:
-    1. 子が承認された番号（`fixed_numbers`）のステップが持つ型の定義を、承認済みの写しから集める
+    1. 子が承認された番号（`fixed_numbers`）のステップが持つ型の定義を、承認済みのコピーから集める
     2. 計画を検める（`plan_problems`）。error があれば、ここで返す
     3. 範囲の改版なら、読めない項（`unreadable_scope`）と作業中の子（`open_children`）を見る
     4. 題・課題・`mr:` を比べる（`mr:` は片方が空なら比べない）
@@ -546,7 +549,7 @@ def revision_problems(
             )
         )
     # `mr:` は承認のあとに ccnavi が書き足すことがある（`review request`）。改版の提案は
-    # 書き足す前の写しかもしれないので、片方が空なら比べない。両方に値があって違えば error。
+    # 書き足す前のコピーかもしれないので、片方が空なら比べない。両方に値があって違えば error。
     if revised.mr is not None and current.mr is not None and revised.mr != current.mr:
         problems.append(
             rules.Problem(
@@ -593,7 +596,7 @@ def revision_problems(
                     "フィードバック計画は 1 回だけ作成でき、変更できません。ただし、承認済みの"
                     "フィードバック作業フェーズの定義の上限と親の範囲に収まる修正は、その"
                     "フェーズに子チケットを追加して対応できます（設計の修正でも、定義が親の範囲の"
-                    "設計書を持つ場合は同様です）。収まらない場合は、ユーザーによる定義の変更か、"
+                    "設計書を持つ場合は同様です）。収まらない場合は、ユーザによる定義の変更か、"
                     f"別作業への切り出しが必要です。切り出す場合は、{elsewhere}",
                 )
             )
@@ -674,7 +677,8 @@ def lock_problems(
     """改版の番号ごとの錠。`fixed` は子が承認された番号。
 
     固定した番号のステップは、定義・`review`・番号・推移的な先行（`workflow.compute` の `waits`）を
-    変えさせない。先行を推移的な形で比べるのは、エージェントが `--explain` の「先行 …」を写しても、
+    変えさせない。先行を推移的な形で比べるのは、
+    エージェントが `--explain` の「先行 …」をコピーしても、
     直接の先行だけを書いても、同じ意味なら通すため。固定した番号に固定していない番号が先行する形
     （子を手で動かして承認した親）では、その先行もステップの同一性（定義と `review`）で比べる。
     番号だけで比べると、先行の番号に別のステップを入れ替える改版が通ってしまう。
@@ -789,13 +793,13 @@ def validate(
     判定が親と定義の上限で切り詰める。
 
     形の検査を error に残すのは、まとめて 1 度で見せて直させるため。判定の側も同じ
-    検査を当てる（`blocking_problems`）ので「判定では補えない」わけではないが、
+    検査を適用する（`blocking_problems`）ので「判定では補えない」わけではないが、
     判定に任せると、承認の画面では通って、あとで書き込みが止まってから気づくことになる。
     承認はユーザがまとめて見て決める場所なので、そこで外れるものはそこで言う。
 
-    `config` は承認したときの `phases.yml`（親の写しを確かめる。`plan_problems`）。子の定義は
-    親の写しから引き、`phases.yml` からは引かない。`approved` は承認済みチケットに当てる
-    `--lint` で、写しと `phases.yml` の食い違いを warn にする。
+    `config` は承認したときの `phases.yml`（親のコピーを確かめる。`plan_problems`）。子の定義は
+    親のコピーから引き、`phases.yml` からは引かない。`approved` は承認済みチケットに適用する
+    `--lint` で、コピーと `phases.yml` の食い違いを warn にする。
     """
     problems: list[rules.Problem] = []
     overflow: list[rules.Problem] = []
@@ -814,7 +818,7 @@ def validate(
         mark = t.maintenance_problem()
         if mark:
             return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, mark)], overflow
-        # 承認済みの親は写しが固定で、言われても直せない（改版が要る）。承認の前に言えば足りる
+        # 承認済みの親はコピーが固定で、言われても直せない（改版が要る）。承認の前に言えば足りる
         if t.has_plan and not approved:
             overflow.extend(phasetypes.parent_scope_problems(t))
         return plan_problems(t, config, approved=approved), overflow
@@ -824,7 +828,7 @@ def validate(
     if parent is None or parent.is_child:
         return problems, overflow
     if t.is_consolidate:
-        # 統合の子の範囲の上限は、ccnavi の中に固定した定義（親の範囲は当てない）。
+        # 統合の子の範囲の上限は、ccnavi の中に固定した定義（親の範囲は適用しない）。
         if not problems:
             overflow.extend(phasetypes.scope_problems(t, phasetypes.consolidate_type()))
         return problems, overflow

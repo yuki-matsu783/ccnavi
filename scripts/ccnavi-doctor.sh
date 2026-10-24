@@ -81,7 +81,7 @@ doctor_clean() {
 
 # URL に埋まった資格情報とトークンを伏せる。.ccnavi/scripts/ccnavi-common.sh の ccnavi_mask_url と
 # 同じ規則（`scheme://` の後ろから最後の `@` まで。scheme の無い `user:pass@host` も）。違いは、
-# ここでは文の途中の URL にも当てることと、glab のトークンの形（glpat-…）も伏せること。
+# ここでは文の途中の URL にも適用することと、glab のトークンの形（glpat-…）も伏せること。
 doctor_mask() {
 	# 最後の awk は、環境の GITLAB_TOKEN・GITHUB_TOKEN の値そのものを伏せる。
 	printf '%s' "$1" | sed -E \

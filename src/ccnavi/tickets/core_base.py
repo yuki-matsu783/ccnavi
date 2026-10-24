@@ -6,7 +6,7 @@
     Snapshot（入力）→ judge_approval / confirm（判定）→ Changes（書くもの）→ Writer
 
 - Reader: Snapshot の中身はファイルシステムから読む（Reader(FS)）。手元は
-  作業ツリー、Chrome は API で読んだ中身を MEMFS に組んだ仮のツリー。
+  ワークツリー、Chrome は API で読んだ中身を MEMFS に組んだ仮のツリー。
   core はブランチごとの blob の表（取っていないファイルを `NOT_FETCHED` にする形）を持たない
 - 判定: `judge_approval`（実行前チェックのモジュール `ccnavi.hook.judge` と
   紛れないように名前を変えた）は承認の対象と画面とダイジェストを返す。通らない理由を返す
@@ -70,7 +70,7 @@ class Snapshot:
 
 
 def read_fs(conf: settings.Settings, root: str, stamp: str = "", actor: Actor | None = None):
-    """Reader(FS)。手元の作業ツリー（か Chrome の仮のツリー）をそのまま読む Snapshot。"""
+    """Reader(FS)。手元のワークツリー（か Chrome の仮のツリー）をそのまま読む Snapshot。"""
     return Snapshot(root=root, conf=conf, stamp=stamp, actor=actor or Actor())
 
 
@@ -334,7 +334,7 @@ class Checked:
     """`confirm` の答え。`problems` は標準エラーに出す文面（行のリスト）。
 
     通らなければ `changes` は None で、`code` に通らなかった根拠の種別（`CORE_*`）が入る。
-    端末と Chrome の画面と試験が、文の言い回しではなく同じ材料で分岐できるようにするため。
+    ターミナルと Chrome の画面と試験が、文の言い回しではなく同じ材料で分岐できるようにするため。
     文面にも同じコードを `[<コード>]` の形で載せる（`tagged`）。理由が幾つもあるときは、
     `code` は最初の理由のもので、文面は理由ごとに自分のコードを持つ。
     """

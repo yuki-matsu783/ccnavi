@@ -1,4 +1,4 @@
-"""ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先。
+"""ワークツリー（git worktree）の特定。判定のキーはファイルの行き先。
 
 ## なぜ行き先で決めるか
 
@@ -269,7 +269,7 @@ def parts_under(base: str, full: str) -> list[str] | None:
 
     突き合わせは、どの機械でも大文字小文字を区別しない（`pathcase.fold`）。返す名前の表記は
     `full` のまま。小文字にしたパスから作ると、チケットが `README.md` と書いた範囲に
-    `readme.md` を当てることになって、永久に当たらない。
+    `readme.md` を適用することになって、永久にヒットしない。
     """
     base_parts = _resolved(base).rstrip(os.sep).split(os.sep)
     parts = _resolved(full).rstrip(os.sep).split(os.sep)
@@ -282,7 +282,7 @@ def parts_under(base: str, full: str) -> list[str] | None:
 
 
 def relative(tree: Tree, full: str) -> str:
-    """作業ツリーのルートからの相対。区切りは "/"。ルートそのものなら空文字。
+    """ワークツリーのルートからの相対。区切りは "/"。ルートそのものなら空文字。
 
     ルートの外なら `..` で辿る形を返す。
     """
@@ -436,7 +436,7 @@ def busy_of(tree_root: str) -> str:
 
 
 def branch_of(tree_root: str) -> str | None:
-    """このツリーの作業ツリーが今いるブランチの名前。分からなければ None。
+    """このツリーのワークツリーが今いるブランチの名前。分からなければ None。
 
     読むのはファイルだけで、git は起こさない（判定の中から呼ばれうる）。`.git` が
     ディレクトリならその `HEAD`、ファイル（`gitdir: <場所>`、相対ならツリーから）ならその
@@ -503,5 +503,5 @@ def _resolved(path: str) -> str:
 
 
 def _key(path: str) -> str:
-    """同じ場所かを比べるための鍵。大文字小文字はどの機械でも区別しない（`pathcase.fold`）。"""
+    """同じ場所かを比べるためのキー。大文字小文字はどの機械でも区別しない（`pathcase.fold`）。"""
     return pathcase.fold(_resolved(path))

@@ -1,5 +1,5 @@
 {
- "about": "計画（plan / feedback のステップ）と、そこから計算する待ち方（waits・review_at）の見本の表。待ち方の決まりは「after を推移的に辿る」「延期は、延期したステップが先行する、延期していない最小の番号が引き受ける」の 2 つだけ。実行ファイルの答えがこの表と同じことを tests/ticket/test_phases_dag.py が確かめる。決まりを直すときは、この表も一緒に直す",
+ "about": "計画（plan / feedback のステップ）と、そこから計算する先行関係（waits・review_at）の見本の表。先行関係の決まりは「after を推移的に辿る」「延期は、延期したステップが先行する、延期していない最小の番号が引き受ける」の 2 つだけ。実行ファイルの答えがこの表と同じことを tests/ticket/test_phases_dag.py が確かめる。決まりを直すときは、この表も一緒に直す",
  "cases": [
   {
    "name": "1 ステップ",
@@ -31,7 +31,7 @@
    "review_at": {}
   },
   {
-   "name": "推移的に並べて写しても同じ",
+   "name": "推移的に並べてコピーしても同じ",
    "plan": ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [1, 2]}],
    "waits": {"1": [], "2": [1], "3": [1, 2]},
    "review_at": {}

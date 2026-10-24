@@ -9,7 +9,7 @@ onedir で作る。onefile は起動のたびにランタイムを一時ディ�
 
 組み立ての元のコミットを実行ファイルに埋める（`ccnavi --version` が言う）。`build/stamp/` に
 `ccnavi_buildinfo.py` を書き、PyInstaller に一緒に入れさせる。git に聞くのはここだけで、
-実行ファイルは聞かない。作業ツリーに未コミットの変更があれば `-dirty` を付ける。
+実行ファイルは聞かない。ワークツリーに未コミットの変更があれば `-dirty` を付ける。
 
 組み立てた `dist/ccnavi/` は `.ccnavi/bin/<os>-<arch>/` へコピーする。hook が起動する振り分けの sh
 （`.ccnavi/scripts/ccnavi-launcher.sh`）は `../bin/` のこちらを探すので、コピーするまで hook は
@@ -207,7 +207,7 @@ def _swap(new: str, live: str) -> None:
 
     Windows は走っている実行ファイルを上書きできない。名前の変更はできるので、
     古いほうを退避してから新しいほうを移し、退避した側を消す。hook は 0.2 秒で
-    終わるが、ちょうど走っている瞬間に当たることはある。数回やり直せば抜ける。
+    終わるが、ちょうど走っている瞬間にヒットすることはある。数回やり直せば抜ける。
     やり直しきれなかったら、退避した側を置き場に戻してから投げる。
     """
     os.makedirs(os.path.dirname(live), exist_ok=True)

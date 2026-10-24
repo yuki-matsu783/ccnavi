@@ -12,7 +12,7 @@ VS Code のボード拡張がオーバーレイで承認するための経路。
 4. `--yes` の識別子の一覧、または見せた各提案ファイルのバイト列（本文・改行・BOM を含む）が
    今と違えば、承認済みチケットを置かず `mismatch` で exit 1。判定が読んだ中身（承認済みチケット・
    マーカー・設定）と承認画面の本文は照合しない
-5. `--yes` は端末の壁を通らない。素の `--agree` は今までどおり壁で止まる
+5. `--yes` はターミナルの壁を通らない。素の `--agree` は今までどおり壁で止まる
 6. 拡張側のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/approve-*.json）と同じ形
 
 形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを走らせ、フィクスチャを書き直す。
@@ -66,7 +66,7 @@ class ApproveJsonTest(PhaseHarness):
         )
 
     def agree_editing(self, edit, answers=("y", "y"), only=()):
-        """端末の `--agree` を、確認の入力を待つ間に提案を書き換えて動かす。
+        """ターミナルの `--agree` を、確認の入力を待つ間に提案を書き換えて動かす。
 
         1 回目の入力を返す直前に `edit()` を呼ぶ（ユーザが画面を見ている間に提案が変わった形）。
         答えは `answers` の順に返す。足りなければ空（やめる）。
@@ -641,7 +641,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertFalse(self.copy_exists("i0001-01-01"))
         self.assertFalse(self.copy_exists("i0001"))
 
-    # ---- 4e. 端末の `--agree` も、確認の入力のあとで同じ照合をする
+    # ---- 4e. ターミナルの `--agree` も、確認の入力のあとで同じ照合をする
 
     def child_path(self):
         return os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
@@ -719,7 +719,8 @@ class ApproveJsonTest(PhaseHarness):
         )
 
     def test_terminal_agree_reports_what_it_could_write(self):
-        """端末の `--agree` は `--placed-out` に、書けたパスと書けなかった提案を JSON で書き出す。
+        """ターミナルの `--agree` は `--placed-out` に、
+        書けたパスと書けなかった提案を JSON で書き出す。
 
         親は置けて、子の書き込みだけ失敗する。終了コードは 4（何も置かない失敗の 1 と分ける）。
         """
@@ -774,7 +775,7 @@ class ApproveJsonTest(PhaseHarness):
         """3. 提案はそのままで、親に固定した定義の scope が変わって子の超過が増えても、
         ダイジェストは変わらない（提案の識別子の一覧とバイト列だけを照合する）。
 
-        子の定義は親の写し（`phases:`）から引く。承認済みの親の写しをユーザが手で直すと、
+        子の定義は親のコピー（`phases:`）から引く。承認済みの親のコピーをユーザが手で直すと、
         子の提案は同じでも超過が増える。
         """
         self.pending_parent_and_child()
@@ -785,7 +786,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual([b["ticket"] for b in before["batch"]], ["i0001-01-01"])
         self.assertEqual(before["batch"][0]["overflow"], [])
 
-        # 承認済みの親の写しの research の scope を、子の範囲を覆わない表記に書き換える。
+        # 承認済みの親のコピーの research の scope を、子の範囲を覆わない表記に書き換える。
         copy = os.path.join(self.approved, "doing", "i0001.md")
         with open(copy, encoding="utf-8") as f:
             text = f.read()
@@ -814,11 +815,11 @@ class ApproveJsonTest(PhaseHarness):
         body = self.preview()
         self.assertIn("4242", body["text"])
 
-    # ---- 5. 端末の壁
+    # ---- 5. ターミナルの壁
 
     def test_yes_does_not_need_a_terminal_but_plain_approve_still_does(self):
         self.pending_parent_and_child()
-        # 壁を有効にしたまま。テストの標準入力は端末ではない。
+        # 壁を有効にしたまま。テストの標準入力はターミナルではない。
         refused = self.ccnavi("user", "agree", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("ターミナル", refused.stderr)
@@ -860,7 +861,7 @@ class ApproveJsonTest(PhaseHarness):
         self._check_fixture("approve-mismatch.json", json.loads(result.stdout))
 
     def test_yes_that_stops_partway_says_what_it_placed(self):
-        """途中で書けなくなっても、置いたぶんを何も言わずに捨てない
+        """途中で書けなくなっても、置いたぶんを何も言わずに破棄しない
         （docs/requirements/json-shapes.md「承認の JSON」の partial）。
 
         置き場に同じ名前のディレクトリを作って、子の承認済みチケットだけ書けなくする。
@@ -884,7 +885,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertIn("i0001-01-01", result.stderr)
 
     def test_partial_carries_the_progress_lines(self):
-        """止まるまでに出た行も渡す。端末だけが知っていて拡張が知らない状態を作らない。
+        """止まるまでに出た行も渡す。ターミナルだけが知っていて拡張が知らない状態を作らない。
 
         レビュー済みのフェーズに子を 2 枚足し、2 枚目だけ書けなくする。1 枚目は置けるので
         そのフェーズのマーカーが消え、その行が `lines` に入る。
@@ -954,9 +955,9 @@ class ApproveJsonTest(PhaseHarness):
         return masked
 
     def _check_fixture(self, name, body):
-        """拡張のフィクスチャと突き合わせる。鍵だけでなく値まで見る。
+        """拡張のフィクスチャと突き合わせる。キーだけでなく値まで見る。
 
-        鍵の集合だけを比べると、識別子や本文が入れ替わっても気づけない。
+        キーの集合だけを比べると、識別子や本文が入れ替わっても気づけない。
         機械に依らない形（`_portable`）に直したうえで、時刻の欄だけ外して比べる。
         """
         portable = self._mask_digests(_portable(body, self.root))

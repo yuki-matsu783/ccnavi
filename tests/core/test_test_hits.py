@@ -2,9 +2,9 @@
 
 見るのは 3 つ。
 
-1. 当たったルール（`rules`）は判定が当てたルールそのもので、ルールファイルを別に読み直さない。
+1. ヒットしたルール（`rules`）は判定が適用したルールそのもので、ルールファイルを別に読み直さない。
    組み込み（設定ファイルの保護・チケットの状態の保護・退避した既定）は `outside` で、式は短く切る。
-   レイヤーの和で重複として捨てられる側のプロジェクトの定義も、同じ id のルールも位置で引ける
+   レイヤーの和で重複として破棄される側のプロジェクトの定義も、同じ id のルールも位置で引ける
 2. payload の欄（`--cwd`・`--permission-mode`・`--agent-id`）が判定に渡り、使った payload が出る。
    知らない権限モードと無いディレクトリは断る。切り替えの環境変数は hook と同じく解いてから
    判定に渡す
@@ -92,7 +92,7 @@ class TestHitsTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         return json.loads(done.stdout)
 
-    # ---- 1. 当たったルール
+    # ---- 1. ヒットしたルール
 
     def test_builtin_guard_is_outside_with_a_short_form(self):
         os.makedirs(os.path.join(self.root, ".ccnavi", "config", "common"))
@@ -163,8 +163,8 @@ class TestHitsTest(unittest.TestCase):
         )
 
     def test_same_definition_in_two_projects_shows_the_one_that_hit(self):
-        # レイヤーの和では後ろのプロジェクトの同じ定義が重複として捨てられる。判定は行き先の
-        # レイヤーで当てるので、捨てられた側のプロジェクトにも当たる。そのルールが見えること。
+        # レイヤーの和では後ろのプロジェクトの同じ定義が重複として破棄される。判定は行き先の
+        # レイヤーで適用するので、破棄された側のプロジェクトにもヒットする。そのルールが見えること。
         git(self.root, "init", "--quiet", "-b", "main")
         write(os.path.join(self.root, ".gitignore"), "/projects/\n")
         write(common_path(self.root, "rules"), json.dumps({"version": 1}))
@@ -282,7 +282,7 @@ class TestHitsTest(unittest.TestCase):
                     self.assertIn(f"{flag} は --test でだけ使える", done.stderr)
 
     def test_flags_between_tool_and_subject_and_extra_words_are_refused(self):
-        """オプションを TOOL と SUBJECT の間に置いた形と、余った語は、黙って捨てずに断る。"""
+        """オプションを TOOL と SUBJECT の間に置いた形と、余った語は、黙って破棄せずに断る。"""
         for argv, said in (
             (
                 ("--test", "Bash", "--permission-mode", "auto", "ls"),

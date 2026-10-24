@@ -5,14 +5,14 @@
 1. フェーズ定義は順序を持たない。`phases.yml` に残った `order`・`after`・`overlap`・`requires` は
    読まずに通し、warn で言う
 2. ステップの `after` の読み方。形の誤りは読み込みで落とさず、例外も出さない
-3. 待ち方はステップの `after` を推移的に辿って計算する。書かないステップは先行なし。
+3. 先行関係はステップの `after` を推移的に辿って計算する。書かないステップは先行なし。
    フィードバック計画はいまは一直線（前の番号が全部先行する）で読む
 4. 計画の検査（終端・最後のステップの延期・延期の引き受け手とそのレビュー）
 5. 承認と順序。並行の枝が一緒に始まり、合流点には両方が先行する
-6. 待ち方のファイルは無い。承認済みチケットの計画から都度計算し、残ったファイルは読まない
+6. 先行関係のファイルは無い。承認済みチケットの計画から都度計算し、残ったファイルは読まない
 7. 手で動かした承認も `after` で読む。壊れた計画の親は判定で止まり、子も止まる
 8. 改版の見つけ方（定義・`review`・推移的な先行の並び）と、番号ごとの錠
-9. 受け入れは親全体に当てはまる（`confirm` が数えるのはホスト上の未解決だけ）。
+9. 受け入れは親全体に該当する（`confirm` が数えるのはホスト上の未解決だけ）。
    次の案内は並行の枝を挙げる
 """
 
@@ -53,7 +53,7 @@ phases:
 
 
 def parent_text(*args, **kwargs):
-    """親の提案の本文。`phases:` はこのテストの定義（DEFS）から写す。"""
+    """親の提案の本文。`phases:` はこのテストの定義（DEFS）からコピーする。"""
     kwargs.setdefault("copy", DEFS)
     return _parent_text(*args, **kwargs)
 
@@ -66,7 +66,7 @@ PLAN = [
     {"type": "docs", "after": [2, 3]},
 ]
 
-# 計画の待ち方の見本の表。待ち方の決まりが黙って変わらないように、ここで固定する。
+# 計画の先行関係の見本の表。先行関係の決まりが黙って変わらないように、ここで固定する。
 PLAN_WAITS = os.path.join(ROOT, "tests", "fixtures", "plan-waits.json")
 
 
@@ -260,7 +260,7 @@ class ComputeTest(unittest.TestCase):
         self.assertEqual(parent.covered_by(5), [3, 4])
 
     def test_the_plan_waits_fixture(self):
-        """計画と待ち方の見本の表。実行ファイルの答えが表と同じ。"""
+        """計画と先行関係の見本の表。実行ファイルの答えが表と同じ。"""
         with open(PLAN_WAITS, encoding="utf-8") as f:
             cases = json.load(f)["cases"]
         self.assertGreaterEqual(len(cases), 5)
@@ -352,7 +352,7 @@ class PlanProblemsTest(unittest.TestCase):
         plan = [item("design", "defer"), item("extra", after=[1]), item("docs", after=[2])]
         found = self.problems(plan, types=types)
         self.assertTrue(any("レビューがありません" in d for d in found), found)
-        # 定義を渡さなければ（判定の側）、定義を読む検査は当てない。
+        # 定義を渡さなければ（判定の側）、定義を読む検査は適用しない。
         self.assertFalse(any("レビューがありません" in d for d in self.problems(plan)))
         plan[1] = item("extra", "mr", [1])
         self.assertEqual(self.problems(plan, types=types), [])
@@ -459,7 +459,7 @@ class LockTest(unittest.TestCase):
         self.assertTrue(any("3" in d and "先行" in d for d in found), found)
 
     def test_copying_the_transitive_waits_into_a_fixed_number_passes(self):
-        """固定した番号の先行は推移的な形で比べる。「先行 1, 2, 3」を写しても通す。"""
+        """固定した番号の先行は推移的な形で比べる。「先行 1, 2, 3」をコピーしても通す。"""
         revised = [
             item("design"),
             item("acceptance", after=[1]),
@@ -684,7 +684,7 @@ class DagApprovalTest(PhaseHarness):
         self.move_by_hand(broken)
         held = self.scanned()
         self.assertIn("先行していない", held.blocked)
-        # 親の範囲は当たらず、書き込みは止まる。
+        # 親の範囲はヒットせず、書き込みは止まる。
         denied = self.hook(
             "PreToolUse",
             "Write",

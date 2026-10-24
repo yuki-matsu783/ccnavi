@@ -525,7 +525,7 @@ class DecideActorTest(ActorHarness):
         self.assertIn("--actor", preview.stderr)
 
     def test_board_is_refused_for_the_way_that_picks_one_by_one(self):
-        """端末で 1 件ずつ選ぶ形（--yes 無し）に --via board は受けない。"""
+        """ターミナルで 1 件ずつ選ぶ形（--yes 無し）に --via board は受けない。"""
         fixture = self.ready()
         done = self.ccnavi(
             "--cwd",

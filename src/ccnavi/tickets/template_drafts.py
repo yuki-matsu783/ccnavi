@@ -7,24 +7,26 @@
 ## 下書きを作る（`make`）
 
 完了した親の `done/` の計画（`plan:` / `feedback:` のステップの `type`・`review`・`after`）と、
-各子のフロー（`.ccnavi/approved/flows/<子>.yml`）を 1 ファイルのテンプレートに写し、親のツリーの
+各子のフロー（`.ccnavi/approved/flows/<子>.yml`）を 1 ファイルのテンプレートにコピーし、親のツリーの
 `wip/handoff/` の下の、取り込み先と同じ相対パスに書く。エージェントが打ってよい（効力が無い）。
 
 - `after` は各計画の中の添字（1 始まり）にする。親の計画の `after` は全体計画の続きの絶対番号で、
   フィードバック計画のステップは全体計画のステップ数を引いて直す。全体計画の `after` はそのまま。
   承認済みの親の計画の順序は承認が確かめているので、並べ替え（`plan_order.renumber`）は要らず、引き算だけで足りる
 - 子のフローは、全体計画の n 番目のステップの子（`phase` が n）のうち、フローを持つ
-  最初の 1 本を写す。
-  写すのは全体計画の子のフローだけ（テンプレートの `flows` は全体計画の添字で指す）
+  最初の 1 本をコピーする。
+  コピーするのは全体計画の子のフローだけ（テンプレートの `flows` は全体計画の添字で指す）
 - 固有名の一般化はエージェントが直す。親の題から入れる `description` と `when` の両方に
   `TODO` の印を付ける。印が残っていれば検査が warn で言う
 - 取り込み先に同名のテンプレートが既にあれば、上書きになる下書きを作らずに断る（直すときは
-  `ccnavi-stage.sh` で既存を写して編集する）。同名の下書きがあれば上書きせず断る。親が `ready` で
+  `ccnavi-stage.sh` で既存をコピーして編集する）。同名の下書きがあれば上書きせず断る。
+  親が `ready` で
   閉じて退避済み（`logs/archive/`）なら、そこからは読まないと言って断る
 
 ## 一覧と検査（`scan`）
 
-全ツリーの `wip/handoff/` の、取り込み先の表で `template` の種類に当たる下書きを読み、取り込み先の
+全ツリーの `wip/handoff/` の、取り込み先の表で `template` の種類にヒットする下書きを読み、
+取り込み先の
 レイヤーのフェーズ定義で検査する。`--templates --json` の `drafts[]` と `--lint` が読む。
 """
 
@@ -123,7 +125,7 @@ def _target_layer(conf: settings.Settings, root: str, where: tree.Tree, key: str
 def scan(conf: settings.Settings, root: str, candidates: dict | None = None) -> DraftScan:
     """全ツリー（ワークスペース・プロジェクト・ワークツリー）のテンプレートの下書きを読んで検査する。
 
-    下書きは `wip/handoff/` の下で、取り込み先の表の `template` の種類に当たるもの。
+    下書きは `wip/handoff/` の下で、取り込み先の表の `template` の種類にヒットするもの。
     検査は取り込み先のレイヤーのフェーズ定義（共通は共通だけ、ほかは共通 + レイヤー）で行う。
     同じ中身の下書きが
     複数のツリーに在れば（親のブランチに乗ったものが子のワークツリーにも checkout される）、
@@ -241,7 +243,7 @@ class Made:
     # 下書きを置いたツリーのルート（`user handoff` を打つツリー）。
     tree_root: str = ""
     template: plan_templates.Template | None = None
-    # 知らせ（写せなかったフロー、落とした先行など）。
+    # 知らせ（コピーできなかったフロー、落とした先行など）。
     notes: list[str] = field(default_factory=list)
     problems: list[Problem] = field(default_factory=list)
 
@@ -309,7 +311,8 @@ def _flows(
     children: list[ticket_model.Ticket],
     notes: list[str],
 ) -> dict[int, dict]:
-    """全体計画の n 番目のステップ → その子のフローの本文。フローを持つ最初の子の 1 本を写す。"""
+    """全体計画の n 番目のステップ → その子のフローの本文。
+    フローを持つ最初の子の 1 本をコピーする。"""
     out: dict[int, dict] = {}
     for n in range(1, len(parent.plan) + 1):
         mine = sorted(
@@ -326,11 +329,13 @@ def _flows(
             if raw is not None:
                 data, why = flow.parse(raw)
             if data is None:
-                notes.append(f"{n} 番目の子 {child.ticket} のフローは読めないので写さない（{why}）")
+                notes.append(
+                    f"{n} 番目の子 {child.ticket} のフローは読めないのでコピーしない（{why}）"
+                )
                 continue
             if taken:
                 notes.append(
-                    f"{n} 番目は {taken} のフローを写した（{child.ticket} にもフローがある）"
+                    f"{n} 番目は {taken} のフローをコピーした（{child.ticket} にもフローがある）"
                 )
                 continue
             out[n] = data
@@ -344,7 +349,7 @@ def _build(
     children: list[ticket_model.Ticket],
     name: str,
 ) -> tuple[plan_templates.Template, list[str]]:
-    """完了した親の計画とフローを、下書きの中身（まだ一般化していない）に写す。何も書かない。"""
+    """完了した親の計画とフローを、下書きの中身（まだ一般化していない）にコピーする。何も書かない。"""
     notes: list[str] = []
     planned = len(found.plan)
     plan = _relative_items(list(found.plan), 0, "plan", notes)
@@ -361,7 +366,7 @@ def _build(
     if found.feedback:
         flowless = [c for c in children if c.phase and c.phase > planned]
         if any(os.path.lexists(flow.flow_file(conf, found.tree_root, c.ticket)) for c in flowless):
-            notes.append("フィードバック計画の子のフローは写さない（全体計画の子のフローだけ）")
+            notes.append("フィードバック計画の子のフローはコピーしない（全体計画の子のフローだけ）")
     return template, notes
 
 
@@ -380,7 +385,7 @@ def _target_of(
                 "",
                 (
                     f"{found.ticket} はプロジェクト（{found.project}）のツリーの親。そのツリーの"
-                    "共通の置き場は共通レイヤーの写しなので、共通の下書きは作らない"
+                    "共通の置き場は共通レイヤーのコピーなので、共通の下書きは作らない"
                 ),
             )
         return f"{home}/{settings.COMMON_DIR}/{file}", plan_templates.LAYER_COMMON, ""
@@ -452,7 +457,7 @@ def make(
             False,
             error=(
                 f"取り込み先に同名のテンプレート {target_rel} が既に在る。上書きになる下書きは"
-                "作らない（別の --name を付けるか、直すなら ccnavi-stage.sh で既存を写して"
+                "作らない（別の --name を付けるか、直すなら ccnavi-stage.sh で既存をコピーして"
                 "編集する）"
             ),
         )

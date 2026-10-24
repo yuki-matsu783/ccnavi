@@ -1,7 +1,7 @@
 """親の提案の計画を書き換える補助のフラグ `ccnavi --plan-order <親> ...` の入口。
 
 形は 2 つ。ここは引数を受けて答えを出すだけで、振り直しと書き戻しは `tickets/plan_order.py`、
-定義の写しは `tickets/plan_phases.py` が持つ。
+定義のコピーは `tickets/plan_phases.py` が持つ。
 
 - `--json [--order <JSON>]` と `--order <JSON> --expect <ハッシュ> --write`: 計画の番号を振り直して
   答え、保存では提案の `plan:` / `feedback:` の値を書き換える。VS Code の計画編集タブが
@@ -13,8 +13,8 @@
 
 `--agree` の外の独立したフラグにしてある。書くのは `todo/` の親の提案（エージェントも書ける
 置き場）だけ。組み込みの止め（`phase_forms._CLI_FORMS`）は `--agree` を含む
-呼び出しを止めるので、`--agree` の副フラグにすると止めに当たる。`entry/cli.py` は `--agree` の
-端末の確かめより手前でここへ分ける。書き換えたあとは、承認の前に改めて preview で見せる。
+呼び出しを止めるので、`--agree` の副フラグにすると止めにヒットする。`entry/cli.py` は `--agree` の
+ターミナルの確かめより手前でここへ分ける。書き換えたあとは、承認の前に改めて preview で見せる。
 """
 
 from __future__ import annotations

@@ -53,7 +53,7 @@ PLAN_INPUTS = ("scripts", "src", "test", "package.json", "tsconfig.test.json")
 
 
 def plan(*paths, root=BOARD):
-    """`--plan` の 1 行を読み、辞書にする。`root` を渡すとそのコピーの runner を回す。"""
+    """`--plan` の 1 行を読み、マップにする。`root` を渡すとそのコピーの runner を回す。"""
     result = subprocess.run(
         [NODE, os.path.join(root, "scripts", "test-groups.js"), "--plan", "--for", *paths],
         capture_output=True,
@@ -133,7 +133,7 @@ class ExtTestPlanTest(unittest.TestCase):
         with copied_board() as root:
             crossing = os.path.join(root, "src", "webview", "projects", "App.tsx")
             # 行頭から始まるように改行を先に置く。行の途中に付くと runner の正規表現に
-            # 当たらず、穴が空いていても通ってしまう（偽陰性）
+            # ヒットせず、穴が空いていても通ってしまう（偽陰性）
             write(crossing, '\nimport "../board/state.js";\n', mode="a")
             got = plan("src/webview/board/state.ts", root=root)
         self.assertIn("board", got["groups"])

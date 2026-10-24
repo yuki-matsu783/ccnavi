@@ -63,7 +63,8 @@ ANOTHER_MACHINE = "haiku-riscv64"
 SHELL = shutil.which("sh") or shutil.which("bash")
 HAS_JQ = shutil.which("jq") is not None
 
-# 登録されていることを確かめる 8 つ。docs/guide/settings.md「hook の 8 つのイベント」の表と対になる。
+# 登録されていることを確かめる 8 つ。
+# docs/guide/settings.md「hook の 8 つのイベント」の表と対になる。
 EVENTS = (
     "SessionStart",
     "UserPromptSubmit",
@@ -99,7 +100,7 @@ GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（入口の ccnavi-common.sh と部品 5 本）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で失敗する。
 # 承認済みチケットをコミットして push する sh（ccnavi-user-push-approved.sh）も配る。
-# ボードは承認のあとこれを端末に送るので、配らないと配布先のボードは
+# ボードは承認のあとこれをターミナルに送るので、配らないと配布先のボードは
 # 承認の push ができない（設計 approve-carry 1.5）。ユーザだけが打つ sh は ccnavi-user-*.sh。
 DEPLOY_SCRIPTS = (
     *GATE_SCRIPTS,
@@ -256,7 +257,8 @@ LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_ENTRY_PATH に書くパス。固定。
 BIN_PATH = "/".join(LAUNCHER_PARTS)
 # 配布先の .gitignore に足す `--docs` の索引の 1 行と見出し。docsearch は git がそこの
-# ccnavi-index.jsonl を無視しているときだけ書く（docs/design/diagnostics.md の 10.1「ドキュメントの索引」）。
+# ccnavi-index.jsonl を無視しているときだけ書く
+# （docs/design/diagnostics.md の 10.1「ドキュメントの索引」）。
 INDEX_LINE = "**/ccnavi-index.jsonl"
 INDEX_HEADER = "# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 # 使い捨ての置き場（ワークスペースルート直下の scratchpad/）を追跡から外す 1 行と見出し。
@@ -487,7 +489,7 @@ class WritesTheExpectedShape(SetupTest):
         """指すのは .ccnavi/scripts/ の振り分けの sh で、どの環境でも 1 行のまま（S1）。
 
         実行ファイルは機械ごとに .ccnavi/bin/<os>-<arch>/ に入り、どれを起動するかは sh が選ぶ。
-        設定に機械の語や `.exe` が入ると、その 1 行が 1 つの環境でしか当たらなくなる。
+        設定に機械の語や `.exe` が入ると、その 1 行が 1 つの環境でしかヒットしなくなる。
         """
         self.run_setup()
         self.assertEqual(self.read_settings()["env"]["CCNAVI_ENTRY_PATH"], BIN_PATH)
@@ -593,14 +595,16 @@ class WritesTheExpectedShape(SetupTest):
 
     @unittest.skipIf(os.name == "nt", "実行ビットは POSIX の話")
     def test_a_ccnavi_on_path_counts_as_a_runnable_build(self):
-        """bin/ に実行ファイルが無くても、振り分けの sh が PATH の ccnavi を起動するので「まだ無いもの」に出さない。"""
+        """bin/ に実行ファイルが無くても、
+        振り分けの sh が PATH の ccnavi を起動するので「まだ無いもの」に出さない。"""
         result = self.run_setup(env=self.with_ccnavi_on_path())
         missing = section(result.stdout, "まだ無いもの")
         self.assertFalse(names(missing, f".ccnavi/bin/{THIS_MACHINE}/ccnavi"), result.stdout)
 
     @unittest.skipIf(os.name == "nt", "実行ビットは POSIX の話")
     def test_a_link_to_the_launcher_on_path_is_not_a_runnable_build(self):
-        """ccnavi という名前で張った振り分けの sh へのリンクは、起動すると自分に戻る。無いものとして数える。"""
+        """ccnavi という名前で張った振り分けの sh へのリンクは、起動すると自分に戻る。
+        無いものとして数える。"""
         launcher = os.path.join(self.dir, *BIN_PATH.split("/"))
         os.makedirs(os.path.dirname(launcher))
         with open(launcher, "w", encoding="utf-8", newline="\n") as f:
@@ -1519,9 +1523,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             self.assertEqual(f.read(), self.PROCESS)
 
     def test_reads_the_process_flag_like_the_ticket_start_does(self):
-        """配る判定は、親チケットの着手が写す判定（skillsync）と同じ答えを返す。
+        """配る判定は、親チケットの着手がコピーする判定（skillsync）と同じ答えを返す。
 
-        食い違うと、着手が写す元の SKILL.md が配布先に届かないまま、何の知らせも出ない。
+        食い違うと、着手がコピーする元の SKILL.md が配布先に届かないまま、何の知らせも出ない。
         特に Windows の Git Bash は、SKILL.md を CRLF で取り出すことがある。
         """
         from ccnavi.tickets import skillsync
@@ -1552,7 +1556,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 )
 
     def test_deploys_only_markdown_under_references_common(self):
-        """ccnavi-index.jsonl や .DS_Store のような生成物は配らない（着手が写すのも .md だけ）。"""
+        """ccnavi-index.jsonl や .DS_Store のような生成物は配らない
+        （着手がコピーするのも .md だけ）。"""
         files = {
             "process-test/SKILL.md": self.PROCESS,
             "process-test/references/common/purpose.md": "共通\n",
@@ -1569,7 +1574,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         )
 
     def test_does_not_deploy_a_skill_md_that_is_a_symlink(self):
-        """着手の写しは SKILL.md のリンクを弾く。配る側も、リンク先の中身を配らない。"""
+        """着手のコピーは SKILL.md のリンクを弾く。配る側も、リンク先の中身を配らない。"""
         src = self.make_source(skills=self.skill_files())
         skill_md = os.path.join(src, ".claude", "skills", "process-test", "SKILL.md")
         os.remove(skill_md)
@@ -1731,7 +1736,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("--bin user と --no-deploy は同時に指定できません", result.stderr)
 
-    # ---- --bin user（ホームディレクトリの下に置く。端末で確認する）
+    # ---- --bin user（ホームディレクトリの下に置く。ターミナルで確認する）
 
     def user_home(self):
         home = tempfile.mkdtemp(prefix="ccnavi-home-")
@@ -1739,8 +1744,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         return home
 
     def run_user_bin(self, home, *args, answer=None, **env_extra):
-        """`--bin user` で配る。answer があれば、端末（疑似端末）に答えを入力する。
-        無ければ端末なし。"""
+        """`--bin user` で配る。answer があれば、ターミナル（疑似ターミナル）に答えを入力する。
+        無ければターミナルなし。"""
         env = clean_env(HOME=home, **env_extra)
         argv = [SHELL, SCRIPT, self.dir, *args]
         if answer is None:
@@ -1775,17 +1780,17 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         return subprocess.CompletedProcess(argv, proc.returncode, out, err)
 
     def test_bin_user_without_a_terminal_writes_nothing(self):
-        """端末でなければ断る。確認に自動で答えるオプションは無いので、エージェントは代わりに答えられない。"""
+        """ターミナルでなければ断る。確認に自動で答えるオプションは無いので、エージェントは代わりに答えられない。"""
         src = self.make_source()
         self.make_git()
         home = self.user_home()
         result = self.run_user_bin(home, "--deploy", src, "--bin", "user")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-        self.assertIn("端末での確認が要ります", result.stderr)
+        self.assertIn("ターミナルでの確認が要ります", result.stderr)
         self.assertEqual(os.listdir(home), [])
         self.assertEqual(os.listdir(self.dir), [".git"])
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_asks_on_the_terminal_and_places_the_build_for_the_path(self):
         src = self.make_source()
         self.make_git()
@@ -1808,7 +1813,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(sorted(os.listdir(home)), [".local"])
         self.assertNotIn("まだ無いもの", result.stdout)
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_stops_without_writing_when_the_answer_is_no(self):
         src = self.make_source()
         self.make_git()
@@ -1819,9 +1824,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(os.listdir(home), [])
         self.assertEqual(os.listdir(self.dir), [".git"])
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_asks_again_only_when_something_will_be_written(self):
-        """同じ中身なら確認なしで終わる。中身が違えば、また端末で確認する。"""
+        """同じ中身なら確認なしで終わる。中身が違えば、またターミナルで確認する。"""
         src = self.make_source()
         self.make_git()
         home = self.user_home()
@@ -1849,7 +1854,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             p for p in os.environ.get("PATH", "").split(os.pathsep) if ".local/bin" not in p
         )
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_names_the_rc_file_of_the_shell_in_use(self):
         src = self.make_source()
         for shell, rc in (("/bin/bash", "~/.bashrc"), ("/usr/bin/zsh", "~/.zshrc")):
@@ -1873,7 +1878,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 self.assertIn(f">> {rc}", result.stdout)
                 self.assertIn("export PATH=", result.stdout)
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_names_fish_add_path_for_fish(self):
         src = self.make_source()
         self.make_git()
@@ -1892,7 +1897,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertIn("fish_add_path", result.stdout)
         self.assertNotIn(">>", result.stdout)
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_says_nothing_about_the_path_when_it_is_already_there(self):
         src = self.make_source()
         self.make_git()
@@ -1912,7 +1917,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         os.chmod(uname, 0o755)
         return shim
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_on_git_bash_puts_the_folder_on_the_path_and_makes_no_link(self):
         """Git Bash はリンクを使わず、ccnavi.exe と _internal/ が並ぶフォルダを PATH に通す。"""
         src = self.make_source(target="windows-x86_64")
@@ -1935,7 +1940,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertNotIn(">> ~/.bashrc", result.stdout)
         self.assertNotIn("まだ無いもの", result.stdout)
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_warns_when_the_project_still_has_its_own_build(self):
         """配布先の bin/ に残った実行ファイルが先に使われる。使われなくなることを知らせる。"""
         src = self.make_source()
@@ -1947,7 +1952,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertIn("実行ファイルが残っています", result.stdout)
         self.assertIn("先に使う", result.stdout)
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_does_not_replace_a_directory_even_with_force(self):
         src = self.make_source()
         self.make_git()
@@ -1970,7 +1975,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(os.listdir(home), [])
         self.assertEqual(os.listdir(self.dir), [".git"])
 
-    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_keeps_a_link_the_user_already_has_unless_forced(self):
         src = self.make_source()
         self.make_git()
@@ -2000,7 +2005,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def test_names_the_push_script_when_the_source_lacks_it(self):
         """15. 配布元に ccnavi-user-push-approved.sh が無ければ、最後の「まだ無いもの」に挙げる。
 
-        ボードは承認のあとこの sh を端末に送る。配れなかったことが最後の一覧に出ないと、
+        ボードは承認のあとこの sh をターミナルに送る。配れなかったことが最後の一覧に出ないと、
         配布先で承認の push ができない理由をユーザが読み取れない。
         """
         src = self.make_source()
@@ -2331,7 +2336,7 @@ class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
         self.assertNotIn("確かめていません", result.stdout)
         self.assertNotIn("向けで", result.stdout)
-        # 目印は dist/ccnavi/ の外にあるので、配布先へは写らない。
+        # 目印は dist/ccnavi/ の外にあるので、配布先へはコピーされない。
         for parts in (
             (".ccnavi", "ccnavi.target"),
             (*BIN_DIR_PARTS, "ccnavi.target"),

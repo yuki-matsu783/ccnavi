@@ -43,7 +43,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
     承認済みの領域（承認済みチケット・マーカー・子の記録・フロー）は数えない（ユーザの決定）。
     承認済みチケットは親のワークツリーに置かれ、判定もフローの案内もそのツリーの版を読む。
-    「統合されるまで使われない」は当てはまらず、言えば誤った案内になる。
+    「統合されるまで使われない」は該当せず、言えば誤った案内になる。
     """
     problems: list[Problem] = []
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("/", os.sep)
@@ -226,7 +226,7 @@ def _drift(conf: settings.Settings, root: str, project: str) -> tuple[list[Probl
         if _same_text(local, remote):
             continue
         if local is None:
-            how = "作業ツリーにありません。"
+            how = "ワークツリーにありません。"
         elif remote is None:
             how = "統合先にありません。"
         else:
@@ -235,7 +235,7 @@ def _drift(conf: settings.Settings, root: str, project: str) -> tuple[list[Probl
             Problem(
                 SEVERITY_WARN,
                 where,
-                f"作業ツリーの {rel} が統合先（origin/{branch}）と違う（{how}）。"
+                f"ワークツリーの {rel} が統合先（origin/{branch}）と違う（{how}）。"
                 "統合先に取り込まれるまで、他の機械と Chrome の判定には使われない。"
                 f"手元の origin/{branch} が古いだけなら、先に取得（fetch）してから見直す",
             )

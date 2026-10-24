@@ -16,7 +16,7 @@
 # 親子のチケットごとの取り込み状態は持たない。判定は親のブランチとチケットの置き場だけで決まる。
 # 親のブランチがリモートから消えたときは、ここでは記録を書かず、診断（下の「P がリモートに無い」）を言って
 # 終了コード 1 にする。親のブランチへの push は、共通の push の関門（ccnavi_push_gate）が止める。
-# 捨てた親子のチケットは、親のワークツリーを片付ければ、この sh の対象から外れ、関門も掛からない。
+# 破棄した親子のチケットは、親のワークツリーを片付ければ、この sh の対象から外れ、関門も掛からない。
 #
 # リポジトリ（ワークスペース自身と、親子のチケットの元のプロジェクト）ごとに 1 回、次の順に行う。
 #
@@ -92,7 +92,7 @@ case "${1:-}" in
 	exit 0
 	;;
 --forget)
-	printf 'ccnavi-sync: --forget は廃止しました。捨てた親子のチケットは、親のワークツリーを片付ければこの sh の対象から外れます（push の関門も掛からない）。ready の後に放棄した親の記録は、ユーザが ccnavi worktree retire --abandon <P> で消します。\n' >&2
+	printf 'ccnavi-sync: --forget は廃止しました。破棄した親子のチケットは、親のワークツリーを片付ければこの sh の対象から外れます（push の関門も掛からない）。ready の後に放棄した親の記録は、ユーザが ccnavi worktree retire --abandon <P> で消します。\n' >&2
 	exit 2
 	;;
 -*)
@@ -369,7 +369,7 @@ say_retired_bad() {
 	ensure_retired
 	sb_line=$(awk -v p="$1" '$1 == p { print; exit }' "$scratch/retired-bad")
 	[ -n "$sb_line" ] || return 1
-	printf '%s: ready の後の片付けの記録（retire/%s.json）が使えない（%s）。閉じたか判断できないので手元は片付けない。MR がマージ済みならブランチとログを手で片付け、捨てた親ならユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消してください\n' \
+	printf '%s: ready の後の片付けの記録（retire/%s.json）が使えない（%s）。閉じたか判断できないので手元は片付けない。MR がマージ済みならブランチとログを手で片付け、破棄した親ならユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消してください\n' \
 		"$1" "$1" "${sb_line#"$1" }" "$here_sh" "$1"
 	return 0
 }
@@ -731,10 +731,10 @@ sync_absent() {
 		return 0
 		;;
 	esac
-	printf '%s: 親のブランチ %s がリモートにありません。マージリクエストもマージされていないので、改名・消し間違いか捨てた親子のチケットかを決められない。このブランチへの push は止まる（push の関門）\n' "$P" "$B"
-	printf '  戻し方 1（改名・消し間違い）: 元の名前 %s でブランチを作り直す。ユーザが端末で、手元の親のワークツリーから git push origin %s を一度打つ。GitHub ならマージリクエストの画面の「Restore branch」、GitLab ならマージリクエストの refs/merge-requests/<番号>/head から %s を作ってもよい。戻したら sh %s/ccnavi-sync.sh %s を再実行します。\n' \
+	printf '%s: 親のブランチ %s がリモートにありません。マージリクエストもマージされていないので、改名・消し間違いか破棄した親子のチケットかを決められない。このブランチへの push は止まる（push の関門）\n' "$P" "$B"
+	printf '  戻し方 1（改名・消し間違い）: 元の名前 %s でブランチを作り直す。ユーザがターミナルで、手元の親のワークツリーから git push origin %s を一度打つ。GitHub ならマージリクエストの画面の「Restore branch」、GitLab ならマージリクエストの refs/merge-requests/<番号>/head から %s を作ってもよい。戻したら sh %s/ccnavi-sync.sh %s を再実行します。\n' \
 		"$B" "$B" "$B" "$here_sh" "$P"
-	printf '  戻し方 2（親子のチケットを捨てた）: 親のワークツリーを片付ける（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）。片付ければこの sh の対象から外れ、push の関門も掛からない。ready の後にマージせず閉じた親の記録は、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で消す（エージェントは実行しません）\n' \
+	printf '  戻し方 2（親子のチケットを破棄した）: 親のワークツリーを片付ける（sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s）。片付ければこの sh の対象から外れ、push の関門も掛からない。ready の後にマージせず閉じた親の記録は、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で消す（エージェントは実行しません）\n' \
 		"$here_sh" "$P" "$here_sh" "$P"
 	fail_note
 	return 0
@@ -798,7 +798,7 @@ sync_retired() {
 		fi
 		;;
 	0:none)
-		printf '%s: ワークツリーは片付け済み。マージリクエスト（%s）はまだマージされていないので片付けない。捨てた親なら、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消す\n' \
+		printf '%s: ワークツリーは片付け済み。マージリクエスト（%s）はまだマージされていないので片付けない。破棄した親なら、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消す\n' \
 			"$P" "$sr_mr" "$here_sh" "$P"
 		;;
 	*)

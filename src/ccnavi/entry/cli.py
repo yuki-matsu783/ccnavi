@@ -116,7 +116,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。
 
     マーカーに書く経路（via）はここで決まる。既定はエージェントが sh から打つサブコマンド
-    （`cli`）で、ユーザの判断の経路（端末・ボード）と hook は枝の中で差し替える。
+    （`cli`）で、ユーザの判断の経路（ターミナル・ボード）と hook は枝の中で差し替える。
     """
     with via.session(via.VIA_CLI):
         try:
@@ -135,7 +135,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 def _test_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> str:
     """`--test` と、その payload の欄の組み合わせの誤り。正しければ空。
 
-    どれも黙って捨てずに断る。捨てると、試したつもりの呼び出しと違う答えを読む。
+    どれも黙って破棄せずに断る。破棄すると、試したつもりの呼び出しと違う答えを読む。
 
     - `--permission-mode` / `--agent-id` は `--test` の payload の欄で、ほかの経路
       （`--lint`・`--explain`・`--docs` など）には読む先が無い
@@ -187,7 +187,7 @@ def _plan_order_usage(args: argparse.Namespace, reordering: bool) -> str:
         return (
             "--plan-order <親> は --json（読むだけ。--order で振り直した答え）か、"
             "--order <JSON> --expect <ハッシュ> --write（書き戻す）か、"
-            "--fill-phases（計画が使う定義だけを phases.yml から親の提案の phases: に写す）と"
+            "--fill-phases（計画が使う定義だけを phases.yml から親の提案の phases: にコピーする）と"
             "一緒に使う"
         )
     return ""
@@ -243,19 +243,21 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 親の提案の計画を書き換える補助（`--agree` の外の独立したフラグ。エージェントも打ってよい）。
     # `--json`（読むだけ。`--order` で振り直した答え）、`--order <JSON> --expect <ハッシュ> --write`
     # （振り直した順序を提案へ書き戻す）、`--fill-phases`（計画が使う定義だけを phases.yml から
-    # `phases:` に写す）。
+    # `phases:` にコピーする）。
     parser.add_argument("--plan-order", default=None, metavar="PARENT")
     parser.add_argument("--fill-phases", action="store_true")
     parser.add_argument("--order", default=None, metavar="JSON")
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--expect", default=None, metavar="SHA")
-    # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
-    # 値なしの `--yes` は `user handoff` と `user mirror` だけが読む（`_run` が、ほかの経路では断る）。
+    # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。
+    # ターミナルは要らない。
+    # 値なしの `--yes` は `user handoff` と `user mirror` だけが読む（`_run` が、
+    # ほかの経路では断る）。
     parser.add_argument("--yes", nargs="?", const=cli_args.BARE_YES, default="")
     # 見せた提案の識別子の一覧と各提案ファイルのバイト列のダイジェスト（`--agree --yes` は
     # preview の `digest`、`--reviewed --yes` は指摘のダイジェスト）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
-    # 端末の `--agree` が実際に書けたパスの一覧を JSON で書き出すファイル。画面（標準出力）は
+    # ターミナルの `--agree` が実際に書けたパスの一覧を JSON で書き出すファイル。画面（標準出力）は
     # ユーザの確認に使うので別にした。`ccnavi-user-agree.sh` が読み、書けた分と
     # 書けなかった分を言う。
     parser.add_argument("--placed-out", default="", metavar="FILE")
@@ -268,7 +270,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 期待する判定をぜんぶ判定に掛ける。scripts/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-expectations", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
-    # 記録のローテートと、古い記録・終わったセッションの記録の削除（prune）。ユーザが端末から打つ。
+    # 記録のローテートと、古い記録・終わったセッションの記録の削除（prune）。
+    # ユーザがターミナルから打つ。
     parser.add_argument("--prune", action="store_true")
     # 記録からルールの候補を作る（suggest）。読むだけで、何も書かない。
     parser.add_argument("--suggest", action="store_true")
@@ -337,7 +340,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
     parser.add_argument("--phase", type=int, default=None)
-    # `worktree retire --abandon <親>`。放棄した親の片付けの記録を消す（ユーザが端末で打つ）。
+    # `worktree retire --abandon <親>`。放棄した親の片付けの記録を消す（ユーザがターミナルで打つ）。
     parser.add_argument("--abandon", default=None, metavar="PARENT")
     parser.add_argument("--body-file", default="")
     parser.add_argument("--reason", default="")
@@ -360,7 +363,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--signal", default="")
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
-    # ユーザが端末で打つ、親を早めに閉じる操作。`--agree` / `--reviewed` と同じく、
+    # ユーザがターミナルで打つ、親を早めに閉じる操作。`--agree` / `--reviewed` と同じく、
     # ユーザの判断はフラグで受ける。
     parser.add_argument("--close-early", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
@@ -373,7 +376,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--record-writes", default="")
     # 一覧の基点（write-and-push の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
     # 置き場の外に書いたら error
-    # （例外は `start` の中で configsync が写したミラーと、skillsync が写した工程スキルだけ）。
+    # （例外は `start` の中で configsync がコピーしたミラーと、
+    # skillsync がコピーした工程スキルだけ）。
     parser.add_argument("--record-tree", default="")
     # 対話の decide の前半。選択とダイジェストをこのファイルに書くだけで、
     # 何も置かない（state の置き場の
@@ -459,8 +463,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.via and args.via not in (via.VIA_TERMINAL, via.VIA_BOARD):
         stderr.write(f"ccnavi: --via に渡せるのは {via.VIA_TERMINAL} か {via.VIA_BOARD}\n")
         return EXIT_ERROR
-    # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
-    # --yes はボードの押した選択と、write-and-push の中の端末の decide（選ぶのを先に済ませた形）
+    # 経路と食い違う組み合わせは受けない。
+    # ターミナルで 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
+    # --yes はボードの押した選択と、
+    # write-and-push の中のターミナルの decide（選ぶのを先に済ませた形）
     # の両方が通る
     if args.via == via.VIA_BOARD and not args.yes and not (args.handoff or args.mirror):
         stderr.write(
@@ -577,7 +583,7 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
     write-and-push がコミットするのは状態だけ。
 
     例外は 2 つ。`ticket start` の中で configsync がミラーしたプロジェクトの
-    `.ccnavi/config/common/`と skillsync が写した工程スキルの `skills/<工程>/`
+    `.ccnavi/config/common/`と skillsync がコピーした工程スキルの `skills/<工程>/`
     （どちらも `skillsync.is_synced_write` が内容で読めるもの）と、`review ready` が
     消した途中の作業の置き場（`wip/`）のファイル（消したもの、つまり今は無いものだけ。
     `review.remove_wip` が追跡済みのものだけを消す）。
@@ -618,7 +624,8 @@ def _ready_removed_wip(real: str, base: str) -> bool:
     """`review ready` が消した途中の作業の置き場（`wip/`）の下のファイルか。
 
     `ready` が消すものを選ぶのと同じ判定（`review.in_wip`。大文字小文字と `\\` の区切りを
-    問わない）を、write-and-push のツリー（`base`）からの相対に当てる。通すのは、そのツリーの中で、
+    問わない）を、write-and-push のツリー（`base`）からの相対に適用する。通すのは、
+    そのツリーの中で、
     今は無い
     （消した）ものだけ。ツリーの外・`..` を含む相対・今も在るものは通さない。
     """
@@ -681,7 +688,7 @@ def _parsed(
     2. 1 つだけ許すフラグと、`cli_templates` や `cli_learnings` の使い方を検査する。
     3. `settings.load` で設定を読む。読めない例外は、hook の経路だけ `_hook_crashed` で受け、
        ほかの経路では例外のまま伝える。
-    4. 診断の経路かを決め（`_diagnosing`）、診断でない経路では差し替えの引数を捨てる
+    4. 診断の経路かを決め（`_diagnosing`）、診断でない経路では差し替えの引数を破棄する
        （`_drop_outside_diagnosis`）。フラグの値を設定へ重ねてから（`_override`）、
        ガードとチケット制御の切り替えを `selfguard.resolve` で解く。
     5. 取り込み・テンプレート・学び・索引（`--docs`）の経路へ分ける。
@@ -689,9 +696,9 @@ def _parsed(
        後始末（`--prune`）を順に見る。
     7. 計画の書き換え（`cli_plan`）と承認（`--agree` の `core` の関数）を見る。
     8. 残りの位置引数は、`ops`・`sync`・`tree`・`write-and-push`・`branches`・`stop-review` の
-       どれかに当たれば、それぞれの関数へ渡す。
+       どれかにヒットすれば、それぞれの関数へ渡す。
     9. 位置引数が残るか、`--reviewed`・`--close-early` があれば `cli_ops.operate` へ渡す。
-    10. どれにも当たらなければ `_hook` で、hook の判定として扱う。
+    10. どれにもヒットしなければ `_hook` で、hook の判定として扱う。
 
     終了コードは、経路の関数が返す値をそのまま返すか、`EXIT_OK` か `EXIT_ERROR` に寄せる。
     検証（`--verify`）は 0 か `modes.EXIT_ANSWER_NO` を返し、承認が途中で止まったときは
@@ -774,11 +781,13 @@ def _parsed(
     # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
     # 差し替えで、無視しても何も動かないので無視するだけにしている）。
     # 保護対象の下書きの取り込み（`user handoff`）。書くとき（`--yes`）は、hook の文字列照合だけを
-    # 歯止めにせず、実行時にも端末の前のユーザが打ったことを確かめる（見るだけの形は求めない）。
-    # ボードの経路（`--via board`）は端末を持たないので、`--expect` の一致と hook の止めに置く。
+    # 歯止めにせず、
+    # 実行時にもターミナルの前のユーザが打ったことを確かめる（見るだけの形は求めない）。
+    # ボードの経路（`--via board`）はターミナルを持たないので、
+    # `--expect` の一致と hook の止めに置く。
     if args.handoff:
         return cli_handoff.run(stdin, stdout, stderr, parser, conf, root, args)
-    # ミラーを揃える（`user mirror`）も同じ。書くとき（`--yes`）は端末の前のユーザを確かめ、
+    # ミラーを揃える（`user mirror`）も同じ。書くとき（`--yes`）はターミナルの前のユーザを確かめ、
     # ボードの経路は `--expect` の一致と hook の止めに置く。
     if args.mirror:
         return cli_mirror.run(stdin, stdout, stderr, parser, conf, root, args)
@@ -841,7 +850,7 @@ def _parsed(
         )
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
-    # ユーザが端末から打って「このルールは何に当たるのか」を確かめるための場所で、
+    # ユーザがターミナルから打って「このルールは何にヒットするのか」を確かめるための場所で、
     # 判定そのものは実運用と同じ関数を通る。判定が読む切り替えの環境変数も、hook と同じ
     # 関数で解いてから渡す（`_resolve_switches`）。
     if args.test is not None or args.test_expectations or (args.explain and not args.json):
@@ -868,7 +877,7 @@ def _parsed(
     if args.prune:
         return cli_args._prune(stdin, stdout, stderr, conf, root, args.preview)
 
-    # 親の提案の計画を書き換える補助の経路。`--agree` の端末の確かめ（`_from_terminal`）より
+    # 親の提案の計画を書き換える補助の経路。`--agree` のターミナルの確かめ（`_from_terminal`）より
     # 手前で分ける。書くのは承認待ちの親の提案（エージェントも書ける置き場）だけで、承認は
     # しない。`--agree` と一緒には受けない（組み込みの止めと経路が食い違わないように）。
     reordering = args.order is not None or args.write or args.expect is not None
@@ -896,7 +905,7 @@ def _parsed(
             args.expect or "",
         )
 
-    # 承認の経路。ユーザが端末から打つもので、payload を読まないのでここで分かれる。
+    # 承認の経路。ユーザがターミナルから打つもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認は、これから判定に使われる
     # 範囲についての合意になる。
     if args.agree:
@@ -919,12 +928,12 @@ def _parsed(
         # 3（いいえ）で、使い方と設定の誤りの 1 とは分ける。
         if args.verify:
             return core.verify(stdout, stderr, conf, root, args.json, list(args.command))
-        # 見るだけの経路。承認済みチケットを置かないので端末の確認は要らない。後ろに並べた語は
+        # 見るだけの経路。承認済みチケットを置かないのでターミナルの確認は要らない。後ろに並べた語は
         # `--agree` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
             code = core.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
-        # 拡張のオーバーレイでユーザが押した承認。端末の確認の代わりに、見せた一覧と今の一覧が
+        # 拡張のオーバーレイでユーザが押した承認。ターミナルの確認の代わりに、見せた一覧と今の一覧が
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
         # deny（phase_forms.ticket_approval_rule）が止める。
         if args.yes:
@@ -1070,7 +1079,8 @@ def _parsed(
         return cli_stopreview.run(stdin, stdout, stderr, conf, list(args.command), root)
 
     if args.command or args.reviewed is not None or args.close_early:
-        # 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` は端末を求めない。
+        # 残った指摘を見せるだけの `--preview` と、
+        # オーバーレイで押した `--yes` はターミナルを求めない。
         # `--yes` を守るのは、見せた指摘のダイジェストの一致と、
         # シェルから打つ形を止める組み込みの deny。
         board = args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes)
@@ -1104,7 +1114,7 @@ def _hook_route(args: argparse.Namespace) -> bool:
     """この起動が hook の経路（`_parsed` の最後の `_hook`）に進むか。
 
     設定を読む前に分ける必要があるときに使う。`_parsed` の振り分けで、payload を読まない経路の
-    どれにも当たらないもの。経路を足したら、ここにも足す。
+    どれにもヒットしないもの。経路を足したら、ここにも足す。
     """
     return not (
         args.docs
@@ -1197,7 +1207,7 @@ def _hook_steps(
     1. 設定の読み込みで出た問題を stderr に書く。
     2. `modes.resolve_mode` でモードを決め、`_resolve_switches` で切り替えを解き、
        `audit.Log` を作る。
-    3. `hookio.decode` で payload を読む。端末の前のユーザ（payload が無い）には使い方を出して
+    3. `hookio.decode` で payload を読む。ターミナルの前のユーザ（payload が無い）には使い方を出して
        終える。読めない payload は、記録と診断ログを残してから `modes.fail_closed` で終える。
     4. payload から記録の枠（`audit.Record`）を作る。
     5. `events.decide` で判定する。例外なら `_internal_error` で応答を組む。出力は手元の
@@ -1220,7 +1230,7 @@ def _hook_steps(
     try:
         payload = hookio.decode(stdin)
     except hookio.NoPayload:
-        # hook ではなく端末の前のユーザ。使い方を出す。
+        # hook ではなくターミナルの前のユーザ。使い方を出す。
         stderr.write(cli_usage.OVERVIEW)
         return EXIT_ERROR
     except hookio.Unusable as exc:
@@ -1333,7 +1343,7 @@ def _internal_error(
 
     - PreToolUse: ツールの種類で決める（`modes.fail_closed`）。書き込み・Agent・Task・
       ツールが分からない回は dry-run でも止める。サブエージェントの報告用のツールは通す。
-      読み取りは最低限の deny に当たらなければ通す。標準エラーの文がモデルに届く
+      読み取りは最低限の deny にヒットしなければ通す。標準エラーの文がモデルに届く
     - PostToolUse: ツールはもう走っているので止めるものは無い。enable は終了コード 2 と
       標準エラーで、実行後の検査をしていないことをモデルに言う（dry-run は 0）
     - payload を読む前に落ちた（イベントが分からない）: PreToolUse と同じく止める

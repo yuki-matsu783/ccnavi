@@ -131,7 +131,7 @@ def _check_command(
     処理フロー:
     1. `_scan_command` で、書き込み先の語・語を解く起点・インタプリタに渡したコードを集める。
     2. インタプリタのコードを `_check_code` で読み、親のワークツリーへの書き込みがあれば返す。
-    3. 書き込み先の語を 1 つずつ `_check_target` で親のワークツリーに当て、当たれば返す。
+    3. 書き込み先の語を 1 つずつ `_check_target` で親のワークツリーに適用し、ヒットすれば返す。
     """
     targets, base, codes = _scan_command(cwd, words, here)
     for code_base, code in codes:
@@ -230,7 +230,7 @@ def write_targets(
         for words, here in shellread.placed(text):
             targets, base, _ = _scan_command(cwd, words, here)
             # `cd` の行き先を読めなかったときは、読めない `cd` を無かったことにして打たれた場所から
-            # 解く。起点が無いまま相対パスを捨てると、`cd "$PWD" &&` を足すだけで見えなくなる。
+            # 解く。起点が無いまま相対パスを破棄すると、`cd "$PWD" &&` を足すだけで見えなくなる。
             out.extend((t, base if base is not None else (cwd or None)) for t in targets)
     return out
 
@@ -240,7 +240,7 @@ def resolve_word(word: str, base: str | None) -> str:
 
     変数・置換・`~`・`{`（`find -exec rm {}` の置き場所など）を含む語と、起点が読めない相対パスは
     読めない。グロブ（`*?[`）は、固定の部分（最後の `/` まで）のディレクトリを返す。
-    末尾に区切りを付けるので、ディレクトリそのものではなく中を書くものとして当たる。
+    末尾に区切りを付けるので、ディレクトリそのものではなく中を書くものとしてヒットする。
     """
     text = word.replace("\\", "/")
     if not text or re.search(r"[$`~{]", text):

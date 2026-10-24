@@ -11,7 +11,7 @@
 #   --from <配布元>        展開済みの配布元のフォルダ。省くと、このスクリプトの 1 つ上。zip は受けない
 #   --mode / --ticket-control / --force / --no-vscode / --no-fetch
 #                          ccnavi-setup.sh にそのまま渡す（ccnavi-setup.sh --help）
-#                          --bin は渡さない。ホームディレクトリに書き込む確認を端末に出すので、ccnavi-setup.sh を直接実行する
+#                          --bin は渡さない。ホームディレクトリに書き込む確認をターミナルに出すので、ccnavi-setup.sh を直接実行する
 #   --clear-quarantine     macOS で、入れた実行ファイルの隔離の印（com.apple.quarantine）を外す
 #   --check                何も書かずに、これから起きることを見せる
 #   --build                ソースで実行ファイルを組み立てる。配らない。組み立てたら、そのソースを
@@ -182,7 +182,7 @@ ibackup() {
 	for bk_rel in $bk_items; do
 		[ -e "$1/$bk_rel" ] || continue
 		(umask 077 && mkdir -p "$bk_dir/$(dirname "$bk_rel")") || return 1
-		# -L: リンクは実体を写す（リンクのまま写すと、リンク先が書き換わったあとに戻す元が無くなる）。
+		# -L: リンクは実体をコピーする（リンクのままコピーすると、リンク先が書き換わったあとに戻す元が無くなる）。
 		cp -RLp "$1/$bk_rel" "$bk_dir/$bk_rel" || return 1
 	done
 	for bk_skill in "$2"/.claude/skills/*/; do
@@ -431,7 +431,7 @@ main() {
 		fi
 		if [ "$protected" = yes ] && [ -n "${CLAUDECODE:-}" ]; then
 			printf '案内: 入れる先は CCNAVI_MODE が dry-run ではなく（enable として扱われる）、ccnavi の保護が効いている。Claude Code の中からは入れない\n'
-			inext "ユーザに、Claude Code の外の端末で同じコマンドを打ってもらう（sh $(iq "$0")${install_argline}）"
+			inext "ユーザに、Claude Code の外のターミナルで同じコマンドを打ってもらう（sh $(iq "$0")${install_argline}）"
 			return 3
 		fi
 	fi
@@ -505,7 +505,7 @@ main() {
 			return 4
 		fi
 		printf '案内: --force の前に、入れ替わるファイルのバックアップを %s に取った（権限 700）\n' "$backup"
-		printf '案内: 戻すときは、ファイルは cp -R %s %s、ディレクトリは cp -R %s %s の形で打つ（<パス> はバックアップの下の相対パス）。入れる先が enable なら Claude Code の外の端末で打つ\n' \
+		printf '案内: 戻すときは、ファイルは cp -R %s %s、ディレクトリは cp -R %s %s の形で打つ（<パス> はバックアップの下の相対パス）。入れる先が enable なら Claude Code の外のターミナルで打つ\n' \
 			"$(iq "$backup/<パス>")" "$(iq "$ws/<パス>")" "$(iq "$backup/<パス>/.")" "$(iq "$ws/<パス>/")"
 	fi
 

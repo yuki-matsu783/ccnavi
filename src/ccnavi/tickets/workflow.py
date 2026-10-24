@@ -1,6 +1,6 @@
-"""計画の待ち方。
+"""計画の先行関係。
 
-待ち方は親の計画（`plan:` / `feedback:`）のステップの `after` から都度計算する。
+先行関係は親の計画（`plan:` / `feedback:`）のステップの `after` から都度計算する。
 ファイルにもチケットの欄にも持たない。承認済みチケットの計画は承認済みの置き場にあり、変えられるのは改版（`--agree`）と
 ユーザの手だけなので、計算の元も固定されている。フェーズ定義（`phases.yml`）もチケットの状態も
 計算の入力にならず、提案も承認済みも同じ関数で計算する。
@@ -17,7 +17,7 @@
 番号が先行する。`after` が指せるのはフィードバック計画の番号だけ。
 
 計算はこの 1 か所に置き、延期の引き受け手を 2 か所で違って言わないようにする。決まりの見張りは
-計画と待ち方の見本の表（`tests/fixtures/plan-waits.json`）。
+計画と先行関係の見本の表（`tests/fixtures/plan-waits.json`）。
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def _parts(parent: ticket_model.Ticket) -> list[tuple[str, int, list[ticket_mode
 
 
 def compute(parent: ticket_model.Ticket) -> ticket_model.Workflow:
-    """親の計画の待ち方を計算する。形の誤った `after`（`after_errors`）は線として数えない。"""
+    """親の計画の先行関係を計算する。形の誤った `after`（`after_errors`）は線として数えない。"""
     wf = ticket_model.Workflow(order=ticket_model.WORKFLOW_DAG)
     planned = len(parent.plan)
     for n, item in enumerate(parent.plan, start=1):
@@ -84,7 +84,7 @@ def _defer_target(
 
 
 def effective(parent: ticket_model.Ticket) -> ticket_model.Workflow:
-    """判定に使う待ち方。入れてあればそれを、無ければその場で計算する。"""
+    """判定に使う先行関係。入れてあればそれを、無ければその場で計算する。"""
     return parent.workflow if parent.workflow is not None else compute(parent)
 
 
@@ -124,10 +124,10 @@ def problems(
 ) -> list[rules.Problem]:
     """計画の順序が組めるか。`after` の形、終端、最後のステップの延期、延期の引き受け手。
 
-    全体計画とフィードバック計画に同じ規則を当てる。`part`（`plan` か `feedback`）を渡せば、
+    全体計画とフィードバック計画に同じ規則を適用する。`part`（`plan` か `feedback`）を渡せば、
     その計画の誤りだけを返す（`--plan-order` が計画ごとの図に分けて返すため）。
-    `types`（フェーズ定義）を渡したときだけ、引き受け手にレビューがあるかも見る。渡すのは親の写し
-    （`phases:`。`phasetypes.types_of`）で、`phases.yml` ではない。判定の側（`errors`）も写しを
+    `types`（フェーズ定義）を渡したときだけ、引き受け手にレビューがあるかも見る。渡すのは親のコピー
+    （`phases:`。`phasetypes.types_of`）で、`phases.yml` ではない。判定の側（`errors`）もコピーを
     渡すので、承認済みチケットだけを読んで済み、`phases.yml` を承認のあとに直しても進行中の親は
     止まらない。
     """
@@ -216,10 +216,10 @@ def after_problems(parent: ticket_model.Ticket, part: str = "") -> list[rules.Pr
 
 
 def errors(parent: ticket_model.Ticket) -> list[rules.Problem]:
-    """承認済みチケットだけを読んで済む計画と定義の誤り（判定の側が当てる分）。
+    """承認済みチケットだけを読んで済む計画と定義の誤り（判定の側が適用する分）。
 
-    計画の順序（`problems`）に、親の写し（`phases:`）の誤り（`phasetypes.copy_problems`。写しが
-    無い、ステップの定義が写しに無い、定義の形・`kind`）を足す。引き受け手のレビューは写しの定義で見る。
+    計画の順序（`problems`）に、親のコピー（`phases:`）の誤り（`phasetypes.copy_problems`。コピーが
+    無い、ステップの定義がコピーに無い、定義の形・`kind`）を足す。引き受け手のレビューはコピーの定義で見る。
     読むのはチケットだけ。子に書いた `phases:` もここで言う。
     """
     found = phasetypes.copy_problems(parent) + problems(parent, phasetypes.types_of(parent))

@@ -157,7 +157,7 @@ def _explain_undeclared(stdout: TextIO, conf: settings.Settings) -> None:
     stdout.write("\n■ どのルールにも一致しないツール呼び出し\n")
     stdout.write(
         "  ccnavi は判定を持たない。読めた呼び出しは Claude Code の権限モードに委ねる。"
-        "読み切れない呼び出し（実行される部分まで読み解けず、生の文字列に当てたコマンド）は、"
+        "読み切れない呼び出し（実行される部分まで読み解けず、生の文字列に適用したコマンド）は、"
         "読めなかったことを言うためにモードを問わず委ねない\n"
     )
     for name in (*judge.PERMISSION_JUDGED, *judge.PERMISSION_NO_JUDGE, _UNKNOWN_MODE):
@@ -212,7 +212,9 @@ def _explain_modes(stdout: TextIO, conf: settings.Settings) -> None:
         dry = "止める" if modes.fail_closed(modes.DRY_RUN, tool) else "通す"
         safe = "止める" if modes.fail_closed(modes.ENABLE, tool, safe=True) else "通す"
         if tool in modes.READ_TOOLS or tool in modes.SHELL_TOOLS:
-            stdout.write(f"  {label}: 最低限の許可リストに当たれば{safe}、当たらなければ{enable}\n")
+            stdout.write(
+                f"  {label}: 最低限の許可リストにヒットすれば{safe}、ヒットしなければ{enable}\n"
+            )
         else:
             stdout.write(f"  {label}: enable は{enable}、dry-run は{dry}\n")
     stdout.write(

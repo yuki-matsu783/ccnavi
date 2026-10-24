@@ -5,7 +5,7 @@
 未送信の確かめ → 書く → コミット → push」の 1 操作にするのは sh（`ccnavi-common-write-and-push.sh`
 の
 `ccnavi_wap_*`）。実行ファイルはネットワークに出ず、コミットもしない（判定と見分けだけを持つ）。
-ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。sh は jq を使わない）。
+ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<キー> <値>`。sh は jq を使わない）。
 
 - `ccnavi write-and-push family <識別子>`: その識別子の親子のチケットと、write-and-push の対象かと、
 親のブランチ名
@@ -261,7 +261,7 @@ def classify_all(
         now, before, ok = states.get(rel, (None, None, False))
         return ok and before is not None and now is None
 
-    # 種類ごとに分ける。上から当てて、最初に当たったものにする。
+    # 種類ごとに分ける。上から適用して、最初にヒットしたものにする。
     out = []
     for rel in changed:
         now, before, ok = states[rel]

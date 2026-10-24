@@ -1,13 +1,14 @@
-"""親の提案の `phases:` に、計画が使うフェーズ定義を写す（`--plan-order <親> --fill-phases`）。
+"""親の提案の `phases:` に、
+計画が使うフェーズ定義をコピーする（`--plan-order <親> --fill-phases`）。
 
 計画（`plan:` / `feedback:`）のステップが使うフェーズ定義だけを `phases.yml`（共通レイヤーと、親の
 `project:` が指すレイヤーの和）から読み、提案の
-`phases:`（親に固定する定義の写し）の値をその定義の集まりに差し替える（無ければ `plan:` の前に
-足す。ステップが使わない定義は外す）。写し間違いを無くし、`phases.yml` を直したあとに承認待ちの
+`phases:`（親に固定する定義のコピー）の値をその定義の集まりに差し替える（無ければ `plan:` の前に
+足す。ステップが使わない定義は外す）。コピー間違いを無くし、`phases.yml` を直したあとに承認待ちの
 提案を追いつかせるのも同じ 1 本で済ませるため。
 
 改版の提案（作業中の承認済みチケットがある親）では、子が承認された番号が使う定義は承認済み
-チケットの写しから、ほかは `phases.yml` から差し込む。改版の承認が同じ規則で確かめる
+チケットのコピーから、ほかは `phases.yml` から差し込む。改版の承認が同じ規則で確かめる
 （`agree_candidates.copy_config_problems`）。
 
 ## ほかのバイトは変えない
@@ -36,15 +37,15 @@ _PLAN_LINE = re.compile(r"^plan\s*:")
 
 @dataclass
 class Filled:
-    """写した結果。`why` が空でなければ書いていない（その理由の文）。"""
+    """コピーした結果。`why` が空でなければ書いていない（その理由の文）。"""
 
     why: str = ""
     # 書き換えたか（変わらなければ偽）。
     changed: bool = False
     copied: list[str] = field(default_factory=list)
-    # 写しから外した、計画が使わない定義。
+    # コピーから外した、計画が使わない定義。
     dropped: list[str] = field(default_factory=list)
-    # 承認済みチケットの写しから差し込んだ定義（子が承認された番号が使うもの）。
+    # 承認済みチケットのコピーから差し込んだ定義（子が承認された番号が使うもの）。
     held: list[str] = field(default_factory=list)
 
 
@@ -59,7 +60,8 @@ def fill(
     `current` は改版ならその親の承認済みチケット、新規なら None。
     """
     name = target.ticket
-    # 写す定義を決める計画と、書き換える本文は、同じ 1 回の読みから取る（間に提案が書き換わって、
+    # コピーする定義を決める計画と、書き換える本文は、
+    # 同じ 1 回の読みから取る（間に提案が書き換わって、
     # 古い計画に合わせた `phases:` が新しい本文に入らないように）。
     raw = fsio.read_bytes(target.path)
     if raw is None:
@@ -78,7 +80,7 @@ def fill(
     if config is None:
         return Filled(
             f"フェーズ定義（共通レイヤーと {target.project or '自身'} のレイヤーの phases.yml）が"
-            "どちらも無いか読めないので、写せない。何も反映しません。"
+            "どちらも無いか読めないので、コピーできない。何も反映しません。"
         )
     held = _held(conf, root, current)
     copy: dict[str, dict] = {}
@@ -113,7 +115,7 @@ def fill(
 def _held(
     conf: settings.Settings, root: str, current: ticket_model.Ticket | None
 ) -> dict[str, phasetypes.PhaseType]:
-    """改版なら、子が承認された番号が使う定義（承認済みチケットの写しの値）。新規なら空。"""
+    """改版なら、子が承認された番号が使う定義（承認済みチケットのコピーの値）。新規なら空。"""
     if current is None:
         return {}
     types = phasetypes.types_of(current)

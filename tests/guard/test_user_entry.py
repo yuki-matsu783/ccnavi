@@ -3,7 +3,7 @@
 1. 表: `user` の操作と、`user` の外で断るオプションが、食い違わない
 2. 実行ファイル: `user <操作>` を内部の形に読み替える。`user` の外のユーザ専用のオプションは
    何も動かさずに断り、見るだけの形は断らない
-3. hook: `user` の入口と `ccnavi-user-*.sh` を、呼び方に依らず止める。端末を求めない経路
+3. hook: `user` の入口と `ccnavi-user-*.sh` を、呼び方に依らず止める。ターミナルを求めない経路
    （`--yes`）は、名前を変えたコピーでも止める
 """
 
@@ -172,20 +172,20 @@ class ExecutableTest(unittest.TestCase):
         result = run_ccnavi(["user", "handoff", "--yes", "--expect", "x"])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "user handoff --yes はユーザーがターミナルから実行する必要があります", result.stderr
+            "user handoff --yes はユーザがターミナルから実行する必要があります", result.stderr
         )
 
     def test_user_mirror_writing_needs_a_terminal(self):
         result = run_ccnavi(["user", "mirror", "--yes", "--expect", "x"])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "user mirror --yes はユーザーがターミナルから実行する必要があります", result.stderr
+            "user mirror --yes はユーザがターミナルから実行する必要があります", result.stderr
         )
 
     def test_user_prune_needs_a_terminal(self):
         result = run_ccnavi(["user", "prune"])
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("user prune はユーザーがターミナルから実行する必要があります", result.stderr)
+        self.assertIn("user prune はユーザがターミナルから実行する必要があります", result.stderr)
 
 
 class HookTest(HookCase):
@@ -290,7 +290,8 @@ class HookTest(HookCase):
 
 
 class LauncherSpellingTest(HookCase):
-    """端末を求めない経路は hook の正規表現が唯一の防御なので、実行ファイルを Python から走らせる
+    """ターミナルを求めない経路は hook の正規表現が唯一の防御なので、
+    実行ファイルを Python から走らせる
     表記の揺れ（インタプリタの選択肢・`ccnavi.__main__`・`py`・実行役）でも止める。"""
 
     def assert_stopped(self, commands):

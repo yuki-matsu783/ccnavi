@@ -4,7 +4,8 @@
     ccnavi user handoff [<相対パス>…] --yes --expect <ハッシュ> [--via board] [--json]   取り込む
 
 見るだけの形を含めて、ユーザ専用（`user` の入口。hook が止める）。`--yes` で書くときは、標準入力が
-端末であることを求める。`--via board` はボードの子プロセスの経路で、端末を求めない代わりに
+ターミナルであることを求める。`--via board` はボードの子プロセスの経路で、
+ターミナルを求めない代わりに
 `--expect` と `--json` が揃うことと、選んだ種類がボードから取り込めること（`defense` は断る）を
 求める。
 取り込みの中身は `tickets.handoff`。cli を読まない。
@@ -85,8 +86,9 @@ def run(
 
     処理フロー:
     1. `usage_problem` で組み合わせを検査する。
-    2. `--yes` のときは、経路を決めてから取り込む。ボードの経路（`--via board`）は端末を求めず、
-       端末の経路は `cli_args._from_terminal` で、端末の前のユーザであることを確かめる。
+    2. `--yes` のときは、経路を決めてから取り込む。
+    ボードの経路（`--via board`）はターミナルを求めず、
+       ターミナルの経路は `cli_args._from_terminal` で、ターミナルの前のユーザであることを確かめる。
        `handoff.prepare` で計画を作り、`handoff.apply` で `--expect` の一致を見ながら書く。
     3. `--yes` がないときは、`handoff.prepare` で計画を作って表示する（書かない）。
     4. `--json` のときは、取り込みか計画を JSON で出す。そうでなければ `_applied_text` か
@@ -131,10 +133,10 @@ def run(
 def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> None:
     """取り込みの計画を人が読む形で書く。何も反映せず、次に打つコマンドを添える。
 
-    下書きの 1 件ごとに、選ばれたか・状態・error と warn・端末のみの理由・conflict を出す。
+    下書きの 1 件ごとに、選ばれたか・状態・error と warn・ターミナルのみの理由・conflict を出す。
     選ばれた下書きが無いか、error か conflict があれば、取り込めない理由を言って終える。
     取り込めるときだけ、`--expect` の値を含む `ccnavi user handoff` の行を出す。
-    ボードからは取り込めない種類を含むときは、端末で実行するよう添える。
+    ボードからは取り込めない種類を含むときは、ターミナルで実行するよう添える。
     """
     stdout.write(f"ccnavi: 保護対象の下書き（{plan.tree} の {handoff.HANDOFF_REL}/）\n")
     if not plan.entries:
@@ -147,18 +149,18 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> 
         for line in entry.warnings:
             stdout.write(f"    warn  {line}\n")
         if entry.defense:
-            stdout.write(f"    端末のみ {entry.defense}。ボードからは取り込めません\n")
+            stdout.write(f"    ターミナルのみ {entry.defense}。ボードからは取り込めません\n")
         if entry.conflict:
             stdout.write(
-                f"    conflict 写したあとに取り込み先が変わりました"
-                f"（写した時点の元は {handoff.ORIG_SUFFIX}）。"
+                f"    conflict コピーしたあとに取り込み先が変わりました"
+                f"（コピーした時点の元は {handoff.ORIG_SUFFIX}）。"
                 "下書きに今の取り込み先の変更を入れてから、下書きと .orig を作り直してください\n"
             )
         if entry.selected and entry.diff:
             for line in entry.diff.split("\n"):
                 stdout.write(f"    {line}\n")
     if plan.ignored:
-        stdout.write(f"対象外: {plan.ignored} 件（取り込める種類の表に当たらない）\n")
+        stdout.write(f"対象外: {plan.ignored} 件（取り込める種類の表にヒットしない）\n")
     chosen = plan.selected
     if not chosen:
         stdout.write("選んだ対象はありません。何も反映していません。\n")
@@ -176,7 +178,7 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> 
     if any(not e.board for e in chosen):
         stdout.write(
             "  （defense の種類か、防御の記述を動かす rules.yml を含むため、ボードからは"
-            "取り込めません。端末で実行してください）\n"
+            "取り込めません。ターミナルで実行してください）\n"
         )
 
 

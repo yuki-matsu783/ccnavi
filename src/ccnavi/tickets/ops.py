@@ -75,7 +75,8 @@ def start(
        `parent_not_started`・`predecessors_unmet`）。
     2. ワークツリーが承認済みの `project` の元リポジトリから切られているかを
        `tree.is_worktree_of` で確かめる。
-    3. ワークツリーの HEAD を基準点にし、`_sync_config` で共通レイヤーと工程スキルを写す（親だけ）。
+    3. ワークツリーの HEAD を基準点にし、`_sync_config` で共通レイヤーと工程スキルをコピーする
+       （親だけ）。
     4. `approval_ops.update_fields` で `started_at` と `base_sha` を欄に書く。
     5. 子ならフローのハッシュを `flow.record_digest` で記録し、次の一手を案内する。
     """
@@ -200,16 +201,16 @@ def _sync_skills(
     found: ticket_model.Ticket,
     worktree: str,
 ) -> list[str] | None:
-    """共通の工程スキルをプロジェクトの `skills/` へ写す。"""
+    """共通の工程スキルをプロジェクトの `skills/` へコピーする。"""
     changes, why = skillsync.plan(root, worktree)
     if why:
-        stderr.write(f"ccnavi: {found.ticket} の工程スキルを写せない: {why}\n")
+        stderr.write(f"ccnavi: {found.ticket} の工程スキルをコピーできない: {why}\n")
         return None
     if not changes:
         return []
     failed = skillsync.apply(changes)
     if failed:
-        stderr.write(f"ccnavi: {found.ticket} の工程スキルを写せない: {failed}\n")
+        stderr.write(f"ccnavi: {found.ticket} の工程スキルをコピーできない: {failed}\n")
         return None
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = skillsync.describe(found.project, changes)

@@ -1,13 +1,13 @@
 """記録と state の後始末。記録を大きさでローテートし、古い記録と終わったセッションの記録を消す。
 
-走るのはセッションの開始（events.decide_at_start）と、ユーザが端末から打つ `ccnavi user prune`
+走るのはセッションの開始（events.decide_at_start）と、ユーザがターミナルから打つ `ccnavi user prune`
 （内部は `--prune`）だけ。実行前チェック（PreToolUse）では走らせない。
 ツール呼び出しのたびに置き場を数えると、
 判定を待たせる（hook は呼び出しのたびにプロセスを起こし常駐しないので、重い仕事はセッションに
 1 度の場所へ置く）。
 
 記録（`logs/decisions.jsonl`）。 大きさが上限を超えていたら、同じディレクトリの
-`decisions.<日時>.jsonl` へ名前を変える。中身は 1 行も捨てない。「記録が無い呼び出し = ccnavi が
+`decisions.<日時>.jsonl` へ名前を変える。中身は 1 行も破棄しない。「記録が無い呼び出し = ccnavi が
 動かなかった」という読み方（audit）は、ローテートした分も合わせて読めば変わらない。
 消すのは、ローテートした記録のうち最後に書かれてから保持日数を過ぎたものだけで、
 いま書いている `decisions.jsonl` は消さない。
@@ -91,7 +91,7 @@ _SESSION_ONLY = (
     re.compile(r"^stoplast-(?P<s>.+)\.json$"),  # stopreview._last_path
     re.compile(
         r"^direct-(?P<s>.+)\.json$"
-    ),  # direct_candidates.path_of（compact・clear では捨てない）
+    ),  # direct_candidates.path_of（compact・clear では破棄しない）
 )
 # セッションを名前に持たない、Stop の AI 判定の記録。それ自身の日付で消す。
 _OWN_DATE = re.compile(r"^(?:stopreview-(?:plan|attempt)-.+|stopops-(?:pre|op)-.+)\.json$")
@@ -102,8 +102,8 @@ DEFAULT_STOP_REVIEW_KEEP_DAYS = 90.0
 STOP_OPS_RESULT_DIR = "stopops-result"  # stopops.RESULT_DIR
 STOP_REVIEW_MATERIAL = os.path.join("stop-review", "material")  # stopreview.MATERIAL_DIR
 STOP_REVIEW_EVENTS = os.path.join("stop-review", "events.jsonl")  # stopreview.log_path
-# 名前の後ろにセッション以外の鍵が `-` で続く記録。セッションにも `-` が入るので、
-# 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。
+# 名前の後ろにセッション以外のキーが `-` で続く記録。セッションにも `-` が入るので、
+# 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に適用して決める。
 _SESSION_AND_KEY = (
     ("once-", ".json"),  # ctxfile._once_path
     ("failstreak-", ".json"),  # failstreak._path
@@ -281,7 +281,8 @@ def _prune_directory(
             report.state.append(_shown(root, path))
 
 
-# 操作記録の置き場の名前（`tickets/oplog.OPS_DIR`）。records は tickets を読めないので写して持つ。
+# 操作記録の置き場の名前（`tickets/oplog.OPS_DIR`）。
+# records は tickets を読めないのでコピーして持つ。
 OPS_DIR = "ops"
 
 
@@ -386,7 +387,7 @@ def _rotate(
 ) -> bool:
     """大きさが上限を超えていたら名前を変える。変えた（dry_run なら変える）とき真。
 
-    名前を変えるだけで、書き写さない。同じ時に追記している hook は、開いたハンドルのまま
+    名前を変えるだけで、書きコピーしない。同じ時に追記している hook は、開いたハンドルのまま
     ローテート先へ書き、次の起動からは新しい `decisions.jsonl` を作って書く（audit は開くたびに
     O_CREAT で作る）。どちらの 1 行も失われない。Windows で開かれていて変えられなければ、
     次の開始でまた試す。
@@ -537,10 +538,10 @@ def _session_entries(
     1. state の置き場の名前を読む（読めなければ空を返す）。
     2. SELFGUARD_DIR の下のバックアップを、名前ごとに組へ入れる（リンクなら辿らず報告する）。
     3. 置き場の各ファイルを、一時ファイルの名前を外した形で振り分ける。
-       セッションの組が当たるものは keyed に、日付だけで決まるものは own_dated に、
-       報告済みの形などは _SESSION_ONLY・_REPORTED の組に入れる。どれにも当たらないものは残す。
-    4. keyed のものを、当たるセッションの表記のうち最も長いものの組へ入れる。
-       どれにも当たらなければ loose に入れる。
+       セッションの組がヒットするものは keyed に、日付だけで決まるものは own_dated に、
+       報告済みの形などは _SESSION_ONLY・_REPORTED の組に入れる。どれにもヒットしないものは残す。
+    4. keyed のものを、ヒットするセッションの表記のうち最も長いものの組へ入れる。
+       どれにもヒットしなければ loose に入れる。
     5. 組と loose を返す。
     """
     groups: dict[str, list[str]] = {}
@@ -573,15 +574,15 @@ def _session_entries(
         if not os.path.isfile(path):
             continue
         # 書き込み中に中断されて残った `write_text_atomic` の一時ファイル
-        # （`.<名前>.<一意>.part.json`）は、先頭の `.` を外した名前で当てる。
-        # 当たり方は名前の形で違う。
+        # （`.<名前>.<一意>.part.json`）は、先頭の `.` を外した名前で適用する。
+        # ヒットの仕方は名前の形で違う。
         # - `.once-…`: 同じセッションの記録と一緒に消える
         #   （セッションの組が他に無ければ、まとめられなかったものとして、それ自身の日付で）
-        # - `.nudged-…`・`.denied-…`・`.stop-…`: 当てる形の「セッション」に
+        # - `.nudged-…`・`.denied-…`・`.stop-…`: 適用する形の「セッション」に
         #   `.<一意>.part` まで入るので別の組になり、それ自身の日付で消える
         # - `.<セッション>.<一意>.part.json`（報告済みの記録）と
-        #   `.<セッション>.turn.<一意>.part.json`（turn）: どの形にも当たらず、消さずに残る。
-        #   形を広げて当てると、知らないファイルまで消しうるので広げない
+        #   `.<セッション>.turn.<一意>.part.json`（turn）: どの形にもヒットせず、消さずに残る。
+        #   形を広げて適用すると、知らないファイルまで消しうるので広げない
         name = fsio.temp_origin(entry)
         pair = next(
             ((p, s) for p, s in _SESSION_AND_KEY if name.startswith(p) and name.endswith(s)),

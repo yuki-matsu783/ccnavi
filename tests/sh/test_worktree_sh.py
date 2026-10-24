@@ -10,7 +10,7 @@ fetch のときだけ origin の URL を bare リポジトリへ向ける git �
 2. C4〜C7 のずれがあれば、切らずに終了コード 3 で止まり、報告と確認コードを出すこと。確認コードが
    今の状態と合わなければ報告からやり直すこと
 3. 書きかけは --no-wip なら入らず、--copy-wip なら確認した時点のものが S になり、ユーザの
-   index と作業ツリーは変わらないこと
+   index とワークツリーは変わらないこと
 4. detached・チケットに結び付く・結び付くかを確かめられない・git 2.39 では断ること
 5. 記録（version 4）が実行後チェックの読み取り（infra/directrec）で有効と読めること
 6. 既にあるワークツリーは何もせずパスを出すこと（冪等）、既にあるブランチ・使えない名前は断ること
@@ -182,7 +182,7 @@ class WorktreeShTest(unittest.TestCase):
     # ---- 道具
 
     def snapshot_of_root(self):
-        """ユーザの index と作業ツリーの状態（変わらないことを確かめるため）。"""
+        """ユーザの index とワークツリーの状態（変わらないことを確かめるため）。"""
         return (
             git(self.ws, "status", "--porcelain=v1", "--untracked-files=all"),
             git(self.ws, "diff", "--cached"),
@@ -201,7 +201,7 @@ class WorktreeShTest(unittest.TestCase):
         return found.group(1)
 
     def make_feature_with_origin(self, branch="feature/x"):
-        """統合先でないブランチへ移し、origin にも同じ位置で置く（C5 だけに当たる）。"""
+        """統合先でないブランチへ移し、origin にも同じ位置で置く（C5 だけにヒットする）。"""
         git(self.ws, "checkout", "-q", "-b", branch)
         git(self.ws, "push", "-q", self.bare, f"{branch}:refs/heads/{branch}")
         git(self.ws, "update-ref", f"refs/remotes/origin/{branch}", "HEAD")
@@ -548,7 +548,7 @@ class WorktreeShTest(unittest.TestCase):
         self.dirty_root()
         first = self.run_sh("topic")
         code = self.code_of(first)
-        # 候補は確認の時点で pending に置かれる。ユーザの index と作業ツリーは変わらない。
+        # 候補は確認の時点で pending に置かれる。ユーザの index とワークツリーは変わらない。
         pending = git(self.ws, "rev-parse", "refs/ccnavi/direct/topic/pending")
         before = self.snapshot_of_root()
         done = self.run_sh("topic", "--accept", code, "--copy-wip")
@@ -567,7 +567,9 @@ class WorktreeShTest(unittest.TestCase):
                 self.assertEqual(want, f.read(), rel)
         self.assertEqual("yes", self.record("topic")["snap_wip"])
         self.assertEqual(pending, self.record("topic")["snap_sha"])
-        self.assertEqual(before, self.snapshot_of_root(), "ユーザの index と作業ツリーは変わらない")
+        self.assertEqual(
+            before, self.snapshot_of_root(), "ユーザの index とワークツリーは変わらない"
+        )
         self.assertNotEqual(
             0,
             subprocess.run(

@@ -12,7 +12,7 @@ from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # Claude Code の設定ファイル。ccnavi 自身はこのファイルを読まない。ここに書かれた
 # env は Claude Code がプロセスに渡し、ccnavi はそれを環境変数として受け取る。
-# 検証だけがこのファイルを直接見る。作業ツリーの中にあってエージェントが書き換えられる
+# 検証だけがこのファイルを直接見る。ワークツリーの中にあってエージェントが書き換えられる
 # ファイルに、防御を無効化する値が書かれていないかを確かめられるのはここだけだから。
 PROJECT_SETTINGS = os.path.join(".claude", "settings.json")
 
@@ -56,7 +56,7 @@ def _after(root: str) -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(project)",
-                f"作業ツリーを読めない（{unreadable}）ので実行後チェックは何も検知しない。"
+                f"ワークツリーを読めない（{unreadable}）ので実行後チェックは何も検知しない。"
                 "実行前チェックはこれまでどおり動く",
             )
         )
@@ -96,7 +96,7 @@ def _registered(root: str, event: str = hookio.POST_TOOL_USE) -> bool | None:
 def _project_settings(root: str) -> list[Problem]:
     """`.claude/settings.json` の env に、防御を無効化する値が無いかを見る。
 
-    このファイルは作業ツリーの中にあり、エージェントが書き換えられ、書いた値は
+    このファイルはワークツリーの中にあり、エージェントが書き換えられ、書いた値は
     次のセッションから使われる。ccnavi は環境変数しか読まないので、ここに書かれた
     off が「ユーザがセッションを起動するときに渡した off」と見分けのつかない形で届く。
     判定の側にはその 2 つを見分ける手段が無いから、書かれていることを
@@ -153,7 +153,7 @@ LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 
 #
 # 保護と判定の働きを変える値（戻す働き・ccnavi 自身の設定の保護・確かめられないモードの止め・
-# 同じ理由の拒否の数え方）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
+# 同じ理由の拒否の数え方）も入れる。手元だけで切ると、ユーザがターミナルで打つ sh と
 # 他の機械で、同じ親子のチケットに掛かる保護が別になる。入れないのは、判定の答えを変えない
 # 次の値だけ。
 # 実行ファイルのパス（`CCNAVI_ENTRY_PATH`。hook の起動のために手元で差し替える。README の
@@ -177,7 +177,8 @@ def _local_settings(root: str) -> list[Problem]:
 
     承認と判定は、保護の切り替えや動作モードを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
     手元だけのファイルに置いた値は Claude Code が起こしたプロセスにだけ使われ、Chrome と
-    ユーザが端末で打つ sh には使われないので、同じ親子のチケットにプロセスごとに別の保護が掛かる。
+    ユーザがターミナルで打つ sh には使われないので、
+    同じ親子のチケットにプロセスごとに別の保護が掛かる。
     置ける例外は無い（統合先の名前は各リポジトリの `origin/HEAD` で決まり、env では動かさない）。
     """
     path = os.path.join(root, LOCAL_SETTINGS)
@@ -196,7 +197,7 @@ def _local_settings(root: str) -> list[Problem]:
             SEVERITY_ERROR,
             "(project)",
             f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に使われる値は手元だけの"
-            "ファイルに置かない（Chrome と端末の sh には使われないので、"
+            "ファイルに置かない（Chrome とターミナルの sh には使われないので、"
             "同じ親子のチケットに"
             "プロセスごとに別の保護が掛かることになる）。"
             f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から"
@@ -227,7 +228,8 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
             Problem(
                 SEVERITY_ERROR,
                 "(project)",
-                f"{PROJECT_SETTINGS} の env の {settings.ENTRY_ENV}={declared} は在るが実行できない。"
+                f"{PROJECT_SETTINGS} の env の {settings.ENTRY_ENV}={declared} は在るが"
+                "実行できない。"
                 "hook が起動しないので何も判定していない。実行ビットを付ける"
                 f"（chmod +x {declared}）か、scripts/ccnavi-setup.sh を再実行してください",
             )

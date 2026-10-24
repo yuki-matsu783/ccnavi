@@ -1,7 +1,7 @@
 """作業チケットの読み込みと、そこが宣言する作業範囲。
 
 識別子とブランチ名の規則は `ticket_ids`、チケットの形（データクラスと書式の定数）は
-`ticket_model`、範囲を当てない置き場は `ticket_places`、同じ識別子のまとめ方は `ticket_fold`、
+`ticket_model`、範囲を適用しない置き場は `ticket_places`、同じ識別子のまとめ方は `ticket_fold`、
 状態の置き場を守るルールと提案の文は `ticket_guard`、スクリプトが書く欄の書き換えは
 `ticket_fields` に分けてある。どれも ticket を読まない。
 
@@ -11,7 +11,7 @@
 範囲の外で止められたエージェントが、チケットに 1 行足して自分の範囲を広げられる。
 止められた側が止め方を書き換えられるなら、止めたことにならない。
 
-判定が使うのは承認済みチケット（approval.py）だけ。作業ツリーの提案は、ユーザに見せて
+判定が使うのは承認済みチケット（approval.py）だけ。ワークツリーの提案は、ユーザに見せて
 承認を求めるためのもので、承認されるまで判定には使われない。承認されたあとに
 提案を書き換えても、判定に使われているのは承認済みチケットの側なので範囲は広がらない。
 
@@ -22,8 +22,8 @@
 「宣言した範囲の外は止める」「deny と書いた場所は止める」「ask と書いた場所は聞く」だけで、
 ルールの allow を狭めることはあっても、ルールの deny や ask を緩めることは無い。
 例外は 2 つ（`ticket_places.is_unscoped`）。チケットの置き場は、次の提案を書けるようにしておくために
-範囲を当てない。
-下書きの置き場（`wip/handoff/`）も、`integrate` が外し `ready` が消す置き場なので範囲を当てない。
+範囲を適用しない。
+下書きの置き場（`wip/handoff/`）も、`integrate` が外し `ready` が消す置き場なので範囲を適用しない。
 子は親の部分集合で、親子は厳しい側を採る。どう書いてもチケットが無いときより
 緩くはならない。
 
@@ -86,7 +86,7 @@ from . import ticket_fold, ticket_ids, ticket_model
 # ようにし、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
-# 親が計画の使うフェーズ定義の写しを書く欄。
+# 親が計画の使うフェーズ定義のコピーを書く欄。
 PHASES_KEY = "phases"
 
 # 範囲のパスに書けない表記。`..` は範囲の外へ出る表記、絶対パスと `~` は
@@ -275,7 +275,7 @@ def parse(text: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
         if read(ticket, front, problems):
             return None, problems
     # 保守用の子の印。値の正しさはここで見ない（落とすと承認済みチケットが索引に入らず、
-    # 判定がその親を知らないまま範囲を当てなくなる）。構造の誤りは `maintenance_problem` が
+    # 判定がその親を知らないまま範囲を適用しなくなる）。構造の誤りは `maintenance_problem` が
     # 承認と判定の両方で言う。
     if ticket_model.MAINTENANCE_KEY in front:
         value = front[ticket_model.MAINTENANCE_KEY]
@@ -431,11 +431,11 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
             ticket.plan = items
         else:
             ticket.feedback = items
-    # 待ち方は計画の `after` から計算する（`workflow.compute`）。
+    # 先行関係は計画の `after` から計算する（`workflow.compute`）。
     # `workflow:` の欄があれば `--agree`・`--lint`・判定が error にする
     # （手で書いた欄が効くと読ませない）。
 
-    # 親の `phases:`（計画が使うフェーズ定義の写し）は生の値だけを持つ。定義に読むのは
+    # 親の `phases:`（計画が使うフェーズ定義のコピー）は生の値だけを持つ。定義に読むのは
     # `phasetypes.types_of`（compose 層）で、形の誤りも子に書いた `phases:` も、ここでは
     # 落とさず判定の `blocked` の理由にする（`phasetypes.copy_problems`）。
     ticket.phases_raw = front.get(PHASES_KEY)
@@ -584,7 +584,7 @@ def subset_problems(child: ticket_model.Ticket, parent: ticket_model.Ticket) -> 
     """子が親の部分集合でない項を名指しする。
 
     glob 同士の包含は一般には決められないので、子の項の字義どおりの前置を
-    親に当てる。前置が親の allow か ask に入っていれば中、入っていなければ外。
+    親に適用する。前置が親の allow か ask に入っていれば中、入っていなければ外。
     `src/components/*` の前置は `src/components/`、`*` の前置は空文字で、
     空文字を中と言える親は `*` を持つ親だけになる。
 
@@ -600,9 +600,9 @@ def subset_problems(child: ticket_model.Ticket, parent: ticket_model.Ticket) -> 
                 Problem(SEVERITY_WARN, child.ticket, regex_overflow_detail(entry.regex))
             )
             continue
-        # ワイルドカードがあれば、前置に 1 文字足したパスを親に当てる。`src/b/*` なら
-        # `src/b/x`。無ければパスそのもの。前置の末尾の `/` を除いて当てると、
-        # 親の `src/b/*` が `src/b` に当たらず、正当な子を「超えている」と読む。
+        # ワイルドカードがあれば、前置に 1 文字足したパスを親に適用する。`src/b/*` なら
+        # `src/b/x`。無ければパスそのもの。前置の末尾の `/` を除いて適用すると、
+        # 親の `src/b/*` が `src/b` にヒットせず、正当な子を「超えている」と読む。
         probe = entry.prefix() + "x" if entry.glob != entry.prefix() else entry.glob
         verdict = parent.decide(probe)
         if verdict not in (rules.ALLOW, rules.ASK):
@@ -805,7 +805,7 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
             # 範囲を式にする。
             expression = regex or ("^" + globmatch.translate(glob))
             # `src/Components/*` と `src/components/*` は同じ範囲として扱う。
-            # 当てる側だけ区別すると、宣言した範囲に自分のファイルが入らない、が
+            # 適用する側だけ区別すると、宣言した範囲に自分のファイルが入らない、が
             # 起きる。機械ごとに変えないのは、同じチケットがどの環境でも同じ場所で
             # 止まるため。`regex` も同じに扱う（ルールと揃える。rules._build）。
             # 区別が要る `regex` は `(?-i:...)` で囲む。

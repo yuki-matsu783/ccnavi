@@ -1,4 +1,4 @@
-"""子チケットの範囲の当て方。書き込み先がどの子の範囲に入るかと、範囲の外の変更の洗い出し。
+"""子チケットの範囲の適用の仕方。書き込み先がどの子の範囲に入るかと、範囲の外の変更の洗い出し。
 
 サブエージェントの終わりと実行後チェックが使う。phase から分けた。
 """
@@ -22,7 +22,7 @@ from . import ticket as ticket_mod
 LIMIT_TICKET = "ticket"
 LIMIT_PARENT = "parent"
 LIMIT_TYPE = "type"
-# チケット自体が信頼できない（`Ticket.blocked`）。範囲を当てる前に止める。
+# チケット自体が信頼できない（`Ticket.blocked`）。範囲を適用する前に止める。
 LIMIT_BLOCKED = "blocked"
 
 # 範囲の外として止める判定。
@@ -57,7 +57,7 @@ def scope_verdict(
 ) -> ScopeVerdict:
     """子の範囲を、親の範囲と定義の上限で切り詰める。
 
-    範囲を当てる 3 か所（実行前チェック、実行後チェック、SubagentStop の差し戻し）はこれを
+    範囲を適用する 3 か所（実行前チェック、実行後チェック、SubagentStop の差し戻し）はこれを
     通す。別に書くと、同じ書き込みが実行前は通って実行後に範囲外と報告される。承認は範囲の超過を
     警告で通すので、超えた分を止めるのはここだけになる。
 
@@ -65,15 +65,15 @@ def scope_verdict(
     外へ出した上限を名指しする。定義の上限は allow か外しか言わない。子が ask と書いた
     場所が定義の中なら ask のまま。
 
-    その前に `blocked` を見る。承認のときにしか当たらなかった構造の検査に引っかかった
-    チケットは、範囲を当てても意味が無い（親が引けない子は、どの範囲で切り詰めるかが
+    その前に `blocked` を見る。承認のときにしかヒットしなかった構造の検査に引っかかった
+    チケットは、範囲を適用しても意味が無い（親が引けない子は、どの範囲で切り詰めるかが
     決まらない）。範囲の中でも外でも止める。
     """
     if child.blocked:
         return ScopeVerdict(rules.DENY, LIMIT_BLOCKED, pt)
     verdict = child.decide(rel)
     limit = LIMIT_TICKET if verdict in _OUTSIDE else ""
-    # 統合の子は親の範囲の上限を当てない。上限は ccnavi の中に固定した定義（`type_for` が返す）と
+    # 統合の子は親の範囲の上限を適用しない。上限は ccnavi の中に固定した定義（`type_for` が返す）と
     # 子の `allow` だけ。固定の定義より広く書いてあっても、定義で切り詰める。
     if parent is not None and not child.is_consolidate:
         verdict = ticket_mod.combine(verdict, parent.decide(rel))
@@ -100,8 +100,8 @@ def type_for(
 ) -> phasetypes.PhaseType | None:
     """子の番号の定義。親が計画を持たない、番号が無い、定義が引けないなら None。
 
-    定義は親に固定した写し（`phases:`）から引き、`phases.yml` は読まない。承認のあとに
-    `phases.yml` を直しても、進行中の親の子の範囲の上限は変わらない。計画を持つ親の写しに定義が
+    定義は親に固定したコピー（`phases:`）から引き、`phases.yml` は読まない。承認のあとに
+    `phases.yml` を直しても、進行中の親の子の範囲の上限は変わらない。計画を持つ親のコピーに定義が
     無いときは、親が判定の側の検査（`workflow.errors`）で止まり、子も `child_problems` で止まる
     （`blocked`）ので、定義で切り詰めずに通る形は残らない。計画を持たない親は `ticket start` が
     止まるので、その子の範囲を引くのは、止まる前に着手していた親だけ（番号だけ。定義で切り詰めない）。
@@ -188,7 +188,7 @@ def _outside(
 ) -> list[tuple[str, ScopeVerdict]]:
     """パスのうち、範囲の外のもの（`scope_verdict`）。
 
-    チケットの置き場に当たるものは範囲にかけず、`places` に足す。
+    チケットの置き場にヒットするものは範囲にかけず、`places` に足す。
     """
     pt = type_for(child, parent)
     outside = []

@@ -1,7 +1,7 @@
 #!/bin/sh
-# ccnavi-user-decide 残った指摘（未解決のスレッド）の対応方針を決めて置く。ユーザが端末で打つ（ボードが押した選択を送る形も、ユーザが打つ）。
+# ccnavi-user-decide 残った指摘（未解決のスレッド）の対応方針を決めて置く。ユーザがターミナルで打つ（ボードが押した選択を送る形も、ユーザが打つ）。
 #
-#   sh .ccnavi/scripts/ccnavi-user-decide.sh <N>                                     端末で 1 件ずつ選ぶ
+#   sh .ccnavi/scripts/ccnavi-user-decide.sh <N>                                     ターミナルで 1 件ずつ選ぶ
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>  ボードでユーザが押した選択を置く
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]                    止まった判断の続きを送る
 #
@@ -16,7 +16,7 @@
 #   返信か解決ができなければ、何も置かずに止まる）
 # → issue に回す分があればここが issue を作り、決めた内容をコメントに書き出す
 #
-# 取り込み済みの親子のチケットでは、置く呼び出しを write-and-push で回す（ccnavi-common-write-and-push.sh）。端末で選ぶ形は、選ぶのを
+# 取り込み済みの親子のチケットでは、置く呼び出しを write-and-push で回す（ccnavi-common-write-and-push.sh）。ターミナルで選ぶ形は、選ぶのを
 # write-and-push の外で先に済ませる（ロックを持ったままユーザを待たない）。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。
@@ -30,12 +30,12 @@ sh .ccnavi/scripts/ccnavi-user-decide.sh <N> [--choices <JSON> --digest <ダイ�
 sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]
 
   未解決（Unresolved）の指摘の対応方針を指摘ごとに選んで置く。対応しない・このフェーズで直す・issue に回す。
-  ユーザが端末で実行します。--choices と --digest は、ボードでユーザが押した選択を置く形（組で渡す）。
+  ユーザがターミナルで実行します。--choices と --digest は、ボードでユーザが押した選択を置く形（組で渡す）。
   一覧を見るだけなら sh .ccnavi/scripts/ccnavi-review.sh decide <N> --preview。
 
   --resume は、途中で止まった判断の続きを送る。保存した判断（操作記録）から、返信・解決・適用・
   issue・コメントの済んでいない段階だけを進める。選び直しはさせず、送り終えた段階は繰り返さない。
-  送る前に内容の要約を見せて、端末で y/N を聞く。操作ID を省くと、未完了の判断が 1 件のときそれを選ぶ。
+  送る前に内容の要約を見せて、ターミナルで y/N を聞く。操作ID を省くと、未完了の判断が 1 件のときそれを選ぶ。
   ワークスペースの中ならどこからでも打てる（親のワークツリーへは自分で移る）。
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
@@ -245,7 +245,7 @@ review_wap
 
 # マーカーに残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
 # ロックを取る前に引く。引けなければ渡さず、マーカーにアカウントを入れない。
-# 経路は、ボードの押した選択（--choices）なら board、端末で選ぶ形なら terminal。
+# 経路は、ボードの押した選択（--choices）なら board、ターミナルで選ぶ形なら terminal。
 decide_who=""
 decide_actor=$(account || :)
 log_debug マーカーのアカウント -- "actor=${decide_actor:+set}"
@@ -253,7 +253,7 @@ if [ -n "$decide_actor" ]; then
 	if [ -n "$choices" ]; then decide_via=board; else decide_via=terminal; fi
 	decide_who="--actor=$decide_actor --via=$decide_via"
 fi
-# 端末で選ぶ形は、選ぶのを write-and-push の外で先に済ませる（ロックを持ったままユーザを待たない）ので、ここでは始めない。
+# ターミナルで選ぶ形は、選ぶのを write-and-push の外で先に済ませる（ロックを持ったままユーザを待たない）ので、ここでは始めない。
 # 適用（ローカルへの反映）が write-and-push で戻された・失敗したとき、記録の「適用済み」を外す。
 # 外さないと、--resume が存在しない適用を前提に、実在しない子を名指しして投稿してしまう。
 unapply_local() {
@@ -305,7 +305,7 @@ stop)
 	exit 1
 	;;
 esac
-# 1. ユーザが端末で選ぶ（何も置かない。選択とダイジェストを state の置き場に書くだけ）。
+# 1. ユーザがターミナルで選ぶ（何も置かない。選択とダイジェストを state の置き場に書くだけ）。
 chosen="$state/review-choose-$$.json"
 ccnavi user reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
 	rm -f "$chosen"
