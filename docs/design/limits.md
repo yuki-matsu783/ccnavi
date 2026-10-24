@@ -90,6 +90,7 @@ ccnavi が Claude Code から読む値のうち、Claude Code の文書に無い
 |---|---|---|---|
 | 環境変数 `CLAUDE_CODE_SESSION_ATTENDED` が `0` なら付き添いなし | セッション開始の作業の決まりの条件 `non_interactive`（REQ-SES-07） | Claude Code 2.1.310 で、親のセッションが `1` のとき、その子の `claude -p`（`--output-format stream-json` でも同じ）は `0` になる。親の値の継承ではなく、`-p` の起動で Claude Code が設定する | 端末の対話 CLI の値（初回の設定画面で止まり、SessionStart まで進めなかった）。SDK からの起動。他の版。コンテナでの自動実行そのもの |
 | 環境変数 `CLAUDE_CODE_ENTRYPOINT`（起動の入口。`sdk-cli`・`remote_desktop` など） | 使わない | `ATTENDED` と違い、親の環境に値があると `-p` でも親の値が残る（親が `remote_desktop` なら子も `remote_desktop`）。外して `-p` を起動すると `sdk-cli` になる | 値の一覧 |
+| 非対話（`claude -p`）は、背景の Bash の完了を待つが、背景のサブエージェントの完了は待たない | 非対話の案内（サブエージェントは前景で起動して完了を待つ） | Claude Code 2.1.310 の haiku で各 1〜2 回。背景の Bash は 75 秒（83 秒で終了）と 660 秒（全体 21 分。途中で Bash の timeout にかかり、モデルが延ばして再起動した）のどちらも、完了まで待った。背景のサブエージェント（60 秒の作業）は 2 回とも 17〜21 秒で終了し、成果は残らなかった。前景のサブエージェント（45 秒の作業）は完了まで待った | 再現性。長時間の背景の Bash の timeout の既定。メインが待つ形（完了通知を待つ発言）の別の書き方。短いサブエージェントが終了より先に終わる場合の安定性 |
 | SessionStart の payload に対話かどうかの欄はない | ― | `session_id`・`transcript_path`・`cwd`・`scratchpad_dir`・`hook_event_name`・`source` だけだった | ― |
 | hook の標準入力・標準出力は、対話でも tty ではない | ― | `-p` の実行で、どちらも tty でない | 対話の実行（payload が標準入力のパイプで来るので、対話でも同じと見ている） |
 
