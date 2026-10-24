@@ -27,6 +27,9 @@ MARKER_DECIDE = "<!-- ccnavi:decide -->"
 # 受け入れた指摘のスレッドに残す返信の目印。返信を残したあと、sh がそのスレッドを解決する。
 MARKER_ACCEPT = "<!-- ccnavi:accept -->"
 MARKER_PREFIX = "<!-- ccnavi:"
+# issue の本文に入れる隠しコメントの印。`op` は指摘ごとに決まる操作ID。同じ印の issue を検索して、
+# 作り直しで重複しないようにする。
+MARKER_ISSUE = "<!-- ccnavi:issue op={op} -->"
 
 GITHUB_TOKEN = "GITHUB_TOKEN"
 GITLAB_TOKEN = "GITLAB_TOKEN"
@@ -233,10 +236,16 @@ ACCEPT_PLAN_VERSION = 1
 ACCEPT_ID = re.compile(r"[A-Za-z0-9_=-]+")
 
 
-def accept_reply(why: str, issue: bool = False) -> str:
-    """受け入れたスレッドに残す返信の本文。`why` は受け入れる場面（1 行）。"""
+def accept_reply(why: str, issue: bool = False, issue_url: str = "") -> str:
+    """受け入れたスレッドに残す返信の本文。`why` は受け入れる場面（1 行）。
+
+    `issue_url` を渡すと、issue の下書きを置く旨の代わりに、その issue の URL を書く
+    （issue を先に作る経路。URL は呼び手が作ったあとに埋めるので、枠の文字列を渡してもよい）。
+    """
     lines = [MARKER_ACCEPT, f"ccnavi: {why}ので、この指摘は対応せず、受け入れて進める。"]
-    if issue:
+    if issue and issue_url:
+        lines.append(f"別の issue に回した: {issue_url}。このスレッドは解決済みにする。")
+    elif issue:
         lines.append("別の issue に回す（issue の下書きを置く）。このスレッドは解決済みにする。")
     else:
         lines.append("このスレッドは解決済みにする。")

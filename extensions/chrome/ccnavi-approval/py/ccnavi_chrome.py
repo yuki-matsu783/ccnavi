@@ -1005,6 +1005,191 @@ def _op_confirm(req: dict, root: str) -> dict:
     }
 
 
+def _op_decide(req: dict, root: str) -> dict:
+    """残った指摘の行き先（keep・fix・issue）を決める。書かない。
+
+    VS Code のボードの decide と同じ判断を、Chrome が直接書く形で行う。Python はネットワークに出ない
+    ので、ホストへの書き込み（issue の作成、スレッドへの返信、解決、MR へのコメント）は計画
+    （`host_plan`）として返し、拡張（TS）が行う。親のブランチへの書き込みは `changes`
+    （`confirm` と同じ形）で返し、拡張が 1 コミットにする。順は、ホスト、そのあと
+    コミット。
+
+    要求は `confirm` と同じ（`family`・`phase`・`stamp`・`actor`・`snapshot`・`hints`・`result`・
+    `compare`・`manual_moved_at`）に、次を足す。
+
+        "mode":         "preview" | "apply"           （必須）
+        "choices":      {"<指摘の鍵>": "keep" | "fix" | "issue"}   （apply のとき必須）
+        "shown_digest": "<preview が返した digest>"   （apply のとき必須）
+        "carry":        ["<指摘の鍵>", ...]            （任意。既定は空）
+
+    `carry` は、ホストで受け入れ済み（返信して解決済み）と拡張が確かめた鍵。取り直した `result` で
+    解決済みでなければならず、`fix` の鍵は入れられない。見せた指摘から外れていても食い違いに数えず、
+    `host_plan` には入らない（もう書かない）。
+
+    答え（`schema` は `handle` が足す）:
+
+        {
+          "family": "<親のブランチ名>",
+          "problems": ["<標準エラーの文面>", ...],        # 通れば空
+          "code": null | "<理由コード>",                   # 通れば null
+          "need_compare": {"base", "head"},                # 任意。confirm と同じ。あれば他は空
+          "need_manual": {"paths": [...]},                 # 任意。confirm と同じ。あれば他は空
+          "preview": {...} | null,                         # mode=preview のときだけ
+          "host_plan": {...} | null,                       # mode=apply のときだけ
+          "reviewed": false,                               # apply で通ったとき、マーカーを置くか
+          "followup": "",                                  # 起こす続きの子の識別子（無ければ ""）
+          "pending_extra": ["<鍵>", ...],                  # 見せたあとに増えた指摘（未対応で残す）
+          "mismatch": null | {"digest": {"expected", "current"}, "changed": [...]},
+          "changes": {"<ブランチ>": [{"op", "path", "content"|"base64"}]} | null,
+          "lines": [...], "stopped": null | {"ticket", "reason"}
+        }
+
+    - `preview`: 手元の `--reviewed N --accept-unresolved --preview --json` と同じ形（ボードの
+      `DecidePreview`）。`{version: 2, parent, phase, mr: {number, url}, can_issue, threads: [{key,
+      url, path, line, body, version, last_comment: {id, at, author}}], digest}`。`digest` は
+      `v2.` で始まる不透明な文字列で、apply の `shown_digest` に返す。preview の `changes` は null
+    - `host_plan`:
+
+          {"issues":   [{"key", "op", "title", "body", "comments": ["<続きのコメント>", ...]}],
+           "replies":  [{"key", "thread_id", "body"}],
+           "resolves": [{"key", "thread_id"}],
+           "comment":  "<MR に書く、決めた内容のコメント>"}
+
+      `issues` は `issue` を選んだ指摘 1 件につき 1 つ（`carry` の鍵を除く）。`op` は親・フェーズ・
+      鍵・指摘の版から決まる操作IDで、`body` の頭の隠しコメント
+      `<!-- ccnavi:issue op=<op> -->` にも入る。
+      作成の前に同じ印の issue を検索して、重複を避ける。`comments` は本文が長いときの続き
+      （issue を作ったあと、順にコメントする）。
+      `replies` と `resolves` は `keep` と `issue` の指摘だけ（`fix` は入らない。
+      返信も解決もしない）。
+      `issue` の返信の本文は `{issue_url}` を含み、同じ鍵の issue の URL に置き換えてから送る。
+      `comment` は `issue` を選んだ指摘があるときだけ末尾に `{issue_links}` を含み、作った issue の
+      URL の一覧（1 行 1 件）に置き換えてから送る。
+      書く順は、issues、replies、resolves、そのあと changes のコミット、最後に comment。
+    - `preview` と `host_plan` は、通らなければ null（`code` に種別が入る）。
+      `mode` でない側の鍵は付かない
+    - `code`: confirm と同じ `CORE_CONFIRM_*`（親・フェーズ・レビュー済み・依頼の記録・動いた・
+      結果の照合・変更要求）に加え、`CORE_DECIDE_NO_DIGEST`（ダイジェストが無い・読めない）、
+      `CORE_DECIDE_MISMATCH`（見せた指摘と今の指摘が違う。`mismatch` が付く。何も積まない）、
+      `CORE_DECIDE_CHOICES`（選択の形が見せた指摘と合わない、`carry` が不正）、
+      `CORE_DECIDE_THREAD_ID`（返信と解決をするスレッドの id が無い）、
+      `CORE_DECIDE_FOLLOWUP`（続きの子を起こせない）、`CORE_DECIDE_STOPPED`（並べる途中で止まった）。
+      通らなければ `changes` と `host_plan` は null で、ホストにも書かない
+    - `reviewed`: `fix` が無く、見せたあとに増えた指摘も無いときだけ true
+      （マーカーが `changes` に入る）。
+      `followup` があるときは、続きの子が `changes` に入り、マーカーは入らない。
+      続きの子の識別子は親のブランチ上の既存のチケットだけを見て決める（手元の退避は見ない）
+
+    - `changes` が `{}`（書くものが無い）になることがある（fix が無く、見せたあとに増えた指摘が
+      あるとき）。この場合は空のコミットを作らない
+    - `carry` の確認は「取り直した結果で今ホストで解決済み」だけを見る（ccnavi の受け入れ返信かは
+      見ない）。issue に回した指摘の `carry` は、1 回目の結果（作った issue の URL）を拡張が持って
+      渡す前提で、2 回目の `host_plan` はその issue を作り直さない
+    - issue に回せる指摘は 1 回の apply で 40 件まで。超えたら `CORE_DECIDE_CHOICES` で
+      何も積まない
+    - レビュー済みのマーカーを置いたあとは `CORE_CONFIRM_ALREADY_REVIEWED` で断る。
+      コミットが成功し comment だけが失敗したときの再送は、この入口では受けない
+      （拡張が独立に扱う）
+    - 続きの子の操作ID は、親・フェーズ・直す指摘の鍵と版から決まる（MR の番号は入らない）
+
+    `manual_moved_at` と `need_manual` は `confirm` と同じ手順で答えるが、decide の判断は
+    手で動かした子を使わない。
+    """
+    mode = req.get("mode")
+    if mode not in ("preview", "apply"):
+        raise Refused("mode は preview か apply")
+    choices = req.get("choices")
+    if mode == "apply" and not (
+        isinstance(choices, dict) and all(isinstance(k, str) for k in choices)
+    ):
+        raise Refused("choices は {指摘の鍵: keep | fix | issue}")
+    shown_digest = req.get("shown_digest")
+    if mode == "apply" and not isinstance(shown_digest, str):
+        raise Refused("shown_digest は見せた指摘のダイジェスト（文字列）")
+    carry = req.get("carry", [])
+    if not (isinstance(carry, list) and all(isinstance(k, str) for k in carry)):
+        raise Refused("carry は指摘の鍵のリスト")
+    snap, place, family, closure = _family_tree(req, root)
+    _writable(snap, family)
+    ident = closure["idents"][family]
+    phase_no = req.get("phase")
+    if not isinstance(phase_no, int) or isinstance(phase_no, bool):
+        raise Refused("phase はフェーズの番号")
+    result = review_host.Result.from_data(req.get("result"))
+    if result.error:
+        raise Refused(f"result を解釈できません：{result.error}")
+    head = str(snap["branches"][family].get("head") or "")
+    compare = req.get("compare")
+    idle = {"reviewed": False, "followup": "", "pending_extra": [], "mismatch": None}
+    # mode の側の鍵は、どの答えにも付ける（有無を揃える）
+    idle["preview" if mode == "preview" else "host_plan"] = None
+    with _environ():
+        snapshot = _core_snapshot(req, root)
+        recorded = core.requested_head(snapshot, ident, phase_no)
+        if compare is None and recorded and recorded != head and review._is_sha(recorded):
+            return {
+                "family": family,
+                "need_compare": {"base": recorded, "head": head},
+                "problems": [],
+                "code": None,
+                **idle,
+                **_changes(root, None),
+            }
+        moved = core.moved_detail_on_host(
+            snapshot, ident, phase_no, head, _compare_files(compare, recorded, head)
+        )
+        at = req.get("manual_moved_at")
+        at = float(at) if isinstance(at, (int, float)) and not isinstance(at, bool) else None
+        manual = core.manual_for(snapshot, ident, phase_no, at)
+        if manual is not None and manual.need_time:
+            marker = "/" + snapshot.conf.approved.strip("/") + "/"
+            paths = [p[p.index(marker) + 1 :] for p in manual.paths if marker in p]
+            return {
+                "family": family,
+                "need_manual": {"paths": paths},
+                "problems": [],
+                "code": None,
+                **idle,
+                **_changes(root, None),
+            }
+        if mode == "preview":
+            shown = core.decide_preview(
+                snapshot, ident, phase_no, result, moved.text, moved, frozenset(carry)
+            )
+            return {
+                "family": family,
+                "problems": [_relative(root, p) for p in shown.problems],
+                "code": shown.code or None,
+                **idle,
+                "preview": shown.preview,
+                **_changes(root, None),
+            }
+        decided = core.decide(
+            snapshot,
+            ident,
+            phase_no,
+            result,
+            moved.text,
+            moved,
+            choices,
+            shown_digest,
+            frozenset(carry),
+        )
+    body = _changes(root, decided.changes)
+    _one_branch(body, family)
+    return {
+        "family": family,
+        "problems": [_relative(root, p) for p in decided.problems],
+        "code": decided.code or None,
+        "host_plan": decided.host_plan,
+        "reviewed": decided.reviewed,
+        "followup": decided.followup,
+        "pending_extra": decided.pending_extra,
+        "mismatch": decided.mismatch,
+        **body,
+    }
+
+
 def _compare_files(compare: object, base: str | None, head: str) -> list[str] | None:
     """compare API の変更の一覧（`{base, head, files}`）。読めなければ None（動いたと数える）。
 
@@ -1194,6 +1379,7 @@ _OPS = {
     "board": _op_board,
     "plan": _op_plan,
     "confirm": _op_confirm,
+    "decide": _op_decide,
     "compat": _op_compat,
     "start": _op_start,
     "adopt": _op_adopt,
