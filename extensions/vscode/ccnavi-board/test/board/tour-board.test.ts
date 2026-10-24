@@ -252,7 +252,7 @@ test("CB-T1172 マージまでの流れの案内は、issue の作り方（GitLa
   const course = def.courses.find((c) => c.id === "to-merge");
   assert.ok(course, "to-merge の案内がありません");
   const withImage = course.steps.filter((step) => step.image !== "");
-  assert.deepEqual(withImage.map((step) => step.image), ["gitlab-issues-menu", "gitlab-issues-list", "gitlab-new-issue", "gitlab-issue-created", "claude-code-prompt", "gitlab-new-mr", "gitlab-changes-tab", "gitlab-line-comment", "gitlab-start-thread", "gitlab-pending-review", "gitlab-submit-review", "gitlab-unresolved-thread", "gitlab-threads-resolved", "gitlab-mr-approval", "gitlab-mark-ready", "gitlab-mr-merge", "gitlab-merged"]);
+  assert.deepEqual(withImage.map((step) => step.image), ["gitlab-issues-menu", "gitlab-issues-list", "gitlab-new-issue", "gitlab-issue-created", "claude-code-prompt", "gitlab-new-mr", "gitlab-changes-tab", "gitlab-line-comment", "gitlab-start-thread", "gitlab-pending-review", "gitlab-submit-review", "gitlab-unresolved-thread", "gitlab-threads-resolved", "gitlab-mark-ready", "gitlab-mr-merge", "gitlab-merged"]);
   assert.ok(withImage.every((step) => step.alt !== "" && step.target === ""));
   // 作業を頼む → 承認 → 作業 → レビュー → マージ → 片付けの順に、画面の部品を指す
   const targets = course.steps.map((step) => step.target).filter((target) => target !== "");
