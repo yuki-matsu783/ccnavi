@@ -222,6 +222,7 @@ class SubagentRolesTest(HookCase):
         "sh .ccnavi/scripts/ccnavi-git.sh integrate-done",
         "sh .ccnavi/scripts/ccnavi-start.sh",
         "sh .ccnavi/scripts/ccnavi-start.sh --issue 3",
+        "sh .ccnavi/scripts/ccnavi-start.sh --issue 3 --list-open",
         "sh .ccnavi/scripts/ccnavi-start.sh --new-issue x --similar-checked",
         "sh .ccnavi/scripts/ccnavi-sync.sh",
         "sh .ccnavi/scripts/ccnavi-worktree.sh add x",

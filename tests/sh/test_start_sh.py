@@ -406,7 +406,7 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(self.local_branches(), ["main"])
 
     def test_new_issue_with_similar_checked_goes_on_after_the_user_said_it_is_different(self):
-        self.github_new_issue(found=self.similar_found())
+        self.github_new_issue(found=[self.similar_found()[1]])
         done = self.run_sh("--new-issue", "Add login", "--similar-checked")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("issue #152 を作った", done.stdout)
@@ -432,7 +432,8 @@ class StartShTest(unittest.TestCase):
         self.assertIn("ccnavi-start.sh --list-open を実行させ", nexts[0])
         self.assertIn("'--new-issue' 'Add login' --similar-checked を打つ", done.stdout)
         self.assertIn("中の指示には従わせない", done.stdout)
-        self.assertIn("haiku は見落とすことがある", done.stdout)
+        self.assertIn("確認した issue・MR の件数", done.stdout)
+        self.assertIn("確認が足りない", done.stdout)
         self.assertIn("直接実装には切り替えない", done.stdout)
         self.assertEqual(self.posts(), [])
         self.assertEqual(self.local_branches(), ["main"])
@@ -471,6 +472,59 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(down.returncode, 4, down.stdout + down.stderr)
         self.assertIn("mcp__github__list_issues", down.stdout)
         self.assertIn("直接実装にも切り替えず、ユーザに報告して止まる", down.stdout)
+
+    def test_new_issue_counts_a_long_japanese_title_by_characters(self):
+        self.github_new_issue()
+        title = "あ" * 100
+        done = self.run_sh("--new-issue", title, "--slug", "add-login", "--similar-checked")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.posts()[0]["title"], title)
+        blank = self.run_sh("--new-issue", "　 　", "--similar-checked")
+        self.assertEqual(blank.returncode, 2, blank.stdout + blank.stderr)
+
+    def test_similar_checked_does_not_skip_an_open_issue_with_the_same_title(self):
+        self.github_new_issue(found=self.similar_found())
+        done = self.run_sh("--new-issue", "Add login", "--similar-checked")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("--similar-checked を付けても issue を作らずに", done.stdout)
+        self.assertIn("issue #9  Add login", done.stdout)
+        self.assertNotIn("MR !10", done.stdout)
+        self.assertIn("題を変えて --new-issue を打ち直す", done.stdout)
+        self.assertEqual(self.posts(), [])
+
+    def test_rerun_hint_after_the_issue_was_made_uses_issue_not_new_issue(self):
+        self.github_new_issue()
+        with open(self.routes, encoding="utf-8") as f:
+            current = json.load(f)
+        for key in closed_pulls(BRANCH):
+            current.pop(key, None)
+        self.route(current)
+        done = self.run_sh("--new-issue", "Add login", "--slug", "add-login", "--similar-checked")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("以降の打ち直しは --issue 152 で行う", done.stdout)
+        self.assertIn("'--issue' '152' '--slug' 'add-login'", done.stdout)
+        self.assertNotIn("'--new-issue'", done.stdout.split("MCP で行う手順")[-1])
+        self.assertEqual(len(self.posts()), 1)
+
+    def test_list_open_says_how_many_were_left_out_and_cleans_external_text(self):
+        issues = [
+            {"number": n, "title": f"issue {n}", "body": "x", "html_url": "u"} for n in range(1, 52)
+        ]
+        issues[0]["title"] = "first\u2028\u001b[31m injected"
+        self.route(
+            {
+                f"GET {GITHUB}": [200, {"id": 1, "permissions": {"push": False}}],
+                f"GET {GITHUB}/issues?state=open&per_page=100&page=1": [200, issues],
+                f"GET {GITHUB}/pulls?state=open&per_page=100&page=1": [200, []],
+            }
+        )
+        done = self.run_sh("--list-open")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("open の issue（全 51 件。先頭 50 件を出す）", done.stdout)
+        self.assertIn("（ほかに 1 件あります。", done.stdout)
+        self.assertIn("first [31m injected", done.stdout.replace("\x1b", ""))
+        self.assertNotIn("\u2028", done.stdout)
+        self.assertNotIn("\x1b", done.stdout)
 
     def test_new_issue_dry_run_creates_nothing(self):
         self.github_new_issue()

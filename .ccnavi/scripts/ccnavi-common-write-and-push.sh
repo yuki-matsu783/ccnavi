@@ -308,7 +308,10 @@ ccnavi_wap_prepare() {
 		# origin の参照を基点にするので、参照が無いと差分を読めずに内部のエラーで終わる。先に事実を言って止める。
 		# 送った形跡があるのに参照が無い親は、上の push の関門と ccnavi-sync.sh の判定に任せる。
 		ccnavi_parent_info "$ccnavi_wap_tree" "$ccnavi_wap_family_id" || :
-		if [ "$ccnavi_pi_parent" != no ] && [ "$ccnavi_pi_approved" != unreadable ] &&
+		# 実行ファイルが答えない・古くて値が unknown のときは、断定せず従来の関門に任せる
+		if [ "$ccnavi_pi_parent" = yes ] && [ "$ccnavi_pi_approved" != unreadable ] &&
+			[ "$ccnavi_pi_approved" != unknown ] && [ "$ccnavi_pi_requested" != unknown ] &&
+			[ "$ccnavi_pi_archived" != unknown ] && [ "$ccnavi_pi_started" != unknown ] &&
 			! ccnavi_parent_trace "$ccnavi_wap_tree" "$ccnavi_wap_branch"; then
 			ccnavi_wap_unsent_parent=1
 			ccnavi_wap_say "親のブランチ ${ccnavi_wap_branch} はリモートにありません。ccnavi-start.sh を通さずに切った親です。何も反映していません"

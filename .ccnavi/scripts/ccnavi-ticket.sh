@@ -329,7 +329,7 @@ ticket_unsent_parent_next() {
 		printf '  1. issue に紐づく MR がすでにある: その MR のブランチで作業するかを聞く。作業するなら sh %s --mr %s（--issue <番号> と一緒に渡せる）\n' "$tup_s" "$tup_mr"
 		printf '  2. MR は無く、issue はある: %s を使わず sh %s --issue <番号> で新しく切る（ブランチ・ワークツリー・Draft MR を作る）。提案は新しい親のワークツリーへ移す。%s にコミットがあれば先に伝える\n' "$tup_b" "$tup_s" "$tup_b"
 		printf '  3. %s を使い続ける: ユーザが git push -u origin %s と MR（説明欄に Closes #<番号>）の作成をしてから、sh %s --mr %s で採用する\n' "$tup_b" "$tup_b" "$tup_s" "$tup_mr"
-		printf '案内: issue が無いときは、ユーザに issue を作ってもらってから 2 へ進む\n'
+		printf '案内: issue が無いときは、sh %s --new-issue <題> で作ってから 2 へ進む\n' "$tup_s"
 	} >&2
 }
 
