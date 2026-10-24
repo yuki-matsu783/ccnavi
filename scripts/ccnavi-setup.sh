@@ -93,7 +93,7 @@ EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure 
 FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh"'
 FETCH_TIMEOUT=60
 # 放置したセッションの引き継ぎ促し（ccnavi-idle.sh）。会話が大きく育ったまま放置されると、モデルが覚えている
-# 会話のコピー（プロンプトキャッシュ）が時間切れで消え、続きを送り直す料金が跳ね上がる。消える前に、次のセッションへの
+# 会話のコピー（プロンプトキャッシュ）が時間切れで消え、続きを送り直す料金が大きく増える。消える前に、次のセッションへの
 # 引き継ぎ文書を書かせる。Stop に 2 本（ユーザへの知らせ `notice`、放置を待つ `start`）、UserPromptSubmit に 1 本
 # （入力したら待機をやめる `reset`）を、本体とは別の行として登録する。`start` は放置の間 sh が待つので、
 # バックグラウンドで走らせ（asyncRewake）、上限を長くする。起こす判断は ccnavi 自身が決める
@@ -227,7 +227,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --no-fetch                セッション開始時の入口（ccnavi-session-start.sh）を hook に登録しない。
                             取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する（ディレクトリ一覧も出なくなる）
   --no-idle                 放置したセッションの引き継ぎ促し（ccnavi-idle.sh）を hook に登録しない。
-                            会話が大きく育ったまま放置されると、キャッシュが切れて続きの料金が増えるため、切れる前に
+                            会話が大きく育ったまま放置されると、キャッシュが切れて続きの料金が増える。そのため、切れる前に
                             次のセッションへの引き継ぎ文書を書かせる。要らないときに指定する
                             （環境変数 CCNAVI_HANDOFF_SUGGEST_TOKENS を 0 にしても止められる）
 

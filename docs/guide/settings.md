@@ -137,7 +137,7 @@ Claude は、会話の内容をいったん記憶（プロンプトキャッシ�
 - サブエージェントのターン
 - 会話の大きさが読めないとき
 
-切るには、環境変数 `CCNAVI_HANDOFF_SUGGEST_TOKENS` を `0` にするか、導入スクリプトに `--no-idle` を付けて登録しない。
+切るには、環境変数 `CCNAVI_HANDOFF_SUGGEST_TOKENS` を `0` にするか、導入スクリプトに `--no-idle` を付けて、登録しないようにする。
 
 判定だけを見るなら `PreToolUse` と `PostToolUse` の 2 つでも動く。
 
