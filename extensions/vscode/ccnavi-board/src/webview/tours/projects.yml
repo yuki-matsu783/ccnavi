@@ -1,5 +1,6 @@
-# プロジェクト管理画面の案内。見本は使わず、いまのワークスペースの画面をそのまま指す。
-# 案内の間も、clone・更新などの操作は実際には送らない。
+# プロジェクト管理画面の案内。`sample:` は案内の間だけ画面に出す見本（実際のプロジェクトではない）。
+# 見本は `core/tour-projects.ts` の決まりで、画面が描く形（一覧・別枠・共通設定の同期）にする。
+# 案内の間は、clone・更新・同期などの操作は実際には送らない。見本の URL は example.com の例。
 # 図（diagrams）の値は「例」。実在のリポジトリ・ユーザ・トークンではない（/ws はワークスペースルートの例）。
 # 手順の本文にも、図の値が例であることを書く。
 # `target:` の印（画面の data-tour）:
@@ -10,6 +11,45 @@
 #   workspace   ワークスペース（プロジェクト外）
 #   tour   「?」
 screen: projects
+
+# 見本。web-app は問題なし、api はワークツリーの warn と共通設定のずれ、self は予約名の error（図 project-lint の値と同じ）。
+sample:
+  tickets_enabled: true
+  projects:
+    - name: web-app
+      origin: https://example.com/team/web-app.git
+      tickets: 3
+      doing: 1
+    - name: api
+      origin: https://example.com/team/api.git
+      worktrees: [fix-login]
+      tickets: 1
+      problems:
+        - severity: warn
+          where: (projects/api)
+          detail: プロジェクトの中にワークツリーがある（fix-login）。ワークツリーはワークスペースの .claude/worktrees/ に置く
+    - name: self
+      origin: https://example.com/team/self.git
+      rules: false
+      problems:
+        - severity: error
+          where: (projects/self)
+          detail: "`common` と `self` はレイヤーの名前として予約してある。プロジェクトを別の名前に変えてください"
+  strays:
+    - path: legacy/old-repo
+      reason: projects/ の外にあるリポジトリ
+  workspace_worktrees: [feature-12-login]
+  mirror:
+    checked_at: "10:30"
+    expect: sample-all
+    projects:
+      - name: web-app
+        state: synced
+      - name: api
+        state: differs
+        expect: sample-api
+        changes:
+          - { rel: .ccnavi/config/common/rules.yml, action: update }
 
 diagrams:
   # はじめて知る人向け: プロジェクトとは何か。値の例は URL だけ

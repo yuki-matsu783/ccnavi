@@ -8,7 +8,8 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
-import { tourOf } from "../../core/tour-def.js";
+import { SAMPLE_NOTE, tourOf } from "../../core/tour-def.js";
+import { parseProjectsSample } from "../../core/tour-projects.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import projectsTour from "../tours/projects.yml";
@@ -18,8 +19,9 @@ import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
 import { isTrackedProjectsDir } from "./text.js";
 
-/** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
+/** 案内（`tours/projects.yml`）と、案内の間だけ描く見本。今の中身は使わず、clone の欄の入力にも触れない */
 const TOUR = tourOf(projectsTour);
+const SAMPLE = parseProjectsSample(TOUR.sample);
 
 export function App({ initial }: { readonly initial: ProjectsData }): JSX.Element {
   const [data, setData] = useState<ProjectsData>(initial);
@@ -80,12 +82,13 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
     );
   }
 
-  const page = data.page;
-  const mirror = data.mirror;
+  const page = tour.touring ? SAMPLE.page : data.page;
+  const mirror = tour.touring ? SAMPLE.mirror : data.mirror;
   const rows = page.rows;
   const courses = coursesOf(TOUR, () => undefined);
   return (
     <>
+      {tour.touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <ScreenHeader courses={courses} onPick={tour.start}>
         <div className="summary" data-tour="summary">
           <span>プロジェクト {rows.length} 件</span>

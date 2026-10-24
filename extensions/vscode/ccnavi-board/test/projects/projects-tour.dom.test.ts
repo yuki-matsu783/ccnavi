@@ -1,6 +1,6 @@
 /**
- * プロジェクト管理画面の案内（`src/webview/tours/projects.yml`）を happy-dom で動かす。見本は使わず、今の画面を指す。
- * 案内の間は clone・更新・.gitignore の操作を拡張ホストへ送らない。
+ * プロジェクト管理画面の案内（`src/webview/tours/projects.yml`）を happy-dom で動かす。案内の間は今の一覧ではなく見本を描く。
+ * 案内の間は clone・更新・共通設定の同期の操作を拡張ホストへ送らない。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -55,18 +55,44 @@ test("CB-D322 全案内の全手順で、指す先が画面に 1 つあり、吹
   }
 });
 
-test("CB-D323 案内の間に clone・更新・.gitignore を押しても、拡張ホストへ送らない", async () => {
+test("CB-D323 案内の間に clone・更新・共通設定の同期を押しても、拡張ホストへ送らない", async () => {
   const dom = await openProjects([row()], { ignored: false });
   try {
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));
     await dom.settle();
-    for (const action of ["refresh", "clone", "fix-ignore"]) {
-      dom.click(dom.one(`[data-action="${action}"]`));
+    for (const action of ["refresh", "clone", "mirror-sync-all"]) {
+      const buttons = dom.all(`[data-action="${action}"]`);
+      assert.ok(buttons.length >= 1, `${action} のボタンが見本に無い`);
+      dom.click(buttons[0]);
     }
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type !== "ready"), []);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D850 案内の間は、今の一覧ではなく説明に合った見本（web-app・api・self、別枠、共通設定のずれ）を描き、見本の帯を出す。閉じたら今の一覧に戻る", async () => {
+  const dom = await openProjects([row({ name: "mine-secret" })]);
+  try {
+    assert.deepEqual(dom.all(".project").map((el) => el.getAttribute("data-name")), ["mine-secret"]);
+    await startCourse(dom, "intro");
+    assert.deepEqual(dom.all(".project").map((el) => el.getAttribute("data-name")), ["web-app", "api", "self"]);
+    assert.equal(dom.all(".banner.tour-sample").length, 1, "見本の帯が出ていない");
+    assert.ok(!dom.one("#root").textContent?.includes("mine-secret"), "実際のプロジェクト名が案内の間に出ている");
+    // warn・error の札と、共通設定のずれ（同期できるのは api だけ）
+    assert.equal(dom.one('[data-name="api"] .badge.warn').textContent, "warn");
+    assert.equal(dom.one('[data-name="self"] .badge.error').textContent, "error");
+    assert.equal(dom.all('[data-name="web-app"] .badge.warn, [data-name="web-app"] .badge.error').length, 0);
+    assert.equal(dom.all('[data-action="mirror-sync"]').length >= 1, true);
+    assert.match(dom.one('[data-action="mirror-sync-all"]').textContent ?? "", /共通設定をすべて同期（1 件）/);
+    assert.ok(dom.one("#root").textContent?.includes("legacy/old-repo"), "別枠の見本が出ていない");
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.deepEqual(dom.all(".project").map((el) => el.getAttribute("data-name")), ["mine-secret"]);
+    assert.equal(dom.all(".banner.tour-sample").length, 0);
   } finally {
     await dom.close();
   }
