@@ -12,7 +12,7 @@ import { openRules } from "./rules-panel.js";
 import { openTemplates } from "./templates-panel.js";
 import { registerSidebar } from "./sidebar.js";
 import { watchTicketControl } from "./ticket-control.js";
-import { initTours } from "./tour.js";
+import { initTours, openSidebarTour, openSidebarTourOnNewVersion, runBasicTours, runScreenTour } from "./tour.js";
 import { warnVersionSkew } from "./version-check.js";
 import { openWorkflow } from "./workflow-panel.js";
 
@@ -47,10 +47,17 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("ccnaviBoard.openTemplates", () => void screens().templates({ kind: "self" })),
     vscode.commands.registerCommand("ccnaviBoard.openHandoff", () => void screens().handoff()),
     vscode.commands.registerCommand("ccnaviBoard.appearance", () => void pickAppearance()),
+    // 左パネルの案内（ウォークスルー）と、そこから動かす画面の基本の案内
+    vscode.commands.registerCommand("ccnaviBoard.tour", () => openSidebarTour(context)),
+    vscode.commands.registerCommand("ccnaviBoard.tourBasics", runBasicTours),
+    vscode.commands.registerCommand("ccnaviBoard.tourProjects", () => runScreenTour("projects")),
+    vscode.commands.registerCommand("ccnaviBoard.tourBoard", () => runScreenTour("board")),
     // 親の識別子を引数で受けて開く（キーバインドの args や、ほかの拡張の executeCommand から）。開く親を選ぶ段が
     // 無いので、コマンドパレットには出さない（package.json の menus.commandPalette で when: false）
     vscode.commands.registerCommand("ccnaviBoard.openWorkflow", (ticket: unknown) => void screens().workflow(String(ticket ?? ""))),
   );
+  // 版が変わった最初の起動で、左パネルの案内を開く
+  openSidebarTourOnNewVersion(context);
 }
 
 export function deactivate(): void {
