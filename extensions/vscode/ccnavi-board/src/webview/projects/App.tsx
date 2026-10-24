@@ -1,8 +1,9 @@
 /**
  * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース（プロジェクト外）。
+ * ミラーの「すべて同期」と最終確認の時刻はヘッダに、カードごとの状態と「ミラーを同期」はカードに出す（`Mirror.tsx`）。
  *
  * 見せる中身は拡張ホストが渡す（`ProjectsData`）。画面が自分で持つのは、ユーザが触って決めるもの
- * （clone の欄、直前の操作の一言）だけ。clone も書き込みも画面はしない。
+ * （clone の欄、直前の操作の一言）だけ。clone もミラーの同期も書き込みも画面はしない。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
@@ -11,6 +12,7 @@ import { tourOf } from "../../core/tour-def.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import projectsTour from "../tours/projects.yml";
+import { CheckedAt, MirrorBanners, SyncAllButton } from "./Mirror.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
@@ -79,6 +81,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   }
 
   const page = data.page;
+  const mirror = data.mirror;
   const rows = page.rows;
   const courses = coursesOf(TOUR, () => undefined);
   return (
@@ -89,14 +92,17 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
           <span className="path" title={page.projectsDir}>
             フォルダ: {`${page.projectsRel}/`}
           </span>
+          {mirror !== undefined && <CheckedAt mirror={mirror} />}
         </div>
         <div className="controls">
+          {mirror !== undefined && <SyncAllButton mirror={mirror} act={act} />}
           <button type="button" className="action" data-action="refresh" data-tour="refresh" onClick={() => act({ type: "refresh" })}>
             更新
           </button>
         </div>
       </ScreenHeader>
       <Banners page={page} act={act} />
+      {mirror !== undefined && <MirrorBanners mirror={mirror} />}
       <section className="clone" data-tour="clone">
         <h2>リポジトリを clone する</h2>
         <div className="clone-form">
@@ -153,7 +159,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         ) : (
           <ul className="projects">
             {rows.map((row, index) => (
-              <Project key={row.name} row={row} ticketsEnabled={page.ticketsEnabled} tour={index === 0} />
+              <Project key={row.name} row={row} ticketsEnabled={page.ticketsEnabled} tour={index === 0} mirror={mirror} act={act} />
             ))}
           </ul>
         )}

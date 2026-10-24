@@ -186,8 +186,8 @@ DOCS_FLAGS = (
     ("--no-refresh", "no_refresh", False),
 )
 DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
-# 値なしで渡された `--yes`。取り込み（`user handoff --yes`）だけが読む（ほかの経路の `--yes` は
-# 識別子を取る）。
+# 値なしで渡された `--yes`。取り込み（`user handoff --yes`）とミラーの同期
+# （`user mirror --yes`）だけが読む（ほかの経路の `--yes` は識別子を取る）。
 BARE_YES = "\x00bare"
 # `--docs` と一緒に使えないフラグ。ほかの経路と、その経路でだけ読むもの。何も出さずに無視すると、
 # 打ったユーザは反映されたと思う。
@@ -195,6 +195,7 @@ _NOT_WITH_DOCS = (
     "--lint",
     "--learnings",
     "--handoff",
+    "--mirror",
     "--test",
     "--test-expectations",
     "--explain",

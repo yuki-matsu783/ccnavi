@@ -293,6 +293,64 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("デフォルトブランチ（trunk）でない", result.stdout)
         self.assertFalse(os.path.exists(self.wt("topic")))
 
+    # ---- projects/ の変更をワークスペースルートから頼まれたときの案内
+
+    PROJECTS_HINT = "projects/ の下のプロジェクトの変更を頼まれたなら"
+
+    def add_project(self, name="app"):
+        """ワークスペースの git が無視する projects/<名前> に、独立したリポジトリを置く。"""
+        with open(os.path.join(self.ws, ".git", "info", "exclude"), "a", encoding="utf-8") as f:
+            f.write("projects/\n")
+        project = os.path.join(self.ws, "projects", name)
+        git(self._tmp.name, "init", "-q", "-b", "work", project)
+        for key, value in (("user.email", "t@example.invalid"), ("user.name", "t")):
+            git(project, "config", key, value)
+        git(project, "commit", "-q", "--allow-empty", "-m", "seed")
+        git(project, "update-ref", "refs/remotes/origin/work", "HEAD")
+        git(project, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/work")
+        return project
+
+    def test_a_cut_from_the_root_with_projects_points_at_cd(self):
+        self.add_project()
+        result = self.run_sh("topic")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn(self.PROJECTS_HINT, result.stdout)
+        self.assertEqual(1, result.stdout.count("案内: projects/ の下"))
+        self.assertTrue(os.path.isdir(self.wt("topic")))
+
+    def test_the_hint_comes_before_the_next_step(self):
+        self.add_project()
+        lines = self.run_sh("topic").stdout.splitlines()
+        hint = next(i for i, ln in enumerate(lines) if self.PROJECTS_HINT in ln)
+        step = next(i for i, ln in enumerate(lines) if ln.startswith("次: "))
+        self.assertLess(hint, step)
+
+    def test_a_workspace_without_projects_gets_no_hint(self):
+        """projects/ が無い形（単体 clone のように、ルートがそのリポジトリ）では出さない。"""
+        result = self.run_sh("topic")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertNotIn(self.PROJECTS_HINT, result.stdout)
+
+    def test_a_directory_in_projects_without_a_repository_gets_no_hint(self):
+        os.makedirs(os.path.join(self.ws, "projects", "notes"))
+        result = self.run_sh("topic")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertNotIn(self.PROJECTS_HINT, result.stdout)
+
+    def test_a_cut_from_inside_the_project_gets_no_hint(self):
+        project = self.add_project()
+        first = self.run_sh("topic", cwd=project)
+        self.assertEqual(3, first.returncode, first.stdout + first.stderr)
+        done = self.run_sh("topic", "--accept", self.code_of(first), cwd=project)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn(self.PROJECTS_HINT, done.stdout)
+
+    def test_the_hint_is_not_printed_by_dry_run(self):
+        self.add_project()
+        result = self.run_sh("topic", "--dry-run")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertNotIn(self.PROJECTS_HINT, result.stdout)
+
     def test_a_free_name_is_warned_after_the_cut_and_still_cut(self):
         result = self.run_sh("topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)

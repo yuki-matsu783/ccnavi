@@ -10,9 +10,9 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 
 ### 9.18 ユーザ専用の入口
 
-ユーザだけが打つ操作（承認・レビュー済みの記録・早めに閉じる・記録の削除・保護対象の取り込み（handoff）・承認済みチケットの push・
+ユーザだけが実行する操作（承認・レビュー済みの記録・早めに閉じる・記録の削除・保護対象の取り込み（handoff）・共通レイヤーのミラーの同期（mirror）・承認済みチケットの push・
 残った指摘の対応方針・子のブランチの削除）が、どの入口にあるかと、hook と実行ファイルがそれをどう止めるかを書く。
-止める判定の細部は [9.5](judging-by-path.md)、承認の手順は [9.4](approval.md)、端末要求は 9.4、`handoff` の中身は [9.19](handoff.md)。
+止める判定の細部は [9.5](judging-by-path.md)、承認の手順は [9.4](approval.md)、端末要求は 9.4、`handoff` の中身は [9.19](handoff.md)、`mirror` の中身は [11.12](../multi-repo/distribute-common.md)。
 
 #### 表が正本
 
@@ -48,12 +48,13 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 | `user close-early` | `--close-early` |
 | `user prune` | `--prune` |
 | `user handoff [<相対パス>…]` | `--handoff [<相対パス>…]` |
+| `user mirror [<プロジェクト名>…]` | `--mirror [<プロジェクト名>…]` |
 
 付随する `--yes`・`--digest`・`--expect`・`--via`・`--reason`・`--result`・`--json` などは、内部の形のときと同じ位置と意味で読む。
 
 見るだけの形のうち、`user` に入れず今までの形のまま通すのは次の 3 つ: `--agree --preview [--verify] [--json]`、`--prune --preview`、
 `--reviewed N --accept-unresolved --preview`（`ccnavi-review.sh decide <N> --preview` が内部で呼ぶ）。
-`user handoff` は見るだけの形（`--yes` なし）も `user` の入口の中に置き、外では断る（見るだけの形を通す `unless` を持たない）。
+`user handoff` と `user mirror` は見るだけの形（`--yes` なし）も `user` の入口の中に置き、外では断る（見るだけの形を通す `unless` を持たない）。
 
 ユーザ専用の sh は `ccnavi-user-<操作>.sh` に分かれる。
 
@@ -78,10 +79,10 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 
 argparse が読んだ後、`entry` が空（`user` の外）で、`user_only.refused(args)` が空でなければ、何も動かさず標準エラーに断りを書いて終了コード 2 で終わる。
 `refused` は `FLAGS` の `gated` の行を、argparse の結果で見る（argv の文字列を探さない）。`--yes` は、どの操作にも付くので最後に見る。
-`unless` の条件に当たる形（`--agree --preview`、`--prune --preview`、`--reviewed … --preview`）は断らない。`--handoff` は `--yes` の有無によらず断る。
+`unless` の条件に当たる形（`--agree --preview`、`--prune --preview`、`--reviewed … --preview`）は断らない。`--handoff` と `--mirror` は `--yes` の有無によらず断る。
 断りの文は、対応する `user` の形（`ccnavi user agree` など）と、見るだけの形があればそれを案内する。
 
-`--version --json` は互換の版（`compat`）18 を返し、`features` に `user-entry` と `handoff` を持つ。
+`--version --json` は互換の版（`compat`）18 を返し、`features` に `user-entry`・`handoff`・`mirror` を持つ。
 
 #### hook の止め
 
@@ -92,7 +93,7 @@ hook の止めは表から作る。ユーザ専用の入口の止めは `DENY_TI
 | `user` の入口 | 実行ファイルの呼び出しで、`WRAPPER_OPTIONS` を読み飛ばした後の最初の語が `user`（`user_entry_forms`）。`--` を挟んだ形も止める。変数・glob・コマンド置換で `user` になりうる語も止める（`hidden_user_entry`）。`prune` は別の deny（`prune_form`）が止める。実行ファイルの呼び出しとして読む表記は、名前（`ccnavi`・`ccnavi.exe`・実行ファイルのパス・`ccnavi-launcher.sh`）と、Python から走らせる形（`python[版]`・`py` に、`-u`・`-I`・`-OO`・`-3`・`-W x`・`-X utf8` などの選択肢を挟み、`-m ccnavi`・`-mccnavi`・`-m ccnavi.__main__`・`main.py` で入る。前に `uv run`・`poetry run`・`pipenv run` を置いてもよい） |
 | `ccnavi-user-*.sh` | コマンド行のどこに名前が出ても止める（`user_script_pattern`。`human_path_form`）。引数に依らない。表示・検索・閲覧の道具だけが並ぶ行は通す |
 | 直接打つ形 | 実行ファイルのオプション（`--agree`・`--reviewed`・`--close-early` など）を `user` の外で直に打つ形 |
-| 名前に依らない文字列検査 | 端末を求めない操作（`user agree`・`user reviewed`・`user handoff` と `--yes` の組、`--choices` と `--digest` の組、`user` を伴わない単独の `--via board` / `--via=board`）と、端末要求を切る形（`CCNAVI_GUARD_TICKET_APPROVAL`、`CCNAVI_` で始まる名前の途中に展開が混じる形（`env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable`）、`--guard-ticket-approval`）。名前を変えたコピー・`python -c`・`awk` の `system()` でも止まる。暫定の止めとして、単独の語の `user` があるコマンド行で、`--` で始まる語に展開（`$`・バッククォート）が混じれば止める（`--y${X}es`・`--y$(echo es)`。入口の表記を読めない形のため。無関係の語の展開まで止める側に広がる） |
+| 名前に依らない文字列検査 | 端末を求めない操作（`user agree`・`user reviewed`・`user handoff`・`user mirror` と `--yes` の組、`--choices` と `--digest` の組、`user` を伴わない単独の `--via board` / `--via=board`）と、端末要求を切る形（`CCNAVI_GUARD_TICKET_APPROVAL`、`CCNAVI_` で始まる名前の途中に展開が混じる形（`env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable`）、`--guard-ticket-approval`）。名前を変えたコピー・`python -c`・`awk` の `system()` でも止まる。暫定の止めとして、単独の語の `user` があるコマンド行で、`--` で始まる語に展開（`$`・バッククォート）が混じれば止める（`--y${X}es`・`--y$(echo es)`。入口の表記を読めない形のため。無関係の語の展開まで止める側に広がる） |
 | sh から呼ぶだけの操作 | `SUBS` の `ticket start/finish/…`・`review confirm/…`・`sync tidy`・`worktree retire/branch` を実行ファイルで直に打つ形 |
 
 エージェントが sh で打てるのは `ccnavi-ticket.sh`・`ccnavi-review.sh`・`ccnavi-git.sh`（`AGENT_SCRIPTS`）で、サブエージェントは
@@ -103,8 +104,8 @@ hook は擬似端末を作る実行役（`script`・`tmux`・`screen`・`expect`
 
 #### 端末要求の位置づけ
 
-実行ファイルは、`user agree`・`user reviewed`・`user close-early`・`user prune` と、書くとき（`--yes`）の `user handoff` で、標準入力が端末のときだけ動く。
+実行ファイルは、`user agree`・`user reviewed`・`user close-early`・`user prune` と、書くとき（`--yes`）の `user handoff` と `user mirror` で、標準入力が端末のときだけ動く。
 端末を求めるときに標準エラーへ出すオプション名は `OPS` の `terminal`（`user_only.terminal`）が持つ。
 
-端末を求めない経路（`--yes` の承認、ボードの指摘の対応方針、ボードからの handoff の取り込み）では、hook の文字列検査が唯一の防御で、端末要求は 2 段目ではない。
+端末を求めない経路（`--yes` の承認、ボードの指摘の対応方針、ボードからの handoff の取り込みとミラーの同期）では、hook の文字列検査が唯一の防御で、端末要求は 2 段目ではない。
 擬似端末を使えば端末要求は満たせる。
