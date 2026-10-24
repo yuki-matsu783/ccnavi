@@ -281,6 +281,15 @@ function HandOver({ retry }: { readonly retry?: { readonly parent: string; reado
       <button type="button" className="action" data-action="prompt-open" onClick={() => post({ type: "promptOpen" })}>
         新しいセッションで開く
       </button>
+      <button
+        type="button"
+        className="action"
+        data-action="prompt-run"
+        title="ボードのターミナルで claude -p を実行します（auto モード）。止めるときはターミナルで Ctrl+C"
+        onClick={() => post({ type: "promptRun" })}
+      >
+        ターミナルで実行
+      </button>
       {retry !== undefined ? (
         <button type="button" className="action" data-action="decide-retry" onClick={() => post({ type: "decide", parent: retry.parent, phase: retry.phase })}>
           指摘を読み直して決め直す

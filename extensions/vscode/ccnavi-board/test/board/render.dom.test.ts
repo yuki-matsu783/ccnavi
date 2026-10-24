@@ -256,6 +256,9 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     page.click(page.one('button[data-action="prompt-open"]'));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "promptOpen" });
+    page.click(page.one('button[data-action="prompt-run"]'));
+    await page.settle();
+    assert.deepEqual(page.posted.at(-1), { type: "promptRun" });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     // 承認の push の sh をターミナルに送ったときだけ、そう言う。
     assert.ok(!texts(page, ".approval-note").some((note) => note.includes("ターミナルに送りました")));

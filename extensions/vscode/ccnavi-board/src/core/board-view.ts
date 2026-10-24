@@ -144,6 +144,8 @@ export type BoardMessage =
   | { readonly type: "approveCancel" }
   | { readonly type: "promptCopy" }
   | { readonly type: "promptOpen" }
+  /** 承認のプロンプトを、ボードのターミナルで `claude -p` として実行する。オーバーレイは閉じる */
+  | { readonly type: "promptRun" }
   /** ［レビュー完了］を押した。残った指摘を読む流れに入る（0 件ならレビュー済みにする画面、1 件以上なら対応方針の画面） */
   | { readonly type: "decide"; readonly parent: string; readonly phase: number }
   /** 残った指摘の行き先を決めた（0 件なら「レビュー済みにする」）。鍵は指摘の `key`、値は `keep` / `fix` / `issue` */
