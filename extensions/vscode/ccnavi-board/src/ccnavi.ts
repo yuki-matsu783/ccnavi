@@ -2,7 +2,7 @@
  * 実行ファイルを探して走らせる。Node の子プロセスを使うが VS Code には依存しない。
  * 実行ファイルはネットワークに出ないので、ここで待つのはワークスペースの走査だけ。
  *
- * 走らせるのは 13 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
+ * 走らせるのは 15 個。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
  * `--test-expectations --json`（期待する判定の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
@@ -13,7 +13,10 @@
  * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、`--templates --check-file <パス> --json`（編集中の 1 本を読ませる）、
  * `user handoff [<パス>…] --json`（`wip/handoff/` の下書きの一覧を見る。取り込み待ち画面が読む。`--root` で指したツリー 1 本だけを見る）と
  * `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ。
- * `expect` は取り込むパスを指して見るだけをもう一度呼んだ答えのもの）。
+ * `expect` は取り込むパスを指して見るだけをもう一度呼んだ答えのもの）、
+ * `user mirror [<名前>…] --json`（共通レイヤーのミラーのずれを見る。プロジェクト管理画面が 5 分ごとに読む）と
+ * `user mirror [<名前>…] --yes --expect <値> --via board --json`（ミラーの同期。書くのは実行ファイルで、各プロジェクトの作業ツリーへ。
+ * ユーザが画面で押したときだけ）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
@@ -43,6 +46,8 @@ import {
   decideArgs,
   handoffArgs,
   handoffYesArgs,
+  mirrorArgs,
+  mirrorYesArgs,
   decidePreviewArgs,
   mrStateArgs,
   syncRetiredArgs,
@@ -78,6 +83,7 @@ import { parsePlanOrder, type PlanOrder, type PlanOrderAnswer, type PlanOrderWri
 import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
 import type { HandoffList, HandoffResult } from "./core/handoff-view.js";
 import { parseHandoffList, parseHandoffResult } from "./core/handoffmodel.js";
+import { parseMirrorList, parseMirrorResult, type MirrorList, type MirrorResult } from "./core/mirrormodel.js";
 import type { TemplateCheck, TemplateDetail, TemplatesJson } from "./core/templates-view.js";
 import { parseTemplateCheck, parseTemplates, parseTemplateShow } from "./core/templatesmodel.js";
 import {
@@ -675,6 +681,12 @@ const TEMPLATE_EDIT_FLAGS = ["--templates", "--check-file"] as const;
 const HANDOFF_FEATURES = ["handoff"] as const;
 
 /**
+ * プロジェクト管理画面のミラーの表示と同期が求める機能（`ccnavi user mirror` を実行ファイルが持つ）。持たない古い実行ファイルは
+ * `user mirror` を知らず、argparse の苦情で返すので、調べる前に見て「古い版です」と言い、ボタンを無効にする
+ */
+const MIRROR_FEATURES = ["mirror"] as const;
+
+/**
  * ユーザ専用の入口（`ccnavi user <操作>`）を実行ファイルが持つことを示す機能名。持たない古い実行ファイルは
  * `user` を知らず、argparse の苦情（不明瞭な断り）で返すので、打つ前に見て「古い版です」と言う
  */
@@ -800,6 +812,18 @@ export async function checkHandoff(root: string, setting: string): Promise<strin
     return NOT_FOUND;
   }
   return missingFeatures(probe, HANDOFF_FEATURES, "取り込み待ち画面", hasSource(root));
+}
+
+/**
+ * 実行ファイルが `user mirror` を持つか（`features` に `mirror`）を聞く。持っていれば undefined、持たなければ理由
+ * （プロジェクト管理画面はミラーの欄にこの理由を出し、同期のボタンを無効にする）。ミラーを調べるたびに 1 回聞く。
+ */
+export async function checkMirror(root: string, setting: string): Promise<string | undefined> {
+  const probe = await probeVersion(root, setting);
+  if (probe === undefined) {
+    return NOT_FOUND;
+  }
+  return missingFeatures(probe, MIRROR_FEATURES, "ミラーの同期", hasSource(root));
 }
 
 /** 失敗の答え（`{ok:false,error}`）の error。読めなければ空 */
@@ -965,6 +989,67 @@ export async function runHandoffYes(workspace: string, setting: string, tree: st
   }
   if (ran.code !== 0) {
     return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+  }
+  return { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
+}
+
+/**
+ * 共通レイヤーのミラーのずれを見る（`user mirror [<名前>…] --json`）。何も書かない。
+ * `--root` はワークスペースのルート（ミラーの元の共通レイヤーと、写す先の `projects/` を持つ側）。
+ * 見るだけの答えは、プロジェクトにずれや error があっても終了コード 0 で返る。`ok` が偽の答え（共通レイヤーが読めないなど）も
+ * 読めた答えとして返し、理由は呼び手が出す。古い実行ファイルかは呼び手が先に `checkMirror` で聞く
+ */
+export async function runMirror(root: string, setting: string, names: readonly string[] = []): Promise<RunResult<MirrorList>> {
+  const what = "ccnavi user mirror --json";
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, mirrorArgs(names), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+  }
+  return mirrorListOf(ran, what);
+}
+
+/** 見るだけの答えを読む。標準出力が読めればそれを、読めなければ失敗の理由を返す（`runMirror` の後半。単体で試すために分ける） */
+export function mirrorListOf(ran: { readonly code: number; readonly stdout: string; readonly stderr: string }, what = "ccnavi user mirror --json"): RunResult<MirrorList> {
+  const parsed = parseMirrorList(ran.stdout);
+  if (parsed.ok) {
+    return { ok: true, value: parsed.value };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf({ ...ran, killed: false })}` };
+  }
+  return { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
+}
+
+/**
+ * ミラーの同期（`user mirror [<名前>…] --yes --expect <値> --via board --json`）。書くのは実行ファイルで、各プロジェクトの作業ツリーへ。
+ * コミットはしない。拡張はファイルを書かない。名前を省くと差分のある全プロジェクト。
+ * 失敗は `{ok:false, error}` の結果で返し、投げない。期限切れのときは、同期できたかが分からないことを文に足す。
+ */
+export async function runMirrorYes(root: string, setting: string, names: readonly string[], expect: string): Promise<MirrorResult> {
+  const what = "ccnavi user mirror --yes --json";
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, mirrorYesArgs(names, expect), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}（同期できたかは分かりません。画面を更新して確認してください）` };
+  }
+  return mirrorResultOf(ran, what);
+}
+
+/** 同期の答えを読む（`runMirrorYes` の後半。単体で試すために分ける） */
+export function mirrorResultOf(ran: { readonly code: number; readonly stdout: string; readonly stderr: string }, what = "ccnavi user mirror --yes --json"): MirrorResult {
+  const parsed = parseMirrorResult(ran.stdout);
+  if (parsed.ok) {
+    return parsed.value;
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf({ ...ran, killed: false })}` };
   }
   return { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
 }
