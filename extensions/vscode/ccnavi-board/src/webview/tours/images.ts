@@ -6,14 +6,18 @@ import claudeCodePrompt from "./images/claude-code-prompt.png";
 import gitlabIssuesList from "./images/gitlab-issues-list.png";
 import gitlabIssuesMenu from "./images/gitlab-issues-menu.png";
 import gitlabLineComment from "./images/gitlab-line-comment.png";
+import gitlabMrMerge from "./images/gitlab-mr-merge.png";
 import gitlabNewIssue from "./images/gitlab-new-issue.png";
+import gitlabNewMr from "./images/gitlab-new-mr.png";
 import gitlabStartThread from "./images/gitlab-start-thread.png";
 
 export const TOUR_IMAGES: Readonly<Record<string, string>> = {
   "claude-code-prompt": claudeCodePrompt,
   "gitlab-issues-list": gitlabIssuesList,
   "gitlab-issues-menu": gitlabIssuesMenu,
+  "gitlab-mr-merge": gitlabMrMerge,
   "gitlab-new-issue": gitlabNewIssue,
+  "gitlab-new-mr": gitlabNewMr,
   "gitlab-line-comment": gitlabLineComment,
   "gitlab-start-thread": gitlabStartThread,
 };

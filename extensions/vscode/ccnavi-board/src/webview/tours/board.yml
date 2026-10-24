@@ -306,6 +306,11 @@ courses:
         body: 作った issue の番号か URL を、Claude Code の入力欄で伝えて作業を頼みます。issue をまだ作っていないときは、作業の内容だけを頼めば、エージェントが issue を作ります。調査や小さな修正は、チケットを使わない直接作業で進みます。設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る作業は、エージェントがチケット作業として提案を書き、MR を用意します。
         image: claude-code-prompt
         alt: Claude Code の画面。下部の入力欄に作業を頼むプロンプトを入力して送る
+      - target: ""
+        title: MR を用意する（人が作る場合もある）
+        body: MR は、エージェントが用意します。人が GitLab で作ってもかまいません。その場合は、ソースを親チケットのブランチ、ターゲットを統合先のブランチにして、題と説明を書き、「Submit merge request」を押します。説明に「Fixes #番号」と書くと、issue と結び付きます。
+        image: gitlab-new-mr
+        alt: GitLab の新しい MR の入力欄。ソースとターゲットのブランチ、題、説明を書き、下の「Submit merge request」で作成する
       - target: card-sample-a
         title: 承認待ちの提案が届く
         body: 提案は、「未着手」の列に札「承認待ち」のカードで出ます。目的・範囲・計画が書かれています。カードを押すと提案のファイルを開けます。直したい点は、Claude Code に伝えて書き直してもらいます。
@@ -346,6 +351,11 @@ courses:
       - target: column-done
         title: 親を閉じてマージする
         body: 最後のフェーズのレビューが済むと、エージェントが親を閉じ、MR の Draft を外します。親のカードは「完了」の列に並びます。MR のマージは、ユーザが GitLab の画面で行います。
+      - target: ""
+        title: MR の画面でマージする（GitLab）
+        body: マージは、GitLab の MR の画面で、ユーザが「Merge」ボタンを押して行います。マージの前に、Draft が外れていることと、レビューの指摘が片付いていることを確かめます。
+        image: gitlab-mr-merge
+        alt: GitLab の MR の画面。「Merge」ボタンと「Remove source branch」の欄、下に議論・コミット・変更のタブがある
       - target: merge-check
         title: マージできたか確かめる
         body: マージしたあと、［マージ状況を確認］を押します。マージ待ちの親がマージ済みかを確かめて、結果を上の帯に出します。読むだけで、何も変えません。
