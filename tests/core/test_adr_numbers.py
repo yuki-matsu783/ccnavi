@@ -1,22 +1,22 @@
 """ADR の番号の決まりを、テストで守る（issue #98）。
 
 番号は 1 枚につき 1 つ。同じ番号が 2 枚にあると、本文や実装に書いた
-`ADR-00NN` がどちらの決定を指すか読めない。実際に 3 組（0051・0058・0060）が
-重なっていて、うち 1 枚は題に番号を書いていなかった。
+`ADR-00NN` がどちらの決定を指すか読めない。実際に 3 組（0051・0058・0060）で
+番号が重なっていた。そのうち 1 枚は題に番号を書いていなかった。
 
-番号は人が手で振る形なので、1 枚足したときに番号を取り違えても誰も言わない。
-テストの ID に同じ検査を置いた回（issue #88、`test/shared/test-ids.test.ts`）と
-同じ形で、見るのは 3 つ。
+番号は人が手で振るので、1 枚足すときに番号を取り違えても、誰も指摘しない。
+テストの ID に同じ検査を入れた回（issue #88、`test/shared/test-ids.test.ts`）と
+同じ形で、見るのは次の 3 つ。
 
 1. 番号が重複しない
 2. 題が `# ADR-<番号>:` で始まり、その番号がファイル名と合う
 3. ADR が、`docs/30_adr.md` の「置き場と分け方」の表にあるディレクトリに置かれている
 
-止められるのは合流の後。 ADR を足しただけのコミットではこのテストは回らない
+止められるのは、合流したあとになる。ADR を足しただけのコミットでは、このテストは回らない
 （`.claude/skills/commit/references/test-groups.md` の「`docs/30_adr/` → `core`」で
 回るのは、その表を見てコミットしたときだけ。hook は未登録で、CI も無い）。
-重複はもともと並行して伸びた枝が合流したときに起きるので、気づく場所が
-「合流して誰かが `core` を回したとき」に早まる、という形で役に立つ。
+重複は、並行して伸びた枝が合流したときに起きる。このテストは、合流したあとに誰かが
+`core` を回した時点で重複に気づかせる、という形で役に立つ。
 
 読むのは `docs/30_adr/` のファイルと `docs/30_adr.md` だけで、判定の実行ファイルには触らない。
 """
@@ -104,16 +104,16 @@ class AdrNumbersTest(unittest.TestCase):
         self.assertEqual([], wrong)
 
     def test_every_sheet_sits_in_a_listed_topic(self):
-        """ADR は、入口の表にあるディレクトリのどれかに置かれている。"""
+        """ADR は、入口の表に載っているディレクトリのどれかに置かれている。"""
         with open(ADR_INDEX, encoding="utf-8") as f:
             listed = set(TOPIC_ROW.findall(f.read()))
         self.assertTrue(listed, f"入口の表からディレクトリを読めない（{ADR_INDEX}）")
         unlisted = sorted({n.split("/")[0] for n in self.sheets} - listed)
-        self.assertEqual([], unlisted, "表に無いディレクトリがある。docs/30_adr.md の表に 1 行足す")
+        self.assertEqual([], unlisted, "表に載っていないディレクトリがある。docs/30_adr.md の表に 1 行足す")
         empty = sorted(t for t in listed if not os.path.isdir(os.path.join(ADR_DIR, t)))
-        self.assertEqual([], empty, "表にあって置かれていないディレクトリがある")
+        self.assertEqual([], empty, "表に載っているが、docs/30_adr/ に無いディレクトリがある")
 
     def test_no_sheet_sits_at_the_top(self):
-        """ADR を主題のディレクトリの外（`docs/30_adr/` 直下）に置かない。"""
+        """ADR は主題のディレクトリの中に置き、`docs/30_adr/` 直下には置かない。"""
         top = sorted(f for f in os.listdir(ADR_DIR) if FILE_NAME.match(f))
         self.assertEqual([], top)
