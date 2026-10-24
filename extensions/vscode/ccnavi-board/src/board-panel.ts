@@ -43,7 +43,7 @@ import { isTicketId } from "./core/ticket-id.js";
 import { forgetSaved, onWorkflowTabs, staleSaved, workflowTabs } from "./core/workflow-tabs.js";
 import { childWorktreeFailureText, unsavedText, type ApproveWorktree, type ChildWorktreeFailure } from "./core/approvemodel.js";
 import { runInTerminal, scriptShell } from "./terminal.js";
-import { markTourSeen, tourSeen } from "./tour.js";
+import { markTourSeen, tourDue } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { noteTicketControl, requireTickets } from "./ticket-control.js";
 import * as diaglog from "./log.js";
@@ -133,6 +133,10 @@ export async function openBoard(project?: string): Promise<void> {
     state.panel.reveal(state.panel.viewColumn);
     state.filter = project;
     void update();
+    // 開いたままのタブに案内を頼まれたとき（左パネルの案内から）。組み上がりの `ready` は来ない
+    if (tourDue(SCREEN)) {
+      state.host.post({ type: "tour" } satisfies ToBoard);
+    }
     return;
   }
 
@@ -396,7 +400,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       postAppearance(current.host);
       // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
       // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
-      if (!tourSeen(SCREEN)) {
+      if (tourDue(SCREEN)) {
         current.host.post({ type: "tour" } satisfies ToBoard);
       }
       return;
