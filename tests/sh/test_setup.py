@@ -1738,9 +1738,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.addCleanup(shutil.rmtree, home, ignore_errors=True)
         return home
 
-    def run_user_bin(self, home, *args, answer=None):
+    def run_user_bin(self, home, *args, answer=None, **env_extra):
         """`--bin user` で配る。answer があれば、端末（疑似端末）に答えを打つ。無ければ端末なし。"""
-        env = clean_env(HOME=home)
+        env = clean_env(HOME=home, **env_extra)
         argv = [SHELL, SCRIPT, self.dir, *args]
         if answer is None:
             return subprocess.run(
@@ -1838,6 +1838,100 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         share = os.path.join(home, ".local", "share", "ccnavi", THIS_MACHINE)
         with open(os.path.join(share, "_internal", "base_library.zip"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "新しい同梱物")
+
+    # ---- PATH の案内は、環境に合った足し方を言う
+
+    def path_without(self, *names):
+        """PATH から、~/.local/bin を外した値。"""
+        return os.pathsep.join(
+            p for p in os.environ.get("PATH", "").split(os.pathsep) if ".local/bin" not in p
+        )
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_names_the_rc_file_of_the_shell_in_use(self):
+        src = self.make_source()
+        for shell, rc in (("/bin/bash", "~/.bashrc"), ("/usr/bin/zsh", "~/.zshrc")):
+            with self.subTest(shell=shell):
+                self.dir = tempfile.mkdtemp(prefix="ccnavi-setup-")
+                self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+                self.make_git()
+                home = self.user_home()
+                result = self.run_user_bin(
+                    home,
+                    "--deploy",
+                    src,
+                    "--bin",
+                    "user",
+                    answer="y",
+                    SHELL=shell,
+                    PATH=self.path_without(),
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("PATH に入っていません", result.stdout)
+                self.assertIn(f">> {rc}", result.stdout)
+                self.assertIn("export PATH=", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_names_fish_add_path_for_fish(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        result = self.run_user_bin(
+            home,
+            "--deploy",
+            src,
+            "--bin",
+            "user",
+            answer="y",
+            SHELL="/usr/bin/fish",
+            PATH=self.path_without(),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("fish_add_path", result.stdout)
+        self.assertNotIn(">>", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_says_nothing_about_the_path_when_it_is_already_there(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        on_path = os.pathsep.join([os.path.join(home, ".local", "bin"), self.path_without()])
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", answer="y", PATH=on_path)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("PATH に入っていません", result.stdout)
+
+    def fake_git_bash(self):
+        """uname が Git Bash（MINGW）の値を答える PATH の先頭の置き場。"""
+        shim = tempfile.mkdtemp(prefix="ccnavi-uname-")
+        self.addCleanup(shutil.rmtree, shim, ignore_errors=True)
+        uname = os.path.join(shim, "uname")
+        with open(uname, "w", encoding="utf-8", newline="\n") as f:
+            f.write('#!/bin/sh\ncase "$1" in -m) echo x86_64 ;; *) echo MINGW64_NT-10.0 ;; esac\n')
+        os.chmod(uname, 0o755)
+        return shim
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_on_git_bash_puts_the_folder_on_the_path_and_makes_no_link(self):
+        """Git Bash はリンクを当てにしない。ccnavi.exe と _internal/ が並ぶフォルダを PATH に通す。"""
+        src = self.make_source(target="windows-x86_64")
+        with open(os.path.join(src, "dist", "ccnavi", "ccnavi.exe"), "w", encoding="utf-8") as f:
+            f.write("exe")
+        self.make_git()
+        home = self.user_home()
+        path = os.pathsep.join([self.fake_git_bash(), self.path_without()])
+        result = self.run_user_bin(
+            home, "--deploy", src, "--bin", "user", answer="y", PATH=path, SHELL="/usr/bin/bash"
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        share = os.path.join(home, ".local", "share", "ccnavi", "windows-x86_64")
+        self.assertTrue(os.path.isfile(os.path.join(share, "ccnavi.exe")))
+        self.assertTrue(os.path.isfile(os.path.join(share, "_internal", "base_library.zip")))
+        self.assertFalse(os.path.exists(os.path.join(home, ".local", "bin")))
+        # Windows の環境変数 Path に、実体のフォルダを足す手順を言う。rc には触れない。
+        self.assertIn("SetEnvironmentVariable", result.stdout)
+        self.assertIn(share, result.stdout)
+        self.assertNotIn(">> ~/.bashrc", result.stdout)
+        self.assertNotIn("まだ無いもの", result.stdout)
 
     def test_check_with_bin_user_writes_nothing_and_does_not_ask(self):
         src = self.make_source()
