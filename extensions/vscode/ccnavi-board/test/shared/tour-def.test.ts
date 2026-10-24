@@ -73,7 +73,7 @@ test("CB-T403 案内の YAML は、ファイル名の画面を指し、どれも
   }
 });
 
-test("CB-T1170 案内の手順が引く画像は、images/ に PNG があり、images.ts の表にある。表と置き場に使われない画像が残らない", () => {
+test("CB-T1177 案内の手順が引く画像は、images/ に PNG があり、images.ts の表にある。表と置き場に使われない画像が残らない", () => {
   const dir = path.join(TOURS_DIR, "images");
   const registry = fs.readFileSync(path.join(TOURS_DIR, "images.ts"), "utf8");
   const used = new Set<string>();
@@ -103,5 +103,42 @@ test("CB-T1173 画像を使う案内はボード画面だけ（画像の表を�
     for (const course of loadTour(screen).courses) {
       assert.ok(course.steps.every((step) => step.image === ""), `${screen}/${course.id}: 画像のある手順は、その画面が画像の表と CSP を持ってから足す`);
     }
+  }
+});
+
+const ACTORS = ["ユーザ", "画面"];
+const DIAGRAM = { actors: ACTORS, steps: [{ id: "a", from: "ユーザ", to: "画面", text: "押す", value: "x" }, { id: "b", from: "画面", text: "覚え書き" }] };
+
+test("CB-T1175 時系列の図（diagrams）は、登場者と矢印を持ち、手順が diagram と focus で指す。to を書かない矢印は同じ登場者の中の動き", () => {
+  const ok = parseTour({ screen: "x", diagrams: { flow: DIAGRAM }, courses: [course(INTRO_ID, { steps: [{ ...STEP, diagram: "flow", focus: "a, b" }, STEP] })] });
+  assert.ok(ok.ok);
+  assert.deepEqual(ok.ok && ok.value.diagrams.flow.steps.map((step) => [step.id, step.from, step.to, step.value]), [["a", "ユーザ", "画面", "x"], ["b", "画面", "画面", ""]]);
+  assert.deepEqual(ok.ok && ok.value.courses[0].steps.map((step) => [step.diagram, step.focus]), [["flow", ["a", "b"]], ["", []]]);
+
+  const bad: Array<[string, Record<string, unknown>, Record<string, unknown> | undefined]> = [
+    ["登場者が 1 人", { flow: { ...DIAGRAM, actors: ["ユーザ"] } }, undefined],
+    ["登場者が重なる", { flow: { ...DIAGRAM, actors: ["ユーザ", "ユーザ"] } }, undefined],
+    ["登場者が 7 人", { flow: { ...DIAGRAM, actors: ["a", "b", "c", "d", "e", "f", "g"] } }, undefined],
+    ["矢印の id が重なる", { flow: { ...DIAGRAM, steps: [DIAGRAM.steps[0], { ...DIAGRAM.steps[0] }] } }, undefined],
+    ["from が登場者にない", { flow: { ...DIAGRAM, steps: [{ ...DIAGRAM.steps[0], from: "だれか" }] } }, undefined],
+    ["矢印の鍵の綴り違い", { flow: { ...DIAGRAM, steps: [{ ...DIAGRAM.steps[0], txt: "a" }] } }, undefined],
+    ["矢印が無い", { flow: { ...DIAGRAM, steps: [] } }, undefined],
+    ["図の名前の形", { Flow: DIAGRAM }, undefined],
+    ["引く図がない", { flow: DIAGRAM }, { diagram: "other" }],
+    ["focus が図にない矢印", { flow: DIAGRAM }, { diagram: "flow", focus: "zzz" }],
+    ["focus だけ", { flow: DIAGRAM }, { focus: "a" }],
+    ["image と diagram を同時に", { flow: DIAGRAM }, { diagram: "flow", target: "", image: "shot", alt: "a" }],
+  ];
+  for (const [name, diagrams, step] of bad) {
+    const parsed = parseTour({ screen: "x", diagrams, courses: [course(INTRO_ID, { steps: [{ ...STEP, ...(step ?? {}) }] })] });
+    assert.ok(!parsed.ok, `${name}: 読めてしまった`);
+  }
+});
+
+test("CB-T1176 案内の YAML の図は、どれかの手順が引く（使われない図を残さない）", () => {
+  for (const screen of tourScreens()) {
+    const def = loadTour(screen);
+    const used = new Set(def.courses.flatMap((course) => course.steps.map((step) => step.diagram)).filter((name) => name !== ""));
+    assert.deepEqual(Object.keys(def.diagrams).sort(), [...used].sort(), `${screen}: 引かれない図、または無い図`);
   }
 });
