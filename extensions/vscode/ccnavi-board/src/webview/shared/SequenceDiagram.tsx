@@ -13,15 +13,17 @@ import type { DiagramDef } from "../../core/tour-def.js";
 export function SequenceDiagram({ name, diagram, focus }: { readonly name: string; readonly diagram: DiagramDef; readonly focus: readonly string[] }): JSX.Element {
   const count = diagram.actors.length;
   const column = (actor: string): number => diagram.actors.indexOf(actor);
-  // 縦の線（登場者の時間軸）は、列の中央に背景として引く。行ごとに分かれて途切れないよう、箱全体に引く
-  const lines = diagram.actors.map((_, index) => `linear-gradient(var(--tour-diagram-line), var(--tour-diagram-line)) calc(${index} * 100% / ${count} + 50% / ${count}) 0 / 1px 100% no-repeat`).join(", ");
-  const style = { gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`, backgroundImage: lines } as CSSProperties;
+  const style = { gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` } as CSSProperties;
   return (
     <div className="tour-diagram" data-diagram={name} style={style} role="group" aria-label="時系列の図">
       {diagram.actors.map((actor, index) => (
         <div key={actor} className="tour-diagram-actor" style={{ gridColumn: index + 1, gridRow: 1 }}>
           {actor}
         </div>
+      ))}
+      {/* 縦の線（登場者の時間軸）。列ごとに、矢印の行すべてにまたがる要素で引く（列の隙間や余白に左右されず、箱の中央に出る） */}
+      {diagram.actors.map((actor, index) => (
+        <div key={`life-${actor}`} className="tour-diagram-life" aria-hidden="true" style={{ gridColumn: index + 1, gridRow: `2 / span ${diagram.steps.length}` }} />
       ))}
       {diagram.steps.map((step, index) => {
         const from = column(step.from);

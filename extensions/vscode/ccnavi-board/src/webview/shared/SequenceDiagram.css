@@ -26,6 +26,12 @@
   overflow-wrap: anywhere;
 }
 
+.tour-diagram-life {
+  justify-self: center;
+  width: 1px;
+  background: var(--tour-diagram-line);
+}
+
 .tour-diagram-step { position: relative; min-width: 0; }
 .tour-diagram-step.dim { opacity: .38; }
 

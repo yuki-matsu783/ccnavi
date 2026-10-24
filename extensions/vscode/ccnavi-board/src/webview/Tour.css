@@ -67,7 +67,16 @@
 
 .tour-close:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
 
-.tour-buttons { display: flex; gap: var(--gap-3); justify-content: flex-end; }
+.tour-buttons {
+  display: flex;
+  gap: var(--gap-3);
+  justify-content: flex-end;
+  /* 吹き出しの中でスクロールするとき（低い画面）も、「次へ」を下端に残す */
+  position: sticky;
+  bottom: 0;
+  padding-top: var(--gap-3);
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+}
 
 .tour-buttons button.action.small { margin-left: 0; }
 

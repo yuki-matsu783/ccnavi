@@ -377,7 +377,7 @@ courses:
         scene: { parent: sample-c }
       - target: ""
         title: レビューを送る（GitLab）
-        body: 「Submit review」を押すと、「Submit your review」の画面が開きます。「Comment」は、承認を伴わない感想です。「Request changes」は、直してからマージしてほしいときに選びます。変更の依頼が出ている間は、ccnaviでもレビュー済みにできません。解除は、レビュアーの「Approve」で行います。画像のように「Approve」が選べない（灰色になる）ときは、自分のMRを承認できない設定などの場合です。
+        body: 「Submit review」を押すと、「Submit your review」の画面が開きます。「Comment」は、承認を伴わない感想です。「Request changes」は、直してからマージしてほしいときに選びます。変更の依頼が出ている間は、ccnaviでもレビュー済みにできません。解除は、レビュアーの「Approve」で行います。画像のように「Approve」が選べない（灰色になる）ときは、GitLabの設定によります。
         image: gitlab-submit-review
         alt: GitLabの「Submit your review」の画面。「Comment」「Approve」「Request changes」の選択肢と、「Submit review」ボタン、ためた指摘の一覧がある
         scene: { parent: sample-c }
