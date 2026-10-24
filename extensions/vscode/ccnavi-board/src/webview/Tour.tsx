@@ -480,6 +480,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
           </p>
           <h3 id="tour-title">{step.title}</h3>
         </div>
+        <div className="tour-scroll">
         <p className="tour-body" id="tour-body">
           {sentenceLines(step.body).map((line, at) => (
             <span key={at} className="tour-line">
@@ -489,6 +490,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         </p>
         {step.image !== undefined && <img className="tour-image" src={step.image.src} alt={step.image.alt} />}
         {step.diagram !== undefined && <SequenceDiagram name={step.diagram.name} diagram={step.diagram.def} focus={step.diagram.focus} />}
+        </div>
         <div className="tour-buttons">
           {index > 0 && (
             <button type="button" className="action small" data-action="tour-back" onClick={() => setIndex(index - 1)}>

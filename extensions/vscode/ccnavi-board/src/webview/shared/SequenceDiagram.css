@@ -42,7 +42,7 @@
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
 }
 
-.tour-diagram-step.dim { opacity: .55; }
+.tour-diagram-step.dim > * { opacity: .55; }
 .tour-diagram-step.focus { background: color-mix(in srgb, var(--vscode-focusBorder) 14%, var(--vscode-editorWidget-background, var(--vscode-editor-background))); }
 
 /* 順番を表す丸数字（字そのものが丸い）。吹き出しの手順の番号と見分けがつく */

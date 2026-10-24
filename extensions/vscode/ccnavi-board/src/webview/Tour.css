@@ -27,10 +27,14 @@
   border: 1px solid var(--vscode-focusBorder);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popup);
-  /* 低い画面でも「次へ」と「×」を押せるよう、はみ出したら吹き出しの中でスクロールする */
+  /* 低い画面でも「次へ」と「×」を押せるよう、ヘッダとボタンは固定し、本文と図の部分（.tour-scroll）だけを中でスクロールする */
+  display: flex;
+  flex-direction: column;
   max-height: calc(100vh - 16px);
-  overflow-y: auto;
+  overflow: hidden;
 }
+
+.tour-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
 .tour-bubble:focus { outline: none; }
 
@@ -81,11 +85,8 @@
   display: flex;
   gap: var(--gap-3);
   justify-content: flex-end;
-  /* 吹き出しの中でスクロールするとき（低い画面）も、「次へ」を下端に残す */
-  position: sticky;
-  bottom: 0;
+  flex: none;
   padding-top: var(--gap-3);
-  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
 }
 
 .tour-buttons button.action.small { margin-left: 0; }
