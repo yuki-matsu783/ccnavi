@@ -107,6 +107,15 @@ def gather(
     フェーズ定義は承認の対象全体で 1 つに決まらない。使う定義は親の写し（`phases:`）で、写しを
     確かめる `phases.yml` は各チケットの `project:` が決めるので、候補を組むところで
     1 件ずつ引き、引いたものを `Candidate` に持たせる。画面は候補が持つ定義を使う。
+
+    処理フロー:
+    1. 提案と承認済み・閉じた・レビュー中のチケットを読む（`approval.read_raw` など）。
+       読めなかったものは標準エラーに出す
+    2. 正とするツリーの外に書かれた改版を別に集める（`approval.revision_elsewhere_text`）
+    3. 承認待ちと親の改版を決める（`waiting`）
+    4. `only` が在れば、その識別子だけに絞る。承認待ちに無い識別子、親の改版を外した子が
+       在れば、何も承認せずに止める
+    5. 候補を組み、通らなかったものは理由を標準エラーに出す（`agree_candidates.candidates`）
     """
     raw = approval.read_raw(conf, root)
     proposals, problems, stale = approval.read_proposals(conf, root, raw.everything)
@@ -346,7 +355,8 @@ class Applied:
     """承認済みチケットを置いた結果。途中で止まったときに、どこまで置いたかを呼び手へ返す。
 
     置いたものは戻さない（戻す途中でまた失敗する）。代わりに、どこで止まって何が置かれたかを
-    そのまま返し、拡張がユーザに伝える（docs/requirements/json-shapes.md「承認の JSON」の `partial`）。
+    そのまま返し、拡張がユーザに伝える
+    （docs/requirements/json-shapes.md「承認の JSON」の `partial`）。
     """
 
     code: int
@@ -406,6 +416,17 @@ def _apply_steps(
 
     照合のあとで提案ファイルが差し替えられていたら、1 件も並べずに止める（照合したバイト列と
     今のファイルが違う。`approval_ops.changed_since_read`）。一部だけ承認しないため。
+
+    返り値は、止めたときは `(識別子, 理由)`、書けたときは `None`。
+
+    処理フロー:
+    1. 照合したあとに提案ファイルが変わっていれば、1 件も並べずに止める（`changed_since_read`）
+    2. 改版の候補は、親の写しを直し（`agree_digest.revise_copy`）、todo/ の提案を消す。
+       変わった定義・計画・範囲を行に出す
+    3. 新規の候補は、置き場を決めて書く（`approval_ops.admit`）
+    4. 終わったフェーズに子を足したら、そのフェーズの完了マーカーを消す
+       （`approval_marks.clear_marks`）。reviewed を消せなければ止める（ほかは警告して続ける）
+    5. 最後に、承認して動かしたことを行に積む
     """
     for cand in batch:
         failed = approval_ops.changed_since_read(cand.ticket)

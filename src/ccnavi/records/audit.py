@@ -185,6 +185,20 @@ class Log:
             os.close(fd)
 
     def _as_dict(self, record: Record) -> dict:
+        """Record を、1 行の JSON にする dict にする。
+
+        処理フロー:
+        1. subject と unwrapped を、伏せる前に REDACT_LIMIT で切り、
+           伏せてから上限で切る（_redacted・_limited）。
+           detail は ccnavi が組む文なので、切らずに伏せるだけにする。
+        2. ts（時刻）と mode を入れる。
+        3. 空でない欄だけを、permission_mode・event・tool・subject の順に入れる。
+        4. decision と enforced は、空でも入れる。
+        5. 空でない欄を入れる（code・reason・degraded・unwrapped・fallback・detail・
+           tree・project・source）。
+        6. 真のときだけ、hinted・rules・quoted・paths・guarded・session を入れる。
+        7. 経過ミリ秒（ms）を入れて返す。
+        """
         # コマンドの全文が入る欄は、秘密の形を伏せてから書く（redact）。伏せるのは記録だけで、
         # record そのものは書き換えない。判定は伏せる前の文字列で済んでいる。切る前に伏せるのは、
         # 上限で値の途中が切れると、形が崩れて伏せられなくなるため。ただし伏せる前にも

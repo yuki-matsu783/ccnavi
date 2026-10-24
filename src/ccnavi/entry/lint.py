@@ -172,8 +172,8 @@ def report(
 ) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
 
-    as_json なら docs/requirements/json-shapes.md「lint の JSON」の形で 1 つの JSON を書く。VS Code 拡張が
-    プロジェクトごとの warn を拾うための形で、ユーザ向けの文面は書き換えてよいが、
+    as_json なら docs/requirements/json-shapes.md「lint の JSON」の形で 1 つの JSON を書く。
+    VS Code 拡張が プロジェクトごとの warn を拾うための形で、ユーザ向けの文面は書き換えてよいが、
     この JSON の形は拡張との契約になる。
 
     書き先は標準出力にしてある。この経路は hook の payload を読まないので、
@@ -317,8 +317,9 @@ def report(
         }
         if flow_path:
             # 実行ファイルが読んだ中身。拡張のフロー編集画面は自分の読みとこれを見比べる
-            # （docs/requirements/json-shapes.md「lint の JSON」）。`rendered` は SubagentStart で渡る手順の行（読めなければ
-            # null）、`candidates` はフローで選べるサブエージェントとスキルの名前
+            # （docs/requirements/json-shapes.md「lint の JSON」）。`rendered` は SubagentStart で
+            # 渡る手順の行（読めなければ null）、
+            # `candidates` はフローで選べるサブエージェントとスキルの名前
             payload["flow"] = {
                 "path": flow_path,
                 "data": flow_data,
@@ -421,6 +422,16 @@ def check(
 
     notes は設定の解決が出した苦情、complaints はモードの解決が出した苦情。
     どちらも深刻度を持たない文字列で届くので、ここで付ける。
+
+    処理フロー:
+    1. 設定の苦情（`notes`）と、モードの苦情（`complaints`）を warn にする。
+    2. モードが disable なら何も判定しないと、dry-run なら報告だけになると warn にする。
+    3. プロジェクトの設定・sh の互換・ccnavi.md・後の処理を見る
+       （`lint_project`・`_sh_compat`・`_ccnavi_md`）。
+    4. 共通レイヤーの 3 本（`config_check`）、チケット・プロジェクトの場所・レイヤー・テンプレート、
+       ワークツリー・直接作業・wiki・ローカルの設定・同期を、順に見て問題を足す。
+
+    戻り値は見つけた問題の一覧（深刻度つき）。
     """
     problems: list[Problem] = []
 

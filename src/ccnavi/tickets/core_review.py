@@ -64,6 +64,16 @@ def confirm(
     手元は git の差分、Chrome は compare API から作る。
     `moved` は動いた理由の種類と（手元だけ）コミットの一覧。止めたあとの説明にだけ使い、判定は
     `changed_since_request` で決まる。
+
+    処理フロー:
+    1. 親の承認済みチケットと、フェーズの子を引く（`_open_parent`・`review._phase`）。無ければ止める
+    2. レビュー済みでないこと、依頼の記録が在ること、依頼のあとに見たものが動いていないことを見る
+       （`approval_marks.MARK_REVIEWED`・`MARK_REQUESTED`・`changed_since_request`）
+    3. 結果が依頼の記録と合うかを見る（`review.matching_problems`）
+    4. 手で動かした子なら `_manual_refusal` を通し、未解決の指摘は版つきで受け入れ台帳に足す
+       （`review.unresolved_for`）。そうでなければ指摘の有無を見る（`review.review_problems`）
+    5. 通ったら、レビュー済みのマーカーと子の移動をステージに積む（`review.settle_and_mark`）。
+       書き込みはここでは行わず、呼び手が `core_base.Changes` を使って書く
     """
     conf, root = snapshot.conf, snapshot.root
     parent = _open_parent(root, conf, parent_id)

@@ -63,10 +63,21 @@ def ready(
     マージすると、既定のブランチにチケットは残らない。
     退避した後に打ち直したとき（親が退避にだけある）は、条件の確かめのうちワークツリーの側
     （未コミット・push 済み）だけを見て、下書きを書き直し、前の回が途中で止まった残りを移す。
+
+    処理フロー:
+    1. 親が退避済みなら、`_ready_again` で下書きを書き直して終わる
+    2. 親を閉じられるかを `ops_close.close_problems` と `review._merge_problems` で確かめる。
+       親が `done/` に無ければ、それも苦情にする。苦情が在れば、何も置かずに止める
+    3. MR の結果（`_result_with_mr`）と、state の置き場を得る
+    4. 退避の置き場が正しいか（`_archive_place_problem`）を確かめ、閉じたときのマーカーがあれば読む
+    5. コメントの下書きを `_ready_note` で書き、`PARENT_MARK_READY` のマーカーを置く
+    6. 閉じた親子のチケットを、手元の退避へ移す（`_archive_closed`）
     """
+    # 親が退避済みなら、下書きを書き直して終わる。
     archived = _archived_parent(root, conf, cwd, result_path)
     if archived is not None:
         return _ready_again(stdout, stderr, root, conf, archived, result_path)
+    # 親を閉じられるかを確かめる。苦情が在れば、何も置かずに止める。
     parent = review._parent_any(stderr, root, conf, cwd)
     if parent is None:
         return 1
@@ -83,6 +94,7 @@ def ready(
             "親を閉じ、コミットして push してから再実行してください"
         )
     problems += review._merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
+    # 苦情が在れば、残りを言って止まる。
     if problems:
         stderr.write("ccnavi: まだ Draft を解除できません:\n")
         for p in problems:
@@ -94,12 +106,14 @@ def ready(
             "を実行します。\n"
         )
         return 1
+    # MR の結果と、state の置き場を得る。
     result = review._result_with_mr(stderr, result_path)
     if result is None:
         return 1
     if not conf.state:
         stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所がありません。\n")
         return 1
+    # 退避の置き場を確かめ、閉じたときのマーカーがあれば読んでから、下書きとマーカーを置く。
     where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     # 退避は親のワークツリーの置き場からだけ行う（ワークスペースルートの done/ には
     # 他の親子のチケットも在り、まとめて消すことになる）。
@@ -115,6 +129,7 @@ def ready(
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
+    # Draft を外す印（ready）を親に置く。
     if not review._parent_mark(
         stderr,
         where,
@@ -344,6 +359,7 @@ def close_early(
 
     作業中の子がいる間は打てない。早めに閉じるのは、手が止まっているときだけ。
     """
+    # 入力と前提を確かめる（理由、親、state の置き場、MR の結果、変更要求、作業中の子）。
     if not reason.strip():
         stderr.write("ccnavi: user close-early には --reason <理由> が必要です。\n")
         return 1
@@ -380,7 +396,9 @@ def close_early(
             "子を閉じるか取り消してから、親を早めに閉じてください\n"
         )
         return 1
+    # 残っているものを集める。
     left = _leftovers(parent, phases, result, review.ledger_of(root, conf, parent))
+    # 計画の段（plan_done・plan_check）。聞き直さず、計画とホストの状態が合うかだけを確かめる。
     if plan_done or plan_check:
         planned = review_host.read_accept_plan(plan_done or plan_check)
         if planned is None:
@@ -398,7 +416,7 @@ def close_early(
                 return 1
             return 0
         # 返信と解決のあとの結果。ホストの実状態で、計画のスレッドが全部解決済みで、
-        # ほかに未解決が増えていないことを確かめる
+        # ほかに未解決が残っていないことを確かめる
         problem = _done_problem(left, result, planned)
         if problem:
             stderr.write(f"ccnavi: 受け入れが済んでいない: {problem}。何も置いていない\n")
@@ -406,6 +424,7 @@ def close_early(
         by_id = {t.id: t for t in result.threads if t.id}
         left.unresolved = [by_id[i] for i in planned.ids]
     else:
+        # 端末で残りを見せて y/N を聞く（plan_out の段もここを通る）。
         _show_leftovers(stdout, parent, left)
         if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
             stderr.write("ccnavi: 早めに閉じなかった\n")
@@ -413,6 +432,7 @@ def close_early(
         if plan_out:
             # 返信と解決は sh がする。済んでから、`plan_done` 付きで打ち直す
             return _write_close_plan(stderr, left, plan_out, issue=not no_issue)
+    # 置く。未着手の子を取り消し、レビューを済ませ、未解決を受け入れる。
     stamp = approval_marks.now()
     settled = _settle(
         stdout, stderr, root, conf, parent, phases, left, result.mr.number, stamp, reason
@@ -420,6 +440,7 @@ def close_early(
     if settled is None:
         return 1
     cancelled, skipped, reviewed_now = settled
+    # 親のマーカーを置き、残りを issue に書き出す下書きを書く。
     accepted = [review.thread_key(t) for t in left.unresolved]
     if not review._parent_mark(
         stderr,
@@ -443,6 +464,7 @@ def close_early(
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
+    # 次に打つ手順を端末に案内する。
     # 下書きのパスは標準出力に出さない。ここはユーザの端末に向いていて、sh は
     # state の置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(

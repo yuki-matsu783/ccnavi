@@ -126,6 +126,17 @@ def _check_command(
     words: list[str],
     here: str | None,
 ) -> tuple[str, str, str]:
+    """1 つのコマンドの語から、親のワークツリーへの書き込みを探す。見つからなければ空の 3 つ組。
+
+    処理フロー:
+    1. 先頭の飾り語を外し（`wrapguard._strip_heads`）、リダイレクトの行き先を先に拾う。
+    2. 実行役（`env`・`sudo` など）を、深さの上限まで 1 枚ずつ外す
+       （`shellread_words._runner_command`）。
+    3. 実行役を外したコマンドの名前で、書き込みの形を振り分ける。インタプリタのコードは
+       `_check_code` で読み、`perl -i`・`sed -i`・コピー・`dd of=` は行き先を足す。
+    4. 集めた行き先を、1 つずつ `_check_target` で親のワークツリーに当てる。
+    """
+    # 先頭の飾り語を外してから読む。
     words = wrapguard._strip_heads(words)
     chdirs: list[str] = []
     targets: list[str] = []

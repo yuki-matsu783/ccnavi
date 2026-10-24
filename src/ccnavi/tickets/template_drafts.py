@@ -409,7 +409,21 @@ def make(
     to: str = TO_PROJECT,
     layer: str = "",
 ) -> Made:
-    """完了した親から下書きを作って、親のツリーの `wip/handoff/` に書く。上書きはしない。"""
+    """完了した親から下書きを作って、親のツリーの `wip/handoff/` に書く。上書きはしない。
+
+    処理フロー:
+    1. `_find_parent` で、完了した親と子の一覧を引く。
+    2. 下書きの名前（既定は親の識別子）を `plan_templates.NAME_RE` と `NAME_LIMIT` で検査する。
+    3. `_target_of` で取り込み先（テンプレートの置き場と、そのレイヤー）を決める。
+    4. `handoff.spelled` で親のツリーからの綴りを求め、
+       取り込み先に同名のテンプレートが在れば止める。
+    5. `handoff.draft_rel` で下書きの置き場を求める。途中にリンクがあれば止める。
+       同名の下書きが在れば止める。
+    6. `_build` でテンプレートを組み、`fsio.write_new_durable` で新規に書く。
+    7. 書いたものを `plan_templates.read_entry` で読み直す。テンプレートがあれば
+       `plan_templates.check` で型と流れを見る。
+    8. 結果を `Made` にして返す。どこかで止まったときは `error` に理由を入れて返す。
+    """
     found, children, why = _find_parent(conf, root, parent)
     if found is None:
         return Made(False, error=why)

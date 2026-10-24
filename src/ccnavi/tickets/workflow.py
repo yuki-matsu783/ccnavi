@@ -133,6 +133,7 @@ def problems(
     def error(text: str) -> None:
         found.append(rules.Problem(rules.SEVERITY_ERROR, parent.ticket, text))
 
+    # 計画の形（after の形と繰り返し）。
     parts = [p for p in _parts(parent) if not part or p[0] == part]
     found.extend(after_problems(parent, part))
     for key, _first, items in parts:
@@ -146,8 +147,10 @@ def problems(
                         f"（{', '.join(map(str, item.after_repeated))}）。1 つにまとめて読む",
                     )
                 )
+    # 待ちの計算。
     wf = compute(parent)
     gaps = loose(parent, wf)
+    # 終端: 最後の項が全部を待つか、最後の項が延期していないか。
     for key, first, items in parts:
         last = first + len(items) - 1
         cut = [m for m in gaps if first <= m < last]
@@ -160,6 +163,7 @@ def problems(
             )
         if items and items[-1].deferred:
             error(f"`{key}` の最後の項は延期できない。誰も見ないまま終わる")
+    # 延期: 延期を引き受ける項が在るか、その項にレビューが在るか。
     numbered = dict(parent.numbered())
     for key, first, items in parts:
         for i, item in enumerate(items):

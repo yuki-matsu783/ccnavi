@@ -151,6 +151,7 @@ def deliver(
     told_once = False
     counted: dict[str, int] | None = None
     consulted = False
+    # ルールごとに、渡す回かどうかを決めてから案内を組む。
     for rule in group:
         has_once = bool(rule.additional_context_once or rule.additional_context_once_file)
         # 数えを記録に残すのは、刻みを持つルールと once を持つルールだけ。ほかは
@@ -178,6 +179,7 @@ def deliver(
                 delivering, first = hits % rule.every == 0, hits == rule.every
         else:
             delivering, first = True, True
+        # 渡す回の案内（`additionalContext` とそのファイル）を組む。
         if delivering:
             # 文の `{root}` は、止めたときの文面と同じくワークスペースルートの実パスにする。
             text = _with_file(
@@ -188,6 +190,8 @@ def deliver(
             )
             if text:
                 parts.append(text)
+        # 記録があるとき、最初の渡す回だけ once の案内（`additionalContextOnce` とそのファイル）を
+        # 続けて並べる。記録が無い・読めないときは毎回渡す。
         if has_once and first:
             once = _with_file(
                 stderr,
@@ -198,6 +202,7 @@ def deliver(
             if once:
                 parts.append(once)
                 told_once = True
+    # 数えを書き戻す。書けず、かつ unsure_speaks=False なら、案内を渡さずに返す。
     if counted is not None:
         saved = _save_once(stderr, counts_path or _path_of(state_dir, payload), counted)
         if not saved and not unsure_speaks:

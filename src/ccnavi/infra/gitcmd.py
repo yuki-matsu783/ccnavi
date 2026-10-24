@@ -76,6 +76,14 @@ def run(
     input は標準入力に渡す文字列（`check-ignore --stdin` など）。無ければ何も渡さない。
     plain_pathspecs はユーザの環境の pathspec の読み方（`GIT_LITERAL_PATHSPECS` など）を外し、
     git の既定の読み方に戻す。`check-ignore` はそれらの magic を受けず 128 で止まる。
+
+    処理フロー:
+    1. _env で環境変数を作る。plain_pathspecs なら PATHSPEC_ENV を外す。
+    2. コマンドを組む。raw_paths なら `-c core.quotePath=false` を前に置く。
+    3. subprocess.run で git を起こし、input を標準入力に、timeout を期限にする。
+    4. 起動できない（missing）、期限を過ぎた（timed_out）、OS の失敗は、
+       Done の failure に入れて返す。ふつうに終わったときは、終了コード・標準出力・
+       標準エラーを返す。
     """
     env = _env()
     if plain_pathspecs:

@@ -265,6 +265,13 @@ def _followup_ticket(
     """続きの子のチケットを組む（書かない）。返すのは識別子・チケット・組めなかった理由。
 
     `op_id` があれば、子の frontmatter に `ccnavi_op` として書く。
+
+    処理フロー:
+    1. 次の子の識別子を決める（`next_child_id`）。決まらなければ止める
+    2. 同じ識別子のファイルが在れば止める（`existing_ticket_file`）。上書きしない
+    3. 前付けを組む。先行は見た子のうち取り消しでないものだけ
+    4. 見た子の欄（`rules.SECTIONS`）を、同じ内容を外して集める
+    5. 続きの子の目印（`approval.FOLLOWUP_KEY`）と本文（指摘の転記）を足す
     """
     try:
         ident = next_child_id(conf, root, parent.ticket, phase_no)

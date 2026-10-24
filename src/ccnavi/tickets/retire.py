@@ -689,9 +689,24 @@ def run_merged(
     順は、ブランチの確認、ワークツリーの削除、ブランチの削除。同じ名前のブランチを作り直して
     使っている親のワークツリー（MR の先頭に含まれない先頭を持つ）を、先に消さないため。
     ブランチが確認を通らなければ、ワークツリーも消さない。
+
+    処理フロー:
+    1. ブランチの先頭（`_tip`）と、親のワークツリーの有無を得る
+    2. 親のワークツリーが在れば、その HEAD が記録のブランチか確かめる（`_parent_head_blocker`）。
+       そのあと、ブランチが MR の先頭に含まれるかを見る（`_merged_blocker`）
+    3. 止める理由が在れば、親のワークツリーもブランチも消さず、理由を言う（`_keep`）
+    4. 止める理由が無ければ、親のワークツリーを消し（`_drop_worktree`）、
+       ブランチを消す（`_drop_branch`）
+    5. 片付けの記録（`record_path`）を読む。読めなければ、子は片付けず、記録も消さない
+    6. 子ごとに、ワークツリーを消して、ブランチを `judge_child` で確かめ、よければ消す。
+       確認が要るもの（ASK）は後でまとめて言う
+    7. 確認が要るものは、ユーザが自分で消すための一覧を言う
+    8. すべて片付き、確認も要らなければ、記録を消す
+    9. 最後に `record yes|no` を言う
     """
     repo = repo_dir(root, conf, project)
     clean = True
+    # 親のブランチと、親のワークツリーの有無を得る。
     tip = _tip(repo, branch)
     parent_path = tree.worktree_path(root, family)
     on_disk = os.path.lexists(parent_path)
@@ -700,6 +715,7 @@ def run_merged(
     blocker = _parent_head_blocker(parent_path, branch, bool(tip)) if on_disk else ""
     if not blocker and tip:
         blocker = _merged_blocker(repo, branch, tip, head_sha)
+    # 止める理由が在れば、親のワークツリーもブランチも消さない。
     if blocker:
         stdout.write(
             f"親 {family} のワークツリーは、ブランチが片付けの条件を満たさないので消しません\n"
@@ -710,6 +726,7 @@ def run_merged(
             stdout.write(f"親のワークツリーは消しませんでした: {blocker}\n")
         clean = False
     else:
+        # 親のワークツリーを先に消し、そのあとブランチを消す（順は docstring の決まり）。
         if not _drop_worktree(
             stdout, root, family, cwd, "。ブランチは MR の先頭に含まれるか確かめて片付ける"
         ):
@@ -719,12 +736,14 @@ def run_merged(
             _say(stdout, outcome)
             if outcome.status != DELETED:
                 clean = False
+    # 子の片付け。記録が読めなければ、子には触らず、記録も消さない。
     path = record_path(conf, family)
     held, broken = _held_record(path) if path else ({}, "")
     if broken:
         # 子の一覧を読めないので、子の片付けは進められず、記録も消さない。
         stdout.write(f"親 {family} の片付けの記録を読めないので、子は片付けません: {broken}\n")
         clean = False
+    # 子ごとに、ワークツリーとブランチを片付ける。確認が要るものは、あとで一覧にする。
     asking: list[Outcome] = []
     for child in _children_from(held):
         if not _drop_worktree(stdout, root, child.ticket, cwd, "。ブランチは別に片付ける"):
@@ -747,6 +766,7 @@ def run_merged(
         )
         for outcome in asking:
             stdout.write(outcome.text + "\n")
+    # 全部片付き、確認も要らなければ、記録を消す。最後に結果を record の行で言う。
     if clean and not asking and path and os.path.lexists(path):
         fsio.unlink(path)
     stdout.write(f"record {'yes' if clean else 'no'}\n")

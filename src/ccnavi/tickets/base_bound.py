@@ -55,7 +55,16 @@ def _front_of(path: str) -> dict | None:
 
 
 def base_bound(root: str, conf: settings.Settings, main_root: str, branch: str) -> tuple[str, str]:
-    """`(yes|no|unknown, 理由)`。理由は yes のときだけ。"""
+    """`(yes|no|unknown, 理由)`。理由は yes のときだけ。
+
+    処理フロー:
+    1. 取り込み先のリポジトリを決める（`_owner`）。決まらなければ unknown
+    2. 各ツリーの承認済みと提案のどこかに、識別子と同じ名前のファイルが在れば yes（`_named_file`）
+    3. 取り込み先の退避（`archive.archived_fields`）に同じ名前の親が在れば yes
+    4. 取り込み先の承認済み（doing・done）で、ブランチか識別子に結び付くものが在れば yes。
+       読めないファイルが在れば unsure を立てる（`_front_of`）
+    5. 見つからず unsure も無ければ no、unsure があれば unknown
+    """
     ident = ticket_ids.branch_to_id(branch)
     owner = _owner(root, conf, main_root)
     if owner is None:

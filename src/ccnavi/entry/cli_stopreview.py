@@ -50,6 +50,19 @@ def run(
     words: list[str],
     root: str = "",
 ):
+    """`stop-review` の入口。`report`・`material`・`record` のどれかに振り分ける。
+
+    処理フロー:
+    1. `report` なら、評価の集計を `_report` で出して終える（例外は 1 で終える）。
+    2. `record` の引数が JSON の 1 語で渡されたら、それを `inline` に取り、語を 4 つに揃える。
+    3. 語の形が合わなければ、使い方を標準エラーに書く。`record` は `_ok` の出力で、
+       それ以外は 0 で終える。
+    4. 状態の置き場が無いときは、`material` なら候補なし（`_not_candidate`）、`record` は
+       `_ok` で終える。
+    5. 共有の鍵（`stopreview.shared_key`）を作り、作れなければ記録して、同じように終える。
+    6. 期限切れを片付け（`stopreview.expire_overdue`）、`material` は `_material`、`record` は
+       `_record` へ渡す。例外は、判定役が作業を止めないように決まった形で終える。
+    """
     if words[1:2] == ["report"] and len(words) == 2:
         try:
             return _report(stdout, conf)

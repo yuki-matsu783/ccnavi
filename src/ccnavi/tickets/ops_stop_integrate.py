@@ -226,7 +226,21 @@ def _already(conf: settings.Settings, session: str, found: Direct) -> bool:
 def probe(
     root: str, conf: settings.Settings, here: tree.Tree, deadline: float | None = None
 ) -> Probe:
-    """1 本のワークツリーを 3 つの結果のどれかで調べる（モジュールの説明の「促す条件」）。"""
+    """1 本のワークツリーを 3 つの結果のどれかで調べる（モジュールの説明の「促す条件」）。
+
+    処理フロー:
+    1. ブランチが読めなければ不明（UNKNOWN）。ブランチがツリーの名前と違う、
+       名前が統合できる形でない、またはチケットに結び付いているなら、
+       対象外として手放す（CLEAR・drop）。
+    2. HEAD と未コミットの変更（`_dirty`）を求める。取れなければ不明にする。
+    3. 直接作業の記録（`direct_record`）があれば `_probe_recorded` で判定する。
+    4. 統合先（`_integration`）と、統合先に入っていない分（`_ahead` か `_unique`）を求める。
+    5. 統合先が決まらない・取り込み先のツリーが無いときは、未取り込みの変更があるときだけ、
+       ユーザに確かめる理由（`blocked`）を付けて HIT にする。統合先の ref が無いときは、
+       未コミットの変更があるときだけ同じく HIT にする。統合先が読めなければ UNKNOWN。
+    6. 取り込みのマーカー（`marker_kind`）があれば HIT。統合先に同じ HEAD の記録（`_recorded`）が
+       あれば CLEAR。無ければ、統合先の作業の空き（`_integration_busy`）を理由に HIT にする。
+    """
     branch = tree.branch_of(here.root)
     if branch is None:
         return Probe(UNKNOWN)
@@ -772,6 +786,7 @@ def integrate_nudge(root: str, found: Direct) -> str:
     work = settings.shell_path(found.worktree)
     integ = settings.shell_path(found.integ_tree)
     lines = [f"[ccnavi] {CODE_INTEGRATE_NUDGE} (worktree: {n})"]
+    # 版を知らない記録は、操作させず、ユーザに片付けを頼んで終える
     if found.marker == "unknown":
         return "\n".join(
             [
@@ -783,6 +798,7 @@ def integrate_nudge(root: str, found: Direct) -> str:
                 "手で消します。",
             ]
         )
+    # 取り込みが確定を待っている
     if found.marker:
         lines += [
             f"ワークツリー .claude/worktrees/{n} の取り込み（integrate {n}）が、"
@@ -797,6 +813,7 @@ def integrate_nudge(root: str, found: Direct) -> str:
         if warn:
             lines.append(warn)
         return "\n".join(lines)
+    # 直接作業（チケットに結び付かない）。記録の有無で案内を分ける
     lines.append(
         f"ワークツリー .claude/worktrees/{n} はチケットに結び付かない直接作業で、"
         f"{_left(found)}があり、"

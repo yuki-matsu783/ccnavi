@@ -139,6 +139,16 @@ class Families:
         return None
 
     def _standing(self, family_id: str, project: str) -> Standing:
+        """家族の親のワークツリーの状態を読む。止まるときは `stop` に理由を入れる。
+
+        処理フロー:
+        1. `home_tree` で親のワークツリーが在れば、それを正として返す。
+        2. 無ければ、同名のフォルダ（`_named_tree`）を探す。在って途中の操作（`tree.busy_of`）
+        があれば STOP_BUSY。
+        3. 同名のフォルダが在って途中の操作が無ければ、HEAD
+        のブランチを変換した識別子が違うので STOP_MISMATCH。
+        4. フォルダが無ければ STOP_ABSENT。ほかのツリーのコピーでは代用しない。
+        """
         repo = tree.repo_key(project)
         branch = self.branch(family_id, project)
         home = self.home_tree(family_id, project)

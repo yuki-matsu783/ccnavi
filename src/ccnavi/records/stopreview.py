@@ -576,11 +576,23 @@ def accept(
     再判定の試行は差し戻さず、元の試行に解消か未解消を残す。
     `still_unapproved(target) -> bool` は、承認状態の再確認（承認済みになっていたら材料が変わった
     として拒否する）。
+
+    処理フロー:
+    1. read_plan と read_attempt で計画と試行を読む。
+       計画か試行が無い、または試行が実行中でなければ、何もせず `{"ok": true}` を返す。
+    2. 材料の版の一致と、結果の形（validate）を検査する。承認状態は still_unapproved で再確認する。
+       どの例外（Rejected と判定役の誤出力を含む）でも試行を未検査で閉じ（_move・log_event）、
+       再判定なら元の試行も未検査として残す。
+    3. classify で最終分類を決め、試行に記録して _move で閉じる。
+    4. 不備検出で、有効モードかつ再判定でないときだけ差し戻す（sent_at を付け、_mark_sent_back）。
+       差し戻したときは rebuke の文面を `{"ok": false}` の reason に入れて返す。
+    5. 再判定の試行なら、元の試行の結果を _resolve_original で残す。
     """
     plan = read_plan(state, key)
     attempt = read_attempt(state, plan["attempt_id"]) if plan else None
     if not plan or not attempt or attempt.get("state") != RUNNING:
         return dict(OK_RETURN)
+    # 材料の版・結果の形・承認状態を検査する。どれかに当たれば拒否する。
     try:
         if plan.get("material_version") != material_version:
             raise Rejected("材料の版が変わった")
@@ -756,9 +768,21 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
     今回のターン: 通知でない最後のユーザの発言から末尾までの、ユーザとアシスタントの発言。
     背景通知・ツールの出力・サブエージェントの報告は指示として扱わない（ターンの境界にもしない）。
     読めない・切れたときは `insufficient` を真にする。
+
+    処理フロー:
+    1. transcript を 1 行ずつ JSON として読み、サイドチェーン・メタの行を除く。
+       compact の境界より前は捨て、compact の要約の行も除く。壊れた行は飛ばす。
+       ファイルを開けなければ unreadable で返す。
+    2. ユーザとアシスタントの発言だけを取り、本文の空と通知を除く（_text_of・_is_notification）。
+    3. 最後のユーザの発言を今回のターンの始まりとする。
+       それより前のユーザの発言を過去の発言とし、PAST_PROMPTS 件まで取る。
+    4. 本文を MATERIAL_LIMIT で切る。切ったときは insufficient にする。
+    5. 過去の発言から指示の候補を拾う（extract_instructions）。
+       compact で過去の発言が範囲に満たないときも insufficient にする。
     """
     rows: list[dict[str, Any]] = []
     compacted = False
+    # transcript を読んで、判定に使う行だけを残す。
     try:
         with open(transcript_path, encoding="utf-8") as handle:
             for line in handle:
@@ -904,7 +928,16 @@ def render_material(
     criteria: str,
     bodies: dict[str, str] | None = None,
 ) -> str:
-    """agent hook に渡す文字列。本文と会話は区切ったデータとして渡し、指示として読ませない。"""
+    """agent hook に渡す文字列。本文と会話は区切ったデータとして渡し、指示として読ませない。
+
+    処理フロー:
+    1. 計画の値（試行の番号・対象・材料の版）と、材料の不足の有無を見出しの行に書く。
+    2. 判定の基準（criteria）を、`<criteria>` の囲みで渡す。
+    3. 過去の発言・指示の候補・今回のターン・参照・提案の一覧を、
+       それぞれ `<data kind=…>` の囲みに入れる。囲みの中の文字は defang で無効にする。
+    4. 提案ごとに本文を `<data kind=proposal>` の囲みに入れる。本文が取れなければ、その旨を書く。
+    """
+    # 見出しと、判定の基準。囲みの中は判定の対象で、指示ではないと明記する。
     out = [
         "STOP_REVIEW_MATERIAL",
         f"attempt_id: {plan['attempt_id']}",

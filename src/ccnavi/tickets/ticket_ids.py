@@ -412,6 +412,7 @@ def _form_problems(
     - 長さが勧める上限（`SUGGESTED_ID_LENGTH`）を超えるか
     """
     name = t.ticket
+    # 形（先頭の語・番号・slug）を見る。
     matched = form_of(name, prefixes)
     own_issue = t.issue is not None and not t.issue_repo
     if matched is None:
@@ -424,6 +425,7 @@ def _form_problems(
             f"親の識別子は {shape} にする。番号は issue の番号"
             "（`ccnavi-start.sh --issue <番号>` が決める名前にする）"
         ]
+    # issue と番号・slug が合うかを見る。
     found: list[str] = []
     number = int(matched.group("num"))
     prefix = matched.group("prefix")
@@ -443,6 +445,7 @@ def _form_problems(
             f"`{prefix}-{t.issue}-{t.project}-<slug>` にする。issue の番号はリポジトリごとなので、"
             "ワークスペースや別のプロジェクトの同じ番号の issue と名前を分ける"
         )
+    # 長さを見る。
     if len(name) > SUGGESTED_ID_LENGTH:
         found.append(
             f"識別子が {SUGGESTED_ID_LENGTH} 文字を超える（{len(name)} 文字）。"

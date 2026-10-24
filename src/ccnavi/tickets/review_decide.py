@@ -435,7 +435,7 @@ def decide_yes(
     受け入れる指摘（対応しない・issue に回す）には、置く前に sh が返信を残して解決する。
     実行ファイルはネットワークに出ないので、3 回に分けて呼ばれる。
 
-    1. `plan_out`（`--accept-plan <ファイル>`）あり: 何も置かずに受け入れの計画だけを書く。
+    1. `plan_out`（`--accept-plan <ファイル>`）あり: ホストにも票にも置かず、判断と計画を書く。
        検査は置くときと同じ（ダイジェスト、選択、置く側の事前検査）。失敗なら計画を書かない
     2. sh が計画のスレッドに返信を残して解決し、結果を取り直す
     3. `plan_done`（`--accept-done <ファイル>`）あり: 取り直した結果を読み、受け入れたスレッドが
@@ -445,8 +445,9 @@ def decide_yes(
     ユーザが端末で打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが一致することを
     求める。エージェントがこれをシェルで打つ形は、組み込みの deny
     （`phase_forms.ticket_approval_rule`）が止める。
-    結果は JSON で返す。違えば何も置かず `mismatch` を返す。
+    結果は JSON で返す。違えば置かずに `mismatch` を返す（返信・解決を済ませた分は操作記録に残す）。
     """
+    # 入力の形を検める。ここで断るときは、まだ何も置いていない。
     if not digest.strip():
         stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が必要です。\n")
         return 1
@@ -467,6 +468,7 @@ def decide_yes(
     ):
         stderr.write(f"ccnavi: --yes の選択は {{鍵: {' / '.join(CHOICES)}}} の形で渡す\n")
         return 1
+    # 計画の段（--accept-done）なら、sh が取り直した結果と計画を読む。
     planned = None
     if plan_done:
         planned = review_host.read_accept_plan(plan_done)
@@ -484,6 +486,7 @@ def decide_yes(
     )
     if d is None:
         return 1
+    # 今の指摘と、見せた指摘のダイジェストを照合する。違えば置かない（返信・解決の分は記録に残す）。
     current = decision_digest(d)
     changed = changed_since_shown(d, *want)
     if changed:
@@ -515,6 +518,7 @@ def decide_yes(
         stderr.write("ccnavi: 選択が見せた指摘と揃っていない（足りないか、余分がある）\n")
         return 1
     picked = {c: [t for t in d.unresolved if raw.get(review.thread_key(t)) == c] for c in CHOICES}
+    # 置く前の検査。計画の段（--accept-plan）は、判断を保存して計画を書き、ここで終わる。
     if not _precheck(stderr, root, conf, d, picked):
         return 1
     if plan_out:
@@ -523,6 +527,7 @@ def decide_yes(
         if op_id is None:
             return 1
         return _write_plan(stderr, d, raw, plan_out, current, op_id)
+    # 計画の段の後半。操作記録と計画が合うことを確かめてから置く。
     op_id = planned.op if planned is not None else ""
     if op_id and not _known_op(stderr, conf, op_id):
         return 1
@@ -531,10 +536,12 @@ def decide_yes(
         if problem:
             stderr.write(f"ccnavi: 受け入れが済んでいない: {problem}。何も置いていない\n")
             return 1
+    # 置く。端末とオーバーレイが同じ apply_decision を通る。
     notes = io.StringIO()
     summary = apply_decision(notes, stderr, root, conf, d, raw, op_id)
     if summary is None:
         return 1
+    # 適用した印を操作記録に残す。書けなくても、投稿の段階は続けられる。
     if op_id:
         try:
             oplog.applied_set(conf.state, op_id, "local", True)
@@ -791,6 +798,7 @@ def apply_decision(
         stdout, stderr, root, conf, parent, ph, "decide"
     ):
         return None
+    # 直す指摘があれば続きの子を起こす。無ければ、追加分が無いときだけレビュー済みの印を置く。
     followup = ""
     if fix:
         items = transcribe(d, fix, op_id)
@@ -807,6 +815,7 @@ def apply_decision(
         review.reviewed_mark(d.result.mr.number, accepted, *_decide_actor()),
     ):
         return None
+    # 回す指摘の issue の下書きと、決めた内容のコメントを state に書く（投稿は sh）。
     issue_draft = ""
     if picked[CHOICE_ISSUE]:
         issue_draft = _write_decide_issue(stderr, conf, d, picked[CHOICE_ISSUE], op_id)
@@ -815,6 +824,7 @@ def apply_decision(
             oplog.applied_set(conf.state, op_id, "followup", followup)
     if conf.state:
         _write_decide_comment(stderr, conf, d, picked, followup)
+    # 端末向けの結果を1行で出す。
     if followup:
         stdout.write(f"OK: フェーズ {ph.number} は続きの子 {followup} で応える\n")
     elif d.extra:
@@ -828,6 +838,7 @@ def apply_decision(
             if accepted
             else f"OK: フェーズ {ph.number} はレビュー済み（未解決（Unresolved）の指摘なし）\n"
         )
+    # オーバーレイ（JSON）に返す結果。
     return {
         "parent": parent.ticket,
         "phase": ph.number,

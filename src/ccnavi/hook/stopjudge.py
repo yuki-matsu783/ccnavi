@@ -253,7 +253,18 @@ def before(
     payload: hookio.Input,
     record: audit.Record,
 ) -> bool:
-    """PreToolUse の入口。通常の判定へ回さないなら真を返す（応答はすでに書き終えている）。"""
+    """PreToolUse の入口。通常の判定へ回さないなら真を返す（応答はすでに書き終えている）。
+
+    処理フロー:
+    1. 判定役を使わない設定なら偽を返す。
+    2. Bash で `stop-review` を呼ぶ形なら `asks` を立てる（`stop_review_call`）。
+    3. 判定役の呼び出し（`is_judge`）は、許す形（`judge_command_ok`）か返り値の道具だけを
+       ALLOW で通す。それ以外は DENY にして、真を返す。
+    4. 判定役でなく `asks` も立たなければ偽を返す。
+    5. `asks` が立ったら、呼び出しを印に残す（`mark_taint`）。
+       dry-run か、設定が ENABLE でなければ偽を返す。
+    6. ENABLE なら、作業からの `stop-review` の呼び出しを DENY にして真を返す。
+    """
     if not conf.stop_review_agent:
         return False
     command = payload.tool_input.get("command")

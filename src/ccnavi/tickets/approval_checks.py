@@ -462,6 +462,13 @@ def predecessor_problems(
     先行が閉じれば同じ提案が通るもの（承認待ち・作業中・レビュー待ち）は `rules.KIND_NOT_YET`。
     書いた側に直すものは無く、`--lint` は warn で言う（フェーズの順序と同じ扱い）。取り消し・
     どこにも無い・複数の場所は、待っても満たさないので、ふつうの error にする。
+
+    処理フロー:
+    1. 満たしていない先行を `unmet_predecessors` で得る（先行の今の状態を `pool` から引く）
+    2. 先行の状態ごとに、苦情の種類と文面を決める。
+       待てば満たす（承認待ち・作業中・レビュー待ち）は `rules.KIND_NOT_YET` にする
+    3. 取り消し・自分自身・親・循環は、待っても満たさないので error にする
+    4. どこにも無い、どれが正か決まらない、の場合は、直し方を文面に書く
     """
     problems: list[rules.Problem] = []
     for p in unmet_predecessors(t, pool):

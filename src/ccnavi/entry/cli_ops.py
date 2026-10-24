@@ -304,6 +304,16 @@ def _worktree(
 
     sh が状態を書く操作の後に呼ぶ。名前は識別子の形だけを受ける（パスを渡して任意の場所を
     消させない）。
+
+    処理フロー:
+    1. `--abandon` があれば、`retire.run_abandon` で放棄した親の片付けの記録を消す。
+    2. `name`・`id`・`issue-id` は、ワークツリーに触らずに名前と識別子の答えを出す。
+       `branch` は `retire.run_branch` で、記録したブランチを条件を確かめ直して消す。
+    3. `drop`・`tidy`・`remaining`・`retire` は、語の数と識別子の形を見る。`drop` 以外は、
+       チケット制御が有効なときだけ、それぞれの関数（`worktrees`・`retire`）へ渡す。
+    4. 語の形が合わなければ、使い方を標準エラーに書いて終える。
+
+    終了コードは、成功で `EXIT_OK`、失敗で `EXIT_ERROR`。
     """
     verb = words[1] if len(words) > 1 else ""
     if args.abandon is not None:

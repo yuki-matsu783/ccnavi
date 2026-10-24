@@ -82,7 +82,17 @@ def _git_out(top: str, args: list[str], deadline: float) -> str | None:
 
 
 def _v4_line(root: str, top: str, name: str, fields: dict[str, str], deadline: float) -> str:
-    """版 4 のmarker 1 件の知らせ。例外は出さない。"""
+    """版 4 の marker 1 件の知らせ。例外は出さない。
+
+    処理フロー:
+    1. 記録に要る欄（`_V4_NEED`）が揃っていなければ、壊れた扱いの文を返す。
+    2. `HEAD` を読む。読めなければ壊れた扱い。
+    3. K（作った取り込みの先頭）があれば、その親と木が記録と同じかを見る。違えば採用しない。
+       K が取り込み先に載っていれば片付けの途中、HEAD が記録と同じなら了承待ち、
+       違えば取り込み先が動いた旨を返す。
+    4. K が無ければ、HEAD が記録と同じなら一時ワークツリーで確認を待つ文、違えば動いた旨を返す。
+    5. 途中で例外が出たら、壊れた扱いの文を返す。
+    """
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     t = settings.shell_path(top)
     head = f"{name}（取り込み先のツリー {t}）: "
@@ -158,6 +168,7 @@ def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list
     common = directrec.common_dir(top)
     if common is None:
         return []
+    # 名前ごとに、残っている跡を集める（一時ワークツリー・専用の ref・書きかけの候補）
     names: dict[str, list[str]] = {}
     tmp_base = os.path.join(root, "logs", "direct-tmp", repo_key(root, top))
     try:
@@ -177,6 +188,7 @@ def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list
             direct = os.path.join(common, directrec.DIRECT_DIR, parts[3])
             if not os.path.isfile(direct):
                 names.setdefault(parts[3], []).append(f"使われなかった書きかけの候補（{ref}）")
+    # done の記録の残り（作業ワークツリー・ブランチ・直接作業の記録）
     done_dir = os.path.join(common, osi._DONE_DIR)
     try:
         for entry in sorted(os.listdir(done_dir)):
@@ -199,6 +211,7 @@ def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list
                 )
     except OSError:
         pass
+    # 報告していない名前だけを、名前の順に 1 行ずつ言う
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     t = settings.shell_path(top)
     lines = []
@@ -224,6 +237,14 @@ def pending_notice(root: str, conf: settings.Settings, deadline: float) -> str:
 
 
 def _notice(root: str, conf: settings.Settings, deadline: float) -> str:
+    """取り込みの途中の跡を、見出しの後ろに 1 件 1 行で並べる。無ければ空。例外は呼び元が受ける。
+
+    処理フロー:
+    1. 本体と各プロジェクトのツリーを順に見る。期限が過ぎたら打ち切り、`CUT_LINE` を足す。
+    2. 記録の置き場の名前ごとに、版 4 の記録なら `_v4_line`、それ以外は `_unknown_line` で言う。
+    3. 記録の無い跡は `_leftovers` で言う。
+    4. 行が無ければ空を返し、あれば `HEAD_LINE` を前に付けて返す。
+    """
     tops = [root] + [t.root for t in tree.projects(conf.projects)]
     lines: list[str] = []
     cut = False

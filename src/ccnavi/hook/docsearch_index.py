@@ -514,7 +514,7 @@ def build(
     行を組むが書かない。refresh が偽なら mtime を見ずに既存の行をそのまま使い、何も書かない
     （行の無い md は parse が真なら読む）。
 
-    順は 3 段。まず全部のディレクトリで既存の行を使い回せるかを見（lstat だけ）、次に
+    順は 3 段。まず全部のディレクトリで既存の索引を読み、md の lstat で行を使い回せるかを見、次に
     読み直しの要る md を、待つ数の少ないディレクトリから読み、最後にディレクトリごとに書く。
     deadline（`time.monotonic` の値）を過ぎたら読むのをやめて `timed_out` にするが、そこまでに
     読めた分は書く。読めなかった md は既存の行があればそれを残す（次の回に mtime の違いで読み
@@ -522,6 +522,7 @@ def build(
     `.git` が無ければ `NotARepository`、git に聞けなければ `GitFailed`。
     """
     result = Built()
+    # md を集め、索引を置くディレクトリごとに分ける。
     listed = [
         p for p in _listed(base, _left(deadline)) if not _excluded(p, excluded_dirs, kept_dirs)
     ]
@@ -530,6 +531,8 @@ def build(
         by_dir.setdefault(rel.rpartition("/")[0], []).append(rel)
     if not by_dir:
         return result
+    # 索引が無視されているかを確かめる。足りなければ、refresh のときに限り
+    # .gitignore に 1 行足して確かめ直す。
     index_rel = {d: (f"{d}/{INDEX_NAME}" if d else INDEX_NAME) for d in by_dir}
     writable = _ignored(base, sorted(index_rel.values()), _left(deadline))
     if not writable and refresh and _add_ignore(base) == ADDED:
@@ -547,6 +550,7 @@ def build(
     writer = _Writer(base, tmp_dir, deadline) if tmp_dir else None
     base_real = pathcase.fold(os.path.realpath(base))
 
+    # 段 1: ディレクトリごとに既存の索引を読み、md の lstat で使い回せる行を分ける。
     dirs: list[_Dir] = []
     for directory in sorted(by_dir):
         if _past(deadline):
@@ -569,8 +573,10 @@ def build(
             continue
         if scanned is not None:
             dirs.append(scanned)
+    # 段 2: 読み直しの要る md を読む。期限を過ぎたら読むのをやめる。
     if parse and not result.timed_out:
         _parse_pending(base, dirs, deadline, result)
+    # 段 3: ディレクトリごとに索引を書く。
     for one in dirs:
         try:
             _settle(one, refresh, writer, result)
@@ -604,6 +610,7 @@ def _scan(
         writable = False
     one = _Dir(directory, index_rel, index_path, writable, owner, old_rows, old_text)
     shown_dir = directory or ROOT_DIRECTORY
+    # md ごとに、既存の行を使い回すか、読み直しの要る md として分ける。
     for rel in sorted(names):
         concept_id = rel[: -len(".md")]
         one.order.append(concept_id)

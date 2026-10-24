@@ -172,7 +172,19 @@ def decide(
     payload,
     raw: approval.Raw | None = None,
 ) -> Result:
-    """起動ツールの呼び出しについて、止める理由か更新の計画を返す。無ければ空の Result。"""
+    """起動ツールの呼び出しについて、止める理由か更新の計画を返す。無ければ空の Result。
+
+    処理フロー:
+    1. 起動ツールでなければ空を返す。`isolation` の指定は値によらず止める（`_isolation`）。
+    2. プロンプトの言及を拾う（`mentions`）。cwd の所属ツリーを `tree.tree_of` で求める。
+    3. 無効なパスが 1 つでもあれば止める（`_target_invalid`）。
+    4. 言及を担当にまとめ（`_targets`）、入れ子なら呼び手の子（`_caller_child`）を足す。
+    5. 担当先が 2 つ以上なら止める（`_multi_target`）。
+    6. 担当先が 1 つなら、親（`_parent_tree`）・子で担当にできない（`unavailable`、
+       `_child_unavailable`）・既存の cwd との食い違い（`_cwd_conflict`）の順に止める。
+       どれにも当たらなければ更新の計画を返す（`_plan`）。
+    7. 言及が 0 件で、親のワークツリーから編集する起動なら、子の指定を求めて止める（`_no_child`）。
+    """
     if payload.tool_name not in modes.AGENT_TOOLS:
         return Result()
     tool_input = payload.tool_input
@@ -584,6 +596,14 @@ def guidance(conf: settings.Settings, root: str, target: Target, book: Book) -> 
 
     必須の行（担当・ワークツリーの絶対パス・3 行・閉じの行・フローのファイルのパス）の予算を先に
     取り、残りに範囲・フローの手順・局面を並べる。収まらない分は省き、末尾を切り捨てない。
+
+    処理フロー:
+    1. 直接作業のワークツリーなら、担当の行と範囲の行だけの案内を返す。
+    2. 子なら、フローのファイルの場所を `flow.resolve` で求め、必須の行の予算を取る。
+    3. 子の案内の本体を `childnote.child_block`、先行する子を `childnote.predecessors` で組む。
+    4. 本体の行・手順の行（`block.brief`）・局面の行（`childnote.stage_lines`）の順に、予算に
+       収まる分だけ足す。収まらなければ省き、その旨を記録する。
+    5. 省いた分があるか、手順を並べなかったときは、フローのファイルの行を残す。
     """
     worktree = target.worktree
     assert worktree is not None

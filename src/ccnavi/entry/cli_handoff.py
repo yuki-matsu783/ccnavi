@@ -81,7 +81,19 @@ def run(
     root: str,
     args: argparse.Namespace,
 ) -> int:
-    """見るだけか、`--yes` で取り込む。"""
+    """保護対象の下書きを、見るだけか、`--yes` で取り込むかを決めて実行する。
+
+    処理フロー:
+    1. `usage_problem` で組み合わせを検査する。
+    2. `--yes` のときは、経路を決めてから取り込む。ボードの経路（`--via board`）は端末を求めず、
+       端末の経路は `cli_args._from_terminal` で、端末の前のユーザであることを確かめる。
+       `handoff.prepare` で計画を作り、`handoff.apply` で `--expect` の一致を見ながら書く。
+    3. `--yes` がないときは、`handoff.prepare` で計画を作って表示する（書かない）。
+    4. `--json` のときは、取り込みか計画を JSON で出す。そうでなければ `_applied_text` か
+       `_plan_text` で出す。
+
+    終了コードは、取り込めたか（または計画を出せたか）で `EXIT_OK`、失敗で `EXIT_ERROR`。
+    """
     refused = usage_problem(parser, args)
     if refused:
         return _fail(stdout, stderr, args.json, refused)
@@ -117,6 +129,13 @@ def run(
 
 
 def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> None:
+    """取り込みの計画を人が読む形で書く。何も反映せず、次に打つコマンドを添える。
+
+    下書きの 1 件ごとに、選ばれたか・状態・error と warn・端末のみの理由・conflict を出す。
+    選ばれた下書きが無いか、error か conflict があれば、取り込めない理由を言って終える。
+    取り込めるときだけ、`--expect` の値を含む `ccnavi user handoff` の行を出す。
+    ボードからは取り込めない種類を含むときは、端末で実行するよう添える。
+    """
     stdout.write(f"ccnavi: 保護対象の下書き（{plan.tree} の {handoff.HANDOFF_REL}/）\n")
     if not plan.entries:
         stdout.write("  取り込める下書きはありません。\n")

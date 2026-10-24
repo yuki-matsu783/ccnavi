@@ -155,11 +155,27 @@ def parse_order(text: str, parent: ticket_model.Ticket) -> tuple[Order | None, s
 
 
 def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) -> Renumbered:
-    """番号を振り直す（モジュールの説明の決まり）。断ったときは提案のまま返す。"""
+    """線（`order`）から番号を振り直す。断る線が 1 つでもあれば、提案のまま返す。
+
+    `order` が None なら、線は無いものとして扱う（線を渡さない部は提案のまま）。振り直しの決まりは
+    モジュールの説明にある。
+
+    処理フロー:
+    1. 計画の部（全体計画・フィードバック計画）ごとに、項の番号の範囲を `_parts` で得る
+    2. 線を渡さない部は、番号も項も提案のまま写す
+    3. 固定した番号に入る線が変わっていれば断る（`REFUSED_LOCKED`）。`_cycle` で循環を
+       見つけたら断る（`REFUSED_CYCLE`）
+    4. 断らない部は、先行が全部前に並んだ項を元の番号の小さい順に空いた番号へ置く。
+       固定した番号は動かさず、詰められなければ断る（`REFUSED_UNPACKABLE`）
+    5. 置けた部は、`after` を新しい番号に付け替えて `built` に入れる
+    6. 断りが 1 件でもあれば、親の計画を写した `Renumbered`（番号は恒等）を返す。無ければ
+       振り直した計画を返す
+    """
     order = order or {}
     refused: list[Refusal] = []
     moved: dict[int, int] = {}
     built: dict[str, list[ticket_model.PlanItem]] = {}
+    # 部ごとに振り直す。断る線が見つかった部は組まずに次の部へ進む。
     for key, first, items in _parts(parent):
         numbers = list(range(first, first + len(items)))
         given = order.get(key)
@@ -168,6 +184,7 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
             moved.update({n: n for n in numbers})
             built[key] = [dataclasses.replace(i) for i in items]
             continue
+        # 線を検める。固定した番号に入る線の変更と、循環を断る。
         preds = {n: given.get(n, []) for n in numbers}
         held = [n for n in numbers if n in fixed]
         locked = [n for n in held if set(preds[n]) != set(items[n - first].after)]
@@ -186,6 +203,7 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
             refused.append(Refusal(REFUSED_CYCLE, cycle[0], f"循環になる線（{path}）"))
         if locked or cycle:
             continue
+        # 番号を振る。固定した番号は動かさず、ほかの項を元の番号の小さい順に空いた番号へ詰める。
         placed: dict[int, int] = {}
         stuck = 0
         for pos in numbers:

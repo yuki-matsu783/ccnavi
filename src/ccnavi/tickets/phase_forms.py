@@ -546,6 +546,17 @@ def _hidden_args(kind: str, args: list[str]) -> str:
     """入口の引数のうち、止める理由になる語。無ければ空。
 
     文字として並んだ `--choices` と `--digest` の組み合わせは human_path_form が先に止める。
+
+    処理フロー:
+    1. リダイレクトを外す。
+    2. `review`（ボードの入口）は、`decide` の語があれば、`--preview` か展開のない形を通し、
+       それ以外は選択肢の旗になりうる語を返す。
+    3. 展開を含む語が無ければ空を返す。
+    4. ラッパーの後ろの最初の語が `user` になりうるなら、それを返す。
+    5. 展開の前の文字どおりの旗を見る。`EXE_OPTIONS` に無い旗か診断の旗があれば、入口は動かないので
+       空を返す。全部 `EXE_OPTIONS` なら 6・7 へ。`--agree` と `--preview` が両方あれば空を返す。
+    6. 承認を隠す旗（`_GUARD_FLAGS`）、worktree の放棄（`_abandon_word`）の順に見て返す。
+    7. 承認・取り込みの旗と `--yes` が揃っていれば、その旗を返す。
     """
     args = _drop_redirects(args)
     if kind == _ENTRY_REVIEW:
@@ -663,6 +674,17 @@ def hidden_user_entry(
 
 
 def _hidden_entry(subject: str, inner: list[tuple[str, str]], bin_path: str) -> tuple[str, str]:
+    """`hidden_user_entry` の本体。見つけた（入口, 隠れた語）、無ければ空の組。
+
+    処理フロー:
+    1. `_entry_commands` で、実行されるコマンドの並びと、位置を見るかを得る。
+    2. 語ごとに `_entry_kind` で入口かを見る。実行か並べて数える入口の名前は `named` に覚える。
+    3. 入口のファイルを `<` で読ませているなら、その形を返す。
+    4. コマンドの位置に無い入口は飛ばす（位置を見るとき）。
+    5. 入口を外から流し込む実行役（`_FEEDERS`、`xargs` など）がいれば、その名で返す。
+    6. `_hidden_args` で入口の後ろの語を見て、隠れた語があれば返す。
+    7. 標準入力から読むシェルと入口の名前が両方揃えば、`STDIN_SHELL` を返す。
+    """
     bin_base = _base_name(bin_path) if bin_path else ""
     commands_, positional = _entry_commands(subject, inner)
     stdin_shell = False
@@ -674,7 +696,7 @@ def _hidden_entry(subject: str, inner: list[tuple[str, str]], bin_path: str) -> 
             if not kind:
                 continue
             # 標準入力から読むシェルと並べて数える名前。sh の入口はファイルとして渡すだけで中身が
-            # 流れ込む（`cat …ccnavi-sync.sh | sh -s`）。実行ファイルの名前は、実行される語として
+            # 流れ込む（`cat …ccnavi-review.sh | sh -s`）。実行ファイルの名前は、実行される語として
             # 立つときだけ数える（`cd /home/user/ccnavi`・`sh -s -- ccnavi` は数えない）。
             if (
                 kind != "ccnavi"
@@ -728,7 +750,15 @@ def _named_in_text(subject: str, bin_base: str) -> str:
 
 
 def _executed_entry(words: list[str], bin_base: str) -> str:
-    """語の並びの頭（前置きを飛ばした先）が入口なら、その入口。"""
+    """語の並びの頭（前置きを飛ばした先）が入口なら、その入口。
+
+    処理フロー:
+    1. 代入・ツールの実行役・シェル・`env` などの前置きを飛ばす。シェルは印を付ける。
+    2. シェルの選択肢で `-s` か `-c` を含むものに当たったら、後ろは引数か文字列なので空を返す。
+    3. 残った頭の語が名前付きの入口（`_NAMED_SCRIPTS`）なら、その名前を返す。
+       ただし `ccnavi-launcher.sh` は `ccnavi` と名付ける。
+    4. 標準入力のシェルの後ろでなく、実行ファイルの名前（`_ENTRY_EXE` か `bin_base`）なら `ccnavi`。
+    """
     shell = False
     k = 0
     while k < len(words):

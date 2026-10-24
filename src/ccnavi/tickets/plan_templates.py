@@ -399,9 +399,23 @@ def parse_template(raw: bytes, stem: str = "") -> tuple[Template | None, list[Pr
 
 
 def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) -> list[Item] | None:
+    """計画の項の欄（`key`）のリストを読む。欄が読めなければ None。苦情は `problems` に足す。
+
+    `required` が真なら、欄が無いことと空であることを、どちらも苦情にする。
+    項は、定義の名前だけの文字列か、`{type, review, after}` のマッピングで書く。
+
+    処理フロー:
+    1. 欄が無い・リストでない・必須なのに空なら、苦情を足して None を返す
+    2. 項を 1 件ずつ読む（添字は 1 から）。文字列は定義の名前だけの項にする。空の文字列は苦情
+    3. マッピングは、知らない欄を警告にして読まない。`type` は必須
+    4. `review` は文字列に限る。`after` は整数の添字のリストに限り、重複は警告にして整える
+    5. 苦情のある項は捨てる。読めた項を `Item` にして返す
+    """
+
     def error(text: str) -> None:
         problems.append(Problem(SEVERITY_ERROR, stem, text))
 
+    # 欄そのものを確かめる。無い・リストでない・必須なのに空なら、ここで止める。
     if raw is None:
         if required:
             error(f"`{key}` がありません。")
@@ -413,6 +427,7 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
         error(f"`{key}` が空")
         return None
     items: list[Item] = []
+    # 項を 1 件ずつ読む。文字列は定義の名前だけの項として扱う。
     for i, entry in enumerate(raw, start=1):
         where = f"`{key}[{i}]`"
         if isinstance(entry, str):
@@ -424,10 +439,12 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
         if not isinstance(entry, dict):
             error(f"{where} は定義の名前か {{type, review, after}} で書く")
             continue
+        # 知らない欄は警告にして、読まない。
         for unknown in entry:
             if unknown not in ITEM_FIELDS:
                 text = f"{where} の未知の欄 `{_line(unknown)}` は読まない"
                 problems.append(Problem(SEVERITY_WARN, stem, text))
+        # 種類は必須。
         kind = entry.get("type")
         if not isinstance(kind, str) or not kind.strip():
             error(f"{where} に `type` がありません。")
@@ -436,6 +453,7 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
         if review is not None and not isinstance(review, str):
             error(f"{where} の `review` は文字列で書く")
             continue
+        # 添字は整数のリストに限る。重複は警告にして、昇順・重複なしに整える。
         after = entry.get("after")
         numbers: list[int] = []
         if after is not None:
@@ -670,12 +688,23 @@ def graph(
 ) -> list[dict]:
     """計画の図の中身。`plan_order.plans` と同じ形（`ApprovePlan`）で、計画ごとに 1 件。
 
-    番号は全体計画が 1..n、フィードバック計画はその続き。`after` はその番号で書く。
+    番号は全体計画が 1..n、フィードバック計画はその続き。`after` は部の中の添字で書く。
     合成できない（`after` が読めないなど）ときは、項と `after` を Template から直接組み、
-    `loose` と `ready` は空にして、理由を `problems` に入れる。
+    `loose` と `ready` は空にする。`problems` には `after` の誤りだけを入れる。
+    `ticket.parse` の苦情は入れない。
+
+    処理フロー:
+    1. `_plan_config` で型の定義を得て、`_composed` の文面を `ticket.parse` で読む
+    2. `after` の誤りが無ければ、`workflow.compute` で待ちの形を計算する（読めなければ計算しない）
+    3. 待ちの形から、`loose` と `ready` を得る
+    4. 全体計画、フィードバック計画の順に、項が在る部ごとに 1 件の図を組む
+    5. 項ごとに、型の定義から題名と審査の種類を引く。`after` は全体の番号に直す
+    6. 部の誤り（`_order_errors` と `workflow.problems`）を `problems` に入れて返す
     """
+    # 型の定義と、合成した計画を読む。
     ptypes, config, _, _ = _plan_config(template, types)
     parsed, _ = ticket.parse(_composed(template, ptypes))
+    # `after` に誤りが無いときだけ、待ちの形を計算する。
     wf = None
     if parsed is not None and not any(
         p.severity == SEVERITY_ERROR for p in _order_errors(template)
@@ -685,6 +714,7 @@ def graph(
     loose = workflow.loose(parsed, wf) if parsed is not None and wf is not None else []
     ready = workflow.ready(parsed, wf) if parsed is not None and wf is not None else []
     out = []
+    # 部ごとに 1 件の図を組む。全体計画は 1 から、フィードバック計画はその続きから番号を振る。
     for key, first, items in (
         ("plan", 1, template.plan),
         ("feedback", planned + 1, template.feedback),
@@ -693,11 +723,13 @@ def graph(
             continue
         numbers = range(first, first + len(items))
         offset = first - 1
+        # `after` は部の中の添字なので、全体の番号に直す。
         after = {
             str(n): sorted({m + offset for m in item.after})
             for n, item in zip(numbers, items, strict=True)
             if item.after
         }
+        # 項ごとの行。題名と審査の種類は、型の定義（あれば）から引く。
         rows = []
         for n, item in zip(numbers, items, strict=True):
             pt = config.get(item.type)

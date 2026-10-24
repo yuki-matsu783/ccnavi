@@ -181,10 +181,20 @@ def run(
     """ローテートと削除を 1 度ずつ行う。dry_run なら何も動かさず、動かすはずのものを返す。
 
     途中の失敗は problems に積んで先へ進む。1 つ消せなくても、残りの後始末は続ける。
+
+    処理フロー:
+    1. limits で閾値（ローテートの大きさ・保持日数）を読む。読めなかった分は problems に入る。
+    2. 実行ログ（log_path）を、_rotate でローテートし、_prune_logs で保持日数を過ぎたものを消す。
+    3. 診断ログを _prune_diag で後始末する。
+    4. state の置き場を _prune_state で、結果の置き場を _prune_directory で後始末する。
+    5. 停止確認の試行のイベントを rotate_mb でローテートし、材料と古いイベントを保持日数
+       （_stop_review_keep_days）で後始末する。
+    6. _count_ops で残った操作の数を数えて返す。
     """
     now = time.time() if now is None else now
     rotate_mb, log_days, state_days, problems = limits()
     report = Report(problems=problems)
+    # 実行ログ。ローテートと保持日数による削除は、それぞれ別の設定で動く。
     if log_path:
         if rotate_mb > 0:
             _rotate(report, root, log_path, int(rotate_mb * 1024 * 1024), dry_run, now)
@@ -450,6 +460,7 @@ def _prune_diag(
     リンクの先には書かない）。
     """
     directory = os.path.join(root, diaglog.DIAG_DIR)
+    # 置き場かその親がリンクなら、何も消さずに報告して戻る。
     for place in (os.path.dirname(directory), directory):
         if os.path.islink(place):
             report.problems.append(
@@ -520,7 +531,18 @@ def _prune_state(
 def _session_entries(
     report: Report, root: str, state_dir: str
 ) -> tuple[dict[str, list[str]], list[str]]:
-    """state の置き場を、セッションの表記ごとにまとめる。2 つめはまとめられなかったもの。"""
+    """state の置き場を、セッションの表記ごとにまとめる。2 つめはまとめられなかったもの。
+
+    処理フロー:
+    1. state の置き場の名前を読む（読めなければ空を返す）。
+    2. SELFGUARD_DIR の下のバックアップを、名前ごとに組へ入れる（リンクなら辿らず報告する）。
+    3. 置き場の各ファイルを、一時ファイルの名前を外した形で振り分ける。
+       セッションの組が当たるものは keyed に、日付だけで決まるものは own_dated に、
+       報告済みの形などは _SESSION_ONLY・_REPORTED の組に入れる。どれにも当たらないものは残す。
+    4. keyed のものを、当たるセッションの表記のうち最も長いものの組へ入れる。
+       どれにも当たらなければ loose に入れる。
+    5. 組と loose を返す。
+    """
     groups: dict[str, list[str]] = {}
     try:
         names = os.listdir(state_dir)

@@ -225,12 +225,14 @@ def test(
     「拒否された」と「試験そのものが失敗した」を見分けられなくなる。
     結果は 1 行目の `verdict:` で読む。
     """
+    # 呼び出しの入力を確かめ、判定を 1 回回す。
     call = call or Call()
     problem = call_problem(call)
     if problem:
         stderr.write(f"ccnavi: {problem}\n")
         return 1
     out = try_one(stderr, conf, root, tool, subject, call)
+    # ターンの終わり（STOP_MATCH）は、ルールを渡す回とは別の書き方で出す。
     if tool == rules.STOP_MATCH:
         stdout.write(f"verdict: {out['verdict']}\ntool: {tool}\n")
         stdout.write(
@@ -518,17 +520,20 @@ def test_expectations(
     食い違いの数は本文の `mismatches` にある。読み手が「食い違った」と
     「試験そのものが失敗した」を終了コードで見分けられるように。
     """
+    # 期待する判定を読んで、ぜんぶ回す。読めなければ 1 で終える。
     try:
         body = run_expectations(stderr, conf, root, path)
     except (OSError, ValueError) as exc:
         stderr.write(f"ccnavi: 期待する判定を読めない: {exc}\n")
         return 1
 
+    # JSON はそのまま出す（終了コードは 0）。
     if as_json:
         stdout.write(json.dumps(body, ensure_ascii=True, indent=1))
         stdout.write("\n")
         return 0
 
+    # 食い違い（期待と判定が違うもの）を、理由と当たったルートつきで並べる。
     for r in body["expectations"]:
         if r["ok"]:
             continue

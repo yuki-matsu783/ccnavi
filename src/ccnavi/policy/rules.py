@@ -806,6 +806,19 @@ def _build(
       `{!root}` の後ろの書き方への warn もここに入る
 
     苦情をリストにしてあるのは、本体と `except` の各パターンがそれぞれ warn を出しうるため。
+
+    処理フロー:
+    1. マッピングでなければ止める。id が無ければ止める（組み込みを除く）
+    2. `Rule` を組み立てる（`every` は `readable_every` で読む）
+    3. 予約の id 接頭辞と `ID_SEPARATOR` を止める（組み込みを除く）。
+       `message`（`_NEEDS_MESSAGE` の区分のみ）と `match` の欠けを止める
+    4. 本体の数を決める。`when` があれば `glob` / `regex` / `when` のキーの有無で、
+       なければ `glob` / `regex` の値の有無で数え、0 と 2 以上は止める
+    5. `when` があれば `_when` で組み合わせ条件にし、`_excepts` で `except` を読む
+    6. 本体の式を `_compile` で作る。`{!root}` を展開できなければ `_ungeneratable` で
+       止める側に倒す（組み合わせ条件では個別条件の 1 つでも同じ）
+    7. `except` の各パターンを `_compile` で作る。書式の誤りはルールごと止める。
+       `{!root}` を展開できないときは、allow は判定に使わず、deny / ask は except を外す
     """
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
@@ -990,6 +1003,17 @@ def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
     ルールの本体と `except` の各パターンが同じこの 1 本を通る。`{root}` の置き換え、
     `{!root}` の展開、先読み・後方参照の禁止、大文字小文字の無視を、両方で食い違わせないため。
     `label` は苦情の頭に付ける語（本体なら空、except なら `except[0] の `）。
+
+    処理フロー:
+    1. `{root}` を使うのに root が無ければ止める
+    2. `{!root}` を `glob` に書いていれば止める（`regex` 専用）
+    3. `{!root}` を `regex` に書いていれば、置き場所（`_not_root_placement`）と root を見る。
+       後ろの書き方は warn にする（`_not_root_suffix`）
+    4. `regex` なら `_unsupported` で先読み・後方参照を止め、`{root}` を置き換え、
+       `{!root}` を `_expand_not_root` で展開する。展開できなければ refused。
+       `glob` なら `{root}` を置き換えて `translate` で正規表現にし、先頭に `^` を付ける
+    5. 大文字小文字を区別せずに `re.compile` する。失敗は error。
+       入れ子が深すぎるときは、`{!root}` があれば refused、無ければ error
     """
     # `{root}` はワークスペースルートの実パスに置き換える。書いた表記（glob / regex）は
     # そのまま残し、置き換えるのは翻訳後の式だけ。報告と --explain は書いた表記を出す。
@@ -1150,6 +1174,14 @@ def _when(written: object, name: str) -> tuple[Condition | None, Problem | None]
 
     書式の誤りは最初の 1 件を返す。書いたユーザは条件を書いたつもりでいるので、
     読めないノードを黙って外すと、当たる範囲が書いたものと気づかないうちに食い違う。
+
+    処理フロー:
+    1. `node` を根から再帰で読む。入れ子の段数（`MAX_WHEN_DEPTH`）と
+       ノード数（`MAX_WHEN_NODES`）を超えたら止める
+    2. ノードは 1 つのキーだけを持つマッピングで、キーは `WHEN_KINDS` の 1 つに限る
+    3. 個別条件（`WHEN_LEAVES`）は空でない文字列。`not` は下に 1 つのノード。
+       `all` / `any` は空でないリスト
+    4. 読めたものを `Condition` にして返す。個別条件の式は `_build` が `_compile` で組み立てる
     """
     count = 0
 

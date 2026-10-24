@@ -92,7 +92,15 @@ def _rate(numerator: int, denominator: int) -> float | None:
 
 
 def summarize(state: str, log_dir: str) -> dict[str, Any]:
-    """集計。期限切れの確定を先に行う。"""
+    """集計。期限切れの確定を先に行う。
+
+    処理フロー:
+    1. stopreview.expire_overdue で期限切れの試行を確定する。
+    2. _attempts で試行を読み、再判定の試行（original が付くもの）を除く。
+    3. _all_events と、ラベルの記録（LABELS_FILE）を読む。
+    4. 試行ごとに、最終分類・差し戻し・再判定の結果を counts と修正の数に振り分ける。
+    5. 集計の値（修正率・遅延・基準ごとの内訳）を _rate・_latency・_by_criterion で組み、返す。
+    """
     stopreview.expire_overdue(state)
     every = _attempts(state)
     # 再判定の試行は元の試行の修正率にだけ使う。Stop の機会を二重に数えない。
@@ -100,6 +108,8 @@ def summarize(state: str, log_dir: str) -> dict[str, Any]:
     events = _all_events(log_dir)
     labels = _jsonl(os.path.join(log_dir, "stop-review", LABELS_FILE))
 
+    # 試行の分類ごとの件数。分類は最初に当たった 1 つを数える（期限切れは未検査にも数える）。
+    # 拒否と汚染は、分類とは別に数える。
     counts = {
         "ccnavi_out_of_scope": 0,
         "ai_out_of_scope": 0,
@@ -253,7 +263,15 @@ def _by_criterion(
 
 
 def render(summary: dict[str, Any], unlinked: int = 0) -> str:
-    """人が読む形。取れない指標は「不明」。"""
+    """人が読む形。取れない指標は「不明」。
+
+    処理フロー:
+    1. pct で割合を小数 1 桁の `%` にする。取れなければ「不明」。
+    2. 試行数・検査カバー率・修正率の行を作る。
+    3. 基準ごとに、不備検出・評価・見逃し率などの行を足す。
+    4. 分けて数える件数（対象外・省略・期限切れなど）の行を足す。
+    5. 判定の待ち時間（latency）の行を足す。無ければ「不明」。
+    """
 
     def pct(value: float | None) -> str:
         return "不明" if value is None else f"{value * 100:.1f}%"

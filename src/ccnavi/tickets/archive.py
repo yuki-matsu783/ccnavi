@@ -304,9 +304,16 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
     親として拾うのは、`done/` に `parent:` を持たないチケットとして在るものと、手元の退避に親として
     在るもの（前の回が途中で止まった残り。`root` を渡したときだけ）。子は名前の形ではなくチケットの
     `parent:` 欄で親に結ぶ（`rel-01` という親を `rel` の子と取り違えない）。
-    フローは、
-    その親か、`done/`（または退避）に在る子のもの、どこにもチケットの無い子のもの。
+    フローは、その親か、`done/`（または退避）に在る子のもの、どこにもチケットの無い子のもの。
     `phases/<親>/` は下をすべて。
+
+    処理フロー:
+    1. `done/` を読み、親にできるものを `family` に入れる（退避の親は `root` を渡したときだけ）
+    2. 子を `parent:` で `family` に結ぶ（`done/` と退避の両方を見る）
+    3. 承認済みの `done/`・`doing/` にも退避にも無い識別子は、子の名前の形
+       （`ticket_ids.child_pattern`）で結ぶ
+    4. 親ごとに `phases/<親>/` の下を全部、フローのファイルは `belongs` が真のものを足す
+    5. 移すチケットは子を先に、親を後に並べ、その `done/` のファイルを足す
     """
     done = _done_copies(approved_dir)
     family = set()
@@ -326,9 +333,9 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
             held = archived_fields(root, project, ident)
             if held is not None and held.parent in family:
                 children.add(ident)
-    # どの置き場にもチケットの無い識別子（チケットが消えた子など）。
+    # 承認済みの `done/`・`doing/` にも退避にも無い識別子（チケットが消えた子など）。
     # フローしか残っていないので、
-    # このときだけ子の形（`<親>-<フェーズ番号>-<連番>`）で親に結ぶ。チケットが在る識別子は
+    # このときだけ子の形（`<親>-<フェーズ番号>-<連番>`）で親に結ぶ。承認済みに在る識別子は
     # `parent:` 欄で決める。
     known = set(done) | set(_regular_md(os.path.join(approved_dir, ticket_model.DOING)))
 

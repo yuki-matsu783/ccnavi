@@ -484,9 +484,10 @@ def _path_spellings(launcher: str = "") -> list[str]:
 def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
     """実行ファイルが入っているディレクトリと、その中の名前（holder_regex に渡す組）。
 
-    binary_clause と同じ末尾 2 要素で読む。PATH の実体のディレクトリは足さない（`~/.local/bin` 全体を
-    守ると、無関係な道具の導入まで止まる）。`cp /tmp/ccnavi dist/` のように、行き先を
-    実行ファイルの入っているディレクトリにした形を止める。振り分けの sh なら、sh の入っている
+    binary_clause と同じ末尾 2 要素で読む。PATH の実体のディレクトリは足さない
+    （`~/.local/bin` 全体を守ると、無関係な道具の導入まで止まる）。
+    `cp /tmp/ccnavi dist/` のように、行き先を実行ファイルの入っている
+    ディレクトリにした形を止める。振り分けの sh なら、sh の入っている
     ディレクトリと、組み立ての置き場（`<親>/bin/` の下の `<os>-<arch>`、`<親>` の下の `bin`）。
     ディレクトリの表記が無い名前だけの表記（`ccnavi`）は、入っている場所が決まらないので足さない。
     """
@@ -719,8 +720,10 @@ def handoff_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None
         words = subject.strip(shellread.SEP).split()
         if len(words) < 3 or words[0] not in _HANDOFF_COPIERS:
             return subject
+        # 表記どおりに読めない語が 1 つでもあれば、外さない。
         if any(ch in _HANDOFF_UNREAD for word in words for ch in word):
             return subject
+        # 元と行き先に分け、選択肢が許すものだけかを見る。
         *sources, dest = [w for w in words[1:] if w != "--"]
         if not sources or dest.startswith("-"):
             return subject
@@ -729,6 +732,7 @@ def handoff_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None
                 continue
             if word.startswith("--") or not set(word[1:]) <= _HANDOFF_SHORT_ALLOWED:
                 return subject
+        # 行き先を実際のパスに解き、置き場の中に落ちるかを見る。
         if ".." in re.split(r"[\\/]", dest):
             return subject
         if not os.path.isabs(dest):
@@ -737,6 +741,7 @@ def handoff_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None
             dest = os.path.join(cwd, dest)
         if not inside(dest):
             return subject
+        # 行き先がディレクトリなら、元の名前を足した先も同じく確かめる。
         if os.path.isdir(dest):
             for source in sources:
                 if source.startswith("-"):
@@ -1176,6 +1181,15 @@ def add_rules(
     `rules.Rule.matches` が式を見ずに外すので、足さなくても判定は同じになる。
     当たるかどうかは `rules.tool_matches` で決め、`Rule.matches` と同じ答えを引く。
     None なら（ツールを決めずに並べる呼び手）これまでどおり足す。
+
+    処理フロー:
+    1. シェルから書き込む形（`guard_shell_regex`）を、`tool` が当たるときだけ足す
+    2. 実行ファイルの書き込み（`binary_clause`）があれば足す
+    3. ccnavi ディレクトリの下（`project_home_glob`）を足す
+    4. `root` があれば、下書きの置き場へのリンク（名指しのツール・シェルの 2 本）を足す
+    5. 記録の置き場（`records_regex`）と、共通レイヤーの 3 ファイルを 1 本の式にして足す
+       （`common_layer_regex`）
+    各 `_insert` は判定の先頭に挿すので、後に足したものほど先に当たる。
     """
     if tool is None or rules.tool_matches(SHELL_MATCH, tool):
         _insert(
@@ -1318,6 +1332,12 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
     に下書きを置き、ユーザが端末の `ccnavi user handoff` で取り込むか、手で直す。
 
     ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない。
+
+    処理フロー:
+    1. 案内の一文（`_stage_hint`）と、下書きの置き場の例外（`handoff_write_exempt`）を用意する
+    2. hook 本体と hook の登録（settings）の 2 本は、必ず名前で足す
+    3. ccnavi ディレクトリの名前（`_home_regex`）があれば、scripts と共通の設定の 2 本を足す
+    4. 4 本とも、`match` を `Write|Edit|NotebookEdit` にして `_insert` で足す
     """
     stage = _stage_hint(root)
     exempt = handoff_write_exempt(root)

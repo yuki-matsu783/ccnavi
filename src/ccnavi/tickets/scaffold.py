@@ -229,6 +229,26 @@ def run(
     （`layer` はテンプレートを統合結果で引くレイヤー。省けば cwd のツリーのレイヤー）。
     フィードバック計画は `with_feedback` のときだけ書く。
     `scope` は今回の作業の範囲（glob）。型の `scope` を集めたものに足して `allow` に書く。
+
+    処理フロー:
+    1. 識別子・題・issue・MR を検査する（`ticket_ids.id_problem`・`ticket_mod.issue_text`）。
+       `template`・`plan`・`layer`・`with_feedback` の組み合わせも見る。
+    2. cwd が識別子と同名の親のワークツリーか（`tree.tree_of`）、その HEAD
+       のブランチが識別子か（`standing.head_branch`）を見る。
+    3. フェーズ定義を `phasetypes.load_types` で読む。テンプレートなら `_from_template`
+       で計画と子の下書きを作る。
+       `plan` のときは、型が work の定義かを見る。
+    4. 範囲を `collect_allow` で型の `scope` から集め、`scope` 引数を足す。空や上限超過は書かない。
+    5. 同じ識別子の提案か承認済みチケットが在れば書かない（`_existing`）。テンプレートなら
+       `_flow_clash` で子の流れの衝突を見る。
+    6. 雛形を `render`（テンプレートなら `render_items`）で作り、`fsio.write_new_durable`
+       で新規に書く。既存は上書きしない。
+    7. `plan_phases.fill` で写し（phases:）を差し込み、`phasetypes.parent_scope_problems`
+       で範囲が定義の上限を超えていないかを見る。
+       超えていれば案内として出す（止めない）。テンプレートなら `_agree_problem` の検査を通し、
+       子の流れを `_write_flows` で書く。
+       どこかで失敗したら、書いたファイルを消して戻す。
+    8. 次の手順を案内して終わる。
     """
 
     def refuse(why: str) -> int:
@@ -451,7 +471,19 @@ def _from_template(
     layer: str,
     with_feedback: bool = False,
 ) -> tuple[_Used | None, str]:
-    """テンプレートを引いて、書く中身を組む。組めなければ (None, 理由)。何も書かない。"""
+    """テンプレートを引いて、書く中身を組む。組めなければ (None, 理由)。何も書かない。
+
+    処理フロー:
+    1. `layer` が空なら、cwd のツリーのプロジェクト（無ければ自身のレイヤー）を使う。
+    2. `template_use.resolve` でテンプレートを引く。無ければ理由を返して止める。
+    3. `template_use.absolute` で全体計画とフィードバック計画の項を組む。フィードバックは
+       `with_feedback` が無ければ捨て、その項数を `skipped` に残す。
+    4. 項の型（計画とフィードバックの両方）が `types` に全部在るかを見る。
+    5. 計画は work、フィードバックは feedback の kind の型だけかを見る。
+    6. `template_use.child_problem` と `template_use.flow_drafts` で、
+       子の提案と子のフローの下書きを組む。
+    7. 組めた中身を `_Used` にして返す。ここではまだ何も書かない。
+    """
     layer = layer or where.project or plan_templates.LAYER_SELF
     found, why = template_use.resolve(conf, root, layer, name)
     if found is None:

@@ -213,7 +213,15 @@ def _counts(value: object) -> tuple[dict[str, int], str]:
 
 
 def parse_impact(text: str) -> Impact | str:
-    """採否の記録の frontmatter を読む。壊れていれば理由の文字列。"""
+    """採否の記録の frontmatter を読む。壊れていれば理由の文字列。
+
+    処理フロー:
+    1. front_matter で frontmatter を読む。読めなければ、その理由を返す。
+    2. proposal（文字列）・target（TARGETS のどれか）・files（文字列の並び）・
+       patterns（件数）・status（DECISIONS のどれか）・reason を、順に検査する。
+    3. decided_at は、在れば _when で日時にする。無ければ、status が PENDING 以外のとき理由を返す。
+    4. 全部通れば Impact を組んで返す。
+    """
     data = front_matter(text)
     if isinstance(data, str):
         return data

@@ -194,6 +194,13 @@ def collect(
     """ワークスペースとプロジェクトの索引を新しくして集める。
 
     `.git` の無いツリーは何も出さずに飛ばす。
+
+    処理フロー:
+    1. 置き場（`places`）を 1 つずつ回す。期限を過ぎたら `timed_out` にして止める。
+    2. 置き場ごとに索引を組む（`docsearch_index.build`）。`.git` が無ければ飛ばし、
+       git に聞けなければ `failed` に残す。
+    3. 置き場の接頭辞を付けて、無視の状態・外のファイル・問題を集める（`_prefixed` の行も）。
+    4. 同じ `concept_id` は 1 つにまとめ、`concept_id` の順に並べて返す。
     """
     result = Collected()
     seen: set[str] = set()

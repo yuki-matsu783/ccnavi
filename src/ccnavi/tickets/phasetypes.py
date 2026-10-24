@@ -252,9 +252,25 @@ def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
 
 
 def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
+    """定義 1 件（識別子と欄の辞書）を `PhaseType` にする。読めなければ None と苦情を返す。
+
+    戻り値は (定義, 苦情)。定義が None のときは、苦情に SEVERITY_ERROR が必ず 1 件以上ある。
+    欄の既定値（表示名は識別子、種類は作業、レビューは MR）は、ここで入れる。
+
+    処理フロー:
+    1. 表示名（`title`）、種類（`kind`）、レビュー（`review`）を読む。知らない値は断る
+    2. 種類がフィードバック対応で、レビューが無しのものは断る（結果を見る場所は MR になる）
+    3. 範囲（`scope`）を読む。無しと `inherit` は親から継ぐ（None）。
+       glob のリストは `_globs` で式にする
+    4. 成果物（`deliverables`）は文字列のリストに限る。
+       `..` や絶対パスは、ワークツリーの外を指すので断る
+    5. 担当（`agent`）と条件（`when`）は文字列として読む
+    6. 学習（`learning`）は真偽値か既知の文字列に限る
+    """
     problems: list[Problem] = []
     pt = PhaseType(id=ident)
 
+    # 表示名、種類、レビュー。知らない種類・レビューは、ここで断る。
     pt.title = str(body.get("title") or "").strip() or ident
     kind = str(body.get("kind") or KIND_WORK).strip()
     if kind not in KINDS:
@@ -278,6 +294,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         )
         return None, problems
 
+    # 範囲。`inherit` か無しは親から継ぐ。glob のリストは、子チケットの範囲と同じ規則で式にする。
     scope = body.get("scope", INHERIT)
     if scope == INHERIT or scope is None:
         pt.scope = None
@@ -295,6 +312,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         problems.append(Problem(SEVERITY_ERROR, ident, "`scope` は glob のリストか `inherit`"))
         return None, problems
 
+    # 成果物と担当・条件。成果物はワークツリーの中を指す形に限る。
     raw = body.get("deliverables")
     if raw is not None:
         if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
@@ -316,6 +334,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
             return None, problems
     pt.agent = str(body.get("agent") or "").strip()
     pt.when = str(body.get("when") or "").strip()
+    # 学習の設定。真偽値か既知の文字列に限る。
     raw_learning = body.get("learning")
     if raw_learning is not None:
         if raw_learning is True:

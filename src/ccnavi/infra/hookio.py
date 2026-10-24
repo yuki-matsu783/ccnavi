@@ -145,7 +145,16 @@ def _text_list(value: Any) -> list[str] | None:
 
 
 def decode(stream: TextIO) -> Input:
-    """payload を 1 件読む。"""
+    """payload を 1 件読む。
+
+    処理フロー:
+    1. 入力を全部読む。空なら NoPayload で止める。
+    2. JSON として読み、オブジェクトでなければ Unusable で止める。
+    3. hook_event_name が空でない文字列であることを確かめる。
+    4. 判定の鍵になる欄（tool_name・session_id など）が、あれば文字列であることを確かめる。
+    5. tool_input がオブジェクトで、TOOL_INPUT_TEXT_FIELDS の欄が文字列であることを確かめる。
+    6. 残りの欄は型を見て、違えば既定の値（空の文字列・空の辞書・偽）にして Input を組んで返す。
+    """
     raw = stream.read()
     if not raw.strip():
         raise NoPayload("標準入力に hook の payload がありません。")

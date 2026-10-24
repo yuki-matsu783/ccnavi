@@ -512,7 +512,17 @@ def _branch_of_ticket(t: ticket_model.Ticket, names: set[str]) -> str:
 def collect(
     conf: settings.Settings, root: str, cwd: str, kind: str, number: int, host: Host
 ) -> tuple[dict, str]:
-    """候補を集める。返すのは JSON の形の辞書と、止める理由（あれば）。"""
+    """候補を集める。返すのは JSON の形の辞書と、止める理由（あれば）。
+
+    処理フロー:
+    1. リポジトリ・プロジェクト・手元と origin のブランチ・チェックアウト先を読む
+       （`_repo_of`・`_refs`・`_checked_out`）。読めなければ止める
+    2. チケットを読む（チケットの機能が有効なときだけ。`_tickets`）
+    3. ホストの MR の元ブランチを候補に入れる
+    4. 番号の種類ごとに候補を入れる。issue は `issue:` のチケットと名前、MR は `mr:` のチケットから
+    5. 各候補に、ワークツリーと、識別子になるブランチのチケットを添える
+    6. 出典の順（チケット、MR、名前）に並べて返す
+    """
     repo, project, failed = _repo_of(conf, root, cwd)
     if repo is None:
         return {}, failed
@@ -596,7 +606,16 @@ def _where(c: dict) -> str:
 
 
 def render(data: dict) -> str:
-    """1 候補 1 行の形。エージェントが読んでユーザに見せる。"""
+    """1 候補 1 行の形。エージェントが読んでユーザに見せる。
+
+    処理フロー:
+    1. 見出し（種類・番号・プロジェクトとリポジトリの場所）を 1 行目に置く
+    2. ホストを見たかを 1 行言う。チケットを見ていないときだけ、その理由を 1 行言う
+    3. 候補を 1 件 1 行にする（在りか・由来・MR・ワークツリー・チケット）。
+       在りかは `_where`、由来は `_SOURCE_LABEL` で言う
+    4. 番号に紐づくチケットを 1 件 1 行にする。最後に、候補が在れば件数と次の一手、
+       無ければ「候補なし」を置く
+    """
     kind, number = data["kind"], data["number"]
     mark = f"issue #{number}" if kind == ISSUE else f"MR !{number}"
     repo = data["repo"]

@@ -142,7 +142,28 @@ def decide_before(
     deadline: float,
 ) -> int:
     """実行前チェックに達し、何が起きたかを record に書き込む。
-    記録と応答が必ず同じ結論から作られるようにするため。"""
+    記録と応答が必ず同じ結論から作られるようにするため。
+
+    処理フロー:
+    1. 判定より先に設定ファイルのバックアップを取る（`guard_setting_files` に `selfguard.before`）。
+       その知らせは `guard` に残し、以降の応答に足す。
+    2. 主題（`record.subject`）が無ければ記録して抜ける。
+    3. ルールを読み、この呼び出しの行き先のツリーを決める（`ruleload.rules_for`）。
+    4. 組み込みの保護をルールに足す（`selfguard_shell`・`ticket_guard`・`phase_forms`）。
+    5. 主題を読み直す（`screen`）。実行される部分が残らなければ記録して抜ける。
+    6. 組み込みの止めを、順に当てる。当たれば `refuse` で返す。順に、環境変数の指定
+       （`wrapguard.check_env`）・自己防衛のパス（`wrapguard.check_core_paths`）・記録の削除
+       （`phase_forms.prune_form`）・ユーザの判断の経路（`phase_forms`）・子の push
+       （`wrapguard.check_child_push`）・サブエージェントの禁止（`phase_forms.forbidden`）・
+       親のワークツリーへの書き込み（`wrapguard.check_parent_tree_git`・`parentwrite.check`）・
+       レビュー待ちの止め（`phase.held_phase`）・サブエージェントの起動（`agentlaunch.decide`）・
+       プロジェクトの食い違い（`project_mismatch`）・着手中の子のロック（`flow_lock`）。
+    7. 書き直しを求める形（`rewrites`）は、読み分けずに止めて書き直し方を返す。
+    8. ルールを deny・ask・allow の順に当てる（`rules.SECTIONS`）。読み切れない形には
+       allow を当てない。期限を過ぎたら、ツールの種類で決めた結論を返す。
+    9. 当たりを記録し、チケットの判定（`ticket_verdict`）と強さを比べて強い側を採る。
+    10. 文面を組み、通す・渡す（`HANDOVER`）・拒否・確認の応答を返す（`refuse`・`_write_pass`）。
+    """
     # バックアップを取るのは判定より先。ここで取る断面が、この呼び出しが何かを書き換えて
     # しまったときに戻る先になる。判定で弾かれた呼び出しでも先に取っておくのは、
     # 弾けなかったものだけが作業ツリーに届くので、届いた側から見れば
@@ -155,6 +176,7 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
+    # ルールを読み、この呼び出しの行き先のツリーを決める。
     rule_set, source, target = ruleload.rules_for(stderr, conf, root, payload, record)
     # チケットの範囲を引く行き先。下で cwd のツリーに置き換える前の、対象のパスそのものの
     # ツリー。ワークスペースの外へ書くときに cwd のワークツリーの範囲を当てないため。
@@ -170,6 +192,7 @@ def decide_before(
     # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
     # 名前で書くツールの 4 本（`add_named_rules`）は既定を使っている間も足す。組み込みの既定は
     # 持っていないので、二重にならない。読めない間も共通の設定への Write / Edit は止まる。
+    # 組み込みの保護（設定ファイル・チケットの置き場・シェルの形）をルールに足す。
     core_on = modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     if record.fallback != builtin.FALLBACK and core_on:
         selfguard_shell.add_rules(
@@ -203,6 +226,7 @@ def decide_before(
         if conf.guard_ticket_approval != selfguard.DISABLE or payload.agent_id:
             rule_set.deny.append(phase_forms.ticket_approval_rule(conf.bin, root))
 
+    # 主題を読み直して、実行される部分（subject）と書き直しの形を取る。
     subject, bare, inner, rewrites = screen(payload.tool_name, record.subject, record)
 
     # 文面の `subject:` には、読み直す前の原文を出す。秘密の形は記録と同じく伏せる。
@@ -664,6 +688,7 @@ def decide_before(
             for rule in rule_set.deny
         )
     )
+    # ルールを deny・ask・allow の順に当てる。最初に当たった区分で判定が決まる。
     verdict, group = "", []
     # group と同じリストで、中で実行されるコマンドで当たったときの
     # （実行役のコマンド, そのコマンド, 引用の中から切り出したコマンドの層か）。
@@ -731,6 +756,7 @@ def decide_before(
     if capped:
         verdict = rules.DENY
 
+    # 記録に、当たったルールと判定の根拠を残す。
     record.rules = [rules.record_name(rule) for rule in group]
     # 当てたルールそのもの。診断（`--test`）が根拠を見せるのに読む。記録には書かない。
     record.hits = list(group)
@@ -785,6 +811,7 @@ def decide_before(
                 record.rules = [decided_by, *record.rules]
                 record.source = ""
 
+    # モデルへの文脈（ルールの文・提案の確認・スキルの目録）を組む。
     # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
     # 別の経路（additionalContext）で届く。
     context, record.hinted = ctxfile.deliver(
@@ -806,6 +833,7 @@ def decide_before(
     if told:
         context = "\n\n".join(p for p in (told, context) if p)
 
+    # 通す回。通知と入力の更新だけを、判定を付けずに返す。
     if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
         if notices or context or updated is not None:
@@ -935,6 +963,7 @@ def decide_before(
             _write_pass(stdout, "\n\n".join(notices + ([told] if told else [])), updated)
         return EXIT_OK
 
+    # 拒否・確認・渡すの応答を 1 つにまとめて返す。
     return refuse(
         stdout,
         mode,
@@ -1311,6 +1340,17 @@ def ticket_verdict(
 
     チケットの置き場（提案と承認済みチケット）については何も言わない。承認された範囲の外に
     あるのが普通で、そこを deny にすると、いちど承認した範囲から出る方法が無くなる。
+
+    処理フロー:
+    1. チケット制御が無い・対象外のツール・ワークツリーでない・チケットが無い・置き場なら、
+       何も言わずに空を返す（`tree.lookup`・`ticket_places.is_unscoped`）。
+    2. 親のワークツリーなら、書き込みを DENY にする（索引か `wrapguard.ticket_role` のどちらかが
+       親と言えば親とする）。
+       チケットが `blocked` のときは後段の範囲の判定で止める。
+    3. 子なら、範囲の判定を `phase_scope.scope_verdict` で取る。ALLOW ならそのまま通す。
+    4. チケットが信頼できない（`blocked`）なら、引っかかった検査を名指しして DENY にする。
+    5. ASK と DENY の文面を組む。ルールの判定より強いときは、ルールの id を名指しする。
+    6. 止めた上限（フェーズの型・親・範囲の外）ごとに、次にすることを文面に書く。
     """
     if not conf.tickets_enabled or tool not in SCOPE_TOOLS:
         return "", "", "", ""

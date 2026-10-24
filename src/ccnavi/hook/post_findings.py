@@ -90,6 +90,15 @@ class ScopeGuard:
         範囲は実行前チェックと同じく、親の範囲と定義の上限で切り詰める（phase_scope.scope_verdict）。
         チケットの置き場は外でも報告しない。次のチケットを提案できなくすると、
         いちど承認した範囲から永久に出られなくなる。外し方は実行前チェックと同じ関数。
+
+        処理フロー:
+        1. 変更のパスのツリーを求め（`tree.tree_of`）、主のツリーを外す。
+           担当（`tree.lookup`）のないものも外す。
+        2. チケットの置き場・下書きの置き場・ELI5 の置き場は外す（`ticket_places`）。
+        3. 親と型の定義から範囲の判定を取る（`phase_scope.type_for`・`phase_scope.scope_verdict`）。
+           範囲の中なら None を返す。
+        4. 外の理由（チケットの不備・フェーズの型・親の範囲・範囲の外）ごとに文面を組み、
+           規則と承認済みチケットの出所を返す。
         """
         t = tree.tree_of(self.root, full, self.projects)
         if t is None or t.is_main:
@@ -297,6 +306,15 @@ def _script_writes(
     読めなかったものは外さない。git を起こせない、期限に達した、ファイルを読めない。
     どれも「変わっていない」ではない。どちらとして扱うかを間違えると、git を数秒止めるだけで
     除外が通る。
+
+    処理フロー:
+    1. 置き場の変更だけを、ツリーの相対のパスで集める
+       （`ticket_places.is_ticket_place`）。無ければ空。
+    2. 変更ごとに、コミット済みの版と比べる。省ける欄（`_droppable`・`_mr_filled`）を除いて
+       同じ形なら外す。読めないものは外さない（`gitstate.committed_text`）。
+    3. 消えた側と現れた側を集め、内容が 1 対 1 で組になるものだけ外す（`finish`・`cancel` の移動）。
+    4. `ready` の退避が消したものは、`_archived_removals` で外す。
+    5. 残りは報告する。
     """
     tickets_rel, approved_rel = places
     if not top or not (tickets_rel or approved_rel):

@@ -280,7 +280,15 @@ def parse(
     各レイヤーはその `<ccnavi ディレクトリ>/scripts/` だけ。
     たがいの側を指す定義はここで error にする。プロジェクトの
     リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
+
+    処理フロー:
+    1. `yamlread.safe_load` で読む。読めない・最上位が辞書でない・版（`VERSION`）が違うなら止める。
+    2. `levels` を読む。書かれた鍵だけを `levels` に入れ、既定は足さない。`ordered` で medium
+       <= high <= critical を見る。
+    3. `factors` を `_factors` で読む。`script_homes` の外を指す `script:` はそこで error になる。
+    4. error が 1 つでもあれば None を返す。warn だけなら定義と問題の列を返す。
     """
+    # 読み込み。YAML・最上位・版の順に見て、読めなければ止める。
     problems: list[Problem] = []
     try:
         data = yamlread.safe_load(text)
@@ -300,6 +308,7 @@ def parse(
     # 共通レイヤーの緩めた境目の点を気づかないうちに戻す。
     # 順を見るときだけ既定で補う。
     levels: dict[str, int] = {}
+    # 境目の点。書かれた鍵だけを読む。
     raw_levels = data.get("levels")
     if raw_levels is not None:
         if not isinstance(raw_levels, dict):
@@ -322,6 +331,7 @@ def parse(
         problems.append(
             Problem(SEVERITY_ERROR, where, "`levels` は medium <= high <= critical の順で書く")
         )
+    # 加点の項目。
     raw_factors = data.get("factors")
     if raw_factors is None:
         raw_factors = []
@@ -348,10 +358,24 @@ def ordered(levels: dict[str, int]) -> bool:
 def _factors(
     raw: list, where: str, script_homes: tuple[str, ...] = SCRIPT_HOMES
 ) -> tuple[list[Factor], list[Problem]]:
+    """`factors:` の 1 項目ずつを Factor の列にする。外れた項目は Problem に積んで次へ進む。
+
+    処理フロー:
+    1. 項目が辞書か、id の形と重複を見る（`_ID`・`seen`）。
+    2. `points` が 0 以上の整数かを見る。
+    3. 加点条件（`KINDS` のどれか 1 つだけ）を見る。
+    4. 条件の種類ごとに値を検証する。`glob` は `globmatch.translate` で式にし、`script` は
+       `script_homes` の下に限る。
+    5. 通った項目を Factor にして並べる。
+
+    戻り値は (factors, problems)。error の項目は factors に入らない。warn の項目は入る。
+    `where` は問題の出所の名前で、文を組むのに使うだけ。
+    """
     problems: list[Problem] = []
     factors: list[Factor] = []
     seen: set[str] = set()
     for i, item in enumerate(raw):
+        # 項目の形（辞書・id・重複・点数）を見る。
         if not isinstance(item, dict):
             problems.append(Problem(SEVERITY_ERROR, where, f"`factors[{i}]` が辞書ではない"))
             continue
@@ -380,6 +404,7 @@ def _factors(
         if not isinstance(points, int) or isinstance(points, bool) or points < 0:
             problems.append(Problem(SEVERITY_ERROR, ident, "`points` が 0 以上の整数ではない"))
             continue
+        # 加点条件の種類と、その種類ごとの値・範囲を見る。
         kinds = [k for k in KINDS if k in item]
         if len(kinds) != 1:
             problems.append(
@@ -475,6 +500,7 @@ def _factors(
                 problems.append(Problem(SEVERITY_ERROR, ident, "`judge` は問いの文を書く"))
                 continue
             value = value.strip()
+        # 通った項目を Factor にする。
         factors.append(
             Factor(
                 id=ident,
@@ -728,12 +754,23 @@ class Diff:
 
 
 def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, str]:
-    """`base..head` の差分を数える。読めなければ None と理由。"""
+    """`base..head` の差分を数える。読めなければ None と理由。
+
+    処理フロー:
+    1. base が空なら、子の仕事の始まりが無いとして止める。
+    2. `git diff --numstat -z` で行数と path を読む。rename は旧と新の 2 つが続く形を読み、path
+       は新しい側にする。
+    3. `git diff --name-status -z` で変更の種類（先頭の 1 文字）を読む。numstat に無い path
+       は行数 0 で足す。読めなければ止める（0 件と数えない）。
+    4. `rev-parse` で head を sha にする。読めなければ止める。
+    5. Diff にして返す。Diff.head は引数の head ではなく、その sha になる。
+    """
     if not base:
         return None, "子の仕事の始まり（親との共通の祖先）がありません。"
     rc, out = _git(worktree, ["diff", "--numstat", "-z", f"{base}..{head}"])
     if rc != 0:
         return None, "子の仕事の始まりからの差分を読めない"
+    # 行数と path を読む。
     changes: dict[str, Change] = {}
     # -z の numstat は `added\tdeleted\tpath\0`。rename は `added\tdeleted\t\0old\0new\0`。
     parts = out.split("\0")
@@ -781,6 +818,7 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
             changes[path].status = status[:1]
         else:
             changes[path] = Change(path=path, status=status[:1])
+    # 測った先の commit を sha にして、戻り値に入れる。
     rc, sha = _git(worktree, ["rev-parse", head])
     if rc != 0 or not sha.strip():
         return None, "測った先のコミットを読めない"
@@ -843,7 +881,21 @@ def evaluate(
     env: dict[str, str],
     judgements: dict[str, dict],
 ) -> Score:
-    """差分と判定から点を出す。定性項目に判定が無ければ pending に積む。"""
+    """差分と判定から点を出す。定性項目に判定が無ければ pending に積む。
+
+    処理フロー:
+    1. 定義の項目を順に読み、種類ごとに当てる。行数・ファイル数・削除数は `scoped` で include /
+       exclude に絞った差分を数える。
+    2. `glob` は当たったファイルの数だけ加点する。その項目に `max` があれば、その値で上限を切る。
+    3. `script` は `run_script` で測る。点が 0 なら何も積まない。
+       測れなければ配点の全部を加点し、理由を `unmeasured` に積む（0
+       件と数えて軽い側へ倒さない）。
+    4. `judge` は `judgements` に、いまの差分の head と同じ判定が無ければ `pending` に積む。
+       判定が hit なら加点する。
+    5. 加点の合計を `points` にし、`definition.level_of` で `level` を決める。
+
+    `pending` は判定がまだ無い定性項目で、点にはまだ含まれない。
+    """
     score = Score()
     for f in definition.factors:
         # 加点した項目には、その定義が書いてあるレイヤーを残す。
