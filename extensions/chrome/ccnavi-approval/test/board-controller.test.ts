@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import type { FamilyBoard, RepoBoard } from "../src/core/snapshot.js";
 import type { Outcome } from "../src/core/write.js";
 import type { RepoConfig } from "../src/core/settings.js";
-import { createBoardController, sayOutcome, type BoardEnv, type BoardOps } from "../src/board/controller.js";
+import { createBoardController, sayDecide, sayOutcome, type BoardEnv, type BoardOps, type DecideOutcome } from "../src/board/controller.js";
 
 const HOSTS = [{ id: "github.com", kind: "github" as const, api: "https://api.github.com", graphql: "https://api.github.com/graphql", web: "https://github.com", label: "GitHub" }];
 const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 7, extraBranches: [], project: "", workspace: "" };
@@ -339,4 +339,216 @@ test("CX-T232 境界の外で描画が落ちたら、controller が #status に�
   h.c.reportRenderError(new Error("描けない"));
   assert.equal(h.c.snapshot().state, "error");
   assert.equal(h.c.snapshot().status.text, "ボードを表示できませんでした：描けない");
+});
+
+const PREVIEW = {
+  version: 2,
+  parent: "i0001",
+  phase: 1,
+  mr: { number: 3, url: "https://example.test/pr/3" },
+  digest: "v2.aaa",
+  threads: [{ key: "k0", url: "", path: "a.ts", line: 1, body: "指摘", version: "v", last_comment: { id: "", at: "", author: "" } }],
+};
+
+test("CX-T273 決める: 開くとプレビューを読み、確定はキー→行き先とダイジェストを ops.decide に渡す。成功の一言と画面の閉じ方", async () => {
+  const seen: unknown[][] = [];
+  let out: DecideOutcome = { kind: "written", oid: "0123456789abcdef", reviewed: false, followup: "i0001-f1", issues: ["https://example.test/issues/9"] };
+  const h = harness({
+    ops: {
+      decidePreview: async (_r, family, phase) => (seen.push(["preview", family, phase]), PREVIEW),
+      decide: async (_r, family, phase, choices, digest) => (seen.push(["decide", family, phase, choices, digest]), out),
+    },
+  });
+  await h.c.refresh();
+  const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
+  h.c.actions.decideOpen?.(b, family(), 1);
+  assert.deepEqual(h.c.snapshot().decide, { repo: KEY, token: 1, family: "i0001", phase: 1, preview: null, deciding: false, notice: "" });
+  await until(() => h.c.snapshot().decide?.preview !== null, "プレビュー");
+  assert.deepEqual(seen, [["preview", "i0001", 1]]);
+  // 決める画面を開いている間は自動の読み直しを飛ばす
+  h.c.actions.decideConfirm?.(b, family(), 1, { k0: "issue" }, "v2.aaa");
+  await until(() => h.c.snapshot().result.kind === "written" && !h.c.snapshot().busy, "確定");
+  assert.deepEqual(seen.at(-1), ["decide", "i0001", 1, { k0: "issue" }, "v2.aaa"]);
+  assert.equal(h.c.snapshot().decide, undefined);
+  assert.match(h.c.snapshot().result.text, /行き先を反映しました。続きの子：i0001-f1。作った issue：https:\/\/example.test\/issues\/9（コミット：0123456）/);
+  // 見せた指摘が変わった: 画面は開いたまま読み直して選び直させる
+  out = { kind: "mismatch", message: "指摘が増えました" };
+  h.c.actions.decideOpen?.(b, family(), 1);
+  await until(() => h.c.snapshot().decide?.preview !== null && h.c.snapshot().decide !== undefined, "再度開く");
+  h.c.actions.decideConfirm?.(b, family(), 1, { k0: "fix" }, "v2.aaa");
+  await until(() => !h.c.snapshot().busy && (h.c.snapshot().decide?.notice ?? "") !== "", "mismatch");
+  assert.match(h.c.snapshot().decide?.notice ?? "", /指摘が変わりました（指摘が増えました）。.*選び直してください/);
+  assert.equal(h.c.snapshot().decide?.deciding, false);
+  h.c.actions.decideCancel?.();
+  assert.equal(h.c.snapshot().decide, undefined);
+});
+
+test("CX-T274 決める: ホストへの書き込みが途中で止まったら、済んだ分と理由と読み直しの案内を出し、画面を閉じる。断れば何も書かない", async () => {
+  let decides = 0;
+  const h = harness({
+    confirm: false,
+    ops: {
+      decidePreview: async () => PREVIEW,
+      decide: async () => (
+        decides++,
+        { kind: "halted", done: { issues: ["https://example.test/issues/9"], replied: 1, resolved: 0 }, message: "解決に失敗（403）" } as DecideOutcome
+      ),
+    },
+  });
+  await h.c.refresh();
+  const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
+  h.c.actions.decideOpen?.(b, family(), 1);
+  await until(() => h.c.snapshot().decide?.preview !== null, "プレビュー");
+  h.c.actions.decideConfirm?.(b, family(), 1, { k0: "issue" }, "v2.aaa");
+  await until(() => !h.c.snapshot().busy, "断る");
+  assert.equal(decides, 0);
+  assert.notEqual(h.c.snapshot().decide, undefined);
+  (h.env as { confirm: (m: string) => boolean }).confirm = () => true;
+  h.c.actions.decideConfirm?.(b, family(), 1, { k0: "issue" }, "v2.aaa");
+  await until(() => h.c.snapshot().result.kind === "halted" && !h.c.snapshot().busy, "途中で止まる");
+  assert.equal(decides, 1);
+  const r = h.c.snapshot().result;
+  assert.equal(r.className, "notice error");
+  assert.match(r.text, /作った issue：https:\/\/example.test\/issues\/9。返信 1 件・解決 0 件）。止まった理由：解決に失敗（403）。.*未解決の指摘だけ決め直してください。済んだ分は MR の返信と issue に残りますが、決めた内容のまとめのコメントには載りません/);
+  assert.equal(h.c.snapshot().decide, undefined);
+});
+
+test("CX-T295 決める: ホストへ書き込み済みの失敗（conflict・refused・changed・mismatch）は、画面を閉じる。書いていない失敗と mismatch は開いたまま", async () => {
+  const cases: [DecideOutcome, boolean][] = [
+    [{ kind: "conflict", message: "ホストは済み", hostWritten: true }, true],
+    [{ kind: "refused", message: "ホストは済み", hostWritten: true }, true],
+    [{ kind: "changed", message: "ホストは済み", hostWritten: true }, true],
+    [{ kind: "mismatch", message: "ホストは済み", hostWritten: true }, true],
+    [{ kind: "refused", message: "何も書いていない" }, false],
+  ];
+  for (const [out, closes] of cases) {
+    const h = harness({ ops: { decidePreview: async () => PREVIEW, decide: async () => out } });
+    await h.c.refresh();
+    const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
+    h.c.actions.decideOpen?.(b, family(), 1);
+    await until(() => h.c.snapshot().decide?.preview !== null, "プレビュー");
+    h.c.actions.decideConfirm?.(b, family(), 1, { k0: "issue" }, "v2.aaa");
+    await until(() => !h.c.snapshot().busy && h.c.snapshot().result.text !== "", "確定");
+    assert.equal(h.c.snapshot().decide === undefined, closes, JSON.stringify(out));
+    assert.match(h.c.snapshot().result.text, /ホストは済み|何も書いていない/);
+  }
+});
+
+test("CX-T296 決める: 再利用した issue は『作った』に数えず、増えた指摘が判断待ちなら文面で言う", () => {
+  const text = sayDecide({ kind: "written", oid: "", reviewed: false, followup: "", issues: [], reusedIssues: ["https://example.test/issues/3"], pendingExtra: 2 }).text;
+  assert.match(text, /行き先は反映しましたが、見せた後に増えた指摘 2 件が判断待ちで、フェーズはレビュー済みにしていません/);
+  assert.match(text, /既にあった issue 1 件：https:\/\/example.test\/issues\/3/);
+  assert.ok(!text.includes("作った issue"));
+  const halted = sayDecide({ kind: "halted", done: { issues: [], reusedIssues: ["https://example.test/issues/3"], replied: 0, resolved: 0 }, message: "x" }).text;
+  assert.match(halted, /作った issue：なし。既にあった issue 1 件/);
+});
+
+const settled = (h: ReturnType<typeof harness>) => !h.c.snapshot().busy && h.c.snapshot().state === "done";
+const previewOf = (over: Partial<typeof PREVIEW> = {}) => ({ ...PREVIEW, ...over });
+
+test("CX-T275 決める: 既定で実物に配線され、入口の操作が付く", () => {
+  assert.equal(typeof harness().c.actions.decideOpen, "function");
+  const w = harness({ ops: { decidePreview: async () => PREVIEW, decide: async () => ({ kind: "failed", message: "x" }) } });
+  assert.equal(typeof w.c.actions.decideOpen, "function");
+});
+
+test("CX-T276 決める: 開くたびの番号で、遅れて届いた読み取りの結果と失敗を、開き直した画面や別のフェーズに付けない。状態はリポジトリのキーを持つ", async () => {
+  const waits: { resolve: (p: typeof PREVIEW) => void; reject: (e: Error) => void }[] = [];
+  const h = harness({
+    ops: {
+      decidePreview: () => new Promise((resolve, reject) => void waits.push({ resolve, reject })),
+      decide: async () => ({ kind: "failed", message: "x" }),
+    },
+  });
+  await h.c.refresh();
+  const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
+  h.c.actions.decideOpen?.(b, family(), 1);
+  assert.equal(h.c.snapshot().decide?.repo, KEY);
+  await until(() => waits.length === 1, "1 回目");
+  h.c.actions.decideCancel?.();
+  h.c.actions.decideOpen?.(b, family(), 1);
+  await until(() => waits.length === 2, "2 回目");
+  waits[1].resolve(previewOf({ digest: "v2.new" }));
+  await until(() => h.c.snapshot().decide?.preview !== null, "2 回目の結果");
+  waits[0].resolve(previewOf({ digest: "v2.old" }));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(h.c.snapshot().decide?.preview?.digest, "v2.new");
+  // 別のフェーズを開いたあとに、前のフェーズの失敗が届く
+  h.c.actions.decideCancel?.();
+  h.c.actions.decideOpen?.(b, family(), 1);
+  await until(() => waits.length === 3, "3 回目");
+  h.c.actions.decideCancel?.();
+  h.c.actions.decideOpen?.(b, family(), 2);
+  await until(() => waits.length === 4, "4 回目");
+  waits[2].reject(new Error("前の失敗"));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(h.c.snapshot().decide?.phase, 2);
+  assert.equal(h.c.snapshot().decide?.notice, "");
+});
+
+test("CX-T277 決める: 確認文に内訳と続きの子の注意が入る。0 件はレビュー済みと同じ文面。失敗は画面を開いたまま理由を残す。要確認なら開かない", async () => {
+  let out: DecideOutcome = { kind: "refused", message: "権限が足りません" };
+  const two = previewOf({
+    threads: [
+      { ...PREVIEW.threads[0], key: "a" },
+      { ...PREVIEW.threads[0], key: "b" },
+      { ...PREVIEW.threads[0], key: "c" },
+    ],
+  });
+  let shown: typeof PREVIEW = two;
+  const called: string[] = [];
+  const h = harness({ ops: { decidePreview: async () => shown, decide: async (_r, _f, _p, c) => (called.push(JSON.stringify(c)), out) } });
+  await h.c.refresh();
+  const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
+  h.c.actions.decideOpen?.(b, family(), 1);
+  await until(() => h.c.snapshot().decide?.preview !== null, "プレビュー");
+  // 未知のキー・足りないキーは ops に渡さない
+  h.c.actions.decideConfirm?.(b, family(), 1, { a: "fix", b: "keep", z: "issue" }, "v2.aaa");
+  await until(() => settled(h), "照合");
+  assert.deepEqual(called, []);
+  assert.match(h.c.snapshot().decide?.notice ?? "", /行き先を選んでいない指摘か/);
+  h.c.actions.decideConfirm?.(b, family(), 1, { a: "fix", b: "keep", c: "issue" }, "v2.aaa");
+  await until(() => called.length === 1 && settled(h), "失敗");
+  assert.match(h.log.confirm.at(-1) ?? "", /このフェーズで直す 1 件・issue に回す 1 件・対応しない 1 件）。「このフェーズで直す」が 1 件以上あるので、続きの子チケットを作り/);
+  // 失敗は画面を開いたまま理由を残す（直後の読み直しでも消えない）
+  assert.ok(h.c.snapshot().decide?.preview);
+  assert.equal(h.c.snapshot().decide?.deciding, false);
+  assert.match(h.c.snapshot().decide?.notice ?? "", /権限が足りません/);
+  h.c.actions.decideCancel?.();
+  // 0 件
+  shown = previewOf({ threads: [] });
+  out = { kind: "written", oid: "0123456789abcdef", reviewed: true, followup: "", issues: [] };
+  h.c.actions.decideOpen?.(b, family(), 1);
+  await until(() => h.c.snapshot().decide?.preview !== null, "0 件");
+  h.c.actions.decideConfirm?.(b, family(), 1, {}, "v2.aaa");
+  await until(() => called.length === 2 && settled(h), "0 件の確定");
+  assert.match(h.log.confirm.at(-1) ?? "", /^i0001 のフェーズ 1 をレビュー済みにする。レビュー待ちの子チケットを done\/ に移動し/);
+  assert.equal(h.c.snapshot().decide, undefined);
+  // 要確認のあいだは開かない
+  h.store.attention = { [KEY]: { i0001: "競合が残った" } };
+  h.c.actions.decideOpen?.(b, family(), 1);
+  await until(() => h.c.snapshot().decide === undefined && h.c.snapshot().result.kind === "refused", "要確認");
+});
+
+test("CX-T278 決める: キーが空・重複の指摘は画面を出さず読み取り不能。見せ直しでキーと版が同じ指摘の選択を引き継ぐ", async () => {
+  let shown = previewOf({ threads: [PREVIEW.threads[0], PREVIEW.threads[0]] });
+  let out: DecideOutcome = { kind: "mismatch", message: "増えた" };
+  const h = harness({ ops: { decidePreview: async () => shown, decide: async () => out } });
+  await h.c.refresh();
+  const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
+  h.c.actions.decideOpen?.(b, family(), 1);
+  await until(() => (h.c.snapshot().decide?.notice ?? "") !== "", "重複");
+  assert.equal(h.c.snapshot().decide?.preview, null);
+  assert.match(h.c.snapshot().decide?.notice ?? "", /キーが重複/);
+  h.c.actions.decideCancel?.();
+  const t = (key: string, version: string) => ({ ...PREVIEW.threads[0], key, version });
+  shown = previewOf({ threads: [t("a", "1"), t("b", "1")] });
+  h.c.actions.decideOpen?.(b, family(), 1);
+  await until(() => h.c.snapshot().decide?.preview !== null, "プレビュー");
+  shown = previewOf({ digest: "v2.next", threads: [t("a", "1"), t("b", "2"), t("c", "1")] });
+  h.c.actions.decideConfirm?.(b, family(), 1, { a: "keep", b: "issue" }, "v2.aaa");
+  await until(() => h.c.snapshot().decide?.preview?.digest === "v2.next" && settled(h), "見せ直し");
+  assert.deepEqual(h.c.snapshot().decide?.inherited, { a: "keep" });
+  assert.match(h.c.snapshot().decide?.notice ?? "", /新しい指摘は「このフェーズで直す」に戻っています/);
+  out = { kind: "written", oid: "0123456789abcdef", reviewed: true, followup: "", issues: [] };
 });

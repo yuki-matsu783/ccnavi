@@ -1,14 +1,14 @@
 /**
  * 残った指摘の対応方針を決めるオーバーレイの中身。［レビュー完了］を押すとここに来る。
  *
- * - 未解決が 0 件（正しく読めたときだけ。読めなかったときはここに来ない）: 「フェーズ N に未解決の指摘はありません」と
- *   主ボタン「レビュー済みにする」
- * - 1 件以上: 指摘を 1 件ずつ並べ、対応方針（対応しない・このフェーズで直す・issue に回す）を選ばせる。全部に選ぶまで
- *   主ボタン「この対応方針を確定」は押せない。副ボタン「エージェントに相談するプロンプトをコピー」は、オーバーレイを
- *   閉じず、選びかけの対応方針も変えない
+ * - 未解決が 0 件のとき（正しく読めたときだけ。読めなかったときはここに来ない）: 「フェーズ N に未解決の指摘はありません」と、
+ *   主ボタン「レビュー済みにする」を出す。
+ * - 1 件以上のとき: 指摘を 1 件ずつ並べ、対応方針（対応しない・このフェーズで直す・issue に回す）を選ばせる。
+ *   何も選ばなければ、全部を「このフェーズで直す」とする。2 件以上なら、全部を一括で同じ対応方針にする小さな行を出す。
+ *   副ボタン「エージェントに相談するプロンプトをコピー」は、オーバーレイを閉じず、選びかけの対応方針も変えない。
  *
- * 選んでいる途中の対応方針だけをここに持つ。見せる指摘・ダイジェスト・置いている最中かは拡張ホストが持ち、
- * ここは渡されたものを見せるだけ。押したら選んだ対応方針をキーごとに返す（`decideConfirm`）。
+ * 選び直した対応方針だけをここに持つ。見せる指摘、ダイジェスト、置いている最中かどうかは拡張ホストが持つ。
+ * ここは渡されたものを見せるだけ。押したら、選んだ対応方針をキーごとに返す（`decideConfirm`）。
  */
 import { useState, type JSX } from "react";
 
@@ -16,6 +16,8 @@ import { DECIDE_CHOICES, DECIDE_LABELS, type DecideChoice, type DecidePreview } 
 import { DialogActions } from "../shared/Dialog.js";
 import { post } from "./post.js";
 import { isHttpUrl } from "./text.js";
+
+const DEFAULT_CHOICE: DecideChoice = "fix";
 
 export function DecideBody({
   preview,
@@ -34,11 +36,16 @@ export function DecideBody({
     digest: preview.digest,
     choices: {},
   });
-  const choices = picked.digest === preview.digest ? picked.choices : {};
+  // 何も選ばなければ、全部「このフェーズで直す」。選び直したものだけを上書きする
+  const overrides = picked.digest === preview.digest ? picked.choices : {};
+  const choices: Record<string, DecideChoice> = Object.fromEntries(
+    preview.threads.map((t) => [t.key, overrides[t.key] ?? DEFAULT_CHOICE]),
+  );
   const choose = (key: string, choice: DecideChoice): void =>
     setPicked({ digest: preview.digest, choices: { ...choices, [key]: choice } });
+  const chooseAll = (choice: DecideChoice): void =>
+    setPicked({ digest: preview.digest, choices: Object.fromEntries(preview.threads.map((t) => [t.key, choice])) });
   const count = preview.threads.length;
-  const done = preview.threads.every((t) => t.key in choices);
   return (
     <>
       <h2 id="approval-title">
@@ -54,6 +61,24 @@ export function DecideBody({
           ? "このフェーズをレビュー済みにしますか？"
           : "「このフェーズで直す」を 1 件でも選ぶと、追加対応用の子チケットを作成し、このフェーズを再開します。"}
       </p>
+      {/* 2 件以上のときだけ、全部を同じ対応方針にする小さな行を出す。個別の選択は上書きされる */}
+      {count < 2 ? null : (
+        <div className="decide-bulk">
+          <span>すべて:</span>
+          {DECIDE_CHOICES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className="decide-bulk-button"
+              data-bulk={c}
+              disabled={deciding}
+              onClick={() => chooseAll(c)}
+            >
+              {DECIDE_LABELS[c]}
+            </button>
+          ))}
+        </div>
+      )}
       {count === 0 ? null : (
         <ol className="decide-threads" data-tour="decide-threads">
           {preview.threads.map((t) => (
@@ -103,7 +128,7 @@ export function DecideBody({
           className="action primary"
           data-action="decide-confirm"
           data-tour="decide-confirm"
-          disabled={deciding || !done}
+          disabled={deciding}
           onClick={() => post({ type: "decideConfirm", choices })}
         >
           {deciding ? "反映中…" : count === 0 ? "レビュー済みにする" : "この対応方針を確定"}

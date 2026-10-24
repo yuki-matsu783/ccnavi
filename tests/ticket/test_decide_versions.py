@@ -99,7 +99,7 @@ class DigestTest(unittest.TestCase):
 
     def test_the_board_json_carries_versions_and_the_last_comment(self):
         t = thread("u1", "x", last_comment_id="c9", last_comment_at="T", last_comment_author="me")
-        data = review_decide._decision_json(decision([t]))
+        data = review_decide.decision_json(decision([t]))
         self.assertEqual(data["version"], 2)
         row = data["threads"][0]
         self.assertEqual(row["version"], review.thread_version(t))
@@ -112,11 +112,11 @@ class TranscribeTest(unittest.TestCase):
         body = "1行目\n\n```py\nprint(1)\n```\n@someone\n/close\n"
         block = review_decide.thread_block(decision([]), thread("u1", body), 1, "o" * 32)
         self.assertIn("### 指摘 1", block)
-        self.assertIn("キー: u1", block)
-        self.assertIn("位置: a.py:3", block)
+        self.assertIn("キー: `u1`", block)
+        self.assertIn("位置: `a.py:3`", block)
         self.assertIn(f"版: {review.thread_version(thread('u1', body))}", block)
-        self.assertIn("取得元: github", block)
-        self.assertIn("操作: " + "o" * 32, block)
+        self.assertIn("取得元: `github`", block)
+        self.assertIn("操作: `" + "o" * 32 + "`", block)
         # 本文の中の ``` より長いフェンスで囲み、本文はそのまま入る。
         self.assertIn("````text\n", block)
         self.assertIn(body.rstrip("\n"), block)
@@ -202,8 +202,8 @@ class PostTextTest(unittest.TestCase):
         self.assertIn("指摘 1", text)
         self.assertNotIn("指摘 2", text)
         self.assertNotIn("指摘 3", text)
-        self.assertIn("操作: " + "a" * 32, text)
-        self.assertIn("取得元: gitlab", text)
+        self.assertIn("操作: `" + "a" * 32 + "`", text)
+        self.assertIn("取得元: `gitlab`", text)
 
     def test_the_note_lists_each_destination_and_the_followup(self):
         text = review_decide.post_text(self.record(), "note")

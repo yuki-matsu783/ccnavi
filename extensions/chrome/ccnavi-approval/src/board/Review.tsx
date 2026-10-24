@@ -5,11 +5,21 @@
  */
 import type { JSX } from "react";
 
-import type { ReviewPanel } from "../core/reviewed.js";
+import type { DecideChoice, ReviewPanel } from "../core/reviewed.js";
+import type { DecideState } from "./controller.js";
+import { Decide } from "./Decide.js";
 import { Markdown } from "./Markdown.js";
 import { ActionButton, Link, Notice } from "./parts.js";
 
-export function Review({ panel, writable, onReview }: { panel: ReviewPanel; writable: boolean; onReview?: (phase: number) => void }): JSX.Element {
+/** 残った指摘の行き先を決める画面への入口。渡さなければ画面を出さない（`decide` は開いている画面の状態） */
+export interface DecideHandlers {
+  readonly state?: DecideState;
+  open(phase: number): void;
+  confirm(phase: number, choices: Record<string, DecideChoice>, digest: string): void;
+  cancel(): void;
+}
+
+export function Review({ panel, writable, onReview, decide }: { panel: ReviewPanel; writable: boolean; onReview?: (phase: number) => void; decide?: DecideHandlers }): JSX.Element {
   // GitLab の MR は `!番号`、GitHub の PR は `#番号`
   const mark = (panel.copy?.host ?? panel.host) === "gitlab" ? "!" : "#";
   const head = (
@@ -31,6 +41,8 @@ export function Review({ panel, writable, onReview }: { panel: ReviewPanel; writ
   // ccnavi の依頼のスレッドを数えないのは Python。ここは未解決の件数を取得した結果のとおりに出す
   const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
   const unresolved = threads.filter((t) => !t.resolved).length;
+  // 未解決の指摘が残るフェーズは、行き先を決める画面から確定する（0 件のときは「レビュー済みにする」）
+  const showDecide = writable && decide !== undefined && (unresolved > 0 || (panel.decide?.threads.length ?? 0) > 0);
   return (
     <section className="review" data-phase={String(panel.phase)}>
       {head}
@@ -47,7 +59,9 @@ export function Review({ panel, writable, onReview }: { panel: ReviewPanel; writ
           </li>
         ))}
       </ul>
-      {panel.problems.length > 0 ? (
+      {showDecide ? (
+        <DecideEntry panel={panel} decide={decide as DecideHandlers} />
+      ) : panel.problems.length > 0 ? (
         <ul className="problems">
           {panel.problems.map((p, i) => (
             <li key={i}>{p}</li>
@@ -59,5 +73,45 @@ export function Review({ panel, writable, onReview }: { panel: ReviewPanel; writ
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** 決める画面を開くボタンと、開いている画面。problems（通さない理由）は画面の上に残す */
+function DecideEntry({ panel, decide }: { panel: ReviewPanel; decide: DecideHandlers }): JSX.Element {
+  const state = decide.state?.phase === panel.phase ? decide.state : undefined;
+  const preview = state?.preview ?? null;
+  return (
+    <>
+      {panel.problems.length > 0 ? (
+        <ul className="problems">
+          {panel.problems.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      ) : null}
+      {state === undefined ? (
+        <div className="actions">
+          <ActionButton action="decide-open" onClick={() => decide.open(panel.phase)}>{`フェーズ ${panel.phase} の残った指摘の行き先を決める`}</ActionButton>
+        </div>
+      ) : preview === null ? (
+        <>
+          <p className="empty">{state.notice || "残った指摘を読み込んでいます…"}</p>
+          {state.notice ? (
+            <div className="actions">
+              <ActionButton action="decide-cancel" onClick={() => decide.cancel()}>閉じる</ActionButton>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <Decide
+          preview={preview}
+          deciding={state.deciding}
+          notice={state.notice}
+          inherited={state.inherited}
+          onConfirm={(choices, digest) => decide.confirm(panel.phase, choices, digest)}
+          onCancel={() => decide.cancel()}
+        />
+      )}
+    </>
   );
 }

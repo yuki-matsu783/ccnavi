@@ -1,0 +1,33 @@
+/*
+ * 残った指摘の行き先を決める画面（`Decide.tsx`）。VS Code 拡張の決める画面（`Approval.css` の `.decide-*`）と同じ作り。
+ * 3 択のラジオは見えなくして、ラベルを同じ寸法の切り替えにする（フォーカスと矢印キーの操作はラジオのまま）。
+ */
+.decide { border-top: 1px solid var(--vscode-panel-border); margin-top: 8px; padding-top: 4px; }
+.decide h5 { margin: 4px 0; font-size: var(--font-lg); }
+.decide-note { margin: 2px 0 6px; color: var(--vscode-descriptionForeground); font-size: var(--font-sm); }
+.decide-bulk { display: flex; align-items: center; gap: var(--gap-4); justify-content: flex-end; margin: 0 0 4px; font-size: var(--font-md); color: var(--vscode-descriptionForeground); }
+.decide-bulk-button { background: none; border: none; padding: 2px 4px; font: inherit; color: var(--vscode-textLink-foreground); cursor: pointer; }
+.decide-bulk-button:hover, .decide-bulk-button:focus-visible { text-decoration: underline; color: var(--vscode-textLink-activeForeground); }
+.decide-bulk-button:disabled { opacity: .5; cursor: not-allowed; text-decoration: none; }
+.decide-threads { margin: 0; padding-left: 22px; }
+.decide-thread { padding: 6px 0; border-bottom: 1px solid var(--vscode-panel-border); }
+.decide-where { display: flex; gap: var(--gap-4); flex-wrap: wrap; font-size: var(--font-md); }
+.decide-url { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+a.decide-url { color: var(--vscode-textLink-foreground); text-decoration: none; }
+a.decide-url:hover, a.decide-url:focus-visible { text-decoration: underline; color: var(--vscode-textLink-activeForeground); }
+.decide-body { margin: 2px 0 4px; overflow-wrap: anywhere; }
+.decide-more > summary { cursor: pointer; width: fit-content; color: var(--vscode-descriptionForeground); font-size: var(--font-md); }
+.decide-unsupported { margin: 4px 0; }
+.decide-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); font-size: var(--font-md); max-width: 36em; }
+.decide-choice {
+  position: relative; display: flex; align-items: center; justify-content: center; text-align: center;
+  box-sizing: border-box; min-height: 28px; padding: 3px 6px; cursor: pointer; overflow-wrap: anywhere;
+  border: 1px solid var(--vscode-button-border, rgba(128, 128, 128, .5));
+  background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
+}
+.decide-choice:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.decide-choice:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.decide-choice input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.decide-choice:has(input:checked) { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); font-weight: 600; }
+.decide-choice:has(input:focus-visible) { outline: 2px solid var(--vscode-focusBorder); outline-offset: -2px; }
+.decide-choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }

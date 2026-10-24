@@ -107,7 +107,7 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 
 | モジュール | 名前 |
 |---|---|
-| `ccnavi.tickets.core` | `Snapshot`・`Actor`・`Changes`（`per_branch()`・`lines`・`planned.stopped`）・`read_fs(conf, root, stamp="", actor=None)`・`judge_approval(snapshot, only=None, shown_ids=None, shown_digest=None)`（戻り値の `gathered.refused`・`batch`・`mismatch`・`identifiers`・`screen_text`・`digest`・`rejected`）・`approval_refusal_code(verdict)`・`plan(snapshot, verdict)`・`confirm(snapshot, parent_id, phase_no, result, changed_since_request)`（`confirm` の戻り値の `problems`・`changes`・`code`）・`reviewable(snapshot, parent_id)`・`requested_head(snapshot, parent_id, phase_no)`・`moved_on_host(snapshot, parent_id, phase_no, head, changed)` |
+| `ccnavi.tickets.core` | `Snapshot`・`Actor`・`Changes`（`per_branch()`・`lines`・`planned.stopped`）・`read_fs(conf, root, stamp="", actor=None)`・`judge_approval(snapshot, only=None, shown_ids=None, shown_digest=None)`（戻り値の `gathered.refused`・`batch`・`mismatch`・`identifiers`・`screen_text`・`digest`・`rejected`）・`approval_refusal_code(verdict)`・`plan(snapshot, verdict)`・`confirm(snapshot, parent_id, phase_no, result, changed_since_request)`（`confirm` の戻り値の `problems`・`changes`・`code`）・`decide_preview(snapshot, parent_id, phase_no, result, changed_since_request, moved=None, carry=frozenset())`・`decide(snapshot, parent_id, phase_no, result, changed_since_request, moved=None, choices=None, shown_digest=None, carry=frozenset())`・`reviewable(snapshot, parent_id)`・`requested_head(snapshot, parent_id, phase_no)`・`moved_on_host(snapshot, parent_id, phase_no, head, changed)` |
 | `ccnavi.entry.cli` | `run(stdin, stdout, stderr, argv)` |
 | `ccnavi.entry.lint` | `SH_COMPAT_FILE`・`_SH_COMPAT`（`CCNAVI_COMPAT` の行を読む正規表現） |
 | `ccnavi.entry.version` | `VERSION`・`COMPAT` |

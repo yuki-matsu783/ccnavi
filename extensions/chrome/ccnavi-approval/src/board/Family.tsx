@@ -10,15 +10,18 @@ import type { JSX, ReactNode } from "react";
 import type { FamilyBoard } from "../core/snapshot.js";
 import { Markdown } from "./Markdown.js";
 import { ActionButton, Notice } from "./parts.js";
-import { Review } from "./Review.js";
+import type { DecideState } from "./controller.js";
+import { Review, type DecideHandlers } from "./Review.js";
 
 export interface FamilyActions {
   approve(): void;
   review?(phase: number): void;
+  /** 残った指摘の行き先を決める画面。渡さなければ画面を出さない */
+  decide?: Omit<DecideHandlers, "state">;
 }
 
 /** `attention` は見出しのすぐ後に置く（要確認の一言。`Attention`） */
-export function Family({ family: f, actions, attention }: { family: FamilyBoard; actions?: FamilyActions; attention?: ReactNode }): JSX.Element {
+export function Family({ family: f, actions, attention, decide }: { family: FamilyBoard; actions?: FamilyActions; attention?: ReactNode; decide?: DecideState }): JSX.Element {
   return (
     <article className="family" data-family={f.family.name}>
       <h3>
@@ -34,12 +37,12 @@ export function Family({ family: f, actions, attention }: { family: FamilyBoard;
         ) : null}
       </h3>
       {attention}
-      <FamilyBody f={f} actions={actions} />
+      <FamilyBody f={f} actions={actions} decide={decide} />
     </article>
   );
 }
 
-function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions }): ReactNode {
+function FamilyBody({ f, actions, decide }: { f: FamilyBoard; actions?: FamilyActions; decide?: DecideState }): ReactNode {
   if (f.error) return <Notice kind="error" text={f.error} />;
   const r = f.result;
   if (r === null) return null;
@@ -99,7 +102,7 @@ function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions })
         ) : null
       ) : null}
       {(f.reviews ?? []).map((panel) => (
-        <Review key={panel.phase} panel={panel} writable={write.allowed} onReview={actions?.review} />
+        <Review key={panel.phase} panel={panel} writable={write.allowed} onReview={actions?.review} decide={actions?.decide ? { ...actions.decide, state: decide } : undefined} />
       ))}
       {(r.rejected ?? []).map((rej, i) => (
         <section key={i} className="rejected" data-ticket={rej.ticket}>

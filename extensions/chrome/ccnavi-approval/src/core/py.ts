@@ -2,6 +2,8 @@
  * Pyodide の上の入口（`py/ccnavi_chrome.py`）との約束。判定はすべて Python が出し、
  * ここは形だけを持つ。TS で判定し直すと、手元の hook・lint と答えが 2 か所に分かれるため。
  */
+import type { HostPlan } from "./decide-host.js";
+import type { DecidePreview } from "./reviewed.js";
 
 /** 要求と答えの形の版。`ccnavi_chrome.SCHEMA` と揃える */
 export const PY_SCHEMA = 1;
@@ -178,6 +180,22 @@ export interface ConfirmResult extends Written {
   readonly need_manual?: { readonly paths: readonly string[] };
 }
 
+/** `decide` の答え。`confirm` と同じ形に、見せる指摘（preview）かホストへ書く計画（apply）が付く */
+export interface DecideResult extends ConfirmResult {
+  /** mode=preview で通ったときだけ。`DecidePreview` と同じ形（`unsupported` は拡張が足す） */
+  readonly preview: DecidePreview | null;
+  /** mode=apply で通ったときだけ。拡張がこの順にホストへ書く */
+  readonly host_plan: HostPlan | null;
+  /** マーカーを置く（`fix` が無く、見せたあとに増えた指摘も無い） */
+  readonly reviewed: boolean;
+  /** 起こす続きの子の識別子（無ければ ""） */
+  readonly followup: string;
+  /** 見せたあとに増えた指摘のキー（未対応で残す） */
+  readonly pending_extra: readonly string[];
+  /** 見せた指摘と今の指摘の食い違い（`CORE_DECIDE_MISMATCH` のとき） */
+  readonly mismatch: unknown;
+}
+
 /** compare API の変更の一覧（`github.compareFiles` の答え。`files` が null なら読めない・打ち切られた） */
 export interface Compare {
   readonly base: string;
@@ -251,4 +269,24 @@ export const py = {
       actor?: Actor;
     },
   ) => ask<ConfirmResult>(call, "confirm", { ...body }, ""),
+  decide: (
+    call: PyCall,
+    body: {
+      snapshot: Snapshot;
+      family: string;
+      phase: number;
+      result: unknown;
+      mode: "preview" | "apply";
+      /** apply のとき必須。指摘のキー → 行き先 */
+      choices?: Readonly<Record<string, string>>;
+      /** apply のとき必須。preview が返した digest */
+      shown_digest?: string;
+      /** ホストで受け入れ済み（返信して解決済み）と確かめたキー */
+      carry?: readonly string[];
+      compare?: Compare;
+      manual_moved_at?: number;
+      stamp: string;
+      actor?: Actor;
+    },
+  ) => ask<DecideResult>(call, "decide", { ...body }, ""),
 };

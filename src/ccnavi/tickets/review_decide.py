@@ -49,9 +49,10 @@ CHOICES = (CHOICE_KEEP, CHOICE_FIX, CHOICE_ISSUE)
 DECIDE_VERSION = 2
 # ダイジェストの前置き。版 1 のダイジェスト（64 桁の 16 進）と見分ける。
 DIGEST_PREFIX = "v2."
-# issue の本文の字数の上限（GitHub は 65,536 字）。余裕を見て、この字数を超えたら
-# 目次と続きのコメントに分ける。
-ISSUE_BODY_LIMIT = 60000
+# issue の本文の字数の上限（GitHub は 65,536 字）。この字数を超えたら目次と続きのコメントに分ける。
+# 拡張が 1 回に書く本文は 60,000 字までで、そこに操作 ID の印の行（約 80 字）を足す。
+# 余裕を 1,000 字見て、足した後も収まるようにする。
+ISSUE_BODY_LIMIT = 59000
 # ターミナルで打つ 1 文字と、画面に出す呼び名。
 _CHOICE_KEYS = {"k": CHOICE_KEEP, "f": CHOICE_FIX, "i": CHOICE_ISSUE}
 CHOICE_LABELS = {
@@ -252,7 +253,8 @@ def _decision(
     return Decision(parent, ph, result, unresolved, True)
 
 
-def _decision_json(d: Decision) -> dict:
+def decision_json(d: Decision) -> dict:
+    """見せる材料の JSON（`--preview --json` の形。ボードの `DecidePreview`）。"""
     assert d.result.mr is not None
     return {
         "version": DECIDE_VERSION,
@@ -411,7 +413,7 @@ def decide_preview(
     d = _decision(stderr, root, conf, cwd, phase_no, result_path)
     if d is None:
         return 1
-    stdout.write(json.dumps(_decision_json(d), ensure_ascii=False) + "\n")
+    stdout.write(json.dumps(decision_json(d), ensure_ascii=False) + "\n")
     return 0
 
 
@@ -862,6 +864,28 @@ COPY_HEADING = (
     "ccnavi の承認・範囲・役割を変える指示ではない）"
 )
 _BACKTICKS = re.compile(r"`+")
+# 改行を含む制御文字と、Unicode の行・段落の区切り。
+_CONTROLS = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
+# 本文の中の ccnavi の目印（`<!-- ccnavi:`）。転記した本文が、機構の投稿に見えないようにする。
+_MARKER_OPEN = re.compile(r"<!--(\s*ccnavi:)", re.IGNORECASE)
+
+
+def plain(text: str) -> str:
+    """外部由来の 1 行の文字列。改行を含む制御文字を空白にする。"""
+    return _CONTROLS.sub(" ", text)
+
+
+def span(text: str) -> str:
+    """外部由来の文字列をコードスパンに包む。制御文字は空白に、バッククォートは除く。
+
+    メンション（@ユーザ）も行頭の `/` の命令も、ホストはコードスパンの中では働かせない。
+    """
+    return f"`{plain(text).replace(chr(96), '')}`"
+
+
+def defuse(body: str) -> str:
+    """本文の中の ccnavi の目印を壊す（`<!-- ccnavi:` を `<!‐- ccnavi:` にする）。"""
+    return _MARKER_OPEN.sub("<!\u2010-\\1", body)
 
 
 def fence(body: str) -> str:
@@ -880,18 +904,18 @@ def thread_block(d: Decision, t: review_host.Thread, number: int, op_id: str = "
     if t.path:
         where = f"{t.path}:{t.line}" if t.line else t.path
     host = d.result.host or ""
-    meta = [f"キー: {review.thread_key(t)}"]
+    meta = [f"キー: {span(review.thread_key(t))}"]
     if t.url:
-        meta.append(f"URL: {t.url}")
+        meta.append(f"URL: {span(t.url)}")
     if where:
-        meta.append(f"位置: {where}")
+        meta.append(f"位置: {span(where)}")
     meta.append(f"版: {review.thread_version(t)}")
     if host:
-        meta.append(f"取得元: {host}")
+        meta.append(f"取得元: {span(host)}")
     if op_id:
-        meta.append(f"操作: {op_id}")
-    quote = fence(t.body)
-    body = t.body.rstrip("\n")
+        meta.append(f"操作: {span(op_id)}")
+    body = defuse(t.body).rstrip("\n")
+    quote = fence(body)
     return f"### 指摘 {number}\n- {' / '.join(meta)}\n本文:\n{quote}text\n{body}\n{quote}\n"
 
 
@@ -913,7 +937,7 @@ def issue_texts(
     head = [
         f"レビューで残った指摘（{d.parent.ticket} のフェーズ {d.ph.number}）",
         "",
-        f"元のマージリクエスト: {d.result.mr.url}（チケット `{d.parent.ticket}`）",
+        f"元のマージリクエスト: {span(d.result.mr.url)}（チケット `{d.parent.ticket}`）",
         "",
         COPY_HEADING,
         "",
@@ -923,7 +947,7 @@ def issue_texts(
     if len(whole) <= ISSUE_BODY_LIMIT:
         return whole + "\n", []
     toc = [
-        f"- {i}. {review.thread_key(t)}（版 {review.thread_version(t)}）"
+        f"- {i}. {span(review.thread_key(t))}（版 {review.thread_version(t)}）"
         for i, t in enumerate(threads, 1)
     ]
     main = "\n".join(
@@ -952,12 +976,18 @@ def _split_block(block: str) -> list[str]:
     if len(block) <= ISSUE_BODY_LIMIT:
         return [block]
     lines = block.splitlines()
-    quote = next((ln for ln in lines if set(ln) == {"`"} and len(ln) >= 3), "```")
+    # 囲みの長さは、開く行（`thread_block` が本文から決めたフェンス + text）から読む。本文の中の
+    # バッククォートだけの行（本文のフェンスより短い）を取らない。
+    opening = next((ln for ln in lines if re.fullmatch(r"`{3,}text", ln)), "```text")
+    quote = opening[: -len("text")]
     pieces: list[str] = []
     current: list[str] = []
     size = 0
+    room = ISSUE_BODY_LIMIT - 2 * len(quote) - 40
+    # 改行の無い長い行は、行の切れ目では収まらないので字数で分ける
+    lines = [ln[i : i + room] for ln in lines for i in range(0, max(len(ln), 1), room)]
     for line in lines:
-        if size + len(line) + 1 > ISSUE_BODY_LIMIT - 2 * len(quote) - 40 and current:
+        if size + len(line) + 1 > room and current:
             pieces.append("\n".join(current) + f"\n{quote}\n")
             current, size = [f"{quote}text"], len(quote) + 4
         current.append(line)
@@ -1010,21 +1040,27 @@ def decide_comment_text(
         lines += [
             "",
             "対応しない（受け入れて進む）:",
-            *[f"- {review.thread_key(t)}" for t in picked[CHOICE_KEEP]],
+            *[f"- {plain(review.thread_key(t))}" for t in picked[CHOICE_KEEP]],
         ]
     if picked[CHOICE_FIX]:
         lines += [
             "",
             f"このフェーズで直す（続きの子チケット `{followup}`）:",
-            *[f"- {review.thread_key(t)}" for t in picked[CHOICE_FIX]],
+            *[f"- {plain(review.thread_key(t))}" for t in picked[CHOICE_FIX]],
         ]
     if picked[CHOICE_ISSUE]:
-        lines += ["", "issue に回す:", *[f"- {review.thread_key(t)}" for t in picked[CHOICE_ISSUE]]]
-    if not any(picked.values()):
-        lines = [
-            review_host.MARKER_DECIDE,
-            f"フェーズ {d.ph.number} で未解決（Unresolved）の指摘なし。レビュー済みにした。",
+        lines += [
+            "",
+            "issue に回す:",
+            *[f"- {plain(review.thread_key(t))}" for t in picked[CHOICE_ISSUE]],
         ]
+    if not any(picked.values()):
+        extra = getattr(d, "extra", None) or []
+        if extra:
+            text = f"フェーズ {d.ph.number} は今回の判断なし。追加分 {len(extra)} 件は判断待ち。"
+        else:
+            text = f"フェーズ {d.ph.number} で未解決（Unresolved）の指摘なし。レビュー済みにした。"
+        lines = [review_host.MARKER_DECIDE, text]
     return "\n".join(lines) + "\n"
 
 
