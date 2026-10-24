@@ -70,6 +70,22 @@ export function sentenceLines(body: string): string[] {
   return lines;
 }
 
+/** 上端のバナー（案内のための見本です）の下に置くための、吹き出しの上端 */
+const WIDE_TOP = 52;
+/** 画面の縁から離す量（幅のある吹き出し） */
+const WIDE_SIDE = 16;
+
+/**
+ * 図や画像のある、幅のある吹き出しの置き場所。指す先の位置で上下に飛ばず、指す先と重ならない側（指す先が左半分なら右端、
+ * 右半分なら左端）の、バナーの下に置く。手順が進んでも、同じ側に留まりやすい。
+ */
+export function placeWide(target: Rect | undefined, bubble: { readonly width: number }, view: { readonly width: number; readonly height: number }): { top: number; left: number } {
+  const centerX = target === undefined ? view.width / 2 : target.left + target.width / 2;
+  const right = Math.max(WIDE_SIDE, view.width - bubble.width - WIDE_SIDE);
+  const left = centerX < view.width / 2 ? right : WIDE_SIDE;
+  return { top: Math.min(WIDE_TOP, Math.max(0, view.height - 120)), left };
+}
+
 /** ヘッダをつかんで動かした吹き出しの左上を、画面の中に収める（ヘッダを必ずつかみ直せるよう、一部は画面に残す） */
 export function clampDragged(at: { readonly top: number; readonly left: number }, bubbleWidth: number, view: { readonly width: number; readonly height: number }): { top: number; left: number } {
   const KEEP = 80;

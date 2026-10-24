@@ -6,9 +6,23 @@
  * `focus` に入れた矢印は光らせ、ほかは薄く出す（空なら全部を同じ濃さで出す）。
  * 矢印の向きは `from` から `to`。同じ登場者なら、その列の覚え書き（自分の中の動き）として箱で出す。
  */
-import type { CSSProperties, JSX } from "react";
+import { Fragment, type CSSProperties, type JSX, type ReactNode } from "react";
 
 import type { DiagramDef } from "../../core/tour-def.js";
+
+/** 文の中の `…` を、コードの字で出す（バッククォートを生のまま見せない）。奇数個で閉じていなければ、そのまま出す */
+export function inlineCode(text: string): ReactNode {
+  const parts = text.split("`");
+  if (parts.length < 3 || parts.length % 2 === 0) {
+    return text;
+  }
+  return parts.map((part, index) => (index % 2 === 1 ? <code key={index} className="tour-code">{part}</code> : <Fragment key={index}>{part}</Fragment>));
+}
+
+/** 図の中の順番。吹き出しの「3 / 5」（手順の番号）と見分けがつくよう、丸数字で出す（21 以上は数字のまま） */
+function circled(order: number): string {
+  return order >= 1 && order <= 20 ? String.fromCodePoint(0x2460 + order - 1) : String(order);
+}
 
 export function SequenceDiagram({ name, diagram, focus }: { readonly name: string; readonly diagram: DiagramDef; readonly focus: readonly string[] }): JSX.Element {
   const count = diagram.actors.length;
@@ -36,8 +50,8 @@ export function SequenceDiagram({ name, diagram, focus }: { readonly name: strin
           const start = Math.min(from, count - 2);
           return (
             <div key={step.id} className={`${classes} note`} data-step={step.id} style={{ gridColumn: `${start + 1} / span 2`, gridRow: row }}>
-              <span className="tour-diagram-no">{index + 1}</span>
-              <span className="tour-diagram-text">{step.text}</span>
+              <span className="tour-diagram-no">{circled(index + 1)}</span>
+              <span className="tour-diagram-text">{inlineCode(step.text)}</span>
               {step.value !== "" && <code className="tour-diagram-value">{step.value}</code>}
             </div>
           );
@@ -47,8 +61,8 @@ export function SequenceDiagram({ name, diagram, focus }: { readonly name: strin
         const arrow = to > from ? "right" : "left";
         return (
           <div key={step.id} className={`${classes} arrow ${arrow}`} data-step={step.id} style={{ gridColumn: `${left + 1} / span ${span}`, gridRow: row, ["--tour-diagram-inset" as string]: `calc(50% / ${span})` }}>
-            <span className="tour-diagram-no">{index + 1}</span>
-            <span className="tour-diagram-text">{step.text}</span>
+            <span className="tour-diagram-no">{circled(index + 1)}</span>
+            <span className="tour-diagram-text">{inlineCode(step.text)}</span>
             {step.value !== "" && <code className="tour-diagram-value">{step.value}</code>}
             <span className="tour-diagram-line" aria-hidden="true" />
           </div>

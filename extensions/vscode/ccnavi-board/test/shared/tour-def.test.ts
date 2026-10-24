@@ -159,3 +159,13 @@ test("CB-T1179 ヘッダを動かした吹き出しの位置は、画面の中�
   assert.deepEqual(clampDragged({ top: -50, left: -900 }, 500, view), { top: 0, left: -420 });
   assert.deepEqual(clampDragged({ top: 900, left: 5000 }, 500, view), { top: 652, left: 920 });
 });
+
+test("CB-T1272 幅のある吹き出しは、指す先が左半分なら右端、右半分なら左端の、バナーの下に置く（指す先が無ければ左端）", async () => {
+  const { placeWide } = await import("../../src/core/tour-place.js");
+  const view = { width: 1000, height: 700 };
+  assert.deepEqual(placeWide({ top: 100, left: 100, width: 100, height: 40 }, { width: 580 }, view), { top: 52, left: 404 });
+  assert.deepEqual(placeWide({ top: 100, left: 800, width: 100, height: 40 }, { width: 580 }, view), { top: 52, left: 16 });
+  assert.deepEqual(placeWide(undefined, { width: 580 }, view), { top: 52, left: 16 });
+  // 狭い画面でも、はみ出さない
+  assert.ok(placeWide({ top: 0, left: 0, width: 10, height: 10 }, { width: 900 }, { width: 400, height: 500 }).left >= 16);
+});

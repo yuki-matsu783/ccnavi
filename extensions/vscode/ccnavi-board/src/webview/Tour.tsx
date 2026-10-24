@@ -14,8 +14,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX, ty
 
 import { ESCAPE_LAYER, useEscape } from "./useEscape.js";
 import { INTRO_ID, type DiagramDef, type Scene, type TourDef } from "../core/tour-def.js";
-import { clampDragged, placeBubble, sentenceLines, type Rect } from "../core/tour-place.js";
-import { SequenceDiagram } from "./shared/SequenceDiagram.js";
+import { clampDragged, placeBubble, placeWide, sentenceLines, type Rect } from "../core/tour-place.js";
+import { inlineCode, SequenceDiagram } from "./shared/SequenceDiagram.js";
 
 export interface TourStep {
   /** 指す先。`document.querySelector` に渡す */
@@ -376,8 +376,15 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
       setPlace(undefined);
       return;
     }
-    setPlace(placeBubble(spot, { width: el.offsetWidth, height: el.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }));
+    const view = { width: window.innerWidth, height: window.innerHeight };
+    // 図のある手順は、指す先と重ならない側の端に置く（手順ごとに位置が飛ばず、指す先も隠さない）
+    setPlace(current.current.diagram !== undefined ? placeWide(spot, { width: el.offsetWidth }, view) : placeBubble(spot, { width: el.offsetWidth, height: el.offsetHeight }, view));
   }, [spot, index]);
+
+  // 図が吹き出しに収まらないとき（低い画面）、いま光っている矢印まで吹き出しの中をスクロールして見せる
+  useLayoutEffect(() => {
+    bubble.current?.querySelector(".tour-diagram-step.focus")?.scrollIntoView?.({ block: "center" });
+  }, [index, measured]);
 
   // 焦点は「次へ」に置く（Enter で進める）。閉じたら、案内の前に焦点があった場所へ戻す。
   // 戻す先は最初に描くときに覚える。 effect で覚えると、先に走る「次へ」への移動のあとを読んでしまい、
@@ -435,7 +442,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         aria-labelledby="tour-title"
         aria-describedby="tour-body"
         tabIndex={-1}
-        style={{ ...(moved !== undefined ? { top: moved.top, left: moved.left, maxHeight: Math.max(120, window.innerHeight - moved.top - 8) } : (place ?? {})), width, visibility: measured && (moved !== undefined || spot === undefined || place !== undefined) ? "visible" : "hidden" }}
+        style={{ ...(moved !== undefined ? { top: moved.top, left: moved.left, maxHeight: Math.max(120, window.innerHeight - moved.top - 8) } : place !== undefined ? { ...place, maxHeight: Math.max(160, window.innerHeight - place.top - 8) } : {}), width, visibility: measured && (moved !== undefined || spot === undefined || place !== undefined) ? "visible" : "hidden" }}
       >
         <button type="button" className="tour-close" data-action="tour-skip" title="案内を閉じる" aria-label="案内を閉じる" onClick={onClose}>
           ×
@@ -476,7 +483,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         <p className="tour-body" id="tour-body">
           {sentenceLines(step.body).map((line, at) => (
             <span key={at} className="tour-line">
-              {line}
+              {inlineCode(line)}
             </span>
           ))}
         </p>

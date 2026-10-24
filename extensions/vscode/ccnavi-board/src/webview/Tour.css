@@ -49,7 +49,7 @@
 
 /* 説明文は、文ごとに行を改めて出す（長い 1 段落にしない） */
 .tour-body { margin: 0 0 var(--gap-4); line-height: 1.7; }
-.tour-line { display: block; margin-bottom: var(--gap-2); }
+.tour-line { display: block; margin-bottom: var(--gap-2); line-break: strict; word-break: auto-phrase; }
 .tour-line:last-child { margin-bottom: 0; }
 
 /* 画面の外の見た目（Claude Code・GitLab の画面）。吹き出しの幅に収める */
