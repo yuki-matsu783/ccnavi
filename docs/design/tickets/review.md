@@ -3,7 +3,7 @@ type: design
 title: 9.10 レビューの依頼と確認
 description: mr のフェーズでのレビューの依頼と確認の流れ
 tags: [design-doc, ticket, review]
-keywords: [レビュー, 依頼, 確認, mr, ccnavi-review.sh]
+keywords: [レビュー, 依頼, 確認, mr, ccnavi-review.sh, GraphQL, 403, REST, ccr]
 ---
 
 [設計書の入口](../../design.md) > [9. チケット制御](../tickets.md)

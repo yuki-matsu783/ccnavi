@@ -7,7 +7,7 @@ keywords: [GraphQL, 403, REST, ccr, review_threads, ready_for_review, resolve, r
 ---
 # ADR-0173: GitHub の GraphQL が 403 の環境では、GraphQL を先に試し、使えないと分かったときだけ REST に替える
 
-状態: 採用（`/ccr/` の道の応答の形は Claude Code のクラウドの実機で確かめた範囲。GHE.com は未検証）
+状態: 採用（`/ccr/` の道の応答の形は、Claude Code のクラウドでの実機の呼び出し（`review_threads`・`comments`）と issue の検証で確かめた範囲。テストはホストの代役で書いた。GHE.com は未検証）
 
 ## 状況
 

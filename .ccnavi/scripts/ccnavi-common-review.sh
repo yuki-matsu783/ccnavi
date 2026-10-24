@@ -265,7 +265,7 @@ threads() {
 			0) ;;
 			3)
 				# 最初のページで GraphQL を使えないと分かったときだけ（2 ページ目以降で変わることは無い）
-				[ "$page" -eq 0 ] || return 1
+				[ "$page" -eq 0 ] || fail graphql-changed "reviewThreads の 2 ページ目以降で GraphQL を使えなくなった。取り直してください。"
 				threads_rest "$mr_number"
 				return
 				;;
@@ -317,9 +317,9 @@ threads_rest() {
 	fi
 	"$JQ" -n --argjson rt "$tr_threads" --argjson cs "$tr_comments" '
 		($cs | map({key: (.id | tostring), value: .}) | from_entries) as $m |
-		[$rt[] | ((.comment_ids // []) | map(tostring)) as $ids | select(($ids | length) > 0) |
-			($m[$ids[0]] // {}) as $f | ($m[$ids | last] // {}) as $l |
-			{id: $ids[0], resolved: (.resolved // false), url: ($f.html_url // ""), path: (.path // $f.path // ""), line: (.line // $f.line // 0),
+		[$rt[] | ((.comment_ids // []) | map(tostring)) as $ids | (($ids[0]) // "") as $first | (($ids | last) // "") as $final |
+			($m[$first] // {}) as $f | ($m[$final] // {}) as $l |
+			{id: $first, resolved: (.resolved // false), url: ($f.html_url // ""), path: (.path // $f.path // ""), line: (.line // $f.line // 0),
 			 body: ($f.body // ""), created_at: ($f.created_at // ""),
 			 last_id: (($l.id // "") | tostring), last_at: ($l.created_at // ""), last_author: ($l.user.login // "")}]'
 }
