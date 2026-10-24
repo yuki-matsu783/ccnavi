@@ -3,7 +3,7 @@
 承認者がブラウザと PAT だけで、リモートのブランチの承認待ちを見て、承認・レビュー済みを親のブランチへ書き、
 issue から親のブランチを始める拡張。GitHub と GitLab の、ワークスペースとプロジェクトのリポジトリを扱う。
 GitLab での ccnavi の書き込みどうしの競合の検出は、実際の GitLab で前提を確かめるまで未実装。
-PAT に要る権限（GitHub は Contents・Pull requests・Issues の Read and write、GitLab は `api` スコープと Developer 以上）は、設定画面の案内と [VERIFY.md](VERIFY.md) の表にある。
+PAT に要る権限は、GitHub が Contents・Pull requests・Issues の Read and write、GitLab が `api` スコープと Developer 以上である。設定画面の案内と [VERIFY.md](VERIFY.md) の表に、同じ内容を載せている。
 
 承認者の操作を、作業者の開発環境やセッションの外に置くための入口で、判定のコアは手元の ccnavi と同じ Python を同梱して使う。
 同期はリアルタイムではなく、書いた結果は作業側の次の fetch / sync で届く（ccnavi の docs/guide/multi-pc.md）。

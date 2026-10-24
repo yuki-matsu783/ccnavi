@@ -46,7 +46,7 @@ keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccna
 `decidePreview` は親子のチケットと MR のスレッド・レビューを読み、Python の `decide`（preview）が通した指摘とダイジェストを返す（書かない）。
 各指摘には、スレッドの id（取得したスレッドから、キー = URL か id で引く）と、書く前の確かめと同じ見分け方で Chrome で扱えない理由（`unsupported`）を付ける。
 
-`decidePhase` は次の順に進む。ホストへ書くのは `writeLoop` の外で 1 度だけで、ループの中は判定とコミットだけにする。
+`decidePhase` は次の順に進む。ホストへの書き込みは `writeLoop` の外で 1 度だけ行い、ループの中は判定とコミットだけを行う。
 
 1. 読み直して `decide`（apply、`carry` なし）を呼び、ホストへ書く計画（`host_plan`）を得る。見せた指摘と違えば `mismatch`、通らなければ `refused` で、何も書かない。`keep`・`issue` が無ければ計画は空なので、この手順は飛ばす
 2. `precheckHostPlan` で権限とスレッドの種類を確かめる。足りなければ `refused`（必要な権限名つき）で、何も書かない
