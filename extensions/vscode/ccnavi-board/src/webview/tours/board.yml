@@ -2,7 +2,7 @@
 # 見本は `ccnavi --explain --json` と同じ形で書く（足りない欄は読み取りが既定値で埋め、`buildBoard` を通す）。
 # 承認・残った指摘・渡す文のオーバーレイは `overlays:` に書く。描くだけで、拡張ホストへは何も送らない。
 #
-# `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。鍵は次の 7 つ。
+# `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。鍵は次の 8 つ。
 #   overlay    出すオーバーレイ。approval（承認の一覧）/ done（承認のあとに渡すプロンプト）/ decide（残った指摘の対応方針）。
 #              書かなければ出さない
 #   project    プロジェクトの絞り込み（見本の projects にある名前。空文字はワークスペース。書かなければ「すべて」）
@@ -21,6 +21,9 @@
 #              risk seen issue unsent）/ phases / phase-review / details / moved / flow-<状態>（create edit locked）/ workflow-button
 #   承認の画面 approval-batch / approval-plan / approve-confirm / approval-prompt / approval-handover / edit-workflow /
 #              decide-threads / decide-consult / decide-confirm
+#
+# 手順の `image:` と `alt:` は、画面の外（Claude Code・GitLab）の見た目を見せる画像で、2 つとも書く。名前は `tours/images/<名前>.png` と
+# `tours/images.ts` の表にある。画像の手順は読み込みで高さが変わるので、`target:` は空にして中ほどに出す。
 screen: board
 
 sample:
@@ -275,6 +278,175 @@ courses:
       - target: tour
         title: 案内
         body: この案内は、ヘッダ右上の ? からもう一度見られます。? を押すと、使い方ごとの案内（承認・レビュー・マージ状況・絞り込みなど）の一覧が開きます。
+
+  - id: to-merge
+    title: 作業を頼んでからマージするまでの流れを知りたいとき
+    summary: 依頼・承認・作業・MRでのレビュー・マージ・片付けを順にたどります
+    steps:
+      - target: board
+        title: 全体の流れ
+        body: 作業は「Claude Codeに頼む → 提案を承認する → エージェントが作業する → MRでレビューする → 親を閉じてマージする → 片付ける」の順に進みます。ボードは、このうちユーザの番（承認・レビュー・片付け）を見つけて進める場所です。この案内では、全体を順にたどります。
+        scene: { parent: sample-a }
+      - target: ""
+        title: まずissueを用意する（2通り）
+        body: チケット作業は、issueとMRを組にして進めるので、まずissueを用意します。作り方は2通りです。「人がGitLabで作る」場合は、この次の2手順で作ります。「Claude Codeに頼んで作ってもらう」場合は、その次の手順です。人が作るときは、プロジェクトのサイドバーで「Plan」を開き、「Issues」を選びます。
+        image: gitlab-issues-menu
+        alt: GitLabのプロジェクトのサイドバーで、「Plan」の下に「Issues」「Issue boards」「Milestones」「Wiki」が並んでいる
+        scene: { parent: sample-a }
+      - target: ""
+        title: 人が作る：「New item」を押す
+        body: issueの一覧が開きます。右上の「New item」を押すと、新しいissueの入力欄が開きます。
+        image: gitlab-issues-list
+        alt: GitLabのissueの一覧で、右上に青い「New item」ボタンがある
+        scene: { parent: sample-a }
+      - target: ""
+        title: 人が作る：題と説明を書いて作成する
+        body: 種類は「Issue」のままにして、題（Title）と説明（Description）を書き、「Create issue」を押します。説明には、困っていることや目的を書きます。作ったissueの番号が、親チケットの識別子の番号になります。
+        image: gitlab-new-issue
+        alt: GitLabの新しいissueの入力欄。種類・題・説明を書き、右下の「Create issue」で作成する
+        scene: { parent: sample-a }
+      - target: ""
+        title: 作った issue の番号を確かめる
+        body: 作成すると、issue の画面が開きます。画面上部の道筋の最後（「#1」など）と、URL の末尾が、issue の番号です。この番号が、親チケットの識別子の番号になります。次の手順で、この番号か URL を Claude Code に伝えます。
+        image: gitlab-issue-created
+        alt: GitLabの issue の画面。上部の道筋の最後に「#1」と出ていて、題・説明・タスクの一覧・コメント欄がある
+        scene: { parent: sample-a }
+      - target: ""
+        title: Claude Codeに作業を頼む
+        body: 作ったissueの番号かURLを、Claude Codeの入力欄で伝えて作業を頼みます。issueをまだ作っていないときは、作業の内容だけを頼めます。その場合は、エージェントがissueを作ります（エージェントがGitLabに届かないときは、ユーザが作って番号を伝えます）。調査や小さな修正は、チケットを使わずに直接作業で進みます。設計に触れる作業、複数のフェーズに分かれる作業、ユーザのレビューが要る作業は、エージェントがチケット作業として提案を書き、MRを用意します。
+        image: claude-code-prompt
+        alt: Claude Codeの画面。下部の入力欄に「XXX処理のバグ修正をお願い」と入力して、右下の送信ボタンで送る
+        scene: { parent: sample-a }
+      - target: ""
+        title: MRを用意する（人が作る場合もある）
+        body: "MRは、エージェントが用意します。人がGitLabで作ってもかまいません。その場合は、ソースを親チケットのブランチ、ターゲットを統合先のブランチにします。題と説明を書いて、「Create merge request」（古い画面では「Submit merge request」）を押します。説明に「Closes #番号」と書くと、issueと結び付きます。"
+        image: gitlab-new-mr
+        alt: GitLabの新しいMRの入力欄。ソースとターゲットのブランチ、題、説明を書き、下の「Submit merge request」で作成する
+        scene: { parent: sample-a }
+      - target: board
+        title: エージェントが準備して、提案を送る
+        body: 頼まれると、エージェントは、まず事前確認（ccnavi-start.sh --check）で、GitLabとgitが使える状態かを確かめます。そのうえで、親のワークツリーと、Draftの MR を用意します。issueだけを渡したときも、MRはエージェントが作ります。MRの用意まで終わると、エージェントが親と子の提案（チケット）を書いて、親のブランチに送ります（propose）。
+        scene: { parent: sample-a }
+      - target: card-sample-a
+        title: 承認待ちの提案が届く
+        body: 提案は、「未着手」の列に札「承認待ち」のカードとして出ます。提案には、目的・範囲・計画が書かれています。カードを押すと、提案のファイルを開けます。直したい点は、Claude Codeに伝えて書き直してもらいます。
+        scene: { parent: sample-a }
+      - target: approval-batch
+        title: 内容を確認して承認する
+        body: カードの［承認］、またはヘッダの「承認待ち N 件を承認」を押すと、承認する内容がオーバーレイに出ます。編集できる範囲、人間のレビューの要否、理由を確かめて、「この N 件を承認する」で承認します。承認するまでは、何も変わりません。
+        scene: { overlay: approval, parent: sample-a }
+      - target: approval-handover
+        title: 承認したことをClaude Codeに伝える
+        body: 承認できたら、Claude Codeに伝えるプロンプトが出ます。コピーして進行中のセッションに貼るか、新しいセッションを開いて渡します。承認済みのチケットを他の機械へ届けるpushは、ボードが統合ターミナルに送ります。
+        scene: { overlay: done, parent: sample-a }
+      - target: phases
+        title: エージェントが作業する
+        body: 承認すると、エージェントは、親を着手し（start）、子を 1 つずつ着手して、子のワークツリーを切ります。実装は、サブエージェントが子のワークツリーで行い、コミットだけをします。親のカードには、札「作業中」とフェーズの一覧が出ます。［更新］を押すと、進み具合を確かめられます。フェーズが複数あるときは、作業とレビューをフェーズごとに繰り返します。
+        scene: { parent: sample-b }
+      - target: card-sample-c
+        title: レビュー待ちになったら
+        body: 子の作業が終わると、エージェントは子を完了します（finish）。子の変更を親のブランチに合流して push し、レビューが要るフェーズの子は、レビューの置き場に移ります。レビューが要らないフェーズの子は、そのまま完了になります。そのあと、エージェントがELI5（変更の説明）を書いて push し、MRにレビューの依頼を書き込みます。依頼を出すまでの札は「レビュー準備中」で、エージェントの番です。依頼を出すと「レビュー待ち」になり、「あなたの番」に操作が出ます。
+        scene: { parent: sample-c }
+      - target: mr
+        title: MRを開く
+        body: ［MR を開く］から、レビューの場のMRを開きます。差分とレビューの依頼が載っています。指摘はMR上に書きます。ボードはMRの差分を読みません。指摘を読むのは、［レビュー完了］を押したときだけです。
+        scene: { parent: sample-c }
+      - target: ""
+        title: 差分を開く（GitLab）
+        body: MRの画面で「Changes」のタブを開くと、変更の差分が出ます。ファイルごとに、変更した行が並びます。
+        image: gitlab-changes-tab
+        alt: GitLabのMRの画面。「Changes」のタブに①の印があり、差分の行にマウスを載せると、吹き出しのボタンに②の印が付いている
+        scene: { parent: sample-c }
+      - target: ""
+        title: 差分に指摘を付ける（GitLab）
+        body: 差分の行にマウスを載せると、行番号の横に吹き出しのボタンが出ます。それを押すと、その行にコメントを書けます。ドラッグすると、複数の行をまとめて選べます。
+        image: gitlab-line-comment
+        alt: GitLabの差分画面。行番号の横の吹き出しのボタンに「Add a comment to this line or drag for multiple lines」と出ている
+        scene: { parent: sample-c }
+      - target: ""
+        title: 指摘は「Start thread」で書く（GitLab）
+        body: 差分の行に付けたコメントは、解決できるスレッドになります。MR全体へのコメントでは、送信ボタンの横の▼で「Comment」か「Start thread」を選びます。直してほしい指摘は、行のコメントか「Start thread」で書きます。解決するまで残る議論になり、ccnaviが未解決の指摘として読みます。「Comment」は、解決の対象にならない通常のコメントです。
+        image: gitlab-start-thread
+        alt: GitLabのコメント欄。送信ボタンの横の▼を開くと、「Comment」と「Start thread」の2つの選択肢が出ている
+        scene: { parent: sample-c }
+      - target: ""
+        title: 指摘をためて、まとめて送る（GitLab）
+        body: 行のコメントを「Start a review」で書くと、コメントは「Pending」になり、まだ送られません。指摘を付け終えたら、「Submit review」でまとめて送ります。「Add comment now」は、そのコメントだけをすぐに送ります。「Pending」のまま送り忘れると、ほかの人にも指摘が届かないので、送ったことを確かめます。
+        image: gitlab-pending-review
+        alt: GitLabの差分画面。行のコメントに「Pending」の札が付き、下に「Submit review」と「Add comment now」のボタンが並んでいる
+        scene: { parent: sample-c }
+      - target: ""
+        title: レビューを送る（GitLab）
+        body: 「Submit review」を押すと、「Submit your review」の画面が開きます。「Comment」は、承認を伴わない感想です。「Request changes」は、直してからマージしてほしいときに選びます。変更の依頼が出ている間は、ccnaviでもレビュー済みにできません。解除は、レビュアーの「Approve」で行います。画像のように「Approve」が選べない（灰色になる）ときは、自分のMRを承認できない設定などの場合です。
+        image: gitlab-submit-review
+        alt: GitLabの「Submit your review」の画面。「Comment」「Approve」「Request changes」の選択肢と、「Submit review」ボタン、ためた指摘の一覧がある
+        scene: { parent: sample-c }
+      - target: phase-review
+        title: レビューを終える
+        body: 指摘を付け終えたら、レビュー待ちの行の［レビュー完了］を押します。押すまでは、ボードは指摘を読みません。
+        scene: { parent: sample-c }
+      - target: decide-threads
+        title: 残った指摘の対応方針を決める
+        body: ［レビュー完了］を押すと、ボードは未解決の指摘を読みます。0件なら、「レビュー済みにする」だけが出ます。残っている場合は、1件ずつ「対応しない」「このフェーズで直す」「issueに回す」のいずれかを選びます。「このフェーズで直す」は、次の手順で説明するとおり、対応の子チケットを作って直す選択です。
+        scene: { overlay: decide, parent: sample-c }
+      - target: decide-confirm
+        title: 方針を確定する
+        body: 全部の指摘に方針を選ぶと、「この対応方針を確定」が押せます。押すと、選んだ内容が記録されます。「このフェーズで直す」を選んだ指摘があると、追加対応用の子チケットが作られ、フェーズが開き直ります。
+        scene: { overlay: decide, parent: sample-c }
+      - target: approval-handover
+        title: 決めた結果をClaude Codeに伝える
+        body: 確定すると、結果を伝えるプロンプトが出ます。承認のときと同じく、コピーして進行中のセッションに貼るか、新しいセッションを開いて渡します。エージェントは、前の会話がなくても、状況を確かめてから対応に入ります。ここで出る見本の文面は承認のものですが、対応方針を決めたときも、同じ形でプロンプトが出ます。
+        scene: { overlay: done, parent: sample-c }
+      - target: phases
+        title: 対応の子チケットが指摘を直す
+        body: 追加対応用の子チケットは、同じフェーズの番号で作られます。親の札は「作業中」に戻り、フェーズの行は進行中になります。エージェントが、指摘された点をこの子チケットで直します。
+        scene: { parent: sample-c }
+      - target: ""
+        title: 未解決の指摘を確かめる（GitLab）
+        body: 画面の右上の「1 unresolved thread」は、未解決のスレッドの数です。直ったことを確かめたら、スレッドの下の返信欄に結果を書き、「Resolve thread」を押して、解決済みにします。
+        image: gitlab-unresolved-thread
+        alt: GitLabの差分画面。右上に「1 unresolved thread」と出ていて、スレッドの下に返信欄と「Resolve thread」ボタンがある
+        scene: { parent: sample-c }
+      - target: ""
+        title: 解決済みになった状態（GitLab）
+        body: 解決すると、スレッドに「Resolved by」と出て、画面の右上が「All threads resolved」になります。解決したスレッドは、「Unresolve thread」で未解決に戻せます。
+        image: gitlab-threads-resolved
+        alt: GitLabの差分画面。スレッドの右上のチェックマークが緑になり「Resolved by」と出ていて、画面の右上に「All threads resolved」と出ている
+        scene: { parent: sample-c }
+      - target: phase-review
+        title: 直ったら、もう一度レビューする
+        body: 直し終えると、フェーズは再びレビュー待ちになります。MRで直った点を確かめます。直すと決めた指摘のスレッドは、ユーザがGitLab上で解決済みにします（エージェントは解決済みにしません。「対応しない」と「issueに回す」を選んだスレッドは、ccnaviが返信して解決済みにします）。そのうえで［レビュー完了］を押します。未解決の指摘が0件になるまで、直すことと確かめることを繰り返します。
+        scene: { parent: sample-c }
+      - target: column-archived
+        title: 親を閉じてマージする
+        body: 最後のフェーズのレビューが済むと、エージェントが親を閉じて（finish）push し、MRのDraftを外して（ready）、ワークツリーを片付けます。Draftを外すと、閉じたチケットは手元のlogs/archive/に移り、ボードでは「アーカイブ」の列に出ます。この列は、「アーカイブ済みチケットを表示」を入れたときだけ見えます。MRのマージは、ユーザがGitLabの画面で行います。
+        scene: { archived: true, parent: sample-i }
+      - target: ""
+        title: Draftを外す（GitLab）
+        body: MRがDraftのままだと、GitLabに「Merge blocked」と出て、マージできません。通常はエージェントがDraftを外しますが、まだ残っているときは「Mark as ready」を押して外します。
+        image: gitlab-mark-ready
+        alt: "GitLabのMRの画面。「Merge blocked: Select Mark as ready to remove it from Draft status.」と出ていて、右に青い「Mark as ready」ボタンがある"
+        scene: { archived: true, parent: sample-i }
+      - target: ""
+        title: MRの画面でマージする（GitLab）
+        body: マージは、GitLabのMRの画面で、ユーザが「Merge」ボタンを押して行います。マージの前に、Draftが外れていることと、レビューの指摘が片付いていることを確かめます。GitLabに承認（Approval）の設定があるプロジェクトでは、必要な承認がそろうまでマージがブロックされます。これは、ccnaviのレビュー完了とは別の設定です。
+        image: gitlab-mr-merge
+        alt: GitLabのMRの画面。「Merge」ボタンと「Remove source branch」の欄があり、下に議論・コミット・変更のタブがある
+        scene: { archived: true, parent: sample-i }
+      - target: ""
+        title: マージできた画面（GitLab）
+        body: マージすると、MRに「Merged by」と出て、マージした人と時刻が残ります。設定によっては、ソースブランチも削除されます。この画面になったら、ボードに戻って、マージできたことを確かめます。
+        image: gitlab-merged
+        alt: GitLabのマージ済みのMRの画面。「Merged by」の欄に、マージした人と時刻、「Revert」「Cherry-pick」のボタン、マージの詳細が出ている
+        scene: { archived: true, parent: sample-i }
+      - target: merge-check
+        title: マージできたか確かめる
+        body: マージしたあと、［マージ状況を確認］を押します。マージ待ちの親がマージ済みかどうかを確かめて、結果を上の帯に出します。読むだけで、何も変えません。
+        scene: { merge: true, archived: true, parent: sample-i }
+      - target: merge-retire
+        title: 片付ける
+        body: マージ済みの親の［片付ける］を押して、確認のダイアログに答えると、ボードのターミナルにccnavi-sync.shのコマンドを送ります。このコマンドは、マージ済みかを確かめ直したうえで、条件を満たすものだけを片付けます。結果はターミナルで確認してください。これで、頼むところから片付けまでの1周が終わります。
+        scene: { merge: true, archived: true, parent: sample-i }
 
   - id: approve
     title: 承認待ちのチケットを承認したいとき

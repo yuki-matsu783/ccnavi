@@ -196,6 +196,203 @@ sample:
         allow:
           - { id: read-docs, section: allow, source: common, match: Read, kind: glob, written: "**/docs/**", pattern: '(?s:(?>.*?[\\/]docs[\\/]).*)\Z', message: "" }
 
+# 案内の手順が引く時系列の図。登場者を左から並べ、矢印を上から下へ時間順に並べる。矢印の `value` は実際に入れる値や出る答えの例（等幅）。
+# 手順の `diagram:` で名前を指し、`focus:` で光らせる矢印（id を , で区切る）を決める。`to` を書かない矢印は、その登場者の中の動き。
+diagrams:
+  # ルールを書いて保存し、次のツール呼び出しから効くまで
+  rule-save:
+    actors: [ユーザ, ルール管理画面, ccnavi, rules.yml]
+    steps:
+      - id: edit
+        from: ユーザ
+        to: ルール管理画面
+        text: deny に 1 件書き足す
+        value: |-
+          id: git-push
+          match: Bash
+          glob: "*git push*"
+          message: push はユーザが行う
+      - id: save
+        from: ルール管理画面
+        to: ccnavi
+        text: ［保存］を押すと、編集中の内容を一時ファイルに書いて検証する（--lint）
+        value: error が 1 件でもあれば保存しない（warn だけなら保存する）
+      - id: lock
+        from: ルール管理画面
+        text: 作業中のチケット（doing）があると保存できない。エージェントがターン中なら、確認が出る
+      - id: write
+        from: ルール管理画面
+        to: rules.yml
+        text: 検証を通ったら書き込む
+        value: .ccnavi/config/common/rules.yml（共通の設定を開いているとき）
+      - id: effect
+        from: ccnavi
+        to: rules.yml
+        text: 次にツールを使うとき、hook が rules.yml を読み直す
+        value: Claude Code の再起動は要らない
+
+  # 値が当たって止まる例（git push）
+  rule-deny:
+    actors: [Claude Code, ccnavi（hook）, rules.yml, decisions.jsonl]
+    steps:
+      - id: call
+        from: Claude Code
+        to: ccnavi（hook）
+        text: ツールを使う直前に、hook を起こして内容を渡す
+        value: '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}'
+      - id: load
+        from: ccnavi（hook）
+        to: rules.yml
+        text: ルールを読む（共通・ワークスペース・プロジェクトの設定の和）
+      - id: match
+        from: ccnavi（hook）
+        text: deny → ask → allow の順に当てる
+        value: |-
+          match: Bash ✓
+          glob: "*git push*" ✓
+          → deny に当たる
+      - id: reply
+        from: ccnavi（hook）
+        to: Claude Code
+        text: 止める答えを返す
+        value: |-
+          permissionDecision: deny
+          reason: push はユーザが行う
+      - id: log
+        from: ccnavi（hook）
+        to: decisions.jsonl
+        text: 返す前に、判定を 1 行追記する
+        value: 'decision: deny'
+      - id: stop
+        from: Claude Code
+        text: コマンドは実行されない。reason（message）がモデルに届き、モデルは別の手を考える
+
+  # 値が当たらない例（git status）
+  rule-pass:
+    actors: [Claude Code, ccnavi（hook）]
+    steps:
+      - id: call
+        from: Claude Code
+        to: ccnavi（hook）
+        text: 別のコマンドを使う直前
+        value: '{"tool_name":"Bash","tool_input":{"command":"git status"}}'
+      - id: match
+        from: ccnavi（hook）
+        text: どのルールにも当たらない
+        value: glob "*git push*" は "git status" に合わない
+      - id: reply
+        from: ccnavi（hook）
+        to: Claude Code
+        text: 判定を返さない（UNDECLARED）。「許可」ではない
+        value: 結末は権限モードで決まる。default なら Claude Code 自身の確認に任せる
+
+  # 組み合わせ条件: 同じルールが、入れる値で止めたり通したりする
+  rule-when:
+    actors: [Claude Code, ccnavi（hook）]
+    steps:
+      - id: call-env
+        from: Claude Code
+        to: ccnavi（hook）
+        text: 環境変数のファイルを読もうとする
+        value: Read /ws/.env
+      - id: match-env
+        from: ccnavi（hook）
+        text: protect-env の when（all）を調べる
+        value: |-
+          regex (^|[\\/])\.env(\.|$) ✓
+          not(any(glob **/.env.example, glob **/.env.sample)) ✓
+          → 両方成り立つ → deny
+      - id: call-example
+        from: Claude Code
+        to: ccnavi（hook）
+        text: 見本のファイルを読もうとする
+        value: Read /ws/.env.example
+      - id: match-example
+        from: ccnavi（hook）
+        text: 同じルールを調べる
+        value: |-
+          regex (^|[\\/])\.env(\.|$) ✓
+          not(any(glob **/.env.example …)) ✗（.env.example に合うので、not は成り立たない）
+          → all は成り立たない → 当たらない（通る）
+
+  # 動作モード: 同じ呼び出しでも、モードで止まる・止まらないが分かれる
+  rule-mode:
+    actors: [Claude Code, ccnavi（hook）]
+    steps:
+      - id: call
+        from: Claude Code
+        to: ccnavi（hook）
+        text: 動作モードが dry-run のとき、同じコマンドを使う
+        value: '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}'
+      - id: match
+        from: ccnavi（hook）
+        text: 判定は enable と同じで deny に当たる。記録も同じ形で残す
+        value: 'decision: deny, enforced: false'
+      - id: reply
+        from: ccnavi（hook）
+        to: Claude Code
+        text: 止めずに、止めるはずだったと知らせる文だけを返す
+        value: '[ccnavi dry-run] enable would have stopped … （additionalContext）'
+      - id: run
+        from: Claude Code
+        text: コマンドは実行される。enable に切り替えると、前の図のとおり止まる
+
+  # 判定を試す: 実際のツールは動かない
+  rule-try:
+    actors: [ユーザ, ルール管理画面, ccnavi]
+    steps:
+      - id: input
+        from: ユーザ
+        to: ルール管理画面
+        text: ツールと対象を入れて［判定］を押す。保存は要らない
+        value: |-
+          ツール: Bash
+          対象: git push origin main
+      - id: ask
+        from: ルール管理画面
+        to: ccnavi
+        text: 編集中のルールで判定させる（--test）
+      - id: answer
+        from: ccnavi
+        to: ルール管理画面
+        text: hook と同じ経路で判定した答えを返す。コマンドは実行しない
+        value: |-
+          判定: deny
+          当たったルール: git-push
+          message: push はユーザが行う
+      - id: note
+        from: ルール管理画面
+        text: 常に enable の答え。記録（decisions.jsonl）は残らず、every の回数も数えない
+
+  # コンテキストの追加: 3 回に 1 度だけ文が届く
+  rule-context:
+    actors: [Claude Code, ccnavi（hook）, state ファイル]
+    steps:
+      - id: call-1
+        from: Claude Code
+        to: ccnavi（hook）
+        text: ルールに当たるコマンドを使う（1 回目）
+        value: pytest tests/core
+      - id: count-1
+        from: ccnavi（hook）
+        to: state ファイル
+        text: 当たった回数を 1 にする。3 の倍数ではないので、文は渡さない
+        value: 'every: 3'
+      - id: call-3
+        from: Claude Code
+        to: ccnavi（hook）
+        text: 3 回目に同じルールへ当たる
+        value: pytest tests/ui
+      - id: count-3
+        from: ccnavi（hook）
+        to: state ファイル
+        text: 回数が 3 になる
+      - id: deliver
+        from: ccnavi（hook）
+        to: Claude Code
+        text: 3 の倍数なので、additionalContext をモデルに渡す
+        value: additionalContext：テストは tests/ に置く
+
 courses:
   - id: intro
     title: 基本の案内
@@ -229,6 +426,87 @@ courses:
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
         scene: { tab: rules }
+
+  - id: how-it-works
+    title: ルールが、いつ・どう効くのかを値の例で知りたいとき
+    summary: 同じ流れでも、入れる値で止まったり通ったりする様子を、例を変えて追う
+    steps:
+      - target: rule-git-push
+        title: 例のルール
+        body: 「Bash で git push を含むコマンドは止める」というルールで追います。保存すると、次にツールを使う場面から効きます。
+        scene: { tab: rules, open: git-push }
+        diagram: rule-deny
+      - target: hooks
+        title: ツールを使う直前に hook が起きる
+        body: Claude Code は、ツールを使う直前に、登録された hook を起こして内容を渡します。hook は、毎回ルールを読み直します。
+        scene: { tab: hooks }
+        diagram: rule-deny
+        focus: call, load
+      - target: hooks
+        title: 値がルールに当たると、止める
+        body: コマンドが git push origin main なので、match の Bash と、glob の *git push* の両方に当たります。deny → ask → allow の順に当て、最初に当たったタイプで決まります。止める答えには、message が理由として付きます。
+        scene: { tab: hooks }
+        diagram: rule-deny
+        focus: match, reply
+      - target: hooks
+        title: 記録して、止める
+        body: hook は、答えを返す前に判定を logs/decisions.jsonl に 1 行足します。コマンドは実行されず、message がモデルに届きます。
+        scene: { tab: hooks }
+        diagram: rule-deny
+        focus: log, stop
+      - target: rules
+        title: 別の値なら当たらない
+        body: git status は、*git push* に合いません。どのルールにも当たらないときは、判定を返しません。これは「許可」ではなく、権限モードに従います。
+        scene: { tab: rules }
+        diagram: rule-pass
+        focus: match, reply
+      - target: rule-protect-env
+        title: 組み合わせ条件は、値で結果が分かれる
+        body: protect-env は「.env 系は止める。ただし .env.example と .env.sample は通す」という 1 つのルールです。同じルールが、.env は止め、.env.example は通します。
+        scene: { tab: rules, open: protect-env, when: r }
+        diagram: rule-when
+        focus: match-env, match-example
+      - target: hooks
+        title: 動作モードで、止まるかどうかが変わる
+        body: CCNAVI_MODE が dry-run のときは、同じ deny に当たっても止まらず、止めるはずだったという文だけが返ります。「判定を試す」は、常に enable の答えを返すので、実際の動きと食い違うことがあります。
+        scene: { tab: hooks }
+        diagram: rule-mode
+        focus: reply, run
+
+  - id: how-save-try
+    title: 保存してから効くまでと、試すときの違いを知りたいとき
+    summary: 保存で何が検証され、いつから効くか。「判定を試す」と本番の違いと、文を 3 回に 1 度だけ渡す設定
+    steps:
+      - target: rules
+        title: ルールを書く
+        body: ここでは、deny に git-push のルールを 1 件足します。書いている間は「未保存」の印が付くだけで、ファイルも hook も変わりません。
+        scene: { tab: rules, open: git-push }
+        diagram: rule-save
+        focus: edit
+      - target: save
+        title: 保存すると、まず検証される
+        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。error が 1 件でもあれば、何も保存しません。作業中のチケットがあるときは保存できません。エージェントがターン中なら、確認が出ます。
+        scene: { tab: rules, open: git-push }
+        diagram: rule-save
+        focus: save, lock
+      - target: save
+        title: 書き込まれて、次から効く
+        body: 検証を通ると、rules.yml に書き込みます。hook はツールを使うたびにファイルを読み直すので、Claude Code を再起動しなくても、次のツール呼び出しから効きます。ワークツリーで直したルールは、統合するまで効きません。
+        scene: { tab: rules, open: git-push }
+        diagram: rule-save
+        focus: write, effect
+      - target: judge-form
+        title: 保存しないで試す
+        body: 「判定を試す」は、編集中の内容で判定します。保存は要りません。実際のコマンドは動かず、記録も残りません。ここでの答えは常に enable のものです。
+        scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
+        diagram: rule-try
+        focus: input, ask, answer, note
+      - target: rule-db-migrate
+        title: 文を 3 回に 1 度だけ渡す
+        body: "every: 3 を付けたルールは、当たった回数が 3 の倍数になった回にだけ、additionalContext をモデルに渡します。「判定を試す」は回数を数えないので、毎回文が出ます。本番との違いに注意してください。"
+        scene: { tab: rules, open: db-migrate, more: true }
+        diagram: rule-context
+        focus: count-1, count-3, deliver
 
   - id: combo-when
     title: 組み合わせ条件を設定する
