@@ -10,7 +10,7 @@
  * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）、
  * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。計画編集タブが読む）と
  * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`（その保存。提案を書き換えるのは実行ファイル）と、
- * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、`--templates --check-file <パス> --json`（編集中の 1 本を読ませる）、
+ * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、`--templates --check-file <パス> --json`（1 本を読ませる。編集中の検査と、一覧の図の中身に使う）、
  * `user handoff [<パス>…] --json`（`wip/handoff/` の下書きの一覧を見る。取り込み待ち画面が読む。`--root` で指したツリー 1 本だけを見る）と
  * `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ。
  * `expect` は取り込むパスを指して見るだけをもう一度呼んだ結果のもの）、

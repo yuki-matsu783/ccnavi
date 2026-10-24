@@ -52,7 +52,7 @@ import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { readOrigin } from "./git.js";
 import * as diaglog from "./log.js";
 import { runInTerminal } from "./terminal.js";
-import { markTourSeen, tourSeen } from "./tour.js";
+import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { confirmIfTurn } from "./turn-confirm.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
@@ -114,6 +114,10 @@ export async function openProjects(): Promise<void> {
     state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
     void update();
+    // 開いたままのタブで、左パネルの案内から案内を頼まれたとき。組み上がりの `ready` は来ない
+    if (tourDue(SCREEN)) {
+      state.host.post({ type: "tour" } satisfies ToProjects);
+    }
     return;
   }
 
@@ -276,6 +280,7 @@ function registerPanelHandlers(current: PanelState): void {
   });
 
   panel.onDidDispose(() => {
+    tourPanelClosed(SCREEN);
     if (current.timer !== undefined) {
       clearTimeout(current.timer);
       current.timer = undefined;
@@ -572,7 +577,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す
-    if (!tourSeen(SCREEN)) {
+    if (tourDue(SCREEN)) {
       current.host.post({ type: "tour" } satisfies ToProjects);
     }
     return;

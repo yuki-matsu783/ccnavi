@@ -38,7 +38,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 ```sh
 pnpm install --frozen-lockfile
 pnpm run compile   # tsc -p .（拡張ホスト）と tsc -p tsconfig.webview.json（画面）で型を見て、esbuild で out/webview/<名前>.js と out/extension.js にバンドルする
-pnpm test          # 全部（867 本）
+pnpm test          # 全部
 pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / templates / handoff / flow / workflow / shared
 pnpm test:templates # テンプレート管理だけ（templates）
 pnpm test:handoff   # 取り込み待ちだけ（handoff）

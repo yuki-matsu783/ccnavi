@@ -26,7 +26,7 @@ issue なしで親チケットを始める道（`next-id` → `ccnavi ticket new
 | `next-id` は残し、直接作業のワークツリー名に付ける通し番号に役割を絞る | 直接作業の名前の形をそろえる用途は残るため | 廃止 |
 | 事前確認 `ccnavi-start.sh --check`（手で打つ）と、`ccnavi-ticket.sh` の start・finish・propose・consolidate の自動の確認（ロックの前）。項目は tools・origin・integration・api・access・git。結果は ok・ng（確定した不備）・unverified（確かめられなかった）・skipped（前提が ok でない）。全体は ng があれば ng、無くて unverified か skipped があれば unverified、それ以外は ok。権限だけ、ok に「判定できない」の印を付けてよい | 作る前・書く前に、ユーザの対応が要る不備を名指しするため | 失敗してから分かる形のまま |
 | 権限の判定が保証するのは「リポジトリのロール上は書き込める」まで（GitLab は `access_level` が 30 以上、GitHub は `permissions.push`）。トークンの scope・ブランチの保護・API と git が別の資格情報で動いていること・`is_admin` は見ない。文面にもそう書く | 見ていないものを見たと言わないため | `is_admin` で通す近道 |
-| キャッシュはしない。1 回の問い合わせは 15 秒、事前確認全体は 60 秒まで。gh / glab / curl の呼び出しは、`timeout` コマンドに頼らず背景で動かして上限で止める。上限を過ぎたら unverified、全体を過ぎたら残りは skipped | 認証や権限は途中で変わる。応答しないホストで止まり続けないため | キャッシュ、`timeout` コマンド |
+| キャッシュはしない。1 回の問い合わせは 15 秒、事前確認全体は 60 秒まで。gh / glab / curl の呼び出しは、`timeout` コマンドに頼らずバックグラウンドで動かして上限で止める。上限を過ぎたら unverified、全体を過ぎたら残りは skipped | 認証や権限は途中で変わる。応答しないホストで止まり続けないため | キャッシュ、`timeout` コマンド |
 | 自動の確認は SessionStart に入れない | 直接作業のセッションでも走ってしまう。制限時間がある。実行ファイルはネットワークに出ない（ホストへの問い合わせは sh が行う） | SessionStart |
 | 自動の確認の出力は標準エラーに出す。標準出力には何も足さない | propose の標準出力は契約（先頭が `提案: …`）で、Stop の判定が読むため | 標準出力 |
 | 自動の確認が続けてよいのは、全体が ok のときと、ng が無く「api が unverified、access が skipped、git が ok」のときだけ（後者は注意を添える）。事前確認は保証ではなく、通ったあとの取り込みや push の関門で止まることはある | API を使わない環境（トークンなし）でも、git が通れば今までどおり進めるため | api が unverified なら止める |
