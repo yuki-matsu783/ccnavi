@@ -271,3 +271,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0164](0164-mirror-sync-is-a-user-entry.md) | 共通レイヤーのミラーの同期は、ユーザ専用の入口で、見せた差分と照合してから作業ツリーに書く |
 | [0165](0165-turn-marker-per-session.md) | ターン中かどうかを、セッションごとの印のファイルで残す |
 | [0166](0166-mirror-sync-at-prompt-to-parent-worktrees.md) | 共通レイヤーのミラーは、ユーザの発言のたびに着手済みの親のワークツリーへ写す |
+| [0167](0167-idle-handoff-before-cache-expires.md) | 大きな会話の放置は、キャッシュが切れる前に引き継ぎ文書を書かせる |
