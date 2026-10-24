@@ -26,7 +26,7 @@ keywords: [--docs, 索引, frontmatter, type, tags, keywords, 検索, NOTICE_DOC
 **ガイドとの違い。** ガード・ガイド（コア機能 1）は、操作や作業の状況がきっかけで、必要な説明が届く。こちらは、エージェントが情報を必要としたときに、資料や手順を自分で探して読む。
 
 ```sh
-ccnavi --docs --text マージ --format detail           # 話題でヒットを付ける
+ccnavi --docs --text マージ --format detail           # 話題の見当を付ける
 ccnavi --docs --type adr --sort mtime -r --limit 10     # 新しい ADR から 10 本
 ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグを持つもの（OR）のパスだけ
 ccnavi --docs --path .ccnavi/docs --format count         # 件数だけ
