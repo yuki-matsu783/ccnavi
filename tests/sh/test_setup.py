@@ -94,6 +94,12 @@ HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}"'
 # セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する。
 # デフォルトブランチを ff で進め、ワークツリーの起点を新しくする。
 FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh"'
+# 放置したセッションの引き継ぎ促し（ccnavi-idle.sh）の 3 行。本体の 1 行とは別に登録される。
+IDLE_PREFIX = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-idle.sh"'
+IDLE_COMMANDS = {
+    "Stop": (IDLE_PREFIX + " notice", IDLE_PREFIX + " start"),
+    "UserPromptSubmit": (IDLE_PREFIX + " reset",),
+}
 # --deploy が配る代わりに通る sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側にほかに取れる方法がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
@@ -128,6 +134,7 @@ DEPLOY_SCRIPTS = (
     "ccnavi-start.sh",
     "ccnavi-stage.sh",
     "ccnavi-worktree.sh",
+    "ccnavi-idle.sh",
 )
 RULES_PARTS = (".ccnavi", "config", "common", "rules.yml")
 # --deploy が配る残りの設定 2 本。リスクの配点は共通レイヤー、
@@ -173,6 +180,7 @@ NO_TEMPLATES_FILES = [
             "ccnavi-dirs.sh",
             "ccnavi-fetch.sh",
             "ccnavi-git.sh",
+            "ccnavi-idle.sh",
             "ccnavi-launcher.sh",
             "ccnavi-review.sh",
             "ccnavi-session-start.sh",
@@ -213,6 +221,10 @@ ccnavi を登録した hook:
   SubagentStop
 登録した hook（セッション開始時の取り込みと一覧。不要なら --no-fetch）:
   SessionStart（.ccnavi/scripts/ccnavi-session-start.sh。セッション開始時の取り込みと一覧）
+登録した hook（放置したセッションの引き継ぎ促し。不要なら --no-idle）:
+  Stop（.ccnavi/scripts/ccnavi-idle.sh notice。会話が大きいときのユーザへの知らせ）
+  Stop（.ccnavi/scripts/ccnavi-idle.sh start。放置されたら引き継ぎ文書を書かせる待機）
+  UserPromptSubmit（.ccnavi/scripts/ccnavi-idle.sh reset。入力したら待機をやめる）
 足した .vscode/settings.json:
   git.detectWorktrees
   git.repositoryScanMaxDepth
@@ -250,6 +262,7 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-start.sh
   .ccnavi/scripts/ccnavi-stage.sh
   .ccnavi/scripts/ccnavi-worktree.sh
+  .ccnavi/scripts/ccnavi-idle.sh
   .ccnavi/scripts/ccnavi-launcher.sh
 env の値は、セッションを開き直すまで反映されません。
 """
@@ -420,7 +433,8 @@ class WritesTheExpectedShape(SetupTest):
         self.run_setup()
         data = self.read_settings()
         for event in EVENTS:
-            hooks = [h for h in self.hooks_of(data, event) if h["command"] != FETCH_COMMAND]
+            others = (FETCH_COMMAND, *IDLE_COMMANDS.get(event, ()))
+            hooks = [h for h in self.hooks_of(data, event) if h["command"] not in others]
             self.assertEqual(len(hooks), 1, f"{event} の hook が 1 つでない")
             self.assertEqual(hooks[0]["command"], HOOK_COMMAND, f"{event} の command")
             self.assertEqual(hooks[0]["type"], "command", f"{event} の type")

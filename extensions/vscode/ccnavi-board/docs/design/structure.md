@@ -11,13 +11,13 @@ keywords: [設計, 構成, ファイル, src, core, webview, test, fixtures, テ
 ```
 src/
   extension.ts        画面の入口の登録（core/screens.ts の帳面）、コマンド登録とサイドパネルの登録（vscode に依存する）
-  sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口（取り込み待ちは並べない）。チケット制御が disable なら 2 つ（プロジェクト管理・ルール管理）。見た目はタイトルバーの配色のアイコンで、今の値を見出しの横に出す（vscode に依存する）
+  sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口（取り込み待ちは並べない）。チケット制御が disable なら 2 つ（プロジェクト管理・ルール管理）。タイトルバーの「?」で左パネルの案内を開く。見た目は配色のアイコンで切り替え、今の値を見出しの横に出す（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に反映する。変化を監視する（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）。マージ状況の確認の結果（core/merge.ts）もここが持つ（ボードが開いている間だけ）。実行ファイルと sh を子プロセスで呼ぶ読み取りと、片付けの送信（ダイアログのあとだけ）を分けて行う
   rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通の設定の定義（読み取り専用。共通の設定を開いているときは並べない）と、共通の設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
-  templates-panel.ts  テンプレート管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。読み直し・本文の取り出しの受け付けと、ファイルの監視、「取り込み待ちを開く」の受け渡し、編集（実行ファイルに読ませる `--templates --check-file`、作業中の錠の取り直し、保存。書くのは保存のときだけで、判定は実行ファイルの答えのまま）。vscode に依存する
+  templates-panel.ts  テンプレート管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。読み直し・本文の取り出し・図の中身の取り出し（preview。読むだけ）の受け付けと、ファイルの監視、「取り込み待ちを開く」の受け渡し、編集（実行ファイルに読ませる `--templates --check-file`、作業中の錠の取り直し、保存。書くのは保存のときだけで、判定は実行ファイルの答えのまま）。vscode に依存する
   handoff-entry.ts    各画面（ルール・リスク・フェーズ・テンプレート管理）の「取り込み待ちを開く」の拡張ホスト側の共通部分（開けるかの確認と、見ている対象に合わせたツリーで開く）。実行ファイルを呼ぶので単体テストの対象外
   handoff-panel.ts    取り込み待ち画面の Webview パネル（1 枚。見るツリー（ワークスペース・プロジェクト・ワークツリー）を切り替える）。user handoff --json の一覧の受け渡しと、取り込みの受け付け（手順は core/handoff-import.ts に分けてあり、ここは実行ファイルの呼び出しを渡すだけ）、ターミナルの案内、下書きと取り込み先のファイルの監視、作業中の錠の取り直し。ボードのカードの下書きの通知からも開く（vscode に依存する）
   flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。ボードのカードから開く）。置き場と錠を実行ファイルに聞き、保存を受け付ける。エージェントの下書きの「提案あり」・取り込み・保存のあとの削除と、依頼の文もここ（vscode に依存する）
@@ -25,7 +25,7 @@ src/
   prompt-handover.ts  Claude Code に文を渡す 2 つの経路（コピー / 新しいセッションで開く）。ボードとフロー編集画面が使う（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信、.gitignore への追記（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
-  tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）
+  tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）。左パネルの案内（package.json の walkthroughs。本文は media/tour/）を、拡張の版が変わった最初の起動と、パネルのタイトルバーの ? で開き、プロジェクト管理 → チケット管理の基本の案内を続けて動かす（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-expectations --json / --lint（--rules / --project-rules-file / --risk / --project-risk-file / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / user agree --yes … --json / --templates --json / --templates --show <名前> --json / user handoff [<パス>…] --json（取り込み先行の一覧。見るだけ）と user handoff <パス…> --yes --expect --via board --json（取り込み）/ --templates --draft <親> --json（ボードの親のカードの「テンプレートの下書きを作る」）/ --suggest --json / --plan-order <親> --json（--order）と --plan-order --write の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起動する（origin を読む。Node の子プロセス）
   webview-asset.ts    バンドルした画面（out/webview/<名前>.js）と CSS（同 .css）を読む。渡すのは画面の名前で、拡張が <script nonce> と <style nonce> に流し込む
@@ -57,7 +57,7 @@ src/
     phases-view.ts    フェーズ管理の拡張ホストと画面の契約（定義の形 PhasesForm、見せる形 PhasesPage / PhasesData、押した操作 PhasesMessage）
     phases-render.ts  フェーズ管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す。読まない順序の欄は名指しするだけで、書き戻しで手を付けない）
-    templates-view.ts テンプレート管理の拡張ホストと画面の契約（見せる形 TemplatesPage / TemplatesData、答えの形 TemplatesJson、押した操作 TemplatesMessage、編集の答え TemplateCheck / EditOpened）
+    templates-view.ts テンプレート管理の拡張ホストと画面の契約（見せる形 TemplatesPage / TemplatesData、答えの形 TemplatesJson、押した操作 TemplatesMessage、編集の答え・図の中身の答え TemplateCheck / EditOpened）
     templates-render.ts テンプレート管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     templatesmodel.ts `--templates` の答え（一覧・層ごとの中身・統合結果・下書き・本文・編集中の 1 本の検査）の読み取り。判定はしない。答えの版が違えば解釈せず伝える
     template-edit.ts  テンプレートの編集の手元のコピー（EditTemplate）と編集の関数（ステップの追加・削除・並べ替え・線・フロー。先行が小さい添字になるよう振り直す）、書き出しと見比べ。vscode も DOM も node も入れない
@@ -76,6 +76,7 @@ src/
     flow-match.ts     画面の中身と実行ファイルが読んだ中身（flow.data）の見比べ（整数と浮動小数の揃え方、食い違った場所と両者の値の言い方）
     flow-history.ts   フロー編集（とテンプレートの編集）の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
+    tour-sidebar.ts   左パネルの案内（ウォークスルー）の ID と、続けて動かす基本の案内の画面。DOM にも vscode にも触れないので、単体で試せる
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
     tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。手順は target・題・本文・scene）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
     tour-rules.ts     ルール管理の案内の見本（tours/rules.yml の sample:）を RuleForm と実行ファイルの JSON の形にする。rules.yml と同じ書き方のルールを読む小さな読み取り（実際の readRules と同じ結果になることをテストが見る）
@@ -166,7 +167,8 @@ src/
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
     templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
     templates/Sum.tsx   統合結果の枠（読み取り専用。実行ファイルの索引を、統合結果を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
-    templates/Template.tsx テンプレート 1 件（札・計画・フロー・本文・「編集」）
+    templates/Template.tsx テンプレート 1 件（札・図・本文・「図を編集」。行は最初から開く）
+    templates/Diagrams.tsx 一覧の 1 行の図（計画の図と子のフローの図。読むだけ。実行ファイルの答え TemplateCheck を描く）
     templates/Edit.tsx  編集欄（説明・使う場面・計画・フロー、元に戻す、保存、作業中の錠の帯、未保存の確認。直すたびに実行ファイルに読ませる）
     templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。種類・レビューの選択、並べ替え、削除、追加）
     templates/FlowEdit.tsx 編集欄の子のフロー 1 本（フロー編集画面の図と右の欄を使い、部品箱でノードを足す）
@@ -229,6 +231,7 @@ src/
     rules/text.ts     要約の文・絞り込みが適用する文字列・件数の出し方
 media/
   icon.svg            アクティビティバーのアイコン
+  tour/*.md           左パネルの案内（ウォークスルー）の各段の本文（panel・projects・board・basics・more）
 test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/ticket/test_board.py が書き出す
   fixtures/test.json, expectations.json  --test --json / --test-expectations --json の実例。tests/core/test_test_json.py が書き出す

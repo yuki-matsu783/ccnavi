@@ -288,7 +288,7 @@ class StopRulesTest(unittest.TestCase):
         """プロジェクトのレイヤーへコピーした共通レイヤーが古くなって `every` が違っても、
         数えるのは共通レイヤーの 1 本。
 
-        共通レイヤーは親の着手でプロジェクトのレイヤーへコピーするので、コピーしたレイヤーが古いまま残ることがある。
+        共通レイヤーは同期でプロジェクトのレイヤーへコピーするので、コピーしたレイヤーが古いまま残ることがある。
         """
         home = self.project()
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))

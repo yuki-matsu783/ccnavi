@@ -16,7 +16,7 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 | 共通レイヤーのルール / フェーズ定義 / リスクの配点 | `.ccnavi/config/common/{rules,phases,risks}.yml`（置き場は固定） | ワークスペース |
 | ルールの期待する判定 | `.ccnavi/config/common/rule-expectations.yml` | ワークスペース |
 | 共通の作業・レビュー計画のテンプレート | `.ccnavi/config/common/templates/<名前>.yml`（置き場は固定。9.15。`*/.ccnavi/*` の一般の保護で守る） | ワークスペース |
-| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/`（親の着手でワークスペースルートの `.ccnavi/config/common/` から配る。11.12） | プロジェクト |
+| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/`（着手済みの親があるとき、ユーザの発言でワークスペースルートの `.ccnavi/config/common/` から配る。11.12） | プロジェクト |
 | ワークスペース自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース |
 | プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | プロジェクト |
 | 自身・プロジェクトのレイヤーのテンプレート | `<ツリー>/.ccnavi/config/project/templates/<名前>.yml`（9.15。共通のテンプレートと同じく一般の保護で守る） | そのツリーのリポジトリ |

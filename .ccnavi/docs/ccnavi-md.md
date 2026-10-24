@@ -3,7 +3,7 @@ title: CCNAVI.md の書き方
 type: guide
 description: .ccnavi/CCNAVI.md の条件（ccnavi:if / else / endif）と差し込み（{{名前}}）の書き方、条件の名前の一覧
 tags: [ccnavi-md, session-start]
-keywords: [CCNAVI.md, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み, 入れ子, 判定, ccnavi-md, lint, SessionStart]
+keywords: [CCNAVI.md, 非対話, non_interactive, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み, 入れ子, 判定, ccnavi-md, lint, SessionStart]
 ---
 
 # CCNAVI.md の書き方
@@ -36,6 +36,7 @@ keywords: [CCNAVI.md, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み
 | `tickets` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL`が`disable`でない） |
 | `docs` | mdの索引の案内（`--docs`）を出す回 |
 | `dry_run` | `CCNAVI_MODE`が`dry-run` |
+| `non_interactive` | 環境変数`CLAUDE_CODE_SESSION_ATTENDED`が`0`（付き添いなし。`claude -p`など）。未設定・`1`・その他の値は成り立たない。この変数はClaude Codeの文書に無い |
 
 ワークツリーとgitの行は、それを支えるdenyがあるときだけ出す。ルールが無いワークスペースで出すと、文と判定が食い違う。
 共通レイヤーが読めずに組み込みの既定に戻ったときも出ない（既定にはこの2つのidが無い）。

@@ -142,8 +142,8 @@ allow:
     additionalContext: >-
       親の feedback: を書くなら、振り返りで残したスキルの候補（親のワークツリーの
       wip/handoff/skill-candidates.md）を見て、あれば skill-improve を入れる。feedback: は
-      最後の項がほかの全部を after で待つ形にする（後ろに足すだけだと承認で落ちる）ので、
-      最後の項の after に skill-improve の番号も足すか、skill-improve を最後に置いてほかの全部を
+      最後のステップにほかの全部が after で先行する形にする（後ろに足すだけだと承認で落ちる）ので、
+      最後のステップの after に skill-improve の番号も足すか、skill-improve を最後に置いてほかの全部を
       待たせる。定義は ccnavi --plan-order <親> --fill-phases で親の phases: にコピーする。
       手順は .ccnavi/docs/skill-review.md。
 

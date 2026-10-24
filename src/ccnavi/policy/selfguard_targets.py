@@ -49,9 +49,6 @@ class Target:
     # ワークツリー側の設定は今の時点では誰も読まないので、「何も起きていないのに
     # 戻された」と読まれる。統合で反映される経路であることを言わないと、同じ操作が繰り返される。
     copy: bool = False
-    # spelled は、リンクを解く前のパス（ワークツリー側の設定だけ持つ）。着手がコピーした分かを
-    # 答えさせるときに渡す。解いた先で答えると、リンクに差し替えた形が指す先の中身で外れる。
-    spelled: str = ""
 
 
 def targets(
@@ -241,7 +238,6 @@ def _worktree_copies(
                     label=_relative(root, full),
                     top=work.root,
                     copy=True,
-                    spelled=os.path.join(work.root, rel),
                 )
             )
     return copies

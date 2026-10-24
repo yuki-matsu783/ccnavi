@@ -21,7 +21,7 @@ keywords: [育つ, grow, rules.yml, phases.yml, risks.yml, テンプレート, �
 | 検証 | 読めるか・ヒットするかを機械に聞く。目で判定を真似しない | エージェント |
 | 承認 | 何をなぜ変えるかと一緒に渡し、ユーザが差分を読んで `ccnavi user handoff` で置く。設定ファイルは保護対象で、エージェントは直接書けない | ユーザ |
 | 効く | 置いたあとの判定・作業から効く。進行中の親や子には届かないものがある（対象ごとの文書） | ccnavi |
-| 配る | 共通レイヤーは、親の `ticket start` がプロジェクトの `.ccnavi/config/common/` へミラーする。ミラーは誰も編集しないコピーで、プロジェクト固有のものは `.ccnavi/config/project/` に置く。ずれたときの同期は、ユーザが `ccnavi user mirror` で行う | ccnavi |
+| 配る | 共通レイヤーは、着手済みの親があるとき、ユーザの発言のたびに、そのワークツリーのプロジェクトの `.ccnavi/config/common/` へミラーされる。ミラーは誰も編集しないコピーで、プロジェクト固有のものは `.ccnavi/config/project/` に置く。ずれたときの同期は、ユーザが `ccnavi user mirror` で行う | ccnavi |
 
 テンプレートと工程スキルの reference は、承認と効く段の主体が上の表と違う（それぞれの文書に書く）。
 

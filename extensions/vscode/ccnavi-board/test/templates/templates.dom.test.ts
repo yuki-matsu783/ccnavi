@@ -16,9 +16,11 @@ function text(element: { textContent: string | null } | null | undefined): strin
   return (element?.textContent ?? "").trim();
 }
 
-/** 行の見出しを押して開く */
+/** 行を開く。行は最初から開いているので、畳んでいるときだけ見出しを押す */
 async function openRow(dom: DomPage, selector: string): Promise<void> {
-  dom.click(dom.one(`${selector} .row-head`));
+  if (dom.all(`${selector}.open`).length === 0) {
+    dom.click(dom.one(`${selector} .row-head`));
+  }
   await dom.settle();
 }
 

@@ -125,7 +125,6 @@ import os
 import shutil
 import time
 import uuid
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
 
@@ -317,7 +316,6 @@ def after(
     root: str,
     found: list[selfguard_targets.Target],
     written: str,
-    synced: Callable[..., bool],
 ) -> list[Outcome]:
     """実行後。バックアップと比べて、変わっていれば戻す。
 
@@ -328,23 +326,17 @@ def after(
     written は、この呼び出しが名指しのツール（REPAIR_TOOLS）で書いた先の解決済みの
     パス。組み込みの既定を使っている間の修復だけは戻さない（_left_as_repair）。
 
-    synced は、ワークツリー側の設定の変更が、着手のときに共通レイヤーをミラーした書き込みかを
-    答える（`configsync.is_synced_write`。第 2 引数は変更後の中身で、None は消えたこと）。
-    そう読めるものは戻さない。戻すと、着手がミラーした中身が同じ呼び出しの中で消える。
-    ワークツリー側の設定に限るのは、ミラーを書くのが親のワークツリーだけだから。
-
     処理フロー:
     1. 無効（DISABLE）か状態の置き場が無ければ何もしない
     2. 大きい対象は `_check_heavy` に任せる
     3. バックアップと今の中身が同じなら何もしない
-    4. コピーの対象（`copy`）で `synced` が真なら、ミラーの書き込みなので戻さない
-    5. 読めないルールファイルの間の修復（`_left_as_repair`）は戻さず、報告だけにする
-    6. バックアップが無いとき: 中身も無ければ何もしない。無かったものが現れていれば、
+    4. 読めないルールファイルの間の修復（`_left_as_repair`）は戻さず、報告だけにする
+    5. バックアップが無いとき: 中身も無ければ何もしない。無かったものが現れていれば、
        報告だけにする（`_absent_noted`）。それ以外は `_fall_back_to_git` で
        コミット済みの内容を基準にする
-    7. dry-run のときは書かず、戻す予定だけを報告する
-    8. enable のときは、バックアップの内容を書き戻す
-    9. 何も起きていない回（`ACTION_KEPT`）は報告から除く
+    6. dry-run のときは書かず、戻す予定だけを報告する
+    7. enable のときは、バックアップの内容を書き戻す
+    8. 何も起きていない回（`ACTION_KEPT`）は報告から除く
     """
     if setting == DISABLE or not state_dir:
         return []
@@ -362,9 +354,6 @@ def after(
         now = _read(target.path)
 
         if saved is not None and now == saved:
-            continue
-
-        if target.copy and synced(target.spelled or target.path, now):
             continue
 
         if _left_as_repair(target, written, saved, now):

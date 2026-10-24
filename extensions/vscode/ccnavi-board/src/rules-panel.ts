@@ -48,6 +48,7 @@ import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/wa
 import * as diaglog from "./log.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
+import { confirmDuringTurn } from "./turn-confirm.js";
 
 const DEFAULT_RULES = ".ccnavi/config/common/rules.yml";
 const DEFAULT_EXPECTATIONS =".ccnavi/config/common/rule-expectations.yml";
@@ -860,6 +861,13 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   }
   if (lock.locked) {
     fail(current, lock.reason);
+    return;
+  }
+  if (!(await confirmDuringTurn(lock))) {
+    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください。");
+    return;
+  }
+  if (!alive(current)) {
     return;
   }
 

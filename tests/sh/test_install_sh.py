@@ -222,13 +222,13 @@ class InstallTest(Env):
     def test_only_five_options_reach_setup(self):
         done = self.install(
             *("--from", self.src, "--mode", "enable", "--ticket-control", "disable"),
-            *("--force", "--no-vscode", "--no-fetch", "--clear-quarantine", "--check"),
+            *("--force", "--no-vscode", "--no-fetch", "--no-idle", "--clear-quarantine", "--check"),
             env=self.env(),
         )
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         got = self.setup_calls()[0]
         want = [self.ws, "--deploy", self.src, "--mode", "enable", "--ticket-control", "disable"]
-        want += ["--force", "--no-vscode", "--no-fetch", "--check"]
+        want += ["--force", "--no-vscode", "--no-fetch", "--no-idle", "--check"]
         self.assertEqual(got, want)
 
     def test_plain_real_run_passes_only_ws_and_deploy(self):

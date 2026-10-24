@@ -210,6 +210,8 @@ export type ToTemplates =
   | { readonly type: "editOpened"; readonly session: number; readonly opened: EditOpened | null; readonly error: string }
   /** 編集中の中身を実行ファイルに読ませた答え（`editCheck`）。`seq` は頼んだ番号 */
   | { readonly type: "editChecked"; readonly session: number; readonly seq: number; readonly check: TemplateCheck | null; readonly error: string }
+  /** 1 件を図で見せるための答え（`preview`）。`error` があれば `check` は null */
+  | { readonly type: "preview"; readonly name: string; readonly layer: string; readonly check: TemplateCheck | null; readonly error: string }
   /** 作業中の錠が変わった（チケットが動いた）。錠が掛かっている間は保存できない */
   | { readonly type: "editLock"; readonly session: number; readonly lock: Lock }
   /** 保存の答え（`editSave`）。書けたら `sha` が新しいファイルのハッシュ。書かなかったら `error` に理由 */
@@ -228,6 +230,8 @@ export type TemplatesMessage =
   | { readonly type: "switchTarget"; readonly kind: string; readonly name: string }
   /** 1 件の本文を読む */
   | { readonly type: "showTemplate"; readonly name: string; readonly layer: string }
+  /** 1 件を実行ファイルに読ませ、計画とフローの図の中身を求める（読むだけ。編集の錠は取らない） */
+  | { readonly type: "preview"; readonly name: string; readonly layer: string }
   /** 取り込み待ち画面を開く（下書きの取り込みと編集は、そちらで行う） */
   | { readonly type: "openHandoff" }
   /** 既存のテンプレートの編集を始める。`session` は画面が付ける番号で、答えに返る */

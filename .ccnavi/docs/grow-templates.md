@@ -20,7 +20,7 @@ keywords: [テンプレート, 育つ, 全体像, 作業・レビュー計画, d
 | 検証 | `TODO` の残りは warn、制御文字を含む下書きは error。`user handoff` の下見が差分（既存があれば前後）を見せる | ccnavi | `ccnavi --lint`、`ccnavi user handoff`（`--yes` なし） |
 | 承認 | 下見を読み、表示された `--expect <ハッシュ>` を付けて `--yes` で書く。ターミナルの前のユーザだけが打てる | ユーザ | `ccnavi user handoff <相対パス> --yes --expect <ハッシュ>` |
 | 効く | 次の親の提案を、テンプレートから始められる | エージェント | `ccnavi ticket new <識別子> --title <題> --template <名前> --issue <値> --mr <番号>` |
-| 配る | 共通は導入 sh が配布先へ配り、親の着手がプロジェクトの `.ccnavi/config/common/` へコピーする | ccnavi | `ccnavi-setup.sh`、親の `ticket start` |
+| 配る | 共通は導入 sh が配布先へ配り、着手済みの親があるときのユーザの発言が、プロジェクトの `.ccnavi/config/common/` へコピーする | ccnavi | `ccnavi-setup.sh`、ユーザの発言 |
 
 ## 規則
 

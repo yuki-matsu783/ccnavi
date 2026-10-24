@@ -2,7 +2,7 @@
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
   "description": "ccnavi のチケットと、それに付随する提案・承認済みチケット・マーカー・ワークツリーをカンバンで表示します。承認する内容をオーバーレイで確認して承認できます。ルールと hook を画面で確認し、ルールを直して判定を試せます。実際の変更内容に基づくリスク評価の配点や、フェーズ定義も画面で編集できます。projects/ のプロジェクトを一覧し、git clone をターミナルに送れます。ルール管理とリスク管理では共通・ワークスペース・プロジェクトの設定を、フェーズ管理ではワークスペース・プロジェクトの設定を切り替えて直せます。テンプレート管理では、作業・レビュー計画のテンプレートと下書きを表示します（読むだけ）。取り込み待ちでは、wip/handoff/ に置いた下書き（テンプレート・設定・docs）の差分を読んで、選んだ対象を取り込めます。ルールとリスクでは、共通の設定との統合結果も読み取り専用で確認できます。",
-  "version": "0.11.21",
+  "version": "0.12.0",
   "publisher": "local",
   "private": true,
   "license": "MIT",
@@ -74,14 +74,36 @@
         "command": "ccnaviBoard.appearance",
         "title": "ccnavi ボード: 見た目を切り替える",
         "icon": "$(color-mode)"
+      },
+      {
+        "command": "ccnaviBoard.tour",
+        "title": "ccnavi ボード: 左パネルの案内を見る",
+        "icon": "$(question)"
+      },
+      {
+        "command": "ccnaviBoard.tourBasics",
+        "title": "ccnavi ボード: 基本の案内を続けて見る（プロジェクト管理 → チケット管理。チケット制御が無効ならプロジェクト管理だけ）"
+      },
+      {
+        "command": "ccnaviBoard.tourProjects",
+        "title": "ccnavi ボード: プロジェクト管理の基本の案内を見る"
+      },
+      {
+        "command": "ccnaviBoard.tourBoard",
+        "title": "ccnavi ボード: チケット管理の基本の案内を見る"
       }
     ],
     "menus": {
       "view/title": [
         {
+          "command": "ccnaviBoard.tour",
+          "when": "view == ccnaviBoard.entries",
+          "group": "navigation@1"
+        },
+        {
           "command": "ccnaviBoard.appearance",
           "when": "view == ccnaviBoard.entries",
-          "group": "navigation"
+          "group": "navigation@2"
         }
       ],
       "commandPalette": [
@@ -108,6 +130,10 @@
         {
           "command": "ccnaviBoard.openWorkflow",
           "when": "false"
+        },
+        {
+          "command": "ccnaviBoard.tourBoard",
+          "when": "ccnaviBoard.ticketControl == 'enable'"
         }
       ]
     },
@@ -150,7 +176,57 @@
           "description": "ccnavi の 7 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は、背景・枠・文字の色と、意味を表す色を Claude の配色に置き換えます（ハイコントラストのテーマでは置き換えません）。サイドパネルのタイトルバーの配色のアイコンからも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
         }
       }
-    }
+    },
+    "walkthroughs": [
+      {
+        "id": "ccnaviBoard.sidebar",
+        "title": "ccnavi の左パネルの案内",
+        "description": "左パネルに並ぶ画面の入口と、最初に見る 2 つの画面（プロジェクト管理・チケット管理）の基本を順に説明します。",
+        "steps": [
+          {
+            "id": "ccnaviBoard.tour.panel",
+            "title": "左パネルを開く",
+            "description": "アクティビティバーの ccnavi を押すと、画面の入口が一覧で並びます。行にマウスを重ねると説明が出ます。\n[左パネルを開く](command:workbench.view.extension.ccnavi)",
+            "media": {
+              "markdown": "media/tour/panel.md"
+            }
+          },
+          {
+            "id": "ccnaviBoard.tour.projects",
+            "title": "プロジェクト管理",
+            "description": "projects/ の一覧と、clone・fetch・pull の実行を説明します。基本は画面の吹き出しの案内で示します。\n[プロジェクト管理の基本の案内を見る](command:ccnaviBoard.tourProjects)",
+            "media": {
+              "markdown": "media/tour/projects.md"
+            }
+          },
+          {
+            "id": "ccnaviBoard.tour.board",
+            "title": "チケット管理",
+            "description": "チケットのカンバンと、承認・レビューの進め方を説明します。基本は画面の吹き出しの案内で示します。\n[チケット管理の基本の案内を見る](command:ccnaviBoard.tourBoard)",
+            "media": {
+              "markdown": "media/tour/board.md"
+            },
+            "when": "ccnaviBoard.ticketControl == 'enable'"
+          },
+          {
+            "id": "ccnaviBoard.tour.basics",
+            "title": "基本の案内を続けて見る",
+            "description": "プロジェクト管理 → チケット管理の順に、基本の案内を続けて動かします。\n[続けて見る](command:ccnaviBoard.tourBasics)",
+            "media": {
+              "markdown": "media/tour/basics.md"
+            }
+          },
+          {
+            "id": "ccnaviBoard.tour.more",
+            "title": "ほかの画面と見た目",
+            "description": "ルール・リスク・フェーズ・テンプレートの各画面にも、初めて開いたときに案内が出ます。見直したいときは各画面の右上の ? を押します。\n[見た目を切り替える](command:ccnaviBoard.appearance)",
+            "media": {
+              "markdown": "media/tour/more.md"
+            }
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "compile": "node scripts/clean-out.js && tsc -p . && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node scripts/bundle.js",

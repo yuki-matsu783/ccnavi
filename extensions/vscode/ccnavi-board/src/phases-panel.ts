@@ -55,6 +55,7 @@ import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
+import { confirmDuringTurn } from "./turn-confirm.js";
 
 const DEFAULT_PHASES = ".ccnavi/config/project/phases.yml";
 /** 共通の設定の定義の場所。ルール管理・リスク管理と同じく固定で、env では動かせない */
@@ -773,6 +774,13 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
   if (lock.locked) {
     fail(current, lock.reason);
+    return;
+  }
+  if (!(await confirmDuringTurn(lock))) {
+    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください。");
+    return;
+  }
+  if (!alive(current)) {
     return;
   }
 

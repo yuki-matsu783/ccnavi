@@ -43,15 +43,13 @@
 
 from __future__ import annotations
 
-import functools
 import hashlib
 import os
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, gitstate, hookio, pathcase, settings, tree
+from ..infra import fsio, gitstate, hookio, pathcase, settings, tree
 from ..policy import rules, selfguard
 from ..records import audit
 from ..tickets import (
@@ -96,7 +94,6 @@ def check(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
-    synced: Callable[..., bool] | None = None,
     root: str = "",
 ) -> tuple[str, bool]:
     """実行後の 1 回ぶんを処理し、（モデルに返す文, ワークツリーを戻そうとしたか）を返す。
@@ -152,7 +149,7 @@ def check(
 
     reported, baseline, announced = _load_reported(stderr, state_dir, payload.session_id)
 
-    found = _found(read, mine, scope, places, synced, root)
+    found = _found(read, mine, scope, places, root)
     if not found:
         # 違反が無くても、基準を作る。ここを飛ばすと、綺麗なワークツリーで
         # 始まったセッションはいつまでも「基準なし」のままになり、その後に現れた
@@ -373,7 +370,6 @@ def _committed_findings(
     mine: tuple[str, ...],
     scope: post_findings.ScopeGuard | None,
     places: tuple[str, str],
-    synced: Callable[..., bool] | None = None,
 ) -> tuple[list[post_findings.Finding], list[str]]:
     """このターンでコミットに入った、保護領域の変更。
 
@@ -411,16 +407,10 @@ def _committed_findings(
             )
             uncounted.append(w.tree.name or ".")
             continue
-        # 着手がコピーした分かどうかは、コミットされた中身で答える。ディスクで答えると、
-        # 好きな中身でコミットしてからディスクだけ共通レイヤーの中身へ戻す形が、呼び出しごとの
-        # チェック・バックアップと復元・ここの 3 つから同時に外れる。
-        judged = functools.partial(_committed_synced, synced, top, changes) if synced else None
         # `integrate-done` が積んだ squash だけが変えたパスは外す（git で確かめたものだけ）。
         # 片付けの後なので staged の除外は効かず、正規の取り込みが毎回報告に並ぶため。
         integrated = post_findings.integrated_paths(top, base) if changes else set()
-        for finding in post_findings._findings(
-            changes, w.rule_set, mine, w.source, scope, w.tree, synced=judged
-        ):
+        for finding in post_findings._findings(changes, w.rule_set, mine, w.source, scope, w.tree):
             if finding.change.path in integrated:
                 continue
             rel = tree.relative(w.tree, finding.change.full)
@@ -428,26 +418,6 @@ def _committed_findings(
                 continue
             out.append(finding)
     return out, uncounted
-
-
-def _committed_synced(
-    synced: Callable[..., bool],
-    top: str,
-    changes: list[gitstate.Change],
-    full: str,
-) -> bool:
-    """コミットされた中身で `synced` に答えさせる。読めなければ外さない。
-
-    変更後は HEAD の中身（無ければ消えたこと）。バイト列のまま読む。文字列で
-    読むと、UTF-8 でないスクリプトや単独の CR が読み替えられ、ミラーした分でも食い違う。
-    """
-    path = next((c.path for c in changes if c.full == full), "")
-    if not path:
-        return False
-    now, readable = gitcmd.blob(top, "HEAD", path)
-    if not readable:
-        return False
-    return synced(os.path.join(top, path.replace("/", os.sep)), now)
 
 
 def at_stop(
@@ -459,7 +429,6 @@ def at_stop(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
-    synced: Callable[..., bool] | None = None,
     root: str = "",
 ) -> str:
     """ターンの終わりに、このターンで変わった保護領域をユーザへ報告する。
@@ -500,7 +469,7 @@ def at_stop(
         f
         for w, top, changes in read
         for f in post_findings._findings(
-            changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced, root
+            changes, w.rule_set, mine, w.source, scope, w.tree, top, places, root
         )
         if f.key() not in baseline
     ]
@@ -509,7 +478,7 @@ def at_stop(
     # 同じ見た目になる（呼び出しごとの実行後チェックも同じ見落としがあるが、そちらは戻しに関わるので
     # 断面を変えない。ユーザが 1 度で見るのはこの報告）。
     side_roots = _side_roots(read)
-    committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places, synced)
+    committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places)
     found += committed
     if not found and not uncounted:
         record.decision, record.enforced = audit.ALLOW, True
@@ -786,7 +755,6 @@ def at_prompt(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
-    synced: Callable[..., bool] | None = None,
     root: str = "",
     accept: bool = False,
 ) -> None:
@@ -816,7 +784,7 @@ def at_prompt(
         fsio.remove(_turn_path(state_dir, payload.session_id))
         return
 
-    found = _found(read, mine, scope, places, synced, root)
+    found = _found(read, mine, scope, places, root)
     # ツリーごとの HEAD も記録する。ターンの終わりに「このターンでコミットに
     # 入ったもの」を数える基準になる（`git status` はコミットを見せない）。
     heads = {top: gitstate.head(top) for _, top, _ in read if top}
@@ -891,7 +859,6 @@ def _found(
     mine: tuple[str, ...],
     scope: post_findings.ScopeGuard | None,
     places: tuple[str, str],
-    synced: Callable[..., bool] | None,
     root: str,
 ) -> list[post_findings.Finding]:
     """読んだツリーの変更のうち、保護領域にヒットするもの。実行後と起動時の基準で同じ式を使う。"""
@@ -899,7 +866,7 @@ def _found(
         f
         for w, top, changes in read
         for f in post_findings._findings(
-            changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced, root
+            changes, w.rule_set, mine, w.source, scope, w.tree, top, places, root
         )
     ]
 
@@ -913,7 +880,6 @@ def capture_baseline(
     record: audit.Record,
     mine: tuple[str, ...],
     places: tuple[str, str],
-    synced: Callable[..., bool] | None,
     root: str,
 ) -> None:
     """セッションの始まり（SessionStart の startup）に在る保護領域の変更を、基準として記録する。
@@ -932,7 +898,7 @@ def capture_baseline(
     read = _read_all(stderr, watched, record)
     if len(read) != len(watched):
         return
-    found = _found(read, mine, scope, places, synced, root)
+    found = _found(read, mine, scope, places, root)
     _save_reported(stderr, state_dir, session, {f.key() for f in found}, announced=False)
 
 

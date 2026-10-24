@@ -694,7 +694,7 @@ def common_types(
 ) -> tuple[PhaseTypes | None, list[rules.Problem]]:
     """共通レイヤーの定義と、その苦情。ファイルが無いか壊れていれば None。
 
-    単体 clone では、共通レイヤーは着手のときに配られたミラー（そのプロジェクトの
+    単体 clone では、共通レイヤーは同期で配られたミラー（そのプロジェクトの
     `.ccnavi/config/common/`）になる。苦情を言う場所は `--lint` の共通レイヤーの項。
     """
     if not conf.phases or not os.path.exists(conf.phases):

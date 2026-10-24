@@ -345,6 +345,20 @@ class StatePruneTest(_Base):
         self.assertFalse(os.path.exists(old))
         self.assertTrue(os.path.exists(new))
 
+    def test_turn_marker_and_mirror_signature_are_pruned(self):
+        # ターン中の印はセッションの記録として、
+        # ミラーの指紋は親の識別子ごと（セッションに依らない）に、
+        # それ自身の日付で消す。
+        old_turn = _write(os.path.join(self.state, f"turn-{S_OLD}.json"), age_days=20)
+        new_turn = _write(os.path.join(self.state, f"turn-{S_LIVE}.json"), age_days=1)
+        old_sig = _write(os.path.join(self.state, "mirror-i0001.json"), age_days=20)
+        new_sig = _write(os.path.join(self.state, "mirror-i0002.json"), age_days=1)
+        self.run_prune()
+        self.assertFalse(os.path.exists(old_turn))
+        self.assertTrue(os.path.exists(new_turn))
+        self.assertFalse(os.path.exists(old_sig))
+        self.assertTrue(os.path.exists(new_sig))
+
     def test_dry_run_lists_but_keeps(self):
         doomed = self.session_files(S_OLD, 20)
         report = self.run_prune(dry_run=True)

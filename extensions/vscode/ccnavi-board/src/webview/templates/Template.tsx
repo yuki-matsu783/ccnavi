@@ -1,11 +1,12 @@
 /**
- * テンプレート 1 件。見出しに名前・層・状態の札・説明を出し、開くと計画・フロー・本文の取り出しを出す。
+ * テンプレート 1 件。見出しに名前・層・状態の札・説明を出し、最初から開いていて、計画とフローの図・本文の取り出しを出す（畳める）。
  * 判定（使える・使われない・破棄した理由・読めない）は実行ファイルの答えのまま出す。
  */
-import type { JSX } from "react";
+import { useEffect, type JSX } from "react";
 
 import { revealControls } from "../../core/templatesmodel.js";
-import type { FlowSummary, TemplateDetail, TemplateEntry } from "../../core/templates-view.js";
+import type { FlowSummary, TemplateCheck, TemplateDetail, TemplateEntry } from "../../core/templates-view.js";
+import { Diagrams } from "./Diagrams.js";
 import { Plan } from "./Plan.js";
 import { Problems } from "./Problems.js";
 import { droppedLabel, flowText, layerLabel } from "./text.js";
@@ -21,12 +22,21 @@ export interface TemplateProps {
   readonly onShow: () => void;
   /** 案内が指す先にする（一覧の最初の 1 件だけ） */
   readonly tour: boolean;
-  /** 編集を始める。渡さなければ「編集」は出さない（読み取り専用の層・読めない行・案内の間） */
+  /** 編集を始める。渡さなければ「図を編集」は出さない（読み取り専用の層・読めない行・案内の間） */
   readonly onEdit?: () => void;
+  /** 図の中身（実行ファイルに読ませた答え）。まだ読んでいなければ undefined。読めなかったときは `previewError` に理由 */
+  readonly preview?: TemplateCheck | undefined;
+  readonly previewError?: string;
+  /** 開いたとき、図の中身を求める。渡さなければ求めない（案内の間） */
+  readonly onPreview?: () => void;
 }
 
-export function Template({ entry, open, onToggle, detail, detailError, onShow, tour, onEdit }: TemplateProps): JSX.Element {
+export function Template({ entry, open, onToggle, detail, detailError, onShow, tour, onEdit, preview, previewError = "", onPreview }: TemplateProps): JSX.Element {
   const dropped = entry.dropped;
+  const wantPreview = open && preview === undefined && previewError === "" ? onPreview : undefined;
+  useEffect(() => {
+    wantPreview?.();
+  }, [wantPreview]);
   return (
     <li className={`row template${open ? " open" : ""}`} data-name={entry.name} data-layer={entry.layer} data-tour={tour ? "template" : undefined}>
       <div
@@ -58,15 +68,25 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           )}
           <p className="hint mono small">{entry.path}</p>
           <Problems problems={entry.problems} />
-          <Plan title="全体計画" items={entry.plan} />
-          <Plan title="フィードバック計画" items={entry.feedback} />
-          <Flows flows={entry.flows} hasFlows={entry.has_flows} />
+          {preview !== undefined ? (
+            <Diagrams check={preview} />
+          ) : previewError !== "" ? (
+            <p className="status failed" data-role="preview-error">
+              図を出せません: {previewError}
+            </p>
+          ) : (
+            <>
+              <Plan title="全体計画" items={entry.plan} />
+              <Plan title="フィードバック計画" items={entry.feedback} />
+              <Flows flows={entry.flows} hasFlows={entry.has_flows} />
+            </>
+          )}
           <button type="button" className="action small" data-action="show-text" onClick={onShow}>
             本文を見る
           </button>
           {onEdit !== undefined && (
             <button type="button" className="action small" data-action="edit-template" onClick={onEdit}>
-              編集
+              図を編集
             </button>
           )}
           {detail !== undefined && detailMatches(detail, entry) && (

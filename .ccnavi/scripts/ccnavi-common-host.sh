@@ -47,7 +47,7 @@ ccnavi_h_tmp=""
 ccnavi_h_max_time=120
 
 # 時間を区切って実行する。<秒> <stdin のファイル> <stdout のファイル> <stderr のファイル> <コマンド>...
-# ccnavi_git_timed と同じやり方（背景で動かし、上限を過ぎたら止める）。上限を過ぎたら 124 を返す。
+# ccnavi_git_timed と同じやり方（バックグラウンドで動かし、上限を過ぎたら止める）。上限を過ぎたら 124 を返す。
 ccnavi_run_timed() {
 	ccnavi_rt_limit="$1"
 	ccnavi_rt_in="$2"

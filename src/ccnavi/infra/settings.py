@@ -108,6 +108,12 @@ LEARNING_SOURCES_ENV = "CCNAVI_LEARNING_SOURCES"
 # 既定は 5。観測元の数が閾値以上の候補が 1 件でもあれば、件数によらず知らせる。
 # 読めない値と 1 未満は既定に戻る。
 LEARNING_NOTICE_COUNT_ENV = "CCNAVI_LEARNING_NOTICE_COUNT"
+# HANDOFF_SUGGEST_TOKENS_ENV は、会話の大きさ（トークン数）がどこまで育ったら、次のセッションへの
+# 引き継ぎを促すか（records.idlehandoff）。既定は 400000。0 なら促さない。読めない値は既定に戻る。
+HANDOFF_SUGGEST_TOKENS_ENV = "CCNAVI_HANDOFF_SUGGEST_TOKENS"
+# HANDOFF_WAIT_SECONDS_ENV は、放置から引き継ぎを書かせるまでの待ち時間の上書き（秒）。
+# 動作の確かめ用で、ふだんは使わない。無ければ、キャッシュの保持時間から決める。
+HANDOFF_WAIT_SECONDS_ENV = "CCNAVI_HANDOFF_WAIT_SECONDS"
 # 個人の上書き設定。Claude Code が `env` を起こしたプロセスに渡す。
 LOCAL_CLAUDE_SETTINGS = os.path.join(".claude", "settings.local.json")
 # 共有の設定。`env` に書いた値は、Claude Code が起こしたプロセスに渡る。
@@ -379,6 +385,9 @@ class Settings:
     fail_streak_count: str = ""
     learning_sources: str = ""
     learning_notice_count: str = ""
+    # 引き継ぎを促す大きさと待ち時間の上書き。書かれたままの値で、読むのは records.idlehandoff。
+    handoff_suggest_tokens: str = ""
+    handoff_wait_seconds: str = ""
     # 戻す働きの 2 つ。どちらも mode と同じ enable / dry-run / disable を取る。
     #
     # restore_if_deny は、ルールが `deny` と宣言した場所が副作用で変わったときに
@@ -513,6 +522,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         fail_streak_count=os.environ.get(FAIL_STREAK_COUNT_ENV, ""),
         learning_sources=os.environ.get(LEARNING_SOURCES_ENV, ""),
         learning_notice_count=os.environ.get(LEARNING_NOTICE_COUNT_ENV, ""),
+        handoff_suggest_tokens=os.environ.get(HANDOFF_SUGGEST_TOKENS_ENV, ""),
+        handoff_wait_seconds=os.environ.get(HANDOFF_WAIT_SECONDS_ENV, ""),
         ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         learning=os.environ.get(LEARNING_ENV, ""),
