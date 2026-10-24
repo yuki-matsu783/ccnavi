@@ -41,6 +41,9 @@ FILE = "CCNAVI.md"
 # 1 回の応答に載せる本文の上限（文字数）。固定。常駐の文脈なので毎回これだけ重くなる。
 MAX_CHARS = 6000
 
+# Claude Code が付き添いの有無を示す環境変数。`0` が付き添いなし（`claude -p` など）。
+ATTENDED_ENV = "CLAUDE_CODE_SESSION_ATTENDED"
+
 
 class Context(NamedTuple):
     """条件の判定に渡す、そのセッションの状況。"""
@@ -82,6 +85,17 @@ def _dry_run(ctx: Context) -> bool:
     return ctx.mode == modes.DRY_RUN
 
 
+def _non_interactive(ctx: Context) -> bool:
+    """非対話のセッション。Claude Code が付き添いなしと示したときだけ真。
+
+    見るのは環境変数 `CLAUDE_CODE_SESSION_ATTENDED` が `0` のことだけ。未設定・`1`・読めない値は、
+    対話として扱う（非対話と誤るほうが、聞くべきところで自走するので害が大きい）。この変数は
+    Claude Code が文書にしていない。変わりうるので、判定はここ 1 か所に置く。
+    実測で確かめたことと確かめていないことは、設計書の限界の節にある。
+    """
+    return os.environ.get(ATTENDED_ENV) == "0"
+
+
 # md の `<!-- ccnavi:if 名前 -->` の名前と、その真偽を返す関数。条件を足すときはここに 1 つ足す。
 CONDITIONS: dict[str, Callable[[Context], bool]] = {
     "workspace_root": _workspace_root,
@@ -90,6 +104,7 @@ CONDITIONS: dict[str, Callable[[Context], bool]] = {
     "tickets": _tickets,
     "docs": _docs,
     "dry_run": _dry_run,
+    "non_interactive": _non_interactive,
 }
 # 配布先が足す条件は、`.ccnavi/scripts/ccnavimd.sh` に関数 `ccnavi_cond_<名前>`
 # としてまとめて書く。組み込みと同じ名前の関数は使わない。
