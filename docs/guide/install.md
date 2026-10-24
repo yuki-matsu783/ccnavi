@@ -204,7 +204,7 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 | `--bin` | 置き場 | 使う場面 |
 |---|---|---|
 | `project`（既定） | 配布先の `.ccnavi/bin/<os>-<arch>/` | プロジェクトごとに実行ファイルを持つ |
-| `user` | 実体は `~/.local/share/ccnavi/<os>-<arch>/`、PATH に通す `~/.local/bin/ccnavi` からそこへリンクを張る | 複数のプロジェクトで 1 つを使う。配布先には実行ファイルを置かない |
+| `user` | 実体は `~/.local/share/ccnavi/<os>-<arch>/`。macOS・Linux・WSL は、PATH に通す `~/.local/bin/ccnavi` からそこへリンクを張る。Windows（Git Bash）はリンクを張らず、この実体のフォルダを PATH に通す | 複数のプロジェクトで 1 つを使う。配布先には実行ファイルを置かない |
 
 ```sh
 sh scripts/ccnavi-setup.sh /path/to/project --bin user
@@ -214,8 +214,19 @@ sh scripts/ccnavi-setup.sh /path/to/project --bin user
 中身が配布元と同じなら、確認なしで終わる。違えば、また確認して入れ替える。`~/.local/bin/ccnavi` に別のものが既にあれば触らない（置き換えるなら `--force`）。
 `--check` は書かず、確認も求めない。
 
-`~/.local/bin` が PATH に入っていなければ、足す行を知らせる。シェルの設定ファイルは書き換えない。
-実体は隣に `_internal/` が要るので、リンクで張る。Windows（Git Bash）では使えない（`--bin project` を使うか、PATH に通すフォルダへ自分で置く）。
+PATH に通すフォルダ（macOS・Linux・WSL は `~/.local/bin`、Windows は実体のフォルダ）が PATH に入っていなければ、環境に合った足し方を知らせる。
+シェルの設定ファイルも Windows の環境変数も、書き換えない。
+
+| 環境 | 案内する足し方 |
+|---|---|
+| Windows（Git Bash） | PowerShell でユーザの環境変数 `Path` に実体のフォルダを足す。画面から足す手順も添える。足したあと、Git Bash と Claude Code を開き直す |
+| macOS・Linux・WSL の zsh | `~/.zshrc` に `export PATH="$HOME/.local/bin:$PATH"` を足す |
+| macOS の bash | `~/.bash_profile` に同じ行を足す |
+| Linux・WSL の bash | `~/.bashrc` に同じ行を足す |
+| fish | `fish_add_path $HOME/.local/bin`（1 度打てば保存される） |
+| そのほか | `~/.profile` に同じ行を足す |
+
+実体は隣に `_internal/` が要るので、単体のコピーは動かない。macOS・Linux・WSL はリンクで張り、Windows は実体のフォルダを PATH に通す。
 この機械で動く実行ファイルだけを置ける。
 
 ### 何がどこへ配られるか
