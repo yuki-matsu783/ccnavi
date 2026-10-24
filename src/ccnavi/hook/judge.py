@@ -741,8 +741,8 @@ def decide_before(
         verdict = rules.DENY
 
     # シェルからワークスペースルート直下へ書く形は、Write / Edit と同じ決まり（ルールファイルの
-    # `workspace-root`）に当てて止める。書き込み先を解いた絶対パスで当てるので、居場所（`cd`）も
-    # 追う。ガード自身の保護など、ほかの deny に当たった呼び出しはその文面で止まるので、ここは
+    # `workspace-root`）に当てて止める。書き込み先を解いた絶対パスで当てるので、`cd` で移った先も
+    # たどる。ガード自身の保護など、ほかの deny に当たった呼び出しは、その文面で止まる。ここでは
     # deny に当たらなかった呼び出しだけを見る。
     if payload.tool_name == "Bash" and verdict != rules.DENY:
         written, place, root_rule = rootwrite.check(
@@ -752,8 +752,8 @@ def decide_before(
             [layer.replace(shellread.SEP, "\n") for _, layer, _ in inner],
         )
         if written:
-            # 記録には止めた決まり（ルールファイルの `workspace-root`）の名前を残す。`--test` が
-            # 式まで見せるのに読む `hits` と位置・名前が揃う。
+            # 記録には、止めた決まり（ルールファイルの `workspace-root`）の名前を残す。`--test` が
+            # 式まで見せる際に読む `hits` と、位置・名前を揃える。
             record.code, record.rules = rootwrite.CODE, [rules.record_name(root_rule)]
             record.hits = [root_rule]
             return refuse(

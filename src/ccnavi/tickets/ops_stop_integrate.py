@@ -524,7 +524,7 @@ def bound_check(
       送ってから始めるので、チケットも提案もまだ無い親は、これで見分ける。ただし直接作業の記録
       （`ccnavi-direct/<名前>`）があるワークツリーは対象にしない。直接作業のブランチも
       `ccnavi-git.sh push` で origin へ送れるので、origin にあるだけでは親と見分けられず、
-      送ったとたんに `integrate` の促しが黙って止まる
+      送ると、`integrate` を促す表示が黙って出なくなる
 
     """
     name = here.name
