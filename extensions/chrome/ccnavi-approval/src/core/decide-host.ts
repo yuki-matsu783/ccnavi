@@ -1,16 +1,18 @@
 /**
- * decide のホスト書き込みを、順序を守って実行する。ネットワークには `HostOps` を通してしか出ない
- * （画面は service worker 経由の `callOps` を渡す。PAT はここに来ない）。
+ * decide のホスト書き込みを、順序を守って実行する。ネットワークには `HostOps` を通してしか出ない。
+ * 画面は service worker 経由の `callOps` を渡す。PAT はここに来ない。
  *
- * 順序は固定で、(1) 全 issue の作成（作る前に同じ操作 ID の印を本文の 1 行目に持つ issue を探し、あれば作らず使う。
- * 探すのが失敗したら作り直さずに止める。続きのコメントには `part=<i>` の印を付け、使い回した issue でも足りない分だけ付ける）、
- * (2) 全返信（`{issue_url}` を作った issue の URL に置き換える。末尾に操作 ID の印を付け、同じ印の返信が既にあるスレッドには付けない）、
- * (3) 全解決、(4) MR へのコメント（`{issue_links}` を作った issue の URL の一覧に置き換える）。どこかで
- * 失敗したら、その時点で止めて、済ませたことと失敗の理由を返す（例外にしない）。同じキーは二度書かない。
+ * 実行の順序は固定である。
+ * (1) 全 issue の作成。作る前に、同じ操作 ID の印を本文の 1 行目に持つ issue を探す。あれば作らず、それを使う。
+ *     探すのが失敗したら、作り直さずに止める。続きのコメントには `part=<i>` の印を付け、使い回した issue でも足りない分だけ付ける。
+ * (2) 全返信。`{issue_url}` は作った issue の URL に置き換える。末尾に操作 ID の印を付け、同じ印の返信が既にあるスレッドには付けない。
+ * (3) 全解決。
+ * (4) MR へのコメント。`{issue_links}` は作った issue の URL の一覧に置き換える。
+ * どこかで失敗したら、その時点で止めて、済ませたことと失敗の理由を返す。例外にはしない。同じキーは二度書かない。
  *
- * 呼ぶ側の約束: 1 回の確定につき 1 度だけ呼ぶ（`writeLoop` の周の中では呼ばない）。操作の記録は持たない。
- * 止まったら、読み直した未解決のスレッドだけを決め直して押せば続きが進む。書く前に `precheckHostPlan` で
- * 権限と、Chrome で扱えない種類のスレッドを見分け、足りなければ何も書かずに止める。
+ * 呼ぶ側は、1 回の確定につき 1 度だけ呼ぶ。`writeLoop` の周の中では呼ばない。操作の記録は持たない。
+ * 止まったときは、未解決のスレッドを読み直し、決め直して押せば続きが進む。
+ * 書く前に `precheckHostPlan` で権限と、Chrome で扱えない種類のスレッドを見分け、足りなければ何も書かずに止める。
  */
 import type { HostCall } from "./snapshot.js";
 import type { FindResult, ThreadAbility, WriteInfo } from "./github.js";
@@ -211,10 +213,10 @@ export function unsupportedReason(kind: Exclude<ThreadAbility["kind"], "ok">): s
 
 /**
  * 書く前に、PAT の権限とスレッドの種類を確かめる。足りなければ何も書かない。
- * - Chrome で扱えない種類（GitLab の差分以外の discussion、解決できないもの、GitHub の保留中のレビュー）は
- *   `unsupported` で、VS Code へ誘導する文面にする
- * - GitHub はスレッドの `viewerCanReply`・`viewerCanResolve`、GitLab は note の `resolvable` とロール・スコープで見る
- * - fine-grained の PAT の権限は書く前には読めない。確かめられなかったものは `ok` の `unknown` に残す
+ * - Chrome で扱えない種類のスレッド（GitLab の差分以外の discussion、解決できないスレッド、GitHub の保留中のレビュー）は、
+ *   `unsupported` とし、VS Code へ誘導する文面を出す。
+ * - GitHub は、スレッドの `viewerCanReply`・`viewerCanResolve` で見る。GitLab は、note の `resolvable` とロール・スコープで見る。
+ * - fine-grained の PAT の権限は、書く前には読めない。確かめられなかったものは、`ok` の `unknown` に残す。
  */
 export async function precheckHostPlan(ops: HostOps, repo: RepoRef, mr: number, plan: HostPlan): Promise<Precheck> {
   const problems = planProblems(plan);

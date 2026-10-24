@@ -1,5 +1,5 @@
 /**
- * Chrome からの残った指摘の行き先（decide）。模擬の GitHub・GitLab と Node の上の Pyodide（拡張と同じ zip）で、
+ * Chrome からの残った指摘の行き先（decide）の試験。模擬の GitHub・GitLab と、Node 上の Pyodide（拡張と同じ zip）を使う。
  * 読む（preview）から、ホストへ書く（issue・返信・解決）、親のブランチへの 1 コミット、MR へのコメントまでを通す。
  *
  * - 一気通貫: keep・issue・fix の混在、全 fix（ホストに書かない）、0 件（レビュー済み）。書いた順は issue → 返信 → 解決 → コミット → コメント
@@ -258,7 +258,7 @@ for (const kind of KINDS) {
     const PENDING = `.ccnavi/approved/phases/${FAMILY}/1.pending`;
     w.mock.beforeCommit = (b) => void w.mock.push(b, { [PENDING]: '{"at": "2026-09-29T00:00:00+0000"}\n' }, "置き場だけの push");
     const out = written(await decidePhase(w.repo, FAMILY, 1, pick(pv, "keep", "issue", "fix"), pv.digest, w.d));
-    // 書く直前に先頭が動いたので、コミットは再試行された（GitHub は 1 回目が stale、GitLab は書いた後の事後確認で戻して積み直す）
+    // 書く直前に先頭が動いたので、コミットを再試行する。GitHub は 1 回目が古い版として失敗し、GitLab は書いたあとの確認で戻して積み直す
     const attempts = w.mock instanceof WriteGitLab ? w.mock.glCommits.length : w.mock.commitCalls.length;
     assert.ok(attempts >= 2, `コミットの試行 ${attempts}`);
     assert.ok(`.ccnavi/approved/doing/${out.followup}.md` in w.mock.files(FAMILY));

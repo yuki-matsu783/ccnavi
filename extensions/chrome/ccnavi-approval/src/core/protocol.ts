@@ -27,7 +27,8 @@
  * decide のホスト書き込み（`replyThread`・`resolveThread`・`createIssue`・`findIssue`・`postComment`・`commentIssue`）も、
  * ボードからだけ・登録したリポジトリだけで受ける。受けるのはスレッドへの返信と解決、issue の作成と検索、
  * MR へのコメントだけで、thread id は API の経路と GraphQL に使える字、題は 1 行、本文は字数の上限を検査する。
- * 作る issue に assignee・labels・milestone は付けない。GitHub のスレッドは、登録したリポジトリのその MR のものかを確かめてから書く。本文はコードフェンスの外の quick action（GitLab）とメンションを無害にしてから送る。
+ * 作る issue には assignee・labels・milestone を付けない。GitHub のスレッドは、登録したリポジトリのその MR のものかを確かめてから書く。
+ * 本文は、コードフェンスの外にある quick action（GitLab）とメンションを無害にしてから送る。
  * 書く前の確かめ `writeInfo` と `issueComments` は読むだけ（登録したリポジトリだけ）。
  */
 import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";

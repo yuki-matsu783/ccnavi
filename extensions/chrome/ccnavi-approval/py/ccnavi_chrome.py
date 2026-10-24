@@ -1029,7 +1029,7 @@ def _op_decide(req: dict, root: str) -> dict:
     食い違いに数えず、
     `host_plan` には入らない（もう書かない）。
 
-    答え（`schema` は `handle` が足す）:
+    答えは次の形になる（`schema` は `handle` が足す）。
 
         {
           "family": "<親のブランチ名>",

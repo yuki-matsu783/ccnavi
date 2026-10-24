@@ -31,10 +31,10 @@ export interface ConfirmInput {
 }
 
 /**
- * Python の入口を呼ぶ。依頼の後に先頭が動いていれば（`need_compare`）求められた 2 つの変更の一覧を読み、
- * 手で `done/` に動かされた子があれば（`need_manual`）その移動の時刻を読んで、呼び直す。
- * 手で動かした子の時刻は、全部の子の最初のコミットの時刻のうち最も新しいもの。1 つでも読めなければ 0
- * （Python が確かめられないものとして確定しない）。`readTimes` が偽なら時刻は読まず 0 で呼び直す
+ * Python の入口を呼ぶ。依頼のあとに先頭が動いていれば（`need_compare`）、求められた 2 つの変更の一覧を読んで呼び直す。
+ * 手で `done/` に動かされた子があれば（`need_manual`）、その移動の時刻を読んで呼び直す。
+ * 手で動かした子の時刻は、全部の子の最初のコミットの時刻のうち最も新しいものにする。1 つでも読めなければ 0 にする。
+ * 0 のときは Python が確かめられないものとして、確定しない。`readTimes` が偽なら、時刻は読まず 0 で呼び直す。
  */
 async function withNeeds<R extends { need_compare?: { base: string; head: string }; need_manual?: { paths: readonly string[] } }>(
   ask: Ask,
@@ -88,8 +88,8 @@ export interface DecideInput extends ConfirmInput {
 }
 
 /**
- * Python の `decide` を呼ぶ（書かない）。`need_compare`・`need_manual` の往復は `confirm` と同じ。
- * 手で動かした子は decide の判断に使わないので、時刻が読めなくても進める
+ * Python の `decide` を呼ぶ（書かない）。`need_compare`・`need_manual` の往復は `confirm` と同じにする。
+ * 手で動かした子は decide の判断に使わないので、時刻が読めなくても進める。
  */
 export async function askDecide(call: PyCall, ask: Ask, input: DecideInput): Promise<DecideResult> {
   const body = {
