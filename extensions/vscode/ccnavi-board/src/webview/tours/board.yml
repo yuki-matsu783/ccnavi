@@ -341,6 +341,11 @@ courses:
         body: 差分の行に付けたコメントは、解決できるスレッドになります。MR全体へのコメントでは、送信ボタンの横の▼で「Comment」か「Start thread」を選びます。直してほしい指摘は、行のコメントか「Start thread」で書きます。解決するまで残る議論になり、ccnaviが未解決の指摘として読みます。「Comment」は、解決の対象にならない通常のコメントです。
         image: gitlab-start-thread
         alt: GitLabのコメント欄。送信ボタンの横の▼を開くと、「Comment」と「Start thread」の2つの選択肢が出ている
+      - target: ""
+        title: 指摘をためて、まとめて送る（GitLab）
+        body: 行のコメントを「Start a review」で書くと、コメントは「Pending」になり、まだ送られません。指摘を付け終えたら、「Submit review」でまとめて送ります。「Add comment now」は、そのコメントだけをすぐに送ります。「Pending」のまま送り忘れると、ほかの人にも指摘が届かないので、送ったことを確かめます。
+        image: gitlab-pending-review
+        alt: GitLabの差分画面。行のコメントに「Pending」の札が付き、下に「Submit review」と「Add comment now」のボタンが並んでいる
       - target: phase-review
         title: レビューを終える
         body: 指摘を付け終えたら、レビュー待ちの行の［レビュー完了］を押します。押すまでは、ボードは指摘を読みません。

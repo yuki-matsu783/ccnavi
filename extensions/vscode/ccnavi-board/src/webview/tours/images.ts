@@ -12,6 +12,7 @@ import gitlabMerged from "./images/gitlab-merged.png";
 import gitlabMrMerge from "./images/gitlab-mr-merge.png";
 import gitlabNewIssue from "./images/gitlab-new-issue.png";
 import gitlabNewMr from "./images/gitlab-new-mr.png";
+import gitlabPendingReview from "./images/gitlab-pending-review.png";
 import gitlabStartThread from "./images/gitlab-start-thread.png";
 
 export const TOUR_IMAGES: Readonly<Record<string, string>> = {
@@ -25,5 +26,6 @@ export const TOUR_IMAGES: Readonly<Record<string, string>> = {
   "gitlab-new-issue": gitlabNewIssue,
   "gitlab-new-mr": gitlabNewMr,
   "gitlab-line-comment": gitlabLineComment,
+  "gitlab-pending-review": gitlabPendingReview,
   "gitlab-start-thread": gitlabStartThread,
 };
