@@ -273,3 +273,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0166](0166-mirror-sync-at-prompt-to-parent-worktrees.md) | 共通レイヤーのミラーは、ユーザの発言のたびに着手済みの親のワークツリーへ写す |
 | [0167](0167-idle-handoff-before-cache-expires.md) | 大きな会話の放置は、キャッシュが切れる前に引き継ぎ文書を書かせる |
 | [0168](0168-print-mode-background-work-waits-within-ceiling.md) | claude -p は、ターン終了後のバックグラウンド作業を待ち上限の範囲で待つように見える。待ちを消す環境変数に注意する |
+| [0169](0169-user-entry-goes-through-scripts.md) | ユーザが打つ入口は ccnavi-user-*.sh にそろえ、実行ファイルの user は印が無いと断る |

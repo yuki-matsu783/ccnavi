@@ -217,7 +217,7 @@ VS Code のボードは、`gate_closed`・`review_waiting`・`marks` を次の�
 ```sh
 ccnavi --agree --preview --json [<絞り>...]           # 一覧を見る（承認済みチケットは置かない）
 ccnavi --agree --preview --verify --json [<絞り>...]  # 承認できる状態かを確かめる（同上）
-ccnavi user agree --yes <識別子,…> --digest <値> --json [<絞り>...]    # 見せた提案（識別子の一覧と各ファイルのバイト列）が今も同じなら承認する
+ccnavi --entry board user agree --yes <識別子,…> --digest <値> --json [<絞り>...]    # 見せた提案（識別子の一覧と各ファイルのバイト列）が今も同じなら承認する
 ```
 
 VS Code の拡張が、承認をボードのオーバーレイで行うための形。承認の対象を組むのは `user agree` と同じ関数で、`--explain --json` の
@@ -320,8 +320,8 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 ## ミラーの JSON
 
 ```sh
-ccnavi user mirror [<プロジェクト名>…] --json                                   # 見るだけ
-ccnavi user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json   # 揃える
+ccnavi --entry board user mirror [<プロジェクト名>…] --json                                   # 見るだけ
+ccnavi --entry board user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json   # 揃える
 ```
 
 ワークスペースの共通レイヤーと、各プロジェクトのメインのチェックアウトにあるミラー

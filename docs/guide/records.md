@@ -78,7 +78,7 @@ URLの`user:<値>@`、mysqlの`-p<値>`、sshpass・docker loginの`-p`、redis-
 
 ```sh
 ccnavi --prune --preview   # 動かすものを並べるだけ
-ccnavi user prune             # 動かして、動かしたものを出す（端末から）
+sh .ccnavi/scripts/ccnavi-user-prune.sh             # 動かして、動かしたものを出す（端末から）
 ```
 
 ## 学びの蓄積

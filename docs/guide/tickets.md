@@ -50,9 +50,9 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 | 置き場 | 意味 | 動かすもの |
 |---|---|---|
 | `wip/proposals/todo/` | 承認待ち | 親が書く。作成と編集は自由 |
-| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `ccnavi user agree`（ユーザ）、ボード、置き場のファイルの移動。続きの子をユーザが起こすときも、ここに直接置く |
+| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `sh .ccnavi/scripts/ccnavi-user-agree.sh`（ユーザ）、ボード、置き場のファイルの移動。続きの子をユーザが起こすときも、ここに直接置く |
 | `wip/proposals/review/` | 作業が終わり、ユーザのレビューを待つ | `sh .ccnavi/scripts/ccnavi-ticket.sh finish <識別子>`（フェーズがレビュー要のとき） |
-| `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、`ccnavi user reviewed`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
+| `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
 
 - `.ccnavi/approved/` へ動かすのはユーザ、`wip/proposals/` へ動かすのはエージェント
 - `review/` への直接の作成・移動は誰がやっても止まる。`.ccnavi/approved/` も止まる
@@ -77,8 +77,8 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 提案を書いても範囲は適用されない（親の改版〔計画・`phases:`・範囲〕だけが承認の対象に入る）。承認の詳細は [設計 9.4](../design/tickets/approval.md)。
 
 ```sh
-ccnavi user agree
-ccnavi user agree i0002 i0002-01-01   # 並べた識別子だけを承認の対象にする
+sh .ccnavi/scripts/ccnavi-user-agree.sh
+sh .ccnavi/scripts/ccnavi-user-agree.sh i0002 i0002-01-01   # 並べた識別子だけを承認の対象にする
 ```
 
 全ツリー（ワークスペース、プロジェクト、ワークツリー）の `wip/proposals/` を走査し、未承認のものをまとめて見せる。
@@ -90,7 +90,7 @@ ccnavi user agree i0002 i0002-01-01   # 並べた識別子だけを承認の対�
 - 終わったフェーズに子を足して承認すると、そのフェーズは開き直り、マーカーは全部消える
 - リスクの点は承認では数えない。子を閉じるときに実績で測る（「実績のリスク」）
 - 計画の待ち方は、承認の画面の待ちの一覧（「すぐ始まる: 1, 3」）で確かめる。辺の書き漏れは並行として通る
-- 合意は全部 `user agree` を通る。全体計画は親の承認、各フェーズの計画はその番号の子の承認、フィードバック計画は `feedback:` を足した親の改版の承認
+- 合意は全部 `ccnavi-user-agree.sh` を通る。全体計画は親の承認、各フェーズの計画はその番号の子の承認、フィードバック計画は `feedback:` を足した親の改版の承認
 
 承認する場所は 4 つある。どこで承認しても**承認はチケットの中身を変えない**。提案のファイルを
 `todo/` から `doing/` へ動かすだけで、欄を書き足さず、改行も BOM も変えない。手で動かした承認と ccnavi の承認は、承認済みチケットが
@@ -220,10 +220,10 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 ユーザが気にするのは次の点である。
 
 - 承認の画面の待ちの一覧（「すぐ始まる: 1, 3」）で、書き漏れを確かめる。**辺の書き漏れは並行として通る**
-- 合意は全部 `user agree` を通る。全体計画は親の承認、フィードバック計画は全体計画の最後のレビューが済んでからの改版の承認である
+- 合意は全部 `ccnavi-user-agree.sh` を通る。全体計画は親の承認、フィードバック計画は全体計画の最後のレビューが済んでからの改版の承認である
 - 順序は承認で止まる。N 番目の子は、N 番目が待つ番号が全部閉じてレビューが済むまで承認されない
 - 改版で変えられるのは `plan`・`feedback`・`phases:`・範囲だけである。範囲を変える改版は、作業中（`doing/`）の子が居ないときだけ通る
-- 改版は、承認済みチケットが在るツリー（親のワークツリーがあればそこ）の `todo/` に書く。ほかのツリーに書いた改版は承認待ちに入らず、`user agree` と `--lint` が置き場を名指しする
+- 改版は、承認済みチケットが在るツリー（親のワークツリーがあればそこ）の `todo/` に書く。ほかのツリーに書いた改版は承認待ちに入らず、`ccnavi-user-agree.sh` と `--lint` が置き場を名指しする
 
 提案の雛形は、エージェントが `ccnavi ticket new` で作る（[設計 9.3](../design/tickets/proposal-format.md)）。
 
@@ -309,10 +309,10 @@ Claude Code はそこをスキルとして読まないので、ccnavi が目録�
 プロジェクト管理画面の clone は、`git clone` をターミナルへ送るだけで、リポジトリを取得する操作である。ccnavi の導入（setup）は含まない。
 そのプロジェクトで親チケットに着手（`ticket start`）したあとは、ユーザの発言のたびに、共通レイヤーのミラーを親のワークツリーへ揃える（差分が無ければ何もしない）。`ticket start` 自身は書かない。子と、ワークスペース自身の作業には配らない。
 ワークスペースの中では共通レイヤーをルートから読み、ミラーは使わない。ミラーが使われるのは、プロジェクトだけを clone して使うとき（単体利用）である。
-ミラーが共通レイヤーとずれていないかは `ccnavi user mirror` で見て、`ccnavi user mirror --yes --expect <値>` で揃える（ユーザだけが実行する操作。VS Code のプロジェクト管理画面からも、5 分ごとの確認とボタンで同じことができる）。揃えるのは作業ツリーのミラーだけで、コミットはしない。
+ミラーが共通レイヤーとずれていないかは `sh .ccnavi/scripts/ccnavi-user-mirror.sh` で見て、`sh .ccnavi/scripts/ccnavi-user-mirror.sh --yes --expect <値>` で揃える（ユーザだけが実行する操作。VS Code のプロジェクト管理画面からも、5 分ごとの確認とボタンで同じことができる）。揃えるのは作業ツリーのミラーだけで、コミットはしない。
 単体利用の手順と、まだ対応していない用途は [単体 clone の未解決事項](../design/multi-repo/standalone-clone-gaps.md)にある。ここに無い用途を「使える」と読まない。
 
 ## 作業・レビュー計画のテンプレート
 
-完了した作業の計画とフローを、次の作業で使い回すひな形である。下書きはエージェントが作り、ユーザが `ccnavi user handoff` か VS Code 拡張の「取り込み待ち」「テンプレート管理」で読んで取り込む。
+完了した作業の計画とフローを、次の作業で使い回すひな形である。下書きはエージェントが作り、ユーザが `sh .ccnavi/scripts/ccnavi-user-handoff.sh` か VS Code 拡張の「取り込み待ち」「テンプレート管理」で読んで取り込む。
 一覧・下書き・取り込み・提案の作り方・画面・古くなったときの扱いは [.ccnavi/docs/templates.md](../../.ccnavi/docs/templates.md)、形と検査の規則は [設計 9.15](../design/tickets/templates.md)、取り込みの規則は [設計 9.19](../design/tickets/handoff.md)にある。

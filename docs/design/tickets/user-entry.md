@@ -56,14 +56,34 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 `--reviewed N --accept-unresolved --preview`（`ccnavi-review.sh decide <N> --preview` が内部で呼ぶ）。
 `user handoff` と `user mirror` は見るだけの形（`--yes` なし）も `user` の入口の中に置き、外では断る（見るだけの形を通す `unless` を持たない）。
 
-ユーザ専用の sh は `ccnavi-user-<操作>.sh` に分かれる。
+ユーザが打つ入口は sh にそろえる。ユーザ専用の sh は `ccnavi-user-<操作>.sh` に分かれる。
 
-- `ccnavi-user-agree.sh`
-- `ccnavi-user-push-approved.sh`
-- `ccnavi-user-close-early.sh`
-- `ccnavi-user-decide.sh`
-- `ccnavi-user-clean-branch.sh`
-- `ccnavi-user-lib-review.sh`（`decide` と `close-early` が呼ぶ部品で、ユーザの判断をホストに書く。単独では打たない）
+| 操作 | sh | 実行ファイルの操作 |
+|---|---|---|
+| 承認 | `ccnavi-user-agree.sh` | `user agree`。承認のあと、`ccnavi-user-push-approved.sh` でコミットと push まで行う |
+| 残った指摘の対応方針 | `ccnavi-user-decide.sh` | `user reviewed N --accept-unresolved` |
+| 早めに閉じる | `ccnavi-user-close-early.sh` | `user close-early` |
+| 記録の整理 | `ccnavi-user-prune.sh` | `user prune` |
+| 保護対象の取り込み | `ccnavi-user-handoff.sh` | `user handoff` |
+| 共通レイヤーのミラーの同期 | `ccnavi-user-mirror.sh` | `user mirror` |
+| 承認済みチケットの push | `ccnavi-user-push-approved.sh` | 無し（git だけ） |
+| 子のブランチの削除 | `ccnavi-user-clean-branch.sh` | `worktree branch` |
+
+`handoff`・`mirror`・`prune` の sh は、実行ファイルを入口の印つきで起こすだけの薄い包み。引数はそのまま渡し、
+実行ファイルは打った人の cwd のまま起こす（取り込み先のツリーと根は実行ファイルが cwd から決める）。
+`ccnavi-user-lib-review.sh` は `decide` と `close-early` が呼ぶ部品で、ユーザの判断をホストに書く。単独では打たない。
+
+#### 入口の印
+
+`user <操作>` は、どこから呼ばれたかを示す印 `--entry <値>` を `user` の前に付けて呼ぶ。値は `sh`（`ccnavi-user-*.sh`）と
+`board`（拡張のボードの子プロセス）の 2 つ。印は `WRAPPER_OPTIONS` に入っていて、読み替え（`rewrite`）と hook の正規表現は
+読み飛ばす。実行ファイルは `take_entry` で argv から外し、argparse の結果（`args`）には入れない。値が 2 つのどちらでもない、
+2 度ある、`user` の入口でない形は `UserEntryError` で断る（終了コード 2）。
+
+印が無い `user <操作>` は、設定を読んでガードを解いた直後に、見るだけの形も含めて断る（`direct_refusal`。終了コード 2）。
+断りの文は、その操作の sh を案内する。`CCNAVI_GUARD_TICKET_APPROVAL=disable` のときは印が無くても通す。これは端末要求を切る
+切り替えと同じで、テストと端末の無い実行環境のための逃げ道。印は断りの案内を出すための印で、守りではない。エージェントが打つ形は
+hook が止める。`--version --json` の `features` に `entry-marker` を持つ。
 
 `ccnavi-review.sh decide <N> --preview`（一覧を見るだけ）は `ccnavi-review.sh` に残る。書く処理（返信・解決・マーカーを置く呼び出し）は
 `ccnavi-user-*.sh` の中だけに置き、共通のファイルには読む側と、エージェントも使うホスト API の関数だけを置く。
@@ -82,7 +102,7 @@ argparse が読んだ後、`entry` が空（`user` の外）で、`user_only.ref
 `unless` の条件に当たる形（`--agree --preview`、`--prune --preview`、`--reviewed … --preview`）は断らない。`--handoff` と `--mirror` は `--yes` の有無によらず断る。
 断りの文は、対応する `user` の形（`ccnavi user agree` など）と、見るだけの形があればそれを案内する。
 
-`--version --json` は互換の版（`compat`）18 を返し、`features` に `user-entry`・`handoff`・`mirror` を持つ。
+`--version --json` は互換の版（`compat`）18 を返し、`features` に `user-entry`・`entry-marker`・`handoff`・`mirror` を持つ。
 
 #### hook の止め
 

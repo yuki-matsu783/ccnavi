@@ -61,7 +61,7 @@ allow:
   実行ファイルが在れば、`cat`向けの`allow`がそれにも当たる
 - `common`と`self`はレイヤーの名前として予約してある。`projects/common/`や`projects/self/`は、表記違い（`projects/Self/`）を
   含めてレイヤーとして数えない。そこに置いた宣言は 1 件も適用されず、そのプロジェクトへの書き込みは共通レイヤーだけで判定される。
-  `--lint`がerrorで名指しし、`user agree`はその`project:`を承認しない
+  `--lint`がerrorで名指しし、`ccnavi-user-agree.sh`はその`project:`を承認しない
 
 ### ルールは 3 つのレイヤーの和で当たる
 
