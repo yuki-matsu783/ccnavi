@@ -126,9 +126,32 @@ def _check_command(
     words: list[str],
     here: str | None,
 ) -> tuple[str, str, str]:
+    targets, base, codes = _scan_command(cwd, words, here)
+    for code_base, code in codes:
+        found = _check_code(conf, root, parents, code_base, code)
+        if found[0]:
+            return found
+    for target in targets:
+        found = _check_target(conf, root, parents, base, target)
+        if found[1]:
+            return found
+    return "", "", ""
+
+
+def _scan_command(
+    cwd: str, words: list[str], here: str | None
+) -> tuple[list[str], str | None, list[tuple[str | None, str]]]:
+    """コマンド 1 本の（書き込み先の語, 語を解く起点, インタプリタに渡したコード）。
+
+    起点は、`cd` と実行役の行き先をたどって決まる居場所で、読めなければ None。
+    コードは（その居場所, 文字列）。
+    親のワークツリーへの書き込みの検査（`_check_command`）と、書き込み先だけを使う
+    `write_targets` が同じ読みを使う。
+    """
     words = wrapguard._strip_heads(words)
     chdirs: list[str] = []
     targets: list[str] = []
+    codes: list[tuple[str | None, str]] = []
     depth = 0
     # リダイレクトは外側のコマンドの語にある。実行役を外す前に拾う。
     targets.extend(_redirect_targets(words))
@@ -153,10 +176,7 @@ def _check_command(
                 # 引用の中の `>` `<` は目印の文字に置き換わっている。コードとして読むので戻す。
                 for stand_in, back in shellread_words.QUOTED_BACK.items():
                     code = code.replace(stand_in, back)
-            if code is not None:
-                found = _check_code(conf, root, parents, base, code)
-                if found[0]:
-                    return found
+                codes.append((base, code))
             if name.startswith("perl") and _in_place(name, args):
                 files = _positionals(name, args)
                 targets.extend(files[1:] if code is None else files)
@@ -174,13 +194,77 @@ def _check_command(
             targets.extend(positional if scripted else positional[1:])
         elif name == "dd":
             targets.extend(a[3:] for a in args if a.startswith("of="))
+        elif name == "install" and "-d" in args:
+            targets.extend(_positionals(name, args))
+        elif name in _OUTPUT_OPTIONS:
+            targets.extend(_option_values(args, _OUTPUT_OPTIONS[name]))
         break
     base = wrapguard._call_place(cwd, here, chdirs) if cwd else None
-    for target in targets:
-        found = _check_target(conf, root, parents, base, target)
-        if found[1]:
-            return found
-    return "", "", ""
+    return targets, base, codes
+
+
+def write_targets(
+    cwd: str, subject: str, layers: list[str] | None = None
+) -> list[tuple[str, str | None]]:
+    """シェルの書き込み先を（書いたとおりの語, 語を解く起点）で並べる。
+
+    読み方と限界はこのモジュールの説明のとおり。インタプリタに渡したコードの中は読まない。
+    """
+    out: list[tuple[str, str | None]] = []
+    for text in [subject, *(layers or [])]:
+        for words, here in shellread.placed(text):
+            targets, base, _ = _scan_command(cwd, words, here)
+            # `cd` の行き先を読めなかったときは、読めない `cd` を無かったことにして打たれた場所から
+            # 解く。起点が無いまま相対パスを捨てると、`cd "$PWD" &&` を足すだけで見えなくなる。
+            out.extend((t, base if base is not None else (cwd or None)) for t in targets)
+    return out
+
+
+def resolve_word(word: str, base: str | None) -> str:
+    """書き込み先の語を、リンクを解いた絶対パスに直す。読めなければ空。
+
+    変数・置換・`~`・`{`（`find -exec rm {}` の置き場所など）を含む語と、起点が読めない相対パスは
+    読めない。グロブ（`*?[`）は、固定の部分（最後の `/` まで）のディレクトリを返す。
+    末尾に区切りを付けるので、ディレクトリそのものではなく中を書くものとして当たる。
+    """
+    text = word.replace("\\", "/")
+    if not text or re.search(r"[$`~{]", text):
+        return ""
+    glob = re.search(r"[*?\[]", text)
+    if glob:
+        head = text[: glob.start()]
+        text = head[: head.rfind("/") + 1] if "/" in head else ""
+    if not os.path.isabs(text):
+        if base is None:
+            return ""
+        text = os.path.join(base, text)
+    try:
+        path = os.path.realpath(text)
+    except OSError:
+        path = os.path.normpath(os.path.abspath(text))
+    return path.rstrip(os.sep) + os.sep if glob else path
+
+
+# 出力先を選択肢で受け取るコマンド（書き込み先は選択肢の値）。
+_OUTPUT_OPTIONS = {
+    "curl": ("-o", "--output"),
+    "wget": ("-O", "--output-document"),
+    "sort": ("-o", "--output"),
+}
+
+
+def _option_values(args: list[str], options: tuple[str, ...]) -> list[str]:
+    """`-o FILE`・`-oFILE`・`--output=FILE`・`--output FILE` の FILE。"""
+    out: list[str] = []
+    for i, arg in enumerate(args):
+        for option in options:
+            if arg == option and i + 1 < len(args):
+                out.append(args[i + 1])
+            elif arg.startswith(option + "=") and option.startswith("--"):
+                out.append(arg.partition("=")[2])
+            elif arg.startswith(option) and not option.startswith("--") and len(arg) > 2:
+                out.append(arg[2:])
+    return out
 
 
 def _redirect_targets(words: list[str]) -> list[str]:
