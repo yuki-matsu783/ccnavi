@@ -457,7 +457,7 @@ test("CX-T272 決める画面: 扱えない指摘は選択肢を出さず理由�
   assert.deepEqual([...doc.querySelectorAll<HTMLElement>("section.review button")].map((b) => b.dataset.action), ["review", "review"]);
 });
 
-test("CX-T279 決める画面: ops 未配線（入口の操作なし）なら従来の「レビュー済みにする」が出る。同じ名前の親が別のリポジトリにあっても、開いたリポジトリにだけ画面が出る", async () => {
+test("CX-T279 決める画面: 入口の操作を渡さない画面では従来の「レビュー済みにする」が出る。同じ名前の親が別のリポジトリにあっても、開いたリポジトリにだけ画面が出る", async () => {
   const plain = withThreads(1);
   (plain.board.families[0].reviews![0] as unknown as { problems: string[] }).problems = [];
   const f = fake({ sections: sections(plain), state: "done" });

@@ -446,12 +446,8 @@ test("CX-T296 決める: 再利用した issue は『作った』に数えず、
 const settled = (h: ReturnType<typeof harness>) => !h.c.snapshot().busy && h.c.snapshot().state === "done";
 const previewOf = (over: Partial<typeof PREVIEW> = {}) => ({ ...PREVIEW, ...over });
 
-test("CX-T275 決める: ops が未配線なら入口を渡さない（従来の「レビュー済みにする」だけ）。既定では実物に配線されている", () => {
+test("CX-T275 決める: 既定で実物に配線され、入口の操作が付く", () => {
   assert.equal(typeof harness().c.actions.decideOpen, "function");
-  const h = harness({ ops: { decidePreview: undefined, decide: undefined } });
-  assert.equal(h.c.actions.decideOpen, undefined);
-  assert.equal(h.c.actions.decideConfirm, undefined);
-  assert.equal(h.c.actions.decideCancel, undefined);
   const w = harness({ ops: { decidePreview: async () => PREVIEW, decide: async () => ({ kind: "failed", message: "x" }) } });
   assert.equal(typeof w.c.actions.decideOpen, "function");
 });

@@ -129,13 +129,12 @@ export interface BoardOps {
   readonly startIssue: typeof startIssue;
   readonly saveRecentDays: typeof saveRecentDays;
   /** 決める画面の材料（残った指摘とダイジェスト）を読む。書かない */
-  readonly decidePreview?: (repo: RepoConfig, family: string, phase: number, deps: WriteDeps) => Promise<DecidePreview>;
+  readonly decidePreview: (repo: RepoConfig, family: string, phase: number, deps: WriteDeps) => Promise<DecidePreview>;
   /**
    * 選んだ行き先を、issue・返信・解決の順にホストへ書いてから親のブランチへ 1 コミットする。
    * `choices` が空（未解決の指摘が 0 件）のときは、従来の「レビュー済みにする」と同じ結果（`reviewed: true`）にする。
-   * 省略した場合は決める画面を出さず、従来の「レビュー済みにする」だけを出す。`decidePreview` と両方そろったときだけ画面が出る
    */
-  readonly decide?: (
+  readonly decide: (
     repo: RepoConfig,
     family: string,
     phase: number,
@@ -522,92 +521,90 @@ export function createBoardController(env: BoardEnv): BoardController {
     },
   };
 
-  /** 決める画面の入口。ops が未配線なら付けない（従来の「レビュー済みにする」だけを出す） */
+  /** 決める画面の入口 */
   const { decidePreview, decide: decideWrite } = ops;
-  if (decidePreview && decideWrite) {
-    let decideSeq = 0;
-    const live = (token: number): boolean => snap.decide?.token === token;
-    const patchOf = (token: number, patch: Partial<DecideState>): void => {
-      if (live(token)) setDecide(patch);
-    };
-    actions.decideOpen = (repoBoard, family, phase) => {
-      if (snap.busy) return;
+  let decideSeq = 0;
+  const live = (token: number): boolean => snap.decide?.token === token;
+  const patchOf = (token: number, patch: Partial<DecideState>): void => {
+    if (live(token)) setDecide(patch);
+  };
+  actions.decideOpen = (repoBoard, family, phase) => {
+    if (snap.busy) return;
+    const name = family.family.name;
+    const token = ++decideSeq;
+    set({ decide: { repo: repoKey(repoBoard.repo), token, family: name, phase, preview: null, deciding: false, notice: "" } });
+    void (async () => {
+      try {
+        if (await blocked(repoBoard.repo, name)) {
+          if (live(token)) setDecide(undefined);
+          return;
+        }
+        const preview = await decidePreview(repoBoard.repo, name, phase, await writeDeps(repoBoard.repo));
+        const bad = previewProblem(preview);
+        if (bad) patchOf(token, { notice: `残った指摘を読み取れませんでした：${bad}` });
+        else patchOf(token, { preview });
+      } catch (err) {
+        patchOf(token, { notice: `残った指摘を読み取れませんでした：${(err as Error).message ?? String(err)}` });
+      }
+    })();
+  };
+  actions.decideConfirm = (repoBoard, family, phase, choices, digest) => {
+    void act(async () => {
       const name = family.family.name;
-      const token = ++decideSeq;
-      set({ decide: { repo: repoKey(repoBoard.repo), token, family: name, phase, preview: null, deciding: false, notice: "" } });
-      void (async () => {
+      const cur = snap.decide;
+      if (!cur || cur.repo !== repoKey(repoBoard.repo) || cur.family !== name || cur.phase !== phase || !cur.preview) return false;
+      const token = cur.token;
+      const preview = cur.preview;
+      const bad = choicesProblem(preview, choices, digest);
+      if (bad) {
+        setDecide({ notice: bad });
+        return false;
+      }
+      if (await blocked(repoBoard.repo, name)) return false;
+      const deps = await writeDeps(repoBoard.repo);
+      const warn = await approvalWarning(deps, repoBoard.repo, name);
+      const msg = Object.keys(choices).length === 0 ? reviewMessage(name, phase, warn) : decideMessage(name, phase, choices, warn);
+      if (!env.confirm(msg)) return false;
+      setDecide({ deciding: true, notice: "" });
+      let out: DecideOutcome;
+      try {
+        out = await decideWrite(repoBoard.repo, name, phase, choices, digest, deps);
+      } catch (err) {
+        out = { kind: "failed", message: (err as Error).message ?? String(err) };
+      }
+      if (out.kind === "attention") await noteAttention(repoBoard.repo, name, out);
+      if (out.kind === "mismatch" && !out.hostWritten) {
+        // 見せた指摘が変わった。読み直して選び直させる（鍵と版が同じ指摘の選択は引き継ぐ）
         try {
-          if (await blocked(repoBoard.repo, name)) {
-            if (live(token)) setDecide(undefined);
-            return;
-          }
-          const preview = await decidePreview(repoBoard.repo, name, phase, await writeDeps(repoBoard.repo));
-          const bad = previewProblem(preview);
-          if (bad) patchOf(token, { notice: `残った指摘を読み取れませんでした：${bad}` });
-          else patchOf(token, { preview });
-        } catch (err) {
-          patchOf(token, { notice: `残った指摘を読み取れませんでした：${(err as Error).message ?? String(err)}` });
-        }
-      })();
-    };
-    actions.decideConfirm = (repoBoard, family, phase, choices, digest) => {
-      void act(async () => {
-        const name = family.family.name;
-        const cur = snap.decide;
-        if (!cur || cur.repo !== repoKey(repoBoard.repo) || cur.family !== name || cur.phase !== phase || !cur.preview) return false;
-        const token = cur.token;
-        const preview = cur.preview;
-        const bad = choicesProblem(preview, choices, digest);
-        if (bad) {
-          setDecide({ notice: bad });
-          return false;
-        }
-        if (await blocked(repoBoard.repo, name)) return false;
-        const deps = await writeDeps(repoBoard.repo);
-        const warn = await approvalWarning(deps, repoBoard.repo, name);
-        const msg = Object.keys(choices).length === 0 ? reviewMessage(name, phase, warn) : decideMessage(name, phase, choices, warn);
-        if (!env.confirm(msg)) return false;
-        setDecide({ deciding: true, notice: "" });
-        let out: DecideOutcome;
-        try {
-          out = await decideWrite(repoBoard.repo, name, phase, choices, digest, deps);
-        } catch (err) {
-          out = { kind: "failed", message: (err as Error).message ?? String(err) };
-        }
-        if (out.kind === "attention") await noteAttention(repoBoard.repo, name, out);
-        if (out.kind === "mismatch" && !out.hostWritten) {
-          // 見せた指摘が変わった。読み直して選び直させる（鍵と版が同じ指摘の選択は引き継ぐ）
-          try {
-            const next = await decidePreview(repoBoard.repo, name, phase, deps);
-            const problem = previewProblem(next);
-            if (problem) {
-              patchOf(token, { preview: null, deciding: false, notice: `指摘が変わりました。読み直しましたが読み取れませんでした：${problem}` });
-            } else {
-              const inherited: Record<string, DecideChoice> = {};
-              for (const t of next.threads) {
-                const before = preview.threads.find((o) => o.key === t.key && o.version === t.version);
-                if (before && choices[t.key]) inherited[t.key] = choices[t.key];
-              }
-              patchOf(token, { preview: next, deciding: false, inherited, notice: `指摘が変わりました（${out.message}）。同じ指摘の選択は引き継ぎましたが、新しい指摘は「${DECIDE_LABELS.fix}」に戻っています。選び直してください。` });
+          const next = await decidePreview(repoBoard.repo, name, phase, deps);
+          const problem = previewProblem(next);
+          if (problem) {
+            patchOf(token, { preview: null, deciding: false, notice: `指摘が変わりました。読み直しましたが読み取れませんでした：${problem}` });
+          } else {
+            const inherited: Record<string, DecideChoice> = {};
+            for (const t of next.threads) {
+              const before = preview.threads.find((o) => o.key === t.key && o.version === t.version);
+              if (before && choices[t.key]) inherited[t.key] = choices[t.key];
             }
-          } catch (err) {
-            patchOf(token, { deciding: false, notice: `指摘が変わりました。読み直せませんでした：${(err as Error).message ?? String(err)}` });
+            patchOf(token, { preview: next, deciding: false, inherited, notice: `指摘が変わりました（${out.message}）。同じ指摘の選択は引き継ぎましたが、新しい指摘は「${DECIDE_LABELS.fix}」に戻っています。選び直してください。` });
           }
-          return false;
+        } catch (err) {
+          patchOf(token, { deciding: false, notice: `指摘が変わりました。読み直せませんでした：${(err as Error).message ?? String(err)}` });
         }
-        set({ result: sayDecide(out) });
-        if (out.kind === "written" || out.kind === "halted" || out.kind === "attention" || ("hostWritten" in out && out.hostWritten)) setDecide(undefined);
-        else patchOf(token, { deciding: false, notice: sayDecide(out).text });
-        return true;
-      }).then(() => {
-        if (snap.decide?.deciding) setDecide({ deciding: false });
-      });
-    };
-    actions.decideCancel = () => {
-      if (snap.busy) return;
-      setDecide(undefined);
-    };
-  }
+        return false;
+      }
+      set({ result: sayDecide(out) });
+      if (out.kind === "written" || out.kind === "halted" || out.kind === "attention" || ("hostWritten" in out && out.hostWritten)) setDecide(undefined);
+      else patchOf(token, { deciding: false, notice: sayDecide(out).text });
+      return true;
+    }).then(() => {
+      if (snap.decide?.deciding) setDecide({ deciding: false });
+    });
+  };
+  actions.decideCancel = () => {
+    if (snap.busy) return;
+    setDecide(undefined);
+  };
 
   /**
    * 読み直す。失敗は投げずに `#status` へ出す（`state` は error。自動のときは文面だけ）。
