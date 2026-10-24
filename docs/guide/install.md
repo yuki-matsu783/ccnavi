@@ -226,7 +226,7 @@ PATH に通すフォルダ（macOS・Linux・WSL は `~/.local/bin`、Windows �
 | fish | `fish_add_path $HOME/.local/bin`（1 度打てば保存される） |
 | そのほか | `~/.profile` に同じ行を足す |
 
-実体は隣に `_internal/` が要るので、単体のコピーは動かない。macOS・Linux・WSL はリンクで張り、Windows は実体のフォルダを PATH に通す。
+実体は隣に `_internal/` が要るので、単体のコピーは動かない。この実体は同じ機械の全プロジェクトが使うので、1 つのプロジェクトで再実行して入れ替えると、ほかのプロジェクトにも効く。`--bin` は `ccnavi-install.sh` に渡せない（確認を端末に出す必要があるため）。`ccnavi-setup.sh` を直接打つ。macOS・Linux・WSL はリンクで張り、Windows は実体のフォルダを PATH に通す。
 この機械で動く実行ファイルだけを置ける。
 
 ### 何がどこへ配られるか

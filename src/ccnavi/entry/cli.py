@@ -250,7 +250,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--expect", default=None, metavar="SHA")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
-    # 値なしの `--yes` は `user handoff` だけが読む（`_run` が、ほかの経路では断る）。
+    # 値なしの `--yes` は `user handoff` と `user mirror` だけが読む（`_run` が、ほかの経路では断る）。
     parser.add_argument("--yes", nargs="?", const=cli_args.BARE_YES, default="")
     # 見せた提案の識別子の一覧と各提案ファイルのバイト列のダイジェスト（`--agree --yes` は
     # preview の `digest`、`--reviewed --yes` は指摘のダイジェスト）。`--yes` と一緒に渡す。

@@ -401,5 +401,5 @@ sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと�
 | `ccnavi --lint` | sh の `CCNAVI_COMPAT` と比べ、`(version)` の warn を出す |
 
 直し方は、ccnavi のリポジトリ（`build.py` とソースがある）なら `uv run --with pyinstaller python build.py` で組み立て直し、
-配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース> --force` で実行ファイルと sh を配り直す。
+配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース>` を打つ（実行ファイルは配布元と中身が違えば入れ替わる）。sh も配り直すなら `--force` を付ける。
 拡張のほうが古ければ拡張を入れ直す。sh は `--version` の答えから互換の版を読めなければ「不明」として食い違いに数える。拡張は版を聞けなかったとき、起動では何も言わず、フラグを使う前に理由を出して先へ進まない。

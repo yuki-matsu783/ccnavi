@@ -14,7 +14,7 @@ keywords: [更新, force, バックアップ, 入れ替え, 配り直し, quaran
 1. **入れる先が enable なら**、Claude Code の外の端末で打ってもらう。install は、enable として使われている入れる先には Claude Code の中から入れない
    （doctor の `existing` が `warn enable`）。コマンドを示して、ユーザに打ってもらう
 2. **`--check` で一覧を見せる**: `install <ws> --from <配布元> --check`。setup が「配布先に既にあるので配っていないもの」として並べたものは、
-   `--force` が無ければ**古いまま残る**。何が残るかをユーザに伝える
+   `--force` が無ければ**古いまま残る**（この機械の実行ファイルは例外で、配布元と中身が違えば入れ替わる）。何が残るかをユーザに伝える
 3. **`--force` を付ける前に了承を得る**: `--force` を付けると、共通レイヤーの rules.yml・CCNAVI.md・docs・sh・スキルが配布元の内容に戻り、
    **利用者の手直しが消える**。消えるものを見せて、了承を得る。install は `--force` のとき、setup の前に入れる先の外へバックアップを取る。
    置き場は `${XDG_CACHE_HOME:-$HOME/.cache}/ccnavi/backup/<ワークスペースの短いハッシュ>-<日時>-<PID>/`（権限 700）。

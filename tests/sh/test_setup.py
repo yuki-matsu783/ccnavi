@@ -1812,7 +1812,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.make_git()
         home = self.user_home()
         result = self.run_user_bin(home, "--deploy", src, "--bin", "user", answer="n")
-        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("中止しました", result.stderr)
         self.assertEqual(os.listdir(home), [])
         self.assertEqual(os.listdir(self.dir), [".git"])

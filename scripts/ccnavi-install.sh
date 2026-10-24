@@ -11,6 +11,7 @@
 #   --from <配布元>        展開済みの配布元のフォルダ。省くと、このスクリプトの 1 つ上。zip は受けない
 #   --mode / --ticket-control / --force / --no-vscode / --no-fetch
 #                          ccnavi-setup.sh にそのまま渡す（ccnavi-setup.sh --help）
+#                          --bin は渡さない。ユーザの置き場に書く確認を端末に出すので、ccnavi-setup.sh を直接打つ
 #   --clear-quarantine     macOS で、入れた実行ファイルの隔離の印（com.apple.quarantine）を外す
 #   --check                何も書かずに、これから起きることを見せる
 #   --build                ソースで実行ファイルを組み立てる。配らない。組み立てたら、そのソースを
