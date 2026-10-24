@@ -363,7 +363,7 @@ courses:
     summary: 注意の行の意味と、「要対応のみ」での絞り込み
     steps:
       - target: summary
-        title: 件数でヒットを付ける
+        title: 件数で見当を付ける
         body: 「承認待ち」や「不備」の件数が出ているときは、ユーザの対応が要ります。数は絞り込みに関係なく、ボード全体のものです。
       - target: filter-attention
         title: 要対応のみ

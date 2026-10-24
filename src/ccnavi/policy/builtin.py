@@ -142,7 +142,7 @@ def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dic
         "id": CONFIG_VIA_BASH_RULE_ID,
         "match": "Bash",
         # 照合する形は selfguard と同じものを 1 か所から取る（`guard_shell_regex`）。
-        # 書きコピーすると既定のほうだけが弱くなり、ルールファイルを破損させることが
+        # コピーすると既定のほうだけが弱くなり、ルールファイルを破損させることが
         # そのまま保護を弱めることになる。
         "regex": regex,
         "message": (
@@ -215,9 +215,8 @@ _TAIL = (
 _UPTO_ANCHOR = rf"(?:{_PLAIN}*+{_ANCHOR})++"
 # 中に git の始まり（`git` / `/usr/bin/git`）を持たない語。git のオプションとその値は、この語だけを
 # 読む。始まりを持つ語で読むのをやめても、その始まりから読み直せば同じ続きでヒットするので、
-# ヒットする形は
-# 変わらない。1 つの始まりから読む長さが次の始まりまでになり、`git -c git -c …` でも
-# 読み直しが積もらない。
+# ヒットする形は変わらない。1 つの始まりから読む長さが次の始まりまでになり、
+# `git -c git -c …` でも読み直しが積もらない。
 _GIT_FREE = rf"(?:{_UPTO_ANCHOR}{_TAIL}?|{_TAIL})"
 _GIT_FREE_OPTION = rf"-{_PLAIN}*+(?:{_UPTO_ANCHOR}{_TAIL}?)?"
 # サブコマンドの前に挟める git のグローバルオプション。値を空白で区切って取るもの

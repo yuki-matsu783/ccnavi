@@ -478,7 +478,7 @@ def copy_config_problems(
                     t.ticket,
                     f"`phases:` の `{ident}` が phases.yml の定義と違う"
                     f"（違う欄: {', '.join(phasetypes.differing(pt, ref))}）。"
-                    f"{fill} でコピー直す",
+                    f"{fill} でコピーし直す",
                 )
             )
     return problems

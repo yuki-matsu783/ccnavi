@@ -87,8 +87,9 @@ def run(
     処理フロー:
     1. `usage_problem` で組み合わせを検査する。
     2. `--yes` のときは、経路を決めてから取り込む。
-    ボードの経路（`--via board`）はターミナルを求めず、
-       ターミナルの経路は `cli_args._from_terminal` で、ターミナルの前のユーザであることを確かめる。
+       ボードの経路（`--via board`）はターミナルを求めず、
+       ターミナルの経路は `cli_args._from_terminal` で、
+       ターミナルの前のユーザであることを確かめる。
        `handoff.prepare` で計画を作り、`handoff.apply` で `--expect` の一致を見ながら書く。
     3. `--yes` がないときは、`handoff.prepare` で計画を作って表示する（書かない）。
     4. `--json` のときは、取り込みか計画を JSON で出す。そうでなければ `_applied_text` か

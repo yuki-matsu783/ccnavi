@@ -47,8 +47,8 @@ const OP_TITLES: Readonly<Record<string, string>> = {
   all: "all: 中のすべてにヒットすればヒットします",
   any: "any: 中のどれかにヒットすればヒットします",
   not: "not: 中にヒットしなければヒットします",
-  glob: "glob: 対象をこの glob で適用します",
-  regex: "regex: 対象をこの正規表現で適用します",
+  glob: "glob: 対象をこの glob で照合します",
+  regex: "regex: 対象をこの正規表現で照合します",
   invalid: "読み込めないノード",
   empty: "空。押して中に入れるものを選びます",
 };

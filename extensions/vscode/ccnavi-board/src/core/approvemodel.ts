@@ -1,7 +1,7 @@
 /**
  * 承認の JSON の形（実行ファイルとの契約）と読み取り。docs/requirements/json-shapes.md「承認の JSON」。
  *
- * `--agree --preview --json` が承認先行の一覧を見せ、`user agree --yes <識別子,…> --json` が承認する。
+ * `--agree --preview --json` が承認待ちの一覧を見せ、`user agree --yes <識別子,…> --json` が承認する。
  * 拡張は一覧の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
  */
 

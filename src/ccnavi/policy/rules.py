@@ -1074,7 +1074,7 @@ def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
             expression = expanded
     else:
         # glob は文字列全体にヒットする約束なので、先頭に固定する。
-        # 固定しないと search が適用し始めの
+        # 固定しないと search が照合を始める
         # 位置ごとに末尾まで読み、`*git push*` のような式が入力の長さの 2 乗で遅くなる（#241）。
         # 先頭に `*` を書かない glob が文字列の途中にヒットすることも、この約束どおりに無くなる。
         expression = "^" + translate(
@@ -1317,8 +1317,8 @@ def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Ru
     """`{!root}` を組み立てられなかったときの扱い。
 
     強い側を採る。`deny` と `ask` は `match` の全部に適用して止め、`allow` は
-    どれにも適用しない。`allow` をヒットする扱いにすると ccnavi が判定を返さない範囲が広がるので、
-    そこだけ逆になる。
+    どれにも適用しない。`allow` にヒットしたものとして扱うと、ccnavi が判定を返さない範囲が
+    広がるので、そこだけ逆になる。
 
     これは `{!root}` の生成失敗に限った扱い。 正規表現の書き損じなど既存の
     失敗の扱いは今までどおり「報告して破棄する」のまま。ここだけ特別なのは、

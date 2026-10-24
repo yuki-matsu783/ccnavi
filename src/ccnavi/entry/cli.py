@@ -135,7 +135,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 def _test_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> str:
     """`--test` と、その payload の欄の組み合わせの誤り。正しければ空。
 
-    どれも黙って破棄せずに断る。破棄すると、試したつもりの呼び出しと違う答えを読む。
+    どれも通知なく無視せずに断る。無視すると、試したつもりの呼び出しと違う答えを読む。
 
     - `--permission-mode` / `--agent-id` は `--test` の payload の欄で、ほかの経路
       （`--lint`・`--explain`・`--docs` など）には読む先が無い

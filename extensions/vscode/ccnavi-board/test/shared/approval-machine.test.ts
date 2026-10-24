@@ -930,7 +930,7 @@ test("CB-T177d 確定した結果は実行ファイルの答えに従う。revie
   assert.equal(fixed?.keep, true);
   assert.match(fixed?.note ?? "", /i0001-02-03/);
   assert.match(fixed?.note ?? "", /追加された指摘 1 件は判断待ち/);
-  // 答えが「レビュー済みでない」のに理由が見ヒットしないときは、レビュー済みになったとは言わない
+  // 答えが「レビュー済みでない」のに理由が見当たらないときは、レビュー済みになったとは言わない
   const odd = overlayOf({ reviewed: false });
   assert.doesNotMatch(odd?.title ?? "", /をレビュー済みにしました/);
   assert.match(odd?.note ?? "", /レビュー済みになっていません/);

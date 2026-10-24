@@ -429,7 +429,7 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
     1. `walk` で下書きを集める。拒否があれば、その理由を入れて返す。
     2. 同じ取り込み先に落ちる下書きが複数ないかを数える。複数なら、どちらにも理由を足す。
     3. 各下書きを `_read` で読み、`Entry` にする。
-    4. `wanted` が None なら、未変更でないものを選ぶ。指定があれば `wanted_key` で引き適用し、
+    4. `wanted` が None なら、未変更でないものを選ぶ。指定があれば `wanted_key` で引き、
        表に無ければ理由を入れて返す。
     5. `_check_contents` で中身を検査し、`_make_diff` で取り込み先との差分を作る。
     """

@@ -116,7 +116,7 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 # 1. ターミナル要求を切る形。
 # 実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で
 #    ターミナル要求を外す（テストと CI のため）。切れなければ、
-#    タターミナルを持たないエージェントは実行ファイルの
+#    ターミナルを持たないエージェントは実行ファイルの
 #    側で止まる
 # 2. ボードの経路の形。`--yes`（承認と残った指摘）はターミナルを求めないので、
 # ここが唯一の保護になる。
@@ -1068,7 +1068,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "handoff・mirror）にまとめてあり、エージェントは実行しません。"
             "下書きの状態を見るだけなら "
             f"'{settings.script_command(root, 'ccnavi-stage.sh')} --commands <パス>' を使います。"
-            "承認先行の一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
+            "承認待ちの一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
         ),
         decision=rules.DENY,
     )

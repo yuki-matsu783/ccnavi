@@ -22,7 +22,7 @@
  * | 状態 | 何をしている |
  * |---|---|
  * | 無し（`overlay` が `undefined`） | 閉じている |
- * | `loading` | 承認先行の一覧を読んでいる |
+ * | `loading` | 承認待ちの一覧を読んでいる |
  * | `preview` | 一覧と本文を見せた。押されるまで何も置かない |
  * | `approving` | 承認を打っている。ここでは閉じない（Esc も受け付けない。画面の側も同じ） |
  * | `done` | 承認した。渡す文がある |
@@ -165,7 +165,7 @@ export type ApprovalInput =
 
 /** 外へ出る仕事。行うのは呼ぶ側（`board-panel.ts`） */
 export type ApprovalEffect =
-  /** 承認先行の一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
+  /** 承認待ちの一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
   | { readonly kind: "loadPreview"; readonly only: readonly string[] }
   /** 承認を打つ（`user agree --yes … --digest …`）。返ったら `approved` で戻す */
   | {
@@ -292,7 +292,7 @@ function opened(
   if (kind === "loading" || kind === "preview" || kind === "approving") {
     return stay(state);
   }
-  // 残った指摘を決める途中にも開かない。見せている指摘が、承認先行の一覧になってしまう
+  // 残った指摘を決める途中にも開かない。見せている指摘が、承認待ちの一覧になってしまう
   if (busyDeciding(state)) {
     return stay(state);
   }

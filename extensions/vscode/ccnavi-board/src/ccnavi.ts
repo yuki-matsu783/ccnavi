@@ -5,7 +5,7 @@
  * 走らせるのは 15 個。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
  * `--test-expectations --json`（期待する判定の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
- * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認先行の一覧を見る）、
+ * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
  * `user agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
  * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）、
  * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。計画編集タブが読む）と
@@ -267,7 +267,7 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
 export type { ApproveOutcome };
 
 /**
- * 承認先行の一覧を見る（`--agree --preview --json`）。承認済みチケットは置かれない。
+ * 承認待ちの一覧を見る（`--agree --preview --json`）。承認済みチケットは置かれない。
  * 記録と state の置き場は外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
  */
 export async function runApprovePreview(

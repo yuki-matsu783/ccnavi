@@ -388,7 +388,7 @@ def followup(
 
     ユーザがターミナルで「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
     そのフェーズは開き直り、マーカーは消える。範囲は見た子の範囲の和。
-    本文には指摘を書きコピーする。返すのは識別子と、起こせなかった理由。
+    本文には指摘をコピーする。返すのは識別子と、起こせなかった理由。
     """
     ident, t, why = _followup_ticket(conf, root, parent, phase_no, children, items, op_id)
     if t is None:

@@ -629,7 +629,7 @@ def decide_before(
 
     # 着手中の子のフローは書き換えさせない。ルールより先に見る。
     # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの保護でも止まる。ロックは
-    # その保護を切った設定でも該当すり、止めた理由（着手中）を名指しする（厳しくする向きだけ）。
+    # その保護を切った設定でも該当し、止めた理由（着手中）を名指しする（厳しくする向きだけ）。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         locked, scanned = flow_lock(conf, root, payload, record.subject, scanned)
         if index is None and scanned is not None:
@@ -722,8 +722,8 @@ def decide_before(
         # 中の `cat …` が読み取りの allow にヒットして通るようになる。
         #
         # 引用の外のレイヤーを先に見る。同じルールが引用の中と外の両方にヒットするなら、
-        # 外でヒットした
-        # ことにする。引用の中の断りは、引用の中にだけヒットしたときに付けるものなので。
+        # 外でヒットしたことにする。
+        # 引用の中の断りは、引用の中にだけヒットしたときに付けるものなので。
         layers = sorted(inner, key=lambda x: x[2]) if name != rules.ALLOW else []
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
@@ -773,8 +773,8 @@ def decide_before(
 
     # シェルからワークスペースルート直下へ書く形は、Write / Edit と同じ決まり（ルールファイルの
     # `workspace-root`）に適用して止める。書き込み先を解いた絶対パスで適用するので、
-    # `cd` で移った先も
-    # たどる。ガード自身の保護など、ほかの deny にヒットした呼び出しは、その文面で止まる。ここでは
+    # `cd` で移った先もたどる。ガード自身の保護など、ほかの deny にヒットした呼び出しは、
+    # その文面で止まる。ここでは
     # deny にヒットしなかった呼び出しだけを見る。
     if payload.tool_name == "Bash" and verdict != rules.DENY:
         written, place, root_rule = rootwrite.check(

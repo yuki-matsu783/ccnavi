@@ -254,7 +254,7 @@ def copy_destination_regex(last_place: str, target_place: str) -> str:
 
 
 def copy_last_place(clause: str) -> str:
-    """場所の表記を、最後の引数の語として適用する形にする。名前がそこで終わる形も、下もヒットする。"""
+    """場所の表記を、最後の引数の語として適用する形にする。名前がそこで終わる形も、その下のものもヒットする。"""
     return _IN_WORD + clause + _COPY_END
 
 
