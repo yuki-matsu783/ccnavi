@@ -5,7 +5,7 @@ description: ユーザが打つコマンドが、sh と実行ファイルの両�
 tags: [ticket, approval, user-entry]
 keywords: [user, 入口, 印, entry, ccnavi-user-agree.sh, ccnavi-user-handoff.sh, ccnavi-user-mirror.sh, ccnavi-user-prune.sh, push, 承認, CCNAVI_GUARD_TICKET_APPROVAL, ボード]
 ---
-# ADR-0169: ユーザが打つ入口は ccnavi-user-*.sh にそろえ、実行ファイルの user は印が無いと断る
+# ADR-0171: ユーザが打つ入口は ccnavi-user-*.sh にそろえ、実行ファイルの user は印が無いと断る
 
 状態: 採用
 

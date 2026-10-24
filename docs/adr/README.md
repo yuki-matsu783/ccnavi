@@ -271,8 +271,8 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0162](0162-setup-replaces-a-differing-executable.md) | 導入スクリプトは、配布元と中身が違う実行ファイルを確認なしで置き換える |
 | [0163](0163-setup-bin-project-or-user.md) | 導入スクリプトに、実行ファイルをホームディレクトリの下に置く選択を追加する |
 | [0164](0164-mirror-sync-is-a-user-entry.md) | 共通レイヤーのミラーの同期は、ユーザ専用の入口で、見せた差分と照合してから作業ツリーに書く |
+| [0171](0171-user-entry-goes-through-scripts.md) | ユーザが打つ入口は ccnavi-user-*.sh にそろえ、実行ファイルの user は印が無いと断る |
 | [0165](0165-turn-marker-per-session.md) | ターン中かどうかを、セッションごとの印のファイルで残す |
 | [0166](0166-mirror-sync-at-prompt-to-parent-worktrees.md) | 共通レイヤーのミラーは、ユーザの発言のたびに着手済みの親のワークツリーへ写す |
 | [0167](0167-idle-handoff-before-cache-expires.md) | 大きな会話の放置は、キャッシュが切れる前に引き継ぎ文書を書かせる |
 | [0168](0168-print-mode-background-work-waits-within-ceiling.md) | claude -p は、ターン終了後のバックグラウンド作業を待ち上限の範囲で待つように見える。待ちを消す環境変数に注意する |
-| [0169](0169-user-entry-goes-through-scripts.md) | ユーザが打つ入口は ccnavi-user-*.sh にそろえ、実行ファイルの user は印が無いと断る |
