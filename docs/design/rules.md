@@ -170,6 +170,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`。下） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
 | `hook`・`settings`・`scripts`・共通の設定 3 本への `Write` `Edit` `NotebookEdit` | 止める（`builtin:guard-hooks` など。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ。8.2）。ルールファイルが読めない間の修復も、直接は通さない。下書きを `wip/handoff/` に置き、ユーザが `ccnavi user handoff` で取り込む |
+| ワークスペースルート直下への `Write` `Edit` と、`Bash` の書き込み先（`workspace-root`） | 既定には入らない（ルールファイルの決まり）。読めない間は、どちらも権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
 
 取り返しの付かない操作の 3 本（`builtin:recursive-delete`・`builtin:git-push`・`builtin:git-reset-hard`）は、既定のときに限らず

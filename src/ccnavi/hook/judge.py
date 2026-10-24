@@ -745,14 +745,17 @@ def decide_before(
     # 追う。ガード自身の保護など、ほかの deny に当たった呼び出しはその文面で止まるので、ここは
     # deny に当たらなかった呼び出しだけを見る。
     if payload.tool_name == "Bash" and verdict != rules.DENY:
-        written, place = rootwrite.check(
+        written, place, root_rule = rootwrite.check(
             rule_set,
             payload.cwd,
             record.subject,
             [layer.replace(shellread.SEP, "\n") for _, layer, _ in inner],
         )
         if written:
-            record.code, record.rules = rootwrite.CODE, [rootwrite.RULE_ID]
+            # 記録には止めた決まり（ルールファイルの `workspace-root`）の名前を残す。`--test` が
+            # 式まで見せるのに読む `hits` と位置・名前が揃う。
+            record.code, record.rules = rootwrite.CODE, [rules.record_name(root_rule)]
+            record.hits = [root_rule]
             return refuse(
                 stdout,
                 mode,

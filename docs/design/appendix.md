@@ -17,6 +17,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `RULE_ASK` | ルールの `ask` に当たった |
 | `UNDECLARED` | どのルールも言及しない。権限モードに委ねた、または確認できる者が居ないので断った |
 | `PARSE_UNCERTAIN` | コマンドを読み切れず生の文字列に当て、どこにも当たらなかった |
+| `DENY_SHELL_WORKSPACE_ROOT` | Bash の書き込み先（`>`・`tee`・`sed -i`・`rm`・`mv`・`cp` など）を、居場所（`cd`）を追って絶対パスに解くと、ルールファイルの `workspace-root` に当たった。ワークスペースルート直下には書かず、`wip/handoff/`・`scratchpad/`・ワークツリーの中に書く案内を付けて止める。ガード自身の保護など、ほかの `deny` に当たった呼び出しはそちらの文面で止まる。変数・置換・`~`・`{}` で組んだ書き込み先と、インタプリタに渡したコードの中は見ず、実行後チェックが戻す |
 | `DENY_REDIRECT_LIMIT` | 生の文字列（読み切れなかった Bash と PowerShell）に `>` が 50 個を超えて含まれ、シェルから書き込む形の保護を当てずに止めた。権限モードに依らず止め、確認には回さない。生の文字列への照合は `>` の個数 × その後ろの空白の無い語の長さで伸びる。上限が無いと `>` が増えるほど長さの 2 乗に近づく。上限の下でも `>` 50 個 × 尾の長さで伸び（照合だけで 100KB で約 0.5 秒、400KB で約 1.8 秒）、上限はこれを長さの 50 倍の線形に抑える。期限（3 秒）を超えると `deadline-exceeded` の block（終了コード 2）になって理由を返せない。上限は止める側のまま、Write / Edit で書くかコマンドを分ける案内を付けて返すためのもの。ほかのルールの `deny` と `ask` には今までどおり当て、`deny` に当たればそのルールの `deny` のまま。`allow` には当てない。上限を掛けるのは、外す保護（ガード自身の設定とチケットの置き場を守る組み込み）がそのツールに当たるときだけ |
 | `DENY_BRACE_EXPANSION` | 引用の外にブレース展開を書いた。ルールより先に止める（6.3） |
 | `DENY_COMMAND_NAME_EXPANSION` | コマンド名の位置に変数・置換・グロブを書いた。ルールより先に止める（6.3） |
@@ -91,6 +92,7 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | `builtin:agent-isolation` / `builtin:agent-no-child` / `builtin:agent-multi-target` / `builtin:agent-parent-tree` / `builtin:agent-child-unavailable` / `builtin:agent-target-invalid` / `builtin:agent-cwd-conflict` | `DENY_AGENT_ISOLATION` / `DENY_AGENT_NO_CHILD` / `DENY_AGENT_MULTI_TARGET` / `DENY_AGENT_PARENT_TREE` / `DENY_AGENT_CHILD_UNAVAILABLE` / `DENY_AGENT_TARGET_INVALID` / `DENY_AGENT_CWD_CONFLICT`（`hook.agentlaunch`） |
 | `builtin:subagent-ticket-op` | `DENY_SUBAGENT_TICKET_OP` |
 | `builtin:redirect-limit` | `DENY_REDIRECT_LIMIT` |
+| `<ルールファイルのパス>:workspace-root` | `DENY_SHELL_WORKSPACE_ROOT`（Bash の書き込み先に当たったとき。Write / Edit に当たったときは `DENY_PATH`） |
 
 ## 付録 B. 記録の 1 行
 

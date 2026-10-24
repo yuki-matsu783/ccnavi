@@ -2,7 +2,8 @@
 
 Write / Edit は、ルールファイルの `workspace-root` が止める（チェックアウトしたブランチ直下は
 編集しない。`wip/handoff/`・`scratchpad/`・`.claude/worktrees/` だけ書ける）。シェルでも同じ場所を
-書けると、`sed -i`・`>`・`tee` などで同じ決まりを素通りできる。そこで、シェルの書き込み先を
+書けると、`sed -i`・`>`・`tee` などで同じ決まりを素通りできる。対象は Bash だけ
+（PowerShell は `no-powershell` のルールが丸ごと止める）。そこで、シェルの書き込み先を
 `parentwrite` と同じ読みで取り出し、解いた絶対パスを、そのルールに Write として当てる。
 置き場の決まりをここに複写しない。ルールを直せば、Write とシェルの両方が変わる。
 ガード自身の保護の場所は、シェルから書く形の専用の保護が先に止めるので、呼び手は
@@ -20,21 +21,32 @@ from ..policy import rules
 from . import parentwrite
 
 CODE = "DENY_SHELL_WORKSPACE_ROOT"
-RULE_ID = "builtin:guard-root-shell-write"
+RULE_ID = "builtin:guard-root-shell-write"  # 文面の見出し。記録のルール名は当てたルール
 # 当てるルールの id。ルールファイルの Write / Edit の決まり。
 SOURCE_RULE_ID = "workspace-root"
 
 
-def check(rule_set: rules.RuleSet, cwd: str, subject: str, layers: list[str]) -> tuple[str, str]:
-    """書き込み先がルート直下の決まりに当たれば（書いたとおりの語, 解いたパス）。無ければ空。"""
-    rule = next((r for r in rule_set.deny if r.id == SOURCE_RULE_ID), None)
-    if rule is None:
-        return "", ""
+def check(
+    rule_set: rules.RuleSet, cwd: str, subject: str, layers: list[str]
+) -> tuple[str, str, rules.Rule | None]:
+    """書き込み先がルート直下の決まりに当たれば（書いたとおりの語, 解いたパス, 当てたルール）。
+
+    当たらなければ空と None。当てるルールは id が `workspace-root` のもの。共通レイヤー以外の
+    レイヤーのルールは id に `<レイヤー名>:` が付くので、その形も同じ決まりとして数える。
+    """
+    found = [
+        r for r in rule_set.deny if r.id == SOURCE_RULE_ID or r.id.endswith(f":{SOURCE_RULE_ID}")
+    ]
+    if not found:
+        return "", "", None
     for target, base in parentwrite.write_targets(cwd, subject, layers):
         path = parentwrite.resolve_word(target, base)
-        if path and rule.matches("Write", path):
-            return target, path
-    return "", ""
+        if not path:
+            continue
+        for rule in found:
+            if rule.matches("Write", path):
+                return target, path, rule
+    return "", "", None
 
 
 def message(root: str, target: str, path: str) -> str:
