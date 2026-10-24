@@ -640,7 +640,9 @@ class MovedJudgeTest(LauncherJudgeTest):
             "cd .claude | echo x > settings.json",
         ]:
             with self.subTest(subject=subject):
-                self.assertEqual(blocking(self.judge(subject)), set(), subject)
+                # 移っていないので保護の場所には当たらない。元の場所（ルート直下）への書き込みとして
+                # ルート直下の保護が止めるのは別の話。
+                self.assertNotIn(SETTING_FILES, blocking(self.judge(subject)), subject)
 
 
 class SubstRepoRulesTest(unittest.TestCase):

@@ -28,6 +28,8 @@ deny:
   # `{root}` はワークスペースルートの実パスに置き換わる。ルート直下を全部止め、3 つの置き場を
   # except で除く。置き場の名前そのもの（`wip/handoff`・`scratchpad`）も除くのは、ディレクトリを指すだけの
   # 呼び出しを止めないため。
+  # Bash の書き込み（`>`・`tee`・`sed -i`・`rm`・`cp` など）も、書き込み先を解いたパスでこのルールに
+  # 当てて止める（src/ccnavi/hook/rootwrite.py。id を `workspace-root` から変えると外れる）。
   - id: workspace-root
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/]'

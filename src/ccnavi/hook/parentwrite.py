@@ -126,9 +126,32 @@ def _check_command(
     words: list[str],
     here: str | None,
 ) -> tuple[str, str, str]:
+    targets, base, codes = _scan_command(cwd, words, here)
+    for code_base, code in codes:
+        found = _check_code(conf, root, parents, code_base, code)
+        if found[0]:
+            return found
+    for target in targets:
+        found = _check_target(conf, root, parents, base, target)
+        if found[1]:
+            return found
+    return "", "", ""
+
+
+def _scan_command(
+    cwd: str, words: list[str], here: str | None
+) -> tuple[list[str], str | None, list[tuple[str | None, str]]]:
+    """コマンド 1 本の（書き込み先の語, 語を解く起点, インタプリタに渡したコード）。
+
+    起点は `cd` と実行役の行き先を追った居場所で、読めなければ None。
+    コードは（その居場所, 文字列）。
+    親のワークツリーへの書き込みの検査（`_check_command`）と、書き込み先だけを使う
+    `write_targets` が同じ読みを使う。
+    """
     words = wrapguard._strip_heads(words)
     chdirs: list[str] = []
     targets: list[str] = []
+    codes: list[tuple[str | None, str]] = []
     depth = 0
     # リダイレクトは外側のコマンドの語にある。実行役を外す前に拾う。
     targets.extend(_redirect_targets(words))
@@ -153,10 +176,7 @@ def _check_command(
                 # 引用の中の `>` `<` は目印の文字に置き換わっている。コードとして読むので戻す。
                 for stand_in, back in shellread_words.QUOTED_BACK.items():
                     code = code.replace(stand_in, back)
-            if code is not None:
-                found = _check_code(conf, root, parents, base, code)
-                if found[0]:
-                    return found
+                codes.append((base, code))
             if name.startswith("perl") and _in_place(name, args):
                 files = _positionals(name, args)
                 targets.extend(files[1:] if code is None else files)
@@ -176,11 +196,47 @@ def _check_command(
             targets.extend(a[3:] for a in args if a.startswith("of="))
         break
     base = wrapguard._call_place(cwd, here, chdirs) if cwd else None
-    for target in targets:
-        found = _check_target(conf, root, parents, base, target)
-        if found[1]:
-            return found
-    return "", "", ""
+    return targets, base, codes
+
+
+def write_targets(
+    cwd: str, subject: str, layers: list[str] | None = None
+) -> list[tuple[str, str | None]]:
+    """シェルの書き込み先を（書いたとおりの語, 語を解く起点）で並べる。
+
+    読み方と限界はこのモジュールの説明のとおり。インタプリタに渡したコードの中は読まない。
+    """
+    out: list[tuple[str, str | None]] = []
+    for text in [subject, *(layers or [])]:
+        for words, here in shellread.placed(text):
+            targets, base, _ = _scan_command(cwd, words, here)
+            out.extend((t, base) for t in targets)
+    return out
+
+
+def resolve_word(word: str, base: str | None) -> str:
+    """書き込み先の語を、リンクを解いた絶対パスに直す。読めなければ空。
+
+    変数・置換・`~`・`{`（`find -exec rm {}` の置き場所など）を含む語と、起点が読めない相対パスは
+    読めない。グロブ（`*?[`）は、固定の部分（最後の `/` まで）のディレクトリを返す。
+    末尾に区切りを付けるので、ディレクトリそのものではなく中を書くものとして当たる。
+    """
+    text = word.replace("\\", "/")
+    if not text or re.search(r"[$`~{]", text):
+        return ""
+    glob = re.search(r"[*?\[]", text)
+    if glob:
+        head = text[: glob.start()]
+        text = head[: head.rfind("/") + 1] if "/" in head else ""
+    if not os.path.isabs(text):
+        if base is None:
+            return ""
+        text = os.path.join(base, text)
+    try:
+        path = os.path.realpath(text)
+    except OSError:
+        path = os.path.normpath(os.path.abspath(text))
+    return path.rstrip(os.sep) + os.sep if glob else path
 
 
 def _redirect_targets(words: list[str]) -> list[str]:

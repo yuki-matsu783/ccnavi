@@ -139,7 +139,8 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 | `src/ccnavi/hook/judge.py` | 実行前チェック。通す・聞く・止めるを決める |
 | `src/ccnavi/hook/reasons.py` | 判定に添える文面と理由コード |
 | `src/ccnavi/hook/failsafe.py` | 判定に達せなかったとき（内部の例外・設定が読めない・内部の期限切れ）に、通してよい呼び出しか。設定もルールも読まずに答える |
-| `src/ccnavi/hook/parentwrite.py` | サブエージェントが Bash から親のワークツリーへ書き込む形を、実行前に止める |
+| `src/ccnavi/hook/parentwrite.py` | サブエージェントが Bash から親のワークツリーへ書き込む形を、実行前に止める。シェルの書き込み先を取り出す読みは `rootwrite` も使う |
+| `src/ccnavi/hook/rootwrite.py` | Bash からワークスペースルート直下へ書く形を、ルールファイルの `workspace-root`（Write / Edit と同じ決まり）に当てて実行前に止める |
 | `src/ccnavi/hook/wrapguard.py` | 保護済みの sh（`.ccnavi/scripts/ccnavi-*.sh`）を呼ぶ形のうち、実行前に止めるもの 3 つ |
 | `src/ccnavi/hook/proposalhint.py` | 親の提案を手書きしたときの書式の誤りを、書いた時点で 1 度だけ案内する（PostToolUse） |
 | `src/ccnavi/hook/projskills.py` | プロジェクトのスキルの目録（名前・説明・場所）を組む |
