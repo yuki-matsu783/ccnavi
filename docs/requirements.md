@@ -115,6 +115,6 @@ ccnavi は Claude Code の hook から呼ばれる。1 回の呼び出しは、�
 | 2.13 拡張との取り決め | REQ-EXT | [requirements/extension-if.md](requirements/extension-if.md) | ccnavi が VS Code 拡張と Chrome 拡張に約束すること（実行ファイルの探し方・互換の版・出力の形・Python の API） |
 | 2.13.1 JSON の形 | REQ-EXT | [requirements/json-shapes.md](requirements/json-shapes.md) | extension-if.md が指す、候補・試験・lint・ボード・承認・残った指摘・版の JSON の欄の形 |
 | 2.14 学びの蓄積 | REQ-LRN | [requirements/learning-wiki.md](requirements/learning-wiki.md) | 子チケットの気づきを集め、learning-wiki に溜め、反映先への提案として育てることについての要件（提案まではエージェント、採るのは人間。一部実装済み） |
-| 3 正常な流れ | — | [requirements/flows.md](requirements/flows.md) | 承認からセッション開始、ツール呼び出し、範囲外、フェーズの正常な流れ |
+| 3 正常な流れ | — | [requirements/flows.md](requirements/flows.md) | 承認からセッション開始、ツール呼び出し、範囲外、フェーズの正常な流れと、ユースケース（3.5） |
 | 4 適用範囲外 | — | [requirements/out-of-scope.md](requirements/out-of-scope.md) | ccnavi が約束しないこと（適用範囲外） |
 | 5 受け入れ条件 | — | [requirements/acceptance.md](requirements/acceptance.md) | 全要求を引く通し確認（受け入れ条件） |
