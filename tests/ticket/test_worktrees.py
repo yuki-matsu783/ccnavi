@@ -33,7 +33,7 @@ class ReviewTurnTest(PhaseHarness):
     def setUp(self):
         super().setUp()
         write(self.phases, PLAIN_PHASES)
-        # 子の宣言を問わずユーザが見る計画（`mr`）。後のフェーズが残る場面だけ 2 項にする。
+        # 子の宣言を問わずユーザが見る計画（`mr`）。後のフェーズが残る場面だけ 2 ステップにする。
         plan = ("work-mr", "work-mr") if "not_the_last" in self._testMethodName else ("work-mr",)
         self.propose("i0001", plain_parent_text("i0001", plan))
         self.commit_parent()

@@ -1,9 +1,9 @@
 """親の提案の `phases:` に、計画が使うフェーズ定義を写す（`--plan-order <親> --fill-phases`）。
 
-計画（`plan:` / `feedback:`）の項が使うフェーズ定義だけを `phases.yml`（共通レイヤーと、親の
+計画（`plan:` / `feedback:`）のステップが使うフェーズ定義だけを `phases.yml`（共通レイヤーと、親の
 `project:` が指すレイヤーの和）から読み、提案の
 `phases:`（親に固定する定義の写し）の値をその定義の集まりに差し替える（無ければ `plan:` の前に
-足す。項が使わない定義は外す）。写し間違いを無くし、`phases.yml` を直したあとに承認待ちの
+足す。ステップが使わない定義は外す）。写し間違いを無くし、`phases.yml` を直したあとに承認待ちの
 提案を追いつかせるのも同じ 1 本で済ませるため。
 
 改版の提案（作業中の承認済みチケットがある親）では、子が承認された番号が使う定義は承認済み
@@ -93,7 +93,7 @@ def fill(
         copy[item.type] = phasetypes.as_copy(pt)
     if missing:
         return Filled(
-            f"計画の項が使う定義 {', '.join(missing)} が phases.yml にありません。"
+            f"計画のステップが使う定義 {', '.join(missing)} が phases.yml にありません。"
             "計画を直すか、ユーザに phases.yml へ追加してもらう。何も反映しません。"
         )
     built, why = _rebuilt(text, copy)

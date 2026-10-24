@@ -2,7 +2,7 @@
 
 計画を持つ親は、計画が使う定義だけを `phases.yml` から写した `phases:` を持つ。
 見本の親を書くテストが、それぞれ定義を手で写さずに済むように
-ここに置く。写すのは、計画（`plan:` / `feedback:`）の項が使う定義だけ。前の版の順序の欄
+ここに置く。写すのは、計画（`plan:` / `feedback:`）のステップが使う定義だけ。前の版の順序の欄
 （`order` `after` `overlap` `requires`）は写さない。
 
 実行ファイルの `--plan-order <親> --fill-phases` と同じことをテストの側で行う。実行ファイルの
@@ -49,7 +49,7 @@ def combined(*phases_ymls: str) -> str:
 
 
 def used_types(front: dict) -> list[str]:
-    """frontmatter の計画の項が使う定義の名前（出てきた順、重なりなし）。"""
+    """frontmatter の計画のステップが使う定義の名前（出てきた順、重なりなし）。"""
     names: list[str] = []
     for key in ("plan", "feedback"):
         for item in front.get(key) or []:

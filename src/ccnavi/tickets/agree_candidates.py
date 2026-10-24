@@ -116,7 +116,8 @@ def candidates(
     for t in sorted(revisions, key=lambda x: x.ticket):
         current = open_index[t.ticket]
         config = config_for(t)
-        # 提案の待ち方と写しの定義も承認済みと同じ関数で入れる（計画の項の `after` と `phases:`）。
+        # 提案の待ち方と写しの定義も承認済みと同じ関数で入れる（計画のステップの `after` と
+        # `phases:`）。
         t.workflow = workflow.compute(t)
         types = phasetypes.types_of(t)
         complaints = _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
@@ -244,7 +245,7 @@ def _mixed_problem(
 
 def _workflow_field(t: ticket_model.Ticket) -> list[rules.Problem]:
     """提案に待ち方の欄（`workflow:`）が書いてあれば拒む。欄は読まないので、書いてあると
-    効くと読み手に思わせる。待ち方は計画の項の `after` から計算する。"""
+    効くと読み手に思わせる。待ち方は計画のステップの `after` から計算する。"""
     if ticket_model.WORKFLOW_KEY not in t.raw:
         return []
     return [
@@ -252,7 +253,7 @@ def _workflow_field(t: ticket_model.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"`{ticket_model.WORKFLOW_KEY}` の欄は提案に書かない（読まない）。"
-            "待ち方は計画の項の `after` から決まる",
+            "待ち方は計画のステップの `after` から決まる",
         )
     ]
 
@@ -353,10 +354,10 @@ def plan_problems(
 ) -> list[rules.Problem]:
     """親の計画と写し（`phases:`）が組めるか。
 
-    写しだけを読んで済むもの（写しが無い、項の定義が写しに無い、定義の形と `kind`、使われて
-    いない定義）は `phasetypes.copy_problems`、順序（`after` の形・終端・最後の項の延期・延期の
-    引き受け手とそのレビュー）は `workflow.problems` が当てる。どちらも判定の側が同じものを当てる。
-    延期できる定義か（レビュー不要の定義は延期するものが無い）はここで見る。
+    写しだけを読んで済むもの（写しが無い、ステップの定義が写しに無い、定義の形と `kind`、使われて
+    いない定義）は `phasetypes.copy_problems`、順序（`after` の形・終端・最後のステップの延期・
+    延期の引き受け手とそのレビュー）は `workflow.problems` が当てる。
+    どちらも判定の側が同じものを当てる。延期できる定義か（レビュー不要の定義は延期するものが無い）はここで見る。
 
     `config` は承認したときの `phases.yml`。写しの各定義がその同じ名前の定義と読んだ形で同じかを
     確かめる（`copy_config_problems`）。`held` は改版で、子が承認された番号が使う定義
@@ -495,11 +496,11 @@ def revision_problems(
     ほかは今の `phases.yml` と同じ。足すのも外すのも自由。
 
     処理フロー:
-    1. 子が承認された番号（`fixed_numbers`）の項が持つ型の定義を、承認済みの写しから集める
+    1. 子が承認された番号（`fixed_numbers`）のステップが持つ型の定義を、承認済みの写しから集める
     2. 計画を検める（`plan_problems`）。error があれば、ここで返す
     3. 範囲の改版なら、読めない項（`unreadable_scope`）と作業中の子（`open_children`）を見る
     4. 題・課題・`mr:` を比べる（`mr:` は片方が空なら比べない）
-    5. 固定した番号の項を変えていないかを見る（`lock_problems`）
+    5. 固定した番号のステップを変えていないかを見る（`lock_problems`）
     6. フィードバック計画の追加・変更を、全体計画の状態に照らして見る（`plan_signature`）
     """
     fixed = fixed_numbers(conf, root, current.ticket)
@@ -555,10 +556,10 @@ def revision_problems(
                 "`mr:` が承認済みチケットと違う",
             )
         )
-    # 錠は番号ごと。子が承認された番号（固定した番号）の項だけを変えさせない。
+    # 錠は番号ごと。子が承認された番号（固定した番号）のステップだけを変えさせない。
     problems += lock_problems(revised, current, fixed)
     # フィードバック計画の番号は全体計画の続きなので、フィードバック計画を立てたあとに全体計画を
-    # 変えると番号と `after` がずれる。比べるのは定義・`review`・推移的な待ちの並び。
+    # 変えると番号と `after` がずれる。比べるのは定義・`review`・推移的な先行の並び。
     # フィードバック計画を立てる改版でも同じ。
     plan_changed = approval.plan_signature(revised, "plan") != approval.plan_signature(
         current, "plan"
@@ -570,12 +571,12 @@ def revision_problems(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
                 f"フィードバック計画を{when}は全体計画を変えられない"
-                "（フィードバック計画の番号は全体計画の続きで、項を追加すると番号がずれる。"
+                "（フィードバック計画の番号は全体計画の続きで、ステップを追加すると番号がずれる。"
                 "全体計画を変えるなら、フィードバック計画を出す前に改版する）",
             )
         )
     # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
-    # 比べるのは定義・`review`・推移的な待ちの並び（`after` だけの違いも違いとして拾う）。
+    # 比べるのは定義・`review`・推移的な先行の並び（`after` だけの違いも違いとして拾う）。
     if approval.plan_signature(revised, "feedback") != approval.plan_signature(current, "feedback"):
         if current.feedback is not None:
             # 残りの切り出し先は進め方で違う。マージリクエストがあれば issue に切り出せるが、
@@ -672,19 +673,19 @@ def lock_problems(
 ) -> list[rules.Problem]:
     """改版の番号ごとの錠。`fixed` は子が承認された番号。
 
-    固定した番号の項は、定義・`review`・番号・推移的な待ち（`workflow.compute` の `waits`）を
-    変えさせない。待ちを推移的な形で比べるのは、エージェントが `--explain` の「待つ: …」を写しても、
-    直接の先行だけを書いても、同じ意味なら通すため。固定した番号が固定していない番号を待つ形
-    （子を手で動かして承認した親）では、その先行も項の同一性（定義と `review`）で比べる。
-    番号だけで比べると、先行の番号に別の項を入れ替える改版が通ってしまう。
+    固定した番号のステップは、定義・`review`・番号・推移的な先行（`workflow.compute` の `waits`）を
+    変えさせない。先行を推移的な形で比べるのは、エージェントが `--explain` の「先行 …」を写しても、
+    直接の先行だけを書いても、同じ意味なら通すため。固定した番号に固定していない番号が先行する形
+    （子を手で動かして承認した親）では、その先行もステップの同一性（定義と `review`）で比べる。
+    番号だけで比べると、先行の番号に別のステップを入れ替える改版が通ってしまう。
 
     延期の引き受け手は、承認済みか提案の引き受け手が固定した番号のときだけ比べる。まだ始まって
-    いない項の間で引き受け手が入れ替わるだけなら、済んだレビューが延期した作業を引き受けたことに
+    いないステップの間で引き受け手が入れ替わるだけなら、済んだレビューが延期した作業を引き受けたことに
     はならない。
 
-    `moved` は番号を振り直したとき（`--plan-order`）の、元の番号 → 振り直した番号。延期した項は
-    元の項の同一性で比べる（承認済みの n 番の延期を、振り直した先の番号の延期と比べる）。固定した
-    番号は振り直しで動かないので、ほかの比べ方は変わらない。
+    `moved` は番号を振り直したとき（`--plan-order`）の、元の番号 → 振り直した番号。
+    延期したステップは元のステップの同一性で比べる（承認済みの n 番の延期を、
+    振り直した先の番号の延期と比べる）。固定した番号は振り直しで動かないので、ほかの比べ方は変わらない。
     """
     problems: list[rules.Problem] = []
 
@@ -708,8 +709,8 @@ def lock_problems(
             continue
         if held.waits.get(n, []) != fresh.waits.get(n, []):
             error(
-                f"{n} 番目（{before.type}）は子が承認されているので、待ちを変えられない"
-                f"（いま待つ: {_numbers(held.waits.get(n, []))}、"
+                f"{n} 番目（{before.type}）は子が承認されているので、先行を変えられない"
+                f"（いま先行: {_numbers(held.waits.get(n, []))}、"
                 f"改版: {_numbers(fresh.waits.get(n, []))}）"
             )
             continue
@@ -719,7 +720,7 @@ def lock_problems(
             was, now = held_items.get(m), new_items.get(m)
             if now is None or was is None or (now.type, now.review) != (was.type, was.review):
                 error(
-                    f"{n} 番目は子の無い {m} 番目を待っているので、{m} 番目の項"
+                    f"{n} 番目に子の無い {m} 番目が先行しているので、{m} 番目のステップ"
                     f"（{was.type if was is not None else '?'}）を入れ替えられない"
                 )
     moved = moved or {}
@@ -738,7 +739,7 @@ def lock_problems(
 
 
 def _numbers(found: list[int]) -> str:
-    return ", ".join(map(str, found)) if found else "何も待たない"
+    return ", ".join(map(str, found)) if found else "先行なし"
 
 
 def parent_elsewhere_text(

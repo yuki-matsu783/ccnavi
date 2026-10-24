@@ -1,4 +1,4 @@
-"""チケットの形。書式の定数・状態の名前・範囲の項・計画の項・待ち方と、チケット 1 本ぶんの
+"""チケットの形。書式の定数・状態の名前・範囲の項・計画のステップ・待ち方と、チケット 1 本ぶんの
 データクラス。
 
 読み込み（`ticket.parse`）と置き場・まとめ方の側がどれも使うので、ここに置く。ticket から分けた。
@@ -114,7 +114,7 @@ class Entry:
         return self.glob[:cut]
 
 
-# 計画の項が書けるレビューの指定。`mr` は定義が none でも要る（強める）、`defer` は
+# 計画のステップが書けるレビューの指定。`mr` は定義が none でも要る（強める）、`defer` は
 # 次にレビューがあるフェーズと一緒に見る（延期）。弱める向き（none）は書けない。
 PLAN_REVIEW_MR = "mr"
 PLAN_REVIEW_DEFER = "defer"
@@ -123,13 +123,13 @@ PLAN_REVIEWS = (PLAN_REVIEW_MR, PLAN_REVIEW_DEFER)
 
 @dataclass
 class PlanItem:
-    """親の計画の 1 項。フェーズ定義の名前と、レビューの指定と、先行（`after`）。
+    """親の計画の 1 ステップ。フェーズ定義の名前と、レビューの指定と、先行（`after`）。
 
-    `after` は、この項より先に閉じてレビューが済んでいるべき項の番号（計画の番号。フィードバック
-    計画も全体計画の続きの番号）。読めた正しい番号（1 以上、自分より小さい、その計画の範囲の中）
-    だけを持つ。形の誤りは読み込みで落とさず、`after_errors` に元の値と理由で持つ
-    （`workflow.problems` が error で言い、判定は親を止める）。読み込みで落とすと承認済み
-    チケットが索引に入らず、判定がその親を知らないまま範囲を当てなくなるため。
+    `after` は、このステップより先に閉じてレビューが済んでいるべきステップの番号（計画の番号。
+    フィードバック計画も全体計画の続きの番号）。読めた正しい番号（1 以上、自分より小さい、
+    その計画の範囲の中）だけを持つ。形の誤りは読み込みで落とさず、
+    `after_errors` に元の値と理由で持つ（`workflow.problems` が error で言い、判定は親を止める）。
+    読み込みで落とすと承認済みチケットが索引に入らず、判定がその親を知らないまま範囲を当てなくなるため。
     `after_repeated` は同じ番号を 2 度挙げたもの（1 つにまとめ、warn で言う）。
     """
 
@@ -154,8 +154,8 @@ class PlanItem:
         return raw
 
     def __eq__(self, other) -> bool:
-        # `after` は入れない。改版かどうかは推移的な待ちで比べる（`approval.plan_differs`）。
-        # 「待つ: 1, 2」を写した `after` と、直接の先行だけを書いた `after` は同じ待ちになる。
+        # `after` は入れない。改版かどうかは推移的な先行で比べる（`approval.plan_differs`）。
+        # 「先行 1, 2」を写した `after` と、直接の先行だけを書いた `after` は同じ先行になる。
         return (
             isinstance(other, PlanItem) and self.type == other.type and self.review == other.review
         )
@@ -167,13 +167,13 @@ WORKFLOW_DAG = "dag"
 
 @dataclass
 class Workflow:
-    """作業・レビュー計画（旧称ワークフロー）の項が互いに待つ関係。
-    承認済みチケット（と提案）の計画の項の `after` から、`workflow.compute` が
+    """作業・レビュー計画（旧称ワークフロー）のステップの先行の関係（待ち方）。
+    承認済みチケット（と提案）の計画のステップの `after` から、`workflow.compute` が
     都度計算する計算結果で、ファイルにもチケットの欄にも持たない。
     VS Code の計画編集タブが編集するのは、この結果ではなく
-    元の `plan:` / `feedback:` の項の `after`。
+    元の `plan:` / `feedback:` のステップの `after`。
 
-    `waits` は番号 → 待つ番号（推移的に辿った全部。番号の小さい順）、`review_at` は延期した
+    `waits` は番号 → 先行の番号（推移的に辿った全部。番号の小さい順）、`review_at` は延期した
     番号 → 引き受ける番号。全体計画もフィードバック計画も入る。`order` はいつも `dag`。
     """
 
@@ -224,7 +224,7 @@ class Ticket:
     # 「見たうえで対応なし」。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
-    # workflow は計画の待ち方。計画の項の `after` から `workflow.compute` が計算して入れる
+    # workflow は計画の待ち方。計画のステップの `after` から `workflow.compute` が計算して入れる
     # （承認済みは `approval.load_copy`、提案は承認の候補を組むときと `phase.phases_of`）。
     # チケットの `workflow:` 欄は読まない。
     workflow: Workflow | None = None
@@ -330,7 +330,7 @@ class Ticket:
         return bool(self.started_at) and not self.completed_at and not self.cancelled_at
 
     def numbered(self) -> list[tuple[int, PlanItem]]:
-        """計画の項に番号を振る。全体計画が 1 から、フィードバック計画はその続き。"""
+        """計画のステップに番号を振る。全体計画が 1 から、フィードバック計画はその続き。"""
         items = list(self.plan) + list(self.feedback or [])
         return [(i + 1, item) for i, item in enumerate(items)]
 

@@ -264,7 +264,7 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
                  problems・fallback
         phases   共通 + そのレイヤーの定義。path・unreadable（そのレイヤーのファイル）・types
                  （各定義の source が出どころのレイヤー。定義は順序を持たないので、待ち方の欄は
-                 無い。順序は親の計画の項の `after`）。足すときの衝突は `--lint` が言う
+                 無い。順序は親の計画のステップの `after`）。足すときの衝突は `--lint` が言う
 
     判定の合成と同じ関数（`ruleload.sum_view` / `risk.layer_definition` /
     `phase.layer_types`）で組む。

@@ -52,7 +52,7 @@
 
 ## 待ち方は計画から都度計算する
 
-計画を持つ親の待ち方（`workflow.compute` の結果）は、承認済みチケットを読むたびに計画の項の
+計画を持つ親の待ち方（`workflow.compute` の結果）は、承認済みチケットを読むたびに計画のステップの
 `after` から計算して `Ticket.workflow` に入れる（`load_copy`）。ファイルにもチケットの欄にも
 持たない。承認済みチケットの計画は承認済みの置き場にあり、変えられるのは改版（`--agree`）と
 ユーザの手だけなので、計算の元も固定されている。`phases.yml` は計算の入力にならないので、承認の
@@ -180,8 +180,8 @@ def load_copy(path: str, require_record: bool = False) -> tuple[ticket_model.Tic
     `completed_at` を 2 つめの保護として求める（`review_all`）。保護が 1 つしか無い置き場で
     欄まで外すと、組み込みの deny に止められずに置かれたファイルが承認済みとして読まれる。
 
-    計画を持つ親には、計画の項の `after` から計算した待ち方（`workflow.compute`）と、親に固定した
-    フェーズ定義（`phases:` を読んだもの。`phasetypes.types_of`）を入れる。
+    計画を持つ親には、計画のステップの `after` から計算した待ち方（`workflow.compute`）と、
+    親に固定したフェーズ定義（`phases:` を読んだもの。`phasetypes.types_of`）を入れる。
     チケットの中に `workflow:` 欄があれば `blocking_problems` が止める。
     """
     ticket, problems = ticket_mod.load(path)
@@ -425,10 +425,10 @@ def revision_elsewhere(t: ticket_model.Ticket, current: ticket_model.Ticket | No
 
 
 def plan_signature(t: ticket_model.Ticket, part: str) -> tuple | None:
-    """計画の比べる形。項ごとの「定義・`review`・推移的に辿った待ち（`workflow.compute`）」の並び。
+    """計画の比べる形。ステップごとの「定義・`review`・推移的に辿った先行（`workflow.compute`）」の並び。
 
-    `after` の書き方が違っても待ちが同じなら違いにしない（`PlanItem.__eq__` も `after` を見ない）。
-    `after: [2]` と、`--explain` の「待つ: 1, 2」を写した `after: [1, 2]` は同じ待ち。
+    `after` の書き方が違っても先行が同じなら違いにしない（`PlanItem.__eq__` も `after` を見ない）。
+    `after: [2]` と、`--explain` の「先行 1, 2」を写した `after: [1, 2]` は同じ先行。
     `part` は `plan` か `feedback`。フィードバック計画が無い（None）ことと空（`[]`）は分ける。
     """
     if part == "feedback" and t.feedback is None:

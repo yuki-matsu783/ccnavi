@@ -2,14 +2,13 @@
 
 見るのは次のとおり。
 
-1. 親の提案: テンプレートの項（`type`・`review`・`after`）を `plan:` / `feedback:` に写す。
-   `after` は計画の中の添字から提案の絶対番号に付け直す（フィードバック計画は全体の項数を足す）。
-   `phases:` の写しが入り、`--lint` と承認の確認（`--agree --preview --verify`）、承認の検査
-   （`agree_candidates.plan_problems`）が error にならない
+1. 親の提案: テンプレートのステップ（`type`・`review`・`after`）を `plan:` / `feedback:` に写す。
+   `after` は計画の中の添字から提案の絶対番号に付け直す
+   （フィードバック計画は全体のステップ数を足す）。`phases:` の写しが入り、`--lint` と承認の確認（`--agree --preview --verify`）、
+   承認の検査（`agree_candidates.plan_problems`）が error にならない
 2. 往復: 完了した親から `--templates --draft` で作った下書きを `user handoff` で取り込み、
-   `--template` で使うと、
-   元の計画と同じ形・同じフローになる
-3. 子のフローの下書き: 全体計画の n 番目の項の最初の子 `<親>-<NN>-01` の
+   `--template` で使うと、元の計画と同じ形・同じフローになる
+3. 子のフローの下書き: 全体計画の n 番目のステップの最初の子 `<親>-<NN>-01` の
    `wip/proposals/flows/<子>.yml` に書く。`flow.load` で読める。効力が無いことを出力で言う
 4. 断る: 無い名前、使えない名前（error・読めない）、定義が phases.yml に無い、kind が
    置き場と合わない、`--plan` との併用、既にある提案・フロー下書き。断ったときは何も書かない
@@ -136,7 +135,7 @@ class ProposalTest(Use):
                 {"type": "implement", "after": [2]},
             ],
         )
-        # フィードバック計画の after は全体計画（3 項）の続きの番号になる: 1 -> 4。
+        # フィードバック計画の after は全体計画（3 ステップ）の続きの番号になる: 1 -> 4。
         self.assertEqual(
             front["feedback"],
             ["implement-feedback", {"type": "implement-feedback", "after": [4]}],
@@ -177,8 +176,8 @@ class ProposalTest(Use):
         self.assertEqual(result.returncode, 0, result.stderr)
         out = result.stdout
         self.assertIn(f"{IDENT} の提案を", out)
-        self.assertIn("plan（3 項）", out)
-        self.assertIn("feedback（2 項）", out)
+        self.assertIn("plan（3 ステップ）", out)
+        self.assertIn("feedback（2 ステップ）", out)
         self.assertIn("フローの下書き 1 件", out)
         self.assertIn(self.child(3), out)
         self.assertIn("下書きには効力がありません。", out)
@@ -193,7 +192,7 @@ class ProposalTest(Use):
         self.assertEqual(len(front["plan"]), 3)
         self.assertNotIn("implement-feedback", front["phases"])
         # テンプレートにフィードバック計画があることと、足し方を言う。
-        self.assertIn("フィードバック計画（2 項）がある", result.stdout)
+        self.assertIn("フィードバック計画（2 ステップ）がある", result.stdout)
         self.assertIn("--with-feedback", result.stdout)
         self.assertNotIn("feedback（", result.stdout)
         # 全体計画だけの提案は、承認のあとで全体計画を改版できる形のまま（検査を通る）。
@@ -526,7 +525,7 @@ class RoundTripTest(Use):
         self.assertIsNotNone(made, notes)
         self.assertEqual([i.as_raw() for i in made.plan], [i.as_raw() for i in original.plan])
         self.assertFalse(made.feedback)
-        self.assertIn("フィードバック計画（2 項）がある", result.stdout)
+        self.assertIn("フィードバック計画（2 ステップ）がある", result.stdout)
 
     def test_absolute_is_the_inverse_of_the_draft_normalization(self):
         from ccnavi.tickets import template_use
@@ -542,7 +541,7 @@ class RoundTripTest(Use):
         )
         plan, feedback = template_use.absolute(template)
         self.assertEqual([i.after for i in plan], [[], [1]])
-        # 全体計画は 2 項なので、フィードバック計画の 1 は 3 になる。
+        # 全体計画は 2 ステップなので、フィードバック計画の 1 は 3 になる。
         self.assertEqual([i.after for i in feedback], [[], [3]])
         # 元の Template は変えない。
         self.assertEqual([i.after for i in template.feedback], [[], [1]])

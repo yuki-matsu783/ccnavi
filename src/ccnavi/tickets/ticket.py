@@ -100,8 +100,9 @@ def _plan(
     """計画のリストを読む。定義が在るかを確かめるのは承認の側。
 
     `start` はこの計画の最初の番号（全体計画は 1、フィードバック計画は全体計画の続き）。
-    項の `after` は `_after` が読む。`after` の形の誤りと最後の項の延期では読み込みを落とさない
-    （`workflow.problems` が error で言い、判定は `blocking_problems` で親を止める）。
+    ステップの `after` は `_after` が読む。`after`
+    の形の誤りと最後のステップの延期では読み込みを落とさない（`workflow.problems` が error
+    で言い、判定は `blocking_problems` で親を止める）。
     """
     problems: list[Problem] = []
     if not isinstance(raw, list):
@@ -141,10 +142,10 @@ def _plan(
 
 
 def _after(item: ticket_model.PlanItem, raw, first: int, number: int) -> None:
-    """項の `after` を読む。正しい番号だけを `after` に、誤りは `after_errors` に入れる。
+    """ステップの `after` を読む。正しい番号だけを `after` に、誤りは `after_errors` に入れる。
 
     正しい番号は、整数（bool は数えない）で、その計画の範囲の中（`first` 以上）で、自分（`number`）
-    より小さいもの。フィードバック計画の項は全体計画の番号を指せない（全体計画はフィードバック
+    より小さいもの。フィードバック計画のステップは全体計画の番号を指せない（全体計画はフィードバック
     計画の前提として全部済んでいる）。どんな値でも例外を出さない。
     """
     if raw is None:
@@ -163,7 +164,7 @@ def _after(item: ticket_model.PlanItem, raw, first: int, number: int) -> None:
             item.after_errors.append(
                 (
                     value,
-                    "フィードバック計画の項はフィードバック計画の番号だけを指せる"
+                    "フィードバック計画のステップはフィードバック計画の番号だけを指せる"
                     if first > 1
                     else "1 以上の番号で書く",
                 )
@@ -393,7 +394,7 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
     1. `project` を `declared_project` に入れ、`project` も同じ値にする（`scan`
        が置き場で上書きする）。
     2. `predecessors` をリストで読む。
-    3. `plan`・`feedback` を `_plan` で項にする。子では読まず WARN にする。
+    3. `plan`・`feedback` を `_plan` でステップにする。子では読まず WARN にする。
        フィードバックの番号は全体計画の続き。
     4. `phases` は生の値のまま `phases_raw` に持つ。定義との照合は後段で行う。
     5. `issue` を `_issue_ref` で読む。親だけが持つ欄で、子では WARN にして読まない。
@@ -406,7 +407,7 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
     ticket.declared_project = _text(front.get("project")).strip()
     ticket.project = ticket.declared_project
 
-    # 先行と、計画・フィードバック計画の項。
+    # 先行と、計画・フィードバック計画のステップ。
     raw_preds = front.get("predecessors")
     if isinstance(raw_preds, list):
         ticket.predecessors = [_text(p).strip() for p in raw_preds if _text(p).strip()]

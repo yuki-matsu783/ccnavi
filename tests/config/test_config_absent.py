@@ -911,7 +911,8 @@ class ExplainSumsTest(ConfigUnionHarness):
         )
         self.assertEqual(sums["app"]["phases"]["types"], [])
         self.assertEqual(sums["app"]["phases"]["unreadable"], "")
-        # 定義は順序を持たない。待ち方は計画の項の `after` から読むので、待ち方の欄は渡さない。
+        # 定義は順序を持たない。待ち方は計画のステップの `after` から読むので、
+        # 待ち方の欄は渡さない。
         self.assertNotIn("order", sums["lib"]["phases"])
 
     def test_a_missing_or_broken_layer_is_said_in_its_own_sum(self):

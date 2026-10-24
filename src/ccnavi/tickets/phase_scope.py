@@ -89,7 +89,7 @@ def scope_verdict(
 def plan_item(
     child: ticket_model.Ticket, parent: ticket_model.Ticket | None
 ) -> ticket_model.PlanItem | None:
-    """子の番号が指す、親の計画の項。親が計画を持たない、番号が無い、計画に無いなら None。"""
+    """子の番号が指す、親の計画のステップ。親が計画を持たない、番号が無い、計画に無いなら None。"""
     if parent is None or not parent.has_plan or child.phase is None:
         return None
     return parent.item_at(child.phase)

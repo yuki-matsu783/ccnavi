@@ -149,7 +149,7 @@ def screen(
        親がまだ承認されていなければ、そう書く
     3. 親なら、編集できる範囲（allow・ask・deny の意味を添える）を出す
     4. 範囲の下に、チケットが宣言したが書き込めない場所（`cand.overflow`）を出す
-    5. 子は人間レビューと先行、親は計画・フェーズ間の待ち（`_plan_lines`・
+    5. 子は人間レビューと先行、親は計画・フェーズ間の先行（`_plan_lines`・
        `_workflow_lines`）・写しの定義（`_copy_lines`）を出す
     6. 課題・理由・出どころ（`_origin_line`）を出し、判定に使われない記述（警告）を末尾に置く
     """
@@ -288,7 +288,7 @@ def _plan_lines(items: list[ticket_model.PlanItem], start: int, types: dict | No
 
 
 def _workflow_lines(t: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[str]:
-    """計画の待ち。全部の番号と、すぐ始まる項。線の書き漏れをユーザが見つける場所。"""
+    """計画の先行。全部の番号と、すぐ始まるステップ。線の書き漏れをユーザが見つける場所。"""
     found = workflow.lines(t, wf)
     if not found:
         return []
@@ -335,7 +335,7 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
             lines.append(f"    {pt.title} / {ident}  " + "、".join(parts))
     unused = [ident for ident in types if ident not in numbers]
     if unused:
-        lines.append("■ 使われていない定義（phases: にあるが、どの項も使わない）")
+        lines.append("■ 使われていない定義（phases: にあるが、どのステップも使わない）")
         lines += [f"    {types[ident].title} / {ident}" for ident in unused]
     left = [pt for ident, pt in (config or {}).items() if ident not in types]
     if left:

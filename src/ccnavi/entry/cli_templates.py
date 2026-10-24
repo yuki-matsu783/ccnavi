@@ -316,8 +316,8 @@ def _draft(
     stdout.write(f"ccnavi: 下書きを書いた: {made.rel}\n")
     stdout.write(f"  取り込み先: {made.target}（{made.layer}）\n")
     stdout.write(
-        f"  親: {args.draft.strip()}  全体計画 {len(template.plan)} 項 / "
-        f"フィードバック計画 {len(template.feedback)} 項 / フロー {len(template.flows)} 本\n"
+        f"  親: {args.draft.strip()}  全体計画 {len(template.plan)} ステップ / "
+        f"フィードバック計画 {len(template.feedback)} ステップ / フロー {len(template.flows)} 本\n"
     )
     stdout.write(f"  ハッシュ: {made.sha}\n")
     for note in made.notes:

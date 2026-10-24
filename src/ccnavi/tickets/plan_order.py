@@ -8,15 +8,15 @@ VS Code の計画編集タブは、図で引いた線を「元の番号（いま
 
 ## 振り直しの決まり
 
-- 先行が全部前に並んだ項のうち、元の番号がいちばん小さいものから順に番号を振る（Kahn の方法。
-  同じ段の項は元の番号順を保つ）。線を変えても並びが崩れなければ番号は変わらない
-- 子が承認された番号（固定した番号）は動かさず、空いた番号に承認されていない項を詰める。詰める項が
-  無ければ「詰められない」と断る。固定した番号へ入る線（固定した項の先行）は変えられない
+- 先行が全部前に並んだステップのうち、元の番号がいちばん小さいものから順に番号を振る（Kahn の方法。
+  同じ段のステップは元の番号順を保つ）。線を変えても並びが崩れなければ番号は変わらない
+- 子が承認された番号（固定した番号）は動かさず、空いた番号に承認されていない
+  ステップを詰める。詰めるステップが無ければ「詰められない」と断る。固定した番号へ入る線（固定したステップの先行）は変えられない
 - 循環になる線は断る。断ったときは振り直さず、提案のままの答えを返す（タブは線を引く前に戻す）
-- `after` は振り直した番号に付け替える。`review: defer` は項に付いたまま動く。延期の引き受け手は
-  保存せず、振り直した計画から計算し直す
+- `after` は振り直した番号に付け替える。`review: defer` はステップに付いたまま動く。
+  延期の引き受け手は保存せず、振り直した計画から計算し直す
 - 全体計画とフィードバック計画は別に振り直す。フィードバック計画の番号は全体計画の続きで、
-  フィードバック計画の項はフィードバック計画の項だけを待てる
+  フィードバック計画のステップにはフィードバック計画のステップだけが先行できる
 
 ## 書き戻し
 
@@ -95,7 +95,7 @@ class Renumbered:
 
 
 def _parts(t: ticket_model.Ticket) -> list[tuple[str, int, list[ticket_model.PlanItem]]]:
-    """(欄の名前, 最初の番号, 項)。フィードバック計画は空でも欄として数える。"""
+    """(欄の名前, 最初の番号, ステップ)。フィードバック計画は空でも欄として数える。"""
     parts = [("plan", 1, list(t.plan))]
     if t.feedback is not None:
         parts.append(("feedback", len(t.plan) + 1, list(t.feedback)))
@@ -106,7 +106,7 @@ def parse_order(text: str, parent: ticket_model.Ticket) -> tuple[Order | None, s
     """`--order` の JSON を読む。読めなければ (None, 理由)。
 
     形は `{"plan": {"1": [], "2": [3]}, "feedback": {...}}`。番号は元の番号。渡した計画は全部の
-    番号の先行をそこから取る（書いていない番号は何も待たない）。渡さない計画は提案のまま。
+    番号の先行をそこから取る（書いていない番号は先行なし）。渡さない計画は提案のまま。
     """
     try:
         data = json.loads(text)
@@ -141,7 +141,7 @@ def parse_order(text: str, parent: ticket_model.Ticket) -> tuple[Order | None, s
                 if isinstance(m, bool) or not isinstance(m, int):
                     return None, f"`{key}` の {n} 番の先行 {m!r} は番号ではない"
                 if m == n:
-                    return None, f"`{key}` の {n} 番は自分を待てない"
+                    return None, f"`{key}` の {n} 番は自分を先行にできない"
                 if m not in numbers:
                     return None, (
                         f"`{key}` の {n} 番の先行 {m} は同じ計画の番号ではない"
@@ -161,11 +161,11 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
     モジュールの説明にある。
 
     処理フロー:
-    1. 計画の部（全体計画・フィードバック計画）ごとに、項の番号の範囲を `_parts` で得る
-    2. 線を渡さない部は、番号も項も提案のまま写す
+    1. 計画の部（全体計画・フィードバック計画）ごとに、ステップの番号の範囲を `_parts` で得る
+    2. 線を渡さない部は、番号もステップも提案のまま写す
     3. 固定した番号に入る線が変わっていれば断る（`REFUSED_LOCKED`）。`_cycle` で循環を
        見つけたら断る（`REFUSED_CYCLE`）
-    4. 断らない部は、先行が全部前に並んだ項を元の番号の小さい順に空いた番号へ置く。
+    4. 断らない部は、先行が全部前に並んだステップを元の番号の小さい順に空いた番号へ置く。
        固定した番号は動かさず、詰められなければ断る（`REFUSED_UNPACKABLE`）
     5. 置けた部は、`after` を新しい番号に付け替えて `built` に入れる
     6. 断りが 1 件でもあれば、親の計画を写した `Renumbered`（番号は恒等）を返す。無ければ
@@ -194,7 +194,7 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
                     REFUSED_LOCKED,
                     n,
                     f"{n} 番（{items[n - first].type}）は子が承認されているので、"
-                    "入る線（待つ項）を変えられない",
+                    "入る線（先行のステップ）を変えられない",
                 )
             )
         cycle = _cycle(preds, numbers)
@@ -203,7 +203,8 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
             refused.append(Refusal(REFUSED_CYCLE, cycle[0], f"循環になる線（{path}）"))
         if locked or cycle:
             continue
-        # 番号を振る。固定した番号は動かさず、ほかの項を元の番号の小さい順に空いた番号へ詰める。
+        # 番号を振る。固定した番号は動かさず、
+        # ほかのステップを元の番号の小さい順に空いた番号へ詰める。
         placed: dict[int, int] = {}
         stuck = 0
         for pos in numbers:
@@ -226,7 +227,8 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
                     REFUSED_UNPACKABLE,
                     stuck,
                     "子が承認された番号を動かさずに番号を振れない"
-                    f"（{stuck} 番に置ける項がありません）。詰められないので、この線は引けない",
+                    f"（{stuck} 番に置けるステップがありません）。"
+                    "詰められないので、この線は引けない",
                 )
             )
             continue
@@ -252,7 +254,7 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
 
 
 def _cycle(preds: dict[int, list[int]], numbers: list[int]) -> list[int]:
-    """先行を辿って循環があれば、その番号の並び（待つ側から先行へ）。無ければ空。"""
+    """先行を辿って循環があれば、その番号の並び（後続側から先行へ）。無ければ空。"""
     state: dict[int, int] = {}
     stack: list[int] = []
 
@@ -379,7 +381,7 @@ class Answer:
     revised: ticket_model.Ticket
     problems: list[rules.Problem]
     revision_problems: list[rules.Problem]
-    # 付け替える子の提案（番号の変わる項を指す子と、その子を `predecessors` で指す子）。
+    # 付け替える子の提案（番号の変わるステップを指す子と、その子を `predecessors` で指す子）。
     changes: list[ChildChange] = field(default_factory=list)
     # 付け替えられない理由（付け替え先の衝突、承認済みの側の参照）。
     child_problems: list[str] = field(default_factory=list)
@@ -432,9 +434,9 @@ class ChildChange:
 def retarget(parent_id: str, moved: dict[int, int], children: list[dict]) -> list[dict]:
     """子の付け替えの決まり。`children` は `{ticket, phase, predecessors}` の並び。
 
-    この親の子（識別子が `<親>-<2 桁>-<2 桁>`）で、`phase` が番号の変わる項を指すものは、識別子の
-    2 桁と `phase` を新しい番号にする（連番は変えない）。どの子も、`predecessors` が付け替えた
-    識別子を指していれば新しい識別子に直す。変わる子だけを、渡した順で返す。
+    この親の子（識別子が `<親>-<2 桁>-<2 桁>`）で、`phase` が番号の変わるステップを指すものは、
+    識別子の 2 桁と `phase` を新しい番号にする（連番は変えない）。どの子も、`predecessors`
+    が付け替えた識別子を指していれば新しい識別子に直す。変わる子だけを、渡した順で返す。
     """
     rename: dict[str, str] = {}
     for c in children:
@@ -572,8 +574,9 @@ def answer(source: Source, order: Order | None) -> Answer:
     revised.workflow = workflow.compute(revised)
     types = phasetypes.types_of(parent)
     revised.phase_types = types
-    # 振り直した計画の項は組み直すので、提案に元からある `after` の形の誤りが消える。振り直す前の
-    # 項の誤りも検査に入れる（読めない `after` を書いた提案を、線を引き直しただけで通さない）。
+    # 振り直した計画のステップは組み直すので、提案に元からある `after` の形の誤りが消える。
+    # 振り直す前のステップの誤りも検査に入れる（読めない `after` を書いた提案を、
+    # 線を引き直しただけで通さない）。
     redrawn = tuple(k for k in PARTS if k in (order or {})) if not got.refused else ()
     problems = [p for p in workflow.problems(revised, types) if p.severity == rules.SEVERITY_ERROR]
     for key in redrawn:
@@ -754,7 +757,7 @@ def _item_text(item: ticket_model.PlanItem) -> str:
 
 
 def _replace_value(text: str, key: str, items: list[ticket_model.PlanItem]) -> tuple[str, str]:
-    """frontmatter の `key:` の値を項の並びに差し替える。ほかの行は変えない。"""
+    """frontmatter の `key:` の値をステップの並びに差し替える。ほかの行は変えない。"""
     if items:
         return _replace_block(text, key, [f"{key}:"] + [f"  - {_item_text(i)}" for i in items])
     return _replace_block(text, key, [f"{key}: []"])
@@ -1024,7 +1027,7 @@ def save(ans: Answer, expect: str) -> Saved:
         (ans.problems, "振り直した計画の順序の検査に error がある。何も反映しません。"),
         (
             ans.revision_problems,
-            "改版で通らない形（子が承認された番号を固定しているので、その番号の項は変えられない）。何も反映しません。",
+            "改版で通らない形（子が承認された番号を固定しているので、その番号のステップは変えられない）。何も反映しません。",
         ),
         (ans.child_problems, "子の提案を付け替えられない。何も反映しません。"),
     ):

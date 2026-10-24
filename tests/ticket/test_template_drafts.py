@@ -191,7 +191,9 @@ class MakeTest(Drafts):
         self.assertIn(
             "ccnavi user handoff .ccnavi/config/project/templates/i0001.yml", result.stdout
         )
-        self.assertIn("全体計画 3 項 / フィードバック計画 2 項 / フロー 1 本", result.stdout)
+        self.assertIn(
+            "全体計画 3 ステップ / フィードバック計画 2 ステップ / フロー 1 本", result.stdout
+        )
         template = self.drafted()
         self.assertEqual(template.name, "i0001")
         self.assertEqual([i.type for i in template.plan], ["research", "design", "implement"])

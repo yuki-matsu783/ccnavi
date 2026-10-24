@@ -72,11 +72,13 @@ phases:
 
 
 def plan_item_lines(items, start=1) -> list[str]:
-    """計画の項を YAML の行にする。`start` はその計画の最初の番号（フィードバック計画は続き）。
+    """計画のステップを YAML の行にする。
 
-    項は定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
-    `after` を書かない項は、すぐ前の項を待つ（一直線）。最初の項は何も待たない。
-    並行にしたい見本は辞書で `after` を明記する（`[]` なら何も待たない）。
+    `start` はその計画の最初の番号（フィードバック計画は続き）。
+
+    ステップは定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
+    `after` を書かないステップは、すぐ前のステップが先行する（一直線）。最初のステップは先行なし。
+    並行にしたい見本は辞書で `after` を明記する（`[]` なら先行なし）。
     """
     lines = []
     for i, item in enumerate(items):
@@ -168,7 +170,7 @@ def load_chrome():
 
 
 # `plan` を持たない親は `ticket start` が止まるので、計画の中身を問わないテストの親は
-# この最小の計画（`work` の項を並べただけ。項は互いに待たない）を持つ。
+# この最小の計画（`work` のステップを並べただけ。ステップは互いに先行しない）を持つ。
 PLAIN_PHASES = """
 version: 1
 phases:
@@ -186,9 +188,12 @@ phases:
 
 
 def plain_plan_lines(plan=1) -> list[str]:
-    """`plan:` の行。`plan` は `work` の項の数か定義名の並び。最後の項だけが前の全部を待つ。"""
+    """`plan:` の行。`plan` は `work` のステップの数か定義名の並び。
+
+    最後のステップだけに前の全部が先行する。
+    """
     names = ["work"] * plan if isinstance(plan, int) else list(plan)
-    # 終端は 1 つ（最後の項がほかの全部を待つ）にしないと承認が通らない。
+    # 終端は 1 つ（最後のステップにほかの全部が先行する）にしないと承認が通らない。
     last = len(names)
     return ["plan:"] + [
         f"  - {{type: {n}, after: [{', '.join(str(k) for k in range(1, last))}]}}"

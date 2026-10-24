@@ -394,7 +394,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertNotEqual(self.approve().returncode, 0)
 
     def test_the_order_comes_from_the_plan_and_not_from_the_file(self):
-        """9.7: ファイルの `order` と定義の `after` は読まない。待ち方は計画の項の `after`。
+        """9.7: ファイルの `order` と定義の `after` は読まない。待ち方は計画のステップの `after`。
 
         承認は待ち方のファイルを書かない。ボードの `order` はいつも `dag`。"""
         write_layer(self.ws, phases=OWN_PHASES_DESIGN)

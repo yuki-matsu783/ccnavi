@@ -46,8 +46,8 @@ Write は止まる。組み込みの既定は持たない。
 
 ## 順序は定義に書かない
 
-どのフェーズがどれを待つかは、親の計画の項の `after` が決める（`workflow`）。定義には順序の欄を
-持たない。
+どのフェーズにどのフェーズが先行するかは、親の計画のステップの `after` が決める（`workflow`）。
+定義には順序の欄を持たない。
 """
 
 from __future__ import annotations
@@ -476,7 +476,8 @@ def parent_scope_problems(parent: ticket_model.Ticket) -> list[Problem]:
     気づくので、親を作るときと承認の確認（`--verify`）で言う。計画に `scope: inherit` の定義が
     あれば上限が無いので、何も言わない。それ以外は warn で言う。
     """
-    # 見るのは plan の項の定義だけ。feedback の定義は多くが `inherit` で、混ぜると警告が効かなくなる
+    # 見るのは plan のステップの定義だけ。feedback の定義は多くが `inherit` で、
+    # 混ぜると警告が効かなくなる
     defs = types_of(parent)
     types = [defs[item.type] for item in parent.plan if item.type in defs]
     if not types or any(pt.inherits_scope for pt in types):
@@ -604,9 +605,10 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
 
     - 子に `phases:` がある（error）。子の `phase:`（番号）と名前が似ていて取り違えやすい
     - 写しの定義の形の誤り（error。`phases.yml` の定義と同じ検査）
-    - 計画を持つのに `phases:` が無い、項が `phases:` に無い定義名を使う（error）
+    - 計画を持つのに `phases:` が無い、ステップが `phases:` に無い定義名を使う（error）
     - 定義の `kind` が置いた計画と合わない（error）
-    - `phases:` にあって、どの項も使わない定義（warn。判定はどの項からも引かないので、範囲・
+    - `phases:` にあって、どのステップも使わない定義（warn。判定はどのステップからも引かないので、
+    範囲・
       見る場所・成果物は変わらない）
     """
     found: list[Problem] = []
@@ -619,7 +621,7 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
         if COPY_KEY in t.raw:
             error(
                 "`phases:` は親だけの欄（計画が使うフェーズ定義の写し）。子は `phase:`（番号）で"
-                "親の計画の項を指す。子の `phases:` は削除してください"
+                "親の計画のステップを指す。子の `phases:` は削除してください"
             )
         return found
     fill = f"`ccnavi --plan-order {name} --fill-phases`"
@@ -661,7 +663,8 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     name,
-                    f"`phases:` の `{ident}` はどの項も使っていない（消し忘れなら {fill} で外す）",
+                    f"`phases:` の `{ident}` はどのステップも使っていない"
+                    f"（消し忘れなら {fill} で外す）",
                 )
             )
     return found

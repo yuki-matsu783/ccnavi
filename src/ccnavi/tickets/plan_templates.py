@@ -1,8 +1,8 @@
 """作業・レビュー計画のテンプレート（読む側）。
 
 テンプレートは、1 つの親の作業・レビュー計画（全体計画 `plan:` とフィードバック計画 `feedback:` の
-項と `after`）と、各子のフローの本文を 1 ファイルにまとめたもの。完了した作業の形を、次の作業で
-使い回すために置く。このモジュールは読む・足す・検査するだけで、書かない（取り込み・下書き・使う側は別）。
+ステップと `after`）と、各子のフローの本文を 1 ファイルにまとめたもの。完了した作業の形を、
+次の作業で使い回すために置く。このモジュールは読む・足す・検査するだけで、書かない（取り込み・下書き・使う側は別）。
 
 ## 置き場と 2 層の統合結果
 
@@ -19,12 +19,12 @@
     name: <名前>             # ファイル名（拡張子を除く）と同じ
     description: 何のための計画か
     when: 選ぶ手がかり        # 省いてよい
-    plan:                    # 全体計画。項は定義の名前か {type, review, after}
+    plan:                    # 全体計画。ステップは定義の名前か {type, review, after}
       - design
       - {type: implement, after: [1]}
     feedback:                # フィードバック計画（省いてよい）
       - {type: implement-feedback}
-    flows:                   # 全体計画の項の添字（1 始まり）→ 子のフローの本文
+    flows:                   # 全体計画のステップの添字（1 始まり）→ 子のフローの本文
       2: {id: ..., nodes: [...], connections: [...]}
 
 `after` は**その計画の中の添字**（1 始まり）。フィードバック計画の `after` も、フィードバック計画の
@@ -41,7 +41,7 @@ UTF-8（BOM は 1 つ外す）で、例外は外に出さない。
 
 計画は、合成した frontmatter を `ticket.parse` に渡して得た `Ticket` に、承認の検査の関数を当てる。
 
-- 順序（`after` の範囲・循環・終端が 1 つ・最後の項の延期・延期の引き受け手）は error
+- 順序（`after` の範囲・循環・終端が 1 つ・最後のステップの延期・延期の引き受け手）は error
 - 型 id が使うフェーズ定義（共通 + レイヤーの `phases.yml`）に無い、`kind` が置き場と合わない、
   延期の引き受け手にレビューが無い、は warn にとどめる。定義が後から変わって食い違うのは
   避けられず、使うときの承認の検査で改めて error になるため
@@ -101,7 +101,7 @@ NAME_LIMIT = 64
 LAYER_COMMON = settings.LAYER_COMMON
 LAYER_SELF = settings.LAYER_SELF
 
-# 項の欄。
+# ステップの欄。
 ITEM_FIELDS = ("type", "review", "after")
 
 # 取り込まれない理由（`Entry.dropped`）。
@@ -115,7 +115,7 @@ _CHECK_ID = "template-check"
 
 @dataclass
 class Item:
-    """計画の 1 項。`after` はその計画の中の添字（1 始まり）。"""
+    """計画の 1 ステップ。`after` はその計画の中の添字（1 始まり）。"""
 
     type: str
     review: str = ""
@@ -139,7 +139,7 @@ class Template:
     when: str = ""
     plan: list[Item] = field(default_factory=list)
     feedback: list[Item] = field(default_factory=list)
-    # 全体計画の項の添字（1 始まり）→ フローの本文（フローのファイルと同じ形のマッピング）。
+    # 全体計画のステップの添字（1 始まり）→ フローの本文（フローのファイルと同じ形のマッピング）。
     flows: dict[int, dict] = field(default_factory=dict)
     # 未知の欄。書き戻しで落とさない。
     extra: dict = field(default_factory=dict)
@@ -399,17 +399,18 @@ def parse_template(raw: bytes, stem: str = "") -> tuple[Template | None, list[Pr
 
 
 def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) -> list[Item] | None:
-    """計画の項の欄（`key`）のリストを読む。欄が読めなければ None。苦情は `problems` に足す。
+    """計画のステップの欄（`key`）のリストを読む。欄が読めなければ None。苦情は `problems` に足す。
 
     `required` が真なら、欄が無いことと空であることを、どちらも苦情にする。
-    項は、定義の名前だけの文字列か、`{type, review, after}` のマッピングで書く。
+    ステップは、定義の名前だけの文字列か、`{type, review, after}` のマッピングで書く。
 
     処理フロー:
     1. 欄が無い・リストでない・必須なのに空なら、苦情を足して None を返す
-    2. 項を 1 件ずつ読む（添字は 1 から）。文字列は定義の名前だけの項にする。空の文字列は苦情
+    2. ステップを 1 件ずつ読む（添字は 1 から）。文字列は定義の名前だけのステップにする。
+    空の文字列は苦情
     3. マッピングは、知らない欄を警告にして読まない。`type` は必須
     4. `review` は文字列に限る。`after` は整数の添字のリストに限り、重複は警告にして整える
-    5. 苦情のある項は捨てる。読めた項を `Item` にして返す
+    5. 苦情のあるステップは捨てる。読めたステップを `Item` にして返す
     """
 
     def error(text: str) -> None:
@@ -427,7 +428,7 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
         error(f"`{key}` が空")
         return None
     items: list[Item] = []
-    # 項を 1 件ずつ読む。文字列は定義の名前だけの項として扱う。
+    # ステップを 1 件ずつ読む。文字列は定義の名前だけのステップとして扱う。
     for i, entry in enumerate(raw, start=1):
         where = f"`{key}[{i}]`"
         if isinstance(entry, str):
@@ -479,14 +480,14 @@ def _flows(raw, problems: list[Problem], stem: str) -> dict[int, dict] | None:
     if raw is None:
         return None
     if not isinstance(raw, dict):
-        error("`flows` は、全体計画の項の添字をキーにしたマッピングで書く")
+        error("`flows` は、全体計画のステップの添字をキーにしたマッピングで書く")
         return None
     out: dict[int, dict] = {}
     for key, body in raw.items():
         if isinstance(key, bool) or not (
             isinstance(key, int) or (isinstance(key, str) and key.isascii() and key.isdigit())
         ):
-            error(f"`flows` のキー `{_line(key)}` は全体計画の項の添字（整数）で書く")
+            error(f"`flows` のキー `{_line(key)}` は全体計画のステップの添字（整数）で書く")
             continue
         index = int(key)
         if index in out:
@@ -557,7 +558,8 @@ def check(
     if total > ticket_ids.MAX_CHILD_NUMBER:
         say(
             SEVERITY_ERROR,
-            f"計画が {total} 項ある（上限 {ticket_ids.MAX_CHILD_NUMBER} 項）。計画を分ける",
+            f"計画が {total} ステップある（上限 {ticket_ids.MAX_CHILD_NUMBER} ステップ）。"
+            "計画を分ける",
         )
     for key, items in (("plan", template.plan), ("feedback", template.feedback)):
         for i, item in enumerate(items, start=1):
@@ -689,22 +691,22 @@ def graph(
     """計画の図の中身。`plan_order.plans` と同じ形（`ApprovePlan`）で、計画ごとに 1 件。
 
     番号は全体計画が 1..n、フィードバック計画はその続き。`after` は部の中の添字で書く。
-    合成できない（`after` が読めないなど）ときは、項と `after` を Template から直接組み、
+    合成できない（`after` が読めないなど）ときは、ステップと `after` を Template から直接組み、
     `loose` と `ready` は空にする。`problems` には `after` の誤りだけを入れる。
     `ticket.parse` の苦情は入れない。
 
     処理フロー:
     1. `_plan_config` で型の定義を得て、`_composed` の文面を `ticket.parse` で読む
-    2. `after` の誤りが無ければ、`workflow.compute` で待ちの形を計算する（読めなければ計算しない）
-    3. 待ちの形から、`loose` と `ready` を得る
-    4. 全体計画、フィードバック計画の順に、項が在る部ごとに 1 件の図を組む
-    5. 項ごとに、型の定義から題名と審査の種類を引く。`after` は全体の番号に直す
+    2. `after` の誤りが無ければ、`workflow.compute` で先行の形を計算する（読めなければ計算しない）
+    3. 先行の形から、`loose` と `ready` を得る
+    4. 全体計画、フィードバック計画の順に、ステップが在る部ごとに 1 件の図を組む
+    5. ステップごとに、型の定義から題名と審査の種類を引く。`after` は全体の番号に直す
     6. 部の誤り（`_order_errors` と `workflow.problems`）を `problems` に入れて返す
     """
     # 型の定義と、合成した計画を読む。
     ptypes, config, _, _ = _plan_config(template, types)
     parsed, _ = ticket.parse(_composed(template, ptypes))
-    # `after` に誤りが無いときだけ、待ちの形を計算する。
+    # `after` に誤りが無いときだけ、先行の形を計算する。
     wf = None
     if parsed is not None and not any(
         p.severity == SEVERITY_ERROR for p in _order_errors(template)
@@ -729,7 +731,7 @@ def graph(
             for n, item in zip(numbers, items, strict=True)
             if item.after
         }
-        # 項ごとの行。題名と審査の種類は、型の定義（あれば）から引く。
+        # ステップごとの行。題名と審査の種類は、型の定義（あれば）から引く。
         rows = []
         for n, item in zip(numbers, items, strict=True):
             pt = config.get(item.type)

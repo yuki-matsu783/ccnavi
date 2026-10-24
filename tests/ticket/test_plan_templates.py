@@ -461,7 +461,7 @@ class CheckTest(Harness):
         for plan, feedback in ((100, 0), (98, 2), (60, 40), (1, 99)):
             with self.subTest(plan=plan, feedback=feedback):
                 found = errors(plan, feedback)
-                self.assertTrue(any("上限 99 項" in d for d in found), found)
+                self.assertTrue(any("上限 99 ステップ" in d for d in found), found)
 
     def test_hidden_characters_anywhere_in_the_strings_are_an_error(self):
         flow_body = {"id": "x", "name": "n", "nodes": [{"id": "p", "data": {"prompt": "a\u200bb"}}]}

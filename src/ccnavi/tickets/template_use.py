@@ -9,17 +9,17 @@
   引く。使えるのは統合結果で取り込まれた（`effective`）もので、error が無いもの。無い・捨てた・
   error があるなら、理由を返す
 - `absolute`: テンプレートの `after`（計画の中の添字）を、提案の絶対番号に付け直す。全体計画は
-  そのまま、フィードバック計画は全体計画の項数を足す。`template_drafts.make`（`--draft`）の
+  そのまま、フィードバック計画は全体計画のステップ数を足す。`template_drafts.make`（`--draft`）の
   正規化の逆
-- `flow_drafts`: `flows`（全体計画の項の添字がキー）を、子の識別子ごとの下書きの文面にする
+- `flow_drafts`: `flows`（全体計画のステップの添字がキー）を、子の識別子ごとの下書きの文面にする
 
 ## 子の識別子
 
 子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁の連番>`（`ticket_ids.child_id`）。フェーズ番号は
-全体計画の項の番号。連番は承認の側がフェーズごとに 1 から数える（`approval_ops.next_child_id`）
-ので、親の提案が承認される前の足場では、そのフェーズの最初の子 `<親>-<NN>-01` と決める。
-子の提案は手で書く（足場は親だけ）ので、ここで決めた識別子は予告にすぎない。別の連番で子を
-起こすなら、下書きの名前を子の識別子に合わせる。
+全体計画のステップの番号。連番は承認の側がフェーズごとに 1 から数える
+（`approval_ops.next_child_id`）ので、親の提案が承認される前の足場では、
+そのフェーズの最初の子 `<親>-<NN>-01` と決める。子の提案は手で書く（足場は親だけ）ので、
+ここで決めた識別子は予告にすぎない。別の連番で子を起こすなら、下書きの名前を子の識別子に合わせる。
 """
 
 from __future__ import annotations
@@ -89,7 +89,10 @@ def resolve(conf, root: str, layer: str, name: str) -> tuple[Found | None, str]:
 def absolute(
     template: plan_templates.Template,
 ) -> tuple[list[plan_templates.Item], list[plan_templates.Item]]:
-    """提案に書く項。`after` を、提案の絶対番号（フィードバック計画は全体計画の続き）に付け直す。"""
+    """提案に書くステップ。
+
+    `after` を、提案の絶対番号（フィードバック計画は全体計画の続き）に付け直す。
+    """
     planned = len(template.plan)
 
     def shifted(items: list[plan_templates.Item], offset: int) -> list[plan_templates.Item]:
@@ -106,7 +109,7 @@ def absolute(
 
 
 def child_id(parent: str, index: int) -> str:
-    """全体計画の `index` 番目の項の最初の子の識別子。"""
+    """全体計画の `index` 番目のステップの最初の子の識別子。"""
     return ticket_ids.child_id(parent, index, FIRST_SEQ)
 
 
@@ -122,7 +125,10 @@ def child_problem(parent: str, template: plan_templates.Template) -> str:
 def flow_drafts(
     parent: str, template: plan_templates.Template
 ) -> tuple[list[tuple[str, int, str]], str]:
-    """子のフローの下書き。[(子の識別子, 全体計画の項の添字, 文面)]（添字順）と、組めない理由。"""
+    """子のフローの下書き。
+
+    [(子の識別子, 全体計画のステップの添字, 文面)]（添字順）と、組めない理由。
+    """
     out: list[tuple[str, int, str]] = []
     for index in sorted(template.flows):
         text, why = plan_templates.dump_flow(template.flows[index])

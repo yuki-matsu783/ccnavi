@@ -6,14 +6,15 @@
 
 ## 下書きを作る（`make`）
 
-完了した親の `done/` の計画（`plan:` / `feedback:` の項の `type`・`review`・`after`）と、各子の
-フロー（`.ccnavi/approved/flows/<子>.yml`）を 1 ファイルのテンプレートに写し、親のツリーの
+完了した親の `done/` の計画（`plan:` / `feedback:` のステップの `type`・`review`・`after`）と、
+各子のフロー（`.ccnavi/approved/flows/<子>.yml`）を 1 ファイルのテンプレートに写し、親のツリーの
 `wip/handoff/` の下の、取り込み先と同じ相対パスに書く。エージェントが打ってよい（効力が無い）。
 
 - `after` は各計画の中の添字（1 始まり）にする。親の計画の `after` は全体計画の続きの絶対番号で、
-  フィードバック計画の項は全体計画の項数を引いて直す。全体計画の `after` はそのまま。承認済みの
-  親の計画の順序は承認が確かめているので、並べ替え（`plan_order.renumber`）は要らず、引き算だけで足りる
-- 子のフローは、全体計画の n 番目の項の子（`phase` が n）のうち、フローを持つ最初の 1 本を写す。
+  フィードバック計画のステップは全体計画のステップ数を引いて直す。全体計画の `after` はそのまま。
+  承認済みの親の計画の順序は承認が確かめているので、並べ替え（`plan_order.renumber`）は要らず、引き算だけで足りる
+- 子のフローは、全体計画の n 番目のステップの子（`phase` が n）のうち、フローを持つ
+  最初の 1 本を写す。
   写すのは全体計画の子のフローだけ（テンプレートの `flows` は全体計画の添字で指す）
 - 固有名の一般化はエージェントが直す。親の題から入れる `description` と `when` の両方に
   `TODO` の印を付ける。印が残っていれば検査が warn で言う
@@ -281,7 +282,10 @@ def _find_parent(
 def _relative_items(
     items: list[ticket_model.PlanItem], offset: int, key: str, notes: list[str]
 ) -> list[plan_templates.Item]:
-    """親の計画の項を、その計画の中の添字の `after` に直す。`offset` はその計画の最初の番号 - 1。"""
+    """親の計画のステップを、その計画の中の添字の `after` に直す。
+
+    `offset` はその計画の最初の番号 - 1。
+    """
     out = []
     for i, item in enumerate(items, start=1):
         after = []
@@ -290,7 +294,9 @@ def _relative_items(
             if 1 <= local < i:
                 after.append(local)
             else:
-                notes.append(f"{key}[{i}] の after {value} は{key}の中の項を指さないので落とした")
+                notes.append(
+                    f"{key}[{i}] の after {value} は{key}の中のステップを指さないので落とした"
+                )
         out.append(
             plan_templates.Item(type=item.type, review=item.review, after=sorted(set(after)))
         )
@@ -303,7 +309,7 @@ def _flows(
     children: list[ticket_model.Ticket],
     notes: list[str],
 ) -> dict[int, dict]:
-    """全体計画の n 番目の項 → その子のフローの本文。フローを持つ最初の子の 1 本を写す。"""
+    """全体計画の n 番目のステップ → その子のフローの本文。フローを持つ最初の子の 1 本を写す。"""
     out: dict[int, dict] = {}
     for n in range(1, len(parent.plan) + 1):
         mine = sorted(
@@ -499,7 +505,7 @@ def _known(conf: settings.Settings, root: str) -> list[str]:
 
 
 def _shape(template: plan_templates.Template) -> tuple[list, list]:
-    """計画の形（全体計画とフィードバック計画の項）。取り込み済みかを見るときの比べる対象。
+    """計画の形（全体計画とフィードバック計画のステップ）。取り込み済みかを見るときの比べる対象。
 
     フローの本文は比べない。下書きの一般化でフローの文も直るので、文まで比べると、
     取り込んだ直後でも「同じ内容」に読めない。

@@ -4,7 +4,7 @@
 
 1. フェーズ定義の検証（識別子と表示名の一意、フィードバック対応は mr 固定、参照先の有無）
 2. 全体計画の承認と、計画に合わない子の拒否（kind、無い番号）。範囲の上限の超過は拒まず見せる
-3. 順序は承認で止まる（待つ番号が閉じてレビューが済むまで承認しない。待たない番号は並行）
+3. 順序は承認で止まる（先行の番号が閉じてレビューが済むまで承認しない。先行のない番号は並行）
 4. 成果物が無ければフェーズの最後の子を閉じられない
 5. 延期したフェーズではレビューで止まらず、次の依頼に含まれる
 6. フィードバック計画は最後のレビューの後に 1 回だけ、空でも証跡になる
@@ -434,7 +434,7 @@ class PhaseTest(PhaseHarness):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
 
     def test_items_that_do_not_wait_on_each_other_are_planned_together(self):
-        """`after` で待たない項は並行する（前の版の `overlap` の代わり）。"""
+        """`after` で先行しないステップは並行する（前の版の `overlap` の代わり）。"""
         plan = [
             "acceptance",
             {"type": "implement", "after": []},

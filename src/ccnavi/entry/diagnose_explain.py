@@ -355,7 +355,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             if ph.planned:
                 waits = workflow.waits_of(parent, ph.number)
                 review += (
-                    f" / 待つ: {', '.join(map(str, waits))}" if waits else " / 先行フェーズなし"
+                    f" / 先行 {', '.join(map(str, waits))}" if waits else " / 先行フェーズなし"
                 )
             stdout.write(
                 f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {hold}{review}\n"

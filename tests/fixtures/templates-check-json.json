@@ -1,5 +1,5 @@
 {
- "about": "`ccnavi --templates --check-file <パス> --json` の答えの見本。tests/ticket/test_plan_templates.py の FEATURE（plan 2 項・feedback 1 項・flows 1 本）を、共通に PHASES を置いたワークスペースで検査した答え。sha と source_sha は <sha> に置き換える。欄: version、ok、layer、name、sha、valid、problems（severity・detail）、data（読んだ中身の写し。読めなければ null）、plans（承認の preview の plans と同じ ApprovePlan の形。番号は全体計画が 1.. でフィードバック計画はその続き）、types（この層で使えるフェーズ定義）。",
+ "about": "`ccnavi --templates --check-file <パス> --json` の答えの見本。tests/ticket/test_plan_templates.py の FEATURE（plan 2 ステップ・feedback 1 ステップ・flows 1 本）を、共通に PHASES を置いたワークスペースで検査した答え。sha と source_sha は <sha> に置き換える。欄: version、ok、layer、name、sha、valid、problems（severity・detail）、data（読んだ中身の写し。読めなければ null）、plans（承認の preview の plans と同じ ApprovePlan の形。番号は全体計画が 1.. でフィードバック計画はその続き）、types（この層で使えるフェーズ定義）。",
  "expect": {
   "version": 1,
   "ok": true,

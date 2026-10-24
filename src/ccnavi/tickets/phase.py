@@ -65,7 +65,7 @@ TIMEOUT_SECONDS = 2.0
 class Phase:
     """1 つの親の 1 つのフェーズ。
 
-    親が計画を持てば、番号に定義と計画の項が付く。持たなければ
+    親が計画を持てば、番号に定義と計画のステップが付く。持たなければ
     番号だけで、今までどおり子の `human_review` からレビューの要否を決める。
     """
 
@@ -74,7 +74,7 @@ class Phase:
     tickets: list[ticket_model.Ticket] = field(default_factory=list)
     states: dict[str, str] = field(default_factory=dict)
     marks: dict[str, dict] = field(default_factory=dict)
-    # 計画があるときだけ。item は計画の項、type は定義、owner は親の承認済みチケット。
+    # 計画があるときだけ。item は計画のステップ、type は定義、owner は親の承認済みチケット。
     item: ticket_model.PlanItem | None = None
     type: phasetypes.PhaseType | None = None
     owner: ticket_model.Ticket | None = None
@@ -164,10 +164,10 @@ class Phase:
 
     @property
     def declared_review(self) -> str | None:
-        """このフェーズ定義と計画の項が言う「見る場所」。宣言が無ければ None。
+        """このフェーズ定義と計画のステップが言う「見る場所」。宣言が無ければ None。
 
-        計画の項は `mr` にだけ強められる（`ticket_model.PLAN_REVIEWS`）ので、項が `mr` なら
-        定義より優先する。定義の無い番号（計画が無い、定義のファイルが無い、その名前の
+        計画のステップは `mr` にだけ強められる（`ticket_model.PLAN_REVIEWS`）ので、ステップが
+        `mr` なら定義より優先する。定義の無い番号（計画が無い、定義のファイルが無い、その名前の
         定義が読めない）は、言っている者が居ないので None。
         """
         if self.item is not None and self.item.review == ticket_model.PLAN_REVIEW_MR:
@@ -180,7 +180,7 @@ class Phase:
     def review_kind(self) -> str:
         """このフェーズの終わりにユーザがどこで見るか。`none` / `mr`。
 
-        見る場所を言えるのは、定義と計画の項と、引き受けた延期だけ。そのうち厳しい側を
+        見る場所を言えるのは、定義と計画のステップと、引き受けた延期だけ。そのうち厳しい側を
         採る。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ言い、
         場所は言わないので、宣言が「見ない」だったフェーズを `mr` へ上げる。
         どちらも止める向きにしか働かない。
@@ -581,19 +581,19 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
                 "全体計画のフェーズは全部終わりました。最後のフェーズのレビューが済んだら、次はフィードバック計画です"
                 "（承認できるのは最後のレビューが済んだあとだけで、承認でレビューの状態は変わりません）。"
                 "親チケットに `feedback:` を追加して（対応が無くても `[]` で）改版を提案し、"
-                "承認を受けてください。項には `after` で先に済んでいるべき項の番号"
-                "（フィードバック計画の番号だけ）を書き、最後の項がほかの全部を待つようにします。"
-                "独立した対応は最後に 1 項で受けるか、一直線に並べます。項が使う定義は "
+                "承認を受けてください。ステップには `after` で先に済んでいるべきステップの番号"
+                "（フィードバック計画の番号だけ）を書き、最後のステップにほかの全部が先行するようにします。"
+                "独立した対応は最後に 1 ステップで受けるか、一直線に並べます。ステップが使う定義は "
                 f"'ccnavi --plan-order {parent.ticket} --fill-phases' で `phases:` に差し込みます。"
                 "改版の提案では `started_at`・`completed_at`・`base_sha`・`merged_sha`・"
                 "`cancelled_at`・`cancel_reason` は空にします。"
             )
         return "計画のフェーズは全部終わりました。親チケットを閉じられます。"
     # 並行して始められるものを全部挙げる。番号が前でも、まだ子の無い枝は拾う。
-    # 待ちが済んだ番号だけ案内する。
+    # 先行が済んだ番号だけ案内する。
     ready = [p for p in phases if not p.tickets and waits_done(parent, phases, p.number)]
     if not ready:
-        return "次に始められるフェーズは、待っているフェーズが済むまでありません。"
+        return "次に始められるフェーズは、先行のフェーズが済むまでありません。"
     names = "、".join(p.label for p in ready)
     hints = "".join(
         f"（{p.label} の案内: {p.type.when}）" for p in ready if p.type is not None and p.type.when
@@ -606,7 +606,7 @@ def downstream_touched(
 ) -> list[str]:
     """N 番目を開き直したとき、影響を受けうる後続の、着手済み・レビュー済みのフェーズ。
 
-    後続は、計画の先行（`after`）で N 番目を待つフェーズ。消えるのは N 番目のマーカーだけ。
+    後続は、計画の先行（`after`）で N 番目が先行するフェーズ。消えるのは N 番目のマーカーだけ。
     着手済みの実装の子や済んだ受入テストのレビュー状態は残る。`after` の見直しは無く、
     設計の修正が後続に届いたかはユーザの判断になる。
     返すのは「フェーズ 3（実装とテスト）: 着手済み・レビュー済み」の形の行。無ければ空。
@@ -646,7 +646,7 @@ def reopen_impact(root: str, conf: settings.Settings, parent_id: str, number: in
 
 
 def waits_done(parent: ticket_model.Ticket, phases: list[Phase], number: int) -> bool:
-    """N 番目が待つフェーズが、全部閉じてレビューが済んでいるか。"""
+    """N 番目の先行のフェーズが、全部閉じてレビューが済んでいるか。"""
     by_number = {p.number: p for p in phases}
     for m in workflow.waits_of(parent, number):
         phase = by_number.get(m)
@@ -861,10 +861,10 @@ def order_problems(
     adding: list[ticket_model.Ticket] | None = None,
     raw: approval.Raw | None = None,
 ) -> list[rules.Problem]:
-    """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか。
+    """N 番目の子を承認してよいか。先行のフェーズが閉じてレビューが済んでいるか。
 
-    待つ番号は親の待ち方（`workflow`。計画の項の `after` を推移的に辿ったもの）が決める。
-    親の計画が壊れていれば（`workflow.errors`）、壊れた待ちで順序を数えずに落とす。
+    先行の番号は親の待ち方（`workflow`。計画のステップの `after` を推移的に辿ったもの）が決める。
+    親の計画が壊れていれば（`workflow.errors`）、壊れた先行で順序を数えずに落とす。
 
     ここで出す苦情は `rules.KIND_NOT_YET`。承認は通さないが、書いた側に直すものは無く、
     前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの定義を見て
@@ -897,9 +897,10 @@ def order_problems(
         if t.phase is not None:
             reopened.setdefault(t.phase, []).append(t.ticket)
     problems: list[rules.Problem] = []
-    # 待つ番号ごとに見る。`phases_of` は承認済みの親があればその計画で並べるので、同じ承認で
+    # 先行の番号ごとに見る。`phases_of` は承認済みの親があればその計画で並べるので、同じ承認で
     # 計画を変える改版（フィードバック計画を立てる改版など）を通すと、改版で足した番号が並ばない。
-    # 並ばない番号は子がまだ無いフェーズとして数える（見落とすと、待つべき項の子と一緒に通る）。
+    # 並ばない番号は子がまだ無いフェーズとして数える（見落とすと、
+    # 先行すべきステップの子と一緒に通る）。
     known = {p.number: p for p in phases_of(root, conf, parent.ticket, parent, raw=raw)}
     types = phasetypes.types_of(parent)
     for number in sorted(waits):
@@ -1001,7 +1002,7 @@ def stage(
     1. 計画が無ければ空を返す。
     2. 止まっている（`gate_closed`）フェーズがあれば、呼び名ごとにまとめて返す。
     3. ユーザが早めに閉じた印（`PARENT_MARK_CLOSE_EARLY`）があれば「閉じられる」と返す。
-    4. 未終了のフェーズがあれば、子の有無と待ちの済み方から「作業中」か
+    4. 未終了のフェーズがあれば、子の有無と先行の済み方から「作業中」か
        「フィードバック対応中」を返す。
     5. フィードバックの計画が無ければ「フィードバック計画待ち」を返す。あれば、対応済みでなければ
        「クローズ可」、対応済みなら「クローズ可（フィードバック対応済み）」を返す。
@@ -1027,7 +1028,7 @@ def stage(
     in_feedback = parent.feedback is not None and len(parent.feedback) > 0
     open_phases = [p for p in phases if not p.ended]
     if open_phases and open_phases[0].number <= len(parent.plan):
-        # 子がまだ無く、待ちが済んでいないフェーズは作業中に数えない。
+        # 子がまだ無く、先行が済んでいないフェーズは作業中に数えない。
         working = [
             p
             for p in open_phases

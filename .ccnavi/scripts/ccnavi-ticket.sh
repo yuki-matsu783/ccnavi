@@ -113,10 +113,10 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
 
   提案の plan に書くフェーズ定義は、共通の .ccnavi/config/common/phases.yml と、親の project: が
   指す config の phases.yml の和から選ぶ（自身のレイヤーは .ccnavi/config/project/phases.yml、
-  プロジェクトは projects/<名前>/.ccnavi/config/project/phases.yml）。plan の項には after: [番号] で先に済んでいる
-  べき項を書き（自分より小さい番号だけ）、最後の項がほかの全部を待つようにする。
-  feedback: の項も同じで、after はフィードバック計画の番号だけを指す。独立した作業は
-  最後に 1 項で受けるか、一直線に並べる。計画が使う定義は親の phases: に写す
+  プロジェクトは projects/<名前>/.ccnavi/config/project/phases.yml）。plan のステップには after: [番号] で先に済んでいる
+  べきステップを書き（自分より小さい番号だけ）、最後のステップにほかの全部が先行するようにする。
+  feedback: のステップも同じで、after はフィードバック計画の番号だけを指す。独立した作業は
+  最後に 1 ステップで受けるか、一直線に並べる。計画が使う定義は親の phases: に写す
   （ccnavi --plan-order <親> --fill-phases。承認のあとの判定はこの写しを読む）
 USAGE
 }

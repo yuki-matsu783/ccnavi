@@ -471,7 +471,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_refuses_when_the_revision_proposal_changed(self):
         """親の改版を見せたあとで、改版の提案の計画を書き換えると、見せたダイジェストでは承認しない。
 
-        書き換えたあとも改版として成り立つ順序（足す項を `design` に）にして、
+        書き換えたあとも改版として成り立つ順序（足すステップを `design` に）にして、
         一括のチケットに残したまま書く計画だけを変える。
         """
         path, shown = self.pending_revision()
