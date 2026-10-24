@@ -115,6 +115,36 @@ courses:
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
 
+  - id: first-look
+    title: リスクの点数とは何かを、はじめて知る人向けに知りたいとき
+    summary: ccnavi がなぜ変更に点数を付けるのか、点数が大きいとどうなるのか、この画面で何を直すのかを、1 つの例で見る
+    steps:
+      - target: ""
+        title: ccnavi は、変更の危なさを点数で測る
+        body: エージェントが作業（子チケット）を終えて閉じると、ccnavi はその作業での変更の内容（差分）を見て、どれくらい危ない変更かを点数にします。これがリスクの点です。例では、300 行を超える変更で 25 点、テストが足りないと判断されて 20 点が足されます。
+        diagram: risk-first
+        focus: finish, measure
+      - target: factors
+        title: 点の付け方は「項目」が決める
+        body: 項目は「こういう変更なら何点足す」という決まりです。行数が多い、CI の設定に触った、テストが足りない、などがあります。当てはまった項目の点を全部足したものが、その作業の点数です。
+        diagram: risk-first
+        focus: measure
+      - target: levels
+        title: 点数が大きいほど、人間のレビューが要る
+        body: 合計の点が境目の点以上になると、リスクのレベルが LOW、MEDIUM、HIGH、CRITICAL と上がります。例の 45 点は HIGH の境目 40 を超えるので HIGH です。HIGH 以上の作業は、人間のレビューが終わるまで、フェーズは先へ進めません。
+        diagram: risk-first
+        focus: level, review
+      - target: save
+        title: この画面は、点の付け方と境目を直す場所
+        body: ここでは、項目の点と、レベルの境目の点を書いて直します。保存を押すと、ccnavi が書き方を検証し、通れば配点のファイル（risks.yml）に書き込みます。
+        diagram: risk-first-tune
+        focus: edit, save
+      - target: tour
+        title: 直した配点は、次に作業を終えるときから使われる
+        body: 保存したあとに終える作業から、新しい配点で数えます。すでに閉じた作業の点は変わりません。次の案内では、どの値で点数とレベルが決まるかを例で見られます。右上の「?」から選べます。
+        diagram: risk-first-tune
+        focus: later
+
   - id: how-score
     title: 点数とレベルが、どの値で決まるのかを例で知りたいとき
     summary: 見本の配点で、差分がどの項目に何点で当たり、合計がどのレベルになるかを、値を変えた例も並べて追う
@@ -640,3 +670,48 @@ diagrams:
         to: ccnavi
         text: レビュー済みにする
         value: ccnavi-review.sh confirm
+
+  # はじめて知る人向け。作業を終えて、点数がつき、レベルが決まり、レビューを頼むまで（見本の配点の big-diff 25 と no-tests 20、境目 40）
+  risk-first:
+    actors: [エージェント, ccnavi, ユーザ]
+    steps:
+      - id: finish
+        from: エージェント
+        to: ccnavi
+        text: 作業（子チケット）を終えて、閉じる
+      - id: measure
+        from: ccnavi
+        text: 変更の内容（差分）を見て、危なさを点数にする。当てはまる項目の点を足す
+        value: |-
+          src/ の下を 330 行変えた（300 行を超える） → +25
+          テストが足りない → +20
+      - id: level
+        from: ccnavi
+        text: 合計の点を、境目の点と比べて、リスクのレベルを決める
+        value: |-
+          25 + 20 = 45
+          45 ≥ 40 → HIGH
+      - id: review
+        from: エージェント
+        to: ユーザ
+        text: HIGH 以上なので、ccnavi の指示で、人間のレビューを頼む
+        value: 'このレビューのリスク: 45 (HIGH)'
+
+  # はじめて知る人向け。配点を直して保存し、次の作業から効くまで（直す前の値は見本の配点と同じ）
+  risk-first-tune:
+    actors: [ユーザ, リスク管理画面, ccnavi]
+    steps:
+      - id: edit
+        from: ユーザ
+        to: リスク管理画面
+        text: 点の付け方（配点）を直す
+        value: 'no-tests（テストが足りない）の点: 20 → 30'
+      - id: save
+        from: リスク管理画面
+        to: ccnavi
+        text: ［保存］を押すと、書き方を検証し、通れば配点のファイルに書く
+        value: .ccnavi/config/common/risks.yml
+      - id: later
+        from: ccnavi
+        text: 次に作業を終えるとき、新しい配点を読んで数える。すでに閉じた作業の点は変わらない
+        value: 'no-tests: テストが足りない → +30'

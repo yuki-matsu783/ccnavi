@@ -11,7 +11,7 @@ const def = loadTour("projects");
 const DIAGRAM_COURSES = ["how-clone", "how-card"];
 
 test("CB-T1210 プロジェクト管理の案内に、図を引く 2 本の案内が基本の案内の次に並ぶ。題は「〜たいとき」で終わり、手順は 4〜9 個で、図と光らせる矢印を持つ", () => {
-  assert.deepEqual(def.courses.map((course) => course.id).slice(0, 3), ["intro", ...DIAGRAM_COURSES]);
+  assert.deepEqual(def.courses.map((course) => course.id).slice(0, 4), ["intro", "first-look", ...DIAGRAM_COURSES]);
   // 既存の案内の ID と題は変えない
   assert.equal(def.courses[0].title, "基本の案内");
   assert.equal(def.courses.find((course) => course.id === "add-project")?.title, "プロジェクトを追加したいとき");

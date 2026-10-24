@@ -12,6 +12,30 @@
 screen: projects
 
 diagrams:
+  # はじめて知る人向け: プロジェクトとは何か。値の例は URL だけ
+  project-first:
+    actors: [ユーザ, プロジェクト管理画面, projects/]
+    steps:
+      - id: place
+        from: projects/
+        text: ccnavi で作業するフォルダをワークスペースと呼ぶ。その下の projects/ に、扱いたいリポジトリ（git で履歴を管理しているフォルダ）を置く。これをプロジェクトと呼ぶ
+      - id: config
+        from: projects/
+        text: プロジェクトごとに設定を持てる。ルール（してよいこと・いけないこと）や作業の進め方（フェーズ）などで、プロジェクトの中の .ccnavi/config/project/ に書く
+      - id: open
+        from: ユーザ
+        to: プロジェクト管理画面
+        text: この画面でプロジェクトの一覧を見る。新しく取り込むときは、リポジトリの URL を入れて clone を押す
+        value: https://example.com/team/web-app.git
+      - id: clone
+        from: プロジェクト管理画面
+        to: projects/
+        text: clone は、リポジトリを手元に複製すること。実際に複製するのは「ccnavi」ターミナルの git で、画面はその命令を送る
+      - id: card
+        from: projects/
+        to: プロジェクト管理画面
+        text: 取り込めると、一覧にカードが出る。カードには、設定が正しいかの検証の結果（問題なし、または error・warn）も出る
+
   # URL と名前を入れて clone を押してから、一覧にカードが出るまで
   project-clone:
     actors: [ユーザ, プロジェクト管理画面, 「ccnavi」ターミナル, projects/]
@@ -285,6 +309,34 @@ courses:
       - target: tour
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+
+  - id: first-look
+    title: プロジェクトとは何かを、はじめて知る人向けに知りたいとき
+    summary: プロジェクトの置き場・設定・この画面の役目を、やさしい順に
+    steps:
+      - target: summary
+        title: プロジェクトは projects/ に置く
+        body: ccnavi で作業するフォルダをワークスペースと呼びます。その下の projects/ に、扱いたいリポジトリを置くと、プロジェクトとして扱われます。図の値はすべて例で、実在するものではありません。
+        diagram: project-first
+        focus: place
+      - target: project
+        title: プロジェクトごとに設定を持てる
+        body: 設定は、ルールや作業の進め方（フェーズ）などです。プロジェクトの中の .ccnavi/config/project/ に書くので、プロジェクトごとに別の決まりを持てます。
+        diagram: project-first
+        focus: config
+      - target: clone
+        title: この画面は、一覧を見て取り込む場所
+        body: 画面ではプロジェクトの一覧を見られます。新しく取り込むには、リポジトリの URL を入れて clone を押します。例では https://example.com/team/web-app.git です。
+        diagram: project-first
+        focus: open, clone
+      - target: list
+        title: 取り込むと、カードと検証の結果が出る
+        body: 取り込めると、一覧にプロジェクトのカードが出ます。設定が正しいかの検証の結果も、カードに出ます。
+        diagram: project-first
+        focus: card
+      - target: tour
+        title: 次は、具体的な例で
+        body: 次の案内では、clone してから一覧に出るまでを例で見られます。「?」を押して「clone してから一覧に出るまでの流れを、値の例で知りたいとき」を選びます。
 
   - id: how-clone
     title: clone してから一覧に出るまでの流れを、値の例で知りたいとき

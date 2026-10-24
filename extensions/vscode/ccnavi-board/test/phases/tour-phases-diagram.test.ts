@@ -137,13 +137,13 @@ test("CB-T1192 図は登場者 2〜6 人で、値つきの矢印を持つ。足�
     assert.ok(diagram.steps.some((step) => step.value !== ""), `${name}: 値つきの矢印がない`);
     assert.ok(diagram.steps.some((step) => step.from !== step.to) , `${name}: 登場者どうしの矢印がない`);
   }
-  assert.deepEqual(Object.keys(def.diagrams).sort(), [...DIAGRAMS].sort(), "引かれない図、または無い図");
+  assert.deepEqual(Object.keys(def.diagrams).sort(), [...DIAGRAMS, "phase-first"].sort(), "引かれない図、または無い図");
 
   const ids = def.courses.map((course) => course.id);
-  assert.deepEqual(ids.slice(0, 1), ["intro"], "基本の案内が先頭");
-  assert.deepEqual(ids.slice(1, 3), COURSES, "足した 2 本は基本の案内の次");
-  assert.deepEqual(ids.slice(3), ["add-phase", "guide-agent", "feedback", "project", "save"], "既存の案内の ID と順");
-  const titles = def.courses.slice(3).map((course) => course.title);
+  assert.deepEqual(ids.slice(0, 2), ["intro", "first-look"], "基本の案内が先頭、入門の案内がその次");
+  assert.deepEqual(ids.slice(2, 4), COURSES, "足した 2 本は入門の案内の次");
+  assert.deepEqual(ids.slice(4), ["add-phase", "guide-agent", "feedback", "project", "save"], "既存の案内の ID と順");
+  const titles = def.courses.slice(4).map((course) => course.title);
   assert.deepEqual(titles, [
     "新しい工程の定義を追加して、計画に使えるようにしたいとき",
     "受入テスト作成などの使いどころを、エージェントに案内したいとき",
@@ -153,7 +153,7 @@ test("CB-T1192 図は登場者 2〜6 人で、値つきの矢印を持つ。足�
   ]);
 
   const used = new Set<string>();
-  for (const course of def.courses.slice(1, 3)) {
+  for (const course of def.courses.slice(2, 4)) {
     assert.match(course.title, /とき$/, `${course.id}: 題は「〜たいとき」`);
     assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
     for (const [index, step] of course.steps.entries()) {

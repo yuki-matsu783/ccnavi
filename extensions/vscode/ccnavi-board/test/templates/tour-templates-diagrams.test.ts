@@ -14,6 +14,9 @@ const sample = parseTemplatesSample(def.sample);
 
 const NEW_COURSES = ["how-drafts-flow", "how-templates-used"];
 const DIAGRAMS = ["template-draft", "template-import", "template-propose", "template-propose-feedback"];
+/** 入門の案内（first-look）が引く図。入門の検査は templates-tour-first.test.ts */
+const FIRST = "first-look";
+const FIRST_DIAGRAM = "template-first";
 
 /** 見本の層の置き場（`sample.path`） */
 const PLACE = (def.sample as { path: string }).path;
@@ -45,7 +48,7 @@ function planText(): string {
 test("CB-T1200 テンプレート管理の案内に、使い方ごとの案内が 2 本、基本の案内の次に並ぶ。既存の案内の ID・題は変わらない", () => {
   assert.deepEqual(
     def.courses.map((course) => course.id),
-    [INTRO_ID, ...NEW_COURSES, "read-sum", "read-drafts"],
+    [INTRO_ID, FIRST, ...NEW_COURSES, "read-sum", "read-drafts"],
   );
   assert.equal(courseOf(INTRO_ID).title, "基本の案内");
   assert.equal(courseOf("read-sum").title, "統合結果を確認するとき");
@@ -61,13 +64,13 @@ test("CB-T1200 テンプレート管理の案内に、使い方ごとの案内�
 });
 
 test("CB-T1201 図は 4 つで、登場者は 2〜6 人。2 本の案内の手順だけが引き、矢印には値の例が添えられている", () => {
-  assert.deepEqual(Object.keys(def.diagrams).sort(), [...DIAGRAMS].sort());
+  assert.deepEqual(Object.keys(def.diagrams).sort(), [...DIAGRAMS, FIRST_DIAGRAM].sort());
   for (const name of DIAGRAMS) {
     const diagram = def.diagrams[name];
     assert.ok(diagram.actors.length >= 2 && diagram.actors.length <= 6, `${name}: 登場者の数`);
     assert.ok(diagram.steps.filter((step) => step.value !== "").length >= 2, `${name}: 値を添えた矢印が少ない`);
   }
-  for (const course of def.courses.filter((c) => !NEW_COURSES.includes(c.id))) {
+  for (const course of def.courses.filter((c) => !NEW_COURSES.includes(c.id) && c.id !== FIRST)) {
     assert.ok(course.steps.every((step) => step.diagram === ""), `${course.id}: 既存の案内は図を引かない`);
   }
   const used = new Set<string>();

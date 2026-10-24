@@ -77,3 +77,7 @@ test("CB-D752 図の矢印の値は、見本の配点の数字を等幅で出す
     await dom.close();
   }
 });
+
+test("CB-D810 入門の案内 first-look の図のある手順は、本文の下に時系列の図を出し、focus の矢印だけを光らせてほかを薄くする", async () => {
+  await checkCourseDiagrams("first-look");
+});

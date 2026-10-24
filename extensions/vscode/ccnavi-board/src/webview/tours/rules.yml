@@ -393,6 +393,27 @@ diagrams:
         text: 3 の倍数なので、additionalContext をモデルに渡す
         value: additionalContext：テストは tests/ に置く
 
+  # はじめて知る人向け。ccnavi が操作の前に見張り、ルールのメモで止める流れ（値の例は git push を止める 1 つだけ）
+  rules-first:
+    actors: [Claude Code, 見張り番（ccnavi の hook）, ルールのメモ]
+    steps:
+      - id: call
+        from: Claude Code
+        to: 見張り番（ccnavi の hook）
+        text: コマンドを実行する前に、見張り番（hook。決まった場面で自動で呼ばれる小さなプログラム）へ内容を見せる
+        value: git push origin main
+      - id: read
+        from: 見張り番（ccnavi の hook）
+        to: ルールのメモ
+        text: メモ（ルール）を読み、今の操作に当てはまるものを探す
+      - id: match
+        from: 見張り番（ccnavi の hook）
+        text: 「git push は止める」というメモ（deny）に当たる
+      - id: reply
+        from: 見張り番（ccnavi の hook）
+        to: Claude Code
+        text: 止める、と答える。コマンドは実行されない
+
 courses:
   - id: intro
     title: 基本の案内
@@ -426,6 +447,41 @@ courses:
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
         scene: { tab: rules }
+
+  - id: first-look
+    title: ルールとは何かを、はじめて知る人向けに知りたいとき
+    summary: ccnavi が何を見張り、ルールが何を決めるのか。全体像を 1 つの例でつかむ
+    steps:
+      - target: ""
+        title: ccnavi は、AI の操作の前に確認する
+        body: Claude Code（AI のプログラミング補助）は、コマンドを実行したりファイルを書き換えたりします。ccnavi は、その前に見張り番（hook）として確認します。ここでは「git push を止める」例で追います。
+        scene: { tab: rules }
+        diagram: rules-first
+        focus: call
+      - target: hooks
+        title: 見張り番は、決まった場面で呼ばれる
+        body: hook は、Claude Code が操作をする直前に自動で呼ばれる小さなプログラムです。呼ばれた hook は、操作の内容を受け取って、ルールのメモと照らします。「hook」タブには、登録された hook が並びます。
+        scene: { tab: hooks }
+        diagram: rules-first
+        focus: call, read
+      - target: rules
+        title: ルールは「止める・確認する・通す」のメモ
+        body: ルールは、どんな操作をどうするかを書いたメモです。deny は止める、ask は確認する、allow は通す、という 3 つのタイプがあります。この例は deny で、当たると操作は実行されません。
+        scene: { tab: rules, open: git-push }
+        diagram: rules-first
+        focus: match, reply
+      - target: add-deny
+        title: このルール管理の画面で、メモを書いて直す
+        body: この画面は、ルールのメモを書いて直す場所です。タイプごとの「＋ ルールを追加」で足し、行を押すと欄が開いて直せます。
+        scene: { tab: rules }
+        diagram: rules-first
+        focus: read, match
+      - target: save
+        title: 保存すると、次の操作から効く
+        body: 保存すると、見張り番は次の操作からそのメモを読みます。Claude Code の再起動は要りません。次の案内では、値を変えると結果がどう変わるかを例で見られます。
+        scene: { tab: rules }
+        diagram: rules-first
+        focus: read
 
   - id: how-it-works
     title: ルールが、いつ・どう効くのかを値の例で知りたいとき

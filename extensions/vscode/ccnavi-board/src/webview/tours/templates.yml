@@ -241,6 +241,31 @@ diagrams:
         from: ccnavi
         text: フィードバック計画の番号は、全体計画の続きになる（2 項のあとなので 3）
 
+  # ccnavi を知らない人向け。テンプレートを溜めて、使い回すまでの全体像（具体的な図は、このあとの 2 本の案内で見る）
+  template-first:
+    actors: [エージェント, ユーザ, ccnavi]
+    steps:
+      - id: draft
+        from: エージェント
+        to: ccnavi
+        text: 終わった作業から、テンプレートの下書き（まだ使えない控え）を作らせる
+      - id: import
+        from: ユーザ
+        to: ccnavi
+        text: 下書きを読んで取り込むと、使えるテンプレートになる。取り込みは「取り込み待ち」の画面で行う
+      - id: look
+        from: ユーザ
+        text: このテンプレート管理の画面は、溜まったテンプレートと下書きを読む場所
+      - id: use
+        from: エージェント
+        to: ccnavi
+        text: 似た作業を始めるとき、テンプレートを指して次の親（まとまった 1 つの作業）の提案を始める
+        value: ccnavi ticket new signup --title "サインアップ画面を追加する" --template feature --issue 12 --mr 34
+      - id: result
+        from: ccnavi
+        to: エージェント
+        text: テンプレートの計画とフローが、提案の下書きとして書かれる。提案は、ふだんどおり承認を通る
+
 courses:
   - id: intro
     title: 基本の案内
@@ -281,6 +306,39 @@ courses:
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
         scene: {}
+
+  - id: first-look
+    title: テンプレートとは何かを、はじめて知る人向けに知りたいとき
+    summary: ccnavi を知らなくても分かる全体像。溜める、読む、使い回すの流れ
+    steps:
+      - target: template
+        title: テンプレートは、計画とフローの型
+        body: 似た作業を何度もするとき、前に作った「計画とフローの型」を使い回せます。それがテンプレートです。計画は「設計してから実装する」のような作業の順番、フローは 1 つの作業の中の手順の流れです。見本の feature は、設計のあとに実装が続く計画を持っています。
+        scene: { open: feature }
+      - target: drafts
+        title: 終わった作業から、下書きを作って溜める
+        body: 作業が終わると、エージェントがその計画とフローからテンプレートの下書きを作れます。下書きはまだ使えない控えで、取り込むまでテンプレートとしては効きません。
+        scene: {}
+        diagram: template-first
+        focus: draft
+      - target: handoff
+        title: 取り込むと、使えるテンプレートになる
+        body: 下書きを読んで内容を確かめ、ユーザが取り込むと、使えるテンプレートになります。取り込みは「取り込み待ち」の画面で行います。
+        scene: {}
+        diagram: template-first
+        focus: import
+      - target: list
+        title: この画面は、読む場所
+        body: このテンプレート管理の画面は、溜まったテンプレートと下書きを読む場所です。下書きの取り込みは、ここではなく取り込み待ちの画面で行います。
+        scene: {}
+        diagram: template-first
+        focus: look
+      - target: template
+        title: 次の作業の提案を、テンプレートから始める
+        body: 似た作業を始めるとき、エージェントはテンプレートの名前を指して、次の作業の提案を始められます。提案はふだんどおり承認を通ります。次の案内では、下書きから取り込み、次の提案で使うまでを例で見られます。
+        scene: { open: feature }
+        diagram: template-first
+        focus: use,result
 
   - id: how-drafts-flow
     title: 完了した作業からテンプレートを溜めたいとき

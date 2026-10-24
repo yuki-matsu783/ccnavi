@@ -109,6 +109,33 @@ sample:
 # 値は上の `sample:` の定義（research・design など）と同じにする。手順の `diagram:` で名前を指し、`focus:` で光らせる矢印（id を , で区切る）を決める。
 # `to` を書かない矢印は、その登場者の中の動き。
 diagrams:
+  # はじめて知る人向け。大きな作業を段階に分け、段階ごとの決めごとを定義に書き、終わったらレビューが入るまで（値は research の定義と同じ）
+  phase-first:
+    actors: [ユーザ, フェーズの定義, 親チケット]
+    steps:
+      - id: write
+        from: ユーザ
+        to: フェーズの定義
+        text: このフェーズ管理の画面で、段階の種類（定義）を書いて直す
+      - id: spec
+        from: フェーズの定義
+        text: 定義には、作るもの（成果物）・編集してよい場所（範囲）・人間がレビューするか、を決めておく
+        value: |-
+          review: none
+          scope: ["wip/research/*"]
+          deliverables: ["wip/research/summary.md"]
+      - id: plan
+        from: 親チケット
+        to: フェーズの定義
+        text: 大きな作業（親チケット）は、使う定義を並べて、段階（フェーズ）に分けて進める
+      - id: scope
+        from: 親チケット
+        to: フェーズの定義
+        text: 段階ごとの小さな作業（子チケット）は、編集する場所を定義の範囲に収める
+      - id: end
+        from: フェーズの定義
+        to: ユーザ
+        text: 段階が終わると、定義に従ってレビューが入る。人間が見る定義なら、ユーザの確認を待つ
   # 定義を直して保存し、承認で計画に使われるまで
   phase-save:
     actors: [ユーザ, フェーズ管理画面, ccnavi, phases.yml]
@@ -323,6 +350,38 @@ courses:
       - target: tour
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+
+  - id: first-look
+    title: フェーズとは何かを、はじめて知る人向けに知りたいとき
+    summary: 大きな作業を段階に分けること、定義に決めること、この画面の役目、終わったあとのレビュー
+    steps:
+      - target: phases
+        title: 大きな作業は、段階に分けて進める
+        body: ccnavi では、大きな作業を親チケットにして、調査・設計・実装などの段階に分けて進めます。この段階がフェーズです。親チケットの計画に、使うフェーズを順に並べます。
+        diagram: phase-first
+        focus: plan
+      - target: phase-deliverables
+        title: 段階ごとに決めておくこと
+        body: フェーズごとに、何を作るか（必須成果物）、どこを編集してよいか（編集可能な範囲）、人間がレビューするか（レビュー）を決めておきます。これをまとめたものがフェーズの定義です。
+        scene: { open: research }
+        diagram: phase-first
+        focus: spec
+      - target: phases
+        title: この画面は、定義を書いて直す場所
+        body: このフェーズ管理の画面は、フェーズの種類（定義）を書いて直す場所です。実際の作業は、ここではなく親チケットと子チケットで進みます。
+        diagram: phase-first
+        focus: write
+      - target: phase-scope
+        title: 範囲は、作業の上限になる
+        body: 子チケットが編集してよい場所は、定義の範囲に収まっている必要があります。範囲に収まるかは、画面ではなく実行ファイルが判定します。
+        scene: { open: research }
+        diagram: phase-first
+        focus: scope
+      - target: tour
+        title: 終わったらレビューが入る。次は例で
+        body: フェーズが終わると、定義のレビューに従って、人間が見るか、省いて次へ進みます。次の案内では、定義の値で動きがどう変わるかを例で見られます。
+        diagram: phase-first
+        focus: end
 
   - id: how-phase-works
     title: 定義が、保存から計画・承認でどう使われるかを値の例で知りたいとき

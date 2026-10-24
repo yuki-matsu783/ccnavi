@@ -224,10 +224,10 @@ test("CB-T1182 図に出る levels の値は、見本の配点・統合結果の
 
 test("CB-T1183 リスクの新しい 2 本の案内は、基本の案内の次に並び、題は「〜たいとき」で 4〜9 手順。図は 2〜6 人で、手順ごとに図を引く", () => {
   assert.deepEqual(
-    def.courses.slice(0, 3).map((course) => course.id),
-    [INTRO_ID, "how-score", "how-save-effect"],
+    def.courses.slice(0, 4).map((course) => course.id),
+    [INTRO_ID, "first-look", "how-score", "how-save-effect"],
   );
-  const added = def.courses.slice(1, 3);
+  const added = def.courses.slice(2, 4);
   assert.deepEqual(added.map((course) => course.title), [
     "点数とレベルが、どの値で決まるのかを例で知りたいとき",
     "保存してから効くまでを知りたいとき",
@@ -246,7 +246,7 @@ test("CB-T1183 リスクの新しい 2 本の案内は、基本の案内の次�
   }
   // 既存の案内の ID・題は変えない
   assert.deepEqual(
-    def.courses.slice(3).map((course) => course.id),
+    def.courses.slice(4).map((course) => course.id),
     ["levels", "add-factor", "kinds", "organize", "sum", "create-file"],
   );
 });
