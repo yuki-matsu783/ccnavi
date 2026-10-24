@@ -19,7 +19,7 @@ export function Plan({ title, items }: { readonly title: string; readonly items:
             <th scope="col">番号</th>
             <th scope="col">種類</th>
             <th scope="col">レビュー</th>
-            <th scope="col">待つ項</th>
+            <th scope="col">先行ステップ</th>
           </tr>
         </thead>
         <tbody>

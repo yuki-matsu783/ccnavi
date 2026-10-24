@@ -64,7 +64,7 @@ function array(value: unknown, at: string): unknown[] {
 function onlyKeys(map: Json, known: readonly string[], at: string): void {
   const unknown = Object.keys(map).find((key) => !known.includes(key));
   if (unknown !== undefined) {
-    throw new Error(`${at} に知らない鍵 ${unknown}`);
+    throw new Error(`${at} に未知の鍵 ${unknown}`);
   }
 }
 

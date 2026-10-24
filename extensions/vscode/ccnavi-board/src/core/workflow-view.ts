@@ -314,14 +314,14 @@ export interface PlanDiffRow {
   readonly after: string;
 }
 
-/** 項 1 つを 1 行の文にする。「題（定義）: 待つ 1, 2」。延期なら「・延期」を添える */
+/** 項 1 つを 1 行の文にする。「題（定義）: 先行 1, 2」。延期なら「・延期」を添える */
 function itemText(plan: ApprovePlan | undefined, number: number): string {
   const item = plan?.items.find((i) => i.number === number);
   if (plan === undefined || item === undefined) {
     return "（なし）";
   }
   const waits = plan.after[String(number)] ?? [];
-  return `${item.title || item.type}（${item.type}）${item.deferred ? "・延期" : ""}: ${waits.length === 0 ? "何も待たない" : `待つ ${waits.join(", ")}`}`;
+  return `${item.title || item.type}（${item.type}）${item.deferred ? "・延期" : ""}: ${waits.length === 0 ? "先行なし" : `先行 ${waits.join(", ")}`}`;
 }
 
 /** 開いたときの提案と、外で変わったあとの提案の差分。変わらない番号は並べない */
@@ -375,7 +375,7 @@ export function saveBlocker(answer: PlanOrderAnswer, state: SaveState): string {
     return "子の提案を付け替えられないため、保存できません";
   }
   if (answer.revision_problems.length > 0) {
-    return "改版で通らない形（子が承認された番号を固定しているので、その番号の項は変えられない）のため、保存できません";
+    return "改版で通らない形（子が承認された番号を固定しているので、その番号のステップは変えられない）のため、保存できません";
   }
   return "順序の検査に error があるため、保存できません";
 }

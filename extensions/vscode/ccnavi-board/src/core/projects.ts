@@ -29,7 +29,7 @@ export interface RemoteInfo {
 
 export type RemoteCheck = { readonly ok: true; readonly remote: RemoteInfo } | { readonly ok: false; readonly error: string };
 
-const FORMS = "使える形式は https://host/path、ssh://host/path、git@host:path の 3 つです。ローカルのパスと file:// は使えません";
+const FORMS = "指定できる形式は https://host/path、ssh://host/path、git@host:path の 3 つです。ローカルのパスと file:// は指定できません";
 
 /**
  * clone 元の URL を検査する。通すのは https / ssh / scp 風の 3 形だけ。
@@ -70,7 +70,7 @@ export function checkRemote(raw: string): RemoteCheck {
   if (userinfo.includes(":")) {
     return {
       ok: false,
-      error: "URL に資格情報（user:token@）が入っています。ターミナルの履歴と .git/config に平文で残るので使えません。credential helper か SSH 鍵を使ってください",
+      error: "URL に資格情報（user:token@）が入っています。ターミナルの履歴と .git/config に平文で残るため指定できません。credential helper か SSH 鍵を使ってください",
     };
   }
   host = host.replace(/:\d+$/, "").toLowerCase();

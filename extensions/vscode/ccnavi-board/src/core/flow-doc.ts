@@ -1149,7 +1149,7 @@ export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = 
   if (depth > NEST_ALLOWED) {
     out.push(
       `入れ子のサブエージェントが、子の下に ${depth} 段重なっています。既定の上限はメインの下 ${SPAWN_LIMIT} 段で、子（1 段目）の下は ${NEST_ALLOWED} 段までです。` +
-        "上限に達した段では Agent ツールが渡らず、そのノードで止まってメインへ戻ります",
+        "上限に達した段では Agent ツールを利用できず、そのノードで止まってメインへ戻ります",
     );
   }
   if (cyclic) {

@@ -633,7 +633,7 @@ function editableLayer(current: PanelState, layerName: string): { readonly ok: t
     return { ok: false, error: `この層の置き場を読めないため、編集できません: ${layer.unreadable}` };
   }
   if (!layer.writable) {
-    return { ok: false, error: "この層は読み取り専用です。実行ファイルが書けないと答えたため、置き場の権限を確かめてください" };
+    return { ok: false, error: "この層は読み取り専用です。実行ファイルが書き込めないと判定したため、置き場の権限を確かめてください" };
   }
   return { ok: true, layer };
 }
@@ -708,7 +708,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
   const where = editableLayer(current, layerName);
   const file = where.ok ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (!where.ok || file === undefined) {
-    postOpened(current, session, null, where.ok ? `テンプレートの名前 ${name} は使えません` : where.error);
+    postOpened(current, session, null, where.ok ? `テンプレートの名前 ${name} は指定できません` : where.error);
     return;
   }
   let read: ReturnType<typeof readFlowFile>;
@@ -766,7 +766,7 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   }
   const file = templateFile(current.folder.uri.fsPath, where.layer, name);
   if (file === undefined) {
-    postOpened(current, session, null, `テンプレートの名前 ${name} は使えません（英数字で始め、英数字と . _ - のみ、64 字まで）`);
+    postOpened(current, session, null, `テンプレートの名前 ${name} は指定できません（英数字で始め、英数字と . _ - のみ、64 字まで）`);
     return;
   }
   // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で 2 本が 1 本に重なるため）。共通の層にある名前も、
@@ -810,7 +810,7 @@ async function editCheck(current: PanelState, session: number, seq: number, data
   };
   const named = dataOf(data);
   if (named === undefined || !validTemplateName(named.name)) {
-    reply(null, "テンプレートの名前が使えません（英数字で始め、英数字と . _ - のみ、64 字まで）");
+    reply(null, "テンプレートの名前が指定できません（英数字で始め、英数字と . _ - のみ、64 字まで）");
     return;
   }
   const checked = await checkBytes(current, target, named.name, yamlText(data));
@@ -849,7 +849,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   const file = templateFile(root, where.layer, name);
   const named = dataOf(data);
   if (file === undefined || named === undefined || named.name !== name) {
-    reply("", "保存しません: テンプレートの名前が使えないか、中身の名前と食い違っています");
+    reply("", "保存しません: テンプレートの名前が不正か、中身の名前と食い違っています");
     return;
   }
   // 1. 書き出す本文を実行ファイルに読ませる。error が 1 件でもあれば書かない

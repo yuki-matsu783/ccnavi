@@ -387,7 +387,7 @@ export function textDiff(rawBefore: FlowDoc, rawAfter: FlowDoc): TextDiff {
   const add = (kind: TextChange["kind"], label: string, a: Readonly<Record<string, unknown>> | undefined, b: Readonly<Record<string, unknown>> | undefined, skip: ReadonlySet<string>): void => {
     const made = fieldTexts(a, b, skip);
     if (made.ambiguous) {
-      problem = "欄の名前が重なって見分けられないもの（`.` や `[` を含むキーなど）があるため、欄ごとの前後に分けられません";
+      problem = "欄の名前が重複していて見分けられないもの（`.` や `[` を含むキーなど）があるため、欄ごとの前後に分けられません";
       changes.push({ kind, label, texts: rawTexts(a, b) });
     } else if (made.texts.length === 0 && a !== undefined && b !== undefined && !sameValue(a, b)) {
       problem = "中身が違うのに、違う欄を見つけられません";

@@ -583,7 +583,7 @@ courses:
         scene: {doc: main}
       - target: graph
         title: 図
-        body: ノードの右の点から次のノードの左の点へドラッグすると、線でつながります（開始へ入る線と、終了から出る線は引けません）。ノードや線を押すと、右の欄で中身を直せます。ノードや線にポインタを載せると × が出て、押すと削除できます。Shift を押しながらノードを押すか、Shift を押しながら何もないところをドラッグして囲むと、複数のノードを選べます。選んだノードは「グループ化」で枠にまとめられます。枠の中へドラッグしたノードは枠に入り、外へドラッグすると枠から出ます。Ctrl+Z で元に戻し、Ctrl+Shift+Z（Ctrl+Y）でやり直せます。選んだノードは Ctrl+C でコピーして Ctrl+V で貼り付け、Ctrl+D で複製できます（開始はコピーしません）。
+        body: ノードの右の点から次のノードの左の点へドラッグすると、線でつながります（開始へ入る線と、終了から出る線は引けません）。ノードや線を押すと、右の欄で中身を直せます。ノードや線にポインタを合わせると × が出て、押すと削除できます。Shift を押しながらノードを押すか、Shift を押しながら何もないところをドラッグして囲むと、複数のノードを選べます。選んだノードは「グループ化」で枠にまとめられます。枠の中へドラッグしたノードは枠に入り、外へドラッグすると枠から出ます。Ctrl+Z で元に戻し、Ctrl+Shift+Z（Ctrl+Y）でやり直せます。選んだノードは Ctrl+C でコピーして Ctrl+V で貼り付け、Ctrl+D で複製できます（開始はコピーしません）。
         scene: {doc: main}
       - target: inspector
         title: 欄
@@ -620,7 +620,7 @@ courses:
         scene: {doc: build-3}
       - target: edge-c-prompt-1-end
         title: 線を直す
-        body: 線を押すと、右の欄で条件を入力できます。ポインタを線やノードに載せると × が出て、押すと削除できます。つなぎ直すときは、削除してから引き直します。
+        body: 線を押すと、右の欄で条件を入力できます。ポインタを線やノードに合わせると × が出て、押すと削除できます。つなぎ直すときは、削除してから引き直します。
         scene: {doc: build-3, select: "edge:c-prompt-1-end"}
       - target: preview
         title: 担当に渡る手順を確認する
@@ -633,7 +633,7 @@ courses:
     steps:
       - target: node-ask-policy
         title: ユーザに聞くノード
-        body: 担当のサブエージェントは、ユーザに質問できません。このノードに来ると、担当は手を止め、問いと選択肢を添えてメインに返します。メインがユーザに聞き、答えを渡して同じ担当を再開させます。
+        body: 担当のサブエージェントは、ユーザに質問できません。このノードに来ると、担当は手を止め、問いと選択肢をそのままメインに返します。メインがユーザに聞き、答えを渡して同じ担当を再開させます。
         scene: {doc: main}
       - target: inspector-question
         title: 問いを入力する
@@ -678,7 +678,7 @@ courses:
         scene: {doc: branch-if, select: "edge:c-check-report"}
       - target: inspector-branches
         title: switch で出口を増やす
-        body: switch は、出口を自由に追加できます。「＋ 出口を追加する」で追加し、「削除」で、その出口と出ている線を削除します。どれにも当たらないときの出口には、条件に default と入力します。
+        body: switch は、出口を自由に追加できます。「＋ 出口を追加する」で追加し、「削除」で、その出口と出ている線を削除します。どれにも該当しないときの出口には、条件に default と入力します。
         scene: {doc: branch-switch, select: kind}
       - target: inspector-loop
         title: 繰り返しの条件と上限
@@ -744,7 +744,7 @@ courses:
         scene: {doc: main, pick: investigate}
       - target: paste
         title: 貼り付ける・複製する
-        body: 「貼り付け」（Ctrl+V）で、少しずらして置きます。同じものを続けて貼ると、そのたびにずれていきます。「複製」（Ctrl+D）は、コピーせずにその場で増やします。
+        body: 「貼り付け」（Ctrl+V）で、少しずらして貼り付けます。同じものを続けて貼ると、そのたびに位置がずれていきます。「複製」（Ctrl+D）は、コピーせずにその場で増やします。
         scene: {doc: main-pasted, select: subAgent-1, clip: true, dirty: true, history: true}
       - target: undo
         title: 元に戻す・やり直す
@@ -761,7 +761,7 @@ courses:
     steps:
       - target: notices
         title: 図の上の注意
-        body: 注意は 2 種類が並びます。この画面が見つけたもの（入れ子の上限など）と、ccnavi が検証して返した warn です。ここは ccnavi の warn が 2 件で、開始がないこと、サブエージェントの種類が候補にないことを言っています。どちらも保存は止めません。
+        body: 注意は 2 種類が並びます。この画面が見つけたもの（入れ子の上限など）と、ccnavi が検証して返した warn です。ここは ccnavi の warn が 2 件で、開始がないことと、サブエージェントの種類が候補にないことです。どちらも保存は止めません。
         scene: {doc: broken}
       - target: node-orphan
         title: つながっていないノード
@@ -815,7 +815,7 @@ courses:
     steps:
       - target: request
         title: エージェントに頼む
-        body: 着手の前なら、エージェントにフローの作成や直しを頼めます。このボタンは、依頼文を組むだけです。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください。
+        body: 着手の前なら、エージェントにフローの作成や直しを頼めます。このボタンは、依頼文を作るだけです。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください。
         scene: {doc: main}
       - target: request-text
         title: 依頼文を渡す
@@ -827,7 +827,7 @@ courses:
         scene: {doc: main, offer: true}
       - target: proposal
         title: 差分を確認する
-        body: 変わった欄の前と後を並べます。フローの文は担当のサブエージェントへの案内になるので、外部の道具を使わせる指示などが紛れていないかを、ここで読みます。
+        body: 変わった欄の前と後を並べます。フローの文は担当のサブエージェントへの案内になるので、外部のツールを使わせる指示などが紛れていないかを、ここで読みます。
         scene: {doc: main, base: main, proposal: true}
       - target: proposal-import
         title: 取り込む

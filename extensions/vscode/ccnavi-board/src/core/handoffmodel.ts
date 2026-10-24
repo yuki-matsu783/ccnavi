@@ -134,7 +134,7 @@ export function refusalReason(entry: HandoffEntry): string {
   }
   switch (entry.state) {
     case "conflict":
-      return "下書きを写したあとで、取り込み先が変わっています（conflict）。下書きを写し直してから、もう一度確かめてください";
+      return "下書きをコピーしたあとで、取り込み先が変わっています（conflict）。下書きをコピーし直してから、もう一度確かめてください";
     case "rejected":
       return "取り込み先として受け付けない対象です（rejected）。errors を直してください";
     case "unchanged":
@@ -143,7 +143,7 @@ export function refusalReason(entry: HandoffEntry): string {
     case "changed":
       return entry.errors.length > 0 ? "検査で error があります。直してから取り込みます" : "";
     default:
-      return `知らない状態です（${entry.state}）。実行ファイルを更新してください`;
+      return `未知の状態です（${entry.state}）。実行ファイルを更新してください`;
   }
 }
 

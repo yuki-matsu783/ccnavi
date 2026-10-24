@@ -73,7 +73,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
     return { ok: false, error: `チケット ${ticket} が実行ファイルの出力にありません` };
   }
   if (found.parent === "") {
-    return { ok: false, error: `${ticket} は親チケットです。フローを持つのは子チケットだけです` };
+    return { ok: false, error: `${ticket} は親チケットです。フローがあるのは子チケットだけです` };
   }
   if (found.flow === null) {
     return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子でファイルがないか、実行ファイルが古いかのどちらかです）` };
@@ -92,7 +92,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
         : found.flow.linked
           ? { locked: true, reason: linkedReason(found.flow.rel) }
           : found.flow.tree === ""
-            ? lockFromFailure("フローを持つツリーが実行ファイルの出力にありません（実行ファイルが古いためです）")
+            ? lockFromFailure("フローのあるツリーが実行ファイルの出力にありません（実行ファイルが古いためです）")
             : OPEN_LOCK,
     },
   };

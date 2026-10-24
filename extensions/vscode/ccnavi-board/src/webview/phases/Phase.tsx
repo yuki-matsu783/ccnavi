@@ -102,7 +102,7 @@ export function Phase(props: PhaseProps): JSX.Element {
       </div>
       <div className="row-body">
         <Captioned name="id" yamlKey="id" tour={mark("phase-id")}>
-          {text("id", "f-id narrow", "implement（英数字で始まり、使えるのは英数字と . _ -）")}
+          {text("id", "f-id narrow", "implement（英数字で始まり、指定できるのは英数字と . _ -）")}
         </Captioned>
         <Captioned name="タイトル" yamlKey="title" tour={mark("phase-title")}>
           {text("title", "f-title narrow", "実装とテスト（空なら id をそのまま使います）")}

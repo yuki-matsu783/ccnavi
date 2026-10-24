@@ -20,7 +20,7 @@ import { isHttpUrl } from "./text.js";
 
 /** 確認できなかった理由の種類の呼び名。画面の言葉（sh の種類の文字列はそのまま出さない） */
 const REASON_LABELS: Readonly<Record<string, string>> = {
-  "no-tool": "道具が無い",
+  "no-tool": "ツールが無い",
   auth: "認証",
   network: "ネットワーク",
   api: "ホストの API",

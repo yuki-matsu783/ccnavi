@@ -77,7 +77,7 @@ export function parseTour(raw: unknown): TourParsed {
   }
   const rootUnknown = unknownKey(root, ROOT_KEYS);
   if (rootUnknown !== undefined) {
-    return { ok: false, error: `知らない鍵 ${rootUnknown}（screen / sample / courses だけ）` };
+    return { ok: false, error: `未知の鍵 ${rootUnknown}（screen / sample / courses だけ）` };
   }
   const screen = text(root.screen);
   if (screen === undefined) {
@@ -96,14 +96,14 @@ export function parseTour(raw: unknown): TourParsed {
     }
     const courseUnknown = unknownKey(course, COURSE_KEYS);
     if (courseUnknown !== undefined) {
-      return { ok: false, error: `${at} に知らない鍵 ${courseUnknown}` };
+      return { ok: false, error: `${at} に未知の鍵 ${courseUnknown}` };
     }
     const id = text(course.id);
     if (id === undefined || !ID.test(id)) {
       return { ok: false, error: `${at}.id は小文字の英字で始まり、英小文字・数字・- だけにする` };
     }
     if (seen.has(id)) {
-      return { ok: false, error: `${at}.id「${id}」が重なっている` };
+      return { ok: false, error: `${at}.id「${id}」が重複している` };
     }
     seen.add(id);
     if (ci === 0 && id !== INTRO_ID) {
@@ -126,7 +126,7 @@ export function parseTour(raw: unknown): TourParsed {
       }
       const stepUnknown = unknownKey(step, STEP_KEYS);
       if (stepUnknown !== undefined) {
-        return { ok: false, error: `${stepAt} に知らない鍵 ${stepUnknown}` };
+        return { ok: false, error: `${stepAt} に未知の鍵 ${stepUnknown}` };
       }
       const stepTitle = text(step.title);
       const body = text(step.body);

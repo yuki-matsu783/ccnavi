@@ -180,7 +180,7 @@ export function stateText(project: MirrorProject): string {
     case "error":
       return "調べられません";
     default:
-      return `知らない状態です（${project.state}）`;
+      return `未知の状態です（${project.state}）`;
   }
 }
 
@@ -235,7 +235,7 @@ function commonBlock(status: MirrorStatus, busy: boolean): string {
       if (!status.list.ok) {
         return "ミラーを調べられませんでした。「更新」で調べ直してください";
       }
-      return status.list.commonEmpty ? "共通レイヤーに写すものがありません" : "";
+      return status.list.commonEmpty ? "共通レイヤーにコピーするものがありません" : "";
   }
 }
 

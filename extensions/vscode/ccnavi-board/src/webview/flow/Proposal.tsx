@@ -99,7 +99,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
         <>
           <p className="dim small">
             下書き {view.proposal.draftPath} と、いまのフローとの違いです。フローの文は担当のサブエージェントへの案内になります。
-            外部の道具を使わせる指示などが紛れていないか、文を読んでから取り込んでください。
+            外部のツールを使わせる指示などが紛れていないか、文を読んでから取り込んでください。
           </p>
           {diff?.problem !== undefined && (
             <p className="proposal-error" id="proposal-problem">

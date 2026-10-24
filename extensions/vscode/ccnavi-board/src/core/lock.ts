@@ -25,7 +25,7 @@ export interface Lock {
 export function lockFromBoard(board: BoardJson, project?: string): Lock {
   const mine = board.tickets.filter((t) => project === undefined || t.project === project);
   if (mine.some((t) => t.in_progress === null)) {
-    return lockFromError("実行ファイルが作業中かを答えません。実行ファイルを組み立て直すか配り直してください");
+    return lockFromError("実行ファイルが作業中かを示しません。実行ファイルを組み立て直すか配り直してください");
   }
   const doing = mine.filter((t) => t.in_progress === true).map((t) => t.ticket);
   if (doing.length === 0) {

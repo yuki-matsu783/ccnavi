@@ -119,7 +119,7 @@ export function MirrorBanners({ mirror }: { readonly mirror: MirrorData }): JSX.
   if (status.kind === "ok" && status.list.commonEmpty) {
     return (
       <div className="banner mirror-banner">
-        共通レイヤー（<code>.ccnavi/config/common/</code>）に写すものがありません。同期しても何も変わらないので、同期のボタンは押せません。
+        共通レイヤー（<code>.ccnavi/config/common/</code>）にコピーするものがありません。同期しても何も変わらないので、同期のボタンは押せません。
       </div>
     );
   }

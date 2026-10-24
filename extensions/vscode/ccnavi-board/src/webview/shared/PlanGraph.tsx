@@ -88,7 +88,7 @@ function reviewText(review: string): string {
 
 /** 延期した項の言葉。本文の待ちの一覧（「レビューは 4 と一緒に」）と同じ言い方 */
 function deferText(reviewAt: number | null): string {
-  return reviewAt === null ? "レビューを引き受ける項がありません" : `レビューは ${reviewAt} と一緒に`;
+  return reviewAt === null ? "レビューを受け持つステップがありません" : `レビューは ${reviewAt} と一緒に`;
 }
 
 /** 項の点。番号・定義の題・見る場所と、延期・固定・終端に当たらない印 */
@@ -96,7 +96,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
   const { node, editable } = data;
   const title = [
     node.type,
-    node.loose ? "最後の項が待たない（終端に当たらない）" : "",
+    node.loose ? "最後のステップの先行になっていない（終端に当たらない）" : "",
     node.locked ? "子が承認された番号です。入る線は変えられません" : "",
   ]
     .filter((part) => part !== "")
@@ -172,8 +172,8 @@ function RemovableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
             className="plan-remove nodrag nopan"
             data-action="plan-remove-edge"
             data-edge={id}
-            aria-label="この線を削除（待たなくする）"
-            title="この線を削除（待たなくする）"
+            aria-label="この線を削除（先行を外す）"
+            title="この線を削除（先行を外す）"
             onMouseDown={stop}
             onPointerDown={stop}
             onClick={(event) => {
@@ -264,7 +264,7 @@ function headingOf(plan: ApprovePlan): string {
 
 /** 図の下の一言。実行ファイルの値を並べるだけ */
 function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
-  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number} は引き受ける項がありません` : `${item.number} は ${item.review_at} と一緒に`));
+  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number} はレビューを受け持つステップがありません` : `${item.number} は ${item.review_at} と一緒に`));
   const lines: { readonly text: string; readonly warn: boolean }[] = [];
   if (plan.ready.length > 0) {
     lines.push({ text: `すぐ始まる: ${plan.ready.join(", ")}`, warn: false });
@@ -274,7 +274,7 @@ function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
   }
   if (plan.loose.length > 0) {
     // 本文の待ちの一覧（「最後の項が待たない: …」）と同じ言い方に、直し方を添える
-    lines.push({ text: `最後の項が待たない: ${plan.loose.join(", ")}。最後の項へ線を引くか、合流の項を置いてください`, warn: true });
+    lines.push({ text: `最後のステップの先行になっていない: ${plan.loose.join(", ")}。最後のステップへ線を引くか、合流のステップを置いてください`, warn: true });
   }
   for (const problem of plan.problems) {
     lines.push({ text: problem, warn: true });
@@ -329,7 +329,7 @@ function useDetailFolded(): boolean {
 function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly graph: Graph; readonly id: string | undefined }): JSX.Element {
   const node = id === undefined ? undefined : graph.nodes.find((n) => n.id === id);
   if (node === undefined || node.number === null) {
-    return <p className="dim small plan-detail-empty">項を押すと、ここに詳細を出します。</p>;
+    return <p className="dim small plan-detail-empty">ステップを押すと、ここに詳細を表示します。</p>;
   }
   const number = node.number;
   const numberOfNode = (nodeId: string): number | undefined => graph.nodes.find((n) => n.id === nodeId)?.number ?? undefined;
@@ -345,10 +345,10 @@ function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly grap
     ["題", node.label],
     ["定義", node.type],
     ["見る場所", node.deferred ? deferText(node.reviewAt) : reviewText(node.review)],
-    ["待つ項（先行）", listOf(before)],
-    ["待たれる項（後続）", listOf(after)],
+    ["先行ステップ", listOf(before)],
+    ["後続ステップ", listOf(after)],
     ["すぐ始まる", plan.ready.includes(number) ? "はい" : "いいえ"],
-    ["最後の項が待たない", node.loose ? "はい（終端に当たらない）" : "いいえ"],
+    ["最後のステップの先行になっていない", node.loose ? "はい（終端に当たらない）" : "いいえ"],
     ["番号の固定", node.locked ? "固定（子が承認済み。入る線は変えられません）" : "なし"],
   ];
   return (
@@ -456,7 +456,7 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
         <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />
       </div>
       {detail && (
-        <aside className="plan-detail" id="plan-detail" aria-label="項の詳細" data-folded={folded ? "1" : "0"}>
+        <aside className="plan-detail" id="plan-detail" aria-label="ステップの詳細" data-folded={folded ? "1" : "0"}>
           <button
             type="button"
             className="action small plan-detail-toggle"

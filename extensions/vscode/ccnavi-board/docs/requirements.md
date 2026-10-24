@@ -17,7 +17,7 @@ VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを�
 | 読むとき | 開くファイル |
 |---|---|
 | サイドパネルの入口、コマンドパレットのコマンド、タブの出方、見た目（配色）の切り替え | [requirements/commands.md](requirements/commands.md) |
-| チケット管理画面（ボード）。列・カード（状態の札・あなたの番・詳細）・絞り込み・承認とレビュー完了のオーバーレイ・マージ状況の確認・自動の読み直し | [requirements/board.md](requirements/board.md) |
+| チケット管理画面（ボード）。列・カード（状態の札・ユーザ待ち・詳細）・絞り込み・承認とレビュー完了のオーバーレイ・マージ状況の確認・自動の読み直し | [requirements/board.md](requirements/board.md) |
 | フロー編集画面（子チケットのフローを図で書く） | [requirements/flow.md](requirements/flow.md) |
 | 計画編集タブ（親の提案の計画の順序を図で引き直す） | [requirements/workflow.md](requirements/workflow.md) |
 | プロジェクト管理画面（`projects/` の一覧と clone・設定の雛形） | [requirements/projects.md](requirements/projects.md) |

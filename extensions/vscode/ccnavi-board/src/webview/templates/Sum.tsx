@@ -33,7 +33,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
     <details className="sum" id="sum" data-tour="sum" open={tour === undefined ? undefined : tour.open}>
       <summary>統合結果（読み取り専用。共通の設定 + 1 つの設定の和）</summary>
       <p className="hint">
-        実際に使われるテンプレートは、共通の設定と、その設定のテンプレートの和です。ここは実行ファイルが出した結果をそのまま見せるだけで、中身を確認するときは画面上部の「設定」の欄で見たい層に切り替えます。
+        実際に使われるテンプレートは、共通の設定と、その設定のテンプレートの和です。ここは実行ファイルが出力した結果をそのまま表示するだけで、中身を確認するときは画面上部の「設定」の欄で見たい層に切り替えます。
         同じ名前が重なったときに捨てられた側は「使われない」と理由を出します。
       </p>
       <label className="sum-pick" data-tour="sum-pick">

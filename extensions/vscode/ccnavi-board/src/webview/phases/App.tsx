@@ -446,7 +446,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               <code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は <code>,</code> で区切ります。
             </p>
             <p className="hint">
-              順序（どのフェーズがどれを待つか）はこのファイルには記載しません。親チケットの計画の項に <code>after</code> で先行を指定します（最後の項がほかの全部を待つようにします）。
+              順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに <code>after</code> で先行を指定します（最後のステップにほかの全部が先行するようにします）。
               親チケットは承認のときに使う定義の写し（<code>phases:</code>）を持つので、あとでここを直しても進行中の親には反映されません。
             </p>
           </div>

@@ -135,5 +135,5 @@ export function missingFeatures(probe: VersionProbe, features: readonly string[]
   if (missing.length === 0) {
     return undefined;
   }
-  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} の機能を持ちません（古い版です）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
+  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} の機能に対応していません（古い版です）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
 }
