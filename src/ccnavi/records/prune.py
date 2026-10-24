@@ -85,6 +85,7 @@ _SESSION_ONLY = (
     re.compile(r"^(?P<s>.+)\.turn\.json$"),  # post._turn_path
     re.compile(r"^(?P<s>.+)\.accepted\.json$"),  # post._accepted_path
     re.compile(r"^busy-(?P<s>.+)\.json$"),  # busy._path
+    re.compile(r"^turn-(?P<s>.+)\.json$"),  # turn._path
     re.compile(r"^stopturn-(?P<s>.+)\.json$"),  # stopops._turn_path
     re.compile(r"^stoprefs-(?P<s>.+)\.json$"),  # stopops._refs_path
     re.compile(r"^stoptaint-(?P<s>.+)\.json$"),  # stopjudge._taint_path

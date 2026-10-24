@@ -14,6 +14,21 @@ export interface Lock {
   /** 保存できない理由。空なら保存できる */
   readonly reason: string;
   readonly doing: readonly string[];
+  /**
+   * いまターンの途中にいるセッション。ターン中の保存は、保存できても、次のツール呼び出しの
+   * 実行後チェックに戻されることがある。保存を止める理由ではなく、保存の前に確かめる印。
+   * 古い実行ファイルの答えでは無い
+   */
+  readonly turns?: readonly string[];
+}
+
+/** ターン中の保存の前に見せる文。ターン中のセッションが無ければ空 */
+export function turnWarning(lock: Lock): string {
+  const turns = lock.turns ?? [];
+  if (turns.length === 0) {
+    return "";
+  }
+  return `エージェントがターンの途中です（セッション ${turns.join(", ")}）。いま保存すると、次のツール呼び出しで元に戻されることがあります。ターンが終わってから保存すると確実です。`;
 }
 
 /**
@@ -28,14 +43,16 @@ export function lockFromBoard(board: BoardJson, project?: string): Lock {
     return lockFromError("実行ファイルが作業中かを答えません。実行ファイルを組み立て直すか配り直してください");
   }
   const doing = mine.filter((t) => t.in_progress === true).map((t) => t.ticket);
+  const turns = (board.turns ?? []).map((t) => t.session);
   if (doing.length === 0) {
-    return { locked: false, reason: "", doing };
+    return { locked: false, reason: "", doing, turns };
   }
   const where = project === undefined ? "" : `プロジェクト ${project} に`;
   return {
     locked: true,
     reason: `${where}作業中のチケットがあります（${doing.join(", ")}）。変更すると整合性が失われるため保存はできません。先に現在の作業をすべて完了させてください。`,
     doing,
+    turns,
   };
 }
 

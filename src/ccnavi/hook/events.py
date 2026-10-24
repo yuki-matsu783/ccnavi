@@ -28,7 +28,7 @@ from ..policy import (
     selfguard_shell,
     selfguard_targets,
 )
-from ..records import audit, busy, failstreak, prune, repeat, stopops, stopreview
+from ..records import audit, busy, failstreak, prune, repeat, stopops, stopreview, turn
 from ..tickets import (
     approval,
     approval_checks,
@@ -117,6 +117,13 @@ def decide(
     ):
         return EXIT_OK
     _track_proposals(conf, payload)
+    if payload.event in (
+        hookio.PRE_TOOL_USE,
+        hookio.POST_TOOL_USE,
+        hookio.POST_TOOL_USE_FAILURE,
+    ):
+        # ターン中の印の更新時刻を新しくする（サブエージェントの呼び出しも、同じターンの内）。
+        turn.touch(conf.state, payload.session_id)
     if payload.event == hookio.PRE_TOOL_USE:
         return judge.decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)
     if payload.event == hookio.POST_TOOL_USE:
@@ -283,6 +290,8 @@ def decide_at_prompt(
     （`selfguard.before`）をここで行い、消えた設定ファイルは戻す。ターンの基準は受け入れの
     有無に関わらず取り直す。
     """
+    # ユーザの発言とバックグラウンド作業の完了通知は、どちらもターンを始める。
+    turn.begin(conf.state, payload.session_id)
     by_user = not payload.from_background_task() and not busy.is_busy(
         conf.state, payload.session_id
     )
@@ -425,6 +434,8 @@ def decide_at_stop(
     """
     # 動かしている作業が残っているか。次の発言での受け入れ（`decide_at_prompt`）が読む。
     busy.record(conf.state, payload.session_id, payload.busy)
+    # ターンの終わり。ここから次の発言までは、ユーザの編集が戻されない。
+    turn.end(conf.state, payload.session_id)
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     watched, scope = watch_context(stderr, conf, root, record, raw)
     report = post.at_stop(
@@ -1023,6 +1034,7 @@ def decide_at_start(
     if payload.source in ("startup", "resume"):
         subagent.forget_running(conf.state, payload.session_id)
         busy.clear(conf.state, payload.session_id)
+        turn.clear(conf.state, payload.session_id)
     if payload.source == "startup":
         _reported_baseline(stderr, conf, root, payload, record)
     # 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
@@ -1178,6 +1190,10 @@ def decide_after_failure(
     ないので数えない。数えの失敗や案内を組む失敗で、ツールの結果は変わらない。
     """
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
+    if payload.is_interrupt and not payload.agent_id:
+        # ユーザの中断。Stop は来ないことがあるので、ここでターンの終わりにする。
+        # 下の照合は中断までに書かれたぶんを戻すので、印を先に消してよい（消す前でも結果は同じ）。
+        turn.end(conf.state, payload.session_id)
     synced = functools.partial(skillsync.is_synced_write, conf, root)
     after = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
     texts = [judge.guard_setting_files(mode, conf, root, payload, record, after)]
