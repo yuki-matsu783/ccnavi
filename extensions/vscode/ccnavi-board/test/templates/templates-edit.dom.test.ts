@@ -298,12 +298,16 @@ test("CB-D388 新しいテンプレートは名前を入れて作る。使えな
   }
 });
 
-test("CB-D389 項のフローは「編集」で図を開き、部品箱でノードを足すと未保存になって読ませる。「フローを足す」は雛形を置き、「フローを外す」で消える", async () => {
+test("CB-D389 項のフローは最初から図を開いていて、部品箱でノードを足すと未保存になって読ませる。「フローを足す」は雛形を置き、「フローを外す」で消える", async () => {
   const dom = await openList();
   try {
     await startEdit(dom);
     const item = (index: number) => `section[data-role="flows"] li[data-index="${index}"]`;
-    // 2 番にはフローがある。開くと図と右の欄が出る
+    // 2 番にはフローがある。最初から図と右の欄が出ている。畳むと消え、開き直すと戻る
+    assert.equal(dom.all(`${item(2)} .tpl-flow-edit`).length, 1);
+    dom.click(dom.one(`${item(2)} button[data-action="toggle-flow"]`));
+    await dom.settle();
+    assert.equal(dom.all(`${item(2)} .tpl-flow-edit`).length, 0);
     dom.click(dom.one(`${item(2)} button[data-action="toggle-flow"]`));
     await dom.settle();
     assert.equal(dom.all(`${item(2)} .tpl-flow-edit`).length, 1);
