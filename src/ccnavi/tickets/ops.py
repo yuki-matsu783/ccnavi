@@ -144,7 +144,7 @@ def start(
                 "承認済みチケットと同じくユーザがコミットする\n"
             )
     if found.project and not found.is_child:
-        # 共通レイヤーと工程スキルの写しは、ここでは書かない（`mirrorsync`）。
+        # 共通レイヤーと工程スキルの写しは、ここでは書かない（`promptsync`）。
         stdout.write(
             "共通レイヤーと工程スキルのプロジェクトへの写しは、次のユーザの発言で置かれる\n"
         )

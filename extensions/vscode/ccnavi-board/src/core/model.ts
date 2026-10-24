@@ -178,10 +178,6 @@ export interface TicketJson {
   readonly attention: boolean;
 }
 
-/**
- * 手元の退避（`logs/archive/`）にある閉じたチケット 1 件。表示のためだけの欄で、実行ファイルは判定に混ぜない。
- * 置き場（`tickets`）に同じ識別子があるものは、実行ファイルがここに出さない
- */
 /** いまターンの途中にいるセッション。時刻は UNIX 秒 */
 export interface TurnJson {
   readonly session: string;
@@ -191,6 +187,10 @@ export interface TurnJson {
   readonly seen: number;
 }
 
+/**
+ * 手元の退避（`logs/archive/`）にある閉じたチケット 1 件。表示のためだけの欄で、実行ファイルは判定に混ぜない。
+ * 置き場（`tickets`）に同じ識別子があるものは、実行ファイルがここに出さない
+ */
 export interface ArchivedTicketJson {
   readonly ticket: string;
   readonly parent: string;

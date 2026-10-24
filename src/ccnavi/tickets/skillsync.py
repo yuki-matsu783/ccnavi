@@ -196,7 +196,7 @@ def _common_of(target: str) -> str:
 
 
 def describe(project: str, changes: list[configsync.Change]) -> list[str]:
-    """着手の出力に足す行。"""
+    """同期の出力に足す行。"""
     lines = [
         f"共通の工程スキルとプロジェクト {project} の skills/ が違っていたので、共通の中身に揃えた:"
     ]

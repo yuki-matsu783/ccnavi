@@ -30,7 +30,7 @@ import os
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import configsync, promptsync, risk
+from ccnavi.tickets import configsync, promptsync, risk, skillsync
 from tests import ROOT, phasecopy
 from tests.config.test_config_union import (
     COMMON_PHASES,
@@ -753,7 +753,10 @@ class ConfigMirrorTest(ConfigUnionHarness):
         target = mirror_of(tree, "rules.yml")
         before = os.stat(target).st_mtime_ns
 
-        with mock.patch.object(configsync, "plan", side_effect=AssertionError("比べ直した")):
+        with (
+            mock.patch.object(configsync, "plan", side_effect=AssertionError("比べ直した")),
+            mock.patch.object(skillsync, "plan", side_effect=AssertionError("比べ直した")),
+        ):
             lines = promptsync.sync(self.settings(), self.ws)
 
         self.assertEqual(lines, [])
@@ -801,6 +804,51 @@ class ConfigMirrorTest(ConfigUnionHarness):
         write(self.risk, COMMON_RISK)
         self.prompt()
         self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK)
+
+    def test_a_rewrite_with_the_same_size_and_time_is_still_noticed(self):
+        """5: 同じ大きさで書き換え、更新時刻を元に戻しても、指紋が変わって比べ直す。"""
+        tree, _ = self.start_parent()
+        source = self.risk
+        stat = os.stat(source)
+        text = read(source)
+        write(source, text.replace("points: 25", "points: 26", 1))
+        os.utime(source, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        self.assertEqual(os.stat(source).st_size, stat.st_size)
+
+        self.prompt()
+
+        self.assertNotEqual(read(mirror_of(tree, "risks.yml")), text)
+        self.assertEqual(read(mirror_of(tree, "risks.yml")), read(source))
+
+    def test_a_source_that_moves_while_comparing_is_not_remembered(self):
+        """5: 比べている間に元が動いたら「揃った」と記録せず、次の発言で比べ直す。"""
+        tree, _ = self.start_parent()
+        write(self.risk, COMMON_RISK + "# 一つ目\n")
+        real = configsync.apply
+
+        def apply_and_move(changes, base=""):
+            failed = real(changes, base)
+            write(self.risk, COMMON_RISK + "# 二つ目\n")
+            return failed
+
+        with mock.patch.object(configsync, "apply", apply_and_move):
+            promptsync.sync(self.settings(), self.ws)
+        self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK + "# 一つ目\n")
+
+        self.prompt()
+
+        self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK + "# 二つ目\n")
+
+    def test_an_unexpected_failure_of_the_sync_does_not_stop_the_prompt(self):
+        """3: 同期が想定外の例外を出しても、発言は通り、受け入れまで進む。"""
+        self.start_parent()
+
+        with mock.patch.object(promptsync, "sync", side_effect=RuntimeError("壊れた")):
+            done = self.hook("", self.ws, event="UserPromptSubmit", guard="enable")
+
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("ミラーの同期で想定外の失敗", done.stderr)
+        self.assertNotIn("internal-error", done.stderr)
 
     def test_an_unstarted_parent_is_not_mirrored(self):
         """2: 着手していない親のワークツリーには写さない。"""

@@ -18,7 +18,9 @@ import shutil
 import tempfile
 import time
 import unittest
+from unittest import mock
 
+from ccnavi.hook import events
 from ccnavi.records import turn
 from tests import ROOT
 from tests.inproc import run_ccnavi
@@ -174,6 +176,18 @@ class TurnWiringTest(unittest.TestCase):
         self.run_hook("PreToolUse")
 
         self.assertGreater(os.stat(self.marker()).st_mtime, old + 300)
+
+    def test_止めた_Stop_ではターンが続くので印を残す(self):
+        # 促しで Stop を止めると、モデルは同じターンの続きを動かす。続きの間も印が要る。
+        self.run_hook("UserPromptSubmit", prompt="お願いします")
+
+        with mock.patch.object(events, "_finish_nudge", return_value="続けてください"):
+            stopped = self.run_hook("Stop")
+
+        self.assertIn("block", stopped.stdout)
+        self.assertEqual(self.active(), ["s1"])
+        self.run_hook("Stop")
+        self.assertEqual(self.active(), [])
 
     def test_ユーザの中断で印を消す(self):
         # 中断では Stop が来ないことがある。

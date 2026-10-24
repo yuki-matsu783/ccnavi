@@ -303,7 +303,12 @@ def decide_at_prompt(
     )
     # 共通レイヤーと工程スキルの写しを、受け入れの前に書く。書いた分が受け入れの対象になり、
     # 次のツール呼び出しが戻さない。
-    mirrored = "\n".join(promptsync.sync(conf, root)) if by_user else ""
+    mirrored = ""
+    if by_user:
+        try:
+            mirrored = "\n".join(promptsync.sync(conf, root))
+        except Exception as exc:  # noqa: BLE001  同期の失敗で、このあとの受け入れまで飛ばさない
+            stderr.write(f"ccnavi: ミラーの同期で想定外の失敗: {exc}\n")
     found = (selfguard.accept if by_user else selfguard.before)(
         modes.effective_setting(mode, conf.guard_core_files),
         conf.state,
@@ -442,8 +447,6 @@ def decide_at_stop(
     """
     # 動かしている作業が残っているか。次の発言での受け入れ（`decide_at_prompt`）が読む。
     busy.record(conf.state, payload.session_id, payload.busy)
-    # ターンの終わり。ここから次の発言までは、ユーザの編集が戻されない。
-    turn.end(conf.state, payload.session_id)
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     watched, scope = watch_context(stderr, conf, root, record, raw)
     report = post.at_stop(
@@ -488,8 +491,11 @@ def decide_at_stop(
     # 判断が食い違わないように）。
     _plan_stop_review(stderr, conf, root, payload, mode, bool(nudge), continuation, raw)
     if nudge:
+        # 止めた Stop はターンの続きなので、ターン中の印は残す（モデルはこのあとも動く）。
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
+    # ターンの終わり。ここから次の発言までは、ユーザの編集が戻されない。
+    turn.end(conf.state, payload.session_id)
     if report:
         hookio.write_system_message(stdout, report)
     return EXIT_OK

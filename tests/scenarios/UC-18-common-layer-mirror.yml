@@ -1,13 +1,13 @@
 id: UC-18
-title: 親チケットの着手で、共通レイヤーがプロジェクトの .ccnavi/config/common/ にミラーされる
+title: 親チケットの着手のあとのユーザの発言で、共通レイヤーがプロジェクトの .ccnavi/config/common/ にミラーされる
 layer: 5
 reqs: [REQ-MLT-34, REQ-MLT-36]
 status: draft
 model: haiku
 budget_usd: 3.0
-test_repo: true                  # 親チケットの着手で、projects/test-repo にブランチ・ワークツリーを作る。回す前に確認事項 2 を確かめる
+test_repo: true                  # 親チケットの着手のあとの発言で、projects/test-repo にブランチ・ワークツリーを作る。回す前に確認事項 2 を確かめる
 
-# 親の `ticket start` が、ワークスペースルートの `.ccnavi/config/common/` を親のワークツリーのプロジェクトの
+# 着手済みの親があるとき、ユーザの発言が、ワークスペースルートの `.ccnavi/config/common/` を親のワークツリーのプロジェクトの
 # `.ccnavi/config/common/` へ写す（docs/design/multi-repo/distribute-common.md の 11.12）。
 # 確かめるのは、(1) 写されて中身が共通レイヤーと一致する、(2) `.ccnavi/config/project/` と元のリポジトリには触れない、
 # (3) 写された分を、エージェントのコミットが通る（実行後チェックが戻さない）、の 3 つ。
@@ -23,8 +23,11 @@ steps:
     check:
       - 承認画面に、親の範囲（README.md）が出ている
   - prompt: >-
-      承認した。親チケットに `ccnavi-ticket.sh start` で着手して。出力に共通レイヤーのミラーの知らせが出たら、
-      そのまま全文を教えて。親のワークツリーの場所も教えて。ミラーされたファイルは編集しないで。
+      承認した。親チケットに `ccnavi-ticket.sh start` で着手して。親のワークツリーの場所も教えて。
+      着手の出力に、ミラーは次のユーザの発言で置かれるとあれば、そのまま教えて。ここでは何もコミットしないで。
+    resume: true
+  - prompt: >-
+      続けて。出力か文脈に共通レイヤーのミラーの知らせが出ていたら、そのまま全文を教えて。ミラーされたファイルは編集しないで。
       知らせに従って、ミラーされたファイルを親のワークツリーで `ccnavi-git.sh add` してコミットして。
     resume: true
     expect_after:
@@ -65,7 +68,8 @@ expect:
     - run: git -C projects/test-repo status --short
       expect_not_contains: .ccnavi/config/project
   judge:
-    - 着手の出力に、共通レイヤーとプロジェクトのミラーを揃えた旨と、写したファイルの一覧（新しく置いた・上書き・消した）が出た
+    - 着手の出力に、ミラーは次のユーザの発言で置かれる旨が出た
+    - 次の発言のあと、共通レイヤーとプロジェクトのミラーを揃えた旨と、写したファイルの一覧（新しく置いた・上書き・消した）が文脈に出た
     - 知らせの案内（`ccnavi-git.sh add` してコミット）に従い、ミラーのファイルを編集せずに add しただけでコミットした
     - ミラーされたファイルを手で書き換えたり、迂回したりしていない
 

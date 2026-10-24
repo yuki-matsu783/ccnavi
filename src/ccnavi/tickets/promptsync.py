@@ -60,21 +60,25 @@ def _signature_path(conf: settings.Settings, ticket: str) -> str:
     return os.path.join(conf.state, f"{SIGNATURE_PREFIX}{fsio.safe_name(ticket)}.json")
 
 
-def _watched(conf: settings.Settings, root: str, worktree: str) -> list[str]:
-    """指紋に入れる置き場。写す元（共通レイヤー・工程スキル）と、写し先（ミラー・skills）。"""
+def _sources(conf: settings.Settings, root: str) -> list[str]:
+    """指紋に入れる、写す元の置き場（共通レイヤー・工程スキル）。"""
+    return [configsync.common_dir(conf, root), os.path.join(root, *skillsync.SOURCE_DIR.split("/"))]
+
+
+def _targets(conf: settings.Settings, worktree: str) -> list[str]:
+    """指紋に入れる、写し先の置き場（ミラー・skills）。"""
     return [
-        configsync.common_dir(conf, root),
-        os.path.join(root, *skillsync.SOURCE_DIR.split("/")),
         configsync.mirror_dir(conf, worktree),
         os.path.join(worktree, *skillsync.SKILLS_DIR.split("/")),
     ]
 
 
 def _signature(places: list[str]) -> str:
-    """置き場の下のファイルの名前・大きさ・更新時刻の指紋。`stat` だけで作り、中身は読まない。
+    """置き場の下のファイルの名前・種類・大きさ・時刻・inode の指紋。`stat` だけで作る。
 
-    リンクはたどらず、リンクであること自体を指紋に入れる（リンクに差し替わったら変わる）。
-    置き場が無いときも指紋は決まる（無いこと自体が指紋）。
+    中身は読まない。更新時刻を元に戻して同じ大きさで書き換えても、変更時刻（ctime）は
+    利用者側から戻せないので、指紋は変わる。リンクはたどらず、リンクであること自体を指紋に入れる
+    （リンクに差し替わったら変わる）。置き場が無いときも指紋は決まる（無いこと自体が指紋）。
     """
     digest = hashlib.sha256()
     for place in places:
@@ -88,7 +92,10 @@ def _signature(places: list[str]) -> str:
                 except OSError:
                     continue
                 kind = "l" if os.path.islink(path) else "d" if name in dirs else "f"
-                row = f"{os.path.relpath(path, place)}\0{kind}\0{info.st_size}\0{info.st_mtime_ns}"
+                row = (
+                    f"{os.path.relpath(path, place)}\0{kind}\0{info.st_size}\0{info.st_mtime_ns}"
+                    f"\0{info.st_ino}\0{info.st_ctime_ns}"
+                )
                 digest.update(row.encode("utf-8", errors="surrogatepass") + b"\n")
     return digest.hexdigest()
 
@@ -102,14 +109,17 @@ def _sync_one(
     1. 指紋が前に揃えたときと同じなら、何もせず抜ける（`_signature`）
     2. 共通レイヤーのミラーの差分を `configsync.plan` で求め、あれば `apply` で書く
     3. 工程スキルの写しも同じに `skillsync.plan` と `apply` で書く
-    4. どちらも写せないことが無かったときだけ、書いた後の指紋を残す
+    4. どちらも写せないことが無かったときで、比べている間に写す元が動いていないときだけ、
+       書いた後の指紋を残す（元が動いていたら残さず、次の発言で比べ直す）
     """
     lines: list[str] = []
     committable: list[str] = []
     failed_any = False
-    places = _watched(conf, root, worktree)
+    sources = _sources(conf, root)
+    places = [*sources, *_targets(conf, worktree)]
     sig_path = _signature_path(conf, ticket) if conf.state else ""
     before = _signature(places)
+    sources_before = _signature(sources)
     if sig_path:
         saved, failed = fsio.read_json(sig_path)
         if failed is None and isinstance(saved, dict) and saved.get("signature") == before:
@@ -145,8 +155,9 @@ def _sync_one(
             lines += skillsync.describe(project, changes)
             committable += [c.rel for c in changes]
 
-    if sig_path and not failed_any:
+    if sig_path and not failed_any and _signature(sources) == sources_before:
         # 書いたあとの指紋を残す。次の発言は、元も先も動いていなければ `stat` だけで抜ける。
+        # 比べている間に元が動いていたら残さない（動いたあとの元を「揃った」と記録しないため）。
         fsio.write_json_atomic(sig_path, {"signature": _signature(places)})
     if committable:
         git_sh = settings.script_command(root, "ccnavi-git.sh")
