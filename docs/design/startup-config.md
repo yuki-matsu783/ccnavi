@@ -48,6 +48,22 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 `matcher` は全ツールにする（絞ると書かなかったツールで hook が起動しない）。同じイベントの他の hook は並行して順不同で走るので、
 各 hook はそれだけで成立させる。
 
+### 4.2.1 放置したセッションの引き継ぎ促し
+
+会話が大きく育ったまま放置されると、プロンプトキャッシュが時間切れで消え、続きの送り直しの費用が増える。消える前に、次のセッションへの引き継ぎ文書を書かせる。判定は `records/idlehandoff.py`、入口は `entry/cli_idle.py`（`ccnavi idle notice|start|check|reset`）、待機は `.ccnavi/scripts/ccnavi-idle.sh`（`notice`・`start`・`reset`）が受け持つ。導入スクリプトは、本体とは別の 3 行として登録する（`--no-idle` で外す）。
+
+| 登録 | 呼ぶもの | すること |
+|---|---|---|
+| `Stop`（同期、上限 10 秒） | `ccnavi-idle.sh notice` → `ccnavi idle notice` | 会話の大きさが促す大きさ以上なら、事情と勧めをユーザに説明する `systemMessage` を、1 セッションに 1 回だけ返す（`<state>/idle/<セッション>.notice` が済みの印） |
+| `Stop`（`asyncRewake`、上限 3600 秒） | `ccnavi-idle.sh start` → `ccnavi idle start` | 促す大きさ以上なら状態を `waiting`（ランダムな印つき）にして待ち時間を返し、sh が `sleep` する。起きたら `ccnavi idle check` に聞き、`fire` なら続く行を標準エラーに出して終了コード 2 で終わる（asyncRewake がセッションを起こし、標準エラーが指示になる） |
+| `UserPromptSubmit`（同期、上限 10 秒） | `ccnavi-idle.sh reset` → `ccnavi idle reset` | 状態を `active` に戻す。起こすときの指示（目印 `[idle-handoff]`）とバックグラウンド作業の完了通知では戻さない |
+
+- 会話の大きさは、トランスクリプトの末尾から、サブエージェントでない最新の応答の `usage`（`input_tokens` + `cache_read_input_tokens` + `cache_creation_input_tokens`）を足して読む。読めなければ促さない。
+- キャッシュの保持時間は、直近でキャッシュを書き込んだ応答の `cache_creation` の内訳で見分ける（5 分側に書き込みがあれば 5 分、無ければ 1 時間）。待ち時間は、1 時間なら 55 分、5 分なら 4 分。`CCNAVI_HANDOFF_WAIT_SECONDS` が正の整数ならその秒数にする（確かめ用）。
+- 促す大きさは `基準 + CCNAVI_HANDOFF_SUGGEST_TOKENS`（既定 400000、0 で無効）。基準は 0 から始まり、引き継ぎを書かせた（`check` が `fire` を返した）ときの会話の大きさに進む。会話が基準より小さくなったら 0 に戻る。
+- 状態は `<state>/idle/<セッション>.json`（`state`・`token`・`due`・`base`）。`fired` の間は、ユーザが打つまで `start` は待機を始めない。古い待機は、印が合わないので何もせず終わる。7 日より古いファイルは `start` が消す。
+- 次のときは何もしない: 見ている人がいない実行（`CLAUDE_CODE_SESSION_ATTENDED=0`、`CLAUDE_CODE_ENTRYPOINT` が `sdk` で始まる）、サブエージェントの呼び出し（`agent_id` がある）、`Stop` 以外のイベント、使えないセッション識別子。どの動詞も終了コード 0 で終わる（`ccnavi-idle.sh start` が起こすときの 2 を除く）。
+
 ### 4.3 設定の解決
 
 設定は環境変数 `CCNAVI_*` で渡す。プロジェクトは `.claude/settings.json` の `env` ブロックに書く。読む順は

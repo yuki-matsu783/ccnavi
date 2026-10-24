@@ -21,7 +21,7 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 |---|---|---|
 | `src/ccnavi/__main__.py` | 入口。標準入出力を整えて `entry/cli.py` の `run` を呼ぶだけ | `entry` |
 | `src/ccnavi/infra/` | 土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー | どれも読まない |
-| `src/ccnavi/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否や失敗の数え・学びの蓄積 | `infra` |
+| `src/ccnavi/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否や失敗の数え・学びの蓄積・放置セッションの引き継ぎ促し | `infra` |
 | `src/ccnavi/policy/` | ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル | `infra`、`records` |
 | `src/ccnavi/tickets/` | チケット。置き場、合意の手続き、承認・レビュー済みの判定、フェーズ、リスク、操作 | `infra`、`records`、`policy` |
 | `src/ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント・文書の検索 | `infra`、`records`、`policy`、`tickets` |
