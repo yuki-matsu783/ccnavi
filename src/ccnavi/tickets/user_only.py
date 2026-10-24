@@ -351,7 +351,9 @@ SUBAGENT_ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("ccnavi-git", "deny", ("push", "worktree", "integrate", "integrate-done")),
     # 起動の sh は、資料・検査・試験・説明・ヘルプだけ許す。中身は実行ファイルの全副命令に届くため。
     ("ccnavi-launcher", "allow", ("--docs", "--lint", "--test", "--explain", "--help")),
-    ("ccnavi-start", "all", ()),
+    # 読み取りだけの副命令は許す（--list-open は意味が近いかの確認をサブエージェントに任せるため）。
+    # 作る・始める形は禁止
+    ("ccnavi-start", "allow", ("--list-open", "--check", "--help")),
     ("ccnavi-sync", "all", ()),
     ("ccnavi-worktree", "all", ()),
     ("ccnavi-clean", "all", ()),

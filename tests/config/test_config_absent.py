@@ -604,6 +604,7 @@ class BuiltinGitWordingTest(unittest.TestCase):
     IDS = (
         "builtin:recursive-delete",
         "builtin:git-reset-hard",
+        "builtin:git-push",
         builtin.CONFIG_VIA_BASH_RULE_ID,
     )
 
@@ -627,12 +628,25 @@ class BuiltinGitWordingTest(unittest.TestCase):
                 self.assertIn(git, text)
                 self.assertNotRegex(text, r"'git ")
 
+    def test_push_with_the_wrapper_separates_the_parent_the_child_and_the_user(self):
+        root = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-builtin:push-"))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        script = os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        os.makedirs(os.path.dirname(script))
+        with open(script, "w", encoding="utf-8"):
+            pass
+        text = self.messages(root)["builtin:git-push"]
+        self.assertIn("親のワークツリーのブランチ", text)
+        self.assertIn("子のワークツリーのブランチは送らず", text)
+        self.assertNotIn("push はユーザに頼んでください", text)
+
     def test_without_the_wrapper(self):
         root = tempfile.mkdtemp(prefix="ccnavi-builtin:words-")
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         texts = self.messages(root)
         self.assertIn("ユーザに削除を頼んでください", texts["builtin:recursive-delete"])
         self.assertIn("ユーザに確認してください", texts["builtin:git-reset-hard"])
+        self.assertIn("push はユーザに頼んでください", texts["builtin:git-push"])
         self.assertIn("ユーザに頼んでください", texts[builtin.CONFIG_VIA_BASH_RULE_ID])
         # 生の git は止まるので、`git` の形は案内しない。ユーザに頼む文になる。
 

@@ -13,7 +13,7 @@ keywords: [直接作業, チケット作業, 提案, propose, 親のワークツ
 - 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体のルールだけに従う。
 - チケット作業（設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る）: `wip/proposals/todo/` に提案を書き、`ccnavi-ticket.sh propose <識別子>` で親のブランチへ送って承認を受ける。承認されると提案は承認済みの置き場の `doing/` へ動く（置き場は設定で変わる。既定は `wip/proposals/` と `.ccnavi/approved/`。[projects.md](projects.md)）。以後の操作は `ccnavi-ticket.sh` を通す（使い方は `--help`）。
 
-チケット作業は必ず issue と MR のセットで進める。issue が無ければユーザに作ってもらう（エージェントが作るのは頼まれたときだけ）。入口で `ccnavi-start.sh --check` を打ち、ホストの API と git のリモートが使えるかを確かめる。子の作業から始めるセッションでは、`ccnavi-ticket.sh` の `start`・`finish`・`propose`・`consolidate` が自動で確かめる。直接作業では確かめない。
+チケット作業は必ず issue と MR のセットで進める。issue が無ければ `ccnavi-start.sh --new-issue <題>` で作ってから進める（題の似た open の issue・MR があれば作らずに止まり、ユーザに聞く。似たものが無くても、haiku のサブエージェントに `ccnavi-start.sh --list-open` を読ませ、意味が近いものがないかを確かめる段を挟む。詳細は worktree-start.md）。作れなければユーザに作ってもらう。入口で `ccnavi-start.sh --check` を打ち、ホストの API と git のリモートが使えるかを確かめる。子の作業から始めるセッションでは、`ccnavi-ticket.sh` の `start`・`finish`・`propose`・`consolidate` が自動で確かめる。直接作業では確かめない。
 
 どちらで進めるか迷ったら、ユーザに聞く。ただし issue・MR を指定された実装は、直接作業にせずチケット作業で進める（ホストで作られたものを途中から頼まれた場合も同じ）。詰まったら直接実装に切り替えず、ユーザに報告して止まる。
 

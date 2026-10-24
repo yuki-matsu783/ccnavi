@@ -311,6 +311,28 @@ ensure_child_worktree() {
 # 続けるのは、全体が ok か、ng が無く「api が確かめられず、権限は省略、git が ok」のときだけ（後者は注意を添える）。
 # それ以外は何も書かずに止める。事前確認は保証ではない（通ったあとの取り込みや push の関門で止まることはある）。
 # propose は外側と内側の 2 回起動するので、呼ぶのは内側（ここ）だけ。
+# 親のブランチが一度も送られていないために止まったときの次の手（共通関数は事実だけを言う）。
+# MR の有無はホストの事柄でエージェントは調べられないので、決めるのはユーザ。
+ticket_unsent_parent_next() {
+	[ -n "${ccnavi_wap_unsent_parent:-}" ] || return 0
+	# 次の手は、手で切った親が最初に打つ propose・start のためのもの。ほかの操作は事実の文だけにする
+	case "${1:-}" in
+	start | propose) ;;
+	*) return 0 ;;
+	esac
+	tup_mr="<MR の番号>"
+	[ -z "${ccnavi_pi_mr:-}" ] || tup_mr="$ccnavi_pi_mr"
+	tup_b="$ccnavi_wap_branch"
+	tup_s=$(ccnavi_sh_quote "$ccnavi_wap_sh/ccnavi-start.sh")
+	{
+		printf '次の手: ユーザに状況を伝えて、どれにするか聞いて返事を待つ。直接実装には切り替えない\n'
+		printf '  1. issue に紐づく MR がすでにある: その MR のブランチで作業するかを聞く。作業するなら sh %s --mr %s（--issue <番号> と一緒に渡せる）\n' "$tup_s" "$tup_mr"
+		printf '  2. MR は無く、issue はある: %s を使わず sh %s --issue <番号> で新しく切る（ブランチ・ワークツリー・Draft MR を作る）。提案は新しい親のワークツリーへ移す。%s にコミットがあれば先に伝える\n' "$tup_b" "$tup_s" "$tup_b"
+		printf '  3. %s を使い続ける: ユーザが git push -u origin %s と MR（説明欄に Closes #<番号>）の作成をしてから、sh %s --mr %s で採用する\n' "$tup_b" "$tup_b" "$tup_s" "$tup_mr"
+		printf '案内: issue が無いときは、sh %s --new-issue <題> で作ってから 2 へ進む\n' "$tup_s"
+	} >&2
+}
+
 ticket_preflight() {
 	ccnavi_preflight "${ccnavi_wap_tree:-$here}"
 	[ "$ccnavi_pf_result" != ok ] || return 0
@@ -365,7 +387,10 @@ start | finish | cancel | propose | consolidate)
 		esac
 		# 取り消しは事前確認しない（ホストに届かない・権限が足りないときでも、取り消せるようにする）
 		[ "$1" = cancel ] || ticket_preflight || exit 1
-		ccnavi_wap_begin || exit 1
+		ccnavi_wap_begin || {
+			ticket_unsent_parent_next "$1"
+			exit 1
+		}
 		# 子の finish は、親のブランチへ合流してから push する。合流してよいかをここで確かめる。
 		if [ "$1" = finish ] && [ "$wap_id" != "$ccnavi_wap_family_id" ]; then
 			ccnavi_wap_merge_plan "$wap_id" || exit 1

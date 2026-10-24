@@ -12,7 +12,8 @@ hook自身は `integrate` を打たない。促すだけ。
 
 - `.claude/worktrees/<名前>` のワークツリーで、今のブランチが名前と同じ
 - チケットに結び付かない。`ccnavi-git.sh integrate` と同じ判定（`bound_reason`。全ツリーの
-  承認済みチケット・提案の `<名前>.md`、手元の退避、origin に在る親のブランチのワークツリー）を
+  承認済みチケット・提案の `<名前>.md`、手元の退避、origin に在る親のブランチのワークツリー。
+  最後の1つは、直接作業の記録（`ccnavi-direct/<名前>`）があるワークツリーを外す）を
   使うので、促したのに `integrate` が断る食い違いは起きない
 - 作業が残っている。ワークツリーに未コミットの変更がある（追跡していないファイルも数える）か、
   取り込み先に入っていないコミットがある。入っていないコミットは、直接作業の記録
@@ -534,11 +535,14 @@ def bound_check(
     - 手元の退避（`ready` 済み）に、同じ名前の親がある
     - `.claude/worktrees/<名前>`（か、名前の `/` を `-` にした識別子）のワークツリーのブランチが、
       識別子と一致し、`origin/<ブランチ>` が手元にある。`ccnavi-start.sh` は親のブランチを origin へ
-      送ってから始めるので、チケットも提案もまだ無い親は、これで見分ける。直接作業のブランチは
-      送らず統合先へ直接取り込むので、origin にあるかで見分けられる
+      送ってから始めるので、チケットも提案もまだ無い親は、これで見分ける。ただし直接作業の記録
+      （`ccnavi-direct/<名前>`）があるワークツリーは対象にしない。直接作業のブランチも
+      `ccnavi-git.sh push` で origin へ送れるので、origin にあるだけでは親と見分けられず、
+      送ると、`integrate` を促す表示が黙って出なくなる
 
     """
     name = here.name
+    owner = tree.project_root(conf.projects, here.project) or root
     for base_root in _tree_roots(root, conf):
         approved = settings.approved_dir(conf, base_root)
         proposals = os.path.join(base_root, conf.tickets.replace("/", os.sep))
@@ -562,6 +566,9 @@ def bound_check(
             continue
         branch = tree.branch_of(work)
         if not branch or pathcase.fold(ticket_ids.branch_to_id(branch)) != pathcase.fold(cand):
+            continue
+        rec = direct_record(owner, cand)
+        if rec is not None and not rec.get("broken"):
             continue
         done = _run(
             work,

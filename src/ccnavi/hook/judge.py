@@ -36,7 +36,16 @@ from ..tickets import (
     ticket_model,
     ticket_places,
 )
-from . import agentlaunch, docsearch, failsafe, parentwrite, projskills, reasons, wrapguard
+from . import (
+    agentlaunch,
+    docsearch,
+    failsafe,
+    parentwrite,
+    projskills,
+    reasons,
+    rootwrite,
+    wrapguard,
+)
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
 # それより先に自前の判定を出し終えることが、遅い判定が何も返さないまま許可として扱われて
@@ -161,8 +170,10 @@ def decide_before(
     7. 書き直しを求める形（`rewrites`）は、読み分けずに止めて書き直し方を返す。
     8. ルールを deny・ask・allow の順に当てる（`rules.SECTIONS`）。読み切れない形には
        allow を当てない。期限を過ぎたら、ツールの種類で決めた結論を返す。
-    9. 当たりを記録し、チケットの判定（`ticket_verdict`）と強さを比べて強い側を採る。
-    10. 文面を組み、通す・渡す（`HANDOVER`）・拒否・確認の応答を返す（`refuse`・`_write_pass`）。
+    9. deny に当たらなかった Bash は、ワークスペースルート直下への書き込みを `rootwrite.check` で
+       当てる。当たれば `refuse` で返す。
+    10. 当たりを記録し、チケットの判定（`ticket_verdict`）と強さを比べて強い側を採る。
+    11. 文面を組み、通す・渡す（`HANDOVER`）・拒否・確認の応答を返す（`refuse`・`_write_pass`）。
     """
     # バックアップを取るのは判定より先。ここで取る断面が、この呼び出しが何かを書き換えて
     # しまったときに戻る先になる。判定で弾かれた呼び出しでも先に取っておくのは、
@@ -755,6 +766,41 @@ def decide_before(
     capped = capped and verdict != rules.DENY
     if capped:
         verdict = rules.DENY
+
+    # シェルからワークスペースルート直下へ書く形は、Write / Edit と同じ決まり（ルールファイルの
+    # `workspace-root`）に当てて止める。書き込み先を解いた絶対パスで当てるので、`cd` で移った先も
+    # たどる。ガード自身の保護など、ほかの deny に当たった呼び出しは、その文面で止まる。ここでは
+    # deny に当たらなかった呼び出しだけを見る。
+    if payload.tool_name == "Bash" and verdict != rules.DENY:
+        written, place, root_rule = rootwrite.check(
+            rule_set,
+            payload.cwd,
+            record.subject,
+            [layer.replace(shellread.SEP, "\n") for _, layer, _ in inner],
+        )
+        if written:
+            # 記録には、止めた決まり（ルールファイルの `workspace-root`）の名前を残す。`--test` が
+            # 式まで見せる際に読む `hits` と、位置・名前を揃える。
+            record.code, record.rules = rootwrite.CODE, [rules.record_name(root_rule)]
+            record.hits = [root_rule]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        rootwrite.CODE,
+                        rootwrite.RULE_ID,
+                        display_subject,
+                        rootwrite.message(root, written, place),
+                    )
+                ],
+                conf=conf,
+                root=root,
+                kind=GENERAL,
+            )
 
     # 記録に、当たったルールと判定の根拠を残す。
     record.rules = [rules.record_name(rule) for rule in group]
