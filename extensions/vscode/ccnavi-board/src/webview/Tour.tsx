@@ -13,8 +13,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
 import { ESCAPE_LAYER, useEscape } from "./useEscape.js";
-import { INTRO_ID, type Scene, type TourDef } from "../core/tour-def.js";
+import { INTRO_ID, type DiagramDef, type Scene, type TourDef } from "../core/tour-def.js";
 import { placeBubble, type Rect } from "../core/tour-place.js";
+import { SequenceDiagram } from "./shared/SequenceDiagram.js";
 
 export interface TourStep {
   /** 指す先。`document.querySelector` に渡す */
@@ -23,6 +24,8 @@ export interface TourStep {
   readonly body: string;
   /** 本文の下に出す画像（画面の外の見た目）。指す先が空の手順だけが持つ（読み込みで吹き出しの高さが変わるため） */
   readonly image?: { readonly src: string; readonly alt: string };
+  /** 本文の下に出す時系列の図と、光らせる矢印の id（`tours/*.yml` の `diagrams:`） */
+  readonly diagram?: { readonly name: string; readonly def: DiagramDef; readonly focus: readonly string[] };
   /** 指す先を出すための下ごしらえ */
   readonly before?: () => void;
 }
@@ -67,6 +70,7 @@ export function coursesOf(def: TourDef, apply: (scene: Scene) => void, images: R
       title: step.title,
       body: step.body,
       image: step.image !== "" && images[step.image] !== undefined ? { src: images[step.image], alt: step.alt } : undefined,
+      diagram: step.diagram !== "" ? { name: step.diagram, def: def.diagrams[step.diagram], focus: step.focus } : undefined,
       before: () => apply(step.scene),
     })),
   }));
@@ -110,6 +114,8 @@ export function boxOf(el: Element): Rect {
 const BUBBLE_WIDTH = 340;
 /** 画像のある手順の吹き出しの幅。画像の中の字が読める広さにする */
 const IMAGE_BUBBLE_WIDTH = 760;
+/** 時系列の図のある手順の吹き出しの幅。登場者の列に文と値が収まる広さにする */
+const DIAGRAM_BUBBLE_WIDTH = 580;
 
 /**
  * ツールバー（`<header className="toolbar">`）。左に画面ごとの中身（`children`）、右端に「?」（`TourButton`）を置く。
@@ -410,7 +416,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   }, [count]);
 
   const last = index === steps.length - 1;
-  const width = Math.min(step.image === undefined ? BUBBLE_WIDTH : IMAGE_BUBBLE_WIDTH, window.innerWidth - 24);
+  const width = Math.min(step.diagram !== undefined ? DIAGRAM_BUBBLE_WIDTH : step.image !== undefined ? IMAGE_BUBBLE_WIDTH : BUBBLE_WIDTH, window.innerWidth - 24);
 
   return (
     <div className="tour" data-step={index}>
@@ -439,6 +445,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
           {step.body}
         </p>
         {step.image !== undefined && <img className="tour-image" src={step.image.src} alt={step.image.alt} />}
+        {step.diagram !== undefined && <SequenceDiagram name={step.diagram.name} diagram={step.diagram.def} focus={step.diagram.focus} />}
         <div className="tour-buttons">
           {index > 0 && (
             <button type="button" className="action small" data-action="tour-back" onClick={() => setIndex(index - 1)}>

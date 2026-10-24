@@ -3,6 +3,8 @@
  * 指す先があるときは、暗くするのを指す先の枠の影（box-shadow）で行い、枠の外を覆う要素は作らない。
  * 指す先が無い手順だけ、`.tour-shade` で画面全体を暗くする。
  */
+@import "./shared/SequenceDiagram.css";
+
 .tour { position: fixed; inset: 0; z-index: var(--z-tour); }
 
 .tour-spot {

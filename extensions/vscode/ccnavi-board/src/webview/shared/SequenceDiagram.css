@@ -1,0 +1,91 @@
+/*
+ * 時系列の図（`SequenceDiagram.tsx`）。登場者の列を grid で並べ、矢印は 1 本ずつ行にする。
+ * 縦の時間軸は、箱の背景に列の中央ごとに引く（インラインの `background-image`）。色は VS Code のテーマ変数だけで組む。
+ */
+.tour-diagram {
+  --tour-diagram-line: var(--vscode-panel-border, rgba(128, 128, 128, .4));
+  --tour-diagram-accent: var(--vscode-focusBorder);
+  display: grid;
+  column-gap: var(--gap-2);
+  row-gap: var(--gap-4);
+  margin: 0 0 var(--gap-4);
+  padding: var(--gap-3) var(--gap-2) var(--gap-4);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+  line-height: 1.45;
+}
+
+.tour-diagram-actor {
+  padding: var(--gap-1) var(--gap-2);
+  text-align: center;
+  font-weight: 600;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.tour-diagram-step { position: relative; min-width: 0; }
+.tour-diagram-step.dim { opacity: .38; }
+
+.tour-diagram-no {
+  display: inline-block;
+  min-width: 16px;
+  margin-right: var(--gap-2);
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+  font-weight: 600;
+}
+
+.tour-diagram-step.focus .tour-diagram-no { color: var(--tour-diagram-accent); }
+
+.tour-diagram-text { overflow-wrap: anywhere; }
+
+/* 実際の値。矢印の文の下に、等幅で 1 つの塊として出す */
+.tour-diagram-value {
+  display: block;
+  margin: var(--gap-1) 0 0;
+  padding: var(--gap-1) var(--gap-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--vscode-editor-font-family, monospace);
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, .15));
+  border-radius: var(--radius-sm);
+}
+
+/* 矢印: 文と値の下に線を引き、向きの側に三角を付ける。線は両端の列の中央から中央まで */
+.tour-diagram-step.arrow { padding: 0 0 var(--gap-4); }
+
+.tour-diagram-line {
+  position: absolute;
+  bottom: 2px;
+  left: var(--tour-diagram-inset);
+  right: var(--tour-diagram-inset);
+  height: 0;
+  border-top: 2px solid var(--vscode-descriptionForeground);
+}
+
+.tour-diagram-step.focus .tour-diagram-line { border-top-color: var(--tour-diagram-accent); }
+
+.tour-diagram-step.arrow .tour-diagram-line::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  border: 5px solid transparent;
+}
+
+.tour-diagram-step.arrow.right .tour-diagram-line::after { right: -2px; border-left: 8px solid var(--vscode-descriptionForeground); }
+.tour-diagram-step.arrow.left .tour-diagram-line::after { left: -2px; border-right: 8px solid var(--vscode-descriptionForeground); }
+.tour-diagram-step.focus.arrow.right .tour-diagram-line::after { border-left-color: var(--tour-diagram-accent); }
+.tour-diagram-step.focus.arrow.left .tour-diagram-line::after { border-right-color: var(--tour-diagram-accent); }
+
+/* 自分の中の動き: 枠で囲む */
+.tour-diagram-step.note {
+  padding: var(--gap-2) var(--gap-3);
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px dashed var(--vscode-descriptionForeground);
+  border-radius: var(--radius-sm);
+}
+
+.tour-diagram-step.focus.note { border: 1px solid var(--tour-diagram-accent); }
