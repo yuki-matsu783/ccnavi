@@ -7,6 +7,7 @@ import gitlabIssuesList from "./images/gitlab-issues-list.png";
 import gitlabIssuesMenu from "./images/gitlab-issues-menu.png";
 import gitlabLineComment from "./images/gitlab-line-comment.png";
 import gitlabMarkReady from "./images/gitlab-mark-ready.png";
+import gitlabMerged from "./images/gitlab-merged.png";
 import gitlabMrMerge from "./images/gitlab-mr-merge.png";
 import gitlabNewIssue from "./images/gitlab-new-issue.png";
 import gitlabNewMr from "./images/gitlab-new-mr.png";
@@ -16,6 +17,7 @@ export const TOUR_IMAGES: Readonly<Record<string, string>> = {
   "claude-code-prompt": claudeCodePrompt,
   "gitlab-issues-list": gitlabIssuesList,
   "gitlab-issues-menu": gitlabIssuesMenu,
+  "gitlab-merged": gitlabMerged,
   "gitlab-mark-ready": gitlabMarkReady,
   "gitlab-mr-merge": gitlabMrMerge,
   "gitlab-new-issue": gitlabNewIssue,
