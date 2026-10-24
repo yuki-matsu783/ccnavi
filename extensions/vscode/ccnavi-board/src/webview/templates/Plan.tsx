@@ -1,5 +1,5 @@
 /**
- * テンプレートの計画の表。番号・種類・レビュー・待つ項。待つ項は計画の中の添字ではなく、提案に写したときの番号で出す。
+ * テンプレートの計画の表。番号・種類・レビュー・先行ステップ。先行ステップは計画の中の添字ではなく、提案にコピーしたときの番号で出す。
  */
 import type { JSX } from "react";
 
@@ -19,7 +19,7 @@ export function Plan({ title, items }: { readonly title: string; readonly items:
             <th scope="col">番号</th>
             <th scope="col">種類</th>
             <th scope="col">レビュー</th>
-            <th scope="col">待つ項</th>
+            <th scope="col">先行ステップ</th>
           </tr>
         </thead>
         <tbody>

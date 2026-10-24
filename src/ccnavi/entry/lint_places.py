@@ -47,7 +47,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     # ワークスペースの git の話ではないので確認を飛ばす。
     # 末尾の `/` は付けない。`projects` がシンボリックリンクだと `projects/` は
     # git が rc=128（beyond a symbolic link）で断る。ディレクトリが実在すれば、
-    # 末尾の `/` が無くても `/projects/` のようなディレクトリ向けの行に当たる。
+    # 末尾の `/` が無くても `/projects/` のようなディレクトリ向けの行にヒットする。
     if rel and indexed is None and os.path.isdir(conf.projects) and _ignored(root, rel) is False:
         problems.append(
             Problem(
@@ -85,7 +85,7 @@ def _misplaced_worktrees(project: tree.Tree, where: str) -> list[Problem]:
 
     ワークツリーはワークスペースの `.claude/worktrees/` に置く。プロジェクトの中のものは
     承認の走査（`tree.worktrees`）の対象外で、そこに書いた提案は「承認待ちに無い」になる。
-    ワークスペースの ccnavi が古く、プロジェクトの `ccnavi-common.sh` の写しをルートと取り違えて
+    ワークスペースの ccnavi が古く、プロジェクトの `ccnavi-common.sh` のコピーをルートと取り違えて
     着手すると、この形になる。検出だけを行う。
     """
     base = os.path.join(project.root, ".claude", "worktrees")
@@ -102,7 +102,7 @@ def _misplaced_worktrees(project: tree.Tree, where: str) -> list[Problem]:
             f"プロジェクトの中にワークツリーがある（{', '.join(names)}）。ワークツリーは"
             "ワークスペースの `.claude/worktrees/` に置く。ここのものは承認の走査の対象外で、"
             "書いた提案は承認待ちに並ばない。ワークスペースの ccnavi が古い"
-            "（`projects/<名前>` の写しをルートと取り違える）可能性があるので、"
+            "（`projects/<名前>` のコピーをルートと取り違える）可能性があるので、"
             "`scripts/ccnavi-setup.sh --force` で配り直し、"
             "このワークツリーはユーザに伝えて片付ける",
         )

@@ -152,7 +152,7 @@ def name_problems(text: str) -> list[str]:
         opened = _IF.match(line)
         if opened and not NAME.match(opened.group(1)):
             found.append(
-                f"{number} 行目: 条件の名前 {opened.group(1)} は使えない"
+                f"{number} 行目: 条件の名前 {opened.group(1)} は指定できない"
                 "（英数字と _ だけ。先頭は数字にしない。`-` は _ にする）"
             )
     return found
@@ -173,7 +173,7 @@ def problems(text: str, scripts: Collection[str] = ()) -> list[str]:
             name = opened.group(1)
             if NAME.match(name) and name not in CONDITIONS and name not in scripts:
                 found.append(
-                    f"{number} 行目: 条件 {name} は使えない"
+                    f"{number} 行目: 条件 {name} は指定できない"
                     f"（組み込みの条件でも {SCRIPT_FILE} の {function_name(name)} でもない）"
                 )
         elif _ELSE.match(line):
@@ -192,7 +192,7 @@ def problems(text: str, scripts: Collection[str] = ()) -> list[str]:
             found.append(f"{number} 行目: ccnavi: の囲みは 1 行に 1 つ、単独で書く")
         for name in _SUBSTITUTION.findall(line):
             if name not in SUBSTITUTIONS:
-                found.append(f"{number} 行目: 差し込み {{{{{name}}}}} は使えない")
+                found.append(f"{number} 行目: 差し込み {{{{{name}}}}} は指定できない")
     if elses:
         found.append("ccnavi:if に対応する ccnavi:endif がありません。")
     return found

@@ -1,21 +1,21 @@
 ---
 title: Bash の読み方とパスの見方
 type: guide
-description: Bash のルールがコマンドのどこに当たるか、止まる書き方と通る書き方、読み切れないとき、実行役のコマンド、ヒアドキュメント、ファイルのパスの扱い、探すツールが届かない範囲
+description: Bash のルールがコマンドのどこにヒットするか、止まる書き方と通る書き方、読み切れないとき、実行役のコマンド、ヒアドキュメント、ファイルのパスの扱い、探すツールが届かない範囲
 tags: [user-guide, rules, bash]
 keywords: [Bash, コマンド, 実行される部分, 引用, ヒアドキュメント, ブレース展開, バッククォート, DENY_BACKQUOTE, DENY_BRACE_EXPANSION, DENY_COMMAND_NAME_EXPANSION, DENY_AMBIGUOUS_FORM, PARSE_UNCERTAIN, 縮退, 実行役, env, sudo, xargs, パス, シンボリックリンク, Grep, .gitignore, permissions.deny]
 ---
 
 # Bash の読み方とパスの見方
 
-[ルールの書き方](rules.md)の続きである。`Bash`のルールがコマンドのどこに当たるか、止まる書き方と通る書き方、
+[ルールの書き方](rules.md)の続きである。`Bash`のルールがコマンドのどこにヒットするか、止まる書き方と通る書き方、
 ファイルのパスや探すツールの扱いをまとめる。読み方の仕組みは [設計 6.2](../design/pre-check.md#62-パスは行き着く先で見る) と
 [6.3](../design/pre-check.md#63-bash-は実行される部分だけを見る) にある。
 
 ## Bash のコマンドは実行される部分だけを見る
 
 `Bash`のルールは、コマンド文字列そのものではなく、シェルが実際に実行する部分に
-当てる。禁止された語を書いただけの操作は止まらない。
+適用する。禁止された語を書いただけの操作は止まらない。
 
 ```sh
 grep -n "git push" README.md      # 通る。git push は grep の引数
@@ -48,13 +48,13 @@ grepのallowは後ろの`git push`まで通さない。外側のコマンドは�
 `if` `then` `do` `{`などの予約語はコマンドの位置にあればそれだけで 1 本になり、後ろの語がコマンドの先頭になる。
 
 引用が 1 語につないだ空白は、コマンドと引数の間の空白としては読まれない（`"git push"`と`git push`を分ける）。
-引用の中身そのものは残るので、`cat "/home/u/.env"`は`.env`のルールに当たる。
+引用の中身そのものは残るので、`cat "/home/u/.env"`は`.env`のルールにヒットする。
 
 ルールの`regex`から見ると、コマンドとコマンドの間には`\x00`が置かれる。
 `[^\x00]*`と書けば「同じコマンドの中」を指す。`.ccnavi/config/common/rules.yml`では、
 `grep -n "git push" README.md`や`find . -name "a b"`のような引用付きのgrep / cat / findが、
-後ろにコマンドが続かなければ`prefer-read-grep` / `prefer-glob`（allow）に当たる。
-`cat README.md | head -20`は`\x00`をまたぐので当たらない。
+後ろにコマンドが続かなければ`prefer-read-grep` / `prefer-glob`（allow）にヒットする。
+`cat README.md | head -20`は`\x00`をまたぐのでヒットしない。
 
 語の中に入った`>` `<` `|` `&` `(` `)`は、演算子としては読まれない。
 `grep -n "x>y" notes.md`の`>`は文字で、素の`echo x>f`は演算子として残る。
@@ -64,7 +64,7 @@ grepのallowは後ろの`git push`まで通さない。外側のコマンドは�
 ### 文字として書きたいとき
 
 二重引用の中の`$( )`とバッククォートは、シェルが実行するので止まる（バッククォートは中身に依らず止まる）。
-引用の中から切り出したコマンドにだけルールが当たったときは、返る文面にそのことと回避策が添えられ、
+引用の中から切り出したコマンドにだけルールがヒットしたときは、返る文面にそのことと回避策が添えられ、
 記録と`--test`に`quoted`（そのルールのid）が出る。
 
 | 書きたいもの | 止まる書き方 | 通る書き方 |
@@ -79,10 +79,10 @@ grepのallowは後ろの`git push`まで通さない。外側のコマンドは�
 ### 読み切れないとき
 
 静的に読めないコマンドは、生の文字列との一致に縮退する。縮退した拒否の文面には、
-読めなかったので生の文字列に当てたという断りが、`note:`で始まる英文の 1 行で付く。
+読めなかったので生の文字列に適用したという断りが、`note:`で始まる英文の 1 行で付く。
 
-縮退した呼び出しに`allow`は当てず、`deny`と`ask`は当てる（生の文字列に当たりすぎるぶん、判定は厳しい側にずれる）。
-どこにも当たらなければコード`PARSE_UNCERTAIN`でユーザに確認が出る。ここは権限モードに委ねない。
+縮退した呼び出しに`allow`は適用せず、`deny`と`ask`は適用する（生の文字列にヒットしすぎるぶん、判定は厳しい側にずれる）。
+どこにもヒットしなければコード`PARSE_UNCERTAIN`でユーザに確認が出る。ここは権限モードに委ねない。
 
 コメントだけの行のように、実行される部分が何も残らないコマンドは判定に入らない。
 
@@ -100,7 +100,7 @@ grepのallowは後ろの`git push`まで通さない。外側のコマンドは�
 
 perlやpythonは縮退の対象に入れていない（`perl -pi -e 's/git push/.../' README.md`のような 1 行編集を通すため）。
 
-記録に残る理由の名前と、縮退した呼び出しに`allow`を当てない理由は [設計 6.3・6.5](../design/pre-check.md#63-bash-は実行される部分だけを見る) と
+記録に残る理由の名前と、縮退した呼び出しに`allow`を適用しない理由は [設計 6.3・6.5](../design/pre-check.md#63-bash-は実行される部分だけを見る) と
 [縮退したとき allow を返さない判断の ADR](../adr/0011-no-allow-when-degraded.md)にある。
 
 ### 書き直しを求める形は止めて案内する
@@ -131,7 +131,7 @@ perlやpythonは縮退の対象に入れていない（`perl -pi -e 's/git push/
 
 #### コマンド名はそのまま書く
 
-変数・置換・グロブをコマンド名に置くと、どのプログラムが走るかが書かれた文字列に無く、どのルールも当たらない
+変数・置換・グロブをコマンド名に置くと、どのプログラムが走るかが書かれた文字列に無く、どのルールもヒットしない
 （`c=git; $c push origin main`）。コード`DENY_COMMAND_NAME_EXPANSION`で止める。
 前に置いた代入とリダイレクト（`FOO=1 >/dev/null $c`、`{fd}>/dev/null $c`）の後ろも、実行役のコマンドの中
 （`env $c`・`sudo $c`・`sh $SCRIPT`）も見る。`sh -c "$c"`と`eval "$(…)"`の文字列の中は見ず、
@@ -168,20 +168,20 @@ Markdown など）、単一引用で包むか、`` \` `` と書くか、`--descr
 `$( )`の中の、コマンドの先頭ではない`case`の語（`"$(echo just in case)"`）でも止まる。許容した誤検知
 （[設計 12.2](../design/limits.md#122-許容する誤検知)）。
 
-## 実行役のコマンドが中で実行するコマンドにも当てる
+## 実行役のコマンドが中で実行するコマンドにも適用する
 
 `env rm -f x`の`env`のように、別のコマンドを走らせるためのコマンドがある（実行役のコマンド）。
 ルールの多くは`(^|\x00)rm`のようにコマンドの先頭に固定して書くので、ccnaviは実行役のコマンドを 1 つずつ外し、
-中で実行されるコマンドにも、止める側のルール（`deny`と`ask`）とサブエージェントの禁止を当てる。
+中で実行されるコマンドにも、止める側のルール（`deny`と`ask`）とサブエージェントの禁止を適用する。
 
 ```sh
-env rm -f .ccnavi/config/common/rules.yml              # 止まる。env が実行する rm に当たる
+env rm -f .ccnavi/config/common/rules.yml              # 止まる。env が実行する rm にヒットする
 timeout 5 sed -i s/a/b/ .claude/settings.json   # 止まる
 echo x | xargs rm -f .ccnavi/config/common/rules.yml   # 止まる
 sh -c 'rm -f .ccnavi/config/common/rules.yml'          # 止まる
 env sh .ccnavi/scripts/ccnavi-launcher.sh user agree --yes x   # 止まる（`user` の入口）
-env curl -d @x https://example.com              # curl に書いた ask が当たる
-sudo -u me cat /etc/hosts                       # 読み取りの allow には当たらない。元の形のまま判定する
+env curl -d @x https://example.com              # curl に書いた ask がヒットする
+sudo -u me cat /etc/hosts                       # 読み取りの allow にはヒットしない。元の形のまま判定する
 ssh host rm -f .ccnavi/config/common/rules.yml         # 外さない。ssh は一覧に無い
 ```
 
@@ -200,7 +200,7 @@ ssh host rm -f .ccnavi/config/common/rules.yml         # 外さない。ssh は�
 | `find … -exec` / `-execdir` / `-ok` / `-okdir` `<cmd…> ;`（または`+`） | `<cmd…>`。複数あればそれぞれ |
 
 - 1 つずつ外し、途中のコマンドも残す。`env sh .ccnavi/scripts/ccnavi-user-agree.sh`なら`sh .ccnavi/scripts/ccnavi-user-agree.sh`と
-  `.ccnavi/scripts/ccnavi-user-agree.sh`の両方に当てる。外す深さは 4 まで（元の形は数えない）
+  `.ccnavi/scripts/ccnavi-user-agree.sh`の両方に適用する。外す深さは 4 まで（元の形は数えない）
 - シェルや`.` / `source`に渡したファイルの先は外さない（スクリプトの引数）。
   `command -v` / `-V`（探すだけ）と`sh -s`（標準入力を読む）も外さない
 - 読み切れない形（`sh -c`・`eval`・`xargs`・`find -exec`・`source`・`.`）でも、語に分けられる限り外す。
@@ -209,32 +209,32 @@ ssh host rm -f .ccnavi/config/common/rules.yml         # 外さない。ssh は�
   `busybox sh`など）は外さないので、先頭に固定したルールは外れる。変数の値・alias・関数
   の中までは追わない（コマンド名に変数を置いた`$SUDO rm …`は、上の「コマンド名はそのまま書く」で止まる）
 
-当てる先は止める側だけにする。
+適用する先は止める側だけにする。
 
-| 当てる先 | 元の形 | 中で実行されるコマンド |
+| 適用する先 | 元の形 | 中で実行されるコマンド |
 |---|---|---|
-| `deny` | 当てる | 当てる |
-| `ask` | 当てる | 当てる |
-| サブエージェントの禁止 | 当てる | 当てる |
-| `allow` | 読み切れたときだけ当てる | 当てない |
-| 止めている間でも通す形 | 当てる | 当てない |
-| チケットの範囲 | 当てる | 当てない |
+| `deny` | 適用する | 適用する |
+| `ask` | 適用する | 適用する |
+| サブエージェントの禁止 | 適用する | 適用する |
+| `allow` | 読み切れたときだけ適用する | 適用しない |
+| 止めている間でも通す形 | 適用する | 適用しない |
+| チケットの範囲 | 適用する | 適用しない |
 
-中で実行されるコマンドは止める側に足す当て先で、元の形の判定を消さないので、外し方を読み違えても緩くはならない。
-`allow`や止めている間でも通す形に当てると、実行役のコマンドを前に置くだけで通るようになる
+中で実行されるコマンドは止める側に足す適用先で、元の形の判定を消さないので、外し方を読み違えても緩くはならない。
+`allow`や止めている間でも通す形に適用すると、実行役のコマンドを前に置くだけで通るようになる
 （`sudo -u me cat /etc/hosts`、`env sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1`）。
 
-中で実行されるコマンドで当たったときは、拒否と確認の文面に 1 行足す。
+中で実行されるコマンドでヒットしたときは、拒否と確認の文面に 1 行足す。
 
 ```
 [ccnavi] DENY_COMMAND_PATTERN (rule: builtin:guard-setting-files)
 subject: env rm -f .ccnavi/config/common/rules.yml
-`env` が実行する `rm -f .ccnavi/config/common/rules.yml` に当たりました。
+`env` が実行する `rm -f .ccnavi/config/common/rules.yml` にヒットしました。
 ガード自身の設定と hook を、シェルから書き換えようとしています。…
 ```
 
-記録の欄`unwrapped`に当たったコマンドが残る（[記録](records.md)）。`--test`は`unwrapped:`の行で出す（[ルールが何に当たるかを確かめる](check.md)）。
-読み切れない形で、当たったルールが全部中で実行されるコマンドで当たったときは、拒否のコードが`PARSE_UNCERTAIN`ではなく
+記録の欄`unwrapped`にヒットしたコマンドが残る（[記録](records.md)）。`--test`は`unwrapped:`の行で出す（[ルールが何にヒットするかを確かめる](check.md)）。
+読み切れない形で、ヒットしたルールが全部中で実行されるコマンドでヒットしたときは、拒否のコードが`PARSE_UNCERTAIN`ではなく
 `DENY_COMMAND_PATTERN`になる。`PARSE_UNCERTAIN`の件数で読み切れない拒否を数えている集計とはずれる。
 層の作り方、外す深さと語数の上限、値を取るオプションの一覧は [設計 6.3.1](../design/pre-check.md#631-実行役のコマンドの中で実行されるコマンド) にある。
 
@@ -259,7 +259,7 @@ uv run python scratch.py    # 通る。scratch.py は Write で置く
 
 `Read` `Write` `Edit` `NotebookEdit`のルールは、呼び出しに来た
 `file_path`そのものではなく、絶対パスに直し`..`を解決しシンボリックリンクを解いた
-結果に当てる。同じ場所を指す別の表記でルールを外せない。
+結果に適用する。同じ場所を指す別の表記でルールを外せない。
 
 ```sh
 .env                  # どれも同じ判定に行き着く
@@ -275,7 +275,7 @@ docs/../.env
 
 `Grep`と`Glob`の対象は探し始める場所のパスで、そこから降りて読まれたファイルは
 判定に届かない。`Grep(path=<git プロジェクトルート>)`は`.env`や`secrets/`の中身を返しうるが、
-ルールは起点にしか当たらない。
+ルールは起点にしかヒットしない。
 
 だから組み込みの`builtin:credentials`の`match`は`Bash|Read|Write|Edit|NotebookEdit`で、
 `Grep`と`Glob`を含めていない。
@@ -292,10 +292,10 @@ docs/../.env
 
 | 呼び方 | ccnaviのルール | `.gitignore` | `Read()`の`deny` |
 |---|---|---|---|
-| `Grep(path=<git プロジェクトルート>)` | 当たらない | 弾く | 弾く |
-| `Grep(path=.../foo/.env)` | 当たらない | 当たらない | 弾く |
-| `Read(.../foo/.env)` | 止める | 当たらない | 弾く |
-| `Bash: cat .../foo/.env` | 止める | 当たらない | 当たらない |
+| `Grep(path=<git プロジェクトルート>)` | ヒットしない | 弾く | 弾く |
+| `Grep(path=.../foo/.env)` | ヒットしない | ヒットしない | 弾く |
+| `Read(.../foo/.env)` | 止める | ヒットしない | 弾く |
+| `Bash: cat .../foo/.env` | 止める | ヒットしない | ヒットしない |
 
 2 行目は`Read()`の`deny`が唯一の保護になる。`permissions.deny`を持たない配布先では、
 ignoreされたファイルを名指しした`Grep`は通る。
@@ -304,7 +304,7 @@ ignoreされたファイルを名指しした`Grep`は通る。
 
 `.gitignore`はripgrepの既定の挙動で動き、ccnaviの側では変えられない。当てにするときの結論は 2 つ。
 
-- 起点そのものに指定されたパスには当たらない。ignoreされたディレクトリやファイルを`path`に渡すと、その中は読まれる
+- 起点そのものに指定されたパスにはヒットしない。ignoreされたディレクトリやファイルを`path`に渡すと、その中は読まれる
 - `.git`が無いディレクトリでは`.gitignore`を読まない。cloneしていない置き場、git化していない`projects/<名前>/`が該当する
 
 `.git`がある場所の扱い、隠しファイル、`.ignore`などの除外ファイルの扱いは [付録C](../design/appendix.md#付録-c-実測で確かめた前提) と
@@ -312,4 +312,4 @@ ignoreされたファイルを名指しした`Grep`は通る。
 
 ワークスペースルートがgit管理下で、`.gitignore`に`/projects/`があるときは、ルートからの
 `Grep`は`projects/`へ降りない。プロジェクトのコードを探すときは`cd projects/<名前>`してから
-呼ぶ（起点に指定した場所にはignoreが当たらない）。
+呼ぶ（起点に指定した場所にはignoreがヒットしない）。

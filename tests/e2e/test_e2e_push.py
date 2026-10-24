@@ -8,7 +8,7 @@
    `ccnavi-git.sh` でコミットし、親のブランチをリモートへ push する（承認の前から親のブランチは
    リモートにある）。`ccnavi-sync.sh` で取り込むと、実行ファイルの
    `--agree --preview --json` が承認待ちに数える
-2. 端末の無い `ccnavi-user-agree.sh` は承認の壁で止まり、何も置かず何も送らない
+2. ターミナルの無い `ccnavi-user-agree.sh` は承認の壁で止まり、何も置かず何も送らない
 3. `ccnavi-user-agree.sh` で承認する。承認済みチケットが `doing/` に置かれ、
    `ccnavi-user-push-approved.sh` が置き場（と消えた提案）だけをコミットして push する。
    同じツリーの書きかけはコミットしない。別の機械（clone）から承認済みチケットが読める
@@ -27,7 +27,7 @@ tests/sh/test_push_approved_sh.py）は、実行ファイルを in-process で�
     uv run --with pyinstaller python build.py
     uv run python -m unittest tests.e2e.test_e2e_push -v
 
-承認は端末からしか通らない（`--agree` の壁）。テストは端末を持たないので、段 3 からは
+承認はターミナルからしか通らない（`--agree` の壁）。テストはターミナルを持たないので、段 3 からは
 `CCNAVI_GUARD_TICKET_APPROVAL=disable` を渡して y を標準入力から送る。単体のテストが
 `--guard-ticket-approval disable` で切るのと同じ扱いで、壁そのものは段 2 で見る。
 
@@ -54,7 +54,8 @@ PROPOSAL = "wip/proposals/todo"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
 NOTHING = "コミットして push する承認済みチケットはありません。"
 
-# 親の提案。`ticket start` が計画（plan）を要るので、計画を持つ形にする（mr と phases の写しも付く）
+# 親の提案。`ticket start` が計画（plan）を要るので、
+# 計画を持つ形にする（mr と phases のコピーも付く）
 PROPOSAL_TEXT = parent_text(TICKET, ["design"], allow=("src/*",))
 
 
@@ -184,7 +185,7 @@ class ApproveAndPushTest(unittest.TestCase):
         write(os.path.join(self.tree, "seed.txt"), "書きかけ\n")
         write(os.path.join(self.tree, "src", "draft.py"), "x\n")
 
-        # 2. 端末が無いと承認の壁で止まる。承認済みチケットも、コミットも、push も出ない。
+        # 2. ターミナルが無いと承認の壁で止まる。承認済みチケットも、コミットも、push も出ない。
         walled = self.run_sh("ccnavi-user-agree.sh", stdin="y\n")
         self.assertEqual(1, walled.returncode, walled.stdout + walled.stderr)
         self.assertIn("ターミナル", walled.stderr)

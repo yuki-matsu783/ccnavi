@@ -66,11 +66,11 @@ function ok(list: MirrorList = listOf()): MirrorStatus {
 }
 
 test("CB-T1155 見るだけの引数は user mirror [<名前>…] --json、同期は --yes --expect <値> --via board --json を足す", () => {
-  assert.deepEqual(mirrorArgs(), ["user", "mirror", "--json"]);
-  assert.deepEqual(mirrorArgs(["web", "app"]), ["user", "mirror", "web", "app", "--json"]);
+  assert.deepEqual(mirrorArgs(), ["--entry", "board", "user", "mirror", "--json"]);
+  assert.deepEqual(mirrorArgs(["web", "app"]), ["--entry", "board", "user", "mirror", "web", "app", "--json"]);
   assert.equal(mirrorArgs(["web"]).includes("--yes"), false);
-  assert.deepEqual(mirrorYesArgs([], "all-sha"), ["user", "mirror", "--yes", "--expect", "all-sha", "--via", "board", "--json"]);
-  assert.deepEqual(mirrorYesArgs(["web"], "web-sha"), ["user", "mirror", "web", "--yes", "--expect", "web-sha", "--via", "board", "--json"]);
+  assert.deepEqual(mirrorYesArgs([], "all-sha"), ["--entry", "board", "user", "mirror", "--yes", "--expect", "all-sha", "--via", "board", "--json"]);
+  assert.deepEqual(mirrorYesArgs(["web"], "web-sha"), ["--entry", "board", "user", "mirror", "web", "--yes", "--expect", "web-sha", "--via", "board", "--json"]);
 });
 
 test("CB-T1156 見るだけの答えを取り決めのとおりに読む。状態・変更・理由・expect を落とさない", () => {
@@ -156,18 +156,18 @@ test("CB-T1161 「すべて同期」の対象は differs のプロジェクト�
   assert.equal(syncAllButton(ok(noExpect), false).enabled, false);
 });
 
-test("CB-T1162 ボタンを押せないとき: 同期中、調べる前、古い実行ファイル、調べられない、写すものが無い。理由を返す", () => {
+test("CB-T1162 ボタンを押せないとき: 同期中、調べる前、古い実行ファイル、調べられない、コピーするものが無い。理由を返す", () => {
   const list = listOf();
   assert.deepEqual(projectSyncButton(ok(list), false, "web"), { enabled: true, reason: "" });
   assert.match(projectSyncButton(ok(list), true, "web").reason, /同期しています/);
   assert.equal(syncAllButton(ok(list), true).enabled, false);
   assert.match(projectSyncButton({ kind: "waiting" }, false, "web").reason, /調べています/);
-  const old: MirrorStatus = { kind: "unsupported", reason: "実行ファイル（ccnavi 0.1.0）が mirror の機能を持ちません（古い版です）" };
+  const old: MirrorStatus = { kind: "unsupported", reason: "実行ファイル（ccnavi 0.1.0）が mirror の機能に対応していません（古い版です）" };
   assert.deepEqual(projectSyncButton(old, false, "web"), { enabled: false, reason: old.reason });
   assert.deepEqual(syncAllButton(old, false), { enabled: false, reason: old.reason, count: 0 });
   assert.match(projectSyncButton({ kind: "failed", error: "期限切れ" }, false, "web").reason, /調べられませんでした/);
   const empty = listOf(LIST_TEXT.replace('"common_empty":false', '"common_empty":true'));
-  assert.match(projectSyncButton(ok(empty), false, "web").reason, /写すものがありません/);
+  assert.match(projectSyncButton(ok(empty), false, "web").reason, /コピーするものがありません/);
   assert.equal(syncAllButton(ok(empty), false).enabled, false);
   // 行ごと: ずれが無い・調べられない・結果に無い
   assert.deepEqual(projectSyncButton(ok(list), false, "app"), { enabled: false, reason: "ずれはありません" });
@@ -175,11 +175,11 @@ test("CB-T1162 ボタンを押せないとき: 同期中、調べる前、古い
   assert.match(projectSyncButton(ok(list), false, "lib").reason, /このプロジェクトがありません/);
 });
 
-test("CB-T1163 同期の結果の通知。成功は作業ツリーへ書いてコミットしていないことを言う。「内容が更新されました」はずれ、他は失敗", () => {
+test("CB-T1163 同期の結果の通知。成功はワークツリーへ書いてコミットしていないことを言う。「内容が更新されました」はずれ、他は失敗", () => {
   const done = syncNotice({ ok: true, synced: [{ name: "web", files: ["a", "b"] }, { name: "app", files: ["c"] }] });
   assert.equal(done.kind, "info");
   assert.match(done.message, /^web、app のミラーを同期しました（3 ファイル）。/);
-  assert.match(done.message, /作業ツリー/);
+  assert.match(done.message, /ワークツリー/);
   assert.match(done.message, /コミットはしていません/);
   assert.deepEqual(syncNotice({ ok: true, synced: [] }), { kind: "info", message: "同期するものはありませんでした" });
   assert.ok(isStale("内容が更新されました。もう一度確認してください"));
@@ -220,7 +220,7 @@ test("CB-T1166 同期の対象に受け取れない名前: - で始まるもの�
   assert.deepEqual(unknownSyncNames({ kind: "waiting" }, ["web"]), ["web"]);
 });
 
-test("CB-T1167 一部のプロジェクトだけ書けなかったとき、書けた分を捨てずに通知へ載せる", () => {
+test("CB-T1167 一部のプロジェクトだけ書けなかったとき、書けた分を破棄せずに通知へ載せる", () => {
   const text = JSON.stringify({ version: 1, ok: false, error: "web: 保存できませんでした", synced: [{ name: "lib", files: ["a"] }] });
   const parsed = parseMirrorResult(text);
   assert.ok(parsed.ok);

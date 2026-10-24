@@ -38,7 +38,7 @@ export interface TourStep {
  * 手順の `before` が見本の上の様子（行を開く、点を選ぶ、タブを替える）を動かす。今の設定の編集中の内容には触れない。
  */
 export interface TourCourse {
-  /** 案内の鍵。画面の中で一意。テストと `data-course` に使う */
+  /** 案内のキー。画面の中で一意。テストと `data-course` に使う */
   readonly id: string;
   /** メニューに出す題 */
   readonly title: string;
@@ -47,7 +47,7 @@ export interface TourCourse {
   readonly steps: readonly TourStep[];
 }
 
-/** 基本の案内の鍵。初回に自動で出る案内で、メニューの先頭に出る */
+/** 基本の案内のキー。初回に自動で出る案内で、メニューの先頭に出る */
 export const INTRO_COURSE = INTRO_ID;
 
 /** 指す先の印の選択子。`target` が空の手順は、どこにも一致しない選択子にして吹き出しを中ほどに出す */
@@ -76,7 +76,7 @@ export function coursesOf(def: TourDef, apply: (scene: Scene) => void, images: R
   }));
 }
 
-/** 鍵で案内を引く。無ければ先頭（基本の案内） */
+/** キーで案内を引く。無ければ先頭（基本の案内） */
 export function courseOf(courses: readonly TourCourse[], id: string | undefined): TourCourse {
   return courses.find((course) => course.id === id) ?? courses[0];
 }
@@ -240,9 +240,9 @@ export function TourButton({ courses, onPick }: { readonly courses: readonly Tou
  * - `start`: 「?」のメニューで案内を選んだとき。指す先が出ていればすぐ始め、出ていなければ（ボードの承認のオーバーレイの
  *   最中など）`request` と同じく出るまで待つ。押した経路だけ待たないと、オーバーレイの上に案内が被さる
  * - `end`: 吹き出しを閉じたとき。`onEnd` を呼ぶ（画面はそこで様子を戻し、`tourDone` を返す）
- * - `course`: いま出している案内の鍵（出していなければ undefined）。画面は鍵で見本の様子を替える
+ * - `course`: いま出している案内のキー（出していなければ undefined）。画面はキーで見本の様子を替える
  *
- * `onStart` は始める直前に呼ぶ（案内の鍵つき）。案内が画面の様子（タブなど）を動かすなら、ここで今の様子を覚えておく。
+ * `onStart` は始める直前に呼ぶ（案内のキーつき）。案内が画面の様子（タブなど）を動かすなら、ここで今の様子を覚えておく。
  * `tourDone` は基本の案内に限らず、どの案内を閉じても返す（初回の自動の案内を出さない印は、どの案内を見ても付く）。
  */
 export function useTour(ready: boolean, hooks: { readonly onStart?: (course: string) => void; readonly onEnd: () => void }): {

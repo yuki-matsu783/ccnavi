@@ -107,7 +107,7 @@ courses:
         body: 子チケットのリスクの点がこの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めません。空欄なら組み込みの値を使います。
       - target: factors
         title: 項目
-        body: 子チケットをクローズするとき、その差分に当てて加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で追加できます。
+        body: 子チケットをクローズするとき、その差分に適用して加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で追加できます。
       - target: save
         title: 保存
         body: 保存すると、実行ファイルが検証し、通ればファイルに反映します。通らなければ、下に理由が出ます。
@@ -117,10 +117,10 @@ courses:
 
   - id: how-score
     title: 点数とレベルが、どの値で決まるのかを例で知りたいとき
-    summary: 見本の配点で、差分がどの項目に何点で当たり、合計がどのレベルになるかを、値を変えた例も並べて追う
+    summary: 見本の配点で、差分がどの項目に何点でヒットし、合計がどのレベルになるかを、値を変えた例も並べて追う
     steps:
       - target: factors
-        title: 例の差分を、項目ごとに当てる
+        title: 例の差分を、項目ごとに適用する
         body: 子チケットを ticket finish で閉じると、ccnavi が配点を読み、子の仕事の始まりから先頭までの差分を数えて点を付けます。ここでは見本の配点で、4 ファイルを変えた子を追います。
         diagram: risk-score-high
         focus: finish, load, diff
@@ -132,7 +132,7 @@ courses:
         focus: diff, c-lines
       - target: factor-value
         title: 触ったパスは、ファイルごとに加点する
-        body: ci は .github/** に当たるファイル 1 つにつき 10 点で、上限は 35 点です。ci.yml の 1 ファイルだけなので 10 点になります。
+        body: ci は .github/** にヒットするファイル 1 つにつき 10 点で、上限は 35 点です。ci.yml の 1 ファイルだけなので 10 点になります。
         scene: { open: ci }
         diagram: risk-score-high
         focus: c-glob
@@ -159,7 +159,7 @@ courses:
         diagram: risk-level
       - target: level-high
         title: 小さな変更は LOW
-        body: login.py だけを 12 行変えた子は、どの項目にも当たらず 0 点で LOW です。判定の項目があるので、小さな変更でも no の答えを記録してから閉じます。
+        body: login.py だけを 12 行変えた子は、どの項目にもヒットせず 0 点で LOW です。判定の項目があるので、小さな変更でも no の答えを記録してから閉じます。
         diagram: risk-score-low
         focus: diff, c-all, sum
       - target: save
@@ -223,16 +223,16 @@ courses:
     steps:
       - target: levels
         title: 境目の点で決まること
-        body: 子チケットをクローズするとき、項目で当てはまった点を足し合わせます。合計がここの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOW には境目がありません。
+        body: 子チケットをクローズするとき、項目に該当した点を足し合わせます。合計がここの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOW には境目がありません。
       - target: level-high
         title: 止めるのは HIGH から
         body: HIGH 以上になったフェーズは、レビューが終わるまで先へ進めません。計画のときに「レビュー不要」と宣言していても同じです。レビューを求める基準を厳しくするなら HIGH を下げ、緩めるなら上げます。
       - target: factors
         title: 項目の点と見比べる
-        body: 見本では big-diff が 25 点、many-files が 15 点で、2 つ当たると 40 点になり HIGH に届きます。境目を動かすときは、項目の点のどの組み合わせが何点になるかを見比べて決めます。
+        body: 見本では big-diff が 25 点、many-files が 15 点で、2 つ該当すると 40 点になり HIGH に届きます。境目を動かすときは、項目の点のどの組み合わせが何点になるかを見比べて決めます。
       - target: levels
         title: 並び順と空欄
-        body: 値は MEDIUM ≤ HIGH ≤ CRITICAL の順に入れます。欄を空にすると、そのリスクレベルは組み込みの値を使います。見本では CRITICAL を空にして、組み込みの 70 を薄く出しています。
+        body: 値は MEDIUM ≤ HIGH ≤ CRITICAL の順に入れます。欄を空にすると、そのリスクレベルは組み込みの値を使います。見本では CRITICAL を空にして、組み込みの 70 を薄く表示しています。
         scene:
           blank: critical
       - target: save
@@ -245,7 +245,7 @@ courses:
     steps:
       - target: add
         title: 項目を追加する
-        body: 「＋ 項目を追加」を押すと、空の項目が末尾に追加され、欄が開いて id に焦点が移ります。1 件につき加点条件は 1 つです。
+        body: 「＋ 項目を追加」を押すと、空の項目が末尾に追加され、欄が開いて id の欄にカーソルが移ります。1 件につき加点条件は 1 つです。
       - target: factor-id
         title: id を付ける
         body: id は項目の名前です。子をクローズしたときの出力や、judge の記録（record-risk）がこの名前で項目を指すので、内容が分かる短い名前にします。
@@ -253,7 +253,7 @@ courses:
           open: big-diff
       - target: factor-points
         title: 点を決める
-        body: 当てはまったときに加える点です。整数で入れます。点の合計が境目の点以上になるとリスクレベルが上がるので、上の境目と見比べて決めます。script だけは、点を読み取れなかったときに加える点になります。
+        body: 該当したときに加える点です。整数で入れます。点の合計が境目の点以上になるとリスクレベルが上がるので、上の境目と見比べて決めます。script だけは、点を読み取れなかったときに加える点になります。
         scene:
           open: big-diff
       - target: factor-kind
@@ -286,17 +286,17 @@ courses:
           open: big-diff
       - target: factor-include
         title: 数えるパスを絞る
-        body: 対象パスを入力すると、当てはまるパスだけを数えます（glob を 1 行に 1 つ）。見本では src/** だけを数えます。空なら差分全体を数えます。この欄は、差分の大きさを数える 3 つの加点条件だけにあります。
+        body: 対象パスを入力すると、該当するパスだけを数えます（glob を 1 行に 1 つ）。見本では src/** だけを数えます。空なら差分全体を数えます。この欄は、差分の大きさを数える 3 つの加点条件だけにあります。
         scene:
           open: big-diff
       - target: factor-exclude
         title: 数えないパスを外す
-        body: 除外パスに当てはまるパスは数えません。対象パスに当てはまっていても外します。見本では生成コードの src/generated/** を外しています。生成物やロックファイルで行数が膨らむときに使います。
+        body: 除外パスに該当するパスは数えません。対象パスに該当していても外します。見本では生成コードの src/generated/** を外しています。生成物やロックファイルで行数が膨らむときに使います。
         scene:
           open: big-diff
       - target: factor-value
         title: 触ったパスで加点する（glob）
-        body: 当てはまるファイルを 1 つ変更するごとに points を加点します。上限に値を入れると、合計がそれを超えません。見本の ci は 1 ファイルにつき 10 点で、上限は 35 点です。
+        body: 該当するファイルを 1 つ変更するごとに points を加点します。上限に値を入れると、合計がそれを超えません。見本の ci は 1 ファイルにつき 10 点で、上限は 35 点です。
         scene:
           open: ci
       - target: factor-value
@@ -316,7 +316,7 @@ courses:
     steps:
       - target: find
         title: 絞り込む
-        body: id・加点条件・値・理由の文字で、項目を絞り込みます。当てはまらない項目は隠れ、件数は「一致 / 全体」で出ます。見本では「github」で ci だけが残ります。
+        body: id・加点条件・値・理由の文字で、項目を絞り込みます。該当しない項目は隠れ、件数は「一致 / 全体」で出ます。見本では「github」で ci だけが残ります。
         scene:
           find: github
       - target: factor-row
@@ -339,7 +339,7 @@ courses:
     steps:
       - target: sum
         title: 統合結果の枠
-        body: 子チケットをクローズするときの配点は、共通の設定と、親の project が指す設定の和です。この枠は、その結果を実行ファイルが出したまま、読み取り専用で見せます。
+        body: 子チケットをクローズするときの配点は、共通の設定と、親の project が指す設定の和です。この枠は、その結果を実行ファイルが出したまま、読み取り専用で表示します。
         scene:
           sum: self
       - target: sum-pick
@@ -349,7 +349,7 @@ courses:
           sum: lib
       - target: sum-levels
         title: 境目の点は小さいほう
-        body: 境目の点は、記載された鍵ごとに小さいほうを採ります。見本では lib が HIGH を 30 と設定しているので、共通の 40 より小さい 30 になります。どちらも設定していない鍵は組み込みの値です。
+        body: 境目の点は、記載されたキーごとに小さいほうを採用します。見本では lib が HIGH を 30 と設定しているので、共通の 40 より小さい 30 になります。どちらも設定していないキーは組み込みの値です。
         scene:
           sum: lib
       - target: sum-table
@@ -411,13 +411,13 @@ diagrams:
           .github/workflows/ci.yml  +6 -2
       - id: c-lines
         from: ccnavi
-        text: 行数を数える項目（big-diff）に当てる。src/** のうち src/generated/** を外した行数で比べる
+        text: 行数を数える項目（big-diff）に適用する。src/** のうち src/generated/** を外した行数で比べる
         value: |-
           250 + 80 = 330 行 > 300
           → +25
       - id: c-glob
         from: ccnavi
-        text: 触ったパスの項目（ci）に当てる。当たったファイル 1 つにつき 10 点で、上限は 35 点
+        text: 触ったパスの項目（ci）に適用する。ヒットしたファイル 1 つにつき 10 点で、上限は 35 点
         value: |-
           .github/workflows/ci.yml の 1 ファイル
           → +10
@@ -449,7 +449,7 @@ diagrams:
         text: 点・レベル・加点した理由を記録する
         value: 'phases/親/子.risk.json（points: 55, level: HIGH）'
 
-  # 小さな変更は、どの項目にも当たらず LOW
+  # 小さな変更は、どの項目にもヒットせず LOW
   risk-score-low:
     actors: [エージェント, ccnavi, risks.yml]
     steps:
@@ -468,7 +468,7 @@ diagrams:
         value: src/auth/login.py  +9 -3
       - id: c-all
         from: ccnavi
-        text: 項目に当てる。判定は no と記録されている
+        text: 項目に適用する。判定は no と記録されている
         value: |-
           big-diff: 12 行 ≤ 300 → 0
           many-files: 1 ファイル ≤ 10 → 0
@@ -598,7 +598,7 @@ diagrams:
         value: src/api/v1.py  +100 -20
       - id: score
         from: ccnavi
-        text: 項目に当てる（判定の no-tests は no と記録されている）
+        text: 項目に適用する（判定の no-tests は no と記録されている）
         value: |-
           big-diff（共通）: 120 行 ≤ 300 → 0
           lib:big-diff: 120 行 > 100 → +15

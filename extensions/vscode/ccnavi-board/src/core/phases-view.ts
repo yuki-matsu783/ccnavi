@@ -12,7 +12,7 @@
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
- * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身が届くのは、画面の編集を捨ててよいときだけ。
+ * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身が届くのは、画面の編集を破棄してよいときだけ。
  */
 import type { HandoffEntry, OpenHandoffMessage } from "./handoff-entry.js";
 import type { AppearanceMessage } from "./appearance.js";

@@ -339,7 +339,7 @@ class LauncherTest(unittest.TestCase):
     # L3
 
     def test_does_not_start_a_build_placed_next_to_itself(self):
-        """隣（`.ccnavi/scripts/<os>-<arch>/`）は配る場所ではない。自己防衛のパスが当たらない。"""
+        """隣（`.ccnavi/scripts/<os>-<arch>/`）は配る場所ではない。自己防衛のパスがヒットしない。"""
         self.pretend("Linux x86_64")
         self.build("linux-x86_64", place=self.scripts)
         result = self.run_launcher()

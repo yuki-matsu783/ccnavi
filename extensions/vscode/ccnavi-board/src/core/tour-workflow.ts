@@ -3,11 +3,11 @@
  *
  * 見本は「実行ファイルの答え」（`--plan-order <親> --json` の答え。`planordermodel.ts` の `PlanOrderAnswer`）を、名前を付けて
  * 何本か持つ。手順の `scene.answer` が、その手順で画面が描く答えを名前で選ぶ。画面は答えをそのまま描くので、
- * 未保存・番号の変わる項・保存できない理由・番号の振り直しの確かめは、実際と同じ読み取り（`workflow-view.ts`）から出る。
+ * 未保存・番号の変わるステップ・保存できない理由・番号の振り直しの確かめは、実際と同じ読み取り（`workflow-view.ts`）から出る。
  *
  * 答えは実行ファイルの JSON と同じ形で書き、欠けた欄は次の決まりで埋めてから `parsePlanOrder` に通す（形がずれれば落ちる）。
  *
- *   計画ごと   `ticket`・`part`・`source_sha`・項の `from`（番号）・`deferred`・`review_at`・`locked` は省ける。
+ *   計画ごと   `ticket`・`part`・`source_sha`・ステップの `from`（番号）・`deferred`・`review_at`・`locked` は省ける。
  *              `proposed`（提案に書いてある先行）は、`base` があればその答えの同じ計画の値、無ければ `after`
  *   base       その答えを引く前の答え（先に定義した答えの名前）。書かなかった計画（plan / feedback）は `base` の計画をそのまま使う。
  *              「案に戻す」・外で変わった差分・点の置き場所の元になる。`base` を書かない答えは、開いたときの答え
@@ -60,18 +60,18 @@ function array(value: unknown, at: string): unknown[] {
   return value;
 }
 
-/** 知らない鍵（綴り違い）は、黙って捨てると既定値に化けるので名指しで落とす */
+/** 知らないキー（綴り違い）は、黙って破棄すると既定値に化けるので名指しで落とす */
 function onlyKeys(map: Json, known: readonly string[], at: string): void {
   const unknown = Object.keys(map).find((key) => !known.includes(key));
   if (unknown !== undefined) {
-    throw new Error(`${at} に知らない鍵 ${unknown}`);
+    throw new Error(`${at} に未知のキー ${unknown}`);
   }
 }
 
 function itemOf(raw: unknown, at: string): Json {
   const item = object(raw, at);
   onlyKeys(item, ITEM_KEYS, at);
-  // 実行ファイルの答えの読み取りは、番号の無い項を黙って落とす。見本では落とさず、書き間違いとして止める
+  // 実行ファイルの答えの読み取りは、番号の無いステップを黙って落とす。見本では落とさず、書き間違いとして止める
   if (typeof item.number !== "number" || !Number.isInteger(item.number) || item.number < 1) {
     throw new Error(`${at}.number は 1 以上の整数にする`);
   }
@@ -111,7 +111,7 @@ function planOf(name: string, part: string, raw: unknown, ticket: string, base: 
 
 /**
  * 見本の答え 1 本を、実行ファイルの JSON と同じ形にする（`parsePlanOrder` に渡す手前）。
- * `known` は先に書いた答え（`base` を引く）。テストが実例の JSON と鍵を見比べるために出している
+ * `known` は先に書いた答え（`base` を引く）。テストが実例の JSON とキーを見比べるために出している
  */
 export function completeAnswer(name: string, raw: unknown, ticket: string, known: Readonly<Record<string, Json>>): { readonly json: Json; readonly base: string } {
   const at = `sample.answers.${name}`;

@@ -195,11 +195,11 @@ test("CX-T167 「始める」: service worker も統合先の先頭で閉じた�
   assert.match((skew as { error: string }).error, /互換の版/);
   mock.branch("Feature-12-X", "main");
   const folded = await ask(d, "feature-12-x");
-  assert.match((folded as { error: string }).error, /feature-12-x は既にある（Feature-12-X）/);
+  assert.match((folded as { error: string }).error, /feature-12-x は既にあります（Feature-12-X）/);
   // 互換分解で同じになる名前（全角）も重なりとして拾う
   mock.branch("ｆｅａｔｕｒｅ-13-ｘ", "main");
   const wide = await ask(d, "feature-13-x");
-  assert.match((wide as { error: string }).error, /feature-13-x は既にある（ｆｅａｔｕｒｅ-13-ｘ）/);
+  assert.match((wide as { error: string }).error, /feature-13-x は既にあります（ｆｅａｔｕｒｅ-13-ｘ）/);
   assert.equal(mock.createdBranches.length, 0);
 });
 
@@ -233,7 +233,7 @@ test("CX-T169 GitLab の読みの上限と断り: tree は 50 ページ、discus
   };
   const client = (fetch: gh.Fetch) => ({ host: GL, token: TOKEN, fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait });
   await assert.rejects(gl.tree(client(answer(() => ({ status: 200, json: pageOf(100) }))), "acme", "widgets", "a".repeat(40), "b".repeat(40), "x"), /取得しきれません/);
-  await assert.rejects(gl.discussions(client(answer(() => ({ status: 200, json: Array(100).fill({ notes: [] }) }))), "acme", "widgets", 7, "u"), /多すぎて読み切れない/);
+  await assert.rejects(gl.discussions(client(answer(() => ({ status: 200, json: Array(100).fill({ notes: [] }) }))), "acme", "widgets", 7, "u"), /多すぎて読み切れません/);
   const limited = answer((_, n) => (n === 1 ? { status: 429, json: {}, headers: { "retry-after": "1" } } : { status: 200, json: { id: 42, default_branch: "main" } }));
   assert.equal((await gl.repoInfo(client(limited), "acme", "widgets")).defaultBranch, "main");
   await assert.rejects(gl.repoInfo(client(answer(() => ({ status: 429, json: {}, headers: { "retry-after": "600" } }))), "acme", "widgets"), /レート制限/);

@@ -9,7 +9,7 @@
  *
  * 上限は深さ 8、ノード数 64（実行ファイルの `--lint` と同じ数え方: 最上位のノードの深さを 1、ノードは個別条件も数える）。
  *
- * ここは組み合わせ条件の形と編集だけを持ち、当たる・当たらないには触れない（判定は実行ファイルの仕事）。
+ * ここは組み合わせ条件の形と編集だけを持ち、ヒットする・ヒットしないには触れない（判定は実行ファイルの仕事）。
  * 画面がこのファイルを読むので、`yaml` も node も VS Code の API も入れない。
  */
 
@@ -306,7 +306,7 @@ export function condSummary(root: CondNode): string {
   return walk(root, 0);
 }
 
-/** 組み合わせ条件の中の個別条件の文字（絞り込みが当てる） */
+/** 組み合わせ条件の中の個別条件の文字（絞り込みが適用する） */
 export function condPatterns(root: CondNode): string[] {
   if (root.op === "glob" || root.op === "regex") {
     return [root.pattern];
@@ -341,11 +341,11 @@ function labelOf(node: CondNode): string {
     case "regex":
       return node.pattern;
     case "all":
-      return "すべてに当たる";
+      return "すべてにヒットする";
     case "any":
-      return "どれかに当たる";
+      return "どれかにヒットする";
     case "not":
-      return "当たらない";
+      return "ヒットしない";
     case "invalid":
       return node.text;
   }

@@ -1,4 +1,4 @@
-"""チケットの形。書式の定数・状態の名前・範囲の項・計画の項・待ち方と、チケット 1 本ぶんの
+"""チケットの形。書式の定数・状態の名前・範囲の項・計画のステップ・先行関係と、チケット 1 本ぶんの
 データクラス。
 
 読み込み（`ticket.parse`）と置き場・まとめ方の側がどれも使うので、ここに置く。ticket から分けた。
@@ -59,7 +59,7 @@ SCRIPT_FIELDS = (
 )
 
 # 保守用の子の印（frontmatter の `maintenance:`）。印から決まる例外は、統合の子かどうかを決める
-# `Ticket.is_consolidate` の 1 か所から当てる。識別子の形や名前から推定しない。
+# `Ticket.is_consolidate` の 1 か所から適用する。識別子の形や名前から推定しない。
 MAINTENANCE_KEY = "maintenance"
 MAINTENANCE_CONSOLIDATE = "learning-consolidate"
 # 統合の子のフェーズ番号。親の計画には載らない番号（計画の番号は 1 から）。
@@ -82,7 +82,7 @@ OUTSIDE = ""
 
 @dataclass
 class Entry:
-    """範囲の 1 項。タイプと、当てる式。"""
+    """範囲の 1 項。タイプと、適用する式。"""
 
     decision: str
     glob: str = ""
@@ -114,7 +114,7 @@ class Entry:
         return self.glob[:cut]
 
 
-# 計画の項が書けるレビューの指定。`mr` は定義が none でも要る（強める）、`defer` は
+# 計画のステップが書けるレビューの指定。`mr` は定義が none でも要る（強める）、`defer` は
 # 次にレビューがあるフェーズと一緒に見る（延期）。弱める向き（none）は書けない。
 PLAN_REVIEW_MR = "mr"
 PLAN_REVIEW_DEFER = "defer"
@@ -123,13 +123,13 @@ PLAN_REVIEWS = (PLAN_REVIEW_MR, PLAN_REVIEW_DEFER)
 
 @dataclass
 class PlanItem:
-    """親の計画の 1 項。フェーズ定義の名前と、レビューの指定と、先行（`after`）。
+    """親の計画の 1 ステップ。フェーズ定義の名前と、レビューの指定と、先行（`after`）。
 
-    `after` は、この項より先に閉じてレビューが済んでいるべき項の番号（計画の番号。フィードバック
-    計画も全体計画の続きの番号）。読めた正しい番号（1 以上、自分より小さい、その計画の範囲の中）
-    だけを持つ。形の誤りは読み込みで落とさず、`after_errors` に元の値と理由で持つ
-    （`workflow.problems` が error で言い、判定は親を止める）。読み込みで落とすと承認済み
-    チケットが索引に入らず、判定がその親を知らないまま範囲を当てなくなるため。
+    `after` は、このステップより先に閉じてレビューが済んでいるべきステップの番号（計画の番号。
+    フィードバック計画も全体計画の続きの番号）。読めた正しい番号（1 以上、自分より小さい、
+    その計画の範囲の中）だけを持つ。形の誤りは読み込みで落とさず、
+    `after_errors` に元の値と理由で持つ（`workflow.problems` が error で言い、判定は親を止める）。
+    読み込みで落とすと承認済みチケットが索引に入らず、判定がその親を知らないまま範囲を適用しなくなるため。
     `after_repeated` は同じ番号を 2 度挙げたもの（1 つにまとめ、warn で言う）。
     """
 
@@ -154,8 +154,8 @@ class PlanItem:
         return raw
 
     def __eq__(self, other) -> bool:
-        # `after` は入れない。改版かどうかは推移的な待ちで比べる（`approval.plan_differs`）。
-        # 「待つ: 1, 2」を写した `after` と、直接の先行だけを書いた `after` は同じ待ちになる。
+        # `after` は入れない。改版かどうかは推移的な先行で比べる（`approval.plan_differs`）。
+        # 「先行 1, 2」をコピーした `after` と、直接の先行だけを書いた `after` は同じ先行になる。
         return (
             isinstance(other, PlanItem) and self.type == other.type and self.review == other.review
         )
@@ -167,13 +167,13 @@ WORKFLOW_DAG = "dag"
 
 @dataclass
 class Workflow:
-    """作業・レビュー計画（旧称ワークフロー）の項が互いに待つ関係。
-    承認済みチケット（と提案）の計画の項の `after` から、`workflow.compute` が
+    """作業・レビュー計画（旧称ワークフロー）のステップの先行の関係（先行関係）。
+    承認済みチケット（と提案）の計画のステップの `after` から、`workflow.compute` が
     都度計算する計算結果で、ファイルにもチケットの欄にも持たない。
     VS Code の計画編集タブが編集するのは、この結果ではなく
-    元の `plan:` / `feedback:` の項の `after`。
+    元の `plan:` / `feedback:` のステップの `after`。
 
-    `waits` は番号 → 待つ番号（推移的に辿った全部。番号の小さい順）、`review_at` は延期した
+    `waits` は番号 → 先行の番号（推移的に辿った全部。番号の小さい順）、`review_at` は延期した
     番号 → 引き受ける番号。全体計画もフィードバック計画も入る。`order` はいつも `dag`。
     """
 
@@ -224,13 +224,13 @@ class Ticket:
     # 「見たうえで対応なし」。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
-    # workflow は計画の待ち方。計画の項の `after` から `workflow.compute` が計算して入れる
+    # workflow は計画の先行関係。計画のステップの `after` から `workflow.compute` が計算して入れる
     # （承認済みは `approval.load_copy`、提案は承認の候補を組むときと `phase.phases_of`）。
     # チケットの `workflow:` 欄は読まない。
     workflow: Workflow | None = None
-    # phases_raw は親の `phases:`（計画が使うフェーズ定義の写し）を読んだままの値。欄が無ければ
+    # phases_raw は親の `phases:`（計画が使うフェーズ定義のコピー）を読んだままの値。欄が無ければ
     # None。ここは生の値だけを持ち、形は確かめない（読み込みで落とすと承認済みチケットが索引に
-    # 入らず、判定がその親を知らないまま範囲を当てなくなる）。形の誤りは `blocked` の理由になる。
+    # 入らず、判定がその親を知らないまま範囲を適用しなくなる）。形の誤りは `blocked` の理由になる。
     phases_raw: object = None
     # phase_types は `phases_raw` を定義に読んだもの（id → `phasetypes.PhaseType`）。読むのは
     # compose 層の `phasetypes.types_of` で、入れるのは work 層（承認済みは `approval.load_copy`、
@@ -267,8 +267,8 @@ class Ticket:
     # 読み直すと、照合した中身と書く中身が別の読みになる。`parse` だけで組んだものは None。
     source: bytes | None = field(default=None, repr=False, compare=False)
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
-    # 当てずに止める（phase_scope.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
-    # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--agree` を通らない）。
+    # 適用せずに止める（phase_scope.scope_verdict）。承認のときにしかヒットしなかった構造の検査を、
+    # 判定の側でも適用するために置く（置き場を手で動かして承認すると `--agree` を通らない）。
     blocked: str = ""
     # maintenance は保守用の子の印の、書かれたままの値（欄が無ければ None）。値の正しさは見ない
     # （`maintenance_problem`）。
@@ -287,7 +287,7 @@ class Ticket:
     def is_consolidate(self) -> bool:
         """統合の子か。子で、`phase: 0` で、`maintenance: learning-consolidate` の 3 つがそろう。
 
-        統合の子だけに当てる例外（計画への所属・範囲・学び・リスク・レビュー）は、すべてこの判定から
+        統合の子だけに適用する例外（計画への所属・範囲・学び・リスク・レビュー）は、すべてこの判定から
         決める。組み合わせのおかしいもの（`maintenance_problem`）はここで偽になり、構造エラーで止まる。
         """
         return (
@@ -330,7 +330,7 @@ class Ticket:
         return bool(self.started_at) and not self.completed_at and not self.cancelled_at
 
     def numbered(self) -> list[tuple[int, PlanItem]]:
-        """計画の項に番号を振る。全体計画が 1 から、フィードバック計画はその続き。"""
+        """計画のステップに番号を振る。全体計画が 1 から、フィードバック計画はその続き。"""
         items = list(self.plan) + list(self.feedback or [])
         return [(i + 1, item) for i, item in enumerate(items)]
 
@@ -346,8 +346,8 @@ class Ticket:
     def review_at(self, number: int) -> int | None:
         """この番号のフェーズのレビューが行われる番号。延期なら引き受ける番号。
 
-        待ち方（`workflow`）があればそれで読む（全体計画もフィードバック計画も）。延期の先が
-        無ければ None（計画が壊れている）。待ち方を入れていない読み方（`workflow` が None）では、
+        先行関係（`workflow`）があればそれで読む（全体計画もフィードバック計画も）。延期の先が
+        無ければ None（計画が壊れている）。先行関係を入れていない読み方（`workflow` が None）では、
         後ろで延期していない最初の番号を採る。
         """
         item = self.item_at(number)
@@ -380,7 +380,7 @@ class Ticket:
     def decide(self, rel: str) -> str:
         """このチケットが、ワークツリーのルートからの相対パスをどう扱うか。
 
-        強いタイプから見る。どこにも当たらなければ OUTSIDE で、それは範囲外。
+        強いタイプから見る。どこにもヒットしなければ OUTSIDE で、それは範囲外。
         書いていない場所は範囲外、が子のファイルだけ読んで範囲が分かる条件。
         """
         for name in rules.SECTIONS:
@@ -389,9 +389,9 @@ class Ticket:
         return OUTSIDE
 
     def entry_for(self, rel: str) -> Entry | None:
-        """decide がその判定の根拠にした項。どの項にも当たらなければ None。
+        """decide がその判定の根拠にした項。どの項にもヒットしなければ None。
 
-        判定の文面で「どの項に当たったか」を名指しするために使う。見る順は decide と同じ。
+        判定の文面で「どの項にヒットしたか」を名指しするために使う。見る順は decide と同じ。
         """
         for name in rules.SECTIONS:
             for e in self.entries:

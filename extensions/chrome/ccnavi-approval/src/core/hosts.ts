@@ -11,7 +11,7 @@
 export type HostKind = "github" | "gitlab";
 
 export interface Host {
-  /** 設定と PAT の鍵。`github.com` など */
+  /** 設定と PAT のキー。`github.com` など */
   readonly id: string;
   readonly kind: HostKind;
   /** REST の根。`https://api.github.com`、GHES なら `https://<ホスト>/api/v3` */
@@ -28,12 +28,12 @@ const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
 /** URL を読み、https（loopback だけ http）で、資格情報・クエリ・# の無いものに限る */
 export function endpoint(value: unknown, what: string): URL {
   if (typeof value !== "string") {
-    throw new Error(`${what} が文字列でない`);
+    throw new Error(`${what} が文字列ではありません`);
   }
   const url = new URL(value);
   const loopback = url.protocol === "http:" && LOOPBACK.has(url.hostname);
   if (url.protocol !== "https:" && !loopback) {
-    throw new Error(`${what} は https に限る（http は localhost と 127.0.0.1 だけ）: ${value}`);
+    throw new Error(`${what} は https のみ指定できます（http は localhost と 127.0.0.1 だけです）：${value}`);
   }
   if (url.username || url.password || url.search || url.hash) {
     throw new Error(`${what} には資格情報・クエリ・# を含めないでください：${value}`);
@@ -46,7 +46,7 @@ export function parseHosts(text: string): Host[] {
   const raw: unknown = JSON.parse(text);
   const list = (raw as { hosts?: unknown })?.hosts;
   if (!Array.isArray(list) || list.length === 0) {
-    throw new Error("hosts が空");
+    throw new Error("hosts が空です");
   }
   const seen = new Set<string>();
   return list.map((entry: Record<string, unknown>) => {
@@ -57,7 +57,7 @@ export function parseHosts(text: string): Host[] {
     seen.add(id);
     const kind = entry.kind;
     if (kind !== "github" && kind !== "gitlab") {
-      throw new Error(`${id}: kind は github か gitlab`);
+      throw new Error(`${id}：kind は github か gitlab を指定してください`);
     }
     const api = endpoint(entry.api, `${id}.api`);
     const web = endpoint(entry.web, `${id}.web`);

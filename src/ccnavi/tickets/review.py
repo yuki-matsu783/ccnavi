@@ -4,14 +4,14 @@ sh が渡す JSON の形と投稿の目印は `review_host`、残った指摘の
 `review_decide`、親を閉じる操作（`ready` と `close-early`）は `review_close` に分けてある。
 review_decide と review_close は review を読む末端で、review からは読まない。
 
-## exe が見るのは作業ツリーの中だけ
+## exe が見るのはワークツリーの中だけ
 
 ここはネットワークに出ない。フェーズが終わっているか、子のブランチが親に入っているか、
 未コミットが無いか、push 済みか、マーカーがどうなっているか。分かるのはそこまでで、
 マージリクエストの中身は `.ccnavi/scripts/ccnavi-review.sh` が取ってきて JSON で渡す
 （`--result <path>`）。その JSON の形が sh と exe の契約で、テストも同じ経路を通る。
 
-API のパス、トークンの権限、ページング、セルフホストの差は実物に当てないと決まらない。
+API のパス、トークンの権限、ページング、セルフホストの差は実物に適用しないと決まらない。
 exe が API を直接呼ぶと、その呼び出しが配布物に組み込まれ、動かなくなったときに exe を
 作り直すしかない。
 sh ならプロジェクトごとに直せる。
@@ -22,11 +22,11 @@ sh ならプロジェクトごとに直せる。
 （`requested`）。段の名前が違えば、どちらで止まったかが exit code を見なくても分かる。
 `prepare` はマーカー付きの本文を state の置き場に書き出し、sh はそれを投稿する。
 
-## 変更要求はユーザの端末でも通せない
+## 変更要求はユーザのターミナルでも通せない
 
 未解決スレッドはユーザが `--reviewed --accept-unresolved` で受け入れて進めるが、
 変更要求（changes requested）のレビューが残っている間はマーカーを置かない。
-「このままではマージしない」の意思表示を、別の人が端末から上書きできるようにはしない。
+「このままではマージしない」の意思表示を、別の人がターミナルから上書きできるようにはしない。
 
 ## 未解決の指摘は、付いた時刻で絞らない
 
@@ -75,14 +75,14 @@ REQUEST_FILE = "review-request-{parent}-{phase}.md"
 # 依頼の本文とマージリクエストの下書きの末尾に必ず書く一文。下書きの置き場
 # （ticket_places.HANDOFF）の変更を、レビュアーが読む対象に数えないため。
 HANDOFF_NOTE = (
-    f"{ticket_places.HANDOFF}/ 配下はユーザに渡す写しで、レビューの対象外。integrate で消える。"
+    f"{ticket_places.HANDOFF}/ 配下はユーザに渡すコピーで、レビューの対象外。integrate で消える。"
 )
 
 # 依頼の本文の末尾に、`HANDOFF_NOTE` のあとに足す固定の 1 文。fix で直した指摘のスレッドは、ホストの
 # 上で未解決のまま残る（仕様）。直ったかを見て resolve するのはユーザで、エージェントは fix を理由に
 # resolve しない。ホストを問わない書き方。keep・issue を選んだときに sh が返信して resolve する
 # 仕組み（受け入れの返信と解決）はこの文の対象外。
-# 依頼の目印の鍵は、この文を足す前の本文と親のブランチの先頭から作る（文を足しても鍵は
+# 依頼の目印のキーは、この文を足す前の本文と親のブランチの先頭から作る（文を足してもキーは
 # 変わらないので、足す前に投稿した依頼を打ち直しても、二重に投稿されない）。
 RESOLVE_NOTE = (
     "修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。"
@@ -132,9 +132,9 @@ def prepare(
     # ユーザが読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
     body = body.rstrip("\n") + "\n\n" + HANDOFF_NOTE + "\n"
-    # 目印に、本文と親のブランチの先頭から作った鍵を入れる。sh は同じ目印の投稿が MR に
+    # 目印に、本文と親のブランチの先頭から作ったキーを入れる。sh は同じ目印の投稿が MR に
     # 既にあれば投稿し直さない（打ち直し・write-and-push のやり直しで依頼を二重にしない）。
-    # 子を足してやり直した依頼は先頭が違うので、別の鍵になる。
+    # 子を足してやり直した依頼は先頭が違うので、別のキーになる。
     head = gitcmd.run(tree_root, ["rev-parse", "HEAD"])
     key = hashlib.sha256(
         (body + "\n" + (head.out.strip() if head.ok else "")).encode("utf-8")
@@ -281,7 +281,7 @@ def reviewed_mark(
     （Chrome は `via: chrome`。手元の `confirm` は `--actor` があるときだけ `actor` と `via: cli` を
     渡し、無ければマーカーは前と同じバイト列）。`stamp` が空なら `at` を
     書かず、`approval_marks.write_mark` が今の時刻を入れる。
-    `accepted` 欄は受け入れた指摘の鍵の記録。受け入れた指摘はホストで解決済みにしてあるので、
+    `accepted` 欄は受け入れた指摘のキーの記録。受け入れた指摘はホストで解決済みにしてあるので、
     確認はホストの状態だけを数える。
     """
     mark: dict = {"mr": mr, "accepted": list(accepted)}
@@ -359,7 +359,7 @@ def review_problems(
         ]
     else:
         lines.append(
-            "ユーザに解決してもらって再実行する。または、ユーザが端末で "
+            "ユーザに解決してもらって再実行する。または、ユーザがターミナルで "
             f"'{review_sh} decide {phase_no}'（ボードの「決める」）を使い、指摘ごとに"
             "受け入れて進むか、続きの子チケットで直すかを選ぶ"
         )
@@ -483,14 +483,14 @@ def _settle_children(
 
 
 def thread_key(t: review_host.Thread) -> str:
-    """選択をスレッドに対応づける鍵。URL を先に使い、無ければスレッドの id。"""
+    """選択をスレッドに対応づけるキー。URL を先に使い、無ければスレッドの id。"""
     return review_host.thread_key(t)
 
 
 def thread_version(t: review_host.Thread) -> str:
-    """指摘の版。SHA-256(鍵 + 改行 + 正規化した最初のコメントの本文) の先頭 32 桁。
+    """指摘の版。SHA-256(キー + 改行 + 正規化した最初のコメントの本文) の先頭 32 桁。
 
-    正規化するのは改行コード（CRLF・CR を LF に）と Unicode の NFC だけ。本文が変わるか、鍵が
+    正規化するのは改行コード（CRLF・CR を LF に）と Unicode の NFC だけ。本文が変わるか、キーが
     変わると版が変わる。見せた指摘と、適用の直前に取り直した指摘が同じかを、この版で照合する
     （CLI と Chrome が同じ Python のコアでこの 1 か所を使う）。
     """
@@ -696,7 +696,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
         problems.append(
             f"`{handoff.HANDOFF_REL}/` に取り込んでいない保護対象の下書きが {len(waiting)} 件ある"
             f"（{shown}）。ready は `{wip}/` を削除するので中止しました。ユーザに"
-            "`ccnavi user handoff` で取り込んでもらうか、要らない下書きを削除してから"
+            "`ccnavi-user-handoff.sh` で取り込んでもらうか、要らない下書きを削除してから"
             "再実行してください"
         )
     if _dirty(tree_root, conf, wip_removals=True):
@@ -746,7 +746,7 @@ def remove_wip(tree_root: str) -> tuple[list[str], str, str]:
     for rel in names:
         full = os.path.join(tree_root, *rel.split("/"))
         if not os.path.lexists(full):
-            # 作業ツリーから先に消えていた（削除が未コミット）。消したものとして一覧に載せ、
+            # ワークツリーから先に消えていた（削除が未コミット）。消したものとして一覧に載せ、
             # write-and-push のコミットに含める。
             fsio.note_removed(full)
             removed.append(rel)

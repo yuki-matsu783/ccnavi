@@ -50,7 +50,7 @@ test("CB-T532 見本の一覧を読める。テンプレートの件数、drafts
   assert.deepEqual([data.errors, data.warns, data.infos], [3, 2, 1]);
 });
 
-test("CB-T533 捨てた理由を読める。共通の broken は invalid、self の feature は duplicate、self の research は conflict", () => {
+test("CB-T533 破棄した理由を読める。共通の broken は invalid、self の feature は duplicate、self の research は conflict", () => {
   const data = fixture();
   const broken = data.templates.find((t) => t.name === "broken" && t.layer === "common");
   assert.equal(broken?.dropped?.reason, "invalid");
@@ -59,7 +59,7 @@ test("CB-T533 捨てた理由を読める。共通の broken は invalid、self 
   const research = data.templates.find((t) => t.name === "research" && t.layer === "self");
   assert.equal(research?.dropped?.reason, "conflict");
   const common = data.templates.find((t) => t.name === "feature" && t.layer === "common");
-  assert.equal(common?.dropped, null, "捨てていなければ null");
+  assert.equal(common?.dropped, null, "破棄していなければ null");
 });
 
 test("CB-T558 下書きは読むだけの欄（名前・置かれたツリー・パス・読めたか・指摘）を読む。取り込みのための欄は持たない", () => {
@@ -78,7 +78,7 @@ test("CB-T558 下書きは読むだけの欄（名前・置かれたツリー・
   );
 });
 
-test("CB-T1103 下書きの欄が古い形（sha・importable・text・exists_in を含む答え）でも読める。余分な欄は捨てる", () => {
+test("CB-T1103 下書きの欄が古い形（sha・importable・text・exists_in を含む答え）でも読める。余分な欄は破棄する", () => {
   const text = fixtureWith((raw) => {
     const drafts = raw.drafts as Record<string, unknown>[];
     drafts[0] = { ...drafts[0], sha: "x", importable: true, text: "t", exists_in: ["common"], also_in: ["lib"], checked_with: "self" };

@@ -897,7 +897,7 @@ def write_report(scn, out, st, results, rows, raw):
         "",
         "列: step=どの step の行か / event=hook の種類 / tool=対象のツール / "
         "decision=判定（allow・deny・ask など）/"
-        " code=判定の理由コード / rules=当たったルール / subject=判定の対象（コマンドやパス）。"
+        " code=判定の理由コード / rules=ヒットしたルール / subject=判定の対象（コマンドやパス）。"
         "UNDECLARED はハンドオーバーに宣言が無いことを示す code。",
         "",
         *_step_decisions_table(rows, step_sessions),
@@ -983,7 +983,7 @@ def confirmation_text(scn, root, mode_text):
     if clash:
         facts += ["", f"注意: setup のパスが既にある（run は回さない）: {', '.join(clash)}"]
     questions = [
-        "確認事項 1: 作業ツリーに未コミットの変更がなく、origin と同期しているか"
+        "確認事項 1: ワークツリーに未コミットの変更がなく、origin と同期しているか"
         "（他のセッションが作業中の変更を含まないか）"
     ]
     if scn.get("test_repo"):

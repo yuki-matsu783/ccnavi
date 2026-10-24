@@ -1,9 +1,9 @@
 /**
- * 編集欄の計画 1 つ（全体計画かフィードバック計画）。上に線を引ける図、下に項の表（種類・レビューを選び、並べ替え・削除・追加）。
+ * 編集欄の計画 1 つ（全体計画かフィードバック計画）。上に線を引ける図、下にステップの表（種類・レビューを選び、並べ替え・削除・追加）。
  *
- * 図に描く中身（番号・始まる項・終端に当たらない項・順序の error）は実行ファイルが読んで返した答え（`plan`）のまま描き、
+ * 図に描く中身（番号・始まるステップ・終端に届かないステップ・順序の error）は実行ファイルが読んで返した答え（`plan`）のまま描き、
  * ここは判定しない。**図が古い間は（編集した直後で、まだ読ませた答えが戻っていない間）線を引けない**。古い図の番号で線を引くと、
- * 別の項を指してしまうため。
+ * 別のステップを指してしまうため。
  */
 import { useState, type JSX } from "react";
 
@@ -25,11 +25,11 @@ import { PlanGraph } from "../shared/PlanGraph.js";
 
 const PART_TITLE: Readonly<Record<PlanPart, string>> = { plan: "全体計画", feedback: "フィードバック計画" };
 
-/** 項の `review` の言葉 */
+/** ステップの `review` の言葉 */
 const REVIEW_LABEL: Readonly<Record<string, string>> = {
   "": "定義のまま",
   mr: "mr（MR を見る）",
-  defer: "defer（後ろの項へ延ばす）",
+  defer: "defer（後ろのステップへ延ばす）",
 };
 
 export interface PlanEditProps {
@@ -68,10 +68,10 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
           className="action small"
           data-action="add-item"
           disabled={first === undefined}
-          title={first === undefined ? "この層で使える型（phases.yml の定義）が見つかりません" : undefined}
+          title={first === undefined ? "この層で指定できる型（phases.yml の定義）が見つかりません" : undefined}
           onClick={() => first !== undefined && onChange(addItem(template, part, first))}
         >
-          {part === "feedback" ? "フィードバック計画を作る" : "項を足す"}
+          {part === "feedback" ? "フィードバック計画を作る" : "ステップを足す"}
         </button>
       </section>
     );
@@ -94,13 +94,13 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
         <p className="hint">図は、実行ファイルが読み終えると出ます。</p>
       )}
       <table className="tpl-plan tpl-edit-items">
-        <caption className="sr-only">{title}の項</caption>
+        <caption className="sr-only">{title}のステップ</caption>
         <thead>
           <tr>
             <th scope="col">番号</th>
             <th scope="col">種類</th>
             <th scope="col">レビュー</th>
-            <th scope="col">待つ項</th>
+            <th scope="col">先行ステップ</th>
             <th scope="col">操作</th>
           </tr>
         </thead>
@@ -154,7 +154,7 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
                     data-action="remove-item"
                     aria-label={`${offset + index} 番を削除`}
                     disabled={part === "plan" && items.length <= 1}
-                    title={part === "plan" && items.length <= 1 ? "全体計画の最後の 1 項は消せません" : undefined}
+                    title={part === "plan" && items.length <= 1 ? "全体計画の最後の 1 ステップは消せません" : undefined}
                     onClick={() => onChange(removeItem(template, part, index))}
                   >
                     削除
@@ -170,7 +170,7 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
   );
 }
 
-/** 末尾に項を足す。足した項は前の末尾の項を待つ（線は図で引き直せる） */
+/** 末尾にステップを足す。足したステップには前の末尾のステップが先行する（線は図で引き直せる） */
 function AddItem({ part, template, types, onChange }: Pick<PlanEditProps, "part" | "template" | "types" | "onChange">): JSX.Element {
   const options = optionsFor(part, types, "");
   const [picked, setPicked] = useState("");
@@ -179,7 +179,7 @@ function AddItem({ part, template, types, onChange }: Pick<PlanEditProps, "part"
   return (
     <p className="tpl-edit-add">
       <label htmlFor={id} className="dim">
-        足す項の種類
+        足すステップの種類
       </label>{" "}
       <select id={id} className="f-add-type" value={type} disabled={options.length === 0} onChange={(event) => setPicked(event.target.value)}>
         {options.map((o) => (
@@ -189,7 +189,7 @@ function AddItem({ part, template, types, onChange }: Pick<PlanEditProps, "part"
         ))}
       </select>{" "}
       <button type="button" className="action small" data-action="add-item" disabled={type === ""} onClick={() => onChange(addItem(template, part, type))}>
-        項を足す
+        ステップを足す
       </button>
     </p>
   );

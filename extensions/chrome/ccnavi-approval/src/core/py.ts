@@ -144,7 +144,7 @@ export interface Written {
 
 /**
  * 通らなかった根拠の種別（付録 A の `CORE_*`）。通れば null。文面の頭の `[<コード>]` と同じもの。
- * 分岐は文面の言い回しではなく、この鍵で決める
+ * 分岐は文面の言い回しではなく、このキーで決める
  */
 export type ReasonCode = string | null;
 

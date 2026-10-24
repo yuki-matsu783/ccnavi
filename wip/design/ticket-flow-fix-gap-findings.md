@@ -65,7 +65,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 
 - 根拠
   - 古い sh は `last_id`・`last_at`・`last_author` を返しません。実行ファイルは空文字で読みます（`review_host.py` 189-191 行）。
-  - 台帳の照合 `_accepted_by_ledger`（`review_host.py` 420 行付近）は、鍵か最後のコメントの id が空なら「受け入れ済みにしない」とします。台帳で受け入れた指摘が未解決として数え直され、見えなくなる側には倒れません。
+  - 台帳の照合 `_accepted_by_ledger`（`review_host.py` 420 行付近）は、キーか最後のコメントの id が空なら「受け入れ済みにしない」とします。台帳で受け入れた指摘が未解決として数え直され、見えなくなる側には倒れません。
   - 再提起の見分けは使えません。台帳に受け入れた指摘が毎回数え直されるだけで、誤って受け入れることはありません。
   - sh と実行ファイルの食い違いは警告だけで、止まりません（`ccnavi_compat_skew` は 1 を返すだけです。呼び手は警告を書いて先へ進みます）。
 - 勧める対応: 現状のまま。更新の案内に「sh を先に更新しないと、受け入れた指摘が再び数えられる」と書きます。
@@ -153,7 +153,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 
 結論: 対応済み（設計どおり）
 
-- 根拠: 台帳は親ごとの `phases/<親>/accepted.json` です。改版の承認（`approval_ops` の開き直し）はフェーズのマーカーだけを消し、台帳は消しません（`approval_marks.py` 189 行のコメント）。数え方は鍵と版と最後のコメントの id だけを見て、フェーズ番号や範囲は見ません。台帳を消すのは ready の退避（`archive.py`、`phases/<親>/` を丸ごと）だけです。
+- 根拠: 台帳は親ごとの `phases/<親>/accepted.json` です。改版の承認（`approval_ops` の開き直し）はフェーズのマーカーだけを消し、台帳は消しません（`approval_marks.py` 189 行のコメント）。数え方はキーと版と最後のコメントの id だけを見て、フェーズ番号や範囲は見ません。台帳を消すのは ready の退避（`archive.py`、`phases/<親>/` を丸ごと）だけです。
 - 注意: 改版で範囲が広がっても、受け入れた指摘は版が変わらない限り数えません。範囲が変わったことを理由に受け入れを失効させる仕組みはありません。設計もそれを求めていません。
 - 勧める対応: 現状のまま。ADR-0152 に 1 行足してもかまいません。
 
@@ -186,7 +186,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 
 - 根拠: `tests/ticket/test_phases.py` の `test_close_early_accepts_threads_in_three_stages`（1143 行付近）は、`user close-early` の `--accept-plan`・`--accept-check`・`--accept-done` を打ちます。断る文言の出どころは `review_close.py` 470 行です。`user reviewed --accept-unresolved` の経路ではありません。
 - decide の経路は別で、追加の指摘を許します。`review_decide.changed_since_shown`（184 行付近）は「見せたあとに追加された指摘は食い違いに数えない」とします。設計の「追加だけなら適用する」と合います。
-- 勧める対応: close-early は設計の対象外です（設計書の照合の表は decide 用です）。close-early が追加の指摘で断るのは、早めに閉じる前に増えた指摘を黙って捨てないためです。このままで足ります。
+- 勧める対応: close-early は設計の対象外です（設計書の照合の表は decide 用です）。close-early が追加の指摘で断るのは、早めに閉じる前に増えた指摘を黙って破棄しないためです。このままで足ります。
 
 ## 7. 保証しないことの一覧（`docs/design/limits.md`）
 
@@ -212,7 +212,7 @@ keywords: [チケット, 手動移動, 受け入れ台帳, 操作記録, 互換�
 
 | テスト | 内容 | 設計 |
 |---|---|---|
-| `test_manual_settle.py` `test_the_same_child_in_review_and_done_is_broken` | `phase.phases_of` が同じ識別子を done 側 1 件に畳み、`assess` の重複検査に届きません。review/ に写しが残っていても READY になります | BROKEN |
+| `test_manual_settle.py` `test_the_same_child_in_review_and_done_is_broken` | `phase.phases_of` が同じ識別子を done 側 1 件に畳み、`assess` の重複検査に届きません。review/ にコピーが残っていても READY になります | BROKEN |
 | `test_manual_settle.py` `test_an_unshared_move_is_not_confirmed_even_with_no_threads` | 未共有の移動でも、未解決の指摘が無いと通常の confirm が通ります | AT38 は確定しない |
 | `test_decide_exe.py` `test_the_same_operation_replayed_after_the_marker_came_back_makes_no_second_child` | `ccnavi_op` は書くだけで、同じ操作IDの子を使い回しません（`approval_ops._followup_ticket`） | AT13 |
 | `test_decide_recovery.py` `test_resume_from_the_workspace_root_after_the_parent_worktree_is_gone` | `--resume` は親のワークツリーが無いと `decide-no-worktree` で断ります | AT25 |

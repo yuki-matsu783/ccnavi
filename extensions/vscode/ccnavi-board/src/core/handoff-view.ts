@@ -24,9 +24,9 @@ export interface HandoffEntry {
   readonly path: string;
   readonly kind: HandoffKind;
   readonly state: HandoffState;
-  /** ボードから取り込めるか。偽（`defense`）は端末でだけ取り込む */
+  /** ボードから取り込めるか。偽（`defense`）はターミナルでだけ取り込む */
   readonly board: boolean;
-  /** 見るだけの呼び出しで指した対象か（パスを省いたときは、許可リストに当たり unchanged でないもの全部） */
+  /** 見るだけの呼び出しで指した対象か（パスを省いたときは、許可リストにヒットし unchanged でないもの全部） */
   readonly selected: boolean;
   readonly errors: readonly string[];
   readonly warnings: readonly string[];
@@ -41,7 +41,7 @@ export interface HandoffList {
   readonly version: number;
   /** 見たツリーの絶対パス */
   readonly tree: string;
-  /** 許可リストに当たらず、対象外にした件数 */
+  /** 許可リストにヒットせず、対象外にした件数 */
   readonly ignored: number;
   readonly entries: readonly HandoffEntry[];
   /** 選んだ対象の集合のハッシュ。拡張は組み直さず、取り込みたいパスを指した答えのものを使う */
@@ -115,7 +115,7 @@ export type ToHandoff =
   | { readonly type: "cancelled" }
   /** 取り込みの答え */
   | ({ readonly type: "imported" } & HandoffOutcome)
-  /** 端末で打つコマンド（`defense` の対象用）。`command` が空なら `error` に理由 */
+  /** ターミナルで打つコマンド（`defense` の対象用）。`command` が空なら `error` に理由 */
   | { readonly type: "terminal"; readonly path: string; readonly command: string; readonly error: string }
   | AppearanceMessage;
 
@@ -129,9 +129,9 @@ export type HandoffMessage =
   | { readonly type: "switchTree"; readonly key: string }
   /** 選んだ対象を取り込む */
   | { readonly type: "import"; readonly paths: readonly string[] }
-  /** 端末で打つコマンドを出す（`board` が偽の対象） */
+  /** ターミナルで打つコマンドを出す（`board` が偽の対象） */
   | { readonly type: "terminal"; readonly path: string }
-  /** 文面をクリップボードへ写す */
+  /** 文面をクリップボードへコピーする */
   | { readonly type: "copy"; readonly text: string };
 
 /** 最初の中身を埋める `<script type="application/json">` の id */

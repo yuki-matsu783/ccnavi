@@ -393,8 +393,8 @@ class GuardScriptTest(_Workspace):
         # 使える副命令の並びは増える（merged の後ろに mr-state）。頭の文面だけ固定する
         self.assertTrue(
             result.stderr.startswith(
-                "ccnavi-review: https://u:SECRET@h は使用できません。"
-                "使えるのは request / confirm / comment / decide / ready / "
+                "ccnavi-review: https://u:SECRET@h は指定できません。"
+                "指定できるのは request / confirm / comment / decide / ready / "
                 "fetch / origin / merged"
             ),
             result.stderr,

@@ -1,6 +1,6 @@
 /**
  * テンプレート管理の案内の時系列の図（`tours/templates.yml` の `diagrams:`）と、図を引く 2 本の案内の検査。
- * 図の中の値（名前・説明・パス・計画の項）は、同じ YAML の見本（`sample:`）と食い違わないようにする。
+ * 図の中の値（名前・説明・パス・計画のステップ）は、同じ YAML の見本（`sample:`）と食い違わないようにする。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -35,10 +35,10 @@ function featureOf() {
   return feature;
 }
 
-/** 見本の feature の計画を、提案に書かれる形（`1 design / 2 implement（待つ 1）`）にする。待つ項は 1 始まりの番号で言う */
+/** 見本の feature の計画を、提案に書かれる形（`1 design / 2 implement（先行 1）`）にする。先行ステップは 1 始まりの番号で言う */
 function planText(): string {
   return featureOf()
-    .plan.map((item, index) => `${index + 1} ${item.type}${item.after.length > 0 ? `（待つ ${index}）` : ""}`)
+    .plan.map((item, index) => `${index + 1} ${item.type}${item.after.length > 0 ? `（先行 ${index}）` : ""}`)
     .join(" / ");
 }
 
@@ -82,7 +82,7 @@ test("CB-T1201 図は 4 つで、登場者は 2〜6 人。2 本の案内の手�
   assert.deepEqual([...used].sort(), [...DIAGRAMS].sort(), "2 本の案内が使わない図がある");
 });
 
-test("CB-T1202 図の中の値は、見本の下書き・テンプレート・置き場と一致する（名前・説明・パス・計画の項・使う場面）", () => {
+test("CB-T1202 図の中の値は、見本の下書き・テンプレート・置き場と一致する（名前・説明・パス・計画のステップ・使う場面）", () => {
   const login = sample.page.data.drafts.find((d) => d.name === "login");
   assert.ok(login !== undefined);
   const feature = featureOf();
@@ -102,15 +102,15 @@ test("CB-T1202 図の中の値は、見本の下書き・テンプレート・�
   assert.ok(propose.includes(`いつ: ${feature.when}`), "一覧の答えに、見本の使う場面");
   assert.ok(propose.includes(`--template ${feature.name}`));
   assert.ok(propose.includes(`${PLACE}${feature.name}.yml`), "引く先は、見本の層の置き場の feature.yml");
-  assert.ok(propose.includes(`plan（${feature.plan.length} 項）: ${planText()}`), "提案の計画は見本の plan と同じ並び");
-  assert.ok(propose.includes(`フィードバック計画（${feature.feedback.length} 項）`), "見本の feedback の項数");
+  assert.ok(propose.includes(`plan（${feature.plan.length} ステップ）: ${planText()}`), "提案の計画は見本の plan と同じ並び");
+  assert.ok(propose.includes(`フィードバック計画（${feature.feedback.length} ステップ）`), "見本の feedback のステップ数");
   assert.ok(!/ccnavi ticket new [^\n]*--with-feedback/.test(propose), "フィードバックなしの図の命令に --with-feedback を付けない");
 
   const withFeedback = valuesOf("template-propose-feedback");
   assert.ok(/ccnavi ticket new [^\n]*--template feature --with-feedback/.test(withFeedback));
   const planned = feature.plan.length;
-  assert.ok(withFeedback.includes(`feedback（${feature.feedback.length} 項）: ${planned + 1} ${feature.feedback[0].type}`), "フィードバック計画の番号は全体計画の続き");
-  assert.ok(withFeedback.includes(`plan（${planned} 項）: ${planText()}`));
+  assert.ok(withFeedback.includes(`feedback（${feature.feedback.length} ステップ）: ${planned + 1} ${feature.feedback[0].type}`), "フィードバック計画の番号は全体計画の続き");
+  assert.ok(withFeedback.includes(`plan（${planned} ステップ）: ${planText()}`));
 });
 
 test("CB-T1203 新しい案内の手順の scene は見本にある名前だけを指し、図を引く手順の focus は図の矢印にある", () => {

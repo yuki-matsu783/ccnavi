@@ -275,7 +275,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["tree"], "app")
         self.assertEqual(record["rules"], ["projects/app/.ccnavi/config/project/rules.yml:schema"])
 
-        # lib に schema の deny は無い。app の deny は lib には当たらない。
+        # lib に schema の deny は無い。app の deny は lib にはヒットしない。
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
@@ -293,7 +293,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["rules"], [".ccnavi/config/common/rules.yml:ws-src"])
         self.assertNotIn("project", record)
 
-        # ワークスペースの schema/ は誰も守っていない。app の deny は当たらない。
+        # ワークスペースの schema/ は誰も守っていない。app の deny はヒットしない。
         passed = self.hook("Write", self.app, file_path=os.path.join(self.ws, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
@@ -334,7 +334,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("app", record["detail"])
         self.assertNotIn("built-in defaults", self.reason(passed))
 
-        # 共通レイヤーの deny は不正なレイヤーの上でも当たったまま。
+        # 共通レイヤーの deny は不正なレイヤーの上でもヒットしたまま。
         guarded = os.path.join(self.app, ".ccnavi", "approved", "x")
         denied = self.hook("Write", self.ws, file_path=guarded)
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
@@ -738,7 +738,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(body["verdict"], "deny", tried.stdout)
         hit = body["rules"][0]
         self.assertEqual(hit["id"], "tmp/lib-rules.yml:docs")
-        # 当たったルールはプロジェクトの名前付きで引け、翻訳後の式まで見える。
+        # ヒットしたルールはプロジェクトの名前付きで引け、翻訳後の式まで見える。
         self.assertEqual(hit["source"], "file")
         self.assertEqual(hit["written"], "*/docs/*")
 

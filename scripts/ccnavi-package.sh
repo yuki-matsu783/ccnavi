@@ -143,7 +143,7 @@ main() {
 			return 0
 			;;
 		*)
-			die "$1 は使えない引数です。使えるものは --help で確認できます。"
+			die "$1 は指定できない引数です。指定できるものは --help で確認できます。"
 			;;
 		esac
 	done
@@ -219,12 +219,12 @@ main() {
 		cp -RPp "$root/$1" "$stage/$2" || return 1
 	}
 
-	copy_into dist/ccnavi dist/ccnavi || die "dist/ccnavi を写せません。" 4
-	copy_into dist/ccnavi.target dist/ccnavi.target || die "dist/ccnavi.target を写せません。" 4
+	copy_into dist/ccnavi dist/ccnavi || die "dist/ccnavi をコピーできません。" 4
+	copy_into dist/ccnavi.target dist/ccnavi.target || die "dist/ccnavi.target をコピーできません。" 4
 	for item in .ccnavi/CCNAVI.md .ccnavi/config/common .ccnavi/scripts .ccnavi/docs .claude/skills \
 		scripts/ccnavi-setup.sh scripts/ccnavi-install.sh scripts/ccnavi-doctor.sh; do
 		[ -e "$root/$item" ] || die "$root/$item がありません。" 4
-		copy_into "$item" "$item" || die "$item を写せません。" 4
+		copy_into "$item" "$item" || die "$item をコピーできません。" 4
 	done
 
 	# 実行ファイルの互換の版（拡張機能の照合の基準）
@@ -242,7 +242,7 @@ main() {
 	elif [ -z "$py_compat" ] || [ "$vsc_compat" != "$py_compat" ]; then
 		printf '案内: VS Code 拡張の互換の版（%s）が実行ファイルの互換の版（%s）と違うので入れていない\n' "${vsc_compat:-不明}" "${py_compat:-不明}"
 	else
-		copy_into "dist/ccnavi-board-$vsc_version.vsix" "dist/ccnavi-board-$vsc_version.vsix" || die "vsix を写せません。" 4
+		copy_into "dist/ccnavi-board-$vsc_version.vsix" "dist/ccnavi-board-$vsc_version.vsix" || die "vsix をコピーできません。" 4
 	fi
 
 	# Chrome 拡張
@@ -260,14 +260,14 @@ main() {
 	elif [ -z "$py_compat" ] || ! grep -Eq "compat:${py_compat}([^0-9]|\$)" "$chr_dir/dist/background.js" 2>/dev/null; then
 		printf '案内: Chrome 拡張の組み込みの互換の版が実行ファイルの互換の版（%s）と合わない（または読めない）ので入れていない。組み立て直すこと\n' "${py_compat:-不明}"
 	else
-		copy_into extensions/chrome/ccnavi-approval/dist extensions/chrome/ccnavi-approval/dist || die "Chrome 拡張を写せません。" 4
+		copy_into extensions/chrome/ccnavi-approval/dist extensions/chrome/ccnavi-approval/dist || die "Chrome 拡張をコピーできません。" 4
 	fi
 
-	# 入れないもの（写したものの中に紛れたものを除く）
+	# 入れないもの（コピーしたものの中に紛れたものを除く）
 	find "$stage" \( -name ccnavi-index.jsonl -o -name .DS_Store \) -exec rm -f {} + || die "不要なファイルを除けません。" 4
-	# 作業ツリーをそのまま写すので、追跡されていない物や無視された物が紛れうる。鍵・認証情報の置き場と、
+	# ワークツリーをそのままコピーするので、追跡されていない物や無視された物が紛れうる。キー・認証情報の置き場と、
 	# 実行時の記録（logs・wip）、古い vsix は入れない。
-	# dist/ccnavi の中の *.pem（証明書の束）は実行ファイルが使うので、鍵の掃除は .ccnavi と .claude だけに掛ける。
+	# dist/ccnavi の中の *.pem（証明書の束）は実行ファイルが使うので、キーの掃除は .ccnavi と .claude だけに掛ける。
 	find "$stage/.ccnavi" "$stage/.claude" -type f \( -name '.env' -o -name '.env.*' -o -name '*.pem' \
 		-o -name '*.key' -o -name 'credentials*.json' -o -name 'secrets.y*ml' -o -name 'id_rsa' \
 		-o -name 'id_ed25519' \) -exec rm -f {} + || die "不要なファイルを除けません。" 4

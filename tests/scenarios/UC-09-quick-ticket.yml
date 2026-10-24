@@ -14,8 +14,9 @@ setup:
     close: true                  # 回したあとに閉じる
 
 # 設計に触れる・ユーザのレビューが要る作業は、提案を書いて承認を受ける（docs/design/tickets/phases.md の「小さい作業」）。
-# 承認（`ccnavi user agree`）とマージリクエストのレビュー（ホスト上）は人間しかできないので、そこで止める。
-# 親は `plan: [quick]` の 1 項だけ、子は `phase: 1`。範囲は親の範囲そのまま。
+# 承認（`ccnavi-user-agree.sh`。承認のあと、承認済みチケットのコミットと push まで行う）とマージリクエストのレビュー（ホスト上）は人間しかできないので、そこで止める。
+# 実行ファイルの `ccnavi user agree` は承認だけでコミットも push もしないので、使わない（使うと着手と子の提案が未 push で止まる）。
+# 親は `plan: [quick]` の 1 ステップだけ、子は `phase: 1`。範囲は親の範囲そのまま。
 steps:
   - prompt: >-
       projects/test-repo の issue #{issue} を指定された小さい作業（README.md の末尾に「テスト 2」と 1 行足す）を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
@@ -23,9 +24,10 @@ steps:
       実装はまだしないで。
   - human: true
     instruction: >-
-      ワークスペースルートで `ccnavi user agree <親の識別子> <子の識別子>` を打つ（識別子は 1 つ目の step の報告にある）。
+      ワークスペースルートで `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子> <子の識別子>` を打つ（識別子は 1 つ目の step の報告にある）。
     check:
       - 承認画面に、親の範囲（README.md）と、リスクの見立て（LOW）が出ている
+      - 承認のあとに「pushしました」と出ている（承認済みチケットが親のブランチに送られている）
       - 「新たに書ける領域」に README.md 以外が無い
   - prompt: >-
       承認した。着手して、README.md に追記して、子を finish し、親に合流し、ELI5 の HTML を wip/eli5/phase-1.html に書いてコミットして push し、`sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html` でレビューを依頼するところまで進めて。

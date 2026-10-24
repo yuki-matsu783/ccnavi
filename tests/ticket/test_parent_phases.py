@@ -1,13 +1,13 @@
 """親に固定するフェーズ定義（親の `phases:`）の受入テスト。
 
-計画を持つ親は、計画が使う定義だけの写しを `phases:` に持つ。見るのは 6 つ。
+計画を持つ親は、計画が使う定義だけのコピーを `phases:` に持つ。見るのは 6 つ。
 
-1. 承認（`--agree`）の検査。写しは承認したときの `phases.yml` の同じ名前の定義と読んだ形で
-   同じでなければ落ちる。使う定義は写しに書く。`phases.yml` にあって写しに無い定義は何も
-   言わない。写しにあって使われない定義は warn。承認画面は定義を 3 つに分けて出す
-2. 承認のあとの判定は写しを読み、`phases.yml` を読まない（直しても進行中の親は変わらない）
-3. 写しの無い計画付きの親と、写しを書いた子は、手で動かしても判定で止まる
-4. 改版の規則。写しだけの違いも改版になり、子が承認された番号の定義は変えられない
+1. 承認（`--agree`）の検査。コピーは承認したときの `phases.yml` の同じ名前の定義と読んだ形で
+   同じでなければ落ちる。使う定義はコピーに書く。`phases.yml` にあってコピーに無い定義は何も
+   言わない。コピーにあって使われない定義は warn。承認画面は定義を 3 つに分けて出す
+2. 承認のあとの判定はコピーを読み、`phases.yml` を読まない（直しても進行中の親は変わらない）
+3. コピーの無い計画付きの親と、コピーを書いた子は、手で動かしても判定で止まる
+4. 改版の規則。コピーだけの違いも改版になり、子が承認された番号の定義は変えられない
 5. 補助のフラグ `--plan-order <親> --fill-phases`
 6. 定義の `scope` と `deliverables` は 20 件まで
 """
@@ -63,7 +63,7 @@ class CopyAgreeTest(PhaseHarness):
         text = parent_text("i0001", ["research", "design"])
         result = self.propose_parent(text)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        # 承認は中身を変えない。写しは承認の前に提案へ書いてある。
+        # 承認は中身を変えない。コピーは承認の前に提案へ書いてある。
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             self.assertEqual(f.read(), text)
         screen = result.stdout
@@ -169,7 +169,7 @@ class CopyAgreeTest(PhaseHarness):
 
 
 class CopyJudgeTest(PhaseHarness):
-    """2・3. 承認のあとの判定は写しを読む。"""
+    """2・3. 承認のあとの判定はコピーを読む。"""
 
     def write_to(self, tree, rel):
         return self.hook(
@@ -205,7 +205,7 @@ class CopyJudgeTest(PhaseHarness):
         ):
             with self.subTest(label):
                 write(self.phases, text)
-                # 写した定義の上限（wip/research/*）で切り詰めたまま。
+                # コピーした定義の上限（wip/research/*）で切り詰めたまま。
                 beyond = self.write_to(tree, "src/a/x.py")
                 self.assertEqual(self.decision(beyond), "deny", beyond.stdout)
                 self.assertIn("limit: phase type 調査 (research)", self.reason(beyond))
@@ -214,7 +214,7 @@ class CopyJudgeTest(PhaseHarness):
 
     def test_phases_and_their_titles_and_reviews_come_from_the_copy_after_approval(self):
         """承認のあとに phases.yml の定義を直しても、フェーズの題・見る場所・止め方と
-        SubagentStart の案内は写しのまま。"""
+        SubagentStart の案内はコピーのまま。"""
         tree = self.approved_child(review=False)
         write(
             self.phases,
@@ -231,7 +231,7 @@ class CopyJudgeTest(PhaseHarness):
         self.assertIn("explorer", said)
         self.assertNotIn("調べ", said)
         self.assertNotIn("planner", said)
-        # 写しの research はレビュー不要。閉じても止めない（phases.yml の mr なら止まる）。
+        # コピーの research はレビュー不要。閉じても止めない（phases.yml の mr なら止まる）。
         write(os.path.join(tree, "wip", "research", "summary.md"), "まとめ\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "summary")
@@ -279,7 +279,7 @@ class CopyJudgeTest(PhaseHarness):
         self.assertIn("親だけの欄", self.reason(result))
 
     def test_a_copy_moved_by_hand_is_trusted_and_lint_says_it_drifted(self):
-        """手で動かした承認では、写しが `phases.yml` と違ってもそのまま効く。`--lint` が warn。"""
+        """手で動かした承認では、コピーが `phases.yml` と違ってもそのまま効く。`--lint` が warn。"""
         narrow = {**RESEARCH, "scope": ["wip/research/a/*"]}
         self.place_by_hand(
             "i0001",
@@ -300,7 +300,7 @@ class CopyJudgeTest(PhaseHarness):
         self.assertIn("進行中の親には反映されない", lint.stdout)
 
     def test_lint_says_a_lost_phases_yml_once_as_a_warning_for_an_approved_parent(self):
-        """承認済みの親は写しを読むので、phases.yml が無くなっても --lint は warn だけで言う。"""
+        """承認済みの親はコピーを読むので、phases.yml が無くなっても --lint は warn だけで言う。"""
         self.family(plan=("research", "design"))
         os.remove(self.phases)
         lint = self.ccnavi("--lint", "--mode", "enable", "--json")
@@ -316,7 +316,7 @@ class CopyJudgeTest(PhaseHarness):
         )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        # 承認のあとに phases.yml の成果物を変えても、閉じるときに見るのは写しの成果物。
+        # 承認のあとに phases.yml の成果物を変えても、閉じるときに見るのはコピーの成果物。
         write(
             self.phases,
             PHASES.replace('["wip/research/summary.md"]', '["wip/research/other.md"]'),
@@ -563,7 +563,7 @@ class FillPhasesTest(PhaseHarness):
         self.assertNotIn("phases:", self.read())
 
     def test_the_agent_may_type_fill_phases(self):
-        """`--agree` の外の独立したフラグなので、組み込みの止めに当たらない。"""
+        """`--agree` の外の独立したフラグなので、組み込みの止めにヒットしない。"""
         rule = phase_forms.ticket_approval_rule("", self.root)
         for command in (
             "ccnavi --plan-order i0001 --fill-phases",
@@ -575,7 +575,7 @@ class FillPhasesTest(PhaseHarness):
 
 
 class LimitTest(unittest.TestCase):
-    """6. 定義の `scope` と `deliverables` は 20 件まで。`phases.yml` も写しも同じ。"""
+    """6. 定義の `scope` と `deliverables` は 20 件まで。`phases.yml` もコピーも同じ。"""
 
     def test_scope_and_deliverables_are_capped(self):
         many = [f"d{i}/*" for i in range(21)]
@@ -599,7 +599,7 @@ FIXTURE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fixtures", "
 
 
 class CopyRuleTableTest(unittest.TestCase):
-    """承認で写しを確かめる決まりを、見本の表（tests/fixtures/parent-phases.json）で固定する。"""
+    """承認でコピーを確かめる決まりを、見本の表（tests/fixtures/parent-phases.json）で固定する。"""
 
     def test_the_rules_match_the_table(self):
         from ccnavi.policy import rules

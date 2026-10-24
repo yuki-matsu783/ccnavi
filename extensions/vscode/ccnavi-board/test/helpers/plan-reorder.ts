@@ -5,14 +5,14 @@
  * 拡張はまだ番号を振り直さない（振り直しの正は実行ファイル）。ここで使うのは、表の計画（振り直す前の
  * `plan` と、振り直したあとの `expect.plan`）を、実行ファイルが承認の preview に載せる `plans` の形に
  * 並べ直すことだけ。番号は計画の並びのまま（全体計画が 1 から、フィードバック計画はその続き）で、
- * `after` も書いてあるとおりに写す。図がその `plans` どおりに点と線を描くかを見るのに使う。
+ * `after` も書いてあるとおりにコピーする。図がその `plans` どおりに点と線を描くかを見るのに使う。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { ApprovePlan, ApprovePlanItem } from "../../src/core/approvemodel.js";
 
-/** 表の計画の項。名前だけか、`type`・`review`・`after` を持つ辞書 */
+/** 表の計画のステップ。名前だけか、`type`・`review`・`after` を持つマップ */
 export type RawItem = string | { readonly type: string; readonly review?: string; readonly after?: readonly number[] };
 
 export interface ReorderCase {

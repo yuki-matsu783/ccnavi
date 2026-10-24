@@ -21,13 +21,13 @@ hook自身は `integrate` を打たない。促すだけ。
   `S..先頭` で数える。
   記録が無いときは統合先（`origin/HEAD`）で数え、`integrate` が断るので `--adopt` を案内する
 - 取り込みの途中のmarker（`ccnavi-integrate/<名前>/`）が無い。あれば「`integrate-done` か
-  `integrate --abort`」を促す。片付けた記録の写し（`ccnavi-integrate-done/<名前>`）は、写しの
+  `integrate --abort`」を促す。片付けた記録のコピー（`ccnavi-integrate-done/<名前>`）は、コピーの
   `branch_sha` が今のHEADと同じで未コミットの変更が無い、という形では無い
-  （名前を使い直した作業を、前の写しで黙らせない）
+  （名前を使い直した作業を、前のコピーで黙らせない）
 
 ## 3 つの結果
 
-1 本を調べた結果は `HIT`（当たる）・`CLEAR`（当たらない。確認済み）・
+1 本を調べた結果は `HIT`（ヒットする）・`CLEAR`（ヒットしない。確認済み）・
 `UNKNOWN`（期限不足・git の失敗・決められない）のどれか。外してよい `CLEAR`（`drop`）は、
 ディレクトリが無い・HEAD のブランチが名前と違う・チケットに結び付く・`integrate` が受けない名前、
 のときだけ。`UNKNOWN` は候補を外さず、促した記録も
@@ -52,7 +52,7 @@ fast-forwardでgitが持ち越す。
 
 ## 1 回だけ
 
-鍵は `integrate:<名前>`、値は状態の要約（促すか理由か・未コミットの有無・統合先に入っていない
+キーは `integrate:<名前>`、値は状態の要約（促すか理由か・未コミットの有無・統合先に入っていない
 コミットの数・HEAD）。同じ要約では 1 回だけで、進めばまた言う。記録は `finish` の促しと同じ
 `nudged-<セッション>.json`。
 
@@ -72,7 +72,7 @@ from . import archive, direct_candidates, ops_close, ops_stop, ticket_ids, ticke
 # 判定の deny ではない。
 CODE_INTEGRATE_NUDGE = "NUDGE_INTEGRATE"
 
-# 記録の鍵の頭。チケットの識別子・`request:` の鍵と分ける。
+# 記録のキーの頭。チケットの識別子・`request:` のキーと分ける。
 _KEY_HEAD = "integrate:"
 # `ccnavi-git.sh integrate` が記録を置く、統合先のツリーの git ディレクトリの中の名前。
 _RECORD_DIR = "ccnavi-integrate"
@@ -173,10 +173,10 @@ def direct_at_stop(
 ) -> Direct | None:
     """メインエージェントが終わろうとしたとき、`integrate` を促す（か理由を言う）直接作業。
 
-    1. cwd のツリーを調べる。当たり、まだ促していなければ返す。
+    1. cwd のツリーを調べる。ヒットし、まだ促していなければ返す。
     2. 記録の候補（`direct_candidates`）を、`checked` の小さい順（未調査が先、同じなら `seen` の
        新しい順）に調べる。cwd と同じものは除く。調べ始めた候補は、結果が「不明」でも `checked` を
-       今にする。「外してよい」と確認できた候補は記録から外す。当たり、まだ促していないものが
+       今にする。「外してよい」と確認できた候補は記録から外す。ヒットし、まだ促していないものが
        見つかったらそこで止めて返す。
     3. 期限が足りなくなったら打ち切る。それまでの `checked` と外す候補は保存する。
 
@@ -302,7 +302,7 @@ def probe(
     found.integ_tree = integ_tree
     if not found.integ_tree:
         found.blocked = (
-            f"統合先（{integration}）をチェックアウトしているツリーが見当たりません。"
+            f"統合先（{integration}）をチェックアウトしているツリーが見ヒットしません。"
             "どのツリーで取り込むかをユーザに確かめてください"
         )
         return Probe(HIT, found)
@@ -479,7 +479,7 @@ def _tree_roots(root: str, conf: settings.Settings) -> list[str]:
     プロジェクトの置き場の直下のディレクトリも、登録の有無によらず入れる。
 
     外れたワークツリーの残骸や、まだ git リポジトリにしていないプロジェクトにチケットがあっても、
-    `integrate` は断る（広めに当てて断る向き）。
+    `integrate` は断る（広めに適用して断る向き）。
     """
     roots = [t.root for t in tree.all_trees(root, conf.projects)]
     homes = [os.path.join(root, tree.WORKTREES_DIR)]
@@ -527,7 +527,7 @@ def bound_check(
     決められないのは、origin の追跡ブランチの有無を引く git が期限不足か失敗で終わったとき。
 
     Stop の促し（`direct_at_stop`）と `ccnavi-git.sh integrate`（`ccnavi tree bound`）が同じ判定を
-    使う。材料は次の 3 つで、広めに当てて断る向き。
+    使う。材料は次の 3 つで、広めに適用して断る向き。
 
     - 全ツリー（ワークスペースルート・プロジェクト・ワークツリー）の承認済みチケット
       （`doing/`・`done/`）と提案（`todo/`・`review/`）に、同じ名前の `<名前>.md` がある
@@ -667,7 +667,7 @@ def _git_path(top: str, name: str, deadline: float | None = None) -> str | None:
 
 
 def _read_record(path: str) -> dict[str, str]:
-    """`ccnavi_record_write` が書いた「鍵 値」の行の記録。読めなければ空。"""
+    """`ccnavi_record_write` が書いた「キー 値」の行の記録。読めなければ空。"""
     text = fsio.read_text(path, errors="replace")
     out: dict[str, str] = {}
     for line in (text or "").splitlines():
@@ -687,11 +687,11 @@ def _recorded(
     """`integrate <名前>` の記録があるか。調べられなければ None（判定全体を「不明」にする）。
 
     - `ccnavi-integrate/<名前>/`（取り込みの途中）があれば「記録あり」。
-    - `ccnavi-integrate-done/<名前>`（片付けた記録の写し）は、写しの `branch_sha` が今の HEAD と
+    - `ccnavi-integrate-done/<名前>`（片付けた記録のコピー）は、コピーの `branch_sha` が今の HEAD と
       同じで、`dirty` が「変更無し」と確認できたときだけ「記録あり」。名前を使い直した作業
-      （新しいコミットを積んだ、同じ HEAD で未コミットの変更がある）を、前の写しで黙らせない。
+      （新しいコミットを積んだ、同じ HEAD で未コミットの変更がある）を、前のコピーで黙らせない。
     - `dirty` が不明なら、取り込み済みとみなさず、判定全体を不明にする。
-    - 写しを読めないときは「記録なし」（促す側に倒す）。
+    - コピーを読めないときは「記録なし」（促す側に倒す）。
     """
     marks = _git_path(integ_tree, _RECORD_DIR, deadline)
     if marks is None:

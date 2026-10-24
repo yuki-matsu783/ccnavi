@@ -13,7 +13,7 @@ limit=10
 root="${CLAUDE_PROJECT_DIR:-.}"
 cd "$root" 2>/dev/null || exit 0
 
-# 直下のディレクトリを新しい順に並べる。ディレクトリが 0 個なら glob が残るので、先に捨てる。
+# 直下のディレクトリを新しい順に並べる。ディレクトリが 0 個なら glob が残るので、先に破棄する。
 list=$(ls -1dt -- */ 2>/dev/null || true)
 [ -n "$list" ] || exit 0
 

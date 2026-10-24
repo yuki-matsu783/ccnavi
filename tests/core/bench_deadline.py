@@ -37,7 +37,7 @@ BASE_COMMAND = "echo "
 
 
 def workspace() -> str:
-    """このリポジトリの設定を写した、記録を汚さない一時のワークスペース。"""
+    """このリポジトリの設定をコピーした、記録を汚さない一時のワークスペース。"""
     ws = tempfile.mkdtemp(prefix="ccnavi-bench-deadline-")
     for kind in ("rules", "risk"):
         for place in (common_path, config_path):
@@ -67,7 +67,7 @@ def cases(big: bool) -> list[tuple[str, str, dict[str, str]]]:
     for count in subs:
         out.append((f"置換 {count:,} 個", "Bash", {"command": BASE_COMMAND + "$(:) " * count}))
     for tail in tails:
-        # PowerShell は読まず、生の文字列にルールを当てる。`>` は上限（50）ちょうど。
+        # PowerShell は読まず、生の文字列にルールを適用する。`>` は上限（50）ちょうど。
         command = "echo " + ">" * 50 + "x" * tail
         out.append((f"`>` 50 個 + 尾 {tail:,} 字", "PowerShell", {"command": command}))
     over = "echo " + ">" * 51 + "x" * 100_000

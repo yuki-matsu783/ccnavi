@@ -15,6 +15,12 @@ import * as path from "node:path";
 /** 承認の push の sh の、ワークスペースルートからのパス */
 export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-user-push-approved.sh";
 
+/**
+ * `user` の入口の前に付ける印。ボードの子プロセスから来たことを実行ファイルに伝える。印の無い
+ * `user …` は、実行ファイルを直に打った形として断られる（ユーザが打つ入口は sh にそろえてある）
+ */
+export const USER_ENTRY = ["--entry", "board"] as const;
+
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
 export type Launcher =
   | { readonly kind: "exe"; readonly path: string }
@@ -50,7 +56,7 @@ export function approveArgs(
   digest: string,
   only: readonly string[] = [],
 ): readonly string[] {
-  return ["user", "agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
+  return [...USER_ENTRY, "user", "agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
 /**
@@ -88,11 +94,11 @@ export function templatesDraftArgs(parent: string): readonly string[] {
 /**
  * `user handoff [<パス>…] --json`。`wip/handoff/` に置いた下書きの一覧を見る（`--yes` を付けない）。
  * パスは `--root` で指したツリーからの相対（`/` 区切り）。パスを渡すと、そのパスが選んだ対象になり、
- * 答えの `expect` はその集合のハッシュになる。パスを省くと、許可リストに当たり unchanged でないもの全部が対象。
+ * 答えの `expect` はその集合のハッシュになる。パスを省くと、許可リストにヒットし unchanged でないもの全部が対象。
  * `--root` は `run()` が付ける。
  */
 export function handoffArgs(paths: readonly string[] = []): readonly string[] {
-  return ["user", "handoff", ...paths, "--json"];
+  return [...USER_ENTRY, "user", "handoff", ...paths, "--json"];
 }
 
 /**
@@ -101,7 +107,7 @@ export function handoffArgs(paths: readonly string[] = []): readonly string[] {
  * `--via board` で、ボードから来た実行だと実行ファイルに伝える（`defense` の種類はこの経路では断られる）
  */
 export function handoffYesArgs(paths: readonly string[], expect: string): readonly string[] {
-  return ["user", "handoff", ...paths, "--yes", "--expect", expect, "--via", "board", "--json"];
+  return [...USER_ENTRY, "user", "handoff", ...paths, "--yes", "--expect", expect, "--via", "board", "--json"];
 }
 
 /**
@@ -110,16 +116,16 @@ export function handoffYesArgs(paths: readonly string[], expect: string): readon
  * `--root` は `run()` が付ける。
  */
 export function mirrorArgs(names: readonly string[] = []): readonly string[] {
-  return ["user", "mirror", ...names, "--json"];
+  return [...USER_ENTRY, "user", "mirror", ...names, "--json"];
 }
 
 /**
- * `user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json`。ミラーの同期。書くのは各プロジェクトの作業ツリーで、コミットはしない。
+ * `user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json`。ミラーの同期。書くのは各プロジェクトのワークツリーで、コミットはしない。
  * 名前を省くと差分のある全プロジェクト。`expect` は見るだけの結果の `expect`（全体）か、各プロジェクトの `expect`（単独）。
  * 変わっていれば実行ファイルは何も書かない
  */
 export function mirrorYesArgs(names: readonly string[], expect: string): readonly string[] {
-  return ["user", "mirror", ...names, "--yes", "--expect", expect, "--via", "board", "--json"];
+  return [...USER_ENTRY, "user", "mirror", ...names, "--yes", "--expect", expect, "--via", "board", "--json"];
 }
 
 /**
@@ -164,7 +170,7 @@ export function decideArgs(
 /**
  * 文面で案内する `.ccnavi/scripts/` の sh のパス。実行ファイルの `settings.script_command` と同じ引用の規則で、
  * ワークスペースルートから `/` 区切りで書き、空白やシェルの記号を含むときだけ引用する。引用しないと
- * sh が単語に分け、止めている間の例外（`\S*ccnavi-...`）にも当たらない。まず `"..."`、`"` の中でも意味を持つ
+ * sh が単語に分け、止めている間の例外（`\S*ccnavi-...`）にもヒットしない。まず `"..."`、`"` の中でも意味を持つ
  * 文字があるときだけ単引用符にする。
  * 実行ファイルは root を realpath で解いてから組む。ここは渡されたパスをそのまま使うので、実行ファイルの
  * 案内と同じパスにしたい呼び手は、解いた root を渡す（board-panel が fs.realpathSync で解く）。
@@ -258,8 +264,8 @@ export function retireConfirmText(parent: string): string {
 }
 
 /**
- * マージせずに閉じた親（捨てた親）の、片付けの記録を消すコマンド: `sh <ルート>/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon <親>`。
- * **ボードはこれを送らない**。コピーするだけで、ユーザが端末で実行する
+ * マージせずに閉じた親（破棄した親）の、片付けの記録を消すコマンド: `sh <ルート>/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon <親>`。
+ * **ボードはこれを送らない**。コピーするだけで、ユーザがターミナルで実行する
  */
 export function abandonCommand(root: string, parent: string): string {
   return `${scriptCommand(root, "ccnavi-launcher.sh")} worktree retire --abandon ${shellWord(parent)}`;
@@ -276,7 +282,7 @@ export function gitScriptCommand(root: string): string {
  * `parents` を渡すとその親子のチケットだけをコミットして push する（取り込み済みのものだけが送られ、
  * そうでないものは今どおりユーザがコミットする）。
  * `paths`（ワークスペースルートからの相対）を渡すと、置き場の変更のうちそのパスだけを送る（`--path`）。
- * 承認が書いた・消したパスを渡し、承認と無関係な変更を承認のコミットに入れない。`parents` とは一緒に使えない
+ * 承認が書いた・消したパスを渡し、承認と無関係な変更を承認のコミットに入れない。`parents` とは同時に指定できない
  */
 export function pushApprovedCommand(
   root: string,

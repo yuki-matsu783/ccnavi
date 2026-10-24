@@ -1,6 +1,6 @@
-"""学びの蓄積の wiki（`docs/wiki/`）を、作業ツリーか git のオブジェクトから読む。
+"""学びの蓄積の wiki（`docs/wiki/`）を、ワークツリーか git のオブジェクトから読む。
 
-- `load_tree` は作業ツリーのファイルを読む（`--learnings`・`--lint`）
+- `load_tree` はワークツリーのファイルを読む（`--learnings`・`--lint`）
 - `load_commit` は 1 つのコミットの `docs/wiki/` を、チェックアウトせずに git のオブジェクトから読む
   （SessionStart の通知）。`ls-tree` で一覧を取り、`cat-file blob` で中身を読む
 
@@ -26,7 +26,7 @@ def _stem(file: str) -> str:
 
 
 def load_tree(tree_root: str) -> wiki.Wiki:
-    """作業ツリーの `docs/wiki/` を読む。無ければ `present` が False の空の `Wiki`。"""
+    """ワークツリーの `docs/wiki/` を読む。無ければ `present` が False の空の `Wiki`。"""
     texts: dict[str, dict[str, str]] = {"pattern": {}, "impact": {}}
     broken: list[wiki.Broken] = []
     present = False

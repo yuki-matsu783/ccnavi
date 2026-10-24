@@ -682,7 +682,7 @@ test("CB-T172b 押した画面のダイジェストが手元の最新と違え�
   assert.deepEqual(kinds(again.effects), ["approve"]);
 });
 
-test("CB-T173 承認できたら渡す文を見せ、承認の push の sh を端末に送り、ボードを再読み込みする。sh がなければ言う。0 件なら何もしない", () => {
+test("CB-T173 承認できたら渡す文を見せ、承認の push の sh をターミナルに送り、ボードを再読み込みする。sh がなければ言う。0 件なら何もしない", () => {
   const approving = toApproving(approvalStep);
   const done = approvalStep(approving, {
     kind: "approved",
@@ -709,7 +709,7 @@ test("CB-T173 承認できたら渡す文を見せ、承認の push の sh を�
     carrier: false,
   });
   assert.deepEqual(noScript.state.overlay, { kind: "done", count: 1, prompt: "文", carried: false });
-  assert.deepEqual(kinds(noScript.effects), ["warn", "refresh"], "端末には送らず、何をすればよいかを言う");
+  assert.deepEqual(kinds(noScript.effects), ["warn", "refresh"], "ターミナルには送らず、何をすればよいかを言う");
   assert.match(
     noScript.effects[0]?.kind === "warn" ? noScript.effects[0].text : "",
     /ccnavi-user-push-approved\.sh がないので/,
@@ -810,7 +810,7 @@ test("CB-T176b 親だけ書けて子が止まった承認は、書けた分の�
   assert.equal(carried.state.overlay?.kind, "error");
   const text = carried.state.overlay?.kind === "error" ? carried.state.overlay.error : "";
   assert.ok(text.includes(".ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
-  assert.ok(text.includes("書けなかった: i0001-01-01"), "書けなかった子を言う");
+  assert.ok(text.includes("書き込めませんでした: i0001-01-01"), "書けなかった子を言う");
   assert.deepEqual(kinds(carried.effects), ["carry", "refresh"], "書けた分は送る");
 
   // push の sh が無ければ送れない。未送信と言う
@@ -894,10 +894,10 @@ test("CB-T177c 相談のプロンプトのコピー: オーバーレイを閉じ
   assert.deepEqual(ok.state.overlay?.kind === "decidePreview" ? ok.state.overlay.consult?.ok : undefined, true);
   assert.equal(ok.state.overlay?.kind === "decidePreview" ? ok.state.overlay.preview : undefined, shown.overlay?.kind === "decidePreview" ? shown.overlay.preview : null);
   // できなかった: 失敗と言う（できたとは言わない）
-  const ng = approvalStep(shown, { kind: "consultCopied", error: "クリップボードが使えません" });
+  const ng = approvalStep(shown, { kind: "consultCopied", error: "クリップボードを利用できません" });
   const consult = ng.state.overlay?.kind === "decidePreview" ? ng.state.overlay.consult : undefined;
   assert.equal(consult?.ok, false);
-  assert.match(consult?.text ?? "", /コピーできませんでした（クリップボードが使えません）/);
+  assert.match(consult?.text ?? "", /コピーできませんでした（クリップボードを利用できません）/);
   assert.doesNotMatch(consult?.text ?? "", /コピーしました/);
   // 確定中は組まない・結果も受けない
   const deciding = toDeciding(approvalStep);
@@ -930,7 +930,7 @@ test("CB-T177d 確定した結果は実行ファイルの答えに従う。revie
   assert.equal(fixed?.keep, true);
   assert.match(fixed?.note ?? "", /i0001-02-03/);
   assert.match(fixed?.note ?? "", /追加された指摘 1 件は判断待ち/);
-  // 答えが「レビュー済みでない」のに理由が見当たらないときは、レビュー済みになったとは言わない
+  // 答えが「レビュー済みでない」のに理由が見ヒットしないときは、レビュー済みになったとは言わない
   const odd = overlayOf({ reviewed: false });
   assert.doesNotMatch(odd?.title ?? "", /をレビュー済みにしました/);
   assert.match(odd?.note ?? "", /レビュー済みになっていません/);
@@ -964,7 +964,7 @@ test("CB-T178 文を渡したら閉じる。コピー・新しいセッション
   );
 });
 
-test("CB-T179 「キャンセル」は閉じる。承認の結果は、どの状態でも受ける（置かれたものを捨てない）", () => {
+test("CB-T179 「キャンセル」は閉じる。承認の結果は、どの状態でも受ける（置かれたものを破棄しない）", () => {
   const preview = toPreview(approvalStep);
   const closed = approvalStep(preview, { kind: "cancel" });
   assert.deepEqual(closed.state, CLOSED);
@@ -972,7 +972,7 @@ test("CB-T179 「キャンセル」は閉じる。承認の結果は、どの状
   // 閉じているところへ届いても、変わっていないので描き直さない
   assert.equal(approvalStep(CLOSED, { kind: "cancel" }).redraw, false);
 
-  // 承認の結果だけは見張らない。承認済みチケットは既に置かれていることがあり、捨てるとユーザに届かない
+  // 承認の結果だけは見張らない。承認済みチケットは既に置かれていることがあり、破棄するとユーザに届かない
   const late = approvalStep(CLOSED, {
     kind: "approved",
     outcome: { ok: true, value: resultOf(["i0001"], "文") },

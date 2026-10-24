@@ -20,7 +20,7 @@ from ..records import audit
 from . import diagnose_shared
 
 # 対象を取り出せるツール。ここに無いツールは判定に届かないまま通るので、
-# 試したいユーザには「当たらない」ではなく「そもそも見ていない」と言う。
+# 試したいユーザには「ヒットしない」ではなく「そもそも見ていない」と言う。
 # 一覧は judge の表そのもの。VS Code 拡張の KNOWN_TOOLS はこれと同じ順序。
 KNOWN_TOOLS = (*judge.SUBJECT_FIELDS, rules.STOP_MATCH)
 
@@ -29,7 +29,7 @@ KNOWN_TOOLS = (*judge.SUBJECT_FIELDS, rules.STOP_MATCH)
 # ルール管理画面。形を変えたら上げる。
 TEST_VERSION = 1
 
-# 当たったルールの `source`。ルールファイルから読んだものと、その外から来た根拠の 2 つだけ。
+# ヒットしたルールの `source`。ルールファイルから読んだものと、その外から来た根拠の 2 つだけ。
 # 値を増やすと、2 値で読む拡張（testmodel.ts）が知らない値を読み違えるので、増やすなら
 # TEST_VERSION も上げる。
 FILE = "file"
@@ -95,13 +95,14 @@ def try_one(
     subject: str,
     call: Call | None = None,
 ) -> dict:
-    """1 件を判定して、結果とすべての理由を 1 つの辞書にする。
+    """1 件を判定して、結果とすべての理由を 1 つのマップにする。
 
     文字で出す `test` と JSON で出す `test_json` の両方がここを読む。読み手ごとに
-    判定を呼び直すと、端末で見た答えと画面で見た答えが違うものになりうる。
+    判定を呼び直すと、ターミナルで見た答えと画面で見た答えが違うものになりうる。
 
-    鍵は docs/requirements/json-shapes.md「試験の JSON」に書いてある。`known` が偽なら、そのツールは
-    判定が対象を取り出せないもので、他の鍵は空のまま。
+    キーは docs/requirements/json-shapes.md「試験の JSON」に書いてある。
+    `known` が偽なら、そのツールは
+    判定が対象を取り出せないもので、他のキーは空のまま。
 
     `call` は payload の欄（`Call`）。渡さなければ cwd はワークスペースルートで、権限モードと
     サブエージェントの印は無い。欄を確かめる（`call_problem`）のは呼び手。
@@ -149,7 +150,7 @@ def try_one(
         subject=judge.subject_of(payload),
     )
 
-    # 応答は捨てずに拾う。判定が返す文面そのものを見せたいので、
+    # 応答は破棄せずに拾う。判定が返す文面そのものを見せたいので、
     # ここで文を組み直さない。組み直すと、試験で読んだ文と
     # エージェントに届く文が違うものになる。
     captured = io.StringIO()
@@ -166,23 +167,23 @@ def try_one(
 
     out["verdict"] = record.decision or audit.ALLOW
     out["code"] = record.code or ""
-    # ファイルのパスは行き着く先まで解いてから当てる。解いた先を見せないと、
-    # 当たらなかった理由が「パスの表記が違う」なのかどうかをユーザが言えない。
+    # ファイルのパスは行き着く先まで解いてから適用する。解いた先を見せないと、
+    # ヒットしなかった理由が「パスの表記が違う」なのかどうかをユーザが言えない。
     out["resolved"] = record.subject if record.subject and record.subject != subject else ""
     out["reason"] = record.reason or ""
     out["degraded"] = record.degraded or ""
-    # 実行役のコマンドが中で実行するコマンドで当たったときの、そのコマンド。
+    # 実行役のコマンドが中で実行するコマンドでヒットしたときの、そのコマンド。
     out["unwrapped"] = record.unwrapped or ""
     out["fallback"] = record.fallback or ""
     out["rules"] = _rules_hit(record)
     out["response"] = _response_text(captured.getvalue())
     # 引用の中から切り出したコマンドにだけヒットしたルールの id。記録と同じく、
-    # 空なら鍵ごと出さない。読み手（VS Code 拡張）の知っている鍵の一覧を、
+    # 空ならキーごと出さない。読み手（VS Code 拡張）の知っているキーの一覧を、
     # この場合が無い呼び出しで変えないため。
     if record.quoted:
         out["quoted"] = list(record.quoted)
     # 判定に渡した payload の欄。`quoted` と同じく、欄を渡したときだけ出す。渡さなければ
-    # cwd はルート（`root` の鍵）で、ほかは空と決まっている。
+    # cwd はルート（`root` のキー）で、ほかは空と決まっている。
     if call.given():
         out["payload"] = used
     return out
@@ -191,7 +192,7 @@ def try_one(
 def _try_stop(conf: settings.Settings, root: str, out: dict) -> dict:
     """`Stop`（ターンの終わり）の試し。使われるルールを並べる。
 
-    ターンの終わりに当てるのは、共通レイヤーと自身のレイヤーの `allow` で、
+    ターンの終わりに適用するのは、共通レイヤーと自身のレイヤーの `allow` で、
     `every` が 2 以上のものだけ
     （`ruleload.stop_rules`）。使われるものがあれば `allow`、無ければ判定に入らない（`skip`）。
     試しで記録を変えない（数えは進めない）。
@@ -270,11 +271,11 @@ def test(
     if out["reason"]:
         stdout.write(f"reason: {out['reason']}\n")
     if out["degraded"]:
-        stdout.write(f"degraded: {out['degraded']}（生の文字列に当てた）\n")
+        stdout.write(f"degraded: {out['degraded']}（生の文字列に適用した）\n")
     if out["unwrapped"]:
         for layer in out["unwrapped"].split("\x00"):
             shown = " ".join(layer.replace("\x01", " ").split())
-            stdout.write(f"unwrapped: {shown}（中で実行されるコマンドに当てた）\n")
+            stdout.write(f"unwrapped: {shown}（中で実行されるコマンドに適用した）\n")
     if out["fallback"]:
         stdout.write(f"fallback: {out['fallback']}（組み込みの既定で判定した）\n")
 
@@ -337,14 +338,14 @@ def test_json(
 
 
 def _rules_hit(record: audit.Record) -> list[dict]:
-    """当たったルールを、タイプと翻訳後の式まで返す。
+    """ヒットしたルールを、タイプと翻訳後の式まで返す。
 
     翻訳後の式を出すのがこの試験の要。`glob` は正規表現に変わるので、
-    書いたものと当たるものの間に見えない変換が 1 つ挟まる。その変換を見せないと、
-    当たらなかった理由をユーザが自分で辿れない。
+    書いたものとヒットするものの間に見えない変換が 1 つ挟まる。その変換を見せないと、
+    ヒットしなかった理由をユーザが自分で辿れない。
 
-    引くのは判定が当てたルールそのもの（`record.hits`）。ルールファイルを別の読み方で
-    読み直すと、判定が足した組み込みや、レイヤーの和で重複として捨てられた側の定義を
+    引くのは判定が適用したルールそのもの（`record.hits`）。ルールファイルを別の読み方で
+    読み直すと、判定が足した組み込みや、レイヤーの和で重複として破棄された側の定義を
     引けず、判定の根拠と違うものを見せる（P9）。`hits` は `rules` の末尾と同じ順に並ぶので、
     id ではなく位置で対応させる。id は必須なので、同じ id のルールが複数あっても位置で引き分ける。
 
@@ -413,7 +414,7 @@ def _response_text(written: str) -> str:
         out = json.loads(written)["hookSpecificOutput"]
     except (ValueError, KeyError):
         return written.strip()
-    # 理由と additionalContext は別の鍵で、deny と ask では両方が届く。
+    # 理由と additionalContext は別のキーで、deny と ask では両方が届く。
     # 両方あるときは届く順に並べる。
     parts = [out.get("permissionDecisionReason") or "", out.get("additionalContext") or ""]
     return "\n\n".join(p for p in parts if p)
@@ -450,18 +451,18 @@ def load_expectations(path: str, root: str) -> list[dict]:
 
 
 def run_expectations(stderr: TextIO, conf: settings.Settings, root: str, path: str) -> dict:
-    """期待する判定をぜんぶ判定に掛けて、期待と突き合わせた結果を 1 つの辞書にする。
+    """期待する判定をぜんぶ判定に掛けて、期待と突き合わせた結果を 1 つのマップにする。
 
     判定は `judge` を通す。ここで判定を作り直さないのが肝で、別の経路で確かめると、
     期待する判定が通ったのに実運用で失敗する、という一番まずい形になる。
 
     `ok` は期待どおりか。`skipped` は allow の期待が判定に入らずに通ったもので、
-    呼び出しは通るので期待は満たしているが、通した理由が「allow に当たった」では
-    ない。ルールを書いても当たらない場所なので、食い違いとは別に数えて必ず見せる。
+    呼び出しは通るので期待は満たしているが、通した理由が「allow にヒットした」では
+    ない。ルールを書いてもヒットしない場所なので、食い違いとは別に数えて必ず見せる。
     """
     # 期待ごとに判定するので、共通レイヤーの苦情は期待の数だけ書かれる。
     # 行き先で読むレイヤーは期待ごとに
-    # 違うので、まとめて捨てずに、まだ書いていない行だけを書く。
+    # 違うので、まとめて破棄せずに、まだ書いていない行だけを書く。
     said: set[str] = set()
     results = []
     for expectation in load_expectations(path, root):
@@ -533,7 +534,7 @@ def test_expectations(
         stdout.write("\n")
         return 0
 
-    # 食い違い（期待と判定が違うもの）を、理由と当たったルートつきで並べる。
+    # 食い違い（期待と判定が違うもの）を、理由とヒットしたルートつきで並べる。
     for r in body["expectations"]:
         if r["ok"]:
             continue

@@ -1,5 +1,5 @@
 /**
- * 案内の手順（`*.yml` の `image:`）が引く画像の表。鍵は `images/<名前>.png` の名前。
+ * 案内の手順（`*.yml` の `image:`）が引く画像の表。キーは `images/<名前>.png` の名前。
  * 画像は data: の URL としてバンドルに入る（Webview はファイルを読まない）。足したら、ここに 1 行足す（テストが突き合わせる）。
  */
 import claudeCodePrompt from "./images/claude-code-prompt.png";

@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-user-agree: 提案を承認し、承認済みチケットを親ブランチにコミットして push する。ユーザが端末で実行する。
+# ccnavi-user-agree: 提案を承認し、承認済みチケットを親ブランチにコミットして push する。ユーザがターミナルで実行する。
 #
 #   sh .ccnavi/scripts/ccnavi-user-agree.sh [<識別子>...]
 #
@@ -15,12 +15,12 @@
 # 承認されないものは通さない（判定は実行ファイルが行う）。
 #
 # 実行ファイルはネットワークに出さないため、コミットと push はここで行う。実行ファイルが
-# 持つのは、どこに置くかと、何を承認してよいかの判定だけである。標準入力が端末かどうかの確認は実行ファイル側で行う。
+# 持つのは、どこに置くかと、何を承認してよいかの判定だけである。標準入力がターミナルかどうかの確認は実行ファイル側で行う。
 #
 # コミットは対象パスを限定する。`-a` も `add -A` も使わない。親のワークツリーにはユーザや他の
 # セッションの未コミット変更があるため、それらを巻き込むと承認コミットに無関係な変更が混入する。
 #
-# 承認待ちの一覧を表示し、y/N で確認を取ってから承認する。承認が通れば（一部だけ通って終了コード 4 で終わった
+# 承認先行の一覧を表示し、y/N で確認を取ってから承認する。承認が通れば（一部だけ通って終了コード 4 で終わった
 # ときも）`ccnavi-user-push-approved.sh --path <パス>...` を呼び出し、この承認が実際に書いた・消したパス
 # （実行ファイルの `--record-writes` の一覧）だけをコミットして push する。同じ置き場にある承認と無関係な変更
 # （review/ の変更や、前の失敗で残ったファイル）は巻き込まない。push が失敗しても承認自体は 0 で終わる（コミットは残り、打ち直せば送れる）。
@@ -45,7 +45,7 @@ sh .ccnavi/scripts/ccnavi-user-agree.sh [<識別子>...]
   承認待ちのチケットを一覧表示し、y/N で確認を取ってから承認する。
   承認が通れば承認済みチケットをコミットして push する。
   識別子を並べると、その分だけを承認の対象にする（例: ccnavi-user-agree.sh i0002-01-03）。
-  端末からユーザが実行します。エージェントからは呼べない（hook が止める）。
+  ターミナルからユーザが実行します。エージェントからは呼べない（hook が止める）。
 USAGE
 }
 
@@ -61,7 +61,7 @@ if [ $# -eq 1 ]; then
 fi
 
 # 並べた語は識別子として `user agree` の後ろにそのまま渡す。承認待ちに在るかは実行ファイルが見る。
-# ここで断るのは空の語と `-` で始まる語。`--yes` や `--root` が混ざると、端末の y/N を経ない
+# ここで断るのは空の語と `-` で始まる語。`--yes` や `--root` が混ざると、ターミナルの y/N を経ない
 # 経路や別のワークスペースの承認になってしまうので、この sh からは選択肢を渡さない。
 for id in "$@"; do
 	case "$id" in
@@ -100,7 +100,7 @@ if ccnavi_wap_use_exe "$root"; then
 	if [ -n "$ccnavi_wap_bin" ]; then
 		skew=$(ccnavi_compat_skew "$root" "$ccnavi_wap_bin") || printf 'ccnavi-user-agree: %s\n' "$skew" >&2
 	fi
-	set -- ccnavi_wap_exe --record-writes "$written" user agree --placed-out "$report" "$@"
+	set -- ccnavi_wap_exe --record-writes "$written" --entry sh user agree --placed-out "$report" "$@"
 else
 	printf 'ccnavi-user-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2

@@ -5,7 +5,7 @@
  * 走らせるのは 15 個。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
  * `--test-expectations --json`（期待する判定の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
- * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
+ * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認先行の一覧を見る）、
  * `user agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
  * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）、
  * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。計画編集タブが読む）と
@@ -15,7 +15,7 @@
  * `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ。
  * `expect` は取り込むパスを指して見るだけをもう一度呼んだ結果のもの）、
  * `user mirror [<名前>…] --json`（共通レイヤーのミラーのずれを見る。プロジェクト管理画面が 5 分ごとに読む）と
- * `user mirror [<名前>…] --yes --expect <値> --via board --json`（ミラーの同期。書くのは実行ファイルで、各プロジェクトの作業ツリーへ。
+ * `user mirror [<名前>…] --yes --expect <値> --via board --json`（ミラーの同期。書くのは実行ファイルで、各プロジェクトのワークツリーへ。
  * ユーザが画面で押したときだけ）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
@@ -123,7 +123,7 @@ const WORKTREE_TIMEOUT_MS = 60_000;
 
 /**
  * ボードの読み直し（`--explain --json`）に付ける期限（ミリ秒）。返らないと画面の「更新」が
- * 押されたまま戻らず、以後の読み直しも何も出さずに捨てられる（board-panel の loading が真のまま残る）。
+ * 押されたまま戻らず、以後の読み直しも何も出さずに破棄される（board-panel の loading が真のまま残る）。
  * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て承認と同じ 60 秒。
  */
 const EXPLAIN_TIMEOUT_MS = 60_000;
@@ -267,7 +267,7 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
 export type { ApproveOutcome };
 
 /**
- * 承認待ちの一覧を見る（`--agree --preview --json`）。承認済みチケットは置かれない。
+ * 承認先行の一覧を見る（`--agree --preview --json`）。承認済みチケットは置かれない。
  * 記録と state の置き場は外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
  */
 export async function runApprovePreview(
@@ -323,7 +323,7 @@ export async function runApproveYes(
       ok: false,
       error:
         `${cutOff("ccnavi user agree --yes", APPROVE_TIMEOUT_MS)}。` +
-        "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・pushするコマンドはターミナルに送信していません" +
+        "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・push するコマンドはターミナルに送信していません" +
         "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確認してください",
     };
   }
@@ -418,12 +418,12 @@ const RETIRED_TIMEOUT_MS = 30_000;
 
 /**
  * 片付けの記録を持つ親の一覧を読む（`ccnavi sync retired`）。ネットワークにも git にも触れない読み取り。
- * 失敗・期限切れ・形式の異常は、「ありません」とは言わず `ok: false` で返す（行を黙って捨てない）
+ * 失敗・期限切れ・形式の異常は、「ありません」とは言わず `ok: false` で返す（行を黙って破棄しない）
  */
 export async function runSyncRetired(root: string, setting: string): Promise<RetiredParse> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
-    return { ok: false, error: `一覧を取れない（${NOT_FOUND}）` };
+    return { ok: false, error: `一覧を取得できません（${NOT_FOUND}）` };
   }
   const ran = await run(launcher, root, syncRetiredArgs(), RETIRED_TIMEOUT_MS);
   return parseRetired(ran);
@@ -447,7 +447,7 @@ export async function runChildWorktreeAdd(shell: string, root: string, w: Approv
   const args = ["worktree", "add", w.path, "-b", w.branch, w.base];
   const ran = await spawn(shell, [toPosixPath(path.join(root, GIT_SCRIPT)), ...args], root, WORKTREE_TIMEOUT_MS);
   if (ran.killed) {
-    return "時間内に終わらなかった";
+    return "時間内に終わりませんでした";
   }
   if (ran.code === 0) {
     return "";
@@ -470,7 +470,7 @@ function runScript(
   return spawn(shell, [toPosixPath(path.join(root, script)), ...args], cwd, timeout);
 }
 
-/** 1 件を判定する。`rules` は当てるルールファイルの差し替え（編集中の内容を置いた一時ファイルでもよい） */
+/** 1 件を判定する。`rules` は適用するルールファイルの差し替え（編集中の内容を置いた一時ファイルでもよい） */
 export async function runTest(
   root: string,
   setting: string,
@@ -678,19 +678,19 @@ const TEMPLATE_EDIT_FLAGS = ["--templates", "--check-file"] as const;
  * 取り込み待ち画面が求める機能（`ccnavi user handoff` を実行ファイルが持つ）。持たない古い実行ファイルは `user handoff` を知らず、
  * argparse の苦情（不明瞭な断り）で返すので、画面を開くときに見て「古い版です」と言い、画面を無効にする
  */
-const HANDOFF_FEATURES = ["handoff"] as const;
+const HANDOFF_FEATURES = ["handoff", "entry-marker"] as const;
 
 /**
  * プロジェクト管理画面のミラーの表示と同期が求める機能（`ccnavi user mirror` を実行ファイルが持つ）。持たない古い実行ファイルは
  * `user mirror` を知らず、argparse の苦情で返すので、調べる前に見て「古い版です」と言い、ボタンを無効にする
  */
-const MIRROR_FEATURES = ["mirror"] as const;
+const MIRROR_FEATURES = ["mirror", "entry-marker"] as const;
 
 /**
  * ユーザ専用の入口（`ccnavi user <操作>`）を実行ファイルが持つことを示す機能名。持たない古い実行ファイルは
  * `user` を知らず、argparse の苦情（不明瞭な断り）で返すので、打つ前に見て「古い版です」と言う
  */
-const USER_ENTRY_FEATURES = ["user-entry"] as const;
+const USER_ENTRY_FEATURES = ["user-entry", "entry-marker"] as const;
 
 /**
  * ユーザ専用の操作（承認・対応方針）を打つ前に、実行ファイルが `user-entry` を持つかを聞く。
@@ -720,7 +720,7 @@ export async function checkPlanOrder(root: string, setting: string, what = "計�
 /**
  * 親の提案の計画を、振り直した答えで読む（`--plan-order <親> --json [--order <JSON>]`）。何も書かない。
  * `order` は元の番号での直接の先行で、空なら提案のまま。番号の振り直しと検査は実行ファイルが答える。
- * `--plan-order` は `user` の外の独立したオプションなので、組み込みの止めにも端末の確かめにも当たらない。
+ * `--plan-order` は `user` の外の独立したオプションなので、組み込みの止めにもターミナルの確かめにもヒットしない。
  * 失敗（実行ファイルが無い・非 0 終了・JSON でない）は理由の文にして返し、画面は壊さない。古い実行ファイルかは
  * 呼び手が先に `checkPlanOrder` で聞く
  */
@@ -757,7 +757,7 @@ export async function runPlanOrderWrite(root: string, setting: string, parent: s
   if (ran.killed) {
     return {
       kind: "error",
-      error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}。提案を変更したかは分かりません。再読込して確認してください`,
+      error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}。提案を変更したかは分かりません。再読み込みして確認してください`,
     };
   }
   const parsed = parsePlanOrder(ran.stdout);
@@ -995,7 +995,7 @@ export async function runHandoffYes(workspace: string, setting: string, tree: st
 
 /**
  * 共通レイヤーのミラーのずれを見る（`user mirror [<名前>…] --json`）。何も書かない。
- * `--root` はワークスペースのルート（ミラーの元の共通レイヤーと、写す先の `projects/` を持つ側）。
+ * `--root` はワークスペースのルート（ミラーの元の共通レイヤーと、コピーする先の `projects/` を持つ側）。
  * 見るだけの結果は、プロジェクトにずれや error があっても終了コード 0 で返る。`ok` が偽の結果（共通レイヤーが読めないなど）も
  * 読めた結果として返し、理由は呼び手が出す。古い実行ファイルかは呼び手が先に `checkMirror` で聞く
  */
@@ -1025,7 +1025,7 @@ export function mirrorListOf(ran: { readonly code: number; readonly stdout: stri
 }
 
 /**
- * ミラーの同期（`user mirror [<名前>…] --yes --expect <値> --via board --json`）。書くのは実行ファイルで、各プロジェクトの作業ツリーへ。
+ * ミラーの同期（`user mirror [<名前>…] --yes --expect <値> --via board --json`）。書くのは実行ファイルで、各プロジェクトのワークツリーへ。
  * コミットはしない。拡張はファイルを書かない。名前を省くと差分のある全プロジェクト。
  * 失敗は `{ok:false, error}` の結果で返し、投げない。期限切れのときは、同期できたかが分からないことを文に足す。
  */

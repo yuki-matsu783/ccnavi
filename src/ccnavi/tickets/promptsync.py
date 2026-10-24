@@ -1,21 +1,21 @@
-"""ユーザの発言のたびに、共通レイヤーと工程スキルをプロジェクトへ写す。
+"""ユーザの発言のたびに、共通レイヤーと工程スキルをプロジェクトへコピーする。
 
-写し先は、`project:` を持つ着手済みの親チケットのワークツリー。
+コピー先は、`project:` を持つ着手済みの親チケットのワークツリー。
 プロジェクトのメインのチェックアウトは対象外で、
-ユーザが押す `ccnavi user mirror`（`mirrorsync`）が受け持つ。写すものと写し方は
+ユーザが押す `ccnavi user mirror`（`mirrorsync`）が受け持つ。コピーするものとコピー方は
 `configsync`（共通レイヤーのミラー `.ccnavi/config/common/`）と `skillsync`（工程スキルの
-`skills/<工程>/`）が決める。ここは、どのワークツリーに、いつ写すかだけを持つ。
+`skills/<工程>/`）が決める。ここは、どのワークツリーに、いつコピーするかだけを持つ。
 
-写すのは UserPromptSubmit だけで、ツール呼び出しの中では写さない。呼び出し側は、ここを
-`selfguard.accept` と `post.at_prompt` の前に呼ぶ。写した分は「前のターンの終わりからここまでの
-変更」に入り、ユーザの手による変更と同じに受け入れられる。ツール呼び出しの中で写すと、
+コピーするのは UserPromptSubmit だけで、ツール呼び出しの中ではコピーしない。呼び出し側は、ここを
+`selfguard.accept` と `post.at_prompt` の前に呼ぶ。コピーした分は「前のターンの終わりからここまでの
+変更」に入り、ユーザの手による変更と同じに受け入れられる。ツール呼び出しの中でコピーすると、
 実行後チェックとバックアップと復元から見てエージェントの書き込みと区別が付かず、
 中身で見分ける仕掛けが要った。
 
-発言のたびに走るので、差分が無いときは何も読まず何も書かない。写す元と写し先のファイルの
+発言のたびに走るので、差分が無いときは何も読まず何も書かない。コピーする元とコピー先のファイルの
 名前・大きさ・更新時刻から指紋を作り（`_signature`）、前に揃えたときの指紋と同じなら、そこで
 抜ける。指紋の確認は `stat` だけで済む。違えば、検証つきの全体の比較（`configsync.plan`・
-`skillsync.plan`）を行い、差分があるぶんだけ書く。写せなかったときは指紋を残さないので、
+`skillsync.plan`）を行い、差分があるぶんだけ書く。コピーできなかったときは指紋を残さないので、
 直るまで毎回報告する。全部を一律に書き直すと、読み込みの検証と全ファイルの書き込みが毎回要り、
 更新時刻も動くので採らない。指紋の置き場は state の置き場の `mirror-<親の識別子>.json`
 （セッションをまたいで共有してよい。同じ内容を書くだけ）。
@@ -33,10 +33,10 @@ SIGNATURE_PREFIX = "mirror-"
 
 
 def sync(conf: settings.Settings, root: str) -> list[str]:
-    """写した結果の行を返す。写すものが無い、揃っているときは空。
+    """コピーした結果の行を返す。コピーするものが無い、揃っているときは空。
 
-    親チケットごとに共通レイヤーのミラー、工程スキルの順に写す。写せない理由（読めない、
-    リンクなど）はその行を返し、ほかの親と、もう一方の写しは続ける。止めても発言は
+    親チケットごとに共通レイヤーのミラー、工程スキルの順にコピーする。コピーできない理由（読めない、
+    リンクなど）はその行を返し、ほかの親と、もう一方のコピーは続ける。止めても発言は
     進めるので、呼び手は行をそのままモデルに渡せばよい。
     """
     if not conf.tickets_enabled:
@@ -61,12 +61,12 @@ def _signature_path(conf: settings.Settings, ticket: str) -> str:
 
 
 def _sources(conf: settings.Settings, root: str) -> list[str]:
-    """指紋に入れる、写す元の置き場（共通レイヤー・工程スキル）。"""
+    """指紋に入れる、コピーする元の置き場（共通レイヤー・工程スキル）。"""
     return [configsync.common_dir(conf, root), os.path.join(root, *skillsync.SOURCE_DIR.split("/"))]
 
 
 def _targets(conf: settings.Settings, worktree: str) -> list[str]:
-    """指紋に入れる、写し先の置き場（ミラー・skills）。"""
+    """指紋に入れる、コピー先の置き場（ミラー・skills）。"""
     return [
         configsync.mirror_dir(conf, worktree),
         os.path.join(worktree, *skillsync.SKILLS_DIR.split("/")),
@@ -103,13 +103,14 @@ def _signature(places: list[str]) -> str:
 def _sync_one(
     conf: settings.Settings, root: str, ticket: str, project: str, worktree: str
 ) -> list[str]:
-    """1 つの親のワークツリーに写す。
+    """1 つの親のワークツリーにコピーする。
 
     処理フロー:
     1. 指紋が前に揃えたときと同じなら、何もせず抜ける（`_signature`）
     2. 共通レイヤーのミラーの差分を `configsync.plan` で求め、あれば `apply` で書く
-    3. 工程スキルの写しも同じに `skillsync.plan` と `apply` で書く
-    4. どちらも写せないことが無かったときで、比べている間に写す元が動いていないときだけ、
+    3. 工程スキルのコピーも同じに `skillsync.plan` と `apply` で書く
+    4. どちらもコピーできないことが無かったときで、
+       比べている間にコピーする元が動いていないときだけ、
        書いた後の指紋を残す（元が動いていたら残さず、次の発言で比べ直す）
     """
     lines: list[str] = []
@@ -145,12 +146,12 @@ def _sync_one(
     changes, why = skillsync.plan(root, worktree)
     if why:
         failed_any = True
-        lines.append(f"ccnavi: {ticket} の工程スキルを写せない: {why}")
+        lines.append(f"ccnavi: {ticket} の工程スキルをコピーできない: {why}")
     elif changes:
         failed = skillsync.apply(changes)
         if failed:
             failed_any = True
-            lines.append(f"ccnavi: {ticket} の工程スキルを写せない: {failed}")
+            lines.append(f"ccnavi: {ticket} の工程スキルをコピーできない: {failed}")
         else:
             lines += skillsync.describe(project, changes)
             committable += [c.rel for c in changes]

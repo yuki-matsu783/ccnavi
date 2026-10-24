@@ -181,7 +181,7 @@ class RepliesTest(unittest.TestCase):
     # ---- decide の照合の範囲
 
     def test_a_changed_or_removed_representative_note_changes_the_key_or_the_version(self):
-        """preview の後に代表の note が消える・変わると、鍵か版が変わり、decide は止まる。"""
+        """preview の後に代表の note が消える・変わると、キーか版が変わり、decide は止まる。"""
         shown = thread(id="d", url="m#note_10", body="最初の返信", last_comment_id="11")
         edited = thread(id="d", url="m#note_10", body="書き換えた", last_comment_id="11")
         removed = thread(id="d", url="m#note_11", body="次の返信", last_comment_id="11")
@@ -190,7 +190,7 @@ class RepliesTest(unittest.TestCase):
         self.assertNotEqual(review_host.thread_key(shown), review_host.thread_key(removed))
 
     def test_a_later_reply_is_not_detected_by_the_digest_inputs(self):
-        """制約（今回は変えない）: 鍵と代表の本文の版だけで照合するので、preview の後に同じ
+        """制約（今回は変えない）: キーと代表の本文の版だけで照合するので、preview の後に同じ
         discussion へ付いた別の返信は検知しない。last_* は台帳の再提起の判定にだけ使う。"""
         shown = thread(id="d", url="m#note_10", body="最初の返信", last_comment_id="11")
         later = thread(id="d", url="m#note_10", body="最初の返信", last_comment_id="12")

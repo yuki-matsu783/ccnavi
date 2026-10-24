@@ -24,7 +24,7 @@ SessionStart でユーザに「提案の候補がある」と知らされ、ユ�
 - 差分と、`docs/wiki/impact/<提案>.md`（`status: 承認待ち`）を同じチケットに入れる
 - 反映先のパスで、直し方を分ける
   - 保護対象でないもの（`.claude/skills/*` の多く、`docs/*`）: 提案チケットの中で直接直す
-  - 保護対象のもの（ルール・配点・フェーズ定義・テンプレート・`.ccnavi/docs/*` など）: 下書きを置き、ユーザの取り込み（`ccnavi user handoff`）で直す
+  - 保護対象のもの（ルール・配点・フェーズ定義・テンプレート・`.ccnavi/docs/*` など）: 下書きを置き、ユーザの取り込み（`sh .ccnavi/scripts/ccnavi-user-handoff.sh`）で直す
 
 `impact/<提案>.md` の frontmatter は次のとおり。
 

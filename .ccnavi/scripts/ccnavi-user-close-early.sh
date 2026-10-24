@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-user-close-early まだ残っているが、早めに閉じる判断を置く。ユーザが端末で打つ。
+# ccnavi-user-close-early まだ残っているが、早めに閉じる判断を置く。ユーザがターミナルで打つ。
 #
 #   sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason <理由> [--no-issue]
 #
@@ -22,7 +22,7 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason <理由> [--no-issue]
 
-  まだ残っているが早めに閉じる判断（ユーザが端末で実行します）。残りを issue に書き出す（--no-issue なら書き出さない）。
+  まだ残っているが早めに閉じる判断（ユーザがターミナルで実行します）。残りを issue に書き出す（--no-issue なら書き出さない）。
   Draft は親が ccnavi-review.sh ready で外す。
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
@@ -91,7 +91,7 @@ carry_human() {
 }
 
 fetch_all >"$result"
-# exe はユーザに残りを見せて y/N を取るので、標準出力は端末のまま。下書きは state の
+# exe はユーザに残りを見せて y/N を取るので、標準出力はターミナルのまま。下書きは state の
 # 置き場の決まった名前で拾う（親の識別子。ブランチ名と違うことがある）。
 # 未解決の指摘は受け入れる。スレッドに返信を残して解決するのはここで、
 # 置く前に済ませる。3 回に分けて打つ。
@@ -104,11 +104,11 @@ rm -f "$accept_plan"
 close_issue_flag=""
 [ "$make_issue" -eq 1 ] || close_issue_flag="--no-issue"
 # shellcheck disable=SC2086 # close_issue_flag は空か --no-issue
-ccnavi user close-early --reason "$reason" --result "$result" --accept-plan "$accept_plan" $close_issue_flag || exit $?
+ccnavi --entry sh user close-early --reason "$reason" --result "$result" --accept-plan "$accept_plan" $close_issue_flag || exit $?
 refetch
-ccnavi user close-early --reason "$reason" --result "$result" --accept-check "$accept_plan" || exit $?
+ccnavi --entry sh user close-early --reason "$reason" --result "$result" --accept-check "$accept_plan" || exit $?
 accept_execute "$accept_plan"
-ccnavi user close-early --reason "$reason" --result "$result" --accept-done "$accept_file" || exit $?
+ccnavi --entry sh user close-early --reason "$reason" --result "$result" --accept-done "$accept_file" || exit $?
 issue_draft="$state/review-close-early-issue-$family.md"
 noted="$state/review-close-early-note-$family.md"
 number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')

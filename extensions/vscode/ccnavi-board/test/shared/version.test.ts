@@ -89,7 +89,7 @@ test("CB-T568 使う機能を実行ファイルが持つかを features で見�
   assert.equal(missingFeatures(ok({ features: ["handoff", "user-entry"] }), ["handoff"], what, false), undefined);
 
   const missing = missingFeatures(ok({ features: ["handoff"] }), ["handoff", "user-entry"], what, false) ?? "";
-  assert.match(missing, /user-entry の機能を持ちません/);
+  assert.match(missing, /user-entry の機能に対応していません/);
   assert.doesNotMatch(missing, /handoff /);
   assert.match(missing, /取り込み待ち画面 で確認できない/);
 
@@ -98,7 +98,7 @@ test("CB-T568 使う機能を実行ファイルが持つかを features で見�
 });
 
 test("CB-T569 features のない実行ファイルは、機能を求めると足りないと言う", () => {
-  assert.match(missingFeatures(ok(), ["handoff"], "取り込み待ち画面", false) ?? "", /handoff の機能を持ちません/);
+  assert.match(missingFeatures(ok(), ["handoff"], "取り込み待ち画面", false) ?? "", /handoff の機能に対応していません/);
 });
 
 test("CB-T1137 handoff を持たない実行ファイルには、取り込み待ち画面を無効にして古い版と言い、組み立て直しを案内する", () => {
@@ -107,7 +107,7 @@ test("CB-T1137 handoff を持たない実行ファイルには、取り込み待
 
   // user-entry だけを持つ（handoff の前の）実行ファイル
   const stale = missingFeatures(ok({ features: ["user-entry"] }), ["handoff"], what, true) ?? "";
-  assert.match(stale, /handoff の機能を持ちません（古い版です）/);
+  assert.match(stale, /handoff の機能に対応していません（古い版です）/);
   assert.match(stale, /組み立て直して/);
   // 配り直しの案内（ccnavi のリポジトリではないワークスペース）
   assert.match(missingFeatures(ok({ features: [] }), ["handoff"], what, false) ?? "", /ccnavi-setup\.sh/);
@@ -120,7 +120,7 @@ test("CB-T1100 user-entry を持たない実行ファイルには、ユーザ専
   assert.equal(missingFeatures(ok({ features: ["user-entry"] }), ["user-entry"], what, false), undefined);
 
   const stale = missingFeatures(ok({ compat: 12, features: ["handoff"] }), ["user-entry"], what, true) ?? "";
-  assert.match(stale, /user-entry の機能を持ちません（古い版です）/);
+  assert.match(stale, /user-entry の機能に対応していません（古い版です）/);
   assert.match(stale, /ccnavi user agree --yes で確認できない/);
   assert.match(stale, /組み立て直して/);
 });

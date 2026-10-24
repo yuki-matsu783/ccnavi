@@ -41,7 +41,7 @@ test("CX-T211 ボードの入力欄からの保存: 範囲の中なら保存し�
   assert.equal(await saveRecentDays(area, HOSTS, "github.com/acme/b", String(MAX_RECENT_DAYS)), MAX_RECENT_DAYS);
   const before = structuredClone(area.data.repos);
   for (const bad of ["-1", String(MAX_RECENT_DAYS + 1), "1.5", "abc", "", " "]) {
-    await assert.rejects(saveRecentDays(area, HOSTS, "github.com/acme/b", bad), /検索期間には、0〜90の整数を入力してください/, bad);
+    await assert.rejects(saveRecentDays(area, HOSTS, "github.com/acme/b", bad), /検索期間には、0〜90 の整数を入力してください/, bad);
   }
   await assert.rejects(saveRecentDays(area, HOSTS, "github.com/acme/none", "5"), /は登録されていません/);
   assert.deepEqual(area.data.repos, before);

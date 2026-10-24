@@ -192,7 +192,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertTrue(any("設計" in p["detail"] for p in errors), errors)
 
     def test_identical_types_in_two_layers_are_both_kept(self):
-        """全欄一致でも後ろを捨てない（info も出ない）。統合結果が無いので重複が起きない。"""
+        """全欄一致でも後ろを破棄しない（info も出ない）。統合結果が無いので重複が起きない。"""
         write_layer(self.lib, phases=LIB_PHASES_COPIED)
 
         self.assertEqual(self.phase_problems("error"), [])
@@ -253,7 +253,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertEqual([t["id"] for t in sums["app"]["phases"]["types"]], ["design"])
 
     def test_fill_phases_takes_types_from_both_layers(self):
-        """`--plan-order <親> --fill-phases` は共通レイヤーとレイヤーの和から写す。"""
+        """`--plan-order <親> --fill-phases` は共通レイヤーとレイヤーの和からコピーする。"""
         write(self.phases, COMMON_PHASES)
         text = ticket_text("i0001", plan=["design", "docs"], allow=("wip/design/*", "docs/*"))
         home = self.worktree(self.ws, "i0001")
@@ -270,7 +270,7 @@ class PhaseUnionTest(ConfigUnionHarness):
     def test_same_id_with_different_body_across_common_is_an_error(self):
         """共通レイヤーと同じ id で中身が違う定義は error。
 
-        衝突した定義だけを捨て、共通の定義を使う。
+        衝突した定義だけを破棄し、共通の定義を使う。
 
         そのレイヤーのほかの定義は生きている。
         """
@@ -284,7 +284,7 @@ class PhaseUnionTest(ConfigUnionHarness):
 
         errors = [p for p in self.phase_problems("error") if p["where"].startswith("(self)")]
         self.assertTrue(any("design" in p["where"] + p["detail"] for p in errors), errors)
-        # 捨てるのは衝突した design だけ。同じレイヤーの docs は使える。
+        # 破棄するのは衝突した design だけ。同じレイヤーの docs は使える。
         self.propose("i0001", ticket_text("i0001", plan=["docs"], allow=("docs/*",)))
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
@@ -295,7 +295,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertEqual(types["design"]["source"], "common")
         self.assertEqual(types["design"]["title"], "設計")
         self.assertEqual(types["docs"]["source"], "self")
-        # 写しが自身のレイヤーの design（中身違い）なら、承認で止まる。
+        # コピーが自身のレイヤーの design（中身違い）なら、承認で止まる。
         own_copy = ticket_text("i0002", plan=["design"], allow=("wip/*",))
         write(
             os.path.join(self.ws, "wip", "proposals", "todo", "i0002.md"),
@@ -306,7 +306,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(self.approved_copy("i0002")))
 
     def test_title_overlap_with_common_is_an_error(self):
-        """共通レイヤーの定義と `title` が重なる別 id の定義は error。重なった定義だけを捨てる。
+        """共通レイヤーの定義と `title` が重なる別 id の定義は error。重なった定義だけを破棄する。
 
         そのレイヤーのほかの定義は生きている。
         """
@@ -340,7 +340,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(self.approved_copy("i0002")))
 
     def test_identical_type_in_common_and_layer_is_dropped_with_info(self):
-        """共通レイヤーと全欄が同じ定義は、レイヤーの側を捨てて info で言う。error ではない。"""
+        """共通レイヤーと全欄が同じ定義は、レイヤーの側を破棄して info で言う。error ではない。"""
         write(self.phases, COMMON_PHASES)
 
         # lib の design は共通レイヤーの design と全欄が同じ。
@@ -394,9 +394,9 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertNotEqual(self.approve().returncode, 0)
 
     def test_the_order_comes_from_the_plan_and_not_from_the_file(self):
-        """9.7: ファイルの `order` と定義の `after` は読まない。待ち方は計画の項の `after`。
+        """9.7: ファイルの `order` と定義の `after` は読まない。先行関係は計画のステップの `after`。
 
-        承認は待ち方のファイルを書かない。ボードの `order` はいつも `dag`。"""
+        承認は先行関係のファイルを書かない。ボードの `order` はいつも `dag`。"""
         write_layer(self.ws, phases=OWN_PHASES_DESIGN)
         write_layer(self.lib, phases=LIB_PHASES_DAG)
         self.propose(
@@ -408,7 +408,7 @@ class PhaseUnionTest(ConfigUnionHarness):
 
         sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
 
-        # 定義は順序を持たないので、待ち方の欄（order）は渡さない
+        # 定義は順序を持たないので、先行関係の欄（order）は渡さない
         self.assertNotIn("order", sums["lib"]["phases"])
         self.assertNotIn("order", sums["self"]["phases"])
         workflow = self.approved_path("phases", "i0001", "workflow.yml", project="lib")
@@ -534,7 +534,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertIn("(CRITICAL)", closed.stdout)
 
     def test_unwritten_level_keys_do_not_take_part(self):
-        """書かれていない鍵は参加しない。
+        """書かれていないキーは参加しない。
         lib が書かない medium / high は共通レイヤーの値。"""
         tree = self.one_child()
         self.commit(tree, "src/a.py", "\n".join(str(i) for i in range(10)) + "\n")
@@ -607,7 +607,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(self.record()["points"], 25)
 
     def test_identical_factor_in_a_later_layer_is_dropped_with_info(self):
-        """全欄一致なら重複として後ろを捨て、info で言う。"""
+        """全欄一致なら重複として後ろを破棄し、info で言う。"""
         copied = COMMON_RISK.replace("levels: {medium: 20, high: 40, critical: 70}\n", "")
         write_layer(self.lib, risk=copied)
 
@@ -756,11 +756,11 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(mark.get("source"), "lib", mark)
 
     def test_the_mark_names_common_when_the_type_comes_from_common(self):
-        """共通レイヤーの定義を写した親のマーカーは、`source` が `common`。
+        """共通レイヤーの定義をコピーした親のマーカーは、`source` が `common`。
 
         `--explain --json` の和と同じ。lib の `work` は共通レイヤーの `work` と全欄が同じなので、
         和では共通の側が残る。
-        写しは出どころを持たないが、共通レイヤーの定義と中身が同じなら共通の定義として記す。
+        コピーは出どころを持たないが、共通レイヤーの定義と中身が同じなら共通の定義として記す。
         """
         write(self.phases, LIB_PHASES_WORK)
         tree = self.one_child()

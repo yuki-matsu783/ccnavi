@@ -114,7 +114,7 @@ class BranchNameRulesTest(unittest.TestCase):
         self.assertFalse(any("統合先" in f for f in ticket_ids.branch_name_problems(ticket)))
         found = ticket_ids.branch_name_problems(ticket, "trunk")
         self.assertIn("統合先の名前（trunk）", found[0])
-        # 固定のリストに当たるものは 1 行だけ。
+        # 固定のリストにヒットするものは 1 行だけ。
         main = ticket_ids.branch_name_problems(ticket_model.Ticket(ticket="main"), "main")
         self.assertEqual(1, len([f for f in main if "統合先" in f]), main)
         child = ticket_model.Ticket(ticket="trunk-01-01", parent="trunk")

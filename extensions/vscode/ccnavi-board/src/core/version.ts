@@ -16,7 +16,7 @@ export const VERSION_SCHEMA = 1;
  * 拡張が頼る実行ファイルの契約の版。src/ccnavi/entry/version.py の COMPAT、ccnavi-common.sh の CCNAVI_COMPAT と揃える
  * （tests/sh/test_compat_skew.py が 3 か所を見比べる）。上げ方は src/ccnavi/entry/version.py の説明のとおり
  */
-export const EXTENSION_COMPAT = 18;
+export const EXTENSION_COMPAT = 19;
 
 export interface VersionInfo {
   readonly schema: number;
@@ -82,7 +82,7 @@ export function rebuildHint(fromSource: boolean): string {
 
 /** 拡張を新しくする直し方 */
 export const UPDATE_EXTENSION_HINT =
-  "拡張を新しくしてください（ccnavi のリポジトリの extensions/vscode/ccnavi-board で pnpm package して入れ直す）";
+  "拡張を新しくしてください（ccnavi のリポジトリの extensions/vscode/ccnavi-board で pnpm package して入れ直します）";
 
 /** 表示に使う実行ファイルの版とコミット（`0.1.0 abc1234`） */
 function named(info: VersionInfo): string {
@@ -135,5 +135,5 @@ export function missingFeatures(probe: VersionProbe, features: readonly string[]
   if (missing.length === 0) {
     return undefined;
   }
-  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} の機能を持ちません（古い版です）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
+  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} の機能に対応していません（古い版です）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
 }

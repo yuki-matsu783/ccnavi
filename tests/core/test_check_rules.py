@@ -56,7 +56,7 @@ class RepoExpectationsTest(unittest.TestCase):
         #
         # 期待の `/repo` は --root に読み替わる。ルートがこのリポジトリのままだと、ワークツリー
         # （`.claude/worktrees/<名前>` の下）で回したときに `Write /repo/wip/...` が
-        # allow:worktrees に当たり、本流と答えが割れる。ルートだけを、ワークツリーの下にならない
+        # allow:worktrees にヒットし、本流と答えが割れる。ルートだけを、ワークツリーの下にならない
         # 使い捨ての置き場に替える。ルールと期待は arguments() のとおりこのリポジトリのものを読む。
         with tempfile.TemporaryDirectory(prefix="ccnavi-expectations-root-") as scratch_root:
             arguments = tool.arguments()
@@ -71,7 +71,7 @@ class RepoExpectationsTest(unittest.TestCase):
             (
                 "{expected} のはずが {verdict}: {tool}  {subject}\n"
                 "    なぜ: {why}\n"
-                "    当たったルール: {hit}"
+                "    ヒットしたルール: {hit}"
             ).format(
                 hit=", ".join(f"{h['section']}:{h['id']}" for h in r["rules"]) or "(無し)",
                 **r,

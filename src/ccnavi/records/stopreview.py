@@ -142,7 +142,7 @@ def _last_assistant_uuid(path: str) -> str | None:
                 tail = handle.read(end - start) + tail
                 end = start
                 lines = tail.split(b"\n")
-                # 先頭は途中で切れているかもしれないので、先頭まで読み切るまでは捨てる。
+                # 先頭は途中で切れているかもしれないので、先頭まで読み切るまでは破棄する。
                 complete = lines if end == 0 else lines[1:]
                 found = _scan(complete)
                 if found is None or found:
@@ -449,7 +449,7 @@ def validate(result: Any, plan: dict[str, Any]) -> dict[str, Any]:
         raise Rejected("results がリストではない")
     targets = set(plan.get("targets") or [])
     no_r2 = set(plan.get("no_r2") or [])
-    # 本文が無い版（送れなかった提案）の R2 は対象外。判定役が余分に出した行は、受理せず捨てる。
+    # 本文が無い版（送れなかった提案）の R2 は対象外。判定役が余分に出した行は、受理せず破棄する。
     # 記録ごと拒否すると、ほかの基準の結果まで失うため（実機で余分な行を出す例があった）。
     rows = [
         r
@@ -592,7 +592,7 @@ def accept(
     attempt = read_attempt(state, plan["attempt_id"]) if plan else None
     if not plan or not attempt or attempt.get("state") != RUNNING:
         return dict(OK_RETURN)
-    # 材料の版・結果の形・承認状態を検査する。どれかに当たれば拒否する。
+    # 材料の版・結果の形・承認状態を検査する。どれかにヒットすれば拒否する。
     try:
         if plan.get("material_version") != material_version:
             raise Rejected("材料の版が変わった")
@@ -771,7 +771,7 @@ def turn_material(transcript_path: str) -> dict[str, Any]:
 
     処理フロー:
     1. transcript を 1 行ずつ JSON として読み、サイドチェーン・メタの行を除く。
-       compact の境界より前は捨て、compact の要約の行も除く。壊れた行は飛ばす。
+       compact の境界より前は破棄し、compact の要約の行も除く。壊れた行は飛ばす。
        ファイルを開けなければ unreadable で返す。
     2. ユーザとアシスタントの発言だけを取り、本文の空と通知を除く（_text_of・_is_notification）。
     3. 最後のユーザの発言を今回のターンの始まりとする。

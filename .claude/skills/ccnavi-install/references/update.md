@@ -11,7 +11,7 @@ keywords: [更新, force, バックアップ, 入れ替え, 配り直し, quaran
 新しい zip（または新しくビルドしたソース）を配布元にして、入れる先に配り直す。`--force` は利用者の手直しを消すので、
 次の順で進める。
 
-1. **入れる先が enable なら**、Claude Code の外の端末で打ってもらう。install は、enable として使われている入れる先には Claude Code の中から入れない
+1. **入れる先が enable なら**、Claude Code の外のターミナルで打ってもらう。install は、enable として使われている入れる先には Claude Code の中から入れない
    （doctor の `existing` が `warn enable`）。コマンドを示して、ユーザに打ってもらう
 2. **`--check` で一覧を見せる**: `install <ws> --from <配布元> --check`。setup が「配布先に既にあるので配っていないもの」として並べたものは、
    `--force` が無ければ**古いまま残る**（この機械の実行ファイルは例外で、配布元と中身が違えば入れ替わる）。何が残るかをユーザに伝える

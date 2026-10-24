@@ -122,7 +122,8 @@ def read(file: str, session: str) -> Outcome | None:
             file=file,
         )
     except (ValueError, TypeError):
-        # 手で直した・版が違うなどで型が合わない記録は、読めないものとして捨てる（hook を止めない）
+        # 手で直した・版が違うなどで型が合わない記録は、読めないものとして破棄する
+        # （hook を止めない）
         return None
 
 

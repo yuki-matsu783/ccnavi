@@ -56,9 +56,10 @@ def at_start(
     子の範囲を案内し、調査役がどこで作業すればよいか分からなくなる（SubagentStop と同じ絞り方）。
 
     処理フロー:
-    1. 判定を ALLOW にし、同じ作業ツリーで動く別のサブエージェントの案内を組む（`_note_running`）。
+    1. 判定を ALLOW にし、
+       同じワークツリーで動く別のサブエージェントの案内を組む（`_note_running`）。
     2. スキルの目録（`projskills.notice`）と振り返りの候補の 1 行を、案内の前に並べる。
-    3. チケット制御が無い・作業ツリーが無い・メインのときは、その文だけを渡して抜ける（`_say`）。
+    3. チケット制御が無い・ワークツリーが無い・メインのときは、その文だけを渡して抜ける（`_say`）。
     4. cwd のツリーに対応する親（または子）の開いている子を決め、子ごとに行を組む
        （`childnote.child_block`・`childnote.stage_lines`）。
     5. 手順が並び、子が 1 本に決まらないときは、自分の子のフローだけに従い、
@@ -67,7 +68,7 @@ def at_start(
     """
     record.decision, record.enforced = audit.ALLOW, True
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
-    # 同じ作業ツリーで動く別の編集するサブエージェントの案内。ワークスペースルートからの起動
+    # 同じワークツリーで動く別の編集するサブエージェントの案内。ワークスペースルートからの起動
     # （チケットの無いツリー）でも渡すので、子チケットの一覧に至る前の return より先に組む。
     shared = _note_running(stderr, conf, root, payload, t)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（本文は要るときに
@@ -205,7 +206,7 @@ def _judge_stop(
             continue
         for rel, found in outside:
             findings.append((child, rel, found))
-    # 相手を見分ける鍵。`agent_id` が無い payload では、cwd のワークツリーの名前を使う。
+    # 相手を見分けるキー。`agent_id` が無い payload では、cwd のワークツリーの名前を使う。
     who = payload.agent_id or (t.name if t is not None else "")
     if unchecked:
         # 範囲を確かめられなかった子がある。通した回と記録で見分けられるよう、範囲外が他に
@@ -307,26 +308,27 @@ def _judge_stop(
 #   セッションの識別子は名前に入れるとき字を置き換えるので、別のセッションの名前と前置きが
 #   重なりうる。どのセッションの印かは 1 行目の完全一致で決める（`_read_mark` と同じ）。
 #   編集するサブエージェントだけが 3 行目以降に `tree <種類> <名前>` と `type <agent_type>` を
-#   持つ（同じ作業ツリーの案内に使う。`_shared_note`）。無い印は案内の相手に数えない
-# - `agent_id` が payload に無い始まり・終わりは、鍵が決まらないので印を置かず、外しもしない。
+#   持つ（同じワークツリーの案内に使う。`_shared_note`）。無い印は案内の相手に数えない
+# - `agent_id` が payload に無い始まり・終わりは、キーが決まらないので印を置かず、外しもしない。
 #   その体は「実行中」と数えられず、委任して待つ回でも促しが出うる
 # - 入れ子の体（孫）も、同じセッションで自分の `agent_id` の印を持つ。1 体でも残っていれば実行中
 # - SubagentStop が来ないまま残った印（中断・クラッシュ・ccnavi の内部エラー）は、開始から
 #   `RUNNING_MAX_SECONDS` を過ぎたら数えない。さらにセッションの起動（`startup`）と再開
-#   （`resume`）で捨てる（`forget_running`）。どちらも新しいプロセスで、前の体は生きていない。
-#   compact・clear では捨てない。同じプロセスで、実行中の体が残りうるため
+#   （`resume`）で破棄する（`forget_running`）。どちらも新しいプロセスで、前の体は生きていない。
+#   compact・clear では破棄しない。同じプロセスで、実行中の体が残りうるため
 # - 数える対象はサブエージェントだけ。チームメイトとバックグラウンドのシェルは数えない
 RUNNING_SUFFIX = ".running"
 
 # 印を「実行中」と数える長さの上限（秒）。4 時間。hook の timeout（10 秒）とは関係なく、
-# バックグラウンドの体が現実に走る長さ（数分から 1 時間ほど）に十分な余裕を足した値。長すぎる分の害は、
+# バックグラウンドの体が現実に走る長さ（数分から 1 時間ほど）に十分な余裕を足した値。
+# 長すぎる分の害は、
 # 取りこぼした印が促しを止める時間が伸びるだけ（促しが 1 回出ないだけで、他は壊れない）。
 # 短すぎると、長く走る体を待つ回で誤って止める。迷ったら止めない側に倒す。
 RUNNING_MAX_SECONDS = 4 * 3600
 
 
 def _running_path(state_dir: str, session: str, who: str) -> str:
-    """実行中の印の置き場。鍵の決め方は差し戻しの記録（_bounce_path）と同じ。"""
+    """実行中の印の置き場。キーの決め方は差し戻しの記録（_bounce_path）と同じ。"""
     return _bounce_path(state_dir, session, who)[: -len(".bounced")] + RUNNING_SUFFIX
 
 
@@ -339,7 +341,7 @@ def _note_running(
 ) -> str:
     """SubagentStart で、このサブエージェントが実行中だと印を置く。置けなくても始まりは止めない。
 
-    チケット制御の有無によらず置く（直接作業の促しも、実行中のサブエージェントが居る間は止める）。返すのは、同じ作業ツリーで動く別の
+    チケット制御の有無によらず置く（直接作業の促しも、実行中のサブエージェントが居る間は止める）。返すのは、同じワークツリーで動く別の
     編集するサブエージェントへの案内（無ければ空）。
 
     印の 3 行目以降は、編集するサブエージェントだけが書く（`tree <種類> <名前>` と
@@ -376,14 +378,14 @@ _TYPE = "type "
 def _shared_note(
     stderr: TextIO, conf: settings.Settings, payload: hookio.Input, here: tree.Tree
 ) -> str:
-    """同じ作業ツリーで実行中の、別の編集するサブエージェントへの案内。まだ案内していない相手がいなければ空。
+    """同じワークツリーで実行中の、別の編集するサブエージェントへの案内。まだ案内していない相手がいなければ空。
 
-    相手は同じセッションの印のうち、自分の鍵ではなく、作業ツリーが同じ（名前は大文字小文字を
+    相手は同じセッションの印のうち、自分のキーではなく、ワークツリーが同じ（名前は大文字小文字を
     区別せず比べる）で、開始から `RUNNING_MAX_SECONDS` を過ぎていないもの。同じ相手への案内を
-    1 回に抑えるため、案内した相手の鍵を覚える（再開で `SubagentStart` がまた走っても、
+    1 回に抑えるため、案内した相手のキーを覚える（再開で `SubagentStart` がまた走っても、
     同じ相手には出さない）。覚えられないときは案内する側に倒す。読めない印は数えない。
     """
-    # 同じセッションの印から、同じ作業ツリーで動いている別の相手を集める。
+    # 同じセッションの印から、同じワークツリーで動いている別の相手を集める。
     marks = _session_marks(conf.state, payload.session_id, RUNNING_SUFFIX)
     if not marks:
         return ""
@@ -424,9 +426,9 @@ def _shared_note(
     who = "、".join(f"{label} {n} 件" for label, n in sorted(counts.items()))
     where = here.name or "ワークスペースルート"
     return (
-        f"[ccnavi] 起動時の作業ディレクトリと同じ作業ツリー（{where}）で、別の編集する"
+        f"[ccnavi] 起動時の作業ディレクトリと同じワークツリー（{where}）で、別の編集する"
         f"サブエージェントが動いています（{who}）。並行して編集するときは、別のワークツリーを切る"
-        "決まりです（.ccnavi/docs/decisions.md）。同じ作業ツリーで続けるなら、触るファイルの"
+        "決まりです（.ccnavi/docs/decisions.md）。同じワークツリーで続けるなら、触るファイルの"
         "持ち主を分け、他のサブエージェントの未コミットの変更には触れないでください。"
         "別のワークツリーで作業している場合や、親から委任された子の場合は、対応は不要です。"
     )
@@ -439,12 +441,12 @@ def _forget_running(conf: settings.Settings, payload: hookio.Input) -> None:
 
 
 def forget_running(state_dir: str, session: str) -> None:
-    """このセッションの実行中の印を全部捨てる。起動（`startup`）と再開（`resume`）の後始末。"""
+    """このセッションの実行中の印を全部破棄する。起動（`startup`）と再開（`resume`）の後始末。"""
     if not state_dir:
         return
     for _, path in _session_marks(state_dir, session, RUNNING_SUFFIX) or []:
         # 名前の前置きが重なる別のセッションの印は消さない（`running` と同じく 1 行目で確かめる）。
-        # 1 行目を読めない印（壊れている・空）は、期限と prune に任せず、ここで捨てる。
+        # 1 行目を読めない印（壊れている・空）は、期限と prune に任せず、ここで破棄する。
         text = fsio.read_text(path, errors="replace")
         lines = text.splitlines() if text is not None else []
         if lines and lines[0] != _MARK_SESSION + _one_line(session):
@@ -501,7 +503,7 @@ def _one_line(session: str) -> str:
 
 
 def _session_marks(state_dir: str, session: str, suffix: str) -> list[tuple[str, str]] | None:
-    """このセッションの名前の前置きに当たる印。相手の鍵とパスの組。一覧できなければ None。
+    """このセッションの名前の前置きにヒットする印。相手のキーとパスの組。一覧できなければ None。
 
     名前は前置きで候補を絞るだけで、セッションは読むときに 1 行目で確かめる。
     """
@@ -659,10 +661,10 @@ def unchecked_scope(state_dir: str, payload: hookio.Input) -> str:
 
 
 def _session_unchecked(state_dir: str, session: str) -> list[tuple[str, str]]:
-    """このセッションに残った、範囲を確かめられなかった印。相手の鍵とパスの組。
+    """このセッションに残った、範囲を確かめられなかった印。相手のキーとパスの組。
 
     ファイルの名前は前置きで候補を絞るだけ。セッションの識別子は名前に入れるときに字を
-    置き換えるうえ、`-` で区切るので別のセッションの名前も前置きに当たりうる。どのセッションの
+    置き換えるうえ、`-` で区切るので別のセッションの名前も前置きにヒットしうる。どのセッションの
     印かは、読むときに中身の 1 行目（`_read_mark`）と完全一致で比べる。
     """
     head = os.path.basename(_unchecked_path(state_dir, session, "x"))[: -len("x.unchecked")]
@@ -684,7 +686,7 @@ def unchecked_after_error(
 
     内部エラーの知らせ（`systemMessage`）はユーザにしか見えず、親には届かない。読めない子が
     あった回と同じ印を置いて、親の PostToolUse か UserPromptSubmit で言わせる。どの子を
-    見るはずだったかは分からないので、中身は空にする。ここでの失敗は捨てる（受け皿の中で
+    見るはずだったかは分からないので、中身は空にする。ここでの失敗は破棄する（受け皿の中で
     例外を重ねない）。
     """
     if not conf.state:
@@ -710,7 +712,7 @@ def unchecked_after_error(
 
 
 def _unchecked_path(state_dir: str, session: str, who: str) -> str:
-    """範囲を確かめられなかった印の置き場。鍵の決め方は差し戻しの記録（_bounce_path）と同じ。"""
+    """範囲を確かめられなかった印の置き場。キーの決め方は差し戻しの記録（_bounce_path）と同じ。"""
     return _bounce_path(state_dir, session, who)[: -len(".bounced")] + ".unchecked"
 
 
@@ -747,9 +749,9 @@ def _remember(stderr: TextIO, path: str, session: str, tickets: list[str]) -> No
 
 
 def _bounce_path(state_dir: str, session: str, who: str) -> str:
-    """差し戻しの記録の置き場。セッションと、その中で相手を見分ける鍵で分ける。
+    """差し戻しの記録の置き場。セッションと、その中で相手を見分けるキーで分ける。
 
-    セッションを鍵に入れるのは、state の置き場がワークスペースに 1 つしか無いから。
+    セッションをキーに入れるのは、state の置き場がワークスペースに 1 つしか無いから。
     入れないと、別のセッションが置いた記録を読んで、一度も差し戻していない相手を
     「差し戻し済み」として通す。記録が消えるのは、親の PostToolUse が `agentId` を
     持って通ったときだけなので、残った 1 つは次の日のセッションでも有効なままになる。

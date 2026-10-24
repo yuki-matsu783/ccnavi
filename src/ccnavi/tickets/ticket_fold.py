@@ -87,7 +87,7 @@ def collisions(
 ) -> list[ticket_model.Ticket]:
     """どれを正とするか決まらないチケットの全部。決まっていれば空。
 
-    まとめて 2 つ以上残り、同じツリーの中で `collided_states` に当たるときだけ入る
+    まとめて 2 つ以上残り、同じツリーの中で `collided_states` にヒットするときだけ入る
     （状態の操作が「複数の場所」で止まるのと、`--lint` が ERROR で言うのとで同じ条件。
     `lint_ticket._proposal_problems` も同じ関数を通る）。複数のツリーにあること自体は
     普通で、親のツリーが決めるので数えない。

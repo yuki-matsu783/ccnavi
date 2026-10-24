@@ -161,7 +161,7 @@ test("CB-T273 開始はコピーしない。グループをコピーすると中
   assert.deepEqual(placed.position, { x: absolutePosition(doc, "p-1").x + 40, y: absolutePosition(doc, "p-1").y + 40 });
 });
 
-test("CB-T274 履歴は直す前のコピーを積み、戻す・やり直すで行き来する。戻してから直すとやり直しは消える。上限を超えたら古いほうから捨てる", () => {
+test("CB-T274 履歴は直す前のコピーを積み、戻す・やり直すで行き来する。戻してから直すとやり直しは消える。上限を超えたら古いほうから破棄する", () => {
   const a = bareFlow("x", "");
   const b = addNode(a, "prompt", { x: 0, y: 0 }).doc;
   const c = renameNode(b, "prompt-1", "書く");

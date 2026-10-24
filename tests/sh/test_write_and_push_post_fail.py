@@ -157,7 +157,7 @@ class PostFailureTest(WriteAndPushHostHarness):
     # ---- AT41: 操作記録を失った後の request の打ち直し
 
     def test_a_request_retyped_after_losing_the_op_record_is_not_posted_twice(self):
-        """AT41: 別の PC や記録の消失の想定。操作記録を消して打ち直しても、本文の内容の鍵で
+        """AT41: 別の PC や記録の消失の想定。操作記録を消して打ち直しても、本文の内容のキーで
         既存の投稿を見つけ、二重に投稿しない。"""
         args = self.request_args()
         first = self.review(*args)

@@ -1,5 +1,5 @@
 /*
- * カード 1 枚（`Card.tsx`）。見出し（ID・題・状態の札）・位置・あなたの番・注意・親のフェーズ一覧・補助の操作・詳細。
+ * カード 1 枚（`Card.tsx`）。見出し（ID・題・状態の札）・位置・ユーザ待ち・注意・親のフェーズ一覧・補助の操作・詳細。
  */
 .card {
   position: relative;
@@ -37,7 +37,7 @@
 .num { font-weight: 600; font-variant-numeric: tabular-nums; }
 .title { flex: 1 1 8em; min-width: 0; overflow-wrap: anywhere; }
 /* 状態の札。色だけに頼らず、言葉を必ず出す。文字と枠の色は文字用の色（`App.css` の `--board-*-text`）で、地に対して 4.5:1 以上。
-   ユーザの番（承認待ち・レビュー待ち）は塗り、確認が要るもの（要確認）は警告の色、それ以外は枠だけ */
+   ユーザ待ち（承認待ち・レビュー待ち）は塗り、確認が要るもの（要確認）は警告の色、それ以外は枠だけ */
 .status {
   margin-left: auto; flex: 0 0 auto; white-space: nowrap;
   font-size: var(--font-xs); padding: 0 8px; border-radius: var(--radius-chip);
@@ -93,7 +93,7 @@
 /* 手で動かした子の確認待ち・移動が未共有など、ユーザが対応する注意。状態の下に 1 行 */
 .phase-manual { grid-column: 2 / -1; min-width: 0; color: var(--board-warn-text); overflow-wrap: anywhere; }
 
-/* あなたの番。ユーザができることがあるときだけ出る。主ボタンは 1 つ。見出しは小さく、本文とボタンを縦に並べる */
+/* ユーザ待ち。ユーザができることがあるときだけ出る。主ボタンは 1 つ。見出しは小さく、本文とボタンを縦に並べる */
 .turn {
   margin-top: 8px; padding: 6px 8px; border-radius: var(--radius-md);
   background: var(--vscode-list-inactiveSelectionBackground, transparent);

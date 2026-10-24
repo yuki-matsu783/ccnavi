@@ -20,9 +20,9 @@ keywords: [スキル, 概念スキル, references, skill-reference, コンテキ
 |---|---|---|
 | 標準概念ごとに薄い入口のスキルを5本置く（`designing` `testing` `debugging` `reviewing` `releasing`）。本文は基本の考え方と引き方の一文だけ | 常駐する説明文を5本に固定し、概念の見つけやすさは保つ | 作業ごとにスキルを足す。数に比例して文脈が汚れる |
 | 細かい挙動は `references/` に足す。振り返りとスキル改善は、原則 reference の追加か追記として入れる | 開かれるまで文脈に入らない。wiki で確かめた手順の行き先になる | SKILL.md に書き足す。本文が膨らむ |
-| 共通は `.claude/skills/<概念>/references/`、プロジェクト固有は `projects/<名前>/skills/<概念>/references/`。プロジェクトのスキルの置き場は `docs/skills/` から `skills/` に改める | `docs/` の下に置くと文書と紛れる。スキルの置き場だと一目で分かる | `docs/skills/` のまま。共通の写しと混ぜると置き場が深い |
-| 共通の概念スキル（SKILL.md の frontmatter に `concept: true`）の `SKILL.md` と `references/common/` を、親の `ticket start` がプロジェクトの `skills/<概念>/` へ写す。共通側から無くなった `common/` の `.md` は写し先からも消す（`SKILL.md` は消さない） | プロジェクトだけを clone しても同じ入口と reference が使える。`references/` の最上段を `common/`（写す）と `project/`（そのリポジトリ固有。写さない）に分けるので、プロジェクト固有を上書きも削除もしない。`common/` は写しなので消しても失うものが無い | `references/` 全体を写す。同じパスでプロジェクト固有を上書きする。別の場所（`.ccnavi/config/common/skills/`）へ写す。単体 clone で目録に載らない |
-| `references/` の最上段は `common/` と `project/` の 2 つにし、その中のディレクトリ構造は任意にする。引く鍵は frontmatter の `tags`（概念のスキル名を必須）と `keywords` | 写す範囲を最上段で決められる。中の構造はまだ見えておらず、索引はどの深さのファイルも拾う | 全体の構造を先に固定する。最上段も分けない |
+| 共通は `.claude/skills/<概念>/references/`、プロジェクト固有は `projects/<名前>/skills/<概念>/references/`。プロジェクトのスキルの置き場は `docs/skills/` から `skills/` に改める | `docs/` の下に置くと文書と紛れる。スキルの置き場だと一目で分かる | `docs/skills/` のまま。共通のコピーと混ぜると置き場が深い |
+| 共通の概念スキル（SKILL.md の frontmatter に `concept: true`）の `SKILL.md` と `references/common/` を、親の `ticket start` がプロジェクトの `skills/<概念>/` へコピーする。共通側から無くなった `common/` の `.md` はコピー先からも消す（`SKILL.md` は消さない） | プロジェクトだけを clone しても同じ入口と reference が使える。`references/` の最上段を `common/`（コピーする）と `project/`（そのリポジトリ固有。コピーしない）に分けるので、プロジェクト固有を上書きも削除もしない。`common/` はコピーなので消しても失うものが無い | `references/` 全体をコピーする。同じパスでプロジェクト固有を上書きする。別の場所（`.ccnavi/config/common/skills/`）へコピーする。単体 clone で目録に載らない |
+| `references/` の最上段は `common/` と `project/` の 2 つにし、その中のディレクトリ構造は任意にする。引くキーは frontmatter の `tags`（概念のスキル名を必須）と `keywords` | コピーする範囲を最上段で決められる。中の構造はまだ見えておらず、索引はどの深さのファイルも拾う | 全体の構造を先に固定する。最上段も分けない |
 | 引く指示は SKILL.md の一文だけにする | まず最小で始める。使われなければ後から ccnavi 側の案内を足す | 作業の種類を見て ccnavi が案内を出す。コードの変更になる |
 | 既存のスキル（`commit` `ccnavi-config` `eli5` `eli10` `yomiyasu`）は対象外にする | 外部取り込みや用途が固定のものがあり、移すと崩れる | 全スキルを概念に寄せる |
 
@@ -33,8 +33,8 @@ keywords: [スキル, 概念スキル, references, skill-reference, コンテキ
 - 失ったもの: **`common/` は、プロジェクトの中で直しても次の着手で上書きされる。** 共通の reference を直すときは、ワークスペース側の提案にする
 - 失ったもの: 消す変更も、書き込みの例外として通す対象に入る。通すのは、承認済みの親のワークツリーの `common/` の `.md` で、共通側に無くなったものだけ
 - 失ったもの: 既存のプロジェクトの `docs/skills/` は目録に載らなくなる。`skills/` へ移す
-- 失ったもの: プロジェクトのルートに `skills/` が既にある場合、同じ場所に写される
-- 失ったもの: 概念に当たらない手順の置き場がない。新しい入口を足すにはユーザの承認が要る
+- 失ったもの: プロジェクトのルートに `skills/` が既にある場合、同じ場所にコピーされる
+- 失ったもの: 概念にヒットしない手順の置き場がない。新しい入口を足すにはユーザの承認が要る
 
 ## 採らなかった案
 

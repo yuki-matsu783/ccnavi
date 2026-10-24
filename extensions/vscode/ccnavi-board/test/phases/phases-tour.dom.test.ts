@@ -62,7 +62,7 @@ function ids(dom: DomPage): string[] {
   return dom.all<HTMLElement>(".phase .sum-id").map((el) => (el.classList.contains("dim") ? "" : (el.textContent ?? "")));
 }
 
-/** 画面に出ている定義の行の鍵 */
+/** 画面に出ている定義の行のキー */
 function keys(dom: DomPage): string[] {
   return dom.all(".phase").map((el) => el.dataset.key ?? "");
 }
@@ -112,7 +112,7 @@ test("CB-D241 全ユースケースの全手順で、指す先が画面に 1 つ
         for (const real of REAL_IDS) {
           assert.ok(!shown.includes(real), `${at}: 実際の定義 ${real} が出ている`);
         }
-        assert.ok(keys(dom).every((key) => !/^p\d+$/.test(key)), `${at}: 実際の行の鍵が出ている`);
+        assert.ok(keys(dom).every((key) => !/^p\d+$/.test(key)), `${at}: 実際の行のキーが出ている`);
         assert.ok(shown.includes(step.scene.target === "lib" ? "quick" : "research"), `${at}: 見本の定義が出ていない`);
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
         await next(dom);

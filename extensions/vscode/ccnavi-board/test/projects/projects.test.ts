@@ -17,7 +17,7 @@ import {
 import { parseLintJson } from "../../src/core/lintmodel.js";
 import { fixture } from "../helpers/fixture.js";
 
-test("CB-T60 URL は https / ssh / scp 風の 3 形を通し、同じリポジトリは同じ鍵になる", () => {
+test("CB-T60 URL は https / ssh / scp 風の 3 形を通し、同じリポジトリは同じキーになる", () => {
   const https = checkRemote("https://GitLab.example.com/group/Repo.git");
   const ssh = checkRemote("ssh://git@gitlab.example.com:2222/group/repo");
   const scp = checkRemote("git@gitlab.example.com:group/repo.git");

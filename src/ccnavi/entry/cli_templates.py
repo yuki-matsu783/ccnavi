@@ -10,7 +10,7 @@
 （保存の前の確かめ用）。
 `--draft` は完了した親から下書きを `wip/handoff/<取り込み先の相対パス>`
 に書くだけで、下書きに効力は無いので、エージェントが打ってよい。取り込みはほかの保護対象と同じく、
-ユーザが `ccnavi user handoff` で行う（テンプレート専用の取り込み・改名・移動・削除は無い。
+ユーザが `ccnavi-user-handoff.sh` で行う（テンプレート専用の取り込み・改名・移動・削除は無い。
 改名・移動・削除は、ユーザがファイルを直接操作する）。cli を読まない。
 """
 
@@ -56,9 +56,11 @@ def _storing_problem(args: argparse.Namespace) -> str:
             ("--yes", bool(args.yes)),
         ):
             if given:
-                return f"{flag} は --draft と一緒に使えない（取り込みは ccnavi user handoff）"
+                return (
+                    f"{flag} は --draft と同時に指定できない（取り込みは ccnavi-user-handoff.sh）"
+                )
         if args.show is not None or args.keyword:
-            return "--draft は --show・--keyword と一緒に使えない"
+            return "--draft は --show・--keyword と同時に指定できない"
         if not args.draft.strip():
             return "--draft には完了した親の識別子を渡す"
         if args.to and args.to not in template_drafts.TARGETS:
@@ -67,12 +69,14 @@ def _storing_problem(args: argparse.Namespace) -> str:
             return "--layer は --to project のときだけ使う"
         return ""
     if args.name:
-        return "--name は --draft でだけ使える"
+        return "--name は --draft でだけ指定できる"
     if args.to:
-        return "--to は --draft でだけ使える"
+        return "--to は --draft でだけ指定できる"
     for flag, given in (("--expect", args.expect is not None), ("--yes", bool(args.yes))):
         if given:
-            return f"{flag} は --templates と一緒に使えない（取り込みは ccnavi user handoff）"
+            return (
+                f"{flag} は --templates と同時に指定できない（取り込みは ccnavi-user-handoff.sh）"
+            )
     return ""
 
 
@@ -105,14 +109,14 @@ def usage_problem(args: argparse.Namespace) -> str:
                 return f"{flag} は --templates と一緒に使う"
         return ""
     if args.docs:
-        return "--templates は --docs と一緒に使えない"
+        return "--templates は --docs と同時に指定できない"
     refused = cli_args._not_with_docs(args)
     if refused:
-        return f"--templates は {refused} と一緒に使えない"
+        return f"--templates は {refused} と同時に指定できない"
     # 絞り込みのフラグは `--docs` の物。`--keyword` だけは同じ語を使う。
     for flag, name, absent in cli_args.DOCS_FLAGS:
         if flag != "--keyword" and getattr(args, name) != absent:
-            return f"{flag} は --docs でだけ使える"
+            return f"{flag} は --docs でだけ指定できる"
     if args.command:
         return f"--templates にはフラグ以外の語を付けられない（{' '.join(args.command)}）"
     if args.check_file is not None:
@@ -128,13 +132,13 @@ def usage_problem(args: argparse.Namespace) -> str:
             ("--yes", bool(args.yes)),
         ):
             if given:
-                return f"{flag} は --check-file と一緒に使えない"
+                return f"{flag} は --check-file と同時に指定できない"
         return ""
     storing = _storing_problem(args)
     if storing:
         return storing
     if args.show is not None and args.keyword:
-        return "--show は --keyword と一緒に使えない"
+        return "--show は --keyword と同時に指定できない"
     if args.show is not None and not args.show.strip():
         return "--show には名前を渡す"
     return ""
@@ -316,8 +320,8 @@ def _draft(
     stdout.write(f"ccnavi: 下書きを書いた: {made.rel}\n")
     stdout.write(f"  取り込み先: {made.target}（{made.layer}）\n")
     stdout.write(
-        f"  親: {args.draft.strip()}  全体計画 {len(template.plan)} 項 / "
-        f"フィードバック計画 {len(template.feedback)} 項 / フロー {len(template.flows)} 本\n"
+        f"  親: {args.draft.strip()}  全体計画 {len(template.plan)} ステップ / "
+        f"フィードバック計画 {len(template.feedback)} ステップ / フロー {len(template.flows)} 本\n"
     )
     stdout.write(f"  ハッシュ: {made.sha}\n")
     for note in made.notes:
@@ -326,9 +330,9 @@ def _draft(
         stdout.write(f"  {_label(problem.severity)} {problem.detail}\n")
     stdout.write(
         "次: description と when を固有名の無い言い方に直し、計画とフローの不要な手順を削る。"
-        "効力が無い下書きで、取り込む（使えるようにする）のはユーザ\n"
+        "効力が無い下書きで、取り込む（利用できるようにする）のはユーザ\n"
         f"案内: 取り込みは、ユーザがこのツリー（{made.tree_root}）で "
-        f"`ccnavi user handoff {made.target}` を打って行う\n"
+        f"`ccnavi-user-handoff.sh {made.target}` を打って行う\n"
         "案内: 下書きは未追跡のファイルで、残っていると親の ready が止まる。取り込むか、"
         "ready の前に下書きを削除します（またはコミットする）\n"
     )

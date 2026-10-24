@@ -41,7 +41,7 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
       assert.notEqual((node as unknown as { style: { visibility: string } }).style.visibility, "hidden", "測れていない点がある");
     }
     const ask = dom.one('.react-flow__node[data-id="askUserQuestion-1"]');
-    assert.equal(ask.querySelector(".flow-badge.ask")?.textContent, "メインエージェントに戻る（ユーザーに質問）");
+    assert.equal(ask.querySelector(".flow-badge.ask")?.textContent, "メインエージェントに戻る（ユーザに質問）");
     const sub = dom.one('.react-flow__node[data-id="subAgent-1"]');
     assert.equal(sub.querySelector(".flow-badge.nest")?.textContent, "入れ子（上限なら戻る）");
     assert.equal(sub.querySelector(".flow-node-summary")?.textContent, "資料を深掘りする");
@@ -206,7 +206,7 @@ test("CB-D111 入れ子が子の下 2 段を超えるときだけ注意を出す
   }
 });
 
-test("CB-D112 外のファイルを取り込むボタンはありません。中身（data）が届くと編集は捨てられて未保存が消える", async () => {
+test("CB-D112 外のファイルを取り込むボタンはありません。中身（data）が届くと編集は破棄されて未保存が消える", async () => {
   const dom = await openFlow();
   try {
     assert.equal(dom.all('[data-action="import"]').length, 0);

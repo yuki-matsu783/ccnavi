@@ -61,7 +61,7 @@ export function parseHooks(text: string, source: HookSource): HookEntry[] {
   return entries;
 }
 
-/** matcher がこのツール名に当たるか */
+/** matcher がこのツール名にヒットするか */
 export function matcherHits(matcher: string, tool: string): boolean {
   const trimmed = matcher.trim();
   if (trimmed === "" || trimmed === "*") {

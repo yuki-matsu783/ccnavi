@@ -5,7 +5,7 @@
 # HIGH 以上はレビューが済むまでフェーズを止める。境目の点は levels で動かす。
 #
 # 項目は 3 系統。
-#   定量（組み込み）: lines_over / files_over / deleted_over / glob（当たるごとに加点。max で上限）
+#   定量（組み込み）: lines_over / files_over / deleted_over / glob（ヒットするごとに加点。max で上限）
 #   定量（スクリプト）: script: <.ccnavi/config/common/scripts/ の下>。cwd は子のワークツリー、
 #                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENT を受け取り、
 #                      標準出力に整数か {"points": N, "message": "..."} を出す。失敗は重い側（points を加点）
@@ -42,7 +42,7 @@ factors:
   #   judge: 互換性を壊す変更（公開 API・設定の形・出力の形）を含むか
   #   message: 互換性を壊す変更
   #
-  # 例: 重要なパスの加点。差分が小さくても、1 つ当たるだけで HIGH（levels.high）に届く点にする。
+  # 例: 重要なパスの加点。差分が小さくても、1 つヒットするだけで HIGH（levels.high）に届く点にする。
   # 使うときにコメントを外し、glob はこのリポジトリの置き場に合わせて直す。
   # - id: auth-paths
   #   points: 40

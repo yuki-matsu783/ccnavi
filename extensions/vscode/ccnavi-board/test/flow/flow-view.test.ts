@@ -10,7 +10,7 @@ import { asFlowMessage, flowButtonLabel, flowRequestPrompt, flowTargetOf, flowTi
 import { parseBoardJson, type BoardJson } from "../../src/core/model.js";
 import { fixture, fixtureText } from "../helpers/fixture.js";
 
-test("CB-T225 画面から届くメッセージは形を確認し、崩れたもの（読み込めない保存の中身など）は捨てる", () => {
+test("CB-T225 画面から届くメッセージは形を確認し、崩れたもの（読み込めない保存の中身など）は破棄する", () => {
   const doc = bareFlow("i0001-01-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "ready" }), { type: "ready" });
   assert.deepEqual(asFlowMessage({ type: "openFile", extra: 1 }), { type: "openFile" });
@@ -21,7 +21,7 @@ test("CB-T225 画面から届くメッセージは形を確認し、崩れたも
   assert.deepEqual(asFlowMessage({ type: "dirty", dirty: false }), { type: "dirty", dirty: false });
   assert.equal(asFlowMessage({ type: "dirty" }), undefined);
   assert.deepEqual(asFlowMessage({ type: "save", doc }), { type: "save", doc });
-  // 保存の中身が描けない形なら、保存そのものを捨てる（書かない）
+  // 保存の中身が描けない形なら、保存そのものを破棄する（書かない）
   assert.equal(asFlowMessage({ type: "save" }), undefined);
   assert.equal(asFlowMessage({ type: "save", doc: { name: "x" } }), undefined);
   assert.equal(asFlowMessage({ type: "save", doc: { nodes: [{ type: "start" }] } }), undefined);

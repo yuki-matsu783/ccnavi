@@ -254,7 +254,7 @@ function relativeToExtension(given) {
   const slashed = given.replace(/\\/g, "/");
   // 拡張の目印を先に見る。パスの祖先に `extensions/shared/` という並びがあっても（クローンの置き場の名前など）、
   // 拡張の下のファイルは拡張のファイルとして扱う。目印が複数あるときは最後の出現を採る
-  // （ワークツリーの置き場 `.claude/worktrees/` の下でも、その下の木の目印に当たる）
+  // （ワークツリーの置き場 `.claude/worktrees/` の下でも、その下の木の目印にヒットする）
   const marker = "extensions/vscode/ccnavi-board/";
   const at = slashed.lastIndexOf(marker);
   if (at < 0) {

@@ -149,7 +149,7 @@ def layer_configs(
 
     見るのは合成したあとの内容。phases は同 `id` で中身が違う、`title` が共通レイヤーと重なる、
     risk は `levels` が逆転する、`script:` がレイヤーの外を指すか指す先が無い、を error で言い、
-    phases の全欄一致で捨てた重複を info で言う。共通レイヤー自身の苦情は `common_phases` /
+    phases の全欄一致で破棄した重複を info で言う。共通レイヤー自身の苦情は `common_phases` /
     `common_risk` が別に言うので、ここではレイヤーの側だけを数える。自身のレイヤーとプロジェクトの
     レイヤーどうしは合成しない。
 

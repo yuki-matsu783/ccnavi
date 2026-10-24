@@ -49,7 +49,7 @@ _SHELLS = frozenset({"sh", "bash", "zsh", "dash", "ksh"})
 
 
 def _fold(path: str) -> str:
-    """パスを比べるための鍵。区切りは `/` にそろえ、大文字小文字は区別しない。"""
+    """パスを比べるためのキー。区切りは `/` にそろえ、大文字小文字は区別しない。"""
     return pathcase.fold(path).replace("\\", "/")
 
 
@@ -110,7 +110,7 @@ def _names(directory: str) -> list[str]:
 
 
 def _call(tool_use_id: str, ident: str) -> str:
-    """1 つの Bash に propose が複数あっても、それぞれ別の呼び出しとして扱うための鍵。"""
+    """1 つの Bash に propose が複数あっても、それぞれ別の呼び出しとして扱うためのキー。"""
     return f"{tool_use_id}~{ident.casefold()}"
 
 

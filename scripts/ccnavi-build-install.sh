@@ -17,7 +17,7 @@
 # package.json のほうが大きければ、そのままビルドする。VS Code は、インストール済みと同じか
 # 古いバージョンの vsix を入れ直しとして受け付けない。そのため、インストール済みのバージョンを超える番号にする。
 # code コマンドはまず PATH から探し、無ければ VS Code の既定のインストール先を探す。
-# インストール時に「PATH へ追加」を外していると、端末からは code が見つからないため。
+# インストール時に「PATH へ追加」を外していると、ターミナルからは code が見つからないため。
 # 環境変数 CODE で場所を渡せば、それを使う。どこにも無いマシン（VS Code の入っていない Linux など）
 # では、バージョンの比較を飛ばし、いまのバージョンのままビルドだけを行う。
 #
@@ -51,7 +51,7 @@ find_code() {
     return
   fi
   # PATH に無ければ、VS Code の既定のインストール先を順に探す。
-  # 上から Windows（ユーザー単位・全ユーザー）、WSL、macOS（全ユーザー・ユーザー単位）。
+  # 上から Windows（ユーザ単位・全ユーザ）、WSL、macOS（全ユーザ・ユーザ単位）。
   for c in \
     "$HOME/AppData/Local/Programs/Microsoft VS Code/bin/code" \
     "/c/Program Files/Microsoft VS Code/bin/code" \

@@ -23,7 +23,7 @@ export interface ViewState {
 
 export const EMPTY: ViewState = { project: "*", parent: "*", attention: false, archived: false, folded: [], widths: {}, details: [] };
 
-/** 詳細の開閉を覚える鍵。プロジェクトと識別子の組（どちらも文字列なので JSON にすれば取り違えない） */
+/** 詳細の開閉を覚えるキー。プロジェクトと識別子の組（どちらも文字列なので JSON にすれば取り違えない） */
 export function detailsKey(card: { readonly project: string; readonly id: string }): string {
   return JSON.stringify([card.project, card.id]);
 }

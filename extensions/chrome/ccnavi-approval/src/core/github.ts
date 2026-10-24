@@ -45,14 +45,14 @@ const BRANCH = /^(?!\/)(?!.*\/\/)(?!.*\.\.)(?!.*[\s~^:?*[\\])(?!.*@\{)[^\x00-\x1
 
 export function checkName(value: unknown, what: string): string {
   if (typeof value !== "string" || !NAME.test(value) || value === "." || value === "..") {
-    throw new HostError(`${what} の形が正しくない: ${String(value)}`);
+    throw new HostError(`${what} の形が正しくありません：${String(value)}`);
   }
   return value;
 }
 
 export function checkBranch(value: unknown): string {
   if (typeof value !== "string" || !BRANCH.test(value) || value.endsWith(".lock")) {
-    throw new HostError(`ブランチ名の形が正しくない: ${String(value)}`);
+    throw new HostError(`ブランチ名の形が正しくありません：${String(value)}`);
   }
   return value;
 }
@@ -120,7 +120,7 @@ function rateLimit(res: Res): { text: string; wait: number | null } | null {
   const when = remaining === "0" && Number.isFinite(reset) && reset > 0 ? `。制限が解けるのは ${new Date(reset * 1000).toISOString()}` : "";
   const kind = after !== "" ? "二次のレート制限" : "レート制限";
   return {
-    text: `GitHub の${kind}にかかった（${res.status}${seconds !== null ? `、${seconds} 秒待つよう求められた` : ""}${when}）。少し待ってからボードを更新してください`,
+    text: `GitHub の${kind}にかかりました（${res.status}${seconds !== null ? `、${seconds} 秒待つよう求められました` : ""}${when}）。少し待ってからボードを更新してください`,
     wait: seconds !== null && seconds <= RETRY_LIMIT_SECONDS ? seconds : null,
   };
 }
@@ -154,7 +154,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
     const res = await fetchNoRedirect(client, url, init, what);
     note(client, res);
     if (res.status === 401) {
-      throw new HostError("PAT で認証できない（401）。設定画面で差し替えてください", 401);
+      throw new HostError("PAT で認証できません（401）。設定画面で差し替えてください", 401);
     }
     const limited = rateLimit(res);
     if (limited) {
@@ -165,7 +165,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
       throw new HostError(limited.text, res.status);
     }
     if (res.status === 403) {
-      throw new HostError(`GitHub が拒否した（403）: ${what}。PAT の権限（リポジトリ・Contents など）を見直してください`, 403);
+      throw new HostError(`GitHub が拒否しました（403）：${what}。PAT の権限（リポジトリ・Contents など）を見直してください`, 403);
     }
     return res;
   }
@@ -178,7 +178,7 @@ async function rest(client: Client, path: string): Promise<{ status: number; bod
     return { status: 404, body: null, next: "" };
   }
   if (!res.ok) {
-    throw new HostError(`GitHub が ${res.status} を返した: GET ${path}`, res.status);
+    throw new HostError(`GitHub が ${res.status} を返しました：GET ${path}`, res.status);
   }
   return { status: res.status, body: await res.json(), next: nextPage(client, header(res, "link")) };
 }
@@ -213,7 +213,7 @@ async function graphql(client: Client, query: string, variables: Record<string, 
       "GraphQL",
     );
     if (!res.ok) {
-      throw new HostError(`GitHub の GraphQL が ${res.status} を返した`, res.status);
+      throw new HostError(`GitHub の GraphQL が ${res.status} を返しました`, res.status);
     }
     const body = (await res.json()) as { data?: Record<string, unknown>; errors?: { type?: string; message?: string }[] };
     const errors = body.errors ?? [];
@@ -224,10 +224,10 @@ async function graphql(client: Client, query: string, variables: Record<string, 
         await pause(client, seconds);
         continue;
       }
-      throw new HostError("GitHub の GraphQL のレート制限にかかった（RATE_LIMITED）。少し待ってからボードを更新してください", 429);
+      throw new HostError("GitHub の GraphQL のレート制限にかかりました（RATE_LIMITED）。少し待ってからボードを更新してください", 429);
     }
     if (errors.length > 0) {
-      throw new HostError(`GitHub の GraphQL が失敗した: ${errors.map((e) => e.message ?? "?").join(" / ")}`);
+      throw new HostError(`GitHub の GraphQL が失敗しました：${errors.map((e) => e.message ?? "?").join(" / ")}`);
     }
     return body.data ?? {};
   }
@@ -405,10 +405,10 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
   oids.forEach((oid, i) => {
     const b = repoData[`b${i}`];
     if (!b) {
-      throw new HostError(`blob ${oid} を取れなかった`);
+      throw new HostError(`blob ${oid} を取れませんでした`);
     }
     if (b.isTruncated) {
-      throw new HostError(`blob ${oid} の本文が切られている（isTruncated）。取り切れていない`);
+      throw new HostError(`blob ${oid} の本文が切られています（isTruncated）。取り切れていません`);
     }
     if (b.isBinary || typeof b.text !== "string") {
       out[oid] = { text: null, binary: true };
@@ -416,7 +416,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
     }
     // 本文が途中で切られていたら「無い」とも「空」とも読ませない（取っていないファイルと同じ扱い）。
     if (typeof b.byteSize === "number" && encoder.encode(b.text).length !== b.byteSize) {
-      throw new HostError(`blob ${oid} の本文が大きさと合わない（取り切れていない）`);
+      throw new HostError(`blob ${oid} の本文が大きさと合いません（取り切れていません）`);
     }
     out[oid] = { text: b.text, binary: false };
   });
@@ -618,7 +618,7 @@ export async function reviewThreads(client: Client, owner: string, repo: string,
       });
     }
     if (!threads.pageInfo.hasNextPage) return out;
-    if (page + 1 > THREAD_PAGES) throw new HostError("reviewThreads が多すぎて読み切れない");
+    if (page + 1 > THREAD_PAGES) throw new HostError("reviewThreads が多すぎて読み切れません");
     after = threads.pageInfo.endCursor;
   }
 }
@@ -630,7 +630,7 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
     const { status, body } = await rest(client, `${repoPath(owner, repo)}/pulls/${number}/reviews?per_page=${PER_PAGE}&page=${page}`);
     // 404 や配列でない答えを「レビュー無し」と読むと、変更要求を見落として通してしまう
     if (status === 404) throw new HostError(`マージリクエスト #${number} のレビューを取得できません（404）`, 404);
-    if (!Array.isArray(body)) throw new HostError(`マージリクエスト #${number} のレビューの応答が配列でない`);
+    if (!Array.isArray(body)) throw new HostError(`マージリクエスト #${number} のレビューの応答が配列ではありません`);
     const chunk = body as Record<string, unknown>[];
     for (const r of chunk) {
       const user = (r.user ?? null) as { id?: unknown; login?: unknown } | null;
@@ -642,7 +642,7 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
       });
     }
     if (chunk.length < PER_PAGE) return out;
-    if (page + 1 > REVIEW_PAGES) throw new HostError("レビューが多すぎて読み切れない");
+    if (page + 1 > REVIEW_PAGES) throw new HostError("レビューが多すぎて読み切れません");
   }
 }
 
@@ -714,7 +714,7 @@ export const BRANCH_PAGES = 50;
 /** 全部のブランチの名前（「始める」が大文字小文字をそろえて重なりを見る。直近 N 日の上限を掛けない） */
 export async function branchNames(client: Client, owner: string, repo: string): Promise<string[]> {
   const { items, more } = await restPages(client, `${repoPath(owner, repo)}/branches?per_page=100`, BRANCH_PAGES);
-  if (more) throw new HostError("ブランチが多すぎて読み切れない。「始める」は手元で行ってください");
+  if (more) throw new HostError("ブランチが多すぎて読み切れません。「始める」は手元で行ってください");
   return (items as { name?: unknown }[]).map((b) => b.name).filter((n): n is string => typeof n === "string");
 }
 
@@ -749,7 +749,7 @@ export async function createBranch(client: Client, owner: string, repo: string, 
   );
   if (!res.ok) throw new HostError(`GitHub がブランチを作成しませんでした（${res.status}。同じ名前のブランチが既にあるか、権限が不足しています）`, res.status);
   const made = (await res.json()) as { ref?: unknown; object?: { sha?: unknown } };
-  if (made.ref !== `refs/heads/${name}`) throw new HostError("作ったブランチの名前が、頼んだ名前と違う");
+  if (made.ref !== `refs/heads/${name}`) throw new HostError("作ったブランチの名前が、頼んだ名前と違います");
   return checkOid(made.object?.sha);
 }
 
@@ -773,7 +773,7 @@ export interface MrInfo {
 /** 開いた MR（PR）の全部。issue を閉じる MR の探索と、採用の確認に使う。読むだけ */
 export async function listOpenMrs(client: Client, owner: string, repo: string): Promise<MrInfo[]> {
   const { items, more } = await restPages(client, `${repoPath(owner, repo)}/pulls?state=open&per_page=100`, MR_PAGES);
-  if (more) throw new HostError("開いたマージリクエストが多すぎて読み切れない。既存の MR を見落とさないよう、「始める」は手元で行ってください");
+  if (more) throw new HostError("開いたマージリクエストが多すぎて読み切れません。既存の MR を見落とさないよう、「始める」は手元で行ってください");
   const own = `${owner}/${repo}`.toLowerCase();
   const out: MrInfo[] = [];
   for (const p of items as { number?: unknown; title?: unknown; body?: unknown; html_url?: unknown; head?: { ref?: unknown; repo?: { full_name?: unknown } | null }; base?: { ref?: unknown } }[]) {
@@ -797,7 +797,7 @@ export async function listOpenMrs(client: Client, owner: string, repo: string): 
 export async function listMergedMrs(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; url: string }[]> {
   const head = encodeURIComponent(`${checkName(owner, "owner")}:${checkBranch(branch)}`);
   const { items, more } = await restPages(client, `${repoPath(owner, repo)}/pulls?state=closed&head=${head}&per_page=100`, MR_PAGES);
-  if (more) throw new HostError("閉じたマージリクエストが多すぎて読み切れない");
+  if (more) throw new HostError("閉じたマージリクエストが多すぎて読み切れません");
   const out: { number: number; url: string }[] = [];
   for (const p of items as { number?: unknown; html_url?: unknown; merged_at?: unknown }[]) {
     if (typeof p.number === "number" && p.merged_at !== null && p.merged_at !== undefined) out.push({ number: p.number, url: String(alt(p.html_url, "")) });
@@ -820,7 +820,7 @@ export async function startCommit(client: Client, owner: string, repo: string, n
   const post = async (path: string, method: string, body: unknown): Promise<unknown> => {
     client.counter.rest += 1;
     const res = await send(client, `${client.host.api}${path}`, { method, headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify(body) }, `${method} ${path}`);
-    if (!res.ok) throw new HostError(`GitHub が ${res.status} を返した: ${method} ${path}`, res.status);
+    if (!res.ok) throw new HostError(`GitHub が ${res.status} を返しました：${method} ${path}`, res.status);
     return res.json();
   };
   const made = (await post(`${repoPath(owner, repo)}/git/commits`, "POST", { message, tree, parents: [parent] })) as { sha?: unknown };

@@ -247,7 +247,7 @@ test("CX-T137 レビュー済みで Python に投げた要求（board・confirm�
 test("CX-T139 レビューの一覧が 404・配列でないなら投げ（レビュー無しと読まない）、compare の一覧が配列でないなら null", async () => {
   const answer = (status: number, json: unknown) => async () => ({ status, ok: status < 300, json: async () => json, headers: { get: () => null } });
   await assert.rejects(gh.pullReviews(client(answer(404, { message: "Not Found" })), "acme", "widgets", 42), /404/);
-  await assert.rejects(gh.pullReviews(client(answer(200, { message: "?" })), "acme", "widgets", 42), /配列でない/);
+  await assert.rejects(gh.pullReviews(client(answer(200, { message: "?" })), "acme", "widgets", 42), /配列ではありません/);
   const a = "a".repeat(40);
   const b = "b".repeat(40);
   assert.equal((await gh.compareFiles(client(answer(200, { status: "ahead" })), "acme", "widgets", a, b)).files, null);

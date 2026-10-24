@@ -1,4 +1,4 @@
-"""実物の GitHub に sh 3 本と exe を当てて 1 周する。ユーザが手で走らせる道具で、
+"""実物の GitHub に sh 3 本と exe を適用して 1 周する。ユーザが手で走らせる道具で、
 自動テストは呼ばない。tests/manual/gitlab/probe_gitlab.py の GitHub 版。
 
 使い捨てのブランチと PR と issue を、実験場のリポジトリ
@@ -402,7 +402,7 @@ def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="�
         "  reason: 実測",
         f"title: {title}",
         "rationale: |",
-        "  実物の GitHub に当てる実測。",
+        "  実物の GitHub に適用する実測。",
     ]
     if allow:
         lines.append("allow:")

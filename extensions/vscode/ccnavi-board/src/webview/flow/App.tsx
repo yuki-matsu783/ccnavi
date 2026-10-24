@@ -8,8 +8,8 @@
  * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存・元に戻す・貼り付け が止まる）。
  * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く。
  *
- * 中身（`data`）が届いたら、編集中のフローはその中身で置き換える。 届くのは編集を捨ててよいとき
- * だけ（再読込・保存が通った）。履歴もそこで空にする。
+ * 中身（`data`）が届いたら、編集中のフローはその中身で置き換える。 届くのは編集を破棄してよいとき
+ * だけ（再読み込み・保存が通った）。履歴もそこで空にする。
  *
  * コピーを替えるのは `edit()` だけ。 直す前のコピーを履歴（`core/flow-history.ts`）に積んでから替える。
  * 「未保存」は、読み込んだ中身（`base`）と見比べて決める（`core/flow-diff.ts` の `sameFlow`）ので、
@@ -183,7 +183,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const clip = useRef<{ readonly clip: FlowClip; pasted: number } | undefined>(undefined);
   const [hasClip, setHasClip] = useState(false);
   // 実行ファイルが言ったこと。`checkedDoc` は出している答えが指すコピー、`pendingDoc` は頼んで答えを待っているコピー、
-  // `checkSeq` は最後に頼んだ確認の番号。コピーが替わるたびに番号を進め、待っていた答えは捨てる
+  // `checkSeq` は最後に頼んだ確認の番号。コピーが替わるたびに番号を進め、待っていた答えは破棄する
   // （答えを待つ間に直すと、古いコピーの答えを今の答えと取り違えるため）
   const [checks, setChecks] = useState<FlowChecks | undefined>(() => pageOf(initial)?.checks);
   const [checking, setChecking] = useState(false);
@@ -242,7 +242,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       setReview(undefined);
       setReviewSave(page?.reviewSave === true);
       setLock(page?.lock ?? NO_LOCK);
-      // 頼んでいた確認の答えは捨てる（番号を進める）
+      // 頼んでいた確認の答えは破棄する（番号を進める）
       checkSeq.current += 1;
       checkedDoc.current = page?.checks === undefined ? undefined : page.doc;
       pendingDoc.current = undefined;
@@ -260,7 +260,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       setOffer(answer.offer);
     } else if (message.type === "proposal") {
       const answer = message as { proposal?: FlowProposal; error?: string };
-      // 閉じたあとに届いた答えは捨てる
+      // 閉じたあとに届いた答えは破棄する
       setProposal((now) =>
         now === undefined ? now : answer.proposal !== undefined ? { kind: "ready", proposal: answer.proposal } : { kind: "error", error: String(answer.error ?? "") },
       );
@@ -350,7 +350,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     if (doc === undefined || pendingDoc.current === doc || tour.touring) {
       return;
     }
-    // コピーが替わった。待っていた答えは古いコピーのものなので捨てる（番号を進める）
+    // コピーが替わった。待っていた答えは古いコピーのものなので破棄する（番号を進める）
     checkSeq.current += 1;
     pendingDoc.current = undefined;
     if (checkedDoc.current === doc) {
@@ -398,10 +398,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     onKey.current = () => undefined;
     return (
       <>
-        <p className="empty">フロー編集画面を読み込み直せませんでした。原因を直してから「再読込」を押してください。</p>
+        <p className="empty">フロー編集画面を読み込み直せませんでした。原因を直してから「再読み込み」を押してください。</p>
         <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
-          再読込
+          再読み込み
         </button>
       </>
     );
@@ -686,9 +686,9 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         </div>
       )}
       <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
-        ファイルの変更を検知しました。再読込してください。
+        ファイルの変更を検知しました。再読み込みしてください。
         <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
-          再読込
+          再読み込み
         </button>
       </div>
       {shownOffer !== undefined && (
@@ -752,7 +752,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
               data-action="request-flow"
               data-tour="request"
               disabled={shownBusy}
-              title="エージェントへの依頼の文を組みます。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください"
+              title="エージェントへの依頼の文を作ります。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください"
               onClick={() => post({ type: "request" })}
             >
               {shownRequest}
@@ -762,7 +762,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
-            再読込
+            再読み込み
           </button>
           <button type="button" className="action primary" id="save" data-action="save" data-tour="save" disabled={shownLock.locked || shownBusy || (!shownDirty && shownPage.exists)} onClick={save}>
             保存

@@ -38,7 +38,8 @@ def _branch_name_problems(
     - 大文字小文字だけが違う識別子。Windows と macOS の既定のファイルシステムでは
       ブランチもワークツリーも同じ名前になる
     - 末尾が `-<2 桁>` の親の識別子。`-<2 桁>-<2 桁>` で終われば子の形（`<親>-<フェーズ>-<連番>`）に
-      当たり、親子のチケットを引くとき別の親の子と読まれる。`-<2 桁>` だけでも、別の親の子の識別子の
+      ヒットし、親子のチケットを引くとき別の親の子と読まれる。
+      `-<2 桁>` だけでも、別の親の子の識別子の
       途中（`<親>-<フェーズ>`）と紛れる
 
     承認と判定はまだ変えない。止めるのは後の段階で、ここで先に数を見ておく。
@@ -167,8 +168,8 @@ def _prefix_setting_problems(conf: settings.Settings) -> list[Problem]:
             SEVERITY_WARN,
             "(settings)",
             f"{settings.BRANCH_PREFIXES_ENV} の {', '.join(conf.branch_prefixes_rejected)} は"
-            "先頭の語に使えないので読まない（英小文字で始まり、英小文字と数字だけでできた語。main・master・"
-            "develop・release は使えない）。"
+            "先頭の語に指定できないので読まない（英小文字で始まり、英小文字と数字だけでできた語。main・master・"
+            "develop・release は指定できない）。"
             f"使うリストは {', '.join(conf.branch_prefixes)}（親のブランチ名の規則）",
         )
     ]

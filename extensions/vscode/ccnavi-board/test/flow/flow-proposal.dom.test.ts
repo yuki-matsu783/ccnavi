@@ -65,7 +65,7 @@ test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見
   }
 });
 
-test("CB-D140 未保存の変更があれば捨てることを言ってから取り込む。着手中は取り込めない。取り込めない下書きは理由だけ", async () => {
+test("CB-D140 未保存の変更があれば破棄することを言ってから取り込む。着手中は取り込めない。取り込めない下書きは理由だけ", async () => {
   const dom = await openFlow({ offer: OFFER });
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));

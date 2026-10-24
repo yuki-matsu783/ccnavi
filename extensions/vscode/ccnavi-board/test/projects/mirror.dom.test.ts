@@ -1,6 +1,6 @@
 /**
  * プロジェクト管理画面（React）のミラーの表示を happy-dom で動かす。カードの状態とずれの中身、「ミラーを同期」と
- * 「すべて同期」が送るもの、押せないとき（同期中・古い実行ファイル・写すものが無い）、最終確認の時刻、案内の間は送らないこと。
+ * 「すべて同期」が送るもの、押せないとき（同期中・古い実行ファイル・コピーするものが無い）、最終確認の時刻、案内の間は送らないこと。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -112,12 +112,12 @@ test("CB-D736 同期中はどのボタンも押せない。終われば（busy �
   }
 });
 
-test("CB-D737 古い実行ファイル・調べられない・写すものが無いときは帯に理由を出し、ボタンは押せない", async () => {
+test("CB-D737 古い実行ファイル・調べられない・コピーするものが無いときは帯に理由を出し、ボタンは押せない", async () => {
   const cases: [MirrorStatus, RegExp][] = [
-    [{ kind: "unsupported", reason: "mirror の機能を持ちません（古い版です）" }, /ミラーのずれを調べられません。mirror の機能を持ちません（古い版です）/],
+    [{ kind: "unsupported", reason: "mirror の機能に対応していません（古い版です）" }, /ミラーのずれを調べられません。mirror の機能に対応していません（古い版です）/],
     [{ kind: "failed", error: "60 秒で中断しました" }, /調べられませんでした。60 秒で中断しました/],
     [{ kind: "ok", list: list({ ok: false, error: "共通レイヤーを読み込めません" }) }, /調べられませんでした。共通レイヤーを読み込めません/],
-    [{ kind: "ok", list: list({ common_empty: true }) }, /写すものがありません/],
+    [{ kind: "ok", list: list({ common_empty: true }) }, /コピーするものがありません/],
   ];
   for (const [status, banner] of cases) {
     const dom = await open(mirror(status));

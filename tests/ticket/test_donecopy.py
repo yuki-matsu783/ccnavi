@@ -1,4 +1,4 @@
-"""閉じた親チケットの写し（`tickets/donecopy.py`）。同じ親かを決める欄の順と、欄の読み方。"""
+"""閉じた親チケットのコピー（`tickets/donecopy.py`）。同じ親かを決める欄の順と、欄の読み方。"""
 
 from __future__ import annotations
 

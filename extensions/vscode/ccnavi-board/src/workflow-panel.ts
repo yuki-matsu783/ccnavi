@@ -2,13 +2,13 @@
  * 計画編集タブ（作業・レビュー計画の編集。旧称ワークフロー編集）の Webview パネル。生成・更新・破棄、提案の監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
  *
- * 親の提案（承認待ちの置き場 `todo/` にある、計画を持つ親。新規と改版の両方）の計画の項どうしの先行（線）を
+ * 親の提案（承認待ちの置き場 `todo/` にある、計画を持つ親。新規と改版の両方）の計画のステップどうしの先行（線）を
  * 図で引き直す。**タブは親ごとに 1 枚**（同じ親をもう 1 度開けば前面に出す）。作りはフロー編集（`flow-panel.ts`）と
  * 同じで、違いは 3 つ。
  *
  * 1. 取り込む段が無い。開いたときの提案の中身（`--plan-order <親> --json` の答え）がそのまま初期値
  * 2. 書くのは実行ファイル（`--plan-order <親> --order <JSON> --expect <ハッシュ> --write`）
- * 3. 保存先はエージェントも書ける提案（親の提案と、番号の変わる項を指す子の提案）。なので開いたときのハッシュ
+ * 3. 保存先はエージェントも書ける提案（親の提案と、番号の変わるステップを指す子の提案）。なので開いたときのハッシュ
  *    （`source_sha`）を `--expect` に渡し、外で変わっていれば実行ファイルが何も書かない
  *
  * 画面は React（`src/webview/workflow/`）で、ここが渡すのは「いま何を見せるか」（`WorkflowData`）だけ。
@@ -24,7 +24,7 @@
  * 無くなったら（承認・取り下げ・削除。ボードの答えで見分ける）、画面を読むだけにする。
  *
  * **未保存のまま閉じたとき。** フロー編集と同じく、閉じるのは止められない（`onDidDispose` は閉じた後）。未保存の間は
- * タブの題の頭に「●」を付け、画面が送ってくる線の写し（`draft`）を覚える。閉じた後に未保存だったら「開き直して戻す」
+ * タブの題の頭に「●」を付け、画面が送ってくる線のコピー（`draft`）を覚える。閉じた後に未保存だったら「開き直して戻す」
  * 「破棄する」を聞く。戻すのは、提案のハッシュが閉じた時点から変わっていないときだけ（変わっていれば戻せないと言う）。
  *
  * **ボードの承認との結び付き。** タブの未保存と、最後に保存したときのハッシュ（`source_sha`）を帳面
@@ -86,7 +86,7 @@ interface PanelState {
   loaded?: PlanOrderAnswer;
   error?: string;
   dirty: boolean;
-  /** 画面が送ってきた、未保存の線の写し（未保存でなければ無い） */
+  /** 画面が送ってきた、未保存の線のコピー（未保存でなければ無い） */
   draft?: PlanOrder;
   /** 開き直したときに戻す線。最初の読み込みで確かめて `shownDraft` に移す */
   restore?: Restore;
@@ -150,7 +150,7 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 線の引き直しの途中を持つので、タブを非表示にしても捨てない
+    // 線の引き直しの途中を持つので、タブを非表示にしても破棄しない
     retainContextWhenHidden: true,
   });
   showLoading(panel, workflowTitle(ticket), SCREEN, `${ticket} の計画編集`);
@@ -232,7 +232,7 @@ function postNotices(current: PanelState): void {
 
 /**
  * 未保存のまま閉じた。閉じるのは止められないので、閉じた後に戻すかを聞く（頭のコメント）。
- * 覚えた写しが無い（線を変えてすぐ閉じた）か、読み込めていなければ何も聞かない
+ * 覚えたコピーが無い（線を変えてすぐ閉じた）か、読み込めていなければ何も聞かない
  */
 function askRestore(current: PanelState): void {
   const loaded = current.loaded;
@@ -319,7 +319,7 @@ async function goneReason(current: PanelState): Promise<string | undefined> {
   return goneReasonOf(current.ticket, revision, found === undefined ? undefined : { proposal: found.proposal?.state ?? null, approved: found.copy.status !== "none" });
 }
 
-/** いま見せるものを渡す。**画面の編集はここで捨てられる**（読み直し・取り込む・保存が通ったときだけ呼ぶ） */
+/** いま見せるものを渡す。**画面の編集はここで破棄される**（読み直し・取り込む・保存が通ったときだけ呼ぶ） */
 function show(current: PanelState): void {
   const loaded = current.loaded;
   if (loaded === undefined) {
@@ -380,7 +380,7 @@ function workflowHost(panel: vscode.WebviewPanel, rootPath: string): ScreenHost<
   );
 }
 
-/** 実行ファイルに聞き直して、提案のままの答えを見せる。画面の編集は捨てる */
+/** 実行ファイルに聞き直して、提案のままの答えを見せる。画面の編集は破棄する */
 async function reload(current: PanelState): Promise<void> {
   current.seq += 1;
   const seq = current.seq;
@@ -469,7 +469,7 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
       return;
     }
     case "adopt":
-      // 画面のボタンが「編集を捨てる」と言っているので、ここでは聞き直さない
+      // 画面のボタンが「編集を破棄する」と言っているので、ここでは聞き直さない
       await reload(current);
       return;
     case "order":

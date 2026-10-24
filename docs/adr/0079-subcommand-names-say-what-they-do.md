@@ -33,7 +33,7 @@ keywords: [サブコマンド, 名前, フラグ, done, judge, check, 判定, re
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
 | `finish` / `record-risk` / `confirm` / `comment` / `decide` / `to-issue` / `close-early` にする。`start` / `cancel` / `request` / `ready` / `fetch` / `origin` は変えない | 名前だけで動きが分かる。`ready` は `gh pr ready` と同じ意味で通じる | 1 語に揃える（`assess` / `spinoff` / `conclude`）。短いが、名前から動きが読めない |
-| 実行ファイルの 1 語目（`ticket` / `review`）は残し、sh の名前と 1 対 1 にする | hook の `builtin-guard-ticket-approval` は `ccnavi … (ticket\|review) <動詞>` の 2 語が並んだ形で状態の操作を見分ける。動詞だけで当てると、`ccnavi --test Bash "npm start"` のような引数に当たる | 1 語目を外す。判定の正規表現を書き直して止め漏れと誤検知を測り直すことになり、得るものが無い |
+| 実行ファイルの 1 語目（`ticket` / `review`）は残し、sh の名前と 1 対 1 にする | hook の `builtin-guard-ticket-approval` は `ccnavi … (ticket\|review) <動詞>` の 2 語が並んだ形で状態の操作を見分ける。動詞だけで適用すると、`ccnavi --test Bash "npm start"` のような引数にヒットする | 1 語目を外す。判定の正規表現を書き直して止め漏れと誤検知を測り直すことになり、得るものが無い |
 | sh は `ccnavi-ticket.sh`（手元の置き場だけを動かす）と `ccnavi-review.sh`（ホストを読み書きする）の 2 本のまま | `review` の側に早めに閉じる操作や issue 作成も入るが、「マージリクエストまわり」と読めば外れない | `ccnavi-host.sh` に改名する、1 本にまとめる |
 | 早めに閉じる操作は実行ファイルのフラグ `--close-early` で受ける。ユーザの判断は全部フラグ（`--approve` / `--reviewed` / `--close-early`）、エージェントが sh 経由で打つものはサブコマンド | ユーザが打つものとエージェントが打つものが形で分かれる | 3 つともサブコマンドにする。`--approve` は拡張と導入スクリプトが使っていて、直す量に対して得るものが見合わない |
 | マーカーのファイル（`close-early.json`）、マージリクエストに残す目印（`<!-- ccnavi:comment -->` など）、state の置き場の下書きの名前、ボードの JSON のキー（`close_early`）も新しい名前に揃える | サブコマンドと、それが残したものを同じ語で探せる | 残したものの名前だけ据え置く |

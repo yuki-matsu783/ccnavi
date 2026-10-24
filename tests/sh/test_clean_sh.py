@@ -387,7 +387,7 @@ class WorktreeOptionTest(unittest.TestCase):
             with self.subTest(args=args):
                 result = self.run_clean(*args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertIn("は使用できません", result.stderr)
+                self.assertIn("は指定できません", result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.top, "node_modules", "x.js")))
         branches = subprocess.run(
             ["git", "branch", "--list", "wt"], cwd=self.ws, capture_output=True, text=True

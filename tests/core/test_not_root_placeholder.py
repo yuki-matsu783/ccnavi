@@ -10,7 +10,7 @@
 内部の構造には触れない。見るのは外から観測できるものだけ。
 
   - `rules.load` が返すルール集合と苦情（Problem）
-  - 組み立てた式が当たるか当たらないか
+  - 組み立てた式がヒットするかヒットしないか
   - hook として呼んだときの判定
   - `--lint` の言い分
 
@@ -42,7 +42,7 @@ _LOOKAROUND = ("(?=", "(?!", "(?<=", "(?<!")
 def absolute(path: str) -> str:
     r"""`C:\...` と書いたパスを、いまの機械で絶対パスになる形に直す。
 
-    展開はルートを 1 文字ずつ書き写すだけなので、区切りが `\` でも中身は変わらない。
+    展開はルートを 1 文字ずつ書きコピーするだけなので、区切りが `\` でも中身は変わらない。
     変わるのは絶対かどうかで、`rules.real_root` が呼ぶ `os.path.realpath` は、
     相対のパスなら頭に cwd を足す。POSIX で `C:\Users\...` をそのまま渡すと、ルートが
     `<cwd>/C:\Users\...` になってしまい、「中」のはずのパスが全部「外」になり、長さの境界も
@@ -50,7 +50,7 @@ def absolute(path: str) -> str:
     合わせる（docs/claude/environment.md「実行環境」: 4 つのどれでも動くように書く）。
 
     `\` は POSIX でも普通の 1 文字として残る（`realpath` が切るのは `/` だけ）。
-    展開した式は `\` と `/` のどちらも区切りとして当てるので、そこは直さなくてよい。
+    展開した式は `\` と `/` のどちらも区切りとして適用するので、そこは直さなくてよい。
 
     `C:` 以外のドライブ（`D:`）は `/drive-d/` に替える。ドライブごとに別の表記にするのは、
     「別々の 2 つのドライブは互いに外」を後から足したときに、気づかないうちに同じ絶対パスに
@@ -116,13 +116,13 @@ class NotRootExpansionTest(unittest.TestCase):
         pattern = self.compiled(root)
         for path in paths:
             with self.subTest(root=root, path=path):
-                self.assertTrue(pattern.search(path), f"外のはずが当たらない: {path!r}")
+                self.assertTrue(pattern.search(path), f"外のはずがヒットしない: {path!r}")
 
     def assert_inside(self, root: str, *paths: str):
         pattern = self.compiled(root)
         for path in paths:
             with self.subTest(root=root, path=path):
-                self.assertFalse(pattern.search(path), f"中のはずが当たる: {path!r}")
+                self.assertFalse(pattern.search(path), f"中のはずがヒットする: {path!r}")
 
     # --- 観点 1: 設計の表 ---
 
@@ -165,7 +165,7 @@ class NotRootExpansionTest(unittest.TestCase):
             with self.subTest(root=root):
                 stem = root.rstrip("\\/")
                 self.assert_inside(root, stem + r"\README.md", stem + r"\sub\x.md")
-                # 「中」だけを見ると、何にも当たらない実装でも通ってしまう。
+                # 「中」だけを見ると、何にもヒットしない実装でも通ってしまう。
                 # 同じルートで「外」も見て、式が本当に展開されていることを縛る。
                 self.assert_outside(root, stem + r"-fork\x.md", absolute(r"D:\elsewhere\x.md"))
 
@@ -228,7 +228,7 @@ class NotRootExpansionTest(unittest.TestCase):
             root.replace("i", "\u0131") + r"\x.md",  # ı
         )
 
-        # 「中」だけを見ると、何にも当たらない実装でも通ってしまう。
+        # 「中」だけを見ると、何にもヒットしない実装でも通ってしまう。
         # 同じルートで「外」も縛り、式が本当に展開されていることを確かめる。
         self.assert_outside(root, root.replace("i", "j") + r"\x.md")
 
@@ -251,7 +251,7 @@ class NotRootExpansionTest(unittest.TestCase):
         """
         root = absolute(r"C:\Users\u\Desktop\git\ccnavi")
         compiled = self.compiled(root)
-        # 先に「本当に展開されている」ことを縛る。何にも当たらない式なら、
+        # 先に「本当に展開されている」ことを縛る。何にもヒットしない式なら、
         # 繰り返しも先読みも含まないのは当たり前で、この検査は無意味になる。
         self.assertTrue(compiled.search(absolute(r"D:\elsewhere\x.md")))
         pattern = compiled.pattern
@@ -369,19 +369,19 @@ class NotRootLimitTest(unittest.TestCase):
     def test_deny_falls_closed(self):
         """組み立てられない `deny` は、`match` の全部を止める。
 
-        捨てると「保護が消える」側に倒れる。ここで止まらずに通ると、
+        破棄すると「保護が消える」側に倒れる。ここで止まらずに通ると、
         このチケットで作ったものが丸ごと意味を失う。
         """
         path = rules_file(self.dir.name, outside_rule())
         rule_set, _ = rules.load(path, self.long_root(600))
-        self.assertTrue(rule_set.deny, "deny が捨てられている（素通りになる）")
+        self.assertTrue(rule_set.deny, "deny が破棄されている（素通りになる）")
         pattern = rule_set.deny[0].compiled
         self.assertIsNotNone(pattern)
         for path_to_write in (absolute(r"C:\anywhere\x.md"), absolute(r"D:\somewhere\else\y.txt")):
-            self.assertTrue(pattern.search(path_to_write), "match の全部に当たるべき")
+            self.assertTrue(pattern.search(path_to_write), "match の全部にヒットするべき")
 
     def test_ask_falls_closed_like_deny(self):
-        """組み立てられない `ask` も `match` の全部に当たる。
+        """組み立てられない `ask` も `match` の全部にヒットする。
 
         設計は deny / ask / allow の 3 つを決めているが、テストは deny と allow しか
         見ていなかった（敵対的レビューの指摘）。確認は戻せるので、ask は deny と同じ向き。
@@ -393,7 +393,7 @@ class NotRootLimitTest(unittest.TestCase):
         )
         rule_set, problems = rules.load(path, self.long_root(600))
         self.assertTrue(problems)
-        self.assertTrue(rule_set.ask, "ask が捨てられている")
+        self.assertTrue(rule_set.ask, "ask が破棄されている")
         self.assertTrue(rule_set.ask[0].compiled.search(absolute(r"C:\anywhere\x.md")))
 
     def test_the_written_message_survives_a_failure(self):
@@ -410,9 +410,9 @@ class NotRootLimitTest(unittest.TestCase):
         self.assertIn("組み立てられない", rule.spoken_message())
 
     def test_allow_falls_the_other_way(self):
-        """組み立てられない `allow` は、どれにも当たらない。
+        """組み立てられない `allow` は、どれにもヒットしない。
 
-        当たる扱いにすると ccnavi が何も言わずに通す範囲が広がる。deny とは逆の側を採る。
+        ヒットする扱いにすると ccnavi が何も言わずに通す範囲が広がる。deny とは逆の側を採る。
         """
         path = rules_file(
             self.dir.name,
@@ -424,7 +424,7 @@ class NotRootLimitTest(unittest.TestCase):
         matched = [
             r for r in rule_set.allow if r.compiled and r.compiled.search(absolute(r"C:\x\y.md"))
         ]
-        self.assertEqual(matched, [], "allow は当たらない側にすべき")
+        self.assertEqual(matched, [], "allow はヒットしない側にすべき")
 
 
 class NotRootWritingTest(unittest.TestCase):
@@ -536,7 +536,7 @@ class NotRootJudgeTest(unittest.TestCase):
             outside = os.path.join(os.path.realpath(elsewhere), "draft.yml")
             out = self.judge(outside, mode="dry-run")
         self.assertNotEqual(out.get("permissionDecision"), "deny", out)
-        # 「止まらない」だけを見ると、ルールが当たっていない実装でも通る。
+        # 「止まらない」だけを見ると、ルールがヒットしていない実装でも通る。
         # `enable` なら止めていたことを告げる文が出ていることまで縛る。
         self.assertIn("outside-workspace", json.dumps(out, ensure_ascii=False), out)
 

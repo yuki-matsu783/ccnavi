@@ -98,7 +98,7 @@ function decidePreview(canIssue: boolean): DecidePreview {
   };
 }
 
-test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選ぶまで決められない。選んだ対応方針を鍵ごとに送る", async () => {
+test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選ぶまで決められない。選んだ対応方針をキーごとに送る", async () => {
   const page = await openBoard(fixture(), {
     approval: { kind: "decidePreview", preview: decidePreview(false), tree: "/w/.claude/worktrees/i0001" },
   });
@@ -267,7 +267,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
   }
   const carried = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-02-03 を承認した", carried: true } });
   try {
-    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットをコミット・pushするコマンドをターミナルに送信しました。"));
+    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットをコミット・push するコマンドをターミナルに送信しました。"));
   } finally {
     await carried.close();
   }
@@ -500,7 +500,7 @@ test("CB-T162 再読み込みできなかった画面にも承認のオーバー
   try {
     assert.equal(text(withApproval, "#approval-title"), "2 件を承認しました");
     assert.equal(text(withApproval, "pre.approval-text"), "i0001-02-03 を承認した");
-    // ボタンが使える（画面の骨組みが載っている）
+    // ボタンが有効（画面の骨組みが載っている）
     withApproval.click(withApproval.one('button[data-action="prompt-copy"]'));
     await withApproval.settle();
     assert.deepEqual(withApproval.posted.at(-1), { type: "promptCopy" });

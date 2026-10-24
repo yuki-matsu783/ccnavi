@@ -94,7 +94,7 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
           <input name="integration" type="text" placeholder="未入力の場合はデフォルトブランチ" />
         </label>
         <label className="field">
-          <span className="cap">表示対象のブランチを検索する期間（過去N日）</span>
+          <span className="cap">表示対象のブランチを検索する期間（過去 N 日）</span>
           <input name="recentDays" type="number" min="0" max="90" defaultValue="7" className="num" />
         </label>
         <label className="field">

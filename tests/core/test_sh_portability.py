@@ -13,7 +13,7 @@ macOS の `sed` と `grep` は BSD 版で、GNU だけの書き方が 2 つ通�
 3. `sed` の置き換えの大文字小文字を区別しない指定（`s/…/…/I`）。BSD の sed は知らない指定として
    失敗する。字ごとに `[Dd]` と書く
 4. `grep` の基本の正規表現の中の `\|`（どれか）。BSD の grep は `|` の字そのものとして読み、
-   当たらなくなる。`grep -E 'a|b'` と書く
+   ヒットしなくなる。`grep -E 'a|b'` と書く
 
 走らせて確かめるのではなく、書かれた文面を読む。bash 3.2 の無い機械でも同じ報告になるように。
 """
@@ -152,7 +152,7 @@ class ShPortabilityTest(unittest.TestCase):
             check=False,
         )
         if result.returncode != 0:
-            self.skipTest("git の作業ツリーではない")
+            self.skipTest("git のワークツリーではない")
         wrong = [line for line in result.stdout.splitlines() if not line.endswith(": eol: lf")]
         self.assertEqual([], wrong, ".gitattributes で *.sh を eol=lf にしてください")
 

@@ -93,7 +93,7 @@ test("CB-T282 レベルは CCNAVI_LOG_LEVEL で絞る。大文字小文字を問
   }
 });
 
-test("CB-T283 書けないときはエラーにせず捨て、console にも何も出さない。root が空なら書かない", () => {
+test("CB-T283 書けないときはエラーにせず破棄し、console にも何も出さない。root が空なら書かない", () => {
   const root = workspace();
   const spoken: unknown[] = [];
   const saved = { log: console.log, error: console.error, warn: console.warn };
@@ -121,7 +121,7 @@ function tryLink(target: string, link: string): boolean {
   }
 }
 
-test("CB-T284 logs・logs/diag・書き先のどれかがリンクなら、辿らずに捨てる", (t) => {
+test("CB-T284 logs・logs/diag・書き先のどれかがリンクなら、辿らずに破棄する", (t) => {
   const root = workspace();
   const outside = workspace();
   try {

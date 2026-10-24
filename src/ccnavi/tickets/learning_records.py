@@ -1,7 +1,7 @@
 """気づきの記録の読み取り（共有）と、処理すべきものの判定。
 
 設計は docs/design/tickets/learning-wiki.md。収集・親の `finish`・`ticket consolidate`・
-`--learnings` が同じ読み方をする。読むのは作業ツリーの HEAD にある通常のファイルで、
+`--learnings` が同じ読み方をする。読むのはワークツリーの HEAD にある通常のファイルで、
 未コミットの変更は見ない（届くのはコミットしたものだけ）。
 
 書式: frontmatter の後の `## ` で始まる行を 1 件の気づきの見出しとする。処理の行は、その節の中の
@@ -10,7 +10,7 @@
 2 段の検査:
 - 読み取りの検査: 読めない・通常のファイルでない・frontmatter が無い／壊れている・`learnings` が
   無い／不正 → 「読み取れない記録」。節が無いから処理済み、とは見なさない
-- 整合の検査（読み取れた記録に当てる）: `none` なのに節がある・数と節の数が合わない・1 つの節に
+- 整合の検査（読み取れた記録に適用する）: `none` なのに節がある・数と節の数が合わない・1 つの節に
   処理の行が 2 つ以上、または形の分からない処理の行がある
 どちらも統合では直せないので、記録を直すよう案内する。
 """
@@ -86,7 +86,7 @@ class Pending:
     items: list[Item] = field(default_factory=list)
     # 読み取れない記録 `(パス, 理由)`。
     unreadable: list[tuple[str, str]] = field(default_factory=list)
-    # 整合の検査に当たる記録 `(パス, 当たった条件)`。
+    # 整合の検査にヒットする記録 `(パス, ヒットした条件)`。
     inconsistent: list[tuple[str, str]] = field(default_factory=list)
 
     @property
@@ -95,7 +95,7 @@ class Pending:
 
 
 def parse(path: str, ident: str, text: str) -> tuple[Record | None, str]:
-    """記録の文面を読む。読み取りの検査に当たれば `(None, 理由)`。"""
+    """記録の文面を読む。読み取りの検査にヒットすれば `(None, 理由)`。"""
     text = text.lstrip("﻿").replace("\r\n", "\n")
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
@@ -128,7 +128,7 @@ def parse(path: str, ident: str, text: str) -> tuple[Record | None, str]:
 
 
 def consistency_problem(record: Record) -> str:
-    """整合の検査。当たれば条件、無ければ空。"""
+    """整合の検査。ヒットすれば条件、無ければ空。"""
     n = len(record.sections)
     if record.learnings is None and n:
         return f"`learnings: none` なのに気づきの節が {n} 件ある"
@@ -205,7 +205,7 @@ def inbox_files(tree_root: str) -> tuple[list[str], str]:
 def pending(tree_root: str) -> Pending:
     """`tree_root` の HEAD で、統合の子が処理すべきものを列挙する。
 
-    読み取れない記録と整合の検査に当たる記録は列挙せず、別に返す（統合では直せない）。
+    読み取れない記録と整合の検査にヒットする記録は列挙せず、別に返す（統合では直せない）。
     """
     out = Pending()
     names, why = _listing(tree_root, LEARNING_DIR)

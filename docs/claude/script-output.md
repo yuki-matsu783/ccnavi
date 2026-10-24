@@ -1,9 +1,9 @@
 ---
 type: guide
 title: スクリプトの出力に次の一手を書く
-description: ワークフローを進めるshと実行ファイルの出力で、次の一手を「次:」で始まる行に出す決まり。行頭の語の使い分け、書き方、出さない場面、テストの型
+description: チケット作業を進めるshと実行ファイルの出力で、次の一手を「次:」で始まる行に出す決まり。行頭の語の使い分け、書き方、出さない場面、テストの型
 tags: [sh-scripts, exe-boundary]
-keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワークフロー, ccnavi-start.sh, ticket new, printf, stdout]
+keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チケット作業, ccnavi-start.sh, ticket new, printf, stdout]
 ---
 
 # スクリプトの出力に次の一手を書く
@@ -13,7 +13,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 `ccnavi-start.sh --issue` が「親チケットか提案が出来たら…打ち直す」としか言わず、提案を作る `ccnavi ticket new` を示さなかったために、
 提案を手書きして詰まり、直接実装に進んだ事故があった。
 
-ワークフローを進めるsh（`.ccnavi/scripts/`）と実行ファイル（`src/ccnavi/`）の出力は、次の決まりで書く。
+チケット作業を進めるsh（`.ccnavi/scripts/`）と実行ファイル（`src/ccnavi/`）の出力は、次の決まりで書く。
 
 ## 行頭の語
 
@@ -44,7 +44,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 
 - 状態を報告するだけで、次の一手がユーザの判断になるとき（例: `integrate-done` のあと、取り込んだコミットをリモートへ送るか）
 - 何も動かなかったときは何も出さない、と決めているとき（`ccnavi-fetch.sh`）
-- ユーザが端末で打つスクリプト（`ccnavi-user-*.sh`。`ccnavi-user-agree.sh`、`ccnavi-user-push-approved.sh` など）。エージェントへの通知は、拡張が渡す承認の文（`user agree --yes` の `prompt`）と `ccnavi-ticket.sh status` が受け持つ
+- ユーザがターミナルで打つスクリプト（`ccnavi-user-*.sh`。`ccnavi-user-agree.sh`、`ccnavi-user-push-approved.sh` など）。エージェントへの通知は、拡張が渡す承認の文（`user agree --yes` の `prompt`）と `ccnavi-ticket.sh status` が受け持つ
 - 共通関数（`ccnavi-common*.sh`）。止める理由ごとに次が違うので、呼び出し元で出す
 - `ccnavi-clean.sh` の dry-run。node があると `exec` で `ccnavi-clean.js` に代わり、出力はそちらが出す。shから行を足せない
 
@@ -71,7 +71,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 | `ccnavi-start.sh --check` | 結果に応じた一手（ユーザに認証や権限を頼む、MCPで代行する、など。ok なら出さない） | `ccnavi-common-host.sh` の `ccnavi_pf_next` |
 | `ccnavi-ticket.sh` の start・finish・propose・consolidate の事前確認 | 同上（標準エラーに `確認:` と `次:` を出す。標準出力には何も足さない） | `ccnavi-ticket.sh` の `ticket_preflight` |
 | `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
-| `ccnavi-stage.sh` | 下書きを編集し、ユーザに `ccnavi user handoff` での取り込みを案内する | `ccnavi-stage.sh` |
+| `ccnavi-stage.sh` | 下書きを編集し、ユーザに `ccnavi-user-handoff.sh` での取り込みを案内する | `ccnavi-stage.sh` |
 | `ccnavi-review.sh` の早めに閉じた | 親に閉じて片付け、`ready` を打たせる | `ccnavi-review.sh` |
 | `ccnavi ticket new` の成功 | 提案を書き、`--lint` と `--agree --preview --verify` を通し、`ccnavi-ticket.sh propose` で親のブランチへ送り、ユーザに承認を頼む | `tickets/scaffold.py` |
 | `ccnavi-ticket.sh propose` の成功 | ユーザに承認を頼んで返事を待つ | `ccnavi-ticket.sh` |

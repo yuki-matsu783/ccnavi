@@ -419,7 +419,7 @@ test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後�
     await dom.settle();
     // チケットがあるボードでも、案内の間は見本を描く
     assert.equal(dom.all(".tour-sample").length, 1);
-    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態の札", "あなたの番", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
+    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態の札", "ユーザ待ち", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);

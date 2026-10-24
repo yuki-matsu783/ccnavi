@@ -73,7 +73,7 @@ class Impact:
     proposal: str
     target: str
     files: tuple[str, ...]
-    # 動機のパターン名（比べるための鍵ではなく書かれた綴り）から、そのときの観測元の数。
+    # 動機のパターン名（比べるためのキーではなく書かれた綴り）から、そのときの観測元の数。
     patterns: Mapping[str, int]
     status: str
     reason: str
@@ -100,7 +100,7 @@ class Wiki:
 
 
 def key(name: str) -> str:
-    """名前を比べるための鍵。大文字小文字を区別しない。"""
+    """名前を比べるためのキー。大文字小文字を区別しない。"""
     return name.strip().casefold()
 
 
@@ -108,7 +108,7 @@ def key(name: str) -> str:
 
 
 def front_matter(text: str) -> dict | str:
-    """頭の frontmatter（`---` で囲んだ YAML）の辞書。読めなければ理由の文字列。"""
+    """頭の frontmatter（`---` で囲んだ YAML）のマップ。読めなければ理由の文字列。"""
     lines = text[:HEAD_LIMIT].lstrip("﻿").splitlines()
     if not lines or lines[0].rstrip() != "---":
         return "frontmatter が無い"

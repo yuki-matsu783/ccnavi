@@ -119,7 +119,7 @@ class ArchiveModuleTest(ArchiveTreeHarness):
         self.assertEqual([t.state for t in archive.find(self.root, "i0001-01-01")], ["done"])
 
     def test_move_again_with_the_same_content_only_removes(self):
-        """前の回の残り（同じ中身）が退避に在れば、写さずに元だけ消す（打ち直し）。"""
+        """前の回の残り（同じ中身）が退避に在れば、コピーせずに元だけ消す（打ち直し）。"""
         todo = archive.plan(self.approved, ["old"])
         base = archive.base_dir(self.root, "")
         write(os.path.join(base, "done", "old.md"), closed_text("old"))
@@ -307,7 +307,7 @@ class ReadyArchivesTest(ReadyHarness):
         self.assertEqual(again.returncode, 0, again.stderr)
         self.assertTrue(again.stdout.splitlines()[0].endswith("review-ready-i0001.md"))
         # ボードには退避のチケットとして載り、置き場のチケットには出ない。子のワークツリーは
-        # 片付けてから見る（残っていると、そこに写った承認済みチケットが置き場の側に出る）
+        # 片付けてから見る（残っていると、そこにコピーされた承認済みチケットが置き場の側に出る）
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         git(self.root, "worktree", "remove", "--force", child)
         board = json.loads(self.ccnavi("--explain", "--json").stdout)
@@ -383,7 +383,7 @@ class ReviewFindingsTest(ReadyHarness):
     """レビューで挙がった指摘の再現（直す前は失敗する）。"""
 
     def test_1_a_stale_doing_copy_in_a_child_tree_goes_with_the_child_worktree(self):
-        """ready の後、閉じた子のワークツリーを片付ければ、古い作業中の写しは残らない。"""
+        """ready の後、閉じた子のワークツリーを片付ければ、古い作業中のコピーは残らない。"""
         fixture = self.closable()
         self.assertEqual(self.ready(fixture).returncode, 0)
         self.commit_parent("退避")

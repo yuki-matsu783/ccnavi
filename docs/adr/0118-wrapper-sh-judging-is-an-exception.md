@@ -19,7 +19,7 @@ keywords: [判定, sh, ccnavi-git.sh, integrate, integrate-done, push, carry, �
 ## 状況
 
 設計原則 P13（ADR-0077）は「止める・通すの判定は hook と実行ファイルが持ち、sh が ccnavi の状態を読んで止めるのは
-2 重目の確認」と決めた。2026-10-11 に `.ccnavi/scripts/ccnavi-git.sh` を見直すと、この形に当てはまらない判定が
+2 重目の確認」と決めた。2026-10-11 に `.ccnavi/scripts/ccnavi-git.sh` を見直すと、この形に該当しない判定が
 残っていた。どれも sh がチケットと取り込み状態を読んで、hook より先に（hook には同じ判定が無いまま）止めている。
 
 | 何 | sh の中の場所 | 何を読むか |
@@ -28,7 +28,7 @@ keywords: [判定, sh, ccnavi-git.sh, integrate, integrate-done, push, carry, �
 | 統合先への push を断る（`push-integration-branch`） | push の検査 | 統合先の名前（環境変数・取り込み結果・`origin/HEAD`） |
 | 親のブランチを 2 つの親子のチケットが宣言していれば断る（`push-ambiguous-family`） | push の検査 | 取り込み状態の `branch` |
 | リモートから消えた親のブランチへの push を断る（`push-gone-family`） | push の検査 | 取り込み状態の `state` |
-| 承認済みの `branch:` のブランチへ移る 1 操作の前提を確かめる（`carry-dirty`・`carry-busy`・`carry-record`・`carry-claimed`） | `co_carry` | 作業ツリー、途中の操作、取り込み状態 |
+| 承認済みの `branch:` のブランチへ移る 1 操作の前提を確かめる（`carry-dirty`・`carry-busy`・`carry-record`・`carry-claimed`） | `co_carry` | ワークツリー、途中の操作、取り込み状態 |
 
 あわせて、`integrate` / `integrate-done` の状態操作（取り込みの記録の読み書き、`merge --squash`、取り込んだブランチの
 `update-ref -d`）も sh が持っている。
@@ -48,7 +48,7 @@ keywords: [判定, sh, ccnavi-git.sh, integrate, integrate-done, push, carry, �
 3. **判定の材料のうち、チケットの中身は実行ファイルに聞く。** sh はチケットの YAML と JSON を自分で読まない。
    親のワークツリーかは `ccnavi tree parent`、親のブランチ名は `ccnavi write-and-push family`、閉じたかは `ccnavi sync closed` に聞き、
    1 行 1 項目の答えを見る。答えが得られないときは、止める側の検査は止める向きに、ツリーを動かす側は動かさない向きに倒す。
-   sh が自分で読んでよいのは、sh が書いた取り込み状態（1 行 1 項目）、git の参照と作業ツリー、環境変数だけ
+   sh が自分で読んでよいのは、sh が書いた取り込み状態（1 行 1 項目）、git の参照とワークツリー、環境変数だけ
 
 例外に入る判定は「状況」の表の 5 つ。`integrate` / `integrate-done` の状態操作も sh に残す。どれも hook へ移さない。
 
@@ -63,7 +63,7 @@ hook が先に止めるもの（子のワークツリーからの push の `DENY
 ## 理由
 
 **判定の材料がネットワークと git の手順の途中にある。** 統合先の名前は取り込み結果と `origin/HEAD` から、消えた親の
-ブランチは `ccnavi-sync.sh` が書いた取り込み状態から決まる。`co_carry` は作業ツリーと途中の操作を見てから、checkout と
+ブランチは `ccnavi-sync.sh` が書いた取り込み状態から決まる。`co_carry` はワークツリーと途中の操作を見てから、checkout と
 merge を続けて打つ。判定と操作の間に別のプロセス（hook の判定）を挟むと、判定したときと操作するときで状態が変わる隙が
 増える。
 
@@ -71,7 +71,7 @@ merge を続けて打つ。判定と操作の間に別のプロセス（hook の
 `git`、環境変数の差し替え）で外れるからだった（ADR-0077）。生の `git` が組み込みで止まり、環境変数の差し替えも止まって
 いれば、ラッパーの中の判定は、それだけで外せない。
 
-**チケットを読むのは実行ファイル 1 か所。** 例外を認めても、チケットの読み方を sh に写すと、Python と sh の読み方がずれて
+**チケットを読むのは実行ファイル 1 か所。** 例外を認めても、チケットの読み方を sh にコピーすると、Python と sh の読み方がずれて
 気づかない（ADR-0077 の「sh 側のコピーがずれる」）。材料は実行ファイルに聞き、sh は答えの 1 行で決める。
 
 ## 得たもの・失ったもの
@@ -98,7 +98,7 @@ merge を続けて打つ。判定と操作の間に別のプロセス（hook の
   打つので、判定だけを移しても隙は残る。状態操作（squash・`update-ref -d`）を実行ファイルへ移すと、実行ファイルが
   git の参照を書くことになる。実行ファイルは判定と見分けだけを持ち、コミットもしない（write-and-push の分担）ので、その線が動く
 - **判定を hook へ移す。** hook はコマンド行しか見ないので、統合先の名前や取り込み状態を読むために hook が git と
-  取り込み状態を読むことになり、ツール呼び出しのたびの時間が延びる。`co_carry` の前提（作業ツリー・途中の操作）は
+  取り込み状態を読むことになり、ツール呼び出しのたびの時間が延びる。`co_carry` の前提（ワークツリー・途中の操作）は
   打つ瞬間の状態で、hook の判定のときと違うことがある
 
 ## 関連

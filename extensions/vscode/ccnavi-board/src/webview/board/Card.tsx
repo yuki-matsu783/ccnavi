@@ -1,8 +1,8 @@
 /**
- * 1 枚のカード。上から 見出し（ID・題・状態の札）・位置・あなたの番・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
+ * 1 枚のカード。上から 見出し（ID・題・状態の札）・位置・ユーザ待ち・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
  * 何を出すかは組み立て（core/board.ts）と状態の札（core/status.ts）が決めた値のとおりで、ここで判定し直さない。
  *
- * 札は「状況」、「あなたの番」は「ユーザができること」。別の規則で決めるので、同時に出てよい
+ * 札は「状況」、「ユーザ待ち」は「ユーザができること」。別の規則で決めるので、同時に出てよい
  * （「要確認」の札と［承認］など）。ボタンは `card-button`（共通の `button.action` は使わない。寸法は `Card.css`）。
  */
 import type { JSX } from "react";
@@ -121,7 +121,7 @@ function StatusMark({ status }: { readonly status: Status }): JSX.Element {
 }
 
 /**
- * あなたの番。ユーザができることがあるときだけ出す。主ボタン（primary）は 1 つ。
+ * ユーザ待ち。ユーザができることがあるときだけ出す。主ボタン（primary）は 1 つ。
  * 親は承認待ちのときだけ（レビューの操作は各フェーズ行に置く）。子は承認 → レビュー完了の順で 1 つだけ。
  * 承認は `pendingApproval` だけを条件にする。札が「要確認」でも出す
  */
@@ -133,7 +133,7 @@ function Turn({ card }: { readonly card: Card }): JSX.Element | null {
   }
   return (
     <div className="turn" data-tour="turn">
-      <div className="turn-head">あなたの番</div>
+      <div className="turn-head">ユーザ待ち</div>
       {approve ? (
         <>
           {card.isParent ? <p className="turn-text">内容を確認して承認してください</p> : null}
@@ -354,7 +354,7 @@ function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
       data-action="workflow"
       data-tour="workflow-button"
       data-ticket={id}
-      title="計画の項どうしの順序（どの項がどの項を待つか）を図で直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。"
+      title="計画のステップどうしの順序（どのステップにどのステップが先行するか）を図で直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。"
       onClick={() => post({ type: "workflow", ticket: id })}
     >
       計画編集

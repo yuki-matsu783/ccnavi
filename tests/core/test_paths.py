@@ -1,4 +1,4 @@
-"""ファイルのパスを当てる先に直す部分のテスト。
+"""ファイルのパスを適用する先に直す部分のテスト。
 
 守る対象は名前ではなく場所なので、同じ場所を指す別のパスが同じ判定に
 行き着かなければならない。
@@ -60,7 +60,7 @@ class FullPathTest(unittest.TestCase):
 class RuleReachTest(unittest.TestCase):
     """正規化したパスに、ルールが実際に届くかどうか。"""
 
-    def test_迂回したパスでも保護領域のルールに当たる(self):
+    def test_迂回したパスでも保護領域のルールにヒットする(self):
         import re
 
         from ccnavi.infra.globmatch import translate

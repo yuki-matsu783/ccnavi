@@ -31,11 +31,12 @@ def admit(approved_dir: str, ticket: ticket_model.Ticket) -> str:
     """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
 
     中身は変えない。 照合に使ったバイト列（`Ticket.source`）を、そのまま `doing/` に
-    書いて元を消す。欄を書き足さず、改行も BOM も変えない。端末・ボード・Chrome・手で動かす、の
+    書いて元を消す。
+    欄を書き足さず、改行も BOM も変えない。ターミナル・ボード・Chrome・手で動かす、の
     どれで承認しても承認済みチケットが提案とバイト単位で同じになるように。消せなければ書いた側を
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
 
-    計画を持つ親でも、待ち方は書かない。待ち方は承認済みチケットの計画から都度計算する
+    計画を持つ親でも、先行関係は書かない。先行関係は承認済みチケットの計画から都度計算する
     （`approval.load_copy`）。
     """
     target = approval.copy_path(approved_dir, ticket.ticket)
@@ -301,7 +302,7 @@ def _followup_ticket(
     front["title"] = f"フェーズ {phase_no} のレビューの指摘に応える"
     front["rationale"] = (
         f"フェーズ {phase_no} のレビューで残った指摘に応える。"
-        "ユーザが端末で起こした続きの子で、承認はその判断で済んでいる。\n"
+        "ユーザがターミナルで起こした続きの子で、承認はその判断で済んでいる。\n"
     )
     for name in rules.SECTIONS:
         entries = []
@@ -320,7 +321,7 @@ def _followup_ticket(
             front[name] = entries
     front.update({"started_at": "", "completed_at": "", "base_sha": "", "merged_sha": ""})
     # 続きの子の目印。提案を経ずにここで作るチケットなので、作るときに書く（承認で中身を
-    # 変えることには当たらない）。
+    # 変えることにはヒットしない）。
     front[approval.FOLLOWUP_KEY] = [c.ticket for c in children]
     if op_id:
         front["ccnavi_op"] = op_id
@@ -385,9 +386,9 @@ def followup(
 ) -> tuple[str, str]:
     """レビューで残った指摘の続きの子を、ユーザの判断で `doing/` に直に起こす。
 
-    ユーザが端末で「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
+    ユーザがターミナルで「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
     そのフェーズは開き直り、マーカーは消える。範囲は見た子の範囲の和。
-    本文には指摘を書き写す。返すのは識別子と、起こせなかった理由。
+    本文には指摘をコピーする。返すのは識別子と、起こせなかった理由。
     """
     ident, t, why = _followup_ticket(conf, root, parent, phase_no, children, items, op_id)
     if t is None:

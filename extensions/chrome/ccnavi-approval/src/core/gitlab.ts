@@ -45,14 +45,14 @@ const USERNAME = /^[A-Za-z0-9_.-]{1,100}$/;
 /** GitLab の owner（名前空間）。`group` か入れ子の `group/sub`。どの段も `.`・`..` でない */
 export function checkNamespace(value: unknown, what = "owner"): string {
   if (typeof value !== "string" || value.length > 255 || value.split("/").some((p) => !SEGMENT.test(p) || p === "." || p === "..")) {
-    throw new HostError(`${what} の形が正しくない: ${String(value)}`);
+    throw new HostError(`${what} の形が正しくありません：${String(value)}`);
   }
   return value;
 }
 
 function project(owner: string, repo: string): string {
   const full = `${checkNamespace(owner)}/${checkNamespace(repo, "repo")}`;
-  if (repo.includes("/")) throw new HostError(`repo の形が正しくない: ${repo}`);
+  if (repo.includes("/")) throw new HostError(`repo の形が正しくありません：${repo}`);
   return `/projects/${encodeURIComponent(full)}`;
 }
 
@@ -76,7 +76,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
   for (let attempt = 0; ; attempt += 1) {
     // 別のホストへの転送を追わない（PAT を載せた要求を通信先の一覧の外へ出さない）
     const res = await fetchNoRedirect(client, url, init, what);
-    if (res.status === 401) throw new HostError("PAT で認証できない（401）。設定画面で差し替えてください", 401);
+    if (res.status === 401) throw new HostError("PAT で認証できません（401）。設定画面で差し替えてください", 401);
     if (res.status === 429) {
       const after = header(res, "retry-after");
       const seconds = /^\d+$/.test(after) ? Number(after) : null;
@@ -84,10 +84,10 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
         await pause(client, seconds);
         continue;
       }
-      throw new HostError(`GitLab のレート制限にかかった（429${seconds !== null ? `、${seconds} 秒待つよう求められた` : ""}）。少し待ってからボードを更新してください`, 429);
+      throw new HostError(`GitLab のレート制限にかかりました（429${seconds !== null ? `、${seconds} 秒待つよう求められました` : ""}）。少し待ってからボードを更新してください`, 429);
     }
     if (res.status === 403) {
-      throw new HostError(`GitLab が拒否した（403）: ${what}。PAT の権限（api スコープ・プロジェクトのメンバー）を見直してください`, 403);
+      throw new HostError(`GitLab が拒否しました（403）：${what}。PAT の権限（api スコープ・プロジェクトのメンバー）を見直してください`, 403);
     }
     return res;
   }
@@ -97,7 +97,7 @@ async function get(client: Client, path: string): Promise<{ status: number; body
   client.counter.rest += 1;
   const res = await send(client, `${client.host.api}${path}`, { method: "GET", headers: headers(client) }, `GET ${path}`);
   if (res.status === 404) return { status: 404, body: null };
-  if (!res.ok) throw new HostError(`GitLab が ${res.status} を返した: GET ${path}`, res.status);
+  if (!res.ok) throw new HostError(`GitLab が ${res.status} を返しました：GET ${path}`, res.status);
   return { status: res.status, body: await res.json() };
 }
 
@@ -136,10 +136,10 @@ async function pages(client: Client, path: string, limit: number, what: string):
     const { status, body } = await get(client, `${path}${sep}per_page=100&page=${page}`);
     // 404 や配列でない答えを「無い」と読むと、見落として通してしまう
     if (status === 404) throw new HostError(`${what} を取得できません（404）`, 404);
-    if (!Array.isArray(body)) throw new HostError(`${what} の応答が配列でない`);
+    if (!Array.isArray(body)) throw new HostError(`${what} の応答が配列ではありません`);
     all.push(...body);
     if (body.length < 100) return all;
-    if (page + 1 > limit) throw new HostError(`${what} が多すぎて読み切れない`);
+    if (page + 1 > limit) throw new HostError(`${what} が多すぎて読み切れません`);
   }
 }
 
@@ -198,7 +198,7 @@ async function listTree(client: Client, owner: string, repo: string, commit: str
   for (let page = 1; ; page += 1) {
     const { status, body } = await get(client, `${base}&per_page=100&page=${page}`);
     if (status === 404) return [];
-    if (!Array.isArray(body)) throw new HostError("tree の応答が配列でない");
+    if (!Array.isArray(body)) throw new HostError("tree の応答が配列ではありません");
     all.push(...(body as TreeItem[]));
     if (body.length < 100) return all;
     if (page >= TREE_PAGES) throw new HostError("置き場の tree が大きすぎて取得しきれません。Chrome では読み取れません");
@@ -255,11 +255,11 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
   const out: Record<string, BlobText> = {};
   for (const oid of oids) {
     const { status, body } = await get(client, `${project(owner, repo)}/repository/blobs/${checkOid(oid)}`);
-    if (status === 404) throw new HostError(`blob ${oid} を取れなかった`);
+    if (status === 404) throw new HostError(`blob ${oid} を取れませんでした`);
     const b = (body ?? {}) as { content?: unknown; encoding?: unknown; size?: unknown };
     if (b.encoding !== "base64" || typeof b.content !== "string") throw new HostError(`blob ${oid} の応答を解釈できません`);
     const bytes = fromBase64(b.content);
-    if (typeof b.size === "number" && bytes.length !== b.size) throw new HostError(`blob ${oid} の本文が大きさと合わない（取り切れていない）`);
+    if (typeof b.size === "number" && bytes.length !== b.size) throw new HostError(`blob ${oid} の本文が大きさと合いません（取り切れていません）`);
     if (bytes.includes(0)) {
       out[oid] = { text: null, binary: true };
       continue;
@@ -403,7 +403,7 @@ export async function reviewers(client: Client, owner: string, repo: string, num
   return (all as { state?: unknown; updated_at?: unknown; created_at?: unknown; user?: { id?: unknown; username?: unknown } | null }[]).map((r) => {
     const raw = alt(r.state, "");
     // jq の ascii_upcase は文字列でなければ失敗する（sh は取得した結果を組めずに止まる）。同じく止める
-    if (r.state !== "requested_changes" && typeof raw !== "string") throw new HostError(`マージリクエスト !${number} のレビュアーの state が文字列でない`);
+    if (r.state !== "requested_changes" && typeof raw !== "string") throw new HostError(`マージリクエスト !${number} のレビュアーの state が文字列ではありません`);
     return {
       state: r.state === "requested_changes" ? "CHANGES_REQUESTED" : asciiUpcase(raw as string),
       url: mrUrl,
@@ -550,7 +550,7 @@ export async function createCommit(
     const why = (res.body as { message?: unknown } | null)?.message;
     throw new HostError(`GitLab が書き込みを拒否しました（${res.status}）：${typeof why === "string" ? why : "?"}`, HOST_REFUSED);
   }
-  if (res.status < 200 || res.status >= 300) throw new HostError(`GitLab が ${res.status} を返した: POST repository/commits`, res.status);
+  if (res.status < 200 || res.status >= 300) throw new HostError(`GitLab が ${res.status} を返しました：POST repository/commits`, res.status);
   const c = (res.body ?? {}) as { id?: unknown; parent_ids?: unknown };
   const parents = Array.isArray(c.parent_ids) ? c.parent_ids : [];
   return { oid: checkOid(c.id), parent: parents.length > 0 ? checkOid(parents[0]) : "" };
@@ -587,7 +587,7 @@ export async function branchNames(client: Client, owner: string, repo: string): 
     if (status === 404 || !Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} のブランチを取得できません`);
     for (const b of body as { name?: unknown }[]) if (typeof b.name === "string") all.push(b.name);
     if (body.length < 100) return all;
-    if (page >= BRANCH_PAGES) throw new HostError("ブランチが多すぎて読み切れない。「始める」は手元で行ってください");
+    if (page >= BRANCH_PAGES) throw new HostError("ブランチが多すぎて読み切れません。「始める」は手元で行ってください");
   }
 }
 
@@ -597,10 +597,10 @@ export async function createBranch(client: Client, owner: string, repo: string, 
   const res = await post(client, `${project(owner, repo)}/repository/branches?${q.toString()}`, {});
   if (res.status < 200 || res.status >= 300) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitLab がブランチを作らなかった（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+    throw new HostError(`GitLab がブランチを作りませんでした（${res.status}）：${typeof why === "string" ? why : "?"}`, res.status);
   }
   const made = (res.body ?? {}) as { name?: unknown; commit?: { id?: unknown } };
-  if (made.name !== name) throw new HostError("作ったブランチの名前が、頼んだ名前と違う");
+  if (made.name !== name) throw new HostError("作ったブランチの名前が、頼んだ名前と違います");
   return checkOid(made.commit?.id);
 }
 

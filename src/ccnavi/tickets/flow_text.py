@@ -51,7 +51,7 @@ _CONFUSABLE = {
 # プロジェクトのスキルの目録（projskills.FENCE_OPEN / FENCE_CLOSE）の区切りも同じく置き換える。
 _FENCE_PHRASES = (
     "ここから合意済みのフローの本文",
-    # 以前の区切りの文。書き写された古いフローの中でも置き換える。
+    # 以前の区切りの文。コピーされた古いフローの中でも置き換える。
     "ここからユーザが書いたフローの本文",
     "フローの本文ここまで",
     "ここからプロジェクトのスキルの目録",
@@ -74,7 +74,7 @@ def clean(text) -> str:
 
 
 def _text(value) -> str:
-    """文字列か数だけを文にする。リストや辞書は中身を辿らない（深い入れ子で失敗しない）。"""
+    """文字列か数だけを文にする。リストやマップは中身を辿らない（深い入れ子で失敗しない）。"""
     if isinstance(value, bool):
         return ""
     if isinstance(value, float) and value.is_integer() and abs(value) < 1e21:

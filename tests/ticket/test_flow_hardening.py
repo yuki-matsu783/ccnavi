@@ -121,7 +121,7 @@ class FlowSpellingTest(unittest.TestCase):
     """置き場のパスを整え、大文字小文字を長さを変えずにそろえる。"""
 
     def test_the_approved_place_is_normalized(self):
-        """`./`・`//`・`x/..`・末尾の `/.` を取り除いた置き場で、整えたパスに当てる。"""
+        """`./`・`//`・`x/..`・末尾の `/.` を取り除いた置き場で、整えたパスに適用する。"""
         root = scratch(self)
         for approved in (
             ".ccnavi/approved",

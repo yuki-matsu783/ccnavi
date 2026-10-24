@@ -4,7 +4,7 @@
 
 1. 読み込み: 書式、未知の欄の warn、読んで書いても中身が変わらない往復、フローと同じ読み手の保護
    （リンク・ハードリンク・大きさ・別名・UTF-8）
-2. 2 層の統合結果: 全欄が同じなら info でレイヤーの側を捨てる、中身が違えば error で
+2. 2 層の統合結果: 全欄が同じなら info でレイヤーの側を破棄する、中身が違えば error で
    レイヤーの側だけを使わない、壊れた共通は空にしてレイヤーを使う
 3. 検査: 順序（終端・延期の引き受け手・`after` の範囲）は error、型 id・kind の食い違いは warn、
    `flows` の添字とフローの形
@@ -461,7 +461,7 @@ class CheckTest(Harness):
         for plan, feedback in ((100, 0), (98, 2), (60, 40), (1, 99)):
             with self.subTest(plan=plan, feedback=feedback):
                 found = errors(plan, feedback)
-                self.assertTrue(any("上限 99 項" in d for d in found), found)
+                self.assertTrue(any("上限 99 ステップ" in d for d in found), found)
 
     def test_hidden_characters_anywhere_in_the_strings_are_an_error(self):
         flow_body = {"id": "x", "name": "n", "nodes": [{"id": "p", "data": {"prompt": "a\u200bb"}}]}

@@ -185,7 +185,7 @@ def _tail(path: str, reach: int) -> tuple[str | None, bool]:
     text = data.decode("utf-8", errors="replace")
     whole = size <= reach
     if not whole:
-        # 先頭の欠けた行を捨てる。
+        # 先頭の欠けた行を破棄する。
         text = text.partition("\n")[2]
     return text, whole
 
