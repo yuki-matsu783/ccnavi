@@ -60,7 +60,7 @@ deny の `recursive-delete`、`credentials`、`credentials-files`、`guard-hooks
 ### D. 共通の rules.yml が読めない間の修復
 
 読めない間も `builtin:guard-ccnavi-config` は外さない。エージェントは共通のルールファイルを Write / Edit で直接直さない。
-`wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（例外で書ける）、ユーザがターミナルの `ccnavi user handoff`
+`wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（例外で書ける）、ユーザがターミナルから `ccnavi user handoff`
 で取り込むか、手で直す。今の中身が読めない rules.yml の取り込みは `handoff._defense_change` が「確かめられないので
 ターミナルに限る」と扱い、ボードからの取り込みは断られる。`ccnavi user handoff` は、共通のルールファイルが壊れていても
 動く（テストで確かめた）。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
@@ -87,7 +87,7 @@ deny の `recursive-delete`、`credentials`、`credentials-files`、`guard-hooks
 `_insert` は `rules.parse` に root を渡さないので、文面の `{root}` / `{script:...}` は置き換わらない。C~E の文面は
 `settings.script_command(root, ...)` で組む。
 
-### G. ヒットしたルールの並び
+### G. 該当したルールの並び
 
 C の 4 本は専用の文面が `guard-project-home` / `guard-common-layer` より先に並ぶ。approved は今の並び
 （`guard-project-home` が先、`builtin:ticket-approved` が後）のまま。

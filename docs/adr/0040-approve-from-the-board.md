@@ -1,7 +1,7 @@
 ---
 type: adr
 title: 承認はターミナルではなくボードのオーバーレイで受ける
-description: 承認をシェルターミナルではなく GUI ボードのオーバーレイで受け、hook で通知する設計
+description: 承認をシェルのターミナルではなく GUI ボードのオーバーレイで受け、hook で通知する設計
 tags: [approval, board, extension]
 keywords: [承認, ボード, オーバーレイ, GUI, hook, ターミナル]
 ---

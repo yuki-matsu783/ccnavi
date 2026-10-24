@@ -562,7 +562,7 @@ write-and-push の 3（と 5）で、置き場（`.ccnavi/approved/`・`wip/prop
 |---|---|
 | `ls-remote`・fetch・早送り・merge・`git cat-file` での `done/` の確かめ・取り込み状態の書き出し | `ccnavi-sync.sh`（新規）と write-and-push。SessionStart の `ccnavi-fetch.sh` は fetch と早送りだけ |
 | ロック・コミット・push・失敗したときに届いたかの確認・戻し | `ccnavi-ticket.sh`・`ccnavi-review.sh`・承認の push（共通の関数は `ccnavi-common.sh`） |
-| マージリクエストのマージ済みの確認、`confirm` のマーカーに入れるアカウントの引き適用し（GitHub `GET /user` の `login`、GitLab `GET /user` の `username`） | `ccnavi-review.sh`。結果は `--actor <名前>` と `--result` で Python に渡す |
+| マージリクエストのマージ済みの確認、`confirm` のマーカーに入れるアカウントの照合（GitHub `GET /user` の `login`、GitLab `GET /user` の `username`） | `ccnavi-review.sh`。結果は `--actor <名前>` と `--result` で Python に渡す |
 | 置き場のパス、書いたパスの一覧、write-and-push の外の変更の見分け、判定、lint | Python（ローカルの git とファイルだけ） |
 
 sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD のコマンド）:

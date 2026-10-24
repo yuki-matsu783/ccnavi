@@ -52,7 +52,7 @@ loggerとは関係なく今のまま出し、loggerに置き換えない。文�
 - 置き場はワークスペースルートの`logs/diag/<出どころ>.log`で、無ければ作る。`logs/`は、`scripts/ccnavi-setup.sh`が配布先のgit管理下の`.gitignore`に`/logs/`として足す（配布を実行し直すまで、既存の配布先には入らない）。
   ワークスペースルートの決め方は言語ごとに次のとおり
   - sh: 呼び出し側が`ccnavi_log_root`に入れた値を使う。空なら`ccnavi_workspace`で1度だけ探す。
-    `ccnavi_workspace`は`CCNAVI_WORKSPACE`を使い、無ければcwdから上へたどる。最初にヒットしたのが`<根>/projects/<名前>/`で、`projects/`の親にもワークスペースがあるときは、その親を根にする（プロジェクトが`.ccnavi/scripts/`のコピーを持っていても、ログと状態はワークスペースルートに置く）。ルートを求め終えているスクリプト（`ccnavi-git.sh`の`WS`、
+    `ccnavi_workspace`は`CCNAVI_WORKSPACE`を使い、無ければcwdから上へたどる。最初に該当したのが`<根>/projects/<名前>/`で、`projects/`の親にもワークスペースがあるときは、その親を根にする（プロジェクトが`.ccnavi/scripts/`のコピーを持っていても、ログと状態はワークスペースルートに置く）。ルートを求め終えているスクリプト（`ccnavi-git.sh`の`WS`、
     `ccnavi-review.sh`の`root`）は、求めた直後に`ccnavi_log_root`へ入れ、loggerに探し直させない。出どころは
     `$0`のファイル名から拡張子を除いたもの（`ccnavi-git`）で、`CCNAVI_LOG_NAME`で上書きできる
   - Python: 呼び出し側が`get(name, root)`にルートを渡す。`root`を省くと`CLAUDE_PROJECT_DIR`を使い、

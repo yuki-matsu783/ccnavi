@@ -16,7 +16,7 @@ GitLab 中心のレビュー運用で、状態の数え方と案内に次の食�
 
 - origin のホストの分類が `github.com` だけで、GHE.com（`*.ghe.com`）が GitLab として扱われ、API の URL も合わなかった。分類は sh・実行ファイル・Chrome 拡張の 3 か所に別々にあった
 - GitLab では ccnavi の依頼コメントに返信するとスレッドになるが、取得も未解決の数え方も最初の note だけを見るため、ユーザの返信が指摘として数えられなかった
-- 変更要求の案内がホストを問わず「approve（または dismiss）」で、GitLab では dismiss にヒットする操作を適用していなかった
+- 変更要求の案内がホストを問わず「approve（または dismiss）」で、GitLab では dismiss に該当する操作を適用していなかった
 - fix で直した指摘のスレッドは未解決のまま残る仕様だが、誰が resolve するかを案内していなかった
 - 依頼のあとに親の HEAD が動いて止めても、何が見られていないかを言わなかった
 - レビュー待ちの間に別の親・別の目的の依頼を同じセッションで受けてしまう
@@ -26,7 +26,7 @@ GitLab 中心のレビュー運用で、状態の数え方と案内に次の食�
 
 | 決めたこと | なぜ |
 |---|---|
-| 分類に使うホストは、origin のホストを小文字にしポートを除いたもの。`.` の区切りで照合する。GitHub は `github.com` と `ghe.com`・`*.ghe.com`、GitLab は残り全部。GitLab の接続先は元の scheme・ホスト・ポートを保ち、GHE.com は `https://api.<ホスト>`（GraphQL は `/graphql`）。GHE.com のポート付きは API の URL を組めないので止める。共通の表（`tests/fixtures/host-kinds.json`）で 3 か所を突き合わせる | 末尾一致では `evilgithub.com` がヒットする。3 か所の食い違いをテストで見つけられる形にする。GHE.com の URL の規則は実物では未検証 |
+| 分類に使うホストは、origin のホストを小文字にしポートを除いたもの。`.` の区切りで照合する。GitHub は `github.com` と `ghe.com`・`*.ghe.com`、GitLab は残り全部。GitLab の接続先は元の scheme・ホスト・ポートを保ち、GHE.com は `https://api.<ホスト>`（GraphQL は `/graphql`）。GHE.com のポート付きは API の URL を組めないので止める。共通の表（`tests/fixtures/host-kinds.json`）で 3 か所を突き合わせる | 末尾一致では `evilgithub.com` が該当する。3 か所の食い違いをテストで見つけられる形にする。GHE.com の URL の規則は実物では未検証 |
 | Chrome 拡張では、ユーザが設定画面で明示した種類を自動判定より優先する。権限は画面と API・GraphQL の origin のすべてに取る | 未知の GHES を GitHub として登録する機能を変えない。GHE.com は画面と API の origin が違う。未登録のホストへ自動で通信しない |
 | GitLab の判定に使う note は、discussion の note から `system: true` を除いたもの。1 つでも `resolvable` なら対象。代表の note（本文・URL・位置・書き手）は、本文が ccnavi の目印で始まらない最初の note。`own` は note が全部目印で始まるときだけ真。`last_*` は集合の最後の note | ユーザの返信を指摘にする。受け入れの返信（目印つき）を足しても、キー・URL・版は変わらない |
 | `Thread.own` は JSON の真偽値だけを受け、それ以外は None（従来の判定）。ccnavi の投稿と見るのは、書き手が依頼の投稿者で `own` が真のとき | 型の崩れた入力で未解決を隠さない |

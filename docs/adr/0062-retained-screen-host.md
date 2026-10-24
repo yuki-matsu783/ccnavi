@@ -99,5 +99,5 @@ React 側と文字列側の両方に書くことになり、埋め込みの JS �
 3 画面とも移し終えた（リスク管理とフェーズ管理は issue #86、ルール設定は issue #84）。
 ここで前提にしていた「ルール設定はまだ文字列で組んでいる」は、もう該当しない。段取り
 （`retainedHost`・再表示されたときの送り直し・中身を渡すのは編集を破棄してよいときだけ）は
-3 画面とも同じ形で該当すり、変えたところは無い。手動確認は `extensions/vscode/ccnavi-board/docs/design/manual-checks.md` の 38b（リスク管理）と
+3 画面とも同じ形で該当し、変えたところは無い。手動確認は `extensions/vscode/ccnavi-board/docs/design/manual-checks.md` の 38b（リスク管理）と
 42c（フェーズ管理）に加えて、ルール設定のぶんも同じ形で確かめる。

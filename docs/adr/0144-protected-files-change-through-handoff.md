@@ -28,12 +28,12 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
 | 保護対象の変更は、`wip/handoff/<ツリーからの相対パス>` に置いた下書きを、ユーザが `ccnavi user handoff` で取り込む一本の手順にする。取り込み先は、下書きがあるツリーの同じ相対パス（`ccnavi-stage.sh` がコピーしたのと同じ約束） | 差分・ハッシュ・検査・ターミナル要求の実装を 1 つにする。取り込みの結果は、そのツリーのブランチの変更として残り、ふつうの合流で届く | テンプレート専用の手順を残す。拡張が直接書く（検査が二重になる）。常にワークスペースルートへ書く |
-| `ccnavi user handoff [<相対パス>…] [--yes --expect <ハッシュ>] [--via board] [--json]`。`--yes` なしは見るだけ（何も書かない）。パスを省くと、許可リストにヒットする下書き全部が対象。見るだけの形を含めて、すべてユーザ専用（`user` の入口） | 1 つのコマンドで一覧・差分・取り込みが済む。ターミナルのユーザは `mv` の代わりに使え、拡張は同じコマンドを呼ぶだけ | 見るだけの形をエージェントに許す（免除の判定が増える。エージェントは `ccnavi-stage.sh --commands` で状態を見られる） |
+| `ccnavi user handoff [<相対パス>…] [--yes --expect <ハッシュ>] [--via board] [--json]`。`--yes` なしは見るだけ（何も書かない）。パスを省くと、許可リストに該当する下書き全部が対象。見るだけの形を含めて、すべてユーザ専用（`user` の入口） | 1 つのコマンドで一覧・差分・取り込みが済む。ターミナルのユーザは `mv` の代わりに使え、拡張は同じコマンドを呼ぶだけ | 見るだけの形をエージェントに許す（免除の判定が増える。エージェントは `ccnavi-stage.sh --commands` で状態を見られる） |
 | ツリーは `--root` で指した 1 本。ほかのツリーの `wip/handoff/` は読まない。`ccnavi-stage.sh` と `user handoff` は、同じツリーの決め方（`ccnavi_workspace` と同じ規則）を使い、docs と sh の食い違いを直す | 相対パスだけでは、どのツリーかを表せない。1 回の取り込みで複数のツリーを書き分けない | 全ツリーを走査して同じ中身をまとめる |
 
 ### 取り込み先（許可リスト）
 
-取り込み先は「禁止の一覧」ではなく、種類の表に載せたものだけにする。下書きのパスは、リンクを解いた実パスの全要素を `pathcase.fold` と NFC に正規化してから、表に適用する。表にヒットしないパスは「対象外」とし、一覧に件数だけ出す。error には数えない（`wip/handoff/` には ccnavi が書く `learnings/`・`inbox/` や、再現用のスクリプトも置かれる）。
+取り込み先は「禁止の一覧」ではなく、種類の表に載せたものだけにする。下書きのパスは、リンクを解いた実パスの全要素を `pathcase.fold` と NFC に正規化してから、表に適用する。表に該当しないパスは「対象外」とし、一覧に件数だけ出す。error には数えない（`wip/handoff/` には ccnavi が書く `learnings/`・`inbox/` や、再現用のスクリプトも置かれる）。
 
 種類（`template`・`layer-config`・`docs`・`defense`）ごとのパス・新規作成の可否・ボードの可否・検査の表は、設計書の [9.19 保護対象の変更の取り込み](../design/tickets/handoff.md) にある。`defense` はボードから取り込めず、ターミナルの前のユーザだけが取り込む。
 
@@ -65,7 +65,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 |---|---|---|
 | 実行ファイルから外すもの: `--import`・`--replace`・`--save-draft`・`--delete-draft`・`--rename-template`・`--move-template`・`--delete-template`・`--new-name`・`--on`・`--to-layer`。`wip/proposals/templates/`（下書きの置き場）もやめる。残すもの: 一覧・検索・表示（`--templates`・`--keyword`・`--show`・`--layer`・`--json`）と `--draft`（`--name`・`--to`・`--layer` を含む） | 取り込み・編集は handoff に一本化する。改名・移動・削除は、ほかの保護対象の削除と同じく、ユーザがファイルを直接操作する | 改名・移動・削除を handoff の取り込みで表す |
 | `--draft <親> [--name <名前>] [--to common\|project] [--layer <名前>]` は、下書きを handoff の取り込み先と同じ相対パスに書く（`--to` の既定は `project`。共通は他のプロジェクトへ配られる）。取り込み先に同名のテンプレートが既にあるときは、上書きになる下書きを作らず断る（直すときは `ccnavi-stage.sh` で既存をコピーして編集する）。同名の下書きがあれば上書きせず断る | `--replace` が無くなるので、黙って置き換わる下書きを作らない | 同名を黙って許す |
-| `ready` は、許可リストにヒットする未取り込みの下書き（取り込み先と中身が違うもの）が `wip/handoff/` に残っているとき、止める。取り込むか、下書きを消してからにする | 今は `wip/proposals/templates/` の未追跡の下書きが `ready` を止めている。handoff は `ready` が消す置き場なので、同じ性質を保つ | 黙って消す |
+| `ready` は、許可リストに該当する未取り込みの下書き（取り込み先と中身が違うもの）が `wip/handoff/` に残っているとき、止める。取り込むか、下書きを消してからにする | 今は `wip/proposals/templates/` の未追跡の下書きが `ready` を止めている。handoff は `ready` が消す置き場なので、同じ性質を保つ | 黙って消す |
 | `ccnavi --lint` は、`wip/handoff/` の `template` の下書きを検査する（`lint_templates.py` の置き場を変える）。`--templates --json` の `drafts[]` は、`wip/handoff/` の `template` の下書きを返す形で残す | 今の検査と、ボードの一覧を保つ | 検査をなくす |
 
 ### 検査の共有
@@ -78,7 +78,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 |---|---|---|
 | ボードに、テンプレート専用の取り込み・編集の画面の代わりに、handoff の一覧の画面（`template`・`layer-config`・`docs` の種類）を置く。一覧は `user handoff --json`（見るだけ）で作り、取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。テンプレートの画面は、一覧・検索・表示だけにする。`defense`（と、防御の記述を動かす `rules.yml`）は一覧に出し、「ターミナルで取り込む」ことと打つコマンド（`ccnavi --root <ツリー> user handoff <パス> --yes --expect <ハッシュ>`。引用は POSIX の sh の形）を案内する | 拡張も、同じ 1 つのコマンドを呼ぶだけ | テンプレートの画面だけ残す。拡張が直接書く |
 | `user_only.py` の表に `handoff` の操作と `--handoff` を足し、テンプレートの書き込みの操作を実行ファイルの `user` から外す。ボードの組み合わせの語のグループ（`user-board-verb`）に `handoff` を足す | 表を正本のままにする | |
-| エージェントが `wip/handoff/` の下のコピーを編集できるよう、名指しのツール（Write / Edit）の保護に例外を入れる。対象は、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下だけ。組み込みの `guard-project-home` と、リポジトリのルール `guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` に入れる。`..` の段・リンク・ハードリンクのあるパス、`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。リポジトリのルールの `except` は式でファイルを見ないので、置き場の中のリンク・ハードリンクの対象への書き込みは組み込みの `builtin:guard-handoff-links` が別に止め、置き場の中にリンクを作るシェルの形（`ln`・`link`・リンクを作る `cp`）は `builtin:guard-handoff-ln` が止める。シェルからの書き込みの保護は、ほかは変えない | `ccnavi-stage.sh` はコピーを元と同じ相対パスに置く。パスに `.ccnavi/` や `.claude/` が入るので、保護の glob にヒットし、エージェントがコピーを編集できなかった（この手順が一般の保護対象では最初から成り立っていなかった）。コピーはユーザが取り込むまで効力が無い | 例外を入れず、ユーザがコピーを編集する |
+| エージェントが `wip/handoff/` の下のコピーを編集できるよう、名指しのツール（Write / Edit）の保護に例外を入れる。対象は、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下だけ。組み込みの `guard-project-home` と、リポジトリのルール `guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` に入れる。`..` の段・リンク・ハードリンクのあるパス、`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。リポジトリのルールの `except` は式でファイルを見ないので、置き場の中のリンク・ハードリンクの対象への書き込みは組み込みの `builtin:guard-handoff-links` が別に止め、置き場の中にリンクを作るシェルの形（`ln`・`link`・リンクを作る `cp`）は `builtin:guard-handoff-ln` が止める。シェルからの書き込みの保護は、ほかは変えない | `ccnavi-stage.sh` はコピーを元と同じ相対パスに置く。パスに `.ccnavi/` や `.claude/` が入るので、保護の glob に該当し、エージェントがコピーを編集できなかった（この手順が一般の保護対象では最初から成り立っていなかった）。コピーはユーザが取り込むまで効力が無い | 例外を入れず、ユーザがコピーを編集する |
 | ボードの rules・phases・risks の画面は、今は拡張が直接書く。この ADR では変えない | 範囲を広げすぎない。画面を handoff に寄せるかは別に決める | 同時に直す |
 
 ## 得たもの・失ったもの

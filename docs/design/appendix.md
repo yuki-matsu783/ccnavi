@@ -31,7 +31,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_RECORDS_PRUNE` | 記録と state を消す `ccnavi user prune` をシェルから打った。チケット制御に依らない |
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルの `user` の入口か `ccnavi-user-*.sh` を打った。実行役のコマンド越しに打った形を含む。ターミナル要求を切る変数とフラグをコマンド行に書いた形も。ターミナルを求めない入口に、止める操作（`user agree` などと `--yes`・`ccnavi-user-decide.sh`・`worktree retire --abandon`・`decide --choices`・`--guard-ticket-approval`）を組み立てうる読み切れない引数（変数・置換・glob・`xargs`）を渡した形と、標準入力から読むシェルに入口の名前を含む文字列を流す形も（9.5、9.18） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
-| `DENY_AGENT_ISOLATION` | `Agent`・`Task` に `isolation` のキーがある（値によらない）。作業場所は ccnavi が決め、isolation のワークツリー（`.claude/worktrees/agent-<id>`）にはチケットの範囲がヒットしない。補助で、チケット制御が無効でも dry-run でも止める。`CCNAVI_MODE=disable` だけ通す（9.12） |
+| `DENY_AGENT_ISOLATION` | `Agent`・`Task` に `isolation` のキーがある（値によらない）。作業場所は ccnavi が決め、isolation のワークツリー（`.claude/worktrees/agent-<id>`）にはチケットの範囲に該当しない。補助で、チケット制御が無効でも dry-run でも止める。`CCNAVI_MODE=disable` だけ通す（9.12） |
 | `DENY_AGENT_NO_CHILD` | 親のワークツリーから、担当の子を指さずに編集する種類のサブエージェントを起動した。作業中の子の識別子を最大 5 件並べる。関門。読み取り専用の種類は止めない（9.12） |
 | `DENY_AGENT_MULTI_TARGET` | プロンプトが違うワークツリーを 2 つ以上指している（「触れない」と書いた子も数える）。関門。チケット制御が無効のときも、パスが 2 つ以上なら止める（補助。9.12） |
 | `DENY_AGENT_PARENT_TREE` | プロンプトが親のワークツリーだけを指している。関門（9.12） |

@@ -100,9 +100,9 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - 処理と場所: `src/ccnavi/hook/projskills.py:101-108` の `project_of` は、MAIN のツリーでは `t.project` が空なので `""` を返す。呼び出しは `hook/events.py:624`、`hook/subagent.py:59`、`hook/judge.py:709`。目録を出す hook はワークスペースの `.claude` にしか無い
 - ワークスペース内 clone: ワークスペースから `cwd=projects/proj1` の SessionStart を呼ぶと、目録が入る
 - 単体 clone: `skills/<名前>/SKILL.md` は git に入るが、SessionStart、SubagentStart、最初の PreToolUse のどこでも目録は渡らない。`skillsync` がコピーした工程スキルの入口（`skills/<工程>/SKILL.md`）も同じ。reference は `ccnavi --docs` で引ける（`--root B --docs --type skill-reference` で再現した）。単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほうである
-- 起きること: `project_of` は単体 clone を検出せず、黙って空を返す。[ワークスペース内 clone と単体 clone の両方で動かす](../../adr/0145-work-in-workspace-and-standalone-clone.md)の「縮退して動く」の定義（頼るものが無いことを検出し、決めた小さい振る舞いに落とす）にはヒットしない。工程スキルのコピーを決めたときの採らなかった案に「単体 clone で目録に載らない」があるが、実装はこれを満たしていない
+- 起きること: `project_of` は単体 clone を検出せず、黙って空を返す。[ワークスペース内 clone と単体 clone の両方で動かす](../../adr/0145-work-in-workspace-and-standalone-clone.md)の「縮退して動く」の定義（頼るものが無いことを検出し、決めた小さい振る舞いに落とす）には該当しない。工程スキルのコピーを決めたときの採らなかった案に「単体 clone で目録に載らない」があるが、実装はこれを満たしていない
 - 確認: 実行で確認
-- 直し方の案: MAIN のツリー（`project == ""`）でも `root/skills` があれば目録を出す。工程スキルがワークスペース内 clone で目録と `--docs` に二重に出る例外（`--docs` は 2 件にヒットする）との整理も要る。未決
+- 直し方の案: MAIN のツリー（`project == ""`）でも `root/skills` があれば目録を出す。工程スキルがワークスペース内 clone で目録と `--docs` に二重に出る例外（`--docs` は 2 件に該当する）との整理も要る。未決
 
 #### C3 setup が `/.claude/worktrees/` を `.gitignore` に足さない（minor から中）
 
@@ -178,7 +178,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 #### E6 案内文が一方の形を前提にしている（nit）
 
-- 場所と内容: `src/ccnavi/entry/lint.py:374-386` の `compat_fix` が「ccnavi-setup.sh <このワークスペース> --force」と案内する。単体 clone の利用者にはヒットしない
+- 場所と内容: `src/ccnavi/entry/lint.py:374-386` の `compat_fix` が「ccnavi-setup.sh <このワークスペース> --force」と案内する。単体 clone の利用者には該当しない
 - 設計済みで、不都合に数えないもの: cwd が `projects/p` のとき `worktree add` が一度断られることは、`.ccnavi/docs/worktree.md:68` が設計済みで、拒否文は正しいパスを教える。`_misplaced_worktrees` は単体の `.claude/worktrees/` では 0 件で、`projects/` の下の各プロジェクトにだけ出る
 - 確認: 実行と読み
 

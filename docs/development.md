@@ -172,7 +172,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |
 | `tests/manual/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを適用して 1 周する、ユーザが手で回す道具。自動テストは呼ばない |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
-| `.ccnavi/config/common/rules.yml` / `phases.yml` / `risks.yml` | このリポジトリ自身の共通レイヤーの設定（`phases.yml` はどのプロジェクトでも指定できる定義） |
+| `.ccnavi/config/common/rules.yml` / `phases.yml` / `risks.yml` | このリポジトリ自身の共通レイヤーの設定（`phases.yml` はどのプロジェクトでも使える定義） |
 | `.ccnavi/config/project/phases.yml` | このリポジトリ自身のレイヤーのフェーズ定義（このリポジトリのレイアウトに依存する定義） |
 | `.ccnavi/config/common/rule-expectations.yml` | ルールが何を止めて何を通すかの期待する判定 |
 | `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |

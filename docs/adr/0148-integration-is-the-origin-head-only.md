@@ -20,7 +20,7 @@ keywords: [統合先, origin/HEAD, CCNAVI_INTEGRATION_BRANCH, --integration-bran
 
 決める場所は 2 つ。sh は `ccnavi-common-state.sh` の `ccnavi_integration`、Python は `ops_stop_integrate.integration_name`（Python にはさらに `--integration-branch` が挟まる）。
 
-1 と 2 はワークスペースで 1 つの値なので、`projects/` の下のどのプロジェクトにも同じ名前がヒットする（`docs/design/multi-repo/standalone-clone-gaps.md` の B1）。
+1 と 2 はワークスペースで 1 つの値なので、`projects/` の下のどのプロジェクトにも同じ名前が該当する（`docs/design/multi-repo/standalone-clone-gaps.md` の B1）。
 
 ## 決定
 
