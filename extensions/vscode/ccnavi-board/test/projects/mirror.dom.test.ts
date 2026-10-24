@@ -1,5 +1,5 @@
 /**
- * プロジェクト管理画面（React）のミラーの表示を happy-dom で動かす。カードの状態とずれの中身、「ミラーを同期」と
+ * プロジェクト管理画面（React）のミラーの表示を happy-dom で動かす。カードの状態とずれの中身、「共通設定を同期」と
  * 「すべて同期」が送るもの、押せないとき（同期中・古い実行ファイル・写すものが無い）、最終確認の時刻、案内の間は送らないこと。
  */
 import { test } from "node:test";
@@ -75,14 +75,14 @@ test("CB-D734 カードにミラーの状態が出る。ずれの中身は畳ん
   }
 });
 
-test("CB-D735 「ミラーを同期」はずれのある行だけ押せて、その名前と行の expect を送る。「すべて同期」は件数を出し、名前を空にして全体の expect を送る", async () => {
+test("CB-D735 「共通設定を同期」はずれのある行だけ押せて、その名前と行の expect を送る。「すべて同期」は件数を出し、名前を空にして全体の expect を送る", async () => {
   const dom = await open(mirror());
   try {
     const button = (name: string): HTMLButtonElement => dom.one<HTMLButtonElement>(`${cardSelector(name)} button[data-action="mirror-sync"]`);
     assert.equal(button("app").disabled, true);
     assert.equal(button("x").disabled, true);
     assert.equal(button("web").disabled, false);
-    assert.equal(text(button("web")), "ミラーを同期");
+    assert.equal(text(button("web")), "共通設定を同期");
     const all = dom.one<HTMLButtonElement>('button[data-action="mirror-sync-all"]');
     assert.equal(text(all), "すべて同期（1 件）");
     assert.equal(all.disabled, false);

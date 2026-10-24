@@ -1,5 +1,5 @@
 /**
- * 共通レイヤーのミラーの表示。カードの「ミラー」の欄（状態・ずれの中身・「ミラーを同期」）、上部の「すべて同期」と最終確認の時刻、
+ * 共通レイヤーのミラーの表示。カードの「ミラー」の欄（状態・ずれの中身・「共通設定を同期」）、上部の「すべて同期」と最終確認の時刻、
  * 調べられないときの帯。
  *
  * 見せる中身は拡張ホストが渡す（`ProjectsData` の `mirror`）。ボタンを押せるかと文言は `core/mirrormodel.ts` が決め、
@@ -32,7 +32,7 @@ export function MirrorField({ mirror, name, act }: { readonly mirror: MirrorData
             }
           }}
         >
-          ミラーを同期
+          共通設定を同期
         </button>
       </div>
       {project !== undefined && project.state === "differs" && project.changes.length > 0 && <Changes project={project} />}

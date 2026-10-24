@@ -139,7 +139,7 @@ export function parseMirrorResult(text: string): MirrorResultParse {
       : [];
   if (!raw.ok) {
     const partial = readSynced(raw.synced);
-    const error = str(raw.error) || "ミラーを同期できませんでした（理由は返りませんでした）";
+    const error = str(raw.error) || "共通設定を同期できませんでした（理由は返りませんでした）";
     return { ok: true, value: partial.length > 0 ? { ok: false, error, synced: partial } : { ok: false, error } };
   }
   if (!Array.isArray(raw.synced)) {
@@ -239,7 +239,7 @@ function commonBlock(status: MirrorStatus, busy: boolean): string {
   }
 }
 
-/** プロジェクト 1 件の「ミラーを同期」を押せるか */
+/** プロジェクト 1 件の「共通設定を同期」を押せるか */
 export function projectSyncButton(status: MirrorStatus, busy: boolean, name: string): SyncButton {
   const common = commonBlock(status, busy);
   if (common !== "") {
@@ -293,10 +293,10 @@ export function syncNotice(result: MirrorResult): { readonly kind: "info" | "war
       const names = done.map((s) => s.name).join("、");
       return {
         kind: "error",
-        message: `ミラーを同期できなかったものがあります: ${result.error}。同期できたのは ${names} です（作業ツリーに書いただけで、コミットはしていません）`,
+        message: `共通設定を同期できなかったものがあります: ${result.error}。同期できたのは ${names} です（作業ツリーに書いただけで、コミットはしていません）`,
       };
     }
-    return { kind: "error", message: `ミラーを同期できませんでした: ${result.error}` };
+    return { kind: "error", message: `共通設定を同期できませんでした: ${result.error}` };
   }
   if (result.synced.length === 0) {
     return { kind: "info", message: "同期するものはありませんでした" };
@@ -305,7 +305,7 @@ export function syncNotice(result: MirrorResult): { readonly kind: "info" | "war
   const names = result.synced.map((s) => s.name).join("、");
   return {
     kind: "info",
-    message: `${names} のミラーを同期しました（${files} ファイル）。書いたのは各プロジェクトの作業ツリーで、コミットはしていません。必要なら各プロジェクトでコミットしてください`,
+    message: `${names} の共通設定を同期しました（${files} ファイル）。書いたのは各プロジェクトの作業ツリーで、コミットはしていません。必要なら各プロジェクトでコミットしてください`,
   };
 }
 

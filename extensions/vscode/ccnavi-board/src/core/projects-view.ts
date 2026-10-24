@@ -111,7 +111,7 @@ export type ProjectsMessage =
   | { readonly type: "fixIgnore" }
   | { readonly type: "clone"; readonly url: string; readonly name: string }
   /**
-   * ミラーを同期する。`names` が空なら差分のある全プロジェクト（「すべて同期」）、1 つならそのプロジェクトだけ（「ミラーを同期」）。
+   * 共通設定を同期する。`names` が空なら差分のある全プロジェクト（「すべて同期」）、1 つならそのプロジェクトだけ（「共通設定を同期」）。
    * `expect` は画面が見せていた結果の値（全体なら結果の `expect`、単独ならそのプロジェクトの `expect`）。
    * 見せた後に内容が変わっていれば、実行ファイルは何も書かない
    */

@@ -178,7 +178,7 @@ test("CB-T1162 ボタンを押せないとき: 同期中、調べる前、古い
 test("CB-T1163 同期の結果の通知。成功は作業ツリーへ書いてコミットしていないことを言う。「内容が更新されました」はずれ、他は失敗", () => {
   const done = syncNotice({ ok: true, synced: [{ name: "web", files: ["a", "b"] }, { name: "app", files: ["c"] }] });
   assert.equal(done.kind, "info");
-  assert.match(done.message, /^web、app のミラーを同期しました（3 ファイル）。/);
+  assert.match(done.message, /^web、app の共通設定を同期しました（3 ファイル）。/);
   assert.match(done.message, /作業ツリー/);
   assert.match(done.message, /コミットはしていません/);
   assert.deepEqual(syncNotice({ ok: true, synced: [] }), { kind: "info", message: "同期するものはありませんでした" });
@@ -186,7 +186,7 @@ test("CB-T1163 同期の結果の通知。成功は作業ツリーへ書いて�
   const stale = syncNotice({ ok: false, error: "内容が更新されました" });
   assert.equal(stale.kind, "warn");
   assert.match(stale.message, /もう一度押してください/);
-  assert.deepEqual(syncNotice({ ok: false, error: "書き込めません" }), { kind: "error", message: "ミラーを同期できませんでした: 書き込めません" });
+  assert.deepEqual(syncNotice({ ok: false, error: "書き込めません" }), { kind: "error", message: "共通設定を同期できませんでした: 書き込めません" });
 });
 
 test("CB-T1164 最終確認の時刻は HH:MM", () => {

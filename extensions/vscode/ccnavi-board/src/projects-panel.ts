@@ -20,7 +20,7 @@
  *
  * 1. `refreshMirror` が `checkMirror`（実行ファイルが `user mirror` を持つか）→ `runMirror` の順に聞き、終わったら次の回を予約する。
  *    読み込み中に呼ばれたら、終わった後にもう 1 回だけ回す（`update` と同じ重ならない作り）。パネルを閉じたら予約を消して止める
- * 2. 画面の「ミラーを同期」「すべて同期」で `mirrorSync` が届いたら `runMirrorYes` を呼ぶ。書くのは実行ファイルで、
+ * 2. 画面の「共通設定を同期」「すべて同期」で `mirrorSync` が届いたら `runMirrorYes` を呼ぶ。書くのは実行ファイルで、
  *    各プロジェクトの作業ツリーへ（コミットはしない）。結果は VS Code の通知で知らせ、すぐ調べ直す
  * 3. 同期している間と、同期の後の調べ直しが終わるまでは、画面のボタンを押せなくする（`busy`）。古い `expect` で押させないため
  */
@@ -460,13 +460,13 @@ async function readMirror(root: string): Promise<MirrorStatus> {
 }
 
 /**
- * ミラーを同期する（`names` が空なら差分のある全プロジェクト）。書くのは実行ファイルで、各プロジェクトの作業ツリーへ。
+ * 共通設定を同期する（`names` が空なら差分のある全プロジェクト）。書くのは実行ファイルで、各プロジェクトの作業ツリーへ。
  * 結果は VS Code の通知で知らせ（成功は情報、見せた後に内容が変わっていたら警告、失敗はエラー）、すぐ調べ直す。
  */
 async function syncMirror(current: PanelState, names: readonly string[], expect: string): Promise<void> {
   if (current.syncing || current.seenSeq < current.syncSeq) {
     // 画面はボタンを押せなくしているので、来るのは押した直後の二度押しくらい。黙って捨てると何も起きないように見えるので言う
-    void vscode.window.showInformationMessage("ミラーを同期しています。終わるまで待ってください");
+    void vscode.window.showInformationMessage("共通設定を同期しています。終わるまで待ってください");
     return;
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
