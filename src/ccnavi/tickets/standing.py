@@ -241,6 +241,6 @@ def guidance(root: str, st: Standing) -> list[str]:
         f"親のワークツリーを切り直してください（'{git} fetch origin {branch}' のあと "
         f"'{git} worktree add .claude/worktrees/{name} {branch}'。ブランチ名の `/` を `-` に"
         "置き換えたものがフォルダ名になる）。"
-        "捨てた親子のチケットなら、親のワークツリーを片付ければよい"
+        "破棄した親子のチケットなら、親のワークツリーを片付ければよい"
         "（push の関門の対象から外れる）",
     ]

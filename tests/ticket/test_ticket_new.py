@@ -5,7 +5,7 @@
 1. 生成物が `--lint` と承認の確認（`--agree --preview --verify`）を通り、`design` を含む plan では
    `wip/design/*` が `allow` に入る（#316 の完了条件）
 2. `allow` は plan の順に scope を集め、重複を除く。`phases:` は生成の直後に差し込まれる
-3. plan の各項は前の項を待つ一直線
+3. plan の前のステップが各ステップに先行する一直線
 4. `phases.yml` が無いとき、`inherit` だけの plan で `allow` が空になるとき、子の識別子、
    feedback の型、無い型は、何も書かずに理由を言って止まる
 5. cwd が識別子と同名のワークツリーでなければ、親のワークツリーの作り方

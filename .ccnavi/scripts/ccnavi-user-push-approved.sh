@@ -2,14 +2,14 @@
 # ccnavi-user-push-approved 承認済みチケットの置き場（と、承認で todo/ から消えた提案、取り込んで消えた
 # フローとテンプレートの下書き）だけをコミットし、
 # 保護されたブランチでなければ push する。
-# ユーザだけが打つ（ボードが端末へ送る 1 行も、ユーザが打つ）。エージェントからは hook が名前で止める。
+# ユーザだけが打つ（ボードがターミナルへ送る 1 行も、ユーザが打つ）。エージェントからは hook が名前で止める。
 #
 #   sh .ccnavi/scripts/ccnavi-user-push-approved.sh [<親>...]
 #   sh .ccnavi/scripts/ccnavi-user-push-approved.sh --path <パス> [--path <パス>...]
 #
 # 承認済みチケットは置かれただけでは他の機械に届かないので、置いたあとに
-# コミットして push するのがこの sh。端末の承認（ccnavi-user-agree.sh）、ボードの承認とフローの保存
-# （端末に送った 1 行）、ユーザの判断（ccnavi-user-close-early.sh）が、それぞれ最後にこの sh を呼ぶ。
+# コミットして push するのがこの sh。ターミナルの承認（ccnavi-user-agree.sh）、ボードの承認とフローの保存
+# （ターミナルに送った 1 行）、ユーザの判断（ccnavi-user-close-early.sh）が、それぞれ最後にこの sh を呼ぶ。
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の write-and-push が止まり、この sh の打ち直しを案内する。
 # 対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
@@ -28,7 +28,7 @@
 # ルートからの相対（区切りは /）。承認が実際に書いた・消したパスの一覧（`ccnavi user agree` の
 # `--record-writes`、`--yes --json` の `written`）を渡す。同じ置き場にある承認と無関係な変更
 # （review/ の変更や、前の失敗で残ったファイル）を承認のコミットに入れないため。並べたパスの無いツリーは
-# 見ない（子のワークツリーの置き場に変更があっても、失敗に数えない）。<親> とは一緒に使えない。
+# 見ない（子のワークツリーの置き場に変更があっても、失敗に数えない）。<親> とは同時に指定できない。
 #
 # 数えるツリーは、ワークスペース、projects の下、.claude/worktrees の下。
 # 置き場は .ccnavi/approved（どの置き場も固定）。承認では提案を
@@ -364,7 +364,7 @@ for place in "$projects" ".claude/worktrees"; do
 				"$place/$(basename "$dir")" >&2
 			continue
 		fi
-		# glob が何にも当たらなければパターンがそのまま残るので、-d で除く。
+		# glob が何にもヒットしなければパターンがそのまま残るので、-d で除く。
 		[ -d "$dir" ] || continue
 		trees="$trees
 $dir"

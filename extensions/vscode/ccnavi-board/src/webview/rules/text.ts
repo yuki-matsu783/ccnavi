@@ -1,7 +1,7 @@
 /**
- * ルール管理画面に出す言葉。行の要約、絞り込みが当てる文字列、件数の出し方。
+ * ルール管理画面に出す言葉。行の要約、絞り込みが適用する文字列、件数の出し方。
  *
- * 当たる・当たらないは実行ファイルの `--test` が言う。ここが作るのは
+ * ヒットする・ヒットしないは実行ファイルの `--test` が言う。ここが作るのは
  * 「このルールは何を止めるか」を折りたたんだままでも読める形に縮めた文だけ。
  */
 import type { RuleForm, Section } from "../../core/rules-view.js";
@@ -18,7 +18,7 @@ export function summaryId(rule: RuleForm): string {
   return rule.id === "" ? "（id 未設定）" : rule.id;
 }
 
-/** 要約のツール。空は「全ツール」＝ どのツールにも当たる */
+/** 要約のツール。空は「全ツール」＝ どのツールにもヒットする */
 export function summaryMatch(rule: RuleForm): string {
   return rule.match === "" ? "（全ツール）" : rule.match;
 }
@@ -59,8 +59,8 @@ export function staleMessage(section: Section): string {
 }
 
 /**
- * 絞り込みが当てる文字列。当てるのは書いてある値そのもの（id・ツール・パターン・文面・
- * 渡す文）で、要約に出ない全文にも当たる。組み合わせ条件のルールは、個別条件の文字すべてに当たる。
+ * 絞り込みが適用する文字列。適用するのは書いてある値そのもの（id・ツール・パターン・文面・
+ * 渡す文）で、要約に出ない全文にもヒットする。組み合わせ条件のルールは、個別条件の文字すべてにヒットする。
  */
 export function findText(rule: RuleForm): string {
   const patterns = rule.when === undefined ? rule.pattern : condPatterns(rule.when).join(" ");
@@ -75,5 +75,5 @@ export function countText(query: string, shown: number, total: number, kept: num
   if (query === "") {
     return String(total);
   }
-  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目：${kept}件）` : ""}`;
+  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目: ${kept} 件）` : ""}`;
 }

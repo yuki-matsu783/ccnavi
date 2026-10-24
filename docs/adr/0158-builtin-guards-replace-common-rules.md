@@ -43,14 +43,14 @@ deny の `recursive-delete`、`credentials`、`credentials-files`、`guard-hooks
 ### C. 自己防衛の保護（`CCNAVI_GUARD_CORE_FILES` の実効値が `disable` でなければ足す）
 
 `selfguard_shell.add_named_rules` が 4 本を足す。`Write|Edit|NotebookEdit` で、書き込みの例外は
-`handoff_write_exempt`（直下の `wip/handoff/` の普通の写し。ハードリンクでつながった写しは外さない）。
+`handoff_write_exempt`（直下の `wip/handoff/` の普通のコピー。ハードリンクでつながったコピーは外さない）。
 
-| id | 当てるもの |
+| id | 適用するもの |
 |---|---|
 | `builtin:guard-hooks` | glob `*/.claude/hooks/*` |
 | `builtin:guard-settings` | regex `[\\/]\.claude[\\/]settings(\.local)?\.json$` |
 | `builtin:guard-scripts` | glob `*/<ccnavi ディレクトリ>/scripts/*` |
-| `builtin:guard-ccnavi-config` | regex `[\\/]<ccnavi ディレクトリ>[\\/]config[\\/]common[\\/](rules\|phases\|risks)\.yml$`（ルートを固定せず、パスの末尾で当てる） |
+| `builtin:guard-ccnavi-config` | regex `[\\/]<ccnavi ディレクトリ>[\\/]config[\\/]common[\\/](rules\|phases\|risks)\.yml$`（ルートを固定せず、パスの末尾で適用する） |
 
 呼ぶ場所は 3 つで、二重に足さない。実行前の通常時は `add_rules` の後（先頭に挿すので、専用の文面が
 `guard-project-home` / `guard-common-layer` より先に並ぶ）。実行前で共通のルールファイルが読めず組み込みの既定で
@@ -60,9 +60,9 @@ deny の `recursive-delete`、`credentials`、`credentials-files`、`guard-hooks
 ### D. 共通の rules.yml が読めない間の修復
 
 読めない間も `builtin:guard-ccnavi-config` は外さない。エージェントは共通のルールファイルを Write / Edit で直接直さない。
-`wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（例外で書ける）、ユーザが端末の `ccnavi user handoff`
+`wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（例外で書ける）、ユーザがターミナルから `ccnavi user handoff`
 で取り込むか、手で直す。今の中身が読めない rules.yml の取り込みは `handoff._defense_change` が「確かめられないので
-端末に限る」と扱い、ボードからの取り込みは断られる。`ccnavi user handoff` は、共通のルールファイルが壊れていても
+ターミナルに限る」と扱い、ボードからの取り込みは断られる。`ccnavi user handoff` は、共通のルールファイルが壊れていても
 動く（テストで確かめた）。`builtin:guard-config-via-bash` と `builtin:guard-ccnavi-config` の文面が、この手順を案内する。
 `selfguard._left_as_repair` は、dry-run で名前で書くツールが通った場合の既存の例外として残し、実行後のチェック
 （`post.check`）には引き継がない。
@@ -80,14 +80,14 @@ deny の `recursive-delete`、`credentials`、`credentials-files`、`guard-hooks
   一律に外す今の設計は変えない。不正な変更をコミットするには、その前の書き込みが要る。その書き込みは実行前のゲートで止まり、
   実行後の検知にも掛かる。そこを抜けた場合は人間のレビュー（MR）で確かめる
 - ccnavi のスクリプトによる正規の書き込みは、今の仕組み（`post.check` の `places`、ADR-0075。コマンド名ではなく変更の
-  中身の形で見分ける）で外れる。handoff の写しの例外は付けない
+  中身の形で見分ける）で外れる。handoff のコピーの例外は付けない
 
 ### F. 文面の差し込み
 
 `_insert` は `rules.parse` に root を渡さないので、文面の `{root}` / `{script:...}` は置き換わらない。C~E の文面は
 `settings.script_command(root, ...)` で組む。
 
-### G. 当たったルールの並び
+### G. 該当したルールの並び
 
 C の 4 本は専用の文面が `guard-project-home` / `guard-common-layer` より先に並ぶ。approved は今の並び
 （`guard-project-home` が先、`builtin:ticket-approved` が後）のまま。

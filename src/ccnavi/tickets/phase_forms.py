@@ -14,7 +14,7 @@ from ..policy import rules, selfguard_shell
 from . import user_only
 
 # 何がユーザ専用かは `user_only` の表が正本。この module はその表から正規表現とオプションの一覧を
-# 組み立て、コマンド行に当てる。操作を足す・外すときは表の行を直し、ここの正規表現は直さない。
+# 組み立て、コマンド行に適用する。操作を足す・外すときは表の行を直し、ここの正規表現は直さない。
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
 # コマンドの位置で `sh` から呼ぶ形だけ。名前がどこかに含まれるだけでは通さない。
@@ -45,7 +45,7 @@ _FORBIDDEN_COMMAND = re.compile(
     re.IGNORECASE,
 )
 
-# シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
+# シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に適用する。
 SHELL_TOOLS = ("Bash", "PowerShell")
 
 # レビューが済むまで止めるツール。
@@ -55,12 +55,12 @@ HELD_TOOLS = (*modes.AGENT_TOOLS, *SHELL_TOOLS)
 # `--close-early` と、状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
 # `--agree --preview` は一覧を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
-# `--agree` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
+# `--agree` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず適用する。
 # 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
 # 免除される。承認を通す形は、免除の理由が何であっても止める。
 #
 # 免除の範囲はコマンド 1 本まで。Bash なら shellread が `\x00` で切るが、PowerShell は
-# 読めないので生の文字列に当たる（judge.screen）。生の文字列には `\x00` が無いので、
+# 読めないので生の文字列にヒットする（judge.screen）。生の文字列には `\x00` が無いので、
 # 区切りとして `;` `&` `|` と改行も見る。見ないと、後ろのコマンドに書いた `--preview` が
 # 前のコマンドの `--agree` を免除する。
 # 語の中の目印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
@@ -104,7 +104,8 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 
     unwrapped は shellread が作る、中で実行されるコマンドのレイヤー（`\\x00` でつないだもの）。
     禁止の形はコマンドの先頭の `sh` に固定しているので、`env sh …` や `sh -c '…'` は
-    元の形では当たらない。レイヤーにも当てる。止める側にだけ足す当て先で、`exempt` には渡さない。
+    元の形ではヒットしない。レイヤーにも適用する。止める側にだけ足す適用先で、
+    `exempt` には渡さない。
     """
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject) + commands(unwrapped))
 
@@ -112,10 +113,13 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 # ユーザの判断の経路のうち、hook のほかに保護が無い形。
 # 組み込みの deny（`DENY_TICKET_APPROVAL_CLI`）で、実行ファイルの呼び方によらず止める。
 #
-# 1. 端末要求を切る形。実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で
-#    端末要求を外す（テストと CI のため）。切れなければ、端末を持たないエージェントは実行ファイルの
+# 1. ターミナル要求を切る形。
+# 実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で
+#    ターミナル要求を外す（テストと CI のため）。切れなければ、
+#    ターミナルを持たないエージェントは実行ファイルの
 #    側で止まる
-# 2. ボードの経路の形。`--yes`（承認と残った指摘）は端末を求めないので、ここが唯一の保護になる。
+# 2. ボードの経路の形。`--yes`（承認と残った指摘）はターミナルを求めないので、
+# ここが唯一の保護になる。
 #    `--agree` / `--reviewed` と `--yes` の組み合わせ、
 #    sh の `--choices` と `--digest` の組み合わせ、
 #    `user handoff` と `--yes` の組み合わせ（保護対象の下書きの取り込み。
@@ -135,7 +139,7 @@ _GUARD_READ = re.compile(
 )
 _GUARD_MENTION = re.compile(rf"(?<![A-Za-z0-9_]){_GUARD_NAME}(?![A-Za-z0-9_])", re.IGNORECASE)
 # `CCNAVI_` で始まる名前の途中に展開が混じる形（`env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable`・
-# `export "CCNAVI_GUARD_`printf TICKET`_APPROVAL=disable"`）。実行の時点で端末要求を切る変数の
+# `export "CCNAVI_GUARD_`printf TICKET`_APPROVAL=disable"`）。実行の時点でターミナル要求を切る変数の
 # 名前になりうるので、名前を文字どおりに書いた形（_GUARD_MENTION）と同じに止める。前が `$`・`{` の
 # 形（`$CCNAVI_ROOT$X`・`${CCNAVI_X}`）は変数を読むだけなので数えない。
 _GUARD_EXPANDED_NAME = re.compile(r"(?<![A-Za-z0-9_${])CCNAVI_[A-Za-z0-9_]*[$`]", re.IGNORECASE)
@@ -223,7 +227,7 @@ def human_path_form(subject: str) -> tuple[str, str]:
     """hook のほかに保護が無いユーザの判断の形があれば（種類, 見つけた文字列）。
     無ければ空の文字列 2 つ。
 
-    種類は `guard-off`（端末要求を切る）・`user-script`（ユーザ専用の sh）・
+    種類は `guard-off`（ターミナル要求を切る）・`user-script`（ユーザ専用の sh）・
     `board`（ボードの経路）・`expanded`（`user` の語と、展開を含む `--` の語が並ぶ）。
     """
     text = _dequoted(subject)
@@ -265,29 +269,29 @@ def expanded_option_message(found: str) -> str:
         "実行の時点で組み立てられる形なので、"
         "何を実行するかを確かめられず止めました。オプションは変数や置換で組み立てず、"
         "そのまま書いてください（値が必要なら先に読み、次の手に書きます）。"
-        "ユーザ専用の操作は、ユーザが端末かボードで実行します。"
+        "ユーザ専用の操作は、ユーザがターミナルかボードで実行します。"
     )
 
 
 def board_form_message(found: str) -> str:
     """ボードの経路の形で止めた文。"""
-    # 取り込みの形は、承認と残った指摘の対応方針の文に当たらない。
+    # 取り込みの形は、承認と残った指摘の対応方針の文にヒットしない。
     lowered = found.casefold()
     decided = (
-        "共通レイヤーのミラーの同期（`ccnavi user mirror`）は、ユーザがボードか端末で"
+        "共通レイヤーのミラーの同期（`ccnavi-user-mirror.sh`）は、ユーザがボードかターミナルで"
         "ミラーの差分を読んでから決めます。"
         if "mirror" in lowered
-        else "保護対象の下書きの取り込み（`ccnavi user handoff`）は、ユーザがボードか端末で"
+        else "保護対象の下書きの取り込み（`ccnavi-user-handoff.sh`）は、ユーザがボードかターミナルで"
         "下書きの差分を読んでから決めます。"
         if "handoff" in lowered
         else "`--via board` は、ボードの画面から押した操作を拡張が実行するときだけ付ける印です。"
         if lowered.startswith("--via")
-        else "承認はユーザが端末・ボード・置き場のファイルの移動で行い、"
-        "残った指摘の対応方針はユーザが VS Code のボードか端末で決めます。"
+        else "承認はユーザがターミナル・ボード・置き場のファイルの移動で行い、"
+        "残った指摘の対応方針はユーザが VS Code のボードかターミナルで決めます。"
     )
     return (
         f"コマンド行に、ボード経由の操作用の形（{found}）が含まれています。この形はユーザがボードの"
-        "オーバーレイで押したものを拡張が実行するためのもので、端末での確かめが無いので、エージェントが"
+        "オーバーレイで押したものを拡張が実行するためのもので、ターミナルでの確かめが無いので、エージェントが"
         f"実行した場合はここで止めます。{decided}"
         "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
@@ -298,34 +302,36 @@ def user_script_message(found: str) -> str:
     return (
         f"コマンド行に、ユーザ専用の sh の名前（{found}）が含まれています。"
         "ccnavi-user- で始まる sh は、承認・レビュー済み・早めに閉じる・"
-        "残った子のブランチの削除など、ユーザが端末で決める操作です。"
+        "残った子のブランチの削除など、ユーザがターミナルで決める操作です。"
         "エージェントは実行しません。必要なら、理由を添えてユーザに依頼してください。"
         "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
 
 def guard_off_message(found: str) -> str:
-    """端末要求を切る形で止めた文。"""
+    """ターミナル要求を切る形で止めた文。"""
     return (
-        f"ユーザの判断の経路（承認・レビュー済み・早めに閉じる操作）で、端末からの入力を求めないようにする形（{found}）を、"
-        "コマンド行に書いています。この変数とフラグは、テストや CI が端末を使わずに実行ファイルを"
+        f"ユーザの判断の経路（承認・レビュー済み・早めに閉じる操作）で、"
+        f"ターミナルからの入力を求めないようにする形（{found}）を、"
+        "コマンド行に書いています。"
+        "この変数とフラグは、テストや CI がターミナルを使わずに実行ファイルを"
         "実行するためのもので、エージェントが置くものではありません。"
-        "承認はユーザが端末・ボード・置き場のファイルの移動で、レビュー済みはユーザが端末かボードで、"
-        "早めに閉じる操作はユーザが端末で行います。"
+        "承認はユーザがターミナル・ボード・置き場のファイルの移動で、レビュー済みはユーザがターミナルかボードで、"
+        "早めに閉じる操作はユーザがターミナルで行います。"
         "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
 
-# ユーザが端末で打つ入口のうち、引数を読み切れない形。human_path_form と組み込みの script 節は
+# ユーザがターミナルで打つ入口のうち、引数を読み切れない形。human_path_form と組み込みの script 節は
 # 文字として並んだ表記で見るので、引数を変数・置換・glob で組み立てると外れる（ADR-0122）。
-# 次の 2 つは 2 段目（実行ファイルの端末要求）が無く、hook が唯一の保護なので、止める操作を
+# 次の 2 つは 2 段目（実行ファイルのターミナル要求）が無く、hook が唯一の保護なので、止める操作を
 # 組み立てうるなら止める。組み立てられない形（読むだけの形）は通す。
 #
-# - `ccnavi-review.sh decide`: `--choices` はボードの経路で、端末を求めない。`--choices` に
+# - `ccnavi-review.sh decide`: `--choices` はボードの経路で、ターミナルを求めない。`--choices` に
 #   なりうる語があれば止める。文字どおりの `--preview` があれば通す
 #   （sh が `--choices` と一緒に断る）
-# - 実行ファイル（launcher を含む）の `--agree` / `--reviewed` と `--yes`: 端末を求めない。
-#   承認のオプションと `--yes` がどちらも文字か展開でそろいうるときと、端末要求を切る
+# - 実行ファイル（launcher を含む）の `--agree` / `--reviewed` と `--yes`: ターミナルを求めない。
+#   承認のオプションと `--yes` がどちらも文字か展開でそろいうるときと、ターミナル要求を切る
 #   `--guard-ticket-approval` になりうる語があるときに止める。展開を含む語より前に、診断のオプション
 #   （`--docs`・`--test` など）か実行ファイルの知らないオプションがあれば通す
 #   （承認の経路に進まない）。
@@ -337,7 +343,7 @@ def guard_off_message(found: str) -> str:
 #
 # 語はコマンドの位置から見る（`shellread.placed` と、実行役を外した層）。前に置けるのは
 # シェル・busybox・`.`・シェルの選択肢・リダイレクト・代入だけ。`sh -x` や `sh < /dev/null` を
-# 挟んでも外れず、`git log --grep ccnavi-sync.sh` のように文字列として出るだけの形には当たらない。
+# 挟んでも外れず、`git log --grep ccnavi-sync.sh` のように文字列として出るだけの形にはヒットしない。
 # 引数を外から流し込む形（`xargs`、入口を `<` で読ませる形）は、入口の名前が出た時点で止める。
 # 標準入力から読むシェル（パイプの先の `sh`・`bash`、`sh -s`、ヒアドキュメント・ヒアストリング）が
 # あれば、コマンド行の文字列のどこかに入口の名前があるだけで止める（流し込む文字列の中の語は
@@ -664,12 +670,13 @@ def _entry_commands(
 def hidden_user_entry(
     subject: str, inner: list[tuple[str, str]] | None = None, bin_path: str = ""
 ) -> tuple[str, str]:
-    """ユーザが端末で打つ入口に、読み切れない引数を渡す形があれば（入口, 見つけた語）。
+    """ユーザがターミナルで打つ入口に、読み切れない引数を渡す形があれば（入口, 見つけた語）。
 
     無ければ空の組み合わせ。
 
     inner は shellread が作る、実行役のコマンドを外した層の（実行役の名前, 層）。`sh -c '…'` の中や
-    `xargs` が実行するコマンドがここに並ぶ。組み込みの script 節（`_SCRIPT_FORMS`）が当たる形は、
+    `xargs` が実行するコマンドがここに並ぶ。
+    組み込みの script 節（`_SCRIPT_FORMS`）がヒットする形は、
     同じルールの文面で止まるように空を返す。
     """
     inner = list(inner or [])
@@ -758,7 +765,7 @@ def _executed_entry(words: list[str], bin_base: str) -> str:
 
     処理フロー:
     1. 代入・ツールの実行役・シェル・`env` などの前置きを飛ばす。シェルは印を付ける。
-    2. シェルの選択肢で `-s` か `-c` を含むものに当たったら、後ろは引数か文字列なので空を返す。
+    2. シェルの選択肢で `-s` か `-c` を含むものにヒットしたら、後ろは引数か文字列なので空を返す。
     3. 残った頭の語が名前付きの入口（`_NAMED_SCRIPTS`）なら、その名前を返す。
        ただし `ccnavi-launcher.sh` は `ccnavi` と名付ける。
     4. 標準入力のシェルの後ろでなく、実行ファイルの名前（`_ENTRY_EXE` か `bin_base`）なら `ccnavi`。
@@ -814,7 +821,7 @@ _ENTRY_REASONS = {
     "ccnavi": (
         "ユーザ専用の入口 user、承認のオプション（--agree / --reviewed）と --yes、"
         "放棄した親の記録を消す worktree retire --abandon、"
-        "または端末要求を切る --guard-ticket-approval になりうる",
+        "またはターミナル要求を切る --guard-ticket-approval になりうる",
         "診断（--docs・--test・--lint・--explain など）は、そのオプションを"
         "展開を含む語より前に書けば"
         "通ります。承認待ちを見るだけなら --agree --preview も通ります。",
@@ -823,39 +830,43 @@ _ENTRY_REASONS = {
 
 
 def hidden_entry_message(entry: str, found: str) -> str:
-    """ユーザが端末で打つ入口を、エージェントが打った形で止めた文。"""
-    tail = "承認・残った指摘の対応方針・放棄した親の記録を消す操作は、ユーザが端末で実行します。"
+    """ユーザがターミナルで打つ入口を、エージェントが打った形で止めた文。"""
+    tail = (
+        "承認・残った指摘の対応方針・放棄した親の記録を消す操作は、ユーザがターミナルで実行します。"
+    )
     if found == STDIN_SHELL:
         return (
-            f"標準入力から読むシェルに流し込む文字列に、ユーザが端末で実行する入口（{entry}）の名前が"
+            f"標準入力から読むシェルに流し込む文字列に、ユーザがターミナルで実行する入口（{entry}）の名前が"
             "あります。流し込んだ文字列の中は語として読めないので、何を実行するかを確かめられません。"
             "入口はコマンド行にそのまま書いてください。" + tail
         )
     if found in _FEEDERS or found.startswith("< "):
         return (
-            f"ユーザが端末で実行する入口（{entry}）に、引数か中身を外から流し込む形（{found}）が"
+            f"ユーザがターミナルで実行する入口（{entry}）に、引数か中身を外から流し込む形（{found}）が"
             "あります。何が渡るかを確かめられないので止めました。"
             "引数はコマンド行にそのまま書いてください。" + tail
         )
     reason, way = _ENTRY_REASONS.get(entry, ("止める操作になりうる", ""))
     return (
-        f"ユーザが端末で実行する入口（{entry}）に渡る語（{found}）が、実行の時点で、{reason}ので止めました。"
+        f"ユーザがターミナルで実行する入口（{entry}）に渡る語（{found}）が、実行の時点で、{reason}ので止めました。"
         "値は変数や glob で組み立てず、そのまま書いてください"
         "（値が必要なら先に読み、次の手に書きます）。" + way + tail
     )
 
 
-# 記録と state を消す `ccnavi --prune`（`--preview` の無い形）。チケット制御と端末要求を切る設定に
+# 記録と state を消す `ccnavi --prune`（`--preview` の無い形）。
+# チケット制御とターミナル要求を切る設定に
 # 依らず、組み込みの deny（`DENY_RECORDS_PRUNE`）で止める。実行ファイルの側の
-# 端末要求は、擬似端末（`script -qc '…' /dev/null`）でも、チケット制御を切ったワークスペースで
-# 端末要求を切る変数を前に並べても抜けられる。しきい値の環境変数を 0 に近づけて並べれば、
+# ターミナル要求は、擬似ターミナル（`script -qc '…' /dev/null`）でも、
+# チケット制御を切ったワークスペースで
+# ターミナル要求を切る変数を前に並べても抜けられる。しきい値の環境変数を 0 に近づけて並べれば、
 # 自分の呼び出しの記録を消せる。
 #
 # 見るのは human_path_form と同じく、引用符と `\` を除いたコマンド行の生の文字列。実行役の
 # コマンド越し（`script -qc`・`bash -c`・`env`）でも同じ文字列が残る。コマンドの切れ目
 # （`;` `&` `|` 改行）の中に ccnavi の名前と、単独の語の `--prune` が並べば止める。
 # `git fetch --prune` や `ccnavi-git.sh fetch --prune` は ccnavi の名前（`ccnavi` と
-# `ccnavi.exe` と実行ファイルの名前が、語の終わりで閉じた形）を持たないので当たらない。
+# `ccnavi.exe` と実行ファイルの名前が、語の終わりで閉じた形）を持たないのでヒットしない。
 #
 # 免除は `--preview` が `--prune` の隣に単独の語として並んだ形だけ。間に引用符があれば
 # 免除しない。免除をコマンドの中のどこかの `--preview` にすると、
@@ -943,7 +954,8 @@ def _previewed(text: str, cuts: set[int], start: int, end: int) -> bool:
 def prune_message() -> str:
     """`--prune` で止めた文。"""
     return (
-        "記録と state を削除する 'ccnavi user prune' は、ユーザが端末から実行するものです。記録は"
+        "記録と state を削除する 'ccnavi-user-prune.sh' は、"
+        "ユーザがターミナルから実行するものです。記録は"
         "「ccnavi が何を判定したか」を後から確かめるための材料なので、"
         "エージェントからは消しません。"
         "何が消える対象かを見るだけなら 'ccnavi --prune --preview' は通ります。"
@@ -979,9 +991,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルをユーザの判断の経路に使う形を止めるルール。
 
     承認のスクリプト（`ccnavi-user-agree.sh`）も同じ形で止める。中身は `--agree` の
-    呼び出しと承認済みチケットの push で、打つのは端末に座っているユーザ。
-    実行ファイルの側は標準入力が端末であることを求めるので、hook から呼んでも通らないが、
-    文字列で止めておけば「なぜ通らないのか」が当たったルールの id で分かる。
+    呼び出しと承認済みチケットの push で、打つのはターミナルに座っているユーザ。
+    実行ファイルの側は標準入力がターミナルであることを求めるので、hook から呼んでも通らないが、
+    文字列で止めておけば「なぜ通らないのか」がヒットしたルールの id で分かる。
 
     承認の push（`ccnavi-user-push-approved.sh`）も止める。コミットして push することは
     合意そのものではないが、push は外へ出す操作で、その時機を決めるのはユーザ。
@@ -991,7 +1003,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     見えなくなるので、打つのはユーザ。
 
     ボードの経路の形（`--yes` の組み合わせ、sh の `--choices` と `--digest`）と、
-    端末要求を切る形は、
+    ターミナル要求を切る形は、
     ここではなく `human_path_form` が止める。実行ファイルのパスに頼らず見るため。
     """
     names = [r"ccnavi(\.exe)?"]
@@ -1030,7 +1042,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "使い、承認はユーザが VS Code のボード・Chrome のボード・"
             f"'{settings.script_command(root, 'ccnavi-user-agree.sh')}'・"
             "置き場のファイルの移動のどれかで、"
-            "残った指摘の対応方針はユーザが VS Code のボードか端末で決めます。"
+            "残った指摘の対応方針はユーザが VS Code のボードかターミナルで決めます。"
             "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-user-push-approved.sh')}'）"
             "もユーザが実行します。"
@@ -1038,8 +1050,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "ユーザの判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-user-close-early.sh')}'）"
             "もユーザが実行します。"
-            "保護対象の下書き（wip/handoff/）の取り込み（'ccnavi user handoff'。"
-            "見るだけの形も含む）と、共通レイヤーのミラーの同期（'ccnavi user mirror'。"
+            "保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。"
+            "見るだけの形も含む）と、共通レイヤーのミラーの同期（'ccnavi-user-mirror.sh'。"
             "見るだけの形も含む）も、ユーザが実行します。"
             "親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・"
             "'ccnavi worktree branch'・"
@@ -1047,7 +1059,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。"
             "残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです"
             "（案内されたコマンドをユーザに見せて、打ってもらってください）。"
-            "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
+            "ボードで承認すると、承認済みチケットのコミットと push がターミナルで実行されます。"
             "エージェントは実行しません。"
             "承認が済んだかどうかは "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} status' で確かめます。"
@@ -1056,7 +1068,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "handoff・mirror）にまとめてあり、エージェントは実行しません。"
             "下書きの状態を見るだけなら "
             f"'{settings.script_command(root, 'ccnavi-stage.sh')} --commands <パス>' を使います。"
-            "承認待ちの一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
+            "承認先行の一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
         ),
         decision=rules.DENY,
     )

@@ -323,7 +323,7 @@ test("CX-T216 設定画面のリポジトリ: 直近の日数は 0〜90。外れ
   for (const value of ["91", "-1", "1.5"]) {
     fill({ owner: "acme", repo: "widgets", recentDays: value });
     await submitRepo();
-    assert.equal(text("#repo-msg"), "検索期間には、0〜90の整数を入力してください。", value);
+    assert.equal(text("#repo-msg"), "検索期間には、0〜90 の整数を入力してください。", value);
     assert.equal($("#repo-msg").className, "status error");
     assert.equal(storage.repos, undefined, value);
   }
@@ -343,7 +343,7 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
 
   value.value = "short";
   await submitToken();
-  assert.equal(text("#token-msg"), "PAT の形が正しくない（英数字と _ - . で 8〜255 字）");
+  assert.equal(text("#token-msg"), "PAT の形が正しくありません（英数字と _ - . で 8〜255 字）");
   assert.equal($("#token-msg").className, "status error");
   assert.equal(value.value, "");
   assert.equal(tokens.size, 0);
@@ -368,7 +368,7 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   assert.equal(text("#token-msg"), "gitlab.com の PAT を登録しました。差し替えた場合は、古いトークンをホスト側で失効させてください。");
   assert.deepEqual(metas.get("gitlab.com"), { manual: "2026-10-03" });
   assert.equal([value.value, $<HTMLInputElement>("#token-expires").value].join(""), "");
-  assert.match(text("#token-list"), /gitlab\.com（GitLab）: 登録済み（gitlab\.com の PAT はあと 3 日で切れる（2026-10-03）。/);
+  assert.match(text("#token-list"), /gitlab\.com（GitLab）: 登録済み（gitlab\.com の PAT はあと 3 日で切れます（2026-10-03）。/);
   assert.ok(!container.innerHTML.includes(TOKEN));
 
   // 送った頼み: PAT は token.set にだけ載る
@@ -428,7 +428,7 @@ test("CX-T218 設定画面の状態欄: 同じ一言が続いても、言い直�
   repo.changes();
   const err = $("#repo-msg").firstElementChild;
   await submitRepo();
-  assert.equal(text("#repo-msg"), "検索期間には、0〜90の整数を入力してください。");
+  assert.equal(text("#repo-msg"), "検索期間には、0〜90 の整数を入力してください。");
   assert.ok(repo.changes() > 0, "同じ誤りの 2 回目で状態欄が作り直されていない");
   assert.notEqual($("#repo-msg").firstElementChild, err);
   repo.stop();
@@ -460,7 +460,7 @@ const fillHost = (kind: string, url: string) => {
 };
 const submitHost = () => click("#host-form button[type=submit]");
 const hostList = () => text("#host-list");
-const EMPTY_HOSTS = "追加のホストは登録されていません（GitHub.comとGitLab.comは標準で利用できます）。";
+const EMPTY_HOSTS = "追加のホストは登録されていません（GitHub.com と GitLab.com は標準で利用できます）。";
 
 test("CX-T240 設定画面の通信先: localhost:8080 の GitLab を許可を求めてから足す。PAT の欄とリポジトリの選び先に出し、外すと PAT と許可も消える", async () => {
   await mount();
@@ -490,7 +490,7 @@ test("CX-T240 設定画面の通信先: localhost:8080 の GitLab を許可を�
   assert.equal(tokens.has("localhost_8080_http"), false);
   assert.deepEqual(storage.customHosts, []);
   assert.deepEqual(permissionCalls.at(-1), { op: "remove", origins: ["http://localhost/*"] });
-  assert.equal(text("#host-msg"), "localhost_8080_http と、このブラウザに保存されていたPATを削除しました。ホスト側でもPATを失効させてください。");
+  assert.equal(text("#host-msg"), "localhost_8080_http と、このブラウザに保存されていた PAT を削除しました。ホスト側でも PAT を失効させてください。");
   assert.equal(hostList(), EMPTY_HOSTS);
 });
 
@@ -507,7 +507,7 @@ test("CX-T241 設定画面の通信先: 許可を断られたら足さない。h
   grant.ok = true;
   fillHost("gitlab", "http://gitlab.example.com");
   await submitHost();
-  assert.match(text("#host-msg"), /https に限る/);
+  assert.match(text("#host-msg"), /https のみ指定できます/);
 
   fillHost("gitlab", "https://gitlab.com");
   await submitHost();

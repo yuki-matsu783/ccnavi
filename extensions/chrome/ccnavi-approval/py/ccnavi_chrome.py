@@ -2,7 +2,7 @@
 
 拡張はホストの API でブランチの置き場を読み、その中身（Snapshot）をここへ渡す。ここは
 ブランチごとの仮のツリーを MEMFS に組み、今の ccnavi（`--agree --preview --json`）を
-そのまま動かす。承認待ちの一覧も、親子のチケットの見分けも、参照の閉包も、
+そのまま動かす。承認先行の一覧も、親子のチケットの見分けも、参照の閉包も、
 互換の比べも Python が出し、拡張（TS）は並べるだけ。TS で判定し直すと、hook・lint と答えが
 2 か所に分かれるため。
 
@@ -10,8 +10,8 @@
 （Changes）を値で返すだけで、ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。
 拡張は `plan`（承認）・`confirm`（レビュー済み）の答えを、親のブランチへの
 1 コミットにして書く。
-通らなかった答えは、理由コード（付録 A の `CORE_*`）を鍵 `code` に持つ（通れば null）。
-拡張はこの鍵で分岐する。
+通らなかった答えは、理由コード（付録 A の `CORE_*`）をキー `code` に持つ（通れば null）。
+拡張はこのキーで分岐する。
 ボードの答えの `reviewable` が候補のフェーズで、ホストからスレッドとレビューを取得した結果は
 拡張が組んで `result` で渡す。
 
@@ -335,9 +335,9 @@ def _rival_problem(snap: dict, place: dict, name: str, ident: str) -> str:
     if not others:
         return ""
     return (
-        f"親子のチケット {ident} になるブランチが 1 本でない"
+        f"親子のチケット {ident} になるブランチが 1 本ではありません"
         f"（{', '.join([name, *others])}。どれも変換すると識別子が同じで、その上に同じ識別子の"
-        "親チケットがある）。どれを正とするか決まらないので、この親子のチケットは判定しない"
+        "親チケットがある）。どれを正とするか決まらないので、この親子のチケットは判定しません"
     )
 
 
@@ -347,8 +347,8 @@ def _ambiguous_problem(closure: dict) -> str:
         return ""
     return (
         f"先行の親子のチケット（{', '.join(closure['ambiguous'])}）"
-        "になるブランチが 1 本でない。"
-        "どれを正とするか決まらないので、この親子のチケットは判定しない"
+        "になるブランチが 1 本ではありません。"
+        "どれを正とするか決まらないので、この親子のチケットは判定しません"
     )
 
 
@@ -554,10 +554,10 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
             continue
         ident = _tree_ident(snap, place, name)
         if not ticket_ids.is_valid_id(ident):
-            raise Refused(f"親子のチケットの識別子が識別子の形でない: {ident!r}")
+            raise Refused(f"親子のチケットの識別子が識別子の形ではありません：{ident!r}")
         if name != ident and ticket_ids.branch_problem(name):
             raise Refused(
-                f"親のブランチ名が使えない: {name!r}（{ticket_ids.branch_problem(name)}）"
+                f"親のブランチ名に指定できません：{name!r}（{ticket_ids.branch_problem(name)}）"
             )
         tree = os.path.join(root, *WORKTREES.split("/"), ident)
         os.makedirs(tree, exist_ok=True)
@@ -576,7 +576,8 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
 def project_layer(snap: dict, place: dict) -> dict[str, str]:
     """プロジェクトのレイヤー（プロジェクトからの相対パス → 中身）。
 
-    プロジェクトの統合先の `.ccnavi/config/project/` を、そのまま写す。共通レイヤーは混ぜない。
+    プロジェクトの統合先の `.ccnavi/config/project/` を、そのままコピーする。
+    共通レイヤーは混ぜない。
     共通レイヤーはワークスペースの統合先の `.ccnavi/config/common/` だけで
     （`_build` がワークスペースルートに置く）、プロジェクトの `.ccnavi/config/common/`
     （同期が配るミラー）は読まない。ワークスペースの中でミラーを共通として読むと、
@@ -877,7 +878,7 @@ def _changes(root: str, changes: core.Changes | None) -> dict:
     for branch, entries in changes.per_branch().items():
         rows = []
         for e in entries:
-            # per_branch のパスはツリーからの相対（ツリーの外は `""` の鍵で絶対パス。
+            # per_branch のパスはツリーからの相対（ツリーの外は `""` のキーで絶対パス。
             # `_one_branch` が断る）
             row = {"op": e["op"], "path": e["path"]}
             if "content" in e:
@@ -1348,7 +1349,7 @@ def _op_adopt(req: dict, root: str) -> dict:
         problems.append(f"ブランチ {branch} は採用できません（{why}）")
     why = ticket_ids.adoption_id_problem(branch)
     if why:
-        problems.append(f"識別子 {ident} は使えません（{why}）")
+        problems.append(f"識別子 {ident} は指定できません（{why}）")
     folded = ident.casefold()
     clash = sorted(
         {n for n in names if n != branch and ticket_ids.branch_to_id(n).casefold() == folded}

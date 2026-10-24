@@ -209,7 +209,7 @@ export function buildBoard(json: BoardJson): Board {
   const pending = new Set(json.pending_approval);
   const live = json.tickets.map((t) => toCard(t, parents, pending));
   // 退避のカードは置き場のカードと識別子が重ならないものだけ（重なれば置き場の側が正）
-  // 鍵はプロジェクトと識別子。ワークスペースとプロジェクトで同じ識別子を使っていても取り違えない
+  // キーはプロジェクトと識別子。ワークスペースとプロジェクトで同じ識別子を使っていても取り違えない
   const liveKeys = new Set(json.tickets.map((t) => `${t.project}\u0000${t.ticket}`));
   const archived = (json.archived ?? []).filter((a) => !liveKeys.has(`${a.project}\u0000${a.ticket}`)).map(toArchivedCard);
   const cards = [...live, ...archived];
@@ -328,7 +328,7 @@ function toCard(
 }
 
 /**
- * 状態の札と、ユーザの番の操作を付ける。操作は札と別の規則で決める。
+ * 状態の札と、ユーザ待ちの操作を付ける。操作は札と別の規則で決める。
  * 承認は `pendingApproval` だけを条件にする（札が「要確認」でも出す）。レビュー完了は札が「レビュー待ち」の子だけ
  * （承認待ちの子には出さない）。親のレビュー完了は各フェーズ行が持つ
  */

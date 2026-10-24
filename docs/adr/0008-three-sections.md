@@ -18,12 +18,12 @@ keywords: [ルール, deny, ask, allow, 判定, 権限モード, 3タイプ]
 ## 決定
 
 ルールファイルは `.claude/ccnavi/rules.yml`（YAML）で、`deny` `ask` `allow` の 3 つのタイプに
-分かれる。強い順に見て、どこにも当たらなければ Claude Code の権限モードに従う（ADR-0009）。
+分かれる。強い順に見て、どこにもヒットしなければ Claude Code の権限モードに従う（ADR-0009）。
 `allow` を書き切るまで、言及されていない呼び出しはすべてそこへ渡る。
 
-Claude Code へ判定を返すのは `deny` と `ask` のときだけ。 `allow` に当たった呼び出しには何も返さず、
+Claude Code へ判定を返すのは `deny` と `ask` のときだけ。 `allow` にヒットした呼び出しには何も返さず、
 `additionalContext` があればそれだけを添える。`allow` が意味するのは、ccnavi 自身の確認（言及が無いときの `ask`）と
-拒否（`dontAsk` / `bypassPermissions`）を起こさないことと、`additionalContext` を当てる先になることまで。
+拒否（`dontAsk` / `bypassPermissions`）を起こさないことと、`additionalContext` を適用する先になることまで。
 
 ## 理由
 

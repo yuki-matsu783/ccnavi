@@ -73,7 +73,7 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   assert.equal(call.expected, before);
   assert.equal(call.headline, `ccnavi: i0001 を承認（Chrome 拡張 ${VERSION}）`);
   assert.deepEqual(call.deletions, [{ path: TODO }]);
-  // 待ち方のファイルは書かない（承認済みチケットの計画の項の after から都度計算する）
+  // 先行関係のファイルは書かない（承認済みチケットの計画のステップの after から都度計算する）
   assert.deepEqual(call.additions.map((a) => a.path).sort(), [DOING].sort());
   // 書いた中身: 提案のままの承認済みチケット（欄を書き足さない）
   const files = mock.files("i0001");
@@ -117,7 +117,7 @@ test("CX-T103 見せたダイジェストが今の中身と違えば、1 つも�
   const shown = shownOf(await board(d), "i0001");
   const out = await approveFamily(REPO, "i0001", { ...shown, digest: "0".repeat(64) }, d);
   assert.equal(out.kind, "changed");
-  // 分岐の材料は鍵の code。文面の頭にも同じコードが載る
+  // 分岐の材料はキーの code。文面の頭にも同じコードが載る
   assert.equal(out.kind === "changed" && out.code, "CORE_APPROVE_DIGEST_CHANGED");
   assert.match(out.message, /^\[CORE_APPROVE_DIGEST_CHANGED\] /);
   // 見せた識別子が今の一覧と違えば、中身より先にそちらの種別

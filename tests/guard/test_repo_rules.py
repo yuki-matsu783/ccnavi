@@ -3,15 +3,16 @@
 tests/fixtures/ のルールではなく、運用に使っている rules.yml をそのまま `--test` に
 渡す。見るのは、shellread が目印を 2 つに分けたあとの判定（wip/design/shellread-sep.md
 4「見本 → 判定」）。ルールの `[^\\x00]*` が「同じコマンドの中」だけを指すようになり、
-引用付きの grep / find が allow に当たる一方、引用の空白をまたいだ書き換えが deny に
-当たること。変わってはいけないもの（3 章）も同じ表で固定する。
+引用付きの grep / find が allow にヒットする一方、引用の空白をまたいだ書き換えが deny に
+ヒットすること。変わってはいけないもの（3 章）も同じ表で固定する。
 
 後半は承認の経路と、実行役のコマンド（`env`・`sudo`・`sh -c`・`xargs` など）が
-中で実行するコマンドを止める側のルールに当てること（wip/design/launcher-scripts.md
+中で実行するコマンドを止める側のルールに適用すること（wip/design/launcher-scripts.md
 3.4・3.5 節、12 節の A1〜A4・W1〜W3・W6・W7）。
 
 道具は外から動かす。`--test <tool> <subject> --json` の `verdict` と `rules[].id` を読む
-（形は docs/requirements/json-shapes.md「試験の JSON」）。期待する判定の `/repo` は `--root` に渡したルートに読み替える。
+（形は docs/requirements/json-shapes.md「試験の JSON」）。
+期待する判定の `/repo` は `--root` に渡したルートに読み替える。
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     既定のまま有効にする。4 の表はそれを含めた判定なので。
 
     `bin_path` を渡すと `CCNAVI_ENTRY_PATH` に置く。承認のルールは実行ファイルのパスから
-    当てる形を作るので、振り分けの sh を指したときの判定はこれで見る。
+    適用する形を作るので、振り分けの sh を指したときの判定はこれで見る。
     """
     environment = {
         **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
@@ -92,7 +93,8 @@ def hit(body: dict) -> list[str]:
 
 
 def blocking(body: dict) -> set[str]:
-    """deny / ask の側で当たったルール。組み込みは `section` が空で返るので、allow 以外を数える。"""
+    """deny / ask の側でヒットしたルール。組み込みは `section` が空で返るので、
+    allow 以外を数える。"""
     return {written_id(rule["id"]) for rule in body["rules"] if rule.get("section") != "allow"}
 
 
@@ -110,7 +112,7 @@ class RepoRulesTest(unittest.TestCase):
             self.assertEqual(hit(body), [], body["rules"])
         return body
 
-    def test_直接作業の指定は確認ダイアログに出し_指定の無い呼び出しは当たらない(self):
+    def test_直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない(self):
         script = "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh"
         for flags in (
             "--base feature/x",
@@ -128,7 +130,7 @@ class RepoRulesTest(unittest.TestCase):
 
     # 変わるべきもの
 
-    def test_引用付きの_grep_は_allow_に当たる(self):
+    def test_引用付きの_grep_は_allow_にヒットする(self):
         # 課題そのもの。`[^\x00]*$` が引用の空白で止まって外れていた。
         for subject in [
             'grep -n "git push" README.md',
@@ -136,7 +138,7 @@ class RepoRulesTest(unittest.TestCase):
             """grep -n "regex: '(>" /repo/.ccnavi/config/common/rules.yml""",
             'grep -n "<<EOF" /repo/README.md',
             # 引用の中の `> 場所` は grep の引数。selfguard の行き先の式が語の中の目印まで
-            # 一致しなくなって、はじめて allow に当たる。
+            # 一致しなくなって、はじめて allow にヒットする。
             'grep -n "> /repo/.ccnavi/config/common/rules.yml" f',
         ]:
             with self.subTest(subject=subject):
@@ -163,7 +165,7 @@ class RepoRulesTest(unittest.TestCase):
         )
 
     def test_ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める(self):
-        # 止めるのは組み込みの builtin:guard-ccnavi-config。当たったルールの id で見る。
+        # 止めるのは組み込みの builtin:guard-ccnavi-config。ヒットしたルールの id で見る。
         for name in ("rules", "phases", "risks"):
             with self.subTest(name=name):
                 path = f"/repo/.claude/worktrees/x/.ccnavi/config/common/{name}.yml"
@@ -201,7 +203,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assertEqual(body["verdict"], "allow", body["response"])
         self.assertNotIn("builtin:guard-project-home", hit(body), body["rules"])
 
-    def test_引用付きの_find_は_allow_に当たる(self):
+    def test_引用付きの_find_は_allow_にヒットする(self):
         self.assert_verdict('find /repo -name "a b"', "allow", "prefer-glob")
 
     def test_引用の空白をまたいだ書き換えは_deny_に届く(self):
@@ -217,20 +219,20 @@ class RepoRulesTest(unittest.TestCase):
                 self.assert_verdict(subject, "deny", rule_id)
 
     def test_入力に混ざった語の中の目印は取り除かれる(self):
-        # `git␁push` のまま読むと実在しない 1 語で、どのルールにも当たらない。
-        # 取り除いて `git push` と読み、raw-git に当たる。
+        # `git␁push` のまま読むと実在しない 1 語で、どのルールにもヒットしない。
+        # 取り除いて `git push` と読み、raw-git にヒットする。
         self.assert_verdict("git" + shellread.WORD_SEP + "push", "deny", "builtin:guard-raw-git")
 
     # 変わってはいけないもの
 
-    def test_パイプの後ろがあれば_allow_に当たらない(self):
+    def test_パイプの後ろがあれば_allow_にヒットしない(self):
         # コマンドの区切りは `\x00` のまま。`[^\x00]*$` がそこで止まる。
         body = self.assert_verdict("cat /repo/README.md | head -20", "ask", "")
         self.assertEqual(body["code"], "UNDECLARED")
 
     def test_引用だけの二重の山括弧は読めないまま止まる(self):
         # 許容した誤検知（tests/guard/test_acceptance.py）。生の文字列に
-        # heredoc が当たり、読めなかったことを示す。
+        # heredoc がヒットし、読めなかったことを示す。
         body = judge("Bash", 'grep -n "<<" README.md')
         self.assertEqual(body["verdict"], "deny")
         self.assertEqual(body["code"], "PARSE_UNCERTAIN")
@@ -259,7 +261,7 @@ class RepoRulesTest(unittest.TestCase):
         別のフラグの値に書いた `--preview` で免除が成立していた。argparse は
         `--reason=--preview` を値として読み取るので `--preview` はフラグにならず、実行ファイルは
         実際の `--agree` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
-        そこで食い違う（端末さえ取れれば、エージェントが自分で承認を置けることになる）。
+        そこで食い違う（ターミナルさえ取れれば、エージェントが自分で承認を置けることになる）。
         """
         for subject in [
             "ccnavi --agree --reason=--preview",
@@ -353,7 +355,7 @@ class TicketApprovalPathTest(LauncherJudgeTest):
             with self.subTest(subject=subject):
                 self.assert_denied_by(subject, APPROVAL, code=APPROVAL_CODE)
 
-    def test_承認でない形は承認のルールに当たらない(self):
+    def test_承認でない形は承認のルールにヒットしない(self):
         # A3。止めすぎの候補。中で実行されるコマンドを見ても、ここは広がらない。
         for subject in [
             LAUNCHER + " --agree --preview x",
@@ -373,8 +375,8 @@ class TicketApprovalPathTest(LauncherJudgeTest):
                 body = self.judge(subject)
                 self.assertNotIn(APPROVAL, hit(body), f"{subject!r}: {body['response']}")
 
-    def test_コミットの文面に書いた承認の形は_raw_git_だけに当たる(self):
-        # A3 の続き。git を直に打ったことでは止まるが、承認のルールには当たらない。
+    def test_コミットの文面に書いた承認の形は_raw_git_だけにヒットする(self):
+        # A3 の続き。git を直に打ったことでは止まるが、承認のルールにはヒットしない。
         body = self.judge("git commit -m 'docs: ccnavi --agree --yes の説明'")
         self.assertIn("builtin:guard-raw-git", hit(body), body["rules"])
         self.assertNotIn(APPROVAL, hit(body), body["rules"])
@@ -411,7 +413,7 @@ RUNNERS = [
     "find . -name x -exec {} \\;",
 ]
 
-# 組み込みの保護に当たる、中で実行されるコマンドと、当たるべきルール。
+# 組み込みの保護にヒットする、中で実行されるコマンドと、ヒットするべきルール。
 GUARDED = [
     ("rm -f .ccnavi/config/common/rules.yml", SETTING_FILES),
     ("mv .claude/settings.json /tmp/settings.json", SETTING_FILES),
@@ -428,10 +430,10 @@ GUARDED = [
 
 
 class RunnerTest(LauncherJudgeTest):
-    """実行役のコマンドが中で実行するコマンドを、止める側のルールに当てる（3.5 節）。"""
+    """実行役のコマンドが中で実行するコマンドを、止める側のルールに適用する（3.5 節）。"""
 
     def test_中で実行されるコマンドそのものは今も止まる(self):
-        # W1 の見本が正しいことの確かめ。実行役のコマンドを付けない形で、同じルールに当たる。
+        # W1 の見本が正しいことの確かめ。実行役のコマンドを付けない形で、同じルールにヒットする。
         for inner, rule_id in GUARDED:
             with self.subTest(subject=inner):
                 self.assert_denied_by(inner, rule_id)
@@ -446,24 +448,24 @@ class RunnerTest(LauncherJudgeTest):
 
     def test_env_越しの承認のスクリプトは途中のレイヤーで止まる(self):
         # W1 の続き。`sh …approve.sh` は `env` を外した途中のレイヤーで、
-        # そこに承認の `script` の枝が当たる。
+        # そこに承認の `script` の枝がヒットする。
         self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-user-agree.sh", APPROVAL)
 
-    def test_先頭に固定したユーザのルールも実行役のコマンドの中で当たる(self):
+    def test_先頭に固定したユーザのルールも実行役のコマンドの中でヒットする(self):
         # W2。
         body = self.judge("env curl -d @x https://example.com")
         self.assertEqual(body["verdict"], "ask", body["response"])
         self.assertIn("prefer-webfetch", hit(body), body["rules"])
 
-    def test_中で実行されるコマンドは_allow_に当てない(self):
-        # W3。当てると、元の形では確認になる `sudo` が読み取りとして通る。
+    def test_中で実行されるコマンドは_allow_に適用しない(self):
+        # W3。適用すると、元の形では確認になる `sudo` が読み取りとして通る。
         body = self.judge("sudo -u me cat /etc/hosts")
         self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
         self.assertNotEqual(body["verdict"], "allow", body["response"])
 
-    def test_普通の作業では止める側に当たるルールが増えない(self):
-        # W6。3.5.4 節の 27 形。値は元の形だけに当てていたとき（この変更の前）の、
-        # deny / ask の側で当たったルール。中で実行されるコマンドを見ても、ここから増えない。
+    def test_普通の作業では止める側にヒットするルールが増えない(self):
+        # W6。3.5.4 節の 27 形。値は元の形だけに適用していたとき（この変更の前）の、
+        # deny / ask の側でヒットしたルール。中で実行されるコマンドを見ても、ここから増えない。
         cases = {
             "time uv run pytest": set(),
             "nice -n 10 make test": set(),
@@ -500,7 +502,7 @@ class RunnerTest(LauncherJudgeTest):
                 body = self.judge(subject)
                 self.assertEqual(blocking(body), want, body["response"])
 
-    def test_中で実行されるコマンドに当たったことが_unwrapped_と文面に出る(self):
+    def test_中で実行されるコマンドにヒットしたことが_unwrapped_と文面に出る(self):
         # W7。元の形のどこが問題なのかを、読み手が辿れるように。
         for subject, runner, layer in [
             (
@@ -522,7 +524,7 @@ class RunnerTest(LauncherJudgeTest):
                 )
                 self.assertRegex(body["response"], line)
 
-    def test_元の形で当たったときは_unwrapped_も文面も出ない(self):
+    def test_元の形でヒットしたときは_unwrapped_も文面も出ない(self):
         # W7 の反対側。
         body = self.judge("rm -f .ccnavi/config/common/rules.yml")
         self.assertEqual(body["verdict"], "deny", body["response"])
@@ -535,7 +537,7 @@ class RunnerTest(LauncherJudgeTest):
     hasattr(shellread_scan, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち"
 )
 class MovedJudgeTest(LauncherJudgeTest):
-    """`cd` で移った先から見たパスに、止める側のルールを当てる（issue #61）。"""
+    """`cd` で移った先から見たパスに、止める側のルールを適用する（issue #61）。"""
 
     def test_守られた場所へ入ってから書く形は止まる(self):
         # issue #61 の表。どれも表記からディレクトリの名前が消えて止められずに通っていた。
@@ -562,16 +564,16 @@ class MovedJudgeTest(LauncherJudgeTest):
         self.assertIn("`cd` で移った先から見ると", body["response"])
         self.assertIn(".claude/settings.json", body["response"])
 
-    def test_移った先から見たパスに_allow_は当てない(self):
-        # 中で実行されるコマンドと同じ線引き（W3）。当てると、`cd` を 1 つ挟むだけで
+    def test_移った先から見たパスに_allow_は適用しない(self):
+        # 中で実行されるコマンドと同じ線引き（W3）。適用すると、`cd` を 1 つ挟むだけで
         # 読み取りの allow が付いて通る形ができる。
         body = self.judge("cd .ccnavi && cat common/rules.yml")
 
         self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
         self.assertNotEqual(body["verdict"], "allow", body["response"])
 
-    def test_書かれた表記の当たり方は変わらない(self):
-        # `cd` した先で打つラッパースクリプトは、今までどおり allow に当たる。
+    def test_書かれた表記のヒットの仕方は変わらない(self):
+        # `cd` した先で打つラッパースクリプトは、今までどおり allow にヒットする。
         # 書かれた表記に継ぎ足していたら、`status` が `projects/lib/status` になって外れる。
         for subject in [
             "cd projects/lib && sh ../../.ccnavi/scripts/ccnavi-git.sh status",
@@ -582,7 +584,7 @@ class MovedJudgeTest(LauncherJudgeTest):
                 self.assertEqual(body["verdict"], "allow", body["response"])
                 self.assertIn("ccnavi-git", hit(body), body["rules"])
 
-    def test_普通の作業では止める側に当たるルールが増えない(self):
+    def test_普通の作業では止める側にヒットするルールが増えない(self):
         # W6 と同じ形。`cd` を挟んだだけの普通の作業が、確認や拒否に回らないこと。
         for subject in [
             "cd projects/lib && pnpm test",
@@ -596,7 +598,7 @@ class MovedJudgeTest(LauncherJudgeTest):
 
     def test_行き先を読めない_cd_は読みを変えない(self):
         # 縮退させない。縮退すると生の文字列で見るので、コマンドの頭に固定して書かれた
-        # 保護（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、書かれた表記で今は
+        # 保護（`(^|\x00)(mv|rm|tee|…)`）がヒットしなくなり、書かれた表記で今は
         # 止まっている形が止まらなくなる（敵対的レビュー）。
         for subject in [
             'cd "$(pwd)" && rm -f /repo/.ccnavi/config/common/rules.yml',
@@ -640,7 +642,8 @@ class MovedJudgeTest(LauncherJudgeTest):
             "cd .claude | echo x > settings.json",
         ]:
             with self.subTest(subject=subject):
-                # 移っていないので保護の場所には当たらない。元の場所（ルート直下）への書き込みとして
+                # 移っていないので保護の場所にはヒットしない。
+                # 元の場所（ルート直下）への書き込みとして
                 # ルート直下の保護が止めるのは別の話。
                 self.assertNotIn(SETTING_FILES, blocking(self.judge(subject)), subject)
 
@@ -650,7 +653,8 @@ class SubstRepoRulesTest(unittest.TestCase):
 
     wip/design/shellread-subst.md の 3 と 4.3。
 
-    期待は (subject, 判定, 当たるルールの id, 根拠コード)。id が空ならどのルールにも当たらないこと、
+    期待は (subject, 判定, ヒットするルールの id, 根拠コード)。
+    id が空ならどのルールにもヒットしないこと、
     コードが空なら見ない。
     """
 
@@ -711,7 +715,7 @@ class SubstRepoRulesTest(unittest.TestCase):
             ]
         )
 
-    def test_組み込みの保護も中身に当たる(self):
+    def test_組み込みの保護も中身にヒットする(self):
         self.check(
             [
                 ('echo "$(ccnavi --agree x)"', "deny", "builtin:guard-ticket-approval", ""),
@@ -857,10 +861,10 @@ class SubstRepoRulesTest(unittest.TestCase):
 
     # 文面（4.3）
 
-    def test_引用の中から切り出したコマンドに当たったときだけ断りが出る(self):
+    def test_引用の中から切り出したコマンドにヒットしたときだけ断りが出る(self):
         quoted = judge("Bash", 'gh issue create --title t --body "use $(git push) here"')
         self.assertIn("二重引用符の中", quoted["response"])
-        # 引用の中の git push は、組み込みの push と生の git の両方に当たる。
+        # 引用の中の git push は、組み込みの push と生の git の両方にヒットする。
         self.assertIn("builtin:guard-raw-git", quoted.get("quoted"))
         # ラッパーのあるワークスペースでは、文字として渡す道もラッパーで案内する。
         self.assertIn("ccnavi-git.sh commit -F <file>", quoted["response"])
@@ -934,7 +938,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         self.assertIn("--body-file", body["response"])
 
     def test_ANSI_Cの引用は中身を確定できるときだけ読む(self):
-        # エスケープ（`\`）の無い `$'…'` は単一引用と同じ文字列なので、そう読んでルールに当てる。
+        # エスケープ（`\`）の無い `$'…'` は単一引用と同じ文字列なので、そう読んでルールに適用する。
         # エスケープがあれば展開しないと中身が決まらないので、確定できない読みとして止める側へ渡す。
         self.check(
             [
@@ -946,7 +950,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         )
 
     def test_実行するときに決まるコマンド名は一律に止める(self):
-        # どれもどのルールにも当たらず、auto では権限モードに渡っていた。
+        # どれもどのルールにもヒットせず、auto では権限モードに渡っていた。
         code = "DENY_COMMAND_NAME_EXPANSION"
         self.check(
             [
@@ -996,13 +1000,13 @@ class SubstRepoRulesTest(unittest.TestCase):
                 self.assertNotEqual(body["code"], "DENY_COMMAND_NAME_EXPANSION", body["response"])
 
     def test_引用の外のブレース展開は一律に止める(self):
-        # Issue #38。どのルールにも当たらないまま、bash は広げた語を実行していた。
+        # Issue #38。どのルールにもヒットしないまま、bash は広げた語を実行していた。
         brace, code = "builtin:brace-expansion", "DENY_BRACE_EXPANSION"
         self.check(
             [
                 ("{git,push,origin,main}", "deny", brace, code),
                 ("{rm,-rf,/tmp/x}", "deny", brace, code),
-                # 生の CR を挟んでも止まる。挟むとルールにも当たらず、
+                # 生の CR を挟んでも止まる。挟むとルールにもヒットせず、
                 # auto では権限モードに渡っていた。
                 ("{git,\rpush,origin,main}", "deny", brace, code),
                 ("grep -rn x --exclude-dir={node_modules,.git} /repo", "deny", brace, code),

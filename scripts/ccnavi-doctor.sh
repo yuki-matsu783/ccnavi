@@ -81,7 +81,7 @@ doctor_clean() {
 
 # URL に埋まった資格情報とトークンを伏せる。.ccnavi/scripts/ccnavi-common.sh の ccnavi_mask_url と
 # 同じ規則（`scheme://` の後ろから最後の `@` まで。scheme の無い `user:pass@host` も）。違いは、
-# ここでは文の途中の URL にも当てることと、glab のトークンの形（glpat-…）も伏せること。
+# ここでは文の途中の URL にも適用することと、glab のトークンの形（glpat-…）も伏せること。
 doctor_mask() {
 	# 最後の awk は、環境の GITLAB_TOKEN・GITHUB_TOKEN の値そのものを伏せる。
 	printf '%s' "$1" | sed -E \
@@ -935,13 +935,13 @@ main() {
 			return 0
 			;;
 		*)
-			die "$1 は使えない引数です。使えるものは --help で確認できます。"
+			die "$1 は指定できない引数です。指定できるものは --help で確認できます。"
 			;;
 		esac
 	done
 	case "$mode" in
 	prebuilt | build) ;;
-	*) die "--mode に使えるのは prebuilt か build です。" ;;
+	*) die "--mode に指定できるのは prebuilt か build です。" ;;
 	esac
 	# 時間の上限は、数字（小数も可）だけ。それ以外は sleep と算術を壊す。
 	case "$DOCTOR_GIT_LIMIT$DOCTOR_CURL_LIMIT" in
@@ -966,7 +966,7 @@ main() {
 	doctor_host_sh="$from/.ccnavi/scripts/ccnavi-common-host.sh"
 	[ -f "$doctor_host_sh" ] || die "$from は ccnavi の配布元に見えません（.ccnavi/scripts/ccnavi-common-host.sh が無い）。"
 	if [ "$with_extensions" = yes ] && [ "$mode" != build ]; then
-		die "--with-extensions は --mode build のときだけ使えます。"
+		die "--with-extensions は --mode build のときだけ指定できます。"
 	fi
 
 	doctor_os=$(uname -s 2>/dev/null || :)

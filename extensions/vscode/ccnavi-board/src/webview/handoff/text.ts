@@ -13,7 +13,7 @@ export function kindLabel(kind: string): string {
     case "docs":
       return "docs";
     case "defense":
-      return "防御（端末のみ）";
+      return "防御（ターミナルのみ）";
     default:
       return kind === "" ? "（種類なし）" : kind;
   }

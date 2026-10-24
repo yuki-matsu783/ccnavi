@@ -113,7 +113,9 @@ class BranchFieldParseTest(unittest.TestCase):
         t, problems = ticket_mod.parse(with_branch(parent_text(PARENT, ["design"]), BRANCH))
         self.assertIsNone(t)
         self.assertTrue(
-            any(p.severity == "error" and "`branch` は使えない欄" in p.detail for p in problems),
+            any(
+                p.severity == "error" and "`branch` は指定できない欄" in p.detail for p in problems
+            ),
             problems,
         )
 
@@ -123,7 +125,7 @@ class BranchFieldParseTest(unittest.TestCase):
         lines.insert(3, f"branch: {BRANCH}")
         t, problems = ticket_mod.parse("\n".join(lines))
         self.assertIsNone(t)
-        self.assertTrue(any("`branch` は使えない欄" in p.detail for p in problems), problems)
+        self.assertTrue(any("`branch` は指定できない欄" in p.detail for p in problems), problems)
 
 
 class ParentBranchTest(unittest.TestCase):
@@ -259,7 +261,7 @@ class ParentBranchTest(unittest.TestCase):
             with_branch(parent_text(PARENT, ["design"], allow=("src/*", "wip/*")), BRANCH),
         )
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn("`branch` は使えない欄", lint.stdout)
+        self.assertIn("`branch` は指定できない欄", lint.stdout)
 
     def test_lint_does_not_say_the_name_form_of_an_adopted_parent(self):
         """既存のブランチを採用した親（ワークツリーが在り、HEAD が合う）は名前の形式を言わない。"""
@@ -406,11 +408,12 @@ class ChromeBranchFieldTest(unittest.TestCase):
             PARENT: {"head": HEAD, "files": rival},
         }
         found = self.ask("families", candidates=[BRANCH, PARENT], branches=branches)
-        self.assertTrue(all("1 本でない" in f["conflict"] for f in found["families"]), found)
+        conflicts = [f["conflict"] for f in found["families"]]
+        self.assertTrue(all("1 本ではありません" in c for c in conflicts), found)
         board = self.ask("board", branches=branches, absent=[])
-        self.assertIn("1 本でない", board.get("undecided", ""), board)
+        self.assertIn("1 本ではありません", board.get("undecided", ""), board)
         plan = self.ask("plan", branches=branches, absent=[], ids=[CHILD])
-        self.assertIn("1 本でない", plan.get("error", ""), plan)
+        self.assertIn("1 本ではありません", plan.get("error", ""), plan)
 
     def test_a_predecessor_family_with_two_branches_is_not_judged(self):
         other = "feature-20-dep"
@@ -424,7 +427,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
         self.assertEqual(closure["ambiguous"], [other])
         board = self.ask("board", branches=branches)
         self.assertIn(
-            "先行の親子のチケット（feature-20-dep）になるブランチが 1 本でない",
+            "先行の親子のチケット（feature-20-dep）になるブランチが 1 本ではありません",
             board["undecided"],
         )
 

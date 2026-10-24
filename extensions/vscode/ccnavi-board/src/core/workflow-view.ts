@@ -1,14 +1,14 @@
 /**
  * 計画編集タブの、拡張ホストと Webview の間の契約。フロー編集（`flow-view.ts`）と同じ作り。
  *
- * タブは親の提案（`todo/` にある計画付きの提案）ごとに 1 枚で、計画の項どうしの先行（線）を図で引き直す。
+ * タブは親の提案（`todo/` にある計画付きの提案）ごとに 1 枚で、計画のステップどうしの先行（線）を図で引き直す。
  * 拡張ホストが渡すのは「いま何を見せるか」（`WorkflowData`）だけで、画面が返すのはユーザが押した操作
  * （`WorkflowMessage`）だけ。
  *
  * **画面は判定しない。番号も振り直さない。** 線を変えるたびに、画面は元の番号（いま提案に書いてある番号）での
  * 直接の先行（`PlanOrder`。`--order` の形）を組んで拡張ホストに頼み（`order`）、拡張ホストが
  * `ccnavi --plan-order <親> --json --order <JSON>` の答えを返す（`answer`）。振り直した番号・順序の検査
- * （`problems`）・終端に当たらない項（`loose`）・書けるか（`writable`）はその答えのまま描く。断られた線
+ * （`problems`）・終端に届かないステップ（`loose`）・書けるか（`writable`）はその答えのまま描く。断られた線
  * （`refused`）は、線を引く前の答えに戻す。ここにある関数は、見えている番号を元の番号に直すこと（`editedOrder`）と、
  * 答えを見せる文の材料（`renumbered`・`planDiff`・`saveBlocker`）だけで、計画の良し悪しを決めない。
  *
@@ -16,7 +16,7 @@
  * 違えば未保存（`isDirty`）。画面が別に「変えたか」を持たないので、案に戻すと必ず消える。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、入れ物は 1 度しか入らない。
- * 中身（`data`）が届くのは、画面の編集を捨ててよいとき（再読込・取り込む・保存が通った）だけ。
+ * 中身（`data`）が届くのは、画面の編集を破棄してよいとき（再読み込み・取り込む・保存が通った）だけ。
  *
  * ここには VS Code の API も DOM も node も入れない。
  */
@@ -76,9 +76,9 @@ export type WorkflowMessage =
   | { readonly type: "order"; readonly seq: number; readonly order: PlanOrder }
   /** 「この順序に決める」。`expect` は開いたときの `source_sha` */
   | { readonly type: "save"; readonly order: PlanOrder; readonly expect: string }
-  /** 未保存の線の写し。未保存のまま閉じられたときに戻すため、拡張ホストが覚えておく。未保存でなくなったら null */
+  /** 未保存の線のコピー。未保存のまま閉じられたときに戻すため、拡張ホストが覚えておく。未保存でなくなったら null */
   | { readonly type: "draft"; readonly order: PlanOrder | null }
-  /** 外で変わった提案を取り込む（編集を捨てて新しい提案から始める） */
+  /** 外で変わった提案を取り込む（編集を破棄して新しい提案から始める） */
   | { readonly type: "adopt" }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" };
@@ -105,7 +105,7 @@ export function asPlanOrder(value: unknown): PlanOrder | undefined {
   return out;
 }
 
-/** 画面から届いたものを確かめる。**形が崩れていたら捨てる**（保存の中身が読めないものを渡さない） */
+/** 画面から届いたものを確かめる。**形が崩れていたら破棄する**（保存の中身が読めないものを渡さない） */
 export function asWorkflowMessage(message: unknown): WorkflowMessage | undefined {
   if (!isRecord(message)) {
     return undefined;
@@ -172,7 +172,7 @@ export function goneReasonOf(ticket: string, revision: boolean, now: ParentNow |
 }
 
 /**
- * 閉じた後に「開き直して戻す」を聞くか。未保存で写し（`draft`）があり、読み込めていて、保存の途中でないときだけ。
+ * 閉じた後に「開き直して戻す」を聞くか。未保存でコピー（`draft`）があり、読み込めていて、保存の途中でないときだけ。
  * 保存を押してすぐ閉じたなら書き込みは通るので、戻すかを聞かない（戻してもハッシュが違って戻らない）
  */
 export function restoreAsked(state: { readonly dirty: boolean; readonly draft: boolean; readonly loaded: boolean; readonly saving: boolean }): boolean {
@@ -191,7 +191,7 @@ export function workflowTitle(ticket: string, dirty = false): string {
 
 // ---- 答えを画面の状態に整える
 
-/** 番号 → 先行の写しを、番号も先行も小さい順に並べ、重なりを落とす（見比べるため） */
+/** 番号 → 先行のコピーを、番号も先行も小さい順に並べ、重なりを落とす（見比べるため） */
 function sorted(map: Readonly<Record<string, readonly number[]>>, numbers: readonly number[]): Record<string, number[]> {
   const out: Record<string, number[]> = {};
   for (const n of [...numbers].sort((a, b) => a - b)) {
@@ -234,7 +234,7 @@ export function orderOf(answer: PlanOrderAnswer): PlanOrder {
   return out;
 }
 
-/** 図で変えた線 1 本。番号は図に見えている番号（振り直したあとの番号）。`to` が `from` を待つ */
+/** 図で変えた線 1 本。番号は図に見えている番号（振り直したあとの番号）。`from` が `to` の先行になる */
 export interface PlanEdit {
   readonly part: string;
   readonly from: number;
@@ -273,7 +273,7 @@ export function editedOrder(answer: PlanOrderAnswer, edit: PlanEdit): PlanOrder 
 }
 
 /**
- * 答えの線のうち、提案と違う計画だけを `--order` の形で返す（保存と、未保存のまま閉じたときの写しに使う）。
+ * 答えの線のうち、提案と違う計画だけを `--order` の形で返す（保存と、未保存のまま閉じたときのコピーに使う）。
  * 提案のままなら空
  */
 export function changedOrder(answer: PlanOrderAnswer): PlanOrder {
@@ -292,7 +292,7 @@ export function isDirty(answer: PlanOrderAnswer): boolean {
   return answer.plans.some((plan) => !sameOrder(partOrder(plan), proposedOrder(plan)));
 }
 
-/** 番号の変わる項（保存の前に見せる） */
+/** 番号の変わるステップ（保存の前に見せる） */
 export interface Renumbered {
   readonly part: string;
   readonly title: string;
@@ -306,7 +306,7 @@ export function renumbered(answer: PlanOrderAnswer): Renumbered[] {
   );
 }
 
-/** 外で変わった提案の差分の 1 行。番号ごとに、定義と待ちの前後 */
+/** 外で変わった提案の差分の 1 行。番号ごとに、定義と先行の前後 */
 export interface PlanDiffRow {
   readonly part: string;
   readonly number: number;
@@ -314,14 +314,14 @@ export interface PlanDiffRow {
   readonly after: string;
 }
 
-/** 項 1 つを 1 行の文にする。「題（定義）: 待つ 1, 2」。延期なら「・延期」を添える */
+/** ステップ 1 つを 1 行の文にする。「題（定義）: 先行 1, 2」。延期なら「・延期」を添える */
 function itemText(plan: ApprovePlan | undefined, number: number): string {
   const item = plan?.items.find((i) => i.number === number);
   if (plan === undefined || item === undefined) {
     return "（なし）";
   }
   const waits = plan.after[String(number)] ?? [];
-  return `${item.title || item.type}（${item.type}）${item.deferred ? "・延期" : ""}: ${waits.length === 0 ? "何も待たない" : `待つ ${waits.join(", ")}`}`;
+  return `${item.title || item.type}（${item.type}）${item.deferred ? "・延期" : ""}: ${waits.length === 0 ? "先行なし" : `先行 ${waits.join(", ")}`}`;
 }
 
 /** 開いたときの提案と、外で変わったあとの提案の差分。変わらない番号は並べない */
@@ -375,7 +375,7 @@ export function saveBlocker(answer: PlanOrderAnswer, state: SaveState): string {
     return "子の提案を付け替えられないため、保存できません";
   }
   if (answer.revision_problems.length > 0) {
-    return "改版で通らない形（子が承認された番号を固定しているので、その番号の項は変えられない）のため、保存できません";
+    return "改版で通らない形（子が承認された番号を固定しているので、その番号のステップは変えられない）のため、保存できません";
   }
   return "順序の検査に error があるため、保存できません";
 }

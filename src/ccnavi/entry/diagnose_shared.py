@@ -41,7 +41,7 @@ def layer_phase_types(path: str) -> tuple[list, str]:
 
     ここで出すのは「どのレイヤーに何が書いてあるか」で、共通レイヤーも同じ読み方を
     する。判定が使う和（共通レイヤー + 親の `project:` が指すレイヤー）は `phasetypes.layer_types`
-    が組む。定義は順序を持たない（順序は親の計画の項の `after`）。
+    が組む。定義は順序を持たない（順序は親の計画のステップの `after`）。
     """
     types, why = layer_phase_set(path)
     return (list(types.values()) if types is not None else []), why

@@ -107,7 +107,7 @@ courses:
         body: 子チケットのリスクの点がこの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めません。空欄なら組み込みの値を使います。
       - target: factors
         title: 項目
-        body: 子チケットをクローズするとき、その差分に当てて加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で追加できます。
+        body: 子チケットをクローズするとき、その差分に適用して加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で追加できます。
       - target: save
         title: 保存
         body: 保存すると、実行ファイルが検証し、通ればファイルに反映します。通らなければ、下に理由が出ます。
@@ -115,22 +115,124 @@ courses:
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
 
+  - id: how-score
+    title: 点数とレベルが、どの値で決まるのかを例で知りたいとき
+    summary: 見本の配点で、差分がどの項目に何点でヒットし、合計がどのレベルになるかを、値を変えた例も並べて追う
+    steps:
+      - target: factors
+        title: 例の差分を、項目ごとに適用する
+        body: 子チケットを ticket finish で閉じると、ccnavi が配点を読み、子の仕事の始まりから先頭までの差分を数えて点を付けます。ここでは見本の配点で、4 ファイルを変えた子を追います。
+        diagram: risk-score-high
+        focus: finish, load, diff
+      - target: factor-include
+        title: 行数は、絞った範囲で数える
+        body: big-diff は src/** だけを数え、src/generated/** を外します。行数は追加と削除の合計です。login.py の 250 行と session.py の 80 行で 330 行になり、300 を超えるので 25 点です。生成コードの 500 行は数えません。
+        scene: { open: big-diff }
+        diagram: risk-score-high
+        focus: diff, c-lines
+      - target: factor-value
+        title: 触ったパスは、ファイルごとに加点する
+        body: ci は .github/** にヒットするファイル 1 つにつき 10 点で、上限は 35 点です。ci.yml の 1 ファイルだけなので 10 点になります。
+        scene: { open: ci }
+        diagram: risk-score-high
+        focus: c-glob
+      - target: factor-value
+        title: 超えなかった項目は 0 点
+        body: many-files は変更が 10 ファイルを超えたときだけ加点します。4 ファイルなので加点しません。db-script は、スクリプトが 0 を返したので加点しません。スクリプトが失敗したときや出力を読めないときは、安全のため points の 10 点を加えます。
+        scene: { open: many-files }
+        diagram: risk-score-high
+        focus: c-skip
+      - target: factor-value
+        title: 読んで判断させる項目は、答えが揃うまで閉じられない
+        body: no-tests は judge なので、ccnavi は問いを書き出して閉じるのを止めます。サブエージェントが差分を読んで yes か no で答え、親がその答えを記録してから、閉じ直します。yes なので 20 点です。
+        scene: { open: no-tests }
+        diagram: risk-score-high
+        focus: judge, record
+      - target: levels
+        title: 合計を境目の点と比べる
+        body: 25 + 10 + 20 = 55 点です。HIGH の 40 以上で CRITICAL の 70 未満なので HIGH になります。結果は phases/親/子.risk.json に残り、閉じたときの出力にも出ます。
+        diagram: risk-score-high
+        focus: sum, write
+      - target: levels
+        title: 境目ちょうどは、上のレベル
+        body: 境目の点は「以上」で判定します。19 点は LOW、20 点で MEDIUM、39 点は MEDIUM、40 点で HIGH、70 点で CRITICAL です。
+        diagram: risk-level
+      - target: level-high
+        title: 小さな変更は LOW
+        body: login.py だけを 12 行変えた子は、どの項目にもヒットせず 0 点で LOW です。判定の項目があるので、小さな変更でも no の答えを記録してから閉じます。
+        diagram: risk-score-low
+        focus: diff, c-all, sum
+      - target: save
+        title: 配点を変えるとき
+        body: 境目の点や項目の点を変えて保存すると、次に閉じる子から新しい配点で数えます。保存からの流れは「保存してから効くまでを知りたいとき」の案内で見られます。
+
+  - id: how-save-effect
+    title: 保存してから効くまでを知りたいとき
+    summary: 配点の保存で何が検証され、どこへ書かれ、いつから使われるか。共通の設定との和と、HIGH 以上のときに変わること
+    steps:
+      - target: levels
+        title: 値を直す
+        body: ここでは、HIGH の境目を 40 から 50 に直します。書いている間は「未保存」の印が付くだけで、ファイルも、子を閉じるときの数え方も変わりません。
+        diagram: risk-save
+        focus: edit
+      - target: save
+        title: 保存すると、まず検証される
+        body: 保存を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します（--lint）。error が 1 件でもあれば何も保存せず、理由を下に出します。点が整数でないときや、境目の点の並びが逆のときも、ここで止まります。
+        diagram: risk-save
+        focus: save
+      - target: save
+        title: 作業中のチケットがあると保存できない
+        body: 配点は子を閉じるときに読まれるので、作業中の子がいる間は保存できません。共通の設定とワークスペースの設定はどのツリーの作業中でも止まり、プロジェクトの設定はそのプロジェクトの作業中だけで止まります。エージェントがターンの途中なら、保存の前に確認が出ます。
+        diagram: risk-save
+        focus: lock
+      - target: save
+        title: 通ったら、配点のファイルへ書く
+        body: 開いている設定の場所に書きます。共通の設定は .ccnavi/config/common/risks.yml です。ワークスペースの設定は .ccnavi/config/project/risks.yml、プロジェクトの設定は projects/名前/.ccnavi/config/project/risks.yml です。ファイルのコメントは残ります。
+        diagram: risk-save
+        focus: write
+      - target: levels
+        title: 効くのは、次に子を閉じるとき
+        body: 配点は子を閉じるときにだけ読まれます。保存したあとに閉じる子から新しい配点で数え、すでに閉じた子の点は書き直しません。Claude Code の再起動は要りません。
+        diagram: risk-save
+        focus: effect
+      - target: level-high
+        title: 同じ 40 点でも、境目が変わると結果が変わる
+        body: HIGH が 40 のときは、40 点の子は HIGH です。50 に直したあとに閉じる 40 点の子は MEDIUM で、実績では人間レビューが要る扱いになりません。宣言の mr は下がりません。
+        diagram: risk-level-edit
+      - target: sum
+        title: 実際に使うのは、共通の設定との和
+        body: 子を閉じるときの配点は、共通の設定と、親の project が指す設定の和です。ここでは lib の設定を共通の設定に足します。境目の点は小さいほう、項目は連結です。
+        scene: { sum: lib }
+        diagram: risk-sum-lib
+        focus: common, layer, merge
+      - target: sum-table
+        title: 同じ差分を、和の配点で数える
+        body: src/api/v1.py を 120 行変えた子で見ます。共通の big-diff は 300 行以下で 0 点です。lib の lib:big-diff は 100 行を超えるので 15 点、public-api は 1 ファイルで 20 点になり、合計 35 点です。lib の HIGH は 30 なので HIGH になります。
+        scene: { sum: lib }
+        diagram: risk-sum-lib
+        focus: diff, score, level
+      - target: level-high
+        title: HIGH 以上のとき変わること
+        body: 宣言が review の none でも、そのフェーズは人間レビューが要る扱いの mr に上がります。レビューが済むまで、親のワークツリーでのサブエージェントの起動と Bash は止まります。依頼文の先頭には、リスクの点とレベルが付きます。
+        diagram: risk-high-review
+        focus: raise, block, request
+
   - id: levels
     title: レビューを必須にする基準を調整したいとき
     summary: 境目の点を変えて、どの子でレビューを必須にするかを決める
     steps:
       - target: levels
         title: 境目の点で決まること
-        body: 子チケットをクローズするとき、項目で当てはまった点を足し合わせます。合計がここの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOW には境目がありません。
+        body: 子チケットをクローズするとき、項目に該当した点を足し合わせます。合計がここの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOW には境目がありません。
       - target: level-high
         title: 止めるのは HIGH から
         body: HIGH 以上になったフェーズは、レビューが終わるまで先へ進めません。計画のときに「レビュー不要」と宣言していても同じです。レビューを求める基準を厳しくするなら HIGH を下げ、緩めるなら上げます。
       - target: factors
         title: 項目の点と見比べる
-        body: 見本では big-diff が 25 点、many-files が 15 点で、2 つ当たると 40 点になり HIGH に届きます。境目を動かすときは、項目の点のどの組み合わせが何点になるかを見比べて決めます。
+        body: 見本では big-diff が 25 点、many-files が 15 点で、2 つ該当すると 40 点になり HIGH に届きます。境目を動かすときは、項目の点のどの組み合わせが何点になるかを見比べて決めます。
       - target: levels
         title: 並び順と空欄
-        body: 値は MEDIUM ≤ HIGH ≤ CRITICAL の順に入れます。欄を空にすると、そのリスクレベルは組み込みの値を使います。見本では CRITICAL を空にして、組み込みの 70 を薄く出しています。
+        body: 値は MEDIUM ≤ HIGH ≤ CRITICAL の順に入れます。欄を空にすると、そのリスクレベルは組み込みの値を使います。見本では CRITICAL を空にして、組み込みの 70 を薄く表示しています。
         scene:
           blank: critical
       - target: save
@@ -143,7 +245,7 @@ courses:
     steps:
       - target: add
         title: 項目を追加する
-        body: 「＋ 項目を追加」を押すと、空の項目が末尾に追加され、欄が開いて id に焦点が移ります。1 件につき加点条件は 1 つです。
+        body: 「＋ 項目を追加」を押すと、空の項目が末尾に追加され、欄が開いて id の欄にカーソルが移ります。1 件につき加点条件は 1 つです。
       - target: factor-id
         title: id を付ける
         body: id は項目の名前です。子をクローズしたときの出力や、judge の記録（record-risk）がこの名前で項目を指すので、内容が分かる短い名前にします。
@@ -151,7 +253,7 @@ courses:
           open: big-diff
       - target: factor-points
         title: 点を決める
-        body: 当てはまったときに加える点です。整数で入れます。点の合計が境目の点以上になるとリスクレベルが上がるので、上の境目と見比べて決めます。script だけは、点を読み取れなかったときに加える点になります。
+        body: 該当したときに加える点です。整数で入れます。点の合計が境目の点以上になるとリスクレベルが上がるので、上の境目と見比べて決めます。script だけは、点を読み取れなかったときに加える点になります。
         scene:
           open: big-diff
       - target: factor-kind
@@ -184,17 +286,17 @@ courses:
           open: big-diff
       - target: factor-include
         title: 数えるパスを絞る
-        body: 対象パスを入力すると、当てはまるパスだけを数えます（glob を 1 行に 1 つ）。見本では src/** だけを数えます。空なら差分全体を数えます。この欄は、差分の大きさを数える 3 つの加点条件だけにあります。
+        body: 対象パスを入力すると、該当するパスだけを数えます（glob を 1 行に 1 つ）。見本では src/** だけを数えます。空なら差分全体を数えます。この欄は、差分の大きさを数える 3 つの加点条件だけにあります。
         scene:
           open: big-diff
       - target: factor-exclude
         title: 数えないパスを外す
-        body: 除外パスに当てはまるパスは数えません。対象パスに当てはまっていても外します。見本では生成コードの src/generated/** を外しています。生成物やロックファイルで行数が膨らむときに使います。
+        body: 除外パスに該当するパスは数えません。対象パスに該当していても外します。見本では生成コードの src/generated/** を外しています。生成物やロックファイルで行数が膨らむときに使います。
         scene:
           open: big-diff
       - target: factor-value
         title: 触ったパスで加点する（glob）
-        body: 当てはまるファイルを 1 つ変更するごとに points を加点します。上限に値を入れると、合計がそれを超えません。見本の ci は 1 ファイルにつき 10 点で、上限は 35 点です。
+        body: 該当するファイルを 1 つ変更するごとに points を加点します。上限に値を入れると、合計がそれを超えません。見本の ci は 1 ファイルにつき 10 点で、上限は 35 点です。
         scene:
           open: ci
       - target: factor-value
@@ -214,7 +316,7 @@ courses:
     steps:
       - target: find
         title: 絞り込む
-        body: id・加点条件・値・理由の文字で、項目を絞り込みます。当てはまらない項目は隠れ、件数は「一致 / 全体」で出ます。見本では「github」で ci だけが残ります。
+        body: id・加点条件・値・理由の文字で、項目を絞り込みます。該当しない項目は隠れ、件数は「一致 / 全体」で出ます。見本では「github」で ci だけが残ります。
         scene:
           find: github
       - target: factor-row
@@ -237,7 +339,7 @@ courses:
     steps:
       - target: sum
         title: 統合結果の枠
-        body: 子チケットをクローズするときの配点は、共通の設定と、親の project が指す設定の和です。この枠は、その結果を実行ファイルが出したまま、読み取り専用で見せます。
+        body: 子チケットをクローズするときの配点は、共通の設定と、親の project が指す設定の和です。この枠は、その結果を実行ファイルが出したまま、読み取り専用で表示します。
         scene:
           sum: self
       - target: sum-pick
@@ -247,7 +349,7 @@ courses:
           sum: lib
       - target: sum-levels
         title: 境目の点は小さいほう
-        body: 境目の点は、記載された鍵ごとに小さいほうを採ります。見本では lib が HIGH を 30 と設定しているので、共通の 40 より小さい 30 になります。どちらも設定していない鍵は組み込みの値です。
+        body: 境目の点は、記載されたキーごとに小さいほうを採用します。見本では lib が HIGH を 30 と設定しているので、共通の 40 より小さい 30 になります。どちらも設定していないキーは組み込みの値です。
         scene:
           sum: lib
       - target: sum-table
@@ -281,3 +383,260 @@ courses:
       - target: levels
         title: 作ったあとに直す
         body: ファイルができると欄が使えるようになり、境目の点と項目を直せます。直し方は「レビューを必須にする基準を調整したいとき」などの案内で見られます。
+
+# 案内の手順が引く時系列の図。登場者を左から並べ、矢印を上から下へ時間順に並べる。矢印の `value` は実際の値や出る答えの例（等幅）。
+# 手順の `diagram:` で名前を指し、`focus:` で光らせる矢印（id を , で区切る）を決める。`to` を書かない矢印は、その登場者の中の動き。
+# 配点は `sample.risks` と同じ値（境目 20 / 40 / 70。big-diff 25、ci 10 上限 35、no-tests 20 など）。値を変えて結果が変わる例は図を分ける。
+diagrams:
+  # 見本の配点で、4 ファイルを変えた子を閉じて HIGH になるまで
+  risk-score-high:
+    actors: [エージェント, ccnavi, risks.yml, risk.json]
+    steps:
+      - id: finish
+        from: エージェント
+        to: ccnavi
+        text: 子を ticket finish で閉じる
+      - id: load
+        from: ccnavi
+        to: risks.yml
+        text: 配点を読む（共通の設定と、親の project が指す設定の和）
+        value: 'levels: {medium: 20, high: 40, critical: 70}'
+      - id: diff
+        from: ccnavi
+        text: 子の仕事の始まりから先頭までの差分を数える
+        value: |-
+          src/auth/login.py         +190 -60
+          src/auth/session.py       +70 -10
+          src/generated/api.py      +500 -0
+          .github/workflows/ci.yml  +6 -2
+      - id: c-lines
+        from: ccnavi
+        text: 行数を数える項目（big-diff）に適用する。src/** のうち src/generated/** を外した行数で比べる
+        value: |-
+          250 + 80 = 330 行 > 300
+          → +25
+      - id: c-glob
+        from: ccnavi
+        text: 触ったパスの項目（ci）に適用する。ヒットしたファイル 1 つにつき 10 点で、上限は 35 点
+        value: |-
+          .github/workflows/ci.yml の 1 ファイル
+          → +10
+      - id: c-skip
+        from: ccnavi
+        text: 超えなかった項目は加点しない
+        value: |-
+          many-files: 4 ファイル ≤ 10 → 0
+          db-script: スクリプトが 0 を返した → 0
+      - id: judge
+        from: ccnavi
+        to: エージェント
+        text: 判定の項目（no-tests）の答えが無いので、閉じずに問いを渡す
+        value: 'no-tests: テストのない振る舞いの変更を含むか'
+      - id: record
+        from: エージェント
+        to: ccnavi
+        text: サブエージェントの答えを記録し、閉じ直す
+        value: ccnavi-ticket.sh record-risk 子 no-tests yes --reason …
+      - id: sum
+        from: ccnavi
+        text: 加点を足して、境目の点と比べる
+        value: |-
+          25 + 10 + 20 = 55
+          55 ≥ 40 かつ 55 < 70 → HIGH
+      - id: write
+        from: ccnavi
+        to: risk.json
+        text: 点・レベル・加点した理由を記録する
+        value: 'phases/親/子.risk.json（points: 55, level: HIGH）'
+
+  # 小さな変更は、どの項目にもヒットせず LOW
+  risk-score-low:
+    actors: [エージェント, ccnavi, risks.yml]
+    steps:
+      - id: finish
+        from: エージェント
+        to: ccnavi
+        text: 子を ticket finish で閉じる
+      - id: load
+        from: ccnavi
+        to: risks.yml
+        text: 配点を読む
+        value: 'levels: {medium: 20, high: 40, critical: 70}'
+      - id: diff
+        from: ccnavi
+        text: 差分を数える
+        value: src/auth/login.py  +9 -3
+      - id: c-all
+        from: ccnavi
+        text: 項目に適用する。判定は no と記録されている
+        value: |-
+          big-diff: 12 行 ≤ 300 → 0
+          many-files: 1 ファイル ≤ 10 → 0
+          ci: .github/** に触っていない → 0
+          db-script: 0 を返した → 0
+          no-tests: no → 0
+      - id: sum
+        from: ccnavi
+        text: 合計を境目の点と比べる
+        value: |-
+          0 < 20 → LOW
+          リスク: 0 (LOW)
+
+  # 合計点とレベルの境目（以上で判定する）
+  risk-level:
+    actors: [ccnavi, risks.yml]
+    steps:
+      - id: read
+        from: ccnavi
+        to: risks.yml
+        text: 境目の点を読む
+        value: 'levels: {medium: 20, high: 40, critical: 70}'
+      - id: p19
+        from: ccnavi
+        text: 合計が 19 点
+        value: 19 < 20 → LOW
+      - id: p20
+        from: ccnavi
+        text: 合計が 20 点
+        value: 20 ≥ 20 → MEDIUM
+      - id: p39
+        from: ccnavi
+        text: 合計が 39 点
+        value: 39 < 40 → MEDIUM
+      - id: p40
+        from: ccnavi
+        text: 合計が 40 点
+        value: 40 ≥ 40 → HIGH（人間レビューが要る扱いに）
+      - id: p70
+        from: ccnavi
+        text: 合計が 70 点
+        value: 70 ≥ 70 → CRITICAL
+
+  # HIGH の境目を 40 から 50 に直すと、40 点の子の結果が変わる
+  risk-level-edit:
+    actors: [ccnavi, risks.yml]
+    steps:
+      - id: before
+        from: ccnavi
+        to: risks.yml
+        text: 保存の前に閉じる子は、直す前の配点を読む
+        value: 'levels: {medium: 20, high: 40, critical: 70}'
+      - id: before-sum
+        from: ccnavi
+        text: 合計が 40 点の子
+        value: 40 ≥ 40 → HIGH
+      - id: after
+        from: ccnavi
+        to: risks.yml
+        text: 保存のあとに閉じる子は、直した配点を読む
+        value: 'levels: {medium: 20, high: 50, critical: 70}'
+      - id: after-sum
+        from: ccnavi
+        text: 同じ 40 点の別の子
+        value: |-
+          40 < 50 かつ 40 ≥ 20 → MEDIUM
+          実績では人間レビューが要る扱いにならない
+      - id: kept
+        from: ccnavi
+        text: すでに閉じた子の記録（risk.json）は書き直さない
+
+  # 配点を直して保存し、次に子を閉じるときから効くまで
+  risk-save:
+    actors: [ユーザ, リスク管理画面, ccnavi, risks.yml]
+    steps:
+      - id: edit
+        from: ユーザ
+        to: リスク管理画面
+        text: HIGH の境目を 40 から 50 に直す
+        value: 'levels: {medium: 20, high: 50, critical: 70}'
+      - id: save
+        from: リスク管理画面
+        to: ccnavi
+        text: ［保存］を押すと、編集中の内容を一時ファイルに書いて検証する（--lint）
+        value: error が 1 件でもあれば保存しない
+      - id: lock
+        from: リスク管理画面
+        text: 作業中のチケット（doing）があると保存できない。エージェントがターン中なら、確認が出る
+      - id: write
+        from: リスク管理画面
+        to: risks.yml
+        text: 検証を通ったら書き込む
+        value: .ccnavi/config/common/risks.yml（共通の設定を開いているとき）
+      - id: effect
+        from: ccnavi
+        to: risks.yml
+        text: 次に子を閉じる（ticket finish）とき、配点を読み直す
+        value: Claude Code の再起動は要らない
+
+  # 共通の設定に lib の設定を足した配点で、同じ差分を数える
+  risk-sum-lib:
+    actors: [ccnavi, 共通の設定, lib の設定]
+    steps:
+      - id: common
+        from: ccnavi
+        to: 共通の設定
+        text: 共通の設定を読む
+        value: |-
+          levels: {medium: 20, high: 40, critical: 70}
+          項目: big-diff, many-files, ci, db-script, no-tests
+      - id: layer
+        from: ccnavi
+        to: lib の設定
+        text: 親の project が指す lib の設定を読む
+        value: |-
+          levels: {medium: 20, high: 30, critical: 70}
+          項目: lib:big-diff, public-api
+      - id: merge
+        from: ccnavi
+        text: 境目の点は小さいほう、項目は連結する
+        value: |-
+          medium 20 / high 30 / critical 70
+          項目 5 + 2 = 7 件
+      - id: diff
+        from: ccnavi
+        text: 子の差分を数える
+        value: src/api/v1.py  +100 -20
+      - id: score
+        from: ccnavi
+        text: 項目に適用する（判定の no-tests は no と記録されている）
+        value: |-
+          big-diff（共通）: 120 行 ≤ 300 → 0
+          lib:big-diff: 120 行 > 100 → +15
+          public-api: src/api/v1.py の 1 ファイル → +20
+          no-tests: no → 0
+      - id: level
+        from: ccnavi
+        text: 合計を境目の点と比べる
+        value: |-
+          15 + 20 = 35
+          35 ≥ 30 → HIGH
+
+  # HIGH のとき、宣言が none でもレビューが要る扱いになる
+  risk-high-review:
+    actors: [エージェント, ccnavi, ユーザ]
+    steps:
+      - id: record
+        from: ccnavi
+        text: 子を閉じたとき、実績のリスクを記録した
+        value: 'phases/親/子.risk.json  points: 55, level: HIGH'
+      - id: raise
+        from: ccnavi
+        text: HIGH 以上なので、宣言が none でも mr に上げる。フェーズの点は子の最大値
+        value: 'review: none → mr'
+      - id: ask
+        from: ccnavi
+        to: エージェント
+        text: すべての子が合流済みと確かめ、レビューを頼み、ターンを終えてユーザを待つよう返す
+      - id: block
+        from: ccnavi
+        text: レビューが済むまで、親のワークツリーでのサブエージェントの起動と Bash を止める。通すのは ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh だけ
+      - id: request
+        from: エージェント
+        to: ユーザ
+        text: レビューを依頼する。依頼文の先頭にリスクを付ける
+        value: 'このレビューのリスク: 55 (HIGH) — 行数が多い（…）'
+      - id: confirm
+        from: ユーザ
+        to: ccnavi
+        text: レビュー済みにする
+        value: ccnavi-review.sh confirm

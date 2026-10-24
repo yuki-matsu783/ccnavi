@@ -75,7 +75,7 @@ class StagedInTargetTest(unittest.TestCase):
     """統合先のツリーに staged の変更が残る状態は、保護領域の変更として報告される。
 
     `integrate` は結果を統合先に staged で置いて止まる。その staged を外す記録の読みは無いので、
-    保護領域に当たるものは、書いたのが誰でも通常の変更と同じに報告する。
+    保護領域にヒットするものは、書いたのが誰でも通常の変更と同じに報告する。
     """
 
     def setUp(self):
@@ -123,7 +123,7 @@ class StagedInTargetTest(unittest.TestCase):
 class IntegratedCommitsTest(unittest.TestCase):
     """`integrate-done` が積んだ squash のコミットを、ターンの終わりの検査から外す条件。
 
-    片付けの後（ワークツリーもブランチも無い）で、記録の写しを手がかりに git で確かめる。
+    片付けの後（ワークツリーもブランチも無い）で、記録のコピーを手がかりに git で確かめる。
     """
 
     def setUp(self):
@@ -256,7 +256,7 @@ class DirectCommitsTest(unittest.TestCase):
     """版 4 の `integrate-done` が fast-forward で載せた K を、ターンの終わりの検査から外す条件。
 
     K の親が記録の `head`、K の木が記録の `c_tree` で、名前がチケットに結び付かないとき。
-    専用の ref は使わず、記録（done の写し）と git のオブジェクトで照らす。
+    専用の ref は使わず、記録（done のコピー）と git のオブジェクトで照らす。
     """
 
     def setUp(self):

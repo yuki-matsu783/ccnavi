@@ -192,7 +192,7 @@ class ApproveVerifyTest(PhaseHarness):
     def test_lint_says_what_the_verify_says(self):
         """承認で外れるものを数える経路は 1 本（`agree_candidates.candidates`）。
 
-        以前は `--lint` だけが `agree_candidates.validate` を当てていて、順序で外れる子・計画に
+        以前は `--lint` だけが `agree_candidates.validate` を適用していて、順序で外れる子・計画に
         無い番号・`project:` の食い違い・改版の検査について何も言わなかった。同じ事実を数える経路が
         2 本あると、片方が気づかないうちに弱くなる。`--lint` は severity の体系で終わるので、
         承認で外れる提案（error）があれば非ゼロで終わる。
@@ -214,7 +214,7 @@ class ApproveVerifyTest(PhaseHarness):
 
     def test_lint_says_the_order_problem_too(self):
         """順序で外れる子。1 本にそろえる前の `--lint` が何も言わなかったのはここ
-        （`validate` だけを当てていたので、フェーズの順序を見ていなかった）。
+        （`validate` だけを適用していたので、フェーズの順序を見ていなかった）。
 
         「計画に無い番号」はそろえる前からの error なので、それだけを見るテストでは、
         配線を旧に戻しても気づけない。この枝が新しく言えるようになった 1 件で確かめる。
@@ -293,7 +293,7 @@ class ApproveVerifyTest(PhaseHarness):
     def test_the_notice_stays_inside_the_workspace(self):
         """ワークスペースの外に同じディレクトリ構成を掘っても、提案を書いたことにはしない。
 
-        当てる式はワークスペースルートに固定してある。ツリー（ワークツリー・プロジェクト）は
+        適用する式はワークスペースルートに固定してある。ツリー（ワークツリー・プロジェクト）は
         どれもルートの下なので、正しい置き場は全部入り、外は入らない。
         """
         elsewhere = os.path.join(tempfile.gettempdir(), "wip", "proposals", "todo", "evil.sh")

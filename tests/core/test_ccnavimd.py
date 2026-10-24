@@ -185,7 +185,7 @@ class ScriptConditionTest(unittest.TestCase):
             ccnavimd.problems(text, ccnavimd.script_names(self.conf, self.root)),  # type: ignore[arg-type]
             [],
         )
-        self.assertIn("条件 has_docker は使えない", "\n".join(ccnavimd.problems(text)))
+        self.assertIn("条件 has_docker は指定できない", "\n".join(ccnavimd.problems(text)))
 
 
 class NameTest(unittest.TestCase):
@@ -198,8 +198,8 @@ class NameTest(unittest.TestCase):
         found = ccnavimd.name_problems(text)
 
         self.assertEqual(len(found), 2)
-        self.assertIn("1 行目: 条件の名前 has-docker は使えない", found[0])
-        self.assertIn("3 行目: 条件の名前 1a は使えない", found[1])
+        self.assertIn("1 行目: 条件の名前 has-docker は指定できない", found[0])
+        self.assertIn("3 行目: 条件の名前 1a は指定できない", found[1])
         self.assertEqual(ccnavimd.problems(text), [])  # 名前の形は name_problems が言う
 
     def test_組み込みの名前はすべて使える形(self):
@@ -239,8 +239,8 @@ class ProblemsTest(unittest.TestCase):
         )
 
         joined = "\n".join(found)
-        self.assertIn("1 行目: 条件 nothing は使えない", joined)
-        self.assertIn("2 行目: 差し込み {{nope}} は使えない", joined)
+        self.assertIn("1 行目: 条件 nothing は指定できない", joined)
+        self.assertIn("2 行目: 差し込み {{nope}} は指定できない", joined)
         self.assertIn("4 行目: ccnavi:endif に対応する ccnavi:if がありません。", joined)
         self.assertIn("ccnavi:if に対応する ccnavi:endif がありません。", joined)
 
@@ -267,13 +267,13 @@ class LintTest(unittest.TestCase):
         out = self.lint("<!-- ccnavi:if nothing -->\n")
 
         self.assertIn("(ccnavi-md)", out)
-        self.assertIn("1 行目: 条件 nothing は使えない", out)
+        self.assertIn("1 行目: 条件 nothing は指定できない", out)
 
     def test_名前に_以外の記号があればerrorで言う(self):
         out = self.lint("<!-- ccnavi:if has-docker -->\n<!-- ccnavi:endif -->\n")
 
         self.assertIn("(ccnavi-md)", out)
-        self.assertIn("条件の名前 has-docker は使えない", out)
+        self.assertIn("条件の名前 has-docker は指定できない", out)
         self.assertIn("error", out.lower())
 
     def test_正しければ言わない(self):

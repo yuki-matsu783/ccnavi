@@ -4,8 +4,8 @@
  * 見せる中身は拡張ホストが渡す（`RiskData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中の配点、開いている行、絞り込み、直前の操作の一言）だけ。点は数えず、ファイルも書かない。
  *
- * 中身（`data`）が届いたら、編集中の配点はその中身で置き換える。 届くのは編集を捨ててよい
- * ときだけ（ユーザが「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
+ * 中身（`data`）が届いたら、編集中の配点はその中身で置き換える。 届くのは編集を破棄してよい
+ * ときだけ（ユーザが「再読み込み」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
@@ -37,7 +37,7 @@ const EMPTY_DRAFT: Draft = { levels: { medium: "", high: "", critical: "" }, row
  */
 const TOUR = tourOf(riskTour);
 const SAMPLE = parseRiskSample(TOUR.sample);
-/** 見本の行の鍵。実際の行の鍵（`f1`…）と重ならない */
+/** 見本の行のキー。実際の行のキー（`f1`…）と重ならない */
 function sampleDraft(page: RiskPage): Draft {
   let seq = 0;
   return draftOf(page.model.form, () => `s${(seq += 1)}`);
@@ -59,7 +59,7 @@ interface Status {
 
 interface Editing {
   readonly draft: Draft;
-  /** 開いている行の鍵 */
+  /** 開いている行のキー */
   readonly open: ReadonlySet<string>;
 }
 
@@ -74,7 +74,7 @@ function editingOf(data: RiskData, nextKey: () => string): Editing {
 }
 
 export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
-  // 鍵は 1 枚の画面の中で数え上げる。描き直しで配り直さない
+  // キーは 1 枚の画面の中で数え上げる。描き直しで配り直さない
   const nextKey = useRef(keyer()).current;
   const [data, setData] = useState<RiskData>(initial);
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
@@ -380,7 +380,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <details className="help">
           <summary>説明</summary>
           <p className="hint">
-            子チケットをクローズするとき、下の「項目」で当てはまった点を合計して、その変更のリスクの点を出します。
+            子チケットをクローズするとき、下の「項目」で該当した点を合計して、その変更のリスクの点を出します。
             合計点が設定値以上になると、リスクレベルが LOW → MEDIUM → HIGH → CRITICAL の順に上がっていきます。
             <strong>HIGH 以上になったフェーズは、レビューが終わるまで先へ進めません。</strong>
             チケット作成時では「レビュー不要」と宣言した場合も、ユーザのレビューが必要になります。

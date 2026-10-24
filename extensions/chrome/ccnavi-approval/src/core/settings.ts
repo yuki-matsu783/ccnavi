@@ -1,5 +1,5 @@
 /**
- * 設定画面で入れるもの（`chrome.storage.local` の `repos`）。PAT はここに持たない（別の鍵で
+ * 設定画面で入れるもの（`chrome.storage.local` の `repos`）。PAT はここに持たない（別のキーで
  * service worker だけが読む）。
  *
  * - 統合先の名前: リポジトリごと。空ならホストのデフォルトブランチ
@@ -39,7 +39,7 @@ export function repoKey(r: Pick<RepoConfig, "host" | "owner" | "repo">): string 
 export function checkRecentDays(value: unknown): number {
   const days = Number(value);
   if (!Number.isInteger(days) || days < 0 || days > MAX_RECENT_DAYS) {
-    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS}の整数を入力してください。`);
+    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS} の整数を入力してください。`);
   }
   return days;
 }
@@ -77,7 +77,7 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const RESERVED_LAYER = new Set(["common", "self"]);
 
-/** 保存された配列を読む。読めない行は捨てる（画面で直させる） */
+/** 保存された配列を読む。読めない行は破棄する（画面で直させる） */
 export function readRepos(value: unknown, hosts: readonly Host[]): RepoConfig[] {
   if (!Array.isArray(value)) {
     return [];
@@ -109,7 +109,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 /** 1 つのリポジトリの直近の日数を書き換える（ボードの入力欄）。外れた値は投げて、何も書かない */
 export async function saveRecentDays(area: StorageArea, hosts: readonly Host[], key: string, value: unknown): Promise<number> {
   if (typeof value === "string" && value.trim() === "") {
-    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS}の整数を入力してください。`);
+    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS} の整数を入力してください。`);
   }
   const days = checkRecentDays(typeof value === "string" ? value.trim() : value);
   const got = await area.get("repos");

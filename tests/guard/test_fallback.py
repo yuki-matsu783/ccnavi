@@ -26,7 +26,7 @@ def run(root, payload, env=None):
     届かない。読めないルールは `--root` の下の共通レイヤーに置く。
 
     コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
-    切らないと、作業ツリーで消した設定ファイルや、ccnavi ディレクトリの名前を動かした先へ
+    切らないと、ワークツリーで消した設定ファイルや、ccnavi ディレクトリの名前を動かした先へ
     `logs/state` のバックアップが書き戻される。組み込みの既定はこの設定に依らず入るので、
     見たいものは変わらない。
     """
@@ -108,7 +108,7 @@ class FallbackTest(unittest.TestCase):
         self.assertIn(self.broken, said, "どのファイルが読めなかったのかを言っていない")
 
     def test_既定でも読み取りは通る(self):
-        # いちばん数が多く、作業ツリーを変えようがない。ここまで確認を出すと、
+        # いちばん数が多く、ワークツリーを変えようがない。ここまで確認を出すと、
         # 本当に見てほしい 1 件がその中に埋もれる。
         result = run(self.root, pre_tool_use("Read", "file_path", "README.md"))
 
@@ -144,7 +144,7 @@ class FallbackTest(unittest.TestCase):
                 reason = out["permissionDecisionReason"]
                 self.assertIn("builtin:guard-ccnavi-config", reason)
                 self.assertIn("wip/handoff/.ccnavi/config/common/rules.yml", reason)
-                self.assertIn("ccnavi user handoff", reason)
+                self.assertIn("ccnavi-user-handoff.sh", reason)
                 out = out_of(self, run(self.root, pre_tool_use(tool, "file_path", draft), guard))
                 self.assertNotEqual(
                     out.get("permissionDecision"), "deny", f"{tool} で下書きを置けない"
@@ -167,7 +167,7 @@ class FallbackTest(unittest.TestCase):
         self.assertIn(
             "wip/handoff/.ccnavi/config/common/rules.yml", out["permissionDecisionReason"]
         )
-        self.assertIn("ccnavi user handoff", out["permissionDecisionReason"])
+        self.assertIn("ccnavi-user-handoff.sh", out["permissionDecisionReason"])
         self.assertNotIn("Write か Edit のツールで書いてください", out["permissionDecisionReason"])
 
     def test_既定でもシェルからの書き込みは表記を変えても止まる(self):
@@ -178,7 +178,7 @@ class FallbackTest(unittest.TestCase):
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
             # `cd` で入ってから書く形（issue #61）。行き先のパスから場所の
-            # 名前が消えるので、移った先から見たパスにも当てないと止められずに通る。
+            # 名前が消えるので、移った先から見たパスにも適用しないと止められずに通る。
             "cd .ccnavi/config/common && echo x > rules.yml",
             "cd .claude && echo x > settings.json",
             "cd .claude/hooks && echo x > lint-py.sh",
@@ -188,7 +188,7 @@ class FallbackTest(unittest.TestCase):
                 out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
-    def test_既定のシェルの保護は設定で動かした置き場にも当たる(self):
+    def test_既定のシェルの保護は設定で動かした置き場にもヒットする(self):
         # 実行ファイルは設定で動く（ccnavi ディレクトリと共通レイヤーは固定）。
         # 既定の側だけ空の設定で組んでいると、動かしたワークスペースではルールファイルが
         # 不正になったときにだけそこへの書き込みが止まらない（issue #14）。

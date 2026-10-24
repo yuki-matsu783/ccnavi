@@ -4,9 +4,9 @@
 落ちる。見るのは payload のツール名と対象の文字列だけ。
 
 - Read・Grep・Glob は、組み込みの最低限の deny（認証情報の形、`.git` の中、操作記録の置き場）に
-  当たらなければ通す。この評価もできなければ通さない
+  ヒットしなければ通す。この評価もできなければ通さない
 - Bash・PowerShell は、読み切れて、連結・置換・リダイレクト・glob を含まない単独のコマンドで、
-  下の許可リストに当たるときだけ通す
+  下の許可リストにヒットするときだけ通す
 - 報告用のツール（`modes.REPORT_TOOLS`）は通す（体が報告を返せなくなるのを避ける）
 - それ以外のツールは通さない（呼び出し側が `modes.fail_closed` で扱いを決める）
 
@@ -26,11 +26,11 @@ READ_TOOLS = ("Read", "Grep", "Glob")
 SHELL_TOOLS = ("Bash", "PowerShell")
 
 # 認証情報の形、`.git` の中、操作記録の置き場。通常の判定の `builtin:credentials` が止める形のうち、
-# 設定を読まずに言える分を写す。
+# 設定を読まずに言える分をコピーする。
 # failsafe 独自に、通常より広く止めるものがある: `.gnupg`、`id_ecdsa`、`.p12` / `.pfx`、
 # `.git` の中と操作記録の置き場の読み取り、先頭が区切りでない `credentials/`。
 # 片方だけ直る事故を避けるため、`builtin:credentials` に形を足したらここも見直す。
-# 承認済みの置き場のうち秘密に当たるものは無いので、ここには入れない。
+# 承認済みの置き場のうち秘密にヒットするものは無いので、ここには入れない。
 _BOUND = r"(?:^|[ \\/\x00=])"
 _MINIMAL_DENY = re.compile(
     rf"{_BOUND}\.(env|netrc|npmrc|pypirc|dev\.vars)"
@@ -84,11 +84,11 @@ def _paths(payload: hookio.Input) -> list[str]:
 
 
 def read_is_safe(payload: hookio.Input) -> bool:
-    """Read・Grep・Glob を、最低限の deny に当てて通してよいか。評価できなければ偽。"""
+    """Read・Grep・Glob を、最低限の deny に適用して通してよいか。評価できなければ偽。"""
     try:
         found = _paths(payload)
         # 探す場所を省いた Grep・Glob は cwd を探す。cwd が操作記録の置き場の中でない限り、
-        # 省略は通す（置き場の中に居る場合は cwd の文字列で当たる）。
+        # 省略は通す（置き場の中に居る場合は cwd の文字列でヒットする）。
         if not found and payload.cwd:
             found.append(payload.cwd)
         return not any(_MINIMAL_DENY.search(pathcase.fold(p).replace("\\", "/")) for p in found)
@@ -97,7 +97,7 @@ def read_is_safe(payload: hookio.Input) -> bool:
 
 
 def shell_is_safe(payload: hookio.Input, root: str = "") -> bool:
-    """Bash・PowerShell を、判定できないとき専用の許可リストに当てて通してよいか。"""
+    """Bash・PowerShell を、判定できないとき専用の許可リストに適用して通してよいか。"""
     if payload.tool_name != "Bash":
         # PowerShell は shellread で読めない。
         return False

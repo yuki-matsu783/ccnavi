@@ -148,7 +148,7 @@ def _slug(text: str) -> str:
 
 
 def _shape(tool: str, subject: str, root: str) -> tuple[str, dict, str] | None:
-    """渡った呼び出しの形（数える鍵）と、それに当てるルールの下書きと、id の元。
+    """渡った呼び出しの形（数えるキー）と、それに適用するルールの下書きと、id の元。
 
     形にできなければ None。
 
@@ -295,9 +295,9 @@ def _lint_errors(path: str, root: str, rule_id: str, layer: bool) -> bool:
 def _expectations_pass(
     conf: settings.Settings, root: str, expectations: list[dict], want: str, rule_id: str
 ) -> bool:
-    """期待がぜんぶ期待したタイプになり、候補に当たるか（`--test-expectations` と同じ）。
+    """期待がぜんぶ期待したタイプになり、候補にヒットするか（`--test-expectations` と同じ）。
 
-    rule_id は記録に出る名前（`rules.record_name` の形）で、当たったルールをこれで引く。
+    rule_id は記録に出る名前（`rules.record_name` の形）で、ヒットしたルールをこれで引く。
     """
     for expectation in expectations:
         subject = expectation["subject"].replace(diagnose.EXPECTATION_PLACEHOLDER, root)
@@ -313,14 +313,14 @@ def _rule_candidates(
     """記録から、足すと良い許可（ask）のルールの候補を作る。
 
     処理フロー:
-    1. `_handover_groups` で、どのルールにも当たらず権限モードへ渡った形を集める。
+    1. `_handover_groups` で、どのルールにもヒットせず権限モードへ渡った形を集める。
     2. 共通レイヤーのルールを読み、既存の id と重ならない id を振る。
     3. 候補ごとに、ルールを足した一時のルールファイルを作り、`_lint_errors` と
-       `_expectations_pass` で検査する。通らないものは捨てて数える（`dropped`）。
+       `_expectations_pass` で検査する。通らないものは破棄して数える（`dropped`）。
     4. 通ったものを `Candidate` にする。上限（`CANDIDATE_LIMIT`）に達したら止める。
 
-    戻り値は（候補の一覧、捨てた数）。共通レイヤーが読めないときは候補を出さず、
-    その数を捨てた数として返す。
+    戻り値は（候補の一覧、破棄した数）。共通レイヤーが読めないときは候補を出さず、
+    その数を破棄した数として返す。
     """
     groups = _handover_groups(records, root)
     if not groups:
@@ -354,7 +354,7 @@ def _rule_candidates(
                 {
                     "tool": tool,
                     "subject": _placeholder(s, root),
-                    "why": f"記録で、どのルールにも当たらず権限モードへ渡った形（{spelled}）",
+                    "why": f"記録で、どのルールにもヒットせず権限モードへ渡った形（{spelled}）",
                 }
                 for s in subjects[:EXPECTATION_LIMIT]
             ]
@@ -379,7 +379,7 @@ def _rule_candidates(
                     count=count,
                     summary=(
                         f"ルールを追加する候補: {tool} の {spelled} が {count} 回、"
-                        "どのルールにも当たらず権限モードへ渡った。"
+                        "どのルールにもヒットせず権限モードへ渡った。"
                         "止めるべきなら deny に移して message を記載してください"
                     ),
                     rule=rule,
@@ -399,12 +399,12 @@ def _message_candidates(
     処理フロー:
     1. `_repeated_denies` で、`n` 回以上止めたルールを集める。
     2. ルールファイルのルールを `ruleload.survey` で読み、記録のルール名と引き合わせる。
-       見つからないもの（組み込みや、もう無いルール）は、文面を直す先が無いので捨てる。
+       見つからないもの（組み込みや、もう無いルール）は、文面を直す先が無いので破棄する。
     3. 候補ごとに、同じ呼び出しを試す期待の判定を作り、`_lint_errors` と `_expectations_pass` で
-       検査する。通らないものは捨てて数える。
+       検査する。通らないものは破棄して数える。
     4. 通ったものを `Candidate` にする。上限（`CANDIDATE_LIMIT`）に達したら止める。
 
-    戻り値は（候補の一覧、捨てた数）。
+    戻り値は（候補の一覧、破棄した数）。
     """
     repeated = _repeated_denies(records, n)
     if not repeated:
@@ -466,7 +466,7 @@ def _message_candidates(
 
 
 def collect(conf: settings.Settings, root: str) -> dict:
-    """候補を集めて 1 つの辞書にする。鍵は docs/requirements/json-shapes.md「候補の JSON」。"""
+    """候補を集めて 1 つのマップにする。キーは docs/requirements/json-shapes.md「候補の JSON」。"""
     # 試験と同じく記録を持たない。候補の検証で「1 度だけ渡す文」を消費しない。
     conf = dataclasses.replace(conf, state="")
     paths = log_files(conf.log)
@@ -501,7 +501,7 @@ def report(stdout: TextIO, conf: settings.Settings, root: str, as_json: bool) ->
     stdout.write(
         f"# 記録 {len(logs)} 本・{body['records']} 行から作った候補 {len(body['candidates'])} 件"
         f"（検証を通らず除いたもの {body['dropped']} 件）。\n"
-        "# 候補はすべて下書きです。ユーザーが /ccnavi-config の手順で確認してから、"
+        "# 候補はすべて下書きです。ユーザが /ccnavi-config の手順で確認してから、"
         "設定に反映してください。\n"
     )
     for c in body["candidates"]:

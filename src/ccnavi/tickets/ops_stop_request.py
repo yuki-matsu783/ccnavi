@@ -28,9 +28,9 @@ SubagentStart / SubagentStop が残す（`docs/design/tickets/subagents.md`）�
 
 ## 1 回だけ
 
-鍵は「親＋フェーズ」、値は状態の要約（次の一手の種類・残っている子・HEAD）。同じ要約では
+キーは「親＋フェーズ」、値は状態の要約（次の一手の種類・残っている子・HEAD）。同じ要約では
 1 回だけ止め、進めば（子を閉じる、合流する、コミットを足す）次に終えるときまた止めてよい。
-記録は `finish` の促しと同じ `nudged-<セッション>.json` に、`request:` で始まる鍵で置く
+記録は `finish` の促しと同じ `nudged-<セッション>.json` に、`request:` で始まるキーで置く
 （チケットの識別子とは重ならない）。
 """
 
@@ -64,7 +64,7 @@ STEP_REQUEST = "request"
 # ユーザが子を手で done/ に動かした。親が confirm を打てば確定する。
 STEP_CONFIRM = "confirm"
 
-# 記録の鍵の頭。`finish` の促しの鍵（チケットの識別子）と分ける。
+# 記録のキーの頭。`finish` の促しのキー（チケットの識別子）と分ける。
 _KEY_HEAD = "request:"
 
 
@@ -190,7 +190,7 @@ def nudged_before(state_dir: str, session: str, found: Pending) -> bool:
     data = fsio.read_dict(ops_stop.nudge_path(state_dir, session)) or {}
     if data.get(found.key) == found.digest:
         return True
-    # 子のツリーで `finish` の促し（`ops_stop.nudged_before`。鍵は子の識別子、値は HEAD）を出した
+    # 子のツリーで `finish` の促し（`ops_stop.nudged_before`。キーは子の識別子、値は HEAD）を出した
     # のと同じ状態は、こちらでは促さない。同じ状態を 2 つの促しが 1 回ずつ止めないため。
     return (
         found.step == STEP_FINISH
@@ -268,7 +268,7 @@ def request_nudge(root: str, found: Pending) -> str:
         )
         todo = (
             "このままでは依頼できません。修正を活かすなら、同じフェーズに子を足して"
-            "ユーザの承認を受け、その子で直します。捨てるなら、そのことをユーザに伝えて"
+            "ユーザの承認を受け、その子で直します。破棄するなら、そのことをユーザに伝えて"
             "判断を仰いでください。"
         )
     elif found.step == STEP_ELI5:

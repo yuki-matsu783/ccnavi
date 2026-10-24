@@ -12,7 +12,7 @@ VS Code の計画編集タブが打つ経路。タブは図で引いた線（元
 5. 改版では子が承認された番号を動かさず、改版の錠に落ちる形は書かない
 6. 書き換えたあとの一覧で承認が通り、書き換えの前のダイジェストでは止まる。`--agree --preview
    --json` の `plans` は `--plan-order <親> --json` と同じ関数で作る
-7. エージェントが打っても組み込みの止めに当たらない
+7. エージェントが打っても組み込みの止めにヒットしない
 8. 承認を渡す文は、計画を持つ親とその子に「番号は承認済みチケットで読み直す」と添える
 """
 
@@ -37,14 +37,14 @@ PLAN_ORDER_FIXTURE = os.path.join(
     ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures", "plan-order.json"
 )
 
-# 3 項の一直線。research → design → implement。
+# 3 ステップの一直線。research → design → implement。
 PLAN3 = ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [2]}]
-# research が design を待つように線を逆に引いた形（元の番号での直接の先行）。
+# design が research に先行するように線を逆に引いた形（元の番号での直接の先行）。
 REVERSE = {"plan": {"1": [2], "2": [], "3": [1]}}
 
 
 def parsed(plan, feedback=None):
-    """計画の項（見本の表の形）を持つ親を読む。"""
+    """計画のステップ（見本の表の形）を持つ親を読む。"""
     front = {"version": 1, "ticket": "i0001", "plan": plan}
     if feedback is not None:
         front["feedback"] = feedback
@@ -132,7 +132,7 @@ class OrderShapeTest(unittest.TestCase):
 
 
 class LockMovedTest(unittest.TestCase):
-    """5. 延期の引き受け手は、元の項の同一性（振り直す前の番号）で比べる。"""
+    """5. 延期の引き受け手は、元のステップの同一性（振り直す前の番号）で比べる。"""
 
     def test_a_moved_deferred_item_is_compared_with_its_own_target(self):
         # 承認済み: 1 の延期は 3 が引き受ける。3 には子がある（固定）。
@@ -259,7 +259,7 @@ class PlanOrderJsonTest(PlanOrderHarness):
         )
         self.assertEqual(plan["after"], {"2": [1], "3": [1, 2]})
         self.assertEqual(plan["proposed"], {"2": [1], "3": [2]})
-        # 延期した design（3 番）を引き受ける項が無い（3 番が最後の項）。
+        # 延期した design（3 番）を引き受けるステップが無い（3 番が最後のステップ）。
         self.assertTrue(any("延期" in p for p in body["problems"]), body["problems"])
         self.assertFalse(body["writable"])
         self.assertEqual(self.read(), text)
@@ -270,7 +270,7 @@ class PlanOrderJsonTest(PlanOrderHarness):
         self.assertEqual(body["loose"], [1, 2])
         self.assertEqual(body["plans"][0]["loose"], [1, 2])
         self.assertEqual(body["plans"][0]["ready"], [1, 3])
-        self.assertTrue(any("待たない" in p for p in body["problems"]), body["problems"])
+        self.assertTrue(any("先行していない" in p for p in body["problems"]), body["problems"])
 
     def test_feedback_is_a_plan_of_its_own(self):
         self.propose(
@@ -341,7 +341,7 @@ class PlanOrderJsonTest(PlanOrderHarness):
         self.assertNotEqual(self.body()["source_sha"], before)
 
     def test_the_agent_may_type_plan_order(self):
-        """7. `--agree` の外の独立したフラグなので、組み込みの止めに当たらない。"""
+        """7. `--agree` の外の独立したフラグなので、組み込みの止めにヒットしない。"""
         rule = phase_forms.ticket_approval_rule("", self.root)
         order = json.dumps(REVERSE)
         for command in (
@@ -572,8 +572,8 @@ class PlanOrderUnpackableTest(PlanOrderHarness):
         )
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        # 改版で 3 番を足す。2 番が 3 番を待つ線は 2 番を後ろへ回すが、固定した 1 番の後ろに
-        # 置ける項が 3 番しか無く、3 番は 2 番の前に要る。並べ替えれば振れるので詰められる。
+        # 改版で 3 番を足す。3 番が 2 番に先行する線は 2 番を後ろへ回すが、固定した 1 番の後ろに
+        # 置けるステップが 3 番しか無く、3 番は 2 番の前に要る。並べ替えれば振れるので詰められる。
         self.propose(
             "i0001",
             parent_text(
@@ -588,7 +588,7 @@ class PlanOrderUnpackableTest(PlanOrderHarness):
         self.commit_parent("revise")
         packed = self.body("--order", json.dumps({"plan": {"2": [1, 3], "3": [1]}}))
         self.assertEqual(packed["refused"], [])
-        # 固定した 1 番が 2 番を待つ線は、子が承認された番号へ入る線なので断る。
+        # 2 番が固定した 1 番に先行する線は、子が承認された番号へ入る線なので断る。
         locked = self.body("--order", json.dumps({"plan": {"1": [2], "3": [1, 2]}}))
         self.assertEqual([r["kind"] for r in locked["refused"]], ["locked"])
         # 詰められない形は見本の表（tests/fixtures/plan-reorder.json）が見る。
@@ -630,7 +630,7 @@ class ChildRetargetTableTest(unittest.TestCase):
 
 
 class PlanOrderChildrenTest(PlanOrderHarness):
-    """子の提案の追従。番号の変わる項を指す `todo/` の子は、識別子・ファイル名・`ticket:`・
+    """子の提案の追従。番号の変わるステップを指す `todo/` の子は、識別子・ファイル名・`ticket:`・
     `phase:` を付け替え、それを指すほかの子の `predecessors` も直す。承認済みの側には触れない。"""
 
     def setUp(self):

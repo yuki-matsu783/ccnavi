@@ -21,7 +21,7 @@ export type { ProjectRow, ProjectsPage, Stray };
 export interface RemoteInfo {
   /** 打たれたままの URL（前後の空白だけ除く） */
   readonly url: string;
-  /** 同じリポジトリかを比べる鍵。scheme・ユーザ・ポート・末尾の `.git` と `/` を除き、小文字にした `host/path` */
+  /** 同じリポジトリかを比べるキー。scheme・ユーザ・ポート・末尾の `.git` と `/` を除き、小文字にした `host/path` */
   readonly key: string;
   /** URL の末尾から採った、`projects/<名前>` の既定の名前 */
   readonly name: string;
@@ -29,7 +29,7 @@ export interface RemoteInfo {
 
 export type RemoteCheck = { readonly ok: true; readonly remote: RemoteInfo } | { readonly ok: false; readonly error: string };
 
-const FORMS = "使える形式は https://host/path、ssh://host/path、git@host:path の 3 つです。ローカルのパスと file:// は使えません";
+const FORMS = "指定できる形式は https://host/path、ssh://host/path、git@host:path の 3 つです。ローカルのパスと file:// は指定できません";
 
 /**
  * clone 元の URL を検査する。通すのは https / ssh / scp 風の 3 形だけ。
@@ -70,7 +70,7 @@ export function checkRemote(raw: string): RemoteCheck {
   if (userinfo.includes(":")) {
     return {
       ok: false,
-      error: "URL に資格情報（user:token@）が入っています。ターミナルの履歴と .git/config に平文で残るので使えません。credential helper か SSH 鍵を使ってください",
+      error: "URL に資格情報（user:token@）が入っています。ターミナルの履歴と .git/config に平文で残るため指定できません。credential helper か SSH キーを使ってください",
     };
   }
   host = host.replace(/:\d+$/, "").toLowerCase();
@@ -85,7 +85,7 @@ export function checkRemote(raw: string): RemoteCheck {
   return { ok: true, remote: { url, key: `${host}/${cleaned.toLowerCase()}`, name } };
 }
 
-/** origin の URL から比べる鍵を出す。読めない表記（ローカルパスなど）なら空 */
+/** origin の URL から比べるキーを出す。読めない表記（ローカルパスなど）なら空 */
 export function remoteKeyOf(url: string): string {
   const checked = checkRemote(url);
   return checked.ok ? checked.remote.key : "";

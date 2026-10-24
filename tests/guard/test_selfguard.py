@@ -482,7 +482,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("builtin:guard-setting-files", result.stdout)
 
     def test_ツール名を渡したときもシェルの守りは同じ1本(self):
-        # 足すかどうかを決めるのは `Rule.matches` と同じツール名の当て方（rules.tool_matches）。
+        # 足すかどうかを決めるのは `Rule.matches` と同じツール名の適用の仕方（rules.tool_matches）。
         # Bash に足した 1 本は、ツール名を渡さない呼び手（従来）が足すものと同じ。
         def built(tool):
             rule_set = rules.RuleSet(version=rules.VERSION)
@@ -498,11 +498,11 @@ class SelfGuardTest(unittest.TestCase):
         for tool in ("Edit", "Write", "Read", "bash", "BASH", " Bash", "mcp__shell__Bash", ""):
             with self.subTest(tool=tool):
                 self.assertEqual([r.key() for r in built(tool)], rest)
-                # 足さなかったツールでは、足していても当たらなかった。
+                # 足さなかったツールでは、足していてもヒットしなかった。
                 self.assertFalse(shell.matches(tool, command))
 
     def test_cd_で入ってから書く形も止まる(self):
-        # issue #61。保護はパスに当てるので、`cd` で入ると行き先から名前が消える。
+        # issue #61。保護はパスに適用するので、`cd` で入ると行き先から名前が消える。
         # hook の登録そのもの（.claude/settings.json と .claude/hooks/）にも及んでいた。
         for command in [
             "cd .ccnavi/config/common && echo x > rules.yml",
@@ -598,7 +598,7 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertIn("builtin:guard-setting-files", result.stdout)
 
     def test_ローテートした記録もシェルからの書き込みで止まる(self):
-        # 消すのはセッションの開始と端末から打つ `ccnavi --prune` だけ（prune）。
+        # 消すのはセッションの開始とターミナルから打つ `ccnavi --prune` だけ（prune）。
         for command in (
             "rm logs/decisions.20260927-120000.jsonl",
             "rm logs/decisions.*.jsonl",
@@ -783,9 +783,9 @@ class SelfGuardTest(unittest.TestCase):
 
                 self.assertNotIn("builtin:guard-setting-files", result.stdout)
 
-    def test_リダイレクトの当て始めは大なりの並びの頭だけ(self):
-        # 並びの途中の `>` からも当て直せると、`>` が n 個続く入力で当て始めが n 通りに増え、
-        # それぞれが行き先の語を読み直す。手数は時間で測ると揺れるので、当て始めの数で見る。
+    def test_リダイレクトの適用し始めは大なりの並びの頭だけ(self):
+        # 並びの途中の `>` からも適用し直せると、`>` が n 個続く入力で適用し始めが n 通りに増え、
+        # それぞれが行き先の語を読み直す。手数は時間で測ると揺れるので、適用し始めの数で見る。
         redirect = re.compile(selfguard_shell._REDIRECT)
         text = shellread.read("echo x " + ">" * 50 + ' "a b"').text
 
@@ -842,8 +842,8 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(record["rules"][0], "builtin:redirect-limit")
         return reason
 
-    def test_上限ちょうどの大なりなら生の文字列にも保護を当てる(self):
-        # 閉じない引用で縮退させ、生の文字列に当てる。`>` は保護対象への 1 個と合わせて 50 個。
+    def test_上限ちょうどの大なりなら生の文字列にも保護を適用する(self):
+        # 閉じない引用で縮退させ、生の文字列に適用する。`>` は保護対象への 1 個と合わせて 50 個。
         command = (
             "echo x > .ccnavi/config/common/rules.yml; echo "
             + ">a" * (selfguard_shell.REDIRECT_LIMIT - 1)
@@ -870,7 +870,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assert_limit_denied(self.run_hook("PreToolUse", command=command), command)
 
     def test_上限を超える大なりの後ろの保護対象への書き込みは素通りしない(self):
-        # 上限より前では止まる形。上限を超えると保護を当てずに止める。通しはしない。
+        # 上限より前では止まる形。上限を超えると保護を適用せずに止める。通しはしない。
         command = (
             "echo "
             + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
@@ -881,7 +881,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assert_limit_denied(self.run_hook("PreToolUse", command=command), command)
 
     def test_上限を超えてもほかのルールの拒否はそのまま(self):
-        # 上限で外すのは保護の照合だけ。ルールファイルの deny は生の文字列に当て続ける。
+        # 上限で外すのは保護の照合だけ。ルールファイルの deny は生の文字列に適用し続ける。
         command = 'git push; echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
 
         decision, reason = self.verdict(self.run_hook("PreToolUse", command=command))
@@ -906,7 +906,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertNotIn("deny", result.stdout)
 
     def test_上限を超えるとどの権限モードでも止める(self):
-        # 確認できるモードでも確認には回さない。保護を当てていない呼び出しなので止める側に置く。
+        # 確認できるモードでも確認には回さない。保護を適用していない呼び出しなので止める側に置く。
         protected = (
             "echo "
             + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
@@ -957,7 +957,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertNotIn("REDIRECT_LIMIT", reason)
 
     def test_PowerShell_の生の文字列にも上限を掛ける(self):
-        # PowerShell は読まずに生の文字列に当てる。チケットの置き場を守る 1 本が当たる。
+        # PowerShell は読まずに生の文字列に適用する。チケットの置き場を守る 1 本がヒットする。
         command = 'Write-Output "' + ">" * (selfguard_shell.REDIRECT_LIMIT + 1) + '"'
         result = self.run_hook("PreToolUse", tool="PowerShell", command=command)
         self.assert_limit_denied(result, command)
@@ -977,14 +977,14 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(reason.count("[ccnavi] "), 1)
         self.assertEqual(self.records()[-1]["rules"], ["builtin:redirect-limit"])
 
-    def test_外す保護が当たらないなら上限を掛けない(self):
+    def test_外す保護がヒットしないなら上限を掛けない(self):
         # 保護を切り、チケット制御も切ると、シェルから書き込む形の保護は 1 本も無い。
-        # 当てない保護が無いので、上限で止める理由も無い。
+        # 適用しない保護が無いので、上限で止める理由も無い。
         off = {"CCNAVI_TICKET_CONTROL": "disable"}
         bash = 'echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
         result = self.run_hook("PreToolUse", setting="disable", extra_env=off, command=bash)
         self.assertNotIn("REDIRECT_LIMIT", result.stdout)
-        # 既定の組み込みに戻っても、その 1 本は Bash にしか当たらない。PowerShell には掛けない。
+        # 既定の組み込みに戻っても、その 1 本は Bash にしかヒットしない。PowerShell には掛けない。
         write(self.rules, "version: [broken")
         power = 'Write-Output "' + ">" * (selfguard_shell.REDIRECT_LIMIT + 1) + '"'
         result = self.run_hook("PreToolUse", tool="PowerShell", extra_env=off, command=power)
@@ -993,7 +993,8 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("DENY_REDIRECT_LIMIT", result.stdout)
 
     def test_上限で止めた回の記録は組み込みの拒否と同じく出所を持たない(self):
-        # ask のルールにも当たった回。判定を決めたのは上限なので、ask のルールのレイヤーを残さない。
+        # ask のルールにもヒットした回。判定を決めたのは上限なので、
+        # ask のルールのレイヤーを残さない。
         rules_data = json.loads(json.dumps(RULES))
         rules_data["ask"] = [
             {"id": "askme", "match": "Bash", "regex": "askme", "message": "ask the user."}
@@ -1014,10 +1015,10 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(record.get("source", ""), builtin_deny.get("source", ""))
         self.assertEqual(record.get("source", ""), "")
 
-    def test_上限を超えても中で実行されるコマンドには保護を当てる(self):
+    def test_上限を超えても中で実行されるコマンドには保護を適用する(self):
         # `grep -n "<<"` で縮退させる。この縮退は読みを止めても実行役の中身（レイヤー）を作るので、
         # 生の文字列の経路に入りつつ、`sudo` が実行する `tee` がレイヤーに出る。上限で外すのは
-        # 生の文字列への照合だけで、レイヤーには保護をそのまま当てる。
+        # 生の文字列への照合だけで、レイヤーには保護をそのまま適用する。
         command = (
             'grep -n "<<" f; sudo tee .ccnavi/config/common/rules.yml </dev/null; echo'
             + " >a" * (selfguard_shell.REDIRECT_LIMIT + 1)
@@ -1068,7 +1069,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin:guard-binary", result.stdout)
 
-    def test_指していなければ実行ファイルのパスは当たらない(self):
+    def test_指していなければ実行ファイルのパスはヒットしない(self):
         # CCNAVI_ENTRY_PATH が空なら、そこは守る対象ではない。パスを推測して
         # 守ると、そこに在る別のファイルを実体として扱うことになる。
         self.binary()
@@ -1077,7 +1078,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertNotIn("deny", result.stdout)
 
-    def test_実行ファイルを外へ写すだけなら止まらない(self):
+    def test_実行ファイルを外へコピーするだけなら止まらない(self):
         # cp / ln / install は行き先（最後の引数）だけを見る。実行ファイルが元の側に
         # 出ただけなら読むだけで、差し替えにはならない。
         path = self.binary()
@@ -1095,8 +1096,8 @@ class SelfGuardTest(unittest.TestCase):
 
                 self.assertNotIn("builtin:guard-setting-files", result.stdout)
 
-    def test_実行ファイルが行き先なら写す形でも止まる(self):
-        # 元の側を通すために行き先の当て方まで緩めていないことを見る。つないだコマンドの
+    def test_実行ファイルが行き先ならコピーする形でも止まる(self):
+        # 元の側を通すために行き先の適用の仕方まで緩めていないことを見る。つないだコマンドの
         # 前後、引用でつないだ語、書き込みの表記（元の側でも止まる）も含める。
         path = self.binary()
 
@@ -1123,9 +1124,9 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin:guard-setting-files", result.stdout)
 
-    def test_振り分けの実体を外へ写すだけなら止まらず行き先なら止まる(self):
+    def test_振り分けの実体を外へコピーするだけなら止まらず行き先なら止まる(self):
         # 組み立ての置き場（`bin/<os>-<arch>/`）の書き込み用の表記は空白をまたぐので、
-        # 写す側には行き先だけに当てる表記を別に足す。
+        # コピーする側には行き先だけに適用する表記を別に足す。
         spelled, _, _ = self.scripts_layout(("tools",))
         build = "tools/bin/" + platformtag.host_target()
 
@@ -1280,7 +1281,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertIn("CCNAVI_ENTRY_PATH", result.stdout)
 
-    def test_拡張子を書かないパスでも実行ファイルに当たる(self):
+    def test_拡張子を書かないパスでも実行ファイルにヒットする(self):
         # hook の登録は 3 つの環境で同じ 1 行を使う。PyInstaller が Windows で
         # だけ `.exe` を付けるので、設定に書いたパスと在るファイルのパスが食い違う。
         # 書いた側を直させるのではなく、在るほうを選ぶ。
@@ -1293,10 +1294,10 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(read(path), "MZ fake executable\n")
 
-    def test_拡張子なしの実行ファイルはそのまま当たる(self):
+    def test_拡張子なしの実行ファイルはそのままヒットする(self):
         # Linux の置き場がこれ。継ぎ足して探すのは書いたパスが無いときだけで、
         # 在るならそれを使う。Windows で `.exe` まで書いた設定も、同じ理由で
-        # 継ぎ足しに回らず、書いたとおりに当たる。
+        # 継ぎ足しに回らず、書いたとおりにヒットする。
         path = os.path.join(self.repo, "dist", "ccnavi", "ccnavi")
         write(path, "ELF fake executable\n")
 
@@ -1371,8 +1372,8 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin:guard-setting-files", result.stdout)
 
-    def test_scripts_に置いた振り分けの保護は隣ではなく_bin_の下に当たる(self):
-        # G4。sh の隣は配る場所ではない。そこに当てると守る必要の無い場所を止め、
+    def test_scripts_に置いた振り分けの保護は隣ではなく_bin_の下にヒットする(self):
+        # G4。sh の隣は配る場所ではない。そこに適用すると守る必要の無い場所を止め、
         # 本当に実体が在る `../bin/` を外す。
         spelled, _, _ = self.scripts_layout(("tools",))
         cases = (
@@ -1508,7 +1509,8 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(read(exe), "ELF fake on path\n")
 
     def test_浅い_PATH_の実体は区切りで始まる形だけに当て_別の_bin_ccnavi_は止めない(self):
-        # `/bin/ccnavi` を末尾 2 要素で当てると、別のプロジェクトの `./bin/ccnavi` にも当たる。
+        # `/bin/ccnavi` を末尾 2 要素で適用すると、
+        # 別のプロジェクトの `./bin/ccnavi` にもヒットする。
         shallow = os.path.join(os.sep, "bin", "ccnavi")
         with mock.patch.object(platformtag, "path_executable", return_value=shallow):
             regex = selfguard_shell.binary_clause("/ws/.ccnavi/scripts/ccnavi-launcher.sh")
@@ -1895,7 +1897,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("would-restore", result.stdout)
 
     def test_モードが_dry_run_なら設定が_enable_でも触らない(self):
-        # dry-run は「呼び出しにも作業ツリーにも手を出さない」が約束。
+        # dry-run は「呼び出しにもワークツリーにも手を出さない」が約束。
         # 守る側だけがその外に出ると、試している最中に誰も頼んでいない
         # ファイル操作が起きる。
         self.run_hook("PreToolUse", mode="dry-run")

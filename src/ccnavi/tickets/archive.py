@@ -396,14 +396,15 @@ def destination(root: str, project: str, rel: str) -> str:
 
 
 def same_bytes(a: bytes | None, b: bytes | None) -> bool:
-    """改行を LF に揃えて同じ中身か（autocrlf で作業ツリーだけ CRLF になったものも同じと読む）。"""
+    """改行を LF に揃えて同じ中身か
+    （autocrlf でワークツリーだけ CRLF になったものも同じと読む）。"""
     if a is None or b is None:
         return False
     return a.replace(b"\r\n", b"\n") == b.replace(b"\r\n", b"\n")
 
 
 def holds(rel: str, held: bytes | None, data: bytes | None) -> bool:
-    """退避したコピー `held` が、ツリーの中身 `data` を写したものか（中身が同じか）。"""
+    """退避したコピー `held` が、ツリーの中身 `data` をコピーしたものか（中身が同じか）。"""
     return same_bytes(held, data)
 
 

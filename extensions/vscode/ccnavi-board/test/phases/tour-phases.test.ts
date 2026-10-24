@@ -68,7 +68,7 @@ test("CB-T461 追加した定義の見本は、実際の読み取りと同じ形
   assert.deepEqual(real.problems, []);
   assert.equal(real.form.phases.length, 1);
   assert.deepEqual(sample.added, { ...real.form.phases[0], origin: null });
-  // 足した定義は、計画に使えるよう id・タイトル・範囲・成果物・補足まで書いてある
+  // 足した定義は、計画に利用できるよう id・タイトル・範囲・成果物・補足まで書いてある
   assert.ok(sample.added.id !== "" && sample.added.title !== "" && sample.added.scope.length > 0 && sample.added.deliverables.length > 0);
   assert.ok(sample.added.agent !== "" && sample.added.when !== "");
   assert.ok(!sample.page.model.form.phases.some((phase) => phase.id === sample.added.id), "追加した定義が見本の一覧にもある");
@@ -111,7 +111,7 @@ test("CB-T464 フェーズの案内の scene は、見本にある設定・定�
       const at = `${course.id} の ${index + 1} 番目の手順`;
       const scene = step.scene;
       for (const key of Object.keys(scene)) {
-        assert.ok(known.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
+        assert.ok(known.includes(key), `${at}: scene のキー ${key} を画面は読まない`);
       }
       assert.ok(scene.target === undefined || scene.target === "lib", `${at}: target は lib だけ（既定はワークスペース）`);
       const ids = new Set((scene.target === "lib" ? sample.project : sample.page).model.form.phases.map((phase) => phase.id));
@@ -140,7 +140,7 @@ test("CB-T465 フェーズの案内は、基本の案内の題と順序を保ち
   );
   assert.equal(def.courses[0].steps[def.courses[0].steps.length - 1].target, "tour", "最後は「?」を指す");
   const useCases = def.courses.slice(1);
-  assert.ok(useCases.length >= 3 && useCases.length <= 6, `ユースケースが ${useCases.length} 本`);
+  assert.ok(useCases.length >= 3 && useCases.length <= 8, `ユースケースが ${useCases.length} 本`);
   for (const course of useCases) {
     assert.match(course.title, /とき$/, `${course.id}: 題は利用者の目的（〜したいとき）で切る`);
     assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);

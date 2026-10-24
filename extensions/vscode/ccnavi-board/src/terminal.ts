@@ -50,7 +50,7 @@ export function scriptShell(): string {
   return shellPath() ?? "sh";
 }
 
-/** Windows だけシェルを指定する。他の OS は既定のシェル（sh が使える前提） */
+/** Windows だけシェルを指定する。他の OS は既定のシェル（sh が利用できる前提） */
 function shellPath(): string | undefined {
   if (process.platform !== "win32") {
     return undefined;

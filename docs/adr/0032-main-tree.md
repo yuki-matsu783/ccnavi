@@ -20,7 +20,7 @@ keywords: [ワークスペース, main, ルール, 保護, 編集, 直下]
 ルールに `{root}`（ワークスペースルートの実パスに読み込み時に置き換わる表記）を足し、
 deny の `main-tree` で「ワークスペースルートの下で、かつ `.claude/worktrees/` の外」を止める。
 ワークツリーの中でも `.claude/settings*.json` は `guard-settings` で止める。ワークツリーの中は
-`worktrees` の allow がまとめて通す。`source` と `project-files` は先に deny に当たって使われなくなるので消した。
+`worktrees` の allow がまとめて通す。`source` と `project-files` は先に deny にヒットして使われなくなるので消した。
 
 ## 理由
 
@@ -29,7 +29,7 @@ deny の `main-tree` で「ワークスペースルートの下で、かつ `.cl
 `w` で始まらない名前）になった。`{root}` は「ワークスペースの下」を絶対パスの直書きなしに
 書くためのもので、Windows と WSL と Linux で表記が分かれない。
 
-hook・スクリプト・承認済みチケットは既存の deny が場所を問わず当たる。
+hook・スクリプト・承認済みチケットは既存の deny が場所を問わずヒットする。
 
 ## 採らなかった案
 

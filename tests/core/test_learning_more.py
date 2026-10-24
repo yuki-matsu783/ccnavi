@@ -74,7 +74,7 @@ class LearningBase(unittest.TestCase):
             return f.read()
 
     def enter_child(self, child: str, wt: str) -> None:
-        """`child` の作業ツリーの中から打ったことにする（`wt` がその作業ツリー）。"""
+        """`child` のワークツリーの中から打ったことにする（`wt` がそのワークツリー）。"""
         patches = [
             mock.patch.object(
                 learning.phase,

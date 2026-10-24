@@ -4,7 +4,7 @@
 
 # ---- state の置き場とロック
 #
-# 1 行 1 項目の `<鍵> <値>` のファイルは、sh が `sed -n 's/^<鍵> //p'` で読み、jq を使わない
+# 1 行 1 項目の `<キー> <値>` のファイルは、sh が `sed -n 's/^<キー> //p'` で読み、jq を使わない
 # （JSON とチケットの YAML は実行ファイルが読んで、sh には 1 行で返す）。
 # 置き場はワークスペースルートの `logs/state`（固定。ccnavi-review.sh と同じ）。
 #
@@ -31,7 +31,7 @@ ccnavi_repo_key() {
 # 親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
 #
 # 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
-# 当たることがある）。違う名前は ccnavi_is_branch で見る。どちらも実行ファイルの検査（`ticket_ids.id_problem`・
+# ヒットすることがある）。違う名前は ccnavi_is_branch で見る。どちらも実行ファイルの検査（`ticket_ids.id_problem`・
 # `branch_problem`）の、ASCII で見分けられる分だけの複製で、受けたものを使う側の 2 段目の確認にあたる。
 ccnavi_branch_ok() {
 	if [ "$1" = "$2" ]; then
@@ -110,16 +110,16 @@ ccnavi_id_clash() {
 	return 1
 }
 
-# 1 行 1 項目のファイル（integrate のマーカー）から 1 項目を読む。無ければ空。<ファイル> <鍵>
+# 1 行 1 項目のファイル（integrate のマーカー）から 1 項目を読む。無ければ空。<ファイル> <キー>
 ccnavi_record_get() {
 	[ -f "$1" ] || return 0
 	sed -n "s/^$2 //p" "$1" 2>/dev/null | head -n 1
 }
 
-# 1 行 1 項目のファイル（integrate のマーカー）を書き直す。<ファイル> <鍵> <値> [<鍵> <値>...]
+# 1 行 1 項目のファイル（integrate のマーカー）を書き直す。<ファイル> <キー> <値> [<キー> <値>...]
 #
 # 同じディレクトリの一時ファイルに書いてから mv で置き換える（読む側が半端な中身を見ない）。
-# 値の改行は空白に置き換える（1 行 1 項目の契約）。書けなければ 1。渡した鍵だけを書く。
+# 値の改行は空白に置き換える（1 行 1 項目の契約）。書けなければ 1。渡したキーだけを書く。
 ccnavi_record_write() {
 	ccnavi_rw_file="$1"
 	shift
@@ -267,7 +267,7 @@ ccnavi_parent_trace() {
 #
 # 親のワークツリー（<ワークスペースルート>/.claude/worktrees/<識別子> で、ブランチ名から作る識別子がそれと
 # 一致し、実行ファイルが親と答える）のブランチだけを見る。通常のブランチと子の push には掛けない。
-# 親のブランチがリモートに無いまま push すると、改名・消し間違い・捨てた親子のチケットの理由を確かめないまま
+# 親のブランチがリモートに無いまま push すると、改名・消し間違い・破棄した親子のチケットの理由を確かめないまま
 # 同じ名前で作り直してしまう。リモートから消えた形跡があるのにリモートに無いときだけ止める。
 #
 # 形跡は 2 つ。手元の `refs/remotes/origin/<ブランチ>`（`branch.<ブランチ>.remote` は使わない。origin/main から
@@ -314,7 +314,7 @@ ccnavi_push_gate() {
 		return 2
 	fi
 	[ -z "$ccnavi_pg_found" ] || return 0
-	ccnavi_pg_why="親のブランチ $ccnavi_pg_b がリモートに無い。改名・消し間違いなら、ユーザに元の名前で戻してもらい（ユーザが端末で git push origin $ccnavi_pg_b を一度打つ）、捨てた親なら親のワークツリーを片付ける。診断は ccnavi-sync.sh $ccnavi_pg_id"
+	ccnavi_pg_why="親のブランチ $ccnavi_pg_b がリモートに無い。改名・消し間違いなら、ユーザに元の名前で戻してもらい（ユーザがターミナルで git push origin $ccnavi_pg_b を一度打つ）、破棄した親なら親のワークツリーを片付ける。診断は ccnavi-sync.sh $ccnavi_pg_id"
 	return 1
 }
 
@@ -324,7 +324,7 @@ ccnavi_push_gate() {
 #
 # 認証を尋ねさせず（GIT_TERMINAL_PROMPT=0・GCM_INTERACTIVE=never、ssh は BatchMode）、<秒> で切る。
 # ssh の BatchMode は、ユーザが GIT_SSH_COMMAND・GIT_SSH・core.sshCommand を持っていればそちらを尊重する。
-# タイムアウト監視の出力は捨てる（つないだままだと、監視の sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
+# タイムアウト監視の出力は破棄する（つないだままだと、監視の sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
 # 戻り値は git のもの（切ったときは 0 でない）。標準出力は、呼ぶ側がリダイレクトする。
 ccnavi_git_timed() {
 	ccnavi_gt_limit="$1"

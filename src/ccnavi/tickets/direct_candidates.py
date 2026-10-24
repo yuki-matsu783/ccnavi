@@ -14,9 +14,9 @@ cwd がワークスペースルートのままでも、サブエージェント�
 
 - `path` は実パス。`seen` は最後に書き込み先として見た時刻（壁時計の秒）、`checked` は Stop で最後に
   調べた時刻（0 は未調査）。
-- 上限は 50 件で、`seen` の古いものから捨てる。
+- 上限は 50 件で、`seen` の古いものから破棄する。
 - 読むときは、`session` が完全に一致するものだけを使い、名前が `integrable_name` を通らない項目と、
-  `path` が `<root>/.claude/worktrees/<名前>` と一致しない項目は捨てる。読めなければ空。
+  `path` が `<root>/.claude/worktrees/<名前>` と一致しない項目は破棄する。読めなければ空。
 - 保存できなくても何も言わない（登録は補助）。並行して書かれて 1 件落ちることがあるが、補わない。
 """
 
@@ -88,7 +88,7 @@ def _read(state_dir: str, session: str) -> list[dict]:
 
 
 def load(conf: settings.Settings, root: str, session: str) -> list[dict]:
-    """このセッションの候補。名前か実パスが合わない項目は捨てる。"""
+    """このセッションの候補。名前か実パスが合わない項目は破棄する。"""
     if not conf.state or not session:
         return []
     kept = []

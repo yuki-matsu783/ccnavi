@@ -325,7 +325,7 @@ class PlanWriterTest(CoreHarness):
             [
                 ("create", ".ccnavi/approved/doing/i0001-01-01.md"),
                 ("create", ".ccnavi/approved/doing/i0001.md"),
-                # 待ち方は書かない（承認済みチケットの計画から都度計算する）
+                # 先行関係は書かない（承認済みチケットの計画から都度計算する）
                 ("delete", "wip/proposals/todo/i0001-01-01.md"),
                 ("delete", "wip/proposals/todo/i0001.md"),
             ],
@@ -482,7 +482,7 @@ class WriterFailureTest(CoreHarness):
         return os.path.join(self.approved, "phases", "i0001", "workflow.yml")
 
     def test_a_failed_move_leaves_no_copy_and_no_workflow_file(self):
-        """承認は待ち方を書かない。動かす段で落ちても、承認済みチケットも待ち方のファイルも残らない。"""
+        """承認は先行関係を書かない。動かす段で落ちても、承認済みチケットも先行関係のファイルも残らない。"""
         doing = os.path.join("doing", "i0001.md")
         todo = os.path.join("todo", "i0001.md")
         for name, when in (
@@ -500,7 +500,7 @@ class WriterFailureTest(CoreHarness):
                 self.assertFalse(os.path.exists(self.held()), err)
 
     def test_a_failed_revision_leaves_the_copy_as_it_was(self):
-        """改版でチケットを書く段で落ちたら、承認済みチケットは前のまま。待ち方のファイルは書かない。"""
+        """改版でチケットを書く段で落ちたら、承認済みチケットは前のまま。先行関係のファイルは書かない。"""
         self.family(plan=["research", "design"])
         copy = os.path.join(self.approved, "doing", "i0001.md")
         with open(copy, "rb") as f:
@@ -902,7 +902,7 @@ class CoreChromeTest(CoreHarness):
         self.assertEqual(local.returncode, 1)
         self.assertEqual(refused["problems"], local.stderr.splitlines())
         self.assertIsNone(refused["changes"])
-        # 分岐の材料は文面ではなく鍵（文面の頭にも同じコードが載る）
+        # 分岐の材料は文面ではなくキー（文面の頭にも同じコードが載る）
         self.assertEqual(refused["code"], "CORE_CONFIRM_REVIEW_OPEN")
         self.assertTrue(refused["problems"][0].startswith("ccnavi: [CORE_CONFIRM_REVIEW_OPEN] "))
         write(fixture, json.dumps(result))

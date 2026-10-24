@@ -1,6 +1,6 @@
 """親の提案を手書きしたときの書式の誤りを、書いた時点で 1 度だけ案内する（PostToolUse）。
 
-提案の雛形は `ccnavi ticket new` が作る。手で書くと、子の例を写して親に `parent:` と `phase:` を
+提案の雛形は `ccnavi ticket new` が作る。手で書くと、子の例をコピーして親に `parent:` と `phase:` を
 書いたり、`plan:`・`phases:`・`mr:` を落としたりする。承認の検査（`--agree --preview --verify`）は
 後から言うが、書いた時点で言えば、直しが 1 手で済む。
 

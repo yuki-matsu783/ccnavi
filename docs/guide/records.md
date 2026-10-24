@@ -27,9 +27,9 @@ ccnaviは判定した呼び出しを記録し、その記録から次のルー�
 |---|---|
 | `decision` | `allow` `ask` `deny` `handover` `skip`（Stopで促した回は`nudge`）。`handover`は権限モードに委ねた回 |
 | `enforced` | 実際に適用したか。`dry-run`は、一般の保護では`false`、関門と補助の保護で止めた回は`true` |
-| `code` | 判定の根拠の種別。一覧は [設計 付録A](../design/appendix.md)。よく出るのは`DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は`POST_VIOLATION`などで、複数の件が当たった回は強いほう 1 つ |
+| `code` | 判定の根拠の種別。一覧は [設計 付録A](../design/appendix.md)。よく出るのは`DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は`POST_VIOLATION`などで、複数の件がヒットした回は強いほう 1 つ |
 | `reason` | 主に`skip`の行。判定まで進まなかった理由（`mode-disabled`、`no-turn-baseline`、`internal-error`など 11 種。一覧は [設計 付録B](../design/appendix.md#付録-b-記録の-1-行)）。Stopの判定役まわりでは`allow`・`deny`の行にも付く（`stop-review-judge`、`stop-review-worker`） |
-| `rules` | 当たったルールの名前（ルールファイル由来は`<相対パス>:<id>`、組み込みはid）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review`など。判定ごとに分かれる） |
+| `rules` | ヒットしたルールの名前（ルールファイル由来は`<相対パス>:<id>`、組み込みはid）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review`など。判定ごとに分かれる） |
 | `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前 |
 
 `jq`で数える。
@@ -66,19 +66,19 @@ URLの`user:<値>@`、mysqlの`-p<値>`、sshpass・docker loginの`-p`、redis-
 
 セッションが始まるたびに、記録とstateを片付ける。実行前チェックでは走らない。
 
-- `decisions.jsonl`が`CCNAVI_LOG_ROTATE_MB`（既定 10 MB）を超えていたら、`logs/decisions.<日時>.jsonl`へ名前を変える。中身は捨てない
+- `decisions.jsonl`が`CCNAVI_LOG_ROTATE_MB`（既定 10 MB）を超えていたら、`logs/decisions.<日時>.jsonl`へ名前を変える。中身は破棄しない
 - ローテートした記録のうち、最後に書かれてから`CCNAVI_LOG_KEEP_DAYS`（既定 14 日）を過ぎたものを消す
 - `logs/state/`の、セッションを名前に持つ記録を、そのセッションのどれもが`CCNAVI_STATE_KEEP_DAYS`（既定 14 日）書かれていなければまとめて消す
 - `logs/stop-review/`の再評価用の材料とイベントの記録は、別の保持日数`CCNAVI_STOP_REVIEW_KEEP_DAYS`（既定 90 日）で消す
 
 どれを消し、どれを消さないかの細則は [設計 4.7](../design/startup-config.md#47-記録)。
-動かした数はセッション開始の行の`detail`に`pruned rotated=1 logs=2 state=5`の形で残る。手で走らせるなら端末から打つ。
+動かした数はセッション開始の行の`detail`に`pruned rotated=1 logs=2 state=5`の形で残る。手で走らせるならターミナルから打つ。
 エージェントがBashから`--preview`の無い形を打つと、チケット制御に依らず`DENY_RECORDS_PRUNE`で止まる。
 記録とstateの置き場は、シェルからの書き込みと同じく`Write` / `Edit`からも止まる（`builtin:guard-records`）。
 
 ```sh
 ccnavi --prune --preview   # 動かすものを並べるだけ
-ccnavi user prune             # 動かして、動かしたものを出す（端末から）
+sh .ccnavi/scripts/ccnavi-user-prune.sh             # 動かして、動かしたものを出す（ターミナルから）
 ```
 
 ## 学びの蓄積

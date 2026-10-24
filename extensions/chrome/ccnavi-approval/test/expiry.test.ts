@@ -28,7 +28,7 @@ test(`CX-T115 切れる ${WARN_DAYS} 日前から知らせ、切れたら差し�
   assert.equal(expiryNotice("github.com", { host: at(30) }, NOW).level, "ok");
   const soon = expiryNotice("github.com", { host: at(3) }, NOW);
   assert.deepEqual([soon.level, soon.daysLeft, soon.source], ["soon", 3, "host"]);
-  assert.match(soon.text, /あと 3 日で切れる/);
+  assert.match(soon.text, /あと 3 日で切れます/);
   assert.equal(expiryNotice("github.com", { host: at(-1) }, NOW).level, "expired");
   const manual = expiryNotice("github.com", { manual: "2026-10-02" }, NOW);
   assert.deepEqual([manual.level, manual.source], ["soon", "manual"]);
@@ -55,7 +55,7 @@ test("CX-T116 service worker はホストの応答から期限を読んで記録
   const after = (await dispatch({ kind: "token.status", host: "github.com" }, BOARD, d)) as { value: TokenStatus };
   assert.equal(after.value.notice?.level, "soon");
   assert.equal(after.value.notice?.daysLeft, 3);
-  // 差し替えると前のトークンの期限は捨て、入れた日付を記録する
+  // 差し替えると前のトークンの期限は破棄し、入れた日付を記録する
   const set = await dispatch({ kind: "token.set", host: "github.com", token: TOKEN, expires: "2026-12-01" }, OPTIONS, d);
   assert.equal(set.ok, true);
   assert.deepEqual(metas.get("github.com"), { manual: "2026-12-01" });

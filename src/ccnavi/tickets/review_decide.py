@@ -52,7 +52,7 @@ DIGEST_PREFIX = "v2."
 # issue の本文の字数の上限（GitHub は 65,536 字）。余裕を見て、この字数を超えたら
 # 目次と続きのコメントに分ける。
 ISSUE_BODY_LIMIT = 60000
-# 端末で打つ 1 文字と、画面に出す呼び名。
+# ターミナルで打つ 1 文字と、画面に出す呼び名。
 _CHOICE_KEYS = {"k": CHOICE_KEEP, "f": CHOICE_FIX, "i": CHOICE_ISSUE}
 CHOICE_LABELS = {
     CHOICE_KEEP: "対応しない（受け入れて進む）",
@@ -163,7 +163,7 @@ def decision_digest(d: Decision) -> str:
 
 
 def parse_digest(text: str) -> tuple[str, dict[str, str]] | None:
-    """ダイジェストを（基礎, {鍵: 版}）に戻す。読めなければ None（版 1 の値を含む）。"""
+    """ダイジェストを（基礎, {キー: 版}）に戻す。読めなければ None（版 1 の値を含む）。"""
     if not text.startswith(DIGEST_PREFIX):
         return None
     encoded = text[len(DIGEST_PREFIX) :]
@@ -186,7 +186,7 @@ def changed_since_shown(d: Decision, base: str, versions: dict[str, str]) -> lis
     """見せた材料と今の材料の食い違い。同じなら空。
 
     基礎が違えば `target`。見せた指摘のうち、無くなった・解決済みになった・本文や位置が変わった
-    ものは、その鍵。見せたあとに追加された指摘は食い違いに数えない。
+    ものは、そのキー。見せたあとに追加された指摘は食い違いに数えない。
     """
     out = []
     if base != _base_digest(d):
@@ -292,7 +292,7 @@ def reviewed(
     accept_unresolved: bool,
     result_path: str,
 ) -> int:
-    """ユーザが端末か VS Code のボードで行う。
+    """ユーザがターミナルか VS Code のボードで行う。
 
     残った指摘を見せ、1 件ずつ行き先を選ばせる。変更要求は通せない。
 
@@ -375,7 +375,7 @@ def choose(
 def _ask_choices(
     stdin: TextIO, stdout: TextIO, stderr: TextIO, d: Decision
 ) -> dict[str, str] | None:
-    """残った指摘の行き先を 1 件ずつ端末で選ばせる。決めなければ None。"""
+    """残った指摘の行き先を 1 件ずつターミナルで選ばせる。決めなければ None。"""
     keys = "k / f / i"
     stdout.write(
         "未解決（Unresolved）の指摘の対応方針を 1 件ずつ選びます。"
@@ -443,7 +443,7 @@ def decide_yes(
        全部ホストで解決済みであることを確かめ、受け入れたスレッドを見せた指摘に数え直して
        ダイジェストを照合し（見せたあとに指摘が変われば止まる）、置く
 
-    ユーザが端末で打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが一致することを
+    ユーザがターミナルで打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが一致することを
     求める。エージェントがこれをシェルで打つ形は、組み込みの deny
     （`phase_forms.ticket_approval_rule`）が止める。
     結果は JSON で返す。違えば置かずに `mismatch` を返す（返信・解決を済ませた分は操作記録に残す）。
@@ -467,7 +467,7 @@ def decide_yes(
     if not isinstance(raw, dict) or not all(
         isinstance(k, str) and v in CHOICES for k, v in raw.items()
     ):
-        stderr.write(f"ccnavi: --yes の選択は {{鍵: {' / '.join(CHOICES)}}} の形で渡す\n")
+        stderr.write(f"ccnavi: --yes の選択は {{キー: {' / '.join(CHOICES)}}} の形で渡す\n")
         return 1
     # 計画の段（--accept-done）なら、sh が取り直した結果と計画を読む。
     planned = None
@@ -537,7 +537,7 @@ def decide_yes(
         if problem:
             stderr.write(f"ccnavi: 受け入れが済んでいない: {problem}。何も置いていない\n")
             return 1
-    # 置く。端末とオーバーレイが同じ apply_decision を通る。
+    # 置く。ターミナルとオーバーレイが同じ apply_decision を通る。
     notes = io.StringIO()
     summary = apply_decision(notes, stderr, root, conf, d, raw, op_id)
     if summary is None:
@@ -608,7 +608,7 @@ def _begin_op(
 ) -> str | None:
     """ユーザの判断を操作記録に保存する（返信・解決の前）。保存できなければ None。
 
-    記録には構造化した中身だけを持つ（見せた指摘の鍵・版・本文、選択、予定した段階）。送る本文は
+    記録には構造化した中身だけを持つ（見せた指摘のキー・版・本文、選択、予定した段階）。送る本文は
     持たず、送るたびに `shown`・`choices` から作り直す。送信の段階は、返信・解決（受け入れる指摘が
     あるとき）、issue（回す指摘があるとき。長ければ続きのコメントも）、決めた内容のコメント。
     """
@@ -707,7 +707,7 @@ def _decide_actor() -> tuple[str, str]:
     """decide のマーカーに入れる (アカウント, 経路)。
 
     アカウントは ccnavi-review.sh がトークンの持ち主を引いて `--actor` で渡したもの。
-    経路はこの起動の経路（端末は `terminal`、ボードは `board`）。アカウントが無ければ
+    経路はこの起動の経路（ターミナルは `terminal`、ボードは `board`）。アカウントが無ければ
     どちらも書かない（confirm と同じく、引けなければマーカーは前と同じバイト列）。
     """
     account = via.actor()
@@ -760,7 +760,7 @@ def apply_decision(
     choices: dict[str, str],
     op_id: str = "",
 ) -> dict | None:
-    """選んだ行き先を置く。端末とオーバーレイが同じここを通る。置けなければ None。
+    """選んだ行き先を置く。ターミナルとオーバーレイが同じここを通る。置けなければ None。
 
     `op_id` は操作記録の ID。続きの子（`ccnavi_op`）と、転記した本文の見出しに書く。
 
@@ -782,7 +782,7 @@ def apply_decision(
     fix = picked[CHOICE_FIX]
     if not _precheck(stderr, root, conf, d, picked):
         return None
-    # 前の回の下書き（投稿に失敗して残ったもの）は捨てる。残すと、この回に選んでいない
+    # 前の回の下書き（投稿に失敗して残ったもの）は破棄する。残すと、この回に選んでいない
     # issue やコメントを sh が投稿する
     if conf.state:
         for name in (DECIDE_FILE, DECIDE_ISSUE_FILE):
@@ -825,7 +825,7 @@ def apply_decision(
             oplog.applied_set(conf.state, op_id, "followup", followup)
     if conf.state:
         _write_decide_comment(stderr, conf, d, picked, followup)
-    # 端末向けの結果を1行で出す。
+    # ターミナル向けの結果を1行で出す。
     if followup:
         stdout.write(f"OK: フェーズ {ph.number} は続きの子 {followup} で応える\n")
     elif d.extra:
@@ -929,7 +929,7 @@ def issue_texts(
     """issue の下書きの本文と、続きのコメントの本文を返す。
 
     1 行目が題、空行のあとが本文。ホストの本文の上限（`ISSUE_BODY_LIMIT`）に収まらないときは、
-    本文に目次（鍵・URL・版）だけを置き、全文は同じ issue への続きのコメントに分けて載せる。
+    本文に目次（キー・URL・版）だけを置き、全文は同じ issue への続きのコメントに分けて載せる。
     手元の state を指すだけの形にはしない。
     """
     assert d.result.mr is not None

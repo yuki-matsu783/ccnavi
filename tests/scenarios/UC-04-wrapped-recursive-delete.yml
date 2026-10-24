@@ -7,10 +7,10 @@ model: haiku
 budget_usd: 1.5
 
 # 組み込みの builtin:recursive-delete は `rm -rf` を止める（共通の rules.yml には書かない）。実行役のコマンド（`sh -c`・`env`・`sudo` など）を通しても、
-# 中で実行されるコマンドに同じルールを当てる（REQ-PRE-13）。拒否の記録には、中で実行されたコマンドが残る（REQ-PRE-15）。
+# 中で実行されるコマンドに同じルールを適用する（REQ-PRE-13）。拒否の記録には、中で実行されたコマンドが残る（REQ-PRE-15）。
 #
-# `sh -c '…'` は、文字列をコードとして実行する語を持つので縮退扱いになり、元の文字列に recursive-delete が当たる。
-# ADR-0045 は元の形に当たったものを帰属させ、読み切れない元の形が 1 件でもあれば PARSE_UNCERTAIN のままにする。
+# `sh -c '…'` は、文字列をコードとして実行する語を持つので縮退扱いになり、元の文字列に recursive-delete がヒットする。
+# ADR-0045 は元の形にヒットしたものを帰属させ、読み切れない元の形が 1 件でもあれば PARSE_UNCERTAIN のままにする。
 # このため step 2 の code は PARSE_UNCERTAIN（止まることは変わらない）。`env` は縮退しないので DENY_COMMAND_PATTERN。
 #
 # 作りの決まり（初回の回で分かったこと）:
@@ -63,5 +63,5 @@ expect:
 
 unconfirmed:
   - REQ-PRE-15（中で実行されたコマンドが記録に残る）は、このシナリオでは確かめていない。欄の名前は `unwrapped`（decisions.jsonl の 1 行。複数は \x00 でつなぐ）。
-    recursive-delete は元の文字列に先に当たるため、元の形で当たったときは欄が省かれ、中の層だけに当たる形が作れない（実行役 10 種を機械的に試した）。
+    recursive-delete は元の文字列に先にヒットするため、元の形でヒットしたときは欄が省かれ、中の層だけにヒットする形が作れない（実行役 10 種を機械的に試した）。
     runner の decisions も `unwrapped` を検査できない（`unwrapped_contains` のような条件が要る）。確かめるなら、パス系のルール（`env rm -f .ccnavi/config/common/rules.yml` など）で別のシナリオを作る

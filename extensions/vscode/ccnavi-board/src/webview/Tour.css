@@ -3,6 +3,8 @@
  * 指す先があるときは、暗くするのを指す先の枠の影（box-shadow）で行い、枠の外を覆う要素は作らない。
  * 指す先が無い手順だけ、`.tour-shade` で画面全体を暗くする。
  */
+@import "./shared/SequenceDiagram.css";
+
 .tour { position: fixed; inset: 0; z-index: var(--z-tour); }
 
 .tour-spot {
@@ -41,7 +43,7 @@
 .tour-body { margin: 0 0 10px; line-height: 1.6; }
 
 /* 画面の外の見た目（Claude Code・GitLab の画面）。吹き出しの幅に収める */
-.tour-image { display: block; max-width: 100%; max-height: 40vh; object-fit: contain; height: auto; margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-sm); }
+.tour-image { display: block; max-width: 100%; max-height: 60vh; object-fit: contain; height: auto; margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-sm); }
 
 /* やめる ×。どの手順でも吹き出しの右上の同じ位置に出す */
 .tour-close {

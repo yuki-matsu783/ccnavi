@@ -38,7 +38,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    このチケットでは、以下に示す場所のみ編集できるようになります。allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可されていても、このチケットの範囲外では編集できません。ルールの deny はこの範囲の中でも止まる\n    allow: wip/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。先行フェーズの終了と必要なレビューの完了を確認するまで、このフェーズの子チケットは承認できません。\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係（計画の各項目の after で決まります。承認後に phases.yml を変更しても変わりません）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。承認後に phases.yml を変更しても、この親チケットの編集可能範囲・確認対象・成果物は変わりません。\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: にない）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ 課題: #1\n    この親のマージリクエストの本文に Closes として記載する番号。マージされると、このIssueもクローズされます。\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: wip/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
+   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    このチケットでは、以下に示す場所のみ編集できるようになります。allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可されていても、このチケットの範囲外では編集できません。ルールの deny はこの範囲の中でも止まる\n    allow: wip/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。先行フェーズの終了と必要なレビューの完了を確認するまで、このフェーズの子チケットは承認できません。\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係（計画の各ステップの after で決まります。承認後に phases.yml を変更しても変わりません）\n    1: research — 先行なし\n    2: design — 先行 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親にコピーして固定する。承認後に phases.yml を変更しても、この親チケットの編集可能範囲・確認対象・成果物は変わりません。\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: にない）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ 課題: #1\n    この親のマージリクエストの本文に Closes として記載する番号。マージされると、このIssueもクローズされます。\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: wip/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
   },
   "request": {
    "family": "i0001",
@@ -58,7 +58,7 @@
       "files": {
        ".ccnavi/config/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"except\": [{\"regex\": \"[\\\\\\\\/]wip[\\\\\\\\/]handoff[\\\\\\\\/]\"}], \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
        ".ccnavi/config/project/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: mr\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: mr\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=18\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=19\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -133,7 +133,7 @@
       "files": {
        ".ccnavi/config/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"except\": [{\"regex\": \"[\\\\\\\\/]wip[\\\\\\\\/]handoff[\\\\\\\\/]\"}], \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
        ".ccnavi/config/project/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: mr\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: mr\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=18\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=19\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -222,7 +222,7 @@
       "files": {
        ".ccnavi/config/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"except\": [{\"regex\": \"[\\\\\\\\/]wip[\\\\\\\\/]handoff[\\\\\\\\/]\"}], \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
        ".ccnavi/config/project/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: mr\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: mr\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=18\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=19\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -291,7 +291,7 @@
       "files": {
        ".ccnavi/config/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"except\": [{\"regex\": \"[\\\\\\\\/]wip[\\\\\\\\/]handoff[\\\\\\\\/]\"}], \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
        ".ccnavi/config/project/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: mr\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: mr\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=18\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=19\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -377,7 +377,7 @@
       "files": {
        ".ccnavi/config/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"except\": [{\"regex\": \"[\\\\\\\\/]wip[\\\\\\\\/]handoff[\\\\\\\\/]\"}], \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
        ".ccnavi/config/project/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: mr\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: mr\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=18\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=19\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -421,7 +421,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ 全体計画の変更\n    いま:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー必須: マージリクエスト\n    改版:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー必須: マージリクエスト\n        3. 受入テスト作成 / acceptance  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係の変更\n    いま:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n    改版:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n        3: acceptance — 待つ: 1, 2\n■ phases: の差分（改版で親に固定する定義）\n    追加: 受入テスト作成 / acceptance\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
+   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ 全体計画の変更\n    いま:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー必須: マージリクエスト\n    改版:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー必須: マージリクエスト\n        3. 受入テスト作成 / acceptance  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係の変更\n    いま:\n        1: research — 先行なし\n        2: design — 先行 1\n    改版:\n        1: research — 先行なし\n        2: design — 先行 1\n        3: acceptance — 先行 1, 2\n■ phases: の差分（改版で親に固定する定義）\n    追加: 受入テスト作成 / acceptance\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
   },
   "request": {
    "family": "i0001",
@@ -441,7 +441,7 @@
       "files": {
        ".ccnavi/config/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"except\": [{\"regex\": \"[\\\\\\\\/]wip[\\\\\\\\/]handoff[\\\\\\\\/]\"}], \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
        ".ccnavi/config/project/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: mr\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: mr\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=18\n"
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=19\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }

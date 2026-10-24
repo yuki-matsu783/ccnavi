@@ -65,7 +65,7 @@ class CloseNoticeTest(ReadyHarness):
         self.assertIn("ccnavi --templates --draft i0001", lines[0])
         self.assertIn("退避されて拾えない", lines[0])
         # 下書きを残したままでは ready が止まるので、そのことも言う。
-        self.assertIn("ccnavi user handoff", lines[0])
+        self.assertIn("ccnavi-user-handoff.sh", lines[0])
         self.assertIn("削除してから ready", lines[0])
         # 案内は、ready の案内の後ろに足す。
         self.assertGreater(closed.stdout.index(MARK), closed.stdout.index("logs/archive/"))

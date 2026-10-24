@@ -84,7 +84,7 @@ keywords: [共通レイヤー, 置き場, .ccnavi/config/common, 環境変数, �
 
 ```
 Write で書く  -> deny（builtin-guard-common-layer。conf が指す場所を追う）
-シェルで書く  -> 通る（_PLACES は `.ccnavi` という名前に当てるので届かない）
+シェルで書く  -> 通る（_PLACES は `.ccnavi` という名前に適用するので届かない）
 ```
 
 同じファイルが `Write` では止まってシェルでは通る、という食い違いになる。ADR-0051 が
@@ -92,7 +92,7 @@ Write で書く  -> deny（builtin-guard-common-layer。conf が指す場所を�
 同じ形なので、こちらも作らない。
 
 穴に届くのは、ユーザが `settings.json` の hook の command に `--rules <別の場所>` と書き足した
-ときだけで、滅多にない。ただし穴に当たるのは、まさにその設定を必要としたユーザになる。
+ときだけで、滅多にない。ただし穴にヒットするのは、まさにその設定を必要としたユーザになる。
 
 ADR-0067 のあとは、その hook の command から動かす手段も閉じた。それでも `common_shell_clause` は
 残してある。診断（`--test`）が判定と同じ関数を通るので、そこで動かした先を守らないと

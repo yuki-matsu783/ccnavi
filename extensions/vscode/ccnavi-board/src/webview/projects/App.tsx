@@ -126,7 +126,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             <input
               id="name"
               type="text"
-              placeholder="URL から自動で入る"
+              placeholder="URL から自動で入ります"
               spellCheck={false}
               value={clone.name}
               onChange={(event) => {

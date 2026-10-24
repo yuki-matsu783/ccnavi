@@ -389,7 +389,7 @@ class SearchTest(unittest.TestCase):
             ids(docsearch_query.Query(types=["adr"])), ["docs/adr/0001-git", "docs/adr/0002-ticket"]
         )
         self.assertEqual(ids(docsearch_query.Query(types=["ad"])), [])
-        # スカラーの tags も 1 要素のリストとして当たる。
+        # スカラーの tags も 1 要素のリストとしてヒットする。
         self.assertEqual(
             ids(docsearch_query.Query(tags=["WORKTREE"])),
             ["docs/adr/0001-git", "docs/claude/worktree"],
@@ -422,7 +422,7 @@ class SearchTest(unittest.TestCase):
         self.assertEqual(ids(docsearch_query.Query(paths=["CLAUDE/"])), ["docs/claude/worktree"])
 
     def test_text_looks_at_values_not_keys(self):
-        # キー名（title・tags・description）には当たらない。当たると全件になる。
+        # キー名（title・tags・description）にはヒットしない。ヒットすると全件になる。
         self.assertEqual(ids(docsearch_query.Query(texts=["title"])), [])
         self.assertEqual(ids(docsearch_query.Query(texts=["tags"])), [])
         self.assertEqual(ids(docsearch_query.Query(texts=["description"])), ["README"])
@@ -596,12 +596,12 @@ class CliTest(Repo):
     def test_filters_outside_docs_stop_the_run(self):
         done = self.ccnavi("--lint", "--type", "adr", "--limit", "3")
         self.assertEqual(done.returncode, 1)
-        self.assertIn("ccnavi: --type は --docs でだけ使える", done.stderr)
-        self.assertIn("ccnavi: --limit は --docs でだけ使える", done.stderr)
+        self.assertIn("ccnavi: --type は --docs でだけ指定できる", done.stderr)
+        self.assertIn("ccnavi: --limit は --docs でだけ指定できる", done.stderr)
         # 別の副命令に --limit を付ける打ち間違いは、失敗にして進めない。
         done = self.ccnavi("ticket", "start", "i0001", "--limit", "3")
         self.assertEqual(done.returncode, 1)
-        self.assertIn("--limit は --docs でだけ使える", done.stderr)
+        self.assertIn("--limit は --docs でだけ指定できる", done.stderr)
         self.assertNotIn("チケット", done.stdout)
 
     def test_flags_of_other_runs_stop_docs(self):
@@ -617,7 +617,7 @@ class CliTest(Repo):
             with self.subTest(args=args):
                 done = self.ccnavi("--docs", *args)
                 self.assertEqual(done.returncode, 1, done.stdout)
-                self.assertIn(f"--docs は {args[0]} と一緒に使えない", done.stderr)
+                self.assertIn(f"--docs は {args[0]} と同時に指定できない", done.stderr)
 
     def test_user_operations_do_not_go_with_docs(self):
         """`user` の操作にも `--docs` は添えられない。`user` の外の `--yes` は先に断る。"""
@@ -630,7 +630,7 @@ class CliTest(Repo):
             with self.subTest(args=args):
                 done = self.ccnavi(*args)
                 self.assertEqual(done.returncode, 1, done.stdout)
-                self.assertIn(f"--docs は {flag} と一緒に使えない", done.stderr)
+                self.assertIn(f"--docs は {flag} と同時に指定できない", done.stderr)
         refused = self.ccnavi("--docs", "--yes", "i0001")
         self.assertEqual(refused.returncode, 2, refused.stdout)
         self.assertIn("ユーザ専用", refused.stderr)
@@ -658,7 +658,7 @@ class CliTest(Repo):
             with self.subTest(args=args):
                 done = self.ccnavi("--docs", *args)
                 self.assertEqual(done.returncode, 1, done.stdout)
-                self.assertIn(f"--docs は {args[0]} と一緒に使えない", done.stderr)
+                self.assertIn(f"--docs は {args[0]} と同時に指定できない", done.stderr)
                 self.assertEqual(done.stdout, "")
                 # レイヤーの置き場の「診断でだけ効く」の文で先へ進まない。
                 self.assertNotIn("診断", done.stderr)
@@ -1358,7 +1358,7 @@ class LineSeparatorTest(Repo):
 
 
 class CrossDeviceTest(Repo):
-    """`.git` が別のファイルシステムでも、作業ツリーの側の一時ファイルで書く。"""
+    """`.git` が別のファイルシステムでも、ワークツリーの側の一時ファイルで書く。"""
 
     def exdev(self):
         real = os.replace

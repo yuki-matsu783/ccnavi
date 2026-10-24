@@ -61,7 +61,7 @@ keywords: [複数人, 別PC, 別セッション, 引き継ぎ, 同期, fetch, sy
 | 入口 | 動くところ | 書くもの | 作業者側への反映 |
 |---|---|---|---|
 | Chrome 拡張 | 承認者のブラウザ。トークンだけで、同梱の ccnavi（Pyodide）が同じ判定のコアを呼ぶ | 親のブランチへ 1 コミット（承認・レビュー済み・「始める」）。GitHub は `expectedHeadOid` で書く時点の先頭を確かめ、GitLab は Commits API でファイル単位の確認をする。保護されたブランチと統合先へは書かない | 次の `fetch` / `sync` |
-| VS Code のボード | ユーザの VS Code。拡張が ccnavi の実行ファイルを子プロセスで呼ぶ | 承認は `user agree --yes`。端末の入力は要らない。エージェントが同じ形を打つことは組み込みの deny（`builtin:guard-ticket-approval`）が止める | 同じ PC の作業ツリー。承認後の push は統合ターミナルへ送る |
+| VS Code のボード | ユーザの VS Code。拡張が ccnavi の実行ファイルを子プロセスで呼ぶ | 承認は `user agree --yes`。ターミナルの入力は要らない。エージェントが同じ形を打つことは組み込みの deny（`builtin:guard-ticket-approval`）が止める | 同じ PC のワークツリー。承認後の push は統合ターミナルへ送る |
 
 拡張は表示と書き込みの入口である（P10）。
 

@@ -218,7 +218,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 編集の途中を持つので、タブを非表示にしても捨てない
+    // 編集の途中を持つので、タブを非表示にしても破棄しない
     retainContextWhenHidden: true,
   });
   showLoading(panel, titleOf(ticket), SCREEN, `${ticket} のフロー`);
@@ -291,7 +291,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     return { target, exists: false, mtimeMs: 0, hash: "", doc, shown, offer: readOffer(root, target, doc) };
   }
   const { bytes, mtimeMs } = read;
-  const refuse = (why: string): Error => new Error(`フローのファイルを開きません（${shown}）: ${why}。エディタで直してから再読込してください`);
+  const refuse = (why: string): Error => new Error(`フローのファイルを開きません（${shown}）: ${why}。エディタで直してから再読み込みしてください`);
   // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として不正かどうかも
   // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を省いて書くことになる。エディタで直させる
   const verdict = await lintText(root, tmpDir, bytes, shown);
@@ -310,7 +310,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   // 値の意味が変わる（`0755` `yes` `1:30` マージキー など）。意味の答えは実行ファイルが持つ（core/flow-match.ts）
   const mismatch = flowMismatch(value.value, verdict.data);
   if (mismatch !== undefined) {
-    throw new Error(`フローのファイルを開きません（${shown}）: ${openMismatchText(mismatch)}。直したら再読込してください`);
+    throw new Error(`フローのファイルを開きません（${shown}）: ${openMismatchText(mismatch)}。直したら再読み込みしてください`);
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
@@ -547,7 +547,7 @@ async function refreshLock(current: PanelState): Promise<{ readonly lock: FlowLo
   return { lock, target };
 }
 
-/** いま見せるものを渡す。画面の編集はここで捨てられる（読み直し・保存が通ったときだけ呼ぶ） */
+/** いま見せるものを渡す。画面の編集はここで破棄される（読み直し・保存が通ったときだけ呼ぶ） */
 function show(current: PanelState): void {
   const loaded = current.loaded;
   if (loaded === undefined) {
@@ -582,7 +582,7 @@ function requestAndOffer(current: PanelState, loaded: Loaded): { request?: strin
   return { ...(request === undefined ? {} : { request }), ...(loaded.offer === undefined ? {} : { offer: loaded.offer }) };
 }
 
-/** 下書きか錠が動いた。読み込んだフローと比べ直して、依頼のボタンと「提案あり」を出し直す（編集は捨てない） */
+/** 下書きか錠が動いた。読み込んだフローと比べ直して、依頼のボタンと「提案あり」を出し直す（編集は破棄しない） */
 function postOffer(current: PanelState): void {
   const loaded = current.loaded;
   if (loaded === undefined || !alive(current)) {
@@ -686,7 +686,7 @@ function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToFlow);
 }
 
-/** 往復の間に読み直されていたら、この操作は捨てる（捨てた編集をファイルに入れない） */
+/** 往復の間に読み直されていたら、この操作は破棄する（破棄した編集をファイルに入れない） */
 function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
@@ -782,7 +782,7 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
 
 /**
  * 編集中のコピーを実行ファイルに確かめさせ、言ったこと（warn・渡る手順・候補）を画面に返す。書きはしない。
- * 読み直しの後に届いた答えは画面が番号（`seq`）で捨てる
+ * 読み直しの後に届いた答えは画面が番号（`seq`）で破棄する
  */
 async function check(current: PanelState, seq: number, doc: FlowDoc): Promise<void> {
   const loaded = current.loaded;
@@ -943,7 +943,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（正とする側のツリー）が替わることがある
   const filePath = loaded.target.flow.path;
   if (target.flow.path !== filePath) {
-    fail(current, `フローの置き場が変わりました（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直してください`);
+    fail(current, `フローの置き場が変わりました（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読み込みしてから編集し直してください`);
     return;
   }
   // 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。5. リンクを辿らない。

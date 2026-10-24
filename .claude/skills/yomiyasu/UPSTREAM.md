@@ -30,6 +30,7 @@ upstream の `skills/yomiyasu/` から次をそのまま写した。
 ## ローカルの変更
 
 - 禁止語に「旧い」とその活用形（「旧く」「旧かっ」「旧けれ」）を足した（「古い」に統一する）。`scripts/yomiyasu_lint.py` の `SLOP_WORDS` と `references/slop-catalog.md` の表。upstream から差し替えるときは足し直す
+- SKILL.md から、和欧文間の半角空白を除く規則を消した（description・「装飾記号の完全排除」・Step 2 の 5）。空白の入れ方はこのスキルでは決めず、対象の文書や画面の既存の書き方に合わせる。upstream から差し替えるときは消し直す（リンターには空白の検査は無い）
 
 ## 既知の注意
 

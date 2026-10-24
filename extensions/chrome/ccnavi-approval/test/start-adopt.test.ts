@@ -145,7 +145,7 @@ test("CX-T253 採用の確認に引っかかったら、何も作らずに止め
     ["フォーク", { fork: true }, () => undefined, /フォークから出た MR/],
     ["マージ先", { base: "develop" }, () => undefined, /マージ先が develop で、統合先 main ではありません/],
     ["保護されたブランチ", { branch: "release/1.0" }, () => undefined, /採用できません/],
-    ["識別子が長い", { branch: `feature/${"a".repeat(60)}` }, () => undefined, /識別子 .* は使えません/],
+    ["識別子が長い", { branch: `feature/${"a".repeat(60)}` }, () => undefined, /識別子 .* は指定できません/],
     ["識別子の末尾が -2 桁", { branch: "feature/20-login-05" }, () => undefined, /末尾が `-<2 桁>`/],
     ["識別子の重なり", {}, (m) => m.branch("feature-20-login", "main"), /どちらも識別子 feature-20-login になります/],
   ];

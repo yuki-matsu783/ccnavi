@@ -5,7 +5,7 @@ description: 拡張が残った指摘の行き先（対応しない・このフ�
 tags: [extension, review, host]
 keywords: [Chrome 拡張, decide, issue, 返信, 解決, 部分失敗, 再試行, 隠しマーカー, writeLoop, PAT, Issues, Pull requests, 採番]
 ---
-# ADR-0170: Chrome 拡張の decide は、issue・返信・解決の順にホストへ書いてから、親のブランチへ 1 コミットする
+# ADR-0172: Chrome 拡張の decide は、issue・返信・解決の順にホストへ書いてから、親のブランチへ 1 コミットする
 
 状態: 採用
 

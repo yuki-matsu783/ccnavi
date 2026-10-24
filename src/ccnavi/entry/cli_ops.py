@@ -90,7 +90,7 @@ def operate(
                 "--reason <理由> と --result <json> を指定してください。\n"
             )
             return EXIT_ERROR
-        # ユーザの判断。`--agree` / `--reviewed` と同じく端末を求める。
+        # ユーザの判断。`--agree` / `--reviewed` と同じくターミナルを求める。
         if not cli_args._from_terminal(stdin, conf, stderr, user_only.terminal("close-early")):
             return EXIT_ERROR
         via.set_via(via.VIA_TERMINAL)
@@ -158,7 +158,8 @@ def operate(
             )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.choose_out:
-        # 対話の decide の前半（ロックを持ったままユーザを待たないため分ける）。ユーザが端末で選び、
+        # 対話の decide の前半（ロックを持ったままユーザを待たないため分ける）。
+        # ユーザがターミナルで選び、
         # 選択とダイジェストを state の置き場に書くだけ。置くのは sh が write-and-push の中で
         # `--yes <選択> --digest <ダイジェスト>` で打つ。
         if not cli_args._inside(
@@ -317,7 +318,8 @@ def _worktree(
     """
     verb = words[1] if len(words) > 1 else ""
     if args.abandon is not None:
-        # 放棄した親の片付けの記録を消す。ユーザが端末で打つ（hook がエージェントからは止める）。
+        # 放棄した親の片付けの記録を消す。
+        # ユーザがターミナルで打つ（hook がエージェントからは止める）。
         if words != ["worktree", "retire"] or not ticket_ids.is_valid_id(args.abandon):
             stderr.write(
                 "ccnavi: worktree retire --abandon <親> の形で指定してください"
@@ -444,7 +446,7 @@ def _write_and_push_bypass(
 
 
 def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
-    """`ccnavi-sync.sh` が要るパスと名前を 1 行 1 項目（`<鍵> <値>`）で返す。
+    """`ccnavi-sync.sh` が要るパスと名前を 1 行 1 項目（`<キー> <値>`）で返す。
 
     sh は jq を使わず、JSON も読まない。置き場のパス（ツリーのルートからの相対）をここが渡す。
     統合先の名前は返さない（sh が各リポジトリの `origin/HEAD` で決める）。
@@ -470,11 +472,11 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
     - `pending`: 未完了の記録を 1 行ずつ（`<操作ID> <種類> <未完了の段階>`）。無ければ何も出さない
     - `show <操作ID>`: 記録の JSON
     - `stage-set <操作ID> <段階ID> <状態> [URL] [アカウント]`: 段階の状態を書く
-    - `applied <操作ID> <鍵> <値>`: ローカルに適用したものを残す（値は true / false / 文字列）
+    - `applied <操作ID> <キー> <値>`: ローカルに適用したものを残す（値は true / false / 文字列）
     - `reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント]`: 送信の照合。結論を
       `sent|send|unknown|stop` で出す（`yes` は一覧を最後まで読めた、`no` は打ち切った）
-    - `begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>…`: 鍵から決めた操作ID で記録を作る
-      （エージェントの request・comment・ready が、打ち直しで同じ記録に当たるため）。ID を出す
+    - `begin <種類> <親> <フェーズ> <MR> <キー> <段階ID:種類>…`: キーから決めた操作ID で記録を作る
+      （エージェントの request・comment・ready が、打ち直しで同じ記録にヒットするため）。ID を出す
     - `post-text <操作ID> <段階ID> <ファイル>`: 段階で投稿する本文を、保存した判断から作り直して書く
     - `resume-plan <操作ID> <ファイル>`: 保存した判断から受け入れの計画を書き直す（`--resume`）
     - `done <操作ID>`: すべての段階が sent なら記録を消す。消したら `done`、残るなら `open` を出す
@@ -529,15 +531,15 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
             stdout.write(f"{verdict} {why}".rstrip() + "\n")
             return EXIT_OK
         if len(words) >= 7 and words[0] == "begin":
-            # begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>…
-            # 鍵から決めた ID で作る（既にあれば作らない）
+            # begin <種類> <親> <フェーズ> <MR> <キー> <段階ID:種類>…
+            # キーから決めた ID で作る（既にあれば作らない）
             kind, parent, phase, mr, key = words[1:6]
             if key.startswith("@"):
-                # 鍵の中身をファイルから取る（本文そのものを鍵にして、衝突を避ける）
+                # キーの中身をファイルから取る（本文そのものをキーにして、衝突を避ける）
                 body = fsio.read_text(key[1:])
                 if not body:
                     # 読めない・空のときにパス文字列で代えると、本文が違っても同じ操作になってしまう
-                    stderr.write(f"ccnavi: 鍵にする本文のファイルを読めない（{key[1:]}）\n")
+                    stderr.write(f"ccnavi: キーにする本文のファイルを読めない（{key[1:]}）\n")
                     return EXIT_ERROR
                 key = body
             stages = []
@@ -588,12 +590,12 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
                 return EXIT_ERROR
             return EXIT_OK if review_decide.resume_plan(record, words[2]) == 0 else EXIT_ERROR
         if len(words) == 8 and words[0] == "mark-sent":
-            # mark-sent <種類> <親> <MR> <鍵> <段階ID> <URL>: 目印で見つけた投稿を送り済みにする
+            # mark-sent <種類> <親> <MR> <キー> <段階ID> <URL>: 目印で見つけた投稿を送り済みにする
             key = words[4]
             if key.startswith("@"):
                 key = fsio.read_text(key[1:]) or ""
             if not key:
-                stderr.write("ccnavi: 鍵にする本文を読めない\n")
+                stderr.write("ccnavi: キーにする本文を読めない\n")
                 return EXIT_ERROR
             oplog.mark_sent(conf.state, words[1], words[2], words[3], key, words[5], words[6])
             return EXIT_OK
@@ -610,7 +612,7 @@ def ops_command(stdout: TextIO, stderr: TextIO, conf: settings.Settings, words: 
     stderr.write(
         "ccnavi: ops の使い方: pending / show <操作ID> / "
         "stage-set <操作ID> <段階ID> <pending|sent|unknown> [URL] [アカウント] / "
-        "begin <種類> <親> <フェーズ> <MR> <鍵> <段階ID:種類>… / applied <操作ID> <鍵> <値> / "
+        "begin <種類> <親> <フェーズ> <MR> <キー> <段階ID:種類>… / applied <操作ID> <キー> <値> / "
         "reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント] / "
         "done <操作ID> / retire <親>\n"
     )

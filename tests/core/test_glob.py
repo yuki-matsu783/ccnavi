@@ -1,6 +1,6 @@
 """glob の翻訳。意味は `fnmatch` そのままで、足しているのは区切りの正規化だけ。
 
-見るのは 3 つ。文字列全体に当たること、区切り文字がどちらの表記でも当たること、
+見るのは 3 つ。文字列全体にヒットすること、区切り文字がどちらの表記でもヒットすること、
 そして語の切れ目が入らないこと。3 つ目は失われた機能ではなく決めた仕様で、
 ここに書いておかないと、次に触る人が「入れ忘れ」と読んで戻してしまう。
 """
@@ -17,14 +17,14 @@ class TranslateTest(unittest.TestCase):
     def hit(self, glob: str, subject: str) -> bool:
         return re.match(translate(glob), subject) is not None
 
-    def test_文字列全体に当たる(self):
-        # 部分一致は自動で足さない。足すと「書いたものがそのまま当たる」が
-        # 成り立たなくなり、書いていない範囲にまでルールが当たる。
+    def test_文字列全体にヒットする(self):
+        # 部分一致は自動で足さない。足すと「書いたものがそのままヒットする」が
+        # 成り立たなくなり、書いていない範囲にまでルールがヒットする。
         self.assertTrue(self.hit("git push", "git push"))
         self.assertFalse(self.hit("git push", "cd /repo && git push"))
         self.assertTrue(self.hit("*git push*", "cd /repo && git push"))
 
-    def test_区切り文字はどちらの表記にも当たる(self):
+    def test_区切り文字はどちらの表記にもヒットする(self):
         # ルールは 1 回書いて、どの機械でも同じ意味でなければならない。
         for subject in ("/repo/secrets/token.txt", "C:\\repo\\secrets\\token.txt"):
             with self.subTest(subject=subject):
@@ -39,8 +39,8 @@ class TranslateTest(unittest.TestCase):
         # 左側は glob では書けない。regex を使うことになる。
         self.assertTrue(self.hit("*git push*", "legit push"))
 
-    def test_ワイルドカードは語の中でも当たる(self):
-        # 語の切れ目を勝手に挟むと、ここが当たらなくなる。
+    def test_ワイルドカードは語の中でもヒットする(self):
+        # 語の切れ目を勝手に挟むと、ここがヒットしなくなる。
         for glob, subject in (
             ("*foo*bar*", "foobar"),
             ("*foo*bar*", "fooXbar"),
@@ -50,10 +50,10 @@ class TranslateTest(unittest.TestCase):
             with self.subTest(glob=glob, subject=subject):
                 self.assertTrue(self.hit(glob, subject))
 
-    def test_いま使っている書き方が意図どおり当たる(self):
+    def test_いま使っている書き方が意図どおりヒットする(self):
         # ルールファイルと組み込みの既定にある書き方を、実例で押さえる。
-        # 翻訳後の式ではなく当たり方で書くのは、fnmatch の出す式が
-        # 版によって変わりうるため。確かめたいのは式ではなく当たり方。
+        # 翻訳後の式ではなくヒットの仕方で書くのは、fnmatch の出す式が
+        # 版によって変わりうるため。確かめたいのは式ではなくヒットの仕方。
         for glob, subject, want in (
             ("*git push*", "git push origin main", True),
             ("*git push*", "cd /repo && git push", True),

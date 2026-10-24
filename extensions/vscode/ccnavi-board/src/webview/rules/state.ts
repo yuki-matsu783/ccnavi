@@ -1,18 +1,18 @@
 /**
  * ルール管理画面が編集中に持つもの。ルールのコピー（`Draft`）と、開いている行・開いているタブ。
  *
- * 契約の `Sections` はタイプごとの配列だけを持つが、画面は行ごとに動かない鍵が要る
+ * 契約の `Sections` はタイプごとの配列だけを持つが、画面は行ごとに動かないキーが要る
  * （足す・消す・タイプを移す・並べ替えの間、React が同じ行を同じ行として描き直せるように）。
- * id はユーザが打つもので、空にも重複にもなるので鍵には使えない。鍵は画面の中だけのもので、
+ * id はユーザが打つもので、空にも重複にもなるのでキーには使えない。キーは画面の中だけのもので、
  * 拡張ホストへ渡すのは、ファイルを選ぶとき（`pickFile` → `picked`）に行を名指しするときだけ。
  *
  * 残す先は Webview の state（`{ open: [id, …], tab }`）。
- * 残すのは id で、鍵は画面を作り直すと変わるため。id が空の行は残せない。
+ * 残すのは id で、キーは画面を作り直すと変わるため。id が空の行は残せない。
  */
 import { SECTIONS, type RuleForm, type Section, type Sections } from "../../core/rules-view.js";
 import { getState, setState } from "../vscode.js";
 
-/** 行 1 つ。`key` は画面の中だけの鍵 */
+/** 行 1 つ。`key` は画面の中だけのキー */
 export interface Row {
   readonly key: string;
   readonly rule: RuleForm;
@@ -22,7 +22,7 @@ export type Draft = Readonly<Record<Section, readonly Row[]>>;
 
 export const EMPTY_DRAFT: Draft = { deny: [], ask: [], allow: [] };
 
-/** 鍵を配る。1 枚の画面の中で数え上げる（`r1`、`r2`、…） */
+/** キーを配る。1 枚の画面の中で数え上げる（`r1`、`r2`、…） */
 export function keyer(): () => string {
   let seq = 0;
   return () => {
@@ -31,7 +31,7 @@ export function keyer(): () => string {
   };
 }
 
-/** 拡張ホストが渡したルールを、行に鍵を付けたコピーにする */
+/** 拡張ホストが渡したルールを、行にキーを付けたコピーにする */
 export function draftOf(sections: Sections, nextKey: () => string): Draft {
   const draft = {} as Record<Section, Row[]>;
   for (const section of SECTIONS) {
@@ -40,7 +40,7 @@ export function draftOf(sections: Sections, nextKey: () => string): Draft {
   return draft;
 }
 
-/** 拡張ホストへ返す形に戻す。鍵は除く */
+/** 拡張ホストへ返す形に戻す。キーは除く */
 export function sectionsOf(draft: Draft): Sections {
   const sections = {} as Record<Section, RuleForm[]>;
   for (const section of SECTIONS) {
@@ -49,7 +49,7 @@ export function sectionsOf(draft: Draft): Sections {
   return sections;
 }
 
-/** 新しいルール。刻み（`every`）は空で始める。空は「刻み無し」＝ 当たるたびに渡す */
+/** 新しいルール。刻み（`every`）は空で始める。空は「刻み無し」＝ ヒットするたびに渡す */
 export function emptyRule(): RuleForm {
   return {
     origin: null,
@@ -66,7 +66,7 @@ export function emptyRule(): RuleForm {
   };
 }
 
-/** 鍵からタイプと行を引く */
+/** キーからタイプと行を引く */
 export function findRow(draft: Draft, key: string): { readonly section: Section; readonly row: Row } | undefined {
   for (const section of SECTIONS) {
     const row = draft[section].find((item) => item.key === key);
@@ -111,7 +111,7 @@ export function saveTab(tab: TabName): void {
   setState({ ...((getState() ?? {}) as object), tab });
 }
 
-/** state に残してある id から、いまの行の鍵に直す。画面を作り直したあとに開き直すため */
+/** state に残してある id から、いまの行のキーに直す。画面を作り直したあとに開き直すため */
 export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlySet<string> {
   const keys = new Set<string>();
   for (const section of SECTIONS) {

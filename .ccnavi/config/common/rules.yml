@@ -1,16 +1,16 @@
-# タイプは強い順に deny / ask / allow。どこにも当たらない呼び出しについて ccnavi は
+# タイプは強い順に deny / ask / allow。どこにもヒットしない呼び出しについて ccnavi は
 # 判定を持たず、Claude Code の権限モードに従う。
 #
 # glob と regex は必ず引用符で囲む。囲まないと YAML が先に解釈する。
 # `<<` はマージキー、`*` はエイリアス、`&` はアンカー、`!` はタグになる。
 #
-# glob は fnmatch と同じ意味で、文字列全体に当たる。部分一致が欲しければ
+# glob は fnmatch と同じ意味で、文字列全体にヒットする。部分一致が欲しければ
 # 前後に `*` を自分で書く。語の切れ目は入らないので、右側だけなら
 # `*sed *` のように空白を書いて守る。左側の切れ目は glob では書けない。
-# `*git push*` は `legit push` にも当たる。これを避けたい場合は regex を使う。
+# `*git push*` は `legit push` にもヒットする。これを避けたい場合は regex を使う。
 #
 # 「A だが B は除く」は except: に `- glob: '...'` か `- regex: '...'` を並べて書く。
-# 本体に当たっても、どれかに当たればそのルールは当たらない（workspace-root がこの形）。
+# 本体にヒットしても、どれかにヒットすればそのルールはヒットしない（workspace-root がこの形）。
 #
 # 「A か B」「A かつ B」は glob / regex の代わりに when: で組み合わせ条件として書く。ノードは
 # `glob: '...'` / `regex: '...'`（個別条件）・`all: [...]`・`any: [...]`・`not: {...}` のどれか 1 つ。
@@ -29,7 +29,7 @@ deny:
   # except で除く。置き場の名前そのもの（`wip/handoff`・`scratchpad`）も除くのは、ディレクトリを指すだけの
   # 呼び出しを止めないため。
   # Bash の書き込み（`>`・`tee`・`sed -i`・`rm`・`cp` など）も、書き込み先を解いたパスに対して
-  # このルールを当てて止める（src/ccnavi/hook/rootwrite.py。id を `workspace-root` から変えると外れる）。
+  # このルールを適用して止める（src/ccnavi/hook/rootwrite.py。id を `workspace-root` から変えると外れる）。
   - id: workspace-root
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/]'
@@ -53,7 +53,7 @@ deny:
     match: Write|Edit|NotebookEdit
     regex: '^(?:/private)?/tmp/claude-[^\\/]+[\\/](?:[^\\/]+[\\/])*scratchpad(?:[\\/]|$)'
     message: >-
-      セッションのスクラッチパッドには書けません。ユーザに渡す物（保護対象を直した写しなど）は
+      セッションのスクラッチパッドには書けません。ユーザに渡す物（保護対象を直したコピーなど）は
       wip/handoff/（ワークツリーの中ならそのワークツリーの、無ければワークスペースルート直下の）、
       直接作業で一時的に見せる物・コミットしたくない物はワークスペースルート直下の scratchpad/ に置いてください。
       置いたファイルのパスも伝えてください（.ccnavi/docs/scratchpad.md）。
@@ -120,7 +120,7 @@ ask:
 
 allow:
   # 書き込みを許すのはワークツリーの中だけ。ワークスペースルートの側は deny の workspace-root が止める。
-  # ワークツリーの中でも hook・スクリプト・settings.json などは deny が先に当たる。
+  # ワークツリーの中でも hook・スクリプト・settings.json などは deny が先にヒットする。
   - id: worktrees
     match: Write|Edit
     glob: "*/.claude/worktrees/*"
@@ -135,16 +135,16 @@ allow:
     additionalContextFile: .ccnavi/docs/skill-review.md
 
   # 提案を書くとき（親のフィードバック計画の改版を含む）に、振り返りの候補を思い出させる。
-  # 当てるのはワークツリーの中の todo/ だけで、上の worktrees の allow の内側。判定は変わらない。
+  # 適用するのはワークツリーの中の todo/ だけで、上の worktrees の allow の内側。判定は変わらない。
   - id: skill-review-at-proposal
     match: Write|Edit
     glob: "*/.claude/worktrees/*/wip/proposals/todo/*"
     additionalContext: >-
       親の feedback: を書くなら、振り返りで残したスキルの候補（親のワークツリーの
       wip/handoff/skill-candidates.md）を見て、あれば skill-improve を入れる。feedback: は
-      最後の項がほかの全部を after で待つ形にする（後ろに足すだけだと承認で落ちる）ので、
-      最後の項の after に skill-improve の番号も足すか、skill-improve を最後に置いてほかの全部を
-      待たせる。定義は ccnavi --plan-order <親> --fill-phases で親の phases: に写す。
+      最後のステップにほかの全部が after で先行する形にする（後ろに足すだけだと承認で落ちる）ので、
+      最後のステップの after に skill-improve の番号も足すか、skill-improve を最後に置いてほかの全部を
+      待たせる。定義は ccnavi --plan-order <親> --fill-phases で親の phases: にコピーする。
       手順は .ccnavi/docs/skill-review.md。
 
   # git の入口。サブコマンドの選別はラッパースクリプトの中で行うので、ここでは区別しない。

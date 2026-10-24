@@ -46,7 +46,7 @@ export const WEBVIEW_SRC = path.join(__dirname, "..", "..", "..", "src", "webvie
  *
  * バンドルした CSS は esbuild が並べ直すので（1 宣言 1 行、選択子も 1 つ 1 行）、規則そのものを
  * 文字列で見たいテストは、この形（`.card { a: 1; b: 2; }`）で読む。並べ方が変わっても、
- * 当てるものと宣言が変わらなければ通る。
+ * 適用するものと宣言が変わらなければ通る。
  */
 export function flatStyle(html: string): string {
   const found = /<style nonce="[^"]*">\n([\s\S]*?)\n<\/style>/.exec(html);

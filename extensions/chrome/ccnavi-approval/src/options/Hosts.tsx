@@ -83,7 +83,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       await chrome.storage.local.set({ customHosts: rows });
       // 同じ許可を組み込みや別の port の行も使っていれば、許可は外さない
       await releasePermission(h, await loadAllHosts());
-      setSaid({ text: `${h.id} と、このブラウザに保存されていたPATを削除しました。ホスト側でもPATを失効させてください。`, ok: true });
+      setSaid({ text: `${h.id} と、このブラウザに保存されていた PAT を削除しました。ホスト側でも PAT を失効させてください。`, ok: true });
     } catch (err) {
       setSaid({ text: (err as Error).message, ok: false });
     } finally {
@@ -98,7 +98,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       <ul id="host-list" className="list">
         {hosts.length === 0 ? (
           <li className="row entry">
-            <span className="text">追加のホストは登録されていません（GitHub.comとGitLab.comは標準で利用できます）。</span>
+            <span className="text">追加のホストは登録されていません（GitHub.com と GitLab.com は標準で利用できます）。</span>
           </li>
         ) : null}
         {hosts.map((h) => (
@@ -121,7 +121,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
           </select>
         </label>
         <label className="field">
-          <span className="cap">ホストのURL（スキーム・ホスト名・必要に応じてポート番号のみ。例 https://gitlab.example.com・http://localhost:8080）</span>
+          <span className="cap">ホストの URL（スキーム・ホスト名・必要に応じてポート番号のみ。例 https://gitlab.example.com・http://localhost:8080）</span>
           <input name="url" id="host-url" type="text" required placeholder="https://gitlab.example.com" />
         </label>
         <div className="buttons">

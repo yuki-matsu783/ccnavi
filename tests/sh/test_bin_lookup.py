@@ -1,6 +1,6 @@
 """保護済み sh が起動する実行ファイルを探す順（.ccnavi/scripts/ccnavi-common.sh の ccnavi_bin）。
 
-ユーザが端末から `ccnavi-ticket.sh` などを打つ場面では settings.json の env が反映されず、
+ユーザがターミナルから `ccnavi-ticket.sh` などを打つ場面では settings.json の env が反映されず、
 CCNAVI_ENTRY_PATH は無いのが普通。配布先には `dist/` もソースも無く、実行ファイルは
 `.ccnavi/bin/<os>-<arch>/` にしか無い。そこを見ないと、配布先では必ず
 「実行ファイルが見つかりません」で止まる。
@@ -103,7 +103,8 @@ class BinLookupTest(unittest.TestCase):
         self.assertTrue(result.stdout.startswith("bin "), result.stdout + result.stderr)
 
     def test_a_link_to_the_launcher_on_path_is_not_a_build(self):
-        """ccnavi という名前で張った launcher へのリンクは、起動すると自分に戻る。無いものとして扱う。"""
+        """ccnavi という名前で張った launcher へのリンクは、起動すると自分に戻る。
+        無いものとして扱う。"""
         place = os.path.join(self.ws, "on-path")
         os.makedirs(place)
         launcher = os.path.join(self.ws, ".ccnavi", "scripts", platformtag.LAUNCHER_NAME)

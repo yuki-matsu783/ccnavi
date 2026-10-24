@@ -57,10 +57,11 @@ def skip_if_too_big_for_argument(test: unittest.TestCase, scene_dir: str) -> Non
         test.skipTest(f"{size} 字の引数を jq に渡せない（引数の上限）")
 
 
-# 写す sh の出どころ。`CCNAVI_SH_DIR` で差し替えられる（既定はこのツリーの `.ccnavi/scripts/`）。
+# コピーする sh の出どころ。
+# `CCNAVI_SH_DIR` で差し替えられる（既定はこのツリーの `.ccnavi/scripts/`）。
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 
-# 写す sh。decide の置く形は、ユーザ専用の ccnavi-user-decide.sh（共有の部品を読む）に移った。
+# コピーする sh。decide の置く形は、ユーザ専用の ccnavi-user-decide.sh（共有の部品を読む）に移った。
 REVIEW_SH = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")
 
 
@@ -337,7 +338,7 @@ class HostFixtureTest(unittest.TestCase):
         self.assertIn("createdAt", ask(q.replace(" createdAt", ""))["errors"][0]["message"])
 
     def test_decide_passes_the_token_owner_and_the_way(self):
-        """decide のマーカーにも actor と via（ボードは board、端末は terminal）"""
+        """decide のマーカーにも actor と via（ボードは board、ターミナルは terminal）"""
         for args, via in (
             (["decide", "1", "--choices", "{}", "--digest", "d"], "board"),
             (["decide", "1"], "terminal"),

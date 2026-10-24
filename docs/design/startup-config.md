@@ -20,13 +20,13 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | hook から（payload あり） | イベントごとの手順（4.2）。終了コード 0 は通す、2 は止める・差し戻す |
 | hook の入力なし | 使い方を標準エラーに出して終了コード 1 |
 | 診断用のオプション（`--lint` `--test` `--test-expectations` `--explain`） | ユーザと VS Code 拡張が使う（10 章） |
-| `user …`（`ccnavi user` の操作）/ `ticket …` / `review …` | チケット制御の操作。ユーザが端末で打つか、ボードの子プロセスか保護済みスクリプトが呼ぶ（9 章） |
+| `user …`（`ccnavi user` の操作）/ `ticket …` / `review …` | チケット制御の操作。ユーザがターミナルで打つか、ボードの子プロセスか保護済みスクリプトが呼ぶ（9 章） |
 
 ワークスペースルートは `--root` → 環境変数 `CLAUDE_PROJECT_DIR` → 作業ディレクトリから上へ辿って
 `.claude/` を持つ最初のディレクトリ、の順で決める。ただし `.claude/worktrees/<名前>` の位置の
 ディレクトリ（ワークツリー）は `.claude/` を持っていても飛ばす。
 
-`CLAUDE_PROJECT_DIR` が無い端末や Bash ツールから、`.claude/` を持つプロジェクトの中で `ccnavi` を直接打つと、`--root` を渡さない限りそのプロジェクトが根と見なされる。`--root` を付けるか、sh のラッパーを通す。未解決で、洗い出しは `docs/design/multi-repo/standalone-clone-gaps.md` の A2。
+`CLAUDE_PROJECT_DIR` が無いターミナルや Bash ツールから、`.claude/` を持つプロジェクトの中で `ccnavi` を直接打つと、`--root` を渡さない限りそのプロジェクトが根と見なされる。`--root` を付けるか、sh のラッパーを通す。未解決で、洗い出しは `docs/design/multi-repo/standalone-clone-gaps.md` の A2。
 
 配布物は PyInstaller の onedir。実行時の依存は PyYAML 1 本で、読むのは `safe_load` に限る。
 呼び出しごとに起動して終わる。
@@ -35,13 +35,13 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 | イベント | すること | 応答 |
 |---|---|---|
-| `SessionStart` | 実行ファイルのバックアップを取る（設定ファイルは最初の発言で取る。8.3）。`additionalContextOnce` の記憶（渡した回の数え）を、起動・再開・compact・clear のどの回でも捨てる（古いセッションの分も消す。`every` の刻みも 0 から数え直す）。`source=startup` なら `match: Stop` の数えも捨てる（6.6）。`source=startup` と `resume` では、そのセッションの実行中のサブエージェントの印と、動かしている作業の印（`state/busy-<セッション>.json`）と、ターン中の印（`state/turn-<セッション>.json`）も捨てる（新しいプロセスで前の体は生きていない。compact と clear では捨てない。9.12）。`source=startup` では、起動時に在る保護領域の変更を実行後チェックの基準として記録する（7.4）。どの回でも、記録のローテートと、古い記録・終わったセッションの記録の削除（prune）を行う（失敗しても開始は止めない）。サブエージェントでなければ、ワークスペースルートとプロジェクトの元ツリーに残った、終わっていない `integrate` の記録（`ccnavi-integrate/<名前>/marker`）を、版 4 の記録は続きの一手の行で、それ以外は「版を知らない壊れた記録」として、モデルとユーザ（`systemMessage`）の両方に知らせる。記録が無ければ何も足さない。期限は hook の期限と開始から 2 秒のうち小さいほう（9.6）。サブエージェントでなければ、ccnavi が前提にしている作業の決まりと考え方を、`.ccnavi/CCNAVI.md` の本文として渡す。対象は、ワークツリー・`ccnavi-git.sh`・`wip/handoff/`・保護対象の直し方（`ccnavi-stage.sh`）・プロジェクトへの `cd`・サブエージェント・合意の要る変更・他セッションへの影響である。チケット制御が有効なら `ccnavi-ticket.sh status` も渡す。`hook/ccnavimd.py` が、条件 `<!-- ccnavi:if 名前 -->` と差し込み `{{名前}}` を解く。条件が成り立たないときの行は `<!-- ccnavi:else -->` で分ける。囲みの中は、深さ 1 段につき半角空白 2 つでインデントしてよく、載せるときに取る。名前ごとに独立した関数が真偽を返す。md が無いときは、無いことだけを 1 行で言う。書き方は `--lint` が `(ccnavi-md)` で見る。ワークツリーと git の行は、共通レイヤーと自身のレイヤーの deny に `workspace-root`・`raw-git` があるときだけ渡す。git の行は、生の git を組み込みで止めるとき（9.1）も渡す。索引の案内を出す回は、`--docs` で詳しく引くよう添える（REQ-SES-06）。チケット制御が有効なら、直接作業とチケット作業の使い分けも同じ md の条件 `tickets` で渡す（9.1）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。チケット制御が有効で、サブエージェントでなければ、cwd のワークツリーに結び付く承認済みチケットの要求のうち、上位の設定（ルールの deny・親の範囲・フェーズ定義の上限）に却下されて効かないものを、要求・理由・出所と、件数と先頭 3 件で渡す。残りは `--explain` へ誘う。glob の重なりは近似なので、その断りを添える。ワークスペースルートからは、却下のあるチケットの件数だけ言う。`--explain` の節「■ 上位の設定に却下された要求」は全件を 1 件 1 行で出す。この 2 つで REQ-SES-02 を満たす。却下は記録に残さず、いまの承認済みチケットとルールから都度再計算する（承認はチケットの中身を変えないので、承認時の結果を固定せず、ルールが変われば結果も変わる）。判定は変えない。この却下の段落（ワークスペースルートでは件数の行）は `systemMessage` にも載せる。サブエージェントでなければ、このPCで作業中の親を 1 行ずつ渡す（チケット制御が有効なとき。親・ブランチ・MR・次の子・未送信。読めなくても開始は止めない）。学びの蓄積が有効なら、提案の候補が新しく現れた回だけ、ユーザにだけ（`systemMessage`。モデルの文脈には入れない）知らせる。サブエージェントでなければ、ワークスペースとプロジェクトの md の frontmatter の索引を差分で新しくする。時間は 3 秒と hook の判定の期限の残りのうち小さいほうまでとする。`--docs` での引き方の 1 行を足す（書き方は、frontmatter の無い md を作った時点で `PostToolUse` が案内する。決まりの文書があれば `--docs --keyword frontmatter` で引くよう添える）。無視の行を足したツリー（その `.gitignore` に未コミットの差分が残る）、索引の対象外にしたツリー、書き換えなかった ccnavi-index.jsonl を渡す（10） | `additionalContext`。却下・終わっていない `integrate`・学びの提案は `systemMessage` にも |
-| `UserPromptSubmit` | ターン中の印を置く（ユーザの発言でもバックグラウンド作業の完了通知でも置く。8.4）。保護領域にいまある変更を記録し、ターンの基準にする（7.4）。ユーザの発言なら、まず共通レイヤーと工程スキルを、着手済みの親のワークツリーのプロジェクトへ写し（`promptsync`。差分が無ければ何も読み書きしない。11.12）、そのあと、前のターンの終わりからの変更をユーザの手によるものとして受け入れる（設定ファイルのバックアップを今の状態に取り直し、`deny` の場所の今の変更を報告済みにする。バックグラウンド作業の完了通知では行わない。8.3、7.4）。取り直しに失敗したときは標準エラーと記録の `guarded` に残す。依頼文に issue・MR の指定があれば、実装の依頼なら `ccnavi-start.sh --check` と `ccnavi-start.sh` を打たせ（出力の「次:」に従う）、説明・調査だけなら答えてよい、という短い指示を渡す（コードブロック・インラインコード・語の一部の番号は拾わない。9.13）。サブエージェントが終わったとき、子のワークツリーを読めず範囲外の変更を確かめられなかったことを示す印が残っていれば、次の依頼の前に「合流の前にそのワークツリーを確かめて」と伝える（9.12） | 無し。伝えることがあれば `additionalContext` |
+| `SessionStart` | 実行ファイルのバックアップを取る（設定ファイルは最初の発言で取る。8.3）。`additionalContextOnce` の記憶（渡した回の数え）を、起動・再開・compact・clear のどの回でも破棄する（古いセッションの分も消す。`every` の刻みも 0 から数え直す）。`source=startup` なら `match: Stop` の数えも破棄する（6.6）。`source=startup` と `resume` では、そのセッションの実行中のサブエージェントの印と、動かしている作業の印（`state/busy-<セッション>.json`）と、ターン中の印（`state/turn-<セッション>.json`）も破棄する（新しいプロセスで前の体は生きていない。compact と clear では破棄しない。9.12）。`source=startup` では、起動時に在る保護領域の変更を実行後チェックの基準として記録する（7.4）。どの回でも、記録のローテートと、古い記録・終わったセッションの記録の削除（prune）を行う（失敗しても開始は止めない）。サブエージェントでなければ、ワークスペースルートとプロジェクトの元ツリーに残った、終わっていない `integrate` の記録（`ccnavi-integrate/<名前>/marker`）を、版 4 の記録は続きの一手の行で、それ以外は「版を知らない壊れた記録」として、モデルとユーザ（`systemMessage`）の両方に知らせる。記録が無ければ何も足さない。期限は hook の期限と開始から 2 秒のうち小さいほう（9.6）。サブエージェントでなければ、ccnavi が前提にしている作業の決まりと考え方を、`.ccnavi/CCNAVI.md` の本文として渡す。対象は、ワークツリー・`ccnavi-git.sh`・`wip/handoff/`・保護対象の直し方（`ccnavi-stage.sh`）・プロジェクトへの `cd`・サブエージェント・合意の要る変更・他セッションへの影響である。チケット制御が有効なら `ccnavi-ticket.sh status` も渡す。`hook/ccnavimd.py` が、条件 `<!-- ccnavi:if 名前 -->` と差し込み `{{名前}}` を解く。条件が成り立たないときの行は `<!-- ccnavi:else -->` で分ける。囲みの中は、深さ 1 段につき半角空白 2 つでインデントしてよく、載せるときに取る。名前ごとに独立した関数が真偽を返す。md が無いときは、無いことだけを 1 行で言う。書き方は `--lint` が `(ccnavi-md)` で見る。ワークツリーと git の行は、共通レイヤーと自身のレイヤーの deny に `workspace-root`・`raw-git` があるときだけ渡す。git の行は、生の git を組み込みで止めるとき（9.1）も渡す。索引の案内を出す回は、`--docs` で詳しく引くよう添える（REQ-SES-06）。チケット制御が有効なら、直接作業とチケット作業の使い分けも同じ md の条件 `tickets` で渡す（9.1）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。チケット制御が有効で、サブエージェントでなければ、cwd のワークツリーに結び付く承認済みチケットの要求のうち、上位の設定（ルールの deny・親の範囲・フェーズ定義の上限）に却下されて効かないものを、要求・理由・出所と、件数と先頭 3 件で渡す。残りは `--explain` へ誘う。glob の重なりは近似なので、その断りを添える。ワークスペースルートからは、却下のあるチケットの件数だけ言う。`--explain` の節「■ 上位の設定に却下された要求」は全件を 1 件 1 行で出す。この 2 つで REQ-SES-02 を満たす。却下は記録に残さず、いまの承認済みチケットとルールから都度再計算する（承認はチケットの中身を変えないので、承認時の結果を固定せず、ルールが変われば結果も変わる）。判定は変えない。この却下の段落（ワークスペースルートでは件数の行）は `systemMessage` にも載せる。サブエージェントでなければ、このPCで作業中の親を 1 行ずつ渡す（チケット制御が有効なとき。親・ブランチ・MR・次の子・未送信。読めなくても開始は止めない）。学びの蓄積が有効なら、提案の候補が新しく現れた回だけ、ユーザにだけ（`systemMessage`。モデルの文脈には入れない）知らせる。サブエージェントでなければ、ワークスペースとプロジェクトの md の frontmatter の索引を差分で新しくする。時間は 3 秒と hook の判定の期限の残りのうち小さいほうまでとする。`--docs` での引き方の 1 行を足す（書き方は、frontmatter の無い md を作った時点で `PostToolUse` が案内する。決まりの文書があれば `--docs --keyword frontmatter` で引くよう添える）。無視の行を足したツリー（その `.gitignore` に未コミットの差分が残る）、索引の対象外にしたツリー、書き換えなかった ccnavi-index.jsonl を渡す（10） | `additionalContext`。却下・終わっていない `integrate`・学びの提案は `systemMessage` にも |
+| `UserPromptSubmit` | ターン中の印を置く（ユーザの発言でもバックグラウンド作業の完了通知でも置く。8.4）。保護領域にいまある変更を記録し、ターンの基準にする（7.4）。ユーザの発言なら、まず共通レイヤーと工程スキルを、着手済みの親のワークツリーのプロジェクトへコピー（`promptsync`。差分が無ければ何も読み書きしない。11.12）、そのあと、前のターンの終わりからの変更をユーザの手によるものとして受け入れる（設定ファイルのバックアップを今の状態に取り直し、`deny` の場所の今の変更を報告済みにする。バックグラウンド作業の完了通知では行わない。8.3、7.4）。取り直しに失敗したときは標準エラーと記録の `guarded` に残す。依頼文に issue・MR の指定があれば、実装の依頼なら `ccnavi-start.sh --check` と `ccnavi-start.sh` を打たせ（出力の「次:」に従う）、説明・調査だけなら答えてよい、という短い指示を渡す（コードブロック・インラインコード・語の一部の番号は拾わない。9.13）。サブエージェントが終わったとき、子のワークツリーを読めず範囲外の変更を確かめられなかったことを示す印が残っていれば、次の依頼の前に「合流の前にそのワークツリーを確かめて」と伝える（9.12） | 無し。伝えることがあれば `additionalContext` |
 | `PreToolUse` | ターン中の印の更新時刻を新しくする（`PostToolUse`・`PostToolUseFailure` も同じ。印が無ければ作らない。8.4）。呼び出しを判定する（6 章）。コアファイルをバックアップする（8 章）。cwd がプロジェクトの中に入った最初の回に、そのスキルの目録を添える（11.13） | `permissionDecision` と `additionalContext` |
-| `PostToolUse` | コアファイルをバックアップと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ書き出し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う。Write で新しく作った md に frontmatter か `type` が無ければ、書き方を 1 度だけ案内する（止めない。`NOTICE_DOC_FRONTMATTER`。10）。親の提案を Write で新しく手書きして書式を誤っていれば（`parent:` を書いた、`plan:`・`phases:`・`mr:` が無い）、書いた時点で 1 度だけ案内する（止めない。`NOTICE_PROPOSAL_PARENT_KEY`・`NOTICE_PROPOSAL_PARENT_FIELDS`。付録 A）。直接作業の候補を登録する（git は呼ばない） | 終了コード 2 と標準エラー、または `additionalContext` |
+| `PostToolUse` | コアファイルをバックアップと突き合わせて戻す。ワークツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ書き出し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う。Write で新しく作った md に frontmatter か `type` が無ければ、書き方を 1 度だけ案内する（止めない。`NOTICE_DOC_FRONTMATTER`。10）。親の提案を Write で新しく手書きして書式を誤っていれば（`parent:` を書いた、`plan:`・`phases:`・`mr:` が無い）、書いた時点で 1 度だけ案内する（止めない。`NOTICE_PROPOSAL_PARENT_KEY`・`NOTICE_PROPOSAL_PARENT_FIELDS`。付録 A）。直接作業の候補を登録する（git は呼ばない） | 終了コード 2 と標準エラー、または `additionalContext` |
 | `PostToolUseFailure` | メインエージェントのユーザの中断（`is_interrupt`）では、ターン中の印を消す（中断では `Stop` が来ないことがある。8.4）。失敗した呼び出しも、`PostToolUse` と同じに設定ファイルのバックアップとの突き合わせと実行後チェックを行い、結果を `additionalContext` で渡す（失敗する前に変えていることがあり、通さないと次の発言で受け入れられる。8.3）。ツール自体の失敗を数える（`failstreak`）。ユーザの中断（`is_interrupt`）は数えない。連続が `CCNAVI_FAIL_STREAK_COUNT` 回（既定 3。0 で無効）に達した回に、資料の索引（`--docs`）を引く案内を返す。止められないイベント。成功（`PostToolUse`）で連続を 0 に戻し、案内は連続の中で 1 回だけ。`PreToolUse` の `deny`（`dry-run` でも）も同じ連続に数え、案内は拒否の文面の末尾に付く。記録は `state/failstreak-<セッション>-<main\|エージェント>.json` | `additionalContext` |
 | `Stop` | ターン中の印を消す（8.4）。このターンで変わった保護領域をユーザへ報告する（7.4）。同じ理由で繰り返し止めた呼び出しが `CCNAVI_DENY_REPEAT` 回（既定 3）に達していれば、言い換えで回っているかもしれないことをユーザに 1 度言う。agent型Stop hook（判定役）を登録したワークスペースでは、既存の促しを実行したあとにAI判定の計画を書き、判定役が差し戻しの返り値を返すことがある（[stop-review.md](stop-review.md)。setupは登録しない）。動かしている作業（payloadの `background_tasks`・`session_crons`）が残っているかを `state/busy-<セッション>.json` に記録する。残っていなければ消す。起動と再開でも消す。残っていれば、次の発言での受け入れ（8.3、7.4）はしない。メインエージェントのcwdのワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6）。促さなかった回で、レビューの依頼までの道の途中にあれば、1 回だけ止めて次の一手を促す（`NUDGE_TICKET_REQUEST`。実行中のサブエージェントが居る間は止めない。9.6・9.12）。途中とは、承認済みの親に作業中の子が残っている、または子が全部閉じたのに依頼のマーカーが無い状態のことである。どちらも促さなかった回で、終わったサブエージェントが範囲外の変更を残した・範囲を確かめられなかった（`outside`・`unchecked`）ときは、同じ結果では 1 回だけ止めて促す（`NUDGE_SUBAGENT_OUTCOME`。チケット制御が有効なときだけ。実行中のサブエージェントが居る間と、サブエージェントの中では止めない。9.12）。これらのどれも促さなかった回は、メインエージェントのcwdか、このセッションが書き込んだ（候補の記録 `direct-<セッション>.json`）、チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`）に未コミットの変更か取り込み先に入っていないコミットがあり、取り込み中のmarkerも無ければ（チケット制御の有無は問わない）、1 回だけ止めて `integrate` の打ち方と、一時ワークツリーに展開した取り込み結果をユーザに確かめてもらう手順を促す（`NUDGE_INTEGRATE`。6.6）。どれも促さなかった回は、`match: Stop` のルールが渡す回なら止めてその文を渡す（6.6） | `systemMessage`。止めるときは `decision: block` と `reason` も |
-| `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。気づいたスキル候補は最後の報告に節を足して返すよう 1 行渡す（6.6）。`agent_id` があれば（チケット制御の有無によらず）、実行中の印を置き、同じ作業ツリーで編集する別のサブエージェントが動いていればその案内も渡す（9.12） | `additionalContext` |
+| `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。気づいたスキル候補は最後の報告に節を足して返すよう 1 行渡す（6.6）。`agent_id` があれば（チケット制御の有無によらず）、実行中の印を置き、同じワークツリーで編集する別のサブエージェントが動いていればその案内も渡す（9.12） | `additionalContext` |
 | `SubagentStop` | 子のワークツリーの差分を読み、範囲外の変更（スクリプト経由など、`PreToolUse` が事前に止められなかったもの）が残っていれば 1 回だけ差し戻す。ワークツリーを読めず確かめられなかったときは、親へ伝える印を置く（9.12）。差し戻さない回に実行中の印を外す（9.12）。終わり方を `ok`・`fixed`・`outside`・`unchecked`・`unattributed` に分けて `state/subagent-<セッション>-<id>.outcome` に残す。担当の子が決まるのは cwd が子のときだけで、親のツリーからの起動は差し戻さず親へ知らせる（9.12） | 終了コード 2 と標準エラー |
 | その他 | 何もせず通す。記録に `event-not-checked` | 無し |
 
@@ -93,11 +93,11 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
   サブコマンドは動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする。
 - `CCNAVI_GUARD_TICKET_APPROVAL`: enable なら、シェルから ccnavi の実行ファイルを `user …` の入口 / `ticket …` / `review …` 付きで打つ形と、
   `ccnavi-user-*.sh` を打つ形を止める（`DENY_TICKET_APPROVAL_CLI`）。
-  `user agree` と `user reviewed` と `user close-early` と `user prune` と、書くとき（`--yes`）の `user handoff` と `user mirror` は標準入力が端末であることを求める。
+  `user agree` と `user reviewed` と `user close-early` と `user prune` と、書くとき（`--yes`）の `user handoff` と `user mirror` は標準入力がターミナルであることを求める。
   エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も
-  同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-user-decide.sh`・実行ファイルの `--yes`）に、
+  同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。ターミナルを求めない入口（`ccnavi-user-decide.sh`・実行ファイルの `--yes`）に、
   変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。
-  テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする。
+  テストやターミナルの無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする。
 - `CCNAVI_STOP_REVIEW`: Stop の AI 判定（agent 型 Stop hook）の効き方。全体のモードと掛け合わせる（4.4）。登録は `scripts/ccnavi-stop-review.sh` で行う（構成は [stop-review.md](stop-review.md)）。
 - `CCNAVI_STOP_REVIEW_AGENT`: `1` のとき、Stop で判定計画を作る。agent hook を登録したワークスペースに置かれる（`scripts/ccnavi-stop-review.sh register` が書く）。
   無ければ何も作らない。評価の集計は `ccnavi stop-review report`。
@@ -147,13 +147,13 @@ Stop の AI 判定の効き方 `CCNAVI_STOP_REVIEW` も同じ 3 値で、`CCNAVI
 | `PostToolUse` / `SubagentStop` の差し戻し | 標準エラーに文、終了コード 2。`dry-run` なら `additionalContext` で 0 |
 
 期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として、`enable` は
-終了コード 2。`dry-run` は、設定を読まずに安全と分かる読み取り（`hook.failsafe`）だけ 0 で、そのほかのツールの呼び出しは `dry-run` でも止める（REQ-CMN-08）。この block は理由を返せないので、生の文字列に `>` が 50 個を超えて並ぶ入力は、シェルから書き込む形の組み込みの保護だけを当てずに、ほかのルールの `deny` と `ask` を当てたあとで、`deny` に当たっていなければ `DENY_REDIRECT_LIMIT` に上げて理由と書き直し方を返す（付録 A）。この保護の照合は `>` の個数 × その後ろの空白の無い語の長さで伸びるので、上限で `>` の個数を抑える。上限の下でも尾が長い入力（400KB 程度）は期限に届きうる。実ルールでの実測では、`*x*` 形の glob の照合が長いと、期限の確認が間に合わずに 3 秒を超える（[12.1](limits.md)）。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
+終了コード 2。`dry-run` は、設定を読まずに安全と分かる読み取り（`hook.failsafe`）だけ 0 で、そのほかのツールの呼び出しは `dry-run` でも止める（REQ-CMN-08）。この block は理由を返せないので、生の文字列に `>` が 50 個を超えて並ぶ入力は、シェルから書き込む形の組み込みの保護だけを適用せずに、ほかのルールの `deny` と `ask` を適用したあとで、`deny` にヒットしていなければ `DENY_REDIRECT_LIMIT` に上げて理由と書き直し方を返す（付録 A）。この保護の照合は `>` の個数 × その後ろの空白の無い語の長さで伸びるので、上限で `>` の個数を抑える。上限の下でも尾が長い入力（400KB 程度）は期限に届きうる。実ルールでの実測では、`*x*` 形の glob の照合が長いと、期限の確認が間に合わずに 3 秒を超える（[12.1](limits.md)）。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
 git の読み取りが 2 秒で打ち切られる。
 
 payload が JSON でない・オブジェクトでない・`hook_event_name` が無いとき、`hook_event_name`・`tool_name`・
 `session_id`・`cwd`・`permission_mode`・`tool_use_id` のどれかが文字列でないとき、`tool_input` がオブジェクトでないとき、
 その中の判定が読む欄（`command`・`file_path` など。`hookio.TOOL_INPUT_TEXT_FIELDS`）が文字列でないときは `payload-unusable` で
-同じ結果になる。記録を書けないときは標準エラーに出して捨て、判定は変えない。UTF-8 にできない字（JSON の
+同じ結果になる。記録を書けないときは標準エラーに出して破棄し、判定は変えない。UTF-8 にできない字（JSON の
 `"\ud800"` のような孤立したサロゲート）は、記録では `\ud800` の 6 字にして書く。期限切れと `payload-unusable` の文は、
 先頭に `[ccnavi] <理由>` を置き、次の一手（期限切れはコマンドを分ける・長い文はファイルで渡す、`payload-unusable` は
 書き直しでは直らないので hook の登録と版をユーザに確かめてもらう）を添える。文はモードとイベントに合わせる。`dry-run` のうち、ツールの呼び出しを持たないイベントは
@@ -168,12 +168,12 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 至らなかった回として記録し（`detail` に例外の型と場所）、診断ログに error で 1 行残す。記録を書く途中で
 落ちた回は、記録を重ねて試さない。例外を抜けさせると
 Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止める扱いにしないので、`PreToolUse` の呼び出しが
-記録も無く通ってしまう。途中まで書いた標準出力は捨て、イベントごとに次のように終える。文には `[ccnavi] internal-error`、
+記録も無く通ってしまう。途中まで書いた標準出力は破棄し、イベントごとに次のように終える。文には `[ccnavi] internal-error`、
 例外の型、診断ログ（`logs/diag/ccnavi.log`）の場所を載せ、モデル宛ての文には「繰り返さずユーザに伝える」を添える。
 
 | イベント | 終え方 |
 |---|---|
-| `PreToolUse`、payload を読む前（イベントが分からない）、または判定中の内部例外 | 標準エラーに文、終了コード 2 で止める。ツールの種類で決め、Write・Edit・NotebookEdit・Agent・Task とツールが分からない回は `dry-run` でも止める。サブエージェントの報告用のツール（`SubagentHandback`・`StructuredOutput`。`modes.REPORT_TOOLS`）はモードによらず通す（体が報告を返せなくなるのを避ける）。Read・Grep・Glob は組み込みの最低限の deny（認証情報の形・`.git` の中・`logs/state/ops/`）に当たらなければ通し、Bash は狭い許可リスト（`pwd`・`ls`・`cat` / `head` / `tail` / `wc` の単独の 1 パス・`ccnavi-ticket.sh status` / `--help`）だけ通す。PowerShell は止める。未知のツールは `enable` だけ止める |
+| `PreToolUse`、payload を読む前（イベントが分からない）、または判定中の内部例外 | 標準エラーに文、終了コード 2 で止める。ツールの種類で決め、Write・Edit・NotebookEdit・Agent・Task とツールが分からない回は `dry-run` でも止める。サブエージェントの報告用のツール（`SubagentHandback`・`StructuredOutput`。`modes.REPORT_TOOLS`）はモードによらず通す（体が報告を返せなくなるのを避ける）。Read・Grep・Glob は組み込みの最低限の deny（認証情報の形・`.git` の中・`logs/state/ops/`）にヒットしなければ通し、Bash は狭い許可リスト（`pwd`・`ls`・`cat` / `head` / `tail` / `wc` の単独の 1 パス・`ccnavi-ticket.sh status` / `--help`）だけ通す。PowerShell は止める。未知のツールは `enable` だけ止める |
 | `PostToolUse` | ツールはもう走っていて止めるものは無い。`enable` は終了コード 2 と標準エラーで、実行後の検査をしていないことをモデルに言う。`dry-run` は 0 |
 | それ以外（`SessionStart`・`UserPromptSubmit`・`Stop`・`SubagentStart`・`SubagentStop`・未知のイベント） | 終了コード 0 で、ユーザに `systemMessage` で知らせる。終了コード 2 で終えると、`Stop` と `SubagentStop` は終われずに続けさせられ、`UserPromptSubmit` は依頼文を消す。ccnavi の不具合が作業そのものを止めないようにする。`SubagentStop` は、子の範囲を確かめられなかった回と同じ印を置き、親に届ける（9.12） |
 
@@ -187,7 +187,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 | `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_ENTRY_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場の env は書かない（置き場は固定。残っていても読まない） |
 | `.claude/settings.json` の `hooks` | 8 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true` と `git.repositoryScanMaxDepth: 2`。足りないキーだけを足す。`--no-vscode` で触らない |
-| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,fetch,dirs,idle,session-start,sync,clean,branches,start,stage,worktree,launcher}.sh`、ユーザ専用の `ccnavi-user-{agree,push-approved,close-early,decide,clean-branch,lib-review}.sh`、共通部の部品 `ccnavi-common-{state,lock,write-and-push,host,log,review}.sh` と `ccnavi-clean.js`。入口（`ccnavi-session-start.sh`。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない）。使い方の文書は配布元の `.ccnavi/docs/*.md` を全部 `.ccnavi/docs/` へ配る（`--docs` の索引はここだけ `.ccnavi/` の下でも載せる。配布先の既にあるものは `--force` のときだけ入れ替える）。配布元に `.ccnavi/docs/` が無ければ「配布元に無くて配れないもの」に挙げる。共通の作業・レビュー計画のテンプレートは配布元の `.ccnavi/config/common/templates/*.yml` を 1 本ずつ同じ場所へ配る（既にあるものは `--force` のときだけ入れ替える。配布元に置き場や `*.yml` が無ければ何もせず、何も言わない）。共通の工程スキルは、配布元の `.claude/skills/<名前>/SKILL.md` の frontmatter に `process: true` を持つものについて、`SKILL.md` と `references/common/` の下の `.md` を同じ場所へ 1 ファイルずつ配る（`.DS_Store` や `ccnavi-index.jsonl` のような生成物は配らない。`process: true` の読み方はユーザの発言のときの同期が写す判定に寄せ、CRLF の改行と、行末の `# コメント`は許し、閉じの `---` が無いものは配らない。配布先の道にディレクトリでないものがあるときは、そのファイルだけ配らずに挙げる）（既にあるものは `--force` のときだけ入れ替える。ユーザの発言のときの同期がプロジェクトへ写す元になる。`.ccnavi/docs/skill-processes.md`）。配布元に該当するスキルが無ければ何もせず、何も言わない |
+| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,fetch,dirs,idle,session-start,sync,clean,branches,start,stage,worktree,launcher}.sh`、ユーザ専用の `ccnavi-user-{agree,push-approved,close-early,decide,clean-branch,lib-review}.sh`、共通部の部品 `ccnavi-common-{state,lock,write-and-push,host,log,review}.sh` と `ccnavi-clean.js`。入口（`ccnavi-session-start.sh`。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない）。使い方の文書は配布元の `.ccnavi/docs/*.md` を全部 `.ccnavi/docs/` へ配る（`--docs` の索引はここだけ `.ccnavi/` の下でも載せる。配布先の既にあるものは `--force` のときだけ入れ替える）。配布元に `.ccnavi/docs/` が無ければ「配布元に無くて配れないもの」に挙げる。共通の作業・レビュー計画のテンプレートは配布元の `.ccnavi/config/common/templates/*.yml` を 1 本ずつ同じ場所へ配る（既にあるものは `--force` のときだけ入れ替える。配布元に置き場や `*.yml` が無ければ何もせず、何も言わない）。共通の工程スキルは、配布元の `.claude/skills/<名前>/SKILL.md` の frontmatter に `process: true` を持つものについて、`SKILL.md` と `references/common/` の下の `.md` を同じ場所へ 1 ファイルずつ配る（`.DS_Store` や `ccnavi-index.jsonl` のような生成物は配らない。`process: true` の読み方はユーザの発言のときの同期がコピーする判定に寄せ、CRLF の改行と、行末の `# コメント`は許し、閉じの `---` が無いものは配らない。配布先の道にディレクトリでないものがあるときは、そのファイルだけ配らずに挙げる）（既にあるものは `--force` のときだけ入れ替える。ユーザの発言のときの同期がプロジェクトへコピーする元になる。`.ccnavi/docs/skill-processes.md`）。配布元に該当するスキルが無ければ何もせず、何も言わない |
 | 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/ccnavi-index.jsonl` の 1 行と、使い捨ての置き場 `/scratchpad` の 1 行と、実行時の記録の置き場 `/logs/` の 1 行。索引・`/scratchpad`・`/logs/` の行はそれぞれ別の見出しの下に入り、`/scratchpad` は同等以上の `/scratchpad/`・`scratchpad/`・`scratchpad` が既にあれば足さない。`scratchpad` を否定する行（`!/scratchpad` など）があればユーザの除外として足さない。`/logs/` は同等以上の `/logs`・`logs/`・`logs` が既にあれば足さず、`logs` の中身を否定する行（`!/logs`・`!/logs/diag` など）があればユーザの除外として足さない。`ccnavi-index.jsonl` の行が既にあれば足さない。`ccnavi-index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトの `.gitignore` には、`--docs` が索引を書く前に足す（10） |
 
 置き場は 2 つに分けて固定する。
@@ -209,13 +209,13 @@ sh の探し方: `here=${0%/*}`（`$0` に `/` が無ければ `.`）から `bin
 `<os>-<arch>` を決める。arm64 の macOS と Windows は、自分向けが無いときだけ x86_64 へ回る。語ごとに `ccnavi` →
 `ccnavi.exe` の順に `[ -f ]` を見て、見つかったものへ `exec` で引数と標準入力を渡す。
 
-- 隣（`.ccnavi/scripts/<os>-<arch>/`）は探さない。自己防衛のパス（8.2）が当たらない置き場になるため
+- 隣（`.ccnavi/scripts/<os>-<arch>/`）は探さない。自己防衛のパス（8.2）がヒットしない置き場になるため
 - `bin_dir` は `..` を含むまま使い、正規化しない。シンボリックリンクも解かない
 - `bin/` に何も見つからなければ、PATH の `ccnavi`（`ccnavi.exe`）を探す（`ccnavi_launcher_path`）。`bin/` が先で、PATH はそのときだけ。見るのは絶対パスの項目だけで、空と相対の項目（`.`、`~/bin`）は cwd や展開の有無で結果が変わるので飛ばす。PATH の順に、通常ファイルで実行できる最初のものを `exec` する。自分と同じファイル（`ccnavi` という名前で張ったリンク）は、自分に戻って終わらなくなるので飛ばす（`-ef`）。`exec` に失敗しても次の項目へは進まない（`bin/` と同じ。126）。launcher のコピーが PATH に 2 つあると互いを起動し合うので、置かない
-- PATH の実行ファイルは隣に onedir の `_internal/` が要る。単体のコピーは動かない。`dist/ccnavi/` を PATH に通すか、そこへのリンクを置く。版は sh と揃えない（食い違いは `ccnavi_compat_skew` が端末の操作で言う。hook では見ない）
+- PATH の実行ファイルは隣に onedir の `_internal/` が要る。単体のコピーは動かない。`dist/ccnavi/` を PATH に通すか、そこへのリンクを置く。版は sh と揃えない（食い違いは `ccnavi_compat_skew` がターミナルの操作で言う。hook では見ない）
 - 見つからなければ終了コード 127 で、文面に `<os>-<arch>` と探した `bin_dir`、PATH も見たことを出す。在るが実行できなければ `exec` が失敗して 126
 - 保護済み sh の `ccnavi_bin` は、`bin/` もソースも無い配布先でだけ PATH の `ccnavi` を返す（無ければ 1 のまま。呼び手の「実行ファイルが無い」の分岐を保つ）。ソースのリポジトリではソースが先
-- 自己防衛は PATH の実体も守る。`bin/` の有無に関わらず、PATH に在れば `bin-path-<パスの印>` の key でバックアップして、同じ形で戻す。key にパスの印を付けるのは、PATH が変わって指す先が替わったとき、古い実体の参照を新しい実体に当てないため。止める正規表現は実体のパスの末尾 3 要素で当てる（2 要素だと別の `./bin/ccnavi` まで当たる）。置き場のディレクトリ全体は守らない。PATH が `/usr/local/bin` のように書けない場所なら、戻しは失敗（`failed`）と報告する
+- 自己防衛は PATH の実体も守る。`bin/` の有無に関わらず、PATH に在れば `bin-path-<パスの印>` のキーでバックアップして、同じ形で戻す。キーにパスの印を付けるのは、PATH が変わって指す先が替わったとき、古い実体の参照を新しい実体に適用しないため。止める正規表現は実体のパスの末尾 3 要素で適用する（2 要素だと別の `./bin/ccnavi` までヒットする）。置き場のディレクトリ全体は守らない。PATH が `/usr/local/bin` のように書けない場所なら、戻しは失敗（`failed`）と報告する
 
 hook は sh を直に起動するので、sh に実行ビットが要る。ccnavi のリポジトリでは追跡するモードを 100755 にする。配布先では
 導入スクリプトが付け、付いていなければ `--lint` が error で言う（10 章）。
@@ -254,8 +254,11 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。状態を聞く `status` と、気づきの記録を書く `learn` は、サブエージェントも呼べる。本体は `ccnavi ticket`。取り込み済みの親子のチケットでは write-and-push（取り込んでから書き、書いたパスだけをコミットして push するまで完了にしない） |
 | `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review`。状態を書くサブコマンドは write-and-push の対象の親子のチケットで write-and-push。`decide <N> --preview`（見るだけ）もここにある。ユーザ専用の `close-early`・`decide` は `ccnavi-user-close-early.sh`・`ccnavi-user-decide.sh` に分かれている |
-| `.ccnavi/scripts/ccnavi-user-agree.sh` | 承認し、`ccnavi-user-push-approved.sh` でコミットして push する。ユーザが端末で打つ。本体は `ccnavi user agree` |
-| `.ccnavi/scripts/ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。ユーザが打つ（エージェントからは止まる）。端末の `ccnavi-user-agree.sh`・ボードの承認とフローの保存・ユーザの判断の入口のあとに呼ばれる。`[<親>...]` で親子のチケットを限る。取り込み済みの親子のチケットはロックを取り、取り込んでから送る |
+| `.ccnavi/scripts/ccnavi-user-agree.sh` | 承認し、`ccnavi-user-push-approved.sh` でコミットして push する。ユーザがターミナルで打つ。本体は `ccnavi user agree` |
+| `.ccnavi/scripts/ccnavi-user-handoff.sh` | `wip/handoff/` の下書きを取り込む。ユーザがターミナルで打つ。実行ファイルの `user handoff` を入口の印を付けて起こす薄い包み。先頭の `--root <ツリー>` は下書きのあるツリーを指す |
+| `.ccnavi/scripts/ccnavi-user-mirror.sh` | 共通レイヤーのミラーを見て、揃える。ユーザがターミナルで打つ。実行ファイルの `user mirror` を入口の印を付けて起こす薄い包み |
+| `.ccnavi/scripts/ccnavi-user-prune.sh` | 判定ログと state を整理する。ユーザがターミナルで打つ。実行ファイルの `user prune` を入口の印を付けて起こす薄い包み |
+| `.ccnavi/scripts/ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。ユーザが打つ（エージェントからは止まる）。ターミナルの `ccnavi-user-agree.sh`・ボードの承認とフローの保存・ユーザの判断の入口のあとに呼ばれる。`[<親>...]` で親子のチケットを限る。取り込み済みの親子のチケットはロックを取り、取り込んでから送る |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になる統合先ブランチを取ってくる。進めるのは fast-forward だけ |
 | `.ccnavi/scripts/ccnavi-session-start.sh` | セッション開始時の入口。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ。SessionStart にはこれを登録する |
 | `.ccnavi/scripts/ccnavi-idle.sh` | 放置したセッションの引き継ぎ促し（`start`・`notice`・`reset`）。`Stop` に 2 行、`UserPromptSubmit` に 1 行で登録する（4.2.1） |
@@ -264,7 +267,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
 | `.ccnavi/scripts/ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先（メインのチェックアウトが開いているブランチ）から切る。ずれが無ければ確認なしで取り込み先のHEADから切る。cwdのブランチ違い・取り込み先が統合先でない・`origin/<取り込み先>` とのずれ（遅れ・進み・分岐・無い・リモート未確認）・書きかけがあるときは、切らずに終了コード 3 で状態・勧め・リスク・確認コードを出す。ユーザの了承を得て `--base`・`--accept`・`--copy-wip`/`--no-wip` を付けて打ち直す。`--side-by-side` で、横で作業する間の自動復元を緩める（`ask` ルールで確認が出る）。記録は共通のgitディレクトリの `ccnavi-direct/<名前>`。`--offline`・`--from-origin` は廃止 |
-| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層。cwd が `.claude/worktrees/<名前>` の中ならそのワークツリーの `wip/handoff/`）へ `cp` する。`--commands` は編集済みの下書きの状態を出す（端末の前のユーザは `mv` の代わりに `ccnavi user handoff` で取り込める）。取り込むのはユーザ |
+| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層。cwd が `.claude/worktrees/<名前>` の中ならそのワークツリーの `wip/handoff/`）へ `cp` する。`--commands` は編集済みの下書きの状態を出す（ターミナルの前のユーザは `mv` の代わりに `ccnavi user handoff` で取り込める）。取り込むのはユーザ |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。子のブランチを消す `--branch` は `ccnavi-user-clean-branch.sh` に分かれている。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 
 #### 配布物の条件
@@ -312,7 +315,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 - 振り分けの代償は、ツール呼び出しのたびに sh の起動と `uname` 1 回ぶんが乗ること（macOS の実測で約 9 ms。Git Bash の Windows ではこれより大きい）。
   VS Code 拡張は sh を通さず、env が振り分けの sh を指していれば、sh と同じ順で `.ccnavi/bin/<os>-<arch>/` の実行ファイルを自分で選んで起動する
   （Windows では sh を直接起動できないため）。実行ファイルが無ければ次の候補へ進む。
-- `.ccnavi/bin/` には実行ファイルだけが並ぶ。sh は自分の隣（`.ccnavi/scripts/<os>-<arch>/`）は探さない（自己防衛のパスが当たらない置き場から起動できる経路を作らないため）。
+- `.ccnavi/bin/` には実行ファイルだけが並ぶ。sh は自分の隣（`.ccnavi/scripts/<os>-<arch>/`）は探さない（自己防衛のパスがヒットしない置き場から起動できる経路を作らないため）。
 
 **ひな形とフェーズ定義。** ルールと配点とフェーズ定義のひな形は、共通レイヤー（`.ccnavi/config/common/`）へ配る。共通レイヤーの `phases.yml` には、
 どのプロジェクトでも同じ構成を前提にできる定義（`src/*`・`tests/*` を範囲に持つものなど）だけがある。判定は、これとワークスペース自身のレイヤー
@@ -353,7 +356,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 
 **実行ファイルの置き方（`--bin`）。** `project`（既定）は上の `.ccnavi/bin/<os>-<arch>/`。`user` は、実体（同梱物ごと）を `~/.local/share/ccnavi/<os>-<arch>/` に置く。macOS・Linux・WSL は、PATH に通す `~/.local/bin/ccnavi` からそこへリンクを張る。Windows（Git Bash）はリンクを張らず（張れないことがある）、実体のフォルダ（`ccnavi.exe` と `_internal/` が並ぶ）を PATH に通す。配布先の `.ccnavi/bin/` には何も置かず、`.gitignore` にも行を追加しない。振り分けの sh は `bin/` に無ければ PATH の `ccnavi` を使うので、起動の仕組みは変わらない。
 - 配布元と中身が違えば置き換える。比べ方は `project` と同じ（実体のフォルダを比べる）。リンクは、実体を指す自分のものなら何もせず、別のものが既にあれば `--force` のときだけ置き換える
-- ホームディレクトリに書き込むとき（実体かリンクを置く・置き換えるとき）は、書く前に端末で確認する。端末でなければ何も書かずに断り、確認に自動で答えるオプションは無い。書くものが無いときと `--check` は確認しない
+- ホームディレクトリに書き込むとき（実体かリンクを置く・置き換えるとき）は、書く前にターミナルで確認する。ターミナルでなければ何も書かずに断り、確認に自動で答えるオプションは無い。書くものが無いときと `--check` は確認しない
 - この機械で動く実行ファイルだけを置く。`HOME` が無いとき、`--no-deploy` と同時のときは断る
 - PATH に通すフォルダ（リンクのフォルダ、Windows は実体のフォルダ）が PATH に入っていなければ、環境に合った足し方を知らせる。Windows は PowerShell でユーザの環境変数 `Path` に追加する手順と画面から追加する手順、macOS・Linux・WSL は使っているシェル（`SHELL`）の設定ファイルに `export` の 1 行を追加する手順（zsh は `~/.zshrc`、macOS の bash は `~/.bash_profile`、Linux の bash は `~/.bashrc`、fish は `fish_add_path`、そのほかは `~/.profile`）。シェルの設定ファイルも Windows の環境変数も書き換えない
 - 「まだ無いもの」の点検は、PATH に通すものがあって実行できれば、この機械で動くものがあるとみなす
@@ -384,6 +387,6 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 | `enforced` | 実際に適用したか。`dry-run` は、一般の保護では偽、関門と補助の保護で止めた回は真 |
 | `code` | 判定の根拠の種別（付録 A） |
 | `reason` | `skip` の理由 |
-| `degraded` | コマンドを読み切れず生の文字列に当てたかどうか |
+| `degraded` | コマンドを読み切れず生の文字列に適用したかどうか |
 | `fallback` | ルールを読めず組み込みの既定で判定したかどうか |
 | `paths` / `detail` | 実行後チェックが拾った変更と件数 |

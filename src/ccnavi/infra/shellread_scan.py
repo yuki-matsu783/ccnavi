@@ -331,7 +331,7 @@ class _Scanner:
 
         中に `\\` が無ければ、単一引用（`'…'`）と同じ文字列になるので、そう書き換えて読む。
         `$` を残したまま shlex に渡すと、`git $'push'` が `git $push` と読まれ、どのルールにも
-        当たらない。`\\` があれば、`\\n`・`\\x41`・`\\cA` などのエスケープを展開しないと
+        ヒットしない。`\\` があれば、`\\n`・`\\x41`・`\\cA` などのエスケープを展開しないと
         中身が決まらないので、確定できない読みとして止める（REASON_ANSI_C）。
         """
         s = self.s
@@ -547,7 +547,7 @@ class _Scanner:
         終端の行は前後の空白を除いて比べる。シェルは完全一致で比べるので、
         シェルより早く閉じることはあっても遅く閉じることはない。早く閉じれば本文の
         残りをコマンドとして読む（厳しい側）。遅く閉じると、本文の後ろのコマンドを
-        本文として捨てる（止まらずに通る側）。CRLF の行でも閉じるのはこのおかげ。
+        本文として破棄する（止まらずに通る側）。CRLF の行でも閉じるのはこのおかげ。
         """
         s = self.s
         while self.pending:
@@ -600,7 +600,7 @@ def _tokenize(src: str) -> list[str]:
     lexer = shlex.shlex(src, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     # コメントは走査が除いてある。shlex に `#` を扱わせると、語の途中の `#` からも
-    # コメントにして後ろのコマンドを捨てる。
+    # コメントにして後ろのコマンドを破棄する。
     lexer.commenters = ""
     return _drop_arithmetic(list(lexer))
 

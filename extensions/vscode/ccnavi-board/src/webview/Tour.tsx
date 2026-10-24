@@ -13,8 +13,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
 import { ESCAPE_LAYER, useEscape } from "./useEscape.js";
-import { INTRO_ID, type Scene, type TourDef } from "../core/tour-def.js";
+import { INTRO_ID, type DiagramDef, type Scene, type TourDef } from "../core/tour-def.js";
 import { placeBubble, type Rect } from "../core/tour-place.js";
+import { SequenceDiagram } from "./shared/SequenceDiagram.js";
 
 export interface TourStep {
   /** 指す先。`document.querySelector` に渡す */
@@ -23,6 +24,8 @@ export interface TourStep {
   readonly body: string;
   /** 本文の下に出す画像（画面の外の見た目）。指す先が空の手順だけが持つ（読み込みで吹き出しの高さが変わるため） */
   readonly image?: { readonly src: string; readonly alt: string };
+  /** 本文の下に出す時系列の図と、光らせる矢印の id（`tours/*.yml` の `diagrams:`） */
+  readonly diagram?: { readonly name: string; readonly def: DiagramDef; readonly focus: readonly string[] };
   /** 指す先を出すための下ごしらえ */
   readonly before?: () => void;
 }
@@ -35,7 +38,7 @@ export interface TourStep {
  * 手順の `before` が見本の上の様子（行を開く、点を選ぶ、タブを替える）を動かす。今の設定の編集中の内容には触れない。
  */
 export interface TourCourse {
-  /** 案内の鍵。画面の中で一意。テストと `data-course` に使う */
+  /** 案内のキー。画面の中で一意。テストと `data-course` に使う */
   readonly id: string;
   /** メニューに出す題 */
   readonly title: string;
@@ -44,7 +47,7 @@ export interface TourCourse {
   readonly steps: readonly TourStep[];
 }
 
-/** 基本の案内の鍵。初回に自動で出る案内で、メニューの先頭に出る */
+/** 基本の案内のキー。初回に自動で出る案内で、メニューの先頭に出る */
 export const INTRO_COURSE = INTRO_ID;
 
 /** 指す先の印の選択子。`target` が空の手順は、どこにも一致しない選択子にして吹き出しを中ほどに出す */
@@ -67,12 +70,13 @@ export function coursesOf(def: TourDef, apply: (scene: Scene) => void, images: R
       title: step.title,
       body: step.body,
       image: step.image !== "" && images[step.image] !== undefined ? { src: images[step.image], alt: step.alt } : undefined,
+      diagram: step.diagram !== "" ? { name: step.diagram, def: def.diagrams[step.diagram], focus: step.focus } : undefined,
       before: () => apply(step.scene),
     })),
   }));
 }
 
-/** 鍵で案内を引く。無ければ先頭（基本の案内） */
+/** キーで案内を引く。無ければ先頭（基本の案内） */
 export function courseOf(courses: readonly TourCourse[], id: string | undefined): TourCourse {
   return courses.find((course) => course.id === id) ?? courses[0];
 }
@@ -109,7 +113,9 @@ export function boxOf(el: Element): Rect {
 /** 吹き出しの幅。狭い画面では画面の幅に合わせる（CSS の max-width） */
 const BUBBLE_WIDTH = 340;
 /** 画像のある手順の吹き出しの幅。画像の中の字が読める広さにする */
-const IMAGE_BUBBLE_WIDTH = 480;
+const IMAGE_BUBBLE_WIDTH = 760;
+/** 時系列の図のある手順の吹き出しの幅。登場者の列に文と値が収まる広さにする */
+const DIAGRAM_BUBBLE_WIDTH = 580;
 
 /**
  * ツールバー（`<header className="toolbar">`）。左に画面ごとの中身（`children`）、右端に「?」（`TourButton`）を置く。
@@ -234,9 +240,9 @@ export function TourButton({ courses, onPick }: { readonly courses: readonly Tou
  * - `start`: 「?」のメニューで案内を選んだとき。指す先が出ていればすぐ始め、出ていなければ（ボードの承認のオーバーレイの
  *   最中など）`request` と同じく出るまで待つ。押した経路だけ待たないと、オーバーレイの上に案内が被さる
  * - `end`: 吹き出しを閉じたとき。`onEnd` を呼ぶ（画面はそこで様子を戻し、`tourDone` を返す）
- * - `course`: いま出している案内の鍵（出していなければ undefined）。画面は鍵で見本の様子を替える
+ * - `course`: いま出している案内のキー（出していなければ undefined）。画面はキーで見本の様子を替える
  *
- * `onStart` は始める直前に呼ぶ（案内の鍵つき）。案内が画面の様子（タブなど）を動かすなら、ここで今の様子を覚えておく。
+ * `onStart` は始める直前に呼ぶ（案内のキーつき）。案内が画面の様子（タブなど）を動かすなら、ここで今の様子を覚えておく。
  * `tourDone` は基本の案内に限らず、どの案内を閉じても返す（初回の自動の案内を出さない印は、どの案内を見ても付く）。
  */
 export function useTour(ready: boolean, hooks: { readonly onStart?: (course: string) => void; readonly onEnd: () => void }): {
@@ -410,7 +416,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   }, [count]);
 
   const last = index === steps.length - 1;
-  const width = Math.min(step.image === undefined ? BUBBLE_WIDTH : IMAGE_BUBBLE_WIDTH, window.innerWidth - 24);
+  const width = Math.min(step.diagram !== undefined ? DIAGRAM_BUBBLE_WIDTH : step.image !== undefined ? IMAGE_BUBBLE_WIDTH : BUBBLE_WIDTH, window.innerWidth - 24);
 
   return (
     <div className="tour" data-step={index}>
@@ -439,6 +445,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
           {step.body}
         </p>
         {step.image !== undefined && <img className="tour-image" src={step.image.src} alt={step.image.alt} />}
+        {step.diagram !== undefined && <SequenceDiagram name={step.diagram.name} diagram={step.diagram.def} focus={step.diagram.focus} />}
         <div className="tour-buttons">
           {index > 0 && (
             <button type="button" className="action small" data-action="tour-back" onClick={() => setIndex(index - 1)}>

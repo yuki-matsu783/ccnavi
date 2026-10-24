@@ -1,7 +1,7 @@
 /**
  * 吹き出しの置き場所（`src/core/tour-place.ts`）。DOM に触れないので単体で試す。
  *
- * 前はフェーズ管理画面の図の下の注意（`graphNotices`）もここで見ていた。図と待ち方の選択を
+ * 前はフェーズ管理画面の図の下の注意（`graphNotices`）もここで見ていた。図と先行関係の選択を
  * 画面から外したので、その注意も無い（図が無いことは `phases.dom.test.ts` が見張る）。
  */
 import { test } from "node:test";

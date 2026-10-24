@@ -148,7 +148,7 @@ test("CB-T220 雛形は 開始 → チケットを読む → 終了 の 3 ノー
   );
   assert.equal(doc.id, "i0001-01-01-flow");
   assert.equal(doc.name, "i0001-01-01 調査");
-  // 子の識別子を埋めない固定文（別の子へ写しても食い違わない）
+  // 子の識別子を埋めない固定文（別の子へコピーしても食い違わない）
   assert.deepEqual(doc.nodes[1].data, { prompt: "担当の子チケットを読み、その内容に沿って作業を進める" });
   assert.deepEqual(
     connectionsOf(doc).map((c) => [c.from, c.to]),
@@ -514,7 +514,7 @@ test("CB-T322 繰り返し（loop）は部品箱の 8 番目で、追加する�
   assert.deepEqual(portsOf(node, []).inputs, [{ id: "input", label: "" }]);
 });
 
-test("CB-T323 繰り返しの線の言葉は出口の項目の id（body / done）か branch-<番号> で当たり、項目の label が出る。欄を直しても出口は変わらない", () => {
+test("CB-T323 繰り返しの線の言葉は出口の項目の id（body / done）か branch-<番号> でヒットし、項目の label が出る。欄を直しても出口は変わらない", () => {
   const doc = loopFlow();
   assert.deepEqual(connectionsOf(doc).map((c) => connectionLabel(doc, c)), ["", "抜ける", "繰り返す"]);
   const body = connect(doc, "loop-1", "body", "end", "input");

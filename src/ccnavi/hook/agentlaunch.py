@@ -48,7 +48,8 @@ INJECT_CWD = False
 
 # 案内の長さの上限（文字）。
 GUIDE_LIMIT = 4000
-# 1 回のプロンプトから検証するパスの数の上限。止める理由に写す表記の長さと件数の上限も別にある。
+# 1 回のプロンプトから検証するパスの数の上限。
+# 止める理由にコピーする表記の長さと件数の上限も別にある。
 MAX_PATHS = 20
 MAX_SHOWN = 5
 MAX_SHOWN_CHARS = 120
@@ -85,7 +86,7 @@ class Plan:
     prompt: str = ""
 
     def apply(self, tool_input: dict) -> dict:
-        """元の tool_input に更新を当てた新しい辞書。元は変えない。"""
+        """元の tool_input に更新を適用した新しいマップ。元は変えない。"""
         updated = dict(tool_input)
         if self.cwd:
             updated["cwd"] = self.cwd
@@ -182,14 +183,15 @@ def decide(
     5. 担当先が 2 つ以上なら止める（`_multi_target`）。
     6. 担当先が 1 つなら、親（`_parent_tree`）・子で担当にできない（`unavailable`、
        `_child_unavailable`）・既存の cwd との食い違い（`_cwd_conflict`）の順に止める。
-       どれにも当たらなければ更新の計画を返す（`_plan`）。
+       どれにもヒットしなければ更新の計画を返す（`_plan`）。
     7. 言及が 0 件で、親のワークツリーから編集する起動なら、子の指定を求めて止める（`_no_child`）。
     """
     if payload.tool_name not in modes.AGENT_TOOLS:
         return Result()
     tool_input = payload.tool_input
     # isolation は値に関係なく止める。作業場所は ccnavi が決め、isolation のワークツリー
-    # （.claude/worktrees/agent-<id>）にはチケットの範囲が当たらない。チケット制御の有無によらない。
+    # （.claude/worktrees/agent-<id>）にはチケットの範囲がヒットしない。
+    # チケット制御の有無によらない。
     if "isolation" in tool_input:
         return Result(stop=_isolation())
 
@@ -338,7 +340,7 @@ def _check_path(root: str, mention: Mention, trees: list[tree.Tree]) -> None:
     text = mention.text
     parts = _parts(text)
     if ".." in parts:
-        mention.invalid = "`..` を含むので使えません"
+        mention.invalid = "`..` を含むので指定できません"
         return
     full = text if _ABSOLUTE.match(text) else os.path.join(root, text)
     rest = _lexical_rest(root, full)
@@ -459,7 +461,7 @@ def _isolation() -> Stop:
 
 
 def _target_invalid(bad: list[Mention]) -> Stop:
-    lines = ["プロンプトに書かれたワークツリーのパスが使えません。"]
+    lines = ["プロンプトに書かれたワークツリーのパスは利用できません。"]
     for m in bad[:MAX_SHOWN]:
         shown = m.text if len(m.text) <= MAX_SHOWN_CHARS else m.text[:MAX_SHOWN_CHARS] + "…"
         lines.append(f"  {shown}: {m.invalid}")

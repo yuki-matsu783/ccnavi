@@ -42,7 +42,7 @@ sh .ccnavi/scripts/ccnavi-git.sh log --oneline -10
 ```
 
 - 既にステージ済みの変更があるとき → それが対象。追加でステージせず、unstaged / untracked は聞かずに対象外にする
-- 何もステージされていないとき → 作業ツリーの変更（unstaged + untracked）を手順 4 のフィルタに通してから個別に `add` する
+- 何もステージされていないとき → ワークツリーの変更（unstaged + untracked）を手順 4 のフィルタに通してから個別に `add` する
 - どちらも空のとき → 「コミットする変更がありません」と伝えて終了する
 
 ### 2. 検査を通す
@@ -55,8 +55,8 @@ uv run --with ruff ruff check .
 uv run python -m unittest discover -s tests/<グループ> -t .
 ```
 
-回すグループは、変えたファイルを [references/test-groups.md](references/test-groups.md) の表に当てて決める。
-表に当たらない変更や、統合先に取り込む前・MR に出す前は全件（`uv run python -m tests`。[テストを回す](../../../docs/claude/testing.md)）を回す。
+回すグループは、変えたファイルを [references/test-groups.md](references/test-groups.md) の表に適用して決める。
+表にヒットしない変更や、統合先に取り込む前・MR に出す前は全件（`uv run python -m tests`。[テストを回す](../../../docs/claude/testing.md)）を回す。
 worktree で作業しているときは、そのツリーの中で実行する（`pyproject.toml` はツリーごと）。
 
 拡張（`extensions/vscode/ccnavi-board`）のファイルが変わっているなら、そのぶんも通す。
@@ -126,11 +126,11 @@ sh .ccnavi/scripts/ccnavi-git.sh commit -m "<prefix>: <日本語の説明>"
 ## このリポジトリでの注意
 
 - ccnavi 自身が PreToolUse に登録されていて、生の git や `push`・`reset --hard` は自分の hook に止められうる。止められても迂回せず、出力の案内（`ccnavi-git.sh` 経由）に従うか、原因を直す
-- 禁止語を含む文字列を Bash のコマンドに書くと、それだけで判定に当たる（部分一致）。ルールの動作確認は payload をファイルに書いてから読み込ませる
+- 禁止語を含む文字列を Bash のコマンドに書くと、それだけで判定にヒットする（部分一致）。ルールの動作確認は payload をファイルに書いてから読み込ませる
 - `.claude/` 配下への書き込みには ccnavi のルールで警告が出る。意図した変更なら気にしなくてよい
 
 ## 失敗したとき
 
 - pre-commit が落ちた → 出力をそのまま見せ、原因を直してから新規コミットを作る
 - 複数コミットの途中で落ちた → そこで停止し、`status` を出してどこまで完了したかを報告する
-- ccnavi の hook に止められた → 迂回せず、何に当たったかを報告する。`logs/decisions.jsonl` の判定の行に当たったルールの id がある
+- ccnavi の hook に止められた → 迂回せず、何にヒットしたかを報告する。`logs/decisions.jsonl` の判定の行にヒットしたルールの id がある

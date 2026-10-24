@@ -118,7 +118,7 @@ function RecentDays({ board, set }: { board: RepoBoard; set: (repo: RepoBoard, v
       }}
     >
       <label>
-        {"表示対象のブランチを検索する期間（過去N日） "}
+        {"表示対象のブランチを検索する期間（過去 N 日） "}
         <input key={board.repo.recentDays} ref={input} type="number" name="recentDays" min="0" max={String(MAX_RECENT_DAYS)} step="1" defaultValue={String(board.repo.recentDays)} />
       </label>
       <ActionButton type="submit" action="recent-days">

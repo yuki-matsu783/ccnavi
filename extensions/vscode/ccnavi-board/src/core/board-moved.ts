@@ -9,7 +9,7 @@
  * どう見せるかは `webview/board/Card.tsx` と `Card.css`。
  *
  * 覚えるのは拡張ホスト（`board-panel.ts`）で、画面ではない。承認のオーバーレイを画面の中に
- * 持たないのと同じ理由（`board-view.ts` の `ApprovalOverlay`）で、画面は非表示になると捨てられ、
+ * 持たないのと同じ理由（`board-view.ts` の `ApprovalOverlay`）で、画面は非表示になると破棄され、
  * 再表示されると入れてある HTML から作り直される（`retainContextWhenHidden` は偽）。画面に持たせると、
  * 承認の文を「新しいセッションで開く」で渡してボードに戻った時点で動いた表示が消える。一番見せたい
  * 場面で消えることになる。

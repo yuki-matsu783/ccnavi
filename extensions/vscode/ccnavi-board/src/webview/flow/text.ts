@@ -18,7 +18,7 @@ export function badgeOf(type: string): Badge | undefined {
   if (type === "askUserQuestion") {
     return {
       kind: "ask",
-      text: "メインエージェントに戻る（ユーザーに質問）",
+      text: "メインエージェントに戻る（ユーザに質問）",
       title: "サブエージェントはユーザに質問できません（AskUserQuestion は渡されません）。このノードで処理を中断し、質問と選択肢をメインエージェントに引き継ぎます。メインがユーザに聞き、その答えを渡して同じサブエージェントを再開させます",
     };
   }

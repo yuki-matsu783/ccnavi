@@ -1,17 +1,17 @@
 /**
  * リスク管理画面が編集中に持つもの。配点のコピー（`Draft`）と、開いている項目。
  *
- * 契約の `RiskForm` は配列だけを持つが、画面は行ごとに動かない鍵が要る（足す・消す・
+ * 契約の `RiskForm` は配列だけを持つが、画面は行ごとに動かないキーが要る（足す・消す・
  * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id はユーザが打つもので、
- * 空にも重複にもなるので鍵には使えない。鍵は画面の中だけのもので、拡張ホストへは渡さない。
+ * 空にも重複にもなるのでキーには使えない。キーは画面の中だけのもので、拡張ホストへは渡さない。
  *
  * 開いている項目は Webview の state（`{ open: [id, …] }`）に残す。残すのは id で、
- * 鍵は画面を作り直すと変わるため。id が空の行は残せない。
+ * キーは画面を作り直すと変わるため。id が空の行は残せない。
  */
 import type { FactorForm, LevelName, RiskForm } from "../../core/risk-view.js";
 import { getState, setState } from "../vscode.js";
 
-/** 行 1 つ。`key` は画面の中だけの鍵で、拡張ホストへは渡さない */
+/** 行 1 つ。`key` は画面の中だけのキーで、拡張ホストへは渡さない */
 export interface Row {
   readonly key: string;
   readonly factor: FactorForm;
@@ -22,7 +22,7 @@ export interface Draft {
   readonly rows: readonly Row[];
 }
 
-/** 鍵を配る。1 枚の画面の中で数え上げる（`f1`、`f2`、…） */
+/** キーを配る。1 枚の画面の中で数え上げる（`f1`、`f2`、…） */
 export function keyer(): () => string {
   let seq = 0;
   return () => {
@@ -31,12 +31,12 @@ export function keyer(): () => string {
   };
 }
 
-/** 拡張ホストが渡した配点を、行に鍵を付けたコピーにする */
+/** 拡張ホストが渡した配点を、行にキーを付けたコピーにする */
 export function draftOf(form: RiskForm, nextKey: () => string): Draft {
   return { levels: form.levels, rows: form.factors.map((factor) => ({ key: nextKey(), factor })) };
 }
 
-/** 拡張ホストへ返す形に戻す。鍵は除く */
+/** 拡張ホストへ返す形に戻す。キーは除く */
 export function formOf(draft: Draft): RiskForm {
   return { levels: draft.levels, factors: draft.rows.map((row) => row.factor) };
 }
@@ -59,7 +59,7 @@ export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {
   setState({ ...((getState() ?? {}) as object), open: ids });
 }
 
-/** state に残してある id から、いまの行の鍵に直す。画面を作り直したあとに開き直すため */
+/** state に残してある id から、いまの行のキーに直す。画面を作り直したあとに開き直すため */
 export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlySet<string> {
   return new Set(draft.rows.filter((row) => row.factor.id !== "" && ids.has(row.factor.id)).map((row) => row.key));
 }

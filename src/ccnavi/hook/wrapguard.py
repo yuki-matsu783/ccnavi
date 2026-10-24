@@ -47,7 +47,7 @@ CORE_PATH_RULE_ID = "builtin:guard-wrapper-paths"
 PARENT_TREE_RULE_ID = "builtin:subagent-parent-tree"
 
 # 保護済みの sh の名前。置き場は `.ccnavi/scripts/` に固定だが、呼び出しの綴りは
-# 絶対パス・相対パス・ワークツリーの中の写しとまちまちなので、パスではなく名前で見る。
+# 絶対パス・相対パス・ワークツリーの中のコピーとまちまちなので、パスではなく名前で見る。
 # 名前の大小は問わない。Windows と macOS の既定のファイルシステムでは `CCNAVI-GIT.SH` も同じ
 # ファイルで、区別すると表記を変えるだけで外せる。
 _SCRIPT = re.compile(r"ccnavi-[A-Za-z0-9-]+\.sh", re.IGNORECASE)
@@ -66,7 +66,7 @@ PASS_THROUGH = frozenset(
 # `CCNAVI_` で始まるもののほかに止める変数。sh のワークスペースルートの探し方に影響する。
 _ALSO_BLOCKED = frozenset({"CLAUDE_PROJECT_DIR"})
 # `GIT_` で始まる変数のうち、同じコマンド行で置いてよいもの。どれも作者の名前と出力の形だけを
-# 変え、git が操作するリポジトリ・作業ツリー・索引・設定には触れない。ほかの `GIT_` は止める。
+# 変え、git が操作するリポジトリ・ワークツリー・索引・設定には触れない。ほかの `GIT_` は止める。
 # `GIT_DIR=<親>/.git GIT_WORK_TREE=<親> sh …ccnavi-git.sh commit` を子のワークツリーで打つと、
 # 居場所の検査は子を見るのに、git は親のワークツリーへコミットする（ラッパーも先頭で外す）。
 _GIT_PASS_THROUGH = frozenset(
@@ -105,7 +105,7 @@ def check_env(subject: str, degraded: str) -> tuple[str, list[str]]:
 
     コマンド行のどこで置いても数える。前置きの代入（`X=… sh …`）、`env X=…`、`export X=…`、
     すでに書き出してある変数への素の代入（`X=…; sh …`。settings.json の env が書き出した変数は
-    代入だけで sh に届く）、`unset X`・`env -u X`。読み切れない形は、allow が当たらずに
+    代入だけで sh に届く）、`unset X`・`env -u X`。読み切れない形は、allow がヒットせずに
     確認になる。
     """
     if degraded:
@@ -150,7 +150,8 @@ def check_child_push(
     return "", "", ""
 
 
-# サブエージェントが親のワークツリーで打てないラッパーのサブコマンド。親のワークツリーの作業ツリー・
+# サブエージェントが親のワークツリーで打てないラッパーのサブコマンド。
+# 親のワークツリーの中身・
 # 索引・ブランチの先頭を動かすもの。読むサブコマンド（status・log・diff など）は止めない。
 # 合流・コミット・push はメインが finish で行う。履歴を書き換えるサブコマンド（cherry-pick・revert・
 # rebase など）はラッパーも通さないが、ここでも名指しして止める
@@ -189,7 +190,7 @@ def check_parent_tree_git(
     居場所は payload の cwd から `cd` と実行役の行き先（`env -C`・`sudo -D`）を追った先
     （子のワークツリーでのコミットと、子のワークツリーで
     親のブランチを取り込む merge は通す）。居場所を追えない形（`cd` の行き先に変数・置換がある、
-    読み切れないコマンド行）で書き換えるサブコマンドを打つ形は、どのツリーに当たるかが決まらないので
+    読み切れないコマンド行）で書き換えるサブコマンドを打つ形は、どのツリーにヒットするかが決まらないので
     止める（名前は `?`）。
     """
     if _GIT_SCRIPT not in subject.lower():
@@ -282,8 +283,8 @@ _VALUE_LONGS = {
     "mv": frozenset(),
 }
 _VALUE_SHORTS = {"restore": "s", "checkout": "bB", "rm": "", "mv": ""}
-# どこに当たるかを読みで決められない pathspec。グロブは `/` もまたぐ（git の pathspec）ので、
-# 文字の前の固定の部分（ディレクトリ）より下のどこにでも当たりうる。
+# どこにヒットするかを読みで決められない pathspec。グロブは `/` もまたぐ（git の pathspec）ので、
+# 文字の前の固定の部分（ディレクトリ）より下のどこにでもヒットしうる。
 _GLOB = re.compile(r"[*?\[]")
 # ディレクトリがこの名前を直に持つなら、守る場所を中に含む
 # （ツリーの頂上・ccnavi ディレクトリの親）。
@@ -309,26 +310,26 @@ def check_core_paths(
     conf: settings.Settings, root: str, cwd: str, subject: str, degraded: str
 ) -> tuple[str, str, str]:
     """`ccnavi-git.sh` で自己防衛の対象を消す・別のコミットの中身に戻す形なら
-    （サブコマンド, 当たった語, 理由の種類）。
+    （サブコマンド, ヒットした語, 理由の種類）。
 
-    当たるとみなすのは次のどれか。
+    ヒットするとみなすのは次のどれか。
 
     - シェルから書き込む形の組み込み（`builtin:guard-setting-files`）と同じ場所の式に、
-      書いたとおりのパスか、居場所から解いた絶対パスが当たる（`.ccnavi/`・
+      書いたとおりのパスか、居場所から解いた絶対パスがヒットする（`.ccnavi/`・
       `.claude/settings*.json`・`.claude/hooks/`・`ccnavi-git.sh`・記録と state・
       実行ファイル・動かした共通レイヤー）
     - そのパスが守る場所を中に含むディレクトリ（ツリーの頂上・`.ccnavi` や `.claude` を持つ
       ディレクトリとその 1 つ上・実行ファイルや共通レイヤーの上・プロジェクトの置き場の上）
-    - 承認済みチケットの置き場（`CORE_STORE`）。レビュー済みのマーカーを消すのはユーザが端末で
+    - 承認済みチケットの置き場（`CORE_STORE`）。レビュー済みのマーカーを消すのはユーザがターミナルで
       打つ手順で、sh は通す。エージェントの呼び出しはここで止めて、ユーザに依頼させる
     - レビュー待ちの置き場（`wip/proposals/review/` とその下。`CORE_REVIEW`）。承認済みチケットの
       置き場と同じ扱いで、sh は `rm` を通す。置き場の親（`wip/`・`wip/proposals/`）は、置き場に
-      何かがあるときだけ当たる（親を閉じた後の `rm -r wip` の案内を止めないため）
-    - 当たる先を読みで決められない指定（`:` で始まる pathspec、固定の部分の無いグロブ、
+      何かがあるときだけヒットする（親を閉じた後の `rm -r wip` の案内を止めないため）
+    - ヒットする先を読みで決められない指定（`:` で始まる pathspec、固定の部分の無いグロブ、
       `--pathspec-from-file`）
     - 対象を読み切れない形（`CORE_UNREAD`）。変数や置換で組み立てた語、居場所の読めない
       `cd` / `pushd` の後の相対パス、走査が読み切れないコマンド行。共通ルールの allow
-      （`*ccnavi-git.sh*`）が生の文字列に当たるので、ここで見ないと確認に落ちずに通る
+      （`*ccnavi-git.sh*`）が生の文字列にヒットするので、ここで見ないと確認に落ちずに通る
     - `checkout -- <パス>`（索引の中身に戻す。`CORE_INDEX`）。sh はこの形を通さないので、
       sh と同じく restore を案内する
 
@@ -380,7 +381,7 @@ def check_core_paths(
 
 def _degraded_core(subject: str) -> tuple[str, str, str]:
     """走査が読み切れないコマンド行。ラッパーの名前の後ろに文字どおりのサブコマンドが無いか、
-    消す・戻すサブコマンドがあれば当たる（`… | xargs sh …ccnavi-git.sh`・`sh -c '… rm …'`）。"""
+    消す・戻すサブコマンドがあればヒットする（`… | xargs sh …ccnavi-git.sh`・`sh -c '… rm …'`）。"""
     for name in _DEGRADED_NAME.finditer(subject):
         sub = _DEGRADED_SUB.match(subject, name.end())
         if not sub:
@@ -391,7 +392,7 @@ def _degraded_core(subject: str) -> tuple[str, str, str]:
 
 
 def _fed_to_stdin(places: list) -> tuple[str, str, str] | None:
-    """標準入力から読むシェルがあり、呼び出しの語でない語にラッパーの名前があれば当たる
+    """標準入力から読むシェルがあり、呼び出しの語でない語にラッパーの名前があればヒットする
     （`echo '…ccnavi-git.sh rm …' | sh`）。流し込む文字列の中は、サブコマンドも対象も読めない。"""
     mention = ""
     stdin = False
@@ -481,7 +482,7 @@ def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
     if sub == "rm" and dry:
         return [], "", False
     if from_file:
-        # パスをファイルから読む形。どこに当たるかを読みで決められない。
+        # パスをファイルから読む形。どこにヒットするかを読みで決められない。
         return [], from_file, False
     index = False
     targets = positional
@@ -489,7 +490,7 @@ def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
         # `checkout -- <パス>` は起点が無く、索引の中身に戻す。
         index = before_dashes == 0 and after_dashes
         targets = positional if index else positional[1:]
-    # パスを変数・置換で組み立てた語。どこに当たるかを読みで決められない。
+    # パスを変数・置換で組み立てた語。どこにヒットするかを読みで決められない。
     unread = next((p for p in targets if _EXPANDS.search(p)), "")
     if unread:
         return [], unread, False
@@ -504,9 +505,9 @@ def _core_hit(
     base: str | None,
     sub: str = "rm",
 ) -> str:
-    """パスの語 1 つが自己防衛の対象に当たるなら、理由の種類。
+    """パスの語 1 つが自己防衛の対象にヒットするなら、理由の種類。
 
-    当たるかを決められない語も当たる側に倒す。
+    ヒットするかを決められない語もヒットする側に倒す。
     """
     word = path.replace("\\", "/")
     if word.startswith(":"):
@@ -560,7 +561,7 @@ def _in_review(conf: settings.Settings, word: str, full: str | None, sub: str = 
 
     空の親を通すのは `rm` だけ。`restore --source <ref>`・`checkout <ref> --` で親を戻すと、
     いまは空でも、過去のコミットにあったレビュー待ちの提案が置き場に戻りうるので、中身に
-    依らず当てる。
+    依らず適用する。
     """
     tickets = (conf.tickets or settings.DEFAULT_TICKETS).replace("\\", "/").strip("/")
     review = f"{tickets}/{ticket_model.REVIEW}".lower()
@@ -584,7 +585,7 @@ def _in_review(conf: settings.Settings, word: str, full: str | None, sub: str = 
 
 
 def _has_entries(path: str) -> bool:
-    """ディレクトリに何かがあるか。無いディレクトリは空と見る。読めなければ当たる側に倒す。"""
+    """ディレクトリに何かがあるか。無いディレクトリは空と見る。読めなければヒットする側に倒す。"""
     if not os.path.lexists(path):
         return False
     if not os.path.isdir(path):
@@ -634,7 +635,7 @@ def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> s
     1. ラッパーの呼び出し方を `settings.script_command` で求める。
     2. `kind` で文面を分ける。承認済みの置き場（`CORE_STORE`）・レビュー待ちの置き場
        （`CORE_REVIEW`）・索引（`CORE_INDEX`）・読み切れない形（`CORE_UNREAD`）。
-    3. どれにも当たらなければ、ccnavi 自身を守る場所（既定の `CORE_HIT`）の文を返す。
+    3. どれにもヒットしなければ、ccnavi 自身を守る場所（既定の `CORE_HIT`）の文を返す。
     """
     git_sh = settings.script_command(root, _GIT_SCRIPT)
     if kind == CORE_STORE:
@@ -643,7 +644,7 @@ def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> s
             "別のコミットの中身に戻す形になっています。ここには承認済みチケットとレビュー済みのマーカーがあり、"
             "動かすのはユーザと ccnavi のスクリプトです（レビューをやり直すためにマーカーを削除する"
             " "
-            f"'{git_sh} rm <マーカー>' も、ユーザが端末で実行する手順です）。"
+            f"'{git_sh} rm <マーカー>' も、ユーザがターミナルで実行する手順です）。"
             "必要なら、何をなぜ削除したいのかを伝えてユーザに依頼してください。"
         )
     if kind == CORE_REVIEW:
@@ -669,7 +670,7 @@ def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> s
             '居場所を読めない cd（cd "$D"・pushd）の後の相対パスは、'
             "ccnavi 自身を守る場所（hook の登録・ルールとフェーズの設定・"
             "保護済みのスクリプト・実行ファイル・判定の記録）と承認済みチケットの置き場に"
-            "当たるかを確かめられないので止めました。ラッパーはサブコマンドと対象をそのまま書いて、"
+            "ヒットするかを確かめられないので止めました。ラッパーはサブコマンドと対象をそのまま書いて、"
             f"直接呼んでください（'{git_sh} <サブコマンド> <パス>'。値は先に読んでから書きます）。"
         )
     return (
@@ -681,7 +682,7 @@ def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> s
         "伝えてユーザに依頼してください。"
         f"衝突を解くときの '{git_sh} restore --ours -- <パス>'（--theirs も）と、索引だけを戻す "
         f"'{git_sh} restore --staged <パス>' は通ります。"
-        "グロブ（* ? [）・: で始まる指定・--pathspec-from-file は、守る場所に当たるかを"
+        "グロブ（* ? [）・: で始まる指定・--pathspec-from-file は、守る場所にヒットするかを"
         "決められないので、"
         "削除する・戻すファイルを 1 つずつ名指ししてください。"
     )
@@ -998,7 +999,7 @@ def env_message(script: str, names: list[str]) -> str:
         f"保護済みの sh（{script}）を、sh の検査の材料を変える環境変数（{shown}）と"
         "同じコマンド行で呼んでいます。この変数は sh がワークスペースルート・承認済みチケットの"
         "置き場・実行ファイルを決めるのに使うか（CCNAVI_*）、git が操作するリポジトリと"
-        "作業ツリーを決めるのに使う（GIT_*）ので、書き換えると sh の検査が外れます。"
+        "ワークツリーを決めるのに使う（GIT_*）ので、書き換えると sh の検査が外れます。"
         "コマンド行のどこに書いても数えます（ループや関数の中では、後ろに書いた代入も次の呼び出しに"
         "届くため）。変数を置かずに、sh の呼び出しを別のコマンドに分けて実行してください。"
         "置き場が本当に違うなら、ユーザに "

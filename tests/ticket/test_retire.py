@@ -327,7 +327,7 @@ class NoteTest(RetireHarness):
         self.assertIn("上書きしない", done.stderr)
         with open(self.record, encoding="utf-8") as f:
             self.assertEqual(f.read(), "{broken")
-        # 退避に進んでいないので、親は作業ツリーに残り、直せば打ち直せる。
+        # 退避に進んでいないので、親はワークツリーに残り、直せば打ち直せる。
         self.assertTrue(os.path.exists(os.path.join(self.approved, "done", "i0001.md")))
         os.remove(self.record)
         again = self.ready(fixture)

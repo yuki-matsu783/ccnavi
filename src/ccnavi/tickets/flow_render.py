@@ -29,7 +29,7 @@ def _summary(node: dict, flows: dict) -> str:
     1. ノードの種類（`type`）と、その欄（`data`）を取り出す。
     2. 種類ごとに文を組む。問い・分岐・繰り返しは選択肢や条件、サブエージェントは説明・
        プロンプト・種類、サブフローは参照先の名前を添える。
-    3. どの種類にも当たらなければ空を返す。
+    3. どの種類にもヒットしなければ空を返す。
     """
     kind = flow_text._text(node.get("type"))
     data = flow_text._dict(node.get("data"))
@@ -96,8 +96,8 @@ def _port_label(node: dict, port: str) -> str:
     """分岐の出口の名前。
 
     出口が項目の `id` とちょうど同じか、`branch-<番号>` の番号が項目の位置なら、その `label`。
-    部分一致は採らない（`b` が `branch-1` に当たる）。項目は種類で決まる欄（分岐は `branches`、
-    問いは `options`）の辞書だけを数える。ボードの線の言葉（`flow-doc.ts` の
+    部分一致は採らない（`b` が `branch-1` にヒットする）。項目は種類で決まる欄（分岐は `branches`、
+    問いは `options`）のマップだけを数える。ボードの線の言葉（`flow-doc.ts` の
     `connectionLabel`）と同じ読み方。
     """
     key = flow_shape.BRANCH_KEYS.get(flow_text._text(node.get("type")))

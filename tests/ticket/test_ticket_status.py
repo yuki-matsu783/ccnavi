@@ -146,7 +146,7 @@ class TicketStatusTest(PhaseHarness):
         self.by_hand(text=parent_text("i0001", ["research", {"type": "design", "after": []}]))
         mine = self.block(self.said(), "i0001")
         self.assertIn("止まっている理由", mine)
-        self.assertIn("待たない", mine)
+        self.assertIn("先行していない", mine)
 
     def test_fields_written_by_start_are_not_an_approval_to_carry(self):
         self.family(plan=["research"])

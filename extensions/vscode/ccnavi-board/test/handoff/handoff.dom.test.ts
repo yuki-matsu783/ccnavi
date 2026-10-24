@@ -1,6 +1,6 @@
 /**
  * 取り込み待ち画面（React）を happy-dom で動かす。対象の一覧（種類・状態・errors・warnings・差分）、
- * 取り込めない理由、選択と取り込みの確認、錠、defense の端末の案内、取り込みの結果、無効・エラー・読み込み中を見る。
+ * 取り込めない理由、選択と取り込みの確認、錠、defense のターミナルの案内、取り込みの結果、無効・エラー・読み込み中を見る。
  * 見本は `test/helpers/handoff.ts`（種類と状態を 1 本ずつ並べた一覧）。
  */
 import { test } from "node:test";
@@ -69,7 +69,7 @@ test("CB-D367 見出しを押すと開き、差分と errors / warnings を出�
   }
 });
 
-test("CB-D368 取り込めない対象は選べず、理由を出す。conflict・error・unchanged・defense（端末のみ）", async () => {
+test("CB-D368 取り込めない対象は選べず、理由を出す。conflict・error・unchanged・defense（ターミナルのみ）", async () => {
   const dom = await openHandoff();
   try {
     for (const path of [TEMPLATE, RULES, DOCS]) {
@@ -80,13 +80,13 @@ test("CB-D368 取り込めない対象は選べず、理由を出す。conflict�
       [".ccnavi/config/project/phases.yml", /取り込めません: .*conflict/],
       [".ccnavi/docs/broken.md", /取り込めません: 検査で error があります/],
       [".ccnavi/docs/same.md", /取り込めません: 取り込み先と同じ内容/],
-      [HOOK, /取り込めません: ボードからは取り込めません。端末で取り込みます/],
+      [HOOK, /取り込めません: ボードからは取り込めません。ターミナルで取り込みます/],
     ];
     for (const [path, pattern] of reasons) {
       assert.equal(pick(dom, path).disabled, true, `${path} は選べない`);
       assert.match(text(dom.one(`${row(path)} [data-role="reason"]`)), pattern);
     }
-    assert.match(text(dom.one(row(HOOK))), /端末で取り込む/);
+    assert.match(text(dom.one(row(HOOK))), /ターミナルで取り込む/);
   } finally {
     await dom.close();
   }
@@ -184,7 +184,7 @@ test("CB-D372 錠が掛かった状態で開いても、template と layer-confi
   }
 });
 
-test("CB-D373 defense は端末の案内を出す。「端末のコマンドを出す」で terminal を送り、返ったコマンドを出してコピーできる", async () => {
+test("CB-D373 defense はターミナルの案内を出す。「ターミナルのコマンドを出す」で terminal を送り、返ったコマンドを出してコピーできる", async () => {
   const dom = await openHandoff();
   try {
     assert.equal(dom.all('[data-role="terminal-guide"]').length, 0, "閉じている間は出さない");
@@ -194,7 +194,7 @@ test("CB-D373 defense は端末の案内を出す。「端末のコマンドを�
     dom.click(dom.one('[data-action="show-terminal"]'));
     await dom.settle();
     assert.deepEqual(dom.posted.filter((m) => m.type === "terminal"), [{ type: "terminal", path: HOOK }]);
-    const command = `ccnavi user handoff ${HOOK} --yes --expect ${"ab".repeat(32)}`;
+    const command = `sh .ccnavi/scripts/ccnavi-user-handoff.sh ${HOOK} --yes --expect ${"ab".repeat(32)}`;
     await dom.send({ type: "terminal", path: HOOK, command, error: "" });
     assert.equal(dom.one('[data-role="terminal-command"]').textContent, command);
     assert.equal(dom.all('[data-action="show-terminal"]').length, 0);
@@ -218,7 +218,7 @@ test("CB-D373 defense は端末の案内を出す。「端末のコマンドを�
   }
 });
 
-test("CB-D374 ボードから取り込める対象には端末の案内を出さない", async () => {
+test("CB-D374 ボードから取り込める対象にはターミナルの案内を出さない", async () => {
   const dom = await openHandoff();
   try {
     dom.click(dom.one(`${row(DOCS)} .row-head`));
@@ -270,7 +270,7 @@ test("CB-D376 取り込めなかった結果は理由を出す。選択は残る
   }
 });
 
-test("CB-D377 読み直すと、同じ entry_sha で取り込める対象だけ選択が残り、変わった対象・消えた対象の選択は外れる。端末の案内も捨てる", async () => {
+test("CB-D377 読み直すと、同じ entry_sha で取り込める対象だけ選択が残り、変わった対象・消えた対象の選択は外れる。ターミナルの案内も破棄する", async () => {
   const dom = await openHandoff();
   try {
     await check(dom, TEMPLATE);
@@ -314,10 +314,10 @@ test("CB-D378 更新はそのまま refresh を送り、ツリーの切り替え
 });
 
 test("CB-D379 実行ファイルが handoff を持たない版のとき、画面を無効にして古い版であることを言う。一覧は出さない", async () => {
-  const reason = "実行ファイル（0.1.0 abc）が handoff の機能を持ちません（古い版です）。取り込み待ち画面 で確認できないので進めません。build.py を実行して組み立て直してください";
+  const reason = "実行ファイル（0.1.0 abc）が handoff の機能に対応していません（古い版です）。取り込み待ち画面 で確認できないので進めません。build.py を実行して組み立て直してください";
   const dom = await openPage({ kind: "disabled", reason });
   try {
-    assert.match(text(dom.one("#handoff-disabled")), /使えません/);
+    assert.match(text(dom.one("#handoff-disabled")), /利用できません/);
     assert.equal(text(dom.one('[data-role="disabled-reason"]')), reason);
     assert.match(text(dom.one('[data-role="disabled-reason"]')), /古い版です/);
     assert.match(text(dom.one('[data-role="disabled-reason"]')), /組み立て直してください/);

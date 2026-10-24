@@ -40,7 +40,7 @@ test("CX-T245 足すホストの誤り: 種類・URL の形・http（loopback �
     ["bitbucket", "https://x.example.com", /GitHub か GitLab/],
     ["gitlab", "", /URL を入れてください/],
     ["gitlab", "not a url", /Invalid URL/],
-    ["gitlab", "http://gitlab.example.com", /https に限る/],
+    ["gitlab", "http://gitlab.example.com", /https のみ指定できます/],
     ["gitlab", "https://u:p@gitlab.example.com", /資格情報/],
     ["gitlab", "https://gitlab.example.com/?x=1", /資格情報・クエリ/],
     ["gitlab", "https://gitlab.example.com/gitlab", /オリジンのみ/],
@@ -52,7 +52,7 @@ test("CX-T245 足すホストの誤り: 種類・URL の形・http（loopback �
   }
 });
 
-test("CX-T246 保存された行は、読めた分だけを組み直す。組み込みと同じ名前の行と、重なった行は捨てる", () => {
+test("CX-T246 保存された行は、読めた分だけを組み直す。組み込みと同じ名前の行と、重なった行は破棄する", () => {
   const stored = [
     { kind: "gitlab", url: "https://gitlab.example.com" },
     { kind: "gitlab", url: "http://gitlab.example.com" }, // https でない（読めない）
@@ -66,7 +66,7 @@ test("CX-T246 保存された行は、読めた分だけを組み直す。組み
     hosts.map((h) => h.id),
     ["gitlab.example.com"],
   );
-  // 行の読み方は「組み立てられた分」だけ（https でない・読めない形は捨てる）。重なりと組み込みとの名前の重なりは hosts 側で捨てる
+  // 行の読み方は「組み立てられた分」だけ（https でない・読めない形は破棄する）。重なりと組み込みとの名前の重なりは hosts 側で破棄する
   assert.deepEqual(readCustomRows(stored), [
     { kind: "gitlab", url: "https://gitlab.example.com" },
     { kind: "github", url: "https://github.com" },

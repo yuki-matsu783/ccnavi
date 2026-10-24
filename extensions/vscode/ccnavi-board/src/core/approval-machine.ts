@@ -22,7 +22,7 @@
  * | 状態 | 何をしている |
  * |---|---|
  * | 無し（`overlay` が `undefined`） | 閉じている |
- * | `loading` | 承認待ちの一覧を読んでいる |
+ * | `loading` | 承認先行の一覧を読んでいる |
  * | `preview` | 一覧と本文を見せた。押されるまで何も置かない |
  * | `approving` | 承認を打っている。ここでは閉じない（Esc も受け付けない。画面の側も同じ） |
  * | `done` | 承認した。渡す文がある |
@@ -165,7 +165,7 @@ export type ApprovalInput =
 
 /** 外へ出る仕事。行うのは呼ぶ側（`board-panel.ts`） */
 export type ApprovalEffect =
-  /** 承認待ちの一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
+  /** 承認先行の一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
   | { readonly kind: "loadPreview"; readonly only: readonly string[] }
   /** 承認を打つ（`user agree --yes … --digest …`）。返ったら `approved` で戻す */
   | {
@@ -294,7 +294,7 @@ function opened(
   if (kind === "loading" || kind === "preview" || kind === "approving") {
     return stay(state);
   }
-  // 残った指摘を決める途中にも開かない。見せている指摘が、承認待ちの一覧になってしまう
+  // 残った指摘を決める途中にも開かない。見せている指摘が、承認先行の一覧になってしまう
   if (busyDeciding(state)) {
     return stay(state);
   }
@@ -379,7 +379,7 @@ function confirmed(
 
 /**
  * 承認の結果。ここには「この状態でなければ受けない」を置かない。
- * 承認済みチケットは既に置かれていることがあり、受けずに捨てるとユーザに届かない
+ * 承認済みチケットは既に置かれていることがあり、受けずに破棄するとユーザに届かない
  */
 function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolean): ApprovalStep {
   if (outcome.ok) {
@@ -388,7 +388,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     const carried = count > 0 && carrier;
     // 承認できたら読み直す。監視（`core/watch.ts`）だけに頼らない。 承認は承認済みチケットを
     // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
-    // 読み直る。拾えないのは、`files.watcherExclude` でそこを外したとき、監視が使えない
+    // 読み直る。拾えないのは、`files.watcherExclude` でそこを外したとき、監視が利用できない
     // ファイルシステムのとき（置き場は既定に固定で、監視するパス `core/watch.ts` とずれない）。
     // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回にまとめる（`board-panel.ts` の `again`）ので、
     // 監視と重なっても画面はちらつかない。1 件も置かれていないなら読み直さない（何も動いていない）。
@@ -635,7 +635,7 @@ function consultCopied(state: ApprovalState, error: string | undefined): Approva
 
 /**
  * 置いた結果。承認の結果と同じく「この状態でなければ受けない」を置かない。 置かれたものは
- * 戻らないので、受けずに捨てるとユーザに届かない。
+ * 戻らないので、受けずに破棄するとユーザに届かない。
  * 表示は実行ファイルの答えに従う。`reviewed` が真ならレビュー済み。偽で `pending_extra` があれば、
  * 見せたあとに指摘が追加されたのでレビュー済みにしていない、と言う（続きの子が起きていなければ、決め直しへ戻れる）
  */

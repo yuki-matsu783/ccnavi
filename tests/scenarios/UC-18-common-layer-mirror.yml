@@ -8,10 +8,10 @@ budget_usd: 3.0
 test_repo: true                  # 親チケットの着手のあとの発言で、projects/test-repo にブランチ・ワークツリーを作る。回す前に確認事項 2 を確かめる
 
 # 着手済みの親があるとき、ユーザの発言が、ワークスペースルートの `.ccnavi/config/common/` を親のワークツリーのプロジェクトの
-# `.ccnavi/config/common/` へ写す（docs/design/multi-repo/distribute-common.md の 11.12）。
-# 確かめるのは、(1) 写されて中身が共通レイヤーと一致する、(2) `.ccnavi/config/project/` と元のリポジトリには触れない、
-# (3) 写された分を、エージェントのコミットが通る（実行後チェックが戻さない）、の 3 つ。
-# 承認（`ccnavi user agree`）は人間しかできないので、そこで止める。
+# `.ccnavi/config/common/` へコピーする（docs/design/multi-repo/distribute-common.md の 11.12）。
+# 確かめるのは、(1) コピーされて中身が共通レイヤーと一致する、(2) `.ccnavi/config/project/` と元のリポジトリには触れない、
+# (3) コピーされた分を、エージェントのコミットが通る（実行後チェックが戻さない）、の 3 つ。
+# 承認（`ccnavi-user-agree.sh`）は人間しかできないので、そこで止める。
 steps:
   - prompt: >-
       projects/test-repo の README.md の末尾に「ミラー確認」と 1 行足す小さい作業を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
@@ -19,9 +19,10 @@ steps:
       実装はまだしないで。
   - human: true
     instruction: >-
-      ワークスペースルートで `ccnavi user agree <親の識別子> <子の識別子>` を打つ（識別子は 1 つ目の step の報告にある）。
+      ワークスペースルートで `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子> <子の識別子>` を打つ（識別子は 1 つ目の step の報告にある）。
     check:
       - 承認画面に、親の範囲（README.md）が出ている
+      - 承認のあとに「pushしました」と出ている
   - prompt: >-
       承認した。親チケットに `ccnavi-ticket.sh start` で着手して。親のワークツリーの場所も教えて。
       着手の出力に、ミラーは次のユーザの発言で置かれるとあれば、そのまま教えて。ここでは何もコミットしないで。
@@ -61,7 +62,7 @@ expect:
         sh -c 'for d in .claude/worktrees/*/.ccnavi/config/common projects/test-repo/.claude/worktrees/*/.ccnavi/config/common;
         do [ -d "$d" ] && for f in rules.yml phases.yml risks.yml; do cmp -s ".ccnavi/config/common/$f" "$d/$f" && echo "same:$f"; done; done'
       expect_contains: same:rules.yml
-    # 元のリポジトリ（projects/test-repo のメインの作業ツリー）にミラーは出ない（親のブランチに乗って届く）
+    # 元のリポジトリ（projects/test-repo のメインのワークツリー）にミラーは出ない（親のブランチに乗って届く）
     - run: git -C projects/test-repo status --short
       expect_not_contains: .ccnavi/config/common
     # プロジェクトの config/project/ は触れられていない
@@ -69,13 +70,13 @@ expect:
       expect_not_contains: .ccnavi/config/project
   judge:
     - 着手の出力に、ミラーは次のユーザの発言で置かれる旨が出た
-    - 次の発言のあと、共通レイヤーとプロジェクトのミラーを揃えた旨と、写したファイルの一覧（新しく置いた・上書き・消した）が文脈に出た
+    - 次の発言のあと、共通レイヤーとプロジェクトのミラーを揃えた旨と、コピーしたファイルの一覧（新しく置いた・上書き・消した）が文脈に出た
     - 知らせの案内（`ccnavi-git.sh add` してコミット）に従い、ミラーのファイルを編集せずに add しただけでコミットした
     - ミラーされたファイルを手で書き換えたり、迂回したりしていない
 
 unconfirmed:
   - 親のワークツリーの置き場。docs/design/multi-repo/places.md と ops の実際で、`.claude/worktrees/<識別子>`（ワークスペース側）か `projects/test-repo` の下かを確かめ、state の glob を 1 本に絞る
   - 識別子の形と、1 つ目の step の報告から人間が読み取れること（UC-09 と同じ）
-  - 共通レイヤーに `rule-expectations.yml` や `templates/` があれば、それも写される。いまの共通レイヤーに無いものは state で比べていない
+  - 共通レイヤーに `rule-expectations.yml` や `templates/` があれば、それもコピーされる。いまの共通レイヤーに無いものは state で比べていない
   - ミラーのコミットを実行後チェックが戻さないこと（REQ-MLT-36）を decisions で比べているが、PostToolUse の `deny` と別の形で記録されるなら期待を直す
   - 「共通レイヤーが読めないときは着手しない」「ミラーが既に一致していれば知らせが出ない」は、この回では比べていない。別の UC か `tests/config/test_config_sync.py` に任せる

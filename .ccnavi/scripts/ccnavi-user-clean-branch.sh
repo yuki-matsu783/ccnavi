@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-user-clean-branch 親を閉じたときに残した子の手元のブランチを、条件を確かめ直して消す。ユーザが端末で打つ。
+# ccnavi-user-clean-branch 親を閉じたときに残した子の手元のブランチを、条件を確かめ直して消す。ユーザがターミナルで打つ。
 #
 #   sh .ccnavi/scripts/ccnavi-user-clean-branch.sh <子の識別子> [--confirmed]
 #
@@ -26,7 +26,7 @@ usage() {
 sh .ccnavi/scripts/ccnavi-user-clean-branch.sh <子の識別子> [--confirmed]
 
   親を閉じたときに片付ける子として記録した手元のブランチを、条件を確かめて削除します。
-  取り消した子は --confirmed（ユーザが確認した）が要る。ユーザが端末で実行します。
+  取り消した子は --confirmed（ユーザが確認した）が要る。ユーザがターミナルで実行します。
 USAGE
 }
 
@@ -42,7 +42,7 @@ for arg in "$@"; do
 		confirmed=1
 		;;
 	-*)
-		printf 'ccnavi-user-clean-branch: %s は受け付けません。使えるのは --confirmed だけです。\n' "$arg" >&2
+		printf 'ccnavi-user-clean-branch: %s は受け付けません。指定できるのは --confirmed だけです。\n' "$arg" >&2
 		exit 2
 		;;
 	*)

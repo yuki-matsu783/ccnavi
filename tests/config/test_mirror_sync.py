@@ -2,7 +2,7 @@
 
 着手済みの親のワークツリーのミラーは発言のたびに揃うが、メインのチェックアウトは対象外なので、
 間が空くとミラーが古いまま残る。`user mirror` は、プロジェクトのメインのチェックアウトの
-ミラーを、見たいときに調べ（書かない）、押したときに揃える（作業ツリーに書き、コミットはしない）。
+ミラーを、見たいときに調べ（書かない）、押したときに揃える（ワークツリーに書き、コミットはしない）。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。
 
@@ -10,11 +10,11 @@ fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ�
 
 1. 調べる: ミラーが無ければずれ（追加）、共通レイヤーと同じなら同期済み。共通レイヤーに無い
    ファイルは削除として出る。名前を渡せばその分だけ。無い名前は全体の誤り
-2. 共通レイヤーに写すものが無いときは、ずれにせず、ミラーを消さない
+2. 共通レイヤーにコピーするものが無いときは、ずれにせず、ミラーを消さない
 3. 揃える: 見せた差分の照合の値（expect）が今の差分と一致するときだけ書く。書くのはミラーだけで、
    プロジェクトの config には触れない。一致しなければ何も書かない
 4. 調べられないプロジェクト（ミラーがリンク）は error にして、まとめて揃える対象から外す
-5. 入口: JSON の形、組み合わせの誤り、端末なしの `--yes` の拒否
+5. 入口: JSON の形、組み合わせの誤り、ターミナルなしの `--yes` の拒否
 """
 
 from __future__ import annotations
@@ -250,13 +250,13 @@ class MirrorSyncTest(ConfigUnionHarness):
         result = self.user_mirror()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("ずれ", result.stdout)
-        self.assertIn(f"user mirror --yes --expect {self.plan().expect}", result.stdout)
+        self.assertIn(f"ccnavi-user-mirror.sh --yes --expect {self.plan().expect}", result.stdout)
 
     def test_the_text_view_quotes_names_and_shows_how_to_see_the_diff(self):
         self.project("odd name")
         result = self.user_mirror("odd name")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("user mirror 'odd name' --yes --expect", result.stdout)
+        self.assertIn("ccnavi-user-mirror.sh 'odd name' --yes --expect", result.stdout)
         self.assertIn("diff -ru", result.stdout)
 
     def test_the_text_view_warns_when_an_update_overwrites_the_mirror(self):

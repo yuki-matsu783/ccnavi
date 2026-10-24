@@ -37,9 +37,9 @@ def bad_path(rel: str) -> str:
         return ""
     slashed = rel.replace("\\", "/")
     if os.path.isabs(rel) or slashed.startswith("/") or (len(slashed) > 1 and slashed[1] == ":"):
-        return "絶対パスは使えない。ルートからの相対パスで書く"
+        return "絶対パスは指定できない。ルートからの相対パスで書く"
     if any(part == ".." for part in slashed.split("/")):
-        return "`..` で上に出るパスは使えない"
+        return "`..` で上に出るパスは指定できない"
     return ""
 
 
@@ -168,7 +168,7 @@ def deliver(
                 # しない。ここで書くと、読めなかっただけの記録を空の中身で置き換えることになる。
                 delivering, first = True, True
             else:
-                # id は必須なので、数えの鍵は id だけでよい。レイヤーをまたぐ同じ id は
+                # id は必須なので、数えのキーは id だけでよい。レイヤーをまたぐ同じ id は
                 # 前置き（`lib:` など）で分かれる。
                 key = rule.id
                 hits = counted.get(key, 0) + 1
@@ -264,10 +264,10 @@ def remember_refs(stderr: TextIO, state_dir: str, session: str, told: set[str]) 
 
 
 def told_peers(stderr: TextIO, state_dir: str, session: str, agent_id: str) -> set[str] | None:
-    """このサブエージェントに、同じ作業ツリーの相手として案内済みの相手の鍵。読めなければ None。
+    """このサブエージェントに、同じワークツリーの相手として案内済みの相手のキー。読めなければ None。
 
     `deliver` が読み書きする `once-<セッション>-<agent_id>.json` とは別のファイルに置く。
-    同じファイルに入れると、`deliver` が書き戻すときに相手の鍵が消え、ルールの数えと混ざる。
+    同じファイルに入れると、`deliver` が書き戻すときに相手のキーが消え、ルールの数えと混ざる。
     掃き方は `once-*` と同じ（`forget`）。置き場が無いときは None（呼ぶ側は案内する側に倒す）。
     """
     if not state_dir or not session or not agent_id:
@@ -290,22 +290,22 @@ def remember_peers(
 def stop_path(state_dir: str, session: str) -> str:
     """Stop の促し（ターンの終わり N 回に 1 度）の数えの記録。
 
-    `once-*` と違い、compact・再開・clear では捨てない。
+    `once-*` と違い、compact・再開・clear では破棄しない。
 
-    捨てるのは起動（`source=startup`）の `forget` と、古いセッションの後始末（prune）だけ。
-    文脈ごとに捨てると、compact が N 回より先に来る長いセッションで一度も届かない。
+    破棄するのは起動（`source=startup`）の `forget` と、古いセッションの後始末（prune）だけ。
+    文脈ごとに破棄すると、compact が N 回より先に来る長いセッションで一度も届かない。
     """
     return os.path.join(state_dir, f"stop-{fsio.safe_name(session) or 'unknown'}.json")
 
 
 def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
-    """この文脈で、どのルールが何回当たったか。まだ無ければ空、読めなければ None。
+    """この文脈で、どのルールが何回ヒットしたか。まだ無ければ空、読めなければ None。
 
-    `given` は「鍵 → 回数」。
+    `given` は「キー → 回数」。
 
     「まだ無い」と「読めない」を分けて返すのは、呼ぶ側が上書きしてよいかを
     決められるようにするため。同じ扱いにすると、読めなかった回に「まだ 1 回も
-    当たっていない」ものとして書き戻し、覚えていたぶんを消してしまう。
+    ヒットしていない」ものとして書き戻し、覚えていたぶんを消してしまう。
     読めないのは記録が在るときにしか起きないので、消す先はいつも中身のある記録になる。
     """
     data, failed = fsio.read_json(path)
@@ -323,7 +323,7 @@ def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
 def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
     """記録を書く。書けたか。"""
     # 取り合いになる記録なので、途中を見せない書き方で置く。素の open(path, "w") だと
-    # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 回も当たっていない」に
+    # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 回もヒットしていない」に
     # なる。途中で中断されたときも空のまま残り、次の起動が同じ読み違いをする。
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
@@ -332,12 +332,12 @@ def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
 
 
 def forget(state_dir: str, session: str, startup: bool = False) -> None:
-    """このセッションの数え（渡した回）を全部捨てる。古いセッションの分も掃く。
+    """このセッションの数え（渡した回）を全部破棄する。古いセッションの分も掃く。
 
-    捨てると「1 度だけ渡す文」はまた渡り、`every` の刻みも 0 から数え直しになる。
+    破棄すると「1 度だけ渡す文」はまた渡り、`every` の刻みも 0 から数え直しになる。
     どちらも「この文脈で何回目か」を見ているので、文脈が変われば一緒に忘れる。
 
-    Stop の促しの数え（`stop_path`）は起動（`startup`）のときだけ捨てる。compact・再開・clear では
+    Stop の促しの数え（`stop_path`）は起動（`startup`）のときだけ破棄する。compact・再開・clear では
     残す。
     """
     if not state_dir or not os.path.isdir(state_dir):

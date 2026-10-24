@@ -35,6 +35,8 @@ test("CB-T17 単引用符で囲み、中の単引用符を割る", () => {
 test("CB-T18 承認は子プロセスの引数で、preview は見るだけ、yes は見せた識別子をそのまま返す", () => {
   assert.deepEqual(previewArgs(), ["--agree", "--preview", "--json"]);
   assert.deepEqual(approveArgs(["i0001", "i0001-01-01"], "ab12"), [
+    "--entry",
+    "board",
     "user",
     "agree",
     "--yes",
@@ -61,6 +63,8 @@ test("CB-T18b preview に識別子を並べると、その分だけが対象に�
 test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて渡す", () => {
   // 絞り込み中。見せたのは 1 件で、絞りも同じ 1 件。
   assert.deepEqual(approveArgs(["i0002"], "ab12", ["i0002"]), [
+    "--entry",
+    "board",
     "user",
     "agree",
     "--yes",
@@ -72,6 +76,8 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
   ]);
   // 絞り込み無し。絞りは空で、実行ファイルは絞らないときの対象と見せた識別子を比べる。
   assert.deepEqual(approveArgs(["i0002", "i0002-01-01"], "ab12"), [
+    "--entry",
+    "board",
     "user",
     "agree",
     "--yes",
@@ -190,7 +196,7 @@ test("CB-T19e マージ状況の引数と片付けのコマンド。mr-state と
   );
   // Windows の区切りは / にそろえ、末尾の区切りは落とす
   assert.equal(retireCommand("C:\\Users\\me\\ws\\", "i0001"), "cd 'C:/Users/me/ws' && sh 'C:/Users/me/ws/.ccnavi/scripts/ccnavi-sync.sh' 'i0001'");
-  // 捨てた親の記録を消すコマンドは、ボードが送らずコピーするだけ。引用の規則は文面の sh と同じ
+  // 破棄した親の記録を消すコマンドは、ボードが送らずコピーするだけ。引用の規則は文面の sh と同じ
   assert.equal(abandonCommand("/ws", "i0001"), "sh /ws/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon i0001");
   assert.equal(abandonCommand("/my ws", "i0001"), 'sh "/my ws/.ccnavi/scripts/ccnavi-launcher.sh" worktree retire --abandon i0001');
   // ダイアログは sync が何をするかを先に言う

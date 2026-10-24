@@ -15,7 +15,7 @@
 import createDOMPurify, { type Config, type WindowLike } from "dompurify";
 import { Marked } from "marked";
 
-/** 許すリンクの表記。DOMPurify は属性の値を DOM で読んだ後（実体参照を解いた後）に当てる */
+/** 許すリンクの表記。DOMPurify は属性の値を DOM で読んだ後（実体参照を解いた後）に適用する */
 export const ALLOWED_URI = /^(?:https?|mailto):/i;
 
 const FORBID_TAGS = [
@@ -30,7 +30,7 @@ const CONFIG: Config = {
   FORBID_TAGS,
   FORBID_ATTR: [
     "style", "srcset", "action", "formaction", "background", "poster", "ping",
-    // 隠す・色で消す・見た目を変える属性。class と id は拡張の CSS に当たりうる
+    // 隠す・色で消す・見た目を変える属性。class と id は拡張の CSS に一致しうる
     "hidden", "class", "id", "name", "color", "bgcolor", "face", "size", "width", "height", "align", "dir", "open", "inert", "popover",
   ],
   ALLOWED_URI_REGEXP: ALLOWED_URI,
@@ -45,7 +45,7 @@ function escape(text: string): string {
 
 /**
  * HTML コメントを、消さずに目に見える文字にする。閉じていないコメントも末尾まで見せる。
- * コードの中のコメントは marked が既に実体参照にしているので当たらない。
+ * コードの中のコメントは marked が既に実体参照にしているのでヒットしない。
  */
 export function visibleComments(html: string): string {
   return html.replace(/<!--([\s\S]*?)(?:-->|$)/g, (_, body: string) => `<span>〈HTML コメント: ${escape(body.trim())}〉</span>`);

@@ -52,10 +52,10 @@ export function customHost(kind: unknown, value: unknown): Host {
   }
   const origin = url.origin;
   // id は `ホスト名[_ポート][_http]`。ホスト名に `_` が無いので、読み返すと一通りに決まり、
-  // https と http・ポートの違いで別の id になる（PAT の鍵 `token:<id>` が別の送り先と重ならない）
+  // https と http・ポートの違いで別の id になる（PAT のキー `token:<id>` が別の送り先と重ならない）
   const id = url.hostname + (url.port ? `_${url.port}` : "") + (url.protocol === "http:" ? "_http" : "");
   if (!CUSTOM_ID.test(id)) {
-    throw new Error(`ホストの名前が使えない形: ${id}`);
+    throw new Error(`ホストの名前に使えない形です：${id}`);
   }
   // 種類はユーザが明示したものを保つ（自動判定より優先）。GitHub として登録した *.ghe.com だけは、
   // 画面と API の origin が違う（https://api.<ホスト>）。それ以外の GitHub は Enterprise Server（/api/v3）
@@ -81,7 +81,7 @@ export function rowId(raw: unknown): string {
   }
 }
 
-/** 保存された配列から、読めた行だけを取る（読めない行は捨てる） */
+/** 保存された配列から、読めた行だけを取る（読めない行は破棄する） */
 export function readCustomRows(value: unknown): CustomRow[] {
   if (!Array.isArray(value)) return [];
   const out: CustomRow[] = [];

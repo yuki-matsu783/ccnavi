@@ -1,4 +1,4 @@
-"""`--lint` のうち、チケットの検査。承認済みチケットの写し・承認・提案・古い提案と、
+"""`--lint` のうち、チケットの検査。承認済みチケットのコピー・承認・提案・古い提案と、
 親子の運用に要る hook の登録・スクリプト・リモートを読み書きする手段を見る。
 ブランチとワークツリーの検査は `lint_branch` に分けてある。
 """
@@ -41,19 +41,19 @@ def _copy_problems(
     承認は置き場で決まり、チケットの中の欄では決まらない。
 
     置き場を動かして承認する進め方では `--agree` を通らないので、承認のときにしか
-    当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
+    ヒットしなかった検査が誰にもヒットしない。判定は `blocked` の分だけを止めるが、
     止まる場所は書き込みのときで、そこで初めて知るのは遅い。ここで全部言う。
 
     severity は 3 通りに分かれる。
 
     - `blocked` は判定が止める理由なので error
     - フェーズの順序は warn。狂っていても範囲の決まり方には影響せず、判定も止めない
-      （`approval_checks.blocking_problems`）。承認のときは error だが、承認済みのものに当てるのは
+      （`approval_checks.blocking_problems`）。承認のときは error だが、承認済みのものに適用するのは
       「その順で始めた」という記録で、いま止める根拠にはならない
     - 計画の形は `validate` が付けた severity のまま（error）。承認の画面を通っていれば起きない
       形なので、置き場を動かして承認した分の不備を CI で止める。範囲の超過だけは `validate` も warn
-    - 親に固定した定義の写し（`phases:`）が今の `phases.yml` と違う・`phases.yml` に無いことと、
-      写しの使われていない定義は warn。判定は写しを読むので進行中の親には効かず、止めない
+    - 親に固定した定義のコピー（`phases:`）が今の `phases.yml` と違う・`phases.yml` に無いことと、
+      コピーの使われていない定義は warn。判定はコピーを読むので進行中の親には効かず、止めない
     - 再開（`done/` から `doing/` へ手で戻す）で残った閉じるときの欄は warn。ユーザの再開を
       止めないため、判定も止めない
     - 作業中の子のフェーズに reviewed のマーカーが残っている形（再開）も warn。マーカーを
@@ -96,8 +96,8 @@ def _copy_problems(
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
             continue
         config = resolve(agree_candidates.project_of(t, pool))
-        # 承認済みの親の写し（`phases:`）と今の `phases.yml` の食い違いは warn（進行中の親には
-        # 効かない）。子の定義は親の写しから引く。
+        # 承認済みの親のコピー（`phases:`）と今の `phases.yml` の食い違いは warn（進行中の親には
+        # 効かない）。子の定義は親のコピーから引く。
         missing = ""
         if t.is_child and pool.get(t.parent) is None:
             missing = agree_candidates.parent_elsewhere_text(
@@ -112,7 +112,7 @@ def _copy_problems(
         if parent is not None:
             types = agree_candidates.types_from(t, pool)
             for p in phase.order_problems(root, conf, t, parent, types, raw=raw):
-                # 承認のときは error。承認済みのものに当てるのは「その順で始めた」という
+                # 承認のときは error。承認済みのものに適用するのは「その順で始めた」という
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
     return problems
@@ -191,8 +191,8 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
         for p in approval_checks.mr_problems(t):
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {p.detail}"))
 
-    # 承認済みの親が phases.yml を読めないことは error にしない。判定は親の写しを読み、
-    # 写しと今の phases.yml の食い違い（読めないことも含む）は `validate` が warn で言う
+    # 承認済みの親が phases.yml を読めないことは error にしない。判定は親のコピーを読み、
+    # コピーと今の phases.yml の食い違い（読めないことも含む）は `validate` が warn で言う
     # （`agree_candidates.copy_config_problems`）。提案は承認の検査が error で言う。
 
     # ツリーの名前から、そのツリーがどのリポジトリのものかを引く表。ワークスペースなら空、
@@ -339,7 +339,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     置き場は ccnavi ディレクトリ（`.ccnavi/`）の下にあり、守るのは組み込みの 1 本
     （`builtin:guard-project-home`）。ルールファイルには書かせない（書かせると消せる）。
     ここで見るのは、置き場が本当に ccnavi ディレクトリの下にあるか。外に向けると、
-    その 1 本が当たらず、エージェントが承認済みチケットを書けて承認の意味が無くなる。
+    その 1 本がヒットせず、エージェントが承認済みチケットを書けて承認の意味が無くなる。
 
     置き場は既定に固定なので、外に向くのは診断のフラグ（`--approved` /
     `--project-home`）で動かしたときだけ。フラグが残る間は見ておく。
@@ -368,10 +368,11 @@ def _approval_problems(
     closed: list,
     review: list,
 ) -> list[Problem]:
-    """承認で失敗するものを、承認の前に名指しする。ユーザが端末で初めて知るより早く。
+    """承認で失敗するものを、承認の前に名指しする。ユーザがターミナルで初めて知るより早く。
 
     承認と同じ関数を通す（`agree_candidates.candidates`）。ここだけ
-    `agree_candidates.validate` を当てる形にすると、順序で失敗する子（前のフェーズが閉じていない）・
+    `agree_candidates.validate` を適用する形にすると、
+    順序で失敗する子（前のフェーズが閉じていない）・
     計画に無い番号・`project:` の食い違い・改版の検査が抜ける。同じ事実を数える経路が 2 本あると、
     片方が気づかないうちに弱くなる。`--agree --preview --verify` と同じ答えをここでも言う。
 
@@ -440,7 +441,7 @@ def _proposal_problems(
     リポジトリをまたいだら、状態が何であれ error にする。プロジェクトは自分の git を持つので、
     そこに同じ識別子が在るのは同じチケットではなく違うチケットどうしの衝突。
     識別子はユーザが選ぶ短い連番で、プロジェクトが独立に振れば重なる。コミットの遅れでは説明が付かないから、
-    ツリーごとの免除を当ててはいけない。
+    ツリーごとの免除を適用してはいけない。
     """
     problems: list[Problem] = []
 
@@ -481,7 +482,7 @@ def _proposal_problems(
                     f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
                     f"{current.state or ticket_model.DOING}/）なのに todo/ にも在る"
                     f"（{_rel(root, t.path)}）。"
-                    "改版（計画・写し・範囲）でなければ todo/ の側を削除してください",
+                    "改版（計画・コピー・範囲）でなければ todo/ の側を削除してください",
                 )
             )
             continue
@@ -495,7 +496,7 @@ def _proposal_problems(
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{t.ticket} は承認待ち（{t.tree or '(ワークスペースルート)'} の todo/）。"
-                "'ccnavi user agree' を通すまで範囲は有効にならない",
+                "'ccnavi-user-agree.sh' を通すまで範囲は有効にならない",
             )
         )
     for t in index.values():

@@ -22,7 +22,7 @@ ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.s
    1 回だけやり直す
 6. 届いていた push（応答だけが失われた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
-   プロジェクトのレイヤーへ写したものは例外。tests/ticket/test_swap_points.py と
+   プロジェクトのレイヤーへコピーしたものは例外。tests/ticket/test_swap_points.py と
    tests/config/ が見る）
 8. hook の書きかけ（pending・skipped）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める
@@ -34,8 +34,9 @@ ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.s
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、write-and-push の confirm が
     書いて送ったものが、経路・時刻のほかは同じ
 
-`CCNAVI_SH_DIR` があれば、`.ccnavi/scripts/` の `.sh` を写したあと、その上に `CCNAVI_SH_DIR` の
-`.sh` を重ねる。写す前の版（`wip/design/scripts/` など）を確かめるときに使う。写す版は一部の sh
+`CCNAVI_SH_DIR` があれば、`.ccnavi/scripts/` の `.sh` をコピーしたあと、その上に `CCNAVI_SH_DIR` の
+`.sh` を重ねる。コピーする前の版（`wip/design/scripts/` など）を確かめるときに使う。
+コピーする版は一部の sh
 だけを持ち、`ccnavi-ticket.sh` などは持たないので、差し替えではなく重ねる。
 """
 
@@ -58,7 +59,7 @@ from tests.ticketsample import PHASES, RULES, child_text, parent_text
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
-# 写す前の版の sh（`wip/design/scripts/` など）。`.ccnavi/scripts/` の上に重ねる。
+# コピーする前の版の sh（`wip/design/scripts/` など）。`.ccnavi/scripts/` の上に重ねる。
 OVERLAY_DIR = os.environ.get("CCNAVI_SH_DIR", "")
 CONFIG = (
     ("user.email", "t@example.invalid"),
@@ -72,7 +73,7 @@ APPROVED = ".ccnavi/approved"
 # 実行ファイルの代わり。このツリーのソースを起こす。
 EXE = """#!/bin/sh
 # `user` の入口は、ラッパーのオプション（--root など）の後の最初の語。
-# 端末要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
+# ターミナル要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
 # （ほかは `--` を挟む呼び出しがあるので前に付ける）。
 skip=""; first=""
 for a in "$@"; do
@@ -422,7 +423,7 @@ case " $* " in
   exit 0 ;;
 esac
 # `user` の入口は、ラッパーのオプション（--root など）の後の最初の語。
-# 端末要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
+# ターミナル要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
 # （ほかは `--` を挟む呼び出しがあるので前に付ける）。
 skip=""; first=""
 for a in "$@"; do
@@ -496,7 +497,7 @@ case " $* " in
 *" user close-early "*) put "$m/2.skipped" '{{"by": "close-early", "at": "t"}}'; exit 0 ;;
 esac
 # `user` の入口は、ラッパーのオプション（--root など）の後の最初の語。
-# 端末要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
+# ターミナル要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
 # （ほかは `--` を挟む呼び出しがあるので前に付ける）。
 skip=""; first=""
 for a in "$@"; do
@@ -695,7 +696,8 @@ class WriteAndPushMergeHarness(WriteAndPushHarness):
         return shim + os.pathsep + os.environ.get("PATH", "")
 
     def term_after(self, pattern):
-        """git の引数が pattern に当たる呼び出しの直後に、finish へ TERM を送る。stderr を返す。"""
+        """git の引数が pattern にヒットする呼び出しの直後に、finish へ TERM を送る。
+        stderr を返す。"""
         import signal
 
         mark = os.path.join(self._base, "reached")

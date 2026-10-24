@@ -113,8 +113,10 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertIn("案内が出たらそれに従い、迂回しない", text)
         self.assertIn("他セッションのもの", text)
         self.assertIn(f"sh {self.root}/.ccnavi/scripts/ccnavi-stage.sh <元のパス>", text)
-        # 写した下書きは、ユーザが `ccnavi user handoff` で取り込む（mv を案内しない）。
-        self.assertIn("ユーザに `ccnavi user handoff` での取り込みを案内してターンを終える", text)
+        # コピーした下書きは、ユーザが `ccnavi-user-handoff.sh` で取り込む（mv を案内しない）。
+        self.assertIn(
+            "ユーザに `ccnavi-user-handoff.sh` での取り込みを案内してターンを終える", text
+        )
         self.assertNotIn("mv（フルパス）", text)
 
     def test_ccnavi_mdが無ければ無いことだけを言う(self):

@@ -152,7 +152,7 @@ class DefinitionTest(unittest.TestCase):
         definition, _ = risk.parse(text)
         moved = risk.Change("vendor/core.py", added=60, deleted=60, status="R", old="src/core.py")
         score = risk.evaluate(definition, risk.Diff(changes=[moved]), "", "", {}, {})
-        # 旧パスが include に当たるので数える。exclude は新旧の両方に当たらないと外さない。
+        # 旧パスが include にヒットするので数える。exclude は新旧の両方にヒットしないと外さない。
         self.assertEqual({"inc": 1, "exc": 2}, {h.id: h.points for h in score.hits})
 
     def test_scope_key_ignores_order_and_duplicates(self):
@@ -222,7 +222,7 @@ class RiskTest(PhaseHarness):
 
     def test_big_change_escalates_to_review_even_when_declared_unneeded(self):
         tree = self.one_child(review=False)
-        # 行数と、ファイル数と、CI と、削除。全部当たる。
+        # 行数と、ファイル数と、CI と、削除。全部ヒットする。
         write(os.path.join(tree, "src", "a.py"), "\n".join(str(i) for i in range(20)) + "\n")
         write(os.path.join(tree, "src", "b.py"), "b\n")
         write(os.path.join(tree, ".github", "ci.yml"), "on: push\n")

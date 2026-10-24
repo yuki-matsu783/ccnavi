@@ -82,7 +82,8 @@ def stop_review_problems(root: str, conf: settings.Settings) -> list[Problem]:
             )
         )
     hooks, file_flag = stop_review_hooks(root)
-    # 端末の `--lint` には settings.json の env が渡らない。無ければ settings.json の env を読む。
+    # ターミナルの `--lint` には settings.json の env が渡らない。
+    # 無ければ settings.json の env を読む。
     registered = conf.stop_review_agent or file_flag == "1"
     if registered and not hooks:
         out.append(
@@ -342,7 +343,7 @@ def report(
     if conf.tickets_enabled:
         stdout.write(f"  チケットの承認の経路を守る: {conf.guard_ticket_approval}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
-    # 端末から打った検証と hook から届く環境は違うので、どちらを見た結果なのかを
+    # ターミナルから打った検証と hook から届く環境は違うので、どちらを見た結果なのかを
     # 明示する。明示しないと、通った検証が別の設定についての報告になる。
     stdout.write(f"  モード: {mode}（この起動の環境から解決したもの）\n")
 

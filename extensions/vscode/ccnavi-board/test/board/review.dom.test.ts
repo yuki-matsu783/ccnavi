@@ -81,7 +81,7 @@ test("CB-D732 相談のプロンプトのコピーの知らせ: できたら短�
     assert.equal((page.one('li[data-key="u1"] input[data-choice="keep"]') as unknown as { checked: boolean }).checked, true, "選びかけが保たれる");
     assert.equal(page.all(".approval-backdrop").length, 1);
     // できなかった
-    await page.send({ type: "data", data: { kind: "board", board: (await import("../../src/core/board.js")).buildBoard(fixture()), approval: { kind: "decidePreview", preview: preview(), tree: "/w", consult: { ok: false, text: "コピーできませんでした（クリップボードが使えません）" } } } });
+    await page.send({ type: "data", data: { kind: "board", board: (await import("../../src/core/board.js")).buildBoard(fixture()), approval: { kind: "decidePreview", preview: preview(), tree: "/w", consult: { ok: false, text: "コピーできませんでした（クリップボードを利用できません）" } } } });
     const ng = page.one('[data-consult="error"]');
     assert.match(ng.textContent, /コピーできませんでした/);
     assert.ok(ng.classList.contains("error"));

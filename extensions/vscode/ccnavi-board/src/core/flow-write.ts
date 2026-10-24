@@ -185,10 +185,10 @@ function changedSince(file: string, expect: FlowExpect, noun: string): string | 
     }
   }
   if (!expect.exists) {
-    return stat === undefined ? undefined : `${noun}のファイルは、読み込んだあとに画面の外で作られています。再読込してから編集し直してください（上書きしません）`;
+    return stat === undefined ? undefined : `${noun}のファイルは、読み込んだあとに画面の外で作られています。再読み込みしてから編集し直してください（上書きしません）`;
   }
   if (stat === undefined) {
-    return `${noun}のファイルは、読み込んだあとに画面の外で消されています。再読込してから編集し直してください`;
+    return `${noun}のファイルは、読み込んだあとに画面の外で消されています。再読み込みしてから編集し直してください`;
   }
   if (stat.isSymbolicLink() || !stat.isFile()) {
     return `${file} がシンボリックリンクか、ファイルではないため、保存しません`;
@@ -197,7 +197,7 @@ function changedSince(file: string, expect: FlowExpect, noun: string): string | 
     return hardLinkedError(file, "保存しません");
   }
   if (stat.mtimeMs !== expect.mtimeMs) {
-    return `${noun}のファイルは、読み込んだあとに画面の外で変更されています。再読込してから編集し直してください（この変更は上書きしません）`;
+    return `${noun}のファイルは、読み込んだあとに画面の外で変更されています。再読み込みしてから編集し直してください（この変更は上書きしません）`;
   }
   return undefined;
 }

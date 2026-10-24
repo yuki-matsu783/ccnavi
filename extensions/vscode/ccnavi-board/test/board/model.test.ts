@@ -50,7 +50,7 @@ test("CB-T3 JSON でなければ理由を返す", () => {
   assert.equal(notObject.ok, false);
 });
 
-test("CB-T110 layers[] からルールファイルの置き場を読み、欠けた JSON でも全体を捨てずに空で補う", () => {
+test("CB-T110 layers[] からルールファイルの置き場を読み、欠けた JSON でも全体を破棄せずに空で補う", () => {
   const board = fixture();
   assert.deepEqual(board.layers.map((l) => l.name), ["common", "self"]);
   assert.equal(board.layers[1].rules.path, "<root>/.ccnavi/config/project/rules.yml");
@@ -80,7 +80,7 @@ test("CB-T318 sums[] を読む。ワークスペースの統合結果（共通 +
   assert.deepEqual(self.risk.levels, { medium: 20, high: 40, critical: 70 });
   assert.equal(self.risk.fallback, "");
   // フェーズ定義は共通 + 自身の設定の和。この見本の共通の設定には定義が無いので、自身の設定の定義だけが載る
-  // 定義は順序を持たない（順序は親の計画の項の after）。待ち方（order）の欄は実行ファイルも渡さず、拡張も読まない
+  // 定義は順序を持たない（順序は親の計画のステップの after）。先行関係（order）の欄は実行ファイルも渡さず、拡張も読まない
   assert.ok(!("order" in self.phases), JSON.stringify(self.phases));
   assert.deepEqual(self.phases.types.map((t) => t.id).slice(0, 2), ["research", "design"]);
   assert.ok(self.phases.types.every((t) => t.source === "self"));
@@ -97,7 +97,7 @@ test("CB-T318 sums[] を読む。ワークスペースの統合結果（共通 +
   assert.deepEqual(broken.board.sums[0].phases.types, []);
 });
 
-test("CB-T4 欠けた項目は既定値で埋め、全体を捨てない", () => {
+test("CB-T4 欠けた項目は既定値で埋め、全体を破棄しない", () => {
   const parsed = parseBoardJson(
     JSON.stringify({
       version: BOARD_VERSION,
@@ -157,7 +157,7 @@ test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま�
   assert.deepEqual(parsed.board.tickets[1].predecessors_unmet, []);
 });
 
-test("CB-T303 archived は実行ファイルの退避の欄を写す。欄がなければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
+test("CB-T303 archived は実行ファイルの退避の欄をコピーする。欄がなければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const parsed = parseBoardJson(
     JSON.stringify({

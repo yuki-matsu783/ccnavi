@@ -85,7 +85,7 @@ async function openScreen(screen: string): Promise<boolean> {
   return false;
 }
 
-/** 続けて見るのを始めるとき、前の続きと頼みを捨てる */
+/** 続けて見るのを始めるとき、前の続きと頼みを破棄する */
 function resetChain(next: readonly string[]): void {
   forced.clear();
   chain = next.slice();
