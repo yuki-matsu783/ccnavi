@@ -69,7 +69,7 @@ test("CB-D734 カードにミラーの状態が出る。ずれの中身は畳ん
       ["更新 .ccnavi/config/common/rules.yml", "追加 .ccnavi/config/common/templates/a.yml", "削除 .ccnavi/config/common/old.yml"],
     );
     assert.equal(dom.all(`${cardSelector("app")} details.mirror-changes`).length, 0);
-    assert.equal(text(dom.one(".summary .mirror-checked")), "ミラーの最終確認 14:05");
+    assert.equal(text(dom.one(".summary .mirror-checked")), "共通設定の最終確認 14:05");
   } finally {
     await dom.close();
   }
@@ -84,7 +84,7 @@ test("CB-D735 「共通設定を同期」はずれのある行だけ押せて、
     assert.equal(button("web").disabled, false);
     assert.equal(text(button("web")), "共通設定を同期");
     const all = dom.one<HTMLButtonElement>('button[data-action="mirror-sync-all"]');
-    assert.equal(text(all), "すべて同期（1 件）");
+    assert.equal(text(all), "共通設定をすべて同期（1 件）");
     assert.equal(all.disabled, false);
     dom.click(button("web"));
     await dom.settle();
@@ -114,7 +114,7 @@ test("CB-D736 同期中はどのボタンも押せない。終われば（busy �
 
 test("CB-D737 古い実行ファイル・調べられない・写すものが無いときは帯に理由を出し、ボタンは押せない", async () => {
   const cases: [MirrorStatus, RegExp][] = [
-    [{ kind: "unsupported", reason: "mirror の機能を持ちません（古い版です）" }, /ミラーのずれを調べられません。mirror の機能を持ちません（古い版です）/],
+    [{ kind: "unsupported", reason: "mirror の機能を持ちません（古い版です）" }, /共通設定のずれを調べられません。mirror の機能を持ちません（古い版です）/],
     [{ kind: "failed", error: "60 秒で中断しました" }, /調べられませんでした。60 秒で中断しました/],
     [{ kind: "ok", list: list({ ok: false, error: "共通レイヤーを読み込めません" }) }, /調べられませんでした。共通レイヤーを読み込めません/],
     [{ kind: "ok", list: list({ common_empty: true }) }, /写すものがありません/],

@@ -91,7 +91,7 @@ export function SyncAllButton({ mirror, act }: { readonly mirror: MirrorData; re
       onClick={() => act({ type: "mirrorSync", names: [], expect })}
     >
       <span className="spin" aria-hidden="true" />
-      すべて同期（{button.count} 件）
+      共通設定をすべて同期（{button.count} 件）
     </button>
   );
 }
@@ -101,20 +101,20 @@ export function CheckedAt({ mirror }: { readonly mirror: MirrorData }): JSX.Elem
   if (mirror.checkedAt === "") {
     return null;
   }
-  return <span className="mirror-checked dim">ミラーの最終確認 {mirror.checkedAt}</span>;
+  return <span className="mirror-checked dim">共通設定の最終確認 {mirror.checkedAt}</span>;
 }
 
 /** ミラーを調べられないとき・写すものが無いときの帯 */
 export function MirrorBanners({ mirror }: { readonly mirror: MirrorData }): JSX.Element | null {
   const status = mirror.status;
   if (status.kind === "unsupported") {
-    return <div className="banner warn mirror-banner">ミラーのずれを調べられません。{status.reason}</div>;
+    return <div className="banner warn mirror-banner">共通設定のずれを調べられません。{status.reason}</div>;
   }
   if (status.kind === "failed") {
-    return <div className="banner warn mirror-banner">ミラーのずれを調べられませんでした。{status.error}</div>;
+    return <div className="banner warn mirror-banner">共通設定のずれを調べられませんでした。{status.error}</div>;
   }
   if (status.kind === "ok" && !status.list.ok) {
-    return <div className="banner warn mirror-banner">ミラーのずれを調べられませんでした。{status.list.error}</div>;
+    return <div className="banner warn mirror-banner">共通設定のずれを調べられませんでした。{status.list.error}</div>;
   }
   if (status.kind === "ok" && status.list.commonEmpty) {
     return (

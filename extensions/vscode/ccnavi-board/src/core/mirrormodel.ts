@@ -82,21 +82,21 @@ export function parseMirrorList(text: string): MirrorListParse {
     return { ok: false, error: versionMismatch(raw.version) };
   }
   if (typeof raw.ok !== "boolean") {
-    return { ok: false, error: "ミラーの JSON の ok 欄が真偽値ではありません" };
+    return { ok: false, error: "共通設定の JSON の ok 欄が真偽値ではありません" };
   }
   if (!raw.ok) {
     return {
       ok: true,
-      value: { version: MIRROR_VERSION, ok: false, error: str(raw.error) || "ミラーを調べられませんでした（理由は返りませんでした）", commonEmpty: raw.common_empty === true, projects: [], expect: "" },
+      value: { version: MIRROR_VERSION, ok: false, error: str(raw.error) || "共通設定を調べられませんでした（理由は返りませんでした）", commonEmpty: raw.common_empty === true, projects: [], expect: "" },
     };
   }
   if (!Array.isArray(raw.projects)) {
-    return { ok: false, error: "ミラーの JSON の projects 欄が配列ではありません" };
+    return { ok: false, error: "共通設定の JSON の projects 欄が配列ではありません" };
   }
   const projects: MirrorProject[] = [];
   for (const item of raw.projects) {
     if (!isRecord(item) || typeof item.name !== "string" || item.name === "") {
-      return { ok: false, error: "ミラーの JSON の projects に、name の無いプロジェクトがあります" };
+      return { ok: false, error: "共通設定の JSON の projects に、name の無いプロジェクトがあります" };
     }
     projects.push({
       name: item.name,
@@ -128,7 +128,7 @@ export function parseMirrorResult(text: string): MirrorResultParse {
     return { ok: false, error: versionMismatch(raw.version) };
   }
   if (typeof raw.ok !== "boolean") {
-    return { ok: false, error: "ミラーの同期の JSON の ok 欄が真偽値ではありません" };
+    return { ok: false, error: "共通設定の同期の JSON の ok 欄が真偽値ではありません" };
   }
   const readSynced = (value: unknown): readonly MirrorSynced[] =>
     Array.isArray(value)
@@ -143,7 +143,7 @@ export function parseMirrorResult(text: string): MirrorResultParse {
     return { ok: true, value: partial.length > 0 ? { ok: false, error, synced: partial } : { ok: false, error } };
   }
   if (!Array.isArray(raw.synced)) {
-    return { ok: false, error: "ミラーの同期の JSON の synced 欄が配列ではありません" };
+    return { ok: false, error: "共通設定の同期の JSON の synced 欄が配列ではありません" };
   }
   return { ok: true, value: { ok: true, synced: readSynced(raw.synced) } };
 }
@@ -226,14 +226,14 @@ function commonBlock(status: MirrorStatus, busy: boolean): string {
   }
   switch (status.kind) {
     case "waiting":
-      return "ミラーを調べています";
+      return "共通設定を調べています";
     case "unsupported":
       return status.reason;
     case "failed":
-      return "ミラーを調べられませんでした。「更新」で調べ直してください";
+      return "共通設定を調べられませんでした。「更新」で調べ直してください";
     case "ok":
       if (!status.list.ok) {
-        return "ミラーを調べられませんでした。「更新」で調べ直してください";
+        return "共通設定を調べられませんでした。「更新」で調べ直してください";
       }
       return status.list.commonEmpty ? "共通レイヤーに写すものがありません" : "";
   }
@@ -247,7 +247,7 @@ export function projectSyncButton(status: MirrorStatus, busy: boolean, name: str
   }
   const project = status.kind === "ok" ? mirrorOf(status.list, name) : undefined;
   if (project === undefined) {
-    return { enabled: false, reason: "ミラーの結果にこのプロジェクトがありません" };
+    return { enabled: false, reason: "共通設定の同期の結果にこのプロジェクトがありません" };
   }
   if (project.state === "synced") {
     return { enabled: false, reason: "ずれはありません" };
@@ -286,7 +286,7 @@ export function isStale(error: string): boolean {
 export function syncNotice(result: MirrorResult): { readonly kind: "info" | "warn" | "error"; readonly message: string } {
   if (!result.ok) {
     if (isStale(result.error)) {
-      return { kind: "warn", message: "表示した後でミラーの内容が変わったので、同期しませんでした。最新の状態を読み直したので、確かめてからもう一度押してください" };
+      return { kind: "warn", message: "表示した後で共通設定の内容が変わったので、同期しませんでした。最新の状態を読み直したので、確かめてからもう一度押してください" };
     }
     const done = result.synced ?? [];
     if (done.length > 0) {
@@ -332,7 +332,7 @@ function parseRecord(text: string): { readonly ok: true; readonly value: Record<
 }
 
 function versionMismatch(version: unknown): string {
-  return `ミラーの JSON の形が違います（拡張は ${MIRROR_VERSION}、実行ファイルは ${String(version)}）`;
+  return `共通設定の JSON の形が違います（拡張は ${MIRROR_VERSION}、実行ファイルは ${String(version)}）`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
