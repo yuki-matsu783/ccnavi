@@ -116,7 +116,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.doesNotMatch(plain, /最後の項が待たない/);
     const notes = dom.one('.plan-graph[data-part="feedback"] .plan-graph-notes').textContent ?? "";
     assert.match(notes, /すぐ始まる: 5, 6/);
-    assert.match(notes, /最後の項が待たない: 6。最後の項へ線を引くか、合流の項を置く/);
+    assert.match(notes, /最後の項が待たない: 6。最後の項へ線を引くか、合流の項を置いてください/);
     assert.match(notes, /フィードバック計画の最後の項（7）が 6 を待っていない/);
   } finally {
     await dom.close();

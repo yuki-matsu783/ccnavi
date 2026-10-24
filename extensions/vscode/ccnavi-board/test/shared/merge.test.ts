@@ -97,11 +97,11 @@ test("CB-T631 一覧が読めたら対象ごとに状況を聞く（MR の番号
 
 test("CB-T632 一覧の形式の異常は「ありません」とは言わず、エラーとして出す", () => {
   const started = step(MERGE_IDLE, { kind: "check" }).state;
-  const failed = step(started, { kind: "listed", token: 1, at: AT, result: { ok: false, error: "一覧を取れない（形式の異常: 頭の行が retired 1 ではありません）" } });
+  const failed = step(started, { kind: "listed", token: 1, at: AT, result: { ok: false, error: "一覧を取得できません（形式の異常: 頭の行が retired 1 ではありません）" } });
   assert.equal(failed.state.checking, false);
   assert.deepEqual(failed.effects, []);
   const view = mergeView(failed.state, abandon);
-  assert.equal(view?.error, "一覧を取れない（形式の異常: 頭の行が retired 1 ではありません）");
+  assert.equal(view?.error, "一覧を取得できません（形式の異常: 頭の行が retired 1 ではありません）");
   assert.deepEqual(view?.rows, []);
   assert.equal(view?.checkedAt, AT);
 });

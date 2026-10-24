@@ -133,7 +133,7 @@ export function Factor(props: FactorProps): JSX.Element {
               <span className="cap" title="YAML のキー: max">
                 上限
               </span>
-              {text("max", "f-max num", "上限。空なら上限なし")}
+              {text("max", "f-max num", "上限。空なら上限なしです")}
             </div>
           ) : (
             text("value", "f-value", KIND_LABELS[factor.kind].placeholder, NUMERIC.includes(factor.kind))
@@ -142,10 +142,10 @@ export function Factor(props: FactorProps): JSX.Element {
         {NUMERIC.includes(factor.kind) && (
           <>
             <Captioned name="対象パス" yamlKey="include" {...mark("factor-include")}>
-              {globs("include", "src/**（glob を 1 行に 1 つ。指定すると、当てはまるパスだけを数える。空なら全パス）")}
+              {globs("include", "src/**（glob を 1 行に 1 つ。指定すると、当てはまるパスだけを数えます。空なら全パスです）")}
             </Captioned>
             <Captioned name="除外パス" yamlKey="exclude" {...mark("factor-exclude")}>
-              {globs("exclude", "*.lock（glob を 1 行に 1 つ。当てはまるパスは数えない。対象パスに当てはまっていても除外する）")}
+              {globs("exclude", "*.lock（glob を 1 行に 1 つ。当てはまるパスは数えません。対象パスに当てはまっていても除外します）")}
             </Captioned>
           </>
         )}

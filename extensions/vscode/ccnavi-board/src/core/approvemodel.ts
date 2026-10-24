@@ -235,10 +235,10 @@ export function partialMessage(partial: ApprovePartial, carried = false): string
   const { placed, paths, ticket, reason, lines } = partial;
   const where = ticket === "" ? "" : placed.includes(ticket) ? `${ticket} の後始末で` : `${ticket} で`;
   const written = paths.length === 0 ? placed.join(", ") : paths.join(", ");
-  const failed = ticket === "" || placed.includes(ticket) ? "" : `書けなかった: ${ticket}。`;
+  const failed = ticket === "" || placed.includes(ticket) ? "" : `書き込めませんでした: ${ticket}。`;
   const sent = carried
-    ? "書けたぶんだけをコミット・pushするコマンドをターミナルに送信しました。結果はターミナルで確認してください（pushできていなければ未送信です）"
-    : "承認済みチケットをコミット・pushするコマンドは送信していません（push用のスクリプトがありません）。未送信です";
+    ? "書けたぶんだけをコミット・push するコマンドをターミナルに送信しました。結果はターミナルで確認してください（push できていなければ未送信です）"
+    : "承認済みチケットをコミット・push するコマンドは送信していません（push 用のスクリプトがありません）。未送信です";
   const what =
     placed.length === 0
       ? "承認済みになったチケットはありません"

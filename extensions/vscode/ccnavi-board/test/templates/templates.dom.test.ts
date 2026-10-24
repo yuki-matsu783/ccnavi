@@ -32,7 +32,7 @@ test("CB-D324 一覧は開いている対象の層のテンプレートだけを
     );
     assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"]')), /捨てた: 共通と同じ中身/);
     assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"]')), /使えない/);
-    assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /捨てた: 共通と食い違う/);
+    assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /捨てた: 共通と食い違います/);
     assert.equal(dom.all('button[data-action="view-sum"], button[data-action="view-raw"]').length, 0);
     assert.equal(dom.all("details#sum").length, 1);
   } finally {
@@ -48,9 +48,9 @@ test("CB-D325 統合結果の枠は閉じた枠で出て、選んだ統合結果
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     const rows = dom.all("details#sum tbody tr").map((tr) => `${tr.getAttribute("data-layer")}/${tr.getAttribute("data-name")}`);
     assert.deepEqual(rows, ["common/broken", "common/feature", "common/research", "self/ends", "self/feature", "self/local", "self/research"]);
-    assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読み込めない/);
+    assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読み込めません/);
     assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="feature"]')), /使われない/);
-    assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通と食い違う/);
+    assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通と食い違います/);
     assert.match(text(dom.one('[data-count="sum"]')), /使われるのは 4 件（common \+ self）/);
     dom.change(dom.one<HTMLSelectElement>("select#sum-select"), "lib");
     await dom.settle();
@@ -116,7 +116,7 @@ test("CB-D328 下書きは 3 件出て、error・TODO を札で出す。効力�
   try {
     assert.equal(dom.all("li.draft").length, 3);
     assert.match(text(dom.one('li.draft[data-name="broken"]')), /error あり/);
-    assert.match(text(dom.one('li.draft[data-name="login"]')), /TODO が残っている/);
+    assert.match(text(dom.one('li.draft[data-name="login"]')), /TODO が残っています/);
     assert.match(text(dom.one('[data-tour="drafts"] .hint')), /効力のない下書き/);
     assert.match(text(dom.one('[data-tour="drafts"] .hint')), /読むだけ/);
     // 取り込み・保存・改名・移動・削除の操作はこの画面に無い

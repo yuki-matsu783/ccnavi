@@ -130,7 +130,7 @@ function troubleOf(card: StatusCard): string {
   }
   if (card.scattered.length > 0) {
     const where = card.scattered.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
-    reasons.push(`複数の場所にある（${card.scattered.length} か所）: ${where}`);
+    reasons.push(`複数の場所にあります（${card.scattered.length} か所）: ${where}`);
   }
   return reasons.join("\n");
 }
@@ -222,12 +222,12 @@ function childStatus(card: StatusCard): Status {
       case "レビュー予定":
         return { label: "レビュー予定", title: "", tone: "wait" };
       default:
-        return check("レビュー待ちの置き場にあるが、フェーズの状態と合わない");
+        return check("レビュー待ちの置き場にあるが、フェーズの状態と合いません");
     }
   }
   if (card.copyStatus === "open") {
     if (card.reviewWaiting || card.gateClosed) {
-      return check("作業中なのに、フェーズがレビューで止まっている");
+      return check("作業中なのに、フェーズがレビューで止まっています");
     }
     return card.startedAt === "" ? { label: "開始前", title: "", tone: "wait" } : { label: "作業中", title: "", tone: "work" };
   }

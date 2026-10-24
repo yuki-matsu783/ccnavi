@@ -46,19 +46,19 @@ export function countText(total: number, query: string, shown: number, kept: num
   if (query === "") {
     return String(total);
   }
-  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目：${kept}件）` : ""}`;
+  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目: ${kept} 件）` : ""}`;
 }
 
 /** id が重なっているときに下部へ出す文 */
 export function duplicateNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
-  return `IDが重複しています（${names.join(", ")}）。重複を解消するまで保存できません。`;
+  return `ID が重複しています（${names.join(", ")}）。重複を解消するまで保存できません。`;
 }
 
 /** 定義が 1 つも無いときに一覧へ出す文。ファイルの有無で変わる */
 export function emptyNote(exists: boolean): string {
   if (exists) {
-    return "定義がありません。定義が空のファイルはccnaviで読み込めません。保存する前に、定義を1つ以上追加してください。";
+    return "定義がありません。定義が空のファイルは ccnavi で読み込めません。保存する前に、定義を 1 つ以上追加してください。";
   }
   return "フェーズ定義ファイルはまだ作成されていません。未設定のため、エラーではありません。定義を追加して保存すると、ファイルが作られます";
 }

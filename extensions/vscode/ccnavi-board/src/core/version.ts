@@ -82,7 +82,7 @@ export function rebuildHint(fromSource: boolean): string {
 
 /** 拡張を新しくする直し方 */
 export const UPDATE_EXTENSION_HINT =
-  "拡張を新しくしてください（ccnavi のリポジトリの extensions/vscode/ccnavi-board で pnpm package して入れ直す）";
+  "拡張を新しくしてください（ccnavi のリポジトリの extensions/vscode/ccnavi-board で pnpm package して入れ直します）";
 
 /** 表示に使う実行ファイルの版とコミット（`0.1.0 abc1234`） */
 function named(info: VersionInfo): string {

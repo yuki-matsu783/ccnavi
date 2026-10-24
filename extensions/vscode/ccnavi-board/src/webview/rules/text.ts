@@ -75,5 +75,5 @@ export function countText(query: string, shown: number, total: number, kept: num
   if (query === "") {
     return String(total);
   }
-  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目：${kept}件）` : ""}`;
+  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目: ${kept} 件）` : ""}`;
 }

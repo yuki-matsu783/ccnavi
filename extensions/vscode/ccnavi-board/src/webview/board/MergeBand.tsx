@@ -24,10 +24,10 @@ const REASON_LABELS: Readonly<Record<string, string>> = {
   auth: "認証",
   network: "ネットワーク",
   api: "ホストの API",
-  "not-found": "見つからない",
+  "not-found": "見つかりません",
   timeout: "期限切れ",
   format: "出力の形が想定外",
-  failed: "実行できない",
+  failed: "実行できません",
   "no-number": "MR の番号が無い",
 };
 
@@ -126,7 +126,7 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
       return (
         <>
           <span>
-            - マージせず閉じた - 自動では片付けません。捨てた親なら、ユーザが端末で{" "}
+            - マージせず閉じました。自動では片付けません。捨てた親なら、ユーザが端末で{" "}
             <code className="merge-command">{row.abandon}</code> を実行して記録を消します
           </span>
           <MrLink url={row.url} />{" "}
@@ -149,11 +149,11 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
     case "unknown":
       return (
         <span className="merge-unknown" data-reason={row.reason}>
-          - 確認できない（{REASON_LABELS[row.reason] ?? row.reason}: {row.detail}）
+          - 確認できません（{REASON_LABELS[row.reason] ?? row.reason}: {row.detail}）
         </span>
       );
     case "incomplete":
-      return <span className="merge-unknown">- 確認できない（記録が不完全: {row.detail}）</span>;
+      return <span className="merge-unknown">- 確認できません（記録が不完全: {row.detail}）</span>;
   }
 }
 

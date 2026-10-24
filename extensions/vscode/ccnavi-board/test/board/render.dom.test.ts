@@ -264,7 +264,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
   }
   const carried = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-02-03 を承認した", carried: true } });
   try {
-    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットをコミット・pushするコマンドをターミナルに送信しました。"));
+    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットをコミット・push するコマンドをターミナルに送信しました。"));
   } finally {
     await carried.close();
   }

@@ -633,7 +633,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
               id="tool"
               type="text"
               list="tool-names"
-              title="候補は判定が対象を取り出せるツール。一覧にない名前も入れられる（判定には届かない）"
+              title="候補は判定が対象を取り出せるツールです。一覧にない名前も入れられます（判定には届きません）"
               spellCheck={false}
               value={shownTool}
               onChange={(event) => setTool(event.target.value)}

@@ -66,12 +66,12 @@ test("CB-D12 絞り込みは一致した行だけを数え、開いている行�
     await dom.settle();
     dom.type(dom.one("#find"), "当てはまるファイル");
     await dom.settle();
-    assert.equal(dom.one("#factor-count").textContent, "1 / 4（検索条件外の展開中項目：1件）", "画面に出ている語で当たる");
+    assert.equal(dom.one("#factor-count").textContent, "1 / 4（検索条件外の展開中項目: 1 件）", "画面に出ている語で当たる");
     dom.type(dom.one("#find"), "github");
     await dom.settle();
     assert.ok(dom.one(rowSelector("f1")).classList.contains("hidden-by-find"));
     assert.ok(dom.one(rowSelector("f1")).classList.contains("open"));
-    assert.equal(dom.one("#factor-count").textContent, "1 / 4（検索条件外の展開中項目：1件）");
+    assert.equal(dom.one("#factor-count").textContent, "1 / 4（検索条件外の展開中項目: 1 件）");
     // 保存の往復の間は欄を止めるが、行の開閉（twist）は止めない
     dom.type(dom.one(`${rowSelector("f1")} input.f-points`), "30");
     await dom.settle();
@@ -205,7 +205,7 @@ test("CB-D53 項目を追加すると開いて出し、並べ替えと削除が�
     dom.type(dom.one("#find"), "未設定");
     await dom.settle();
     assert.ok(dom.one(rowSelector("f5")).classList.contains("hidden-by-find"));
-    assert.equal(dom.one("#factor-count").textContent, "0 / 5（検索条件外の展開中項目：1件）");
+    assert.equal(dom.one("#factor-count").textContent, "0 / 5（検索条件外の展開中項目: 1 件）");
     dom.type(dom.one("#find"), "");
     await dom.settle();
     dom.type(dom.one(`${rowSelector("f5")} input.f-id`), "new");

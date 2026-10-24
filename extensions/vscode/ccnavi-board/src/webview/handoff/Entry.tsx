@@ -95,7 +95,7 @@ export function Entry({ entry, lock, selected, open, disabled, terminal, onToggl
               ))}
             </ul>
           ) : null}
-          <h3 className="entry-diff-head">差分（制御文字・書式文字・改行コードは、見える形で示す）</h3>
+          <h3 className="entry-diff-head">差分（制御文字・書式文字・改行コードは、見える形で示します）</h3>
           {entry.diff === "" ? (
             <p className="hint" data-role="no-diff">
               差分はありません。

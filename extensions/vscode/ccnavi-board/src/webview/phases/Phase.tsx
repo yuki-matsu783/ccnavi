@@ -105,7 +105,7 @@ export function Phase(props: PhaseProps): JSX.Element {
           {text("id", "f-id narrow", "implement（英数字で始まり、使えるのは英数字と . _ -）")}
         </Captioned>
         <Captioned name="タイトル" yamlKey="title" tour={mark("phase-title")}>
-          {text("title", "f-title narrow", "実装とテスト（空なら id をそのまま使う）")}
+          {text("title", "f-title narrow", "実装とテスト（空なら id をそのまま使います）")}
         </Captioned>
         <Captioned name="区分" yamlKey="kind" tour={mark("phase-kind")}>
           <select
@@ -146,7 +146,7 @@ export function Phase(props: PhaseProps): JSX.Element {
               <option value="inherit">inherit（親チケットの編集可能範囲を引き継ぐ）</option>
               <option value="globs">上限を指定する（glob のリスト）</option>
             </select>
-            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの編集可能な範囲はこの中に収める）")}
+            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの編集可能な範囲はこの中に収めます）")}
           </div>
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
@@ -174,10 +174,10 @@ export function Phase(props: PhaseProps): JSX.Element {
           </summary>
           <div className="sub">
             <Captioned name="案内するエージェント" yamlKey="agent" tour={mark("phase-agent")}>
-              {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしない）")}
+              {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしません）")}
             </Captioned>
             <Captioned name="使う場面" yamlKey="when" tour={mark("phase-when")}>
-              {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使う）")}
+              {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使います）")}
             </Captioned>
           </div>
         </details>

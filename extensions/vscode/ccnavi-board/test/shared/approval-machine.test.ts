@@ -810,7 +810,7 @@ test("CB-T176b 親だけ書けて子が止まった承認は、書けた分の�
   assert.equal(carried.state.overlay?.kind, "error");
   const text = carried.state.overlay?.kind === "error" ? carried.state.overlay.error : "";
   assert.ok(text.includes(".ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
-  assert.ok(text.includes("書けなかった: i0001-01-01"), "書けなかった子を言う");
+  assert.ok(text.includes("書き込めませんでした: i0001-01-01"), "書けなかった子を言う");
   assert.deepEqual(kinds(carried.effects), ["carry", "refresh"], "書けた分は送る");
 
   // push の sh が無ければ送れない。未送信と言う

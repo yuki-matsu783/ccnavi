@@ -197,7 +197,7 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
     // 開いている deps は hidden-by-find でも表示は消えない（CSS の :not(.open)）
     assert.ok(dom.one("#tab-rules").classList.contains("finding"));
     assert.equal(dom.one('[data-count="deny"]').textContent, "1 / 2");
-    assert.equal(dom.one('[data-count="ask"]').textContent, "0 / 1（検索条件外の展開中項目：1件）");
+    assert.equal(dom.one('[data-count="ask"]').textContent, "0 / 1（検索条件外の展開中項目: 1 件）");
     assert.equal(dom.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
     // 空に戻すと元どおり
     dom.type(dom.one("#find"), "");
@@ -279,7 +279,7 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
     await dom.send(judged([hit("deny", "git-push"), hit("deny", "no-rm")]));
     assert.ok(dom.one(rowSelector("git-push")).classList.contains("open"));
     assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
-    assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（検索条件外の展開中項目：2件）");
+    assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（検索条件外の展開中項目: 2 件）");
     assert.equal(dom.one('[data-count="ask"]').textContent, "1 / 1");
     // 折りたたんだタイプの中のルールが当たれば、タイプが開いて矢印もそれに合う
     dom.type(dom.one("#find"), "");

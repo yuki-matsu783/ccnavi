@@ -274,7 +274,7 @@ function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
   }
   if (plan.loose.length > 0) {
     // 本文の待ちの一覧（「最後の項が待たない: …」）と同じ言い方に、直し方を添える
-    lines.push({ text: `最後の項が待たない: ${plan.loose.join(", ")}。最後の項へ線を引くか、合流の項を置く`, warn: true });
+    lines.push({ text: `最後の項が待たない: ${plan.loose.join(", ")}。最後の項へ線を引くか、合流の項を置いてください`, warn: true });
   }
   for (const problem of plan.problems) {
     lines.push({ text: problem, warn: true });
@@ -349,7 +349,7 @@ function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly grap
     ["待たれる項（後続）", listOf(after)],
     ["すぐ始まる", plan.ready.includes(number) ? "はい" : "いいえ"],
     ["最後の項が待たない", node.loose ? "はい（終端に当たらない）" : "いいえ"],
-    ["番号の固定", node.locked ? "固定（子が承認済み。入る線は変えられない）" : "なし"],
+    ["番号の固定", node.locked ? "固定（子が承認済み。入る線は変えられません）" : "なし"],
   ];
   return (
     <dl className="plan-detail-list" data-number={number}>

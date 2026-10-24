@@ -92,9 +92,9 @@ test("CB-T603 子の札: 要確認（書き込み停止・複数の場所）が�
   assert.match(cards.get("c1")!.status.title, /書き込み停止中: 親が引けない/);
   assert.deepEqual(cards.get("c1")!.actions, [{ kind: "approve" }]);
   assert.equal(label(cards.get("c2")), "要確認");
-  assert.match(cards.get("c2")!.status.title, /複数の場所にある（2 か所）: main:todo, i0001:doing/);
+  assert.match(cards.get("c2")!.status.title, /複数の場所にあります（2 か所）: main:todo, i0001:doing/);
   // 両方あれば理由を並べる
-  assert.match(cards.get("c3")!.status.title, /書き込み停止中: 停止\n複数の場所にある/);
+  assert.match(cards.get("c3")!.status.title, /書き込み停止中: 停止\n複数の場所にあります/);
 });
 
 test("CB-T604 子の札: 承認待ち → 取り消し → 完了（done・取り消しでないアーカイブ）の順", () => {
@@ -151,7 +151,7 @@ test("CB-T605 子の札: copyStatus が review のときは自分のフェーズ
   assert.equal(label(cards.get("c3")), "レビュー予定");
   for (const id of ["c4", "c6"]) {
     assert.equal(label(cards.get(id)), "要確認", id);
-    assert.equal(cards.get(id)!.status.title, "レビュー待ちの置き場にあるが、フェーズの状態と合わない", id);
+    assert.equal(cards.get(id)!.status.title, "レビュー待ちの置き場にあるが、フェーズの状態と合いません", id);
     assert.deepEqual(cards.get(id)!.actions, [], `${id}: 要確認の子にはレビューの操作を出さない`);
   }
   // 操作は札が「レビュー待ち」の子だけ。MR の URL は断片を除いたマージリクエスト自体
@@ -180,7 +180,7 @@ test("CB-T606 子の札: copyStatus が open のとき、フェーズがレビ�
   assert.equal(label(cards.get("working")), "作業中");
   for (const id of ["held", "waiting"]) {
     assert.equal(label(cards.get(id)), "要確認", id);
-    assert.equal(cards.get(id)!.status.title, "作業中なのに、フェーズがレビューで止まっている", id);
+    assert.equal(cards.get(id)!.status.title, "作業中なのに、フェーズがレビューで止まっています", id);
     // open + レビュー待ちの子にレビューの操作は出さない
     assert.deepEqual(cards.get(id)!.actions, [], id);
   }

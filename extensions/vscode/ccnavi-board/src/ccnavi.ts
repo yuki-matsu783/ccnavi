@@ -323,7 +323,7 @@ export async function runApproveYes(
       ok: false,
       error:
         `${cutOff("ccnavi user agree --yes", APPROVE_TIMEOUT_MS)}。` +
-        "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・pushするコマンドはターミナルに送信していません" +
+        "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・push するコマンドはターミナルに送信していません" +
         "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確認してください",
     };
   }
@@ -423,7 +423,7 @@ const RETIRED_TIMEOUT_MS = 30_000;
 export async function runSyncRetired(root: string, setting: string): Promise<RetiredParse> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
-    return { ok: false, error: `一覧を取れない（${NOT_FOUND}）` };
+    return { ok: false, error: `一覧を取得できません（${NOT_FOUND}）` };
   }
   const ran = await run(launcher, root, syncRetiredArgs(), RETIRED_TIMEOUT_MS);
   return parseRetired(ran);
@@ -447,7 +447,7 @@ export async function runChildWorktreeAdd(shell: string, root: string, w: Approv
   const args = ["worktree", "add", w.path, "-b", w.branch, w.base];
   const ran = await spawn(shell, [toPosixPath(path.join(root, GIT_SCRIPT)), ...args], root, WORKTREE_TIMEOUT_MS);
   if (ran.killed) {
-    return "時間内に終わらなかった";
+    return "時間内に終わりませんでした";
   }
   if (ran.code === 0) {
     return "";

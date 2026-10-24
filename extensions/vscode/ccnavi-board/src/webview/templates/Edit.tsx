@@ -242,7 +242,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
         <textarea className="f-description" rows={2} value={tpl.description} onChange={(event) => update(setMeta(tpl, { description: event.target.value }), "meta:description")} onBlur={() => setHistory(seal)} />
       </label>
       <label className="field">
-        <span className="dim">使う場面（when。選ぶ手がかり。省いてよい）</span>
+        <span className="dim">使う場面（when。選ぶ手がかり。省略できます）</span>
         <input type="text" className="f-when" value={tpl.when} onChange={(event) => update(setMeta(tpl, { when: event.target.value }), "meta:when")} onBlur={() => setHistory(seal)} />
       </label>
       <Problems problems={checked.check.problems} />

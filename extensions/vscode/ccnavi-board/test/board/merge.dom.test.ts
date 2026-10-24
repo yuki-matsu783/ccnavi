@@ -107,12 +107,12 @@ test("CB-D722 マージ待ち（Draft なら付記）・マージ済み・閉じ
     assert.equal(state("a-open"), "- マージ待ち MR を開く");
     assert.equal(state("b-draft"), "- マージ待ち（Draft） MR を開く");
     assert.equal(state("c-merged"), "- マージ済み 片付ける");
-    assert.match(state("d-closed"), /^- マージせず閉じた - 自動では片付けません。捨てた親なら、ユーザが端末で sh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closed を実行して記録を消します/);
-    assert.equal(state("e-unknown"), "- 確認できない（認証: 認証に失敗した（トークンか gh の認証を確かめる））");
-    assert.equal(state("f-timeout"), "- 確認できない（期限切れ: 時間内に終わりませんでした）");
-    assert.match(state("g-format"), /^- 確認できない（出力の形が想定外: 出力の形が想定外です/);
-    assert.equal(state("h-failed"), "- 確認できない（実行できない: sh が終了コード 127 で終わりました）");
-    assert.equal(state("i-incomplete"), "- 確認できない（記録が不完全: 記録を読めない（壊れている））");
+    assert.match(state("d-closed"), /^- マージせず閉じました。自動では片付けません。捨てた親なら、ユーザが端末で sh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closed を実行して記録を消します/);
+    assert.equal(state("e-unknown"), "- 確認できません（認証: 認証に失敗した（トークンか gh の認証を確かめる））");
+    assert.equal(state("f-timeout"), "- 確認できません（期限切れ: 時間内に終わりませんでした）");
+    assert.match(state("g-format"), /^- 確認できません（出力の形が想定外: 出力の形が想定外です/);
+    assert.equal(state("h-failed"), "- 確認できません（実行できません: sh が終了コード 127 で終わりました）");
+    assert.equal(state("i-incomplete"), "- 確認できません（記録が不完全: 記録を読めない（壊れている））");
     assert.equal(state("j-wait"), "確認中…");
     // 確認した時刻
     assert.equal(text(page, '[data-merge="checked-at"]'), "確認した時刻 2026-10-01 10:00:00");
@@ -204,11 +204,11 @@ test("CB-D725 マージせず閉じた親は、記録を消すコマンドのコ
   }
 });
 
-test("CB-D726 一覧を取れなかったときは「一覧を取れない」をエラーに出し、「ありません」とは言わない。正しく取れて 0 件のときだけ「マージ待ちの親はありません」", async () => {
-  const error = await openBoard(json(), { merge: view([], { error: "一覧を取れない（形式の異常: 頭の行が retired 1 ではありません）" }) });
+test("CB-D726 一覧を取れなかったときは「一覧を取得できません」をエラーに出し、「ありません」とは言わない。正しく取れて 0 件のときだけ「マージ待ちの親はありません」", async () => {
+  const error = await openBoard(json(), { merge: view([], { error: "一覧を取得できません（形式の異常: 頭の行が retired 1 ではありません）" }) });
   try {
     const alert = error.one('[data-merge="list-error"]');
-    assert.equal(alert.textContent, "一覧を取れない（形式の異常: 頭の行が retired 1 ではありません）");
+    assert.equal(alert.textContent, "一覧を取得できません（形式の異常: 頭の行が retired 1 ではありません）");
     assert.equal(alert.getAttribute("role"), "alert");
     assert.equal(error.all('[data-merge="empty"]').length, 0);
     assert.ok(!error.document.body.textContent.includes("マージ待ちの親はありません"));
@@ -226,7 +226,7 @@ test("CB-D726 一覧を取れなかったときは「一覧を取れない」を
   const only = await openBoard(json(), { merge: view([row("x", { state: "incomplete", mr: null, url: "", detail: "mr が無い" })]) });
   try {
     assert.equal(only.all('[data-merge="empty"]').length, 0);
-    assert.match(text(only, '.merge-row[data-parent="x"] .merge-state'), /確認できない（記録が不完全: mr が無い）/);
+    assert.match(text(only, '.merge-row[data-parent="x"] .merge-state'), /確認できません（記録が不完全: mr が無い）/);
   } finally {
     await only.close();
   }

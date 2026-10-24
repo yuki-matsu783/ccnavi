@@ -180,7 +180,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 data-action="to-when"
                 data-tour={tour("to-when")}
                 disabled={blocker !== undefined}
-                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に変換する。除外は not の中へ移る"}
+                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に変換します。除外は not の中へ移ります"}
                 onClick={() => props.onChange(toWhen(rule))}
               >
                 組み合わせ条件に変換
@@ -198,7 +198,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 </div>
               ))}
               <span className="dim">
-                {rule.when !== undefined ? "組み合わせ条件に当たっても" : "パターンに当たっても"}、これに当たれば当たらない扱い。画面では編集しません。ルールファイルで直すか、
+                {rule.when !== undefined ? "組み合わせ条件に当たっても" : "パターンに当たっても"}、これに当たれば当たらない扱いになります。画面では編集できません。ルールファイルで直すか、
                 {rule.when !== undefined ? "組み合わせ条件の not に移してください" : "「組み合わせ条件に変換」で組み合わせ条件の中へ移してください"}
               </span>
             </div>
@@ -206,7 +206,7 @@ export function Rule(props: RuleProps): JSX.Element {
         )}
         {section === "deny" ? (
           <Captioned name="メッセージ" yamlKey="message" tour={tour("message")}>
-            {area("message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）")}
+            {area("message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届きます）")}
           </Captioned>
         ) : (
           rule.message !== "" && (
@@ -230,7 +230,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 type は text（number ではない）。数でない値を空にしてしまうと、読み込めない値を
                 見せて直させるという欄の目的が消える */}
             <Captioned name="every" yamlKey="every" tour={tour("every")}>
-              {text("every", "f-every", "5（空なら毎回渡す）")}
+              {text("every", "f-every", "5（空なら毎回渡します）")}
             </Captioned>
             <Captioned name="additionalContext" yamlKey="additionalContext" tour={tour("text")}>
               {area("additionalContext", "f-context", "ヒットしたときにモデルへ渡すプロンプト")}
