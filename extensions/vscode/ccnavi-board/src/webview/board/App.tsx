@@ -14,6 +14,7 @@ import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { OVERLAY_NAMES, parseBoardSample, type OverlayName } from "../../core/tour-board.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
+import { TOUR_IMAGES } from "../tours/images.js";
 import boardTour from "../tours/board.yml";
 import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
@@ -86,7 +87,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     mutePosts(touring);
     return () => mutePosts(false);
   }, [touring]);
-  const courses = coursesOf(TOUR, setScene);
+  const courses = coursesOf(TOUR, setScene, TOUR_IMAGES);
   /**
    * 案内の間は、実際のチケットではなく見本のボードを描く（`tour-board.ts`）。見本は描くだけで、
    * 絞り込みの state や承認の件数の元にはしない

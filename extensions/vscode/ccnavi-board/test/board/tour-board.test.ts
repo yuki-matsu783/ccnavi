@@ -10,6 +10,7 @@ import { archivedTitleOf, COLUMNS, type Board, type Card } from "../../src/core/
 import { parseBoardJson } from "../../src/core/model.js";
 import { OVERLAY_NAMES, parseBoardSample } from "../../src/core/tour-board.js";
 import { INTRO_ID } from "../../src/core/tour-def.js";
+import { boardPage } from "../helpers/board.js";
 import { loadTour } from "../helpers/tour.js";
 
 const def = loadTour("board");
@@ -211,7 +212,11 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
       const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
-      assert.ok(step.target !== "", `${at}: 指す先がない（吹き出しが中ほどに出る）`);
+      // 指す先を持たないのは、画面の外の見た目を画像で見せる手順だけ（吹き出しが中ほどに出る）
+      assert.ok(step.target !== "" || step.image !== "", `${at}: 指す先がない（吹き出しが中ほどに出る）`);
+      if (step.target === "") {
+        continue;
+      }
       if (step.target.startsWith("card-")) {
         assert.ok(cards.some((c) => `card-${c.id}` === step.target), `${at}: ${step.target} のカードが見本にありません`);
       } else if (step.target.startsWith("column-")) {
@@ -227,17 +232,38 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 
-test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順で、「〜したいとき」の題と 1 行の説明を持つ。案内のキーは重ならない", () => {
+test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまでの流れだけは 36 手順まで）で、「〜したいとき」の題と 1 行の説明を持つ。案内のキーは重ならない", () => {
   const useCases = def.courses.slice(1);
-  assert.ok(useCases.length >= 3 && useCases.length <= 8);
+  assert.ok(useCases.length >= 3 && useCases.length <= 9);
+  // マージまでの流れ（to-merge）は基本の案内のすぐ次に出る
   assert.deepEqual(
     useCases.map((c) => c.id),
-    ["approve", "review", "merge", "attention", "progress", "filter", "closed", "flow"],
+    ["to-merge", "approve", "review", "merge", "attention", "progress", "filter", "closed", "flow"],
   );
   for (const course of useCases) {
-    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= (course.id === "to-merge" ? 36 : 9), `${course.id}: ${course.steps.length} 手順`);
     assert.match(course.title, /たいとき$/, `${course.id}: 利用者の目的の題でない`);
     assert.ok(course.summary.length > 0 && course.summary.length <= 60, `${course.id}: 説明が長い`);
   }
   assert.equal(new Set(def.courses.map((c) => c.id)).size, def.courses.length);
+});
+
+test("CB-T1172 マージまでの流れの案内は、issue の作り方（GitLab）・Claude Code の入力欄・MR の作成・GitLab の差分とスレッド・マージの画像を、この順で持つ", () => {
+  const course = def.courses.find((c) => c.id === "to-merge");
+  assert.ok(course, "to-merge の案内がありません");
+  const withImage = course.steps.filter((step) => step.image !== "");
+  assert.deepEqual(withImage.map((step) => step.image), ["gitlab-issues-menu", "gitlab-issues-list", "gitlab-new-issue", "gitlab-issue-created", "claude-code-prompt", "gitlab-new-mr", "gitlab-changes-tab", "gitlab-line-comment", "gitlab-start-thread", "gitlab-pending-review", "gitlab-submit-review", "gitlab-unresolved-thread", "gitlab-threads-resolved", "gitlab-mark-ready", "gitlab-mr-merge", "gitlab-merged"]);
+  assert.ok(withImage.every((step) => step.alt !== "" && step.target === ""));
+  // 作業を頼む → 承認 → 作業 → レビュー → マージ → 片付けの順に、画面の部品を指す
+  const targets = course.steps.map((step) => step.target).filter((target) => target !== "");
+  assert.deepEqual(
+    targets.filter((target) => ["approval-batch", "decide-threads", "decide-confirm", "column-archived", "merge-check", "merge-retire"].includes(target)),
+    ["approval-batch", "decide-threads", "decide-confirm", "column-archived", "merge-check", "merge-retire"],
+  );
+});
+
+test("CB-T1174 ボードの入れ物の CSP は、画像を data: だけに許し、外の URL は許さない", () => {
+  const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(boardPage({ kind: "board", board: sample.board }))?.[1] ?? "";
+  assert.match(csp, /default-src 'none'/);
+  assert.deepEqual(csp.match(/img-src [^;]*/g), ["img-src data:"]);
 });

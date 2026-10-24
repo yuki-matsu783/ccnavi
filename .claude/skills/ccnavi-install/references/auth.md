@@ -20,7 +20,7 @@ doctor の `remote`・`host-api`・`source-remote` が todo のとき、`origin`
 - **API の認証**: ccnavi はまず `glab api` でプロジェクトを読んでみる。通らなければ curl に切り替える。
   curl のときは、curl と環境変数 `GITLAB_TOKEN` があるかしか見ない（通信して確かめない）。
   doctor の `host-api` は、curl のときは API を実際に打って確かめる
-- origin が ssh の形（`git@host:…`）のとき、glab の資格情報は足されない。ssh 鍵で通る。API だけは glab か `GITLAB_TOKEN` が要る。
+- origin が ssh の形（`git@host:…`）のとき、glab の資格情報は足されない。ssh キーで通る。API だけは glab か `GITLAB_TOKEN` が要る。
   https に替えるかはユーザが決める
 
 ## glab でログインする
@@ -47,7 +47,7 @@ glab auth login --hostname <host[:port]>
 
 glab を入れられない・入れたくないとき、次で足りる。
 
-1. **fetch と push**: git の資格情報（Git Credential Manager・キーチェーン・SSH 鍵）で通る。一度、ターミナルで `git -C <ws> fetch origin` を打って認証を済ませてもらう
+1. **fetch と push**: git の資格情報（Git Credential Manager・キーチェーン・SSH キー）で通る。一度、ターミナルで `git -C <ws> fetch origin` を打って認証を済ませてもらう
 2. **レビュー（API）**: curl と環境変数 `GITLAB_TOKEN` が要る
 3. 確かめる: `doctor --online` で `remote` と `host-api` が ok になれば、glab は入れなくてよい。`glab` 行は `warn … optional:` になる
 

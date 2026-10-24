@@ -50,7 +50,7 @@ test("CB-D200 「?」は案内の一覧を開き、基本の案内が先頭で�
   }
 });
 
-test("CB-D201 全部の案内の全部の手順で、指す先が画面にあり吹き出しが中ほどに出ず、見本だけを描く。最後の手順のあとで閉じる", async () => {
+test("CB-D201 全部の案内の全部の手順で、指す先が画面にあり（画像の手順だけは中ほどに出る）吹き出しが中ほどに出ず、見本だけを描く。最後の手順のあとで閉じる", async () => {
   for (const course of def.courses) {
     const dom = await openBoard(fixture(), { measure: true });
     try {
@@ -60,8 +60,14 @@ test("CB-D201 全部の案内の全部の手順で、指す先が画面にあり
         await dom.settle();
         const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
-        assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
-        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
+        if (step.target === "") {
+          // 画面の外の見た目を画像で見せる手順だけが、指す先を持たず中ほどに出る
+          assert.ok(step.image !== "", `${at}: 指す先も画像もない`);
+          assert.equal(dom.all(".tour-bubble.center").length, 1, `${at}: 画像の手順が中ほどに出ていない`);
+        } else {
+          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+          assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
+        }
         // 実際のチケットではなく見本。実際のカードは 1 枚も出ない
         assert.ok(cardIds(dom).length > 0 && cardIds(dom).every((id) => id.startsWith("sample-")), `${at}: 実際のカードが出ている`);
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
@@ -224,6 +230,31 @@ test("CB-D206 案内の間に実際の承認のオーバーレイが出たら案
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.all(".approval-backdrop").length, 1);
     assert.equal(dom.one(".approval-backdrop").getAttribute("data-approval"), "loading", "実際のオーバーレイでなく見本が残った");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D741 画像のある手順は、本文の下に data: の画像を出し、吹き出しを中ほどに広く出す。画像のない手順は出さない", async () => {
+  const course = def.courses.find((c) => c.id === "to-merge")!;
+  const dom = await openBoard(fixture(), { measure: true });
+  try {
+    await start(dom, course.id);
+    for (const [index, step] of course.steps.entries()) {
+      await dom.settle();
+      const images = dom.all(".tour-bubble img.tour-image");
+      if (step.image === "") {
+        assert.equal(images.length, 0, `${index + 1} 番目（${step.title}）に画像が出ている`);
+      } else {
+        assert.equal(images.length, 1, `${index + 1} 番目（${step.title}）に画像がない`);
+        assert.match(images[0].getAttribute("src") ?? "", /^data:image\/png;base64,/);
+        assert.equal(images[0].getAttribute("alt"), step.alt);
+        assert.ok(dom.one(".tour-bubble").className.includes("center"), `${step.title}: 画像の手順が中ほどに出ていない`);
+      }
+      if (index < course.steps.length - 1) {
+        dom.click(dom.one('[data-action="tour-next"]'));
+      }
+    }
   } finally {
     await dom.close();
   }

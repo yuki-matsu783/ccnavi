@@ -42,7 +42,7 @@ keywords: [ローテーション, 記録, ログ, セッション, rotate, prune
 AWS の `AKIA…`、GitHub の `ghp_…` / `github_pat_…`、GitLab の `glpat-…`、Slack の `xox?-…`、`sk-…`（`sk-ant-…`・
 `sk-proj-…`）、Stripe の `sk_live_…` / `rk_live_…`、Google の `AIza…`、npm の `npm_…`、JWT、URL の `user:<値>@`
 （値に `@` があればホストの手前の最後の `@` まで）、mysql 系の `-p<値>`、curl の `-u user:<値>` と `-b` / `--cookie`、
-sshpass の `-p`、docker login の `-p`、redis-cli の `-a`、`aws configure set aws_secret_access_key <値>`、秘密鍵の本文。
+sshpass の `-p`、docker login の `-p`、redis-cli の `-a`、`aws configure set aws_secret_access_key <値>`、秘密キーの本文。
 特定のコマンドに限ったフラグは、そのコマンドの中でだけ読む（`mkdir -p`・`ssh -p 22`・`ls -a` は伏せない）。
 `$VAR` のように変数を指すだけの値は伏せない。
 

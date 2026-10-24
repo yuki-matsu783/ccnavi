@@ -70,7 +70,7 @@ export function checkRemote(raw: string): RemoteCheck {
   if (userinfo.includes(":")) {
     return {
       ok: false,
-      error: "URL に資格情報（user:token@）が入っています。ターミナルの履歴と .git/config に平文で残るため指定できません。credential helper か SSH 鍵を使ってください",
+      error: "URL に資格情報（user:token@）が入っています。ターミナルの履歴と .git/config に平文で残るため指定できません。credential helper か SSH キーを使ってください",
     };
   }
   host = host.replace(/:\d+$/, "").toLowerCase();

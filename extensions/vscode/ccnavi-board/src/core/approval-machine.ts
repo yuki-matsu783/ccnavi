@@ -22,7 +22,7 @@
  * | 状態 | 何をしている |
  * |---|---|
  * | 無し（`overlay` が `undefined`） | 閉じている |
- * | `loading` | 承認待ちの一覧を読んでいる |
+ * | `loading` | 承認先行の一覧を読んでいる |
  * | `preview` | 一覧と本文を見せた。押されるまで何も置かない |
  * | `approving` | 承認を打っている。ここでは閉じない（Esc も受け付けない。画面の側も同じ） |
  * | `done` | 承認した。渡す文がある |
@@ -138,7 +138,7 @@ export type ApprovalInput =
   /** 「やめる」「閉じる」を押した（画面の Esc も同じ） */
   | { readonly kind: "cancel" }
   /** 承認のプロンプト・決めた結果のプロンプトを渡した */
-  | { readonly kind: "handOver"; readonly how: "promptCopy" | "promptOpen" }
+  | { readonly kind: "handOver"; readonly how: "promptCopy" | "promptOpen" | "promptRun" }
   /**
    * ［レビュー完了］を押した。`tree` と `chip` はボードから引くので、無いことがある（古いボード）
    */
@@ -165,7 +165,7 @@ export type ApprovalInput =
 
 /** 外へ出る仕事。行うのは呼ぶ側（`board-panel.ts`） */
 export type ApprovalEffect =
-  /** 承認待ちの一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
+  /** 承認先行の一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
   | { readonly kind: "loadPreview"; readonly only: readonly string[] }
   /** 承認を打つ（`user agree --yes … --digest …`）。返ったら `approved` で戻す */
   | {
@@ -207,6 +207,8 @@ export type ApprovalEffect =
   | { readonly kind: "copyConsult"; readonly prompt: string }
   /** プロンプトを埋めて新しいセッションで開く */
   | { readonly kind: "openSession"; readonly prompt: string }
+  /** プロンプトを `claude -p` でボードのターミナルから実行する（止めるには、ターミナルで Ctrl+C を押す。結果は取り込まない） */
+  | { readonly kind: "runClaude"; readonly prompt: string }
   /** 親の計画編集タブを開く（`screens().workflow`） */
   | { readonly kind: "openWorkflow"; readonly ticket: string }
   /** ユーザに言う（警告） */
@@ -292,7 +294,7 @@ function opened(
   if (kind === "loading" || kind === "preview" || kind === "approving") {
     return stay(state);
   }
-  // 残った指摘を決める途中にも開かない。見せている指摘が、承認待ちの一覧になってしまう
+  // 残った指摘を決める途中にも開かない。見せている指摘が、承認先行の一覧になってしまう
   if (busyDeciding(state)) {
     return stay(state);
   }
@@ -386,7 +388,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     const carried = count > 0 && carrier;
     // 承認できたら読み直す。監視（`core/watch.ts`）だけに頼らない。 承認は承認済みチケットを
     // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
-    // 読み直る。拾えないのは、`files.watcherExclude` でそこを外したとき、監視が使えない
+    // 読み直る。拾えないのは、`files.watcherExclude` でそこを外したとき、監視が利用できない
     // ファイルシステムのとき（置き場は既定に固定で、監視するパス `core/watch.ts` とずれない）。
     // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回にまとめる（`board-panel.ts` の `again`）ので、
     // 監視と重なっても画面はちらつかない。1 件も置かれていないなら読み直さない（何も動いていない）。
@@ -447,7 +449,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
  * プロンプトを Claude Code に渡す。プロンプトは拡張ホストが持っている分を使う（画面から届いたものは使わない）。
  * 渡したらオーバーレイを閉じる
  */
-function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen"): ApprovalStep {
+function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen" | "promptRun"): ApprovalStep {
   const overlay = state.overlay;
   // 渡すプロンプトがあるのは、承認した（done）ときと決めた結果（prompt）のときだけ
   if (overlay?.kind !== "done" && overlay?.kind !== "prompt") {
@@ -458,7 +460,11 @@ function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen"): App
   return move(
     state,
     CLOSED,
-    how === "promptCopy" ? { kind: "copy", prompt, what } : { kind: "openSession", prompt },
+    how === "promptCopy"
+      ? { kind: "copy", prompt, what }
+      : how === "promptOpen"
+        ? { kind: "openSession", prompt }
+        : { kind: "runClaude", prompt },
   );
 }
 
@@ -642,7 +648,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     }
     const extra = value.pending_extra.length;
     const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
-    const handover = " Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。";
+    const handover = " Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。「ターミナルで実行」は、押すとすぐ確認なしで実行されます。";
     const overlay = state.overlay;
     const where = overlay?.kind === "deciding" ? { parent: overlay.preview.parent, phase: overlay.preview.phase } : { parent: value.parent, phase: value.phase };
     let title: string;

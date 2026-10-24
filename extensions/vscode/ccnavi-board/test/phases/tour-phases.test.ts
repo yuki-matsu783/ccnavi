@@ -140,7 +140,7 @@ test("CB-T465 フェーズの案内は、基本の案内の題と順序を保ち
   );
   assert.equal(def.courses[0].steps[def.courses[0].steps.length - 1].target, "tour", "最後は「?」を指す");
   const useCases = def.courses.slice(1);
-  assert.ok(useCases.length >= 3 && useCases.length <= 6, `ユースケースが ${useCases.length} 本`);
+  assert.ok(useCases.length >= 3 && useCases.length <= 8, `ユースケースが ${useCases.length} 本`);
   for (const course of useCases) {
     assert.match(course.title, /とき$/, `${course.id}: 題は利用者の目的（〜したいとき）で切る`);
     assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);

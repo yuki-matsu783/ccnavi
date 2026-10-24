@@ -13,6 +13,7 @@ import {
   planOrderArgs,
   planOrderWriteArgs,
   previewArgs,
+  claudeRunCommand,
   pushApprovedCommand,
   abandonCommand,
   consultPrompt,
@@ -233,4 +234,15 @@ test("CB-T365 計画編集タブの引数。読むだけは --plan-order <親> -
   assert.deepEqual(planOrderWriteArgs("i0001", order, "abc"), ["--plan-order", "i0001", "--order", JSON.stringify(order), "--expect", "abc", "--write", "--json"]);
   // 保存は線を変えていなくても --order を付ける（実行ファイルは --write に --order を求める）
   assert.deepEqual(planOrderWriteArgs("i0001", {}, "abc"), ["--plan-order", "i0001", "--order", "{}", "--expect", "abc", "--write", "--json"]);
+});
+
+test("CB-T1170 claude -p は、プロンプトのファイルを標準入力に渡す 1 行にする。パスは単引用符で引用し、Windows のパスは / にする", () => {
+  assert.equal(claudeRunCommand("/tmp/ccnavi-prompt-x/prompt.txt"), "claude -p --permission-mode auto < '/tmp/ccnavi-prompt-x/prompt.txt'");
+  assert.equal(
+    claudeRunCommand("C:\\Users\\x y\\prompt.txt"),
+    "claude -p --permission-mode auto < 'C:/Users/x y/prompt.txt'",
+  );
+  // 単引用符・$・バッククォート・日本語を含むパスも 1 語のまま
+  assert.equal(claudeRunCommand("/tmp/a'b/p.txt"), "claude -p --permission-mode auto < '/tmp/a'\\''b/p.txt'");
+  assert.equal(claudeRunCommand("/tmp/$x `y`/プロンプト.txt"), "claude -p --permission-mode auto < '/tmp/$x `y`/プロンプト.txt'");
 });

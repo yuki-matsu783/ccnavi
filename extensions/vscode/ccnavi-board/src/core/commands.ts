@@ -289,6 +289,15 @@ export function pushApprovedCommand(
 }
 
 /**
+ * プロンプトを書いたファイルを標準入力に渡して `claude -p` を打つ 1 行。プロンプトは複数行で長いので、
+ * コマンド行には載せずファイルで渡す（引用と長さの問題を避ける）。許可は auto モード（分類器による自動承認）。
+ * 結果はターミナルに流れるだけで、拡張は受け取らない。止めるには、ターミナルで Ctrl+C を押す
+ */
+export function claudeRunCommand(promptFile: string): string {
+  return `claude -p --permission-mode auto < ${shellQuote(toPosixPath(promptFile))}`;
+}
+
+/**
  * `ccnavi write-and-push family <親>` の答えから `target`（`yes` / `no` / `stop`）を読む。頭の `write-and-push 1` が無ければ
  * 空文字（古い実行ファイル）。行末の CR は除く
  */

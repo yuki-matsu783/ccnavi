@@ -302,7 +302,7 @@ def probe(
     found.integ_tree = integ_tree
     if not found.integ_tree:
         found.blocked = (
-            f"統合先（{integration}）をチェックアウトしているツリーが見当たりません。"
+            f"統合先（{integration}）をチェックアウトしているツリーが見ヒットしません。"
             "どのツリーで取り込むかをユーザに確かめてください"
         )
         return Probe(HIT, found)

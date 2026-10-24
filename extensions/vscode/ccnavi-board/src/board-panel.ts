@@ -35,7 +35,7 @@ import {
 import type { BoardData, BoardMessage, ToBoard } from "./core/board-view.js";
 import { renderBoardPage } from "./core/render.js";
 import { showLoading } from "./loading.js";
-import { copyCommand, copyPrompt, openPromptInSession } from "./prompt-handover.js";
+import { copyCommand, copyPrompt, openPromptInSession, runPromptInTerminal } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlOf } from "./core/ticket-control.js";
 import { WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
@@ -439,6 +439,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       return;
     case "promptCopy":
     case "promptOpen":
+    case "promptRun":
       dispatch(current, { kind: "handOver", how: message.type });
       return;
     case "decide":
@@ -711,6 +712,9 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     case "openSession":
       await openPromptInSession(effect.prompt);
       return;
+    case "runClaude":
+      await runPromptInTerminal(root, effect.prompt);
+      return;
     case "loadDecide": {
       const result = await runDecidePreview(root, scriptShell(), effect.tree, effect.phase, {
         parent: effect.parent,
@@ -839,6 +843,7 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   approveCancel: true,
   promptCopy: true,
   promptOpen: true,
+  promptRun: true,
   decide: true,
   decideConfirm: true,
   decideConsult: true,
@@ -879,6 +884,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "approveCancel":
     case "promptCopy":
     case "promptOpen":
+    case "promptRun":
     case "decideConsult":
     case "mergeCheck":
       return { type: m.type };

@@ -1448,7 +1448,7 @@ report_user_bin_path() {
 		path_ps=$(printf '%s' "$path_win" | sed "s/'/''/g")
 		printf '案内: Windows のユーザの環境変数 Path に追加します。PowerShell で次を実行します:\n'
 		printf "案内:   [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ';%s', 'User')\\n" "$path_ps"
-		printf '案内: 画面から追加するなら、「環境変数を編集」でユーザーの Path を開き、「新規」で %s を加えます。\n' "$path_win"
+		printf '案内: 画面から追加するなら、「環境変数を編集」でユーザの Path を開き、「新規」で %s を加えます。\n' "$path_win"
 		printf '案内: 追加したあと、Git Bash と Claude Code を開き直すと反映されます。\n'
 		return 0
 	fi

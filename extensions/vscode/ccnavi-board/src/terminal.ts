@@ -28,6 +28,21 @@ export function runInTerminal(root: string, command: string): void {
 }
 
 /**
+ * 実行のたびに新しい専用ターミナルを作って 1 行を送る。「ccnavi」ターミナルは承認の push の sh などが
+ * 使っていて、走っている間に送った行はそのプロセスの標準入力に入ってしまうので、取り合わないよう分ける
+ */
+export function runInNewTerminal(root: string, name: string, command: string): void {
+  const options: vscode.TerminalOptions = { name, cwd: root };
+  const shell = shellPath();
+  if (shell !== undefined) {
+    options.shellPath = shell;
+  }
+  const terminal = vscode.window.createTerminal(options);
+  terminal.show(true);
+  terminal.sendText(command, true);
+}
+
+/**
  * 子プロセスで sh のスクリプトを走らせるシェル。Windows は統合ターミナルと同じ Git Bash、
  * 他の OS は `sh`
  */
@@ -35,7 +50,7 @@ export function scriptShell(): string {
   return shellPath() ?? "sh";
 }
 
-/** Windows だけシェルを指定する。他の OS は既定のシェル（sh が使える前提） */
+/** Windows だけシェルを指定する。他の OS は既定のシェル（sh が利用できる前提） */
 function shellPath(): string | undefined {
   if (process.platform !== "win32") {
     return undefined;

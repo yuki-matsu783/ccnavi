@@ -241,7 +241,7 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
   }
 });
 
-test("CB-T108b 承認したら同じオーバーレイに文とコピー・新しいセッションで開く・閉じるを出す", async () => {
+test("CB-T108b 承認したら同じオーバーレイに文とコピー・新しいセッションで開く・ターミナルで実行・閉じるを出す", async () => {
   const page = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-02-03 を承認した <b>" } });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "done");
@@ -256,6 +256,9 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     page.click(page.one('button[data-action="prompt-open"]'));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "promptOpen" });
+    page.click(page.one('button[data-action="prompt-run"]'));
+    await page.settle();
+    assert.deepEqual(page.posted.at(-1), { type: "promptRun" });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     // 承認の push の sh をターミナルに送ったときだけ、そう言う。
     assert.ok(!texts(page, ".approval-note").some((note) => note.includes("ターミナルに送りました")));
@@ -449,6 +452,7 @@ test("CB-T131o 決めた結果のプロンプトのオーバーレイは、題�
     assert.equal(text(page, "pre.approval-text"), "[ccnavi] レビューを終えた <b>");
     assert.equal(page.all('button[data-action="prompt-copy"]').length, 1);
     assert.equal(page.all('button[data-action="prompt-open"]').length, 1);
+    assert.equal(page.all('button[data-action="prompt-run"]').length, 1);
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     assert.ok(!text(page, ".approval").includes("を承認しました"));
   } finally {
@@ -496,7 +500,7 @@ test("CB-T162 再読み込みできなかった画面にも承認のオーバー
   try {
     assert.equal(text(withApproval, "#approval-title"), "2 件を承認しました");
     assert.equal(text(withApproval, "pre.approval-text"), "i0001-02-03 を承認した");
-    // ボタンが使える（画面の骨組みが載っている）
+    // ボタンが有効（画面の骨組みが載っている）
     withApproval.click(withApproval.one('button[data-action="prompt-copy"]'));
     await withApproval.settle();
     assert.deepEqual(withApproval.posted.at(-1), { type: "promptCopy" });

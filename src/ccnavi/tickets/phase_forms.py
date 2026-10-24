@@ -1068,7 +1068,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "handoff・mirror）にまとめてあり、エージェントは実行しません。"
             "下書きの状態を見るだけなら "
             f"'{settings.script_command(root, 'ccnavi-stage.sh')} --commands <パス>' を使います。"
-            "承認待ちの一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
+            "承認先行の一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
         ),
         decision=rules.DENY,
     )

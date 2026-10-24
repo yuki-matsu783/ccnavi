@@ -24,7 +24,7 @@ keywords: [置き場, 環境変数, CCNAVI_PROJECTS, CCNAVI_PROJECT_HOME, CCNAVI
 | `CCNAVI_LOG` | `logs/log.jsonl` | ワークスペースルート | 記録しない |
 | `CCNAVI_STATE` | `logs/state` | ワークスペースルート | state を保存しない |
 
-**既定から変えている配布先は見当たらなかった。** 導入スクリプト（`scripts/ccnavi-setup.sh`）が
+**既定から変えている配布先は見ヒットしなかった。** 導入スクリプト（`scripts/ccnavi-setup.sh`）が
 配る `settings.json` に書くのは既定と同じ値だけで、`CCNAVI_LOG` は常に、残りの 4 つ
 （`CCNAVI_STATE`・`CCNAVI_TICKETS_PROPOSAL`・`CCNAVI_TICKETS_APPROVED`・`CCNAVI_PROJECT_HOME`）は
 `--all` のときだけ書く。`CCNAVI_PROJECTS` は書かない。このリポジトリで既定と違う値を入れているのはテストだけだった。

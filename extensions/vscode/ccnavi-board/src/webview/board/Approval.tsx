@@ -73,7 +73,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
           <h2 id="approval-title">{overlay.count} 件を承認しました</h2>
           {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・push するコマンドをターミナルに送信しました。</p> : null}
           <p className="approval-note">
-            Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。
+            Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください（送るときは自分で Enter を押す）。「ターミナルで実行」は、押すとすぐ確認なしで実行されます。
           </p>
           <pre className="approval-text" data-tour="approval-prompt">{overlay.prompt}</pre>
           <HandOver />
@@ -280,6 +280,15 @@ function HandOver({ retry }: { readonly retry?: { readonly parent: string; reado
       </button>
       <button type="button" className="action" data-action="prompt-open" onClick={() => post({ type: "promptOpen" })}>
         新しいセッションで開く
+      </button>
+      <button
+        type="button"
+        className="action"
+        data-action="prompt-run"
+        title="ボードのターミナルで claude -p を実行します（auto モード）。止めるときはターミナルで Ctrl+C"
+        onClick={() => post({ type: "promptRun" })}
+      >
+        ターミナルで実行
       </button>
       {retry !== undefined ? (
         <button type="button" className="action" data-action="decide-retry" onClick={() => post({ type: "decide", parent: retry.parent, phase: retry.phase })}>
