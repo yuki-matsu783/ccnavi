@@ -520,11 +520,14 @@ def bound_check(
     - 手元の退避（`ready` 済み）に、同じ名前の親がある
     - `.claude/worktrees/<名前>`（か、名前の `/` を `-` にした識別子）のワークツリーのブランチが、
       識別子と一致し、`origin/<ブランチ>` が手元にある。`ccnavi-start.sh` は親のブランチを origin へ
-      送ってから始めるので、チケットも提案もまだ無い親は、これで見分ける。直接作業のブランチは
-      送らず統合先へ直接取り込むので、origin にあるかで見分けられる
+      送ってから始めるので、チケットも提案もまだ無い親は、これで見分ける。ただし直接作業の記録
+      （`ccnavi-direct/<名前>`）があるワークツリーは対象にしない。直接作業のブランチも
+      `ccnavi-git.sh push` で origin へ送れるので、origin にあるだけでは親と見分けられず、
+      送ったとたんに `integrate` の促しが黙って止まる
 
     """
     name = here.name
+    owner = tree.project_root(conf.projects, here.project) or root
     for base_root in _tree_roots(root, conf):
         approved = settings.approved_dir(conf, base_root)
         proposals = os.path.join(base_root, conf.tickets.replace("/", os.sep))
@@ -548,6 +551,8 @@ def bound_check(
             continue
         branch = tree.branch_of(work)
         if not branch or pathcase.fold(ticket_ids.branch_to_id(branch)) != pathcase.fold(cand):
+            continue
+        if direct_record(owner, cand) is not None:
             continue
         done = _run(
             work,
