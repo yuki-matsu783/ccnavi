@@ -81,7 +81,7 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 | `builtin:ticket-state` / `builtin:ticket-state-shell` | 状態の置き場への直接の作成・移動（`wip/proposals/review/` など） |
 | `builtin:ticket-approved` / `builtin:ticket-approved-shell` | 承認済みの置き場（`.ccnavi/approved/` の下すべて）への書き込み。関門で、`dry-run` でも `CCNAVI_GUARD_CORE_FILES` の値でも効く。文面は承認の経路・`status`・`finish`・`propose` を案内する。名前で書くツール用の 1 本は、実行後の保護範囲にも足す（チケット制御が有効な間。`ticket_guard.approved_write_rule`） |
 | `builtin:ticket-ops` / `builtin:ticket-ops-shell` | 操作記録の置き場（`logs/state/ops/`）への書き込み。関門で、`dry-run` でも `CCNAVI_GUARD_CORE_FILES` の値でも効く |
-| `builtin:guard-hooks` / `builtin:guard-settings` / `builtin:guard-scripts` / `builtin:guard-ccnavi-config` | `.claude/hooks/`、`.claude/settings*.json`、`<ccnavi ディレクトリ>/scripts/`、共通の設定 3 本（`<ccnavi ディレクトリ>/config/common/{rules,phases,risks}.yml`）への `Write` `Edit` `NotebookEdit`。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ、実行前にも、実行後の保護範囲にも足す。直下の `wip/handoff/` の普通の写しは通す。共通のルールファイルが読めない間も外れない（8.2） |
+| `builtin:guard-hooks` / `builtin:guard-settings` / `builtin:guard-scripts` / `builtin:guard-ccnavi-config` | `.claude/hooks/`、`.claude/settings*.json`、`<ccnavi ディレクトリ>/scripts/`、共通の設定 3 本（`<ccnavi ディレクトリ>/config/common/{rules,phases,risks}.yml`）への `Write` `Edit` `NotebookEdit`。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ、実行前にも、実行後の保護範囲にも足す。直下の `wip/handoff/` の普通の写しは通す。共通のルールファイルが読めなくても、外れない（8.2） |
 | `builtin:credentials` | 認証情報の場所（`.env*`、`.dev.vars`、`.netrc`、`.npmrc`、`.pypirc`、`.aws/`、`.ssh/`、`*.pem` / `*.key`（後ろに別の拡張子が続く形も）、`secrets/`、`credentials/`、`credentials.json`、`id_rsa`、`id_ed25519`）への `Bash` `Read` `Write` `Edit` `NotebookEdit`。常に効く土台で、設定で切れない。見本の `.env.example` も止める。`Grep` `Glob` `PowerShell` は対象外 |
 | `builtin:guard-raw-git` | 生の `git`。補助（チケット制御が有効なら `dry-run` でも止める） |
 | `builtin:ticket-scope` | `DENY_TICKET_SCOPE` / `TICKET_ASK`、実行後チェックと `SubagentStop` の `POST_TICKET_SCOPE` |
@@ -145,11 +145,11 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 | `PreToolUse` で `permissionDecision` と `additionalContext` を 1 つの応答に入れたとき、両方がモデルに届くか | 届く（Claude Code 2.1.235）。deny と ask では `permissionDecisionReason` と一緒に届く |
 | ask の `permissionDecisionReason` が誰に見えるか | ユーザの確認ダイアログに出る。Yes を押した後もモデルには届かない。No のときは拒否の定型文だけがモデルに届いてターンが終わる。allow の文面はどこにも出ない |
 | `/compact` の後に `SessionStart` が来るか | `source: compact` の `SessionStart` が同じ `session_id` で届く |
-| サブエージェントの `PostToolUse`・`SubagentStart`・`SubagentStop` の `session_id` は親と同じか | 同じ（前景・背景とも）。`agent_id`（と `agent_type`）が付き、`cwd` は起動した側のまま。親（メイン）の呼び出しには `agent_id` が付かない |
+| サブエージェントの `PostToolUse`・`SubagentStart`・`SubagentStop` の `session_id` は親と同じか | 同じ（フォアグラウンド・バックグラウンドとも）。`agent_id`（と `agent_type`）が付き、`cwd` は起動した側のまま。親（メイン）の呼び出しには `agent_id` が付かない |
 | サブエージェントの `PostToolUse` の `tool_input` のパスは絶対か相対か | 絶対パスで来た（`Write`・`Edit` の `file_path`）。相対で来ても `cwd` から解く実装にしてある |
-| 前景と背景のサブエージェントで payload の形は違うか | 違わない。背景は `PostToolUse` が親の `Agent` 呼び出しより後に来ることがある |
+| フォアグラウンドとバックグラウンドのサブエージェントで payload の形は違うか | 違わない。バックグラウンドは `PostToolUse` が親の `Agent` 呼び出しより後に来ることがある |
 | 入れ子のサブエージェント（サブエージェントがさらに起動する体）の payload | 実測できない。この版ではサブエージェントが `Agent` ツールを持たなかった（`ToolSearch` でも見つからない） |
-| `SubagentStop` が来て実行中の印が外れるか | 来る（前景・背景とも、`agent_id` つき）。印は `SubagentStop` で外れる |
+| `SubagentStop` が来て実行中の印が外れるか | 来る（フォアグラウンド・バックグラウンドとも、`agent_id` つき）。印は `SubagentStop` で外れる |
 | 期限の数値（残り − 0.5 秒・0.2 秒以下は起動しない・SessionStart の 2 秒）で足りるか | Linux では足りる（ワークツリー 8 本・記録 1 件で、Stop も SessionStart も 1 回 0.3 秒未満）。Windows の Git Bash は未測定で、測ってから見直す |
 | `/clear` の後の `SessionStart` の `session_id` と `source` | 未実測（ユーザの操作が要る）。`compact` は上の行のとおり |
 | `${CLAUDE_PROJECT_DIR}` は `env` で展開されるか | hook の `command` では展開されるが `env` では展開されない |
@@ -169,7 +169,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 
 `shlex` は引用・`#`・改行・行継続・`<<` の扱いがシェルと違う。`shellread.py` は先に原文を走査してから語の分割だけを
 shlex に任せる。走査か shlex のどちらかに手を入れたら `tests/core/test_shellread.py` の `SHELL_CASES`（bash 3.2 と zsh で実測）を回す。
-引用された `<<` による縮退は許容する誤検知（6.3、12.2）。
+引用された `<<` で縮退する形は、許容する誤検知（6.3、12.2）。
 
 ### 探すツールと `.gitignore`（ripgrep の既定の挙動）
 
@@ -201,7 +201,7 @@ shlex に任せる。走査か shlex のどちらかに手を入れたら `tests
 | `logs/decisions.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`decisions.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/subagent-<セッション>-<agent_id>.running` |
 | サブエージェントの `cwd` | 文書: メインの `cwd`（`cd` は持ち越さない）。孫の `cwd` も親のワークツリーになる |
 | 親の `agent_id` や深さは hook の入力にあるか | 文書: 無い |
-| 起動側は子の終了を待つか | 文書: 非対話 / SDK では待たない |
+| 起動側は子の終了を待つか | 文書: 非対話では待つ（待ち上限の既定は連続 10 分の idle）。ただし下のバックグラウンドのサブエージェントの計測では、待たれなかった（計測時の環境変数は下の行を参照） |
 | AskUserQuestion をサブエージェントに渡せるか | 文書: `tools` に書いても全部のサブエージェントから外される |
 | 自動 compact で `SubagentStart` の文は残るか | 文書: 起動時に入れた文は compact で消えうる。同じサブエージェントの次の起動（再開）で `SubagentStart` がまた走り、文脈にその文が無ければ入れ直す |
 | `PreCompact` / `PostCompact` | 文書: サブエージェントの compact でも来て、`agent_id` / `agent_type` を持つ。どちらも `systemMessage` を捨て、`additionalContext` を受けるとは書かれていない（`PostCompact` は decision control も無い）。メインの compact は別の文脈のサブエージェントに影響しない |
@@ -238,15 +238,15 @@ GitLab の実物で分かったこと。
 | `CLAUDE_CODE_ENTRYPOINT` の値 | 親の環境に値があると `-p` でも親の値が残る（親が `remote_desktop` なら子も同じ）。外して `-p` で起動すると `sdk-cli` |
 | SessionStart の payload | `session_id`・`transcript_path`・`cwd`・`scratchpad_dir`・`hook_event_name`・`source` だけ。対話かどうかの欄はない |
 | hook の標準入力・標準出力 | `-p` の実行で、どちらも tty でない |
-| 背景の Bash | 75 秒の待ちは 83 秒で終わり、成果ファイルができた。660 秒の待ちは、途中で Bash の timeout にかかったため、モデルが timeout を延ばして起動し直し、全体で 21 分かけて完了した。どちらも `-p` は完了まで待った |
-| 背景のサブエージェント（60 秒の作業） | 2 回とも 17〜21 秒で終了し、成果は残らなかった。メインが「完了通知を待つ」と言ってターンを終えた時点で、プロセスが終わった |
-| 前景のサブエージェント（45 秒の作業） | 57 秒かけて完了まで待ち、成果ファイルができ、結果の報告まで返った |
+| バックグラウンドの Bash | 75 秒の待ちは 83 秒で終わり、成果ファイルができた。660 秒の待ちは、途中で Bash の timeout にかかったため、モデルが timeout を延ばして起動し直し、全体で 21 分かけて完了した。どちらも `-p` は完了まで待った |
+| バックグラウンドのサブエージェント（60 秒の作業） | 2 回とも 17〜21 秒で終了し、成果は残らなかった。メインが「完了通知を待つ」と言ってターンを終えた時点で、プロセスが終わった。この計測では `CLAUDE_CODE_BG_TASKS_REPORT_RUNNING` を外していなかった（値は記録していない）。外した状態の計測は別にある |
+| フォアグラウンドのサブエージェント（45 秒の作業） | 57 秒かけて完了まで待ち、成果ファイルができ、結果の報告まで返った |
 
 確かめていないこと。
 
 - 端末の対話 CLI での値（初回の設定画面で止まり、SessionStart まで進めなかった）、SDK からの起動、人が付き添う IDE 拡張などの入口で `0` になるか、他の版、コンテナでの自動実行そのもの
 - 各実験は 1〜2 回で、再現性は見ていない
-- 前景のサブエージェントを複数並べたときの待ち方と、10 分を超える前景のサブエージェント
-- 背景の Bash の timeout の既定
+- フォアグラウンドのサブエージェントを複数並べたときの待ち方と、10 分を超えるフォアグラウンドのサブエージェント
+- 待ち上限と裏の Bash の既定を 60 分にした場合の、60 分ちょうどの待ち（約 55 分と約 50 分の待ちは完了まで待たれた）
 
 再現は、SessionStart の hook で環境変数を書き出す設定を `--settings` で渡し、`claude -p` を空のディレクトリで回す。
