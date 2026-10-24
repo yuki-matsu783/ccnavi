@@ -98,6 +98,40 @@ class RootShellWriteTest(unittest.TestCase):
         self.assertFalse(self.stopped("cd .claude/worktrees/wt && echo x > README.md"))
         self.assertTrue(self.stopped("cd docs && echo x > README.md"))
 
+    def test_a_destination_that_is_the_root_itself_is_stopped(self):
+        for command in (
+            "cp scratchpad/a .",
+            "cp -t . scratchpad/a",
+            "install --target-directory=. x",
+            "mv scratchpad/a ./",
+            "cp x ..",
+        ):
+            cwd = "scratchpad" if command.endswith("..") else ""
+            with self.subTest(command=command):
+                self.assertTrue(self.stopped(command, cwd=cwd))
+        self.assertFalse(self.stopped("cp x .", cwd="scratchpad"))
+
+    def test_an_unreadable_cd_does_not_hide_a_relative_write(self):
+        for command in (
+            'cd "$PWD" && echo x > README.md',
+            "d=.; cd $d; echo x > README.md",
+            'cd "$(pwd)"; cp scratchpad/a .',
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(self.stopped(command))
+        self.assertFalse(self.stopped('cd "$PWD" && echo x > a', cwd="scratchpad"))
+
+    def test_output_options_of_common_downloaders_are_writes(self):
+        for command in (
+            "curl -o README.md https://example.com",
+            "curl --output=README.md https://example.com",
+            "wget -O README.md https://example.com",
+            "sort -o README.md README.md",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(self.stopped(command))
+        self.assertFalse(self.stopped("curl -o scratchpad/x https://example.com"))
+
     def test_the_refusal_points_to_the_drafts_places(self):
         decision, reason = self.decide("sed -i 's/a/b/' README.md")
         self.assertEqual("deny", decision)

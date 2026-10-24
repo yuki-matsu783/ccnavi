@@ -194,6 +194,10 @@ def _scan_command(
             targets.extend(positional if scripted else positional[1:])
         elif name == "dd":
             targets.extend(a[3:] for a in args if a.startswith("of="))
+        elif name == "install" and "-d" in args:
+            targets.extend(_positionals(name, args))
+        elif name in _OUTPUT_OPTIONS:
+            targets.extend(_option_values(args, _OUTPUT_OPTIONS[name]))
         break
     base = wrapguard._call_place(cwd, here, chdirs) if cwd else None
     return targets, base, codes
@@ -210,7 +214,9 @@ def write_targets(
     for text in [subject, *(layers or [])]:
         for words, here in shellread.placed(text):
             targets, base, _ = _scan_command(cwd, words, here)
-            out.extend((t, base) for t in targets)
+            # `cd` の行き先を読めなかったときは、読めない `cd` を無かったことにして打たれた場所から
+            # 解く。起点が無いまま相対パスを捨てると、`cd "$PWD" &&` を足すだけで見えなくなる。
+            out.extend((t, base if base is not None else (cwd or None)) for t in targets)
     return out
 
 
@@ -237,6 +243,28 @@ def resolve_word(word: str, base: str | None) -> str:
     except OSError:
         path = os.path.normpath(os.path.abspath(text))
     return path.rstrip(os.sep) + os.sep if glob else path
+
+
+# 出力先を選択肢で受け取るコマンド（書き込み先は選択肢の値）。
+_OUTPUT_OPTIONS = {
+    "curl": ("-o", "--output"),
+    "wget": ("-O", "--output-document"),
+    "sort": ("-o", "--output"),
+}
+
+
+def _option_values(args: list[str], options: tuple[str, ...]) -> list[str]:
+    """`-o FILE`・`-oFILE`・`--output=FILE`・`--output FILE` の FILE。"""
+    out: list[str] = []
+    for i, arg in enumerate(args):
+        for option in options:
+            if arg == option and i + 1 < len(args):
+                out.append(args[i + 1])
+            elif arg.startswith(option + "=") and option.startswith("--"):
+                out.append(arg.partition("=")[2])
+            elif arg.startswith(option) and not option.startswith("--") and len(arg) > 2:
+                out.append(arg[2:])
+    return out
 
 
 def _redirect_targets(words: list[str]) -> list[str]:

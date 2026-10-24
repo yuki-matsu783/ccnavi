@@ -16,6 +16,8 @@ Write / Edit は、ルールファイルの `workspace-root` が止める（チ�
 
 from __future__ import annotations
 
+import os
+
 from ..infra import settings
 from ..policy import rules
 from . import parentwrite
@@ -44,8 +46,11 @@ def check(
         path = parentwrite.resolve_word(target, base)
         if not path:
             continue
+        # 既存のディレクトリは、中へ書くものとしても当てる（`cp a .` はルート自身ではなく
+        # ルート直下に書く）。決まりの式が区切りを要るため、区切りを足した形も見る。
+        spelled = [path, path.rstrip(os.sep) + os.sep] if os.path.isdir(path) else [path]
         for rule in found:
-            if rule.matches("Write", path):
+            if any(rule.matches("Write", p) for p in spelled):
                 return target, path, rule
     return "", "", None
 

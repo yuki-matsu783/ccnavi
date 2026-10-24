@@ -553,7 +553,8 @@ def bound_check(
         branch = tree.branch_of(work)
         if not branch or pathcase.fold(ticket_ids.branch_to_id(branch)) != pathcase.fold(cand):
             continue
-        if direct_record(owner, cand) is not None:
+        rec = direct_record(owner, cand)
+        if rec is not None and not rec.get("broken"):
             continue
         done = _run(
             work,
