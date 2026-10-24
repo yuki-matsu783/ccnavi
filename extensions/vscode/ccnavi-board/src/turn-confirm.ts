@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { loadBoard } from "./ccnavi.js";
 import { turnWarning, type Lock } from "./core/lock.js";
 
 /**
@@ -19,4 +20,13 @@ export async function confirmTurns(sessions: readonly string[]): Promise<boolean
   const go = "それでも保存する";
   const picked = await vscode.window.showWarningMessage(warning, { modal: true }, go);
   return picked === go;
+}
+
+/**
+ * ボードを聞き直して、ターン中なら確認する。錠を持たない書き込み（取り込み・ファイルの新規作成・ミラーの同期）が使う。
+ * ボードが読めないときは、ターン中かが分からないので確認を出さない（書き込み自体の検査は実行ファイルの側にある）。
+ */
+export async function confirmIfTurn(root: string, setting: string): Promise<boolean> {
+  const board = await loadBoard(root, setting);
+  return confirmTurns(board.ok ? (board.board.turns ?? []).map((t) => t.session) : []);
 }

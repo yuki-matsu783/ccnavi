@@ -53,7 +53,7 @@ import { readOrigin } from "./git.js";
 import * as diaglog from "./log.js";
 import { runInTerminal } from "./terminal.js";
 import { markTourSeen, tourSeen } from "./tour.js";
-import { confirmTurns } from "./turn-confirm.js";
+import { confirmIfTurn } from "./turn-confirm.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 /** 他の画面（WATCH_DEBOUNCE_MS = 120）より長い。理由は記録が無く未確認。変える前に、プロジェクトの一覧を読む重さを測ること */
@@ -465,9 +465,7 @@ async function syncMirror(current: PanelState, names: readonly string[], expect:
     return;
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
-  const board = await loadBoard(current.folder.uri.fsPath, binSetting());
-  const turns = board.ok ? (board.board.turns ?? []).map((t) => t.session) : [];
-  if (!(await confirmTurns(turns))) {
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
     return;
   }
   if (state !== current) {

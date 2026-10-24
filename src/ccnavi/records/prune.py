@@ -95,7 +95,10 @@ _SESSION_ONLY = (
     ),  # direct_candidates.path_of（compact・clear では捨てない）
 )
 # セッションを名前に持たない、Stop の AI 判定の記録。それ自身の日付で消す。
-_OWN_DATE = re.compile(r"^(?:stopreview-(?:plan|attempt)-.+|stopops-(?:pre|op)-.+)\.json$")
+_OWN_DATE = re.compile(
+    r"^(?:stopreview-(?:plan|attempt)-.+|stopops-(?:pre|op)-.+"
+    r"|mirror-.+)\.json$"  # promptsync._signature_path（親の識別子ごと。セッションに依らない）
+)
 # Stop の AI 判定の再評価用の材料（`logs/stop-review/material/`）の保持日数。
 # 評価の途中で消えないよう、記録の保持日数とは別にして長くする。0 は消さない。
 STOP_REVIEW_KEEP_DAYS_ENV = "CCNAVI_STOP_REVIEW_KEEP_DAYS"

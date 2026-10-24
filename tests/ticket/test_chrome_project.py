@@ -8,7 +8,7 @@
    承認で書くもの（Changes）はその親子のチケットの親のブランチだけ
 2. プロジェクトのレイヤーは、プロジェクトの統合先の `.ccnavi/config/project/` をそのまま使う。
    共通レイヤーはワークスペースの統合先の `.ccnavi/config/common/` だけで、プロジェクトの
-   `.ccnavi/config/common/`（親の着手が配るミラー）は読まない。親のブランチの上のレイヤーも読まない
+   `.ccnavi/config/common/`（同期が配るミラー）は読まない。親のブランチの上のレイヤーも読まない
 3. 「始める」: issue の番号から識別子（`feature-12-<slug>`、プロジェクトのリポジトリなら
    `feature-12-web-<slug>`）を決め、統合先の `done/` にある・同じ名前のブランチがある・
    開いた親子のチケットに同じ識別子がある・互換の版が違う、のどれでも始められない
@@ -144,7 +144,7 @@ class ChromeProjectTest(unittest.TestCase):
                 "trunk": project_integration(
                     **{
                         ".ccnavi/config/project/risks.yml": risks,
-                        # 親の着手が配るミラー。ワークスペースの中では共通レイヤーとして読まない
+                        # 同期が配るミラー。ワークスペースの中では共通レイヤーとして読まない
                         ".ccnavi/config/common/rules.yml": MIRROR_RULES,
                         "README.md": "r\n",
                     }

@@ -30,6 +30,7 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
+import { confirmIfTurn } from "./turn-confirm.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
@@ -470,6 +471,14 @@ async function importPaths(current: PanelState, loaded: Loaded | undefined, path
   };
   if (loaded?.kind !== "page") {
     answer({ ok: false, error: "画面を再読み込みしてください" });
+    return;
+  }
+  // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
+    answer({ ok: false, error: "ターン中のため取り込みを取りやめました。ターンが終わってから取り込んでください" });
+    return;
+  }
+  if (!alive(current)) {
     return;
   }
   current.writing = true;
