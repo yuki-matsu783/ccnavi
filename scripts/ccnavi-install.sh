@@ -3,13 +3,13 @@
 # 最後に lint で確かめる。ccnavi-setup.sh の中身は変えず、呼ぶだけ。
 #
 #   sh <配布元>/scripts/ccnavi-install.sh <ワークスペースルート> [--from <配布元>]
-#        [--mode dry-run|enable] [--ticket-control enable|disable] [--force] [--no-vscode] [--no-fetch]
+#        [--mode dry-run|enable] [--ticket-control enable|disable] [--force] [--no-vscode] [--no-fetch] [--no-idle]
 #        [--clear-quarantine] [--check]
 #   sh <ソース>/scripts/ccnavi-install.sh <ワークスペースルート> --build [--source <ソース>]
 #        [--with-extensions] [--check]
 #
 #   --from <配布元>        展開済みの配布元のフォルダ。省くと、このスクリプトの 1 つ上。zip は受けない
-#   --mode / --ticket-control / --force / --no-vscode / --no-fetch
+#   --mode / --ticket-control / --force / --no-vscode / --no-fetch / --no-idle
 #                          ccnavi-setup.sh にそのまま渡す（ccnavi-setup.sh --help）
 #                          --bin は渡さない。ホームディレクトリに書き込む確認を端末に出すので、ccnavi-setup.sh を直接実行する
 #   --clear-quarantine     macOS で、入れた実行ファイルの隔離の印（com.apple.quarantine）を外す
@@ -35,7 +35,7 @@ install_argline=""
 usage() {
 	printf '%s\n' \
 		'sh <配布元>/scripts/ccnavi-install.sh <ワークスペースルート> [--from <配布元>]' \
-		'  [--mode dry-run|enable] [--ticket-control enable|disable] [--force] [--no-vscode] [--no-fetch]' \
+		'  [--mode dry-run|enable] [--ticket-control enable|disable] [--force] [--no-vscode] [--no-fetch] [--no-idle]' \
 		'  [--clear-quarantine] [--check]' \
 		'sh <ソース>/scripts/ccnavi-install.sh <ワークスペースルート> --build [--source <ソース>]' \
 		'  [--with-extensions] [--check]' \
@@ -259,6 +259,7 @@ main() {
 	force=no
 	no_vscode=no
 	no_fetch=no
+	no_idle=no
 	clear_q=no
 	with_extensions=no
 	ws=""
@@ -299,6 +300,10 @@ main() {
 			no_fetch=yes
 			shift
 			;;
+		--no-idle)
+			no_idle=yes
+			shift
+			;;
 		--clear-quarantine)
 			clear_q=yes
 			shift
@@ -333,8 +338,8 @@ main() {
 	[ -n "$ws" ] || die "ワークスペースルートを指定してください。"
 	if [ "$build" = yes ]; then
 		if [ -n "$from" ] || [ -n "$mode_opt" ] || [ -n "$ticket_opt" ] || [ "$force" = yes ] ||
-			[ "$no_vscode" = yes ] || [ "$no_fetch" = yes ] || [ "$clear_q" = yes ]; then
-			die "--build は --from・--mode・--ticket-control・--force・--no-vscode・--no-fetch・--clear-quarantine と同時に使えません。"
+			[ "$no_vscode" = yes ] || [ "$no_fetch" = yes ] || [ "$no_idle" = yes ] || [ "$clear_q" = yes ]; then
+			die "--build は --from・--mode・--ticket-control・--force・--no-vscode・--no-fetch・--no-idle・--clear-quarantine と同時に使えません。"
 		fi
 	else
 		[ "$with_extensions" = no ] || die "--with-extensions は --build のときだけ使えます。"
@@ -463,6 +468,7 @@ main() {
 	[ "$force" != yes ] || set -- "$@" --force
 	[ "$no_vscode" != yes ] || set -- "$@" --no-vscode
 	[ "$no_fetch" != yes ] || set -- "$@" --no-fetch
+	[ "$no_idle" != yes ] || set -- "$@" --no-idle
 
 	quarantined=no
 	if grep -q '^check: package warn quarantined' "$install_tmp/doctor.out"; then

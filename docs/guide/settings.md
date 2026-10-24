@@ -3,7 +3,7 @@ title: 設定
 type: guide
 description: .claude/settings.json に書く hook の登録と env の例、置き場の一覧、環境変数の表。値と既定を引くためのページ
 tags: [user-guide, settings, env, hook]
-keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_ENTRY_PATH, CCNAVI_RESTORE_IF_DENY, CCNAVI_GUARD_CORE_FILES, CCNAVI_TICKET_CONTROL, 置き場, 8 つのイベント, matcher, CLAUDE_PROJECT_DIR]
+keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_HANDOFF_SUGGEST_TOKENS, CCNAVI_HANDOFF_WAIT_SECONDS, 引き継ぎ, CCNAVI_MODE, CCNAVI_ENTRY_PATH, CCNAVI_RESTORE_IF_DENY, CCNAVI_GUARD_CORE_FILES, CCNAVI_TICKET_CONTROL, 置き場, 8 つのイベント, matcher, CLAUDE_PROJECT_DIR]
 ---
 
 # 設定
@@ -30,6 +30,9 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_E
     "UserPromptSubmit": [
       { "matcher": "", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
+      ]},
+      { "matcher": "", "hooks": [
+        { "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-idle.sh\" reset", "timeout": 10 }
       ]}
     ],
     "PreToolUse": [
@@ -50,6 +53,12 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_MODE, CCNAVI_E
     "Stop": [
       { "matcher": "", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}\"", "timeout": 10 }
+      ]},
+      { "matcher": "", "hooks": [
+        { "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-idle.sh\" notice", "timeout": 10 }
+      ]},
+      { "matcher": "", "hooks": [
+        { "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-idle.sh\" start", "timeout": 3600, "asyncRewake": true }
       ]}
     ],
     "SubagentStart": [
