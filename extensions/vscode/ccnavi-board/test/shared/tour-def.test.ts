@@ -6,7 +6,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { INTRO_ID, parseTour } from "../../src/core/tour-def.js";
-import { loadTour, rawTour, tourScreens } from "../helpers/tour.js";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import { loadTour, rawTour, TOURS_DIR, tourScreens } from "../helpers/tour.js";
 
 const STEP = { target: "save", title: "保存", body: "保存します" };
 
@@ -41,6 +44,23 @@ test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内�
   }
 });
 
+test("CB-T1169 手順の image は名前（小文字・数字・-）で、alt と両方書くか両方書かない。書かなければ空", () => {
+  const ok = parseTour({ screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, target: "", image: "shot-1", alt: "画面" }, STEP] })] });
+  assert.ok(ok.ok);
+  assert.deepEqual(ok.ok && ok.value.courses[0].steps.map((step) => [step.image, step.alt]), [["shot-1", "画面"], ["", ""]]);
+
+  const bad: Array<[string, Record<string, unknown>]> = [
+    ["image の名前に拡張子", { image: "shot.png", alt: "a" }],
+    ["image の名前に大文字", { image: "Shot", alt: "a" }],
+    ["alt が無い", { image: "shot" }],
+    ["image が無いのに alt", { alt: "a" }],
+  ];
+  for (const [name, extra] of bad) {
+    const parsed = parseTour({ screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, ...extra }] })] });
+    assert.ok(!parsed.ok, `${name}: 読めてしまった`);
+  }
+});
+
 test("CB-T403 案内の YAML は、ファイル名の画面を指し、どれも先頭が基本の案内で、各案内に 1 手順以上ある", () => {
   const screens = tourScreens();
   assert.ok(screens.length >= 1, "案内の YAML が 1 本もありません");
@@ -50,4 +70,29 @@ test("CB-T403 案内の YAML は、ファイル名の画面を指し、どれも
     assert.equal(def.courses[0].id, INTRO_ID);
     assert.ok(rawTour(screen) !== undefined);
   }
+});
+
+test("CB-T1170 案内の手順が引く画像は、images/ に PNG があり、images.ts の表にある。表と置き場に使われない画像が残らない", () => {
+  const dir = path.join(TOURS_DIR, "images");
+  const registry = fs.readFileSync(path.join(TOURS_DIR, "images.ts"), "utf8");
+  const used = new Set<string>();
+  for (const screen of tourScreens()) {
+    for (const course of loadTour(screen).courses) {
+      for (const step of course.steps) {
+        if (step.image !== "") {
+          used.add(step.image);
+        }
+      }
+    }
+  }
+  assert.ok(used.size >= 1, "画像を使う手順が 1 つもありません");
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  for (const name of used) {
+    const file = path.join(dir, `${name}.png`);
+    assert.ok(fs.existsSync(file), `${name}.png が images/ にありません`);
+    assert.ok(fs.readFileSync(file).subarray(0, 8).equals(PNG), `${name}.png が PNG ではありません`);
+    assert.match(registry, new RegExp(`"${name}": `), `${name} が images.ts の表にありません`);
+  }
+  const files = fs.readdirSync(dir).filter((file) => file.endsWith(".png")).map((file) => file.slice(0, -4));
+  assert.deepEqual([...files].sort(), [...used].sort(), "どの手順も使っていない画像、または画像のない手順の名前があります");
 });

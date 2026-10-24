@@ -21,6 +21,9 @@
 #              risk seen issue unsent）/ phases / phase-review / details / moved / flow-<状態>（create edit locked）/ workflow-button
 #   承認の画面 approval-batch / approval-plan / approve-confirm / approval-prompt / approval-handover / edit-workflow /
 #              decide-threads / decide-consult / decide-confirm
+#
+# 手順の `image:` と `alt:` は、画面の外（Claude Code・GitLab）の見た目を見せる画像で、2 つとも書く。名前は `tours/images/<名前>.png` と
+# `tours/images.ts` の表にある。画像の手順は読み込みで高さが変わるので、`target:` は空にして中ほどに出す。
 screen: board
 
 sample:
@@ -275,6 +278,67 @@ courses:
       - target: tour
         title: 案内
         body: この案内は、ヘッダ右上の ? からもう一度見られます。? を押すと、使い方ごとの案内（承認・レビュー・マージ状況・絞り込みなど）の一覧が開きます。
+
+  - id: to-merge
+    title: 作業を頼んでからマージするまでの流れを知りたいとき
+    summary: 頼む・承認・作業・MR でのレビュー・マージ・片付けを順に回します
+    steps:
+      - target: board
+        title: 全体の流れ
+        body: 作業は「Claude Code に頼む → 提案を承認する → エージェントが作業する → MR でレビューする → 親を閉じてマージする → 片付ける」の順に進みます。ボードは、この間のユーザの番（承認・レビュー・片付け）を見つけて進める場所です。この案内で全体をたどります。
+      - target: ""
+        title: Claude Code に作業を頼む
+        body: 作業は、Claude Code の入力欄に頼むところから始まります。調査や小さな修正は、チケットを使わない直接作業で進みます。設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る作業は、エージェントがチケット作業として提案を書き、issue と MR を用意します。
+        image: claude-code-prompt
+        alt: Claude Code の画面。下部の入力欄に作業を頼むプロンプトを入力して送る
+      - target: card-sample-a
+        title: 承認待ちの提案が届く
+        body: 提案は、「未着手」の列に札「承認待ち」のカードで出ます。目的・範囲・計画が書かれています。カードを押すと提案のファイルを開けます。直したい点は、Claude Code に伝えて書き直してもらいます。
+      - target: approval-batch
+        title: 内容を確認して承認する
+        body: カードの［承認］（またはヘッダの「承認待ち N 件を承認」）を押すと、承認する内容がオーバーレイに出ます。編集できる範囲・人間レビューの要否・理由を確かめて、「この N 件を承認する」で承認します。承認するまでは、何も変わりません。
+        scene: { overlay: approval }
+      - target: approval-handover
+        title: 承認したことを Claude Code に伝える
+        body: 承認できたら、Claude Code に伝えるプロンプトが出ます。コピーして進行中のセッションに貼るか、新しいセッションで開いて渡します。承認済みのチケットを他の機械へ届ける push は、ボードが統合ターミナルに送ります。
+        scene: { overlay: done }
+      - target: phases
+        title: エージェントが作業する
+        body: 承認すると、エージェントがフェーズごとの子チケットを、それぞれのワークツリーで進めます。親のカードには札「作業中」とフェーズ一覧が出て、［更新］で進み具合を確かめられます。フェーズが複数あるときは、作業とレビューをフェーズごとに繰り返します。
+      - target: card-sample-c
+        title: レビュー待ちになったら
+        body: レビューが要るフェーズが終わると、エージェントが MR にレビューを依頼します。親の札が「レビュー待ち」になり、「あなたの番」に操作が出ます。依頼を出す前の「レビュー準備中」は、エージェントの番です。
+      - target: mr
+        title: MR を開く
+        body: ［MR を開く］から、レビューの場の MR を開きます。差分とレビューの依頼が載っています。指摘は MR の上に書きます。ボードは MR の中身を読みません。
+      - target: ""
+        title: 差分に指摘を付ける（GitLab）
+        body: 差分の行にマウスを載せると、行番号の横に吹き出しのボタンが出ます。押すとその行にコメントを書けます。ドラッグすると複数の行をまとめて選べます。
+        image: gitlab-line-comment
+        alt: GitLab の差分画面。行番号の横の吹き出しのボタンに「Add a comment to this line or drag for multiple lines」と出ている
+      - target: ""
+        title: 指摘は「Start thread」で書く（GitLab）
+        body: コメントを書いたあと、送信ボタンの横の ▼ で「Comment」か「Start thread」を選びます。直してほしい指摘は「Start thread」にします。解決するまで残る議論になり、ccnavi が未解決の指摘として読みます。「Comment」は解決の対象にならない通常のコメントです。
+        image: gitlab-start-thread
+        alt: GitLab のコメント欄。送信ボタンの横の ▼ を開くと、「Comment」と「Start thread」の 2 つの選択肢が出ている
+      - target: phase-review
+        title: レビューを終える
+        body: 指摘を付け終えたら、レビュー待ちの行の［レビュー完了］を押します。押すまで、ボードは指摘を読みません。
+      - target: decide-threads
+        title: 残った指摘の対応方針を決める
+        body: ［レビュー完了］を押すと、未解決の指摘を読みます。0 件ならそのままレビュー済みになります。残っていれば、1 件ずつ「対応しない」「このフェーズで直す」「issue に回す」を選びます。「このフェーズで直す」を選ぶと続きの子が作られ、エージェントが直したあと、再びレビュー待ちになります。
+        scene: { overlay: decide }
+      - target: column-done
+        title: 親を閉じてマージする
+        body: 最後のフェーズのレビューが済むと、エージェントが親を閉じ、MR の Draft を外します。親のカードは「完了」の列に並びます。MR のマージは、ユーザが GitLab の画面で行います。
+      - target: merge-check
+        title: マージできたか確かめる
+        body: マージしたあと、［マージ状況を確認］を押します。マージ待ちの親がマージ済みかを確かめて、結果を上の帯に出します。読むだけで、何も変えません。
+        scene: { merge: true }
+      - target: merge-retire
+        title: 片付ける
+        body: マージ済みの親の［片付ける］で、ボードのターミナルに ccnavi-sync.sh のコマンドを送ります。マージ済みかを確かめ直したうえで、条件を満たすものだけを片付けます。結果はターミナルで確認してください。これで、頼むところから片付けまでの 1 周が終わります。
+        scene: { merge: true }
 
   - id: approve
     title: 承認待ちのチケットを承認したいとき

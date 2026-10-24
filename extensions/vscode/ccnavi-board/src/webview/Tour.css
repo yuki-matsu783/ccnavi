@@ -37,6 +37,9 @@
 
 .tour-body { margin: 0 0 10px; line-height: 1.6; }
 
+/* 画面の外の見た目（Claude Code・GitLab の画面）。吹き出しの幅に収める */
+.tour-image { display: block; max-width: 100%; height: auto; margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-sm); }
+
 /* やめる ×。どの手順でも吹き出しの右上の同じ位置に出す */
 .tour-close {
   position: absolute;

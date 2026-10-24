@@ -79,6 +79,8 @@ const common = {
   bundle: true,
   sourcemap: false,
   logLevel: "info",
+  // 案内の画像（`src/webview/tours/images/*.png`）は data: の URL にして JS へ入れる（ファイルとして読ませない）
+  loader: { ".png": "dataurl" },
 };
 
 esbuild

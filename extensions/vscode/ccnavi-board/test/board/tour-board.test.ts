@@ -211,7 +211,11 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
       const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
-      assert.ok(step.target !== "", `${at}: 指す先がない（吹き出しが中ほどに出る）`);
+      // 指す先を持たないのは、画面の外の見た目を画像で見せる手順だけ（吹き出しが中ほどに出る）
+      assert.ok(step.target !== "" || step.image !== "", `${at}: 指す先がない（吹き出しが中ほどに出る）`);
+      if (step.target === "") {
+        continue;
+      }
       if (step.target.startsWith("card-")) {
         assert.ok(cards.some((c) => `card-${c.id}` === step.target), `${at}: ${step.target} のカードが見本にありません`);
       } else if (step.target.startsWith("column-")) {
@@ -227,17 +231,32 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 
-test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順で、「〜したいとき」の題と 1 行の説明を持つ。案内の鍵は重ならない", () => {
+test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまでの流れだけは 15 手順まで）で、「〜したいとき」の題と 1 行の説明を持つ。案内の鍵は重ならない", () => {
   const useCases = def.courses.slice(1);
-  assert.ok(useCases.length >= 3 && useCases.length <= 8);
+  assert.ok(useCases.length >= 3 && useCases.length <= 9);
+  // マージまでの流れ（to-merge）は基本の案内のすぐ次に出る
   assert.deepEqual(
     useCases.map((c) => c.id),
-    ["approve", "review", "merge", "attention", "progress", "filter", "closed", "flow"],
+    ["to-merge", "approve", "review", "merge", "attention", "progress", "filter", "closed", "flow"],
   );
   for (const course of useCases) {
-    assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= (course.id === "to-merge" ? 15 : 9), `${course.id}: ${course.steps.length} 手順`);
     assert.match(course.title, /たいとき$/, `${course.id}: 利用者の目的の題でない`);
     assert.ok(course.summary.length > 0 && course.summary.length <= 60, `${course.id}: 説明が長い`);
   }
   assert.equal(new Set(def.courses.map((c) => c.id)).size, def.courses.length);
+});
+
+test("CB-T1168 マージまでの流れの案内は、Claude Code の入力欄と GitLab の差分・スレッドの画像を、この順で持つ", () => {
+  const course = def.courses.find((c) => c.id === "to-merge");
+  assert.ok(course, "to-merge の案内がありません");
+  const withImage = course.steps.filter((step) => step.image !== "");
+  assert.deepEqual(withImage.map((step) => step.image), ["claude-code-prompt", "gitlab-line-comment", "gitlab-start-thread"]);
+  assert.ok(withImage.every((step) => step.alt !== "" && step.target === ""));
+  // 作業を頼む → 承認 → 作業 → レビュー → マージ → 片付けの順に、画面の部品を指す
+  const targets = course.steps.map((step) => step.target).filter((target) => target !== "");
+  assert.deepEqual(
+    targets.filter((target) => ["approval-batch", "phases", "decide-threads", "column-done", "merge-check", "merge-retire"].includes(target)),
+    ["approval-batch", "phases", "decide-threads", "column-done", "merge-check", "merge-retire"],
+  );
 });
