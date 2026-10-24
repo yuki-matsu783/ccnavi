@@ -44,14 +44,14 @@ keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccna
 ## decide の流れ（`write.ts` の `decidePreview`・`decidePhase`）
 
 `decidePreview` は親子のチケットと MR のスレッド・レビューを読み、Python の `decide`（preview）が通した指摘とダイジェストを返す（書かない）。
-各指摘には、スレッドの id（取得したスレッドから、鍵 = URL か id で引く）と、書く前の確かめと同じ見分け方で Chrome で扱えない理由（`unsupported`）を付ける。
+各指摘には、スレッドの id（取得したスレッドから、キー = URL か id で引く）と、書く前の確かめと同じ見分け方で Chrome で扱えない理由（`unsupported`）を付ける。
 
 `decidePhase` は次の順に進む。ホストへ書くのは `writeLoop` の外で 1 度だけで、ループの中は判定とコミットだけにする。
 
 1. 読み直して `decide`（apply、`carry` なし）を呼び、ホストへ書く計画（`host_plan`）を得る。見せた指摘と違えば `mismatch`、通らなければ `refused` で、何も書かない。`keep`・`issue` が無ければ計画は空なので、この手順は飛ばす
 2. `precheckHostPlan` で権限とスレッドの種類を確かめる。足りなければ `refused`（必要な権限名つき）で、何も書かない
 3. `runHostPlan` で issue、返信、解決の順に書く（コメントは後段に回す）。止まれば `halted`（済んだ分と理由）で、コミットしない
-4. `writeLoop` で、周ごとにスレッドを読み直し、書き終えた `keep`・`issue` の鍵を `carry` に渡して `decide` を呼び、返った `changes` を `confirm` と同じ検査で 1 コミットにする。先頭が動けば読み直して再試行するが、ホストには書かない。`changes` が空なら空のコミットを作らない
+4. `writeLoop` で、周ごとにスレッドを読み直し、書き終えた `keep`・`issue` のキーを `carry` に渡して `decide` を呼び、返った `changes` を `confirm` と同じ検査で 1 コミットにする。先頭が動けば読み直して再試行するが、ホストには書かない。`changes` が空なら空のコミットを作らない
 5. コミットが済んだら、1 の計画のコメント（1 を飛ばしたときは 4 の応答のもの）の `{issue_links}` を、作った・使い回した issue の URL の一覧に置き換えて MR に投稿する。指摘が 0 件の確定では投稿しない。失敗はコミットを戻さず警告にする
 
 4 の `carry` の確認がホストの読み取りの遅れで通らないときだけ、短く待って最大 3 回取り直し、それでも通らなければ `attention` にする。3 の後に 4 が通らなかったときは、ホストの側は済んでいること・コメントは未投稿であることを結果の文面の先頭に言い、結果に `hostWritten` を付けて画面を閉じさせる。指摘が 0 件のときは 1〜3 を空で通り、マーカーを置くコミットになる。

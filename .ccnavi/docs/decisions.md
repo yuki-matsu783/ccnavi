@@ -47,7 +47,7 @@ keywords: [提案, 相談, メリット, デメリット, サブエージェン�
 - ターミナルの`confirm`: ユーザが親のワークツリーで`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>`を打つ
 - VS Code 拡張のボードの［レビュー完了］: 残った指摘を`ccnavi-review.sh decide <N> --preview`で読む。読み取れなければ、理由を言って確定のボタンを出さない。未解決が 0 件なら、［レビュー済みにする］で`decide`と同じ答えが置かれる。1 件以上なら、下の`decide`と同じ対応方針の画面が出る。エージェントに`confirm`を打たせる文は渡さない
 - Chrome 拡張のボードの「レビュー済み」: ユーザがブラウザで押す。リモートの親のブランチに、マーカーと`done/`への移動が書き込まれる
-- `decide`: 未解決の指摘が残っているとき、ユーザが指摘ごとの方針（対応しない・このフェーズで直す・issue に回す。issue はいつでも選べる）を決める。ターミナルの`ccnavi-user-decide.sh <N>`（一覧だけは`ccnavi-review.sh decide <N> --preview`）か VS Code のボードの［レビュー完了］で行う。Chrome 拡張からは行えない。ボードの「エージェントに相談するプロンプトをコピー」は`decide <N> --preview`だけを打たせるプロンプトをコピーし、確定する操作は禁じる。結果（レビュー済みになる条件、続きの子、選んでいる間に増えた指摘の扱い）は`ticket-flow.md`の 10'、途中で失敗した送信は`ccnavi-user-decide.sh --resume <操作ID>`で続ける
+- `decide`: 未解決の指摘が残っているとき、ユーザが指摘ごとの方針（対応しない・このフェーズで直す・issue に回す。issue はいつでも選べる）を決める。ターミナルの`ccnavi-user-decide.sh <N>`（一覧だけは`ccnavi-review.sh decide <N> --preview`）、VS Code のボードの［レビュー完了］、Chrome 拡張のボードの「残った指摘の行き先を決める」のどれかで行う。Chrome 拡張は、issue の作成、スレッドへの返信、解決をホストへ書いてから、続きの子・マーカー・`done/`への移動を親のブランチへ 1 コミットで書く。解決できない種類のスレッド（GitLab の差分以外のコメント、保留中のレビュー）が残るときは、Chrome では扱えないと言って VS Code かターミナルへ誘導する。ボードの「エージェントに相談するプロンプトをコピー」は`decide <N> --preview`だけを打たせるプロンプトをコピーし、確定する操作は禁じる。結果（レビュー済みになる条件、続きの子、選んでいる間に増えた指摘の扱い）は`ticket-flow.md`の 10'、途中で失敗した送信は`ccnavi-user-decide.sh --resume <操作ID>`で続ける
 
 未解決のスレッドが残っていると、`confirm`と Chrome の「レビュー済み」は通らない。変更要求が立っている間は、`decide`も含めてどれも通らない。Chrome の「レビュー済み」と`decide`で`done/`へ動いた子のワークツリーは、その場では消えず、次の親の`finish`の片付けで拾われる。Chrome の経路で済ませたときは、ユーザがそのあとセッションに一言送り、エージェントは`ccnavi-ticket.sh status [<親>]`で確かめる。
 

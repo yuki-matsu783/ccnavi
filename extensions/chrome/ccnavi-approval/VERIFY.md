@@ -178,7 +178,7 @@ Approve の付いた PR を試すには、PR の作者と別のアカウント�
 
 | # | 操作 | 期待する結果 | 記録するもの |
 |---|---|---|---|
-| V1 | 未解決のスレッドがある間にボードを開く | 「レビュー済みにする」が出ず、解決するか `decide` で受け入れると出る。ccnavi の依頼のスレッドは数えない | 画面の文面、`reviewThreads` の応答（`pageInfo`・`isResolved`・`path`・`line`・最初のコメントの `url`） |
+| V1 | 未解決のスレッドがある間にボードを開く | 「レビュー済みにする」が出ず、「残った指摘の行き先を決める」が出る。そこで行き先を決めて確定する（または解決する）と「レビュー済みにする」が出る。ccnavi の依頼のスレッドは数えない | 画面の文面、`reviewThreads` の応答（`pageInfo`・`isResolved`・`path`・`line`・最初のコメントの `url`） |
 | V2 | 変更要求のレビューを出し、その後に同じユーザがコメントだけのレビューを出す | 変更要求が残り、通らない | `GET /pulls/<N>/reviews` の応答（`state`・`submitted_at`・`user.id`） |
 | V3 | スレッドを解決し、変更要求を Approve に変えてから「フェーズ N をレビュー済みにする」を押す | 1 コミットで子が `done/` へ動き、`phases/<親>/<N>.reviewed` に `actor`（PAT の持ち主）と `via: chrome` が入る | コミット、マーカーの中身、GraphQL の `viewer` の応答 |
 | V4 | 依頼の後に置き場の外を変えるコミットを push してから開く | compare の変更の一覧で「動いた」かを判定する。ユーザが見るものが動いていれば通らない | `GET /compare/<base>...<head>` の応答（`status`・`files` の件数・改名の `previous_filename`） |
