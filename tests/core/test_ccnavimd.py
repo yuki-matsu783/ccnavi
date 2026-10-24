@@ -6,6 +6,7 @@ import os
 import tempfile
 import types
 import unittest
+from unittest import mock
 
 from ccnavi.hook import ccnavimd
 from tests import ROOT
@@ -212,6 +213,22 @@ class FlagsTest(unittest.TestCase):
         self.assertTrue(ccnavimd.CONDITIONS["workspace_root"](ctx))
         self.assertTrue(ccnavimd.CONDITIONS["docs"](ctx))
         self.assertTrue(ccnavimd.CONDITIONS["dry_run"](ctx))
+
+    def test_非対話は付き添いなしと示されたときだけ真(self):
+        ctx = ccnavimd.Context(None, "", False, set(), "enable")  # type: ignore[arg-type]
+        check = ccnavimd.CONDITIONS["non_interactive"]
+
+        with mock.patch.dict(os.environ, {ccnavimd.ATTENDED_ENV: "0"}):
+            self.assertTrue(check(ctx))
+        for value in ("1", "", "true", "0 "):
+            with (
+                self.subTest(value=value),
+                mock.patch.dict(os.environ, {ccnavimd.ATTENDED_ENV: value}),
+            ):
+                self.assertFalse(check(ctx))
+        with mock.patch.dict(os.environ):
+            os.environ.pop(ccnavimd.ATTENDED_ENV, None)
+            self.assertFalse(check(ctx))
 
 
 class ProblemsTest(unittest.TestCase):
