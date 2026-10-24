@@ -18,9 +18,9 @@
 - 写し先かその途中がシンボリックリンクなら止める
 - 上書きと削除は一時ファイルからの置き換えで行う。途中で止まれば、した分を元へ戻す
 
-ミラーの書き込みは、実行後チェックとバックアップと復元（どちらも `.ccnavi/` を守る）から見れば
-エージェントの書き込みと区別が付かない。区別は内容で付ける（`is_synced_write`）。
-誰が書いたかの台帳は持たない。台帳は git に入らないので、clone した別の機械には届かない。
+ミラーを書くのは、ユーザの発言のとき（`promptsync`）とユーザが押す入口（`mirrorsync`）だけで、
+ツール呼び出しの中では書かない。書いた分は次の受け入れ（`selfguard.accept`）で基準になるので、
+実行後チェックとバックアップと復元から特別扱いする仕掛けは持たない。
 """
 
 from __future__ import annotations
@@ -31,15 +31,13 @@ from dataclasses import dataclass
 
 import yaml
 
-from ..infra import fsio, pathcase, settings, tree, yamlread
+from ..infra import fsio, pathcase, settings, yamlread
 from ..policy import rules
-from . import approval, approval_checks, flow, phasetypes, plan_templates, risk
+from . import flow, phasetypes, plan_templates, risk
 
 COMMON_DIR = settings.COMMON_DIR
 # 共通レイヤーの期待する判定のファイル名。
 EXPECTATIONS_NAME = "rule-expectations.yml"
-# `is_synced_write` の `content` を渡さなかった目印。None は「そのファイルが無い」の意味で使う。
-UNSET = object()
 
 
 @dataclass
@@ -192,55 +190,6 @@ def apply(changes: list[Change], base: str = "") -> str:
     if base:
         _prune_empty(base)
     return ""
-
-
-def is_synced_write(
-    conf: settings.Settings,
-    root: str,
-    path: str,
-    content: bytes | None | object = UNSET,
-) -> bool:
-    """その変更が、親の着手がミラーへ配った書き込みだと読めるか。
-
-    `content` は変更後の中身（渡さなければディスク上の今の中身。None はそのファイルが無い）。
-    コミットに入った分を見るときは、コミットされた中身を渡すこと。ディスクで答えると、
-    好きな中身でコミットしてからディスクだけ戻す形が外れる。
-
-    読めるのは次が全部揃ったときだけ。
-
-    1. 置き場が、プロジェクトから切った承認済みの親チケットのワークツリー（名前が親の
-       識別子で、そのチケットの `project:` がワークツリーのプロジェクトと同じ）の中の
-       `.ccnavi/config/common/`。元リポジトリ、子のワークツリー、チケットの無いワークツリー、
-       他のプロジェクトのワークツリーは外さない
-    2. そのパス（解く前）の途中にシンボリックリンクが無い。リンクで差し替えると、指す先の中身で
-       答えてしまう
-    3. その中身が、ワークスペースルートの共通レイヤーの対応するものと同じ（バイト列で比べる。
-       共通レイヤーに無いものは、無いのが同じ）
-
-    読めないものは外さない。
-    """
-    where = tree.tree_of(root, path, conf.projects)
-    if where is None or not where.project or where.is_main:
-        return False
-    rel = _rel(where.root, path)
-    prefix = f"{_home(conf)}/{COMMON_DIR}/"
-    if not rel.startswith(prefix) or rel == prefix:
-        return False
-    if _linked(where.root, path):
-        return False
-    if not _approved_parent(conf, root, where):
-        return False
-    expected = _read(os.path.join(common_dir(conf, root), rel[len(prefix) :].replace("/", os.sep)))
-    now = _read(path) if content is UNSET else content
-    return now == expected
-
-
-def _approved_parent(conf: settings.Settings, root: str, where: tree.Tree) -> bool:
-    """そのワークツリーが、同じプロジェクト向けの承認済みの親チケットのものか。"""
-    copies, _ = approval.scan(conf, root)
-    closed, _ = approval.scan(conf, root, closed=True)
-    ticket = approval_checks.by_id(copies + closed).get(where.name)
-    return ticket is not None and not ticket.is_child and ticket.project == where.project
 
 
 def _home(conf: settings.Settings) -> str:
