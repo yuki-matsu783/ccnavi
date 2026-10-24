@@ -272,7 +272,7 @@ export function requestedMark(head: string, mr = 42, host: "github" | "gitlab" =
  * - `main`（プロジェクトの統合先）: クローズ済みの親子のチケット web-i0003 の `done/` とプロジェクトのレイヤー（rules.yml と phases.yml。
  *   フェーズ定義は、ワークスペースの共通レイヤーと、親の `project:` が指すこのプロジェクトの config の和が使われる）。
  *   共通レイヤー・設定・互換のマーカーはワークスペース（`fixture()` の `main`）から読む（置き場のパスは既定に固定）。
- *   プロジェクトの `.ccnavi/config/common/`（親の着手が配るミラー）はワークスペースの中では共通として読まない
+ *   プロジェクトの `.ccnavi/config/common/`（同期が配るミラー）はワークスペースの中では共通として読まない
  * - `web-i0012`（直近）: issue #12 から始めた親と子の提案
  * - `web-i0012` の上の `.ccnavi/config/project/phases.yml` は読まない（置き場の外）
  */

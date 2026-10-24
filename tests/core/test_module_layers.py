@@ -138,6 +138,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "records.stopeval",
                 "records.stopops",
                 "records.stopreview",
+                "records.turn",
             }
         ),
     ),
@@ -226,6 +227,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.template_drafts",
                 "tickets.handoff",
                 "tickets.mirrorsync",
+                "tickets.promptsync",
                 "tickets.learning",
                 "tickets.learning_records",
                 "tickets.template_use",

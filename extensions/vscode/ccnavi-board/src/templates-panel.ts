@@ -52,6 +52,7 @@ import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
+import { confirmDuringTurn } from "./turn-confirm.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "templates";
@@ -844,6 +845,13 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   if (lock.locked) {
     current.host.post({ type: "editLock", session, lock } satisfies ToTemplates);
     reply("", `保存しません: ${lock.reason}`);
+    return;
+  }
+  if (!(await confirmDuringTurn(lock))) {
+    reply("", "保存しません。ターン中です。ターンが終わってから保存してください");
+    return;
+  }
+  if (abandoned(current, target, (e) => reply("", e))) {
     return;
   }
   const file = templateFile(root, where.layer, name);

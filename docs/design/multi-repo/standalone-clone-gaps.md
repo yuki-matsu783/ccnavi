@@ -35,7 +35,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 | C2 | プロジェクトのスキルの目録が、単体 clone で出ない | major | 実行 |
 | C3 | setup が `/.claude/worktrees/` を `.gitignore` に足さない | minor から中 | 実行 |
 | C4 | `.git` がファイルの clone で、ワークツリーが認識されない | 中 | 実行 |
-| D1 | ワークスペースの `ticket start` が、プロジェクトのミラーと写しを上書きする | minor から中（設計上の緊張） | 実行 |
+| D1 | ワークスペースの発言のときの同期が、プロジェクトのミラーと写しを上書きする | minor から中（設計上の緊張） | 実行 |
 | D2 | ワークスペースの SessionStart が、プロジェクトの `.gitignore` に追記する | minor | 実行 |
 | E1 | ルールの `{root}` が、プロジェクトのレイヤーでもワークスペースルートを指す | info | 読み |
 | E2 | `--lint` のレビュー経路の検査が、ワークスペースの origin しか見ない | minor | 読み |
@@ -122,11 +122,11 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 ## D. 別リポジトリへの書き込み・上書き
 
-#### D1 ワークスペースの `ticket start` が、プロジェクトのミラーと写しを上書きする（minor から中。設計上の緊張）
+#### D1 ワークスペースの発言のときの同期が、プロジェクトのミラーと写しを上書きする（minor から中。設計上の緊張）
 
-- 処理と場所: `src/ccnavi/tickets/ops.py:161-240` の `_sync_config`、`_sync_common`、`_sync_skills`、および `configsync.py`、`skillsync.py`。プロジェクトの `.ccnavi/config/common/` と `skills/<工程>/` を、共通レイヤーと工程スキルの写しで上書きする
+- 処理と場所: `src/ccnavi/tickets/promptsync.py` の `sync`、および `configsync.py`、`skillsync.py`。プロジェクトの `.ccnavi/config/common/` と `skills/<工程>/` を、共通レイヤーと工程スキルの写しで上書きする
 - ワークスペース内 clone: プロジェクトの `config/common/rules.yml` に 1 行足してコミットしておくと、「共通レイヤーの中身に揃えた: rules.yml（上書き）」と書き換える。書き換えるのは親のワークツリーで、差分はマージリクエストに出る。静かにデータが消えるわけではない
-- 単体 clone: `found.project` が空で写しは動かず、このミラーが共通レイヤーそのものになる。`user handoff` の取り込み先（`handoff.py` の `KINDS`）に `.ccnavi/config/common/…` が入っているので、単体の利用者は編集できる。ミラーは誰も編集しないという前提が単体 clone では成り立たず、更新の手段もワークスペースの start か setup だけ
+- 単体 clone: `found.project` が空で写しは動かず、このミラーが共通レイヤーそのものになる。`user handoff` の取り込み先（`handoff.py` の `KINDS`）に `.ccnavi/config/common/…` が入っているので、単体の利用者は編集できる。ミラーは誰も編集しないという前提が単体 clone では成り立たず、更新の手段もワークスペースの発言のときの同期か setup だけ
 - 確認: 実行で確認
 - 直し方の案: 単体用とワークスペース用の写しを印（指紋）で見分ける。または、ミラーがワークスペースの共通と違うときは上書きせず、差を warn して止める。未決（「未決」のミラーの指紋）
 

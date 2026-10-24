@@ -54,8 +54,9 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
             if os.path.exists(os.path.join(origin, home, rel.replace("/", os.sep))):
                 continue
             if work.project and rel.startswith(f"{settings.COMMON_DIR}/"):
-                # プロジェクトのワークツリーの `.ccnavi/config/common/` は、親の着手がミラーした
-                # 共通レイヤー。ワークスペースの中では読まれないので、言わない。
+                # プロジェクトのワークツリーの `.ccnavi/config/common/` は、
+                # 発言のときの同期がミラーした共通レイヤー。
+                # ワークスペースの中では読まれないので、言わない。
                 continue
             where = pathcase.fold(
                 os.path.normpath(os.path.join(work.root, home, rel.replace("/", os.sep)))

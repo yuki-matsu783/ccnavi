@@ -29,7 +29,6 @@ from . import (
     approval_checks,
     approval_marks,
     approval_ops,
-    configsync,
     flow,
     learning,
     ops_close,
@@ -37,7 +36,6 @@ from . import (
     ops_stop,
     phase,
     risk,
-    skillsync,
     template_drafts,
     ticket_model,
     ticket_places,
@@ -75,7 +73,7 @@ def start(
        `parent_not_started`・`predecessors_unmet`）。
     2. ワークツリーが承認済みの `project` の元リポジトリから切られているかを
        `tree.is_worktree_of` で確かめる。
-    3. ワークツリーの HEAD を基準点にし、`_sync_config` で共通レイヤーと工程スキルを写す（親だけ）。
+    3. ワークツリーの HEAD を基準点にする。
     4. `approval_ops.update_fields` で `started_at` と `base_sha` を欄に書く。
     5. 子ならフローのハッシュを `flow.record_digest` で記録し、次の一手を案内する。
     """
@@ -121,9 +119,6 @@ def start(
     if not sha:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1
-    synced = _sync_config(stderr, root, conf, found, worktree)
-    if synced is None:
-        return 1
     fields = {"started_at": approval_marks.now(), "base_sha": sha}
     failed = approval_ops.update_fields(found.path, fields)
     if failed:
@@ -148,8 +143,11 @@ def start(
                 f"フローのハッシュを {where} に記録した。"
                 "承認済みチケットと同じくユーザがコミットする\n"
             )
-    for line in synced:
-        stdout.write(line + "\n")
+    if found.project and not found.is_child:
+        # 共通レイヤーと工程スキルの写しは、ここでは書かない（`promptsync`）。
+        stdout.write(
+            "共通レイヤーと工程スキルのプロジェクトへの写しは、次のユーザの発言で置かれる\n"
+        )
     for line in ops_plan.childless_notice(root, conf, found):
         stdout.write(line + "\n")
     if found.is_child:
@@ -167,90 +165,6 @@ def start(
             "（無ければ learnings: none）\n"
         )
     return 0
-
-
-def _sync_config(
-    stderr: TextIO,
-    root: str,
-    conf: settings.Settings,
-    found: ticket_model.Ticket,
-    worktree: str,
-) -> list[str] | None:
-    """親の着手の前に、共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。
-
-    返すのは着手の出力に足す行。ミラーできなければ None（着手しない）。子は親のブランチに
-    含まれるので配らない。ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるので配らない。
-    プロジェクトの `.ccnavi/config/project/` には触れない。
-    """
-    if found.is_child or not found.project:
-        return []
-    lines = _sync_common(stderr, root, conf, found, worktree)
-    if lines is None:
-        return None
-    more = _sync_skills(stderr, root, conf, found, worktree)
-    if more is None:
-        return None
-    return lines + more
-
-
-def _sync_skills(
-    stderr: TextIO,
-    root: str,
-    conf: settings.Settings,
-    found: ticket_model.Ticket,
-    worktree: str,
-) -> list[str] | None:
-    """共通の工程スキルをプロジェクトの `skills/` へ写す。"""
-    changes, why = skillsync.plan(root, worktree)
-    if why:
-        stderr.write(f"ccnavi: {found.ticket} の工程スキルを写せない: {why}\n")
-        return None
-    if not changes:
-        return []
-    failed = skillsync.apply(changes)
-    if failed:
-        stderr.write(f"ccnavi: {found.ticket} の工程スキルを写せない: {failed}\n")
-        return None
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
-    lines = skillsync.describe(found.project, changes)
-    lines.append(
-        f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in changes)} を"
-        f" '{git_sh} add' してコミットしてください"
-    )
-    return lines
-
-
-def _sync_common(
-    stderr: TextIO,
-    root: str,
-    conf: settings.Settings,
-    found: ticket_model.Ticket,
-    worktree: str,
-) -> list[str] | None:
-    """共通レイヤーのミラー。ミラーできなければ None。"""
-    changes, why = configsync.plan(conf, root, worktree)
-    if why:
-        stderr.write(f"ccnavi: {found.ticket} の共通レイヤーをミラーできない: {why}\n")
-        return None
-    if not changes:
-        return []
-    failed = configsync.apply(changes, configsync.mirror_dir(conf, worktree))
-    if failed:
-        stderr.write(f"ccnavi: {found.ticket} の共通レイヤーをミラーできない: {failed}\n")
-        return None
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
-    lines = [
-        f"共通レイヤーとプロジェクト {found.project} のミラー（.ccnavi/config/common/）が違っていたので、"  # noqa: E501
-        "共通レイヤーの中身に揃えた:"
-    ]
-    for c in changes:
-        state = "削除した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")
-        lines.append(f"  - {c.rel}（{state}）")
-    lines.append(
-        f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in changes)} を"
-        f" '{git_sh} add' してコミットしてください"
-    )
-    return lines
 
 
 def finish(
