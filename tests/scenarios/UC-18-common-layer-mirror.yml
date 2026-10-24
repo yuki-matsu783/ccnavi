@@ -11,7 +11,7 @@ test_repo: true                  # 親チケットの着手のあとの発言で
 # `.ccnavi/config/common/` へ写す（docs/design/multi-repo/distribute-common.md の 11.12）。
 # 確かめるのは、(1) 写されて中身が共通レイヤーと一致する、(2) `.ccnavi/config/project/` と元のリポジトリには触れない、
 # (3) 写された分を、エージェントのコミットが通る（実行後チェックが戻さない）、の 3 つ。
-# 承認（`ccnavi user agree`）は人間しかできないので、そこで止める。
+# 承認（`ccnavi-user-agree.sh`。承認のあと push まで行う）は人間しかできないので、そこで止める。
 steps:
   - prompt: >-
       projects/test-repo の README.md の末尾に「ミラー確認」と 1 行足す小さい作業を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
@@ -19,9 +19,10 @@ steps:
       実装はまだしないで。
   - human: true
     instruction: >-
-      ワークスペースルートで `ccnavi user agree <親の識別子> <子の識別子>` を打つ（識別子は 1 つ目の step の報告にある）。
+      ワークスペースルートで `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子> <子の識別子>` を打つ（識別子は 1 つ目の step の報告にある）。
     check:
       - 承認画面に、親の範囲（README.md）が出ている
+      - 承認のあとに「pushしました」と出ている
   - prompt: >-
       承認した。親チケットに `ccnavi-ticket.sh start` で着手して。親のワークツリーの場所も教えて。
       着手の出力に、ミラーは次のユーザの発言で置かれるとあれば、そのまま教えて。ここでは何もコミットしないで。
