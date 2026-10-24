@@ -306,7 +306,7 @@ courses:
         scene: { overlay: approval }
       - target: approval-handover
         title: 承認のあと
-        body: 承認できたら、Claude Code に伝えるプロンプトが出ます。コピーして進行中のセッションに貼るか、新しいセッションで開いて渡します。
+        body: 承認できたら、Claude Code に伝えるプロンプトが出ます。コピーして進行中のセッションに貼るか、新しいセッションで開くか、ターミナルで claude -p として実行して渡します。
         scene: { overlay: done }
 
   - id: review

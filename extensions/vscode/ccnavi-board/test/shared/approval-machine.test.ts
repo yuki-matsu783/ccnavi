@@ -936,7 +936,7 @@ test("CB-T177d 確定した結果は実行ファイルの答えに従う。revie
   assert.match(odd?.note ?? "", /レビュー済みになっていません/);
 });
 
-test("CB-T178 文を渡したら閉じる。コピーと新しいセッションで、呼び名は同じ文に付く", () => {
+test("CB-T178 文を渡したら閉じる。コピー・新しいセッション・ターミナルで実行で、呼び名は同じ文に付く", () => {
   const done = toDone(approvalStep);
   const copied = approvalStep(done, { kind: "handOver", how: "promptCopy" });
   assert.equal(copied.state.overlay, undefined);

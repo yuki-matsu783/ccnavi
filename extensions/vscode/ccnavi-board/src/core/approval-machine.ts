@@ -648,7 +648,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     }
     const extra = value.pending_extra.length;
     const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
-    const handover = " Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。";
+    const handover = " Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開くか、ターミナルで実行してください。送るときは自分で Enter を押してください。";
     const overlay = state.overlay;
     const where = overlay?.kind === "deciding" ? { parent: overlay.preview.parent, phase: overlay.preview.phase } : { parent: value.parent, phase: value.phase };
     let title: string;

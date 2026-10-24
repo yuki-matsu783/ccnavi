@@ -241,7 +241,7 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
   }
 });
 
-test("CB-T108b 承認したら同じオーバーレイに文とコピー・新しいセッションで開く・閉じるを出す", async () => {
+test("CB-T108b 承認したら同じオーバーレイに文とコピー・新しいセッションで開く・ターミナルで実行・閉じるを出す", async () => {
   const page = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-02-03 を承認した <b>" } });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "done");

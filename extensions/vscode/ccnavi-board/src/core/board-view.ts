@@ -30,7 +30,7 @@ export type ApprovalOverlay =
   | { readonly kind: "approving"; readonly preview: ApprovePreview }
   | { readonly kind: "error"; readonly error: string }
   /**
-   * 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く を出す。
+   * 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く / ターミナルで実行 を出す。
    * `carried` は承認済みチケットをコミットして push する sh をターミナルに送ることにしたか（その sh が置いてあるか）。
    * 送るのは拡張ホストで、送れたかまでは見ていない。真のときだけ、そう言う
    */
