@@ -82,10 +82,22 @@ def decide(
     record: audit.Record,
     deadline: float,
 ) -> int:
-    """イベントごとの処理に振り分ける。
+    """イベントごとの処理に振り分ける。戻り値は hook の終了コード（`EXIT_OK`）。
 
     振り分けだけをここに置く。イベントが増えるたびに 1 本の関数が長くなると、
     どのイベントで何が起きるのかを読むのに全部を読むことになる。
+
+    処理フロー:
+    1. 無効モードなら記録だけ残して抜ける。Stop のときは判定役の計画だけ書く
+       （`_plan_stop_review`）。
+    2. 判定役の呼び出しは、PreToolUse のときだけ `stopjudge.before` に渡す。
+       ほかは判定せず、記録に SKIP を残して返す。
+    3. PreToolUse は `stopjudge.before` が処理したら抜ける。そうでなければ提案を
+       記録する（`_track_proposals`）。
+    4. イベントごとに 1 つの関数へ渡す（`judge.decide_before`・`decide_after`・
+       `decide_after_failure`・`decide_at_start`・`decide_at_prompt`・`decide_at_stop`・
+       `subagent.at_start`・`subagent.at_stop`）。
+    5. どれにも当たらないイベントは、判定をしないものとして記録して抜ける。
     """
     if mode == modes.DISABLE:
         record.decision, record.reason = audit.SKIP, audit.REASON_MODE_DISABLED
@@ -614,6 +626,17 @@ def _plan_stop_review_inner(
     agent hook を登録していなければ（`CCNAVI_STOP_REVIEW_AGENT`）何もしない。書けなくても Stop は
     止めない。対象は Stop の機会（R1・R3）と、このターンの提案の最終の有効版（R2・R4）。
     提案の操作実績（`stopops`）で、着手済みの親に属さない提案があれば候補にする。
+
+    処理フロー:
+    1. 状態の置き場・セッション・判定役の登録のどれかが無ければ何もしない。
+    2. 共有キー（`stopreview.shared_key`）を導く。導けなければ `no_key` を記録して抜ける。
+    3. 前回の Stop の記録を見て、再開の疑いを記録し、今回の Stop を覚える（`note_last_stop`）。
+    4. このターンの提案の操作（`stopops`）から最終の版と未送信の書き込みを集め、
+       着手していない親のものを外す（`_unstarted_ops`）。
+    5. 候補かどうかを `stopreview.candidate` で決める。基準が読めなければ候補にしない。
+       候補外で、理由が `_NOT_CANDIDATE_FINAL` に無いものは、何も書かずに抜ける。
+    6. 対象・提案・材料の版・参照・提出済みを計画にまとめ、`stopreview.write_plan` に書く。
+       書けなければ 1 行の知らせにして、Stop は止めない。
     """
     if not (conf.state and payload.session_id and conf.stop_review_agent):
         return
@@ -1224,6 +1247,17 @@ def _decide_after(
     防ぐためのもので、止められるイベントでしか意味を持たない。ここは
     何も止めていないので、遅れは待ち時間にしかならない。作業ツリーを読む側は
     自前の短い時間を持っていて、そこに達したら何も言わずに終わる。
+
+    処理フロー:
+    1. 失敗の連続を 0 に戻す（`failstreak.reset`）。
+    2. 設定ファイルの保護を、ルールを読む前に戻す
+       （`judge.guard_setting_files`・`selfguard.after`）。
+    3. 見る作業ツリーを決め（`watched_for`）、実行後チェック（`post.check`）で報告と差し戻しを得る。
+    4. 差し戻しの有無によらず、フェーズの知らせ（`phase.announce`）とサブエージェントの知らせ
+       （`subagent.ignored_bounce`・`subagent.unchecked_scope`・`subagent.outcome_notices`）を足す。
+    5. 差し戻しの対象は、直前の実行が汚したと言える DENY だけ。ENABLE なら標準エラーに書いて
+       `exit 2` で返す。dry-run では差し戻さず、標準出力の文脈に dry-run の文を添えて返す。
+    6. 最後に、告げた知らせを確定する（`subagent.confirm_outcomes`）。
     """
     # 成功が入ったので、失敗の連続（failstreak）を 0 に戻す。
     failstreak.reset(

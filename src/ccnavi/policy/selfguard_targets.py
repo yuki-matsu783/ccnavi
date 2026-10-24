@@ -74,6 +74,14 @@ def targets(
     バックアップの key はレイヤーごとに分ける。共通レイヤーは kind そのまま（`rules` / `phases` /
     `risk`）、それ以外は `rules:self` / `phases:lib` の形。key はそのままバックアップの
     名前になるので、レイヤーが違えば別の断面として残り、取り違えが起きない。
+
+    処理フロー:
+    1. `_places` で、設定ファイルと各レイヤーの場所を、key と持ち主の置き場と一緒に集める
+    2. それぞれを `Target` にする（報告用のパスは `_relative`、戻す先のルートは `_home_top`）
+    3. 実行ファイル（`bin_path`）を heavy な対象にする。振り分けの sh なら、その先の実体も足す
+    4. 振り分けの sh の形なら、PATH の ccnavi の実体を、パスの印つきの key で足す
+       （同じ実体が既に在れば足さない）
+    5. `_worktree_copies` で、ワークツリー側の写しを足す
     """
     places = _places(root, projects_dir, rules_path, layers)
     found = [

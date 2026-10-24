@@ -197,7 +197,20 @@ class _Scanner:
     # --- コマンドの文脈
 
     def command(self, collect: bool, closing: bool) -> None:
-        """引用の外。closing が真なら `$( )` の中で、対になる `)` の手前で戻る。"""
+        """引用の外。closing が真なら `$( )` の中で、対になる `)` の手前で戻る。
+
+        処理フロー:
+        1. _COMMAND_STOP までの普通の文字を、まとめて emit する。
+           `$( )` の中なら refuse_case で予約語 `case` を確かめる。
+        2. 止めた文字ごとに分ける。`\\` は次の 1 文字と組で emit する。
+           `'`・`"`・`$`・`` ` `` はそれぞれの引用・置換の読みへ回す。
+        3. 語の先頭（空白や `;` の後ろ）の `#` は、行末までコメントとして飛ばす。
+           引用の外の改行はコマンドの区切りになり、heredoc_bodies で本文を読む。
+        4. `<<<` は here-string、`<<` は heredoc_head で扱う。
+           `<(`・`>(` はプロセス置換として substitution で読む。
+        5. closing のときは、`(` と `)` の深さを数え、深さ 0 の `)` で戻る。
+        6. 戻る前に、閉じない `$( )` なら _Unreadable を投げる。
+        """
         s = self.s
         depth = 0
         word_start = True

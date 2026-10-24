@@ -159,7 +159,18 @@ def requested(
     phase_no: int,
     result_path: str,
 ) -> int:
-    """投稿の結果を受けて、依頼のマーカーを置く。"""
+    """投稿の結果を受けて、依頼のマーカーを置く。
+
+    処理フロー:
+    1. 親とフェーズを `_parent_phase` で得る。依頼済みで出し直せないなら
+       （`_already_requested`）止める
+    2. 投稿の結果（`_result_with_mr`）を読む。投稿の url が無ければ、マーカーは置かず止める
+    3. 投稿の後に前提が崩れていないか（`_unmet`）を見る。崩れていれば、マーカーは置かず止める
+    4. HEAD と、投稿の情報（MR・url・ホスト・時刻・投稿者）を `_mark` で依頼のマーカーに書く
+    5. 依頼の待ちのファイルを消し、MR に注記を残す（`_note_mr`）
+    6. 依頼した（または依頼し直した）ことを 1 行で言う
+    """
+    # 親のフェーズと、依頼済みでないことを確かめる。
     found = _parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
         return 1
@@ -170,6 +181,7 @@ def requested(
         stderr.write(f"ccnavi: {already}\n")
         return 1
     again = approval_marks.MARK_REQUESTED in ph.marks
+    # 投稿の結果（url を含む）を読む。url が無ければ、投稿されていないとしてマーカーは置かない。
     result = _result_with_mr(stderr, result_path)
     if result is None:
         return 1
@@ -178,14 +190,14 @@ def requested(
             "ccnavi: 結果に投稿の url がありません。投稿されていないならマーカーは置かない\n"
         )
         return 1
-    # 投稿とマーカーの間に HEAD が動いていないか。
-    # 動いていれば、ユーザが見るものとマーカーが食い違う。
+    # 投稿の後も、依頼の前提（子の合流・未コミット・未 push）が崩れていないか見る。
     unmet = _unmet(root, tree_root, conf, ph)
     if unmet:
         stderr.write("ccnavi: 投稿の後に前提が成り立たなくなった。マーカーは置かない\n")
         for line in unmet:
             stderr.write(f"  - {line}\n")
         return 1
+    # 依頼のマーカーを置く。HEAD と、投稿の情報を書く。
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     # since はホストの時計。手元の時計と比べると、依頼直後の指摘が「依頼より前」と
     # 判定され、気づかないうちに除かれる。
@@ -207,11 +219,13 @@ def requested(
         },
     ):
         return 1
+    # 依頼の待ちのファイルを消し、MR に注記を残す。
     if conf.state:
         fsio.remove(
             os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
         )
     _note_mr(stderr, root, conf, parent, result.mr.number)
+    # 依頼した（または依頼し直した）ことを 1 行で言う。
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
         f"OK: レビューを{done}（{result.mr.url or result.url}）。"

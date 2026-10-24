@@ -423,6 +423,14 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
 
     `wanted` は引数で指したパス（ツリーからの相対）。None なら、表に当たって `unchanged` でない
     もの全部を選ぶ。
+
+    処理フロー:
+    1. `walk` で下書きを集める。拒否があれば、その理由を入れて返す。
+    2. 同じ取り込み先に落ちる下書きが複数ないかを数える。複数なら、どちらにも理由を足す。
+    3. 各下書きを `_read` で読み、`Entry` にする。
+    4. `wanted` が None なら、未変更でないものを選ぶ。指定があれば `wanted_key` で引き当て、
+       表に無ければ理由を入れて返す。
+    5. `_check_contents` で中身を検査し、`_make_diff` で取り込み先との差分を作る。
     """
     plan = Plan(tree=root)
     found, plan.ignored, refused = walk(root)
@@ -466,7 +474,16 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
 
 
 def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
-    """下書き・取り込み先・`.orig` を読み、形の上の断る理由を足す。中身の検査は別。"""
+    """下書き・取り込み先・`.orig` を読み、形の上の断る理由を足す。中身の検査は別。
+
+    処理フロー:
+    1. パスの要素に `.git` で始まるものがあれば断る。
+    2. 下書きを読み、NUL を含まないか、UTF-8 として読めるかを見る。
+    3. `_locate_layer` で下書きのレイヤーを求め、`spelled` で取り込み先を決める。
+    4. 取り込み先の途中にリンクがあるか、ツリーの外を指すなら断る。
+    5. 取り込み先があれば読む。無いのに種類が新しく作れないものなら断る。
+    6. `.orig` があれば読み、写したあとに取り込み先が変わっていれば `conflict` を立てる。
+    """
     parts = entry.key.split("/")
     if any(part.startswith(".git") for part in parts):
         entry.errors.append("パスの要素に `.git` で始まるものがある。git の置き場には取り込めない")
@@ -880,7 +897,14 @@ def not_ok_reason(plan: Plan) -> str:
 
 
 def apply(plan: Plan, expect: str, via_board: bool = False) -> Applied:
-    """選んだ対象を書く。`plan` が通り、`expect` が今の照合の値と同じときだけ書く。"""
+    """選んだ対象を書く。`plan` が通り、`expect` が今の照合の値と同じときだけ書く。
+
+    処理フロー:
+    1. 計画の理由、対象の有無、`via_board` の拒否、`plan.ok` を順に確かめる。
+    2. `expect` が無いか、今の `plan.expect` と違えば、何も書かずに返す。
+    3. 選んだ対象を `_write_one` で順に書く。途中で失敗したら `_roll_back` で書いたものを戻す。
+    4. 全部書けたら、各対象の下書きを `_clean_draft` で片付ける。
+    """
     if plan.error:
         return Applied(False, plan.error)
     chosen = sorted(plan.selected, key=lambda e: e.key)
@@ -969,7 +993,14 @@ def _roll_back(written: list[Entry]) -> list[str]:
 
 
 def _clean_draft(root: str, entry: Entry, done: Applied) -> None:
-    """下書きの今のバイト列が取り込んだものと同じときだけ、下書きと `.orig` を消す。"""
+    """下書きの今のバイト列が取り込んだものと同じときだけ、下書きと `.orig` を消す。
+
+    処理フロー:
+    1. 下書きを読み直し、取り込んだときの `entry.raw` と同じかを見る。違えば消さずに残す理由を積む。
+    2. 下書きを `fsio.unlink` で消し、`removed_drafts` に入れる。
+    3. `.orig` があれば、`lstat` で通常のファイルかを見て、そうなら消す。通常のファイルでなければ
+       （リンクやディレクトリを含む）残す。
+    """
     now, why = flow.read_bytes(entry.draft, root)
     if now is None:
         done.kept_drafts.append((entry.draft_rel, f"下書きを読めなかったので消していない（{why}）"))

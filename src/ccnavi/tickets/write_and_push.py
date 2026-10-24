@@ -233,6 +233,7 @@ def classify_all(
     `archive_at` は `(ワークスペースルート, プロジェクト)`。渡せば、ready がこのツリーから退避した
     削除を (b) にする（`archived_removal`）。None なら (b) にしない。
     """
+    # 退避（ready）の判定と、ready の内容の読み込み。
     approved_rel, review_rel = places
     ready: set[str] = set()
     if archive_at is not None:
@@ -240,6 +241,7 @@ def classify_all(
         # （未コミットなら HEAD、未送信の確かめなら `since`）。
         head = archive.tree_head(tree_root, since or "HEAD")
         ready = archive.ready_files(archive_at[0], archive_at[1], tree_root, head)
+    # 各ファイルの今の中身と、比べる先の中身を読む。
     states: dict[str, tuple[bytes | None, bytes | None, bool]] = {}
     for rel in changed:
         if since:
@@ -250,6 +252,7 @@ def classify_all(
             before, readable_before = gitcmd.blob(tree_root, "HEAD", rel, _TIMEOUT)
         states[rel] = (now, before, readable and readable_before)
 
+    # 追加・削除は、組の両側の中身で決める。
     def added(rel: str) -> bool:
         now, before, ok = states.get(rel, (None, None, False))
         return ok and before is None and now is not None
@@ -258,6 +261,7 @@ def classify_all(
         now, before, ok = states.get(rel, (None, None, False))
         return ok and before is not None and now is None
 
+    # 種類ごとに分ける。上から当てて、最初に当たったものにする。
     out = []
     for rel in changed:
         now, before, ok = states[rel]

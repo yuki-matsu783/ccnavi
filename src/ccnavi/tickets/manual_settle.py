@@ -102,7 +102,19 @@ def assess(
 
     `external` は git を持たない呼び手（Chrome）。ホストの親のブランチを読んでいるので、共有済み
     と見なし、移動の時刻だけを外から受ける。`moved_at`（epoch 秒）が無ければ `need_time` で返し、
-    読めなかった（0 以下）なら確かめられないものとして BROKEN で返す。
+    読めなかった（0 以下、NaN、無限大）なら確かめられないものとして BROKEN で返す。
+
+    処理フロー:
+    1. レビュー済みか、レビュー要でないフェーズは判定しない（空を返す）。
+    2. 同じ番号（カバーする分を含む）の子を集める。識別子が重なれば BROKEN。
+    3. 完了した子を、レビュー側で閉じたもの（`reviewed`）、閉じ先の記録が無いもの（`unknown`）、
+       閉じ先のレビュー側で、ユーザが手で動かしたもの（`hand`）に分ける。
+    4. 手で動かした子が無ければ、閉じ先の不明な子しか無く、レビュー待ちも閉じ先の記録済みも
+       無いときだけ `ROUTE_UNKNOWN` で返し、それ以外は空を返す。
+    5. レビュー待ちの子があれば `PARTIAL`、依頼の印が無ければ `NO_REQUEST` を返す。
+    6. `external` なら、`moved_at` が無ければ `need_time` を付けて `READY` で返す。読めなければ
+       `BROKEN` で返す。読めれば、今の時刻を超えないように抑えて `READY` で返す。
+    7. それ以外は `_shared` で共有済みの時刻を求め、`UNSHARED`・`BROKEN`・`READY` のどれかを返す。
     """
     if approval_marks.MARK_REVIEWED in ph.marks or not ph.review_required:
         return Manual()

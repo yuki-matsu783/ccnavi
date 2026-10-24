@@ -173,7 +173,7 @@ shlex に任せる。走査か shlex のどちらかに手を入れたら `tests
 
 ### 探すツールと `.gitignore`（ripgrep の既定の挙動）
 
-`Grep` が読むファイルは ripgrep の既定の挙動に従い、ccnavi の側では変えられない。判断の経緯は ADR-0050。
+`Grep` が読むファイルは ripgrep の既定の挙動に従い、ccnavi の側では変えられない。`Grep` が止められるのは起点のパスだけで、探した先で読まれたファイルは判定に届かないため、`Grep` と `Glob` は `credentials` の対象にしない。降りた先は `.gitignore` と `permissions.deny` の `Read(...)` が受け持つ。
 
 | 前提 | 実測 |
 |---|---|

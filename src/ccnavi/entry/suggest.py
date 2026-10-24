@@ -310,6 +310,18 @@ def _expectations_pass(
 def _rule_candidates(
     conf: settings.Settings, root: str, records: list[dict]
 ) -> tuple[list[Candidate], int]:
+    """記録から、足すと良い許可（ask）のルールの候補を作る。
+
+    処理フロー:
+    1. `_handover_groups` で、どのルールにも当たらず権限モードへ渡った形を集める。
+    2. 共通レイヤーのルールを読み、既存の id と重ならない id を振る。
+    3. 候補ごとに、ルールを足した一時のルールファイルを作り、`_lint_errors` と
+       `_expectations_pass` で検査する。通らないものは捨てて数える（`dropped`）。
+    4. 通ったものを `Candidate` にする。上限（`CANDIDATE_LIMIT`）に達したら止める。
+
+    戻り値は（候補の一覧、捨てた数）。共通レイヤーが読めないときは候補を出さず、
+    その数を捨てた数として返す。
+    """
     groups = _handover_groups(records, root)
     if not groups:
         return [], 0
@@ -382,6 +394,18 @@ def _rule_candidates(
 def _message_candidates(
     conf: settings.Settings, root: str, records: list[dict], n: int
 ) -> tuple[list[Candidate], int]:
+    """記録で同じ呼び出しを繰り返し止めた deny のルールについて、message の見直し候補を作る。
+
+    処理フロー:
+    1. `_repeated_denies` で、`n` 回以上止めたルールを集める。
+    2. ルールファイルのルールを `ruleload.survey` で読み、記録のルール名と引き合わせる。
+       見つからないもの（組み込みや、もう無いルール）は、文面を直す先が無いので捨てる。
+    3. 候補ごとに、同じ呼び出しを試す期待の判定を作り、`_lint_errors` と `_expectations_pass` で
+       検査する。通らないものは捨てて数える。
+    4. 通ったものを `Candidate` にする。上限（`CANDIDATE_LIMIT`）に達したら止める。
+
+    戻り値は（候補の一覧、捨てた数）。
+    """
     repeated = _repeated_denies(records, n)
     if not repeated:
         return [], 0

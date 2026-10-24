@@ -42,6 +42,16 @@ def hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
 
 
 def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
+    """書いたのが親の提案（`todo/` の md）なら、書式の誤りを 1 行の案内にして返す。無ければ空。
+
+    処理フロー:
+    1. 書いたのが `.md` で、チケット制御が有効でなければ空を返す。
+    2. 書いた先のツリーを求め、`todo/` の直下の md でなければ空を返す（`tree.relative`）。
+    3. frontmatter を読む（`ticket.front_mapping`）。読めなければ空を返す。
+    4. `parent:` が在るときは、識別子が子の形なら空を返す。子の形でなければ、
+       `parent:` を消すよう案内する。
+    5. `parent:` が無いときは、`PARENT_FIELDS` の欠けを案内する。欠けが無ければ空を返す。
+    """
     raw = str(payload.tool_input.get("file_path") or "")
     if not raw.endswith(".md") or not conf.tickets:
         return ""

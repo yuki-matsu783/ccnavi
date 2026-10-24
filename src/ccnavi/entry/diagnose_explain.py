@@ -228,6 +228,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     それはまだ無いので、ここで言えるのは「どのルールがどのタイプにあるか」と
     「チケットの範囲が有効か」まで。言えないことは言わない。
     """
+    # レイヤーごとに、宣言されたルールを書く。
     views = ruleload.survey(stderr, conf, root)
     source = builtin.SOURCE if views[0].unreadable else conf.rules
     stdout.write(f"ccnavi: いま有効な宣言（出所 {source}）\n")
@@ -296,6 +297,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals)
     approval_checks.align_imported(conf, root, preds)
     times = approval_times.approved_times(conf, copies + review)
+    # チケットを 1 件ずつ、作業範囲（承認済みチケットの欄）として書く。
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"

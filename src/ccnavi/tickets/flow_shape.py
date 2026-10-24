@@ -129,7 +129,19 @@ def structure_problems(data) -> list[str]:
 
 
 def _structure_problems(data) -> list[str]:
+    """`structure_problems` の本体。例外は呼び元が受ける。
+
+    処理フロー:
+    1. `_step_nodes` で手順のノードを集め、グループを除いて `by_id` を作る。
+    2. 線を 1 本ずつ見て、`from` / `to` の欠けた指し先、`start` に入る線、`end` から出る線を言い、
+       出口（`ports`）と辺（`edges`・`edge_ports`）を作る。
+    3. `start` と `end` の有無を見て、`start` から辺を辿れないノードを言う。
+    4. 分岐・問い・繰り返しの項目ごとに出口の線を見る（`_port_taken`）。
+       複数選択の問いは `output` の 1 本。
+    5. `_loop_problems` で `loop` の条件・上限・出口と、繰り返しを通らない巡回を言う。
+    """
     data = flow_text._dict(data)
+    # 手順のノードと、グループを除いた ID の対応
     nodes = _step_nodes(data)
     by_id = {_node_id(n): n for n in nodes}
     groups = {
@@ -143,6 +155,7 @@ def _structure_problems(data) -> list[str]:
     edges: dict[str, list[str]] = {}
     edge_ports: dict[str, list[tuple[str, str]]] = {}
     ports: dict[str, set[str]] = {}
+    # 線を 1 本ずつ見る。指し先の欠けと、start・end に入る・出る線を言う
     for index, c in enumerate(flow_text._list(data.get("connections"))):
         if not isinstance(c, dict):
             continue
@@ -170,6 +183,7 @@ def _structure_problems(data) -> list[str]:
     out.extend(missing[:ITEM_LIMIT])
     if len(missing) > ITEM_LIMIT:
         out.append(f"無いノードを指す線は…ほか {len(missing) - ITEM_LIMIT} 件")
+    # start と end の有無。start から辺を辿って届かないノードを言う
     starts = [nid for nid in by_id if kinds[nid] == "start"]
     if not starts:
         out.append("start がありません（どこから始めるかが決まらない）")
@@ -187,6 +201,7 @@ def _structure_problems(data) -> list[str]:
         lost = [n for nid, n in by_id.items() if nid not in reached]
         if lost:
             out.append(f"start から届かないノードがある: {_names(lost)}")
+    # 分岐・問い・繰り返しの項目ごとに、出口に線があるかを見る
     for nid, node in by_id.items():
         key = BRANCH_KEYS.get(kinds[nid])
         if key is None:
@@ -211,6 +226,7 @@ def _structure_problems(data) -> list[str]:
             what = {ASK: "問い", LOOP: "繰り返し"}.get(kinds[nid], "分岐")
             shown = ", ".join(flow_text._capped(empty[:ITEM_LIMIT], len(empty)))
             out.append(f"{what} {_named(node)} の出口に線が無い: {shown}")
+    # 繰り返し（loop）の条件・上限・出口と、巡回
     out.extend(_loop_problems(by_id, kinds, edge_ports))
     return out
 
@@ -275,6 +291,7 @@ def _cycle_problems(
     巡回の上にあるのは、強連結成分（Tarjan。手間はノードと線の数に比例）の大きさが 2 以上のものと、
     自分に戻る線のあるノード。
     """
+    # 繰り返す側の線を外したグラフと、自分に戻る線
     graph: dict[str, list[str]] = {n: [] for n in by_id}
     self_loop: set[str] = set()
     for src, pairs in edge_ports.items():
@@ -286,6 +303,7 @@ def _cycle_problems(
             graph[src].append(dst)
             if src == dst:
                 self_loop.add(src)
+    # Tarjan の強連結成分を、再帰を使わず作業の一覧で辿る
     index: dict[str, int] = {}
     low: dict[str, int] = {}
     on_stack: set[str] = set()
@@ -329,6 +347,7 @@ def _cycle_problems(
             if work:
                 parent = work[-1][0]
                 low[parent] = min(low[parent], low[node])
+    # 巡回の上のノードを 1 行にまとめる
     on_cycle |= self_loop
     if not on_cycle:
         return []
@@ -364,6 +383,14 @@ def name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
 
 
 def _name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
+    """`name_problems` の本体。例外は呼び元が受ける。
+
+    処理フロー:
+    1. `_flow_nodes` で最上位とサブフローのノードを集める。
+    2. `subAgent` の `builtInType` と `skill` の `name` だけを取り出す（`:` を含むスキルは除く）。
+    3. 空の欄は言わず、候補（`agents`・`skills`）に無いものを言う。
+       大文字小文字だけが違うなら、正しい表記を添える。
+    """
     agents = [i["name"] for i in cat.get("agents", [])]
     skills = [i["name"] for i in cat.get("skills", [])]
     out: list[str] = []

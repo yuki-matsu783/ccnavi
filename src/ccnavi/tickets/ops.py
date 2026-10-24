@@ -67,7 +67,18 @@ def ready_command(root: str, parent_id: str) -> str:
 def start(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> int:
-    """`doing/` の承認済みチケットに、着手の時刻と基準点を書く。"""
+    """`doing/` の承認済みチケットに、着手の時刻と基準点を書く。
+
+    処理フロー:
+    1. `ops_close.find` で承認済みを引き、`doing/` の未着手であることと、置き場・計画・
+       親の着手・先行チケットを確かめる（`misplaced_home`・`plan_missing`・
+       `parent_not_started`・`predecessors_unmet`）。
+    2. ワークツリーが承認済みの `project` の元リポジトリから切られているかを
+       `tree.is_worktree_of` で確かめる。
+    3. ワークツリーの HEAD を基準点にし、`_sync_config` で共通レイヤーと工程スキルを写す（親だけ）。
+    4. `approval_ops.update_fields` で `started_at` と `base_sha` を欄に書く。
+    5. 子ならフローのハッシュを `flow.record_digest` で記録し、次の一手を案内する。
+    """
     found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
@@ -245,7 +256,17 @@ def _sync_common(
 def finish(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> int:
-    """`doing/` → `review/`（レビュー要）か `done/`（不要）。完了の時刻を書く。"""
+    """`doing/` → `review/`（レビュー要）か `done/`（不要）。完了の時刻を書く。
+
+    処理フロー:
+    1. `ops_close.find` で承認済みを引き、着手済みであることと、置き場・親の状態・成果物を確かめる
+       （`misplaced_home`・`parent_still_busy`・`deliverables_missing`）。
+    2. 学びの記録（`learning.record_missing`・`learning.parent_blocked`）を確かめる。
+    3. 子なら `_score_child` で実績のリスクを数える。判定が揃わなければ閉じない。
+    4. 完了の時刻・親へ入った子の先頭（`_merged_sha`）・行き先（`_needs_review`）を決める。
+       行き先は `review` か `done`。
+    5. `_move` で欄を書いて動かす。成功したら、リスクの行を出し、親なら `_close_parent` を呼ぶ。
+    """
     found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
@@ -424,7 +445,14 @@ def _close_parent(
 def cancel(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str, reason: str
 ) -> int:
-    """`doing/` → `done/`。取り消しの時刻と理由を書く。理由が要る。"""
+    """`doing/` → `done/`。取り消しの時刻と理由を書く。理由が要る。
+
+    処理フロー:
+    1. 理由が空なら止める。
+    2. `ops_close.find` で承認済みを引き、未承認（`todo/`）と作業中でないものを止める。
+    3. 親が作業中（`ops_close.parent_still_busy`）なら止める。
+    4. `cancelled_at` と `cancel_reason` を欄に書き、`_move` で `done/` へ動かす。
+    """
     if not reason.strip():
         stderr.write("ccnavi: 取り消しには --reason <理由> が必要です。\n")
         return 1
@@ -468,6 +496,13 @@ def record_risk(
     """定性のリスク項目の判定を記録する。判断したのはサブエージェント、記録するのは親。
 
     判定は子の HEAD に結ぶ。HEAD が動いたら判定は古く、閉じるときに取り直しになる。
+
+    処理フロー:
+    1. `answer` が yes か no か、`reason` が空でないかを見る。
+    2. `ops_close.find` で子を引き、項目が定義の定性の項目（`KIND_JUDGE`）かを見る。
+    3. 子のワークツリーの HEAD を求める（`ops_stop.worktree_head_sha`）。
+    4. 子の判定の記録（`CHILD_RECORD_JUDGE`）を読み、この項目の欄（`hit`・`reason`・`head`・`at`・
+       `source`）を置き換えて書き戻す。
     """
     answer = answer.strip().lower()
     if answer not in ("yes", "no"):
@@ -545,6 +580,14 @@ def _score_child(
     """子の実績のリスクを数えて記録する。閉じられなければ None。
 
     返すのは、閉じたあとに出す行（点と内訳）。
+
+    処理フロー:
+    1. 子でないもの（親・単独）と統合の子は測らず、空を返す。
+    2. `risk.load_definition` で配点を読む（プロジェクトの `project` のレイヤーを使う）。
+    3. 差分の範囲を `gitstate.child_base` で求め、`risk.measure` で測る。
+    4. 子の定性の判定（`CHILD_RECORD_JUDGE`）を読み、`risk.evaluate` で点を付ける。
+    5. 判定が残っていれば、問いを書き出して止める（None）。
+    6. 結果を `CHILD_RECORD_RISK` に書き、点と内訳の行を返す。
     """
     if not found.is_child or found.is_consolidate:
         # 統合の子は実績リスクを測らない（定性の判定も求めない）。
@@ -637,7 +680,15 @@ def _move(
     fields: dict[str, str],
     said: str,
 ) -> int:
-    """`doing/` の承認済みチケットに欄を書き、`review/` か `done/` へ動かす。"""
+    """`doing/` の承認済みチケットに欄を書き、`review/` か `done/` へ動かす。
+
+    処理フロー:
+    1. `approval_ops.update_fields` で `fields` を欄に書く。
+    2. `state` が `review` なら `approval_ops.to_review`、それ以外は
+       `approval_ops.close_copy` で動かす。
+    3. 動かした先を言い、`review` のときは `phase.review_next` の文（無ければ既定の文）を、
+       子が `done` に入ったときは親の次の一手を案内する。
+    """
     failed = approval_ops.update_fields(found.path, fields)
     if failed:
         stderr.write(f"ccnavi: {found.ticket} に欄を保存できませんでした: {failed}\n")

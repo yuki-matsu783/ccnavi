@@ -80,6 +80,14 @@ def load_commit(repo: str, rev: str, deadline: float | None = None) -> wiki.Wiki
     `docs/wiki/` がそのコミットに無いのは読めた結果で、`present` が False の空の `Wiki` を返す。
     期限を過ぎたとき、git が失敗したとき、blob が読めないときは None
     （一部だけ読んだ答えは返さない）。
+
+    処理フロー:
+    1. `ls-tree` で、パターンと影響の置き場の一覧を取る。取れなければ None。
+    2. 一覧の 1 件ずつ、置き場とファイル名（_stem）を得る。どちらの置き場にも無いものは飛ばす。
+       1 件でも在れば `present` を真にする。
+    3. ふつうのファイルでないもの、サイズが上限を超えるものは broken に積み、読まない。
+    4. それ以外は `cat-file` で本文を読む。読めなければ None。
+    5. wiki.build で組み、broken を足して名前で並べて返す。
     """
     listed = _run(
         repo,

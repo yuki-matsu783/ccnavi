@@ -416,14 +416,16 @@ def _long_option(arg: str, full: str, least: int) -> bool:
 
 
 def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
-    """サブコマンドの引数から、消す・戻す先のパスの語（, 読めない指定があればその語,
-    索引の中身に戻す `checkout -- <パス>` か）。
+    """サブコマンドの引数から、消す・戻す先のパスの語を返す。
+
+    返すのは 3 つ組（パスの語、読めない指定があればその語、索引の中身に戻す
+    `checkout -- <パス>` か）。
 
     `restore` は `--source` が無ければ何も返さない。`checkout` は `--` より前の最初の語（行き先か
     起点）を除く。`rm` は `-n` / `--dry-run` があれば（後ろに `--no-dry-run` が無ければ）何も
     返さない。長いオプションは、git が受ける
     省略形（`--sou=` など）も同じに読む。パスに変数・置換があれば、その語を読めない指定として
-    返す。オプションを変数で書く形（`restore $O HEAD~1 <パス>`）は見ない（ADR-0121 の限界。sh
+    返す。オプションを変数で書く形（`restore $O HEAD~1 <パス>`）は見ない（この検査の限界。sh
     が止める）。
     """
     longs, shorts = _VALUE_LONGS[sub], _VALUE_SHORTS[sub]
@@ -626,7 +628,14 @@ def _holds_core(conf: settings.Settings, root: str, full: str) -> bool:
 
 
 def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> str:
-    """自己防衛の対象をラッパーで消す・戻す形を止めた文。"""
+    """自己防衛の対象をラッパーで消す・戻す形を止めた文。
+
+    処理フロー:
+    1. ラッパーの呼び出し方を `settings.script_command` で求める。
+    2. `kind` で文面を分ける。承認済みの置き場（`CORE_STORE`）・レビュー待ちの置き場
+       （`CORE_REVIEW`）・索引（`CORE_INDEX`）・読み切れない形（`CORE_UNREAD`）。
+    3. どれにも当たらなければ、ccnavi 自身を守る場所（既定の `CORE_HIT`）の文を返す。
+    """
     git_sh = settings.script_command(root, _GIT_SCRIPT)
     if kind == CORE_STORE:
         return (

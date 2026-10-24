@@ -126,6 +126,12 @@ def begin(
 
     op_id を渡すと、その ID で作る（復旧で同じ ID を使い回す）。既にあれば上書きしない。
     stages は（段階ID, 種類）を送る順に並べたもの。
+
+    処理フロー:
+    1. 操作の種類（`KINDS`）と、操作 ID の形（`valid_id`）を確かめる。
+    2. 同じ ID の記録が既にあれば、段階だけを `_add_stages` で足し、その ID を返す。
+    3. 無ければ記録を組み、段階は `_stage` で作る。
+    4. `_save` で保存し、ID を返す。
     """
     if kind not in KINDS:
         raise OpError(f"知らない操作の種類: {kind}")
@@ -295,6 +301,15 @@ def _stage_set(
     url: str,
     account: str,
 ) -> None:
+    """操作記録の段階 1 つの状態を書く。読めない・送信済みを戻すなどは `OpError`。
+
+    処理フロー:
+    1. `new_state` が既知の状態か見る。
+    2. 操作記録を `load` で読む。無ければ `OpError`。
+    3. 段階を `id` で探す。送信済みを送信済み以外へ戻すなら `OpError`。
+    4. 状態が変わるか、待ちのとき、試行の回数（`tries`）を増やす（送信済みへの変更は増やさない）。
+    5. 時刻と、渡された `url`・`account` を書き、`_save` で保存する。
+    """
     if new_state not in STATES:
         raise OpError(f"知らない段階の状態: {new_state}")
     record = load(state, op_id)

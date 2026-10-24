@@ -54,6 +54,16 @@ def at_start(
     その子自身。ワークスペースルートと、チケットの無いワークツリーからの起動には何も渡さない。
     全部の子を渡すと、別のセッションがワークスペースルートで調査を委譲したときにも無関係な
     子の範囲を案内し、調査役がどこで作業すればよいか分からなくなる（SubagentStop と同じ絞り方）。
+
+    処理フロー:
+    1. 判定を ALLOW にし、同じ作業ツリーで動く別のサブエージェントの案内を組む（`_note_running`）。
+    2. スキルの目録（`projskills.notice`）と振り返りの候補の 1 行を、案内の前に並べる。
+    3. チケット制御が無い・作業ツリーが無い・メインのときは、その文だけを渡して抜ける（`_say`）。
+    4. cwd のツリーに対応する親（または子）の開いている子を決め、子ごとに行を組む
+       （`childnote.child_block`・`childnote.stage_lines`）。
+    5. 手順が並び、子が 1 本に決まらないときは、自分の子のフローだけに従い、
+       他の子には従わない旨を 1 行足す。
+    6. 子の変更の知らせを足して渡す。
     """
     record.decision, record.enforced = audit.ALLOW, True
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
@@ -161,10 +171,20 @@ def _judge_stop(
     コミット済みの差分と、未コミットの両方を見る。
     範囲は実行前チェックと同じく親の範囲と定義の上限で切り詰め、子の範囲の中でも
     上限の外なら、どの上限かをパスの後ろにつける。
+
+    処理フロー:
+    1. 判定を ALLOW として始める。チケット制御が無効なら通す。
+    2. cwd のツリーから担当の子（または親の開いている子の全部）を決める（`tree.lookup`）。
+    3. 子ごとに範囲の外の変更を見る（`phase_scope.scope_findings`）。読めない子は
+       `unchecked` に残し、detail と印に書く。
+    4. 範囲の外が無ければ、結果を記録して通す（フローの変更の知らせは添える）。
+    5. 担当が分からないときは差し戻さず、親に知らせる（`UNATTRIBUTED`）。
+    6. ENABLE で初めての差し戻しは、標準エラーに書いて `exit 2`。2 回目以降は通して結果を記録する。
     """
     record.decision, record.enforced = audit.ALLOW, True
     if not conf.tickets_enabled:
         return EXIT_OK
+    # 担当の子と、その範囲の外の変更を集める。
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     copies, _ = approval.scan(conf, root)
     index = approval_checks.by_id(copies)
@@ -363,6 +383,7 @@ def _shared_note(
     1 回に抑えるため、案内した相手の鍵を覚える（再開で `SubagentStart` がまた走っても、
     同じ相手には出さない）。覚えられないときは案内する側に倒す。読めない印は数えない。
     """
+    # 同じセッションの印から、同じ作業ツリーで動いている別の相手を集める。
     marks = _session_marks(conf.state, payload.session_id, RUNNING_SUFFIX)
     if not marks:
         return ""

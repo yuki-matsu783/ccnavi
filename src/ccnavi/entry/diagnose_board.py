@@ -43,7 +43,18 @@ def board(
     mode_flag: str = "",
     ticket_control_flag: str = "",
 ) -> dict:
-    """ボードの中身。形は docs/requirements/json-shapes.md「ボードの JSON」に書いてある。"""
+    """ボードの中身。形は docs/requirements/json-shapes.md「ボードの JSON」に書いてある。
+
+    処理フロー:
+    1. `hook_settings` でモードとチケット制御を解き、その値で設定を組み直す。
+    2. ツリーとレイヤーを集め、送信の途中の操作を `problems` に入れる。チケット制御が無効なら、
+       閉じたものの退避（`_archived_records`）だけを載せて返す。
+    3. `ticket_mod.scan_all` で全チケットを読み、承認済み・提案・承認待ちの索引に分ける。同じ
+       識別子が複数の場所にあるものは `ticket_fold.collisions` で数える。
+    4. 承認の時刻を git から引き、チケットごとに `_ticket_record` で行を組む。
+    5. 親ごとに `_parent_record` で局面とフェーズを組み、最後に `_mark_attention` で不備と要対応を
+       決める。全チケットと親が揃ってから決めるのは、親の有無やフェーズの状態を見るため。
+    """
     mode, ticket_control = hook_settings(conf, root, stderr, mode_flag, ticket_control_flag)
     # ボードの中身も、hook が受け取るはずのチケット制御で組む。settings に出す値と食い違わせない
     conf = dataclasses.replace(conf, ticket_control=ticket_control)
@@ -411,7 +422,16 @@ def _ticket_record(
     preds: dict[str, list[ticket_model.Ticket]],
     times: dict[str, approval_times.ApprovedTime],
 ) -> dict:
-    """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
+    """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。
+
+    処理フロー:
+    1. 状態（`status`）は承認済みチケットの置き場で決める（review・open・closed、どちらにも無ければ
+       none）。項目は提案があれば提案を、無ければ承認済みの写し（`copy`）を使う。
+    2. `tree.lookup` でワークツリーを引き、親なら MR の番号・ブランチ・リモートとの差を載せる。
+    3. 満たしていない先行（`approval_checks.unmet_predecessors`）と、ブロックの理由を載せる。
+    4. 承認の時刻（`approval_times`）、フロー（`flow.info`）、完了した親の下書きの入口を載せる。
+    5. 子なら、親のワークツリーから `approval_marks.read_child_record` でリスクと判定を読む。
+    """
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
     source = proposal or copy
     assert source is not None

@@ -75,6 +75,16 @@ def candidates(
     承認（`agree`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
     ここを通る。承認で外れるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
     （実際に `--lint` は `validate` だけを当てていて、順序で外れる子に何も言わなかった）。
+
+    処理フロー:
+    1. 承認済みを対応表（`pool`）に入れ、設定と先行の対応表の入れ物を用意する
+    2. 改版（`revisions`）を 1 件ずつ検める（`revision_problems` など）。
+       通った改版だけを `pool` に入れる
+    3. 承認待ち（`pending`）を親・子の順に検める（`validate` など）。
+       子の順序の検査には、同じ親で今回通った前の子を渡す
+    4. 先行を書いた子は、`done/` に在る先行だけを満たすものとして検める
+       （`approval_checks.predecessor_problems`）
+    5. 外れなかったものを `batch`、外れたものを `rejected` に入れて返す
     """
     open_index = approval_checks.by_id(approved)
     # 親子を引く対応表は、承認済みチケットと、今回の承認で通ったものだけ。外れた親を対応表に残すと、
@@ -483,6 +493,14 @@ def revision_problems(
     変えてよいのは計画（`plan:` / `feedback:`）・写し（`phases:`）・範囲。写しは、子が承認された番号
     （固定した番号）が使う定義だけ承認済みチケットの値のまま（`phases.yml` と違っていてよい）、
     ほかは今の `phases.yml` と同じ。足すのも外すのも自由。
+
+    処理フロー:
+    1. 子が承認された番号（`fixed_numbers`）の項が持つ型の定義を、承認済みの写しから集める
+    2. 計画を検める（`plan_problems`）。error があれば、ここで返す
+    3. 範囲の改版なら、読めない項（`unreadable_scope`）と作業中の子（`open_children`）を見る
+    4. 題・課題・`mr:` を比べる（`mr:` は片方が空なら比べない）
+    5. 固定した番号の項を変えていないかを見る（`lock_problems`）
+    6. フィードバック計画の追加・変更を、全体計画の状態に照らして見る（`plan_signature`）
     """
     fixed = fixed_numbers(conf, root, current.ticket)
     held_types = phasetypes.types_of(current)

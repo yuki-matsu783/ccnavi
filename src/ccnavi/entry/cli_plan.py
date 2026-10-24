@@ -82,7 +82,17 @@ def reorder(
     読むだけなら答えを出して 0。書くときは、書けたか変わらなければ 0、書かなければ 1（理由は
     標準エラー。`--json` なら答えの `written` が偽）。`--order` の形の誤りと、親の提案が無い・
     読めないときは 1（使い方の誤り）。
+
+    処理フロー:
+    1. `approval.scan_proposals` で親の提案を集め、`plan_order.pick` で対象を 1 つに決める。
+    2. `plan_order.current_parent` と `plan_order.load` で、書き換える元の計画を読む。
+    3. `--order` があれば `plan_order.parse_order` で振り直しを読み、`plan_order.answer` で
+       答えを組み、`plan_order.body` で JSON の形にする。
+    4. 書かないときは答えを出して終える。書くときは `plan_order.save` で保存し、書けたときだけ
+       `plan_order.reread_sha` で元の版の印を取り直して、答えに入れる。
+    5. `--json` なら答えを、そうでなければ結果の 1 行を標準出力に出す。
     """
+    # 対象の提案を決める。
     proposals, _ = approval.scan_proposals(conf, root)
     target, ambiguous = plan_order.pick(proposals, name)
     if ambiguous:

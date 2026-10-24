@@ -23,7 +23,14 @@ def _labels(items, key: str) -> list[str]:
 
 
 def _summary(node: dict, flows: dict) -> str:
-    """ノード 1 つの中身を 1 行で。知らない種類は空。"""
+    """ノード 1 つの中身を 1 行で。知らない種類は空。
+
+    処理フロー:
+    1. ノードの種類（`type`）と、その欄（`data`）を取り出す。
+    2. 種類ごとに文を組む。問い・分岐・繰り返しは選択肢や条件、サブエージェントは説明・
+       プロンプト・種類、サブフローは参照先の名前を添える。
+    3. どの種類にも当たらなければ空を返す。
+    """
     kind = flow_text._text(node.get("type"))
     data = flow_text._dict(node.get("data"))
     if kind == "prompt":
@@ -142,7 +149,16 @@ def render(
 
 
 def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
+    """`render` の本体。例外は `render` が受けるので、ここでは外に出してよい。
+
+    処理フロー:
+    1. `nodes` からグループと ID の重複を除いて候補にする（`flow_shape._node_id`）。
+    2. 線を出口ごとに `_port_key` で並べ、ノードの番号を `_order` で決める。
+    3. 番号の順に `limit` 件まで、1 ノード 1 行を `_summary` と `_port_label` で組む。
+    4. 文字数の上限に達したら止め、残りは「ほか N 件」の 1 行にまとめる。
+    """
     data = flow_text._dict(data)
+    # ノードを集める。グループと ID の重複は外す
     nodes: list[dict] = []
     seen_ids: set[str] = set()
     for n in flow_text._list(data.get("nodes")):
@@ -162,6 +178,7 @@ def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
         for f in flow_text._list(data.get("subAgentFlows"))
         if isinstance(f, dict) and flow_text._text(f.get("id"))
     }
+    # 線を出口ごとに並べ、ノードの番号を決める
     by_id = {flow_shape._node_id(n): n for n in nodes}
     ids = list(by_id)
     kinds_by = {i: flow_text._text(n.get("type")) for i, n in by_id.items()}
@@ -173,6 +190,7 @@ def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
     order = _order(ids, kinds_by, out)
     number = {nid: i + 1 for i, nid in enumerate(order)}
     kinds = set(kinds_by.values())
+    # 番号の順に行を組み、文字数の上限まで積む
     lines: list[str] = []
     used = 0
     shown = 0

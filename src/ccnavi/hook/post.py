@@ -117,11 +117,26 @@ def check(
 
     places はチケットの置き場（提案と承認済みチケット）。そこに現れた変更のうち、
     ccnavi のサブコマンドが書いたと内容から読めるものを外す（`_script_writes`）。
+
+    処理フロー:
+    1. 読み取りだけのツールなら何もせず抜ける（`READ_ONLY_TOOLS`）。
+    2. 見るツリーを読み（`_read_all`）、ターンの基準に居ないツリーの HEAD を記録する
+       （`_note_new_trees`）。
+    3. 報告済みの記録と基準を読み、違反を集める（`_found`）。無ければ基準を作って抜ける。
+    4. 違反を新しいもの・報告済みのものに分ける。受け入れたあとに中身が変わったもの
+       （`shadowed`）と横で作業する変更の一部は、新しいものとして扱う。
+    5. 基準の有無から、前から在ったものを伝える分（`carried`）を分ける。
+    6. 戻す設定（ENABLE）なら、`deny` と宣言された場所の新しい変更を戻す（`_restore`）。
+       dry-run なら、戻していたはずのものを予行として言う（`would`）。
+    7. 記録を保存し、記録の code と detail を残す。
+    8. 違反ごとの文（`post_report._violation`・`post_report._preexisting`）を組み、
+       件数の上限で切って返す。
     """
     if payload.tool_name in READ_ONLY_TOOLS:
         record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE
         return "", False
 
+    # 見るツリーを読む。読めなければ何もしない。
     read = _read_all(stderr, watched, record)
     if not read:
         return "", False
@@ -459,6 +474,15 @@ def at_stop(
 
     戻しもしない。ここで報告するのは、実行後チェックが戻さなかった、あるいは
     戻す設定になっていなかった変更で、どうするかはユーザが決める。
+
+    処理フロー:
+    1. ターンの基準と、各ツリーの HEAD を読む（`_load_turn`）。基準が無ければ何も言わずに抜ける。
+    2. 見るツリーを読み（`_read_all`）、基準に無い違反を集める（`post_findings._findings`）。
+    3. このターンでコミットに入った違反を足す（`_committed_findings`）。数えていないツリーがあれば、
+       その旨の 1 行を添える（`_uncounted_line`）。
+    4. 違反も数えていない分も無ければ、記録を残して抜ける。
+    5. 違反ごとに、戻す手順（`gitstate.undo`）と対象のルールを 1 行にまとめる。
+       上限を超える分は件数で言う。
     """
     baseline, known_baseline, heads = _load_turn(stderr, state_dir, payload.session_id)
     if not known_baseline:

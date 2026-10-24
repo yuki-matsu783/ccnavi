@@ -94,7 +94,19 @@ class Entry:
 
 
 def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, family: str) -> int:
-    """状態を出す。親を渡して何も見つからなければ 1。"""
+    """状態を出す。親を渡して何も見つからなければ 1。
+
+    処理フロー:
+    1. 作業中・完了・レビュー・提案の各チケットを集め、識別子ごとの `Entry` にまとめる。
+       承認済みと同じ識別子の提案は、改版の候補として状態の相手にしない。
+    2. 親（`family`）を渡されたら、その親と子のチケットを対象にする。見つからなければ、
+       標準エラーに理由と注記を出して 1 で終える。渡されていないときは、作業中のものがある親を
+       並べる。対象が無ければ、その旨を出して 0 で終える。
+    3. 手元の置き場と git だけを読み、先頭に読んだ範囲と、リモートとの差の注意を出す。
+    4. このPCで作業中の親の一覧（引数が無いときだけ）と、親ごとに子の状態と詳細
+       （`_Family.describe`）、手作業の行（`_manual_lines`）を出す。
+    5. 最後に、途中で止まった操作の一覧（`_unfinished_ops`）を出す。
+    """
     raw = approval.read_raw(conf, root)
     doing, notes = approval.scan(conf, root, raw=raw)
     closed, more = approval.scan(conf, root, closed=True, raw=raw)
@@ -227,6 +239,17 @@ class _Family:
         return self._write_and_push
 
     def describe(self, e: Entry, revision: bool) -> list[str]:
+        """チケット 1 件の状態の行を組む（`run` の親ごとの詳細）。
+
+        処理フロー:
+        1. 同じ識別子が複数の置き場にあれば、場所を並べて止まる理由と次の操作だけを返す。
+        2. 未承認（`todo`）は、置き場のファイルの状態と承認を待つ旨を返す。
+        3. 承認の時刻と改版の有無を足す。閉じたもの（`_CLOSED`）は、取り消し・完了の別と
+           置き場のファイルを返して終える。
+        4. 作業中（`doing`）は `_doing` で止まっている理由と次の一手を足す。
+        5. レビュー（`review`）は `phase.review_next` で次の操作を決める。依頼前は
+           「レビュー準備中」、依頼後はユーザを待つ、と言い分ける。
+        """
         t = e.t
         role = f"子（フェーズ {t.phase}）" if t.is_child else "親"
         if len(e.hits) > 1:
@@ -295,7 +318,17 @@ class _Family:
         return lines + self._doing(t, file_state)
 
     def _doing(self, t: ticket_model.Ticket, file_state: FileState) -> list[str]:
-        """作業中のチケットの、止まっている理由・注意・次の一手。"""
+        """作業中のチケットの、止まっている理由・注意・次の一手。
+
+        処理フロー:
+        1. 親子の立ち位置（`family_standing`）と、チケットの止め（`blocked`）から、
+           止まっている理由を集める。
+        2. 未着手なら、write-and-push の対象か、先行や親の状態で止まっていないかを見る。
+        3. 基準点が HEAD の祖先か、作業中なのに閉じるときに書く欄（`completed_at` など）に
+           値が残っていないかを、注意として集める。
+        4. 次の一手を決める。止まっていれば原因の解消、未着手なら開始の手順、
+           着手後は finish を案内する。
+        """
         stops: list[str] = []
         warns: list[str] = []
         st = approval_checks.family_standing(self.conf, self.root, t, self.fams)

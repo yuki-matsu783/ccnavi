@@ -318,6 +318,23 @@ RECURSIVE_DELETE_REGEX = (
 # 設定で動かない残り。止める形は設定に依らない。文面の git の打ち方だけがワークスペースで変わる。
 # ラッパーが無いときは生の git も止まるので、`git` の形を案内せず、ユーザに頼む文にする。
 def _deny(root: str) -> list[dict]:
+    """設定に依らない組み込みの deny を、ルールの dict の列で返す。`rules.parse` が読む形。
+
+    処理フロー:
+    1. `settings.git_command` と `settings.has_git_wrapper` で、文面に出す git の打ち方を決める
+    2. 次の順に dict を並べる
+       - `builtin:recursive-delete`: 再帰と強制の両方を持つ rm（`RECURSIVE_DELETE_REGEX`）
+       - `builtin:git-push`: git push（`GIT_PUSH_REGEX`）
+       - `builtin:git-reset-hard`: git reset --hard（`GIT_RESET_HARD_REGEX`）
+       - `builtin:credentials`: 認証情報の場所の形（Bash・Read・Write・Edit・NotebookEdit の入力）
+       - `builtin:guard-git-dir`: `.git` の中を書く Write・Edit・NotebookEdit
+         （`selfguard_shell.GIT_DIR_PATH_REGEX`）
+       - `builtin:guard-git-dir-via-bash`: `.git` の中を書く Bash
+         （`selfguard_shell.git_dir_shell_regex`）
+    3. `.git` 向けの 2 本の文面は `_git_dir_message` で組む
+
+    ラッパーが無いときは、打てる git の形を案内せず、ユーザに頼む文にする。
+    """
     git = settings.git_command(root)
     wrapper = settings.has_git_wrapper(root)
     return [

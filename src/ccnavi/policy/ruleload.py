@@ -339,6 +339,13 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
     ここを並べたものが、Bash の和に入っているものと一致する。判定の側は
     `rules_for` を通る。読み方を 2 つ持たないために、重ね方はどちらも
     `merge_rules` の 1 本にまとめてある。
+
+    処理フロー:
+    1. `read_common` で共通レイヤーを読む。既定に戻っていれば `unreadable`、無ければ `missing`
+    2. 共通レイヤーの rules を、重ねる先の `merged` に入れる
+    3. `layers` の順に各レイヤーを読む。無いものは `missing`、共通が壊れていれば足さない
+    4. 読めたレイヤーは `mark_file` と `prefix_ids` を通し、`merge_rules` で `merged` に重ねる
+    5. 重ねて増えた分だけを、そのレイヤーの `rule_set` にする（捨てられた重複は入らない）
     """
     record = audit.Record()
     common = read_common(stderr, conf, record, root)
@@ -347,10 +354,12 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
         views[0].unreadable = record.detail or conf.rules
     elif not os.path.exists(conf.rules):
         views[0].missing = True
+    # 共通レイヤーの rules を、重ねる先の土台にする。
     merged = rules.RuleSet(version=common.version)
     for name in rules.SECTIONS:
         merged.section(name).extend(common.section(name))
 
+    # レイヤーを判定と同じ順で読み、重ねる。
     for layer in layers(conf, root):
         view = LayerView(layer.name, layer.path, rules.RuleSet(version=rules.VERSION))
         views.append(view)

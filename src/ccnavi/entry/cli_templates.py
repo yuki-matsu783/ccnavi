@@ -77,7 +77,16 @@ def _storing_problem(args: argparse.Namespace) -> str:
 
 
 def usage_problem(args: argparse.Namespace) -> str:
-    """`--templates` の組み合わせの誤り。正しければ空。設定を読む前に見る。"""
+    """`--templates` の組み合わせの誤り。正しければ空。設定を読む前に見る。
+
+    処理フロー:
+    1. `--template` と `--with-feedback` は `ticket new` と一緒にだけ使えるかを見る。
+    2. `--templates` が無いときは、テンプレートの一覧系フラグが付いていないかを見る。
+    3. `--templates` のときは、`--docs` との併用と、`cli_args.DOCS_FLAGS` の絞り込みを見る。
+       語（`command`）の付き方も見る。
+    4. `--check-file` のときは、パスの有無と、一緒に使えないフラグを見る。
+    5. それ以外は `_storing_problem` で保存の組み合わせを見て、`--show` の組み合わせを見る。
+    """
     if args.template and (args.templates or not _ticket_new(args)):
         return "--template は ticket new <識別子> --title <題> --template <名前> でだけ使う"
     if args.with_feedback and (args.templates or not _ticket_new(args) or not args.template):
@@ -264,7 +273,16 @@ def _draft(
     root: str,
     args: argparse.Namespace,
 ) -> int:
-    """完了した親から下書きを作る（`--draft`）。上書きはしない。"""
+    """完了した親から下書きを作る（`--draft`）。上書きはしない。
+
+    処理フロー:
+    1. `template_drafts.make` で、親の計画から下書きを作る（取り込み先は既定でプロジェクト）。
+    2. `--json` なら結果を JSON で出す。
+    3. そうでなければ、失敗を出して終えるか、作った下書きの概要・問題・次の手順を出す。
+       次の手順は、取り込みをユーザに頼む案内を含む。
+
+    終了コードは、作れたら `EXIT_OK`、失敗は `EXIT_ERROR`。
+    """
     made = template_drafts.make(
         conf,
         root,
@@ -333,6 +351,15 @@ def _show(
     name: str,
     as_json: bool,
 ) -> int:
+    """テンプレート 1 つの中身を、表示する（`--show`）。読むだけで、何も書かない。
+
+    処理フロー:
+    1. `plan_templates.find` で、共通とレイヤーの中から名前で引く。無ければ失敗を出して終える。
+    2. 共通のテンプレートは、いまのレイヤーの種類で `plan_templates.recheck` にかけ直す。
+    3. `--json` なら、要約と本文を JSON で出す。
+    4. そうでなければ、要約（説明・いつ・計画・フロー・問題）を出し、最後にファイルの中身を
+       `plan_templates.reveal` を通して出す。
+    """
     entry = plan_templates.find(scanned, layer, name)
     if entry is None:
         return _fail(

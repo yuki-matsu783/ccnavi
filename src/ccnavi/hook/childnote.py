@@ -74,6 +74,14 @@ def child_block(
 
     `brief_room` があれば、フローの手順に使う文字数をそれまでに絞る（プロンプトに書き足す案内は
     上限が小さい）。
+
+    処理フロー:
+    1. ワークツリーの場所と有無を求め（`tree.worktree_path`）、未完了の先行を集める
+       （`approval_checks.unmet_predecessors`）。
+    2. 親の局面の定義から、フェーズの名前と案内するエージェントを引く（`phasetypes.types_of`）。
+    3. 子の 1 行目を作り、範囲（禁止・確認・許可の欄）を 1 行ずつ足す（`rules.SECTIONS`）。
+    4. フローを `flow.briefing` で読み、失敗したら 1 行の知らせにする。
+    5. フローの変更の知らせ（`flow.changed_notice`）を添えて返す。
     """
     where = tree.worktree_path(root, t.ticket)
     state = (

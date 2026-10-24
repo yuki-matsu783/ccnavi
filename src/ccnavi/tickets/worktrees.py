@@ -106,7 +106,20 @@ def retry_command(root: str, name: str) -> str:
 
 
 def drop(root: str, name: str, cwd: str) -> Dropped:
-    """`.claude/worktrees/<名前>` を消す。消さないときは理由を持って返す（何も消さない）。"""
+    """`.claude/worktrees/<名前>` を消す。消さないときは理由を持って返す（何も消さない）。
+
+    処理フロー:
+    1. 名前にパスの区切りや `.`・`..` が無いかを見る。
+    2. 無ければ ABSENT。リンクやジャンクションなら REFUSED（リンクの先は消さない）。
+       ディレクトリでなければ REFUSED。
+    3. cwd がその中なら CWD_INSIDE。
+    4. `_owner` で持ち主のリポジトリを求める。
+    5. `git status --porcelain` で未コミットの変更を見る。あれば DIRTY。`_ignored`
+       で無視されたファイルを見る。あれば IGNORED。
+    6. `_remove_blocked` で `git worktree remove` が通らない形を、生成物を消す前に見る。
+       通るなら `_clean_generated` で生成物を消す。
+    7. `git worktree remove` で消す。失敗したら REFUSED。
+    """
     path = tree.worktree_path(root, name)
     if not name or name in (".", "..") or any(c in name for c in ("/", "\\", ":")):
         return Dropped(

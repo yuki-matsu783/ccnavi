@@ -283,7 +283,17 @@ def parse(text: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
 
 
 def _read_identity(ticket: ticket_model.Ticket, front: dict, problems: list[Problem]) -> bool:
-    """版と識別子と親子の形。読めなければ True。"""
+    """版と識別子と親子の形。読めなければ True。
+
+    処理フロー:
+    1. 版（`version`）が `ticket_model.VERSION` と違えば止める。
+    2. 識別子を `ticket_ids.id_problem` で見る。
+    3. `parent` があれば子として見る。識別子が子の形（`_CHILD`）で、親の識別子と一致するかを見る。
+       親のつもりで `parent:` を書いた形は、その旨を添える。
+    4. `phase` が 0 以上の整数で、`ticket_ids.MAX_CHILD_NUMBER` 以下かを見る。
+       識別子のフェーズ番号と一致するかも見て、`ticket.phase` に入れる。
+    5. `parent` が無ければ、子だけの欄（`phase`・`predecessors`）が在れば WARN にして読まない。
+    """
     name = ticket.ticket
     version = front.get("version")
     if version != ticket_model.VERSION:
@@ -303,6 +313,7 @@ def _read_identity(ticket: ticket_model.Ticket, front: dict, problems: list[Prob
         problems.append(Problem(SEVERITY_ERROR, name, problem))
         return True
 
+    # 子か親かで、読む欄と照合を分ける。
     if ticket.parent:
         matched = ticket_ids._CHILD.match(name)
         if matched is None or matched.group("parent") != ticket.parent:
@@ -376,13 +387,26 @@ def _read_identity(ticket: ticket_model.Ticket, front: dict, problems: list[Prob
 
 
 def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Problem]) -> bool:
-    """プロジェクト、先行、計画、課題の番号。読めなければ True。"""
+    """プロジェクト、先行、計画、課題の番号。読めなければ True。
+
+    処理フロー:
+    1. `project` を `declared_project` に入れ、`project` も同じ値にする（`scan`
+       が置き場で上書きする）。
+    2. `predecessors` をリストで読む。
+    3. `plan`・`feedback` を `_plan` で項にする。子では読まず WARN にする。
+       フィードバックの番号は全体計画の続き。
+    4. `phases` は生の値のまま `phases_raw` に持つ。定義との照合は後段で行う。
+    5. `issue` を `_issue_ref` で読む。親だけが持つ欄で、子では WARN にして読まない。
+    6. `mr` を `_mr_number` で読む。親だけが持つ欄で、子では WARN にして読まない。
+    7. `branch` 欄が在れば止める（親のブランチ名は欄に書かず、ワークツリーの HEAD から読む）。
+    """
     name = ticket.ticket
     # frontmatter の `project:` は照合用の宣言。本当のプロジェクトは提案を置いた場所で、
     # `scan` が上書きする。`scan` を通さない経路ではこの値が残る。
     ticket.declared_project = _text(front.get("project")).strip()
     ticket.project = ticket.declared_project
 
+    # 先行と、計画・フィードバック計画の項。
     raw_preds = front.get("predecessors")
     if isinstance(raw_preds, list):
         ticket.predecessors = [_text(p).strip() for p in raw_preds if _text(p).strip()]
@@ -415,6 +439,7 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
     # 落とさず判定の `blocked` の理由にする（`phasetypes.copy_problems`）。
     ticket.phases_raw = front.get(PHASES_KEY)
 
+    # 課題と MR は親だけが持つ。
     raw_issue = front.get("issue")
     if raw_issue is not None:
         repo, number = _issue_ref(raw_issue)
@@ -452,6 +477,7 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
         else:
             ticket.mr = mr_number
 
+    # 親のブランチは欄に書かせない。
     if ticket_ids.BRANCH_KEY in front:
         problems.append(
             Problem(
@@ -636,6 +662,14 @@ def scan_all(
 
     ボード（`--explain --json`）が「どのツリーにあるか」を見せるために使う。
     判定と承認は `scan` のまとめた側を読む。
+
+    処理フロー:
+    1. 置き場の組を作る。ワークスペースルート、プロジェクト、ワークツリーの順。
+    2. 置き場ごとに、状態（`ticket_model.STATES`）のフォルダを読む。フォルダが無ければ飛ばす。
+    3. 実体のフォルダ名（リンクを解いた先）が状態の名前と違うものは WARN にして読まない。
+    4. `.md` の項目を `load` で読む。読んだ問題には、ファイルの相対パスを添えて積む。
+    5. ファイル名と識別子が一致しなければ ERROR にして、その提案は入れない。
+    6. 状態・ツリー名・ツリーのルート・プロジェクトを入れて `found` に積む。
     """
     found: list[ticket_model.Ticket] = []
     problems: list[Problem] = []
@@ -644,10 +678,12 @@ def scan_all(
     # あり、プロジェクト向けの提案はそのプロジェクトの git が持つ。承認をプロジェクトの
     # git で共有するので、提案も同じブランチに乗せる。
     # frontmatter の `project:` は照合に使うだけ。
+    # 置き場の組を作る。
     places = [
         (t, tickets_rel, t.project)
         for t in [ws, *tree.projects(projects_dir), *tree.worktrees(root, projects_dir)]
     ]
+    # 置き場ごとに、状態のフォルダを読む。
     for t, rel, place_project in places:
         base = os.path.join(t.root, rel.replace("/", os.sep))
         for state in ticket_model.STATES:
@@ -697,6 +733,20 @@ def scan_all(
 
 
 def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Problem]]:
+    """frontmatter の欄（`rules.SECTIONS`）の項目を、判定に使える Entry の列にする。
+
+    処理フロー:
+    1. 欄ごとに、リストかを見る。欄が無ければ飛ばす。
+    2. 項目ごとに、マッピングか、`match` に書き込みのツールがあるかを見る。
+       書き込みのツールが無い項目は WARN にして読まない。
+    3. `glob` と `regex` は、どちらか 1 つだけを書く。`_forbidden` で書けない範囲を弾き、
+       絶対パスも弾く。
+    4. `glob` は `globmatch.translate` で式にし、`regex` はそのまま式にする。
+       どちらも大文字小文字を区別せずに組む。
+    5. 組めた項目を Entry にする。
+
+    戻り値は (entries, problems)。問題の出所の名前は `name` を使う。
+    """
     problems: list[Problem] = []
     entries: list[ticket_model.Entry] = []
     for section in rules.SECTIONS:
@@ -711,6 +761,7 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
             if not isinstance(raw, dict):
                 problems.append(Problem(SEVERITY_ERROR, name, f"{where} がマッピングではない"))
                 continue
+            # 書き込みのツールを含む項目だけを読む。
             match = _text(raw.get("match"))
             tools = [w.strip() for w in match.split("|") if w.strip()]
             if not any(t in ticket_model.WRITE_TOOLS for t in tools):
@@ -723,6 +774,7 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
                     )
                 )
                 continue
+            # 範囲は glob か regex のどちらか 1 つだけを書く。
             glob = _text(raw.get("glob")).strip()
             regex = _text(raw.get("regex")).strip()
             if not glob and not regex:
@@ -749,6 +801,7 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
                 )
                 continue
             glob = glob.replace("\\", "/").strip("/")
+            # 範囲を式にする。
             expression = regex or ("^" + globmatch.translate(glob))
             # `src/Components/*` と `src/components/*` は同じ範囲として扱う。
             # 当てる側だけ区別すると、宣言した範囲に自分のファイルが入らない、が
@@ -790,6 +843,18 @@ def front_mapping(text: str) -> dict | None:
 
 
 def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
+    """テキストの先頭の frontmatter を読み、(マッピング, 本文, 問題の列) を返す。
+
+    処理フロー:
+    1. 先頭の行が `---` でなければ止める。BOM が付いているときは、その旨を名指しする（BOM
+       は読み飛ばさない）。
+    2. 閉じの `---` を `_closing_fence` で探す。無ければ止める。
+    3. 開きと閉じの間を `yamlread.safe_load` で読む。YAML として読めなければ止める。
+    4. 空か、マッピングでなければ止める。
+    5. 閉じの後ろを本文にする。末尾に改行が無ければ 1 つ足す。
+
+    止めたときは (None, "", 問題の列) を返す。読めたときは問題の列が空になる。
+    """
     lines = text.splitlines()
     if not lines or lines[0].strip() != ticket_model.FENCE:
         # 通す側にはしない。「先頭の 1 バイト目から `---`」が frontmatter の契約で、

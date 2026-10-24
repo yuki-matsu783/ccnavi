@@ -79,7 +79,14 @@ def build(
     parent: ticket_model.Ticket,
     items: list[learning_records.Item],
 ) -> tuple[str, str, str]:
-    """統合の子の識別子と文面。作れなければ `("", "", 理由)`。"""
+    """統合の子の識別子と文面。作れなければ `("", "", 理由)`。
+
+    処理フロー:
+    1. 次の連番の識別子を決める（`approval_ops.next_child_id`）。連番が決まらなければ止める
+    2. 同じ識別子のファイルが在れば止める（`approval_ops.existing_ticket_file`）。上書きしない
+    3. 前付け（識別子・親・`phase: 0`・保守の印・許す書き込み先）と本文（`_body`）を組む
+    4. `ticket_mod.render` で文面にし、読み直して error があれば止める（`ticket_mod.parse`）
+    """
     try:
         ident = approval_ops.next_child_id(
             conf, root, parent.ticket, ticket_model.CONSOLIDATE_PHASE
@@ -128,6 +135,20 @@ def build(
 
 
 def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, parent_id: str) -> int:
+    """`ticket consolidate <親>` の本体。
+
+    終了コードは 0（作った、または開いている統合の子を出した）か 1。
+
+    処理フロー:
+    1. 学びの蓄積が enable かを見る。親を `ops_close.find` で引き、作業中で着手済みかを見る
+    2. 開いている統合の子があれば、それを出して終わる（`_open_consolidate`）。
+       新しくは作らない
+    3. 親の `finish` の学び以外の検査を通すかを見る（`ops_close.close_problems`）
+    4. 親の学びの置き場に未コミットの変更が無いか、処理すべき気づきが在るかを見る
+       （`learning_records.uncommitted`・`learning_records.pending`）
+    5. `build` で子の文面を作り、親の置き場に書く（`approval_marks.write_ticket`）
+    書いたパスは sh が write-and-push でコミットする。ここではコミットしない。
+    """
     if not conf.learning_enabled:
         stderr.write(f"ccnavi: 学びの蓄積が disable（{settings.LEARNING_ENV}）なので動かない\n")
         return 1

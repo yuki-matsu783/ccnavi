@@ -256,6 +256,11 @@ def command_word(subject: str) -> str:
 
 
 def build_digest(records: list[dict], recorded: bool, tree_name: str | None = None) -> dict:
+    """ログの記録から、判定の件数と繰り返した止めを作る。`tree_name` があれば、その木の記録だけ。
+
+    `repeated` は、強制された deny のうち（先頭のルート・ツール・コマンドの語）が同じものを
+    回数の多い順に並べ、2 回以上のものだけ入れる。
+    """
     if tree_name is not None:
         records = [r for r in records if r.get("tree", "") == tree_name]
     kinds = {
@@ -427,10 +432,22 @@ def run(
     target: str,
     signal: str,
 ) -> int:
+    """`learn` の本体。結果は stdout、理由は stderr に出す。終了コードは 0 が書けた、1 が止め。
+
+    処理フロー:
+    1. 学びの蓄積が無効なら止める。
+    2. `phase.worktree_at` で今いるワークツリーを求める。ツリーの外（ルートも含む）なら止める。
+    3. `_bound_ticket` で、このツリーがチケットに結び付くかを見る。`ident_arg` が違えば止める。
+    4. `note` が空なら、チケットに結び付く作業に限り、記録の雛形（`scaffold_text`）と要約
+       （`build_digest`）を書いて終える。結び付かなければ止める（終了コード 1）。
+    5. `note` があれば `validate` と `entry_text` で本文を作り、チケットに結び付くなら記録へ
+       `append_entry` で追記し、結び付かないなら受信箱に新しい名前で書く（`inbox_rel`）。
+    """
     if not conf.learning_enabled:
         stderr.write(f"ccnavi: 学びの蓄積が disable（{settings.LEARNING_ENV}）\n")
         return 1
 
+    # 今いるワークツリーと、それがチケットに結び付くかを求める
     here = phase.worktree_at(root, conf, cwd)
     if here is None:
         # ワークスペースルートとプロジェクトのルートには書かない（追跡されず、誰がまとめるかも
@@ -455,6 +472,7 @@ def run(
 
     now_text = approval_marks.now()
 
+    # --note が無いときは、チケットに結び付く作業なら記録の雛形と要約を書いて終える
     if not note.strip():
         if bound is None:
             stderr.write(
@@ -503,12 +521,14 @@ def run(
         stdout.write(f"要約: {digest_rel(ident)}（git add と git commit をする）\n")
         return 0
 
+    # --note があるときは、本文を組んで記録か受信箱へ書く
     msg = validate(note, target, signal)
     if msg:
         stderr.write(f"ccnavi: {msg}\n")
         return 1
     entry = entry_text(note, target, signal, now_text)
 
+    # チケットに結び付くときは記録へ追記する
     if bound is not None:
         parent = bound.parent if bound.is_child else ""
         bad = unsafe_path(tree_root, record_rel(ident))
@@ -535,6 +555,7 @@ def run(
         stdout.write(f"追記した: {record_rel(ident)}\n")
         return 0
 
+    # 結び付かないときは受信箱に、名前が重ならない新しいファイルを書く
     bad = unsafe_path(tree_root, INBOX_DIR)
     if bad:
         stderr.write(

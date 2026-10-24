@@ -71,7 +71,22 @@ def _say(stdout: TextIO, key: str, text: str) -> None:
 
 
 def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
-    """`ccnavi write-and-push merge <子>`。合流の前の検査。"""
+    """`ccnavi write-and-push merge <子>`。合流の前の検査。
+
+    処理フロー:
+    1. 識別子が親なら、合流しないので skip して終わる（`write_and_push.family_of`）。
+    2. `ops_close.find` で子の承認済みチケットを引く。作業中で着手済みでなければ skip する。
+    3. `_tree_problem` で親と子のワークツリーを見る。問題があれば stop する。
+    4. 子と親の先頭を `gitstate.head` で 1 回ずつ読む。検査と合流は、この子の sha を使う。
+    5. `phase_scope.merge_findings` で、子のコミットにある置き場の変更と範囲の外のパスを見る。
+    6. `gitstate.child_base` で子の仕事の始まりを求め、
+       `_ignored_in_parent`（親の無視されるファイル）と
+       `_unrestorable`（戻せない形の変更）を見る。
+    7. 通ったら child・head・base と、merge（子の先頭が親の先頭に既に入っていれば no、
+       でなければ yes）を出す。
+
+    止めたときは stop と hint を出す。戻り値は検査の結果によらず 0。
+    """
     stdout.write(write_and_push.HEAD + "\n")
     parent_id = write_and_push.family_of(ident)
     if parent_id == ident:
@@ -97,6 +112,7 @@ def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
     if not (head and parent_head):
         _stop(stdout, f"子 {ident} の先頭を読めない。何も変えずに止めた", [])
         return 0
+    # 承認の写しから親のチケットを引き、子のコミットを調べる。
     copies, _ = approval.scan(conf, root)
     parent = approval_checks.by_id(copies).get(parent_id)
     places, outside, why = phase_scope.merge_findings(root, conf, found, parent, head)
@@ -128,6 +144,7 @@ def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
             ],
         )
         return 0
+    # 子の仕事の始まりを求め、親へ入れると壊れる形になっていないかを見る。
     base, why = gitstate.child_base(child_tree, parent_tree, child_head=head)
     if not base:
         _stop(stdout, f"子 {ident} の先頭を読めない（{why}）。何も変えずに止めた", [])

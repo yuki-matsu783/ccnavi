@@ -247,6 +247,14 @@ def before(
 
     2 つを分けるのがバックアップの有無。バックアップが在るのに対象が無いなら、バックアップを取った
     あとに消えたということになる。
+
+    処理フロー:
+    1. 無効（DISABLE）か状態の置き場が無ければ何もしない
+    2. 大きい対象は `_refresh` で印を新しくし、enable なら `_rebase_if_changed` で取り直す
+    3. 在る対象は `_clear_absent` で無印にし、`_write_backup` で断面を取る
+    4. 無い対象で、無いことを記録済みなら何も出さない（`_absent_noted`）
+    5. 無い対象は `_recover_missing` で戻す。戻せたらその内容でバックアップを取り直す。
+       戻せず、バックアップも無ければ `_note_absent` で無いことを記録する
     """
     if setting == DISABLE or not state_dir:
         return []
@@ -256,7 +264,8 @@ def before(
         if target.heavy:
             # 大きい対象は、呼び出しのたびにコピーも読みもしない（数十 MB を毎回扱うと、
             # 判定より重くなる）。大きさと更新時刻が変わったときだけ、新しい版を基準に
-            # 取り直す。ツールを呼ぶ前に、ccnavi の外で再ビルドされていた場合もここで取り直す。
+            # 取り直す（enable のとき）。ツールを呼ぶ前に、ccnavi の外で再ビルドされていた場合も
+            # ここで取り直す。
             # 参照は書き直さないので、掃除（`sweep`）に古いと読まれないよう、
             # 更新時刻だけを新しくする。
             _refresh(_ref_path(state_dir, session, target))
@@ -265,6 +274,7 @@ def before(
                 if outcome is not None:
                     outcomes.append(outcome)
             continue
+        # 在る対象は、いまの断面をバックアップに取る。
         content = _read(target.path)
         if content is not None:
             _clear_absent(state_dir, session, target)
@@ -283,6 +293,7 @@ def before(
             _refresh(_absent_path(state_dir, session, target))
             continue
 
+        # 消えていた対象は、バックアップから戻すか、最初から無いものとして印を残す。
         saved = _read_backup(state_dir, session, target)
         outcome = _recover_missing(setting, root, target, saved)
         content = _read(target.path)
@@ -321,12 +332,26 @@ def after(
     答える（`configsync.is_synced_write`。第 2 引数は変更後の中身で、None は消えたこと）。
     そう読めるものは戻さない。戻すと、着手がミラーした中身が同じ呼び出しの中で消える。
     ワークツリー側の設定に限るのは、ミラーを書くのが親のワークツリーだけだから。
+
+    処理フロー:
+    1. 無効（DISABLE）か状態の置き場が無ければ何もしない
+    2. 大きい対象は `_check_heavy` に任せる
+    3. バックアップと今の中身が同じなら何もしない
+    4. 写しの対象（`copy`）で `synced` が真なら、ミラーの書き込みなので戻さない
+    5. 読めないルールファイルの間の修復（`_left_as_repair`）は戻さず、報告だけにする
+    6. バックアップが無いとき: 中身も無ければ何もしない。無かったものが現れていれば、
+       報告だけにする（`_absent_noted`）。それ以外は `_fall_back_to_git` で
+       コミット済みの内容を基準にする
+    7. dry-run のときは書かず、戻す予定だけを報告する
+    8. enable のときは、バックアップの内容を書き戻す
+    9. 何も起きていない回（`ACTION_KEPT`）は報告から除く
     """
     if setting == DISABLE or not state_dir:
         return []
 
     outcomes = []
     for target in found:
+        # 大きい対象の判定は `_check_heavy` に任せる。
         if target.heavy:
             heavy = _check_heavy(setting, state_dir, session, target)
             if heavy is not None:
@@ -598,6 +623,11 @@ def _sweep_store(root: str, kept: list[str], cutoff: float) -> None:
     最後に使われてから日が経っていること。参照だけを見ると、セッション開始が
     まだ来ていない置き場の実体を消しうる。時刻だけを見ると、何日も続いている
     セッションが、自分が戻す先を失う。
+
+    処理フロー:
+    1. 実体の置き場（`STORE_DIR`）の中身を読む。読めなければ何もしない
+    2. 残すセッション（`kept`）の参照（`REF_SUFFIX`）から、使われている実体の名前を集める
+    3. 実体ごとに、使われていないもので、更新時刻が `cutoff` より古いものを削除する
     """
     store = os.path.join(root, STORE_DIR)
     try:
@@ -605,6 +635,7 @@ def _sweep_store(root: str, kept: list[str], cutoff: float) -> None:
     except OSError:
         return
 
+    # 残すセッションが参照している実体の名前。
     alive = set()
     for name in kept:
         directory = os.path.join(root, name)
@@ -640,6 +671,15 @@ def _save_heavy(state_dir: str, session: str, target: selfguard_targets.Target) 
 
     参照には、バックアップした時点の大きさと更新時刻も書く。照合はこの数字と
     現物を比べる形になるので、実体の側の時刻をあとから触っても判定は動かない。
+
+    処理フロー:
+    1. 対象の大きさと更新時刻を `os.stat` で取る。取れなければ理由を返す
+    2. 中身を `scratch-<乱数>` の名前で `store/` にコピーする（`_copy`）
+    3. コピーの中身のハッシュ（`_digest`）を名前にして実体を置く。
+       同じものが在れば、コピーを捨てる
+    4. 実体の更新時刻を今にする（掃除の基準）
+    5. 参照（ハッシュ・大きさ・更新時刻）をセッションの置き場に書く（`_write`）
+    6. 古い版のバックアップを消す。成功なら空文字を返す
     """
     try:
         shape = os.stat(target.path)
@@ -728,7 +768,14 @@ def _check_heavy(
 def _restore_heavy(
     state_dir: str, digest: str, target: selfguard_targets.Target, mtime: int
 ) -> Outcome:
-    """実行ファイルを、参照の版（直前のツール呼び出しの直前に取った版）に戻す。"""
+    """実行ファイルを、参照の版（直前のツール呼び出しの直前に取った版）に戻す。
+
+    処理フロー:
+    1. 参照の実体が無ければ、戻せないと報告して終わる
+    2. 今の対象が在れば、消す前に `aside/` へ退避する。退避できなければ戻さない
+    3. 実体を対象の場所へ置く（`_place`）
+    4. 対象の更新時刻を、参照に書いた時刻に戻す（実体はコピーなので、時刻が違うままになるため）
+    """
     entry = _store_path(state_dir, digest)
     if not os.path.exists(entry):
         return Outcome(
@@ -873,7 +920,14 @@ def _copy(source: str, target: str) -> str:
 
 
 def report(outcomes: list[Outcome]) -> str:
-    """モデルに返す文。何が起きたかと、次に何をすべきかを書く。"""
+    """モデルに返す文。何が起きたかと、次に何をすべきかを書く。
+
+    処理フロー:
+    1. 結果が無ければ空文字を返す
+    2. 見出しを書き、結果を 1 件ずつ並べる
+    3. 状況ごとに注意を足す（ワークツリー側・戻さなかった修復・取り直し）
+    4. 取り直し・戻さなかった以外の結果があれば、ユーザに依頼するよう添える
+    """
     if not outcomes:
         return ""
     lines = [

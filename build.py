@@ -101,6 +101,20 @@ def write_buildinfo(stamp: str, commit: str) -> str:
 
 
 def build() -> int:
+    """実行ファイルを PyInstaller で組み、dist/ に置き、ビルドの場所へ入れる。
+
+    処理フロー:
+    1. `source_commit` で組み立て元のコミットを得て、`write_buildinfo` で build/stamp に書く。
+    2. PyInstaller（`--onedir`）を `subprocess.run` で呼び、build/dist に組む。
+       失敗なら、その終了コードを返す。
+    3. `_swap` で build/dist の成果物を dist/ に置き換える。失敗したら、前の版の場所と
+       組んだ版の場所を表示して 1 で終える。置き換えが通るまで `TARGET` は書き換えない。
+    4. `build_target` の値を `TARGET` に書く。
+    5. `install` で、dist/ の実行ファイルを `BIN_ROOT` の下へコピーする。失敗したら、
+       dist/ は新しく、コピー先は前のままだと表示して 1 で終える。
+
+    終了コードは、すべて通れば 0、途中で失敗すれば 1 かその失敗の終了コード。
+    """
     work = os.path.join(ROOT, "build")
     staging = os.path.join(work, "dist")
     stamp = os.path.join(work, "stamp")

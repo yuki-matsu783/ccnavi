@@ -101,7 +101,7 @@ grepのallowは後ろの`git push`まで通さない。外側のコマンドは�
 perlやpythonは縮退の対象に入れていない（`perl -pi -e 's/git push/.../' README.md`のような 1 行編集を通すため）。
 
 記録に残る理由の名前と、縮退した呼び出しに`allow`を当てない理由は [設計 6.3・6.5](../design/pre-check.md#63-bash-は実行される部分だけを見る) と
-[ADR-0011](../adr/0011-no-allow-when-degraded.md)にある。
+[縮退したとき allow を返さない判断の ADR](../adr/0011-no-allow-when-degraded.md)にある。
 
 ### 書き直しを求める形は止めて案内する
 
@@ -308,7 +308,7 @@ ignoreされたファイルを名指しした`Grep`は通る。
 - `.git`が無いディレクトリでは`.gitignore`を読まない。cloneしていない置き場、git化していない`projects/<名前>/`が該当する
 
 `.git`がある場所の扱い、隠しファイル、`.ignore`などの除外ファイルの扱いは [付録C](../design/appendix.md#付録-c-実測で確かめた前提) と
-[ADR-0050](../adr/0050-search-tools-and-ignore.md)にある。
+[探すツールと .gitignore の扱いの ADR](../adr/0050-search-tools-and-ignore.md)にある。
 
 ワークスペースルートがgit管理下で、`.gitignore`に`/projects/`があるときは、ルートからの
 `Grep`は`projects/`へ降りない。プロジェクトのコードを探すときは`cd projects/<名前>`してから

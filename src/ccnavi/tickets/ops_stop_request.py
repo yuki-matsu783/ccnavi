@@ -208,7 +208,14 @@ def remember_nudge(state_dir: str, session: str, found: Pending) -> str:
 
 
 def request_nudge(root: str, found: Pending) -> str:
-    """Stop を止めて渡す文。決まった道の途中で、許可は要らないことと、次に打つコマンドを言う。"""
+    """Stop を止めて渡す文。決まった道の途中で、許可は要らないことと、次に打つコマンドを言う。
+
+    処理フロー:
+    1. `found.step` で、いまの段階を分ける（子の finish・confirm・合流の確認・合流後の修正・
+       ELI5・依頼）。
+    2. 段階ごとに、どこで止まっているか（`where`）と次に打つこと（`todo`）を組む。
+    3. 許可は要らないことと、この案内が同じ状態では 1 回だけであることを添えて、行を並べて返す。
+    """
     p = found.parent
     n = found.number
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")

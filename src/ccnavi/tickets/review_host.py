@@ -159,7 +159,16 @@ class Result:
 
     @classmethod
     def from_data(cls, data: object) -> Result:
-        """読んだ JSON の値から組む。Chrome は sh と同じ形の結果を組んで渡す。"""
+        """読んだ JSON の値から組む。Chrome は sh と同じ形の結果を組んで渡す。
+
+        処理フロー:
+        1. 最上位が辞書でなければ、error を入れて返す。`error` の欄が在れば、その文を入れて返す。
+        2. `mr` が辞書で `number` が在れば MergeRequest にする。`draft` は bool のときだけ使い、
+        それ以外は None にする。
+        3. `threads`・`reviews` の項目を、辞書のものだけ読んで Thread・Review にする。
+        文字列・整数・真偽は型に合わせて整える。
+        4. host・url・created_at・author を整えて返す。
+        """
         if not isinstance(data, dict):
             return cls(error="結果の最上位が辞書ではない")
         if data.get("error"):

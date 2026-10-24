@@ -47,9 +47,18 @@ def usage_problem(args: argparse.Namespace) -> str:
 
 
 def summary(found: wiki.Wiki, threshold: int) -> dict:
-    """一覧の中身（`--json` の形）。ファイルも時計も見ない。"""
+    """一覧の中身（`--json` の形）。ファイルも時計も見ない。
+
+    処理フロー:
+    1. `wiki.rows` でパターンの表を作り、候補（`wiki.CANDIDATE`）だけを取り出す。
+    2. 対象（`wiki.TARGETS`）ごとに、パターン数・候補数・到達数（`reached`）を数える。
+    3. 全体の数と、パターンごとの行、`wiki.pending` の提案、壊れた記録（`found.broken`）を
+       並べて返す。
+    """
+    # パターンの表と候補。
     table = wiki.rows(found)
     candidates = [r for r in table if r.status == wiki.CANDIDATE]
+    # 対象ごとの集計。
     by_target = {}
     for target in wiki.TARGETS:
         mine = [r for r in candidates if r.target == target]

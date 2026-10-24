@@ -255,9 +255,10 @@ def preview(
 ) -> int:
     """`--agree --preview`。一覧を見せるだけで、承認済みチケットは置かない。端末の確認は要らない。
 
-    JSON の形は docs/requirements/json-shapes.md「承認の JSON」。一覧が空でも 0 で返す。拡張は `batch` が空なら
-    「承認待ちは無い」と出す。`only` はボードの絞り込みで見えている分（`--agree` と
-    同じ意味）。見せる一覧と承認する対象が同じ絞りを通るようにする。
+    JSON の形は docs/requirements/json-shapes.md「承認の JSON」。一覧が空でも 0 で返す。
+    拡張は `batch` が空なら「承認待ちは無い」と出す。
+    `only` はボードの絞り込みで見えている分（`--agree` と同じ意味）。
+    見せる一覧と承認する対象が同じ絞りを通るようにする。
     """
     verdict = core_base.judge_approval(core_base.read_fs(conf, root), only)
     stderr.write(verdict.messages)
@@ -368,6 +369,17 @@ def approve_yes(
     「そのとき掛けていた絞り」（`--agree --preview` に渡したものと同じ）。分けないと検査が
     必ず通る。絞りだけで対象を狭めて、その狭めた対象と見せた識別子を比べると、いつでも一致する。
     絞りは preview と同じものを通し、比べるのは「その絞りで今できる一覧」と「見せた識別子」。
+
+    処理フロー:
+    1. ダイジェストが無ければ止める（`CODE_APPROVE_NO_DIGEST`）
+    2. 今の状態を読み（`core_base.read_fs`）、見せた識別子とダイジェストを比べる
+       （`core_base.judge_approval`）
+    3. 食い違えば何も置かず `mismatch` を返す（終了コード 1）
+    4. 承認するものが無ければ止める（終了コード 1）
+    5. 承認の書き込みを行う（`write_recorded`）。途中で止まれば、置いたものを
+       `partial` として返す（終了コードは 1）
+    6. 子のワークツリーの計画（`worktrees.child_worktrees`）と承認後の案内
+       （`agree_screen.approved_text`）を添えて返す（終了コード 0）
     """
     wanted = sorted({s.strip() for s in expected if s.strip()})
     narrowed = [s.strip() for s in (only or []) if s.strip()]
@@ -426,7 +438,8 @@ def approve_yes(
     )
     if applied.code != 0:
         # 途中で止まった。置いたものはそのまま残るので、どこまで置いたかを返す。それを言わずに
-        # 失敗を返すと、ユーザは「何も起きていない」と読む（docs/requirements/json-shapes.md「承認の JSON」の `partial`）。
+        # 失敗を返すと、ユーザは「何も起きていない」と読む
+        # （docs/requirements/json-shapes.md「承認の JSON」の `partial`）。
         stderr.write(
             core_base.tagged(
                 CODE_APPROVE_STOPPED,

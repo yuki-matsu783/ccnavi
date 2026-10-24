@@ -56,6 +56,11 @@ def file_problems(
 
     `project` はプロジェクトのレイヤーかどうか。ターンの終わりのルール（`match: Stop`）は
     プロジェクトのレイヤーから読まない（共通レイヤーと自身のレイヤーだけ）ので、そこに書いたものを言う。
+
+    処理フロー:
+    1. `rules.load` で読む。読めなければ、その 1 件だけを error で返して終わる
+    2. ファイル全体の問い（`layer` でないときだけ）: `deny` が空なら error、`allow` が空なら warn
+    3. ルールを順に見る。id の重複を warn にし、`_rule_problems` でルール 1 件ぶんを検める
     """
     home = home or root or os.path.dirname(os.path.abspath(path))
     try:
@@ -67,6 +72,7 @@ def file_problems(
 
     problems = list(problems)
 
+    # ファイル全体の問い。レイヤーは共通レイヤーに足すものなので、空でも穴にはならない。
     if not rule_set.deny and not layer:
         problems.append(
             Problem(
@@ -90,6 +96,7 @@ def file_problems(
             )
         )
 
+    # ルールごとの検査。id の重複もここで見る。
     seen: set[str] = set()
     for rule in rule_set.all():
         name = rule.id
@@ -108,8 +115,21 @@ def file_problems(
 
 
 def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False) -> list[Problem]:
-    """ルール 1 件の中身。当たらない match、届かない message、指すファイル、広い allow。"""
+    """ルール 1 件の中身。当たらない match、届かない message、指すファイル、広い allow。
+
+    処理フロー:
+    1. `_inert` で、match のツールのうち対象を取り出せないものを warn にする
+    2. `_stop_problems` で `match: Stop` の書き方を見る
+    3. `message` を `deny` 以外に書いていれば error（届かない欄）
+    4. `message` と `additionalContext` と `additionalContextOnce` の文面を、`_has_relative_scripts`
+       と `rules.SCRIPT_PLACEHOLDER` で見る（相対の sh、`{script:<名前>}` の名前と有無）
+    5. `additionalContextFile` と `additionalContextOnceFile` の場所を `ctxfile` で見る
+       （ワークスペースの外、無い、上限超え）
+    6. `_every_problems` `_except_problems` `_when_problems` `_catch_all_deny_problems` に委ねる
+    7. 刻みの無い allow（`every <= 1`）に文脈があれば、`_broad` で広さの理由を言う（warn）
+    """
     problems: list[Problem] = []
+    # match のツールのうち、判定が対象を取り出せないもの。
     for tool in _inert(rule.match):
         problems.append(
             Problem(
@@ -435,6 +455,8 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
         return []
     problems: list[Problem] = []
 
+    # 何にでも当たる・何にも当たらないノードを外側から見て言う。
+    # 外側が中立（どちらとも言えない）のときだけ、中の子を見る。
     def look(node: rules.Condition) -> None:
         value = _constant(node)
         if value == _UNKNOWN:
@@ -458,6 +480,7 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
 
     look(tree)
 
+    # 同じ個別条件が肯定と否定で並ぶ `all` / `any` を見る。
     def operands(node: rules.Condition) -> list[rules.Condition]:
         """同じ演算子の入れ子（`all` の中の `all`）を 1 つに開いた子。"""
         out: list[rules.Condition] = []

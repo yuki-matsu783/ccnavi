@@ -193,6 +193,21 @@ def _plan_order_usage(args: argparse.Namespace, reordering: bool) -> str:
 
 
 def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
+    """引数を読み、組み合わせを検査してから、実際の処理へ渡す。
+
+    処理フロー:
+    1. `user_only.rewrite` で、ユーザ専用の入口（`ccnavi user <操作>`）を今の形に読み替える。
+    2. argparse のパーサを組み、`_take_test_words` などで `--test` の引数を整えて読む。
+    3. `--help` なら `cli_args.help_text` を出して終わる。
+    4. ユーザ専用のオプションを、`user` の入口の外では `user_only.refused` で断る。
+    5. 組み合わせを検査する（`--all`、`_test_usage`、`--yes`、`--record-tree`、
+       `--actor`、`--via`）。
+    6. `--record-writes` があり `--version` でなければ `_recorded_run`、それ以外は `_parsed` へ
+       渡し、その終了コードを返す。
+
+    終了コードは、読み替えや検査で断ったときは `EXIT_BLOCK` か `EXIT_ERROR`、`--help` と
+    引数の解析の失敗は `EXIT_ERROR`、それ以外は `_parsed` か `_recorded_run` が返す値。
+    """
     # ユーザ専用の入口（`ccnavi user <操作>`）を、今の内部の形に読み替える。入口から来たかどうかは
     # argparse の結果（args）には入れない。オプションで偽装できないようにするため。
     try:
@@ -651,6 +666,29 @@ def _parsed(
     parser: argparse.ArgumentParser,
     args: argparse.Namespace,
 ) -> int:
+    """解析済みの引数を、経路ごとの処理へ振り分ける。
+
+    処理フロー:
+    1. `--version` は `version.report` で出して終わる。
+    2. 1 つだけ許すフラグと、`cli_templates` や `cli_learnings` の使い方を検査する。
+    3. `settings.load` で設定を読む。読めない例外は、hook の経路だけ `_hook_crashed` で受け、
+       ほかの経路では例外のまま伝える。
+    4. 診断の経路かを決め（`_diagnosing`）、診断でない経路では差し替えの引数を捨てる
+       （`_drop_outside_diagnosis`）。フラグの値を設定へ重ねてから（`_override`）、
+       ガードとチケット制御の切り替えを `selfguard.resolve` で解く。
+    5. 取り込み・テンプレート・学び・索引（`--docs`）の経路へ分ける。
+    6. 検証（`--lint`）、診断（`--test`・`--test-expectations`・`--suggest`・`--explain`）、
+       後始末（`--prune`）を順に見る。
+    7. 計画の書き換え（`cli_plan`）と承認（`--agree` の `core` の関数）を見る。
+    8. 残りの位置引数は、`ops`・`sync`・`tree`・`write-and-push`・`branches`・`stop-review` の
+       どれかに当たれば、それぞれの関数へ渡す。
+    9. 位置引数が残るか、`--reviewed`・`--close-early` があれば `cli_ops.operate` へ渡す。
+    10. どれにも当たらなければ `_hook` で、hook の判定として扱う。
+
+    終了コードは、経路の関数が返す値をそのまま返すか、`EXIT_OK` か `EXIT_ERROR` に寄せる。
+    検証（`--verify`）は 0 か `modes.EXIT_ANSWER_NO` を返し、承認が途中で止まったときは
+    `modes.EXIT_PARTIAL` をそのまま返す。
+    """
     # 版だけを出す。フラグは上の定義から引くので、足したものはそのまま並ぶ。
     if args.version:
         return version.report(stdout, parser, args.json)
@@ -1140,6 +1178,22 @@ def _hook_steps(
     args: argparse.Namespace,
     so_far: _HookSoFar,
 ) -> int:
+    """hook の 1 回分の処理。`_hook` から呼ばれ、途中の進み具合を `so_far` に残す。
+
+    処理フロー:
+    1. 設定の読み込みで出た問題を stderr に書く。
+    2. `modes.resolve_mode` でモードを決め、`_resolve_switches` で切り替えを解き、
+       `audit.Log` を作る。
+    3. `hookio.decode` で payload を読む。端末の前のユーザ（payload が無い）には使い方を出して
+       終える。読めない payload は、記録と診断ログを残してから `modes.fail_closed` で終える。
+    4. payload から記録の枠（`audit.Record`）を作る。
+    5. `events.decide` で判定する。例外なら `_internal_error` で応答を組む。出力は手元の
+       バッファに溜める。
+    6. `cli_args._record` で記録を書き、診断ログを書く。最後にバッファを stdout へ出す。
+
+    終了コードは判定が返したもの。payload が無い・読めないときは `EXIT_ERROR` か
+    `modes.fail_closed` の値。
+    """
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
 
@@ -1265,8 +1319,8 @@ def _internal_error(
     達せなかった回として終える。
 
     - PreToolUse: ツールの種類で決める（`modes.fail_closed`）。書き込み・Agent・Task・
-      ツールが分からない回は dry-run でも止める。サブエージェントの報告用のツールは通す。読み取りは最低限の deny に当たらなければ通す。
-      標準エラーの文がモデルに届く
+      ツールが分からない回は dry-run でも止める。サブエージェントの報告用のツールは通す。
+      読み取りは最低限の deny に当たらなければ通す。標準エラーの文がモデルに届く
     - PostToolUse: ツールはもう走っているので止めるものは無い。enable は終了コード 2 と
       標準エラーで、実行後の検査をしていないことをモデルに言う（dry-run は 0）
     - payload を読む前に落ちた（イベントが分からない）: PreToolUse と同じく止める

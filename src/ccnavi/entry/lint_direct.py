@@ -53,6 +53,18 @@ def _has_branch(top: str, name: str) -> bool:
 def _records(
     conf: settings.Settings, root: str, main: tree.Tree, common: str, label: str
 ) -> list[Problem]:
+    """直接作業の記録（`ccnavi-direct/` の 1 件ごと）を見て、warn と info を返す。
+
+    処理フロー:
+    1. 記録の置き場（`common` の下の `directrec.DIRECT_DIR`）を一覧する。読めなければ何も返さない。
+    2. 記録ごとに、版と必須の欄（`_NEED`）を見る。欠けていれば、壊れた記録として warn にし、
+       取り込みは断られる旨と、直し方（消して切り直すか、`--adopt` で引き取る）を添える。
+    3. 壊れていない記録は、ワークツリーもブランチも無ければ、片付け残りとして info にする。
+    4. 手順 3 に当たらなかった記録のうち、有効な記録（`directrec.records_of` に在る名前）は、
+       横で作業する指定が有効だと info にする。
+
+    戻り値は見つけた指摘の一覧（無ければ空）。`label` は指摘の場所の表記（`direct/<label>/…`）。
+    """
     base = os.path.join(common, directrec.DIRECT_DIR)
     try:
         names = sorted(n for n in os.listdir(base) if not n.startswith("."))

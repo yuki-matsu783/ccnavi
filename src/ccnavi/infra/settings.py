@@ -486,6 +486,13 @@ def load(root: str) -> tuple[Settings, list[str]]:
     設定ファイルが無い、あるいは読めないことは失敗ではない。
     既定値だけで初回のチェックアウトが動かないと、
     ccnavi を入れるだけで設定ファイルの編集が必要になってしまう。
+
+    処理フロー:
+    1. 環境変数から、既定の置き場と欄を持つ Settings を組む。
+    2. 実行ファイルの指定（`overrides`）を環境変数で上書きし、branch_prefixes で枝の接頭辞を読む。
+    3. own_source_tree が偽なら、ここで返す。上書き設定ファイルは読まない。
+    4. ccnavi 自身のツリーなら、_read_local で上書き設定ファイルを読み、書かれた欄で上書きする。
+       読めなければ、その問題を返す。
     """
     from_env = os.environ.get(MODE_ENV, "")
     settings = Settings(

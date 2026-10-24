@@ -12,7 +12,7 @@ keywords: [Chrome拡張, PAT, Pyodide, MV3, CSP, createCommitOnBranch, expectedH
 
 承認者の機械に clone も ccnavi も無い場合に、承認者がブラウザと PAT だけで、リモートの親のブランチ（`P`）へ承認を書くための拡張（`extensions/chrome/ccnavi-approval/`）。
 判定は同梱の ccnavi を Pyodide で動かして出し、拡張は判定を自分で書かない。要求は [承認の要件](../../requirements/approval.md)（REQ-APV）と [拡張の入口](../../requirements/extension-if.md)。
-有効とするチケットを `P` の上のものだけに限る規則は [9.5](judging-by-path.md)、共有の全体は [9.17](sharing.md)。決めた理由は ADR-0093 にある。
+有効とするチケットを `P` の上のものだけに限る規則は [9.5](judging-by-path.md)、共有の全体は [9.17](sharing.md)。決めた理由は、拡張の承認の ADR にある。
 
 #### 形
 
