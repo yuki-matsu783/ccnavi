@@ -18,7 +18,7 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 | 外から観測できる約束 | [requirements.md](requirements.md) |
 | 実行ファイルと拡張の JSON の形 | [requirements/json-shapes.md](requirements/json-shapes.md) |
 | いまの実装の作り | [design.md](design.md) |
-| ディレクトリ構成（モジュールごとの表） | [design/modules.md](design/modules.md) |
+| ディレクトリ構成（サブパッケージごとの表） | [design/modules.md](design/modules.md) |
 | 判断の理由と経緯、採らなかった案 | [adr/README.md](adr/README.md) |
 | 実測で確かめた前提と、環境固有の落とし穴 | [設計の付録 C](design/appendix.md)、[claude/environment.md](claude/environment.md) |
 | 開発で常に守る決まり（テストの回し方、ログ、sh、出力の案内など） | `docs/claude/`（入口は [CLAUDE.md](../CLAUDE.md) の「詳細」の表） |
@@ -146,7 +146,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 
 ## ディレクトリ構成（トップレベル）
 
-モジュールごとの表は [design/modules.md](design/modules.md)。
+サブパッケージごとの表は [design/modules.md](design/modules.md)。
 
 | 場所 | 中身 |
 |---|---|
