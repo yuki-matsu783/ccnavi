@@ -207,7 +207,7 @@ export type ApprovalEffect =
   | { readonly kind: "copyConsult"; readonly prompt: string }
   /** プロンプトを埋めて新しいセッションで開く */
   | { readonly kind: "openSession"; readonly prompt: string }
-  /** プロンプトを `claude -p` でボードのターミナルから実行する（止めるのはターミナルの Ctrl+C。結果は取り込まない） */
+  /** プロンプトを `claude -p` でボードのターミナルから実行する（止めるには、ターミナルで Ctrl+C を押す。結果は取り込まない） */
   | { readonly kind: "runClaude"; readonly prompt: string }
   /** 親の計画編集タブを開く（`screens().workflow`） */
   | { readonly kind: "openWorkflow"; readonly ticket: string }

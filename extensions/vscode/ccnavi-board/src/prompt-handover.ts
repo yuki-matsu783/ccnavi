@@ -1,5 +1,5 @@
 /**
- * Claude Code にプロンプトを渡す経路（コピー・新しいセッションで開く。ボードはさらにターミナルで実行）。
+ * Claude Code にプロンプトを渡す経路（コピー・新しいセッションで開く。ボードはさらに「ターミナルで実行」もできる）。
  * 承認のプロンプト・決めた結果のプロンプト（ボード）と、フローの作成の依頼（フロー編集画面）が同じものを使う。
  * VS Code の API に触れるので単体テストの対象外。
  */
@@ -34,7 +34,7 @@ export async function openPromptInSession(prompt: string): Promise<void> {
 
 /**
  * プロンプトをファイルに書き、ボードのターミナル（`terminal.ts`）で `claude -p` に渡して実行する。
- * 結果は取り込まず、ターミナルに流れるだけ（止めるのは Ctrl+C）。claude が PATH に無いときはターミナルがその旨を出す。
+ * 結果は取り込まず、ターミナルに流れるだけ（止めるには Ctrl+C を押す）。claude が PATH に無いときはターミナルがその旨を出す。
  * 書けなかったときは警告を出して送らない
  */
 export async function runPromptInTerminal(root: string, prompt: string): Promise<void> {
