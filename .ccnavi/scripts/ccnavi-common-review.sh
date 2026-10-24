@@ -167,10 +167,10 @@ api_failed() {
 }
 
 # GraphQL を制限している実行環境がある（Claude Code のクラウドは REST だけ通し、GraphQL は 403 を返す）。
-# GitHub ではスレッドの解決状態（threads）・Draft 外し（undraft）・指摘への返信と解決が GraphQL の道を持つので、
+# GitHub ではスレッドの解決状態（threads）・Draft 外し（undraft）・指摘への返信と解決が GraphQL の道を持つ。そこで
 # GraphQL を先に試し、使えない 403 のときだけ REST（/ccr/ の道）に替える。
 #
-# gql <JSON> GraphQL を打つ。成功なら応答を標準出力へ。戻り値は、0 成功 / 1 失敗（理由は api_failed が出した。認証の失敗や
+# gql <JSON> GraphQL を打つ。成功なら応答を標準出力へ出す。戻り値は、0 成功 / 1 失敗（理由は api_failed が出している。認証の失敗や
 # 別の理由の 403 もここ） / 3 GraphQL を使えない環境の 403（何も出さない。呼び手が REST に替える）。
 # 戻り値 3 かどうかは ccnavi_host_graphql_blocked が決める。
 gql_text=""
@@ -198,7 +198,7 @@ gql() {
 	return 1
 }
 
-# GraphQL が 403 で、REST（/ccr/）の代わりの道も失敗したときの案内。REST の失敗の返事は api_failed が先に出している。
+# GraphQL が 403 で、REST（/ccr/）の代わりの道も失敗したときの案内。REST の失敗の返事は、api_failed が先に出している。
 # 打てる手が無いので、エージェントは続きを試さず、ユーザに環境の確認を頼んで止まる。
 rest_fallback_failed() {
 	printf '%s: %s\n' "$review_label" \
@@ -240,11 +240,11 @@ project_id() {
 	ccnavi_host_project_id
 }
 
-# ---- スレッド。GitHub は GraphQL で解決状態を読む（GraphQL が 403 の環境は REST の /ccr/ で読む）。GitLab は discussions。
+# ---- スレッド。GitHub は GraphQL で解決状態を読む（GraphQL が 403 の環境では REST の /ccr/ で読む）。GitLab は discussions。
 #
 # どちらも [{id, resolved, url, path, line, body, created_at, last_id, last_at, last_author}] を返す。
-# id は GraphQL なら スレッドの node id、REST ならスレッドの先頭コメントの id（数字。スレッド自体の id を REST は持たない）。
-# 受け入れ（accept_reply・accept_resolve）は id の形（数字だけか）で道を選ぶので、取った道と同じ道で書く。
+# id は GraphQL ならスレッドの node id、REST ならスレッドの先頭コメントの id（数字。REST にはスレッド自体の id が無い）。
+# 受け入れ（accept_reply・accept_resolve）は id の形（数字だけか）で道を選ぶ。取った道と同じ道で書く。
 
 threads() {
 	mr_number="$1"
@@ -302,7 +302,7 @@ threads() {
 }
 
 # GraphQL が使えない環境で、スレッドを REST で読む。<MR の番号>
-# /ccr/review_threads は {resolved, outdated, path, line, comment_ids} だけで、スレッドの id・本文・url・作成者を持たない。
+# /ccr/review_threads が返すのは {resolved, outdated, path, line, comment_ids} だけで、スレッドの id・本文・url・作成者は含まない。
 # コメントの一覧（pulls/<N>/comments。全ページ）から、先頭のコメント（id・url・本文・作成の時刻）と最後のコメント
 # （last_*）を引く。スレッドの id は先頭コメントの id（文字列）。
 threads_rest() {

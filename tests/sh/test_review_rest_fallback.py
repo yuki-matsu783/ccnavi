@@ -4,10 +4,10 @@
 `accept_resolve`）は、GraphQL を先に試し、使えない 403 のときだけ REST（`/ccr/` の道）に替える。
 GraphQL が通る環境の動きは変えない。認証の失敗（401）と別の理由の 403 は替えない。
 
-見るのは次の点。
+確かめるのは次の点。
 
 - threads: GraphQL が通れば REST（`ccr/`・`pulls/<N>/comments`）を呼ばない。403 なら REST の応答から
-  従来と同じ形の JSON を組む（返信が重なったスレッドは last_* が最後のコメントのもの）
+  従来と同じ形の JSON を組む。返信が重なったスレッドでは、last_* が最後のコメントを指す
 - confirm: その JSON を実行ファイルに渡す。未解決のスレッドが 1 件あれば止まり、解決済みなら通る
 - undraft: 403 で `ccr/ready_for_review` を呼び、`draft` を読んで返す
 - decide の返信と解決: 数字の id は REST、node id は GraphQL
@@ -35,7 +35,7 @@ NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPTS = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")
 
-# 実行ファイルの代役。`--result` に渡された JSON を、そのまま残す。
+# 実行ファイルの代役。`--result` で渡された JSON を、そのまま残す。
 EXE = """#!/bin/sh
 case " $* " in
 *" --version --json "*)
@@ -263,7 +263,7 @@ class RestFallbackTest(unittest.TestCase):
                 got = json.loads(done.stdout)
                 self.assertEqual(got["threads"], EXPECTED)
                 self.assertEqual(got["mr"]["number"], 42)
-                # GraphQL 先。そのあとで REST
+                # GraphQL を先に試し、そのあとで REST
                 calls = self.calls()
                 self.assertLess(
                     calls.index("POST /graphql"),

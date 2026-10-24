@@ -1,20 +1,20 @@
 """GraphQL が制限されている環境で、REST にも失敗したときの案内。
 
 GitHub ではスレッドの解決状態（`threads`）と Draft 外し（`undraft`）が GraphQL の道を持つ。
-GraphQL を制限する実行環境があり（Claude Code のクラウドは REST だけ通す）、
-そこでは GraphQL が 403 になる。ccnavi は GraphQL を先に試し、403 のときだけ
+GraphQL を制限する実行環境（Claude Code のクラウドは REST だけ通す）では、
+GraphQL が 403 になる。ccnavi は GraphQL を先に試し、403 のときだけ
 REST（`/ccr/` の道）に替える（`test_review_rest_fallback.py`）。
 
 この試験が見るのは、REST にも失敗したときの案内（`rest_fallback_failed`）。
 
 - 案内は、ユーザに JSON を作らせて `ccnavi review confirm --result` を打たせる手順を書かない。
-  その手順は write-and-push に止められる（`--record-tree` が付かない）。
-  書くと、拒否される手順を案内することになる
-- 案内が、止まってユーザに接続の確認を頼むことを名指しする
+  その手順は write-and-push の検査で止まる（`--record-tree` が付かないため）。
+  書くと、拒否される手順を案内してしまう
+- 案内に、止まってユーザに接続の確認を頼むことを書く
 - GraphQL 以外の失敗では案内を出さない: 閉じたポートへ実際に打つ
 
-実際の GitHub の GraphQL を失敗させる環境は作れない（`remote_kind` はホスト名で github と読むので、
-127.0.0.1 に立てた偽物は gitlab として読まれる）。GraphQL の 403 は `github_host.py` の代役で作る。
+実際の GitHub の GraphQL を失敗させる環境は作れない。`remote_kind` はホスト名で github と読むため、
+127.0.0.1 に立てた偽物は gitlab として読まれる。GraphQL の 403 は `github_host.py` の代役で作る。
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ MUST_NAME = (
     "ユーザに",
     "止まって",
 )
-# 案内に書かない手順。JSON を作ることはユーザにもできない（write-and-push に止められる）。
+# 案内に書かない手順。JSON を実行ファイルに直接渡す手順は、ユーザが打っても止まる。
 MUST_NOT_NAME = (
     "ccnavi review confirm",
     "--result",
@@ -57,7 +57,7 @@ def script_text():
 
 
 def function_body(text, name):
-    """`name() {` から次の `}` だけの行までを切り出す。"""
+    """`name() {` の行から、次の `}` だけの行までを切り出す。"""
     start = text.index(f"{name}() {{")
     rest = text[start:]
     end = rest.index("\n}\n")
@@ -68,7 +68,7 @@ class TheHintIsInTheFailurePathTest(unittest.TestCase):
     """案内は、REST にも失敗したときの文面に置く。"""
 
     def test_api_failed_has_no_graphql_only_branch(self):
-        """GraphQL の失敗は `gql` が分ける。`api_failed` は共通の文面だけにする。"""
+        """GraphQL の失敗は `gql` が分ける。`api_failed` は共通の文面だけを持つ。"""
         body = function_body(script_text(), "api_failed")
         self.assertNotIn("graphql)", body)
         for word in MUST_NOT_NAME:

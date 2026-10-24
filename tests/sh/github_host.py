@@ -18,13 +18,13 @@ Chrome と手元の sh が同じ見本から同じ JSON を組むことを見る
 - 依頼の投稿（`GET`/`POST /repos/<o>/<r>/issues/<番号>/comments`）は、状態のファイル
   （環境変数 `FAKE_GITHUB_STATE`）に溜めて返す（write-and-push のハーネスで request を通すため）
 - `FAKE_GITHUB_GRAPHQL` が `blocked` なら、`POST /graphql` はすべて 403
-  （Claude Code のクラウドの本文。`gh` は本文を返し、`curl` は番号だけが残る）。
+  （Claude Code のクラウドと同じ本文。`gh` は本文を返し、`curl` では番号だけが残る）。
   `forbidden` なら別の理由の 403、`unauthorized` なら 401。
   `blocked` のときだけ、REST の代わりの道（`.../pulls/<番号>/ccr/...`）が答える。
   通常の GitHub では 404（`FAKE_GITHUB_NO_CCR` を付けると、`blocked` でも 404）
-- REST の見本は、環境変数 `FAKE_GITHUB_REST` のファイル
+- REST の見本は、環境変数 `FAKE_GITHUB_REST` が指すファイルに置く
   （`review_threads`・`comments` の配列と、`body`・`draft`）。
-  返信・解決・Draft 外しの書き込みは `FAKE_GITHUB_MUTATIONS` に
+  返信・解決・Draft 外しの書き込みは、`FAKE_GITHUB_MUTATIONS` に
   `{"rest": "<M> <path>", "body": ...}` で残す
 - ほかは 404
 
@@ -158,7 +158,7 @@ def _note(entry: dict) -> None:
 
 
 def _graphql_refusal() -> tuple[int, object] | None:
-    """`FAKE_GITHUB_GRAPHQL` が GraphQL を断る形のとき、その答え。"""
+    """`FAKE_GITHUB_GRAPHQL` が GraphQL を断るときの答え。"""
     mode = os.environ.get("FAKE_GITHUB_GRAPHQL", "")
     if mode == "blocked":
         message = "GitHub GraphQL is not available from Claude Code sessions"
@@ -171,7 +171,7 @@ def _graphql_refusal() -> tuple[int, object] | None:
 
 
 def _rest_answer(method: str, pieces: list[str], query: dict, body: str, number: str):
-    """REST の代わりの道と、それが使うコメントの一覧・返信。pieces は `pulls/<番号>/...`。"""
+    """REST の代わりの道の答え。コメントの一覧と返信も含む。pieces は `pulls/<番号>/...`。"""
     if pieces[:1] != ["pulls"] or len(pieces) < 2 or pieces[1] != number:
         return None
     rest = pieces[2:]
@@ -360,7 +360,7 @@ def gh(argv: list[str]) -> int:
         log.write(f"{method} {path}\n")
     sys.stdout.write(json.dumps(data, ensure_ascii=False))
     if status >= 400:
-        # 本物の gh は 4xx でも本文を標準出力へ書き、標準エラーに「gh: <message> (HTTP N)」を出す
+        # 本物の gh は 4xx でも本文を標準出力へ書き、標準エラーには「gh: <message> (HTTP N)」を出す
         message = data.get("message", "") if isinstance(data, dict) else ""
         sys.stderr.write(f"gh: {message} (HTTP {status})\n")
     return 0 if status < 400 else 1

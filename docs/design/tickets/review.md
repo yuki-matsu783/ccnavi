@@ -98,8 +98,8 @@ Chrome 拡張のレビュー済みと `decide` のワークツリーは、親の
    （続きの子を起こせるか、issue の下書きの置き場）を置くときと同じに適用し、通れば受け入れるスレッドの id・キー・返信の
    本文・見せたダイジェストを書く。通らなければ計画を書かず、ホストにも触れない
 3. sh が計画の id を確かめ（API の経路に使える字か。GitLab は 16 進。取り直した結果に在るか）、全部に返信してから、
-   全部を解決する（GitHub は GraphQL の `addPullRequestReviewThreadReply` と `resolveReviewThread`、GraphQL が使えない環境では
-   REST の `pulls/<N>/comments/<id>/replies` と `ccr/comments/<id>/resolve`。道は id の形で選ぶ（下の「GraphQL が使えない環境」）。GitLab は
+   全部を解決する（GitHub は GraphQL の `addPullRequestReviewThreadReply` と `resolveReviewThread`。GraphQL が使えない環境では
+   REST の `pulls/<N>/comments/<id>/replies` と `ccr/comments/<id>/resolve` を使い、id の形で道を選ぶ（下の「GraphQL が使えない環境」）。GitLab は
    discussions の返信と `resolved=true`）。返信か解決に 1 件でも失敗したら、受け入れは未完了として止め、何も置かない。
    そのあと結果を取り直す
 4. 置く呼び出しは `--accept-done <ファイル>` を付ける。取り直した結果を読み、受け入れるスレッドが全部ホストで
@@ -251,16 +251,16 @@ GitLab に GitHub の dismiss にヒットする操作は適用していない�
 
 ポートを除くのは分類のときだけで、GitLab の接続先はポートを保つ。GHE.com の origin にポートが付いていると API の URL を組めないので、理由を言って止まる。**GHE.com の API と GraphQL の URL の規則は、実物では未検証**（この表は前提として固定したもの）。`gh api --hostname` の疎通の確認は今までどおり。判定は sh（`ccnavi_host_parse`）・実行ファイル（`review_host.classify`・`transport_problem`）・Chrome 拡張（`hostclass.ts`）の 3 か所に同じ規則で置き、`tests/fixtures/host-kinds.json` の同じ表で突き合わせる。Chrome 拡張では、この表は自動判定に使い、設定画面でユーザが明示した種類（GitHub / GitLab）は、これより優先する（未知のホストを GitHub として登録すれば Enterprise Server の `/api/v3`・`/api/graphql`。GHE.com を GitHub として登録した場合だけ上の表の接続先）。登録していないホストへ自動で通信したり PAT を送ったりはしない。権限は画面の origin だけでなく API と GraphQL の origin に対しても取る（GHE.com は画面と API の origin が違う）。
 
-**GraphQL が使えない環境。** Claude Code のクラウドは GitHub の GraphQL を 403 で断る（REST は通る）。GitHub の次の 4 か所は、GraphQL を先に試し、使えない 403 のときだけ REST（`ccr` の道）に替える。GraphQL が通る環境の動きは変わらず、GitLab は変えない。使えない 403 は、gh なら本文の `GraphQL is not available`、curl なら番号だけの 403（curl は本文を捨てるので認証の失敗と見分けが付かず、替えて失敗したら元の文面を言う）。401 と別の理由の 403 は替えない。判定は `ccnavi_host_graphql_blocked`、GraphQL を打つ入口は `gql`（戻り値 3 が「使えない」）。
+**GraphQL が使えない環境。** Claude Code のクラウドでは、GitHub の GraphQL が 403 で拒否される（REST は通る）。GitHub の次の 4 か所は、GraphQL を先に試し、使えない 403 のときだけ REST（`ccr` の道）に替える。GraphQL が通る環境の動きは変わらない。GitLab は変えない。「使えない 403」とは、gh なら本文が `GraphQL is not available` を含むもの、curl なら番号だけの 403 を指す。curl は本文を捨てるので、認証の失敗と見分けが付かない。curl の 403 は替えて、それも失敗したら元の文面を言う。401 と別の理由の 403 は替えない。判定は `ccnavi_host_graphql_blocked`、GraphQL を打つ入口は `gql`（戻り値 3 が「使えない」）。
 
 | 場所 | REST での代わり |
 |---|---|
-| スレッドの取得（`threads`） | `GET pulls/<N>/ccr/review_threads`（`resolved`・`path`・`line`・`comment_ids`）と `GET pulls/<N>/comments`（全ページ）から、GraphQL と同じ形の JSON を組む。スレッドの id は先頭コメントの id（数字の文字列）。url・本文・作成の時刻は先頭コメント、`last_*` は `comment_ids` の最後のコメント |
-| Draft 外し（`undraft`） | 題の `Draft:` 除去の PATCH のあと `POST pulls/<N>/ccr/ready_for_review`。`GET pulls/<N>` の `draft` を返す（戻り値の形は GraphQL と同じ） |
-| 受け入れの返信と解決（`accept_reply`・`accept_resolve`） | `POST pulls/<N>/comments/<id>/replies` と `POST pulls/<N>/ccr/comments/<id>/resolve`。計画の id が数字だけなら REST、そうでなければ GraphQL の node id。id は取り直した結果にあるものだけを通すので、取った道と書く道は同じ |
+| スレッドの取得（`threads`） | `GET pulls/<N>/ccr/review_threads`（`resolved`・`path`・`line`・`comment_ids`）と `GET pulls/<N>/comments`（全ページ）から、GraphQL と同じ形の JSON を組む。スレッドの id は先頭コメントの id（数字の文字列）。url・本文・作成の時刻は先頭コメントから、`last_*` は `comment_ids` の最後のコメントから取る |
+| Draft 外し（`undraft`） | 題の `Draft:` 除去の PATCH のあとで `POST pulls/<N>/ccr/ready_for_review` を打つ。戻り値は `GET pulls/<N>` の `draft`（戻り値の形は GraphQL と同じ） |
+| 受け入れの返信と解決（`accept_reply`・`accept_resolve`） | `POST pulls/<N>/comments/<id>/replies` と `POST pulls/<N>/ccr/comments/<id>/resolve`。計画の id が数字だけなら REST、そうでなければ GraphQL の node id を使う。id は取り直した結果にあるものだけを通すので、取った道と書く道は同じになる |
 | MR が閉じる issue（`ccnavi-start.sh` の `mr_linked_issues`） | `GET pulls/<N>` の本文の `close(s/d)`・`fix(es/ed)`・`resolve(s/d)` に続く `#n`・`owner/repo#n`（大文字小文字不問）。MCP で確かめた値を渡す回避路（`--mcp-checked`）は残す |
 
-REST の代わりの道も失敗したときは、止まってユーザに接続（認証と権限）の確認を頼む案内を出す（`rest_fallback_failed`）。スレッドとレビューの JSON を作って実行ファイルに直接渡す手順は案内しない（write-and-push に止められる）。`ccr` の道は通常の GitHub では 404 になる。
+REST の代わりの道も失敗したときは、ユーザに接続（認証と権限）の確認を頼んで止まる案内を出す（`rest_fallback_failed`）。スレッドとレビューの JSON を作って実行ファイルに直接渡す手順は案内しない（write-and-push の検査で止まるため）。`ccr` の道は通常の GitHub では 404 になる。
 
 **GitLab の依頼コメントへの返信。** GitLab では、ccnavi の依頼コメント（`<!-- ccnavi:request`）にユーザが返信するとスレッドになる（実物での挙動は未検証で、見本は手で組んだもの）。スレッドの判定に使う note は、discussion の note から `system: true` を除いたもの（空なら discussion ごと除く）。note が 1 つでも `resolvable` なら対象にし、全部 `resolvable` でないもの（MR 画面の普通のコメント）は数えない。`resolved` は、`resolvable` な note が全部 resolved のとき。**代表の note**（本文・URL・位置・作成日時・書き手）は、本文が `<!-- ccnavi:` で始まらない最初の note（無ければ先頭）。依頼コメントへの返信があれば返信が代表になり、`decide` が見せる本文、issue と続きの子に転記する本文、キー（URL）、版は返信のものになる。`own` は note の本文が全部目印で始まるときだけ真（JSON の真偽値）で、実行ファイルは `true` / `false` だけを受け、それ以外は `own` が無いものとして従来の判定（本文の目印と書き手）に戻る。ccnavi の投稿として未解決から除くのは、書き手が依頼を投稿したアカウントで、`own` が真のとき。依頼したアカウントが目印なしで返信したスレッドは数える。`ccnavi:accept` の返信を足しても、代表の note・URL・版は変わらない。`last_*`（最後のコメントの id・時刻・書き手）は system を除いた集合の最後の note になった。受け入れ台帳（`accepted.json`）は最後のコメントの id で再提起を見分けるので、system note（コミットの追加・行の変更・解決の通知）が付くだけでは再提起にならなくなり、system note の id を最後のコメントとして残している古い項目は一度合わなくなって未解決として数え直される（隠さない側に倒れる）。**制約（今回は変えない）:** `decide` のダイジェストはキーと代表の本文の版だけで照合する。preview のあとに代表の note が消える・変わると止まるが、同じ discussion へ別の返信が付いても検知しない。`last_*` を使うのは、手で動かした子の確定と受け入れ台帳での再提起の判定だけ。
 

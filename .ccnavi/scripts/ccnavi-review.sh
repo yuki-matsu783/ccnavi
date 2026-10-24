@@ -418,7 +418,7 @@ find_posted() {
 	fi
 }
 
-# ---- Draft を外す。GitHub は GraphQL で外す（GraphQL が 403 の環境は REST の ccr/ready_for_review）。GitLab は題の "Draft: " を除く。
+# ---- Draft を外す。GitHub は GraphQL で外す（GraphQL が 403 の環境では REST の ccr/ready_for_review を使う）。GitLab は題の "Draft: " を除く。
 
 # 題の頭の Draft の印（`Draft:`・`[Draft]`・`WIP:` など。大文字小文字は問わない）を除く。標準入力の 1 行。
 # sed の大文字小文字を区別しない指定（`I`）は GNU だけで、BSD の sed（macOS）では失敗するので、字ごとに書く。
