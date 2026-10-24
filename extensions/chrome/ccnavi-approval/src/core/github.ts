@@ -3,7 +3,8 @@
  *
  * 操作は名前で限る。画面から来るのは操作の名前と引数だけで、URL・クエリ・ヘッダは
  * ここで組む。GraphQL の問い合わせは固定の文で、引数は変数で渡す（文に継ぎ足さない）。
- * 書くのは `createCommitOnBranch`（`expectedHeadOid` つき）の 1 つだけ。
+ * 書くのは `createCommitOnBranch`（`expectedHeadOid` つき）、ブランチの作成・初期コミット・Draft の MR、
+ * レビューのスレッドへの返信と解決、issue の作成、MR へのコメントに限る。
  */
 import type { Host } from "./hosts.js";
 
@@ -83,7 +84,7 @@ export interface Client {
   readonly fetch: Fetch;
   readonly counter: Counter;
   /** 応答から読んだもの（PAT の期限。読めなければ空）。呼び手が記録する */
-  readonly seen?: { expiration: string };
+  readonly seen?: { expiration: string; scopes?: string };
   /** 待つ（レート制限の Retry-After）。試験は差し替える */
   readonly sleep?: (ms: number) => Promise<void>;
 }
@@ -91,6 +92,9 @@ export interface Client {
 function note(client: Client, res: Awaited<ReturnType<Fetch>>): void {
   const exp = res.headers?.get(EXPIRATION_HEADER);
   if (client.seen && typeof exp === "string" && exp.trim() !== "") client.seen.expiration = exp.trim();
+  // classic の PAT だけが付ける。fine-grained には無い（権限を書く前に読み取れない）
+  const scopes = res.headers?.get("x-oauth-scopes");
+  if (client.seen && typeof scopes === "string") client.seen.scopes = scopes.trim();
 }
 
 function headers(client: Client): Record<string, string> {
@@ -99,6 +103,21 @@ function headers(client: Client): Record<string, string> {
     Authorization: `Bearer ${client.token}`,
     "X-GitHub-Api-Version": "2022-11-28",
   };
+}
+
+/** 書き込みに要る PAT の権限（fine-grained の名前）。無ければ読み取り */
+export type Need = "Contents" | "Issues" | "Pull requests";
+
+const NEED_TEXT: Record<Need, string> = {
+  Contents: "Contents: Read and write",
+  Issues: "Issues: Read and write",
+  "Pull requests": "Pull requests: Read and write",
+};
+
+/** 権限が足りないときの文面。書く操作ごとに、要る権限の名前を言う */
+export function lacking(need?: Need): string {
+  if (!need) return "PAT の権限（リポジトリ・Contents など）を見直してください";
+  return `PAT に ${NEED_TEXT[need]} の権限が要ります（fine-grained token は対象のリポジトリも選びます。classic は repo スコープ）`;
 }
 
 /** Retry-After を待ち直す上限（秒）。これより長ければ待たずに原因を言う */
@@ -148,7 +167,7 @@ async function pause(client: Client, seconds: number): Promise<void> {
  * 1 回の呼び出し。401 は差し替えを促し、レート制限（403・429、Retry-After）は原因を言う。
  * Retry-After が短ければ 1 回だけ待ち直す（15 の決定）。
  */
-async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string): Promise<Res> {
+async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string, need?: Need): Promise<Res> {
   for (let attempt = 0; ; attempt += 1) {
     // 別のホストへの転送を追わない（PAT を載せた要求を通信先の一覧の外へ出さない）
     const res = await fetchNoRedirect(client, url, init, what);
@@ -165,7 +184,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
       throw new HostError(limited.text, res.status);
     }
     if (res.status === 403) {
-      throw new HostError(`GitHub が拒否した（403）: ${what}。PAT の権限（リポジトリ・Contents など）を見直してください`, 403);
+      throw new HostError(`GitHub が拒否した（403）: ${what}。${lacking(need)}`, 403);
     }
     return res;
   }
@@ -203,7 +222,12 @@ async function restPages(client: Client, path: string, pages: number): Promise<{
   return { items, more: next !== "" && next !== path };
 }
 
-async function graphql(client: Client, query: string, variables: Record<string, unknown>): Promise<Record<string, unknown>> {
+/** GraphQL の errors が権限の不足を言っているか */
+function forbidden(errors: { type?: string; message?: string }[]): boolean {
+  return errors.some((e) => e.type === "FORBIDDEN" || e.type === "INSUFFICIENT_SCOPES" || /resource not accessible|must have .*permission|not permitted/i.test(e.message ?? ""));
+}
+
+async function graphql(client: Client, query: string, variables: Record<string, unknown>, need?: Need): Promise<Record<string, unknown>> {
   for (let attempt = 0; ; attempt += 1) {
     client.counter.graphql += 1;
     const res = await send(
@@ -211,6 +235,7 @@ async function graphql(client: Client, query: string, variables: Record<string, 
       client.host.graphql,
       { method: "POST", headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify({ query, variables }) },
       "GraphQL",
+      need,
     );
     if (!res.ok) {
       throw new HostError(`GitHub の GraphQL が ${res.status} を返した`, res.status);
@@ -227,7 +252,9 @@ async function graphql(client: Client, query: string, variables: Record<string, 
       throw new HostError("GitHub の GraphQL のレート制限にかかった（RATE_LIMITED）。少し待ってからボードを更新してください", 429);
     }
     if (errors.length > 0) {
-      throw new HostError(`GitHub の GraphQL が失敗した: ${errors.map((e) => e.message ?? "?").join(" / ")}`);
+      const text = errors.map((e) => e.message ?? "?").join(" / ");
+      if (need && forbidden(errors)) throw new HostError(`GitHub が拒否した: ${text}。${lacking(need)}`, 403);
+      throw new HostError(`GitHub の GraphQL が失敗した: ${text}`);
     }
     return body.data ?? {};
   }
@@ -843,4 +870,320 @@ export async function createDraftMr(client: Client, owner: string, repo: string,
   const made = (await res.json()) as { number?: unknown; html_url?: unknown };
   if (typeof made.number !== "number") throw new HostError("作ったマージリクエストの番号を取得できません");
   return { number: made.number, url: String(alt(made.html_url, "")) };
+}
+
+// ---- decide のホスト書き込み。スレッドへの返信と解決、issue の作成と検索、MR へのコメント ------
+
+/** issue の題・返信とコメントと issue の本文の字数の上限（GitHub の本文の上限は 65,536 字） */
+export const MAX_TITLE = 255;
+export const MAX_WRITE_TEXT = 65000;
+
+const THREAD_ID = /^[A-Za-z0-9_=-]{1,200}$/;
+/** issue の操作 ID の印。本文に入れ、作る前に同じ印の issue を探す */
+export const ISSUE_MARKER = /^<!-- ccnavi:issue op=[A-Za-z0-9._:-]{1,100} -->$/;
+
+/** GraphQL の node id（スレッドの id）。経路にも変数にも使える字に限る */
+export function checkThreadId(value: unknown): string {
+  if (typeof value !== "string" || !THREAD_ID.test(value)) throw new HostError(`スレッドの id の形が正しくない: ${String(value)}`);
+  return value;
+}
+
+/** PR・MR の番号 */
+export function checkNumber(value: unknown, what = "番号"): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 999_999_999) throw new HostError(`${what} の形が正しくない: ${String(value)}`);
+  return value;
+}
+
+/** 返信・コメント・issue の本文。空でなく、上限以内で、NUL を含まない */
+export function checkWriteText(value: unknown, what: string): string {
+  if (typeof value !== "string" || value.trim() === "" || value.length > MAX_WRITE_TEXT || value.includes("\0")) {
+    throw new HostError(`${what} は ${MAX_WRITE_TEXT} 字までの空でない文字列にしてください（NUL は含められません）`);
+  }
+  return value;
+}
+
+/** issue の題。1 行で、制御文字を含まない */
+export function checkTitle(value: unknown): string {
+  if (typeof value !== "string" || value.trim() === "" || value.length > MAX_TITLE || /[\x00-\x1f\x7f]/.test(value)) {
+    throw new HostError(`issue の題は ${MAX_TITLE} 字までの 1 行の文字列にしてください（改行・制御文字は含められません）`);
+  }
+  return value;
+}
+
+/** 本文の 1 行目だけを印として読む。印でなければ空 */
+export function markerLine(body: unknown): string {
+  if (typeof body !== "string") return "";
+  const first = body.split("\n", 1)[0].replace(/\r$/, "");
+  return ISSUE_MARKER.test(first) ? first : "";
+}
+
+/**
+ * ホストへ送る本文の無害化。コードフェンスの外だけを直す: GitLab は行頭の `/`（quick action）の前に、
+ * 両ホストとも `@` の直後（メンション）に、ゼロ幅の空白を入れる。フェンスの中は変えない
+ */
+export function neutralize(text: string, gitlab: boolean): string {
+  const ZW = "\u200b";
+  let fence: { ch: string; len: number } | null = null;
+  return text
+    .split("\n")
+    .map((line) => {
+      const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line.replace(/\r$/, ""));
+      if (fence) {
+        if (m && m[1][0] === fence.ch && m[1].length >= fence.len && m[2].trim() === "") fence = null;
+        return line;
+      }
+      if (m) {
+        fence = { ch: m[1][0], len: m[1].length };
+        return line;
+      }
+      let out = line.replace(/(^|[^\w`])@(?=[\w])/g, `$1@${ZW}`);
+      if (gitlab && /^\s*\//.test(out)) out = ZW + out;
+      return out;
+    })
+    .join("\n");
+}
+
+export function checkMarker(value: unknown): string {
+  if (typeof value !== "string" || !ISSUE_MARKER.test(value)) throw new HostError("issue の操作 ID の印の形が正しくない");
+  return value;
+}
+
+/** ホストが返した画面の URL。通信先の画面の根の下に限る（返信の本文に入れるので、別の場所を指させない） */
+export function checkWebUrl(client: Pick<Client, "host">, value: unknown): string {
+  let url: URL;
+  try {
+    url = new URL(String(value));
+  } catch {
+    throw new HostError(`ホストが返した URL を読めません: ${String(value)}`);
+  }
+  const root = new URL(client.host.web);
+  if (url.origin !== root.origin || url.username || url.password || /[\s`<>]/.test(String(value))) {
+    throw new HostError(`ホストが返した URL が通信先の画面の外を指しています: ${String(value)}`);
+  }
+  return url.toString();
+}
+
+export interface IssueRef {
+  readonly number: number;
+  readonly url: string;
+}
+
+/** 書く前に確かめる 1 つのスレッドの状態 */
+export interface ThreadAbility {
+  readonly id: string;
+  /** ok: 扱える。pending: 保留中のレビューのスレッド（GitHub）。not-resolvable: 解決できない種類。non-diff: 差分以外の discussion（GitLab） */
+  readonly kind: "ok" | "pending" | "not-resolvable" | "non-diff";
+  readonly canReply: boolean;
+  readonly canResolve: boolean;
+  /** スレッドの既存のコメントにある、返信の印（`<!-- ccnavi:reply op=… -->`）の操作 ID。同じ返信を二度付けない */
+  readonly replyOps: readonly string[];
+}
+
+/** コメントの本文の並びから、返信の印の操作 ID を集める */
+export function replyOpsOf(bodies: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const b of bodies) for (const m of b.matchAll(/<!-- ccnavi:reply op=([0-9a-f]{32}) key=\S* -->/g)) out.push(m[1]);
+  return out;
+}
+
+/** 足りないと分かった権限 1 つ。`for` は、その権限が要る操作（`all` はどれにも要る） */
+export interface Missing {
+  readonly need: string;
+  readonly for: "all" | "issue" | "reply" | "resolve" | "comment";
+}
+
+/** 書く前の確かめの材料（`precheckHostPlan` が計画と突き合わせる） */
+export interface WriteInfo {
+  readonly host: "github" | "gitlab";
+  readonly threads: readonly ThreadAbility[];
+  /** PAT かロールに足りないと分かったもの */
+  readonly missing: readonly Missing[];
+  /** 書く前には確かめられなかった権限の名前（実際に書くまで分からない） */
+  readonly unknown: readonly string[];
+}
+
+async function writeJson(client: Client, path: string, method: string, body: unknown, need: Need): Promise<{ status: number; body: unknown }> {
+  client.counter.rest += 1;
+  const res = await send(client, `${client.host.api}${path}`, { method, headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify(body) }, `${method} ${path}`, need);
+  let parsed: unknown = null;
+  try {
+    parsed = await res.json();
+  } catch {
+    parsed = null;
+  }
+  return { status: res.status, body: parsed };
+}
+
+const REPLY_THREAD = `mutation($input: AddPullRequestReviewThreadReplyInput!) {
+  addPullRequestReviewThreadReply(input: $input) { comment { id url } }
+}`;
+
+/** レビューのスレッドへ返信する（`addPullRequestReviewThreadReply`。Pull requests の書き込み） */
+export async function replyThread(client: Client, threadId: string, body: string): Promise<{ url: string }> {
+  const data = await graphql(client, REPLY_THREAD, { input: { pullRequestReviewThreadId: checkThreadId(threadId), body: checkWriteText(body, "返信の本文") } }, "Pull requests");
+  const comment = (data.addPullRequestReviewThreadReply as { comment?: { id?: unknown; url?: unknown } | null } | null)?.comment;
+  if (!comment || typeof comment.id !== "string") throw new HostError("GitHub がスレッドへの返信を受け付けなかった（返信が作られていない。保留中のレビューのスレッドは返信できないことがあります）");
+  return { url: typeof comment.url === "string" ? comment.url : "" };
+}
+
+const RESOLVE_THREAD = `mutation($input: ResolveReviewThreadInput!) {
+  resolveReviewThread(input: $input) { thread { id isResolved } }
+}`;
+
+/** レビューのスレッドを解決済みにする（`resolveReviewThread`）。解決済みになったことまで確かめる */
+export async function resolveThread(client: Client, threadId: string): Promise<void> {
+  const data = await graphql(client, RESOLVE_THREAD, { input: { threadId: checkThreadId(threadId) } }, "Pull requests");
+  const thread = (data.resolveReviewThread as { thread?: { isResolved?: unknown } | null } | null)?.thread;
+  if (!thread || thread.isResolved !== true) throw new HostError("GitHub がスレッドを解決済みにしなかった（応答が解決済みを示していない）");
+}
+
+/**
+ * issue を作る（`POST /repos/{o}/{r}/issues`）。題と本文だけを送る。assignee・labels・milestone は入れない
+ * （入れると、権限のないユーザには黙って無視されるか、割り当てが通知になる）。
+ */
+export async function createIssue(client: Client, owner: string, repo: string, title: string, body: string): Promise<IssueRef> {
+  const path = `${repoPath(owner, repo)}/issues`;
+  const res = await writeJson(client, path, "POST", { title: checkTitle(title), body: checkWriteText(body, "issue の本文") }, "Issues");
+  if (res.status === 410) throw new HostError("このリポジトリは Issues が無効です（410）。設定で Issues を有効にしてください", 410);
+  if (res.status === 404) throw new HostError(`issue を作れませんでした（404）。リポジトリ ${owner}/${repo} が見えないか、PAT に ${NEED_TEXT.Issues} の権限がありません`, 404);
+  if (res.status < 200 || res.status >= 300) {
+    const why = (res.body as { message?: unknown } | null)?.message;
+    throw new HostError(`GitHub が issue を作らなかった（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+  }
+  const made = (res.body ?? {}) as { number?: unknown; html_url?: unknown };
+  if (typeof made.number !== "number" || !Number.isInteger(made.number) || made.number <= 0) throw new HostError("作った issue の番号を取得できません");
+  return { number: made.number, url: checkWebUrl(client, made.html_url) };
+}
+
+/** 検索で見る issue の上限（100 件 × 3 ページ。新しい順）。届いても探し切れたとは言わない（検索は best effort） */
+export const FIND_PAGES = 3;
+
+/** 探した結果。`truncated` は、上限まで読んでも見つからず、探し切れていない */
+export interface FindResult {
+  readonly issue: IssueRef | null;
+  readonly truncated: boolean;
+}
+
+/**
+ * 操作 ID の印を本文の 1 行目に持つ issue を探す。PAT の持ち主が作ったものだけを拾う（他人が印を書いて、返信の
+ * リンク先を差し替えさせない）。404 は「無い」。5xx・429・通信の失敗は投げる（作り直さずに止める）。
+ * 上限（100 件 × 3 ページ、新しい順）まで読んで見つからなければ `truncated` を立てる。
+ */
+export async function findIssueByMarker(client: Client, owner: string, repo: string, marker: string): Promise<FindResult> {
+  const m = checkMarker(marker);
+  const me = (await viewer(client)).toLowerCase();
+  for (let page = 1; page <= FIND_PAGES; page += 1) {
+    const { status, body } = await rest(client, `${repoPath(owner, repo)}/issues?state=all&sort=created&direction=desc&per_page=100&page=${page}`);
+    if (status === 404) return { issue: null, truncated: false };
+    if (!Array.isArray(body)) throw new HostError(`リポジトリ ${owner}/${repo} の Issue の一覧の応答が配列でない`);
+    for (const i of body as { number?: unknown; html_url?: unknown; body?: unknown; pull_request?: unknown; user?: { login?: unknown } | null }[]) {
+      if (i.pull_request !== undefined && i.pull_request !== null) continue;
+      if (markerLine(i.body) !== m) continue;
+      if (typeof i.user?.login !== "string" || i.user.login.toLowerCase() !== me) continue;
+      if (typeof i.number !== "number" || !Number.isInteger(i.number) || i.number <= 0) continue;
+      return { issue: { number: i.number, url: checkWebUrl(client, i.html_url) }, truncated: false };
+    }
+    if (body.length < 100) return { issue: null, truncated: false };
+  }
+  return { issue: null, truncated: true };
+}
+
+/** issue のコメントの本文（続きのコメントが付いているかを見る）。500 件を超えたら読み切れないので投げる */
+export async function issueComments(client: Client, owner: string, repo: string, number: number): Promise<string[]> {
+  const out: string[] = [];
+  for (let page = 1; page <= 5; page += 1) {
+    const { status, body } = await rest(client, `${repoPath(owner, repo)}/issues/${checkNumber(number, "issue の番号")}/comments?per_page=100&page=${page}`);
+    if (status === 404 || !Array.isArray(body)) throw new HostError(`issue #${number} のコメントを読めません`, status === 404 ? 404 : 0);
+    for (const c of body as { body?: unknown }[]) out.push(typeof c.body === "string" ? c.body : "");
+    if (body.length < 100) return out;
+  }
+  throw new HostError(`issue #${number} のコメントが多すぎて読み切れません`);
+}
+
+const THREAD_OWNER = `query($id: ID!) {
+  node(id: $id) { ... on PullRequestReviewThread { pullRequest { number repository { nameWithOwner } } } }
+}`;
+
+/** スレッドが、登録したリポジトリの、その PR のものか（別のリポジトリ・別の PR のスレッドに書かせない） */
+export async function threadBelongs(client: Client, threadId: string, owner: string, repo: string, number: number): Promise<boolean> {
+  const data = await graphql(client, THREAD_OWNER, { id: checkThreadId(threadId) });
+  const pr = (data.node as { pullRequest?: { number?: unknown; repository?: { nameWithOwner?: unknown } } | null } | null)?.pullRequest;
+  return pr?.number === number && typeof pr.repository?.nameWithOwner === "string" && pr.repository.nameWithOwner.toLowerCase() === `${owner}/${repo}`.toLowerCase();
+}
+
+/**
+ * PR か issue にコメントを付ける（`POST /issues/{n}/comments`。PR は issue の一種）。
+ * 要る権限は、PR なら Pull requests の書き込み、issue なら Issues の書き込み
+ */
+export async function issueComment(client: Client, owner: string, repo: string, number: number, body: string, target: "pr" | "issue" = "pr"): Promise<{ url: string }> {
+  const path = `${repoPath(owner, repo)}/issues/${checkNumber(number, target === "pr" ? "PR の番号" : "issue の番号")}/comments`;
+  const need: Need = target === "pr" ? "Pull requests" : "Issues";
+  const res = await writeJson(client, path, "POST", { body: checkWriteText(body, "コメントの本文") }, need);
+  if (res.status === 404) throw new HostError(`コメントを付けられませんでした（404）。${target === "pr" ? "PR" : "issue"} #${number} が見えないか、PAT に ${NEED_TEXT[need]} の権限がありません`, 404);
+  if (res.status < 200 || res.status >= 300) {
+    const why = (res.body as { message?: unknown } | null)?.message;
+    throw new HostError(`GitHub がコメントを受け付けなかった（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+  }
+  const url = (res.body as { html_url?: unknown } | null)?.html_url;
+  return { url: typeof url === "string" ? checkWebUrl(client, url) : "" };
+}
+
+const WRITE_THREADS = `query($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    hasIssuesEnabled
+    isArchived
+    viewerPermission
+    pullRequest(number: $number) {
+      reviewThreads(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id isResolved viewerCanReply viewerCanResolve comments(first: 1) { nodes { state } } recent: comments(last: 30) { nodes { body } } }
+      }
+    }
+  }
+}`;
+
+/**
+ * 書く前の確かめの材料。スレッドごとに返信・解決できるか（`viewerCanReply`・`viewerCanResolve`）と、保留中のレビューか
+ * （最初のコメントの state が PENDING）を読み、Issues が使えるか・アーカイブされていないか・classic の PAT のスコープを見る。
+ * fine-grained の PAT の権限は、書く前には読み取れない（`unknown` に入れる）。
+ */
+export async function writeInfo(client: Client, owner: string, repo: string, number: number): Promise<WriteInfo> {
+  const n = checkNumber(number, "PR の番号");
+  const threads: ThreadAbility[] = [];
+  const missing: Missing[] = [];
+  let after: string | null = null;
+  for (let page = 0; ; page += 1) {
+    const data = await graphql(client, WRITE_THREADS, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), number: n, after });
+    const r = data.repository as {
+      hasIssuesEnabled?: unknown;
+      isArchived?: unknown;
+      viewerPermission?: unknown;
+      pullRequest?: { reviewThreads?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: Record<string, unknown>[] } } | null;
+    } | null;
+    const conn = r?.pullRequest?.reviewThreads;
+    if (!r || !conn) throw new HostError(`マージリクエスト #${n} のスレッドを取得できません`);
+    if (page === 0) {
+      if (r.isArchived === true) missing.push({ need: "リポジトリのアーカイブの解除（読み取り専用です）", for: "all" });
+      if (r.hasIssuesEnabled === false) missing.push({ need: "リポジトリの Issues の有効化", for: "issue" });
+    }
+    for (const t of conn.nodes) {
+      const first = ((t.comments as { nodes?: { state?: unknown }[] } | null)?.nodes ?? [])[0];
+      const pending = first?.state === "PENDING";
+      const recent = ((t.recent as { nodes?: { body?: unknown }[] } | null)?.nodes ?? []).map((c) => (typeof c.body === "string" ? c.body : ""));
+      threads.push({ id: String(t.id), kind: pending ? "pending" : "ok", canReply: t.viewerCanReply === true, canResolve: t.viewerCanResolve === true, replyOps: replyOpsOf(recent) });
+    }
+    if (!conn.pageInfo.hasNextPage) break;
+    if (page + 1 > THREAD_PAGES) throw new HostError("reviewThreads が多すぎて読み切れない");
+    after = conn.pageInfo.endCursor;
+  }
+  const scopes = client.seen?.scopes;
+  const unknown: string[] = [];
+  if (typeof scopes === "string") {
+    // classic の PAT: repo（公開リポジトリだけなら public_repo）が無ければ、issue もコメントも書けない
+    const have = scopes.split(",").map((x) => x.trim());
+    if (!have.includes("repo") && !have.includes("public_repo")) missing.push({ need: "repo スコープ（classic の PAT）", for: "all" });
+  } else {
+    unknown.push(NEED_TEXT.Issues, NEED_TEXT["Pull requests"]);
+  }
+  return { host: "github", threads, missing, unknown };
 }

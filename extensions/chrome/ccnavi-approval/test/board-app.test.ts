@@ -17,6 +17,7 @@ import { createRenderer } from "../src/core/sanitize.js";
 import type { FamilyBoard, RepoBoard } from "../src/core/snapshot.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import type { Outcome } from "../src/core/write.js";
+import type { DecideChoice, DecidePreview } from "../src/core/reviewed.js";
 import { HERE } from "./helpers/python.js";
 
 // 本物のページ（static/board.html）。見出しの 2 つのボタンや枠の ID は写しではなく実物で確かめる（scripts は動かさない）
@@ -343,4 +344,130 @@ test("CX-T230 直近の日数の入力欄は、保存されている値が変わ
   pressed.length = 0;
   await act(async () => $<HTMLButtonElement>("form.recent-days button[type=submit]").click());
   assert.deepEqual(pressed, ["days 30"]);
+});
+
+/** 残った指摘 n 件の決める画面の材料 */
+function preview(n: number, over: { digest?: string; unsupported?: Record<number, string> } = {}): DecidePreview {
+  return {
+    version: 2,
+    parent: "i0001",
+    phase: 1,
+    mr: { number: 3, url: "https://example.test/pr/3" },
+    digest: over.digest ?? "v2.aaa",
+    threads: Array.from({ length: n }, (_, i) => ({
+      key: `k${i}`,
+      url: i === 0 ? "https://example.test/c/0" : "javascript:alert(1)",
+      path: `src/f${i}.ts`,
+      line: i + 1,
+      body: `**指摘${i}**\n\n詳しい説明<script>x</script>`,
+      version: "v",
+      last_comment: { id: "", at: "", author: "" },
+      ...(over.unsupported?.[i] ? { unsupported: over.unsupported[i] } : {}),
+    })),
+  };
+}
+
+/** 未解決の指摘が残るフェーズの欄 */
+function withThreads(n: number): Section {
+  const b = board();
+  const fam = writable("i0001");
+  const panel = fam.reviews![0] as unknown as { copy: { threads: unknown[] }; problems: string[] };
+  panel.copy.threads = Array.from({ length: n }, (_, i) => ({ url: "https://example.test/c", path: "a.ts", line: i, body: "指摘", resolved: false }));
+  panel.problems = ["未解決のスレッドが残っています"];
+  return { board: { ...b, families: [fam] } as RepoBoard, attention: {}, issues: undefined };
+}
+
+const decided: string[] = [];
+function decideActions(): Actions {
+  return {
+    ...actions,
+    decideOpen: (_r, f, n) => void decided.push(`open ${f.family.name} ${n}`),
+    decideConfirm: (_r, f, n, choices, digest) => void decided.push(`confirm ${f.family.name} ${n} ${JSON.stringify(choices)} ${digest}`),
+    decideCancel: () => void decided.push("cancel"),
+  };
+}
+
+const radio = (key: string, choice: DecideChoice) => $<HTMLInputElement>(`li[data-key=${key}] input[data-choice=${choice}]`);
+const checkedOf = (key: string) => [...doc.querySelectorAll<HTMLInputElement>(`li[data-key=${key}] input`)].find((i) => i.checked)?.dataset.choice;
+
+test("CX-T270 決める画面: 既定は全件 fix で確定が押せる。一括で全件が切り替わり、個別の選び直しが一括を上書きする。確定は鍵→行き先とダイジェストを渡す", async () => {
+  decided.length = 0;
+  const fakeActions = decideActions();
+  const f = fake({ sections: sections(withThreads(2)), state: "done" });
+  (f.controller as { actions: Actions }).actions = fakeActions;
+  await mountOn(f.controller);
+  // 閉じているときは入口のボタンだけ（従来の「レビュー済みにする」は出さない）
+  assert.deepEqual([...doc.querySelectorAll<HTMLElement>("section.review button")].map((b) => b.dataset.action), ["decide-open"]);
+  await act(async () => $<HTMLButtonElement>("button[data-action=decide-open]").click());
+  assert.deepEqual(decided, ["open i0001 1"]);
+  await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2), deciding: false, notice: "" } });
+  assert.equal(checkedOf("k0"), "fix");
+  assert.equal(checkedOf("k1"), "fix");
+  assert.equal($<HTMLButtonElement>("button[data-action=decide-confirm]").disabled, false);
+  // 本文は消毒して描く（script は残らない）。1 行目＋全文の details。http(s) 以外の URL はリンクにしない
+  assert.equal(doc.querySelectorAll(".decide script").length, 0);
+  assert.ok(doc.querySelector("li[data-key=k0] details summary"));
+  assert.ok(doc.querySelector("li[data-key=k0] a.decide-url"));
+  assert.equal(doc.querySelector("li[data-key=k1] a.decide-url"), null);
+  // 一括
+  await act(async () => $<HTMLButtonElement>("button[data-bulk=issue]").click());
+  assert.deepEqual([checkedOf("k0"), checkedOf("k1")], ["issue", "issue"]);
+  // 個別の選び直しが一括を上書きする
+  await act(async () => radio("k1", "keep").click());
+  assert.deepEqual([checkedOf("k0"), checkedOf("k1")], ["issue", "keep"]);
+  await act(async () => $<HTMLButtonElement>("button[data-action=decide-confirm]").click());
+  assert.deepEqual(decided.at(-1), 'confirm i0001 1 {"k0":"issue","k1":"keep"} v2.aaa');
+  await act(async () => $<HTMLButtonElement>("button[data-action=decide-cancel]").click());
+  assert.equal(decided.at(-1), "cancel");
+});
+
+test("CX-T271 決める画面: 見せ直す（ダイジェストが変わる）と選び直す。確定中は全部無効。1 件のときは一括の行を出さない", async () => {
+  decided.length = 0;
+  const f = fake({ sections: sections(withThreads(2)), state: "done", decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2), deciding: false, notice: "" } });
+  (f.controller as { actions: Actions }).actions = decideActions();
+  await mountOn(f.controller);
+  await act(async () => radio("k0", "keep").click());
+  assert.equal(checkedOf("k0"), "keep");
+  // 同じダイジェストで描き直しても選びかけは保たれる
+  await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2), deciding: false, notice: "" } });
+  assert.equal(checkedOf("k0"), "keep");
+  // 見せ直した
+  await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2, { digest: "v2.bbb" }), deciding: false, notice: "指摘が変わりました" } });
+  assert.equal(checkedOf("k0"), "fix");
+  assert.match($(".decide .notice").textContent ?? "", /指摘が変わりました/);
+  // 確定中
+  await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2, { digest: "v2.bbb" }), deciding: true, notice: "" } });
+  assert.ok([...doc.querySelectorAll<HTMLInputElement | HTMLButtonElement>(".decide input, .decide button")].every((e) => e.disabled));
+  // 1 件
+  await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(1), deciding: false, notice: "" } });
+  assert.equal(doc.querySelector(".decide-bulk"), null);
+});
+
+test("CX-T272 決める画面: 扱えない指摘は選択肢を出さず理由を言い、確定を出さない。0 件は従来の「レビュー済みにする」", async () => {
+  decided.length = 0;
+  const f = fake({ sections: sections(withThreads(2)), state: "done", decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2, { unsupported: { 1: "差分の外のコメントです" } }), deciding: false, notice: "" } });
+  (f.controller as { actions: Actions }).actions = decideActions();
+  await mountOn(f.controller);
+  assert.equal(doc.querySelectorAll("li[data-key=k1] input").length, 0);
+  assert.match($("li[data-key=k1] .decide-unsupported").textContent ?? "", /Chrome では扱えません。VS Code で。差分の外のコメントです/);
+  assert.equal(doc.querySelector("button[data-action=decide-confirm]"), null);
+  assert.equal(doc.querySelectorAll("li[data-key=k0] input").length, 3);
+  // 指摘が 0 件のフェーズ（従来どおり）
+  await f.set({ sections: sections({ board: board(), attention: {}, issues: undefined }), decide: undefined });
+  assert.deepEqual([...doc.querySelectorAll<HTMLElement>("section.review button")].map((b) => b.dataset.action), ["review", "review"]);
+});
+
+test("CX-T279 決める画面: ops 未配線（入口の操作なし）なら従来の「レビュー済みにする」が出る。同じ名前の親が別のリポジトリにあっても、開いたリポジトリにだけ画面が出る", async () => {
+  const plain = withThreads(1);
+  (plain.board.families[0].reviews![0] as unknown as { problems: string[] }).problems = [];
+  const f = fake({ sections: sections(plain), state: "done" });
+  await mountOn(f.controller);
+  assert.deepEqual([...doc.querySelectorAll<HTMLElement>("section.review button")].map((b) => b.dataset.action), ["review"]);
+  const other = withThreads(1);
+  const second: Section = { ...other, board: { ...other.board, repo: { ...REPO, repo: "other" } } as RepoBoard };
+  (f.controller as { actions: Actions }).actions = decideActions();
+  await f.set({ sections: sections(withThreads(1), second), decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(1), deciding: false, notice: "" } });
+  assert.equal(doc.querySelectorAll(".decide").length, 1);
+  assert.ok(doc.querySelector('section.repo[data-repo="' + KEY + '"] .decide'));
+  assert.equal(doc.querySelectorAll('section.repo[data-repo="github.com/acme/other"] button[data-action=decide-open]').length, 1);
 });

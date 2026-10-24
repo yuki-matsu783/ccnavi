@@ -23,6 +23,12 @@
  * ブランチを作った後の初期コミット（`startCommit`）・Draft の MR の作成（`createDraftMr`）も受ける。後の 2 つは
  * `createBranch` と同じく、ボードからだけ・登録したリポジトリだけ・issue から決める形の名前だけで、
  * Draft の MR は統合先へ向け、本文は `Closes #<番号>` に限る。
+ *
+ * decide のホスト書き込み（`replyThread`・`resolveThread`・`createIssue`・`findIssue`・`postComment`・`commentIssue`）も、
+ * ボードからだけ・登録したリポジトリだけで受ける。受けるのはスレッドへの返信と解決、issue の作成と検索、
+ * MR へのコメントだけで、thread id は API の経路と GraphQL に使える字、題は 1 行、本文は字数の上限を検査する。
+ * 作る issue に assignee・labels・milestone は付けない。GitHub のスレッドは、登録したリポジトリのその MR のものかを確かめてから書く。本文はコードフェンスの外の quick action（GitLab）とメンションを無害にしてから送る。
+ * 書く前の確かめ `writeInfo` と `issueComments` は読むだけ（登録したリポジトリだけ）。
  */
 import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";
 import * as github from "./github.js";
@@ -51,6 +57,14 @@ export type HostOp =
   | "listMergedMrs"
   | "startCommit"
   | "createDraftMr"
+  | "replyThread"
+  | "resolveThread"
+  | "createIssue"
+  | "findIssue"
+  | "postComment"
+  | "commentIssue"
+  | "writeInfo"
+  | "issueComments"
   | "commit";
 
 export type Request =
@@ -132,7 +146,41 @@ const MAX_BODY = 64 * 1024;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 /** ホストへ書く操作。ボードからだけ、登録したリポジトリだけに受ける */
-const WRITE_OPS: ReadonlySet<string> = new Set(["commit", "createBranch", "startCommit", "createDraftMr"]);
+const WRITE_OPS: ReadonlySet<string> = new Set([
+  "commit",
+  "createBranch",
+  "startCommit",
+  "createDraftMr",
+  "replyThread",
+  "resolveThread",
+  "createIssue",
+  "findIssue",
+  "postComment",
+  "commentIssue",
+]);
+
+/** decide のホスト書き込みの引数（owner と repo のあと）の検査。形が悪ければ投げる */
+function hostWriteArgs(op: string, lab: boolean, rest: readonly unknown[]) {
+  const thread = (v: unknown) => (lab ? gitlab.checkDiscussionId(v) : github.checkThreadId(v));
+  // 外から来た本文は、フェンスの外の quick action（GitLab）とメンションを無害にしてから送る
+  const text = (v: unknown, what: string) => github.neutralize(github.checkWriteText(v, what), lab);
+  switch (op) {
+    case "replyThread":
+      return { mr: github.checkNumber(rest[0], "MR の番号"), thread: thread(rest[1]), body: text(rest[2], "返信の本文") };
+    case "resolveThread":
+      return { mr: github.checkNumber(rest[0], "MR の番号"), thread: thread(rest[1]) };
+    case "createIssue":
+      return { title: github.neutralize(github.checkTitle(rest[0]), false), body: text(rest[1], "issue の本文") };
+    case "findIssue":
+      return { marker: github.checkMarker(rest[0]) };
+    case "postComment":
+      return { mr: github.checkNumber(rest[0], "MR の番号"), body: text(rest[1], "コメントの本文") };
+    case "commentIssue":
+      return { issue: github.checkNumber(rest[0], "issue の番号"), body: text(rest[1], "コメントの本文") };
+    default:
+      throw new Error(`未対応の操作:${op}`);
+  }
+}
 
 async function hostOf(deps: Deps, id: unknown): Promise<Host> {
   const host = (await deps.getHosts()).find((h) => h.id === id);
@@ -396,6 +444,29 @@ function text(value: unknown, what: string, max: number): string {
   return value;
 }
 
+/** 検査の済んだ引数でホストへ書く */
+async function hostWrite(client: github.Client, op: string, o: string, r: string, w: Record<string, unknown>): Promise<unknown> {
+  const lab = client.host.kind === "gitlab";
+  switch (op) {
+    case "replyThread":
+      return lab
+        ? await gitlab.replyDiscussion(client, o, r, w.mr as number, w.thread as string, w.body as string)
+        : await github.replyThread(client, w.thread as string, w.body as string);
+    case "resolveThread":
+      if (lab) await gitlab.resolveDiscussion(client, o, r, w.mr as number, w.thread as string);
+      else await github.resolveThread(client, w.thread as string);
+      return null;
+    case "createIssue":
+      return lab ? await gitlab.createIssue(client, o, r, w.title as string, w.body as string) : await github.createIssue(client, o, r, w.title as string, w.body as string);
+    case "findIssue":
+      return lab ? await gitlab.findIssueByMarker(client, o, r, w.marker as string) : await github.findIssueByMarker(client, o, r, w.marker as string);
+    case "commentIssue":
+      return lab ? await gitlab.issueNote(client, o, r, w.issue as number, w.body as string) : await github.issueComment(client, o, r, w.issue as number, w.body as string, "issue");
+    default:
+      return lab ? await gitlab.mrNote(client, o, r, w.mr as number, w.body as string) : await github.issueComment(client, o, r, w.mr as number, w.body as string);
+  }
+}
+
 async function hostOp(client: github.Client, op: unknown, args: unknown[], counter: github.Counter, deps: Deps): Promise<Response> {
   const [owner, repo, a, b, c] = args as unknown[];
   const lab = client.host.kind === "gitlab";
@@ -550,6 +621,35 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       value = { name, head: await x.createBranch(client, o, r, name, head) };
       break;
     }
+    case "replyThread":
+    case "resolveThread":
+    case "createIssue":
+    case "findIssue":
+    case "commentIssue":
+    case "postComment": {
+      // decide: ホストへ書く。引数の形が悪ければ 400 で断る（書く流れは原因を言って止める）
+      let w: ReturnType<typeof hostWriteArgs>;
+      try {
+        w = hostWriteArgs(op, lab, [a, b, c]);
+      } catch (err) {
+        return refuse((err as Error).message);
+      }
+      // GitHub のスレッドは node id だけで指せるので、登録したリポジトリのこの MR のものかを確かめてから書く
+      if (!lab && (op === "replyThread" || op === "resolveThread")) {
+        const wt = w as { mr: number; thread: string };
+        if (!(await github.threadBelongs(client, wt.thread, o, r, wt.mr))) return refuse(`スレッドが ${o}/${r} の #${wt.mr} のものではないため、書き込みません`);
+      }
+      value = await hostWrite(client, op, o, r, w as Record<string, unknown>);
+      break;
+    }
+    case "issueComments":
+      // decide: issue の続きのコメントが付いているかを見る。読むだけ
+      value = await x.issueComments(client, o, r, github.checkNumber(a, "issue の番号"));
+      break;
+    case "writeInfo":
+      // decide: 書く前の確かめ。読むだけ（登録したリポジトリだけ）
+      value = await x.writeInfo(client, o, r, github.checkNumber(a, "MR の番号"));
+      break;
     case "listOpenMrs":
       // 「始める」: issue を閉じる開いた MR を探す。読むだけ
       value = await x.listOpenMrs(client, o, r);

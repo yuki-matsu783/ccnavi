@@ -10,7 +10,7 @@ import { memo, useRef, type JSX } from "react";
 import { MAX_RECENT_DAYS, repoKey } from "../core/settings.js";
 import type { RepoBoard } from "../core/snapshot.js";
 import { Attention } from "./Attention.js";
-import type { Actions, IssueList } from "./controller.js";
+import type { Actions, DecideState, IssueList } from "./controller.js";
 import { Family } from "./Family.js";
 import { ActionButton, Notice } from "./parts.js";
 import { Start } from "./Start.js";
@@ -22,11 +22,13 @@ export interface RepoProps {
   readonly attention?: Readonly<Record<string, string>>;
   /** 読んだ issue の一覧（「始める」） */
   readonly issues?: IssueList;
+  /** 残った指摘の行き先を決める画面（開いているとき） */
+  readonly decide?: DecideState;
 }
 
 const NONE: Readonly<Record<string, string>> = {};
 
-export const Repo = memo(function Repo({ board, actions, attention = NONE, issues }: RepoProps): JSX.Element {
+export const Repo = memo(function Repo({ board, actions, attention = NONE, issues, decide }: RepoProps): JSX.Element {
   return (
     <section className="repo" data-repo={repoKey(board.repo)}>
       <header className="repo-head">
@@ -41,12 +43,12 @@ export const Repo = memo(function Repo({ board, actions, attention = NONE, issue
         ) : null}
         {actions?.setRecentDays ? <RecentDays board={board} set={actions.setRecentDays} /> : null}
       </header>
-      {board.error ? <Notice kind="error" text={board.error} /> : <RepoBody board={board} actions={actions} attention={attention} issues={issues} />}
+      {board.error ? <Notice kind="error" text={board.error} /> : <RepoBody board={board} actions={actions} attention={attention} issues={issues} decide={decide} />}
     </section>
   );
 });
 
-function RepoBody({ board, actions, attention, issues }: RepoProps & { attention: Readonly<Record<string, string>> }): JSX.Element {
+function RepoBody({ board, actions, attention, issues, decide }: RepoProps & { attention: Readonly<Record<string, string>> }): JSX.Element {
   const s = board.stats;
   const dismiss = (family: string) => (actions?.dismiss ? () => actions.dismiss?.(board, family) : undefined);
   return (
@@ -68,8 +70,17 @@ function RepoBody({ board, actions, attention, issues }: RepoProps & { attention
                 : {
                     approve: () => actions.approve(board, f),
                     review: actions.review ? (n: number) => actions.review?.(board, f, n) : undefined,
+                    decide:
+                      actions.decideOpen && actions.decideConfirm && actions.decideCancel
+                        ? {
+                            open: (n) => actions.decideOpen?.(board, f, n),
+                            confirm: (n, choices, digest) => actions.decideConfirm?.(board, f, n, choices, digest),
+                            cancel: () => actions.decideCancel?.(),
+                          }
+                        : undefined,
                   }
             }
+            decide={decide?.repo === repoKey(board.repo) && decide.family === f.family.name ? decide : undefined}
             attention={why ? <Attention text={why} onDismiss={dismiss(f.family.name)} /> : null}
           />
         );

@@ -14,7 +14,8 @@ import { startAutoRefresh, type AutoRefresh, type AutoRefreshEnv } from "../core
 import { readRepos, repoKey, saveRecentDays, type RepoConfig, type StorageArea } from "../core/settings.js";
 import { collectRepo, type BlobCache, type Deps, type FamilyBoard, type HostCall, type RepoBoard, type Stats } from "../core/snapshot.js";
 import { listIssues, startIssue } from "../core/start.js";
-import { approveFamily, confirmPhase, type Outcome, type WriteDeps } from "../core/write.js";
+import { DECIDE_CHOICES, DECIDE_LABELS, type DecideChoice, type DecidePreview } from "../core/reviewed.js";
+import { approveFamily, confirmPhase, decidePhase, decidePreview, type DecideOutcome, type Outcome, type WriteDeps } from "../core/write.js";
 import type { PyWorker } from "./py-client.js";
 
 /** 親子のチケットごとの「要確認」（リポジトリの鍵 → 親のブランチ名 → 文面）。`chrome.storage.local` の `attention` */
@@ -31,6 +32,12 @@ export interface Actions {
   approve(repo: RepoBoard, family: FamilyBoard): void;
   /** レビュー済みにする。渡さなければ「レビュー済みにする」を出さない */
   review?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
+  /** 残った指摘の行き先を決める画面を開く（プレビューを読む）。渡さなければ画面を出さない */
+  decideOpen?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
+  /** 選んだ行き先（鍵 → 行き先）と、見せたダイジェストで確定する */
+  decideConfirm?(repo: RepoBoard, family: FamilyBoard, phase: number, choices: Readonly<Record<string, DecideChoice>>, digest: string): void;
+  /** 決める画面を閉じる */
+  decideCancel?(): void;
   /** issue の一覧を読む（「始める」）。渡さなければ「始める」の欄を出さない */
   loadIssues?(repo: RepoBoard): void;
   /** issue から親のブランチを作る */
@@ -70,6 +77,25 @@ export interface BannerLine {
   readonly text: string;
 }
 
+/** 決める画面の状態。`preview` は読み込み中は null。読み込みの失敗は `notice` に出す */
+export interface DecideState {
+  /** リポジトリの鍵（`repoKey`）。同じ名前の親が別のリポジトリにあっても取り違えない */
+  readonly repo: string;
+  /** 開くたびに増える番号。遅れて届いた読み取りの結果が、開き直した画面に付かないようにする */
+  readonly token: number;
+  readonly family: string;
+  readonly phase: number;
+  readonly preview: DecidePreview | null;
+  /** 確定の最中（画面は全部押せなくする） */
+  readonly deciding: boolean;
+  /** 画面に出す一言（見せた指摘が変わった・読めなかった・断られた理由） */
+  readonly notice: string;
+  /** 見せ直したとき、鍵と版が同じ指摘から引き継いだ選択（画面は新しいダイジェストの初期値にする） */
+  readonly inherited?: Readonly<Record<string, DecideChoice>>;
+}
+
+export type { DecideDone, DecideOutcome } from "../core/write.js";
+
 export type BoardState = "loading" | "writing" | "done" | "error";
 
 export interface BoardSnapshot {
@@ -86,6 +112,8 @@ export interface BoardSnapshot {
   readonly banner: readonly BannerLine[];
   readonly status: StatusLine;
   readonly result: ResultLine;
+  /** 残った指摘の行き先を決める画面（開いていなければ無い） */
+  readonly decide?: DecideState;
   /** 書く操作の最中 */
   readonly busy: boolean;
   /** `body` の `data-state` */
@@ -100,6 +128,21 @@ export interface BoardOps {
   readonly listIssues: typeof listIssues;
   readonly startIssue: typeof startIssue;
   readonly saveRecentDays: typeof saveRecentDays;
+  /** 決める画面の材料（残った指摘とダイジェスト）を読む。書かない */
+  readonly decidePreview?: (repo: RepoConfig, family: string, phase: number, deps: WriteDeps) => Promise<DecidePreview>;
+  /**
+   * 選んだ行き先を、issue・返信・解決の順にホストへ書いてから親のブランチへ 1 コミットする。
+   * `choices` が空（未解決の指摘が 0 件）のときは、従来の「レビュー済みにする」と同じ結果（`reviewed: true`）にする。
+   * 省略した場合は決める画面を出さず、従来の「レビュー済みにする」だけを出す。`decidePreview` と両方そろったときだけ画面が出る
+   */
+  readonly decide?: (
+    repo: RepoConfig,
+    family: string,
+    phase: number,
+    choices: Readonly<Record<string, DecideChoice>>,
+    digest: string,
+    deps: WriteDeps,
+  ) => Promise<DecideOutcome>;
 }
 
 export interface BoardEnv {
@@ -140,7 +183,45 @@ export interface BoardController {
   start(): void;
 }
 
-const DEFAULT_OPS: BoardOps = { collectRepo, approveFamily, confirmPhase, listIssues, startIssue, saveRecentDays };
+const DEFAULT_OPS: BoardOps = {
+  collectRepo,
+  approveFamily,
+  confirmPhase,
+  decidePreview,
+  decide: decidePhase,
+  listIssues,
+  startIssue,
+  saveRecentDays,
+};
+
+/** 決めた結果の一言。途中で止まった報告は、済んだ分と理由、続きの案内を出す */
+export function sayDecide(out: DecideOutcome): ResultLine {
+  if (out.kind === "written") {
+    const extra = out.pendingExtra ?? 0;
+    const head = out.reviewed ? "レビュー済みにしました" : extra > 0 && !out.followup ? `行き先は反映しましたが、見せた後に増えた指摘 ${extra} 件が判断待ちで、フェーズはレビュー済みにしていません` : "行き先を反映しました";
+    const parts = [head];
+    if (out.followup) parts.push(`続きの子：${out.followup}`);
+    if (extra > 0 && out.followup) parts.push(`見せた後に増えた指摘 ${extra} 件は判断待ちで、フェーズはレビュー済みにしていません`);
+    if (out.issues.length > 0) parts.push(`作った issue：${out.issues.join(", ")}`);
+    const reused = out.reusedIssues ?? [];
+    if (reused.length > 0) parts.push(`既にあった issue ${reused.length} 件：${reused.join(", ")}`);
+    const commit = out.oid ? `（コミット：${out.oid.slice(0, 7)}）` : "（親のブランチへ積むものはありませんでした）";
+    const warn = out.warning ? ` 注意：${out.warning}。` : "";
+    return { kind: "written", className: warn ? "notice error" : "notice ok", text: `${parts.join("。")}${commit}。${warn}` };
+  }
+  if (out.kind === "halted") {
+    const d = out.done;
+    const made = d.issues.length > 0 ? `作った issue：${d.issues.join(", ")}` : "作った issue：なし";
+    const reused = (d.reusedIssues ?? []).length > 0 ? `。既にあった issue ${d.reusedIssues?.length} 件：${d.reusedIssues?.join(", ")}` : "";
+    return {
+      kind: "halted",
+      className: "notice error",
+      text: `ホストへの書き込みが途中で止まりました。済んだ分（${made}${reused}。返信 ${d.replied} 件・解決 ${d.resolved} 件）。止まった理由：${out.message}。ボードを読み直して、未解決の指摘だけ決め直してください。`,
+    };
+  }
+  if (out.kind === "mismatch") return { kind: "changed", className: "notice error", text: `指摘が変わっていたので反映していません：${out.message}` };
+  return sayOutcome(out, "指摘の行き先");
+}
 
 function newStats(): Stats {
   return { rest: 0, graphql: 0, blobsFetched: 0, blobsCached: 0 };
@@ -159,6 +240,40 @@ export function sayOutcome(outcome: Outcome, what: string): ResultLine {
             ? `${what}は確認が必要な状態です。反映されたかどうかと残っている内容を、ホストの履歴で確認してください：${outcome.message}`
             : `${what}は反映されていません：${outcome.message}`;
   return { kind: outcome.kind, className: `notice ${outcome.kind === "written" ? "ok" : "error"}`, text };
+}
+
+/** 従来の「レビュー済みにする」の確認文（指摘が 0 件の決めるも同じ文面） */
+function reviewMessage(family: string, phase: number, warn: string): string {
+  return `${family} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子チケットを done/ に移動し、レビュー済みマーカーとともに1つのコミットとして反映します。反映する前に、押した時点のスレッドとレビューを再取得して確認します。${warn}`;
+}
+
+function decideMessage(family: string, phase: number, choices: Readonly<Record<string, DecideChoice>>, warn: string): string {
+  const n = (c: DecideChoice): number => Object.values(choices).filter((v) => v === c).length;
+  const parts = `${DECIDE_LABELS.fix} ${n("fix")} 件・${DECIDE_LABELS.issue} ${n("issue")} 件・${DECIDE_LABELS.keep} ${n("keep")} 件`;
+  const fix = n("fix") > 0 ? `「${DECIDE_LABELS.fix}」が 1 件以上あるので、続きの子チケットを作り、このフェーズを再開します。` : "";
+  return `${family} のフェーズ ${phase} の残った指摘の行き先を反映します（${parts}）。${fix}issue の作成、スレッドへの返信、スレッドの解決の順にホストへ書いてから、親のブランチへ1つのコミットとして反映します。${warn}`;
+}
+
+/** 読み取った指摘の鍵が空か重複していれば理由を返す（行き先を結ぶ鍵として使えない） */
+function previewProblem(preview: DecidePreview): string {
+  const seen = new Set<string>();
+  for (const t of preview.threads) {
+    if (typeof t.key !== "string" || t.key === "") return "指摘の鍵が空です";
+    if (seen.has(t.key)) return `指摘の鍵が重複しています（${t.key}）`;
+    seen.add(t.key);
+  }
+  return "";
+}
+
+/** 選んだ行き先が、見せた指摘の全部に 1 つずつ付いているか。付いていなければ理由を返す */
+function choicesProblem(preview: DecidePreview, choices: Readonly<Record<string, DecideChoice>>, digest: string): string {
+  if (digest !== preview.digest) return "見せた指摘と確定の内容が食い違っています。閉じて開き直してください";
+  if (preview.threads.some((t) => t.unsupported)) return "Chrome では扱えない指摘があります。VS Code で決めてください";
+  const keys = preview.threads.map((t) => t.key);
+  const given = Object.keys(choices);
+  if (given.length !== keys.length || !keys.every((k) => k in choices)) return "行き先を選んでいない指摘か、見せていない指摘があります";
+  if (!given.every((k) => DECIDE_CHOICES.includes(choices[k]))) return "不明な行き先があります";
+  return "";
 }
 
 export function createBoardController(env: BoardEnv): BoardController {
@@ -261,6 +376,14 @@ export function createBoardController(env: BoardEnv): BoardController {
     await env.storage.set({ attention: all });
   }
 
+  function setDecide(patch: Partial<DecideState> | undefined): void {
+    if (patch === undefined) {
+      set({ decide: undefined });
+      return;
+    }
+    if (snap.decide) set({ decide: { ...snap.decide, ...patch } });
+  }
+
   function say(outcome: Outcome, what: string): void {
     set({ result: sayOutcome(outcome, what) });
   }
@@ -330,7 +453,7 @@ export function createBoardController(env: BoardEnv): BoardController {
         if (await blocked(repoBoard.repo, family.family.name)) return false;
         const deps = await writeDeps(repoBoard.repo);
         const warn = await approvalWarning(deps, repoBoard.repo, family.family.name);
-        const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子チケットを done/ に移動し、レビュー済みマーカーとともに1つのコミットとして反映します。反映する前に、押した時点のスレッドとレビューを再取得して確認します。${warn}`;
+        const msg = reviewMessage(family.family.name, phase, warn);
         if (!env.confirm(msg)) return false;
         const outcome = await ops.confirmPhase(repoBoard.repo, family.family.name, phase, deps);
         await noteAttention(repoBoard.repo, family.family.name, outcome);
@@ -399,6 +522,93 @@ export function createBoardController(env: BoardEnv): BoardController {
     },
   };
 
+  /** 決める画面の入口。ops が未配線なら付けない（従来の「レビュー済みにする」だけを出す） */
+  const { decidePreview, decide: decideWrite } = ops;
+  if (decidePreview && decideWrite) {
+    let decideSeq = 0;
+    const live = (token: number): boolean => snap.decide?.token === token;
+    const patchOf = (token: number, patch: Partial<DecideState>): void => {
+      if (live(token)) setDecide(patch);
+    };
+    actions.decideOpen = (repoBoard, family, phase) => {
+      if (snap.busy) return;
+      const name = family.family.name;
+      const token = ++decideSeq;
+      set({ decide: { repo: repoKey(repoBoard.repo), token, family: name, phase, preview: null, deciding: false, notice: "" } });
+      void (async () => {
+        try {
+          if (await blocked(repoBoard.repo, name)) {
+            if (live(token)) setDecide(undefined);
+            return;
+          }
+          const preview = await decidePreview(repoBoard.repo, name, phase, await writeDeps(repoBoard.repo));
+          const bad = previewProblem(preview);
+          if (bad) patchOf(token, { notice: `残った指摘を読み取れませんでした：${bad}` });
+          else patchOf(token, { preview });
+        } catch (err) {
+          patchOf(token, { notice: `残った指摘を読み取れませんでした：${(err as Error).message ?? String(err)}` });
+        }
+      })();
+    };
+    actions.decideConfirm = (repoBoard, family, phase, choices, digest) => {
+      void act(async () => {
+        const name = family.family.name;
+        const cur = snap.decide;
+        if (!cur || cur.repo !== repoKey(repoBoard.repo) || cur.family !== name || cur.phase !== phase || !cur.preview) return false;
+        const token = cur.token;
+        const preview = cur.preview;
+        const bad = choicesProblem(preview, choices, digest);
+        if (bad) {
+          setDecide({ notice: bad });
+          return false;
+        }
+        if (await blocked(repoBoard.repo, name)) return false;
+        const deps = await writeDeps(repoBoard.repo);
+        const warn = await approvalWarning(deps, repoBoard.repo, name);
+        const msg = Object.keys(choices).length === 0 ? reviewMessage(name, phase, warn) : decideMessage(name, phase, choices, warn);
+        if (!env.confirm(msg)) return false;
+        setDecide({ deciding: true, notice: "" });
+        let out: DecideOutcome;
+        try {
+          out = await decideWrite(repoBoard.repo, name, phase, choices, digest, deps);
+        } catch (err) {
+          out = { kind: "failed", message: (err as Error).message ?? String(err) };
+        }
+        if (out.kind === "attention") await noteAttention(repoBoard.repo, name, out);
+        if (out.kind === "mismatch" && !out.hostWritten) {
+          // 見せた指摘が変わった。読み直して選び直させる（鍵と版が同じ指摘の選択は引き継ぐ）
+          try {
+            const next = await decidePreview(repoBoard.repo, name, phase, deps);
+            const problem = previewProblem(next);
+            if (problem) {
+              patchOf(token, { preview: null, deciding: false, notice: `指摘が変わりました。読み直しましたが読み取れませんでした：${problem}` });
+            } else {
+              const inherited: Record<string, DecideChoice> = {};
+              for (const t of next.threads) {
+                const before = preview.threads.find((o) => o.key === t.key && o.version === t.version);
+                if (before && choices[t.key]) inherited[t.key] = choices[t.key];
+              }
+              patchOf(token, { preview: next, deciding: false, inherited, notice: `指摘が変わりました（${out.message}）。同じ指摘の選択は引き継ぎましたが、新しい指摘は「${DECIDE_LABELS.fix}」に戻っています。選び直してください。` });
+            }
+          } catch (err) {
+            patchOf(token, { deciding: false, notice: `指摘が変わりました。読み直せませんでした：${(err as Error).message ?? String(err)}` });
+          }
+          return false;
+        }
+        set({ result: sayDecide(out) });
+        if (out.kind === "written" || out.kind === "halted" || out.kind === "attention" || ("hostWritten" in out && out.hostWritten)) setDecide(undefined);
+        else patchOf(token, { deciding: false, notice: sayDecide(out).text });
+        return true;
+      }).then(() => {
+        if (snap.decide?.deciding) setDecide({ deciding: false });
+      });
+    };
+    actions.decideCancel = () => {
+      if (snap.busy) return;
+      setDecide(undefined);
+    };
+  }
+
   /**
    * 読み直す。失敗は投げずに `#status` へ出す（`state` は error。自動のときは文面だけ）。
    * 手動の読み直しは始めに欄を空にするので、失敗したときは、始める前に描いていた欄を戻す（読めた分は新しいまま）。
@@ -437,6 +647,8 @@ export function createBoardController(env: BoardEnv): BoardController {
     if (!fromTimer) patch.state = "loading";
     if (clearResult) patch.result = { ...snap.result, kind: undefined, text: "" };
     if (!fromTimer) patch.sections = new Map();
+    // 書いた後の読み直しでは決める画面を残す（失敗の理由を見せ続ける）。手で押した読み直しだけ閉じる
+    if (clearResult && !fromTimer) patch.decide = undefined;
     if (Object.keys(patch).length > 0) set(patch);
     const got = await env.storage.get("repos");
     const repos = readRepos(got.repos, env.hosts);
@@ -470,7 +682,7 @@ export function createBoardController(env: BoardEnv): BoardController {
 
   /** 自動の読み直しを飛ばす間: 読み直しが走っている、書く操作の最中、ボードの入力欄を触っている */
   function skipAuto(): boolean {
-    return snap.busy || inflight !== null || env.editing();
+    return snap.busy || inflight !== null || env.editing() || snap.decide !== undefined;
   }
 
   return {

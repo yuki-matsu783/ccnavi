@@ -24,7 +24,8 @@ import { APPROVE_DIGEST_CHANGED, APPROVE_LIST_CHANGED, py, PyError, tagged, type
 import type { RepoConfig } from "./settings.js";
 import { MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
 import type { BlobText, FileAddition, PathObject, ReviewCopy } from "./github.js";
-import { askConfirm } from "./reviewed.js";
+import { askConfirm, askDecide, type DecideChoice, type DecidePreview, type DecideThread } from "./reviewed.js";
+import { callOps, describeHostFailure, ISSUE_LINKS_SLOT, precheckHostPlan, runHostPlan, unsupportedReason, type HostPlan } from "./decide-host.js";
 import { underPlaces } from "./guard.js";
 import { localStamp } from "./stamp.js";
 
@@ -538,4 +539,270 @@ export async function confirmPhase(repo: RepoConfig, family: string, phase: numb
     const message = commitMessage([family], `のフェーズ ${phase} のレビュー済みを置いた`, "レビュー済みを置いた", deps.version);
     return { kind: "rows", rows, message, lines: res.lines };
   });
+}
+
+
+// ---- 残った指摘の行き先を決める（decide） --------------------------------------------------------
+
+/** 途中で止まったときの、済んだ分 */
+export interface DecideDone {
+  /** 作れた issue の URL */
+  readonly issues: readonly string[];
+  /** 同じ印の issue が既にあったので作らず使った issue の URL */
+  readonly reusedIssues?: readonly string[];
+  /** 返信できたスレッドの数 */
+  readonly replied: number;
+  /** 解決できたスレッドの数 */
+  readonly resolved: number;
+}
+
+/**
+ * 決めた結果。ホストへ書く順の途中で止まったら `halted`（済んだ分と理由）。
+ * `hostWritten` は、ホストへの書き込みが済んだあとで積めなかったことを表す（古いプレビューを開いたままにしない）
+ */
+export type DecideOutcome =
+  /** `oid` はコミットの sha。積むものが無かったときは空。`warning` は反映が済んだあとに起きた失敗（MR へのコメントなど）。`pendingExtra` は見せたあとに増えた指摘の数 */
+  | {
+      readonly kind: "written";
+      readonly oid: string;
+      readonly reviewed: boolean;
+      readonly followup: string;
+      readonly issues: readonly string[];
+      readonly reusedIssues?: readonly string[];
+      readonly pendingExtra?: number;
+      readonly warning?: string;
+    }
+  /** 見せた指摘が今と違う（画面を読み直して選び直させる） */
+  | { readonly kind: "mismatch"; readonly message: string; readonly hostWritten?: boolean }
+  | { readonly kind: "halted"; readonly done: DecideDone; readonly message: string }
+  | (Exclude<Outcome, { readonly kind: "written" }> & { readonly hostWritten?: boolean });
+
+/** 決める判断の内側で、書かずに終える答え（コミットを積む中身が無い） */
+const NO_COMMIT: Outcome = { kind: "refused", message: "親のブランチへ反映する内容がありません" };
+
+/** Python の `CORE_DECIDE_MISMATCH`（見せた指摘と今の指摘が違う） */
+const DECIDE_MISMATCH = "CORE_DECIDE_MISMATCH";
+
+/** Python の `CORE_DECIDE_CHOICES`（選択の形が合わない。`carry` が読み直した結果で解決済みでないときも） */
+const DECIDE_CHOICES = "CORE_DECIDE_CHOICES";
+
+/** 指摘の鍵（URL か、無ければスレッドの id）→ ホストのスレッドの id。同じ鍵が複数あれば null（取り違えない） */
+function threadIds(copy: ReviewCopy): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  for (const t of copy.threads) {
+    if (t.resolved) continue;
+    const key = t.url || t.id;
+    out.set(key, out.has(key) ? null : t.id);
+  }
+  return out;
+}
+
+function reasonOf(err: unknown): string {
+  return (err as Error).message ?? String(err);
+}
+
+/** 親子のチケットを読み直す。読んでいる間に先頭が動いたら、上限まで読み直す。収まらなければ null */
+async function readSettled(repo: RepoConfig, family: string, deps: WriteDeps): Promise<FamilyRead | null> {
+  for (let round = 1; round <= MAX_ROUNDS; round += 1) {
+    const read = await readOrMoved(repo, family, deps);
+    if (read !== null) return read;
+  }
+  return null;
+}
+
+/**
+ * 決める画面の材料を読む（書かない）。親子のチケットと MR のスレッド・レビューを読み、Python の `decide`（preview）が
+ * 通したときだけ、残った指摘とダイジェストを返す。通らなければ理由を投げる。
+ *
+ * 各指摘に、Chrome で扱えない理由（`unsupported`）を付ける。保留中のレビューのスレッド・解決できない種類のスレッド・
+ * 差分以外の discussion（書く前の確かめと同じ見分け方）と、ホストのスレッドの id を特定できないもの。
+ * 書く前の確かめが読めなかったときは付けず、確定のときの確かめで止める。
+ */
+export async function decidePreview(repo: RepoConfig, family: string, phase: number, deps: WriteDeps): Promise<DecidePreview> {
+  const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
+  const read = await readSettled(repo, family, deps);
+  if (read === null) throw new Error(`読み取り中に ${family} の先頭が ${MAX_ROUNDS} 回更新されました。少し待ってからボードを更新してください`);
+  const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
+  const res = await askDecide(deps.py, ask, { snapshot: read.input, family, phase, copy, stamp: localStamp(deps.now()), mode: "preview" });
+  if (res.problems.length > 0 || !res.preview) throw new Error(res.problems.join("\n") || "残った指摘を読み取れませんでした");
+  const ids = threadIds(copy);
+  let abilities: Map<string, string> | null = null;
+  try {
+    const info = await callOps(deps.call).writeInfo(repo, copy.mr.number);
+    abilities = new Map(info.threads.filter((t) => t.kind !== "ok").map((t) => [t.id, unsupportedReason(t.kind as Exclude<typeof t.kind, "ok">)]));
+  } catch {
+    abilities = null;
+  }
+  const threads: DecideThread[] = res.preview.threads.map((t) => {
+    const id = ids.get(t.key);
+    if (!id) return { ...t, unsupported: "ホストのスレッドを特定できません" };
+    const kind = abilities?.get(id);
+    return kind ? { ...t, unsupported: kind } : t;
+  });
+  return { ...res.preview, threads };
+}
+
+/** ホストへ書いた後に積めなかった答えには、ホストの側は済んでいることを先に言い、画面を閉じさせる */
+function afterHost(out: Exclude<Outcome, { readonly kind: "written" }>, note: string): DecideOutcome {
+  if (note === "") return out;
+  return { ...out, message: `${note}${out.message}`, hostWritten: true };
+}
+
+/** 書き終えた keep・issue の鍵を `carry` にしたとき、Python が読み直した結果で解決済みと確かめる回数 */
+const CARRY_TRIES = 3;
+
+/**
+ * 選んだ行き先を反映する。順序は、(1) 見せた指摘のまま通るかを Python に聞いて計画（`host_plan`）を得る、
+ * (2) 書く前の確かめ（権限・Chrome で扱えない種類）、(3) ホストへ issue・返信・解決を書く（`writeLoop` の外で 1 度だけ）、
+ * (4) 読み直して `writeLoop` で親のブランチへ 1 コミット、(5) MR にコメントを投稿する。
+ *
+ * - (1)(2) で通らなければ何も書かない。(3) で止まればコミットせず、済んだ分と理由を返す。
+ *   止まった後は、ボードを読み直して未解決の指摘だけ決め直せば続きが進む
+ * - (4) のループはホストに書かない。先頭が動いて再試行しても、issue・返信・解決は重ならない。
+ *   ホストで書き終えた `keep`・`issue` の鍵は `carry` で渡し、読み直した結果で解決済みであることを Python が確かめる。
+ *   ホストの読み取りが遅れて確かめが通らないときだけ、短く待って取り直す
+ * - 指摘が 0 件（`choices` が空）なら、ホストには書かず「レビュー済みにする」と同じコミットを積む。コメントも投稿しない
+ *   （従来の「レビュー済みにする」は MR への書き込み権限を要らなかった）
+ * - 積むものが無ければ（`fix` が無く、見せたあとに増えた指摘がある）コミットを作らない（`oid` は空）
+ * - (5) のコメントは、(1) の計画のもの（`{issue_links}` を作った・使った issue の URL の一覧に置き換える）。
+ *   (1) を通らなかったとき（`fix` だけ）は、(4) の応答のもの。コミットが積めなかったときは投稿しない。
+ *   投稿の失敗はコミットを戻さず、警告として結果に載せる（マーカーを置いた後は同じ入口で再送できない）
+ */
+export async function decidePhase(
+  repo: RepoConfig,
+  family: string,
+  phase: number,
+  choices: Readonly<Record<string, DecideChoice>>,
+  digest: string,
+  deps: WriteDeps,
+): Promise<DecideOutcome> {
+  let actor: Actor;
+  try {
+    actor = await actorOf(deps, repo);
+  } catch (err) {
+    return { kind: "failed", message: reasonOf(err) };
+  }
+  const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const ops = callOps(deps.call);
+  const target = { owner: repo.owner, repo: repo.repo };
+  const base = { family, phase, actor, mode: "apply" as const, choices, digest };
+  const hostKeys = Object.keys(choices).filter((k) => choices[k] !== "fix");
+  let mr = 0;
+  const made: { key: string; url: string; reused: boolean }[] = [];
+  let hostNote = "";
+  let carry: string[] = [];
+  /** (1) の計画のコメント（枠つき）。無ければ null */
+  let planned: { comment: string | null } | null = null;
+  let truncated = false;
+
+  try {
+    // (1) 見せた指摘のまま通るか。ホストへ書く計画を得る（`keep`・`issue` があるときだけ）
+    if (hostKeys.length > 0) {
+      const read = await readSettled(repo, family, deps);
+      if (read === null) return { kind: "conflict", message: `反映前の読み取り中に ${family} の先頭が ${MAX_ROUNDS} 回更新されました。少し待ってからボードを更新し、もう一度決めてください。` };
+      const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
+      mr = copy.mr.number;
+      const res = await askDecide(deps.py, ask, { ...base, snapshot: read.input, copy, stamp: localStamp(deps.now()), carry: [] });
+      if (res.code === DECIDE_MISMATCH || res.mismatch) return { kind: "mismatch", message: res.problems.join("\n") || "見せた指摘が今の指摘と違います" };
+      if (res.problems.length > 0 || !res.host_plan) {
+        return { kind: "refused", message: res.problems.join("\n") || "残った指摘の行き先を反映できません", ...codeOf(res) };
+      }
+      const plan = res.host_plan;
+      planned = { comment: plan.comment };
+      if (plan.issues.length > 0 || plan.replies.length > 0 || plan.resolves.length > 0) {
+        // (2) 書く前の確かめ。足りなければ何も書かない
+        const pre = await precheckHostPlan(ops, target, mr, plan);
+        if (!pre.ok) return { kind: "refused", message: pre.reason };
+        // (3) ホストへ書く。済んだ分を控える
+        const done = await runHostPlan(ops, target, mr, { ...plan, comment: null } satisfies HostPlan);
+        for (const i of done.issues) made.push({ key: i.key, url: i.url, reused: i.reused });
+        truncated = done.searchTruncated;
+        if (!done.ok) {
+          return {
+            kind: "halted",
+            done: {
+              issues: done.issues.filter((i) => !i.reused).map((i) => i.url),
+              reusedIssues: done.issues.filter((i) => i.reused).map((i) => i.url),
+              replied: done.replied.length,
+              resolved: done.resolved.length,
+            },
+            message: done.failed ? describeHostFailure(done.failed) : "ホストへの書き込みが止まりました",
+          };
+        }
+        carry = plan.resolves.map((r) => r.key);
+        const reused = made.filter((i) => i.reused).length;
+        hostNote = `ホストへの書き込み（issue ${made.length - reused} 件${reused > 0 ? `・既にあった issue ${reused} 件` : ""}・返信 ${done.replied.length} 件・解決 ${done.resolved.length} 件）は済んでいますが、親のブランチへ反映できませんでした。MR のコメントは投稿していません。ボードを読み直して、残った指摘だけ決め直してください。`;
+      }
+    }
+  } catch (err) {
+    return { kind: err instanceof PyError ? "refused" : "failed", message: reasonOf(err) };
+  }
+
+  // (4) 読み直して、親のブランチへ 1 コミット（ループの中ではホストに書かない）
+  let last: Awaited<ReturnType<typeof askDecide>> | null = null;
+  const out = await writeLoop(repo, family, deps, "決め直してください。", async (read, stamp) => {
+    let res!: Awaited<ReturnType<typeof askDecide>>;
+    for (let attempt = 1; attempt <= CARRY_TRIES; attempt += 1) {
+      const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
+      mr = copy.mr.number;
+      res = await askDecide(deps.py, ask, { ...base, snapshot: read.input, copy, stamp, carry });
+      // 書き終えた鍵が、読み直した結果でまだ解決済みに見えない（ホストの読み取りの遅れ）ときだけ、待って取り直す
+      if (carry.length === 0 || res.code !== DECIDE_CHOICES) break;
+      if (attempt < CARRY_TRIES) await sleep(VERIFY_WAIT_MS);
+      else {
+        return {
+          kind: "stop",
+          outcome: {
+            kind: "attention",
+            message: `書いた結果がホストの読み直しに反映されず、確かめられませんでした。ホストには書けています。読み直してから決め直してください（${res.problems.join("\n") || DECIDE_CHOICES}）`,
+          },
+        };
+      }
+    }
+    if (res.code === DECIDE_MISMATCH || res.mismatch) {
+      return { kind: "stop", outcome: { kind: "changed", message: res.problems.join("\n") || "見せた指摘が今の指摘と違います", code: DECIDE_MISMATCH } };
+    }
+    if (res.problems.length > 0 || res.stopped) {
+      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || (res.stopped ? `${res.stopped.ticket}: ${res.stopped.reason}` : "残った指摘の行き先を反映できません"), ...codeOf(res) } };
+    }
+    last = res;
+    if (!res.changes || Object.keys(res.changes).length === 0) return { kind: "stop", outcome: NO_COMMIT };
+    const rows = rowsOf(res, family, read);
+    if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };
+    const message = res.reviewed
+      ? commitMessage([family], `のフェーズ ${phase} のレビュー済みを置いた`, "レビュー済みを置いた", deps.version)
+      : commitMessage([family], `のフェーズ ${phase} の残った指摘の行き先を反映`, "行き先を反映した", deps.version);
+    return { kind: "rows", rows, message, lines: res.lines };
+  });
+
+  let oid = "";
+  if (out.kind === "written") oid = out.oid;
+  else if (out !== NO_COMMIT) {
+    // 積めなかった。コメントは投稿しない（コミットが無いのに「決めた」と書かない）
+    return afterHost(out, hostNote);
+  }
+
+  // (5) 決めた内容のコメント。0 件の確定では投稿しない。失敗はコミットを戻さず警告にする
+  const decided = last as Awaited<ReturnType<typeof askDecide>> | null;
+  const warnings: string[] = [];
+  if (truncated) warnings.push("issue の検索が上限まで読んでも見つからず、探し切れていません（以前に作った issue があれば重複します）");
+  const comment = planned ? planned.comment : (decided?.host_plan?.comment ?? null);
+  if (comment && Object.keys(choices).length > 0) {
+    try {
+      await ops.postComment(target, mr, comment.split(ISSUE_LINKS_SLOT).join(made.map((i) => `- ${i.url}`).join("\n")));
+    } catch (err) {
+      warnings.push(`決めた内容のコメントだけ MR に投稿できませんでした（${reasonOf(err)}）。反映は済んでいて同じ入口から再送できないため、必要なら MR に手で書いてください`);
+    }
+  }
+  return {
+    kind: "written",
+    oid,
+    reviewed: decided?.reviewed ?? false,
+    followup: decided?.followup ?? "",
+    issues: made.filter((i) => !i.reused).map((i) => i.url),
+    ...(made.some((i) => i.reused) ? { reusedIssues: made.filter((i) => i.reused).map((i) => i.url) } : {}),
+    ...(decided && decided.pending_extra.length > 0 ? { pendingExtra: decided.pending_extra.length } : {}),
+    ...(warnings.length > 0 ? { warning: warnings.join("。") } : {}),
+  };
 }

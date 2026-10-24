@@ -64,7 +64,7 @@ export function App({ controller, md, frame }: AppProps): JSX.Element {
       <BusyContext value={busy}>
         {[...s.sections].map(([key, section]) => (
           <RepoBoundary key={key} name={`${section.board.repo.owner}/${section.board.repo.repo}`} repoKey={key} section={section}>
-            <Repo board={section.board} actions={controller.actions} attention={section.attention} issues={section.issues} />
+            <Repo board={section.board} actions={controller.actions} attention={section.attention} issues={section.issues} decide={s.decide} />
           </RepoBoundary>
         ))}
       </BusyContext>
