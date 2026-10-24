@@ -116,20 +116,21 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
     """
     plan = Plan()
     found = tree.projects(conf.projects)
-    names = {t.name for t in found}
+    # 名前は大文字小文字を区別せずに比べる（Windows と macOS では同じディレクトリのため）。
+    names = {t.name.casefold() for t in found}
     if wanted:
-        missing = [n for n in wanted if n not in names]
+        missing = [n for n in wanted if n.casefold() not in names]
         if missing:
             plan.error = f"プロジェクトがありません: {', '.join(missing)}"
             return plan
-    wanted_set = set(wanted or names)
+    wanted_set = {n.casefold() for n in (wanted or names)}
     wanted_files, why = configsync.sources(conf, root)
     if why:
         plan.error = why
         return plan
     plan.common_empty = not wanted_files
     for entry in found:
-        project = Project(entry.name, entry.root, selected=entry.name in wanted_set)
+        project = Project(entry.name, entry.root, selected=entry.name.casefold() in wanted_set)
         plan.projects.append(project)
         if plan.common_empty:
             continue

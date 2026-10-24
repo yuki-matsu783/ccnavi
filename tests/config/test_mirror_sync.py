@@ -117,6 +117,10 @@ class MirrorSyncTest(ConfigUnionHarness):
         self.assertIn("nothing", bad.error)
         self.assertEqual(bad.projects, [])
 
+    def test_names_are_matched_without_regard_to_case(self):
+        plan = self.plan(["LIB"])
+        self.assertEqual([p.name for p in plan.projects if p.selected], ["lib"])
+
     def test_the_expect_changes_when_the_common_layer_changes(self):
         before = self.plan().expect
         write(self.risk, COMMON_RISK + EXTRA_FACTOR)

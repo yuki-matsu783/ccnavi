@@ -348,6 +348,10 @@ ccnavi user mirror [<プロジェクト名>…] --yes --expect <値> --via board
 | `projects[].expect` | そのプロジェクトだけを揃えるときの `--expect` の値。ずれが無ければ空 |
 | `expect` | 差分のある全プロジェクトを揃えるときの `--expect` の値。差分が無ければ空 |
 
+全体の `expect` に入るのは、`differs` のプロジェクトだけ（`error` と `synced` は入らない）。`common_empty` が真のときは、`projects` は全部 `synced` で、`expect` は空。`changes[].action` は `create`・`update`・`delete` の 3 つだけ。
+名前は大文字小文字を区別せずに引き、答えには実際のディレクトリの綴りで返す。
+終了コードは、見るだけは 0（`projects` に `error` があっても 0）、全体の誤り（`ok` が偽）は 1。揃える形は、全部書けたとき 0、書けなかったもの・照合の不一致・対象が無いとき 1。どちらも標準出力の JSON を先に読む。
+
 揃える形の答えは `{"version": 1, "ok": true, "error": "", "synced": [{"name": "web", "files": ["…"]}]}`。
 `--expect` が今の差分と一致しないときは何も書かず、`ok` を偽にして `error` に「内容が更新されました」で始まる文を返す
 （呼ぶ側は画面を読み直して、もう一度押してもらう）。1 つのプロジェクトが書けなくても、ほかのプロジェクトは書き、
