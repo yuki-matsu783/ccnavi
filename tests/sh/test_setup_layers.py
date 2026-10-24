@@ -123,6 +123,7 @@ class SetupTest(unittest.TestCase):
             "ccnavi-start.sh",
             "ccnavi-stage.sh",
             "ccnavi-worktree.sh",
+            "ccnavi-idle.sh",
         ):
             write(os.path.join(src, ".ccnavi", "scripts", name), f"# {name}\n")
         return src

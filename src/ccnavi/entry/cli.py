@@ -40,6 +40,7 @@ from ..tickets import (
 from . import (
     cli_args,
     cli_handoff,
+    cli_idle,
     cli_learnings,
     cli_mirror,
     cli_ops,
@@ -1064,6 +1065,10 @@ def _parsed(
             args.json,
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
+
+    # 放置したセッションの引き継ぎ促し。payload は入口の中で読む（`ccnavi-idle.sh` が呼ぶ）。
+    if args.command[:1] == ["idle"]:
+        return cli_idle.run(stdin, stdout, stderr, conf, list(args.command))
 
     # Stop の AI 判定の判定役（agent hook）が打つ入口。payload は読まない。
     if args.command[:1] == ["stop-review"]:
