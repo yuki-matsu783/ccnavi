@@ -110,14 +110,16 @@ function openNext(): void {
     return;
   }
   forceTour(next);
-  void openScreen(next).then((opened) => {
-    // 開けない画面で止まらず、次へ進む
-    if (!opened && chain[0] === next) {
-      forced.delete(next);
-      chain.shift();
-      openNext();
-    }
-  });
+  void openScreen(next)
+    .catch(() => false)
+    .then((opened) => {
+      // 開けない画面（開く入口が失敗したときも）で止まらず、次へ進む
+      if (!opened && chain[0] === next) {
+        forced.delete(next);
+        chain.shift();
+        openNext();
+      }
+    });
 }
 
 /**
@@ -125,7 +127,16 @@ function openNext(): void {
  * 前の案内を閉じる（最後まで見るか、やめる）と次を開く。チケット制御が無効のワークスペースでは、開けない画面を外す
  */
 export function runTours(command: string): void {
-  resetChain(playableScreens(WALKTHROUGH_TOURS[command] ?? [], ticketControl() === "enable"));
+  if (vscode.workspace.workspaceFolders?.[0] === undefined) {
+    void vscode.window.showInformationMessage("ワークスペースが開かれていないため、画面の案内を始められません");
+    return;
+  }
+  const playable = playableScreens(WALKTHROUGH_TOURS[command] ?? [], ticketControl() === "enable");
+  if (playable.length === 0) {
+    void vscode.window.showInformationMessage("チケット制御が無効のワークスペースでは、この画面の案内を始められません");
+    return;
+  }
+  resetChain(playable);
   openNext();
 }
 
