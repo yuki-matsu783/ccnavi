@@ -52,7 +52,7 @@ import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { readOrigin } from "./git.js";
 import * as diaglog from "./log.js";
 import { runInTerminal } from "./terminal.js";
-import { markTourSeen, tourDue } from "./tour.js";
+import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { confirmIfTurn } from "./turn-confirm.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
@@ -280,6 +280,7 @@ function registerPanelHandlers(current: PanelState): void {
   });
 
   panel.onDidDispose(() => {
+    tourPanelClosed(SCREEN);
     if (current.timer !== undefined) {
       clearTimeout(current.timer);
       current.timer = undefined;

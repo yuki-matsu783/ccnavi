@@ -46,11 +46,20 @@ export function tourDue(screen: string): boolean {
 }
 
 export function markTourSeen(screen: string): void {
-  forced.delete(screen);
+  const asked = forced.delete(screen);
   void memento?.update(key(screen), true);
-  if (chain[0] === screen) {
+  // 続けて見る途中で頼んだ画面の案内を閉じたときだけ、次へ進む。ふつうに開いた画面の案内では進めない
+  if (asked && chain[0] === screen) {
     chain.shift();
     openNext();
+  }
+}
+
+/** 頼んだ画面のタブが案内を閉じずに閉じられた。続けて見るのを終え、頼みも下げる（後でふつうに開いた画面が次を開かないように） */
+export function tourPanelClosed(screen: string): void {
+  forced.delete(screen);
+  if (chain[0] === screen) {
+    chain = [];
   }
 }
 
@@ -59,18 +68,27 @@ export function forceTour(screen: string): void {
   forced.add(screen);
 }
 
-/** 基本の案内を動かせる画面を開く。開けない画面（案内の入口が無い）は false */
+/** 基本の案内を動かせる画面を、開けるときだけ開く。ワークスペースが無い・チケット制御が無効のとき開く入口は何も開かないので、先に見て false を返す */
 async function openScreen(screen: string): Promise<boolean> {
+  if (vscode.workspace.workspaceFolders?.[0] === undefined) {
+    return false;
+  }
   const open = screens();
   if (screen === "projects") {
     await open.projects();
     return true;
   }
-  if (screen === "board") {
+  if (screen === "board" && ticketControl() === "enable") {
     await open.board();
     return true;
   }
   return false;
+}
+
+/** 続けて見るのを始めるとき、前の続きと頼みを捨てる */
+function resetChain(next: readonly string[]): void {
+  forced.clear();
+  chain = next.slice();
 }
 
 function openNext(): void {
@@ -94,13 +112,13 @@ function openNext(): void {
  * チケット制御が無効のワークスペースではチケット管理を開けないので、プロジェクト管理だけにする
  */
 export function runBasicTours(): void {
-  chain = basicTourScreens(ticketControl() === "enable").slice();
+  resetChain(basicTourScreens(ticketControl() === "enable"));
   openNext();
 }
 
 /** 1 つの画面の基本の案内だけを動かす（ウォークスルーの各段のボタン） */
 export function runScreenTour(screen: string): void {
-  chain = [screen];
+  resetChain([screen]);
   openNext();
 }
 

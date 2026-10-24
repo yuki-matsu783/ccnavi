@@ -43,7 +43,7 @@ import { isTicketId } from "./core/ticket-id.js";
 import { forgetSaved, onWorkflowTabs, staleSaved, workflowTabs } from "./core/workflow-tabs.js";
 import { childWorktreeFailureText, unsavedText, type ApproveWorktree, type ChildWorktreeFailure } from "./core/approvemodel.js";
 import { runInTerminal, scriptShell } from "./terminal.js";
-import { markTourSeen, tourDue } from "./tour.js";
+import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { noteTicketControl, requireTickets } from "./ticket-control.js";
 import * as diaglog from "./log.js";
@@ -219,6 +219,7 @@ function registerPanelHandlers(current: PanelState): void {
   });
 
   panel.onDidDispose(() => {
+    tourPanelClosed(SCREEN);
     current.stopTabs?.();
     if (current.timer !== undefined) {
       clearTimeout(current.timer);
