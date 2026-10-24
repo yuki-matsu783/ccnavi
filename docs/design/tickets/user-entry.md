@@ -10,9 +10,9 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 
 ### 9.18 ユーザ専用の入口
 
-ユーザだけが打つ操作（承認・レビュー済みの記録・早めに閉じる・記録の削除・保護対象の取り込み（handoff）・承認済みチケットの push・
+ユーザだけが打つ操作（承認・レビュー済みの記録・早めに閉じる・記録の削除・保護対象の取り込み（handoff）・共通レイヤーのミラーの同期（mirror）・承認済みチケットの push・
 残った指摘の対応方針・子のブランチの削除）が、どの入口にあるかと、hook と実行ファイルがそれをどう止めるかを書く。
-止める判定の細部は [9.5](judging-by-path.md)、承認の手順は [9.4](approval.md)、端末要求は 9.4、`handoff` の中身は [9.19](handoff.md)。
+止める判定の細部は [9.5](judging-by-path.md)、承認の手順は [9.4](approval.md)、端末要求は 9.4、`handoff` の中身は [9.19](handoff.md)、`mirror` の中身は [11.12](../multi-repo/distribute-common.md)。
 
 #### 表が正本
 
@@ -48,12 +48,13 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 | `user close-early` | `--close-early` |
 | `user prune` | `--prune` |
 | `user handoff [<相対パス>…]` | `--handoff [<相対パス>…]` |
+| `user mirror [<プロジェクト名>…]` | `--mirror [<プロジェクト名>…]` |
 
 付随する `--yes`・`--digest`・`--expect`・`--via`・`--reason`・`--result`・`--json` などは、内部の形のときと同じ位置と意味で読む。
 
 見るだけの形のうち、`user` に入れず今までの形のまま通すのは次の 3 つ: `--agree --preview [--verify] [--json]`、`--prune --preview`、
 `--reviewed N --accept-unresolved --preview`（`ccnavi-review.sh decide <N> --preview` が内部で呼ぶ）。
-`user handoff` は見るだけの形（`--yes` なし）も `user` の入口の中に置き、外では断る（見るだけの形を通す `unless` を持たない）。
+`user handoff` と `user mirror` は見るだけの形（`--yes` なし）も `user` の入口の中に置き、外では断る（見るだけの形を通す `unless` を持たない）。
 
 ユーザ専用の sh は `ccnavi-user-<操作>.sh` に分かれる。
 
@@ -81,7 +82,7 @@ argparse が読んだ後、`entry` が空（`user` の外）で、`user_only.ref
 `unless` の条件に当たる形（`--agree --preview`、`--prune --preview`、`--reviewed … --preview`）は断らない。`--handoff` は `--yes` の有無によらず断る。
 断りの文は、対応する `user` の形（`ccnavi user agree` など）と、見るだけの形があればそれを案内する。
 
-`--version --json` は互換の版（`compat`）18 を返し、`features` に `user-entry` と `handoff` を持つ。
+`--version --json` は互換の版（`compat`）18 を返し、`features` に `user-entry`・`handoff`・`mirror` を持つ。
 
 #### hook の止め
 
@@ -103,8 +104,8 @@ hook は擬似端末を作る実行役（`script`・`tmux`・`screen`・`expect`
 
 #### 端末要求の位置づけ
 
-実行ファイルは、`user agree`・`user reviewed`・`user close-early`・`user prune` と、書くとき（`--yes`）の `user handoff` で、標準入力が端末のときだけ動く。
+実行ファイルは、`user agree`・`user reviewed`・`user close-early`・`user prune` と、書くとき（`--yes`）の `user handoff` と `user mirror` で、標準入力が端末のときだけ動く。
 端末を求めるときに標準エラーへ出すオプション名は `OPS` の `terminal`（`user_only.terminal`）が持つ。
 
-端末を求めない経路（`--yes` の承認、ボードの指摘の対応方針、ボードからの handoff の取り込み）では、hook の文字列検査が唯一の防御で、端末要求は 2 段目ではない。
+端末を求めない経路（`--yes` の承認、ボードの指摘の対応方針、ボードからの handoff の取り込みとミラーの同期）では、hook の文字列検査が唯一の防御で、端末要求は 2 段目ではない。
 擬似端末を使えば端末要求は満たせる。
