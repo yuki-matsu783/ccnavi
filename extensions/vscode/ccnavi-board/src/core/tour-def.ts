@@ -10,11 +10,15 @@
  *   sample   案内の間だけ画面に出す見本。形は画面ごとに決める
  *   courses  案内の一覧。先頭は基本の案内（`intro`。初回に自動で出る）、あとは使い方ごとの案内（ユースケース）
  *
- * 手順（`steps`）は、指す先（`target`）・題・本文・その手順の画面の様子（`scene`）を持つ。
+ * 手順（`steps`）は、指す先（`target`）・題・本文・その手順の画面の様子（`scene`）を持つ。画面の外（Claude Code・GitLab）の
+ * 見た目を見せたい手順は、画像（`image` と `alt`）も持てる。
  *
  *   target  `data-tour="…"` の値。空なら吹き出しを画面の中ほどに出して文だけを見せる
  *   scene   その手順で画面がとる様子（開く行・開くタブ・選ぶ点など）。鍵と値は画面ごとに決める。手順ごとに全部を書き直す
  *           （前の手順の様子を引き継がない）ので、「戻る」でも同じ様子になる。値は文字列・数・真偽だけ
+ *   image   本文の下に出す画像の名前。`webview/tours/images/<名前>.png` に置き、`webview/tours/images.ts` に登録する。
+ *           画像は読み込みを待つ間に吹き出しの高さが変わるので、指す先は空にして中ほどに出す
+ *   alt     画像の代替文（`image` があるとき必須）
  */
 
 export type SceneValue = string | number | boolean;
@@ -25,6 +29,10 @@ export interface TourStepDef {
   readonly title: string;
   readonly body: string;
   readonly scene: Scene;
+  /** 画像の名前。無ければ空 */
+  readonly image: string;
+  /** 画像の代替文。画像が無ければ空 */
+  readonly alt: string;
 }
 
 export interface TourCourseDef {
@@ -51,7 +59,7 @@ const ID = /^[a-z][a-z0-9-]*$/;
 const TARGET = /^[a-z][a-z0-9-]*$/;
 
 const COURSE_KEYS = ["id", "title", "summary", "steps"];
-const STEP_KEYS = ["target", "title", "body", "scene"];
+const STEP_KEYS = ["target", "title", "body", "scene", "image", "alt"];
 const ROOT_KEYS = ["screen", "sample", "courses"];
 
 /** 知らない鍵（綴り違い）を名指しする。黙って捨てると、空の指す先や空の様子に化ける */
@@ -136,6 +144,17 @@ export function parseTour(raw: unknown): TourParsed {
       if (step.target !== undefined && step.target !== "" && (typeof step.target !== "string" || !TARGET.test(step.target))) {
         return { ok: false, error: `${stepAt}.target は小文字の英字で始まり、英小文字・数字・- だけにする（空なら中ほどに出す）` };
       }
+      const image = step.image === undefined ? "" : text(step.image);
+      if (image === undefined || (image !== "" && !ID.test(image))) {
+        return { ok: false, error: `${stepAt}.image は小文字の英字で始まり、英小文字・数字・- だけにする（画像の名前）` };
+      }
+      const alt = step.alt === undefined ? "" : text(step.alt);
+      if (alt === undefined || (image !== "" && alt === "") || (image === "" && alt !== "")) {
+        return { ok: false, error: `${stepAt} は image と alt を両方書くか、両方書かない` };
+      }
+      if (image !== "" && step.target !== undefined && step.target !== "") {
+        return { ok: false, error: `${stepAt} は image があるので target は空にする（画像の読み込みで吹き出しの高さが変わる）` };
+      }
       const scene: Record<string, SceneValue> = {};
       if (step.scene !== undefined) {
         const given = object(step.scene);
@@ -149,7 +168,7 @@ export function parseTour(raw: unknown): TourParsed {
           scene[key] = value;
         }
       }
-      steps.push({ target: (step.target as string | undefined) ?? "", title: stepTitle, body, scene });
+      steps.push({ target: (step.target as string | undefined) ?? "", title: stepTitle, body, scene, image, alt });
     }
     courses.push({ id, title, summary, steps });
   }

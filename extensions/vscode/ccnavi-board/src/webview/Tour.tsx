@@ -21,6 +21,8 @@ export interface TourStep {
   readonly target: string;
   readonly title: string;
   readonly body: string;
+  /** 本文の下に出す画像（画面の外の見た目）。指す先が空の手順だけが持つ（読み込みで吹き出しの高さが変わるため） */
+  readonly image?: { readonly src: string; readonly alt: string };
   /** 指す先を出すための下ごしらえ */
   readonly before?: () => void;
 }
@@ -53,8 +55,9 @@ export function targetSelector(target: string): string {
 /**
  * 定義（YAML）から案内の一覧を作る。手順の下ごしらえは、その手順の `scene` を画面の `apply` に渡すこと。
  * 画面は `apply` で「見本の上の様子」（開く行・タブ・選ぶ点）を state に入れ、見本を描く。
+ * `images` は手順の `image`（名前）から画像の URL を引く表（`tours/images.ts`）。表に無い名前の手順は画像なしで出る（テストが見つける）
  */
-export function coursesOf(def: TourDef, apply: (scene: Scene) => void): readonly TourCourse[] {
+export function coursesOf(def: TourDef, apply: (scene: Scene) => void, images: Readonly<Record<string, string>> = {}): readonly TourCourse[] {
   return def.courses.map((course) => ({
     id: course.id,
     title: course.title,
@@ -63,6 +66,7 @@ export function coursesOf(def: TourDef, apply: (scene: Scene) => void): readonly
       target: targetSelector(step.target),
       title: step.title,
       body: step.body,
+      image: step.image !== "" && images[step.image] !== undefined ? { src: images[step.image], alt: step.alt } : undefined,
       before: () => apply(step.scene),
     })),
   }));
@@ -104,6 +108,8 @@ export function boxOf(el: Element): Rect {
 
 /** 吹き出しの幅。狭い画面では画面の幅に合わせる（CSS の max-width） */
 const BUBBLE_WIDTH = 340;
+/** 画像のある手順の吹き出しの幅。画像の中の字が読める広さにする */
+const IMAGE_BUBBLE_WIDTH = 480;
 
 /**
  * ツールバー（`<header className="toolbar">`）。左に画面ごとの中身（`children`）、右端に「?」（`TourButton`）を置く。
@@ -404,7 +410,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   }, [count]);
 
   const last = index === steps.length - 1;
-  const width = Math.min(BUBBLE_WIDTH, window.innerWidth - 24);
+  const width = Math.min(step.image === undefined ? BUBBLE_WIDTH : IMAGE_BUBBLE_WIDTH, window.innerWidth - 24);
 
   return (
     <div className="tour" data-step={index}>
@@ -432,6 +438,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         <p className="tour-body" id="tour-body">
           {step.body}
         </p>
+        {step.image !== undefined && <img className="tour-image" src={step.image.src} alt={step.image.alt} />}
         <div className="tour-buttons">
           {index > 0 && (
             <button type="button" className="action small" data-action="tour-back" onClick={() => setIndex(index - 1)}>

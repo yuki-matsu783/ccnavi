@@ -25,6 +25,9 @@
   border: 1px solid var(--vscode-focusBorder);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popup);
+  /* 低い画面でも「次へ」と「×」を押せるよう、はみ出したら吹き出しの中でスクロールする */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
 }
 
 .tour-bubble:focus { outline: none; }
@@ -36,6 +39,9 @@
 .tour-count { margin: 0 24px 2px 0; color: var(--vscode-descriptionForeground); font-size: var(--font-sm); }
 
 .tour-body { margin: 0 0 10px; line-height: 1.6; }
+
+/* 画面の外の見た目（Claude Code・GitLab の画面）。吹き出しの幅に収める */
+.tour-image { display: block; max-width: 100%; max-height: 40vh; object-fit: contain; height: auto; margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-sm); }
 
 /* やめる ×。どの手順でも吹き出しの右上の同じ位置に出す */
 .tour-close {
