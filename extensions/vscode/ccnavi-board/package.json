@@ -181,7 +181,7 @@
       {
         "id": "ccnaviBoard.sidebar",
         "title": "ccnavi の左パネルの案内",
-        "description": "左のパネルに並ぶ画面の入口と、最初に見る 2 つの画面（プロジェクト管理・チケット管理）の基本を順に見ます。",
+        "description": "左パネルに並ぶ画面の入口と、最初に見る 2 つの画面（プロジェクト管理・チケット管理）の基本を順に説明します。",
         "steps": [
           {
             "id": "ccnaviBoard.tour.panel",
@@ -194,7 +194,7 @@
           {
             "id": "ccnaviBoard.tour.projects",
             "title": "プロジェクト管理",
-            "description": "projects/ の一覧と、clone・fetch・pull の実行を見ます。画面の吹き出しの案内で基本を説明します。\n[プロジェクト管理の基本の案内を見る](command:ccnaviBoard.tourProjects)",
+            "description": "projects/ の一覧と、clone・fetch・pull の実行を説明します。基本は画面の吹き出しの案内で示します。\n[プロジェクト管理の基本の案内を見る](command:ccnaviBoard.tourProjects)",
             "media": {
               "markdown": "media/tour/projects.md"
             }
@@ -202,7 +202,7 @@
           {
             "id": "ccnaviBoard.tour.board",
             "title": "チケット管理",
-            "description": "チケットのカンバンと、承認・レビューの進め方を見ます。画面の吹き出しの案内で基本を説明します。\n[チケット管理の基本の案内を見る](command:ccnaviBoard.tourBoard)",
+            "description": "チケットのカンバンと、承認・レビューの進め方を説明します。基本は画面の吹き出しの案内で示します。\n[チケット管理の基本の案内を見る](command:ccnaviBoard.tourBoard)",
             "media": {
               "markdown": "media/tour/board.md"
             },

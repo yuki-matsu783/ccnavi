@@ -1,5 +1,5 @@
 /**
- * 左パネルの案内（ウォークスルー）の決まり。`package.json` の宣言と、案内が指すコマンド・本文の Markdown がそろっていることを見る。
+ * 左パネルの案内（ウォークスルー）の決まり。`package.json` の宣言と、案内が指すコマンド・本文の Markdown がそろっていることを確かめる。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -25,7 +25,7 @@ interface Manifest {
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")) as Manifest;
 
-test("CB-T1168 基本の案内はプロジェクト管理 → チケット管理の順。チケット制御が無効ならプロジェクト管理だけ。どちらも案内を持つ画面", () => {
+test("CB-T1168 基本の案内はプロジェクト管理 → チケット管理の順。チケット制御が無効ならプロジェクト管理だけ。どちらも案内の定義がある画面", () => {
   assert.deepEqual(basicTourScreens(true), ["projects", "board"]);
   assert.deepEqual(basicTourScreens(false), ["projects"]);
   for (const screen of basicTourScreens(true)) {

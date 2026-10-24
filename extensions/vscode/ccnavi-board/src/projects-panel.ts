@@ -114,7 +114,7 @@ export async function openProjects(): Promise<void> {
     state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
     void update();
-    // 開いたままのタブに案内を頼まれたとき（左パネルの案内から）。組み上がりの `ready` は来ない
+    // 開いたままのタブで、左パネルの案内から案内を頼まれたとき。組み上がりの `ready` は来ない
     if (tourDue(SCREEN)) {
       state.host.post({ type: "tour" } satisfies ToProjects);
     }

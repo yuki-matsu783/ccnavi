@@ -18,7 +18,7 @@ keywords: [手動確認, 拡張開発ホスト, F5, Developer: Reload Window, �
 
 ## 手動確認の手順
 
-`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `risk-panel.ts` / `phases-panel.ts` / `templates-panel.ts` / `flow-panel.ts` / `workflow-panel.ts` / `prompt-handover.ts` / `projects-panel.ts` / `sidebar.ts` / `handoff-panel.ts` / `handoff-entry.ts` / `terminal.ts` / `ccnavi.ts` / `git.ts` は、VS Code の API か子プロセスに触れるので単体テストの対象外。次の項目を拡張開発ホストで確かめる。`tour.ts`（コマンド・`globalState`・ウォークスルーを扱う）も対象外。チケットのある状態を作るには、`tests/ticket/test_board.py` の `scene()` と同じ手順（親を承認、子を着手・閉じる、次の子を提案）を実際のリポジトリでたどる。
+`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `risk-panel.ts` / `phases-panel.ts` / `templates-panel.ts` / `flow-panel.ts` / `workflow-panel.ts` / `prompt-handover.ts` / `projects-panel.ts` / `sidebar.ts` / `handoff-panel.ts` / `handoff-entry.ts` / `terminal.ts` / `ccnavi.ts` / `git.ts` / `tour.ts` は、VS Code の API か子プロセスに触れるので単体テストの対象外。次の項目を拡張開発ホストで確かめる。チケットのある状態を作るには、`tests/ticket/test_board.py` の `scene()` と同じ手順（親を承認、子を着手・閉じる、次の子を提案）を実際のリポジトリでたどる。
 
 | # | 確認すること | 手順 | 期待 | 結果 |
 |---|---|---|---|---|

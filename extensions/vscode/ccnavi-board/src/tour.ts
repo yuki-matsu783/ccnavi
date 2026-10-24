@@ -18,7 +18,7 @@ import { basicTourScreens, SIDEBAR_WALKTHROUGH } from "./core/tour-sidebar.js";
 import { ticketControl } from "./ticket-control.js";
 
 let memento: vscode.Memento | undefined;
-/** 見たかどうかに関わらず、次に開いたとき案内を出す画面 */
+/** 見たかどうかに関わらず、次に開いたときに案内を出す画面 */
 const forced = new Set<string>();
 /** 続けて動かしている基本の案内の残り。先頭の画面の案内を閉じたら、次を開く */
 let chain: string[] = [];
@@ -38,8 +38,8 @@ export function tourSeen(screen: string): boolean {
 }
 
 /**
- * 画面が組み上がったときに、基本の案内を頼むか。まだ見ていない画面と、`forceTour` で頼まれた画面で真。
- * 画面は開いていても、タブを閉じて開き直しても、頼まれたものは閉じるまで残る
+ * 画面が組み上がったときに、案内を出すか。まだ見ていない画面と、`forceTour` で頼まれた画面で真になる。
+ * 頼まれた案内は、タブを開いたままでも、閉じて開き直しても、案内を閉じるまで残る
  */
 export function tourDue(screen: string): boolean {
   return memento !== undefined && (forced.has(screen) || !tourSeen(screen));
@@ -54,7 +54,7 @@ export function markTourSeen(screen: string): void {
   }
 }
 
-/** 見たことがあっても、次にその画面が組み上がったとき基本の案内を出す */
+/** 見たことがあっても、次にその画面が組み上がったときに基本の案内を出す */
 export function forceTour(screen: string): void {
   forced.add(screen);
 }
@@ -109,7 +109,7 @@ const VERSION_KEY = "tour.sidebarVersion";
 /**
  * 拡張の版が、左パネルの案内を最後に出したときと違えば、左パネルの案内（ウォークスルー）を開く。
  * 新しく入れたときと、入れ直して版が上がったときに 1 度ずつ出る。開く前に版を覚えるので、開けなくても繰り返さない。
- * ワークスペースが開かれていない間は出さない（画面の案内が動かせない）
+ * ワークスペースが開かれていない間は出さない（画面の案内を動かせないため）
  */
 export function openSidebarTourOnNewVersion(context: vscode.ExtensionContext): void {
   const version = String(context.extension.packageJSON.version ?? "");

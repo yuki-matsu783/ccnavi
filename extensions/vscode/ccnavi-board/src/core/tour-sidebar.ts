@@ -9,7 +9,7 @@
 export const SIDEBAR_WALKTHROUGH = "ccnaviBoard.sidebar";
 
 /**
- * 最初に動かす基本の案内の画面（`webview/tours/<画面>.yml` の先頭の案内）。順に動かす。
+ * 続けて動かす基本の案内の画面（`webview/tours/<画面>.yml` の先頭の案内）。この順に動かす。
  * チケット管理はチケット制御（CCNAVI_TICKET_CONTROL）が有効なときだけ開けるので、無効なら外す
  */
 export function basicTourScreens(ticketsEnabled: boolean): readonly string[] {
