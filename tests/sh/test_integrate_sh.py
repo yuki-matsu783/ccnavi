@@ -814,9 +814,15 @@ class IntegrateReviewTest(Fixture):
 
     # ---- 名前のほうのチケットの結び付き
 
-    def test_a_name_bound_to_a_ticket_is_refused(self):
+    def test_a_pushed_direct_branch_with_a_record_is_not_taken_for_a_parent(self):
+        """直接作業のブランチを push しても（origin/<名前> があっても）、記録があれば親とみなさない。"""
         self.work_in_branch()
         git(self.ws, "update-ref", "refs/remotes/origin/wt", "HEAD")
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+
+    def test_a_name_bound_to_a_ticket_is_refused(self):
+        self.work_in_branch()
+        write(os.path.join(self.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
         r = self.run_git_sh("integrate", "wt")
         self.assertOk(r, 2)
         self.assertIn("チケットに結び付く", r.stderr)
