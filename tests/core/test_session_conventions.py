@@ -243,7 +243,7 @@ class SessionConventionsTest(unittest.TestCase):
         self.attended = "0"
         noninteractive = block(self.start("--mode", "enable"))
         self.assertIn("このセッションは非対話", noninteractive)
-        self.assertIn("前景で起動し", noninteractive)
+        self.assertIn("フォアグラウンドで起動し", noninteractive)
         self.assertIn("リモートへ反映する", noninteractive)
 
         for value in ("1", None):
@@ -251,13 +251,13 @@ class SessionConventionsTest(unittest.TestCase):
                 self.attended = value
                 text = block(self.start("--mode", "enable"))
                 self.assertNotIn("このセッションは非対話", text)
-                self.assertNotIn("前景で起動し", text)
+                self.assertNotIn("フォアグラウンドで起動し", text)
 
     def test_非対話でもチケット制御がdisableなら反映の注記は出ない(self):
         self.attended = "0"
         text = block(self.start("--mode", "enable", "--ticket-control", "disable"))
 
-        self.assertIn("前景で起動し", text)
+        self.assertIn("フォアグラウンドで起動し", text)
         self.assertNotIn("リモートへ反映する", text)
 
     def test_サブエージェントには出さない(self):
