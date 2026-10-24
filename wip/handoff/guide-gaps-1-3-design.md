@@ -110,11 +110,29 @@ git -C "$ccnavi_wap_tree" rev-parse --verify -q "refs/remotes/origin/$ccnavi_wap
 ただし、すでに送った形跡（`ccnavi_parent_trace`）があるのに ref が無い場合は、取得漏れの可能性があるので、従来どおり push の関門と
 sync に任せる（この追加の確認は形跡が無い場合だけ）。
 
+### 案内の分岐（ユーザの指示で追加）
+origin に親のブランチが無いときの次の一手は、issue と MR の有無で変える。固定の 1 文にしない。
+
+| 状態 | 案内 |
+|---|---|
+| issue に紐づく MR がすでにある | MR の元ブランチがあるはず。手で切ったブランチではなく、そちらで作業するかをユーザに聞く。ユーザが選んだら `ccnavi-start.sh --mr <番号>`（`--issue` と一緒に渡せる）で続ける |
+| issue だけある | 手で切ったブランチを捨てて `ccnavi-start.sh --issue <番号>` を打つ。ブランチ・ワークツリー・Draft MR（`Closes #<番号>`）まで作って進む。手で切ったブランチに積んだコミットがあれば、先にユーザに伝える |
+| issue も無い | 現状はユーザに issue を作ってもらう。エージェントが作る変更は下の「別件」 |
+
+エージェントはこの表のどれかを自分で確かめられない（ホストの MR を引けない）ので、案内は `ccnavi-start.sh --issue <番号>` を打つよう言う。
+`ccnavi-start.sh` が MR の有無を調べて続ける・一覧を出す・作るを決める。ブランチだけの push をユーザに頼む案は、MR が付かないので採らない。
+
+### 別件（この修正に含めない）
+「issue も無いとき、エージェントが issue を作って、ブランチと紐づけた MR まで作って進める」は、今の決まり
+（issue はエージェントが作るのは頼まれたときだけ。`worktree.md`・`ticket-work.md`・`.ccnavi/CCNAVI.md`）を変える。
+`ccnavi-start.sh` に issue 作成の枝（GitHub・GitLab 両方、書き込み権限の事前確認、題と本文の決め方、重複 issue の防止）を足す別の設計になる。
+既存 MR があるときに「そちらで作業するか聞く」を `ccnavi-start.sh` の常時の動作にするか（今は候補が 1 件で open の MR があれば聞かずに続ける）も、同じ設計で決める。
+
 ### 注意する点
 - `ccnavi_wap_sort` の失敗文（`write-and-push sort: …差分を読めない`）は実装内の表現のまま。利用者向けの文は手前の確認で出す
 - 手で作った親でも `ccnavi-start.sh --issue N` は既存のブランチを候補として拾う設計（候補が 1 件で MR 無し→作りかけなら MR を作って続ける）。
-  案内に「作り直す」と書くので、`ccnavi-start.sh` が手で作ったブランチをそのまま採用する経路があることを、実装前に `tests/sh/test_start_sh.py` で確かめる。
-  採用されない形なら、案内を「ユーザにブランチの push を頼む」に変える
+  ただし作りかけでないブランチ（コミットが載っている）は終了コード 3 で止まる。この場合の案内は、実装前に `tests/sh/test_start_sh.py` で確かめ、
+  ユーザに「そのブランチを使うか、新しく切るか」を聞く形にする
 
 ### 変更点
 - `.ccnavi/scripts/ccnavi-common-write-and-push.sh`: sort の前に ref の確認と案内（`ccnavi_wap_say` を使う）
