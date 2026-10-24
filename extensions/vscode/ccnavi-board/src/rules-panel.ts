@@ -169,7 +169,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     if (!sameTarget(state.target, target)) {
       await switchTarget(state, target);
     }
-    // 開いたままのタブに案内を頼まれたとき（左パネルの案内から）。組み上がりの `ready` は来ない
+    // 開いたままのタブに、左パネルの案内から案内を頼まれたとき。タブは組み直さないので `ready` は来ない
     if (tourDue(SCREEN) && state !== undefined) {
       state.host.post({ type: "tour" } satisfies ToRules);
     }

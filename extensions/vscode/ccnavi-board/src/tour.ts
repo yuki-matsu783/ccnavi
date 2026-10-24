@@ -7,8 +7,8 @@
  *
  * 左のパネル（サイドパネル）は VS Code 標準のツリー表示で、吹き出しを出せない。左パネルの案内は
  * VS Code のウォークスルー（`package.json` の `contributes.walkthroughs`）に置き、拡張の版が変わった
- * 最初の起動で開く（`openSidebarTourOnNewVersion`）。そこから「プロジェクト管理 → チケット管理」の
- * 基本の案内を続けて動かせる（`runTours`。ウォークスルーの段のコマンドから呼ぶ）。
+ * 最初の起動で開く（`openSidebarTourOnNewVersion`）。そこから段ごとに画面の基本の案内を動かせる。プロジェクト管理とチケット管理は続けて動かす
+ * （`runTours`。ウォークスルーの段のコマンドから呼ぶ）。
  * VS Code の API に触れるので単体テストの対象外。
  */
 import * as vscode from "vscode";

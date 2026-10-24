@@ -235,7 +235,7 @@
           {
             "id": "ccnaviBoard.tour.phases",
             "title": "フェーズを管理する",
-            "description": "計画に並べる工程の型(フェーズ)を定義します。工程ごとに編集できる範囲の上限と、レビューの既定を決めます。\n[ツアー実行](command:ccnaviBoard.tourPhases)",
+            "description": "計画に並べる工程の型（フェーズ）を定義します。工程ごとに、編集できる範囲の上限とレビューの既定を決めます。\n[ツアー実行](command:ccnaviBoard.tourPhases)",
             "when": "ccnaviBoard.ticketControl == 'enable'",
             "media": {
               "markdown": "media/tour/phases.md"
@@ -244,7 +244,7 @@
           {
             "id": "ccnaviBoard.tour.templates",
             "title": "テンプレートを管理する",
-            "description": "作業とレビューの計画のひな形(テンプレート)と、下書きを見て直します。同じ種類の作業を、同じ計画で始められます。\n[ツアー実行](command:ccnaviBoard.tourTemplates)",
+            "description": "作業とレビューの計画のひな形（テンプレート）と下書きを見て直します。同じ種類の作業を、同じ計画で始められます。\n[ツアー実行](command:ccnaviBoard.tourTemplates)",
             "when": "ccnaviBoard.ticketControl == 'enable'",
             "media": {
               "markdown": "media/tour/templates.md"
