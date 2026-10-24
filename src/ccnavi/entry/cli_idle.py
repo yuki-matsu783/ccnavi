@@ -53,7 +53,7 @@ def run(
         _skip(stdout, verb, "disabled")
         return EXIT_OK
     if verb == "check":
-        return _check(stdout, conf, words[2:])
+        return _check(stdout, conf, words[2:], limit)
     try:
         payload = hookio.decode(stdin)
     except (hookio.NoPayload, hookio.Unusable):
@@ -102,7 +102,12 @@ def _notice(stdout: TextIO, conf, payload: hookio.Input, usage, limit: int) -> i
 def _start(stdout: TextIO, conf, payload: hookio.Input, usage, limit: int) -> int:
     idlehandoff.prune(conf.state)
     plan = idlehandoff.start(
-        conf.state, payload.session_id, usage, limit, conf.handoff_wait_seconds
+        conf.state,
+        payload.session_id,
+        usage,
+        limit,
+        conf.handoff_wait_seconds,
+        payload.transcript_path,
     )
     if plan is None:
         stdout.write("skip not-due\n")
@@ -111,12 +116,12 @@ def _start(stdout: TextIO, conf, payload: hookio.Input, usage, limit: int) -> in
     return EXIT_OK
 
 
-def _check(stdout: TextIO, conf: settings.Settings, rest: list[str]) -> int:
-    if len(rest) != 3 or not rest[2].isdigit():
+def _check(stdout: TextIO, conf: settings.Settings, rest: list[str], limit: int) -> int:
+    if len(rest) != 3 or not (rest[2].isascii() and rest[2].isdigit()):
         stdout.write("skip usage\n")
         return EXIT_OK
     session, token, wait = rest[0], rest[1], int(rest[2])
-    text = idlehandoff.check(conf.state, session, token, wait)
+    text = idlehandoff.check(conf.state, session, token, wait, limit)
     if text is None:
         stdout.write("skip not-waiting\n")
         return EXIT_OK

@@ -80,6 +80,20 @@ class UsageTest(Fixture):
         self.assertIsNone(idlehandoff.usage_of(self.transcript("not json", "{}")))
 
 
+class UsageEdgeTest(Fixture):
+    def test_末尾に巨大な行が続いても直前の応答の大きさを読む(self):
+        big = json.dumps({"type": "user", "message": {"content": "x" * (1_100_000)}})
+        path = self.transcript(assistant(500_000, long=10), big)
+
+        self.assertEqual(idlehandoff.usage_of(path).tokens, 500_000)
+
+    def test_使用量が全部0の行は飛ばす(self):
+        empty = json.dumps({"type": "assistant", "message": {"usage": {"input_tokens": 0}}})
+        path = self.transcript(assistant(300_000, long=10), empty)
+
+        self.assertEqual(idlehandoff.usage_of(path).tokens, 300_000)
+
+
 class SettingTest(unittest.TestCase):
     def test_閾値の読み方(self):
         self.assertEqual(idlehandoff.threshold(""), 400000)
@@ -95,6 +109,10 @@ class SettingTest(unittest.TestCase):
     def test_待ち時間は確かめ用に上書きできる(self):
         self.assertEqual(idlehandoff.wait_seconds(3600, "2"), 2)
         self.assertEqual(idlehandoff.wait_seconds(3600, "x"), 55 * 60)
+
+    def test_上付き数字や上限を超える値で落ちない(self):
+        self.assertEqual(idlehandoff.wait_seconds(3600, "\u00b2"), 55 * 60)
+        self.assertEqual(idlehandoff.wait_seconds(3600, "999999"), idlehandoff.MAX_WAIT)
 
     def test_見ている人がいない実行を見分ける(self):
         self.assertTrue(idlehandoff.unattended({"CLAUDE_CODE_SESSION_ATTENDED": "0"}))
@@ -141,6 +159,25 @@ class FlowTest(Fixture):
         idlehandoff.reset(self.state, SESSION, idlehandoff.MARKER + " 書いてください")
 
         self.assertIsNotNone(idlehandoff.check(self.state, SESSION, plan.token, plan.wait))
+
+    def test_目印は先頭にあるときだけ数える(self):
+        plan = self.begin()
+
+        idlehandoff.reset(self.state, SESSION, "この差分を見て: [idle-handoff] を含む実装")
+
+        self.assertIsNone(idlehandoff.check(self.state, SESSION, plan.token, plan.wait))
+
+    def test_待っている間に会話が小さくなっていたら起こさない(self):
+        big = self.transcript(assistant(500_000, long=10))
+        plan = idlehandoff.start(
+            self.state, SESSION, idlehandoff.usage_of(big), 400_000, transcript=big
+        )
+        # /compact のあと、同じ記録が小さな会話に書き換わる。
+        self.transcript(assistant(50_000, long=10))
+
+        text = idlehandoff.check(self.state, SESSION, plan.token, plan.wait, 400_000)
+
+        self.assertIsNone(text)
 
     def test_バックグラウンド作業の完了通知ではユーザが打ったことにしない(self):
         plan = self.begin()
@@ -196,6 +233,31 @@ class FlowTest(Fixture):
 
     def test_0なら無効(self):
         self.assertIsNone(self.begin(limit=0))
+
+
+class PruneTest(Fixture):
+    def test_知らせ済みの印は対の状態ファイルが新しい間は残す(self):
+        idlehandoff.start(self.state, SESSION, idlehandoff.Usage(500_000, 3600), 400_000)
+        idlehandoff.notice(self.state, SESSION, idlehandoff.Usage(500_000, 3600), 400_000)
+        folder = os.path.join(self.state, "idle")
+        old = os.path.getmtime(os.path.join(folder, SESSION + ".notice")) - 8 * 86400
+        os.utime(os.path.join(folder, SESSION + ".notice"), (old, old))
+
+        idlehandoff.prune(self.state)
+
+        self.assertIn(SESSION + ".notice", os.listdir(folder))
+
+    def test_古い状態ファイルは印と一緒に消す(self):
+        idlehandoff.start(self.state, SESSION, idlehandoff.Usage(500_000, 3600), 400_000)
+        idlehandoff.notice(self.state, SESSION, idlehandoff.Usage(500_000, 3600), 400_000)
+        folder = os.path.join(self.state, "idle")
+        for name in os.listdir(folder):
+            old = os.path.getmtime(os.path.join(folder, name)) - 8 * 86400
+            os.utime(os.path.join(folder, name), (old, old))
+
+        idlehandoff.prune(self.state)
+
+        self.assertEqual(os.listdir(folder), [])
 
 
 class NoticeTest(Fixture):

@@ -48,6 +48,10 @@ ACTIVE = "active"
 
 # 末尾から読むトランスクリプトの大きさ（バイト）。最新の応答の行が入る長さがあればよい。
 _TAIL_BYTES = 1024 * 1024
+# 末尾に応答の行が無いとき（巨大なツールの結果が続いたとき）に、広げて遡る読み取りの大きさの上限。
+_TAIL_LIMIT = 16 * 1024 * 1024
+# 待ち時間の上限（秒）。hook の上限 3600 秒より前に起きる。
+MAX_WAIT = 3300
 # キャッシュの保持時間を探して遡る応答の行数の上限。
 _LOOKBACK = 40
 
@@ -141,38 +145,49 @@ def usage_of(transcript_path: str) -> Usage | None:
     """
     if not transcript_path:
         return None
-    raw = _tail(transcript_path)
-    if raw is None:
-        return None
-    rows = _assistant_usages(raw)
+    rows: list[dict] = []
+    reach = _TAIL_BYTES
+    while reach <= _TAIL_LIMIT:
+        raw, whole = _tail(transcript_path, reach)
+        if raw is None:
+            return None
+        # 中断や API の誤りの行は、使用量がすべて 0 になる。大きさを測れないので飛ばす。
+        rows = [u for u in _assistant_usages(raw) if _size_of(u) > 0]
+        if rows or whole:
+            break
+        reach *= 4
     if not rows:
         return None
-    first = rows[0]
-    tokens = sum(_int(first.get(k)) for k in _SIZE_KEYS)
-    return Usage(tokens=tokens, ttl=_ttl_of(rows[:_LOOKBACK]))
+    return Usage(tokens=_size_of(rows[0]), ttl=_ttl_of(rows[:_LOOKBACK]))
 
 
 _SIZE_KEYS = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+
+
+def _size_of(usage: dict) -> int:
+    return sum(_int(usage.get(k)) for k in _SIZE_KEYS)
 
 
 def _int(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
 
 
-def _tail(path: str) -> str | None:
+def _tail(path: str, reach: int) -> tuple[str | None, bool]:
+    """末尾から `reach` バイトを読む。返すのは文字列と、ファイル全体を読んだか。"""
     try:
         with open(path, "rb") as handle:
             handle.seek(0, os.SEEK_END)
             size = handle.tell()
-            handle.seek(max(size - _TAIL_BYTES, 0))
+            handle.seek(max(size - reach, 0))
             data = handle.read()
     except OSError:
-        return None
+        return None, True
     text = data.decode("utf-8", errors="replace")
-    if size > _TAIL_BYTES:
+    whole = size <= reach
+    if not whole:
         # 先頭の欠けた行を捨てる。
         text = text.partition("\n")[2]
-    return text
+    return text, whole
 
 
 def _assistant_usages(raw: str) -> list[dict]:
@@ -210,8 +225,8 @@ def _ttl_of(rows: list[dict]) -> int:
 def wait_seconds(ttl: int, override: str = "") -> int:
     """放置してから起こすまでの待ち時間（秒）。上書きが正の整数ならそれ。"""
     text = (override or "").strip()
-    if text.isdigit() and int(text) > 0:
-        return int(text)
+    if text.isascii() and text.isdigit() and int(text) > 0:
+        return min(int(text), MAX_WAIT)
     return WAIT_SHORT if ttl <= 300 else WAIT_LONG
 
 
@@ -265,6 +280,7 @@ def start(
     usage: Usage | None,
     limit: int,
     wait_override: str = "",
+    transcript: str = "",
 ) -> Plan | None:
     """ターンの終わりに待機を始める。始めないなら None。
 
@@ -283,23 +299,29 @@ def start(
         "due": usage.tokens,
         "base": _base(data, usage.tokens),
         "at": int(time.time()),
+        "transcript": transcript,
     }
     if not _write(state, session, new):
         return None
     return Plan(wait=wait_seconds(usage.ttl, wait_override), token=token)
 
 
-def check(state: str, session: str, token: str, wait: int) -> str | None:
+def check(state: str, session: str, token: str, wait: int, limit: int = 0) -> str | None:
     """待機のあとで呼ぶ。起こすべきなら指示の文面を返し、状態を `fired` にして基準を進める。
 
     状態が `waiting` でなくなっている、または印が違う（その間にユーザが打った、あとの待機に
-    置き換わった）ときは None。
+    置き換わった）ときは None。`limit` が正で、待機の始めに会話の場所を覚えていれば、会話の大きさを
+    読み直す。入力を伴わずに会話が小さくなっていたとき（`/compact` など）は起こさない。
     """
     if not session_ok(session):
         return None
     data = _read(state, session)
     if data.get("state") != WAITING or data.get("token") != token:
         return None
+    if limit > 0 and data.get("transcript"):
+        usage = usage_of(str(data["transcript"]))
+        if usage is None or not due(data, usage.tokens, limit):
+            return None
     new = dict(data, state=FIRED, base=_int(data.get("due")))
     new.pop("token", None)
     if not _write(state, session, new):
@@ -313,7 +335,7 @@ def reset(state: str, session: str, prompt: str, background: bool = False) -> No
     起こすときの指示（目印付き）と、バックグラウンド作業の完了通知は、ユーザの入力ではないので
     状態を戻さない。
     """
-    if not session_ok(session) or MARKER in prompt or background:
+    if not session_ok(session) or prompt.lstrip().startswith(MARKER) or background:
         return
     data = _read(state, session)
     if not data or data.get("state") == ACTIVE:
@@ -356,8 +378,14 @@ def prune(state: str, now: float | None = None) -> None:
         return
     for name in names:
         path = os.path.join(folder, name)
+        # 知らせ済みの印は書き換わらないので、対の状態ファイルが新しい間は残す。
+        pair = os.path.join(folder, name[: -len(".notice")] + ".json")
         try:
+            if name.endswith(".notice") and os.path.exists(pair):
+                continue
             if os.path.getmtime(path) < cutoff:
                 fsio.remove(path)
+                if name.endswith(".json"):
+                    fsio.remove(os.path.join(folder, name[: -len(".json")] + ".notice"))
         except OSError:
             continue
