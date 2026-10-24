@@ -5,7 +5,7 @@ description: UserPromptSubmit で置き、ツール呼び出しで更新時刻�
 tags: [self-guard, hook, vscode-extension]
 keywords: [ターン, turn, 印, セッション, 中断, 古い印, turns, 保存, 戻される, mtime]
 ---
-# ADR-0162: ターン中かどうかを、セッションごとの印のファイルで残す
+# ADR-0165: ターン中かどうかを、セッションごとの印のファイルで残す
 
 状態: 採用
 
