@@ -38,7 +38,7 @@ keywords: [複数人, 別PC, 別セッション, 引き継ぎ, 同期, fetch, sy
 | 場面 | 手順 | 担当 |
 |---|---|---|
 | セッション開始 | `ccnavi-fetch.sh` が親のブランチと統合先を取り、早送りだけで進める。届かなければ止めず、手元の版で判定して「リモート未確認」と示す。fetch 1 回の期限は `CCNAVI_FETCH_TIMEOUT`（既定 15 秒） | hook（SessionStart） |
-| 別 PC で親を始める | `ccnavi-start.sh --mr <番号>` か `--issue <番号>`。origin から取って早送りし、最後に `ccnavi-sync.sh <識別子>` を打つ | ユーザ |
+| 別 PC で親を始める | `ccnavi-start.sh --mr <番号>`（`--issue <番号>` だけでは、MR があれば聞いて止まる。続けるなら `--issue <番号> --mr <番号>`）。origin から取って早送りし、最後に `ccnavi-sync.sh <識別子>` を打つ | ユーザ |
 | 親が分かれた | `ccnavi-sync.sh [<親>]` が取り込む。衝突したら自分が始めた merge だけ取りやめる。取り込み後に判定し直し、error があれば表示して終了コード 1 にする | ユーザ |
 | 親のブランチへの push | 親のワークツリーのブランチは、push の前に共通の push の関門（`ccnavi_push_gate`）を通す。リモートから消えた親のブランチを作り直す形を止める。`ccnavi-git.sh push`・write-and-push・`ccnavi-user-push-approved.sh` の 3 経路が同じ関門を使う（9.2） | `ticket` / `review` の sh |
 | 状態を書く操作 | write-and-push（`ccnavi-common-write-and-push.sh`）が、ロック → 取り込み → 書く → コミット → push → 届いたかの確認の順で進める。push が通らなければ戻して取り込み直し、1 回だけやり直す。再び通らなければ戻して `ccnavi-sync.sh` を案内して終わる | `ticket` / `review` の sh |

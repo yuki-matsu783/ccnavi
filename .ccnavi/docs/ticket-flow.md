@@ -59,7 +59,7 @@ sequenceDiagram
 
 | # | 誰 | 区分 | 内容 |
 |---|---|---|---|
-| 0 前 | エージェント | 手順 | 事前確認。ホストの API（認証・リポジトリの有無・書き込みの権限）と git のリモートが使える状態かを確かめる（[worktree-start.md](worktree-start.md)）。チケット作業は必ず issue と MR のセット。issue が無ければユーザに作ってもらう |
+| 0 前 | エージェント | 手順 | 事前確認。ホストの API（認証・リポジトリの有無・書き込みの権限）と git のリモートが使える状態かを確かめる（[worktree-start.md](worktree-start.md)）。チケット作業は必ず issue と MR のセット。issue が無ければ `ccnavi-start.sh --new-issue <題>` で作る（作れなければユーザに作ってもらう） |
 | 0 前 | | コマンド | `ccnavi-start.sh --check`（0 以外なら、結果と「次:」をユーザに伝えて止まる） |
 | 0 前 | | 成果物 | 何も作らない。標準出力に項目ごとの結果（OK・NG・未確認・省略・注意）と結論が出る |
 | 0 | エージェント | 手順 | 親のワークツリーと MR を用意する。issue・MR を指定された作業では、ワークツリーを切る前に打つ（[worktree-start.md](worktree-start.md)） |

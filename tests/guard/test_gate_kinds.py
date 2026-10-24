@@ -221,6 +221,9 @@ class SubagentRolesTest(HookCase):
         "sh .ccnavi/scripts/ccnavi-git.sh integrate",
         "sh .ccnavi/scripts/ccnavi-git.sh integrate-done",
         "sh .ccnavi/scripts/ccnavi-start.sh",
+        "sh .ccnavi/scripts/ccnavi-start.sh --issue 3",
+        "sh .ccnavi/scripts/ccnavi-start.sh --issue 3 --list-open",
+        "sh .ccnavi/scripts/ccnavi-start.sh --new-issue x --similar-checked",
         "sh .ccnavi/scripts/ccnavi-sync.sh",
         "sh .ccnavi/scripts/ccnavi-worktree.sh add x",
         "sh .ccnavi/scripts/ccnavi-clean.sh --worktree i0001-01-01",
@@ -245,6 +248,9 @@ class SubagentRolesTest(HookCase):
         "sh .ccnavi/scripts/ccnavi-launcher.sh --docs x",
         "sh .ccnavi/scripts/ccnavi-launcher.sh --lint",
         "sh .ccnavi/scripts/ccnavi-launcher.sh --explain x",
+        "sh .ccnavi/scripts/ccnavi-start.sh --list-open",
+        "sh .ccnavi/scripts/ccnavi-start.sh --check",
+        "sh .ccnavi/scripts/ccnavi-start.sh --help",
     )
 
     def test_the_subagent_cannot_type_them_in_any_mode(self):
