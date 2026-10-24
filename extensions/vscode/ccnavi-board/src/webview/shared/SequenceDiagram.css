@@ -1,75 +1,93 @@
 /*
  * 時系列の図（`SequenceDiagram.tsx`）。登場者の列を grid で並べ、矢印は 1 本ずつ行にする。
- * 縦の時間軸は、箱の背景に列の中央ごとに引く（インラインの `background-image`）。色は VS Code のテーマ変数だけで組む。
+ * やさしい見た目にするため、登場者は丸い名札、順番は丸い数字、説明中の矢印はやわらかい色の背景で囲む。
+ * 縦の時間軸は、列ごとの要素（`.tour-diagram-life`）で引く。色は VS Code のテーマ変数だけで組む。
  */
 .tour-diagram {
   --tour-diagram-line: var(--vscode-panel-border, rgba(128, 128, 128, .4));
   --tour-diagram-accent: var(--vscode-focusBorder);
+  --tour-diagram-soft: color-mix(in srgb, var(--vscode-focusBorder) 14%, transparent);
   display: grid;
-  column-gap: var(--gap-2);
-  row-gap: var(--gap-4);
+  column-gap: var(--gap-3);
+  row-gap: var(--gap-5);
   margin: 0 0 var(--gap-4);
-  padding: var(--gap-3) var(--gap-2) var(--gap-4);
+  padding: var(--gap-5) var(--gap-4);
   border: 1px solid var(--vscode-panel-border);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-sm);
-  line-height: 1.45;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-md);
+  line-height: 1.6;
 }
 
 .tour-diagram-actor {
-  padding: var(--gap-1) var(--gap-2);
+  padding: var(--gap-2) var(--gap-4);
   text-align: center;
   font-weight: 600;
-  background: var(--vscode-editor-background);
-  border: 1px solid var(--vscode-panel-border);
-  border-radius: var(--radius-sm);
+  background: var(--tour-diagram-soft);
+  border-radius: var(--radius-pill);
   overflow-wrap: anywhere;
 }
 
 .tour-diagram-life {
   justify-self: center;
-  width: 1px;
-  background: var(--tour-diagram-line);
+  width: 0;
+  border-left: 1px dashed var(--tour-diagram-line);
 }
 
-.tour-diagram-step { position: relative; min-width: 0; }
-.tour-diagram-step.dim { opacity: .38; }
+.tour-diagram-step {
+  position: relative;
+  min-width: 0;
+  padding: var(--gap-2) var(--gap-4);
+  border-radius: var(--radius-lg);
+}
 
+.tour-diagram-step.dim { opacity: .4; }
+.tour-diagram-step.focus { background: var(--tour-diagram-soft); }
+
+/* 順番を表す丸い数字 */
 .tour-diagram-no {
   display: inline-block;
-  min-width: 16px;
-  margin-right: var(--gap-2);
+  min-width: 1.6em;
+  margin-right: var(--gap-3);
   text-align: center;
   color: var(--vscode-descriptionForeground);
+  border: 1px solid var(--tour-diagram-line);
+  border-radius: var(--radius-round);
+  font-size: var(--font-sm);
   font-weight: 600;
 }
 
-.tour-diagram-step.focus .tour-diagram-no { color: var(--tour-diagram-accent); }
+.tour-diagram-step.focus .tour-diagram-no {
+  color: var(--vscode-editor-background);
+  background: var(--tour-diagram-accent);
+  border-color: var(--tour-diagram-accent);
+}
 
 .tour-diagram-text { overflow-wrap: anywhere; }
 
-/* 実際の値。矢印の文の下に、等幅で 1 つの塊として出す */
+/* 実際の値。文の下に、等幅で 1 つの塊として出す */
 .tour-diagram-value {
   display: block;
-  margin: var(--gap-1) 0 0;
-  padding: var(--gap-1) var(--gap-3);
+  margin: var(--gap-2) 0 0;
+  padding: var(--gap-2) var(--gap-4);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--font-sm);
   background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, .15));
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
 }
 
 /* 矢印: 文と値の下に線を引き、向きの側に三角を付ける。線は両端の列の中央から中央まで */
-.tour-diagram-step.arrow { padding: 0 0 var(--gap-4); }
+.tour-diagram-step.arrow { padding-bottom: var(--gap-5); }
 
 .tour-diagram-line {
   position: absolute;
-  bottom: 2px;
+  bottom: var(--gap-3);
   left: var(--tour-diagram-inset);
   right: var(--tour-diagram-inset);
   height: 0;
   border-top: 2px solid var(--vscode-descriptionForeground);
+  border-radius: var(--radius-pill);
 }
 
 .tour-diagram-step.focus .tour-diagram-line { border-top-color: var(--tour-diagram-accent); }
@@ -86,12 +104,9 @@
 .tour-diagram-step.focus.arrow.right .tour-diagram-line::after { border-left-color: var(--tour-diagram-accent); }
 .tour-diagram-step.focus.arrow.left .tour-diagram-line::after { border-right-color: var(--tour-diagram-accent); }
 
-/* 自分の中の動き: 枠で囲む */
+/* 自分の中の動き: 点線の吹き出しで囲む */
 .tour-diagram-step.note {
-  padding: var(--gap-2) var(--gap-3);
-  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   border: 1px dashed var(--vscode-descriptionForeground);
-  border-radius: var(--radius-sm);
 }
 
 .tour-diagram-step.focus.note { border: 1px solid var(--tour-diagram-accent); }

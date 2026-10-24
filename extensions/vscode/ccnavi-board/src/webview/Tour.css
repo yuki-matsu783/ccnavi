@@ -36,11 +36,21 @@
 
 .tour-bubble.center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-.tour-bubble h3 { margin: 0 24px 6px 0; font-size: var(--font-title); }
+.tour-bubble h3 { margin: 0 0 var(--gap-3); font-size: var(--font-title); }
 
-.tour-count { margin: 0 24px 2px 0; color: var(--vscode-descriptionForeground); font-size: var(--font-sm); }
+.tour-count { margin: 0 0 var(--gap-1); color: var(--vscode-descriptionForeground); font-size: var(--font-sm); }
 
-.tour-body { margin: 0 0 10px; line-height: 1.6; }
+/* ヘッダ（番号と題）。つかんで動かせる。右上の × を避けて余白を空ける */
+.tour-head { margin-right: 24px; cursor: grab; user-select: none; touch-action: none; }
+.tour-head:active { cursor: grabbing; }
+
+/* 動かしたあとは、中ほどの置き方（transform）をやめて、左上の位置で置く */
+.tour-bubble.moved { transform: none; }
+
+/* 説明文は、文ごとに行を改めて出す（長い 1 段落にしない） */
+.tour-body { margin: 0 0 var(--gap-4); line-height: 1.7; }
+.tour-line { display: block; margin-bottom: var(--gap-2); }
+.tour-line:last-child { margin-bottom: 0; }
 
 /* 画面の外の見た目（Claude Code・GitLab の画面）。吹き出しの幅に収める */
 .tour-image { display: block; max-width: 100%; max-height: 60vh; object-fit: contain; height: auto; margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-sm); }

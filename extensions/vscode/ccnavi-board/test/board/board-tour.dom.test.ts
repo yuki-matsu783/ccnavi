@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { buildBoard } from "../../src/core/board.js";
-import type { HTMLButtonElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 import { fixture } from "../helpers/fixture.js";
 import { openBoard } from "../helpers/board.js";
 import type { DomPage } from "../helpers/dom.js";
@@ -255,6 +255,48 @@ test("CB-D741 画像のある手順は、本文の下に data: の画像を出�
         dom.click(dom.one('[data-action="tour-next"]'));
       }
     }
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D743 ヘッダをつかんで吹き出しを動かせる。動かした位置は次の手順でも変わらず、画面の外には出ない。説明文は文ごとの行に分かれる", async () => {
+  const dom = await openBoard(fixture(), { measure: true });
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));
+    await dom.settle();
+    const head = dom.one(".tour-bubble .tour-head");
+    const view = head.ownerDocument.defaultView as unknown as { PointerEvent: new (type: string, init: Record<string, unknown>) => Event };
+    const fire = (type: string, x: number, y: number): void => {
+      head.dispatchEvent(new view.PointerEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0, pointerId: 1 }) as never);
+    };
+    assert.equal(dom.all(".tour-bubble.moved").length, 0);
+    fire("pointerdown", 100, 100);
+    fire("pointermove", 260, 220);
+    fire("pointerup", 260, 220);
+    await dom.settle();
+    const bubble = dom.one<HTMLElement>(".tour-bubble");
+    assert.ok(bubble.className.includes("moved"), "動かしても moved が付かない");
+    const left = bubble.style.left;
+    const top = bubble.style.top;
+    assert.ok(left !== "" && top !== "");
+    // 画面の外へ動かしても、収まる
+    fire("pointerdown", 100, 100);
+    fire("pointermove", -9000, -9000);
+    fire("pointerup", -9000, -9000);
+    await dom.settle();
+    assert.ok(Number.parseFloat(bubble.style.top) >= 0, "上の外へ出た");
+    // 次の手順でも、動かした位置のまま
+    const before = { left: bubble.style.left, top: bubble.style.top };
+    dom.click(dom.one('[data-action="tour-next"]'));
+    await dom.settle();
+    assert.deepEqual({ left: dom.one<HTMLElement>(".tour-bubble").style.left, top: dom.one<HTMLElement>(".tour-bubble").style.top }, before);
+    // 説明文は、文ごとの行になっている
+    const lines = dom.all(".tour-bubble .tour-body .tour-line");
+    assert.ok(lines.length >= 1);
+    assert.equal(lines.map((line) => line.textContent).join(""), dom.one(".tour-bubble .tour-body").textContent);
   } finally {
     await dom.close();
   }

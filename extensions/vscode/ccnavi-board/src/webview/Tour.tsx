@@ -14,7 +14,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX, ty
 
 import { ESCAPE_LAYER, useEscape } from "./useEscape.js";
 import { INTRO_ID, type DiagramDef, type Scene, type TourDef } from "../core/tour-def.js";
-import { placeBubble, type Rect } from "../core/tour-place.js";
+import { clampDragged, placeBubble, sentenceLines, type Rect } from "../core/tour-place.js";
 import { SequenceDiagram } from "./shared/SequenceDiagram.js";
 
 export interface TourStep {
@@ -314,6 +314,9 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   const [spot, setSpot] = useState<Spot | undefined>(undefined);
   const [place, setPlace] = useState<{ top: number; left: number } | undefined>(undefined);
   const [measured, setMeasured] = useState(false);
+  // ヘッダをつかんで動かした吹き出しの左上。裏の画面を見たいときに、手順をまたいでその位置のままにする
+  const [moved, setMoved] = useState<{ top: number; left: number } | undefined>(undefined);
+  const grab = useRef<{ dx: number; dy: number } | undefined>(undefined);
   const bubble = useRef<HTMLDivElement>(null);
   const next = useRef<HTMLButtonElement>(null);
   const step = steps[index];
@@ -426,23 +429,56 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
       {spot === undefined && <div className="tour-shade" />}
       <div
         ref={bubble}
-        className={spot === undefined ? "tour-bubble center" : "tour-bubble"}
+        className={`tour-bubble${spot === undefined ? " center" : ""}${moved !== undefined ? " moved" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tour-title"
         aria-describedby="tour-body"
         tabIndex={-1}
-        style={{ ...(place ?? {}), width, visibility: measured && (spot === undefined || place !== undefined) ? "visible" : "hidden" }}
+        style={{ ...(moved !== undefined ? { top: moved.top, left: moved.left, maxHeight: Math.max(120, window.innerHeight - moved.top - 8) } : (place ?? {})), width, visibility: measured && (moved !== undefined || spot === undefined || place !== undefined) ? "visible" : "hidden" }}
       >
         <button type="button" className="tour-close" data-action="tour-skip" title="案内を閉じる" aria-label="案内を閉じる" onClick={onClose}>
           ×
         </button>
-        <p className="tour-count">
-          {index + 1} / {steps.length}
-        </p>
-        <h3 id="tour-title">{step.title}</h3>
+        <div
+          className="tour-head"
+          data-grab="tour-head"
+          title="ドラッグして動かせます"
+          onPointerDown={(event) => {
+            const el = bubble.current;
+            if (el === null || event.button !== 0) {
+              return;
+            }
+            const rect = el.getBoundingClientRect();
+            grab.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
+            setMoved({ top: rect.top, left: rect.left });
+            event.currentTarget.setPointerCapture?.(event.pointerId);
+            event.preventDefault();
+          }}
+          onPointerMove={(event) => {
+            const at = grab.current;
+            if (at !== undefined) {
+              setMoved(clampDragged({ top: event.clientY - at.dy, left: event.clientX - at.dx }, width, { width: window.innerWidth, height: window.innerHeight }));
+            }
+          }}
+          onPointerUp={() => {
+            grab.current = undefined;
+          }}
+          onPointerCancel={() => {
+            grab.current = undefined;
+          }}
+        >
+          <p className="tour-count">
+            {index + 1} / {steps.length}
+          </p>
+          <h3 id="tour-title">{step.title}</h3>
+        </div>
         <p className="tour-body" id="tour-body">
-          {step.body}
+          {sentenceLines(step.body).map((line, at) => (
+            <span key={at} className="tour-line">
+              {line}
+            </span>
+          ))}
         </p>
         {step.image !== undefined && <img className="tour-image" src={step.image.src} alt={step.image.alt} />}
         {step.diagram !== undefined && <SequenceDiagram name={step.diagram.name} diagram={step.diagram.def} focus={step.diagram.focus} />}

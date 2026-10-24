@@ -142,3 +142,20 @@ test("CB-T1176 案内の YAML の図は、どれかの手順が引く（使わ�
     assert.deepEqual(Object.keys(def.diagrams).sort(), [...used].sort(), `${screen}: 引かれない図、または無い図`);
   }
 });
+
+test("CB-T1178 説明文は、「。」のあとで文ごとの行に分け、かぎ括弧や丸括弧の中の「。」では折らず、文中の改行も行の区切りにする", async () => {
+  const { sentenceLines } = await import("../../src/core/tour-place.js");
+  assert.deepEqual(sentenceLines("一つ目です。二つ目です。"), ["一つ目です。", "二つ目です。"]);
+  assert.deepEqual(sentenceLines("「止める。確認する。」と書きます。次です。"), ["「止める。確認する。」と書きます。", "次です。"]);
+  assert.deepEqual(sentenceLines("（例。補足）です。\n改行です"), ["（例。補足）です。", "改行です"]);
+  assert.deepEqual(sentenceLines(""), []);
+  assert.deepEqual(sentenceLines("句点なし"), ["句点なし"]);
+});
+
+test("CB-T1179 ヘッダを動かした吹き出しの位置は、画面の中に収まり、ヘッダの一部が必ず画面に残る", async () => {
+  const { clampDragged } = await import("../../src/core/tour-place.js");
+  const view = { width: 1000, height: 700 };
+  assert.deepEqual(clampDragged({ top: 100, left: 200 }, 500, view), { top: 100, left: 200 });
+  assert.deepEqual(clampDragged({ top: -50, left: -900 }, 500, view), { top: 0, left: -420 });
+  assert.deepEqual(clampDragged({ top: 900, left: 5000 }, 500, view), { top: 652, left: 920 });
+});

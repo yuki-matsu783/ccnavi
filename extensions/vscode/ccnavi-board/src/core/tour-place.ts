@@ -37,3 +37,43 @@ export function placeBubble(spot: Rect, bubble: { readonly width: number; readon
   return { top, left };
 }
 
+
+/**
+ * 説明文を、文ごとの行に分ける。「。」のあとで折り、「」・（）・［］の中の「。」では折らない。
+ * 文の中の改行（`\n`）も行の区切りにする。空の行は作らない。
+ */
+export function sentenceLines(body: string): string[] {
+  const lines: string[] = [];
+  let depth = 0;
+  let current = "";
+  const flush = (): void => {
+    if (current.trim() !== "") {
+      lines.push(current.trim());
+    }
+    current = "";
+  };
+  for (const char of body) {
+    if (char === "\n") {
+      flush();
+      continue;
+    }
+    current += char;
+    if ("「（［".includes(char)) {
+      depth += 1;
+    } else if ("」）］".includes(char)) {
+      depth = Math.max(0, depth - 1);
+    } else if (char === "。" && depth === 0) {
+      flush();
+    }
+  }
+  flush();
+  return lines;
+}
+
+/** ヘッダをつかんで動かした吹き出しの左上を、画面の中に収める（ヘッダを必ずつかみ直せるよう、一部は画面に残す） */
+export function clampDragged(at: { readonly top: number; readonly left: number }, bubbleWidth: number, view: { readonly width: number; readonly height: number }): { top: number; left: number } {
+  const KEEP = 80;
+  const top = Math.min(Math.max(at.top, 0), Math.max(0, view.height - 48));
+  const left = Math.min(Math.max(at.left, KEEP - bubbleWidth), Math.max(0, view.width - KEEP));
+  return { top, left };
+}
