@@ -242,6 +242,7 @@ test("CB-T1170 claude -p は、プロンプトのファイルを標準入力に�
     claudeRunCommand("C:\\Users\\x y\\prompt.txt"),
     "claude -p --permission-mode auto < 'C:/Users/x y/prompt.txt'",
   );
-  // 単引用符を含むパスも 1 語のまま
-  assert.ok(claudeRunCommand("/tmp/a'b/p.txt").startsWith("claude -p --permission-mode auto < '"));
+  // 単引用符・$・バッククォート・日本語を含むパスも 1 語のまま
+  assert.equal(claudeRunCommand("/tmp/a'b/p.txt"), "claude -p --permission-mode auto < '/tmp/a'\\''b/p.txt'");
+  assert.equal(claudeRunCommand("/tmp/$x `y`/プロンプト.txt"), "claude -p --permission-mode auto < '/tmp/$x `y`/プロンプト.txt'");
 });

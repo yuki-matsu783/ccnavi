@@ -9,7 +9,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { claudeRunCommand } from "./core/commands.js";
-import { runInTerminal } from "./terminal.js";
+import { runInNewTerminal } from "./terminal.js";
 
 /**
  * プロンプトをクリップボードに入れる。`what` は知らせに出す呼び名（「承認のプロンプト」など）。
@@ -33,16 +33,19 @@ export async function openPromptInSession(prompt: string): Promise<void> {
 }
 
 /**
- * プロンプトをファイルに書き、ボードのターミナル（`terminal.ts`）で `claude -p` に渡して実行する。
+ * プロンプトをファイルに書き、専用の新しいターミナル（`terminal.ts`）で `claude -p` に渡して実行する。
  * 結果は取り込まず、ターミナルに流れるだけ（止めるには Ctrl+C を押す）。claude が PATH に無いときはターミナルがその旨を出す。
  * 書けなかったときは警告を出して送らない
  */
+/** `claude -p` を走らせる専用ターミナルの名前 */
+const CLAUDE_TERMINAL_NAME = "ccnavi claude";
+
 export async function runPromptInTerminal(root: string, prompt: string): Promise<void> {
   try {
     const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "ccnavi-prompt-"));
     const file = path.join(dir, "prompt.txt");
     await fs.promises.writeFile(file, prompt, { encoding: "utf8", mode: 0o600 });
-    runInTerminal(root, claudeRunCommand(file));
+    runInNewTerminal(root, CLAUDE_TERMINAL_NAME, claudeRunCommand(file));
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     void vscode.window.showWarningMessage(`プロンプトのファイルを書けなかったため、実行できませんでした: ${reason}`);

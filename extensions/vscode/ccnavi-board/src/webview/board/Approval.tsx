@@ -73,7 +73,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
           <h2 id="approval-title">{overlay.count} 件を承認しました</h2>
           {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・pushするコマンドをターミナルに送信しました。</p> : null}
           <p className="approval-note">
-            Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開くか、ターミナルで実行してください。
+            Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください（送るときは自分で Enter を押す）。「ターミナルで実行」は、押すとすぐ確認なしで実行されます。
           </p>
           <pre className="approval-text" data-tour="approval-prompt">{overlay.prompt}</pre>
           <HandOver />

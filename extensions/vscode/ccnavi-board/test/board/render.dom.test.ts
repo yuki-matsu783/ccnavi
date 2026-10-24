@@ -452,6 +452,7 @@ test("CB-T131o 決めた結果のプロンプトのオーバーレイは、題�
     assert.equal(text(page, "pre.approval-text"), "[ccnavi] レビューを終えた <b>");
     assert.equal(page.all('button[data-action="prompt-copy"]').length, 1);
     assert.equal(page.all('button[data-action="prompt-open"]').length, 1);
+    assert.equal(page.all('button[data-action="prompt-run"]').length, 1);
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     assert.ok(!text(page, ".approval").includes("を承認しました"));
   } finally {

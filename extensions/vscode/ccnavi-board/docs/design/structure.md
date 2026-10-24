@@ -22,7 +22,7 @@ src/
   handoff-panel.ts    取り込み待ち画面の Webview パネル（1 枚。見るツリー（ワークスペース・プロジェクト・ワークツリー）を切り替える）。user handoff --json の一覧の受け渡しと、取り込みの受け付け（手順は core/handoff-import.ts に分けてあり、ここは実行ファイルの呼び出しを渡すだけ）、端末の案内、下書きと取り込み先のファイルの監視、作業中の錠の取り直し。ボードのカードの下書きの通知からも開く（vscode に依存する）
   flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。ボードのカードから開く）。置き場と錠を実行ファイルに聞き、保存を受け付ける。エージェントの下書きの「提案あり」・取り込み・保存のあとの削除と、依頼の文もここ（vscode に依存する）
   workflow-panel.ts   計画編集タブの Webview パネル（親の提案ごとに 1 枚。識別子を渡すコマンドと、ボードの親の提案のカードの「計画編集」、承認のオーバーレイの「計画を編集」から開く）。線を変えるたびの --plan-order --json --order と、保存の --plan-order --write --expect を実行ファイルに打たせる（拡張はファイルを書かない）。提案の監視（外で変わった・承認待ちから無くなった）、未保存の「●」と閉じた後の聞き方、初回の案内もここ。未保存と、保存したあとのハッシュ（source_sha）を帳面（core/workflow-tabs.ts）に書く（vscode に依存する）
-  prompt-handover.ts  Claude Code に文を渡す経路（コピー / 新しいセッションで開く / ボードのターミナルで claude -p を実行）。ボードとフロー編集画面が使う（vscode に依存する）
+  prompt-handover.ts  Claude Code に文を渡す経路（コピー / 新しいセッションで開く / 専用ターミナルで claude -p を実行）。ボードとフロー編集画面が使う（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信、.gitignore への追記（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）。左パネルの案内（package.json の walkthroughs。本文は media/tour/）を、拡張の版が変わった最初の起動と、パネルのタイトルバーの ? で開き、プロジェクト管理 → チケット管理の基本の案内を続けて動かす（vscode に依存する）

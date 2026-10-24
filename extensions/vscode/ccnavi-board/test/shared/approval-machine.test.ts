@@ -953,6 +953,10 @@ test("CB-T178 文を渡したら閉じる。コピー・新しいセッション
   assert.deepEqual(ran.effects, [{ kind: "runClaude", prompt: "承認の文" }]);
   // 文の無い状態（閉じている）では渡さない
   assert.deepEqual(approvalStep(CLOSED, { kind: "handOver", how: "promptRun" }).effects, []);
+  // 決めた結果のプロンプトからも、同じく文を渡して実行する（how の取り違えを守る）
+  const ranPrompt = approvalStep(prompt, { kind: "handOver", how: "promptRun" });
+  assert.equal(ranPrompt.state.overlay, undefined);
+  assert.deepEqual(kinds(ranPrompt.effects), ["runClaude"]);
   const copiedPrompt = approvalStep(prompt, { kind: "handOver", how: "promptCopy" });
   assert.equal(
     copiedPrompt.effects[0]?.kind === "copy" ? copiedPrompt.effects[0].what : "",
