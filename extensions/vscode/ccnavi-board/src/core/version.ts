@@ -1,6 +1,6 @@
 /**
  * `ccnavi --version --json`（版の JSON）の読み方と、拡張との食い違いの見分け方。
- * 形の定義は ccnavi の docs/requirements/json-shapes.md「版の JSON」。VS Code の API は使わない（単体テストで確かめる）。
+ * 形の定義は ccnavi の docs/11_requirements/json-shapes.md「版の JSON」。VS Code の API は使わない（単体テストで確かめる）。
  *
  * 見るのは 2 つ。
  *

@@ -1,6 +1,6 @@
 /**
  * フロー編集画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
- * VS Code の API に触れるので単体テストの対象外。docs/design/manual-checks.md の手動確認の手順で確かめる。
+ * VS Code の API に触れるので単体テストの対象外。docs/21_design/manual-checks.md の手動確認の手順で確かめる。
  *
  * 子チケット 1 枚のフローを図で直す。開くのはボードのカードの「フロー」だけで、
  * タブは子ごとに 1 枚（同じ子をもう 1 度開けば前面に出す）。
@@ -623,7 +623,7 @@ function redraw(current: PanelState): void {
 function flowHost(panel: vscode.WebviewPanel, root: string): ScreenHost<FlowData> {
   if (panel.options.retainContextWhenHidden !== true) {
     // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
-    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
+    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/42_claude/logging.md）
     diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "flow", retainContextWhenHidden: false });
   }
   return retainedHost<FlowData>(

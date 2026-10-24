@@ -25,7 +25,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, d
 uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複数は 1 つずつ続けて回す。`discover -s` は 1 か所しか取らない）
 ```
 
-全件は `uv run python -m tests`（同時実行）で回す。`discover -s tests` の 1 本は使わない。理由と手順は[テストを回す](../../../../docs/claude/testing.md)。時間の目安は並行セッションがあると数倍になる。
+全件は `uv run python -m tests`（同時実行）で回す。`discover -s tests` の 1 本は使わない。理由と手順は[テストを回す](../../../../docs/42_claude/testing.md)。時間の目安は並行セッションがあると数倍になる。
 
 実行ファイル（`.ccnavi/bin/`、無ければ PATH の `ccnavi`）が無い環境（Claude Code on the web、ビルド前）では、ランチャー経由の `--lint` と `ccnavi` コマンドが動かない。
 `python main.py --lint` で代える（ランチャーが実行ファイルを探して失敗するため）。
@@ -57,7 +57,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `tests/fixtures/` | `guard` `ticket` |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `extensions/chrome/ccnavi-approval/`（`py/`・`test/fixtures/`） | `ticket` `sh`（Chrome の入口を手元のコアと突き合わせる） |
-| `docs/adr/`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
+| `docs/30_adr/`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
 自動テストで中身を確かめられないもの（変えたら手で動かして確かめる）:

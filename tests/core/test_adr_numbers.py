@@ -4,7 +4,7 @@
 `ADR-00NN` がどちらの決定を指すか読めない。実際に 3 組（0051・0058・0060）が
 重なっていて、うち 1 枚は題に番号を書いていなかった。
 
-一覧（`docs/adr/README.md`）は人が手で書き足す形なので、1 枚足したときに
+一覧（`docs/30_adr/README.md`）は人が手で書き足す形なので、1 枚足したときに
 番号を取り違えても誰も言わない。テストの ID に同じ検査を置いた回
 （issue #88、`test/shared/test-ids.test.ts`）と同じ形で、見るのは 3 つ。
 
@@ -14,12 +14,12 @@
    （既存の行は題を縮めてある）
 
 止められるのは合流の後。 ADR を足しただけのコミットではこのテストは回らない
-（`.claude/skills/commit/references/test-groups.md` の「`docs/adr/` → `core`」で
+（`.claude/skills/commit/references/test-groups.md` の「`docs/30_adr/` → `core`」で
 回るのは、その表を見てコミットしたときだけ。hook は未登録で、CI も無い）。
 重複はもともと並行して伸びた枝が合流したときに起きるので、気づく場所が
 「合流して誰かが `core` を回したとき」に早まる、という形で役に立つ。
 
-読むのは `docs/adr/` のファイルだけで、判定の実行ファイルには触らない。
+読むのは `docs/30_adr/` のファイルだけで、判定の実行ファイルには触らない。
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from collections import Counter
 
 from tests import ROOT
 
-ADR_DIR = os.path.join(ROOT, "docs", "adr")
+ADR_DIR = os.path.join(ROOT, "docs", "30_adr")
 
 # `0064-extension-board-in-react.md` → 0064。README.md は番号を持たないので外れる。
 FILE_NAME = re.compile(r"^(\d{4})-.+\.md$")
@@ -50,7 +50,7 @@ LINK = re.compile(r"\[(\d{4})\]\((\d{4}-[^)]+\.md)\)")
 
 
 def sheets() -> list[str]:
-    """`docs/adr/` に置いてある ADR のファイル名。番号の順に並べる。"""
+    """`docs/30_adr/` に置いてある ADR のファイル名。番号の順に並べる。"""
     return sorted(f for f in os.listdir(ADR_DIR) if FILE_NAME.match(f))
 
 
@@ -77,7 +77,7 @@ class AdrNumbersTest(unittest.TestCase):
             [],
             duplicated,
             "同じ番号が 2 枚にある。引かれている数が少ないほうを空き番号へ動かし、"
-            "旧番号を docs/adr/README.md の表に残す",
+            "旧番号を docs/30_adr/README.md の表に残す",
         )
 
     def test_title_carries_its_own_number(self):
@@ -104,7 +104,7 @@ class AdrNumbersTest(unittest.TestCase):
         listed = [target for _, target in linked]
 
         missing = [name for name in self.sheets if name not in set(listed)]
-        self.assertEqual([], missing, "一覧に無い ADR がある（docs/adr/README.md）")
+        self.assertEqual([], missing, "一覧に無い ADR がある（docs/30_adr/README.md）")
 
         phantom = [target for target in listed if target not in set(self.sheets)]
         self.assertEqual([], phantom, "一覧が指している ADR が置かれていない")

@@ -4,7 +4,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 
 この拡張は、チケットの状態を見て、承認などの人の操作を受ける入口です。判定は実行ファイルが行い、作業中のエージェントのセッションへプロンプトを送り込む手段は持ちません（ccnavi の README「複数人・別 PC・別セッションで進める」）。
 
-この拡張が何をするか（画面ごとのふるまい）は [docs/requirements.md](docs/requirements.md)、作り（構成・画面の段取り・テストの ID）は [docs/design.md](docs/design.md) に書いてある。この README には、必要なもの・組み立てと導入だけを書く。拡張開発ホストでの動かし方と手動確認の手順は [docs/design/manual-checks.md](docs/design/manual-checks.md) にある。
+この拡張が何をするか（画面ごとのふるまい）は [docs/10_requirements.md](docs/10_requirements.md)、作り（構成・画面の段取り・テストの ID）は [docs/20_design.md](docs/20_design.md) に書いてある。この README には、必要なもの・組み立てと導入だけを書く。拡張開発ホストでの動かし方と手動確認の手順は [docs/21_design/manual-checks.md](docs/21_design/manual-checks.md) にある。
 
 ## 必要なもの
 
@@ -12,7 +12,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 |---|---|
 | VS Code | 1.90 以上 |
 | ccnavi の実行ファイル | 探す順は、設定 `ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json` が優先）の `CCNAVI_ENTRY_PATH` → `dist/ccnavi/ccnavi[.exe]` → `.ccnavi/scripts/ccnavi-launcher.sh` → ソースがあれば `uv run python -m ccnavi` → PATH の `ccnavi`（絶対パスの項目だけ）。振り分けの sh（名前が `ccnavi-launcher.sh`）を指していれば、sh を通さず `../bin/<os>-<arch>/` にあるこの OS と CPU 向けの実行ファイルを使い、無ければ次の候補へ進む（Windows では sh を直接起動できないため、sh そのものは使わない）。それ以外のパスは、そのまま実行ファイルとして使う |
-| 実行ファイルの版 | 起動のときに 1 度 `--version --json` を聞き、互換の版（`compat`）が拡張の `EXTENSION_COMPAT` と違うときに通知を出す。版を聞けなかったとき（実行ファイルが `--version --json` に失敗する・答えが読めない）は、起動では何も言わない。画面ごとに、使うフラグを確かめられない理由を出して先へ進まない。通知では、どちらが古いかと直し方（ccnavi のリポジトリなら `build.py` で組み立て直し、配布先なら `scripts/ccnavi-setup.sh --force` で配り直し、拡張が古ければ入れ直し）を示す。画面は止めない（[版の JSON](../../../docs/requirements/json-shapes.md#版の-json)） |
+| 実行ファイルの版 | 起動のときに 1 度 `--version --json` を聞き、互換の版（`compat`）が拡張の `EXTENSION_COMPAT` と違うときに通知を出す。版を聞けなかったとき（実行ファイルが `--version --json` に失敗する・答えが読めない）は、起動では何も言わない。画面ごとに、使うフラグを確かめられない理由を出して先へ進まない。通知では、どちらが古いかと直し方（ccnavi のリポジトリなら `build.py` で組み立て直し、配布先なら `scripts/ccnavi-setup.sh --force` で配り直し、拡張が古ければ入れ直し）を示す。画面は止めない（[版の JSON](../../../docs/11_requirements/json-shapes.md#版の-json)） |
 | bash | clone / fetch / pull を送るターミナル。承認と未解決の指摘の対応方針はこのターミナルを通らない（子プロセスで打つ。sh はこのシェルで走らせる）。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
 | git | PATH にあること。プロジェクト管理画面が origin を読み、ターミナルで clone を打つ |
 | Node.js / pnpm | 22 以上 / 10。組み立てとテストにだけ要る |
@@ -58,8 +58,8 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 入れたときの `[DEP0169] DeprecationWarning: url.parse() ...` は `code` コマンド自身の警告で、拡張とは関係ない。`successfully installed` が出ていれば入っている。
 
-テストの分け方、tsconfig の 3 本、依存の理由、生成物の消し方（`pnpm run clean`）といった開発者向けの説明は [docs/design/development.md](docs/design/development.md) に書いてある。
+テストの分け方、tsconfig の 3 本、依存の理由、生成物の消し方（`pnpm run clean`）といった開発者向けの説明は [docs/21_design/development.md](docs/21_design/development.md) に書いてある。
 
 ## 拡張開発ホストでの動かし方と手動確認
 
-拡張開発ホストで動かす手順と、単体テストの対象外の部分を手で確かめる項目は [docs/design/manual-checks.md](docs/design/manual-checks.md) に書いてある。
+拡張開発ホストで動かす手順と、単体テストの対象外の部分を手で確かめる項目は [docs/21_design/manual-checks.md](docs/21_design/manual-checks.md) に書いてある。

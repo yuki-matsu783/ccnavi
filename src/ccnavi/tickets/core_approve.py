@@ -258,7 +258,7 @@ def preview(
     """`--agree --preview`。一覧を見せるだけで、承認済みチケットは置かない。
     ターミナルの確認は要らない。
 
-    JSON の形は docs/requirements/json-shapes.md「承認の JSON」。一覧が空でも 0 で返す。
+    JSON の形は docs/11_requirements/json-shapes.md「承認の JSON」。一覧が空でも 0 で返す。
     拡張は `batch` が空なら「承認待ちは無い」と出す。
     `only` はボードの絞り込みで見えている分（`--agree` と同じ意味）。
     見せる一覧と承認する対象が同じ絞りを通るようにする。
@@ -442,7 +442,7 @@ def approve_yes(
     if applied.code != 0:
         # 途中で止まった。置いたものはそのまま残るので、どこまで置いたかを返す。それを言わずに
         # 失敗を返すと、ユーザは「何も起きていない」と読む
-        # （docs/requirements/json-shapes.md「承認の JSON」の `partial`）。
+        # （docs/11_requirements/json-shapes.md「承認の JSON」の `partial`）。
         stderr.write(
             core_base.tagged(
                 CODE_APPROVE_STOPPED,

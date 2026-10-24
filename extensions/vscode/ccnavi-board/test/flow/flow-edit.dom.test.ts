@@ -3,7 +3,7 @@
  * ミニマップ、保存前の差分の一覧、未保存のまま閉じた編集を戻して開くこと、実行ファイルの答え（渡る手順・warn・候補）を見る。
  *
  * 線を引く途中の断り（`isValidConnection`）はドラッグが要るので、ここでは見ない（規則は `flow-edit-ops.test.ts`
- * の `canConnect`、図の上は docs/design/manual-checks.md の手動確認）。
+ * の `canConnect`、図の上は docs/21_design/manual-checks.md の手動確認）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

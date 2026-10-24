@@ -6,9 +6,9 @@ GitLab での ccnavi の書き込みどうしの競合の検出は、実際の G
 PAT に要る権限は、GitHub が Contents の Read and write、GitLab が `api` スコープである。残った指摘の行き先を確定するときは、さらに GitHub が Pull requests・Issues の Read and write、GitLab が Developer 以上のロールを要る。設定画面の案内と [VERIFY.md](VERIFY.md) の表に、同じ内容を載せている。
 
 承認者の操作を、作業者の開発環境やセッションの外に置くための入口で、判定のコアは手元の ccnavi と同じ Python を同梱して使う。
-同期はリアルタイムではなく、書いた結果は作業側の次の fetch / sync で届く（ccnavi の docs/guide/multi-pc.md）。
+同期はリアルタイムではなく、書いた結果は作業側の次の fetch / sync で届く（ccnavi の docs/41_guide/multi-pc.md）。
 
-何をするか（ふるまい）は [docs/requirements.md](docs/requirements.md)、構成は [docs/design.md](docs/design.md) にある。この README には、組み立てと試験の手順だけを書く。
+何をするか（ふるまい）は [docs/10_requirements.md](docs/10_requirements.md)、構成は [docs/20_design.md](docs/20_design.md) にある。この README には、組み立てと試験の手順だけを書く。
 
 ## 組み立て
 

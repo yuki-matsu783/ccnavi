@@ -334,7 +334,7 @@ class TicketTest(unittest.TestCase):
     def test_scope_ignores_case_on_every_machine(self):
         """表記の大文字小文字は、どの機械でも区別しない。
 
-        `docs/Design/*` と書いた範囲に `docs/design/plan.md` がヒットする。機械に
+        `docs/Design/*` と書いた範囲に `docs/21_design/plan.md` がヒットする。機械に
         任せると、同じチケットと同じパスで、止まる場所が Windows と Linux で
         食い違う。範囲はユーザが宣言する意図なので、機械の都合ではなく書かれたパスの意味で
         読む（`_fold` と `_entries` の re.IGNORECASE）。

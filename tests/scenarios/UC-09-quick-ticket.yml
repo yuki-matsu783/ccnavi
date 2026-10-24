@@ -13,7 +13,7 @@ setup:
     body: "受け入れシナリオ UC-09 で使う issue。README.md の末尾に「テスト 2」を 1 行足す作業の着手に使う。"
     close: true                  # 回したあとに閉じる
 
-# 設計に触れる・ユーザのレビューが要る作業は、提案を書いて承認を受ける（docs/design/tickets/phases.md の「小さい作業」）。
+# 設計に触れる・ユーザのレビューが要る作業は、提案を書いて承認を受ける（docs/21_design/tickets/phases.md の「小さい作業」）。
 # 承認（`ccnavi-user-agree.sh`。承認のあと、承認済みチケットのコミットと push まで行う）とマージリクエストのレビュー（ホスト上）は人間しかできないので、そこで止める。
 # 実行ファイルの `ccnavi user agree` は承認だけでコミットも push もしないので、使わない（使うと着手と子の提案が未 push で止まる）。
 # 親は `plan: [quick]` の 1 ステップだけ、子は `phase: 1`。範囲は親の範囲そのまま。
@@ -63,5 +63,5 @@ unconfirmed:
   - 識別子の形（親 `<先頭の語>-<番号>-<slug>`、子 `<親>-01-01` の形かどうか）と、1 つ目の step の報告から人間が読み取れること
   - ticket status の出力の語（作業中・レビュー待ち・承認待ち・完了）。親子が両方 done に入ったことを比べる形に直す
   - 3 つ目の step で子の finish → 親への合流まで 1 回の prompt で通るか。長ければ step を分ける
-  - 承認済みチケットの置き場が、project が test-repo の親ではプロジェクトの側になるか（docs/design/tickets/places.md で確かめる）
+  - 承認済みチケットの置き場が、project が test-repo の親ではプロジェクトの側になるか（docs/21_design/tickets/places.md で確かめる）
   - マージリクエストの作成に test-repo のホスト認証が要る。無い環境では 4 つ目の step から先を回せない

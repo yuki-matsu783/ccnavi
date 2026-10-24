@@ -11,7 +11,7 @@ tests/fixtures/ のルールではなく、運用に使っている rules.yml �
 3.4・3.5 節、12 節の A1〜A4・W1〜W3・W6・W7）。
 
 道具は外から動かす。`--test <tool> <subject> --json` の `verdict` と `rules[].id` を読む
-（形は docs/requirements/json-shapes.md「試験の JSON」）。
+（形は docs/11_requirements/json-shapes.md「試験の JSON」）。
 期待する判定の `/repo` は `--root` に渡したルートに読み替える。
 """
 

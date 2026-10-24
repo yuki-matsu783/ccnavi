@@ -194,7 +194,7 @@ phases:
 - `scope` と `deliverables` はそれぞれ 20 件まで
 - `feedback` のフェーズ定義に `review: none` は書けない
 - 小さい作業を親 1 本・子 1 本で回すなら、`review: mr`・`scope: inherit` の定義（例: `quick`）を 1 つ置き、親は `plan: [quick]`・`feedback: []` にする
-  （親の `phases:` は `--fill-phases` で差し込む。手順は docs/design/tickets/phases.md の「小さい作業」）
+  （親の `phases:` は `--fill-phases` で差し込む。手順は docs/21_design/tickets/phases.md の「小さい作業」）
 - `when` と `agent` は判定に使われない案内。`when` は「次は X の計画です（定義の案内: …）」の
   形でモデルに届くので、そのフェーズ定義を飛ばしてよい条件まで書く
 
