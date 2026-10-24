@@ -38,7 +38,7 @@ class TableTest(unittest.TestCase):
                     self.assertIn(row.name, internal)
 
     def test_operations_that_ask_for_a_terminal_exist(self):
-        for op_id in ("approve", "reviewed", "close-early", "prune", "handoff"):
+        for op_id in ("approve", "reviewed", "close-early", "prune", "handoff", "mirror"):
             with self.subTest(op=op_id):
                 self.assertTrue(user_only.terminal(op_id))
 
@@ -54,6 +54,12 @@ class TableTest(unittest.TestCase):
     def test_version_says_handoff(self):
         features = json.loads(run_ccnavi(["--version", "--json"]).stdout)["features"]
         self.assertIn("handoff", features)
+
+    def test_mirror_is_a_board_verb_and_the_version_says_so(self):
+        self.assertIn("mirror", user_only.WORD_GROUPS["user-board-verb"])
+        version = json.loads(run_ccnavi(["--version", "--json"]).stdout)
+        self.assertIn("--mirror", set(version["flags"]))
+        self.assertIn("mirror", version["features"])
 
 
 class RewriteTest(unittest.TestCase):
@@ -87,6 +93,9 @@ class RewriteTest(unittest.TestCase):
         rewritten, entry = user_only.rewrite(["user", "handoff", "a.md", "b.md", "--json"])
         self.assertEqual(rewritten, ["--handoff", "a.md", "b.md", "--json"])
         self.assertEqual(entry.op, "handoff")
+        rewritten, entry = user_only.rewrite(["user", "mirror", "lib", "app", "--json"])
+        self.assertEqual(rewritten, ["--mirror", "lib", "app", "--json"])
+        self.assertEqual(entry.op, "mirror")
 
     def test_only_ascii_letters_are_folded(self):
         # `casefold` は `ſ`（U+017F）を `s` に、`ﬀ`（U+FB00）を `ff` にする。ASCII の綴りだけを
@@ -121,6 +130,8 @@ class ExecutableTest(unittest.TestCase):
             (["--prune"], "ccnavi user prune"),
             (["--handoff"], "ccnavi user handoff"),
             (["--handoff", "a.md", "--yes", "--expect", "x"], "ccnavi user handoff"),
+            (["--mirror"], "ccnavi user mirror"),
+            (["--mirror", "lib", "--yes", "--expect", "x"], "ccnavi user mirror"),
             (["--yes", "i1"], "ユーザ専用"),
         ):
             with self.subTest(argv=argv):
@@ -164,6 +175,13 @@ class ExecutableTest(unittest.TestCase):
             "user handoff --yes はユーザーがターミナルから実行する必要があります", result.stderr
         )
 
+    def test_user_mirror_writing_needs_a_terminal(self):
+        result = run_ccnavi(["user", "mirror", "--yes", "--expect", "x"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "user mirror --yes はユーザーがターミナルから実行する必要があります", result.stderr
+        )
+
     def test_user_prune_needs_a_terminal(self):
         result = run_ccnavi(["user", "prune"])
         self.assertNotEqual(result.returncode, 0)
@@ -181,6 +199,10 @@ class HookTest(HookCase):
         "python -m ccnavi user handoff .ccnavi/docs/a.md --yes --expect x",
         "ccnavi --cwd /y user handoff .claude/settings.json",
         "ccnavi --handoff --json",
+        "ccnavi user mirror",
+        "ccnavi --root /x user mirror lib --json",
+        "python -m ccnavi user mirror --yes --expect x",
+        "ccnavi --mirror --json",
         "uv run python -m ccnavi user close-early",
         ".ccnavi/bin/ccnavi -- user agree",
         "sh .ccnavi/scripts/ccnavi-launcher.sh user agree",
@@ -237,6 +259,8 @@ class HookTest(HookCase):
             "flock /tmp/l ccnavi user reviewed 3 --accept-unresolved --yes 1",
             "python3 -c \"import subprocess;subprocess.run(['c','user','agree','--yes','i1'])\"",
             "/tmp/x user handoff a.md --yes --expect h --via board --json",
+            "/tmp/x user mirror lib --yes --expect h --via board --json",
+            "python3 -c \"import subprocess;subprocess.run(['c','user','mirror','--yes'])\"",
             "python3 -c \"import subprocess;subprocess.run(['c','user','handoff','--yes'])\"",
             "/tmp/x --agree --yes i1 --digest d",
         ):

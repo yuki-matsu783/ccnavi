@@ -3,7 +3,7 @@ title: チケットによる作業範囲の使い方
 type: guide
 description: チケット制御を使うかの決め方、置き場と状態、承認の打ち方、承認したものだけが効く理由、止まったときの見方、フェーズとレビュー、親の閉じ方と片付け、テンプレートの取り込み
 tags: [user-guide, ticket, worktree, approval]
-keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケット作業, CCNAVI_TICKET_CONTROL, CCNAVI_BRANCH_PREFIXES, フェーズ, HITL, リスク, ready, Draft, 片付け, close-early, テンプレート, user handoff, ticket new, ccnavi-user-push-approved.sh, ccnavi-sync.sh]
+keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケット作業, CCNAVI_TICKET_CONTROL, CCNAVI_BRANCH_PREFIXES, フェーズ, HITL, リスク, ready, Draft, 片付け, close-early, テンプレート, user handoff, user mirror, ticket new, ccnavi-user-push-approved.sh, ccnavi-sync.sh]
 ---
 
 # チケットによる作業範囲の使い方
@@ -309,6 +309,7 @@ Claude Code はそこをスキルとして読まないので、ccnavi が目録�
 プロジェクト管理画面の clone は、`git clone` をターミナルへ送るだけで、リポジトリを取得する操作である。ccnavi の導入（setup）は含まない。
 共通レイヤーのミラーは、そのプロジェクトで親チケットに着手（`ticket start`）した時点で配られる。子の着手と、ワークスペース自身の作業では配らない。
 ワークスペースの中では共通レイヤーをルートから読み、ミラーは使わない。ミラーが使われるのは、プロジェクトだけを clone して使うとき（単体利用）である。
+ミラーが共通レイヤーとずれていないかは `ccnavi user mirror` で見て、`ccnavi user mirror --yes --expect <値>` で揃える（ユーザだけが実行する操作。VS Code のプロジェクト管理画面からも、5 分ごとの確認とボタンで同じことができる）。揃えるのは作業ツリーのミラーだけで、コミットはしない。
 単体利用の手順と、まだ対応していない用途は [単体 clone の未解決事項](../design/multi-repo/standalone-clone-gaps.md)にある。ここに無い用途を「使える」と読まない。
 
 ## 作業・レビュー計画のテンプレート

@@ -101,6 +101,7 @@ Pyodide のメモリ上のファイルシステムに組んだ仮のツリーを
 | REQ-EXT-30 | 常時 | ccnavi は、`core.plan`・`core.confirm` で、書くものを値（`Changes`）で返すだけにし、ディスクにもホストにも書かないこと。`confirm` は、通らなければ `changes` を `None` にして理由を `problems` で返すこと。`Changes.per_branch()` はブランチごとに `{op: create\|update\|delete, path, content}`（`path` はツリーからの相対、`content` はバイト列）を返すこと |
 | REQ-EXT-31 | 常時 | ccnavi は、`Snapshot.stamp` が渡されたとき、書くものの時刻（マーカー・承認の記録）をその時刻に固定し、同じ入力から手元と同じバイト列を出すこと。`core.confirm` は、`Snapshot.actor`（`Actor(account, via)`）のアカウントと経路をレビュー済みのマーカーに書くこと。`core.plan` が書くマーカーの経路とアカウントは、呼び手が `via.session` で渡すこと（Chrome 拡張は経路に `chrome` を渡す） |
 | REQ-EXT-32 | 常時 | ccnavi は、手元と同じ形に組んだ仮のツリー（ワークスペースルートに統合先、`.claude/worktrees/<識別子>` に親子のチケット、`projects/<名前>` にプロジェクトの統合先）を、手元と同じ関数で読むこと。ワークツリーの見分けとブランチ名は `.git` のファイル（`HEAD`・`gitdir:`）から読むこと。git を起こせない場（`sys.platform` が `emscripten`）では、承認の時刻のように git に頼る表示の値を分からないとして空にすること |
+| REQ-EXT-35 | 事象 | `user mirror [<プロジェクト名>…] --json` を求められたとき、ccnavi は、何も書かずに、プロジェクトごとのミラーの状態と照合の値を JSON で返し、全体の誤りは `ok` を偽にして 1、それ以外は 0 で終わること。`user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json` を求められたときは、標準入力が端末でなくても、値が今の差分と一致するときだけ作業ツリーのミラーを揃えて、書けたものを返し、不一致・対象なし・書けなかったときは `ok` を偽にして 1 で終わること。形は json-shapes.md のミラーの JSON |
 
 Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 

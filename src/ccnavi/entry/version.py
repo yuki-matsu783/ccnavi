@@ -69,6 +69,8 @@ FEATURES: tuple[str, ...] = (
     "user-entry",
     # 保護対象の下書きの取り込み（`ccnavi user handoff`）。
     "handoff",
+    # 共通レイヤーのミラーの同期（`ccnavi user mirror`）。
+    "mirror",
 )
 # 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"

@@ -105,6 +105,24 @@ export function handoffYesArgs(paths: readonly string[], expect: string): readon
 }
 
 /**
+ * `user mirror [<プロジェクト名>…] --json`。共通レイヤーのミラーのずれを見る（`--yes` を付けない。何も書かない）。
+ * 名前を省くと全プロジェクト。結果の `expect` は差分のある全プロジェクトの、各プロジェクトの `expect` はそのプロジェクトだけのハッシュ。
+ * `--root` は `run()` が付ける。
+ */
+export function mirrorArgs(names: readonly string[] = []): readonly string[] {
+  return ["user", "mirror", ...names, "--json"];
+}
+
+/**
+ * `user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json`。ミラーの同期。書くのは各プロジェクトの作業ツリーで、コミットはしない。
+ * 名前を省くと差分のある全プロジェクト。`expect` は見るだけの結果の `expect`（全体）か、各プロジェクトの `expect`（単独）。
+ * 変わっていれば実行ファイルは何も書かない
+ */
+export function mirrorYesArgs(names: readonly string[], expect: string): readonly string[] {
+  return ["user", "mirror", ...names, "--yes", "--expect", expect, "--via", "board", "--json"];
+}
+
+/**
  * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`。計画編集タブの保存。
  * `expect` は開いたときの `source_sha`。親か子の提案が外で変わっていれば、実行ファイルは何も書かない。
  * `--write` は `--order` を求めるので、空でも付ける

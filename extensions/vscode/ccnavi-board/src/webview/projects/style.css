@@ -11,4 +11,5 @@
 @import "@ccnavi/shared/styles/page.css";
 @import "./App.css";
 @import "./Project.css";
+@import "./Mirror.css";
 @import "../Tour.css";

@@ -325,6 +325,7 @@ class SetupTest(unittest.TestCase):
     def run_setup(self, *args, env=None):
         return subprocess.run(
             [SHELL, SCRIPT, self.dir, *quiet_deploy(args)],
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -1706,15 +1707,15 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(sorted(os.listdir(self.deployed(*BIN_DIR_PARTS))), [THIS_MACHINE])
         self.assertNotIn("まだ無いもの", result.stdout)
 
-    def test_refuses_a_bin_option_as_unknown_and_writes_nothing(self):
-        """`--bin` は持たない。知らないオプションとして 2 で断り、何も書かない（S4）。
+    def test_refuses_a_bin_value_it_does_not_know_and_writes_nothing(self):
+        """`--bin` が受け取るのは project か user だけ。パスは受け取らない。2 で断り、何も書かない。
 
-        置き場は固定なので、置き場を名指しするオプションは無い。
+        配置先は固定なので、配置先のパスを名指しするオプションは無い。
         """
         src = self.make_source()
-        for args in (
-            ("--bin", BIN_PATH),
-            ("--bin",),
+        for args, message in (
+            (("--bin", BIN_PATH), "--bin に使えるのは project か user です"),
+            (("--bin",), "--bin に値がありません"),
         ):
             with self.subTest(args=args):
                 self.dir = tempfile.mkdtemp(prefix="ccnavi-setup-")
@@ -1722,8 +1723,266 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 self.make_git()
                 result = self.run_setup("--mode", "enable", "--deploy", src, *args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertIn("--bin は使えないオプションです", result.stderr)
+                self.assertIn(message, result.stderr)
                 self.assertEqual(os.listdir(self.dir), [".git"])
+
+    def test_refuses_bin_user_together_with_no_deploy(self):
+        result = self.run_setup("--no-deploy", "--bin", "user")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("--bin user と --no-deploy は同時に指定できません", result.stderr)
+
+    # ---- --bin user（ホームディレクトリの下に置く。端末で確認する）
+
+    def user_home(self):
+        home = tempfile.mkdtemp(prefix="ccnavi-home-")
+        self.addCleanup(shutil.rmtree, home, ignore_errors=True)
+        return home
+
+    def run_user_bin(self, home, *args, answer=None, **env_extra):
+        """`--bin user` で配る。answer があれば、端末（疑似端末）に答えを入力する。
+        無ければ端末なし。"""
+        env = clean_env(HOME=home, **env_extra)
+        argv = [SHELL, SCRIPT, self.dir, *args]
+        if answer is None:
+            return subprocess.run(
+                argv,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+        import pty
+
+        master, slave = pty.openpty()
+        try:
+            proc = subprocess.Popen(
+                argv,
+                stdin=slave,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+            os.close(slave)
+            os.write(master, (answer + "\n").encode())
+            out, err = proc.communicate(timeout=60)
+        finally:
+            os.close(master)
+        return subprocess.CompletedProcess(argv, proc.returncode, out, err)
+
+    def test_bin_user_without_a_terminal_writes_nothing(self):
+        """端末でなければ断る。確認に自動で答えるオプションは無いので、エージェントは代わりに答えられない。"""
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("端末での確認が要ります", result.stderr)
+        self.assertEqual(os.listdir(home), [])
+        self.assertEqual(os.listdir(self.dir), [".git"])
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_asks_on_the_terminal_and_places_the_build_for_the_path(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", answer="y")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        share = os.path.join(home, ".local", "share", "ccnavi", THIS_MACHINE)
+        link = os.path.join(home, ".local", "bin", "ccnavi")
+        self.assertTrue(os.path.isfile(os.path.join(share, "ccnavi")))
+        self.assertTrue(os.path.isfile(os.path.join(share, "_internal", "base_library.zip")))
+        self.assertTrue(os.path.islink(link))
+        self.assertEqual(os.readlink(link), os.path.join(share, "ccnavi"))
+        # 配布先の .ccnavi/bin/ には置かず、無視する行も追加しない。sh と設定は配る。
+        self.assertFalse(os.path.exists(self.built(THIS_MACHINE)))
+        self.assertTrue(os.path.isfile(self.deployed(*LAUNCHER_PARTS)))
+        self.assertNotIn(".ccnavi/bin/", self.gitignore())
+        # リンクを置く場所が PATH に無ければ、追加する行を知らせる。
+        # シェルの設定ファイルには書かない。
+        self.assertIn("PATH に入っていません", result.stdout)
+        self.assertEqual(sorted(os.listdir(home)), [".local"])
+        self.assertNotIn("まだ無いもの", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_stops_without_writing_when_the_answer_is_no(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", answer="n")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("中止しました", result.stderr)
+        self.assertEqual(os.listdir(home), [])
+        self.assertEqual(os.listdir(self.dir), [".git"])
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_asks_again_only_when_something_will_be_written(self):
+        """同じ中身なら確認なしで終わる。中身が違えば、また端末で確認する。"""
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        args = ("--deploy", src, "--bin", "user")
+        self.assertEqual(self.run_user_bin(home, *args, answer="y").returncode, 0)
+
+        again = self.run_user_bin(home, *args)
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertNotIn("続けますか", again.stdout)
+
+        self.change_source_build(src)
+        no_terminal = self.run_user_bin(home, *args)
+        self.assertEqual(no_terminal.returncode, 2, no_terminal.stdout + no_terminal.stderr)
+        replaced = self.run_user_bin(home, *args, answer="y")
+        self.assertEqual(replaced.returncode, 0, replaced.stdout + replaced.stderr)
+        share = os.path.join(home, ".local", "share", "ccnavi", THIS_MACHINE)
+        with open(os.path.join(share, "_internal", "base_library.zip"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい同梱物")
+
+    # ---- PATH の案内は、環境に合った追加の仕方を言う
+
+    def path_without(self, *names):
+        """PATH から、~/.local/bin を外した値。"""
+        return os.pathsep.join(
+            p for p in os.environ.get("PATH", "").split(os.pathsep) if ".local/bin" not in p
+        )
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_names_the_rc_file_of_the_shell_in_use(self):
+        src = self.make_source()
+        for shell, rc in (("/bin/bash", "~/.bashrc"), ("/usr/bin/zsh", "~/.zshrc")):
+            with self.subTest(shell=shell):
+                self.dir = tempfile.mkdtemp(prefix="ccnavi-setup-")
+                self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+                self.make_git()
+                home = self.user_home()
+                result = self.run_user_bin(
+                    home,
+                    "--deploy",
+                    src,
+                    "--bin",
+                    "user",
+                    answer="y",
+                    SHELL=shell,
+                    PATH=self.path_without(),
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("PATH に入っていません", result.stdout)
+                self.assertIn(f">> {rc}", result.stdout)
+                self.assertIn("export PATH=", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_names_fish_add_path_for_fish(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        result = self.run_user_bin(
+            home,
+            "--deploy",
+            src,
+            "--bin",
+            "user",
+            answer="y",
+            SHELL="/usr/bin/fish",
+            PATH=self.path_without(),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("fish_add_path", result.stdout)
+        self.assertNotIn(">>", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_says_nothing_about_the_path_when_it_is_already_there(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        on_path = os.pathsep.join([os.path.join(home, ".local", "bin"), self.path_without()])
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", answer="y", PATH=on_path)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("PATH に入っていません", result.stdout)
+
+    def fake_git_bash(self):
+        """uname が Git Bash（MINGW）の値を答える代役のフォルダ。PATH の先頭に置く。"""
+        shim = tempfile.mkdtemp(prefix="ccnavi-uname-")
+        self.addCleanup(shutil.rmtree, shim, ignore_errors=True)
+        uname = os.path.join(shim, "uname")
+        with open(uname, "w", encoding="utf-8", newline="\n") as f:
+            f.write('#!/bin/sh\ncase "$1" in -m) echo x86_64 ;; *) echo MINGW64_NT-10.0 ;; esac\n')
+        os.chmod(uname, 0o755)
+        return shim
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_on_git_bash_puts_the_folder_on_the_path_and_makes_no_link(self):
+        """Git Bash はリンクを使わず、ccnavi.exe と _internal/ が並ぶフォルダを PATH に通す。"""
+        src = self.make_source(target="windows-x86_64")
+        with open(os.path.join(src, "dist", "ccnavi", "ccnavi.exe"), "w", encoding="utf-8") as f:
+            f.write("exe")
+        self.make_git()
+        home = self.user_home()
+        path = os.pathsep.join([self.fake_git_bash(), self.path_without()])
+        result = self.run_user_bin(
+            home, "--deploy", src, "--bin", "user", answer="y", PATH=path, SHELL="/usr/bin/bash"
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        share = os.path.join(home, ".local", "share", "ccnavi", "windows-x86_64")
+        self.assertTrue(os.path.isfile(os.path.join(share, "ccnavi.exe")))
+        self.assertTrue(os.path.isfile(os.path.join(share, "_internal", "base_library.zip")))
+        self.assertFalse(os.path.exists(os.path.join(home, ".local", "bin")))
+        # Windows の環境変数 Path に、実体のフォルダを追加する手順を言う。rc には触れない。
+        self.assertIn("SetEnvironmentVariable", result.stdout)
+        self.assertIn(share, result.stdout)
+        self.assertNotIn(">> ~/.bashrc", result.stdout)
+        self.assertNotIn("まだ無いもの", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_warns_when_the_project_still_has_its_own_build(self):
+        """配布先の bin/ に残った実行ファイルが先に使われる。使われなくなることを知らせる。"""
+        src = self.make_source()
+        self.make_git()
+        self.run_setup("--deploy", src)
+        home = self.user_home()
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", answer="y")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("実行ファイルが残っています", result.stdout)
+        self.assertIn("先に使う", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_does_not_replace_a_directory_even_with_force(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        link = os.path.join(home, ".local", "bin", "ccnavi")
+        os.makedirs(os.path.join(link, "inside"))
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", "--force", answer="y")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.isdir(os.path.join(link, "inside")))
+        self.assertFalse(os.path.islink(link))
+        self.assertIn("ディレクトリがあるので、リンクを張れない", result.stdout)
+
+    def test_check_with_bin_user_writes_nothing_and_does_not_ask(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", "--check")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertNotIn("続けますか", result.stdout)
+        self.assertEqual(os.listdir(home), [])
+        self.assertEqual(os.listdir(self.dir), [".git"])
+
+    @unittest.skipIf(os.name == "nt", "疑似端末は POSIX の話")
+    def test_bin_user_keeps_a_link_the_user_already_has_unless_forced(self):
+        src = self.make_source()
+        self.make_git()
+        home = self.user_home()
+        link = os.path.join(home, ".local", "bin", "ccnavi")
+        os.makedirs(os.path.dirname(link))
+        with open(link, "w", encoding="utf-8") as f:
+            f.write("自分で置いたもの")
+        result = self.run_user_bin(home, "--deploy", src, "--bin", "user", answer="y")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(os.path.islink(link))
+        self.assertIn("配布先に既にあるので配っていないもの", result.stdout)
 
     def test_the_deployed_list_matches_the_scripts_in_the_tree(self):
         """配る sh の一覧（DEPLOY_SCRIPTS）は、このツリーの .ccnavi/scripts/ の sh と同じ。"""
@@ -1846,6 +2105,74 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertIn("配布先に既にあるので配っていないもの", result.stdout)
         with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertIn("このプロジェクトで直した", f.read())
+
+    def change_source_build(self, src, text="新しい同梱物"):
+        """配布元の組み立てを変える（組み立て直したことにする）。"""
+        with open(os.path.join(src, "dist", "ccnavi", "_internal", "base_library.zip"), "w") as f:
+            f.write(text)
+
+    def test_replaces_a_build_that_differs_from_the_source_without_force(self):
+        """組み立て直して中身が違えば、`--force` が無くても実行ファイルを置き換える。
+
+        古いままだと、sh との互換の食い違いで hook が働かなくなる。
+        前の組み立ての残りも持ち越さない。
+        """
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        stale = self.built(THIS_MACHINE, "_internal", "古い同梱物.so")
+        with open(stale, "w", encoding="utf-8") as f:
+            f.write("前の版")
+        self.change_source_build(src)
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("入れ替えた", result.stdout)
+        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい同梱物")
+        self.assertFalse(os.path.exists(stale))
+        # 新しい版を隣に作ってから入れ替えるので、途中の置き場を残さない。
+        left = [
+            n for n in os.listdir(os.path.dirname(self.built())) if ".new." in n or ".old." in n
+        ]
+        self.assertEqual(left, [])
+
+    def test_does_not_replace_a_build_that_is_the_same_as_the_source(self):
+        """中身が同じなら置き換えない。何度実行しても同じ結果になる。"""
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        before = os.stat(self.built(THIS_MACHINE, "_internal", "base_library.zip")).st_mtime_ns
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("入れ替えた", result.stdout)
+        after = os.stat(self.built(THIS_MACHINE, "_internal", "base_library.zip")).st_mtime_ns
+        self.assertEqual(before, after)
+
+    def test_a_differing_build_does_not_replace_the_rules_the_project_edited(self):
+        """置き換えるのは実行ファイルだけ。直されている前提のルールには触らない。"""
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        with open(self.deployed(*RULES_PARTS), "w", encoding="utf-8") as f:
+            f.write("# このプロジェクトで直したルール\n")
+        self.change_source_build(src)
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
+            self.assertIn("このプロジェクトで直した", f.read())
+        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい同梱物")
+
+    def test_check_counts_a_differing_build_as_not_settled(self):
+        """`--check` は、配布元と中身が違う実行ファイルを「揃っていない」に数える。書かない。"""
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        self.change_source_build(src)
+
+        result = self.run_setup("--deploy", src, "--check")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "同梱物")
 
     def test_force_replaces_and_drops_the_previous_build(self):
         """`--force` なら入れ替える。前の組み立ての残りも持ち越さない。
