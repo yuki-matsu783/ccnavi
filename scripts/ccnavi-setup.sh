@@ -455,7 +455,8 @@ if [ -n "$deploy" ]; then
 fi
 
 # 配るものを決める。配布先に既にあるものには触らない。入れ替えるのは --force の
-# ときだけで、そのときも配布元にあるものだけを動かす。
+# ときだけで、そのときも配布元にあるものだけを動かす。例外は実行ファイル（.ccnavi/bin/<この機械>/）で、
+# 配布元と中身が違えば --force が無くても入れ替える。
 #
 # 「配布元に無い」ものを、何も言わずに飛ばさない。ルールファイルや代わりに通る sh が
 # 欠けた配布元から配ると、判定するものだけが入り、何を止めるかが入らない。その状態は
@@ -531,6 +532,24 @@ verdict() {
 	fi
 }
 
+# 配布元の中身が、配布先の同じ名前のものと違えば 0。copy_tree が動かす単位（配布元の直下の
+# 1 つずつ）で比べる。配布先にだけあるファイルは、配布元の名前の下にあるものだけを見る
+# （前の組み立ての残りは入れ替えのときに消える）。比べられないとき（diff が無い、読めない）は
+# 違わないものとして扱う。確かめられないまま、動いている実行ファイルを入れ替えない。
+tree_differs() {
+	# $1 配布元の絶対パス / $2 配布先の絶対パス
+	command -v diff >/dev/null 2>&1 || return 1
+	for entry in "$1"/*; do
+		[ -e "$entry" ] || continue
+		name=$(basename "$entry")
+		[ -e "$2/$name" ] || return 0
+		tree_rc=0
+		diff -rq "$entry" "$2/$name" >/dev/null 2>&1 || tree_rc=$?
+		[ "$tree_rc" -ne 1 ] || return 0
+	done
+	return 1
+}
+
 note_deploy() {
 	# $1 verdict / $2 配布先のパス / $3 配布元のパス
 	case "$1" in
@@ -564,6 +583,11 @@ if [ -n "$deploy" ]; then
 		bin_there=no
 	fi
 	bin_verdict=$(verdict "$source_root/$DEPLOY_BIN_DIR" "$bin_there")
+	# 実行ファイルは、配布先で手直しされるものではない。配布元と中身が違えば、--force が無くても
+	# 入れ替える（組み立て直したのに古いまま残ると、sh との互換の食い違いで hook が働かなくなる）。
+	if [ "$bin_verdict" = keep ] && tree_differs "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel"; then
+		bin_verdict=replace
+	fi
 	note_deploy "$bin_verdict" "$build_dir_rel" "$DEPLOY_BIN_DIR"
 
 	if [ -e "$root/$DEPLOY_RULES" ]; then

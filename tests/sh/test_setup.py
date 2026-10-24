@@ -1847,6 +1847,69 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertIn("このプロジェクトで直した", f.read())
 
+    def change_source_build(self, src, text="新しい同梱物"):
+        """配布元の組み立てを変える（組み立て直したことにする）。"""
+        with open(os.path.join(src, "dist", "ccnavi", "_internal", "base_library.zip"), "w") as f:
+            f.write(text)
+
+    def test_replaces_a_build_that_differs_from_the_source_without_force(self):
+        """組み立て直して中身が違えば、`--force` が無くても実行ファイルを入れ替える。
+
+        古いままだと、sh との互換の食い違いで hook が働かなくなる。
+        前の組み立ての残りも持ち越さない。
+        """
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        stale = self.built(THIS_MACHINE, "_internal", "古い同梱物.so")
+        with open(stale, "w", encoding="utf-8") as f:
+            f.write("前の版")
+        self.change_source_build(src)
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("入れ替えた", result.stdout)
+        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい同梱物")
+        self.assertFalse(os.path.exists(stale))
+
+    def test_does_not_replace_a_build_that_is_the_same_as_the_source(self):
+        """中身が同じなら入れ替えない。何度打っても同じ結果になる。"""
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        before = os.stat(self.built(THIS_MACHINE, "_internal", "base_library.zip")).st_mtime_ns
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("入れ替えた", result.stdout)
+        after = os.stat(self.built(THIS_MACHINE, "_internal", "base_library.zip")).st_mtime_ns
+        self.assertEqual(before, after)
+
+    def test_a_differing_build_does_not_replace_the_rules_the_project_edited(self):
+        """入れ替えるのは実行ファイルだけ。直されている前提のルールには触らない。"""
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        with open(self.deployed(*RULES_PARTS), "w", encoding="utf-8") as f:
+            f.write("# このプロジェクトで直したルール\n")
+        self.change_source_build(src)
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
+            self.assertIn("このプロジェクトで直した", f.read())
+        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい同梱物")
+
+    def test_check_counts_a_differing_build_as_not_settled(self):
+        """`--check` は、配布元と中身が違う実行ファイルを「揃っていない」に数える。書かない。"""
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        self.change_source_build(src)
+
+        result = self.run_setup("--deploy", src, "--check")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "同梱物")
+
     def test_force_replaces_and_drops_the_previous_build(self):
         """`--force` なら入れ替える。前の組み立ての残りも持ち越さない。
 
