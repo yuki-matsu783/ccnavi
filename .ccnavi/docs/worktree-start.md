@@ -98,4 +98,4 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
     拡張は承認のJSONの`worktrees`の`create`だけを`ccnavi-git.sh worktree add <行き先> -b <子> <base>`で作る。作れなかった子は、
     警告の通知に、ワークツリー名と手で打つコマンド（同名のブランチが既にあるときの形も）を出す。承認の文面（Claude Codeに渡す文）には
     作成の失敗は入らない。親のワークツリーが無い子とプロジェクトの子は自動で切らない。
-    ターミナルの承認（`user agree`）では自動で切らない
+    ターミナルの承認（`ccnavi-user-agree.sh`）では自動で切らない
