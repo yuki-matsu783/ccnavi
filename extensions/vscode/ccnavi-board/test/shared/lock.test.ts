@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { lockFromBoard, lockFromError } from "../../src/core/lock.js";
+import { lockFromBoard, lockFromError, turnWarning } from "../../src/core/lock.js";
+import { parseBoardJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
 
 test("CB-T34 実行ファイルが作業中と答えたチケットがあれば保存できない", () => {
@@ -43,4 +44,45 @@ test("CB-T392 プロジェクトを渡したときは、そのプロジェクト
   const tickets = board.tickets.map((t) => ({ ...t, project: t.ticket === "i0001-02-02" ? "lib" : "" }));
   assert.equal(lockFromBoard({ ...board, tickets }, "lib").locked, true);
   assert.equal(lockFromBoard({ ...board, tickets }, "other").locked, false);
+});
+
+test("CB-T586 ターン中のセッションがあれば、保存は止めずに警告の文を出す", () => {
+  const board = fixture();
+  const turns = [
+    { session: "a", since: 1, seen: 2 },
+    { session: "b", since: 3, seen: 4 },
+  ];
+  const tickets = board.tickets.map((t) => ({ ...t, in_progress: false }));
+  const lock = lockFromBoard({ ...board, tickets, turns });
+  assert.equal(lock.locked, false);
+  assert.deepEqual(lock.turns, ["a", "b"]);
+  assert.match(turnWarning(lock), /ターンの途中.*a, b/);
+});
+
+test("CB-T587 ターン中のセッションが無ければ警告は出ない。欄を出さない古い実行ファイルでも同じ", () => {
+  const board = fixture();
+  const tickets = board.tickets.map((t) => ({ ...t, in_progress: false }));
+  assert.equal(turnWarning(lockFromBoard({ ...board, tickets, turns: [] })), "");
+  const { turns: _omitted, ...old } = board;
+  assert.equal(turnWarning(lockFromBoard({ ...old, tickets })), "");
+  assert.equal(turnWarning(lockFromError("読めない")), "");
+});
+
+test("CB-T588 作業中のチケットで止めるときも、ターン中の印は持ち越す", () => {
+  const board = fixture();
+  const lock = lockFromBoard({ ...board, turns: [{ session: "a", since: 1, seen: 2 }] });
+  assert.equal(lock.locked, true);
+  assert.deepEqual(lock.turns, ["a"]);
+});
+
+test("CB-T589 ボードの JSON の turns を読む。形の違う行は欠けた値で埋める", () => {
+  const raw = JSON.parse(JSON.stringify({ ...fixture(), turns: [{ session: "a", since: 10, seen: 20 }, { session: "b" }, "x"] }));
+  const parsed = parseBoardJson(JSON.stringify(raw));
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.deepEqual(parsed.board.turns, [
+      { session: "a", since: 10, seen: 20 },
+      { session: "b", since: 0, seen: 0 },
+    ]);
+  }
 });

@@ -12,6 +12,7 @@ from typing import TextIO
 
 from ..infra import modes, pathcase, settings, tree
 from ..policy import ruleload, rules, selfguard
+from ..records import turn
 from ..tickets import (
     agree,
     approval,
@@ -86,6 +87,12 @@ def board(
         # まだ在るもの（退避の後の push が戻されたなど）は `tickets` の側に出すので、
         # ここには出さない。
         "archived": [],
+        # いまターンの途中にいるセッション。ターン中に設定ファイルを直すと、次のツール呼び出しで
+        # 戻されることがある。拡張は保存の前にこれで知らせる。チケット制御の有無によらず出す。
+        "turns": [
+            {"session": t.session, "since": int(t.since), "seen": int(t.seen)}
+            for t in turn.active(conf.state)
+        ],
     }
     # 送信の途中で止まった操作(引き継ぎ未完了)。ボードは problems の行として並べる。
     if conf.state:

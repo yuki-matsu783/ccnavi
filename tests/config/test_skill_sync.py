@@ -1,4 +1,4 @@
-"""着手の前に共通の工程スキルをプロジェクトの `skills/` へ写す。
+"""ユーザの発言のたびに、共通の工程スキルをプロジェクトの `skills/` へ写す。
 
 fixture は tests/config/test_config_sync.py と同じ ConfigUnionHarness を使う。ワークスペースの
 `.claude/skills/` に工程スキル（`process: true`）と、そうでないスキルを置く。
@@ -6,17 +6,18 @@ fixture は tests/config/test_config_sync.py と同じ ConfigUnionHarness を使
 見るのは 3 つ。
 
 
-1. 親の `ticket start` が、工程スキルの `SKILL.md` と `references/common/` の `.md` を
-   親のワークツリーの `skills/<工程>/` へ写す。`references/` のそれ以外(プロジェクト固有)と、
-   `process: true` を持たないスキルは写さない
+1. 発言が、工程スキルの `SKILL.md` と `references/common/` の `.md` を、着手済みの親の
+   ワークツリーの `skills/<工程>/` へ写す（`ticket start` は写さない）。`references/` の
+   それ以外(プロジェクト固有)と、`process: true` を持たないスキルは写さない
 2. `common/` は共通の写し。同じパスは共通の中身で上書きし、共通側に無くなった `.md` は消す
    (空になったディレクトリも片付ける)。`references/` の common 以外(プロジェクト固有)は
-   上書きも削除もしない。消す変更も、写しとして例外に通すのは共通側に無いファイルだけ
+   上書きも削除もしない
 3. 中身が同じなら何も書かず、知らせない
 """
 
 from __future__ import annotations
 
+import json
 import os
 
 from tests import phasecopy
@@ -40,7 +41,33 @@ def plain_skill(name: str) -> str:
     return f"---\nname: {name}\ndescription: {name}\n---\n\n# {name}\n"
 
 
+class Started:
+    """`ticket start` と、その後の発言（工程スキルを写す）の結果をまとめたもの。"""
+
+    def __init__(self, start, prompt, said):
+        self.returncode = start.returncode
+        self.stdout = start.stdout + said
+        self.stderr = start.stderr + prompt.stderr
+
+
 class SkillSyncTest(ConfigUnionHarness):
+    def prompt(self, session="s1"):
+        """ユーザの発言を 1 件渡す（工程スキルを写す）。実行後チェックの基準も取る。"""
+        if getattr(self, "_began", None) != session:
+            self._began = session
+            start = {"hook_event_name": "SessionStart", "session_id": session, "source": "startup"}
+            start["cwd"] = self.ws
+            self.ccnavi("--mode", "enable", stdin=json.dumps(start))
+        done = self.hook("", self.ws, event="UserPromptSubmit", session=session)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        return done
+
+    def start_ticket(self, name):
+        """親の `ticket start` を打ち、続けてユーザの発言を渡す。"""
+        started = self.ccnavi("ticket", "start", name)
+        prompted = self.prompt()
+        return Started(started, prompted, self.reason(prompted))
+
     def source(self, *parts):
         return os.path.join(self.ws, ".claude", "skills", *parts)
 
@@ -51,7 +78,7 @@ class SkillSyncTest(ConfigUnionHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         tree = self.worktree(self.lib, name)
-        started = self.ccnavi("ticket", "start", name)
+        started = self.start_ticket(name)
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         return tree, started
 
@@ -113,7 +140,7 @@ class SkillSyncTest(ConfigUnionHarness):
         """3: 中身が同じなら知らせない"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         _, first = self.start_parent("i0001")
-        self.assertIn("工程スキル", first.stdout)
+        self.assertIn("skills/process-test", first.stdout)
         tree = self.worktree(self.lib, "i0002")
         write(
             os.path.join(tree, "skills", "process-test", "SKILL.md"), process_skill("process-test")
@@ -122,9 +149,9 @@ class SkillSyncTest(ConfigUnionHarness):
             "i0002", ticket_text("i0002", project="lib", plan=["build"], allow=SCOPE), project="lib"
         )
         self.assertEqual(self.approve().returncode, 0)
-        second = self.ccnavi("ticket", "start", "i0002")
+        second = self.start_ticket("i0002")
         self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
-        self.assertNotIn("工程スキル", second.stdout)
+        self.assertNotIn("skills/process-test", second.stdout)
 
     def test_symlinked_process_dir_is_not_a_process(self):
         """2: 工程スキルのディレクトリ自体がシンボリックリンクなら、工程スキルに数えない"""
@@ -147,10 +174,9 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(sources, {})
         self.assertIn("シンボリックリンク", why)
 
-    def test_the_start_write_and_push_carries_the_copied_skills(self):
-        """1: 書いたパスの一覧(基点は親のワークツリー)で、写した工程スキルは外でも通す"""
+    def test_the_start_does_not_copy_the_skills(self):
+        """1: `ticket start` 自身は工程スキルを写さない。写すのは次のユーザの発言"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        write(self.source("process-test", "references", "common", "unit", "basics.md"), "# 基本\n")
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         write(
             os.path.join(tree, "wip", "proposals", "todo", "i0001.md"),
@@ -161,45 +187,16 @@ class SkillSyncTest(ConfigUnionHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         target = os.path.join(self.ws, "logs", "state", "write-and-push", "lib", "i0001.t.writes")
+
         started = self.ccnavi(
             "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"
         )
+
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        listed = read(target).splitlines()
-        self.assertIn("skills/process-test/SKILL.md", listed)
-        self.assertIn("skills/process-test/references/common/unit/basics.md", listed)
-        self.assertNotIn("置き場の外", started.stderr)
-
-    def test_only_an_exact_copy_in_an_approved_parent_reads_as_synced(self):
-        """1: 中身が違う、元リポジトリ、工程スキルでないスキル、消す変更は写しと読まない"""
-        from ccnavi.infra import settings
-        from ccnavi.tickets import skillsync
-
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        write(self.source("commit", "SKILL.md"), plain_skill("commit"))
-        tree, _ = self.start_parent()
-        conf, _ = settings.load(self.ws)
-        copied = os.path.join(tree, "skills", "process-test", "SKILL.md")
-        self.assertTrue(skillsync.is_synced_write(conf, self.ws, copied))
-        # 手で書き換えた中身は外す。
-        write(copied, "書き換えた\n")
-        self.assertFalse(skillsync.is_synced_write(conf, self.ws, copied))
-        self.assertTrue(
-            skillsync.is_synced_write(conf, self.ws, copied, process_skill("process-test").encode())
-        )
-        # 消す変更は写しではない。
-        self.assertFalse(skillsync.is_synced_write(conf, self.ws, copied, None))
-        # 工程スキルでないものと、工程スキルの外のファイルは外す。
-        other = os.path.join(tree, "skills", "commit", "SKILL.md")
-        write(other, plain_skill("commit"))
-        self.assertFalse(skillsync.is_synced_write(conf, self.ws, other))
-        loose = os.path.join(tree, "skills", "process-test", "notes.txt")
-        write(loose, process_skill("process-test"))
-        self.assertFalse(skillsync.is_synced_write(conf, self.ws, loose))
-        # 元リポジトリのファイルは外す。
-        main_copy = os.path.join(self.lib, "skills", "process-test", "SKILL.md")
-        write(main_copy, process_skill("process-test"))
-        self.assertFalse(skillsync.is_synced_write(conf, self.ws, main_copy))
+        self.assertFalse(os.path.exists(os.path.join(tree, "skills", "process-test")))
+        self.assertNotIn("skills/", read(target) if os.path.exists(target) else "")
+        self.prompt()
+        self.assertTrue(os.path.isfile(os.path.join(tree, "skills", "process-test", "SKILL.md")))
 
     def test_only_the_common_references_are_copied(self):
         """1: references/ の common 以外(プロジェクト固有)は、ワークスペースにあっても写さない"""
@@ -214,25 +211,6 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(read(os.path.join(base, "common", "shared.md")), "共通\n")
         self.assertFalse(os.path.exists(os.path.join(base, "project")))
         self.assertFalse(os.path.exists(os.path.join(base, "loose.md")))
-
-    def test_a_copy_outside_common_does_not_read_as_synced(self):
-        """1: 中身が共通と同じでも、references/ の common 以外は写しと読まない"""
-        from ccnavi.infra import settings
-        from ccnavi.tickets import skillsync
-
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        write(self.source("process-test", "references", "common", "shared.md"), "共通\n")
-        write(self.source("process-test", "references", "project", "same.md"), "共通\n")
-        tree, _ = self.start_parent()
-        conf, _ = settings.load(self.ws)
-        base = os.path.join(tree, "skills", "process-test", "references")
-        self.assertTrue(
-            skillsync.is_synced_write(conf, self.ws, os.path.join(base, "common", "shared.md"))
-        )
-        write(os.path.join(base, "project", "same.md"), "共通\n")
-        self.assertFalse(
-            skillsync.is_synced_write(conf, self.ws, os.path.join(base, "project", "same.md"))
-        )
 
     def test_symlinked_common_dir_stops_the_copy(self):
         """2: common/ そのものがシンボリックリンクなら、何も写さず理由を返す"""
@@ -267,45 +245,3 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertTrue(os.path.exists(os.path.join(out, "common", "note.txt")))
         self.assertEqual(read(os.path.join(out, "project", "own.md")), "プロジェクト固有\n")
         self.assertIn("削除した", started.stdout)
-
-    def test_the_start_write_and_push_carries_the_deletions(self):
-        """1: 消した分も、書いたパスの一覧で置き場の外でも通す"""
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        gone = os.path.join(self.lib, "skills", "process-test", "references", "common", "gone.md")
-        write(gone, "消える\n")
-        git(self.lib, "add", "-A")
-        git(self.lib, "commit", "-m", "seed")
-        tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
-        write(
-            os.path.join(tree, "wip", "proposals", "todo", "i0001.md"),
-            phasecopy.insert(
-                ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), LIB_PHASES
-            ),
-        )
-        self.assertEqual(self.approve().returncode, 0)
-        target = os.path.join(self.ws, "logs", "state", "write-and-push", "lib", "i0001.t.writes")
-        started = self.ccnavi(
-            "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"
-        )
-        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        self.assertIn("skills/process-test/references/common/gone.md", read(target).splitlines())
-        self.assertNotIn("置き場の外", started.stderr)
-
-    def test_deletions_read_as_synced_only_for_files_gone_from_the_source(self):
-        """1: 消す変更を写しと読むのは、共通側に無い common/ の .md だけ"""
-        from ccnavi.infra import settings
-        from ccnavi.tickets import skillsync
-
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        write(self.source("process-test", "references", "common", "shared.md"), "共通\n")
-        tree, _ = self.start_parent()
-        conf, _ = settings.load(self.ws)
-        base = os.path.join(tree, "skills", "process-test")
-        in_source = os.path.join(base, "references", "common", "shared.md")
-        gone = os.path.join(base, "references", "common", "gone.md")
-        project_side = os.path.join(base, "references", "project", "own.md")
-        skill_file = os.path.join(base, "SKILL.md")
-        self.assertFalse(skillsync.is_synced_write(conf, self.ws, in_source, None))
-        self.assertTrue(skillsync.is_synced_write(conf, self.ws, gone, None))
-        self.assertFalse(skillsync.is_synced_write(conf, self.ws, project_side, None))
-        self.assertFalse(skillsync.is_synced_write(conf, self.ws, skill_file, None))

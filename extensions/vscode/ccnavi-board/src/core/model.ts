@@ -178,6 +178,15 @@ export interface TicketJson {
   readonly attention: boolean;
 }
 
+/** いまターンの途中にいるセッション。時刻は UNIX 秒 */
+export interface TurnJson {
+  readonly session: string;
+  /** ターンが始まった時刻 */
+  readonly since: number;
+  /** 最後にツールの呼び出しがあった時刻 */
+  readonly seen: number;
+}
+
 /**
  * 手元の退避（`logs/archive/`）にある閉じたチケット 1 件。表示のためだけの欄で、実行ファイルは判定に混ぜない。
  * 置き場（`tickets`）に同じ識別子があるものは、実行ファイルがここに出さない
@@ -361,6 +370,11 @@ export interface BoardJson {
   readonly parents: readonly ParentJson[];
   /** 手元の退避にある閉じたチケット（表示用）。任意の欄で、この欄を出さない古い実行ファイルでは空か無し */
   readonly archived?: readonly ArchivedTicketJson[];
+  /**
+   * いまターンの途中にいるセッション。ターン中に設定ファイルを直すと、次のツール呼び出しで
+   * 戻されることがある。この欄を出さない古い実行ファイルでは空か無し
+   */
+  readonly turns?: readonly TurnJson[];
 }
 
 export type ParseResult =
@@ -411,6 +425,7 @@ export function parseBoardJson(text: string): ParseResult {
       tickets: list(raw.tickets).filter(isRecord).map(ticket),
       parents: list(raw.parents).filter(isRecord).map(parent),
       archived: list(raw.archived).filter(isRecord).map(archived),
+      turns: list(raw.turns).filter(isRecord).map(turnOf),
     },
   };
 }
@@ -534,6 +549,10 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     attention: raw.attention === true,
     template_draft: raw.template_draft === true,
   };
+}
+
+function turnOf(raw: Record<string, unknown>): TurnJson {
+  return { session: str(raw.session), since: num(raw.since) ?? 0, seen: num(raw.seen) ?? 0 };
 }
 
 function archived(raw: Record<string, unknown>): ArchivedTicketJson {

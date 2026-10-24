@@ -227,3 +227,26 @@ GitLab の実物で分かったこと。
 | ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を引き継がないので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く。ただし gh / glab で認証済みなら、ccnavi が `ccnavi_git_auth` でその helper を足す（利用者の環境変数での差し替えは効かない）。probe はリポジトリの `credential.helper` を空にしてから足す |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tests/manual/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |
+
+### 非対話の起動（Claude Code 2.1.310）
+
+`claude -p`（haiku）を、リポジトリの外の空のディレクトリで回して確かめた。SessionStart の hook に環境変数と payload を書き出す設定を `--settings` で渡した。
+
+| 確かめたこと | 結果 |
+|---|---|
+| `CLAUDE_CODE_SESSION_ATTENDED` の値 | 親の対話セッションが `1` のとき、その子の `claude -p`（`--output-format stream-json` でも同じ）は `0`。親の値の継承ではなく、`-p` の起動で Claude Code が設定する |
+| `CLAUDE_CODE_ENTRYPOINT` の値 | 親の環境に値があると `-p` でも親の値が残る（親が `remote_desktop` なら子も同じ）。外して `-p` で起動すると `sdk-cli` |
+| SessionStart の payload | `session_id`・`transcript_path`・`cwd`・`scratchpad_dir`・`hook_event_name`・`source` だけ。対話かどうかの欄はない |
+| hook の標準入力・標準出力 | `-p` の実行で、どちらも tty でない |
+| 背景の Bash | 75 秒の待ちは 83 秒で終わり、成果ファイルができた。660 秒の待ちは、途中で Bash の timeout にかかったため、モデルが timeout を延ばして起動し直し、全体で 21 分かけて完了した。どちらも `-p` は完了まで待った |
+| 背景のサブエージェント（60 秒の作業） | 2 回とも 17〜21 秒で終了し、成果は残らなかった。メインが「完了通知を待つ」と言ってターンを終えた時点で、プロセスが終わった |
+| 前景のサブエージェント（45 秒の作業） | 57 秒かけて完了まで待ち、成果ファイルができ、結果の報告まで返った |
+
+確かめていないこと。
+
+- 端末の対話 CLI での値（初回の設定画面で止まり、SessionStart まで進めなかった）、SDK からの起動、人が付き添う IDE 拡張などの入口で `0` になるか、他の版、コンテナでの自動実行そのもの
+- 各実験は 1〜2 回で、再現性は見ていない
+- 前景のサブエージェントを複数並べたときの待ち方と、10 分を超える前景のサブエージェント
+- 背景の Bash の timeout の既定
+
+再現は、SessionStart の hook で環境変数を書き出す設定を `--settings` で渡し、`claude -p` を空のディレクトリで回す。

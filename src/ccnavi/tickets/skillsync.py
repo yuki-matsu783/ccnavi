@@ -23,7 +23,7 @@ import os
 
 import yaml
 
-from ..infra import settings, tree, yamlread
+from ..infra import yamlread
 from . import configsync, flow
 
 PROCESS_KEY = "process"
@@ -196,7 +196,7 @@ def _common_of(target: str) -> str:
 
 
 def describe(project: str, changes: list[configsync.Change]) -> list[str]:
-    """着手の出力に足す行。"""
+    """同期の出力に足す行。"""
     lines = [
         f"共通の工程スキルとプロジェクト {project} の skills/ が違っていたので、共通の中身に揃えた:"
     ]
@@ -204,59 +204,3 @@ def describe(project: str, changes: list[configsync.Change]) -> list[str]:
         state = "削除した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")
         lines.append(f"  - {c.rel}（{state}）")
     return lines
-
-
-def is_synced_write(
-    conf: settings.Settings,
-    root: str,
-    path: str,
-    content: bytes | None | object = configsync.UNSET,
-) -> bool:
-    """その変更が、親の着手がミラーか工程スキルの写しとして配った書き込みだと読めるか。
-
-    `configsync.is_synced_write`（共通レイヤーのミラー）に、工程スキルの写しを足した答え。
-    write-and-push の置き場の検査と、実行後チェック、バックアップの復元が使う。
-    """
-    if configsync.is_synced_write(conf, root, path, content):
-        return True
-    return _is_copied_skill(conf, root, path, content)
-
-
-def _is_copied_skill(
-    conf: settings.Settings, root: str, path: str, content: bytes | None | object
-) -> bool:
-    """工程スキルの写しとして読めるか。次が全部揃ったときだけ。
-
-    1. 置き場が、プロジェクトから切った承認済みの親チケットのワークツリーの
-       `skills/<工程>/SKILL.md` か `skills/<工程>/references/common/` の下の `.md`
-       （`<工程>` は共通の工程スキル。元リポジトリ、子、チケットの無いワークツリー、
-       他のプロジェクトは外さない）
-    2. そのパスの途中にシンボリックリンクが無い
-    3. 中身が、ワークスペースの `.claude/skills/<工程>/` の同じファイルと同じ（改行は見ない）。
-       消す変更（変更後の中身が無い）は、共通側にそのファイルが無いときだけ通す。共通側に
-       あるファイルを消す変更と、`SKILL.md` を消す変更は通さない
-
-    読めないものは外さない。
-    """
-    where = tree.tree_of(root, path, conf.projects)
-    if where is None or not where.project or where.is_main:
-        return False
-    rel = configsync._rel(where.root, path)
-    parts = rel.split("/")
-    if len(parts) < 3 or parts[0] != SKILLS_DIR or parts[1] not in processes(root):
-        return False
-    if not is_shared(parts[2:]):
-        return False
-    if configsync._linked(where.root, path) or not configsync._approved_parent(conf, root, where):
-        return False
-    source = os.path.join(root, *SOURCE_DIR.split("/"), *parts[1:])
-    if configsync._linked(root, source):
-        return False
-    now = configsync._read(path) if content is configsync.UNSET else content
-    if now is None:
-        # 消す変更。共通側から無くなったファイルの片付けだけを通す（リンクの先を見て答えない）。
-        return parts[2:] != [SKILL_FILE] and not os.path.lexists(source)
-    expected = configsync._read(source)
-    if expected is None or not isinstance(now, bytes):
-        return False
-    return configsync._same(now, expected)

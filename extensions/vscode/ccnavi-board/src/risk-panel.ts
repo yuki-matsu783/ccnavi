@@ -54,6 +54,7 @@ import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
+import { confirmDuringTurn, confirmIfTurn } from "./turn-confirm.js";
 
 const DEFAULT_RISK = ".ccnavi/config/common/risks.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
@@ -713,6 +714,13 @@ async function create(current: PanelState): Promise<void> {
     fail(current, `${loaded.riskRel} は既に存在するため、上書きしません。更新してください`);
     return;
   }
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
+    fail(current, "ターン中のため作成を取りやめました。ターンが終わってから作成してください。");
+    return;
+  }
+  if (!alive(current)) {
+    return;
+  }
   try {
     fs.mkdirSync(path.dirname(loaded.riskPath), { recursive: true });
     current.wroteAt = Date.now();
@@ -788,6 +796,13 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   }
   if (lock.locked) {
     fail(current, lock.reason);
+    return;
+  }
+  if (!(await confirmDuringTurn(lock))) {
+    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください。");
+    return;
+  }
+  if (!alive(current)) {
     return;
   }
 
