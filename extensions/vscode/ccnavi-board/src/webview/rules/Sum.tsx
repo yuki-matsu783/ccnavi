@@ -16,7 +16,7 @@ export interface SumProps {
   readonly initial: string;
   /**
    * 案内の間の様子。あれば、枠を開くか（`open`）と選ぶ統合結果（`picked`）は画面の中の選びではなくこれに従う。
-   * 案内の間の見本は鍵を替えて別に作るので、閉じたあとの実際の枠には持ち越さない
+   * 案内の間の見本はキーを替えて別に作るので、閉じたあとの実際の枠には持ち越さない
    */
   readonly tour?: { readonly open: boolean; readonly picked: string };
 }
@@ -33,7 +33,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
       <summary>統合結果（読み取り専用。共通の設定 + 1 つの設定の和）</summary>
       <p className="hint">
         判定に効くルールは、共通の設定と、その設定のルールの和です。ここは実行ファイルが出力した結果をそのまま表示するだけで、直すときは画面上部の「設定」の欄で編集する 1 本に切り替えます。保存済みの内容の和で、編集中の内容は含みません。
-        パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を合算した和ではありません。
+        パスを持たないツール（Bash など）が適用するのは、全プロジェクトの設定を合算した和ではありません。
       </p>
       <label className="sum-pick" data-tour="sum-pick">
         統合結果{" "}

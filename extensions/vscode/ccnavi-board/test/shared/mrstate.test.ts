@@ -118,7 +118,7 @@ test("CB-T625 sync retired: retired の行は対象、incomplete の行は確認
   assert.ok(parseRetired(ran("retired 1\r\nretired i0001 self 3 b\r\n")).ok);
 });
 
-test("CB-T626 sync retired の異常は「一覧を取得できません」にする。「ありません」とは言わず、行を黙って捨てない", () => {
+test("CB-T626 sync retired の異常は「一覧を取得できません」にする。「ありません」とは言わず、行を黙って破棄しない", () => {
   const error = (r: Pick<Ran, "code" | "stdout" | "killed">): string => {
     const parsed = parseRetired(r);
     assert.equal(parsed.ok, false);
@@ -130,7 +130,7 @@ test("CB-T626 sync retired の異常は「一覧を取得できません」に�
   assert.match(error({ ...base, stdout: "usage: ccnavi ...\n" }), /頭の行が retired 1 ではありません/);
   assert.match(error({ code: 1, killed: false, stdout: HEAD }), /一覧を取得できません（コマンドが失敗しました。終了コード 1）/);
   assert.match(error({ code: 0, killed: true, stdout: HEAD }), /一覧を取得できません（時間内に終わりませんでした）/);
-  // 知らない行（黙って捨てない）
+  // 知らない行（黙って破棄しない）
   assert.match(error({ ...base, stdout: `${HEAD}retired i0001 self 1 b\nmystery i0002\n` }), /3 行目を知りません/);
   assert.match(error({ ...base, stdout: `${HEAD}\nretired i0001 self 1 b\n` }), /2 行目を知りません/);
   // retired の行の項目が足りない

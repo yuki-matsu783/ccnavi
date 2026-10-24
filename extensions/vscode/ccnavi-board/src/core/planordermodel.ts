@@ -16,7 +16,7 @@ export const PLAN_ORDER_VERSION = 1;
 
 /**
  * 元の番号（いま提案に書いてある番号）での直接の先行。計画（`plan` / `feedback`）ごとに、番号の文字列 → 先行の番号。
- * 渡した計画は全部の番号の先行をそこから取る（書いていない番号は何も待たない）。渡さない計画は提案のまま
+ * 渡した計画は全部の番号の先行をそこから取る（書いていない番号は先行なし）。渡さない計画は提案のまま
  */
 export type PlanOrder = Readonly<Record<string, Readonly<Record<string, readonly number[]>>>>;
 
@@ -58,7 +58,7 @@ export interface PlanOrderAnswer {
   readonly loose: readonly number[];
   /** 断った線。断ったときは振り直さず、提案のままの答えが入っている */
   readonly refused: readonly PlanOrderRefusal[];
-  /** 改版の錠（子が承認された番号）に当たるもの */
+  /** 改版の錠（子が承認された番号）にヒットするもの */
   readonly revision_problems: readonly string[];
   readonly children: readonly PlanOrderChild[];
   /** 子を付け替えられない理由 */

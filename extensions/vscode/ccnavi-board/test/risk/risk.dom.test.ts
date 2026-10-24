@@ -22,7 +22,7 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
   try {
     assert.equal(dom.all(".factor.open").length, 0);
     assert.equal(dom.one(`${rowSelector("f1")} .sum .clip`).textContent, "変更した行数（追加＋削除）が 300 行を超えると加点行数が多い");
-    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, ".github/** に当てはまるファイルを 1 つ変更するごとに加点（上限 35 点）CI に触った");
+    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, ".github/** に該当するファイルを 1 つ変更するごとに加点（上限 35 点）CI に触った");
     // script は「返した点を加点」で、points は測れなかったときの保険。judge は yes で加点
     assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/config/common/scripts/risk.sh が返した点を加点（点を読み取れなかったときは 10 点）");
     assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "質問「テストのない変更を含むか」の答えが yes なら加点");
@@ -64,9 +64,9 @@ test("CB-D12 絞り込みは一致した行だけを数え、開いている行�
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));
     await dom.settle();
-    dom.type(dom.one("#find"), "当てはまるファイル");
+    dom.type(dom.one("#find"), "該当するファイル");
     await dom.settle();
-    assert.equal(dom.one("#factor-count").textContent, "1 / 4（検索条件外の展開中項目: 1 件）", "画面に出ている語で当たる");
+    assert.equal(dom.one("#factor-count").textContent, "1 / 4（検索条件外の展開中項目: 1 件）", "画面に出ている語でヒットする");
     dom.type(dom.one("#find"), "github");
     await dom.settle();
     assert.ok(dom.one(rowSelector("f1")).classList.contains("hidden-by-find"));
@@ -200,7 +200,7 @@ test("CB-D53 項目を追加すると開いて出し、並べ替えと削除が�
     const added = dom.all("#factors > li.factor").pop();
     assert.ok(added !== undefined && added.classList.contains("open"), "追加した項目は開いて出す");
     assert.equal(added.getAttribute("data-key"), "f5");
-    // 空の欄の代わりに出す断り（未設定）は書いてある値ではないので、絞り込みでは当たらない
+    // 空の欄の代わりに出す断り（未設定）は書いてある値ではないので、絞り込みではヒットしない
     assert.equal(dom.one(`${rowSelector("f5")} .sum-points`).textContent, "（未設定）");
     dom.type(dom.one("#find"), "未設定");
     await dom.settle();
@@ -227,7 +227,7 @@ test("CB-D53 項目を追加すると開いて出し、並べ替えと削除が�
   }
 });
 
-test("CB-D54 ファイルが外で変わったら帯を出し、押すと再読込を送る（打ちかけは残す）", async () => {
+test("CB-D54 ファイルが外で変わったら帯を出し、押すと再読み込みを送る（打ちかけは残す）", async () => {
   const dom = await openRisk();
   try {
     assert.ok(dom.one("#changed").classList.contains("hidden"));
@@ -252,7 +252,7 @@ test("CB-D55 組み上がったら ready を送り、届いた中身で編集を
     dom.type(dom.one(`${rowSelector("f1")} input.f-points`), "30");
     await dom.settle();
     assert.ok(!dom.one("#dirty").classList.contains("hidden"));
-    // 再読込・保存が通ったときだけ届く。届いたらその中身で描き直す
+    // 再読み込み・保存が通ったときだけ届く。届いたらその中身で描き直す
     await dom.send({ type: "data", data: { kind: "page", page: page({ riskPath: "risks.yml" }) } });
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("f5")} input.f-points`).value, "25");
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
@@ -305,7 +305,7 @@ test("CB-D58 加点条件の選択肢は 6 つで、キーの表記と説明を�
   }
 });
 
-test("CB-D64 往復の間は、帯の再読込も止める。やめたと返れば欄は戻る", async () => {
+test("CB-D64 往復の間は、帯の再読み込みも止める。やめたと返れば欄は戻る", async () => {
   const dom = await openRisk();
   try {
     await dom.send({ type: "changed" });
@@ -313,9 +313,9 @@ test("CB-D64 往復の間は、帯の再読込も止める。やめたと返れ�
     await dom.settle();
     dom.click(dom.one("#save"));
     await dom.settle();
-    // 往復の間に帯の再読込を押せると、捨てたはずの編集が遅れて保存される
+    // 往復の間に帯の再読み込みを押せると、破棄したはずの編集が遅れて保存される
     for (const button of dom.all<HTMLButtonElement>('button[data-action="reload"]')) {
-      assert.ok(button.disabled, "保存の往復の間はどの再読込も押せない");
+      assert.ok(button.disabled, "保存の往復の間はどの再読み込みも押せない");
     }
     await dom.send({ type: "failed", message: "lint error" });
     assert.ok(!dom.one<HTMLButtonElement>('#changed button[data-action="reload"]').disabled);
@@ -324,7 +324,7 @@ test("CB-D64 往復の間は、帯の再読込も止める。やめたと返れ�
   }
 });
 
-test("CB-D65 再読込を押した時点で欄を止め、ユーザがやめたら戻す", async () => {
+test("CB-D65 再読み込みを押した時点で欄を止め、ユーザがやめたら戻す", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one('header button[data-action="reload"]'));
@@ -340,7 +340,7 @@ test("CB-D65 再読込を押した時点で欄を止め、ユーザがやめた�
   }
 });
 
-test("CB-D66 再読み込みできなかった画面からも、再読込を頼める", async () => {
+test("CB-D66 再読み込みできなかった画面からも、再読み込みを頼める", async () => {
   const dom = await openPage({ kind: "error", error: "EACCES" });
   try {
     dom.click(dom.one('button[data-action="reload"]'));

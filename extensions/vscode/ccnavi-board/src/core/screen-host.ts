@@ -7,12 +7,12 @@
  *
  * | パネル | 使うもの | 非表示になったとき |
  * |---|---|---|
- * | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost` | 画面は捨てられる。入れ物ごと入れ直す |
+ * | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost` | 画面は破棄される。入れ物ごと入れ直す |
  * | `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集） | `retainedHost` | 画面は生きている。何もしない |
  *
  * 取り違えるとどちらの向きでも不具合が出る。保持する画面で `screenHost` を使うと、非表示の間の
- * 入れ直しでユーザが打ちかけていた内容が消える。保持しない画面に `retainedHost` を当てると、
- * 捨てられた画面へ送り続けて中身が古いまま止まる。
+ * 入れ直しでユーザが打ちかけていた内容が消える。保持しない画面に `retainedHost` を適用すると、
+ * 破棄された画面へ送り続けて中身が古いまま止まる。
  *
  * 以下は `screenHost`（保持しない画面）の話。`retainedHost` はこのファイルの下のほうにある。
  *
@@ -24,7 +24,7 @@
  * | 作り直している最中 | `deferred`。渡さない。 受け取る側（`message` のリスナ）はまだ無く、送っても失われる |
  * | 非表示になっている / まだ 1 枚も入れていない | `rebuilt`。入れ物ごと入れ直す。再表示されると VS Code はこれから作り直す |
  *
- * `deferred` になったものは捨てられる。画面が組み上がると `ready` が届くので、受けた側がそこで
+ * `deferred` になったものは破棄される。画面が組み上がると `ready` が届くので、受けた側がそこで
  * 渡し直す（board-panel の `ready` → `redraw`）。1 度きりの指示（「このプロジェクトで絞って開く」）は、
  * `rebuilt` なら入れ物に埋めて渡り、`posted` なら `post` が真を返したときだけ渡っている。
  * 渡る前に消さないこと。 消してから失敗すると二度と届かない。
@@ -42,8 +42,8 @@
 /** 拡張ホストが持つ Webview の窓口。パネルをこの形に合わせて渡す */
 export interface Surface {
   /**
-   * 表示されているか。`retainContextWhenHidden` が偽の画面は、非表示になると捨てられる。
-   * 捨てられた画面に送っても誰にも届かない。
+   * 表示されているか。`retainContextWhenHidden` が偽の画面は、非表示になると破棄される。
+   * 破棄された画面に送っても誰にも届かない。
    *
    * `retainedHost` は読まない。保持する画面は非表示でも生きていて、`postMessage` も届くため
    */
@@ -80,7 +80,7 @@ export interface ScreenHost<D> {
   /** 画面から `ready` が届いた。呼んだ側は、続けて中身を渡し直す */
   ready(): void;
   /**
-   * 非表示になった（`onDidChangeViewState`）。`screenHost` は画面が捨てられているので、組み上がって
+   * 非表示になった（`onDidChangeViewState`）。`screenHost` は画面が破棄されているので、組み上がって
    * いないものとして扱う（行って戻るまでこの段取りが 1 度も呼ばれないと自分では気づけないので、ここで
    * 教えてもらう）。`retainedHost` は画面が生きているので何もしない
    */
@@ -116,7 +116,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
 
   /**
    * 呼ばれるたびに表示の有無を見て、前と違えば組み上がっていないものとして扱う。どちらの向きでも、
-   * そのとき生きていた画面は捨てられている（非表示 = 捨てられる、再表示 = 入れてある HTML から
+   * そのとき生きていた画面は破棄されている（非表示 = 破棄される、再表示 = 入れてある HTML から
    * 作り直される）。`hidden()` の取りこぼしを拾うためのもので、これだけには頼れない
    * （行って戻るまで呼ばれなければ、違いが見えない）。
    */
@@ -141,7 +141,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
           surface.post(message);
           return "posted";
         }
-        // 作り直している最中。いま読み込んでいるものを捨てないよう、入れ直しもしない
+        // 作り直している最中。いま読み込んでいるものを破棄しないよう、入れ直しもしない
         return "deferred";
       }
       surface.html(render(rebuilt ?? data));
@@ -159,7 +159,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
     },
     ready(): void {
       sync();
-      // 非表示になっている画面は `ready` を送らない。届いたなら、それは捨てられた画面が残していったもの。
+      // 非表示になっている画面は `ready` を送らない。届いたなら、それは破棄された画面が残していったもの。
       // これを真に受けると、作り直し中の画面へ送って失うことになる。
       // （`live` と `post` も表示されていることを見るので、ここは二重の確認。単体では外から観測できない）
       if (!seen) {
@@ -178,7 +178,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  * 保持する画面（`retainContextWhenHidden: true`）に中身を渡す段取り。ルール管理・リスク管理・
  * フェーズ管理・テンプレート管理・フロー編集・計画編集が使う。返る形は `screenHost` と同じなので、パネルは作るところの 1 行だけが違う。
  *
- * 保持する画面は非表示になっても捨てられない。VS Code は DOM も Webview の中の状態もそのまま持ち、
+ * 保持する画面は非表示になっても破棄されない。VS Code は DOM も Webview の中の状態もそのまま持ち、
  * 再表示しても作り直さない。だから、この段取りが `screenHost` と違うのは次の 3 つ。
  *
  * - 入れ物（HTML）は 1 度しか入れない。 入れ直すと画面は作り直され、ユーザが打ちかけていた
@@ -189,12 +189,12 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  *   「非表示になった画面にはメッセージを送れない」と言う）。どちらが正しくても正しく動くよう、呼ぶ側は
  *   再表示されたときに、いま出すべき知らせ（`lock`・`changed`）と見た目（`appearance`）を送り直す
  *   （rules-panel / risk-panel / phases-panel / templates-panel / flow-panel / workflow-panel）
- * - `hidden()` は何もしない。 教えてもらっても、捨てられていないので扱いを変えるものが無い
+ * - `hidden()` は何もしない。 教えてもらっても、破棄されていないので扱いを変えるものが無い
  *
  * 残る `deferred` は 1 枚目だけ。入れ物を入れてから画面が組み上がる（`ready`）までの間は、
  * 受け取る側がまだ無いので送らない。そこは `screenHost` と同じで、受けた側が `ready` で渡し直す。
  *
- * 中身を渡すのは、画面の編集を捨ててよいときだけ。 保持する画面は編集の途中を持つので、
+ * 中身を渡すのは、画面の編集を破棄してよいときだけ。 保持する画面は編集の途中を持つので、
  * 監視がファイルの変化に気づいても勝手に渡さない（`{type:"changed"}` の帯を出してユーザに決めさせる）。
  * 渡すのは、ユーザが「更新」を押したときと、保存・作成が通って中身が入れ替わったとき。
  */
@@ -230,7 +230,7 @@ export function retainedHost<D>(surface: RetainedSurface, render: (data: D) => s
     ready(): void {
       mounted = true;
     },
-    /** 保持する画面は捨てられない。教えてもらっても扱いを変えるものが無い */
+    /** 保持する画面は破棄されない。教えてもらっても扱いを変えるものが無い */
     hidden(): void {
       // 何もしない
     },

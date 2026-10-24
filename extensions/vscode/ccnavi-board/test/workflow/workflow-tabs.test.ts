@@ -41,7 +41,7 @@ test("CB-T381 未保存の親と保存したときのハッシュを持ち、変
     forgetSaved(["i0001"]);
     assert.equal(calls, 6);
 
-    // 渡した写しを書き換えても帳面は変わらない
+    // 渡したコピーを書き換えても帳面は変わらない
     const shot = workflowTabs();
     (shot.unsaved as string[]).push("i0003");
     assert.deepEqual(workflowTabs().unsaved, ["i0002"]);
@@ -54,7 +54,7 @@ test("CB-T381 未保存の親と保存したときのハッシュを持ち、変
   resetWorkflowTabs();
 });
 
-test("CB-T390 ボードを再読み込みしたとき、承認待ちの親の提案にない親の保存のハッシュを忘れる（端末や Chrome 拡張で承認した・取り下げた親）", () => {
+test("CB-T390 ボードを再読み込みしたとき、承認待ちの親の提案にない親の保存のハッシュを忘れる（ターミナルや Chrome 拡張で承認した・取り下げた親）", () => {
   const saved = { i0001: "s1", i0002: "s2", i0003: "s3" };
   assert.deepEqual(staleSaved(saved, ["i0002", "i0009"]), ["i0001", "i0003"]);
   assert.deepEqual(staleSaved(saved, ["i0001", "i0002", "i0003"]), []);

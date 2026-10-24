@@ -19,7 +19,7 @@ import type { RepoConfig } from "../src/core/settings.js";
 import type { Outcome } from "../src/core/write.js";
 import { HERE } from "./helpers/python.js";
 
-// 本物のページ（static/board.html）。見出しの 2 つのボタンや枠の ID は写しではなく実物で確かめる（scripts は動かさない）
+// 本物のページ（static/board.html）。見出しの 2 つのボタンや枠の ID はコピーではなく実物で確かめる（scripts は動かさない）
 const PAGE = fs.readFileSync(path.join(HERE, "static", "board.html"), "utf8");
 const dom = new JSDOM(PAGE);
 const g = globalThis as unknown as Record<string, unknown>;

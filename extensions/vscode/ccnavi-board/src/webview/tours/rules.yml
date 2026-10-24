@@ -152,7 +152,7 @@ sample:
         id: suggest-npm-install
         tool: Bash
         count: 6
-        summary: "ルールを追加する候補: Bash の npm install が 6 回、どのルールにも当たらず権限モードへ渡った"
+        summary: "ルールを追加する候補: Bash の npm install が 6 回、どのルールにもヒットせず権限モードへ渡った"
         layer: common
         rules_path: /ws/.ccnavi/config/common/rules.yml
         expectations:
@@ -215,7 +215,7 @@ courses:
         scene: { tab: rules, find: env }
       - target: judge-form
         title: 判定を試す
-        body: ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールに当たるかを実行ファイルが返します。保存は不要です。「期待する判定を一括で確認する」は、期待する判定のファイルに並べた例をまとめて確認します。
+        body: ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールにヒットするかを実行ファイルが返します。保存は不要です。「期待する判定を一括で確認する」は、期待する判定のファイルに並べた例をまとめて確認します。
         scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
       - target: hooks
         title: hook
@@ -236,7 +236,7 @@ courses:
     steps:
       - target: rule-protect-env
         title: 組み合わせ条件のルール
-        body: glob や regex が 1 つでは表現できない条件は、組み合わせ条件（when）で記述できます。畳んだ行には、条件を 1 行に縮めた形（all(regex …, not(any(2)))）が出ます。この例は「.env 系のファイルに当たり、かつ .env.example / .env.sample ではない」です。
+        body: glob や regex が 1 つでは表現できない条件は、組み合わせ条件（when）で記述できます。畳んだ行には、条件を 1 行に縮めた形（all(regex …, not(any(2)))）が出ます。この例は「.env 系のファイルにヒットし、かつ .env.example / .env.sample ではない」です。
         scene: { tab: rules }
       - target: rule-protect-env
         title: 図で見る
@@ -260,7 +260,7 @@ courses:
         scene: { tab: judge, tool: Read, subject: /ws/.env, judge: env-read }
       - target: judge-form
         title: 通す例を確認する
-        body: .env.example はどのルールにも当たらず、判定の対象外（そのまま通る）になります。
+        body: .env.example はどのルールにもヒットせず、判定の対象外（そのまま通る）になります。
         scene: { tab: judge, tool: Read, subject: /ws/.env.example, judge: env-example }
       - target: save
         title: 保存
@@ -277,15 +277,15 @@ courses:
         scene: { tab: rules }
       - target: rule-git-push-match
         title: ツールを決める
-        body: 「ツール」の欄は押すと選択肢が出ます。Bash・Read・Edit のようにチェックを入れて選ぶと、複数なら Write|Edit の形で 1 つの欄に入ります。候補は判定が対象を取り出せるツールです。一覧にない名前は「新しいツール名」で追加できますが、判定には届かず当たりません。
+        body: 「ツール」の欄は押すと選択肢が出ます。Bash・Read・Edit のようにチェックを入れて選ぶと、複数なら Write|Edit の形で 1 つの欄に入ります。候補は判定が対象を取り出せるツールです。一覧にない名前は「新しいツール名」で追加できますが、判定には届かずヒットしません。
         scene: { tab: rules, open: git-push }
       - target: rule-git-push-pattern
         title: glob で記述する
-        body: パターンは種類（glob か regex）と式で決めます。glob は * が「何でも」を表し、*git push* は「git push を含むコマンド」に当たります。短く記述できますが、legit push のように語の途中にも当たります。
+        body: パターンは種類（glob か regex）と式で決めます。glob は * が「何でも」を表し、*git push* は「git push を含むコマンド」にヒットします。短く記述できますが、legit push のように語の途中にもヒットします。
         scene: { tab: rules, open: git-push }
       - target: rule-no-rm-rf-pattern
         title: regex で記述する
-        body: 語の切れ目まで決めたいときは regex を使います。\brm\s+-rf\b は、rm と -rf が語として並ぶときだけに当たります。種類の欄で glob と regex を替えられます。式の誤りは、保存前の検証で止まります。
+        body: 語の切れ目まで決めたいときは regex を使います。\brm\s+-rf\b は、rm と -rf が語として並ぶときだけにヒットします。種類の欄で glob と regex を替えられます。式の誤りは、保存前の検証で止まります。
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-git-push-message
         title: 止めるときの言葉を入力する
@@ -293,7 +293,7 @@ courses:
         scene: { tab: rules, open: git-push }
       - target: judge-form
         title: 判定で確認する
-        body: 入力したら「判定を試す」で、止めたい例（git push origin main）を入力します。保存しなくても、編集中のルールでどのルールに当たり、どのメッセージが返るかを実行ファイルが調べて表示します。
+        body: 入力したら「判定を試す」で、止めたい例（git push origin main）を入力します。保存しなくても、編集中のルールでどのルールにヒットし、どのメッセージが返るかを実行ファイルが調べて表示します。
         scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
       - target: save
         title: 保存
@@ -306,7 +306,7 @@ courses:
     steps:
       - target: rule-db-migrate
         title: 畳んだ行で見分ける
-        body: 畳んだ行の右に「3 回ごと」のような札と、コンテキストの追加がある印が出ます。見本では db-migrate が 3 回に 1 度、deps-change が 1 回ごと（当たるたび）に文を渡します。
+        body: 畳んだ行の右に「3 回ごと」のような札と、コンテキストの追加がある印が出ます。見本では db-migrate が 3 回に 1 度、deps-change が 1 回ごと（ヒットするたび）に文を渡します。
         scene: { tab: rules }
       - target: rule-db-migrate-context
         title: コンテキストの追加
@@ -314,7 +314,7 @@ courses:
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-db-migrate-every
         title: every で何回に 1 度かを決める
-        body: 'every: 3 は、そのルールが当たった回数が 3 の倍数になった回だけを「渡す回」にします（3・6・9 回目）。空なら毎回です。数えるのは当たった回数で、セッションの開始（起動・再開・compact の後）で 0 に戻ります。0 や整数でない値は lint の error です。'
+        body: 'every: 3 は、そのルールがヒットした回数が 3 の倍数になった回だけを「渡す回」にします（3・6・9 回目）。空なら毎回です。数えるのはヒットした回数で、セッションの開始（起動・再開・compact の後）で 0 に戻ります。0 や整数でない値は lint の error です。'
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-db-migrate-text
         title: 渡す回のたびに届く文
@@ -330,7 +330,7 @@ courses:
         scene: { tab: rules, open: deps-change, more: true }
       - target: judge-result
         title: 届く文を判定で確認する
-        body: 「判定を試す」の結果の「返すメッセージ」に、入力した文が何と一緒に届くかが出ます。every で間引くかどうかは、実際に当たった回数で決まるので、ここで確認できるのは文の中身と、当たるルールです。
+        body: 「判定を試す」の結果の「返すメッセージ」に、入力した文が何と一緒に届くかが出ます。every で間引くかどうかは、実際にヒットした回数で決まるので、ここで確認できるのは文の中身と、ヒットするルールです。
         scene: { tab: judge, tool: Bash, subject: python manage.py migrate, judge: db-migrate }
 
   - id: check-expectations
@@ -351,11 +351,11 @@ courses:
         scene: { tab: judge, checked: true }
       - target: expectation-ng
         title: 食い違いを確認する
-        body: 食い違った行は赤く出ます。この例は、allow を期待した .env.example が、どの allow にも当たらず判定の対象外になっています。期待が正しければ allow のルールを追加し、期待が古ければ例を直します。
+        body: 食い違った行は赤く出ます。この例は、allow を期待した .env.example が、どの allow にもヒットせず判定の対象外になっています。期待が正しければ allow のルールを追加し、期待が古ければ例を直します。
         scene: { tab: judge, checked: true }
       - target: expectations-result
-        title: 当たったルールも見る
-        body: 「ヒットしたルール」の列で、どのルールが効いたかが読めます。期待と合っていても、意図したルールではなく別のルールに当たっていないかを確認します。
+        title: ヒットしたルールも見る
+        body: 「ヒットしたルール」の列で、どのルールが効いたかが読めます。期待と合っていても、意図したルールではなく別のルールにヒットしていないかを確認します。
         scene: { tab: judge, checked: true }
       - target: save
         title: 合ったら保存する
@@ -368,7 +368,7 @@ courses:
     steps:
       - target: suggest
         title: 記録から候補を出す
-        body: 「記録から候補を出す」は、判定の記録（logs/decisions.jsonl）を集計して、deny / ask のルールの下書きを作ります。どのルールにも当たらず権限モードへ渡った呼び出しが同じ形で 5 回以上あると、その形にルールを追加する候補になります。保存済みのルールで確認するので、編集中の内容は使いません。
+        body: 「記録から候補を出す」は、判定の記録（logs/decisions.jsonl）を集計して、deny / ask のルールの下書きを作ります。どのルールにもヒットせず権限モードへ渡った呼び出しが同じ形で 5 回以上あると、その形にルールを追加する候補になります。保存済みのルールで確認するので、編集中の内容は使いません。
         scene: { tab: judge }
       - target: suggest-result
         title: 結果の読み方
@@ -384,7 +384,7 @@ courses:
         scene: { tab: rules }
       - target: judge-form
         title: 転記したら判定で確認する
-        body: 下書きの例（npm install left-pad）を「判定を試す」に入力し、期待したタイプ（ask）で当たるかを確認します。
+        body: 下書きの例（npm install left-pad）を「判定を試す」に入力し、期待したタイプ（ask）でヒットするかを確認します。
         scene: { tab: judge, tool: Bash, subject: npm install left-pad, judge: npm-install }
       - target: open-expectations
         title: 期待する例も追加する
@@ -401,7 +401,7 @@ courses:
     steps:
       - target: rule-protect-secrets
         title: 除外を持つルール
-        body: except に並べた glob / regex は、「本体に当たっても、どれかに当たればそのルールは当たらない」という除外です。畳んだ行には「除外 1」と出ます。見本の protect-secrets は、secrets の下は止めるが、README.md だけ除きます。
+        body: except に並べた glob / regex は、「本体にヒットしても、どれかにヒットすればそのルールはヒットしない」という除外です。畳んだ行には「除外 1」と出ます。見本の protect-secrets は、secrets の下は止めるが、README.md だけ除きます。
         scene: { tab: rules }
       - target: rule-protect-secrets-except
         title: 画面では編集しない
@@ -417,11 +417,11 @@ courses:
         scene: { tab: rules, open: protect-env, when: r }
       - target: judge-result
         title: 止める例を確認する
-        body: 意味が変わっていないことを判定で確認します。まず止めたい例（secrets の下の key.pem）が、変換後も deny に当たることを見ます。
+        body: 意味が変わっていないことを判定で確認します。まず止めたい例（secrets の下の key.pem）が、変換後も deny にヒットすることを見ます。
         scene: { tab: judge, tool: Read, subject: /ws/secrets/key.pem, judge: secrets-key }
       - target: judge-form
         title: 除く例を確認する
-        body: 次に除外の例（secrets/README.md）を入力します。除外に当たるので、どのルールにも当たらず、判定の対象外になります。
+        body: 次に除外の例（secrets/README.md）を入力します。除外にヒットするので、どのルールにもヒットせず、判定の対象外になります。
         scene: { tab: judge, tool: Read, subject: /ws/secrets/README.md, judge: secrets-readme }
       - target: save
         title: 保存
@@ -463,23 +463,23 @@ courses:
     steps:
       - target: find
         title: 文字で絞り込む
-        body: 欄に文字を入れると、id・ツール・パターン・メッセージ・渡す文に当たる行だけが残ります。組み合わせ条件のルールは、中の個別条件の文字にも当たります。
+        body: 欄に文字を入れると、id・ツール・パターン・メッセージ・渡す文にヒットする行だけが残ります。組み合わせ条件のルールは、中の個別条件の文字にもヒットします。
         scene: { tab: rules, find: git }
       - target: count-deny
         title: 件数は「一致 / 全体」
-        body: 絞り込み中は、タイプの見出しの件数が「一致 / 全体」になります。畳んだタイプの中も探すので、見えないところに当たりがあるときも件数で分かります。
+        body: 絞り込み中は、タイプの見出しの件数が「一致 / 全体」になります。畳んだタイプの中も探すので、見えないところにヒットがあるときも件数で分かります。
         scene: { tab: rules, find: git }
       - target: fold-allow
         title: タイプを畳む
-        body: 見出しの ▾ を押すと、そのタイプの行が畳まれます（▸ になります）。deny を見たいときに allow を畳む、のように使います。畳んでもルールは消えず、判定にも関わりません。判定で当たった行は、畳んであってもその場だけ開いて出ます。
+        body: 見出しの ▾ を押すと、そのタイプの行が畳まれます（▸ になります）。deny を見たいときに allow を畳む、のように使います。畳んでもルールは消えず、判定にも関わりません。判定でヒットした行は、畳んであってもその場だけ開いて出ます。
         scene: { tab: rules, fold: allow }
       - target: order-hint
         title: 判定の強さ
-        body: 判定は強い順に deny > ask > allow です。1 件でも deny に当たれば拒否で、弱いタイプは確認しません。行の並びが強さを決めるのではなく、タイプが決めます。
+        body: 判定は強い順に deny > ask > allow です。1 件でも deny にヒットすれば拒否で、弱いタイプは確認しません。行の並びが強さを決めるのではなく、タイプが決めます。
         scene: { tab: rules }
       - target: rule-no-rm-rf-buttons
         title: 同じタイプの中の順
-        body: 行を開いた右下の ↑ ↓ で、同じタイプの中の順を替えます。同じタイプに複数当たれば全部の文を並べて返すので、順は返す文の並びに出ます。当たるかどうかは変わりません。「削除」で行を削除できます。
+        body: 行を開いた右下の ↑ ↓ で、同じタイプの中の順を替えます。同じタイプに複数ヒットすれば全部の文を並べて返すので、順は返す文の並びに出ます。ヒットするかどうかは変わりません。「削除」で行を削除できます。
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-no-rm-rf-type
         title: タイプを移す

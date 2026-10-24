@@ -1,5 +1,5 @@
 /**
- * フェーズ管理画面に出す言葉。要約に出す範囲の文、絞り込みが当てる文字列、id の重なりの文面。
+ * フェーズ管理画面に出す言葉。要約に出す範囲の文、絞り込みが適用する文字列、id の重なりの文面。
  *
  * ここが作るのは並べて読めるようにした文だけ。
  */
@@ -36,7 +36,7 @@ export function splitList(text: string): readonly string[] {
     .filter((part) => part !== "");
 }
 
-/** 絞り込みが当てる文字列。id・題・範囲・成果物・使う場面に当たる */
+/** 絞り込みが適用する文字列。id・題・範囲・成果物・使う場面にヒットする */
 export function findText(phase: PhaseForm): string {
   return `${phase.id} ${phase.title} ${phase.scope.join(" ")} ${phase.deliverables.join(" ")} ${phase.when}`.toLowerCase();
 }

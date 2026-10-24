@@ -33,7 +33,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** 値が同じか。辞書はキーの順序を見ない。配列は順も見る */
+/** 値が同じか。マップはキーの順序を見ない。配列は順も見る */
 export function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) {
     return true;
@@ -226,7 +226,7 @@ export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
 // ---- 値の前後まで見せる差分（下書きの取り込み）
 
 /** 値の種類（画面が前後に付ける）。`1` と `"1"`、`true` と `"true"`、`null` と `"null"` を見分けるため */
-export type ValueKind = "文字列" | "数" | "真偽" | "null" | "辞書" | "配列" | "その他";
+export type ValueKind = "文字列" | "数" | "真偽" | "null" | "マップ" | "配列" | "その他";
 
 /** 欄 1 つの前後。足した欄は `before` が無く、消した欄は `after` が無い */
 export interface FieldText {
@@ -271,7 +271,7 @@ function kindOf(value: unknown): ValueKind {
   if (Array.isArray(value)) {
     return "配列";
   }
-  return isRecord(value) ? "辞書" : "その他";
+  return isRecord(value) ? "マップ" : "その他";
 }
 
 /** 値を見せる文。文字列はそのまま（改行も残す）、ほかは JSON の表記。種類は `kindOf` で別に付ける */
@@ -303,7 +303,7 @@ interface Leaf {
   readonly value: unknown;
 }
 
-/** 値を葉まで開く。辞書と配列は中へ下りる。空の辞書・配列は葉として扱う */
+/** 値を葉まで開く。マップと配列は中へ下りる。空のマップ・配列は葉として扱う */
 function leaves(value: unknown, path: readonly (string | number)[], field: string, out: Map<string, Leaf>): void {
   if (isRecord(value) && Object.keys(value).length > 0) {
     for (const [key, inner] of Object.entries(value)) {

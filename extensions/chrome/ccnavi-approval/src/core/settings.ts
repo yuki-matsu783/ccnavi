@@ -1,5 +1,5 @@
 /**
- * 設定画面で入れるもの（`chrome.storage.local` の `repos`）。PAT はここに持たない（別の鍵で
+ * 設定画面で入れるもの（`chrome.storage.local` の `repos`）。PAT はここに持たない（別のキーで
  * service worker だけが読む）。
  *
  * - 統合先の名前: リポジトリごと。空ならホストのデフォルトブランチ
@@ -77,7 +77,7 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const RESERVED_LAYER = new Set(["common", "self"]);
 
-/** 保存された配列を読む。読めない行は捨てる（画面で直させる） */
+/** 保存された配列を読む。読めない行は破棄する（画面で直させる） */
 export function readRepos(value: unknown, hosts: readonly Host[]): RepoConfig[] {
   if (!Array.isArray(value)) {
     return [];

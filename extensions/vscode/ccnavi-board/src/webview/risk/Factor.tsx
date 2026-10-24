@@ -16,10 +16,10 @@ const KINDS_KEYS = KINDS.join(" / ");
 const NUMERIC: readonly FactorKind[] = ["lines_over", "files_over", "deleted_over"];
 
 export interface FactorProps {
-  /** 画面の中だけの鍵（`state.ts`）。行を名指しするために `data-key` へ出す */
+  /** 画面の中だけのキー（`state.ts`）。行を名指しするために `data-key` へ出す */
   readonly factorKey: string;
   readonly factor: FactorForm;
-  /** 絞り込みが当てる文字列（`data-find`）。当たらなければ `hidden` */
+  /** 絞り込みが適用する文字列（`data-find`）。ヒットしなければ `hidden` */
   readonly find: string;
   readonly hidden: boolean;
   readonly open: boolean;
@@ -142,10 +142,10 @@ export function Factor(props: FactorProps): JSX.Element {
         {NUMERIC.includes(factor.kind) && (
           <>
             <Captioned name="対象パス" yamlKey="include" {...mark("factor-include")}>
-              {globs("include", "src/**（glob を 1 行に 1 つ。指定すると、当てはまるパスだけを数えます。空なら全パスです）")}
+              {globs("include", "src/**（glob を 1 行に 1 つ。指定すると、該当するパスだけを数えます。空なら全パスです）")}
             </Captioned>
             <Captioned name="除外パス" yamlKey="exclude" {...mark("factor-exclude")}>
-              {globs("exclude", "*.lock（glob を 1 行に 1 つ。当てはまるパスは数えません。対象パスに当てはまっていても除外します）")}
+              {globs("exclude", "*.lock（glob を 1 行に 1 つ。該当するパスは数えません。対象パスに該当していても除外します）")}
             </Captioned>
           </>
         )}

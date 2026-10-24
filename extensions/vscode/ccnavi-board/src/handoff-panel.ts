@@ -49,7 +49,7 @@ type Loaded =
   | { readonly kind: "disabled"; readonly key: string; readonly reason: string };
 
 interface PanelState {
-  /** いま見ているツリーの鍵。別のツリーを開くと入れ替わる（タブは 1 枚） */
+  /** いま見ているツリーのキー。別のツリーを開くと入れ替わる（タブは 1 枚） */
   key: string;
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
@@ -67,9 +67,9 @@ interface PanelState {
   writing: boolean;
   /** 自分が書いた時刻。この直後の監視の反応は、外で変わったものとして扱わない */
   wroteAt: number;
-  /** 読み直しの番号。読み終えたときに変わっていたら捨てる */
+  /** 読み直しの番号。読み終えたときに変わっていたら破棄する */
   seq: number;
-  /** 錠の読み直しの番号。読み終えたときに変わっていたら捨てる */
+  /** 錠の読み直しの番号。読み終えたときに変わっていたら破棄する */
   lockSeq: number;
 }
 
@@ -110,7 +110,7 @@ export async function openHandoff(key: string = MAIN_TREE_KEY): Promise<void> {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 選んだ対象や開いた行を持つので、タブを非表示にしても捨てない。
+    // 選んだ対象や開いた行を持つので、タブを非表示にしても破棄しない。
     retainContextWhenHidden: true,
   });
   showLoading(panel, TITLE, SCREEN, keyLabel(key));
@@ -255,7 +255,7 @@ function alive(current: PanelState): boolean {
   return state === current;
 }
 
-/** ファイルが外で変わったら、少し待ってから読み直す。自分の取り込みの最中とその直後の反応は、取り込みの側が読み直すので捨てる */
+/** ファイルが外で変わったら、少し待ってから読み直す。自分の取り込みの最中とその直後の反応は、取り込みの側が読み直すので破棄する */
 function scheduleChanged(current: PanelState): void {
   if (current.writing || Date.now() - current.wroteAt < OWN_WRITE_GRACE_MS) {
     return;
@@ -423,10 +423,10 @@ async function handleMessage(current: PanelState, message: HandoffMessage | unde
     return;
   }
   if (message.type === "copy") {
-    // 画面が出した端末のコマンドだけを写す
+    // 画面が出したターミナルのコマンドだけをコピーする
     if (isTerminalCommand(message.text)) {
       await vscode.env.clipboard.writeText(message.text);
-      void vscode.window.showInformationMessage("端末で打つコマンドをコピーしました");
+      void vscode.window.showInformationMessage("ターミナルで打つコマンドをコピーしました");
     }
     return;
   }

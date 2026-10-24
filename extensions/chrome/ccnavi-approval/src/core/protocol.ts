@@ -105,7 +105,7 @@ export interface Deps {
   getToken(host: string): Promise<string>;
   setToken(host: string, token: string): Promise<void>;
   clearToken(host: string): Promise<void>;
-  /** PAT の期限の記録。PAT そのものとは別の鍵に置く */
+  /** PAT の期限の記録。PAT そのものとは別のキーに置く */
   getMeta(host: string): Promise<TokenMeta>;
   /** 設定画面で登録したリポジトリ（書く頼みはここにあるものだけ受ける） */
   getRepos(): Promise<RepoConfig[]>;
@@ -166,7 +166,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
           return { ok: false, error: "期限は YYYY-MM-DD の形の日付で入れてください" };
         }
         await deps.setToken(host.id, msg.token);
-        // 差し替えたら、前のトークンの期限は捨てる（ホストの応答で読み直す）
+        // 差し替えたら、前のトークンの期限は破棄する（ホストの応答で読み直す）
         await deps.setMeta(host.id, manual ? { manual } : {});
         return { ok: true, value: null };
       }
@@ -234,7 +234,7 @@ async function gitlabExpiry(client: github.Client, deps: Deps): Promise<void> {
   await deps.setMeta(client.host.id, { ...meta, ...(iso ? { host: iso } : {}), checked: deps.now().toISOString() });
 }
 
-/** 書く頼みの断り（形が悪い・保護に当たった）。書く流れはこれを「先頭が動いた」と取り違えない */
+/** 書く頼みの断り（形が悪い・保護にヒットした）。書く流れはこれを「先頭が動いた」と取り違えない */
 export const REFUSED = 400;
 
 function refuse(error: string): Response {

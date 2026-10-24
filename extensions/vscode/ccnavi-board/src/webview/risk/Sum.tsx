@@ -17,7 +17,7 @@ export interface SumProps {
   readonly initial: string;
   /**
    * 案内の間の様子。あれば、枠を開くか（`open`）と選ぶ統合結果（`picked`）は画面の中の選びではなくこれに従う。
-   * 案内の間の見本は鍵を替えて別に作るので、閉じたあとの実際の枠には持ち越さない
+   * 案内の間の見本はキーを替えて別に作るので、閉じたあとの実際の枠には持ち越さない
    */
   readonly tour?: { readonly open: boolean; readonly picked: string };
 }

@@ -1,6 +1,6 @@
 /**
  * 対象 1 件。見出しに選択の欄・パス・種類・状態の札を出し、取り込めない理由（錠を含む）を直下に出す。
- * 開くと差分・指摘（errors / warnings）を出す。`board` が偽の対象（`defense`）には、端末で取り込む案内を出す。
+ * 開くと差分・指摘（errors / warnings）を出す。`board` が偽の対象（`defense`）には、ターミナルで取り込む案内を出す。
  * 取り込めるか・取り込めない理由は実行ファイルの答えを読んだ `handoffmodel.ts` の判断のまま使う。
  */
 import type { JSX } from "react";
@@ -10,7 +10,7 @@ import { blockReason } from "../../core/handoffmodel.js";
 import type { Lock } from "../../core/lock.js";
 import { kindLabel, stateLabel, stateTone } from "./text.js";
 
-/** 端末で打つコマンドの案内の状態。まだ頼んでいなければ undefined */
+/** ターミナルで打つコマンドの案内の状態。まだ頼んでいなければ undefined */
 export interface TerminalState {
   readonly command: string;
   readonly error: string;
@@ -21,7 +21,7 @@ export interface EntryProps {
   readonly lock: Lock;
   readonly selected: boolean;
   readonly open: boolean;
-  /** 往復の途中か案内の間は、選択も端末の案内も頼めない */
+  /** 往復の途中か案内の間は、選択もターミナルの案内も頼めない */
   readonly disabled: boolean;
   readonly terminal: TerminalState | undefined;
   readonly onToggle: () => void;
@@ -70,7 +70,7 @@ export function Entry({ entry, lock, selected, open, disabled, terminal, onToggl
         <span className={tone === "" ? "tag" : `tag ${tone}`} data-role="state">
           {stateLabel(entry.state)}
         </span>
-        {!entry.board && <span className="tag warn">端末で取り込む</span>}
+        {!entry.board && <span className="tag warn">ターミナルで取り込む</span>}
         {entry.errors.length > 0 && <span className="tag bad">error {entry.errors.length}</span>}
         {entry.warnings.length > 0 && <span className="tag warn">warn {entry.warnings.length}</span>}
       </div>
@@ -113,7 +113,7 @@ export function Entry({ entry, lock, selected, open, disabled, terminal, onToggl
 }
 
 /**
- * `board` が偽の対象の案内。ボードからは取り込まない。端末で打つコマンドを出す
+ * `board` が偽の対象の案内。ボードからは取り込まない。ターミナルで打つコマンドを出す
  * （`expect` はそのパスだけを指して見るだけをもう一度呼んで取る。拡張が組み直さない）。
  */
 function TerminalGuide({
@@ -132,11 +132,11 @@ function TerminalGuide({
   return (
     <div className="terminal-guide" data-role="terminal-guide">
       <p>
-        この対象（{kindLabel(entry.kind)}）はボードから取り込めません。差分を読んだうえで、端末で次のコマンドを打って取り込みます。
+        この対象（{kindLabel(entry.kind)}）はボードから取り込めません。差分を読んだうえで、ターミナルで次のコマンドを打って取り込みます。
       </p>
       {terminal === undefined ? (
         <button type="button" className="action small" data-action="show-terminal" disabled={disabled} onClick={onTerminal}>
-          端末のコマンドを出す
+          ターミナルのコマンドを出す
         </button>
       ) : terminal.command !== "" ? (
         <>

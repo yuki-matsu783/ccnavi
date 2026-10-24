@@ -23,7 +23,7 @@ const label = (card: Card | undefined): string => card?.status.label ?? "(カー
 
 // --- フェーズ行（2-3 の表の全行） ---
 
-test("CB-T600 フェーズ行の状態の一言は、JSON の欄から表の順に最初に当たったものを採る（全 10 行）", () => {
+test("CB-T600 フェーズ行の状態の一言は、JSON の欄から表の順に最初にヒットしたものを採る（全 10 行）", () => {
   const p = (n: number, over: Partial<PhaseJson>): PhaseJson => phaseJson(n, over);
   const all = [
     p(1, { gate_closed: true, review_waiting: true, state: "ended" }), // 1
@@ -49,7 +49,7 @@ test("CB-T600 フェーズ行の状態の一言は、JSON の欄から表の順�
 test("CB-T601 フェーズ行の優先順位: 止まっているのが先（reviewed が残っていても止まっていればレビュー待ち）。gate_closed でない review_waiting は採らない", () => {
   const stillWaiting = phaseJson(1, { gate_closed: true, review_waiting: true, marks: { reviewed: {}, skipped: {} }, state: "ended" });
   assert.equal(phaseStatusOf(stillWaiting, [stillWaiting]), "レビュー待ち");
-  // review_waiting だけが真で gate_closed が偽: 1・2 のどちらにも当たらず、マーカーと状態で決まる（判定し直さない）
+  // review_waiting だけが真で gate_closed が偽: 1・2 のどちらにもヒットせず、マーカーと状態で決まる（判定し直さない）
   const odd = phaseJson(1, { gate_closed: false, review_waiting: true, state: "ended" });
   assert.equal(phaseStatusOf(odd, [odd]), "終了");
   // reviewed は延期より先
@@ -186,7 +186,7 @@ test("CB-T606 子の札: copyStatus が open のとき、フェーズがレビ�
   }
 });
 
-test("CB-T607 子の札: どの規則にも当たらなければ要確認で、読めた欄をツールチップに出す（承認待ちでない提案、フェーズが引けない子）", () => {
+test("CB-T607 子の札: どの規則にもヒットしなければ要確認で、読めた欄をツールチップに出す（承認待ちでない提案、フェーズが引けない子）", () => {
   const json = boardOf(
     [
       ticketJson("i0001"),

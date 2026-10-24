@@ -5,7 +5,7 @@
  * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
  * `retainContextWhenHidden` が真で、入れ物（HTML）は 1 度しか入らない。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
+ * 中身を渡すのは、画面の編集を破棄してよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
  * 対象は 3 種。共通の設定の定義（`.ccnavi/config/common/phases.yml`。場所は固定）、ワークスペースの設定の定義
  * （既定 `.ccnavi/config/project/phases.yml`）、プロジェクト 1 つの設定の定義（既定 `projects/<名前>/.ccnavi/config/project/phases.yml`）。
@@ -27,7 +27,7 @@
  * error を上部の帯で出す。共通の設定を開いているときは、その定義を直して検証の通る形で保存できる（直さなければ、ほかの対象の `--lint` も error のまま）。
  *
  * チケット制御が disable のワークスペースでは、対象がどれでも開かない。定義は親チケットの計画と
- * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じ鍵で隠れる。
+ * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じキーで隠れる。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -107,7 +107,7 @@ interface PanelState {
   readonly folder: vscode.WorkspaceFolder;
   readonly tmpDir: string;
   readonly host: ScreenHost<PhasesData>;
-  /** 編集対象と設定ファイルの監視。対象のパスが変わるので、再読込のたびに張り直す */
+  /** 編集対象と設定ファイルの監視。対象のパスが変わるので、再読み込みのたびに張り直す */
   fileWatchers: vscode.FileSystemWatcher[];
   /** チケットの置き場の監視。開いている間ずっと同じ */
   watchers: vscode.FileSystemWatcher[];
@@ -123,7 +123,7 @@ interface PanelState {
   /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
   dirty: boolean;
   /**
-   * 読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら捨てる。
+   * 読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら破棄する。
    * 設定ファイルの場所を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
    */
   seq: number;
@@ -205,7 +205,7 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 編集の途中を持つので、タブを非表示にしても捨てない。
+    // 編集の途中を持つので、タブを非表示にしても破棄しない。
     retainContextWhenHidden: true,
   });
   showLoading(panel, TITLE, SCREEN, whatOf(target));
@@ -235,7 +235,7 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
  * やめたらタブは前面に出たまま、前の対象と編集が残る。
  *
  * 読み終えるまでは前の対象の中身を消して「読み込み中」を見せ、操作も受けない（`loaded` を空にする）。
- * 前の対象の保存が往復の途中なら、`stale` が捨てる。
+ * 前の対象の保存が往復の途中なら、`stale` が破棄する。
  */
 async function switchTarget(current: PanelState, target: PhasesTarget): Promise<void> {
   if (current.dirty) {
@@ -404,7 +404,7 @@ function registerPanelHandlers(current: PanelState): void {
 
 /**
  * 定義のファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
- * 対象のパスは設定で変わるので、再読込のたびに張り直す。絶対パスはワークスペース相対の glob に
+ * 対象のパスは設定で変わるので、再読み込みのたびに張り直す。絶対パスはワークスペース相対の glob に
  * ならないので、そのディレクトリを起点にする。
  */
 function watchFiles(current: PanelState): void {
@@ -488,7 +488,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。画面の編集はここで捨てられるので、呼ぶのはユーザが「更新」を押した
+ * いま見せるものを渡す。画面の編集はここで破棄されるので、呼ぶのはユーザが「更新」を押した
  * ときと、保存・作成が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
@@ -550,7 +550,7 @@ function redraw(current: PanelState): void {
 /**
  * フェーズ管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
  * 入れ物は 1 度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
- * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
+ * パネルの `retainContextWhenHidden` を偽に変えると、送った先が破棄されていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
 function phasesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<PhasesData> {
@@ -604,14 +604,14 @@ async function reload(current: PanelState): Promise<void> {
  * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
  *
  * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間にユーザが「更新」を押せば、
- * 画面の編集は捨てられ、新しい中身が出ている。そこへ古い編集を書くと、捨てたはずのものが
+ * 画面の編集は破棄され、新しい中身が出ている。そこへ古い編集を書くと、破棄したはずのものが
  * ファイルに入る。 読み直されていたら、この保存はもう無かったことにする。
  */
 function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  // 往復の間に別の対象へ切り替わった。捨てるのは同じだが、切り替え先の画面に前の対象の話を出さない
+  // 往復の間に別の対象へ切り替わった。破棄するのは同じだが、切り替え先の画面に前の対象の話を出さない
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
@@ -619,7 +619,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   return true;
 }
 
-/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに捨てられる（非表示になっていても届く） */
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ届かずに破棄される（非表示になっていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToPhases);
 }
@@ -652,7 +652,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     markTourSeen(SCREEN);
     return;
   }
-  // 読み直せていない画面では、定義に当たる操作はどれも行き先が無い（「更新」は
+  // 読み直せていない画面では、定義にヒットする操作はどれも行き先が無い（「更新」は
   // 押せるが、その経路は `reload` が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;

@@ -23,7 +23,7 @@
  *
  * 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`）、
  * 着手中に書けるかは実行ファイルが `flow.locked` で言う。
- * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限に当たった
+ * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限にヒットした
  * サブエージェントに Agent ツールが渡らないこと（そのノードで止まってメインへ戻る）。
  *
  * ここには VS Code の API も node も DOM も入れない。画面（React）がバンドルして読むため。
@@ -313,7 +313,7 @@ function escapeForPyYaml(text: string): string {
   });
 }
 
-/** 雛形のプロンプト。子の識別子を埋めない固定文にする（フローを別の子へ写しても食い違わない） */
+/** 雛形のプロンプト。子の識別子を埋めない固定文にする（フローを別の子へコピーしても食い違わない） */
 export const READ_TICKET_PROMPT = "担当の子チケットを読み、その内容に沿って作業を進める";
 
 /**
@@ -1019,7 +1019,7 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
     // 出口なし
   } else if (key !== undefined && !multi) {
     // 線が項目の `id`（`body` / `done` など）で出口を指しているなら、その `id` を出口にする（`branch-<番号>` と
-    // 別の出口が並ぶのを避ける。実行ファイルの出口の読み方と同じく、項目の `id` でも `branch-<番号>` でも当たる）
+    // 別の出口が並ぶのを避ける。実行ファイルの出口の読み方と同じく、項目の `id` でも `branch-<番号>` でもヒットする）
     const used = new Set(connections.filter((c) => connectionFrom(c) === node.id).map((c) => connectionFromPort(c)));
     branchItems(node).forEach((item, index) => {
       const id = labelText(item.id);
@@ -1064,7 +1064,7 @@ export function connectionLabel(doc: FlowDoc, c: FlowConnection): string {
   if (from === undefined) {
     return "";
   }
-  // 出口が項目の id とちょうど同じか、`branch-<番号>` の番号が項目の位置。部分一致や末尾の数字だけでは当てない
+  // 出口が項目の id とちょうど同じか、`branch-<番号>` の番号が項目の位置。部分一致や末尾の数字だけでは適用しない
   // （実行ファイルの案内 `flow_render._port_label` と同じ読み方。出口・id・言葉の値も `flow_text._text` と同じく、
   // 真偽値は空として読む）
   const port = labelText(c.fromPort);
@@ -1138,7 +1138,7 @@ export function nesting(doc: FlowDoc): Nesting {
 }
 
 /**
- * 図の上に出す注意。当てはまるときだけ出す。 良し悪しは決めない（保存は止めない）。
+ * 図の上に出す注意。該当するときだけ出す。 良し悪しは決めない（保存は止めない）。
  *
  * 実行ファイル（`--lint --flow`）の warn と並べて出す。`exe` を真にすると、実行ファイルが同じことを言うもの
  * （開始が無い。実行ファイルは「start が無い」と言う）は出さず、実行ファイルの答えにそろえる（二重に出さない）。

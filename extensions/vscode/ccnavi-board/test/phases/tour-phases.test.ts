@@ -111,7 +111,7 @@ test("CB-T464 フェーズの案内の scene は、見本にある設定・定�
       const at = `${course.id} の ${index + 1} 番目の手順`;
       const scene = step.scene;
       for (const key of Object.keys(scene)) {
-        assert.ok(known.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
+        assert.ok(known.includes(key), `${at}: scene のキー ${key} を画面は読まない`);
       }
       assert.ok(scene.target === undefined || scene.target === "lib", `${at}: target は lib だけ（既定はワークスペース）`);
       const ids = new Set((scene.target === "lib" ? sample.project : sample.page).model.form.phases.map((phase) => phase.id));

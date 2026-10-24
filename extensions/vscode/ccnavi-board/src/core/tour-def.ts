@@ -13,7 +13,7 @@
  * 手順（`steps`）は、指す先（`target`）・題・本文・その手順の画面の様子（`scene`）を持つ。
  *
  *   target  `data-tour="…"` の値。空なら吹き出しを画面の中ほどに出して文だけを見せる
- *   scene   その手順で画面がとる様子（開く行・開くタブ・選ぶ点など）。鍵と値は画面ごとに決める。手順ごとに全部を書き直す
+ *   scene   その手順で画面がとる様子（開く行・開くタブ・選ぶ点など）。キーと値は画面ごとに決める。手順ごとに全部を書き直す
  *           （前の手順の様子を引き継がない）ので、「戻る」でも同じ様子になる。値は文字列・数・真偽だけ
  */
 
@@ -40,7 +40,7 @@ export interface TourDef {
   readonly courses: readonly TourCourseDef[];
 }
 
-/** 基本の案内の鍵。初回に自動で出る案内で、一覧の先頭に出る */
+/** 基本の案内のキー。初回に自動で出る案内で、一覧の先頭に出る */
 export const INTRO_ID = "intro";
 
 /** 見本の目印。画面は見本を出している間、この文を帯で出す */
@@ -54,7 +54,7 @@ const COURSE_KEYS = ["id", "title", "summary", "steps"];
 const STEP_KEYS = ["target", "title", "body", "scene"];
 const ROOT_KEYS = ["screen", "sample", "courses"];
 
-/** 知らない鍵（綴り違い）を名指しする。黙って捨てると、空の指す先や空の様子に化ける */
+/** 知らないキー（綴り違い）を名指しする。黙って破棄すると、空の指す先や空の様子に化ける */
 function unknownKey(map: Record<string, unknown>, known: readonly string[]): string | undefined {
   return Object.keys(map).find((key) => !known.includes(key));
 }
@@ -77,7 +77,7 @@ export function parseTour(raw: unknown): TourParsed {
   }
   const rootUnknown = unknownKey(root, ROOT_KEYS);
   if (rootUnknown !== undefined) {
-    return { ok: false, error: `未知の鍵 ${rootUnknown}（screen / sample / courses だけ）` };
+    return { ok: false, error: `未知のキー ${rootUnknown}（screen / sample / courses だけ）` };
   }
   const screen = text(root.screen);
   if (screen === undefined) {
@@ -96,7 +96,7 @@ export function parseTour(raw: unknown): TourParsed {
     }
     const courseUnknown = unknownKey(course, COURSE_KEYS);
     if (courseUnknown !== undefined) {
-      return { ok: false, error: `${at} に未知の鍵 ${courseUnknown}` };
+      return { ok: false, error: `${at} に未知のキー ${courseUnknown}` };
     }
     const id = text(course.id);
     if (id === undefined || !ID.test(id)) {
@@ -126,7 +126,7 @@ export function parseTour(raw: unknown): TourParsed {
       }
       const stepUnknown = unknownKey(step, STEP_KEYS);
       if (stepUnknown !== undefined) {
-        return { ok: false, error: `${stepAt} に未知の鍵 ${stepUnknown}` };
+        return { ok: false, error: `${stepAt} に未知のキー ${stepUnknown}` };
       }
       const stepTitle = text(step.title);
       const body = text(step.body);

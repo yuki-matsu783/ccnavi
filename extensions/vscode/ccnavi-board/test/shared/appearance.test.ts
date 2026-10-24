@@ -43,7 +43,7 @@ test("CB-T129 body のクラスは Claude の配色のときだけ付き、CSS �
   assert.equal(bodyTag("vscode"), "<body>");
   assert.equal(bodyTag("claude-light"), '<body class="ccnavi-claude-light">');
   assert.equal(appearanceClass("claude-dark"), "ccnavi-claude-dark");
-  // HC では当てない書き方
+  // HC では適用しない書き方
   assert.match(APPEARANCE_STYLE, /body\.ccnavi-claude-dark:not\(\.vscode-high-contrast\):not\(\.vscode-high-contrast-light\) \{\s*--vscode-editor-background: #262624;/);
   assert.match(APPEARANCE_STYLE, /body\.ccnavi-claude-light:not\(\.vscode-high-contrast\):not\(\.vscode-high-contrast-light\) \{\s*--vscode-editor-background: #FAF9F5;/);
   // 意味の色は両方で地に合わせて置き換える（ライトのテーマからダークを選んでも読める）
@@ -62,7 +62,7 @@ test("CB-T129 body のクラスは Claude の配色のときだけ付き、CSS �
   }
 });
 
-/** Chrome 拡張の画面が読む配色（`extensions/shared/styles/browser-theme.css`）。appearance.css の写し */
+/** Chrome 拡張の画面が読む配色（`extensions/shared/styles/browser-theme.css`）。appearance.css のコピー */
 const BROWSER_THEME = fs.readFileSync(path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "styles", "browser-theme.css"), "utf8");
 
 /** CSS の `--vscode-*` の宣言を、名前 -> 値で取る（コメントは除き、値は大文字小文字と空白の差を無視する） */
@@ -130,7 +130,7 @@ function surface(visible = true): Surface & { visible: boolean; readonly pages: 
   };
 }
 
-test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上がっていない画面と捨てられた画面には送らない", () => {
+test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上がっていない画面と破棄された画面には送らない", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
 
@@ -148,7 +148,7 @@ test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上
   assert.equal(sendAppearance(host, "claude-dark"), true);
   assert.deepEqual(spy.posted, [{ type: "appearance", value: "claude-dark" }]);
 
-  // 非表示にする。画面は捨てられているので送らない。再表示すると入れ物から作り直され、
+  // 非表示にする。画面は破棄されているので送らない。再表示すると入れ物から作り直され、
   // 組み上がった（`ready`）ところで呼ぶ側が送り直す
   spy.visible = false;
   host.hidden();
@@ -166,7 +166,7 @@ test("CB-T182b 保持する画面は非表示でも送る。1 枚目を読み込
   host.ready();
   assert.equal(sendAppearance(host, "claude-light"), true);
 
-  // 保持する画面は非表示になっても捨てられない。表示の有無を見ないので送れる
+  // 保持する画面は非表示になっても破棄されない。表示の有無を見ないので送れる
   // （届くかどうかは VS Code 次第なので、再表示されたところで呼ぶ側が送り直す）
   host.hidden();
   assert.equal(sendAppearance(host, "vscode"), true);
@@ -189,7 +189,7 @@ const EXT_SRC = path.join(WEBVIEW_SRC, "..");
 
 /**
  * コードだけを返す。コメントを外すのが肝で、外さないと「`webview.postMessage` は呼ばない」と
- * 書いた説明そのものが「呼んでいる」として当たる。
+ * 書いた説明そのものが「呼んでいる」としてヒットする。
  */
 function source(name: string): string {
   return fs
@@ -226,7 +226,7 @@ test("CB-T183c 保持する画面は、再表示されたところでも送り�
     assert.match(found[1], /postAppearance\(current\.host\)/, `${name} が再表示されても見た目を送り直していない`);
   }
   for (const name of REBUILT_PANELS) {
-    // 保持しない画面は作り直されるので、ここで送ると「捨てられた画面へ送る」になる
+    // 保持しない画面は作り直されるので、ここで送ると「破棄された画面へ送る」になる
     assert.doesNotMatch(source(name), /onDidChangeViewState\([\s\S]{0,400}?postAppearance/, `${name} は ready で足りる`);
   }
 });

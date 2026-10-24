@@ -1,9 +1,9 @@
 /**
- * 編集欄の計画 1 つ（全体計画かフィードバック計画）。上に線を引ける図、下に項の表（種類・レビューを選び、並べ替え・削除・追加）。
+ * 編集欄の計画 1 つ（全体計画かフィードバック計画）。上に線を引ける図、下にステップの表（種類・レビューを選び、並べ替え・削除・追加）。
  *
- * 図に描く中身（番号・始まる項・終端に当たらない項・順序の error）は実行ファイルが読んで返した答え（`plan`）のまま描き、
+ * 図に描く中身（番号・始まるステップ・終端にヒットしないステップ・順序の error）は実行ファイルが読んで返した答え（`plan`）のまま描き、
  * ここは判定しない。**図が古い間は（編集した直後で、まだ読ませた答えが戻っていない間）線を引けない**。古い図の番号で線を引くと、
- * 別の項を指してしまうため。
+ * 別のステップを指してしまうため。
  */
 import { useState, type JSX } from "react";
 
@@ -25,7 +25,7 @@ import { PlanGraph } from "../shared/PlanGraph.js";
 
 const PART_TITLE: Readonly<Record<PlanPart, string>> = { plan: "全体計画", feedback: "フィードバック計画" };
 
-/** 項の `review` の言葉 */
+/** ステップの `review` の言葉 */
 const REVIEW_LABEL: Readonly<Record<string, string>> = {
   "": "定義のまま",
   mr: "mr（MR を見る）",
@@ -170,7 +170,7 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
   );
 }
 
-/** 末尾に項を足す。足した項は前の末尾の項を待つ（線は図で引き直せる） */
+/** 末尾にステップを足す。足したステップには前の末尾のステップが先行する（線は図で引き直せる） */
 function AddItem({ part, template, types, onChange }: Pick<PlanEditProps, "part" | "template" | "types" | "onChange">): JSX.Element {
   const options = optionsFor(part, types, "");
   const [picked, setPicked] = useState("");

@@ -4,8 +4,8 @@
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
  * 出番の少ない 2 欄（補足。agent / when）は見出し 1 行に折りたたみ、値がある定義だけ最初から開く。
  *
- * **ほかの定義との関係の欄（overlap / requires / after）は出さない。** 順序（どのフェーズがどれを待つか）は
- * フェーズ定義ではなく親チケットの計画の項の `after` で決める。
+ * **ほかの定義との関係の欄（overlap / requires / after）は出さない。** 順序（どのフェーズにどのフェーズが先行するか）は
+ * フェーズ定義ではなく親チケットの計画のステップの `after` で決める。
  */
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
@@ -13,7 +13,7 @@ import { KIND_LABELS, PHASE_KINDS, REVIEWS, REVIEW_LABELS, type PhaseForm, type 
 import { moreNote, scopeText, scopeTitle, splitList } from "./text.js";
 
 export interface PhaseProps {
-  /** 画面の中だけの鍵（`state.ts`）。行を名指しするために `data-key` へ出す */
+  /** 画面の中だけのキー（`state.ts`）。行を名指しするために `data-key` へ出す */
   readonly phaseKey: string;
   readonly phase: PhaseForm;
   readonly find: string;
@@ -203,8 +203,8 @@ export function Phase(props: PhaseProps): JSX.Element {
  * 打っている途中の文字は欄が持つ。 リストに直したものをそのまま欄へ戻すと、`a, ` と打った
  * ところで `a` に縮む（区切りの直後が打てない）。
  *
- * 外から中身が入れ替わったとき（再読込・保存）は、行の鍵が配り直されてこの部品ごと作り直されるので、
- * 欄は新しい値で始まる。下の `useEffect` はその経路を通らない保険で、鍵を保つ書き方に変えたときに
+ * 外から中身が入れ替わったとき（再読み込み・保存）は、行のキーが配り直されてこの部品ごと作り直されるので、
+ * 欄は新しい値で始まる。下の `useEffect` はその経路を通らない保険で、キーを保つ書き方に変えたときに
  * 欄が古いまま残らないように置いてある。
  */
 function ListInput({

@@ -55,7 +55,7 @@ test("CX-T116 service worker はホストの応答から期限を読んで記録
   const after = (await dispatch({ kind: "token.status", host: "github.com" }, BOARD, d)) as { value: TokenStatus };
   assert.equal(after.value.notice?.level, "soon");
   assert.equal(after.value.notice?.daysLeft, 3);
-  // 差し替えると前のトークンの期限は捨て、入れた日付を記録する
+  // 差し替えると前のトークンの期限は破棄し、入れた日付を記録する
   const set = await dispatch({ kind: "token.set", host: "github.com", token: TOKEN, expires: "2026-12-01" }, OPTIONS, d);
   assert.equal(set.ok, true);
   assert.deepEqual(metas.get("github.com"), { manual: "2026-12-01" });

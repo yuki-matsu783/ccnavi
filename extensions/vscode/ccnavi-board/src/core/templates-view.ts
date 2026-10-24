@@ -3,7 +3,7 @@
  * 1 件の本文（`--templates --show <名前> --json`）。形の見本は `tests/fixtures/templates-json.json`。
  * 一覧・検索・表示と、テンプレートの編集（保存はユーザが押したときだけ）をする画面。下書きの取り込みは取り込み待ち画面（`handoff-view.ts`）が受け持つ。
  *
- * 判定は実行ファイルが答え、画面は読むだけにする（有効か・捨てた理由は実行ファイルが決める）。読み取りは `templatesmodel.ts` の側に置く。
+ * 判定は実行ファイルが答え、画面は読むだけにする（有効か・破棄した理由は実行ファイルが決める）。読み取りは `templatesmodel.ts` の側に置く。
  * 画面は React で組み、拡張ホストは HTML を組み立てない（`phases-view.ts` と同じ作り）。ここには VS Code の API も DOM も node も入れない。
  * 両側から import されるので、片方だけが持てるものを置くとバンドルできなくなる。
  */
@@ -25,7 +25,7 @@ export interface TemplateProblem {
   readonly detail: string;
 }
 
-/** テンプレートの計画の 1 項。`index` は計画の中の添字、`number` は提案に写したときの番号、`after` は計画の中の添字 */
+/** テンプレートの計画の 1 ステップ。`index` は計画の中の添字、`number` は提案にコピーしたときの番号、`after` は計画の中の添字 */
 export interface PlanItem {
   readonly index: number;
   readonly number: number;
@@ -44,7 +44,7 @@ export interface FlowSummary {
   readonly node_types: Readonly<Record<string, number>>;
 }
 
-/** 統合結果で捨てた理由。reason は invalid / duplicate / conflict だが、知らない値も通す */
+/** 統合結果で破棄した理由。reason は invalid / duplicate / conflict だが、知らない値も通す */
 export interface Dropped {
   readonly reason: string;
   readonly detail: string;
@@ -69,7 +69,7 @@ export interface TemplateEntry {
   readonly effective: boolean;
   /** 使われ、error も無い */
   readonly usable: boolean;
-  /** 捨てた理由。捨てていなければ null */
+  /** 破棄した理由。破棄していなければ null */
   readonly dropped: Dropped | null;
   readonly writable: boolean;
   readonly problems: readonly TemplateProblem[];
@@ -146,7 +146,7 @@ export interface TemplateDetail extends TemplateEntry {
   readonly text: string;
 }
 
-/** この層で使えるフェーズ定義 1 件（計画の項の型の選択肢） */
+/** この層で使えるフェーズ定義 1 件（計画のステップの型の選択肢） */
 export interface PhaseTypeInfo {
   readonly id: string;
   readonly title: string;

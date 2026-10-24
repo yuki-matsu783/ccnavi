@@ -401,7 +401,7 @@ test("CB-D710 詳細の開閉はカードごと（プロジェクトと ID の�
   const remembered = await openBoard(json, { state: { details: [detailsKey("web", "dup"), detailsKey("web", "gone")] } });
   try {
     assert.equal(remembered.all('li.card[data-id="dup"][data-project="web"] details.card-details')[0].hasAttribute("open"), true);
-    // 消えたカードの分は、次に覚えるときに捨てる
+    // 消えたカードの分は、次に覚えるときに破棄する
     remembered.click(remembered.one('li.card[data-id="dup"][data-project=""] details > summary'));
     await remembered.settle();
     assert.deepEqual((remembered.state() as { details: string[] }).details.sort(), [detailsKey("", "dup"), detailsKey("web", "dup")].sort());

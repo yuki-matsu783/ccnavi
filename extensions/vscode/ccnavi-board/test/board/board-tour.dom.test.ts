@@ -15,7 +15,7 @@ import { loadTour } from "../helpers/tour.js";
 
 const def = loadTour("board");
 
-/** 「?」から案内の一覧を開き、鍵の案内を始める */
+/** 「?」から案内の一覧を開き、キーの案内を始める */
 async function start(dom: DomPage, course: string): Promise<void> {
   dom.click(dom.one('[data-action="tour"]'));
   await dom.settle();

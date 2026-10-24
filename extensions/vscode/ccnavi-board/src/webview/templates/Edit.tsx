@@ -1,5 +1,5 @@
 /**
- * テンプレートの編集欄。説明・使う場面・計画の項と線（`PlanEdit.tsx`）・子のフロー（`FlowEdit.tsx`）を直し、保存する。
+ * テンプレートの編集欄。説明・使う場面・計画のステップと線（`PlanEdit.tsx`）・子のフロー（`FlowEdit.tsx`）を直し、保存する。
  *
  * 編集中の中身（`EditTemplate`）はこの欄が持つ。直すたびに（少し待って）実行ファイルに読ませ（`editCheck`）、返ってきた
  * 苦情と図の中身をそのまま描く。読めるか・計画の順序・フローの形は実行ファイルの答えで、ここは判定しない。
@@ -7,7 +7,7 @@
  * ファイルが外で変わっていないときだけ書く。断られたら理由を出して、編集は続けられる。
  *
  * 作業中のチケットがある間は編集はできるが保存できない（錠は拡張ホストが取り直して知らせる。`editLock`）。
- * 未保存のまま閉じようとすると、捨ててよいかを聞く。名前は変えられない（改名は持たない。ファイルを直接操作する）。
+ * 未保存のまま閉じようとすると、破棄してよいかを聞く。名前は変えられない（改名は持たない。ファイルを直接操作する）。
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -37,7 +37,7 @@ interface Status {
   readonly error: boolean;
 }
 
-/** 全体計画の最初の項にする型。`implement` があればそれ、無ければ作業の型の最初 */
+/** 全体計画の最初のステップにする型。`implement` があればそれ、無ければ作業の型の最初 */
 function firstType(check: TemplateCheck): string {
   const work = check.types.filter((t) => t.kind === "work");
   return (work.find((t) => t.id === "implement") ?? work[0])?.id ?? "implement";
@@ -58,7 +58,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   }, []);
   const [tpl, setTpl] = useState<EditTemplate | undefined>(start);
   const [history, setHistory] = useState<FlowHistory<EditTemplate>>(() => emptyHistory<EditTemplate>());
-  /** 実行ファイルに読ませた答えと、読ませた中身の鍵 */
+  /** 実行ファイルに読ませた答えと、読ませた中身のキー */
   const [checked, setChecked] = useState<{ readonly key: string; readonly check: TemplateCheck }>(() => ({
     key: keyOf(fromData(opened.data) ?? blankTemplate(opened.name, "implement")),
     check: opened.check,
@@ -154,7 +154,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     setTpl(next);
     setStatus(undefined);
   };
-  /** 計画の編集。フローのキーが振り直ったときは、開いているフローがどの項のものか分からなくなるので閉じる */
+  /** 計画の編集。フローのキーが振り直ったときは、開いているフローがどのステップのものか分からなくなるので閉じる */
   const updatePlan = (next: EditTemplate, typing?: string): void => {
     if (next.flows !== tpl.flows) {
       setOpenFlow(undefined);
@@ -218,9 +218,9 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
       )}
       {confirmClose && (
         <div className="banner warn" role="alert" data-role="confirm-close">
-          保存していない変更があります。捨てて閉じますか？{" "}
+          保存していない変更があります。破棄して閉じますか？{" "}
           <button type="button" className="action small" data-action="discard-edit" onClick={finish}>
-            捨てて閉じる
+            破棄して閉じる
           </button>{" "}
           <button type="button" className="action small" data-action="keep-edit" onClick={() => setConfirmClose(false)}>
             編集を続ける

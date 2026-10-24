@@ -36,18 +36,18 @@ const COMMON_SH = (compat: number) => `#!/bin/sh
 CCNAVI_COMPAT=${compat}
 `;
 
-/** 見本の phases.yml（PHASES）の定義の欄。親の `phases:`（計画が使う定義の写し）に写す */
+/** 見本の phases.yml（PHASES）の定義の欄。親の `phases:`（計画が使う定義のコピー）にコピーする */
 const DEFINITIONS: Record<string, string[]> = {
   research: ["    kind: work", "    title: 調査", "    review: none", '    scope: ["wip/research/*"]'],
   design: ["    kind: work", "    title: 設計", "    review: mr", '    scope: ["wip/design/*"]'],
 };
 
-/** 親の `phases:` の行。計画が使う定義だけを、PHASES と同じ中身で写す（`--plan-order <親> --fill-phases` と同じ） */
+/** 親の `phases:` の行。計画が使う定義だけを、PHASES と同じ中身でコピーする（`--plan-order <親> --fill-phases` と同じ） */
 function phasesLines(plan: string[]): string[] {
   return ["phases:", ...[...new Set(plan)].flatMap((name) => [`  ${name}:`, ...DEFINITIONS[name]])];
 }
 
-/** 計画の項の行。2 番目からは、すぐ前の項を待つ（`after`）一直線にする。最初の項は何も待たない */
+/** 計画のステップの行。2 番目からは、すぐ前のステップが先行する（`after`）一直線にする。最初のステップは先行なし */
 function planLines(plan: string[]): string[] {
   return plan.map((p, i) => (i === 0 ? `  - ${p}` : `  - {type: ${p}, after: [${i}]}`));
 }

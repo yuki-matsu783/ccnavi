@@ -5,7 +5,7 @@
  * **大きさの偽物が要る**（`openBoard` の `measure`）。React Flow は点の大きさを測れないと線を 1 本も描かず、
  * テストは空の絵を見て通ってしまう（`test/helpers/dom.ts` の `LoadOptions`）。
  *
- * 図は判定をしない。終端に当たらない項（`loose`）・すぐ始まる項（`ready`）・延期の引き受け手（`review_at`）・
+ * 図は判定をしない。終端にヒットしないステップ（`loose`）・すぐ始まるステップ（`ready`）・延期の引き受け手（`review_at`）・
  * 順序の検査の理由（`problems`）は実行ファイルの答えをそのまま出す。
  */
 import { test } from "node:test";
@@ -23,7 +23,7 @@ import { buildBoard } from "../../src/core/board.js";
 const DIAMOND: readonly RawItem[] = ["research", { type: "design", after: [1] }, { type: "acceptance", after: [1] }, { type: "implement", after: [2, 3] }];
 const FEEDBACK: readonly RawItem[] = ["design-feedback", "skill-improve", { type: "implement-feedback", after: [5] }];
 
-/** 全体計画（1〜4。1 は子が承認済み、2 は延期で 4 が引き受ける）と、終端に当たらない項のあるフィードバック計画（5〜7） */
+/** 全体計画（1〜4。1 は子が承認済み、2 は延期で 4 が引き受ける）と、終端にヒットしないステップのあるフィードバック計画（5〜7） */
 function samplePlans(): ApprovePlan[] {
   const [main, feedback] = plansOf(DIAMOND, FEEDBACK, [1]);
   return [
@@ -38,7 +38,7 @@ function samplePlans(): ApprovePlan[] {
       ...feedback,
       loose: [6],
       ready: [5, 6],
-      problems: ["フィードバック計画の最後の項（7）が 6 を待っていない。最後の項へ線を引くか、合流の項を置く"],
+      problems: ["フィードバック計画の最後のステップ（7）に 6 が先行していない。最後のステップへ線を引くか、合流のステップを置く"],
     },
   ];
 }
@@ -61,7 +61,7 @@ function edgeIds(dom: DomPage, part: string): string[] {
     .sort();
 }
 
-test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図を読むだけで出す。start・end の仮の点、延期の引き受け手、固定した番号、終端に当たらない項、すぐ始まる項、順序の検査の理由は実行ファイルの答えのまま", async () => {
+test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図を読むだけで出す。start・end の仮の点、延期の引き受け手、固定した番号、終端にヒットしないステップ、すぐ始まるステップ、順序の検査の理由は実行ファイルの答えのまま", async () => {
   const dom = await openOverlay(samplePlans());
   try {
     const graphs = dom.all(".approval .plan-graph");
@@ -78,7 +78,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     const order = Array.from(box.querySelectorAll(".plan-graphs, pre.approval-text")).map((el) => el.className);
     assert.deepEqual(order, ["plan-graphs", "approval-text"]);
 
-    // 点は項と start・end。線は after と、start・end への仮の線
+    // 点はステップと start・end。線は after と、start・end への仮の線
     assert.equal(dom.all('.plan-graph[data-part="plan"] .react-flow__node').length, 6);
     assert.deepEqual(edgeIds(dom, "plan"), ["after-1-2", "after-1-3", "after-2-4", "after-3-4", "end-4", "start-1"]);
     assert.equal(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="start"]').textContent, "開始");
@@ -94,13 +94,13 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.equal(n1.getAttribute("data-locked"), "1");
     assert.match(n1.textContent ?? "", /子が承認済み/);
     const n2 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"] .plan-node');
-    // 延期した項は、本文の待ちの一覧と同じ言い方で引き受け手を言い、見る場所は出さない（本文も出さない）
+    // 延期したステップは、本文の先行の一覧と同じ言い方で引き受け手を言い、見る場所は出さない（本文も出さない）
     assert.match(n2.textContent ?? "", /レビューは 4 と一緒に/);
     assert.doesNotMatch(n2.textContent ?? "", /レビュー必須/);
     assert.match(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n3"] .plan-node').textContent ?? "", /レビュー必須（MR）/);
     assert.equal(n2.getAttribute("data-locked"), "0");
 
-    // 終端に当たらない項は、実行ファイルが言ったものだけに印。その項から end への線も
+    // 終端にヒットしないステップは、実行ファイルが言ったものだけに印。そのステップから end への線も
     assert.deepEqual(
       dom.all('.plan-graph[data-part="feedback"] .plan-node[data-loose="1"]').map((node) => node.getAttribute("data-number")),
       ["6"],
@@ -109,7 +109,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.ok(dom.one('.plan-graph[data-part="feedback"] .react-flow__edge[data-id="end-6"]').classList.contains("loose"));
     assert.ok(!dom.one('.plan-graph[data-part="feedback"] .react-flow__edge[data-id="end-7"]').classList.contains("loose"));
 
-    // 図の下。すぐ始まる項・終端に当たらない項・順序の検査の理由
+    // 図の下。すぐ始まるステップ・終端にヒットしないステップ・順序の検査の理由
     const plain = dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "";
     assert.match(plain, /すぐ始まる: 1/);
     assert.match(plain, /延期したレビュー: 2 は 4 と一緒に/);
@@ -117,7 +117,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     const notes = dom.one('.plan-graph[data-part="feedback"] .plan-graph-notes').textContent ?? "";
     assert.match(notes, /すぐ始まる: 5, 6/);
     assert.match(notes, /最後のステップの先行になっていない: 6。最後のステップへ線を引くか、合流のステップを置いてください/);
-    assert.match(notes, /フィードバック計画の最後の項（7）が 6 を待っていない/);
+    assert.match(notes, /フィードバック計画の最後のステップ（7）に 6 が先行していない/);
   } finally {
     await dom.close();
   }
@@ -143,7 +143,7 @@ test("CB-D161 図は読むだけ。線を引く取っ手も、点のドラッグ
   }
 });
 
-test("CB-D162 plans がない・空なら図を出さない。見本の preview（実行ファイルの出力）の plans は、その項と線のまま描く", async () => {
+test("CB-D162 plans がない・空なら図を出さない。見本の preview（実行ファイルの出力）の plans は、そのステップと線のまま描く", async () => {
   const none = await openOverlay([]);
   try {
     assert.equal(none.all(".plan-graph, .plan-graphs").length, 0);

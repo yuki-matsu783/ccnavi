@@ -1,7 +1,7 @@
 /**
- * リスク管理画面に出す言葉。要約の文、欄の名前、絞り込みが当てる文字列。
+ * リスク管理画面に出す言葉。要約の文、欄の名前、絞り込みが適用する文字列。
  *
- * 点は数えない。ここが作るのは「この項目はどう当たるか」を読める語順に並べた文だけで、
+ * 点は数えない。ここが作るのは「この項目はどうヒットするか」を読める語順に並べた文だけで、
  * 何点になるかは実行ファイルが子を閉じるときに出す。
  */
 import { KIND_LABELS, type FactorForm, type FactorKind } from "../../core/risk-view.js";
@@ -65,7 +65,7 @@ export function describe(factor: FactorForm): readonly Part[] {
     case "deleted_over":
       return [dim("削除したファイルが "), code(value), dim(" 件を超えると加点"), ...scopeParts(factor)];
     case "glob":
-      return [code(value), dim(` に当てはまるファイルを 1 つ変更するごとに加点${factor.max === "" ? "" : `（上限 ${factor.max} 点）`}`)];
+      return [code(value), dim(` に該当するファイルを 1 つ変更するごとに加点${factor.max === "" ? "" : `（上限 ${factor.max} 点）`}`)];
     case "script":
       return [dim("スクリプト "), code(value), dim(` が返した点を加点（点を読み取れなかったときは ${factor.points === "" ? "points" : `${factor.points} 点`}）`)];
     case "judge":
@@ -89,10 +89,10 @@ export function kindTitle(factor: FactorForm): string {
 }
 
 /**
- * 絞り込みが当てる文字列。画面に出ている語（加点条件のラベルと要約の文）でも、キーの表記
- * （`lines_over` など）でも当たる。 要約に出る文をそのまま含めるので、加点条件を変えれば
- * 当たる語も変わる。ただし空の欄の代わりに出す断り（「（id 未設定）」「（未設定）」「（基準 未設定）」など）は
- * 書いてある値ではないので含めない。「未設定」で探しても、空の欄がある項目には当たらない。
+ * 絞り込みが適用する文字列。画面に出ている語（加点条件のラベルと要約の文）でも、キーの表記
+ * （`lines_over` など）でもヒットする。 要約に出る文をそのまま含めるので、加点条件を変えれば
+ * ヒットする語も変わる。ただし空の欄の代わりに出す断り（「（id 未設定）」「（未設定）」「（基準 未設定）」など）は
+ * 書いてある値ではないので含めない。「未設定」で探しても、空の欄がある項目にはヒットしない。
  */
 export function findText(factor: FactorForm): string {
   const points = factor.points === "" ? "" : summaryPoints(factor);

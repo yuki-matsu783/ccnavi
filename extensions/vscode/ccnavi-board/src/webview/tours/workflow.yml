@@ -1,40 +1,40 @@
 # 計画編集画面の案内。`sample:` は案内の間だけ画面に出す見本（実際の提案ではない）。
 #
 # 見本は「実行ファイルの答え」（`--plan-order <親> --json` の答え）に名前を付けて並べたもの。実行ファイルの JSON と同じ形で書き、
-# 欠けた欄は `core/tour-workflow.ts` の決まりで埋める（ticket・part・source_sha・項の from・proposed・loose の寄せ集め・writable など）。
+# 欠けた欄は `core/tour-workflow.ts` の決まりで埋める（ticket・part・source_sha・ステップの from・proposed・loose の寄せ集め・writable など）。
 #   base      その答えを引く前の答え。書かなかった計画（plan / feedback）は base のものを使う。点の置き場所・「案に戻す」・外で
 #             変わった差分の元になる。書かない答えは「開いたときの答え」
-#   after     振り直したあとの番号での、項ごとの直接の先行（実行ファイルは推移的に整理しない。書いたとおりに残る）
+#   after     振り直したあとの番号での、ステップごとの直接の先行（実行ファイルは推移的に整理しない。書いたとおりに残る）
 #   proposed  提案に記載されている先行（元の番号）。base を書けば base の値を使う
-# 画面は答えをそのまま描く（未保存・番号の変わる項・保存できない理由は、実際と同じ読み取りで答えから出る）。
+# 画面は答えをそのまま描く（未保存・番号の変わるステップ・保存できない理由は、実際と同じ読み取りで答えから出る）。
 #
 # `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。書かなければ answer: open の素の画面。
-#   answer    描く答えの名前（sample.answers の鍵）。既定は open
+#   answer    描く答えの名前（sample.answers のキー）。既定は open
 #   refused   断られた線の理由を下の一行に出す。この名前の答えの refused を読む（図は answer のまま）
 #   checking  真なら、線を変えて ccnavi の答えを待っている間の画面（一言を出し、線を変えられない）
-#   changed   外で変わった提案の名前（答えの鍵）。帯と、answer の base との差分を出す
+#   changed   外で変わった提案の名前（答えのキー）。帯と、answer の base との差分を出す
 #   diff      changed のとき、差分の表を出すか（既定は出す。偽なら帯の文だけ）
 #   gone      真なら、提案が承認待ちから無くなった画面
 #   review    真なら、保存の前の確かめを開く
-#   pick      項の番号。押して詳細の欄を出す
+#   pick      ステップの番号。押して詳細の欄を出す
 #   tidy      真なら、点の置き場所を今の線から組み直した図にする（「並べ直す」を押したあと）
 #
 # 指す先（target）の印。図の中身は画面が実際の DOM に付ける（図の部品は共通なので触らない）。
 #   graphs  図の領域全体            controls  ボタンの並び              relayout / revert / reload / save  各ボタン
 #   summary  題と未保存の印の並び   dirty  「未保存」                   tour  「?」
-#   status  下の一言                renumbered  番号が変わる項の一行    problems  理由の一覧
+#   status  下の一言                renumbered  番号が変わるステップの一行    problems  理由の一覧
 #   changed  外で変わった帯         changed-diff  差分の表              adopt  取り込む    gone  承認待ちから無くなった帯
 #   review-numbers / review-children / review-note  保存の確かめの各欄
 #   graph-plan / graph-feedback     計画ごとの図
 #   detail-plan / notes-plan / zoom-plan            計画ごとの詳細の欄・図の下の一言・拡大縮小のボタン
-#   node-<番号>   項の点（振り直したあとの番号）
-#   edge-<先行>-<番号>  線。cut-<先行>-<番号>  その線の ×（引けた項どうしの線だけ）
+#   node-<番号>   ステップの点（振り直したあとの番号）
+#   edge-<先行>-<番号>  線。cut-<先行>-<番号>  その線の ×（引けたステップどうしの線だけ）
 screen: workflow
 
 sample:
   ticket: sample-a
   answers:
-    # 開いたとき。全体計画 1〜4（2 と 3 が 1 を待ち、4 が両方を待つ）と、フィードバック計画 5〜6
+    # 開いたとき。全体計画 1〜4（2 と 3 に 1 が先行し、4 に両方が先行する）と、フィードバック計画 5〜6
     open:
       plan:
         items:
@@ -62,7 +62,7 @@ sample:
         after: { 2: [1], 3: [2], 4: [3] }
         ready: [1]
       feedback: *feedback
-    # 4 が 2 と 3 の両方を待つ
+    # 4 に 2 と 3 の両方が先行する
     chain-join:
       base: chain
       plan:
@@ -73,7 +73,7 @@ sample:
           - { number: 4, type: docs, title: 文書, review: mr }
         after: { 2: [1], 3: [2], 4: [2, 3] }
         ready: [1]
-    # 3 が 1 も待つ
+    # 3 に 1 も先行する
     chain-add:
       base: chain
       plan:
@@ -84,7 +84,7 @@ sample:
           - { number: 4, type: docs, title: 文書, review: mr }
         after: { 2: [1], 3: [1, 2], 4: [2, 3] }
         ready: [1]
-    # 3 が 2 を待たなくなり、2 と 3 が並列になった
+    # 3 に 2 が先行しなくなり、2 と 3 が並列になった
     chain-cut:
       base: chain
       plan:
@@ -108,7 +108,7 @@ sample:
         loose: [2]
         ready: [1]
         problems:
-          - "error: sample-a: `plan` の最後の項（4: docs）が 2 を待たない。終端は 1 つにしてください（最後の項がほかの全部を推移的に待つように `after` を入力する。独立した作業は最後に 1 項で受けるか、一直線に並べる）"
+          - "error: sample-a: `plan` の最後のステップ（4: docs）に 2 が先行していない。終端は 1 つにしてください（最後のステップにほかの全部が推移的に先行するように `after` を書く。独立した作業は最後に 1 ステップで受けるか、一直線に並べる）"
 
     # 線のつなぎ変えの案内。open に 2 → 3 を足し、1 → 3 を消す
     after-23:
@@ -170,7 +170,7 @@ sample:
         proposed: { 6: [5] }
         ready: [5]
 
-    # 3 が待たれず、最後の項（4）が 3 を待たない形。error で保存できない
+    # 3 が先行にならず、最後のステップ（4）に 3 が先行していない形。error で保存できない
     loose:
       base: open
       plan:
@@ -183,9 +183,9 @@ sample:
         loose: [3]
         ready: [1]
         problems:
-          - "error: sample-a: `plan` の最後の項（4: docs）が 3 を待たない。終端は 1 つにしてください（最後の項がほかの全部を推移的に待つように `after` を入力する。独立した作業は最後に 1 項で受けるか、一直線に並べる）"
+          - "error: sample-a: `plan` の最後のステップ（4: docs）に 3 が先行していない。終端は 1 つにしてください（最後のステップにほかの全部が推移的に先行するように `after` を書く。独立した作業は最後に 1 ステップで受けるか、一直線に並べる）"
 
-    # 改版の提案。3（実装とテスト）は子が承認されている。4 は 1 と 3 を待つ
+    # 改版の提案。3（実装とテスト）は子が承認されている。4 に 1 と 3 が先行する
     locked-open:
       plan:
         items:
@@ -197,7 +197,7 @@ sample:
         current: { 2: [1], 3: [2], 4: [1, 3] }
         ready: [1]
       feedback: *feedback
-    # 1 → 2 を消すと、子が承認された 3 の待ち（いま 1, 2）が変わって通らない
+    # 1 → 2 を消すと、子が承認された 3 の先行（いま 1, 2）が変わって通らない
     locked-cut:
       base: locked-open
       plan:
@@ -210,12 +210,12 @@ sample:
         current: { 2: [1], 3: [2], 4: [1, 3] }
         ready: [1, 2]
       revision_problems:
-        - "3 番目（implement）は子が承認されているので、待ちを変えられない（いま待つ: 1, 2、改版: 2）"
+        - "3 番目（implement）は子が承認されているので、先行を変えられない（いま先行: 1, 2、改版: 2）"
     # ccnavi が断った線の見本（refused だけを読む。図は locked-open のまま）
     unpackable:
       base: locked-open
       refused:
-        - { kind: unpackable, number: 3, text: 子が承認された番号を動かさずに番号を振れない（3 番に置ける項がありません）。詰められないので、この線は引けない }
+        - { kind: unpackable, number: 3, text: 子が承認された番号を動かさずに番号を振れない（3 番に置けるステップがありません）。詰められないので、この線は引けない }
 
     # 番号が変わるが、子の提案を付け替えられない。計画と食い違う子の提案もある
     child-problems:
@@ -234,7 +234,7 @@ sample:
       mismatched:
         - { ticket: sample-a-07-01, path: /ws/wip/proposals/todo/sample-a-07-01.md, phase: 7, text: "sample-a-07-01 の phase: 7 は親の計画（1〜4 番）にありません" }
 
-    # 外で変わった提案（エージェントが 3 の待ちと 4 の待ちを書き換えた）
+    # 外で変わった提案（エージェントが 3 の先行と 4 の先行を書き換えた）
     outside:
       plan:
         items:
@@ -258,7 +258,7 @@ courses:
           線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。最後のステップから先行をたどっても届かないステップは、注意の色で出ます。
       - target: controls
         title: 直す手段
-        body: 「並べ直す」は今の線で点の置き場所を組み直します（番号は変わりません）。「案に戻す」は提案に記載されている順序に戻し、「再読込」は提案を再読み込みします。
+        body: 「並べ直す」は今の線で点の置き場所を組み直します（番号は変わりません）。「案に戻す」は提案に記載されている順序に戻し、「再読み込み」は提案を再読み込みします。
       - target: save
         title: この順序に決める
         body: >-
@@ -475,7 +475,7 @@ courses:
         scene: { answer: child-problems }
 
   - id: tools
-    title: 「案に戻す」「並べ直す」「再読込」を使い分けたいとき
+    title: 「案に戻す」「並べ直す」「再読み込み」を使い分けたいとき
     summary: 戻す・組み直す・再読み込みするの違い
     steps:
       - target: relayout
@@ -484,11 +484,11 @@ courses:
         scene: { answer: swap }
       - target: revert
         title: 案に戻す
-        body: 引いた線も番号の振り直しも捨てて、画面を開いたときの順序（提案に記載されている順序）へ戻します。ccnavi への往復はありません。線を変えていないときは押せません。
+        body: 引いた線も番号の振り直しも破棄して、画面を開いたときの順序（提案に記載されている順序）へ戻します。ccnavi への往復はありません。線を変えていないときは押せません。
         scene: { answer: swap }
       - target: reload
-        title: 再読込
-        body: ccnavi に聞き直して、いま提案に記載されている順序を再読み込みします。エージェントが提案を変更したあとなどに使います。未保存の線があれば、捨ててよいかを確認します。
+        title: 再読み込み
+        body: ccnavi に聞き直して、いま提案に記載されている順序を再読み込みします。エージェントが提案を変更したあとなどに使います。未保存の線があれば、破棄してよいかを確認します。
         scene: { answer: swap }
       - target: zoom-plan
         title: 図が見づらいとき
@@ -510,7 +510,7 @@ courses:
         scene: { answer: swap, changed: outside }
       - target: adopt
         title: 取り込む
-        body: いまの提案から始め直します。未保存の線があれば捨てます（ボタンに「編集を捨てる」と出ます）。残したい線は、書き留めてから取り込みます。
+        body: いまの提案から始め直します。未保存の線があれば破棄します（ボタンに「編集を破棄する」と出ます）。残したい線は、書き留めてから取り込みます。
         scene: { answer: swap, changed: outside }
       - target: changed
         title: 編集を続ける
@@ -537,7 +537,7 @@ courses:
         scene: { answer: open, checking: true }
       - target: summary
         title: 未保存のあいだは承認できない
-        body: 未保存の変更があるあいだは、チケット管理画面で、この親を含む一覧を承認できません。承認する前に、保存するか「案に戻す」で捨てます。
+        body: 未保存の変更があるあいだは、チケット管理画面で、この親を含む一覧を承認できません。承認する前に、保存するか「案に戻す」で破棄します。
         scene: { answer: swap }
       - target: save
         title: 保存は承認ではない

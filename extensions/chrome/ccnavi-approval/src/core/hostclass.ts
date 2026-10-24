@@ -10,7 +10,7 @@
  *   `https://api.github.com`、GHE.com が `https://api.<ホスト>`。GraphQL はその根の `/graphql`。
  *   GHE.com の origin にポートが付いていれば API の URL を組めない（問題として返す）。
  *   GHE.com の API の URL の規則は、実物では未検証
- * - GitLab: 上のどれにも当たらないもの全部。接続先は origin の scheme・ホスト・ポートを保つ
+ * - GitLab: 上のどれにもヒットしないもの全部。接続先は origin の scheme・ホスト・ポートを保つ
  *
  * これは自動判定の表で、設定画面でユーザが明示した種類（`custom-hosts.ts`）は、これより優先する。
  * 登録していないホストへ通信したり PAT を送ったりする入口ではない（分類して接続先を言うだけ）。

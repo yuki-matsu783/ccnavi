@@ -129,7 +129,7 @@ test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら
   assert.deepEqual(view?.rows.map((r) => [r.parent, r.state, r.reason]), [["i1", "merged", ""], ["i2", "unknown", "timeout"], ["i3", "unknown", "failed"]]);
 });
 
-test("CB-T634 頼んだ世代でない答えは受けない（閉じたボードや前の確認へ遅れて返った結果を捨てる）", () => {
+test("CB-T634 頼んだ世代でない答えは受けない（閉じたボードや前の確認へ遅れて返った結果を破棄する）", () => {
   const started = step(MERGE_IDLE, { kind: "check" }).state; // 世代 1
   const loaded = step(started, { kind: "listed", token: 1, at: AT, result: listed([{ parent: "i1", repo: "self", mr: 11, branch: "" }]) }).state;
   // 別の世代・別の親・確認していないとき
@@ -148,7 +148,7 @@ test("CB-T634 頼んだ世代でない答えは受けない（閉じたボード
   const answered = step(loaded, { kind: "stated", token: 1, parent: "i1", result: merged(11), at: AT }).state;
   const dup = step(answered, { kind: "stated", token: 1, parent: "i1", result: closed(11), at: AT });
   assert.equal(dup.state, answered);
-  // 確認が終わったあとの遅れた一覧も受けない。新しい確認を始めたら、前の世代の答えは捨てる
+  // 確認が終わったあとの遅れた一覧も受けない。新しい確認を始めたら、前の世代の答えは破棄する
   assert.equal(step(answered, { kind: "listed", token: 1, result: listed([{ parent: "x", repo: "self", mr: 1, branch: "" }]), at: AT }).state, answered);
   const second = step(answered, { kind: "check" }).state;
   assert.equal(second.token, 2);

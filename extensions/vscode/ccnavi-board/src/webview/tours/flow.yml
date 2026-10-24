@@ -4,7 +4,7 @@
 # 見本が実際の形から外れないことは、テスト（test/flow/tour-flow.test.ts）が実際の読み取りと実行ファイルで確かめる。
 #
 # `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
-#   doc          見本のフローの名前（sample.flows の鍵）。既定は main
+#   doc          見本のフローの名前（sample.flows のキー）。既定は main
 #   select       右の欄に出すもの。ノードの id、または edge:<線の id>。無ければフロー自体の欄
 #   pick         図で選ぶノードの id（, で区切って複数）。Shift で選んだ状態。select がノードなら、それも選ぶ
 #   base         保存前の差分（review）と下書きの差分（proposal）の「いまのフロー」にする見本の名前。既定は main
@@ -806,7 +806,7 @@ courses:
         scene: {doc: main, lock: true}
       - target: changed
         title: 外で変わったとき
-        body: ファイルが画面の外で変わると、この帯が出ます。編集中の内容は残りますが、戻す先が変わるので履歴は空になります。「再読込」で再読み込みします。
+        body: ファイルが画面の外で変わると、この帯が出ます。編集中の内容は残りますが、戻す先が変わるので履歴は空になります。「再読み込み」で再読み込みします。
         scene: {doc: main-edited, dirty: true, changed: true}
 
   - id: agent-draft

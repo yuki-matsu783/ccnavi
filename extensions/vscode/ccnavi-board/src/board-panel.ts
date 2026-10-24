@@ -75,14 +75,14 @@ interface PanelState {
    */
   approval: ApprovalState;
   /**
-   * 前の読み直しから動いたカード。画面ではなくここが持つ。画面は非表示になると捨てられ、
+   * 前の読み直しから動いたカード。画面ではなくここが持つ。画面は非表示になると破棄され、
    * 再表示されると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
    * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
    */
   moved: MovedState;
   /**
    * マージ状況の確認の結果（`core/merge.ts`）。ボードが開いている間だけここに持つ（タブを隠して画面が作り直されても残り、
-   * ボードを閉じて開き直すと消える）。遅れて返った結果は、世代が違えば遷移の側が捨てる
+   * ボードを閉じて開き直すと消える）。遅れて返った結果は、世代が違えば遷移の側が破棄する
    */
   merge: MergeState;
   /** 計画編集タブの帳面（`core/workflow-tabs.ts`）を見るのをやめる */
@@ -155,7 +155,7 @@ export async function openBoard(project?: string): Promise<void> {
     retainContextWhenHidden: false,
   });
   if (panel.options.retainContextWhenHidden !== false) {
-    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が捨てられず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
+    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が破棄されず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
     diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: true });
   }
   showLoading(panel, TITLE, SCREEN, "チケット");
@@ -198,7 +198,7 @@ function registerPanelHandlers(current: PanelState): void {
     const becameVisible = panel.visible && !current.wasVisible;
     current.wasVisible = panel.visible;
     if (!panel.visible) {
-      // `retainContextWhenHidden` は偽なので、非表示になった画面は捨てられる。再表示されると
+      // `retainContextWhenHidden` は偽なので、非表示になった画面は破棄される。再表示されると
       // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
       current.host.hidden();
     }
@@ -285,7 +285,7 @@ async function update(): Promise<void> {
     }
     const board = buildBoard(result.board);
     current.board = board;
-    // 承認待ちの親の提案に無い親の、計画編集タブの保存のハッシュを忘れる。端末や Chrome 拡張で承認した・
+    // 承認待ちの親の提案に無い親の、計画編集タブの保存のハッシュを忘れる。ターミナルや Chrome 拡張で承認した・
     // 取り下げた親を、あとで出す改版の提案と比べない（ボードから承認したときは承認の結果でも忘れる）
     forgetSaved(staleSaved(workflowTabs().saved, todoParentsOf(board)));
     show(current, board);
@@ -392,7 +392,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       current.host.ready();
       redraw(current);
       // 非表示の間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
-      // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
+      // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て破棄している
       postAppearance(current.host);
       // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
       // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう 1 度出る
@@ -512,7 +512,7 @@ function realRoot(root: string): string {
 
 /**
  * いまの状態で描き直す（オーバーレイの出し入れ）。読み直せていないときはエラー画面のほうに
- * 載せ替える。ボードが無いことを理由にここで捨てると、承認した文がユーザに届かない。
+ * 載せ替える。ボードが無いことを理由にここで破棄すると、承認した文がユーザに届かない。
  */
 function redraw(current: PanelState): void {
   if (current.board !== undefined) {
@@ -636,7 +636,7 @@ async function runMergeEffect(current: PanelState, effect: MergeEffect): Promise
 }
 
 /**
- * マージせずに閉じた親の、記録を消すコマンドをコピーする。ボードからは送らない（ユーザが端末で実行する）。
+ * マージせずに閉じた親の、記録を消すコマンドをコピーする。ボードからは送らない（ユーザがターミナルで実行する）。
  * 画面が言った親をそのまま信頼せず、いまの結果で「マージせず閉じた」と確認できている親だけを扱う
  */
 async function copyAbandon(current: PanelState, parent: string): Promise<void> {
@@ -823,7 +823,7 @@ async function makeTemplateDraft(current: PanelState, ticket: string): Promise<v
 /**
  * 形を確かめる操作の一覧。`BoardMessage` に足したのにここへ足していなければ、型が合わなくなる。
  * `handleMessage` の網羅検査（`never`）は処理の書き忘れしか止めないので、入口の側でも同じことをする。
- * 足し忘れると、画面のボタンは押せるのに、届いたものが何も出さずに捨てられる。
+ * 足し忘れると、画面のボタンは押せるのに、届いたものが何も出さずに破棄される。
  */
 const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   ready: true,
@@ -878,21 +878,21 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "mergeCheck":
       return { type: m.type };
     case "approve":
-      // 形が不正なら捨てる。「全部承認」として扱うと、検証に失敗したときに承認の範囲が広がってしまう。
+      // 形が不正なら破棄する。「全部承認」として扱うと、検証に失敗したときに承認の範囲が広がってしまう。
       return Array.isArray(m.tickets) &&
         m.tickets.every((t) => typeof t === "string") &&
         typeof m.filtered === "boolean"
         ? { type: "approve", tickets: m.tickets, filtered: m.filtered }
         : undefined;
     case "approveConfirm":
-      // ダイジェストの無い押下は捨てる。どの一覧を見て押したかが分からないまま打たない
+      // ダイジェストの無い押下は破棄する。どの一覧を見て押したかが分からないまま打たない
       return Array.isArray(m.tickets) && m.tickets.every((t) => typeof t === "string") && typeof m.digest === "string"
         ? { type: "approveConfirm", tickets: m.tickets as string[], digest: m.digest }
         : undefined;
     case "open":
       return typeof m.filePath === "string" ? { type: "open", filePath: m.filePath } : undefined;
     case "decideConfirm":
-      // 値が文字列でない選択は捨てる。行き先が見せた指摘の全部に付いているかは遷移の側が見る
+      // 値が文字列でない選択は破棄する。行き先が見せた指摘の全部に付いているかは遷移の側が見る
       return typeof m.choices === "object" &&
         m.choices !== null &&
         !Array.isArray(m.choices) &&
@@ -913,7 +913,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
       return isTicketId(m.ticket) ? { type: m.type, ticket: m.ticket } : undefined;
     case "mergeRetire":
     case "mergeCopyAbandon":
-      // 親の識別子の形でないものは捨てる（コマンド行に入る文字列なので、ここで形を確かめる）
+      // 親の識別子の形でないものは破棄する（コマンド行に入る文字列なので、ここで形を確かめる）
       return isTicketId(m.parent) ? { type: m.type, parent: m.parent } : undefined;
     default:
       return undefined;

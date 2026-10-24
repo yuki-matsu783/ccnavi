@@ -154,7 +154,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     document.body.classList.toggle("filtering", filtering);
   }, [filtering]);
 
-  // 詳細を開いているカード。覚えるのは実際のボードのカードだけ（消えたカードの分は捨てる）。
+  // 詳細を開いているカード。覚えるのは実際のボードのカードだけ（消えたカードの分は破棄する）。
   // 読み直せなかった画面（board が無い）では、覚えていた分を触らない
   const cardKeys = board === undefined ? undefined : new Set(board.columns.flatMap((column) => column.cards.map(detailsKey)));
   const details = cardKeys === undefined ? view.details : view.details.filter((key) => cardKeys.has(key));

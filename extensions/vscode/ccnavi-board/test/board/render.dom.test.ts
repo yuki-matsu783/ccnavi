@@ -98,7 +98,7 @@ function decidePreview(canIssue: boolean): DecidePreview {
   };
 }
 
-test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選ぶまで決められない。選んだ対応方針を鍵ごとに送る", async () => {
+test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選ぶまで決められない。選んだ対応方針をキーごとに送る", async () => {
   const page = await openBoard(fixture(), {
     approval: { kind: "decidePreview", preview: decidePreview(false), tree: "/w/.claude/worktrees/i0001" },
   });

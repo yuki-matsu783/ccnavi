@@ -2,7 +2,7 @@
 
 拡張はホストの API でブランチの置き場を読み、その中身（Snapshot）をここへ渡す。ここは
 ブランチごとの仮のツリーを MEMFS に組み、今の ccnavi（`--agree --preview --json`）を
-そのまま動かす。承認待ちの一覧も、親子のチケットの見分けも、参照の閉包も、
+そのまま動かす。承認先行の一覧も、親子のチケットの見分けも、参照の閉包も、
 互換の比べも Python が出し、拡張（TS）は並べるだけ。TS で判定し直すと、hook・lint と答えが
 2 か所に分かれるため。
 
@@ -10,8 +10,8 @@
 （Changes）を値で返すだけで、ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。
 拡張は `plan`（承認）・`confirm`（レビュー済み）の答えを、親のブランチへの
 1 コミットにして書く。
-通らなかった答えは、理由コード（付録 A の `CORE_*`）を鍵 `code` に持つ（通れば null）。
-拡張はこの鍵で分岐する。
+通らなかった答えは、理由コード（付録 A の `CORE_*`）をキー `code` に持つ（通れば null）。
+拡張はこのキーで分岐する。
 ボードの答えの `reviewable` が候補のフェーズで、ホストからスレッドとレビューを取得した結果は
 拡張が組んで `result` で渡す。
 
@@ -576,7 +576,8 @@ def _build(root: str, snap: dict, place: dict, families: list[str]) -> None:
 def project_layer(snap: dict, place: dict) -> dict[str, str]:
     """プロジェクトのレイヤー（プロジェクトからの相対パス → 中身）。
 
-    プロジェクトの統合先の `.ccnavi/config/project/` を、そのまま写す。共通レイヤーは混ぜない。
+    プロジェクトの統合先の `.ccnavi/config/project/` を、そのままコピーする。
+    共通レイヤーは混ぜない。
     共通レイヤーはワークスペースの統合先の `.ccnavi/config/common/` だけで
     （`_build` がワークスペースルートに置く）、プロジェクトの `.ccnavi/config/common/`
     （親の着手が配るミラー）は読まない。ワークスペースの中でミラーを共通として読むと、
@@ -877,7 +878,7 @@ def _changes(root: str, changes: core.Changes | None) -> dict:
     for branch, entries in changes.per_branch().items():
         rows = []
         for e in entries:
-            # per_branch のパスはツリーからの相対（ツリーの外は `""` の鍵で絶対パス。
+            # per_branch のパスはツリーからの相対（ツリーの外は `""` のキーで絶対パス。
             # `_one_branch` が断る）
             row = {"op": e["op"], "path": e["path"]}
             if "content" in e:

@@ -3,8 +3,8 @@
  *
  * 見本は実行ファイルの答え（`--plan-order <親> --json`）の形で書き、`parseWorkflowSample` が欠けた欄を埋めて
  * `parsePlanOrder` に通す。実行ファイルの答えの実例（`test/fixtures/plan-order.json`）と形がずれないこと、実行ファイルが
- * 守る関係（終端に届かない項・すぐ始まる項・番号の振り直し・子の付け替え・書けるか）が見本でも成り立つことを、ここで見る。
- * 見本の数は多いので、関係の検査は実例の答え 6 つにも同じものを当てて、検査自体が実行ファイルの決まりと合っているのを保つ。
+ * 守る関係（終端に届かないステップ・すぐ始まるステップ・番号の振り直し・子の付け替え・書けるか）が見本でも成り立つことを、ここで見る。
+ * 見本の数は多いので、関係の検査は実例の答え 6 つにも同じものを適用して、検査自体が実行ファイルの決まりと合っているのを保つ。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -36,7 +36,7 @@ function completed(): Record<string, Json> {
 
 const keysOf = (value: unknown): string[] => Object.keys(value as Json).sort();
 
-/** 項から推移的に待つ番号 */
+/** ステップに推移的に先行する番号 */
 function waitsOf(plan: ApprovePlan): Map<number, Set<number>> {
   const direct = new Map(plan.items.map((item) => [item.number, plan.after[String(item.number)] ?? []]));
   const out = new Map<number, Set<number>>();
@@ -87,7 +87,7 @@ function renumberOf(plan: ApprovePlan): Map<number, number> {
     } else {
       pick = numbers.find((m) => !placed.has(m) && !fixed.has(m) && (preds.get(m) ?? []).every((p) => placed.has(p)));
     }
-    assert.ok(pick !== undefined, `${pos} 番に置ける項がない（振り直せない形）`);
+    assert.ok(pick !== undefined, `${pos} 番に置けるステップがない（振り直せない形）`);
     placed.set(pick, pos);
   }
   return placed;
@@ -100,13 +100,13 @@ function allAnswers(): Array<[string, PlanOrderAnswer]> {
   ];
 }
 
-test("CB-T500 見本の答えは、実行ファイルの答えの実例（plan-order.json）と、欄の鍵と型が同じ形で parsePlanOrder を通る", () => {
+test("CB-T500 見本の答えは、実行ファイルの答えの実例（plan-order.json）と、欄のキーと型が同じ形で parsePlanOrder を通る", () => {
   const real = FIXTURE.open;
   const realPlan = (real.plans as Json[])[0];
   const realItem = (realPlan.items as Json[])[0];
   const typeOf = (value: unknown): string => (value === null ? "null" : Array.isArray(value) ? "array" : typeof value);
   for (const [name, json] of Object.entries(completed())) {
-    assert.deepEqual(keysOf(json), keysOf(real), `${name}: 答えの鍵が実例とずれた`);
+    assert.deepEqual(keysOf(json), keysOf(real), `${name}: 答えのキーが実例とずれた`);
     for (const key of Object.keys(real)) {
       // 実例の current は null（改版でない）。改版の見本だけ、承認済みの先行を持つ
       if (key !== "plans") {
@@ -114,11 +114,11 @@ test("CB-T500 見本の答えは、実行ファイルの答えの実例（plan-o
       }
     }
     for (const plan of json.plans as Json[]) {
-      assert.deepEqual(keysOf(plan), keysOf(realPlan), `${name}: 計画の鍵が実例とずれた`);
+      assert.deepEqual(keysOf(plan), keysOf(realPlan), `${name}: 計画のキーが実例とずれた`);
       for (const item of plan.items as Json[]) {
-        assert.deepEqual(keysOf(item), keysOf(realItem), `${name}: 項の鍵が実例とずれた`);
+        assert.deepEqual(keysOf(item), keysOf(realItem), `${name}: ステップのキーが実例とずれた`);
         for (const key of Object.keys(realItem)) {
-          assert.equal(typeOf(item[key]), typeOf(realItem[key]), `${name}: 項の ${key}`);
+          assert.equal(typeOf(item[key]), typeOf(realItem[key]), `${name}: ステップの ${key}`);
         }
       }
     }
@@ -134,7 +134,7 @@ test("CB-T501 見本の open は、実例の open と同じ線・番号・見る
   const mask = (plans: readonly ApprovePlan[]): unknown =>
     plans.map((plan) => ({ ...plan, ticket: "", source_sha: "", items: plan.items.map((item) => ({ ...item, title: "", review: "" })) }));
   assert.equal(sample.ticket, "sample-a");
-  assert.deepEqual(mask(sample.answers.open.answer.plans), mask(real.plans), "見本が実例とずれた。plan-order.json を書き出し直したら workflow.yml の見本も写し直す");
+  assert.deepEqual(mask(sample.answers.open.answer.plans), mask(real.plans), "見本が実例とずれた。plan-order.json を書き出し直したら workflow.yml の見本もコピー直す");
   const { plans: _a, ticket: _b, source_sha: _c, ...restSample } = sample.answers.open.answer;
   const { plans: _d, ticket: _e, source_sha: _f, ...restReal } = real;
   assert.deepEqual(restSample, restReal);
@@ -147,7 +147,7 @@ test("CB-T501 見本の open は、実例の open と同じ線・番号・見る
   }
 });
 
-test("CB-T502 終端に届かない項・すぐ始まる項・書けるか・答え全体の寄せ集めは、実行ファイルの決まりどおり（実例の答えにも同じ検査を当てる）", () => {
+test("CB-T502 終端に届かないステップ・すぐ始まるステップ・書けるか・答え全体の寄せ集めは、実行ファイルの決まりどおり（実例の答えにも同じ検査を適用する）", () => {
   for (const [name, answer] of allAnswers()) {
     for (const plan of answer.plans) {
       assert.deepEqual([...plan.loose].sort(), expectedLoose(plan), `${name} ${plan.part}: loose`);
@@ -158,14 +158,14 @@ test("CB-T502 終端に届かない項・すぐ始まる項・書けるか・答
     assert.equal(answer.writable, !blocked, `${name}: writable`);
     assert.deepEqual(answer.loose, answer.plans.flatMap((plan) => plan.loose), `${name}: 答え全体の loose`);
     assert.deepEqual(answer.problems, answer.plans.flatMap((plan) => plan.problems), `${name}: 答え全体の problems`);
-    // 終端の error は、終端に届かない項があるときだけ
+    // 終端の error は、終端に届かないステップがあるときだけ
     for (const plan of answer.plans) {
       assert.equal(plan.problems.length > 0, plan.loose.length > 0, `${name} ${plan.part}: 終端の error と loose が合わない`);
     }
   }
 });
 
-test("CB-T503 見本の番号の振り直しは、実行ファイルの決まり（先行が並んだ項のうち元の番号が小さい順。固定した番号は動かさない）で再現できる", () => {
+test("CB-T503 見本の番号の振り直しは、実行ファイルの決まり（先行が並んだステップのうち元の番号が小さい順。固定した番号は動かさない）で再現できる", () => {
   for (const [name, answer] of allAnswers()) {
     for (const plan of answer.plans) {
       const placed = renumberOf(plan);
@@ -176,7 +176,7 @@ test("CB-T503 見本の番号の振り直しは、実行ファイルの決まり
   }
 });
 
-test("CB-T504 子の提案の付け替えは、番号の変わる項の phase と predecessors に合う（実行ファイルの retarget と同じ決まり）", () => {
+test("CB-T504 子の提案の付け替えは、番号の変わるステップの phase と predecessors に合う（実行ファイルの retarget と同じ決まり）", () => {
   const pad = (n: number): string => String(n).padStart(2, "0");
   let checked = 0;
   for (const [name, answer] of allAnswers()) {
@@ -193,7 +193,7 @@ test("CB-T504 子の提案の付け替えは、番号の変わる項の phase �
     for (const child of answer.children) {
       assert.deepEqual(child.new_predecessors, child.predecessors.map((p) => rename.get(p) ?? p), `${name}: ${child.ticket} の predecessors`);
     }
-    // 番号の変わる項を指す子が、1 本も付け替わらないことは無い（見本の答えで、付け替えの一覧を持つものの間で）
+    // 番号の変わるステップを指す子が、1 本も付け替わらないことは無い（見本の答えで、付け替えの一覧を持つものの間で）
     if (answer.children.length > 0) {
       for (const [from, number] of moved) {
         if (from !== number) {
@@ -234,7 +234,7 @@ test("CB-T505 見本の答えは、引く前の答え（base）と提案に書�
       const before = base.plans.find((p) => p.part === plan.part);
       assert.ok(before !== undefined, `${name}: base に ${plan.part} がありません`);
       assert.deepEqual(plan.proposed, before.proposed, `${name} ${plan.part}: 提案に書いてある先行が base と違う`);
-      assert.deepEqual(plan.items.map((item) => item.from).sort(), before.items.map((item) => item.from).sort(), `${name} ${plan.part}: 項の集まりが base と違う`);
+      assert.deepEqual(plan.items.map((item) => item.from).sort(), before.items.map((item) => item.from).sort(), `${name} ${plan.part}: ステップの集まりが base と違う`);
     }
   }
   // 保存して読み直したあとは、未保存でなく番号が入れ替わったまま
@@ -242,7 +242,7 @@ test("CB-T505 見本の答えは、引く前の答え（base）と提案に書�
   assert.equal(renumbered(sample.answers.swap.answer).length, 2);
 });
 
-/** 画面が見本に出す `data-tour` の印の一覧（画面の描き方の写し。DOM のテストが実際に付いていることを見る） */
+/** 画面が見本に出す `data-tour` の印の一覧（画面の描き方のコピー。DOM のテストが実際に付いていることを見る） */
 function targetsOf(scene: Record<string, string | number | boolean>): Set<string> {
   const name = (value: unknown, fallback: string): string => (typeof value === "string" && value in sample.answers ? value : fallback);
   const answer = sample.answers[name(scene.answer, "open")].answer;
@@ -288,7 +288,7 @@ function targetsOf(scene: Record<string, string | number | boolean>): Set<string
   return out;
 }
 
-test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答えの名前・項の番号だけを指す。綴り違いで既定の画面へ戻ってしまわない。指す先は、その手順の見本に出る", () => {
+test("CB-T506 案内の scene は、画面が読むキーと、見本にある答えの名前・ステップの番号だけを指す。綴り違いで既定の画面へ戻ってしまわない。指す先は、その手順の見本に出る", () => {
   const known = ["answer", "refused", "checking", "changed", "diff", "gone", "review", "pick", "tidy"];
   let steps = 0;
   for (const course of tour.courses) {
@@ -296,7 +296,7 @@ test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答�
       const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
       const scene = step.scene;
       for (const key of Object.keys(scene)) {
-        assert.ok(known.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
+        assert.ok(known.includes(key), `${at}: scene のキー ${key} を画面は読まない`);
       }
       for (const key of ["answer", "refused", "changed"] as const) {
         assert.ok(scene[key] === undefined || (typeof scene[key] === "string" && String(scene[key]) in sample.answers), `${at}: ${key} の ${String(scene[key])} が見本にありません`);
@@ -309,7 +309,7 @@ test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答�
       }
       if (scene.pick !== undefined) {
         const shown = sample.answers[String(scene.answer ?? "open")].answer;
-        assert.ok(typeof scene.pick === "number" && shown.plans.some((plan) => plan.items.some((item) => item.number === scene.pick)), `${at}: pick の項が答えにありません`);
+        assert.ok(typeof scene.pick === "number" && shown.plans.some((plan) => plan.items.some((item) => item.number === scene.pick)), `${at}: pick のステップが答えにありません`);
       }
       // 指す先は、その手順の見本に出る印だけ（出ないものを指すと、吹き出しが中ほどに出る）
       assert.ok(step.target !== "", `${at}: 指す先がありません`);
@@ -320,7 +320,7 @@ test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答�
   assert.ok(steps >= 40, `手順が少ない（${steps}）`);
 });
 
-test("CB-T507 案内の構成。基本の案内は今の題と順序のまま。ユースケースは 5〜8 本で 1 本 4〜10 手順、鍵と題が重ならない", () => {
+test("CB-T507 案内の構成。基本の案内は今の題と順序のまま。ユースケースは 5〜8 本で 1 本 4〜10 手順、キーと題が重ならない", () => {
   assert.deepEqual(
     tour.courses[0].steps.map((step) => step.title),
     ["図", "直す手段", "この順序に決める", "承認との関係", "案内"],
@@ -340,21 +340,21 @@ test("CB-T507 案内の構成。基本の案内は今の題と順序のまま。
   );
 });
 
-test("CB-T508 見本の書き間違いは読み込みで落ちる（知らない鍵・先に書いていない base・計画がない答え・開いたときの答えがありません）", () => {
+test("CB-T508 見本の書き間違いは読み込みで落ちる（知らないキー・先に書いていない base・計画がない答え・開いたときの答えがありません）", () => {
   const plan = { items: [{ number: 1, type: "research", title: "調査", review: "none" }], after: {}, ready: [1] };
   const ok = { ticket: "t", answers: { open: { plan } } };
   assert.ok(parseWorkflowSample(ok).answers.open.answer.writable);
   const bad: Array<[string, unknown, RegExp]> = [
     ["オブジェクトでない", [], /オブジェクトではない/],
     ["ticket がありません", { answers: { open: { plan } } }, /ticket/],
-    ["知らない鍵（根）", { ...ok, anwsers: {} }, /未知の鍵 anwsers/],
-    ["知らない鍵（答え）", { ticket: "t", answers: { open: { plan, writeable: true } } }, /未知の鍵 writeable/],
-    ["知らない鍵（計画）", { ticket: "t", answers: { open: { plan: { ...plan, redy: [1] } } } }, /未知の鍵 redy/],
-    ["知らない鍵（項）", { ticket: "t", answers: { open: { plan: { ...plan, items: [{ number: 1, type: "a", titel: "x" }] } } } }, /未知の鍵 titel/],
+    ["知らないキー（根）", { ...ok, anwsers: {} }, /未知のキー anwsers/],
+    ["知らないキー（答え）", { ticket: "t", answers: { open: { plan, writeable: true } } }, /未知のキー writeable/],
+    ["知らないキー（計画）", { ticket: "t", answers: { open: { plan: { ...plan, redy: [1] } } } }, /未知のキー redy/],
+    ["知らないキー（ステップ）", { ticket: "t", answers: { open: { plan: { ...plan, items: [{ number: 1, type: "a", titel: "x" }] } } } }, /未知のキー titel/],
     ["base が先にありません", { ticket: "t", answers: { open: { plan }, next: { base: "later", plan }, later: { plan } } }, /base「later」/],
     ["計画がありません", { ticket: "t", answers: { open: {} } }, /計画/],
     ["open がありません", { ticket: "t", answers: { other: { plan } } }, /open/],
-    ["実行ファイルの形でない（項に番号がありません）", { ticket: "t", answers: { open: { plan: { ...plan, items: [{ type: "a" }] } } } }, /\.number は/],
+    ["実行ファイルの形でない（ステップに番号がありません）", { ticket: "t", answers: { open: { plan: { ...plan, items: [{ type: "a" }] } } } }, /\.number は/],
   ];
   for (const [name, raw, pattern] of bad) {
     assert.throws(() => parseWorkflowSample(raw), pattern, name);

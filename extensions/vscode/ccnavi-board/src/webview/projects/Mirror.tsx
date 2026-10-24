@@ -25,7 +25,7 @@ export function MirrorField({ mirror, name, act }: { readonly mirror: MirrorData
           className="action small"
           data-action="mirror-sync"
           disabled={!button.enabled}
-          title={button.enabled ? "共通レイヤーの内容を、このプロジェクトの作業ツリーに写します。コミットはしません" : button.reason}
+          title={button.enabled ? "共通レイヤーの内容を、このプロジェクトのワークツリーにコピーします。コミットはしません" : button.reason}
           onClick={() => {
             if (project !== undefined) {
               act({ type: "mirrorSync", names: [project.name], expect: project.expect });
@@ -87,7 +87,7 @@ export function SyncAllButton({ mirror, act }: { readonly mirror: MirrorData; re
       className={`action${mirror.busy ? " busy" : ""}`}
       data-action="mirror-sync-all"
       disabled={!button.enabled}
-      title={button.enabled ? "ずれのある全プロジェクトに、共通レイヤーの内容を写します。書くのは各プロジェクトの作業ツリーで、コミットはしません" : button.reason}
+      title={button.enabled ? "ずれのある全プロジェクトに、共通レイヤーの内容をコピーします。書くのは各プロジェクトのワークツリーで、コミットはしません" : button.reason}
       onClick={() => act({ type: "mirrorSync", names: [], expect })}
     >
       <span className="spin" aria-hidden="true" />
@@ -104,7 +104,7 @@ export function CheckedAt({ mirror }: { readonly mirror: MirrorData }): JSX.Elem
   return <span className="mirror-checked dim">ミラーの最終確認 {mirror.checkedAt}</span>;
 }
 
-/** ミラーを調べられないとき・写すものが無いときの帯 */
+/** ミラーを調べられないとき・コピーするものが無いときの帯 */
 export function MirrorBanners({ mirror }: { readonly mirror: MirrorData }): JSX.Element | null {
   const status = mirror.status;
   if (status.kind === "unsupported") {

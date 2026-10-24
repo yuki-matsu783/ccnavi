@@ -2,8 +2,8 @@
  * 計画編集画面の案内（`src/webview/tours/workflow.yml`）を happy-dom で動かす。
  *
  * 案内の間、画面は今の計画ではなく見本の答え（実行ファイルの答えの形。`core/tour-workflow.ts`）を描く。手順ごとの様子
- * （描く答え・開く確かめ・選ぶ項）は `scene` が決め、指す先は `data-tour` の印。実際の答え・未保存の線・置き場所・確かめと、
- * 拡張ホストへの送信（線の頼み・保存・再読込・取り込む）には触れない。
+ * （描く答え・開く確かめ・選ぶステップ）は `scene` が決め、指す先は `data-tour` の印。実際の答え・未保存の線・置き場所・確かめと、
+ * 拡張ホストへの送信（線の頼み・保存・再読み込み・取り込む）には触れない。
  *
  * 図に点と線を描くので、大きさの偽物（`measure`）が要る（`test/helpers/dom.ts`）。
  */
@@ -152,7 +152,7 @@ test("CB-D282 案内の間は、実際の答え・未保存の線・保存の確
     });
     assert.deepEqual(sentSince(dom, from), ["tourDone"]);
 
-    // 閉じたあと、実際の答え・未保存・番号の変わる項が、案内の前のまま
+    // 閉じたあと、実際の答え・未保存・番号の変わるステップが、案内の前のまま
     assert.deepEqual(numbers(dom, "plan"), real);
     assert.ok(!dom.one("#dirty").classList.contains("hidden"));
     assert.equal(dom.one("#workflow-renumbered").textContent, realRenumbered);
@@ -164,7 +164,7 @@ test("CB-D282 案内の間は、実際の答え・未保存の線・保存の確
   }
 });
 
-test("CB-D283 案内の間は、線を引く・削除する・保存・再読込・案に戻す・並べ直す・取り込むを押しても、画面も拡張ホストも動かない", async () => {
+test("CB-D283 案内の間は、線を引く・削除する・保存・再読み込み・案に戻す・並べ直す・取り込むを押しても、画面も拡張ホストも動かない", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "tools");
@@ -201,7 +201,7 @@ test("CB-D283 案内の間は、線を引く・削除する・保存・再読込
   }
 });
 
-test("CB-D284 ノード・線・× を指す案内は、指す先の項の番号と線を実際の図の要素に付け、枠で囲う。項を選ぶ手順は詳細の欄を開く", async () => {
+test("CB-D284 ノード・線・× を指す案内は、指す先のステップの番号と線を実際の図の要素に付け、枠で囲う。ステップを選ぶ手順は詳細の欄を開く", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "parallel");
@@ -224,7 +224,7 @@ test("CB-D284 ノード・線・× を指す案内は、指す先の項の番号
     });
     assert.ok(seen.some((t) => t.startsWith("node-")) && seen.some((t) => t.startsWith("edge-")) && seen.some((t) => t.startsWith("cut-")), seen.join());
 
-    // 項を選ぶ手順（renumber の 4 番目の手順）: 詳細の欄に、提案での番号と振り直した番号を並べる
+    // ステップを選ぶ手順（renumber の 4 番目の手順）: 詳細の欄に、提案での番号と振り直した番号を並べる
     await startCourse(dom, "renumber");
     for (let i = 0; i < 3; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
@@ -262,8 +262,8 @@ test("CB-D285 手順ごとの答えで図を描き直す。線が増える・消
     // 一直線の置き場所のまま（2 と 3 は別の列）。並べ直した手順（5）だけ、2 と 3 が同じ列に並ぶ
     assert.notEqual(xs[4][0], xs[4][1], "並べ直す前に 2 と 3 が並んだ（置き場所を動かした）");
     assert.equal(xs[5][0], xs[5][1], "並べ直した手順で 2 と 3 が並ばない");
-    // 先に消した形（最後の手順）は、終端に届かない項があり、図の下に error が出る
-    assert.match(notes, /最後の項/);
+    // 先に消した形（最後の手順）は、終端に届かないステップがあり、図の下に error が出る
+    assert.match(notes, /最後のステップ/);
   } finally {
     await dom.close();
   }
@@ -312,10 +312,10 @@ test("CB-D287 外で変わった提案の案内は、帯と差分（開いたと
         assert.equal(banner, 1, at);
         assert.equal(dom.one<HTMLButtonElement>("#save").disabled, true, `${at}: 外で変わったのに保存できる`);
         assert.match(dom.one("#save").getAttribute("title") ?? "", /外で変わった/, at);
-        assert.match(dom.one('[data-action="adopt"]').textContent ?? "", /編集を捨てる/, at);
+        assert.match(dom.one('[data-action="adopt"]').textContent ?? "", /編集を破棄する/, at);
       }
       if (index <= 2) {
-        // 開いたとき（open）と外で変わった提案（outside）の違いは 3 と 4 の待ち
+        // 開いたとき（open）と外で変わった提案（outside）の違いは 3 と 4 の先行
         assert.deepEqual(
           dom.all("#changed-diff tbody tr").map((row) => row.getAttribute("data-number")),
           ["3", "4"],
@@ -336,7 +336,7 @@ test("CB-D287 外で変わった提案の案内は、帯と差分（開いたと
   }
 });
 
-test("CB-D288 保存できない理由の案内は、断られた線の一言・終端に届かない項・子が承認された番号・改版で通らない待ち・子の付け替えの問題を、実際と同じ読み取りで出す", async () => {
+test("CB-D288 保存できない理由の案内は、断られた線の一言・終端に届かないステップ・子が承認された番号・改版で通らない先行・子の付け替えの問題を、実際と同じ読み取りで出す", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "blocked");
@@ -361,11 +361,11 @@ test("CB-D288 保存できない理由の案内は、断られた線の一言・
           assert.equal(dom.one<HTMLButtonElement>("#save").disabled, true, at);
           assert.match(titleOf(), /順序の検査/, at);
           assert.equal(dom.one('.plan-node[data-number="3"]').getAttribute("data-loose"), "1", at);
-          assert.match(dom.one('[data-tour="notes-plan"]').textContent ?? "", /最後の項/, at);
+          assert.match(dom.one('[data-tour="notes-plan"]').textContent ?? "", /最後のステップ/, at);
           break;
         case 5:
           assert.match(titleOf(), /改版で通らない/, at);
-          assert.match(dom.one('#workflow-problems li[data-kind="revision"]').textContent ?? "", /待ちを変えられない/, at);
+          assert.match(dom.one('#workflow-problems li[data-kind="revision"]').textContent ?? "", /先行を変えられない/, at);
           break;
         case 6:
           assert.match(titleOf(), /子の提案を付け替えられない/, at);

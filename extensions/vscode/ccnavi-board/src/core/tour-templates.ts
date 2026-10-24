@@ -2,7 +2,7 @@
  * テンプレート管理画面の案内の見本（`webview/tours/templates.yml` の `sample:`）を、画面が描く形にする。
  *
  * 見本は実行ファイルの JSON（`--templates --json`）より小さい書き方で YAML に書き、ここで `TemplatesPage`（画面が描く形）にする。
- * 案内の間に描くだけ。有効か・捨てた理由・取り込めるかは見本に書いた値をそのまま使う。
+ * 案内の間に描くだけ。有効か・破棄した理由・取り込めるかは見本に書いた値をそのまま使う。
  */
 import type { DraftEntry, FlowSummary, PlanItem, ProblemSeverity, Sum, SumRow, TemplateEntry, TemplateProblem, TemplatesPage } from "./templates-view.js";
 
@@ -49,7 +49,7 @@ function problemsOf(value: unknown, at: string): TemplateProblem[] {
   });
 }
 
-/** 計画の 1 項。`index` は並びの添字、`number` は添字 + 1 */
+/** 計画の 1 ステップ。`index` は並びの添字、`number` は添字 + 1 */
 function planOf(value: unknown, at: string): PlanItem[] {
   return list(value, at).map((item, index) => {
     const map = object(item, `${at}[${index}]`);

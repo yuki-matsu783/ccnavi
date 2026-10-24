@@ -6,7 +6,7 @@
  * ここは実行ファイルの JSON が判定した欄（`gate_closed`・`review_waiting`・`blocked`・`pending_approval`・
  * マーカー）を表示の言葉に置き換えるだけで、レビューの要否・ゲートの条件・リスクは判定し直さない。
  *
- * 規則は上から見て、最初に当たったものを採る。表は `docs/design/screens.md` の「状態の札」と同じ。
+ * 規則は上から見て、最初にヒットしたものを採る。表は `docs/design/screens.md` の「状態の札」と同じ。
  */
 import type { CopyStatus, PhaseJson } from "./model.js";
 
@@ -34,7 +34,7 @@ export interface Status {
 }
 
 /**
- * フェーズ行の状態の一言。使う欄と優先順位は次のとおり（上から最初に当たったもの）。
+ * フェーズ行の状態の一言。使う欄と優先順位は次のとおり（上から最初にヒットしたもの）。
  *
  * | 順 | 条件 | 言葉 |
  * |---|---|---|
@@ -139,7 +139,7 @@ function closed(card: StatusCard): boolean {
   return card.column === "done" || (card.column === "archived" && card.cancelledAt === "");
 }
 
-/** 読めた欄。どの規則にも当たらなかったときに、ツールチップへ出す */
+/** 読めた欄。どの規則にもヒットしなかったときに、ツールチップへ出す */
 function fieldsOf(card: StatusCard): string {
   return [
     `列: ${card.column}`,
@@ -153,7 +153,7 @@ function fieldsOf(card: StatusCard): string {
 }
 
 /**
- * カードの状態の札。上から最初に当たったものを採る。
+ * カードの状態の札。上から最初にヒットしたものを採る。
  *
  * 子
  * 1. `blocked` か `scattered` がある → 要確認
@@ -163,7 +163,7 @@ function fieldsOf(card: StatusCard): string {
  * 5. `copyStatus === "review"`: 自分のフェーズの状態を使う（レビュー待ち／レビュー準備中／レビュー予定。それ以外は要確認）
  * 6. `copyStatus === "open"`: 自分のフェーズが `reviewWaiting` か `gateClosed` なら要確認。そうでなければ
  *    `startedAt` が空なら開始前、あれば作業中
- * 7. 上のどれにも当たらない → 要確認（読めた欄をツールチップに出す）
+ * 7. 上のどれにもヒットしない → 要確認（読めた欄をツールチップに出す）
  *
  * 親（親のレビュー状態はフェーズ一覧から見る。親カードの `gateClosed` は使わない）
  * 1. `blocked` か `scattered` → 要確認
@@ -173,7 +173,7 @@ function fieldsOf(card: StatusCard): string {
  * 5. フェーズのどれかがレビュー待ち → レビュー待ち
  * 6. フェーズのどれかがレビュー準備中 → レビュー準備中
  * 7. `copyStatus === "open"` → 開始前／作業中
- * 8. 上のどれにも当たらない → 要確認
+ * 8. 上のどれにもヒットしない → 要確認
  */
 export function statusOf(card: StatusCard): Status {
   const trouble = troubleOf(card);

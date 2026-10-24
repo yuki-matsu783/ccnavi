@@ -4,7 +4,7 @@
  *
  * 画面は React（`src/webview/projects/`）で、ここが渡すのは「いま何を見せるか」（`ProjectsData`）だけ。
  * 渡し方（送る・入れ物ごと・作り直し中で見送る）は `core/screen-host.ts` が決める。この画面は
- * `retainContextWhenHidden` が偽なので、そのまま当たる（打ちかけの clone の欄は Webview の state にある）。
+ * `retainContextWhenHidden` が偽なので、そのままヒットする（打ちかけの clone の欄は Webview の state にある）。
  *
  * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
  * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
@@ -21,7 +21,7 @@
  * 1. `refreshMirror` が `checkMirror`（実行ファイルが `user mirror` を持つか）→ `runMirror` の順に聞き、終わったら次の回を予約する。
  *    読み込み中に呼ばれたら、終わった後にもう 1 回だけ回す（`update` と同じ重ならない作り）。パネルを閉じたら予約を消して止める
  * 2. 画面の「ミラーを同期」「すべて同期」で `mirrorSync` が届いたら `runMirrorYes` を呼ぶ。書くのは実行ファイルで、
- *    各プロジェクトの作業ツリーへ（コミットはしない）。結果は VS Code の通知で知らせ、すぐ調べ直す
+ *    各プロジェクトのワークツリーへ（コミットはしない）。結果は VS Code の通知で知らせ、すぐ調べ直す
  * 3. 同期している間と、同期の後の調べ直しが終わるまでは、画面のボタンを押せなくする（`busy`）。古い `expect` で押させないため
  */
 import * as crypto from "node:crypto";
@@ -135,7 +135,7 @@ export async function openProjects(): Promise<void> {
     retainContextWhenHidden: false,
   });
   if (panel.options.retainContextWhenHidden !== false) {
-    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が捨てられず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
+    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が破棄されず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
     diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: true });
   }
   showLoading(panel, TITLE, SCREEN, "プロジェクト");
@@ -265,7 +265,7 @@ function registerPanelHandlers(current: PanelState): void {
     const becameVisible = panel.visible && !current.wasVisible;
     current.wasVisible = panel.visible;
     if (!panel.visible) {
-      // `retainContextWhenHidden` は偽なので、非表示になった画面は捨てられる。再表示されると
+      // `retainContextWhenHidden` は偽なので、非表示になった画面は破棄される。再表示されると
       // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
       current.host.hidden();
     }
@@ -454,12 +454,12 @@ async function readMirror(root: string): Promise<MirrorStatus> {
 }
 
 /**
- * ミラーを同期する（`names` が空なら差分のある全プロジェクト）。書くのは実行ファイルで、各プロジェクトの作業ツリーへ。
+ * ミラーを同期する（`names` が空なら差分のある全プロジェクト）。書くのは実行ファイルで、各プロジェクトのワークツリーへ。
  * 結果は VS Code の通知で知らせ（成功は情報、見せた後に内容が変わっていたら警告、失敗はエラー）、すぐ調べ直す。
  */
 async function syncMirror(current: PanelState, names: readonly string[], expect: string): Promise<void> {
   if (current.syncing || current.seenSeq < current.syncSeq) {
-    // 画面はボタンを押せなくしているので、来るのは押した直後の二度押しくらい。黙って捨てると何も起きないように見えるので言う
+    // 画面はボタンを押せなくしているので、来るのは押した直後の二度押しくらい。黙って破棄すると何も起きないように見えるので言う
     void vscode.window.showInformationMessage("ミラーを同期しています。終わるまで待ってください");
     return;
   }
@@ -494,7 +494,7 @@ function showError(current: PanelState, error: string): void {
 }
 
 /**
- * いまの状態で描き直す。`send` が `deferred`（作り直し中）を返して捨てられたものは、
+ * いまの状態で描き直す。`send` が `deferred`（作り直し中）を返して破棄されたものは、
  * 画面が組み上がった（`ready`）ところでここから渡し直す。
  *
  * 読み直せなかったことも渡し直す。 ここで渡さないと、入れてある HTML（古い一覧）が出たまま
@@ -539,7 +539,7 @@ function projectsHost(panel: vscode.WebviewPanel): ScreenHost<ProjectsData> {
 
 /**
  * 操作の結果の一言。生きている画面にしか届かない（作り直している最中と非表示の間は届かない）。
- * その場で言うだけのものなので、持ち越さずに捨てる。
+ * その場で言うだけのものなので、持ち越さずに破棄する。
  */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToProjects);
@@ -561,7 +561,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     current.host.ready();
     redraw(current);
     // 非表示の間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
-    // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
+    // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て破棄している
     postAppearance(current.host);
     // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す
     if (!tourSeen(SCREEN)) {

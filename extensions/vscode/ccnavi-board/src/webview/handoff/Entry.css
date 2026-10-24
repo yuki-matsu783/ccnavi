@@ -1,6 +1,6 @@
 /*
  * 対象 1 件（`Entry.tsx`）。見出しは選択の欄・パス・札を 1 行に流し、狭い幅では折り返す。
- * 開いた本体（差分・指摘・端末の案内）は縦に並べる（list.css の `.row-body` は格子なので、ここで上書きする）。
+ * 開いた本体（差分・指摘・ターミナルの案内）は縦に並べる（list.css の `.row-body` は格子なので、ここで上書きする）。
  */
 .row.entry > .row-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-2) var(--gap-4); }
 .row.entry > .row-head:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }

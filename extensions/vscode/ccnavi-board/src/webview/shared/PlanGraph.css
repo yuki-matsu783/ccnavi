@@ -51,9 +51,9 @@
 .plan-node-title { font-weight: 600; overflow-wrap: anywhere; }
 .plan-node-tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--gap-1) var(--gap-3); font-size: var(--font-xs); color: var(--vscode-descriptionForeground); }
 .plan-node-tags .tag { border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-sm); padding: 0 3px; }
-/* 見る場所が none の項は、縁を細くして「ユーザが見ない」を示す */
+/* 見る場所が none のステップは、縁を細くして「ユーザが見ない」を示す */
 .plan-node:has(.tag[data-review="none"]) { border-left-color: var(--vscode-descriptionForeground); border-left-style: dashed; }
-/* 終端に当たらない項（実行ファイルの loose）。縁を注意の色にする。文字は普通の色のまま */
+/* 終端にヒットしないステップ（実行ファイルの loose）。縁を注意の色にする。文字は普通の色のまま */
 .plan-node[data-loose="1"] { border-color: var(--vscode-editorWarning-foreground); border-left-color: var(--vscode-editorWarning-foreground); }
 /* 子が承認された番号（固定した番号）。薄くして、動かせないことを示す */
 .plan-node[data-locked="1"] { opacity: .7; border-style: dotted; }
@@ -68,7 +68,7 @@
 }
 /* start と end への線は図が引くもの。破線にして、計画の after の線と分ける */
 .plan-graph .react-flow__edge.plan-start path, .plan-graph .react-flow__edge.plan-end path { stroke-dasharray: 4 3; }
-/* 終端に当たらない項から end への線。注意の色 */
+/* 終端にヒットしないステップから end への線。注意の色 */
 .plan-graph .react-flow__edge.loose path { stroke: var(--vscode-editorWarning-foreground); }
 .plan-graph .react-flow__handle { width: 6px; height: 6px; }
 /* 図の下の一言。注意の行は左に注意の色の縁を付ける（文字の色は変えない） */
@@ -88,7 +88,7 @@
   background: var(--vscode-inputValidation-errorBackground, var(--vscode-list-hoverBackground));
   border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-focusBorder));
 }
-/* 項の詳細（計画編集タブ）。図の右に置き、畳むと細い帯になる。狭いときは図の下に回す */
+/* ステップの詳細（計画編集タブ）。図の右に置き、畳むと細い帯になる。狭いときは図の下に回す */
 .plan-graph-body { display: flex; gap: var(--gap-4); align-items: stretch; }
 .plan-graph-body .plan-graph-canvas { flex: 1 1 0; min-width: 0; }
 .plan-detail {

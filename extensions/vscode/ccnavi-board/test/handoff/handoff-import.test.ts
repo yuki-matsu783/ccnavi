@@ -1,6 +1,6 @@
 /**
  * 取り込み待ち画面の「取り込む」の手順（`src/core/handoff-import.ts`）を、実行ファイルを使わずに確かめる。
- * 呼び出しの層（`HandoffDeps`）を差し替え、呼ぶ順・渡す引数・`expect` の取り方・錠の掛かり方・端末の案内を見る。
+ * 呼び出しの層（`HandoffDeps`）を差し替え、呼ぶ順・渡す引数・`expect` の取り方・錠の掛かり方・ターミナルの案内を見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -106,11 +106,11 @@ test("CB-T1126 錠は押した時点で取り直す。画面の錠が空いて�
   assert.deepEqual(r.applied, []);
 });
 
-test("CB-T1127 defense は端末のみ。錠が空いていてもボードからは取り込まず、実行ファイルを呼ばない", async () => {
+test("CB-T1127 defense はターミナルのみ。錠が空いていてもボードからは取り込まず、実行ファイルを呼ばない", async () => {
   const r = rig();
   const outcome = await importSelected(r.deps, shown, [HOOK]);
   assert.equal(outcome.attempted, false);
-  assert.match(outcome.result.ok ? "" : outcome.result.error, /ボードからは取り込めません。端末で取り込みます/);
+  assert.match(outcome.result.ok ? "" : outcome.result.error, /ボードからは取り込めません。ターミナルで取り込みます/);
   assert.deepEqual(r.calls, ["lock"]);
   // docs と混ぜても、defense が混じれば全体を止める
   const mixed = rig();
@@ -176,7 +176,7 @@ test("CB-T1131 パスは大文字小文字を無視して引くが、実行フ�
   assert.deepEqual(r.calls, ["lock", `view:${DOCS}`, `apply:${DOCS}`]);
 });
 
-test("CB-T1132 端末の案内は、そのパスだけを指して見るだけをもう一度呼び、返った expect でコマンドを組む", async () => {
+test("CB-T1132 ターミナルの案内は、そのパスだけを指して見るだけをもう一度呼び、返った expect でコマンドを組む", async () => {
   const r = rig();
   const guide = await terminalGuide(r.deps, shown, HOOK);
   assert.deepEqual(r.calls, [`view:${HOOK}`]);
@@ -185,7 +185,7 @@ test("CB-T1132 端末の案内は、そのパスだけを指して見るだけ�
   assert.deepEqual(guide, { command: `ccnavi --root /ws user handoff ${HOOK} --yes --expect expect-of(${HOOK})`, error: "" });
 });
 
-test("CB-T1133 端末の案内を出さない場合。ボードから取り込める対象・取り込めない状態・error・一覧にない・見せたあとの変更・見るだけの失敗", async () => {
+test("CB-T1133 ターミナルの案内を出さない場合。ボードから取り込める対象・取り込めない状態・error・一覧にない・見せたあとの変更・見るだけの失敗", async () => {
   const r = rig();
   assert.match((await terminalGuide(r.deps, shown, DOCS)).error, /ボードから取り込めます/);
   assert.match((await terminalGuide(r.deps, shown, "none")).error, /一覧にない対象です/);

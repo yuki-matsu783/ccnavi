@@ -50,7 +50,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.deepEqual(preview.problems, []);
 });
 
-test("CB-T354 承認の preview の plans を読む（計画を持つ親の図の中身。実行ファイルが組んだ番号・先行・終端に当たらない項・すぐ始まる項・延期の引き受け手をそのまま）", () => {
+test("CB-T354 承認の preview の plans を読む（計画を持つ親の図の中身。実行ファイルが組んだ番号・先行・終端にヒットしないステップ・すぐ始まるステップ・延期の引き受け手をそのまま）", () => {
   const parsed = parseApprovePreview(fixtureText("approve-preview.json"));
   assert.ok(parsed.ok);
   if (!parsed.ok) {
@@ -96,7 +96,7 @@ test("CB-T354 承認の preview の plans を読む（計画を持つ親の図�
           current: { "4": [3] },
           loose: [3, "4"],
           ready: [3],
-          problems: ["最後の項がほかの項を待っていない", 5],
+          problems: ["最後のステップにほかのステップが先行していない", 5],
         },
       ],
     }),
@@ -113,7 +113,7 @@ test("CB-T354 承認の preview の plans を読む（計画を持つ親の図�
   assert.deepEqual(fb.proposed, {});
   assert.deepEqual(fb.current, { "4": [3] });
   assert.deepEqual(fb.loose, [3]);
-  assert.deepEqual(fb.problems, ["最後の項がほかの項を待っていない"]);
+  assert.deepEqual(fb.problems, ["最後のステップにほかのステップが先行していない"]);
 });
 
 test("CB-T104b 超過の欄がない古い答えは、空の配列として読む", () => {
@@ -202,7 +202,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     lines: [],
   }, true);
   assert.ok(sent.includes("書けたぶんだけをコミット・push するコマンドをターミナルに送信しました"), sent);
-  assert.ok(stopped.includes("マーカーを削除した"), "端末に出ていた行も渡す");
+  assert.ok(stopped.includes("マーカーを削除した"), "ターミナルに出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
   const none = partialMessage({ placed: [], paths: [], written: [], ticket: "i0001", reason: "書けない", lines: [] });

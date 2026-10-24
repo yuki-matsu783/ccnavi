@@ -11,7 +11,7 @@
 export type HostKind = "github" | "gitlab";
 
 export interface Host {
-  /** 設定と PAT の鍵。`github.com` など */
+  /** 設定と PAT のキー。`github.com` など */
   readonly id: string;
   readonly kind: HostKind;
   /** REST の根。`https://api.github.com`、GHES なら `https://<ホスト>/api/v3` */

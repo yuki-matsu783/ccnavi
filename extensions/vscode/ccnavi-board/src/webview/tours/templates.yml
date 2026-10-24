@@ -1,6 +1,6 @@
 # テンプレート管理画面の案内。`sample:` は案内の間だけ画面に出す見本（実際のテンプレートではない）。
 #   path       見本の層の置き場（画面には「（見本）」を付けて出す）
-#   templates  見本の層（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（捨てた理由。あれば「使われない」）・text（本文）
+#   templates  見本の層（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（破棄した理由。あれば「使われない」）・text（本文）
 #   drafts     見本の下書き。name・description・problems・plan・feedback・flows
 #   sums       「統合結果」の見本。実行ファイルが出す索引の形（共通の設定 + 1 つの設定の和）
 # `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
@@ -115,7 +115,7 @@ courses:
         scene: {}
       - target: list
         title: テンプレートの一覧
-        body: 選んだ層のテンプレートが並びます。各テンプレートに、有効・無効を示すラベルや、適用対象から除外された理由が表示されます。捨てた理由は、同じ中身があるか、読み込めないかなどです。
+        body: 選んだ層のテンプレートが並びます。各テンプレートに、有効・無効を示すラベルや、適用対象から除外された理由が表示されます。破棄した理由は、同じ中身があるか、読み込めないかなどです。
         scene: {}
       - target: template
         title: 1 件を開く
@@ -125,7 +125,7 @@ courses:
           body: true
       - target: sum
         title: 統合結果
-        body: 実際に使われるのは、共通の設定と選んだ層の和です。枠を開くと、どの名前がどの層から使われ、どれが捨てられたかの一覧が出ます。読み取り専用で、中身は上の一覧で読みます。
+        body: 実際に使われるのは、共通の設定と選んだ層の和です。枠を開くと、どの名前がどの層から使われ、どれが破棄されたかの一覧が出ます。読み取り専用で、中身は上の一覧で読みます。
         scene:
           sum: self
       - target: drafts
@@ -143,7 +143,7 @@ courses:
 
   - id: read-sum
     title: 統合結果を確認するとき
-    summary: どの名前が使われ、どれが捨てられたかを見る
+    summary: どの名前が使われ、どれが破棄されたかを見る
     steps:
       - target: sum
         title: 統合結果の枠
@@ -161,8 +161,8 @@ courses:
         scene:
           sum: self
       - target: sum-table
-        title: 由来と捨てた理由
-        body: 名前ごとに、どの層のものか、使われるか、捨てられたときの理由が出ます。同じ名前で中身が違うと、共通の側が使われます。
+        title: 由来と破棄した理由
+        body: 名前ごとに、どの層のものか、使われるか、破棄されたときの理由が出ます。同じ名前で中身が違うと、共通の側が使われます。
         scene:
           sum: self
 

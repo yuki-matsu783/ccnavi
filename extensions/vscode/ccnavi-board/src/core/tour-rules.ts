@@ -43,7 +43,7 @@ export function condOfRaw(raw: unknown, at = "when"): CondNode {
   const map = object(raw, at);
   const keys = Object.keys(map);
   if (keys.length !== 1) {
-    throw new Error(`${at} の鍵はちょうど 1 つでなければならない`);
+    throw new Error(`${at} のキーはちょうど 1 つでなければならない`);
   }
   const key = keys[0];
   const value = map[key];
@@ -60,7 +60,7 @@ export function condOfRaw(raw: unknown, at = "when"): CondNode {
     case "not":
       return { op: "not", child: condOfRaw(value, `${at}.not`) };
     default:
-      throw new Error(`${at} の鍵「${key}」は未知の鍵です`);
+      throw new Error(`${at} のキー「${key}」は未知のキーです`);
   }
 }
 

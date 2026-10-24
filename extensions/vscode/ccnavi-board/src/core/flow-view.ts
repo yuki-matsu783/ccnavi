@@ -9,7 +9,7 @@
  * `started_at` などから組み直さない。保存の直前にも拡張ホストが実行ファイルに聞き直す。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
- * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身が届くのは、画面の編集を捨ててよいときだけ。
+ * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身が届くのは、画面の編集を破棄してよいときだけ。
  *
  * ここには VS Code の API も DOM も node も入れない。
  */
@@ -288,7 +288,7 @@ export type FlowMessage =
   | { readonly type: "requestOpen" };
 
 /**
- * 画面から届いたものを確かめる。形が不正なら捨てる（保存の中身が読めないものを書かない）。
+ * 画面から届いたものを確かめる。形が不正なら破棄する（保存の中身が読めないものを書かない）。
  */
 export function asFlowMessage(message: unknown): FlowMessage | undefined {
   if (typeof message !== "object" || message === null) {

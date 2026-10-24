@@ -22,15 +22,15 @@ type TextKey = "id" | "match" | "pattern" | "every" | "additionalContextFile" | 
 type AreaKey = "message" | "additionalContext" | "additionalContextOnce";
 
 export interface RuleProps {
-  /** 画面の中だけの鍵（`state.ts`）。行を名指しするために `data-key` へ出す */
+  /** 画面の中だけのキー（`state.ts`）。行を名指しするために `data-key` へ出す */
   readonly ruleKey: string;
   readonly section: Section;
   readonly rule: RuleForm;
-  /** 絞り込みが当てる文字列（`data-find`）。当たらなければ `hidden` */
+  /** 絞り込みが適用する文字列（`data-find`）。ヒットしなければ `hidden` */
   readonly find: string;
   readonly hidden: boolean;
   readonly open: boolean;
-  /** 直前の判定で当たった行。折りたたんだままでも分かるように縁を付ける */
+  /** 直前の判定でヒットした行。折りたたんだままでも分かるように縁を付ける */
   readonly hit: boolean;
   /** ツールの選択肢が開いているか。開くのは画面ぜんたいで 1 つだけ */
   readonly pickerOpen: boolean;
@@ -198,7 +198,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 </div>
               ))}
               <span className="dim">
-                {rule.when !== undefined ? "組み合わせ条件に当たっても" : "パターンに当たっても"}、これに当たれば当たらない扱いになります。画面では編集できません。ルールファイルで直すか、
+                {rule.when !== undefined ? "組み合わせ条件にヒットしても" : "パターンにヒットしても"}、これにヒットすればヒットしない扱いになります。画面では編集できません。ルールファイルで直すか、
                 {rule.when !== undefined ? "組み合わせ条件の not に移してください" : "「組み合わせ条件に変換」で組み合わせ条件の中へ移してください"}
               </span>
             </div>
@@ -275,11 +275,11 @@ function toWhen(rule: RuleForm): RuleForm {
 
 /**
  * ツールの選択肢。`match` はツール名を `|` で並べたもので、判定は名前をそのまま突き合わせるので
- * 打ち間違えると気づかないうちに当たらなくなる。書かせずに選ばせる。ファイルに書いてある知らない名前
+ * 打ち間違えると気づかないうちにヒットしなくなる。書かせずに選ばせる。ファイルに書いてある知らない名前
  * （MCP のツールなど）も、消さずにそのまま選択肢にして出す（開いただけで消えたように見えないように）。
  *
  * 一覧にない新しいツールは、欄に名前を打って足す。形は `isToolName` で確かめる。一覧にない名前は、
- * ccnavi がそのツールの対象を取り出せないため、判定には届かず当たらない（`lint` が warn で言う）。
+ * ccnavi がそのツールの対象を取り出せないため、判定には届かずヒットしない（`lint` が warn で言う）。
  */
 function Picker({
   rule,

@@ -10,9 +10,9 @@
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
- * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身（`data`）が届くのは、画面の編集を捨ててよいとき
- * だけ（ユーザが「再読込」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
- * ときは `changed` の帯を出し、捨てるかどうかはユーザが決める。
+ * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身（`data`）が届くのは、画面の編集を破棄してよいとき
+ * だけ（ユーザが「再読み込み」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
+ * ときは `changed` の帯を出し、破棄するかどうかはユーザが決める。
  */
 import type { HandoffEntry, OpenHandoffMessage } from "./handoff-entry.js";
 import type { AppearanceMessage } from "./appearance.js";
@@ -76,16 +76,16 @@ export interface RuleForm {
   readonly kind: PatternKind;
   readonly pattern: string;
   readonly message: string;
-  /** 当たったときにモデルへ渡す文（`additionalContext`）。無ければ空 */
+  /** ヒットしたときにモデルへ渡す文（`additionalContext`）。無ければ空 */
   readonly additionalContext: string;
-  /** 1 つの文脈で最初に当たったときだけ渡す文（`additionalContextOnce`）。無ければ空 */
+  /** 1 つの文脈で最初にヒットしたときだけ渡す文（`additionalContextOnce`）。無ければ空 */
   readonly additionalContextOnce: string;
   /** 文に続けて本文を渡すファイル（`additionalContextFile`）。ルートからの相対パス。無ければ空 */
   readonly additionalContextFile: string;
-  /** 最初に当たったときだけ本文を渡すファイル（`additionalContextOnceFile`）。無ければ空 */
+  /** 最初にヒットしたときだけ本文を渡すファイル（`additionalContextOnceFile`）。無ければ空 */
   readonly additionalContextOnceFile: string;
   /**
-   * 何回に 1 度渡すか（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
+   * 何回に 1 度渡すか（`every`）。ヒットした回数がこの倍数になった回だけ文が渡り、
    * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ空。
    *
    * 他の欄と同じく書かれたままの文字で持つ。数（`number | null`）で持つと、空欄が
@@ -97,7 +97,7 @@ export interface RuleForm {
   readonly every: string;
   /**
    * 除くもの（`except:`）を `glob: …` / `regex: …` の形にしたもの。見せるだけ。書き戻しは元のノードをそのまま使うので、ここを変えてもファイルは変わらない。
-   * 本体に当たっても、どれかに当たればルールは当たらない（判定は実行ファイルの仕事）。
+   * 本体にヒットしても、どれかにヒットすればルールはヒットしない（判定は実行ファイルの仕事）。
    * 書いていなければ省く。
    */
   readonly excepts?: readonly string[];
@@ -107,7 +107,7 @@ export interface RuleForm {
    */
   readonly exceptNodes?: readonly CondNode[];
   /**
-   * 組み合わせ条件（`when:`）。在れば `kind` と `pattern` は使わない（`glob` / `regex` の代わりに組み合わせ条件で当てる）。
+   * 組み合わせ条件（`when:`）。在れば `kind` と `pattern` は使わない（`glob` / `regex` の代わりに組み合わせ条件で適用する）。
    * 書き戻しは、組み合わせ条件が読み込んだときと同じなら元のノードに触らない。変えたら組み合わせ条件を書き、`glob` / `regex` を消す。
    * 書いていなければ省く
    */
@@ -205,7 +205,7 @@ export type ToRules =
   | { readonly type: "changed" }
   /** 頼んだ往復が起きなかった（ユーザが「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
-  /** 選んだファイルのパス。`key` は画面が渡した行の鍵で、拡張ホストはそのまま返す */
+  /** 選んだファイルのパス。`key` は画面が渡した行のキーで、拡張ホストはそのまま返す */
   | { readonly type: "picked"; readonly key: string; readonly field: FileField; readonly path: string }
   /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */
   | { readonly type: "tour" }
@@ -253,7 +253,7 @@ export function modeBanner(mode: string): string {
     return "判定と記録をします。deny や ask にヒットしても、一般の保護はツールの実行を止めません（チケットの関門と補助の保護は止まります）";
   }
   if (mode === "disable") {
-    return "判定しません。ルールは使われず、deny や ask に当たる操作も止まりません";
+    return "判定しません。ルールは使われず、deny や ask にヒットする操作も止まりません";
   }
   return "";
 }

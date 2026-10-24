@@ -96,7 +96,7 @@ export type BoardData =
       readonly approval?: ApprovalOverlay;
       /**
        * 前の読み直しから動いたカード（`board-moved.ts`）。決めるのも覚えるのも拡張ホストで、
-       * オーバーレイと同じ理由（画面は非表示になると捨てられる）。画面は渡された分に動いた表示を出すだけ
+       * オーバーレイと同じ理由（画面は非表示になると破棄される）。画面は渡された分に動いた表示を出すだけ
        */
       readonly moved?: readonly Moved[];
       /**
@@ -106,7 +106,7 @@ export type BoardData =
       readonly unsaved?: readonly string[];
       /**
        * マージ状況の確認の結果（`core/merge.ts`）。持つのも決めるのも拡張ホストで、オーバーレイと同じ理由
-       * （画面は非表示になると捨てられる）。まだ一度も確認していなければ無い。画面は渡された分を帯に出すだけ
+       * （画面は非表示になると破棄される）。まだ一度も確認していなければ無い。画面は渡された分を帯に出すだけ
        */
       readonly merge?: MergeView;
       /**
@@ -146,7 +146,7 @@ export type BoardMessage =
   | { readonly type: "promptOpen" }
   /** ［レビュー完了］を押した。残った指摘を読む流れに入る（0 件ならレビュー済みにする画面、1 件以上なら対応方針の画面） */
   | { readonly type: "decide"; readonly parent: string; readonly phase: number }
-  /** 残った指摘の行き先を決めた（0 件なら「レビュー済みにする」）。鍵は指摘の `key`、値は `keep` / `fix` / `issue` */
+  /** 残った指摘の行き先を決めた（0 件なら「レビュー済みにする」）。キーは指摘の `key`、値は `keep` / `fix` / `issue` */
   | { readonly type: "decideConfirm"; readonly choices: Readonly<Record<string, string>> }
   /** 対応方針の画面の「エージェントに相談するプロンプトをコピー」を押した。オーバーレイは閉じない */
   | { readonly type: "decideConsult" }

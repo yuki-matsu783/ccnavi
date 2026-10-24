@@ -9,7 +9,7 @@ export function severityLabel(severity: ProblemSeverity): string {
   return severity;
 }
 
-/** 捨てた理由の言葉。知らない値はそのまま返す */
+/** 破棄した理由の言葉。知らない値はそのまま返す */
 export function droppedLabel(reason: string): string {
   switch (reason) {
     case "invalid":
@@ -50,13 +50,13 @@ export function flowText(flow: FlowSummary): string {
   return `${flow.name}（ノード ${flow.nodes}・接続 ${flow.connections}）`;
 }
 
-/** 待つ項の番号の並び。空なら「なし」 */
+/** 先行ステップの番号の並び。空なら「なし」 */
 export function afterText(after: readonly number[]): string {
   return after.length === 0 ? "なし" : after.join(", ");
 }
 
 /**
- * 待つ項を、計画の中の添字（`index`）から提案に写したときの番号（`number`）に直す。
+ * 先行ステップを、計画の中の添字（`index`）から提案にコピーしたときの番号（`number`）に直す。
  * 見つからない添字は、そのまま添字を返す。
  */
 export function afterNumbers(item: PlanItem, items: readonly PlanItem[]): number[] {

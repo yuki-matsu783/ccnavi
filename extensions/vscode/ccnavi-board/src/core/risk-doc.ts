@@ -29,9 +29,9 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 # HIGH 以上はレビューが済むまでフェーズを止める。境目の点は levels で動かす。
 #
 # 項目は 3 系統。1 件につき加点条件を 1 つだけ書く。
-#   定量（組み込み）: lines_over / files_over / deleted_over / glob（当たるごとに加点。max で上限）
+#   定量（組み込み）: lines_over / files_over / deleted_over / glob（ヒットするごとに加点。max で上限）
 #                    lines_over / files_over / deleted_over は include / exclude（glob のリスト）で数えるパスを絞れる。
-#                    無指定なら差分全体。include があれば当たったパスだけ、exclude に当たったパスは数えない
+#                    無指定なら差分全体。include があればヒットしたパスだけ、exclude にヒットしたパスは数えない
 #   定量（スクリプト）: script: <.ccnavi/config/common/scripts/ の下>。cwd は子のワークツリー、
 #                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENT を受け取り、
 #                      標準出力に整数か {"points": N, "message": "..."} を出す。失敗は重い側（points を加点）
@@ -78,7 +78,7 @@ export function readRisk(text: string): RiskDocument {
     problems.push(`YAML として解釈できません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは組み込みの配点を使います。保存すると中身を捨てて空のマップから始めます");
+    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは組み込みの配点を使います。保存すると中身を破棄して空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
@@ -165,7 +165,7 @@ function scalarText(map: YAMLMap, key: string): string {
 }
 
 function applyTo(doc: Document, edited: RiskForm): string {
-  // 空か、最上位が対応表でないファイルは、中身を捨てて対応表から始める（読み込みの苦情で言ってある）。
+  // 空か、最上位が対応表でないファイルは、中身を破棄して対応表から始める（読み込みの苦情で言ってある）。
   const top: YAMLMap = isMap(doc.contents) ? doc.contents : new YAMLMap();
   if (doc.contents !== top) {
     doc.contents = top;
@@ -306,7 +306,7 @@ function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   }
 }
 
-/** glob のリストを書く。行ごとに 1 つ、空行は捨てる。変わっていなければ触らない（元の書き方を残す） */
+/** glob のリストを書く。行ごとに 1 つ、空行は破棄する。変わっていなければ触らない（元の書き方を残す） */
 function writeGlobs(doc: Document, node: YAMLMap, key: string, text: string): void {
   const globs = text
     .split("\n")

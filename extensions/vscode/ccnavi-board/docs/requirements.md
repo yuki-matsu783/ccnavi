@@ -25,7 +25,7 @@ VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを�
 | リスク管理画面（`risks.yml` の配点の編集） | [requirements/risk.md](requirements/risk.md) |
 | フェーズ管理画面（`phases.yml` の定義の編集） | [requirements/phases.md](requirements/phases.md) |
 | テンプレート管理画面（作業・レビュー計画のテンプレートと下書きの一覧・本文、テンプレートの計画とフローの編集） | [requirements/templates.md](requirements/templates.md) |
-| 取り込み待ち画面（`wip/handoff/` の下書きの差分を読んで取り込む。作業中の錠・防御の端末の案内） | [requirements/handoff.md](requirements/handoff.md) |
+| 取り込み待ち画面（`wip/handoff/` の下書きの差分を読んで取り込む。作業中の錠・防御のターミナルの案内） | [requirements/handoff.md](requirements/handoff.md) |
 
 ## 用語と参照
 

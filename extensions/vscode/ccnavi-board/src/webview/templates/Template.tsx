@@ -1,6 +1,6 @@
 /**
  * テンプレート 1 件。見出しに名前・層・状態の札・説明を出し、開くと計画・フロー・本文の取り出しを出す。
- * 判定（使える・使われない・捨てた理由・読めない）は実行ファイルの答えのまま出す。
+ * 判定（使える・使われない・破棄した理由・読めない）は実行ファイルの答えのまま出す。
  */
 import type { JSX } from "react";
 
@@ -79,7 +79,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           )}
           {detail !== undefined && !detailMatches(detail, entry) && (
             <p className="hint" data-role="detail-mismatch">
-              この行の本文は読み込めません。実行ファイルは、統合結果で使われる同名の別の層の本文を返すためです（捨てられた行など）。ファイルを直接開いて読んでください: <span className="mono">{entry.path}</span>
+              この行の本文は読み込めません。実行ファイルは、統合結果で使われる同名の別の層の本文を返すためです（破棄された行など）。ファイルを直接開いて読んでください: <span className="mono">{entry.path}</span>
             </p>
           )}
           {detailError !== "" && <p className="status failed">{detailError}</p>}
@@ -90,20 +90,20 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
 }
 
 /**
- * 届いた本文が、この行のものか。実行ファイルは層ごとでなく統合結果で 1 件を返すので、捨てられた行を開くと
+ * 届いた本文が、この行のものか。実行ファイルは層ごとでなく統合結果で 1 件を返すので、破棄された行を開くと
  * 別の層の本文が来ることがある。層と sha（読めない行は sha が空なので層だけ）で突き合わせる
  */
 function detailMatches(detail: TemplateDetail, entry: TemplateEntry): boolean {
   return detail.layer === entry.layer && (entry.sha === "" || detail.sha === entry.sha);
 }
 
-/** 状態の札。使える・使われない・捨てた理由・読み取り専用・読めない。色と文字の両方で出す */
+/** 状態の札。使える・使われない・破棄した理由・読み取り専用・読めない。色と文字の両方で出す */
 function StateTags({ entry }: { readonly entry: TemplateEntry }): JSX.Element {
   return (
     <>
       {entry.usable ? <span className="tag ok">有効</span> : <span className="tag bad">無効</span>}
       {!entry.effective && <span className="tag">使われない</span>}
-      {entry.dropped !== null && <span className="tag warn">{`捨てた: ${droppedLabel(entry.dropped.reason)}`}</span>}
+      {entry.dropped !== null && <span className="tag warn">{`破棄した: ${droppedLabel(entry.dropped.reason)}`}</span>}
       {!entry.writable && <span className="tag">読み取り専用</span>}
       {!entry.valid && <span className="tag bad">読み込めません</span>}
     </>

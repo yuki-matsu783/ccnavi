@@ -4,8 +4,8 @@
  * 見せる中身は拡張ホストが渡す（`PhasesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中の定義、開いている行、絞り込み、直前の操作の一言）だけ。定義の意味は判定しない。
  *
- * 中身（`data`）が届いたら、編集中の定義はその中身で置き換える。 届くのは編集を捨ててよい
- * ときだけ（ユーザが「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
+ * 中身（`data`）が届いたら、編集中の定義はその中身で置き換える。 届くのは編集を破棄してよい
+ * ときだけ（ユーザが「再読み込み」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  *
  * id の重なりだけは画面で止める。 同じ id が 2 つあると実行ファイルは後ろで何も出さずに上書きする。
@@ -15,7 +15,7 @@
  * 共通の設定の定義は、開いている設定の定義に足されて判定に使われる。出どころが分かるように別の欄に
  * 読み取り専用で並べる（`PhasesPage.common`。実行ファイルの統合結果のうち出どころが共通のもの）。
  *
- * 順序（どのフェーズがどれを待つか）はフェーズ定義ではなく親チケットの計画の項の `after` で決める。
+ * 順序（どのフェーズにどのフェーズが先行するか）はフェーズ定義ではなく親チケットの計画のステップの `after` で決める。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
@@ -45,7 +45,7 @@ const EMPTY_DRAFT: Draft = { rows: [] };
 const TOUR = tourOf(phasesTour);
 const SAMPLE = parsePhasesSample(TOUR.sample);
 const TEXTS = parsePhasesTexts(TOUR.sample);
-/** 見本の行の鍵。実際の行の鍵（`p1`…）と重ならない */
+/** 見本の行のキー。実際の行のキー（`p1`…）と重ならない */
 function sampleDraft(page: PhasesPage, prefix: string): Draft {
   let seq = 0;
   return draftOf(page.model.form, () => `${prefix}${(seq += 1)}`);
@@ -69,7 +69,7 @@ interface Status {
 
 interface Editing {
   readonly draft: Draft;
-  /** 開いている行の鍵 */
+  /** 開いている行のキー */
   readonly open: ReadonlySet<string>;
   /**
    * 「補足」を開いているか。行ごとに 1 度だけ値の有無で決め、あとはユーザの開閉で動く。
@@ -267,7 +267,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   const courses = coursesOf(TOUR, setScene);
 
-  /** 定義を足す。絞り込みは外す（id が空の行は絞り込みに当たらず隠れる） */
+  /** 定義を足す。絞り込みは外す（id が空の行は絞り込みにヒットせず隠れる） */
   const add = (): void => {
     if (tour.touring) {
       return;
@@ -447,7 +447,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             </p>
             <p className="hint">
               順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに <code>after</code> で先行を指定します（最後のステップにほかの全部が先行するようにします）。
-              親チケットは承認のときに使う定義の写し（<code>phases:</code>）を持つので、あとでここを直しても進行中の親には反映されません。
+              親チケットは承認のときに使う定義のコピー（<code>phases:</code>）を持つので、あとでここを直しても進行中の親には反映されません。
             </p>
           </div>
         )}

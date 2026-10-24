@@ -33,7 +33,7 @@ export interface Screens {
   readonly phases: (target: PhasesTarget) => Promise<void>;
   readonly templates: (target: TemplatesTarget) => Promise<void>;
   /**
-   * 取り込み待ち画面（`wip/handoff/` の下書きを取り込む）。`tree` は見るツリーの鍵（`main:` はワークスペース、
+   * 取り込み待ち画面（`wip/handoff/` の下書きを取り込む）。`tree` は見るツリーのキー（`main:` はワークスペース、
    * `project:<名前>`、`worktree:<名前>`）。未指定はワークスペース。タブは 1 枚で、別のツリーを開けば中身を入れ替える
    */
   readonly handoff: (tree?: string) => Promise<void>;
@@ -44,7 +44,7 @@ export interface Screens {
    */
   readonly flow: (ticket: string) => Promise<void>;
   /**
-   * 親の提案 1 枚の計画編集タブ（計画の項どうしの先行を図で引き直す）。対象は承認待ち（`todo/`）の
+   * 親の提案 1 枚の計画編集タブ（計画のステップどうしの先行を図で引き直す）。対象は承認待ち（`todo/`）の
    * 計画を持つ親。タブは親ごとに 1 枚で、同じ親をもう 1 度開けば前面に出す
    */
   readonly workflow: (ticket: string) => Promise<void>;

@@ -29,8 +29,8 @@ test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内�
     ["id の形", { screen: "x", courses: [course(INTRO_ID), course("A_b")] }, /\.id は/],
     ["steps が空", { screen: "x", courses: [course(INTRO_ID, { steps: [] })] }, /steps が空/],
     ["body がありません", { screen: "x", courses: [course(INTRO_ID, { steps: [{ target: "a", title: "t" }] })] }, /courses\[0\]\.steps\[0\] の title と body/],
-    ["手順の鍵の綴り違い", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, targt: "a" }] })] }, /未知の鍵 targt/],
-    ["案内の鍵の綴り違い", { screen: "x", courses: [course(INTRO_ID, { sumary: "a" })] }, /未知の鍵 sumary/],
+    ["手順のキーの綴り違い", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, targt: "a" }] })] }, /未知のキー targt/],
+    ["案内のキーの綴り違い", { screen: "x", courses: [course(INTRO_ID, { sumary: "a" })] }, /未知のキー sumary/],
     ["指す先に引用符", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, target: 'a"b' }] })] }, /\.target は/],
     ["scene の値", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, scene: { open: ["a"] } }] })] }, /scene\.open/],
   ];

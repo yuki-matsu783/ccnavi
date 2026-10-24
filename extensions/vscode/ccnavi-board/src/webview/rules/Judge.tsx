@@ -209,7 +209,7 @@ export function SuggestResult({ result }: { readonly result: SuggestJson }): JSX
     <div id="suggest-result" className="result" data-tour="suggest-result">
       <p>
         記録 {result.logs.length} 本・{result.records} 行から、候補 {result.candidates.length} 件
-        （検証を通らず除いたもの {result.dropped} 件）。候補はすべて下書きです。確認して設定に反映するのはユーザーです。
+        （検証を通らず除いたもの {result.dropped} 件）。候補はすべて下書きです。確認して設定に反映するのはユーザです。
       </p>
       {result.candidates.length === 0 ? (
         <p className="empty">候補はありません</p>

@@ -291,7 +291,7 @@ test("CX-T224 自動の読み直し: 入力欄を触っている間と書く操�
   assert.equal(h.log.collect, now + 1);
 });
 
-test("CX-T231 読み直しの失敗: 手動の読み直しでも、書いた後の読み直しでも、state=error と文面を出し、描いた欄は残す。投げ捨てない", async () => {
+test("CX-T231 読み直しの失敗: 手動の読み直しでも、書いた後の読み直しでも、state=error と文面を出し、描いた欄は残す。投げ破棄しない", async () => {
   const unhandled: unknown[] = [];
   const onUnhandled = (e: unknown) => void unhandled.push(e);
   process.on("unhandledRejection", onUnhandled);

@@ -6,8 +6,8 @@
  * 「判定」も「期待する判定を一括で確かめる」も、編集中の内容を拡張ホストへ渡し、
  * 実行ファイルが返した結果を出すだけ。
  *
- * 中身（`data`）が届いたら、編集中のルールはその中身で置き換える。 届くのは編集を捨ててよい
- * ときだけ（ユーザが「再読込」を押した、保存が通った）で、ファイルが外で変わっただけのときは
+ * 中身（`data`）が届いたら、編集中のルールはその中身で置き換える。 届くのは編集を破棄してよい
+ * ときだけ（ユーザが「再読み込み」を押した、保存が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
@@ -53,7 +53,7 @@ import { countText, findText, hasContext } from "./text.js";
  */
 const TOUR = tourOf(rulesTour);
 const SAMPLE = parseRulesSample(TOUR.sample);
-/** 見本の行の鍵。実際の行の鍵（`r1`…）と重ならない */
+/** 見本の行のキー。実際の行のキー（`r1`…）と重ならない */
 const SAMPLE_DRAFT: Draft = draftOf(SAMPLE.sections, ((): (() => string) => {
   let seq = 0;
   return () => `s${(seq += 1)}`;
@@ -76,7 +76,7 @@ interface Status {
 
 interface Editing {
   readonly draft: Draft;
-  /** ユーザが開いた行の鍵。state に入るのはこちらだけ */
+  /** ユーザが開いた行のキー。state に入るのはこちらだけ */
   readonly open: ReadonlySet<string>;
 }
 
@@ -91,22 +91,22 @@ function editingOf(data: RulesData, nextKey: () => string): Editing {
 }
 
 export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
-  // 鍵は 1 枚の画面の中で数え上げる。描き直しで配り直さない
+  // キーは 1 枚の画面の中で数え上げる。描き直しで配り直さない
   const nextKey = useRef(keyer()).current;
   const [data, setData] = useState<RulesData>(initial);
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
   /**
-   * 判定で当たってその場だけ開いた行。state には入れない（判定を繰り返しても、ユーザが決めた
+   * 判定でヒットしてその場だけ開いた行。state には入れない（判定を繰り返しても、ユーザが決めた
    * 既定の折りたたみが変わらない）。次の判定で入れ替わる。
    */
   const [transient, setTransient] = useState<ReadonlySet<string>>(new Set());
-  /** 直前の判定で当たったルールの id。折りたたんだままでも分かるように縁を付ける */
+  /** 直前の判定でヒットしたルールの id。折りたたんだままでも分かるように縁を付ける */
   const [hits, setHits] = useState<ReadonlySet<string>>(new Set());
-  /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後はユーザの操作を鍵で覚える */
+  /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後はユーザの操作をキーで覚える */
   const [moreOpen, setMoreOpen] = useState<ReadonlyMap<string, boolean>>(new Map());
   const [folded, setFolded] = useState<ReadonlySet<Section>>(new Set());
   const [dirty, setDirty] = useState(false);
-  /** 実行ファイルへの往復の間。判定・期待する判定の確認・再読込・保存のボタンを止める */
+  /** 実行ファイルへの往復の間。判定・期待する判定の確認・再読み込み・保存のボタンを止める */
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
@@ -257,7 +257,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   useEscape(pickerKey !== undefined, ESCAPE_LAYER.popup, () => setPickerKey(undefined));
 
   /**
-   * 判定で当たった行を、折りたたんであってもその場だけ開く。見えないところで光っても分からないので、
+   * 判定でヒットした行を、折りたたんであってもその場だけ開く。見えないところで光っても分からないので、
    * タイプの折りたたみも外す。state には入れないので、次の判定で元の折りたたみに戻る。
    */
   const unfoldHits = (ids: readonly string[]): void => {
@@ -611,7 +611,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           );
         })}
         {touring ? (
-          // 案内の間の見本は鍵を替えて別に作る（閉じたあとの実際の枠に、案内で選んだ統合結果を持ち越さない）
+          // 案内の間の見本はキーを替えて別に作る（閉じたあとの実際の枠に、案内で選んだ統合結果を持ち越さない）
           <Sum
             sums={SAMPLE.sums}
             initial={defaultSum(SAMPLE.sums, undefined)}

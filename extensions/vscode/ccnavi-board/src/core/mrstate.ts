@@ -6,7 +6,7 @@
  *
  * どちらも**厳しく読む**。形が想定外のものを「マージ待ち」「マージ済み」「ありません」と読み間違えると、
  * ユーザが片付けを起こしたり、確認すべき親を見落としたりするため。読めないものは「出力の形が想定外」「一覧を取得できません」と
- * 正直に言い、行を黙って捨てない。
+ * 正直に言い、行を黙って破棄しない。
  */
 
 /** `mr-state` の 1 行目。頭の行の版 */
@@ -68,7 +68,7 @@ function parseNumber(word: string): number | undefined {
  * - Draft が `yes` / `no`
  * - 終了コードが状態と合う（状態が分かれば 0、`unknown` は 1）
  *
- * 当てはまらなければ「出力の形が想定外」。URL が http(s) でないときは状態を出し、リンクにしない（呼び手の仕事）。
+ * 該当しなければ「出力の形が想定外」。URL が http(s) でないときは状態を出し、リンクにしない（呼び手の仕事）。
  * 期限で打ち切ったときは `timeout`
  */
 export function interpretMrState(ran: Ran, expected: number): MrStateResult {
@@ -178,7 +178,7 @@ export const RETIRED_HEAD = "retired 1";
 /**
  * `ccnavi sync retired` の答えを読む。頭の行が `retired 1` でない・コマンドが失敗した（`code` が 0 でない）・
  * 知らない行がある・`retired` の行の項目が足りない、のどれかなら「一覧を取得できません」（`ok: false`）にする。
- * 「ありません」とは言わず、行を黙って捨てない
+ * 「ありません」とは言わず、行を黙って破棄しない
  */
 export function parseRetired(ran: Pick<Ran, "code" | "stdout" | "killed">): RetiredParse {
   if (ran.killed) {

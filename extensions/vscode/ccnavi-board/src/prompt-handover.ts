@@ -27,7 +27,7 @@ export async function openPromptInSession(prompt: string): Promise<void> {
 }
 
 /**
- * コマンド行をクリップボードに入れる（ボードからは送らない。ユーザが端末に貼って実行する）。
+ * コマンド行をクリップボードに入れる（ボードからは送らない。ユーザがターミナルに貼って実行する）。
  * 入れられたら空、入れられなかったら理由を返す。投げない
  */
 export async function copyCommand(command: string, what: string): Promise<string | undefined> {
@@ -38,6 +38,6 @@ export async function copyCommand(command: string, what: string): Promise<string
     void vscode.window.showWarningMessage(`${what}をコピーできませんでした: ${reason}`);
     return reason === "" ? "理由は不明です" : reason;
   }
-  vscode.window.setStatusBarMessage(`${what}をコピーしました。端末に貼って実行してください`, 5000);
+  vscode.window.setStatusBarMessage(`${what}をコピーしました。ターミナルに貼って実行してください`, 5000);
   return undefined;
 }

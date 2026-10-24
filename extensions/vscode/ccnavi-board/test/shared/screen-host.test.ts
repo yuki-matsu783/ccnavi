@@ -31,7 +31,7 @@ test("CB-T143 1 枚目は入れ物ごと入れる。組み上がる前に渡し�
   assert.equal(host.send("あ"), "rebuilt");
   assert.deepEqual(spy.pages, ["<html>あ</html>"]);
   assert.deepEqual(spy.posted, []);
-  // 作り直している最中。受け取る側がまだ無いので送らない（いま読み込んでいるものも捨てない）
+  // 作り直している最中。受け取る側がまだ無いので送らない（いま読み込んでいるものも破棄しない）
   assert.equal(host.live, false);
   assert.equal(host.send("い"), "deferred");
   assert.deepEqual(spy.pages, ["<html>あ</html>"]);
@@ -54,7 +54,7 @@ test("CB-T145 非表示になったら入れ物ごと入れ直す。再表示さ
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
   host.ready();
-  // 非表示にする。画面は捨てられる
+  // 非表示にする。画面は破棄される
   spy.visible = false;
   host.hidden();
   assert.equal(host.live, false);
@@ -89,7 +89,7 @@ test("CB-T146 1 度きりのメッセージは、届いたときだけ真を返�
   assert.deepEqual(spy.posted, [{ type: "filter" }]);
 });
 
-test("CB-T147 非表示になっている画面からの ready は、捨てられた画面が残したものとして捨てる", () => {
+test("CB-T147 非表示になっている画面からの ready は、破棄された画面が残したものとして破棄する", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
@@ -151,14 +151,14 @@ test("CB-T150 教えてもらえなくても、表示の有無が変わってい
   assert.deepEqual(spy.posted, []);
 });
 
-// ---- 保持する画面（retainContextWhenHidden: true）。非表示になっても画面が捨てられないので段取りが変わる
+// ---- 保持する画面（retainContextWhenHidden: true）。非表示になっても画面が破棄されないので段取りが変わる
 
 test("CB-T151 保持する画面は入れ物を 1 度しか入れない。2 枚目からは中身だけ送る", () => {
   const spy = surface();
   const host = retainedHost<string>(spy, (data) => `<html>${data}</html>`);
   assert.equal(host.send("あ"), "rebuilt");
   assert.deepEqual(spy.pages, ["<html>あ</html>"]);
-  // 組み上がるまでは受け取る側が無い。入れ直しもしない（読み込んでいるものを捨てない）
+  // 組み上がるまでは受け取る側が無い。入れ直しもしない（読み込んでいるものを破棄しない）
   assert.equal(host.live, false);
   assert.equal(host.send("い"), "deferred");
   assert.deepEqual(spy.pages, ["<html>あ</html>"]);
@@ -174,7 +174,7 @@ test("CB-T152 保持する画面は非表示になっても入れ直さず、非
   const host = retainedHost<string>(spy, (data) => data);
   host.send("あ");
   host.ready();
-  // 非表示にする。VS Code は画面を捨てないので、送ったものは届く
+  // 非表示にする。VS Code は画面を破棄しないので、送ったものは届く
   spy.visible = false;
   host.hidden();
   assert.equal(host.live, true);

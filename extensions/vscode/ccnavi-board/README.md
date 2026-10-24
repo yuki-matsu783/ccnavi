@@ -19,7 +19,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 
 設定（`settings.json`）。
 
-| 鍵 | 何 |
+| キー | 何 |
 |---|---|
 | `ccnaviBoard.binPath` | 実行ファイルの場所。空なら上の順で探す。相対ならワークスペースルートから |
 | `ccnaviBoard.bashPath` | Windows で使うシェル。空なら Git Bash |

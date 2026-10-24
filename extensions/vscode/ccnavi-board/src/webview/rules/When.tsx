@@ -44,11 +44,11 @@ interface CondData extends Record<string, unknown> {
 type CondFlowNode = Node<CondData, "cond">;
 
 const OP_TITLES: Readonly<Record<string, string>> = {
-  all: "all: 中のすべてに当たれば当たります",
-  any: "any: 中のどれかに当たれば当たります",
-  not: "not: 中に当たらなければ当たります",
-  glob: "glob: 対象をこの glob で当てます",
-  regex: "regex: 対象をこの正規表現で当てます",
+  all: "all: 中のすべてにヒットすればヒットします",
+  any: "any: 中のどれかにヒットすればヒットします",
+  not: "not: 中にヒットしなければヒットします",
+  glob: "glob: 対象をこの glob で適用します",
+  regex: "regex: 対象をこの正規表現で適用します",
   invalid: "読み込めないノード",
   empty: "空。押して中に入れるものを選びます",
 };
@@ -239,15 +239,15 @@ function Inspector({
       {(node.op === "all" || node.op === "any") && (
         <span className="inline">
           <select className="f-cond-op" value={node.op} onChange={(event) => edit(changeOp(tree, path, event.target.value as "all" | "any"))}>
-            <option value="all">all（すべてに当たる）</option>
-            <option value="any">any（どれかに当たる）</option>
+            <option value="all">all（すべてにヒットする）</option>
+            <option value="any">any（どれかにヒットする）</option>
           </select>
           {adders(path, node.children.length)}
         </span>
       )}
       {node.op === "not" && (
         <span className="inline">
-          <span className="dim">not（中に当たらなければ当たる）</span>
+          <span className="dim">not（中にヒットしなければヒットする）</span>
           {node.child === null && adders(path, 0)}
           {node.child !== null && (
             <button type="button" className="action small" data-op-action="unwrap" onClick={() => edit(unwrapNot(tree, path), path)}>
