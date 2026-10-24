@@ -15,6 +15,7 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 | 知りたいこと | 読む場所 |
 |---|---|
 | 用語 | [CONTEXT.md](CONTEXT.md) |
+| 根底にある考え方（なぜ・何を・どう）。スライド版は[01_idea/index.html](01_idea/index.html) | [00_idea.md](00_idea.md) |
 | 外から観測できる約束 | [requirements.md](requirements.md) |
 | 実行ファイルと拡張の JSON の形 | [requirements/json-shapes.md](requirements/json-shapes.md) |
 | いまの実装の作り | [design.md](design.md) |

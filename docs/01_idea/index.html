@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ccnavi の思想</title>
+<!-- 正は docs/00_idea.md。ユーザが依頼しない限り直さない。直すときは 00_idea.md と揃える。 -->
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --fg: #1d2330; --muted: #5b6475;
+    --accent: #2457d6; --accent-soft: #e6edfc; --warn: #b4442a; --line: #d9dde6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c; --card: #1a1f2a; --fg: #e8ebf2; --muted: #9aa3b5;
+      --accent: #7ea2ff; --accent-soft: #232c45; --warn: #ff9a80; --line: #2c3342;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg); overflow: hidden;
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
+    line-height: 1.7;
+  }
+  .slide {
+    display: none; position: absolute; inset: 0;
+    padding: clamp(24px, 6vh, 64px) clamp(20px, 7vw, 120px) clamp(56px, 10vh, 90px);
+    flex-direction: column; gap: clamp(12px, 2.4vh, 24px);
+    overflow-y: auto;
+  }
+  .slide.on { display: flex; }
+  .slide > :first-child { margin-top: auto; }
+  .slide > :last-child { margin-bottom: auto; }
+  .tag { font-size: clamp(12px, 1.6vh, 15px); letter-spacing: .12em; color: var(--accent); font-weight: 700; }
+  h1 { font-size: clamp(32px, 7vh, 64px); margin: 0; line-height: 1.25; }
+  h2 { font-size: clamp(24px, 4.6vh, 42px); margin: 0; line-height: 1.3; }
+  p, li { font-size: clamp(15px, 2.6vh, 24px); margin: 0; }
+  .lead { font-size: clamp(17px, 3.2vh, 30px); }
+  .muted { color: var(--muted); }
+  ul { margin: 0; padding-left: 1.2em; display: grid; gap: .5em; }
+  .grid { display: grid; gap: clamp(10px, 2vh, 20px); grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: clamp(12px, 2.2vh, 22px) clamp(14px, 2vw, 24px);
+  }
+  .card b { display: block; font-size: clamp(16px, 2.8vh, 26px); margin-bottom: .2em; }
+  .card span { font-size: clamp(13px, 2.2vh, 20px); color: var(--muted); display: block; }
+  .num { font-style: normal; color: var(--accent); font-weight: 800; margin-right: .3em; }
+  .bad b { color: var(--warn); }
+  .quote {
+    background: var(--accent-soft); border-left: 6px solid var(--accent);
+    padding: clamp(14px, 2.6vh, 28px) clamp(16px, 2.4vw, 32px); border-radius: 8px;
+    font-size: clamp(18px, 3.4vh, 32px); font-weight: 700; line-height: 1.6;
+  }
+  table { border-collapse: collapse; width: 100%; background: var(--card); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; vertical-align: top; padding: .55em .8em; border-bottom: 1px solid var(--line); font-size: clamp(13px, 2.3vh, 21px); }
+  th { width: 34%; }
+  nav {
+    position: fixed; left: 0; right: 0; bottom: 0; height: clamp(40px, 6vh, 56px);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 clamp(12px, 3vw, 32px); background: var(--bg); border-top: 1px solid var(--line);
+  }
+  nav button {
+    background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 8px;
+    padding: .3em .9em; font-size: 16px; cursor: pointer;
+  }
+  nav button:disabled { opacity: .35; cursor: default; }
+  #count { color: var(--muted); font-size: 14px; }
+  #bar { position: fixed; top: 0; left: 0; height: 4px; background: var(--accent); transition: width .2s; }
+  @media print {
+    body { overflow: visible; height: auto; }
+    .slide { display: flex; position: static; min-height: 100vh; page-break-after: always; }
+    nav, #bar { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<section class="slide">
+  <div class="tag">CCNAVI / IDEA</div>
+  <h1>ccnavi の思想</h1>
+  <p class="lead muted">なぜ作るか、何を作るか、どう実現するか</p>
+  <div class="quote">エージェントに任せる範囲を広げながら、人間の判断と目が届く道を失わせない。</div>
+  <p class="muted">アプリの根底にある考え方。ユーザが依頼しない限り変えない。正の文書は <code>docs/00_idea.md</code>。</p>
+</section>
+
+<section class="slide">
+  <div class="tag">WHY 1 / 課題</div>
+  <h2>エージェントは、目的のために制約を突破しうる</h2>
+  <p class="lead">悪意はない。「hook が邪魔なので外す」「deny が厳しいので緩める」を、目的を達しようとして普通に選ぶ。</p>
+  <p class="muted">任せる範囲を広げるほど、人間が一手ずつ見ることはできなくなる。</p>
+</section>
+
+<section class="slide">
+  <div class="tag">WHY 2 / 既存の防ぎ方の穴</div>
+  <h2>既存の防ぎ方には 4 つの穴がある</h2>
+  <div class="grid">
+    <div class="card bad"><b>構造を見ない</b><span>パターン一致は連鎖・サブシェル・リダイレクトを見ず、複合コマンドの後段が素通りする</span></div>
+    <div class="card bad"><b>確率でしかない</b><span>プロンプトの禁止は、守られる確率を上げるだけで 0 にはならない</span></div>
+    <div class="card bad"><b>二択になる</b><span>静的な権限は、広く開けるか毎回確認するか。前者は守れず、後者は承認が形骸化する</span></div>
+    <div class="card bad"><b>根拠を書き換えられる</b><span>拒否の根拠が、エージェントの書き換えられる作業ツリーの中にある</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="tag">WHY 3 / 解きたいこと</div>
+  <h2>守る対象はプロジェクトが決め、あとは合意に委ねる</h2>
+  <div class="quote">逸れたときは、人間の目に触れさせる。</div>
+  <ul>
+    <li>エージェントは、止められても、代わりに何をすればよいか分かり、自力で進められる</li>
+    <li>人間は承認・レビュー・採否という判断に集中できる。その判断は代行されない</li>
+    <li>記録が残り、同じ失敗を繰り返さないよう、決まりと手順が育つ</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <div class="tag">WHAT 1 / 何を作るか</div>
+  <h2>Claude Code の開発を支える 4 つのコア機能</h2>
+  <div class="grid">
+    <div class="card"><b><i class="num">1</i>ガードとガイド</b><span>ルールで判定し、止める・確認する・伝える。拒否には代わりの手段を添える</span></div>
+    <div class="card"><b><i class="num">2</i>チケットとレビュー</b><span>目的・範囲・計画を合意し、承認からレビューまで進める</span></div>
+    <div class="card"><b><i class="num">3</i>検索と必要時の参照</b><span>文書と手順は全部は渡さず、目録で絞り、必要なときに読ませる</span></div>
+    <div class="card"><b><i class="num">4</i>記録と振り返り</b><span>記録から改善候補を出し、人間が採ったものを次に活かす</span></div>
+  </div>
+  <p class="muted">記録・dry-run・診断・ワークツリー・拡張などは、この 4 つを支える仕組みと入口である。</p>
+</section>
+
+<section class="slide">
+  <div class="tag">WHAT 2 / 作らないもの</div>
+  <h2>ccnavi がやらないこと</h2>
+  <table>
+    <tr><th>OS 権限分離の代わり</th><td>同じ権限で任意のシェルを動かせる相手には境界にならない。逸れるエージェントと事故への柵である</td></tr>
+    <tr><th>人間の判断の代行</th><td>承認・レビュー済み・採否を、エージェントが出せる形は作らない</td></tr>
+    <tr><th>モデルの学習</th><td>改善するのはルール・手順・文書・計画の側</td></tr>
+    <tr><th>守られる保証</th><td>そうなるよう設計するが、保証はしない</td></tr>
+  </table>
+</section>
+
+<section class="slide">
+  <div class="tag">HOW 1 / 3 つの原則</div>
+  <h2>製品として共通する 3 つの原則</h2>
+  <div class="grid">
+    <div class="card"><b><i class="num">1</i>必要な情報を、必要なタイミングで</b><span>開始時は前提と入口だけ。理由と手順は場面で、詳しい資料は引いて読む。先に詰め込まない</span></div>
+    <div class="card"><b><i class="num">2</i>人間の判断を残し、守る</b><span>承認・レビュー・採否とガード自身の変更を、エージェントが代行できる形にしない</span></div>
+    <div class="card"><b><i class="num">3</i>単一の場所に閉じ込めない</b><span>チケットはブランチに載せ、レビューはホスト上で。対話も自動実行も同じ道で扱う</span></div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="tag">HOW 2 / 考え方</div>
+  <h2>原則を支える考え方</h2>
+  <table>
+    <tr><th>判定はモデルの外で</th><td>hook の処理がコンテキストの外で判定する。エージェントの自発的な遵守に頼らない</td></tr>
+    <tr><th>拒否は誘導と一緒に</th><td>止めるだけでは打ち直される。理由と代わりの手段を名指しで返す</td></tr>
+    <tr><th>失敗の向きは非対称</th><td>誤検知は一手止まるだけ、素通りは気づけない。迷ったら止める。ただし回復手段は奪わない</td></tr>
+    <tr><th>制約は緩められない</th><td>チケットは絞る向きにだけ働く</td></tr>
+    <tr><th>逸脱は必ず見せる</th><td>委ねた回も既定に落ちた回も記録に残す</td></tr>
+    <tr><th>親は清潔に、育てる</th><td>親は判断と報告、作業は子へ。記録から改善候補を出し、採否は人間が決める</td></tr>
+  </table>
+</section>
+
+<section class="slide">
+  <div class="tag">MAP / 読む順</div>
+  <h2>この思想から下位の文書へ</h2>
+  <table>
+    <tr><th>思想</th><td><code>docs/00_idea.md</code>（このスライドの正）</td></tr>
+    <tr><th>約束</th><td><code>docs/requirements.md</code>　外から観測できる振る舞い</td></tr>
+    <tr><th>設計</th><td><code>docs/design.md</code>　いまの実装の作り</td></tr>
+    <tr><th>理由と経緯</th><td><code>docs/adr/</code>　採らなかった案を含む</td></tr>
+    <tr><th>使い方</th><td><code>docs/guide/</code></td></tr>
+  </table>
+  <p class="muted">食い違ったら機能の側を見直す。考え方の側を直すのは、ユーザが依頼したときだけ。</p>
+</section>
+
+<nav>
+  <button id="prev" aria-label="前へ">←</button>
+  <span id="count"></span>
+  <button id="next" aria-label="次へ">→</button>
+</nav>
+
+<script>
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var cur = 0;
+  function show(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function (s, k) { s.classList.toggle("on", k === cur); });
+    document.getElementById("count").textContent = (cur + 1) + " / " + slides.length;
+    document.getElementById("bar").style.width = ((cur + 1) / slides.length * 100) + "%";
+    document.getElementById("prev").disabled = cur === 0;
+    document.getElementById("next").disabled = cur === slides.length - 1;
+    try { history.replaceState(null, "", "#" + (cur + 1)); } catch (e) {}
+  }
+  document.getElementById("prev").onclick = function () { show(cur - 1); };
+  document.getElementById("next").onclick = function () { show(cur + 1); };
+  document.addEventListener("keydown", function (e) {
+    if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].indexOf(e.key) >= 0) { e.preventDefault(); show(cur + 1); }
+    else if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].indexOf(e.key) >= 0) { e.preventDefault(); show(cur - 1); }
+    else if (e.key === "Home") show(0);
+    else if (e.key === "End") show(slides.length - 1);
+  });
+  var start = parseInt((location.hash || "").slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+</script>
+</body>
+</html>
