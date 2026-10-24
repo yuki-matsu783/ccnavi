@@ -10,7 +10,7 @@ import { useRef, useState, type JSX } from "react";
 
 import { defaultSum } from "../../core/sums.js";
 import { templateNameTaken, validTemplateName } from "../../core/templatesmodel.js";
-import type { EditOpened, TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
+import type { EditOpened, TemplateCheck, TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseTemplatesSample } from "../../core/tour-templates.js";
 import { useHostMessages } from "../useHostMessages.js";
@@ -52,12 +52,16 @@ interface Editing {
 export function App({ initial }: { readonly initial: TemplatesData }): JSX.Element {
   const [data, setData] = useState<TemplatesData>(initial);
   const [busy, setBusy] = useState(false);
-  /** 開いているテンプレートのキー（`layer/name`） */
-  const [openTemplates, setOpenTemplates] = useState<ReadonlySet<string>>(() => new Set());
+  /** 畳んだテンプレートのキー（`layer/name`）。行は最初から開いて図を見せるので、畳んだものだけを覚える */
+  const [foldedTemplates, setFoldedTemplates] = useState<ReadonlySet<string>>(() => new Set());
   /** 開いている下書きの名前 */
   const [openDrafts, setOpenDrafts] = useState<ReadonlySet<string>>(() => new Set());
   /** 本文の答え（キーは `layer/name`） */
   const [details, setDetails] = useState<Readonly<Record<string, Detail>>>({});
+  /** 図の中身の答え（キーは `layer/name`）。読めなければ `error` */
+  const [previews, setPreviews] = useState<Readonly<Record<string, { readonly check?: TemplateCheck; readonly error: string }>>>({});
+  /** 図の中身を頼んだ行（頼み直さないため）。読み直したら空にする */
+  const asked = useRef<Set<string>>(new Set());
   /** 編集中のテンプレート。あるあいだは一覧の代わりに編集欄を出す */
   const [editing, setEditing] = useState<Editing | undefined>(undefined);
   /** 編集を始められなかった理由 */
@@ -88,6 +92,8 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       setData(message.data);
       setBusy(false);
       setDetails({});
+      setPreviews({});
+      asked.current = new Set();
     } else if (message.type === "tour") {
       requestTour();
     } else if (message.type === "editOpened") {
@@ -102,6 +108,9 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         setEditError(String(message.error ?? "編集を始められませんでした"));
         setEditing(undefined);
       }
+    } else if (message.type === "preview" && message.name !== undefined && message.layer !== undefined) {
+      const key = `${message.layer}/${message.name}`;
+      setPreviews((now) => ({ ...now, [key]: { check: (message.check as TemplateCheck | null) ?? undefined, error: String(message.error ?? "") } }));
     } else if (message.type === "detail" && message.name !== undefined && message.layer !== undefined) {
       const key = `${message.layer}/${message.name}`;
       setDetails((now) => ({ ...now, [key]: { detail: message.template ?? undefined, error: String(message.error ?? "") } }));
@@ -149,7 +158,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     if (tour.touring) {
       return;
     }
-    setOpenTemplates((now) => {
+    setFoldedTemplates((now) => {
       const next = new Set(now);
       if (next.has(key)) {
         next.delete(key);
@@ -158,6 +167,16 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       }
       return next;
     });
+  };
+
+  /** 図の中身を頼む（1 行につき 1 度。読み直すまで頼み直さない） */
+  const askPreview = (entry: TemplateEntry): void => {
+    const key = `${entry.layer}/${entry.name}`;
+    if (tour.touring || asked.current.has(key)) {
+      return;
+    }
+    asked.current.add(key);
+    post({ type: "preview", name: entry.name, layer: entry.layer });
   };
 
   const toggleDraft = (name: string): void => {
@@ -203,7 +222,10 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       <Template
         key={key}
         entry={entry}
-        open={touring ? sceneOpenTemplates.has(key) : openTemplates.has(key)}
+        open={touring ? sceneOpenTemplates.has(key) : !foldedTemplates.has(key)}
+        preview={touring ? undefined : previews[key]?.check}
+        previewError={touring ? "" : (previews[key]?.error ?? "")}
+        onPreview={touring || !entry.valid ? undefined : () => askPreview(entry)}
         onToggle={() => toggleTemplate(key)}
         detail={touring ? sampleDetail : shown?.detail}
         detailError={touring ? "" : (shown?.error ?? "")}

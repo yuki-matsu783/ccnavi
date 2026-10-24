@@ -67,8 +67,6 @@ const text = (element: { textContent: string | null } | null | undefined): strin
 test("CB-D382 編集を押すと editOpen を送り、答えが届くまで読み込み中を出す。答えが届くと一覧の代わりに編集欄を出し、説明・使う場面・計画の表・フローの欄が見本どおりに入る", async () => {
   const dom = await openList();
   try {
-    dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] .row-head'));
-    await dom.settle();
     dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] button[data-action="edit-template"]'));
     await dom.settle();
     assert.match(text(dom.one("#edit-loading")), /feature を読み込み中/);
@@ -236,8 +234,6 @@ test("CB-D386 未保存のまま閉じようとすると捨ててよいかを聞
 test("CB-D387 編集を始められなかったときは、理由を一覧の上に出す。読み取り専用の層では編集と作るの入口を出さない", async () => {
   const dom = await openList();
   try {
-    dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] .row-head'));
-    await dom.settle();
     dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] button[data-action="edit-template"]'));
     await dom.settle();
     const session = dom.posted.find((m) => m.type === "editOpen")?.session as number;
@@ -256,8 +252,6 @@ test("CB-D387 編集を始められなかったときは、理由を一覧の上
   };
   const ro = await loadPage(templatesHtml({ kind: "page", page: readOnly }), undefined, { measure: true });
   try {
-    await ro.settle();
-    ro.click(ro.one('li.template[data-name="feature"][data-layer="self"] .row-head'));
     await ro.settle();
     assert.equal(ro.all('button[data-action="edit-template"]').length, 0);
     assert.equal(ro.all('[data-role="new-template"]').length, 0);
@@ -355,6 +349,52 @@ test("CB-D390 作業中のチケットがある間は編集はできるが保存
     await dom.send({ type: "editLock", session: session + 99, lock: locked });
     await dom.settle();
     assert.equal(dom.all('[data-role="edit-lock"]').length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D739 一覧の行は最初から開き、図の中身を求める（preview）。答えが届くと計画の図と子のフローの図を読むだけで出し、「図を編集」で編集欄に進める", async () => {
+  const dom = await openList();
+  try {
+    const row = 'li.template[data-name="feature"][data-layer="self"]';
+    assert.equal(dom.all(`${row}.open`).length, 1, "最初から開いている");
+    const asked = dom.posted.filter((m) => m.type === "preview" && m.name === "feature");
+    assert.equal(asked.length, 1, "1 行につき 1 度だけ求める");
+    assert.equal(asked[0].layer, "self");
+    // 答えが届くまでは表で出す
+    assert.equal(dom.all(`${row} table.tpl-plan`).length > 0, true);
+    await dom.send({ type: "preview", name: "feature", layer: "self", check: fixtureCheck(), error: "" });
+    await dom.settle();
+    assert.equal(dom.all(`${row} [data-role="diagrams"]`).length, 1);
+    assert.equal(dom.all(`${row} .plan-graph`).length >= 1, true, "計画の図が出る");
+    assert.equal(dom.all(`${row} .plan-graph[data-editable="1"]`).length, 0, "一覧の図は読むだけ");
+    assert.equal(dom.all(`${row} [data-role="flow-diagram"] .react-flow__node`).length >= 2, true, "子のフローの図が出る");
+    assert.equal(dom.all(`${row} table.tpl-plan`).length, 0, "図が出たら表は出さない");
+    // 畳むと消え、押し直すと戻る。求め直さない
+    dom.click(dom.one(`${row} .row-head`));
+    await dom.settle();
+    assert.equal(dom.all(`${row}.open`).length, 0);
+    dom.click(dom.one(`${row} .row-head`));
+    await dom.settle();
+    assert.equal(dom.all(`${row} [data-role="diagrams"]`).length, 1);
+    assert.equal(dom.posted.filter((m) => m.type === "preview" && m.name === "feature").length, 1);
+    await startEdit(dom);
+    assert.equal(dom.all('section[data-role="edit"]').length, 1);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D740 図の中身を読めなかったときは、理由を言って表のまま出す", async () => {
+  const dom = await openList();
+  try {
+    const row = 'li.template[data-name="feature"][data-layer="self"]';
+    await dom.send({ type: "preview", name: "feature", layer: "self", check: null, error: "検査できません" });
+    await dom.settle();
+    assert.match(text(dom.one(`${row} [data-role="preview-error"]`)), /検査できません/);
+    assert.equal(dom.all(`${row} table.tpl-plan`).length > 0, true);
+    assert.equal(dom.posted.filter((m) => m.type === "preview" && m.name === "feature").length, 1, "失敗しても求め直し続けない");
   } finally {
     await dom.close();
   }

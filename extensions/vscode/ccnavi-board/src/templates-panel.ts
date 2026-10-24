@@ -491,6 +491,10 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
       } satisfies ToTemplates);
       return;
     }
+    case "preview": {
+      await attempt(() => preview(current, message.name, message.layer), (e) => current.host.post({ type: "preview", name: message.name, layer: message.layer, check: null, error: e } satisfies ToTemplates));
+      return;
+    }
     case "editOpen": {
       await attempt(() => editOpen(current, message.session, message.name, message.layer), (e) => current.host.post({ type: "editOpened", session: message.session, opened: null, error: e } satisfies ToTemplates));
       return;
@@ -531,6 +535,8 @@ function asMessage(message: unknown): TemplatesMessage | undefined {
       return typeof m.kind === "string" && typeof m.name === "string" ? { type: "switchTarget", kind: m.kind, name: m.name } : undefined;
     case "showTemplate":
       return typeof m.name === "string" && typeof m.layer === "string" ? { type: "showTemplate", name: m.name, layer: m.layer } : undefined;
+    case "preview":
+      return typeof m.name === "string" && typeof m.layer === "string" ? { type: "preview", name: m.name, layer: m.layer } : undefined;
     case "editOpen":
       return typeof m.session === "number" && typeof m.name === "string" && typeof m.layer === "string"
         ? { type: "editOpen", session: m.session, name: m.name, layer: m.layer }
@@ -694,6 +700,38 @@ function abandoned(current: PanelState, target: TemplatesTarget, reply: (error: 
     return true;
   }
   return false;
+}
+
+/**
+ * 一覧の 1 行を図で見せるため、そのファイルを実行ファイルに読ませて答えを返す。読むだけで、錠も編集の番号も取らない。
+ * 層は開いている対象のどの層でもよい（読み取り専用の層も図は見られる）
+ */
+async function preview(current: PanelState, name: string, layerName: string): Promise<void> {
+  const target = current.target;
+  const reply = (check: TemplateCheck | null, error: string): void => {
+    current.host.post({ type: "preview", name, layer: layerName, check, error } satisfies ToTemplates);
+  };
+  const layer = current.loaded?.data.layers.find((l) => l.name === layerName);
+  const file = layer === undefined ? undefined : templateFile(current.folder.uri.fsPath, layer, name);
+  if (layer === undefined || file === undefined) {
+    reply(null, `テンプレート ${name} の置き場が分かりません`);
+    return;
+  }
+  const read = readFlowFile(current.folder.uri.fsPath, file);
+  if (read === undefined) {
+    reply(null, `${name}.yml がありません。更新してください`);
+    return;
+  }
+  const decoded = decodeFlowBytes(read.bytes);
+  if (!decoded.ok) {
+    reply(null, decoded.error);
+    return;
+  }
+  const checked = await checkBytes(current, target, name, read.bytes);
+  if (abandoned(current, target, (e) => reply(null, e))) {
+    return;
+  }
+  reply(checked.ok ? checked.check : null, checked.ok ? "" : checked.error);
 }
 
 async function editOpen(current: PanelState, session: number, name: string, layerName: string): Promise<void> {

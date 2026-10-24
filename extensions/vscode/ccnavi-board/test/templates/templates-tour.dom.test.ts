@@ -86,7 +86,7 @@ test("CB-D334 案内の間に更新・テンプレートの開閉・本文の依
     dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] .row-head'));
     await dom.settle();
     assert.deepEqual(
-      dom.posted.filter((message) => message.type !== "ready"),
+      dom.posted.filter((message) => message.type !== "ready" && message.type !== "preview"),
       [],
     );
     assert.equal(dom.all('li.template[data-name="feature"][data-layer="self"].open').length, 0);
@@ -110,7 +110,7 @@ test("CB-D359 案内の間は見本を描き、実際のテンプレートは出
     assert.equal(dom.all(".banner.tour-sample").length, 0);
     assert.equal(dom.all("li.draft").length, 3);
     assert.deepEqual(
-      dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone"),
+      dom.posted.filter((message) => message.type !== "ready" && message.type !== "preview" && message.type !== "tourDone"),
       [],
     );
   } finally {
@@ -157,7 +157,7 @@ test("CB-D361 統合結果の案内は、見本の統合結果を選び、閉じ
     dom.click(dom.one(`[data-tour="handoff"]`));
     await dom.settle();
     assert.deepEqual(
-      dom.posted.filter((message) => message.type !== "ready"),
+      dom.posted.filter((message) => message.type !== "ready" && message.type !== "preview"),
       [],
     );
     dom.click(dom.one(`[data-action="tour-skip"]`));
