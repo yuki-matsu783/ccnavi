@@ -45,7 +45,7 @@ write-and-push の書いたパスの一覧（`--record-writes`）も、診断の
 `EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh は実行ファイルを起動する前に、拡張は起動のときに `--version` を読んで
 比べ、`--lint` は sh の値と比べる（`(version)` の warn）。食い違えば、どれも直し方（ccnavi のリポジトリなら組み立て直し、配布先なら
 配り直し、拡張が古ければ入れ直し）を名指しする。新しいフラグを使う前は、渡してみて argparse のエラーで見分けるのでは
-なく `flags` を見る。`--version` を知らない実行ファイルは古いとして扱う。レイヤーは頭の `version:` が書式の版を示す。
+なく `flags` を見る。sh は `--version` の答えから互換の版を読めなければ「不明」として食い違いに数える。拡張は版を聞けなかったとき、起動では何も言わず、フラグを使う前に理由を出して先へ進まない。レイヤーは頭の `version:` が書式の版を示す。
 読めない版は読む側が error にする。
 
 `--flow <パス>` も診断でだけ有効で、読むのは `--lint` だけ。`--test` / `--test-expectations` / `--explain` に渡すと
@@ -86,7 +86,7 @@ hook の判定の経路（`load`）はこの重ねを使わず、プロセスに
 設定を画面で直す 3 つ（ルール管理・リスク管理・フェーズ管理）は、編集中の内容を一時ファイルに書いて
 `--rules` / `--risk` / `--phases`（ワークスペースとプロジェクトの設定のレイヤーは `--project-rules-file` / `--project-risk-file` / `--project-phases-file`）で渡し、`--lint` が error を返さないときだけ保存する。フロー編集画面も
 本文を一時ファイルに書いて `--lint --json --flow` に渡し、`(flow)` の error が無く、`flow.data` が画面の中身と
-同じときだけ開く・保存する（`--version` の `flags` に `--flow` が無いか、`--version` を知らない古い実行ファイルでは開かない）。
+同じときだけ開く・保存する（`--version` の `flags` に `--flow` が無いか、版を確かめられないときは開かない）。
 
 リスク管理・フェーズ管理・テンプレート管理は、`CCNAVI_TICKET_CONTROL` が `disable` のワークスペースでは開かない（適用されない
 設定だから）。入口はすべて隠す（サイドパネル・コマンドパレット、フェーズ管理はプロジェクト管理画面の
@@ -108,8 +108,7 @@ error がある間は配点もフェーズ定義も保存できない。
 - 文字コード: 入口（`__main__` の `hookio.rebind_streams`）が標準入出力を UTF-8・改行 LF に張り直す。診断の JSON
   （`--explain` / `--test` / `--test-expectations` / `--lint` / `--suggest` / `--version`）は `ensure_ascii=True` で ASCII に変換し、
   承認の JSON と残った指摘の JSON は `ensure_ascii=False` で書く
-- 古い実行ファイルの見分け: argparse の苦情（`unrecognized arguments: --version`）を拡張が読む。
-  `parse_args` の `SystemExit` は捕まえて終了コード 1 にする
+- `parse_args` の `SystemExit` は捕まえて終了コード 1 にする
 - `ccnavi write-and-push family <親>` の答え（1 行目 `write-and-push 1`、`target yes|no|stop`）は、sh（write-and-push）だけでなく拡張も読む。
   フローを保存した後に承認の push を送るかを、これで決める
 - 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・Python・拡張の 3 つの logger で揃える（`docs/claude/logging.md`）。

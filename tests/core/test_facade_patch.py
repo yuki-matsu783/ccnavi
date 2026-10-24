@@ -33,13 +33,8 @@ from tests import ROOT, SRC
 TESTS = Path(ROOT) / "tests"
 PACKAGE = Path(SRC) / "ccnavi"
 
-# (tests/ からの相対パス, patch 先の式, 名前)。許可する理由をそれぞれに書く。
-ALLOWED = {
-    # 呼び手の `cli` が `core.approve` / `core.approve_yes` を呼ぶたびに属性参照で引くので、
-    # `cli.core` の名前を差し替えると効く。
-    ("core/test_approve_renamed.py", "cli.core", "approve"),
-    ("core/test_approve_renamed.py", "cli.core", "approve_yes"),
-}
+# (tests/ からの相対パス, patch 先の式, 名前)。許可する理由をそれぞれに書く。今は無い。
+ALLOWED: set[tuple[str, str, str]] = set()
 
 
 def _dotted(path: Path) -> str:

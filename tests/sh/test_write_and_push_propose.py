@@ -56,7 +56,7 @@ class ProposeTest(WriteAndPushHarness):
         mine = self.put(f"{self.TODO}/{PARENT}.md")
         other = self.put(f"{self.TODO}/i0002.md")
         sibling = self.put(f"{self.TODO}/{PARENT}x.md")
-        draft = self.put("wip/proposals/templates/login.yml")
+        draft = self.put("wip/handoff/.ccnavi/config/common/templates/login.yml")
         result = self.ticket("propose", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.committed(), [mine])

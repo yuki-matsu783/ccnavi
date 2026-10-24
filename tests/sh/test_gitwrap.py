@@ -265,8 +265,7 @@ class RejectTest(GitWrapperTest):
         self.assertNotEqual(2, result.returncode, result.stderr)
 
 
-# 拒否の文に代わりの手段を書くと決めた理由の名前。どれも以前は「通しません」「ありません」で
-# 終わり、次に何をすればよいかが無かった。
+# 拒否の文に代わりの手段を書くと決めた理由の名前。次に何をすればよいかを必ず書く。
 NEEDS_ALTERNATIVE = (
     "integrate-tmp",
     "grep-pager",

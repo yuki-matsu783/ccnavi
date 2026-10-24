@@ -28,7 +28,7 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 
 | type | 対象 | 現状 |
 |---|---|---|
-| `guide` | 使い方と作業の手引き。`.ccnavi/docs/*.md`、`docs/claude/*.md`、`docs/adr/README.md`、`docs/guide/*.md`（利用者向け）、`docs/development.md`（開発者向けの入口）、`docs/release-notes.md` | 付いている。ルートの`README.md`と拡張の`README.md`（`extensions/**`）には付けていない（理由は表の下） |
+| `guide` | 使い方と作業の手引き。`.ccnavi/docs/*.md`、`docs/claude/*.md`、`docs/adr/README.md`、`docs/guide/*.md`（利用者向け）、`docs/development.md`（開発者向けの入口） | 付いている。ルートの`README.md`と拡張の`README.md`（`extensions/**`）には付けていない（理由は表の下） |
 | `rule` | 常に守る決まり。`CLAUDE.md` | 付けていない（理由は表の下）。`--type rule`では何も出ない |
 | `design` | 現在の実装の説明。`docs/design.md`・`docs/design/**`、`wip/design/**`の設計メモ | `docs/design.md`・`docs/design/**`に付いている |
 | `requirements` | 外から観測できる約束。`docs/requirements.md`・`docs/requirements/**` | 付いている |
@@ -36,18 +36,12 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 | `adr` | 設計判断の記録。`docs/adr/NNNN-*.md` | 付いている |
 | `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`skills/*/SKILL.md` | 付けていない（理由は表の下）。`name`・`description`を持つ。共通の工程スキルは`process: true`（真偽値）も持つ（`.ccnavi/docs/skill-processes.md`）。`--type skill`では何も出ない |
 | `skill-reference` | スキルから切り出した資料。`.claude/skills/*/references/**/*.md`、プロジェクトの`skills/*/references/**/*.md`。工程スキルの`references/`は最上段を`common/`と`project/`に分け、中のディレクトリ構造は任意。工程スキルの reference は`tags`にスキル名を入れる（`.ccnavi/docs/skill-processes.md`） | 付いている |
-| `learning-wiki` | 気づきを統合した知識（パターン・採否の記録）と受信箱。`docs/wiki/**`、`projects/<名前>/docs/wiki/**`（`.ccnavi/docs/skill-wiki.md`。旧称 `skill-wiki`） | 書いたときに付ける。`ccnavi --docs` は `--type learning-wiki` を明示したときだけ出す（作業のセッションに渡さないため） |
+| `learning-wiki` | 気づきを統合した知識（パターン・採否の記録）と受信箱。`docs/wiki/**`、`projects/<名前>/docs/wiki/**`（`.ccnavi/docs/skill-wiki.md`） | 書いたときに付ける。`ccnavi --docs` は `--type learning-wiki` を明示したときだけ出す（作業のセッションに渡さないため） |
 | `report` | 調査結果や作業報告。`wip/`の下など、置き場はその都度決める | 書いたときに付ける |
 
 表に無い種類の文書を足すときは、この表に行を足してから使う。
 
-表で「付けていない」とした文書の理由と探し方は次のとおり。
-
-- `CLAUDE.md`と`README.md`類は、中身がそのまま使われる。`CLAUDE.md`は毎回モデルの文脈に入り、`README.md`はホストやエディタが
-  先頭から表示する。先頭にYAMLを足すと、そのYAMLがユーザにも見え、モデルの文脈にも毎回入るので付けない。
-  これらは`--path`（`--path README`、`--path CLAUDE`）か、`--text`でパスを指定して探す
-- `SKILL.md`には、Claude Codeがスキルを選ぶときに読む`name`と`description`がある（下の「対象外」を参照）。`type: skill`を
-  足す決まりはあるが、既存のスキルにはまだ足していない。スキルは`--path .claude/skills`で探す
+表で「付けていない」とした文書（`CLAUDE.md`・`README.md`類・`SKILL.md`）の理由と探し方は、[.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)の「typeの値」と「対象外」にある。
 
 ## 対象外の表と実行ファイル
 

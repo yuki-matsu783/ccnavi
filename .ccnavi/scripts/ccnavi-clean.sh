@@ -5,9 +5,7 @@
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前> --dry-run
 #   sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
 #
-# 親を閉じたときに残した子の手元のブランチを消す入口は、ユーザ専用の ccnavi-user-clean-branch.sh に移した
-# （前はこの sh の `--branch <子の識別子> [--confirmed]`）。`--branch` と `--confirmed` は、何もせずに終了コード 2 で
-# 新しい sh を案内する（古い手順書や古い拡張から来たとき用）。
+# 親を閉じたときに残した子の手元のブランチを消す入口は、ユーザ専用の ccnavi-user-clean-branch.sh。
 #
 # --worktree は生成物の掃除と `git worktree remove`（--force なし）を 1 本で行う。ccnavi が ready の
 # 最後や confirm の後に消せなかったワークツリー（cwd が中にあった、など）を、外から消し直すための入口。
@@ -69,11 +67,6 @@ for arg in "$@"; do
 		;;
 	--worktree)
 		whole=1
-		;;
-	--branch | --confirmed)
-		# 子のブランチを消す入口はユーザ専用の sh に移した。何も動かさずに案内する。
-		printf 'ccnavi-clean: %s は ccnavi-user-clean-branch.sh に移りました。何もしていません。子のブランチを削除するなら、ユーザが sh %s/ccnavi-user-clean-branch.sh <子の識別子> [--confirmed] を実行します（エージェントは実行しません）。\n' "$arg" "$(dirname "$0")" >&2
-		exit 2
 		;;
 	-*)
 		printf 'ccnavi-clean: %s は使用できません。使えるのは --dry-run・--worktree だけです。\n' "$arg" >&2

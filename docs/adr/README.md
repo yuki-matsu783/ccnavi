@@ -93,7 +93,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの state をセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
 | [0092](0092-rename-decision-records.md) | 判定の記録のファイル名を `logs/decisions.jsonl` にする |
 | [0099](0099-subpackages-by-role-and-agree.md) | `ccnavi/` を役割ごとの 6 つのサブパッケージに分け、置き場（approval）と合意の手続き（agree）を分けて循環を無くし、承認の CLI を `--agree` に改名する（判定のコアと write-and-push の見分けの置き場は ADR-0117 が改める） |
-| [0102](0102-identifier-prefix-number-slug.md) | 親の識別子を `<先頭の語>-<番号>-<slug>`（`feature-64-統合先の解決` など）にそろえ、日本語の字を使えるようにする。先頭の語は `CCNAVI_BRANCH_PREFIXES` で変えられる。既にあるブランチとのぶつかりを warn する。親チケットの `branch:` キーで、識別子と違う既存のブランチを親のブランチにできる（`branch:`／`switch` の手順は 0136 が置き換え） |
+| [0102](0102-identifier-prefix-number-slug.md) | 親の識別子を `<先頭の語>-<番号>-<slug>`（`feature-64-統合先の解決` など）にそろえ、日本語の字を使えるようにする。先頭の語は `CCNAVI_BRANCH_PREFIXES` で変えられる。既にあるブランチとのぶつかりを warn する。親チケットの `branch:` キーで、識別子と違う既存のブランチを親のブランチにできる（`branch:`／`switch` の手順は 0136 が置き換え。取り込み状態への言及は 0142 が改める） |
 | [0106](0106-conventions-at-session-start.md) | ccnavi が前提にしている作業の決まりは、セッション開始で要点だけを渡し、詳しいことは今ある入口に聞かせる |
 | [0117](0117-approval-core-lives-in-tickets.md) | 承認・取り下げ・レビュー済みの判定のコアと write-and-push の見分けを `hook/` から `tickets/` へ移す |
 
@@ -119,10 +119,10 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0048](0048-layers-by-path.md) | ルールのレイヤーは、パスを持つツールは行き先で、持たないツールは全部の和で選ぶ |
 | [0049](0049-unwatched-gate.md) | 未宣言の呼び出しは判断できる相手が居るモード全部に委ね、確認できない側は設定で選ぶ |
 | [0050](0050-search-tools-and-ignore.md) | 探すツールが読むファイルの保護は、ルールに足さず 3 レイヤーに分ける |
-| [0051](0051-regex-ignores-case.md) | `regex` も大文字小文字を区別せずに当て、区別が要るときは `(?-i:...)` で囲む |
+| [0051](0051-regex-ignores-case.md) | `regex` も大文字小文字を区別せずに当て、区別が要るときは `(?-i:...)` で囲む（`{root}` を囲む分岐は 0140 が改める） |
 | [0063](0063-not-root-placeholder.md) | ワークスペースの外は、先読みではなく展開で書く |
 | [0052](0052-common-layer-fixed.md) | 共通レイヤーの置き場を `.ccnavi/config/common/` に固定し、env で動かせなくする |
-| [0067](0067-common-layer-flags-are-diagnosis-only.md) | レイヤーの置き場を動かすフラグを診断の経路に限る |
+| [0067](0067-common-layer-flags-are-diagnosis-only.md) | レイヤーの置き場を動かすフラグを診断の経路に限る（`chat` は 0132 が廃止） |
 | [0098](0098-places-are-fixed-to-defaults.md) | 置き場を既定に固定し、置き場を動かす環境変数を廃止する |
 | [0056](0056-state-written-without-showing-the-middle.md) | state の記録は途中を見せない書き方で置き、取りこぼしはロックで塞がない（承認済みチケットの書き方は ADR-0105 が決める） |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
@@ -140,10 +140,10 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0071](0071-restore-only-what-deny-declares.md) | 報告するのは deny と ask と範囲外、戻すのは deny だけ |
 | [0072](0072-turn-report-sees-commits.md) | コミットに入った変更を見るのは、ターンの終わりの報告だけ |
 | [0075](0075-post-monitor-tells-its-own-writes-by-shape.md) | 実行後チェックは、自分のサブコマンドの書き込みを正規化した内容で見分ける |
-| [0077](0077-judging-lives-in-the-hook-not-the-sh.md) | 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする |
+| [0077](0077-judging-lives-in-the-hook-not-the-sh.md) | 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする（push の関門の例外は 0142 が改める） |
 | [0114](0114-raw-git-is-a-builtin-deny-under-ticket-control.md) | チケット制御が有効な間は生の git を組み込みで止め、土台の deny を表記違いに強くする |
 | [0116](0116-detect-and-guide-over-front-loading.md) | 決まりを先に詰め込まず、危険と失敗を起きた時点で検知して案内する |
-| [0118](0118-wrapper-sh-judging-is-an-exception.md) | 入口を 1 本に寄せたラッパーの中の可否の判定は、止める・通すの原則の例外にする |
+| [0118](0118-wrapper-sh-judging-is-an-exception.md) | 入口を 1 本に寄せたラッパーの中の可否の判定は、止める・通すの原則の例外にする（push の関門への広がりは 0142 が改める） |
 | [0121](0121-wrapper-cannot-remove-core-paths.md) | git のラッパーでも、自己防衛の対象を消す・別のコミットの中身に戻す形は hook が止める |
 | [0131](0131-raw-git-always-builtin-no-common-sample.md) | 生の git は組み込みでいつも止め、共通レイヤーの見本を外す。組み込みの土台の id は ccnavi 自身を守るもの以外を `builtin-deny-` で始める |
 | [0158](0158-builtin-guards-replace-common-rules.md) | ccnavi 自身の保護と認証情報の保護を組み込みに寄せ、共通の rules.yml から外す |
@@ -167,9 +167,9 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0040](0040-approve-from-the-board.md) | 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える（hook が伝えることは ADR-0104 が改める） |
 | [0043](0043-approve-carry.md) | 承認済みチケットは sh がコミットして push し、範囲の超過は判定で止め、ボードの承認はダイジェストで照合する（種類の `scope` を読む先は ADR-0109 が改める） |
 | [0065](0065-review-in-chat.md) | レビューはマージリクエストのほかに、このセッションでも受ける |
-| [0053](0053-review-hold-naming.md) | 止めている状態は「ゲート」ではなく「レビュー準備中」「レビュー待ち」と呼ぶ |
+| [0053](0053-review-hold-naming.md) | 止めている状態は「ゲート」ではなく「レビュー準備中」「レビュー待ち」と呼ぶ（`chat` は 0132 が廃止） |
 | [0054](0054-proposal-place-name.md) | 提案の置き場の既定を `wip/proposals` にする |
-| [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする |
+| [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする（`--reviewed --chat` は 0132 が廃止） |
 | [0058](0058-approval-is-the-place.md) | 承認は置き場を本物とする。記録のキーは必須にせず、承認の検査を判定でも当てる（承認で記録の欄と `project:` を書き足すことは ADR-0104 が、判定で止める範囲は ADR-0109 が改める） |
 | [0059](0059-verify-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は判定に触れずに渡す |
 | [0060](0060-default-branch-at-session-start.md) | ワークツリーの起点になるデフォルトブランチは、セッションの頭で進める |
@@ -181,8 +181,8 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める（エージェントの下書きは置き換え（ADR-0100）） |
 | [0086](0086-state-history-is-an-append-only-aid.md) | 状態の履歴を、チケットごとの追記専用のファイルに残す。状態は今までどおり置き場で決まる（承認の時刻の出どころは ADR-0104 が改める）。置き換え（ADR-0141） |
 | [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
-| [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ（続きの子の目印の置き場は ADR-0104 が改める） |
-| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する（提案。段階 0 だけ実装。「閉じた」の照合と取り下げの条件は ADR-0104 が、共通レイヤーを写す前提（D28・D34）は ADR-0107 が、待ち方を運ぶファイルは ADR-0109 が、通信先を設定画面で足さない D24 は ADR-0128 が、統合先の名前の D30 は ADR-0148 が改める） |
+| [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ（続きの子の目印の置き場は ADR-0104 が改める。`closed` で満たす道は 0142 が廃止、`--reviewed --chat` は 0132 が廃止） |
+| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、有効とするチケットは親のブランチ上のものだけに固定する（「閉じた」の照合と取り下げの条件は ADR-0104 が、共通レイヤーを写す前提（D28・D34）は ADR-0107 が、待ち方を運ぶファイルは ADR-0109 が、通信先を設定画面で足さない D24 は ADR-0128 が、統合先の名前の D30 は ADR-0148 が、取り込み状態は ADR-0142 が、チャットは ADR-0132 が、ワークツリー名の大文字小文字は ADR-0140 が改める。承認の取り下げ（D14）は ADR-0155 が廃止） |
 | [0128](0128-extension-hosts-added-in-settings.md) | 通信先を設定画面で足せるようにする（ADR-0093 の D24 を改める。足したホストの許可と、CSP の connect-src の広がり） |
 | [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、ユーザは crit で見る（置き場と指摘の書き出し方は置き換え（ADR-0095）） |
 | [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘はユーザが crit push で送る（範囲と依頼し直しの扱いは置き換え（ADR-0096）） |
@@ -198,23 +198,23 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0112](0112-ccnavi-index-jsonl-added-to-project-gitignore.md) | 索引を ccnavi-index.jsonl にし、無視の行が無いツリーには .gitignore に足して索引の対象にする |
 | [0113](0113-stop-nudges-block-in-dry-run.md) | Stop の促し（finish・match: Stop）は dry-run でも止める |
 | [0119](0119-rule-expectations-rename.md) | ルールの「見本」を「期待する判定」と呼び、名前を rule-expectations に改める |
-| [0120](0120-nudge-request-path-at-stop.md) | レビュー依頼までの道の途中で終えようとしたら、Stop で 1 回だけ止めて次の一手を返す |
+| [0120](0120-nudge-request-path-at-stop.md) | レビュー依頼までの道の途中で終えようとしたら、Stop で 1 回だけ止めて次の一手を返す（`review: chat` は 0132 が廃止） |
 | [0153](0153-ai-review-at-stop.md) | Stop の AI 判定（agent 型 Stop フック）を、既存の促しを変えずに足す |
-| [0122](0122-deny-unreadable-args-to-user-entries.md) | 2 段目の無いユーザの入口は、引数を読み切れなければ止める |
+| [0122](0122-deny-unreadable-args-to-user-entries.md) | 2 段目の無いユーザの入口は、引数を読み切れなければ止める（`--forget` の止めは 0142 が `--abandon` に置き換え、承認の経路の判定は 0143 が引き継ぐ） |
 | [0115](0115-drop-all-migration-reads.md) | 公開前なので、移行のための読み取りと掃除をすべて外す |
 | [0101](0101-child-id-carries-the-phase.md) | 子チケットの識別子にフェーズ番号を入れ、連番はフェーズごとに振る |
 | [0103](0103-issue-mr-branch-lookup.md) | issue・MR を指定された依頼では、UserPromptSubmit が指示を足し、`ccnavi-branches.sh` で紐づくブランチを探してユーザに確かめてから進める（止めない）（`branch:`／`switch` の手順は 0136 が置き換え） |
 | [0104](0104-approval-leaves-the-ticket-as-is.md) | 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す（待ち方のファイルは ADR-0109 が改める） |
 | [0105](0105-approved-ticket-written-durably.md) | 承認済みチケットは一時ファイルに書き切って fsync してから差し替える（待ち方のファイルの記述は ADR-0109 が改める） |
 | [0109](0109-plan-order-on-plan-items.md) | フェーズの順序は親の計画の項の `after` に書き、待ち方は計画から都度計算し、計画が使う定義は親に写して固定する（採用。実行ファイルの側は実装済み。ワークフロー編集タブと図も入れた。画面の実機での確認はまだ。画面の呼び名は ADR-0127 が「計画編集タブ」に改める） |
-| [0130](0130-work-review-plan-templates.md) | 完了した作業・レビュー計画と子のフローをテンプレートとして溜め、下書きから取り込んで再利用する |
-| [0134](0134-template-edit-from-board.md) | テンプレート管理画面から下書きの保存と、取り込み済みの改名・移動・削除をできるようにする（0130 の「カードからの入口は作らない」を改める） |
+| [0130](0130-work-review-plan-templates.md) | 完了した作業・レビュー計画と子のフローをテンプレートとして溜め、下書きから取り込んで再利用する（取り込み・編集の手順は 0144 が置き換え） |
+| [0134](0134-template-edit-from-board.md) | テンプレート管理画面から下書きの保存と、取り込み済みの改名・移動・削除をできるようにする（0130 の「カードからの入口は作らない」を改める。取り込み・編集の手順は 0144 が置き換え） |
 | [0149](0149-template-edit-writes-directly-from-board.md) | テンプレート管理画面は、ユーザが図で直したテンプレートを拡張が直接保存する（書くのは拡張だが、保存の前に実行ファイルが読んで確かめる） |
 | [0135](0135-learning-wiki-grows-through-tickets.md) | 気づきを子ごとの記録に溜め、learning-wiki で統合し、反映先ごとの提案にして人間が承認する |
 | [0159](0159-learning-judged-before-parent-closes.md) | 気づきを親を閉じる前に統合の子で判定し、観測元の数と MR のマージで提案を決着する |
-| [0136](0136-handoff-across-pcs-and-parent-branch-authority.md) | 親ブランチを正本にして、PC をまたいだ引き継ぎを決める（0102 の `branch:` キーと 0103 の `switch` の手順を置き換える） |
+| [0136](0136-handoff-across-pcs-and-parent-branch-authority.md) | 親ブランチを正本にして、PC をまたいだ引き継ぎを決める（0102 の `branch:` キーと 0103 の `switch` の手順を置き換える。取り込み記録をキャッシュとして使う点は 0142 が改める） |
 | [0137](0137-merge-child-at-finish.md) | 子の成果の合流を finish で行い、状態と 1 つのマージコミットにして push する |
-| [0138](0138-tidy-up-when-parent-closes.md) | 親を閉じるときの片付けを ccnavi が行い、消すのは成果が失われないと確かめられたものだけにする |
+| [0138](0138-tidy-up-when-parent-closes.md) | 親を閉じるときの片付けを ccnavi が行い、消すのは成果が失われないと確かめられたものだけにする（片付ける記録の元は 0142 が `retire/<親>.json` に改めた） |
 | [0139](0139-accept-by-resolving-the-thread.md) | 受け入れた未解決スレッドは記録ファイルに持たず、ホストのスレッドに返信を残して解決する（0030・0081 の `accepted.json` への記録を置き換える。手で動かした子の確定にだけ ADR-0152 が台帳として復活させた） |
 | [0140](0140-paths-ignore-case-everywhere.md) | パスと名前の大文字小文字は、どの機械でも区別せず同じものとして扱い、両立させない |
 | [0141](0141-drop-the-state-history.md) | 状態の履歴（`events/<識別子>.jsonl`）をやめ、状態は置き場とマーカーだけで持つ（0086 を置き換える） |
@@ -233,7 +233,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | 番号 | 題 |
 |---|---|
 | [0033](0033-projects.md) | 複数のリポジトリ：道具はワークスペース、設定はプロジェクト、Bash は和 |
-| [0035](0035-extension-no-judging.md) | VS Code 拡張は判定を自分で出さない |
+| [0035](0035-extension-no-judging.md) | VS Code 拡張は判定を自分で出さない（テンプレートの取り込みは 0144 が、判定し直しの食い違いの扱いは 0142 が改める） |
 | [0084](0084-common-layer-is-distributed-to-projects.md) | 共通レイヤーは配る定義にし、親の着手でプロジェクトのレイヤーを上書きして最初のレビューで知らせる（ADR-0107 が置き換える） |
 | [0107](0107-common-layer-is-mirrored-and-phases-live-in-config.md) | 共通レイヤーはプロジェクトの common へミラーし、フェーズ定義は config だけに置く（`phases.yml` の効く範囲は ADR-0109 が、config だけに置き足し算しないことは ADR-0125 が改める） |
 | [0125](0125-phases-add-common-and-project-layers.md) | フェーズ定義を共通レイヤーと project レイヤーの足し算にする |
@@ -258,10 +258,10 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0036](0036-tests-at-stop.md) | テストは編集ごとの hook ではなくターンの終わりに回す |
 | [0061](0061-ext-tests-by-group-at-stop.md) | 拡張のテストもターンの終わりに回し、回すのは触ったファイルが関わるグループだけ |
 | [0037](0037-rewrite-design-doc.md) | 設計書を実装に合わせて書き直す |
-| [0132](0132-abolish-review-chat.md) | レビューの chat を廃止し、見る場所を none と mr の 2 つにする |
+| [0132](0132-abolish-review-chat.md) | レビューの chat を廃止し、見る場所を none と mr の 2 つにする（取り込み状態を持たない前提は 0142 で無くなった） |
 | [0133](0133-process-skill-names-follow-phase-ids.md) | 工程スキルの名前を process- とフェーズ定義の id の語にし、implement を足す |
 | [0148](0148-integration-is-the-origin-head-only.md) | 統合先は各リポジトリの origin/HEAD だけで決め、環境変数と --integration-branch を廃止する |
 | [0155](0155-abolish-chrome-withdraw.md) | Chrome 拡張の承認の取り下げを廃止し、子は取り消して出し直し、親は改版か取り消しにする |
-| [0156](0156-review-operation-state-and-guidance-fixes.md) | レビュー運用の状態遷移と案内の修正（ホストの分類・依頼コメントへの返信・案内の出し分け）をまとめて互換の版 18 で出す |
+| [0156](0156-review-operation-state-and-guidance-fixes.md) | レビュー運用の状態遷移と案内の修正（ホストの分類・依頼コメントへの返信・案内の出し分け）をまとめて出す |
 | [0157](0157-feedback-plan-approval-does-not-settle-the-review.md) | フィードバック計画の承認でレビューの状態を変えず、issue に回すをいつでも選べるようにする |
 | [0160](0160-ticket-work-is-issue-mr-pair-with-preflight.md) | チケット作業を issue と MR のセットに限り、入口でホストの API と git のリモートの使える状態を確かめる |

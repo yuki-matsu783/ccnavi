@@ -8,7 +8,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 
 # ADR-0093: 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する
 
-状態: 提案（ワークツリーの名前を大文字小文字まで一致で求める点は ADR-0140 が改め、どの機械でも区別しない形にした。取り込みでの「閉じた」の照合と取り下げの条件は ADR-0104 が改める。共通レイヤーを `configsync` でプロジェクトのレイヤーへ写す前提の D28・D34 は、配り先をプロジェクトの `common/` のミラーに改めた ADR-0107 が改める。Chrome の承認と取り下げが運ぶものから待ち方のファイルが外れることは ADR-0109 が改める。本文の `chat`（`ccnavi-review.sh chat`、`--reviewed --chat`、chat だけの親子のチケット）は当時の記述で、ADR-0132 が廃止した。chat だけの親子のチケットの見分けは、マージリクエストで見るフェーズが無い親子のチケットの見分けに改まった。取り込み状態（`families`）と統合先の取り込み結果（`integration`）を記録として組み立てて手元と同じ関数で読む部分と、`gone` で承認を止める部分は ADR-0142 が改める。拡張は記録を組み立てず、ホストに親ブランチが無いときは `Standing.stop` で止まる）
+状態: 採用（Chrome の承認の取り下げ（D14）は ADR-0155 が廃止した。GitLab の `seq` による比較つきの書き込み（8.4 の 2 段目）は実機で前提を確かめてから足す予定で、入れていない。ワークツリーの名前を大文字小文字まで一致で求める点は ADR-0140 が改め、どの機械でも区別しない形にした。取り込みでの「閉じた」の照合と取り下げの条件は ADR-0104 が改める。共通レイヤーを `configsync` でプロジェクトのレイヤーへ写す前提の D28・D34 は、配り先をプロジェクトの `common/` のミラーに改めた ADR-0107 が改める。Chrome の承認と取り下げが運ぶものから待ち方のファイルが外れることは ADR-0109 が改める。本文の `chat`（`ccnavi-review.sh chat`、`--reviewed --chat`、chat だけの親子のチケット）は当時の記述で、ADR-0132 が廃止した。chat だけの親子のチケットの見分けは、マージリクエストで見るフェーズが無い親子のチケットの見分けに改まった。取り込み状態（`families`）と統合先の取り込み結果（`integration`）を記録として組み立てて手元と同じ関数で読む部分と、`gone` で承認を止める部分は ADR-0142 が改める。拡張は記録を組み立てず、ホストに親ブランチが無いときは `Standing.stop` で止まる）
 
 改訂（2026-10-22）: 「issue なし」のフォールバック（D4 の後半と手順の 6・「issue なし」の列）は ADR-0160 がやめた。チケット作業は issue と MR のセットで、親の識別子は issue の番号から決まる。
 
@@ -16,9 +16,8 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 
 改訂（2026-10-14）: 「CI を skip しない」（4.3）は保つ。ADR-0137 で `finish` が子のコードを親のブランチへ合流して push するようになり、積まれるコミットに CI が走ることに意味が出た。本物とするチケットを親のブランチ上のものだけにする点は保ち、その決め方（親のワークツリー 1 か所、親の識別子はブランチ名の変換、取り込み記録はキャッシュ）は ADR-0136 が簡素にした。
 
-2026-09-28 に段階 0 を採用して実装した。2026-09-29 に段階 1 を実装した（11.2）。同日、ユーザが段階 2a〜2d に進むことを承認し（2b・2c は判定を変える段階として相談して承認を得た）、段階 2a を実装した（11.3）。同日、段階 2b を実装した（11.4）。同日、段階 2c を実装した（11.5）。同日、段階 2d を実装した（11.6）。2026-09-30 にユーザが段階 3 に進むことを承認し（REQ-APV-07 の改訂が適用され始める、判定が緩む段階）、段階 3 を実装した（11.7）。同日、レビューの指摘を直した（11.7.1）。同日、ユーザが段階 4 に進むことを承認し（本物の GitHub での段階 3 の確認は後回しにした）、段階 4 を実装した（11.8）。同日、レビューの指摘を直した（11.8.1）。同日、ユーザが段階 5 に進むことを承認し（本物の GitHub・GitLab での確認は後回しにした）、段階 5 のうち GitLab の 1 段目（事後確認と元に戻すコミット（revert））・プロジェクトのリポジトリ・「始める」・decide のマーカーの `actor` を実装した（11.9）。GitLab の `seq`（8.4 の 2 段目）は本物で確かめてから入れる段階 5b として残す。段階 5b・6 は 11 章のとおり、入れる前にユーザに相談する。
 
-本文の `ファイル:行` は、この ADR を書いた時点（`6d0e53e`）の行番号です。段階 0 の変更で `ccnavi-git.sh` の行はずれています。
+本文の `ファイル:行` は、この ADR を書いた時点の行番号で、いまの実装とはずれている。
 
 用語:
 
@@ -29,7 +28,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 - 「統合先」は `done/` とレイヤーと置き場のパスを読むブランチ（D30）。統合先の設定はリポジトリには置かず、Chrome 拡張の設定と手元の環境変数で変えられる。未設定ならホストのデフォルトブランチになる。
   `P` はここから切り、マージリクエストはここへマージする（`docs/claude/environment.md` の「統合先ブランチ」と同じもの）
 - 「state の置き場」は手元の `conf.state`。リポジトリには入らない（古い呼び名: 控え）
-- 「親子のチケットの取り込み状態」は `sync/<リポジトリ>/families/<P>`、「統合先の取り込み結果」は `sync/<リポジトリ>/integration/`（3.6・4.2。古い呼び名: 家族の控え・統合先の控え）。
+- 「親子のチケットの取り込み状態」は `sync/<リポジトリ>/families/<P>`、「統合先の取り込み結果」は `sync/<リポジトリ>/integration/`（3.6・4.2。古い呼び名: 家族の控え・統合先の控え）。どちらも廃止した（ADR-0142）。
   `<リポジトリ>` はワークスペース自身なら `self`、プロジェクトならプロジェクト名。取り込み状態がある親子のチケットを「取り込み済みの親子のチケット」と呼ぶ
 - 「手元の統合先」は最後に取り込んだ `origin/<統合先>`（D26）
 - 「承認の push」はユーザの判断を `P` へコミットして送る処理。今の `ccnavi-push-approved.sh` を改修したもの（4.6）
@@ -72,7 +71,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 | D11 | 二重状態は write-and-push を絞って入れる: origin があり親子のチケットの取り込み状態が `present` の親子のチケットだけ、状態を書く操作を 1 操作（ロック → 見分けとコミット → 取り込み → 書く → コミット → push）にする。取り込み状態は最初の push で作る。それ以外は今のまま | write-and-push をすべての親子のチケットに / C2 / C3 | 4.3 |
 | D12 | SessionStart（`ccnavi-fetch.sh`）は親のワークツリーの早送りだけ。ロックが取れなければ飛ばす。merge・観測ずれの再試行・マージリクエストの確認は `ccnavi-sync.sh` と write-and-push だけ | SessionStart でも merge する | 4.2 |
 | D13 | `P` の削除・改名は追わない。マージ後に消えた場合は統合先の `done/` を確かめて正常系として扱い、それ以外は「決まらない」として止め、戻し方を案内文で出す。確かめは `ccnavi-sync.sh` と write-and-push だけ | 改名を追う / Chrome で戻す | 3.6 |
-| D14 | Chrome に「承認の取り下げ」を置く。未着手・新規・子の無い承認に限り、提案は git の履歴から戻す | 置かない / `added` キーで組み直す | 8.8 |
+| D14 | （ADR-0155 が廃止）Chrome に「承認の取り下げ」を置く。未着手・新規・子の無い承認に限り、提案は git の履歴から戻す | 置かない / `added` キーで組み直す | 8.8 |
 | D15 | Chrome から「レビュー済み」を付けられる。検査は `confirm` と同じコア | エージェントの `confirm` だけ | 8.9 |
 | D16 | ホストの Approve が新しいコミットで外れる設定は運用で避け、Chrome は外れうることを画面に出す | 設定を変えさせる | 8.10 |
 | D17 | 実行ファイルの境界を守る。取り込み・コミット・push・`ls-remote`・戻し・アカウントの引き当ては sh、Python は判定・書いたパスの一覧・見分けだけを受け持つ | Python にネットワークとコミットを持たせる | 4.5 |
@@ -94,7 +93,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 | D33 | 取り込み状態は 1 行 1 項目のテキストにし、sh は jq を使わない。JSON を読むのは Python だけ | 取り込み状態を JSON にして sh で jq を使う | 4.5 |
 | D34 | configsync がコピーしたプロジェクトのレイヤーは `start` の write-and-push でコミットして push する。記録レイヤーの「置き場の外は error」に例外を 1 つ置く | 未コミットで残す | 4.3 |
 | D35 | write-and-push と承認の pushのコミットは `commit --only -- <パス>`。取り込みの merge は索引が HEAD と同じときだけ | `add` してから `commit` | 4.3 |
-| D36 | `checkout -B` などの拒否は `ccnavi-sync.sh` と同じ段階で入れ、今の復旧案内文（`ccnavi-git.sh:99,607`）を同時に書き換える | 段階 0 で拒否する | 5.2・11 |
+| D36 | `checkout -B` などの拒否は `ccnavi-sync.sh` と同じ段階で入れ、今の復旧案内文（`ccnavi-git.sh:99,607`）を同時に書き換える | 段階 0 で拒否する | 5.2 |
 | D37 | コミットの目印（`ccnavi-state:`・`ccnavi-approve:` など）を削る。コミットメッセージはユーザが読む説明だけにし、どの処理も読まない | 目印を残す | 4.3・8.8 |
 
 ## 3. 親のブランチと本物とする側
@@ -177,7 +176,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 | 2 | ユーザ | 親のブランチ `i<番号>` を統合先の先頭から作る（Chrome 拡張の「始める」か、ホストの画面） | なし |
 | 3 | エージェント | `ccnavi-git.sh fetch origin i<番号>` → `worktree add .claude/worktrees/i<番号> -b i<番号> origin/i<番号>` → `ccnavi-sync.sh i<番号>` で親子のチケットの取り込み状態ができ、write-and-push の対象になる | `worktree add .claude/worktrees/<id> -b <id> <統合先>`。最初の push までは今の手元の動き |
 | 4 | エージェント | 親のワークツリーで提案を書き（`issue:` 付き）、`--approve --preview --verify <id>` で確かめ、コミットして push | 同じ（`issue:` なし）。push が通ると `ccnavi-git.sh` が親子のチケットの取り込み状態を `present` で作り、write-and-push の対象になる（4.3 の最初の push） |
-| 5 | 承認者 | Chrome 拡張で承認。承認済みチケットと提案の削除が 1 つのコミットで `P` に入る。着手前なら取り下げられる（8.8） | 同じ |
+| 5 | 承認者 | Chrome 拡張で承認。承認済みチケットと提案の削除が 1 つのコミットで `P` に入る。着手前なら取り下げられる（8.8。取り下げは ADR-0155 が廃止） | 同じ |
 | 6 | 開発者の手元 | 取り込み: `start` の write-and-push の中で取り込まれる。先に見たければ `ccnavi-sync.sh`（4.2） | 同じ |
 | 7 | エージェント | `start`・`finish`・マーカーは write-and-push で `P` へのコミットと push まで済ませる（4.3） | 同じ |
 | 8 | エージェント | `ccnavi-review.sh request` がマージリクエストを探し、無ければ Draft を作って依頼を投稿 | 同じ |
@@ -239,7 +238,7 @@ REQ-APV-14 の案内（`ticket.py:1163-1179`）に「push してから依頼す�
        開いている親子のチケットの判定の基準もそれに合わせて動きます（着手でコピーした結果とは違いうる）。`P` の上のレイヤーを書き換えても判定が変わらないことを優先しました
      - `P` の上のプロジェクトのレイヤーがこの計算と違えば、取り込み（4.2）と `--lint` が warn を出す
      - configsync 自体（プロジェクトだけを clone したユーザにレイヤーを配る役）は残す。写したレイヤーは `start` の write-and-push でコミットして push する（D34・4.3）
-     - **ADR-0084 を改訂対象に入れる**（9 章）
+     - **ADR-0084 を改訂対象に入れる**（設計書と要件に反映済み）
    - **手元のレイヤー（段階 2c のレビューの後のユーザの決定 B1）**: 上の 2 つ（統合先から読む・D28 の計算）は **Chrome の側にだけ当てる**。
      手元（hook・lint・承認・状態の操作）は今どおりワークスペースルートとプロジェクトの作業ツリーのレイヤーを読む。
      作業ツリーのレイヤーと統合先の取り込み結果のレイヤーの違い、`P` の上のプロジェクトのレイヤーと D28 の計算の違いは `--lint`（と取り込みの後の検査）の warn で知らせる。
@@ -268,23 +267,6 @@ REQ-APV-14 の案内（`ticket.py:1163-1179`）に「push してから依頼す�
 | `ops_close._undecided` と ADR-0073 の文面 | 「1 つにしてから」 | 3.6 の案内 |
 | `ccnavi-git.sh` push の保護（`:531-563`） | 全ツリーを探して子を見分ける | 子の見分けは変えない。親子のチケットの取り込み状態が `gone` の `P` への push を拒否。push が通ったら取り込み状態を作る（4.3 の最初の push） |
 | `review.py` / `ccnavi-review.sh` | 「識別子 = ブランチ名」を暗黙の前提にしている | `Closes` のリポジトリ付き、`ready` の前提（3.6）、`confirm` のコア化と `actor`（8.9）、write-and-push（4.3） |
-
-### 3.5 移行: 既存のチケットがほかのブランチ上にある場合
-
-1. 調べる: ディレクトリ名とブランチ名が違うワークツリー（`--lint` の warn）と、「`P` 以外にしか無い」チケットを一覧にする
-2. 元ツリーに未コミットで残ったチケット（ADR-0073 の失ったもの）: ユーザがそのチケットを親のワークツリー（`.claude/worktrees/<P>`）の同じ置き場へ移し、
-   コミットと push をして、元のチケットを消す。止めたときの文面（チケットの `blocked`、状態の操作の拒否、取り込みの後の検査）にこの手順を出す
-3. ディレクトリ名 ≠ ブランチ名の親のワークツリー: 開いている親子のチケットを名指しし、閉じるのを待ってから切り替える
-4. 閉じた親子のチケットは統合先の `done/` にあり、3.3 の 2 で読めるので触らない
-5. 1 の検査を error に上げてから、`_authoritative` の古い経路を消す
-
-**実装（段階 2c）は 1 と 5 を段に分けず、判定を厳しくする形で最初から入れた**（段階 2c のレビューの後にユーザの決定で残した）。
-取り込み済みの親子のチケット（取り込み状態があるもの）では、`P` 以外にしか無いチケットを最初から信じない（`blocked`。`--lint` は error）。
-古い経路（`_authoritative` が元ツリー上のチケットを採る形）は、取り込み済みの親子のチケットでは信じないチケットを出すだけになり、取り込み状態の無い親子のチケットでは今のまま（D11）。
-warn の段を挟まないので、移行の間に取り込み済みの親子のチケットで「元ツリー上のチケットで動いていた」ものは止まり、ユーザが 2 の手順で移すまで動かない
-
-- メリット: 判定が緩む経路（承認済みの見落とし、古い reviewed マーカー）が消え、手元と API で同じ規則になる
-- デメリット: 移行の間は二重の規則を持つ
 
 ### 3.6 `P` の削除・改名
 
@@ -454,7 +436,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 6. 元の先頭 `H0` を記録する（`rev-parse HEAD`）
 7. **書く**: Python のコマンドを `--record-writes <ファイル>` つきで起こす。Python は fsio の記録レイヤー（下）で、この実行で書いたパスの一覧を出す
 8. **コミット**: 一覧のパスだけを `commit --only -- <パス>`（新しいファイルは先に `add -- <パス>`）。`--no-verify` でユーザの hook を飛ばし
-   （状態のファイルだけなので。段階 2d のレビューの決定 C）、署名はユーザの設定に従うがタイムアウト監視の時間（`CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT`、既定 60 秒）で切る。
+   （状態のファイルだけなので）、署名はユーザの設定に従うがタイムアウト監視の時間（`CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT`、既定 60 秒）で切る。
    落ちたら、この実行が `add` したパスを索引から外す。ほかのステージ済みの変更は索引に残ったまま入らない（D35。git 2.43 で確かめた）。
    GitLab のリポジトリなら `phases/<P>/seq` の更新を同じコミットに含める（8.4。段階 5 の 2 段目から）。コミットメッセージはユーザが読む説明だけ（D37）
 9. **push**: `git push origin P`（`--force` なし）。通れば取り込み状態の `sha` を書き換えてロックを外す
@@ -470,7 +452,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
   書けない・読み返した中身が違うときは取れていないとして待ちに戻る（段階 2b のレビューで直した）
 - **古いロックの判断**:
   - 同じホスト名で同じ OS、置き場が `/mnt/` の下でなければ pid で見る。`kill -0 <pid>` が失敗すればすぐ古い。
-    **持ち主が生きていれば、10 分を過ぎても強制取得しない**（段階 2d のレビューの決定 B。長い操作のロックを強制取得して二重に書かせない）。
+    **持ち主が生きていれば、10 分を過ぎても強制取得しない**（長い操作のロックを強制取得して二重に書かせない）。
     待っても取れなければ「ロックが長い（10 分を超えて持たれている）。持ち主はまだ動いている」と言って失敗にする
   - ホスト名か OS が違う（WSL と Git Bash は同じホスト名になり pid が通じない）、置き場が `/mnt/` の下、`owner` が読めない、のどれかなら
     pid を確かめられないので時刻だけで判断する（**10 分**。`owner` が無ければ `find <ロック> -maxdepth 0 -mmin +10` で見る）
@@ -526,7 +508,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 - **`record-risk`** は write-and-push にしない。書いた `<子>.judge.json` はその子の `finish` の write-and-push がコミットして push する（`finish` はこの判定を入力として読むので、記録レイヤーが読んだ入力として一覧に足す）。
   record-risk を別の write-and-push にする形は採らない
 - **push する先は `P` だけ**。子のブランチは送らない（`ccnavi-git.sh:562` と同じ）
-- **REQ-APV-11** が止めているのは「承認済みチケットをコミットして push する sh をエージェントが起こすこと」です。補足の文を事実に合わせて直します（9 章）:
+- **REQ-APV-11** が止めているのは「承認済みチケットをコミットして push する sh をエージェントが起こすこと」です。補足の文を事実に合わせて直します（設計書と要件に反映済み）。直した文は次のとおり。
   > write-and-push の push は `P` の未送信のコミットをすべて送る（git push の性質）。コードのコミットはエージェントが `ccnavi-git.sh push` で送れる範囲と同じ。
   > 置き場について送るのは、状態の操作がこの実行で書いたパスと、ccnavi が書いたと内容で分かるパス（4.4 の (b)）だけで、
   > それ以外の置き場の変更が未送信なら write-and-push は送らずに止める（4.3 の 5）
@@ -654,10 +636,10 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
   自己防衛が守る。残る危険は、ユーザが止まった理由を確かめずに消すことと、ホストの API への直接の書き込み（5.2 と同じく防がない）
 - **止めの解除にネットワークが要る**: `gone`・`blocked` の親子のチケットを戻すのは、オンラインで打つ `ccnavi-sync.sh <P>`（取り込みと検査し直し）だけ。
   オフラインでは解けず、案内文にも「オンラインで」と書く
-- **`expectedHeadOid` は `P` しか守らない**（段階 3 のレビューの後の決定 C）: Chrome が読んでから書くまでの間に、統合先の `done/`・レイヤーや
+- **`expectedHeadOid` は `P` しか守らない**: Chrome が読んでから書くまでの間に、統合先の `done/`・レイヤーや
   閉包の `P_X` が動いても、書き込みは通る（先頭の一致を取るのは書く先の `P` だけ）。その間の変更で判定が変わる形は、手元の取り込みの後の
   判定し直し（C3。4.2 の 4）が後で見つけて親子のチケットを `blocked` にする前提で受け入れる。書き込みそのものは戻さない
-- **ダイジェストが関係の無いワークツリーの動きで揺れる**（段階 2c のレビューの後の決定 B2）: 手元の read_set は、取り込み状態の無い親子のチケットでは全ツリー上のチケットを読むので、
+- **ダイジェストが関係の無いワークツリーの動きで揺れる**: 手元の read_set は、取り込み状態の無い親子のチケットでは全ツリー上のチケットを読むので、
   preview と `--yes` の間に関係の無いワークツリーを作る・片付けるとダイジェストが変わり、見せ直しになる。厳しくする変更（承認が通らないだけ）なので受け入れる
 
 **REQ-APV-07 の改訂（決定。判定がさらに緩む変更）**: 次に書き換えます。
@@ -666,7 +648,7 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
 > リモートの置き場（親のブランチ）はホストの権限でのみ守る（書き手の表示は行わない）
 
 「取り込むときに、置き場を変えたコミットの書き手を表示すること」を改訂文に入れなかったので、書き手を表示する案より判定がさらに緩む変更です。
-改訂が適用され始めるのは Chrome で承認を書く段階 3 です（11 章）。判定が緩む変更であることは、ADR と要件の変更履歴に明記します。
+改訂が適用され始めるのは Chrome で承認を書く段階 3 です。判定が緩む変更であることは、ADR と要件の変更履歴に明記します。
 
 ### 5.2 安く塞ぐ抜け（既存のガードで足りるもの）
 
@@ -852,264 +834,22 @@ Chrome は ccnavi の .pyc を同梱するので、手元の ccnavi と版がず
 
 ## 8. Chrome 拡張の構成
 
-### 8.1 形
+現在の構成（形と CSP、ブランチの読み方と読み取り量、承認の流れと競合、1 コミットの作り方、PAT の権限、「始める」、`ccnavi-review.sh` との関係、レビュー済みのマーカー、Approve が外れる設定）は設計書 [9.20 Chrome 拡張による承認](../design/tickets/chrome-approval.md) に書いた。ここには決めた理由だけを残す。
 
-- MV3。ボードは拡張のページ（サイドパネルかタブ）。Pyodide はそのページが起動する Web Worker で動かす（動かないなら sandbox ページ。7.2）
-- CSP: `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*`（ADR-0128 で改めた形）。Pyodide・PyYAML・ccnavi の .pyc・DOMPurify を同梱
-- PAT とホストの API の呼び出しは service worker が持つ（5.5 の 4）
-- ビルドのときに API のホストの一覧から `host_permissions` を生成する（D24。`connect-src` は ADR-0128 で固定の形）
-- コアの切り出しが済むまでは、MEMFS にブランチごとの仮のツリーを組んで今のコードを動かす（段階 1）
+承認の取り下げ（D14。旧 8.8）は ADR-0155 がやめた。本文にある 8.1〜8.10 への参照は、旧 8 章の内容、つまりこの設計書の対応する節を指す。設計書の節（`####`）には番号が無いので、対応は次のとおり。
 
-### 8.2 ブランチの読み方と読み取り量
-
-- 統合先: 拡張の設定にあればその名前、空なら `GET /repos/{o}/{r}` / GitLab `GET /projects/:id` のデフォルトブランチ（3.3）。設定した名前のブランチが無ければ（404）止めて知らせ、使った名前をボードの見出しに出す
-- 直近 N 日（表示用）: GitHub は GraphQL の `refs { target { committedDate } }`、GitLab は `GET /repository/branches`
-- `P` と閉包の `P_X`: 提案の `parent or ticket` と、参照する識別子から求める（3.3 の 5）
-- 読むのは置き場のサブツリーだけ。GitHub はパスで置き場の tree の sha を引き、`?recursive=1` で取る。`truncated: true` なら error で止める。
-  GitLab は `repository/tree`（`path`・`recursive`）をページングで取り切り、取り切れなければ error
-
-読み取りを減らす工夫:
-
-- **blob は sha で引き、IndexedDB に保存する**（sha が同じなら中身は同じなので、失効が要らない）。ボードを開くたびに読むのは tree だけになる
-- **まとめて取る**: GitHub は GraphQL の別名（`f1: object(expression: "P:path") { ... on Blob { text } }` を並べる）で、IndexedDB に無い blob を 1 回に最大 50 件ほど取る。
-  GitLab は GraphQL の `repository { blobs(paths: [...], ref:) }` を使う見込みで、確度は中程度。段階 5 では確かめられなかったので、REST の `repository/blobs/:sha` を 1 件ずつ引いて IndexedDB に保存する（11.9）
-- **統合先の `done/`**: 今の `predecessor_pool` は `scan(closed=True)` で `done/` を全部読む（`approval_ops.py:373-380`）。
-  MEMFS で今のコードを動かす間（段階 1〜2a）は `done/` の blob を全部取る。コアに移ってからは、判定が要るもの（閉包の先行、同じ識別子の検査で当たったもの）だけを取り、
-  取らなかったものは `NOT_FETCHED`（6.2）にする
-
-見積もりの式（初回）: blob の数 ≒ Σ（判定に入る親子のチケットの置き場のファイル数）+ 統合先の `done/` の件数。GraphQL の呼び出し ≒ ⌈blob の数 / 50⌉ + 1（refs）。
-2 回目以降は、変わった blob の分だけ。
-
-例（GitHub、承認待ちのある親子のチケット 3 本、それぞれの置き場に 40 ファイル、`done/` に 200 件）:
-
-| 場面 | REST | GraphQL | 備考 |
-|---|---|---|---|
-| ボードを開く（初回） | 約 11（リポジトリ 1、tree 各ブランチ 2 × 4、互換のマーカー 1、統合先の有無 1） | 約 8（refs 1、blob のまとめ読み 7） | blob 約 320 件（親子のチケット 120 + `done/` 200） |
-| ボードを開く（2 回目以降、変更なし） | 約 11 | 1 | blob は IndexedDB から |
-| 承認 1 回（読み直し + 書き込み） | 約 4 | 2 | ダイジェストの比較と `createCommitOnBranch` |
-
-GitHub の上限（REST 5,000 回/時、GraphQL 5,000 点/時）に対して十分小さい。GitLab.com も認証済みの上限に対して小さい見込み。
-
-### 8.3 承認の流れと競合
-
-1. preview: Snapshot を組み、`judge` → 画面とダイジェスト。書く先の `P` の先頭 `H` を記録する
-2. yes: Snapshot を組み直し、ダイジェストが同じか確かめる（違えば preview からやり直し）
-3. `plan` の変更を、`P` へ 1 コミットで書く。条件は「`P` の先頭が `H` のまま」
-4. 先頭が動いていたら（D20）、**新しい先頭で Snapshot を組み直し、`judge` と `plan` を必ずやり直す**。
-   ダイジェストが同じなら新しい plan を新しい先頭に書く（ユーザに見せ直さない）。違えば preview からやり直す。
-   古い plan をそのまま書くことはしない（状態の履歴は全文を `update` で書くので、相手が足した行が消えてしまうため）。3 回やり直しても書けなければユーザの対応に切り替える
-
-**1 回の承認は 1 つの `P` に限る**。取り下げ（8.8）とレビュー済み（8.9）も同じ流れで書きます。
-
-### 8.4 1 コミットの作り方
-
-- **GitHub**: GraphQL の `createCommitOnBranch`（`expectedHeadOid = H`）。先頭が `H` でなければ書き込みが失敗するので、そのまま競合の検出になる。
-  Git Data API + `PATCH refs` は force push 後の巻き戻しを早送りとして通すので採らない。**`seq` は書かない**（`expectedHeadOid` で足りる）
-- **GitLab**: `POST projects/:id/repository/commits`（`branch: P`、`actions`）。既存ブランチに「先頭がこの sha のときだけ」の指定が無い見込み。2 段で入れます（D21）
-  - **1 段目（段階 5 の最初。11.9 で入れた）: ファイル単位の比較と事後確認と元に戻すコミット（revert）**。書き換える・消すファイルには `last_commit_id`
-    （そのファイルを最後に変えたコミット。読んだ先頭の上の値）を付け、同じファイルを他人が変えていれば GitLab が断るので書かない（11.9.1 の決定 A）。
-    書いた後にコミットの `parent_ids[0]` が `H` と同じか確かめ、違えば（別のファイルへの書き込みが間に入った）自分の書き込みの直前の状態（その親）で
-    同じ時刻で判定し直し、書くものが違えば元に戻すコミット（revert）を積んで知らせる。元に戻すコミットの各ファイルには「最後に変えたのは自分のコミット」を付け、
-    他人の変更の上には書かない。元に戻すコミットがさらに競合して 2 回で収まらなければ、止めてユーザの対応に切り替える（ボードに親子のチケットを「要確認」で出す）。
-    この段では、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に `P` に残りうる（別のファイルどうしの競合は `last_commit_id` では検出できない）
-  - **2 段目（確認事項 2 が確かめられたら。段階 5b）: seq ファイル `phases/<P>/seq` を足す**。ccnavi の全コミット（Chrome の承認・取り下げ・レビュー済み、write-and-push、承認の push）が
-    GitLab のリポジトリでだけ必ず更新する親子のチケットごとの小さなファイル（中身は通し番号と最後の操作）。
-    Chrome は書く直前に `GET repository/commits?path=phases/<P>/seq&ref_name=P&per_page=1` で「`seq` を最後に変えたコミット」の sha を引き、
-    `seq` の `update` の action に `last_commit_id = <その sha>` を付ける。`last_commit_id` は「そのファイルを最後に変えたコミット」と比べる見込み（確度は中〜高）なので、
-    ccnavi の書き込みどうしは後の方が失敗し、疑似的な比較つき書き込みになる。コードだけのコミットは `seq` を変えないので失敗しない（状態には関係しない）。
-    引いてから書くまでの間の書き込み（TOCTOU）とコードのコミットは検出できないので、1 段目の事後確認は安全網として残す
-  - 代案（一時ブランチ + マージリクエストの fast-forward マージ）は、確認で前提が崩れたときの予備の案
-- 手元の merge で `seq` だけが衝突したら origin 側を採って解く（4.2 の 3）
-- 提案の削除: 提案が `P` の上にあれば同じコミットで消す。`P` 以外のブランチにある提案は承認しない
-- コミットメッセージはユーザが読む説明（「ccnavi: <識別子> を承認」など）と拡張の版だけ。どの処理も読まない（D37）。`[skip ci]` は付けない（4.3）
-
-### 8.5 PAT の権限
-
-| ホスト | 承認・取り下げ（段階 3） | レビュー済み（段階 4） | 「始める」（段階 5） |
-|---|---|---|---|
-| GitHub（fine-grained、リポジトリを限る） | Contents: Read and write、Metadata: Read、Pull requests: Read | 同じ | 同じ + Issues: Read |
-| GitLab | `api`（Commits API は `write_repository` では書けない） | 同じ | 同じ |
-
-GitLab のトークンの種類: project access token（リポジトリを限れる）を勧めるが、**GitLab.com の無料版では使えない見込み**（確度は中程度。10.2 の確認事項 3）。
-使えなければ `api` スコープの個人の PAT になり、リポジトリを限れない点を受け入れる危険に入れる（5.5）。
-
-保護されたブランチ（`main` など）と統合先へは書かない（`ccnavi-push-approved.sh:174-175` と同じ一覧 + 統合先の名前）。
-
-### 8.6 Chrome 拡張から issue・ブランチを作る操作（「始める」。D19）
-
-| 案 | 内容 | メリット | デメリット |
-|---|---|---|---|
-| G0 | 載せない。ユーザがホストの画面で作る | 権限が最小 | ホストの既定のブランチ名をユーザが毎回 `i<番号>` に直す |
-| **G1（採用）** | issue の一覧に「始める」: `P = i<番号>` を統合先の先頭から作る。マージリクエストは作らない | 名前を拡張が決めるので直し忘れが無い | PAT にブランチを作る権限が要る |
-| G2 | issue の作成も載せる | 全部が拡張で済む | ホストの issue 画面の再実装に近づく |
-
-- **拒否する場合**: 求めた識別子が統合先の `done/` にある（既存の `i0055`〜`i0062` と issue #55〜#62 の衝突など）、
-  同じ名前のブランチが既にある、開いた親子のチケットに同じ識別子がある、予約の名前に当たる（3.1 の 5）。画面に「この issue からは始められない。識別子をユーザが付けて（フォールバック）始める」と出す
-- 差分 0 のブランチからは GitHub がマージリクエストを作らせない（422）ので、マージリクエストは最初の push の後に `ccnavi-review.sh request` が作る
-
-### 8.7 `ccnavi-review.sh` との関係
-
-| 操作 | 今 | 変更 |
-|---|---|---|
-| `request` | マージリクエストが無ければ Draft を作り、依頼を投稿 | 変わらない。依頼のマーカーは write-and-push で送る |
-| `confirm` | エージェントが打ち、スレッドを見てレビュー済みのマーカーを置く | 中身はコアの `confirm` / `reviewed_mark`。sh がトークンの持ち主を引いて `--actor` で渡す。write-and-push で送る |
-| `decide` | ユーザが端末かボードで打つ | Chrome には載せない。sh の中で write-and-push を回す |
-| `ready` | Draft を外す前提を確かめる | 前提に「親が `done/` にある」を足す（3.6）。マーカーは write-and-push。`[skip ci]` を付けない |
-| `close-early` | ユーザが端末で早めに閉じる | 入口を `ccnavi-review.sh close-early` にし、最後に承認の pushを呼ぶ（4.4 の (c)、4.6） |
-| 新規 `chat`・`config-synced` | なし | `--reviewed --chat`・`--config-synced` のユーザの入口。最後に承認の pushを呼ぶ（4.6） |
-| マージリクエストの `Closes` | `issue:` から書き出す（`review.py:284-285`） | `owner/repo#N` を扱う |
-| 子の push 禁止（`ccnavi-git.sh:562`） | 子のブランチはリモートに出さない | 変わらない |
-
-### 8.8 承認の取り下げ
-
-Chrome のボードに「承認を取り下げる」を置きます（D14）。既存の「差し戻し」（子を足してやり直す）とも `cancel`（取り消し。`done/` に `cancelled` で閉じる）とも別の操作です。
-
-**条件**（すべて満たすときだけ出す。判定はコアの `withdraw`）:
-
-- 承認済みチケットが `P` の `doing/` にあり、**新規の承認**である（`ccnavi_approved` に `revised_at`・`feedback_at` が無い）。改版は `settle_review` などが走っていて戻せない
-- **followup で起こしたチケットではない**: `followup_of` を持つチケット、または `source_path` が空のチケット（`approval_ops.followup`、`approval_ops.py:286-372` が作ったもの）は対象外
-- **未着手**: `started_at` が空。着手は write-and-push で必ず `P` に送られている前提（対象外の親子のチケットは Chrome に見えない）
-- **子が無い**（親のチケットのとき）: その親を `parent:` に持つチケットが `doing/`・`review/`・`done/` に無く、**`todo/` にも子の提案が無く**、`phases/<親>/` にマーカーが無い
-- **`P` に `todo/<識別子>.md` が無い**（戻す先に別の提案がある間は出さない）
-- **承認コミットが引ける**（下の 2）。引けなければ出さない
-
-**操作**（`P` への 1 コミット）:
-
-1. `doing/<識別子>.md` を消す
-2. `wip/proposals/todo/<識別子>.md` に、**承認コミットの親にあったバイト列**をそのまま戻す。
-   承認コミットは、`P` の履歴で `doing/<識別子>.md` を足したコミットのうち**最新の、親が 1 つのもの**（merge コミットは飛ばす）。
-   段階 3 のレビューの後の決定 B で、そのコミットが `P` の first-parent の鎖の上にあるときだけにした（別の枝で承認して merge で入った承認は、
-   確かめられないので取り下げない）。「足した」は変更の一覧の `status` ではなく、そのコミットと親の木で `doing/<識別子>.md` を引いて比べる
-   （GitHub は承認コミットを `renamed` で返し、一覧は 300 件で切れる）。ボードは承認コミットを引けたときだけ取り下げを出す。
-   GitHub は `GET /commits?sha=P&path=<doing のパス>`、GitLab は `repository/commits?ref_name=P&path=` で引き、各コミットの変更で「足した」かを確かめる。
-   その親のコミットの `todo/<識別子>.md` を読む。**目印は見ない**（D37）。親に提案が無い（端末で承認して別のブランチから移した場合など）ときは取り下げを出さない。
-   取り下げの後に承認し直せば、次の取り下げは新しい方の承認コミットを選ぶ
-3. `events/<識別子>.jsonl` に 1 行足す: `{"kind": "withdrawn", "from": "doing", "to": "todo", "actor": <アカウント>, "via": "chrome", "version": <拡張の版>, "at": <時刻>, "reason": <任意>}`
-4. GitLab の 2 段目からは `seq` を更新する
-
-子の承認で消えたフェーズのマーカーは戻しません（判定が厳しくなる変更）。
-
-**着手後**は取り下げられません。画面には「着手済み。取りやめるなら `ccnavi-ticket.sh cancel <識別子> --reason <理由>` をエージェントに頼む（`done/` に取り消しの記録が残る）」と出します。
-
-**Python 側**:
-
-- `events/` は補助で、判定も状態の操作も読まない（`history.py:3-7`）。判定側の変更は要らない
-- 足すもの: `history.KIND_WITHDRAWN = "withdrawn"`、経路 `history.VIA_CHROME = "chrome"`（経路の一覧は `history.py:55-64`）、状態の履歴の行の `actor`・`version` キー
-- VS Code のボードの呼び名の表（`vscode-extension/ccnavi-board/src/webview/board/text.ts:155-181`）に `withdrawn: "承認の取り下げ"` と `chrome: "Chrome 拡張"` を足す
-- 取り下げ後に同じ識別子を承認し直すのは普通の新規の承認。`next_child_id` は todo の提案も数えるので、番号は再利用されない
-
-- メリット: 押し間違えた承認を、エージェントが動く前なら履歴を残して元のバイト列に戻せる。条件が狭く、判定は緩まない
-- デメリット: 着手後・改版・followup・子のある親・承認コミットの引けない承認は取り下げられない。取り下げのたびに履歴の API を数回引く
-
-### 8.9 レビュー済みのマーカーを Chrome から付ける
-
-開発者と承認者が別の前提では、マージリクエストを見てスレッドを片付けるのは承認者側です。Chrome に「レビュー済み」を置きます（D15）。
-`ccnavi-review.sh confirm` は手元用に残し、両方とも同じコアの `confirm` と `reviewed_mark` を使います。
-
-**マーカーの中身**（`phases/<親>/<N>.reviewed`）:
-
-```json
-{"mr": 42, "accepted": [], "actor": "<ホストのアカウント名>", "via": "chrome", "at": "<時刻>"}
-```
-
-- 既存のキー `by` は**経路名**（`"feedback-plan"` `phase.py:1128`、`"chat"` `review.py:1043`、`"close-early"` `review.py:1366,1379`）なので、
-  アカウントは新しいキー **`actor`** に入れる。`confirm` のマーカーは今どおり `by` を持たない
-- Chrome の `actor` は PAT の持ち主。手元の `confirm` の `actor` は `ccnavi-review.sh` がトークンの持ち主を API で引いて `--actor` で渡す。
-  引けなければ `actor` を書かず、マーカーは前と同じ中身。段階 4 の決定 1 で「git の `user.name`」から改めた。`via` は `cli`。段階 5 で、`decide` のマーカーも同じ関数で書くようにした。その `via` は `terminal` か `board`（11.9）
-- 読む側（`phase.py` の止める判定）はマーカーが在るかと `mr`・`accepted` しか見ないので、キーを足しても判定は変わらない。`actor` は記録で、表示や警報には使わない（D29）
-- `actor` は押したユーザではなく、トークン（手元は `gh`・`glab` の認証か `GITHUB_TOKEN`/`GITLAB_TOKEN`、Chrome は PAT）の持ち主。
-  マージリクエストの作者本人のアカウントでも通る（自己レビューは防がない。それはホストの保護設定が受け持つ）
-
-**`confirm` の検査を Chrome で同じにできるか**:
-
-| 検査（`review.confirm`） | 手元での材料 | Chrome での材料 | 同じにできるか |
-|---|---|---|---|
-| 依頼のマーカーがある | `P` の `phases/<親>/<N>.requested` | 同じファイルを API で読む | できる |
-| 依頼の後にユーザが見るものが動いていない（`_moved_since_request`） | 手元の git の差分 | compare API の変更パスをコアに渡す。打ち切られたら（GitHub は 300 件）動いたとみなす | できる |
-| push 済みか（`_unpushed`） | 手元と `origin/P` の差 | 不要 | 手元だけに残す |
-| 同じマージリクエストか（`_matching`） | `ccnavi-review.sh fetch` の JSON | 親のブランチの開いたマージリクエストを引き、依頼の記録の `host`・`mr` と照合する（手元と同じ。11.8.1 の 8） | できる |
-| 変更要求のレビューが無い（`effective`） | JSON の `reviews` | GitHub `GET /pulls/{n}/reviews`、GitLab は approvals と discussions | できる |
-| 未解決スレッドが無い | JSON の `threads` と `accepted.json` | GitHub GraphQL の `reviewThreads.isResolved`、GitLab `discussions` の `resolved` | できる |
-| レビュー待ちの子を `done/` へ | ファイルの移動 | 同じ移動を `Changes` にして同じコミットに入れる | できる |
-
-ホストから取得した内容は、`ccnavi-review.sh` が組む JSON（`{host, mr, threads, reviews, fetched_at}`）と同じ形にして `Result.load` に渡します。
-未解決が残るときは Chrome では通さず、「解決するか、`decide`（端末・VS Code のボード）で受け入れる」と出します。
-
-**sh と TS の二重実装の見本と更新手順**（段階 4）:
-
-- 本物のホストの応答の形に合わせて手で組んだ見本を拡張の試験の置き場 `chrome-extension/ccnavi-approval/test/fixtures/host/<github|gitlab>/<場面>/` に置く。見本の場面は、ページングの 2 ページ目、解決済みと未解決の混在、変更要求の後の承認など。
-  段階 4 の決定 2 で置き場を拡張の側にした。段階 4 は github だけ
-- 期待値は「その見本から sh が組んだ JSON」1 つで、sh の試験と TS の試験の両方がそれと突き合わせる
-- 更新の手順（手で行う。段階 4 の決定 2）: (1) ホストの応答の形が変わったら、本物のマージリクエストから取り直すか、見本のうち形の変わったキーだけを手で直す、(2) sh の試験を
-  `CCNAVI_HOST_FIXTURE=1` で回して期待値の JSON を作り直す、(3) TS の試験を回し、落ちたら TS を直す、(4) 見本・期待値・sh・TS の変更を
-  **同じコミット**に入れる。片方だけの変更は試験で落ちる。手順の詳細は拡張の README の「ホストの応答の見本」
-- メリット: レビューした本人がその場でマーカーを付けられ、マーカーに誰が付けたかが残る
-- デメリット: ホストのスレッドの取り方が sh と TS で二重になる（判定はコアで 1 か所）
-
-### 8.10 ホストの「新しいコミットで既存の承認を外す」設定
-
-GitHub の「Dismiss stale pull request approvals when new commits are pushed」、GitLab の「Remove all approvals when commits are added to the source branch」が
-有効だと、ccnavi のコミットが `P` に積まれるたびにマージリクエストの Approve が外れます（D16）。
-
-方針: ccnavi のコミットはチケットの置き場だけを変えるので、コードの最後の Approve の前に済ませる運用にします。
-ccnavi 自身はマージリクエストの Approve を読まない（`review.py:396-433`）ので、途中の Approve が外れても ccnavi の流れは止まりません。
-
-| 時点 | ccnavi のコミット（`P` へ） | マージリクエスト | ホストの Approve |
-|---|---|---|---|
-| 親の計画の承認 | Chrome の承認 | まだ無い | 無い |
-| 着手・子の承認・子の終了 | write-and-push、Chrome の承認 | Draft | 付けない |
-| フェーズのレビュー | 依頼のマーカー（write-and-push）→ Chrome の「レビュー済み」か `confirm` | Draft | 付けない |
-| 親を閉じる | `finish`（write-and-push）→ `wip/` を消して push → `ready` のマーカー（write-and-push） | Draft を外す | なし |
-| マージ | 無い | Ready | ここで最後の Approve を付ける |
-
-Chrome の画面では、マージリクエストに Approve が付いているときに「このコミットでマージリクエストの Approve が外れることがあります」と出します。止めはしません。
-設定で避ける方法（GitLab の Code Owners の対象から `.ccnavi/approved/` を外すなど）は未確認なので、確かめるまで案内しません（10.2 の確認事項 1）。
-
-## 9. 消す・変えるもの一覧（改訂が要るもの）
-
-下の ADR と要件は、**この ADR では書き換えません**。それぞれの段階を入れるときに改訂し、改訂した ADR の状態に、改訂のもとになった ADR-0093 を書き添えます。
-
-| 種類 | もの | 扱い |
-|---|---|---|
-| ADR | 0058（承認は置き場を本物とする） | 改訂: 本物とする側を「`P` の置き場 + 統合先の `done/`」に限る |
-| ADR | 0073（本物とするツリーが無ければ元ツリーを採る） | 取り込み済みの親子のチケットについて置き換え（3.3・3.6） |
-| ADR | 0084（configsync） | 改訂: 判定は `P` の上のプロジェクトのレイヤーを読まず、「プロジェクトの統合先の現在のレイヤー + 共通レイヤーを写したレイヤー」を計算する（3.3 の 6）。コピーする役は残し、写したレイヤーは `start` の write-and-push でコミットして push する |
-| ADR | 0024・0055 | 文言の見直し（ツリー → ブランチ、デフォルトブランチ → 統合先） |
-| ADR | 0035 | 改訂: 「同じコードの答え」を認める（Pyodide）。版ずれの扱い（7.3） |
-| ADR | 0086（状態の履歴） | 追記: `withdrawn` の種類、`chrome` の経路、`actor`・`version` キー |
-| ADR | 0029・0040・0059 | 端末のユーザの承認を消すなら 0029 を廃止、0040 は VS Code を残すかで決まる。0059 は残す |
-| ADR | 新規 | 取り込みと write-and-push（4 章）、承認の push（4.6）、実行ファイルの境界の適用（4.5）、受け入れる危険（5 章）、取り下げとレビュー済み（8.8・8.9）、統合先の設定（3.3） |
-| 要件 | REQ-APV-07 | 改訂: 「リモートの置き場はホストの権限でのみ守る（書き手の表示は行わない）」。判定がさらに緩む変更であることを明記し、段階 3 で適用する（5.1） |
-| 要件 | REQ-APV-11 | 補足（4.3 のそのほかの引用文）: write-and-push の push は未送信のコミットをすべて送る。置き場については、書いたパスと (b) 以外に未送信の変更があれば止める |
-| 要件 | REQ-APV-10・12、REQ-MLT-30 | 本物とする側の規則を書き直す。REQ-APV-14 に「push してから依頼」 |
-| 要件 | 新規 | 取り下げの条件（8.8）、マーカーの `actor`（8.9）、`P` が無いときの扱い（3.6）、write-and-push の対象・最初の push・戻し（4.3）、ユーザの判断の push（4.6）、統合先（3.3）、版ずれ（7.3） |
-| コード | `approval._authoritative` / `home_dir` / `_origin_is_current` / `approval_ops.predecessor_pool`、`ops_close._undecided` | 3.4 |
-| コード | `approval.gather` / `_apply` / `phase.phases_of`、`history.stamp` | 6 章のコアと差し替え点へ |
-| コード | `phase.types_path` とレイヤーの読み | 取り込み済みの親子のチケットは統合先の取り込み結果、プロジェクトのレイヤーは 3.3 の 6 |
-| コード | `fsio` と fsio を通らない書き込み | 記録レイヤー（4.3）。`approval.py` の `os.remove`・`os.rename`・`shutil.copy2`、`history.note`、`configsync._replace` を揃える |
-| コード | 新規: write-and-push の外の変更の見分け | 4.4 の (b)・(c)・(d) と数えないもの。コミットに入った変更にも適用できる形（4.3 の 5） |
-| コード | `settings` | `CCNAVI_INTEGRATION_BRANCH` の読み（環境変数。`settings.local.json` の `env` を含む） |
-| コード | `review.confirm` / `apply_decision` | コアの `confirm` と `reviewed_mark`、`--actor` |
-| コード | `review.ready` | 前提に「親が `done/` にある」 |
-| コード | `history.py` | `KIND_WITHDRAWN`、`VIA_CHROME`、`actor`・`version` キー |
-| コード | `ticket.py` | ref 制約、大文字小文字の一意性、`i` と `<名前>-i\d+` の予約、`main`・`master`・`develop`・`release*` の予約、`owner/repo#N` |
-| コード | `lint.py` | 移行の検査、`settings.local.json` の検査（承認の判定を変える値を置かせない。`CCNAVI_INTEGRATION_BRANCH` だけ例外）、作業ツリーと統合先の取り込み結果のレイヤーの食い違い、`P` の上のプロジェクトのレイヤーの食い違い、置き場のパスの設定が絶対パス（info）、`_CHILD` に当たる親の識別子 |
-| sh | 新規 `ccnavi-sync.sh` | 4.2・3.6。`ls-remote`・fetch・早送り・merge・`done/` の確かめ・観測ずれ・マージリクエストの確認・取り込み状態の書き出し |
-| sh | `ccnavi-common.sh` | 取り込み・ロック（D32）・write-and-push のコミット・push・失敗したときに届いたかの確認・戻しの共通の関数 |
-| sh | `ccnavi-ticket.sh`・`ccnavi-review.sh` | 対象の親子のチケットで write-and-push を回す。`confirm` の `--actor`。ユーザの入口 `chat`・`config-synced`・`close-early` と最後の承認の push |
-| sh | `ccnavi-push-approved.sh` | 4.6: 親子のチケットを引数で取る、ロック（入れ子を許す）、取り込んでから送る、`commit --only`、GitLab の `seq`、push が失敗したときに届いたかの確認 |
-| sh | `ccnavi-git.sh` | 段階 0: `branch` の `*M*` を拒否していなかったこと（と使い方の文との食い違い）、`fetch`・`pull` の refspec（`:`・`+`）、置き場に当たる `checkout <ref> <パス>`・`restore --source`・`--ours/--theirs`。段階 2b: `worktree add` の名前、`--detach/-f/-B`・`checkout -B`/`switch -C` の拒否と `:99`・`:607` の文面、取り込み状態が `gone` の `P` への push の拒否、push が通ったら親子のチケットの取り込み状態を作る |
-| sh | `ccnavi-fetch.sh` | 早送りだけ（対象の見分け、ロックを試すだけ、45 秒の枠）。「ref が無い」で落ちた fetch を `failed` に入れない。merge・消えたかの確かめ・取り込み状態は持たない |
-| sh | `ccnavi-approve.sh` | 端末のユーザの承認を消すなら削除。deny（`phase.py:105-113`）の対象から外す。残す間は改修した承認の pushを呼ぶ |
-| 拡張 | `vscode-extension/ccnavi-board` | 承認は未決（10.3 の 2）。呼び名に `withdrawn`・`chrome`。フローの保存の後に承認の pushを送る |
-| 拡張 | Chrome 拡張（新規） | 8 章。書き手の表示は持たない（D29） |
-| テスト | 承認のハーネス `approve()` を使う約 20 ファイル | コアの `judge`/`plan` を直に呼ぶ形へ |
-| テスト | 新規 | 名前の見本表、`branch -M` と refspec の回帰、バイト比較の見本（手元と Pyodide）、閉包と手元の対応表の一致、8.3〜8.4 の競合と GitLab の事後確認・`seq`、取り込み（早送りの対象・重なりの拒否・ステージ済みで merge しない・merge・衝突で止まる・`seq` だけの衝突・消えたと閉じたの区別・観測ずれ）、SessionStart（ロックで飛ばす・45 秒の枠）、write-and-push（ロックの強制取得の仕方と入れ子・途中の操作で始めない・(b) を先にコミット・hook の追記と重なっての再試行・未送信の置き場の変更で止まる・書いたパスだけ・`commit --only`・届いていた push・戻しの比較つき `update-ref`・記録レイヤーと `git status` の一致）、最初の push、4.4 の見分け、承認の pushの自動呼び出し、取り下げの条件と承認コミットの選び方、`confirm` の sh と TS の一致、版ずれ、悪意のある Markdown、sh の移植性（bash 3.2・BSD の道具） |
-
-`--approve --preview --verify`（`phase.py:108-112` で deny から外している）は残します。
-
-- メリット: エージェントが承認を頼む前に自分で確かめる唯一の手段で、書き込みを伴わない
-- デメリット: 手元の Python に `--approve` の読み取り側が残る
+| 参照 | 設計書 9.20 の節 |
+|---|---|
+| 8.1 | 形 |
+| 8.2 | ブランチの読み方と読み取り量 |
+| 8.3 | 承認の流れと競合 |
+| 8.4 | 1 コミットの作り方 |
+| 8.5 | PAT の権限 |
+| 8.6 | 「始める」 |
+| 8.7 | `ccnavi-review.sh` との関係 |
+| 8.8 | （承認の取り下げ。ADR-0155 が廃止したので、節は無い） |
+| 8.9 | レビュー済みのマーカーを Chrome から付ける |
+| 8.10 | ホストの「新しいコミットで既存の承認を外す」設定 |
 
 ## 10. 決定と未決
 
@@ -1163,14 +903,14 @@ Chrome の画面では、マージリクエストに Approve が付いている�
    `refs/merge-requests/<N>/head` がブランチ消去後も残るか、GraphQL の `blobs(paths:)` でまとめて取れるか（8.2・8.4）。段階 5 の 2 段目の前
 3. GitLab.com の無料版で project access token が使えるか（使えない見込み、確度は中程度）。project access token で `GET /personal_access_tokens/self` が期限を返すか（5.5・8.5）
 4. Pyodide が MV3 の CSP（`'wasm-unsafe-eval'` だけ）で動くか。`EM_ASM`/`EM_JS` の `eval` で落ちないか（7.2。段階 1）
-   → 動いた（2026-09-29、Pyodide 314.0.7・Chromium 141 の headless=new）。拡張のページのモジュール Worker で起動し、ccnavi を import して承認待ちを出すまで CSP の違反は無い。sandbox ページは要らない（11.2）
+   → 動いた。拡張のページのモジュール Worker で起動し、ccnavi を import して承認待ちを出すまで CSP の違反は無い。sandbox ページは要らない
 5. GitHub の `github-authentication-token-expiration` を拡張の fetch で読めるか。`host_permissions` を持つ拡張の fetch は CORS を受けないので読めるはずで、確度は中程度（5.5、段階 3）
    → 模擬のホストでは読めた（2026-09-30、Chromium 141 の headless=new。127.0.0.1 を `host_permissions` に持つ service worker の fetch が、
-   `Access-Control-Expose-Headers` に載せていないヘッダを読んだ）。本物の GitHub では確かめていない（11.7）
+   `Access-Control-Expose-Headers` に載せていないヘッダを読んだ）。本物の GitHub では確かめていない
 6. Git Bash で、別の sh が取ったロックの pid に `kill -0` が通じるか（D32。段階 2d）
 7. GitHub の `GET /commits?sha=P&path=` が merge コミットを返すか・飛ばすか。取り下げの承認コミットの選び方に関わる（8.8、段階 3）
-   → 確かめていない（PAT が無い）。実装はどちらでも同じ答えになる形にした（一覧の merge コミットは飛ばし、各コミットの変更で「足した」かを確かめる。11.7）
-8. レビュー済み（8.9。段階 4）で使う GitHub の応答の形。見本（11.8）は本物の形に合わせて手で組んだもので、本物からは録っていない（PAT が無い）
+   → 確かめていない（PAT が無い）。実装はどちらでも同じ答えになる形にした（一覧の merge コミットは飛ばし、各コミットの変更で「足した」かを確かめる）
+8. レビュー済み（8.9。段階 4）で使う GitHub の応答の形。見本は本物の形に合わせて手で組んだもので、本物からは録っていない（PAT が無い）
    - GraphQL の `pullRequest.reviewThreads(first: 100, after:)` の `pageInfo`・`isResolved`・最初のコメントの `url`・`path`・`line`（古い行への指摘で null）・`body`・`createdAt`
    - `GET /pulls/<N>/reviews?per_page=100&page=<N>` の `state`・`html_url`・`submitted_at`・`user.id`（消えたユーザで `user` が null）
    - `GET /compare/<base>...<head>` の `status`（`ahead`・`identical`・`diverged`）、`files` が 300 件で切れること、改名の `previous_filename`
@@ -1178,9 +918,9 @@ Chrome の画面では、マージリクエストに Approve が付いている�
    - fine-grained の PAT の「Pull requests: Read」と「Contents: Read and write」で、`reviewThreads`・レビュー・compare が読めること（8.5 の表）
    - `GET /pulls?state=open&head=<owner>:<branch>` の `:` を URL の符号化（`%3A`）で送っても同じ答えになること（拡張は符号化し、sh はしない）
    - レビュー済みのコミットで、マージリクエストの Approve が「新しいコミットで外す」設定のとき外れること（8.10。画面の注意が合っているか）
-   - レビューの一覧に書きかけ（PENDING）が出るのはトークンの持ち主のものだけか、`submitted_at` が無いか（11.8.1 の決定 A と見本 `pending`）
-   - 投稿の答え（GitHub の issue のコメントの `user.login`、GitLab の note の `author.id`）と、GitLab の discussions の `notes[0].author.id`（11.8.1 の決定 C。11.9.1 の 15 で名前から id に変えた）
-9. 段階 5（11.9・11.9.1）で使う GitLab と「始める」の応答の形。見本（`test/fixtures/host/gitlab/`）と模擬の GitLab は本物の形に合わせて手で組んだもので、本物からは録っていない（PAT が無い）
+   - レビューの一覧に書きかけ（PENDING）が出るのはトークンの持ち主のものだけか、`submitted_at` が無いか
+   - 投稿の答え（GitHub の issue のコメントの `user.login`、GitLab の note の `author.id`）と、GitLab の discussions の `notes[0].author.id`
+9. 段階 5 で使う GitLab と「始める」の応答の形。見本（`test/fixtures/host/gitlab/`）と模擬の GitLab は本物の形に合わせて手で組んだもので、本物からは録っていない（PAT が無い）
    - `merge_requests/:iid/discussions` の `notes[].resolvable`・`resolved`・`position.new_path`・`new_line`・`author.id`、
      マージリクエストの一般のコメント（依頼の投稿）が `resolvable: true` になるか、システムのノートが `resolvable: false` か
    - `merge_requests/:iid/reviewers` の `state`（`unreviewed`・`reviewed`・`requested_changes`・`approved`）と `updated_at` の有無。
@@ -1190,18 +930,18 @@ Chrome の画面では、マージリクエストに Approve が付いている�
    - `repository/tree?path=&ref=&recursive=true` のページング（`per_page=100` と `page`）と `truncated` に当たるものが無いこと、`type: commit`（サブモジュール）
    - `repository/blobs/:sha` の `encoding: base64`・`size`
    - `repository/commits?ref_name=<sha>&path=`（承認コミット）と `first_parent=true`（鎖）。merge コミットの扱いは確認事項 2 と同じく未確認
-   - `repository/merge_base?refs[]=&refs[]=` と `repository/compare?from=&to=` の `diffs`・`compare_timeout`。差分の件数の上限（拡張は 450 件以上で打ち切られたとみなす。11.9.1 の 9・11.9.3 の 3）。インスタンスの `diff_max_files`（既定 1000、最小 500）
+   - `repository/merge_base?refs[]=&refs[]=` と `repository/compare?from=&to=` の `diffs`・`compare_timeout`。差分の件数の上限（拡張は 450 件以上で打ち切られたとみなす）。インスタンスの `diff_max_files`（既定 1000、最小 500）
    - `GET /personal_access_tokens/self` の `expires_at`（個人の PAT と project access token の両方。確認事項 3）
    - 「始める」: GitHub の `POST /git/refs`（fine-grained の Contents: Read and write で通るか、既にあれば 422）と `GET /issues`（マージリクエストが混ざり `pull_request` で見分けられること、Issues: Read で読めること）。
      GitLab の `POST repository/branches`（既にあれば 400）と `GET /issues`（`iid`）
    - GitLab の入れ子のグループ（`group/sub/proj`）を `projects/<符号化したパス>` で引けること
    - 本物の GitLab での事後確認: 2 つの書き手をほぼ同時に書かせたとき、元に戻すコミット（revert）が意図どおりに積まれ、ボードに「要確認」が出ること
-   - 11.9.1: Commits API の `last_commit_id`（update・delete。そのファイルを最後に変えたコミットと比べ、違えば 400 で書かないか）と、
+   - Commits API の `last_commit_id`（update・delete。そのファイルを最後に変えたコミットと比べ、違えば 400 で書かないか）と、
      `repository/files/:path?ref=<sha>` の `last_commit_id` がそれと同じ値か（merge コミットの扱いを含む）
-   - 11.9.1: マージリクエストの `source_project_id`（フォークのマージリクエストが同じ `source_branch` で並ぶこと）、discussions の `notes[].author.id`
-   - 11.9.1: compare の打ち切り: 件数（`diff_max_files`）のほかに行数（`diff_max_lines`）や大きさで折りたたまれた diff に `collapsed`・`too_large` が付くか。
-     拡張は 450 件以上・`collapsed`・`too_large`・`compare_timeout` のどれでも一覧を読めないとする（11.9.3 の 3）
-   - 11.9.1: `GET /repository/branches` の全件のページング（「始める」の大文字小文字を区別しない重なりの検査。GitHub は `GET /branches`）
+   - マージリクエストの `source_project_id`（フォークのマージリクエストが同じ `source_branch` で並ぶこと）、discussions の `notes[].author.id`
+   - compare の打ち切り: 件数（`diff_max_files`）のほかに行数（`diff_max_lines`）や大きさで折りたたまれた diff に `collapsed`・`too_large` が付くか。
+     拡張は 450 件以上・`collapsed`・`too_large`・`compare_timeout` のどれでも一覧を読めないとする
+   - `GET /repository/branches` の全件のページング（「始める」の大文字小文字を区別しない重なりの検査。GitHub は `GET /branches`）
 
 ### 10.3 後の段階で決めること（段階 5 で決めたもの）
 
@@ -1213,829 +953,6 @@ Chrome の画面では、マージリクエストに Approve が付いている�
    - デメリット: Chrome の登録の名前と手元のディレクトリ名がずれうる。ずれると Chrome 上のチケットの `project:` が手元の置き場と合わず、
      手元で取り込んだ後の判定し直し（C3）で親子のチケットが止まる（厳しくなる変更）。揃える仕組みは持たない
 2. **VS Code 拡張の承認** → **決定（段階 5、ユーザ）**: 残す。段階 6 で消すのは端末の承認（`ccnavi-approve.sh`）だけ
-
-## 11. 段階的な進め方
-
-| 段階 | 内容 | 手元の変更 | 判定への影響 |
-|---|---|---|---|
-| 0 | 手間をかけずに塞げる抜け（5.2 の段階 0 の行）: `branch` の `*M*`、`fetch`・`pull` の refspec、置き場に当たる `checkout`・`restore`。名前の規則（3.1 の 2・3・5・6）と `_CHILD` に当たる親の識別子を lint の warn で入れる（ハードな拒否ではない） | sh・lint | 厳しくなる |
-| 1 | 読み取り専用ボード（設定画面に統合先の名前の入力欄）: MV3 の拡張のページの Worker で Pyodide を起動し、純 Python の PyYAML で今の `waiting` を動かす（MEMFS、`done/` は全部取る）。CSP で落ちれば sandbox ページ + `postMessage`（確認事項 4）。DOMPurify と CSP、悪意のある Markdown の試験。ホストの一覧から `host_permissions` と `connect-src` を生成するビルド。互換のマーカーの比較（7.3） | 無し | 無し |
-| 2a | コアと差し替え点（`judge`・`plan`・`withdraw`・`confirm`・`reviewed_mark`）。見本をバイト比較・閉包を含む複数の場面に広げ、手元の `--approve` と `confirm` をコア経由にする。`source_path` の相対化。fsio の記録レイヤーと、fsio を通らない書き込みを揃える | Python | 無し（試験で保証） |
-| 2b | 取り込みと取り込み状態: `ccnavi-sync.sh`（消えたと閉じたの区別、観測ずれ、取り込み状態の書き出し）、統合先の名前の読みと、無いブランチで止める・使った名前を出す（D30）、`ccnavi-fetch.sh` の早送りだけへの縮小とロックを試すだけの動き、`ccnavi-git.sh push` の取り込み状態の作成と `gone` の拒否、`worktree add`・`checkout -B` などの拒否と `:99`・`:607` の文面の書き換え（D36）。この段では取り込み状態を書くだけで、判定はまだ読まない | sh・Python（環境変数の読み） | 厳しくなる |
-| 2c | 本物とする側（3.3〜3.4）と `P` の消失（3.6）: 閉じた親子のチケット、決まらないときは止める、参照の閉包と手元の対応表の揃え、統合先の取り込み結果からのレイヤー（ADR-0084 の改訂）。`ready` の前提。移行の検査を error に上げてから古い経路を消す。2b の取り込み状態に依る | Python | 厳しくなる |
-| 2d | write-and-push（ロック、途中の操作、(b) を先にコミット、取り込み、未送信の確かめ、書いたパスだけ、`commit --only`、push が失敗したときに届いたかの確認、比較つきの戻し、最初の push、configsync の例外）と承認の pushの改修（4.6）とユーザの入口の sh。`history` の `withdrawn`・`chrome`・`actor`・`version` | Python・sh・VS Code のボード | 厳しくなる。ただし REQ-APV-11 の文の補足を含む |
-| 3 | Chrome で承認と取り下げ: GitHub・ワークスペースのリポジトリだけ。`createCommitOnBranch`、親子のチケットごと。Approve が外れうることの注意、PAT の期限の知らせと期限ヘッダの確認（確認事項 5）。**REQ-APV-07 の改訂が適用され始める**。2b〜2d が前提 | VS Code のボードの呼び名 | **判定が緩む**（リモートの置き場をホストの権限でのみ守り、書き手も表示しない） |
-| 4 | Chrome で「レビュー済み」: スレッドとレビューの読み取り、手で組んだホストの応答の見本での sh と TS の一致試験と見本の更新手順（8.9）、スレッド本文の描画試験 | 無し | 経路が 1 つ増える（同じコード） |
-| 5 | GitLab を 2 段で: まず事後確認と元に戻すコミット（revert）だけで出し、確認事項 2 が取れたら `seq`（write-and-push と承認の pushの側も同時）。プロジェクトのリポジトリ（10.3 の 1 の後）、「始める」 | `ccnavi-review.sh` の `Closes`、GitLab の `seq` | 無し |
-| 5b | GitLab の `seq`（8.4 の 2 段目。write-and-push・承認の push・手元の merge の `seq` だけの衝突も同時）。確認事項 2 を本物の GitLab で確かめてから（段階 5 のユーザの決定 4） | sh・Chrome 拡張 | 無し |
-| 6 | 端末のユーザの承認（`ccnavi-approve.sh`）を消す。VS Code の承認は残す（10.3 の 2） | sh・deny・ADR・要件・テスト | 経路が減る |
-
-入れる前にユーザに相談するのは、段階 **2b・2c・2d・3・5b・6** と、REQ-APV-07・REQ-APV-11 の文の変更。
-2b〜2d は判定と報告の経路を変え、影響範囲が読み切れない。3 は判定が緩む（REQ-APV-07 の改訂の中身は決定済みで、相談するのは入れる時期）。6 は戻せない。
-
-### 11.1 段階 0 で入れたもの（2026-09-28）
-
-| 何 | 場所 | 形 |
-|---|---|---|
-| `branch` の `-M`（強制の改名）・`-C`（強制の複製）。まとめた短いオプション `-rM`・`-rC` も | `ccnavi-git.sh` の `branch)` | ハードに拒否。`-m`・`--move` は今までどおり拒否。使い方の文を「`-D -m -M -C -f -u` は不可」に直した |
-| `fetch`・`pull` の `:` か `+` を含む引数（refspec・`--refmap`・URL） | `ccnavi-git.sh` の `fetch \| pull)` | ハードに拒否。文面は「`<リモート> <ブランチ>` の形で取り、手元へ入れるのは `merge <リモート>/<ブランチ>`」。3.1 の 10 の文面（「手元の ref は `ccnavi-sync.sh` が進める」）は、`ccnavi-sync.sh` ができる段階 2b で書き換える（まだ無いコマンドを案内しない） |
-| 置き場（`.ccnavi/approved/`・`wip/proposals/review/`。`CCNAVI_TICKETS_APPROVED`・`CCNAVI_TICKETS_PROPOSAL` に従う）に当たる `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` | `ccnavi-git.sh` の `checkout \| switch)`・`restore)` | ハードに拒否。git のトップからのパスに直して比べ（cwd からの相対・`..`・`\`・大文字小文字を区別しない）、置き場の親（`.ccnavi`・`wip`）も当たる。`*` `?` `[` と `:` で始まる pathspec、`--pathspec-from-file` は当たるとみなす。`--ours / --theirs` の文面は `merge --abort` と「ユーザの対応に切り替える」を案内する |
-| 新規の提案の識別子の形（3.1 の 2・5・6）: `..` を含む、`.lock`・`.` で終わる、`main`・`master`・`develop`・`release`・`release-*`（大文字小文字を区別しない）、`issue:` の無い `i<番号>` | `ticket_ids.branch_name_problems`、`lint._branch_name_problems` | `--lint` の warn。新規の提案（`todo/` にあり、承認済みでも閉じてもいない）だけを見る |
-| 大文字小文字だけが違う識別子（3.1 の 3） | `lint._branch_name_problems` | `--lint` の warn。全部の置き場を横断して見る |
-| 子の形（`_CHILD`）に当たる親の識別子（3.3 の 5） | `lint._branch_name_problems` | `--lint` の warn。全部の置き場を横断して見る |
-
-入れなかったもの:
-
-- `worktree add` の `--detach`・`-f`・`-B`、`checkout -B`・`switch -C`、`:99`・`:607` の文面: D36 のとおり段階 2b（`ccnavi-sync.sh` と同時）
-- 予約の「その時点の統合先の名前」（3.1 の 5）: 統合先の名前の読み（D30）は段階 2b で入る。段階 0 では固定のリストだけを見る
-- 3.1 の 4（issue の番号と識別子の一致）・7（プロジェクトの `<名前>-i<番号>`）・8（`owner/repo#N`）: 段階 0 の行に無い。7 はプロジェクト名の決め方が未決（10.3 の 1）
-
-### 11.2 段階 1 で入れたもの（2026-09-29）
-
-置き場は `chrome-extension/ccnavi-approval/`（`vscode-extension/ccnavi-board` と同じ構成）。手元の ccnavi・sh・hook は変えていない。
-
-| 何 | 場所 | 形 |
-|---|---|---|
-| MV3 の拡張（ボード・設定画面・service worker・Worker） | `src/` | ボードは拡張のページ（タブ）。Pyodide はそのページのモジュール Worker で動かす（8.1）。sandbox ページは使わない（10.2 の 4） |
-| 判定の入口 | `py/ccnavi_chrome.py` | MEMFS に統合先をワークスペースルート、親子のチケットをワークツリー（相互参照の `gitdir` つき）として組み、今の `--approve --preview --json` を呼ぶ。親子のチケットの見分け・参照の閉包（上限は親子のチケット 16 組）・互換の比較も Python で行う。TS は並べるだけ |
-| 判定の入力（D2） | `src/core/snapshot.ts` | 直近 N 日（既定 3）と指定のブランチは親子のチケットを見つけるのに使うだけ。親子のチケットごとに統合先・`P`・閉包の `P_X` だけを渡す。統合先から読むのは `done/`・共通レイヤー・自身のレイヤー・判定に要る設定（`.claude/settings.json`）・互換のマーカー。置き場のパスは既定に固定し、統合先からは読まない（段階 3 の実装では統合先の設定の `env` から読んでいた） |
-| 読み取り（8.2） | `src/core/github.ts` | 置き場のパスの tree を GraphQL で引いて REST の `?recursive=1` で読み、blob は sha で 50 件ずつ GraphQL で取る。`truncated` が付いたときと、本文が大きさと合わない blob のときは止める。blob は IndexedDB に保存する。GitHub だけ（GitLab は段階 5） |
-| PAT（5.5） | `src/core/protocol.ts`・`src/background/` | `chrome.storage.local` に平文。読むのは service worker だけ。画面は PAT を受け取らず、名前で決めた読み取りの操作だけを service worker に頼む。PAT を書く・消す頼みは設定画面からだけ受ける。`externally_connectable` は宣言しない |
-| 描画（5.5 の 2） | `src/core/sanitize.ts` | Markdown は marked で HTML にし、DOMPurify でサニタイズした DOM の断片で入れる。リンクは `http:`・`https:`・`mailto:` だけ。画像・SVG・MathML・フォーム・style も除く（画像は外への通信になるため。ADR より厳しくした） |
-| 通信先の埋め込み（D24） | `hosts.json`・`scripts/build.js` | 一覧から `host_permissions` を組む。CSP は（ADR-0128 で改めた形）`script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*` |
-| 互換のマーカー（7.3） | `py/ccnavi_chrome.py` | 統合先の `CCNAVI_COMPAT` と同梱の `version.COMPAT` を比べ、違えば帯に出す（段階 1 は表示だけ） |
-| 同梱物 | `scripts/build.js`・`scripts/python.js` | Pyodide は npm の版を固定し、コピーした物のハッシュを比べる。PyYAML は純 Python 版を `uv.lock` の sdist とハッシュで取る。ccnavi と入口は .pyc（unchecked-hash）付きの zip。リポジトリには入れない |
-
-試験: 単体（通信先と manifest、service worker の約束、GitHub の読み取り、悪意のある Markdown）、Node の上の Pyodide でのボードの組み立て、
-ボード 1 回ぶんの要求に対する Pyodide と手元の CPython の答えの比較、拡張を読み込んだ Chromium での実機の試験（CSP の違反が無いこと、悪意のある Markdown で何も動かないこと）。
-
-測った値（Chromium 141 の headless=new、Linux）: Pyodide の起動 約 3.7 秒、ccnavi の読み込み 約 0.6 秒、ボードが描けるまで 約 5.5 秒。
-同梱の大きさは 14.3MB（Pyodide 12.9MB、Python の zip 1.3MB）。
-
-入れなかったもの:
-
-- 承認・取り下げ・レビュー済み・「始める」と、そのダイジェスト（`digest`）: 段階 3〜5
-- PAT の期限の知らせ（D25）と期限ヘッダの確認（確認事項 5）: 段階 3
-- GitLab の読み取り: 段階 5（`hosts.json` には既定のとおり `gitlab.com` を置き、設定画面で「段階 5」と出す）
-- `source_path` の相対化（D22）: 段階 2a。段階 1 では、画面の本文にある仮のツリーの絶対パスを `<P>:` に縮めて見せるだけ
-- 3.3 の「決まらない」の規則（`P_X` が無ければ止める）: 段階 2c。段階 1 は今の ccnavi の答え（先行が無い）をそのまま出す
-
-### 11.3 段階 2a で入れたもの（2026-09-29）
-
-判定は変えていない（試験で確かめた）。手元の書き込みも、失敗の仕方を含めて前と同じ。違うのはレビューで直した 1 か所（マーカーの消去。11.3.1 の決定 A）で、判定を厳しくする変更。
-
-| 何 | 場所 | 形 |
-|---|---|---|
-| 判定のコアと差し替え点（6.2） | `ccnavi/core.py` | `Snapshot`（Reader(FS)）→ `judge_approval` → `plan` → `Changes` → `write_fs`（Writer(FS)）。`judge_approval` は 6.2 の `judge`（実行前チェックのモジュール `ccnavi.judge` と紛れないように名前を変えた）で、見せた識別子とダイジェストを今のものと比べる（前の `--yes` の検査）。`Changes` は書き込みと見せる行のリストと、ブランチごとの create / update / delete（`per_branch`、ツリーからの相対パス。中身の改行は LF に固定） |
-| 書けなかったときの扱い | `fsio.policy`・`core.write_fs` | 並べる段では書き込みが落ちないので、止める・言って続ける・行を出して同じ組を飛ばす・何も言わない・状態の履歴を書けなかった知らせに溜める、のどれかを書き込みごとに付けておき、Writer(FS) は前と同じ文面と順で落ちる。置けた分は残す。マーカーは置けた後だけ消す。フローを移せなければ行で言い、元を残す |
-| 手元の `--approve` | `core.approve`・`approve_yes`・`preview`・`verify` | どれも `core.judge_approval` を通る。書くのは `core.plan` → `core.write_fs`。前の `_apply` は並べる手順（`approval.plan_batch`）になり、書き込みの手順のコードは 1 つ。入口は approval から core へ移した（approval に置くと import が循環する） |
-| `confirm`（8.9） | `core.confirm`・`core.confirm_local` | 検査（依頼の記録・動いたか・同じマージリクエストか・変更要求・未解決）と書くもの（レビュー待ちの子を `done/` へ・レビュー済みのマーカー）をコアへ。手元（`confirm_local`、前の `review.confirm`）は cwd の親・git の差分・`--result` の JSON を前と同じ順で読んで渡す。履歴の経路は Snapshot の経路（Chrome なら `chrome`） |
-| `reviewed_mark`（8.9） | `core.reviewed_mark`・`review.reviewed_mark` | `confirm` と `decide` が使う。キーは 8.9 の順序（`mr`・`accepted`・`actor`・`via`・`at`）で、`actor` はアカウントが分かるときだけ、`via` は経路が分かるときだけ書く（Chrome は `via: chrome`）。段階 2a の手元はどちらも渡さないので、手元のマーカーは前と同じバイト列 |
-| `withdraw`（8.8） | `core.withdraw` | 条件（新規・followup でない・未着手・子もマーカーも無い・戻す先が空いている・承認コミットの親の提案がある）と書くもの（`doing/` を消し、`todo/` に元のバイト列、状態の履歴）。呼ぶのは Chrome の入口の試験だけ（画面は段階 3）。履歴の種類 `withdrawn` と経路 `chrome` を `history` に足した（コアの書くものに要るため） |
-| 時計（Clock） | `fsio.clock`・`stamp`・`utc_stamp`、`history.stamp` | 固定した 1 つの時刻から、承認の記録（オフセット付き）と状態の履歴（UTC）を出す。plan の間は `Snapshot.stamp`（空なら今）に固定する |
-| D22 | `approval_ops.admit`・`source_path`・`source_branch`・`_origin_line`、`tree.branch_of` | `source_path` は提案のツリーからの相対（"/"。別のドライブならパスのまま）、`source_tree` はそのツリーの HEAD が指すブランチ名（ファイルだけを読み、git は起こさない）。HEAD が切り離し（sha）・空・壊れている・読めないときはツリーの名前（ワークスペースルートなら空）を使い、`Changes.per_branch` の名前と同じ決め方にした。承認画面の「提案:」も相対パスにした |
-| 書き込みを溜める段 | `fsio.staging`・`Stage`・`Op`・`Line` | 中では書き込みを溜め、読み（`read_*`・`exists`・`lexists`・`listdir`・`load_text`）は溜めた内容を先に見る。承認の手順は、同じ承認の中で動かした後の置き場を読む（`home_dir`・`settle_review`・マーカー・状態の履歴） |
-| fsio の記録レイヤー（4.3） | `fsio.recording`、`cli` の `--record-writes <ファイル>` | 書いた・消したパスを 1 行 1 つ、ワークスペースルートからの相対（"/"）で書き出す。比べるのは行き着く先のパス（リンクを解き、大文字小文字を区別しない）。ルートの外と別のドライブは絶対パス、既定の state の置き場の下（リポジトリに入らない）と一覧自身は載せない。書き出し先は 11.3.1 の 1 |
-| fsio を通らない書き込みを揃えた | `approval`（`admit`・`carry_flow`・`move_file`・`clear_marks`・改版の提案の削除）、`history._append`、`configsync._replace`・`_restore`、読みの `ticket.load`・`approval._load_dir`・`home_dir` | `fsio.unlink`・`move`・`write_new`・`append`・`replace_bytes` を足して通した。置き場を書くモジュールに素の書き込みが残っていないことを試験で見る |
-| Chrome の入口 | `chrome-extension/ccnavi-approval/py/ccnavi_chrome.py` | ボードの本文を縮めずに返し、ダイジェスト（`digest`）も返す（段階 1 で外したもの。D22 で機械に依らなくなった）。仮のツリーに HEAD を書く。`plan`・`withdraw`・`confirm` の操作（書くものを値で返すだけ。ホストにもディスクにも書かない） |
-| 見本 | `tests/ticket/test_core.py`、拡張の `test/fixtures/core-scenarios.json`・CX-T061 | 7 場面（新規、レビュー済みのフェーズに子を足してマーカーを消す、改版、フィードバック計画、多段の先行で通る子と落ちる子、取り下げ、レビュー済み）。Chrome の入口の答えが、手元のコアが実際に書いたバイト列と同じことを手元で見て見本に書き出し、拡張の試験が Pyodide と手元の CPython でも同じ答えになることを見る |
-
-分かったこと:
-
-- Pyodide（314.0.7、Python 3.14）と手元の CPython 3.12 が、7 場面で同じバイト列（承認済みチケット・状態の履歴・マーカー・提案の削除）を出した。比べ方は中身のバイト比較（6.2 の「差分のパスの一覧だけ」から広げた）
-- D22 で承認画面の本文が機械に依らなくなり、Chrome のボードのダイジェストと手元の `--approve --preview` のダイジェストが同じ値になった
-- 後方互換: このリポジトリの `.ccnavi/approved/done/` の 18 本（`source_path` が Windows の絶対パス）で、`--explain --json`・`--lint --json`・`--approve --preview --json`・`--verify --json` の答え（時刻のキーを除く）と標準エラーが段階 2a の前と同じ。前の形の承認済みチケットに書き換えても承認と実行前チェックが同じことは試験で見る
-- 時刻: 1 回の承認の記録（`approved_at`）と状態の履歴（`at`）は同じ時刻になった（前は別々に時計を読んでいた）
-
-入れなかったもの:
-
-- `judge` の `read_set` と、それで作るダイジェスト（6.2）: Reader が FS のままなので、判定が読んだものを漏れなく数えられない。ダイジェストは前のまま（画面の本文 + 承認済みチケットに書き出す中身）。ブランチごとの blob の表から読む Snapshot（`NOT_FETCHED`）と一緒に入れる（8.2 の「コアに移ってから」）
-- 承認のハーネス `approve()` を使う約 20 の試験をコアを直に呼ぶ形へ（9 章のテスト）: CLI がコアを通るので、今の試験がそのままコアを通る
-- `confirm` の `--actor` と、`ccnavi-review.sh` のアカウントの引き当て（8.7・8.9）: sh の変更で、段階 2a の行に無い。手元のマーカーの `actor` は空（書かない）
-- 記録の一覧に置き場の外があれば error にすることと D34 の例外: write-and-push の側（段階 2d）
-- VS Code のボードの呼び名（`withdrawn`・`chrome`）: 段階 2d
-- Chrome の画面で `plan`・`withdraw`・`confirm` を使うこと: 段階 3・4
-
-#### 11.3.1 レビューで直したもの（2026-09-29）
-
-段階 2a の後の敵対的レビューの指摘を、ユーザの承認を得て直した。
-
-| # | 何 | 直し方 |
-|---|---|---|
-| 1 | `--record-writes` の書き出し先の制限に抜けがあった | 置き場は `--state`・`CCNAVI_STATE` で上書きする前の既定（ワークスペースルートの `logs/state/write-and-push/`）だけ。行き先・置き場・ルートは行き着く先（`realpath`、大文字小文字を区別しない）で比べ、`..`・上書きした置き場・`write-and-push/` の下のリンク・行き先そのもののリンクを断る。書き出しは同じディレクトリの一時ファイルから `os.replace` で置き換える（行き先のリンクの先を開かない。Windows でも同じ）。**write-and-push（段階 2d）の前提**: コマンドが落ちても、そこまでに書いたパスで一覧を書き、終了コードはコマンドのもの。一覧を書けなければ、コマンドの結果に依らず 1 で終わる。行き先を断ったときはコマンドを走らせずに 1 |
-| 2（決定 A） | 子を足してマーカーを消すとき、在るのに消せなかったマーカーも「消した」と出ていた | reviewed を先に消し、消せなければその場で止める（残るとフェーズが済んだまま読まれる。判定を厳しくする変更で、ユーザが承認）。ほかの種類は消せなければ「消せなかった（理由）。<種類> は残っていて効く」と言って続ける（`FAIL_WARN`）。行と履歴（`phase-reopened` の `cleared`）は Writer(FS) が実際に消せた種類だけで書く（`fsio.Call`）。Changes（Chrome の 1 コミット）は全部消した状態。書き込みを溜める段の消去はリンクを辿らない（`lexists`）。続きの子（`approval_ops.followup`）も同じ規則 |
-| 3 | macOS などで記録の一覧が絶対パスになった | 1 と同じく行き着く先のパスで記録し、比べる |
-| 4 | Chrome の `confirm` の履歴の経路が `cli` になっていた | 並べる段を Snapshot の経路の `history.session` で包む（取り下げと同じ形）。マーカーの `via` は 8.9 のとおり経路が分かるときに書く |
-| 5 | 取り下げの条件で、マーカーの置き場を読めないときも「無い」とみなしていた | 無い（`FileNotFoundError`）だけを無いとし、ほかの読めない理由は問題として返す（緩めない） |
-| 6 | Chrome の入口が、読めない時刻を受けると例外をそのまま外へ投げた | 仮のツリーを組む前に時刻を確かめ、`error` で返す |
-| 7 | `branch_of` と `source_branch` の決め方が `per_branch` と違った | 上の D22 の行のとおり揃えた |
-| 8 | 並べた後に動かす先が置かれても、書くときに確かめていなかった | Writer(FS) が動かす前に行き先を確かめ、在れば止める（上書きしない） |
-| 9 | Windows で別のドライブの相対パスが作れず落ちた | パスのまま返す |
-| 10 | Changes の中身の改行が機械で変わった | LF に固定。ディスクへは前と同じ改行で書く |
-| 11 | 取り下げとレビュー済みを並べる段で状態の履歴を書けないと分かっても、そのことが何も言われずに捨てられていた | error として返し、何も並べない |
-| 12 | 試験の穴 | Writer(FS) の落ちる枝（提案を消せない→戻す、改版の提案を消せない→言って続ける、履歴を書けない→警告、マーカー、動かす先）、Windows の絶対パスを持つ古い形式のチケット、HEAD の形（切り離し・壊れた・ワークスペースルート・相対の gitdir）、記録の書き出し先の抜け、手元の CLI の出力（行・止まったか・問題点・本文・ダイジェスト）と Chrome の答えの突き合わせを全場面に（取り下げは CLI が無いのでコアと）、見本の新旧を場面ごとにその場で比べる、CX-T061 の Pyodide の側は uv が無くても回す、素の書き込みの検査に review・phase・ticket・gitstate を足した（`gitstate.restore` の `shutil.move` は実行後チェックが範囲外の変更を脇へ退けるもので、状態の操作ではないので許す） |
-| 13 | 名前 | `core.judge` を `core.judge_approval` に改名。core が使う approval の関数は公開名にした（`preview_body`・`verify_verdict`・`approved_text`）。review の非公開の関数は、手元の confirm と同じ読み方と文面にするために使い、理由をコメントに書いた |
-
-### 11.4 段階 2b で入れたもの（2026-09-29）
-
-取り込みと取り込み状態。取り込み状態は書くだけで、判定はまだ読まない（2c）。判定の答えは変えていない。
-
-| 何 | 場所 | 形 |
-|---|---|---|
-| 取り込みの sh（4.2・3.6） | `.ccnavi/scripts/ccnavi-sync.sh`（新規） | `ccnavi-sync.sh [<P>...]`。省けば `.claude/worktrees/` の下の親のワークツリー全部。リポジトリごとに `ls-remote --heads origin` を 1 回（2 列目を `grep -F -x` で完全一致）、落ちたら止める。`P` があれば fetch して早送りか merge（索引が HEAD と同じときだけ。衝突したら `merge --abort` してユーザの対応に切り替える）、親子のチケットの取り込み状態を `present` で書く。`P` が無く取り込み状態も無ければ「まだ送っていない親子のチケット」で今のまま。取り込み状態があれば統合先の `done/<P>.md` を `cat-file -e` で見て `closed`、無ければ統合先を取り直して確かめ直し（既定 3 回、5 秒おき）、`ccnavi-review.sh merged` でマージ済みと分かれば「反映待ち」で止め、どれにも当たらなければ `gone` を書いて理由と戻し方 1・2 を出して止める。ロックは待って取る |
-| 統合先の名前（D30） | `ccnavi-sync.sh`、`ccnavi sync paths`、`settings.integration_local` | 環境変数 `CCNAVI_INTEGRATION_BRANCH`、空なら `.claude/settings.local.json` の `env` の値（JSON は実行ファイルが読んで 1 行で返す。D33）、空ならホストのデフォルトブランチ（リモートの一覧にある `origin/HEAD`、無ければ `main`・`master`）。設定した名前がリモートに無ければ既定に切り替えずに止める。使った名前とどこから決めたかを出力の頭と統合先の取り込み結果の `head`（`source` は `env`・`settings.local.json`・`default`）に出す。実行ファイルは環境変数を読まない |
-| 統合先の取り込み結果（D26） | `logs/state/sync/<リポジトリ>/integration/` | 統合先の先頭から `<置き場>/done/`・`.ccnavi/config/common/`・`<ccnavi ディレクトリ>/config/`・`.claude/settings.json` をファイルのまま同じ順序でコピーし（11.4.2 で `ls-tree` と `cat-file blob` に替えた）、`head` に `remote`・`branch`・`source`・`sha`・`fetched_at`。一時の置き場に組んでから入れ替える |
-| 親子のチケットの取り込み状態（3.6） | `logs/state/sync/<リポジトリ>/families/<P>` | 1 行 1 項目（`remote`・`branch`・`sha`・`fetched_at`・`state`・`reason`）。`state` は `present`・`closed`・`gone`（`blocked` は 2c） |
-| ロック（D32） | `ccnavi-common.sh` の `ccnavi_lock_take` / `ccnavi_lock_drop` | `mkdir` で取り、`owner` に `<ホスト名> <pid> <開始時刻> <持ち主の情報>`。古いロック（同じホストで `kill -0` が落ちる・10 分を過ぎた・`owner` が読めず `find -mmin +10`）は `mv` で強制取得し、持ち主が替わっていたら戻す。入れ子は `CCNAVI_LOCK_HELD`。sync は `CCNAVI_LOCK_WAIT`（既定 120 秒）待ち、SessionStart は 1 回だけ試す |
-| SessionStart の早送りだけ（D12） | `ccnavi-fetch.sh` | 取り込み済みの親子のチケット（`.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の承認済みチケットか提案があり、親子のチケットの取り込み状態がある）は、ロックを 1 回だけ試し、`origin/<P>` の祖先なら `merge --ff-only`。書きかけとの重なりは git に任せ、拒まれたら重なったパスと `ccnavi-sync.sh <P>` を言う。分かれていれば「取り込みが要る」と 1 行言う（merge しない）。開始から 45 秒（`CCNAVI_FETCH_BUDGET`）を過ぎたら飛ばして名指しする。それ以外のツリーは前のまま |
-| 「ref が無い」で落ちた fetch（3.6） | `ccnavi-fetch.sh` | `couldn't find remote ref` で落ちたら、その origin を落ちたものに数えない（同じ origin の統合先の取り込みを飛ばさない）。親子のチケットなら「`ccnavi-sync.sh <P>` で確かめる」と言う |
-| 最初の push と `gone` の拒否（4.3・3.6） | `ccnavi-git.sh` の `push)` | 送る前に、取り込み状態が `gone` の `P` への push を拒否する（取り込み状態を読むだけ。`ls-remote` はしない）。通った後、送った先が親のブランチ（ディレクトリ名 = ブランチ名、親の承認済みチケットか提案がある）で送り先が origin なら、取り込み状態を `present` で作る。置き場（`approved/`・`proposals/review/`。未追跡を含む）に未コミットの変更があれば作らずに言う。`present` の取り込み状態は `sha` だけ書き直し、`closed` は触らない |
-| 付け替えと移動の拒否（D36・5.2・3.1 の 10） | `ccnavi-git.sh` の `worktree)`・`checkout \| switch)` | `worktree add` の `-B`・`--detach`/`-d`・`-f`/`--force` を拒否し、`-b` の名前（`-b` が無ければ 2 つ目の語）が行き先の名前と違えば拒否。`checkout -B`（まとめた `-qB` も）・`switch --force-create` を拒否（`switch -C` は全引数の `-C` で前から止まる）。親のワークツリーでは、自分のブランチと `HEAD` 以外へ移る形（`checkout <別>`・`-b`・`--orphan`・`--detach`・`switch --create`・`-d`・`-`）を拒否し、取り込みがそのワークツリーを飛ばし、取り込み済みの親子のチケットでは承認・状態の操作・実行前の判定が止まると言う（文面は 3.1 の 10） |
-| 案内文の書き換え（D36・3.1 の 10） | `ccnavi-git.sh` の使い方と `reset` の拒否文、`fetch`・`pull` の refspec の拒否文 | 「リモートに合わせるなら、親のブランチは `ccnavi-sync.sh <P>`。ほかのブランチは `fetch` のあと `merge <リモート>/<ブランチ>`。分かれていて進めないならユーザの対応に切り替える」。refspec の文は「手元の ref は `ccnavi-sync.sh <ブランチ>` が進める」 |
-| 統合先の名前の予約（3.1 の 5） | `ticket_ids.branch_name_problems`、`lint`、`cli` の `--integration-branch` | 渡された統合先の名前（大文字小文字を区別しない）に当たる新規の親の識別子を `--lint` の warn で言う。環境変数は読まない |
-| 配る sh | `scripts/ccnavi-setup.sh` | `ccnavi-sync.sh` を配る一覧に足した（拒否の文面が案内するため） |
-
-後方互換（D11）: origin の無いリポジトリと、一度も push していない `P`（取り込み状態が無い）は前と同じ動き。
-chat だけの親子のチケット（マージリクエストを持たない親子のチケット）も、送らなければ取り込み状態ができず前と同じ。送れば取り込み状態ができる（見分けは実行ファイルの種類の読みが要るので、write-and-push の対象を決める 2d で入れる）。
-取り込み状態ができた親子のチケットで段階 2b が変えるのは、SessionStart の早送りの規則、`ccnavi-sync.sh` の消えたかの確かめ、`gone` の `P` への push の拒否の 3 つ。
-取り込み状態の無い親のワークツリーは、SessionStart でも前の規則（未コミットがあれば進めない）のまま。取り込み状態ができるのは、段階 2b の後に `ccnavi-git.sh push` が通ったときか、`ccnavi-sync.sh` を打ったとき。
-判定（hook・lint・承認）は取り込み状態を読まないので、答えは変わらない。
-
-ADR に無かった判断:
-
-- 置き場のパスと settings.local.json の統合先の値は、実行ファイルの `ccnavi sync paths`（1 行 1 項目）で sh に渡す。実行ファイルが無ければ環境変数のパスを使う。統合先の名前は環境変数が settings.local.json より先
-- `--integration-branch` を今渡す呼び手は無い（2c で sync の lint がこれを渡す）
-- マージリクエストの確認は `ccnavi-review.sh merged`（新しいサブコマンド。実行ファイルを起こさない）で行い、答えが `merged <番号>` のときだけ「反映待ち」にする
-- 「3 回まで 5 秒おき」は最初の確かめの後の確かめ直しの回数と読んだ。試験のために `CCNAVI_SYNC_RETRIES`・`CCNAVI_SYNC_RETRY_WAIT`・`CCNAVI_FETCH_BUDGET` で変えられる（既定は ADR の値）
-- `ccnavi-sync.sh` が扱うのは親のワークツリーだけ。ほかのブランチには `merge <リモート>/<ブランチ>` を案内する
-- 早送りや merge が止まったときも、取り込み状態は `present`（リモートにあること）で書く
-- 引数を省いた `ccnavi-sync.sh` は、親子のチケットが無くても origin のあるリポジトリ（ワークスペースとプロジェクト）の統合先の取り込み結果を書く
-
-入れなかったもの:
-
-- 判定が取り込み状態と取り込み結果を読むこと（本物とする側・閉じた親子のチケット・閉包から作る対応表・統合先の取り込み結果からのレイヤー）、取り込みの後の `--lint` と C3 の判定し直し、取り込み状態の `blocked`、`ready` の前提: 段階 2c
-- ダイジェストを `read_set` にすること: 2c（Reader の差し替えと同時。ユーザの決定）
-- 書いたパスの一覧の基点を `P` のワークツリーに絞ることと、置き場の外を error にすること: 2d（ユーザの決定）
-- write-and-push、承認の pushの改修、ユーザの入口の sh: 2d。ロックの関数は入れたが、write-and-push からの入れ子の使い方と Git Bash の `kill -0`（10.2 の 6）は 2d で確かめる
-- `phases/<P>/seq` だけの衝突を origin 側で解くこと: GitLab の段階 5
-- `settings.local.json` に承認の判定を変える値を置かせない lint と、`P` の上のプロジェクトのレイヤーの食い違いの warn: 2c
-- `ccnavi-fetch.sh` の 2 周目（ワークツリーの起点）は今までどおりデフォルトブランチを進める。統合先の名前には合わせていない
-
-#### 11.4.2 レビューで直したもの（2026-09-29）
-
-段階 2b の後の敵対的レビューの指摘を、ユーザの承認を得て直した。判定を厳しくする変更だけで、緩めた所は無い。
-
-| # | 何 | 直し方 |
-|---|---|---|
-| 1（重大） | `ccnavi-git.sh` の `checkout`・`switch`・`branch`・`pull` などが、長いオプションの略（`switch --force-c`・`checkout --det`・`--orph=`・`--for`・`switch --discard-ch`・`branch --mov`・`pull --rebas`）と値をまとめた短いオプション（`checkout -bnew`・`-qbnew`・`switch -cbar`）で抜けた | 決定 A: `branch`・`checkout`・`switch`・`fetch`・`pull`・`merge`・`commit`・`rm`・`restore`・`cat-file`・`worktree`（list・prune・remove）を許可リストで読む（`opt_walk`）。長いオプションは一覧にそのままの表記であるものだけ通し、略は断る。まとめた短いオプションは 1 字ずつ読み、値を取る字（`b`・`B`・`c`・`C`・`m`・`s` など）の後ろは値とする。止める名前は一覧に入れた上で名前を見て止める。読むだけのサブコマンドも、止める長いオプション（`--output`・`--upload-pack`・`--exec`・`--textconv` など）の頭に当たる略を止め、`grep -O`（`--open-files-in-pager`）を止め、`cat-file` は許可リストにした。`pull --rebase` と `commit --amend` も止める（履歴の書き換え）。親のワークツリーでは、語が無い・自分のブランチ・`HEAD`・`checkout <ref> <パス>` のほかは通さない |
-| 2（重大） | 取り込み状態の無い親子のチケットが閉じていても「まだ送っていない」になった | 取り込み状態の有無より先に統合先で閉じているかを見る。取り込み状態が無くても `origin/<P>` か追跡の設定があれば「push した形跡あり」として 3.6 の確かめをし、消えていても gone は書かずに止める（決定 B5。取り込み状態の無い親子のチケットは今のまま） |
-| 3（重大） | ロックの強制取得の仕方に ABA と二重の `mv` があった | 4.3 の「強制取得の仕方」のとおり、`<ロック>.steal` のロックで強制取得の操作を 1 つにし、古いと判断したときに読んだ行と比べ、戻す前に元の名前が空いているかを見る。取った側も `owner` を書けたかを読み返す |
-| 4（重大） | `ccnavi-sync.sh` がユーザ自身の途中の merge を取りやめた | 途中の操作（`MERGE_HEAD`・`CHERRY_PICK_HEAD`・`REVERT_HEAD`・`sequencer`・`rebase-merge`・`rebase-apply`。`rev-parse --git-path` で引く）があれば何もせず止める。`merge --abort` は、この sh が始めた merge のときだけ |
-| 5 | `ccnavi-review.sh merged` の API の失敗が `none`（→ gone）になった。jq のパイプで失敗が消えた | 決定 B2: 答えを受けてから jq に渡し、API か jq が落ちれば `unknown`（終了コード 3）。コマンド・トークンが無ければ `none` を出さずに止まる。sync は終了コード 0 の `none` のときだけ gone を書き、ほかは取り込み状態を変えずに「確かめられなかった」で止める |
-| 6 | 閉じたかを `done/<P>.md` が在るかだけで見ていた | 中身の `ticket:` が P で、`parent:` が無く、承認の時刻（`approved_at`）が親のワークツリー上のチケットと同じときだけ閉じたとする（同じ識別子の古い親子のチケット上のチケットを取り違えない） |
-| 7 | 入れ子の持ち主の情報を確かめていなかった。親子のチケットが重なっていた | 4.3 の「入れ子」のとおり持ち主の情報を `owner` と照らし、外すときに消す。同じ `<P>` を 2 度渡しても 1 度だけ取り込む |
-| 8 | sync の fetch・ls-remote にタイムアウト監視が無く、ssh が入力を求めて止まることがあった | タイムアウト監視を `ccnavi-common.sh` の `ccnavi_git_timed` に移して fetch.sh と共用（sync は `CCNAVI_SYNC_TIMEOUT`、既定 60 秒）。ssh は `BatchMode=yes`（`GIT_SSH_COMMAND`・`GIT_SSH`・`core.sshCommand` があればそちらを尊重） |
-| 9 | SessionStart の 45 秒の枠を fetch の前に見ていなかった | fetch の前にも見て、過ぎたら fetch ごと飛ばして名指しする（2 周目も）。fetch 1 回のタイムアウト監視は枠の残りより長くしない |
-| 10 | 統合先の取り込み結果の入れ替えがアトミックでなく、並行して動くと中身の不整合が起きえた。`git archive` の属性で中身が変わった | リポジトリごとのロック（`locks/<リポジトリ>/_integration`）の中で書き、前の回の残り（`*.tmp.*`・`*.old.*`）を消し、統合先の先頭が前と同じならコピーしない（`head` の時刻だけ書き直す）。`git archive` をやめ、`ls-tree` と `cat-file blob` でコミットのバイト列をそのまま書く（export-ignore・export-subst・eol の影響を受けない）。**限界**: ディレクトリの入れ替えは `mv` 2 回で、その間の一瞬だけ取り込み結果が無い（入れ替えられないのは rename が空でないディレクトリを上書きしないため）。2c の読む側は、`integration/` か `head` が無ければ少し待って読み直し、それでも無ければ「取り込み結果が無い」と読む |
-| 11 | 親子のチケットの取り込み状態に寿命が無く、同じ名前で切り直すと push が止まり続けた | sync の頭で、親のワークツリーが無い親子のチケットの取り込み状態を消す。gone の戻し方 2 に「片付けて sync を打つと取り込み状態も消える」を書いた。**段階 2c のレビューの後の決定 A で取りやめた**（取り込み状態は削除せずに残し、消すのはユーザの `--forget`。11.5.1） |
-| 12 | リンクを経た作業場で、`show-toplevel` とワークスペースルートの比較が外れて保護が働かなかった | 両辺をリンクを解いたパス（`ccnavi_phys`。`pwd -P`、Windows は `pwd -W`）で揃える。`ccnavi_project` も同じ |
-| 13 | 単一ブランチの clone で `origin/<P>` が進まず古い ref を読んだ | sh の中の fetch は `+refs/heads/<b>:refs/remotes/origin/<b>` と行き先を書く（sync・fetch.sh。段階 0 の refspec の拒否は `ccnavi-git.sh` の入口の話で、sh の中の git には掛からない） |
-| 14 | `sync paths` が落ちると統合先が何も言わずに既定に戻った | 実行ファイルが在るのに答えなければ止める（終了コード 2）。無いときだけ環境変数のパスを使う |
-| 15 | WSL と Git Bash で同じホスト名のとき、pid でロックを古いと誤った | `owner` に OS を足し、OS が違うか置き場が `/mnt/` の下なら時刻だけで見る |
-| 16 | dash で EXIT の trap が INT・TERM・HUP で走らなかった | sync・fetch とも INT・TERM・HUP にも trap を置く。sync は自分の merge の途中を示す目印を置き、切られたらその merge を取りやめる |
-| 17 | `worktree add <行き先> <語>` の語がタグ・sha だと detached になった | 語が `refs/heads/<語>` か `refs/remotes/origin/<語>` に当たるときだけ通す |
-| 18 | push の取り込み状態を、送り先を解かずに作っていた | 引数のリモート → `branch.<b>.pushRemote` → `remote.pushDefault` → `branch.<b>.remote` → origin の順に解き、origin 以外なら取り込み状態を作らない |
-| 19 | 「書きかけの（空）と重なる」など、理由と違う文面が出た | `ccnavi_git_refusal` で理由どおりに言う（重なり・`index.lock`・`user.name` が無い・署名・hook・ほかは git の 1 行目） |
-| 20〜23 | 固定文字列の比較、親子のチケットの無いプロジェクトの失敗、ホストの既定の読み方、先頭 0 の数 | 親子のチケットの一覧は `awk` で列を比べる。引数を省いた回で親子のチケットの無いリポジトリが落ちても名指しして続け、1 にしない。ホストの既定ブランチは `ls-remote --symref origin HEAD` で読む（読めなければ `origin/HEAD`・`main`・`master`）。数は先頭の 0 を落とす。使っていない関数を消し、戻し方 1 の sha を「取り込み状態にある、最後に取り込んだか送った P の先頭」と書いた |
-| 24 | 試験の穴 | 上の各項目の再現を回帰試験にした（略とまとめた短いオプション、取り込み状態の無い閉じた親子のチケット、途中の merge、ロックの `<ロック>.steal`・入れ子の偽物・別の OS・先頭 0、`merged` の失敗、同じ識別子の古い `done/`、単一ブランチの clone、リンクを経た作業場、`sync paths` の失敗、fetch の枠、dash の TERM、タグ・sha の `worktree add`、送り先の解き方、state の置き場のリンク、取り込み状態の寿命） |
-
-前回の相談点への決定（ユーザ）:
-
-- B1: chat だけの親子のチケットの見分けは段階 2d（write-and-push と一緒）で入れる
-- B3: hook・VS Code の `--lint` が読む統合先の名前は、`--integration-branch` が無ければ sync が統合先の取り込み結果に書いた名前（`sync/self/integration/head` の `branch`）。取り込み結果が無ければ固定のリストだけ。取り込み結果の途中のリンクは辿らない
-- B4: 取り込み結果のシンボリックリンクはコピーするときに除く（`ls-tree` で 120000 を飛ばし、最後に `find -type l` でも消す）。**読む側（2c）も取り込み結果の中のリンクを辿らない**（lstat で見て、リンクなら読まずに「取り込み結果が壊れている」とする）
-- B6: SessionStart の 2 周目（ワークツリーの起点）は統合先に合わせる（`CCNAVI_INTEGRATION_BRANCH`、無ければ sync が統合先の取り込み結果に書いた名前、無ければデフォルトブランチ）
-
-直さなかったもの:
-
-- `stash`・`add`・`push` のまとめた短いオプション: `push` はもともと一覧の表記だけを通す。`stash`・`add` は止める名前を持たないので、許可リストにしなかった
-
-直しの後の相談への決定（ユーザ。同日に入れた）:
-
-| # | 何 | 形 |
-|---|---|---|
-| 1 | `ccnavi-git.sh tag <名前>` でタグを作れた | 位置の引数は `-l` / `--list` のときの絞り込みだけ通す（厳しくする変更）。`--contains`・`--no-contains`・`--points-at`・`--merged`・`--no-merged` は値を次の語で取るので値ごと飛ばす |
-| 2 | 許可リストに無く止まっていた、履歴を書き換えない形 | 足した: `commit --fixup`・`--squash`（autosquash の rebase は止めたまま）、`fetch` と `pull` の `--depth`・`--deepen`・`--shallow-since`・`--unshallow`（`--unshallow` は前は `fetch-force` で止めていた）、`merge` と `pull` の `--autostash`・`--no-autostash`、`fetch` の `--show-forced-updates`・`--no-show-forced-updates`・`--write-fetch-head`・`--no-write-fetch-head`。足さなかった: `--force` 系、`--rebase` 系、refspec を取るもの（`--refmap` など） |
-| 3 | 統合先の取り込み結果の入れ替えの一瞬（上の 10） | **決定**: 2c の Python は、`sync/<リポジトリ>/integration/` か `head` が無ければ少し待って読み直すことで、入れ替えの一瞬をやり過ごす。それでも無ければ「取り込み結果が無い」と読む。実装は 2c |
-| 4 | 片付けてから sync を打つと gone の取り込み状態が消える | 受け入れる危険として 5.1 に書いた |
-| なし | dash の TERM の試験がときどき落ちた（ロックを作ってから持ち主の情報を書くまでの間に切られるとロックが残った） | ロックの置き場と持ち主の情報を、`mkdir` の直後と owner を書く前に記録する。owner がまだ無ければ、作った側が外す |
-
-#### 11.4.1 段階 2b で触った保護の対象
-
-`.ccnavi/scripts/` の `ccnavi-git.sh`・`ccnavi-fetch.sh`・`ccnavi-common.sh`・`ccnavi-review.sh`（`merged` のサブコマンド）と、新しい `ccnavi-sync.sh`。
-ユーザの承認を得て直接直した。11.4.2 のレビューの直しでも同じ 5 本を直した。
-
-### 11.5 段階 2c で入れたもの（2026-09-29）
-
-本物とする側（3.3〜3.4）と `P` の消失（3.6）。判定が取り込み状態と取り込み結果を読み始める。変えたのは厳しくする所だけで、取り込み状態の無い親子のチケット（2b より前に送った、
-origin が無い、一度も push していない）は前と同じ答え（D11）。
-
-| 何 | 場所 | 形 |
-|---|---|---|
-| 取り込み状態と取り込み結果の読み | `ccnavi/syncstate.py`（新規） | 親子のチケットの取り込み状態と統合先の取り込み結果を 1 行 1 項目で読む（D33）。途中（`sync`・`<リポジトリ>`・`families`・`integration` とその下のファイル）のシンボリックリンクは辿らず「取り込み状態か取り込み結果が壊れている」とする（決定 B4。lstat と `O_NOFOLLOW`）。統合先の取り込み結果の入れ替えの一瞬（`integration.tmp.*`・`integration.old.*` が並ぶ、`integration/` に `head` が無い）と分かるときだけ 0.05 秒おきに 5 回読み直し、それでも無ければ「取り込み結果が無い」（11.4.2 の決定 3。11.5.1 の 2 で「入れ替えが終わらない」として壊れている側に直した）。`sync/` が無ければ何も読まず待たない。git もネットワークも使わない（`tree.py:95-96`） |
-| 親子のチケットの立ち位置 | `syncstate.standing` | 取り込み済みの親子のチケット（取り込み状態があるもの）は、親のワークツリー（`.claude/worktrees/<P>` で HEAD が `P` を指すもの。名前は大文字小文字まで一致）上のものだけを本物とする。取り込み状態が `gone`・`blocked`・壊れている、`present` なのに親のワークツリーが無いか HEAD が別のブランチ、は**決まらない**。`closed` は閉じた親子のチケット（11.5.1 の 1 で、統合先の取り込み結果の `done/` からも引くようにした） |
-| チケットへの `blocked` の付与 | `approval.mark_imported`（`scan`・`scan_review` の後） | 決まらない・閉じた親子のチケットの開いたチケットと、親のワークツリーの外にしか無いチケット（元ツリーに未コミットで残ったチケットなど。移行の検査 3.5 の 1）に `blocked` を付ける。実行前チェック・実行後チェック・サブエージェント終了時チェックが同じ `blocked` で止まる（ADR-0058 の経路）。**一覧からは除かない**（除くと「在る」ことで止まっていたものが通るようになる） |
-| 承認 | `approval.family_problems`・`integration_closed`・`waiting` | 決まらない・閉じた親子のチケットの提案と改版は承認しない（解き方を添える）。取り込み済みの親子のチケットの提案は親のワークツリーの上のものだけ（3.2）。統合先の取り込み結果の `done/` にある識別子の新規の提案は承認待ちに入れない（3.3 の 4）。`--lint` は「閉じたのに todo/ にも在る」の warn で言う。11.5.1 の 4・12 で、取り込んだ形跡のあるリポジトリの全提案に当て、理由を添えて承認しない側に回すよう直した |
-| 先行を引く対応表（3.3 の 5） | `approval.align_imported`（承認・着手・lint・ボード・SubagentStart） | 取り込み済みの親子のチケットの先行を、その親のワークツリー上のチケットで読み直す。親子のチケットが決まらない・親のワークツリーにそのチケットが無ければ「親子のチケットが決まらない」（`PRED_UNDECIDED`、error）。親のワークツリー上のチケットが 1 つで開いていればそれを採る。**通る向きには読み替えない**（親のワークツリーで閉じていても、前の対応表で満たしていなければ満たさない） |
-| 状態の操作 | `ops_close.family_stopped`（`find`）、`review._parent`・`_parent_any` | 決まらない・閉じた親子のチケットの着手・終了・取り消し・記録・依頼・確認・行き先・早めに閉じる操作・`ready` を止め、3.6 の解き方を出す。引いたチケットが親のワークツリーの外にしか無いときも止める（信用しないチケットを動かさない）。「複数の場所にある」の文面は、取り込み済みの親子のチケットなら「優先するのは、親のブランチ上のチケットだけ」と言う |
-| 書く先 | `approval.home_dir` | 取り込み済みの親子のチケットは親のワークツリーだけに書く（元ツリーに未コミットで書く形 ADR-0073 をやめる。3.4） |
-| 止めた状態の置き場と解き方 | `ccnavi-sync.sh` の `check_family`、実行ファイルの `ccnavi sync check <P>`、`lint.family_check` | 取り込みの後（統合先の取り込み結果を書いた後）、`present` の親子のチケットごとに判定し直す（4.2 の 4）: 親子のチケットの承認済みチケットの検査（C3。読めないチケットを含む）、親のワークツリーの外のチケット、決まらない理由。error があれば親子のチケットの取り込み状態を `blocked`（`reason` に最初の error）にして止め、理由と「直してから `ccnavi-sync.sh <P>` を打ち直す」を出す。打ち直すと取り込みで `present` に書き直してから検査し直すので、通れば戻る。実行ファイルが無ければ検査しなかったと言う |
-| `ready` の前提（3.6） | `review.ready` | 親の承認済みチケットが `done/` にあることを足した（厳しくする変更） |
-| ダイジェスト（6.2） | `fsio.reading`・`note_read`、`approval.read_set`・`approval_digest`、`core.Verdict.read_set` | 判定が読んだファイルの中身のダイジェスト（改行は LF に揃える。無かったファイルも「無い」として）を、`<ブランチ>:<ツリーからの相対パス>` の鍵で集め、画面の本文・一括のチケットとして書き出す中身と一緒にダイジェストにする。state の置き場は取り込み状態と取り込み結果（`(控え):sync/...`）だけ入れ、セッションごとの記録は入れない。全ブランチの先頭は入れない。VS Code のボードのダイジェストも同じ意味になった（ボードの文面・注釈・試験を合わせた。見本の JSON はダイジェストを伏せているので変わらない） |
-| lint（3.3 の 6・D28・3.5） | `lint._local_settings`・`_sync` | `.claude/settings.local.json` の `env` に承認と判定を変える値（置き場のパス・プロジェクトの置き場・ccnavi ディレクトリ・state の置き場・チケット制御・承認の保護・モード）があれば error。`CCNAVI_INTEGRATION_BRANCH` だけ例外。名前が親の識別子なのに別のブランチの上に居る親のワークツリーは warn。親子のチケットの取り込み状態が決まらない形は error（閉じた親子のチケットは info）、統合先の取り込み結果が壊れていれば error、作業ツリーのレイヤーと統合先の取り込み結果のレイヤーの違いは warn、`P` の上のプロジェクトのレイヤーが「プロジェクトの統合先のレイヤーに共通レイヤーを `configsync.projected` で写したレイヤー」と違えば warn |
-
-後方互換（このワークスペースの `.ccnavi/approved/`、取り込み状態は無い）: 1ba6001 の時点と変更後で `--explain --json`・`--lint --json`・`--approve --preview --json`・
-`--approve --preview --verify --json` と、実行前チェック 8 通り（ワークスペースルートとワークツリー 2 つへの Write、承認済みの置き場への Write、Edit、Bash 3 つ）を
-打ち比べた。違いは `digest`（read_set を入れたため。上のダイジェストの行）と `generated_at`（時刻）だけで、終了コードと標準エラーは同じ。
-**ただし、取り込み状態の無い親子のチケットでも答えが変わる所が 2 つある**（11.5.1 で正確に直した）: `ready` の前提（親のチケットが `done/` にあること）は親子のチケットの取り込み状態の有無に
-依らず当たる（厳しくする変更として残す。このワークスペースでは打ち比べの 4 つの出力に現れない）。ダイジェストは read_set を入れたので全部の親子のチケットで値が変わる。
-
-ADR に無かった判断:
-
-- 取り込み済みの親子のチケットの見分けは「親子のチケットの取り込み状態があるか」だけ。chat だけの親子のチケットの見分けは 2d（決定 B1）
-- `present` でも親のワークツリーが無い・HEAD が別のブランチなら決まらない（3.3 の「手元での読み替え」をそのまま止める側に読んだ）
-- 3.3 の 5 の対応表は「親のワークツリー + 統合先の取り込み結果の `done/`」に**限らず**、前の全ツリーから作る対応表に厳しくする読み直しだけを加えた。
-  統合先の `done/` で閉じた先行を満たしたと数えると、手元の置き場で満たしていなかったものが通るようになるため
-- 止めた状態は親子のチケットの取り込み状態の `blocked` に置き、書くのは `ccnavi-sync.sh` だけ（Python は判定し直しの結果を 1 行 1 件で返す `ccnavi sync check <P>` を持つ）
-- 取り込みの後の検査は、親のワークツリーの中の読めないチケットも止める理由にする
-- ダイジェストの `read_set` に加えて、一括のチケットとして書き出す中身（前のダイジェストの部分）もダイジェストに含めたままにする（読みの記録を通らない読みが紛れても、書き出す中身の変化を取りこぼさない）
-
-入れなかったもの:
-
-- **レイヤーを統合先の取り込み結果から読むこと**（3.4 の `phase.types_path`、3.3 の 6、ADR-0084 の改訂）: 取り込み済みの親子のチケットのレイヤーを作業ツリーから統合先の取り込み結果に
-  切り替えると、統合先のレイヤーが作業ツリーより緩いときに通るものが増える。相談の結果、手元は作業ツリーのレイヤーのまま、D28 は Chrome の側にだけ当てると決めた（決定 B1。11.5.1）
-- Chrome の入口で取り込み状態を組むこと: Chrome は取り込み状態を持たないので、無い `P_X` は前どおり「先行が無い」で止まる（止まることは同じで、文面が違う）。
-  手元のダイジェストは取り込み状態の無い親子のチケットで全ツリー上のチケットを読むので、Chrome のダイジェストと同じ値にならないことがある（CX-T061 の見本は、合流した子のワークツリーを片付けて揃えた）
-- write-and-push、書いたパスの一覧の基点の絞りと置き場の外の error、chat だけの親子のチケットの見分け、`history` の `actor`・`version`・VS Code の呼び名: 2d
-- 版ずれで `blocked` にすること（7.3。Chrome と手元の判定の突き合わせ）: Chrome で承認を書く段階 3 から
-
-#### 11.5.1 レビューで直したもの（2026-09-29）
-
-段階 2c の後の敵対的レビューの指摘を、ユーザの承認を得て直した。判定は厳しくする変更だけで、緩めた所は無い
-（例外は 6 の「古い実行ファイルで検査を実行できなかったときは止めない」で、段階 2b と同じ動きに戻すもの。ユーザの指示）。
-
-前回の相談点への決定（ユーザ）:
-
-- **A（取り込み状態を消さない）**: 親子のチケットの取り込み状態は削除せずに残す。親のワークツリーが無くても `gone`・`blocked`・`closed`・`present` の取り込み状態を消さない。
-  消すのはユーザが打つ `ccnavi-sync.sh --forget <P>`（親のワークツリーが残っていれば断る。ネットワークを使わない）だけで、エージェントの Bash は
-  組み込みの deny（`builtin-guard-ticket-approval`）が止める。段階 2b の「親のワークツリーが無い親子のチケットの取り込み状態を消す」ループ（11.4.2 の 11）はやめた
-- **B1（レイヤー）**: 手元はワークスペースルートと作業ツリーのレイヤーを読むまま。D28（統合先のレイヤーからの計算）は Chrome の側にだけ当てる（3.3 の 6・D28 を改めた）。食い違いは warn のまま
-- **B2（ダイジェストの揺れ）**: 関係の無いワークツリーの動きでダイジェストが変わるのは受け入れる（5.1 に書いた）
-
-| # | 何 | 直し方 |
-|---|---|---|
-| 1（重大） | 取り込み状態の掃除（sync の頭）で `gone` の取り込み状態が消え、止めが外れた | 決定 A。閉じたかは親子のチケットの取り込み状態に頼らず統合先の取り込み結果の `done/` から引く（親のワークツリーがあれば承認の時刻が同じときだけ。`syncstate.Families._closed_in_integration`）。片付けた後に削除せずに残した `present` の取り込み状態は、統合先を取り込み直せば閉じた親子のチケットとして扱われ、何も出さない |
-| 2（重大） | 統合先の取り込み結果が壊れている・読めない・`head` が無い・入れ替えが終わらないとき、`done/` の検査を何も言わずに通していた | 取り込んだ形跡（`sync/<リポジトリ>/`）があるのに読めなければ `Integration.broken` に理由を入れて返す（`integration()` が None なのは、そのリポジトリを一度も取り込んでいないときだけ）。そのリポジトリの新規の提案は「決まらない」で承認しない（error）。最初の push の直後（親子のチケットの取り込み状態だけがあり統合先の取り込み結果がまだ無い）も同じで、`ccnavi-sync.sh` を打つまで承認しない |
-| 3（重大） | 検査が error なのに、ロックが取れない・取り込み状態を書けないと親子のチケットが止まらないまま終わった。並行する sync の書いた gone・closed を上書きしえた | ロックを取った後に取り込み状態がまだ `present` かを確かめ、違えば書かない。取れない・書けないときは 3 回まで試し、それでも駄目なら終了コード 3（止めるべき親子のチケットが止まっていない） |
-| 4 | 統合先 `done/` の検査が取り込み済みの親子のチケットの提案だけだった | 取り込んだ形跡のあるリポジトリでは全提案に当てる（3.3 の 4）。承認待ちからは外さず、`candidates` が理由を添えて承認しない側に回す（12） |
-| 5 | read_set の鍵がリポジトリをまたいでぶつかりえた | 鍵を `<リポジトリ>:<ブランチ>:<相対パス>` にした（git の ref は `:` を含めない） |
-| 6 | 古い実行ファイルが `sync check` を知らないと親子のチケットが blocked になった | 答えの頭に `check 1` を出し、無ければ「検査を実行できなかった」として警告だけ（検査の error と分ける） |
-| 7 | 親子のチケットごとにワークツリーを並べ直していた（hook の速さ） | `syncstate.Families` で、1 回の判定の中のワークツリーの一覧・親子のチケットの取り込み状態・統合先の取り込み結果を 1 度ずつ読む |
-| 8 | `blocked`・`gone` を解くのにネットワークが要ることが書かれていなかった | 案内文に「オンラインで」を書き、5.1 に受け入れる危険として書いた |
-| 9 | `ready` の前提が取り込み状態の無い親子のチケットの答えも変えることが 11.5 の後方互換に無かった | 厳しくする変更として残し、11.5 の後方互換の記述を直した |
-| 10 | 読めないチケットの検出が文面の部分一致だった | `approval.unreadable_copies` が (パス, 説明) を返す |
-| 11 | `mark_imported` が前の `blocked` の理由を上書きした | 前の理由に連ねる |
-| 12 | 統合先の `done/` にある識別子の提案が承認とボードから理由なしで消えた | 承認の `rejected` に理由を出す（ボードの承認待ちにも残る）。`--lint` は「閉じたのに todo/ にも在る」の warn |
-| 13 | `fsio.reading` の入れ子を等価で外していた | 同一性で外す |
-| 14 | 取り込み状態の無い親子のチケットの試験が秒の境目でぶれた | `generated_at` を除いて比べる |
-| 15 | settings.local.json に置かせない値が少なかった | 記録の置き場・ccnavi 自身の設定の保護・戻す働き・確かめられないモードの止め・同じ理由の拒否の数え方を足した。足さない値（実行ファイルのパス・診断ログ・タイムアウト監視の秒）は答えを変えないので理由をコメントに書いた |
-| 16 | リポジトリの分からない親子のチケットの引き方が同名の親子のチケットを取り違えた | `home_dir` に `project` を渡し、分からなければ取り込み状態のあるリポジトリを全部探して 2 つ以上なら決めない |
-| 17 | 取り込み状態と取り込み結果の読みの細部 | `Integration.names()` も `..` を断る。`Integration.file()` は `O_NOFOLLOW`。64KiB を超える取り込み状態と取り込み結果は切らずに壊れているとする |
-| 18 | read_set に設定と HEAD が入っていなかった | `pyproject.toml`・`ccnavi.settings.local.json`・`.claude/settings*.json` の中身と、置き場のパス・チケット制御の値と、鍵に使ったツリーの HEAD の中身を入れた（state の置き場・モード・承認の保護は承認の答えを変えないので入れない） |
-| 19 | 親のワークツリーが rebase・merge の途中で HEAD が切り離されると「HEAD が指していない」とだけ言った | 途中の操作の目印（`MERGE_HEAD`・`rebase-merge` など。ファイルだけを見る）があれば「途中の操作がある」と言う（止めるのは同じ） |
-| 20 | `--config-synced`（`configsync.acknowledge`）が決まらない親子のチケットで古い経路に進んだ | ほかの状態の操作と同じく止める |
-| 21 | 3.5 と実装（`P` 以外にしか無いチケットを最初から止める）が食い違った | 厳しくする変更として残し、3.5 を実装に合わせ、ユーザがチケットを移す手順を文面に書いた |
-| 22 | 試験の穴 | 親のワークツリーを片付けて sync しても止めが外れない、`--forget`（断る・消す・ネットワークを使わない・エージェントの deny）、統合先の取り込み結果の壊れ・無い・入れ替え中の承認、新しい親子のチケットの識別子の再利用、鍵の衝突、古い実行ファイルの `sync check`、check_family の競合とロック、プロジェクト（repo ≠ self）の親子のチケットの hook と状態の操作、途中の操作の文面、理由を連ねる、同名の親子のチケット、設定でダイジェストが変わる、入れ子の読みの記録 |
-
-直さなかったもの:
-
-- Python 3.11 で `shutil.rmtree(onexc=)` が無く試験が環境エラーになる件: `pyproject.toml` の `requires-python` は `>=3.12` で、3.11 は対象外
-
-#### 11.5.2 段階 2c で触った保護の対象
-
-`.ccnavi/scripts/ccnavi-sync.sh`（取り込みの後の検査と `blocked` の書き込み。レビューの後に `--forget`・削除せずに残す取り込み状態・書き込みの再試行と終了コード 3）、
-`.ccnavi/scripts/ccnavi-git.sh`（gone の push の拒否文に `--forget` を書いた）。
-
-### 11.6 段階 2d で入れたもの（2026-09-29）
-
-write-and-push（4.3・4.4）、承認の pushの改修（4.6）、ユーザの判断の入口の sh。変えたのは厳しくする所だけで、write-and-push の対象外の親子のチケット
-（取り込み状態が無い、origin が無い、chat だけの親子のチケット、置き場のパスの設定が絶対パス）は前と同じ動き（D11）。
-
-| 何 | 場所 | 形 |
-|---|---|---|
-| write-and-push の対象の見分け（D11） | `ccnavi/write_and_push.py` の `family`、`ccnavi write-and-push family <識別子>` | 1 行 1 項目で `family`（子なら親）・`repo`・`target`（`yes` / `no` / `stop`）・`why`・`tree`・置き場のパス・止めたときの `hint`。`yes` は置き場のパスが相対で、親子のチケットの取り込み状態があり、chat だけの親子のチケット（`phase.chat_only`）でなく、2c の止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の無い親子のチケット。origin の有無は sh が見る。答えない古い実行ファイルでは、親子のチケットの取り込み状態があれば `stop`、無ければ `no` |
-| write-and-push の外の変更の見分け（4.4） | `write_and_push.sort`・`classify`、`ccnavi write-and-push sort <親> [<版>]` | 置き場（承認済みと `wip/proposals/review/`）の変更を分ける。(b) は `phases/<親>/<N>.pending`・`.skipped` で変更前が無く中身が hook のキー（`at`・`review`・`source`・`deferred_to`・`tickets`）だけの JSON と、`events/<識別子>.jsonl` で変更前が前置きで足した行がどれも状態の履歴の行（`at`・`ticket`・`kind` が文字列）のもの。(c) は形で見るユーザの判断（フロー・`reviewed`・(b) でない `skipped`・`close-early.json`・`config-sync.json`・`accepted.json`・新しく置かれた `doing/` の承認済みチケット）。ほかは (d)。`keep` は未コミットの `<子>.judge.json`、`skip` は書きかけの一時ファイル。`<版>` を渡すと `<版>..HEAD` でコミットに入った分を同じ規則で見る（4.3 の 5） |
-| 書いたパスの一覧の基点と置き場の外（4.3） | `cli` の `--record-tree <親のワークツリー>` | 一覧をそのツリーからの相対にし、置き場の外に書いたら標準エラーで名指しして 1 で終わる（一覧は書く。write-and-push は戻すのに使う）。例外は `ticket start` の中の configsync の写したレイヤー（`configsync.is_synced_write` が内容で読めるもの。D34） |
-| record-risk の記録を finish でコミットして push する | `ops`・`fsio.note_input` | finish が読んだ `<子>.judge.json` を、書いたものと同じく一覧に載せる |
-| write-and-push の手順（4.3 の 1〜11） | `ccnavi-common.sh` の `ccnavi_wap_family`・`begin`・`write`・`end` | 1 ロック（待つ。`CCNAVI_LOCK_WAIT`）2 途中の操作（`MERGE_HEAD`・`CHERRY_PICK_HEAD`・`REVERT_HEAD`・`rebase-merge`・`rebase-apply`・`sequencer`・`index.lock`）3 見分け → (c)・(d) があれば止め、(b) を `commit --only` 4 取り込み（`ccnavi-sync.sh <P>` を入れ子のロックで起こす。統合先の取り込み結果も同じ回で書く）→ 親子のチケットの取り込み状態が `present` のままか確かめる 5 `origin/<P>..HEAD` の置き場の変更が (b) だけか 6 元の先頭 7 実行ファイルを `--record-writes`・`--record-tree` つきで起こす 8 一覧のパスだけ `commit --only`（新しいファイルは先に `add`）9 `push origin P`（`--force` なし）10 落ちたら `ls-remote` の完全一致で届いたかを見る 11 届いていなければ先頭が自分のコミットのときだけ `update-ref` で戻し、索引と書いたパスの中身を元に戻して、3 から 1 回だけやり直す |
-| write-and-push を回す入口 | `ccnavi-ticket.sh` の start・finish・cancel、`ccnavi-review.sh` の request（マーカー）・confirm・decide（`--preview` を除く）・ready | 対象でなければ前と同じ（実行ファイルに渡すだけ）。`stop` なら書かずに止め、2c の解き方を出す |
-| 承認の push（4.6） | `ccnavi-push-approved.sh [<親>...]` | 取り込み済みの親子のチケットの親のワークツリーは、ロック（入れ子を許す）→ 途中の操作 → 取り込み → 置き場（承認済み、`review/`、消えた `todo/` の提案）を `commit --only` → push → 失敗したら届いたかの確認。落ちてもコミットは残す。`<親>` を並べるとその親子のチケットだけで、取り込み済みでない親子のチケットは push しない（今のままユーザがコミットする）。省けば前どおり変更のある全ツリーで、取り込み済みの親子のチケットだけ上の手順 |
-| ユーザの判断の入口（D27） | `ccnavi-review.sh chat <N>`・`config-synced <親>`・`close-early` | 実行ファイル（`--reviewed <N> --chat`・`--config-synced`・`--close-early`）が書いた後、取り込み済みの親子のチケットなら `ccnavi-push-approved.sh <親>` を呼ぶ。送れなければ 1 で終わり、打ち直しを言う。chat と config-synced はホストに触らないので origin も jq も要らない |
-| エージェントから止める | `phase_forms.ticket_approval_rule`・`_FORBIDDEN_COMMAND` | `ccnavi-review.sh chat / config-synced / close-early` を組み込みの deny とサブエージェントの禁止に足した（厳しくする変更） |
-| ボード | `vscode-extension/ccnavi-board` | フローを保存したら `ccnavi-push-approved.sh <親>` を端末に送る。状態の履歴の呼び名に `withdrawn`（承認の取り下げ）と `chrome`（Chrome 拡張）を足した |
-| REQ-APV-11 の補足 | `docs/requirements/approval.md` | 4.3 のそのほかの引用文のとおり |
-
-直したもの（段階 2b の関数）: 入れ子で起こされた sh が別のロック（統合先の取り込み結果のロック）を取って外すと、
-`CCNAVI_LOCK_HELD` を消していた。write-and-push から起こした `ccnavi-sync.sh` が、その後の取り込みの後の検査で親子のチケットのロックを
-入れ子と読めず、`blocked` を書けなかった（試験で見つけた）。取る前の値を記録し、外すときに戻す。
-
-`history` の `actor`・`version` キーは、段階 2a の時点で `history.note` に追加のキーとして渡せば書けた（取り下げはそうして書いている）。2d で足したのは
-ボードの呼び名だけ。
-
-後方互換（このワークスペース。親子のチケットの取り込み状態は無い）: 6437196 の時点と変更後で `--explain --json`・`--lint --json`・
-`--approve --preview --json`・`--approve --preview --verify --json` と、実行前チェック 12 通り（ワークスペースルートと
-ワークツリー 2 つへの Write、承認済みの置き場への Write、Edit、Bash 7 つ）を打ち比べた。違いは `generated_at`（時刻）と、
-`ccnavi-review.sh chat 1`・`close-early` が ask（言及の無い呼び出し）から deny になったこと、deny の文面にユーザの判断の
-入口を足したことだけ。終了コードは同じ。sh は試験のワークスペースで、取り込み状態の無い親子のチケット・origin の無い親子のチケット・chat だけの
-親子のチケットの `ticket start` がコミットも push もしないこと、実行ファイルを直に打ったのと同じ出力と終了コードになることを見た。
-
-ADR に無かった判断:
-
-- write-and-push の取り込みは `ccnavi-sync.sh <P>` をそのまま起こす（入れ子のロック）。消えたかの確かめ・統合先の取り込み結果・
-  取り込みの後の検査が同じ回に入る。3 と 4 の間に hook が書いて重なったかは、sync の文面（「書きかけの」）で見る
-- 止める理由のある取り込み済みの親子のチケット（`stop`）は、ネットワークに出る前に sh が止める（実行ファイルも 2c で止めるが、
-  ロックと取り込みを先にしない）
-- 実行ファイルが落ちた回も、書いたパスの中身を元に戻す（コミットしない）。この実行の前から未コミットだった
-  `judge.json`（`keep`）は戻さない
-- `ccnavi-review.sh` では、write-and-push の 1〜5 をホストに触る前に済ませ、送れなかったときのやり直しは状態を書く実行ファイルの
-  1 回だけにする（依頼の投稿や issue の作成を 2 度しない）。決めた内容のコメントは送った後に投稿する
-- write-and-push の文面はすべて標準エラーに出す（ボードが標準出力の JSON を読むため）
-- (c) と (d) の区別は文面が違うだけ（どちらも止める）。(c) の形は 4.4 の表から取った
-- 承認の pushで名指しした親子のチケットが取り込み済みでなければ push しない（0 で終わる）。ユーザの判断の入口とフローの保存では、
-  取り込み済みの親子のチケットだけを送り、取り込み状態の無い親子のチケットは前と同じ（置くだけ）になる
-- 承認の pushのコミットに、`review/` の変更（ユーザのレビューで done/ へ動いた子の削除）を足した（write-and-push の 5 が未送信の (d) で
-  止まり続けないため）。取り込み済みでない親子のチケットの前の経路は変えていない
-- write-and-push のコミットの文は「ccnavi: <識別子> に着手」などユーザが読む説明だけ（D37）。(b) は「ccnavi: <P> の hook のマーカーと状態の履歴をコミットする」
-
-入れなかったもの:
-
-- `confirm` の `--actor` と `ccnavi-review.sh` のアカウントの引き当て（8.7・8.9）: 11 章の段階 2d の行に無い。段階 4 に回す（11.6.1 の決定 E）
-- GitLab の `phases/<P>/seq`（8.4）: 段階 5
-- Git Bash で別の sh の pid に `kill -0` が通じるか（10.2 の 6）: この環境（Linux）では確かめられない。Windows で確かめるまで
-  前のまま（同じホスト・同じ OS なら pid を見る）
-- hook の告知の文（「ユーザが端末で 'ccnavi --reviewed <N> --chat' を打つ」）の書き換え: 11.6.1 のレビューの後の決定 E で入れた
-
-#### 11.6.1 レビューで直したもの（2026-09-30）
-
-段階 2d の後の敵対的レビューの指摘を、ユーザの承認を得て直した。判定の変更は厳しくするものだけで、緩めた所は無い。
-
-前回の相談点と、レビューの後にユーザが決めたこと:
-
-- **A（対話の decide）**: 選択は write-and-push の外で先に取る。`ccnavi --reviewed N --accept-unresolved --choose-out <state の下のファイル>` が
-  ユーザに選ばせて選択とダイジェストを書くだけ（置き場には何も置かない）。sh はその後で write-and-push を始め、write-and-push の中では `--yes <選択> --digest <ダイジェスト>` で書く。
-  取り込みで指摘や親子のチケットが動いていればダイジェストが合わずに止まる。取り込み状態の無い親子のチケットは前のまま（実行ファイルが対話で選んで置く）
-- **B（ロックの 10 分）**: 4.3 の「古いロックの判断」と D32 を直した
-- **C（write-and-push のコミット）**: `--no-verify` とタイムアウト監視の時間（4.3 の 8）。承認の pushの取り込み済みの親子のチケットのコミットも同じ
-- **D（依頼の二重投稿）**: 依頼文の頭の目印を `<!-- ccnavi:request <P>:<N> key=<鍵> -->` にした。鍵は本文と親のブランチの先頭から作る。
-  sh はマージリクエストのコメントに同じ目印で始まるものがあれば投稿し直さず、その投稿を記録に使う。実行をまたいでも二重にならない。
-  子を足してやり直した依頼は先頭が違うので別に投稿する。**限界**: 1 回目と 2 回目の間に親のブランチが動くと（取り込みで Chrome の
-  承認が入るなど）鍵が変わり、もう 1 度投稿する。コメントの一覧を取れなければ投稿せずに止める
-- **E**: `--actor` は段階 4 に回した（入れない）。hook の告知と `close_problems` の案内を `ccnavi-review.sh chat <N>`・`config-synced <親>` に
-  書き換えた。ボードのフローの保存は、取り込み済みの親子のチケット（`ccnavi write-and-push family` が `yes`）のときだけ「端末で送る」ボタンを出し、
-  押したときだけ承認の pushを端末に送る（対話中の端末に勝手に打ち込まないため、確認の形を採った）。それ以外の親子のチケットは前と同じ案内だけを出す
-
-| # | 何 | 直し方 |
-|---|---|---|
-| 1（重大） | コミットに失敗すると、`add` した新しいファイルが索引に残った | この実行が `add` したパスを記録し、落ちたら `restore --staged --source=<先頭>` で外す（戻すときに索引を戻すのと同じ関数 `ccnavi_wap_unstage`） |
-| 2（重大） | `core.autocrlf=true` で状態の履歴の追記が (b) にならず、write-and-push が毎回止まった | 変更前と今の中身の改行を LF に揃えて比べる |
-| 3（重大） | `ccnavi-ticket.sh start -- <親>` などで write-and-push を通らずに進めた | sh は `--` と `--reason <値>` を飛ばした最初の語を識別子と読む。さらに実行ファイルが、write-and-push の対象の親子のチケットへの状態の操作（`ticket start/finish/cancel`、`review requested/confirm/ready`、書く形の `--reviewed N --accept-unresolved`）を `--record-tree` 無しでは断る（ユーザの入口 `--chat`・`--config-synced`・`--close-early`、書かない形、`record-risk` は見ない）。そのため `write-and-push family` も origin の有無を見る（ローカルの `git config`） |
-| 4 | (b) が広かった | 4.4 の表のとおり、親子のチケット・種類・マーカーの名前・数字の形・状態の履歴のファイルの有無で絞った |
-| 5 | push が届いたのに確かめ（`ls-remote`）も失敗すると、戻して書き直し、成功を失敗として返した | やり直しの取り込みの後、自分のコミットが HEAD の祖先なら届いていたとして書き直さずに成功で終える |
-| 6 | ユーザが直に打った chat の書き込みの大半が (d) になった | ユーザの判断が一緒に書く移動の組（`review/`→`done/`、`doing/`→`done/`）、マーカーの消去、状態の履歴の追記（読める行）を (c) にした |
-| 7 | `--state`・`CCNAVI_STATE` でstate の置き場を動かしていると、依頼・行き先・Draft 外しの下書きが置き場の外として error になった | 動かしたstate の置き場の下も一覧から外す |
-| 8 | Windows で実行ファイルの標準出力が CRLF になり、sh が 1 行 1 項目で読むときにずれうる | 実行ファイルの標準出力と標準エラーを LF に固定し、sh の側でも `tr -d '\r'` を挟む（`write-and-push family`・`write-and-push sort`・`sync paths`・`sync check`） |
-| 9 | `git status` の失敗を握りつぶしていた | コミットの失敗にする（1 と同じく索引を戻す） |
-| 10 | 承認の pushが書きかけの一時ファイル（`.part`・`.ccnavi-sync`）をコミットしえた。パスの読みが改行に弱かった | 一時ファイルを除き、`status --porcelain -z` で読む |
-| 11 | 一時ディレクトリが作れないと、取り込み状態の無い親子のチケットまで止めた | 先に親子のチケットの取り込み状態の有無を sh で見て、無ければ実行ファイルにも聞かずに対象外とする（D11） |
-| 12 | `sh -x .ccnavi/scripts/ccnavi-push-approved.sh` が deny に当たらなかった | 組み込みの deny とサブエージェントの禁止の表記を `(sh\|bash)(\s+-\S+)*` にし、シェルを付けない形も当てる。変数の展開・`cat … \| sh -s` は 5.1 の受け入れる危険に書いた。`CCNAVI_LOCK_HELD` の偽造は協調用で保護ではないと 4.3 に書いた |
-| 13 | 名前を省いた承認の pushが、子のワークツリーから親のブランチを 2 度 push し、子のツリーの置き場は push しなかった | 親のブランチは 1 度だけ push する。取り込み済みの親子のチケットの子のワークツリーに置き場の変更があれば push せずに言って 1 で終える（チケットは親のワークツリーに置き、子のブランチはリモートに出さない） |
-| 14 | `write-and-push family` がパスの空白をまとめていた | パス（`tree`）は空白をまとめずに出す。改行を含むパスは `stop` |
-| 15 | partial clone で、判定と見分けで呼ぶ git が、遅延取得のためにネットワークへ接続しうる | `gitcmd` の環境に `GIT_NO_LAZY_FETCH=1` を足した（実行ファイルのすべての git） |
-| 16 | write-and-push の途中で INT・TERM が来たとき | 送る前の自分のコミットを trap で比較つきで戻す。タイムアウト監視（`ccnavi_git_timed`）の子が呼び手の標準出力を開いたまま残らないようにし、trap でも止める。KILL で残ったコミットがあると次の write-and-push の 5 で止まる。その文面に戻し方を書いた |
-| 17 | 決定 A〜D | 上のとおり |
-| 18 | 試験の穴 | コミットの失敗（署名）、署名のタイムアウト監視、ユーザの hook を飛ばす、autocrlf、`--` で write-and-push を通らない形と実行ファイルの断り、届いたのに確かめられなかった push、ユーザが直に打った chat の後の write-and-push、生きた持ち主の 10 分を超えるロック、偽の状態の履歴の行、リンク越しのワークスペース、`request`・`confirm`・`ready`・端末の `decide` の sh からの write-and-push、`close-early`・`config-synced` が承認の pushへ渡ること、実行をまたいだ依頼の二重投稿、state の置き場を動かした本物の実行ファイルでの `--record-tree`、TERM での戻し、子のワークツリーの扱いを回帰試験にした。`commands.test.ts` の崩れた整形も直した |
-
-直さなかったもの:
-
-- 送る前に TERM が来たとき、裏で走っていた `git push` がその後で通ることがある（手元は戻した後）。次の write-and-push の取り込みでそのコミットが入るので、
-  状態は食い違わない（2 度書かれることは無い）
-- `ccnavi_git_timed` のタイムアウト監視の `sleep` が、タイムアウト監視を止めた後も指定の時間が過ぎるまで残る（前からの形。入出力は閉じてあり、何も開いたままにしない）
-
-レビューの後に決めたもの（2026-09-30。ユーザ）:
-
-- **(a) 実行ファイルを直に打つ**: write-and-push の対象の親子のチケット（`ccnavi write-and-push family` が `yes`）では、`ccnavi` を直に打って状態を変える
-  （`ticket start/finish/cancel`、`review requested/confirm/ready`、書く形の `--reviewed N --accept-unresolved`）ことはできない。
-  `--record-tree` の無い呼び出しを実行ファイルが断る（上の表の 3）。sh の入口（`ccnavi-ticket.sh`・`ccnavi-review.sh`）を通す。
-  厳しくする変更で、手で打てなくなることは受け入れる。ユーザの判断の入口（`--chat`・`--config-synced`・`--close-early`）、書かない形、
-  `record-risk` は前のまま
-- **(b) 依頼の二重投稿の残り（受け入れる危険）**: 依頼の目印の鍵（決定 D）は本文と親のブランチの先頭から作るので、1 回目と打ち直しの間に
-  P が動くと（取り込みで Chrome の承認が入る、別の操作が送る など）鍵が変わり、同じ依頼がもう 1 度マージリクエストに投稿されうる。そうなっても
-  記録にはその回の投稿を使い、先の投稿はコメントとして残るだけ。鍵から先頭を外すと、子を足してやり直した依頼を
-  別に出せなくなるので、この形のまま受け入れる。見つけたらユーザが古いほうのコメントを消す
-- **(c) 長いロックの文面**: 持ち主が生きていて 10 分を超えて持たれているロック（`ccnavi_lock_long`）で失敗にするとき、write-and-push と承認の pushの文面に
-  持ち主の pid・ホスト・開始時刻（読める形。GNU の `date -d @N`、BSD の `date -r N`、どちらも失敗すれば数のまま）と止め方
-  （「そのプロセスが固まっているなら、ユーザが終了させてから打ち直す」）を足した（`ccnavi-common.sh` の `ccnavi_lock_describe`）。
-  変えたのは文面だけで、ロックを強制取得するか待つかの判断は変えていない（厳しくする・緩める変化は無い）。回帰試験は `tests/sh/test_write_and_push_sh.py` の
-  `test_a_long_lock_names_its_owner_and_how_to_stop_it`
-
-#### 11.6.2 段階 2d で触った保護の対象
-
-`.ccnavi/scripts/ccnavi-common.sh`（write-and-push の関数、ロックの `CCNAVI_LOCK_HELD` の戻し）、`ccnavi-ticket.sh`・`ccnavi-review.sh`
-（write-and-push とユーザの判断の入口）、`ccnavi-push-approved.sh`（親子のチケットを取る、取り込んでから送る）。ユーザの承認（段階 2d の実施）を得て直接直した。
-11.6.1 のレビューの直しでは、この 4 本と `ccnavi-sync.sh`（実行ファイルの答えの CR を除く）を直した。
-
-### 11.7 段階 3 で入れたもの（2026-09-30）
-
-Chrome で承認と取り下げ（GitHub・ワークスペースのリポジトリだけ）。**REQ-APV-07 の改訂が適用され始める**（リモートの置き場は
-ホストの権限でのみ守り、書き手を表示しない。5.1）。ユーザが「段階 3 に進む」と承認した。それ以外に判定を緩めた所は無く、
-手元の判定（Python）の変更は厳しくするものか、状態の履歴と文面にキー（`actor`・`version`）を足すか、理由の文面の頭に判定の違いを足すものだけ。
-
-| 何 | 場所 | 形 |
-|---|---|---|
-| 取り込み状態と取り込み結果に相当するもの（3.3。段階 2c の「Chrome の入口で取り込み状態を組む」） | `py/ccnavi_chrome.py` の `records`・`_build` | 仮のツリーの `logs/state/sync/self/` に、統合先の取り込み結果（`done/`・共通レイヤー・自身のレイヤー・`.claude/settings.json` のコピーと `head`）と、閉包の親子のチケットの取り込み状態（ホストに在れば `present`、無く統合先でも閉じていなければ `gone`）を組む。手元と同じ判定のコードが取り込み済みの親子のチケットとして読むので、`gone` の親子のチケットは決まらない（`PRED_UNDECIDED`・`blocked`） |
-| 読めない入力で止める（6.2 の `NOT_FETCHED`） | `ccnavi_chrome._unreadable` | 統合先・`P`・閉包の `P_X` の読む置き場に本文を読めない（バイナリの）ファイルがあれば、ボードは「決まらない」、書く操作は受けない（段階 1 は言うだけだった） |
-| 書けるか（7.3・D31・8.5） | `ccnavi_chrome._write_refusal`、ボードの答えの `write` | 同梱の互換の版が統合先の `CCNAVI_COMPAT` と違う、書く先が予約の名前（`main`・`master`・`develop`・`release`・`release-*`）か統合先の名前、のどれかなら承認も取り下げも受けない。ボードは表示だけにしてボタンを出さない |
-| 見せたものの照合と書く先（8.3 の 2・8.4） | `ccnavi_chrome._op_plan`（`shown`）・`_one_branch` | 見せた一覧とダイジェストを `core.judge_approval` に渡し、違えば書くもの（Changes）を出さない（`mismatch`）。Changes が親のブランチ `P` の外に及べば受けない |
-| 取り下げの可否（8.8） | `core.withdrawable`、ボードの答えの `withdrawable` | `P` の `doing/` の承認済みチケットごとに、`withdraw` と同じ条件（承認コミットの親の提案は引ける前提）の理由を返す。ボードは理由の無いものに「承認を取り下げる」を出す |
-| 状態の履歴のキー（7.3・8.8） | `history.session` の `actor`・`version` | Chrome の承認・改版の状態の履歴に、PAT の持ち主のアカウントと拡張の版を足す。手元の経路は渡さないので前と同じ中身 |
-| Chrome と手元の判定の違い（7.3） | `lint._chrome_disagrees`（`family_check` の中） | 取り込みの後の判定し直しで error になったチケットの、最後の承認・改版の状態の履歴が `via: chrome` なら、理由の頭に「Chrome <拡張の版> と手元 <版> で判定が違う」を足す（sh が `blocked` の `reason` に書く）。止めるかどうかは変えない |
-| GitHub の書き込みと読み取り（8.4・8.8・8.10・D25） | `src/core/github.ts` | `createCommitOnBranch`（`expectedHeadOid`）、承認コミットの引き当て（`GET /commits?sha=<読んだ P の先頭>&path=<doing のパス>` を最大 30 件、親が 1 つのものだけ、`GET /commits/<sha>` の変更で「足した」かを確かめる）、開いたマージリクエストの Approve、PAT の持ち主（`viewer`）、期限のヘッダの読み |
-| service worker（5.5 の 4・8.5・D25） | `src/core/protocol.ts`・`src/background/main.ts` | 書く頼み `commit` はボードからだけ受け、保護された名前と統合先の名前を断る（Python と二重）。応答ヘッダの期限を `tokenMeta:<ホスト>` に保存し、`token.status` は期限の知らせだけを返す（PAT は返さない）。`chrome.alarms` で 1 日 1 回と保存したときに期限を比べ、切れる 7 日前からバッジに出す。manifest の権限に `alarms` を足した |
-| 承認と取り下げの流れ（8.3） | `src/core/write.ts` | 押すたびに親子のチケット 1 本ぶんを読み直して Snapshot を組み、Python の `plan`（見せた一覧とダイジェストつき）か `withdraw` の答えを 1 コミットにして書く。`expectedHeadOid` は読み直した `P` の先頭。落ちたら先頭を読み直し、動いていれば新しい Snapshot で判定と plan をやり直す（ダイジェストが同じなら見せ直さずに書く、違えば書かずに見直させる）。3 回でユーザの対応に切り替える。書いた後、新しい先頭の各パスの blob の sha が書いたとおりかを確かめる |
-| ボードと設定画面 | `src/core/render.ts`・`src/board/main.ts`・`src/options/main.ts`・`static/` | 承認のボタン（確認に 8.10 の注意を添える）、作業中の承認済みチケットと取り下げのボタン（理由は任意で入れる）、結果の行、PAT の期限の帯。設定画面に期限の日付の入力欄と、段階 3 の権限（Contents: Read and write・Metadata・Pull requests: Read）と 90 日の案内 |
-| 要件と ADR | `docs/requirements/approval.md`、ADR-0035・ADR-0086 | REQ-APV-07 を 5.1 の文に改訂し、判定が緩む変更と書いた。REQ-APV-15（Chrome の承認）・16（取り下げ）・17（版ずれと書く先）を足した。ADR-0035 に「同じコードの答え」と版ずれ、ADR-0086 に `withdrawn`・`chrome`・`actor`・`version` を書いた |
-
-試験: Python は `tests/ticket/test_chrome_write.py`（取り込み状態の `gone` と決まらないチケット、読めない入力、版ずれ、ダイジェストの不一致、書く先、状態の履歴のキー、
-手元が Chrome の書いた承認済みチケットを判定し直しても error が無いこと、違えば版を名指しすること、取り下げの可否）。判定のコアの見本
-（CX-T061）は、手元の state の置き場にも Chrome と同じ取り込み状態を組んで作り直した（画面の本文とダイジェストが手元の CLI と同じ値になる）。
-拡張は単体（1 コミットの組み立て、`expectedHeadOid` の競合で読み直して書く・中身が変われば書かない、ダイジェストの不一致、決まらない親子のチケット、
-版ずれ、取り下げと merge の飛ばし方、応答だけが落ちた書き込み、3 回でユーザの対応に切り替える、保護された名前、PAT を返さない、期限の知らせ、
-ボタンのある画面での悪意のある Markdown、承認と取り下げの要求での Pyodide と手元の CPython の一致）と、Chromium の実機
-（ボードからの承認・取り下げ・悪意のある本文の承認・期限の帯とバッジ・PAT がボードに渡らないこと）。
-
-分かったこと:
-
-- 確認事項 5: 模擬のホストでは、service worker が CORS に公開していない期限のヘッダを読めた（10.2 の 5）。本物の GitHub では確かめていない
-- 手元と Chrome が同じ取り込み状態を読めば、画面の本文とダイジェストも同じ値になる（段階 2c の「ダイジェストが同じ値にならないことがある」は、取り込み状態を揃えれば起きない）
-
-ADR に無かった判断:
-
-- 組んだ取り込み状態には先頭の sha と取り込んだ時刻を書かない。書くと判定が読んだ中身（read_set）に入り、関係の無い push でダイジェストが変わるため（6.2）
-- 無い `P_X` の先行が判定の入力のどこにも無いときは、前のまま「どの置き場にも無い」で止まる（文面が違うだけで、止まるのは同じ）。
-  `gone` で「決まらない」になるのは、その親子のチケットが判定の入力（`P` の上の古いチケットなど）に在るとき
-- 読めない（バイナリの）入力は親子のチケットごと「決まらない」にした（どのファイルを判定が読むかを前もって言えないため）
-- 取り下げの条件に「承認済みチケットに `blocked` が付いていない」を足した（`core_withdraw._withdraw_problems`）。決まらない親子のチケットの状態は動かさない。判定を厳しくする変更
-- 承認コミットは読んだ `P` の先頭から最大 30 件まで遡る。`doing/<識別子>.md` を最後に変えたコミット（親が 1 つ）が「足した」でなければ
-  （書き換え・消去）引けないとして取り下げを出さない
-- 書き込みの応答だけが落ちたときは、先頭が書いたとおりか（blob の sha）を確かめ、合えば書けたとする（2 度書かない）
-- 書く頼み `commit` はボードからだけ受け、service worker でも保護された名前と統合先の名前を断る（Python の検査と二重）
-- ボードの答えに `only`（ダイジェストを出したときの絞り）を足し、承認のときに同じ絞りで `plan` を呼ぶ
-- 8.10 の注意は、承認を押したときにマージリクエストの Approve を引いて確認の文に足す（ボードを開くたびには引かない）。読めなくても承認は止めない
-- 拡張の版を 0.2.0 に上げた（状態の履歴の `version` とコミットの見出しに入る）。見出しは「ccnavi: <識別子> を承認（Chrome 拡張 <版>）」
-  「ccnavi: <識別子> の承認を取り下げ（Chrome 拡張 <版>）」
-
-入れなかったもの:
-
-- レビュー済み（8.9）と `confirm` の `--actor`: 段階 4
-- GitLab・プロジェクトのリポジトリ・「始める」: 段階 5
-- D28 のプロジェクトのレイヤーの計算: 段階 3 はワークスペースのリポジトリだけで、読むレイヤーは統合先の共通レイヤーと自身のレイヤー（`P` の上のレイヤーは読まない）。
-  プロジェクトが絡む提案は今の判定（置き場とプロジェクトの照合、3.3 の 7）で承認しない
-- 本物の GitHub への書き込みの試験（PAT が無い）。確認事項 5・7 と、`createCommitOnBranch` の競合の応答の形は、ユーザが本物で確かめる
-
-#### 11.7.1 レビューで直したもの（2026-09-30）
-
-段階 3 の後の敵対的レビューの指摘を、ユーザの承認を得て直した。判定の変更は厳しくするものだけで、緩めた所は無い。
-
-レビューの後にユーザが決めたこと:
-
-- **A（承認の画面）**: ccnavi の画面の本文（範囲・リスク・計画など）を、親子のチケットの中の最初に、開いた状態で出し、承認のボタンはその下に置く
-  （REQ-APV-01 の「範囲を最初に」。閉じた details には入れない）。Markdown の本文では、内容を隠す書き方を通さない（`hidden`・`class`・`style`・
-  `id`・`color` などの属性、`font`・`details`・`summary` などの要素を除く）。HTML コメントは消さずに「〈HTML コメント: …〉」の文字で見せる
-- **B（merge で入った承認の取り下げ）**: 承認コミットが `P` の first-parent の鎖の上にあるときだけ取り下げる（8.8 に書いた）。確かめられなければ出さない
-- **C（`expectedHeadOid` が `P` しか守らない）**: 手元の C3 が後で捕まえる前提で、受け入れる危険として 5.1 に書いた
-- **D（service worker の保護）**: 書く頼みは、設定画面で登録したリポジトリだけ受ける。統合先の名前はボードの値を信じず自分で引き（設定、無ければ
-  ホストのデフォルトブランチ）、書くパスは既定の置き場（提案・承認済み）の下に限る。書く流れ（`rowsOf`）も
-  Python の答えの置き場で同じ検査をする
-  （追記 2026-10-05: 段階 3 では、置き場を統合先の設定から自分で引いていた。その後、置き場を既定に固定したので、ボードの値も統合先の設定も読まずに既定の置き場で検査する）
-
-| # | 何 | 直し方 |
-|---|---|---|
-| 1（重大） | 承認コミットの引き当てが変更の一覧の `status: added` に頼っていた。GitHub は承認コミットを `renamed`（`previous_filename` が todo）で返し、一覧は 300 件で切れる | `GET /commits?path=` の最新のコミットについて、そのコミットに `doing/<識別子>.md` の blob があり、最初の親に無いかを木で引いて比べる（一覧を読まない）。親が 1 つでない、最新の変更が「足した」でない、first-parent の鎖に無い、のどれかなら引けない（古いコミットへは進まない）。鎖は GraphQL の `history(first: 100)` の親から組む。模擬の GitHub に rename 検出（中身の似た消去と追加を `renamed`）と一覧の打ち切り、`git log -- path` の既定の簡略化（merge がどれかの親と同じならその親だけを辿る）を足した |
-| 2 | 入口の `_relative` が文面の途中の `/ws/` まで消した（Pyodide の仮のツリーは `/ws`） | 書くもの（Changes）のパスには当てない（既にツリーからの相対）。文面ではパスの頭（行の頭・空白・引用符・括弧・区切りの直後）にあるものだけを消す |
-| 3 | コミットの見出しが 200 字を超えると断っていたため、子の多い承認が書けなかった。service worker の断りが「先頭が動いた」に紛れた | 見出しは先頭の 3 件と件数にまとめ、全件は本文（`message.body`）に書く。service worker の断りは 400 で返し、書く流れはそれを原因どおりに失敗として言う |
-| 4 | 模擬の履歴が first-parent だけだった | 上の 1 のとおり本物の簡略化に寄せ、決定 B を試験した |
-| 5 | 決定 A・D | 上のとおり |
-| 6 | service worker が起きるたびに alarm を作り直し、1 日 1 回にならなかった | `alarms.get` で在るか見て、無いときだけ作る（`src/core/alarm.ts`） |
-| 7 | 期限を切り捨てた日数で比べ、7 日と数時間前から知らせた | ミリ秒で比べて 7 日前ちょうどから知らせる。見せる日数は切り上げ。登録のときの日付はその日の終わり（UTC）まで |
-| 8 | 承認コミットを引けないチケットにも取り下げを出していた | ボードを組むときに承認コミットと親の提案を引き、引けなければ理由を足して出さない（厳しくする側。8.8） |
-| 9 | 入口の版ずれと書く先の検査が、見せたものつきの `plan` と `withdraw` でしか行っていなかった | `plan`（見せたものの有無に関わらず）・`withdraw`・`confirm` の全部で行う |
-| 10 | `plan` で状態の履歴を書けなかったことが、何も知らされずに消えた | `withdraw` と揃え、書くものを出さずに止める |
-| 11 | Chrome と手元の判定の違いの名指しが、文面の書式に頼り、Chrome の後に手元が触ったチケットも Chrome のせいにした | チケットごとに判定し直して帰属を構造で持つ。状態の履歴の最後の行が Chrome の承認・改版のときだけ名指しする |
-| 12 | tree の mode 120000（シンボリックリンク）を普通のファイルとして読んだ | 読まずに `links` に入れ、Python が「決まらない」にする（親子のチケットが止まるので、リンクのパスへ書くことも無い） |
-| 13 | 応答だけ落ちた書き込みの見分けが中身だけだった。読んでいる間に先頭が動くと失敗した。書いた直後の読み取りの遅れ | 新しい先頭の親が読んだ先頭かも見る。読んでいる間に動いたら読み直して再試行する。書いた後の確かめは 1 秒おきに 3 回まで読み直す |
-| 14 | CSP | `img-src 'self'; form-action 'none'; base-uri 'none'` を足した。`default-src 'self'` は入れない（悪意のある本文の style 属性を DOMPurify が取り除く前の解析で、Chromium がインラインの style の違反を毎回報告する。表示の保護は DOMPurify が持つ） |
-| 15 | 403・429・二次のレート制限・GraphQL の `RATE_LIMITED` を原因を言わずに失敗にした。レビューの一覧が 100 件で切れた。打ち切られた blob | 原因（レート制限・回復の時刻・権限）を言い、Retry-After が 60 秒以内なら 1 回だけ待ち直す。レビュー・マージリクエスト・履歴の一覧は Link で読む。`isTruncated` の blob は読めないとする |
-| 16 | 試験の穴 | 上の各項目を回帰試験にした（Python `tests/ticket/test_chrome_write.py`、拡張 `test/review.test.ts` の CX-T118〜128、`protocol.test.ts` の CX-T112・117、e2e の画面の位置） |
-
-直さなかったもの:
-
-- 置き場の外の名指しのファイル（`.claude/settings.json`・互換のマーカー）がシンボリックリンクのとき: パスで引く GraphQL は mode を返さないので見分けていない。
-  置き場の下（`done/`・レイヤー・提案・承認済み）は tree の mode で見分ける
-- 読んでいる間に先頭が動く例外（`MovedError`）は、親子のチケット 1 本ぶんの読み直しでは同じブランチを 2 度違う先頭で読まないので起きにくく、試験は読み直して再試行する枝を直に見ていない
-
-### 11.8 段階 4 で入れたもの（2026-09-30）
-
-Chrome で「レビュー済み」（8.9）。GitHub・ワークスペースのリポジトリだけ。ユーザが「段階 4 に進む」と承認した（本物の GitHub での
-段階 3 の確認は後回し）。Chrome からレビュー済みを付けられること自体は承認済みの決定（D15）で、confirm の検査は手元と同じ関数を使い、
-手元より緩めていない。依頼の後に動いたかの確かめは Chrome の方が厳しくなる所がある（下の「ADR に無かった判断」）。手元の判定は変えていない。
-
-ユーザの決定（段階 4 の前）:
-
-1. `confirm --actor` を入れる。手元は `ccnavi-review.sh` が `gh` か API（`GITHUB_TOKEN`/`GITLAB_TOKEN` と curl）でトークンの持ち主を引いて
-   `--actor` で渡す。引けなければ渡さず、マーカーは前と同じ（8.9 の「git の `user.name`」をやめた）。Chrome は PAT の持ち主。キーは `actor`（`by` は経路名のまま）
-2. ホストの応答の見本は拡張の試験の fixtures に置き、ホストの API が変わったら手で更新する（手順は拡張の README）。confirm の検査は Python の同じ関数で、
-   スレッドを取ってくる処理（sh と TS）が同じ見本で同じ JSON を組むことを試験で見る
-3. Chrome と手元の confirm の突き合わせは、手元の CLI を直に打つと write-and-push に断られるので、試験の中で write-and-push と同じ手順（write-and-push のハーネス）で手元を回して比べる
-4. スレッドの本文は承認の画面と同じ規則で描く（内容を隠す書き方を通さない、HTML コメントは見える文字で出す、DOMPurify、CSP を緩めない）
-
-| 何 | 場所 | 形 |
-|---|---|---|
-| マーカーの `actor`（8.9） | `cli` の `--actor`、`core.confirm_local`・`confirm` | `review confirm` だけが受ける（ほかの形と、`[A-Za-z0-9_.-]{1,100}` でない値は断る）。あればマーカーに `actor` と `via: cli`、状態の履歴に `actor` を書く。無ければマーカーも状態の履歴も前と同じバイト列 |
-| アカウントの引き当て（4.5・D17） | `ccnavi-review.sh` の `account`・`confirm` | `GET /user`（gh・glab・curl のどれでも）の GitHub は `login`、GitLab は `username`。落ちる・形が違う（英数字と `_ . -` の 1〜100 字でない）なら空で、止めずに渡さない。ロックを取る前に引く。呼び手が `--actor` を渡せば断る（マーカーのアカウントを偽らせない） |
-| 依頼の後に動いたか（8.9 の表の 2 行目） | `review.moved_since` | 手元の `_moved_since_request` から git を読む所を外した関数。手元は `git diff --name-only --no-renames <依頼時>..HEAD`、Chrome は compare API の一覧を渡す。一覧が無い（読めない・打ち切られた）なら「動いた」 |
-| Chrome の confirm（8.9） | `py/ccnavi_chrome.py` の `_op_confirm`、`core.requested_head`・`moved_on_host`・`reviewable` | 依頼時の先頭は Python がマーカーから読み、読んだ `P` の先頭と違えば `need_compare`（`{base, head}`）で返す。拡張が compare API で読んで呼び直す（閉包の `need` と同じ形）。`compare` の 2 つがマーカーの先頭と読んだ先頭でなければ使わない。前の `changed`（文字列を TS が渡す形）はやめた。ボードの答えに `reviewable`（依頼済みでまだレビュー済みでないフェーズ）を足した |
-| スレッドとレビューの JSON（8.9） | `src/core/github.ts` の `openPull`・`reviewThreads`・`pullReviews`・`reviewCopy`、`protocol.ts` の `reviewCopy` | `ccnavi-review.sh` の `find_mr`・`threads`・`reviews` と同じ問い合わせ・同じページの切り方（スレッドは GraphQL の cursor で 21 ページ目、レビューは REST の `page` で 20 ページを超えたら止める）で、キーが無いか null のときは同じ既定値（空文字・0 など。jq の `//`）を入れて、`{host, mr, threads, reviews, fetched_at}` を組む。読むだけ |
-| 依頼の後の変更の一覧 | `github.compareFiles`、`protocol.ts` の `compareFiles` | `GET /compare/<base>...<head>`。改名は元と先の両方。`status` が `ahead`・`identical` でない、404、一覧が 300 件（打ち切り）なら `files: null` |
-| ボード（8.9・5.5） | `src/core/reviewed.ts`・`snapshot.ts`・`render.ts` | 候補のフェーズごとに JSON を読み、Python の `confirm`（書かない）で通るかを聞く。スレッドは未解決を先に、本文は承認の画面と同じサニタイズ（`md.markdown`）で描く。リンクは `http(s)`・`mailto` だけ。通らなければ理由（手元の confirm の標準エラーと同じ文面）を出し、通って書ける親子のチケットにだけ「フェーズ N をレビュー済みにする」を出す。依頼したホストが GitHub でなければ「段階 5」と出す |
-| 書く流れ（8.3・8.4） | `write.ts` の `confirmPhase`、ボードの `review` | 押すと 8.10 の注意を添えて確かめ、毎周、親子のチケットとスレッド・レビューを読み直して Python の `confirm` に通させ、Changes を `createCommitOnBranch` の 1 コミットにする（承認と同じ競合の扱い・書いた後の確かめ）。見出しは「ccnavi: <P> のフェーズ N のレビュー済みを置いた（Chrome 拡張 <版>）」。拡張の版を 0.3.0 に上げた |
-| 見本（決定 2） | `chrome-extension/ccnavi-approval/test/fixtures/host/github/<場面>/`、`tests/sh/github_host.py`、`test/helpers/host-fixture.ts` | 4 場面（`resolved`・`paged`・`changes-requested`・`hostile`）。代役は sh 用と TS 用の 2 つで、同じ規則で見本を返す。期待値は sh が組んだ JSON（`expected.json`）と結論（`conclusion.json`） |
-| 要件 | `docs/requirements/approval.md` | REQ-APV-18（Chrome のレビュー済み）と、手元のレビューの確認で置くマーカーのアカウントについての補足を足した |
-
-試験: Python は `tests/ticket/test_review_actor.py`（マーカーの `actor` と引けないときに前と同じバイト列、`--actor` の形、`moved_since` の規則、依頼の後の
-コードの変更で Chrome と手元が同じ文面で止める、compare の打ち切り・不一致、Chrome と手元のマーカーが経路と時刻のほかは同じ、ボードの候補）、
-`tests/sh/test_review_host_fixture.py`（見本ごとに sh が組んだ JSON が期待値と同じ、結論、`--actor` の引き当てと失敗と形の違い、呼び手の `--actor` を断る）、
-`tests/sh/test_write_and_push_sh.py` の `WriteAndPushChromeConfirmTest`（write-and-push の手順で依頼と confirm を回し、同じ状態からの Chrome の書くものと、write-and-push が書いて送ったものが
-経路・時刻・拡張の版のほかは同じ）、判定のコアの見本（CX-T061 の `confirm`。compare を渡す形に作り直した）。拡張は `test/reviewed.test.ts` の
-CX-T129〜137（見本ごとに TS が組んだ JSON が期待値と同じ、compare、ボードの出し分け、書く流れとマーカーの中身、未解決・変更要求・後から増えた未解決で書かない、
-依頼の後のコードの変更で書かない、悪意のある本文の描画、PAT が答えに入らない、Pyodide と CPython の一致）と、Chromium の実機の CX-T138
-（悪意のある本文を描いても何も動かず隠れない、解決したらボードから書く、PAT が画面に渡らない）。
-
-ADR に無かった判断:
-
-- `via: cli` は `actor` を書くときだけ書く（引けなかったときにマーカーを前と同じバイト列にするため。決定 1 の「前と同じ」）
-- 呼び手が `ccnavi-review.sh confirm --actor` を渡したら断る。実行ファイルの `--actor` は `review confirm` のときだけ受け、形を確かめる。
-  実行ファイルを直に打てる形（write-and-push の対象でない親子のチケット）では、エージェントが `--actor` を偽れる。`actor` は記録のためのもので、判定にも表示にも使わない（D29）ので受け入れる
-- 依頼の後に動いたかを比べる相手（依頼時の先頭）は Python が出し、拡張は求められた 2 つだけを compare で読む（`need_compare`。TS に判定の材料を選ばせない）
-- Chrome は依頼時の先頭が祖先でない（`diverged`）・ホストに無い（404）ときも「動いた」と数える。手元は 2 点の木の差分で見るので、
-  履歴を書き換えて同じ木に戻した形では手元は通り Chrome は止める（厳しくなる側の食い違い）
-- 拡張のレビューの一覧は sh と同じページの番号で読む（Link ヘッダを使わない）。同じ見本を同じ規則で返すため
-- ボードを開くたびに、候補のフェーズごとにマージリクエスト・スレッド・レビュー（と要れば compare）を読み、Python に通るかを聞く（書かない）。候補の無い親子のチケットは読まない
-- 見本は本物の形に合わせて手で組んだ（PAT が無く、本物からは録っていない。10.2 の 8）
-- confirm の状態の履歴（`phase-mark` の `reviewed`、子の `settled`）にも `actor` と拡張の版を入れる（承認・取り下げと揃えた）
-- 描画の `Actions.review` は省ける（渡さなければ「レビュー済みにする」を出さない。読み取りだけのボード）
-
-入れなかったもの:
-
-- `decide` のマーカーの `actor` と `via`（`terminal`・`board`）: 8.9 に書いてあるが、11 章の段階 4 の行と決定 1 は `confirm` だけ。入れると `decide` のマーカーの
-  中身が変わるので、入れる時期を相談する
-- GitLab（スレッドの読み・マーカー・`seq`）、プロジェクトのリポジトリ、「始める」: 段階 5。GitLab のマージリクエストで依頼したフェーズは、ボードで「段階 5」と出して書かない
-- 見本を本物から録り直す sh: 決定 2 で手で更新することにした
-
-本物の GitHub で確かめてほしい点（段階 3 のものに足す）:
-
-- 段階 3 から: 期限のヘッダ（10.2 の 5）、`GET /commits?sha=&path=` と merge コミット（10.2 の 7）、`createCommitOnBranch` の競合の応答の形
-- 段階 4: 10.2 の 8 の各点。特に、見本（`test/fixtures/host/github/`）の形が本物の応答と合っているか（合わなければ README の手順で見本を直す）、
-  レビュー済みのコミットで Approve が外れるときの画面の注意、fine-grained の PAT の権限で読めること
-
-#### 11.8.1 レビューで直したもの（2026-09-30）
-
-段階 4 の後の敵対的レビューの指摘を、ユーザの承認を得て直した。判定の変更は厳しくするものだけで、緩めた所は無い。
-
-レビューの後にユーザが決めたこと:
-
-- **A（ユーザごとの最新のレビュー）**: `review.effective` がユーザごとの最新を選ぶ対象を APPROVED・CHANGES_REQUESTED・DISMISSED に限り、
-  COMMENTED と PENDING（書きかけ）は飛ばす。変更要求は同じユーザの Approve か dismiss まで残る（前は、変更要求の後に同じユーザが
-  コメントだけのレビューを出すと変更要求が消えた）。手元と Chrome の両方に当てはまる。GitLab の `reviewed`・`unreviewed` も数えない
-- **B（レビュー済みに重ねない）**: `core.confirm` はフェーズがレビュー済みなら「フェーズ N はレビュー済み」で止める。手元の 2 度打ちも
-  Chrome も止まる（前はマーカーと状態の履歴を書き直した）。ボードは押した時点で読み直して判定するので、開いた後にほかで付いたマーカーでも止まる
-- **C（ccnavi の投稿のスレッド）**: 目印（`<!-- ccnavi:`）で始まるスレッドを未解決から除くのは、GitLab の JSON で、書いたのが依頼を
-  投稿したアカウントのときだけ。GitHub では除かない（依頼はマージリクエストのコメントでスレッドにならない。目印は誰でも書ける）。
-  依頼の記録に投稿したアカウント（`poster`）を残す（sh が投稿の答えから渡す）。記録に無ければ除かない
-
-| # | 何 | 直し方 |
-|---|---|---|
-| 1 | 拡張のレビューの一覧が 404 だと「レビュー無し」と読んだ | `pullReviews` は 404 と配列でない答えでは例外を投げる（変更要求を見落として通さないため） |
-| 2 | compare の答えに `files` が無い・配列でないと「変わっていない」と読んだ | `files: null`（動いたと数える） |
-| 3 | `--actor <値>` の値が `-` で始まるとオプションに読まれうる | `--actor=<値>` で渡し、`-` で始まる名前は捨てる |
-| 4 | アカウントに付いた CR とロケールのせいで、形の判定がずれる | `tr -d '\r'` を挟み、形は `LC_ALL=C` の `grep` で見る |
-| 5 | `GET /user` に時間の上限が無い。gh・glab の標準エラーが応答に混ざる | 引き当ては 15 秒（`CCNAVI_REVIEW_ACCOUNT_TIMEOUT`）で切る（curl は `--max-time`、gh・glab はタイムアウト監視）。ほかの curl にも `--connect-timeout 15 --max-time 120` を足した。`api` の gh・glab は標準エラーを別に受け、落ちたときだけ本文と一緒に見せる（前からの穴で、更新の知らせなどが混ざると JSON を読めなかった） |
-| 6 | 読み取りのハンドラ `reviewCopy`・`compareFiles` が登録の無いリポジトリも読んだ | 書く頼みと同じく、設定画面で登録したリポジトリだけ受ける |
-| 7 | `actor` の意味が書かれていなかった | 「押した人でなくトークンの持ち主」「マージリクエストの作者本人でも通る（自己レビューは防がない）」を 8.9・README・要件に書いた |
-| 8 | 前の 8.9 の「依頼の記録の host・mr でマージリクエストを直接引く」と実装（親のブランチの開いたマージリクエストを引いて番号を照合）が食い違う。依頼の記録に `mr`・`host` が無いと照合を飛ばした | ADR を実装に合わせた（判断: 直接引く形は、依頼したマージリクエストが閉じて同じブランチに別のマージリクエストが開いたときに古いマージリクエストのスレッドで通りうる。ブランチから引いて番号を照合する今の形の方が厳しい）。記録に `host` か `mr` が無ければ「依頼し直すこと」で止める（`review.matching_problems`。手元の confirm・decide と Chrome） |
-| 9 | ボードが依頼済みのフェーズごとにマージリクエスト・スレッド・レビューを読み直した | 親子のチケットに 1 度だけ読んで全部のフェーズに使う（compare はフェーズごと） |
-| 10 | write-and-push の突き合わせが通る場面だけだった | 止まる場面（未解決・変更要求・変更要求の後のコメント・書きかけ・レビュー済みへの重ね打ち）で、Chrome の理由が write-and-push で回した手元の標準エラーにそのまま出て、何も送らないことを見る。Chrome の一覧は GitHub の compare と拡張の `compareFiles` と同じ規則（改名は元と先の両方）で組む。直打ちの断りは文面まで見る |
-| 11 | sh の `actor` の gh・glab の経路が試されていなかった | gh（標準エラーの雑音、遅い答えを切る）・glab（`username`）の経路を試す |
-| 12 | 見本の穴 | `cr-commented`（変更要求の後のコメント）、`pending`（書きかけ。`submitted_at` 無し）、`full-page`（レビューがちょうど 100 件で 2 ページ目が空。目印をまねたユーザの解決済みのスレッド）を足した。`draft: true`・`user: null`・`line: null`・`comments.nodes: []`・DISMISSED は前からある |
-| 13 | GraphQL の代役が問い合わせのキーの名前を見ずに見本を返した | sh と拡張の代役とも、見本の応答が持つキー（`reviewThreads`・`pageInfo`・`hasNextPage`・`endCursor`・`nodes`・`id`・`isResolved`・`comments`・`url`・`path`・`line`・`body`・`createdAt`、`viewer` の `login`）が問い合わせに語として無ければ答えない |
-
-直した試験: 決定 B で、decide（受け入れ）の後に confirm を重ねて通していた試験 4 つ（`test_ticket.py` の 3 つと `test_phases.py` の 1 つ）を、
-「レビュー済みで止まる」か「マーカーを外してから確かめ直すと受け入れた分は数えない」に直した。
-
-ADR に無かった判断:
-
-- 依頼の記録の `poster` は分かるときだけ書く（分からなければ前と同じ中身）
-- 決定 C で、段階 4 より前に GitLab で置いた依頼の記録（`poster` が無い）では、目印で始まる ccnavi の依頼のスレッドが未解決に数えられ、
-  その依頼は解決するか decide で受け入れるまで confirm が通らない（厳しくする変更。依頼し直せば `poster` が入る）
-- `close-early` の残りの未解決の数え方は、依頼を特定しないので `poster` を使わず、目印でも除かない（厳しくする変更）
-- 引き当ての時間の上限は環境変数 `CCNAVI_REVIEW_ACCOUNT_TIMEOUT` で変えられる（試験のため。既定 15 秒）
-
-直さなかったもの:
-
-- write-and-push の突き合わせで、拡張の `compareFiles` そのものを通すこと: Python の試験から TS を起こさず、同じ規則で一覧を組んだ（TS の関数は CX-T130・139 が見る）
-- タイムアウト監視の `sleep` が指定の時間が過ぎるまで残る（`ccnavi_git_timed` と同じ前からの形。入出力は閉じてあり、何も開いたままにしない）
-
-#### 11.8.2 段階 4 で触った保護の対象
-
-`.ccnavi/scripts/ccnavi-review.sh`（`confirm` のアカウントの引き当てと `--actor`、呼び手の `--actor` を断る）。ユーザの承認（段階 4 の実施）を得て直接直した。
-11.8.1 のレビューの直しでも同じ 1 本を直した（`--actor=`、CR と C ロケール、時間の上限、gh・glab の標準エラー、投稿者の記録、GitLab のスレッドの作者）。
-
-### 11.9 段階 5 で入れたもの（2026-09-30）
-
-GitLab（8.4 の 1 段目まで）、プロジェクトのリポジトリ（3.3 の 7）、「始める」（8.6）、decide のマーカーの `actor`（8.9）。
-ユーザが「段階 5 に進む」と承認した（本物の GitHub・GitLab での確認は後回し）。手元の判定（Python）の変更は厳しくするもの（lint の warn と改版の検査）と、
-マーカーと状態の履歴にキーを足すだけ。GitLab の書き込みは事後確認なので、元に戻すまでの間に判定の変わった書き込みが一時的に残りうる（8.4・D21 で受け入れた範囲。
-下の「受け入れた範囲の確かめ」）。
-
-ユーザの決定（段階 5 の前）:
-
-1. decide のマーカーにも `actor` と `via`（confirm と同じ形）。手元は sh がアカウントを引いて `--actor=` で渡し、引けなければ前と同じバイト列。
-   Chrome からの decide は ADR の範囲に無い（「採らなかった案」）ので入れない
-2. GitLab の読み取り（tree・blob・マージリクエスト・discussions・approvals・compare・user）と書き込み（Commits API の `actions` で 1 コミット）を TS に足し、
-   手で組んだ応答の見本を fixtures に置く。sh と TS が同じ見本で同じ JSON・同じ結論になることを試験で見る。依頼の記録の `poster` も含む
-3. プロジェクトの識別子は 10.3 の 1 のとおり（決定済みに移した）。プロジェクトのリポジトリも Chrome の設定に登録して読む
-4. GitLab の比較つき書き込みは事後確認と元に戻すコミットだけで出す。`seq` は本物で確かめてから（段階 5b）
-5. 「始める」の権限は Issues の読み取りとブランチを作るための Contents の書き込み（GitHub）、`api`（GitLab）。マージリクエストは作らない。統合先の `done/` にある識別子は拒否
-6. Chrome の判定が手元より厳しくなる点（依頼時の先頭が祖先でなければ止める）は残す（GitLab も `merge_base` で同じにした）
-7. VS Code 拡張の承認は残す（10.3 の 2 を決定済みに移した）
-
-| 何 | 場所 | 形 |
-|---|---|---|
-| issue から決める識別子（3.1 の 4・7・11） | `ticket_ids.issue_identifier`・`branch_name_problems` | 「issue → 識別子」は `issue_identifier(番号, プロジェクト名)` の 1 つだけ（`i0012`・`web-i0012`。5 桁以上はそのまま）。Chrome も Pyodide の上でこれを呼ぶ。`--lint` の warn に、`<名前>-i<番号>` の形の予約（`issue:` が無い・ワークスペースの提案）と、issue から決める形の識別子が番号と置き場に合わないこと、別のリポジトリの課題で issue から決める形を使うことを足した（新規の提案だけ） |
-| 別のリポジトリの課題（3.1 の 8・8.7） | `ticket._issue_ref`・`issue_label`、`review.mr_draft`、`approval` | `issue: owner/repo#N`（GitLab の入れ子のグループも）を読み、マージリクエストの本文は `Closes owner/repo#N`、承認の画面は `■ 課題: owner/repo#N`。改版で課題のリポジトリを変えるのは課題番号と同じく断る（厳しくする変更） |
-| decide のマーカーの `actor`・`via`（8.9） | `ccnavi-review.sh` の `decide`、`cli` の `--actor`・`--via`、`review.apply_decision`、`history.set_actor` | sh は confirm と同じく `GET /user` でトークンの持ち主を引き（ロックの前、見るだけの `--preview` では引かない）、`--actor=<名前> --via=board`（ボードの選択）か `--via=terminal`（端末で選ぶ形）を渡す。実行ファイルは書く形の decide だけで受け、マーカーに `actor`・`via`、状態の履歴に `actor` を書く。無ければマーカーも状態の履歴も前と同じ。呼び手の `--actor` は前から断る |
-| GitLab の読み書き（8.2・8.4・8.8・8.9・8.10・D25） | `chrome-extension/ccnavi-approval/src/core/gitlab.ts` | GitHub と同じ名前の操作を REST（v4）で組む。tree は `repository/tree`（コミットとパス、再帰、100 件ずつ 50 ページまで）、blob は `repository/blobs/:sha` を 1 件ずつ（NUL か UTF-8 で読めなければバイナリ。大きさが合わなければ止める）、承認コミットは `repository/commits?ref_name=&path=` と `first_parent=true` の鎖、マージリクエストの Approve は `approvals`、変更の一覧は `merge_base`（祖先でなければ null）と `compare`（時間切れ・1000 件で null）、PAT の持ち主は `GET /user` の `username`、期限は `GET /personal_access_tokens/self` を 1 日 1 回。認証は `PRIVATE-TOKEN` |
-| スレッドとレビューの JSON（8.9） | `gitlab.reviewCopy` | `ccnavi-review.sh` の GitLab の枝（`find_mr`・`threads`・`reviews`）と同じ問い合わせ・ページの切り方で、キーの値も同じに整える（無いか null のキーに既定値を入れる jq の `//`、文字列にする `tostring`、大文字にする `ascii_upcase`）。スレッドは最初のノートの書き手（`author`）を持ち、Python が依頼の記録の `poster` と比べて ccnavi の依頼のスレッドを除く（11.8.1 の決定 C） |
-| GitLab の書き込み（8.4 の 1 段目・D21） | `gitlab.createCommit`、`protocol.ts` の `commit`、`write.ts` の `writeLoop`・`settleRace`・`revert` | service worker は書く直前に先頭を読み、読んだ先頭と違えば書かない（409）。Commits API の `actions`（作る・書き換える・消すは Python の Changes のとおり。GitLab が断れば 409）で 1 コミット書き、答えのコミットの親を返す。書く流れは、親が読んだ先頭と違えば（間に書き込みが入った）自分の書き込みの直前の状態で判定し直し、書くもの（パス・種類・バイト列）が同じなら残す。違えば、今の先頭で自分の書いたパスがまだ書いたとおりのときだけ、直前の中身に戻す元に戻すコミット（revert）を積み、読み直して再試行する（ダイジェストが変わっていれば見直しを求める）。元に戻すコミットを積めない・元に戻すコミットの間にも同じパスが変わった・2 回とも書けないときは止めてユーザの対応に切り替える（`attention`）。ボードは親子のチケットを「要確認」で出し、ユーザが「確かめた」を押すまで保存する（`chrome.storage.local`）。GitHub は `expectedHeadOid` のまま（答えの親は読んだ先頭） |
-| プロジェクトのリポジトリ（3.3 の 7・D28・10.3 の 1） | 設定画面、`settings.ts`、`snapshot.readProjectIntegration`、`py/ccnavi_chrome.py` の `_build`・`project_layer`・`records` | 設定画面でプロジェクト名（`projects/<名前>` の名前。`common`・`self` は不可）と、先に登録したワークスペースのリポジトリを選ぶ（ホストが違ってよい）。置き場のパス・共通レイヤー・自身のレイヤー・互換のマーカーはワークスペースの統合先から、`done/` とプロジェクトのレイヤーはプロジェクトの統合先から読む。仮のツリーは手元と同じ形（ワークスペースルート、`projects/<名前>/`、そのワークツリーとしての `.claude/worktrees/<P>`）で、レイヤーは D28 の計算（共通レイヤーにあるファイルを `configsync.projected` でコピーし、無いファイルはプロジェクトの統合先のもの）。取り込み状態と取り込み結果は `sync/self/` と `sync/<名前>/`。service worker の書く保護も置き場のパスをワークスペースの統合先から自分で引く |
-| 「始める」（8.6・D19） | `src/core/start.ts`、`ccnavi_chrome._op_start`、`protocol.ts` の `issues`・`createBranch`、ボード | ボードの「issue を読む」で開いた issue を新しい順に 50 件（GitHub はマージリクエストを除く）読み、「始める」を押すと、統合先を読み直して Python に識別子と始められない理由（統合先の `done/` にある・同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・予約の名前・互換の版が違う）を聞き、無ければ service worker が統合先の今の先頭からブランチを作る（GitHub は `POST /git/refs`、GitLab は `POST repository/branches`）。service worker も、ボードからだけ・登録したリポジトリだけ・issue から決める形の名前（プロジェクトなら `<名前>-i<番号>`）だけ・保護された名前と統合先の名前は作らない・渡された sha が統合先の今の先頭・既に無い、を自分で確かめる。マージリクエストは作らない |
-| ボードと設定画面 | `render.ts`・`board/main.ts`・`options/main.ts`・`static/options.html` | GitLab のマージリクエストは `!番号`。プロジェクトのリポジトリは見出しにプロジェクト名。「始める」の項目（issue の題は素の文字列、リンクは http(s) だけ）と「要確認」。設定画面にプロジェクト名とワークスペースの入力欄、段階 5 の権限（GitHub は Issues: Read を足す。GitLab は `api`）。拡張の版を 0.4.0 に上げた |
-| 通信先の埋め込み（D24） | `hosts.json`（既定は変えない）、`test/fixtures/hosts.e2e.json` | 既定のビルドは `api.github.com` と `gitlab.com`。実機の試験はセルフホストの GitLab（模擬。127.0.0.1:18788）を足したビルドで回し、`host_permissions` と `connect-src` がその一覧だけになることを見る。GitLab の `graphql` キーは読まない（REST だけ） |
-| 要件 | `docs/requirements/approval.md` | REQ-APV-15 の補足に GitLab の事後確認、REQ-APV-18 の補足に decide のマーカー、REQ-APV-19（「始める」）を足した |
-
-試験: Python は `tests/ticket/test_lint_branch_names.py`（issue から決める形・`<名前>-i<番号>`・別のリポジトリの課題・`issue_identifier`）、
-`tests/ticket/test_issue_ref.py`（`owner/repo#N` の読み・`Closes`・改版）、`tests/ticket/test_review_actor.py` の `DecideActorTest`（decide のマーカーの
-`actor`・`via` と状態の履歴、無ければ前と同じ、`--via` の断り）、`tests/ticket/test_chrome_project.py`（プロジェクトの親子のチケットの判定と書くもの、D28 のレイヤー、
-取り込み状態と取り込み結果の分け方、予約の名前、互換の版、「始める」の識別子と拒否）、`tests/sh/test_review_host_fixture.py`（decide の `--actor`・`--via` の受け渡し、
-GitLab の見本ごとの sh が組んだ JSON と結論、GitLab での依頼の投稿者の記録と二重に投稿しないこと）。拡張は `test/gitlab.test.ts` の CX-T144〜156・158
-（見本ごとに TS が組んだ JSON が sh の期待値と同じ、GitHub と同じボード、Commits API の承認と取り下げ、関係の無い割り込みは残す、判定の変わる割り込みは
-元に戻して見直しを求める、連鎖競合と後からの書き換えでユーザの対応に切り替える、「始める」とその拒否、service worker の「始める」の保護、GitLab のレビュー済みと
-依頼のスレッドの見分け、スレッドの悪意のある本文、プロジェクトのリポジトリ、Pyodide と CPython の一致、PAT の期限、「始める」と「要確認」の描画）、
-`test/hosts.test.ts` の CX-T157（セルフホストの GitLab を足したビルド）、Chromium の実機の CX-T159・160（セルフホストの GitLab で登録・ボード・
-スレッドの描画・承認、「始める」とその拒否。PAT が画面に渡らない）。
-
-受け入れた範囲の確かめ（ユーザの指示）: 8.4 の 1 段目は「書いた後に確かめ、結論が違えば元に戻すコミット（revert）を積む。2 回で収まらなければユーザの対応に切り替える」で、
-元に戻すまでの間は判定の変わった書き込みが `P` に残る（8.4 は「親の無い子」を例に挙げ、D21 のデメリットに入れている）。実装はこの範囲で、
-元に戻せないときに残ったままになるのも 8.4 の「止めてユーザの対応に切り替える」のとおり。手元は取り込みの後の判定し直し（C3。4.2 の 4）でその親子のチケットを止める。
-これより広く緩める所は無い（ADR に無かった判断の 1 は厳しくする変更）。
-
-ADR に無かった判断:
-
-1. 事後確認で元に戻すのは「判定し直して書くものが同じでない」とき全部（緩む結果かどうかを見分けない。厳しくする変更）
-2. 書く直前に service worker が先頭を読み、違えば書かない（その間を短くするだけで、事後確認は残る）
-3. 元に戻すコミットは、今の先頭で自分の書いたパスがまだ書いたとおりのときだけ積む（後から別の書き手が同じファイルを変えていれば、その変更を消さずにユーザの対応に切り替える）。
-   元に戻すコミットの間に書き込みが入っても、それが同じパスを変えていなければ元に戻せたとする。「2 回」は元に戻すコミット（revert）を送る回数
-4. 「要確認」はそのブラウザの `chrome.storage.local` に保存し、ユーザが「確かめた」を押すまで出す（ほかの承認者には見えない。手元は C3 が止める）
-5. GitLab の blob は REST で 1 件ずつ（GraphQL の `blobs(paths:)` は確認事項 2 のまま）。compare の打ち切りは 1000 件とみなす
-6. プロジェクトのリポジトリはワークスペースのリポジトリの登録を名指しする。置き場は既定に固定し、ワークスペースの統合先からも読まない。判定に要る設定はワークスペースの統合先から読み、プロジェクトの
-   `.claude/settings.json` は読まない（手元の `settings.load` がワークスペースルートを読むのと同じ）。
-   （追記 2026-10-05: 段階 5 では、置き場のパスもワークスペースの統合先から読んでいた。その後、置き場を既定に固定したので読まなくなった）
-7. 「始める」は互換の版が違えば拒否する（承認と同じく。厳しくする変更）。issue の一覧はボードを開くたびには読まず、「issue を読む」を押したときだけ
-8. decide の `via` を渡すために実行ファイルに `--via terminal|board` を足した（`--actor` と一緒のときだけ受ける）。write-and-push の中の端末の decide は
-   `--yes` で書くので、前は状態の履歴の経路が `board` になっていた。アカウントを引けたときは `terminal` になる（引けなければ前のまま）
-9. `issue: owner/repo#N` は段階 5 の行の「`Closes`」として入れた。識別子はユーザが付ける（issue から決める形にすると warn）
-10. GitLab の owner は入れ子のグループ（`group/sub`）を受ける
-
-入れなかったもの:
-
-- GitLab の `seq`（8.4 の 2 段目。write-and-push・承認の push・手元の merge の `seq` だけの衝突の解き方も）: 段階 5b（ユーザの決定 4）
-- Chrome からの decide: ADR の「採らなかった案」
-- プロジェクト名とリモートの対応表・その lint（10.3 の 1 の前の推奨）: 決定で Chrome の設定に持たせたので置かない
-- Chrome からユーザが名前を付けて始める（フォールバック）: 8.6 は issue から始めるだけ。フォールバックは今どおり手元で切る
-- VS Code のボードの `issue_repo` の表示（`owner/repo#N` を `#N` と出す）
-
-#### 11.9.1 レビューで直したもの（2026-09-30）
-
-段階 5 の後の敵対的レビューの指摘を、ユーザの承認を得て直した。判定の変更はおおむね厳しくするものだが、次の 2 つは正確には厳しくするだけのものではない（11.9.3 で書き直した）。
-
-- 17 は lint の warn を**緩めた**。`issue:` の無い提案の `<名前>-i<番号>` は、前は名前の形だけで warn だったが、その提案のプロジェクトの issue から決まる名前と重なるときだけにした。ワークスペースの提案の `web-i0012` は warn しなくなった（warn なので判定は止めない）。ワークスペースの親子のチケットとプロジェクト web の issue 12 の親子のチケットが同じ名前になったときは、lint の「複数のリポジトリにある」（error）と、親子のチケットの取り込み状態を名前で引く処理（`syncstate.standing_any`）が止める（11.9.3 の 13）
-- 15 は移行の段差がある。GitLab の依頼の記録の `poster` を名前から id に変えたので、前の版で記録した依頼（`poster` が名前）は ccnavi の依頼のスレッドと見分けられず、依頼の投稿が解決できるスレッド（`resolvable`。確認事項 9）なら未解決として数える。そのため、実行中の依頼（依頼済みで、まだレビュー済みでないフェーズ）は、依頼し直すか `decide` で受け入れるまで confirm・Chrome のレビュー済みが通らない（止まる向き）
-
-レビューの後にユーザが決めたこと:
-
-- **A（GitLab のファイル単位の比較）**: 書き込み（本体と元に戻すコミットの両方）の update・delete に `last_commit_id` を付ける。本体は読んだ先頭の上で
-  そのファイルを最後に変えたコミット（service worker が `repository/files/:path?ref=` で引く）、元に戻すコミットは自分のコミット。他人が同じファイルを
-  変えていれば GitLab が断る（400）。本体は書かずに読み直して再試行し（GitHub の `expectedHeadOid` の競合と同じ扱い。3 回でユーザの対応に切り替える）、
-  元に戻すコミットはユーザの対応に切り替える（要確認）。`seq`（段階 5b）は本物で確かめてからのまま。8.4・D21 に書いた
-- **B（要確認の親子のチケット）**: そのブラウザでは承認・レビュー済み・取り下げのボタンを出さない。操作を受けたときも、書く前に保存した要確認を見て、要確認なら書かない。画面に「このブラウザにだけ保存している
-  （ほかの承認者には見えない）」と出す。マージリクエストへのコメントは書かない。「確かめた」は確認を挟む
-- **C（古い実行ファイル）**: sh は実行ファイルの `--version --json` の flags を見て、知っているときだけ `--actor`・`--via` を渡す（decide は両方を
-  知っているときだけ。confirm の `--actor` も同じ）。無ければ前と同じバイト列。COMPAT は上げない
-
-| # | 何 | 直し方 |
-|---|---|---|
-| 1（重大） | 応答が落ちた書き込みを、先頭の親が 1 つで中身が合えば自分のものとして受け直していた。上に別の書き込みが積まれると取り違えた（PROBE-2・3） | 今の先頭から最初の親を 20 まで遡り、「そのコミットの上で書いた各パスが書いたとおりで、親の上ではそうでない」コミットを探す。探すのは書いた中身と親の組で、コミットメッセージの目印は使わない（D37）。GitHub は親が読んだ先頭のものだけ、GitLab は親から最初の親を遡って読んだ先頭に届くものだけ。見つからず、先頭に書いた中身が在れば（見分けられない）ユーザの対応に切り替える |
-| 2（重大） | 事後確認の判定し直しで時刻を読み直し、状態の履歴の `at` が変わるだけで「書くものが違う」として元に戻した | 周ごとに時刻を 1 回決め、書くものを決めるときと判定し直すときに同じ値を渡す |
-| 3（重大） | 事後確認と元に戻すコミットの途中の例外（429・5xx・マージリクエストが消えた など）が失敗（failed）になった | 全部「書いたが確認できなかった」の要確認にする（失敗と文面を分ける） |
-| 4（重大） | 元に戻すコミットが、確かめてから送るまでの間に他人が変えたファイルを上書きした（PROBE-1） | 決定 A の `last_commit_id`（元に戻すコミットは自分のコミット）で GitLab に断らせ、ユーザの対応に切り替える |
-| 5 | 古い実行ファイルに知らないフラグを渡すと decide・confirm が落ちた | 決定 C |
-| 6 | GitLab のマージリクエスト探しがフォークの同じ名前のブランチのマージリクエストを拾いえた | sh（`find_mr`・`merged`）と TS（`openMr`・`pullApprovals`）とも、`source_project_id` がそのプロジェクトのものだけ。依頼の記録の番号との照合は前から（`matching_problems`） |
-| 7 | 「始める」の重なりの検査が直近のブランチの名前だけだった。service worker が Python の答えを信じていた | 全部のブランチの名前（`branchNames`。上限 5,000）を大文字小文字を区別せずに比べる。service worker も統合先の今の先頭で、大文字小文字を揃えた名前の重なり・`done/` の閉じた識別子・互換の版（ビルドが埋め込む同梱の版と、ワークスペースの統合先の `CCNAVI_COMPAT`）を確かめ直す |
-| 8 | service worker の読み取りのハンドラが、登録していないリポジトリも読んだ | すべての操作を登録したリポジトリに限る。ワークスペースの登録まで確かめるのは「始める」だけで、書く操作（`commit`）はプロジェクトのリポジトリ自身の登録だけを見る。断った頼みでは GitLab の期限も聞かない（追記 2026-10-05: 前は「プロジェクトのワークスペースも登録したもの」に限っていた。これは、置き場を読むためにワークスペースを探す処理のついでに確かめていたもので、置き場を既定に固定してその処理が無くなったときに外れた。利用者が戻さないと決めた） |
-| 9 | GitLab の compare が、折りたたまれた・大きすぎる差分や上限に近い件数でも一覧を信じた | `compare_timeout`・各 diff の `collapsed`・`too_large`、900 件以上のどれでも読めない（動いたと数える）。確認事項 9 に行数での打ち切りを足した |
-| 10 | 元に戻すコミットの応答が落ちたとき、届いていたのに「後から変わった」と誤ってユーザの対応に切り替えることがあった | 今の先頭の親が送った先で中身が戻したとおりなら、届いたとする |
-| 11 | 実行ファイルが `--via` を呼び手から受けていた | 値は `board`・`terminal` だけで、端末で 1 件ずつ選ぶ形（`--yes` 無し）に `board` は受けない |
-| 12 | jq と TS でキーの型の読み方が違った（行番号・時刻・本文・`ascii_upcase`） | TS も jq と同じく型をそのままコピーし、`state` が文字列でなければ止める。見本に型の違う場面（`odd-types`）を足した |
-| 13 | 元に戻すコミットで BOM が消えた | GitLab の blob を BOM を残したまま読み、元に戻すコミットの中身はバイト列（base64）で戻し、送る前と戻した後に blob の sha で確かめる |
-| 14 | GitLab の要求が転送を追いえた | GitHub と GitLab の要求に `redirect: "error"` |
-| 15 | GitLab のスレッドの書き手と依頼の投稿者を名前で比べていた | sh と TS とも `author.id` を入れ、依頼の記録の `poster` も id で残す（前の記録の名前とは合わないので、ccnavi の依頼のスレッドも数える。厳しくする変更） |
-| 16 | GitLab のパスで引くとシンボリックリンクを blob として読んだ | tree の mode 120000 を `link` とし、読まずに「決まらない」にする |
-| 17 | lint の `<名前>-i<番号>` の warn がユーザの付けた名前にも当たった | `issue:` があるときだけ形の食い違いを言い、無いときはそのプロジェクトの issue から決まる名前と重なるときだけ言う |
-| 18 | 「確かめた」が確認なしに外れた | 確認を挟む（決定 B） |
-| 19 | 試験の穴 | 入れ子のグループ（代役のパスを直し、場面 `nested`）、フォークのマージリクエスト（場面 `impostor`）、PROBE-1〜3、時計が進む事後確認、途中の例外、compare の打ち切り、tree の 50 ページ・discussions の 20 ページの上限、429・403、転送、シンボリックリンク、BOM、要確認でボタンを出さない、古い実行ファイル（`--version --json` を知らない・`--actor` だけ知っている 387d4a6 の形）を回帰試験にした。見本は「手で組んだ」と書いた |
-| 20 | 8.4 の「新しい先頭で判定をやり直し」と実装（直前の状態で判定し直す）が食い違った | 8.4 を実装に合わせた |
-
-ADR に無かった判断:
-
-- 本体の書き込みが `last_commit_id` で断られたときは、ユーザの対応に切り替えずに読み直して再試行する（何も書いていないので、GitHub の `expectedHeadOid` の競合と同じ）。3 回でユーザの対応に切り替える
-- 応答の落ちた書き込みの見分けは、GitHub でも最初の親を遡る（親が読んだ先頭のコミットだけを受ける。上に無関係な書き込みが積まれても受け直せる）
-- 「始める」の互換の版は、ビルドが `ccnavi/version.py` の COMPAT を埋め込んだ値と比べる
-
-直さなかったもの:
-
-- 別のファイルどうしの競合（取り下げと子の承認が同時に通るなど）は `last_commit_id` で捕まらず、事後確認で元に戻すまで残りうる（8.4。`seq` の段階 5b）
-- GitHub のパスで引く GraphQL のシンボリックリンク（11.7.1 から）
-
-#### 11.9.2 段階 5 で触った保護の対象
-
-`.ccnavi/scripts/ccnavi-review.sh`（`decide` のアカウントの引き当てと `--actor=`・`--via=` の受け渡し）。ユーザの承認（段階 5 の実施）を得て直接直した。
-11.9.1 のレビューの直しでも同じ 1 本を直した（実行ファイルの flags を見てから渡す、GitLab のマージリクエストを `source_project_id` で絞る、書き手と投稿者を id で書き出す）。
-
-本物の GitHub・GitLab で確かめてほしい点（段階 3・4 のものに足す。10.2 の 9）:
-
-- GitLab の見本と模擬の形（10.2 の 9 の各点）。特に Commits API の `parent_ids` と、並行に書いたときの元に戻すコミットと「要確認」
-- 「始める」の権限（GitHub の fine-grained の Contents: Read and write・Issues: Read、GitLab の `api`）と、既にある名前で断られること
-- GitLab.com の無料版の project access token と `GET /personal_access_tokens/self`（確認事項 3）
-- decide のマーカーの `actor`（`gh`・`glab`・curl のどれでも、トークンの持ち主が入ること）
-- 11.9.1: GitLab の Commits API の `last_commit_id` が、同じファイルを他人が変えていれば 400 で書かないこと。`repository/files/:path?ref=<sha>` の
-  `last_commit_id` がそれと同じ値か（merge コミットを挟むときを含む）。並行に書かせたとき、元に戻すコミットが他人の変更を消さずに断られ「要確認」になること
-- 11.9.1: マージリクエストの `source_project_id` でフォークのマージリクエストを外せること、discussions と note の `author.id`、compare の `collapsed`・`too_large`（行数での打ち切り）、
-  `GET /repository/branches`（GitHub は `GET /branches`）の全件のページング
-- 11.9.1: 古い実行ファイル（`--version --json` を知らない・flags に `--via` が無い）と新しい sh の組み合わせで、confirm・decide が前と同じマーカーを置くこと
-
-#### 11.9.3 最新レビューで直したもの（2026-10-01）
-
-11.9.1・11.9.2 の後の差分（32f6b18..0c8dca9）の敵対的レビューの指摘を直した。直しは厳しくする変更か、試験と文書だけ。
-
-| # | 何 | 直し方 |
-|---|---|---|
-| 1 | 書いた応答が落ちた後の確かめ（先頭・親・中身の読み取り）が落ちると、書いたかもしれないのに失敗（failed）になった。書いた後の中身の確かめが合わない・落ちたときも失敗だった | どれも要確認（attention。「書いたかもしれないが確認できなかった」「書いた後の中身を確認できなかった」）にし、ボードが保持する値（`noteAttention`）に載る |
-| 2 | GitLab の書き込みの断り（409）が、送る前の確認で先頭が動いた（何も送っていない）ときと、`last_commit_id` で GitLab が断ったときで同じだった | 前者を 412（`gitlab.HOST_MOVED`）、後者を 409（`gitlab.HOST_REFUSED`）に分けた。元に戻すコミットは 412 なら上限（2 回）の範囲で読み直して元に戻し直し、409 ならユーザの対応に切り替える。本体の書き込みは 412 なら「動いた」で読み直して再試行する |
-| 3 | compare の打ち切りを 900 件とみなしていたが、GitLab の `diff_max_files` は管理者が 500 まで下げられる | 450 件以上で打ち切られたとみなす。VERIFY.md の L6 でインスタンスの値を記録する。`commits` の数での裏取りは、差分の打ち切りと関係が無い（merge だけのコミットで差分が空になる）ので入れていない |
-| 4 | ボードの要確認の文面が「元に戻すコミットが収まらなかった」に決め打ちだった | 「書いたかどうか・何が残ったかを、ホストの履歴でユーザが確かめる」に本文を添える |
-| 5 | 転送（`redirect: "error"`）や通信の失敗で fetch が例外を投げると、`TypeError: Failed to fetch` だけが出た | GitHub と GitLab の要求で包み、「通信が落ちたか、転送された。通信先と登録の owner/repo を見直す」と言う。status は 0 のまま（書く流れは届いたか分からないとして確かめる） |
-| 6 | sh の `find_mr` がプロジェクトの id を読めないと、理由を言わずに落ちた。GitLab のマージリクエストの一覧は 1 ページ目しか読まず、フォークのマージリクエストで埋まると本物を外した | id を読めなければ理由を言って止める（マージリクエストが無いと取り違えて作り直さない）。sh（`find_mr`・`merged`）と TS（`openMr`・`pullApprovals`）とも全ページ（20 ページまで）を読んでから `source_project_id` で絞る（API はこのキーで絞れない）。sh の `pages` は API の失敗と配列でない答えで 1 を返す |
-| 7〜11 | 変異試験で変更を検出できなかった試験 | update の `last_commit_id` と割り込みでの 400（CX-T177）、要確認の親子のチケットで押しても書かない・外すのに確認を挟む（e2e の CX-T173）、`merged` の GitLab の枝（フォーク・2 ページ目・id が読めなければ unknown。`test_review_merged.py`）と `find_mr` の id の失敗、TS のマージリクエストのフォークの除外と全ページ（CX-T178）、GitHub の `redirect: "error"`（CX-T179）、読んだ先頭に届かない線の同じ中身を自分のものと取らない（CX-T176）、元に戻すコミットの 412 で元に戻し直す（CX-T175）、確かめが落ちたら要確認（CX-T174）。元に戻すコミットの 409 でユーザの対応に切り替えるのは CX-T149 |
-| 12 | VERIFY.md の手順の穴 | L2・L3 を同じファイルを update で競合させる手順（service worker のブレークポイントか、curl で古い `last_commit_id` を付けて直接 POST）に、S2 を「Python が断り、ホストへの要求が出ない」にし、ホストの 422・400 は S2b に分けた。親子のチケットの用意（3.4）を PAT の登録の後へ。古い実行ファイルと新しい sh の組み合わせ（X11）、確認事項 2（L12・L13）と 6（X12）の手順を足し、4 は解決済みと書いた。`.gitignore` に `logs/`・`.claude/worktrees/` を足す手順、統合先への push はユーザが素の git で打つこと、本番どおりの流れを見る回は `--mode enable` |
-| 13 | 11.9.1 の冒頭の「緩めた所は無い」が不正確。ワークスペースの親子のチケットとプロジェクトの親子のチケットが同じ名前のとき、親子のチケットの取り込み状態を名前で引く処理が取り違えうる | 冒頭を直した（17 は lint の warn を緩めた、15 は実行中の依頼が止まる移行）。`standing_any`（リポジトリを添えずに引く: write-and-push・config-synced・lint の一部）は、取り込み状態が 2 つ以上なら前から止めていた。取り込み状態が 1 つでも同じ名前の親のワークツリーが別のリポジトリにあれば、どちらとも決めずに止めるようにした |
-| 14 | service worker の `toLowerCase` と Python の `casefold` の違い | 作る名前は ASCII に限る（`startName` と `ticket_ids._ID`）ので同じ答えになる。比べる相手のホストのブランチの名前は ASCII とは限らないので、service worker は NFKC で互換分解してから大文字小文字を揃える（全角や合字も重なりとして拾う。厳しくする変更） |
-
-ADR に無かった判断:
-
-- 本体の書き込みが `last_commit_id` で断られた（409）ときは、11.9.1 のとおりユーザの対応に切り替えず読み直して再試行する（何も書いていない。3 回でユーザの対応に切り替える）。ユーザの対応に切り替えるのは元に戻すコミットだけ
-- `find_mr` に統合先（`target_branch`）の絞りは足さない。依頼のマージリクエストを作る側（`create_mr`）が `origin/HEAD` を統合先にしており、ユーザが別の統合先へ出したマージリクエストを見落とすと
-  `request` がマージリクエストを作り直すため
-
-触った保護の対象: `.ccnavi/scripts/ccnavi-review.sh`（`find_mr` の止め方と全ページ、`merged` の全ページ、`pages` の失敗の返し方）。ユーザの承認（レビューの直し）を得て直接直した。
 
 ## 得たもの・失ったもの
 

@@ -4,7 +4,7 @@
 1. 状態の操作（`ticket finish` など）は、副命令の前に `--` を挟んでも止まる。挟んだ形に
    `--record-tree` を足すと、実行ファイルの「write-and-push を通っていない」検査も外れる
 2. 親を閉じたときの片付け（`sync tidy`・`worktree retire`・`worktree branch`・
-   `ccnavi-clean.sh --branch` / `--confirmed`）は、メインのエージェントもサブエージェントも
+   `ccnavi-user-clean-branch.sh`）は、メインのエージェントもサブエージェントも
    直には打てない。呼ぶのは sh の中（hook を通らない）か、ユーザが `!` を付けて打つときだけ
 """
 
@@ -88,10 +88,10 @@ class CleanupFormsTest(HookCase):
         "uv run python -m ccnavi worktree retire i0001",
         ".ccnavi/bin/ccnavi worktree branch i0001-01-01",
         "ccnavi --root /x worktree branch i0001-01-01 confirmed",
-        "sh .ccnavi/scripts/ccnavi-clean.sh --branch i0001-01-01 --confirmed",
-        "sh .ccnavi/scripts/ccnavi-clean.sh --branch i0001-01-01",
-        "bash -x .ccnavi/scripts/ccnavi-clean.sh --confirmed --branch i0001-01-01",
-        "cd /x && sh .ccnavi/scripts/ccnavi-clean.sh --branch i0001-01-01 --confirmed",
+        "sh .ccnavi/scripts/ccnavi-user-clean-branch.sh i0001-01-01 --confirmed",
+        "sh .ccnavi/scripts/ccnavi-user-clean-branch.sh i0001-01-01",
+        "bash -x .ccnavi/scripts/ccnavi-user-clean-branch.sh --confirmed i0001-01-01",
+        "cd /x && sh .ccnavi/scripts/ccnavi-user-clean-branch.sh i0001-01-01 --confirmed",
     )
     PASSED = (
         # 生成物とワークツリーの片付け（ブランチは消さない）と、片付けを中で呼ぶ sh。
@@ -109,9 +109,9 @@ class CleanupFormsTest(HookCase):
                 with self.subTest(command=command, agent=agent):
                     decision, reason = self.hook(command, agent)
                     self.assertEqual(decision, "deny", reason)
-                    if agent and "ccnavi-clean.sh" in command:
-                        # clean の sh は、サブエージェントには役割の表で先に止まる。
-                        self.assertIn("DENY_SUBAGENT_TICKET_OP", reason)
+                    if "ccnavi-user-" in command:
+                        # ユーザ専用の sh は名前で止まる（案内は名前の説明）。
+                        self.assertIn("ccnavi-user-clean-branch.sh", reason)
                         continue
                     self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
                     self.assertIn("! を付けて", reason)

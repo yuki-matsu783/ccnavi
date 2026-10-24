@@ -16,19 +16,13 @@ hook の payload を渡す。共通のルールは最小の組（残す側のル
 
 from __future__ import annotations
 
-import io
 import json
 import os
 import shutil
 import tempfile
 import unittest
 
-import yaml
-
-from ccnavi.hook import events
 from ccnavi.infra import settings
-from ccnavi.policy import rules
-from ccnavi.records import audit
 from tests import ROOT
 from tests.guard.test_post import DOING, STARTED, TICKET, git, write
 from tests.inproc import run_ccnavi
@@ -614,78 +608,6 @@ class ScriptWritesTest(Fixture):
         write(self.path("ws", "wip/proposals/todo/i0001.md"), TICKET)
         result = self.run_script()
         self.assertEqual(result.returncode, 2, self.said(result))
-
-
-class OldRulesComparisonTest(Fixture):
-    """実行後の保護範囲が、旧ルール（固定データ）の保護対象と写しの例外を失っていないこと。
-
-    旧ルールの `guard-hooks` / `guard-scripts` / `guard-ccnavi-config` / `guard-settings` /
-    `guard-approved-tickets` と、今の保護範囲（`events.watched_for` の組）を、代表パスの表で比べる。
-    今に足されたのは、NotebookEdit での hooks / scripts と、ハードリンクでつながった写しの扱いだけ。
-    """
-
-    TOOLS = ("Write", "Edit", "NotebookEdit")
-
-    def old_rules(self):
-        with open(
-            os.path.join(ROOT, "tests", "fixtures", "rules-before-builtin-guards.yml"),
-            encoding="utf-8",
-        ) as f:
-            data = yaml.safe_load(f)
-        data["deny"] = [r for r in data["deny"] if r["id"].startswith("guard-")]
-        built, problems = rules.parse(data, self.root)
-        self.assertEqual([p for p in problems if p.severity == rules.SEVERITY_ERROR], [])
-        return built
-
-    def new_rules(self):
-        watched = events.watched_for(
-            io.StringIO(),
-            settings.load(self.root)[0],
-            self.root,
-            audit.Record(),
-            None,
-        )
-        by_tree = {w.tree.root: w for w in watched}
-        return by_tree[self.root].rule_set
-
-    def test_the_table(self):
-        old, new = self.old_rules(), self.new_rules()
-        rows = []
-        for tree in TREES:
-            base = self.trees[tree]
-            for rel in dict.fromkeys(
-                [
-                    *TARGETS,
-                    *(f"wip/handoff/{r}" for r in TARGETS),
-                    *(f"docs/wip/handoff/{r}" for r in TARGETS),
-                    *(f"wip/handoffx/{r}" for r in TARGETS),
-                    DOING,
-                    ".ccnavi/approved/done/i0001.md",
-                    ".ccnavi/approved/phases/i0001/1.requested",
-                    f"wip/handoff/{DOING}",
-                    "src/app.py",
-                    ".claude/skills/x/SKILL.md",
-                    ".ccnavi/docs/a.md",
-                    ".claude/settings.json.bak",
-                ]
-            ):
-                full = os.path.join(base, *rel.split("/"))
-                for tool in self.TOOLS:
-                    was = any(r.matches(tool, full) for r in old.deny)
-                    now = any(r.matches(tool, full) for r in new.deny + new.ask)
-                    rows.append((tree, tool, rel, was, now))
-        lost = [r for r in rows if r[3] and not r[4]]
-        self.assertEqual(lost, [], "旧ルールが守っていた場所を失った")
-        added = [r for r in rows if r[4] and not r[3]]
-        for tree, tool, rel, _, _ in added:
-            self.assertTrue(
-                tool == "NotebookEdit"
-                and ("/" + rel).rsplit("/", 1)[0].endswith(("/.claude/hooks", "/.ccnavi/scripts")),
-                (tree, tool, rel),
-            )
-        if os.environ.get("CCNAVI_PRINT_TABLE"):
-            for tree, tool, rel, was, now in rows:
-                print(f"{tree:17} {tool:12} {rel:55} 旧={int(was)} 今={int(now)}")
 
 
 if __name__ == "__main__":

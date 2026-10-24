@@ -2,7 +2,7 @@
 
 sh は起動のときに実行ファイルの `--version` を読み、自分の `CCNAVI_COMPAT` と比べる。
 食い違えば直し方（ccnavi のリポジトリなら組み立て直し、配布先なら配り直し）を標準エラーに
-言い、止めずに先へ進む。`--version` を知らない古い実行ファイルは古いとして言う。
+言い、止めずに先へ進む。
 
 ワークスペースを使い捨てで組み、実行ファイルの代わりに `--version` にだけ答える sh を置く。
 版の値そのもの（実行ファイル・sh・拡張の 3 か所が揃っていること）は最後のテストが見る。
@@ -29,14 +29,6 @@ STUB = """#!/bin/sh
 if [ "$1" = --version ]; then
 	printf 'ccnavi 9.9.9\\ncommit: abc\\ncompat: {compat}\\n'
 	exit 0
-fi
-printf 'ran %s\\n' "$*"
-"""
-# `--version` を知らない古い実行ファイル。argparse と同じく使い方を出して 1 で終わる。
-OLD_STUB = """#!/bin/sh
-if [ "$1" = --version ]; then
-	printf 'ccnavi: error: unrecognized arguments: --version\\n' >&2
-	exit 1
 fi
 printf 'ran %s\\n' "$*"
 """
@@ -119,15 +111,6 @@ class CompatSkewTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("build.py を実行して組み立て直して", result.stderr)
         self.assertNotIn("ccnavi-setup.sh", result.stderr)
-
-    def test_v4_an_executable_that_does_not_know_version_is_called_old(self):
-        """V4 `--version` を知らない実行ファイルは古いとして言う。"""
-        self.put_bin(OLD_STUB)
-        result = self.run_ticket()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("ticket status x", result.stdout)
-        self.assertIn("古い版", result.stderr)
-        self.assertNotIn("unrecognized", result.stderr)
 
     def test_v5_the_real_executable_agrees_with_the_sh(self):
         """V5 ソースの `--version` が言う互換の版を、同じ読み方（sed）で sh が読める。"""

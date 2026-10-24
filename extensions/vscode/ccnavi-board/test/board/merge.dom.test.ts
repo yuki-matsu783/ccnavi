@@ -97,7 +97,7 @@ test("CB-D722 マージ待ち（Draft なら付記）・マージ済み・閉じ
     row("e-unknown", { state: "unknown", url: "", reason: "auth", detail: "認証に失敗した（トークンか gh の認証を確かめる）" }),
     row("f-timeout", { state: "unknown", url: "", reason: "timeout", detail: "時間内に終わりませんでした" }),
     row("g-format", { state: "unknown", url: "", reason: "format", detail: "出力の形が想定外です（番号が頼んだ MR（#5）と違います（6））" }),
-    row("h-old", { state: "unknown", url: "", reason: "old-sh", detail: "sh が古い版です。配り直してください" }),
+    row("h-failed", { state: "unknown", url: "", reason: "failed", detail: "sh が終了コード 127 で終わりました" }),
     row("i-incomplete", { state: "incomplete", url: "", mr: null, detail: "記録を読めない（壊れている）" }),
     row("j-wait", { state: "checking", url: "" }),
   ]);
@@ -111,7 +111,7 @@ test("CB-D722 マージ待ち（Draft なら付記）・マージ済み・閉じ
     assert.equal(state("e-unknown"), "- 確認できない（認証: 認証に失敗した（トークンか gh の認証を確かめる））");
     assert.equal(state("f-timeout"), "- 確認できない（期限切れ: 時間内に終わりませんでした）");
     assert.match(state("g-format"), /^- 確認できない（出力の形が想定外: 出力の形が想定外です/);
-    assert.equal(state("h-old"), "- 確認できない（sh が古い: sh が古い版です。配り直してください）");
+    assert.equal(state("h-failed"), "- 確認できない（実行できない: sh が終了コード 127 で終わりました）");
     assert.equal(state("i-incomplete"), "- 確認できない（記録が不完全: 記録を読めない（壊れている））");
     assert.equal(state("j-wait"), "確認中…");
     // 確認した時刻

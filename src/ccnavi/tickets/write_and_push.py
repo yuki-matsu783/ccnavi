@@ -49,8 +49,7 @@ from typing import TextIO
 from ..infra import fsio, gitcmd, settings, tree
 from . import approval_marks, archive, standing, ticket_ids, ticket_model
 
-# 答えの頭の行。sh はこれが無ければ「実行ファイルが write-and-push を知らない（古い）
-# 」と読んで止める。
+# 答えの頭の行。sh はこれが無ければ「実行ファイルが write-and-push に答えなかった」と読んで止める。
 HEAD = "write-and-push 1"
 
 TARGET_YES = "yes"
@@ -304,12 +303,6 @@ def _read(path: str) -> tuple[bytes | None, bool]:
 
 
 _NUMBER = re.compile(r"[0-9]+")
-
-
-def _lf(data: bytes) -> bytes:
-    """改行を LF に揃える（autocrlf で作業ツリーだけ CRLF になった形跡を、
-    コミット済みと比べる）。"""
-    return data.replace(b"\r\n", b"\n")
 
 
 def _hook_mark(parts: list[str], parent: str, now: bytes | None, before: bytes | None) -> bool:

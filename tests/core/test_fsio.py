@@ -200,7 +200,7 @@ class WriteAtomicTest(unittest.TestCase):
         固定の名前（`<行き先>.part` など）だと、同時に書く 2 つが同じ一時
         ファイルを取り合い、片方の書きかけをもう片方が差し替える。
         先頭の `.` と `.part` は、承認済みの置き場に残ったものを運ぶ側
-        （ccnavi-push-approved.sh と tickets/write_and_push.py）が除くため。元の名前と拡張子を
+        （ccnavi-user-push-approved.sh と tickets/write_and_push.py）が除くため。元の名前と拡張子を
         残すのは、先頭の `.` を外せば（`temp_origin`）ctxfile.forget の
         「`once-` で始まり `.json` で終わる」という条件で掃除できるようにするため。
         """
@@ -466,7 +466,7 @@ class WriteBytesAtomicTest(unittest.TestCase):
             name = os.path.basename(part)
             self.assertTrue(name.startswith(".i0001.md."), name)
             self.assertTrue(name.endswith(".part"), name)
-            # ccnavi-push-approved.sh と tickets/write_and_push.py が運ばない一時ファイルの形。
+            # ccnavi-user-push-approved.sh と tickets/write_and_push.py が運ばない一時ファイルの形。
             self.assertRegex(name, r"^\.[^/]*\.part(\.[^/]*)?$")
 
     def test_staged_write_is_queued_as_its_own_kind(self):

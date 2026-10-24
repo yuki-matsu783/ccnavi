@@ -30,7 +30,7 @@ SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scri
 SCRIPTS = (
     "ccnavi-clean.sh",
     "ccnavi-clean.js",
-    # 残った子のブランチを消す入口。前は ccnavi-clean.sh の --branch だった
+    # 残った子のブランチを消す入口
     "ccnavi-user-clean-branch.sh",
     *common_sh(SH_DIR),
 )
@@ -374,19 +374,20 @@ class WorktreeOptionTest(unittest.TestCase):
                 result = self.clean_branch(*args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
 
-    def test_the_old_branch_mode_moves_to_the_user_script(self):
-        # ccnavi-clean.sh の --branch と --confirmed は、何も動かさずに 2 で新しい sh を案内する。
+    def test_the_old_branch_mode_is_refused_as_an_unknown_option(self):
+        # hook の止めが ask に下がっても、ccnavi-clean.sh の --branch と --confirmed は
+        # 未知のオプションとして 2 で拒否し、何も消さない。
         for args in (
             ("--branch", "wt"),
             ("--branch", "wt", "--confirmed"),
             ("--confirmed", "wt"),
+            ("--confirmed",),
             ("wt", "--branch"),
         ):
             with self.subTest(args=args):
                 result = self.run_clean(*args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertIn("ccnavi-user-clean-branch.sh", result.stderr)
-                self.assertIn("何もしていません", result.stderr)
+                self.assertIn("は使用できません", result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.top, "node_modules", "x.js")))
         branches = subprocess.run(
             ["git", "branch", "--list", "wt"], cwd=self.ws, capture_output=True, text=True

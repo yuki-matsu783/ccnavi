@@ -27,7 +27,6 @@ const REASON_LABELS: Readonly<Record<string, string>> = {
   "not-found": "見つからない",
   timeout: "期限切れ",
   format: "出力の形が想定外",
-  "old-sh": "sh が古い",
   failed: "実行できない",
   "no-number": "MR の番号が無い",
 };

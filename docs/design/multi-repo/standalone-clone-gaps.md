@@ -11,13 +11,13 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 ### 11.14 単体 clone で不都合な処理の一覧
 
 [ワークスペース内 clone と単体 clone の両方で動かす](../../adr/0145-work-in-workspace-and-standalone-clone.md)考え方に沿って、ワークスペースにあるものに頼る処理を洗い出した記録。
-この文書は現状の記述で、直し方は決めていない。「直し方の案」は選択肢で、採用するかどうかは機能ごとに決める。「未決」の節に、設計判断が要る点の選択肢を並べた。
+この文書は未解決の項目だけを残した現状の記述で、直し方は決めていない。「直し方の案」は選択肢で、採用するかどうかは機能ごとに決める。「未決」の節に、設計判断が要る点の選択肢を並べた。
 
 ## 調査の範囲
 
-- 調査の時点: 2026-10-18。行番号はこの時点のもの
+- 行番号は調査の時点のもの
 - 用語: ワークスペース内 clone は `<WS>/projects/<名前>/` に clone したプロジェクト。単体 clone はそのリポジトリだけを clone して、そこで作業する形（11.0）
-- 実験環境: Linux、Claude Code 2.1.303。ワークスペース、プロジェクト、単体 clone を一時ディレクトリに組み、sh は実物を、ccnavi の実行ファイルはソースを呼ぶ shim で代用して回した。洗い出しのあとに、別の目で全項目を読み直して判定と重さを直した。この文書の判定と重さは、その直した値である
+- 実験環境: Linux。ワークスペース、プロジェクト、単体 clone を一時ディレクトリに組み、sh は実物を、ccnavi の実行ファイルはソースを呼ぶ shim で代用して回した
 - 確認の仕方の凡例: 実行で確認は、実験環境で再現した。読みのみは、コードを読んだだけで、再現していない
 - 未実施: Windows、macOS、WSL の実機。実行ファイルのバイナリ固有の挙動（shim で代用した）。GitHub や GitLab が要るコマンド（`ccnavi-review.sh`、`ccnavi-user-decide.sh` など）。子チケットの作成から finish、review、ready、integrate までの一巡
 
@@ -31,7 +31,6 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 | A2 | `CLAUDE_PROJECT_DIR` が無い端末の直打ちで、Python が根を取り違える | major | 実行 |
 | A3 | `.claude/` を持つ祖先の下に置いた単体 clone で、祖先が根になる | minor | 実行 |
 | A4 | sh の `*/projects` 判定が大文字小文字を区別する | minor | 読み（Linux では再現できない） |
-| B1 | 統合先ブランチ名を、ワークスペースの値だけで決める（変数を廃止して解消した） | 中 | 実行（sh）、読み（push 拒否） |
 | C1 | 単体 clone の直後は `.ccnavi/bin/` が無く、案内が合わない | 初回は blocker（単体 clone 固有ではない） | 実行 |
 | C2 | プロジェクトのスキルの目録が、単体 clone で出ない | major | 実行 |
 | C3 | setup が `/.claude/worktrees/` を `.gitignore` に足さない | minor から中 | 実行 |
@@ -48,7 +47,6 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 | N1 | ワークツリーで起動すると、ログと state がワークツリーの中にできる | 中 | 実行 |
 | N2 | 分岐名の接頭辞の設定が、ワークスペース全体で 1 つ | minor | 読み |
 | N3 | `ccnavi-user-push-approved.sh` の `given_in` が `projects/*` の下を除く | minor | 読み |
-| N4 | 起動場所の説明が、文書同士で食い違っていた | 文書（このブランチで直した） | 読み |
 
 ## A. 根の決め方がずれる
 
@@ -86,23 +84,14 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - 起きること: Linux では `Projects` と `projects` が別ディレクトリなので、実害を再現できない。macOS と Windows は未確認
 - 直し方の案: `pathcase` 相当の小文字化比較にする
 
-## B. 統合先ブランチ
-
-#### B1 統合先ブランチ名を、ワークスペースの値だけで決める（中。変数を廃止して解消した）
-
-- 当時の処理: 統合先ブランチ名の解決は、環境変数 `CCNAVI_INTEGRATION_BRANCH`、`settings.local.json` の env、`origin/HEAD` の順で、前の 2 つはワークスペースで 1 つの値だった。sh は `ccnavi_integration_local`（ワークスペースの `sync paths` だけを見る）、Python は `ops_stop_integrate.integration_name`（`project` 引数を使わない）と `infra/settings.py` が読んでいた
-- 当時の害: ワークスペースの値が全プロジェクトに当たった。ワークスペースが `develop`、p の既定が `trunk` のとき、`ccnavi-git.sh push` の拒否が `trunk` を統合先と見ず止めない。Python の `--lint` の識別子の予約も、プロジェクトの統合先で効かない。`settings.local.json` はエージェントが書き換えられるので、エージェントが統合先を変えられた
-- 解消: 環境変数と `--integration-branch` と `settings.local.json` の読みを廃止し、統合先は各リポジトリの手元の `origin/HEAD`（無ければ `origin/main`・`origin/master`）だけで決める。`ccnavi-fetch.sh` が SessionStart で `origin/HEAD` をホストの既定ブランチへ向け直す。識別子の予約はチケットの `project` ごとにそのリポジトリの統合先で検査する（[ADR-0148](../../adr/0148-integration-is-the-origin-head-only.md)）
-- 残る制約: origin の無いリポジトリでは統合先が決まらない。ワークスペースと単体 clone のどちらも、そのリポジトリの `origin/HEAD` だけを見るので食い違わない
-
 ## C. 単体 clone で動かない・縮退する
 
 #### C1 単体 clone の直後は `.ccnavi/bin/` が無く、案内が合わない（初回は blocker。単体 clone 固有ではない）
 
 - 処理と場所: `ccnavi-common.sh:195-205` の `ccnavi_bin`、`:214-235` の `ccnavi_compat_skew`、`ccnavi-launcher.sh:50-65`
 - ワークスペース内 clone・単体 clone: `.ccnavi/bin/` は setup が `.gitignore` に入れるので、どの fresh clone にも無い。単体 clone に限らない
-- 起きること: 全 hook が exit 127 で終わり、ガードは働かない（`docs/design/startup-config.md` の「見つからなければ終了コード 127」）。`CCNAVI_ENTRY_PATH` が設定されているとランチャーの sh はあるので `ccnavi_bin` は成功し、`ccnavi-ticket.sh status` は「ランチャーは `--version` で互換の版を返しません（古い版です）。build.py を実行し `ccnavi-setup.sh <このワークスペース> --force` で配り直してください」と出す。原因は「この機械向けの実行ファイルが無い」ことで、案内が違う。`ccnavi-worktree.sh` は別の文面（id-unchecked）、`ccnavi-fetch.sh` は無言で終了し、`ccnavi-git.sh worktree add` は通る
-- 追記（2026-10-23）: `bin/` に無いときは PATH の `ccnavi` を起動する。`bin/` もソースも無い配布先の `ccnavi_bin` も PATH の `ccnavi` を返す。PATH にも無ければ、以下は変わらない
+- 起きること: 全 hook が exit 127 で終わり、ガードは働かない（`docs/design/startup-config.md` の「見つからなければ終了コード 127」）。`CCNAVI_ENTRY_PATH` が設定されているとランチャーの sh はあるので `ccnavi_bin` は成功し、`ccnavi-ticket.sh status` は「実行ファイル <ランチャー> は互換 不明、sh は互換 N で食い違っています。build.py を実行し `ccnavi-setup.sh <このワークスペース> --force` で配り直してください」と出す。原因は「この機械向けの実行ファイルが無い」ことで、案内が違う。`ccnavi-worktree.sh` は別の文面（id-unchecked）、`ccnavi-fetch.sh` は無言で終了し、`ccnavi-git.sh worktree add` は通る
+- `bin/` に無いときは PATH の `ccnavi` を起動する。`bin/` もソースも無い配布先の `ccnavi_bin` も PATH の `ccnavi` を返す。PATH にも無ければ、以上のとおり
 - 確認: 実行で確認
 - 直し方の案: 「ランチャーが指す `bin/<os>-<arch>/` が空」を専用の文面で案内し、単体 clone の導入手順（プロジェクトに setup を実行する）を入れる。未決（「未決」の単体の初回導入）
 
@@ -192,7 +181,6 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - 場所と内容: `src/ccnavi/entry/lint.py:374-386` の `compat_fix` が「ccnavi-setup.sh <このワークスペース> --force」と案内する。単体 clone の利用者には当たらない
 - 設計済みで、不都合に数えないもの: cwd が `projects/p` のとき `worktree add` が一度断られることは、`.ccnavi/docs/worktree.md:68` が設計済みで、拒否文は正しいパスを教える。`_misplaced_worktrees` は単体の `.claude/worktrees/` では 0 件で、`projects/` の下の各プロジェクトにだけ出る
 - 確認: 実行と読み
-- 文書側の食い違い（N4）は、このブランチで直した
 
 #### E7 同じリポジトリを 2 通りに clone すると、記録が割れる（info。設計上受け入れ済み）
 
@@ -212,7 +200,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 #### N2 分岐名の接頭辞の設定が、ワークスペース全体で 1 つ（minor）
 
-- 処理と場所: `CCNAVI_BRANCH_PREFIXES`。B1 と同じ原因で、ワークスペース全体で 1 つの値を使う
+- 処理と場所: `CCNAVI_BRANCH_PREFIXES`。ワークスペース全体で 1 つの値を使う
 - 確認: 読みのみ
 
 #### N3 `ccnavi-user-push-approved.sh` の `given_in` が `projects/*` の下を除く（minor）
@@ -221,16 +209,12 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - 単体 clone: `projects/` を実ディレクトリとして使っていると、その下の `--path` が飛ばされる
 - 確認: 読みのみ
 
-#### N4 起動場所の説明が、文書同士で食い違っていた（文書。直した）
-
-- 内容: `.ccnavi/docs/terms.md` と [手引き](../../guide/troubleshooting.md)の「`projects/` のプロジェクトの中で hook が動かない」が、[複数のリポジトリ：道具はワークスペース、設定はプロジェクト](../../adr/0033-projects.md)の追記と `to-measure.md`（プロジェクトの hook が使われる）と食い違っていた。ワークスペースの hook は動かず、プロジェクトが自前の `.claude/` を持てばその hook とスキルが使われる、に直した
-
 ## 未決
 
 次は設計判断が要る点で、選択肢だけを並べる。どれも決定していない。
 
 - 根の決め方（A1、A2、A3、N1）: 次の 3 つの選択肢がある。(a) いまのまま、hook は `CLAUDE_PROJECT_DIR` を採り、Python は `.claude/` を持つ最も近い祖先を採る。(b) 祖先をたどるとき、`<親>/projects/<名前>` の形で親が ccnavi の根なら親を採り、sh と揃える。(c) 根の目印を `.claude/` ではなく `.ccnavi/scripts/ccnavi-common.sh` にする。sh に `CLAUDE_PROJECT_DIR` を読ませる案は、Bash ツールの環境に来ないので選択肢にならない
-- 分岐名の接頭辞の設定（N2）: `CCNAVI_BRANCH_PREFIXES` をプロジェクトごとに持つかどうか。統合先ブランチの優先順位（B1）は、変数を廃止して解消した（ADR-0148）
+- 分岐名の接頭辞の設定（N2）: `CCNAVI_BRANCH_PREFIXES` をプロジェクトごとに持つかどうか
 - ミラーの指紋（D1）: 単体用とワークスペース用の写しを印で見分けるか、ワークスペースの共通と違うときは上書きせず差を warn して止めるか
 - 単体 clone の初回導入（C1）: 実行ファイルが無いときの専用の案内と、単体 clone に setup を実行する手順を、どこに置くか
 - 単体 clone での縮退の中身（C2）: 目録を MAIN のツリーでも出すか、別の形に落とすか。工程スキルがワークスペース内 clone で二重に出る例外をどうするか

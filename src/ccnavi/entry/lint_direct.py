@@ -9,7 +9,7 @@
 - info: 有効な横で作業する記録があり、そのチェックアウトで自動復元が緩んでいること
 - info: 作業ワークツリーもブランチも無い記録
 - info: 残った一時ワークツリー・専用のref（t・c・k）・版 4 のmarker
-- warn: 旧形式のmarker（版の無いもの）
+- warn: 版を知らないmarker（版 4 でないもの）
 """
 
 from __future__ import annotations
@@ -114,14 +114,15 @@ def _markers(root: str, main: tree.Tree, common: str, label: str) -> list[Proble
     for name in names:
         kind = osi.marker_kind(base, name)
         where = f"(direct/{label}/{name})"
-        if kind == "old":
+        if kind == "unknown":
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     where,
-                    "旧形式の取り込みの marker（ccnavi-integrate/"
-                    f"{name}）が残っています。integrate は打てません。"
-                    "ユーザに確かめてから、integrate-done か integrate --abort で終わらせます",
+                    f"取り込みの marker（ccnavi-integrate/{name}）の版を知りません。"
+                    "integrate は断ります。版 4 でない記録は ccnavi が読めません。ユーザが統合先の"
+                    "staged を git status で確かめ、不要なら git reset --merge で戻してから、"
+                    "記録のディレクトリを手で消します",
                 )
             )
         elif kind == "v4":

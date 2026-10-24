@@ -37,8 +37,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   （ネットワークはshの仕事）。この2経路にほかの判定は足さない
 - shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`tree base-bound`・`tree guarded`・`tree handoff-pending`・`write-and-push family`・`sync retired`・
   `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
-  （止める側の検査は止める向き、ツリーを動かす側は動かさない向き）。`tree parent`の答えの`approved`・`started`などの行が無い（古い実行ファイル）ときは
-  `unknown`として読む
+  （止める側の検査は止める向き、ツリーを動かす側は動かさない向き）。
 - 実行ファイルには、ディレクトリの外へ情報を取りに行くコードを足さない。取得する処理はshに任せ、
   実行ファイルには取得した結果を読む処理だけを足す。shと実行ファイルの間の契約は、このJSONの形で決まる。
   形は設計 9.10に書いてある
@@ -56,8 +55,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
 
   `ccnavi-review.sh mr-state <番号>`（読み取りだけ）は 3 と 4 を使わず、0（状態が分かった）・1（`unknown`。状態が分からない）・
   2（引数の誤り）で返す。1 行目は `mr-state 1`、2 行目は `open <番号> <yes|no> <URL>`・`merged <番号> <URL>`・`closed <番号> <URL>`・
-  `unknown <種類> <理由>`（種類は `no-tool`・`auth`・`network`・`api`・`not-found`）。ボードが読む。知らない副命令として断る古い sh
-  （終了コード 2、標準エラーに「mr-state は使用できません。使えるのは」）は、ボードが「sh が古い版です」と言う
+  `unknown <種類> <理由>`（種類は `no-tool`・`auth`・`network`・`api`・`not-found`）。ボードが読む
 
 - 実行ファイルの標準出力をshが読む約束もある。`review ready`は1行目にコメントの下書きのパス、2行目に`tree <退避したツリーのルート>`を出し、
   `wip/`から消したものがあれば続けて`wip-from <消す前のHEAD>`と`wip <パス>`（1行1本）を出す。shはwrite-and-pushの中でこの削除を

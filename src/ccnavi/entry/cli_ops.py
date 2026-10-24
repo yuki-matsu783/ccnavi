@@ -687,8 +687,8 @@ _REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
 
 
-# `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが
-# 知らないサブコマンドを断った、など）と読み、親子のチケットを止めない（検査の error と分ける）。
+# `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（実行ファイルが
+# 失敗した、など）と読み、親子のチケットを止めない（検査の error と分ける）。
 SYNC_CHECK_HEAD = "check 1"
 _SHA = re.compile(r"[0-9a-f]{7,64}")
 _GIT_TIMEOUT = 20.0

@@ -15,7 +15,6 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 | 知りたいこと | 読む場所 |
 |---|---|
 | 用語 | [CONTEXT.md](CONTEXT.md) |
-| 更新したときの変更点 | [release-notes.md](release-notes.md) |
 | 外から観測できる約束 | [requirements.md](requirements.md) |
 | 実行ファイルと拡張の JSON の形 | [requirements/json-shapes.md](requirements/json-shapes.md) |
 | いまの実装の作り | [design.md](design.md) |
@@ -120,8 +119,7 @@ PATH の実行ファイルも自己防衛が守る。テストは `tests/__init_
 `CCNAVI_ENTRY_PATH` を上書きできるが、変わるのは自己防衛が何を守るかだけで、hook が何を起動するかは変わらない。
 
 配布物は PyInstaller の onedir で組み立てる。Windows なら `dist/ccnavi/ccnavi.exe`、
-Linux なら `dist/ccnavi/ccnavi`。onefile は起動のたびにランタイムを展開して遅いので使わない
-（onedir は 1 呼び出しあたり約 220 ms で配布物は 17 MB のフォルダ、onefile は 1000〜1500 ms で 7 MB の 1 ファイル）。
+Linux なら `dist/ccnavi/ccnavi`。onefile は起動のたびにランタイムを展開して遅いので使わない。
 配布物の設計は[導入と配布の設計](design/startup-config.md)の 4.1 にある。
 
 ## 配布する sh を確かめる
@@ -144,15 +142,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 3. `.ccnavi/CCNAVI.md` で `<!-- ccnavi:if 名前 -->` … `<!-- ccnavi:endif -->` で行を囲む。
 4. `.ccnavi/docs/ccnavi-md.md` の条件の表に 1 行足す。判定の関数のテストを `tests/core/test_ccnavimd.py` に足す。
 
-### 条件の判定の仕組み
-
-条件の判定は、名前ごとに独立した関数が持つ。
-
-- 関数は、そのセッションの状況（設定・ワークスペースルート・`--docs`を出す回か・ルールのdenyのid・動作モード）を受け取り、真偽を返す。1つの関数は1つの名前だけを判定する
-- 読み込みのたびに、全部の関数を呼んで、真になった名前の集合を作る。判定はmdを読む前に済む
-- mdを上から読み、`ccnavi:if`で囲まれた行は、囲みの名前がすべて集合に入っているときだけ載る
-- 載せる行が決まったら、`{{名前}}`を値に置き換え、続く空行をまとめて1つの文にする
-- 組み込みにも`ccnavimd.sh`の関数にも無い名前は、判定できないので真にして囲んだ行を出す。`ccnavi --lint`が警告する。差し込みの一覧に無い`{{名前}}`は、そのまま残る（書き間違いが見える形で届く）
+条件の判定のしかた（判定できない名前は真にして出す、など）は [`.ccnavi/docs/ccnavi-md.md`](../.ccnavi/docs/ccnavi-md.md) の「条件を足す（配布先）」と「差し込みの名前」にある。
 
 ## ディレクトリ構成（トップレベル）
 
@@ -180,7 +170,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを診断する（閉じたかはホストの MR で決める） |
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
-| `.ccnavi/scripts/ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先（メインのチェックアウトが開いているブランチ）から切る。ずれが無ければ確認なしで取り込み先のHEADから切る。cwdのブランチ違い・取り込み先が統合先でない・`origin/<取り込み先>` とのずれ（遅れ・進み・分岐・無い・リモート未確認）・書きかけがあるときは、切らずに終了コード 3 で状態・勧め・リスク・確認コードを出す。ユーザの了承を得て `--base`・`--accept`・`--copy-wip`/`--no-wip` を付けて打ち直す。`--side-by-side` で、横で作業する間の自動復元を緩める（`ask` ルールで確認が出る）。記録は共通のgitディレクトリの `ccnavi-direct/<名前>`。`--offline`・`--from-origin` は廃止 |
+| `.ccnavi/scripts/ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先（メインのチェックアウトが開いているブランチ）から切る。ずれが無ければ確認なしで取り込み先のHEADから切る。cwdのブランチ違い・取り込み先が統合先でない・`origin/<取り込み先>` とのずれ（遅れ・進み・分岐・無い・リモート未確認）・書きかけがあるときは、切らずに終了コード 3 で状態・勧め・リスク・確認コードを出す。ユーザの了承を得て `--base`・`--accept`・`--copy-wip`/`--no-wip` を付けて打ち直す。`--side-by-side` で、横で作業する間の自動復元を緩める（`ask` ルールで確認が出る）。記録は共通のgitディレクトリの `ccnavi-direct/<名前>` |
 | `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層。cwd が `.claude/worktrees/<名前>` の中ならそのワークツリーの `wip/handoff/`）へ `cp` する。`--commands` は編集済みの下書きの状態を出す（端末の前のユーザは `mv` の代わりに `ccnavi user handoff` で取り込める）。取り込むのはユーザ |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。子のブランチを消す `--branch` は `ccnavi-user-clean-branch.sh` に分かれている。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 | `.ccnavi/scripts/ccnavi-user-clean-branch.sh` | 親を閉じたときに残した子の手元のブランチを、条件を確かめ直して消す。ユーザが端末で打つ（エージェントからは止まる）。本体は `ccnavi worktree branch` |

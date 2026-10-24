@@ -3,9 +3,7 @@
 言うのは 6 つ。版・組み立ての元になったコミット・受け付けるフラグ・互換の版・読み書きする
 書式の版・実行ファイルが持つ振る舞い（`features`）。VS Code 拡張と `.ccnavi/scripts/` の sh は、
 起動のときにこれを読んで自分と合っているかを見る。受け付けるフラグから読めない振る舞い
-（JSON の欄の有無など）は `features` で言う。前は拡張が `--flow` を渡してみて、argparse の「知らない
-オプション」の苦情で古い実行ファイルを見分けていた。フラグ 1 本ごとに渡してみる形は、
-フラグが増えるたびに見分け方も増える。
+（JSON の欄の有無など）は `features` で言う。
 
 互換の版（COMPAT）は、実行ファイルと、それを呼ぶ側（`.ccnavi/scripts/` の sh と
 VS Code 拡張）との契約の版。呼ぶ側が頼っているフラグや出力の形を、呼ぶ側を直さないと
@@ -13,10 +11,8 @@ VS Code 拡張）との契約の版。呼ぶ側が頼っているフラグや出
 `EXTENSION_COMPAT`（extensions/vscode/ccnavi-board/src/core/version.ts）も同じ値に揃える。
 Chrome 拡張は組み立てのときにここの値を埋め込む。
 
-データの形（承認済みの置き場に置くものの並び、待ち方の読み方など）が変わるときも
-上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が新しい形のデータを読むと、
-フラグが同じでも読み違える（計画の項の `after` を知らない実行ファイルは待ち方を一直線と読む）。
-sh が古い実行ファイルの知らないサブコマンドを呼ぶようになったときも同じ。
+データの形（承認済みの置き場に置くものの並び、待ち方の読み方など）が変わるときも上げる。
+フラグが同じでも読み違えるため。sh が実行ファイルの新しいサブコマンドを呼ぶようになったときも同じ。
 
 フラグを足すだけ、JSON の欄を足すだけで、データの形も変わらないなら上げない。足したものが
 在るかは `flags` を見れば分かる。
@@ -48,42 +44,31 @@ from ..tickets import phasetypes, risk, ticket_model
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"
 # 実行ファイルと sh・拡張の契約の版。上げ方は冒頭の説明のとおり。
-# 13: 新しい sh が実行ファイルの新しいサブコマンド（`tree parent` の追加行、`sync retired`）を呼ぶ。
+# 13: sh が実行ファイルの新しいサブコマンド（`tree parent` の追加行、`sync retired`）を呼ぶ。
 # Chrome と手元の判定の規則が変わる（取り込み状態を読まない）。
 # 14: C1 を write-and-push に改名した。sh が呼ぶサブコマンドが
 # `c1 family|sort|merge|merge-blame` から `write-and-push …` に変わり、答えの頭の行も
 # `c1 1` から `write-and-push 1` に変わった。
 # 15: `integrate` がチケットに結び付くかの判定を、実行ファイルの `tree bound` に聞くようにした。
-# sh が呼ぶサブコマンドが増え、sh は答えの頭の行 `tree 1` が無ければ断る向きに倒す。
+# sh は答えの頭の行 `tree 1` が無ければ断る向きに倒す。
 # 16: ユーザだけが打つ操作を `user <操作>`（agree・reviewed・close-early・prune・handoff）に集め、
-# sh を ccnavi-user-*.sh に分けた。`user` の外の形は断るので、古い sh は新しい実行ファイルで
-# 動かない。
+# sh を ccnavi-user-*.sh に分けた。`user` の外の形は断る。
 # 17: 送信を操作記録（`ops` サブコマンド）に載せ、decide の判断のダイジェストを版 2 にした。
 # 手で動かした子の確定が受け入れ台帳（`phases/<親>/accepted.json`）と `via: manual` を書く。
-# 新しい sh が実行ファイルの `ops …` を呼び、ボードは版 1 の decide を断る。旧い sh は新しい
-# 実行ファイルの decide（版 2）を扱えず、旧い実行ファイルは新しい sh の `ops` を知らない。
+# sh が実行ファイルの `ops …` を呼び、ボードは版 1 の decide を断る。
 # 18: レビュー運用の状態遷移と案内の修正。フィードバック計画の承認がレビューの状態を変えない、
 # `decide` の issue をいつでも選べる（`can_issue` は常に真でダイジェストが変わる）、
 # GitLab の依頼コメントへの返信を指摘に数える（`own`・代表の note・`last_*`）、
 # GHE.com を GitHub と分類する、Chrome 拡張の取り下げを廃止する。
-# 意味の変更と入口の削除があり、新旧が混ざると誤判定する
-# （古い実行ファイルは GHE.com を GitLab と読む、古い sh は承認でレビューが済む前提で案内する）。
 COMPAT = 18
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 実行ファイルが持つ振る舞い。オプションや JSON の欄の有無を `flags` から読めないものを足す。
 # 足すだけなら COMPAT は上げない。
 FEATURES: tuple[str, ...] = (
-    "templates.draft-text",
     "user-entry",
-    # 保護対象の下書きの取り込み（`ccnavi user handoff`）。テンプレート専用の取り込み・編集
-    # （前の `templates.edit`・`board.template-draft`）の代わり。
+    # 保護対象の下書きの取り込み（`ccnavi user handoff`）。
     "handoff",
-    # 直接作業の取り込み先がチケットに結び付くかの問い合わせ（`tree base-bound`）。
-    "tree.base-bound",
-    # 取り込みが自己防衛の対象を含むかと、取り込んでいない下書きの問い合わせ。
-    "tree.guarded",
-    "tree.handoff-pending",
 )
 # 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"

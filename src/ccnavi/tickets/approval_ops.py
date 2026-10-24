@@ -152,7 +152,7 @@ def settle_review(
     ユーザがレビューを済ませたときに呼ぶ（`confirm` / `decide` /
     `close-early`。フィードバック計画の承認は呼ばない）。返すのは動かした識別子と、動かせなかった理由。
 
-    `by` は動かした経路（`ticket_model.SETTLED_BY_VALUES`）。動かした子の `settled_by` に書く。
+    `by` は動かした経路（confirm・decide・close-early・chrome）。動かした子の `settled_by` に書く。
     ユーザが手で動かした子には書かれないので、ccnavi が動かしたものと区別できる。
     """
     review, _ = approval.scan_review(conf, root)

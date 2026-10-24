@@ -26,13 +26,7 @@ ccnavi の振る舞い（ガードの拒否、チケットの流れ、サブエ�
 
 ## 置き場
 
-| 置くもの | 場所 |
-|---|---|
-| シナリオ（1 本 1 ファイル） | `tests/scenarios/<ID>-<slug>.yml` |
-| 回す道具 | `tests/scenarios/runner.py`（単体テストは `tests/scenarios/test_runner.py`） |
-| シナリオの一覧、機能の層、ユースケースの表 | `tests/scenarios/README.md` |
-
-シナリオの ID は UC の番号を引き継ぐ（例: `UC-01`）。
+シナリオは 1 本 1 ファイルで `tests/scenarios/<ID>-<slug>.yml`（ID は UC の番号を引き継ぐ。例: `UC-01`）、回す道具は `tests/scenarios/runner.py`。シナリオの一覧、機能の層、ユースケースの表は `tests/scenarios/README.md`。
 
 ## シナリオの形
 

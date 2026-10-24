@@ -3,7 +3,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-user-agree.sh [<識別子>...]
 #
-# 前の名前は ccnavi-agree.sh。ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、名前で見分けられる。
+# ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、名前で見分けられる。
 #
 # 承認処理自体は ccnavi の `user agree`（ユーザ専用の入口。中では `--agree` に読み替わる）が行う。承認された提案は todo/ から親チケットのツリー内にある
 # .ccnavi/approved（固定）の doing/ へ移動する（コピーは作らない）。承認はチケットの中身を変えず、

@@ -183,7 +183,7 @@ class RepoRulesTest(unittest.TestCase):
                     self.assertEqual(body["verdict"], "deny", body["response"])
                     self.assertIn("builtin:guard-project-home", hit(body), body["rules"])
             for command in (
-                f"cp {tree}/wip/proposals/templates/feature.yml {place}",
+                f"cp {tree}/wip/handoff/.ccnavi/config/common/templates/feature.yml {place}",
                 f"tee {place}",
                 f"echo x > {place}",
             ):
@@ -193,9 +193,11 @@ class RepoRulesTest(unittest.TestCase):
                     self.assertIn(SETTING_FILES, hit(body), body["rules"])
 
     def test_テンプレートの下書きの_write_は止まらない(self):
-        # 下書きの置き場（`wip/proposals/templates/`）はフローの下書きと同じ扱いで、
-        # ワークツリーの中なら通る。
-        body = judge("Write", "/repo/.claude/worktrees/x/wip/proposals/templates/feature.yml")
+        # 下書きの置き場（`wip/handoff/`）は、ワークツリーの中なら通る。
+        body = judge(
+            "Write",
+            "/repo/.claude/worktrees/x/wip/handoff/.ccnavi/config/common/templates/feature.yml",
+        )
         self.assertEqual(body["verdict"], "allow", body["response"])
         self.assertNotIn("builtin:guard-project-home", hit(body), body["rules"])
 
@@ -419,9 +421,9 @@ GUARDED = [
     ("truncate -s 0 .claude/settings.json", SETTING_FILES),
     ("mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md", TICKET_STATE),
     ("ccnavi --agree --yes x", APPROVAL),
-    ("sh .ccnavi/scripts/ccnavi-agree.sh", APPROVAL),
+    ("sh .ccnavi/scripts/ccnavi-user-agree.sh", APPROVAL),
     # 識別子を並べた形（#31）。引数が付いても承認の経路として止める。
-    ("sh .ccnavi/scripts/ccnavi-agree.sh i0002-01-03 i0002-01-04", APPROVAL),
+    ("sh .ccnavi/scripts/ccnavi-user-agree.sh i0002-01-03 i0002-01-04", APPROVAL),
 ]
 
 
@@ -445,7 +447,7 @@ class RunnerTest(LauncherJudgeTest):
     def test_env_越しの承認のスクリプトは途中のレイヤーで止まる(self):
         # W1 の続き。`sh …approve.sh` は `env` を外した途中のレイヤーで、
         # そこに承認の `script` の枝が当たる。
-        self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-agree.sh", APPROVAL)
+        self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-user-agree.sh", APPROVAL)
 
     def test_先頭に固定したユーザのルールも実行役のコマンドの中で当たる(self):
         # W2。
@@ -483,7 +485,7 @@ class RunnerTest(LauncherJudgeTest):
             # 代わりに通る sh 3 形。承認のスクリプトは元の形から止まっている。
             "sh .ccnavi/scripts/ccnavi-ticket.sh start x": set(),
             "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md": set(),
-            "sh .ccnavi/scripts/ccnavi-agree.sh": {APPROVAL},
+            "sh .ccnavi/scripts/ccnavi-user-agree.sh": {APPROVAL},
             "exec zsh": set(),
             "time git log --oneline": {"builtin:guard-raw-git"},
             "find . -name '*.pyc' -exec rm {} +": set(),
@@ -505,11 +507,6 @@ class RunnerTest(LauncherJudgeTest):
                 "env rm -f .ccnavi/config/common/rules.yml",
                 "env",
                 "rm -f .ccnavi/config/common/rules.yml",
-            ),
-            (
-                "env sh .ccnavi/scripts/ccnavi-agree.sh",
-                "env",
-                "sh .ccnavi/scripts/ccnavi-agree.sh",
             ),
         ]:
             with self.subTest(subject=subject):
@@ -646,13 +643,6 @@ class MovedJudgeTest(LauncherJudgeTest):
                 self.assertEqual(blocking(self.judge(subject)), set(), subject)
 
 
-# 再帰的な強制削除は組み込み（builtin:recursive-delete）にあり、共通の rules.yml から外した。
-# 外す前の rules.yml（ユーザが handoff で取り込むまでの間）は同じ式を `recursive-delete` の id で
-# 持ち、土台の組み込みはその下に落ちて当たった id に出ない。取り込みの前後どちらでも通るよう、
-# 外す前の id も受ける。
-LEGACY_IDS = {"builtin:recursive-delete": "recursive-delete"}
-
-
 class SubstRepoRulesTest(unittest.TestCase):
     """コマンド置換・改行・プロセス置換を読んだあとの判定。
 
@@ -669,10 +659,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 self.assertTrue(body["known"])
                 self.assertEqual(body["verdict"], want, body["response"])
                 if rule_id:
-                    self.assertTrue(
-                        {rule_id, LEGACY_IDS.get(rule_id, rule_id)} & set(hit(body)),
-                        (rule_id, body["rules"]),
-                    )
+                    self.assertIn(rule_id, hit(body), body["rules"])
                 elif want != "skip":
                     self.assertEqual(hit(body), [], body["rules"])
                 if code:

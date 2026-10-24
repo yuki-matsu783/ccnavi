@@ -50,14 +50,6 @@ test("CB-T269 起動のときの知らせ。揃っていれば言わず、古い
   // 聞けなかったことは起動では言わない（画面を開いたときに言う）
   assert.equal(skewMessage({ kind: "failed", error: "x" }, false), undefined);
 
-  const old = skewMessage({ kind: "old" }, false) ?? "";
-  assert.match(old, /--version に対応していません/);
-  assert.match(old, /scripts\/ccnavi-setup\.sh/);
-  // ccnavi のリポジトリ（build.py とソースがある）では組み立て直し
-  const oldHere = skewMessage({ kind: "old" }, true) ?? "";
-  assert.match(oldHere, /build\.py を実行して組み立て直して/);
-  assert.doesNotMatch(oldHere, /ccnavi-setup/);
-
   const exeOld = skewMessage(ok({ compat: EXTENSION_COMPAT - 1 }), true) ?? "";
   assert.match(exeOld, /実行ファイルが古い版/);
   assert.match(exeOld, /0123456789ab/);
@@ -77,11 +69,6 @@ test("CB-T270 使うフラグを実行ファイルが知っているかを版の
   assert.match(missing, /--flow に対応していません（古い版です）/);
   assert.match(missing, /ccnavi --lint --json --flow で確認できない/);
   assert.match(missing, /ccnavi-setup\.sh/);
-
-  // `--version` を知らない実行ファイルは、`--flow` を知っていても確かめられないとして止める
-  const old = missingFlags({ kind: "old" }, ["--flow"], what, true) ?? "";
-  assert.match(old, /--version に対応していません/);
-  assert.match(old, /組み立て直して/);
 
   const failed = missingFlags({ kind: "failed", error: "打ち切った" }, ["--flow"], what, false) ?? "";
   assert.match(failed, /打ち切った/);
@@ -106,10 +93,6 @@ test("CB-T568 使う機能を実行ファイルが持つかを features で見�
   assert.doesNotMatch(missing, /handoff /);
   assert.match(missing, /取り込み待ち画面 で確認できない/);
 
-  const old = missingFeatures({ kind: "old" }, ["handoff"], what, true) ?? "";
-  assert.match(old, /--version に対応していません/);
-  assert.match(old, /組み立て直して/);
-
   const failed = missingFeatures({ kind: "failed", error: "打ち切った" }, ["handoff"], what, false) ?? "";
   assert.match(failed, /打ち切った/);
 });
@@ -128,8 +111,7 @@ test("CB-T1137 handoff を持たない実行ファイルには、取り込み待
   assert.match(stale, /組み立て直して/);
   // 配り直しの案内（ccnavi のリポジトリではないワークスペース）
   assert.match(missingFeatures(ok({ features: [] }), ["handoff"], what, false) ?? "", /ccnavi-setup\.sh/);
-  // 版を知らない・確かめられない実行ファイルも進めない
-  assert.match(missingFeatures({ kind: "old" }, ["handoff"], what, true) ?? "", /古い版です/);
+  // 確かめられない実行ファイルも進めない
   assert.match(missingFeatures({ kind: "failed", error: "打ち切った" }, ["handoff"], what, true) ?? "", /打ち切った/);
 });
 
@@ -141,7 +123,4 @@ test("CB-T1100 user-entry を持たない実行ファイルには、ユーザ専
   assert.match(stale, /user-entry の機能を持ちません（古い版です）/);
   assert.match(stale, /ccnavi user agree --yes で確認できない/);
   assert.match(stale, /組み立て直して/);
-
-  // `--version` を知らない実行ファイルも、同じく進めない
-  assert.match(missingFeatures({ kind: "old" }, ["user-entry"], what, true) ?? "", /古い版です/);
 });

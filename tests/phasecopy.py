@@ -13,11 +13,9 @@ from __future__ import annotations
 
 import yaml
 
-_OLD_FIELDS = ("order", "after", "overlap", "requires")
-
 
 def definitions(phases_yml: str) -> dict:
-    """`phases.yml` の本文から、定義の id → 欄の辞書（前の版の順序の欄を除く）。"""
+    """`phases.yml` の本文から、定義の id → 欄の辞書。"""
     try:
         data = yaml.safe_load(phases_yml) or {}
     except yaml.YAMLError:
@@ -27,7 +25,7 @@ def definitions(phases_yml: str) -> dict:
     out = {}
     for ident, body in (data.get("phases") or {}).items():
         if isinstance(body, dict):
-            out[str(ident)] = {k: v for k, v in body.items() if k not in _OLD_FIELDS}
+            out[str(ident)] = dict(body)
     return out
 
 

@@ -16,9 +16,6 @@
 #   ccnavi-user-decide.sh <N> [--choices <JSON> --digest <ダイジェスト>]   残った指摘の対応方針を決めて置く
 #   ccnavi-user-close-early.sh --reason <理由> [--no-issue]               まだ残っているが早めに閉じる
 #
-# この sh の decide（--preview を除く）と close-early は、何も動かさずに終了コード 2 で新しい sh を案内する
-# （古い手順書や古い拡張から来たとき用）。
-#
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
 # ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・マーカー）
 # だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。ホストを読む関数と write-and-push の支度は
@@ -120,10 +117,6 @@ shift
 args_n=$#
 case "$sub" in
 request | confirm | comment | decide | ready | fetch | origin | merged | mr-state) ;;
-close-early)
-	# ユーザ専用の sh に移した。何も動かさずに案内する。
-	fail close-early-moved "close-early は ccnavi-user-close-early.sh に移りました。何もしていません。早めに閉じるなら、ユーザが sh $(dirname "$0")/ccnavi-user-close-early.sh --reason <理由> [--no-issue] を実行します（エージェントは実行しません）。" 2
-	;;
 -h | --help | help)
 	usage
 	exit 0
@@ -133,11 +126,7 @@ close-early)
 	;;
 esac
 
-# ---- decide は、見るだけの --preview だけを受ける。選んだものを置く形（--choices・--digest、端末で選ぶ形）は
-# ユーザ専用の sh に移したので、何も動かさずに案内する。
-decide_moved() {
-	fail decide-moved "decide の選んだものを置く形（端末で選ぶ形と --choices / --digest）は ccnavi-user-decide.sh に移りました。何もしていません。指摘の対応方針を決めるなら、ユーザが sh $(dirname "$0")/ccnavi-user-decide.sh <N> を実行します（エージェントは実行しません）。一覧を見るだけなら decide <N> --preview です。" 2
-}
+# ---- decide は、見るだけの --preview だけを受ける。選んだものを置くのはユーザ専用の ccnavi-user-decide.sh。
 if [ "$sub" = decide ]; then
 	n="${1:-}"
 	case "$n" in
@@ -151,11 +140,10 @@ if [ "$sub" = decide ]; then
 		case "$decide_arg" in
 		--preview) preview=1 ;;
 		--json) ;;
-		--choices | --digest | --choices=* | --digest=* | --yes | --yes=*) decide_moved ;;
 		*) fail decide-bad-option "decide は $decide_arg を受けない。" 2 ;;
 		esac
 	done
-	[ "$preview" -eq 1 ] || decide_moved
+	[ "$preview" -eq 1 ] || fail decide-no-preview "decide は <N> --preview だけを受ける。選んだものを置くのは ccnavi-user-decide.sh です。" 2
 fi
 
 # ---- mr-state <番号>。MR の今の状態を、機械が読む 2 行で答える（読むだけ）。
@@ -571,9 +559,8 @@ confirm)
 		--actor | --actor=*) fail confirm-actor "confirm は --actor を受けない。マーカーに記すアカウントは、トークンの持ち主をホストに問い合わせて入れる。" 2 ;;
 		esac
 	done
-	# マーカーに残すアカウント。ロックを取る前に引く（引けなくても止めない。前と同じマーカーになる）
-	actor=""
-	exe_knows --actor && actor=$(account || :)
+	# マーカーに残すアカウント。ロックを取る前に引く（引けなくても止めず、マーカーにアカウントを入れない）
+	actor=$(account || :)
 	log_debug マーカーのアカウント -- "actor=${actor:+set}"
 	[ -z "$actor" ] || set -- "$@" "--actor=$actor"
 	confirm_phase=""

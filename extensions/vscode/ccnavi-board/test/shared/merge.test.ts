@@ -106,7 +106,7 @@ test("CB-T632 一覧の形式の異常は「ありません」とは言わず、
   assert.equal(view?.checkedAt, AT);
 });
 
-test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら終える。期限切れ・古い sh もその親だけの結果", () => {
+test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら終える。期限切れ・sh の失敗もその親だけの結果", () => {
   const started = step(MERGE_IDLE, { kind: "check" }).state;
   let state = step(started, {
     kind: "listed",
@@ -122,11 +122,11 @@ test("CB-T633 一部だけ失敗してもほかは続け、全部そろったら
   assert.equal(state.checking, true, "ほかの親の答えを待つ");
   state = step(state, { kind: "stated", token: 1, parent: "i1", at: AT, result: merged(11) }).state;
   assert.equal(state.checking, true);
-  state = step(state, { kind: "stated", token: 1, parent: "i3", at: "終わった時刻", result: { kind: "unknown", reason: "old-sh", detail: "sh が古い版です。配り直してください" } }).state;
+  state = step(state, { kind: "stated", token: 1, parent: "i3", at: "終わった時刻", result: { kind: "unknown", reason: "failed", detail: "sh が終了コード 127 で終わりました" } }).state;
   assert.equal(state.checking, false);
   assert.equal(state.checkedAt, "終わった時刻");
   const view = mergeView(state, abandon);
-  assert.deepEqual(view?.rows.map((r) => [r.parent, r.state, r.reason]), [["i1", "merged", ""], ["i2", "unknown", "timeout"], ["i3", "unknown", "old-sh"]]);
+  assert.deepEqual(view?.rows.map((r) => [r.parent, r.state, r.reason]), [["i1", "merged", ""], ["i2", "unknown", "timeout"], ["i3", "unknown", "failed"]]);
 });
 
 test("CB-T634 頼んだ世代でない答えは受けない（閉じたボードや前の確認へ遅れて返った結果を捨てる）", () => {

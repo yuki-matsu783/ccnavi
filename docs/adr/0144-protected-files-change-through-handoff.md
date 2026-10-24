@@ -35,12 +35,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 
 取り込み先は「禁止の一覧」ではなく、種類の表に載せたものだけにする。下書きのパスは、リンクを解いた実パスの全要素を `pathcase.fold` と NFC に正規化してから、表に当てる。表に当たらないパスは「対象外」とし、一覧に件数だけ出す。error には数えない（`wip/handoff/` には ccnavi が書く `learnings/`・`inbox/` や、再現用のスクリプトも置かれる）。
 
-| 種類 | パス（ツリーからの相対） | 新規作成 | ボード | 検査 |
-|---|---|---|---|---|
-| `template` | `.ccnavi/config/common/templates/<名前>.yml`（共通。ワークスペースルートのツリーでだけ書ける）、`.ccnavi/config/project/templates/<名前>.yml`、`projects/<名前>/.ccnavi/config/project/templates/<名前>.yml` | できる | 可 | テンプレートの検査（`plan_templates`）。`description` と `when` の `TODO` の印は warn、制御文字は error、共通と層で同名なのに中身が違えば error、ファイル名と中身の `name:` の照合、名前の形（`NAME_RE`・`NAME_LIMIT`） |
-| `layer-config` | `.ccnavi/config/{common,project}/{rules,phases,risks}.yml`、`projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | できない | 可（`rules.yml` で防御の記述を動かすものは不可。下記） | `ccnavi --lint` が同じファイルに掛ける検査と同じ水準（同じ関数を呼ぶ。後述） |
-| `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md` | できない | 可 | なし（UTF-8 であること） |
-| `defense` | `.ccnavi/scripts/**/*.sh`、`.claude/hooks/**`、`.claude/settings.json`、`.claude/settings.local.json`、`.claude/skills/**/*.md`（スキルの frontmatter は使えるツールや hook を持てる） | できない | **不可**（`--via board` は断る。端末の前のユーザだけ） | `.sh` は CRLF を error にして `sh -n`。`settings*.json` は JSON として読めること |
+種類（`template`・`layer-config`・`docs`・`defense`）ごとのパス・新規作成の可否・ボードの可否・検査の表は、設計書の [9.19 保護対象の変更の取り込み](../design/tickets/handoff.md) にある。`defense` はボードから取り込めず、端末の前のユーザだけが取り込む。
 
 `layer-config` の `rules.yml` のうち、防御の記述を動かす取り込みは、`defense` と同じく端末に限る（`--via board` は断り、`--json` の `board` は偽になる）。防御の記述とみなすのは、`guard-` で始まる id のルール（足す・消す・判定を移す・`except` を含む中身を変える）と、今ある deny（消す・中身を変える）。deny を足すのは止める側への変更なので数えない。今の中身か下書きが読めなければ、確かめられないので端末に限る（`handoff._defense_change`）。`phases.yml`・`risks.yml` はこの判定の外。
 
@@ -82,9 +77,8 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
 | ボードに、テンプレート専用の取り込み・編集の画面の代わりに、handoff の一覧の画面（`template`・`layer-config`・`docs` の種類）を置く。一覧は `user handoff --json`（見るだけ）で作り、取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。テンプレートの画面は、一覧・検索・表示だけにする。`defense`（と、防御の記述を動かす `rules.yml`）は一覧に出し、「端末で取り込む」ことと打つコマンド（`ccnavi --root <ツリー> user handoff <パス> --yes --expect <ハッシュ>`。引用は POSIX の sh の形）を案内する | 拡張も、同じ 1 つのコマンドを呼ぶだけ | テンプレートの画面だけ残す。拡張が直接書く |
-| `user_only.py` の表に `handoff` の操作と `--handoff` を足し、テンプレートの書き込みの操作を実行ファイルの `user` から外す。外したオプションは `legacy`（今の実行ファイルは受け付けないが、古い実行ファイルが手元に残るときのため、hook は止め続ける）にする。ボードの組み合わせの語のグループ（`user-board-verb`）に `handoff` を足し、古い `templates` の組み合わせは `legacy` のグループで残す | 表を正本のままにする | 外したオプションの止めも消す |
+| `user_only.py` の表に `handoff` の操作と `--handoff` を足し、テンプレートの書き込みの操作を実行ファイルの `user` から外す。ボードの組み合わせの語のグループ（`user-board-verb`）に `handoff` を足す | 表を正本のままにする | |
 | エージェントが `wip/handoff/` の下の写しを編集できるよう、名指しのツール（Write / Edit）の保護に例外を入れる。対象は、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下だけ。組み込みの `guard-project-home` と、リポジトリのルール `guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` に入れる。`..` の段・リンク・ハードリンクのあるパス、`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。リポジトリのルールの `except` は式でファイルを見ないので、置き場の中のリンク・ハードリンクの対象への書き込みは組み込みの `builtin:guard-handoff-links` が別に止め、置き場の中にリンクを作るシェルの形（`ln`・`link`・リンクを作る `cp`）は `builtin:guard-handoff-ln` が止める。シェルからの書き込みの保護は、ほかは変えない | `ccnavi-stage.sh` は写しを元と同じ相対パスに置く。パスに `.ccnavi/` や `.claude/` が入るので、保護の glob に当たり、エージェントが写しを編集できなかった（この手順が一般の保護対象では最初から成り立っていなかった）。写しはユーザが取り込むまで効力が無い | 例外を入れず、ユーザが写しを編集する |
-| 互換の版は、ADR-0143 と同じ 15 のまま（同じ版で出す）。`features` から `templates.edit`・`board.template-draft` を外し、`handoff` を足す | まだ出ていない版の中の変更なので、二重に上げない | 14 に上げる |
 | ボードの rules・phases・risks の画面は、今は拡張が直接書く。この ADR では変えない | 範囲を広げすぎない。画面を handoff に寄せるかは別に決める | 同時に直す |
 
 ## 得たもの・失ったもの
@@ -105,11 +99,3 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 
 - ADR-0130（作業・レビュー計画のテンプレート）と ADR-0134（ボードからのテンプレートの編集）の、取り込みと編集の手順を置き換える。テンプレートの形・検査・一覧・使う側は変わらない
 - ADR-0143（ユーザ専用の入口の分離）の対象のうち、`templates` の書き込みを `handoff` に置き換える
-
-## 実装の段階
-
-1. 取り込みの処理（`tickets/handoff.py`）、検査の共有（パスを受ける関数の切り出し）、実行ファイルの `user handoff`、表と hook の更新
-2. `--draft` の置き場の変更、`ready` の止め、`--lint` の置き場の変更、テンプレート専用の取り込み・編集の削除
-3. テスト（古い試験の削除、handoff の試験の追加）
-4. 拡張（handoff の一覧の画面、テンプレートの画面の縮小）
-5. docs・`.ccnavi/docs/`・`ccnavi-stage.sh` の案内

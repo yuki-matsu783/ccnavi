@@ -206,16 +206,13 @@ ccnavi_parent_tree() {
 
 # `tree parent` の答えを変数に入れる。ツリーが無ければ 1、答えを得られなければ 2。<ツリー> <名前>
 #
-# 入れる変数は、どれも yes / no / unreadable / unknown のどれか（unknown は、実行ファイルが無い・答えない・
-# 古くてその行を知らない）。
+# 入れる変数は、どれも yes / no / unreadable / unknown のどれか（unknown は、実行ファイルが無い・答えない）。
 #   ccnavi_pi_parent     そのツリーが親のワークツリーか
 #   ccnavi_pi_approved   親のワークツリーの承認済み（approved/ の doing か done）に親チケットがある（見るのは承認済みのチケットだけ）
 #   ccnavi_pi_requested  承認済みの phases/<名前>/ に <N>.requested が 1 つ以上ある
 #   ccnavi_pi_archived   手元の退避（ready 済み）に親がある
 #   ccnavi_pi_started    承認済みの親チケットの started_at が空でない（着手は push してから完了する）
 #   ccnavi_pi_mr         親チケットの mr 欄（無ければ空）
-#   ccnavi_pi_hasmr      答えに mr の行が在ったら yes（無ければ空。古い実行ファイル）
-# 古い実行ファイルは新しい行（approved・requested・archived・started・mr）を出さない。そのときは unknown のまま。
 ccnavi_parent_info() {
 	ccnavi_pi_parent=unknown
 	ccnavi_pi_approved=unknown
@@ -223,7 +220,6 @@ ccnavi_parent_info() {
 	ccnavi_pi_archived=unknown
 	ccnavi_pi_started=unknown
 	ccnavi_pi_mr=""
-	ccnavi_pi_hasmr=""
 	[ -d "$1" ] || return 1
 	case "$1" in
 	*/.claude/worktrees/*) ccnavi_pi_ws="${1%/.claude/worktrees/*}" ;;
@@ -246,10 +242,6 @@ ccnavi_parent_info() {
 		esac
 	done
 	ccnavi_pi_mr=$(printf '%s\n' "$ccnavi_pi_out" | sed -n 's/^mr //p' | head -n 1)
-	# `mr` の行が在ったか（古い実行ファイルは出さない。呼ぶ側が「欄に番号が無い」と「行が無い」を言い分ける）
-	if printf '%s\n' "$ccnavi_pi_out" | grep -q '^mr '; then
-		ccnavi_pi_hasmr=yes
-	fi
 	[ "$ccnavi_pi_mr" != "-" ] || ccnavi_pi_mr=""
 	return 0
 }

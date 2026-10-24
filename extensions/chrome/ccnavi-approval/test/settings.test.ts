@@ -28,7 +28,7 @@ function storage(initial: Record<string, unknown> = {}): StorageArea & { data: R
 const row = (repo: string, recentDays?: number) => ({ host: "github.com", owner: "acme", repo, integration: "", ...(recentDays === undefined ? {} : { recentDays }), extraBranches: [], project: "", workspace: "" });
 const days = (repos: RepoConfig[]) => repos.map((r) => r.recentDays);
 
-test("CX-T210 既定は 7 日。recentDays が欠けた古い形式は 7 日で読む", () => {
+test("CX-T210 既定は 7 日。recentDays が欠けた形式は 7 日で読む", () => {
   assert.equal(DEFAULT_RECENT_DAYS, 7);
   assert.equal(normalizeRepo({ host: "github.com", owner: "acme", repo: "w" }, HOSTS).recentDays, 7);
 });

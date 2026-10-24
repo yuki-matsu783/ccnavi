@@ -20,7 +20,6 @@
 
 from __future__ import annotations
 
-import glob
 import hashlib
 import json
 import os
@@ -200,11 +199,9 @@ class AllowListTest(HandoffCase):
 
     def test_the_table_and_the_design_document_agree(self):
         # 表を直したら、設計の文書の表も直す。文書に無い行を表に足さない。
-        found = glob.glob(
-            os.path.join(ROOT, "docs", "adr", "*-protected-files-change-through-handoff.md")
-        )
-        self.assertEqual(len(found), 1, found)
-        with open(found[0], encoding="utf-8") as f:
+        with open(
+            os.path.join(ROOT, "docs", "design", "tickets", "handoff.md"), encoding="utf-8"
+        ) as f:
             text = f.read()
         for kind in handoff.KINDS:
             for shown in kind.shown:

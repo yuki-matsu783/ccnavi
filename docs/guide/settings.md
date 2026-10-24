@@ -131,9 +131,7 @@ ccnavi の実行ファイル側で条件を足す手順は[開発の入口](../d
 `CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれず、ワークスペースの ccnavi の hook は動かない
 （プロジェクトが自前の `.claude/` を持っていれば、その hook とスキルが使われる）。
 
-以前は 6 つの環境変数（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・
-`CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）で置き場を動かせたが、廃止した。
-`settings.json` の `env` に残っていても読まない。「記録しない」「state を保存しない」「プロジェクトを数えない」も指定できない。
+置き場は環境変数で動かせない。「記録しない」「state を保存しない」「プロジェクトを数えない」も指定できない。
 プロジェクトを数えたくなければ `projects/` を作らない。診断に限るフラグの理由などは[環境変数の内部の挙動](../design/startup-config.md)にある。
 置き場の全項目は[置き場の設計](../design/multi-repo/places.md)にある。
 
@@ -155,11 +153,33 @@ ccnavi の実行ファイル側で条件を足す手順は[開発の入口](../d
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。ユーザにも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（[ルールが言及していない呼び出し](rules.md)）。`dry-run` は無く、それ以外の値は `enable` として動き、`--lint` が指摘する |
 | `CCNAVI_ENTRY_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い。導入スクリプトは `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh）と書き、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に入る。無ければ PATH の `ccnavi` を使う（[導入と配布](install.md)）。拡張子は書かない。Windows の `.exe` は ccnavi が補う |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。`disable` なら `ccnavi user` の操作と `ticket` / `review` のサブコマンドは動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
-| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `user …` の入口 / `ticket …` / `review …` 付きで打つ形と、`ccnavi-user-*.sh` を打つ形を止め（`DENY_TICKET_APPROVAL_CLI`。古い形の `--agree` / `--reviewed` / `--close-early` なども止める）、`user agree` と `user reviewed` と `user close-early` と `user prune` と、書くとき（`--yes`）の `user handoff` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-user-decide.sh`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
+| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `user …` の入口 / `ticket …` / `review …` 付きで打つ形と、`ccnavi-user-*.sh` を打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`user agree` と `user reviewed` と `user close-early` と `user prune` と、書くとき（`--yes`）の `user handoff` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-user-decide.sh`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 | `CCNAVI_LEARNING` | 学びの蓄積を使うか。`enable` / `disable`、既定 `enable`。子チケットを閉じるときに気づきの記録（`wip/handoff/learnings/<子>.md`）を求め、親を閉じるときに気づきの処理の証跡を確かめる（[記録](records.md)の「学びの蓄積」） |
 | `CCNAVI_LEARNING_SOURCES` | パターンの観測元の数が何以上なら提案に足りるか。既定 3 |
 | `CCNAVI_LEARNING_NOTICE_COUNT` | 提案の候補が何件溜まったら SessionStart で知らせるか。既定 5 |
+| `CCNAVI_FETCH_TIMEOUT` | セッション開始時の `ccnavi-fetch.sh` が、fetch 1 回を打ち切る秒数。既定は `15`。数字でない値は既定に戻る（[複数人・別 PC](multi-pc.md)） |
+| `CCNAVI_FETCH_BUDGET` | 同じ sh が親のブランチを早送りする時間の枠（秒）。既定は `45`。数字でない値は既定に戻る |
+| `CCNAVI_LOCK_WAIT` | `ccnavi-sync.sh` と write-and-push 系の sh が、他のセッションのロックを待つ秒数。既定は `120`。数字でない値は既定に戻る |
+| `CCNAVI_SYNC_TIMEOUT` | `ccnavi-sync.sh` が、`ls-remote` と fetch 1 回を打ち切る秒数。既定は `60` |
+| `CCNAVI_WRITE_AND_PUSH_TIMEOUT` | write-and-push 系の sh と子のワークツリーからの push が、push と `ls-remote` 1 回を打ち切る秒数。既定は `60` |
+| `CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT` | write-and-push 系の sh が、コミット 1 回を打ち切る秒数。既定は `60` |
+| `CCNAVI_PREFLIGHT_TIMEOUT` | 作業前の事前確認の 1 回の問い合わせを打ち切る秒数。既定は問い合わせが `15`、git の確認が `30`。指定すると両方がその値になる |
+| `CCNAVI_PREFLIGHT_TOTAL` | 事前確認の全体の秒数。既定は `60`。過ぎたら残りの項目は確かめずに飛ばす |
+| `CCNAVI_START_HOST_TIMEOUT` | `ccnavi-start.sh` が、ホスト（issue・MR）の問い合わせを打ち切る秒数。既定は `30` |
+| `CCNAVI_START_GIT_TIMEOUT` | `ccnavi-start.sh` が、`ls-remote` を打ち切る秒数。既定は `30` |
+| `CCNAVI_REVIEW_ACCOUNT_TIMEOUT` | レビューの sh が、ホストのアカウント名を調べるのを打ち切る秒数。既定は `15` |
+| `CCNAVI_BRANCHES_HOST_TIMEOUT` | `ccnavi-branches.sh` が、ホストの問い合わせを打ち切る秒数。既定は `30` |
+| `CCNAVI_WORKTREE_GIT_TIMEOUT` | `ccnavi-worktree.sh` が、origin の同名ブランチを調べる `ls-remote` を打ち切る秒数。既定は `30` |
+| `CCNAVI_GIT_MAX_LINES` | `ccnavi-git.sh` が返す本文の行数の上限。既定は `40`。超えたぶんは `logs/` にだけ残る |
+| `CCNAVI_GIT_FAIL_LINES` | `ccnavi-git.sh` が、失敗したときに返す末尾の行数。既定は `30` |
+| `CCNAVI_GIT_KEEP_LOGS` | `ccnavi-git.sh` が残す記録の本数。既定は `50` |
+| `CCNAVI_WORKSPACE` | ワークスペースルートの絶対パス。hook の外（端末など）から ccnavi の sh を打つとき、sh がルートを探せなければ渡す。ワークスペースルートの `.ccnavi/scripts/ccnavi-common.sh` が在るパスでなければ使われない |
+| `CCNAVI_BRANCH_PREFIXES` | 親の識別子の先頭の語のリスト（カンマ区切り）。既定は `feature,hotfix,fix,bugfix,chore,refactor,docs`。`main` `master` `develop` `release` は使えない（[チケット](tickets.md)の「識別子とブランチ名」） |
+| `CCNAVI_LOG_LEVEL` | 診断ログ（`logs/diag/`）に出すレベル。`DEBUG` `INFO` `WARN` `ERROR`（大文字小文字は問わない）。既定と読めない値は `INFO` |
+
+上の秒数と行数の調整値は、`settings.json` の `env` で渡す。保護済みの sh を呼ぶコマンド行に前置きすると、`CCNAVI_GIT_MAX_LINES`・`CCNAVI_GIT_FAIL_LINES`・`CCNAVI_GIT_KEEP_LOGS`・`CCNAVI_FETCH_TIMEOUT` 以外は止まる。
+`CCNAVI_LOCK_HELD`・`CCNAVI_PROPOSE_INNER`・`CCNAVI_PROPOSE_NOTE`・`CCNAVI_DOCTOR_*`・`CCNAVI_ROOT`・`CCNAVI_LOG_NAME` など、sh 同士やテストの受け渡しに使う変数は内部用で、ここには載せない。利用者は設定しない。
 
 `CCNAVI_GUARD_TICKET_APPROVAL` のどの形を止めるかの細部は、[環境変数の内部の挙動](../design/startup-config.md)にある。
 

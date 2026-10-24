@@ -495,8 +495,8 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual(self.calls(), [])
         self.assertEqual(GitLab.posted, [])
 
-    def test_the_old_entry_in_ccnavi_review_moves_to_the_user_script(self):
-        """ccnavi-review.sh decide の置く形は、何も動かさずに 2 で新しい sh を案内する。"""
+    def test_ccnavi_review_decide_takes_only_preview(self):
+        """ccnavi-review.sh decide は --preview だけを受ける。置く形は何も動かさずに 2 で断る。"""
         for args in (
             ("1",),
             ("1", "--choices", '{"u1":"keep"}', "--digest", "d0"),
@@ -506,8 +506,6 @@ class ReviewDecideShTest(unittest.TestCase):
             with self.subTest(args=args):
                 refused = self.decide(*args, script="ccnavi-review.sh")
                 self.assertEqual(refused.returncode, 2, refused.stderr)
-                self.assertIn("ccnavi-user-decide.sh", refused.stderr)
-                self.assertIn("何もしていません", refused.stderr)
         self.assertEqual(self.calls(), [])
         self.assertEqual(GitLab.posted, [])
         self.assertEqual(GitLab.fetches, 0)

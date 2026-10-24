@@ -58,10 +58,6 @@ SCRIPT_FIELDS = (
     "settled_by",
 )
 
-# `settled_by` の値。ccnavi が子を `review/` から `done/` へ動かす経路。
-# `feedback-plan` は古い版がフィードバック計画の承認で書いた値。新しくは書かず、読める値として残す。
-SETTLED_BY_VALUES = ("confirm", "decide", "close-early", "feedback-plan", "chrome")
-
 # 保守用の子の印（frontmatter の `maintenance:`）。印から決まる例外は、統合の子かどうかを決める
 # `Ticket.is_consolidate` の 1 か所から当てる。識別子の形や名前から推定しない。
 MAINTENANCE_KEY = "maintenance"

@@ -1282,7 +1282,7 @@ class PhaseTest(PhaseHarness):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ターミナル", result.stderr)
         for command in (
-            "sh .ccnavi/scripts/ccnavi-review.sh close-early --reason x",
+            "sh .ccnavi/scripts/ccnavi-review.sh decide 1",
             "sh .ccnavi/scripts/ccnavi-review.sh ready",
         ):
             payload = {

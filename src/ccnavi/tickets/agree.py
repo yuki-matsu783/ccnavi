@@ -423,9 +423,7 @@ def _apply_steps(
             group=0,
         ):
             if cand.is_revision and cand.current is not None:
-                where = approval.home_dir(
-                    conf, root, t.ticket, t.parent, t.tree_root, project=t.project
-                )
+                where = approval.home_dir(conf, root, t.ticket, t.parent, project=t.project)
                 with fsio.policy(places=t.ticket):
                     failed = agree_digest.revise_copy(where, cand.current, t)
                 if failed:
@@ -455,9 +453,7 @@ def _apply_steps(
                     what = f"{what}・範囲" if what else "範囲"
                 stage.line(f"  {t.ticket} の{what}を改版した")
                 continue
-            where = approval.home_dir(
-                conf, root, t.ticket, t.parent, t.tree_root, project=t.project
-            )
+            where = approval.home_dir(conf, root, t.ticket, t.parent, project=t.project)
             failed = approval_ops.admit(where, t)
             if failed:
                 return t.ticket, failed

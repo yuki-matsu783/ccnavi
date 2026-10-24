@@ -1,17 +1,17 @@
 ---
 type: adr
 title: 公開前なので、移行のための読み取りと掃除をすべて外す
-description: 承認記録の古い形・待ち方ファイルの名残り・古い識別子・古い索引名・古い承認の知らせの掃除など、過去データを読むための処理を消し、互換の版を 10 に上げる
+description: 承認記録の古い形・待ち方ファイルの名残り・古い識別子・古い索引名・古い承認の知らせの掃除など、過去データを読むための処理を消す
 tags: [approval, ticket, records, compat]
 keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflow.yml, i<番号>, index.jsonl, approved-, COMPAT, 互換の版]
 ---
 # ADR-0115: 公開前なので、移行のための読み取りと掃除をすべて外す
 
-状態: 採用（ADR-0104 の「既存の承認済みチケットに残る欄は消さない。移行はしない」「古い形も読む」、ADR-0109 の「前の版が書いた待ち方のファイルは読まない（`--lint` が warn で言う）」を改める。追記: 古い取り込み状態を読む移行は、ADR-0142 の `ccnavi sync migrate`（`tickets/legacy_sync.py`）が使い捨ての読み取りとして 1 回だけ持つ）
+状態: 採用（ADR-0104 の「既存の承認済みチケットに残る欄は消さない。移行はしない」「古い形も読む」、ADR-0109 の「前の版が書いた待ち方のファイルは読まない（`--lint` が warn で言う）」を改める）
 
 ## 状況
 
-2026-10-11。ccnavi はまだ外部に公開しておらず、過去のデータを持つのは開発中のワークスペースだけ。
+ccnavi はまだ外部に公開しておらず、過去のデータを持つのは開発中のワークスペースだけ。
 それでもコードは、過去の版が書いたデータを読むための分岐を持ち続けていた。
 
 - 承認の記録 `ccnavi_approved`（`approved_at`・`source_tree`・`source_path`）を持つ古い承認済みチケットの読み取り。
@@ -33,7 +33,7 @@ keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflo
 - 取り込み済みの親子が「閉じた」かは、`base_sha` → `started_at` → `cancelled_at` の順だけで比べる。
   どの欄でも照合できなければ閉じていない側に倒す
 - 提案の `ccnavi_approved` は拒まなくなる（読まない欄になるため）。`followup_of` と `workflow:` は今までどおり拒む
-- 互換の版（COMPAT）を 9 から 10 に上げる。承認済みチケットの読み方が変わるため
+- 互換の版（COMPAT）を上げる。承認済みチケットの読み方が変わるため
 
 ## 理由
 

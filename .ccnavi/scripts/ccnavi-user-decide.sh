@@ -5,8 +5,7 @@
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>  ボードでユーザが押した選択を置く
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]                    止まった判断の続きを送る
 #
-# 前は `ccnavi-review.sh decide <N> [--choices … --digest …]` だった。ユーザだけが打つ sh は ccnavi-user-*.sh に
-# 分けてあり、エージェントからは hook が名前で止める。一覧を見るだけの形（`ccnavi-review.sh decide <N> --preview`）は
+# ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、エージェントからは hook が名前で止める。一覧を見るだけの形（`ccnavi-review.sh decide <N> --preview`）は
 # エージェントも使うので、ccnavi-review.sh に残してある。
 #
 # ここが取ってくる → `ccnavi user reviewed N --accept-unresolved` がユーザに見せ、指摘ごとに
@@ -115,10 +114,8 @@ resume_prepare() {
 		rp_count=$(printf '%s\n' "$rp_list" | grep -c . || :)
 		case "$rp_count" in
 		0)
-			# 操作記録を入れる前の版が残した下書き（issue とコメント）があるかは、親が決まってから見る
-			# （review_host のあと。無ければそこで「未完了の判断はありません」と言う）。
-			resume_legacy=check
-			return 0
+			printf '%s: 未完了の判断はありません。\n' "$review_label"
+			exit 0
 			;;
 		1) resume_op="$rp_list" ;;
 		*)
@@ -162,61 +159,6 @@ if [ -n "$resuming" ]; then
 	review_exe || review_no_bin
 fi
 review_host
-
-# 古い形の下書きの送り直し（--resume で未完了の判断が無く、下書きだけが残っているとき）。
-# 下書きから issue とコメントを、操作記録の段階（鍵は下書きの名前）に載せて送る。送れた下書きは消す。
-resume_legacy_drafts() {
-	printf '%s: 操作記録を入れる前の版が残した下書きがあります:\n' "$review_label"
-	# 下書きの一覧は改行区切り。パスに空白があっても割れないよう、語の区切りを改行だけにする。
-	rl_ifs="$IFS"
-	IFS='
-'
-	set -f
-	printf '  %s\n' $resume_legacy
-	printf '送りますか [y/N]: '
-	read -r rl_answer || rl_answer=n
-	case "$rl_answer" in
-	y | Y | yes | YES) ;;
-	*) fail decide-not-confirmed "送らずにやめました。" 1 ;;
-	esac
-	fetch_all >"$result"
-	rl_number=$("$JQ" '.mr.number' "$result")
-	rl_url=$("$JQ" -r '.mr.url' "$result")
-	rl_failed=""
-	rl_issue_note=""
-	for rl_file in $resume_legacy; do
-		case "$rl_file" in
-		*/review-issue-*)
-			if rl_made=$(staged_send decide "$(basename "$rl_file")" issue issue "$rl_number" "$rl_url" "$rl_file"); then
-				rl_issue_note=$(printf '%s' "$rl_made" | "$JQ" -r '"\nissue に回した分: #" + ((.number // 0) | tostring) + " " + (.url // "")')
-				rm -f "$rl_file"
-			else
-				rl_failed=1
-			fi
-			;;
-		esac
-	done
-	for rl_file in $resume_legacy; do
-		case "$rl_file" in
-		*/review-decide-*)
-			if [ -n "$rl_issue_note" ]; then
-				printf '%s\n' "$rl_issue_note" >>"$rl_file"
-				rl_issue_note=""
-			fi
-			if staged_send decide "$(basename "$rl_file")" comment note "$rl_number" "$rl_url" "$rl_file" >/dev/null; then
-				rm -f "$rl_file"
-			else
-				rl_failed=1
-			fi
-			;;
-		esac
-	done
-	set +f
-	IFS="$rl_ifs"
-	[ -z "$rl_failed" ] || fail decide-legacy-incomplete "送れなかった下書きがあります。確かめてから --resume を打ち直してください。" 1
-	printf 'OK: 古い形の下書きを送った\n'
-	exit 0
-}
 
 # decide: 選択を置く前に、受け入れる指摘（対応しない・issue に回す）へ返信を残して解決する。
 # <選択の JSON> <ダイジェスト>。計画の段（置く側の事前検査とダイジェストの照合を含む。何も置かない）
@@ -301,35 +243,15 @@ trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
 review_wap
 
-if [ -n "${resume_legacy:-}" ]; then
-	# 名前が `<親>-<フェーズの数字>.md` のものだけ（`i0001` の glob が親 `i0001-x` の下書きに当たらないように）
-	resume_legacy=""
-	for rl_cand in "$state"/review-issue-"$family"-[0-9]*.md "$state"/review-decide-"$family"-[0-9]*.md; do
-		[ -f "$rl_cand" ] || continue
-		case "${rl_cand##*/}" in
-		review-issue-"$family"-*[!0-9.md]* | review-decide-"$family"-*[!0-9.md]*) continue ;;
-		esac
-		resume_legacy="${resume_legacy:+$resume_legacy
-}$rl_cand"
-	done
-	if [ -z "$resume_legacy" ]; then
-		printf '%s: 未完了の判断はありません。\n' "$review_label"
-		exit 0
-	fi
-	resume_legacy_drafts
-fi
-
 # マーカーに残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
-# ロックを取る前に引く。引けなければ渡さず、マーカーは前と同じ。
+# ロックを取る前に引く。引けなければ渡さず、マーカーにアカウントを入れない。
 # 経路は、ボードの押した選択（--choices）なら board、端末で選ぶ形なら terminal。
 decide_who=""
-if exe_knows --actor && exe_knows --via; then
-	decide_actor=$(account || :)
-	log_debug マーカーのアカウント -- "actor=${decide_actor:+set}"
-	if [ -n "$decide_actor" ]; then
-		if [ -n "$choices" ]; then decide_via=board; else decide_via=terminal; fi
-		decide_who="--actor=$decide_actor --via=$decide_via"
-	fi
+decide_actor=$(account || :)
+log_debug マーカーのアカウント -- "actor=${decide_actor:+set}"
+if [ -n "$decide_actor" ]; then
+	if [ -n "$choices" ]; then decide_via=board; else decide_via=terminal; fi
+	decide_who="--actor=$decide_actor --via=$decide_via"
 fi
 # 端末で選ぶ形は、選ぶのを write-and-push の外で先に済ませる（ロックを持ったままユーザを待たない）ので、ここでは始めない。
 # 適用（ローカルへの反映）が write-and-push で戻された・失敗したとき、記録の「適用済み」を外す。

@@ -161,7 +161,7 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 | `src/ccnavi/entry/lint_templates.py` | lint のうち、作業・レビュー計画のテンプレートの検査 |
 | `src/ccnavi/entry/lint_ticket.py` | lint のうち、承認済みチケット・承認・提案と、親子の運用に要る hook の検査 |
 | `src/ccnavi/entry/lint_branch.py` | lint のうち、チケットのブランチ名・連番・既存ブランチ・ワークツリーの検査 |
-| `src/ccnavi/entry/lint_direct.py` | lintのうち、直接作業の記録（記録の無いワークツリー・壊れた記録・横で作業する指定・残った一時ワークツリー、ref、marker・旧形式のmarker）の検査 |
+| `src/ccnavi/entry/lint_direct.py` | lintのうち、直接作業の記録（記録の無いワークツリー・壊れた記録・横で作業する指定・残った一時ワークツリー、ref、marker・版を知らないmarker）の検査 |
 | `src/ccnavi/entry/lint_wiki.py` | lint のうち、学びの蓄積の wiki（`docs/wiki/`）のパターンと採否の記録の検査 |
 | `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain`。名前を引き受けるだけで、中身は下の 4 つに分けてある |
 | `src/ccnavi/entry/diagnose_try.py` | diagnose のうち、`--test` と `--test-expectations`。判定と同じ経路で 1 件と期待を試す |

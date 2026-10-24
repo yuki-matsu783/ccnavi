@@ -131,20 +131,6 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_ERROR
 
 
-# 前の名前。「合意」を表す語を 1 つにするため `--agree` に改名した。別名にはしない（これで承認が
-# 動くことは無い。残すと組み込みの保護とヘルプの両方に 2 つの表記が残り続ける）。
-# argparse に登録しないので、ヘルプにも `--version` の flags 一覧にも出ない。
-RENAMED_APPROVE = "--approve"
-RENAMED_APPROVE_NOTICE = (
-    "ccnavi: --approve は --agree に改名しました。sh なら ccnavi-user-agree.sh を使ってください。\n"
-)
-
-
-def _asks_renamed_approve(argv: list[str]) -> bool:
-    """前の名前 `--approve`（`--approve=x` の形も）が渡されているか。"""
-    return any(word == RENAMED_APPROVE or word.startswith(RENAMED_APPROVE + "=") for word in argv)
-
-
 def _test_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> str:
     """`--test` と、その payload の欄の組み合わせの誤り。正しければ空。
 
@@ -207,10 +193,6 @@ def _plan_order_usage(args: argparse.Namespace, reordering: bool) -> str:
 
 
 def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
-    # 何も読まず何も動かさずに終える。承認の経路にも判定にも入れない。
-    if _asks_renamed_approve(argv):
-        stderr.write(RENAMED_APPROVE_NOTICE)
-        return EXIT_BLOCK  # 2。使い方の誤り（1）と分け、案内だけで終える
     # ユーザ専用の入口（`ccnavi user <操作>`）を、今の内部の形に読み替える。入口から来たかどうかは
     # argparse の結果（args）には入れない。オプションで偽装できないようにするため。
     try:

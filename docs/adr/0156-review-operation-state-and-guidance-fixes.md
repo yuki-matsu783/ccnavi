@@ -1,12 +1,12 @@
 ---
 type: adr
-title: レビュー運用の状態遷移と案内の修正（ホストの分類・依頼コメントへの返信・案内の出し分け）をまとめて互換の版 18 で出す
-description: GHE.com を GitHub として分類し、GitLab の依頼コメントへの返信を指摘として数え、変更要求・fix・HEAD の移動・新しい依頼の案内を整える。意味の変更と公開している入口の削除があるため、互換の版を 17 から 18 に上げて sh・実行ファイル・VS Code 拡張・Chrome 拡張をそろえる
+title: レビュー運用の状態遷移と案内の修正（ホストの分類・依頼コメントへの返信・案内の出し分け）をまとめて出す
+description: GHE.com を GitHub として分類し、GitLab の依頼コメントへの返信を指摘として数え、変更要求・fix・HEAD の移動・新しい依頼の案内を整える。意味の変更と公開している入口の削除があるため、互換の版を上げて sh・実行ファイル・VS Code 拡張・Chrome 拡張をそろえる
 tags: [tickets, review, hosts, gitlab, compat]
 keywords: [GHE.com, ghe.com, 分類, ホスト, own, 代表の note, system note, last_comment, 変更要求, Request changes, resolve, HEAD が動いた, 互換の版, COMPAT]
 ---
 
-# ADR-0156: レビュー運用の状態遷移と案内の修正をまとめて互換の版 18 で出す
+# ADR-0156: レビュー運用の状態遷移と案内の修正をまとめて出す
 
 状態: 採用（GHE.com と GitLab の実物での挙動は未検証）
 
@@ -39,7 +39,7 @@ GitLab 中心のレビュー運用で、状態の数え方と案内に次の食�
 
 ## 互換の版
 
-17 から 18 に上げる。意味の変更（フィードバック計画の承認、`decide` の選択肢、未解決の数え方、ホストの分類）、公開している入口の削除（Chrome 拡張の取り下げ）、新旧の版が混ざったときの誤判定（古い実行ファイルは GHE.com を GitLab と読み、古い sh は GHE.com の API に届かない）があるため。sh・実行ファイル・VS Code 拡張・Chrome 拡張をそろえる。
+互換の版を上げる。意味の変更（フィードバック計画の承認、`decide` の選択肢、未解決の数え方、ホストの分類）、公開している入口の削除（Chrome 拡張の取り下げ）、新旧の版が混ざったときの誤判定（古い実行ファイルは GHE.com を GitLab と読み、古い sh は GHE.com の API に届かない）があるため。sh・実行ファイル・VS Code 拡張・Chrome 拡張をそろえる。
 
 ## 採らなかった案
 

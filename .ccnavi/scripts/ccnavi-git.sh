@@ -638,9 +638,7 @@ wt_fresh() {
 # 書かず、一時ワークツリーで作ったコミットを `merge --ff-only --no-overwrite-ignore` で載せる。
 # チケットの作業は今までどおりマージリクエストで出すので、チケットに結び付くワークツリーは断る。
 #
-# このあとのig_ 系の関数は、版の無い旧形式のmarker（`merge --squash` で統合先のツリーにstagedで載せた
-# 取り込み）を終わらせるためだけに残してある。旧形式のintegrateは打てない（integrate-old-marker）。
-# 旧形式の記録は統合先のツリーのgitディレクトリのccnavi-integrate/<名前>/ に置いた。
+# markerの版が4でないものは、版を知らない壊れた記録として「版を知りません」で止める。
 
 # 名前を確かめる。<名前>
 ig_name() {
@@ -655,51 +653,16 @@ ig_name() {
 	esac
 }
 
-# 統合先のツリーで打たれたかを確かめ、ig_top・ig_integ・ig_gdir（記録の置き場）を決める。
-ig_where() {
-	ig_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	[ -n "$ig_top" ] ||
-		reject not-a-repo "git リポジトリの中で実行してください（統合先をチェックアウトしているツリーで $SELF $sub ... を実行します）。"
-	ig_integ=$(ccnavi_integration "$ig_top") || ig_integ=""
-	[ -n "$ig_integ" ] ||
-		reject integrate-no-integration "$(ccnavi_integration_hint "$ig_top")"
-	ig_head=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
-	if [ "$ig_head" != "$ig_integ" ]; then
-		ig_home=$(git worktree list --porcelain 2>/dev/null | awk -v want="branch refs/heads/$ig_integ" '
-			/^worktree / { p = substr($0, 10) }
-			$0 == want { print p; exit }')
-		if [ -n "$ig_home" ]; then
-			reject integrate-not-integration-tree "$sub は統合先（${ig_integ}）をチェックアウトしているツリーでだけ実行します。ここ（${ig_top}）は ${ig_head:-ブランチの外（detached HEAD）} です。統合先のツリー（${ig_home}）へ cd してから、同じコマンドを再実行してください。"
-		fi
-		reject integrate-not-integration-tree "$sub は統合先（${ig_integ}）をチェックアウトしているツリーでだけ実行します。統合先をチェックアウトしているツリーが見当たりません。どのツリーで取り込むかをユーザに確かめてください。"
-	fi
-	ig_gdir=$(git rev-parse --git-path ccnavi-integrate 2>/dev/null || :)
-	[ -n "$ig_gdir" ] || reject integrate-no-gitdir "git ディレクトリの場所が読めません。ユーザに伝えてください。"
-	case "$ig_gdir" in
-	/* | [A-Za-z]:*) ;;
-	*) ig_gdir="$(pwd)/$ig_gdir" ;;
-	esac
-}
-
 # 名前から、記録とワークツリーのパスを決める。<名前>
 ig_set() {
 	ig_n="$1"
 	ig_mark="$ig_gdir/$1/marker"
-	ig_paths="$ig_gdir/$1/paths"
 	ig_wt="$WS/.claude/worktrees/$1"
-}
-
-# 記録を読む。
-ig_read() {
-	ig_state=$(ccnavi_record_get "$ig_mark" state)
-	ig_m_bsha=$(ccnavi_record_get "$ig_mark" branch_sha)
-	ig_m_base=$(ccnavi_record_get "$ig_mark" base)
-	ig_m_tree=$(ccnavi_record_get "$ig_mark" tree)
 }
 
 # 記録を消す。消せなければ 1。
 ig_drop_mark() {
-	rm -f "$ig_mark" "$ig_paths" 2>/dev/null || :
+	rm -f "$ig_mark" 2>/dev/null || :
 	rmdir "$ig_gdir/$ig_n" 2>/dev/null || :
 	rmdir "$ig_gdir" 2>/dev/null || :
 	[ ! -e "$ig_mark" ]
@@ -719,185 +682,8 @@ ig_wt_branch() {
 		done
 }
 
-# merge-tree --write-tree（git 2.38 から）が使えるなら 0。
-ig_git_new_enough() {
-	ig_ver=$(git version 2>/dev/null | sed -n 's/^git version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')
-	[ -n "$ig_ver" ] || return 1
-	ig_major="${ig_ver% *}"
-	ig_minor="${ig_ver#* }"
-	[ "$ig_major" -gt 2 ] || { [ "$ig_major" -eq 2 ] && [ "$ig_minor" -ge 38 ]; }
-}
-
-# 全量の記録（logs/git-*.log）を開く。ig_log・ig_logrel を決める。<見出し>...
-ig_log_open() {
-	ig_lp=$(ccnavi_project "$(pwd)" "$WS")
-	if [ -n "$ig_lp" ]; then
-		ig_logdir="$WS/logs/$ig_lp"
-	else
-		ig_logdir="$WS/logs"
-	fi
-	mkdir -p "$ig_logdir"
-	ig_log="$ig_logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
-	{
-		printf '# %s  cwd=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$(pwd)"
-		printf '$ ccnavi-git %s\n--- 出力 ---\n' "$*"
-	} >"$ig_log"
-	case "$ig_log" in
-	"$WS"/*) ig_logrel="${ig_log#"$WS"/}" ;;
-	*) ig_logrel="$ig_log" ;;
-	esac
-	[ -f "$ig_logrel" ] || ig_logrel="$ig_log"
-}
-
-# 記録の本文（目印の次の行から）の末尾。
-ig_log_tail() {
-	awk 'f; /^--- 出力 ---$/ { f = 1 }' "$ig_log" | tail -n "$FAIL_LINES"
-}
-
-# 2 つのツリーの差が、wip/handoff/ の下だけ（差が無いのも含む）なら 0。<ツリー> <ツリー>
-# 旧形式のintegrateはwip/handoff/ の追跡済みファイルを外してstagedにしたので、ブランチの中身が統合先に
-# 入りきったかを見るときは、その分を差し引く。wip/ のそれ以外（wip/proposals/ など）の差は数える。
-# ツリーが読めないときは 1（差があるものとして扱う）。名前は git が制御文字を引用符で囲んで出すので、
-# 改行を含む名前が下書きの下に見えることは無い。
-ig_same_but_handoff() {
-	[ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
-	git rev-parse --verify --quiet "$1^{tree}" >/dev/null 2>&1 || return 1
-	git rev-parse --verify --quiet "$2^{tree}" >/dev/null 2>&1 || return 1
-	ig_dt=$(git -c core.quotepath=off diff-tree -r --no-renames --name-only "$1" "$2" 2>/dev/null) || return 1
-	[ -z "$(printf '%s\n' "$ig_dt" | grep -v -e '^wip/handoff/' -e '^$')" ]
-}
-
 ig_short() {
 	git rev-parse --short "$1" 2>/dev/null || printf '%s\n' "$1"
-}
-
-# 旧形式のmarker（版の無いもの）のintegrate --abort。名前は呼ぶ側が確かめてある。<名前>
-ig_abort_old() {
-	ig_name "$1"
-	ig_where
-	ig_set "$1"
-	log_info 受け付けた -- "sub=integrate" "action=abort" "name=$ig_n"
-	[ -f "$ig_mark" ] ||
-		reject integrate-abort-none "$ig_n の取り込みの記録がありません。戻すものはありません（$SELF status で確かめてください。記録の無い squash や staged は、この取り込みのものと決められないので戻しません）。"
-	ig_read
-	if [ "$(git rev-parse --verify HEAD 2>/dev/null || :)" = "$ig_m_base" ]; then
-		[ -f "$ig_paths" ] ||
-			reject integrate-abort-no-paths "取り込みの記録のうち、変えたパスの一覧（${ig_paths}）がありません。どこまでが取り込みの変更か決められないので戻しません。$SELF status で確かめ、ユーザに伝えてください。"
-		ig_extra=$(git diff --cached --no-renames --name-only HEAD 2>/dev/null | grep -v -x -F -f "$ig_paths" | grep -v '^$' | head -n 10 || :)
-		if [ -n "$ig_extra" ]; then
-			reject integrate-abort-extra "取り込んだ後に、取り込みと関係の無いパスが staged になっています（$(printf '%s' "$ig_extra" | tr '\n' ' ')）。戻すとその変更も消えるので戻しません。持ち主に確かめ、コミットか退避を済ませてもらってから再実行してください。"
-		fi
-		# 取り込み直後の index のツリーが分かっているなら、それと違う index は戻さない。取り込み後に別の人が
-		# staged した変更が、取り込んだパスに重なっている場合も含む（上のパスの確認では見分けられない）。戻すとその変更も消える。
-		if [ "$ig_state" = staged ] && [ -n "$ig_m_tree" ] && [ "$(git write-tree 2>/dev/null || :)" != "$ig_m_tree" ]; then
-			reject integrate-abort-changed "取り込んだ後に、staged の内容が取り込み直後と変わっています（別のセッションかユーザの変更が、取り込んだパスに重なっているかもしれません）。戻すとその変更も消えるので戻しません。$SELF status と $SELF diff --staged で確かめ、持ち主に確かめてください。"
-		fi
-		ig_log_open integrate --abort "$ig_n"
-		if ! git reset --merge >>"$ig_log" 2>&1; then
-			printf 'fail  git integrate  %s の取り込みを戻せなかった（記録は残した）  log=%s\n' "$ig_n" "$ig_logrel"
-			ig_log_tail
-			printf '案内: 取り込んだパスに staged にしていない変更が重なっていると戻せない。%s status で確かめ、持ち主に確かめてから再実行します。\n' "$SELF"
-			log_error 取り込みを戻せなかった -- "name=$ig_n"
-			exit 1
-		fi
-		ig_how="取り込む前（$(ig_short "$ig_m_base")）の状態に戻した"
-	else
-		if ! git diff --cached --quiet 2>/dev/null; then
-			reject integrate-abort-moved "取り込んだ後に統合先の HEAD が動いていて、staged もあります。どれがこの取り込みの変更か決められないので戻しません。$SELF status と $SELF log で確かめ、ユーザに伝えてください。"
-		fi
-		ig_how="統合先の HEAD は取り込んだ後に動いていて（コミット済み）、staged も無いので、取り込みの記録だけを外した"
-	fi
-	ig_drop_mark ||
-		reject integrate-abort-marker "取り込みの記録（${ig_mark}）を削除できませんでした。ユーザに伝えてください。"
-	printf 'ok  git integrate  %s の取り込みをやめた。%s\n' "$ig_n" "$ig_how"
-	log_info 取り込みをやめた -- "name=$ig_n"
-	exit 0
-}
-
-# 片付けを途中で止める。<理由>
-ig_stop() {
-	printf 'fail  git integrate-done  %s の片付けを途中で止めた\n' "$ig_n"
-	printf '理由: %s\n' "$1"
-	[ -z "$ig_did" ] || printf '済んだこと: %s\n' "$ig_did"
-	ig_kept=""
-	{ [ -e "$ig_wt" ] || [ -L "$ig_wt" ]; } && ig_kept="ワークツリー .claude/worktrees/$ig_n"
-	git show-ref --verify --quiet "refs/heads/$ig_n" && ig_kept="${ig_kept:+${ig_kept}、}ブランチ $ig_n"
-	[ -f "$ig_mark" ] && ig_kept="${ig_kept:+${ig_kept}、}取り込みの記録"
-	[ -z "$ig_kept" ] || printf '残したもの: %s\n' "$ig_kept"
-	printf '案内: 原因を片付けてから、統合先のツリーで %s integrate-done %s を再実行すると、済んだところを飛ばして続きから進む\n' "$SELF" "$ig_n"
-	log_info 片付けを止めた -- "name=$ig_n" "reason=$2"
-	exit 1
-}
-
-# 中身が統合先に入りきったことを確かめてから、ワークツリー・ブランチ・記録を消す。
-# 片付けの前に、取り込みの記録を ccnavi-integrate-done/<名前> へ写して残す。ターンの終わりの実行後チェックが、
-# このターンのコミットのうち旧形式のintegrateのsquashを見分けるのに使う（ワークツリーもブランチも消えた後なので）。
-# 実行後チェックは git で確かめる（コミットの親とツリー、merge-tree の結果）。写せなくても片付けは
-# 進む（ターンの終わりに報告が出る）。古い写しは 7 日で消す。
-ig_keep_done() {
-	ig_ddir="${ig_gdir}-done"
-	mkdir -p "$ig_ddir" 2>/dev/null || return 0
-	find "$ig_ddir" -type f -mtime +7 -exec rm -f {} + 2>/dev/null || :
-	if cp "$ig_mark" "$ig_ddir/.$ig_n.$$" 2>/dev/null && mv -f "$ig_ddir/.$ig_n.$$" "$ig_ddir/$ig_n" 2>/dev/null; then
-		return 0
-	fi
-	rm -f "$ig_ddir/.$ig_n.$$" 2>/dev/null || :
-	log_info 取り込みの写しを残せなかった -- "name=$ig_n"
-}
-
-ig_cleanup() {
-	ig_chk=""
-	if [ "$ig_has_branch" = yes ]; then
-		if ! ig_git_new_enough; then
-			ig_stop "git が古く（$(git version 2>/dev/null)）、ブランチの中身が統合先に入りきったかを merge-tree --write-tree（git 2.38 から）で確かめられないので、何も削除していません。git を 2.38 以上にしてから再実行するか、片付けをユーザに頼む" integrate-done-old-git
-		fi
-		# 確かめた先頭を覚えておき、消すときもその先頭が動いていないことを条件にする（確かめた後に積まれたコミットを消さない）。
-		ig_chk=$(git rev-parse --verify "refs/heads/$ig_n" 2>/dev/null || :)
-		[ -n "$ig_chk" ] ||
-			ig_stop "ブランチ $ig_n の先頭を読めないので、何も削除していません。" integrate-done-no-tip
-		ig_mt_rc=0
-		ig_mt=$(git merge-tree --write-tree HEAD "$ig_chk" 2>/dev/null) || ig_mt_rc=$?
-		ig_mt=$(printf '%s\n' "$ig_mt" | head -n 1)
-		ig_ht=$(git rev-parse --verify "HEAD^{tree}" 2>/dev/null || :)
-		# wip/handoff/ の差は数えない（integrate が外した下書きの分。ig_same_but_handoff）。
-		if [ "$ig_mt_rc" -ne 0 ] || ! ig_same_but_handoff "$ig_mt" "$ig_ht"; then
-			ig_stop "ブランチ $ig_n の中身が統合先（${ig_integ}）に入りきっていない（統合先とブランチを合わせた結果が統合先の今のツリーと違う。合わせて衝突するときも含む）ので、何も削除していません。取り込みをまだコミットしていないか、コミットした中身が取り込んだときと違う。$SELF diff HEAD $ig_n で確かめ、ユーザに伝える" integrate-done-not-contained
-		fi
-	fi
-	# ワークツリーがあるなら、いまそのブランチを開いている必要がある（ブランチが無くても同じ）。別のブランチや
-	# detached HEAD で積んだコミットは、ワークツリーごと消えると、どの ref からも届かなくなる。
-	if [ -e "$ig_wt" ] || [ -L "$ig_wt" ]; then
-		ig_wb=$(ig_wt_branch)
-		if [ "$ig_wb" != "refs/heads/$ig_n" ]; then
-			ig_stop "ワークツリー .claude/worktrees/$ig_n が、いまブランチ $ig_n を開いていない（${ig_wb:-detached HEAD かこのリポジトリの登録に無い}）。ここで積んだコミットは、削除すると戻せないので、何も削除していません。ワークツリーの中で $ig_n に戻すか、積んだコミットの扱いをユーザに確かめる" integrate-done-worktree-branch
-		fi
-	fi
-	if [ -e "$ig_wt" ] || [ -L "$ig_wt" ]; then
-		ig_cl_rc=0
-		ig_cl=$(sh "$(dirname "$0")/ccnavi-clean.sh" --worktree "$ig_n" 2>&1) || ig_cl_rc=$?
-		if [ "$ig_cl_rc" -ne 0 ]; then
-			ig_stop "ワークツリー .claude/worktrees/$ig_n を削除できませんでした。ccnavi-clean.sh --worktree の出力: $ig_cl" integrate-done-worktree
-		fi
-		ig_did="${ig_did:+${ig_did}、}ワークツリー .claude/worktrees/$ig_n を削除しました。"
-	fi
-	if git show-ref --verify --quiet "refs/heads/$ig_n"; then
-		ig_bsha_now=$(ig_short "refs/heads/$ig_n")
-		# 直接の git。-D を外から通さない方針は変えない（ここでは中身が入りきったことを確かめた後だけ）。
-		[ -n "$ig_chk" ] ||
-			ig_stop "ブランチ $ig_n が、中身を確かめた後に現れた。確かめていないので、何も削除していません。" integrate-done-new-branch
-		# 確かめた先頭のままのときだけ消す（update-ref の旧値の指定。確かめた後に積まれたコミットは消さない）。
-		if ! ig_bd=$(git update-ref -d "refs/heads/$ig_n" "$ig_chk" 2>&1); then
-			ig_stop "ブランチ $ig_n を削除できませんでした（$(printf '%s' "$ig_bd" | head -n 1)）。ワークツリーの登録が残っているなら $SELF worktree prune で外してから再実行します。" integrate-done-branch
-		fi
-		ig_did="${ig_did:+${ig_did}、}ブランチ $ig_n を削除しました（先頭は ${ig_bsha_now}）"
-	fi
-	ig_keep_done
-	ig_drop_mark ||
-		ig_stop "取り込みの記録（${ig_mark}）を削除できませんでした。" integrate-done-marker
-	printf 'ok  git integrate-done  %s を取り込んで片付けた。%s\n' "$ig_n" "${ig_did:-片付けるものは記録だけだった}"
-	[ -z "${ig_note:-}" ] || printf '案内: %s\n' "$ig_note"
-	log_info 取り込みを片付けた -- "name=$ig_n"
-	exit 0
 }
 
 # integrate-doneの引数を読む。ig_n・ig_msg・ig_has_msgを決める。
@@ -938,63 +724,6 @@ ig_done_args() {
 	fi
 }
 
-# 旧形式のmarker（版の無いもの）のintegrate-done。引数はig_done_argsが読んである。
-ig_done_old() {
-	ig_where
-	ig_set "$ig_n"
-	log_info 受け付けた -- "sub=integrate-done" "name=$ig_n" "message=$ig_has_msg"
-	ig_has_branch=no
-	git show-ref --verify --quiet "refs/heads/$ig_n" && ig_has_branch=yes
-	if [ ! -f "$ig_mark" ]; then
-		if [ "$ig_has_branch" = no ] && [ ! -e "$ig_wt" ] && [ ! -L "$ig_wt" ]; then
-			printf 'ok  git integrate-done  %s は片付け済み（ワークツリーもブランチも取り込みの記録もありません）\n' "$ig_n"
-			exit 0
-		fi
-		reject integrate-done-no-marker "$ig_n の取り込みの記録がありません。先に $SELF integrate $ig_n で staged に取り込み、中身を確かめてから実行してください（記録の無いブランチは、中身が統合先に入ったかを確かめずには消しません）。"
-	fi
-	ig_read
-	if [ "$ig_state" != staged ]; then
-		reject integrate-done-conflict "$ig_n の取り込みは衝突で止まっています。コミットも片付けもしません。$SELF integrate --abort $ig_n で取り込む前に戻し、ワークツリー（.claude/worktrees/${ig_n}）の中で $SELF merge $ig_integ を実行して衝突を解いてコミットしてから、$SELF integrate $ig_n を再実行してください。"
-	fi
-	if [ "$ig_has_branch" = yes ]; then
-		ig_bnow=$(git rev-parse --verify "refs/heads/$ig_n")
-		if [ "$ig_bnow" != "$ig_m_bsha" ]; then
-			reject integrate-done-branch-moved "ブランチ $ig_n の先頭が取り込んだとき（$(ig_short "$ig_m_bsha")）から動いています（今は $(ig_short "$ig_bnow")）。後から積んだコミットは取り込まれていないので、コミットも片付けもしません。$SELF integrate --abort $ig_n で戻してから、$SELF integrate $ig_n を再実行してください。"
-		fi
-	fi
-	if ! git diff --cached --quiet 2>/dev/null; then
-		if [ "$(git rev-parse --verify HEAD 2>/dev/null || :)" != "$ig_m_base" ]; then
-			reject integrate-done-head-moved "統合先の HEAD が取り込んだときから動いていて、staged もあります。staged がこの取り込みのものか決められないので、コミットも片付けもしません。$SELF status と $SELF log で確かめ、ユーザに伝えてください。"
-		fi
-		ig_idx=$(git write-tree 2>/dev/null || :)
-		if [ -z "$ig_idx" ] || [ "$ig_idx" != "$ig_m_tree" ]; then
-			reject integrate-done-staged-differs "staged が取り込んだときの中身と違います（手で変えたか、衝突の印が残っている）。コミットも片付けもしません。$SELF diff --staged で確かめ、取り込み直すなら $SELF integrate --abort $ig_n のあと $SELF integrate $ig_n を実行してください。"
-		fi
-		[ "$ig_has_msg" = yes ] ||
-			reject integrate-done-no-message "staged の取り込みをコミットするので、メッセージが要ります（$SELF integrate-done $ig_n -m <メッセージ>）。"
-		ig_log_open integrate-done "$ig_n"
-		ig_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-integrate) || reject integrate-tmp "一時ファイルが作れないので、コミットしていません（staged はそのままです）。一時ファイルの置き場（TMPDIR）に書けるかを確かめてから、$SELF integrate-done $ig_n -m <メッセージ> を再実行してください。直せないならユーザに伝えてください。"
-		ig_crc=0
-		git commit -q -m "$ig_msg" >"$ig_out" 2>&1 || ig_crc=$?
-		cat "$ig_out" >>"$ig_log"
-		if [ "$ig_crc" -ne 0 ]; then
-			ig_why=$(ccnavi_git_refusal "$ig_out")
-			rm -f "$ig_out"
-			printf 'fail  git integrate-done  %s をコミットできなかった（%s）。staged と取り込みの記録はそのまま、何も片付けていない  log=%s\n' "$ig_n" "$ig_why" "$ig_logrel"
-			ig_log_tail
-			printf '案内: 原因を直してから %s integrate-done %s -m <メッセージ> を再実行します。\n' "$SELF" "$ig_n"
-			log_error コミットできなかった -- "name=$ig_n" "exit=$ig_crc"
-			exit 1
-		fi
-		rm -f "$ig_out"
-		ig_did="コミットした（$(ig_short HEAD)）"
-		log_info 取り込みをコミットした -- "name=$ig_n"
-	elif [ "$ig_has_msg" = yes ]; then
-		ig_note="staged が無いので -m のメッセージは使わなかった（コミットはしていない）"
-	fi
-	ig_cleanup
-}
-
 # ---- 直接作業の取り込み（取り込み先へ 1 コミットで載せる形。記録はversion 4）
 #
 # 切ったときの記録（ccnavi-worktree.shがgitの共通ディレクトリのccnavi-direct/<名前> に書く）から、
@@ -1009,8 +738,7 @@ ig_done_old() {
 #                         そのあとワークツリー・一時ワークツリー・ブランチ・ref・記録を片付ける。何度打ち直してもよい
 #   integrate --abort     一時ワークツリーとrefとmarkerを消す。作業ワークツリーとメインのチェックアウトには触らない
 #
-# markerは <メインのgitディレクトリ>/ccnavi-integrate/<名前>/marker。版の無いmarkerは旧形式（squashでstagedに
-# 載せる形）で、ig_abort_old・ig_done_oldが扱う。旧形式のintegrateは打てない。
+# markerは <メインのgitディレクトリ>/ccnavi-integrate/<名前>/marker。
 
 d4_lower() {
 	printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'
@@ -1035,7 +763,7 @@ d4_commit_tree() {
 	git -c user.name=ccnavi -c user.email=ccnavi@localhost commit-tree "$@"
 }
 
-# markerの置き場だけを調べる。ig_n・d4_pv（4 / old / none）を決める。<名前>
+# markerの置き場だけを調べる。ig_n・d4_pv（4 / none / それ以外は知らない版）を決める。<名前>
 d4_probe() {
 	ig_name "$1"
 	d4_top0=$(git rev-parse --show-toplevel 2>/dev/null || :)
@@ -1050,8 +778,13 @@ d4_probe() {
 	d4_pv=none
 	if [ -f "$d4_g0/$1/marker" ]; then
 		d4_pv=$(ccnavi_record_get "$d4_g0/$1/marker" version)
-		[ -n "$d4_pv" ] || d4_pv=old
+		[ -n "$d4_pv" ] || d4_pv=無し
 	fi
+}
+
+# 版を知らない記録で止まる。ccnavi が読めない記録なので、エージェントは触らず、ユーザが統合先を確かめて戻す。<名前>
+d4_unknown_marker() {
+	reject integrate-marker "取り込みの記録（${d4_g0}/${1}/marker）の版（${d4_pv}）を知りません。版 4 でない記録は ccnavi が読めません。ユーザが git status で統合先の staged を確かめ、不要なら git reset --merge で戻してから、${d4_g0}/${1} を手で消してください。エージェントは操作しません。"
 }
 
 # 共通部。名前・場所・記録の置き場を決める（ロックは取らない）。<名前>
@@ -1354,10 +1087,7 @@ ig_integrate() {
 	d4_probe "$1"
 	case "$d4_pv" in
 	4 | none) ;;
-	old)
-		reject integrate-old-marker "旧来の取り込み（staged で載せる形）が残っている（記録: ${d4_g0}/${1}/marker）。$SELF_Q integrate --abort $1 で取り込む前に戻すか、$SELF_Q integrate-done $1 で終わらせてから、integrate を打ち直してください。"
-		;;
-	*) reject integrate-marker "取り込みの記録（${d4_g0}/${1}/marker）の版（${d4_pv}）を知りません。ユーザに確かめてください。" ;;
+	*) d4_unknown_marker "$1" ;;
 	esac
 	d4_begin "$1"
 	log_info 受け付けた -- "sub=integrate" "name=$ig_n"
@@ -1535,9 +1265,10 @@ ig_abort() {
 	[ "$#" -eq 1 ] ||
 		reject integrate-args "integrate --abort は名前を 1 つだけ取ります（$SELF_Q integrate --abort <名前>）。"
 	d4_probe "$1"
-	if [ "$d4_pv" = old ]; then
-		ig_abort_old "$1"
-	fi
+	case "$d4_pv" in
+	4 | none) ;;
+	*) d4_unknown_marker "$1" ;;
+	esac
 	d4_begin "$1"
 	log_info 受け付けた -- "sub=integrate" "action=abort" "name=$ig_n"
 	d4_lock
@@ -1644,7 +1375,7 @@ d4_finish() {
 	fi
 	# ⑤ 専用のrefと直接作業の記録
 	d4_refs_drop t c k s pending ||
-		d4_stop "専用の ref（$d4_ref/ の $d4_rd_failed）を削除できませんでした。直接作業の記録と取り込みの記録は残しています" refs
+		d4_stop "専用の ref（${d4_ref}/ の ${d4_rd_failed}）を削除できませんでした。直接作業の記録と取り込みの記録は残しています" refs
 	rm -f "$d4_rec" 2>/dev/null || :
 	rmdir "$d4_common/ccnavi-direct" 2>/dev/null || :
 	# ⑥ marker
@@ -1666,9 +1397,6 @@ ig_done() {
 	ig_done_args "$@"
 	d4_probe "$ig_n"
 	case "$d4_pv" in
-	old)
-		ig_done_old
-		;;
 	none)
 		d4_nb=no
 		git show-ref --verify --quiet "refs/heads/$ig_n" && d4_nb=yes
@@ -1679,7 +1407,7 @@ ig_done() {
 		reject integrate-done-no-marker "$ig_n の取り込みの記録がありません。先に $SELF_Q integrate $ig_n で取り込み結果を用意し、中身を確かめてから実行してください（記録の無いブランチは、取り込んだことを確かめずには消しません）。"
 		;;
 	4) ;;
-	*) reject integrate-marker "取り込みの記録の版（${d4_pv}）を知りません。ユーザに確かめてください。" ;;
+	*) d4_unknown_marker "$ig_n" ;;
 	esac
 	d4_begin "$ig_n"
 	log_info 受け付けた -- "sub=integrate-done" "name=$ig_n" "message=$ig_has_msg"
@@ -2585,7 +2313,7 @@ push)
 	fi
 	;;
 integrate)
-	# 直接作業の取り込み（版 4。d4_ 系）。版の無い旧形式のmarkerだけ、旧来のig_ 系が受け持つ。
+	# 直接作業の取り込み（版 4。d4_ 系）。
 	if [ "${1:-}" = --abort ]; then
 		shift
 		ig_abort ${1+"$@"}

@@ -42,8 +42,6 @@ WRITERS = (
     "post_decision",
     "carry_human",
 )
-# 前の版にあったユーザ専用の sh の名前（今は ccnavi-user-*.sh）。
-OLD_NAMES = ("ccnavi-agree.sh", "ccnavi-approve.sh", "ccnavi-push-approved.sh")
 DEFINITION = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(\)\s*\{", re.MULTILINE)
 
 
@@ -130,12 +128,6 @@ class PlacementTest(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue(pattern.search(f"sh .ccnavi/scripts/{name} x"), name)
 
-    def test_the_old_names_are_in_the_table(self):
-        """古い名前は、hook が古い形として止める表（user_only.SCRIPTS）にある。"""
-        listed = {f"{n}.sh" for row in user_only.SCRIPTS for n in row.names}
-        for name in OLD_NAMES:
-            self.assertIn(name, listed)
-
     def test_user_scripts_call_the_executable_through_the_user_entry(self):
         """ユーザ専用の操作は `user <操作>` の形で呼ぶ（`user` の外の形は実行ファイルが断る）。"""
         old = re.compile(r"(?<![\w-])--(?:agree|close-early|prune)\b|(?<![\w-])--reviewed\s+\"")
@@ -197,27 +189,20 @@ class EntryTest(unittest.TestCase):
         self.assertEqual(done.stdout, "")
         self.assertFalse(os.path.exists(self.called))
 
-    def test_old_entries_refuse_and_point_to_the_new_scripts(self):
-        for name, args, new in (
-            ("ccnavi-review.sh", ("close-early", "--reason", "r"), "ccnavi-user-close-early.sh"),
-            ("ccnavi-review.sh", ("decide", "1"), "ccnavi-user-decide.sh"),
+    def test_old_review_entries_are_refused_by_the_script(self):
+        # hook の止めが ask に下がっても、ccnavi-review.sh 自身が拒否する。
+        # 実行側の拒否が唯一の守りになる。
+        for args, message in (
+            (("close-early", "--reason", "r"), "close-early は使用できません"),
             (
-                "ccnavi-review.sh",
                 ("decide", "1", "--choices", "{}", "--digest", "d"),
-                "ccnavi-user-decide.sh",
-            ),
-            ("ccnavi-clean.sh", ("--branch", "i0001-01-01"), "ccnavi-user-clean-branch.sh"),
-            (
-                "ccnavi-clean.sh",
-                ("--branch", "i0001-01-01", "--confirmed"),
-                "ccnavi-user-clean-branch.sh",
+                "decide は --choices を受けない",
             ),
         ):
-            with self.subTest(name=name, args=args):
-                refused = self.run_sh(name, *args)
+            with self.subTest(args=args):
+                refused = self.run_sh("ccnavi-review.sh", *args)
                 self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
-                self.assertIn(new, refused.stderr)
-                self.assertIn("何もしていません", refused.stderr)
+                self.assertIn(message, refused.stderr)
         self.assertFalse(os.path.exists(self.called), "古い入口は実行ファイルを起こさない")
 
     def test_review_usage_names_the_user_scripts(self):

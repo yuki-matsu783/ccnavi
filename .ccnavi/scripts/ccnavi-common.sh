@@ -232,7 +232,6 @@ ccnavi_bin() {
 # 食い違えば直し方を含む 1 行を標準出力に出して 1 を返す。呼ぶ側はその行を標準エラーへ書き、止めずに先へ進む。
 # 止めるか通すかは実行ファイルと hook が判定する。
 #
-# `--version` を知らない古い実行ファイルは互換の版を答えないので、古い版として知らせる。
 # 直し方は、ccnavi のリポジトリ（build.py とソースがある）なら組み立て直し、配布先なら実行ファイルと sh の配り直し
 # （scripts/ccnavi-setup.sh --force）。
 ccnavi_compat_skew() {
@@ -245,12 +244,8 @@ ccnavi_compat_skew() {
 		# 配り直しは sh も入れ替える。
 		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
 	fi
-	if [ -z "$ccnavi_cs_have" ]; then
-		printf '実行ファイル %s は --version で互換の版を返しません（古い版です）。%s。\n' "$2" "$ccnavi_cs_fix"
-		return 1
-	fi
 	[ "$ccnavi_cs_have" = "$CCNAVI_COMPAT" ] && return 0
-	printf '実行ファイル %s は互換 %s、sh は互換 %s で食い違っています。%s。\n' "$2" "$ccnavi_cs_have" "$CCNAVI_COMPAT" "$ccnavi_cs_fix"
+	printf '実行ファイル %s は互換 %s、sh は互換 %s で食い違っています。%s。\n' "$2" "${ccnavi_cs_have:-不明}" "$CCNAVI_COMPAT" "$ccnavi_cs_fix"
 	return 1
 }
 

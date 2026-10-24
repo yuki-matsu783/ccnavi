@@ -1,13 +1,13 @@
 ---
 type: adr
 title: 取り込み状態（sync/）を廃止し、親ブランチの状態だけで判定する
-description: 親子ごとの取り込み状態（families）と統合先のコピー（integration）をやめる。親ブランチの消失は共通の push 関門で止め、片付けの列挙元は ready が書く retire/<親>.json にする。閉じた識別子の再利用検知は開始時だけ、レイヤーのずれは git show の warn にする。互換の版は 13
+description: 親子ごとの取り込み状態（families）と統合先のコピー（integration）をやめる。親ブランチの消失は共通の push 関門で止め、片付けの列挙元は ready が書く retire/<親>.json にする。閉じた識別子の再利用検知は開始時だけ、レイヤーのずれは git show の warn にする
 tags: [ticket, records, state, sync]
-keywords: [取り込み状態, sync, families, integration, gone, blocked, push 関門, ccnavi_push_gate, retire, abandon, forget, 閉じた識別子, レイヤーのずれ, layer_drift, 互換の版, sync migrate, Chrome, ボード]
+keywords: [取り込み状態, sync, families, integration, gone, blocked, push 関門, ccnavi_push_gate, retire, abandon, forget, 閉じた識別子, レイヤーのずれ, layer_drift, 互換の版, Chrome, ボード]
 ---
 # ADR-0142: 取り込み状態（sync/）を廃止し、親ブランチの状態だけで判定する
 
-状態: 採用（2026-10-18。ADR-0136 の「取り込み記録はキャッシュとしてだけ使う」を、記録そのものをやめる形に改める。ADR-0093 の取り込み結果による「閉じた」の照合、ADR-0118 の `push-gone-family` と `push-ambiguous-family` の材料、ADR-0122 の `--forget` も改める。互換の版を 13 に上げた）
+状態: 採用（ADR-0136 の「取り込み記録はキャッシュとしてだけ使う」を、記録そのものをやめる形に改める。ADR-0093 の取り込み結果による「閉じた」の照合、ADR-0118 の `push-gone-family` と `push-ambiguous-family` の材料、ADR-0122 の `--forget` も改める）
 
 ## 状況
 
@@ -47,8 +47,7 @@ ccnavi は、チケットの置き場のほかに、手元の `logs/state/sync/`
 | ロックは残す（`ccnavi-common-lock.sh`、`ccnavi_repo_key`、`integrate` のマーカー用の `ccnavi_record_get` と `ccnavi_record_write`）。`mr` を引き継ぐ処理と、`ccnavi_record_put`・`ccnavi_family_record` は消す | 並行する子の `finish` が共有の親ワークツリーで merge するため、同じ PC の中の排他は要る。取り込み状態とは別の問題で、ここで外すと範囲が広がりすぎる | ロックも外す（子の `finish` が親ワークツリーを奪い合う） |
 | Chrome 拡張は、`ccnavi_chrome.py` の `records()` と、記録の組み立て（`families`・`integration` の `state`）を削る。仮のツリー、`_placement`、手元と同じ関数で読むこと（REQ-EXT-32）は変えない。ホストに親ブランチが無いときの停止は、偽のワークツリーが作られず `Standing.stop`（親のワークツリーがありません）で止まる既存の動きに任せ、`gone` 専用の入力は足さない | 拡張が手元の記録の形を知らなくてよくなる。止まる向きは変わらない | `gone` の入力を拡張に足す |
 | VS Code のボードは、`unprepared[]`・`remote.fetched_at`・`remote.mr` を消す。「このPCでは未準備」のカードと「準備する」ボタン、「最終取り込み」の表示は項目ごとなくす。MR の番号は親チケットの `mr:` から出す | 出す元の記録が無い。親のワークツリーが無い PC では、その親子のチケットがボードに出ず、`ccnavi-start.sh --mr <番号>` で用意する | 親チケットの有無から未準備を組み直す |
-| 互換の版 `CCNAVI_COMPAT` を 12 から 13 に上げる（`COMPAT`・`CCNAVI_COMPAT`・`EXTENSION_COMPAT` の 3 か所を同時に）。`tests/sh/test_compat_skew.py` の版を追従する | 新しい sh が、実行ファイルの新しい副命令（`tree parent` の追加行、`sync retired`、`sync migrate`）を呼ぶ。Chrome と手元の判定の規則が変わる（記録の有無で止まらなくなる） | 上げずに副命令の有無を見る |
-| 古い取り込み状態を `ccnavi sync migrate`（冪等）で移す。`ccnavi-sync.sh` は先頭で 1 回呼ぶ（頭の行が `migrate 1` でなければ何もしない）。親のワークツリー（`.claude/worktrees/<P>`）が無い古い記録だけを、`mr` と `branch` を持つ `retire/<P>.json` に書く（`moved`）。既にある `retire/<P>.json` は尊重する（`kept`）。親のワークツリーが在る記録、`mr` も `branch` も無い記録は古いファイルを消す（`dropped`）。シンボリックリンクは辿らず消さない（`skipped`）。`integration/` は消す。状態（`gone`・`blocked` など）は捨てる。古い記録の読み取りは使い捨てのモジュール `tickets/legacy_sync.py` に最小限で写す | ADR-0115 は移行のための読み取りを外す方針だが、ready 済みで `retire/<P>.json` が無い古い親の片付けを列挙し続けるために 1 回だけ要る。使い捨てにして本体に残さない | 移行せず、古い親を手で片付けてもらう |
+| 互換の版 `CCNAVI_COMPAT` を上げる（`COMPAT`・`CCNAVI_COMPAT`・`EXTENSION_COMPAT` の 3 か所を同時に）。`tests/sh/test_compat_skew.py` の版を追従する | 新しい sh が、実行ファイルの新しい副命令（`tree parent` の追加行、`sync retired`）を呼ぶ。Chrome と手元の判定の規則が変わる（記録の有無で止まらなくなる） | 上げずに副命令の有無を見る |
 
 ### push の関門の判定
 
@@ -79,7 +78,7 @@ ccnavi は、チケットの置き場のほかに、手元の `logs/state/sync/`
 - 失ったもの: 常時のレイヤーのずれ検知。warn と運用の決まりで守る。ccnavi 自身の開発では、レイヤーを変える作業と、それを使う作業を別のチケットに分ける。Chrome の承認は統合先のレイヤーを読むので、ずれは手元の warn でしか知らされない
 - 失ったもの: push の前に `ls-remote` が走る。失敗したら拒否に倒すので、認証が対話式の環境ではユーザが端末で `git push origin <B>` を一度打つ必要がある
 - 失ったもの: 片付けの列挙元（`retire/<親>.json`）は `ready` を打った PC にだけある。別の PC で `ready` 後の片付けを列挙することはできない。放棄した親は、ユーザが `--abandon` を打つまで、`ccnavi-sync.sh` が毎回案内を出し続ける（終了コードは 0。親のワークツリーが在る間だけ 1）
-- 失ったもの: ユーザの手が増える。sh（`.ccnavi/scripts/`）は保護された場所にあり、互換の版を 13 に揃えるまで、ユーザがコピーする。Chrome 拡張は、統合先に新しい sh が入った後に公開する
+- 失ったもの: ユーザの手が増える。sh（`.ccnavi/scripts/`）は保護された場所にあり、互換の版を揃えるまで、ユーザがコピーする。Chrome 拡張は、統合先に新しい sh が入った後に公開する
 - 失ったもの: 閉じた別の親子の子を先行に持つチケットは `PRED_MISSING` になり、`predecessors` からの削除が要る。承認済みチケットは保護されていてエージェントは直せないので、ユーザが `predecessors` を手で編集するか、改版（提案を出し直して承認）する。統合先のルートの `done/` にその先行のコピーが残っていると、`PRED_MISSING` ではなく「親のワークツリーがありません」で止まり、案内が「親のワークツリーを切り直して」になる（`approval_checks.align_imported`）。この場合も直し方は同じで、`predecessors` から外す
 - 失ったもの: 読めない承認済みチケット（マージのコンフリクトマーカーが入った `doing/<子>.md` など）が親のツリーにあっても、hook は親子の全チケットを止めない。古い `blocked` は親子の全チケットを止めていた。再現して確かめた範囲では、その子のワークツリーに読める写しがあれば親のワークツリーの外にしか無いチケットとして deny、写しも読めなければチケットの無いツリーと同じ扱い（`UNDECLARED`）になり、親の範囲を借りて書けることはない。一方、読める兄弟の子と親の書き込みは止まらず、読めないことは `ccnavi sync check` の表示と終了コード 1 でだけ伝わる（`--lint` の `family_check` にも出る）
 - 失ったもの: 承認では、閉じた識別子の再利用を検知しない。手元の退避（`logs/archive/`）に同じ識別子の閉じたチケットがあっても、同じ識別子の提案を承認できる。検知は `ccnavi-start.sh` の開始時の照会だけ

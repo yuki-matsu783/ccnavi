@@ -50,13 +50,12 @@ keywords: [統合先, 取り込み, マージ, マージリクエスト, integra
   Kがすでに取り込み先に載っているときは断る。ユーザが`git revert`する。
   `integrate`が衝突で止まったときは、衝突したパスを挙げて断る。メインのチェックアウトでは解かず、
   作業ワークツリーの中で`ccnavi-git.sh merge <取り込み先>`を打って解いてコミットしてから、`integrate`を打ち直す
+- 取り込みの途中のmarkerの版が4でない（版が無いものも含む）ときは、`integrate`が「版を知りません」で止まる。エージェントは操作せず、ユーザに確かめる。ユーザは`git status`で統合先のstagedを確かめ、不要なら`git reset --merge`で戻してから、`<gitdir>/ccnavi-integrate/<名前>/`を手で消す。Stopの促しも同じ文面で止まる
 - `integrate`の対象は直接作業のワークツリーだけで、チケットに結び付く名前は拒否される。結び付くかは実行ファイルの`tree bound`に聞いて決める。
   取り込み先のブランチがチケットに結び付くかは、別の判定として`tree base-bound`に聞き、ワークツリーを切る前に断る
   （承認済みチケット・提案に同じ名前がある、手元の退避に同じ名前の親がある、取り込み先のリポジトリの承認済みチケットの`branch:`が一致する、など）。
   チケットの作業は今までどおり、下のマージリクエストの手順で出す
 - 記録の無い直接作業のワークツリーは、`integrate`が断って`ccnavi-worktree.sh <名前> --adopt --base <ブランチ>`での引き取りを案内する
-- 版の無い古い形式のmarker（旧来のsquashでstagedにした取り込み）は、`integrate`が断る。`integrate-done`か`integrate --abort`で終わらせる。
-  更新の前に、途中の`integrate`を終わらせておく
 - 取り込んだコミットをリモートへ送るかどうかはユーザが決める。`origin/<取り込み先>`が手元より進んでいれば、`integrate`が警告し、
   `integrate-done`が`git push origin <取り込み先>`をユーザに頼む案内を出す（`ccnavi-git.sh push`は統合先へも取り込み先へも送らない）
 

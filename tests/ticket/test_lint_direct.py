@@ -1,6 +1,6 @@
 """`--lint` の直接作業の検査（lint_direct）の受入テスト。
 
-記録の無いワークツリー・壊れた記録・横で作業する指定・片付け残り・旧形式の marker を、
+記録の無いワークツリー・壊れた記録・横で作業する指定・片付け残り・版を知らない marker を、
 実際の git のリポジトリで確かめる。
 """
 
@@ -102,9 +102,10 @@ class LintDirectTest(base.StopNudgeTest):
         self.said(SEVERITY_INFO, "refs/ccnavi/direct/t1/c")
         self.said(SEVERITY_INFO, "marker")
 
-    def test_an_old_format_marker_is_warn(self):
+    def test_a_marker_of_unknown_version_is_warn(self):
         write(os.path.join(self.common(), "ccnavi-integrate", "o1", "marker"), "state staged\n")
-        self.said(SEVERITY_WARN, "旧形式")
+        self.said(SEVERITY_WARN, "版を知りません")
+        self.said(SEVERITY_WARN, "git reset --merge")
 
 
 if __name__ == "__main__":

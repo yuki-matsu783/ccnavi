@@ -22,11 +22,10 @@ export type ShUnknownKind = (typeof SH_UNKNOWN_KINDS)[number];
  *
  * - `timeout`: 期限切れ（拡張が 1 回ごとに付ける期限で打ち切った）
  * - `format`: 出力の形が想定外（頭の行・語の数・番号・Draft・終了コードの食い違いなど）
- * - `old-sh`: sh が古い版（`mr-state` を知らない）。配り直してもらう
  * - `failed`: 実行できなかった、または sh が想定外の終了コードで終わった
  * - `no-number`: 片付けの記録に MR の番号が無い（番号が読めない）
  */
-export type UnknownKind = ShUnknownKind | "timeout" | "format" | "old-sh" | "failed" | "no-number";
+export type UnknownKind = ShUnknownKind | "timeout" | "format" | "failed" | "no-number";
 
 export type MrStateResult =
   | { readonly kind: "open"; readonly number: number; readonly draft: boolean; readonly url: string }
@@ -46,16 +45,6 @@ export interface Ran {
 const OPEN_WORDS = 4;
 const SETTLED_WORDS = 3;
 const UNKNOWN_MIN_WORDS = 3;
-
-/**
- * 古い sh（`mr-state` を知らない）の見分け。今の `ccnavi-review.sh` に知らない副命令を渡すと、標準出力は空、
- * 終了コードは 2、標準エラーは `ccnavi-review: <名前> は使用できません。使えるのは request / … です。` になる。
- * 1 行目が `mr-state 1` でなく、この形に当てはまるときだけ「古い」と言う（引数の誤りは終了コード 2 でも文言が違う）
- */
-export function isUnknownSubcommand(ran: Ran): boolean {
-  const first = firstLine(ran.stdout);
-  return first !== MR_STATE_HEAD && ran.code === 2 && /mr-state は使用できません。使えるのは/.test(ran.stderr);
-}
 
 function firstLine(text: string): string {
   return text.split("\n")[0]?.replace(/\r$/, "") ?? "";
@@ -80,14 +69,11 @@ function parseNumber(word: string): number | undefined {
  * - 終了コードが状態と合う（状態が分かれば 0、`unknown` は 1）
  *
  * 当てはまらなければ「出力の形が想定外」。URL が http(s) でないときは状態を出し、リンクにしない（呼び手の仕事）。
- * 期限で打ち切ったときは `timeout`、古い sh のときは `old-sh`
+ * 期限で打ち切ったときは `timeout`
  */
 export function interpretMrState(ran: Ran, expected: number): MrStateResult {
   if (ran.killed) {
     return unknown("timeout", "時間内に終わりませんでした");
-  }
-  if (isUnknownSubcommand(ran)) {
-    return unknown("old-sh", "sh が古い版です。配り直してください");
   }
   const lines = ran.stdout.split("\n").map((line) => line.replace(/\r$/, ""));
   // 末尾の改行で生まれる空行は無視する。途中の空行は形の異常（語の数で落ちる）

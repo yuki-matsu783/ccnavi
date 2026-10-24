@@ -7,7 +7,7 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
 ---
 # ADR-0099: 役割ごとのサブパッケージと段、approval/agree の分割、--agree への改名
 
-状態: 採用
+状態: 採用（旧名 `--approve`・`ccnavi-approve.sh` を止める分は、配布前なので削除した。下の表の該当の行はその前の決定）
 
 ## 状況
 
@@ -34,8 +34,8 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
 | 段（TIERS）は残し、ドットの名前（`infra.fsio`）で持つ。サブパッケージの表（PACKAGES）を足す | サブパッケージの中の読む順はディレクトリでは言えないので、段が補う | 段を捨ててサブパッケージだけにする |
 | 再輸出しない。サブパッケージの `__init__.py` は役割の docstring だけ。パッケージの中は相対の 2 形（`from . import x`、`from ..infra import fsio`）だけ | 行き先が import 文にそのまま残り、段とサブパッケージの検査が 1 通りの読みで済む | `__init__.py` で名前を並べ直す（行き先が `__init__.py` に見える）、絶対の `ccnavi.` を許す（表記が 2 通りになる） |
 | `ccnavi --approve` を `--agree` に改名し、別名は残さない。sh は `ccnavi-agree.sh` に改名する | 「合意」を表す語を 1 つにする。古い名前を残すと、保護（組み込みの deny）とヘルプの両方に 2 つの表記が残り続ける | `--approve` を別名として残す |
-| 互換の版（COMPAT）を 3 に上げる | 呼ぶ側（sh と拡張）が頼るフラグの名前が変わり、呼ぶ側を直さないと動かない形になった（`ccnavi/entry/version.py` の上げ方どおり） | 上げない（古い sh は `--approve` を渡して argparse の苦情で落ち、理由が分からない） |
-| 組み込みの deny（`builtin-guard-ticket-approval`）は `--agree` と `--approve`、`ccnavi-agree.sh` と `ccnavi-approve.sh` の両方を止める | 実行ファイルはもう `--approve` を受け付けないが、古い実行ファイルや sh のコピーが手元に残っていれば通ってしまう。広がるのは止める側だけ | 新しい表記だけを止める |
+| 互換の版（COMPAT）を上げる | 呼ぶ側（sh と拡張）が頼るフラグの名前が変わり、呼ぶ側を直さないと動かない形になった（`ccnavi/entry/version.py` の上げ方どおり） | 上げない（古い sh は `--approve` を渡して argparse の苦情で落ち、理由が分からない） |
+| 組み込みの deny（`builtin-guard-ticket-approval`）は `--agree` と承認のスクリプトを止める（旧名 `--approve`・`ccnavi-approve.sh` の止めは削除した。スクリプトの現行名は `ccnavi-user-agree.sh`） | 当時は、実行ファイルがもう `--approve` を受け付けなくても、古い実行ファイルや sh のコピーが手元に残っていれば通ってしまうので、旧名も止めた。配布前なので、その旧名の止めは後で削除した | 新しい表記だけを止める |
 | VS Code 拡張の `flow-agree.ts` を `flow-match.ts` に、`flowDisagreement` などを `flowMismatch` に改める | `agree` を「合意」の意味に一本化する | そのまま残す |
 
 変えなかったもの。置き場のモジュール名 `approval`、ディレクトリ `.ccnavi/approved/`、チケットの欄
@@ -54,8 +54,8 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
   拡張の Pyodide の入口・テスト・`mock.patch` の文字列）の表記が全部変わった。`--approve` を打っていた
   ユーザと、改名の前の sh・拡張は動かなくなる（互換の版の食い違いとして知らせる）。`.ccnavi/scripts/` は
   保護された場所なので、sh の改名と互換の版の書き換えはユーザの手で入れる必要がある
-- 失ったもの（配布済みの Chrome 拡張）: COMPAT を 3 に上げたので、同梱の compat が 2 の配布済みの
-  Chrome 拡張は、統合先が COMPAT=3 になると「始める」・承認・取り下げを拒み、表示だけになる
+- 失ったもの（配布済みの Chrome 拡張）: COMPAT を上げたので、同梱の compat が古い配布済みの
+  Chrome 拡張は、統合先が新しい COMPAT になると「始める」・承認・取り下げを拒み、表示だけになる
   （`chrome-extension/ccnavi-approval/src/core/protocol.ts:333-338`、`render.ts:71`。ADR-0093 の
   7.3 の設計どおり）。拡張の配り直しが要る
 - 失ったもの（実行ファイル）: マージ後は `build.py` で実行ファイルを組み直すまで、端末の承認が通らない。

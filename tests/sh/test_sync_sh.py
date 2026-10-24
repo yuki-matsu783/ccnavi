@@ -432,21 +432,21 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertNotIn("検査で止める", done.stdout)
 
-    def test_an_old_executable_that_cannot_check_does_not_block(self):
-        # 古い実行ファイル（`sync check` を知らない）は、検査の error と分けて警告だけにする。
+    def test_an_executable_that_cannot_check_does_not_block(self):
+        # `sync check` が失敗して答えない実行ファイルは、検査の error と分けて警告だけにする。
         launcher = self.launcher()
-        old = write(
-            os.path.join(self._tmp.name, "bin", "old-ccnavi"),
+        failing = write(
+            os.path.join(self._tmp.name, "bin", "failing-ccnavi"),
             "#!/bin/sh\n"
-            'case "$*" in *"sync check"*) echo "ccnavi: unknown command" >&2; exit 2 ;; esac\n'
+            'case "$*" in *"sync check"*) echo "ccnavi: failed" >&2; exit 2 ;; esac\n'
             f'exec "{launcher}" "$@"\n',
         )
-        os.chmod(old, 0o755)
+        os.chmod(failing, 0o755)
         write(
             os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
             child_copy_text(),
         )
-        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=old)
+        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=failing)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("検査を実行できなかった", done.stdout)
 

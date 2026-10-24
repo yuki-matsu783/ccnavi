@@ -368,10 +368,6 @@ class Settings:
     mode_declared_in_file: str = ""
     mode_from_environment: str = ""
 
-    # live_files は上書き設定を読んだことを示す。
-    # ccnavi 自身のソースツリーでしか真にならない。
-    live_files: bool = False
-
     log: str = ""
     rules: str = ""
     state: str = ""
@@ -542,7 +538,6 @@ def load(root: str) -> tuple[Settings, list[str]]:
     conf, problems = _read_local(root)
     if conf is None:
         return settings, problems
-    settings.live_files = True
 
     if isinstance(conf.get("mode"), str):
         settings.mode_declared_in_file = conf["mode"]

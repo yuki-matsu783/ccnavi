@@ -3,8 +3,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason <理由> [--no-issue]
 #
-# 前は `ccnavi-review.sh close-early` だった。ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、
-# エージェントからは hook が名前で止める。
+# ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、エージェントからは hook が名前で止める。
 #
 # 実行ファイル（`ccnavi user close-early`）が残りを見せて y/N を取り、マーカーを置いて下書きを書く。
 # ここが残りを issue に書き出し、コメントを投稿する。Draft を外すのは、親が片付けて push したあとの

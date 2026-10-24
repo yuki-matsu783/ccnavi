@@ -95,22 +95,6 @@ review_no_bin() {
 	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 }
 
-# 実行ファイルがそのフラグを知っているか（`--version --json` の flags で見る）。
-# 知らない古い実行ファイルには `--actor`・`--via` を渡さない（渡すと引数の誤りで失敗する。マーカーは前と同じ中身になる）。
-# 答えは 1 度だけ引いて覚えておく。`$( )` の中から呼ぶと覚えた値が親に残らないので、親で呼ぶ。
-exe_flags=""
-exe_flags_read=""
-exe_knows() {
-	if [ -z "$exe_flags_read" ]; then
-		exe_flags_read=1
-		exe_flags=$(ccnavi --version --json </dev/null 2>/dev/null | tr -d '\r') || exe_flags=""
-	fi
-	case "$exe_flags" in
-	*"\"$1\""*) return 0 ;;
-	esac
-	return 1
-}
-
 # ---- リモート。origin の URL でホストを見分ける。
 review_host() {
 	origin=$(git remote get-url origin 2>/dev/null || :)
@@ -394,8 +378,12 @@ staged_send() {
 	cs_file="$7"
 	cs_id=$(ccnavi ops begin "$cs_kind" "${branch:-}" 0 "$cs_mr" "$cs_key" "$cs_stage:$cs_stage" 2>/dev/null) || cs_id=""
 	if [ -z "$cs_id" ]; then
-		if [ "$cs_skind" = issue ]; then create_issue "$cs_file"; else comment "$cs_mr" "$cs_url" "$cs_file"; fi
-		return $?
+		# 記録なしの直接投稿。API が失敗すると、パイプの最後の jq は空入力でも 0 で終わるので、
+		# 終了コードだけでなく出力の有無でも失敗と読む（空の出力を成功として返さない）。
+		if [ "$cs_skind" = issue ]; then cs_direct=$(create_issue "$cs_file") || return 1; else cs_direct=$(comment "$cs_mr" "$cs_url" "$cs_file") || return 1; fi
+		[ -n "$cs_direct" ] || return 1
+		printf '%s\n' "$cs_direct"
+		return 0
 	fi
 	# 同じ操作を同時に送らない（照合の前に 2 つが「未送信」と見て、両方が投稿するのを防ぐ）。
 	# ロックが使えない構成（root が無い）では、取らずに進む。

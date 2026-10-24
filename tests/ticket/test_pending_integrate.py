@@ -1,7 +1,7 @@
 """SessionStart で、終わっていない `integrate` の記録を知らせる（pending_integrate）の受入テスト。
 
-記録（統合先のツリーの `.git/ccnavi-integrate/<名前>/marker`）を A〜D に分け、モデルの文脈と
-`systemMessage` の両方に出す。記録が無ければ何も足さない。
+記録（取り込み先のツリーの `.git/ccnavi-integrate/<名前>/marker`）の版 4 の続きの一手と、
+版を知らない壊れた記録を、モデルの文脈と `systemMessage` の両方に出す。記録が無ければ何も足さない。
 """
 
 from __future__ import annotations
@@ -63,58 +63,29 @@ class PendingIntegrateTest(TicketTest):
         self.assertEqual(self.notice(), "")
         self.assertNotIn(HEAD, self.start().stdout)
 
-    def test_a_staged_record_matching_head_and_index_is_A(self):
+    def test_a_marker_that_is_not_version_4_is_told_as_broken_without_raising(self):
         head = self.head()
-        tree = git(self.root, "rev-parse", "HEAD^{tree}").strip()
-        self.marker("w1", state="staged", branch="w1", branch_sha=head, base=head, tree=tree)
+        self.marker("w4", state="staged", branch="w4", branch_sha=head, base=head)
         text = self.notice()
         self.assertIn(HEAD, text)
-        self.assertIn("w1（統合先のツリー", text)
-        self.assertIn("HEAD と staged の内容は、取り込みの記録と一致しています", text)
-        self.assertIn("integrate-done w1 -m '<メッセージ>'", text)
-        self.assertIn("integrate --abort w1", text)
+        self.assertIn("w4（取り込み先のツリー", text)
+        self.assertIn("を知りません", text)
+        self.assertIn("操作せず", text)
+        self.assertIn("git reset --merge", text)
+        self.assertIn("ccnavi-integrate/w4", text)
+        self.assertNotIn("integrate-done", text)
 
-    def test_a_moved_head_with_nothing_staged_is_B_and_does_not_claim_completion(self):
-        old = self.head()
-        write(os.path.join(self.root, "src", "later.py"), "x\n")
-        git(self.root, "add", "-A")
-        git(self.root, "commit", "--quiet", "-m", "later")
-        self.marker("w2", state="staged", branch="w2", branch_sha=old, base=old, tree="x")
+    def test_a_marker_with_another_version_is_told_as_broken(self):
+        self.marker("w5", version="3", head=self.head())
         text = self.notice()
-        self.assertIn("片付けだけが残っている可能性がありますが、確かめてはいません", text)
-        self.assertIn("log --oneline -5", text)
-        self.assertNotIn("取り込み済みです", text)
+        self.assertIn("記録の版（3）を知りません", text)
+        self.assertIn("操作せず", text)
 
-    def test_a_conflict_record_is_C(self):
-        head = self.head()
-        self.marker("w3", state="conflict", branch="w3", branch_sha=head, base=head)
-        self.assertIn("取り込みが途中で止まっています", self.notice())
-
-    def test_a_broken_record_is_D_without_raising(self):
-        self.marker("w4", state="???")
-        self.assertIn("記録と今の状態が合わないか、読めません", self.notice())
-        head = self.head()
-        # staged の記録でも、staged が記録の tree と違えば A にも B にもしない。
-        write(os.path.join(self.root, "src", "dirty.py"), "x\n")
-        git(self.root, "add", "-A")
-        self.marker(
-            "w5",
-            state="staged",
-            branch="w5",
-            branch_sha=head,
-            base=head,
-            tree=git(self.root, "rev-parse", "HEAD^{tree}").strip(),
-        )
-        text = self.notice()
-        self.assertIn("w5（統合先のツリー", text)
-        self.assertEqual(text.count("記録と今の状態が合わないか、読めません"), 2)
-
-    def test_a_directory_without_a_marker_is_told_as_D(self):
+    def test_a_directory_without_a_marker_is_told_as_broken(self):
         os.makedirs(os.path.join(self.root, ".git", "ccnavi-integrate", "w9"))
-        write(os.path.join(self.root, ".git", "ccnavi-integrate", "w9", "paths"), "x\n")
         text = self.notice()
-        self.assertIn("w9（統合先のツリー", text)
-        self.assertIn("記録と今の状態が合わないか、読めません", text)
+        self.assertIn("w9（取り込み先のツリー", text)
+        self.assertIn("を知りません", text)
 
     def test_an_expired_deadline_starts_no_git_and_says_so(self):
         head = self.head()
@@ -260,13 +231,12 @@ class PendingIntegrateTest(TicketTest):
         ws = os.path.join(base, "a b's")
         os.makedirs(os.path.join(ws, ".ccnavi", "scripts"))
         write(os.path.join(ws, ".ccnavi", "scripts", "ccnavi-git.sh"), 'echo "ARGS:$*"\n')
-        for kind in "ABCD":
-            line = pending_integrate._line(ws, ws, "nm", kind)
-            for cmd in re.findall(r"`([^`]+)`", line):
-                cmd = cmd.replace("<メッセージ>", "msg")
-                done = subprocess.run(["sh", "-c", cmd], cwd="/", capture_output=True, text=True)
-                self.assertEqual(done.returncode, 0, (cmd, done.stderr))
-                self.assertIn("ARGS:", done.stdout)
+        line = pending_integrate._unknown_line(ws, ws, "nm", "")
+        for cmd in re.findall(r"`([^`]+)`", line):
+            cmd = cmd.replace("<メッセージ>", "msg")
+            done = subprocess.run(["sh", "-c", cmd], cwd="/", capture_output=True, text=True)
+            self.assertEqual(done.returncode, 0, (cmd, done.stderr))
+            self.assertIn("ARGS:", done.stdout)
 
 
 if __name__ == "__main__":

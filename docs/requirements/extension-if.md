@@ -31,7 +31,7 @@ JSON の欄の細かい形は [json-shapes.md](json-shapes.md) の各 JSON の�
 | REQ-EXT-05 | 常時 | ccnavi は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh、VS Code 拡張、Chrome 拡張）の契約の版（互換の版）を持ち、実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）・sh（`.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT`）・VS Code 拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）に同じ値を書くこと。呼ぶ側が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたとき、データの形（承認済みの置き場に置くものの並び、待ち方の置き場など）を変えたとき、sh が古い実行ファイルの知らないサブコマンドを呼ぶようになったときに 1 上げること。フラグや欄を足すだけでデータの形も変わらないなら上げないこと |
 | REQ-EXT-06 | 常時 | ccnavi は、互換の版を、`src/ccnavi/entry/version.py` では行頭から行末までの 1 行 `COMPAT = <整数>`（`^COMPAT = N$`）で、`.ccnavi/scripts/ccnavi-common.sh` では行頭から始まる 1 行 `CCNAVI_COMPAT=<整数>`（`^CCNAVI_COMPAT=N$`）で書くこと。Chrome 拡張の組み立ては前者を、Chrome 拡張は統合先の後者を、それぞれ正規表現で読む |
 | REQ-EXT-07 | 異常時 | 知らないオプションを渡されたなら、ccnavi は、何もせずに argparse の文言（`ccnavi: error: unrecognized arguments: <オプション>`）を標準エラーに出し、終了コード 1 で終わること |
-| REQ-EXT-08 | 常時 | ccnavi は、使い方の誤りと読めない設定を、`ccnavi:` で始まる標準エラーの文と終了コード 1 で示すこと。終了コード 2 は hook の拒否と前の名前（`--approve`）の案内に、3 は確かめの「いいえ」（REQ-APV-13）に使い、1 と分けること |
+| REQ-EXT-08 | 常時 | ccnavi は、使い方の誤りと読めない設定を、`ccnavi:` で始まる標準エラーの文と終了コード 1 で示すこと。終了コード 2 は hook の拒否に、3 は確かめの「いいえ」（REQ-APV-13）に使い、1 と分けること |
 | REQ-EXT-09 | 常時 | ccnavi は、診断ログをワークスペースルートの `logs/diag/<出どころ>.log` に、sh・Python・拡張（TS）で同じ行の形（`<時刻> <レベル 5 字> <出どころ>[<pid>] <本文> <key=value>…`）で書くこと。出すレベルは `CCNAVI_LOG_LEVEL`（読めない値は `INFO`）で決め、新しいファイルは 0600 で作り、`logs`・`logs/diag`・書き込み先がシンボリックリンクなら書かないこと。片付け（`user prune` とセッションの開始）は、拡張が書いたものを含めて `logs/diag/*.log` を同じしきい値でローテートし、消すこと |
 | REQ-EXT-10 | 常時 | ccnavi は、時刻を次の形で書くこと。マーカーと記録の時刻は現地時刻とオフセット（`YYYY-MM-DDThh:mm:ss+hhmm`。`fsio.stamp`）、診断ログは現地時刻とコロン付きのオフセット（`+hh:mm`）。時刻を固定する `fsio.clock` は `fsio.stamp` の形でない値を受けないこと |
 | REQ-EXT-11 | 常時 | ccnavi は、置き場（提案 `wip/proposals/`、承認済みチケット `.ccnavi/approved/`、共通レイヤー `.ccnavi/config/common/`、記録と state `logs/`、プロジェクト `projects/`、自身のレイヤーとプロジェクトのレイヤー `.ccnavi/config/project/`）を既定のパスに固定し、環境変数でも上書き設定ファイルでも動かさないこと。別の場所を指せるのは診断のフラグだけとすること |
@@ -48,8 +48,7 @@ REQ-EXT-03 の UTF-8 は、実行ファイルの入口（`hookio.rebind_streams`
 REQ-EXT-05 の 3 か所は `tests/sh/test_compat_skew.py` が突き合わせる。Chrome 拡張は、互換の版を
 組み立てのときに REQ-EXT-06 の行から埋め込む。版の JSON の形と、食い違ったときの直し方は json-shapes.md「[版の JSON](json-shapes.md#版の-json)」にある。
 
-REQ-EXT-07 の文言は、`--version` を知らない古い実行ファイルを VS Code 拡張が見分けるのに使う。新しいフラグを知っているかは
-`--version --json` の `flags` で見る（REQ-EXT-04）。
+新しいフラグを知っているかは `--version --json` の `flags` で見る（REQ-EXT-04）。
 
 ### 2.13.2 VS Code 拡張
 

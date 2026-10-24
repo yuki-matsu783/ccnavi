@@ -20,8 +20,8 @@ hook自身は `integrate` を打たない。促すだけ。
   `S..先頭` で数える。
   記録が無いときは統合先（`origin/HEAD`）で数え、`integrate` が断るので `--adopt` を案内する
 - 取り込みの途中のmarker（`ccnavi-integrate/<名前>/`）が無い。あれば「`integrate-done` か
-  `integrate --abort`」を促す。片付けた記録の写し（`ccnavi-integrate-done/<名前>`）は、旧形式の
-  写しの `branch_sha` が今のHEADと同じで未コミットの変更が無い、という形では無い
+  `integrate --abort`」を促す。片付けた記録の写し（`ccnavi-integrate-done/<名前>`）は、写しの
+  `branch_sha` が今のHEADと同じで未コミットの変更が無い、という形では無い
   （名前を使い直した作業を、前の写しで黙らせない）
 
 ## 3 つの結果
@@ -102,7 +102,7 @@ class Direct:
     base: str = ""
     # 記録が無い（更新前に切った・手で切った）。integrateは断るので、`--adopt` を案内する。
     no_record: bool = False
-    # 取り込みの途中のmarker。"" なし、"v4" 新形式、"old" 旧形式。
+    # 取り込みの途中のmarker。"" なし、"v4" 版 4、"unknown" 版を知らない（壊れた記録）。
     marker: str = ""
     # 手元の取り込み先より `origin/<取り込み先>` が先に進んでいるコミットの数。
     origin_ahead: int = 0
@@ -161,13 +161,6 @@ def _run(
     if deadline is None:
         return gitcmd.run(cwd, args, timeout)
     return gitcmd.run_until(cwd, args, deadline, timeout)
-
-
-def _out(cwd: str, args: list[str], deadline: float | None = None) -> tuple[int, str]:
-    done = _run(cwd, args, deadline)
-    if done.failure:
-        return 1, ""
-    return done.code, done.out
 
 
 def direct_at_stop(
@@ -339,12 +332,12 @@ def direct_record(owner: str, name: str) -> dict[str, str] | None:
 
 
 def marker_kind(marks: str, name: str) -> str:
-    """`ccnavi-integrate/<名前>/` のmarkerの種類。無ければ空、版 4 なら "v4"、ほかは "old"。"""
+    """`ccnavi-integrate/<名前>/` のmarkerの種類。無ければ空、版 4 なら "v4"、ほかは "unknown"。"""
     folder = os.path.join(marks, name)
     if not os.path.lexists(folder):
         return ""
     fields = directrec.parse(fsio.read_text(os.path.join(folder, "marker"), errors="replace") or "")
-    return "v4" if fields.get("version") == directrec.VERSION else "old"
+    return "v4" if fields.get("version") == directrec.VERSION else "unknown"
 
 
 def _origin_ahead(owner: str, base: str, deadline: float | None) -> int:
@@ -779,6 +772,17 @@ def integrate_nudge(root: str, found: Direct) -> str:
     work = settings.shell_path(found.worktree)
     integ = settings.shell_path(found.integ_tree)
     lines = [f"[ccnavi] {CODE_INTEGRATE_NUDGE} (worktree: {n})"]
+    if found.marker == "unknown":
+        return "\n".join(
+            [
+                *lines,
+                f"ワークツリー .claude/worktrees/{n} の取り込みの記録"
+                f"（{integ} の ccnavi-integrate/{n}/marker）の版を知りません。"
+                "版 4 でない記録は ccnavi が読めません。操作せず、ユーザが統合先の staged を"
+                "git status で確かめ、不要なら git reset --merge で戻してから、記録のディレクトリを"
+                "手で消します。",
+            ]
+        )
     if found.marker:
         lines += [
             f"ワークツリー .claude/worktrees/{n} の取り込み（integrate {n}）が、"
