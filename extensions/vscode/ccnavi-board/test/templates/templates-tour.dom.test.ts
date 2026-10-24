@@ -12,6 +12,14 @@ import type { HTMLButtonElement, HTMLSelectElement } from "happy-dom" with { "re
 
 const def = loadTour("templates");
 
+/** 開く前に図の中身を求めた行の数（見本の一覧の self の層の 4 件）。案内の間に増えない */
+const ASKED_BEFORE_TOUR = 4;
+
+/** 図の中身の依頼は、案内に入る前に送った分だけ。数が増えていれば、案内の間に送ったことになる */
+function assertNoPreviewDuringTour(dom: { readonly posted: readonly { readonly type?: unknown }[] }): void {
+  assert.equal(dom.posted.filter((message) => message.type === "preview").length, ASKED_BEFORE_TOUR);
+}
+
 async function startCourse(dom: DomPage, id: string): Promise<void> {
   dom.click(dom.one('[data-action="tour"]'));
   await dom.settle();
@@ -89,6 +97,7 @@ test("CB-D334 案内の間に更新・テンプレートの開閉・本文の依
       dom.posted.filter((message) => message.type !== "ready" && message.type !== "preview"),
       [],
     );
+    assertNoPreviewDuringTour(dom);
     assert.equal(dom.all('li.template[data-name="feature"][data-layer="self"].open').length, 0);
   } finally {
     await dom.close();
@@ -113,6 +122,7 @@ test("CB-D359 案内の間は見本を描き、実際のテンプレートは出
       dom.posted.filter((message) => message.type !== "ready" && message.type !== "preview" && message.type !== "tourDone"),
       [],
     );
+    assertNoPreviewDuringTour(dom);
   } finally {
     await dom.close();
   }
@@ -160,6 +170,7 @@ test("CB-D361 統合結果の案内は、見本の統合結果を選び、閉じ
       dom.posted.filter((message) => message.type !== "ready" && message.type !== "preview"),
       [],
     );
+    assertNoPreviewDuringTour(dom);
     dom.click(dom.one(`[data-action="tour-skip"]`));
     await dom.settle();
     assert.equal(dom.one<HTMLButtonElement>(`[data-tour="handoff"]`).disabled, false, "閉じたあと、入口が実際の状態に戻る");

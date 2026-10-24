@@ -1,5 +1,5 @@
 /**
- * テンプレート 1 件。見出しに名前・層・状態の札・説明を出し、開くと計画・フロー・本文の取り出しを出す。
+ * テンプレート 1 件。見出しに名前・層・状態の札・説明を出し、最初から開いていて、計画とフローの図・本文の取り出しを出す（畳める）。
  * 判定（使える・使われない・捨てた理由・読めない）は実行ファイルの答えのまま出す。
  */
 import { useEffect, type JSX } from "react";
@@ -22,7 +22,7 @@ export interface TemplateProps {
   readonly onShow: () => void;
   /** 案内が指す先にする（一覧の最初の 1 件だけ） */
   readonly tour: boolean;
-  /** 編集を始める。渡さなければ「編集」は出さない（読み取り専用の層・読めない行・案内の間） */
+  /** 編集を始める。渡さなければ「図を編集」は出さない（読み取り専用の層・読めない行・案内の間） */
   readonly onEdit?: () => void;
   /** 図の中身（実行ファイルに読ませた答え）。まだ読んでいなければ undefined。読めなかったときは `previewError` に理由 */
   readonly preview?: TemplateCheck | undefined;
