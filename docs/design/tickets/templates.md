@@ -237,7 +237,7 @@ Draft を外し済みの親には出さない。前者は `wip/` を消す手順
 
 ミラー先の `.ccnavi/config/common/templates/` は、単体 clone では `--templates` の共通として読まれる（共通の置き場は `settings.common_templates_dir`
 で、ワークスペースルートでもミラーでも同じ形）。ワークスペースの中では読まれず、ワークスペースルートの共通だけを読む（設定 3 本と同じ）。
-ミラーのサブディレクトリ（`templates/`）も、他のファイルと同じに比べて写す。空になった `templates/`
+ミラーのサブディレクトリ（`templates/`）も、他のファイルと同じように比べて写す。空になった `templates/`
 は、消したあとに片付ける。
 
 **導入 sh の配布。** `scripts/ccnavi-setup.sh` は設定 3 本（rules・risks・phases）とスクリプトと使い方の文書を配るが、`config/common/` のそれ以外は配らない
