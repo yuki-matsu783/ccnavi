@@ -104,6 +104,12 @@
   .col ul { font-size: clamp(12px, 2vh, 17px); gap: .3em; }
   .col li { font-size: inherit; line-height: 1.55; }
   @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(8px, 1.6vh, 16px); }
+  .col { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: clamp(8px, 1.6vh, 16px) clamp(10px, 1.6vw, 18px); min-width: 0; }
+  .col h4 { margin: 0 0 .3em; font-size: clamp(14px, 2.4vh, 20px); color: var(--accent); letter-spacing: .08em; }
+  .col ul { font-size: clamp(12px, 2vh, 17px); gap: .3em; }
+  .col li { font-size: inherit; line-height: 1.55; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
   .mini { width: 100%; height: auto; display: block; margin-bottom: 8px; }
   @media print {
     body { overflow: visible; height: auto; }
@@ -158,7 +164,7 @@
   <div class="tag">テーマ 1 / 指示が守られない</div>
   <h2>指示を緻密に書いても、希望どおりに動かない</h2>
   <svg class="fig" viewBox="0 0 800 190" role="img" aria-label="外れを検知してやり直させる" style="max-height:26vh"><rect class="b" x="10" y="50" width="120" height="60" rx="12"/><text class="t" x="70.0" y="76.0">指示</text><text class="tm" x="70.0" y="100.0">スキル</text><rect class="b" x="190" y="50" width="130" height="60" rx="12"/><text class="t" x="255.0" y="86.0">エージェント</text><rect class="ba" x="380" y="40" width="150" height="80" rx="12"/><text class="t" x="455.0" y="76.0">検知</text><text class="tm" x="455.0" y="100.0">hook</text><rect class="b" x="600" y="50" width="120" height="60" rx="12"/><text class="t" x="660.0" y="86.0">完了</text><path class="ln" d="M130 80 H187"/><path class="ln" d="M320 80 H377"/><path class="la" d="M530 80 H597"/><text class="tb" x="565" y="70">OK</text><path class="lw" d="M455 122 C455 160 255 160 255 114"/><text class="tw" x="355" y="178">外れ → ガイドして再実行</text></svg>
-  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>hello と尋ねたら answer.md に「こんにちは」と書くスキルでも、必ず従うとは限らない</li><li>LLM の答えは確率的。絶対にはならない</li><li>スキル自体が使われないこともある</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>外れを検知し、ガイドを添えてやり直させる</li><li>外れる確率が 1% の LLM でも、ほぼ希望どおりに動く</li><li>hook を作る手間を軽くする</li></ul></div><div class="col"><h4>HOW</h4><ul><li>判定と案内は、モデルの外の hook が行う</li><li>検知と案内はルールとして宣言する。hook を自作しない</li><li>起きた時点で、その場に案内する</li></ul></div></div>
+  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>hello と尋ねたら answer.md に「こんにちは」と書くスキルでも、必ず従うとは限らない</li><li>LLM の答えは確率的。絶対にはならない</li><li>スキル自体が使われないこともある</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>外れを検知し、ガイドを添えてやり直させる</li><li>外れる確率 1% の LLM でも、検知してやり直せば、3 回続けて外れる確率は 1% × 1% × 1% = 0.0001%。失敗し続ける確率はほぼ 0% に近づく</li><li>hook を作る手間を軽くする</li></ul></div><div class="col"><h4>HOW</h4><ul><li>判定と案内は、モデルの外の hook が行う</li><li>検知と案内はルールとして宣言する。hook を自作しない</li><li>起きた時点で、その場に案内する</li></ul></div></div>
 </section>
 
 <section class="slide">
