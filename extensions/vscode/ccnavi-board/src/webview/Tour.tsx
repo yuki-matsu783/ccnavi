@@ -109,7 +109,7 @@ export function boxOf(el: Element): Rect {
 /** 吹き出しの幅。狭い画面では画面の幅に合わせる（CSS の max-width） */
 const BUBBLE_WIDTH = 340;
 /** 画像のある手順の吹き出しの幅。画像の中の字が読める広さにする */
-const IMAGE_BUBBLE_WIDTH = 480;
+const IMAGE_BUBBLE_WIDTH = 760;
 
 /**
  * ツールバー（`<header className="toolbar">`）。左に画面ごとの中身（`children`）、右端に「?」（`TourButton`）を置く。

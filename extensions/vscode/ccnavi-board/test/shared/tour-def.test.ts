@@ -73,7 +73,7 @@ test("CB-T403 案内の YAML は、ファイル名の画面を指し、どれも
   }
 });
 
-test("CB-T1170 案内の手順が引く画像は、images/ に PNG があり、images.ts の表にある。表と置き場に使われない画像が残らない", () => {
+test("CB-T1177 案内の手順が引く画像は、images/ に PNG があり、images.ts の表にある。表と置き場に使われない画像が残らない", () => {
   const dir = path.join(TOURS_DIR, "images");
   const registry = fs.readFileSync(path.join(TOURS_DIR, "images.ts"), "utf8");
   const used = new Set<string>();
