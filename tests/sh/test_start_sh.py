@@ -751,6 +751,30 @@ class StartShTest(unittest.TestCase):
                 self.assertIn(f"ブランチ: {branch}（", done.stdout)
                 self.assertEqual(self.local_branches(), ["main"])
 
+    def test_a_long_title_stops_and_asks_for_a_short_slug(self):
+        """題が長くて slug が切れるときは、何も作らずに止め、短い --slug での打ち直しを案内する。
+
+        --slug を付ければ、同じ issue で進める。題が収まるときは止めない。
+        """
+        title = "テキスト整形CLI（main.sh）を README の仕様どおりに実装する"
+        self.github_new(title=title, branch="feature-152-text-formatter-cli")
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("題が長く", done.stderr)
+        next_lines = [x for x in done.stderr.splitlines() if x.startswith("次: ")]
+        self.assertEqual(len(next_lines), 1, done.stderr)
+        self.assertIn("--issue", next_lines[0])
+        self.assertIn("--slug <語>", next_lines[0])
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.remote_branches(), ["main"])
+        self.assertEqual(self.posts(), [])
+        # <語> のまま打っても断られる（誤った成果物を作らない）
+        placeholder = self.run_sh("--issue", "152", "--slug", "<語>")
+        self.assertEqual(placeholder.returncode, 2, placeholder.stdout + placeholder.stderr)
+        done = self.run_sh("--issue", "152", "--slug", "text-formatter-cli", "--dry-run")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("feature-152-text-formatter-cli", done.stdout)
+
     def test_an_unusable_identifier_stops_before_anything_is_made(self):
         """--slug で作る識別子が親に使えなければ（58 文字超・末尾が -2 桁）、何も作らずに止める。"""
         for slug, word in (("a" * 50, "長すぎる"), ("login-12", "末尾")):

@@ -181,13 +181,59 @@ def next_serial(
 def issue_slug(title: str, room: int = SUGGESTED_ID_LENGTH) -> str:
     """issue のタイトルから作る slug。英数字と日本語の字だけを残し、ほかは `-` にまとめる。
 
-    NFKC で全角英数を半角に、半角カナを全角にそろえ、ASCII の英字は小文字にする。
-    前後の `-` を除き、`room` 文字で切る。何も残らなければ空（呼び手が `EMPTY_SLUG` で埋める）。
+    NFKC で全角英数を半角に、半角カナを全角に、ASCII の英字は小文字にそろえる。前後の `-` を除く。
+    `room` 文字を超えるときは、語の区切り（`-`）で切り、入りきらない最後の語は落とす。最初の 1 語が
+    `room` を超えるときだけ、その語を `room` 文字で切る。日本語は語の区切りが `-` に出ないので、
+    区切りの無い長い題は 1 語として扱われ、落ちるか `room` 文字で切れる（短くしたいときは、
+    `ccnavi-start.sh` が `--slug` で人かエージェントに短い名前を付けさせる）。
+    何も残らなければ空（呼び手が `EMPTY_SLUG` で埋める）。
     """
     text = unicodedata.normalize("NFKC", title or "")
     text = "".join(c.lower() if c.isascii() else c for c in text)
     slug = _SLUG_DROP.sub("-", text).strip("-")
-    return slug[: max(room, 0)].rstrip("-")
+    room = max(room, 0)
+    if len(slug) <= room:
+        return slug
+    kept = ""
+    for word in slug.split("-"):
+        joined = f"{kept}-{word}" if kept else word
+        if len(joined) > room:
+            break
+        kept = joined
+    return (kept or slug[:room]).rstrip("-")
+
+
+def issue_identifier_parts(
+    number: int, title: str = "", project: str = "", prefix: str = DEFAULT_ISSUE_PREFIX
+) -> tuple[str, bool]:
+    """`issue_identifier` の答えと、題が長くて slug を短くしたか。
+
+    短くしたかは、`issue_slug` が `room` に収めるために落とした（題から作った slug より短くなった）
+    ことを指す。末尾の `-<2 桁>` を除いただけなら偽。
+    `ccnavi-start.sh` はこれが真のとき、題から作った名前で進めず、短い `--slug` を付けさせる。
+    題から何も残らず `EMPTY_SLUG` にしたときは偽。
+    """
+    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+        raise ValueError(f"issue の番号は正の整数: {number!r}")
+    if project and not _NAME.match(project):
+        raise ValueError(f"プロジェクト名が識別子の形でない: {project!r}")
+    if not isinstance(prefix, str) or not settings.is_branch_prefix(prefix):
+        raise ValueError(f"先頭の語が形に合わない: {prefix!r}")
+    head = f"{prefix}-{number}-" + (f"{project}-" if project else "")
+    title = title if isinstance(title, str) else ""
+    slug = issue_slug(title, SUGGESTED_ID_LENGTH - len(head))
+    full = issue_slug(title, len(title) * 2 + 1)
+    shortened = len(slug) < len(full)
+    ident = head + slug
+    while slug and _CHILD_TAIL.search(ident):
+        slug = slug[:-3].rstrip("-")
+        ident = head + slug
+    if not slug:
+        ident = head + EMPTY_SLUG
+    problem = id_problem(ident)
+    if problem:
+        raise ValueError(f"issue から識別子を作れない: {problem}")
+    return ident, shortened
 
 
 def issue_identifier(
@@ -199,31 +245,15 @@ def issue_identifier(
     （`issue_slug`）。プロジェクトの issue なら slug の頭に `<プロジェクト名>-` を付ける
     （`feature-12-web-<slug>`。issue の番号はリポジトリごとなので、ワークスペースや
     別のプロジェクトの同じ番号の issue と名前を分ける）。
-    タイトルから何も残らなければ slug は `issue`。全体は `SUGGESTED_ID_LENGTH` 文字に収める。
+    タイトルから何も残らなければ slug は `issue`。全体は `SUGGESTED_ID_LENGTH` 文字に収め、
+    超えるときは slug を語の区切り（`-`）で切る（`issue_slug`）。
     末尾が `-<2 桁>` になるときは、その部分を除く（`-<2 桁>-<2 桁>` なら子の識別子そのもの、
     `-<2 桁>` だけでも子の識別子の途中の `<親>-<フェーズ番号>` と紛れる。lint の warn にヒットしない
     名前にする）。
     「issue → 識別子」はこの 1 つだけで、Chrome 拡張も Pyodide の上でこれを呼ぶ。
     番号が正の整数でないか、プロジェクト名が形に合わなければ ValueError。
     """
-    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
-        raise ValueError(f"issue の番号は正の整数: {number!r}")
-    if project and not _NAME.match(project):
-        raise ValueError(f"プロジェクト名が識別子の形でない: {project!r}")
-    if not isinstance(prefix, str) or not settings.is_branch_prefix(prefix):
-        raise ValueError(f"先頭の語が形に合わない: {prefix!r}")
-    head = f"{prefix}-{number}-" + (f"{project}-" if project else "")
-    slug = issue_slug(title if isinstance(title, str) else "", SUGGESTED_ID_LENGTH - len(head))
-    ident = head + slug
-    while slug and _CHILD_TAIL.search(ident):
-        slug = slug[:-3].rstrip("-")
-        ident = head + slug
-    if not slug:
-        ident = head + EMPTY_SLUG
-    problem = id_problem(ident)
-    if problem:
-        raise ValueError(f"issue から識別子を作れない: {problem}")
-    return ident
+    return issue_identifier_parts(number, title, project, prefix)[0]
 
 
 def branch_to_id(branch: str) -> str:

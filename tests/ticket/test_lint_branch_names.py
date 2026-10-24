@@ -164,6 +164,48 @@ class BranchNameRulesTest(unittest.TestCase):
         self.assertEqual(1, len(found), found)
         self.assertIn("48 文字を超える", found[0])
 
+    def test_issue_slug_cuts_at_the_hyphen(self):
+        title = "テキスト整形CLI（main.sh）を README の仕様どおりに実装する"
+        # 入りきらない最後の語は落とす。語の途中（「実装す」）では切らない
+        self.assertEqual(
+            "feature-41-テキスト整形cli-main-sh-を-readme",
+            ticket_ids.issue_identifier(41, title),
+        )
+        word = "Add retry to the HTTP client when the server returns 503"
+        self.assertEqual(
+            "feature-41-add-retry-to-the-http-client-when-the",
+            ticket_ids.issue_identifier(41, word),
+        )
+        self.assertEqual("add-retry", ticket_ids.issue_slug(word, 10))
+        # 最初の 1 語が入りきらないときだけ、その語を上限で切る（失敗しない）
+        one = "あ" * 60
+        self.assertEqual("あ" * 5, ticket_ids.issue_slug(one, 5))
+        ident = ticket_ids.issue_identifier(7, one)
+        self.assertEqual("feature-7-" + "あ" * 38, ident)
+        self.assertTrue(ticket_ids.is_valid_id(ident))
+        # 収まる題はそのまま。番号だけ・記号だけは従来どおり
+        self.assertEqual("add-retry", ticket_ids.issue_slug("Add retry", 48))
+        self.assertEqual("", ticket_ids.issue_slug("！？", 48))
+        self.assertEqual("feature-2-issue", ticket_ids.issue_identifier(2, "！？"))
+        self.assertEqual("feature-4-issue", ticket_ids.issue_identifier(4, "07"))
+        # 切った結果の末尾が `-<2 桁>` なら、従来どおり削る
+        tail = "a" * 33 + " 12 tail"
+        self.assertEqual("feature-5-" + "a" * 33, ticket_ids.issue_identifier(5, tail))
+
+    def test_issue_identifier_parts_says_when_the_slug_was_cut(self):
+        title = "テキスト整形CLI（main.sh）を README の仕様どおりに実装する"
+        self.assertEqual(
+            ("feature-41-テキスト整形cli-main-sh-を-readme", True),
+            ticket_ids.issue_identifier_parts(41, title),
+        )
+        self.assertEqual(
+            ("feature-41-login-form", False), ticket_ids.issue_identifier_parts(41, "Login form")
+        )
+        # 空の題・記号だけ・末尾の `-<2 桁>` を除いただけでは、短くしたと言わない
+        for text in ("", "！？", "release 01", "07"):
+            with self.subTest(title=text):
+                self.assertFalse(ticket_ids.issue_identifier_parts(3, text)[1])
+
     def test_issue_identifier(self):
         self.assertEqual("feature-12-issue", ticket_ids.issue_identifier(12))
         self.assertEqual(
@@ -185,7 +227,7 @@ class BranchNameRulesTest(unittest.TestCase):
         # 子の形（`-<2 桁>`）で終わらせない
         self.assertEqual("feature-3-release", ticket_ids.issue_identifier(3, "release 01"))
         self.assertEqual("feature-4-issue", ticket_ids.issue_identifier(4, "07"))
-        # 長いタイトルは 48 文字で切る
+        # 長いタイトルは 48 文字に収める
         long = ticket_ids.issue_identifier(5, "word " * 40)
         self.assertLessEqual(len(long), ticket_ids.SUGGESTED_ID_LENGTH)
         self.assertFalse(long.endswith("-"))
