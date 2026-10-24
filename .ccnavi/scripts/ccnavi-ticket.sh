@@ -315,6 +315,11 @@ ensure_child_worktree() {
 # MR の有無はホストの事柄でエージェントは調べられないので、決めるのはユーザ。
 ticket_unsent_parent_next() {
 	[ -n "${ccnavi_wap_unsent_parent:-}" ] || return 0
+	# 次の手は、手で切った親が最初に打つ propose・start のためのもの。ほかの操作は事実の文だけにする
+	case "${1:-}" in
+	start | propose) ;;
+	*) return 0 ;;
+	esac
 	tup_mr="<MR の番号>"
 	[ -z "${ccnavi_pi_mr:-}" ] || tup_mr="$ccnavi_pi_mr"
 	tup_b="$ccnavi_wap_branch"
@@ -383,7 +388,7 @@ start | finish | cancel | propose | consolidate)
 		# 取り消しは事前確認しない（ホストに届かない・権限が足りないときでも、取り消せるようにする）
 		[ "$1" = cancel ] || ticket_preflight || exit 1
 		ccnavi_wap_begin || {
-			ticket_unsent_parent_next
+			ticket_unsent_parent_next "$1"
 			exit 1
 		}
 		# 子の finish は、親のブランチへ合流してから push する。合流してよいかをここで確かめる。

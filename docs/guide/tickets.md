@@ -289,7 +289,10 @@ sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152 
 
 終了コード 0 で終わったら、採用した MR と、その MR が閉じる issue と、元ブランチが確定している。出力の「必須」の行の `issue:` と `mr:` を提案に書く。どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める。
 候補が複数あるときは、エージェントが一覧を見せて「既存のブランチで続ける・新しく `<先頭の語>-<番号>-<slug>` を切る・やめる」を聞くので、答える。
-終了コード、ホストに届かないときの MCP での代行、`projects/<名前>` の依頼（`--repo`）、候補の探し方は [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md) と [設計 9.13](../design/tickets/branch-lookup.md)。
+`--issue` だけで来て、紐づく open の MR がすでにあり、この PC にそのブランチのワークツリーが無いときも、他の PC や他のセッションの作業かもしれないので、エージェントが聞く。続けるなら `--issue <番号> --mr <MR の番号>` で打ち直す（自分の作業の再開は聞かない）。
+
+issue がまだ無いときは、エージェントが `ccnavi-start.sh --new-issue <題>` で issue を作ってから進む。作る前に、題の似た open の issue・MR（題の 2 文字組の一致率 0.5 以上）を確かめ、あれば作らずに一覧を見せて、同じ作業かを聞く。似たものが無くても、haiku のサブエージェントが open の issue・MR の一覧（`--list-open`）を読んで意味の近いものを探し、該当が無いと分かってから作る。別の作業だと答えたときは、エージェントが `--similar-checked` を付けて打ち直す。ホストに届かず作れないときは、GitHub は MCP で、GitLab はユーザが issue を作って番号を伝える。
+終了コード、ホストに届かないときの代行（GitHub は MCP、GitLab はユーザが確かめる）、`projects/<名前>` の依頼（`--repo`）、候補の探し方は [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md) と [設計 9.13](../design/tickets/branch-lookup.md)。
 
 ## プロジェクトのスキル
 

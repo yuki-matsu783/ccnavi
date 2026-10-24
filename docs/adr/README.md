@@ -265,3 +265,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0156](0156-review-operation-state-and-guidance-fixes.md) | レビュー運用の状態遷移と案内の修正（ホストの分類・依頼コメントへの返信・案内の出し分け）をまとめて出す |
 | [0157](0157-feedback-plan-approval-does-not-settle-the-review.md) | フィードバック計画の承認でレビューの状態を変えず、issue に回すをいつでも選べるようにする |
 | [0160](0160-ticket-work-is-issue-mr-pair-with-preflight.md) | チケット作業を issue と MR のセットに限り、入口でホストの API と git のリモートの使える状態を確かめる |
+| [0161](0161-agent-creates-issue-with-similarity-check.md) | issue が無いとき、エージェントが似た issue・MR を確かめてから issue を作って進める |

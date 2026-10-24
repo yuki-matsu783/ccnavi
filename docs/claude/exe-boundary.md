@@ -47,7 +47,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   | どこ | 3 | 4 |
   |---|---|---|
   | 実行ファイル | `EXIT_ANSWER_NO`（問われたことへの「いいえ」。`--agree --preview --verify`） | `EXIT_PARTIAL`（`user agree` だけ。承認済みチケットを一部だけ置いて止まった） |
-  | `ccnavi-start.sh` | 候補が複数（何も作らない） | `EXIT_HOST`（ホストに届かず、MCP などで代行が要る） |
+  | `ccnavi-start.sh` | `EXIT_MULTI`（候補が複数・MR の無い候補・ワークツリーの無い既存の MR・似た issue・MR・意味が近いかの確認待ち。何も作らず、ユーザに聞く） | `EXIT_HOST`（ホストに届かず、代行が要る。GitHub は MCP、GitLab はユーザが確かめる） |
   | `ccnavi-worktree.sh` | `EXIT_CONFIRM`（確認が要る。何も切らず、ユーザの了承を待つ） | —（origin に届かなくても止めず、リモート未確認として 3 で確認を求める） |
   | `ccnavi-git.sh` | —（拒否はすべて 2。前提の未充足を 1 で返す区別はしない） | — |
   | `ccnavi-review.sh merged` | `unknown`（MR がマージ済みかを確かめられない） | — |

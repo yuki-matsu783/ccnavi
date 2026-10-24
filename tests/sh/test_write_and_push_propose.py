@@ -78,6 +78,33 @@ class ProposeTest(WriteAndPushHarness):
         self.assertEqual(self.remote_sha("i0002"), "")
         self.assertFalse(os.path.exists(os.path.join(self.state, "locks", "self", "i0002")))
 
+    def test_start_on_a_parent_never_pushed_stops_with_the_options(self):
+        tree = os.path.join(self.ws, ".claude", "worktrees", "i0003")
+        git(self.ws, "worktree", "add", "-q", tree, "-b", "i0003", "main")
+        write(
+            os.path.join(tree, *f"{self.TODO}/i0003.md".split("/")),
+            parent_text("i0003", ["design"], allow=("src/*", "wip/*")),
+        )
+        before = self.sha(tree, "HEAD")
+        result = self.sh("ccnavi-ticket.sh", "start", "i0003", cwd=tree, **self.host_env({}))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("親のブランチ i0003 はリモートにありません", result.stderr)
+        self.assertIn("次の手: ユーザに状況を伝えて", result.stderr)
+        self.assertNotIn("bad revision", result.stderr)
+        self.assertEqual(self.sha(tree, "HEAD"), before)
+
+    def test_other_operations_on_a_parent_never_pushed_say_only_the_fact(self):
+        tree = os.path.join(self.ws, ".claude", "worktrees", "i0004")
+        git(self.ws, "worktree", "add", "-q", tree, "-b", "i0004", "main")
+        write(
+            os.path.join(tree, *f"{self.TODO}/i0004.md".split("/")),
+            parent_text("i0004", ["design"], allow=("src/*", "wip/*")),
+        )
+        result = self.sh("ccnavi-ticket.sh", "finish", "i0004", cwd=tree, **self.host_env({}))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("親のブランチ i0004 はリモートにありません", result.stderr)
+        self.assertNotIn("次の手: ユーザに状況を伝えて", result.stderr)
+
     def test_other_families_and_template_drafts_stay_out(self):
         mine = self.put(f"{self.TODO}/{PARENT}.md")
         other = self.put(f"{self.TODO}/i0002.md")
