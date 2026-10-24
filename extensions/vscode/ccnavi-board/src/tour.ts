@@ -59,13 +59,18 @@ export function forceTour(screen: string): void {
   forced.add(screen);
 }
 
-async function openScreen(screen: string): Promise<void> {
+/** 基本の案内を動かせる画面を開く。開けない画面（案内の入口が無い）は false */
+async function openScreen(screen: string): Promise<boolean> {
   const open = screens();
   if (screen === "projects") {
     await open.projects();
-  } else if (screen === "board") {
-    await open.board();
+    return true;
   }
+  if (screen === "board") {
+    await open.board();
+    return true;
+  }
+  return false;
 }
 
 function openNext(): void {
@@ -74,7 +79,14 @@ function openNext(): void {
     return;
   }
   forceTour(next);
-  void openScreen(next);
+  void openScreen(next).then((opened) => {
+    // 開けない画面で止まらず、次へ進む
+    if (!opened && chain[0] === next) {
+      forced.delete(next);
+      chain.shift();
+      openNext();
+    }
+  });
 }
 
 /**

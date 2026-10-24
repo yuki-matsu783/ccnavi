@@ -82,7 +82,7 @@
       },
       {
         "command": "ccnaviBoard.tourBasics",
-        "title": "ccnavi ボード: 基本の案内を続けて見る（プロジェクト管理とチケット管理）"
+        "title": "ccnavi ボード: 基本の案内を続けて見る（プロジェクト管理 → チケット管理。チケット制御が無効ならプロジェクト管理だけ）"
       },
       {
         "command": "ccnaviBoard.tourProjects",
@@ -205,7 +205,8 @@
             "description": "チケットのカンバンと、承認・レビューの進め方を見ます。画面の吹き出しの案内で基本を説明します。\n[チケット管理の基本の案内を見る](command:ccnaviBoard.tourBoard)",
             "media": {
               "markdown": "media/tour/board.md"
-            }
+            },
+            "when": "ccnaviBoard.ticketControl == 'enable'"
           },
           {
             "id": "ccnaviBoard.tour.basics",
