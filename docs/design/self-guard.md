@@ -32,7 +32,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 
 ### 8.2 止める側
 
-`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す（`selfguard_shell.add_rules`）。そのあとに、名前で書くツールの 4 本（下）を挿す（`selfguard_shell.add_named_rules`）。これとは別に、チケット制御が有効な間は、承認済みの置き場（`.ccnavi/approved/` の下すべて）と操作記録の置き場（`logs/state/ops/`）への書き込みを止める組み込みの関門（`ticket_guard.gate_rules`）を足す。関門は `CCNAVI_GUARD_CORE_FILES` の値にも `dry-run` にも依らず止める。承認済みの置き場は、チケット制御の保護として扱う。チケット制御が有効な間は自己防衛の値に依らず、実行前は拒否し（`builtin:ticket-approved`。文面は承認の経路・`status`・`finish`・`propose` を案内する）、実行後は未コミットの変更を検知する。実行後の保護範囲には、同じ式と文面の 1 本（`ticket_guard.approved_write_rule`。シェル版は要らない）を `events.watched_for` が足す。復元は `CCNAVI_RESTORE_IF_DENY` の実効値が `enable` のときだけ。ccnavi のスクリプトによる正規の書き込みは、コマンド名ではなく変更の中身の形で外れる（`post_findings._script_writes`、ADR-0075）。コミット済みの変更の `Stop` での報告は対象外で（`post._committed_findings` がチケットの置き場のコミット済みの変更を一律に外す）、MR のレビューで確かめる。チケット制御を `disable` にすると、実行後の保護は外れる（実行前は、自己防衛が有効なら `builtin:guard-project-home` が止める）。
+`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す（`selfguard_shell.add_rules`）。そのあとに、名前で書くツールの 4 本（下）を挿す（`selfguard_shell.add_named_rules`）。これとは別に、チケット制御が有効な間は、承認済みの置き場（`.ccnavi/approved/` の下すべて）と操作記録の置き場（`logs/state/ops/`）への書き込みを止める組み込みの関門（`ticket_guard.gate_rules`）を足す。関門は `CCNAVI_GUARD_CORE_FILES` の値にも `dry-run` にも依らず止める。承認済みの置き場は、チケット制御の保護として扱う。チケット制御が有効な間は自己防衛の値に依らず、実行前は拒否し（`builtin:ticket-approved`。文面は承認の経路・`status`・`finish`・`propose` を案内する）、実行後は未コミットの変更を検知する。実行後の保護範囲には、同じ式と文面の 1 本（`ticket_guard.approved_write_rule`。シェル版は要らない）を `events.watched_for` が足す。復元は `CCNAVI_RESTORE_IF_DENY` の実効値が `enable` のときだけ。ccnavi のスクリプトによる正規の書き込みは、コマンド名ではなく変更の中身の形で外れる（`post_findings._script_writes`）。コミット済みの変更の `Stop` での報告は対象外で（`post._committed_findings` がチケットの置き場のコミット済みの変更を一律に外す）、MR のレビューで確かめる。チケット制御を `disable` にすると、実行後の保護は外れる（実行前は、自己防衛が有効なら `builtin:guard-project-home` が止める）。
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
@@ -121,7 +121,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 `builtin:guard-project-home` より先にこちらが当たる。期待する判定（`rule-expectations.yml`）は 3 本に入らず、既定の置き場なら
 `builtin:guard-project-home` が止める。
 
-生の git（`builtin:guard-raw-git`）: いつも、生の git を組み込みで止める（9.1）。ラッパーがあればその打ち方を文面で名指しする（ADR-0131）。
+生の git（`builtin:guard-raw-git`）: いつも、生の git を組み込みで止める（9.1）。ラッパーがあればその打ち方を文面で名指しする。
 ラッパーの中のチケット制御の可否を、ラッパーの外から打つ git で外させないためで、ガード自身を守る組み込みに数える（P4）。
 `CCNAVI_GUARD_CORE_FILES` では切れず、チケット制御（`CCNAVI_TICKET_CONTROL`）を切ると外れる。
 
@@ -136,10 +136,10 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 | 書いたとおりのパスか、居場所（payload の cwd から `cd` を追った先）で解いた絶対パスに、`builtin:guard-setting-files` の場所の式が当たる | シェルの書き込みと同じ場所を、同じ式で見る。実行ファイル・動かした ccnavi ディレクトリ・共通レイヤーもそこに入っている |
 | 守る場所を中に含むディレクトリ（ワークスペースルート・実行ファイル・共通レイヤー・記録と state・プロジェクトの置き場の上と、`.ccnavi`・`.claude`・`.git` を直に、または 1 つ下に持つディレクトリ） | `restore --source <ref> -- .` や `rm -r projects` で中身ごと戻す・消す |
 | `:` で始まる pathspec、グロブの前に固定のディレクトリが無い指定、`--pathspec-from-file`（省略形も） | 当たる先を読みで決められない。git の pathspec のグロブは `/` もまたぐ |
-| 対象を読み切れない形。変数・置換で組み立てたパス、居場所の読めない `cd` / `pushd` の後の相対パス、走査が読み切れないコマンド行 | 共通ルールの allow（`*ccnavi-git.sh*`）が生の文字列に当たるので、ここで止めないと確認に落ちずに通る（ADR-0121 の追記） |
+| 対象を読み切れない形。変数・置換で組み立てたパス、居場所の読めない `cd` / `pushd` の後の相対パス、走査が読み切れないコマンド行 | 共通ルールの allow（`*ccnavi-git.sh*`）が生の文字列に当たるので、ここで止めないと確認に落ちずに通る |
 | 承認済みチケットの置き場（`.ccnavi/approved/` とその下） | 置き場を動かすのはユーザと ccnavi のスクリプト。文面は「ユーザに依頼する」。レビュー済みのマーカーを消す `rm` はユーザが端末で打つ手順なので、sh は通す |
-| レビュー待ちの置き場（`wip/proposals/review/` とその下。提案の置き場の設定に従う）と、置き場に何かがある間のその親（`wip/`・`wip/proposals/`） | 承認済みチケットの置き場と同じ扱い。文面は「レビュー待ちの提案を外すのはユーザに依頼する」。sh は `rm` を通し、過去の中身に戻す形は前からの置き場の検査が止める。空の置き場の親を消す形（親を閉じた後の案内の `rm -r wip`）は通す。親を過去の中身に戻す形（`restore --source <ref> wip`・`checkout <ref> -- wip`）は空でも当てる（ADR-0121 の追記） |
-| ラッパーの名前があるのに、サブコマンドが文字どおりの語でない形（`$S`・`$(echo rm)`・`r?`）、標準入力から読むシェル（`bash --norc`・`--rcfile <値>`・`-o pipefail`・`-O extglob` のようなオプションを前に置いた形と、`env sh`・`command sh` を含む）に流す文字列の中の名前、走査が読み切れず名前の直後に文字どおりのサブコマンドが無い形（`… \| xargs sh …ccnavi-git.sh`） | 共通ルールの allow（`*ccnavi-git.sh*`）は名前があるだけで当たるので、読めない形を確認に落とせない（ADR-0121 の再レビューの追記。`CDPATH`・別の言語の中・`xargs` の値・オプションの変数は限界として 12.1 に書く） |
+| レビュー待ちの置き場（`wip/proposals/review/` とその下。提案の置き場の設定に従う）と、置き場に何かがある間のその親（`wip/`・`wip/proposals/`） | 承認済みチケットの置き場と同じ扱い。文面は「レビュー待ちの提案を外すのはユーザに依頼する」。sh は `rm` を通し、過去の中身に戻す形は前からの置き場の検査が止める。空の置き場の親を消す形（親を閉じた後の案内の `rm -r wip`）は通す。親を過去の中身に戻す形（`restore --source <ref> wip`・`checkout <ref> -- wip`）は空でも当てる |
+| ラッパーの名前があるのに、サブコマンドが文字どおりの語でない形（`$S`・`$(echo rm)`・`r?`）、標準入力から読むシェル（`bash --norc`・`--rcfile <値>`・`-o pipefail`・`-O extglob` のようなオプションを前に置いた形と、`env sh`・`command sh` を含む）に流す文字列の中の名前、走査が読み切れず名前の直後に文字どおりのサブコマンドが無い形（`… \| xargs sh …ccnavi-git.sh`） | 共通ルールの allow（`*ccnavi-git.sh*`）は名前があるだけで当たるので、読めない形を確認に落とせない（`CDPATH`・別の言語の中・`xargs` の値・オプションの変数は限界として 12.1 に書く） |
 | `checkout -- <パス>`（起点の無い、索引の中身に戻す形） | sh はこの形を通さない。文面は sh と同じく `restore <パス>` を名指しで使うよう案内する |
 
 通すのは、索引の中身に戻す `restore`（`--staged`、衝突を解く `--ours` / `--theirs`）と、何も消さない `rm -n` / `--dry-run`（後ろに `--no-dry-run` があれば、git と同じく消す形として見る）。

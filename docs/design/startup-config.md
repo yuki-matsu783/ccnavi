@@ -204,13 +204,11 @@ sh の探し方: `here=${0%/*}`（`$0` に `/` が無ければ `.`）から `bin
 hook は sh を直に起動するので、sh に実行ビットが要る。ccnavi のリポジトリでは追跡するモードを 100755 にする。配布先では
 導入スクリプトが付け、付いていなければ `--lint` が error で言う（10 章）。
 
-ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse HEAD`（未コミットの変更があれば `-dirty` を付ける）を
-`build/stamp/ccnavi_buildinfo.py` に書き、PyInstaller に一緒にバンドルさせる（`--version` の `commit`。パッケージの外に置く）。次に PyInstaller の出力を `dist/ccnavi/` に入れ替え、`dist/ccnavi.target` を
-書いたあと、`install()` で `dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする（`dist/` は導入スクリプトの配布元で、
-代わりに通る sh が env の無いときに探す先でもあるので残す）。隣の `<os>-<arch>.new` にコピーし切ってから `_swap` で入れ替える。
-`_swap` は置き場を `.old` へ退避してから新しいほうを移す（Windows でも走っている実行ファイルの名前は変えられる。付録 C）。
-失敗したら 0.3 秒おきに 5 回までやり直し、やり直しきれなければ `.old` を置き場に戻してから投げる。`install()` が失敗したら
-`build.py` は 1 を返し、`dist/` は新しく、`.ccnavi/bin/<os>-<arch>/` は前のまま、と言う。
+ccnavi のリポジトリでの組み立て: `build.py` が PyInstaller の出力を `dist/ccnavi/` に作り、それを `.ccnavi/bin/<os>-<arch>/` へコピーする。
+`dist/` は導入スクリプトの配布元で、代わりに通る sh が env の無いときに探す先でもあるので残す。
+コピーは隣の `<os>-<arch>.new` に済ませてから入れ替える。入れ替えに失敗したら `.ccnavi/bin/<os>-<arch>/` は前のままで、`build.py` は 1 を返し、
+`dist/` は新しく置き場は前のまま、と言う。組み立ての順序、入れ替えのやり直し、`--version` の `commit` に埋める値の取り方は `build.py` の説明に書いてある。
+Windows でも走っている実行ファイルの名前は変えられる（付録 C）ので、入れ替えは名前の変更で行う。
 
 - rename 2 回の間（数 ms）に来た hook は sh が 127 で終わり、その 1 回は判定が走らない
 - ワークツリーで組み立てるとコピー先はそのワークツリーの `.ccnavi/bin/` なので、走っている hook（ワークスペースルートの sh）は変わらない
