@@ -235,10 +235,10 @@ GitLab の実物で分かったこと。
 | 確かめたこと | 結果 |
 |---|---|
 | `CLAUDE_CODE_SESSION_ATTENDED` の値 | 親の対話セッションが `1` のとき、その子の `claude -p`（`--output-format stream-json` でも同じ）は `0`。親の値の継承ではなく、`-p` の起動で Claude Code が設定する |
-| `CLAUDE_CODE_ENTRYPOINT` の値 | 親の環境に値があると `-p` でも親の値が残る（親が `remote_desktop` なら子も同じ）。外して `-p` を起動すると `sdk-cli` |
+| `CLAUDE_CODE_ENTRYPOINT` の値 | 親の環境に値があると `-p` でも親の値が残る（親が `remote_desktop` なら子も同じ）。外して `-p` で起動すると `sdk-cli` |
 | SessionStart の payload | `session_id`・`transcript_path`・`cwd`・`scratchpad_dir`・`hook_event_name`・`source` だけ。対話かどうかの欄はない |
 | hook の標準入力・標準出力 | `-p` の実行で、どちらも tty でない |
-| 背景の Bash | 75 秒の待ちは 83 秒で終わり、成果ファイルができた。660 秒の待ちは、途中で Bash の timeout にかかってモデルが延ばして起動し直し、全体で 21 分かけて完了した。どちらも `-p` は完了まで待った |
+| 背景の Bash | 75 秒の待ちは 83 秒で終わり、成果ファイルができた。660 秒の待ちは、途中で Bash の timeout にかかったため、モデルが timeout を延ばして起動し直し、全体で 21 分かけて完了した。どちらも `-p` は完了まで待った |
 | 背景のサブエージェント（60 秒の作業） | 2 回とも 17〜21 秒で終了し、成果は残らなかった。メインが「完了通知を待つ」と言ってターンを終えた時点で、プロセスが終わった |
 | 前景のサブエージェント（45 秒の作業） | 57 秒かけて完了まで待ち、成果ファイルができ、結果の報告まで返った |
 
