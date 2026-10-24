@@ -5,7 +5,7 @@ description: 会話が閾値より大きく育ったまま放置されたら、�
 tags: [settings, distribution]
 keywords: [引き継ぎ, プロンプトキャッシュ, 放置, asyncRewake, Stop, UserPromptSubmit, CCNAVI_HANDOFF_SUGGEST_TOKENS, ccnavi-idle.sh, idle, scratchpad, 基準, 刻み]
 ---
-# ADR-0165: 大きな会話の放置は、キャッシュが切れる前に引き継ぎ文書を書かせる
+# ADR-0167: 大きな会話の放置は、キャッシュが切れる前に引き継ぎ文書を書かせる
 
 状態: 採用
 

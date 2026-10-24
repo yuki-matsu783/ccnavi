@@ -6,7 +6,6 @@ post から分けた。post を読まない。
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from ..infra import fsio, gitcmd, gitstate, pathcase, tree
@@ -57,13 +56,6 @@ def codes_note(found: list[Finding]) -> str:
     counts = {c: sum(1 for f in found if f.code == c) for c in CODE_ORDER}
     shown = [f"{c} {n}" for c, n in counts.items() if n]
     return "codes " + ", ".join(shown) if len(shown) > 1 else ""
-
-
-def _spelled(change: gitstate.Change, top: str) -> str:
-    """変更の、リンクを解く前の絶対パス。ツリーのルートが分からなければ解いた先。"""
-    if not top or not change.path:
-        return change.full
-    return os.path.join(top, change.path.replace("/", os.sep))
 
 
 @dataclass
@@ -215,7 +207,6 @@ def _findings(
     where: tree.Tree,
     top: str = "",
     places: tuple[str, str] = ("", ""),
-    synced: Callable[..., bool] | None = None,
     root: str = "",
 ) -> list[Finding]:
     """変更のうち、報告すべきものを返す。
@@ -245,12 +236,6 @@ def _findings(
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
             continue
         if change.full in script:
-            continue
-        # 着手のときに共通レイヤーをミラーした分（`configsync.is_synced_write`）。
-        # 置き場・パスの途中のリンク・内容で見分け、読めないものは外さない。渡すのは解く前のパス。
-        # 解いた先で答えると、設定を別のコピーへのシンボリックリンクに差し替えた形が、
-        # 指す先の中身で外れる。
-        if synced is not None and synced(_spelled(change, top or tree_root)):
             continue
         group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
         if group:

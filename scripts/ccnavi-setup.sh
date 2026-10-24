@@ -139,7 +139,7 @@ DEPLOY_DOCS_DIR=".ccnavi/docs"
 DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # 共通の工程スキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true` を持つ
 # スキルだけを配る（.ccnavi/docs/skill-processes.md）。配るのは SKILL.md と references/common/ の下の .md。
-# references/project/ は配布元固有の事情なので配らない。親チケットの着手は、ワークスペースのこの置き場から
+# references/project/ は配布元固有の事情なので配らない。ユーザの発言のときの同期は、ワークスペースのこの置き場から
 # プロジェクトの skills/<工程>/ へ写すので、配布先のワークスペースに無いと写す元が無い。
 # commit や yomiyasu のような `process: true` を持たないスキルは、配布元固有の手順や外部の取り込みなので配らない。
 # 配布元に置き場が無い、または該当するスキルが 1 つも無いのは正常で、何も言わずに飛ばす。
@@ -529,7 +529,7 @@ skills_skipped=""
 skills_blocked=""
 
 # 配布元のスキルが、frontmatter に `process: true` を持つか。先頭の `---` から閉じの `---` までの
-# 間に、その 1 行（行末の `# コメント`は可）があるものだけを当てる。親チケットの着手が写す判定
+# 間に、その 1 行（行末の `# コメント`は可）があるものだけを当てる。ユーザの発言のときの同期が写す判定
 # （src/ccnavi/tickets/skillsync.py の _process_flag）に寄せてある。CRLF の改行と、`---` の前後の空白は
 # 許し、閉じの `---` が無いもの、BOM 付き、文字列の "true"、本文だけにあるものは当てない。
 # SKILL.md 自体がリンクのものは、skillsync と同じく当てない。
@@ -840,7 +840,7 @@ if [ -n "$deploy" ]; then
 			set -f
 			for skill_file in $skill_files; do
 				skill_rel="$skill_name/$skill_file"
-				# 配るのは .md だけ（親チケットの着手が写すものと同じ）。.DS_Store や ccnavi-index.jsonl のような
+				# 配るのは .md だけ（ユーザの発言のときの同期が写すものと同じ）。.DS_Store や ccnavi-index.jsonl のような
 				# 生成物は配らない。名前の範囲はスキルのディレクトリ名と同じで、外れるファイルは、
 				# 単語分割や glob で配布を半端に止めるので配らない。
 				case "$skill_rel" in
@@ -2063,7 +2063,7 @@ IFS='
 set -f
 for skill_rel in $skills_all; do
 	if [ ! -f "$root/$DEPLOY_SKILLS_DIR/$skill_rel" ]; then
-		note_missing "${DEPLOY_SKILLS_DIR}/${skill_rel}（共通の工程スキル。親チケットの着手がプロジェクトへ写す元）"
+		note_missing "${DEPLOY_SKILLS_DIR}/${skill_rel}（共通の工程スキル。ユーザの発言のときの同期がプロジェクトへ写す元）"
 	fi
 done
 set +f

@@ -31,7 +31,6 @@ from ..tickets import (
     branchfind,
     core,
     review,
-    skillsync,
     user_only,
     via,
     write_and_push,
@@ -374,7 +373,6 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--record-writes", default="")
     # 一覧の基点（write-and-push の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
     # 置き場の外に書いたら error
-    # （例外は `start` の中で configsync が写したミラーと、skillsync が写した工程スキルだけ）。
     parser.add_argument("--record-tree", default="")
     # 対話の decide の前半。選択とダイジェストをこのファイルに書くだけで、
     # 何も置かない（state の置き場の
@@ -577,11 +575,8 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
 
     write-and-push がコミットするのは状態だけ。
 
-    例外は 2 つ。`ticket start` の中で configsync がミラーしたプロジェクトの
-    `.ccnavi/config/common/`と skillsync が写した工程スキルの `skills/<工程>/`
-    （どちらも `skillsync.is_synced_write` が内容で読めるもの）と、`review ready` が
-    消した途中の作業の置き場（`wip/`）のファイル（消したもの、つまり今は無いものだけ。
-    `review.remove_wip` が追跡済みのものだけを消す）。
+    例外は `review ready` が消した途中の作業の置き場（`wip/`）のファイル（消したもの、
+    つまり今は無いものだけ。`review.remove_wip` が追跡済みのものだけを消す）。
     """
     conf, _ = settings.load(root)
     cli_args._override(conf, args)
@@ -597,19 +592,12 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
         places += [
             cli_args._real(os.path.join(base, tickets_dir, name)) for name in ("todo", "flows")
         ]
-    starting = list(args.command[:2]) == ["ticket", "start"]
     readying = list(args.command[:2]) == ["review", "ready"]
     found = []
     for real in reals:
         if cli_args._inside(real, base) and any(cli_args._inside(real, p) for p in places):
             continue
         if readying and _ready_removed_wip(real, base):
-            continue
-        if (
-            starting
-            and cli_args._inside(real, base)
-            and skillsync.is_synced_write(conf, root, real)
-        ):
             continue
         found.append(real)
     return found

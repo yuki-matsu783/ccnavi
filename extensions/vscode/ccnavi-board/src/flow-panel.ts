@@ -80,6 +80,7 @@ import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { runInTerminal } from "./terminal.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
+import { confirmIfTurn } from "./turn-confirm.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
@@ -929,6 +930,14 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   }
   if (lock.locked || target === undefined) {
     fail(current, lock.reason);
+    return;
+  }
+  // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
+    fail(current, "ターン中のため保存を取りやめました。ターンが終わってから保存してください");
+    return;
+  }
+  if (!alive(current) || stale(current, loaded)) {
     return;
   }
   // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（正とする側のツリー）が替わることがある

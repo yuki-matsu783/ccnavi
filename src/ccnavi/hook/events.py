@@ -28,7 +28,7 @@ from ..policy import (
     selfguard_shell,
     selfguard_targets,
 )
-from ..records import audit, busy, failstreak, prune, repeat, stopops, stopreview
+from ..records import audit, busy, failstreak, prune, repeat, stopops, stopreview, turn
 from ..tickets import (
     approval,
     approval_checks,
@@ -42,8 +42,8 @@ from ..tickets import (
     overview,
     pending_integrate,
     phase,
+    promptsync,
     session_rejects,
-    skillsync,
     ticket_guard,
 )
 from . import (
@@ -117,6 +117,13 @@ def decide(
     ):
         return EXIT_OK
     _track_proposals(conf, payload)
+    if payload.event in (
+        hookio.PRE_TOOL_USE,
+        hookio.POST_TOOL_USE,
+        hookio.POST_TOOL_USE_FAILURE,
+    ):
+        # ターン中の印の更新時刻を新しくする（サブエージェントの呼び出しも、同じターン内）。
+        turn.touch(conf.state, payload.session_id)
     if payload.event == hookio.PRE_TOOL_USE:
         return judge.decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)
     if payload.event == hookio.POST_TOOL_USE:
@@ -251,16 +258,18 @@ def decide_at_prompt(
     """ユーザが何か言ったとき。ターンの基準をここで取る。
 
     基準を取るだけの回は何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
-    まだ何も起きていない時点で文を足さないためで、返すのは次の 5 種類の文だけ。空でない文は
+    まだ何も起きていない時点で文を足さないためで、返すのは次の 6 種類の文だけ。空でない文は
     空行で区切って 1 つの `additionalContext` にまとめる。
 
     1. 設定ファイルの変更の知らせ（`guard`）。ユーザの発言ではない回（バックグラウンド作業の
        完了通知など）に、ターンの間に動いた設定ファイルを戻した旨を言う
-    2. 依頼文の issue・MR の指定への指示（`branchfind.prompt_context`）。着手の前に紐づく
+    2. 共通レイヤーと工程スキルをプロジェクトへ写した知らせ（`promptsync.sync`）。写した
+       ファイルのコミットを案内する。ユーザの発言のときだけ写す
+    3. 依頼文の issue・MR の指定への指示（`branchfind.prompt_context`）。着手の前に紐づく
        ブランチを探してユーザに確かめる
-    3. 終わったサブエージェントの子の範囲を確かめられなかった印（`subagent.unchecked_scope`）
-    4. 終わったサブエージェントの結果の知らせ（`subagent.outcome_notices`）
-    5. 手作業で確かめる旨（`_manual_confirm_note`）
+    4. 終わったサブエージェントの子の範囲を確かめられなかった印（`subagent.unchecked_scope`）
+    5. 終わったサブエージェントの結果の知らせ（`subagent.outcome_notices`）
+    6. 手作業で確かめる旨（`_manual_confirm_note`）
 
     どれも文を足すだけで、作業は止めない。
 
@@ -269,6 +278,10 @@ def decide_at_prompt(
     増えた承認を数える形は、セッションの開始時の取り込みで届いた承認を起点に含めて取りこぼした。
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）に渡す。
+
+    ユーザの発言なら、まず共通レイヤーと工程スキルをプロジェクトへ写す（`promptsync.sync`）。
+    写すのはツール呼び出しの外のここだけで、写した分もユーザの変更と同じに受け入れるので、
+    ミラーは実行後チェックとバックアップと復元から特別扱いされない。
 
     ユーザの発言なら、前のターンの終わりからここまでの変更を、ユーザの手によるものとして
     受け入れる。ccnavi 自身の設定ファイルのバックアップを今の状態に取り直し（`selfguard.accept`）、
@@ -283,9 +296,19 @@ def decide_at_prompt(
     （`selfguard.before`）をここで行い、消えた設定ファイルは戻す。ターンの基準は受け入れの
     有無に関わらず取り直す。
     """
+    # ユーザの発言とバックグラウンド作業の完了通知は、どちらもターンを始める。
+    turn.begin(conf.state, payload.session_id)
     by_user = not payload.from_background_task() and not busy.is_busy(
         conf.state, payload.session_id
     )
+    # 共通レイヤーと工程スキルの写しを、受け入れの前に書く。書いた分が受け入れの対象になり、
+    # 次のツール呼び出しが戻さない。
+    mirrored = ""
+    if by_user:
+        try:
+            mirrored = "\n".join(promptsync.sync(conf, root))
+        except Exception as exc:  # noqa: BLE001  同期の失敗で、このあとの受け入れまで飛ばさない
+            stderr.write(f"ccnavi: ミラーの同期で想定外の失敗: {exc}\n")
     found = (selfguard.accept if by_user else selfguard.before)(
         modes.effective_setting(mode, conf.guard_core_files),
         conf.state,
@@ -318,7 +341,6 @@ def decide_at_prompt(
         payload,
         record,
         (conf.tickets, conf.approved),
-        functools.partial(skillsync.is_synced_write, conf, root),
         root,
         accept=by_user,
     )
@@ -332,7 +354,7 @@ def decide_at_prompt(
         subagent.outcome_notices(conf.state, payload) if conf.tickets_enabled else ("", [])
     )
     manual = _manual_confirm_note(stderr, conf, root, payload, raw)
-    hint = "\n\n".join(p for p in (guard, hint, unchecked, outcomes, manual) if p)
+    hint = "\n\n".join(p for p in (guard, mirrored, hint, unchecked, outcomes, manual) if p)
     if hint:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, hint)
     if told:
@@ -436,7 +458,6 @@ def decide_at_stop(
         payload,
         record,
         (conf.tickets, conf.approved),
-        functools.partial(skillsync.is_synced_write, conf, root),
         root,
     )
     # 同じ理由で繰り返し止めた呼び出し（repeat）。拒否の文面はモデルにしか届かないので、
@@ -470,8 +491,11 @@ def decide_at_stop(
     # 判断が食い違わないように）。
     _plan_stop_review(stderr, conf, root, payload, mode, bool(nudge), continuation, raw)
     if nudge:
+        # 止めた Stop はターンの続きなので、ターン中の印は残す（モデルはこのあとも動く）。
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
+    # ターンの終わり。ここから次の発言までは、ユーザの編集が戻されない。
+    turn.end(conf.state, payload.session_id)
     if report:
         hookio.write_system_message(stdout, report)
     return EXIT_OK
@@ -1023,6 +1047,7 @@ def decide_at_start(
     if payload.source in ("startup", "resume"):
         subagent.forget_running(conf.state, payload.session_id)
         busy.clear(conf.state, payload.session_id)
+        turn.clear(conf.state, payload.session_id)
     if payload.source == "startup":
         _reported_baseline(stderr, conf, root, payload, record)
     # 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
@@ -1127,7 +1152,6 @@ def _reported_baseline(
         record,
         mine=(conf.state, conf.log),
         places=(conf.tickets, conf.approved),
-        synced=functools.partial(skillsync.is_synced_write, conf, root),
         root=root,
     )
 
@@ -1178,8 +1202,11 @@ def decide_after_failure(
     ないので数えない。数えの失敗や案内を組む失敗で、ツールの結果は変わらない。
     """
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
-    synced = functools.partial(skillsync.is_synced_write, conf, root)
-    after = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
+    if payload.is_interrupt and not payload.agent_id:
+        # ユーザの中断。Stop は来ないことがあるので、ここでターンの終わりにする。
+        # 下の照合は中断までに書かれたぶんを戻すので、印を先に消してよい（消す前でも結果は同じ）。
+        turn.end(conf.state, payload.session_id)
+    after = functools.partial(selfguard.after, written=_written(payload, record))
     texts = [judge.guard_setting_files(mode, conf, root, payload, record, after)]
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     text, _ = post.check(
@@ -1193,7 +1220,6 @@ def decide_after_failure(
         payload=payload,
         record=record,
         places=(conf.tickets, conf.approved),
-        synced=synced,
         root=root,
     )
     texts.append(text)
@@ -1272,11 +1298,7 @@ def _decide_after(
     # 保護の根拠を、この呼び出しが触れる前の状態に返してから読む。
     # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
     # （selfguard._left_as_repair）。
-    # 着手のときに共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーした分は、
-    # 置き場・パスの途中のリンク・内容で見分けて外す。
-    # 戻す側と、報告する側の両方で同じ答えを使う。
-    synced = functools.partial(skillsync.is_synced_write, conf, root)
-    restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
+    restore = functools.partial(selfguard.after, written=_written(payload, record))
     guard = judge.guard_setting_files(mode, conf, root, payload, record, restore)
 
     watched = watched_for(stderr, conf, root, record, payload)
@@ -1306,7 +1328,6 @@ def _decide_after(
         # `_committed_findings` が置き場を外すのと同じ理由。判定の有無で、外れたり
         # 外れなかったりさせない。
         places=(conf.tickets, conf.approved),
-        synced=synced,
         # 退避（`ready`）が消した閉じたチケットを見分けるため、`logs/archive/` を読む。
         root=root,
     )
