@@ -110,6 +110,18 @@
   .col ul { font-size: clamp(12px, 2vh, 17px); gap: .3em; }
   .col li { font-size: inherit; line-height: 1.55; }
   @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(8px, 1.6vh, 16px); }
+  .col { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: clamp(8px, 1.6vh, 16px) clamp(10px, 1.6vw, 18px); min-width: 0; }
+  .col h4 { margin: 0 0 .3em; font-size: clamp(14px, 2.4vh, 20px); color: var(--accent); letter-spacing: .08em; }
+  .col ul { font-size: clamp(12px, 2vh, 17px); gap: .3em; }
+  .col li { font-size: inherit; line-height: 1.55; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(8px, 1.6vh, 16px); }
+  .col { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: clamp(8px, 1.6vh, 16px) clamp(10px, 1.6vw, 18px); min-width: 0; }
+  .col h4 { margin: 0 0 .3em; font-size: clamp(14px, 2.4vh, 20px); color: var(--accent); letter-spacing: .08em; }
+  .col ul { font-size: clamp(12px, 2vh, 17px); gap: .3em; }
+  .col li { font-size: inherit; line-height: 1.55; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
   .mini { width: 100%; height: auto; display: block; margin-bottom: 8px; }
   @media print {
     body { overflow: visible; height: auto; }
@@ -132,7 +144,7 @@
 <section class="slide">
   <div class="tag">CCNAVI / IDEA</div>
   <h1>ccnavi の思想</h1>
-  <p class="lead muted">7 つのテーマごとに、なぜ・何を・どう</p>
+  <p class="lead muted">5 つのテーマごとに、なぜ・何を・どう</p>
   <svg class="fig" viewBox="0 0 800 250" role="img" aria-label="人間が判断し、ccnavi がエージェントの操作を通す、または止める" style="max-height:34vh">
     <rect class="b" x="330" y="8" width="140" height="44" rx="10"/><text class="t" x="400" y="37">人間</text>
     <path class="la" d="M400 52 V96" stroke-dasharray="6 5"/><text class="tb" x="445" y="80" style="text-anchor:start">判断</text>
@@ -148,74 +160,57 @@
 
 <section class="slide">
   <div class="tag">OVERVIEW / 全体像</div>
-  <h2>ccnavi が解決する 7 つのテーマ</h2>
+  <h2>ccnavi が解決する 5 つのテーマ</h2>
   <table>
-    <tr><th style="width:auto"><i class="num">1</i> 指示を緻密に書いても、希望どおりに動かない</th><td>外れを検知し、ガイドして、やり直させる</td></tr>
-    <tr><th style="width:auto"><i class="num">2</i> 目的のために、制約を突破しようとする</th><td>守る対象を決め、あとは合意に委ねる</td></tr>
-    <tr><th style="width:auto"><i class="num">3</i> レビュー管理が要るが、作業は複数の PC・セッションに散る</th><td>issue・MR・ブランチを 1:1:1 で紐づける</td></tr>
-    <tr><th style="width:auto"><i class="num">4</i> 共通ルールとプロジェクトのルールを分けて管理したい</th><td>ルールを git で管理し、共通を同期する</td></tr>
-    <tr><th style="width:auto"><i class="num">5</i> 分け方・範囲・レビューの場所を、計画で決めたい</th><td>分類は事前に定義し、承認どおりに進める</td></tr>
-    <tr><th style="width:auto"><i class="num">6</i> リスクの高い作業は、人間が必ず見る</th><td>事前に定義し、一定以上はレビュー必須</td></tr>
-    <tr><th style="width:auto"><i class="num">7</i> 同じ流れを毎回作り直し、状況も見えにくい</th><td>テンプレートで再利用し、拡張で見せる</td></tr>
+    <tr><th style="width:auto"><i class="num">1</i> エージェントに、指示と制約を守らせる</th><td>外れを検知してやり直させる。守る対象は決め、逸れたら人間の目に触れさせる</td></tr>
+    <tr><th style="width:auto"><i class="num">2</i> 計画で決めて、そのとおりに進める</th><td>分類は事前に定義し、承認どおりに進める。流れはテンプレートで再利用</td></tr>
+    <tr><th style="width:auto"><i class="num">3</i> レビューを厳密に管理する</th><td>issue・MR・ブランチを 1:1:1 で紐づける。高リスクはレビュー必須。拡張で見せる</td></tr>
+    <tr><th style="width:auto"><i class="num">4</i> ルールを共通とプロジェクトで共存させる</th><td>ルールを git で管理し、共通を同期する</td></tr>
+    <tr><th style="width:auto"><i class="num">5</i> 必要な情報を必要な時に届け、記録から育てる</th><td>入口だけ渡して必要時に引かせる。記録から改善候補を出し、人間が採ったものを活かす</td></tr>
   </table>
 </section>
 
 <section class="slide">
-  <div class="tag">テーマ 1 / 指示が守られない</div>
-  <h2>指示を緻密に書いても、希望どおりに動かない</h2>
-  <svg class="fig" viewBox="0 0 800 190" role="img" aria-label="外れを検知してやり直させる" style="max-height:26vh"><rect class="b" x="10" y="50" width="120" height="60" rx="12"/><text class="t" x="70.0" y="76.0">指示</text><text class="tm" x="70.0" y="100.0">スキル</text><rect class="b" x="190" y="50" width="130" height="60" rx="12"/><text class="t" x="255.0" y="86.0">エージェント</text><rect class="ba" x="380" y="40" width="150" height="80" rx="12"/><text class="t" x="455.0" y="76.0">検知</text><text class="tm" x="455.0" y="100.0">hook</text><rect class="b" x="600" y="50" width="120" height="60" rx="12"/><text class="t" x="660.0" y="86.0">完了</text><path class="ln" d="M130 80 H187"/><path class="ln" d="M320 80 H377"/><path class="la" d="M530 80 H597"/><text class="tb" x="565" y="70">OK</text><path class="lw" d="M455 122 C455 160 255 160 255 114"/><text class="tw" x="355" y="178">外れ → ガイドして再実行</text></svg>
-  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>hello と尋ねたら answer.md に「こんにちは」と書くスキルでも、必ず従うとは限らない</li><li>LLM の答えは確率的。絶対にはならない</li><li>スキル自体が使われないこともある</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>外れを検知し、ガイドを添えてやり直させる</li><li>外れる確率 1% の LLM でも、検知してやり直せば、3 回続けて外れる確率は 1% × 1% × 1% = 0.0001%。失敗し続ける確率はほぼ 0% に近づく</li><li>hook を作る手間を軽くする</li></ul></div><div class="col"><h4>HOW</h4><ul><li>判定と案内は、モデルの外の hook が行う</li><li>検知と案内はルールとして宣言する。hook を自作しない</li><li>起きた時点で、その場に案内する</li></ul></div></div>
+  <div class="tag">テーマ 1 / 守らせる</div>
+  <h2>エージェントに、指示と制約を守らせる</h2>
+  <svg class="fig" viewBox="0 0 800 190" role="img" aria-label="外れを検知してやり直させる" style="max-height:26vh"><rect class="b" x="10" y="50" width="120" height="60" rx="12"/><text class="t" x="70.0" y="76.0">指示</text><text class="tm" x="70.0" y="100.0">スキル・ルール</text><rect class="b" x="190" y="50" width="130" height="60" rx="12"/><text class="t" x="255.0" y="86.0">エージェント</text><rect class="ba" x="380" y="40" width="150" height="80" rx="12"/><text class="t" x="455.0" y="76.0">検知</text><text class="tm" x="455.0" y="100.0">hook</text><rect class="b" x="600" y="50" width="120" height="60" rx="12"/><text class="t" x="660.0" y="86.0">完了</text><path class="ln" d="M130 80 H187"/><path class="ln" d="M320 80 H377"/><path class="la" d="M530 80 H597"/><text class="tb" x="565" y="70">OK</text><path class="lw" d="M455 122 C455 160 255 160 255 114"/><text class="tw" x="355" y="178">外れ → 理由と代わりの手段を返して再実行</text></svg>
+  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>指示を書いても、LLM は確率的。絶対に従うとは限らない</li><li>目的のために、hook を外す・deny を緩めることを選ぶ</li><li>パターン一致は構造を見ず、禁止の文は確率でしかなく、根拠は書き換えられる</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>外れる確率 1% の LLM でも、検知してやり直せば、3 回続けて外れる確率は 1% × 1% × 1% = 0.0001%</li><li>守る対象はプロジェクトが決め、あとは合意に委ね、逸れたら人間の目に触れさせる</li><li>hook を作る手間を軽くする</li></ul></div><div class="col"><h4>HOW</h4><ul><li>判定と案内は、モデルの外の hook が行い、ルールとして宣言する</li><li>拒否は理由と代わりの手段を返す。迷ったら止める</li><li>宣言された制約は緩めない。ガード自身を守り、逸脱は記録する</li></ul></div></div>
 </section>
 
 <section class="slide">
-  <div class="tag">テーマ 2 / 制約の突破</div>
-  <h2>エージェントは、目的のために制約を突破しようとする</h2>
-  <svg class="fig" viewBox="0 0 800 150" role="img" aria-label="突破を許さず、逸れたら人間の目に触れさせる" style="max-height:26vh"><rect class="b" x="10" y="45" width="130" height="60" rx="12"/><text class="t" x="75.0" y="81.0">エージェント</text><rect class="bm" x="270" y="15" width="24" height="120" rx="6"/><rect class="b" x="430" y="45" width="150" height="60" rx="12"/><text class="t" x="505.0" y="71.0">守る対象</text><text class="tm" x="505.0" y="95.0">プロジェクトが決める</text><rect class="bh" x="640" y="45" width="150" height="60" rx="12"/><text class="th" x="715.0" y="71.0">人間の目</text><text class="tm" x="715.0" y="95.0">逸れたら見せる</text><path class="ln" d="M140 75 H255"/><text class="tw" x="238" y="66">✕</text><path class="lw" d="M60 42 C150 -20 380 -20 430 48"/><path class="la" d="M580 75 H637"/></svg>
-  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>悪意なく「hook を外す」「deny を緩める」を選ぶ</li><li>パターン一致は構造を見ない。禁止の文は確率でしかない</li><li>権限は広く開けるか毎回確認するかの二択。根拠は書き換えられる場所にある</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>守る対象はプロジェクトが決め、あとは作業ごとの合意に委ねる</li><li>逸れたら人間の目に触れさせる</li><li>二択を崩す</li></ul></div><div class="col"><h4>HOW</h4><ul><li>拒否は理由と代わりの手段を一緒に返す</li><li>迷ったら止める。ただし回復手段は奪わない</li><li>宣言された制約は緩めない。ガード自身を守る。逸脱は記録する</li></ul></div></div>
+  <div class="tag">テーマ 2 / 計画</div>
+  <h2>計画で決めて、そのとおりに進める</h2>
+  <svg class="fig" viewBox="0 0 800 165" role="img" aria-label="計画で分類を選び、承認どおりに作業し、流れを蓄積する" style="max-height:26vh"><rect class="b" x="10" y="40" width="160" height="70" rx="12"/><text class="t" x="90.0" y="71.0">テンプレート</text><text class="tm" x="90.0" y="95.0">過去の流れ</text><rect class="ba" x="215" y="40" width="170" height="70" rx="12"/><text class="t" x="300.0" y="71.0">計画</text><text class="tm" x="300.0" y="95.0">分類を選んで提案</text><rect class="bh" x="430" y="40" width="130" height="70" rx="12"/><text class="th" x="495.0" y="71.0">承認</text><text class="tm" x="495.0" y="95.0">人間</text><rect class="ba" x="605" y="40" width="185" height="70" rx="12"/><text class="t" x="697.5" y="71.0">承認どおりに作業</text><text class="tm" x="697.5" y="95.0">範囲の外は止める</text><path class="la" d="M170 75 H212"/><path class="la" d="M385 75 H427"/><path class="la" d="M560 75 H602"/><path class="ln" d="M700 112 C700 160 90 160 90 114" style="stroke-dasharray:6 5"/><text class="tm" x="400" y="150">完了した計画を、テンプレートとして蓄積</text></svg>
+  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>分割・範囲・レビューの場所は、始める前に決めたい</li><li>計画のたびに分類を考え直すと、ぶれる</li><li>似た流れを毎回ゼロから計画すると、手間もぶれも増える</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>計画時に、分割・範囲・レビューの場所を決める</li><li>分類は事前に定義し、計画ではその中から選ぶ</li><li>流れをテンプレートとして蓄積し、再利用する</li></ul></div><div class="col"><h4>HOW</h4><ul><li>親子のチケットを人間が承認する。承認範囲の外は止め、中は聞かない</li><li>計画の変更は改版の提案に限る</li><li>分類はフェーズの定義。完了した計画をテンプレートに貯める</li></ul></div></div>
 </section>
 
 <section class="slide">
-  <div class="tag">テーマ 3 / レビュー管理</div>
-  <h2>厳密なレビュー管理が要るが、作業は複数の PC・セッションに散る</h2>
-  <svg class="fig" viewBox="0 0 800 150" role="img" aria-label="issue・MR・ブランチを 1 対 1 対 1 で紐づける" style="max-height:26vh"><rect class="ba" x="30" y="45" width="170" height="60" rx="12"/><text class="t" x="115.0" y="81.0">issue</text><rect class="ba" x="315" y="45" width="170" height="60" rx="12"/><text class="t" x="400.0" y="81.0">マージリクエスト</text><rect class="ba" x="600" y="45" width="170" height="60" rx="12"/><text class="t" x="685.0" y="81.0">ブランチ</text><path class="la" d="M200 75 H312"/><path class="la" d="M485 75 H597"/><text class="tb" x="256" y="66">1 : 1</text><text class="tb" x="541" y="66">1 : 1</text><text class="tm" x="400" y="136">どれか 1 つから、残りと作業の状態へたどれる</text></svg>
-  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>チケット作業では、レビューを厳密に管理したい</li><li>作業は複数台の PC・複数のセッションで進む</li><li>終われば消える自動実行もある</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>チケットをマージリクエストに載せて管理する</li><li>issue・MR・ブランチを 1:1:1 で紐づける</li><li>チケットの動きを制御する</li></ul></div><div class="col"><h4>HOW</h4><ul><li>チケットとマーカーを親のブランチに載せ、レビューはホスト上で受ける</li><li>承認とレビュー済みは、人間が直接操作する場所で受ける</li><li>作業は子のワークツリーで行う</li></ul></div></div>
+  <div class="tag">テーマ 3 / レビュー</div>
+  <h2>レビューを厳密に管理する</h2>
+  <svg class="fig" viewBox="0 0 800 170" role="img" aria-label="issue・MR・ブランチの紐づけと、リスクによるレビュー必須" style="max-height:26vh"><rect class="ba" x="30" y="10" width="170" height="56" rx="12"/><text class="t" x="115.0" y="44.0">issue</text><rect class="ba" x="315" y="10" width="170" height="56" rx="12"/><text class="t" x="400.0" y="44.0">マージリクエスト</text><rect class="ba" x="600" y="10" width="170" height="56" rx="12"/><text class="t" x="685.0" y="44.0">ブランチ</text><path class="la" d="M200 38 H312"/><path class="la" d="M485 38 H597"/><text class="tb" x="256" y="30">1 : 1</text><text class="tb" x="541" y="30">1 : 1</text><rect class="b" x="30" y="100" width="230" height="56" rx="12"/><text class="t" x="145.0" y="134.0">高リスクの作業</text><rect class="bh" x="310" y="100" width="200" height="56" rx="12"/><text class="th" x="410.0" y="134.0">人間のレビュー必須</text><rect class="b" x="560" y="100" width="210" height="56" rx="12"/><text class="t" x="665.0" y="124.0">VS Code 拡張</text><text class="tm" x="665.0" y="148.0">状態を見せる</text><path class="lw" d="M260 128 H307"/></svg>
+  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>レビューを厳密に管理したい。作業は複数の PC・セッションに散り、自動実行は終われば消える</li><li>全部を同じ重さで見ると追いつけない。重く見るものを勘で選ぶとぶれる</li><li>状態や承認待ちは、文字だけでは追いにくい</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>チケットを MR に載せ、issue・MR・ブランチを 1:1:1 で紐づける</li><li>リスクの高い作業を事前に定義し、一定以上は人間のレビューを必須にする</li><li>VS Code の拡張で、状態を見せる</li></ul></div><div class="col"><h4>HOW</h4><ul><li>チケットとマーカーを親のブランチに載せ、レビューはホスト上で受ける</li><li>承認とレビュー済みは、人間が直接操作する場所で受ける</li><li>リスクは実績の差分に配点して測り、高いものはレビューが済むまで進めない</li></ul></div></div>
 </section>
 
 <section class="slide">
   <div class="tag">テーマ 4 / ルールの共存</div>
-  <h2>共通ルールとプロジェクトのルールを分けて管理したい</h2>
+  <h2>ルールを共通とプロジェクトで共存させる</h2>
   <svg class="fig" viewBox="0 0 800 150" role="img" aria-label="共通ルールをプロジェクト側へ同期する" style="max-height:26vh"><rect class="ba" x="10" y="50" width="170" height="60" rx="12"/><text class="t" x="95.0" y="76.0">共通ルール</text><text class="tm" x="95.0" y="100.0">ワークスペース</text><rect class="b" x="330" y="15" width="200" height="52" rx="12"/><text class="t" x="430.0" y="47.0">プロジェクト A</text><rect class="b" x="330" y="85" width="200" height="52" rx="12"/><text class="t" x="430.0" y="117.0">プロジェクト B</text><rect class="b" x="620" y="50" width="170" height="60" rx="12"/><text class="t" x="705.0" y="86.0">同じルールで作業</text><path class="la" d="M180 70 C250 70 260 41 327 41"/><path class="la" d="M180 90 C250 90 260 111 327 111"/><text class="tb" x="255" y="66" style="font-size:14px">同期</text><path class="la" d="M530 41 C580 41 580 70 617 78"/><path class="la" d="M530 111 C580 111 580 90 617 88"/></svg>
   <div class="cols"><div class="col"><h4>WHY</h4><ul><li>ワークスペースの下に clone して共通ルールを管理する使い方がある</li><li>各プロジェクトで直接 Claude Code を起動する使い方もある</li><li>同じチームで共存する</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>どちらの使い方でも、誰もが同じルールで作業できる</li></ul></div><div class="col"><h4>HOW</h4><ul><li>ルールは共通とプロジェクトの 2 層。判定は両者の和</li><li>ルールを git で管理し、共通ルールをプロジェクト側へ同期する</li><li>写しが無くても動く</li></ul></div></div>
 </section>
 
 <section class="slide">
-  <div class="tag">テーマ 5 / 計画で決める</div>
-  <h2>作業の分け方・範囲・レビューの場所を、計画で決めて進めたい</h2>
-  <svg class="fig" viewBox="0 0 800 150" role="img" aria-label="計画で分類を選び、承認どおりに作業する" style="max-height:26vh"><rect class="ba" x="10" y="40" width="200" height="70" rx="12"/><text class="t" x="110.0" y="71.0">計画</text><text class="tm" x="110.0" y="95.0">分類を選んで提案</text><rect class="bh" x="300" y="40" width="160" height="70" rx="12"/><text class="th" x="380.0" y="71.0">承認</text><text class="tm" x="380.0" y="95.0">人間</text><rect class="ba" x="550" y="40" width="230" height="70" rx="12"/><text class="t" x="665.0" y="71.0">承認どおりに作業</text><text class="tm" x="665.0" y="95.0">範囲の外は止める</text><path class="la" d="M210 75 H297"/><path class="la" d="M460 75 H547"/><text class="tm" x="110" y="136">調査 ／ 設計 ／ 実装 ／ テスト … 事前に定義した分類</text></svg>
-  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>分割・範囲・レビューの場所は、始める前に決めたい</li><li>計画のたびに分類を考え直すと、ぶれる</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>計画時に、分割・範囲・レビューの場所を決める</li><li>分類は事前に定義し、計画ではその中から選ぶ</li><li>承認された計画のとおりに作業する</li></ul></div><div class="col"><h4>HOW</h4><ul><li>親子のチケット（目的・範囲・フェーズ・レビューの位置）を人間が承認する</li><li>承認範囲の外は止め、中は聞かない。変更は改版の提案</li><li>分類はフェーズの定義として持つ</li></ul></div></div>
-</section>
-
-<section class="slide">
-  <div class="tag">テーマ 6 / リスク</div>
-  <h2>リスクの高い作業は、人間が必ず見る</h2>
-  <svg class="fig" viewBox="0 0 800 150" role="img" aria-label="一定以上のリスクは人間のレビュー必須" style="max-height:26vh"><rect class="bm" x="40" y="60" width="720" height="26" rx="13"/><rect class="bh" x="40" y="60" width="330" height="26" rx="13" style="fill:var(--accent)"/><rect x="370" y="60" width="390" height="26" rx="13" style="fill:var(--warn);fill-opacity:.55"/><path d="M520 40 V106" stroke="var(--warn)" stroke-width="3" stroke-dasharray="6 5"/><text class="tw" x="520" y="30">一定以上</text><text class="tw" x="640" y="130">人間のレビュー必須</text><text class="tm" x="200" y="130">通常の流れ</text><text class="tm" x="60" y="48" style="text-anchor:start">低</text><text class="tm" x="740" y="48" style="text-anchor:end">高</text></svg>
-  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>すべてを同じ重さでレビューすると、人間が追いつかない</li><li>重く見るものを勘で選ぶと、ぶれる</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>リスクの高い作業を事前に定義する</li><li>一定以上は、人間のレビューを必須にする</li></ul></div><div class="col"><h4>HOW</h4><ul><li>リスクは、実績の差分に配点して測る</li><li>高いものは、レビューが済むまで先へ進めない</li></ul></div></div>
-</section>
-
-<section class="slide">
-  <div class="tag">テーマ 7 / 再利用と可視化</div>
-  <h2>同じ流れを毎回作り直し、いまの状況も見えにくい</h2>
-  <svg class="fig" viewBox="0 0 800 190" role="img" aria-label="テンプレートを蓄積して再利用し、拡張で見せる" style="max-height:26vh"><rect class="b" x="10" y="45" width="170" height="60" rx="12"/><text class="t" x="95.0" y="81.0">完了した計画</text><rect class="ba" x="250" y="45" width="170" height="60" rx="12"/><text class="t" x="335.0" y="81.0">テンプレート</text><rect class="b" x="490" y="45" width="140" height="60" rx="12"/><text class="t" x="560.0" y="81.0">次の計画</text><rect class="bh" x="670" y="45" width="120" height="60" rx="12"/><text class="th" x="730.0" y="81.0">拡張</text><path class="la" d="M180 75 H247"/><path class="la" d="M420 75 H487"/><path class="ln" d="M630 75 H667"/><text class="tm" x="730" y="130" style="font-size:13px">VS Code で見える</text><path class="la" d="M335 108 C335 150 560 150 560 108" style="stroke-dasharray:6 5"/><text class="tb" x="448" y="170" style="font-size:14px">蓄積して再利用</text></svg>
-  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>似た流れが何度も現れる。毎回ゼロから計画すると手間もぶれも増える</li><li>チケットの状態や承認待ちは、文字だけでは追いにくい</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>流れをテンプレートとして蓄積し、次のタスクでも再利用する</li><li>VS Code の拡張で、状態を見える形にする</li></ul></div><div class="col"><h4>HOW</h4><ul><li>完了した計画を貯め、新しい計画の提案に使い回す</li><li>記録と振り返りから改善候補を出す。採るかは人間</li><li>拡張のボードで、状態・承認・レビューを見せる</li></ul></div></div>
+  <div class="tag">テーマ 5 / 届ける・育てる</div>
+  <h2>必要な情報を必要な時に届け、記録から育てる</h2>
+  <svg class="fig" viewBox="0 0 800 160" role="img" aria-label="記録から改善候補を出し、人間が採ったものを次に活かす" style="max-height:26vh"><rect class="b" x="10" y="45" width="170" height="60" rx="12"/><text class="t" x="95.0" y="71.0">記録</text><text class="tm" x="95.0" y="95.0">判定・気づき・振り返り</text><rect class="ba" x="235" y="45" width="160" height="60" rx="12"/><text class="t" x="315.0" y="71.0">改善候補</text><text class="tm" x="315.0" y="95.0">エージェントが提案</text><rect class="bh" x="450" y="45" width="140" height="60" rx="12"/><text class="th" x="520.0" y="81.0">人間が採る</text><rect class="ba" x="645" y="45" width="145" height="60" rx="12"/><text class="t" x="717.5" y="71.0">次の作業</text><text class="tm" x="717.5" y="95.0">ルール・手順・文書</text><path class="la" d="M180 75 H232"/><path class="la" d="M395 75 H447"/><path class="la" d="M590 75 H642"/><path class="ln" d="M717 107 C717 150 95 150 95 109" style="stroke-dasharray:6 5"/><text class="tm" x="400" y="146">次の作業がまた記録を残す</text></svg>
+  <div class="cols"><div class="col"><h4>WHY</h4><ul><li>決まりや文書を最初から全部渡すと、肝心なものが読まれない</li><li>決まりや手順は、作って終わりにならない。同じ失敗を繰り返したくない</li></ul></div><div class="col"><h4>WHAT</h4><ul><li>開始時は入口だけ。理由は場面で、詳しい資料は必要なときに引かせる</li><li>記録・気づき・振り返りから、ルール・手順・文書の改善候補を提案する</li><li>人間が採ったものを、次に活かす</li></ul></div><div class="col"><h4>HOW</h4><ul><li>本文は渡さず、frontmatter の索引と目録で、自分で引く</li><li>提案まではエージェント。採るかは人間が決める</li><li>改善するのはルール・手順・文書の側で、モデルの学習ではない</li></ul></div></div>
 </section>
 
 <section class="slide">
   <div class="tag">COMMON / 共通の原則</div>
-  <h2>テーマをまたぐ 3 つの原則と、作らないもの</h2>
+  <h2>テーマをまたぐ 2 つの原則と、作らないもの</h2>
   <div class="grid">
-    <div class="card"><b><i class="num">1</i>必要な情報を、必要なタイミングで</b><span>先に詰め込まず、場面で案内し、必要なときに引く</span></div>
-    <div class="card"><b><i class="num">2</i>人間の判断を残し、守る</b><span>承認・レビュー・採否を、エージェントが代行できる形にしない</span></div>
-    <div class="card"><b><i class="num">3</i>単一の場所に閉じ込めない</b><span>ブランチとホストで、複数の PC・セッションをつなぐ</span></div>
+    <div class="card"><b><i class="num">1</i>人間の判断を残し、守る</b><span>承認・レビュー・採否を、エージェントが代行できる形にしない</span></div>
+    <div class="card"><b><i class="num">2</i>単一の場所に閉じ込めない</b><span>ブランチとホストで、複数の PC・セッションをつなぐ</span></div>
   </div>
   <table>
     <tr><th>作らないもの</th><td>OS 権限分離の代わり ／ 人間の判断の代行 ／ モデルの学習 ／ 守られる保証</td></tr>
