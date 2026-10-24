@@ -7,6 +7,7 @@
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_ENTRY_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
     "CCNAVI_TICKET_CONTROL": "enable",
+    "CLAUDE_CODE_BG_TASKS_REPORT_RUNNING": "1",
     "CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS": "3600000",
     "BASH_DEFAULT_TIMEOUT_MS": "3600000"
   },
