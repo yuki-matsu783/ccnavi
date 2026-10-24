@@ -337,6 +337,11 @@ courses:
         title: MRを開く
         body: ［MR を開く］から、レビューの場のMRを開きます。差分とレビューの依頼が載っています。指摘はMR上に書きます。ボードはMRの差分を読みません。指摘を読むのは、［レビュー完了］を押したときだけです。
       - target: ""
+        title: 差分を開く（GitLab）
+        body: MRの画面で「Changes」のタブを開くと、変更の差分が出ます。ファイルごとに、変更した行が並びます。
+        image: gitlab-changes-tab
+        alt: GitLabのMRの画面。「Changes」のタブに①の印があり、差分の行にマウスを載せると、吹き出しのボタンに②の印が付いている
+      - target: ""
         title: 差分に指摘を付ける（GitLab）
         body: 差分の行にマウスを載せると、行番号の横に吹き出しのボタンが出ます。それを押すと、その行にコメントを書けます。ドラッグすると、複数の行をまとめて選べます。
         image: gitlab-line-comment
@@ -351,6 +356,11 @@ courses:
         body: 行のコメントを「Start a review」で書くと、コメントは「Pending」になり、まだ送られません。指摘を付け終えたら、「Submit review」でまとめて送ります。「Add comment now」は、そのコメントだけをすぐに送ります。「Pending」のまま送り忘れると、ほかの人にも指摘が届かないので、送ったことを確かめます。
         image: gitlab-pending-review
         alt: GitLabの差分画面。行のコメントに「Pending」の札が付き、下に「Submit review」と「Add comment now」のボタンが並んでいる
+      - target: ""
+        title: レビューを送る（GitLab）
+        body: 「Submit review」を押すと、「Submit your review」の画面が開きます。「Comment」は、承認を伴わない感想です。「Request changes」は、直してからマージしてほしいときに選びます。変更の依頼が出ている間は、ccnaviでもレビュー済みにできません。解除は、レビュアーの「Approve」で行います。
+        image: gitlab-submit-review
+        alt: GitLabの「Submit your review」の画面。「Comment」「Approve」「Request changes」の選択肢と、「Submit review」ボタン、ためた指摘の一覧がある
       - target: phase-review
         title: レビューを終える
         body: 指摘を付け終えたら、レビュー待ちの行の［レビュー完了］を押します。押すまでは、ボードは指摘を読みません。
@@ -370,8 +380,13 @@ courses:
         title: 対応の子チケットが指摘を直す
         body: 追加対応用の子チケットは、同じフェーズの番号で作られます。親の札は「作業中」に戻り、フェーズの行は進行中になります。エージェントが、指摘された点をこの子チケットで直します。
       - target: ""
-        title: 直った指摘を解決済みにする（GitLab）
-        body: 指摘が直ったことを確かめたら、スレッドの右上のチェックマークを押して、解決済みにします。返信の欄の「Resolve thread」でも同じです。すべてのスレッドを解決すると、画面の右上が「All threads resolved」になります。
+        title: 未解決の指摘を確かめる（GitLab）
+        body: 画面の右上の「1 unresolved thread」は、未解決のスレッドの数です。直ったことを確かめたら、スレッドの下の返信欄に結果を書き、「Resolve thread」を押して、解決済みにします。
+        image: gitlab-unresolved-thread
+        alt: GitLabの差分画面。右上に「1 unresolved thread」と出ていて、スレッドの下に返信欄と「Resolve thread」ボタンがある
+      - target: ""
+        title: 解決済みになった状態（GitLab）
+        body: 解決すると、スレッドに「Resolved by」と出て、画面の右上が「All threads resolved」になります。解決したスレッドは、「Unresolve thread」で未解決に戻せます。
         image: gitlab-threads-resolved
         alt: GitLabの差分画面。スレッドの右上のチェックマークが緑になり「Resolved by」と出ていて、画面の右上に「All threads resolved」と出ている
       - target: phase-review
