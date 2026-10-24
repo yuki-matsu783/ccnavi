@@ -267,3 +267,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0160](0160-ticket-work-is-issue-mr-pair-with-preflight.md) | チケット作業を issue と MR のセットに限り、入口でホストの API と git のリモートの使える状態を確かめる |
 | [0161](0161-agent-creates-issue-with-similarity-check.md) | issue が無いとき、エージェントが似た issue・MR を確かめてから issue を作って進める |
 | [0162](0162-setup-replaces-a-differing-executable.md) | 導入スクリプトは、配布元と中身が違う実行ファイルを確認なしで入れ替える |
+| [0163](0163-setup-bin-project-or-user.md) | 導入スクリプトに、実行ファイルをユーザの置き場に置く選択を足す |
