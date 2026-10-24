@@ -21,9 +21,9 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 |---|---|---|
 | `src/ccnavi/__main__.py` | 入口。標準入出力を整えて `entry/cli.py` の `run` を呼ぶだけ | `entry` |
 | `src/ccnavi/infra/` | 土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー | どれも読まない |
-| `src/ccnavi/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否や失敗の数え・学びの蓄積 | `infra` |
+| `src/ccnavi/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否や失敗の数え・ターン中の印・学びの蓄積 | `infra` |
 | `src/ccnavi/policy/` | ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル | `infra`、`records` |
-| `src/ccnavi/tickets/` | チケット。置き場、合意の手続き、承認・レビュー済みの判定、フェーズ、リスク、操作 | `infra`、`records`、`policy` |
+| `src/ccnavi/tickets/` | チケット。置き場、合意の手続き、承認・レビュー済みの判定、フェーズ、リスク、操作、ユーザの発言のときの共通レイヤー・工程スキルのミラー | `infra`、`records`、`policy` |
 | `src/ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント・文書の検索 | `infra`、`records`、`policy`、`tickets` |
 | `src/ccnavi/entry/` | 入口。CLI・診断・lint・提案・版 | 下の全部。どこからも読まれない |
 
@@ -73,7 +73,7 @@ keywords: [モジュール, 構成, infra, records, policy, tickets, hook, entry
 | テンプレートとフロー | 作業・レビュー計画のテンプレートの読み込み・下書き・使う側、子チケットのフロー（置き場・形の検査・文面の整え方・描き方） |
 | レビュー（`review*`） | 依頼と確認、sh との契約の JSON の形、残った指摘の行き先の決定、親を閉じる |
 | 状態を動かす操作（`ops*`） | `ticket start / finish / cancel / record-risk`、動かしてよいかの検査、Stop で打ち忘れや道の途中を見つけて促す判定 |
-| 着手の前と片付け | 共通レイヤー・工程スキルのミラー、閉じた親子の退避、ワークツリーとブランチの片付け、終わっていない integrate の記録、直接作業の取り込み先 |
+| 着手の前と片付け | 閉じた親子の退避、ワークツリーとブランチの片付け、終わっていない integrate の記録、直接作業の取り込み先 |
 | write-and-push | sh が聞くこと。親子のチケットが対象か、置き場の変更の分け方、合流の前に聞くこと |
 | 学び（`learning*`・`consolidate`） | 気づきの記録・受信箱・判定記録の要約、処理すべきものの判定、SessionStart の通知、統合の子を作る |
 | そのほか | ユーザだけが打つ操作の表（`user_only`。hook の止めと端末要求が引く正本）、誰がどの経路で動かしたか（`via`）、保護対象の下書きの取り込み、ブランチの探索、セッション開始で示す一覧と却下された要求 |
