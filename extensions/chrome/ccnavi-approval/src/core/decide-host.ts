@@ -7,7 +7,8 @@
  *     探すのが失敗したら、作り直さずに止める。続きのコメントには `part=<i>` の印を付け、使い回した issue でも足りない分だけ付ける。
  * (2) 全返信。`{issue_url}` は作った issue の URL に置き換える。末尾に操作 ID の印を付け、同じ印の返信が既にあるスレッドには付けない。
  * (3) 全解決。
- * (4) MR へのコメント。`{issue_links}` は作った issue の URL の一覧に置き換える。
+ * (4) MR へのコメント。計画の `comment` があるときだけ行い、`{issue_links}` は作った issue の URL の一覧に置き換える。
+ *     `decidePhase` は `comment` を null で渡し、親のブランチへのコミットが済んでから自分で投稿する。
  * どこかで失敗したら、その時点で止めて、済ませたことと失敗の理由を返す。例外にはしない。同じキーは二度書かない。
  *
  * 呼ぶ側は、1 回の確定につき 1 度だけ呼ぶ。`writeLoop` の周の中では呼ばない。操作の記録は持たない。
@@ -487,7 +488,7 @@ export function describeHostResult(r: HostStepResult): string {
   if (r.replied.length > 0) done.push(`返信 ${r.replied.length} 件`);
   if (r.resolved.length > 0) done.push(`解決 ${r.resolved.length} 件`);
   if (r.commented) done.push("MR へのコメント");
-  const summary = (done.length > 0 ? `済んだこと: ${done.join("、")}` : "ホストには何も書いていません") + (r.searchTruncated ? "。issue の検索が上限まで読んでも見つからず、探し切れていません（以前に作った issue があれば重複します）" : "");
+  const summary = (done.length > 0 ? `済んだこと: ${done.join("、")}` : "ホストには何も書いていません") + (r.searchTruncated ? "。issue の検索が上限まで読んでも見つからず、探し切れていません（既に作った issue があれば重複します）" : "");
   if (r.ok || !r.failed) return summary;
   const f = r.failed;
   const retry = f.step === "plan" ? "" : "。MR を読み直して残った指摘を決め直せば、続きから進みます（同じ印の issue は作り直さず、返信も同じ印があれば付け直しません）";

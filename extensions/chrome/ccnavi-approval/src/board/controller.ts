@@ -132,7 +132,7 @@ export interface BoardOps {
   readonly decidePreview: (repo: RepoConfig, family: string, phase: number, deps: WriteDeps) => Promise<DecidePreview>;
   /**
    * 選んだ行き先を、issue・返信・解決の順にホストへ書いてから親のブランチへ 1 コミットする。
-   * `choices` が空（未解決の指摘が 0 件）のときは、従来の「レビュー済みにする」と同じ結果（`reviewed: true`）にする。
+   * `choices` が空（未解決の指摘が 0 件）のときは、「レビュー済みにする」と同じ結果（`reviewed: true`）にする。
    */
   readonly decide: (
     repo: RepoConfig,
@@ -215,7 +215,7 @@ export function sayDecide(out: DecideOutcome): ResultLine {
     return {
       kind: "halted",
       className: "notice error",
-      text: `ホストへの書き込みが途中で止まりました。済んだ分（${made}${reused}。返信 ${d.replied} 件・解決 ${d.resolved} 件）。止まった理由：${out.message}。ボードを読み直して、未解決の指摘だけ決め直してください。`,
+      text: `ホストへの書き込みが途中で止まりました。済んだ分（${made}${reused}。返信 ${d.replied} 件・解決 ${d.resolved} 件）。止まった理由：${out.message}。ボードを読み直して、未解決の指摘だけ決め直してください。済んだ分は MR の返信と issue に残りますが、決めた内容のまとめのコメントには載りません。`,
     };
   }
   if (out.kind === "mismatch") return { kind: "changed", className: "notice error", text: `指摘が変わっていたので反映していません：${out.message}` };
@@ -241,7 +241,7 @@ export function sayOutcome(outcome: Outcome, what: string): ResultLine {
   return { kind: outcome.kind, className: `notice ${outcome.kind === "written" ? "ok" : "error"}`, text };
 }
 
-/** 従来の「レビュー済みにする」の確認文（指摘が 0 件の決めるも同じ文面） */
+/** 「レビュー済みにする」の確認文（指摘が 0 件の決めるも同じ文面） */
 function reviewMessage(family: string, phase: number, warn: string): string {
   return `${family} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子チケットを done/ に移動し、レビュー済みマーカーとともに1つのコミットとして反映します。反映する前に、押した時点のスレッドとレビューを再取得して確認します。${warn}`;
 }

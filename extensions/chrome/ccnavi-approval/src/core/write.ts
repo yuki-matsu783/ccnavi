@@ -662,7 +662,7 @@ const CARRY_TRIES = 3;
  *   ホストで書き終えた `keep`・`issue` のキーは `carry` で渡し、読み直した結果で解決済みであることを Python が確かめる。
  *   ホストの読み取りが遅れて確かめが通らないときだけ、短く待って取り直す。
  * - 指摘が 0 件（`choices` が空）なら、ホストには書かず、「レビュー済みにする」と同じコミットを積む。コメントも投稿しない。
- *   従来の「レビュー済みにする」は、MR への書き込み権限を必要としなかった。
+ *   「レビュー済みにする」は MR への書き込み権限を要らないので、権限の足りない PAT でも通るようにする。
  * - 積むものが無ければ（`fix` が無く、見せたあとに増えた指摘がある）コミットを作らない（`oid` は空）
  * - (5) のコメントは、(1) の計画のもの（`{issue_links}` を作った・使った issue の URL の一覧に置き換える）。
  *   (1) を通らなかったとき（`fix` だけ）は、(4) の応答のもの。コミットが積めなかったときは投稿しない。
@@ -693,7 +693,7 @@ export async function decidePhase(
   let hostNote = "";
   let carry: string[] = [];
   /** (1) の計画のコメント（枠つき）。無ければ null */
-  let planned: { comment: string | null } | null = null;
+  let planned: { comment: string | null; followup: string } | null = null;
   let truncated = false;
 
   try {
@@ -709,7 +709,7 @@ export async function decidePhase(
         return { kind: "refused", message: res.problems.join("\n") || "残った指摘の行き先を反映できません", ...codeOf(res) };
       }
       const plan = res.host_plan;
-      planned = { comment: plan.comment };
+      planned = { comment: plan.comment, followup: res.followup };
       if (plan.issues.length > 0 || plan.replies.length > 0 || plan.resolves.length > 0) {
         // (2) 書く前の確かめ。足りなければ何も書かない
         const pre = await precheckHostPlan(ops, target, mr, plan);
@@ -779,6 +779,8 @@ export async function decidePhase(
   let oid = "";
   if (out.kind === "written") oid = out.oid;
   else if (out !== NO_COMMIT) {
+    // ホストに書いていないときの食い違いは、画面が読み直して選び直させる（mismatch）
+    if (out.kind === "changed" && out.code === DECIDE_MISMATCH && hostNote === "") return { kind: "mismatch", message: out.message };
     // 積めなかった。コメントは投稿しない（コミットが無いのに「決めた」と書かない）
     return afterHost(out, hostNote);
   }
@@ -786,8 +788,13 @@ export async function decidePhase(
   // (5) 決めた内容のコメント。0 件の確定では投稿しない。失敗はコミットを戻さず警告にする
   const decided = last as Awaited<ReturnType<typeof askDecide>> | null;
   const warnings: string[] = [];
-  if (truncated) warnings.push("issue の検索が上限まで読んでも見つからず、探し切れていません（以前に作った issue があれば重複します）");
-  const comment = planned ? planned.comment : (decided?.host_plan?.comment ?? null);
+  if (truncated) warnings.push("issue の検索が上限まで読んでも見つからず、探し切れていません（既に作った issue があれば重複します）");
+  let comment = planned ? planned.comment : (decided?.host_plan?.comment ?? null);
+  if (comment && decided) {
+    // 続きの子の名前と増えた指摘は、コミットを積んだ側（2 周目）の値にそろえる
+    if (planned?.followup && decided.followup && planned.followup !== decided.followup) comment = comment.split(`\`${planned.followup}\``).join(`\`${decided.followup}\``);
+    if (decided.pending_extra.length > 0 && !comment.includes("追加分")) comment = `${comment.replace(/\n*$/, "\n")}\n見せたあとに増えた指摘 ${decided.pending_extra.length} 件は判断待ち。\n`;
+  }
   if (comment && Object.keys(choices).length > 0) {
     try {
       await ops.postComment(target, mr, comment.split(ISSUE_LINKS_SLOT).join(made.map((i) => `- ${i.url}`).join("\n")));

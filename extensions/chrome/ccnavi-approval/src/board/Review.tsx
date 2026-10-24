@@ -41,7 +41,7 @@ export function Review({ panel, writable, onReview, decide }: { panel: ReviewPan
   // ccnavi の依頼のスレッドを数えないのは Python。ここは未解決の件数を取得した結果のとおりに出す
   const threads = [...(panel.copy?.threads ?? [])].sort((a, b) => Number(a.resolved) - Number(b.resolved));
   const unresolved = threads.filter((t) => !t.resolved).length;
-  // 未解決の指摘が残るフェーズは、行き先を決める画面から確定する（0 件のときは従来の「レビュー済みにする」）
+  // 未解決の指摘が残るフェーズは、行き先を決める画面から確定する（0 件のときは「レビュー済みにする」）
   const showDecide = writable && decide !== undefined && (unresolved > 0 || (panel.decide?.threads.length ?? 0) > 0);
   return (
     <section className="review" data-phase={String(panel.phase)}>

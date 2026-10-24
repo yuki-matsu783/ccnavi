@@ -409,7 +409,7 @@ test("CX-T274 決める: ホストへの書き込みが途中で止まったら�
   assert.equal(decides, 1);
   const r = h.c.snapshot().result;
   assert.equal(r.className, "notice error");
-  assert.match(r.text, /作った issue：https:\/\/example.test\/issues\/9。返信 1 件・解決 0 件）。止まった理由：解決に失敗（403）。.*未解決の指摘だけ決め直してください/);
+  assert.match(r.text, /作った issue：https:\/\/example.test\/issues\/9。返信 1 件・解決 0 件）。止まった理由：解決に失敗（403）。.*未解決の指摘だけ決め直してください。済んだ分は MR の返信と issue に残りますが、決めた内容のまとめのコメントには載りません/);
   assert.equal(h.c.snapshot().decide, undefined);
 });
 
@@ -486,7 +486,7 @@ test("CX-T276 決める: 開くたびの番号で、遅れて届いた読み取�
   assert.equal(h.c.snapshot().decide?.notice, "");
 });
 
-test("CX-T277 決める: 確認文に内訳と続きの子の注意が入る。0 件は従来のレビュー済みと同じ文面。失敗は画面を開いたまま理由を残す。要確認なら開かない", async () => {
+test("CX-T277 決める: 確認文に内訳と続きの子の注意が入る。0 件はレビュー済みと同じ文面。失敗は画面を開いたまま理由を残す。要確認なら開かない", async () => {
   let out: DecideOutcome = { kind: "refused", message: "権限が足りません" };
   const two = previewOf({
     threads: [

@@ -292,6 +292,17 @@ for (const kind of KINDS) {
     assert.ok(!(MARK in w.mock.files(FAMILY)));
   });
 
+  test(`CX-T369 ${label}: fix だけの確定で指摘が変わっていたら、ホストに書いていないので mismatch（画面が読み直して選び直す）`, async () => {
+    const w = world(kind, threadsOf(kind, 2));
+    const pv = await preview(w);
+    w.mock.w.threads[0].body = "A の指摘を書き換えた";
+    const out = await decidePhase(w.repo, FAMILY, 1, pick(pv), pv.digest, w.d);
+    assert.equal(out.kind, "mismatch", JSON.stringify(out));
+    assert.equal("hostWritten" in out, false);
+    assert.equal(w.at.length, 0);
+    assert.equal(commits(w), 0);
+  });
+
   test(`CX-T361 ${label}: 全 fix でコメントだけ権限不足（拒否）になっても、コミットは積み、警告にとどめる`, async () => {
     const w = world(kind, threadsOf(kind, 2));
     const pv = await preview(w);
@@ -311,6 +322,9 @@ for (const kind of KINDS) {
     assert.deepEqual([out.reviewed, out.followup, out.pendingExtra], [false, "i0004-01-02", 1]);
     assert.match(sayDecide(out).text, /増えた指摘 1 件は判断待ちで、フェーズはレビュー済みにしていません/);
     assert.equal(w.mock.w.threads[2].resolved, false);
+    // MR のコメントにも、続きの子と増えた指摘がコミットした側の値で載る
+    assert.ok(w.mock.w.comments[0].includes(`\`${out.followup}\``));
+    assert.match(w.mock.w.comments[0], /見せたあとに増えた指摘 1 件は判断待ち/);
   });
 
   test(`CX-T363 ${label}: 見せたあとに指摘が増えて積むものが無ければ、文面は「行き先は反映したが、増えた指摘が判断待ち」と言う`, async () => {
@@ -396,6 +410,19 @@ test("CX-T368 ホスト書き込みの後の 2 周目で、見せた指摘が変
   assert.match(out.kind === "changed" ? out.message : "", /^ホストへの書き込み.*は済んでいます/);
   assert.equal("hostWritten" in out && out.hostWritten, true);
   assert.equal(commits(w), 0);
+});
+
+test("CX-T370 issue の本文が長くても、本文と続きのコメントは 1 回に書ける上限（60000 字）に収まって書ける。境界の前後と改行の無い長い本文", async () => {
+  for (const size of [58900, 59100, 150000]) {
+    const w = world("github", [thread("PRRT_A", { body: "あ".repeat(size), noteId: 101 })]);
+    const pv = await preview(w);
+    const out = await decidePhase(w.repo, FAMILY, 1, pick(pv, "issue"), pv.digest, w.d);
+    assert.equal(out.kind, "written", `${size}: ${JSON.stringify(out).slice(0, 300)}`);
+    const issue = w.mock.w.issues[0];
+    assert.ok(issue.body.length <= 60000, `${size}: 本文 ${issue.body.length}`);
+    for (const c of issue.comments) assert.ok(c.length <= 60000, `${size}: コメント ${c.length}`);
+    if (size >= 59100) assert.ok(issue.comments.length > 0, `${size}: 続きのコメントに分ける`);
+  }
 });
 
 test("CX-T360 結果の一言: コミットが無いときはその旨を、コメントだけの失敗は警告として同じ欄に出す", () => {

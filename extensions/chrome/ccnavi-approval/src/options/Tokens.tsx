@@ -110,7 +110,7 @@ export function Tokens({ revision }: { readonly revision: number }): JSX.Element
       </form>
       <Status id="token-msg" said={said} />
       <p className="hint">
-        PAT は、承認とレビュー完了の状態を親ブランチに反映するときと、「始める」で Issue から親ブランチを作成するときに使います。GitHub では fine-grained token を作り、対象のリポジトリを限定して、Contents: Read and write（ブランチの作成にも使用）・Metadata: Read-only・Pull requests: Read and write（指摘への返信と解決、MR へのコメント）・Issues: Read and write（issue の作成と検索）を選びます。classic の PAT なら repo スコープです。GitLab では api スコープを選び（Commits API は write_repository では書き込めないため）、ロールは Developer 以上にします（指摘の解決に要ります）。残った指摘の行き先を決める操作は、書く前に権限を確かめ、足りなければ何も書かずに必要な権限の名前を出して止まります。プロジェクトアクセストークンを作成できる場合は、アクセス対象をそのプロジェクトに限定できます。作成できない場合は個人の PAT になり、プロジェクトを限定できません。期限は 90 日を選びます。エージェント用のトークンとは別に作ります。PAT は、このブラウザのプロファイル内に暗号化されずに保存され、同じ OS ユーザのプロセスから読み取れます。リポジトリを限定した最小権限のトークンにしてください。期限はホストの応答から取得します。取得できない場合は上の欄の日付を使用し、有効期限の7日前から、ボードと拡張機能のアイコンで通知します。
+        PAT は、承認とレビュー完了の状態を親ブランチに反映するときと、「始める」で Issue から親ブランチを作成するときに使います。GitHub では fine-grained token を作り、対象のリポジトリを限定して、Contents: Read and write（ブランチの作成にも使用）・Metadata: Read-only・Pull requests: Read and write（残った指摘の行き先を決めるときの、指摘への返信と解決、MR へのコメント）・Issues: Read and write（同じく issue の作成と検索）を選びます。classic の PAT なら repo スコープです。GitLab では api スコープを選び（Commits API は write_repository では書き込めないため）、ロールは、残った指摘の行き先を決める操作のために Developer 以上にします（指摘の解決に要ります）。残った指摘の行き先を決める操作は、書く前に権限を確かめ、足りなければ何も書かずに必要な権限の名前を出して止まります。プロジェクトアクセストークンを作成できる場合は、アクセス対象をそのプロジェクトに限定できます。作成できない場合は個人の PAT になり、プロジェクトを限定できません。期限は 90 日を選びます。エージェント用のトークンとは別に作ります。PAT は、このブラウザのプロファイル内に暗号化されずに保存され、同じ OS ユーザのプロセスから読み取れます。リポジトリを限定した最小権限のトークンにしてください。期限はホストの応答から取得します。取得できない場合は上の欄の日付を使用し、有効期限の7日前から、ボードと拡張機能のアイコンで通知します。
       </p>
       <ul id="token-links" className="links">
         {hosts.map((h) => (

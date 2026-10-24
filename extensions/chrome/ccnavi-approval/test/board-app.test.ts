@@ -396,7 +396,7 @@ test("CX-T270 決める画面: 既定は全件 fix で確定が押せる。一�
   const f = fake({ sections: sections(withThreads(2)), state: "done" });
   (f.controller as { actions: Actions }).actions = fakeActions;
   await mountOn(f.controller);
-  // 閉じているときは入口のボタンだけ（従来の「レビュー済みにする」は出さない）
+  // 閉じているときは入口のボタンだけ（「レビュー済みにする」は出さない）
   assert.deepEqual([...doc.querySelectorAll<HTMLElement>("section.review button")].map((b) => b.dataset.action), ["decide-open"]);
   await act(async () => $<HTMLButtonElement>("button[data-action=decide-open]").click());
   assert.deepEqual(decided, ["open i0001 1"]);
@@ -443,7 +443,7 @@ test("CX-T271 決める画面: 見せ直す（ダイジェストが変わる）�
   assert.equal(doc.querySelector(".decide-bulk"), null);
 });
 
-test("CX-T272 決める画面: 扱えない指摘は選択肢を出さず理由を言い、確定を出さない。0 件は従来の「レビュー済みにする」", async () => {
+test("CX-T272 決める画面: 扱えない指摘は選択肢を出さず理由を言い、確定を出さない。0 件は「レビュー済みにする」", async () => {
   decided.length = 0;
   const f = fake({ sections: sections(withThreads(2)), state: "done", decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2, { unsupported: { 1: "差分の外のコメントです" } }), deciding: false, notice: "" } });
   (f.controller as { actions: Actions }).actions = decideActions();
@@ -452,12 +452,12 @@ test("CX-T272 決める画面: 扱えない指摘は選択肢を出さず理由�
   assert.match($("li[data-key=k1] .decide-unsupported").textContent ?? "", /Chrome では扱えません。VS Code で。差分の外のコメントです/);
   assert.equal(doc.querySelector("button[data-action=decide-confirm]"), null);
   assert.equal(doc.querySelectorAll("li[data-key=k0] input").length, 3);
-  // 指摘が 0 件のフェーズ（従来どおり）
+  // 指摘が 0 件のフェーズ
   await f.set({ sections: sections({ board: board(), attention: {}, issues: undefined }), decide: undefined });
   assert.deepEqual([...doc.querySelectorAll<HTMLElement>("section.review button")].map((b) => b.dataset.action), ["review", "review"]);
 });
 
-test("CX-T279 決める画面: 入口の操作を渡さない画面では従来の「レビュー済みにする」が出る。同じ名前の親が別のリポジトリにあっても、開いたリポジトリにだけ画面が出る", async () => {
+test("CX-T279 決める画面: 入口の操作を渡さない画面では「レビュー済みにする」が出る。同じ名前の親が別のリポジトリにあっても、開いたリポジトリにだけ画面が出る", async () => {
   const plain = withThreads(1);
   (plain.board.families[0].reviews![0] as unknown as { problems: string[] }).problems = [];
   const f = fake({ sections: sections(plain), state: "done" });
