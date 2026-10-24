@@ -3,7 +3,7 @@ title: CCNAVI.md の書き方
 type: guide
 description: .ccnavi/CCNAVI.md の条件（ccnavi:if / else / endif）と差し込み（{{名前}}）の書き方、条件の名前の一覧
 tags: [ccnavi-md, session-start]
-keywords: [CCNAVI.md, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み, 入れ子, 判定, ccnavi-md, lint, SessionStart]
+keywords: [CCNAVI.md, 非対話, non_interactive, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み, 入れ子, 判定, ccnavi-md, lint, SessionStart]
 ---
 
 # CCNAVI.md の書き方
