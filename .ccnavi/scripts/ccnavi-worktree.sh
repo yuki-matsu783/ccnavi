@@ -687,6 +687,20 @@ if [ "$c6" = yes ]; then
 	unverified) printf '案内: リモート未確認で切った。つながったら ccnavi-git.sh fetch origin %s で確かめ、遅れていれば取り込む前に合わせる。ユーザにも伝える\n' "$target" ;;
 	esac
 fi
+# ワークスペースルートで打たれ、projects/ の下にリポジトリがあるときは、projects/ の変更なら
+# cd してから打ち直すよう案内する。断らない。ワークスペース自身の作業もルートから打つのが正しく、
+# どのプロジェクトの話かは sh には分からない。単体 clone（projects/ が無い）と、プロジェクトの中で
+# 打ったときは出さない。
+top_cmp=$(ccnavi_phys "$top" | tr '[:upper:]' '[:lower:]')
+root_cmp=$(ccnavi_phys "$root" | tr '[:upper:]' '[:lower:]')
+if [ "$top_cmp" = "$root_cmp" ]; then
+	for pj_git in "$root"/projects/*/.git; do
+		if [ -e "$pj_git" ]; then
+			printf '案内: projects/ の下のプロジェクトの変更を頼まれたなら、このワークツリーはワークスペース自身のリポジトリに切れている。片付けて、projects/<名前> へ cd してから打ち直す\n'
+			break
+		fi
+	done
+fi
 # 直接作業の名前の形は実行ファイルに聞く。取れなければ案内は出さない。
 name_note=""
 if name_bin=$(ccnavi_bin "$root"); then
