@@ -48,6 +48,22 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 `matcher` は全ツールにする（絞ると書かなかったツールで hook が起動しない）。同じイベントの他の hook は並行して順不同で走るので、
 各 hook はそれだけで成立させる。
 
+### 4.2.1 放置したセッションの引き継ぎ促し
+
+会話が大きく育ったまま放置されると、プロンプトキャッシュが時間切れで消え、続きの送り直しの費用が増える。消える前に、次のセッションへの引き継ぎ文書を書かせる。判定は `records/idlehandoff.py`、入口は `entry/cli_idle.py`（`ccnavi idle notice|start|check|reset`）、待機は `.ccnavi/scripts/ccnavi-idle.sh`（`notice`・`start`・`reset`）が受け持つ。導入スクリプトは、本体とは別の 3 行として登録する（`--no-idle` で外す）。
+
+| 登録 | 呼ぶもの | すること |
+|---|---|---|
+| `Stop`（同期、上限 10 秒） | `ccnavi-idle.sh notice` → `ccnavi idle notice` | 会話の大きさが促す大きさ以上なら、事情と勧めをユーザに説明する `systemMessage` を、1 セッションに 1 回だけ返す（`<state>/idle/<セッション>.notice` が済みの印） |
+| `Stop`（`asyncRewake`、上限 3600 秒） | `ccnavi-idle.sh start` → `ccnavi idle start` | 促す大きさ以上なら状態を `waiting`（ランダムな印つき）にして待ち時間を返し、sh が `sleep` する。起きたら `ccnavi idle check` に聞き、`fire` なら続く行を標準エラーに出して終了コード 2 で終わる（asyncRewake がセッションを起こし、標準エラーが指示になる） |
+| `UserPromptSubmit`（同期、上限 10 秒） | `ccnavi-idle.sh reset` → `ccnavi idle reset` | 状態を `active` に戻す。起こすときの指示（目印 `[idle-handoff]`）とバックグラウンド作業の完了通知では戻さない |
+
+- 会話の大きさは、トランスクリプトの末尾から、サブエージェントでない最新の応答の `usage`（`input_tokens` + `cache_read_input_tokens` + `cache_creation_input_tokens`）を足して読む。読めなければ促さない。
+- キャッシュの保持時間は、直近でキャッシュを書き込んだ応答の `cache_creation` の内訳で見分ける（5 分側に書き込みがあれば 5 分、無ければ 1 時間）。待ち時間は、1 時間なら 55 分、5 分なら 4 分。`CCNAVI_HANDOFF_WAIT_SECONDS` が正の整数ならその秒数にする（確かめ用）。
+- 促す大きさは `基準 + CCNAVI_HANDOFF_SUGGEST_TOKENS`（既定 400000、0 で無効）。基準は 0 から始まり、引き継ぎを書かせた（`check` が `fire` を返した）ときの会話の大きさに進む。会話が基準より小さくなったら 0 に戻る。
+- 状態は `<state>/idle/<セッション>.json`（`state`・`token`・`due`・`base`）。`fired` の間は、ユーザが打つまで `start` は待機を始めない。古い待機は、印が合わないので何もせず終わる。7 日より古いファイルは `start` が消す。
+- 次のときは何もしない: 見ている人がいない実行（`CLAUDE_CODE_SESSION_ATTENDED=0`、`CLAUDE_CODE_ENTRYPOINT` が `sdk` で始まる）、サブエージェントの呼び出し（`agent_id` がある）、`Stop` 以外のイベント、使えないセッション識別子。どの動詞も終了コード 0 で終わる（`ccnavi-idle.sh start` が起こすときの 2 を除く）。
+
 ### 4.3 設定の解決
 
 設定は環境変数 `CCNAVI_*` で渡す。プロジェクトは `.claude/settings.json` の `env` ブロックに書く。読む順は
@@ -171,7 +187,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 | `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_ENTRY_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場の env は書かない（置き場は固定。残っていても読まない） |
 | `.claude/settings.json` の `hooks` | 8 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true` と `git.repositoryScanMaxDepth: 2`。足りないキーだけを足す。`--no-vscode` で触らない |
-| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,fetch,dirs,session-start,sync,clean,branches,start,stage,worktree,launcher}.sh`、ユーザ専用の `ccnavi-user-{agree,push-approved,close-early,decide,clean-branch,lib-review}.sh`、共通部の部品 `ccnavi-common-{state,lock,write-and-push,host,log,review}.sh` と `ccnavi-clean.js`。入口（`ccnavi-session-start.sh`。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない）。使い方の文書は配布元の `.ccnavi/docs/*.md` を全部 `.ccnavi/docs/` へ配る（`--docs` の索引はここだけ `.ccnavi/` の下でも載せる。配布先の既にあるものは `--force` のときだけ入れ替える）。配布元に `.ccnavi/docs/` が無ければ「配布元に無くて配れないもの」に挙げる。共通の作業・レビュー計画のテンプレートは配布元の `.ccnavi/config/common/templates/*.yml` を 1 本ずつ同じ場所へ配る（既にあるものは `--force` のときだけ入れ替える。配布元に置き場や `*.yml` が無ければ何もせず、何も言わない）。共通の工程スキルは、配布元の `.claude/skills/<名前>/SKILL.md` の frontmatter に `process: true` を持つものについて、`SKILL.md` と `references/common/` の下の `.md` を同じ場所へ 1 ファイルずつ配る（`.DS_Store` や `ccnavi-index.jsonl` のような生成物は配らない。`process: true` の読み方はユーザの発言のときの同期が写す判定に寄せ、CRLF の改行と、行末の `# コメント`は許し、閉じの `---` が無いものは配らない。配布先の道にディレクトリでないものがあるときは、そのファイルだけ配らずに挙げる）（既にあるものは `--force` のときだけ入れ替える。ユーザの発言のときの同期がプロジェクトへ写す元になる。`.ccnavi/docs/skill-processes.md`）。配布元に該当するスキルが無ければ何もせず、何も言わない |
+| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,fetch,dirs,idle,session-start,sync,clean,branches,start,stage,worktree,launcher}.sh`、ユーザ専用の `ccnavi-user-{agree,push-approved,close-early,decide,clean-branch,lib-review}.sh`、共通部の部品 `ccnavi-common-{state,lock,write-and-push,host,log,review}.sh` と `ccnavi-clean.js`。入口（`ccnavi-session-start.sh`。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない）。使い方の文書は配布元の `.ccnavi/docs/*.md` を全部 `.ccnavi/docs/` へ配る（`--docs` の索引はここだけ `.ccnavi/` の下でも載せる。配布先の既にあるものは `--force` のときだけ入れ替える）。配布元に `.ccnavi/docs/` が無ければ「配布元に無くて配れないもの」に挙げる。共通の作業・レビュー計画のテンプレートは配布元の `.ccnavi/config/common/templates/*.yml` を 1 本ずつ同じ場所へ配る（既にあるものは `--force` のときだけ入れ替える。配布元に置き場や `*.yml` が無ければ何もせず、何も言わない）。共通の工程スキルは、配布元の `.claude/skills/<名前>/SKILL.md` の frontmatter に `process: true` を持つものについて、`SKILL.md` と `references/common/` の下の `.md` を同じ場所へ 1 ファイルずつ配る（`.DS_Store` や `ccnavi-index.jsonl` のような生成物は配らない。`process: true` の読み方はユーザの発言のときの同期が写す判定に寄せ、CRLF の改行と、行末の `# コメント`は許し、閉じの `---` が無いものは配らない。配布先の道にディレクトリでないものがあるときは、そのファイルだけ配らずに挙げる）（既にあるものは `--force` のときだけ入れ替える。ユーザの発言のときの同期がプロジェクトへ写す元になる。`.ccnavi/docs/skill-processes.md`）。配布元に該当するスキルが無ければ何もせず、何も言わない |
 | 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/ccnavi-index.jsonl` の 1 行と、使い捨ての置き場 `/scratchpad` の 1 行と、実行時の記録の置き場 `/logs/` の 1 行。索引・`/scratchpad`・`/logs/` の行はそれぞれ別の見出しの下に入り、`/scratchpad` は同等以上の `/scratchpad/`・`scratchpad/`・`scratchpad` が既にあれば足さない。`scratchpad` を否定する行（`!/scratchpad` など）があればユーザの除外として足さない。`/logs/` は同等以上の `/logs`・`logs/`・`logs` が既にあれば足さず、`logs` の中身を否定する行（`!/logs`・`!/logs/diag` など）があればユーザの除外として足さない。`ccnavi-index.jsonl` の行が既にあれば足さない。`ccnavi-index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトの `.gitignore` には、`--docs` が索引を書く前に足す（10） |
 
 置き場は 2 つに分けて固定する。
@@ -242,6 +258,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 | `.ccnavi/scripts/ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。ユーザが打つ（エージェントからは止まる）。端末の `ccnavi-user-agree.sh`・ボードの承認とフローの保存・ユーザの判断の入口のあとに呼ばれる。`[<親>...]` で親子のチケットを限る。取り込み済みの親子のチケットはロックを取り、取り込んでから送る |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になる統合先ブランチを取ってくる。進めるのは fast-forward だけ |
 | `.ccnavi/scripts/ccnavi-session-start.sh` | セッション開始時の入口。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ。SessionStart にはこれを登録する |
+| `.ccnavi/scripts/ccnavi-idle.sh` | 放置したセッションの引き継ぎ促し（`start`・`notice`・`reset`）。`Stop` に 2 行、`UserPromptSubmit` に 1 行で登録する（4.2.1） |
 | `.ccnavi/scripts/ccnavi-dirs.sh` | セッション開始時に、プロジェクト直下のディレクトリを更新が新しい順に最大 10 件出す。超えるときは `ls` を案内する |
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを診断する（閉じたかはホストの MR で決める） |
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |

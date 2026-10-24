@@ -67,6 +67,6 @@ ccnavi を入れる作業を、状況の調査 → 足りないものの案内 �
 - トークン・パスワードを会話に出させない、書かせない。`glab auth login` は別の端末で打ってもらう
 - 道具は勝手に入れない。入れ方を示し、ユーザに打ってもらう
 - `ng` を残したまま先へ進まない。直せなければユーザに報告して止まる
-- `--mode enable`・`--force`・`--no-fetch`・`--clear-quarantine` は、ユーザの了承なしに付けない。`--force` は [references/update.md](references/update.md) の手順を通してからにする
+- `--mode enable`・`--force`・`--no-fetch`・`--no-idle`・`--clear-quarantine` は、ユーザの了承なしに付けない。`--force` は [references/update.md](references/update.md) の手順を通してからにする
 - 配布元の信頼（受け取り元・チェックサム）を確かめずに進めない
 - TodoWrite と Agent ツールを使わない

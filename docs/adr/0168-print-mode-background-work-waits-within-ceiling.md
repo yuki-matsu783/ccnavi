@@ -5,7 +5,7 @@ description: claude -p で、ターン終了後に残るバックグラウンド
 tags: [claude-code, process, experiment]
 keywords: [claude -p, バックグラウンド, サブエージェント, 待ち, 上限, CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS, CLAUDE_CODE_BG_TASKS_REPORT_RUNNING, Monitor, timeout, Bash, 実験]
 ---
-# ADR-0167: claude -p は、ターン終了後のバックグラウンド作業を待ち上限の範囲で待つ。待ちを消す環境変数に注意する
+# ADR-0168: claude -p は、ターン終了後のバックグラウンド作業を待ち上限の範囲で待つ。待ちを消す環境変数に注意する
 
 状態: 提案（決定の方針は、採否をユーザが決める。コードは変えていない）
 

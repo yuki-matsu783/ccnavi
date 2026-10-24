@@ -92,6 +92,15 @@ EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure 
 # タイムアウト監視（1 回 15 秒）が重なっても収まる長さにしてある。
 FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-session-start.sh"'
 FETCH_TIMEOUT=60
+# 放置したセッションの引き継ぎ促し（ccnavi-idle.sh）。会話が大きく育ったまま放置されると、モデルが覚えている
+# 会話のコピー（プロンプトキャッシュ）が時間切れで消え、続きを送り直す料金が大きく増える。消える前に、次のセッションへの
+# 引き継ぎ文書を書かせる。Stop に 2 本（ユーザへの知らせ `notice`、放置を待つ `start`）、UserPromptSubmit に 1 本
+# （入力したら待機をやめる `reset`）を、本体とは別の行として登録する。`start` は放置の間 sh が待つので、
+# バックグラウンドで走らせ（asyncRewake）、上限を長くする。起こす判断は ccnavi 自身が決める
+# （CCNAVI_HANDOFF_SUGGEST_TOKENS が 0 なら何もしない）。
+IDLE_PREFIX='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-idle.sh"'
+IDLE_TIMEOUT=10
+IDLE_WAIT_TIMEOUT=3600
 
 DEFAULT_MODE="dry-run"
 # CCNAVI_ENTRY_PATH に書くパス。hook が起動する振り分けの sh で、固定。
@@ -164,7 +173,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-fetch.sh ccnavi-dirs.sh ccnavi-session-start.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-write-and-push.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common-review.sh ccnavi-common.sh ccnavi-user-lib-review.sh ccnavi-user-push-approved.sh ccnavi-user-agree.sh ccnavi-user-decide.sh ccnavi-user-close-early.sh ccnavi-user-clean-branch.sh ccnavi-fetch.sh ccnavi-dirs.sh ccnavi-session-start.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-idle.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 mode="$DEFAULT_MODE"
 # 明示されたかどうかを別の変数で持つ。--force で置き換えてよいのは、ユーザがこの実行で
@@ -181,6 +190,7 @@ force=no
 check=no
 vscode=yes
 fetch=yes
+idle=yes
 target=""
 # 配布元。指定されたかどうかを別の変数で持つ。既定で埋めただけの配布元が使えないのは
 # 「組み立てていない」で済むが、ユーザが指定したものが使えないのは誤り。
@@ -216,6 +226,10 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --no-vscode               .vscode/settings.json には触らない
   --no-fetch                セッション開始時の入口（ccnavi-session-start.sh）を hook に登録しない。
                             取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する（ディレクトリ一覧も出なくなる）
+  --no-idle                 放置したセッションの引き継ぎ促し（ccnavi-idle.sh）を hook に登録しない。
+                            会話が大きく育ったまま放置されると、キャッシュが切れて続きの料金が増える。そのため、切れる前に
+                            次のセッションへの引き継ぎ文書を書かせる。要らないときに指定する
+                            （環境変数 CCNAVI_HANDOFF_SUGGEST_TOKENS を 0 にしても止められる）
 
 CCNAVI_ENTRY_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 3 本（.ccnavi/config/common/rules.yml、
@@ -286,6 +300,10 @@ while [ "$#" -gt 0 ]; do
 		;;
 	--no-fetch)
 		fetch=no
+		shift
+		;;
+	--no-idle)
+		idle=no
 		shift
 		;;
 	-h | --help | help)
@@ -1050,7 +1068,9 @@ forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length 
 REGISTERED='def commands($ev): [ (.hooks[$ev] // [])[] | (.hooks // [])[] | .command // "" ];
 	def exact($ev; $cmd): [ commands($ev)[] | select(. == $cmd) ] | length > 0;
 	def fetching($ev): [ commands($ev)[] | select(test("ccnavi-session-start")) ] | length > 0;
+	def idling($ev; $verb): [ commands($ev)[] | select(test("ccnavi-idle")) | select(endswith(" " + $verb)) ] | length > 0;
 	def looks($ev): [ commands($ev)[] | ascii_downcase | select(test("ccnavi-session-start") | not)
+		| select(test("ccnavi-idle") | not)
 		| select(test("(^|[^a-z0-9])ccnavi([^a-z0-9]|$)")) ] | length > 0;'
 
 missing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" '
@@ -1097,6 +1117,15 @@ if [ "$fetch" = yes ]; then
 	missing_fetch=$(printf '%s' "$current" | jq -r "
 		$REGISTERED
 		if fetching(\"SessionStart\") then empty else \"SessionStart（.ccnavi/scripts/ccnavi-session-start.sh。セッション開始時の取り込みと一覧）\" end
+	")
+fi
+missing_idle=""
+if [ "$idle" = yes ]; then
+	missing_idle=$(printf '%s' "$current" | jq -r "
+		$REGISTERED
+		( if idling(\"Stop\"; \"notice\") then empty else \"Stop（.ccnavi/scripts/ccnavi-idle.sh notice。会話が大きいときのユーザへの知らせ）\" end ),
+		( if idling(\"Stop\"; \"start\") then empty else \"Stop（.ccnavi/scripts/ccnavi-idle.sh start。放置されたら引き継ぎ文書を書かせる待機）\" end ),
+		( if idling(\"UserPromptSubmit\"; \"reset\") then empty else \"UserPromptSubmit（.ccnavi/scripts/ccnavi-idle.sh reset。入力したら待機をやめる）\" end )
 	")
 fi
 
@@ -1301,6 +1330,10 @@ report() {
 		printf '%s hook（セッション開始時の取り込みと一覧。不要なら --no-fetch）:\n' "$4"
 		printf '%s\n' "$missing_fetch" | sed 's/^/  /'
 	fi
+	if [ -n "$missing_idle" ]; then
+		printf '%s hook（放置したセッションの引き継ぎ促し。不要なら --no-idle）:\n' "$4"
+		printf '%s\n' "$missing_idle" | sed 's/^/  /'
+	fi
 	if [ -n "$replacing_env" ]; then
 		printf '%s env:\n' "$3"
 		printf '%s\n' "$replacing_env" | sed 's/^/  /'
@@ -1444,7 +1477,7 @@ report_user_bin_path() {
 # 不足の 2 つだけで決めると、CCNAVI_MODE=disable が書かれた設定に --check を
 # 実行しても「揃っています」と表示することになる。
 settled=yes
-if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] ||
+if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] || [ -n "$missing_idle" ] ||
 	[ -n "$replacing_env" ] || [ -n "$differing_env" ] || [ -n "$other_hooks" ] ||
 	[ -n "$missing_vscode" ] || [ -n "$differing_vscode" ] || [ -n "$vscode_blocked" ]; then
 	settled=no
@@ -1601,7 +1634,7 @@ fi
 # 書き込む作業があるか。値が違うだけで指定されていないものと、別の表記での
 # 登録は、このスクリプトが触らないので数えない。ただし、何も言わずには終わらせない。
 settings_work=no
-if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] ||
+if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] || [ -n "$missing_idle" ] ||
 	[ -n "$replacing_env" ]; then
 	settings_work=yes
 fi
@@ -1714,6 +1747,10 @@ if [ "$settings_work" = yes ]; then
 		--arg fetch "$fetch" \
 		--arg fetch_cmd "$FETCH_COMMAND" \
 		--argjson fetch_timeout "$FETCH_TIMEOUT" \
+		--arg idle "$idle" \
+		--arg idle_prefix "$IDLE_PREFIX" \
+		--argjson idle_timeout "$IDLE_TIMEOUT" \
+		--argjson idle_wait_timeout "$IDLE_WAIT_TIMEOUT" \
 		"
 		$REGISTERED
 		(\$env | with_entries(select(.key as \$k | \$forced | index(\$k) != null))) as \$overrides
@@ -1731,6 +1768,24 @@ if [ "$settings_work" = yes ]; then
 			.hooks.SessionStart = ((.hooks.SessionStart // []) + [{
 				matcher: \"\",
 				hooks: [{type: \"command\", command: \$fetch_cmd, timeout: \$fetch_timeout}]
+			}])
+		else . end
+		| if \$idle == \"yes\" and (idling(\"Stop\"; \"notice\") | not) then
+			.hooks.Stop = ((.hooks.Stop // []) + [{
+				matcher: \"\",
+				hooks: [{type: \"command\", command: (\$idle_prefix + \" notice\"), timeout: \$idle_timeout}]
+			}])
+		else . end
+		| if \$idle == \"yes\" and (idling(\"Stop\"; \"start\") | not) then
+			.hooks.Stop = ((.hooks.Stop // []) + [{
+				matcher: \"\",
+				hooks: [{type: \"command\", command: (\$idle_prefix + \" start\"), timeout: \$idle_wait_timeout, asyncRewake: true}]
+			}])
+		else . end
+		| if \$idle == \"yes\" and (idling(\"UserPromptSubmit\"; \"reset\") | not) then
+			.hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) + [{
+				matcher: \"\",
+				hooks: [{type: \"command\", command: (\$idle_prefix + \" reset\"), timeout: \$idle_timeout}]
 			}])
 		else . end
 	")
@@ -1964,6 +2019,9 @@ for name in $DEPLOY_SCRIPTS; do
 			;;
 		ccnavi-worktree.sh)
 			why="作業用のワークツリーを統合先から切る"
+			;;
+		ccnavi-idle.sh)
+			why="放置したセッションに引き継ぎ文書を書かせる待機"
 			;;
 		ccnavi-common-*.sh)
 			why="代わりに通る sh が起動して最初に読む共通部の部品"
