@@ -434,7 +434,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         tabIndex={-1}
         style={{ ...(place ?? {}), width, visibility: measured && (spot === undefined || place !== undefined) ? "visible" : "hidden" }}
       >
-        <button type="button" className="tour-close" data-action="tour-skip" title="案内を閉じる" aria-label="案内を閉じる" onClick={onClose}>
+        <button type="button" className="tour-close" data-action="tour-skip" title="案内を閉じる（Esc）" aria-label="案内を閉じる" onClick={onClose}>
           ×
         </button>
         <p className="tour-count">

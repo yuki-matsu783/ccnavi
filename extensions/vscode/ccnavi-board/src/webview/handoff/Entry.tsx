@@ -8,7 +8,7 @@ import type { JSX } from "react";
 import type { HandoffEntry } from "../../core/handoff-view.js";
 import { blockReason } from "../../core/handoffmodel.js";
 import type { Lock } from "../../core/lock.js";
-import { kindLabel, stateLabel, stateTone } from "./text.js";
+import { DEFENSE_NOTE, kindLabel, stateLabel, stateTone } from "./text.js";
 
 /** ターミナルで打つコマンドの案内の状態。まだ頼んでいなければ undefined */
 export interface TerminalState {
@@ -134,6 +134,7 @@ function TerminalGuide({
       <p>
         この対象（{kindLabel(entry.kind)}）はボードから取り込めません。差分を読んだうえで、ターミナルで次のコマンドを打って取り込みます。
       </p>
+      {entry.kind === "defense" && <p className="hint">{DEFENSE_NOTE}</p>}
       {terminal === undefined ? (
         <button type="button" className="action small" data-action="show-terminal" disabled={disabled} onClick={onTerminal}>
           ターミナルのコマンドを出す

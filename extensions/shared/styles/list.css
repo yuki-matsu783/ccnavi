@@ -74,3 +74,5 @@ details.more > .sub { display: grid; grid-template-columns: 150px minmax(0, 1fr)
   .field > .cap { text-align: left; margin-top: 4px; }
   .row-head { row-gap: var(--gap-1); }
 }
+/* 欄の下の説明。2 列のときは入力欄の列、1 列のときはその列 */
+.field > .hint { grid-column: -2 / -1; margin: 0; }
