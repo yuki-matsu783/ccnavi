@@ -1296,6 +1296,40 @@ next_ticket_lines() {
 	printf '次: ワークツリーの中で sh %s/ccnavi-launcher.sh ticket new %s --title %s --plan quick-work --scope %s%s%s で提案を作る。作れたら、承認をユーザに頼んで返事を待つ\n' \
 		"$scripts" "$nt_id" "$nt_title" "$nt_scope" "$nt_issue" "$nt_mr"
 	printf '案内: 設計判断が要らない作業は、範囲が複数のディレクトリや文書・設定にまたがっても quick-work。大きい作業は --plan を design,implement のように変える（型と範囲は .ccnavi/config/common/phases.yml）。提案は手で書かず、承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる\n'
+	template_note
+}
+
+# 使えるテンプレートが 1 本以上あるときだけ、--template を案内する 1 行を出す。
+# 件数は `ccnavi --templates --json` の usable（error で使えないものは数えない）と同じ。実行ファイルを呼ぶのは 1 回だけ。
+# 実行ファイルや jq が無い・時間切れ・読めないときは、何も出さずに診断ログへ残す
+template_note() {
+	tn_bin=$(ccnavi_bin "$root") || {
+		log_info テンプレートの案内を省いた -- "reason=no-exe"
+		return 0
+	}
+	command -v jq >/dev/null 2>&1 || {
+		log_info テンプレートの案内を省いた -- "reason=no-jq"
+		return 0
+	}
+	# ticket new --template が引く層に合わせる（projects/<名前>/ ならそのプロジェクトの層）
+	tn_project=$(ccnavi_project "$top" "$root")
+	tn_rc=0
+	tn_n=""
+	tn_project_args=""
+	[ -z "$tn_project" ] || tn_project_args="--layer $tn_project"
+	ccnavi_run_timed 5 /dev/null "$state/start-templates-$$" /dev/null "$tn_bin" --root "$root" --templates $tn_project_args --json || tn_rc=$?
+	if [ "$tn_rc" -eq 0 ]; then
+		tn_n=$(jq -r '[.templates[]? | select(.usable == true)] | length' "$state/start-templates-$$" 2>/dev/null | tr -d '\r') || tn_n=""
+	fi
+	rm -f "$state/start-templates-$$"
+	case "${tn_n:-}" in
+	'' | *[!0-9]*)
+		log_warn テンプレートの数を読めなかった -- "rc=$tn_rc"
+		return 0
+		;;
+	0) return 0 ;;
+	esac
+	printf '案内: 使えるテンプレートがある（%s 本）。合うものがあれば --plan の代わりに --template <名前> を使う。一覧は sh %s/ccnavi-launcher.sh --templates（名前・説明・使う場面が出る）\n' "$tn_n" "$scripts"
 }
 
 # 既存の MR を採用してよいか確かめる。引っかかったら止める。<ブランチ> <MR の JSON>
