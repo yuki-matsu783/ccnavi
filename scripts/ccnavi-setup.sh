@@ -2219,7 +2219,7 @@ done
 set +f
 IFS=$skill_ifs
 if [ -d "$root/$DEPLOY_OLD_MESSAGES_DIR" ] && [ -d "$root/$DEPLOY_MESSAGES_DIR" ]; then
-	printf '案内: 古い置き場 %s は不要です（文面ファイルは %s に移りました）。消してかまいません。\n' "$DEPLOY_OLD_MESSAGES_DIR" "$DEPLOY_MESSAGES_DIR"
+	printf '案内: 古い置き場 %s は不要です（文面ファイルは %s に移りました）。実行ファイルを新しいものに入れ替えてから、消してかまいません。\n' "$DEPLOY_OLD_MESSAGES_DIR" "$DEPLOY_MESSAGES_DIR"
 fi
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"

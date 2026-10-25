@@ -569,14 +569,7 @@ def _inside(root: str, path: str) -> bool:
 
 def _locate_layer(conf: settings.Settings, root: str, entry: Entry) -> None:
     """テンプレートとレイヤーの設定の、レイヤーを決める。読まれない置き場なら断る。"""
-    if entry.kind.id == KIND_MESSAGES:
-        # 文面ファイルはレイヤーを持たない。`projects/<名前>/.ccnavi/messages/` は KINDS が許さない。
-        if not plan_templates.common_writable(conf, root):
-            entry.errors.append(
-                "このツリーは共通レイヤーのコピー（ミラー）を持つプロジェクトのものなので、"
-                "文面ファイルは書かない。ワークスペースのツリーで取り込む"
-            )
-        return
+    # 文面ファイルはレイヤーを持たない（`projects/<名前>/.ccnavi/messages/` は KINDS が許さない）。
     if entry.kind.id not in (KIND_TEMPLATE, KIND_LAYER_CONFIG):
         return
     parts = entry.key.split("/")
