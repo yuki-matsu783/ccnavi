@@ -225,22 +225,14 @@ def stop_pending(state_dir: str, session: str) -> list[Outcome]:
     return [o for o in all_of(state_dir, session) if o.outcome in NUDGE and not o.nudged]
 
 
-def stop_nudge(state_dir: str, session: str) -> str:
-    """Stop を止めて渡す文。促すものが無ければ空。促したら印を付ける（同じ結果は 1 回だけ）。"""
+def stop_lines(state_dir: str, session: str) -> list[str]:
+    """Stop で促す結果の 1 行ずつ。促すものが無ければ空。促したら印を付ける（同じ結果は 1 回だけ）。
+
+    前後の文は呼ぶ側が文面ファイルから引く（`NUDGE_SUBAGENT_OUTCOME`）。
+    """
     todo = stop_pending(state_dir, session)
     if not todo:
-        return ""
+        return []
     # 印を付けられないものは促さない（付けないと毎回止めてしまう）。付けられたものだけ促す。
     todo = [o for o in todo if not _mark(o, "nudged")]
-    if not todo:
-        return ""
-    lines = [f"  - {line(o)}" for o in todo]
-    return "\n".join(
-        [
-            "[ccnavi] SUBAGENT_OUTCOME: サブエージェントが範囲外の変更を残したか、"
-            "範囲を確かめられないまま終わっています。",
-            *lines,
-            "合流（finish）の前に、その子のワークツリーの範囲外の変更を確かめて直すか、"
-            "ユーザに伝えてください。この案内は同じ結果では 1 回だけです。",
-        ]
-    )
+    return [f"  - {line(o)}" for o in todo]

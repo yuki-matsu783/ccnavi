@@ -2090,7 +2090,7 @@ class TicketTest(unittest.TestCase):
         done = self.ccnavi("ticket", "finish", "i0001-01-02")
 
         self.assertNotEqual(done.returncode, 0, done.stdout)
-        self.assertIn("親のワークツリーを切り直して", done.stderr)
+        self.assertIn("親のワークツリーを切り直す", done.stderr)
         # 元ツリーのコピーは動かない。
         self.assertFalse(
             os.path.exists(os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-01-02.md"))

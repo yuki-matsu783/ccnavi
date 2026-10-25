@@ -72,8 +72,8 @@ class RequestNudgeTest(base.StopNudgeTest):
         reason = self.asked(self.stop(self.parent_tree))
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn("i0001-01-01, i0001-01-02", reason)
-        self.assertIn(f"'{ticket_sh} finish i0001-01-01'", reason)
-        self.assertIn(f"'{ticket_sh} finish i0001-01-02'", reason)
+        self.assertIn(f"`{ticket_sh} finish i0001-01-01`", reason)
+        self.assertIn(f"`{ticket_sh} finish i0001-01-02`", reason)
         # 前置きと同じ考え方の 3 点: 許可は要らない・打つコマンド・本当の問いは書き直す。
         self.assertIn("ユーザの許可は要りません", reason)
         self.assertIn("問いがある場合は、その問いを最後に書き直して", reason)
@@ -117,8 +117,8 @@ class RequestNudgeTest(base.StopNudgeTest):
         reason = self.asked(self.stop(self.parent_tree))
         self.assertIn("レビューの依頼（request）がまだです", reason)
         self.assertIn("子 i0001-01-01 が親のブランチに合流済みと確かめられません", reason)
-        self.assertIn(f"'{ticket_sh} status i0001'", reason)
-        self.assertNotIn(f"'{git_sh} merge", reason)
+        self.assertIn(f"`{ticket_sh} status i0001`", reason)
+        self.assertNotIn(f"`{git_sh} merge", reason)
         self.assertNotIn("i0001-01-02 が", reason)
         self.assert_not_asked(self.stop(self.parent_tree))
         # 合流の記録が揃うと次の一手は ELI5。
@@ -126,7 +126,7 @@ class RequestNudgeTest(base.StopNudgeTest):
         record_merge(self.parent_tree, "i0001-01-01")
         reason = self.asked(self.stop(self.parent_tree))
         self.assertIn("wip/eli5/phase-1.html", reason)
-        self.assertNotIn(f"'{git_sh} merge", reason)
+        self.assertNotIn(f"`{git_sh} merge", reason)
         self.assert_not_asked(self.stop(self.parent_tree))
         # ELI5 を置くと、次の一手は依頼。
         write(os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html"), "<p>x</p>\n")
@@ -134,7 +134,7 @@ class RequestNudgeTest(base.StopNudgeTest):
         git(self.parent_tree, "commit", "--quiet", "-m", "eli5")
         reason = self.asked(self.stop(self.parent_tree))
         self.assertIn(
-            f"'{review_sh} request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html'",
+            f"`{review_sh} request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html`",
             reason,
         )
         self.assertNotIn("ELI5 の HTML を", reason)

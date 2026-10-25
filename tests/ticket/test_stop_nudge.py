@@ -92,7 +92,7 @@ class StopNudgeTest(TicketTest):
         reason = body["reason"]
         self.assertIn(f"[ccnavi] {CODE} (ticket: i0001-01-01)", reason)
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
-        self.assertIn(f"'{ticket_sh} finish i0001-01-01'", reason)
+        self.assertIn(f"`{ticket_sh} finish i0001-01-01`", reason)
         self.assertIn("続ける理由", reason)
         self.assertIn("コミットが 1 件", reason)
         # 連鎖の 2 回目（Stop の hook が続けさせた後）は促さない。

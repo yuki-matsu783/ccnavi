@@ -19,6 +19,7 @@ import os
 from dataclasses import dataclass
 
 from ..infra import pathcase, settings, tree
+from ..policy import texts
 from . import ticket_ids
 
 # `Standing.kind`: 止める理由の種別。案内（`guidance`）は文面ではなくこれで分ける。
@@ -217,30 +218,13 @@ def same_tree(a: str, b: str) -> bool:
 
 
 def guidance(root: str, st: Standing) -> list[str]:
-    """止めたときの解き方。1 行ずつ。"""
-    git = settings.script_command(root, "ccnavi-git.sh")
-    name = st.family
-    branch = st.branch_name
-    if st.kind == STOP_BUSY:
-        return [
-            "親のワークツリーの途中の操作（merge・rebase など）を済ませるか取りやめてから"
-            "再実行してください"
-        ]
-    if st.kind == STOP_MISMATCH:
-        now = f"（今の HEAD: {st.head}）" if st.head else "（HEAD がブランチを指していない）"
-        return [
-            f"親のワークツリー（.claude/worktrees/{name}）の HEAD を、ブランチ名の `/` を `-` に"
-            f"置き換えると {name} になるブランチに戻してください{now}"
-        ]
-    if st.kind == STOP_AMBIGUOUS:
-        return [
-            f"同じ名前 {name} の親のワークツリーが複数のリポジトリにあります。"
-            "片方の親子のチケットを片付けるか、識別子を変えて、1 つのリポジトリに絞ってください"
-        ]
-    return [
-        f"親のワークツリーを切り直してください（'{git} fetch origin {branch}' のあと "
-        f"'{git} worktree add .claude/worktrees/{name} {branch}'。ブランチ名の `/` を `-` に"
-        "置き換えたものがフォルダ名になる）。"
-        "破棄した親子のチケットなら、親のワークツリーを片付ければよい"
-        "（push の関門の対象から外れる）",
-    ]
+    """止めたときの解き方。1 行ずつ。
+
+    文は種別ごとに文面ファイルが持つ（`NEXT_STANDING`）。呼ぶ側は行の途中や `hint` の値にも
+    使うので、文面の見出し（`次: `）は外して、文だけを返す。
+    """
+    kind = st.kind if st.kind in (STOP_BUSY, STOP_MISMATCH, STOP_AMBIGUOUS) else STOP_ABSENT
+    now = f"（今の HEAD: {st.head}）" if st.head else "（HEAD がブランチを指していない）"
+    values = {"name": st.family, "branch": st.branch_name, "now": now}
+    said = texts.say(root, "NEXT_STANDING", values, {"next": kind})
+    return [said.removeprefix(texts.LABELS["next"])]

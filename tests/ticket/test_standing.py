@@ -138,7 +138,7 @@ class ParentTreeTest(AuthorityHarness):
         self.assertIn(
             "HEAD のブランチ名を変換した識別子がフォルダ名（i0001）と合わない", started.stderr
         )
-        self.assertIn("に戻してください", started.stderr)
+        self.assertIn("に戻す", started.stderr)
 
     def test_a_state_operation_does_not_move_a_copy_outside_the_parent_tree(self):
         # 子のチケットが親のワークツリーから消え、元ツリーにだけ残った形。
@@ -199,7 +199,7 @@ class NoParentTreeTest(AuthorityHarness):
         self.assertIn("親のワークツリー", finished.stderr)
         self.assertIn("がありません", finished.stderr)
         # 解き方は、切り直すか、破棄した親子なら片付ければよい（`--forget` は無い）。
-        self.assertIn("切り直してください", finished.stderr)
+        self.assertIn("切り直す", finished.stderr)
         self.assertIn("片付ければよい", finished.stderr)
         self.assertNotIn("--forget", finished.stderr)
         for word in ("gone", "blocked"):
@@ -416,9 +416,9 @@ class GuidanceByKindTest(AuthorityHarness):
         self.assertEqual("", st.branch)
         text = self.guidance(st)
         self.assertIn("今の HEAD: elsewhere", text)
-        self.assertIn("に戻してください", text)
+        self.assertIn("に戻す", text)
         self.assertNotIn("<ブランチ名>", text)
-        self.assertNotIn("切り直してください", text)
+        self.assertNotIn("切り直す", text)
 
     def test_a_detached_head_says_it_does_not_point_at_a_branch(self):
         git(self.parent_tree, "checkout", "--quiet", "--detach")
@@ -437,13 +437,13 @@ class GuidanceByKindTest(AuthorityHarness):
         st = standing.standing(self.conf(), self.root, "i0001")
         self.assertEqual(standing.STOP_BUSY, st.kind)
         self.assertIn("途中の操作", self.guidance(st))
-        self.assertNotIn("切り直してください", self.guidance(st))
+        self.assertNotIn("切り直す", self.guidance(st))
 
     def test_an_absent_tree_says_to_recut_it(self):
         self.drop_parent()
         st = standing.standing(self.conf(), self.root, "i0001")
         self.assertEqual(standing.STOP_ABSENT, st.kind)
-        self.assertIn("切り直してください", self.guidance(st))
+        self.assertIn("切り直す", self.guidance(st))
 
     def test_a_family_in_two_repositories_does_not_say_to_recut_the_tree(self):
         from ccnavi.infra import tree
@@ -457,8 +457,8 @@ class GuidanceByKindTest(AuthorityHarness):
         self.assertEqual(standing.STOP_AMBIGUOUS, st.kind)
         text = self.guidance(st)
         self.assertIn("複数のリポジトリ", text)
-        self.assertIn("1 つのリポジトリに絞って", text)
-        self.assertNotIn("切り直してください", text)
+        self.assertIn("1 つのリポジトリに絞る", text)
+        self.assertNotIn("切り直す", text)
         self.assertNotIn("worktree add", text)
 
     def test_a_standing_that_does_not_stop_has_no_kind(self):

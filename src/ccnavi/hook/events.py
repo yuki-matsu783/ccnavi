@@ -27,6 +27,7 @@ from ..policy import (
     selfguard,
     selfguard_shell,
     selfguard_targets,
+    texts,
 )
 from ..records import (
     audit,
@@ -74,13 +75,6 @@ PENDING_SECONDS = 2.0
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
-# `match: Stop` のルールで止めたとき、ルールの文の前に必ず置く文。ルールの文や
-# 指したファイルが差し替わっても、止めた回の扱いがここで決まるように、実行ファイルに持つ。
-STOP_PREFACE = (
-    "これはタスクの続きではない。ここまでの作業の振り返りだけをし、ほかの作業は始めないでください。"
-    "このターンがユーザへの問い・確認で終わっていたなら、振り返りの後にその問いを最後にもう一度書いてください。"
-    "振り返って何も無ければ「振り返り: 無し」とだけ答えてください。"
-)
 
 
 def decide(
@@ -495,7 +489,7 @@ def decide_at_stop(
     if not nudge:
         nudge = _feedback_nudge(stderr, conf, root, asked, record, raw)
     if not nudge:
-        nudge = _subagent_nudge(conf, payload, record)
+        nudge = _subagent_nudge(conf, root, payload, record)
     if not nudge:
         # 上の促しで止める回は、直接作業の促しを出しも数えもしない。前提を満たせず促せない回は
         # 止めずに理由だけを報告へ足す。
@@ -804,7 +798,8 @@ def stop_rules_nudge(
       ターンの終わりのたびに止まるので、何も言わない側を採る（`finish` の促しと同じ）
 
     数えは `ctxfile.stop_path` に置き、compact・再開・clear では破棄しない。渡す文の頭には
-    `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、ユーザへの問いで終わった
+    振り返りの前置き（文面ファイルの `NUDGE_STOP_RULE`）を必ず付ける。止めた回がタスクの続きと
+    読まれず、ユーザへの問いで終わった
     ターンの問いが消えないように。記録の `rules` には、実際に渡したルールだけを残す。
     """
     if payload.stop_hook_active or payload.agent_id or not conf.state:
@@ -828,7 +823,8 @@ def stop_rules_nudge(
     record.decision, record.code = audit.NUDGE, CODE_RULE_NUDGE
     record.enforced = True
     record.rules = delivered
-    return f"{CODE_RULE_NUDGE}: {STOP_PREFACE}\n\n" + "\n\n".join(parts)
+    preface = texts.say(root, CODE_RULE_NUDGE)
+    return f"{CODE_RULE_NUDGE}: {preface}\n\n" + "\n\n".join(parts)
 
 
 def _over_report(record: audit.Record) -> None:
@@ -902,7 +898,7 @@ def _request_nudge(
     """レビューの依頼までの道の途中で終えようとしたとき、次の一手を促す文。促さないなら空文字。
 
     最後の発言は読まない。「進めてよいですか」で終わった回も、そうでない回も、状態だけで決める。
-    文は `STOP_PREFACE` と同じ考え方で、決まった道の途中でユーザの許可は要らないこと、
+    文は振り返りの前置き（`NUDGE_STOP_RULE`）と同じ考え方で、決まった道の途中でユーザの許可は要らないこと、
     本当にユーザの判断が要る問いならその問いを最後に書き直して終えることを言う。
 
     止めない回と止め方は `_finish_nudge` と同じ（`stop_hook_active`・サブエージェント・
@@ -963,7 +959,9 @@ def _feedback_nudge(
     return ops_stop_feedback.feedback_nudge(root, found)
 
 
-def _subagent_nudge(conf: settings.Settings, payload: hookio.Input, record: audit.Record) -> str:
+def _subagent_nudge(
+    conf: settings.Settings, root: str, payload: hookio.Input, record: audit.Record
+) -> str:
     """終わったサブエージェントが範囲外の変更を残した・範囲を確かめられなかったとき、Stop で促す文。
 
     促すのは `outside` と `unchecked` だけ（`unattributed` と正常な終了では促さない）。同じ結果では
@@ -973,11 +971,14 @@ def _subagent_nudge(conf: settings.Settings, payload: hookio.Input, record: audi
         return ""
     if subagent.running(conf.state, payload.session_id):
         return ""
-    text = subagent.stop_nudge(conf.state, payload.session_id)
-    if text:
-        record.decision, record.code = audit.NUDGE, "NUDGE_SUBAGENT_OUTCOME"
-        record.enforced = True
-    return text
+    lines = subagent.stop_lines(conf.state, payload.session_id)
+    if not lines:
+        return ""
+    record.decision, record.code = audit.NUDGE, "NUDGE_SUBAGENT_OUTCOME"
+    record.enforced = True
+    # 結果の 1 行ずつはコードが組み、前後の文は文面ファイルが持つ。状態の行の次の 1 行が what。
+    what, *rest = texts.say(root, "NUDGE_SUBAGENT_OUTCOME").split("\n")
+    return "\n".join(["[ccnavi] SUBAGENT_OUTCOME", what, *lines, *rest])
 
 
 def _integrate_nudge(

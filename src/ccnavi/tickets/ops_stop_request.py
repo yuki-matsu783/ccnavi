@@ -40,6 +40,7 @@ import os
 from dataclasses import dataclass, field
 
 from ..infra import fsio, gitcmd, settings, tree
+from ..policy import texts
 from . import (
     approval,
     approval_checks,
@@ -63,6 +64,9 @@ STEP_ELI5 = "eli5"
 STEP_REQUEST = "request"
 # ユーザが子を手で done/ に動かした。親が confirm を打てば確定する。
 STEP_CONFIRM = "confirm"
+
+# 文面ファイルが場合分けで持つ段階（これ以外は依頼の段階として言う）。
+_STEPS = (STEP_FINISH, STEP_MERGE, STEP_LATE_FIX, STEP_ELI5, STEP_REQUEST, STEP_CONFIRM)
 
 # 記録のキーの頭。`finish` の促しのキー（チケットの識別子）と分ける。
 _KEY_HEAD = "request:"
@@ -212,84 +216,22 @@ def request_nudge(root: str, found: Pending) -> str:
 
     処理フロー:
     1. `found.step` で、いまの段階を分ける（子の finish・confirm・合流の確認・合流後の修正・
-       ELI5・依頼）。
-    2. 段階ごとに、どこで止まっているか（`where`）と次に打つこと（`todo`）を組む。
-    3. 許可は要らないことと、この案内が同じ状態では 1 回だけであることを添えて、行を並べて返す。
+       ELI5・依頼）。文は段階ごとに文面ファイルが持つ（`NUDGE_TICKET_REQUEST`）。
+    2. 子の finish だけは、子ごとのコマンドを並べた値を組んで渡す。
+    3. 許可は要らないことと、この案内が同じ状態では 1 回だけであることは、文面ファイルが添える。
     """
     p = found.parent
     n = found.number
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    review_sh = settings.script_command(root, "ccnavi-review.sh")
-    phase_name = f"フェーズ {n}" + (f"（{found.title}）" if found.title else "")
-    eli5 = f"wip/eli5/phase-{n}.html"
-    request = f"'{review_sh} request --phase {n} --body-file <依頼文> --eli5 {eli5}'"
-    if found.step == STEP_FINISH:
-        where = (
-            f"{p.ticket} の作業中（{ticket_model.DOING}/）の子 "
-            f"{', '.join(found.children)} が残っています。"
-        )
-        todo = "作業が済んでいる子には " + "、".join(
-            f"'{ticket_sh} finish {c}'" for c in found.children
-        )
-        todo += (
-            " を実行します。まだ作業が残っているなら、確認を取らずに続けます。"
-            "子が全部閉じて（合流は finish が済ませます）、すべての子が合流済みと確かめたら、"
-            "ELI5、レビューの依頼（request）へ進みます。"
-        )
-    elif found.step == STEP_CONFIRM:
-        where = (
-            f"{p.ticket} の{phase_name}は、ユーザが子 {', '.join(found.children)} を "
-            f"{ticket_model.DONE}/ へ手で動かして共有しています（レビュー完了確認待ち）。"
-        )
-        todo = (
-            f"'{review_sh} confirm --phase {n}' を実行して確定します。"
-            "未解決の指摘は、移動の前に付いたものだけが版つきで受け入れられ、"
-            "移動の後に付いたものが残っていれば止まるので、その分は decide をユーザに頼みます。"
-        )
-    elif found.step == STEP_MERGE:
-        where = (
-            f"{p.ticket} の{phase_name}は子が全部閉じていますが、レビューの依頼"
-            f"（request）がまだです。子 {', '.join(found.children)} が"
-            "親のブランチに合流済みと確かめられません（合流した先頭 merged_sha が無いか、"
-            "親の HEAD に入っていません）。"
-        )
-        todo = (
-            f"合流は子の finish が行います。'{ticket_sh} status {p.ticket}' で子の状態を確かめ、"
-            "合流の記録が無い理由（origin が無い親、置き場を手で動かした子など）をユーザに"
-            f"伝えてください。合流済みと確かめられたら、ELI5 の HTML を {eli5} に書いて"
-            f"コミットして push し、{request} で依頼します。"
-        )
-    elif found.step == STEP_LATE_FIX:
-        where = (
-            f"{p.ticket} の{phase_name}は子が全部閉じていますが、レビューの依頼"
-            f"（request）がまだです。子 {', '.join(found.children)} の手元のブランチに、"
-            "合流されていない修正があります"
-            "（finish の後に積んだコミットは親のブランチに入りません）。"
-        )
-        todo = (
-            "このままでは依頼できません。修正を活かすなら、同じフェーズに子を足して"
-            "ユーザの承認を受け、その子で直します。破棄するなら、そのことをユーザに伝えて"
-            "判断を仰いでください。"
-        )
-    elif found.step == STEP_ELI5:
-        where = (
-            f"{p.ticket} の{phase_name}は子が全部閉じて合流も済んでいますが、"
-            "レビューの依頼（request）がまだです。"
-        )
-        todo = f"ELI5 の HTML を {eli5} に書いてコミットして push し、{request} で依頼します。"
-    else:
-        where = f"{p.ticket} の{phase_name}は、レビューの依頼（request）がまだです。"
-        todo = (
-            f"未コミットの変更があれば先にコミットして push してから（`request` は HEAD の"
-            f"普通のファイルを前提にする）、{request} で依頼します。"
-        )
-    return "\n".join(
-        [
-            f"[ccnavi] {CODE_REQUEST_NUDGE} (parent: {p.ticket}, phase: {n})",
-            where,
-            "これは決まった道の途中で、ユーザの許可は要りません。進めてよいかを聞かずに、次を実行してください。",
-            todo,
-            ops_stop.USER_STOP_NOTE,
-            "この案内は同じ状態では 1 回だけで、作業が進むまで次に終えるときは止めません。",
-        ]
-    )
+    values = {
+        "parent": p.ticket,
+        "phase": str(n),
+        "phase_name": f"フェーズ {n}" + (f"（{found.title}）" if found.title else ""),
+        "children": ", ".join(found.children),
+        "finish_cmds_q": "、".join(f"`{ticket_sh} finish {c}`" for c in found.children),
+        "user_stop_note": ops_stop.USER_STOP_NOTE,
+    }
+    step = found.step if found.step in _STEPS else STEP_REQUEST
+    case = step.replace("-", "_")
+    said = texts.say(root, "NUDGE_TICKET_REQUEST", values, {"what": case, "next": case})
+    return "\n".join([f"[ccnavi] {CODE_REQUEST_NUDGE} (parent: {p.ticket}, phase: {n})", said])

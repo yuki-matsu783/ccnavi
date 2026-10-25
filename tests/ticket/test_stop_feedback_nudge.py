@@ -74,7 +74,7 @@ class FeedbackNudgeTest(FeedbackPlanApprovalTest):
         self.assertIn("started_at・completed_at・base_sha", reason)
         self.assertIn(".ccnavi/docs/decisions.md", reason)
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
-        self.assertIn(f"'{ticket_sh} propose i0001'", reason)
+        self.assertIn(f"`{ticket_sh} propose i0001`", reason)
         # ユーザが止めたときの扱いと、同じ状態では 1 回だけであること
         self.assertIn("止めて", reason)
         self.assertIn("同じ状態では 1 回だけ", reason)
@@ -124,8 +124,8 @@ class FeedbackNudgeTest(FeedbackPlanApprovalTest):
         reason = self.asked(self.stop())
         self.assertIn(f"フィードバック計画の改版は {self.todo()} にあります", reason)
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
-        self.assertIn(f"'{ticket_sh} propose i0001'", reason)
-        self.assertIn(f"'{ticket_sh} status i0001'", reason)
+        self.assertIn(f"`{ticket_sh} propose i0001`", reason)
+        self.assertIn(f"`{ticket_sh} status i0001`", reason)
         self.assertNotIn("started_at・completed_at", reason)
         self.quiet(self.stop())
 

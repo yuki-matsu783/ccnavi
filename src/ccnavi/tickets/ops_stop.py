@@ -13,6 +13,7 @@ import os
 from dataclasses import dataclass
 
 from ..infra import fsio, gitcmd, settings, tree
+from ..policy import texts
 from . import approval, approval_checks, ops_close, standing, ticket_model
 
 # Stop で `finish` の打ち忘れを促すときの理由コード。止めるのは 1 回だけの促しで、
@@ -151,28 +152,19 @@ def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
 
 
 def finish_nudge(root: str, found: Unfinished) -> str:
-    """Stop を止めて渡す文。打つ sh のパスと、続けるならどうするかを言う。"""
+    """Stop を止めて渡す文。続けるならどうするかを言う。文は文面ファイルが持つ。"""
     t = found.ticket
-    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    kind = "子チケット" if t.is_child else "親チケット"
-    return "\n".join(
-        [
-            f"[ccnavi] {CODE_FINISH_NUDGE} (ticket: {t.ticket})",
-            f"{kind} {t.ticket} は着手済みのまま作業中（{ticket_model.DOING}/）です。ワークツリー "
-            f"{found.worktree} に未コミットの変更が無く、"
-            + (
-                "親のブランチに無いコミットが "
-                if t.is_child
-                else f"基準点 {t.base_sha[:12]} より先にコミットが "
-            )
-            + f"{found.ahead} 件あります。",
-            f"作業が終わったなら '{ticket_sh} finish {t.ticket}' を実行してから終えてください。"
-            "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。",
-            USER_STOP_NOTE,
-            "この案内は同じ HEAD では 1 回だけで、"
-            "コミットを追加するまで次に終えるときは止めません。",
-        ]
+    values = {
+        "ticket": t.ticket,
+        "worktree": found.worktree,
+        "ahead": str(found.ahead),
+        "base": t.base_sha[:12],
+        "user_stop_note": USER_STOP_NOTE,
+    }
+    said = texts.say(
+        root, "NUDGE_TICKET_FINISH", values, {"what": "child" if t.is_child else "parent"}
     )
+    return "\n".join([f"[ccnavi] {CODE_FINISH_NUDGE} (ticket: {t.ticket})", said])
 
 
 def base_off_head(root: str, conf: settings.Settings, t: ticket_model.Ticket) -> str:

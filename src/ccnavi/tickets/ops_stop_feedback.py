@@ -28,6 +28,7 @@ import os
 from dataclasses import dataclass
 
 from ..infra import fsio, settings, tree
+from ..policy import texts
 from . import (
     approval,
     approval_checks,
@@ -133,33 +134,19 @@ def remember_nudge(state_dir: str, session: str, found: Waiting) -> str:
 
 
 def feedback_nudge(root: str, found: Waiting) -> str:
-    """Stop を止めて渡す文。改版を提案していないか、提案済みかで言うことを分ける。"""
+    """Stop を止めて渡す文。改版が提案済みかで言うことを分ける。文は文面ファイルが持つ。"""
     p = found.parent
-    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    if found.proposal:
-        todo = (
-            f"フィードバック計画の改版は {found.proposal} にあります。"
-            f"送っていなければ '{ticket_sh} propose {p.ticket}' で送り、"
-            "ユーザに承認を頼んで返事を待ちます。"
-            f"送り済みかは '{ticket_sh} status {p.ticket}' で確かめます。"
-        )
-    else:
-        todo = (
-            "全体計画のレビューが済み、親を閉じる前にフィードバック計画が要ります。"
-            "指摘が無ければ feedback: [] を、あれば対応のフェーズを feedback: に並べた"
-            f"親の改版を {found.todo} に書きます"
-            "（承認済みチケットをコピーし、スクリプトだけが書く欄 "
-            "started_at・completed_at・base_sha・"
-            "merged_sha・cancelled_at・cancel_reason・finished_to・settled_by は空にする。"
-            "手順は .ccnavi/docs/decisions.md）。"
-            f"書いたら '{ticket_sh} propose {p.ticket}' で送り、ユーザに承認を頼みます。"
-        )
-    return "\n".join(
-        [
-            f"[ccnavi] {CODE_FEEDBACK_NUDGE} (parent: {p.ticket})",
-            f"親 {p.ticket} は{STAGE_WAITING}です。",
-            todo,
-            ops_stop.USER_STOP_NOTE,
-            "この案内は同じ状態では 1 回だけで、作業が進むまで次に終えるときは止めません。",
-        ]
+    values = {
+        "parent": p.ticket,
+        "stage": STAGE_WAITING,
+        "proposal": found.proposal,
+        "todo": found.todo,
+        "user_stop_note": ops_stop.USER_STOP_NOTE,
+    }
+    said = texts.say(
+        root,
+        "NUDGE_TICKET_FEEDBACK",
+        values,
+        {"next": "proposed" if found.proposal else "drafting"},
     )
+    return "\n".join([f"[ccnavi] {CODE_FEEDBACK_NUDGE} (parent: {p.ticket})", said])
