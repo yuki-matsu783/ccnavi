@@ -5,6 +5,8 @@
 シナリオを拾わないこと。
 """
 
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -360,7 +362,7 @@ class ExpectAfterTest(unittest.TestCase):
             rc = runner.finish(scn, out, st, root)
             report = json.loads((out / "report.json").read_text(encoding="utf-8"))
         self.assertEqual(rc, 2)
-        self.assertEqual([r["kind"] for r in report], ["expect_after", "repo", "host"])
+        self.assertEqual([r["kind"] for r in report], ["expect_after", "repo", "host", "cost"])
         self.assertEqual(report[0]["verdict"], runner.INCONCLUSIVE)
 
     def load_yml(self, text):
@@ -1106,6 +1108,10 @@ def deny_line(reason, name="PreToolUse:Edit"):
     return hook_line("PreToolUse", name, {"hookSpecificOutput": spec})
 
 
+def stop_block(reason):
+    return hook_line("Stop", "Stop", {"decision": "block", "reason": reason})
+
+
 def call_line(name, tool_input, call_id="t1", parent=None):
     block = {"type": "tool_use", "id": call_id, "name": name, "input": tool_input}
     return json.dumps(
@@ -1298,26 +1304,99 @@ class DenialTrendTest(unittest.TestCase):
         cut = [rec(decision="deny", tool="Edit", subject="/work/b.md…(+30)")]
         self.assertEqual(runner.bypass_suspects(cut, streams, self.SESSIONS), [])
 
-    def test_denial_without_guide_line_is_flagged(self):
-        tmp, out = make_out(
-            [
-                "\n".join(
-                    [
-                        deny_line("[ccnavi] DENY_PATH\n編集しません。"),
-                        deny_line("[ccnavi] DENY_PATH\n理由\n  次: sh x.sh を打つ"),
-                        deny_line("理由\n案内: 補足"),
-                        deny_line("理由\n必須: 項目"),
-                        deny_line("本文の途中に 次: と書いても行頭ではない"),
-                    ]
-                )
-            ]
-        )
+    def flagged(self, *lines):
+        tmp, out = make_out(["\n".join(lines) + "\n"])
         self.addCleanup(tmp.cleanup)
-        got = runner.unguided_denials(runner.step_streams(out))
-        self.assertEqual(
-            [text for _, _, text in got],
-            ["[ccnavi] DENY_PATH\n編集しません。", "本文の途中に 次: と書いても行頭ではない"],
+        return [text for _, _, text in runner.unguided_denials(runner.step_streams(out))]
+
+    def test_denial_without_next_step_is_flagged(self):
+        got = self.flagged(
+            deny_line("[ccnavi] DENY_PATH\n編集しません。"),
+            deny_line("[ccnavi] DENY_PATH\n理由\n  次: sh x.sh を打つ"),
+            deny_line("理由\n案内: 補足"),
+            deny_line("理由\n必須: 項目"),
+            deny_line("本文の途中に 次: と書いても行頭ではない"),
+            deny_line("[ccnavi] DENY_PATH"),
         )
+        self.assertEqual(
+            got,
+            [
+                "[ccnavi] DENY_PATH\n編集しません。",
+                "本文の途中に 次: と書いても行頭ではない",
+                "[ccnavi] DENY_PATH",
+            ],
+        )
+
+    def test_denial_with_empty_reason_is_flagged(self):
+        empty = hook_line(
+            "PreToolUse",
+            "PreToolUse:Bash",
+            {"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": ""}},
+        )
+        block = hook_line("Stop", "Stop", {"decision": "block"})
+        self.assertEqual(self.flagged(empty, block), [runner.EMPTY_REASON] * 2)
+
+    def test_ask_is_not_a_denial(self):
+        ask = hook_line(
+            "PreToolUse",
+            "PreToolUse:Bash",
+            {"hookSpecificOutput": {"permissionDecision": "ask", "permissionDecisionReason": "x"}},
+        )
+        self.assertEqual(self.flagged(ask), [])
+
+    def test_real_denials_with_a_next_step_are_not_flagged(self):
+        # issue #570 の実データ 4 件。文面は実コードから取る（文面が変わっても追従する）
+        from ccnavi.policy import builtin
+        from ccnavi.tickets import ops_stop_integrate as stop
+        from ccnavi.tickets import ticket_guard
+
+        root = str(ROOT)
+        raw_git = ticket_guard.raw_git_rule(root).message
+        by_id = {r["id"]: r["message"] for r in builtin._deny(root)}
+        heredoc = next(
+            r["message"]
+            for r in yaml.safe_load(
+                (Path(ROOT) / ".ccnavi/config/common/rules.yml").read_text("utf-8")
+            )["deny"]
+            if r["id"] == "heredoc"
+        )
+        found = stop.Direct(
+            name="work1",
+            worktree=f"{root}/.claude/worktrees/work1",
+            head="work1",
+            dirty=False,
+            ahead=1,
+            integration="main",
+            integ_tree=root,
+            base="main",
+        )
+        nudge = stop.integrate_nudge(root, found)
+        waiting = stop.integrate_nudge(root, stop.Direct(**{**found.__dict__, "marker": "v4"}))
+        texts = [raw_git, by_id["builtin:recursive-delete"], heredoc, nudge, waiting]
+        self.assertTrue(all(texts))
+        self.assertEqual(
+            self.flagged(*[deny_line(t) for t in texts[:3]], *[stop_block(t) for t in texts[3:]]),
+            [],
+        )
+
+    def test_every_shipped_deny_message_has_a_next_step(self):
+        from ccnavi.policy import builtin
+
+        rules = yaml.safe_load((Path(ROOT) / ".ccnavi/config/common/rules.yml").read_text("utf-8"))
+        texts = [r["message"] for r in rules["deny"]]
+        texts += [r["message"] for r in builtin._deny(str(ROOT))]
+        with tempfile.TemporaryDirectory() as d:  # git の入口が無いワークスペースの文面
+            texts += [r["message"] for r in builtin._deny(d)]
+        self.assertGreater(len(texts), 10)
+        self.assertEqual([t for t in texts if not runner.has_guide(t)], [])
+
+    def test_report_names_the_empty_and_unguided(self):
+        deny = deny_line("[ccnavi] DENY_PATH\n編集しません。")
+        tmp, out = make_out([deny + "\n"])
+        self.addCleanup(tmp.cleanup)
+        report = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["report.md"]
+        self.assertIn("### 案内の無い拒否（理由文に次の手を示す語", report)
+        self.assertIn("- step 1 [PreToolUse:Edit]: [ccnavi] DENY_PATH 編集しません。", report)
 
     def test_report_shows_the_marks(self):
         deny = deny_line("[ccnavi] DENY_PATH\n編集しません。")
@@ -1893,6 +1972,83 @@ class ResetTest(unittest.TestCase):
                 "refs/remotes/origin/keep",
             )
 
+    def ccnavi_state(self, ws, name="work1"):
+        """ccnavi が対象の .git に書く記録・marker・ref を作る（ブランチも切る）。"""
+        t = ws.target
+        common = t / ".git"
+        (common / "ccnavi-direct").mkdir()
+        (common / "ccnavi-direct" / name).write_text("version 4\n", encoding="utf-8")
+        (common / "ccnavi-integrate" / name).mkdir(parents=True)
+        (common / "ccnavi-integrate" / name / "marker").write_text("m\n", encoding="utf-8")
+        (common / "ccnavi-integrate-done").mkdir()
+        (common / "ccnavi-integrate-done" / name).write_text("done\n", encoding="utf-8")
+        git(t, "branch", name)
+        git(t, "update-ref", f"refs/ccnavi/direct/{name}/s", ws.base)
+        git(t, "update-ref", f"refs/ccnavi/direct/{name}/pending", ws.base)
+        return common
+
+    def test_ccnavi_own_records_markers_and_refs_are_removed(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            common = self.ccnavi_state(ws)
+            (ws.target / "logs").mkdir()
+            (ws.target / "logs" / "keep.log").write_text("判定の記録\n", encoding="utf-8")
+            (ws.target / ".gitignore").write_text("logs/\n", encoding="utf-8")
+            git(ws.target, "add", ".gitignore")
+            git(ws.target, "commit", "-q", "-m", "ignore logs")
+            base = git(ws.target, "rev-parse", "HEAD")
+            runner.reset_repo(ws.root, ws.target, base)
+            self.assertFalse((common / "ccnavi-direct").exists())
+            self.assertFalse((common / "ccnavi-integrate").exists())
+            self.assertFalse((common / "ccnavi-integrate-done").exists())
+            self.assertEqual(git(ws.target, "for-each-ref", "refs/ccnavi"), "")
+            self.assertEqual(
+                git(ws.target, "for-each-ref", "--format=%(refname:short)", "refs/heads"), "main"
+            )
+            self.assertTrue((ws.target / "logs" / "keep.log").exists(), "ignore 済みは残す")
+
+    def test_temp_worktree_with_a_record_leaves_nothing_prunable(self):
+        # 一時ワークツリーは本体の logs/direct-tmp/<repo>/<名前> にある（対象の外）。
+        # 登録が生きているものと、ディレクトリだけ先に消えたもの（prunable）の両方
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            self.ccnavi_state(ws)
+            base_dir = ws.root / "logs" / "direct-tmp" / "test-repo"
+            alive, gone = base_dir / "work1", base_dir / "work2"
+            git(ws.target, "worktree", "add", "-q", "--detach", str(alive), ws.base)
+            git(ws.target, "worktree", "add", "-q", "--detach", str(gone), ws.base)
+            shutil.rmtree(gone)
+            self.assertIn("prunable", git(ws.target, "worktree", "list", "--porcelain"))
+            runner.reset_repo(ws.root, ws.target, ws.base)
+            self.assertEqual(len(git(ws.target, "worktree", "list").splitlines()), 1)
+            self.assertNotIn("prunable", git(ws.target, "worktree", "list", "--porcelain"))
+            self.assertFalse(alive.exists())
+
+    def test_failed_worktree_removal_keeps_the_records(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            common = self.ccnavi_state(ws)
+            locked = ws.root / "logs" / "direct-tmp" / "test-repo" / "work1"
+            git(ws.target, "worktree", "add", "-q", "--detach", str(locked), ws.base)
+            git(ws.target, "worktree", "lock", str(locked))
+            with self.assertRaises(runner.Refusal):
+                runner.reset_repo(ws.root, ws.target, ws.base)
+            self.assertTrue((common / "ccnavi-direct" / "work1").exists())
+            refs = git(ws.target, "for-each-ref", "refs/ccnavi")
+            self.assertIn("refs/ccnavi/direct/work1/s", refs)
+
+    def test_ccnavi_state_of_the_body_is_not_touched(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            common = ws.root / ".git"
+            (common / "ccnavi-direct").mkdir()
+            (common / "ccnavi-direct" / "mine").write_text("x\n", encoding="utf-8")
+            git(ws.root, "update-ref", "refs/ccnavi/direct/mine/s", "HEAD")
+            with self.assertRaises(runner.Refusal):
+                runner.reset_repo(ws.root, ws.root, ws.base, allowed=ws.root)
+            self.assertTrue((common / "ccnavi-direct" / "mine").exists())
+            self.assertIn("refs/ccnavi/direct/mine/s", git(ws.root, "for-each-ref", "refs/ccnavi"))
+
     def test_main_pointing_elsewhere_is_moved_to_base(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
@@ -2129,6 +2285,382 @@ class LockTest(unittest.TestCase):
         proc = subprocess.Popen([sys.executable, "-c", "pass"])
         proc.wait()
         self.assertFalse(runner._pid_alive(proc.pid))
+
+
+class RunAllTest(unittest.TestCase):
+    """run-all: 使い捨てのリポジトリのシナリオを、1 回の確認で直列に回す。claude は呼ばない。"""
+
+    def make(self, ws, sid, *, budget=1.0, reset=True, human=False, body=False):
+        """シナリオを 1 本書く。reset=False は host: bare だけ（対象は触るが戻さない）、
+        body=True は setup なし（使い捨てのリポジトリを触らない）。"""
+        if body:
+            setup = {}
+        elif reset:
+            setup = {
+                "git": [["git", "switch", "-q", "-c", f"feat-{sid.lower()}"]],
+                "reset": {"base": ws.base},
+            }
+        else:
+            setup = {"host": "bare"}
+        steps = [{"human": True, "instruction": "打つ"}] if human else [{"prompt": f"{sid} をやる"}]
+        data = {
+            "id": sid,
+            "title": f"題 {sid}",
+            "model": "haiku",
+            "budget_usd": budget,
+            "steps": steps,
+            "expect": {},
+            "setup": setup,
+        }
+        d = ws.root.parent / "scn"
+        d.mkdir(exist_ok=True)
+        (d / f"{sid}.yml").write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+        return d
+
+    def main(self, ws, *args):
+        with (
+            mock.patch.object(runner, "_ENTRY", True),
+            mock.patch.object(runner, "mode_check", return_value=(True, "## モード: enable")),
+        ):
+            return runner.main(["run-all", *args, "--root", str(ws.root)])
+
+    def digest(self, ws, scn_dir, cap):
+        paths = runner.expand_scenario_paths([str(scn_dir)])
+        eligible, _ = runner.run_all_plan(paths, ws.root)
+        return runner.run_all_digest(eligible, cap)
+
+    def fake_step(self, costs, seen=None):
+        calls = []
+
+        def run_step(scn, step, out, idx, sid, resume_id, persist, root, issue_no=None, env=None):
+            calls.append((scn["id"], sid, resume_id, persist))
+            if seen is not None:
+                seen.append(scn["id"])
+            cost = costs.get(scn["id"], 0.0)
+            if isinstance(cost, Exception):
+                raise cost
+            return {"cost_usd": cost, "session_ids": []}
+
+        return run_step, calls
+
+    def test_without_confirmation_it_prints_the_list_and_runs_nothing(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            self.make(ws, "UC-92", budget=0.5)
+            step, calls = self.fake_step({})
+            buf = io.StringIO()
+            with (
+                mock.patch.object(runner, "run_step", side_effect=step),
+                contextlib.redirect_stdout(buf),
+            ):
+                rc = self.main(ws, str(scn_dir), "--max-total-usd", "3")
+            text = buf.getvalue()
+            self.assertEqual(rc, 3)
+            self.assertEqual(calls, [])
+            self.assertIn("| UC-91 |", text)
+            self.assertIn("| UC-92 |", text)
+            self.assertIn(ws.base[:12], text)
+            self.assertIn("3.0 USD", text)  # 費用の上限
+            self.assertIn(f"--confirmed {self.digest(ws, scn_dir, 3.0)}", text)
+            self.assertTrue(git(ws.target, "branch", "--show-current") == "main")
+
+    def test_only_disposable_repo_scenarios_are_run_and_the_rest_are_listed_with_reasons(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            self.make(ws, "UC-92", body=True)
+            self.make(ws, "UC-93", reset=False)
+            self.make(ws, "UC-94", human=True)
+            (scn_dir / "broken.yml").write_text("id: UC-95\n", encoding="utf-8")
+            eligible, skipped = runner.run_all_plan(
+                runner.expand_scenario_paths([str(scn_dir)]), ws.root
+            )
+            self.assertEqual([s["id"] for _, s in eligible], ["UC-91"])
+            why = dict(skipped)
+            self.assertIn("ccnavi 本体に作用しうる", why["UC-92"])
+            self.assertIn("setup.reset が無い", why["UC-93"])
+            self.assertIn("人間の操作", why["UC-94"])
+            self.assertTrue(any("読み込めない" in y for w, y in skipped if "broken" in w))
+
+    def test_the_body_is_refused_as_a_target(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            shutil.rmtree(ws.target / ".git")  # 対象がリポジトリでなくなると、本体のものになる
+            eligible, skipped = runner.run_all_plan(
+                runner.expand_scenario_paths([str(scn_dir)]), ws.root
+            )
+            self.assertEqual(eligible, [])
+            self.assertIn("ccnavi 本体", dict(skipped)["UC-91"])
+
+    def test_confirmed_run_goes_in_order_and_continues_after_a_failure(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-92")
+            self.make(ws, "UC-91")
+            self.make(ws, "UC-93")
+            seen = []
+            step, calls = self.fake_step(
+                {"UC-91": 0.25, "UC-92": RuntimeError("起動できない")}, seen
+            )
+            batch = Path(d) / "batch"
+            buf = io.StringIO()
+            with (
+                mock.patch.object(runner, "run_step", side_effect=step),
+                contextlib.redirect_stdout(buf),
+            ):
+                rc = self.main(
+                    ws,
+                    str(scn_dir),
+                    "--max-total-usd",
+                    "5",
+                    "--confirmed",
+                    self.digest(ws, scn_dir, 5.0),
+                    "--out",
+                    str(batch),
+                )
+            self.assertEqual(seen, ["UC-91", "UC-92", "UC-93"])  # ID 順で直列。失敗しても続く
+            self.assertEqual(rc, 2)
+            summary = json.loads((batch / "summary.json").read_text(encoding="utf-8"))
+            by_id = {r["id"]: r for r in summary["scenarios"]}
+            self.assertEqual(by_id["UC-91"]["cost_usd"], 0.25)
+            self.assertEqual(summary["total_cost_usd"], 0.25)
+            self.assertIn(by_id["UC-92"]["verdict"], (runner.INCONCLUSIVE,))
+            text = (batch / "summary.md").read_text(encoding="utf-8")
+            self.assertIn("| ID | 判定 | 実費 (USD) | ツール呼び出し | 拒否 | ask |", text)
+            self.assertIn("| UC-91 |", text)
+            self.assertEqual(
+                [k for k in ("tool_calls", "denies", "asks") if k not in by_id["UC-91"]], []
+            )
+            # 実費は各回の report.json にも残る
+            report = json.loads((batch / "UC-91" / "report.json").read_text(encoding="utf-8"))
+            self.assertEqual([r["cost_usd"] for r in report if r["kind"] == "cost"], [0.25])
+            # どの回も、対象は base に戻っている
+            self.assertEqual(git(ws.target, "rev-parse", "main"), ws.base)
+            self.assertEqual(git(ws.target, "branch", "--show-current"), "main")
+            self.assertEqual(len(calls), 3)
+
+    def test_each_scenario_starts_a_fresh_session_without_resume(self):
+        # hook の once の案内（hinted）の記憶はセッションごと。前のシナリオの session を
+        # 持ち越さない（新しい --session-id、resume なし、persist なし）ことを見る
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            self.make(ws, "UC-92")
+            step, calls = self.fake_step({})
+            with (
+                mock.patch.object(runner, "run_step", side_effect=step),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.main(
+                    ws,
+                    str(scn_dir),
+                    "--max-total-usd",
+                    "5",
+                    "--confirmed",
+                    self.digest(ws, scn_dir, 5.0),
+                    "--out",
+                    str(Path(d) / "batch"),
+                )
+            sessions = [sid for _, sid, _, _ in calls]
+            self.assertEqual(len(set(sessions)), 2)
+            self.assertEqual([r for _, _, r, _ in calls], [None, None])
+            self.assertEqual(
+                [p for _, _, _, p in calls], [False, False]
+            )  # --no-session-persistence
+
+    def test_hinted_state_is_not_carried_over_to_another_session(self):
+        from ccnavi.infra import hookio
+        from ccnavi.policy import ctxfile, rules
+
+        rule = rules.Rule(id="once", match="Write", additional_context_once="案内")
+        with tempfile.TemporaryDirectory() as state:
+
+            def told(session):
+                payload = hookio.Input(event="PreToolUse", tool_name="Write", session_id=session)
+                return ctxfile.deliver(io.StringIO(), state, payload, [rule])[1]
+
+            self.assertTrue(told("scn-1"))
+            self.assertFalse(told("scn-1"))  # 同じセッションの 2 回目は渡さない
+            self.assertTrue(told("scn-2"))  # 次のシナリオ（別のセッション）には、また渡る
+
+    def test_a_changed_set_stops_before_running(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            confirmed = self.digest(ws, scn_dir, 5.0)
+            self.make(ws, "UC-92")  # 確認のあとに増えた
+            step, calls = self.fake_step({})
+            buf = io.StringIO()
+            with (
+                mock.patch.object(runner, "run_step", side_effect=step),
+                contextlib.redirect_stdout(buf),
+            ):
+                rc = self.main(ws, str(scn_dir), "--max-total-usd", "5", "--confirmed", confirmed)
+            self.assertEqual(rc, 3)
+            self.assertEqual(calls, [])
+            self.assertIn("確認した内容と今回の対象が違う", buf.getvalue())
+            self.assertIn("UC-91, UC-92", buf.getvalue())
+
+    def test_a_removed_scenario_a_new_cap_and_a_new_base_each_invalidate_the_confirmation(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            self.make(ws, "UC-92")
+            confirmed = self.digest(ws, scn_dir, 5.0)
+            # 費用の上限が違う
+            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 4.0))
+            # base が違う
+            git(ws.target, "commit", "--allow-empty", "-q", "-m", "next")
+            other = git(ws.target, "rev-parse", "HEAD")
+            path = scn_dir / "UC-92.yml"
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            data["setup"]["reset"]["base"] = other
+            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+            # 減った
+            path.unlink()
+            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+
+    def test_it_stops_when_the_next_budget_exceeds_what_is_left(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            self.make(ws, "UC-92")
+            self.make(ws, "UC-93")
+            step, calls = self.fake_step({"UC-91": 1.0, "UC-92": 1.0})
+            batch = Path(d) / "batch"
+            buf = io.StringIO()
+            with (
+                mock.patch.object(runner, "run_step", side_effect=step),
+                contextlib.redirect_stdout(buf),
+            ):
+                rc = self.main(
+                    ws,
+                    str(scn_dir),
+                    "--max-total-usd",
+                    "2.5",
+                    "--confirmed",
+                    self.digest(ws, scn_dir, 2.5),
+                    "--out",
+                    str(batch),
+                )
+            self.assertEqual(rc, 3)
+            self.assertEqual([c[0] for c in calls], ["UC-91", "UC-92"])  # UC-93 は回さない
+            summary = json.loads((batch / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["remaining"], ["UC-93"])
+            self.assertIn("UC-93", summary["stopped"])
+            self.assertIn("回した本数 2", (batch / "summary.md").read_text(encoding="utf-8"))
+            self.assertIn("残りの ID: UC-93", buf.getvalue())
+
+    def test_a_single_budget_over_the_cap_runs_nothing(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91", budget=3.0)
+            step, calls = self.fake_step({})
+            with (
+                mock.patch.object(runner, "run_step", side_effect=step),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                rc = self.main(
+                    ws,
+                    str(scn_dir),
+                    "--max-total-usd",
+                    "2",
+                    "--confirmed",
+                    self.digest(ws, scn_dir, 2.0),
+                    "--out",
+                    str(Path(d) / "batch"),
+                )
+            self.assertEqual(rc, 3)
+            self.assertEqual(calls, [])
+
+    def test_non_positive_cap_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(self.main(ws, str(scn_dir), "--max-total-usd", "0"), 2)
+
+    def test_nan_and_inf_caps_are_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            step, calls = self.fake_step({})
+            with (
+                mock.patch.object(runner, "run_step", side_effect=step),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                for bad in ("nan", "inf"):
+                    self.assertEqual(self.main(ws, str(scn_dir), "--max-total-usd", bad), 2)
+            self.assertEqual(calls, [])
+
+    def test_editing_the_prompt_or_permission_mode_invalidates_the_confirmation(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            confirmed = self.digest(ws, scn_dir, 5.0)
+            path = scn_dir / "UC-91.yml"
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            data["permission_mode"] = "bypassPermissions"
+            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+            data["permission_mode"] = "auto"
+            data["steps"][0]["prompt"] += "x" * 200  # 概要は 120 字で切るので出ない後ろ
+            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+
+    def test_failed_step_cost_counts_toward_the_total(self):
+        scn = {"budget_usd": 1.0, "_prompt_steps": 2}
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            timeout = subprocess.TimeoutExpired("claude", 1)
+            self.assertEqual(runner._failed_step_cost(scn, out, 1, timeout), 0.5)  # step の上限
+            self.assertEqual(runner._failed_step_cost(scn, out, 1, RuntimeError("x")), 0.0)
+            line = json.dumps({"type": "result", "total_cost_usd": 0.4, "session_id": "s"})
+            (out / "step-1.jsonl").write_text(line + "\n", encoding="utf-8")
+            self.assertEqual(runner._failed_step_cost(scn, out, 1, RuntimeError("x")), 0.4)
+
+    def test_issue_scenarios_raise_the_host_question(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            path = scn_dir / "UC-91.yml"
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            data["setup"]["issue"] = {"repo": "projects/test-repo", "title": "t", "body": "b"}
+            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+            eligible, skipped = runner.run_all_plan(
+                runner.expand_scenario_paths([str(path)]), ws.root
+            )
+            text = runner.run_all_confirmation(
+                eligible, skipped, 5.0, "d", "m", ws.root, [str(path)]
+            )
+            self.assertIn("本物のホストに issue も作る", text)
+
+    def test_not_enable_mode_runs_nothing(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            step, calls = self.fake_step({})
+            with (
+                mock.patch.object(runner, "_ENTRY", True),
+                mock.patch.object(runner, "mode_check", return_value=(False, "dry-run")),
+                mock.patch.object(runner, "run_step", side_effect=step),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                rc = runner.main(
+                    ["run-all", str(scn_dir), "--max-total-usd", "5", "--root", str(ws.root)]
+                )
+            self.assertEqual(rc, 3)
+            self.assertEqual(calls, [])
+
+    def test_run_all_is_closed_when_imported(self):
+        args = runner.argparse.Namespace(
+            scenarios=["x"], max_total_usd=1.0, confirmed=None, root=".", out=None
+        )
+        with self.assertRaises(RuntimeError):
+            runner.cmd_run_all(args)
 
 
 class LifecycleTest(unittest.TestCase):

@@ -1,9 +1,9 @@
 ---
 title: 受入シナリオを claude -p で回す
 type: guide
-description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方
+description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方（run-all での 1 回の確認による続けて回す方法を含む）
 tags: [test, scenario]
-keywords: [受入シナリオ, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
+keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -100,7 +100,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 
 ## 回し方
 
-1. **回す前に、人間に確認する。** 確認が取れるまで、1 本も回さない。回すたびに取り直す（前の回の了承を使い回さない）。
+1. **回す前に、人間に確認する。** 確認が取れるまで、1 本も回さない。回すたびに取り直す（前の回の了承を使い回さない）。例外は `run-all` の 1 回の確認だけ（「続けて回す（run-all）」）。
    エージェントは先に次の事実を集め、そのまま見せて、人間に問う。
    - 概要: 実行器が出す「受け入れシナリオ」の節（何をさせ、何を期待し、何が残るか、まだ確かめていない点）。確認の前に、人間がこれを読んで決める
    - ワークスペース状態: ワークスペースルートと `projects/test-repo` の `ccnavi-git.sh status`、origin との先行・遅れ、残っているワークツリーとブランチ、
@@ -128,7 +128,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    実行器は step を 1 つずつ `claude -p` で回す（`--model`・`--max-budget-usd`・`--permission-mode`・`--include-hook-events`・
    `--output-format stream-json` を付ける）。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す。
    続きの step が `resume` でなければ `--no-session-persistence` を付ける。出力は `logs/scenarios/<ID>-<日時>/` に置く
-   （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`、`context-N.md`、`messages.md`。後ろの 2 つは下の「証拠の読み方」）
+   （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`、`context-N.md`、`messages.md`。後ろの 2 つは下の「証拠の読み方」）。`run-all` の出力は「続けて回す（run-all）」
 4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。
    人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
    続けずにやめるときは `uv run python -m tests.scenarios.runner restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
@@ -141,6 +141,48 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 7. **後片付けをする。** 実行器が `setup.files`（作る形）を消し、`setup.reset` があれば対象を `base` へ戻す。シナリオで作ったワークツリー・ブランチ・MR は、`projects/test-repo` のものだけ残してよい（後でまとめて片付ける）。
    ccnavi 本体に変更が残っていたら、期待が破れたということなので、そのまま報告して直さない（見つけたものの扱いに従い issue にする）
 8. **結果を残す。** `report.md` が、各 step の期待と実際、費用をまとめている。期待と違えば、どの欄で違ったかが分かる
+
+## 続けて回す（run-all）
+
+使い捨てのリポジトリ（`projects/test-repo`）を対象にするシナリオを何本も回すときは、確認を 1 回にして直列に回す。
+
+```sh
+uv run python -m tests.scenarios.runner run-all tests/scenarios --max-total-usd 5      # 確認文と目印を出して止まる（終了コード 3）
+uv run python -m tests.scenarios.runner run-all tests/scenarios --max-total-usd 5 --confirmed <目印>
+```
+
+引数はディレクトリ（`*.yml`）・glob・ファイルを複数書ける。`--max-total-usd` は必須。`--out` は要約の置き場（既定は `logs/scenarios/run-all-<日時>/`。各シナリオの出力は、その下の `<ID>/`）。
+
+### 対象にするもの
+
+「対象の判定」（`require_disposable_repo`・`check_before_run`・`setup_clashes`）を通る、使い捨てのリポジトリを触る setup を持つシナリオだけ。加えて、続けて回すために次の 2 つを満たすこと。
+
+- 人間の操作の step が無い（10 で止まると、残し印が次の回を断る）
+- `setup.reset` を持つ（前の回の状態を次の回に残さない。`reset` が無い `setup.host` だけの回は対象にしない）
+
+ccnavi 本体に作用しうるシナリオ（`setup` が使い捨てのリポジトリを触らないもの）は対象にせず、従来どおり 1 本ずつ確認して回す。対象にしなかったものは、理由つきで確認文と要約の「対象にしなかったもの」に出す。
+
+### 確認の例外
+
+回し方 1 の「回すたびに取り直す」の例外として、`run-all` は次の確認を **1 回** だけ取る。
+
+- 確認の内容: 回す ID の一覧、各シナリオの概要と作るもの（`scenario_summary`）、対象のリポジトリの状態、`base`、費用の上限（1 本ごとの `budget_usd` と、累計の `--max-total-usd`）
+- 有効な範囲: **確認した ID の集合・`base`・費用の上限・概要に限る。** 確認文が出す目印（`--confirmed` に渡す）は、これらとシナリオの全文（prompt の全文・`permission_mode`・`model`・`expect`・`setup` の中身）から作る。実行の直前に作り直し、違えば回さずに止まる（終了コード 3）。ID の増減、`base` や `budget_usd` や概要やシナリオの書き換え、`--max-total-usd` の変更は、すべて違いになる
+- 確認の中身は 1 本ごとに違う（概要、`setup_clashes`、確認事項）ので、`--confirmed` を素通しにはしない。一覧に対する 1 回の確認を、目印が表す
+- 使い回さない: 別の回の目印、ID を足したあとの目印は使えない。確認を取り直す
+
+### 費用
+
+- `--max-total-usd`: 実費（各シナリオの `result` の `total_cost_usd` の合計。`state.json` の `cost_usd`）の累計の上限。各シナリオの前に、そのシナリオの `budget_usd` が累計の残り（上限 − 実費の累計）を超えないかを見て、超えるなら回さずに止まる。1 本の途中では止められない。正常に終わらなかった step も累計に入れる（出力が残っていればその費用、時間切れで出力が無ければ step の上限）。`--max-total-usd` は 0 より大きい有限の値だけ（`nan`・`inf` は終了コード 2）
+- `budget_usd` は `claude -p` の `--max-budget-usd` の元で、実費がわずかに超えることがある。上限は目安として扱う
+- 止まったら、回した本数と残りの ID を出す。続きは、確認を取り直して `run-all` を打ち直す
+
+### 失敗・停止と分離
+
+- 1 本が `fail` / `inconclusive` でも続ける。対象を戻せない・ロックで断られるなどで終了コードが 3 のときは、対象の状態が信用できないので、そこで止める
+- 終了コード: 0 全部 pass / 1 fail がある・回せるシナリオが無い / 2 inconclusive・意味の判定待ちがある・`--max-total-usd` が不正 / 3 確認が要る・止まった
+- 最後に全体の表を出し、`summary.md` と `summary.json` に書く。列は ID、判定、実費、ツール呼び出し数、拒否数、ask 数、出力の置き場。ツール呼び出し数は stream-json の `tool_use`、拒否数と ask 数は回したセッションの `decisions.jsonl` の `deny` と `ask`。実費は各シナリオの `report.json`（`kind: cost` の行）にも残す
+- 全本が同じ `cwd` と `logs/` を使う。各 step は新しい `--session-id` で始め、続きの step でない限り `--no-session-persistence` を付ける（現行のとおり）。hook の once の案内（`hinted`）の記憶はセッションごとなので、前のシナリオの記憶は次に持ち越されない（`test_runner.py` が見張る）
 
 ## 使い捨てのリポジトリの事前状態と後片付け
 
@@ -197,12 +239,15 @@ setup:
 `base` は 40 桁の 16 進のコミット SHA だけ（短縮 SHA・ブランチ名・タグ名は ValueError。ブランチやタグは動くので使わない）。次の順で対象を戻す。
 
 1. `git worktree remove --force`（本体のワークツリー以外すべて）→ `git worktree prune`
-2. `git checkout -f -B main <base>`（ローカルの `main` を `base` に合わせて切り替える）
-3. `main` 以外のローカルブランチを `git branch -D`
-4. タグを `git tag -d`
-5. `git stash clear`
-6. `git reset --hard <base>`
-7. `git clean -fd`
+2. ccnavi 自身の状態を消す。git の共通ディレクトリ直下の `ccnavi-direct/`（直接作業の記録）・`ccnavi-integrate/`（取り込みの marker）・`ccnavi-integrate-done/`、と `refs/ccnavi/` の下のすべての ref（`refs/ccnavi/direct/<名前>/s` など）。前のシナリオの取り込み待ちを、次の SessionStart の文脈や `ccnavi-worktree.sh` の `adopt-recorded` に持ち越さないようにする
+3. `git checkout -f -B main <base>`（ローカルの `main` を `base` に合わせて切り替える）
+4. `main` 以外のローカルブランチを `git branch -D`
+5. タグを `git tag -d`
+6. `git stash clear`
+7. `git reset --hard <base>`
+8. `git clean -fd`
+
+2 をワークツリーの除去と prune の後に置くのは、記録が一時ワークツリー（本体の `logs/direct-tmp/<repo>/<名前>`。対象の外）やブランチを指しているからである。ワークツリーが消せずに止まった回（ロックされているなど）で、記録だけ先に消えて食い違いが生じるのを防ぐ。ディレクトリだけ先に消えた登録（prunable）は prune が外す。消すのは `require_disposable_repo` を通した対象の `.git/` の名指しの 3 つと `refs/ccnavi/` だけで、`logs/` など `.gitignore` 済みのものは残す（判定の記録はセッション ID で絞れる）。
 
 `git clean` に `-x` は付けない（`.gitignore` 済みの `logs/`・`.claude/` などを消さない）。`refs/remotes/*` は触らない。`.git/config`・`.git/hooks`・reflog・`refs/notes` も戻さない。merge・rebase などの途中で止まった対象は、`branch -D` が失敗して「戻せなかった」になる（手で中断してから `restore`）。origin への push は戻さない。push が要るシナリオは、各シナリオが自分で後始末する。
 戻す前に `base` が対象にあるコミットかを確かめ、無ければ何も変えずに止める。
@@ -301,7 +346,7 @@ step ごとに、エージェントへ渡った文面を文字数つきで出す
 |---|---|---|
 | 反復拒否 | 同じ step で、同じ `code` の `deny` が、間に `allow` を挟まず 3 回以上続いた箇所 | `allow` は Stop など別の事象の行も数えるので、ターンの境目で途切れる。`allow` 以外の行（`skip`・`handover`）は途切れにしない。別の `code` の `deny` が入ると数え直す |
 | 迂回の疑い | `PreToolUse` で deny された `Edit` / `Write` の対象パスと、同じ step の `Edit` / `Write` の `file_path` が、`pathcase.fold` を通して一致し、`file_path` の呼び出し数が deny の数を超えたもの | Bash の中身（`sed -i`・`tee`・リダイレクト）からはパスを取らないので、そちらの迂回は見逃す。deny と呼び出しは数だけで突き合わせるので、deny より前に通った同じパスの呼び出しも疑いになる。deny された呼び出しをもう一度打っただけ（呼び出し数が deny の数と同じ）なら疑わない。記録の `subject` が上限で切られた行（末尾が `…(+N)`）、相対パスで打たれた呼び出し（記録の `subject` と形が合わない）は比べない |
-| 案内の無い拒否 | 理由文のどの行も、行頭（前の空白を除く）が `次:`・`案内:`・`必須:` で始まらない拒否（deny・block） | 行頭の語だけを見る。`次の手:` や文中の案内は数えないので、案内があっても出ることがある。確認（ask）は対象にしない |
+| 案内の無い拒否 | 次の手を示していない拒否（deny・block）。理由文が次のどれも満たさない: 行頭（前の空白を除く）が `次:`・`案内:`・`必須:`、依頼・指示の語（`ください`・`頼んで`・`依頼`・`使って`・`使います`・`従って`・`してから`・`書き直`・`打ち直`・`伝えて`・`報告して`）、バッククォートで囲んだコード片。理由文が空の拒否も含む | 語の有無だけを見る。hook の拒否文は、次の手をマーカーのない行頭の文で書くことが多いので（マーカーを持つのは sh の出力。[スクリプトの出力に次の一手を書く](script-output.md)）、マーカーだけでは案内のある拒否まで挙がった（#570）。次の手を示さない文にも「ください」が出れば、案内なしとして挙がらない（見逃し）。次の手が上の語以外の言い回しだけで書かれていれば、案内のある拒否が挙がる（誤検知）。出荷している拒否文（`rules.yml` と組み込みの deny）が、すべて「案内あり」になることをテストで見張る。確認（ask）は対象にしない |
 
 出た目印は、人が元の記録を読んで確かめる。出なかったことは、拒否に問題が無いことを意味しない。
 
