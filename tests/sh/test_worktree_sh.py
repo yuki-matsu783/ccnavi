@@ -130,6 +130,7 @@ class WorktreeShTest(unittest.TestCase):
         os.makedirs(scripts)
         for name in ("ccnavi-worktree.sh", "ccnavi-git.sh", *common_sh(SH_DIR)):
             shutil.copy(final(f".ccnavi/scripts/{name}"), scripts)
+        put_messages(self.ws)
         self.exe = write(
             os.path.join(base, "exe", "ccnavi"), EXE.format(src=SRC, python=sys.executable)
         )
