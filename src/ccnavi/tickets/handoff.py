@@ -1102,9 +1102,9 @@ def survey(tree_root: str, start: str) -> tuple[list[str], list[str]] | None:
     """置き場の下書きを、`<起点>` の木の元のパスと突き合わせる。`(元と違う写し, 元の無い下書き)`。
 
     `ccnavi-git.sh integrate` が、取り込み結果に含まれない下書きを見分けるのに使う。
-    下書きの置き場を除いた相対パスを、`<起点>` の木のパスと `key_of` で比べる（大文字小文字・
-    NFC/NFD の違いは同じものとして扱う）。比べるのは見つけるためだけで、元を読むときは起点の
-    木の表記を使う。
+    下書きの置き場を除いた相対パス（階層名の読み替えを戻したもの）を、`<起点>` の木のパスと
+    `key_of` で比べる（大文字小文字・NFC/NFD の違いは同じものとして扱う）。比べるのは見つける
+    ためだけで、元を読むときは起点の木の表記を使う。
 
     - 起点の木の同じ下書きと中身が同じ: ブランチが持ち込んだものではない。どちらにも入れない
     - 元が起点の木に無い: 元の無い下書き（新規のメモ・報告）
@@ -1130,7 +1130,7 @@ def survey(tree_root: str, start: str) -> tuple[list[str], list[str]] | None:
         own = origins.get(key_of(shown))
         if own and _holds(tree_root, start, own, raw):
             continue
-        sources = origins.get(key_of(rel))
+        sources = origins.get(key_of(handoff_names.from_draft(rel)))
         if not sources:
             notes.append(shown)
         elif not _holds(tree_root, start, sources, raw):

@@ -563,6 +563,16 @@ class TreeHandoffPendingStartTest(Harness):
         self.draft("Docs/GUIDE.MD", "new\n")
         self.assertIn("foreign wip/handoff/Docs/GUIDE.MD", self.lines())
 
+    def test_a_renamed_claude_level_finds_the_original(self):
+        path = os.path.join(self.ws, ".claude", "settings.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write("old\n")
+        git(self.ws, "add", "-f", ".claude/settings.json")
+        git(self.ws, "commit", "-q", "-m", "claude")
+        self.draft("handoff-.claude/settings.json", "new\n")
+        self.assertIn("foreign wip/handoff/handoff-.claude/settings.json", self.lines())
+
     def test_non_ascii_case_differences_find_the_original(self):
         self.draft("DOCS/CAF\u00c9.md", "new\n")
         self.assertIn("foreign wip/handoff/DOCS/CAF\u00c9.md", self.lines())
