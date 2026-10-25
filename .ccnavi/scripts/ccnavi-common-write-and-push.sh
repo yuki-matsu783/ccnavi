@@ -732,15 +732,15 @@ ccnavi_wap_inflight=""
 ccnavi_wap_inflight_h0=""
 ccnavi_wap_inflight_list=""
 ccnavi_wap_end() {
-	# タイムアウト監視の途中で切られたら、監視も止める（後で別のプロセスを kill しないように）。
-	if [ -n "${ccnavi_gt_dog:-}" ]; then
-		kill "$ccnavi_gt_dog" 2>/dev/null || :
-		wait "$ccnavi_gt_dog" 2>/dev/null || :
-		ccnavi_gt_dog=""
+	# タイムアウト監視（ccnavi_run_timed）の途中で切られたら、監視も止める。後で別のプロセスを kill しないようにするため。
+	if [ -n "${ccnavi_tm_dog:-}" ]; then
+		kill "$ccnavi_tm_dog" 2>/dev/null || :
+		wait "$ccnavi_tm_dog" 2>/dev/null || :
+		ccnavi_tm_dog=""
 		# 監視していた git（コミット・push）も止めて終わりを待つ。動いている途中のツリーを見て戻さない。
-		if [ -n "${ccnavi_gt_pid:-}" ]; then
-			kill "$ccnavi_gt_pid" 2>/dev/null || :
-			wait "$ccnavi_gt_pid" 2>/dev/null || :
+		if [ -n "${ccnavi_tm_pid:-}" ]; then
+			kill "$ccnavi_tm_pid" 2>/dev/null || :
+			wait "$ccnavi_tm_pid" 2>/dev/null || :
 		fi
 	fi
 	if [ -n "$ccnavi_wap_inflight" ] && [ -n "$ccnavi_wap_tmp" ]; then
