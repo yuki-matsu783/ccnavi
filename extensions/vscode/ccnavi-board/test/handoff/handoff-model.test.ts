@@ -292,3 +292,16 @@ test("CB-T1119 一覧の見本は、種類と状態を網羅している（画�
   assert.deepEqual([...new Set(entries.map((e) => e.kind))].sort(), ["defense", "docs", "layer-config", "template"]);
   assert.deepEqual([...new Set(entries.map((e) => e.state))].sort(), ["changed", "conflict", "new", "unchanged"]);
 });
+
+test("CB-T1228 ignored_paths は形が正しいときだけ読む（欄なし・配列でない・欠けた欄は件数だけ）", () => {
+  const read = (overrides: Record<string, unknown>) => {
+    const parsed = parseHandoffList(listText(overrides));
+    assert.ok(parsed.ok);
+    return parsed.ok ? parsed.value : undefined;
+  };
+  assert.deepEqual(read({ ignored_paths: [{ path: "a.sh", why: "not-allowed" }] })?.ignored_paths, [{ path: "a.sh", why: "not-allowed" }]);
+  assert.equal(read({})?.ignored_paths, undefined);
+  assert.equal(read({ ignored_paths: "x" })?.ignored_paths, undefined);
+  assert.equal(read({ ignored_paths: [{ path: "a.sh" }] })?.ignored_paths, undefined);
+  assert.equal(read({ ignored_paths: [{ why: "linked-dir" }] })?.ignored_paths, undefined);
+});

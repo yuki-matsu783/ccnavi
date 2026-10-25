@@ -292,6 +292,30 @@ test("CB-D388 新しいテンプレートは名前を入れて作る。使えな
   }
 });
 
+test("CB-D1224 作った直後は error の苦情を隠し（warn は出す）、触ったあとは出る", async () => {
+  const dom = await openList();
+  try {
+    dom.type(dom.one(".f-new-name"), "my-flow2");
+    await dom.settle();
+    dom.click(dom.one('button[data-action="new-template"]'));
+    await dom.settle();
+    const asked = dom.posted.find((m) => m.type === "editNew");
+    const check = fixtureCheck();
+    const problems = [{ severity: "error", detail: "description がありません" }, { severity: "warn", detail: "when がありません" }];
+    const skeleton = { name: "my-flow2", description: "", plan: ["implement"] };
+    await dom.send({ type: "editOpened", session: asked?.session, opened: { name: "my-flow2", layer: "self", created: true, sha: "", data: skeleton, check: { ...check, name: "my-flow2", problems }, lock: { locked: false, reason: "", doing: [] } }, error: "" });
+    await dom.settle();
+    assert.equal(dom.all(".tpl-problems .sev-error").length, 0, "未入力の間は error を出さない");
+    assert.equal(dom.all(".tpl-problems .sev-warn").length, 1);
+    dom.type(dom.one(".f-description"), "x");
+    dom.type(dom.one(".f-description"), "");
+    await dom.settle();
+    assert.equal(dom.all(".tpl-problems .sev-error").length, 1, "触ったあとは空に戻しても出す");
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D389 ステップのフローは最初から図を開いていて、部品箱でノードを足すと未保存になり、答えを読み直す。「フローを足す」は雛形を置き、「フローを外す」で消える", async () => {
   const dom = await openList();
   try {

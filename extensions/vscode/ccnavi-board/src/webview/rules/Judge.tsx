@@ -9,8 +9,9 @@
 import { Fragment, type JSX } from "react";
 
 import type { HookEntry } from "../../core/hooks.js";
-import { SECTIONS } from "../../core/rules-view.js";
+import { SECTIONS, tmpName } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
+import { JUDGE_LABELS } from "./text.js";
 import type { ExpectationsJson, RuleHitJson, TestJson } from "../../core/testmodel.js";
 
 /** 判定のバッジ。空（判定の対象外）は薄い地の色で出す */
@@ -19,14 +20,14 @@ function Verdict({ verdict }: { readonly verdict: string }): JSX.Element {
 }
 
 /** 値のある組だけ出す定義リスト（`dl`） */
-function Pairs({ pairs }: { readonly pairs: readonly (readonly [string, string])[] }): JSX.Element {
+function Pairs({ pairs }: { readonly pairs: readonly (readonly [keyof typeof JUDGE_LABELS, string])[] }): JSX.Element {
   return (
     <dl className="kv">
       {pairs
         .filter(([, value]) => value !== "")
         .map(([name, value]) => (
           <Fragment key={name}>
-            <dt>{name}</dt>
+            <dt>{JUDGE_LABELS[name]}</dt>
             <dd>{value}</dd>
           </Fragment>
         ))}
@@ -53,7 +54,7 @@ function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Elemen
           {rules.map((rule, index) => (
             <tr key={index}>
               <td>{rule.section !== "" && <span className={`verdict ${rule.section}`}>{rule.section}</span>}</td>
-              <td>{rule.id + (rule.source === "outside" ? "（ルールファイル外の根拠）" : "")}</td>
+              <td>{tmpName(rule.id) + (rule.source === "outside" ? "（ルールファイル外の根拠）" : "")}</td>
               <td>{rule.kind !== "" && <code>{`${rule.kind} ${rule.written}`}</code>}</td>
               <td>{rule.pattern !== "" && <code>{rule.pattern}</code>}</td>
             </tr>
@@ -117,7 +118,7 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
               ["tool", result.tool],
               ["subject", result.subject],
               ["resolved", result.resolved],
-              ["reason", result.reason],
+              ["reason", tmpName(result.reason)],
               ["degraded", result.degraded === "" ? "" : `${result.degraded}（生の文字列に対して判定）`],
               ["fallback", result.fallback === "" ? "" : `${result.fallback}（組み込みの既定で判定）`],
             ]}
@@ -125,7 +126,7 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
           <h3>ヒットしたルール</h3>
           <Hits rules={result.rules} />
           <h3>返すメッセージ</h3>
-          {result.response === "" ? <p className="empty">メッセージは返しません</p> : <pre className="response">{result.response}</pre>}
+          {result.response === "" ? <p className="empty">メッセージは返しません</p> : <pre className="response">{tmpName(result.response)}</pre>}
         </>
       ) : (
         <p>
@@ -185,10 +186,10 @@ export function ExpectationsResult({ result }: { readonly result: ExpectationsJs
                 <td>
                   {expectation.rules
                     .filter((rule) => rule.source === "file")
-                    .map((rule) => `${rule.section}:${rule.id}`)
+                    .map((rule) => `${rule.section}:${tmpName(rule.id)}`)
                     .join(", ")}
                 </td>
-                <td className="why">{expectation.why}</td>
+                <td className="why">{tmpName(expectation.why)}</td>
               </tr>
             ))}
           </tbody>
