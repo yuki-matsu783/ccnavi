@@ -294,6 +294,17 @@ class ReadingTest(unittest.TestCase):
             "読めた拒否に読めなかったと書かれている",
         )
 
+    def test_括弧でグループ化した述語は読めなかったと書かない(self):
+        # find の `\\( … \\)` は読める形。書き込みの述語が後ろに続く形だけが読めない。
+        for command in ("find . \\( -name x -o -name y \\) -print", "grep -e '(' -n main.sh"):
+            with self.subTest(command=command):
+                result = run(payload=pre_tool_use("Bash", "command", command))
+                self.assertEqual(result.stdout, "", f"止めた: {command!r}")
+        out = verdict(
+            self, run(payload=pre_tool_use("Bash", "command", "find . -exec wc {} \\; -delete"))
+        )
+        self.assertIn("生の文字列", out["permissionDecisionReason"])
+
 
 class HeredocTest(unittest.TestCase):
     def test_ヒアドキュメントは止まる(self):
