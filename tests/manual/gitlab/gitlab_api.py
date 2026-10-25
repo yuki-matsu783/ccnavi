@@ -69,7 +69,8 @@ class Client:
     def call(
         self, method: str, path: str, token: str, payload: dict | None = None, tag: str = ""
     ) -> tuple[int, object]:
-        """起動直後の GitLab は応答が遅いので、1 回の待ちは 120 秒まで、失敗したら 3 回まで試す。"""
+        """起動直後の GitLab は応答が遅いので、1 回の待ちは 120 秒まで。
+        GET は失敗したら 3 回まで試す。書き込みは送り直すと二重に作られるので 1 回で止める。"""
         data = json.dumps(payload).encode("utf-8") if payload is not None else None
         req = urllib.request.Request(
             self.api + path,
@@ -87,6 +88,9 @@ class Client:
                 status, raw = exc.code, exc.read().decode("utf-8", "replace")
                 break
             except (TimeoutError, OSError) as exc:
+                if method != "GET":
+                    status, raw = 0, json.dumps({"error": str(exc)})
+                    break
                 self._record(
                     kind="retry", method=method, path=path, error=str(exc), attempt=attempt + 1
                 )

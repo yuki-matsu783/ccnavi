@@ -642,11 +642,6 @@ def main() -> int:
             checked.returncode != 0 and "変更要求" in checked.stderr,
             checked.stderr.strip()[:200],
         )
-        accepted = sh(REVIEW_SH, parent_tree, "decide", "1", stdin="y\n")
-        record(
-            "変更要求は decide でも通らない",
-            accepted.returncode != 0 and "変更要求" in (accepted.stderr + accepted.stdout),
-        )
     status, ap = CLIENT.approve(REVIEWER_TOKEN, pid, iid)
     record("レビュアーが approve する", status in (200, 201), f"status={status}")
     _, reviewers = CLIENT.reviewers(ROOT_TOKEN, pid, iid)
@@ -679,37 +674,14 @@ def main() -> int:
     status, disc2 = CLIENT.create_discussion(
         REVIEWER_TOKEN, pid, iid, "typo。次でよい", tag="discussion-create-2"
     )
-    disc2_note = disc2.get("notes", [{}])[0].get("id", "")
-    accepted = sh(REVIEW_SH, parent_tree, "decide", "1", stdin="y\n")
-    say("decide:\n" + redact(accepted.stdout + accepted.stderr))
-    record(
-        "decide で未解決を受け入れる", accepted.returncode == 0 and "受け入れた" in accepted.stdout
-    )
-    acc = [n for n in notes_of(pid, iid) if n.get("body", "").startswith("<!-- ccnavi:decide -->")]
-    record(
-        "受け入れの note が MR に書き込まれる",
-        bool(acc) and f"#note_{disc2_note}" in acc[-1].get("body", ""),
-    )
-    checked = sh(REVIEW_SH, parent_tree, "confirm", "--phase", "1")
-    record(
-        "受け入れ済みのスレッドは confirm で数えない",
-        checked.returncode == 0,
-        checked.stderr.strip()[:200],
-    )
+    # 受け入れ（ユーザの decide）は probe では通さない。経路は未検証（gitlab-manual.md）
 
     # ---- 4. 親を閉じて ready（Draft を外す）
-    refused = sh(REVIEW_SH, parent_tree, "ready")
-    record(
-        "wip/ が追跡されたままなら ready は止まる",
-        refused.returncode != 0 and "wip" in refused.stderr,
-        refused.stderr.strip()[:200],
-    )
     # 親の start は冒頭（子の start より前）で済ませている。ここでは呼び直さない
+    # 追跡済みの wip/ は ready が消すので、手で消さない（ready の動きを probe でそのまま通す）
     closed = sh(TICKET_SH, parent_tree, "finish", "i0001")
     record("親の done", closed.returncode == 0, (closed.stdout + closed.stderr).strip()[:200])
     commit_all(parent_tree, "状態の移動")
-    git(parent_tree, "rm", "-r", "-q", "wip")
-    git(parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
     pushed = sh(GIT_SH, parent_tree, "push")
     record(
         "親の push（引数なし）",

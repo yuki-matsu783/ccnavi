@@ -60,7 +60,7 @@ uv run python tests/manual/gitlab/probe_gitlab.py
 - `CCNAVI_PROBE_GITLAB`（既定 `http://127.0.0.1:<CCNAVI_GITLAB_PORT、既定 8929>`）で接続先を変える。
 - 結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
 - probe はユーザの役として、承認の push（`ccnavi-user-push-approved.sh`）を実行する。子は finish の前に `ticket learn` で学びの記録を書く。
-- ユーザの decide（`ccnavi-user-decide.sh`）は通さず、`review decide` で代用する。decide の経路は確かめられていない。
+- ユーザの受け入れ（`ccnavi-user-decide.sh`）は probe では通さない。この経路は確かめられていない。
 - `--help` は、トークンも exe も無くても終わる。
 
 ## CE の限界

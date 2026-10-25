@@ -313,8 +313,15 @@ def cmd_status(_args: argparse.Namespace) -> int:
     status, body = client.version(tokens["GITLAB_TOKEN"])
     version = body.get("version") if isinstance(body, dict) else body
     print(f"API: HTTP {status}、GitLab {version}")
-    valid = all(client.user(tokens[k])[0] == 200 for k in TOKEN_KEYS)
-    print(f"トークンの有効性: {'有効' if valid else '無効（up で作り直す）'}")
+    codes = [client.user(tokens[k])[0] for k in TOKEN_KEYS]
+    # up と同じく、401（失効）だけを無効とみなす。0・5xx は一時的な不通かもしれないので「不明」
+    if all(code == 200 for code in codes):
+        verdict = "有効"
+    elif 401 in codes:
+        verdict = "無効（up で作り直す）"
+    else:
+        verdict = f"不明（HTTP {codes}。時間をおいて再実行）"
+    print(f"トークンの有効性: {verdict}")
     return 0
 
 
