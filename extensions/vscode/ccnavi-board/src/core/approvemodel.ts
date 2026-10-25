@@ -116,7 +116,7 @@ export function summarize(preview: ApprovePreview): ApproveSummary {
     // 番号順に並べるだけにする。計画は先行関係で並列のステップもあるため、矢印では書かない
     const names = [...plan.items].sort((a, b) => a.number - b.number).map((item) => item.title || item.type);
     const label = PART_LABELS[plan.part] ?? plan.part;
-    return `${plan.ticket}${revised.has(plan.ticket) ? "（改版）" : ""}の${label} ${names.length} ステップ（${names.join("・")}）`;
+    return `${plan.ticket}${revised.has(plan.ticket) ? "（改版）" : " "}の${label} ${names.length} ステップ（${names.join("・")}）`;
   });
   return { tickets: `承認するチケット ${batch.length} 件（${kinds.join("・")}）`, plans };
 }
