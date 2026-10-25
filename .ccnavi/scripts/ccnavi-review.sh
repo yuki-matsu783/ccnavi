@@ -456,6 +456,7 @@ undraft() {
 				rest_fallback_failed "Draft の解除"
 				return 1
 			fi
+			rm -f "${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" || :
 			printf '%s' "$pr" | "$JQ" -r '.draft // false'
 			;;
 		*) return 1 ;;

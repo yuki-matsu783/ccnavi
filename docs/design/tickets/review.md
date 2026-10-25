@@ -258,7 +258,7 @@ GitLab に GitHub の dismiss にヒットする操作は適用していない�
 | スレッドの取得（`threads`） | `GET pulls/<N>/ccr/review_threads`（`resolved`・`path`・`line`・`comment_ids`）と `GET pulls/<N>/comments`（全ページ）から、GraphQL と同じ形の JSON を組む。スレッドの id は先頭コメントの id（数字の文字列）。url・本文・作成の時刻は先頭コメントから、`last_*` は `comment_ids` の最後のコメントから取る |
 | Draft 外し（`undraft`） | 題の `Draft:` 除去の PATCH のあとで `POST pulls/<N>/ccr/ready_for_review` を打つ。戻り値は `GET pulls/<N>` の `draft`（戻り値の形は GraphQL と同じ） |
 | 受け入れの返信と解決（`accept_reply`・`accept_resolve`） | `POST pulls/<N>/comments/<id>/replies` と `POST pulls/<N>/ccr/comments/<id>/resolve`。計画の id が数字だけなら REST、そうでなければ GraphQL の node id を使う。id は取り直した結果にあるものだけを通すので、取った道と書く道は同じになる |
-| MR が閉じる issue（`ccnavi-start.sh` の `mr_linked_issues`） | `GET pulls/<N>` の本文の `close(s/d)`・`fix(es/ed)`・`resolve(s/d)` に続く `#n`・`owner/repo#n`（大文字小文字不問）。MCP で確かめた値を渡す回避路（`--mcp-checked`）は残す |
+| MR が閉じる issue（`ccnavi-start.sh` の `mr_linked_issues`） | `GET pulls/<N>` の本文の `close(s/d)`・`fix(es/ed)`・`resolve(s/d)` に続く `#n`・`owner/repo#n`（大文字小文字不問）。コードブロック・インラインコード・HTML コメント・引用行は読まない。`not close #n` と、語の途中の `fix`（`bug-fix #n`）も拾わない。MCP で確かめた値を渡す回避路（`--mcp-checked`）は残す |
 
 REST の代わりの道も失敗したときは、ユーザに接続（認証と権限）の確認を頼んで止まる案内を出す（`rest_fallback_failed`）。スレッドとレビューの JSON を作って実行ファイルに直接渡す手順は案内しない（write-and-push の検査で止まるため）。`ccr` の道は通常の GitHub では 404 になる。
 

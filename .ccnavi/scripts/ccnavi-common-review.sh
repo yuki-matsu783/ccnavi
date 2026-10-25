@@ -339,7 +339,7 @@ threads_rest() {
 			{id: $first, resolved: (.resolved // false), url: ($f.html_url // ""), path: (.path // $f.path // ""), line: (.line // $f.line // 0),
 			 body: ($f.body // ""), created_at: ($f.created_at // ""),
 			 last_id: (($l.id // "") | tostring), last_at: ($l.created_at // ""), last_author: ($l.user.login // "")}]' || tr_rc=$?
-	rm -f "$tr_file.rt" "$tr_file.cs" || :
+	rm -f "$tr_file.rt" "$tr_file.cs" "${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" || :
 	return "$tr_rc"
 }
 

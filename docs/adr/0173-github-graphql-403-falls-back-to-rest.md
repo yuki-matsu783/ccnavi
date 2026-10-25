@@ -32,7 +32,7 @@ Claude Code のクラウド環境では、GitHub の GraphQL が 403 で拒否�
 | `accept_reply`・`accept_resolve` は、スレッドの id の形で道を選ぶ。数字だけなら REST（`replies`・`ccr/.../resolve`）、そうでなければ GraphQL の node id | 計画の id は取り直した結果にあるものだけを通すので、取った道と書く道が同じになる。1 回の実行の中で道が混ざらず、実行をまたいだ計画（`--resume`）でも道が決まる |
 | REST の返信は、スレッドの先頭コメントへの返信にする | GraphQL の `addPullRequestReviewThreadReply` と同じく、スレッドに返信が付く |
 | `undraft` は、題の `Draft:` 除去の PATCH はそのまま。`markPullRequestReadyForReview` が使えない 403 のときだけ `ccr/ready_for_review` を打ち、`GET pulls/<N>` の `draft` を返す | 戻り値（`true` / `false`）を GraphQL と同じにし、呼び手の判定を変えない |
-| `closingIssuesReferences` が使えない 403 のときは、MR の本文の `close(s/d)`・`fix(es/ed)`・`resolve(s/d)` に続く `#n`・`owner/repo#n` を読む（大文字小文字不問）。MCP で確かめた値を渡す回避路（`--mcp-checked`）は残す | GitHub のリンクのうち、本文のキーワードで付いたものだけを読む形に縮める。コミットメッセージや手で付けたリンクは拾わない |
+| `closingIssuesReferences` が使えない 403 のときは、MR の本文の `close(s/d)`・`fix(es/ed)`・`resolve(s/d)` に続く `#n`・`owner/repo#n` を読む（大文字小文字不問）。コードブロック・インラインコード・HTML コメント・引用行は読まない。`not close #n` と、語の途中の `fix`（`bug-fix #n`）も拾わない。MCP で確かめた値を渡す回避路（`--mcp-checked`）は残す | GitHub のリンクのうち、本文のキーワードで付いたものだけを読む形に縮める。コミットメッセージや手で付けたリンクは拾わない |
 | `api_failed` の GraphQL の枝は外し、GraphQL の失敗は `gql` が分ける。REST の代わりの道も失敗したときの案内（`rest_fallback_failed`）は、ユーザに接続（認証と権限）の確認を頼んで止まる。JSON を作らせる手順は書かない。gh も curl も無いときの案内からも、同じ手順を外す | 拒否される手順を案内しない |
 
 ## 理由
