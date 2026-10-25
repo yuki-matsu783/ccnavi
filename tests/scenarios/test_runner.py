@@ -2924,7 +2924,7 @@ class LifecycleTest(unittest.TestCase):
             self.assertIn("対象のリポジトリを使えない", body)
 
 
-# ---- setup.host（評価の相手: bare / fake-gitlab / real） ----
+# ---- setup.host（評価の相手: bare / fake-gitlab / docker-gitlab / real） ----
 
 # 別のグループ（tests/sh）の部品は import できないので、読むのに要るぶんだけここに持つ
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")

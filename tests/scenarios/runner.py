@@ -999,12 +999,12 @@ def setup_clashes(scn, root):
 
 
 def scenario_host(scn):
-    """setup.host の値（bare / fake-gitlab / real）。欄が無ければ real。"""
+    """setup.host の値（bare / fake-gitlab / docker-gitlab / real）。欄が無ければ real。"""
     return (scn.get("setup") or {}).get("host", hostenv.DEFAULT_HOST)
 
 
 def uses_target(scn):
-    """使い捨てのリポジトリを触る setup（git・reset・追記・bare / fake-gitlab の相手）があるか。"""
+    """使い捨てのリポジトリを触る setup（git・reset・追記・bare / fake-gitlab / docker-gitlab の相手）があるか。"""
     setup = scn.get("setup") or {}
     appends = any(file_spec(v)[1] for v in (setup.get("files") or {}).values())
     return bool(
@@ -1154,7 +1154,7 @@ def fill_issue(text, number):
 
 
 def _host_env(st):
-    """claude に渡す環境。setup.host が bare / fake-gitlab のときだけ作る（real は None）。"""
+    """claude に渡す環境。setup.host が real 以外のときだけ作る（real は None）。"""
     host = st.get("host")
     return hostenv.step_env(host) if host and not host.get("down") else None
 
