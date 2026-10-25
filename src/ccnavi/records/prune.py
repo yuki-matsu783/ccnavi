@@ -47,7 +47,7 @@ import shutil
 import time
 from dataclasses import dataclass, field
 
-from ..infra import fsio, pathsafe
+from ..infra import fsio, pathcase, pathsafe
 from . import diaglog
 
 # しきい値の環境変数と既定値。
@@ -248,7 +248,18 @@ def _stop_review_keep_days(report: Report) -> float:
 
 
 def _linkless(root: str, path: str) -> bool:
-    """`root` の下の `path` までの道に、リンクが 1 つも無いか。`path` が `root` の外なら偽。"""
+    """`root` の下の `path` までの道に、リンクが 1 つも無いか。`path` が `root` の外なら偽。
+
+    外かどうかは書かれたパスのまま比べる（root がリンク経由で、path が実体の表記のときも外）。
+    比べられない（別ドライブ、絶対と相対の混在）ときも偽。
+    """
+    top = pathcase.fold(os.path.abspath(root))
+    here = pathcase.fold(os.path.abspath(path))
+    try:
+        if os.path.commonpath([top, here]) != top:
+            return False
+    except ValueError:
+        return False
     return not pathsafe.has_link(root, path)
 
 

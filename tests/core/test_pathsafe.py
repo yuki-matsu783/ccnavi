@@ -132,6 +132,24 @@ class PathsafeTest(unittest.TestCase):
         self.assertIs(archive._linked(self.root, ("a", "b")), False)
         self.assertIsNone(archive._linked(self.root, ("a", "nope")))
 
+    def test_prune_keeps_outside_by_spelling(self):
+        from ccnavi.records import prune
+
+        alias = os.path.join(self.base, "alias")
+        if not _symlink(self.root, alias):
+            self.skipTest("シンボリックリンクを作れない")
+        # root が別綴り（リンク経由）で、path が実体の表記のときは、今までどおり範囲外で何も消さない
+        self.assertFalse(prune._linkless(alias, os.path.join(self.root, "a")))
+        self.assertTrue(prune._linkless(alias, os.path.join(alias, "a")))
+        self.assertFalse(prune._linkless("relative-root", self.root))
+
+    def test_has_link_lands_when_root_spelled_differently(self):
+        # path が root と違う綴り（root より上のリンク経由）でも、実体が root に着けば止まる
+        up = os.path.join(self.base, "up")
+        if not _symlink(self.base, up):
+            self.skipTest("シンボリックリンクを作れない")
+        self.assertFalse(pathsafe.has_link(self.root, os.path.join(up, "root", "a", "b")))
+
 
 if __name__ == "__main__":
     unittest.main()
