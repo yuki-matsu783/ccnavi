@@ -1197,15 +1197,18 @@ run_sync() {
 		printf '%s\n' "$rs_out" | sed 's/^/  /'
 		sync_ok=1
 	else
-		printf 'ccnavi-sync.sh %s は取り込まなかった（終了コード %s）:\n' "$rs_id" "$rs_rc"
-		printf '%s\n' "$rs_out" | sed 's/^/  /'
 		# 「親チケットも提案もありません」は ccnavi-sync.sh の文言。変えるときはここと test_start_sh.py も直す
+		# ワークツリーを切った直後は親チケットも提案も無いのが正常なので、見出しは失敗と区別できる言い方にする
 		case "$rs_out" in
 		*親チケットも提案もありません*)
+			printf 'ccnavi-sync.sh %s: ワークツリーを切った直後なので、取り込むものはまだありません（失敗ではありません）:\n' "$rs_id"
+			printf '%s\n' "$rs_out" | sed 's/^/  /'
 			sync_no_ticket=1
 			sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
 			;;
 		*)
+			printf 'ccnavi-sync.sh %s は取り込まなかった（終了コード %s）:\n' "$rs_id" "$rs_rc"
+			printf '%s\n' "$rs_out" | sed 's/^/  /'
 			sync_next="取り込めなかった理由は上の出力のとおり。直したら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す（直せないときはユーザに伝える）"
 			;;
 		esac
