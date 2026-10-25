@@ -14,7 +14,8 @@
 
 止められるのは、合流したあとになる。ADR を足しただけのコミットでは、このテストは回らない
 （`.claude/skills/commit/references/test-groups.md` の「`docs/30_adr/` → `core`」で
-回るのは、その表を見てコミットしたときだけ。CI も無い）。書いた直後の重なりは `.claude/hooks/check-adr.sh` が止める。
+回るのは、その表を見てコミットしたときだけ。CI も無い）。書いた直後の重なりは
+`.claude/hooks/check-adr.sh` が止める。
 重複は、並行して伸びた枝が合流したときに起きる。このテストは、合流したあとに誰かが
 `core` を回した時点で重複に気づかせる、という形で役に立つ。
 
@@ -111,9 +112,15 @@ class AdrNumbersTest(unittest.TestCase):
         self.assertTrue(listed, f"入口の表からディレクトリを読めない（{ADR_INDEX}）")
         # 名前は大文字小文字を区別せずに比べる（表の綴りと置き場の綴りが違っても同じもの）
         folded = {pathcase.fold(t) for t in listed}
-        unlisted = sorted({n.split("/")[0] for n in self.sheets if pathcase.fold(n.split("/")[0]) not in folded})
-        self.assertEqual([], unlisted, "表に載っていないディレクトリがある。docs/30_adr.md の表に 1 行足す")
-        placed = {pathcase.fold(t) for t in os.listdir(ADR_DIR) if os.path.isdir(os.path.join(ADR_DIR, t))}
+        unlisted = sorted(
+            {n.split("/")[0] for n in self.sheets if pathcase.fold(n.split("/")[0]) not in folded}
+        )
+        self.assertEqual(
+            [], unlisted, "表に載っていないディレクトリがある。docs/30_adr.md の表に 1 行足す"
+        )
+        placed = {
+            pathcase.fold(t) for t in os.listdir(ADR_DIR) if os.path.isdir(os.path.join(ADR_DIR, t))
+        }
         empty = sorted(t for t in listed if pathcase.fold(t) not in placed)
         self.assertEqual([], empty, "表に載っているが、docs/30_adr/ に無いディレクトリがある")
 

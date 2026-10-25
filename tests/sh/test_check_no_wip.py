@@ -11,7 +11,12 @@ SH = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "ccnavi-chec
 
 
 def git(cwd: str, *a: str) -> None:
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=cwd, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", *a],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+    )
 
 
 class CheckNoWip(unittest.TestCase):
@@ -27,7 +32,9 @@ class CheckNoWip(unittest.TestCase):
                     fh.write("x\n")
             git(d, "add", "-A")
             git(d, "commit", "-q", "--allow-empty", "-m", "topic")
-            return subprocess.run(["sh", os.path.abspath(SH), "main"], cwd=d, capture_output=True, text=True)
+            return subprocess.run(
+                ["sh", os.path.abspath(SH), "main"], cwd=d, capture_output=True, text=True
+            )
 
     def test_wip_in_diff_fails(self) -> None:
         r = self.run_check(["src/a.py", "wip/proposals/todo/x.md"])
@@ -41,7 +48,9 @@ class CheckNoWip(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             git(d, "init", "-q", "-b", "main")
             git(d, "commit", "-q", "--allow-empty", "-m", "base")
-            r = subprocess.run(["sh", os.path.abspath(SH), "nosuch"], cwd=d, capture_output=True, text=True)
+            r = subprocess.run(
+                ["sh", os.path.abspath(SH), "nosuch"], cwd=d, capture_output=True, text=True
+            )
         self.assertNotEqual(r.returncode, 0)
 
     def test_uppercase_wip_fails(self) -> None:

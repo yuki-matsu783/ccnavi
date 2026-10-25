@@ -328,7 +328,8 @@ def reason_for(
 
 # 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルールの一覧です（bare_id → (対象に
 # 含まれる語の式, 1 行)）。式が空なら、そのルールにヒットした回に必ず出します。
-# ask のルールには message を書けず、additionalContext は自動拒否のときに届かないため、ここに置きます。
+# ask のルールには message を書けず、additionalContext は自動拒否のときに届かないため、
+# ここに置きます。
 #
 # direct-worktree-confirm の 1 行は、あとのスクリプト側の拒否を確認が隠さないための説明です。
 # `--adopt` は、確認が通ってもスクリプトが「チケットに結び付くワークツリーです」と断るので、
@@ -536,7 +537,8 @@ def internal_error(code: str, event: str, kind: str, log_path: str, *, passed: b
             f"[ccnavi] {code}",
             f"{what}原因は呼び出しではなく ccnavi にあります（{kind}）。詳細は診断ログ "
             f"{log_path} にあります。同じ呼び出しを打ち直して回避しないでください。"
-            "ユーザに、ここで ccnavi が失敗したことと診断ログの場所を伝え、続け方を任せてください。",
+            "ユーザに、ここで ccnavi が失敗したことと診断ログの場所を伝え、"
+            "続け方を任せてください。",
         ]
     )
 
@@ -546,7 +548,8 @@ def internal_error_notice(code: str, event: str, kind: str, log_path: str) -> st
     ユーザへ見せる文。止めていないことと、診断ログの場所を言う。"""
     return (
         f"[ccnavi] {code}: {event} の処理中に ccnavi の内部の不具合が起き（{kind}）、"
-        f"そこでの処理を飛ばしました。止めたものはありません。詳細は診断ログ {log_path} にあります。"
+        "そこでの処理を飛ばしました。止めたものはありません。"
+        f"詳細は診断ログ {log_path} にあります。"
     )
 
 

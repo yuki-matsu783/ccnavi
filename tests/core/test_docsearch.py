@@ -914,9 +914,7 @@ class FrontmatterHintTest(Repo):
         self.assertNotEqual(self.hint(".claude/skills/x/references/a.md", "# 見出し\n"), "")
 
     def test_a_skill_without_type_is_told_to_add_type_skill(self):
-        said = self.hint(
-            ".claude/skills/x/SKILL.md", "---\nname: x\ndescription: y\n---\n# x\n"
-        )
+        said = self.hint(".claude/skills/x/SKILL.md", "---\nname: x\ndescription: y\n---\n# x\n")
         self.assertIn("type: skill を足してください", said)
         self.assertNotIn("ありません。ので", said)
 

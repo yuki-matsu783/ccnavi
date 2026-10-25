@@ -42,9 +42,7 @@ class CommittedUpstreamTest(unittest.TestCase):
         os.mkdir(self.up)
         git(self.up, "init", "-q", "-b", "main")
         commit_file(self.up, "a")
-        subprocess.run(
-            ["git", "clone", "-q", self.up, self.clone], check=True, capture_output=True
-        )
+        subprocess.run(["git", "clone", "-q", self.up, self.clone], check=True, capture_output=True)
         self.base = git(self.clone, "rev-parse", "HEAD")
         commit_file(self.up, "b")
 

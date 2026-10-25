@@ -710,7 +710,10 @@ class RouteTest(HandoffCase):
     def test_the_view_json_has_the_agreed_shape(self):
         self.stage(DOCS, b"new\n")
         answer = self.view()
-        self.assertEqual(sorted(answer), ["entries", "expect", "ignored", "ignored_paths", "ok", "tree", "version"])
+        self.assertEqual(
+            sorted(answer),
+            ["entries", "expect", "ignored", "ignored_paths", "ok", "tree", "version"],
+        )
         self.assertEqual(answer["version"], 1)
         self.assertEqual(answer["tree"], self.root)
         self.assertEqual(
