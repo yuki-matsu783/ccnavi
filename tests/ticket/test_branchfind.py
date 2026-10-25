@@ -204,6 +204,23 @@ class BranchesCommandTest(PhaseHarness):
         self.assertIn("在りか=origin", remote)
         self.assertIn("候補 4 件", text)
 
+    def test_a_web_session_branch_with_the_digits_in_its_suffix_is_not_a_candidate(self):
+        git(self.root, "branch", "claude/tender-volta-qmy99q", "main")
+        data = self.json_of("issue", 99)
+        self.assertEqual(data["candidates"], [])
+        text = self.branches("issue", 99).stdout
+        self.assertNotIn("qmy99q", text)
+        self.assertIn("候補なし", text)
+
+    def test_a_candidate_found_only_by_name_is_called_a_weak_ground(self):
+        text = self.branches("issue", 152).stdout
+        self.assertIn("案内: ", text)
+        self.assertIn("弱い根拠", text)
+        self.assertNotIn("\n次:", text)
+        # チケットに結び付く候補だけなら言わない
+        self.propose("feature-153-slash", parent_text("feature-153-slash", ["research"], issue=153))
+        self.assertNotIn("弱い根拠", self.branches("issue", 153).stdout)
+
     def test_tickets_with_the_issue_join_the_candidates(self):
         # 候補は識別子になるブランチ
         self.propose("feature-152-login", parent_text("feature-152-login", ["research"], issue=152))
