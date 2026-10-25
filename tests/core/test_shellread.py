@@ -79,6 +79,8 @@ class ReadTest(_Readable, unittest.TestCase):
             "find . \\( -name x -exec rm {} \\; \\) -print",
             "find . -name x -exec grep foo {} \\; -fprint /tmp/out",
             "find . -exec sh -c y {} \\; -delete",
+            "find . -exec wc {} \\; -ok rm {} \\;",
+            "find . -exec wc {} \\; -fprintf /tmp/out x",
             "xargs --arg-file grep rm",
             "xargs --process-slot-var grep rm",
             "xargs",
