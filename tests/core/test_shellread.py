@@ -43,7 +43,7 @@ class ReadTest(_Readable, unittest.TestCase):
             "xargs -a x.txt grep foo",
             "xargs --max-args=3 sort",
             "/usr/bin/xargs /usr/bin/GREP.exe x",
-            "find . -exec wc {} \\; -exec ls {} \\;",
+            "find . -exec wc {} +",
         ]
         for src in cases:
             with self.subTest(src=src):
@@ -59,6 +59,10 @@ class ReadTest(_Readable, unittest.TestCase):
             "find . -exec sh -c 'x' \\;",
             "find . -exec rm {} \\;",
             "find . -exec wc {} \\; -exec rm {} \\;",
+            "find . -exec wc {} \\; -delete",
+            "find . -exec wc {} \\; -type f -exec rm {} \\;",
+            "xargs --arg-file grep rm",
+            "xargs --process-slot-var grep rm",
             "xargs",
             "xargs -I{} {}",
             "xargs -n 2 grep x | xargs rm",

@@ -59,7 +59,23 @@ _READONLY_RUNNEE = frozenset(
 
 # `xargs` のオプションで、次の語を値に取るもの。一覧に無いオプションは値を取らないものとして読む。
 _XARGS_VALUE_OPTIONS = frozenset(
-    {"-I", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "--max-args", "--max-procs", "--delimiter"}
+    {
+        "-I",
+        "-n",
+        "-P",
+        "-d",
+        "-L",
+        "-s",
+        "-E",
+        "-a",
+        "--max-args",
+        "--max-procs",
+        "--delimiter",
+        "--arg-file",
+        "--max-chars",
+        "--max-lines",
+        "--process-slot-var",
+    }
 )
 
 # コマンドの位置に置かれたときに予約語になる語。予約語の後ろはコマンドの先頭なので、
@@ -205,8 +221,10 @@ def _classify(commands: list[list[str]]) -> str:
         if command and _base(command[0]) in _RUNS_A_STRING and not _xargs_readonly(command):
             return REASON_TAKEN_AS_CODE
 
-        # find の 2 つめ以降の `-exec` は、`\;` のあとで別のコマンドの頭に来る。
-        if command and command[0] in _TAKES_CODE_FLAG["find"] and not _readonly(command[1:2]):
+        # `-` で始まる語が頭に来るのは、`find -exec … \;` のあとに続く述語
+        # （`-delete` `-exec` など）。
+        # 別のコマンドとして読むと find の書き込みの述語を見逃すので、読めない形に戻す。
+        if command and command[0].startswith("-"):
             return REASON_TAKEN_AS_CODE
 
         # フラグを付けて初めて文字列を実行するものは、先頭でなくてもよい。

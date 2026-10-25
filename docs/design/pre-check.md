@@ -192,7 +192,7 @@ Bash のコマンドに現れるパスはコマンド文字列として見る。
 | `ionice` | `-c` `-n` `-p` `--class` `--classdata` `--pid` | 0 |
 | `command` / `nohup` | — | 0 |
 | `sh` `bash` `zsh` `dash` `ksh` | `-o` `+o` `-O` `+O` `--rcfile` `--init-file` | — |
-| `xargs` | `-I` `-n` `-P` `-d` `-L` `-s` `-E` `-a` `--max-args` `--max-procs` `--delimiter` | 0 |
+| `xargs` | `-I` `-n` `-P` `-d` `-L` `-s` `-E` `-a` `--max-args` `--max-procs` `--delimiter` `--arg-file` `--max-chars` `--max-lines` `--process-slot-var` | 0 |
 
 `--unset=HOME` や `-o0` のように値が同じ語に入っていれば 1 語。短いオプションをまとめた形（`-Eu me`）は、値を取る文字が
 最後に来たときだけ次の語を値に取る。一覧に無いオプションは値を取らないものとして読む。

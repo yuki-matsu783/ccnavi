@@ -410,14 +410,14 @@ def unreadable(reason: str, *, matched: bool = True) -> str:
 # 読めなかった理由ごとの書き換え例。書き換え先は読める形で、ルールには触れない。
 _REWRITE = {
     shellread_words.REASON_TAKEN_AS_CODE: (
-        "書き換え: Grep ツールを使うか、`grep -rn <語> <パス>` と書く。ファイルの行数などが要るなら、"
-        "`wc -l <パス>` のようにファイル名を直接並べて 1 回で呼ぶ。",
+        "書き換え: Grep ツールを使うか、`grep -rn <語> <パス>` と書く。"
+        "ファイルの行数などが要るなら、`wc -l <パス>` のようにファイル名を直接並べて 1 回で呼ぶ。",
         "`xargs` と `find -exec` は、後ろのコマンドが次のどれかのときだけ読める形として扱う: "
         + " ".join(sorted(shellread_words._READONLY_RUNNEE)),
     ),
     shellread_scan.REASON_ANSI_C: (
-        "書き換え: タブは `grep -P '\\t'` のように書く。または `printf '\\t'` の出力をファイルに書いて、"
-        "そのファイルを渡す。",
+        "書き換え: タブは `grep -P '\\t'` のように書く。"
+        "または `printf '\\t'` の出力をファイルに書いて、そのファイルを渡す。",
     ),
     shellread_scan.REASON_UNTERMINATED: (
         "書き換え: 複数行の文字列やヒアドキュメントは、Write ツールでファイルに書き、"
