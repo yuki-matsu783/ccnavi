@@ -435,10 +435,19 @@ def run(
     )
     # ccnavi を PATH に持たない環境でも、そのまま打てるように、起動の sh 経由で書く
     launcher = settings.script_command(root, "ccnavi-launcher.sh")
+    # --plan の雛形は親だけ。子の提案は手で書くので、同じ承認で通すために先に書かせる。
+    # --template は子の提案も一緒に組むので、足さない。
+    child_first = ticket_ids.child_id(ident, 1, 1)
+    child_step = (
+        ""
+        if used is not None
+        else f"子の提案（{child_first} のように <親>-<フェーズ 2 桁>-<連番 2 桁>）も"
+        "同じ承認で通すため、親と一緒に先に書く。"
+    )
     stdout.write(
         f"次: {path} の rationale と、見出しの下の目印（「（ここに〜を書く）」）を実際の内容に"
         "書き換える。目印が残っていると承認で止まる。"
-        f"allow を実際の作業に合わせて絞る・足す。{tail}"
+        f"allow を実際の作業に合わせて絞る・足す。{tail}{child_step}"
         f"書けたら '{launcher} --lint' で確かめ、"
         f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
         f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {ident}' で"
@@ -450,6 +459,11 @@ def run(
         "で phases: を再実行します。"
         "承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる\n"
     )
+    if used is None:
+        stdout.write(
+            f"案内: propose は親の識別子 {ident} で打つ（子の識別子 {child_first} では打たない）。"
+            "子の提案も同じ呼び出しで送られる\n"
+        )
     return EXIT_OK
 
 
