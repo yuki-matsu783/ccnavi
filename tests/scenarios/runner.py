@@ -1272,8 +1272,8 @@ HOST_NOTES = {
     "real": "real: 本物の GitHub / GitLab を相手にした",
     "bare": "bare: ローカルの bare を origin にした。ホストの API は失敗（確かめられなかった）",
     "fake-gitlab": "fake-gitlab: ローカルの bare と fake_gitlab.py を相手にした",
-    "docker-gitlab": "docker-gitlab: Docker の本物の GitLab CE に使い捨てのプロジェクトを作った。"
-    "CE にない機能（変更要求など）は確かめられない",
+    "docker-gitlab": "docker-gitlab: Docker の本物の GitLab CE を相手にした。"
+    "gh / glab は使えず curl で呼ぶ。CE にない機能（変更要求など）は確かめられない",
 }
 FAKE_NOTE = "。模擬は本物と同じ形を返す保証が無く、模擬のずれで見逃した問題がありうる"
 
@@ -1299,7 +1299,9 @@ def finish(scn, out, st, root):
         results.append(("repo", "ccnavi 本体の HEAD・ブランチ・ワークツリー", v, why))
         note = host_note(scenario_host(scn))
         if (st.get("host") or {}).get("version"):
-            note += f"（GitLab {st['host']['version']}）"
+            note = note.replace(
+                "docker-gitlab:", f"docker-gitlab（GitLab {st['host']['version']}）:", 1
+            )
         results.append(("host", "setup.host", PASS, note))
     finally:
         _cleanup(st["setup_made"], st.get("setup_dirs", []), root)

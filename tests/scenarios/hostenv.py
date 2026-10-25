@@ -193,6 +193,9 @@ def _make_docker_project(root, host, top, scenario_id, git):
     client, token, base, values = _connect()
     status, body = client.version(token)
     host["version"] = body.get("version", "") if status == 200 and isinstance(body, dict) else ""
+    reviewer = values.get("CCNAVI_PROBE_REVIEWER_ID", "")
+    if not reviewer.isdigit():
+        raise RuntimeError("トークンのファイルの CCNAVI_PROBE_REVIEWER_ID が数字ではない")
     name = project_name(scenario_id)
     status, body = client.create_project(token, name)
     if status != 201 or not isinstance(body, dict) or "id" not in body:
@@ -201,9 +204,6 @@ def _make_docker_project(root, host, top, scenario_id, git):
     host["url"] = f"{base}/{host['project']}"
     host["bare"] = host["url"] + ".git"  # origin の通信先（git の代役が向け直す先）
     _log(root).info("プロジェクトを作った", project_id=host["project_id"], url=host["url"])
-    reviewer = values.get("CCNAVI_PROBE_REVIEWER_ID")
-    if not reviewer:
-        raise RuntimeError("トークンのファイルに CCNAVI_PROBE_REVIEWER_ID が無い")
     status, _ = client.add_member(token, host["project_id"], int(reviewer), DEVELOPER)
     if status not in (200, 201):
         raise RuntimeError(f"人間役をメンバーに加えられない（HTTP {status}）")
