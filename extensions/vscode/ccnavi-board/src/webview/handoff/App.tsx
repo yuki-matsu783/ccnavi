@@ -16,13 +16,13 @@ import { Entry, type TerminalState } from "./Entry.js";
 import { post } from "./post.js";
 import { Result } from "./Result.js";
 
-/** 中身が無いときの錠。止めていない扱いにする */
 /** 対象外の理由。知らない値はそのまま出す */
 const IGNORED_WHY: Readonly<Record<string, string>> = {
   "not-allowed": "取り込める種類の表に無い",
   "linked-dir": "リンクのディレクトリ（中は読まない）",
 };
 
+/** 中身が無いときの錠。止めていない扱いにする */
 const NO_LOCK: Lock = { locked: false, reason: "", doing: [] };
 
 function pageOf(data: HandoffData): HandoffPage | undefined {

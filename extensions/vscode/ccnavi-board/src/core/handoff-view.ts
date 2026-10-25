@@ -47,7 +47,7 @@ export interface HandoffList {
   readonly version: number;
   /** 見たツリーの絶対パス */
   readonly tree: string;
-  /** 許可リストにヒットせず、対象外にした件数 */
+  /** 取り込める種類の表に無いパスと、リンクのディレクトリの件数 */
   readonly ignored: number;
   /** 対象外の名前と理由（置き場からの相対パス）。古い実行ファイルは返さない。`ignored` と件数が一致する */
   readonly ignored_paths?: readonly HandoffIgnored[];
