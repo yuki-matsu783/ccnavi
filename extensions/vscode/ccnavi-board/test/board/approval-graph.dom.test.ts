@@ -155,6 +155,7 @@ test("CB-D162 plans がない・空なら図を出さない。見本の preview�
   try {
     await dom.settle();
     assert.equal(dom.all(".plan-graph").length, 1);
+    assert.equal(dom.all(".react-flow__attribution").length, 0, "React Flow の帯は出さない");
     assert.deepEqual(
       dom.all('.plan-graph[data-part="plan"] .plan-node').map((node) => node.textContent?.replace(/レビュー.*$/, "")),
       ["1調査", "2設計"],

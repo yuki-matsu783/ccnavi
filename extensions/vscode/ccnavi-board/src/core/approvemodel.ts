@@ -93,6 +93,34 @@ export interface ApprovePreview {
   readonly plans: readonly ApprovePlan[];
 }
 
+/** 承認画面の要約。`batch` と `plans` にあるものだけから作る（範囲などは本文にしか無いので扱わない） */
+export interface ApproveSummary {
+  /** 承認するチケットの件数の行。一覧が空なら空文字 */
+  readonly tickets: string;
+  /** 計画ごとの行（親・全体計画／フィードバック計画の順は届いた順）。計画が無ければ空 */
+  readonly plans: readonly string[];
+}
+
+const PART_LABELS: Readonly<Record<string, string>> = { plan: "全体計画", feedback: "フィードバック計画" };
+
+export function summarize(preview: ApprovePreview): ApproveSummary {
+  const batch = preview.batch;
+  if (batch.length === 0) {
+    return { tickets: "", plans: [] };
+  }
+  const parents = batch.filter((b) => b.parent === null).length;
+  const revisions = batch.filter((b) => b.revision).length;
+  const kinds = [`親 ${parents} 件`, `子 ${batch.length - parents} 件`, ...(revisions > 0 ? [`改版 ${revisions} 件`] : [])];
+  const revised = new Set(batch.filter((b) => b.revision).map((b) => b.ticket));
+  const plans = preview.plans.map((plan) => {
+    // 番号順に並べるだけにする。計画は先行関係で並列のステップもあるため、矢印では書かない
+    const names = [...plan.items].sort((a, b) => a.number - b.number).map((item) => item.title || item.type);
+    const label = PART_LABELS[plan.part] ?? plan.part;
+    return `${plan.ticket}${revised.has(plan.ticket) ? "（改版）" : " "}の${label} ${names.length} ステップ（${names.join("・")}）`;
+  });
+  return { tickets: `承認するチケット ${batch.length} 件（${kinds.join("・")}）`, plans };
+}
+
 /**
  * 一覧のうち、計画編集タブに未保存の変更がある親（識別子の順）。親は一覧の親（`parent` が null。改版も）と、
  * 図のある親。子の識別子は親のタブと取り違えない。**空でなければ承認を打たない**（承認の遷移のガードと、画面のボタン）
