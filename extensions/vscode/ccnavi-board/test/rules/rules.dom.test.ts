@@ -463,7 +463,9 @@ test("CB-D1223 notice は赤にせずに一言を出す（期待する判定の�
   try {
     await dom.send({ type: "notice", message: "期待する判定のファイルがまだありません: x.yml。" });
     assert.equal(dom.one("#status").textContent, "期待する判定のファイルがまだありません: x.yml。");
-    assert.ok(!dom.one("#status").closest(".foot")?.classList.contains("error"));
+    const foot = dom.one("#status").closest(".foot");
+    assert.ok(foot, "足元の枠がある");
+    assert.ok(!foot.classList.contains("error"));
   } finally {
     await dom.close();
   }
