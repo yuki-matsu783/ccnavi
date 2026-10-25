@@ -117,7 +117,9 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                   両方取り込むときは merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス>
                   (現在・祖先・相手の順) で出力し、それを読んで Edit で書く
   通信      fetch  pull  (--force / --prune は不可。取ってくるのは <リモート> <ブランチ> だけで、
-                   : や + を含む引数(refspec・URL)は不可。手元の ref は ccnavi-sync.sh が進める)
+                   : や + を含む引数(refspec・URL)は不可。手元の ref は ccnavi-sync.sh が進める。
+                   統合先のユーザのチェックアウトの pull は、引数なしと現在のブランチと同じ名前
+                   (pull --ff-only <リモート> <統合先>) だけ。別のブランチは merge と同じく不可)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release と統合先 (そのリポジトリの origin/HEAD、無ければ
                    origin/main・origin/master) へ直接は送れない。
@@ -793,6 +795,23 @@ d4_unknown_marker() {
 user_checkout_is() {
 	d4_main=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
 	[ -n "$d4_main" ] && [ "$(ccnavi_phys "$1")" = "$(ccnavi_phys "$d4_main")" ]
+}
+
+# 今のチェックアウトが、統合先をチェックアウトしているユーザのチェックアウトか調べる（merge) と pull が使う）。
+#
+# 当てはまるとき 0 を返し、統合先の名前を mg_integ に残す。統合先が決まらないとき（origin が無いなど）は、
+# どれが統合先か言えないので当てはまらない。
+merge_target_is_here() {
+	mg_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
+	[ -n "$mg_top" ] && user_checkout_is "$mg_top" || return 1
+	mg_integ=$(ccnavi_integration "$mg_top" || :)
+	mg_cur=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
+	[ -n "$mg_integ" ] && [ "$mg_cur" = "$mg_integ" ]
+}
+
+# merge-on-target の「次:」の行。merge) と pull が同じ案内を出す。
+merge_on_target_next() {
+	printf '%s' "次: $WT_SH_Q <名前> でワークツリーを切り、その中で $SELF_Q merge $(ccnavi_sh_quote "$mg_integ") を打って衝突を解いてコミットし、$SELF_Q integrate <名前> で取り込む"
 }
 
 # 共通部。名前・場所・記録の置き場を決める（ロックは取らない）。<名前>
@@ -1973,17 +1992,10 @@ merge)
 	#  - ワークツリーの中の merge（main を取り込む形を含む）。
 	#  - 統合先でないブランチのチェックアウトの merge。detached HEAD も、統合先のブランチを動かさないので通す。
 	# 統合先が決まらないとき（origin が無いなど）は、どれが統合先か言えないので止めない。
-	if [ "$mg_finish" = no ]; then
-		mg_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
-		if [ -n "$mg_top" ] && user_checkout_is "$mg_top"; then
-			mg_integ=$(ccnavi_integration "$mg_top" || :)
-			mg_cur=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
-			if [ -n "$mg_integ" ] && [ "$mg_cur" = "$mg_integ" ]; then
-				reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは merge できません。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
-次: $WT_SH_Q <名前> でワークツリーを切り、その中で $SELF_Q merge $(ccnavi_sh_quote "$mg_integ") を打って衝突を解いてコミットし、$SELF_Q integrate <名前> で取り込む
+	if [ "$mg_finish" = no ] && merge_target_is_here; then
+		reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは merge できません。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
+$(merge_on_target_next)
 案内: 途中の merge を終わらせる --abort / --continue / --quit と、統合先でないブランチでの merge は、ここでも打てます。"
-			fi
-		fi
 	fi
 	;;
 
@@ -2173,6 +2185,9 @@ fetch | pull)
 		ow_spec "quiet verbose ff ff-only no-ff no-rebase stat no-stat no-edit edit commit no-commit progress no-progress tags no-tags force prune unshallow autostash no-autostash" \
 			"depth deepen shallow-since" "rebase" "qvnfpr" ""
 	fi
+	fp_n=0
+	fp_refs=""
+	fp_other=no
 	fetch_cb() {
 		case "$1" in
 		opt)
@@ -2181,11 +2196,25 @@ fetch | pull)
 				reject fetch-force "$2 は手元の参照を書き換えます。オプション無しの $SELF $sub で足ります。"
 				;;
 			--rebase | -r)
-				reject pull-rebase "pull の $2 は手元のコミットを取ってきた側へ付け直し、履歴を書き換えます。取り込むのは $SELF pull（merge）か、親のブランチなら $SYNC <P> です。"
+				reject pull-rebase "pull の $2 は手元のコミットを取ってきた側へ付け直し、履歴を書き換えます。取り込むのは $SELF pull（merge。統合先のユーザのチェックアウトでは、統合先の更新だけ）か、親のブランチなら $SYNC <P> です。"
 				;;
 			esac
 			;;
 		pos)
+			fp_n=$((fp_n + 1))
+			# pull の 1 語目はリモート、2 語目はブランチ、3 語目以降は取ってくる先が増える形（オクトパス）。
+			# 統合先のユーザのチェックアウトでは、現在のブランチのリモートと、現在のブランチと同じ名前
+			# （大小も含めた完全一致。HEAD・refs/heads/…・タグ・SHA は同じ名前でないので通さない）だけを通す（下の判定）。
+			fp_refs="$fp_refs $2"
+			fp_cur=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
+			case "$fp_n" in
+			1)
+				fp_rem=$(git config --get "branch.$fp_cur.remote" 2>/dev/null || :)
+				[ "$2" = "${fp_rem:-origin}" ] || fp_other=yes
+				;;
+			2) [ "$2" = "$fp_cur" ] || fp_other=yes ;;
+			*) fp_other=yes ;;
+			esac
 			# refspec（`+refs/heads/x:refs/heads/y`・`x:y`）は、取ってきたものを手元の
 			# ブランチへ直に書く。`+` は早送りでない書き換えも通す。取ってくるのはブランチ名だけにする。
 			# URL も `:` を含むので同じく止まる。取得先は設定済みのリモート名で書く。
@@ -2199,6 +2228,16 @@ fetch | pull)
 		return 0
 	}
 	opt_walk fetch_cb ${1+"$@"}
+	# pull は取ってきたブランチを今のブランチへ merge する。統合先のユーザのチェックアウトでは、merge と
+	# 同じく別のブランチを取り込めない。条件は merge) と同じ（ユーザのチェックアウトで、現在のブランチが統合先。
+	# 統合先が決まらないときは止めない）。通すのは、位置引数が無い形（上流の更新）と、現在のブランチのリモート +
+	# 現在のブランチと同じ名前だけ（--ff-only の pull origin <統合先> を含む）。ワークツリーの中の
+	# pull origin <親のブランチ> と、統合先でないブランチのチェックアウトの pull は対象外。
+	if [ "$sub" = pull ] && [ "$fp_other" = yes ] && merge_target_is_here; then
+		reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは、pull <リモート> <ブランチ>（${fp_refs# }）で別のブランチ・リモートを取り込めません（merge できないのと同じです）。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
+$(merge_on_target_next)
+案内: 統合先の更新（引数なしの pull と pull --ff-only <リモート> ${mg_integ}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも打てます。"
+	fi
 	;;
 
 push)
