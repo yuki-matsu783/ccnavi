@@ -26,7 +26,7 @@ keywords: [proposal-format, 提案書式, 提案, 子の提案, 親の提案, �
 親のワークツリーの中で打つ。
 
 ```
-ccnavi ticket new <識別子> --title <題> --plan <型,型,...> --issue <番号> --mr <番号>
+ccnavi ticket new <識別子> --title <タイトル> --plan <型,型,...> --issue <番号> --mr <番号>
 ```
 
 - `--plan` は `phases.yml` の型の名前をカンマで並べる（例: `research,design,implement`）。計画は前のステップに続く一直線になる
