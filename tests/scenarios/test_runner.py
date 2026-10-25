@@ -2583,6 +2583,61 @@ class RunAllTest(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(self.main(ws, str(scn_dir), "--max-total-usd", "0"), 2)
 
+    def test_nan_and_inf_caps_are_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            step, calls = self.fake_step({})
+            with (
+                mock.patch.object(runner, "run_step", side_effect=step),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                for bad in ("nan", "inf"):
+                    self.assertEqual(self.main(ws, str(scn_dir), "--max-total-usd", bad), 2)
+            self.assertEqual(calls, [])
+
+    def test_editing_the_prompt_or_permission_mode_invalidates_the_confirmation(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            confirmed = self.digest(ws, scn_dir, 5.0)
+            path = scn_dir / "UC-91.yml"
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            data["permission_mode"] = "bypassPermissions"
+            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+            data["permission_mode"] = "auto"
+            data["steps"][0]["prompt"] += "x" * 200  # 概要は 120 字で切るので出ない後ろ
+            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+
+    def test_failed_step_cost_counts_toward_the_total(self):
+        scn = {"budget_usd": 1.0, "_prompt_steps": 2}
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            timeout = subprocess.TimeoutExpired("claude", 1)
+            self.assertEqual(runner._failed_step_cost(scn, out, 1, timeout), 0.5)  # step の上限
+            self.assertEqual(runner._failed_step_cost(scn, out, 1, RuntimeError("x")), 0.0)
+            line = json.dumps({"type": "result", "total_cost_usd": 0.4, "session_id": "s"})
+            (out / "step-1.jsonl").write_text(line + "\n", encoding="utf-8")
+            self.assertEqual(runner._failed_step_cost(scn, out, 1, RuntimeError("x")), 0.4)
+
+    def test_issue_scenarios_raise_the_host_question(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn_dir = self.make(ws, "UC-91")
+            path = scn_dir / "UC-91.yml"
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            data["setup"]["issue"] = {"repo": "projects/test-repo", "title": "t", "body": "b"}
+            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+            eligible, skipped = runner.run_all_plan(
+                runner.expand_scenario_paths([str(path)]), ws.root
+            )
+            text = runner.run_all_confirmation(
+                eligible, skipped, 5.0, "d", "m", ws.root, [str(path)]
+            )
+            self.assertIn("本物のホストに issue も作る", text)
+
     def test_not_enable_mode_runs_nothing(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)

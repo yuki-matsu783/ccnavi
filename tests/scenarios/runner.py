@@ -46,6 +46,7 @@ import contextlib
 import glob
 import hashlib
 import json
+import math
 import os
 import re
 import shlex
@@ -1164,6 +1165,18 @@ def _start_host(scn, st, out, root, top):
     _write_state(out, st)
 
 
+def _failed_step_cost(scn, out, num, exc):
+    """正常に終わらなかった step の実費の見積もり。累計の上限が過小に見えないようにする。
+    出力が残っていれば（終了コードが 0 でない）その result の費用、時間切れで出力が無ければ
+    step の上限（--max-budget-usd に渡す値。実費より多めの保守側）。それ以外は 0。"""
+    path = out / f"step-{num}.jsonl"
+    if path.exists():
+        return parse_stream(path.read_text(encoding="utf-8"))["cost_usd"]
+    if isinstance(exc, subprocess.TimeoutExpired):
+        return round(scn["budget_usd"] / max(1, scn["_prompt_steps"]), 2)
+    return 0.0
+
+
 def drive(scn, out, st, root):
     """st['next_step'] から、人間の操作の step か末尾まで進める。
     人間の操作で止まったら 10、末尾まで進んだら None を返す。
@@ -1201,6 +1214,7 @@ def drive(scn, out, st, root):
                 env=_host_env(st),
             )
         except Exception as e:  # 起動できない・時間切れ・終了コードが 0 でない
+            st["cost_usd"] += _failed_step_cost(scn, out, idx + 1, e)
             # 後続は回さず止める。finish に回して、後片付けを通す
             st["halt"] = {
                 "step": idx + 1,
@@ -2467,11 +2481,14 @@ def run_all_digest(eligible, cap):
                 "base": scn["setup"]["reset"]["base"],
                 "budget_usd": scn["budget_usd"],
                 "summary": scenario_summary(scn),
+                # 概要に出ない欄（prompt の全文・permission_mode・model・expect・setup の中身）も
+                # 含める。書き換えがあれば目印が変わり、確認を取り直す（安全側）
+                "scenario": {k: v for k, v in scn.items() if k != "_prompt_steps"},
             }
             for _, scn in eligible
         ],
     }
-    text = json.dumps(body, ensure_ascii=False, sort_keys=True)
+    text = json.dumps(body, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
@@ -2495,8 +2512,11 @@ def run_all_confirmation(eligible, skipped, cap, digest, mode_text, root, scenar
         f"確認事項 2: {DISPOSABLE_REL} の未コミットの変更・main 以外のブランチ・ワークツリー・"
         "タグ・stash を、各シナリオの前と後に消してよいか（setup.reset。base は上の表）",
     ]
-    if any(scn.get("test_repo") for _, scn in eligible):
-        questions.append(f"確認事項 3: {DISPOSABLE_REL} にブランチや MR ができてよいか")
+    if any(scn.get("test_repo") or (scn.get("setup") or {}).get("issue") for _, scn in eligible):
+        questions.append(
+            f"確認事項 3: {DISPOSABLE_REL} にブランチや MR ができてよいか"
+            "（setup.issue のシナリオは、本物のホストに issue も作る）"
+        )
     questions.append(
         f"確認事項 4: 実費の累計 {cap} USD までを使ってよいか"
         f"（1 本の上限の合計は {budget:.2f} USD。"
@@ -2653,10 +2673,9 @@ def cmd_run_all(args):
     _require_entry()
     root = Path(args.root).resolve()
     cap = round(float(args.max_total_usd), 4)
-    if cap <= 0:
-        print(
-            "--max-total-usd は 0 より大きい値にする\n次: 実費の累計の上限を USD で渡して打ち直す"
-        )
+    if not math.isfinite(cap) or cap <= 0:
+        print("--max-total-usd は 0 より大きい有限の値にする")
+        print("次: 実費の累計の上限を USD で渡して打ち直す")
         return 2
     mode_ok, mode_text = mode_check(root)
     if not mode_ok:
