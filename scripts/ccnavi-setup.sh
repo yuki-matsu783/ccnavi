@@ -137,10 +137,12 @@ DEPLOY_DOCS_DIR=".ccnavi/docs"
 # 一部なので、設定 3 本と同じく .ccnavi/config/common/ の下へ配る。配布元に置き場が無い、または
 # *.yml が 1 本も無いのは正常（共通のテンプレートはまだ無いことがある）で、何も言わずに飛ばす。
 DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
-# 共通の文面ファイル（拒否・促し・次の一手の文）の置き場。実行ファイルの `ccnavi text` が引く。配布元にある
-# *.yml を全部配る。共通レイヤーの一部なので、設定 3 本と同じく .ccnavi/config/common/ の下へ配る。
+# 文面ファイル（拒否・促し・次の一手の文）の置き場。実行ファイルの `ccnavi text` が引く。配布元にある
+# *.yml を全部配る。ccnavi の仕組み側のもので、設定ではないので .ccnavi/config/ の外に置く。
 # 無いと sh と hook の文は短い既定の文に落ちる（止める・止めないは変わらない）。
-DEPLOY_MESSAGES_DIR=".ccnavi/config/common/messages"
+DEPLOY_MESSAGES_DIR=".ccnavi/messages"
+# 旧い置き場。自動では消さない（古い実行ファイルが走っている間に消すと、文が既定の文に落ちる）。
+DEPLOY_OLD_MESSAGES_DIR=".ccnavi/config/common/messages"
 # 配布先へ配るスキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true`（共通の工程スキル）
 # か `distribute: true`（配るだけのスキル。ccnavi-config）を持つものだけを配る（.ccnavi/docs/skill-processes.md）。
 # 配るのは SKILL.md と references/common/ の下の .md。`distribute: true` のスキルは、ユーザの発言のときの同期の対象ではない。
@@ -245,8 +247,8 @@ CCNAVI_ENTRY_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）
 .ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
 配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
-（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・共通の文面ファイル
-（.ccnavi/config/common/messages/*.yml。拒否・促し・次の一手の文。無いと短い既定の文に落ちる）・共通の工程スキルと配るだけのスキル
+（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・文面ファイル
+（.ccnavi/messages/*.yml。拒否・促し・次の一手の文。無いと短い既定の文に落ちる）・共通の工程スキルと配るだけのスキル
 （.claude/skills/ のうち SKILL.md に process: true か distribute: true を持つもの。SKILL.md と references/common/ の下の .md だけで、
 references/project/ は配らない）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
@@ -792,7 +794,7 @@ if [ -n "$deploy" ]; then
 		note_deploy absent "$DEPLOY_DOCS_DIR/" "$DEPLOY_DOCS_DIR/"
 	fi
 
-	# 共通の文面ファイル。テンプレートと同じ作り。
+	# 文面ファイル。テンプレートと同じ作り。
 	if [ -d "$source_root/$DEPLOY_MESSAGES_DIR" ]; then
 		for message_entry in "$source_root/$DEPLOY_MESSAGES_DIR"/*.yml; do
 			[ -f "$message_entry" ] || continue
@@ -2178,7 +2180,7 @@ if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_DOCS_DIR" ]; then
 		fi
 	done
 fi
-# 共通の文面ファイルも同じ。
+# 文面ファイルも同じ。
 if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_MESSAGES_DIR" ]; then
 	for message_entry in "$source_root/$DEPLOY_MESSAGES_DIR"/*.yml; do
 		[ -f "$message_entry" ] || continue
@@ -2187,7 +2189,7 @@ if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_MESSAGES_DIR" ]; then
 		*[!A-Za-z0-9._-]* | [!A-Za-z0-9]*) continue ;;
 		esac
 		if [ ! -f "$root/$DEPLOY_MESSAGES_DIR/$message_name" ]; then
-			note_missing "${DEPLOY_MESSAGES_DIR}/${message_name}（共通の文面ファイル。無いと sh と hook の文が短い既定の文に落ちる）"
+			note_missing "${DEPLOY_MESSAGES_DIR}/${message_name}（文面ファイル。無いと sh と hook の文が短い既定の文に落ちる）"
 		fi
 	done
 fi
@@ -2216,6 +2218,9 @@ for skill_rel in $skills_all; do
 done
 set +f
 IFS=$skill_ifs
+if [ -d "$root/$DEPLOY_OLD_MESSAGES_DIR" ] && [ -d "$root/$DEPLOY_MESSAGES_DIR" ]; then
+	printf '案内: 古い置き場 %s は不要です（文面ファイルは %s に移りました）。実行ファイルを新しいものに入れ替えてから、消してかまいません。\n' "$DEPLOY_OLD_MESSAGES_DIR" "$DEPLOY_MESSAGES_DIR"
+fi
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
 	# 配布をやめた理由は report_deploy が既に出している。ここで足すのは、ユーザが自分で

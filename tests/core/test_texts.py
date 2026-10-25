@@ -30,8 +30,9 @@ messages:
 
 
 def put(root: str, layer: str, name: str, body: str) -> None:
-    sub = "common" if layer == "common" else "project"
-    path = os.path.join(root, ".ccnavi", "config", sub, "messages", name)
+    # common は読まれる置き場（`.ccnavi/messages/`）。project は読まれない旧来のレイヤーの置き場。
+    where = ("messages",) if layer == "common" else ("config", "project", "messages")
+    path = os.path.join(root, ".ccnavi", *where, name)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(body)

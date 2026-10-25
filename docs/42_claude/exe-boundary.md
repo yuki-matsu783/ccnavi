@@ -58,7 +58,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   2（引数の誤り）で返す。1 行目は `mr-state 1`、2 行目は `open <番号> <yes|no> <URL>`・`merged <番号> <URL>`・`closed <番号> <URL>`・
   `unknown <種類> <理由>`（種類は `no-tool`・`auth`・`network`・`api`・`not-found`）。ボードが読む
 
-- shは文面ファイル（`.ccnavi/config/common/messages/`）を直接 grep・cat しない。文は実行ファイルの `text <識別子> [名前=値]…` に引かせる（`ccnavi_text`）。引けないとき（実行ファイルが無い・互換が合わない・文面ファイルが壊れている）は sh の短い既定の文を出して先へ進み、止める・止めないの判定は変えない（[文面ファイルに文を足す・直す](message-files.md)）
+- shは文面ファイル（`.ccnavi/messages/`）を直接 grep・cat しない。文は実行ファイルの `text <識別子> [名前=値]…` に引かせる（`ccnavi_text`）。引けないとき（実行ファイルが無い・互換が合わない・文面ファイルが壊れている）は sh の短い既定の文を出して先へ進み、止める・止めないの判定は変えない（[文面ファイルに文を足す・直す](message-files.md)）
 - 実行ファイルの標準出力をshが読む約束もある。`review ready`は1行目にコメントの下書きのパス、2行目に`tree <退避したツリーのルート>`を出し、
   `wip/`から消したものがあれば続けて`wip-from <消す前のHEAD>`と`wip <パス>`（1行1本）を出す。shはwrite-and-pushの中でこの削除を
   コミットして送ってからDraftを外す（設計 9.10）。ファイルを`logs/archive/`へ動かすのと`wip/`の追跡済みのファイルを消すのは実行ファイルで、

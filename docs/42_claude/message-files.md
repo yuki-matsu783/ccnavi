@@ -8,7 +8,7 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 
 # 文面ファイルに文を足す・直す
 
-エージェントとユーザが読む文は、コードや sh に書かず、文面ファイル（`.ccnavi/config/common/messages/*.yml`）に置く。
+エージェントとユーザが読む文は、コードや sh に書かず、文面ファイル（`.ccnavi/messages/*.yml`）に置く。
 条件（いつ出すか）はコード・ルール・sh に残る。設計は[文面ファイルの設計](../21_design/messages.md)、一覧と移行の進み具合は[文面の移行の一覧](message-migration.md)にある。
 止め方の選び方と拒否の文の型は[止め方の型と選び方](stop-patterns.md)、出力の `次:` の決まりは[スクリプトの出力に次の一手を書く](script-output.md)。
 
@@ -47,14 +47,14 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 
 ## 上書きと保護
 
-文だけを替える上書きの口は持たない。自身のレイヤーの `.ccnavi/config/project/messages/` に文面ファイルが置かれていても読まず、`--lint` も何も言わない。読まれるのは共通レイヤーだけ。
+文だけを替える上書きの口は持たない。`.ccnavi/messages/` の外（`.ccnavi/config/project/messages/` や旧い置き場）に文面ファイルが置かれていても読まず、`--lint` も何も言わない。読まれるのは `.ccnavi/messages/` だけで、共通レイヤーのミラーにも入らない。
 
-`.ccnavi/` の下は組み込みの保護が止めるので、エージェントは書けない。直す下書きは `wip/handoff/` に置き、ユーザが `ccnavi-user-handoff.sh` で取り込む（共通レイヤーの下書きだけが取り込める。取り込み前に検査（欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script）が走る）。文面ファイルは設定 3 本（コア）に加えていない。
+`.ccnavi/` の下は組み込みの保護が止めるので、エージェントは書けない。直す下書きは `wip/handoff/` に置き、ユーザが `ccnavi-user-handoff.sh` で取り込む（`.ccnavi/messages/<名前>.yml` の下書きだけが取り込める。取り込み前に検査（欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script）が走る）。文面ファイルは設定 3 本（コア）に加えていない。
 
 ## 配る
 
-`scripts/ccnavi-setup.sh` が、配布元の `.ccnavi/config/common/messages/*.yml` を配布先の同じ場所へ配る。配布先に無いと、文は短い既定の文に落ちる。
+`scripts/ccnavi-setup.sh` が、配布元の `.ccnavi/messages/*.yml` を配布先の同じ場所へ配る。配布先に無いと、文は短い既定の文に落ちる。配布先に旧い置き場 `.ccnavi/config/common/messages/` が残っていても自動では消さず、不要と案内するだけ（古い実行ファイルが走っている間に消すと、文が既定の文に落ちる）。
 
 ## 使う側のテスト
 
-使い捨てのワークスペースで文を見るテストは、同じプロセスで動く Python なら、文面ファイルが無い木でもこのリポジトリの共通レイヤーの文を引く（`tests/__init__.py`）。別プロセスで起こす sh と実行ファイルを使うテストは、`tests.put_messages(root)` でコピーする。
+使い捨てのワークスペースで文を見るテストは、同じプロセスで動く Python なら、文面ファイルが無い木でもこのリポジトリの文面ファイルの文を引く（`tests/__init__.py`）。別プロセスで起こす sh と実行ファイルを使うテストは、`tests.put_messages(root)` でコピーする。
