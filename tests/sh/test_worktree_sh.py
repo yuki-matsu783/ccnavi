@@ -6,7 +6,7 @@ fetch のときだけ origin の URL を bare リポジトリへ向ける git �
 
 見るのは次のとおり。
 
-1. ずれが無ければ確認なしで、取り込み先（メインのチェックアウトのブランチ）の HEAD から切ること
+1. ずれが無ければ確認なしで、取り込み先（ユーザのチェックアウトのブランチ）の HEAD から切ること
 2. C4〜C7 のずれがあれば、切らずに終了コード 3 で止まり、報告と確認コードを出すこと。確認コードが
    今の状態と合わなければ報告からやり直すこと
 3. 書きかけは --no-wip なら入らず、--copy-wip なら確認した時点のものが S になり、ユーザの
@@ -277,7 +277,7 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual("no", self.record("topic")["side_by_side"])
 
     def test_a_project_is_cut_from_its_own_main_checkout_branch(self):
-        """projects/app の取り込み先は、そのメインのチェックアウトのブランチ（work）。
+        """projects/app の取り込み先は、そのユーザのチェックアウトのブランチ（work）。
         デフォルトブランチ（origin/HEAD の trunk）と違うので、確認が要る。"""
         project = os.path.join(self.ws, "projects", "app")
         git(self._tmp.name, "init", "-q", "-b", "work", project)

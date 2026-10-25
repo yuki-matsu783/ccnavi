@@ -187,8 +187,8 @@ def watched_for(
     書き込みが報告に並ぶ。
     """
     ws = tree.main_tree(root)
-    # 横で作業する指定が有効なメインのチェックアウトは、触ったツリーによらず毎回見る
-    # （エージェントは作業ワークツリーで動いていて、書き換えはそのメインのチェックアウトに起きる）。
+    # 横で作業する指定が有効なユーザのチェックアウトは、触ったツリーによらず毎回見る
+    # （エージェントは作業ワークツリーで動いていて、書き換えはそのユーザのチェックアウトに起きる）。
     sbs = directrec.side_by_side_roots(root, conf.projects)
     sbs_keys = {pathcase.fold(t.root) for t in sbs}
     if payload is None:
