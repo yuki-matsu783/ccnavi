@@ -7,6 +7,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1057,10 +1058,6 @@ class ResultsTableTest(unittest.TestCase):
         self.assertIn("w" * 300, full)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 # ---- 使い捨てのリポジトリの事前状態と後片付け（setup.git・setup.reset・append・ロック） ----
 
 GIT_USER = ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]
@@ -1205,6 +1202,15 @@ class DisposableRepoTest(unittest.TestCase):
             ws = Workspace(d, origin_target="https://example.com/o/t.git")
             runner.require_disposable_repo(ws.root, ws.target)
 
+    def test_linked_worktree_of_the_body_is_refused_even_without_origin(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            shutil.rmtree(ws.target)
+            git(ws.root, "worktree", "add", "-q", str(ws.target), "-b", "linked")
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.require_disposable_repo(ws.root, ws.target)
+            self.assertIn("同じリポジトリ", str(cm.exception))
+
     def test_not_a_repo_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
@@ -1261,6 +1267,13 @@ class SetupGitTest(unittest.TestCase):
         runner.check_git_argv(["git", "switch", "-c", "feat"])
         runner.check_git_argv(["git", "commit", "-m", "x"])
 
+    def test_git_without_reset_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write_scenario(d, {"git": [["git", "status"]]})
+            with self.assertRaises(ValueError) as cm:
+                runner.load_scenario(path)
+        self.assertIn("setup.reset", str(cm.exception))
+
     def test_load_scenario_rejects_a_bad_command(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
@@ -1310,7 +1323,7 @@ class SetupGitTest(unittest.TestCase):
                     ws.root, ws.target, [["git", "branch", "x"], ["git", "branch", "y"]]
                 )
             self.assertIn("ccnavi 本体", str(cm.exception))
-            self.assertNotIn("y", git(ws.target, "branch"))
+            self.assertNotIn("y", git(ws.target, "branch", "--format=%(refname:short)").split())
 
     def test_failed_command_stops_with_the_command_named(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1479,6 +1492,19 @@ class AppendTest(unittest.TestCase):
             self.assertIn("外", str(cm.exception))
             self.assertEqual((ws.root / "outside.txt").read_text(encoding="utf-8"), "o")
 
+    def test_path_is_matched_literally_not_as_a_glob(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            (ws.target / "docs1.md").write_text("t", encoding="utf-8")
+            git(ws.target, "add", "docs1.md")
+            try:
+                (ws.target / "docs*.md").write_text("u", encoding="utf-8")
+            except OSError:
+                self.skipTest("ファイル名に * を使えない")
+            top = runner.require_disposable_repo(ws.root, ws.target)
+            with self.assertRaises(runner.Refusal):
+                runner._setup(self.scenario("projects/test-repo/docs*.md"), ws.root, top)
+
     def test_append_needs_the_checked_target(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
@@ -1622,6 +1648,74 @@ class SetupFailureTest(unittest.TestCase):
                 runner._setup(scn, root)
             self.assertFalse((root / "a").exists())
             self.assertEqual(runner.setup_clashes(scn, root), [])
+
+
+class CleanupRobustnessTest(unittest.TestCase):
+    def test_close_issue_failure_does_not_stop_the_restore(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            ws.dirty()
+            top = str(ws.target.resolve())
+            lock = runner.acquire_target(top, ws.out)
+            st = {
+                "target": {"path": top, "base": ws.base, "lock": lock},
+                "out": str(ws.out),
+                "setup_made": [],
+                "issue_no": 7,
+            }
+            ws.out.mkdir()
+            scn = {"setup": {"issue": {"repo": "projects/test-repo", "close": True}}}
+            with (
+                mock.patch.object(runner, "repo_host_kind", side_effect=FileNotFoundError("gh")),
+                mock.patch("builtins.print"),
+            ):
+                runner._abort(scn, ws.out, st, ws.root)
+            self.assertEqual(git(ws.target, "status", "--porcelain"), "")
+            self.assertFalse(Path(lock).exists())
+
+    def test_restore_after_finish_does_not_delete_a_file_made_later(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = ws.scenario_file(
+                {"files": {"projects/test-repo/new.txt": "x\n"}, "reset": {"base": ws.base}}
+            )
+            with (
+                mock.patch.object(runner, "_ENTRY", True),
+                mock.patch.object(
+                    runner, "run_step", return_value={"cost_usd": 0.0, "session_ids": []}
+                ),
+                mock.patch("builtins.print"),
+            ):
+                args = ["run", str(path), "--confirmed", "--root", str(ws.root)]
+                self.assertEqual(runner.main([*args, "--out", str(ws.out)]), 0)
+                later = ws.target / "new.txt"
+                later.write_text("あとから作った\n", encoding="utf-8")
+                self.assertEqual(runner.main(["restore", str(ws.out)]), 0)
+            self.assertTrue(later.exists())
+
+    def test_relative_out_is_stored_as_an_absolute_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]
+            path = ws.scenario_file({"reset": {"base": ws.base}}, steps)
+            before = os.getcwd()
+            os.chdir(d)
+            self.addCleanup(os.chdir, before)
+            with (
+                mock.patch.object(runner, "_ENTRY", True),
+                mock.patch.object(
+                    runner, "run_step", return_value={"cost_usd": 0.0, "session_ids": []}
+                ),
+                mock.patch("builtins.print"),
+            ):
+                args = ["run", str(path), "--confirmed", "--root", str(ws.root), "--out", "rel"]
+                self.assertEqual(runner.main(args), 10)
+                marker = ws.target / ".git" / runner.LEFT_NAME
+                self.assertEqual(
+                    marker.read_text(encoding="utf-8"), str((Path(d) / "rel").resolve())
+                )
+                os.chdir(ws.root)  # 別の cwd からでも、同じ回として続けられる
+                self.assertEqual(runner.main(["restore", str(Path(d) / "rel")]), 0)
 
 
 class LockTest(unittest.TestCase):
@@ -1796,7 +1890,7 @@ class LifecycleTest(unittest.TestCase):
             # next が最後まで終わると戻る
             with mock.patch("builtins.print"):
                 done = runner.main(["next", str(ws.out)])
-            self.assertIn(done, (0, 2))
+            self.assertEqual(done, 0)
             self.assertTrue(self.restored(ws))
             names = self.git_dir_names(ws)
             self.assertNotIn(runner.LEFT_NAME, names)
@@ -1940,3 +2034,7 @@ class LifecycleTest(unittest.TestCase):
             self.assertIn(ws.base, text)
             body = runner.confirmation_text(scn, ws.target, "MODE OK")
             self.assertIn("対象のリポジトリを使えない", body)
+
+
+if __name__ == "__main__":
+    unittest.main()

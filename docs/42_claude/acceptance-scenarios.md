@@ -150,7 +150,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 `setup.git`・`setup.reset`・`setup.files` の追記は、すべて `require_disposable_repo(root, target, allowed)` を通る。`test_repo: true` の自己申告は判定に使わない。
 
 - 比べるのは、`target` の `git rev-parse --show-toplevel` の実体（realpath）と、`allowed`（既定は `projects/test-repo`）の実体。`pathcase.fold` を通して比べる。違えば断る
-- ワークスペースルート（ccnavi 本体）が対象のとき、対象の origin が本体の origin と同じとき（`.git` の有無・末尾の `/`・大文字小文字は無視）も断る。どちらかに origin が無いときは origin を比べず、toplevel の比較だけで決める
+- ワークスペースルート（ccnavi 本体）が対象のとき、対象が本体のリンクされたワークツリーのとき（`git rev-parse --git-common-dir` が同じ）、対象の origin が本体の origin と同じとき（`.git` の有無・末尾の `/`・大文字小文字は無視）も断る。どちらかに origin が無いときは origin を比べず、toplevel の比較だけで決める
 - 断ると終了コード 3。回す前（確認文より前）に止まるので、何も作らない。追記のパスが使えないことと `base` が対象に無いことも、同じ所（確認文より前）で断る。`preflight` も同じ判定を事実に出す。追記のパスは `reset` のあとにもう一度確かめ、失敗したら戻す
 - `claude` の cwd は、これとは関係なくワークスペースルートのまま。エージェントは自分で対象へ `cd` して使う
 
@@ -165,7 +165,7 @@ setup:
     - [git, commit, --allow-empty, -q, -m, 作りかけ]
 ```
 
-- 先頭は `git` だけ。`-C`・`--git-dir`・`--work-tree`（`=` 付き・`-C<パス>` も）と、サブコマンドより前の `-c`・`--config-env`・`--exec-path` は、読み込みの時点で ValueError
+- 先頭は `git` だけ。`-C`・`--git-dir`・`--work-tree`（`=` 付き・`-C<パス>` も）と、サブコマンドより前の `-c`・`--config-env`・`--exec-path` は、読み込みの時点で ValueError。この禁止リストはうっかり防止で、安全境界ではない（`git config`・`git worktree add <外のパス>` などは通る）。シナリオは信頼済みの内容として書く
 - cwd は判定を通した toplevel に固定する。`GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE`・`GIT_COMMON_DIR` は外して渡す
 - コマンドごとに、ccnavi 本体の `repo_snapshot`（HEAD・ブランチ・ワークツリー）が変わっていないか確かめる。変わったら止めて報告する
 - 実行したコマンドと結果（終了コード・出力の長さ・失敗時の 1 行目）は、診断ログ `logs/diag/scenario-runner.log` に残す（[診断ログを書く](logging.md)）。個々の `reset` のコマンドは DEBUG、`reset` の完了は INFO
@@ -181,7 +181,7 @@ setup:
 | `append: true` | 対象にある、git 管理下のファイルへの追記 | パスが無ければ回さない | 消さない（消すと管理下のファイルを削除するため。戻すのは `setup.reset`） |
 
 - パスはワークスペースルートからの相対（例: `projects/test-repo/README.md`）。追記のパスは realpath にして、判定を通した toplevel の中にあることを確かめる。`..`・絶対パス・外へ出るシンボリックリンクは断る。git 管理下でないファイル・ディレクトリも断る
-- `setup.reset` が無いシナリオで追記を使うと、読み込みの時点で ValueError
+- `setup.reset` が無いシナリオで追記や `setup.git` を使うと、読み込みの時点で ValueError
 - 追記は改行を変換せず、`content` をそのまま末尾に足す
 
 ### `setup.reset`
@@ -202,7 +202,7 @@ setup:
 6. `git reset --hard <base>`
 7. `git clean -fd`
 
-`git clean` に `-x` は付けない（`.gitignore` 済みの `logs/`・`.claude/` などを消さない）。`refs/remotes/*` は触らない。origin への push は戻さない。push が要るシナリオは、各シナリオが自分で後始末する。
+`git clean` に `-x` は付けない（`.gitignore` 済みの `logs/`・`.claude/` などを消さない）。`refs/remotes/*` は触らない。`.git/config`・`.git/hooks`・reflog・`refs/notes` も戻さない。merge・rebase などの途中で止まった対象は、`branch -D` が失敗して「戻せなかった」になる（手で中断してから `restore`）。origin への push は戻さない。push が要るシナリオは、各シナリオが自分で後始末する。
 戻す前に `base` が対象にあるコミットかを確かめ、無ければ何も変えずに止める。
 
 ### 中断・失敗・停止のあと
@@ -213,7 +213,7 @@ setup:
 | claude の失敗・`expect_after` を満たさない停止（内部の値 11。`finish` を通る） | `base` に戻す | 放す |
 | `KeyboardInterrupt` など（`_continue` の `BaseException`） | `base` に戻し、元の例外を投げ直す | 放す |
 | 人間の操作の step で止まった（10） | **戻さず残す**（人間が操作したあとの `next` で続くため） | 放す |
-| 対象を取る前の拒否（判定・ロック・残し印・`base` が無い・追記の対象が使えない） | 何もしない | 取っていない |
+| 対象を取る前の拒否（判定・ロック・残し印・`base` が無い・追記の対象が使えない） | 何もしない（出力の置き場だけ作る） | 取っていない |
 | 対象を取ったあとの setup の失敗 | 作ったものを消し、`base` に戻す | 放す |
 
 - 10 で残すとき、出力に「`base` に戻していない」と、`next` と `restore` の打ち方を出す。`next` が最後まで終わると戻す。やめるときは `restore <出力の置き場>`（`setup.files` の作る形を消し、`base` に戻す）

@@ -191,10 +191,9 @@ def _check_setup(path, setup):
                 "（短縮 SHA・ブランチ名・タグ名は受けない）"
             )
         reset["base"] = base.lower()
-    if appends and reset is None:
+    if (git or appends) and reset is None:
         raise ValueError(
-            f"{path}: setup.files の追記（{', '.join(appends)}）は、戻す setup.reset が無いと"
-            "使えない"
+            f"{path}: setup.git と setup.files の追記は、戻す setup.reset が無いと使えない"
         )
 
 
@@ -557,7 +556,16 @@ class Refusal(Exception):
 
 def _git_env():
     """cwd で対象を決めさせるため、git の向き先を変える環境変数を外す。"""
-    drop = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
+    drop = (
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_COMMON_DIR",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_CONFIG_PARAMETERS",
+    )
     return {k: v for k, v in os.environ.items() if k not in drop}
 
 
@@ -580,6 +588,12 @@ def _toplevel(path):
     except OSError:
         return None
     return os.path.realpath(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else None
+
+
+def _common_dir(path):
+    """リンクされたワークツリーも同じになる、リポジトリ共通の .git の実体（比べる形）。"""
+    r = _git(["rev-parse", "--git-common-dir"], cwd=path)
+    return pathcase.fold(os.path.realpath(os.path.join(path, r.stdout.strip())))
 
 
 def _origin(top):
@@ -615,6 +629,12 @@ def require_disposable_repo(root, target, allowed=None):
         raise Refusal(
             f"対象が ccnavi 本体（ワークスペースルート）になっている: {top}",
             f"対象を使い捨てのリポジトリ（{DISPOSABLE_REL}）にして打ち直す",
+            use,
+        )
+    if _common_dir(top) == _common_dir(body):
+        raise Refusal(
+            f"対象が ccnavi 本体と同じリポジトリのワークツリーになっている: {top}",
+            f"本体とは別のリポジトリを {DISPOSABLE_REL} に置いて打ち直す",
             use,
         )
     mine, theirs = _origin(top), _origin(body)
@@ -739,6 +759,9 @@ def _pid_alive(pid):
         import ctypes
 
         k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.OpenProcess.restype = ctypes.c_void_p
+        k32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+        k32.CloseHandle.argtypes = [ctypes.c_void_p]
         handle = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
         if handle:
             k32.CloseHandle(handle)
@@ -864,7 +887,8 @@ def resolve_append(rel, root, toplevel):
             f"追記の対象のファイルが無い: {rel}",
             "追記は対象にすでにあるファイルにだけ使える。パスを直すか、作って消す形（文字列）にする",
         )
-    r = _git(["ls-files", "--error-unmatch", "--", os.path.relpath(real, toplevel)], cwd=toplevel)
+    rel_in_top = os.path.relpath(real, toplevel)
+    r = _git(["--literal-pathspecs", "ls-files", "--error-unmatch", "--", rel_in_top], cwd=toplevel)
     if r.returncode != 0:
         raise Refusal(
             f"追記の対象が git 管理下にない: {rel}",
@@ -1021,13 +1045,18 @@ def make_issue(issue, root):
 def close_issue(issue, number, root):
     """回したあとに、作った issue を閉じる（setup の issue の close: true のときだけ）。"""
     repo = Path(root) / issue["repo"]
-    r = subprocess.run(
-        issue_close_args(repo_host_kind(repo), number),
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    try:
+        r = subprocess.run(
+            issue_close_args(repo_host_kind(repo), number),
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        # 後片付けの途中なので、対象を戻す処理を止めない
+        print(f"issue #{number} を閉じられなかった: {exc}")
+        return
     if r.returncode != 0:
         print(f"issue #{number} を閉じられなかった: {r.stderr.strip()}")
 
@@ -1117,6 +1146,7 @@ def finish(scn, out, st, root):
         results.append(("repo", "ccnavi 本体の HEAD・ブランチ・ワークツリー", v, why))
     finally:
         _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
+        st["setup_made"] = []  # restore が、あとから同じパスに作られたファイルを消さないように
         issue = (scn.get("setup") or {}).get("issue")
         if issue and issue.get("close") and st.get("issue_no"):
             close_issue(issue, st["issue_no"], root)
@@ -1659,7 +1689,7 @@ def cmd_run(args):
         return 3
     out = Path(
         args.out or ROOT / "logs" / "scenarios" / f"{scn['id']}-{datetime.now():%Y%m%d-%H%M%S}"
-    )
+    ).resolve()  # cwd が変わっても next / restore が同じ回と分かるように
     out.mkdir(parents=True, exist_ok=True)
     pre = {rel: file_digest(root / rel) for rel in scn["expect"].get("files_unchanged", [])}
     setup = scn.get("setup") or {}
@@ -1726,6 +1756,7 @@ def _continue(scn, out, st, root):
         # 割り込みなど、drive を抜けて finish に届かないときも、setup のファイルを残さず、
         # 対象を base へ戻す（戻せなければ文面を出す。元の例外はそのまま投げ直す）
         _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
+        st["setup_made"] = []
         release_target(st, root)
         _write_state(out, st)
         raise
