@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitLab のにせ物に足りない窓口を足す</title>
+<style>
+  body { font-family: sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.7; color: #222; background: #fff; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 1.6rem; }
+  .box { border: 1px solid #ccc; border-radius: 8px; padding: .6rem 1rem; background: #f7f7f7; }
+  @media (prefers-color-scheme: dark) { body { color: #ddd; background: #181818; } .box { background: #222; border-color: #444; } }
+</style>
+</head>
+<body>
+<h1>GitLab のにせ物に、足りない窓口を足す</h1>
+
+<h2>何の話か</h2>
+<p>ccnavi を試すとき、本物の GitLab のかわりに「にせ物の GitLab」を使うことがあります。にせ物は、本物と同じ形で答える小さなサーバです。</p>
+
+<h2>困っていたこと</h2>
+<p>ccnavi が「この MR は、どの issue を閉じるの？」と聞くと、にせ物は「そんな窓口は無い」と答えて（404）、そこで作業が止まっていました。本物なら答えられる質問です。にせ物の側が、質問の窓口を持っていなかったためです。</p>
+
+<h2>何を変えたか</h2>
+<div class="box">
+<p>にせ物に、次の窓口を足しました。</p>
+<ul>
+  <li>MR が閉じる issue を答える窓口（MR の説明にある「Closes #3」のような書き方から探します）</li>
+  <li>自分のユーザ情報、プロジェクトのメンバーの権限</li>
+  <li>issue の中身、issue につながる MR、issue へのコメント</li>
+  <li>議論（スレッド）への返信</li>
+</ul>
+<p>これらは ccnavi の sh が実際に聞きに行く窓口です。足したものに合わせて、試験も足しました。</p>
+</div>
+
+<h2>リスク</h2>
+<p>低いです。変わるのは試験用のにせ物とその試験だけで、ccnavi 本体や本物の GitLab には触れていません。</p>
+<p>にせ物は本物と同じ答えを返す保証が無く、この変更は「本物と同じ形」の確認ではありません。それは別の issue（#551・#553）で扱います。</p>
+
+<h2>確かめ方</h2>
+<p>にせ物の試験（<code>tests/sh/test_fake_gitlab.py</code>）が通ります。別の試験 <code>tests/scenarios/test_runner.py</code> は、この変更の前から失敗しています。</p>
+</body>
+</html>
