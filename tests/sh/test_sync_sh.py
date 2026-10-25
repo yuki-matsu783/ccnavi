@@ -186,7 +186,7 @@ class SyncHarness(unittest.TestCase):
         header = [ln for ln in lines if ln.startswith("#")]
         refs = [ln for ln in lines if not ln.startswith(("#", "^"))]
         refs.append(f"{sha} refs/heads/{added}")
-        refs.sort(key=lambda ln: ln.split(" ", 1)[1])  # packed-refs は ref 名のバイト順
+        refs.sort(key=lambda ln: ln.split(" ", 1)[1])  # packed-refs は ref 名のバイト順に並ぶ
         with open(packed, "w", encoding="utf-8", newline="\n") as f:
             f.write("\n".join([*header, *refs]) + "\n")
         names = git(

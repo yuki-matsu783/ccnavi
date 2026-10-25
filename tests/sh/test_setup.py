@@ -1962,7 +1962,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
     @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_names_the_rc_file_that_fits_the_real_os(self):
-        """差し替えなしで、いま動いている OS の期待どおりに案内する。"""
+        """差し替えなしで、いま動いている OS に合った案内が出ることを確かめる。"""
         rc = "~/.bash_profile" if sys.platform == "darwin" else "~/.bashrc"
         src = self.make_source()
         self.make_git()
