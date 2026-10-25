@@ -19,13 +19,14 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `DENY_NEEDS_USER_TURN__INTEGRATE`・`DENY_NEEDS_USER_TURN__STATE` | `hook/turngate.py` の `message` | 移した（宣言の `Gate.message` が識別子を指す） |
 | `NUDGE_INTEGRATE__UNKNOWN_MARKER`・`__CONFIRM`・`__ADOPT`・`__RUN`、`NOTE_INTEGRATE_*` | `tickets/ops_stop_integrate.py` の `integrate_nudge` | 移した（`blocked_notice` の `systemMessage` は残る） |
 | `NEXT_START_*`・`NOTE_START_*`・`CHOICES_START_ISSUE_CLOSED` | `ccnavi-start.sh` の `次:`・`次の手:` と、それに続く `案内:` | 移した（全部。状態を報告する行・`必須:`・`確認:`・`MCP で行う手順:` は次の一手ではないので残る） |
+| `DENY_TICKET_PROJECT_MISMATCH`・`DENY_TICKET_BLOCKED`・`DENY_TICKET_SCOPE` | `hook/judge.py`（取り違え・チケットが成り立たない・範囲の外） | 移した（状態を報告する先頭の行 `subject:`・`ticket:`・`scope:`・`limit:`・`problem:` は残る。`DENY_TICKET_SCOPE` は上限ごとに `what` `why` `next` を `area`・`type`・`parent` で分ける） |
 | `NEXT_PF_*` | `ccnavi-common-host.sh` の `ccnavi_pf_next`（`--check`・失敗時の `次:`・`ccnavi-ticket.sh` の事前確認） | 移した（`integration` の文は共有の `ccnavi_integration_hint` を使うので残る） |
 
 ## 残り
 
 | 種類 | 出力元 | 数の目安 | 状態 |
 |---|---|---|---|
-| 組み込みの拒否（Python） | `hook/reasons.py`（`reason_for` の組み立て・`subagent_forbidden`・`rewrite`・`internal_error` ほか）、`hook/judge.py` の `DENY_TICKET_SCOPE`・`DENY_TICKET_BLOCKED`・`DENY_TICKET_PROJECT_MISMATCH` ほか、`hook/agentlaunch.py` の `DENY_AGENT_*`、`hook/wrapguard.py`、`tickets/flow.py`、`tickets/phase_forms.py` | 約 30 コード | 未移行 |
+| 組み込みの拒否（Python） | `hook/reasons.py`（`reason_for` の組み立て・`subagent_forbidden`・`rewrite`・`internal_error` ほか）、`hook/judge.py` の他の拒否、`hook/agentlaunch.py` の `DENY_AGENT_*`、`hook/wrapguard.py`、`tickets/flow.py`、`tickets/phase_forms.py` | 約 30 コード | 未移行 |
 | 英語の文面 | `hook/post_report.py`・`hook/post_findings.py`・`reasons.py` の一部（日本語と英語の混在の整理は別に進めている） | | 未移行 |
 | Stop の促し | `tickets/ops_stop.py`（`NUDGE_TICKET_FINISH`）、`ops_stop_request.py`（`NUDGE_TICKET_REQUEST`）、`ops_stop_feedback.py`（`NUDGE_TICKET_FEEDBACK`）、`hook/subagent_outcome.py`、`hook/events.py`（`NUDGE_STOP_RULE`）、`tickets/standing.py` の `guidance()` | 6 | 未移行 |
 | ルールの文 | `rules.yml` の `message`・`additionalContext`・`additionalContextOnce`（インライン） | | 未移行（識別子で引く `message_id` は持たない。`additionalContextFile` で md の本文を出せる） |
