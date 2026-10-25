@@ -57,7 +57,8 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 ## 開発用の hook
 
 Python のファイルを編集するたびに `.claude/hooks/lint-py.sh`（`PostToolUse` の
-`Write|Edit|NotebookEdit`）が整形と検査を走らせる。テストはそこでは走らせない。
+`Write|Edit|NotebookEdit`）が編集したファイルの整形と検査を走らせる。テストはそこでは走らせない。
+編集していないファイルの指摘は出ない。他のファイルを壊す変更（定義の削除で別ファイルの import が壊れる等）はその場では出ず、ターンの終わりの `test-py.sh`（`Stop`）のテストが失敗すれば、そこで見つかる。
 
 テストは `.claude/hooks/test-py.sh` で、`Stop` に登録してターンの終わりに 1 回だけ回す。
 失敗していたら差し戻すが、差し戻しは 3 回まで。上限に達したら止まらせて判断をユーザへ返す。
@@ -155,7 +156,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `src/ccnavi/__main__.py` | `python -m ccnavi` の入口。サブパッケージは役割ごとに 6 つで、読む向きは infra < records < policy < tickets < hook < entry（`tests/core/test_module_layers.py` が見る） |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
 | `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）と共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）と共通の工程スキル（`.claude/skills/` のうち `process: true` か `distribute: true` を持つもの。`SKILL.md` と `references/common/` の下の `.md` だけ）を配る |
-| `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
+| `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。編集したファイルの整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/check-adr.sh` | 同じく ADR の番号の重なりと置き場の間違いを、書いた直後に止める |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |

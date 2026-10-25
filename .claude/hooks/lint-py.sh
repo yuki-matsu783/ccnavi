@@ -1,9 +1,14 @@
 #!/bin/sh
-# PostToolUse (Write|Edit): 編集したファイルのツリーを整形・検査する
+# PostToolUse (Write|Edit): 編集したファイルを整形・検査する
 #
 # Python ソースのときだけ実行する。指摘は exit 2 で返す
 # このイベントでモデルに届く経路はこれだけなので、指摘がコミット時ではなく
 # 同じターンの中で直る
+#
+# 検査の対象は編集したファイルだけで、ツリー全体ではない。他のファイルの既存の指摘が毎回出て
+# 自分の指摘が埋もれるのを避けるため。弱点は、編集していないファイルの指摘が出ないこと。
+# 他のファイルを壊す変更（定義の削除で別ファイルの import が壊れる等）はその場では出ず、
+# ターンの終わりの test-py.sh (Stop) のテストが失敗すれば、そこで見つかる
 #
 # 報告はそれだけで読んで成立させる。同じイベントのフックは並行して順不同で走るため、
 # 他のフックが何を判断したかには触れない
@@ -61,14 +66,16 @@ report=""
 add() { report="${report}$1
 "; }
 
-if unformatted=$($UV --with ruff ruff format --check . 2>&1); then
+# ruff は設定を、対象ファイルのパスから上の階層へ順に探す。絶対パスのまま渡せば、そのツリーの
+# pyproject.toml が効く。ファイルを明示すると exclude が無視されるため、--force-exclude を付ける
+if unformatted=$($UV --with ruff ruff format --check --force-exclude "$file" 2>&1); then
 	:
 else
-	add "ruff format: 整形されていません。'uv run --with ruff ruff format .' を実行してください:
+	add "ruff format: 整形されていません。'uv run --with ruff ruff format \"$file\"' を実行してください:
 $unformatted"
 fi
 
-if lint=$($UV --with ruff ruff check . 2>&1); then
+if lint=$($UV --with ruff ruff check --force-exclude "$file" 2>&1); then
 	:
 else
 	add "ruff check:
