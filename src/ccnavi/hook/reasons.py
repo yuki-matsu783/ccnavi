@@ -213,7 +213,7 @@ _UNDECLARED_NEXT = {
     ),
     (True, rules.DENY): (
         "ccnavi は、このコマンドが実際に何を実行するか読めませんでした。このセッションには"
-        "確認に答える人がいない（権限モードが自分で答えるか、答えない）ので、実行しません。"
+        "確認に答える人がおらず、権限モードが自分で答えるか、そもそも答えないので、実行しません。"
         "何のためのコマンドかを伝えても通りません。読める形に書き直してください。"
         "書き直せないときは、何のために要るかをユーザに伝えてください。"
     ),
@@ -393,7 +393,7 @@ def unreadable(reason: str, *, matched: bool = True) -> str:
         shellread_scan.REASON_UNTERMINATED: "引用符かヒアドキュメントが閉じていない",
         shellread_words.REASON_TAKEN_AS_CODE: "文字列をコードとして実行するものに渡している",
         shellread_scan.REASON_UNTERMINATED_SUBST: "$( ) が閉じていない",
-        shellread_scan.REASON_ANSI_C: "ANSI-C 引用（$'…'）を含み、何の文字になるかを読めない",
+        shellread_scan.REASON_ANSI_C: "ANSI-C 引用（$'…'）の中身が何の文字になるか読めない",
     }.get(reason, "読めない形をしている")
     if not matched:
         return (
@@ -410,19 +410,18 @@ def unreadable(reason: str, *, matched: bool = True) -> str:
 # 読めなかった理由ごとの書き換え例。書き換え先は読める形で、ルールには触れない。
 _REWRITE = {
     shellread_words.REASON_TAKEN_AS_CODE: (
-        "書き換え: Grep ツールを使うか、`grep -rn <語> <パス>` と書く。`wc -l <パス>` のように"
-        "ファイル名を直接書くか、ファイル名を並べて 1 回で呼ぶ。",
-        "`xargs` と `find -exec` は、後ろのコマンドが "
-        + " ".join(sorted(shellread_words._READONLY_RUNNEE))
-        + " のときだけ、読める形として扱う。",
+        "書き換え: Grep ツールを使うか、`grep -rn <語> <パス>` と書く。ファイルの行数などが要るなら、"
+        "`wc -l <パス>` のようにファイル名を直接並べて 1 回で呼ぶ。",
+        "`xargs` と `find -exec` は、後ろのコマンドが次のどれかのときだけ読める形として扱う: "
+        + " ".join(sorted(shellread_words._READONLY_RUNNEE)),
     ),
     shellread_scan.REASON_ANSI_C: (
-        "書き換え: タブは `grep -P '\\t'` で書く。または `printf '\\t'` の結果をファイルに書き、"
+        "書き換え: タブは `grep -P '\\t'` のように書く。または `printf '\\t'` の出力をファイルに書いて、"
         "そのファイルを渡す。",
     ),
     shellread_scan.REASON_UNTERMINATED: (
         "書き換え: 複数行の文字列やヒアドキュメントは、Write ツールでファイルに書き、"
-        "そのファイルを渡す。引用符は閉じる。",
+        "そのファイルを渡す。引用符は閉じて書く。",
     ),
 }
 
