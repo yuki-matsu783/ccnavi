@@ -17,7 +17,7 @@ keywords: [GitLab, Docker, docker_gitlab, probe_gitlab, make_gitlab_tokens, comp
 | `compose.yml` | GitLab CE の立て方（ポート・メモリ・ボリューム・`external_url`）。`docker_gitlab.py` が環境変数を渡して使う。直接 `compose` を打たない |
 | `make_gitlab_tokens.rb` | root（エージェント役）と `ccnavi-reviewer`（人間役）の personal access token を作る。`docker_gitlab.py up` が呼ぶ |
 | `gitlab_api.py` | 人間役の API 呼び出し。import しても副作用は無い |
-| `probe_gitlab.py` | 動いている GitLab に使い捨てのプロジェクトを作り、sh と実行ファイルを 1 周させる |
+| `probe_gitlab.py` | 動いている GitLab に使い捨てのプロジェクトを作り、親の Draft MR を API で先に作ったうえで、sh と実行ファイルを 1 周させる |
 | `fake_gitlab.py` | Docker が無い環境で使う代役の GitLab |
 
 ## 起動・確認・停止
@@ -59,11 +59,13 @@ uv run python tests/manual/gitlab/probe_gitlab.py
 - 必要なもの: 組み立て済みの exe（`dist/ccnavi/ccnavi`。`CCNAVI_ENTRY_PATH` で差し替え）、jq と curl。
 - `CCNAVI_PROBE_GITLAB`（既定 `http://127.0.0.1:<CCNAVI_GITLAB_PORT、既定 8929>`）で接続先を変える。
 - 結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
+- probe はユーザの役として、承認の push（`ccnavi-user-push-approved.sh`）を実行する。子は finish の前に `ticket learn` で学びの記録を書く。
+- ユーザの decide（`ccnavi-user-decide.sh`）は通さず、`review decide` で代用する。decide の経路は未カバー。
 - `--help` は、トークンも exe も無しに終わる。
 
 ## CE の限界
 
-- 変更要求（`request_changes`）は GitLab EE の機能。CE では 404 になる。probe はその段だけ失敗を許す。
+- 変更要求（`request_changes`）は GitLab EE の機能。CE では 404 になる。probe は 404 を許し、その段は PASS とする。
   この 404 は、実機の CE（19.4.1）で probe を回して確かめた（`request_changes` が `status=404`）。ほかの版では未確認。
 
 ## 手動の通し確認

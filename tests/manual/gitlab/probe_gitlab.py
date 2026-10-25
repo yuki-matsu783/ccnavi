@@ -1,8 +1,9 @@
-"""実物の GitLab に sh 3 本と exe を適用して 1 周する。ユーザが手で走らせる道具で、
+"""実物の GitLab に sh 5 本と exe を適用して 1 周する。ユーザが手で走らせる道具で、
 自動テストは呼ばない。
 
 tests/ticket/test_ticket.py と同じ形で一時リポジトリを作り、使い捨てのプロジェクトを
-GitLab に作って、`ccnavi-ticket.sh` / `ccnavi-git.sh` / `ccnavi-review.sh` を実物に通す。
+GitLab に作って、`ccnavi-ticket.sh` / `ccnavi-git.sh` / `ccnavi-review.sh` /
+`ccnavi-user-push-approved.sh` / `ccnavi-user-close-early.sh` を実物に通す。
 人間役（レビュアー）は別ユーザのトークンで API を直に呼ぶ。
 sh と同じ道具を使わないのは、片方の不具合がもう片方に隠れないようにするため。
 
@@ -32,7 +33,8 @@ push は URL にトークンを埋めない（埋めると origin の URL に混
 
 sh の HTTP 経路（curl・jq・ページング・投稿・認証）と、GitLab が返す JSON の形が sh の読み方と
 合っているか。結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
-変更要求（request_changes）は GitLab EE の機能で、CE では 404 になる。CE ではその段だけ失敗する。
+変更要求（request_changes）は GitLab EE の機能で、CE では 404 になる。
+CE では 404 を許し、その段は PASS とする。
 """
 
 from __future__ import annotations
