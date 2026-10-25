@@ -8,6 +8,7 @@
     "state": "opened",
     "source_branch": "i0001",
     "target_branch": "main",
+    "description": "",
     "draft": false,
     "web_url": "https://gitlab.com/acme/widgets/-/merge_requests/8"
   },
@@ -19,6 +20,7 @@
     "state": "opened",
     "source_branch": "i0001",
     "target_branch": "main",
+    "description": "",
     "draft": true,
     "web_url": "https://gitlab.com/acme/widgets/-/merge_requests/7",
     "source_project_id": 42
