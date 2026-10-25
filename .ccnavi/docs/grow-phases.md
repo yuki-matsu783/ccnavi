@@ -3,7 +3,7 @@ type: guide
 title: フェーズが育つ流れ
 description: phases.yml のフェーズ定義が、計画で使いたい型の不足から下書き・検証・配置・親への固定・配布までどう育つかの全体像
 tags: [phase, config, ticket]
-keywords: [フェーズ, フェーズ定義, phases.yml, 育つ, 全体像, plan, 計画, fill-phases, plan-order, コピー, scope, review, ミラー]
+keywords: [フェーズ, フェーズ定義, phases, phases.yml, 育つ, 全体像, plan, 計画, fill-phases, plan-order, コピー, scope, review, ミラー]
 ---
 
 # フェーズが育つ流れ

@@ -23,7 +23,7 @@ keywords: [提案, 相談, メリット, デメリット, サブエージェン�
 
 ## 提案を書く前に読むもの
 
-- 提案（チケット）を書く前に、`ccnavi-launcher.sh --docs`で`proposal-format`と`phases`を引く。書式と、フェーズ（計画のステップ）の決め方が書かれている
+- 提案（チケット）を書く前に、`ccnavi-launcher.sh --docs --keyword 提案書式`で`proposal-format.md`を引く。親と子の提案の書式、`plan`と`after`、雛形を作る`ccnavi ticket new`、書いたあとの検査が書かれている。フェーズ（計画のステップ）の決め方は`--keyword phases`で引く。このとき`proposal-format.md`と`grow-phases.md`が当たる。どの型を選ぶかは`phases.yml`の`when`、型ごとに書ける範囲は`ccnavi --explain`で見る
 - 親は計画（plan）を必ず持つ。計画の無い親は、子や子の提案があっても`ticket start`が止まり、`--lint`も警告する。止まったら、`phases.yml`に最小の定義（例: workを1つ）を書き、親に`plan:`を足す。`phases.yml`はユーザが持つ設定で、書くのはユーザ
 - 計画のある親の`start`は、子のないフェーズが残るとき案内を出す。フェーズごとに子チケットを作る。子のないまま進めても`finish`で止まる
 - 親の提案は、識別子と同じ名前のワークツリーに書く（.ccnavi/docs/worktree.md「直接作業からチケット作業に移るとき」）
