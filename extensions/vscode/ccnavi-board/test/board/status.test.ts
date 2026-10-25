@@ -1,6 +1,6 @@
 /**
- * 状態の札（`statusOf`）とフェーズ行の状態の一言（`phaseStatusOf`）。
- * 札は「状況」、操作は「ユーザができること」で、別の規則で決める。表の全行を、実行ファイルの JSON と同じ形のチケットから
+ * 状態のバッジ（`statusOf`）とフェーズ行の状態の一言（`phaseStatusOf`）。
+ * バッジは「状況」、操作は「ユーザができること」で、別の規則で決める。表の全行を、実行ファイルの JSON と同じ形のチケットから
  * `buildBoard` を通して確かめる（画面が見るのと同じ道）。
  */
 import { test } from "node:test";
@@ -70,9 +70,9 @@ test("CB-T602 延期の引き受け先: 番号のフェーズが無い・数で�
   assert.equal(phases({}, []), "レビュー省略", "marks の中身が無い");
 });
 
-// --- 子の札（2-1 の表の全行） ---
+// --- 子のバッジ（2-1 の表の全行） ---
 
-test("CB-T603 子の札: 要確認（書き込み停止・複数の場所）が最優先。理由は札のツールチップに出る。承認ボタンは pendingApproval だけを条件に出す", () => {
+test("CB-T603 子のバッジ: 要確認（書き込み停止・複数の場所）が最優先。理由はバッジのツールチップに出る。承認ボタンは pendingApproval だけを条件に出す", () => {
   const where = [{ tree: "", state: "todo", path: "/a" }, { tree: "i0001", state: "doing", path: "/b" }];
   const json = pending(
     boardOf(
@@ -87,7 +87,7 @@ test("CB-T603 子の札: 要確認（書き込み停止・複数の場所）が�
     "c1",
   );
   const cards = cardsOf(json);
-  // blocked + pendingApproval: 札は要確認、承認ボタンは出る
+  // blocked + pendingApproval: バッジは要確認、承認ボタンは出る
   assert.equal(label(cards.get("c1")), "要確認");
   assert.match(cards.get("c1")!.status.title, /書き込み停止中: 親が引けない/);
   assert.deepEqual(cards.get("c1")!.actions, [{ kind: "approve" }]);
@@ -97,7 +97,7 @@ test("CB-T603 子の札: 要確認（書き込み停止・複数の場所）が�
   assert.match(cards.get("c3")!.status.title, /書き込み停止中: 停止\n複数の場所にあります/);
 });
 
-test("CB-T604 子の札: 承認待ち → 取り消し → 完了（done・取り消しでないアーカイブ）の順", () => {
+test("CB-T604 子のバッジ: 承認待ち → 取り消し → 完了（done・取り消しでないアーカイブ）の順", () => {
   const archived = (ticket: string, over: Partial<ArchivedTicketJson> = {}): ArchivedTicketJson => ({
     ticket, parent: "i0001", phase: 1, title: ticket, project: "", path: `/ws/logs/archive/x/done/${ticket}.md`,
     started_at: "", completed_at: "t", cancelled_at: "", cancel_reason: "", ...over,
@@ -109,7 +109,7 @@ test("CB-T604 子の札: 承認待ち → 取り消し → 完了（done・取�
         proposalJson("pend", { parent: "i0001", phase: 1 }),
         closedJson("done", { parent: "i0001", phase: 1 }),
         closedJson("cancelled", { parent: "i0001", phase: 1, cancelled_at: "2026-10-03T00:00:00+0900", cancel_reason: "要件が変わった" }),
-        // 取り消し + フェーズがレビュー待ち: 札は取り消し。レビュー完了の操作は出ない
+        // 取り消し + フェーズがレビュー待ち: バッジは取り消し。レビュー完了の操作は出ない
         closedJson("cancelled-waiting", { parent: "i0001", phase: 2, cancelled_at: "t" }),
       ],
       [parentJson("i0001", [phaseJson(1), waitingPhase(2)])],
@@ -132,7 +132,7 @@ test("CB-T604 子の札: 承認待ち → 取り消し → 完了（done・取�
   assert.deepEqual(cards.get("arch")!.actions, []);
 });
 
-test("CB-T605 子の札: copyStatus が review のときは自分のフェーズの状態を使う（全分岐）。合わなければ要確認でレビューの操作を出さない", () => {
+test("CB-T605 子のバッジ: copyStatus が review のときは自分のフェーズの状態を使う（全分岐）。合わなければ要確認でレビューの操作を出さない", () => {
   const phases = [
     waitingPhase(1), // レビュー待ち
     phaseJson(2, { state: "ended", gate_closed: true, review_required: true, marks: { pending: {} } }), // レビュー準備中
@@ -154,13 +154,13 @@ test("CB-T605 子の札: copyStatus が review のときは自分のフェーズ
     assert.equal(cards.get(id)!.status.title, "レビュー待ちの置き場にあるが、フェーズの状態と合いません", id);
     assert.deepEqual(cards.get(id)!.actions, [], `${id}: 要確認の子にはレビューの操作を出さない`);
   }
-  // 操作は札が「レビュー待ち」の子だけ。MR の URL は断片を除いたマージリクエスト自体
+  // 操作はバッジが「レビュー待ち」の子だけ。MR の URL は断片を除いたマージリクエスト自体
   assert.deepEqual(cards.get("c1")!.actions, [{ kind: "review", parent: "i0001", phase: 1, mrUrl: "https://example.com/o/r/pull/12" }]);
   assert.deepEqual(cards.get("c2")!.actions, []);
   assert.deepEqual(cards.get("c3")!.actions, []);
 });
 
-test("CB-T606 子の札: copyStatus が open のとき、フェーズがレビューで止まっていれば要確認、そうでなければ開始前／作業中", () => {
+test("CB-T606 子のバッジ: copyStatus が open のとき、フェーズがレビューで止まっていれば要確認、そうでなければ開始前／作業中", () => {
   const json = boardOf(
     [
       ticketJson("i0001"),
@@ -186,7 +186,7 @@ test("CB-T606 子の札: copyStatus が open のとき、フェーズがレビ�
   }
 });
 
-test("CB-T607 子の札: どの規則にもヒットしなければ要確認で、読めた欄をツールチップに出す（承認待ちでない提案、フェーズが引けない子）", () => {
+test("CB-T607 子のバッジ: どの規則にもヒットしなければ要確認で、読めた欄をツールチップに出す（承認待ちでない提案、フェーズが引けない子）", () => {
   const json = boardOf(
     [
       ticketJson("i0001"),
@@ -205,9 +205,9 @@ test("CB-T607 子の札: どの規則にもヒットしなければ要確認で�
   assert.equal(cards.get("orphan")!.phaseStatus, "");
 });
 
-// --- 親の札 ---
+// --- 親のバッジ ---
 
-test("CB-T608 親の札: 要確認 → 承認待ち（改版は「承認待ち（改版）」）→ 取り消し → 完了（早めに終了）→ フェーズのレビュー → 開始前／作業中 → 要確認", () => {
+test("CB-T608 親のバッジ: 要確認 → 承認待ち（改版は「承認待ち（改版）」）→ 取り消し → 完了（早めに終了）→ フェーズのレビュー → 開始前／作業中 → 要確認", () => {
   const json = pending(
     boardOf(
       [
@@ -256,7 +256,7 @@ test("CB-T608 親の札: 要確認 → 承認待ち（改版は「承認待ち�
   assert.match(cards.get("odd")!.status.title, /置き場: none/);
 });
 
-test("CB-T609 親の札: アーカイブの親は完了（取り消しなら取り消し）。レビュー待ちのフェーズがあっても閉じていれば完了", () => {
+test("CB-T609 親のバッジ: アーカイブの親は完了（取り消しなら取り消し）。レビュー待ちのフェーズがあっても閉じていれば完了", () => {
   const archived = (ticket: string, over: Partial<ArchivedTicketJson> = {}): ArchivedTicketJson => ({
     ticket, parent: "", phase: null, title: ticket, project: "", path: `/ws/logs/archive/x/done/${ticket}.md`,
     started_at: "", completed_at: "t", cancelled_at: "", cancel_reason: "", ...over,
@@ -265,7 +265,7 @@ test("CB-T609 親の札: アーカイブの親は完了（取り消しなら取�
   const cards = cardsOf(json);
   assert.equal(label(cards.get("a")), "完了");
   assert.equal(label(cards.get("b")), "取り消し");
-  // 閉じた親（done/）の子がレビュー待ちの行を持っていても、札は完了
+  // 閉じた親（done/）の子がレビュー待ちの行を持っていても、バッジは完了
   const done = cardsOf(boardOf([closedJson("p")], [parentJson("p", [waitingPhase(1)])]));
   assert.equal(label(done.get("p")), "完了");
 });
@@ -288,10 +288,10 @@ test("CB-T610 操作: 子の承認待ち + レビュー待ちは承認だけ。�
   const cards = cardsOf(json);
   // 子: 承認待ち + フェーズがレビュー待ち → 承認だけ
   assert.deepEqual(cards.get("c")!.actions, [{ kind: "approve" }]);
-  // 子: 札がレビュー待ち → レビュー完了（承認は出ない）
+  // 子: バッジがレビュー待ち → レビュー完了（承認は出ない）
   assert.equal(label(cards.get("r")), "レビュー待ち");
   assert.deepEqual(cards.get("r")!.actions.map((a) => a.kind), ["review"]);
-  // 親: 改版の承認待ちが札。承認はカード、レビュー完了は同時に待っている 2 フェーズそれぞれの行
+  // 親: 改版の承認待ちがバッジ。承認はカード、レビュー完了は同時に待っている 2 フェーズそれぞれの行
   const p = cards.get("p")!;
   assert.equal(p.status.label, "承認待ち（改版）");
   assert.deepEqual(p.actions, [{ kind: "approve" }]);

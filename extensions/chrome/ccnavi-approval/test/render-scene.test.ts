@@ -79,7 +79,7 @@ before(async () => {
 });
 const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
 
-test("CX-T381 DOM の要約: 親子のチケットごとに承認待ち（札・操作）・レビュー待ち・承認対象外を取り出す。押せないボタンは操作に含めない", async () => {
+test("CX-T381 DOM の要約: 親子のチケットごとに承認待ち（バッジ・操作）・レビュー待ち・承認対象外を取り出す。押せないボタンは操作に含めない", async () => {
   const branches = fixture();
   const mock = new MockGitHub(branches);
   mock.branch("i0004", "main");

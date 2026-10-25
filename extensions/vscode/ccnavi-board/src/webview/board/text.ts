@@ -1,7 +1,7 @@
 /**
  * カードとフェーズ行に出す言葉。判定は実行ファイルがやっていて、ここは JSON が言ったことを
  * 言い換えるだけ。マーカーや済みから状態を組み直さない。
- * 状態の札とフェーズ行の一言は `core/status.ts`。ここは札のほかの、注意の行と詳細の行の言葉を持つ。
+ * 状態のバッジとフェーズ行の一言は `core/status.ts`。ここはバッジのほかの、注意の行と詳細の行の言葉を持つ。
  */
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";

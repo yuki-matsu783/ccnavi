@@ -49,7 +49,7 @@ function sentSince(dom: DomPage, from: number): string[] {
   return dom.posted.slice(from).map((message) => message.type);
 }
 
-/** 点の番号と題（その図の中） */
+/** 点の番号とタイトル（その図の中） */
 function numbers(dom: DomPage, part: string): string[] {
   return dom
     .all(`.plan-graph[data-part="${part}"] .plan-node`)
@@ -235,7 +235,7 @@ test("CB-D284 ノード・線・× を指す案内は、指す先のステップ
     const rows = Object.fromEntries(dom.all(".plan-graph[data-part=\"plan\"] .plan-detail-row").map((row) => [row.querySelector("dt")?.textContent, row.querySelector("dd")?.textContent]));
     assert.equal(rows["番号"], "2");
     assert.equal(rows["提案での番号"], "3");
-    assert.equal(rows["題"], "実装とテスト");
+    assert.equal(rows["タイトル"], "実装とテスト");
     assert.equal(dom.all(".tour-bubble.center").length, 0);
   } finally {
     await dom.close();

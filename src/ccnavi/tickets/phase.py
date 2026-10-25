@@ -291,7 +291,7 @@ def phases_of(
         owner = proposed
     if owner is not None and owner.has_plan:
         # 定義は親に固定したコピー（`phases:`）から引く。`phases.yml` は読まない（承認のあとに
-        # 直しても、進行中の親のフェーズの題・見る場所・案内は変わらない）。提案の親（`proposed`）は
+        # 直しても、進行中の親のフェーズのタイトル・見る場所・案内は変わらない）。提案の親（`proposed`）は
         # その提案のコピーから引く。
         types = phasetypes.types_of(owner)
         if owner.workflow is None:

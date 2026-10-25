@@ -81,7 +81,7 @@ def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
             f"[ccnavi] {CODE_PARENT_KEY} ({rel}) 識別子 {name} は子の形ではないのに `parent:` が"
             "あります。親の提案なら `parent:` と `phase:` の行を消してください"
             "（子だけの欄）。雛形は"
-            " `ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>`"
+            " `ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <値> --mr <番号>`"
             " が作ります。"
         )
     missing = [key for key in PARENT_FIELDS if not front.get(key)]
@@ -90,7 +90,7 @@ def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
     return (
         f"[ccnavi] {CODE_PARENT_FIELDS} ({rel}) 親の提案に {'・'.join(f'`{k}:`' for k in missing)}"
         " がありません。手で足さず、"
-        "`ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>`"
+        "`ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <値> --mr <番号>`"
         " で雛形を作るか、`ccnavi --plan-order <親> --fill-phases` で"
         " `phases:` を差し込んでください。書式は `ccnavi --docs --keyword 提案書式` で引く。"
     )

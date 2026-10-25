@@ -422,7 +422,7 @@ ISSUE_URL_SLOT = "{issue_url}"
 ISSUE_LINKS_SLOT = "{issue_links}"
 # 1 回の apply で issue にできる指摘の上限（ホストへの書き込みを 1 回の操作に収める）。
 MAX_ISSUES = 40
-# issue の題の字数の上限（GitHub は 256 字）。
+# issue のタイトルの字数の上限（GitHub は 256 字）。
 _ISSUE_TITLE_LIMIT = 200
 
 
@@ -802,7 +802,7 @@ def _stage_decision(
 
 
 def _issue_title(d: review_decide.Decision, head: str, t: review_host.Thread) -> str:
-    """指摘 1 件の issue の題。出どころの題に、指摘の位置（無ければキー）を添える。"""
+    """指摘 1 件の issue のタイトル。出どころのタイトルに、指摘の位置（無ければキー）を添える。"""
     where = ""
     if t.path:
         where = f"{t.path}:{t.line}" if t.line else t.path

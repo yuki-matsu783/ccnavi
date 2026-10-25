@@ -132,7 +132,7 @@ test("CB-T464 フェーズの案内の scene は、見本にある設定・定�
   }
 });
 
-test("CB-T465 フェーズの案内は、基本の案内の題と順序を保ち、ユースケースは「〜したいとき」の 4〜9 手順で、指す先は画面にある印だけを使う", () => {
+test("CB-T465 フェーズの案内は、基本の案内のタイトルと順序を保ち、ユースケースは「〜したいとき」の 4〜9 手順で、指す先は画面にある印だけを使う", () => {
   assert.equal(def.courses[0].id, INTRO_ID);
   assert.deepEqual(
     def.courses[0].steps.map((step) => step.title),
@@ -142,7 +142,7 @@ test("CB-T465 フェーズの案内は、基本の案内の題と順序を保ち
   const useCases = def.courses.slice(1);
   assert.ok(useCases.length >= 3 && useCases.length <= 8, `ユースケースが ${useCases.length} 本`);
   for (const course of useCases) {
-    assert.match(course.title, /とき$/, `${course.id}: 題は利用者の目的（〜したいとき）で切る`);
+    assert.match(course.title, /とき$/, `${course.id}: タイトルは利用者の目的（〜したいとき）で切る`);
     assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
   }
   for (const course of def.courses) {

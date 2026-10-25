@@ -60,7 +60,7 @@ export interface SettingsScreen<D, T, L, M> {
   readonly accepts: SettingsNotice extends M ? true : never;
   /** このパネルがまだ開いている現役のものか */
   alive(current: SettingsState<D, T, L>): boolean;
-  /** 閉じた。開いているパネルの札（モジュールの `state`）が `current` なら外す */
+  /** 閉じた。開いているパネルのバッジ（モジュールの `state`）が `current` なら外す */
   release(current: SettingsState<D, T, L>): void;
   /** 画面からの操作の受け付け（受け取った値の型の絞り込みも含む） */
   handleMessage(current: SettingsState<D, T, L>, message: unknown): void;

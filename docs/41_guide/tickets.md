@@ -65,7 +65,7 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 
 - 親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、`hotfix-64-統合先の解決`）。先頭の語は既定で `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs` のどれか。チャットで「hotfix で」と言えばエージェントがその語で書く
 - リストを変えるときだけ `.claude/settings.json` の `env` に `CCNAVI_BRANCH_PREFIXES=feature,hotfix,fix` のように書く
-- 番号は issue の番号（通し番号は直接作業のワークツリー名だけに使う）。slug には日本語も指定できる。issue の題が長いと、`ccnavi-start.sh --issue` は名前を作らずに止まり、エージェントが短い英語の `--slug` を考えて打ち直す。`--slug` で渡す語は小文字・数字・ハイフンだけ。Chrome 拡張の「始める」は、題から作った名前を語の区切りで切って進む
+- 番号は issue の番号（通し番号は直接作業のワークツリー名だけに使う）。slug には日本語も指定できる。issue のタイトルが長いと、`ccnavi-start.sh --issue` は名前を作らずに止まり、エージェントが短い英語の `--slug` を考えて打ち直す。`--slug` で渡す語は小文字・数字・ハイフンだけ。Chrome 拡張の「始める」は、タイトルから作った名前を語の区切りで切って進む
 - 子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。ワークツリーの名前は識別子と同じ
 
 提案の書式は [.ccnavi/docs/proposal-format.md](../../.ccnavi/docs/proposal-format.md)（配布先にも配る）。親のワークツリーの扱いと、深さと件数の上限は [設計 9.3](../21_design/tickets/proposal-format.md) にある。ワークツリーの名前の決まりは [.ccnavi/docs/worktree.md](../../.ccnavi/docs/worktree.md)。
@@ -294,7 +294,7 @@ sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue 152 
 issue が closed で MR が無いときも、`ccnavi-start.sh` は終了コード 3 で止まり、「次の手:」に reopen する・closed のまま続ける・別の issue にする・やめる、を並べる。ユーザが closed と承知で続けると言ったときだけ `--reopened` を付けて打ち直す（詳細は `.ccnavi/docs/worktree-start.md`）。
 `--issue` だけで来て、紐づく open の MR がすでにあり、この PC にそのブランチのワークツリーが無いときも、他の PC や他のセッションの作業かもしれないので、エージェントが聞く。続けるなら `--issue <番号> --mr <MR の番号>` で打ち直す（自分の作業の再開は聞かない）。
 
-issue がまだ無いときは、エージェントが `ccnavi-start.sh --new-issue <題>` で issue を作ってから進む。作る前に、題の似た open の issue・MR（題の 2 文字組の一致率 0.5 以上）を確かめ、あれば作らずに一覧を見せて、同じ作業かを聞く。似たものが無くても、haiku のサブエージェントが open の issue・MR の一覧（`--list-open`）を読んで意味の近いものを探し、該当が無いと分かってから作る。別の作業だと答えたときは、エージェントが `--similar-checked` を付けて打ち直す。ホストに届かず作れないときは、GitHub は MCP で、GitLab はユーザが issue を作って番号を伝える。
+issue がまだ無いときは、エージェントが `ccnavi-start.sh --new-issue <タイトル>` で issue を作ってから進む。作る前に、タイトルの似た open の issue・MR（タイトルの 2 文字組の一致率 0.5 以上）を確かめ、あれば作らずに一覧を見せて、同じ作業かを聞く。似たものが無くても、haiku のサブエージェントが open の issue・MR の一覧（`--list-open`）を読んで意味の近いものを探し、該当が無いと分かってから作る。別の作業だと答えたときは、エージェントが `--similar-checked` を付けて打ち直す。ホストに届かず作れないときは、GitHub は MCP で、GitLab はユーザが issue を作って番号を伝える。
 終了コード、ホストに届かないときの代行（GitHub は MCP、GitLab はユーザが確かめる）、`projects/<名前>` の依頼（`--repo`）、候補の探し方は [.ccnavi/docs/worktree-start.md](../../.ccnavi/docs/worktree-start.md) と [設計 9.13](../21_design/tickets/branch-lookup.md)。
 
 ## プロジェクトのスキル

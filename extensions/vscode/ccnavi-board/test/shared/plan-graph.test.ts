@@ -48,7 +48,7 @@ test("CB-T355 ステップごとに点を置き、after を線にする。先行
   // 全体計画の start と end の名前。保存しない図だけの点
   assert.equal(graph.nodes[0].label, "開始");
   assert.equal(graph.nodes[graph.nodes.length - 1].label, "終了");
-  // 点は番号と題を持つ
+  // 点は番号とタイトルを持つ
   assert.deepEqual(graph.nodes.filter((node) => node.kind === "item").map((node) => node.label), ["research", "design", "acceptance", "implement"]);
 });
 
@@ -74,7 +74,7 @@ test("CB-T357 終端に届かないステップは実行ファイルの loose �
   assert.deepEqual(plain.edges.filter((edge) => edge.loose), []);
 });
 
-test("CB-T358 点は定義の題・見る場所・延期の引き受け手・固定した番号を実行ファイルの値のまま持つ", () => {
+test("CB-T358 点は定義のタイトル・見る場所・延期の引き受け手・固定した番号を実行ファイルの値のまま持つ", () => {
   const base = plan(DIAMOND);
   const graph = planGraphOf({
     ...base,

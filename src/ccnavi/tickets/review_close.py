@@ -659,7 +659,7 @@ def _close_early_drafts(
     """残りを書き出す issue の下書きと、マージリクエストへ残すコメント の下書き。
     書けなければ理由。"""
     assert result.mr is not None
-    # 1 行目が題、空行のあとが本文。
+    # 1 行目がタイトル、空行のあとが本文。
     issue = [f"{parent.title} の残り", ""]
     issue += [
         f"元のマージリクエスト: {result.mr.url}（チケット `{parent.ticket}`）",

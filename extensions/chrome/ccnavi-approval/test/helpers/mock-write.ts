@@ -60,7 +60,7 @@ export function thread(id: string, extra: Partial<MockThread> = {}): MockThread 
 
 /** 書き込みの共通の記録と失敗の仕掛け */
 export class WriteState {
-  /** 書いた順（`issue <題>`・`issueComment <番号>`・`reply <id>`・`resolve <id>`・`comment`） */
+  /** 書いた順（`issue <タイトル>`・`issueComment <番号>`・`reply <id>`・`resolve <id>`・`comment`） */
   readonly log: string[] = [];
   /** 本文つきの記録（`{op, ...}`） */
   readonly writes: { op: string; id?: string; body?: string; title?: string; number?: number; raw?: unknown }[] = [];

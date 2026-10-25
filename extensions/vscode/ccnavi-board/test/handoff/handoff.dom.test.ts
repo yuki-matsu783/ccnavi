@@ -30,7 +30,7 @@ async function check(dom: DomPage, path: string): Promise<void> {
   await dom.settle();
 }
 
-test("CB-D366 一覧は対象ごとに 1 行。パス・種類・状態の札と、errors / warnings の件数、要約の件数を出す", async () => {
+test("CB-D366 一覧は対象ごとに 1 行。パス・種類・状態のバッジと、errors / warnings の件数、要約の件数を出す", async () => {
   const dom = await openHandoff();
   try {
     assert.deepEqual(

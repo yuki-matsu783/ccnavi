@@ -398,7 +398,7 @@ test("CB-D82b 新規起票のカードは「新規起票」と言う", async () 
   }
 });
 
-/** 吹き出しの案内を最後まで進め、手順の題を順に返す。閉じたあとの画面を見るのは呼ぶ側 */
+/** 吹き出しの案内を最後まで進め、手順のタイトルを順に返す。閉じたあとの画面を見るのは呼ぶ側 */
 async function walkTour(dom: DomPage): Promise<string[]> {
   const titles: string[] = [];
   for (let i = 0; i < 20 && dom.all(".tour").length > 0; i += 1) {
@@ -419,7 +419,7 @@ test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後�
     await dom.settle();
     // チケットがあるボードでも、案内の間は見本を描く
     assert.equal(dom.all(".tour-sample").length, 1);
-    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態の札", "ユーザ待ち", "詳細", "承認", "更新", "MR の状況を確認", "案内"]);
+    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態のバッジ", "ユーザ待ち", "詳細", "承認", "更新", "MR の状況を確認", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
@@ -450,7 +450,7 @@ test("CB-D96 チケットが 1 枚もないボードでは、案内の間だけ�
     assert.ok(dom.all(".card").length > 0, "見本のカードがありません");
     assert.ok(dom.all('.card[data-attention="1"]').length > 0);
     // カードの手順は見本のカードを指す（中ほどに出す文だけの吹き出しにならない）
-    while (dom.one("#tour-title").textContent !== "状態の札") {
+    while (dom.one("#tour-title").textContent !== "状態のバッジ") {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }

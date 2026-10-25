@@ -1,5 +1,5 @@
 /**
- * テンプレート管理画面（React）を happy-dom で動かす。一覧の札と破棄した理由、統合結果の枠、
+ * テンプレート管理画面（React）を happy-dom で動かす。一覧のバッジと破棄した理由、統合結果の枠、
  * 1 件の計画と本文、下書き（読むだけ）と取り込み待ちへの入口、エラー・読み込み中、見た目、対象の切り替えを見る。
  * 見本は `tests/fixtures/templates-json.json` の `expect`（self の層）。
  */
@@ -24,7 +24,7 @@ async function openRow(dom: DomPage, selector: string): Promise<void> {
   await dom.settle();
 }
 
-test("CB-D324 一覧は開いている対象の層のテンプレートだけを出し、破棄した理由と無効の札を行に出す。統合結果の枠は別に出す", async () => {
+test("CB-D324 一覧は開いている対象の層のテンプレートだけを出し、破棄した理由と無効のバッジを行に出す。統合結果の枠は別に出す", async () => {
   const dom = await openTemplates();
   try {
     // 対象は self。一覧は self の層の 4 件（ends / feature / local / research）だけで、共通の層の行は出さない
@@ -113,7 +113,7 @@ test("CB-D327 苦情の件数と深刻度の文字（[error] [warn] [info]）が
   }
 });
 
-test("CB-D328 下書きは 3 件出て、error・TODO を札で出す。効力がなく読むだけであることを一覧の前に言い、取り込み・編集のボタンを持たない", async () => {
+test("CB-D328 下書きは 3 件出て、error・TODO をバッジで出す。効力がなく読むだけであることを一覧の前に言い、取り込み・編集のボタンを持たない", async () => {
   const dom = await openTemplates();
   try {
     assert.equal(dom.all("li.draft").length, 3);

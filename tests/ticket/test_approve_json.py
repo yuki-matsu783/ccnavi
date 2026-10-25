@@ -338,7 +338,7 @@ class ApproveJsonTest(PhaseHarness):
         inside = "wip/research/*"
         beyond = "src/a/*"
         for label, old, new in (
-            ("題", "title: 子 i0001-01-01", "title: 書き換えた題"),
+            ("タイトル", "title: 子 i0001-01-01", "title: 書き換えたタイトル"),
             ("理由", "rationale: r", "rationale: 書き換えた理由"),
             ("範囲（上限の内側）", f'glob: "{inside}"', 'glob: "wip/research/sub/*"'),
             ("範囲（上限の外）", f'glob: "{beyond}"', 'glob: "src/b/*"'),

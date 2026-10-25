@@ -10,14 +10,14 @@ import { loadTour } from "../helpers/tour.js";
 const def = loadTour("projects");
 const DIAGRAM_COURSES = ["how-clone", "how-card"];
 
-test("CB-T1210 プロジェクト管理の案内に、図を引く 2 本の案内が基本の案内の次に並ぶ。題は「〜たいとき」で終わり、手順は 4〜9 個で、図と光らせる矢印を持つ", () => {
+test("CB-T1210 プロジェクト管理の案内に、図を引く 2 本の案内が基本の案内の次に並ぶ。タイトルは「〜たいとき」で終わり、手順は 4〜9 個で、図と光らせる矢印を持つ", () => {
   assert.deepEqual(def.courses.map((course) => course.id).slice(0, 3), ["intro", ...DIAGRAM_COURSES]);
-  // 既存の案内の ID と題は変えない
+  // 既存の案内の ID とタイトルは変えない
   assert.equal(def.courses[0].title, "基本の案内");
   assert.equal(def.courses.find((course) => course.id === "add-project")?.title, "プロジェクトを追加したいとき");
   for (const id of DIAGRAM_COURSES) {
     const course = def.courses.find((c) => c.id === id)!;
-    assert.ok(course.title.endsWith("たいとき"), `${id}: 題は「〜たいとき」で終える`);
+    assert.ok(course.title.endsWith("たいとき"), `${id}: タイトルは「〜たいとき」で終える`);
     assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${id}: 手順は ${course.steps.length} 個`);
     for (const step of course.steps) {
       assert.notEqual(step.diagram, "", `${id}「${step.title}」: 図を引かない手順がある`);

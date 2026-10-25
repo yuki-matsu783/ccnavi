@@ -65,7 +65,7 @@ ADR-0102 の 5 章で、親チケットは `branch:` キーで既存のブラン
 | 指定 | 候補 | 誰が読むか |
 |---|---|---|
 | MR | その MR の元ブランチ（GitHub は `pulls/<N>` の `head.ref`、GitLab は `merge_requests/<N>` の `source_branch`）。フォークから出たものは目印を付ける | sh（ホスト） |
-| issue | その issue を参照している開いた MR の元ブランチ。GitHub は開いた PR を全部読み、題・本文の `#<N>`（前が英数字・`_`・`&`・`/` でない）か `issues/<N>`、元ブランチの名前の番号で選ぶ。GitLab は `issues/<N>/related_merge_requests` の `opened` | sh（ホスト） |
+| issue | その issue を参照している開いた MR の元ブランチ。GitHub は開いた PR を全部読み、タイトル・本文の `#<N>`（前が英数字・`_`・`&`・`/` でない）か `issues/<N>`、元ブランチの名前の番号で選ぶ。GitLab は `issues/<N>/related_merge_requests` の `opened` | sh（ホスト） |
 | issue | 名前に番号を含むブランチ（手元と origin。番号の前後が数字でないこと: `feature-152-x`・`fix/152-y`・`issue-152`・`x-152`） | 実行ファイル（git の ref） |
 | issue | `issue: <N>` を持つ親チケット（同じリポジトリの課題だけ）の親のブランチ。承認済み（作業中・レビュー待ち・閉じた）は `branch:`（無ければ識別子）、承認待ちの提案は識別子（提案の `branch:` は使わない） | 実行ファイル（チケット） |
 

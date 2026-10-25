@@ -368,10 +368,10 @@ ROWS = [
         "docs/adr/0001-git",
         "2026-08-01T09:00:00",
         type="adr",
-        title="B 題",
+        title="B タイトル",
         tags=["git", "Worktree"],
     ),
-    row("docs/adr/0002-ticket", "2026-08-05T23:30:00", type="ADR", title="A 題", keywords=["承認"]),
+    row("docs/adr/0002-ticket", "2026-08-05T23:30:00", type="ADR", title="A タイトル", keywords=["承認"]),
     row("docs/claude/worktree", "2026-08-06T00:00:00", type="guide", tags="worktree"),
     row("README", "2026-07-01T00:00:00", type="guide", description="使い方 description"),
     row("notes/plain"),
@@ -504,7 +504,7 @@ class RenderTest(unittest.TestCase):
 
     def test_table_aligns_wide_characters_as_two_columns(self):
         rows = [
-            row("日本語/文書", type="ガイド", title="題"),
+            row("日本語/文書", type="ガイド", title="タイトル"),
             row("ab", type="adr", title="t"),
         ]
         lines = render(docsearch_query.Query(format="table"), rows).splitlines()

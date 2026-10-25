@@ -2,9 +2,9 @@
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
  * 列は 未着手 / 作業中 / 完了 / 取り消し / アーカイブ。置き場との対応は、未着手 = `wip/proposals/todo/`、
- * 作業中 = `.ccnavi/approved/doing/` と `wip/proposals/review/`（レビュー待ちも作業中の列。待ちはカードの札で言う）、
+ * 作業中 = `.ccnavi/approved/doing/` と `wip/proposals/review/`（レビュー待ちも作業中の列。待ちはカードのバッジで言う）、
  * 完了 = `.ccnavi/approved/done/`、取り消し = 同じ `done/` で `cancelled_at` を持つもの、アーカイブ = 手元の退避
- * （`logs/archive/`。JSON の `archived` の欄。既定では画面が隠す）。カードの状況は状態の札（`status.ts`）、
+ * （`logs/archive/`。JSON の `archived` の欄。既定では画面が隠す）。カードの状況は状態のバッジ（`status.ts`）、
  * ユーザができること（承認・レビュー完了）は操作（`actions`）で言う。この 2 つは別の規則で決める。
  * 止まっているかや承認待ちの判断はここでやり直さない。JSON が言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
  */
@@ -45,7 +45,7 @@ export const COLUMNS: readonly ColumnDef[] = [
 export type Action =
   | { readonly kind: "approve" }
   /**
-   * レビュー完了。札（`status`）やフェーズ行の状態の一言が「レビュー待ち」のときだけ付く。
+   * レビュー完了。バッジ（`status`）やフェーズ行の状態の一言が「レビュー待ち」のときだけ付く。
    * 押すと残った指摘を読み、0 件なら「レビュー済みにする」、1 件以上なら対応方針の画面になる
    */
   | { readonly kind: "review"; readonly parent: string; readonly phase: number; readonly mrUrl: string };
@@ -115,7 +115,7 @@ export interface Card {
   readonly phaseLabel: string;
   /** 子だけ。自分のフェーズの状態の一言。フェーズが引けなければ空 */
   readonly phaseStatus: PhaseStatus | "";
-  /** 状態の札（`core/status.ts` の `statusOf`）。見出しの右端に 1 つ出す */
+  /** 状態のバッジ（`core/status.ts` の `statusOf`）。見出しの右端に 1 つ出す */
   readonly status: Status;
   /** 親だけ */
   readonly stage: string;
@@ -175,7 +175,7 @@ export interface BoardColumn extends ColumnDef {
   readonly count: number;
 }
 
-/** 親の絞り込みの候補。識別子と題名 */
+/** 親の絞り込みの候補。識別子とタイトル */
 export interface ParentOption {
   readonly id: string;
   readonly title: string;
@@ -328,8 +328,8 @@ function toCard(
 }
 
 /**
- * 状態の札と、ユーザ待ちの操作を付ける。操作は札と別の規則で決める。
- * 承認は `pendingApproval` だけを条件にする（札が「要確認」でも出す）。レビュー完了は札が「レビュー待ち」の子だけ
+ * 状態のバッジと、ユーザ待ちの操作を付ける。操作はバッジと別の規則で決める。
+ * 承認は `pendingApproval` だけを条件にする（バッジが「要確認」でも出す）。レビュー完了はバッジが「レビュー待ち」の子だけ
  * （承認待ちの子には出さない）。親のレビュー完了は各フェーズ行が持つ
  */
 function withStatus(base: Omit<Card, "status" | "actions">): Card {
@@ -446,7 +446,7 @@ function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | nul
 }
 
 /**
- * 列は置き場から引く。提案の側にあれば `todo/` は未着手、`review/` は作業中（レビュー待ちは札で言う）。
+ * 列は置き場から引く。提案の側にあれば `todo/` は未着手、`review/` は作業中（レビュー待ちはバッジで言う）。
  * 無ければ承認済みチケットから。閉じた承認済みチケット（`done/`）は取り消しの時刻があれば cancelled、無ければ done。
  * 開いている承認済みチケット（`doing/`）は doing。どちらにも無いのは食い違いなので todo に置く（不備の文は実行ファイルの `issues`）。
  */
@@ -558,8 +558,8 @@ export function phaseChipOf(board: Board, parent: string, phase: number): PhaseC
 }
 
 /**
- * ボードのアーカイブにある親の題。プロジェクトと識別子が一致するものだけを引く（別プロジェクトの同じ識別子を取り違えない）。
- * 無ければ undefined（呼び手は識別子だけを出す）。マージ状況の帯が、片付けの記録（題を持たない）の親に題を添えるのに使う
+ * ボードのアーカイブにある親のタイトル。プロジェクトと識別子が一致するものだけを引く（別プロジェクトの同じ識別子を取り違えない）。
+ * 無ければ undefined（呼び手は識別子だけを出す）。マージ状況の帯が、片付けの記録（タイトルを持たない）の親にタイトルを添えるのに使う
  */
 export function archivedTitleOf(board: Board, project: string, parent: string): string | undefined {
   const column = board.columns.find((c) => c.state === "archived");

@@ -178,7 +178,7 @@ test("CX-T226 書く操作の最中は、欄のボタン（button.action）を�
   await f.set({ busy: true, state: "writing" });
   assert.ok(actionButtons().every((b) => b.disabled));
   // 最中に「始める」の一覧を読み終えて欄を描き直しても、新しいボタンは押せない
-  await f.set({ sections: sections({ ...all, issues: { list: [{ number: 12, title: "題", url: "https://example.test/12" }], error: "" } }) });
+  await f.set({ sections: sections({ ...all, issues: { list: [{ number: 12, title: "タイトル", url: "https://example.test/12" }], error: "" } }) });
   assert.deepEqual(
     actionButtons().map((b) => b.dataset.action),
     ["recent-days", "approve", "review", "dismiss", "start"],

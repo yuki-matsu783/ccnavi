@@ -1,6 +1,6 @@
 /**
- * カード 1 枚が何を描くか（React の画面を happy-dom で動かす）。上から 見出し（ID・題・状態の札）・位置・ユーザ待ち・
- * 注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。札の決め方は status.test.ts、ここは構造・操作・ボタンの規則・押したときの動き。
+ * カード 1 枚が何を描くか（React の画面を happy-dom で動かす）。上から 見出し（ID・タイトル・状態のバッジ）・位置・ユーザ待ち・
+ * 注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。バッジの決め方は status.test.ts、ここは構造・操作・ボタンの規則・押したときの動き。
  * 寸法と見た目は拡張開発ホストでの手動確認（docs/design/manual-checks.md の表）に回す。
  */
 import { test } from "node:test";
@@ -49,7 +49,7 @@ function scene(): BoardJson {
   );
 }
 
-test("CB-D700 カードは 見出し（ID・題・状態の札）→ 位置 → ユーザ待ち → 注意 → フェーズ行 → 補助の操作 → 詳細 の順に並ぶ", async () => {
+test("CB-D700 カードは 見出し（ID・タイトル・状態のバッジ）→ 位置 → ユーザ待ち → 注意 → フェーズ行 → 補助の操作 → 詳細 の順に並ぶ", async () => {
   const page = await openBoard(scene());
   try {
     const kindsOf = (id: string): string[] => Array.from(page.one(card(page, id)).children).map((el) => el.className.split(" ")[0]);
@@ -57,7 +57,7 @@ test("CB-D700 カードは 見出し（ID・題・状態の札）→ 位置 → 
     assert.deepEqual(kindsOf("fresh"), ["card-head", "turn", "card-actions", "card-details"]);
     const parent = page.one(card(page, "busy"));
     assert.deepEqual(kindsOf("busy"), ["card-head", "stage", "badges", "phases", "card-details"]);
-    // 見出し: ID・題・札（札は右端の 1 つ）
+    // 見出し: ID・タイトル・バッジ（バッジは右端の 1 つ）
     const head = parent.querySelector(".card-head")!;
     assert.deepEqual(Array.from(head.children).map((el) => el.className.split(" ")[0]), ["num", "title", "status"]);
     assert.equal(head.querySelectorAll(".status").length, 1);
@@ -78,7 +78,7 @@ test("CB-D700 カードは 見出し（ID・題・状態の札）→ 位置 → 
   }
 });
 
-test("CB-D701 札は見出しの右端に 1 つ。言葉とツールチップは札の決め方のとおりで、色に頼らず言葉を出す", async () => {
+test("CB-D701 バッジは見出しの右端に 1 つ。言葉とツールチップはバッジの決め方のとおりで、色に頼らず言葉を出す", async () => {
   const page = await openBoard(scene());
   try {
     const status = (id: string): string => page.one(`${card(page, id)} .card-head .status`).textContent;
@@ -89,14 +89,14 @@ test("CB-D701 札は見出しの右端に 1 つ。言葉とツールチップは
     assert.equal(status("held"), "要確認");
     assert.equal(page.one(`${card(page, "held")} .status`).getAttribute("title"), "書き込み停止中: 親が引けない");
     assert.equal(page.one(`${card(page, "busy")}`).getAttribute("data-status"), "レビュー待ち");
-    // 理由の無い札にはツールチップを付けない
+    // 理由の無いバッジにはツールチップを付けない
     assert.equal(page.one(`${card(page, "fresh")} .status`).getAttribute("title"), null);
   } finally {
     await page.close();
   }
 });
 
-test("CB-D702 ユーザ待ち: 親の承認待ちは「内容を確認して承認してください」と［承認］（主ボタン）。子の承認待ちは［承認］だけ。要確認の札でも承認は出る", async () => {
+test("CB-D702 ユーザ待ち: 親の承認待ちは「内容を確認して承認してください」と［承認］（主ボタン）。子の承認待ちは［承認］だけ。要確認のバッジでも承認は出る", async () => {
   const page = await openBoard(
     pendingOf(
       boardOf([
@@ -117,7 +117,7 @@ test("CB-D702 ユーザ待ち: 親の承認待ちは「内容を確認して承�
     page.click(approve);
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["p"], filtered: true });
-    // 子: 札は「要確認」（blocked）でも、pendingApproval だけを条件に承認が出る。文は付かない
+    // 子: バッジは「要確認」（blocked）でも、pendingApproval だけを条件に承認が出る。文は付かない
     const child = card(page, "c");
     assert.equal(textOf(page, `${child} .status`), "要確認");
     assert.equal(page.all(`${child} button[data-action="approve-one"]`).length, 1);
@@ -128,7 +128,7 @@ test("CB-D702 ユーザ待ち: 親の承認待ちは「内容を確認して承�
   }
 });
 
-test("CB-D703 ユーザ待ち: 札が「レビュー待ち」の子には［MR を開く］（リンク）と［レビュー完了］（主ボタン）。押すとレビュー完了の流れに入る。ほかの子には出さない", async () => {
+test("CB-D703 ユーザ待ち: バッジが「レビュー待ち」の子には［MR を開く］（リンク）と［レビュー完了］（主ボタン）。押すとレビュー完了の流れに入る。ほかの子には出さない", async () => {
   const page = await openBoard(scene());
   try {
     const child = card(page, "busy-02-01");
@@ -387,7 +387,7 @@ test("CB-D709 詳細は畳んである。MR・issue・ブランチ・ワーク�
 });
 
 test("CB-D710 詳細の開閉はカードごと（プロジェクトと ID の組）に webview の状態へ覚え、更新や列の移動でも閉じない。同じ ID の別プロジェクトを混同しない", async () => {
-  const same = (project: string): TicketJson => ticketJson("dup", { project, title: `題 ${project || "ws"}` });
+  const same = (project: string): TicketJson => ticketJson("dup", { project, title: `タイトル ${project || "ws"}` });
   const json = boardOf([same(""), same("web")], [], { projects: ["web"] });
   const page = await openBoard(json);
   try {
@@ -403,7 +403,7 @@ test("CB-D710 詳細の開閉はカードごと（プロジェクトと ID の�
     await page.send({ type: "data", data: { kind: "board", board: buildBoard(json) } });
     assert.equal(open("web"), true);
     // 列の移動（作業中 → 完了）でも閉じない
-    const moved = boardOf([same(""), { ...closedJson("dup", { project: "web", title: "題 web" }) }], [], { projects: ["web"] });
+    const moved = boardOf([same(""), { ...closedJson("dup", { project: "web", title: "タイトル web" }) }], [], { projects: ["web"] });
     await page.send({ type: "data", data: { kind: "board", board: buildBoard(moved) } });
     assert.equal(page.one('li.card[data-id="dup"][data-project="web"]').closest(".column")?.getAttribute("data-state"), "done");
     assert.equal(open("web"), true, "列を移っても開いたまま");
@@ -438,7 +438,7 @@ test("CB-D711 カードを押す（または焦点を当てて Enter）とチケ
   try {
     const opened = (): number => page.posted.filter((m) => m.type === "open").length;
     const target = card(page, "w");
-    // カード本体（題）を押すと開く
+    // カード本体（タイトル）を押すと開く
     page.click(page.one(`${target} .title`));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "open", filePath: "/ws/wip/proposals/review/w.md" });
@@ -514,7 +514,7 @@ test("CB-D713 カードの言葉は用語の表のとおり（承認待ち・開
   }
 });
 
-test("CB-D714 カードの見た目の規則: ボタンは文字サイズ・高さ・余白を明示し、狭い列でも折り返す。札は右端に寄せる", async () => {
+test("CB-D714 カードの見た目の規則: ボタンは文字サイズ・高さ・余白を明示し、狭い列でも折り返す。バッジは右端に寄せる", async () => {
   const css = flatStyle(boardPage({ kind: "board", board: buildBoard(boardOf([ticketJson("a")])) } as BoardData));
   assert.match(css, /\.card-button \{[^}]*box-sizing: border-box;[^}]*min-height: 26px;[^}]*padding: 3px 10px;[^}]*font-size: var\(--vscode-font-size, 13px\);[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/);
   assert.match(css, /a\.card-button, a\.card-button:hover/);

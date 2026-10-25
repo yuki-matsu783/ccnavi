@@ -1,7 +1,7 @@
 /**
  * 「始める」。`ccnavi-start.sh` と同じ手順で、issue から作業を始める。
  *
- *   1. issue を閉じる開いた MR を探す（題・本文の `Closes #<番号>` など、閉じる語に続く issue の指定。
+ *   1. issue を閉じる開いた MR を探す（タイトル・本文の `Closes #<番号>` など、閉じる語に続く issue の指定。
  *      参照しているだけの MR は採用しない）
  *   2. 1 本あれば、その元ブランチを親として採用する。ブランチも MR も作らない
  *      （採用の確認: MR が open・フォークでない・マージ先が統合先・ブランチ名が保護されていない・識別子が使える・
@@ -56,13 +56,13 @@ export async function listIssues(repo: RepoConfig, deps: Deps): Promise<Issue[]>
 }
 
 /**
- * その issue を**閉じる** MR か。題・本文に、閉じる語（close・closes・closed・closing、fix・fixes・fixed・fixing、
+ * その issue を**閉じる** MR か。タイトル・本文に、閉じる語（close・closes・closed・closing、fix・fixes・fixed・fixing、
  * resolve・resolves・resolved・resolving）の直後に、この issue の指定（`#<番号>`、`<owner/repo>#<番号>`、
  * `.../issues/<番号>` の URL）が続くもの。指定が別のリポジトリの issue なら閉じない（`repoPath` は
  * `<owner>/<repo>`。大文字小文字は区別しない）。参照しているだけ（`#<番号>` の言及・元ブランチの名前の番号）、
  * コードブロック・インラインコード・引用（先頭が `>` の行）の中、閉じる語の直前に否定（not・n't・never）が
  * あるものは含めない。`ccnavi-start.sh` が MR の閉じる issue をホストのリンクで確かめて採用を決めるのと
- * 同じ考え方で、ここは題・本文の語から見る（拡張はホストの閉じるリンクを読まない）。閉じる語 1 つにつき、
+ * 同じ考え方で、ここはタイトル・本文の語から見る（拡張はホストの閉じるリンクを読まない）。閉じる語 1 つにつき、
  * 直後の 1 つの指定だけを見る（`Closes #21, #20` の `#20` は閉じない）
  */
 export function closesIssue(mr: Pick<Mr, "title" | "body">, issue: number, repoPath: string): boolean {

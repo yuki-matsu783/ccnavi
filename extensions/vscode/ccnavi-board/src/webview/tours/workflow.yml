@@ -21,7 +21,7 @@
 #
 # 指す先（target）の印。図の中身は画面が実際の DOM に付ける（図の部品は共通なので触らない）。
 #   graphs  図の領域全体            controls  ボタンの並び              relayout / revert / reload / save  各ボタン
-#   summary  題と未保存の印の並び   dirty  「未保存」                   tour  「?」
+#   summary  タイトルと未保存の印の並び   dirty  「未保存」                   tour  「?」
 #   status  下の一言                renumbered  番号が変わるステップの一行    problems  理由の一覧
 #   changed  外で変わった帯         changed-diff  差分の表              adopt  取り込む    gone  承認待ちから無くなった帯
 #   review-numbers / review-children / review-note  保存の確かめの各欄
@@ -280,7 +280,7 @@ courses:
       - target: graph-plan
         title: まず図を確認する
         body: >-
-          点は計画のステップで、番号・定義の題・見る場所（レビューの要否）を表示します。線は「右のステップに左のステップが先行する」ことを表し、開始から出る線と終了へ入る線は図だけの目印です。
+          点は計画のステップで、番号・定義のタイトル・見る場所（レビューの要否）を表示します。線は「右のステップに左のステップが先行する」ことを表し、開始から出る線と終了へ入る線は図だけの目印です。
           ここでは設計（2）と実装とテスト（3）の先行が、どちらも調査（1）だけです。
         scene: { answer: open }
       - target: node-2
@@ -400,9 +400,9 @@ courses:
         body: 線を引くと、図の下に番号が変わるステップが出ます。振り直しは ccnavi が決め、画面は答えを描くだけです。
         scene: { answer: swap }
       - target: node-2
-        title: 名札だけが変わる
+        title: 番号の表示だけが変わる
         body: >-
-          実装とテスト（いま 2 番）は、提案では 3 番でした。点の置き場所は動かさず、名札の番号だけが変わるので、どのステップかを見失いません。
+          実装とテスト（いま 2 番）は、提案では 3 番でした。点の置き場所は動かさず、表示する番号だけが変わるので、どのステップかを見失いません。
           置き場所を組み直すには「並べ直す」を使います。
         scene: { answer: swap }
       - target: detail-plan
@@ -527,7 +527,7 @@ courses:
     steps:
       - target: dirty
         title: 未保存の印
-        body: 線を変えて、答えが提案と違うあいだは「未保存」が出て、タブの題にも「●」が付きます。印は ccnavi の答えから決めるので、線を元に戻せば消えます。
+        body: 線を変えて、答えが提案と違うあいだは「未保存」が出て、タブのタイトルにも「●」が付きます。印は ccnavi の答えから決めるので、線を元に戻せば消えます。
         scene: { answer: swap }
       - target: status
         title: 答えを待つあいだも止まる

@@ -17,7 +17,7 @@
 # `target:` は `data-tour="…"` の印。使うものは次のとおり。
 #   ヘッダ     summary / filter-project / filter-parent / filter-attention / filter-archived / refresh / merge-check / approve / tour
 #   ボード     board / column-<列> / card-<識別子> / merge-band / merge-retire / merge-abandon
-#   カード内   status（状態の札）/ turn（ユーザ待ち）/ approve-one / review-done / mr / notes / badge-<種類>（blocked preds worktree
+#   カード内   status（状態のバッジ）/ turn（ユーザ待ち）/ approve-one / review-done / mr / notes / badge-<種類>（blocked preds worktree
 #              risk seen issue unsent）/ phases / phase-review / details / moved / flow-<状態>（create edit locked）/ workflow-button
 #   承認の画面 approval-batch / approval-plan / approve-confirm / approval-prompt / approval-handover / edit-workflow /
 #              decide-threads / decide-consult / decide-confirm
@@ -31,7 +31,7 @@ sample:
     projects: [web]
     pending_approval: [sample-a, sample-a-01-01, sample-b-03-01]
     tickets:
-      # 承認待ちの親（計画あり）と、その子。札「承認待ち」・［承認］・「計画編集」・「フロー: 作成」を見せる
+      # 承認待ちの親（計画あり）と、その子。バッジ「承認待ち」・［承認］・「計画編集」・「フロー: 作成」を見せる
       - ticket: sample-a
         title: "（見本）ログイン画面にパスワードの再設定を追加する"
         proposal: { state: todo, has_plan: true }
@@ -92,7 +92,7 @@ sample:
         predecessors_unmet:
           - { ticket: sample-b-02-01, state: doing, label: 作業中（doing/） }
         flow: { path: /ws/.claude/worktrees/sample-b/.ccnavi/approved/flows/sample-b-03-01.yml, rel: .ccnavi/approved/flows/sample-b-03-01.yml, tree: /ws/.claude/worktrees/sample-b, exists: false, linked: false, locked: false }
-      # レビュー待ちのフェーズを持つ親と、そのフェーズの子。札「レビュー待ち」・［MR を開く］［レビュー完了］・HIGH のリスクを見せる
+      # レビュー待ちのフェーズを持つ親と、そのフェーズの子。バッジ「レビュー待ち」・［MR を開く］［レビュー完了］・HIGH のリスクを見せる
       - ticket: sample-c
         title: "（見本）ログの出力を整理する"
         project: web
@@ -159,7 +159,7 @@ sample:
             review_waiting: true
             risk: { points: 60, level: HIGH }
             risk_line: "リスク: 60 (HIGH)"
-    # 手元の退避（アーカイブの列）。マージ状況の帯の題は、ここの同じ親から取る
+    # 手元の退避（アーカイブの列）。マージ状況の帯のタイトルは、ここの同じ親から取る
     archived:
       - ticket: sample-g
         title: "（見本）古い設定ファイルを整理する"
@@ -257,11 +257,11 @@ courses:
         title: 列
         body: チケットは「未着手 → 作業中 → 完了（または取り消し）」の順に列を移ります。見出しを押すと列を畳み、右端をドラッグすると幅を変えられます（ダブルクリックで元に戻ります）。
       - target: status
-        title: 状態の札
-        body: カードの見出しの右端に、いまの状況を表す札が 1 つ出ます。「承認待ち」「開始前」「作業中」「レビュー準備中」「レビュー待ち」「完了」「取り消し」「要確認」のどれかです。「要確認」は、どちらが正か決まらない・書き込み停止中・状態が合わない、のどれかのときです。理由はマウスを載せると出ます。
+        title: 状態のバッジ
+        body: カードの見出しの右端に、いまの状況を表すバッジが 1 つ出ます。「承認待ち」「開始前」「作業中」「レビュー準備中」「レビュー待ち」「完了」「取り消し」「要確認」のどれかです。「要確認」は、どちらが正か決まらない・書き込み停止中・状態が合わない、のどれかのときです。理由はマウスを載せると出ます。
       - target: turn
         title: ユーザ待ち
-        body: ユーザができることがあるカードだけに「ユーザ待ち」が出ます。承認待ちなら［承認］、レビュー待ちなら［MR を開く］と［レビュー完了］です。札は状況を、ここはユーザができることを表し、それぞれ別に決まります（「要確認」の札のカードにも、承認待ちなら［承認］が出ます）。
+        body: ユーザができることがあるカードだけに「ユーザ待ち」が出ます。承認待ちなら［承認］、レビュー待ちなら［MR を開く］と［レビュー完了］です。バッジは状況を、ここはユーザができることを表し、それぞれ別に決まります（「要確認」のバッジのカードにも、承認待ちなら［承認］が出ます）。
       - target: details
         title: 詳細
         body: マージリクエスト・issue・ブランチ・ワークツリー・リスク・人間レビューの要否と、不備や停止の理由の全文は「詳細」に畳んであります。開きたいときだけ開けます。開閉はカードごとに覚えるので、更新しても閉じません。
@@ -300,16 +300,16 @@ courses:
         alt: GitLabのissueの一覧で、右上に青い「New item」ボタンがある
         scene: { parent: sample-a }
       - target: ""
-        title: 人が作る：題と説明を書いて作成する
-        body: 種類は「Issue」のままにして、題（Title）と説明（Description）を書き、「Create issue」を押します。説明には、困っていることや目的を書きます。作ったissueの番号が、親チケットの識別子の番号になります。
+        title: 人が作る：タイトルと説明を書いて作成する
+        body: 種類は「Issue」のままにして、タイトル（Title）と説明（Description）を書き、「Create issue」を押します。説明には、困っていることや目的を書きます。作ったissueの番号が、親チケットの識別子の番号になります。
         image: gitlab-new-issue
-        alt: GitLabの新しいissueの入力欄。種類・題・説明を書き、右下の「Create issue」で作成する
+        alt: GitLabの新しいissueの入力欄。種類・タイトル・説明を書き、右下の「Create issue」で作成する
         scene: { parent: sample-a }
       - target: ""
         title: 作った issue の番号を確かめる
         body: 作成すると、issue の画面が開きます。画面上部の道筋の最後（「#1」など）と、URL の末尾が、issue の番号です。この番号が、親チケットの識別子の番号になります。次の手順で、この番号か URL を Claude Code に伝えます。
         image: gitlab-issue-created
-        alt: GitLabの issue の画面。上部の道筋の最後に「#1」と出ていて、題・説明・タスクの一覧・コメント欄がある
+        alt: GitLabの issue の画面。上部の道筋の最後に「#1」と出ていて、タイトル・説明・タスクの一覧・コメント欄がある
         scene: { parent: sample-a }
       - target: ""
         title: Claude Codeに作業を頼む
@@ -319,9 +319,9 @@ courses:
         scene: { parent: sample-a }
       - target: ""
         title: MRを用意する（人が作る場合もある）
-        body: "MRは、エージェントが用意します。人がGitLabで作ってもかまいません。その場合は、ソースを親チケットのブランチ、ターゲットを統合先のブランチにします。題と説明を書いて、「Create merge request」（古い画面では「Submit merge request」）を押します。説明に「Closes #番号」と書くと、issueと結び付きます。"
+        body: "MRは、エージェントが用意します。人がGitLabで作ってもかまいません。その場合は、ソースを親チケットのブランチ、ターゲットを統合先のブランチにします。タイトルと説明を書いて、「Create merge request」（古い画面では「Submit merge request」）を押します。説明に「Closes #番号」と書くと、issueと結び付きます。"
         image: gitlab-new-mr
-        alt: GitLabの新しいMRの入力欄。ソースとターゲットのブランチ、題、説明を書き、下の「Submit merge request」で作成する
+        alt: GitLabの新しいMRの入力欄。ソースとターゲットのブランチ、タイトル、説明を書き、下の「Submit merge request」で作成する
         scene: { parent: sample-a }
       - target: board
         title: エージェントが準備して、提案を送る
@@ -329,7 +329,7 @@ courses:
         scene: { parent: sample-a }
       - target: card-sample-a
         title: 承認待ちの提案が届く
-        body: 提案は、「未着手」の列に札「承認待ち」のカードとして出ます。提案には、目的・範囲・計画が書かれています。カードを押すと、提案のファイルを開けます。直したい点は、Claude Codeに伝えて書き直してもらいます。
+        body: 提案は、「未着手」の列にバッジ「承認待ち」のカードとして出ます。提案には、目的・範囲・計画が書かれています。カードを押すと、提案のファイルを開けます。直したい点は、Claude Codeに伝えて書き直してもらいます。
         scene: { parent: sample-a }
       - target: approval-batch
         title: 内容を確認して承認する
@@ -341,11 +341,11 @@ courses:
         scene: { overlay: done, parent: sample-a }
       - target: phases
         title: エージェントが作業する
-        body: 承認すると、エージェントは、親を着手し（start）、子を 1 つずつ着手して、子のワークツリーを切ります。実装は、サブエージェントが子のワークツリーで行い、コミットだけをします。親のカードには、札「作業中」とフェーズの一覧が出ます。［更新］を押すと、進み具合を確かめられます。フェーズが複数あるときは、作業とレビューをフェーズごとに繰り返します。
+        body: 承認すると、エージェントは、親を着手し（start）、子を 1 つずつ着手して、子のワークツリーを切ります。実装は、サブエージェントが子のワークツリーで行い、コミットだけをします。親のカードには、バッジ「作業中」とフェーズの一覧が出ます。［更新］を押すと、進み具合を確かめられます。フェーズが複数あるときは、作業とレビューをフェーズごとに繰り返します。
         scene: { parent: sample-b }
       - target: card-sample-c
         title: レビュー待ちになったら
-        body: 子の作業が終わると、エージェントは子を完了します（finish）。子の変更を親のブランチに合流して push し、レビューが要るフェーズの子は、レビューの置き場に移ります。レビューが要らないフェーズの子は、そのまま完了になります。そのあと、エージェントがELI5（変更の説明）を書いて push し、MRにレビューの依頼を書き込みます。依頼を出すまでの札は「レビュー準備中」で、エージェントの番です。依頼を出すと「レビュー待ち」になり、「あなたの番」に操作が出ます。
+        body: 子の作業が終わると、エージェントは子を完了します（finish）。子の変更を親のブランチに合流して push し、レビューが要るフェーズの子は、レビューの置き場に移ります。レビューが要らないフェーズの子は、そのまま完了になります。そのあと、エージェントがELI5（変更の説明）を書いて push し、MRにレビューの依頼を書き込みます。依頼を出すまでのバッジは「レビュー準備中」で、エージェントの番です。依頼を出すと「レビュー待ち」になり、「あなたの番」に操作が出ます。
         scene: { parent: sample-c }
       - target: mr
         title: MRを開く
@@ -373,7 +373,7 @@ courses:
         title: 指摘をためて、まとめて送る（GitLab）
         body: 行のコメントを「Start a review」で書くと、コメントは「Pending」になり、まだ送られません。指摘を付け終えたら、「Submit review」でまとめて送ります。「Add comment now」は、そのコメントだけをすぐに送ります。「Pending」のまま送り忘れると、ほかの人にも指摘が届かないので、送ったことを確かめます。
         image: gitlab-pending-review
-        alt: GitLabの差分画面。行のコメントに「Pending」の札が付き、下に「Submit review」と「Add comment now」のボタンが並んでいる
+        alt: GitLabの差分画面。行のコメントに「Pending」のバッジが付き、下に「Submit review」と「Add comment now」のボタンが並んでいる
         scene: { parent: sample-c }
       - target: ""
         title: レビューを送る（GitLab）
@@ -399,7 +399,7 @@ courses:
         scene: { overlay: done, parent: sample-c }
       - target: phases
         title: 対応の子チケットが指摘を直す
-        body: 追加対応用の子チケットは、同じフェーズの番号で作られます。親の札は「作業中」に戻り、フェーズの行は進行中になります。エージェントが、指摘された点をこの子チケットで直します。
+        body: 追加対応用の子チケットは、同じフェーズの番号で作られます。親のバッジは「作業中」に戻り、フェーズの行は進行中になります。エージェントが、指摘された点をこの子チケットで直します。
         scene: { parent: sample-c }
       - target: ""
         title: 未解決の指摘を確かめる（GitLab）
@@ -457,7 +457,7 @@ courses:
         body: ヘッダの「承認待ち N 件」は、承認が済んでいないチケットの数です。絞り込みに関係なく、ボード全体の数で、0 件なら出ません。
       - target: card-sample-a
         title: 承認待ちのカード
-        body: 承認待ちのカードは「未着手」の列に並び、札は「承認待ち」です（承認済みの親に改版が出ているときは「承認待ち（改版）」）。カードを押すと提案のファイルを開きます。
+        body: 承認待ちのカードは「未着手」の列に並び、バッジは「承認待ち」です（承認済みの親に改版が出ているときは「承認待ち（改版）」）。カードを押すと提案のファイルを開きます。
       - target: approve-one
         title: 1 件だけ承認する
         body: カードの［承認］は、そのチケットだけを承認の対象にします。同じ親の承認待ちがほかにあっても巻き込みません。押すと内容がオーバーレイに出るだけで、まだ承認はされません。
@@ -487,13 +487,13 @@ courses:
     steps:
       - target: card-sample-c
         title: レビュー待ちの親を見つける
-        body: 親の札が「レビュー待ち」なら、どれかのフェーズが、ユーザのレビューを待っています。依頼を出す前は「レビュー準備中」で、エージェントが作業する段階です。
+        body: 親のバッジが「レビュー待ち」なら、どれかのフェーズが、ユーザのレビューを待っています。依頼を出す前は「レビュー準備中」で、エージェントが作業する段階です。
       - target: phases
         title: どのフェーズが待っているか
         body: フェーズ一覧の右に、フェーズごとの状態が一言で出ます。「レビュー待ち」の行がユーザ待ちです。複数のフェーズが同時に待っているときは、それぞれの行に操作が付きます。
       - target: phase-review
         title: 行の中の操作
-        body: レビュー待ちの行に、［MR を開く］と［レビュー完了］があります。主ボタンは［レビュー完了］だけです。子のカードも、札が「レビュー待ち」なら同じ操作が「ユーザ待ち」に出ます。
+        body: レビュー待ちの行に、［MR を開く］と［レビュー完了］があります。主ボタンは［レビュー完了］だけです。子のカードも、バッジが「レビュー待ち」なら同じ操作が「ユーザ待ち」に出ます。
       - target: mr
         title: マージリクエストを開く
         body: ［MR を開く］から、レビューの場を開きます。指摘はそこにコメントで書きます。ボードはマージリクエストの中身を読みません。
@@ -547,7 +547,7 @@ courses:
         scene: { attention: true }
       - target: badge-blocked
         title: 書き込み停止中
-        body: 親が引けないなど、編集できる範囲を決められないチケットに出ます。札は「要確認」になり、理由の全文は詳細に出ます。
+        body: 親が引けないなど、編集できる範囲を決められないチケットに出ます。バッジは「要確認」になり、理由の全文は詳細に出ます。
         scene: { attention: true }
       - target: badge-issue
         title: 不備
@@ -610,10 +610,10 @@ courses:
     steps:
       - target: column-done
         title: 完了
-        body: 終わったチケットが並び、札は「完了」です（早めに終えた親は「完了（早めに終了）」）。フェーズのレビューが済むまでは、完了ではなくレビュー待ちの札が付くことがあります。
+        body: 終わったチケットが並び、バッジは「完了」です（早めに終えた親は「完了（早めに終了）」）。フェーズのレビューが済むまでは、完了ではなくレビュー待ちのバッジが付くことがあります。
       - target: card-sample-f
         title: 取り消し
-        body: 取り消したチケットは、完了と同じ置き場に残り、取り消しの列に並びます。札は「取り消し」で、理由は詳細に出ます。
+        body: 取り消したチケットは、完了と同じ置き場に残り、取り消しの列に並びます。バッジは「取り消し」で、理由は詳細に出ます。
       - target: filter-archived
         title: アーカイブを表示する
         body: 入れると、右端に「アーカイブ」の列が追加されます。親のレビューが済んで Draft を解除したときに、ローカルの logs/archive/ に移動した、完了・取り消しのチケットです。初期状態では表示せず、集計にも数えません。

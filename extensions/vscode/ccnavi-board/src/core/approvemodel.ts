@@ -37,7 +37,7 @@ export interface ApprovePlanItem {
   readonly from: number;
   /** 定義の名前 */
   readonly type: string;
-  /** 定義の題（親の `phases:` から） */
+  /** 定義のタイトル（親の `phases:` から） */
   readonly title: string;
   /** 見る場所（`none` / `mr`。ステップの `review: mr` は `mr`） */
   readonly review: string;

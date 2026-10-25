@@ -1,6 +1,6 @@
 /*
  * ボードの骨組み（`static/board.html` の見出し・状態・帯・結果と、`App.tsx` が並べる欄の入れ物）。
- * 見出しは共通の `.toolbar`（左に題、右にボタン）。帯と結果は、試験が中身の HTML を一字ずつ見るので
+ * 見出しは共通の `.toolbar`（左にタイトル、右にボタン）。帯と結果は、試験が中身の HTML を一字ずつ見るので
  * クラスを足せない。共通の `.banner warn/error` と設定画面の `.status ok/error`（`src/options/App.css`）と
  * 同じ宣言を ID で適用する。
  */

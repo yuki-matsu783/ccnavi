@@ -36,19 +36,19 @@ EXPECT_KEYS = {
 
 
 class IssueCommandTest(unittest.TestCase):
-    ISSUE = {"title": "題", "body": "本文", "repo": "projects/test-repo"}
+    ISSUE = {"title": "タイトル", "body": "本文", "repo": "projects/test-repo"}
 
     def test_gitlab_uses_glab(self):
         self.assertEqual(
             runner.issue_create_args("gitlab", self.ISSUE),
-            ["glab", "issue", "create", "--title", "題", "--description", "本文", "--yes"],
+            ["glab", "issue", "create", "--title", "タイトル", "--description", "本文", "--yes"],
         )
         self.assertEqual(runner.issue_close_args("gitlab", 12), ["glab", "issue", "close", "12"])
 
     def test_github_uses_gh(self):
         self.assertEqual(
             runner.issue_create_args("github", self.ISSUE),
-            ["gh", "issue", "create", "--title", "題", "--body", "本文"],
+            ["gh", "issue", "create", "--title", "タイトル", "--body", "本文"],
         )
         self.assertEqual(runner.issue_close_args("github", 12), ["gh", "issue", "close", "12"])
 
@@ -2305,7 +2305,7 @@ class RunAllTest(unittest.TestCase):
         steps = [{"human": True, "instruction": "打つ"}] if human else [{"prompt": f"{sid} をやる"}]
         data = {
             "id": sid,
-            "title": f"題 {sid}",
+            "title": f"タイトル {sid}",
             "model": "haiku",
             "budget_usd": budget,
             "steps": steps,

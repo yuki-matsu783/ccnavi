@@ -26,7 +26,7 @@ function idsOf(board: Board, state: string): string[] {
   return board.columns.find((column) => column.state === state)!.cards.map((c) => c.id);
 }
 
-test("CB-T420 ボードの見本は、実行ファイルの出力と同じ形を buildBoard に通した列とカードを持ち、どれも見本と分かる題で、root と時刻は渡したものを使う", () => {
+test("CB-T420 ボードの見本は、実行ファイルの出力と同じ形を buildBoard に通した列とカードを持ち、どれも見本と分かるタイトルで、root と時刻は渡したものを使う", () => {
   assert.deepEqual(idsOf(sample.board, "todo"), ["sample-a", "sample-a-01-01", "sample-b-03-01"]);
   assert.deepEqual(idsOf(sample.board, "doing"), ["sample-b", "sample-b-02-01", "sample-c", "sample-c-01-01", "sample-e"]);
   assert.deepEqual(idsOf(sample.board, "done"), ["sample-b-01-01"]);
@@ -74,14 +74,14 @@ test("CB-T421 ボードの見本のキーはどれも読み取りが読む（綴
   assert.deepEqual(lostKeys(raw, parsed.ok ? parsed.board : undefined, "board", free), []);
 });
 
-test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っている（札の各種・レビュー待ち・HIGH・不備・要確認・先行待ち・取り消し・フェーズの進み・フロー・計画編集・マージ状況）", () => {
-  // 承認待ち: 1 件ずつ承認する操作と、「計画編集」の入口を持つ。札は「承認待ち」
+test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っている（バッジの各種・レビュー待ち・HIGH・不備・要確認・先行待ち・取り消し・フェーズの進み・フロー・計画編集・マージ状況）", () => {
+  // 承認待ち: 1 件ずつ承認する操作と、「計画編集」の入口を持つ。バッジは「承認待ち」
   assert.ok(card("sample-a").pendingApproval && card("sample-a").actions.some((a) => a.kind === "approve"));
   assert.ok(card("sample-a").workflow);
   assert.equal(card("sample-a").copyStatus, "none");
   assert.equal(card("sample-a").status.label, "承認待ち");
   assert.equal(card("sample-b-03-01").status.label, "承認待ち");
-  // レビュー待ち: 親のフェーズ行に［MR を開く］［レビュー完了］、子のカードはユーザ待ちに同じ操作。札はどちらも「レビュー待ち」
+  // レビュー待ち: 親のフェーズ行に［MR を開く］［レビュー完了］、子のカードはユーザ待ちに同じ操作。バッジはどちらも「レビュー待ち」
   const chip = card("sample-c").phases[0];
   assert.ok(chip.reviewWaiting && chip.gateClosed && chip.status === "レビュー待ち" && chip.actions.some((a) => a.kind === "review"));
   assert.equal(card("sample-c").mrNumber, 12);
@@ -90,7 +90,7 @@ test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っ
   assert.ok(card("sample-c-01-01").gateClosed && card("sample-c-01-01").reviewWaiting);
   assert.equal(card("sample-c-01-01").status.label, "レビュー待ち");
   assert.ok(card("sample-c-01-01").actions.some((a) => a.kind === "review"));
-  // HIGH のリスク・不備・書き込み停止（札は要確認）
+  // HIGH のリスク・不備・書き込み停止（バッジは要確認）
   assert.equal(card("sample-c-01-01").riskLevel, "HIGH");
   assert.ok(card("sample-e").issues.length === 1 && !card("sample-e").worktreeExists && card("sample-e").copyStatus === "open");
   assert.equal(card("sample-e").status.label, "要確認");
@@ -121,7 +121,7 @@ test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っ
   // 動いた表示は、見本の中の作業中のカードに付く
   assert.deepEqual(sample.moved, [{ id: "sample-b-02-01", from: "todo", to: "doing" }]);
   assert.equal(card("sample-b-02-01").column, "doing");
-  // マージ状況の帯の見本: 5 つの行（マージ待ち・マージ済み・閉じた・確認できない・記録が不完全）。題は退避の同じ親から引ける
+  // マージ状況の帯の見本: 5 つの行（マージ待ち・マージ済み・閉じた・確認できない・記録が不完全）。タイトルは退避の同じ親から引ける
   assert.deepEqual(sample.merge?.rows.map((r) => r.state), ["open", "merged", "closed", "unknown", "incomplete"]);
   assert.equal(archivedTitleOf(sample.board, "", "sample-i"), "（見本）API の応答にキャッシュを付ける");
   assert.equal(archivedTitleOf(sample.board, "", "sample-h"), undefined);
@@ -207,7 +207,7 @@ const FIXED_TARGETS = new Set([
   "approval-batch", "approval-plan", "approve-confirm", "approval-prompt", "approval-handover", "edit-workflow", "decide-threads", "decide-consult", "decide-confirm",
 ]);
 
-test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見本にあるカード・列の印だけで、基本の案内は今の題と順序、最後は案内の入口を指す", () => {
+test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見本にあるカード・列の印だけで、基本の案内は今のタイトルと順序、最後は案内の入口を指す", () => {
   const states = new Set(COLUMNS.map((c) => c.state as string));
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
@@ -228,11 +228,11 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   }
   const intro = def.courses[0];
   assert.equal(intro.id, INTRO_ID);
-  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態の札", "ユーザ待ち", "詳細", "承認", "更新", "MR の状況を確認", "案内"]);
+  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態のバッジ", "ユーザ待ち", "詳細", "承認", "更新", "MR の状況を確認", "案内"]);
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 
-test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまでの流れだけは 36 手順まで）で、「〜したいとき」の題と 1 行の説明を持つ。案内のキーは重ならない", () => {
+test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまでの流れだけは 36 手順まで）で、「〜したいとき」のタイトルと 1 行の説明を持つ。案内のキーは重ならない", () => {
   const useCases = def.courses.slice(1);
   assert.ok(useCases.length >= 3 && useCases.length <= 9);
   // マージまでの流れ（to-merge）は基本の案内のすぐ次に出る
@@ -242,7 +242,7 @@ test("CB-T427 使い方ごとの案内は 1 本 4〜9 手順（マージまで�
   );
   for (const course of useCases) {
     assert.ok(course.steps.length >= 4 && course.steps.length <= (course.id === "to-merge" ? 36 : 9), `${course.id}: ${course.steps.length} 手順`);
-    assert.match(course.title, /たいとき$/, `${course.id}: 利用者の目的の題でない`);
+    assert.match(course.title, /たいとき$/, `${course.id}: 利用者の目的のタイトルでない`);
     assert.ok(course.summary.length > 0 && course.summary.length <= 60, `${course.id}: 説明が長い`);
   }
   assert.equal(new Set(def.courses.map((c) => c.id)).size, def.courses.length);

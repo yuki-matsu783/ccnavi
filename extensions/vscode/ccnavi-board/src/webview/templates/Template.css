@@ -1,11 +1,11 @@
 /*
- * テンプレート 1 件（`Template.tsx`）。見出しは名前・層・札・説明を 1 行に流し、狭い幅では折り返す。
+ * テンプレート 1 件（`Template.tsx`）。見出しは名前・層・バッジ・説明を 1 行に流し、狭い幅では折り返す。
  * 開いた本体は縦に並べる（list.css の `.row-body` は格子なので、ここで上書きする）。
  */
 .row.template > .row-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-2) var(--gap-4); }
 .row.template > .row-head:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .tpl-name { font-weight: 600; overflow-wrap: anywhere; }
-/* 層の札（span）と、層ごとの見出しの箱（div.tpl-layer。App.css）は別の要素なので、選択子を分ける */
+/* 層のバッジ（span）と、層ごとの見出しの箱（div.tpl-layer。App.css）は別の要素なので、選択子を分ける */
 span.tpl-layer { font-size: var(--font-sm); }
 .tpl-desc { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; font-size: var(--font-md); }
 .tpl-dropped { margin: 0; padding: 0 8px 6px 36px; overflow-wrap: anywhere; }

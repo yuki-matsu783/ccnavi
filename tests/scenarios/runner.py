@@ -2655,7 +2655,7 @@ def run_all_confirmation(eligible, skipped, cap, digest, mode_text, root, scenar
     """run-all の確認文。全シナリオに対する 1 回の確認で、回す ID の一覧・概要・作るもの・
     対象の状態・base・費用の上限を見せる。"""
     budget = sum(float(scn["budget_usd"]) for _, scn in eligible)
-    table = ["| ID | 題 | base | モデル | 1 本の上限 (USD) |", "|---|---|---|---|---|"]
+    table = ["| ID | タイトル | base | モデル | 1 本の上限 (USD) |", "|---|---|---|---|---|"]
     table += [
         f"| {scn['id']} | {_cell(scn['title'])} | {scn['setup']['reset']['base'][:12]} | "
         f"{scn['model']} | {scn['budget_usd']} |"

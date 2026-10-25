@@ -1,9 +1,9 @@
 /**
- * 1 枚のカード。上から 見出し（題・ID・状態の札。DOM は ID・題・札の順で、題を先頭に出すのは CSS の order）・位置・ユーザ待ち・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
- * 何を出すかは組み立て（core/board.ts）と状態の札（core/status.ts）が決めた値のとおりで、ここで判定し直さない。
+ * 1 枚のカード。上から 見出し（タイトル・ID・状態のバッジ。DOM は ID・タイトル・バッジの順で、タイトルを先頭に出すのは CSS の order）・位置・ユーザ待ち・注意・フェーズ行（親だけ）・補助の操作・詳細（畳む）。
+ * 何を出すかは組み立て（core/board.ts）と状態のバッジ（core/status.ts）が決めた値のとおりで、ここで判定し直さない。
  *
- * 札は「状況」、「ユーザ待ち」は「ユーザができること」。別の規則で決めるので、同時に出てよい
- * （「要確認」の札と［承認］など）。ボタンは `card-button`（共通の `button.action` は使わない。寸法は `Card.css`）。
+ * バッジは「状況」、「ユーザ待ち」は「ユーザができること」。別の規則で決めるので、同時に出てよい
+ * （「要確認」のバッジと［承認］など）。ボタンは `card-button`（共通の `button.action` は使わない。寸法は `Card.css`）。
  */
 import type { JSX } from "react";
 
@@ -116,7 +116,7 @@ export function CardItem({
 /** カードの上で押しても提案を開かない場所。ボタン・リンク・詳細（開閉と開いた本文） */
 const NOT_OPENING = "button, a, details";
 
-/** 状態の札。見出しの右端に 1 つ。言葉は必ず出す（色だけに頼らない）。理由があればツールチップ */
+/** 状態のバッジ。見出しの右端に 1 つ。言葉は必ず出す（色だけに頼らない）。理由があればツールチップ */
 function StatusMark({ status }: { readonly status: Status }): JSX.Element {
   return (
     <span className={`status status-${status.tone}`} data-tour="status" title={status.title === "" ? undefined : status.title}>
@@ -128,7 +128,7 @@ function StatusMark({ status }: { readonly status: Status }): JSX.Element {
 /**
  * ユーザ待ち。ユーザができることがあるときだけ出す。主ボタン（primary）は 1 つ。
  * 親は承認待ちのときだけ（レビューの操作は各フェーズ行に置く）。子は承認 → レビュー完了の順で 1 つだけ。
- * 承認は `pendingApproval` だけを条件にする。札が「要確認」でも出す
+ * 承認は `pendingApproval` だけを条件にする。バッジが「要確認」でも出す
  */
 function Turn({ card }: { readonly card: Card }): JSX.Element | null {
   const approve = card.actions.some((a) => a.kind === "approve");

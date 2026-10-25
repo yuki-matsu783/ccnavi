@@ -14,7 +14,7 @@ import { loadTour, rawTour, TOURS_DIR, tourScreens } from "../helpers/tour.js";
 const STEP = { target: "save", title: "保存", body: "保存します" };
 
 function course(id: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
-  return { id, title: "題", summary: "説明", steps: [STEP], ...extra };
+  return { id, title: "タイトル", summary: "説明", steps: [STEP], ...extra };
 }
 
 test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内は intro。手順の scene は文字列・数・真偽だけ", () => {

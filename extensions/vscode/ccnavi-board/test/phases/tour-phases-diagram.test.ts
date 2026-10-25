@@ -129,7 +129,7 @@ test("CB-T1191 計画の番号と先行は、図どうしで揃う。ステッ�
   assert.match(value("phase-order", "gate"), new RegExp(String(plan.length - 1)));
 });
 
-test("CB-T1192 図は登場者 2〜6 人で、値つきの矢印を持つ。足した案内 2 本は「〜たいとき」の 4〜9 手順で、全手順が図を引き、既存の案内の ID と題を変えない", () => {
+test("CB-T1192 図は登場者 2〜6 人で、値つきの矢印を持つ。足した案内 2 本は「〜たいとき」の 4〜9 手順で、全手順が図を引き、既存の案内の ID とタイトルを変えない", () => {
   for (const name of DIAGRAMS) {
     const diagram: DiagramDef = def.diagrams[name];
     assert.ok(diagram !== undefined, `${name} がない`);
@@ -154,7 +154,7 @@ test("CB-T1192 図は登場者 2〜6 人で、値つきの矢印を持つ。足�
 
   const used = new Set<string>();
   for (const course of def.courses.slice(1, 3)) {
-    assert.match(course.title, /とき$/, `${course.id}: 題は「〜たいとき」`);
+    assert.match(course.title, /とき$/, `${course.id}: タイトルは「〜たいとき」`);
     assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${course.id}: ${course.steps.length} 手順`);
     for (const [index, step] of course.steps.entries()) {
       const at = `${course.id} の ${index + 1} 番目の手順`;

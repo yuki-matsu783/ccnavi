@@ -245,7 +245,7 @@ class ProjectsCollisionTest(unittest.TestCase):
             self.fail(f"--lint --json が読めない: {exc}\n{result.stdout}\n{result.stderr}")
 
     def about_projects(self):
-        """`(projects)` の名札の苦情。プロジェクトごとの `(projects/<名前>)` は含めない。"""
+        """`(projects)` の名前で出す苦情。プロジェクトごとの `(projects/<名前>)` は含めない。"""
         return [p for p in self.lint() if p["where"] == "(projects)"]
 
     # ---- A5. 追跡があるとき

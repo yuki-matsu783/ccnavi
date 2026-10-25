@@ -12,7 +12,7 @@ export function ticketJson(ticket: string, over: Partial<TicketJson> = {}): Tick
     ticket,
     parent: "",
     phase: null,
-    title: `題 ${ticket}`,
+    title: `タイトル ${ticket}`,
     project: "",
     issue: null,
     mr: null,

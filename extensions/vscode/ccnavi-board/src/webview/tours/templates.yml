@@ -130,8 +130,8 @@ diagrams:
         from: ccnavi
         text: 説明と使う場面に TODO の印を付ける
         value: |-
-          description: TODO 一般化する: <親の題>
-          when: TODO 一般化する: 「<親の題>」と同じ形の作業をするとき
+          description: TODO 一般化する: <親のタイトル>
+          when: TODO 一般化する: 「<親のタイトル>」と同じ形の作業をするとき
       - id: fix
         from: エージェント
         to: wip/handoff/

@@ -42,7 +42,7 @@ class Candidate:
     current: ticket_model.Ticket | None = None
     # このチケットに使うフェーズ定義。親のコピー（`phases:`）を読んだもの。
     # 親ならその提案のコピー、
-    # 子なら親（承認済みか、同じ承認で通る提案）のコピー。承認画面はこれで題と見る場所を出す。
+    # 子なら親（承認済みか、同じ承認で通る提案）のコピー。承認画面はこれでタイトルと見る場所を出す。
     types: dict | None = None
     # 承認したときの `phases.yml`（共通レイヤー + 親の `project:` が指すレイヤーの和）。コピーが
     # これと同じかを確かめ、承認画面に「この親では使わない定義」を出すのに使う。
@@ -377,7 +377,7 @@ def plan_problems(
                     t.ticket,
                     "親の提案に計画（`plan:`）がありません。計画の無い親は承認しても"
                     "`ticket start` が止まります。"
-                    "`ccnavi ticket new <識別子> --title <題> --plan <型,…>"
+                    "`ccnavi ticket new <識別子> --title <タイトル> --plan <型,…>"
                     " --issue <値> --mr <番号>` の雛形に揃えてください",
                 )
             )
@@ -502,7 +502,7 @@ def revision_problems(
     1. 子が承認された番号（`fixed_numbers`）のステップが持つ型の定義を、承認済みのコピーから集める
     2. 計画を検める（`plan_problems`）。error があれば、ここで返す
     3. 範囲の改版なら、読めない項（`unreadable_scope`）と作業中の子（`open_children`）を見る
-    4. 題・課題・`mr:` を比べる（`mr:` は片方が空なら比べない）
+    4. タイトル・課題・`mr:` を比べる（`mr:` は片方が空なら比べない）
     5. 固定した番号のステップを変えていないかを見る（`lock_problems`）
     6. フィードバック計画の追加・変更を、全体計画の状態に照らして見る（`plan_signature`）
     """
@@ -545,7 +545,7 @@ def revision_problems(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
                 "改版で変えられるのは plan・feedback・phases・範囲だけ。"
-                "題か課題番号が承認済みチケットと違う",
+                "タイトルか課題番号が承認済みチケットと違う",
             )
         )
     # `mr:` は承認のあとに ccnavi が書き足すことがある（`review request`）。改版の提案は

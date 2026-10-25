@@ -96,7 +96,7 @@ test("CB-T374 保存できない理由。書けない答え（実行ファイル
   assert.match(saveBlocker(blocked, calm), /子の提案/);
 });
 
-test("CB-T375 タブの題は未保存の間だけ頭に ● を付ける", () => {
+test("CB-T375 タブのタイトルは未保存の間だけ頭に ● を付ける", () => {
   assert.equal(workflowTitle("i0001"), "ccnavi 計画編集: i0001");
   assert.equal(workflowTitle("i0001", true), "● ccnavi 計画編集: i0001");
 });

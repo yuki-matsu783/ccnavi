@@ -1261,7 +1261,7 @@ async function startCourse(dom: DomPage, id: string): Promise<void> {
   position.set(dom, 0);
 }
 
-/** 案内の n 番目の手順（0 始まり）へ移る。吹き出しの題が、定義の手順の題と同じであることも見る */
+/** 案内の n 番目の手順（0 始まり）へ移る。吹き出しのタイトルが、定義の手順のタイトルと同じであることも見る */
 async function toStep(dom: DomPage, id: string, index: number): Promise<void> {
   const steps = loadTour("rules").courses.find((course) => course.id === id)!.steps;
   let at = position.get(dom) ?? 0;
@@ -1275,7 +1275,7 @@ async function toStep(dom: DomPage, id: string, index: number): Promise<void> {
   assert.equal(dom.one("#tour-title").textContent, steps[index].title);
 }
 
-test("CB-D300 ユースケースの一覧は、基本の案内の後ろに、追加したユースケースが定義の順で並び、題と要約が出る", async () => {
+test("CB-D300 ユースケースの一覧は、基本の案内の後ろに、追加したユースケースが定義の順で並び、タイトルと要約が出る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one('[data-action="tour"]'));

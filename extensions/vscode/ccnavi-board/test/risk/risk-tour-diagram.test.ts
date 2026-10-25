@@ -222,7 +222,7 @@ test("CB-T1182 図に出る levels の値は、見本の配点・統合結果の
   }
 });
 
-test("CB-T1183 リスクの新しい 2 本の案内は、基本の案内の次に並び、題は「〜たいとき」で 4〜9 手順。図は 2〜6 人で、手順ごとに図を引く", () => {
+test("CB-T1183 リスクの新しい 2 本の案内は、基本の案内の次に並び、タイトルは「〜たいとき」で 4〜9 手順。図は 2〜6 人で、手順ごとに図を引く", () => {
   assert.deepEqual(
     def.courses.slice(0, 3).map((course) => course.id),
     [INTRO_ID, "how-score", "how-save-effect"],
@@ -244,7 +244,7 @@ test("CB-T1183 リスクの新しい 2 本の案内は、基本の案内の次�
     assert.ok(diagram.actors.length >= 2 && diagram.actors.length <= 6, `${name}: 登場者が ${diagram.actors.length} 人`);
     assert.ok(diagram.steps.some((step) => step.value !== ""), `${name}: 値の例がない`);
   }
-  // 既存の案内の ID・題は変えない
+  // 既存の案内の ID・タイトルは変えない
   assert.deepEqual(
     def.courses.slice(3).map((course) => course.id),
     ["levels", "add-factor", "kinds", "organize", "sum", "create-file"],

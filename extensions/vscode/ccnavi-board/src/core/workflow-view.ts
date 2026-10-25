@@ -68,7 +68,7 @@ export type WorkflowMessage =
   | { readonly type: "ready" }
   | { readonly type: "reload"; readonly dirty: boolean }
   /**
-   * 未保存か（答えの線が提案と違うか）と、線を変えて答えを待っているか（`checking`）。拡張ホストは題の「●」を
+   * 未保存か（答えの線が提案と違うか）と、線を変えて答えを待っているか（`checking`）。拡張ホストはタイトルの「●」を
    * `dirty` で、ボードの承認を止めるかを `dirty || checking` で決める（答えを待つ間に承認が通らないように）
    */
   | { readonly type: "dirty"; readonly dirty: boolean; readonly checking: boolean }
@@ -184,7 +184,7 @@ export function savedShaOf(result: PlanOrderWrite): string | undefined {
   return result.kind === "written" ? result.answer.source_sha : undefined;
 }
 
-/** タブの題。未保存の間は頭に「●」 */
+/** タブのタイトル。未保存の間は頭に「●」 */
 export function workflowTitle(ticket: string, dirty = false): string {
   return `${dirty ? "● " : ""}ccnavi 計画編集: ${ticket}`;
 }
@@ -314,7 +314,7 @@ export interface PlanDiffRow {
   readonly after: string;
 }
 
-/** ステップ 1 つを 1 行の文にする。「題（定義）: 先行 1, 2」。延期なら「・延期」を添える */
+/** ステップ 1 つを 1 行の文にする。「タイトル（定義）: 先行 1, 2」。延期なら「・延期」を添える */
 function itemText(plan: ApprovePlan | undefined, number: number): string {
   const item = plan?.items.find((i) => i.number === number);
   if (plan === undefined || item === undefined) {

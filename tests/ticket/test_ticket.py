@@ -1832,7 +1832,7 @@ class TicketTest(unittest.TestCase):
         # この回に選んでいない issue を
         # sh が投稿する
         stale = os.path.join(self.state, "review-issue-i0001-1.md")
-        write(stale, "前の回の題\n\n前の回の本文\n")
+        write(stale, "前の回のタイトル\n\n前の回の本文\n")
         digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
         choices = json.dumps({"u1": "keep", "u2": "keep"})
         done = self.decide(fixture, "--yes", choices, "--digest", digest, "--json")

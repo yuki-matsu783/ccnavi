@@ -74,7 +74,7 @@ class CopyAgreeTest(PhaseHarness):
         self.assertIn("wip/research/summary.md", fixed)
         self.assertIn("使う番号: 1", fixed)
         self.assertIn("使う番号: 2", fixed)
-        # phases.yml にあってこの親では使わない定義は、名前と題を 1 行に並べる。止めない。
+        # phases.yml にあってこの親では使わない定義は、名前とタイトルを 1 行に並べる。止めない。
         self.assertIn("■ この親では使わない定義", screen)
         unused = screen.split("■ この親では使わない定義", 1)[1].split("■", 1)[0]
         self.assertIn("受入テスト作成", unused)
@@ -213,7 +213,7 @@ class CopyJudgeTest(PhaseHarness):
                 self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
 
     def test_phases_and_their_titles_and_reviews_come_from_the_copy_after_approval(self):
-        """承認のあとに phases.yml の定義を直しても、フェーズの題・見る場所・止め方と
+        """承認のあとに phases.yml の定義を直しても、フェーズのタイトル・見る場所・止め方と
         SubagentStart の案内はコピーのまま。"""
         tree = self.approved_child(review=False)
         write(
@@ -412,7 +412,7 @@ class FillPhasesTest(PhaseHarness):
 
     def test_fill_phases_writes_only_the_used_definitions_and_keeps_other_bytes(self):
         original = parent_text("i0001", ["research", "design"], copy=None).replace(
-            "title: 親\n", "# 題の前のコメント\ntitle: 親\n", 1
+            "title: 親\n", "# タイトルの前のコメント\ntitle: 親\n", 1
         )
         self.propose("i0001", original)
         result = self.fill()
@@ -420,7 +420,7 @@ class FillPhasesTest(PhaseHarness):
         text = self.read()
         front = front_of(text)
         self.assertEqual(list(front["phases"]), ["research", "design"])
-        self.assertIn("# 題の前のコメント", text)
+        self.assertIn("# タイトルの前のコメント", text)
         without = {k: v for k, v in front.items() if k != "phases"}
         self.assertEqual(without, front_of(original))
         self.assertEqual(text.split("---\n", 2)[2], original.split("---\n", 2)[2])

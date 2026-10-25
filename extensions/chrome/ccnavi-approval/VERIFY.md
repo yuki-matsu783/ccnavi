@@ -161,7 +161,7 @@ node scripts/render-scene.js --repo <ccnavi を配布済みのリポジトリ> -
 
 | 項目 | 内容 |
 |---|---|
-| 出力 | `<out>/board.png`（全体）・`board.txt`（見えているテキスト）・`board.dom.json`（親子のチケットごとの札・操作・レビュー待ち・承認対象外）・`board.log`（ページと service worker のコンソール・エラー。リクエストは記録しない） |
+| 出力 | `<out>/board.png`（全体）・`board.txt`（見えているテキスト）・`board.dom.json`（親子のチケットごとのバッジ・操作・レビュー待ち・承認対象外）・`board.log`（ページと service worker のコンソール・エラー。リクエストは記録しない） |
 | 載せるもの | ローカルブランチごとの、許可リスト（`wip/`・`.ccnavi/approved/`・`.ccnavi/config/{common,project}/`・`.ccnavi/scripts/ccnavi-common.sh`・`.claude/settings.json` の `CCNAVI_` の env だけ）のファイルと、先頭のコミットの日付。`.env`・鍵・コード・バイナリ・`.git/` は載せない。1 ファイル 256 KiB・ブランチごとに 8 MiB を超えたら終了コード 1 |
 | 通信先・PAT | 127.0.0.1:18787（GitHub）・18788（GitLab）の模擬。PAT は模擬の固定のダミー。同時に 2 本は回せない（使用中は終了コード 3） |
 | 終了コード | 0 描けた / 1 描けなかった（画面の状態が `done` でない・120 秒で終わらない・ページか service worker のエラー・載せる上限を超えた・出力に PAT が出た）/ 2 使い方の誤り（`--out` が `--repo` の下など）/ 3 環境が揃っていない（`dist-e2e/`・Chromium・ポート） |

@@ -183,7 +183,7 @@ def issue_slug(title: str, room: int = SUGGESTED_ID_LENGTH) -> str:
     NFKC で全角英数を半角に、半角カナを全角に、ASCII の英字は小文字にそろえる。前後の `-` を除く。
     `room` 文字を超えるときは、語の区切り（`-`）で切り、入りきらない最後の語は落とす。最初の 1 語が
     `room` を超えるときだけ、その語を `room` 文字で切る。日本語は語の区切りが `-` に出ないので、
-    区切りの無い長い題は 1 語として扱われ、落ちるか `room` 文字で切れる（短くしたいときは、
+    区切りの無い長いタイトルは 1 語として扱われ、落ちるか `room` 文字で切れる（短くしたいときは、
     `ccnavi-start.sh` が `--slug` で人かエージェントに短い名前を付けさせる）。
     何も残らなければ空（呼び手が `EMPTY_SLUG` で埋める）。
     """
@@ -205,12 +205,12 @@ def issue_slug(title: str, room: int = SUGGESTED_ID_LENGTH) -> str:
 def issue_identifier_parts(
     number: int, title: str = "", project: str = "", prefix: str = DEFAULT_ISSUE_PREFIX
 ) -> tuple[str, bool]:
-    """`issue_identifier` の答えと、題が長くて slug を短くしたか。
+    """`issue_identifier` の答えと、タイトルが長くて slug を短くしたか。
 
     短くしたかどうかは、`issue_slug` が `room` に収めるために字を落としたかで決まる。
     末尾の `-<2 桁>` を除いただけなら偽。
-    `ccnavi-start.sh` はこれが真のとき、題から作った名前で進めず、短い `--slug` を付けさせる。
-    題から何も残らず `EMPTY_SLUG` にしたときは偽。
+    `ccnavi-start.sh` はこれが真のとき、タイトルから作った名前で進めず、短い `--slug` を付けさせる。
+    タイトルから何も残らず `EMPTY_SLUG` にしたときは偽。
     """
     if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
         raise ValueError(f"issue の番号は正の整数: {number!r}")
@@ -221,7 +221,7 @@ def issue_identifier_parts(
     head = f"{prefix}-{number}-" + (f"{project}-" if project else "")
     title = title if isinstance(title, str) else ""
     slug = issue_slug(title, SUGGESTED_ID_LENGTH - len(head))
-    # NFKC で字数が増える題でも切られないよう、十分大きい上限で全体の slug を作る。
+    # NFKC で字数が増えるタイトルでも切られないよう、十分大きい上限で全体の slug を作る。
     full = issue_slug(title, 10**6)
     shortened = len(slug) < len(full)
     ident = head + slug

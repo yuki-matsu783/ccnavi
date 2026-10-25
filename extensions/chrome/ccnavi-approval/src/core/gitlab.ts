@@ -711,7 +711,7 @@ export async function startCommit(client: Client, owner: string, repo: string, n
   return checkOid(id);
 }
 
-/** Draft の MR を作る（題の頭に `Draft: ` を付ける）。番号（iid）と URL を返す */
+/** Draft の MR を作る（タイトルの頭に `Draft: ` を付ける）。番号（iid）と URL を返す */
 export async function createDraftMr(client: Client, owner: string, repo: string, head: string, base: string, title: string, body: string): Promise<{ number: number; url: string }> {
   const res = await post(client, `${project(owner, repo)}/merge_requests`, { source_branch: checkBranch(head), target_branch: checkBranch(base), title: `Draft: ${title}`, description: body });
   if (res.status < 200 || res.status >= 300) {
@@ -764,7 +764,7 @@ export async function resolveDiscussion(client: Client, owner: string, repo: str
   }
 }
 
-/** issue を作る（`POST projects/:id/issues`）。題と本文だけを送る。assignee・labels・milestone は入れない */
+/** issue を作る（`POST projects/:id/issues`）。タイトルと本文だけを送る。assignee・labels・milestone は入れない */
 export async function createIssue(client: Client, owner: string, repo: string, title: string, body: string): Promise<IssueRef> {
   const res = await post(client, `${project(owner, repo)}/issues`, { title: checkTitle(title), description: checkWriteText(body, "issue の本文") }, true);
   if (res.status === 404) throw new HostError(`issue を作れませんでした（404）。プロジェクト ${owner}/${repo} が見えないか、PAT のロールが足りません（Reporter 以上・api スコープ）`, 404);

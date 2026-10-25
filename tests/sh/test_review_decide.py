@@ -66,7 +66,7 @@ case " $* " in
   fi ;;
 *" --yes "*)
   [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }
-  printf 'issue の題\\n\\n本文\\n' >"$root/logs/state/review-issue-i0001-1.md"
+  printf 'issue のタイトル\\n\\n本文\\n' >"$root/logs/state/review-issue-i0001-1.md"
   printf '<!-- ccnavi:decide -->\\n決めた\\n' >"$root/logs/state/review-decide-i0001-1.md"
   printf '{"version":1,"ok":true,"reviewed":true,"followup":""}\\n' ;;
 esac
@@ -369,7 +369,7 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertTrue(reply["body"].startswith("<!-- ccnavi:accept -->"))
         self.assertTrue(resolve["path"].endswith("/merge_requests/1/discussions/d1"))
         self.assertIs(resolve["resolved"], True)
-        self.assertEqual(GitLab.posted[2][1]["title"], "issue の題")
+        self.assertEqual(GitLab.posted[2][1]["title"], "issue のタイトル")
         note = GitLab.posted[3][1]["body"]
         self.assertTrue(note.startswith("<!-- ccnavi:decide -->"))
         self.assertIn("issue に回した分: #1", note)

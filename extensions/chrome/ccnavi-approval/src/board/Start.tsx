@@ -1,6 +1,6 @@
 /**
  * 「始める」の欄（`[data-testid=start]`）。issue は押されてから読む（ボードを開くたびには読まない）。
- * issue の題は素の文字列（textContent）。押すと、issue を閉じる開いたマージリクエストがあればその元ブランチを採用し、無ければ親のブランチを統合先の先頭から作って Draft のマージリクエストを作る（`Actions.start`）。
+ * issue のタイトルは素の文字列（textContent）。押すと、issue を閉じる開いたマージリクエストがあればその元ブランチを採用し、無ければ親のブランチを統合先の先頭から作って Draft のマージリクエストを作る（`Actions.start`）。
  */
 import type { JSX } from "react";
 

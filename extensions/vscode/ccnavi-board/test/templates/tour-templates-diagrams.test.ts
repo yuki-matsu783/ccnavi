@@ -42,7 +42,7 @@ function planText(): string {
     .join(" / ");
 }
 
-test("CB-T1200 テンプレート管理の案内に、使い方ごとの案内が 2 本、基本の案内の次に並ぶ。既存の案内の ID・題は変わらない", () => {
+test("CB-T1200 テンプレート管理の案内に、使い方ごとの案内が 2 本、基本の案内の次に並ぶ。既存の案内の ID・タイトルは変わらない", () => {
   assert.deepEqual(
     def.courses.map((course) => course.id),
     [INTRO_ID, ...NEW_COURSES, "read-sum", "read-drafts"],
@@ -52,7 +52,7 @@ test("CB-T1200 テンプレート管理の案内に、使い方ごとの案内�
   assert.equal(courseOf("read-drafts").title, "下書きを確認するとき");
   for (const id of NEW_COURSES) {
     const course = courseOf(id);
-    assert.ok(course.title.endsWith("たいとき"), `${id}: 題は「〜たいとき」で終える（${course.title}）`);
+    assert.ok(course.title.endsWith("たいとき"), `${id}: タイトルは「〜たいとき」で終える（${course.title}）`);
     assert.ok(course.steps.length >= 4 && course.steps.length <= 9, `${id}: 手順は 4〜9（${course.steps.length}）`);
     for (const [index, step] of course.steps.entries()) {
       assert.notEqual(step.target, "", `${id} の ${index + 1} 番目: 指す先は画面の印にする`);

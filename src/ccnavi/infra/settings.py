@@ -214,7 +214,7 @@ def shell_path(path: str) -> str:
 def shell_word(text: str) -> str:
     """文面で案内するコマンドの 1 語。区切りは変えず、要るときだけ引用する（`shell_path` の語版）。
 
-    パスでない値（題・名前）に使う。パスは `shell_path` で、区切りを `/` に揃える。
+    パスでない値（タイトル・名前）に使う。パスは `shell_path` で、区切りを `/` に揃える。
     """
     return _quoted(text)
 
@@ -292,19 +292,19 @@ LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RIS
 # 行い、そこは ruleload を import できない（ruleload が phase を import する）。
 LAYER_COMMON = "common"
 LAYER_SELF = "self"
-# レイヤーの名札に予約してある表記。プロジェクトはこの名前を使えない。
+# レイヤーの名前に予約してある表記。プロジェクトはこの名前を使えない。
 # `builtin` は組み込みのルールの id（`builtin:<名前>`）と同じ形の前置きになるため予約する。
 RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF, "builtin")
-# 予約名のプロジェクトのバックアップの key につける前置き。名札の側（`rules:self`）と
+# 予約名のプロジェクトのバックアップの key につける前置き。名前の側（`rules:self`）と
 # プロジェクトの側を分ける（_layer_key）。
 PROJECT_KEY_HOME = "projects/"
 # ミラーのバックアップの key につける前置き（`rules:mirror/lib`）。
 MIRROR_KEY_HOME = "mirror/"
 
-# レイヤーの種別。そのレイヤーがどこから来たかを、名札の表記とは別に持つ。
+# レイヤーの種別。そのレイヤーがどこから来たかを、名前の表記とは別に持つ。
 #
-# 名札の表記では種別を決められない。`projects/common/` の名札は `common` だが
-# 共通レイヤーではないし、`projects/self/` の名札は `self` だがワークスペース自身のレイヤー
+# 名前の表記では種別を決められない。`projects/common/` の名前は `common` だが
+# 共通レイヤーではないし、`projects/self/` の名前は `self` だがワークスペース自身のレイヤー
 # ではない。`layer == LAYER_COMMON` のような文字列比較で種別を決めると、
 # プロジェクトが名前を 1 つ選ぶだけで、共通レイヤーと同じ扱いを受けられてしまう。
 ORIGIN_COMMON = "common-layer"
@@ -318,9 +318,9 @@ ORIGIN_MIRROR = "mirror-layer"
 class LayerFile(NamedTuple):
     """レイヤー 1 つの設定ファイル。守る対象（selfguard）へ渡す形（`ruleload.layer_files`）。
 
-    `origin` はレイヤーの種別（ORIGIN_*）、`layer` は名札（`common` / `self` /
+    `origin` はレイヤーの種別（ORIGIN_*）、`layer` は名前（`common` / `self` /
     プロジェクトの名前）、`kind` は rules / phases / risk、`path` はそのパス。
-    種別をつけるのは、受け取る側が名札の文字列比較をしなくて済むようにするため。
+    種別をつけるのは、受け取る側が名前の文字列比較をしなくて済むようにするため。
     """
 
     origin: str

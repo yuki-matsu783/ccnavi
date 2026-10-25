@@ -37,7 +37,7 @@ export function stateLabel(state: string): string {
   }
 }
 
-/** 状態の札の色。取り込める状態は ok、取り込めない状態は bad、変更なしは色なし */
+/** 状態のバッジの色。取り込める状態は ok、取り込めない状態は bad、変更なしは色なし */
 export function stateTone(state: string): "ok" | "bad" | "" {
   if (state === "new" || state === "changed") {
     return "ok";

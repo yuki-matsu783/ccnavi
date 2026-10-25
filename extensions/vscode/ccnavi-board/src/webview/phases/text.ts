@@ -36,7 +36,7 @@ export function splitList(text: string): readonly string[] {
     .filter((part) => part !== "");
 }
 
-/** 絞り込みが適用する文字列。id・題・範囲・成果物・使う場面にヒットする */
+/** 絞り込みが適用する文字列。id・タイトル・範囲・成果物・使う場面にヒットする */
 export function findText(phase: PhaseForm): string {
   return `${phase.id} ${phase.title} ${phase.scope.join(" ")} ${phase.deliverables.join(" ")} ${phase.when}`.toLowerCase();
 }

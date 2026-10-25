@@ -3,7 +3,7 @@
  */
 .approval { --overlay-w: 920px; }
 .approval-batch { border-collapse: collapse; width: 100%; font-size: var(--font-md); margin-bottom: 8px; }
-/* 狭い幅では題名や場所の長い語を折り、表を枠の幅に収める（伸びると右の「場所」の列が隠れる）。識別子だけは折らない */
+/* 狭い幅ではタイトルや場所の長い語を折り、表を枠の幅に収める（伸びると右の「場所」の列が隠れる）。識別子だけは折らない */
 .approval-batch th, .approval-batch td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; overflow-wrap: anywhere; }
 .approval-id { font-family: var(--vscode-editor-font-family); white-space: nowrap; }
 .approval-text {

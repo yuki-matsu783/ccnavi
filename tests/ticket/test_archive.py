@@ -43,7 +43,7 @@ def closed_text(name, parent="", phase=None, predecessors=()):
         "human_review:",
         "  required: false",
         "  reason: t",
-        f"title: {name} の題",
+        f"title: {name} のタイトル",
         "rationale: r",
         "allow:",
         "  - match: Write|Edit",

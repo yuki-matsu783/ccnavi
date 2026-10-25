@@ -378,7 +378,7 @@ class RestFallbackTest(unittest.TestCase):
                 self.assertEqual(done.stdout.strip(), "false")
                 rest = [m["rest"] for m in self.mutations()]
                 self.assertIn("POST pulls/42/ccr/ready_for_review", rest)
-                # 題の Draft: 除去の PATCH は今のまま
+                # タイトルの Draft: 除去の PATCH は今のまま
                 self.assertIn("PATCH /repos/acme/widgets/pulls/42", self.calls())
 
     def test_undraft_when_graphql_works_does_not_call_rest(self):

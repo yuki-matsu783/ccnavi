@@ -129,7 +129,7 @@ test("CB-T500 見本の答えは、実行ファイルの答えの実例（plan-o
   assert.ok(Object.keys(sample.answers).length >= 10, "見本の答えが少ない");
 });
 
-test("CB-T501 見本の open は、実例の open と同じ線・番号・見る場所の並びで、識別子・ハッシュ・題・見る場所の言葉だけが見本のもの", () => {
+test("CB-T501 見本の open は、実例の open と同じ線・番号・見る場所の並びで、識別子・ハッシュ・タイトル・見る場所の言葉だけが見本のもの", () => {
   const real = planOrderSample("open");
   const mask = (plans: readonly ApprovePlan[]): unknown =>
     plans.map((plan) => ({ ...plan, ticket: "", source_sha: "", items: plan.items.map((item) => ({ ...item, title: "", review: "" })) }));
@@ -138,7 +138,7 @@ test("CB-T501 見本の open は、実例の open と同じ線・番号・見る
   const { plans: _a, ticket: _b, source_sha: _c, ...restSample } = sample.answers.open.answer;
   const { plans: _d, ticket: _e, source_sha: _f, ...restReal } = real;
   assert.deepEqual(restSample, restReal);
-  // 見る場所は、実例が持つ言葉（none / mr）だけ。題は実行ファイルが定義の題を入れるので、見本は実際の定義の題を使う
+  // 見る場所は、実例が持つ言葉（none / mr）だけ。タイトルは実行ファイルが定義のタイトルを入れるので、見本は実際の定義のタイトルを使う
   for (const plan of sample.answers.open.answer.plans) {
     for (const item of plan.items) {
       assert.ok(["none", "mr"].includes(item.review), `${item.number} の見る場所 ${item.review}`);
@@ -320,7 +320,7 @@ test("CB-T506 案内の scene は、画面が読むキーと、見本にある�
   assert.ok(steps >= 40, `手順が少ない（${steps}）`);
 });
 
-test("CB-T507 案内の構成。基本の案内は今の題と順序のまま。ユースケースは 5〜8 本で 1 本 4〜10 手順、キーと題が重ならない", () => {
+test("CB-T507 案内の構成。基本の案内は今のタイトルと順序のまま。ユースケースは 5〜8 本で 1 本 4〜10 手順、キーとタイトルが重ならない", () => {
   assert.deepEqual(
     tour.courses[0].steps.map((step) => step.title),
     ["図", "直す手段", "この順序に決める", "承認との関係", "案内"],
@@ -328,10 +328,10 @@ test("CB-T507 案内の構成。基本の案内は今の題と順序のまま。
   assert.equal(tour.courses[0].id, "intro");
   const cases = tour.courses.slice(1);
   assert.ok(cases.length >= 5 && cases.length <= 8, `ユースケースの数 ${cases.length}`);
-  assert.equal(new Set(tour.courses.map((c) => c.title)).size, tour.courses.length, "題が重なっている");
+  assert.equal(new Set(tour.courses.map((c) => c.title)).size, tour.courses.length, "タイトルが重なっている");
   for (const course of cases) {
     assert.ok(course.steps.length >= 4 && course.steps.length <= 10, `${course.id}: ${course.steps.length} 手順`);
-    assert.equal(new Set(course.steps.map((s) => s.title)).size, course.steps.length, `${course.id}: 手順の題が重なっている`);
+    assert.equal(new Set(course.steps.map((s) => s.title)).size, course.steps.length, `${course.id}: 手順のタイトルが重なっている`);
   }
   // 基本の案内の最初の 4 手順は、画面の見どころ（図・ボタンの並び・保存・承認）を指す
   assert.deepEqual(

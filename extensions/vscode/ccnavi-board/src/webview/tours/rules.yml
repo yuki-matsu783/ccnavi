@@ -584,7 +584,7 @@ courses:
     steps:
       - target: rule-db-migrate
         title: 畳んだ行で見分ける
-        body: 畳んだ行の右に「3 回ごと」のような札と、コンテキストの追加がある印が出ます。見本では db-migrate が 3 回に 1 度、deps-change が 1 回ごと（ヒットするたび）に文を渡します。
+        body: 畳んだ行の右に「3 回ごと」のようなバッジと、コンテキストの追加がある印が出ます。見本では db-migrate が 3 回に 1 度、deps-change が 1 回ごと（ヒットするたび）に文を渡します。
         scene: { tab: rules }
       - target: rule-db-migrate-context
         title: コンテキストの追加

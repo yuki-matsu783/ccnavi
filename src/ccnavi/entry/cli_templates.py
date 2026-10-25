@@ -92,9 +92,9 @@ def usage_problem(args: argparse.Namespace) -> str:
     5. それ以外は `_storing_problem` で保存の組み合わせを見て、`--show` の組み合わせを見る。
     """
     if args.template and (args.templates or not _ticket_new(args)):
-        return "--template は ticket new <識別子> --title <題> --template <名前> でだけ使う"
+        return "--template は ticket new <識別子> --title <タイトル> --template <名前> でだけ使う"
     if args.with_feedback and (args.templates or not _ticket_new(args) or not args.template):
-        return "--with-feedback は ticket new <識別子> --title <題> --template <名前> でだけ使う"
+        return "--with-feedback は ticket new <識別子> --title <タイトル> --template <名前> でだけ使う"
     if not args.templates:
         for flag, given in (
             ("--check-file", args.check_file is not None),
