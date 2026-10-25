@@ -414,7 +414,7 @@ _REWRITE = {
         "ファイル名を直接書くか、ファイル名を並べて 1 回で呼ぶ。",
         "`xargs` と `find -exec` は、後ろのコマンドが "
         + " ".join(sorted(shellread_words._READONLY_RUNNEE))
-        + " のときだけ通る。",
+        + " のときだけ、読める形として扱う。",
     ),
     shellread_scan.REASON_ANSI_C: (
         "書き換え: タブは `grep -P '\\t'` で書く。または `printf '\\t'` の結果をファイルに書き、"
