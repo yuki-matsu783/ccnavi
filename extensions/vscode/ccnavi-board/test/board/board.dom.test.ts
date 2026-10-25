@@ -63,7 +63,7 @@ test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠�
   }
 });
 
-test("CB-D46 書き込みが止まっているカードは「要対応のみ」でも残る", async () => {
+test("CB-D46 書き込みが止まっているカードは「ユーザ待ちのみ」でも残る", async () => {
   // 信頼できない理由（`blocked`）は、実行ファイルが不備として積み `attention` を真にする。素の版では
   // i0001-02-02 は隠れる（CB-D42）ので、実行ファイルがそう言ったときだけ残ることが確かめられる。
   const base = fixture();
@@ -82,7 +82,7 @@ test("CB-D46 書き込みが止まっているカードは「要対応のみ」�
   }
 });
 
-test("CB-D42 「要対応のみ」でユーザが動く必要のないカードが隠れ、列の件数が減り、state に残る。承認は見えている承認待ちだけ", async () => {
+test("CB-D42 「ユーザ待ちのみ」でユーザが動く必要のないカードが隠れ、列の件数が減り、state に残る。承認は見えている承認待ちだけ", async () => {
   const page = await openBoard();
   try {
     const box = page.one<HTMLInputElement>("#attention-filter");
@@ -419,7 +419,7 @@ test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後�
     await dom.settle();
     // チケットがあるボードでも、案内の間は見本を描く
     assert.equal(dom.all(".tour-sample").length, 1);
-    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態の札", "ユーザ待ち", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
+    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態の札", "ユーザ待ち", "詳細", "承認", "更新", "MR の状況を確認", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
@@ -592,7 +592,7 @@ test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れ
     page.click(page.one('.card[data-id="old"]'));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "open", filePath: "/ws/logs/archive/self/done/old.md" });
-    // 「要対応のみ」と重ねると隠れる（アーカイブは要対応に入らない）
+    // 「ユーザ待ちのみ」と重ねると隠れる（アーカイブは要対応に入らない）
     page.click(page.one("#attention-filter"));
     await page.settle();
     assert.ok(page.one('.card[data-id="old"]').classList.contains("hidden"));

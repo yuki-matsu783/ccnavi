@@ -1,5 +1,5 @@
 /**
- * 「マージ状況を確認」の遷移（`src/core/merge.ts`）。確認の二重起動・遅れて返った答え・一部だけの失敗・
+ * 「MR の状況を確認」の遷移（`src/core/merge.ts`）。確認の二重起動・遅れて返った答え・一部だけの失敗・
  * 片付けの再入と送信の失敗。外へ出る仕事は効果として返るだけなので、単体で全部試せる。
  */
 import { test } from "node:test";
@@ -224,7 +224,7 @@ test("CB-T637 送信の結果: 成功すると、その行を「送信した」�
   const retry = step(step(step(ng.state, { kind: "retire", parent: "i1" }).state, { kind: "retireAnswered", parent: "i1", accepted: true }).state, { kind: "retireSent", parent: "i1", error: undefined });
   assert.equal(mergeView(retry.state, abandon)?.rows[0].sendError, "");
   assert.deepEqual(retry.state.sent, ["i1"]);
-  // 次に「マージ状況を確認」を押すまで押せない（確認を始めると、送った印は消える）
+  // 次に「MR の状況を確認」を押すまで押せない（確認を始めると、送った印は消える）
   assert.deepEqual(retry.state.sent, ["i1"]);
   const recheck = step({ ...retry.state, checking: false }, { kind: "check" });
   assert.deepEqual(recheck.state.sent, []);

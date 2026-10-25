@@ -112,7 +112,7 @@ test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っ
   assert.equal(card("sample-a-01-01").flow?.locked, false);
   assert.equal(card("sample-b-02-01").flow?.lock_kind, "doing");
   assert.equal(card("sample-b-01-01").flow?.exists, true);
-  // 要対応のカードと、そうでないカードがある（「要対応のみ」で絞れて、何かが残る）
+  // 要対応のカードと、そうでないカードがある（「ユーザ待ちのみ」で絞れて、何かが残る）
   assert.ok(cards.some((c) => c.attention) && cards.some((c) => !c.attention && c.column !== "archived"));
   // プロジェクトの絞り込みで残るカードと隠れるカードがある
   assert.ok(cards.some((c) => c.project === "web") && cards.some((c) => c.project === ""));
@@ -228,7 +228,7 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   }
   const intro = def.courses[0];
   assert.equal(intro.id, INTRO_ID);
-  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態の札", "ユーザ待ち", "詳細", "承認", "更新", "マージ状況を確認", "案内"]);
+  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態の札", "ユーザ待ち", "詳細", "承認", "更新", "MR の状況を確認", "案内"]);
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 
