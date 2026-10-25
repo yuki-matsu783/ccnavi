@@ -192,7 +192,7 @@ gql() {
 	fi
 	rm -f "$gql_file" || :
 	if ccnavi_host_graphql_blocked "$gql_text"; then
-		# 元の返事を覚えておく。REST の代わりの道も失敗したとき、rest_fallback_failed が併記する（$( ) の中でも渡る）
+		# 元の返事は、REST の代わりの道も失敗したときに rest_fallback_failed が併記する。$( ) の中で呼ばれても渡るように、ファイルに残す。
 		ccnavi_host_fail_body "$gql_text" >"${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" 2>/dev/null || :
 		return 3
 	fi
@@ -321,13 +321,13 @@ threads_rest() {
 		rest_fallback_failed "スレッドの取得"
 		return 1
 	fi
-	# コメントの一覧は大きい（diff_hunk を含む）ので、引数ではなくファイルで渡す（引数 1 個の上限を超える）
+	# コメントの一覧は diff_hunk を含むため大きい。引数 1 個の上限を超えるので、引数ではなくファイルで渡す。
 	tr_file="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-threads-$$"
 	printf '%s' "$tr_threads" >"$tr_file.rt"
 	printf '%s' "$tr_comments" >"$tr_file.cs"
 	if ! "$JQ" -e -s '.[0] | type == "array"' "$tr_file.rt" >/dev/null 2>&1 || ! "$JQ" -e -s '.[0] | type == "array"' "$tr_file.cs" >/dev/null 2>&1; then
 		rm -f "$tr_file.rt" "$tr_file.cs" || :
-		printf '%s: %s\n' "$review_label" "ccr/review_threads かコメントの一覧の応答が配列でない。" >&2
+		printf '%s: %s\n' "$review_label" "ccr/review_threads の返事か、コメント一覧の返事が配列でない。" >&2
 		rest_fallback_failed "スレッドの取得"
 		return 1
 	fi

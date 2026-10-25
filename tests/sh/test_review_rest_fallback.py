@@ -286,7 +286,7 @@ class RestFallbackTest(unittest.TestCase):
         self.assertEqual(thread["created_at"], "2026-10-01T00:00:00Z")
 
     def test_a_large_comment_list_does_not_hit_the_argument_limit(self):
-        """diff_hunk を含むコメントが多い MR でも、組み立てが引数の上限（128KB）で落ちない。"""
+        """diff_hunk を含むコメントが多い MR でも、引数の上限（128KB）に当たらない。"""
         big = [
             comment(1000 + i, "reviewer", "2026-10-02T00:00:00Z", "x" * 500, diff_hunk="y" * 2000)
             for i in range(120)
@@ -363,7 +363,7 @@ class RestFallbackTest(unittest.TestCase):
         done = self.review("fetch", graphql="blocked", transport="gh", FAKE_GITHUB_NO_CCR="1")
         self.assertIn("GraphQL の返事:", done.stderr)
         self.assertIn("GraphQL is not available", done.stderr)
-        # curl は本文を捨てるので、番号だけが残る
+        # curl の経路では本文が捨てられ、番号だけが残る
         done = self.review("fetch", graphql="blocked", FAKE_GITHUB_NO_CCR="1")
         self.assertIn("GraphQL の返事:", done.stderr)
         self.assertIn("403", done.stderr)

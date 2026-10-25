@@ -722,7 +722,7 @@ new_issue_post() {
 # GraphQL を使えない環境で、MR の本文の閉じるキーワード（close・fix・resolve の各形。大文字小文字不問）に続く
 # `#n` と `<owner>/<repo>#n` を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ出す。<MR の番号>
 # GitHub の closingIssuesReferences の代わり。本文だけを読む（コミットメッセージのキーワードや、手で付けたリンクは拾わない）。
-# コードブロック・インラインコード・HTML コメント・引用行は読まない。`not close #n` と、語の途中の `fix`（`bug-fix #n`）も拾わない。
+# コードブロック・インラインコード・HTML コメント・引用行の中の文字は対象外とする。`not close #n` や、語の途中の `fix`（`bug-fix #n`）も拾わない。
 # 戻り値: 0 読めた / 1 API の失敗
 mr_linked_issues_body() {
 	mb_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$1") || return 1
