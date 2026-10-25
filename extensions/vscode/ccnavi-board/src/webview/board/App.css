@@ -26,7 +26,7 @@ body {
 .filter.attention { gap: var(--gap-2); cursor: pointer; }
 .filter.attention input { margin: 0; cursor: pointer; }
 .board-empty { padding: 4px; color: var(--vscode-descriptionForeground); }
-/* 列は空きに合わせて伸び縮みする。1 列 220px を割るところまで狭まったら横スクロールにする。
+/* 列は空きに合わせて伸び縮みする。4 列が 220px ずつ収まらない幅（940px 以下）では、横スクロールをやめて列を縦に積む。
    右端の取っ手をドラッグした列は幅が px で固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
    畳んだ列は見出し 1 行ぶんの幅に縮む。縦書きにはしない。
    取っ手は列の右の隙間にはみ出して置くが、最後の列だけは内側に置く（外に出すとボードが常に数 px 横に流れる） */
