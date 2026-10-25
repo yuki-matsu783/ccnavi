@@ -326,7 +326,7 @@ test("CB-T132 要対応は実行ファイルの attention をそのまま持ち�
     [...cards.values()].filter((card) => card.attention).map((card) => card.id),
     ["i0001-02-03"],
   );
-  // 承認待ち・ワークツリーなし・HIGH のリスク・止まったフェーズを足しても、実行ファイルが偽と言えば偽のまま
+  // 承認待ち・ワークツリーが見つからない・HIGH のリスク・止まったフェーズを足しても、実行ファイルが偽と言えば偽のまま
   const base = fixture();
   const loud: TicketJson = {
     ...base.tickets[2],
