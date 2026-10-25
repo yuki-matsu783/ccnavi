@@ -427,8 +427,10 @@ c7=no
 make_candidate() {
 	rm -f "$cand_index"
 	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" read-tree "$head_sha" 2>/dev/null || return 1
+	# 除外指定つきの add は、除く先が .gitignore 済みだと終了コード 1 になる。素の add のあとで index から除く。
+	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" add -A >/dev/null 2>&1 || return 1
 	# 他のワークツリー（.claude/worktrees/ の下）は、埋め込みリポジトリとして木に入るので取り込まない。
-	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" add -A -- . ':(exclude).claude/worktrees' >/dev/null 2>&1 || return 1
+	GIT_INDEX_FILE="$cand_index" git -C "$main_tree" rm -r --cached -q --ignore-unmatch -- .claude/worktrees >/dev/null 2>&1 || return 1
 	mc_tree=$(GIT_INDEX_FILE="$cand_index" git -C "$main_tree" write-tree 2>/dev/null) || return 1
 	GIT_AUTHOR_NAME=ccnavi GIT_AUTHOR_EMAIL=ccnavi@localhost GIT_AUTHOR_DATE="1970-01-01T00:00:00+0000" \
 		GIT_COMMITTER_NAME=ccnavi GIT_COMMITTER_EMAIL=ccnavi@localhost GIT_COMMITTER_DATE="1970-01-01T00:00:00+0000" \
