@@ -5,7 +5,7 @@ description: issue 指定の候補探しで、名前に番号を含むブラン�
 tags: [ticket, sh-scripts]
 keywords: [ブランチ, 番号, 区切り, names_number, 候補, claude/, 乱数, ccnavi-branches.sh, ccnavi-start.sh, ADR-0103]
 ---
-# ADR-0180: ブランチ名の番号は、前後が区切りか端のときだけ issue の番号として読む
+# ADR-0182: ブランチ名の番号は、前後が区切りか端のときだけ issue の番号として読む
 
 状態: 採用
 

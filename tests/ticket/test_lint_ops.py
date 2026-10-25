@@ -105,7 +105,7 @@ class LintOpsTest(PhaseHarness):
         self.assertTrue(
             any(
                 "親 i0001 に plan がありません" in line
-                and "proposal-format と phases を引き" in line
+                and "--keyword 提案書式" in line
                 for line in lines
             ),
             lines,

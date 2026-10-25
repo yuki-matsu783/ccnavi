@@ -92,5 +92,5 @@ def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
         " がありません。手で足さず、"
         "`ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>`"
         " で雛形を作るか、`ccnavi --plan-order <親> --fill-phases` で"
-        " `phases:` を差し込んでください。書式は docs/21_design/tickets/proposal-format.md。"
+        " `phases:` を差し込んでください。書式は `ccnavi --docs --keyword 提案書式` で引く。"
     )
