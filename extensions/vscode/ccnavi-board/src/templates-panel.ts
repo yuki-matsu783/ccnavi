@@ -46,9 +46,8 @@ import { targetOptions, type TargetOption } from "./core/targets.js";
 import { shownLayerOf, templateNameTaken, templatesLayerOf, validTemplateName } from "./core/templatesmodel.js";
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { TemplateCheck, TemplateLayer, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
-import { WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
-import * as diaglog from "./log.js";
+import { assertRetained, debounce, watchPattern, watchTickets } from "./panel-common.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -265,14 +264,7 @@ function registerPanelHandlers(current: PanelState): void {
 
   watchFiles(current);
   // チケットが動いたら、編集欄を開いている間だけ、保存を止めるかを取り直す
-  for (const pattern of WATCH_PATTERNS) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(current.folder, pattern));
-    const moved = () => scheduleLock(current);
-    watcher.onDidCreate(moved);
-    watcher.onDidChange(moved);
-    watcher.onDidDelete(moved);
-    current.lockWatchers.push(watcher);
-  }
+  current.lockWatchers.push(...watchTickets(current.folder, () => scheduleLock(current)));
 }
 
 /**
@@ -296,14 +288,7 @@ function watchFiles(current: PanelState): void {
   const patterns: vscode.RelativePattern[] = globs.map((glob) => new vscode.RelativePattern(current.folder, toGlob(glob)));
   patterns.push(new vscode.RelativePattern(current.folder, ".claude/settings.json"));
   patterns.push(new vscode.RelativePattern(current.folder, ".claude/settings.local.json"));
-  for (const pattern of patterns) {
-    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-    const changed = () => scheduleChanged(current);
-    watcher.onDidCreate(changed);
-    watcher.onDidChange(changed);
-    watcher.onDidDelete(changed);
-    current.fileWatchers.push(watcher);
-  }
+  current.fileWatchers.push(...patterns.map((pattern) => watchPattern(pattern, () => scheduleChanged(current))));
 }
 
 function toGlob(rel: string): string {
@@ -316,15 +301,11 @@ function alive(current: PanelState): boolean {
 
 /** ファイルが外で変わったら、少し待ってから読み直す。自分の保存でも読み直す（編集欄は中身を替えない） */
 function scheduleChanged(current: PanelState): void {
-  if (current.timer !== undefined) {
-    clearTimeout(current.timer);
-  }
-  current.timer = setTimeout(() => {
-    current.timer = undefined;
+  debounce(current, "timer", () => {
     if (alive(current)) {
       void reload(current);
     }
-  }, WATCH_DEBOUNCE_MS);
+  });
 }
 
 /** いま見せるものを渡す。呼ぶのはユーザが「更新」を押したときと、外で変わったものを読み直したときだけ。 */
@@ -385,11 +366,7 @@ function redraw(current: PanelState): void {
  * 型では止まらないので、ここで見て言う。
  */
 function templatesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<TemplatesData> {
-  if (panel.options.retainContextWhenHidden !== true) {
-    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
-    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/42_claude/logging.md）
-    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "templates", retainContextWhenHidden: false });
-  }
+  assertRetained(panel, root, "templates");
   return retainedHost<TemplatesData>(
     {
       html(text: string): void {
@@ -594,13 +571,9 @@ function scheduleLock(current: PanelState): void {
   if (current.editing === undefined) {
     return;
   }
-  if (current.lockTimer !== undefined) {
-    clearTimeout(current.lockTimer);
-  }
-  current.lockTimer = setTimeout(() => {
-    current.lockTimer = undefined;
+  debounce(current, "lockTimer", () => {
     void refreshLock(current);
-  }, WATCH_DEBOUNCE_MS);
+  });
 }
 
 /** 錠を取り直して、編集欄に知らせる。読んでいる間に別の読み直しが始まっていた、または編集欄が閉じていたら、この答えは破棄する */

@@ -110,11 +110,13 @@ keywords: [設計, 画面, approval-machine, 状態の札, ユーザ待ち, 詳�
 | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost(surface, render)` | 画面は破棄される。入れ物ごと入れ直す |
 | `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理・テンプレート管理・取り込み待ち・フロー編集・計画編集） | `retainedHost(surface, render)` | 画面は生きている。何もしない |
 
-返る形（`ScreenHost<D>`）と呼び方（`send` / `post` / `ready` / `hidden`）は同じ。取り違えても型では止まらない（保持する画面に `screenHost` を使うと打ちかけが消え、逆だと中身が古いまま更新されない）。保持する画面のパネルは、`ScreenHost` を返す関数（`rulesHost`・`riskHost`・`phasesHost`・`templatesHost`・`handoffHost`・`flowHost`・`workflowHost`）で `retainedHost` の形に合わせる。この関数は `panel.options.retainContextWhenHidden` を見て、偽なら診断ログに残す。
+返る形（`ScreenHost<D>`）と呼び方（`send` / `post` / `ready` / `hidden`）は同じ。取り違えても型では止まらない。保持する画面に `screenHost` を使うと打ちかけが消え、逆だと中身が古いまま更新されない。保持する画面のパネルは、`ScreenHost` を返す関数（`rulesHost`・`riskHost`・`phasesHost`・`templatesHost`・`handoffHost`・`flowHost`・`workflowHost`）で作り、`retainedHost` の形に合わせる。この関数は `panel-common.ts` の `assertRetained(panel, root, 画面の名前)` で `panel.options.retainContextWhenHidden` を見る。偽なら診断ログに残す（保持しない 2 画面は `assertRetained(..., false)`）。
 
 保持する画面には、再表示されたところで知らせ（`lock`・`changed`）と見た目を送り直す。非表示の画面に届くかどうかについて、VS Code の型定義の記述が一致していない。中身（`data`）は送り直さない。
 
 保持する画面に中身（`data`）を渡すのは、画面の編集を破棄してよいときだけ（ユーザが「更新」を押した、保存や作成が通って中身が入れ替わった）。監視がファイルの変化に気づいても中身は渡さず、帯（`changed`）を出してユーザに決めてもらう。
+
+ルール管理・リスク管理・フェーズ管理の 3 画面は、パネルの受け付け・再表示・破棄、監視の反応の遅らせ方、読み直しと描き直し、対象の切り替えを `settings-panel.ts`（`settingsPanel`）にまとめてある。画面ごとに違う仕事（何を読む・何を見せる・どのファイルを見張る・保存できるかをどう聞く）は、`settingsPanel` に渡す `SettingsScreen` のコールバックで注入する。3 画面の差を共通の側に持たせず、残す仕事は画面のパネルに残す。
 
 画面（`*-panel.ts`）どうしは互いを import しない。ある画面から別の画面を開く導線（ルール管理からフェーズ管理の対象を切り替える、など）は、相手のパネルの関数を直に呼ばず、`core/screens.ts` の帳面（`screens().board(...)`）を通す。帳面に入口を載せるのは `extension.ts` だけで、載せ方を見る場所もそこ 1 か所。
 画面の様子をほかの画面が知る必要があるときも、相手のパネルを読まずに小さな帳面を通す。ボードのカードの「計画編集」は、いまのボードでそのカードが入口を出しているかを確かめてから、コマンド `ccnaviBoard.openWorkflow`（帳面の `screens().workflow` と同じ入口）を呼ぶ。計画編集タブの未保存と保存したときのハッシュは `core/workflow-tabs.ts` にあり、タブが書いてボードが読む（変わったら知らせを受けて描き直す）。
