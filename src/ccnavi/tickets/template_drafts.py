@@ -536,8 +536,8 @@ def close_notice(conf: settings.Settings, root: str, parent: str, mr: bool = Tru
     いないときだけ。`ready` で閉じると材料（`done/` と `flows/`）は退避されて拾えなくなるので、
     `ready` の前に出す。読めなければ出さない。
 
-    `mr` が偽なら、マージリクエストを作らない親の文面にする（`ready` は無い）。この親の材料は
-    `wip/` を削除して統合先に取り込むまで残り、取り込むと拾えなくなる。
+    `mr` が偽なら、マージリクエストを作らない親の文面にする。この親には `ready` が無いので、
+    材料は `wip/` を削除して統合先に取り込むまで残り、取り込んだあとは拾えない。
     """
     found, children, _ = _find_parent(conf, root, parent)
     if found is None:
@@ -558,7 +558,7 @@ def close_notice(conf: settings.Settings, root: str, parent: str, mr: bool = Tru
         return (
             f"テンプレートにするなら、`ccnavi --templates --draft {parent}` で下書きを作る。"
             f"`{ticket_places.WIP_ROOT}/` を削除して統合先に取り込む前に打つ"
-            "（取り込んだあとは下書きの材料が残らず拾えない）。"
+            "（取り込んだあとは材料が残らず拾えない）。"
             "下書きはユーザが `ccnavi-user-handoff.sh` で取り込む\n"
         )
     return (
