@@ -214,7 +214,7 @@ setup:
 | 値 | 相手 | 使う場面 |
 |---|---|---|
 | `bare` | 一時ディレクトリの bare。ホストの API は失敗（「確かめられなかった」） | 直接作業・integrate・レビューなしのチケット作業（毎回） |
-| `fake-gitlab` | bare と `tests/sh/fake_gitlab.py` | レビュー（MR・スレッド・依頼・解決）を含むチケット作業（毎回） |
+| `fake-gitlab` | bare と `tests/fake_gitlab.py` | レビュー（MR・スレッド・依頼・解決）を含むチケット作業（毎回） |
 | `real` | 本物の GitHub / GitLab（`projects/test-repo`）。欄が無いときも同じで、挙動は変わらない | リリース前などの通し確認だけ。本物でしか出ない不具合（例: GraphQL が 403）を拾う |
 
 - `bare` / `fake-gitlab` は、`setup.git` と同じ `require_disposable_repo` を通ったときだけ動く（ccnavi 本体は断る。終了コード 3）。対象に origin が無いときも断る

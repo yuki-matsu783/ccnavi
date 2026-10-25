@@ -1,7 +1,7 @@
 """`ccnavi-ticket.sh` の start・finish・propose・consolidate が打つ事前確認の受入テスト。
 
 ホストの API と git のリモートが使える状態かを、ロックを取る前に確かめる（直接作業では確かめない）。
-共通の道具と全体の説明は `tests/sh/write_and_push_harness.py` と `tests/sh/host_stub.py` にある。
+共通の道具と全体の説明は `tests/sh/write_and_push_harness.py` と `tests/host_stub.py` にある。
 ホストは代役（失敗する gh / glab、routes.json で答える curl）で、本物のネットワークには出ない。
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import unittest
 
-from tests.sh import host_stub
+from tests import host_stub
 from tests.sh.write_and_push_harness import (
     CHILD,
     PARENT,

@@ -18,13 +18,9 @@ from unittest import mock
 import yaml
 
 from ccnavi.entry import version
+from tests import ROOT, common_sh, fake_gitlab, host_stub
 from tests import __main__ as full_run
-from tests import common_sh
 from tests.scenarios import hostenv, runner
-from tests.sh import fake_gitlab, host_stub
-from tests.sh.test_fake_gitlab import PROJECT as FAKE_PROJECT
-from tests.sh.test_fake_gitlab import seeded
-from tests.sh.test_review_host_fixture import REVIEW_SH, SH_DIR, STUB, write
 
 SCENARIOS = sorted(Path(__file__).parent.glob("UC-*.yml"))
 EXPECT_KEYS = {
@@ -2398,6 +2394,55 @@ class LifecycleTest(unittest.TestCase):
 
 # ---- setup.host（評価の相手: bare / fake-gitlab / real） ----
 
+# 別のグループ（tests/sh）の部品は import できないので、読むのに要るぶんだけここに持つ
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+REVIEW_SH = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")
+FAKE_PROJECT = "ns/proj"
+# 実行ファイルの代役。版の問い合わせにだけ答える
+EXE_STUB = """#!/bin/sh
+case " $* " in
+*" --version --json "*)
+  printf '{{"compat": {compat}, "flags": ["--accept-unresolved", "--actor", "--via"]}}\\n'
+  exit 0 ;;
+*" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
+esac
+exit 0
+"""
+
+
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    return path
+
+
+def seeded():
+    """未解決のスレッドを 1 つ持つ MR が 1 件ある、模擬の初期状態。"""
+    note = {
+        "id": 101,
+        "body": "ここを直してください",
+        "resolvable": True,
+        "resolved": False,
+        "created_at": "2026-10-25T00:00:00Z",
+        "author": {"id": 2, "username": "reviewer"},
+        "position": {"new_path": "a.txt", "new_line": 3},
+    }
+    mr = {
+        "iid": 1,
+        "state": "opened",
+        "source_branch": "i0001",
+        "target_branch": "main",
+        "title": "i0001",
+        "web_url": f"http://127.0.0.1/{FAKE_PROJECT}/-/merge_requests/1",
+        "discussions": [{"id": "d101", "individual_note": False, "notes": [note]}],
+        "reviewers": [],
+        "notes": [],
+        "created_at": "2026-10-25T00:00:00Z",
+    }
+    return {"project": FAKE_PROJECT, "seq": 100, "issues": [], "mrs": [mr]}
+
+
 REAL_ORIGIN = "https://github.com/acme/real.git"
 BODY_ORIGIN = "https://github.com/acme/body.git"
 HAS_TOOLS = all(shutil.which(t) for t in ("sh", "git", "jq", "curl"))
@@ -2694,7 +2739,7 @@ class FakeGitlabHostTest(unittest.TestCase):
         git(self.ws.target, "switch", "-q", "-c", "i0001")
         exe = write(
             os.path.join(self._tmp.name, "exe", "ccnavi"),
-            STUB.format(compat=version.COMPAT, log=os.path.join(self._tmp.name, "args.txt")),
+            EXE_STUB.format(compat=version.COMPAT, log=os.path.join(self._tmp.name, "args.txt")),
         )
         os.chmod(exe, 0o755)
         env.update({"CCNAVI_ENTRY_PATH": exe, "CCNAVI_LEARNING": "disable"})

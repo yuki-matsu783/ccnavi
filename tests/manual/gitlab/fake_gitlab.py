@@ -1,6 +1,6 @@
 """GitLab API v4 の代役。`.ccnavi/scripts/ccnavi-review.sh` を実物なしで通すための的。
 
-ユーザが手で 1 周させるための道具。本体は `tests/sh/fake_gitlab.py` にあり、
+ユーザが手で 1 周させるための道具。本体は `tests/fake_gitlab.py` にあり、
 ここは起動するだけの入口。
 自動テストは、その本体の `start` を import して起こす（受入シナリオからも同じ関数を呼べる）。
 
@@ -38,7 +38,7 @@ curl で直に呼ぶ。sh と同じ道具を使わないほうが、片方の不
 
 自動テストと受入シナリオは、コマンドラインを使わず import して起こす。
 
-    from tests.sh import fake_gitlab
+    from tests import fake_gitlab
 
     server = fake_gitlab.start(state_path, skew=None, initial_state={...})
     server.url      # http://127.0.0.1:<port>
@@ -73,7 +73,7 @@ def load_body():
     src = os.path.join(ROOT, "src")
     if src not in sys.path:
         sys.path.insert(0, src)
-    path = os.path.join(ROOT, "tests", "sh", "fake_gitlab.py")
+    path = os.path.join(ROOT, "tests", "fake_gitlab.py")
     spec = importlib.util.spec_from_file_location("fake_gitlab_body", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

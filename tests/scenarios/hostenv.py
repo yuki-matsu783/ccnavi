@@ -4,7 +4,7 @@
 - `bare`: 対象の origin への通信を、一時ディレクトリの bare に向ける。
   git の代役が URL をホストの形で答える。
   ホストの API は gh / glab が失敗し、curl は空の routes で 404（「確かめられなかった」）
-- `fake-gitlab`: `bare` に加え、`tests/sh/fake_gitlab.py` を起こす（curl の代役は置かない）
+- `fake-gitlab`: `bare` に加え、`tests/fake_gitlab.py` を起こす（curl の代役は置かない）
 - `real`: 何もしない
 
 実行器（runner.py）から呼ぶ。状態は JSON にできる辞書（`prepare` の戻り値）で、state.json に残す。
@@ -18,7 +18,7 @@ import sys
 import tempfile
 
 from ccnavi.records import diaglog
-from tests.sh import fake_gitlab, host_stub
+from tests import fake_gitlab, host_stub
 
 HOSTS = ("bare", "fake-gitlab", "real")
 DEFAULT_HOST = "real"
