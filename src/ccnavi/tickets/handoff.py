@@ -134,14 +134,8 @@ KINDS: tuple[Kind, ...] = (
     ),
     Kind(
         KIND_MESSAGES,
-        (
-            ".ccnavi/config/common/messages/<名前>.yml",
-            ".ccnavi/config/project/messages/<名前>.yml",
-        ),
-        (
-            rf"\.ccnavi/config/common/messages/{_NAME}\.yml",
-            rf"\.ccnavi/config/project/messages/{_NAME}\.yml",
-        ),
+        (".ccnavi/config/common/messages/<名前>.yml",),
+        (rf"\.ccnavi/config/common/messages/{_NAME}\.yml",),
         new=True,
         board=False,
     ),
@@ -672,16 +666,13 @@ def _check_messages(root: str, entry: Entry) -> None:
     """文面ファイルの下書き。取り込んだあとに検査（`--lint`）で落ちる文は取り込ませない。
 
     欄・差し込みの名前・`次:` の数などを外した文で、拒否や促しの型を弱められないようにする。
-    自身のレイヤーの下書きは、共通レイヤーの同じ識別子に重ねて検査する。
     """
     try:
         text = (entry.raw or b"").decode("utf-8")
     except UnicodeDecodeError:
         entry.errors.append("UTF-8 として読めない")
         return
-    layer = entry.layer or settings.LAYER_SELF
-    common = texts.load(root).common if layer != settings.LAYER_COMMON else None
-    _, problems = texts.check_text(text, layer, entry.draft or entry.rel, common)
+    _, problems = texts.check_text(text, entry.draft or entry.rel)
     _said(entry, problems)
 
 
