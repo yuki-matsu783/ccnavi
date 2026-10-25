@@ -2,7 +2,7 @@
  * ユーザの判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の配列。
  *
  * 承認と残った指摘の行き先は、ボードのオーバーレイでユーザが押したものを、拡張が子プロセスで打つ
- * （`user agree --yes <識別子,…>`、`ccnavi-user-decide.sh decide <N> --choices …`）。ターミナルの壁は無く、
+ * （`user agree --yes <識別子,…>`、`ccnavi-user-decide.sh <N> --choices …`）。ターミナルの壁は無く、
  * 代わりに「見せたものと今のものが同じ」ことを実行ファイルがダイジェストで求める。エージェントが Bash で
  * 同じ形を打つ経路は、実行ファイルの組み込みの deny が止める。`close-early` はターミナル（tty）から打つもので、
  * ボードには置かない。
@@ -155,7 +155,7 @@ export function decidePreviewArgs(phase: number): readonly string[] {
 }
 
 /**
- * `ccnavi-user-decide.sh decide <N> --choices <JSON> --digest <ダイジェスト>`。ユーザがオーバーレイで選んだ行き先を置く。
+ * `ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>`。先頭の引数は `decide` ではなくフェーズ番号。ユーザがオーバーレイで選んだ行き先を置く。
  * ダイジェストは見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
  * エージェントがこの形を打つと、組み込みの deny（builtin:guard-ticket-approval）が止める
  */
@@ -164,7 +164,7 @@ export function decideArgs(
   choices: Readonly<Record<string, string>>,
   digest: string,
 ): readonly string[] {
-  return ["decide", String(phase), "--choices", JSON.stringify(choices), "--digest", digest];
+  return [String(phase), "--choices", JSON.stringify(choices), "--digest", digest];
 }
 
 /**

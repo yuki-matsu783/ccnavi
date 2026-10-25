@@ -190,7 +190,7 @@ export type ApprovalEffect =
       readonly phase: number;
       readonly mr: number | null;
     }
-  /** 行き先を置く（`ccnavi-user-decide.sh decide <N> --choices … --digest …`）。返ったら `decided` で戻す */
+  /** 行き先を置く（`ccnavi-user-decide.sh <N> --choices … --digest …`）。返ったら `decided` で戻す */
   | {
       readonly kind: "decide";
       readonly tree: string;
