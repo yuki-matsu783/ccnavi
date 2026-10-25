@@ -172,7 +172,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 
 #### E5 issue 起点の識別子が、ワークスペース内と単体で変わる（info。意図した設計）
 
-- 処理と場所: `ccnavi-start.sh:295-320`、`src/ccnavi/tickets/ticket_ids.py:181-205,409-429`
+- 処理と場所: `ccnavi-start.sh:295-320`、`src/ccnavi/tickets/ticket_ids.py:181-257`
 - 振る舞い: ワークスペース内では `feature-12-p-<slug>`、単体では `feature-12-<slug>` になる。同じ remote に別名のブランチが並ぶ。`issue_identifier` の docstring が、番号はリポジトリごとなので `<プロジェクト名>-` を付けるという意図を書いている
 - 確認: 読みのみ
 
