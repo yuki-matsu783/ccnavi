@@ -1,11 +1,11 @@
 # 受入シナリオ
 
 ccnavi の振る舞いを `claude -p` で回して確かめるシナリオ。回し方・書き方・見つけたものの扱いは
-[docs/claude/acceptance-scenarios.md](../../docs/claude/acceptance-scenarios.md)。
+[docs/42_claude/acceptance-scenarios.md](../../docs/42_claude/acceptance-scenarios.md)。
 明確な指示があったときだけ回す（普段のテストには含めない）。
 
-要求の出どころは [docs/requirements.md](../../docs/requirements.md)（REQ-xxx）と
-[受け入れ条件](../../docs/requirements/acceptance.md)。ここのシナリオは、その通し確認のうち
+要求の出どころは [docs/10_requirements.md](../../docs/10_requirements.md)（REQ-xxx）と
+[受け入れ条件](../../docs/11_requirements/acceptance.md)。ここのシナリオは、その通し確認のうち
 **エージェントが実際に打った呼び出しで確かめたいもの**を拾う。ccnavi の外から hook の入力を直接与えて確かめるものは
 既存のテスト（`tests/guard/` など）に任せる。
 
@@ -48,12 +48,12 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 | UC-18 | 親チケットの着手で、共通レイヤーがプロジェクトの `.ccnavi/config/common/` にミラーされる（`config/project/` と元のリポジトリは触れない） | 5 | [UC-18](UC-18-common-layer-mirror.yml) | draft |
 
 「状態」は、`draft` が書いただけで一度も回していないもの、`verified` が実ログと突き合わせて期待を確定したもの。
-最初に回したあと、期待が実ログと食い違えば、[見つけたものの扱い](../../docs/claude/acceptance-scenarios.md)に従って issue にする。
+最初に回したあと、期待が実ログと食い違えば、[見つけたものの扱い](../../docs/42_claude/acceptance-scenarios.md)に従って issue にする。
 
 ## 前提
 
 - **回し始める前に、人間に確認する。** 状態がきれいで最新か。`test_repo: true` のシナリオは、加えて `projects/test-repo` にブランチや MR ができてよいか。ccnavi 本体に何も残らないことは、実行器が回す前後で比べる（`repo` の判定）。
-  確認の手順は [回し方](../../docs/claude/acceptance-scenarios.md) の 1。回すたびに取り直す
+  確認の手順は [回し方](../../docs/42_claude/acceptance-scenarios.md) の 1。回すたびに取り直す
 - ccnavi 本体を対象にするシナリオ（UC-01〜07）は、拒否されること（何も変わらないこと）の確認に限る。
   ブランチ・コミット・MR を作る作業（UC-08・09）は `projects/test-repo` で行う
 

@@ -14,4 +14,4 @@ keywords: [要件, 互換, CCNAVI_COMPAT, 版, 更新]
 |---|---|---|
 | REQ-CHR-03 | 状態 | ワークスペースの統合先の `.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT` と、組み立てのときに埋め込んだ同梱の互換の版が違う間、Chrome 拡張は、どちらを更新するかを出し、承認を出さず、承認・レビュー済みを書かないこと。「始める」でもブランチを作らないこと（REQ-APV-17） |
 
-互換の版を読む行の形は本体の REQ-EXT-06（[要件 2.13](../../../../../docs/requirements/extension-if.md)）。
+互換の版を読む行の形は本体の REQ-EXT-06（[要件 2.13](../../../../../docs/11_requirements/extension-if.md)）。

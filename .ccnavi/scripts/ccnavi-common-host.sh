@@ -445,7 +445,7 @@ ccnavi_git_auth() {
 # ---- 事前確認（チケット作業の入口と、子チケットの作業から始める操作が使う）
 #
 # ホストの API と git のリモートが使える状態かを確かめる。ここの関数はユーザ向けの文面を出さず、
-# 結果・理由・勧める対処を変数で返す。文面と `次:` の行は呼ぶ側が組み立てる（docs/claude/script-output.md）。
+# 結果・理由・勧める対処を変数で返す。文面と `次:` の行は呼ぶ側が組み立てる（docs/42_claude/script-output.md）。
 
 # ccnavi_host_connect の後に呼ぶ。経路によらずプロジェクトを 1 回読む（GitHub は repos/<パス>、GitLab は projects/<パス>）。
 #   ccnavi_h_project_json  応答の JSON

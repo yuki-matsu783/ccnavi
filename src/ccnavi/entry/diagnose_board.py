@@ -44,7 +44,7 @@ def board(
     mode_flag: str = "",
     ticket_control_flag: str = "",
 ) -> dict:
-    """ボードの中身。形は docs/requirements/json-shapes.md「ボードの JSON」に書いてある。
+    """ボードの中身。形は docs/11_requirements/json-shapes.md「ボードの JSON」に書いてある。
 
     処理フロー:
     1. `hook_settings` でモードとチケット制御を解き、その値で設定を組み直す。

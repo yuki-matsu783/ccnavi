@@ -1,5 +1,5 @@
 """学びの蓄積の記録（気づきの記録・受信箱・判定記録の要約）。
-設計は docs/design/tickets/learning-wiki.md
+設計は docs/21_design/tickets/learning-wiki.md
 
 子を閉じる前に、その子の気づきの記録が在り、追跡されているかを見る。記録は雛形と気づきを書く
 操作（`ticket learn`）が書き、判定記録の要約は読むだけ。
