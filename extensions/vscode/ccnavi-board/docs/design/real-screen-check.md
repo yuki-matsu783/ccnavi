@@ -16,7 +16,7 @@ keywords: [実画面, code-server, 日本語, ユーザ目線, 画面確認, Chr
 
 動かした環境は Linux（クラウドのコンテナ、root）で、外へ出られるのは npm のレジストリだけだった。
 VS Code 本体の配布元、GitHub のリリース、Open VSX は 403 で、`code` や `@vscode/test-electron` は使えない。
-そのため VS Code は npm の `code-server`（ブラウザで開く VS Code）で代える。手順は他の環境でもそのまま使える。
+そのため VS Code は npm の `code-server`（ブラウザで開く VS Code）で代える。手順は Linux で動かした。macOS や Git Bash では、`setsid`・`disown`・`python3` を読み替える（未確認）。
 
 ## 1. 前提と準備
 
@@ -61,7 +61,7 @@ sh "$CCNAVI/scripts/ccnavi-setup.sh" "$UC" --mode enable --force
 ```
 
 コピーなので `--force` を付けてよい。`--force` は、配布先にある配布物（設定 3 本の `rules.yml`・`risks.yml`・共通の `phases.yml`、`.ccnavi/` の文書・スクリプト・テンプレート、スキル、`settings.json` の env）を、配布元の内容で置き換える。
-test-repo 本体に反映するときは `--force` を付けない（付けると検証用の設定が消える）。付けて置き換えてしまったら、`git diff --stat -- .ccnavi .claude` で差分を見て、残したいものだけ `git checkout -- <ファイル>` で戻す（今回は `rules.yml` と `risks.yml` を戻した）。
+test-repo 本体に反映するときは `--force` を付けない（付けると検証用の設定が消える）。付けて置き換えてしまったら、`git diff --stat -- .ccnavi .claude` で差分を見て、残したいものだけ `git checkout -- <ファイル>` で戻す。
 
 ### 1.3 チケットを並べる（親 2・子 4）
 
@@ -125,8 +125,10 @@ git("worktree", "add", f".claude/worktrees/{A}-02-01", f"{A}-02-01")
 
 ```sh
 python3 "$W/seed.py" "$UC" "$CCNAVI"
-sh "$UC/.ccnavi/scripts/ccnavi-launcher.sh" --lint | tail -3    # error 0 件になること。承認待ちと「子のワークツリーが無い」の warn は出てよい
+sh "$UC/.ccnavi/scripts/ccnavi-launcher.sh" --lint | tail -3    # error 0 件になること（warn は出てよい）
 ```
+
+コピー元（`$TESTREPO`）にコミット済みの内容から親のワークツリーを切るので、コピー元の未コミットの変更は反映されない。やり直すときは 1.2 から（同じ名前のブランチが残ると止まる）。
 
 `--lint` が error になるときは、親のワークツリー（`.claude/worktrees/<親>`）が無いか、子の `allow` が親の範囲を超えている。
 
@@ -140,7 +142,16 @@ printf '\n追記: 新しい手順\n' >> wip/handoff/.ccnavi/docs/worktree.md
 
 手で `wip/handoff/` に置いたファイルは、階層名の読み替え（`handoff-.claude` など）が合わないと「対象外」に数えられる。必ず `ccnavi-stage.sh` で作る。
 
-何も無い状態（編集の確認用）は、チケットを並べない別のコピー（`cp -a "$TESTREPO" /home/user/ed-repo` と、同じ `git remote remove origin`・setup）で作る。チケットが作業中だと、ルール・リスク・フェーズは保存できないため、編集の操作は、チケットを並べないコピーで撮る。
+何も無い状態（編集の確認用）は、チケットを並べない別のコピーで作る。
+
+```sh
+ED=/home/user/ed-repo
+rm -rf "$ED" && cp -a "$TESTREPO" "$ED"
+cd "$ED" && git remote remove origin && git remote -v       # 何も出ないこと
+sh "$CCNAVI/scripts/ccnavi-setup.sh" "$ED" --mode enable --force
+```
+
+チケットが作業中だと、ルール・リスク・フェーズは保存できないため、編集の操作は、チケットを並べないコピーで撮る。
 
 ### 1.4 拡張の vsix を作る
 
@@ -163,15 +174,15 @@ npm install code-server --ignore-scripts --no-audit --no-fund
 拡張は `--install-extension` が失敗するので、vsix を展開して拡張の置き場へ置く。
 
 ```sh
-VSIX=$(ls "$CCNAVI"/dist/ccnavi-board-*.vsix | tail -1)
+VER=$(node -p "require('$BOARD/package.json').version")
+VSIX="$CCNAVI/dist/ccnavi-board-$VER.vsix"
 rm -rf "$W/x" "$W/ext" && mkdir -p "$W/x" "$W/ext" "$W/ud/User"
 python3 -m zipfile -e "$VSIX" "$W/x"
-VER=$(node -p "require('$BOARD/package.json').version")
 cp -r "$W/x/extension" "$W/ext/local.ccnavi-board-$VER"
 echo '{"workbench.startupEditor":"none","security.workspace.trust.enabled":false,"telemetry.telemetryLevel":"off","update.mode":"none","extensions.autoCheckUpdates":false,"workbench.tips.enabled":false}' > "$W/ud/User/settings.json"
 ```
 
-起動する。`setsid` と `< /dev/null` を付けないと、呼び出したシェルが終わったときに落ちる。
+テーマは設定に書かない（書かないと明るい配色で撮れた）。起動する。`setsid` と `< /dev/null` を付けないと、呼び出したシェルが終わったときに落ちる。
 
 ```sh
 cd "$W/cs" && setsid nohup node node_modules/code-server/out/node/entry.js \
@@ -245,7 +256,7 @@ node "$W/shoot.js" "$UC" board 1280 760 チケット管理      # 最初の 1 �
 | `npm install code-server` が `sh ./postinstall.sh` で失敗する（root では `--unsafe-perm` を要求される） | postinstall がネイティブモジュールをビルドする。`--unsafe-perm` を付けても `kerberos` の node-gyp が失敗する | `--ignore-scripts` で入れる。ネイティブモジュールが無くても、画面の確認には足りた |
 | code-server に繋ぐと 500 で `Cannot find package '@microsoft/1ds-core-js'` | `--ignore-scripts` では、`lib/vscode/` の依存が入らない | `(cd node_modules/code-server/lib/vscode && npm install --omit=dev --ignore-scripts)`（1.5） |
 | `--install-extension <vsix>` が `Got error from Code` で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性） | vsix を `python3 -m zipfile -e` で展開し、`extension/` を `--extensions-dir` の下に `local.ccnavi-board-<版>` で置く（1.5）。左の一覧に ccnavi が出る |
-| `pkill -f code-server/out/node/entry.js` や `pgrep -f … | xargs kill` を、その文字列を含む呼び出しの中で打ったら、シェルごと落ちた（終了コード 144） | `pkill -f` が、自分のコマンドラインにも含まれる文字列に当たった | 止めるのと起動は別の呼び出しにし、`pgrep -f "[c]ode-server/out/node/entry"` で PID を見て `kill` する。起動は `setsid nohup … < /dev/null & disown` |
+| `pkill -f code-server/out/node/entry.js` を、その文字列を含む呼び出しの中で打ったら、シェルごと落ちた（終了コード 144） | `pkill -f` が、自分のコマンドラインにも含まれる文字列に当たった | 止めるのと起動は別の呼び出しにし、`pgrep -f "[c]ode-server/out/node/entry"` で PID を見て `kill` する。起動は `setsid nohup … < /dev/null & disown` |
 | Playwright が `strict mode violation`（同じ placeholder の入力欄が 16 個）や `element is not visible` で落ちる | ルールなどの一覧は、行ごとに隠れた入力欄を持つ。新しく足した行は値が空 | `input[placeholder="git-push"][value=""]` や `textarea.f-message:visible` のように、空の値・見えているものに絞る |
 | 画面を開いた直後に撮ると、中身が空や古い | webview は拡張が中身を渡すまで読み込み中 | 開いてから 5 秒待つ。ボードは `ccnavi --explain --json` を呼ぶので、遅いときは増やす |
 | VS Code の表示が英語のまま（`locale: ja` を設定しても変わらない） | 日本語言語パックを入れていない（Open VSX に出られない） | 未確認の宿題（5 章）。拡張の文言は日本語で出るので、ccnavi の画面の確認には影響しない |
