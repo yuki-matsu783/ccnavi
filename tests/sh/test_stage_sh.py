@@ -244,7 +244,7 @@ class StageShTest(unittest.TestCase):
         self.assertIn("取り込みの手順 と mv", nexts[0])
 
     def test_importable_classification_matches_the_python_kinds(self):
-        """sh の is_importable が、実行ファイルの KINDS と同じ答えを返すことを確かめる（表のずれを見つける）。"""
+        """sh の is_importable が、実行ファイルの KINDS と同じ答えを返す（表のずれを見つける）。"""
         from ccnavi.tickets import handoff
 
         paths = [
