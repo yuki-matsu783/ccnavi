@@ -15,7 +15,7 @@ import re
 import shlex
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import fsio, gitcmd, pathsafe, settings, tree
 from ..records import audit, redact
 from . import (
     approval,
@@ -85,15 +85,12 @@ def unsafe_path(tree_root: str, rel: str) -> str:
     parts = [p for p in rel.split("/") if p]
     if not parts:
         return ""
-    cur = tree_root
-    for part in parts:
-        cur = os.path.join(cur, part)
-        if os.path.islink(cur):
-            return cur
-    if os.path.exists(cur):
-        real_root = os.path.realpath(tree_root)
-        if not os.path.realpath(cur).startswith(real_root + os.sep):
-            return cur
+    link = pathsafe.first_link(tree_root, parts)
+    if link:
+        return link
+    cur = os.path.join(tree_root, *parts)
+    if os.path.exists(cur) and pathsafe.escapes(tree_root, cur):
+        return cur
     return ""
 
 

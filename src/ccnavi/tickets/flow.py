@@ -99,7 +99,7 @@ import stat
 
 import yaml
 
-from ..infra import fsio, pathcase, settings, tree, yamlread
+from ..infra import fsio, pathsafe, settings, tree, yamlread
 from ..records import diaglog
 from . import flow_render, flow_shape, flow_text, ticket_model
 
@@ -207,28 +207,6 @@ def draft_file(conf: settings.Settings, tree_root: str, ticket_id: str) -> str:
     return os.path.normpath(os.path.join(tree_root, *draft_rel(conf, ticket_id).split("/")))
 
 
-def linked(tree_root: str, path: str) -> bool:
-    """tree_root から path までの途中（path 自身を含む）に、シンボリックリンクがあるか。
-
-    `configsync._linked` と同じ読み方。パスのままさかのぼり、実体が tree_root に着いたところで
-    止める。tree_root より上のリンク（macOS の `/tmp` など）は数えない。着けなければ
-    （外を指している）リンクと同じに扱う。
-    """
-    try:
-        base = pathcase.fold(os.path.realpath(tree_root))
-        current = os.path.abspath(path)
-        while pathcase.fold(os.path.realpath(current)) != base or os.path.islink(current):
-            if os.path.islink(current):
-                return True
-            parent = os.path.dirname(current)
-            if parent == current:
-                return True
-            current = parent
-    except (OSError, ValueError):
-        return True
-    return False
-
-
 def resolve(
     conf: settings.Settings, root: str, child: ticket_model.Ticket
 ) -> tuple[str, str, bool]:
@@ -276,14 +254,14 @@ def info(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> dict
         "rel": flow_rel(conf, child.ticket),
         "tree": base,
         "exists": exists,
-        "linked": exists and linked(base, path),
+        "linked": exists and pathsafe.has_link(base, path),
         "locked": lock_kind is not None,
         "lock_kind": lock_kind,
         "draft": {
             "path": draft,
             "rel": draft_rel(conf, child.ticket),
             "exists": draft_exists,
-            "linked": draft_exists and linked(base, draft),
+            "linked": draft_exists and pathsafe.has_link(base, draft),
         },
     }
 
@@ -426,7 +404,7 @@ def read_bytes(path: str, tree_root: str = "") -> tuple[bytes | None, str]:
     `O_NOFOLLOW` も無いので、確かめ直しだけが役に立つ。
     """
     try:
-        if tree_root and linked(tree_root, path):
+        if tree_root and pathsafe.has_link(tree_root, path):
             return None, LINKED
         before = os.lstat(path)
         if stat.S_ISLNK(before.st_mode):
@@ -679,7 +657,7 @@ def _entries(path: str, root: str) -> list[os.DirEntry]:
     （`linked` と同じ考え方）。
     """
     try:
-        if linked(root, path) or not os.path.isdir(path):
+        if pathsafe.has_link(root, path) or not os.path.isdir(path):
             return []
         with os.scandir(path) as it:
             found = sorted(it, key=lambda e: e.name)

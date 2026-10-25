@@ -58,7 +58,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, pathcase, settings, yamlread
+from ..infra import fsio, pathcase, pathsafe, settings, yamlread
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import config_check, flow, handoff_names, plan_templates, ticket_places
@@ -253,7 +253,7 @@ def walk(tree_root: str) -> tuple[list[Found], int, str]:
     base = handoff_dir(tree_root)
     if not os.path.lexists(base):
         return [], 0, ""
-    if flow.linked(tree_root, base) or not os.path.isdir(base):
+    if pathsafe.has_link(tree_root, base) or not os.path.isdir(base):
         return [], 0, f"{HANDOFF_REL}/ がリンクか、ディレクトリではないので読めない"
     found: list[Found] = []
     ignored = 0
@@ -520,7 +520,7 @@ def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
         entry.errors.append(why)
         return
     entry.target = target
-    if not _inside(root, target) or flow.linked(root, target):
+    if not _inside(root, target) or pathsafe.has_link(root, target):
         entry.errors.append("取り込み先の途中にリンクがあるか、ツリーの外を指すので書かない")
         return
     if os.path.lexists(target):
@@ -968,7 +968,7 @@ def apply(plan: Plan, expect: str, via_board: bool = False) -> Applied:
 
 def _write_one(root: str, entry: Entry) -> str:
     """1 本を書く。書く直前にリンクと取り込み先のハッシュを確かめ直す。失敗なら理由。"""
-    if flow.linked(root, entry.target) or not _inside(root, entry.target):
+    if pathsafe.has_link(root, entry.target) or not _inside(root, entry.target):
         return f"{entry.rel}: 取り込み先の途中がリンクに変わった"
     if os.path.lexists(entry.target):
         now, why = flow.read_bytes(entry.target, root)
