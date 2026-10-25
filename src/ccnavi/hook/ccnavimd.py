@@ -85,7 +85,7 @@ def _dry_run(ctx: Context) -> bool:
     return ctx.mode == modes.DRY_RUN
 
 
-def _non_interactive(ctx: Context) -> bool:
+def unattended() -> bool:
     """非対話のセッション。Claude Code が付き添いなしと示したときだけ真。
 
     見るのは環境変数 `CLAUDE_CODE_SESSION_ATTENDED` が `0` のことだけ。未設定・`1`・読めない値は、
@@ -94,6 +94,11 @@ def _non_interactive(ctx: Context) -> bool:
     実測で確かめたことと確かめていないことは、設計書の限界の節にある。
     """
     return os.environ.get(ATTENDED_ENV) == "0"
+
+
+def _non_interactive(ctx: Context) -> bool:
+    """非対話のセッション（`unattended`）。"""
+    return unattended()
 
 
 # md の `<!-- ccnavi:if 名前 -->` の名前と、その真偽を返す関数。条件を足すときはここに 1 つ足す。

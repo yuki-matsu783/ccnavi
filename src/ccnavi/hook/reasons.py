@@ -12,6 +12,7 @@ from ..infra import hookio, settings, shellread, shellread_scan, shellread_words
 from ..infra.modes import DRY_RUN
 from ..policy import rules
 from ..tickets import phase, phase_forms
+from . import ccnavimd
 
 # 返す理由に載せる理由コード。設計の理由コードの体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
@@ -186,6 +187,8 @@ def undeclared(
     lines.append(
         template.format(what="command" if tool == "Bash" else "path", where=where, then=then)
     )
+    if degraded:
+        lines.extend(rewrite_hint(degraded))
     return "\n".join(lines)
 
 
@@ -205,17 +208,14 @@ _UNDECLARED_NEXT = {
         "here. {then}"
     ),
     (True, rules.ASK): (
-        "ccnavi is asking rather than deciding because it could not tell what this call "
-        "would actually do. Say what the command is for, or rewrite it in a form that can "
-        "be read: no heredoc, no string handed to something that runs it, no case inside "
-        "$( )."
+        "ccnavi は、このコマンドが実際に何を実行するか読めなかったので、判定せずに確認しています。"
+        "何のためのコマンドかを伝えるか、読める形に書き直してください。"
     ),
     (True, rules.DENY): (
-        "ccnavi could not tell what this call would actually do, and this session has no one "
-        "to ask: its permission mode answers on its own or not at all. So the call is not run, "
-        "and saying what the command is for will not get it through. Rewrite it in a form that "
-        "can be read: no heredoc, no string handed to something that runs it, no case inside "
-        "$( ). If it cannot be written that way, tell the user what you need it for."
+        "ccnavi は、このコマンドが実際に何を実行するか読めませんでした。このセッションには"
+        "確認に答える人がいない（権限モードが自分で答えるか、答えない）ので、実行しません。"
+        "何のためのコマンドかを伝えても通りません。読める形に書き直してください。"
+        "書き直せないときは、何のために要るかをユーザに伝えてください。"
     ),
 }
 
@@ -317,6 +317,7 @@ def reason_for(
         lines.append(ran_by(runner, inner))
     if degraded:
         lines.append(unreadable(degraded))
+        lines.extend(rewrite_hint(degraded))
     lines.append(rule.spoken_message())
     if quoted:
         lines.append(inside_quotes(git))
@@ -389,23 +390,52 @@ def unreadable(reason: str, *, matched: bool = True) -> str:
     次の一手は呼び手が続けて書く。
     """
     what = {
-        shellread_scan.REASON_UNTERMINATED: ("a quote or heredoc in this command never closes"),
-        shellread_words.REASON_TAKEN_AS_CODE: (
-            "this command hands a string to something that runs it as code"
-        ),
-        shellread_scan.REASON_UNTERMINATED_SUBST: "a $( ) in this command never closes",
-    }.get(reason, "this command could not be read")
+        shellread_scan.REASON_UNTERMINATED: "引用符かヒアドキュメントが閉じていない",
+        shellread_words.REASON_TAKEN_AS_CODE: "文字列をコードとして実行するものに渡している",
+        shellread_scan.REASON_UNTERMINATED_SUBST: "$( ) が閉じていない",
+        shellread_scan.REASON_ANSI_C: "ANSI-C 引用（$'…'）を含み、何の文字になるかを読めない",
+    }.get(reason, "読めない形をしている")
     if not matched:
         return (
-            "note: " + what + ", so ccnavi could only match its rules against the raw text "
-            "of the command, and none of them mentions it."
+            f"注: このコマンドは、{what}ため、ccnavi は書かれた生の文字列にしかルールを当てられず、"
+            "どのルールもそれに言及していません。"
         )
     return (
-        "note: " + what + ", so this rule was matched against the raw text of the "
-        "command instead of against what runs. If these words are only being "
-        "written down and not run, nothing was deliberately forbidden: move the "
-        "text into a file, or split the command up, and try again."
+        f"注: このコマンドは、{what}ため、このルールは実行される中身ではなく、書かれた生の文字列に"
+        "当てました。語を書いただけで実行しないなら、禁止したわけではありません。"
+        "語をファイルに移すか、コマンドを分けて打ち直してください。"
     )
+
+
+# 読めなかった理由ごとの書き換え例。書き換え先は読める形で、ルールには触れない。
+_REWRITE = {
+    shellread_words.REASON_TAKEN_AS_CODE: (
+        "書き換え: Grep ツールを使うか、`grep -rn <語> <パス>` と書く。`wc -l <パス>` のように"
+        "ファイル名を直接書くか、ファイル名を並べて 1 回で呼ぶ。",
+        "`xargs` と `find -exec` は、後ろのコマンドが "
+        + " ".join(sorted(shellread_words._READONLY_RUNNEE))
+        + " のときだけ通る。",
+    ),
+    shellread_scan.REASON_ANSI_C: (
+        "書き換え: タブは `grep -P '\\t'` で書く。または `printf '\\t'` の結果をファイルに書き、"
+        "そのファイルを渡す。",
+    ),
+    shellread_scan.REASON_UNTERMINATED: (
+        "書き換え: 複数行の文字列やヒアドキュメントは、Write ツールでファイルに書き、"
+        "そのファイルを渡す。引用符は閉じる。",
+    ),
+}
+
+
+def rewrite_hint(reason: str) -> list[str]:
+    """読めなかった理由ごとの書き換え例の行。例の無い理由は空。
+
+    非対話のセッションでは確認に答える人がいないので、書き直すほかないことを 1 行足す。
+    """
+    lines = list(_REWRITE.get(reason, ()))
+    if lines and ccnavimd.unattended():
+        lines.append("このセッションでは確認に答えられないので、上の形に書き直してください。")
+    return lines
 
 
 def subagent_forbidden(subject: str, runner: str, inner: str) -> str:

@@ -33,6 +33,50 @@ class _Readable:
 
 
 class ReadTest(_Readable, unittest.TestCase):
+    def test_xargsとfind_execは後ろが読むだけのコマンドなら読める(self):
+        cases = [
+            "find . -name x -print0 | xargs -0 wc -l",
+            "ls | xargs grep -l foo",
+            "xargs -I{} grep -n foo {}",
+            "find . -name x -exec wc -l {} +",
+            "xargs -n 1 -P 4 grep -c foo",
+            "xargs -a x.txt grep foo",
+            "xargs --max-args=3 sort",
+            "/usr/bin/xargs /usr/bin/GREP.exe x",
+            "find . -exec wc {} \\; -exec ls {} \\;",
+        ]
+        for src in cases:
+            with self.subTest(src=src):
+                self.readable(src)
+
+    def test_xargsとfind_execは後ろが一覧に無いか決まらなければ縮退する(self):
+        cases = [
+            "xargs rm",
+            "printf a | xargs rm",
+            "xargs sh script.sh",
+            "xargs -I{} sh -c 'echo {}'",
+            "xargs -a x.txt sh script.sh",
+            "find . -exec sh -c 'x' \\;",
+            "find . -exec rm {} \\;",
+            "find . -exec wc {} \\; -exec rm {} \\;",
+            "xargs",
+            "xargs -I{} {}",
+            "xargs -n 2 grep x | xargs rm",
+            "ls | xargs grep x | xargs rm",
+            "xargs -I X cat X",
+            "xargs cat",
+            "eval grep x f",
+        ]
+        for src in cases:
+            with self.subTest(src=src):
+                result = read(src)
+                self.assertTrue(result.degraded, f"{src!r} を普通に読んでしまった")
+                self.assertEqual(result.reason, REASON_TAKEN_AS_CODE)
+
+    def test_xargsの値を取るオプションの値を実行される語と読まない(self):
+        # `2` を実行される語と読むと、一覧に無いので縮退するはず。読めるのは値を飛ばしたから。
+        self.readable("xargs -n 2 grep x")
+
     def test_実行される語はそのまま残る(self):
         cases = {
             "git push origin main": "git push origin main",
@@ -829,7 +873,7 @@ class SubstTest(unittest.TestCase):
             ("echo `git push", shellread_scan.REASON_BACKQUOTE),
             ('echo "`git push"', shellread_scan.REASON_BACKQUOTE),
             ('echo "$(case a in a) git push;; esac)"', shellread_scan.REASON_AMBIGUOUS_SUBST),
-            ('echo "$(xargs echo < f)"', REASON_TAKEN_AS_CODE),
+            ('echo "$(xargs rm < f)"', REASON_TAKEN_AS_CODE),
             ("cat <<'EOF' > notes.md", REASON_UNTERMINATED),
         ]
         for src, reason in cases:
