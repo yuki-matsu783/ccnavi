@@ -76,6 +76,14 @@ class CommittedUpstreamTest(unittest.TestCase):
         commit_file(self.clone, "mine")
         self.assertEqual(self.paths(), {"mine"})
 
+    def test_commit_pushed_in_the_same_turn_is_not_counted(self):
+        # 未 push だけを数える方針の範囲外。設計書の「残る穴」で許した挙動を固定する。
+        git(self.clone, "pull", "-q", "--ff-only")
+        git(self.up, "config", "receive.denyCurrentBranch", "ignore")
+        commit_file(self.clone, "mine")
+        git(self.clone, "push", "-q", "origin", "HEAD:main")
+        self.assertEqual(self.paths(), set())
+
     def test_commit_tree_then_reset_hard_is_counted(self):
         with open(os.path.join(self.clone, "forged"), "w") as f:
             f.write("x\n")
