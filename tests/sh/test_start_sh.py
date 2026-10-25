@@ -1190,7 +1190,7 @@ class StartShTest(unittest.TestCase):
         self.assertFalse(os.path.isdir(self.wt("fix-152-other-05")))
 
     def templates_note(self, templates_out):
-        """`--templates --json` に決めた答えを返す実行ファイルで、新規作成の出力から案内の行を取る。"""
+        """`--templates --json` に決まった答えを返す実行ファイルで、新規作成の出力から案内の行を取る。"""
         self.github_new()
         fake = write(
             os.path.join(self._tmp.name, "tpl", "ccnavi"),
