@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "note": "書き方は docs/42_claude/gitlab-contract.md。パスは /api/v4 より後ろ。${名前} は録る側・比べる側が実体に置き換える。書き込みは最後にまとめてある（読みの形が前の書き込みで変わらないように）",
+  "requests": [
+    {"name": "user", "method": "GET", "path": "/user", "token": "main", "used_by": ["sh"], "save": {"user.id": "id"}},
+    {"name": "project", "method": "GET", "path": "/projects/${project}", "token": "main", "used_by": ["sh"]},
+    {"name": "member", "method": "GET", "path": "/projects/${project}/members/all/${user.id}", "token": "main", "used_by": ["sh"]},
+    {"name": "mrs_opened", "method": "GET", "path": "/projects/${project}/merge_requests", "query": {"state": "opened", "source_branch": "${mr.branch}"}, "token": "main", "used_by": ["sh"]},
+    {"name": "mrs_merged", "method": "GET", "path": "/projects/${project}/merge_requests", "query": {"state": "merged", "source_branch": "${mr.merged_branch}"}, "token": "main", "used_by": ["sh"]},
+    {"name": "mr_get", "method": "GET", "path": "/projects/${project}/merge_requests/${mr.iid}", "token": "main", "used_by": ["sh"]},
+    {"name": "discussions", "method": "GET", "path": "/projects/${project}/merge_requests/${mr.iid}/discussions", "token": "main", "used_by": ["sh"]},
+    {"name": "reviewers", "method": "GET", "path": "/projects/${project}/merge_requests/${mr.iid}/reviewers", "token": "main", "used_by": ["sh"]},
+    {"name": "notes_get", "method": "GET", "path": "/projects/${project}/merge_requests/${mr.iid}/notes", "query": {"order_by": "created_at", "sort": "desc"}, "token": "main", "used_by": ["sh"]},
+    {"name": "closes_issues", "method": "GET", "path": "/projects/${project}/merge_requests/${mr.iid}/closes_issues", "token": "main", "used_by": ["sh"]},
+    {"name": "issues_list", "method": "GET", "path": "/projects/${project}/issues", "query": {"state": "opened"}, "token": "main", "used_by": ["sh"]},
+    {"name": "issue_get", "method": "GET", "path": "/projects/${project}/issues/${issue.iid}", "token": "main", "used_by": ["sh"]},
+    {"name": "issue_notes_get", "method": "GET", "path": "/projects/${project}/issues/${issue.iid}/notes", "query": {"order_by": "created_at", "sort": "desc"}, "token": "main", "used_by": ["sh"]},
+    {"name": "issue_related_mrs", "method": "GET", "path": "/projects/${project}/issues/${issue.iid}/related_merge_requests", "token": "main", "used_by": ["sh"]},
+    {"name": "error_401", "method": "GET", "path": "/user", "token": "none", "used_by": ["sh"]},
+    {"name": "error_404", "method": "GET", "path": "/projects/${project}/merge_requests/999999", "token": "main", "used_by": ["sh"]},
+    {"name": "mr_put", "method": "PUT", "path": "/projects/${project}/merge_requests/${mr.iid}", "body": {"title": "contract: retitled"}, "token": "main", "used_by": ["sh"]},
+    {"name": "discussion_reply", "method": "POST", "path": "/projects/${project}/merge_requests/${mr.iid}/discussions/${discussion.id}/notes", "body": {"body": "contract reply"}, "token": "main", "used_by": ["sh"]},
+    {"name": "discussion_resolve", "method": "PUT", "path": "/projects/${project}/merge_requests/${mr.iid}/discussions/${discussion.id}", "body": {"resolved": true}, "token": "main", "used_by": ["sh"]},
+    {"name": "notes_post", "method": "POST", "path": "/projects/${project}/merge_requests/${mr.iid}/notes", "body": {"body": "contract note"}, "token": "main", "used_by": ["sh"]},
+    {"name": "issue_create", "method": "POST", "path": "/projects/${project}/issues", "body": {"title": "contract issue", "description": "contract body"}, "token": "main", "used_by": ["sh"]},
+    {"name": "issue_notes_post", "method": "POST", "path": "/projects/${project}/issues/${issue.iid}/notes", "body": {"body": "contract issue note"}, "token": "main", "used_by": ["sh"]},
+    {"name": "mr_create", "method": "POST", "path": "/projects/${project}/merge_requests", "body": {"source_branch": "${mr.new_branch}", "target_branch": "main", "title": "Draft: contract", "description": "Closes #${issue.iid}"}, "token": "main", "used_by": ["sh"]}
+  ]
+}

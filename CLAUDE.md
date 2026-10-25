@@ -32,4 +32,5 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | sh・Python・TS でログを書く、logger を直す | `docs/42_claude/logging.md` |
 | sh や実行ファイルの出力に案内（`次:`・`案内:`・`必須:`）を足す・直す、チケット作業を進める出力を新しく書く | `docs/42_claude/script-output.md` |
 | Python のテストを回す（特に全件）、回すグループを決める | `docs/42_claude/testing.md` |
+| GitLab の模擬（`tests/fake_gitlab.py`）の応答を変える、契約テスト（`tests/contract/`）・録画した応答の形（`recorded*.json`）を足す・直す | `docs/42_claude/gitlab-contract.md` |
 | 受入シナリオ（`tests/scenarios/`）を書く、`claude -p` で振る舞いを回す（明確な指示があったときだけ） | `docs/42_claude/acceptance-scenarios.md` |

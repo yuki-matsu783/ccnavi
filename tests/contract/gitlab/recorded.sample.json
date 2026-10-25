@@ -1,0 +1,992 @@
+{
+ "version": 1,
+ "source": "sample",
+ "gitlab_image": null,
+ "recorded_at": null,
+ "not_recorded": [
+  "headers",
+  "page2",
+  "error_403"
+ ],
+ "requests": {
+  "user": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "id": {
+      "t": [
+       "integer"
+      ]
+     },
+     "name": {
+      "t": [
+       "string"
+      ]
+     },
+     "state": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  },
+  "project": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "id": {
+      "t": [
+       "integer"
+      ]
+     },
+     "path_with_namespace": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  },
+  "member": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "access_level": {
+      "t": [
+       "integer"
+      ]
+     },
+     "id": {
+      "t": [
+       "integer"
+      ]
+     },
+     "state": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  },
+  "mrs_opened": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "array"
+    ],
+    "items": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "created_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "iid": {
+       "t": [
+        "integer"
+       ]
+      },
+      "source_branch": {
+       "t": [
+        "string"
+       ]
+      },
+      "source_project_id": {
+       "t": [
+        "integer"
+       ]
+      },
+      "state": {
+       "t": [
+        "string"
+       ]
+      },
+      "target_branch": {
+       "t": [
+        "string"
+       ]
+      },
+      "title": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "mrs_merged": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "array"
+    ],
+    "items": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "created_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "iid": {
+       "t": [
+        "integer"
+       ]
+      },
+      "merged_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "source_branch": {
+       "t": [
+        "string"
+       ]
+      },
+      "source_project_id": {
+       "t": [
+        "integer"
+       ]
+      },
+      "state": {
+       "t": [
+        "string"
+       ]
+      },
+      "target_branch": {
+       "t": [
+        "string"
+       ]
+      },
+      "title": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "mr_get": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "iid": {
+      "t": [
+       "integer"
+      ]
+     },
+     "source_branch": {
+      "t": [
+       "string"
+      ]
+     },
+     "source_project_id": {
+      "t": [
+       "integer"
+      ]
+     },
+     "state": {
+      "t": [
+       "string"
+      ]
+     },
+     "target_branch": {
+      "t": [
+       "string"
+      ]
+     },
+     "title": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  },
+  "discussions": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "array"
+    ],
+    "items": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "id": {
+       "t": [
+        "string"
+       ]
+      },
+      "individual_note": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "notes": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "author": {
+          "t": [
+           "object"
+          ],
+          "keys": {
+           "id": {
+            "t": [
+             "integer"
+            ]
+           }
+          }
+         },
+         "body": {
+          "t": [
+           "string"
+          ]
+         },
+         "created_at": {
+          "t": [
+           "datetime"
+          ]
+         },
+         "id": {
+          "t": [
+           "integer"
+          ]
+         },
+         "resolvable": {
+          "t": [
+           "boolean"
+          ]
+         },
+         "resolved": {
+          "t": [
+           "boolean"
+          ]
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "reviewers": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "array"
+    ],
+    "items": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "created_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "state": {
+       "t": [
+        "string"
+       ]
+      },
+      "updated_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "user": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "id": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "notes_get": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "array"
+    ],
+    "items": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "body": {
+       "t": [
+        "string"
+       ]
+      },
+      "created_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "id": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "closes_issues": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "array"
+    ],
+    "items": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "created_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "description": {
+       "t": [
+        "string"
+       ]
+      },
+      "iid": {
+       "t": [
+        "integer"
+       ]
+      },
+      "notes": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "body": {
+          "t": [
+           "string"
+          ]
+         },
+         "created_at": {
+          "t": [
+           "datetime"
+          ]
+         },
+         "id": {
+          "t": [
+           "integer"
+          ]
+         }
+        }
+       }
+      },
+      "references": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "full": {
+         "t": [
+          "string"
+         ]
+        },
+        "relative": {
+         "t": [
+          "string"
+         ]
+        },
+        "short": {
+         "t": [
+          "string"
+         ]
+        }
+       }
+      },
+      "state": {
+       "t": [
+        "string"
+       ]
+      },
+      "title": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "issues_list": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "array"
+    ],
+    "items": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "created_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "description": {
+       "t": [
+        "string"
+       ]
+      },
+      "iid": {
+       "t": [
+        "integer"
+       ]
+      },
+      "notes": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "body": {
+          "t": [
+           "string"
+          ]
+         },
+         "created_at": {
+          "t": [
+           "datetime"
+          ]
+         },
+         "id": {
+          "t": [
+           "integer"
+          ]
+         }
+        }
+       }
+      },
+      "state": {
+       "t": [
+        "string"
+       ]
+      },
+      "title": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "issue_get": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "description": {
+      "t": [
+       "string"
+      ]
+     },
+     "iid": {
+      "t": [
+       "integer"
+      ]
+     },
+     "notes": {
+      "t": [
+       "array"
+      ],
+      "items": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "body": {
+         "t": [
+          "string"
+         ]
+        },
+        "created_at": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "id": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      }
+     },
+     "state": {
+      "t": [
+       "string"
+      ]
+     },
+     "title": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  },
+  "issue_notes_get": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "array"
+    ],
+    "items": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "body": {
+       "t": [
+        "string"
+       ]
+      },
+      "created_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "id": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "issue_related_mrs": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "array"
+    ],
+    "items": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "created_at": {
+       "t": [
+        "datetime"
+       ]
+      },
+      "iid": {
+       "t": [
+        "integer"
+       ]
+      },
+      "source_branch": {
+       "t": [
+        "string"
+       ]
+      },
+      "source_project_id": {
+       "t": [
+        "integer"
+       ]
+      },
+      "state": {
+       "t": [
+        "string"
+       ]
+      },
+      "target_branch": {
+       "t": [
+        "string"
+       ]
+      },
+      "title": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "error_401": {
+   "status": 401,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "message": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  },
+  "error_404": {
+   "status": 404,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "message": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  },
+  "mr_put": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "iid": {
+      "t": [
+       "integer"
+      ]
+     },
+     "source_branch": {
+      "t": [
+       "string"
+      ]
+     },
+     "source_project_id": {
+      "t": [
+       "integer"
+      ]
+     },
+     "state": {
+      "t": [
+       "string"
+      ]
+     },
+     "target_branch": {
+      "t": [
+       "string"
+      ]
+     },
+     "title": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  },
+  "discussion_reply": {
+   "status": 201,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "author": {
+      "t": [
+       "object"
+      ],
+      "keys": {
+       "id": {
+        "t": [
+         "integer"
+        ]
+       }
+      }
+     },
+     "body": {
+      "t": [
+       "string"
+      ]
+     },
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "id": {
+      "t": [
+       "integer"
+      ]
+     }
+    }
+   }
+  },
+  "discussion_resolve": {
+   "status": 200,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "id": {
+      "t": [
+       "string"
+      ]
+     },
+     "individual_note": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "notes": {
+      "t": [
+       "array"
+      ],
+      "items": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "author": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "id": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "body": {
+         "t": [
+          "string"
+         ]
+        },
+        "created_at": {
+         "t": [
+          "datetime"
+         ]
+        },
+        "id": {
+         "t": [
+          "integer"
+         ]
+        },
+        "resolvable": {
+         "t": [
+          "boolean"
+         ]
+        },
+        "resolved": {
+         "t": [
+          "boolean"
+         ]
+        }
+       },
+       "opt": [
+        "resolvable",
+        "resolved"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "notes_post": {
+   "status": 201,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "body": {
+      "t": [
+       "string"
+      ]
+     },
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "id": {
+      "t": [
+       "integer"
+      ]
+     }
+    }
+   }
+  },
+  "issue_create": {
+   "status": 201,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "description": {
+      "t": [
+       "string"
+      ]
+     },
+     "iid": {
+      "t": [
+       "integer"
+      ]
+     },
+     "state": {
+      "t": [
+       "string"
+      ]
+     },
+     "title": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  },
+  "issue_notes_post": {
+   "status": 201,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "body": {
+      "t": [
+       "string"
+      ]
+     },
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "id": {
+      "t": [
+       "integer"
+      ]
+     }
+    }
+   }
+  },
+  "mr_create": {
+   "status": 201,
+   "shape": {
+    "t": [
+     "object"
+    ],
+    "keys": {
+     "created_at": {
+      "t": [
+       "datetime"
+      ]
+     },
+     "iid": {
+      "t": [
+       "integer"
+      ]
+     },
+     "source_branch": {
+      "t": [
+       "string"
+      ]
+     },
+     "source_project_id": {
+      "t": [
+       "integer"
+      ]
+     },
+     "state": {
+      "t": [
+       "string"
+      ]
+     },
+     "target_branch": {
+      "t": [
+       "string"
+      ]
+     },
+     "title": {
+      "t": [
+       "string"
+      ]
+     }
+    }
+   }
+  }
+ }
+}
