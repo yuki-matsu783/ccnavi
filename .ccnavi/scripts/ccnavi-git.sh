@@ -1693,7 +1693,7 @@ worktree)
 			-b) wt_skip=b ;;
 			--reason) wt_skip=r ;;
 			-B)
-				reject worktree-force-branch "worktree add -B は、同じ名前の既存のブランチを別のコミットへ移します。そのブランチにしか無いコミットが外れ、親のブランチなら承認済みチケットの置き場ごと中身が変わります。新しく切るなら $SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>、既にあるブランチを出すなら $SELF worktree add .claude/worktrees/<ブランチ> <ブランチ> です。リモートに合わせるのは $SYNC <P> です。"
+				reject worktree-force-branch "worktree add -B は、同じ名前の既存のブランチを別のコミットへ移します。そのブランチにしか無いコミットが外れ、親のブランチなら承認済みチケットの置き場ごと中身が変わります。新しく切るなら $SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>、既にあるブランチを出すなら $SELF worktree add .claude/worktrees/<ブランチ> <ブランチ> です。直接作業のブランチなら、続けて $WT_SH_Q <名前> --adopt --base <統合先> で引き取ります（ユーザの確認が要ります。引き取らないと integrate できません）。リモートに合わせるのは $SYNC <P> です。"
 				;;
 			--detach | -d)
 				reject worktree-detach "worktree add $wt_word はブランチの外（detached HEAD）にワークツリーを作ります。ワークツリーはブランチの上に作り、名前をブランチ名に揃えます（$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点>）。"
@@ -1767,7 +1767,7 @@ worktree)
 			fi
 		elif [ -n "$wt_base" ]; then
 			if [ "$(ccnavi_branch_to_id "$wt_base")" != "$wt_leaf" ]; then
-				reject worktree-name "worktree add $wt_dest $wt_base は、$wt_base を名前の違う作成先（${wt_leaf}）に出すか、ブランチの外（detached HEAD）に作ります。ワークツリーの名前は、ブランチ名の / を - に置き換えたものにします。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf ${wt_base}、既にあるブランチ $wt_base を出すなら行き先を .claude/worktrees/$(ccnavi_branch_to_id "$wt_base") にしてください。"
+				reject worktree-name "worktree add $wt_dest $wt_base は、$wt_base を名前の違う作成先（${wt_leaf}）に出すか、ブランチの外（detached HEAD）に作ります。ワークツリーの名前は、ブランチ名の / を - に置き換えたものにします。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf ${wt_base}、既にあるブランチ $wt_base を出すなら行き先を .claude/worktrees/$(ccnavi_branch_to_id "$wt_base") にしてください。直接作業のブランチなら、続けて $WT_SH_Q <名前> --adopt --base <統合先> で引き取ります（ユーザの確認が要ります。引き取らないと integrate できません）。"
 			elif ! git show-ref --verify --quiet "refs/heads/$wt_base" &&
 				! git show-ref --verify --quiet "refs/remotes/origin/$wt_base"; then
 				# 名前が揃っていても、ブランチでない（タグ・sha）ならブランチの外に作る。
