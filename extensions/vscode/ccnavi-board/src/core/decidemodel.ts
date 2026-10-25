@@ -2,7 +2,7 @@
  * 残った指摘を決める JSON の形（実行ファイルとの契約）と読み取り。docs/11_requirements/json-shapes.md「残った指摘の JSON」。
  *
  * `ccnavi-review.sh decide <N> --preview` が残った指摘とダイジェストを見せ、
- * `ccnavi-user-decide.sh decide <N> --choices <JSON> --digest <ダイジェスト>` がユーザの選んだ行き先を置く。
+ * `ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>` がユーザの選んだ行き先を置く。
  * 拡張は見せられた指摘をそのまま並べ、選んだ行き先をキーごとに返すだけ
  * （マージリクエストを読むのは sh、判断するのは実行ファイル）。
  */
