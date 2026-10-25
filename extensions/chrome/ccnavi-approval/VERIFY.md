@@ -155,7 +155,7 @@
 拡張を読み込んだ Chromium でボードを描いて、PNG・テキスト・DOM の要約に残します。以降の表の「ツールで代替できるか」の列は、この方法で確かめられる項目を示します。
 
 ```sh
-node scripts/test.js --e2e      # 先に dist-e2e/ と out/ を組む（render-scene.js からはビルドしない）
+node scripts/test.js --e2e      # 先に dist-e2e/ と out/ を組む（render-scene.js からはビルドしない。e2e の試験全体も回る。CCNAVI_CHROMIUM を使う環境では、組み立てのあとに 3 で終わるが、組み上がってはいる）
 node scripts/render-scene.js --repo <ccnavi を配布済みのリポジトリ> --out <リポジトリの外のディレクトリ> [--host github|gitlab] [--width 1400]
 ```
 
@@ -171,7 +171,7 @@ node scripts/render-scene.js --repo <ccnavi を配布済みのリポジトリ> -
 確かめられないのは、ホストの応答の形、MR のスレッドとレビュー（模擬には載せない。レビュー待ちの欄は「対応する MR が無い」と出る）、PAT の権限と期限、承認などの書き込み、保護の挙動です。これらは次の表の手順で実際のホストを使います。
 
 DOM の要約（`src/core/dom-summary.ts`）は、この拡張の中だけに置きます。`extensions/shared/` は今は CSS だけで、TS の関数を置くには
-tsconfig・esbuild のバンドル・両拡張の `workspace:*` 依存・拡張ごとの lockfile の整合が要るためです。VS Code 側へは同じ形（`schema: 1`。Chrome の `family` は VS Code 側では `parent`、
+tsconfig・esbuild のバンドル・両拡張の `workspace:*` 依存・拡張ごとの lockfile の整合が要るためです。VS Code 側には、まだ実装がありません。足すときは同じ形（`schema: 1`。Chrome の `family` は VS Code 側では `parent`、
 `column` は Chrome 側では持たない）を別に書き、形を確かめるテストを両方に置きます。
 
 ### 4.1 読み取りボード
