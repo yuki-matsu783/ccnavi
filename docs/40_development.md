@@ -162,7 +162,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `.claude/skills/` | このリポジトリのスキル。設定 3 本を足す・確かめる `ccnavi-config`、ccnavi を入れる・更新する `ccnavi-install`、コミットの手順 `commit`、気づきを記録に足す `learn`、図解の説明 `eli5` / `eli10`、文章の推敲 `yomiyasu`、工程の考え方の入口 `process-*`（`process: true` と `distribute: true` のものは `scripts/ccnavi-setup.sh` が配る） |
 | `.ccnavi/scripts/` | 配布する sh。一覧と役割は[配布するスクリプト](41_guide/scripts.md) |
 | `scripts/ccnavi-install.sh` | ccnavi を入れる入口。状況を調べ（`ccnavi-doctor.sh`）、入れる先に配り（`ccnavi-setup.sh`）、最後に lint で確かめる |
-| `scripts/ccnavi-check-no-wip.sh` | main へ入れる PR の差分に `wip/` の追跡済みファイル（`wip/handoff/` 以外）が入っていれば止める。`.github/workflows/no-wip.yml` が Draft でない PR で呼ぶ。Draft はチケット作業中で `wip/proposals/` が載るので見ない（`ready` が `wip/` を消してから Draft を外す） |
+| `scripts/ccnavi-check-no-wip.sh` | main へ入れる PR の差分に `wip/` の追跡済みファイルがあれば止める。ただし `wip/handoff/` は数えない。`.github/workflows/no-wip.yml` が Draft でない PR で呼ぶ。Draft はチケット作業中のため `wip/proposals/` が載っていても見ない。`ready` は `wip/` を消してから Draft を外す |
 | `scripts/ccnavi-doctor.sh` | 入れる前に、この機械の状況を調べて 1 項目 1 行で報告する。何も書き換えない |
 | `scripts/ccnavi-package.sh` | 配る側が ccnavi の配布用の zip を作る。ソースのリポジトリで打つ |
 | `scripts/ccnavi-build-install.sh` | ccnavi・VS Code 拡張・Chrome 拡張をビルドし、ccnavi と VS Code 拡張をこの機械に入れる |

@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 jobs:
   no-wip:
-    # Draft はチケット作業中。wip/proposals/ が載っていて正常
+    # Draft はチケット作業中のため、wip/proposals/ が載っているのが正常
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:

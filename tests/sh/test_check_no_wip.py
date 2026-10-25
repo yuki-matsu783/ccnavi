@@ -1,4 +1,4 @@
-"""scripts/ccnavi-check-no-wip.sh: 統合先へ入れる差分に wip/ が入っていれば止める。"""
+"""scripts/ccnavi-check-no-wip.sh: 統合先へ入れる差分に wip/ が含まれていれば失敗させる。"""
 
 from __future__ import annotations
 
@@ -37,8 +37,11 @@ class CheckNoWip(unittest.TestCase):
     def test_no_wip_passes(self) -> None:
         self.assertEqual(self.run_check(["src/a.py"]).returncode, 0)
 
+    def test_uppercase_wip_fails(self) -> None:
+        self.assertEqual(self.run_check(["WIP/proposals/x.md"]).returncode, 1)
+
     def test_handoff_is_allowed(self) -> None:
-        self.assertEqual(self.run_check(["wip/handoff/learnings/a.md"]).returncode, 0)
+        self.assertEqual(self.run_check(["Wip/Handoff/learnings/a.md"]).returncode, 0)
 
 
 if __name__ == "__main__":
