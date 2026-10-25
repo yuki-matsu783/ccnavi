@@ -108,6 +108,82 @@ class ImportSideEffectTest(unittest.TestCase):
         self.assertIn("make_gitlab_tokens.rb", done.stderr)
 
 
+class ProbePureHelpersTest(unittest.TestCase):
+    """probe の純粋な部分（Docker 不要）。実機で直した期待が戻らないように固定する（#614）。"""
+
+    def setUp(self) -> None:
+        import probe_gitlab  # noqa: PLC0415
+
+        self.probe = probe_gitlab
+
+    def approved_parent(self) -> str:
+        """probe が承認する親と同じ形（plan 1 つ・フィードバック計画なし）の全文。"""
+        from tests.ticketsample import parent_text  # noqa: PLC0415
+
+        return parent_text("i0001", ["work"])
+
+    def parse(self, text: str):
+        from ccnavi.tickets import ticket as ticket_mod  # noqa: PLC0415
+
+        found, problems = ticket_mod.parse(text)
+        self.assertIsNotNone(found, problems)
+        return found
+
+    def test_feedback_revision_adds_only_an_empty_feedback_plan(self):
+        text = self.approved_parent()
+        revised = self.probe.feedback_revision(text)
+        self.assertEqual(text.replace("human_review:", "feedback: []\nhuman_review:", 1), revised)
+
+    def test_feedback_revision_blanks_the_fields_written_after_approval(self):
+        text = (
+            self.approved_parent()
+            .replace('started_at: ""', 'started_at: "2026-01-01T00:00:00"')
+            .replace('base_sha: ""', 'base_sha: "abc123"')
+        )
+        revised = self.probe.feedback_revision(text)
+        self.assertIn('started_at: ""', revised)
+        self.assertIn('base_sha: ""', revised)
+        self.assertNotIn("2026-01-01", revised)
+        self.assertNotIn("abc123", revised)
+
+    def test_feedback_revision_is_detected_as_a_revision(self):
+        from ccnavi.tickets import approval  # noqa: PLC0415
+
+        current = self.parse(self.approved_parent())
+        revised = self.parse(self.probe.feedback_revision(self.approved_parent()))
+        self.assertTrue(approval.plan_differs(revised, current))
+        self.assertEqual([], revised.feedback)
+        self.assertIsNone(current.feedback)
+
+    def test_feedback_revision_refuses_a_text_that_already_has_feedback(self):
+        once = self.probe.feedback_revision(self.approved_parent())
+        with self.assertRaises(ValueError):
+            self.probe.feedback_revision(once)
+
+    def test_cancelled_children_live_in_done_not_in_a_cancelled_directory(self):
+        from ccnavi.tickets import ticket_model  # noqa: PLC0415
+
+        path = self.probe.approved_copy_path("/t", "done", "i0002-01-01")
+        self.assertEqual(os.path.join("/t", ".ccnavi", "approved", "done", "i0002-01-01.md"), path)
+        self.assertNotIn(ticket_model.CANCELLED, path)
+        self.assertNotIn(ticket_model.CANCELLED, ticket_model.STATES)
+
+    def test_cancelled_mark_needs_a_filled_cancelled_at(self):
+        self.assertTrue(self.probe.is_cancelled_copy('x: 1\ncancelled_at: "2026-01-01T00:00:00"\n'))
+        self.assertFalse(self.probe.is_cancelled_copy('x: 1\ncancelled_at: ""\n'))
+        self.assertFalse(self.probe.is_cancelled_copy("x: 1\n"))
+
+    def test_project_name_takes_a_prefix_to_tell_runs_apart(self):
+        self.assertEqual(
+            "ccnavi-probe-0101-120000", self.probe.project_name("ccnavi-probe", "0101-120000")
+        )
+        self.assertEqual("p614-0101-120000", self.probe.project_name("p614", "0101-120000"))
+
+    def test_summary_counts_skip_apart_from_pass(self):
+        results = [("a", "PASS", ""), ("b", "SKIP", ""), ("c", "FAIL", ""), ("d", "PASS", "")]
+        self.assertEqual("PASS 2 / SKIP 1 / FAIL 1", self.probe.summary_line(results))
+
+
 class ClientMethodTest(unittest.TestCase):
     def test_get_branch_calls_the_branch_path(self):
         client = gitlab_api.Client("http://x")
