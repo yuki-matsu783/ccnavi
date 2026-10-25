@@ -42,7 +42,7 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
 ## どこに足すか
 
 候補を書く前に、`ccnavi --learnings` の一覧と `docs/wiki/impact/`（採否の記録）を読む。wiki は `.ccnavi/docs/skill-wiki.md`。
-足し先は、上にあるものほど優先する。
+足す先は、上の項目ほど優先する。
 
 1. このセッションで読んだスキルを直す
 2. 工程スキル（`process-design` `process-research` `process-implement` `process-test` `process-debug` `process-review` `process-release`）にヒットする作業なら、その `references/` に足すか広げる。他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`。SKILL.md は直さない（`.ccnavi/docs/skill-processes.md`）

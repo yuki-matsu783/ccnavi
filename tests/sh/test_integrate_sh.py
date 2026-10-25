@@ -1601,7 +1601,7 @@ class PullOnTargetTest(Fixture):
         self.assertEqual(before, git(self.ws, "rev-parse", "HEAD").strip())
 
     def test_a_branch_ahead_of_the_target_is_refused_too(self):
-        # 分岐していない（main より進んだだけ）feat の素の pull は、黙って fast-forward する。
+        # 分岐せず main より進んだだけの feat も、素の pull なら fast-forward で取り込まれる。
         git(self.ws, "fetch", "-q", "origin", "main")
         side = os.path.join(self._tmp.name, "side-ahead")
         git(self.ws, "worktree", "add", "-q", side, "-b", "ahead", "origin/main")

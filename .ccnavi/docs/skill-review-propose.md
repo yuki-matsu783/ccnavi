@@ -8,7 +8,7 @@ keywords: [振り返り, スキル, 候補, 提案, 提案チケット, ccnavi-s
 
 # スキルの提案チケットと候補の書き方
 
-拾うもの・足し先・候補の渡し先は `.ccnavi/docs/skill-review.md`。ここは、候補を書くときの注意と、提案チケットの書き方。
+拾うもの・足す先・候補の渡し先は `.ccnavi/docs/skill-review.md`。ここは、候補を書くときの注意と、提案チケットの書き方。
 
 ## 候補を書くときの注意
 
@@ -24,8 +24,7 @@ keywords: [振り返り, スキル, 候補, 提案, 提案チケット, ccnavi-s
 
 識別子は `chore-<issueの番号>-skill-<スキル名>-<要点>` の形にする。末尾を `-<2桁の数>` にしない（子の識別子`<親>-<2桁>-<2桁>`と紛れる）。
 
-親の提案には、その仕事を載せるMRの番号（`mr:`）が要る。ワークツリーは`ccnavi-worktree.sh`（直接作業用）では切らず、
-issueを立ててから`ccnavi-start.sh`で切る。ブランチ・ワークツリー・Draft MRを作り、`mr:`に書く番号を出す
+親の提案には、その仕事を載せるMRの番号（`mr:`）が要る。ワークツリーは`ccnavi-worktree.sh`（直接作業用）では切らず、issueを立ててから`ccnavi-start.sh`で切る。ブランチ・ワークツリー・Draft MRを作り、`mr:`に書く番号を出す
 （`.ccnavi/docs/worktree-start.md`）。
 
 | 対象 | 切り方 |
@@ -60,7 +59,7 @@ allow:
 `allow` には `docs/wiki/*` も足す。
 ```
 
-この提案は親として書いている。親は `plan:` が無いと `start` が止まるので、上のように `plan:` と、そのステップが使うフェーズ定義のコピー `phases:` を持つ。`phases:` は手で書かず、`ccnavi --plan-order <親> --fill-phases` でコピーしてよい。`quick-work` の範囲は `scope: inherit` で、親の `allow`（ここでは `.claude/skills/commit/*` と `docs/wiki/*`）がそのまま作業の上限になる。`allow` を空のまま出すと、範囲が集まらず子を起こせない。
+この提案は親として書いている。親は `plan:` が無いと `start` が止まるので、上のように `plan:` と、そのステップが使うフェーズ定義のコピー `phases:` を持つ。`phases:` は手で書かず、`ccnavi --plan-order <親> --fill-phases` でコピーしてよい。`quick-work` の範囲は `scope: inherit` で、親の `allow`（ここでは `.claude/skills/commit/*` と `docs/wiki/*`）がそのまま作業の上限になる。`allow` を空のまま出すと、作業の範囲が決まらず子を起こせない。
 
 プロジェクトのスキルについての提案は、そのプロジェクトの提案として書き、`allow` に `skills/<スキル>/*` を書く。
 パスはプロジェクトのルートからの相対で書く。

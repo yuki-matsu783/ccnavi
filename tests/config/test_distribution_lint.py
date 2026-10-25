@@ -1,8 +1,8 @@
-"""配布物（.ccnavi/ の設定・文書・スクリプト）を置いたプロジェクトの `--lint` が問題 0 件。
+"""配布物（.ccnavi/ の設定・文書・スクリプト）を置いたプロジェクトの `--lint` は問題 0 件になる。
 
 ccnavi が配るルールと文書が自身の検査に引っかかると、配布直後のプロジェクトで
 エージェントが `--lint` を打つたびに警告を見ることになる。たとえば `additionalContextFile` の文書が
-上限（ctxfile.MAX_CHARS）を超えると、先頭だけが渡って残りは渡らない。
+上限（ctxfile.MAX_CHARS）を超えると、先頭までしか渡らず、残りは渡らない。
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from tests.inproc import run_ccnavi
 
 DIST = os.path.join(ROOT, ".ccnavi")
 
-# main に既にある warn（#578 の ask ルールの except）。#564 の対象ではないので名指しで除く。
+# main に既にある warn（#578 の ask ルールの例外）。#564 の対象ではないので、名指しで除く。
 # 直したらここから外す（外し忘れると、下の試験が「もう出ていない」と知らせる）。
 KNOWN_WARN_RULES = {"direct-worktree-confirm"}
 

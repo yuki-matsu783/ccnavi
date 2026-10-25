@@ -797,7 +797,7 @@ user_checkout_is() {
 	[ -n "$d4_main" ] && [ "$(ccnavi_phys "$1")" = "$(ccnavi_phys "$d4_main")" ]
 }
 
-# 今のチェックアウトが、統合先をチェックアウトしているユーザのチェックアウトか調べる（merge) と pull が使う）。
+# 今のチェックアウトが、統合先をチェックアウトしているユーザのものかを調べる（merge) と pull が使う）。
 #
 # 当てはまるとき 0 を返し、統合先の名前を mg_integ に残す。統合先が決まらないとき（origin が無いなど）は、
 # どれが統合先か言えないので当てはまらない。
@@ -2236,7 +2236,7 @@ fetch | pull)
 	if [ "$sub" = pull ] && [ "$fp_other" = yes ] && merge_target_is_here; then
 		reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは、pull <リモート> <ブランチ>（${fp_refs# }）で別のブランチ・リモートを取り込めません（merge できないのと同じです）。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
 $(merge_on_target_next)
-案内: 統合先の更新（引数なしの pull と pull [--ff-only] <リモート> ${mg_integ}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも打てます。"
+案内: 統合先の更新（引数なしの pull と pull [--ff-only] <リモート> ${mg_integ}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。"
 	fi
 	;;
 
