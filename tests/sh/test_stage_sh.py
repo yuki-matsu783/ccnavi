@@ -2,7 +2,8 @@
 
 確かめるのは 4 つ。元ファイルが wip/handoff/ の同じ階層へ cp されること。既にある下書きを
 上書きしないこと。ワークスペースの外や下書きの置き場の中を断ること。--commands が、元と違う
-下書きにだけフルパスの mv を出すこと。
+下書きだけを、種類ごとに分けて出すこと（取り込める種類は ccnavi-user-handoff.sh の手順、defense は
+フルパスの mv）。
 """
 
 from __future__ import annotations
@@ -72,7 +73,8 @@ class StageShTest(unittest.TestCase):
 
     def test_inside_a_worktree_the_draft_goes_to_that_worktrees_handoff(self):
         """cwd が .claude/worktrees/<名前> の中なら、下書きはそのワークツリーの wip/handoff/ に置く
-        （ブランチに載るので push でき、直接作業なら integrate が外す）。mv の行き先は元のまま。"""
+        （ブランチに載るので push でき、直接作業なら integrate が外す）。
+        取り込みの手順はそのワークツリーを --root に指す。"""
         wt = os.path.join(self.ws, ".claude", "worktrees", "scratch-1-x")
         os.makedirs(os.path.join(wt, "src"))
         r = self.stage(self.rules, cwd=os.path.join(wt, "src"))
@@ -83,7 +85,11 @@ class StageShTest(unittest.TestCase):
         write(draft, "version: 2\n")
         r = self.stage("--commands", self.rules, cwd=wt)
         self.assertEqual(0, r.returncode, r.stderr)
-        self.assertIn(f"mv '{draft}' '{self.rules}'", r.stdout)
+        # 取り込める種類は mv ではなく、--root にワークツリーを指した取り込みの手順
+        self.assertNotIn("mv ", r.stdout)
+        self.assertIn(
+            f"--root '{wt}' '.ccnavi/config/common/rules.yml'", r.stdout.replace(os.sep, "/")
+        )
         # 下書きの置き場の中（ワークツリー側）は元として受けない。
         r = self.stage(draft, cwd=wt)
         self.assertEqual(2, r.returncode)
@@ -129,7 +135,8 @@ class StageShTest(unittest.TestCase):
         self.assertNotIn("<パス>", nexts[0])
         self.assertTrue(
             nexts[0].endswith(
-                f"--commands {self.rules} {self.hook} を打つ（差し替えの mv が出る）"
+                f"--commands {self.rules} {self.hook} を打つ"
+                "（種類ごとに、取り込みの手順か差し替えの mv が出る）"
             ),
             nexts[0],
         )
@@ -166,14 +173,14 @@ class StageShTest(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("引用符", result.stderr)
 
-    def test_commands_print_full_path_mv_for_edited_drafts_only(self):
+    def test_commands_print_full_path_mv_for_edited_defense_drafts_only(self):
         self.stage(".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh")
-        write(self.draft_rules, "version: 2\n")
+        write(self.draft_hook, "echo lint2\n")
         result = self.stage(
             "--commands", ".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh"
         )
         mvs = [line for line in result.stdout.splitlines() if line.startswith("mv ")]
-        self.assertEqual([f"mv '{self.draft_rules}' '{self.rules}'".replace(os.sep, "/")], mvs)
+        self.assertEqual([f"mv '{self.draft_hook}' '{self.hook}'".replace(os.sep, "/")], mvs)
         self.assertEqual(
             1, result.returncode, "編集していない下書きが残るので、揃っていないと知らせる"
         )
@@ -181,10 +188,43 @@ class StageShTest(unittest.TestCase):
         # 揃っていないので、ユーザに案内する次の一手は出さない
         self.assertNotIn("次: ", result.stdout)
         self.assertEqual(
-            "version: 1\n", read(self.rules), "差し替えはユーザの手。スクリプトは動かさない"
+            "echo lint\n", read(self.hook), "差し替えはユーザの手。スクリプトは動かさない"
         )
 
-    def test_commands_all_edited_succeeds(self):
+    def test_commands_all_edited_defense_succeeds(self):
+        self.stage(".claude/hooks/lint-py.sh")
+        write(self.draft_hook, "echo lint2\n")
+        result = self.stage("--commands", ".claude/hooks/lint-py.sh")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(1, len([ln for ln in result.stdout.splitlines() if ln.startswith("mv ")]))
+        self.assertNotIn("ccnavi-user-handoff.sh", result.stdout)
+        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(1, len(nexts), result.stdout)
+        self.assertIn("mvをユーザに案内してターンを終える", nexts[0])
+
+    def test_commands_point_importable_kinds_to_user_handoff_not_mv(self):
+        write(
+            os.path.join(self.ws, ".ccnavi", "config", "common", "templates", "quickfix.yml"),
+            "a: 1\n",
+        )
+        draft = os.path.join(
+            self.ws, "wip", "handoff", ".ccnavi", "config", "common", "templates", "quickfix.yml"
+        )
+        self.stage(".ccnavi/config/common/templates/quickfix.yml")
+        write(draft, "a: 2\n")
+        result = self.stage("--commands", ".ccnavi/config/common/templates/quickfix.yml")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("mv ", result.stdout)
+        handoff = f"{self.ws}/.ccnavi/scripts/ccnavi-user-handoff.sh".replace(os.sep, "/")
+        self.assertIn(
+            f"sh '{handoff}' '.ccnavi/config/common/templates/quickfix.yml'\n", result.stdout
+        )
+        self.assertIn("--yes --expect <上のハッシュ>", result.stdout)
+        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(1, len(nexts), result.stdout)
+        self.assertIn("取り込みの手順をユーザに案内してターンを終える", nexts[0])
+
+    def test_commands_split_mixed_kinds(self):
         self.stage(".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh")
         write(self.draft_rules, "version: 2\n")
         write(self.draft_hook, "echo lint2\n")
@@ -192,11 +232,56 @@ class StageShTest(unittest.TestCase):
             "--commands", ".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh"
         )
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual(2, len([ln for ln in result.stdout.splitlines() if ln.startswith("mv ")]))
-        # 全件が揃ったので、mv をユーザに案内してターンを終える
-        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
+        lines = result.stdout.splitlines()
+        self.assertEqual(1, len([ln for ln in lines if ln.startswith("mv ")]))
+        self.assertIn(f"mv '{self.draft_hook}' '{self.hook}'".replace(os.sep, "/"), lines)
+        self.assertEqual(
+            1, len([ln for ln in lines if "ccnavi-user-handoff.sh" in ln and "--yes" not in ln])
+        )
+        self.assertNotIn(f"mv '{self.draft_rules}'".replace(os.sep, "/"), result.stdout)
+        nexts = [ln for ln in lines if ln.startswith("次: ")]
         self.assertEqual(1, len(nexts), result.stdout)
-        self.assertIn("ユーザに案内してターンを終える", nexts[0])
+        self.assertIn("取り込みの手順 と mv", nexts[0])
+
+    def test_importable_classification_matches_the_python_kinds(self):
+        """sh の is_importable が、実行ファイルの KINDS と同じ答えを返す（表のずれを見つける）。"""
+        from ccnavi.tickets import handoff
+
+        paths = [
+            ".ccnavi/config/common/templates/a.yml",
+            ".ccnavi/config/project/templates/a.yml",
+            ".ccnavi/config/project/templates/sub/a.yml",
+            ".ccnavi/config/common/templates/x/templates/a.yml",
+            ".ccnavi/docs/.md",
+            "projects/p/.ccnavi/config/project/templates/a.yml",
+            ".ccnavi/config/common/rules.yml",
+            ".ccnavi/config/project/risks.yml",
+            "projects/p/.ccnavi/config/project/phases.yml",
+            "projects/p/.ccnavi/config/common/rules.yml",
+            ".ccnavi/docs/a/b.md",
+            ".ccnavi/CCNAVI.md",
+            ".ccnavi/scripts/ccnavi-stage.sh",
+            ".claude/hooks/lint-py.sh",
+            ".claude/settings.json",
+            ".claude/skills/x/SKILL.md",
+            "README.md",
+        ]
+        script = os.path.join(SH_DIR, "ccnavi-stage.sh")
+        with open(script, encoding="utf-8") as f:
+            text = f.read()
+        start = text.index("is_importable() {")
+        func = text[start : text.index("\n}\n", start) + 3]
+        for rel in paths:
+            with self.subTest(rel=rel):
+                kind = handoff.kind_of(handoff.key_of(rel))
+                want = kind is not None and kind.id != handoff.KIND_DEFENSE
+                got = (
+                    subprocess.run(
+                        [SHELL, "-c", f"{func}\nis_importable '{rel}'"], capture_output=True
+                    ).returncode
+                    == 0
+                )
+                self.assertEqual(want, got)
 
     def test_commands_without_draft_or_edit_prints_nothing(self):
         result = self.stage("--commands", ".ccnavi/config/common/rules.yml")
