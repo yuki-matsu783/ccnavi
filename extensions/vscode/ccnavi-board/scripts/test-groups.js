@@ -27,7 +27,7 @@ const { spawnSync } = require("node:child_process");
 const ROOT = path.resolve(__dirname, "..");
 const TEST_DIR = path.join(ROOT, "test");
 
-// test/ の下にあってグループではないもの。helpers はどのグループも読む部品、
+// test/ の下にあってグループではないもの。helpers は画面を描くグループが読む部品（devtools は読まない）、
 // fixtures は実行時に名前で開く固定データ。
 const NOT_GROUPS = new Set(["helpers", "fixtures"]);
 

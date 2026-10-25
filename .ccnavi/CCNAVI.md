@@ -27,8 +27,8 @@
   - git は直接呼ばない。止められたら迂回せず、出力の案内に従う。git の操作が要るときはユーザに頼む。
 <!-- ccnavi:endif -->
 - ホスト（issue・MR など）の操作は glab を基本にし、gh は origin が GitHub のときだけ使う。ccnavi のスクリプトがある操作はそちらを優先する。認証で止まったら、ユーザに glab auth login（GitHub なら gh auth login）を頼む。
-- 下書きの置き場は 2 つ。ユーザに渡す物は {{handoff}}/（追跡される。integrate が外し、ready が消す）、一時的な物・コミットしたくない物はワークスペースルート直下の {{scratch}}/（追跡されない。終わったら自分で消す）。セッションのスクラッチパッドには置かない。
-- 書き込みを止められている場所（保護対象など）は、{{stage_sh}} <元のパス> で {{handoff}}/ にコピーして編集する（`.claude` の階層は `handoff-.claude` に読み替えて置かれる。`.claude/settings.json` は `{{handoff}}/handoff-.claude/settings.json`。`wip/handoff/.claude/` に自分で作らない）。複数あるときはすべてコピーしてからターンを終える。対話セッションでは、ユーザに `ccnavi-user-handoff.sh` での取り込みを案内してターンを終える。非対話セッションでは、編集済みの下書きを push し、確認と取り込みをユーザに頼んでターンを終える。
+- 下書きの置き場は 2 つ。ユーザに渡す物は {{handoff}}/（追跡される。integrate が外し、ready が消す）、一時的な物・コミットしたくない物はワークスペースルート直下の {{scratch}}/（追跡されない。終わったら消す）。セッションのスクラッチパッドには置かない。
+- 書き込みを止められている場所（保護対象など）は、{{stage_sh}} <元のパス> で {{handoff}}/ にコピーして編集する（`.claude` の階層は `handoff-.claude` に読み替えて置かれる。`.claude/settings.json` は `{{handoff}}/handoff-.claude/settings.json`。`wip/handoff/.claude/` に自分で作らない）。複数あるときは全部コピーしてからターンを終える。対話セッションでは、ユーザに `ccnavi-user-handoff.sh` での取り込みを案内してターンを終える。非対話セッションでは、編集済みの下書きを push し、確認と取り込みをユーザに頼んでターンを終える。
 <!-- ccnavi:if projects -->
   - {{projects}}/<名前>/ を直すときは、そこへ cd してから作業する（git は cwd のリポジトリに向く）。
 <!-- ccnavi:endif -->
@@ -42,7 +42,7 @@
 
 ## 詳細
 
-詳しい決まりは `.ccnavi/docs/` にある。作業が表の「読むとき」に該当したら開く。
+詳細は `.ccnavi/docs/`。表の「読むとき」に当たったら開く。
 
 | 読むとき | 開くファイル（`.ccnavi/docs/` の中） |
 |---|---|
