@@ -129,6 +129,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.shellread",
                 "infra.shellread_cd",
                 "infra.modes",
+                "infra.pathsafe",
                 "policy.rules",
                 "records.audit",
                 "records.busy",

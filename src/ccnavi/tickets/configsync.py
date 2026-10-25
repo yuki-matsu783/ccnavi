@@ -34,7 +34,7 @@ from dataclasses import dataclass
 
 import yaml
 
-from ..infra import fsio, pathcase, settings, yamlread
+from ..infra import fsio, pathcase, pathsafe, settings, yamlread
 from ..policy import rules
 from . import flow, phasetypes, plan_templates, risk
 
@@ -142,7 +142,7 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Chang
         # （共通を消し忘れた・取り違えたときに、ミラーを全部失わないため）。
         return [], ""
     base = mirror_dir(conf, tree_root)
-    if not _inside(tree_root, base) or _linked(tree_root, base):
+    if not _inside(tree_root, base) or pathsafe.has_link(tree_root, base):
         return (
             [],
             f"{_rel_plain(tree_root, base)} がシンボリックリンクか、その下にある。コピーしない",
@@ -153,7 +153,7 @@ def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Chang
     out: list[Change] = []
     for name in sorted(wanted):
         target = os.path.join(base, name.replace("/", os.sep))
-        if _linked(tree_root, target):
+        if pathsafe.has_link(tree_root, target):
             return (
                 [],
                 f"{_rel_plain(tree_root, target)} がシンボリックリンクか、"
@@ -292,24 +292,6 @@ def _put(path: str, content: bytes | None) -> str:
             return ""
         return fsio.unlink(path)
     return fsio.replace_bytes(path, content, ".ccnavi-sync")
-
-
-def _linked(tree_root: str, path: str) -> bool:
-    """tree_root から path までの途中（path 自身を含む）に、シンボリックリンクがあるか。
-
-    パスのままさかのぼり、実体が tree_root に着いたところで止める。tree_root より上の
-    リンク（macOS の `/tmp` など）は数えない。着けなければ（外を指している）リンクと同じに扱う。
-    """
-    base = _key(tree_root)
-    current = os.path.abspath(path)
-    while _key(current) != base:
-        if os.path.islink(current):
-            return True
-        parent = os.path.dirname(current)
-        if parent == current:
-            return True
-        current = parent
-    return False
 
 
 def _rel_plain(base: str, path: str) -> str:

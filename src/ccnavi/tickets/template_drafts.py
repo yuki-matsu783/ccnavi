@@ -35,7 +35,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, pathsafe, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import approval, archive, flow, handoff, plan_templates, ticket_ids, ticket_model
@@ -466,7 +466,7 @@ def make(
     place, why = handoff.spelled(base, rel)
     if why:
         return Made(False, error=why)
-    if flow.linked(base, os.path.dirname(place)):
+    if pathsafe.has_link(base, os.path.dirname(place)):
         return Made(
             False,
             error=f"下書きの置き場（{os.path.dirname(rel)}/）の途中にリンクがあるので反映しません",

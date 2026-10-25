@@ -43,7 +43,7 @@ import re
 import stat
 from dataclasses import dataclass, field
 
-from ..infra import fsio, gitcmd, pathcase, tree
+from ..infra import fsio, gitcmd, pathcase, pathsafe, tree
 from . import donecopy, ticket_ids, ticket_model
 from . import ticket as ticket_mod
 
@@ -69,17 +69,10 @@ def base_dir(root: str, project: str) -> str:
 
 
 def _linked(root: str, parts: tuple[str, ...]) -> bool | None:
-    """ルートの下の parts を順に lstat して、リンクがあれば True。途中で無ければ None。"""
-    path = root
-    for part in parts:
-        path = os.path.join(path, part)
-        try:
-            mode = os.lstat(path).st_mode
-        except OSError:
-            return None
-        if stat.S_ISLNK(mode):
-            return True
-    return False
+    """ルートの下の parts にリンクか junction があれば True。無ければ None、在れば False。"""
+    if pathsafe.first_link(root, parts):
+        return True
+    return False if os.path.lexists(os.path.join(root, *parts)) else None
 
 
 def _repo_names(root: str) -> list[str]:
