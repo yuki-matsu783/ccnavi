@@ -950,7 +950,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         )
 
     def test_request_removes_a_body_file_under_scratchpad(self):
-        """依頼文が scratchpad/ の中にあれば、成功のあとに request 自身が消す（待ち中は rm を打てない）。"""
+        """依頼文が scratchpad/ の中にあれば、成功のあとに request が消す。"""
         for rel in ("scratchpad/req.md", "scratchpad/sub/../req2.md"):
             with self.subTest(rel=rel):
                 os.makedirs(os.path.join(self.ws, "scratchpad", "sub"), exist_ok=True)
@@ -964,7 +964,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 os.remove(os.path.join(self._tmp.name, "notes.json"))
 
     def test_request_keeps_a_body_file_outside_scratchpad(self):
-        """scratchpad/ の外（ワークスペースの外、wip/、scratchpad の名前だけ似た場所、.. で出る道）は消さない。"""
+        """scratchpad/ の外（外のファイル、wip/、名前だけ似た場所、.. で出る道）は消さない。"""
         outside = write(os.path.join(self._tmp.name, "mine.md"), "利用者のファイル\n")
         near = write(os.path.join(self.ws, "wip", "scratchpad", "req.md"), "x\n")
         likeness = write(os.path.join(self.ws, "scratchpadX", "req.md"), "x\n")
