@@ -3,7 +3,7 @@ version: 1
 ticket: feature-600-fake-gitlab-closes-issues
 issue: 600
 mr: 605
-title: "fake_gitlab.py に MR の closes_issues が無く、模擬の相手で ccnavi-start.sh --mr が 404 で止まる"
+title: fake_gitlab.py に MR の closes_issues が無く、模擬の相手で ccnavi-start.sh --mr が 404 で止まる
 phases:
   quick-work:
     kind: work
@@ -12,18 +12,21 @@ phases:
     scope: inherit
     when: 設計判断や並行作業が要らないとき
 plan:
-  - quick-work
-rationale: |
-  fake-gitlab の模擬に closes_issues のルートが無く、受入シナリオで --mr を回すと 404 で止まるため。
+- quick-work
+rationale: 'fake-gitlab の模擬に closes_issues のルートが無く、受入シナリオで --mr を回すと 404 で止まるため。
+
+  '
 allow:
-  - match: Write|Edit
-    glob: "tests/manual/gitlab/fake_gitlab.py"
-  - match: Write|Edit
-    glob: "tests/sh/test_fake_gitlab.py"
-  - match: Write|Edit
-    glob: "tests/sh/gitlab_host.py"
-started_at: "2026-10-25T19:42:49+0900"
-base_sha: "8d9494afd295a1be0dee15f532e971ab7150233c"
+- match: Write|Edit
+  glob: tests/fake_gitlab.py
+- match: Write|Edit
+  glob: tests/manual/gitlab/fake_gitlab.py
+- match: Write|Edit
+  glob: tests/sh/test_fake_gitlab.py
+- match: Write|Edit
+  glob: tests/sh/gitlab_host.py
+started_at: 2026-10-25T19:42:49+0900
+base_sha: 8d9494afd295a1be0dee15f532e971ab7150233c
 ---
 ## 目的
 
