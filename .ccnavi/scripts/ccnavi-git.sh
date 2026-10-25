@@ -97,7 +97,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
 通すもの
   読む      status log show diff blame shortlog describe rev-parse rev-list
             ls-files ls-tree merge-base diff-tree cat-file grep
-  一覧      branch (-d は可 / -D -m -M -C -f -u は不可)  tag (一覧のみ)
+  一覧      branch (-d は可 / -D -m -M -C -f -u は不可)  tag (一覧のみ。作成はユーザに依頼)
             remote (-v / show / get-url のみ)  worktree (list add prune remove)
             worktree add は行き先の名前 = ブランチ名の / を - に置き換えたもの、の形だけ
                   (add <行き先> -b <ブランチ> [<起点>] か add <行き先> <既にあるブランチ>。
