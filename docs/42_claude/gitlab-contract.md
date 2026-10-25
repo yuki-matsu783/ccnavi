@@ -150,7 +150,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 - 許可したのに実際は差が出ていない項目は失敗する（古い許可の検出）。模擬を直したら外す
 - `not_recorded` は、録らないものの宣言（ヘッダ・2 ページ目・403）。比べる対象ではない
 
-**いまの項目は 0 件**。`reads` で絞ったうえで、録った差は全部模擬を直して消した。版差や EE の機能（直せない差）が出たら、理由つきで足す。
+**`entries`（fake 側）の項目は 0 件**。`reads` で絞ったうえで、録った差は全部模擬を直して消した。版差や EE の機能（直せない差）が出たら、理由つきで足す。見本の許可は別キーの `host_entries`（下の「見本」）。
 
 ### 契約テストが見つけた模擬の誤り
 
@@ -163,6 +163,45 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 - MR の応答が `draft`・`sha`・`description` を返さなかった（sh が `.draft` と `.sha` を読む）
 - 作成・取得したメモと issue の `author` が無かった
 - スレッドのメモに `type`（`DiscussionNote`。system のメモは null）が無かった
+
+## 見本（gitlab_host.py）
+
+`tests/sh/gitlab_host.py` と、その読む場面（`extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/`）の応答の形も、`recorded.json` と `reads` のキーで比べる。試験は `tests/contract/test_host_sample.py`。`gitlab_host.py` は import せず、パスを指して読み込む（`tests/contract` は `tests/sh` を import しない）。場面の一覧と置き場は `gitlab_host.scene_names()`・`SCENES` から取る。
+
+### 場面
+
+| 場面 | 扱い | 理由 |
+|---|---|---|
+| `nested`・`paged`・`replies`・`replies-accepted`・`requested-changes`・`resolved` | 比べる | 本物の形に近い見本。`paged` は `discussions` の 1 ページ目だけ比べる |
+| `hostile`・`odd-types`・`impostor` | 除く | 異常な値や型をわざと入れた見本（悪意のある本文・型の違う欄・フォークの MR）。本物の形とは合わない |
+
+場面を足したら、比べるか除くかを試験の一覧に足す（どちらにも無ければ試験が落ちる）。
+
+### 要求名
+
+比べる要求は試験の固定リスト。名前が `requests.json` に無ければ失敗する。要求の URL は `scene.json`・`mrs.json`（`source_project_id` が 42 の MR）から組む。
+
+| 要求名 | 見本の答え | 扱い |
+|---|---|---|
+| `user` `mrs_opened` `discussions` `reviewers` | `user.json`・`mrs.json`・`discussions.1.json`・`reviewers.1.json` | 場面ごとに比べる |
+| `notes_post` `notes_get` | 状態ファイル（`FAKE_GITLAB_STATE`） | 場面に依らないので 1 場面で 1 回。先に `notes_post` を打ち、`notes_get` が空にならないようにする |
+| `mrs_merged` | 全場面で `[]` | 除く。`state=merged` の枝が無く、比べても配列が空で何も比べない |
+| `project` | 固定値 `{"id":42,"default_branch":"main"}` | 除く。読むキー（`archived` `permissions` など）がほとんど無い |
+| 上以外 | 404 | 見本が答えない（読み取り専用の代役） |
+
+### 比べ方と許可
+
+- 比べるキーは `reads`。要求ごと・場面ごとに、`reads` のうち見本にも記録にも存在するキーが 0 件なら失敗する。`reads` の全キーが見本にあることも確かめる
+- 差は場面をまたいで集め、`allow.json` の `host_entries`（項目の形は `entries` と同じ）に 1 回通す。`entries` は fake 側が読むので共用しない
+- 失敗には場面名・要求名・キー・違いの種類が出る
+
+| 要求・キー・種類 | 扱い | 理由 |
+|---|---|---|
+| `mrs_opened` `[].description` | 見本を直した | `mrs.json` に足した |
+| `discussions` `[].notes[].type` が `null` | 見本を直した | system のメモの `type` を `null` にした（`nested`・`resolved`） |
+| `discussions` `[].notes[].position` の `extra` | `host_entries` | 本物の場面に DiffNote が無い。sh が読む |
+| `discussions` `[].notes[].type` の `type` | `host_entries` | system のメモが無い場面（`paged`・`requested-changes`）は文字列だけ。足すと `expected.json` が変わる |
+| `discussions` `[].notes[].resolved` の `presence` | `host_entries` | 本物は system のメモに `resolved` が無い。system のメモが無い場面は全ノートが持つ。足すと `expected.json` が変わる |
 
 ## 機密の検査
 

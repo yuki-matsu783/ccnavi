@@ -1,5 +1,5 @@
 {
-  "note": "意図して許す違い（要求名＋キー＋違いの種類）。比べるのは requests.json の reads のキーだけ。reason が空なら失敗し、差が出ていない項目も失敗する",
+  "note": "意図して許す違い（要求名＋キー＋違いの種類）。比べるのは requests.json の reads のキーだけ。reason が空なら失敗し、差が出ていない項目も失敗する。host_entries は見本（gitlab_host.py）の比較の許可で、fake 側の entries とは別",
   "entries": [],
   "not_recorded": [
     {
@@ -13,6 +13,26 @@
     {
       "what": "error_403",
       "reason": "fake が 403 を出せないので録らない"
+    }
+  ],
+  "host_entries": [
+    {
+      "request": "discussions",
+      "key": "[].notes[].position",
+      "kind": "extra",
+      "reason": "本物の記録の場面に DiffNote が無く、position を持つノートが無い。sh が読むので見本から消せない"
+    },
+    {
+      "request": "discussions",
+      "key": "[].notes[].type",
+      "kind": "type",
+      "reason": "本物は system のメモで null、それ以外で文字列を取る。system のメモが無い場面（paged・requested-changes）は文字列だけ。足すと expected.json が変わる"
+    },
+    {
+      "request": "discussions",
+      "key": "[].notes[].resolved",
+      "kind": "presence",
+      "reason": "本物は system のメモに resolved が無い（任意）。system のメモが無い場面（paged・replies・replies-accepted・requested-changes）は全ノートが持つ。足すと expected.json が変わる"
     }
   ]
 }

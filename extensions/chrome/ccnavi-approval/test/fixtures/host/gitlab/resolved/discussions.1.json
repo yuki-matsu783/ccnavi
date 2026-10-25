@@ -71,7 +71,7 @@
     "notes": [
       {
         "id": 5004,
-        "type": "DiscussionNote",
+        "type": null,
         "body": "added 1 commit",
         "author": {
           "id": 201,
