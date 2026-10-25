@@ -29,6 +29,8 @@ sh と同じ道具（curl・glab）を使わないのは、片方の不具合が
     Client.notes(token, project_id, iid) -> list[dict]
     Client.create_discussion(token, project_id, iid, body)
     Client.resolve_discussion(token, project_id, iid, discussion_id, resolved=True)
+    Client.discussions(token, project_id, iid) -> list[dict]   スレッドの一覧（notes を持つ）
+    Client.tree(token, project_id, ref, path="", recursive=False) -> list[str]   ブランチの一覧
     Client.request_changes(token, project_id, iid)   変更要求。GitLab EE の機能で、CE では 404
     Client.approve(token, project_id, iid)
     Client.reviewers(token, project_id, iid)
@@ -231,6 +233,31 @@ class Client:
             {"resolved": resolved},
             tag="discussion-resolve",
         )
+
+    def discussions(self, token: str, project_id: int, iid: int) -> list[dict]:
+        _, found = self.call(
+            "GET",
+            f"/projects/{project_id}/merge_requests/{iid}/discussions?per_page=100",
+            token,
+            tag=f"discussions-{iid}",
+        )
+        return found if isinstance(found, list) else []
+
+    def tree(
+        self, token: str, project_id: int, ref: str, path: str = "", recursive: bool = False
+    ) -> list[str]:
+        """ブランチの一覧（ファイルとディレクトリの名前。path を渡すとその下）。
+        無いブランチ・読めないときは空。100 件まで。"""
+        query = f"ref={ref}&per_page=100" + ("&recursive=true" if recursive else "")
+        found = self.call(
+            "GET",
+            f"/projects/{project_id}/repository/tree?{query}" + (f"&path={path}" if path else ""),
+            token,
+            tag=f"tree-{ref}",
+        )[1]
+        if not isinstance(found, list):
+            return []
+        return [item.get("path", "") for item in found]
 
     def request_changes(self, token: str, project_id: int, iid: int):
         return self.call(

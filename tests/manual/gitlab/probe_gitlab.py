@@ -34,7 +34,8 @@ push は URL にトークンを埋めない（埋めると origin の URL に混
 sh の HTTP 経路（curl・jq・ページング・投稿・認証）と、GitLab が返す JSON の形が sh の読み方と
 合っているか。結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
 変更要求（request_changes）は GitLab EE の機能で、CE では 404 になる。
-CE では 404 を許し、その段は PASS とする。
+CE ではその段を SKIP とする（確かめていないものを PASS に数えない）。まとめは
+`PASS n / SKIP m / FAIL k`。FAIL があれば終了コードは 1。
 """
 
 from __future__ import annotations
@@ -64,6 +65,7 @@ CLOSE_EARLY_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user
 PUSH_APPROVED_SH = os.path.join(
     ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-push-approved.sh"
 )
+DECIDE_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-decide.sh")
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
 GITLAB = os.environ.get(
@@ -80,8 +82,11 @@ ROOT = ""
 ENV: dict[str, str] = {}
 STAMP = ""
 LOG = None
-RESULTS: list[tuple[str, bool, str]] = []
+# (段名, "PASS" | "SKIP" | "FAIL", 詳細)
+RESULTS: list[tuple[str, str, str]] = []
 API_SEQ = 0
+# この実行が作ったプロジェクトの id。終わりに、これだけを消す
+PROJECT_IDS: list[int] = []
 
 
 def _exe() -> str:
@@ -129,15 +134,27 @@ RULES = {
 }
 
 
+def project_name(prefix: str, stamp: str) -> str:
+    """プロジェクト名。他の作業と区別したいときは CCNAVI_PROBE_PREFIX で前置きを変える。"""
+    return f"{prefix}-{stamp}"
+
+
+def summary_line(results: list[tuple[str, str, str]]) -> str:
+    count = {s: sum(1 for r in results if r[1] == s) for s in ("PASS", "SKIP", "FAIL")}
+    return f"PASS {count['PASS']} / SKIP {count['SKIP']} / FAIL {count['FAIL']}"
+
+
 def say(text: str) -> None:
     print(text, flush=True)
     LOG.write(text + "\n")
     LOG.flush()
 
 
-def record(name: str, ok: bool, detail: str = "") -> None:
-    RESULTS.append((name, ok, detail))
-    say(f"{'PASS' if ok else 'FAIL'}  {name}  {detail}")
+def record(name: str, ok: bool, detail: str = "", *, skip: bool = False) -> None:
+    """段の結果を残す。skip は「確かめられなかった」（CE の変更要求など）。PASS には数えない。"""
+    state = "SKIP" if skip else ("PASS" if ok else "FAIL")
+    RESULTS.append((name, state, detail))
+    say(f"{state}  {name}  {detail}")
 
 
 def redact(text: str) -> str:
@@ -275,13 +292,15 @@ def write_explainer(tree: str) -> str:
     )
 
 
-def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="作業", issue=None):
+def ticket_text(
+    name, *, parent="", phase=None, allow=(), review=True, title="作業", issue=None, mr=1
+):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if parent:
         lines += [f"parent: {parent}", f"phase: {phase}"]
     if not parent:
         # 親は MR の番号を持つ（ccnavi の親チケットは issue と MR のセット）
-        lines.append("mr: 1")
+        lines.append(f"mr: {mr}")
     if issue:
         lines.append(f"issue: {issue}")
     lines += [
@@ -307,6 +326,54 @@ def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="�
     ]
     # 親には計画（1 フェーズ）を足す。子は plain_parent が何もしない
     return plain_parent("\n".join(lines), plan=1)
+
+
+# 承認のあとに ccnavi が書く欄。改版の提案では空にする（approval の検査が求める）
+APPROVAL_FIELDS = (
+    "started_at",
+    "completed_at",
+    "base_sha",
+    "merged_sha",
+    "cancelled_at",
+    "cancel_reason",
+    "finished_to",
+    "settled_by",
+)
+
+
+def approved_copy_path(tree: str, state: str, ticket: str) -> str:
+    """承認済みチケットの置き場（`.ccnavi/approved/<doing|done>/<チケット>.md`）。
+    取り消しは置き場でなく欄なので、取り消した子も `done/` に在る（ticket_model.CANCELLED）。"""
+    return os.path.join(tree, ".ccnavi", "approved", state, ticket + ".md")
+
+
+def feedback_revision(approved_text: str) -> str:
+    """承認済みの親の全文に `feedback: []` を足した改版の本文。
+
+    ゼロから作り直さない（plan・phases・範囲は承認済みのまま）。`plan_differs` が改版と検出する。
+    承認のあとに ccnavi が書いた欄（`APPROVAL_FIELDS`）は、提案には書かない決まりなので空にする。
+    """
+    lines = approved_text.split("\n")
+    if any(line.startswith("feedback:") for line in lines):
+        raise ValueError("feedback が既にある")
+    end = lines.index("---", 1)  # frontmatter の終わり。本文の行は触らない
+    for i in range(1, end):
+        key = lines[i].split(":", 1)[0]
+        if key in APPROVAL_FIELDS and lines[i].startswith(key + ":"):
+            lines[i] = f'{key}: ""'
+    at = next(i for i, line in enumerate(lines) if line.startswith("human_review:"))
+    lines[at:at] = ["feedback: []"]
+    return "\n".join(lines)
+
+
+def is_cancelled_copy(text: str) -> bool:
+    """承認済みのコピーの `cancelled_at` が空でない（取り消した印）。"""
+    return re.search(r'^cancelled_at:\s*"?[^\s"]', text, re.M) is not None
+
+
+def read_text(path: str) -> str:
+    with open(path, encoding="utf-8") as f:
+        return f.read()
 
 
 def worktree(name: str, base: str) -> str:
@@ -347,11 +414,7 @@ def request_marked(project_id: int, iid: int) -> bool:
     )
 
 
-def main() -> int:
-    if any(arg in ("-h", "--help") for arg in sys.argv[1:]):
-        print((__doc__ or "").strip())
-        return 0
-    setup()
+def run_probe() -> None:
     say(f"== 実測の置き場: {OUT}")
     status, version = CLIENT.version(ROOT_TOKEN)
     record(
@@ -366,11 +429,11 @@ def main() -> int:
         str(me.get("username") if isinstance(me, dict) else me),
     )
     if status != 200:
-        return finish()
+        return
     reviewer_id = int(me["id"])
 
     # ---- 0. ユーザが用意するもの: プロジェクト、メンバー、課題、main
-    project_path = f"ccnavi-probe-{STAMP}"
+    project_path = project_name(os.environ.get("CCNAVI_PROBE_PREFIX", "ccnavi-probe"), STAMP)
     status, project = CLIENT.create_project(ROOT_TOKEN, project_path)
     record(
         "プロジェクトを作る",
@@ -378,8 +441,9 @@ def main() -> int:
         str(project.get("web_url") if isinstance(project, dict) else project),
     )
     if status != 201:
-        return finish()
+        return
     pid = project["id"]
+    PROJECT_IDS.append(pid)
     status, _ = CLIENT.add_member(ROOT_TOKEN, pid, reviewer_id, 40)
     record("レビュアーをメンバーにする", status == 201)
     status, issue = CLIENT.create_issue(
@@ -583,7 +647,7 @@ def main() -> int:
         bool(mr) and f"Closes #{issue_no}" in (mr.get("description") or ""),
     )
     if not mr:
-        return finish()
+        return
     iid = mr["iid"]
     record(
         "依頼の note に ccnavi:request のマーカーがある",
@@ -630,6 +694,7 @@ def main() -> int:
         "レビュアーが変更要求を出す（EE の機能。CE では 404）",
         ee or status == 404,
         f"status={status}",
+        skip=not ee and status == 404,  # CE は確かめていないので PASS に数えない
     )
     status, _ = CLIENT.resolve_discussion(REVIEWER_TOKEN, pid, iid, disc_id)
     record("レビュアーがスレッドを解決する", status == 200)
@@ -674,7 +739,26 @@ def main() -> int:
     status, disc2 = CLIENT.create_discussion(
         REVIEWER_TOKEN, pid, iid, "typo。次でよい", tag="discussion-create-2"
     )
-    # 受け入れ（ユーザの decide）は probe では通さない。経路は未検証（gitlab-manual.md）
+    # 受け入れ（ユーザの decide）は別の親で通す（手順 6）
+
+    # ---- 3b. フィードバック計画の改版（親の done の前提。全体計画の最後がレビュー済みになった後）
+    current = approved_copy_path(parent_tree, "doing", "i0001")
+    revised = write(
+        os.path.join(parent_tree, "wip", "proposals", "todo", "i0001.md"),
+        feedback_revision(read_text(current)),
+    )
+    commit_all(parent_tree, "フィードバック計画の改版")
+    agreed = exe("user", "agree", stdin="y\n")
+    record(
+        "--agree（フィードバック計画の改版）", agreed.returncode == 0, redact(agreed.stderr)[-200:]
+    )
+    revised_push = sh(PUSH_APPROVED_SH, parent_tree, "i0001")
+    record("改版の承認を push（ユーザの役）", revised_push.returncode == 0)
+    record(
+        "承認済みのコピーの feedback 欄が空の計画になる",
+        re.search(r"^feedback: \[\]\s*$", read_text(current), re.M) is not None,
+    )
+    del revised
 
     # ---- 4. 親を閉じて ready（Draft を外す）
     # 親の start は冒頭（子の start より前）で済ませている。ここでは呼び直さない
@@ -688,6 +772,16 @@ def main() -> int:
         pushed.returncode == 0,
         redact(pushed.stdout + pushed.stderr).strip()[:120],
     )
+    stray = write(os.path.join(parent_tree, "wip", "stray.txt"), "未追跡\n")
+    blocked = sh(REVIEW_SH, parent_tree, "ready")
+    record(
+        "wip/ に未追跡ファイルがあると ready が止まる",
+        blocked.returncode != 0,
+        redact(blocked.stderr).strip()[:160],
+    )
+    held = mr_of(pid, "i0001")
+    record("止まったとき MR は Draft のまま", bool(held) and bool(held.get("draft")))
+    os.remove(stray)
     ready = sh(REVIEW_SH, parent_tree, "ready")
     say("ready:\n" + redact(ready.stdout + ready.stderr))
     record("ready が通る", ready.returncode == 0)
@@ -699,6 +793,22 @@ def main() -> int:
         f"squash={mr and mr.get('squash')}",
     )
     record("ready の note が MR にある", has_marker(notes_of(pid, iid), "<!-- ccnavi:ready -->"))
+    top = CLIENT.tree(ROOT_TOKEN, pid, "i0001")
+    record("ready のあと GitLab の i0001 に wip/ が無い", bool(top) and "wip" not in top, str(top))
+    # logs/archive/ は git の外（ワークスペースの下）。git 上は削除される（ticket-flow.md の 13）
+    archive = os.path.join(ROOT, "logs", "archive")
+    archived = [
+        os.path.relpath(os.path.join(d, f), archive)
+        for d, _, files in os.walk(archive)
+        for f in files
+        if f.startswith("i0001")
+    ]
+    record(
+        "閉じた親子が logs/archive/ へ移った（ローカル）",
+        any(a.endswith(os.path.join("done", "i0001.md")) for a in archived)
+        and any(a.endswith(os.path.join("ready", "i0001.json")) for a in archived),
+        str(sorted(archived))[:160],
+    )
 
     # ---- 5. 別の親をユーザが早めに閉じる（close-early）
     parent2 = worktree("i0002", "main")
@@ -748,16 +858,18 @@ def main() -> int:
             bool(made),
             f"{made[0].get('web_url') if made else '無し'}",
         )
+        moved = approved_copy_path(parent2, "done", "i0002-01-01")
         record(
-            "未着手の子が cancelled/ へ動く",
-            os.path.exists(
-                os.path.join(parent2, "wip", "proposals", "cancelled", "i0002-01-01.md")
-            ),
+            "未着手の子が done/ へ動き、cancelled_at が入る",
+            os.path.isfile(moved) and is_cancelled_copy(read_text(moved)),
+            moved,
         )
         record(
             "close-early のコメントが MR にある",
             has_marker(notes_of(pid, mr2["iid"]), "<!-- ccnavi:close-early -->"),
         )
+
+    decide_section(pid, reviewer_id)
 
     # ---- 6. URL にトークンを埋めた origin でも読めて、出力に漏れない
     scheme, _, hostpath = origin.partition("://")
@@ -772,15 +884,167 @@ def main() -> int:
         "トークン入り URL のトークンが出力に漏れない", ROOT_TOKEN not in seen.stdout + seen.stderr
     )
     git(parent2, "remote", "set-url", "origin", origin)
+    return
+
+
+def decide_section(pid: int, reviewer_id: int) -> None:
+    """ユーザの受け入れ（decide）を、別の親 i0003 で通す。
+
+    未解決の指摘が残る → confirm は止まる → decide で受け入れる（reviewed が置かれる）→
+    同じフェーズへの confirm は「レビュー済み」で拒まれる。
+    """
+    del reviewer_id
+    status, issue3 = CLIENT.create_issue(ROOT_TOKEN, pid, "受け入れを通す親", "実測の 3 本目")
+    record("課題 3 を立てる", status == 201)
+    tree = worktree("i0003", "main")
+    propose(
+        tree, "i0003", allow=("src/*", "wip/*"), title="受け入れを通す親", issue=issue3["iid"], mr=3
+    )
+    propose(
+        tree,
+        "i0003-01-01",
+        parent="i0003",
+        phase=1,
+        allow=("src/d/*",),
+        review=True,
+        title="d を書く",
+    )
+    write_explainer(tree)
+    commit_all(tree, "tickets")
+    record("i0003 の push", sh(GIT_SH, tree, "push", "-u", "origin", "i0003").returncode == 0)
+    for _ in range(10):
+        if CLIENT.get_branch(ROOT_TOKEN, pid, "i0003")[0] == 200:
+            break
+        time.sleep(1)
+    status, mr3 = CLIENT.create_mr(ROOT_TOKEN, pid, "i0003", "main", "Draft: 受け入れを通す親")
+    record(
+        "i0003 の Draft MR（mr: 3 と一致）",
+        status == 201 and isinstance(mr3, dict) and mr3.get("iid") == 3,
+        f"status={status}",
+    )
+    if status != 201:
+        return
+    mr_no = mr3["iid"]
+    agreed = exe("user", "agree", stdin="y\n")
+    record("--agree（i0003）", agreed.returncode == 0, redact(agreed.stderr)[-200:])
+    pushed = sh(PUSH_APPROVED_SH, tree, "i0003")
+    record("i0003 の承認を push（ユーザの役）", pushed.returncode == 0)
+    record("親 i0003 の start", sh(TICKET_SH, tree, "start", "i0003").returncode == 0)
+    child = "i0003-01-01"
+    child_tree = worktree(child, "i0003")
+    record(f"ticket start {child}", sh(TICKET_SH, tree, "start", child).returncode == 0)
+    write(os.path.join(child_tree, "src", "d", "work.py"), f"# {child}\n")
+    sh(TICKET_SH, child_tree, "learn")
+    commit_all(child_tree, f"{child}: work")
+    commit_all(tree, "start")
+    record(f"ticket finish {child}", sh(TICKET_SH, tree, "finish", child).returncode == 0)
+    commit_all(tree, "finish")
+    git(tree, "merge", "--quiet", "--no-edit", child)
+    record(
+        "i0003 の push（request の前提）",
+        sh(GIT_SH, tree, "push", "-u", "origin", "i0003").returncode == 0,
+    )
+    body = write(os.path.join(OUT, "request-3.md"), "見てほしい点\n\n- src/d を足した\n")
+    requested = sh(
+        REVIEW_SH, tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+    )
+    record("i0003 の request が通る", requested.returncode == 0, redact(requested.stderr)[-200:])
+    status, disc = CLIENT.create_discussion(
+        REVIEWER_TOKEN,
+        pid,
+        mr_no,
+        "名前は今は直さない（decide で受け入れる）",
+        tag="discussion-create-4",
+    )
+    record("レビュアーがスレッドを立てる（i0003）", status == 201)
+    disc_id = disc.get("id", "") if isinstance(disc, dict) else ""
+    stopped = sh(REVIEW_SH, tree, "confirm", "--phase", "1")
+    record(
+        "未解決の指摘が残ると confirm が止まる（i0003）",
+        stopped.returncode != 0 and "未解決" in stopped.stderr,
+    )
+
+    preview = sh(REVIEW_SH, tree, "decide", "1", "--preview")
+    write(os.path.join(OUT, "decide-preview.json"), preview.stdout)
+    try:
+        shown = json.loads(preview.stdout)
+    except ValueError:
+        shown = {}
+    threads = shown.get("threads") if isinstance(shown, dict) else None
+    record(
+        "decide --preview が threads と digest を JSON で返す",
+        preview.returncode == 0 and bool(threads) and bool(shown.get("digest")),
+        redact(preview.stderr)[-160:],
+    )
+    bare = sh(REVIEW_SH, tree, "decide", "1")
+    record(
+        "--preview なしの decide は rc 2 で断られる",
+        bare.returncode == 2,
+        f"rc={bare.returncode} " + redact(bare.stderr).strip()[-120:],
+    )
+    if not threads:
+        return
+    choices = json.dumps(
+        {t["key"]: "keep" for t in threads if isinstance(t, dict) and "key" in t},
+        ensure_ascii=False,
+    )
+    decided = sh(DECIDE_SH, tree, "1", "--choices", choices, "--digest", shown["digest"])
+    say("decide:\n" + redact(decided.stdout + decided.stderr))
+    record(
+        "decide（対応しないを選ぶ）が通る", decided.returncode == 0, redact(decided.stderr)[-200:]
+    )
+
+    # 判定は副作用の状態で見る
+    found = [d for d in CLIENT.discussions(ROOT_TOKEN, pid, mr_no) if d.get("id") == disc_id]
+    notes = found[0].get("notes", []) if found else []
+    record("スレッドが解決済みになる", bool(notes) and bool(notes[0].get("resolved")))
+    record("スレッドに返信の note が付く", len(notes) >= 2, f"notes={len(notes)}")
+    marker_dir = os.path.join(tree, ".ccnavi", "approved", "phases", "i0003")
+    placed = sorted(os.listdir(marker_dir)) if os.path.isdir(marker_dir) else []
+    record("reviewed が置かれる", any(n.endswith("reviewed") for n in placed), str(placed))
+    again = sh(REVIEW_SH, tree, "confirm", "--phase", "1")
+    record(
+        "同じフェーズの confirm は「レビュー済み」で拒まれる",
+        again.returncode != 0 and "レビュー済み" in again.stderr,
+        redact(again.stderr).strip()[-120:],
+    )
+
+
+def cleanup_projects() -> None:
+    """この実行が作ったプロジェクトだけを消す。GitLab の削除は非同期（応答は 202）。
+    CCNAVI_PROBE_KEEP が空でなければ消さない（調べるために残したいとき）。"""
+    if os.environ.get("CCNAVI_PROBE_KEEP"):
+        say(f"プロジェクト {PROJECT_IDS} は消さない（CCNAVI_PROBE_KEEP）")
+        return
+    for project_id in PROJECT_IDS:
+        status, _ = CLIENT.delete_project(ROOT_TOKEN, project_id)
+        after, seen = CLIENT.call("GET", f"/projects/{project_id}", ROOT_TOKEN, tag="project-after")
+        marked = seen.get("marked_for_deletion_on") if isinstance(seen, dict) else None
+        record(
+            f"自分が作ったプロジェクト {project_id} を消す",
+            status in (200, 202, 204),
+            f"DELETE status={status} 直後の GET status={after} marked_for_deletion_on={marked}",
+        )
+
+
+def main() -> int:
+    if any(arg in ("-h", "--help") for arg in sys.argv[1:]):
+        print((__doc__ or "").strip())
+        return 0
+    setup()
+    try:
+        run_probe()
+    finally:
+        cleanup_projects()
     return finish()
 
 
 def finish() -> int:
     say("\n==== まとめ ====")
-    for name, ok, _ in RESULTS:
-        say(f"{'PASS' if ok else 'FAIL'}  {name}")
-    failed = [r for r in RESULTS if not r[1]]
-    say(f"\n{len(RESULTS) - len(failed)} / {len(RESULTS)} PASS。置き場: {OUT}")
+    for name, state, _ in RESULTS:
+        say(f"{state}  {name}")
+    failed = [r for r in RESULTS if r[1] == "FAIL"]
+    say(f"\n{summary_line(RESULTS)}。置き場: {OUT}")
     LOG.close()
     return 1 if failed else 0
 
