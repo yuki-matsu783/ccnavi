@@ -112,10 +112,6 @@ _SHELL_VALUE_OPTIONS = frozenset({"-o", "+o", "-O", "+O", "--rcfile", "--init-fi
 # 最初の引数のファイルを、今のシェルで実行するもの。
 _SOURCES = frozenset({".", "source"})
 
-_XARGS_VALUE_OPTIONS = frozenset(
-    {"-I", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "--max-args", "--max-procs", "--delimiter"}
-)
-
 # find の、後ろに書いたコマンドを実行する述語。`;` か `+` までがコマンド。
 _FIND_EXEC = frozenset(shellread_words._TAKES_CODE_FLAG["find"])
 
@@ -602,22 +598,9 @@ def _peel(command: list[str], rewrites: list[tuple[str, str]]) -> tuple[str, lis
     if name == "eval":
         return name, _reread(" ".join(command[1:]), rewrites), True
     if name == "xargs":
-        rest = _skip_options(command[1:], _XARGS_VALUE_OPTIONS)
+        rest = shellread_words._skip_options(command[1:], shellread_words._XARGS_VALUE_OPTIONS)
         return name, [rest] if rest else [], True
     return "", [], False
-
-
-def _skip_options(args: list[str], value_options: frozenset[str]) -> list[str]:
-    """先頭のオプション（と値）を飛ばした残り。`--` はそこで終わる。"""
-    i = 0
-    while i < len(args):
-        token = args[i]
-        if token == "--":
-            return args[i + 1 :]
-        if not token.startswith("-") or token == "-":
-            break
-        i += shellread_words._option_width(token, args[i + 1 :], value_options)
-    return args[i:]
 
 
 def _shell_commands(

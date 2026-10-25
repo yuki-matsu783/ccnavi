@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import re
 
+from . import pathcase
+
 # シェルが演算子として読む文字。shlex の punctuation_chars と同じ文字。
 # 演算子はこの文字だけでできたトークンとして返ってくるので、語の中に
 # 同じ文字が現れたときと見分けられる。
@@ -34,6 +36,47 @@ _OPERATORS = frozenset({";", ";;", "&", "&&", "|", "||", "|&", "(", ")"})
 # 文字列を受け取って実行することが仕事のコマンド。
 # 何を実行するかはトークンの中に無いので、ここからは見えない。
 _RUNS_A_STRING = frozenset({"eval", "source", ".", "xargs"})
+
+# `xargs` と `find -exec` の後ろに置いてよい、読むだけのコマンド。ここに載っていれば、
+# 文字列をコードとして実行するものとは数えない。中身をそのまま出す `cat` `head` `tail` は入れない。
+# 引数のファイル名が標準入力から来るので、ファイル名を見るルールは外れる（この点は許容している）。
+_READONLY_RUNNEE = frozenset(
+    {
+        "grep",
+        "egrep",
+        "fgrep",
+        "wc",
+        "ls",
+        "file",
+        "stat",
+        "sort",
+        "uniq",
+        "basename",
+        "dirname",
+        "echo",
+    }
+)
+
+# `xargs` のオプションで、次の語を値に取るもの。一覧に無いオプションは値を取らないものとして読む。
+_XARGS_VALUE_OPTIONS = frozenset(
+    {
+        "-I",
+        "-n",
+        "-P",
+        "-d",
+        "-L",
+        "-s",
+        "-E",
+        "-a",
+        "--max-args",
+        "--max-procs",
+        "--delimiter",
+        "--arg-file",
+        "--max-chars",
+        "--max-lines",
+        "--process-slot-var",
+    }
+)
 
 # コマンドの位置に置かれたときに予約語になる語。予約語の後ろはコマンドの先頭なので、
 # `then find . -delete` の find を find として読ませるには、予約語で 1 本切る必要がある。
@@ -174,16 +217,58 @@ def _classify(commands: list[list[str]]) -> str:
         # いくらでもある。ここを全語で見ると、そういう普通の作業が読めなくなる。
         # パイプや ";" の後ろは別のコマンドになるので、xargs や eval も
         # 先頭の語として現れる。
-        if command and _base(command[0]) in _RUNS_A_STRING:
+        # xargs は、実行される語が読むだけのコマンドなら数えない。
+        if command and _base(command[0]) in _RUNS_A_STRING and not _xargs_readonly(command):
+            return REASON_TAKEN_AS_CODE
+
+        # `-` で始まる語が頭に来るのは、`find -exec … \;` のあとに続く述語
+        # （`-delete` `-exec` など）。
+        # 別のコマンドとして読むと find の書き込みの述語を見逃すので、読めない形に戻す。
+        if command and command[0].startswith("-"):
             return REASON_TAKEN_AS_CODE
 
         # フラグを付けて初めて文字列を実行するものは、先頭でなくてもよい。
         # sudo -u root sh -c は 4 語目に来る。
         for i, token in enumerate(command):
             flags = _TAKES_CODE_FLAG.get(_base(token))
-            if flags and _has_flag(command[i + 1 :], flags):
+            # find -exec は、次の語がすべて読むだけのコマンドなら数えない。
+            if (
+                flags
+                and _has_flag(command[i + 1 :], flags)
+                and not (_base(token) == "find" and _execs_readonly(command[i + 1 :], flags))
+            ):
                 return REASON_TAKEN_AS_CODE
     return ""
+
+
+def _readonly(words: list[str]) -> bool:
+    """先頭の語が、読むだけのコマンドの一覧にあるか。"""
+    return bool(words) and pathcase.fold(_base(words[0])) in _READONLY_RUNNEE
+
+
+def _xargs_readonly(command: list[str]) -> bool:
+    """`xargs` の、オプションと値を飛ばした最初の語が、読むだけのコマンドか。"""
+    return _base(command[0]) == "xargs" and _readonly(
+        _skip_options(command[1:], _XARGS_VALUE_OPTIONS)[:1]
+    )
+
+
+def _execs_readonly(tokens: list[str], flags: tuple[str, ...]) -> bool:
+    """`-exec` などの次の語が、どれも読むだけのコマンドか。"""
+    return all(_readonly(tokens[j + 1 : j + 2]) for j, token in enumerate(tokens) if token in flags)
+
+
+def _skip_options(args: list[str], value_options: frozenset[str]) -> list[str]:
+    """先頭のオプション（と値）を飛ばした残り。`--` はそこで終わる。"""
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token == "--":
+            return args[i + 1 :]
+        if not token.startswith("-") or token == "-":
+            break
+        i += _option_width(token, args[i + 1 :], value_options)
+    return args[i:]
 
 
 def _has_flag(tokens: list[str], flags: tuple[str, ...]) -> bool:

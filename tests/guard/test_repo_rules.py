@@ -237,7 +237,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assertEqual(body["verdict"], "deny")
         self.assertEqual(body["code"], "PARSE_UNCERTAIN")
         self.assertEqual(body["degraded"], shellread_scan.REASON_UNTERMINATED)
-        self.assertIn("raw text", body["response"])
+        self.assertIn("生の文字列", body["response"])
 
     def test_コマンド置換の中の_git_は止まる(self):
         self.assert_verdict("echo $(git push origin main)", "deny", "builtin:guard-raw-git")
@@ -817,7 +817,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ('find "$(pwd)" -name x', "ask", "", "UNDECLARED"),
                 ('cat "$(ls -t logs/git-*.log | head -1)"', "ask", "", "UNDECLARED"),
                 ("grep -n foo f\ngrep -n bar g", "ask", "", "UNDECLARED"),
-                ('echo "$(xargs echo < f)"', "ask", "", "PARSE_UNCERTAIN"),
+                ('echo "$(xargs rm < f)"', "ask", "", "PARSE_UNCERTAIN"),
             ]
         )
 
@@ -877,16 +877,20 @@ class SubstRepoRulesTest(unittest.TestCase):
     def test_縮退の断りは理由ごとに違う(self):
         responses = {}
         for subject, reason, phrase in [
-            ('echo "git push', shellread_scan.REASON_UNTERMINATED, "quote or heredoc"),
+            (
+                'echo "git push',
+                shellread_scan.REASON_UNTERMINATED,
+                "引用符かヒアドキュメントが閉じていない",
+            ),
             (
                 "echo $(git push",
                 shellread_scan.REASON_UNTERMINATED_SUBST,
-                "$( ) in this command never",
+                "$( ) が閉じていない",
             ),
             (
                 "bash -c x; git push origin main",
                 shellread_words.REASON_TAKEN_AS_CODE,
-                "runs it as code",
+                "コードとして実行するものに渡している",
             ),
         ]:
             with self.subTest(subject=subject):
@@ -1031,7 +1035,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         self.assertIn("--exclude-dir=a --exclude-dir=b", body["response"])
         # 読めなかったのではない。読めなかった断りを付けない。
         self.assertNotIn("PARSE_UNCERTAIN", body["response"])
-        self.assertNotIn("raw text", body["response"])
+        self.assertNotIn("生の文字列", body["response"])
 
 
 if __name__ == "__main__":
