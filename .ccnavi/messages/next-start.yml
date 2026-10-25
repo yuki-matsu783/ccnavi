@@ -64,7 +64,7 @@ messages:
     kind: next
     values: []
     next: |-
-      MCP（mcp__github__list_issues と mcp__github__list_pull_requests）で、題の似た open の issue・MR が無いと確かめてから、mcp__github__issue_write で issue を作り、その番号で打ち直す: {script:ccnavi-start.sh} --issue <作った番号>。作れなければ、直接実装にも切り替えず、ユーザに報告して止まる
+      MCP（mcp__github__list_issues と mcp__github__list_pull_requests）で、タイトルの似た open の issue・MR が無いと確かめてから、mcp__github__issue_write で issue を作り、その番号で打ち直す: {script:ccnavi-start.sh} --issue <作った番号>。作れなければ、直接実装にも切り替えず、ユーザに報告して止まる
 
   NEXT_START_NEW_ISSUE__GITLAB:
     kind: next
@@ -86,7 +86,7 @@ messages:
     kind: note
     values: []
     note: |-
-      別の作業なら、題を変えて --new-issue を打ち直す（題が同じものは作れない）
+      別の作業なら、タイトルを変えて --new-issue を打ち直す（タイトルが同じものは作れない）
 
   NOTE_START_SIMILAR_UNCHECKED:
     kind: note
@@ -120,7 +120,7 @@ messages:
     kind: next
     values: [real_args_q]
     next: |-
-      題の要点を表す短い英語の語を決め（30 文字ほどまで。例: text-formatter-cli）、<語> に入れて打ち直す: {script:ccnavi-start.sh} {real_args_q} --slug <語>
+      タイトルの要点を表す短い英語の語を決め（30 文字ほどまで。例: text-formatter-cli）、<語> に入れて打ち直す: {script:ccnavi-start.sh} {real_args_q} --slug <語>
 
   NEXT_START_MR_EXISTS:
     kind: next
@@ -137,7 +137,7 @@ messages:
       - |-
         closed のまま続ける: ユーザが closed と承知のうえで続けると言ったときだけ、--reopened を付けて打ち直す: {script:ccnavi-start.sh} {real_args_q} --reopened
       - |-
-        別の issue にする: ユーザに番号を聞いて打ち直す: {script:ccnavi-start.sh} --issue <別の issue の番号>。issue がまだ無ければ --new-issue <題>
+        別の issue にする: ユーザに番号を聞いて打ち直す: {script:ccnavi-start.sh} --issue <別の issue の番号>。issue がまだ無ければ --new-issue <タイトル>
       - |-
         やめる: ユーザに報告して止まる
 

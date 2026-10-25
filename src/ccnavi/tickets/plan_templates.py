@@ -702,7 +702,7 @@ def graph(
     2. `after` の誤りが無ければ、`workflow.compute` で先行の形を計算する（読めなければ計算しない）
     3. 先行の形から、`loose` と `ready` を得る
     4. 全体計画、フィードバック計画の順に、ステップが在る部ごとに 1 件の図を組む
-    5. ステップごとに、型の定義から題名と審査の種類を引く。`after` は全体の番号に直す
+    5. ステップごとに、型の定義からタイトルと審査の種類を引く。`after` は全体の番号に直す
     6. 部の誤り（`_order_errors` と `workflow.problems`）を `problems` に入れて返す
     """
     # 型の定義と、合成した計画を読む。
@@ -733,7 +733,7 @@ def graph(
             for n, item in zip(numbers, items, strict=True)
             if item.after
         }
-        # ステップごとの行。題名と審査の種類は、型の定義（あれば）から引く。
+        # ステップごとの行。タイトルと審査の種類は、型の定義（あれば）から引く。
         rows = []
         for n, item in zip(numbers, items, strict=True):
             pt = config.get(item.type)

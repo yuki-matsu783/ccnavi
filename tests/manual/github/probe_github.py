@@ -980,7 +980,7 @@ def main() -> int:
     )
     pr = pr_of("i0001")
     record(
-        "PR の Draft が外れ、題から Draft: が消える",
+        "PR の Draft が外れ、タイトルから Draft: が消える",
         bool(pr) and not pr.get("draft") and not pr.get("title", "").lower().startswith("draft"),
         f"title={pr and pr.get('title')} draft={pr and pr.get('draft')}",
     )

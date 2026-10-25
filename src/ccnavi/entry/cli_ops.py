@@ -225,11 +225,11 @@ def operate(
             stdout, stderr, root, conf, where, target, args.note, args.target, args.signal
         )
     elif kind == "ticket" and verb == "new":
-        # ticket new <識別子> --title <題> (--plan <型,型,...> |
+        # ticket new <識別子> --title <タイトル> (--plan <型,型,...> |
         # --template <名前> [--layer <名前>] [--with-feedback]) [--issue N]。親の提案の雛形を作る。
         if len(words) != 3:
             stderr.write(
-                "ccnavi: ticket new <識別子> --title <題> --plan <型,型,...>"
+                "ccnavi: ticket new <識別子> --title <タイトル> --plan <型,型,...>"
                 " [--scope <glob>] --issue <N|owner/repo#N> --mr <N>"
                 " か --template <名前> [--layer <名前>] [--with-feedback]\n"
             )
@@ -341,7 +341,7 @@ def _worktree(
         return EXIT_OK
     if verb == "issue-id" and len(words) in (4, 5):
         # issue から新しい親のブランチ名（= 識別子）を作る。Chrome の「始める」と同じ関数。
-        # worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <題>
+        # worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <タイトル>
         try:
             ident, shortened = ticket_ids.issue_identifier_parts(
                 int(words[2]) if words[2].isdigit() else 0,
@@ -354,7 +354,7 @@ def _worktree(
             return EXIT_ERROR
         stdout.write(f"id {ident}\n")
         if shortened:
-            # 題が長くて slug を短くした。ccnavi-start.sh は短い --slug を付けさせる。
+            # タイトルが長くて slug を短くした。ccnavi-start.sh は短い --slug を付けさせる。
             stdout.write("long yes\n")
         return EXIT_OK
     if verb == "branch" and len(words) in (3, 4) and words[3:] in ([], ["confirmed"]):
@@ -373,7 +373,7 @@ def _worktree(
             " か worktree retire --abandon <親>"
             " か worktree branch <名前> [confirmed]"
             " か worktree name <名前> か worktree id <ブランチ>"
-            " か worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <題>\n"
+            " か worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <タイトル>\n"
         )
         return EXIT_ERROR
     target = words[2]

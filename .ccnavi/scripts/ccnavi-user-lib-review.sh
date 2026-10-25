@@ -209,7 +209,7 @@ accept_cleanup() {
 	}
 }
 
-# ---- issue を作る。下書きの 1 行目が題、3 行目からが本文。{number, url} を返す。
+# ---- issue を作る。下書きの 1 行目がタイトル、3 行目からが本文。{number, url} を返す。
 
 create_issue() {
 	draft="$1"

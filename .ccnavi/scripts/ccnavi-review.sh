@@ -24,7 +24,7 @@
 #   request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
 #            下書きを書き出す → ここが（無ければ）マージリクエストを下書きで作り、依頼を投稿する
 #            → `ccnavi review requested` がマーカーを置く
-#            ユーザはレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。題から Draft を
+#            ユーザはレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。タイトルから Draft を
 #            外してマージするのはユーザに任せる。
 #            --eli5 <HTML> は必須（付け忘れを後回しにさせない）。変更をやさしく説明した 1 枚の HTML で、
 #            このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html）にコミットしておく。
@@ -449,9 +449,9 @@ find_posted() {
 	fi
 }
 
-# ---- Draft を外す。GitHub は GraphQL で外す（GraphQL が 403 の環境では REST の ccr/ready_for_review を使う）。GitLab は題の "Draft: " を除く。
+# ---- Draft を外す。GitHub は GraphQL で外す（GraphQL が 403 の環境では REST の ccr/ready_for_review を使う）。GitLab はタイトルの "Draft: " を除く。
 
-# 題の頭の Draft の印（`Draft:`・`[Draft]`・`WIP:` など。大文字小文字は問わない）を除く。標準入力の 1 行。
+# タイトルの頭の Draft の印（`Draft:`・`[Draft]`・`WIP:` など。大文字小文字は問わない）を除く。標準入力の 1 行。
 # sed の大文字小文字を区別しない指定（`I`）は GNU だけで、BSD の sed（macOS）では失敗するので、字ごとに書く。
 strip_draft() {
 	sed -E 's/^[[:space:]]*(\[?([Dd][Rr][Aa][Ff][Tt]|[Ww][Ii][Pp])\]?:?[[:space:]]*)+//'
@@ -463,7 +463,7 @@ undraft() {
 		pr=$(api GET "repos/$path/pulls/$mr_number")
 		node=$(printf '%s' "$pr" | "$JQ" -r '.node_id // empty')
 		[ -n "$node" ] || fail no-node-id "マージリクエスト #$mr_number の node_id を読めない。"
-		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときに題からも除く。
+		# タイトルの "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときにタイトルからも除く。
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
 		stripped=$(printf '%s' "$title" | strip_draft) || stripped=""
 		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
@@ -494,16 +494,16 @@ undraft() {
 		esac
 	else
 		title=$(api GET "projects/$(encoded_path)/merge_requests/$mr_number" | "$JQ" -r '.title // empty')
-		[ -n "$title" ] || fail no-mr-title "マージリクエスト !$mr_number の題を読めない。"
+		[ -n "$title" ] || fail no-mr-title "マージリクエスト !$mr_number のタイトルを読めない。"
 		stripped=$(printf '%s' "$title" | strip_draft) ||
-			fail undraft-title "マージリクエスト !$mr_number の題から Draft を除けなかった。題は変えていない。"
+			fail undraft-title "マージリクエスト !$mr_number のタイトルから Draft を除けなかった。タイトルは変えていない。"
 		if [ "$stripped" = "$title" ]; then
 			printf 'false\n'
 			return 0
 		fi
-		# 除いた結果が空なら、空の題で更新しない。
+		# 除いた結果が空なら、空のタイトルで更新しない。
 		[ -n "$stripped" ] ||
-			fail undraft-empty-title "マージリクエスト !$mr_number の題から Draft を除くと空になる。題は変えていない。題を付けてから再実行してください。"
+			fail undraft-empty-title "マージリクエスト !$mr_number のタイトルから Draft を除くと空になる。タイトルは変えていない。タイトルを付けてから再実行してください。"
 		# squash も有効にする。途中のコミットを既定のブランチに残さない。GitHub は MR ごとに持てない
 		# （マージのときにユーザが選ぶ）ので、コメントに書くだけ。
 		payload=$("$JQ" -n --arg t "$stripped" '{title: $t, squash: true}')

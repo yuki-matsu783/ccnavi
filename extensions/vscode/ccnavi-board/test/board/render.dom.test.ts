@@ -455,7 +455,7 @@ test("CB-T16 本文の文字列で表示が崩れない", async () => {
   }
 });
 
-test("CB-T131o 決めた結果のプロンプトのオーバーレイは、題・注意・プロンプトと、承認と同じコピー・新しいセッションで開く・閉じる", async () => {
+test("CB-T131o 決めた結果のプロンプトのオーバーレイは、タイトル・注意・プロンプトと、承認と同じコピー・新しいセッションで開く・閉じる", async () => {
   const page = await openBoard(fixture(), {
     approval: { kind: "prompt", title: "フェーズ 2 をレビュー済みにしました", note: "注意 <i>", prompt: "[ccnavi] レビューを終えた <b>" },
   });

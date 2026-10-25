@@ -1,12 +1,12 @@
 /**
- * カードの「状態の札」とフェーズ行の「状態の一言」を決める。純粋な関数で、VS Code にも DOM にも触れない。
+ * カードの「状態のバッジ」とフェーズ行の「状態の一言」を決める。純粋な関数で、VS Code にも DOM にも触れない。
  *
- * 札は「状況」、カードの操作欄は「ユーザができること」。両者は別の規則で決め、同時に出てよい
- * （「要確認」の札と［承認］、など）。操作してよいかの最終判断は実行ファイルが持つ。
+ * バッジは「状況」、カードの操作欄は「ユーザができること」。両者は別の規則で決め、同時に出てよい
+ * （「要確認」のバッジと［承認］、など）。操作してよいかの最終判断は実行ファイルが持つ。
  * ここは実行ファイルの JSON が判定した欄（`gate_closed`・`review_waiting`・`blocked`・`pending_approval`・
  * マーカー）を表示の言葉に置き換えるだけで、レビューの要否・ゲートの条件・リスクは判定し直さない。
  *
- * 規則は上から見て、最初にヒットしたものを採る。表は `docs/design/screens.md` の「状態の札」と同じ。
+ * 規則は上から見て、最初にヒットしたものを採る。表は `docs/design/screens.md` の「状態のバッジ」と同じ。
  */
 import type { CopyStatus, PhaseJson } from "./model.js";
 
@@ -22,11 +22,11 @@ export type PhaseStatus =
   | "これから"
   | "要確認";
 
-/** 札の色の系統。色だけに頼らず、言葉は必ず出す */
+/** バッジの色の系統。色だけに頼らず、言葉は必ず出す */
 export type Tone = "check" | "turn" | "wait" | "work" | "done" | "cancel";
 
 export interface Status {
-  /** 札の言葉。「完了（早めに終了）」のように補足を括弧で足したものもここに入る */
+  /** バッジの言葉。「完了（早めに終了）」のように補足を括弧で足したものもここに入る */
   readonly label: string;
   /** ツールチップ。理由があるときだけ（無ければ空） */
   readonly title: string;
@@ -92,7 +92,7 @@ function deferredTo(skipped: Record<string, unknown>): unknown {
   return value === undefined || value === null ? undefined : value;
 }
 
-/** 札の判定に要るカードの欄。`Card`（`board.ts`）がそのまま満たす */
+/** バッジの判定に要るカードの欄。`Card`（`board.ts`）がそのまま満たす */
 export interface StatusCard {
   readonly isParent: boolean;
   readonly column: string;
@@ -153,7 +153,7 @@ function fieldsOf(card: StatusCard): string {
 }
 
 /**
- * カードの状態の札。上から最初にヒットしたものを採る。
+ * カードの状態のバッジ。上から最初にヒットしたものを採る。
  *
  * 子
  * 1. `blocked` か `scattered` がある → 要確認

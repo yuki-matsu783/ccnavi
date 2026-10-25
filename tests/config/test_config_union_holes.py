@@ -886,7 +886,7 @@ class ReservedLayerRestoreTest(GuardHarness):
         )
 
     def test_the_layer_of_a_project_named_common_is_restored(self):
-        """名札と同じ名前のプロジェクトでも、レイヤーの 3 本がバックアップと復元の対象。"""
+        """レイヤーの名前と同じ名前のプロジェクトでも、レイヤーの 3 本がバックアップと復元の対象。"""
         for kind in settings.LAYER_KINDS:
             with self.subTest(kind=kind):
                 path = layer_path(self.reserved, kind)

@@ -477,7 +477,7 @@ case " $* " in
 *" review prepare "*)
   mkdir -p "$root/logs/state"
   printf '<!-- ccnavi:request i0001:1 key=k1 -->\\n見てほしい\\n' >"$root/logs/state/req.md"
-  printf '題\\n\\n本文\\n' >"$root/logs/state/mr.md"
+  printf 'タイトル\\n\\n本文\\n' >"$root/logs/state/mr.md"
   printf '%s\\n%s\\n' "$root/logs/state/req.md" "$root/logs/state/mr.md"
   exit 0 ;;
 *" review requested "*)

@@ -460,7 +460,7 @@ test("CX-T156 GitLab の PAT の期限は GET /personal_access_tokens/self か�
   assert.equal(asked(), 2);
 });
 
-test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題は素の文字列で描き、押すと頼む。要確認は外すボタンを添えて出す", async () => {
+test("CX-T158 ボードの「始める」の欄と「要確認」: issue のタイトルは素の文字列で描き、押すと頼む。要確認は外すボタンを添えて出す", async () => {
   const mock = new MockGitLab(fixture());
   const b = await collectRepo(GITLAB_REPO, glDeps(mock));
   const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only" });
@@ -474,7 +474,7 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題�
   };
   const first = renderBoard(dom.window.document, md, b, actions);
   (first.querySelector("[data-testid=start] button[data-action=issues]") as HTMLElement).click();
-  const hostile = '<img src=x onerror="window.__pwned=\'issue\'">題';
+  const hostile = '<img src=x onerror="window.__pwned=\'issue\'">タイトル';
   const html = renderBoard(dom.window.document, md, b, actions, {
     issues: { list: [{ number: 12, title: hostile, url: "javascript:window.__pwned='url'" }], error: "" },
     attention: { i0001: "元に戻せなかった", gone: "見えない親子のチケット" },

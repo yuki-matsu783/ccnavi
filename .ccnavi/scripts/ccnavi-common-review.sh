@@ -429,7 +429,7 @@ find_marked() {
 #
 # staged_send <操作の種類> <キー> <段階ID> <note|issue> <MR の番号> <MR の URL> <本文のファイル>
 # 操作ID は種類・親・MR・キーから決まる（打ち直しが同じ記録にヒットする）。段階は issue と comment の 2 つを
-# 記録に持つ。note は MR へのコメント、issue は issue の作成（create_issue が要る。本文の 1 行目が題）。
+# 記録に持つ。note は MR へのコメント、issue は issue の作成（create_issue が要る。本文の 1 行目がタイトル）。
 # 標準出力は note なら `comment`、issue なら `create_issue` と同じ形の JSON（送り済みと分かったときは
 # {url}、issue はそれに {number}）。送り済みなら送らず、前に試した形跡があれば先にホストを目印で照合する。
 # 確定できないときは止めて 1（自動では送り直さない）。

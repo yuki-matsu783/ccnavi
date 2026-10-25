@@ -35,7 +35,7 @@
 
 下の例は子の提案。親の提案は `parent:` と `phase:` を書かず、`mr:`・`plan:`・`phases:` を持つ
 （全体の書式は docs/21_design/tickets/proposal-format.md）。手で書かず、
-`ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>` で雛形を作る。
+`ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <値> --mr <番号>` で雛形を作る。
 
     ---
     version: 1
@@ -334,7 +334,7 @@ def _read_identity(ticket: ticket_model.Ticket, front: dict, problems: list[Prob
                         f" の形で書く（フェーズ 5 の 1 枚目なら `{example}`）。"
                         "親の提案を書いているなら、`parent:` と `phase:` の行を消す"
                         "（この 2 つは子だけの欄）。雛形は "
-                        "`ccnavi ticket new <識別子> --title <題> --plan <型,…>"
+                        "`ccnavi ticket new <識別子> --title <タイトル> --plan <型,…>"
                         " --issue <値> --mr <番号>` が作る",
                     )
                 )

@@ -242,7 +242,7 @@ def write_fs(stdout: TextIO, stderr: TextIO, planned: agree.Planned) -> agree.Ap
     - `FAIL_QUIET`: 何も出さずに続ける
 
     並べる段で止まっていたら（`planned.stopped`）、並べた分を書いてから同じ形で言って止める。
-    `Call` は同じ組で書けた名札（`tag`）を渡して呼び、
+    `Call` は同じ組で書けた名前（`tag`）を渡して呼び、
     返った行を出す（マーカーの消去の行は、実際に消せた種類で書く）。
     """
     placed: list[str] = []

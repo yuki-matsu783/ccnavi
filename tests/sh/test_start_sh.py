@@ -494,7 +494,7 @@ class StartShTest(unittest.TestCase):
         self.assertIn("--similar-checked を付けても issue を作らずに", done.stdout)
         self.assertIn("issue #9  Add login", done.stdout)
         self.assertNotIn("MR !10", done.stdout)
-        self.assertIn("題を変えて --new-issue を打ち直す", done.stdout)
+        self.assertIn("タイトルを変えて --new-issue を打ち直す", done.stdout)
         self.assertEqual(self.posts(), [])
 
     def test_rerun_hint_after_the_issue_was_made_uses_issue_not_new_issue(self):
@@ -726,7 +726,7 @@ class StartShTest(unittest.TestCase):
                 ],
             }
         )
-        # MCP で実在を確かめた後の再実行（--mcp-checked）なら、仮の題で進む
+        # MCP で実在を確かめた後の再実行（--mcp-checked）なら、仮のタイトルで進む
         done = self.run_sh("--issue", "152", "--slug", "login", "--mcp-checked")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.posts()[0]["title"], "#152 login")
@@ -803,7 +803,7 @@ class StartShTest(unittest.TestCase):
         self.assertNotIn("は closed", done.stdout)
 
     def test_a_response_without_a_state_does_not_stop_and_says_unconfirmed(self):
-        # 題は読めたが状態が分からない応答でも止めない
+        # タイトルは読めたが状態が分からない応答でも止めない
         self.github_new()
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
@@ -815,17 +815,17 @@ class StartShTest(unittest.TestCase):
         self.assertIn("--reopened は --issue と一緒", done.stderr)
 
     def test_a_title_of_symbols_only_falls_back_to_issue(self):
-        """題から何も残らなければ slug は issue（Chrome の「始める」と同じ作り方）。"""
+        """タイトルから何も残らなければ slug は issue（Chrome の「始める」と同じ作り方）。"""
         self.github_new(title="!!!", branch="feature-152-issue")
         done = self.run_sh("--issue", "152", "--dry-run")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("feature-152-issue", done.stdout)
 
     def test_the_branch_from_a_title_is_the_one_chrome_makes(self):
-        """題からのブランチ名は Chrome の「始める」と同じ関数（`issue_identifier`）で作る。
+        """タイトルからのブランチ名は Chrome の「始める」と同じ関数（`issue_identifier`）で作る。
 
-        末尾が `-<2 桁>` になる題は、その部分を除く（除かないと、作ったあとに採用の確認で止まり、
-        手で消すまで戻れない）。日本語の題は日本語のまま残す。
+        末尾が `-<2 桁>` になるタイトルは、その部分を除く（除かないと、作ったあとに採用の確認で止まり、
+        手で消すまで戻れない）。日本語のタイトルは日本語のまま残す。
         """
         for title, branch in (
             ("Update 10 20", "feature-152-update"),
@@ -840,15 +840,15 @@ class StartShTest(unittest.TestCase):
                 self.assertEqual(self.local_branches(), ["main"])
 
     def test_a_long_title_stops_and_asks_for_a_short_slug(self):
-        """題が長くて slug が切れるときは、何も作らずに止め、短い --slug での打ち直しを案内する。
+        """タイトルが長くて slug が切れるときは、何も作らずに止め、短い --slug での打ち直しを案内する。
 
-        --slug を付ければ、同じ issue で進める。題が収まるときは止めない。
+        --slug を付ければ、同じ issue で進める。タイトルが収まるときは止めない。
         """
         title = "テキスト整形CLI（main.sh）を README の仕様どおりに実装する"
         self.github_new(title=title, branch="feature-152-text-formatter-cli")
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
-        self.assertIn("題が長く", done.stderr)
+        self.assertIn("タイトルが長く", done.stderr)
         next_lines = [x for x in done.stderr.splitlines() if x.startswith("次: ")]
         self.assertEqual(len(next_lines), 1, done.stderr)
         self.assertIn("--issue", next_lines[0])

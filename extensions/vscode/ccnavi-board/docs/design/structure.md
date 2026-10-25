@@ -39,8 +39,8 @@ src/
     testmodel.ts      試験の JSON の形（--test --json / --test-expectations --json）と読み取り
     suggestmodel.ts   候補の JSON の形（--suggest --json）と読み取り。allow の候補は並べない
     lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情とフローの苦情（(flow)）の抜き出し
-    board.ts          列とカードへの組み立て、操作の有無（親の提案のカードの「計画編集」は提案の has_plan から）。状態の札とフェーズ行の一言を JSON の欄から付ける。マージ状況の帯の題を引く archivedTitleOf
-    status.ts         カードの状態の札（statusOf）とフェーズ行の状態の一言（phaseStatusOf）。上から最初にヒットしたものを採る純粋な関数で、JSON の判定済みの欄を表示の言葉に置き換えるだけ
+    board.ts          列とカードへの組み立て、操作の有無（親の提案のカードの「計画編集」は提案の has_plan から）。状態のバッジとフェーズ行の一言を JSON の欄から付ける。マージ状況の帯のタイトルを引く archivedTitleOf
+    status.ts         カードの状態のバッジ（statusOf）とフェーズ行の状態の一言（phaseStatusOf）。上から最初にヒットしたものを採る純粋な関数で、JSON の判定済みの欄を表示の言葉に置き換えるだけ
     mrstate.ts        マージ状況の確認が読む 2 つの答え（ccnavi-review.sh mr-state <番号>、ccnavi sync retired）の厳しい検証と、リポジトリのディレクトリの引き方
     merge.ts          マージ状況の確認の遷移（いまの状態 ＋ 入力 → 次の状態 ＋ やること）と、画面に渡す形 MergeView。世代（token）で遅れた答えを破棄し、確認中の再押下・片付けの再入を受けない。外へ出る仕事は返すだけで、行うのは board-panel
     board-moved.ts    前の読み直しから列が変わったカードと、新しく現れたカード（いまの状態 ＋ 読めたボード → 次の状態）。持ち直すのは board-panel。VS Code に触れないので単体で試せる
@@ -80,7 +80,7 @@ src/
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
     tour-sidebar.ts   左パネルの案内（ウォークスルー）の ID と、続けて動かす基本の案内の画面。DOM にも vscode にも触れないので、単体で試せる
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
-    tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。手順は target・題・本文・scene・image と alt）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
+    tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。手順は target・タイトル・本文・scene・image と alt）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
     tour-rules.ts     ルール管理の案内の見本（tours/rules.yml の sample:）を RuleForm と実行ファイルの JSON の形にする。rules.yml と同じ書き方のルールを読む小さな読み取り（実際の readRules と同じ結果になることをテストが見る）
     tour-board.ts     ボード画面の案内の見本（tours/board.yml の sample:）を parseBoardJson / buildBoard と承認・残った指摘の読み取りに通して、画面が描く形にする。実行ファイルの JSON と同じ形で書く
     tour-risk.ts      リスク管理の案内の見本（tours/risk.yml の sample:）を、risks.yml と同じ書き方から RiskPage（配点あり・ファイル無し・統合結果）にする小さな読み取り。yaml を持たず、readRisk と同じ結果になることをテストが見る
@@ -108,7 +108,7 @@ src/
     appearance.ts     見た目の切り替え（body のクラスの書き換え）。9 画面で 1 本
     useHostMessages.ts 拡張ホストからのメッセージの受信（見た目はここで受ける）と、組み上がったときの ready。9 画面で 1 本
     useEscape.ts      Esc で閉じる面の入口。重なっているときは最も手前の面（ESCAPE_LAYER。CSS の z-index と同じ順）だけが受ける
-    tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・題・本文・scene・画像の image と alt・時系列の図の diagram と focus。図は diagrams: に登場者と矢印で書く）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
+    tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・タイトル・本文・scene・画像の image と alt・時系列の図の diagram と focus。図は diagrams: に登場者と矢印で書く）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
     tours/images.ts   手順の image（名前）から画像の data: URL を引く表。画像は tours/images/<名前>.png に置き、esbuild の dataurl の読み込みでバンドルへ入れる（Webview はファイルを読まず、ボードの CSP だけ img-src data: を許す）。表と置き場と YAML の突き合わせはテストが見る
     Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある 8 画面で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。ツールバーは ScreenHeader が組み、? を最後の子に置くのでどの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）。画面全体を覆う `role="dialog"` は Dialog.tsx を使わず、指す先の枠の影で暗くする作りを別に持つ。画像のある手順は、本文の下に img を出し、吹き出しを広げる（指す先は空にして中ほどに出す）
     TargetSelect.tsx  ルール管理・リスク管理・フェーズ管理・テンプレート管理の、設定の対象を切り替える欄
@@ -159,7 +159,7 @@ src/
     phases/state.ts   編集中の定義（行ごとのキー）・開いている行（id で保持する）・id の重なり
     phases/text.ts    要約の文・絞り込みが適用する文字列・空のときの言葉
     templates/style.css テンプレート管理画面の CSS の入口
-    templates/App.css   App.tsx の CSS（枠・札・「取り込み待ちを開く」の段落の余白）
+    templates/App.css   App.tsx の CSS（枠・バッジ・「取り込み待ちを開く」の段落の余白）
     templates/Template.css Template.tsx の CSS（テンプレート 1 件の行）
     templates/Draft.css Draft.tsx の CSS（下書き 1 件）
     templates/Sum.css   Sum.tsx の CSS（統合結果の枠と表）
@@ -170,23 +170,23 @@ src/
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
     templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
     templates/Sum.tsx   統合結果の枠（読み取り専用。実行ファイルの索引を、統合結果を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
-    templates/Template.tsx テンプレート 1 件（札・図・本文・「図を編集」。行は最初から開く）
+    templates/Template.tsx テンプレート 1 件（バッジ・図・本文・「図を編集」。行は最初から開く）
     templates/Diagrams.tsx 一覧の 1 行の図（計画の図と子のフローの図。読むだけ。実行ファイルの答え TemplateCheck を描く）
     templates/Edit.tsx  編集欄（説明・使う場面・計画・フロー、元に戻す、保存、作業中の錠の帯、未保存の確認。直すたびに実行ファイルに読ませる）
     templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。種類・レビューの選択、並べ替え、削除、追加）
     templates/FlowEdit.tsx 編集欄の子のフロー 1 本（フロー編集画面の図と右の欄を使い、部品箱でノードを足す）
-    templates/Draft.tsx 下書き 1 件（読むだけ。札と指摘・計画。取り込みは取り込み待ち画面）
+    templates/Draft.tsx 下書き 1 件（読むだけ。バッジと指摘・計画。取り込みは取り込み待ち画面）
     templates/Plan.tsx  計画の表（番号・種類・レビュー・先行ステップ）
     templates/Problems.tsx 苦情の一覧（深刻度は色と文字の両方で出す）
     templates/text.ts   答えの値を読みやすい言葉に直す（判定はしない）
     handoff/style.css   取り込み待ち画面の CSS の入口
-    handoff/App.css     App.tsx の CSS（札・一括の操作・確認の帯）
+    handoff/App.css     App.tsx の CSS（バッジ・一括の操作・確認の帯）
     handoff/Entry.css   Entry.tsx の CSS（対象 1 件の行・差分・指摘）
     handoff/Result.css  Result.tsx の CSS（取り込みの結果）
     handoff/post.ts     取り込み待ちの送り口。契約に無いものは型で止まる
     handoff/main.tsx    取り込み待ち画面の入口。埋め込みの JSON を読んでマウントする
     handoff/App.tsx     帯・ツールバー（ツリーの欄）・対象の一覧・選択・確認の帯・結果。選んだ対象と開いた行だけを画面が持つ。無効（古い実行ファイル）・エラー・読み込み中の表示
-    handoff/Entry.tsx   対象 1 件（選択の欄・種類と状態の札・取り込めない理由・差分と指摘・defense のターミナルの案内）
+    handoff/Entry.tsx   対象 1 件（選択の欄・種類と状態のバッジ・取り込めない理由・差分と指摘・defense のターミナルの案内）
     handoff/Result.tsx  取り込みの結果（取り込めた対象・消した下書き・残した下書きと理由・失敗の理由）
     handoff/text.ts     種類・状態の値を読みやすい言葉に直す（判定はしない）
     flow/style.css    フロー編集画面の CSS の入口（先頭で React Flow の CSS を @import する）
@@ -246,7 +246,7 @@ test/
   helpers/fixture.ts  board.json を読む
   helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を記録する
   helpers/board.ts    ボード画面（React）をバンドルしたものごと happy-dom で開く
-  helpers/cards.ts    カードの組み立てを欄ごとに指定して作る部品（状態の札・レビュー・マージの画面のテストが使う）
+  helpers/cards.ts    カードの組み立てを欄ごとに指定して作る部品（状態のバッジ・レビュー・マージの画面のテストが使う）
   helpers/projects.ts プロジェクト管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/risk.ts     リスク管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/phases.ts   フェーズ管理画面（React）をバンドルしたものごと happy-dom で開く

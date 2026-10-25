@@ -106,7 +106,7 @@ function text(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "" && value.length <= MAX_TEXT && !value.includes("\0");
 }
 
-/** issue の題を 1 行にする（改行・制御文字は空白にし、上限で切る） */
+/** issue のタイトルを 1 行にする（改行・制御文字は空白にし、上限で切る） */
 export function oneLine(title: string): string {
   const flat = title.replace(/[\x00-\x1f\x7f\u2028\u2029]+/g, " ").replace(/\s+/g, " ").trim();
   return [...flat].slice(0, MAX_TITLE).join("");
@@ -148,7 +148,7 @@ export function planProblems(plan: unknown): string[] {
     }
     if (issueKeys.has(i.key)) out.push(`issue のキーが重なっています: ${i.key}`);
     issueKeys.add(i.key);
-    if (typeof i.title !== "string" || oneLine(i.title) === "") out.push(`issue の題が空です: ${i.key}`);
+    if (typeof i.title !== "string" || oneLine(i.title) === "") out.push(`issue のタイトルが空です: ${i.key}`);
     if (!text(i.body)) {
       out.push(`issue の本文が空か長すぎます: ${i.key}`);
       continue;

@@ -348,7 +348,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--abandon", default=None, metavar="PARENT")
     parser.add_argument("--body-file", default="")
     parser.add_argument("--reason", default="")
-    # `ticket new` の引数。題・計画の型（カンマ区切り）・issue の番号。
+    # `ticket new` の引数。タイトル・計画の型（カンマ区切り）・issue の番号。
     parser.add_argument("--title", default="")
     parser.add_argument("--plan", default="")
     parser.add_argument("--issue", default=None)

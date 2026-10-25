@@ -874,7 +874,7 @@ export async function createDraftMr(client: Client, owner: string, repo: string,
 
 // ---- decide のホスト書き込み。スレッドへの返信と解決、issue の作成と検索、MR へのコメント ------
 
-/** issue の題・返信とコメントと issue の本文の字数の上限（GitHub の本文の上限は 65,536 字） */
+/** issue のタイトル・返信とコメントと issue の本文の字数の上限（GitHub の本文の上限は 65,536 字） */
 export const MAX_TITLE = 255;
 export const MAX_WRITE_TEXT = 65000;
 
@@ -902,10 +902,10 @@ export function checkWriteText(value: unknown, what: string): string {
   return value;
 }
 
-/** issue の題。1 行で、制御文字を含まない */
+/** issue のタイトル。1 行で、制御文字を含まない */
 export function checkTitle(value: unknown): string {
   if (typeof value !== "string" || value.trim() === "" || value.length > MAX_TITLE || /[\x00-\x1f\x7f]/.test(value)) {
-    throw new HostError(`issue の題は ${MAX_TITLE} 字までの 1 行の文字列にしてください（改行・制御文字は含められません）`);
+    throw new HostError(`issue のタイトルは ${MAX_TITLE} 字までの 1 行の文字列にしてください（改行・制御文字は含められません）`);
   }
   return value;
 }
@@ -1038,7 +1038,7 @@ export async function resolveThread(client: Client, threadId: string): Promise<v
 }
 
 /**
- * issue を作る（`POST /repos/{o}/{r}/issues`）。題と本文だけを送る。assignee・labels・milestone は入れない
+ * issue を作る（`POST /repos/{o}/{r}/issues`）。タイトルと本文だけを送る。assignee・labels・milestone は入れない
  * （入れると、権限のないユーザには黙って無視されるか、割り当てが通知になる）。
  */
 export async function createIssue(client: Client, owner: string, repo: string, title: string, body: string): Promise<IssueRef> {

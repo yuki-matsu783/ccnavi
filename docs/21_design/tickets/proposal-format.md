@@ -98,7 +98,7 @@ base_sha: ""
   承認のあとの判定はコピーを読み、`phases.yml` を読まない。`phases.yml` を直したら、承認待ちの提案は `--fill-phases` を
   打ち直す。改版の提案では、子が承認された番号が使う定義は承認済みチケットの値のまま（`--fill-phases` がそう差し込む）。
   子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
-- 親の提案の雛形は `ccnavi ticket new <識別子> --title <題> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) --issue <N|owner/repo#N> --mr <N>` で作る（`tickets/scaffold.py`。
+- 親の提案の雛形は `ccnavi ticket new <識別子> --title <タイトル> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) --issue <N|owner/repo#N> --mr <N>` で作る（`tickets/scaffold.py`。
   REQ-TKT-56）。識別子と同名のワークツリーの中から打つと、`<提案の置き場>/todo/<識別子>.md` に書く。生成物は
   `version` `ticket` `issue`（`--issue` があれば）`title` `phases` `plan` `rationale` `allow` と、本文の見出し
   `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由`（この順。Stop の判定が親の提案に求める内容に

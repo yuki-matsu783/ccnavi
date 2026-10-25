@@ -929,7 +929,7 @@ def issue_texts(
 ) -> tuple[str, list[str]]:
     """issue の下書きの本文と、続きのコメントの本文を返す。
 
-    1 行目が題、空行のあとが本文。ホストの本文の上限（`ISSUE_BODY_LIMIT`）に収まらないときは、
+    1 行目がタイトル、空行のあとが本文。ホストの本文の上限（`ISSUE_BODY_LIMIT`）に収まらないときは、
     本文に目次（キー・URL・版）だけを置き、全文は同じ issue への続きのコメントに分けて載せる。
     手元の state を指すだけの形にはしない。
     """
@@ -1003,7 +1003,7 @@ def _write_decide_issue(
     threads: list[review_host.Thread],
     op_id: str = "",
 ) -> str:
-    """issue に回す指摘の下書き。1 行目が題、空行のあとが本文。書けなければ空。
+    """issue に回す指摘の下書き。1 行目がタイトル、空行のあとが本文。書けなければ空。
 
     指摘は全文で転記する。長いときは続きのコメントの下書き（`…part<N>.md`）も書く。
     """
@@ -1112,7 +1112,7 @@ def _decision_of(record: dict) -> tuple[Decision, dict[str, list[review_host.Thr
 def post_text(record: dict, stage_id: str) -> str | None:
     """段階 `stage_id` で投稿する本文。保存した判断から作り直す。作れなければ None。
 
-    - `issue`: issue の下書き（1 行目が題、空行のあとが本文）
+    - `issue`: issue の下書き（1 行目がタイトル、空行のあとが本文）
     - `issue-part-<N>`: issue の続きのコメント
     - `note`: 決めた内容の MR へのコメント。issue を作っていれば、その URL も書き足す
     """

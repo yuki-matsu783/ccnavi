@@ -66,7 +66,7 @@ test("CB-D260 「?」は案内の一覧を開き、選んだ案内だけが始�
   }
 });
 
-test("CB-D261 基本の案内は、今の題と順序のまま（部品箱・図・欄・保存・案内）で、拡張ホストが送る tour でも始まる", async () => {
+test("CB-D261 基本の案内は、今のタイトルと順序のまま（部品箱・図・欄・保存・案内）で、拡張ホストが送る tour でも始まる", async () => {
   const dom = await openFlow();
   try {
     await dom.send({ type: "tour" });

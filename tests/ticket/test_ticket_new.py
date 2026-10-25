@@ -183,8 +183,8 @@ class TicketNewTest(TicketNewTestBase):
         self.assertEqual(front["phases"]["design"]["scope"], ["wip/design/*"])
 
     def test_only_the_title_with_special_characters_is_quoted_safely(self):
-        self.assertEqual(self.new(title='題: "引用" #1').returncode, 0)
-        self.assertEqual(front_of(self.written())["title"], '題: "引用" #1')
+        self.assertEqual(self.new(title='タイトル: "引用" #1').returncode, 0)
+        self.assertEqual(front_of(self.written())["title"], 'タイトル: "引用" #1')
 
     def test_without_phases_yml_it_stops_and_says_why(self):
         os.remove(config_path(self.root, "phases"))
@@ -341,13 +341,13 @@ class TicketNewScopeTest(TicketNewTestBase):
             self.assertNotIn("承認しても書けない", result.stdout, glob)
 
     def test_a_placeholder_from_a_guidance_line_is_refused(self):
-        # 案内の行の仮の値（`<触るファイルの glob>`・`<題>`）をそのまま打つと、
-        # 実在しない glob や題の提案ができて承認まで通る。作らずに断る
+        # 案内の行の仮の値（`<触るファイルの glob>`・`<タイトル>`）をそのまま打つと、
+        # 実在しない glob やタイトルの提案ができて承認まで通る。作らずに断る
         result = self.new("--scope", "<触るファイルの glob>", plan="quick-work")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("仮の値", result.stderr)
         self.assertFalse(os.path.exists(self.todo))
-        result = self.new("--scope", "src/a.py", plan="quick-work", title="<題>")
+        result = self.new("--scope", "src/a.py", plan="quick-work", title="<タイトル>")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("仮の値", result.stderr)
         self.assertFalse(os.path.exists(self.todo))

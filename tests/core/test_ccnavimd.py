@@ -12,7 +12,7 @@ from ccnavi.hook import ccnavimd
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
-TEXT = """# 題
+TEXT = """# タイトル
 - いつも
 <!-- ccnavi:if a -->
 - a のとき {{x}}
@@ -30,8 +30,8 @@ TEXT = """# 題
 
 class RenderTest(unittest.TestCase):
     def test_成り立つ条件の行だけが残る(self):
-        self.assertEqual(ccnavimd.render(TEXT, set(), {}), "# 題\n- いつも\n\n- 最後")
-        self.assertEqual(ccnavimd.render(TEXT, {"b"}, {}), "# 題\n- いつも\n\n- b のとき\n- 最後")
+        self.assertEqual(ccnavimd.render(TEXT, set(), {}), "# タイトル\n- いつも\n\n- 最後")
+        self.assertEqual(ccnavimd.render(TEXT, {"b"}, {}), "# タイトル\n- いつも\n\n- b のとき\n- 最後")
 
     def test_入れ子は外も内も成り立つときだけ載る(self):
         out = ccnavimd.render(TEXT, {"a", "b"}, {"x": "値"})
@@ -277,7 +277,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("error", out.lower())
 
     def test_正しければ言わない(self):
-        self.assertNotIn("(ccnavi-md)", self.lint("# 題\n"))
+        self.assertNotIn("(ccnavi-md)", self.lint("# タイトル\n"))
 
     def test_ccnavi_ディレクトリが無いワークスペースは言わない(self):
         directory = tempfile.TemporaryDirectory()

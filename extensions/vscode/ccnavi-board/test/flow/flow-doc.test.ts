@@ -161,7 +161,7 @@ test("CB-T220 雛形は 開始 → チケットを読む → 終了 の 3 ノー
   assert.ok(read.ok);
   assert.deepEqual(read.doc, doc);
   assert.deepEqual(flowNotices(doc), []);
-  // 題が空なら名前は識別子だけ
+  // タイトルが空なら名前は識別子だけ
   assert.equal(templateFlow("i0002-01-01", "").name, "i0002-01-01");
 });
 

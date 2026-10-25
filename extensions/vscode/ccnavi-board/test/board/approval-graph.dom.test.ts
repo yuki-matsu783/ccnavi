@@ -86,7 +86,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.equal(dom.one('.plan-graph[data-part="feedback"] .react-flow__node[data-id="start"]').textContent, "全体計画のレビュー後");
     assert.equal(dom.one('.plan-graph[data-part="feedback"] .react-flow__node[data-id="end"]').textContent, "親をクローズする");
 
-    // 点は番号・題・見る場所。延期なら引き受け手、子が承認された番号は固定の印
+    // 点は番号・タイトル・見る場所。延期なら引き受け手、子が承認された番号は固定の印
     const n1 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n1"] .plan-node');
     assert.match(n1.textContent ?? "", /^1調査/);
     // 見る場所の言葉は、同じオーバーレイの本文（承認画面）と同じ言葉の短い形

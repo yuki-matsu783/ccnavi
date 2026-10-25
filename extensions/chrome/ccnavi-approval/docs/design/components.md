@@ -27,7 +27,7 @@ keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccna
 
 - ホストへの操作は `HostOps` を通す。ボードは service worker 経由の `callOps` を渡し、PAT は service worker だけが持つ。
   service worker は操作ごとに、送り手がボードか、登録したリポジトリか、引数の形（thread id は API の経路と GraphQL に使える字、
-  題は 1 行、本文は字数の上限）を検査してからホストを呼ぶ
+  タイトルは 1 行、本文は字数の上限）を検査してからホストを呼ぶ
 - 書く前に `precheckHostPlan` が、スレッドごとの返信・解決の可否（GitHub は `viewerCanReply`・`viewerCanResolve` と保留中のレビューか、
   GitLab は `resolvable` と差分への指摘か）と、PAT の権限・ロールを読む。足りなければ何も書かない。Chrome で扱えない種類は権限不足と分けて返す。扱えない指摘を含む確定は画面が先にブロックするので、ここでの見分けは、読み直しの間に変わった場合の保険である。
   fine-grained の PAT の権限は書く前に読めないので、確かめられなかったものとして残し、実際に断られたときに権限の名前を言う
@@ -37,7 +37,7 @@ keywords: [設計, 構成, service worker, Pyodide, Web Worker, hosts.json, ccna
   検索が失敗したら作り直さずに止める（404 だけが「無い」）。上限まで読んで見つからなければ作り、結果に探し切れていないことを載せる。
   失敗したらそこで止まり、済ませたことと理由を結果に入れて返す。操作の記録は持たない。同じ計画の実行中の再入は断る
 - service worker は送る本文のコードフェンスの外を無害にする（GitLab は行頭の `/`、両ホストは `@` のメンション）。GitHub のスレッドは、登録したリポジトリのその MR のものかを確かめてから書く
-- issue の作成には題と本文だけを送る（assignee・labels・milestone は送らない）
+- issue の作成にはタイトルと本文だけを送る（assignee・labels・milestone は送らない）
 - GitLab のスレッドが機構自身のもの（`own`）になるのは、ノートが全部目印で始まり、書き手が全部代表のノートと同じときだけ。
   依頼の投稿者と一致するかは、依頼の記録を持つ Python が比べる
 

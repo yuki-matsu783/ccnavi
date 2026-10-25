@@ -1,6 +1,6 @@
 """親チケットの提案の雛形を作る。
 
-`ccnavi ticket new <識別子> --title <題> --plan <型,型,...> --issue <値> --mr <番号>`。
+`ccnavi ticket new <識別子> --title <タイトル> --plan <型,型,...> --issue <値> --mr <番号>`。
 
 提案を手で書くと frontmatter の形を間違えやすく、とくにフェーズ定義の `scope` を `allow` に
 コピーし忘れて、`design` フェーズの子が `wip/design/*` に書けず詰まる。この雛形の生成は、選んだ
@@ -232,7 +232,7 @@ def run(
     `scope` は今回の作業の範囲（glob）。型の `scope` を集めたものに足して `allow` に書く。
 
     処理フロー:
-    1. 識別子・題・issue・MR を検査する（`ticket_ids.id_problem`・`ticket_mod.issue_text`）。
+    1. 識別子・タイトル・issue・MR を検査する（`ticket_ids.id_problem`・`ticket_mod.issue_text`）。
        `template`・`plan`・`layer`・`with_feedback` の組み合わせも見る。
     2. cwd が識別子と同名の親のワークツリーか（`tree.tree_of`）、その HEAD
        のブランチが識別子か（`standing.head_branch`）を見る。
@@ -265,13 +265,13 @@ def run(
             "子の提案は手で書く（書式は ccnavi --docs --keyword 提案書式）"
         )
     if not (title or "").strip():
-        return refuse("--title <題> が必要です")
+        return refuse("--title <タイトル> が必要です")
     if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in title):
         return refuse("--title に改行や制御文字は指定できない")
     stripped = title.strip()
     if stripped.startswith("<") and stripped.endswith(">"):
         return refuse(
-            f"--title {stripped!r} は案内の仮の値。実際の題（issue や MR の題）に置き換える"
+            f"--title {stripped!r} は案内の仮の値。実際のタイトル（issue や MR のタイトル）に置き換える"
         )
     # チケット作業は issue と MR のセット。どちらかが無い親の提案は作らない
     if issue is None:

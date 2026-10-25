@@ -27,7 +27,7 @@ dry-run でも渡す。
 
 1. sh がホストを読む。繋ぎ方は `ccnavi-common-host.sh` の「ホスト（GitHub / GitLab）への接続」で、`ccnavi-review.sh` と同じ
    （gh / glab、無ければ curl と `GITHUB_TOKEN` / `GITLAB_TOKEN`）。MR 指定はその MR の元ブランチ、issue 指定はその issue を
-   参照している開いた MR の元ブランチ（GitHub は開いた PR の題・本文・元ブランチ名、GitLab は `related_merge_requests`）。
+   参照している開いた MR の元ブランチ（GitHub は開いた PR のタイトル・本文・元ブランチ名、GitLab は `related_merge_requests`）。
    繋げないときも止めず、理由を書く
 2. 結果を `logs/state/branches-host-<pid>.json` に書き、実行ファイルの `ccnavi branches <issue|mr> <N> --result <json>` に渡す
 3. 実行ファイルが手元を読む（git の ref、ツリーの HEAD、チケット）。issue 指定なら、名前に番号を含むブランチ（手元と origin。
@@ -45,7 +45,7 @@ ccnavi-branches: issue #152 に紐づくブランチ（ワークスペース: .�
 候補 feature/152-login  在りか=まだ無い  由来=チケット  MR=-  ワークツリー=-  チケット=feature-152-login(doing)
 候補 topic/a  在りか=ホストだけ  由来=MR  MR=!11(open)  ワークツリー=-  チケット=-
 候補 feature-152-login  在りか=手元  由来=名前に番号  MR=-  ワークツリー=.claude/worktrees/feature-152-login  チケット=feature-152-login(doing)
-チケット feature-152-login  承認済み  状態=doing  題=ログイン
+チケット feature-152-login  承認済み  状態=doing  タイトル=ログイン
 候補 3 件。ユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞いて返事を待つ
 ```
 

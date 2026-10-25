@@ -303,7 +303,7 @@ test("CB-D178 並べ直すと、今の線で置き場所を組み直す（番号
   }
 });
 
-/** 吹き出しの案内を最後まで進め、手順の題と、指す先が見つかったか（中ほどに出す文だけの吹き出しでないか）を順に返す */
+/** 吹き出しの案内を最後まで進め、手順のタイトルと、指す先が見つかったか（中ほどに出す文だけの吹き出しでないか）を順に返す */
 async function walkTour(dom: DomPage): Promise<string[]> {
   const titles: string[] = [];
   for (let i = 0; i < 20 && dom.all(".tour").length > 0; i += 1) {
@@ -377,7 +377,7 @@ test("CB-D186 線を変えたら、答えを待つ間も拡張ホストに「確
     const { seq } = removeEdge(dom, "after-1-3");
     await dom.settle();
     assert.deepEqual(lastPosted(dom, "dirty"), { type: "dirty", dirty: false, checking: true });
-    // 題の「●」と「未保存」は答えから決める（待つ間はまだ出さない）
+    // タイトルの「●」と「未保存」は答えから決める（待つ間はまだ出さない）
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
     // 断られた線は引く前のまま。未保存でも確かめ中でもなくなる
     await dom.send({ type: "answer", seq, answer: planOrderSample("cycle") });

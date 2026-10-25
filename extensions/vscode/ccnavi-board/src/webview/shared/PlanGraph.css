@@ -58,7 +58,7 @@
 /* 子が承認された番号（固定した番号）。薄くして、動かせないことを示す */
 .plan-node[data-locked="1"] { opacity: .7; border-style: dotted; }
 .plan-node-tags .tag.locked { border-style: dotted; }
-/* start と end の仮の点。名前だけの小さな丸い札 */
+/* start と end の仮の点。名前だけの小さな丸いバッジ */
 .plan-end {
   padding: 3px 10px; border-radius: var(--radius-pill);
   border: 1px dashed var(--vscode-descriptionForeground);
@@ -105,7 +105,7 @@
 .plan-detail-empty { margin: 0; }
 .plan-node[data-picked="1"] { outline: 2px solid var(--vscode-focusBorder); }
 .plan-graph-canvas .react-flow__node-planItem { cursor: pointer; }
-/* 畳んだら札のボタンだけ残す（中身は消さずに隠す） */
+/* 畳んだらバッジのボタンだけ残す（中身は消さずに隠す） */
 .plan-detail[data-folded="1"] > :not(.plan-detail-toggle) { display: none; }
 @media (max-width: 700px) {
   .plan-graph-body { flex-direction: column; }

@@ -11,7 +11,7 @@
 // 通信先は 127.0.0.1:18787（GitHub）・18788（GitLab）で固定（拡張の host_permissions と一致が要る）。同時に 2 本は回せない。
 // PAT は模擬の固定のダミー。実際の GitHub / GitLab へは繋がない。
 //
-// 出力（<out>/）: board.png（fullPage）・board.txt（body の見えているテキスト）・board.dom.json（親子のチケットごとの札と操作）・
+// 出力（<out>/）: board.png（fullPage）・board.txt（body の見えているテキスト）・board.dom.json（親子のチケットごとのバッジと操作）・
 // board.log（ページと service worker のコンソール・ページエラー。リクエストは記録しない）。
 //
 // 終了コード: 0 描けた / 1 描けなかった・失敗の条件に当たった / 2 使い方の誤り / 3 環境が揃っていない。

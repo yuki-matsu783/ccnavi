@@ -183,7 +183,7 @@ class BranchNameRulesTest(unittest.TestCase):
         ident = ticket_ids.issue_identifier(7, one)
         self.assertEqual("feature-7-" + "あ" * 38, ident)
         self.assertTrue(ticket_ids.is_valid_id(ident))
-        # 収まる題はそのまま。番号だけ・記号だけは従来どおり
+        # 収まるタイトルはそのまま。番号だけ・記号だけは従来どおり
         self.assertEqual("add-retry", ticket_ids.issue_slug("Add retry", 48))
         self.assertEqual("", ticket_ids.issue_slug("！？", 48))
         self.assertEqual("feature-2-issue", ticket_ids.issue_identifier(2, "！？"))
@@ -201,13 +201,13 @@ class BranchNameRulesTest(unittest.TestCase):
         self.assertEqual(
             ("feature-41-login-form", False), ticket_ids.issue_identifier_parts(41, "Login form")
         )
-        # 空の題・記号だけ・末尾の `-<2 桁>` を除いただけでは、短くしたと言わない
+        # 空のタイトル・記号だけ・末尾の `-<2 桁>` を除いただけでは、短くしたと言わない
         for text in ("", "！？", "release 01", "07"):
             with self.subTest(title=text):
                 self.assertFalse(ticket_ids.issue_identifier_parts(3, text)[1])
 
     def test_the_cut_is_noticed_when_nfkc_makes_the_title_longer(self):
-        # NFKC で 1 字が 2 字に増える題（㍿ → 株式）でも、切ったことを返す
+        # NFKC で 1 字が 2 字に増えるタイトル（㍿ → 株式）でも、切ったことを返す
         ident, shortened = ticket_ids.issue_identifier_parts(7, "㍿" * 10)
         self.assertTrue(shortened, ident)
         self.assertTrue(ticket_ids.is_valid_id(ident))

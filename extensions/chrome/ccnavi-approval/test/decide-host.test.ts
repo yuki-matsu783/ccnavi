@@ -95,7 +95,7 @@ test("CX-T320 順序は issue → 返信 → 解決 → コメント。返信の
 test("CX-T321 GitLab も同じ順序で書く（discussion への返信は notes、解決は PUT、issue は projects/:id/issues、コメントは MR のメモ）", async () => {
   const { mock, ops } = lab();
   const p: HostPlan = {
-    issues: [{ key: "k1", title: "題", body: `${MARK1}\n\n本文`, comments: ["続き"] }],
+    issues: [{ key: "k1", title: "タイトル", body: `${MARK1}\n\n本文`, comments: ["続き"] }],
     replies: [reply("k1", D1, true), reply("k2", D2)],
     resolves: [
       { key: "k1", thread_id: D1 },
@@ -105,24 +105,24 @@ test("CX-T321 GitLab も同じ順序で書く（discussion への返信は notes
   };
   const out = await runHostPlan(ops, REPO, 7, p);
   assert.equal(out.ok, true, JSON.stringify(out));
-  assert.deepEqual(mock.w.log, ["issue 題", "issueComment 500", `reply ${D1}`, `reply ${D2}`, `resolve ${D1}`, `resolve ${D2}`, "comment"]);
+  assert.deepEqual(mock.w.log, ["issue タイトル", "issueComment 500", `reply ${D1}`, `reply ${D2}`, `resolve ${D1}`, `resolve ${D2}`, "comment"]);
   assert.ok(mock.w.threads[0].replies[0].includes("https://gitlab.com/acme/widgets/-/issues/500。"));
   assert.ok(mock.w.threads.every((t) => t.resolved));
   assert.ok(mock.w.comments[0].endsWith("- https://gitlab.com/acme/widgets/-/issues/500"));
   assert.deepEqual(mock.w.issues[0].comments, [`${partMarker("0123456789abcdef0123456789abcdef", 1)}\n続き`]);
 });
 
-test("CX-T322 issue には題と本文だけを送る（assignee・labels・milestone は入れない）。題は 1 行にする", async () => {
+test("CX-T322 issue にはタイトルと本文だけを送る（assignee・labels・milestone は入れない）。タイトルは 1 行にする", async () => {
   const targets = [
     { ...hub(), field: "body" },
     { ...lab(), field: "description" },
   ];
   for (const { mock, ops, field } of targets) {
-    const p: HostPlan = { issues: [{ key: "k", title: "題\n二行目\u2028 `x`", body: `${MARK1}\n本文` }], replies: [], resolves: [], comment: null };
+    const p: HostPlan = { issues: [{ key: "k", title: "タイトル\n二行目\u2028 `x`", body: `${MARK1}\n本文` }], replies: [], resolves: [], comment: null };
     assert.equal((await runHostPlan(ops, REPO, 7, p)).ok, true);
     const sent = (mock.w.writes[0].raw ?? {}) as Record<string, unknown>;
     assert.deepEqual(Object.keys(sent).sort(), field === "body" ? ["body", "title"] : ["description", "title"]);
-    assert.equal(sent.title, "題 二行目 `x`");
+    assert.equal(sent.title, "タイトル 二行目 `x`");
   }
   assert.equal(oneLine("a".repeat(400)).length, 255);
 });
@@ -279,7 +279,7 @@ test("CX-T336 再実行: 1 回目が返信の途中で失敗しても、2 回目
   assert.equal(a.mock.w.comments.length, 1);
 
   const gp: HostPlan = {
-    issues: [{ key: "k1", title: "題", body: `${MARK1}\n\n本文`, comments: ["続き"] }],
+    issues: [{ key: "k1", title: "タイトル", body: `${MARK1}\n\n本文`, comments: ["続き"] }],
     replies: [reply("k1", D1, true), reply("k2", D2)],
     resolves: [{ key: "k1", thread_id: D1 }, { key: "k2", thread_id: D2 }],
     comment: null,
@@ -323,8 +323,8 @@ test("CX-T338 外から来た本文の無害化: フェンスの外の行頭 / �
   assert.ok(sent.startsWith("<!-- ccnavi:accept -->\n"));
   // GitHub は行頭 / を変えず、メンションだけ直す
   const h = hub();
-  await runHostPlan(h.ops, REPO, 7, { issues: [{ key: "k", title: "題 @dave", body: `${MARK1}\n/close @eve\n\`\`\`\n@frank\n\`\`\`` }], replies: [], resolves: [], comment: "/x @gina" });
-  assert.equal(h.mock.w.writes[0].title, `題 @${ZW}dave`);
+  await runHostPlan(h.ops, REPO, 7, { issues: [{ key: "k", title: "タイトル @dave", body: `${MARK1}\n/close @eve\n\`\`\`\n@frank\n\`\`\`` }], replies: [], resolves: [], comment: "/x @gina" });
+  assert.equal(h.mock.w.writes[0].title, `タイトル @${ZW}dave`);
   assert.ok(h.mock.w.issues[0].body.includes(`\n/close @${ZW}eve\n\`\`\`\n@frank`));
   assert.equal(h.mock.w.comments[0], `/x @${ZW}gina`);
 });
@@ -491,7 +491,7 @@ test("CX-T332 protocol: 新しい書き込みはボードからだけ、登録�
   const ok = [
     ["replyThread", ["acme", "widgets", 7, T1, "本文"]],
     ["resolveThread", ["acme", "widgets", 7, T1]],
-    ["createIssue", ["acme", "widgets", "題", `${MARK1}\n本文`]],
+    ["createIssue", ["acme", "widgets", "タイトル", `${MARK1}\n本文`]],
     ["findIssue", ["acme", "widgets", MARK1]],
     ["postComment", ["acme", "widgets", 7, "本文"]],
     ["commentIssue", ["acme", "widgets", 500, "続き"]],
@@ -519,8 +519,8 @@ test("CX-T332 protocol: 新しい書き込みはボードからだけ、登録�
     ["resolveThread", ["acme", "widgets", 7, `${"A".repeat(201)}`], /スレッドの id/],
     ["createIssue", ["acme", "widgets", "改行\nあり", "本文"], /1 行/],
     ["createIssue", ["acme", "widgets", "x".repeat(256), "本文"], /1 行/],
-    ["createIssue", ["acme", "widgets", "題", "x".repeat(65001)], /issue の本文/],
-    ["createIssue", ["acme", "widgets", "題", ""], /issue の本文/],
+    ["createIssue", ["acme", "widgets", "タイトル", "x".repeat(65001)], /issue の本文/],
+    ["createIssue", ["acme", "widgets", "タイトル", ""], /issue の本文/],
     ["findIssue", ["acme", "widgets", "<!-- ccnavi:issue op=x y -->"], /印の形/],
     ["findIssue", ["acme", "widgets", "任意の検索語"], /印の形/],
     ["postComment", ["acme", "widgets", -1, "本文"], /MR の番号/],

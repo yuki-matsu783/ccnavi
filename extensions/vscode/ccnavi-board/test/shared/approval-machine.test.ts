@@ -45,7 +45,7 @@ function previewOf(tickets: readonly string[], digest = "d1"): ApprovePreview {
     generated_at: "2026-09-20T00:00:00Z",
     batch: tickets.map((ticket) => ({
       ticket,
-      title: `題 ${ticket}`,
+      title: `タイトル ${ticket}`,
       parent: null,
       phase: null,
       revision: false,

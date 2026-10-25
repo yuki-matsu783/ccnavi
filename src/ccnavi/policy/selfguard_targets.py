@@ -155,14 +155,14 @@ def _places(
 def _layer_key(origin: str, layer: str, kind: str) -> str:
     """バックアップの key。共通レイヤーは kind そのまま、それ以外は `<kind>:<レイヤー>`。
 
-    決めるのはレイヤーの種別（`settings.ORIGIN_*`）で、名札の表記ではない。名札で
+    決めるのはレイヤーの種別（`settings.ORIGIN_*`）で、名前の表記ではない。名前で
     比べると、`projects/common/` の 3 本が共通レイヤーと同じ key（`rules` / `phases` /
     `risk`）になり、`_places` の重複の排除でそのレイヤーの 3 本がバックアップと復元の対象から
     まとめて外れる。プロジェクトが名前を 1 つ選ぶだけで保護が外れることになる。
 
     予約名のプロジェクトは置き場をつける（`rules:projects/self`）。`projects/self/`
     の 3 本をそのまま `rules:self` にすると、こんどはワークスペース自身のレイヤーと
-    ぶつかって、先に積んだほうだけが残る。名札に予約してある表記は名札の側で
+    ぶつかって、先に積んだほうだけが残る。名前に予約してある表記は名前の側で
     使い、プロジェクトの側は別の表記にする。
     """
     if origin == settings.ORIGIN_COMMON:

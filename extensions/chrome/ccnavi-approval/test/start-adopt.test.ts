@@ -213,11 +213,11 @@ test("CX-T256 書く操作（startCommit・createDraftMr）の保護: ボード�
     ["startCommit", ["acme", "other", "feature-20-x", head], BOARD, /登録されていない/],
     ["startCommit", ["acme", "widgets", "main", head], BOARD, /issue から作る/],
     ["startCommit", ["acme", "widgets", "feature-20-x", "f".repeat(40)], BOARD, /動いているため/],
-    ["createDraftMr", ["acme", "widgets", "feature-20-x", "main", "題", "Closes #20"], OPTIONS, /ボードからのみ/],
-    ["createDraftMr", ["acme", "other", "feature-20-x", "main", "題", "Closes #20"], BOARD, /登録されていない/],
-    ["createDraftMr", ["acme", "widgets", "main", "main", "題", "Closes #20"], BOARD, /issue から作る/],
-    ["createDraftMr", ["acme", "widgets", "feature-20-x", "develop", "題", "Closes #20"], BOARD, /統合先 main に限ります/],
-    ["createDraftMr", ["acme", "widgets", "feature-20-x", "main", "題", "任意の本文"], BOARD, /Closes #<issue の番号>/],
+    ["createDraftMr", ["acme", "widgets", "feature-20-x", "main", "タイトル", "Closes #20"], OPTIONS, /ボードからのみ/],
+    ["createDraftMr", ["acme", "other", "feature-20-x", "main", "タイトル", "Closes #20"], BOARD, /登録されていない/],
+    ["createDraftMr", ["acme", "widgets", "main", "main", "タイトル", "Closes #20"], BOARD, /issue から作る/],
+    ["createDraftMr", ["acme", "widgets", "feature-20-x", "develop", "タイトル", "Closes #20"], BOARD, /統合先 main に限ります/],
+    ["createDraftMr", ["acme", "widgets", "feature-20-x", "main", "タイトル", "任意の本文"], BOARD, /Closes #<issue の番号>/],
   ];
   for (const [op, args, sender, why] of refused) {
     const res = await ask(op, args, sender);
@@ -225,7 +225,7 @@ test("CX-T256 書く操作（startCommit・createDraftMr）の保護: ボード�
     assert.match((res as { error: string }).error, why, `${op} ${JSON.stringify(args)}`);
   }
   assert.equal(mock.createdMrs.length, 0);
-  const ok = await ask("createDraftMr", ["acme", "widgets", "feature-20-x", "main", "題", "Closes #20"]);
+  const ok = await ask("createDraftMr", ["acme", "widgets", "feature-20-x", "main", "タイトル", "Closes #20"]);
   assert.ok(ok.ok, JSON.stringify(ok));
   assert.equal(mock.createdMrs.length, 1);
   // 読み取り（listOpenMrs・listMergedMrs）は登録したリポジトリだけ

@@ -1,7 +1,7 @@
 /**
  * 描いたボードの DOM の要約（開発用。`scripts/render-scene.js` が出す `board.dom.json`）。
  *
- * 親子のチケットの欄（`article.family[data-family]`）ごとに、承認待ちの札（`section.entry[data-ticket]`）、
+ * 親子のチケットの欄（`article.family[data-family]`）ごとに、承認待ちのバッジ（`section.entry[data-ticket]`）、
  * レビュー待ちの欄（`section.review[data-phase]`）、承認対象外（`section.rejected`）、利用できる操作を取り出す。
  * 取るのは画面にある属性とクラスだけで、承認待ちかレビュー待ちかは `data-waiting`（欄の種類）から読む（判定はここでしない）。
  * 承認などの操作ができるかは `actions`（押せるボタン）で見る。`waiting` は操作できることを表さない。
@@ -55,7 +55,7 @@ export function summarizeBoard(doc: Document): BoardSummary {
       .filter((b) => !(b as HTMLButtonElement).disabled && (skip === "" || b.closest(skip) === null))
       .map((b) => text(b))
       .filter((label) => label !== "");
-  // 見出しから `code`（識別子）と札を除いた題
+  // 見出しから `code`（識別子）とバッジを除いたタイトル
   const titleOf = (h: Element | null): string => {
     if (h === null) return "";
     const copy = h.cloneNode(true) as Element;

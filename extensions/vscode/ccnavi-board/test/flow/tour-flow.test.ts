@@ -184,7 +184,7 @@ const STATIC_TARGETS = new Set([
 ]);
 const PALETTE_TARGETS = new Set(["start", "end", "prompt", "sub-agent", "ask", "if-else", "switch", "loop", "skill"]);
 
-test("CB-T488 フローの案内は、基本の案内が先頭で、使い方ごとの案内が 5〜8 本あり、どれも 4〜10 手順で、題が重ならない", () => {
+test("CB-T488 フローの案内は、基本の案内が先頭で、使い方ごとの案内が 5〜8 本あり、どれも 4〜10 手順で、タイトルが重ならない", () => {
   assert.equal(tour.courses[0].id, INTRO_ID);
   assert.deepEqual(
     tour.courses[0].steps.map((step) => step.title),
@@ -194,7 +194,7 @@ test("CB-T488 フローの案内は、基本の案内が先頭で、使い方ご
   assert.ok(uses.length >= 5 && uses.length <= 8, `使い方ごとの案内が ${uses.length} 本`);
   for (const course of uses) {
     assert.ok(course.steps.length >= 4 && course.steps.length <= 10, `${course.id}: ${course.steps.length} 手順`);
-    assert.equal(new Set(course.steps.map((step) => step.title)).size, course.steps.length, `${course.id}: 手順の題が重なっている`);
+    assert.equal(new Set(course.steps.map((step) => step.title)).size, course.steps.length, `${course.id}: 手順のタイトルが重なっている`);
   }
   assert.ok(tour.courses[0].steps.length <= 6, "基本の案内は今くらいの量");
 });

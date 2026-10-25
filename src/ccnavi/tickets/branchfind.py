@@ -654,7 +654,7 @@ def render(data: dict) -> str:
         lines.append("  ".join(parts))
     for t in data["issue_tickets"]:
         state = "承認済み" if t["approved"] else "提案（承認前）"
-        lines.append(f"チケット {t['ticket']}  {state}  状態={t['state']}  題={t['title'] or '-'}")
+        lines.append(f"チケット {t['ticket']}  {state}  状態={t['state']}  タイトル={t['title'] or '-'}")
     count = len(data["candidates"])
     weak = [
         c["branch"] for c in data["candidates"] if c["sources"] == ["name"] and not c["tickets"]

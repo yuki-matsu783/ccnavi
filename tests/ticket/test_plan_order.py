@@ -385,7 +385,7 @@ class PlanOrderWriteTest(PlanOrderHarness):
     """4・6. 書き戻し。"""
 
     def test_write_changes_only_the_plan_value(self):
-        text = parent_text("i0001", PLAN3).replace("title: 親\n", "# 題の前のコメント\ntitle: 親\n")
+        text = parent_text("i0001", PLAN3).replace("title: 親\n", "# タイトルの前のコメント\ntitle: 親\n")
         self.propose("i0001", text)
         result = self.write_order(REVERSE)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -399,7 +399,7 @@ class PlanOrderWriteTest(PlanOrderHarness):
             {k: v for k, v in front.items() if k != "plan"},
             {k: v for k, v in before.items() if k != "plan"},
         )
-        self.assertIn("# 題の前のコメント\ntitle: 親\n", written)
+        self.assertIn("# タイトルの前のコメント\ntitle: 親\n", written)
         self.assertEqual(written.split("---\n", 2)[2], text.split("---\n", 2)[2])
         # 書いたあとのハッシュを返す。読み直した答えと同じ。
         answer = json.loads(result.stdout)
@@ -682,7 +682,7 @@ class PlanOrderChildrenTest(PlanOrderHarness):
         moved_a = self.read("i0001-02-01")
         self.assertEqual(front_of(moved_a)["ticket"], "i0001-02-01")
         self.assertEqual(front_of(moved_a)["phase"], 2)
-        # ほかの欄と本文は元のまま（題は自由な文なので変えない）。
+        # ほかの欄と本文は元のまま（タイトルは自由な文なので変えない）。
         rest = {k: v for k, v in front_of(moved_a).items() if k not in ("ticket", "phase")}
         self.assertEqual(
             rest, {k: v for k, v in front_of(self.a).items() if k not in ("ticket", "phase")}

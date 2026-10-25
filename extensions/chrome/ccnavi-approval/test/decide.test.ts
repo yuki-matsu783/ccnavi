@@ -110,7 +110,7 @@ function written(out: DecideOutcome): Extract<DecideOutcome, { kind: "written" }
   return out as Extract<DecideOutcome, { kind: "written" }>;
 }
 
-/** ホストへ書いた記録の種類だけ（`issue <題>` → `issue`、`reply <id>` → `reply`） */
+/** ホストへ書いた記録の種類だけ（`issue <タイトル>` → `issue`、`reply <id>` → `reply`） */
 const ops = (w: World): string[] => w.at.map((x) => x.entry.split(" ")[0]);
 
 for (const kind of KINDS) {

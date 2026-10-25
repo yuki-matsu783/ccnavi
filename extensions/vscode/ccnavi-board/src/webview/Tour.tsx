@@ -40,7 +40,7 @@ export interface TourStep {
 export interface TourCourse {
   /** 案内のキー。画面の中で一意。テストと `data-course` に使う */
   readonly id: string;
-  /** メニューに出す題 */
+  /** メニューに出すタイトル */
   readonly title: string;
   /** メニューに出す 1 行の説明（何ができるようになる案内か） */
   readonly summary: string;

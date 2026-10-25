@@ -24,7 +24,7 @@
  * 無くなったら（承認・取り下げ・削除。ボードの答えで見分ける）、画面を読むだけにする。
  *
  * **未保存のまま閉じたとき。** フロー編集と同じく、閉じるのは止められない（`onDidDispose` は閉じた後）。未保存の間は
- * タブの題の頭に「●」を付け、画面が送ってくる線のコピー（`draft`）を覚える。閉じた後に未保存だったら「開き直して戻す」
+ * タブのタイトルの頭に「●」を付け、画面が送ってくる線のコピー（`draft`）を覚える。閉じた後に未保存だったら「開き直して戻す」
  * 「破棄する」を聞く。戻すのは、提案のハッシュが閉じた時点から変わっていないときだけ（変わっていれば戻せないと言う）。
  *
  * **ボードの承認との結び付き。** タブの未保存と、最後に保存したときのハッシュ（`source_sha`）を帳面
@@ -418,7 +418,7 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
   switch (message.type) {
     case "dirty":
       current.dirty = message.dirty;
-      // 線の答えを待つ間も、ボードの承認を止める（題の「●」は答えの未保存だけ）
+      // 線の答えを待つ間も、ボードの承認を止める（タイトルの「●」は答えの未保存だけ）
       markUnsaved(current.ticket, message.dirty || message.checking);
       current.panel.title = workflowTitle(current.ticket, message.dirty);
       if (!message.dirty) {

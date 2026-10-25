@@ -66,7 +66,7 @@ test("CB-D720 「MR の状況を確認」はツールバーに通常の色で置
   }
 });
 
-test("CB-D721 帯の行: 親・題・MR !N ・状態。題はボードのアーカイブの同じ親（プロジェクトと ID が一致）から取り、無ければ ID だけ", async () => {
+test("CB-D721 帯の行: 親・タイトル・MR !N ・状態。タイトルはボードのアーカイブの同じ親（プロジェクトと ID が一致）から取り、無ければ ID だけ", async () => {
   const rows = [row("i1"), row("i2", { project: "web", mr: 6 }), row("i2", { project: "", mr: 7 }), row("nowhere", { mr: null })];
   // 同じ ID が 2 行あると key が重なるので、別の ID でプロジェクトの取り違えを確かめる
   const page = await openBoard(json(), { merge: view([row("i1"), row("i2", { project: "web", mr: 6 }), row("nowhere", { mr: null })]) });
@@ -74,11 +74,11 @@ test("CB-D721 帯の行: 親・題・MR !N ・状態。題はボードのアー�
     const line = (parent: string): string => text(page, `.merge-row[data-parent="${parent}"] .merge-who`);
     assert.equal(line("i1"), "i1 古い親 MR !5");
     assert.equal(line("i2"), "i2 別のプロジェクトの親 MR !6");
-    assert.equal(line("nowhere"), "nowhere", "題が無ければ ID だけ（MR の番号も無ければ出さない）");
+    assert.equal(line("nowhere"), "nowhere", "タイトルが無ければ ID だけ（MR の番号も無ければ出さない）");
   } finally {
     await page.close();
   }
-  // プロジェクトが違えば別の親: web の i2 の題を、ワークスペースの i2 に付けない
+  // プロジェクトが違えば別の親: web の i2 のタイトルを、ワークスペースの i2 に付けない
   const other = await openBoard(json(), { merge: view([row("i2", { project: "" })]) });
   try {
     assert.equal(text(other, '.merge-row[data-parent="i2"] .merge-who'), "i2 MR !5");

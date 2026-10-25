@@ -418,7 +418,7 @@ def sum_view(stderr: TextIO, conf: settings.Settings, root: str, layer: Layer) -
 
 
 def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
-    """守る対象（selfguard）に渡す、レイヤーごとの設定ファイル（種別, 名札, kind, パス）。
+    """守る対象（selfguard）に渡す、レイヤーごとの設定ファイル（種別, 名前, kind, パス）。
 
     共通レイヤーは phases と risk の 2 本だけ返す。共通レイヤーの rules は
     `selfguard_targets.targets` が `rules_path` で受け取っているので、ここから重ねると同じファイルが
@@ -428,8 +428,8 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
     差し替え（`--project-rules-file`）は診断のためのもの。
 
     種別（`settings.ORIGIN_*`）をつける。受け取る側はバックアップの key と、戻す先の git を
-    ここから決める。名札の表記では決められない。`projects/common/` の名札は
-    `common` なので、名札で比べると共通レイヤーと同じ key になり、重複の排除でそのレイヤーの 3 本が
+    ここから決める。名前の表記では決められない。`projects/common/` の名前は
+    `common` なので、名前で比べると共通レイヤーと同じ key になり、重複の排除でそのレイヤーの 3 本が
     バックアップと復元の対象からまとめて外れる。
 
     予約名のプロジェクトも並べる。判定のレイヤーとしては数えない（layers）が、ファイルは

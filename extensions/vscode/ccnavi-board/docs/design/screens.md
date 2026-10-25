@@ -1,9 +1,9 @@
 ---
 title: ccnavi ボードの画面の作り
 type: design
-description: 承認のオーバーレイの遷移、カードの組み立て（状態の札・ユーザ待ち・詳細）、ボタンの見た目、レビュー完了の流れ、マージ状況の確認、見た目の実装、機能や画面を足すときに触る場所と、画面に中身を渡す段取り
+description: 承認のオーバーレイの遷移、カードの組み立て（状態のバッジ・ユーザ待ち・詳細）、ボタンの見た目、レビュー完了の流れ、マージ状況の確認、見た目の実装、機能や画面を足すときに触る場所と、画面に中身を渡す段取り
 tags: [design-doc, extension, board]
-keywords: [設計, 画面, approval-machine, 状態の札, ユーザ待ち, 詳細, card-button, レビュー完了, マージ状況, merge, 見た目, ScreenHost, screenHost, retainedHost, retainContextWhenHidden, screens.ts, 契約, BoardMessage]
+keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち, 詳細, card-button, レビュー完了, マージ状況, merge, 見た目, ScreenHost, screenHost, retainedHost, retainContextWhenHidden, screens.ts, 契約, BoardMessage]
 ---
 
 # 画面の作り
@@ -16,11 +16,11 @@ keywords: [設計, 画面, approval-machine, 状態の札, ユーザ待ち, 詳�
 
 ## カードの組み立て
 
-カード 1 枚は、上から順に見出し（題が主、ID は補助、状態の札は右端。DOM は ID・題・札の順のまま CSS の `order` で並べる）、位置、ユーザ待ち、注意、フェーズ行（親だけ）、補助の操作、詳細（畳む）の順に並ぶ。`webview/board/Card.tsx` が描き、何を出すかは `core/board.ts` と `core/status.ts` が決めた値のとおりで、画面は判定し直さない。
+カード 1 枚は、上から順に見出し（タイトルが主、ID は補助、状態のバッジは右端。DOM は ID・タイトル・バッジの順のまま CSS の `order` で並べる）、位置、ユーザ待ち、注意、フェーズ行（親だけ）、補助の操作、詳細（畳む）の順に並ぶ。`webview/board/Card.tsx` が描き、何を出すかは `core/board.ts` と `core/status.ts` が決めた値のとおりで、画面は判定し直さない。
 
-**状態の札は「状況」、操作欄（ユーザ待ち）は「ユーザができること」。** 両者は別の規則で決め、同時に出てよい（札「要確認」と［承認］など）。操作してよいかの最終判断は実行ファイルが持つ。
+**状態のバッジは「状況」、操作欄（ユーザ待ち）は「ユーザができること」。** 両者は別の規則で決め、同時に出てよい（バッジ「要確認」と［承認］など）。操作してよいかの最終判断は実行ファイルが持つ。
 
-状態の札（`statusOf`）。上から最初にヒットしたものを採る。判定は実行ファイルの JSON が持ち、ここは判定済みの欄を表示の言葉に置き換えるだけ。レビューの要否・ゲートの条件・リスクは判定し直さない。
+状態のバッジ（`statusOf`）。上から最初にヒットしたものを採る。判定は実行ファイルの JSON が持ち、ここは判定済みの欄を表示の言葉に置き換えるだけ。レビューの要否・ゲートの条件・リスクは判定し直さない。
 
 | 順 | 子 | 親（レビューの状態はフェーズ一覧から見る。親カードの `gateClosed` は使わない） |
 |---|---|---|
@@ -48,7 +48,7 @@ keywords: [設計, 画面, approval-machine, 状態の札, ユーザ待ち, 詳�
 
 `marks` の中身（`skipped.deferred_to`）は `ccnavi --explain --json` の `marks` にそのまま載っているので、ボードは推測で代わりを作らない。
 
-ユーザ待ちは、ユーザができることがあるときだけ出し、主ボタンは 1 つ。親は承認待ちなら「内容を確認して承認してください」と［承認］で、レビューの操作は各フェーズ行に置く。子は承認待ちなら［承認］、札が「レビュー待ち」なら「マージリクエストでレビューしてください」と［MR を開く］（リンク）と［レビュー完了］（主ボタン）の順で 1 つだけ出す。承認は `pendingApproval` だけを条件にし、札が「要確認」でも出す。
+ユーザ待ちは、ユーザができることがあるときだけ出し、主ボタンは 1 つ。親は承認待ちなら「内容を確認して承認してください」と［承認］で、レビューの操作は各フェーズ行に置く。子は承認待ちなら［承認］、バッジが「レビュー待ち」なら「マージリクエストでレビューしてください」と［MR を開く］（リンク）と［レビュー完了］（主ボタン）の順で 1 つだけ出す。承認は `pendingApproval` だけを条件にし、バッジが「要確認」でも出す。
 
 注意の行は例外のときだけ短い言葉で出す（不備・書き込み停止中・先行待ち・リスク HIGH 以上・複数の場所にある・ワークツリー未作成（承認待ち）・ワークツリーが見つからない（作業中・レビュー中）・未送信）。理由の全文、MR・issue・ブランチ・ワークツリー名・プロジェクト・取り消しの理由、リスクの文言（JSON のまま）、人間レビューの要否と理由は詳細に畳む。base / 合流の sha、マーカー名は画面に出さない。詳細の開閉はカードごと（プロジェクトと ID の組）に `webview/board/state.ts` の状態へ覚え、更新や列の移動でも閉じない。案内の見本の上では、開閉を実際の状態に書かない（案内は `scene.details` で見本のカードを開く）。
 
@@ -61,11 +61,11 @@ keywords: [設計, 画面, approval-machine, 状態の札, ユーザ待ち, 詳�
 - 主ボタンは「ユーザ待ちの操作」だけ。操作のまとまり（「ユーザ待ち」と各フェーズ行）ごとに 1 つまで。補助の操作（フロー・計画編集・テンプレートの下書き）は通常の色。
 - カードの中で縦に広がるメニューは使わない。
 - 詳細の中のリンクは普通のリンクのまま（`detail-link`）。ボタンの寸法にしない。
-- 検査: DOM で、操作ボタンと操作の MR リンクが全部 `card-button` を持つこと、詳細の中のリンクは持たないこと、操作のまとまりごとに主ボタンが 1 つ以下であることを見る（`test/board/card.dom.test.ts`）。寸法と見た目は、拡張開発ホストでの手動確認（README の 6g）に回す。狭い列（220px）・長い題・ズーム 150% で、操作ボタンの高さと文字サイズが揃っていること。
+- 検査: DOM で、操作ボタンと操作の MR リンクが全部 `card-button` を持つこと、詳細の中のリンクは持たないこと、操作のまとまりごとに主ボタンが 1 つ以下であることを見る（`test/board/card.dom.test.ts`）。寸法と見た目は、拡張開発ホストでの手動確認（README の 6g）に回す。狭い列（220px）・長いタイトル・ズーム 150% で、操作ボタンの高さと文字サイズが揃っていること。
 
 ## レビュー完了の流れ
 
-［レビュー完了］（フェーズ行、札が「レビュー待ち」の子のカード）は、`approval-machine.ts` の `decide` に入る。`loadDecide` の効果が `ccnavi-review.sh decide <N> --preview` を読み、`parseDecidePreview` が**厳しく検証する**。頼んだ親・フェーズ・MR の番号（フェーズ行の依頼が持つもの。分かるとき）と照らし、不正な要素は破棄せずに全体をエラーにする。読み取れなければ「指摘を読み取れませんでした（理由）」で確定のボタンを出さない。正しく読めて 0 件なら「フェーズ N に未解決の指摘はありません」と［レビュー済みにする］、1 件以上なら対応方針の画面（`Decide.tsx`）。確定後の表示は実行ファイルの答え（`reviewed`・`pending_extra`・`followup`）に従い、続きの子が起きていないのに追加された指摘があれば、決め直しへ戻れる（`retry`）。
+［レビュー完了］（フェーズ行、バッジが「レビュー待ち」の子のカード）は、`approval-machine.ts` の `decide` に入る。`loadDecide` の効果が `ccnavi-review.sh decide <N> --preview` を読み、`parseDecidePreview` が**厳しく検証する**。頼んだ親・フェーズ・MR の番号（フェーズ行の依頼が持つもの。分かるとき）と照らし、不正な要素は破棄せずに全体をエラーにする。読み取れなければ「指摘を読み取れませんでした（理由）」で確定のボタンを出さない。正しく読めて 0 件なら「フェーズ N に未解決の指摘はありません」と［レビュー済みにする］、1 件以上なら対応方針の画面（`Decide.tsx`）。確定後の表示は実行ファイルの答え（`reviewed`・`pending_extra`・`followup`）に従い、続きの子が起きていないのに追加された指摘があれば、決め直しへ戻れる（`retry`）。
 
 副ボタン「エージェントに相談するプロンプトをコピー」は、遷移が `copyConsult` の効果を返し、`board-panel.ts` がクリップボードに入れて結果（`consultCopied`）を戻す。オーバーレイは閉じず、選びかけの対応方針は React の状態（ダイジェストが同じ間は保たれる）に残る。確定中（`deciding`）と 0 件の画面では組まない。プロンプトは `commands.ts` の `consultPrompt` が組み、許すのは `decide <N> --preview` を単体で実行することだけ。
 
@@ -85,7 +85,7 @@ keywords: [設計, 画面, approval-machine, 状態の札, ユーザ待ち, 詳�
 
 | 足すもの | 触る場所 |
 |---|---|
-| カードに出す項目 | `core/status.ts`（札の言葉と規則）→ `core/model.ts`（実行ファイルとの契約。JSON を増やすなら Python 側の `tests/ticket/test_board.py` が書き出す見本 `test/fixtures/board.json` も）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/text.ts`（出す言葉）→ `webview/board/Card.tsx`（見せ方）→ `webview/board/Card.css`（CSS）→ テスト（`test/board/model.test.ts`・`board.test.ts`・`status.test.ts`・`card.dom.test.ts`・`render.dom.test.ts`） |
+| カードに出す項目 | `core/status.ts`（バッジの言葉と規則）→ `core/model.ts`（実行ファイルとの契約。JSON を増やすなら Python 側の `tests/ticket/test_board.py` が書き出す見本 `test/fixtures/board.json` も）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/text.ts`（出す言葉）→ `webview/board/Card.tsx`（見せ方）→ `webview/board/Card.css`（CSS）→ テスト（`test/board/model.test.ts`・`board.test.ts`・`status.test.ts`・`card.dom.test.ts`・`render.dom.test.ts`） |
 | ユーザが押せる操作 | `core/board-view.ts` の `BoardMessage` → 画面のボタン → `board-panel.ts` の `KNOWN`（形の確認の一覧）と `asMessage`（形の確認）と `handleMessage`（処理）。`KNOWN` か処理を書き忘れると型が合わなくなる（どちらも型で網羅を強制してある） |
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
