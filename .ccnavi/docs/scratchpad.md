@@ -58,11 +58,12 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 2. `wip/handoff/`の下書きを編集する。複数のファイルを同時に直すときは、すべてそろえてからターンを終える
 3. ユーザが`ccnavi-user-handoff.sh [<相対パス>...]`で差分を見て、`--yes --expect <ハッシュ>`で取り込む。`ccnavi-user-handoff.sh`はユーザ専用で、見るだけの形もエージェントは打てない。状態を見るときは`ccnavi-stage.sh --commands <元のパス>...`を使う
 
-コピー先は、下書きがあるツリーの同じ相対パス。取り込める保護対象は次の表の4種類で、表にヒットしない下書き（`learnings/`・`inbox/`・再現用のスクリプトなど）は対象外になる。
+コピー先は、下書きがあるツリーの同じ相対パス。取り込める保護対象は次の表の5種類で、表にヒットしない下書き（`learnings/`・`inbox/`・再現用のスクリプトなど）は対象外になる。
 
 | 種類 | 反映する先 | 新規 | ボードから |
 |---|---|---|---|
 | `template` | `.ccnavi/config/{common,project}/templates/<名前>.yml` ほか | できる | 可 |
+| `messages` | `.ccnavi/config/{common,project}/messages/<名前>.yml` | できる | 不可（ターミナルのユーザだけ） |
 | `layer-config` | `rules.yml`・`phases.yml`・`risks.yml` | できない | 可（`rules.yml`の`guard-*`のルールか今あるdenyを動かす取り込みは不可） |
 | `docs` | `.ccnavi/docs/**/*.md`・`.ccnavi/CCNAVI.md` | できない | 可 |
 | `defense` | `.ccnavi/scripts/**/*.sh`・`.claude/hooks/**`・`.claude/settings*.json`・`.claude/skills/**/*.md` | できない | 不可（ターミナルのユーザだけ） |

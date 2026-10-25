@@ -137,6 +137,10 @@ DEPLOY_DOCS_DIR=".ccnavi/docs"
 # 一部なので、設定 3 本と同じく .ccnavi/config/common/ の下へ配る。配布元に置き場が無い、または
 # *.yml が 1 本も無いのは正常（共通のテンプレートはまだ無いことがある）で、何も言わずに飛ばす。
 DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
+# 共通の文面ファイル（拒否・促し・次の一手の文）の置き場。実行ファイルの `ccnavi text` が引く。配布元にある
+# *.yml を全部配る。共通レイヤーの一部なので、設定 3 本と同じく .ccnavi/config/common/ の下へ配る。
+# 無いと sh と hook の文は短い既定の文に落ちる（止める・止めないは変わらない）。
+DEPLOY_MESSAGES_DIR=".ccnavi/config/common/messages"
 # 共通の工程スキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true` を持つ
 # スキルだけを配る（.ccnavi/docs/skill-processes.md）。配るのは SKILL.md と references/common/ の下の .md。
 # references/project/ は配布元固有の事情なので配らない。ユーザの発言のときの同期は、ワークスペースのこの置き場から
@@ -526,6 +530,7 @@ common_phases_verdict=""
 scripts_todo=""
 docs_todo=""
 templates_todo=""
+messages_todo=""
 templates_skipped=""
 skills_all=""
 skills_todo=""
@@ -785,6 +790,28 @@ if [ -n "$deploy" ]; then
 		note_deploy absent "$DEPLOY_DOCS_DIR/" "$DEPLOY_DOCS_DIR/"
 	fi
 
+	# 共通の文面ファイル。テンプレートと同じ作り。
+	if [ -d "$source_root/$DEPLOY_MESSAGES_DIR" ]; then
+		for message_entry in "$source_root/$DEPLOY_MESSAGES_DIR"/*.yml; do
+			[ -f "$message_entry" ] || continue
+			message_name=$(basename "$message_entry")
+			case "$message_name" in
+			*[!A-Za-z0-9._-]* | [!A-Za-z0-9]*) continue ;;
+			esac
+			if [ -e "$root/$DEPLOY_MESSAGES_DIR/$message_name" ]; then
+				message_there=yes
+			else
+				message_there=no
+			fi
+			message_verdict=$(verdict "$message_entry" "$message_there")
+			note_deploy "$message_verdict" "$DEPLOY_MESSAGES_DIR/$message_name" "$DEPLOY_MESSAGES_DIR/$message_name"
+			case "$message_verdict" in
+			copy | replace)
+				messages_todo="$messages_todo $message_name"
+				;;
+			esac
+		done
+	fi
 	# 共通のテンプレート。置き場が無いか空なら、何も配らず何も言わない。
 	if [ -d "$source_root/$DEPLOY_TEMPLATES_DIR" ]; then
 		for template_entry in "$source_root/$DEPLOY_TEMPLATES_DIR"/*.yml; do
@@ -1947,6 +1974,9 @@ if [ "$deploy_work" = yes ]; then
 	for name in $templates_todo; do
 		copy_file "$source_root/$DEPLOY_TEMPLATES_DIR/$name" "$root/$DEPLOY_TEMPLATES_DIR/$name"
 	done
+	for name in $messages_todo; do
+		copy_file "$source_root/$DEPLOY_MESSAGES_DIR/$name" "$root/$DEPLOY_MESSAGES_DIR/$name"
+	done
 	for name in $docs_todo; do
 		copy_file "$source_root/$DEPLOY_DOCS_DIR/$name" "$root/$DEPLOY_DOCS_DIR/$name"
 	done
@@ -2143,6 +2173,19 @@ if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_DOCS_DIR" ]; then
 		doc_name=$(basename "$doc_entry")
 		if [ ! -f "$root/$DEPLOY_DOCS_DIR/$doc_name" ]; then
 			note_missing "${DEPLOY_DOCS_DIR}/${doc_name}（ccnavi の使い方の文書。ccnavi --docs で引く）"
+		fi
+	done
+fi
+# 共通の文面ファイルも同じ。
+if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_MESSAGES_DIR" ]; then
+	for message_entry in "$source_root/$DEPLOY_MESSAGES_DIR"/*.yml; do
+		[ -f "$message_entry" ] || continue
+		message_name=$(basename "$message_entry")
+		case "$message_name" in
+		*[!A-Za-z0-9._-]* | [!A-Za-z0-9]*) continue ;;
+		esac
+		if [ ! -f "$root/$DEPLOY_MESSAGES_DIR/$message_name" ]; then
+			note_missing "${DEPLOY_MESSAGES_DIR}/${message_name}（共通の文面ファイル。無いと sh と hook の文が短い既定の文に落ちる）"
 		fi
 	done
 fi

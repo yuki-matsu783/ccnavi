@@ -309,6 +309,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.cli_mirror",
                 "entry.cli_stopreview",
                 "entry.lint_templates",
+                "entry.lint_texts",
                 "entry.sh_ask",
                 "entry.cli_text",
                 "entry.status",
