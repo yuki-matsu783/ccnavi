@@ -674,7 +674,7 @@ class WorktreeShTest(unittest.TestCase):
     # ---- 置き場が .gitignore 済みでも、書きかけを含むスナップショットを作れる
 
     def leave_worktrees_ignored(self, line="/.claude/worktrees/"):
-        """.gitignore に置き場の行を入れ、最初のワークツリーを切る。"""
+        """置き場の行を .gitignore に入れてから、最初のワークツリーを切る。"""
         write(os.path.join(self.ws, ".gitignore"), f"logs/\n.ccnavi/\n{line}\n")
         write(os.path.join(self.ws, "README.md"), "# readme\n")
         git(self.ws, "add", ".gitignore", "README.md")
