@@ -20,7 +20,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 
 | 段 | 誰が | 何をする |
 |---|---|---|
-| コピーする | エージェント | `ccnavi-stage.sh <パス>` が元のファイルを `wip/handoff/<ツリーからの相対パス>` にコピーし、コピーした時点の元の中身を `<下書き>.orig` に残す。新規のテンプレートはコピーする元が無いので、`ccnavi --templates --draft` が `wip/handoff/` に作る |
+| コピーする | エージェント | `ccnavi-stage.sh <パス>` が元のファイルを `wip/handoff/<ツリーからの相対パス>`（`.claude` の階層は `handoff-.claude` に読み替える。下の「階層名の読み替え」）にコピーし、コピーした時点の元の中身を `<下書き>.orig` に残す。新規のテンプレートはコピーする元が無いので、`ccnavi --templates --draft` が `wip/handoff/` に作る |
 | 編集 | エージェント | `wip/handoff/` の下書きを編集する |
 | 見る | ユーザ | `ccnavi user handoff [<相対パス>…]`。何も書かない。対象の一覧・差分・検査の結果・`--expect` のハッシュを出す |
 | 取り込む | ユーザ | `ccnavi user handoff <相対パス>… --yes --expect <ハッシュ>`。取り込み先に書く |
@@ -32,12 +32,28 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 - ターミナルの前のユーザは、`ccnavi-stage.sh --commands` が出す `mv` の代わりにこのコマンドを使える
 
 **ツリー。** `--root` で指した 1 本のツリーだけを見る。ほかのツリーの `wip/handoff/` は読まない。`ccnavi-stage.sh` と `user handoff` は
-同じツリーの決め方（`ccnavi_workspace` と同じ規則）を使う。取り込み先は、下書きがあるツリーの同じ相対パス。
+同じツリーの決め方（`ccnavi_workspace` と同じ規則）を使う。取り込み先は、下書きがあるツリーの、階層名の読み替えを戻した相対パス。
 ワークツリーで取り込んだ結果は、そのブランチの変更として残り、ふつうの合流で届く。
+
+#### 階層名の読み替え
+
+Claude Code 本体は `.claude` という名前の階層（深さを問わない）を機密パスとして扱い、非対話（`claude -p`）では編集を許可できない。そのため、下書きの相対パスの中の `.claude` の階層は `handoff-.claude` に読み替えて置き、取り込むときに戻す。
+
+| 元のパス | 下書きのパス（`wip/handoff/` の下） |
+|---|---|
+| `.claude/settings.json` | `handoff-.claude/settings.json` |
+| `.claude/hooks/lint-py.sh` | `handoff-.claude/hooks/lint-py.sh` |
+| `projects/<名前>/.claude/settings.json` | `projects/<名前>/handoff-.claude/settings.json` |
+
+- **表は 1 か所。** 読み替える名前（元の階層名 → 下書きでの階層名）は `.ccnavi/scripts/ccnavi-handoff-names.txt` の 1 か所にあり、`ccnavi-stage.sh`（sh）が実行時に読む。実行ファイルは、`build.py` が同梱した同じファイルを読む（`tickets/handoff_names.py`。ソースでは同じパス）。`ccnavi-stage.sh` は実行ファイルが無くても動くため、sh が実行ファイルに聞く形にはしない。名前を足すときは表に 1 行足し、テストの見本に 1 行足す
+- **変換の位置。** 元 → 下書きは `ccnavi-stage.sh`（下書きのパスを組む）と `handoff.draft_rel`（テンプレートの下書き）。下書き → 元は `handoff.walk` と、引数のパスを引く `handoff.wanted_key`。`ccnavi-git.sh integrate` は下書きを起点の同じパスと比べるだけなので、変換を持たない
+- **比べ方。** 要素ごとに大文字小文字を区別せず比べる（`.CLAUDE` も `Handoff-.Claude` も表に当たる）。表の名前は ASCII だけで、非 ASCII の要素は表に当てない。sh が ASCII の大文字小文字しか畳めないため、Python も同じ答えにする。戻した名前は表の元の階層名の綴りになる。置き場にある実際の綴りは `spelled` が引く
+- **予約名。** 下書きでの階層名（`handoff-.claude`）は予約した名前。元のパスにその名前の階層があるファイルは、`ccnavi-stage.sh` が断る（読み替えを逆向きにたどれなくなるため）
+- **JSON。** `user handoff --json` の各対象は、元のパス（`path`）と下書きのパス（`draft`）の両方を持つ。ボードは `path`（元のパス）で引く
 
 #### 種類の表（許可リスト）
 
-取り込み先は、種類の表に載せたものだけ。下書きのパスは、リンクを解いた実パスの全要素を `pathcase.fold` と NFC に正規化してから表に適用する。
+取り込み先は、種類の表に載せたものだけ。下書きの読み替えを戻した取り込み先のパスは、リンクを解いた実パスの全要素を `pathcase.fold` と NFC に正規化してから表に適用する。
 表に該当しないパスは「対象外」とし、一覧に件数だけ出す。error には数えない（`wip/handoff/` には ccnavi が書く `learnings/` や、
 再現用のスクリプトも置かれる）。バイナリ（NUL を含む）と、実行ファイル（`.ccnavi/bin/`）は対象外。
 

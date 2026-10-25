@@ -33,7 +33,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先から切る。状況にずれや書きかけがあれば、切らずに状態と確認コードを出し、ユーザの了承を得て打ち直す | エージェント |
 | `ccnavi-sync.sh` | 親のブランチをリモートから取り込む。リモートから消えた親のブランチを診断する | エージェント |
 | `ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`--worktree` で、掃除とワークツリーの削除を 1 本で行う | エージェント |
-| `ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/` へコピーして、下書きで直せるようにする。元の場所へ取り込むのはユーザ（`sh .ccnavi/scripts/ccnavi-user-handoff.sh`） | エージェント |
+| `ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/` へコピーして、下書きで直せるようにする（`.claude` の階層は `handoff-.claude` に読み替えて置く）。元の場所へ取り込むのはユーザ（`sh .ccnavi/scripts/ccnavi-user-handoff.sh`） | エージェント |
 
 ## issue・MR・チケット・レビュー
 

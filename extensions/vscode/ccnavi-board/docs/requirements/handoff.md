@@ -1,14 +1,14 @@
 ---
 title: ccnavi ボードの取り込み待ち画面
 type: requirements
-description: wip/handoff/ に置いた下書き（テンプレート・設定・docs・防御）を、差分を読んで同じツリーの同じ相対パスへ取り込む画面のふるまい。一覧は user handoff の見るだけで作り、取り込みは選んだパスを指して取り直した expect で書く。作業中の錠は template と layer-config にだけ掛け、防御はターミナルの案内だけを出す
+description: wip/handoff/ に置いた下書き（テンプレート・設定・docs・防御）を、差分を読んで同じツリーの元のパス（下書きの置き場で読み替えた `.claude` の階層は戻す）へ取り込む画面のふるまい。一覧は user handoff の見るだけで作り、取り込みは選んだパスを指して取り直した expect で書く。作業中の錠は template と layer-config にだけ掛け、防御はターミナルの案内だけを出す
 tags: [design-doc, extension, handoff, template]
 keywords: [要件, 取り込み待ち, handoff, wip/handoff, 下書き, 取り込み, user handoff, --expect, --via board, entry_sha, 種類, template, layer-config, docs, defense, ターミナルで取り込む, 作業中の錠, 差分]
 ---
 
 # 取り込み待ち画面
 
-同じ拡張に「取り込み待ち画面」がある。保護対象（`rules.yml`・`phases.yml`・`risks.yml`・テンプレート・`.ccnavi/docs/` の docs・hook やラッパースクリプトなど）を直すとき、エージェントは元のファイルを `wip/handoff/<ツリーからの相対パス>` にコピーして下書きを編集する。この画面は、その下書きの差分を読み、選んだ対象を同じツリーの同じ相対パスへ取り込む。
+同じ拡張に「取り込み待ち画面」がある。保護対象（`rules.yml`・`phases.yml`・`risks.yml`・テンプレート・`.ccnavi/docs/` の docs・hook やラッパースクリプトなど）を直すとき、エージェントは元のファイルを `wip/handoff/<ツリーからの相対パス>` にコピーして下書きを編集する。この画面は、その下書きの差分を読み、選んだ対象を同じツリーの元のパス（下書きの置き場で読み替えた `.claude` の階層は戻す）へ取り込む。
 種類・状態・検査・差分・ハッシュ・取り込めるかを決めて書くのは実行ファイル（`ccnavi user handoff`）で、拡張はその答えを並べ、選んだ対象を実行ファイルに取り込ませるだけにする。拡張は取り込み先のファイルを書かない。
 チケット制御が `disable` のワークスペースでも開く（作業中の錠は、チケットが無ければ掛からない）。
 

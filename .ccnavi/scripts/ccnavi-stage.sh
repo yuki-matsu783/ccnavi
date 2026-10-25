@@ -13,12 +13,17 @@
 #
 # <パス> は元のファイル。cwd からの相対でも絶対でもよく、ワークスペースルートの下の実在するファイルだけを受け付ける
 # （リンクと、途中のリンクでワークスペースの外に出るものは断る）。
-# 下書きは <置き場>/wip/handoff/<ワークスペースルートからの相対パス> に置く（元と同じ階層を保つので、同じ名前が衝突しない）。
+# 下書きは <置き場>/wip/handoff/<ワークスペースルートからの相対パス> に置く（元と同じ階層を保つので、違う元のファイルが同じ下書きに落ちない）。
+# ただし、相対パスの中の .claude の階層は handoff-.claude に読み替えて置く（深さを問わない。
+# .claude/settings.json → wip/handoff/handoff-.claude/settings.json）。Claude Code 本体は .claude という名前の
+# 階層を機密パスとして扱い、非対話（claude -p）では編集を許可できないため。取り込み（ccnavi-user-handoff.sh）が
+# 読み替えを戻す。読み替える名前の表は ccnavi-handoff-names.txt（実行ファイルも同じ表を読む）。
+# 表の下書きでの名前（handoff-.claude）は予約した名前で、元のパスにその名前の階層があるファイルは断る。
 # 下書きが既にあれば上書きしない（編集中のものを消さないため）。
 #
 # --commands は、編集が済んだあとに打つ。下書きが元と違うものだけ、差し替えの mv をフルパスで 1 行ずつ出す。
-# 元と同じ（まだ編集していない）もの、下書きがまだ無いもの、下書きを作った後に元が変わったもの
-# （cp 時のコピー <下書き>.orig と比べる。mv すると他の人の変更を上書きする）は、その旨を標準エラーに言い、mv は出さない。
+# 元と同じ（まだ編集していない）もの、下書きがまだ無いもの、下書きを作ったあとに元が変わったもの
+# （作ったときの <下書き>.orig と比べる。mv すると他の人の変更を上書きする）は、その旨を標準エラーに出し、mv は出さない。
 # 複数ファイルを直すときは、すべての下書きを作ってから --commands を打つ。
 #
 # 打ったあとの進め方（CLAUDE.md）:
@@ -41,7 +46,8 @@ sh .ccnavi/scripts/ccnavi-stage.sh --commands <パス>...
   --commands  編集が済んだあとに実行します。下書きが元と違うものだけ、差し替えの mv をフルパスで出す
 
 下書きは <cwd のワークツリー（無ければワークスペースルート）>/wip/handoff/<ワークスペースルートからの相対パス> に cp する
-（既にあれば上書きしない）。
+（既にあれば上書きしない）。.claude の階層は handoff-.claude に読み替えて置く
+（.claude/settings.json → wip/handoff/handoff-.claude/settings.json）。取り込みで元に戻す。
 複数ファイルを直すときは、すべての下書きを作ってから --commands を実行し、ターンを終える。
 USAGE
 }
@@ -83,12 +89,71 @@ case "$here" in
 	;;
 *) handoff="$root/wip/handoff" ;;
 esac
-# 置き場（か wip/）がリンクなら、cp と mkdir がリンクの先へ書く。ワークツリーの置き場はブランチの
-# 内容で決まるので、リンクを追跡しているブランチだと書き先が外へ出る。書かずに断る。
+# 置き場（か wip/）がリンクなら、cp と mkdir がリンクの先へ書いてしまう。ワークツリーの置き場はブランチの
+# 内容で決まるので、リンクを含むブランチでは書き先が外へ出る。書かずに断る。
 if [ -z "$commands" ] && { [ -L "$handoff" ] || [ -L "$(dirname "$handoff")" ]; }; then
 	printf 'ccnavi-stage: 下書きの置き場（%s）か wip/ がシンボリックリンクです。リンクの先へは書きません。\n' "$handoff" >&2
 	exit 2
 fi
+
+# 読み替える階層名の表（ccnavi-handoff-names.txt。実行ファイルも同じファイルを読む）。
+# alias_words に「元(小文字) 下書き 下書き(小文字)」の 3 語組を並べる。名前に空白と / は入らない。
+names_file="$(dirname "$0")/ccnavi-handoff-names.txt"
+alias_words=""
+# 表を読む。$@ を書き換えるので、関数の中で読む。
+load_aliases() {
+	if [ ! -f "$names_file" ]; then
+		printf 'ccnavi-stage: 読み替えの表 %s がありません。ccnavi の配布（scripts/ccnavi-setup.sh --force）をやり直してください。\n' "$names_file" >&2
+		exit 2
+	fi
+	while IFS= read -r al_line || [ -n "$al_line" ]; do
+		al_line=$(printf '%s' "$al_line" | tr -d '\r')
+		case "$al_line" in
+		'' | '#'*) continue ;;
+		esac
+		set -f
+		# shellcheck disable=SC2086
+		set -- $al_line
+		set +f
+		if [ "$#" -ne 2 ]; then
+			printf 'ccnavi-stage: %s の行を読めません: %s\n' "$names_file" "$al_line" >&2
+			exit 2
+		fi
+		al_before=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+		al_after=$(printf '%s' "$2" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+		alias_words="$alias_words$al_before $2 $al_after "
+	done <"$names_file"
+}
+load_aliases
+
+# 元の相対パス <$1> の各要素（階層名）を表で読み替え、下書きの置き場の中の相対パスを ad_out に入れる。
+# 予約した名前（表の下書きでの名前）の要素があれば、その要素を ad_reserved に入れる（無ければ空）。
+# 比べ方は大文字小文字を区別しない ASCII だけ（Python 側は非 ASCII の要素を表に当てない）。
+scan_parts() {
+	ad_out=""
+	ad_reserved=""
+	ad_lines=$(printf '%s\n' "$1" | tr '/' '\n')
+	while IFS= read -r ad_part; do
+		ad_lc=$(printf '%s' "$ad_part" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+		ad_new=$ad_part
+		set -f
+		# shellcheck disable=SC2086
+		set -- $alias_words
+		set +f
+		while [ "$#" -ge 3 ]; do
+			if [ "$ad_lc" = "$1" ]; then
+				ad_new=$2
+			fi
+			if [ "$ad_lc" = "$3" ] && [ -z "$ad_reserved" ]; then
+				ad_reserved=$ad_part
+			fi
+			shift 3
+		done
+		ad_out="${ad_out:+$ad_out/}$ad_new"
+	done <<EOF
+$ad_lines
+EOF
+}
 
 # 元のファイルの、ワークスペースルートからの相対パスを出す。使えないパスは理由を言って 1 を返す。
 relative_of() {
@@ -114,6 +179,11 @@ relative_of() {
 		return 1
 		;;
 	esac
+	scan_parts "$rl_rel"
+	if [ -n "$ad_reserved" ]; then
+		printf 'ccnavi-stage: %s の `%s` は、下書きでの階層名として予約されています（表: %s）。この名前の階層を含むファイルは下書きにできません。\n' "$root/$rl_rel" "$ad_reserved" "$names_file" >&2
+		return 1
+	fi
 	if [ ! -f "$root/$rl_rel" ]; then
 		printf 'ccnavi-stage: %s は実在するファイルではありません。\n' "$root/$rl_rel" >&2
 		return 1
@@ -150,7 +220,8 @@ for arg in "$@"; do
 		continue
 	}
 	orig="$root/$rel"
-	draft="$handoff/$rel"
+	scan_parts "$rel"
+	draft="$handoff/$ad_out"
 	if [ -n "$commands" ]; then
 		if [ ! -f "$draft" ]; then
 			missing="${missing:+$missing }$rel"
