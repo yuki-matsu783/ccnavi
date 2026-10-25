@@ -328,7 +328,8 @@ class Handler(BaseHTTPRequestHandler):
             "merged_at",
         )
         view = {k: mr[k] for k in keep if k in mr}
-        # 実物の MR も持つ項目。呼ぶ側は、これで「このプロジェクトから出た MR か」を絞り込む。
+        # 実物の MR も持つ項目。sh（ccnavi-common-review.sh の find_mr など）が、jq でこれを見て
+        # 「このプロジェクトから出た MR か」を絞り込む。
         # 代役のプロジェクトの id は 1（`project` の答え）
         view["source_project_id"] = mr.get("source_project_id", 1)
         return view
@@ -338,8 +339,10 @@ class Server(ThreadingHTTPServer):
     """起動した代役。`start` が返す。状態はすべてこのインスタンスが持つ。"""
 
     # keep-alive の接続を開いたままの相手がいても、stop が待たされないようにする。
-    # block_on_close が True（既定）だと、server_close が各接続のスレッドの終わりを join する。
-    # 相手が接続を切らないかぎり、スレッドは次の要求を待ち続けるので、join が返らない。
+    # 既定（daemon_threads が False、block_on_close が True）だと、server_close が各接続の
+    # スレッドの終わりを join する。相手が接続を切らないかぎり、スレッドは次の要求を待ち続けるので、
+    # join が返らない。daemon_threads が True なら join の対象にならない。
+    # block_on_close は、その前提に頼らず明示しておく。
     daemon_threads = True
     block_on_close = False
 
@@ -424,7 +427,7 @@ def start(
     port: int = 0,
     echo: bool = False,
 ) -> Server:
-    """代役を別スレッドで立てて、接続が通るまで待って返す（上限 5 秒。超えたら TimeoutError）。
+    """代役を別スレッドで立てて、接続を受けられるのを確かめてから返す（上限 5 秒。超えたら TimeoutError）。
 
     `port` を 0 にすると OS に決めさせる（`Server.port`）。空きポートを先に探してから
     bind し直すと、その間に取られるので、探さない。0 以外は手で使う入口のためにある。
