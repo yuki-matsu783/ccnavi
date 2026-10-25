@@ -17,7 +17,7 @@ keywords: [GitLab, Docker, docker_gitlab, probe_gitlab, make_gitlab_tokens, comp
 | `compose.yml` | GitLab CE の立て方（ポート・メモリ・ボリューム・`external_url`）。`docker_gitlab.py` が環境変数を渡して使う。直接 `compose` を打たない |
 | `make_gitlab_tokens.rb` | root（エージェント役）と `ccnavi-reviewer`（人間役）の personal access token を作る。`docker_gitlab.py up` が呼ぶ |
 | `gitlab_api.py` | 人間役の API 呼び出し。import しても副作用は無い |
-| `probe_gitlab.py` | 動いている GitLab に使い捨てのプロジェクトを作り、親の Draft MR を API で先に作ったうえで、sh と実行ファイルを 1 周させる |
+| `probe_gitlab.py` | 動いている GitLab に使い捨てのプロジェクトを作り、親の Draft MR を API で先に作ってから、sh と実行ファイルを 1 周させる |
 | `fake_gitlab.py` | Docker が無い環境で使う代役の GitLab |
 
 ## 起動・確認・停止
@@ -30,10 +30,10 @@ uv run python tests/manual/gitlab/docker_gitlab.py down --purge  # ボリュー�
 ```
 
 - `up` は、イメージが無いとき取得せずに止まる。取得は `--pull` を付けたときだけ。
-- `up` は、動いていれば起動しない。健康になり、`/api/v4/version` が応答するまで待つ（上限 15 分。実測（GitLab 19.4.1、イメージ取得済み）は、停止後の再起動で約 2 分、`up --pull` の全体で約 1 分）。イメージを初めて取る時間は、この実測には含まない。
+- `up` は、動いていれば起動しない。健康になり、`/api/v4/version` が応答するまで待つ（上限 15 分）。実測（GitLab 19.4.1、イメージ取得済み）では、停止後の再起動に約 2 分、`up --pull` の全体に約 1 分かかる。イメージを初めて取る時間は、この実測には含まない。
 - CE は 4GB のメモリが要る。コンテナの上限は余裕をとって 6g（`MEM_LIMIT`）。Docker に割り当てたメモリが 6GB 未満なら、`up` が `次:` で警告する。足りないと engine ごと落ちる。
-- 公開ポートは `127.0.0.1` の `CCNAVI_GITLAB_PORT`（既定 8929）だけ。LAN には出さない。`probe_gitlab.py` の既定の接続先と `external_url` も、この値から作る。`external_url` と公開ポートは同じ値にする（ずれると clone URL と `web_url` が壊れる）。
-- `restart: "no"`。Docker Desktop の起動で勝手に上がらないようにしている。
+- 公開ポートは `127.0.0.1` の `CCNAVI_GITLAB_PORT`（既定 8929）だけ。LAN には公開しない。`probe_gitlab.py` の既定の接続先と `external_url` も、この値から作る。`external_url` と公開ポートは同じ値にする（ずれると clone URL と `web_url` が壊れる）。
+- `restart: "no"`。Docker Desktop の起動時に自動では起動しないようにしている。
 - root のパスワードは、コンテナもボリュームも無いときだけ乱数で作り、0600 の状態のファイルに書く。ボリュームが残っていれば作り直さない（GitLab は初回のパスワードを持っているため）。`down --purge` のあと作り直す。
 
 ## 版の固定
@@ -60,8 +60,8 @@ uv run python tests/manual/gitlab/probe_gitlab.py
 - `CCNAVI_PROBE_GITLAB`（既定 `http://127.0.0.1:<CCNAVI_GITLAB_PORT、既定 8929>`）で接続先を変える。
 - 結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
 - probe はユーザの役として、承認の push（`ccnavi-user-push-approved.sh`）を実行する。子は finish の前に `ticket learn` で学びの記録を書く。
-- ユーザの decide（`ccnavi-user-decide.sh`）は通さず、`review decide` で代用する。decide の経路は未カバー。
-- `--help` は、トークンも exe も無しに終わる。
+- ユーザの decide（`ccnavi-user-decide.sh`）は通さず、`review decide` で代用する。decide の経路は確かめられていない。
+- `--help` は、トークンも exe も無くても終わる。
 
 ## CE の限界
 
@@ -70,5 +70,5 @@ uv run python tests/manual/gitlab/probe_gitlab.py
 
 ## 手動の通し確認
 
-手動の確認は、ユーザの確認を取ってから行う（コンテナの起動・プロジェクトの作成と削除を伴う）。
+手動の確認は、ユーザに確認を取ってから行う（コンテナの起動・プロジェクトの作成と削除を伴う）。
 順番は `up --pull` → `status` → `probe_gitlab.py` を 1 周 → `down`。結果は PR の説明に書く。

@@ -25,7 +25,7 @@ GitLab API を人間役のトークンで呼ぶ部分は `gitlab_api.py` にあ�
 ## 認証画面を出さない
 
 push は URL にトークンを埋めない（埋めると origin の URL に混ざる）。git のラッパースクリプトは
-`GIT_CONFIG_COUNT` を除くので環境変数でも差し替えられない。一時リポジトリの
+`GIT_CONFIG_COUNT` を取り除くため、環境変数では差し替えられない。一時リポジトリの
 `credential.helper` を空文字で一度リセットしてから（system / global の GCM を外す）、
 トークンを返す helper を足す。
 
@@ -447,7 +447,7 @@ def main() -> int:
     )
     write_explainer(parent_tree)
     commit_all(parent_tree, "tickets")
-    # 子の start は親のブランチがリモートにあることを前提にする（ccnavi-start 経由の親が前提）
+    # 子の start は、親のブランチがリモートにあることを前提とする（ccnavi-start 経由の親）
     pushed_parent = sh(GIT_SH, parent_tree, "push", "-u", "origin", "i0001")
     record(
         "親 i0001 を push",
@@ -475,7 +475,7 @@ def main() -> int:
     )
     approved = exe("user", "agree", stdin="y\n")
     record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
-    # 承認の push はユーザが打つ（ccnavi-user-push-approved.sh）。probe はユーザの役をする
+    # 承認の push はユーザが打つ（ccnavi-user-push-approved.sh）。probe はユーザの役を務める
     pushed_approval = sh(PUSH_APPROVED_SH, parent_tree, "i0001")
     record(
         "承認を push（ユーザの役）",
@@ -495,7 +495,7 @@ def main() -> int:
             os.path.join(tree, "src", {"i0001-01-01": "a", "i0001-01-02": "b"}[child], "work.py"),
             f"# {child}\n",
         )
-        # 学びの記録は finish の必須（learning.py の record_missing）。雛形を learn で書いてから
+        # finish では学びの記録が必須（learning.py の record_missing）。learn で雛形を書いてから
         # 同じコミットに入れる（learnings: none のまま）
         learned = sh(TICKET_SH, tree, "learn")
         record(
@@ -704,7 +704,7 @@ def main() -> int:
         refused.returncode != 0 and "wip" in refused.stderr,
         refused.stderr.strip()[:200],
     )
-    # 親の start は冒頭（子の start の前）で済んでいる。ここでは二度呼ばない
+    # 親の start は冒頭（子の start より前）で済ませている。ここでは呼び直さない
     closed = sh(TICKET_SH, parent_tree, "finish", "i0001")
     record("親の done", closed.returncode == 0, (closed.stdout + closed.stderr).strip()[:200])
     commit_all(parent_tree, "状態の移動")
