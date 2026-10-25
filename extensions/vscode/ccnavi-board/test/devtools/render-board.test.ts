@@ -159,7 +159,7 @@ test("CB-T1217 VS Code の窓口のスタブは、送ったものを window.__po
   assert.deepEqual(win.__csp, ["script-src: inline"]);
 });
 
-test("CB-T1218 使い方の誤りは終了コード 2: 引数なし・両方指定・--repo が無い・--out が --repo の下", () => {
+test("CB-T1218 使い方の誤りは終了コード 2: 引数なし・両方指定・--repo が無い・--out が --repo の下・--out がファイル", () => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "render-board-"));
   try {
     const repo = path.join(base, "repo");
@@ -172,6 +172,8 @@ test("CB-T1218 使い方の誤りは終了コード 2: 引数なし・両方指�
     assert.equal(inside.status, 2, inside.stderr);
     assert.match(inside.stderr, /--out が --repo の下/);
     assert.ok(!fs.existsSync(path.join(repo, "out")), "リポジトリの下に何も作らない");
+    fs.writeFileSync(path.join(base, "file"), "");
+    assert.equal(run("--repo", repo, "--out", path.join(base, "file")).status, 2, "--out がファイル");
     assert.equal(run("--repo", repo, "--out", path.join(base, "out"), "--appearance", "nope").status, 2);
     assert.equal(run("--repo", repo, "--out", path.join(base, "out"), "--width", "10").status, 2);
   } finally {

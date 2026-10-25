@@ -20,6 +20,8 @@ import "../../src/webview-asset.js";
 
 const ROOT = path.join(__dirname, "..", "..", "..");
 const FIXTURE = path.join(ROOT, "test", "fixtures", "board.json");
+/** ツールが止まったときにテストごと止まらないための上限 */
+const TOOL_TIMEOUT_MS = 180_000;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 function main(): number {
@@ -27,6 +29,7 @@ function main(): number {
   try {
     const ran = spawnSync(process.execPath, [path.join(ROOT, "scripts", "render-board.js"), "--fixture", FIXTURE, "--out", out], {
       encoding: "utf8",
+      timeout: TOOL_TIMEOUT_MS,
     });
     if (ran.status === 3) {
       console.error(`render-board e2e: 環境が揃っていません（終了コード 3）: ${ran.stderr.trim()}`);

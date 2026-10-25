@@ -224,14 +224,21 @@ async function boardJsonOf(options, out) {
     }
     return parsed.board;
   }
-  const loaded = await out.loadBoard(options.repo, "");
+  const loaded = await out.loadBoard(path.resolve(options.repo), "");
   if (!loaded.ok) {
     throw new ToolError(EXIT.FAILED, loaded.error);
   }
   return loaded.board;
 }
 
+const OUTPUT_NAMES = ["board.png", "board.txt", "board.html", "board.log"];
+
 async function render(options, out, browserType) {
+  // 前回の出力を先に消す。失敗したのに古い PNG が残ると、成功と取り違えるため
+  fs.mkdirSync(options.out, { recursive: true });
+  for (const name of OUTPUT_NAMES) {
+    fs.rmSync(path.join(options.out, name), { force: true });
+  }
   const board = await boardJsonOf(options, out);
   const data = { kind: "board", board: out.buildBoard(board) };
   const html = out.renderBoardPage(data, {
@@ -241,7 +248,6 @@ async function render(options, out, browserType) {
     appearance: options.appearance,
   });
 
-  fs.mkdirSync(options.out, { recursive: true });
   const htmlPath = path.join(options.out, "board.html");
   fs.writeFileSync(htmlPath, html);
 
@@ -278,8 +284,9 @@ async function render(options, out, browserType) {
     fs.writeFileSync(path.join(options.out, "board.txt"), `${await page.evaluate(() => document.body.innerText)}\n`);
   } finally {
     await browser.close();
+    // 描画の途中で投げても、集めた記録は残す（調べたいのはそのとき）
+    fs.writeFileSync(path.join(options.out, "board.log"), entries.map(logLine).join("\n") + (entries.length > 0 ? "\n" : ""));
   }
-  fs.writeFileSync(path.join(options.out, "board.log"), entries.map(logLine).join("\n") + (entries.length > 0 ? "\n" : ""));
 
   if (timedOut) {
     throw new ToolError(EXIT.FAILED, `描画が ${RENDER_TIMEOUT_MS / 1000} 秒で終わりませんでした（読み込み中のまま）。${path.join(options.out, "board.log")} を見る`);
@@ -301,6 +308,9 @@ async function main(argv) {
     const checked = validateAppearance(options.appearance, out.APPEARANCES);
     if (!checked.ok) {
       throw new ToolError(EXIT.USAGE, `${checked.error}\n${USAGE}`);
+    }
+    if (fs.existsSync(options.out) && !fs.statSync(options.out).isDirectory()) {
+      throw new ToolError(EXIT.USAGE, `--out がディレクトリではありません: ${options.out}`);
     }
     if (options.repo !== undefined) {
       if (!fs.existsSync(options.repo) || !fs.statSync(options.repo).isDirectory()) {
@@ -327,5 +337,8 @@ async function main(argv) {
 module.exports = { EXIT, ToolError, parseArgs, validateAppearance, isInside, isIgnorableConsole, failuresOf, logLine, codeForFailures };
 
 if (require.main === module) {
-  main(process.argv.slice(2)).then((code) => process.exit(code));
+  main(process.argv.slice(2)).then((code) => {
+    // process.exit で切ると、パイプへの出力が（Windows で）残りを落とすことがある
+    process.exitCode = code;
+  });
 }
