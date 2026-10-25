@@ -527,7 +527,7 @@ _SCRIPTS = """\
     ccnavi tree handoff-pending <tree> [<start>]
         （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"pending <件数>"（取り込んでいない
          wip/handoff/ の下書きの数）と、1 件ごとに "path <パス>" を出力します。<start>（コミット）を
-         渡すと、起点の木の元のパス（wip/handoff/ を除いた相対パス。大文字小文字の違いは同じもの）と
+         渡すと、起点の木の元のパス（wip/handoff/ を除いた相対パス。大文字と小文字は区別しない）と
          突き合わせ、元があり中身が違う写しごとに "foreign <パス>"、元の無い下書きごとに
          "note <パス>" を足します）
     ccnavi worktree id <branch>

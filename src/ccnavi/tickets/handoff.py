@@ -1075,7 +1075,7 @@ def pending(tree_root: str) -> list[str]:
 
 
 def _draft_files(tree_root: str) -> list[str]:
-    """置き場の下に今あるファイル（リンクを含む。ディレクトリでないもの）の、置き場からの相対パス。"""
+    """置き場の下にあるファイル（リンクを含む。ディレクトリでないもの）を、置き場からの相対パスで返す。"""
     base = handoff_dir(tree_root)
     out: list[str] = []
     for parent, dirs, files in os.walk(base, followlinks=False):
@@ -1088,7 +1088,7 @@ def _draft_files(tree_root: str) -> list[str]:
 
 
 def _holds(tree_root: str, start: str, sources: list[str], raw: bytes | None) -> bool | None:
-    """起点の木のどれかのパスが、この中身と同じか。起点から読めなければ None。"""
+    """起点の木のいずれかのパスの中身が、この中身と同じかを返す。起点から読めなければ None。"""
     same = False
     for source in sources:
         held, readable = gitcmd.blob(tree_root, start, source, timeout=30.0)
@@ -1099,16 +1099,18 @@ def _holds(tree_root: str, start: str, sources: list[str], raw: bytes | None) ->
 
 
 def survey(tree_root: str, start: str) -> tuple[list[str], list[str]] | None:
-    """置き場の下書きを、`<起点>` の木の元のパスと突き合わせる。`(元と違う写し, 元の無い下書き)`。
+    """置き場の下書きを、`<起点>` の木の元のパスと突き合わせる。
 
-    `ccnavi-git.sh integrate` が、取り込み結果に含まれない下書きを見分けるのに使う。
-    下書きの置き場を除いた相対パス（階層名の読み替えを戻したもの）を、`<起点>` の木のパスと
+    結果は `(元と違う写し, 元の無い下書き)`。`ccnavi-git.sh integrate` が、
+    取り込み結果に含まれない下書きを見分けるのに使う。
+    置き場を除いた下書きの相対パス（階層名の読み替えを戻したもの）を、`<起点>` の木のパスと
     `key_of` で比べる（大文字小文字・NFC/NFD の違いは同じものとして扱う）。比べるのは見つける
     ためだけで、元を読むときは起点の木の表記を使う。
 
-    - 起点の木の同じ下書きと中身が同じ: ブランチが持ち込んだものではない。どちらにも入れない
+    - 起点の木に同じ下書きがあり中身も同じ: ブランチが持ち込んだものではない。
+      どちらの一覧にも入れない
     - 元が起点の木に無い: 元の無い下書き（新規のメモ・報告）
-    - 元があり中身が同じ: 編集していない写し。どちらにも入れない
+    - 元があり中身が同じ: 編集していない写し。どちらの一覧にも入れない
     - 元があり中身が違う、または読めない（リンクなど）: 元と違う写し（取り込んでいない）
 
     起点の木を読めなければ None（呼ぶ側は止める）。パスは置き場つきで、置き場の表記のまま。
