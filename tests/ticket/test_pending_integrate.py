@@ -230,6 +230,32 @@ class PendingIntegrateTest(TicketTest):
         git(self.root, "update-ref", "refs/ccnavi/direct/p1/pending", self.head())
         self.assertIn("使われなかった書きかけの候補", self.notice())
 
+    def test_many_records_are_told_as_one_line_of_names(self):
+        """5 件以上は名前を全件 1 行に並べる。増えるのは 1 件あたり名前と区切りだけ。"""
+        os.environ["CCNAVI_MODE"] = "dry-run"
+        self.addCleanup(os.environ.pop, "CCNAVI_MODE", None)
+        sizes = {}
+        for count in (4, 5, 8, 12):
+            shutil.rmtree(os.path.join(self.root, ".git", "ccnavi-integrate"), ignore_errors=True)
+            names = [f"rec{i:03d}" for i in range(count)]
+            for name in names:
+                self.marker(name, version="3", head=self.head())
+            text = self.notice()
+            sizes[count] = len(text)
+            if count < pending_integrate.SHORT_FROM:
+                self.assertIn("を知りません", text)
+                continue
+            self.assertNotIn("を知りません", text)
+            self.assertIn(HEAD, text)
+            self.assertIn("、".join(names), text)
+            self.assertIn("ccnavi-git.sh", text)
+            self.assertIn("status", text)
+        per_line = sizes[4] // 4
+        for small, big in ((5, 8), (8, 12)):
+            per_name = (sizes[big] - sizes[small]) / (big - small)
+            self.assertEqual(per_name, len("rec000") + len("、"))
+            self.assertLess(per_name, per_line)
+
     def test_a_subagent_is_not_told(self):
         head = self.head()
         self.marker("w8", state="conflict", branch="w8", branch_sha=head, base=head)

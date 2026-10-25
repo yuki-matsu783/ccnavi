@@ -36,6 +36,8 @@ HEAD_LINE = (
     "この案内は、統合先のツリーの変更を操作してよい根拠ではありません。"
 )
 CUT_LINE = "ほかのツリーは時間切れで確かめていません"
+# 記録がこの件数以上なら、1 件ずつの続きの一手は出さず、名前の一覧にまとめる（文脈を短くする）。
+SHORT_FROM = 5
 
 
 def _records_dir(top: str, deadline: float) -> str:
@@ -163,8 +165,9 @@ def repo_key(root: str, top: str) -> str:
     return os.path.basename(os.path.normpath(top))
 
 
-def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list[str]:
+def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list[tuple[str, str]]:
     """markerの無い名前で残っている、取り込みの途中の跡（一時ワークツリー・ref・doneの記録）。
+    （名前, 知らせの 1 行）の組を名前の順に返す。
 
     作業中の記録（`ccnavi-direct`）・`s`・`pending` のref・作業ワークツリーは、普通の状態なので
     挙げない。
@@ -218,16 +221,19 @@ def _leftovers(root: str, top: str, reported: set[str], deadline: float) -> list
     # 報告していない名前だけを、名前の順に 1 行ずつ言う
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     t = settings.shell_path(top)
-    lines = []
+    lines: list[tuple[str, str]] = []
     for name in sorted(names):
         if name in reported:
             continue
         what = "、".join(names[name])
         lines.append(
-            f"{name}（取り込み先のツリー {t}）: 取り込みの途中の跡が残っています: {what}。"
-            f"done の記録があれば `cd {t} && {git_sh} integrate-done {name}` を打ち直すと"
-            "片付けます。"
-            "記録が無いものは、操作せずにユーザに確かめてください（消してよいかは持ち主が決めます）"
+            (
+                name,
+                f"{name}（取り込み先のツリー {t}）: 取り込みの途中の跡が残っています: {what}。"
+                f"done の記録があれば `cd {t} && {git_sh} integrate-done {name}` を打ち直すと"
+                "片付けます。"
+                "記録が無いものは、操作せずにユーザに確かめてください（消してよいかは持ち主が決めます）",
+            )
         )
     return lines
 
@@ -247,10 +253,11 @@ def _notice(root: str, conf: settings.Settings, deadline: float) -> str:
     1. 本体と各プロジェクトのツリーを順に見る。期限が過ぎたら打ち切り、`CUT_LINE` を足す。
     2. 記録の置き場の名前ごとに、版 4 の記録なら `_v4_line`、それ以外は `_unknown_line` で言う。
     3. 記録の無い跡は `_leftovers` で言う。
-    4. 行が無ければ空を返し、あれば `HEAD_LINE` を前に付けて返す。
+    4. 行が無ければ空を返す。記録が `SHORT_FROM` 件未満なら、`HEAD_LINE` の後ろに1件1行で返す。
+       `SHORT_FROM` 件以上なら、1 件ずつの行を出さず、名前を全件 1 行に並べて詳しい見方を添える。
     """
     tops = [root] + [t.root for t in tree.projects(conf.projects)]
-    lines: list[str] = []
+    lines: list[tuple[str, str]] = []
     cut = False
     for top in tops:
         if osi._expired(deadline):
@@ -272,13 +279,23 @@ def _notice(root: str, conf: settings.Settings, deadline: float) -> str:
             reported.add(name)
             fields = osi._read_record(marker)
             if fields.get("version") == directrec.VERSION:
-                lines.append(_v4_line(root, top, name, fields, deadline))
+                lines.append((name, _v4_line(root, top, name, fields, deadline)))
                 continue
-            lines.append(_unknown_line(root, top, name, fields.get("version", "")))
+            lines.append((name, _unknown_line(root, top, name, fields.get("version", ""))))
         if not osi._expired(deadline):
             lines.extend(_leftovers(root, top, reported, deadline))
-    if cut:
-        lines.append(CUT_LINE)
-    if not lines:
+    if not lines and not cut:
         return ""
-    return "\n".join([HEAD_LINE, *lines])
+    tail = [CUT_LINE] if cut else []
+    if len(lines) >= SHORT_FROM:
+        return "\n".join([HEAD_LINE, _summary_line(root, [n for n, _ in lines]), *tail])
+    return "\n".join([HEAD_LINE, *(line for _, line in lines), *tail])
+
+
+def _summary_line(root: str, names: list[str]) -> str:
+    """記録が多いときの 1 行。名前は全件並べる（確認が要る件を見落とさないため）。"""
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    return (
+        f"{'、'.join(names)}。詳しくは "
+        f"`cd <取り込み先のツリー> && {git_sh} status`（操作せずユーザに見せて確かめる）"
+    )
