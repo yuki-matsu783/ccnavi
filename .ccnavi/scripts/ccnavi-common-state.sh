@@ -74,6 +74,31 @@ ccnavi_ask() {
 	printf '%s\n' "$ccnavi_ak_out" | tr -d '\r'
 }
 
+# 名前のワークツリーがチケットに結び付くかを実行ファイル（`tree bound`）に聞く。<ワークスペースルート> <ワークツリーのパス> <名前>
+#
+# 答えは ccnavi_tb_state（yes・no・unavailable（実行ファイルに確かめられない）・undecided（決められない））と、
+# 結び付くときの理由 ccnavi_tb_why に入れる。結び付かない（no）ときだけ 0。`ccnavi-git.sh integrate` と
+# `ccnavi-worktree.sh --adopt` が同じ判定で断るための入口で、sh はチケットの置き場を自分で読まない。
+# 止める側の呼び出し元は、no 以外を「引き取らない・取り込まない」に倒す。
+ccnavi_tree_bound() {
+	ccnavi_tb_out=$(ccnavi_ask "$1" tree bound "$2" "$3") || ccnavi_tb_out=""
+	ccnavi_tb_why=""
+	if [ "$(printf '%s\n' "$ccnavi_tb_out" | head -n 1)" != "tree 1" ]; then
+		ccnavi_tb_state=unavailable
+		return 1
+	fi
+	ccnavi_tb_why=$(printf '%s\n' "$ccnavi_tb_out" | sed -n 's/^why //p' | head -n 1)
+	case "$(printf '%s\n' "$ccnavi_tb_out" | sed -n 's/^bound //p' | head -n 1)" in
+	no)
+		ccnavi_tb_state=no
+		return 0
+		;;
+	yes) ccnavi_tb_state=yes ;;
+	*) ccnavi_tb_state=undecided ;;
+	esac
+	return 1
+}
+
 # ブランチ名から作る識別子と、それが使えるかを実行ファイル（`worktree id`）に聞く。<ワークスペースルート> <ブランチ>
 #
 # 答えは ccnavi_id_ident（識別子）・ccnavi_id_problem（親のブランチとして採用できない理由。58 文字・末尾の

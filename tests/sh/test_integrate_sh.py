@@ -415,6 +415,40 @@ class IntegrateTest(Fixture):
         self.assertOk(r, 2)
         self.assertIn("--adopt", r.stderr)
 
+    def test_without_a_record_a_direct_name_is_not_told_about_merge_requests(self):
+        self.work_in_branch()
+        os.remove(self.record())
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r, 2)
+        self.assertIn("--adopt --base <取り込み先>", r.stderr)
+        self.assertNotIn("マージリクエスト", r.stderr)
+
+    def test_without_a_record_a_ticket_bound_name_is_not_pointed_at_adopt(self):
+        # --adopt はチケットに結び付く名前を断る。案内が行き止まりに向かわないよう、
+        # 同じ判定で先に言う。
+        self.work_in_branch()
+        os.remove(self.record())
+        write(os.path.join(self.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r, 2)
+        self.assertNotIn("--adopt", r.stderr)
+        self.assertIn("チケットに結び付く名前です", r.stderr)
+        self.assertIn("マージリクエストで出します", r.stderr)
+        self.assertIn("ccnavi-ticket.sh", r.stderr)
+        self.assertIn("status", r.stderr)
+        self.assertFalse(os.path.exists(self.tmp_wt()))
+
+    def test_without_a_record_an_unanswerable_exe_still_points_at_adopt(self):
+        # 結び付くか確かめられないときは、従来どおり（--adopt 側が確かめて断る）。
+        self.work_in_branch()
+        os.remove(self.record())
+        write(os.path.join(self.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
+        r = self.run_git_sh(
+            "integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": "/nonexistent/ccnavi"}
+        )
+        self.assertOk(r, 2)
+        self.assertIn("--adopt", r.stderr)
+
     def test_a_record_of_another_repository_is_refused(self):
         self.work_in_branch()
         text = read(self.record()).replace(self.common_dir(), "/somewhere/else/.git")

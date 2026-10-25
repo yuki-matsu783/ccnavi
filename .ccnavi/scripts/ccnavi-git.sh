@@ -78,6 +78,7 @@ reject() {
 # `SELF` は今までの動きのまま変えない。
 SELF_Q="sh $(ccnavi_sh_quote "$0")"
 WT_SH_Q="sh $(ccnavi_sh_quote "$(dirname "$0")/ccnavi-worktree.sh")"
+TICKET_SH_Q="sh $(ccnavi_sh_quote "$(dirname "$0")/ccnavi-ticket.sh")"
 
 # ワークスペースルート。道具と記録の置き場。git のトップとは違うもので、
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
@@ -1124,8 +1125,15 @@ ig_integrate() {
 			reject integrate-has-k "$ig_n は確定の途中です（K=$(ig_short "$d4_k0")）。$SELF_Q integrate-done $ig_n -m '<メッセージ>' で続けるか、$SELF_Q integrate --abort $ig_n でやめてください。"
 		fi
 	fi
-	[ -f "$d4_rec" ] ||
+	if [ ! -f "$d4_rec" ]; then
+		# チケットに結び付く名前は --adopt が断る。案内が行き止まりに向かわないよう、先に同じ判定
+		# （ccnavi_tree_bound。--adopt と共通）で聞く。
+		ccnavi_tree_bound "$WS" "$ig_wt" "$ig_n" || :
+		if [ "$ccnavi_tb_state" = yes ]; then
+			reject integrate-no-record "$ig_n の直接作業の記録がありません（ccnavi-direct/${ig_n}）。$ig_n はチケットに結び付く名前です（${ccnavi_tb_why}）。チケットの作業は直接作業に引き取らず、マージリクエストで出します（$TICKET_SH_Q status の次の操作に従う。.ccnavi/docs/worktree-merge.md）。"
+		fi
 		reject integrate-no-record "$ig_n の直接作業の記録がありません（ccnavi-direct/${ig_n}）。更新前に切ったワークツリーや、手で切ったワークツリーは、ユーザの確認を経て $WT_SH_Q $ig_n --adopt --base <取り込み先> で引き取ります。"
+	fi
 	d4_common_check
 	d4_git_ge 2 40 ||
 		reject integrate-old-git "git が古く（$(git version 2>/dev/null)）、merge-tree --merge-base（git 2.40 から）が利用できません。git を 2.40 以上にしてから再実行してください。"
@@ -1158,16 +1166,14 @@ ig_integrate() {
 	[ "$ig_b" = "refs/heads/$ig_n" ] ||
 		reject integrate-worktree-branch ".claude/worktrees/$ig_n は、このリポジトリで $ig_n をチェックアウトしているワークツリーではありません（${ig_b:-このリポジトリの登録に無い}）。"
 	# 名前のほうもチケットに結び付かないことを確かめる（取り込み先の判定とは別）。
-	d4_nb=$(ccnavi_ask "$WS" tree bound "$ig_wt" "$ig_n") || d4_nb=""
-	if [ "$(printf '%s\n' "$d4_nb" | head -n 1)" != "tree 1" ]; then
-		reject integrate-ticket "$ig_n がチケットに結び付くかを実行ファイルに確かめられないので、取り込みません。"
-	fi
-	case "$(printf '%s\n' "$d4_nb" | sed -n 's/^bound //p' | head -n 1)" in
+	ccnavi_tree_bound "$WS" "$ig_wt" "$ig_n" || :
+	case "$ccnavi_tb_state" in
 	no) ;;
 	yes)
-		reject integrate-ticket "$ig_n はチケットに結び付くワークツリーです（$(printf '%s\n' "$d4_nb" | sed -n 's/^why //p' | head -n 1)）。チケットの作業は取り込み先へ直接取り込まず、マージリクエストで出します（.ccnavi/docs/worktree-merge.md）。"
+		reject integrate-ticket "$ig_n はチケットに結び付くワークツリーです（${ccnavi_tb_why}）。チケットの作業は取り込み先へ直接取り込まず、マージリクエストで出します（.ccnavi/docs/worktree-merge.md）。"
 		;;
-	*) reject integrate-ticket "$ig_n がチケットに結び付くかを決められないので、取り込みません。" ;;
+	undecided) reject integrate-ticket "$ig_n がチケットに結び付くかを決められないので、取り込みません。" ;;
+	*) reject integrate-ticket "$ig_n がチケットに結び付くかを実行ファイルに確かめられないので、取り込みません。" ;;
 	esac
 	ig_wdirty=$(git -C "$ig_wt" status --porcelain 2>/dev/null | head -n 10)
 	if [ -n "$ig_wdirty" ]; then
