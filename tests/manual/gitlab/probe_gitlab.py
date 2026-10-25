@@ -39,12 +39,17 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 
 import gitlab_api
+
+# 提案の書式（計画・config の phases）は、ticket のテストと同じ補助で作る
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from tests.ticketsample import plain_parent, write_plain_phases  # noqa: E402
 
 ROOT_OF_CCNAVI = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -138,8 +143,8 @@ def env_for() -> dict[str, str]:
         {
             "GITLAB_TOKEN": ROOT_TOKEN,
             "CCNAVI_ENTRY_PATH": EXE,
-            # sh の ticket 系は、cwd の一時リポジトリからではワークスペースを見つけられない
-            "CCNAVI_WORKSPACE": ROOT_OF_CCNAVI,
+            # 一時リポジトリをワークスペースにする（sh の ticket 系は cwd からこの根を使う）
+            "CCNAVI_WORKSPACE": ROOT,
             "CCNAVI_GUARD_TICKET_APPROVAL": "disable",
             "CCNAVI_MODE": "enable",
             "CCNAVI_GUARD_CORE_FILES": "disable",
@@ -254,6 +259,9 @@ def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="�
     lines = ["---", "version: 1", f"ticket: {name}"]
     if parent:
         lines += [f"parent: {parent}", f"phase: {phase}"]
+    if not parent:
+        # 親は MR の番号を持つ（ccnavi の親チケットは issue と MR のセット）
+        lines.append("mr: 1")
     if issue:
         lines.append(f"issue: {issue}")
     lines += [
@@ -277,7 +285,8 @@ def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="�
         "本文（ユーザが読む説明）",
         "",
     ]
-    return "\n".join(lines)
+    # 親には計画（1 フェーズ）を足す。子は plain_parent が何もしない
+    return plain_parent("\n".join(lines), plan=1)
 
 
 def worktree(name: str, base: str) -> str:
@@ -294,7 +303,8 @@ def propose(tree: str, name: str, **kw) -> str:
 
 def commit_all(tree: str, msg: str) -> None:
     git(tree, "add", "-A")
-    git(tree, "commit", "--quiet", "-m", msg)
+    # 変更が無い段（start など）でも止まらない
+    git(tree, "commit", "--quiet", "--allow-empty", "-m", msg)
 
 
 def mr_of(project_id: int, branch: str) -> dict | None:
@@ -353,8 +363,14 @@ def main() -> int:
 
     os.makedirs(os.path.join(ROOT, ".claude"), exist_ok=True)
     git(ROOT, "init", "--quiet", "-b", "main")
+    # 一時リポジトリをワークスペースにする。sh の道具（scripts と config）を写す。bin と docs は要らない
+    shutil.copytree(
+        os.path.join(ROOT_OF_CCNAVI, ".ccnavi"),
+        os.path.join(ROOT, ".ccnavi"),
+        ignore=shutil.ignore_patterns("bin", "docs", "__pycache__"),
+    )
     write(os.path.join(ROOT, "src", "keep.py"), "print(1)\n")
-    write(os.path.join(ROOT, ".gitignore"), ".claude/\nwip/tmp/\n")
+    write(os.path.join(ROOT, ".gitignore"), ".claude/\n.ccnavi/\nwip/tmp/\n")
     commit_all(ROOT, "init")
     origin = f"{GITLAB}/root/{project_path}.git"
     git(ROOT, "remote", "add", "origin", origin)
@@ -375,6 +391,7 @@ def main() -> int:
         "main を push（認証画面なし）", pushed.returncode == 0, redact(pushed.stderr.strip())[:200]
     )
     write(os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), json.dumps(RULES))
+    write_plain_phases(ROOT)
 
     # ---- 1. 親 1 本と子 2 本、フェーズ 1
     parent_tree = worktree("i0001", "main")
@@ -398,8 +415,17 @@ def main() -> int:
         title="b を書く",
     )
     commit_all(parent_tree, "tickets")
+    # 子の start は親のブランチがリモートにあることを前提にする（ccnavi-start を通さずに切った親は送れない）
+    pushed_parent = sh(GIT_SH, parent_tree, "push", "-u", "origin", "i0001")
+    record(
+        "親 i0001 を push",
+        pushed_parent.returncode == 0,
+        redact(pushed_parent.stderr.strip())[:200],
+    )
     approved = exe("user", "agree", stdin="y\n")
     record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
+    parent_started = sh(TICKET_SH, parent_tree, "start", "i0001")
+    record("親 i0001 の start", parent_started.returncode == 0, parent_started.stderr.strip()[:200])
 
     for child in ("i0001-01-01", "i0001-01-02"):
         tree = worktree(child, "i0001")
