@@ -20,11 +20,11 @@ import http.client
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
 import threading
-import time
 import unittest
 from datetime import UTC, datetime, timedelta
 
@@ -222,6 +222,11 @@ class KeepAliveTest(ServerCase):
         res = conn.getresponse()
         return res.status, json.loads(res.read() or b"null")
 
+    def assert_same_connection(self, conn, first):
+        # http.client は、サーバが接続を切ると次の要求で黙って張り直す。張り直されていないことを見る
+        self.assertIsNotNone(first, "1 件目の応答のあとで接続が閉じられた")
+        self.assertIs(conn.sock, first, "2 件目の要求で接続が張り直された")
+
     def test_a_next_request_works_after_a_401_or_404_that_carried_a_body(self):
         server = self.start()
         cases = {
@@ -235,8 +240,10 @@ class KeepAliveTest(ServerCase):
                 conn = self.keep_alive(server)
                 code, _ = self.send(conn, server, "POST", path, {"title": "t" * 50}, token)
                 self.assertEqual(code, expected[label])
+                first = conn.sock
                 code, got = self.send(conn, server, "GET", f"/api/v4/projects/{ENC}")
                 self.assertEqual((code, got.get("path_with_namespace")), (200, PROJECT))
+                self.assert_same_connection(conn, first)
 
     def test_a_missing_merge_request_is_a_404_on_every_route(self):
         server = self.start()
@@ -246,9 +253,13 @@ class KeepAliveTest(ServerCase):
                 path = f"/api/v4/projects/{ENC}/merge_requests/99{tail}"
                 code, got = self.send(conn, server, method, path, body)
                 self.assertEqual(code, 404, got)
+                # プロジェクトや経路の 404 ではなく、MR が無い 404 であること
+                self.assertIn("99", got["message"])
+                first = conn.sock
                 # 接続は切れず、同じ接続で次の要求が通る
                 code, _ = self.send(conn, server, "GET", f"/api/v4/projects/{ENC}")
                 self.assertEqual(code, 200)
+                self.assert_same_connection(conn, first)
         with open(os.path.join(self.tmp, "state.json"), encoding="utf-8") as f:
             saved = json.load(f)
         self.assertEqual((saved["mrs"], saved["seq"]), ([], 100))
@@ -256,8 +267,12 @@ class KeepAliveTest(ServerCase):
     def test_an_existing_merge_request_next_to_a_missing_one_still_answers(self):
         server = self.start(initial_state=seeded())
         base = f"/api/v4/projects/{ENC}/merge_requests"
-        self.assertEqual(call(server, "GET", f"{base}/1")[0], 200)
-        self.assertEqual(call(server, "GET", f"{base}/2")[0], 404)
+        conn = self.keep_alive(server)
+        self.assertEqual(self.send(conn, server, "GET", f"{base}/1")[0], 200)
+        first = conn.sock
+        self.assertEqual(self.send(conn, server, "GET", f"{base}/2")[0], 404)
+        self.assertEqual(self.send(conn, server, "GET", f"{base}/1")[0], 200)
+        self.assert_same_connection(conn, first)
 
 
 class ManualEntryTest(unittest.TestCase):
@@ -326,14 +341,10 @@ class ManualEntryTest(unittest.TestCase):
         self.assertEqual([m["title"] for m in json.loads(res.read())], ["by-hand"])
         with open(self.state, encoding="utf-8") as f:
             self.assertEqual(len(json.load(f)["mrs"]), 1)
+        # 止めたあとは、同じポートへつながらない
         self.stop(proc)
-        self.assertIsNotNone(proc.returncode)
-
-    def test_the_hand_entry_keeps_listening_until_stopped(self):
-        proc = self.launch()
-        self.listening_port(proc)
-        time.sleep(0.3)
-        self.assertIsNone(proc.poll(), "入口が起動直後に終わった")
+        with self.assertRaises(OSError):
+            socket.create_connection(("127.0.0.1", port), timeout=2).close()
 
 
 def seeded() -> dict:

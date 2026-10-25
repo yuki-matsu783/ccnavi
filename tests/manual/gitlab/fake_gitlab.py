@@ -24,6 +24,7 @@ sh の HTTP 経路（curl / gh / glab、jq での組み立て、ページング�
 
 `<port>` に 0 を渡すと OS が空きポートを決める。決まったポートは、起動時に標準エラーへ出る
 `fake-gitlab listening on 127.0.0.1:<port> state=<state.json>` の行で分かる。
+下の origin の設定は、ポートが分かってから行う。
 
 対象のプロジェクトは、origin を `http://127.0.0.1:<port>/demo/greeter.git` にして、
 push だけ手元の bare リポジトリへ向ける（`git remote set-url --push`）。
