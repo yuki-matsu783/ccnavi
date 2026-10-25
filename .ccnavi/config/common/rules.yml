@@ -168,7 +168,10 @@ allow:
     regex: 'ccnavi-git\.sh\s+worktree\s+add(\s|$)'
     additionalContextOnce: >-
       直接作業のワークツリーは {script:ccnavi-worktree.sh} <名前> で切ります。取り込み先の確認・リモートとのずれの確認・
-      書きかけの扱いをまとめて行い、手で worktree add を打つ必要はありません。
+      書きかけの扱いをまとめて行うので、新しく切るときに手で worktree add を打つ必要はありません。
+      ブランチが既にあるときの worktree add（ccnavi-worktree.sh が案内する 1 段目）は、このあとに
+      {script:ccnavi-worktree.sh} <名前> --adopt --base <統合先> が要ります（引き取りにはユーザの確認が要ります。
+      引き取らないと integrate できません）。
       worktree add が断られたら、出力の案内どおりに打ち直してください。手元の取り込み先は進めません。
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを

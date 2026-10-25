@@ -193,6 +193,13 @@ cgit() {
 	return 0
 }
 
+# 非対話（CLAUDE_CODE_SESSION_ATTENDED が 0。実行ファイルの ccnavimd.unattended と同じ見方）のときだけ、
+# 確認に答えられないことと次の行動を足す。対話のときは何も出さない。
+unattended_line() {
+	[ "${CLAUDE_CODE_SESSION_ATTENDED:-}" = 0 ] || return 0
+	printf '%s' "このセッションでは確認に答えられません。ユーザに引き取りの了承を頼み、了承されたら打ち直してもらってください。"
+}
+
 # 最後の行（名前の警告よりも後）に出す次の一手。コマンドは 1 行で完結する形にする。
 print_next() {
 	pn_q=$(ccnavi_sh_quote "$dest")
@@ -208,12 +215,22 @@ if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
 	[ "$have" = "refs/heads/$name" ] ||
 		fail dest-exists "${dest} は既にありますが、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${have:-ワークツリーの登録が無い}）。中身を確かめ、不要ならユーザに確かめてから片付け、別の名前で再実行してください。"
 	printf 'ワークツリーは既にある: %s\n' "$dest"
-	log_info 既にある -- "name=$name"
+	# 取り込みの記録（--adopt が読む場所）の有無。無いと integrate に進めない。
+	ex_common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
+	if [ -n "$ex_common" ] && [ -e "$(ccnavi_phys "$ex_common")/ccnavi-direct/$name" ]; then
+		printf '案内: 取り込みの記録は、ある（ccnavi-direct/%s）。integrate に進める\n' "$name"
+		ex_record=yes
+	else
+		printf '案内: 取り込みの記録は、無い（ccnavi-direct/%s）。integrate に進むには、ユーザの確認を経て sh %s %s --adopt --base <取り込み先> で引き取る%s\n' \
+			"$name" "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$(ccnavi_sh_quote "$name")" "$(unattended_line)"
+		ex_record=no
+	fi
+	log_info 既にある -- "name=$name" "record=$ex_record"
 	print_next
 	exit 0
 fi
 if [ -z "$adopt" ] && git show-ref --verify --quiet "refs/heads/$name"; then
-	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すなら sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")、新しく切るなら別の名前にしてください。"
+	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すなら 2 段です。1 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")。2 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base <統合先> で引き取ります（引き取らないと integrate できません。引き取りにはユーザの確認が要ります）。新しく切るなら別の名前にしてください。$(unattended_line)"
 fi
 
 # 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。

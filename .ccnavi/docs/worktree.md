@@ -49,7 +49,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   行き先は`<ワークスペースルート>/.claude/worktrees/<名前>`で、cwdが`projects/<名前>`の中でも変わらない。ワークツリーが既にあればパスを出すだけ。`--dry-run`は予定だけ出す（fetchしない）。
   `origin`か手元に同じ識別子になるブランチ（同じ名前、`feature/7-x`に対する`feature-7-x`、英字の大文字小文字だけ違う名前）があるときは、切らずに終了コード1で止まり、`ccnavi-start.sh`を案内する（既にあるブランチは、MRを採用してよいか確かめてから出す）。名前の字と長さ（64文字まで）は実行ファイルが確かめる。
   記録（version 4）は共通のgitディレクトリの`ccnavi-direct/<名前>`、Sは`refs/ccnavi/direct/<名前>/s`に置く。
-  `worktree add`が拒否されたときは、`ccnavi-git.sh`の出力の案内に従う。以下の手動の手順は、このスクリプトを使えないとき（既存のブランチを出すときなど）に使う
+  `worktree add`が拒否されたときは、`ccnavi-git.sh`の出力の案内に従う。以下の手動の手順は、このスクリプトを使えないときに使う。名前と同じブランチが既にあってワークツリーが無いときは2段で、`ccnavi-git.sh worktree add .claude/worktrees/<名前> <名前>`で出したあと、`ccnavi-worktree.sh <名前> --adopt --base <統合先>`で引き取る（ユーザの確認が要る。引き取らないと`integrate`が記録なしで止まる。`--adopt`は既存のワークツリーが前提）
 - `ccnavi-worktree.sh`は直接作業のワークツリー用で、名前と同じブランチを新しく切る。親子のチケットの親のワークツリーには使わない。
   親は識別子の名前のブランチを作らず、親のブランチ（MRの元ブランチ）を直接チェックアウトする。作るのは`ccnavi-start.sh --mr <番号>`か
   `--issue <番号>`。子のワークツリーは`ccnavi-ticket.sh start <子>`が親のブランチから作る

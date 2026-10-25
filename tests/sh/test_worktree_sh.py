@@ -31,6 +31,7 @@ import sys
 import tempfile
 import unicodedata
 import unittest
+from unittest import mock
 
 from tests import ROOT, SRC, common_sh
 from tests.draft import final
@@ -895,6 +896,46 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("既にある", result.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.wt("topic"), "keep.txt")))
+
+    def test_existing_worktree_reports_whether_the_record_exists(self):
+        # 切ったワークツリーには記録がある。integrate に進める。
+        self.run_sh("topic")
+        result = self.run_sh("topic")
+        self.assertIn("取り込みの記録は、ある（ccnavi-direct/topic）", result.stdout)
+        self.assertNotIn("--adopt", result.stdout)
+        # 手で切ったワークツリーには記録が無い。引き取る手を言う。
+        git(self.ws, "worktree", "add", "-q", self.wt("manual"), "-b", "manual", "main")
+        result = self.run_sh("manual")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("取り込みの記録は、無い（ccnavi-direct/manual）", result.stdout)
+        self.assertIn("manual' --adopt --base <取り込み先>", result.stdout)
+        self.assertNotIn("確認に答えられません", result.stdout)
+        # 最後の行は次の一手のまま。
+        self.assertTrue(result.stdout.rstrip("\n").split("\n")[-1].startswith("次: 編集は"))
+
+    def test_existing_branch_points_to_adopt_as_the_second_step(self):
+        git(self.ws, "branch", "taken")
+        result = self.run_sh("taken")
+        self.assertEqual(1, result.returncode, result.stdout)
+        self.assertIn("1 段目: sh ", result.stderr)
+        self.assertIn("worktree add", result.stderr)
+        self.assertIn("2 段目: sh ", result.stderr)
+        self.assertIn("taken' --adopt --base <統合先>", result.stderr)
+        self.assertIn("ユーザの確認が要ります", result.stderr)
+        self.assertNotIn("確認に答えられません", result.stderr)
+
+    def test_unattended_adds_the_fixed_line_only_when_the_variable_is_zero(self):
+        git(self.ws, "branch", "taken")
+        git(self.ws, "worktree", "add", "-q", self.wt("manual"), "-b", "manual", "main")
+        for name in ("taken", "manual"):
+            for value, shown in (("0", True), ("1", False), (None, False)):
+                with self.subTest(name=name, value=value):
+                    with mock.patch.dict(os.environ):
+                        os.environ.pop("CLAUDE_CODE_SESSION_ATTENDED", None)
+                        extra = {} if value is None else {"CLAUDE_CODE_SESSION_ATTENDED": value}
+                        result = self.run_sh(name, **extra)
+                    said = result.stdout + result.stderr
+                    self.assertEqual(shown, "このセッションでは確認に答えられません" in said, said)
 
     def test_refuses_bad_names_and_existing_branch(self):
         git(self.ws, "branch", "taken")
