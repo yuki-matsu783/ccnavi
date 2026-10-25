@@ -147,7 +147,7 @@ def _fold(path: str) -> str:
 
 
 def _same_name(a: str, b: str) -> bool:
-    """名前が大文字小文字を除いて同じか。比べるのは `<識別子>.yml` で、区切りは入らない。"""
+    """名前が大文字小文字の違いを除いて同じか。比べるのは `<識別子>.yml` の名前で、パスの区切りは含まない。"""
     return a.casefold() == b.casefold()
 
 
