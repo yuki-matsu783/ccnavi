@@ -34,6 +34,18 @@ pnpm test:e2e   # 拡張を読み込んだ Chromium（Playwright、PLAYWRIGHT_BR
                 # （承認・レビュー済み・「始める」を含む。GitLab はセルフホストとして通信先に足したビルドで回す）
 ```
 
+### 実リポジトリの状態を描く（開発用）
+
+```sh
+node scripts/test.js --e2e              # dist-e2e/ と out/ を組む（render-scene.js はビルドしない）
+node scripts/render-scene.js --repo <ccnavi を配布済みのリポジトリ> --out <リポジトリの外のディレクトリ> [--host github|gitlab] [--width 1400]
+```
+
+ローカルブランチの許可リストのファイルを模擬のホストに載せ、ボードを描いて `board.png`・`board.txt`・`board.dom.json`・`board.log` を出す。
+`--out` は `--repo` を含むリポジトリ全体の外に指定する（`--repo` がリポジトリの途中のディレクトリでも、git は上のリポジトリを読む）。
+`node scripts/test.js --e2e` は組み立てのあと e2e の試験全体も回す。`CCNAVI_CHROMIUM` で Chromium を指す環境では、組み立てのあとに 3 で終わるが、`dist-e2e/` と `out/` は組み上がっている。
+配布物には入らない。使い方・前提・確かめられること・確かめられないことは [VERIFY.md](VERIFY.md) の 4.0。
+
 ### ホストの応答の見本（レビュー済み）
 
 GitHub と GitLab の 2 つ。どちらも実際の形に合わせて手で組んだもので、実物からは録っていない。GitHub の形は、2026-10-12 に実物と突き合わせて、

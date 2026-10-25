@@ -22,6 +22,7 @@ sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
 sh .ccnavi/scripts/ccnavi-review.sh comment --body-file scratchpad/decision.md
 ```
 
+- `request` が成功すると、`--body-file` が `scratchpad/` の中の依頼文は `request` が消す（レビュー待ちの間はシェルが止まって `rm` を打てないため）。残したいファイルは `scratchpad/` の外に置く。
 - `request` は、前提（フェーズが終わっている・レビューが延期されていない・すべての子が親に合流済み・未コミット無し・push 済み・未依頼）を確かめ、1 つでも欠けたら全件を列挙して何もしない。通れば依頼コメントを投稿する。マージリクエストは作らない（親のブランチの open の MR が無ければ止まる。作るのは `ccnavi-start.sh`）
 - 依頼後に親の HEAD が動いたら、レビュー済みになる前なら `request` を打ち直せる
 - `confirm` は、依頼時の HEAD と今の HEAD が同じで push 済みであることを求め、今残っている未解決スレッドを数える。未解決も変更要求も無ければレビュー済みになり、そのフェーズの `review/` の子が `done/` へ動く。残るなら一覧を返す

@@ -2,7 +2,7 @@
 # ccnavi-start issue・MR を指定して作業を頼まれたとき、既存のものを確かめ、無ければ Draft MR・ワークツリー・
 # feature ブランチを先に作る。
 #
-#   sh .ccnavi/scripts/ccnavi-start.sh --issue <値> [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked]
+#   sh .ccnavi/scripts/ccnavi-start.sh --issue <値> [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked] [--reopened]
 #   sh .ccnavi/scripts/ccnavi-start.sh --mr <番号> [--issue <値>] [--repo <owner/repo>] [--dry-run]
 #   sh .ccnavi/scripts/ccnavi-start.sh --issue <値> --mr <番号> --branch <元ブランチ> --mcp-checked
 #   sh .ccnavi/scripts/ccnavi-start.sh --new-issue <題> [--issue-body <本文>] [--similar-checked] [--dry-run]
@@ -36,7 +36,7 @@
 #
 # --check はチケット作業の入口の事前確認（ccnavi_preflight。ホストの API と git のリモートが使える状態か）。
 #
-# 終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数か、MR の無い候補か、MR が閉じる issue が複数か、
+# 終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数か、MR の無い候補か、closed の issue か、MR が閉じる issue が複数か、
 #             ワークツリーの無い既存の MR か、似た issue・MR か、意味が近いかの確認待ち（何も作らず、ユーザに聞く・選ぶ） /
 #             4 ホストに届かず、その段を代行してほしい（GitHub は MCP、GitLab はユーザが確かめる。案内を標準出力に出した。
 #             済んだら打ち直す）。
@@ -59,7 +59,7 @@ fail() {
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-start.sh (--issue <値> | --mr <番号> [--issue <値>]) [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked] [--branch <元ブランチ>]
+sh .ccnavi/scripts/ccnavi-start.sh (--issue <値> | --mr <番号> [--issue <値>]) [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run] [--mcp-checked] [--branch <元ブランチ>] [--reopened]
 sh .ccnavi/scripts/ccnavi-start.sh --new-issue <題> [--issue-body <本文>] [--similar-checked] [--slug <語>] [--prefix <語>] [--title <題>] [--repo <owner/repo>] [--dry-run]
 sh .ccnavi/scripts/ccnavi-start.sh --check
 sh .ccnavi/scripts/ccnavi-start.sh --list-open
@@ -111,6 +111,9 @@ sh .ccnavi/scripts/ccnavi-start.sh --list-open
   --repo <owner/repo>
                 依頼の URL が示すリポジトリ。cwd の origin と違えば、ホストに問い合わせる前に止めて、移動先
                 （projects/<名前>/）を案内する（終了コード 1）。大文字小文字は区別しない
+  --reopened    --issue で指定した issue が closed でも続ける。closed の issue は、MR が無くても止めて（終了コード 3）、reopen する・
+                closed のまま続ける・別の issue にする・やめる、を「次の手:」に並べる。ユーザが closed と承知のうえで
+                続けると言ったときだけ付ける。ホストから issue の状態を読めないときは止めず、「確認:」の行で未確認と出す
   --dry-run     何も作らず、作る予定の内容だけ出す（リモートは読むだけ）
   --mcp-checked ホストの API に届かず、MCP またはユーザがブラウザで確かめたあとに付ける（エージェントが確かめずに付けない）
   --branch <元ブランチ>
@@ -124,7 +127,7 @@ sh .ccnavi/scripts/ccnavi-start.sh --list-open
   代行したあと、案内のコマンドを再実行すると、完了済みの処理をスキップし、未完了の処理から再開します。
   冪等。cwd のリポジトリ（ワークスペース・projects/<名前>）を対象にする。
 
-終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数・MR の無い候補・閉じる issue が複数・ワークツリーの無い既存の MR・似た issue・MR・意味が近いかの確認待ち（何も作らず、ユーザに聞く） / 4 ホストに届かないか、断られて代行が要る（GitHub は MCP、GitLab はユーザが確かめる）。--check では「確かめられなかった項目がある」
+終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数・MR の無い候補・closed の issue・閉じる issue が複数・ワークツリーの無い既存の MR・似た issue・MR・意味が近いかの確認待ち（何も作らず、ユーザに聞く） / 4 ホストに届かないか、断られて代行が要る（GitHub は MCP、GitLab はユーザが確かめる）。--check では「確かめられなかった項目がある」
 USAGE
 }
 
@@ -144,6 +147,7 @@ new_issue_title=""
 new_issue_body=""
 similar_checked=""
 list_open=""
+opt_reopened=""
 orig_count="$#"
 # 外から来る文字列（題・本文）から、制御文字（C0・C1）、行・段落区切り（U+2028・U+2029）、全角空白を空白にする。
 # 案内の行を偽装されないよう、出力に流す前に必ず通す
@@ -216,6 +220,10 @@ while [ "$#" -gt 0 ]; do
 		similar_checked=1
 		shift
 		;;
+	--reopened)
+		opt_reopened=1
+		shift
+		;;
 	--check)
 		check=1
 		shift
@@ -254,6 +262,7 @@ else
 	fi
 	[ -n "$new_issue_title" ] || [ -z "$new_issue_body" ] || fail body-alone "--issue-body は --new-issue と一緒のときだけ渡せます。" 2
 	[ -n "$new_issue_title" ] || [ -z "$similar_checked" ] || fail similar-alone "--similar-checked は --new-issue と一緒のときだけ渡せます。" 2
+	[ -z "$opt_reopened" ] || [ -n "$issue_arg" ] || fail reopened-alone "--reopened は --issue と一緒のときだけ渡せます。" 2
 	[ -z "$branch_arg" ] || [ -n "$mcp_checked" ] || fail branch-alone "--branch は --mcp-checked と一緒のときだけ渡せます。" 2
 fi
 
@@ -530,12 +539,15 @@ api_failed_reason() {
 }
 
 # 親のシェルで呼ぶ。結果は issue_title_read（題。1 行、制御文字は空白）と issue_why（失敗の理由）に入れる。
+# issue の状態も同じ取得で読み、issue_state_read に open / closed を入れる（読めなければ空。GitLab の opened は open にそろえる）。
 # 戻り値: 0 読めた / 1 API が失敗した（ホストに届いていない） / 2 issue が無い・権限が無い（ホストには届いた） / 3 PR の番号だった
 issue_title_read=""
+issue_state_read=""
 issue_why=""
 issue_title_get() {
 	it_num="${1:-$number}"
 	issue_title_read=""
+	issue_state_read=""
 	issue_why=""
 	rm -f "$host_err" "$host_err.status" "$host_err.body"
 	if [ "$ccnavi_h_kind" = github ]; then
@@ -566,7 +578,36 @@ issue_title_get() {
 	fi
 	it_raw=$(printf '%s' "$it_got" | "$ccnavi_h_jq" -r '.title // empty') || return 1
 	issue_title_read=$(printf '%s\n' "$it_raw" | head -n 1 | LC_ALL=C tr '\001-\037\177' ' ' | sed -e 's/^ *//' -e 's/ *$//')
+	it_state=$(printf '%s' "$it_got" | "$ccnavi_h_jq" -r '.state // empty') || it_state=""
+	case "$it_state" in
+	open | opened) issue_state_read=open ;;
+	closed) issue_state_read=closed ;;
+	esac
 	return 0
+}
+
+# issue が closed のときは止める。閉じた issue は完了済み・却下・重複のことが多く、理由が分からないまま実装を始めると
+# 不要な作業になる。承認の前（提案の段）に、ユーザが気づける形にする。--reopened（closed と分かって続ける）で通す。
+# 状態を読めなかった（ホストに届かない・応答に state が無い）ときは止めず、確認: の行で未確認と出す。
+# issue_title_get を呼んだ後に使う。呼べなかったときは issue_state_read が空のままなので、未確認になる。
+issue_state_gate() {
+	if [ -z "$issue_state_read" ]; then
+		printf '確認: issue #%s の状態: 未確認（ホストから読めなかった。closed かどうかは見ていない）\n' "$number"
+		return 0
+	fi
+	[ "$issue_state_read" = closed ] || return 0
+	if [ -n "$opt_reopened" ]; then
+		printf '案内: issue #%s は closed。--reopened が付いているので、そのまま続ける\n' "$number"
+		return 0
+	fi
+	printf 'ccnavi-start: issue #%s は closed です。完了済み・却下・重複のことが多いので、何も作成せずに処理を中断しました。ユーザに状況を伝えて、どれにするか聞いて返事を待ってください。直接実装には切り替えないでください。\n' "$number"
+	printf '次の手:\n'
+	printf '  1. reopen する: ユーザに issue #%s を reopen してもらい、同じコマンドを打ち直す（reopen 済みなら止まらない）: sh %s/ccnavi-start.sh %s\n' "$number" "$scripts" "$real_args"
+	printf '  2. closed のまま続ける: ユーザが closed と承知のうえで続けると言ったときだけ、--reopened を付けて打ち直す: sh %s/ccnavi-start.sh %s --reopened\n' "$scripts" "$real_args"
+	printf '  3. 別の issue にする: ユーザに番号を聞いて打ち直す: sh %s/ccnavi-start.sh --issue <別の issue の番号>。issue がまだ無ければ --new-issue <題>\n' "$scripts"
+	printf '  4. やめる: ユーザに報告して止まる\n'
+	log_info closed の issue で止めた -- "issue=$number"
+	exit "$EXIT_MULTI"
 }
 
 # issue の番号と題から、新しい親のブランチ名（= 識別子）を実行ファイルに作らせる（`worktree issue-id`）。
@@ -1616,6 +1657,8 @@ if [ "$total" -eq 0 ]; then
 	id_check "$new_branch" "--prefix・--slug を見直して再実行してください。" 2
 	clash_check "$new_branch" strict
 	merged_check "$new_branch"
+	# マージ済みの MR の関門（終了コード 1）が先。そのあとで、閉じた issue かを見る
+	issue_state_gate
 	new_title=$(make_title "$slug")
 	new_wt="$root/.claude/worktrees/$new_branch"
 	final_issue=$(issue_show "" "$number")
@@ -1761,6 +1804,7 @@ if [ -n "$resume" ]; then
 	3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 	esac
 	merged_check "$cb"
+	issue_state_gate
 	fetch_branch "$cb"
 	ensure_worktree "$cb"
 	fast_forward "$cb"

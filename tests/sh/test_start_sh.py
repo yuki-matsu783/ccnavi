@@ -730,6 +730,89 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.posts()[0]["title"], "#152 login")
 
+    # ---- closed の issue
+
+    def closed_issue(self, state="closed"):
+        """issue #152 の状態が state になっている GitHub の代役（MR は無い）。新規作成は通る。"""
+        self.github_new()
+        with open(self.routes, encoding="utf-8") as f:
+            routes = json.load(f)
+        routes[f"GET {GITHUB}/issues/152"] = [200, {"title": "Add login", "state": state}]
+        self.route(routes)
+
+    def test_a_closed_issue_without_an_mr_stops_and_offers_choices(self):
+        self.closed_issue()
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("issue #152 は closed", done.stdout)
+        # 次の手: は 1 つで、番号つきの選択肢を並べる。次: は出さない
+        self.assertEqual(
+            len([line for line in done.stdout.splitlines() if line.startswith("次の手:")]), 1
+        )
+        self.assertEqual([line for line in done.stdout.splitlines() if line.startswith("次: ")], [])
+        for number in ("1. reopen", "2. closed のまま", "3. 別の issue", "4. やめる"):
+            self.assertIn(number, done.stdout)
+        # 値が埋まっていて、そのまま打てる（--reopened を付けた打ち直しも）
+        self.assertIn("ccnavi-start.sh '--issue' '152' --reopened", done.stdout)
+        self.assertNotIn("ADR", done.stdout)
+        # 何も作らない
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.remote_branches(), ["main"])
+        self.assertEqual(self.posts(), [])
+
+    def test_a_closed_issue_stops_a_dry_run_too(self):
+        self.closed_issue()
+        done = self.run_sh("--issue", "152", "--dry-run")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("issue #152 は closed", done.stdout)
+        # 打ち直しの案内に --dry-run は残さない
+        self.assertNotIn("--dry-run", done.stdout)
+
+    def test_reopened_lets_a_closed_issue_through(self):
+        self.closed_issue()
+        done = self.run_sh("--issue", "152", "--reopened")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("--reopened が付いている", done.stdout)
+        self.assertIn(BRANCH, self.remote_branches())
+        self.assertEqual(self.posts()[0]["title"], "Add login")
+
+    def test_a_merged_mr_gate_comes_before_the_closed_issue_stop(self):
+        merged = {**pr(2, BRANCH), "merged_at": "2026-01-01T00:00:00Z", "state": "closed"}
+        self.closed_issue()
+        with open(self.routes, encoding="utf-8") as f:
+            routes = json.load(f)
+        self.route({**routes, **closed_pulls(BRANCH, [merged])})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("マージ済み MR（!2）", done.stderr)
+        self.assertNotIn("は closed", done.stdout)
+
+    def test_an_open_issue_is_not_stopped(self):
+        self.closed_issue(state="open")
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("closed", done.stdout)
+        self.assertNotIn("未確認", done.stdout)
+
+    def test_an_unreadable_state_does_not_stop_and_says_unconfirmed(self):
+        # MCP で確かめたあとの再実行（ホストに届かない）。止めず、確認: の行で未確認と出す
+        done = self.run_sh("--issue", "152", "--slug", "login", "--mcp-checked", token=False)
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("確認: issue #152 の状態: 未確認", done.stdout)
+        self.assertNotIn("は closed", done.stdout)
+
+    def test_a_response_without_a_state_does_not_stop_and_says_unconfirmed(self):
+        # 題は読めたが状態が分からない応答でも止めない
+        self.github_new()
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("確認: issue #152 の状態: 未確認", done.stdout)
+
+    def test_reopened_needs_issue(self):
+        done = self.run_sh("--mr", "5", "--reopened")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("--reopened は --issue と一緒", done.stderr)
+
     def test_a_title_of_symbols_only_falls_back_to_issue(self):
         """題から何も残らなければ slug は issue（Chrome の「始める」と同じ作り方）。"""
         self.github_new(title="!!!", branch="feature-152-issue")
@@ -1671,6 +1754,22 @@ class StartShGitLabTest(StartShTest):
         again = self.run_sh("--issue", "152")
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(len(self.posts()), 2)
+
+    def test_a_closed_gitlab_issue_stops_and_an_opened_one_does_not(self):
+        self.gitlab_routes()
+        with open(self.routes, encoding="utf-8") as f:
+            routes = json.load(f)
+        routes[f"GET {GITLAB}/issues/152"] = [200, {"title": "Add login", "state": "closed"}]
+        self.route(routes)
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("issue #152 は closed", done.stdout)
+        self.assertEqual(self.posts(), [])
+        routes[f"GET {GITLAB}/issues/152"] = [200, {"title": "Add login", "state": "opened"}]
+        self.route(routes)
+        again = self.run_sh("--issue", "152")
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertNotIn("未確認", again.stdout)
 
     def install_glab(self):
         """認証済みのglabの代役。本文付きでContent-Typeが無いと、GitLabと同じくHTTP 415を返す。

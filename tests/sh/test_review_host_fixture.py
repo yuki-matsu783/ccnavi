@@ -935,6 +935,68 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertIn(f"`crit push {number}`", body)
         self.assertNotIn("やさしい説明", body)
 
+    def request_with_body(self, body, **extra):
+        """--body-file に body（ws からの相対か絶対）を渡して request を打つ。"""
+        out = os.path.join(self._tmp.name, "out")
+        stub = self.request_stub(out)
+        if not os.path.exists(os.path.join(self.ws, *ELI5.split("/"))):
+            self.eli5()
+        return self.review(
+            "resolved",
+            *("request", "--phase", "1", "--body-file", body, f"--eli5={ELI5}"),
+            CCNAVI_ENTRY_PATH=stub,
+            FAKE_GITLAB_STATE=os.path.join(self._tmp.name, "notes.json"),
+            **extra,
+        )
+
+    def test_request_removes_a_body_file_under_scratchpad(self):
+        """依頼文が scratchpad/ の中にあれば、成功のあとに request が消す。"""
+        for rel in ("scratchpad/req.md", "scratchpad/sub/../req2.md"):
+            with self.subTest(rel=rel):
+                os.makedirs(os.path.join(self.ws, "scratchpad", "sub"), exist_ok=True)
+                body = write(os.path.normpath(os.path.join(self.ws, rel)), "依頼文\n")
+                done = self.request_with_body(rel)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertFalse(os.path.exists(body), done.stdout)
+                self.assertIn("案内: 依頼文 ", done.stdout)
+                self.assertIn("消した", done.stdout)
+                shutil.rmtree(os.path.join(self._tmp.name, "out"), ignore_errors=True)
+                os.remove(os.path.join(self._tmp.name, "notes.json"))
+
+    def test_request_keeps_a_body_file_outside_scratchpad(self):
+        """scratchpad/ の外（外のファイル、wip/、名前だけ似た場所、.. で出る道）は消さない。"""
+        outside = write(os.path.join(self._tmp.name, "mine.md"), "利用者のファイル\n")
+        near = write(os.path.join(self.ws, "wip", "scratchpad", "req.md"), "x\n")
+        likeness = write(os.path.join(self.ws, "scratchpadX", "req.md"), "x\n")
+        escaped = write(os.path.join(self.ws, "escaped.md"), "x\n")
+        cases = (
+            outside,
+            "wip/scratchpad/req.md",
+            "scratchpadX/req.md",
+            "scratchpad/../escaped.md",
+        )
+        for body in cases:
+            with self.subTest(body=body):
+                done = self.request_with_body(body)
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertNotIn("消した", done.stdout)
+                shutil.rmtree(os.path.join(self._tmp.name, "out"), ignore_errors=True)
+                os.remove(os.path.join(self._tmp.name, "notes.json"))
+        for path in (outside, near, likeness, escaped):
+            self.assertTrue(os.path.exists(path), path)
+
+    @unittest.skipIf(os.name == "nt" or os.geteuid() == 0, "書き込めないディレクトリを作れない")
+    def test_request_only_warns_when_the_body_file_cannot_be_removed(self):
+        """消せなかったときは警告だけで、終了コードは 0 のまま（依頼は済んでいる）。"""
+        body = write(os.path.join(self.ws, "scratchpad", "locked", "req.md"), "依頼文\n")
+        locked = os.path.dirname(body)
+        os.chmod(locked, 0o555)
+        self.addCleanup(os.chmod, locked, 0o755)
+        done = self.request_with_body("scratchpad/locked/req.md")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertTrue(os.path.exists(body))
+        self.assertIn("消せなかった", done.stderr)
+
     def test_the_tree_path_is_quoted_for_the_shell(self):
         """ツリーの絶対パスに `'`・`$`・空白があっても、案内の cd は 1 語のまま。"""
         moved = os.path.join(self._tmp.name, "w s'$(touch pwned)")

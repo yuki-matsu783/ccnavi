@@ -77,7 +77,7 @@ function FamilyBody({ f, actions, decide }: { f: FamilyBoard; actions?: FamilyAc
         </section>
       ) : null}
       {batch.map((entry) => (
-        <section key={entry.ticket} className="entry" data-ticket={entry.ticket}>
+        <section key={entry.ticket} className="entry" data-ticket={entry.ticket} data-waiting="approval">
           <h4>
             <code>{entry.ticket}</code>
             {` ${entry.title}`}
