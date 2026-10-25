@@ -5,7 +5,7 @@ description: 対話の中で人が「覚えておいて」「これは次回も�
 
 # learn
 
-人が頼んだ気づきを、気づきの記録に 1 件足す。足すだけで、wiki・スキル・ルール・配点・フェーズ定義は直さない（直すのは提案と承認の流れ。`docs/design/tickets/learning-wiki.md`）。
+人が頼んだ気づきを、気づきの記録に 1 件足す。足すだけで、wiki・スキル・ルール・配点・フェーズ定義は直さない（直すのは提案と承認の流れ。`docs/21_design/tickets/learning-wiki.md`）。
 
 ## 手順
 

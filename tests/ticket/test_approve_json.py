@@ -873,7 +873,7 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_yes_that_stops_partway_says_what_it_placed(self):
         """途中で書けなくなっても、置いたぶんを何も言わずに破棄しない
-        （docs/requirements/json-shapes.md「承認の JSON」の partial）。
+        （docs/11_requirements/json-shapes.md「承認の JSON」の partial）。
 
         置き場に同じ名前のディレクトリを作って、子の承認済みチケットだけ書けなくする。
         一括のチケットは親 → 子の順なので、親は置かれたあとに止まる。

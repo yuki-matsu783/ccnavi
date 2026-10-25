@@ -343,7 +343,7 @@ def _worktree(
         # issue から新しい親のブランチ名（= 識別子）を作る。Chrome の「始める」と同じ関数。
         # worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <題>
         try:
-            ident = ticket_ids.issue_identifier(
+            ident, shortened = ticket_ids.issue_identifier_parts(
                 int(words[2]) if words[2].isdigit() else 0,
                 args.title,
                 words[4] if len(words) == 5 else "",
@@ -353,6 +353,9 @@ def _worktree(
             stderr.write(f"ccnavi: {exc}\n")
             return EXIT_ERROR
         stdout.write(f"id {ident}\n")
+        if shortened:
+            # 題が長くて slug を短くした。ccnavi-start.sh は短い --slug を付けさせる。
+            stdout.write("long yes\n")
         return EXIT_OK
     if verb == "branch" and len(words) in (3, 4) and words[3:] in ([], ["confirmed"]):
         # 親を閉じたときに片付ける子として記録したブランチを、条件を確かめ直して消す。

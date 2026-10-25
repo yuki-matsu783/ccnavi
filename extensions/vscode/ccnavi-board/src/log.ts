@@ -1,5 +1,5 @@
 /**
- * 診断ログ。ワークスペースルートの `logs/diag/<出どころ>.log` に 1 行ずつ足す（docs/claude/logging.md）。
+ * 診断ログ。ワークスペースルートの `logs/diag/<出どころ>.log` に 1 行ずつ足す（docs/42_claude/logging.md）。
  *
  * sh（`.ccnavi/scripts/ccnavi-common-log.sh` の log_*）と実行ファイル（`src/ccnavi/records/diaglog.py`）と
  * 同じ形の行を出す。

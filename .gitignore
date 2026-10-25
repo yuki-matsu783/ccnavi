@@ -23,7 +23,7 @@ __pycache__/
 #                  実行後チェックが自分の記録を保護領域の変更として報告しはじめる
 #   logs/session/  hook がセッションごとに持つ一時的な状態。差し戻しの回数と、その
 #                  ターンで触ったツリーの一覧。他人に配ると「誰かの直しかけ」を持ち込む
-#   logs/diag/     sh・実行ファイル・拡張の診断ログ（docs/claude/logging.md）。あとから
+#   logs/diag/     sh・実行ファイル・拡張の診断ログ（docs/42_claude/logging.md）。あとから
 #                  何が起きたかを追うための補助で、判定は読まない
 /logs/
 
@@ -56,7 +56,7 @@ __pycache__/
 settings.local.json*
 
 # 参照専用の他プロジェクト。.claude/ を持つ外部リポジトリは、--root なしの端末の
-# ccnavi が根を取り違える（洗い出しは docs/design/multi-repo/standalone-clone-gaps.md の A2）ので、
+# ccnavi が根を取り違える（洗い出しは docs/21_design/multi-repo/standalone-clone-gaps.md の A2）ので、
 # 読み終えたら外へ出す。置いている間だけ無視する。
 /参考/
 

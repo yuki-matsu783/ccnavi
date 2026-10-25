@@ -318,7 +318,7 @@ export function writeAndPushTargetOf(stdout: string): string {
 
 /**
  * 判定と検証に掛けるルールファイルの差し替え。共通の設定のルールは `--rules` で、
- * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（docs/requirements/json-shapes.md「lint の JSON」）。
+ * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（docs/11_requirements/json-shapes.md「lint の JSON」）。
  * ワークスペースの設定は同じオプションに名前 `self` で渡す。実行ファイルはレイヤー（layer）の名前で差し替えを引き、
  * `self` という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）でだけ有効で、
