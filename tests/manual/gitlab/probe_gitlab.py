@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -58,6 +59,9 @@ ROOT_OF_CCNAVI = os.path.dirname(
 )
 REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh")
 CLOSE_EARLY_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-close-early.sh")
+PUSH_APPROVED_SH = os.path.join(
+    ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-push-approved.sh"
+)
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
 GITLAB = os.environ.get(
@@ -257,6 +261,18 @@ def write(path: str, text: str) -> str:
     return path
 
 
+EXPLAINER = "wip/eli5/phase-1.html"
+
+
+def write_explainer(tree: str) -> str:
+    # request は --eli5 の HTML を要る。外部の読み込みは無し（ccnavi-review の規則）
+    return write(
+        os.path.join(tree, "wip", "eli5", "phase-1.html"),
+        '<!doctype html><meta charset="utf-8"><title>実測</title>'
+        "<p>挨拶を足す変更の確認。危険は無い（実測用）。</p>\n",
+    )
+
+
 def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="作業", issue=None):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if parent:
@@ -318,6 +334,15 @@ def notes_of(project_id: int, iid: int) -> list[dict]:
 
 
 has_marker = gitlab_api.has_marker
+# 依頼の目印は製品の形のまま照合する（review_host.MARKER_REQUEST に key=<16 桁の 16 進> が続く）
+REQUEST_MARKER = re.compile(r"<!-- ccnavi:request i0001:1 key=[0-9a-f]{16} -->")
+
+
+def request_marked(project_id: int, iid: int) -> bool:
+    return any(
+        REQUEST_MARKER.fullmatch(note.get("body", "").split("\n", 1)[0].strip())
+        for note in notes_of(project_id, iid)
+    )
 
 
 def main() -> int:
@@ -365,14 +390,18 @@ def main() -> int:
 
     os.makedirs(os.path.join(ROOT, ".claude"), exist_ok=True)
     git(ROOT, "init", "--quiet", "-b", "main")
-    # 一時リポジトリをワークスペースにする。sh の道具（scripts と config）を写す。bin と docs は要らない
+    # 一時リポジトリをワークスペースにする。sh の道具（scripts と config）を写す
     shutil.copytree(
         os.path.join(ROOT_OF_CCNAVI, ".ccnavi"),
         os.path.join(ROOT, ".ccnavi"),
         ignore=shutil.ignore_patterns("bin", "docs", "__pycache__"),
     )
     write(os.path.join(ROOT, "src", "keep.py"), "print(1)\n")
-    write(os.path.join(ROOT, ".gitignore"), ".claude/\n.ccnavi/\nwip/tmp/\n")
+    # 実物と同じく、.ccnavi/bin だけ無視する。承認済みチケットは .ccnavi の下で git が追跡する
+    write(os.path.join(ROOT, ".gitignore"), ".claude/\n.ccnavi/bin/\nwip/tmp/\n")
+    # 設定は init の commit に入れる（後から書くと、main と手元の config が食い違う）
+    write(os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), json.dumps(RULES))
+    write_plain_phases(ROOT)
     commit_all(ROOT, "init")
     origin = f"{GITLAB}/root/{project_path}.git"
     git(ROOT, "remote", "add", "origin", origin)
@@ -392,8 +421,6 @@ def main() -> int:
     record(
         "main を push（認証画面なし）", pushed.returncode == 0, redact(pushed.stderr.strip())[:200]
     )
-    write(os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), json.dumps(RULES))
-    write_plain_phases(ROOT)
 
     # ---- 1. 親 1 本と子 2 本、フェーズ 1
     parent_tree = worktree("i0001", "main")
@@ -416,24 +443,62 @@ def main() -> int:
         review=False,
         title="b を書く",
     )
+    write_explainer(parent_tree)
     commit_all(parent_tree, "tickets")
-    # 子の start は親のブランチがリモートにあることを前提にする（ccnavi-start を通さずに切った親は送れない）
+    # 子の start は親のブランチがリモートにあることを前提にする（ccnavi-start 経由の親が前提）
     pushed_parent = sh(GIT_SH, parent_tree, "push", "-u", "origin", "i0001")
     record(
         "親 i0001 を push",
         pushed_parent.returncode == 0,
         redact(pushed_parent.stderr.strip())[:200],
     )
+    # 親の mr 欄（ticket_text の "mr: 1"）は、親の Draft MR が既にある前提。
+    # ccnavi-start が作る MR を、probe は通らずに API で作る。説明に Closes を入れる
+    status, parent_mr = CLIENT.call(
+        "POST",
+        f"/projects/{pid}/merge_requests",
+        ROOT_TOKEN,
+        {
+            "source_branch": "i0001",
+            "target_branch": "main",
+            "title": "Draft: 挨拶を足す",
+            "description": f"Closes #{issue_no}",
+        },
+        tag="mr-create-parent",
+    )
+    record(
+        "親の Draft MR を作る（mr: 1 と一致）",
+        status == 201 and isinstance(parent_mr, dict) and parent_mr.get("iid") == 1,
+        f"status={status}",
+    )
     approved = exe("user", "agree", stdin="y\n")
     record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
+    # 承認の push はユーザが打つ（ccnavi-user-push-approved.sh）。probe はユーザの役をする
+    pushed_approval = sh(PUSH_APPROVED_SH, parent_tree, "i0001")
+    record(
+        "承認を push（ユーザの役）",
+        pushed_approval.returncode == 0,
+        redact(pushed_approval.stdout + pushed_approval.stderr).strip()[:200],
+    )
     parent_started = sh(TICKET_SH, parent_tree, "start", "i0001")
+    say("親 i0001 の start（全文）:\n" + redact(parent_started.stdout + parent_started.stderr))
     record("親 i0001 の start", parent_started.returncode == 0, parent_started.stderr.strip()[:200])
 
     for child in ("i0001-01-01", "i0001-01-02"):
         tree = worktree(child, "i0001")
         started = sh(TICKET_SH, parent_tree, "start", child)
         record(f"ticket start {child}", started.returncode == 0, started.stderr.strip()[:200])
-        write(os.path.join(tree, "src", child[-1], "work.py"), f"# {child}\n")
+        # 子の allow（propose の src/a/*・src/b/*）の範囲に入るパスに書く
+        write(
+            os.path.join(tree, "src", {"i0001-01-01": "a", "i0001-01-02": "b"}[child], "work.py"),
+            f"# {child}\n",
+        )
+        # 学びの記録は finish の必須（learning.py の record_missing）。雛形を learn で書いてから
+        # 同じコミットに入れる（learnings: none のまま）
+        learned = sh(TICKET_SH, tree, "learn")
+        record(
+            f"learn が雛形を書く（{child}）", learned.returncode == 0, learned.stderr.strip()[:200]
+        )
         commit_all(tree, f"{child}: work")
     commit_all(parent_tree, "start")
 
@@ -460,7 +525,8 @@ def main() -> int:
     said = hook("PostToolUse", "Bash", parent_tree, command="ls")
     record(
         "フェーズ 1 の終わりの告知",
-        "フェーズ 1 が終わりました" in said,
+        # フェーズの名前（番号（タイトル））ごと照合する（製品の文言どおり）
+        "フェーズ 1（作業） が終わりました" in said,
         said[:120].replace("\n", " "),
     )
     record(
@@ -469,7 +535,12 @@ def main() -> int:
     )
 
     body = write(os.path.join(OUT, "request-1.md"), "見てほしい点\n\n- src/a と src/b を足した\n")
-    early = sh(REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body)
+    # 未 push の src の変更を 1 つ足してから request する（ccnavi の置き場の差分だけでは止まらない）
+    write(os.path.join(parent_tree, "src", "a", "unpushed.py"), "# 未 push\n")
+    commit_all(parent_tree, "未 push の変更")
+    early = sh(
+        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+    )
     record(
         "push 前の request は前提で止まる",
         early.returncode != 0 and "push" in early.stderr,
@@ -494,7 +565,9 @@ def main() -> int:
         and "api_base=" + GITLAB + "/api/v4" in origin_seen.stdout,
     )
 
-    requested = sh(REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body)
+    requested = sh(
+        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+    )
     say("request:\n" + redact(requested.stdout + requested.stderr))
     record("request が通る（MR を作って投稿してマーカー）", requested.returncode == 0)
     mr = mr_of(pid, "i0001")
@@ -512,9 +585,11 @@ def main() -> int:
     iid = mr["iid"]
     record(
         "依頼の note に ccnavi:request のマーカーがある",
-        has_marker(notes_of(pid, iid), "<!-- ccnavi:request i0001:1 -->"),
+        request_marked(pid, iid),
     )
-    again = sh(REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body)
+    again = sh(
+        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+    )
     record(
         "2 度目の request は依頼済みで止まる", again.returncode != 0 and "依頼済み" in again.stderr
     )
@@ -627,7 +702,7 @@ def main() -> int:
         refused.returncode != 0 and "wip" in refused.stderr,
         refused.stderr.strip()[:200],
     )
-    record("親の start", sh(TICKET_SH, parent_tree, "start", "i0001").returncode == 0)
+    # 親の start は冒頭（子の start の前）で済んでいる。ここでは二度呼ばない
     closed = sh(TICKET_SH, parent_tree, "finish", "i0001")
     record("親の done", closed.returncode == 0, (closed.stdout + closed.stderr).strip()[:200])
     commit_all(parent_tree, "状態の移動")
@@ -653,7 +728,16 @@ def main() -> int:
 
     # ---- 5. 別の親をユーザが早めに閉じる（close-early）
     parent2 = worktree("i0002", "main")
-    propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で早めに閉じる親")
+    # 親の提案には issue が要る（agree は issue が無いと承認しない）
+    status, issue2 = CLIENT.create_issue(ROOT_TOKEN, pid, "途中で早めに閉じる親", "実測の 2 本目")
+    record("課題 2 を立てる", status == 201)
+    propose(
+        parent2,
+        "i0002",
+        allow=("src/*", "wip/*"),
+        title="途中で早めに閉じる親",
+        issue=issue2["iid"],
+    )
     propose(
         parent2,
         "i0002-01-01",
@@ -667,6 +751,11 @@ def main() -> int:
     approved = exe("user", "agree", stdin="y\n")
     record("--agree（i0002）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
     record("i0002 の push", sh(GIT_SH, parent2, "push", "-u", "origin", "i0002").returncode == 0)
+    # push 直後はブランチが API に見えないことがある（400 source_branch does not exist）
+    for _ in range(10):
+        if CLIENT.get_branch(ROOT_TOKEN, pid, "i0002")[0] == 200:
+            break
+        time.sleep(1)
     status, mr2 = CLIENT.create_mr(ROOT_TOKEN, pid, "i0002", "main", "Draft: 途中で早めに閉じる親")
     record("ユーザが i0002 の MR を作る", status == 201)
     if status == 201:
