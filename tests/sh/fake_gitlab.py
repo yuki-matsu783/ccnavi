@@ -146,6 +146,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def dispatch(self, method: str):
         self._body = None
+        # 本文は先に読み切る。401 や 404 で返すときも読まないと、keep-alive の同じ接続で
+        # 次の要求の頭に本文が残り、400 になる
+        self.body()
         name, args, query = self.route()
         if name == "version":
             return self.send_json(200, {"version": "18.5.4-fake", "revision": "fake"})
@@ -167,6 +170,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def act(self, method, name, args, query, state):
         iid = int(args["iid"]) if "iid" in args else 0
+        # 無い MR は 404（実物と同じ）。issue の iid とは別の番号なので、issue は除く
+        if "iid" in args and name != "issue" and mr_of(state, iid) is None:
+            raise KeyError(iid)
 
         if name == "project":
             return 200, {"id": 1, "path_with_namespace": state["project"]}
