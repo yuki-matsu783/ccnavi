@@ -1,9 +1,13 @@
-"""ホスト（GitHub / GitLab）の代役。write-and-push と `ccnavi-ticket.sh` のテストが使う。
+"""ホスト（GitHub / GitLab）の代役。write-and-push と `ccnavi-ticket.sh` のテストと、
+受入シナリオの `setup.host`（tests/scenarios/hostenv.py）が使う。
 
-origin は手元の bare リポジトリのまま、`git remote get-url origin` だけがホストの形の URL
-（`https://gitlab.com/acme/widgets.git`）を答える。fetch・push・ls-remote は bare のまま動く。
+`git remote get-url origin` だけがホストの形の URL（`https://gitlab.com/acme/widgets.git`）を答える。
+origin が手元の bare ならそのまま fetch・push・ls-remote が動く。origin が本物のホストのときは、
+`env` に bare と本物の URL を渡すと、`-c url.<bare>.insteadOf=<本物の URL>` で bare へ向く
+（対象のリポジトリだけに効かせるのは `target_common`）。
 PATH の先頭に置いた gh / glab は失敗する代役、curl は routes.json で答える代役。
-本物のネットワークには出ない。
+本物のネットワークには出ない。`build(curl=False)` は curl の代役を置かない
+（fake-gitlab の模擬に届くように）。
 トークンを渡さなければ、ホストの API は「確かめられなかった」になり、git のリモートの確認は通る。
 """
 
