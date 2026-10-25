@@ -30,7 +30,7 @@ keywords: [要件, 取り込み待ち, handoff, wip/handoff, 下書き, 取り�
 
 見るだけの呼び出し（`user handoff --json`。何も書かない）の答えを、対象ごとに 1 行で出す。
 
-- パス（ツリーからの相対）、種類（`template`・`layer-config`・`docs`・`defense`）、状態（`new`・`changed`・`unchanged`・`conflict`・`rejected`）の札
+- パス（ツリーからの相対）、種類（`template`・`messages`・`layer-config`・`docs`・`defense`。`messages` は `board` が偽で、ターミナルで取り込む）、状態（`new`・`changed`・`unchanged`・`conflict`・`rejected`）の札
 - errors と warnings の件数。見出しを押して開くと、errors・warnings の本文と差分を出す。差分は実行ファイルの文のまま出し（改行コード・BOM・制御文字・ゼロ幅の文字は見える形に直して返る）、拡張は整形しない
 - 要約の行に、対象の件数・取り込める件数・選択の件数・対象外（許可リストにヒットせず数えなかった）の件数
 

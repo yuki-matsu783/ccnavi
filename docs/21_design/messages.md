@@ -111,7 +111,7 @@ messages:
 Python:
 
 ```python
-texts.say(root, "DENY_TICKET_PARENT", {"ticket": …}, variants={"what": "agent"})
+texts.say(root, "DENY_PHASE_REVIEW__WAITING", {"parent": …, "phase": …}, {"why": "child"})
 ```
 
 戻りは組み立てた文。失敗しても例外を投げず、既定の文（13.8）を返す。呼ぶ側の判定は変わらない。

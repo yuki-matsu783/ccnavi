@@ -245,7 +245,8 @@ CCNAVI_ENTRY_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）
 .ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
 配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
-（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・共通の工程スキルと配るだけのスキル
+（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・共通の文面ファイル
+（.ccnavi/config/common/messages/*.yml。拒否・促し・次の一手の文。無いと短い既定の文に落ちる）・共通の工程スキルと配るだけのスキル
 （.claude/skills/ のうち SKILL.md に process: true か distribute: true を持つもの。SKILL.md と references/common/ の下の .md だけで、
 references/project/ は配らない）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する

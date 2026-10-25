@@ -32,6 +32,7 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | 組み込みのルールの文 | `policy/builtin.py`・`policy/selfguard_shell.py` の `message` | | 未移行 |
 | 確認の理由 | `hook/reasons.py` の `ask_hint`・`_ASK_ALTERNATIVE` | 2 | 未移行 |
 | sh の `次:` | `ccnavi-git.sh` 4、`ccnavi-worktree.sh` 3、`ccnavi-stage.sh` 2、`ccnavi-ticket.sh` 2、`ccnavi-common-state.sh` 2（`ccnavi_text` の既定の文）、`ccnavi-user-close-early.sh` 1 | 約 14 | 未移行（`ccnavi-common-state.sh` の既定の文は残す） |
+| 配布側の sh の `次:` | `scripts/ccnavi-doctor.sh` 2、`scripts/ccnavi-package.sh` 1、`scripts/ccnavi-install.sh`（`次:` を組み立てる関数）。配布の道具で、ワークスペースの実行ファイルが無いときにも動くため、`ccnavi text` に頼らない | | 対象外 |
 | sh の拒否・失敗の文 | `fail "…"` の文（各 sh） | 多数 | 未移行 |
 
 ## 点検
