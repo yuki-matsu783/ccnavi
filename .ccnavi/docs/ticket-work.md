@@ -68,6 +68,7 @@ issue（または MR）を指定され、かつユーザが直接作業を明示
 | 承認済みで着手した子（`doing/`） | メインが `ccnavi-ticket.sh cancel <子の識別子> --reason <理由>` を打つ。`--reason` が要り、サブエージェントは打てない |
 | 親ごと、残りがあるまま早めに閉じたい | ユーザが親のワークツリーで `sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason <理由>` を打つ。エージェントは打てず、代わりに判断もしない。残りは issue に書き出す。`--no-issue` を付けると書き出さない。作業中の子がいる間は打てない。未着手の子は自動で `cancel` される。そのあと親で `ccnavi-ticket.sh finish` して push し、`ccnavi-review.sh ready` を実行する。マージリクエストが無い・変更要求が残るときも通らない |
 
+- 親のワークツリーから `ccnavi-worktree.sh` で直接作業へ切り替えると、残っている提案・着手中の子・MR と取り下げの手順が、出力の `案内:` に出る（上の表と同じ手順）
 - `ccnavi-user-close-early.sh` が MR について行うのは、親が片付いたあとに `ccnavi-review.sh ready` が Draft を外すところまで。MR を閉じる操作ではない
 - ccnavi には MR を閉じる操作が無い。Draft のまま残すか、閉じるかは、ユーザがホストで決める。エージェントは MR を閉じない
 - 既存の MR のブランチは、直接作業へ切り替えても変わらない。直接作業の変更は別のブランチ（`ccnavi-worktree.sh` の名前）に入る

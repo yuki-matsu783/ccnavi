@@ -204,6 +204,7 @@ test("CB-D373 defense はターミナルの案内を出す。「ターミナル�
     dom.click(dom.one(`${row(HOOK)} .row-head`));
     await dom.settle();
     assert.match(text(dom.one('[data-role="terminal-guide"]')), /ボードから取り込めません/);
+    assert.match(text(dom.one('[data-role="terminal-guide"]')), /防御を外せてしまうため/);
     dom.click(dom.one('[data-action="show-terminal"]'));
     await dom.settle();
     assert.deepEqual(dom.posted.filter((m) => m.type === "terminal"), [{ type: "terminal", path: HOOK }]);

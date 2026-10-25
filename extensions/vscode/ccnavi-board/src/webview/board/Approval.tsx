@@ -75,8 +75,11 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
           <p className="approval-note">
             Claude Code に伝えるプロンプトを用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください（送るときは自分で Enter を押す）。「ターミナルで実行」は、押すとすぐ確認なしで実行されます。
           </p>
-          <pre className="approval-text" data-tour="approval-prompt">{overlay.prompt}</pre>
           <HandOver />
+          <details className="approval-more" data-tour="approval-prompt">
+            <summary>次に打つコマンドを含む案内</summary>
+            <pre className="approval-text">{overlay.prompt}</pre>
+          </details>
         </>
       );
     case "prompt":

@@ -348,6 +348,7 @@ test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後ま�
     // 最後の手順は「完了」。やめる × はどの手順でも右上に出す
     assert.equal(dom.one('[data-action="tour-next"]').textContent, "完了");
     assert.equal(dom.one('.tour-bubble > [data-action="tour-skip"]').textContent?.trim(), "×");
+    assert.match(dom.one('[data-action="tour-skip"]').getAttribute("title") ?? "", /Esc/);
     dom.click(dom.one('[data-action="tour-next"]'));
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);

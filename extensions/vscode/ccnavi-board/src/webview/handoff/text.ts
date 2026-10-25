@@ -13,11 +13,15 @@ export function kindLabel(kind: string): string {
     case "docs":
       return "docs";
     case "defense":
-      return "防御（ターミナルのみ）";
+      return "防御（hook など・ターミナルのみ）";
     default:
       return kind === "" ? "（種類なし）" : kind;
   }
 }
+
+/** 防御の説明。何が防御か、なぜターミナルのみか（`docs/requirements/handoff.md`） */
+export const DEFENSE_NOTE =
+  "防御は、エージェントを止める仕組み（hook やラッパースクリプトなど）のファイルです。ボードから取り込むと防御を外せてしまうため、ユーザのターミナルで打って取り込みます。";
 
 /** 状態の言葉 */
 export function stateLabel(state: string): string {

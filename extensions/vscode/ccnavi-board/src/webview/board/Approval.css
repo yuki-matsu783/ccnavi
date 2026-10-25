@@ -12,6 +12,7 @@
   font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size);
   background: var(--vscode-textCodeBlock-background); border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-md);
 }
+.approval-more > summary { cursor: pointer; width: fit-content; margin: 8px 0 4px; color: var(--vscode-descriptionForeground); font-size: var(--font-md); }
 /* 説明を畳んだ見出し。ホバーで出ることを点線で知らせる */
 .approval-head { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
 /* 畳んだ説明。目には出さず、読み上げと選択には残す */
