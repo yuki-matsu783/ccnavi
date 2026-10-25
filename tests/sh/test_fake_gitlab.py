@@ -8,7 +8,7 @@
 4. `skew` を変えると、返す時刻が変わる
 5. 実物の `ccnavi-review.sh fetch` が、`GITLAB_TOKEN` と代役の origin から、
    curl 経路で模擬の MR とスレッドを読める（`glab` は失敗する代役を前に置く）
-6. 401・404 を返したあとも、同じ keep-alive 接続の次の要求が通る（本文を読み捨てている）
+6. 401・404 を返したあとも、同じ keep-alive 接続の次の要求が通る（要求の本文を読み捨てている）
 7. 存在しない MR への要求は、MR を引く全ルートで 404 になり、接続が切れない
 8. 手で使う入口 `python tests/manual/gitlab/fake_gitlab.py <state.json> <port>` が、
    別プロセスで起動して 1 往復できる
@@ -192,7 +192,7 @@ class FakeGitlabTest(ServerCase):
 TESTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANUAL = os.path.join(TESTS_DIR, "manual", "gitlab", "fake_gitlab.py")
 
-# act の中で MR を引く要求のすべて（method, path の MR 以降, 本文）
+# act で MR を引くすべての要求（method, path の MR 以降, 本文）
 MR_REQUESTS = [
     ("GET", "", None),
     ("PUT", "", {"title": "x"}),
@@ -208,7 +208,7 @@ MR_REQUESTS = [
 
 
 class KeepAliveTest(ServerCase):
-    """同じ接続で続けて叩く。1 件目の応答の取りこぼしが、2 件目の失敗として現れる。"""
+    """同じ接続で続けて要求する。1 件目の応答の読み残しが、2 件目の失敗として現れる。"""
 
     def keep_alive(self, server):
         conn = http.client.HTTPConnection("127.0.0.1", server.port, timeout=5)
@@ -227,9 +227,9 @@ class KeepAliveTest(ServerCase):
         cases = {
             "401": (f"/api/v4/projects/{ENC}/merge_requests", "wrong"),
             "別のプロジェクト": ("/api/v4/projects/x%2Fy/merge_requests", None),
-            "知らない道": ("/api/v4/nothing", None),
+            "知らないルート": ("/api/v4/nothing", None),
         }
-        expected = {"401": 401, "別のプロジェクト": 404, "知らない道": 404}
+        expected = {"401": 401, "別のプロジェクト": 404, "知らないルート": 404}
         for label, (path, token) in cases.items():
             with self.subTest(label):
                 conn = self.keep_alive(server)
