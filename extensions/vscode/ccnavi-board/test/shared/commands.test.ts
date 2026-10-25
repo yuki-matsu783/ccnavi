@@ -96,8 +96,8 @@ test("CB-T19a ユーザ専用の sh の名前。書く側は ccnavi-user-decide.
 
 test("CB-T19 decide の引数。一覧は --preview、選んだ対応方針は JSON と見せたダイジェストで渡す", () => {
   assert.deepEqual(decidePreviewArgs(2), ["decide", "2", "--preview"]);
+  // ccnavi-user-decide.sh は第 1 引数をフェーズ番号として読む。使い方は `<N> [--choices …]`。先頭に decide を付けると終了コード 2 で止まる
   assert.deepEqual(decideArgs(1, { u1: "keep", "https://x/y#z": "fix" }, "d0"), [
-    "decide",
     "1",
     "--choices",
     '{"u1":"keep","https://x/y#z":"fix"}',

@@ -269,7 +269,7 @@ test("CB-D706 ［MR を開く］は URL が http(s) のときだけリンクに�
   }
 });
 
-test("CB-D707 注意の行は例外のときだけ短い言葉で出す（不備・書き込み停止・先行待ち・HIGH 以上・複数の場所・ワークツリーなし・未送信）。理由の全文は詳細にある", async () => {
+test("CB-D707 注意の行は例外のときだけ短い言葉で出す（不備・書き込み停止・先行待ち・HIGH 以上・複数の場所・ワークツリー未作成／ワークツリーが見つからない・未送信）。理由の全文は詳細にある", async () => {
   const where = [{ tree: "", state: "todo", path: "/a" }, { tree: "x", state: "doing", path: "/b" }];
   const json = boardOf(
     [
@@ -295,7 +295,7 @@ test("CB-D707 注意の行は例外のときだけ短い言葉で出す（不備
     assert.deepEqual(notes("noisy"), [
       "不備 2 件",
       "書き込み停止中",
-      "ワークツリーなし",
+      "ワークツリーが見つからない",
       "リスク CRITICAL（90 点）",
       "複数の場所にある（2 か所）",
       "先行チケットの条件が未達成（p-01-09）",
@@ -315,6 +315,22 @@ test("CB-D707 注意の行は例外のときだけ短い言葉で出す（不備
     // 普通のこと（LOW・MEDIUM のリスク、未送信 0 件）は注意に出さない。LOW は詳細にだけある
     assert.equal(page.all(`${card(page, "calm")} .notes`).length, 0);
     assert.deepEqual(notes("p"), ["未送信 3 件"]);
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-D707a 承認待ち（ワークツリー未作成）は警告色にせず、作業中でワークツリーが無いものだけ警告色の「見つからない」", async () => {
+  const gone = { exists: false, path: "/ws/.claude/worktrees/x", project: "" };
+  const json = boardOf([proposalJson("wait", { worktree: gone }), ticketJson("busy", { worktree: gone })], []);
+  const page = await openBoard(json);
+  try {
+    const badge = (id: string): { text: string; warn: boolean } => {
+      const b = page.one(`${card(page, id)} .notes .badge.worktree`);
+      return { text: b.textContent.trim(), warn: b.classList.contains("none") };
+    };
+    assert.deepEqual(badge("wait"), { text: "ワークツリー未作成", warn: false });
+    assert.deepEqual(badge("busy"), { text: "ワークツリーが見つからない", warn: true });
   } finally {
     await page.close();
   }

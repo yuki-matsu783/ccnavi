@@ -374,7 +374,7 @@ export async function runDecidePreview(
 }
 
 /**
- * ユーザが選んだ行き先を置く（`ccnavi-user-decide.sh decide <N> --choices <JSON> --digest <ダイジェスト>`）。
+ * ユーザが選んだ行き先を置く（`ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>`）。
  * 見せた指摘と今の指摘が違えば、実行ファイルは何も置かず `mismatch` を返す
  */
 export async function runDecideYes(
@@ -386,7 +386,7 @@ export async function runDecideYes(
   choices: Readonly<Record<string, string>>,
   digest: string,
 ): Promise<DecideOutcome> {
-  const refused = await checkUserEntry(root, setting, "ccnavi-user-decide.sh decide");
+  const refused = await checkUserEntry(root, setting, "ccnavi-user-decide.sh");
   if (refused !== undefined) {
     return { ok: false, error: refused };
   }
@@ -395,7 +395,7 @@ export async function runDecideYes(
     return {
       ok: false,
       error:
-        `${cutOff("ccnavi-user-decide.sh decide", DECIDE_TIMEOUT_MS)}。` +
+        `${cutOff("ccnavi-user-decide.sh", DECIDE_TIMEOUT_MS)}。` +
         "反映できたか分かりません。チケット管理画面を更新して、フェーズの状態を確認してください",
     };
   }
@@ -404,7 +404,7 @@ export async function runDecideYes(
     return parsed;
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
-  return { ok: false, error: said === "" ? `ccnavi-user-decide.sh decide の出力を読み取れません（${parsed.error}）` : said };
+  return { ok: false, error: said === "" ? `ccnavi-user-decide.sh の出力を読み取れません（${parsed.error}）` : said };
 }
 
 /**
