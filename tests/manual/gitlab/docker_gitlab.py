@@ -165,7 +165,7 @@ def compose(args: list[str], password: str):
     env["GITLAB_PORT"] = str(PORT)
     env["GITLAB_MEM_LIMIT"] = MEM_LIMIT
     env["GITLAB_ROOT_PASSWORD"] = password or "unused"
-    # 起動と停止は長い。時間切れで止めない
+    # 起動と停止は時間がかかるので、時間切れで打ち切らない
     return run(["docker", "compose", "-f", COMPOSE_FILE, *args], env=env, timeout=None)
 
 

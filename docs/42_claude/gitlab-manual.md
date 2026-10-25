@@ -31,20 +31,19 @@ uv run python tests/manual/gitlab/docker_gitlab.py down --purge  # ボリュー�
 
 - `up` は、イメージが無いとき取得せずに止まる。取得は `--pull` を付けたときだけ。
 - `up` は、動いていれば起動しない。健康になり、`/api/v4/version` が応答するまで待つ（上限 15 分。初回は 5〜10 分かかる）。
-- CE は 4GB のメモリが要る。足りないと engine ごと落ちる。
-- 公開ポートは `127.0.0.1:8929` だけ。LAN には出さない。`external_url` と公開ポートは同じ値にする（崩れると clone URL と `web_url` が壊れる）。
+- CE は 4GB のメモリが要る。コンテナの上限は余裕をとって 6g（`MEM_LIMIT`）。Docker に割り当てたメモリが 6GB 未満なら、`up` が `次:` で警告する。足りないと engine ごと落ちる。
+- 公開ポートは `127.0.0.1` の `CCNAVI_GITLAB_PORT`（既定 8929）だけ。LAN には出さない。`probe_gitlab.py` の既定の接続先と `external_url` も、この値から作る。`external_url` と公開ポートは同じ値にする（ずれると clone URL と `web_url` が壊れる）。
 - `restart: "no"`。Docker Desktop の起動で勝手に上がらないようにしている。
-- root のパスワードは、コンテナを作るたびに乱数で作る。0600 の状態のファイルに書く。
+- root のパスワードは、コンテナもボリュームも無いときだけ乱数で作り、0600 の状態のファイルに書く。ボリュームが残っていれば作り直さない（GitLab は初回のパスワードを持っているため）。`down --purge` のあと作り直す。
 
 ## 版の固定
 
 版は `docker_gitlab.py` の `GITLAB_IMAGE` の 1 か所で、ダイジェストで固定する。タグ（`19.4.1-ce.0` など）は使わない。
 `latest` は使わない。版を上げるときは、この値を書き換えて `up --pull` を打つ。
-#551 の記録と docker-gitlab の記録は、同じ定数を参照する。
 
 ## トークン
 
-- `up` は、有効なトークンがあれば作り直さない。作り直すと、別の回のトークンが失効するため。
+- `up` は、有効なトークンがあれば作り直さない。作り直すと、既存のトークンが失効するため。
 - `up --rotate` のときだけ作り直す。既存は失効する。
 - トークンは `~/.cache/ccnavi/gitlab/tokens.env`（`XDG_CACHE_HOME` があればその下）に 0600 で書く。リポジトリの外。端末には出さない。
 - 使うときは、`set -a; . <status が出すパス>; set +a` で環境変数に載せる。
@@ -58,9 +57,9 @@ uv run python tests/manual/gitlab/probe_gitlab.py
 ```
 
 - 必要なもの: 組み立て済みの exe（`dist/ccnavi/ccnavi`。`CCNAVI_ENTRY_PATH` で差し替え）、jq と curl。
-- `CCNAVI_PROBE_GITLAB`（既定 `http://localhost:8929`）で接続先を変える。
+- `CCNAVI_PROBE_GITLAB`（既定 `http://127.0.0.1:<CCNAVI_GITLAB_PORT、既定 8929>`）で接続先を変える。
 - 結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
-- `--help` は、トークンも exe も無くて終わる。
+- `--help` は、トークンも exe も無しに終わる。
 
 ## CE の限界
 

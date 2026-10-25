@@ -120,7 +120,8 @@ class DockerGitlabTest(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         # 状態のファイルは一時ディレクトリへ。up・down の表示はテストの出力に出さない
-        # docker の情報・ボリューム・診断ログは実物に触れさせない（既定は十分なメモリで、ボリュームは無し）
+        # docker の情報・ボリューム・診断ログは実物に触れさせない
+        # （既定は十分なメモリで、ボリュームは無し）
         for patcher in (
             mock.patch.dict(os.environ, {"XDG_CACHE_HOME": self._tmp.name}),
             mock.patch("sys.stdout", new_callable=io.StringIO),
