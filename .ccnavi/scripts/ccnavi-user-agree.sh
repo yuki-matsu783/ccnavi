@@ -117,7 +117,7 @@ approve_rc=0
 # 書けなかった理由が入っていれば見せる。
 say_report() {
 	if [ -s "$report" ]; then
-		printf 'ccnavi-user-agree: 承認の結果（placed=書けたパス / written=書いた・消したパス / failed=書けなかった提案 / unwritten=止まったため書かなかった提案 / rejected=承認の対象にしなかった提案）: %s\n' \
+		printf 'ccnavi-user-agree: 承認の結果（placed=書けたパス / written=書いた・消したパス / failed=書けなかった提案 / unwritten=止まったため書かなかった提案 / rejected=承認の対象にしなかった提案 / dirty_parent=承認した親のワークツリーに残る、提案以外の未コミットの変更）: %s\n' \
 			"$(cat "$report")" >&2
 	fi
 }
