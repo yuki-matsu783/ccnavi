@@ -154,7 +154,7 @@ github_mr() {
 		  fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
 }
 
-# GitHub: その issue を参照している開いた PR。題・本文の `#<番号>` か `issues/<番号>`、元ブランチの名前の番号（前後が `-` `/` `_` `.` か端）で見る。
+# GitHub: その issue を参照している開いた PR。題・本文の `#<番号>` か `issues/<番号>`、元ブランチ名の番号（前後が `-` `/` `_` `.` か端のもの）で見る。
 github_issue() {
 	got=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=open") || return "$?"
 	printf '%s' "$got" | "$ccnavi_h_jq" --arg p "$ccnavi_h_path" --arg n "$number" '

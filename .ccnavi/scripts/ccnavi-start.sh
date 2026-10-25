@@ -953,7 +953,7 @@ stop_host() {
 			;;
 		search)
 			if [ "$what" = issue ]; then
-				printf '  1. mcp__github__search_pull_requests を query=「repo:%s/%s is:pr is:open %s」で呼ぶ。題・本文に #%s を含むか、元ブランチの名前に %s を含む PR が、この issue に紐づく MR\n' "$sh_owner" "$sh_repo" "$number" "$number" "$number"
+				printf '  1. mcp__github__search_pull_requests を query=「repo:%s/%s is:pr is:open %s」で呼ぶ。題・本文に #%s を含むか、元ブランチの名前に %s を含む（前後が - / _ . か端。区切り以外の文字が隣なら含まない）PR が、この issue に紐づく MR\n' "$sh_owner" "$sh_repo" "$number" "$number" "$number"
 				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら、その PR の元ブランチ（head.ref）と本文の Closes を確かめ、--mr <その PR の番号> --issue <閉じる issue> --branch <head.ref> --mcp-checked を付けて打ち直す）\n'
 				printf '  3. 紐づく PR が無いと確かめたら、mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することも確かめる（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
 				if [ -n "$sh_adopt" ]; then
