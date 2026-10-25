@@ -23,6 +23,7 @@ def approved_text(
     revisions: set[str],
     root: str,
     worktrees: list[dict[str, str]] | None = None,
+    notices: list[str] | None = None,
 ) -> str:
     """チケットが承認されたことをモデルに伝える文。
 
@@ -33,6 +34,8 @@ def approved_text(
     revisions は親の改版だった識別子。root はワークスペースルートで、sh のパスに使う。
     worktrees は子のワークツリーの計画（`worktrees.child_worktrees`）。
     無ければ従来の案内だけを出す。
+    notices は補足と注意（承認した親のワークツリーに残る提案以外の変更など）。1 件を 1 行の
+    `案内:` にして添える。次の一手ではない。
     """
     lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
     for t in tickets:
@@ -70,6 +73,7 @@ def approved_text(
     if worktrees is not None:
         git_sh = settings.script_command(root, "ccnavi-git.sh")
         lines += _child_worktree_lines(tickets, worktrees, git_sh)
+    lines += [f"案内: {text}" for text in notices or []]
     # 承認の前に計画編集タブ（`--plan-order --write`）で計画の順序が書き換わると、
     # エージェントが書いた番号と承認された番号が違うことがある。書き換えられたかを見分ける材料が
     # 無い（コミットしていない編集と見分けられない）ので、計画を持つ親とその子があればいつも添える。
