@@ -3,7 +3,7 @@ title: 受入シナリオを claude -p で回す
 type: guide
 description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方
 tags: [test, scenario]
-keywords: [受入シナリオ, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
+keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -100,7 +100,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 
 ## 回し方
 
-1. **回す前に、人間に確認する。** 確認が取れるまで、1 本も回さない。回すたびに取り直す（前の回の了承を使い回さない）。
+1. **回す前に、人間に確認する。** 確認が取れるまで、1 本も回さない。回すたびに取り直す（前の回の了承を使い回さない）。例外は `run-all` の 1 回の確認だけ（「続けて回す（run-all）」）。
    エージェントは先に次の事実を集め、そのまま見せて、人間に問う。
    - 概要: 実行器が出す「受け入れシナリオ」の節（何をさせ、何を期待し、何が残るか、まだ確かめていない点）。確認の前に、人間がこれを読んで決める
    - ワークスペース状態: ワークスペースルートと `projects/test-repo` の `ccnavi-git.sh status`、origin との先行・遅れ、残っているワークツリーとブランチ、
@@ -128,7 +128,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    実行器は step を 1 つずつ `claude -p` で回す（`--model`・`--max-budget-usd`・`--permission-mode`・`--include-hook-events`・
    `--output-format stream-json` を付ける）。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す。
    続きの step が `resume` でなければ `--no-session-persistence` を付ける。出力は `logs/scenarios/<ID>-<日時>/` に置く
-   （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`、`context-N.md`、`messages.md`。後ろの 2 つは下の「証拠の読み方」）
+   （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`、`context-N.md`、`messages.md`。後ろの 2 つは下の「証拠の読み方」）。`run-all` の出力は「続けて回す（run-all）」
 4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。
    人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
    続けずにやめるときは `uv run python -m tests.scenarios.runner restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
@@ -141,6 +141,48 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 7. **後片付けをする。** 実行器が `setup.files`（作る形）を消し、`setup.reset` があれば対象を `base` へ戻す。シナリオで作ったワークツリー・ブランチ・MR は、`projects/test-repo` のものだけ残してよい（後でまとめて片付ける）。
    ccnavi 本体に変更が残っていたら、期待が破れたということなので、そのまま報告して直さない（見つけたものの扱いに従い issue にする）
 8. **結果を残す。** `report.md` が、各 step の期待と実際、費用をまとめている。期待と違えば、どの欄で違ったかが分かる
+
+## 続けて回す（run-all）
+
+使い捨てのリポジトリ（`projects/test-repo`）を対象にするシナリオを何本も回すときは、確認を 1 回にして直列に回す。
+
+```sh
+uv run python -m tests.scenarios.runner run-all tests/scenarios --max-total-usd 5      # 確認文と目印を出して止まる（終了コード 3）
+uv run python -m tests.scenarios.runner run-all tests/scenarios --max-total-usd 5 --confirmed <目印>
+```
+
+引数はディレクトリ（`*.yml`）・glob・ファイルを複数書ける。`--max-total-usd` は必須。`--out` は要約の置き場（既定は `logs/scenarios/run-all-<日時>/`。各シナリオの出力は、その下の `<ID>/`）。
+
+### 対象にするもの
+
+「対象の判定」（`require_disposable_repo`・`check_before_run`・`setup_clashes`）を通る、使い捨てのリポジトリを触る setup を持つシナリオだけ。加えて、続けて回すために次の 2 つを満たすこと。
+
+- 人間の操作の step が無い（10 で止まると、残し印が次の回を断る）
+- `setup.reset` を持つ（前の回の状態を次の回に残さない。`reset` が無い `setup.host` だけの回は対象にしない）
+
+ccnavi 本体に作用しうるシナリオ（`setup` が使い捨てのリポジトリを触らないもの）は対象にせず、従来どおり 1 本ずつ確認して回す。対象にしなかったものは、理由つきで確認文と要約の「対象にしなかったもの」に出す。
+
+### 確認の例外
+
+回し方 1 の「回すたびに取り直す」の例外として、`run-all` は次の確認を **1 回** だけ取る。
+
+- 確認の内容: 回す ID の一覧、各シナリオの概要と作るもの（`scenario_summary`）、対象のリポジトリの状態、`base`、費用の上限（1 本ごとの `budget_usd` と、累計の `--max-total-usd`）
+- 有効な範囲: **確認した ID の集合・`base`・費用の上限・概要に限る。** 確認文が出す目印（`--confirmed` に渡す）は、これらから作る。実行の直前に作り直し、違えば回さずに止まる（終了コード 3）。ID の増減、`base` や `budget_usd` や概要の書き換え、`--max-total-usd` の変更は、すべて違いになる
+- 確認の中身が 1 本ごとに違う（概要、`setup_clashes`、確認事項）ので、`--confirmed` の素通りにはしない。一覧に対する 1 回の確認として、目印がそれを束ねる
+- 使い回さない: 別の回の目印、ID を足したあとの目印は使えない。確認を取り直す
+
+### 費用
+
+- `--max-total-usd`: 実費（各シナリオの `result` の `total_cost_usd` の合計。`state.json` の `cost_usd`）の累計の上限。各シナリオの前に、そのシナリオの `budget_usd` が累計の残り（上限 − 実費の累計）を超えないかを見て、超えるなら回さずに止まる。1 本の途中では止められない
+- `budget_usd` は `claude -p` の `--max-budget-usd` の元で、実費がわずかに超えることがある。上限は目安として扱う
+- 止まったら、回した本数と残りの ID を出す。続きは、確認を取り直して `run-all` を打ち直す
+
+### 失敗・停止と分離
+
+- 1 本が `fail` / `inconclusive` でも続ける。対象を戻せない・ロックで断られるなどで終了コードが 3 のときは、対象の状態が信用できないので、そこで止める
+- 終了コード: 0 全部 pass / 1 fail がある / 2 inconclusive・意味の判定待ちがある / 3 確認が要る・止まった
+- 最後に全体の表を出し、`summary.md` と `summary.json` に書く。列は ID、判定、実費、ツール呼び出し数、拒否数、ask 数、出力の置き場。ツール呼び出し数は stream-json の `tool_use`、拒否数と ask 数は回したセッションの `decisions.jsonl` の `deny` と `ask`。実費は各シナリオの `report.json`（`kind: cost` の行）にも残す
+- 全本が同じ `cwd` と `logs/` を使う。各 step は新しい `--session-id` で始め、続きの step でない限り `--no-session-persistence` を付ける（現行のとおり）。hook の once の案内（`hinted`）の記憶はセッションごとなので、前のシナリオの記憶は次に持ち越されない（`test_runner.py` が見張る）
 
 ## 使い捨てのリポジトリの事前状態と後片付け
 
