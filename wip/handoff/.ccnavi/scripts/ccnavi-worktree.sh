@@ -209,7 +209,7 @@ print_next() {
 
 # 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。
 # <一覧のファイル> <どこ（手元・origin）>
-# dest-exists より前に置く。大文字小文字を区別しない機械では、綴り違いの名前のパスが既にあるものとして見えるため。
+# dest-exists より前に置く。大文字小文字を区別しない機械では、綴り違いの名前のパスが既にあるように見えるため。
 heads_list="$root/logs/state/worktree-heads-$$"
 cand_index="$root/logs/state/worktree-index-$$"
 mkdir -p "$root/logs/state" 2>/dev/null || :

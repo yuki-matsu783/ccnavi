@@ -993,7 +993,7 @@ class WorktreeShTest(unittest.TestCase):
 
     def test_the_same_identifier_is_refused_before_the_existing_directory_check(self):
         """大文字小文字を区別しない機械では、綴り違いのパスが既にあるように見える。
-        それを模して、ただのディレクトリがあっても同じ識別子の案内で断る。"""
+        それを再現するため、ただのディレクトリがあっても、同じ識別子だという案内で断る。"""
         git(self.ws, "branch", "Topic")
         stray = write(os.path.join(self.wt("topic"), "stray.txt"), "x")
         result = self.run_sh("topic")
