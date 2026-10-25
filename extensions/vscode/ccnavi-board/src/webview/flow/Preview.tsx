@@ -2,7 +2,7 @@
  * 担当に渡る手順のプレビュー。`SubagentStart` で担当のサブエージェントに渡る手順の行を、実行ファイル
  * （`--lint --json --flow` の `flow.rendered`）が並べたとおりに見せる。画面は並べ直さない。
  *
- * 編集するたびに、止まってから呼び手（`App.tsx`）が実行ファイルに確かめ直させる。確かめている間は前の答えを
+ * 編集するたびに、止まってから呼び手（`App.tsx`）が実行ファイルに確かめ直させる。確かめている間は、最後に確認が済んだ答えを
  * 残し、そう言う。開閉できる区画（`<details>`）で、既定は開いておく。
  */
 import type { JSX } from "react";
@@ -34,9 +34,13 @@ export function Preview({ checks, checking, error }: PreviewProps): JSX.Element 
   return (
     <details className="flow-preview" id="flow-preview" data-tour="preview" open>
       <summary title="SubagentStart で担当のサブエージェントに渡る手順です。実行ファイル（ccnavi --lint --flow）が並べたものです">担当に渡る手順</summary>
-      {checking && (
+      <p className="dim small" id="flow-preview-lead">
+        子チケットを担当するサブエージェントに渡る手順です。編集するとここに反映されます
+      </p>
+      {/* 結果がまだ無い（確認していない）ときは、前の答えが無いので言わない。body の「まだ確認していません」が今の状態 */}
+      {checking && checks !== undefined && (
         <p className="dim small" id="flow-preview-checking">
-          再確認しています…（表示は前回の結果です）
+          確認中です。下の手順は、最後に確認が済んだときのものです
         </p>
       )}
       {error !== undefined && <p className="error small" id="flow-preview-error">{error}</p>}

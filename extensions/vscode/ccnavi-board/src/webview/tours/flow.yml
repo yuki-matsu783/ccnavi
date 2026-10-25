@@ -776,8 +776,8 @@ courses:
         body: 直したら、担当に渡る手順を再読み込みします。開始からたどった順に、1 ノード 1 行で並びます。想定した順になっているかを確認します。
         scene: {doc: main}
       - target: preview
-        title: 再確認の間
-        body: 編集が止まると、ccnavi に再確認させます。確認している間は、前回の結果を出したまま、そう表示します。
+        title: 確認中の表示
+        body: 編集が止まると、ccnavi に確認させます。確認している間は、最後に確認が済んだときの手順を出したまま、「確認中です」と表示します。
         scene: {doc: main, checking: true}
 
   - id: save-review
