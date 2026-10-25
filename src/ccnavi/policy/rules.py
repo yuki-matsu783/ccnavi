@@ -1107,6 +1107,22 @@ def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
         )
 
 
+def compile_condition(glob: str, regex: str, name: str) -> tuple[re.Pattern | None, str]:
+    """ルールの外で `glob` か `regex` の 1 つを、ルールと同じ読み方で組み立てる。
+
+    ルールファイルに書かない組み込みの宣言（ターン分離の関門など）が、条件の読み方を
+    ルールと食い違わせないための入口。大文字小文字の無視、先読み・後方参照の禁止、
+    glob の翻訳は `_compile` と同じ。`{root}` と `{!root}` はワークスペースルートを
+    持たないので使えない（使うと苦情になる）。返すのは (式, 苦情)。苦情があれば式は None。
+    """
+    built = _compile(glob, regex, "", name, "")
+    if built.error is not None:
+        return None, built.error.detail
+    if built.compiled is None:
+        return None, built.refused or "式を組み立てられない"
+    return built.compiled, ""
+
+
 def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | None]:
     """`except:` を読む。返すのは (glob, regex) の組のリストと、書式の苦情。
 

@@ -22,6 +22,19 @@ SESSION_START = "SessionStart"
 USER_PROMPT_SUBMIT = "UserPromptSubmit"
 # バックグラウンド作業の完了通知が UserPromptSubmit の prompt として届くときの先頭に付く文字列。
 TASK_NOTIFICATION = "<task-notification>"
+# ユーザが打ったのではない UserPromptSubmit の、prompt の先頭に付く目印（`is_user_prompt`）。
+# `[idle-handoff]` は ccnavi 自身が放置したセッションを起こす指示（records/idlehandoff.MARKER と
+# 同じ値。tests/core/test_user_prompt.py が一致を見る）。残りは実機の payload ではなく、
+# 実行環境の案内が示す、外部の出来事がセッションを起こす封筒の形。
+NOT_USER_STARTS = (
+    "[idle-handoff]",
+    "<wake",
+    "<webhook-payload",
+    "<child-session-event",
+    "<event ",
+    "[system notification",
+    "<system-reminder",
+)
 STOP = "Stop"
 # サブエージェントの開始と終了。開始は止められないイベントで、返せるのは文だけ。
 # 終了は Stop と同じで、exit 2 が「続けさせる」を意味する。
@@ -135,6 +148,32 @@ class Input:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
         value = self.tool_input.get(name)
         return value if isinstance(value, str) else ""
+
+
+def is_user_prompt(payload: Input) -> bool:
+    """この UserPromptSubmit は、ユーザの発言と言い切れるか。
+
+    ユーザの返事を数えるもの（ターン分離の関門）だけが使う。迷うものは数えない。数えると、
+    ユーザが何も打たなくても関門が開くため。`from_background_task` は変えない（ターンの印と、
+    ユーザの手による変更の受け入れは、これまでどおりそちらで決める）。
+
+    数えないもの:
+    - イベントが UserPromptSubmit でない、サブエージェントの中、prompt が空
+    - バックグラウンド作業の完了通知（prompt のどこかに `<task-notification>` を含む。先頭に
+      限らないのは `from_background_task` と同じ。ユーザがその文字列を自分で打っても数えない
+      非対称は、安全側として残す。普通に打ち直せば数える）
+    - 先頭が `NOT_USER_STARTS` の目印で始まるもの（大文字小文字は区別しない）
+
+    payload にユーザの発言と言い切れる欄（来歴）は無い。予約した実行（`session_crons`、
+    `ScheduleWakeup`、`send_later`）の prompt は保存した文そのままで、打った文と見分けられない。
+    見分けられない形は、数える側に残る。
+    """
+    if payload.event != USER_PROMPT_SUBMIT or payload.agent_id:
+        return False
+    text = payload.prompt.strip()
+    if not text or payload.from_background_task():
+        return False
+    return not text.lower().startswith(NOT_USER_STARTS)
 
 
 def _text_list(value: Any) -> list[str] | None:

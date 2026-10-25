@@ -810,7 +810,10 @@ def integrate_nudge(root: str, found: Direct) -> str:
         lines += [
             f"ワークツリー .claude/worktrees/{n} の取り込み（integrate {n}）が、"
             "確定を待っています。",
-            f"差分と変わるファイルの一覧をユーザに見せ、了承を得たら "
+            "差分と変わるファイルの一覧をユーザに見せ、返事を待ってこのターンを終えます。"
+            "確定はユーザの次の発言のあとです。この同じターンでは integrate-done を打てません"
+            "（この案内で続けたターンは、ユーザの発言に数えません）。",
+            f"ユーザの発言のあと、了承を得ていれば "
             f"`cd {integ} && {git_sh} integrate-done {n} -m '<メッセージ>'`"
             " で取り込んで片付けます。"
             f"やめるなら `cd {integ} && {git_sh} integrate --abort {n}`。",
@@ -852,7 +855,9 @@ def integrate_nudge(root: str, found: Direct) -> str:
         f"作業が終わったなら `cd {integ} && {git_sh} integrate {n}` を実行して止めてください。"
         "取り込み結果は一時ワークツリーに用意され、ユーザのチェックアウトは変わりません。"
         "hook は integrate を実行しません。",
-        "続き: 出力の差分と変わるファイルの一覧をユーザに見せます。了承を得たら "
+        "続き: 出力の差分と変わるファイルの一覧をユーザに見せ、返事を待ってターンを終えます。"
+        "確定はユーザの次の発言のあとで、同じターンでは integrate-done を打てません。"
+        f"ユーザの発言のあと、了承を得ていれば "
         f"`cd {integ} && {git_sh} integrate-done {n} -m '<メッセージ>'` で取り込んで片付けます。"
         f"やめるなら `cd {integ} && {git_sh} integrate --abort {n}`。",
     ]

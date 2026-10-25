@@ -125,6 +125,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
             {
                 "hook.agentkind",
                 "hook.failsafe",
+                "hook.turngate",
                 "infra.directrec",
                 "infra.gitstate",
                 "infra.shellread",
@@ -142,6 +143,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "records.stopops",
                 "records.stopreview",
                 "records.turn",
+                "records.userprompt",
             }
         ),
     ),

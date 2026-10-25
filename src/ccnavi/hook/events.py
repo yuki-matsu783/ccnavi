@@ -28,7 +28,17 @@ from ..policy import (
     selfguard_shell,
     selfguard_targets,
 )
-from ..records import audit, busy, failstreak, prune, repeat, stopops, stopreview, turn
+from ..records import (
+    audit,
+    busy,
+    failstreak,
+    prune,
+    repeat,
+    stopops,
+    stopreview,
+    turn,
+    userprompt,
+)
 from ..tickets import (
     approval,
     approval_checks,
@@ -56,6 +66,7 @@ from . import (
     proposalhint,
     stopjudge,
     subagent,
+    turngate,
 )
 
 # SessionStart で、終わっていない integrate の記録を確かめる時間の上限（秒）。
@@ -125,7 +136,11 @@ def decide(
         # ターン中の印の更新時刻を新しくする（サブエージェントの呼び出しも、同じターン内）。
         turn.touch(conf.state, payload.session_id)
     if payload.event == hookio.PRE_TOOL_USE:
-        return judge.decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)
+        code = judge.decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)
+        if record.decision == audit.DENY and record.enforced:
+            # 実行を止めた呼び出しは走らない。実行前に残した関門の記録（A）を消す。
+            turngate.forget_call(conf.state, payload.session_id, payload.tool_use_id)
+        return code
     if payload.event == hookio.POST_TOOL_USE:
         return decide_after(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.POST_TOOL_USE_FAILURE:
@@ -298,6 +313,9 @@ def decide_at_prompt(
     """
     # ユーザの発言とバックグラウンド作業の完了通知は、どちらもターンを始める。
     turn.begin(conf.state, payload.session_id)
+    # ユーザの発言と言い切れるものだけを、ターン分離の関門が読む記録に書く。ターンの印とは別。
+    if hookio.is_user_prompt(payload):
+        userprompt.note(conf.state, payload.session_id)
     by_user = not payload.from_background_task() and not busy.is_busy(
         conf.state, payload.session_id
     )
@@ -1049,6 +1067,8 @@ def decide_at_start(
         subagent.forget_running(conf.state, payload.session_id)
         busy.clear(conf.state, payload.session_id)
         turn.clear(conf.state, payload.session_id)
+        turngate.clear(conf.state, payload.session_id)
+        userprompt.clear(conf.state, payload.session_id)
     if payload.source == "startup":
         _reported_baseline(stderr, conf, root, payload, record)
     # 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
@@ -1203,6 +1223,8 @@ def decide_after_failure(
     ないので数えない。数えの失敗や案内を組む失敗で、ツールの結果は変わらない。
     """
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
+    # 失敗した呼び出しは、ターン分離の関門の A に数えない（実行前に残した記録を消す）。
+    turngate.forget_call(conf.state, payload.session_id, payload.tool_use_id)
     if payload.is_interrupt and not payload.agent_id:
         # ユーザの中断。Stop は来ないことがあるので、ここでターンの終わりにする。
         # 下の照合は中断までに書かれたぶんを戻すので、印を先に消してよい（消す前でも結果は同じ）。

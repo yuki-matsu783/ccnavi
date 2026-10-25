@@ -90,6 +90,8 @@ ask:
   # 直接作業の取り込み先・状態の了承・横で作業する指定・引き取りは、ユーザの確認ダイアログに出す。
   # ダイアログのコマンドに、取り込み先のブランチ名と選んだ指定が見える。
   # --side-by-side は自動復元を緩めるので、ほかにずれが無くても必ずダイアログに出す。
+  # 非対話では確認が拒否になり、理由の文（reasons.ask_hint）がエージェントに返る。--adopt は、
+  # チケットに結び付く名前には了承されても通らない（スクリプトが断る）ので、その旨も理由に足している。
   - id: direct-worktree-confirm
     match: Bash
     regex: 'ccnavi-worktree\.sh\b[^\x00]*\s--(base|accept|side-by-side|adopt)(\s|=|$)'

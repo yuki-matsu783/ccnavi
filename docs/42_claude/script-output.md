@@ -13,7 +13,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 `ccnavi-start.sh --issue` が「親チケットか提案が出来たら…打ち直す」としか言わず、提案を作る `ccnavi ticket new` を示さなかったために、
 提案を手書きして詰まり、直接実装に進んだ事故があった。
 
-チケット作業を進めるsh（`.ccnavi/scripts/`）と実行ファイル（`src/ccnavi/`）の出力は、次の決まりで書く。
+チケット作業を進めるsh（`.ccnavi/scripts/`）と実行ファイル（`src/ccnavi/`）の出力は、次の決まりで書く。拒否の文面の型と、止め方の選び方は[止め方の型と選び方](stop-patterns.md)にある。
 
 ## 行頭の語
 
@@ -82,7 +82,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 | `ccnavi-ticket.sh start`（親で子の無いフェーズが残る） | フェーズごとに子チケットを作る | `tickets/ops_plan.py` |
 | `ccnavi-ticket.sh finish`（子で、レビュー不要） | 親の `status` | `tickets/ops.py` |
 | `ccnavi-ticket.sh finish`（親） | 移動をコミットして push し、Draft を解除する | `tickets/ops.py` |
-| `ccnavi-git.sh integrate` | 差分と変わるファイルをユーザに見せ、了承を得て `integrate-done`（やめるなら `integrate --abort`） | `ccnavi-git.sh` |
+| `ccnavi-git.sh integrate` | 差分と変わるファイルをユーザに見せ、返事を待ってターンを終える。確定はユーザの発言のあとで、了承を得ていれば `integrate-done`（やめるなら `integrate --abort`）。取り込む差分が無いときも、ユーザに伝えて返事を待ち、片付けは発言のあと | `ccnavi-git.sh` |
 | `ccnavi-worktree.sh` の成功（切ったとき・既にあるとき） | 編集は、ワークツリーの中で行う。git は `cd <引用したパス> && <ラッパー> <サブコマンド>`。終わったらコミットし、integrate の案内に従う。名前の警告の後に出る最後の行 | `ccnavi-worktree.sh` の `print_next` |
 
 issue・MRを指定された依頼文には、ccnaviのUserPromptSubmitが「出力に『次:』があればそれに従う」と足す（`tickets/branchfind.py` の `_start_lines`）。
