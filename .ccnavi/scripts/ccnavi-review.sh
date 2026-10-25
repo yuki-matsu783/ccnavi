@@ -436,7 +436,7 @@ undraft() {
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
 		stripped=$(printf '%s' "$title" | strip_draft) || stripped=""
 		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
-			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null
+			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null || return 1
 		fi
 		query=$("$JQ" -n --arg id "$node" '{
 			query: "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{number isDraft}}}",
@@ -448,7 +448,7 @@ undraft() {
 		3)
 			# GraphQL を使えない環境。Draft を外したあと、実状態（draft）を読んで返す（戻り値の形は GraphQL と同じ true / false）
 			rest_rc=0
-			api POST "repos/$path/pulls/$mr_number/ccr/ready_for_review" >/dev/null || rest_rc=$?
+			api POST "repos/$path/pulls/$mr_number/ccr/ready_for_review" '{}' >/dev/null || rest_rc=$?
 			if [ "$rest_rc" -eq 0 ]; then
 				pr=$(api GET "repos/$path/pulls/$mr_number") || rest_rc=$?
 			fi

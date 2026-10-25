@@ -728,7 +728,7 @@ mr_linked_issues_body() {
 	mb_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$1") || return 1
 	printf '%s' "$mb_got" | "$ccnavi_h_jq" -r --arg p "$ccnavi_h_path" \
 		'(.body // "") | gsub("(?s)```.*?```"; "") | gsub("(?s)<!--.*?-->"; "") | gsub("`[^`\n]*`"; "") | gsub("(?m)^[ \t]*>[^\n]*"; "")
-		| scan("(?<![A-Za-z0-9_-])(?<!not )(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+((?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)(?![A-Za-z0-9_])"; "i") | .[0] | if startswith("#") then $p + . else . end' || return 1
+		| scan("(?i)(?<![A-Za-z0-9_-])(?<!not )(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+((?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)(?![A-Za-z0-9_])") | .[0] | if startswith("#") then $p + . else . end' || return 1
 }
 
 # その MR が閉じる issue を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>

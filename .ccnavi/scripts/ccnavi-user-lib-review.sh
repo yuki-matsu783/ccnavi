@@ -92,7 +92,7 @@ accept_resolve() {
 		case "$accept_id" in
 		"" | *[!0-9]*) ;;
 		*)
-			accept_res=$(api POST "repos/$path/pulls/$2/ccr/comments/$accept_id/resolve") || return 1
+			accept_res=$(api POST "repos/$path/pulls/$2/ccr/comments/$accept_id/resolve" '{}') || return 1
 			return 0
 			;;
 		esac
