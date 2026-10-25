@@ -231,7 +231,8 @@ class ScriptRoutesTest(ServerCase):
         code, got = call(server, "GET", f"/api/v4/projects/{ENC}/merge_requests/1/closes_issues")
         self.assertEqual(code, 200)
         self.assertEqual([i["iid"] for i in got], [2, 3])
-        self.assertEqual(got[0]["references"]["full"], "ns/proj#2")
+        # 実物は references を返さない。sh は代替の `<パス>#<iid>` で受ける
+        self.assertNotIn("references", got[0])
 
     def test_closes_issues_is_empty_without_a_closing_word(self):
         server = self.make("Related to #2")
