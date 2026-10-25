@@ -999,8 +999,8 @@ def _parsed(
             stdout, stderr, root, conf, args.command[2], list(args.command[3:])
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
-    if len(args.command) == 3 and list(args.command[:2]) == ["tree", "handoff-pending"]:
-        code = sh_ask.handoff_pending_tree(stdout, stderr, args.command[2])
+    if len(args.command) in (3, 4) and list(args.command[:2]) == ["tree", "handoff-pending"]:
+        code = sh_ask.handoff_pending_tree(stdout, stderr, *args.command[2:])
         return EXIT_OK if code == 0 else EXIT_ERROR
     if len(args.command) == 6 and list(args.command[:2]) == ["sync", "tidy"]:
         code = cli_ops.sync_tidy(
