@@ -1,5 +1,5 @@
 /**
- * 「マージ状況を確認」の遷移と、画面に渡す形。「いまの状態 ＋ 入力 → 次の状態 ＋ やること」だけをここに置く。
+ * 「MR の状況を確認」の遷移と、画面に渡す形。「いまの状態 ＋ 入力 → 次の状態 ＋ やること」だけをここに置く。
  * VS Code の API には触れない（外へ出る仕事は `MergeEffect` として返すだけで、行うのは `board-panel.ts`）。
  * `approval-machine.ts` と同じ段取り: 返った状態を持ち直し、描き直し、やることを順に行う。
  *
@@ -62,7 +62,7 @@ export interface MergeState {
 export const MERGE_IDLE: MergeState = { checking: false, token: 0, checkedAt: "", list: { kind: "none" }, sent: [], confirming: [], sendErrors: {} };
 
 export type MergeInput =
-  /** 「マージ状況を確認」を押した */
+  /** 「MR の状況を確認」を押した */
   | { readonly kind: "check" }
   /** 一覧（`sync retired`）が返った */
   | { readonly kind: "listed"; readonly token: number; readonly result: RetiredParse; readonly at: string }
@@ -203,7 +203,7 @@ function retireAsked(state: MergeState, parent: string): MergeStep {
   const row = rowOfParent(state, parent);
   // マージ済みと確認できた親だけ。画面が古いボードのまま押した場合もここで止める
   if (row === undefined || row.result?.kind !== "merged") {
-    return stay(state, { kind: "warn", text: `親 ${parent} は、マージ済みと確認できていません。もう一度「マージ状況を確認」を押してください` });
+    return stay(state, { kind: "warn", text: `親 ${parent} は、マージ済みと確認できていません。もう一度「MR の状況を確認」を押してください` });
   }
   // ダイアログを開いている間・送っている間・送ったあとは再入させない
   if (state.confirming.includes(parent) || state.sent.includes(parent)) {

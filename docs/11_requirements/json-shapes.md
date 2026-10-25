@@ -197,7 +197,7 @@ ccnavi --explain --json
 | `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, lock_kind, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）、`lock_kind` はその種類（`doing` は着手中、`review` はレビュー中、止めていなければ null。種類の欄が無い古い実行ファイルでは出ない）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked}`。`path` が指すのは正とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、ボードはパスを組まずにこれを読み、いまのフローと違えば「提案あり」を出す。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのままコピーし、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
 | `issues[]` | 読み手が気づくべき不備の文。この順に入る。`blocked` が空でなければ `書き込みが止まっています: <blocked>`、提案が無く `copy.status` が `open` でも `closed` でもなければ `提案が見つかりません（承認済みチケットだけがあります）`、子で親の識別子のチケットが `tickets[]` に無ければ `親 <親> が見つかりません`。無ければ空。ボードはこれをそのまま出し、自分では組み直さない |
-| `attention` | ユーザが動く必要があるか。真になるのは、`pending_approval` に入っている、子で自分のフェーズが `gate_closed` か `review_waiting`、未着手・作業中（提案が無く `closed` のもの以外）なのにワークツリーが無い、自分の `risk` の水準が HIGH 以上、`scattered[]` が空でない、`issues[]` が空でない、親でフェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates` のとき（`src/ccnavi/entry/diagnose_board.py` の `_mark_attention`）。ボードの「要対応のみ」はこれで絞るだけ |
+| `attention` | ユーザが動く必要があるか。真になるのは、`pending_approval` に入っている、子で自分のフェーズが `gate_closed` か `review_waiting`、未着手・作業中（提案が無く `closed` のもの以外）なのにワークツリーが無い、自分の `risk` の水準が HIGH 以上、`scattered[]` が空でない、`issues[]` が空でない、親でフェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates` のとき（`src/ccnavi/entry/diagnose_board.py` の `_mark_attention`）。ボードの「ユーザ待ちのみ」はこれで絞るだけ |
 
 `parents[]` の 1 件。
 
@@ -210,7 +210,7 @@ ccnavi --explain --json
 
 VS Code のボードは、`gate_closed`・`review_waiting`・`marks` を次のように言葉に置き換えるだけで、レビューの要否・ゲートの条件・リスクは判定し直さない（フェーズ行の一言は上から最初にヒットしたもの）。`gate_closed` かつ `review_waiting` は「レビュー待ち」、`gate_closed` は「レビュー準備中」、`marks.reviewed` があれば「レビュー済み」、`marks.skipped.deferred_to` があり、その番号のフェーズに `marks.reviewed` があれば「レビュー済み」、`deferred_to` があれば「レビュー予定」、`marks.skipped` があれば「レビュー省略」、ほかは `state` により「終了」「進行中」「これから」。`marks` の中身（`skipped` の `deferred_to`、`requested` の `mr` と `url`）は JSON にそのまま載っているので、ボードは推測で代わりを作らない。
 
-また、ボードの「マージ状況を確認」は、`ccnavi sync retired`（片付けの記録を持つ親の一覧）と `ccnavi-review.sh mr-state <番号>`（マージリクエストの状況。読むだけ）を使う。どちらも形を厳しく検証し、形が想定外のものを「マージ待ち」「マージ済み」「ありません」と読まない。互換の版は上げない（追加だけで、実行ファイルを起こさない）。
+また、ボードの「MR の状況を確認」は、`ccnavi sync retired`（片付けの記録を持つ親の一覧）と `ccnavi-review.sh mr-state <番号>`（マージリクエストの状況。読むだけ）を使う。どちらも形を厳しく検証し、形が想定外のものを「マージ待ち」「マージ済み」「ありません」と読まない。互換の版は上げない（追加だけで、実行ファイルを起こさない）。
 
 ## 承認の JSON
 

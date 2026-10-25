@@ -1,5 +1,5 @@
 /**
- * マージ状況の帯と、ツールバーの「マージ状況を確認」（React の画面を happy-dom で動かす）。
+ * マージ状況の帯と、ツールバーの「MR の状況を確認」（React の画面を happy-dom で動かす）。
  * 中身（`MergeView`）は拡張ホストが持つ。ここは渡されたものを正しく出し、押した操作を正しく返すかを見る。
  */
 import { test } from "node:test";
@@ -32,11 +32,11 @@ function text(page: DomPage, selector: string): string {
   return page.one(selector).textContent.replace(/\s+/g, " ").trim();
 }
 
-test("CB-D720 「マージ状況を確認」はツールバーに通常の色で置く。押すと mergeCheck を送り、確認中は「確認中…」で押せず、二重に送らない", async () => {
+test("CB-D720 「MR の状況を確認」はツールバーに通常の色で置く。押すと mergeCheck を送り、確認中は「確認中…」で押せず、二重に送らない", async () => {
   const page = await openBoard(json());
   try {
     const button = page.one<HTMLButtonElement>('.controls button[data-action="merge-check"]');
-    assert.equal(button.textContent.trim(), "マージ状況を確認");
+    assert.equal(button.textContent.trim(), "MR の状況を確認");
     assert.ok(button.classList.contains("action") && !button.classList.contains("primary"));
     assert.equal(page.all(".merge-band").length, 0, "一度も確認していなければ帯を出さない");
     page.click(button);
@@ -60,7 +60,7 @@ test("CB-D720 「マージ状況を確認」はツールバーに通常の色で
     await page.send({ type: "data", data: { kind: "board", board: buildBoard(json()), merge: view([row("i1")]) } });
     const idle = page.one<HTMLButtonElement>('button[data-action="merge-check"]');
     assert.equal(idle.disabled, false);
-    assert.equal(idle.textContent.trim(), "マージ状況を確認");
+    assert.equal(idle.textContent.trim(), "MR の状況を確認");
   } finally {
     await page.close();
   }

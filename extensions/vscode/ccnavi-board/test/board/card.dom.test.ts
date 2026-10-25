@@ -472,7 +472,7 @@ test("CB-D711 カードを押す（または焦点を当てて Enter）とチケ
   }
 });
 
-test("CB-D712 要対応のみの絞り込み・畳んだ列・幅と同じく、詳細の開閉を覚える state は他の覚えを消さない", async () => {
+test("CB-D712 ユーザ待ちのみの絞り込み・畳んだ列・幅と同じく、詳細の開閉を覚える state は他の覚えを消さない", async () => {
   const saved = { project: "*", parent: "*", attention: true, archived: false, folded: ["done"], widths: { todo: 300 }, details: [] };
   const page = await openBoard(boardOf([ticketJson("a", { attention: true })]), { state: saved });
   try {

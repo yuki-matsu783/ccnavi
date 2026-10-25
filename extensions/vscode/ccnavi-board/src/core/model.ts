@@ -174,7 +174,7 @@ export interface TicketJson {
   readonly flow: FlowJson | null;
   /** 読み手が気づくべき不備の文。実行ファイルが組み、ボードはそのまま出す */
   readonly issues: readonly string[];
-  /** ユーザが動く必要があるか。実行ファイルが決め、ボードは「要対応のみ」でこれを見るだけ */
+  /** ユーザが動く必要があるか。実行ファイルが決め、ボードは「ユーザ待ちのみ」でこれを見るだけ */
   readonly attention: boolean;
 }
 

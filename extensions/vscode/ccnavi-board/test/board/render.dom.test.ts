@@ -474,15 +474,15 @@ test("CB-T131o 決めた結果のプロンプトのオーバーレイは、題�
   }
 });
 
-test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値をそのまま使うだけ", async () => {
+test("CB-T132r 「ユーザ待ちのみ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値をそのまま使うだけ", async () => {
   const page = await openBoard();
   try {
     const label = page.one("label.filter.attention");
     assert.equal(
       label.getAttribute("title"),
-      "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーが見つからない・HIGH 以上のリスク・不備）",
+      "承認・レビューなど、ユーザの操作で進むものだけを出します",
     );
-    assert.equal(label.textContent.trim(), "要対応のみ");
+    assert.equal(label.textContent.trim(), "ユーザ待ちのみ");
     assert.equal(page.one('.card[data-id="i0001-02-03"]').getAttribute("data-attention"), "1");
     assert.equal(page.one('.card[data-id="i0001"]').getAttribute("data-attention"), "0");
     assert.equal(page.one('.card[data-id="i0001-01-01"]').getAttribute("data-attention"), "0");

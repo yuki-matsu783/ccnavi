@@ -172,7 +172,7 @@ export type BoardMessage =
    * 計画編集タブを開く（一覧の図にある親だけ。決めるのは承認の遷移）
    */
   | { readonly type: "editWorkflow"; readonly ticket: string }
-  /** 「マージ状況を確認」を押した。確認中なら拡張ホストが受けない（二重に走らせない） */
+  /** 「MR の状況を確認」を押した。確認中なら拡張ホストが受けない（二重に走らせない） */
   | { readonly type: "mergeCheck" }
   /**
    * マージ済みの親の［片付ける］を押した。拡張ホストが確認のダイアログを出し、「実行する」なら
