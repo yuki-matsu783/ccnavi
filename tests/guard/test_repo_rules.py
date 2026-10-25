@@ -123,10 +123,49 @@ class RepoRulesTest(unittest.TestCase):
         ):
             with self.subTest(flags=flags):
                 self.assert_verdict(f"{script} x {flags}", "ask", "direct-worktree-confirm")
-        for plain in (f"{script} x", f"{script} x --dry-run", f"{script} x --no-wip"):
+        for plain in (
+            f"{script} x",
+            f"{script} x --dry-run",
+            f"{script} x --no-wip",
+            # 何も書かない確認は、指定があっても対象から外す。
+            f"{script} x --adopt --base feature/x --dry-run",
+            f"{script} x --dry-run --adopt --base feature/x",
+            f"{script} x --base feature/x --accept 7f3a9c21 --dry-run",
+        ):
             with self.subTest(plain=plain):
                 body = judge("Bash", plain)
                 self.assertNotIn("direct-worktree-confirm", hit(body))
+
+    def test_確認の理由の固定文は非対話のときだけ出る(self):
+        from unittest import mock
+
+        script = "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh"
+        cases = {
+            f"{script} x --base feature/x": "direct-worktree-confirm",
+            "curl -s https://example.com/a": "prefer-webfetch",
+        }
+        for subject, rule_id in cases.items():
+            for attended, shown in (("0", True), ("1", False), (None, False)):
+                with self.subTest(subject=subject, attended=attended):
+                    patch = {} if attended is None else {"CLAUDE_CODE_SESSION_ATTENDED": attended}
+                    with mock.patch.dict(os.environ, patch):
+                        if attended is None:
+                            os.environ.pop("CLAUDE_CODE_SESSION_ATTENDED", None)
+                        body = self.assert_verdict(subject, "ask", rule_id)
+                    said = json.dumps(body["response"], ensure_ascii=False)
+                    self.assertEqual(shown, "確認に答えられません" in said, said)
+                    if rule_id == "prefer-webfetch":
+                        self.assertEqual(shown, "代わりの手:" in said, said)
+
+    def test_別のコマンドの_dry_run_では確認の対象から外れない(self):
+        script = "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh"
+        for subject in (
+            f"{script} x --adopt --base feature/x && sh /repo/other.sh y --dry-run",
+            f"sh /repo/other.sh y --dry-run; {script} x --adopt --base feature/x",
+            f"sh /repo/other.sh y --dry-run | {script} x --base feature/x",
+        ):
+            with self.subTest(subject=subject):
+                self.assert_verdict(subject, "ask", "direct-worktree-confirm")
 
     # 変わるべきもの
 

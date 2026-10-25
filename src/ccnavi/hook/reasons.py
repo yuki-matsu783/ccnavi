@@ -319,9 +319,40 @@ def reason_for(
         lines.append(unreadable(degraded))
         lines.extend(rewrite_hint(degraded))
     lines.append(rule.spoken_message())
+    if rule.decision == rules.ASK:
+        lines.extend(ask_hint(rule.bare_id, shown))
     if quoted:
         lines.append(inside_quotes(git))
     return "\n".join(lines)
+
+
+# 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルール（bare_id → 1 行）。
+# ask のルールには message を書けず、additionalContext は自動拒否のとき届かないので、ここに置く。
+_ASK_ALTERNATIVE = {
+    "prefer-webfetch": (
+        "代わりの手: 調査で一度きりなら WebFetch ツール、"
+        "何度も叩くなら .ccnavi/scripts/ の sh に固めてから実行してください。"
+    ),
+}
+
+
+def ask_hint(bare_id: str, shown: str) -> list[str]:
+    """確認（ask）の理由に足す、非対話のときだけの説明。対話のときは空。
+
+    非対話のセッションでは確認に答える人がいないので、ask は自動で拒否になる。
+    ルール名と対象だけでは「確認待ち」なのか「止められた」のかが読めないため、
+    確認が要ることと次の行動を言う。
+    """
+    if not ccnavimd.unattended():
+        return []
+    lines = [
+        "この操作はユーザの確認が要りますが、このセッションでは確認に答えられません。"
+        f"ユーザに「{shown}」の了承を頼み、了承されたら打ち直してもらってください。"
+    ]
+    alternative = _ASK_ALTERNATIVE.get(bare_id)
+    if alternative:
+        lines.append(alternative)
+    return lines
 
 
 def ran_by(runner: str, inner: str) -> str:
