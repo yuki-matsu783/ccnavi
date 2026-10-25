@@ -540,7 +540,7 @@ class TestExtChromeHookTest(unittest.TestCase):
         self.assertTrue(os.path.exists(marker))
 
     def test_documents_only_run_nothing(self):
-        workspace, _, _ = self.workspace(touched=("README.md", "docs/design.md"))
+        workspace, _, _ = self.workspace(touched=("README.md", "docs/20_design.md"))
         result, ran_in = self.stop(workspace)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIsNone(ran_in)

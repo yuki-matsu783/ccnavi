@@ -1,5 +1,5 @@
 /**
- * 残った指摘を決める JSON の形（実行ファイルとの契約）と読み取り。docs/requirements/json-shapes.md「残った指摘の JSON」。
+ * 残った指摘を決める JSON の形（実行ファイルとの契約）と読み取り。docs/11_requirements/json-shapes.md「残った指摘の JSON」。
  *
  * `ccnavi-review.sh decide <N> --preview` が残った指摘とダイジェストを見せ、
  * `ccnavi-user-decide.sh decide <N> --choices <JSON> --digest <ダイジェスト>` がユーザの選んだ行き先を置く。

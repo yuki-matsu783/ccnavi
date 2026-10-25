@@ -5,7 +5,7 @@ VS Code 拡張のフロー編集画面は、開くときと保存の前に編集
 
 1. SubagentStart と同じ読み手・同じ検査（`flow.load`）で読み、読めなければ `(flow)` の error
 2. 読めるフローには `(flow)` の苦情が出ない
-3. `--json` の形は docs/requirements/json-shapes.md「lint の JSON」のまま（`where` が `(flow)`）
+3. `--json` の形は docs/11_requirements/json-shapes.md「lint の JSON」のまま（`where` が `(flow)`）
 4. 形の誤り（`nodes` が無い、`id` が無い・重なる、`connections` がリストでない）は
    SubagentStart の読み（`flow.load`）とここで同じ理由になる
 5. 診断の外では無視して言う。`--lint` でない診断でも読まずにそう言う

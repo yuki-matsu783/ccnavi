@@ -10,7 +10,7 @@ keywords: [要件, VS Code 拡張, ボード, チケット管理, ルール管�
 
 VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを書く。入口はサイドパネルとコマンドパレットで、チケット管理（ボード）・ルール管理・リスク管理・フェーズ管理・テンプレート管理・取り込み待ち・プロジェクト管理の 7 画面と、ボードの子のカードから開くフロー編集画面がある。取り込み待ちはサイドパネルに並べず、ルール管理・リスク管理・フェーズ管理・テンプレート管理から開く。使い方と組み立ては [README](../README.md)、作りは [design.md](design.md) にある。
 
-拡張と ccnavi 本体の間の取り決め（拡張が呼ぶコマンド、読む JSON の形、互換の版）は本体側に書く。本体の [要件 2.13 拡張との取り決め](../../../../docs/requirements/extension-if.md)（REQ-EXT）と [設計](../../../../docs/design.md) を見る。拡張自身の要件のうち、本体の要件から切り出したものには REQ-VSC の ID を振ってある。
+拡張と ccnavi 本体の間の取り決め（拡張が呼ぶコマンド、読む JSON の形、互換の版）は本体側に書く。本体の [要件 2.13 拡張との取り決め](../../../../docs/11_requirements/extension-if.md)（REQ-EXT）と [設計](../../../../docs/20_design.md) を見る。拡張自身の要件のうち、本体の要件から切り出したものには REQ-VSC の ID を振ってある。
 
 ## 詳細
 
@@ -31,5 +31,5 @@ VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを�
 
 共通の設定（`.ccnavi/config/common/`）・ワークスペースの設定・プロジェクトの設定を、実行ファイルや ccnavi 本体の docs では「レイヤー（layer）」と呼ぶ（共通レイヤー・自身のレイヤー（`self`）・プロジェクトのレイヤー）。
 
-- 出力の形: ccnavi の docs/requirements/json-shapes.md「ボードの JSON」「試験の JSON」
-- 設計: [設計 10](../../../../docs/design/diagnostics.md)、要求: [要件 REQ-DIA-02 / REQ-DIA-03 / REQ-DIA-06](../../../../docs/requirements/diagnostics.md)
+- 出力の形: ccnavi の docs/11_requirements/json-shapes.md「ボードの JSON」「試験の JSON」
+- 設計: [設計 10](../../../../docs/21_design/diagnostics.md)、要求: [要件 REQ-DIA-02 / REQ-DIA-03 / REQ-DIA-06](../../../../docs/11_requirements/diagnostics.md)

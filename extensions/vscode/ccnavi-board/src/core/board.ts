@@ -148,7 +148,7 @@ export interface Card {
   readonly remote: RemoteJson | null;
   /**
    * ユーザが動く必要があるか。「要対応のみ」の絞り込みが見る。実行ファイルの `attention` をそのまま持ち、
-   * 条件はここで組み直さない（条件は ccnavi の docs/requirements/json-shapes.md「ボードの JSON」）
+   * 条件はここで組み直さない（条件は ccnavi の docs/11_requirements/json-shapes.md「ボードの JSON」）
    */
   readonly attention: boolean;
   /**

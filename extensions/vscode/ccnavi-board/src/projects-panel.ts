@@ -140,7 +140,7 @@ export async function openProjects(): Promise<void> {
     retainContextWhenHidden: false,
   });
   if (panel.options.retainContextWhenHidden !== false) {
-    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が破棄されず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
+    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が破棄されず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/42_claude/logging.md）
     diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: true });
   }
   showLoading(panel, TITLE, SCREEN, "プロジェクト");

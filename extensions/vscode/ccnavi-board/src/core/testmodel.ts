@@ -1,6 +1,6 @@
 /**
  * `ccnavi --test --json` と `--test-expectations --json`（試験の JSON）が出す形。
- * 実行ファイルと拡張の契約で、拡張はこれ以外を読まない。形の定義は ccnavi の docs/requirements/json-shapes.md「試験の JSON」。
+ * 実行ファイルと拡張の契約で、拡張はこれ以外を読まない。形の定義は ccnavi の docs/11_requirements/json-shapes.md「試験の JSON」。
  * 同じ例が test/fixtures/test.json と expectations.json にあり、Python 側のテスト
  * （tests/core/test_test_json.py）が同じ例で形を確かめる。
  */

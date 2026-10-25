@@ -11,7 +11,7 @@
   ブランチ・ワークツリー・`issue:` を持つチケット）を集め、sh がホストから取ってきた結果
   （`--result`）と合わせて 1 候補 1 行か JSON で出す
 
-実行ファイルはネットワークに出ない（docs/claude/exe-boundary.md）。ホスト（MR の元ブランチ、issue を
+実行ファイルはネットワークに出ない（docs/42_claude/exe-boundary.md）。ホスト（MR の元ブランチ、issue を
 参照している MR）は sh が読み、ここはその JSON を読むだけ。ホストを見ていないときは、そう言う。
 """
 
