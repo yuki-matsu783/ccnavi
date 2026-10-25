@@ -168,6 +168,7 @@ write-and-push の対象の親子のチケットでは、親のワークツリ�
 | `failed[]` | 書き込みで止まった提案。`{ticket, reason}` |
 | `unwritten[]` | 止まったために書かなかった提案の識別子 |
 | `rejected[]` | 検査で承認の対象にしなかった提案。`{ticket, problems[]}` |
+| `dirty_parent[]` | 承認した親のワークツリーに残る、提案とチケットの置き場以外の未コミットの変更。`{ticket（親の識別子）, paths[]}`。承認は止めない。親のワークツリーが無い・読めないときは出さない。`user agree --yes --json` の本体にも同じ名前で載り、承認の通知（`prompt`）には戻し方を添えた `案内:` の行が付く |
 
 `ccnavi-user-agree.sh` は 0 か 4 のとき `ccnavi-user-push-approved.sh --path <パス>...` を呼び、この承認が書いた・消したパス（実行ファイルの `--record-writes` の一覧）だけをコミットして push する。
 そのあと上の JSON を標準エラーに出し、コミットか push が済んでいないツリーがあればそう言う（送れたツリーは push-approved が「pushしました」と言う）。

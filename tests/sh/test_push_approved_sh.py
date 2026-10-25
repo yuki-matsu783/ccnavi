@@ -913,6 +913,20 @@ class ApproveCarriesTest(Workspace):
         self.assertIn("保存できませんでした", result.stderr)
         self.assertNotIn("未送信", result.stderr)
 
+    def test_approve_shows_a_change_left_in_the_parent_worktree(self):
+        """承認の結果に、親のワークツリーに残る提案以外の変更が出る。承認は通る（終了コード 0）。"""
+        tree = self.worktree("i0001")
+        report = (
+            f'{{"placed":["{posix(tree)}/{APPROVED}/i0001.md"],"failed":[],"unwritten":[],'
+            '"rejected":[],"dirty_parent":[{"ticket":"i0001","paths":["index.html"]}]}'
+        )
+        result = self.approve(STUB_TREE=tree, STUB_REPORT=report)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("dirty_parent=", result.stderr)
+        self.assertIn("index.html", result.stderr)
+        # ユーザが打つ sh には `次:` を足さない（案内は拡張の prompt と status が担う）。
+        self.assertNotIn("次:", result.stdout + result.stderr)
+
     def test_partial_approval_whose_push_fails_names_the_unsent_paths(self):
         """一部だけ書けて、push も失敗したときは、未送信のパスを名指しする。"""
         tree = self.worktree("i0001")
