@@ -196,8 +196,10 @@ class ExtTestPlanTest(unittest.TestCase):
         self.assertTrue(got["webview"])
 
     def test_the_shared_helper_calls_every_group(self):
-        # どのグループも読む部品。触ったら全部回る。
-        self.assertEqual(groups_on_disk(), plan("test/helpers/dom.ts")["groups"])
+        # 画面を描くグループはどれも読む部品。触ったら全部回る。
+        # devtools は happy-dom を使わず（E2E が Chromium で描く）、dom.ts を import しないので回らない。
+        expected = [name for name in groups_on_disk() if name != "devtools"]
+        self.assertEqual(expected, plan("test/helpers/dom.ts")["groups"])
 
     def test_the_build_ground_calls_every_group(self):
         for path in ("package.json", "tsconfig.test.json", "scripts/bundle-webview.js"):
