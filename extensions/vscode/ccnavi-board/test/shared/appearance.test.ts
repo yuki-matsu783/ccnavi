@@ -220,8 +220,10 @@ test("CB-T183b 9 画面とも段取りに繋ぎ、組み上がったところで
 
 test("CB-T183c 保持する画面は、再表示されたところでも送り直す（作り直されないので ready が来ない）", () => {
   for (const name of RETAINED_PANELS) {
-    const text = source(name);
-    const found = /panel\.onDidChangeViewState\(\(\) => \{([\s\S]*?)\n  \}\);/.exec(text);
+    const raw = source(name);
+    // ルール・リスク・フェーズの再表示の処理は、3 画面が共通で使う段取り（settings-panel.ts）にある
+    const text = /settingsPanel</.test(raw) ? source("settings-panel.ts") : raw;
+    const found = /panel\.onDidChangeViewState\(\(\) => \{([\s\S]*?)\n\s*\}\);/.exec(text);
     assert.ok(found !== null, `${name} に再表示されたときの送り直しがありません`);
     assert.match(found[1], /postAppearance\(current\.host\)/, `${name} が再表示されても見た目を送り直していない`);
   }

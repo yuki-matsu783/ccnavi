@@ -191,6 +191,16 @@ class PendingIntegrateTest(TicketTest):
         self.assertIn("tip・c_tree がありません", text)
         self.assertIn("操作せず", text)
 
+    def test_a_broken_record_in_a_path_with_braces_is_still_told(self):
+        top = os.path.join(self.root, "a{b}c{0}")
+        text = pending_integrate._v4_line(
+            self.root, top, "v7", {"version": "4"}, time.monotonic() + 30
+        )
+        self.assertIn("v7（取り込み先のツリー", text)
+        self.assertIn("a{b}c{0}", text)
+        self.assertIn("head・tip・c_tree がありません", text)
+        self.assertIn("操作せず", text)
+
     def test_leftovers_without_a_marker_are_listed(self):
         tmp = os.path.join(self.root, "logs", "direct-tmp", "self", "left1")
         os.makedirs(tmp)

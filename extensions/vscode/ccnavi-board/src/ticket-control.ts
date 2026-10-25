@@ -8,6 +8,7 @@ import * as vscode from "vscode";
 
 import { loadBoard } from "./ccnavi.js";
 import { TICKET_CONTROL_ENV, ticketControlOf, type TicketControl } from "./core/ticket-control.js";
+import { watchGlobs } from "./panel-common.js";
 
 /** package.json の `when` と揃える */
 export const CONTEXT_KEY = "ccnaviBoard.ticketControl";
@@ -77,11 +78,5 @@ export function watchTicketControl(context: vscode.ExtensionContext): void {
   }
   const again = () => void refresh(folder.uri.fsPath);
   again();
-  for (const pattern of SETTINGS_FILES) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    watcher.onDidCreate(again);
-    watcher.onDidChange(again);
-    watcher.onDidDelete(again);
-    context.subscriptions.push(watcher);
-  }
+  context.subscriptions.push(...watchGlobs(folder, SETTINGS_FILES, again));
 }

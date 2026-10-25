@@ -1165,7 +1165,7 @@ INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
 # `scratchpad/` はどの階層の同名にもヒットするので、ルートに固定した `/scratchpad` が既にあるとき、
 # または同等以上の `/scratchpad/`・`scratchpad`・`scratchpad/` があるときは足さない。
 # 末尾に `/` を付けないのは、scratchpad が symlink でもヒットするようにするため（`/scratchpad/` はディレクトリにしかヒットしない）。
-# `!/scratchpad` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
+# `!/scratchpad`・`!scratchpad/keep.md` のようにユーザが否定している行（配下の否定を含む）があれば、追跡すると決めているので足さずに伝える。
 SCRATCH_IGNORE_COMMENT="# 使い捨ての置き場"
 SCRATCH_IGNORE_LINE="/scratchpad"
 # ワークスペースルート直下の logs/ は、判定の記録・state・診断ログ（logs/diag/）の置き場。実行時に
@@ -1179,7 +1179,7 @@ LOGS_IGNORE_LINE="/logs/"
 # .claude/worktrees/ は、ccnavi がワークツリーを切る置き場。無視する行が無い配布先では、最初のワークツリーを切った
 # あと未追跡のまま ユーザのチェックアウトに残り、ワークツリーを切るスクリプトが「書きかけ」と数えてしまう。
 # ルートに固定した `/.claude/worktrees/` が既にあるとき、または同等以上の `/.claude/worktrees`・
-# `.claude/worktrees/`・`.claude/worktrees` があるときは足さない。`!/.claude/worktrees` のようにユーザが
+# `.claude/worktrees/`・`.claude/worktrees` があるときは足さない。`!/.claude/worktrees`・`!.claude/worktrees/keep` のように配下も含めてユーザが
 # 否定している行があれば、追跡すると決めているので足さずに伝える。実行ファイルの置き場（--bin user）とは関係なく足す。
 WORKTREES_IGNORE_COMMENT="# ワークツリーの置き場"
 WORKTREES_IGNORE_LINE="/.claude/worktrees/"
@@ -1229,7 +1229,7 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_index_todo="$INDEX_IGNORE_LINE
 "
 	fi
-	scratch_negated=$(gitignore_lines | grep -E '^!/?scratchpad/?$' || true)
+	scratch_negated=$(gitignore_lines | grep -E '^!/?scratchpad(/.*)?$' || true)
 	if [ -n "$scratch_negated" ]; then
 		ignore_scratch_negated="$scratch_negated
 "
@@ -1245,7 +1245,7 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_logs_todo="$LOGS_IGNORE_LINE
 "
 	fi
-	worktrees_negated=$(gitignore_lines | grep -E '^!/?\.claude/worktrees/?$' || true)
+	worktrees_negated=$(gitignore_lines | grep -E '^!/?\.claude/worktrees(/.*)?$' || true)
 	if [ -n "$worktrees_negated" ]; then
 		ignore_worktrees_negated="$worktrees_negated
 "

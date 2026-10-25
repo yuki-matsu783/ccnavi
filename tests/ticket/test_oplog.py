@@ -108,27 +108,6 @@ class OplogTest(unittest.TestCase):
         self.assertIn("broken", found[0])
         self.assertIn("壊れている", oplog.summary(found[0]))
 
-    def test_the_lock_refuses_a_second_runner_and_frees_itself(self):
-        op_id = self.begin()
-        with (
-            oplog.locked(self.state, op_id),
-            self.assertRaises(oplog.OpError),
-            oplog.locked(self.state, op_id),
-        ):
-            pass
-        with oplog.locked(self.state, op_id):
-            pass
-
-    def test_a_stale_lock_is_taken_over(self):
-        op_id = self.begin()
-        path = os.path.join(oplog.ops_dir(self.state), f"{op_id}.lock")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("999999")
-        old = time.time() - oplog.LOCK_STALE_SECONDS - 5
-        os.utime(path, (old, old))
-        with oplog.locked(self.state, op_id):
-            pass
-
     def test_applied_set_keeps_what_was_applied_locally(self):
         op_id = self.begin()
         oplog.applied_set(self.state, op_id, "moved", ["i0001-01-01"])

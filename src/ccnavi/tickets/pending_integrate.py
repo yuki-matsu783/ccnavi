@@ -97,25 +97,28 @@ def _v4_line(root: str, top: str, name: str, fields: dict[str, str], deadline: f
     t = settings.shell_path(top)
     head = f"{name}（取り込み先のツリー {t}）: "
     cd = f"cd {t} && {git_sh}"
-    broken = (
-        f"{head}記録が壊れているか、今の状態と合いません（{{why}}）。"
-        f"操作せず、`{cd} status` の結果をユーザに見せて確かめてください"
-    )
+
+    def broken(why: str) -> str:
+        return (
+            f"{head}記録が壊れているか、今の状態と合いません（{why}）。"
+            f"操作せず、`{cd} status` の結果をユーザに見せて確かめてください"
+        )
+
     try:
         missing = [k for k in _V4_NEED if not fields.get(k)]
         if missing:
-            return broken.format(why=f"{'・'.join(missing)} がありません")
+            return broken(f"{'・'.join(missing)} がありません")
         rec = osi.direct_record(top, name)
         base = (rec or {}).get("base_branch", "")
         k = fields.get("k", "")
         now = _git_out(top, ["rev-parse", "HEAD"], deadline)
         if now is None:
-            return broken.format(why="HEAD を読めません")
+            return broken("HEAD を読めません")
         if k and k != "-":
             parent = _git_out(top, ["rev-parse", "--verify", f"{k}^"], deadline)
             tree_of = _git_out(top, ["rev-parse", "--verify", f"{k}^{{tree}}"], deadline)
             if parent != fields["head"] or tree_of != fields["c_tree"]:
-                return broken.format(why="K の親か木が記録と違います。K を採用しません")
+                return broken("K の親か木が記録と違います。K を採用しません")
             landed = bool(base) and (
                 _code(top, ["merge-base", "--is-ancestor", k, f"refs/heads/{base}"], deadline) == 0
             )
@@ -149,7 +152,7 @@ def _v4_line(root: str, top: str, name: str, fields: dict[str, str], deadline: f
             f"やめるなら `{cd} integrate --abort {name}`"
         )
     except Exception:  # noqa: BLE001  壊れた記録でセッションの開始を止めない
-        return broken.format(why="読めません")
+        return broken("読めません")
 
 
 def repo_key(root: str, top: str) -> str:

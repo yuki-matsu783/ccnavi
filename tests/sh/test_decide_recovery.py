@@ -233,16 +233,35 @@ class DecideRecoveryShTest(unittest.TestCase):
         now = int(time.time())
         with open(os.path.join(lock, "owner"), "w", encoding="utf-8") as f:
             f.write(f"{host} {os.getpid()} {now} {os.getpid()}-{now}\n")
+        # 最初の判断で issue 以外の段階（note）は送り済み。--resume でも増えないことを確かめる
+        notes_before = len(STORE["notes"])
+        calls_before = len(self.calls())
         result = self.run_decide("--resume", stdin="y\n")
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertEqual(len(STORE["issues"]), 0, "ロック中なのに issue を作った")
-        self.assertEqual(len(STORE["notes"]), 0)
+        self.assertEqual(len(STORE["notes"]), notes_before, "ロック中なのに投稿した")
+        self.assertEqual(self.calls()[calls_before:], [], "ロック中なのに ccnavi を呼んだ")
+        self.assertIn("別のプロセスで実行中", result.stderr)
+        self.assertTrue(os.path.isdir(lock), "他のプロセスのロックを消した")
 
-    # decide の --resume は操作IDのロック（ccnavi_lock_take）を取らない（post_staged は
-    # staged_send を通らない）。ロック中でも投稿する
-    test_two_resumes_of_the_same_operation_do_not_post_twice = unittest.expectedFailure(
-        test_two_resumes_of_the_same_operation_do_not_post_twice
-    )
+    def ops_locks(self) -> list[str]:
+        d = os.path.join(self.state, "locks", "ops")
+        return os.listdir(d) if os.path.isdir(d) else []
+
+    def test_the_operation_lock_is_released_after_a_new_decision_and_after_resume(self):
+        """AT20: 新規の判断も --resume も、終わったら操作IDのロックを残さない"""
+        self.assertEqual(self.choose().returncode, 0)
+        self.assertEqual(self.ops_locks(), [], "新規の判断が操作IDのロックを残した")
+        # 投稿が拒まれて止まった判断を --resume で通す
+        STORE["reject"].add("issue")
+        self.assertEqual(self.choose().returncode, 0)
+        record = self.record()
+        self.assertEqual(self.ops_locks(), [], "投稿に失敗した判断がロックを残した")
+        STORE["reject"].clear()
+        self.age(record["id"], "issue")
+        done = self.run_decide("--resume", stdin="y\n")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.ops_locks(), [], "--resume がロックを残した")
 
 
 if __name__ == "__main__":
