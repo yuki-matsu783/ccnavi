@@ -5,7 +5,7 @@ description: Claude Code 本体は .claude という名前の階層を機密パ�
 tags: [handoff, selfguard, sh-scripts]
 keywords: [handoff, 下書き, .claude, handoff-.claude, 読み替え, 予約名, ccnavi-stage.sh, 非対話, claude -p, 機密パス, ccnavi-handoff-names.txt, 後方互換]
 ---
-# ADR-0174: 下書きの置き場では .claude の階層を handoff-.claude に読み替え、表は sh と実行ファイルが同じファイルから読む
+# ADR-0178: 下書きの置き場では .claude の階層を handoff-.claude に読み替え、表は sh と実行ファイルが同じファイルから読む
 
 状態: 採用
 
