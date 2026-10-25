@@ -481,7 +481,7 @@ class SyncTest(SyncHarness):
             "#!/bin/sh\n"
             'case "$*" in *"sync check"*)\n'
             f'  mkdir -p "{self.state}/locks/self/{PARENT}" && '
-            f'printf "elsewhere 1 9999999999 1-1 Other\\n" '
+            f'printf "elsewhere 1 9999999999 1-1\\n" '
             f'> "{self.state}/locks/self/{PARENT}/owner" ;; esac\n'
             f'exec "{launcher}" "$@"\n',
         )
