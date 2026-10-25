@@ -215,7 +215,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
           <ul>
             {page.list.ignored_paths?.map((item) => (
               <li key={item.path}>
-                <code>{item.path}</code>: {IGNORED_WHY[item.why] ?? item.why}
+                <code>{item.path}</code>: {Object.prototype.hasOwnProperty.call(IGNORED_WHY, item.why) ? IGNORED_WHY[item.why] : item.why}
               </li>
             ))}
           </ul>
