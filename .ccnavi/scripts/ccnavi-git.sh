@@ -112,7 +112,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                   ccnavi-git.sh) には rm と restore --source と checkout <ref> <パス> を利用できない
                   (衝突の解決の restore --ours / --theirs は利用できる。変更が必要ならユーザに依頼する)
             stash (list show push pop apply)
-            merge (-X ours / -s ours / --no-verify は不可)
+            merge (-X ours / -s ours / --no-verify は不可。統合先のユーザのチェックアウトでは --abort / --continue / --quit 以外すべて不可)
             merge-file -p (標準出力に出す形だけ。ファイルへは書かない)
                   両方取り込むときは merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス>
                   (現在・祖先・相手の順) で出力し、それを読んで Edit で書く
