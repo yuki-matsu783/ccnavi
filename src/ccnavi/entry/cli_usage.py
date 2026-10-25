@@ -523,7 +523,7 @@ _SCRIPTS = """\
          守る対象にヒットするか。
          ヒットすると integrate-done はターミナルから打つよう案内します）、
          ヒットするパスごとに "path <パス>" を出力します。
-         パスはメインのチェックアウトからの相対です）
+         パスはユーザのチェックアウトからの相対です）
     ccnavi tree handoff-pending <tree> [<start>]
         （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"pending <件数>"（取り込んでいない
          wip/handoff/ の下書きの数）と、1 件ごとに "path <パス>" を出力します。<start>（コミット）を

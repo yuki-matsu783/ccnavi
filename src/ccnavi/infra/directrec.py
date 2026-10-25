@@ -6,10 +6,10 @@
 ここが答えるのは「横で作業する指定が、いま有効か」だけ。有効な記録は次をすべて満たす。
 
 - `side_by_side yes`
-- `main_tree` が、記録を置いたリポジトリのメインのチェックアウトと同じ場所
+- `main_tree` が、記録を置いたリポジトリのユーザのチェックアウトと同じ場所
 - 作業ワークツリー（`.claude/worktrees/<名前>`）が在り、そのリポジトリのワークツリーとして
   登録されていて、同じ名前のブランチを開いている
-- 共通の前提チェック: 記録の `common_dir` と、メインのチェックアウトの git の共通ディレクトリの
+- 共通の前提チェック: 記録の `common_dir` と、ユーザのチェックアウトの git の共通ディレクトリの
   実パスが、大文字小文字を区別せず同じ
 
 ワークツリーを消せば、記録が残っていても無効になる（元の動きに戻る）。git は実行せず、
@@ -98,7 +98,7 @@ def _valid(root: str, main: tree.Tree, common: str, name: str, fields: dict[str,
 
 
 def records_of(root: str, main: tree.Tree) -> list[Record]:
-    """このメインのチェックアウトの、有効な横で作業する記録。"""
+    """このユーザのチェックアウトの、有効な横で作業する記録。"""
     common = common_dir(main.root)
     if common is None:
         return []
@@ -123,6 +123,6 @@ def records_of(root: str, main: tree.Tree) -> list[Record]:
 
 
 def side_by_side_roots(root: str, projects_dir: str = "") -> list[tree.Tree]:
-    """有効な記録があるメインのチェックアウト（ワークスペース自身かプロジェクト）。"""
+    """有効な記録があるユーザのチェックアウト（ワークスペース自身かプロジェクト）。"""
     mains = [tree.main_tree(root), *tree.projects(projects_dir)]
     return [m for m in mains if records_of(root, m)]

@@ -22,12 +22,12 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   （`ccnavi-git.sh integrate` が断る条件。Stop の促しと同じ判定）。`bound yes|no` に続けて、
   結び付くなら `why <理由>`。判定は `ops_stop_integrate.bound_reason`。
 
-- `ccnavi tree base-bound <メインのチェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが、
+- `ccnavi tree base-bound <ユーザのチェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが、
   チケットに結び付くか（`ccnavi-worktree.sh` が切る前に断る条件）。`bound yes|no|unknown` に続けて、
   yes なら `why <理由>`。識別子の衝突はワークスペース全体、結び付きは取り込み先のリポジトリだけを
   見る（`base_bound.base_bound`）。unknown（決められない）のときも、呼ぶ側は断る。
 
-- `ccnavi tree guarded <メインのチェックアウト> <パス>…`: パスが自己防衛の守る対象にヒットするか。
+- `ccnavi tree guarded <ユーザのチェックアウト> <パス>…`: パスが自己防衛の守る対象にヒットするか。
   `guarded yes|no` に続けて、ヒットするパスごとに `path <パス>`。`ccnavi-git.sh integrate` が、
   確定をターミナルから打つよう案内するかどうかを決めるために聞く。
 
@@ -175,7 +175,7 @@ def bound_tree(
 def base_bound_tree(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, path: str, branch: str
 ) -> int:
-    """`ccnavi tree base-bound <メインのチェックアウト> <ブランチ>`。
+    """`ccnavi tree base-bound <ユーザのチェックアウト> <ブランチ>`。
 
     頭に `tree 1`、続けて `bound yes|no|unknown`、yes なら `why <理由>`。
     """
@@ -203,10 +203,10 @@ def guarded_tree(
     path: str,
     rels: list[str],
 ) -> int:
-    """`ccnavi tree guarded <メインのチェックアウト> <パス>…`。
+    """`ccnavi tree guarded <ユーザのチェックアウト> <パス>…`。
 
     頭に `tree 1`、続けて `guarded yes|no`、守る対象にヒットするパスごとに `path <パス>`。
-    パスはメインのチェックアウトからの相対。判定は `selfguard_targets.targets`（自己防衛が
+    パスはユーザのチェックアウトからの相対。判定は `selfguard_targets.targets`（自己防衛が
     守る設定ファイル・実行ファイル）と、行き着く先まで解いたパスを大文字小文字を畳んで比べる。
     """
     if not path or not os.path.isdir(path):

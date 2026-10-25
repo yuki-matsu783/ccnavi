@@ -3,7 +3,7 @@
 ワークスペース 1 つとプロジェクト 2 つ（p と q）を作り、p の作業ワークツリーと
 直接作業の記録（`ccnavi-direct/<名前>`）を置く。見るのは次のこと。
 
-- 指定が有効なら、p のメインのチェックアウトの deny の場所の変更は戻さず、出所不明として報告する
+- 指定が有効なら、p のユーザのチェックアウトの deny の場所の変更は戻さず、出所不明として報告する
 - エージェントが p の作業ワークツリーで動いていても、p は監視される
 - ワークスペース自身と q は従来どおり戻る
 - 指定が無い・ワークツリーを消した・共通ディレクトリが違う記録は無効で、従来どおり戻る
@@ -195,7 +195,7 @@ class SideBySideTest(unittest.TestCase):
         self.assertIn("schema/keep.sql", result.stderr)
         self.assertNotIn("restored:", result.stderr)
 
-    def test_作業ワークツリーで動いていてもメインのチェックアウトを監視する(self):
+    def test_作業ワークツリーで動いていてもユーザのチェックアウトを監視する(self):
         self.record()
         self.hook(self.wt)
         self.dirty(self.p)
@@ -254,7 +254,7 @@ class SideBySideTest(unittest.TestCase):
 
     def test_同名の別ツリーが混ざっても報告と戻す判定が食い違わない(self):
         # q の下に p と同じ名前のワークツリーを切る。
-        # 名前で突き合わせると、戻していない p のメインを戻したと言う。
+        # 名前で突き合わせると、戻していない p のユーザのチェックアウトを戻したと言う。
         self.record()
         twin = os.path.join(self.ws, ".claude", "worktrees", "p")
         git(self.q, "worktree", "add", "--quiet", twin, "-b", "p")
@@ -264,7 +264,7 @@ class SideBySideTest(unittest.TestCase):
 
         result = self.hook(twin)
 
-        self.assertEqual(self.text(p_path), "-- changed\n", "p のメインは戻さない")
+        self.assertEqual(self.text(p_path), "-- changed\n", "p のユーザのチェックアウトは戻さない")
         self.assertIn("出所不明の変更", result.stderr)
 
     def test_報告したあとに中身が変わったら言い直す(self):

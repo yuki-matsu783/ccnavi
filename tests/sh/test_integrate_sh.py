@@ -1,7 +1,7 @@
 """`ccnavi-git.sh integrate` / `integrate --abort` / `integrate-done` の受入テスト。
 
 直接作業（チケットを起こさない）のワークツリーの成果を、切ったときの取り込み先のブランチへ
-1 コミットで載せる流れ。確認している間、メインのチェックアウトの index とワークツリーには書かず、
+1 コミットで載せる流れ。確認している間、ユーザのチェックアウトの index とワークツリーには書かず、
 一時ワークツリーで取り込み結果を作り、最後に `merge --ff-only --no-overwrite-ignore` で載せる。
 使い捨てのワークスペースを毎回組み、sh を外から呼ぶ。読み返すのは終了コード・出力と、
 git とファイルシステムに残ったものだけ。
@@ -286,7 +286,7 @@ class IntegrateTest(Fixture):
         self.work_in_branch()
         r = self.run_git_sh("integrate", "wt", cwd=self.wt)
         self.assertOk(r, 2)
-        self.assertIn("メインのチェックアウト", r.stderr)
+        self.assertIn("ユーザのチェックアウト", r.stderr)
 
     def test_a_dirty_source_worktree_is_refused(self):
         self.work_in_branch()

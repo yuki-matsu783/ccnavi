@@ -8,9 +8,9 @@ budget_usd: 2.0
 test_repo: true                  # projects/test-repo にブランチ・コミットを作る。回す前に確認事項 2 を確かめる
 
 # チケットを起こさない小さな修正の通常の道。ガードに止められずに最後まで通ること、止められたとしても案内に従って戻れること。
-# `integrate` は取り込み結果を一時ワークツリー（logs/direct-tmp/）に展開して止まり、メインのチェックアウトには何も書かない。
+# `integrate` は取り込み結果を一時ワークツリー（logs/direct-tmp/）に展開して止まり、ユーザのチェックアウトには何も書かない。
 # 中身を人間が確かめてから `integrate-done` で 1 コミットにして取り込み先へ載せる（.ccnavi/docs/direct-flow.md）。
-# projects/test-repo のメインのチェックアウトが開いているブランチが取り込み先になる。ずれが無ければ確認なしで切れる。
+# projects/test-repo のユーザのチェックアウトが開いているブランチが取り込み先になる。ずれが無ければ確認なしで切れる。
 # ccnavi 本体にコミットを作らないよう、対象は projects/test-repo。
 steps:
   - prompt: >-
@@ -19,10 +19,10 @@ steps:
       integrate-done はまだ打たないで、一時ワークツリーに展開した状態で止めて、取り込む中身を報告して。
   - human: true
     instruction: >-
-      projects/test-repo で integrate が出力した「次:」の diff のコマンド（`ccnavi-git.sh diff HEAD <C>`）を打ち、`ccnavi-git.sh status` でメインのチェックアウトに何も載っていないことも確かめる。
+      projects/test-repo で integrate が出力した「次:」の diff のコマンド（`ccnavi-git.sh diff HEAD <C>`）を打ち、`ccnavi-git.sh status` でユーザのチェックアウトに何も載っていないことも確かめる。
     check:
       - 差分が README.md の末尾 1 行の追加だけである
-      - メインのチェックアウトの status は変わっていない（staged が無い）
+      - ユーザのチェックアウトの status は変わっていない（staged が無い）
   - prompt: >-
       確認した。取り込みを確定して、片付けまで進めて。
     resume: true

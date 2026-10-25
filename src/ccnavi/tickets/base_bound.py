@@ -1,6 +1,6 @@
 """直接作業の取り込み先のブランチが、チケットに結び付くか（`ccnavi tree base-bound`）。
 
-`ccnavi-worktree.sh` が、メインのチェックアウトのブランチへ直接作業を切ってよいかを
+`ccnavi-worktree.sh` が、ユーザのチェックアウトのブランチへ直接作業を切ってよいかを
 決めるために聞く。`ops_stop_integrate.bound_check`（ワークツリーの名前が結び付くか）とは材料が違う。
 
 - 識別子の衝突: ワークスペース全体のチケット・提案に、`branch_to_id(ブランチ)` の名前のものがある
@@ -33,7 +33,7 @@ def _same(a: str, b: str) -> bool:
 
 
 def _owner(root: str, conf: settings.Settings, main_root: str) -> tree.Tree | None:
-    """メインのチェックアウトにヒットする、ワークスペースかプロジェクト。どれでもなければ None。"""
+    """ユーザのチェックアウトにヒットする、ワークスペースかプロジェクト。どれでもなければ None。"""
     projects_dir = ""
     if conf.projects:
         projects_dir = (
