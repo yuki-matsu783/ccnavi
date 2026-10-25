@@ -55,6 +55,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/ticketsample.py` | `ticket` `sh` |
+| `tests/sh/host_stub.py`・`tests/sh/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` | `scenarios` `sh`（`tests/scenarios/test_runner.py` が代役と模擬を import して起こす） |
 | `tests/fixtures/` | `guard` `ticket` |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `extensions/chrome/ccnavi-approval/`（`py/`・`test/fixtures/`） | `ticket` `sh`（Chrome の入口を手元のコアと突き合わせる） |

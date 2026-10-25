@@ -3,7 +3,7 @@ title: 受入シナリオを claude -p で回す
 type: guide
 description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方
 tags: [test, scenario]
-keywords: [受入シナリオ, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
+keywords: [受入シナリオ, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -145,11 +145,11 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 ## 使い捨てのリポジトリの事前状態と後片付け
 
 「ユーザのチェックアウトに未コミットの変更がある」「同名のブランチがある」といった git の状態は、`setup` の `git`・`files` の追記・`reset` で作り、回したあとに戻す。
-この 3 つが触れるのは、使い捨てのリポジトリ（`projects/test-repo`）だけ。
+この 3 つと `setup.host`（次々節）が触れるのは、使い捨てのリポジトリ（`projects/test-repo`）だけ。
 
 ### 対象の判定
 
-`setup.git`・`setup.reset`・`setup.files` の追記は、すべて `require_disposable_repo(root, target, allowed)` を通る。`test_repo: true` の自己申告は判定に使わない。
+`setup.git`・`setup.reset`・`setup.files` の追記・`setup.host` の `bare` / `fake-gitlab` は、すべて `require_disposable_repo(root, target, allowed)` を通る。`test_repo: true` の自己申告は判定に使わない。
 
 - 比べるのは、`target` の `git rev-parse --show-toplevel` の実体（realpath）と、`allowed`（既定は `projects/test-repo`）の実体。`pathcase.fold` を通して比べる。違えば断る
 - ワークスペースルート（ccnavi 本体）が対象のとき、対象が本体のリンクされたワークツリーのとき（`git rev-parse --git-common-dir` が同じ）、対象の origin が本体の origin と同じとき（`.git` の有無・末尾の `/`・大文字小文字は無視）も断る。どちらかに origin が無いときは origin を比べず、toplevel の比較だけで決める
@@ -238,11 +238,11 @@ setup:
 | 最後まで回った（`finish`） | `base` に戻す | 放す |
 | claude の失敗・`expect_after` を満たさない停止（内部の値 11。`finish` を通る） | `base` に戻す | 放す |
 | `KeyboardInterrupt` など（`_continue` の `BaseException`） | `base` に戻し、元の例外を投げ直す | 放す |
-| 人間の操作の step で止まった（10） | **戻さず残す**（人間が操作したあとの `next` で続くため） | 放す |
+| 人間の操作の step で止まった（10） | **戻さず残す**（人間が操作したあとの `next` で続くため。`setup.host` は模擬を止め、置き場は残す） | 放す |
 | 対象を取る前の拒否（判定・ロック・残し印・`base` が無い・追記の対象が使えない） | 何もしない（出力の置き場だけ作る） | 取っていない |
 | 対象を取ったあとの setup の失敗 | 作ったものを消し、`base` に戻す | 放す |
 
-- 10 で残すとき、出力に「`base` に戻していない」と、`next` と `restore` の打ち方を出す。`next` が最後まで終わると戻す。やめるときは `restore <出力の置き場>`（`setup.files` の作る形を消し、`base` に戻す）
+- 10 で残すとき、出力に「`base` に戻していない」と、`next` と `restore` の打ち方を出す。`next` が最後まで終わると戻す。やめるときは `restore <出力の置き場>`（`setup.files` の作る形を消し、`setup.host` の置き場を消し、`base` に戻す）
 - 残した状態に別のシナリオが入らないよう、対象の `.git/ccnavi-scenario.left`（中身は残した回の出力の置き場）を残し印として置く。印があると、その回の `next` / `restore` 以外の `run` は断る
 - 戻せなかったときは、「手作業で戻す必要がある」ことと対象のパスを出して終了コード 3 で止まる。レポートは書いてから 3 を返す。戻せなかった回も残し印が残るので、次の回は始まらない。手で戻したら `restore` で印を外す。`KeyboardInterrupt` のときも戻せなかったことを出したうえで、元の例外を投げ直す
 - 停止（実行器の内部の値 11。終了コードとしては出ない）のあとの `next` は続けられない（終了コード 2）。`finish` に届かず戻っていなければ、ここで戻し、戻せなければ終了コード 3
@@ -266,7 +266,7 @@ AI の出力を機械だけで判定することはできない。ccnavi の判�
 
 | 判定 | 意味 | 何で決まるか |
 |---|---|---|
-| `pass` / `fail` | 機械で比べた結果 | `decisions`（回した step のセッション ID の行だけを `logs/decisions.jsonl` から取り出して比べる）、`decisions_none`、`files_unchanged`、`state`、`transcript_forbidden` |
+| `pass` / `fail` | 機械で比べた結果 | `decisions`（回した step のセッション ID の行だけを `logs/decisions.jsonl` から取り出して比べる）、`decisions_none`、`files_unchanged`、`state`、`transcript_forbidden`。報告の `repo` の行（本体に残らないこと）。`host` の行は、どの相手で回したかを残すだけで、いつも `pass` |
 | `inconclusive`（未成立） | 期待した呼び出し自体が記録に無い。`fail` にしない | `decisions` の `event`・`tool`・`subject_contains` に該当する行が無い。`expect_after` を満たさず止めた回も `inconclusive`(理由に満たさなかった欄が出る)。claude が終了コード 0 で終わらなかった・起動できなかった・時間切れのときも、その step で止めて `inconclusive`（`run` の行） |
 | `needs-review` | 意味で読む | `judge`。実行器が `evidence.md` に、機械判定の表・judge の基準・step ごとの入力プロンプト・ツール呼び出しと結果（成功とエラーは別の見出し。hook の拒否理由と同じ文のエラーは「hook の応答を参照」と書く）・hook の応答（拒否・確認・終了コードが 0 でないもの・停止・案内文・通知・Stop だけ。他は件数）・最後の報告・判定の行（step 列つきの表）を抜き出す。拒否の文面は全文を載せ、他を切るときは切ったことと全量の在りかを書く。別のエージェントが基準に照らして読み、`report.md` に結果を書く |
 
