@@ -6,11 +6,16 @@
 """
 
 import json
+import os
+import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+
+import yaml
 
 from tests import __main__ as full_run
 from tests.scenarios import runner
@@ -1051,6 +1056,984 @@ class ResultsTableTest(unittest.TestCase):
         full = "\n".join(runner._results_table(results))
         self.assertIn("c" * 300, full)
         self.assertIn("w" * 300, full)
+
+
+# ---- 使い捨てのリポジトリの事前状態と後片付け（setup.git・setup.reset・append・ロック） ----
+
+GIT_USER = ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]
+
+
+def git(cwd, *args):
+    r = subprocess.run(["git", *GIT_USER, *args], cwd=cwd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise AssertionError(f"git {' '.join(args)}: {r.stderr}")
+    return r.stdout.strip()
+
+
+def make_repo(path, origin=None):
+    """小さな git リポジトリ。README.md と .gitignore を持つ最初のコミットの SHA を返す。"""
+    Path(path).mkdir(parents=True, exist_ok=True)
+    git(path, "init", "-q", "-b", "main")
+    if origin:
+        git(path, "remote", "add", "origin", origin)
+    (Path(path) / "README.md").write_text("元の中身\n", encoding="utf-8")
+    (Path(path) / ".gitignore").write_text("ignored.log\n", encoding="utf-8")
+    git(path, "add", ".")
+    git(path, "commit", "-q", "-m", "base")
+    return git(path, "rev-parse", "HEAD")
+
+
+class Workspace:
+    """ワークスペースルート（本体の代わりの小さなリポジトリ）と、その下の使い捨てのリポジトリ。"""
+
+    def __init__(self, tmp, *, origin_root=None, origin_target=None):
+        self.root = Path(tmp) / "ws"
+        make_repo(self.root, origin_root)
+        self.target = self.root / "projects" / "test-repo"
+        self.base = make_repo(self.target, origin_target)
+        self.out = Path(tmp) / "out"
+
+    def dirty(self):
+        """回したあとの、戻したい散らかり方を一通り作る。"""
+        t = self.target
+        (t / "README.md").write_text("元の中身\n追記\n", encoding="utf-8")
+        (t / "untracked.txt").write_text("x\n", encoding="utf-8")
+        (t / "ignored.log").write_text("残る\n", encoding="utf-8")
+        git(t, "branch", "feat")
+        git(t, "tag", "v1")
+        (t / "other.txt").write_text("o\n", encoding="utf-8")
+        git(t, "add", "other.txt")
+        git(t, "commit", "-q", "-m", "ahead")
+        (t / "README.md").write_text("元の中身\nstash\n", encoding="utf-8")
+        git(t, "stash")
+        git(t, "worktree", "add", "-q", str(t.parent / "wt"), "-b", "wtbranch")
+        git(t, "update-ref", "refs/remotes/origin/keep", "HEAD")
+        (t / "README.md").write_text("元の中身\n未コミット\n", encoding="utf-8")
+
+    def scenario_file(self, setup, steps=None, name="UC-99-x.yml"):
+        return write_scenario(self.root.parent, setup, steps, name)
+
+
+def write_scenario(directory, setup, steps=None, name="UC-99-x.yml"):
+    data = {
+        "id": "UC-99",
+        "title": "t",
+        "steps": steps or [{"prompt": "a"}],
+        "expect": {},
+        "setup": setup,
+    }
+    path = Path(directory) / name
+    path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+    return path
+
+
+class DisposableRepoTest(unittest.TestCase):
+    def test_workspace_root_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.require_disposable_repo(ws.root, ws.root, allowed=ws.root)
+        self.assertIn("ccnavi 本体", str(cm.exception))
+
+    def test_dir_inside_root_without_own_repo_is_the_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            plain = ws.root / "projects" / "plain"
+            plain.mkdir()
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.require_disposable_repo(ws.root, plain, allowed=plain)
+        self.assertIn("ccnavi 本体", str(cm.exception))
+
+    def test_default_allowed_is_projects_test_repo(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            top = runner.require_disposable_repo(ws.root, ws.target)
+        self.assertEqual(top, str(ws.target.resolve()))
+
+    def test_other_repo_than_allowed_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            other = Path(d) / "other"
+            make_repo(other)
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.require_disposable_repo(ws.root, other, allowed=ws.target)
+        self.assertIn("許可された", str(cm.exception))
+
+    def test_case_differing_spelling_is_the_same_target(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            shouting = Path(str(ws.target).swapcase())
+            top = runner.require_disposable_repo(ws.root, ws.target, allowed=shouting)
+        self.assertEqual(top, str(ws.target.resolve()))
+
+    def test_symlink_to_the_allowed_repo_is_the_same_target(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            link = Path(d) / "link"
+            try:
+                link.symlink_to(ws.target, target_is_directory=True)
+            except OSError:
+                self.skipTest("シンボリックリンクを作れない")
+            top = runner.require_disposable_repo(ws.root, link, allowed=ws.target)
+        self.assertEqual(top, str(ws.target.resolve()))
+
+    def test_same_origin_as_the_body_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(
+                d,
+                origin_root="https://example.com/o/r.git",
+                origin_target="https://EXAMPLE.com/o/r/",
+            )
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.require_disposable_repo(ws.root, ws.target)
+        self.assertIn("origin", str(cm.exception))
+
+    def test_different_origin_is_allowed(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(
+                d,
+                origin_root="https://example.com/o/r.git",
+                origin_target="https://example.com/o/t.git",
+            )
+            runner.require_disposable_repo(ws.root, ws.target)
+
+    def test_missing_origin_on_either_side_compares_the_toplevel_only(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d, origin_target="https://example.com/o/t.git")
+            runner.require_disposable_repo(ws.root, ws.target)
+
+    def test_linked_worktree_of_the_body_is_refused_even_without_origin(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            shutil.rmtree(ws.target)
+            git(ws.root, "worktree", "add", "-q", str(ws.target), "-b", "linked")
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.require_disposable_repo(ws.root, ws.target)
+            self.assertIn("同じリポジトリ", str(cm.exception))
+
+    def test_not_a_repo_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            with self.assertRaises(runner.Refusal):
+                runner.require_disposable_repo(ws.root, Path(d) / "nothing")
+
+    def test_refusal_text_ends_with_one_next_line(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.require_disposable_repo(ws.root, ws.root)
+        lines = str(cm.exception).splitlines()
+        self.assertEqual([x for x in lines if x.startswith("次: ")], [lines[-1]])
+        self.assertTrue(any(x.startswith("案内: ") for x in lines))
+
+    def test_run_refuses_the_body_with_exit_3_before_anything_is_made(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            (ws.root / "projects" / "test-repo" / ".git").rename(Path(d) / "gone-git")
+            path = ws.scenario_file({"reset": {"base": ws.base}})
+            args = ["run", str(path), "--confirmed", "--root", str(ws.root), "--out", str(ws.out)]
+            with (
+                mock.patch.object(runner, "_ENTRY", True),
+                mock.patch.object(runner, "drive") as drive,
+                mock.patch("builtins.print") as shown,
+            ):
+                rc = runner.main(args)
+            text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
+        self.assertEqual(rc, 3)
+        drive.assert_not_called()
+        self.assertFalse(ws.out.exists())
+        self.assertIn("次: ", text)
+
+
+class SetupGitTest(unittest.TestCase):
+    def test_argv_rules(self):
+        for bad in (
+            ["cd", "x"],
+            ["sh", "-c", "git status"],
+            ["git", "-C", "..", "status"],
+            ["git", "-C../x", "status"],
+            ["git", "--git-dir=/x", "status"],
+            ["git", "--git-dir", "/x", "status"],
+            ["git", "--work-tree=/x", "status"],
+            ["git", "--work-tree", "/x", "status"],
+            ["git", "-c", "alias.x=!sh", "x"],
+            ["git", "--exec-path=/x", "status"],
+            "git status",
+            [],
+            ["git", ""],
+        ):
+            with self.subTest(argv=bad), self.assertRaises(ValueError):
+                runner.check_git_argv(bad)
+        runner.check_git_argv(["git", "switch", "-c", "feat"])
+        runner.check_git_argv(["git", "commit", "-m", "x"])
+
+    def test_git_without_reset_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write_scenario(d, {"git": [["git", "status"]]})
+            with self.assertRaises(ValueError) as cm:
+                runner.load_scenario(path)
+        self.assertIn("setup.reset", str(cm.exception))
+
+    def test_load_scenario_rejects_a_bad_command(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = ws.scenario_file({"git": [["git", "-C", "/", "status"]]})
+            with self.assertRaises(ValueError):
+                runner.load_scenario(path)
+
+    def test_runs_in_the_target_not_the_body_and_logs_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            before = runner.repo_snapshot(ws.root)
+            runner.run_setup_git(
+                ws.root, ws.target, [["git", "switch", "-q", "-c", "feat"], ["git", "branch", "b2"]]
+            )
+            self.assertEqual(git(ws.target, "branch", "--show-current"), "feat")
+            self.assertIn("b2", git(ws.target, "branch"))
+            self.assertEqual(runner.repo_snapshot(ws.root), before)
+            log = (ws.root / "logs" / "diag" / "scenario-runner.log").read_text(encoding="utf-8")
+        self.assertIn("git switch -q -c feat", log)
+        self.assertIn("rc=0", log)
+
+    def test_cwd_is_the_checked_toplevel_even_when_git_dir_is_in_the_environment(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            env = {"GIT_DIR": str(ws.root / ".git"), "GIT_WORK_TREE": str(ws.root)}
+            with mock.patch.dict(os.environ, env):
+                runner.run_setup_git(ws.root, ws.target, [["git", "branch", "only-in-target"]])
+            self.assertIn("only-in-target", git(ws.target, "branch"))
+            self.assertNotIn("only-in-target", git(ws.root, "branch"))
+
+    def test_refuses_the_body_as_target(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            with self.assertRaises(runner.Refusal):
+                runner.run_setup_git(ws.root, ws.root, [["git", "branch", "x"]], allowed=ws.root)
+            self.assertNotIn("x", git(ws.root, "branch"))
+
+    def test_stops_when_the_body_changed(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            snaps = iter(["a", "b", "b", "b"])
+            with (
+                mock.patch.object(runner, "repo_snapshot", side_effect=lambda r: next(snaps)),
+                self.assertRaises(runner.Refusal) as cm,
+            ):
+                runner.run_setup_git(
+                    ws.root, ws.target, [["git", "branch", "x"], ["git", "branch", "y"]]
+                )
+            self.assertIn("ccnavi 本体", str(cm.exception))
+            self.assertNotIn("y", git(ws.target, "branch", "--format=%(refname:short)").split())
+
+    def test_failed_command_stops_with_the_command_named(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.run_setup_git(ws.root, ws.target, [["git", "checkout", "nonexistent"]])
+        self.assertIn("git checkout nonexistent", str(cm.exception))
+
+
+class ScenarioFieldsTest(unittest.TestCase):
+    def load(self, setup):
+        with tempfile.TemporaryDirectory() as d:
+            return runner.load_scenario(write_scenario(d, setup))
+
+    def test_dict_form_is_accepted(self):
+        base = "a" * 40
+        scn = self.load(
+            {"files": {"x.md": {"content": "y", "append": True}, "z": "s"}, "reset": {"base": base}}
+        )
+        self.assertEqual(runner.file_spec(scn["setup"]["files"]["x.md"]), ("y", True))
+        self.assertEqual(runner.file_spec(scn["setup"]["files"]["z"]), ("s", False))
+
+    def test_bad_shapes_are_rejected(self):
+        base = {"base": "a" * 40}
+        for setup in (
+            {"files": {"x": {"append": True}}, "reset": base},
+            {"files": {"x": {"content": 1, "append": True}}, "reset": base},
+            {"files": {"x": {"content": "y", "append": "yes"}}, "reset": base},
+            {"files": {"x": {"content": "y", "mode": "a"}}, "reset": base},
+            {"files": {"x": 1}},
+            {"reset": {"base": "abc1234"}},
+            {"reset": {"base": "main"}},
+            {"reset": {"base": "v1.0"}},
+            {"reset": {"base": "g" * 40}},
+            {"reset": {"base": "a" * 40, "force": True}},
+            {"reset": "a" * 40},
+            {"git": "git status"},
+            {"reeset": base},
+        ):
+            with self.subTest(setup=setup), self.assertRaises(ValueError):
+                self.load(setup)
+
+    def test_append_without_reset_is_rejected(self):
+        with self.assertRaises(ValueError) as cm:
+            self.load({"files": {"x.md": {"content": "y", "append": True}}})
+        self.assertIn("setup.reset", str(cm.exception))
+
+    def test_clashes_are_inverted_for_append(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "have.txt").write_text("x", encoding="utf-8")
+            scn = {
+                "setup": {
+                    "files": {
+                        "have.txt": "新規",
+                        "missing.txt": "新規",
+                        "app-have.txt": {"content": "a", "append": True},
+                        "app-missing.txt": {"content": "a", "append": True},
+                    }
+                }
+            }
+            (root / "app-have.txt").write_text("x", encoding="utf-8")
+            self.assertEqual(runner.setup_clashes(scn, root), ["have.txt", "app-missing.txt"])
+
+    def test_summary_separates_created_and_appended_files(self):
+        scn = {
+            "id": "UC-XX",
+            "title": "t",
+            "steps": [{"prompt": "a"}],
+            "setup": {
+                "files": {
+                    "new.txt": "x",
+                    "projects/test-repo/README.md": {"content": "y", "append": True},
+                },
+                "git": [["git", "switch", "-c", "feat"]],
+                "reset": {"base": "a" * 40},
+            },
+        }
+        text = runner.scenario_summary(scn)
+        self.assertIn("回す前に作り、回したあとに消すファイル: new.txt", text)
+        self.assertIn("回す前に追記する、対象にある管理下のファイル", text)
+        self.assertIn("projects/test-repo/README.md", text.split("追記する", 1)[1])
+        self.assertIn("git switch -c feat", text)
+        self.assertIn("a" * 40, text)
+        self.assertIn("人間の操作で止めた回は、戻さずに残す", text)
+
+
+class AppendTest(unittest.TestCase):
+    REL = "projects/test-repo/README.md"
+
+    def scenario(self, rel=None, body="追記\n"):
+        return {"setup": {"files": {rel or self.REL: {"content": body, "append": True}}}}
+
+    def test_appends_to_the_tracked_file_and_cleanup_keeps_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            top = runner.require_disposable_repo(ws.root, ws.target)
+            files, dirs = runner._setup(self.scenario(), ws.root, top)
+            self.assertEqual((files, dirs), ([], []))
+            self.assertEqual(
+                (ws.target / "README.md").read_text(encoding="utf-8"), "元の中身\n追記\n"
+            )
+            runner._cleanup(files, dirs, ws.root)
+            self.assertTrue((ws.target / "README.md").is_file())
+
+    def test_appended_file_is_not_removed_by_finish(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            top = runner.require_disposable_repo(ws.root, ws.target)
+            files, dirs = runner._setup(self.scenario(), ws.root, top)
+            ws.out.mkdir()
+            st = {
+                "setup_made": files,
+                "setup_dirs": dirs,
+                "session_ids": [],
+                "pre_digests": {},
+                "pre_repo": runner.repo_snapshot(ws.root),
+                "cost_usd": 0.0,
+            }
+            runner.finish({"id": "UC-XX", "title": "t", "expect": {}}, ws.out, st, ws.root)
+            self.assertTrue((ws.target / "README.md").is_file())
+
+    def refused(self, rel):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            top = runner.require_disposable_repo(ws.root, ws.target)
+            (ws.target / "untracked.txt").write_text("u", encoding="utf-8")
+            (ws.target / "sub").mkdir()
+            (ws.root / "outside.txt").write_text("o", encoding="utf-8")
+            before = (ws.target / "README.md").read_text(encoding="utf-8")
+            with self.assertRaises(runner.Refusal):
+                runner._setup(self.scenario(rel), ws.root, top)
+            self.assertEqual((ws.target / "README.md").read_text(encoding="utf-8"), before)
+
+    def test_outside_missing_untracked_and_directory_are_refused(self):
+        for rel in (
+            "projects/test-repo/../../outside.txt",
+            "outside.txt",
+            "projects/test-repo/none.md",
+            "projects/test-repo/untracked.txt",
+            "projects/test-repo/sub",
+            "README.md",
+        ):
+            with self.subTest(rel=rel):
+                self.refused(rel)
+
+    def test_absolute_path_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            top = runner.require_disposable_repo(ws.root, ws.target)
+            with self.assertRaises(runner.Refusal):
+                runner._setup(self.scenario(str(ws.target / "README.md")), ws.root, top)
+
+    def test_symlink_that_leaves_the_target_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            (ws.root / "outside.txt").write_text("o", encoding="utf-8")
+            try:
+                (ws.target / "escape.txt").symlink_to(ws.root / "outside.txt")
+            except OSError:
+                self.skipTest("シンボリックリンクを作れない")
+            git(ws.target, "add", "escape.txt")
+            top = runner.require_disposable_repo(ws.root, ws.target)
+            with self.assertRaises(runner.Refusal) as cm:
+                runner._setup(self.scenario("projects/test-repo/escape.txt"), ws.root, top)
+            self.assertIn("外", str(cm.exception))
+            self.assertEqual((ws.root / "outside.txt").read_text(encoding="utf-8"), "o")
+
+    def test_path_is_matched_literally_not_as_a_glob(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            (ws.target / "docs1.md").write_text("t", encoding="utf-8")
+            git(ws.target, "add", "docs1.md")
+            try:
+                (ws.target / "docs*.md").write_text("u", encoding="utf-8")
+            except OSError:
+                self.skipTest("ファイル名に * を使えない")
+            top = runner.require_disposable_repo(ws.root, ws.target)
+            with self.assertRaises(runner.Refusal):
+                runner._setup(self.scenario("projects/test-repo/docs*.md"), ws.root, top)
+
+    def test_append_needs_the_checked_target(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            with self.assertRaises(runner.Refusal):
+                runner._setup(self.scenario(), ws.root)
+
+
+class ResetTest(unittest.TestCase):
+    def test_restores_everything_but_ignored_files_and_remote_refs(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            ws.dirty()
+            t = ws.target
+            runner.reset_repo(ws.root, t, ws.base)
+            self.assertEqual(git(t, "rev-parse", "HEAD"), ws.base)
+            self.assertEqual(git(t, "rev-parse", "main"), ws.base)
+            self.assertEqual(git(t, "branch", "--show-current"), "main")
+            self.assertEqual(
+                git(t, "for-each-ref", "--format=%(refname:short)", "refs/heads"), "main"
+            )
+            self.assertEqual(git(t, "tag", "-l"), "")
+            self.assertEqual(git(t, "stash", "list"), "")
+            self.assertEqual(len(git(t, "worktree", "list").splitlines()), 1)
+            self.assertEqual(git(t, "status", "--porcelain"), "")
+            self.assertEqual((t / "README.md").read_text(encoding="utf-8"), "元の中身\n")
+            self.assertFalse((t / "untracked.txt").exists())
+            self.assertTrue((t / "ignored.log").exists(), "clean に -x を付けない")
+            self.assertEqual(
+                git(t, "for-each-ref", "--format=%(refname)", "refs/remotes"),
+                "refs/remotes/origin/keep",
+            )
+
+    def test_main_pointing_elsewhere_is_moved_to_base(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            t = ws.target
+            git(t, "switch", "-q", "-c", "side")
+            (t / "s.txt").write_text("s", encoding="utf-8")
+            git(t, "add", "s.txt")
+            git(t, "commit", "-q", "-m", "side")
+            git(t, "branch", "-f", "main", "side")
+            runner.reset_repo(ws.root, t, ws.base)
+            self.assertEqual(git(t, "rev-parse", "main"), ws.base)
+            self.assertEqual(git(t, "branch", "--show-current"), "main")
+
+    def test_order_and_no_x_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            ws.dirty()
+            with mock.patch.object(runner, "_target_git", side_effect=runner._target_git) as spy:
+                runner.reset_repo(ws.root, ws.target, ws.base)
+            calls = [c.args[2] for c in spy.call_args_list]
+            kinds = []
+            for c in calls:
+                key = c[:2] if c[0] in ("worktree", "stash") else c[:1]
+                if c[0] == "reset":
+                    key = ["reset", c[1]]
+                if c[0] == "clean":
+                    key = ["clean", c[1]]
+                kinds.append(" ".join(key))
+            order = [
+                "worktree remove",
+                "worktree prune",
+                "checkout",
+                "branch",
+                "tag",
+                "stash clear",
+                "reset --hard",
+                "clean -fd",
+            ]
+            for name in order:
+                self.assertIn(name, kinds)
+            first = [kinds.index(n) for n in order]
+            self.assertEqual(first, sorted(first))
+            checkout = next(c for c in calls if c[0] == "checkout")
+            self.assertEqual(checkout[-3:], ["-B", "main", ws.base])
+            clean = next(c for c in calls if c[0] == "clean")
+            self.assertEqual(clean, ["clean", "-fd"])
+            self.assertNotIn("-x", [a for c in calls for a in c])
+
+    def test_unknown_base_changes_nothing(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            ws.dirty()
+            with self.assertRaises(runner.Refusal):
+                runner.reset_repo(ws.root, ws.target, "f" * 40)
+            self.assertEqual(
+                (ws.target / "README.md").read_text(encoding="utf-8"), "元の中身\n未コミット\n"
+            )
+
+    def test_refuses_the_body(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            git(ws.root, "branch", "keep-me")
+            with self.assertRaises(runner.Refusal):
+                runner.reset_repo(ws.root, ws.root, ws.base, allowed=ws.root)
+            self.assertIn("keep-me", git(ws.root, "branch"))
+
+
+class PreRunCheckTest(unittest.TestCase):
+    def test_unknown_base_is_refused_before_anything_is_changed(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            ws.dirty()
+            scn = {"setup": {"reset": {"base": "0" * 40}}}
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.check_before_run(scn, ws.root, str(ws.target.resolve()))
+            self.assertIn("次: ", str(cm.exception))
+            self.assertEqual(git(ws.target, "branch", "--show-current"), "main")
+            self.assertNotIn(runner.LEFT_NAME, {p.name for p in (ws.target / ".git").iterdir()})
+
+    def test_unusable_append_target_is_refused_before_the_confirmation(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = ws.scenario_file(
+                {
+                    "files": {"projects/test-repo/untracked.txt": {"content": "x", "append": True}},
+                    "reset": {"base": ws.base},
+                }
+            )
+            (ws.target / "untracked.txt").write_text("u", encoding="utf-8")
+            with mock.patch.object(runner, "_ENTRY", True), mock.patch("builtins.print"):
+                rc = runner.main(["run", str(path), "--root", str(ws.root)])  # --confirmed なし
+            self.assertEqual(rc, 3)
+            self.assertFalse(ws.out.exists())
+
+
+class SetupFailureTest(unittest.TestCase):
+    def test_partial_failure_removes_what_was_made(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            scn = {"setup": {"files": {"a/one.txt": "1", "a/two.txt": "2"}}}
+            real = Path.write_text
+
+            def flaky(self, *a, **k):
+                if self.name == "two.txt":
+                    raise OSError("書けない")
+                return real(self, *a, **k)
+
+            with mock.patch.object(Path, "write_text", flaky), self.assertRaises(OSError):
+                runner._setup(scn, root)
+            self.assertFalse((root / "a").exists())
+            self.assertEqual(runner.setup_clashes(scn, root), [])
+
+
+class CleanupRobustnessTest(unittest.TestCase):
+    def test_close_issue_failure_does_not_stop_the_restore(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            ws.dirty()
+            top = str(ws.target.resolve())
+            lock = runner.acquire_target(top, ws.out)
+            st = {
+                "target": {"path": top, "base": ws.base, "lock": lock},
+                "out": str(ws.out),
+                "setup_made": [],
+                "issue_no": 7,
+            }
+            ws.out.mkdir()
+            scn = {"setup": {"issue": {"repo": "projects/test-repo", "close": True}}}
+            with (
+                mock.patch.object(runner, "repo_host_kind", side_effect=FileNotFoundError("gh")),
+                mock.patch("builtins.print"),
+            ):
+                runner._abort(scn, ws.out, st, ws.root)
+            self.assertEqual(git(ws.target, "status", "--porcelain"), "")
+            self.assertFalse(Path(lock).exists())
+
+    def test_restore_after_finish_does_not_delete_a_file_made_later(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = ws.scenario_file(
+                {"files": {"projects/test-repo/new.txt": "x\n"}, "reset": {"base": ws.base}}
+            )
+            with (
+                mock.patch.object(runner, "_ENTRY", True),
+                mock.patch.object(
+                    runner, "run_step", return_value={"cost_usd": 0.0, "session_ids": []}
+                ),
+                mock.patch("builtins.print"),
+            ):
+                args = ["run", str(path), "--confirmed", "--root", str(ws.root)]
+                self.assertEqual(runner.main([*args, "--out", str(ws.out)]), 0)
+                later = ws.target / "new.txt"
+                later.write_text("あとから作った\n", encoding="utf-8")
+                self.assertEqual(runner.main(["restore", str(ws.out)]), 0)
+            self.assertTrue(later.exists())
+
+    def test_relative_out_is_stored_as_an_absolute_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]
+            path = ws.scenario_file({"reset": {"base": ws.base}}, steps)
+            before = os.getcwd()
+            os.chdir(d)
+            self.addCleanup(os.chdir, before)
+            with (
+                mock.patch.object(runner, "_ENTRY", True),
+                mock.patch.object(
+                    runner, "run_step", return_value={"cost_usd": 0.0, "session_ids": []}
+                ),
+                mock.patch("builtins.print"),
+            ):
+                args = ["run", str(path), "--confirmed", "--root", str(ws.root), "--out", "rel"]
+                self.assertEqual(runner.main(args), 10)
+                marker = ws.target / ".git" / runner.LEFT_NAME
+                self.assertEqual(
+                    marker.read_text(encoding="utf-8"), str((Path(d) / "rel").resolve())
+                )
+                os.chdir(ws.root)  # 別の cwd からでも、同じ回として続けられる
+                self.assertEqual(runner.main(["restore", str(Path(d) / "rel")]), 0)
+
+
+class LockTest(unittest.TestCase):
+    def test_second_run_is_refused_and_release_lets_it_in(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            top = str(ws.target.resolve())
+            lock = runner.acquire_target(top, ws.out)
+            self.assertEqual(Path(lock).read_text(encoding="utf-8"), str(os.getpid()))
+            with self.assertRaises(runner.Refusal) as cm:
+                runner.acquire_target(top, ws.out)
+            self.assertIn("別の回が使っている", str(cm.exception))
+            st = {"target": {"path": top, "base": None}, "out": str(ws.out)}
+            runner.release_target(st, ws.root)
+            runner.acquire_target(top, ws.out)
+
+    def test_lock_lives_in_dot_git_and_survives_clean(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            lock = runner.acquire_target(str(ws.target.resolve()), ws.out)
+            self.assertEqual(Path(lock).parent, (ws.target / ".git").resolve())
+            self.assertEqual(git(ws.target, "status", "--porcelain"), "")
+            git(ws.target, "clean", "-fd")
+            self.assertTrue(Path(lock).exists())
+
+    def test_dead_owner_is_taken_over(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            proc = subprocess.Popen([sys.executable, "-c", "pass"])
+            proc.wait()
+            lock = ws.target / ".git" / runner.LOCK_NAME
+            lock.write_text(str(proc.pid), encoding="utf-8")
+            runner.acquire_target(str(ws.target.resolve()), ws.out)
+            self.assertEqual(lock.read_text(encoding="utf-8"), str(os.getpid()))
+
+    def test_unreadable_owner_counts_as_alive(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            (ws.target / ".git" / runner.LOCK_NAME).write_text("", encoding="utf-8")
+            with self.assertRaises(runner.Refusal):
+                runner.acquire_target(str(ws.target.resolve()), ws.out)
+
+    def test_failed_liveness_check_counts_as_alive(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            (ws.target / ".git" / runner.LOCK_NAME).write_text("999999", encoding="utf-8")
+            with (
+                mock.patch.object(runner.os, "kill", side_effect=PermissionError),
+                self.assertRaises(runner.Refusal),
+            ):
+                runner.acquire_target(str(ws.target.resolve()), ws.out)
+
+    def test_pid_alive(self):
+        self.assertTrue(runner._pid_alive(os.getpid()))
+        proc = subprocess.Popen([sys.executable, "-c", "pass"])
+        proc.wait()
+        self.assertFalse(runner._pid_alive(proc.pid))
+
+
+class LifecycleTest(unittest.TestCase):
+    """cmd_run から finish / 中断 / 人間の操作の step までを、claude を呼ばずに回す。"""
+
+    STEP_OUT = {"cost_usd": 0.0, "session_ids": []}
+
+    def setup_for(self, ws, steps=None):
+        return ws.scenario_file(
+            {
+                "files": {"projects/test-repo/README.md": {"content": "追記\n", "append": True}},
+                "git": [["git", "switch", "-q", "-c", "feat"]],
+                "reset": {"base": ws.base},
+            },
+            steps,
+        )
+
+    def run_cmd(self, ws, path, *extra):
+        args = [
+            "run",
+            str(path),
+            "--confirmed",
+            "--root",
+            str(ws.root),
+            "--out",
+            str(ws.out),
+            *extra,
+        ]
+        with mock.patch.object(runner, "_ENTRY", True):
+            return runner.main(args)
+
+    def restored(self, ws):
+        t = ws.target
+        return (
+            git(t, "rev-parse", "main") == ws.base
+            and git(t, "branch", "--show-current") == "main"
+            and git(t, "status", "--porcelain") == ""
+            and (t / "README.md").read_text(encoding="utf-8") == "元の中身\n"
+        )
+
+    def git_dir_names(self, ws):
+        return {p.name for p in (ws.target / ".git").iterdir()}
+
+    def test_pre_state_is_made_and_finish_restores_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            ws.dirty()
+            seen = {}
+
+            def run_step(*a, **k):
+                seen["branch"] = git(ws.target, "branch", "--show-current")
+                seen["readme"] = (ws.target / "README.md").read_text(encoding="utf-8")
+                seen["lock"] = runner.LOCK_NAME in self.git_dir_names(ws)
+                return self.STEP_OUT
+
+            with mock.patch.object(runner, "run_step", side_effect=run_step):
+                rc = self.run_cmd(ws, self.setup_for(ws))
+            self.assertEqual(seen, {"branch": "feat", "readme": "元の中身\n追記\n", "lock": True})
+            self.assertIn(rc, (0, 2))
+            self.assertTrue(self.restored(ws))
+            names = self.git_dir_names(ws)
+            self.assertNotIn(runner.LOCK_NAME, names)
+            self.assertNotIn(runner.LEFT_NAME, names)
+
+    def test_keyboard_interrupt_restores_and_reraises(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            with (
+                mock.patch.object(runner, "run_step", side_effect=KeyboardInterrupt),
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                self.run_cmd(ws, self.setup_for(ws))
+            self.assertTrue(self.restored(ws))
+            self.assertNotIn(runner.LOCK_NAME, self.git_dir_names(ws))
+
+    def test_failed_step_restores(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            with mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")):
+                rc = self.run_cmd(ws, self.setup_for(ws))
+            self.assertEqual(rc, 2)
+            self.assertTrue(self.restored(ws))
+
+    def test_human_step_leaves_the_state_until_next_finishes(self):
+        steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = self.setup_for(ws, steps)
+            with (
+                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+                mock.patch("builtins.print") as shown,
+            ):
+                rc = self.run_cmd(ws, path)
+            text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
+            self.assertEqual(rc, 10)
+            self.assertEqual(git(ws.target, "branch", "--show-current"), "feat")
+            self.assertIn("元の中身\n追記\n", (ws.target / "README.md").read_text(encoding="utf-8"))
+            names = self.git_dir_names(ws)
+            self.assertNotIn(runner.LOCK_NAME, names)
+            self.assertIn(runner.LEFT_NAME, names)
+            self.assertIn(f"{ws.base} に戻していない", text)
+            self.assertIn(f"次: 続けるなら `{runner.RUNNER} next {ws.out}`", text)
+            self.assertIn(f"やめるなら `{runner.RUNNER} restore {ws.out}`", text)
+
+            # 残した状態に、別の回は入れない
+            other = ws.scenario_file({"reset": {"base": ws.base}}, name="UC-98-y.yml")
+            with (
+                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+                mock.patch("builtins.print"),
+            ):
+                other_rc = self.run_cmd(ws, other, "--out", str(Path(d) / "out2"))
+            self.assertEqual(other_rc, 3)
+            self.assertEqual(git(ws.target, "branch", "--show-current"), "feat")
+
+            # next が最後まで終わると戻る
+            with mock.patch("builtins.print"):
+                done = runner.main(["next", str(ws.out)])
+            self.assertEqual(done, 0)
+            self.assertTrue(self.restored(ws))
+            names = self.git_dir_names(ws)
+            self.assertNotIn(runner.LEFT_NAME, names)
+            self.assertNotIn(runner.LOCK_NAME, names)
+
+    def test_restore_abandons_a_held_run(self):
+        steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = self.setup_for(ws, steps)
+            with (
+                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+                mock.patch("builtins.print"),
+            ):
+                self.assertEqual(self.run_cmd(ws, path), 10)
+            with mock.patch("builtins.print"):
+                self.assertEqual(runner.main(["restore", str(ws.out)]), 0)
+            self.assertTrue(self.restored(ws))
+            self.assertNotIn(runner.LEFT_NAME, self.git_dir_names(ws))
+
+    def test_halted_run_restores_and_next_afterwards_is_harmless(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            with mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")):
+                self.assertEqual(self.run_cmd(ws, self.setup_for(ws)), 2)
+            self.assertTrue(self.restored(ws))
+            with mock.patch("builtins.print"):
+                self.assertEqual(runner.main(["next", str(ws.out)]), 2)
+            self.assertTrue(self.restored(ws))
+
+    def test_next_after_a_halt_that_never_reached_finish_restores(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = self.setup_for(ws)
+            with (
+                mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")),
+                mock.patch.object(runner, "finish", return_value=2),
+            ):
+                self.assertEqual(self.run_cmd(ws, path), 2)
+            self.assertFalse(self.restored(ws), "finish を通っていないので残っている")
+            with mock.patch("builtins.print"):
+                self.assertEqual(runner.main(["next", str(ws.out)]), 2)
+            self.assertTrue(self.restored(ws))
+
+    def test_unrestorable_target_gives_exit_3_after_the_report(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            fail = runner.Refusal("失敗", "手で戻す")
+            with (
+                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT),
+                mock.patch.object(runner, "reset_repo", side_effect=[None, fail]),
+                mock.patch("builtins.print") as shown,
+            ):
+                rc = self.run_cmd(ws, self.setup_for(ws))
+            text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
+            self.assertEqual(rc, 3)
+            self.assertTrue((ws.out / "report.md").is_file(), "レポートは書いてから 3 を返す")
+            self.assertIn("手作業で戻す必要がある", text)
+            self.assertIn(str(ws.target.resolve()), text)
+            self.assertIn("次: ", text)
+            self.assertIn(runner.LEFT_NAME, self.git_dir_names(ws))
+            self.assertNotIn(runner.LOCK_NAME, self.git_dir_names(ws))
+            # 戻せていない対象では、次の回を始めさせない
+            other = ws.scenario_file({"reset": {"base": ws.base}}, name="UC-98-y.yml")
+            with mock.patch("builtins.print"):
+                self.assertEqual(self.run_cmd(ws, other, "--out", str(Path(d) / "out2")), 3)
+
+    def test_interrupt_with_unrestorable_target_reports_and_reraises_the_original(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            fail = runner.Refusal("失敗", "手で戻す")
+            with (
+                mock.patch.object(runner, "run_step", side_effect=KeyboardInterrupt),
+                mock.patch.object(runner, "reset_repo", side_effect=[None, fail]),
+                mock.patch("builtins.print") as shown,
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                self.run_cmd(ws, self.setup_for(ws))
+            text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
+            self.assertIn("手作業で戻す必要がある", text)
+
+    def test_second_run_on_a_locked_target_is_refused_before_touching_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            ws.dirty()
+            runner.acquire_target(str(ws.target.resolve()), ws.out)
+            with (
+                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as step,
+                mock.patch("builtins.print"),
+            ):
+                rc = self.run_cmd(ws, self.setup_for(ws), "--out", str(Path(d) / "out2"))
+            self.assertEqual(rc, 3)
+            step.assert_not_called()
+            self.assertEqual(
+                (ws.target / "README.md").read_text(encoding="utf-8"), "元の中身\n未コミット\n"
+            )
+
+    def test_append_to_a_missing_file_stops_before_anything_is_touched(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = ws.scenario_file(
+                {
+                    "files": {"projects/test-repo/none.md": {"content": "x", "append": True}},
+                    "reset": {"base": ws.base},
+                }
+            )
+            with mock.patch("builtins.print"):
+                rc = self.run_cmd(ws, path)
+            self.assertEqual(rc, 1)  # 追記の対象が無い。clash の判定で、何も触る前に止まる
+            self.assertNotIn(runner.LOCK_NAME, self.git_dir_names(ws))
+
+    def test_failed_setup_git_rolls_back_and_exits_3(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            path = ws.scenario_file(
+                {
+                    "files": {"projects/test-repo/README.md": {"content": "x\n", "append": True}},
+                    "git": [["git", "checkout", "nonexistent"]],
+                    "reset": {"base": ws.base},
+                }
+            )
+            with (
+                mock.patch.object(runner, "drive") as drive,
+                mock.patch("builtins.print") as shown,
+            ):
+                rc = self.run_cmd(ws, path)
+            text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
+            self.assertEqual(rc, 3)
+            drive.assert_not_called()
+            self.assertIn("次: ", text)
+            self.assertTrue(self.restored(ws))
+            self.assertNotIn(runner.LOCK_NAME, self.git_dir_names(ws))
+
+    def test_confirmation_shows_the_target_and_asks_about_the_reset(self):
+        with tempfile.TemporaryDirectory() as d:
+            ws = Workspace(d)
+            scn = runner.load_scenario(self.setup_for(ws))
+            text = runner.confirmation_text(scn, ws.root, "MODE OK")
+            self.assertIn(f"対象のリポジトリ: {ws.target.resolve()}（使い捨てと確かめた）", text)
+            self.assertIn("確認事項 3", text)
+            self.assertIn(ws.base, text)
+            body = runner.confirmation_text(scn, ws.target, "MODE OK")
+            self.assertIn("対象のリポジトリを使えない", body)
 
 
 if __name__ == "__main__":

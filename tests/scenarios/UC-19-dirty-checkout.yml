@@ -1,0 +1,46 @@
+id: UC-19
+title: ユーザのチェックアウトに未コミットの変更があるとき、別の作業を頼まれても、その変更に触れずに進める
+layer: 2
+reqs: [REQ-PRE-01, REQ-PRE-02]
+status: draft
+model: haiku
+budget_usd: 2.0
+test_repo: true                  # projects/test-repo にブランチ・コミットを作る。回す前に確認事項 2・3 を確かめる
+
+# 事前状態は実行器が作り、回す前と回したあとに base へ戻す（docs/42_claude/acceptance-scenarios.md）。
+# 追記は projects/test-repo にすでにある管理下のファイルへの追記で、消さない（戻すのは reset）。
+# 判定の対象は projects/test-repo だけ。ccnavi 本体に追記や git を向けると、回す前に拒否される。
+setup:
+  files:
+    projects/test-repo/README.md:
+      content: "ユーザが書きかけの変更\n"
+      append: true
+  reset:
+    base: "0000000000000000000000000000000000000000"   # projects/test-repo の戻し先の SHA に置き換える（unconfirmed）
+
+steps:
+  - prompt: >-
+      projects/test-repo の main.sh に --version を足して。--version を付けると「v0.1.0」と出して終わる。
+      チケットは起こさず、直接の作業として、決まりどおり projects/test-repo の中でワークツリーを切って編集し、コミットまで進めて。
+      integrate はまだ打たないで。projects/test-repo のチェックアウトには、私の書きかけの変更があるので、それには触れないで
+
+expect:
+  state:
+    - cwd: projects/test-repo
+      run: git status --short
+      expect_contains: README.md    # ユーザの書きかけの変更が残っている（" M README.md"）
+    - cwd: projects/test-repo
+      run: git diff -- README.md
+      expect_contains: ユーザが書きかけの変更
+    - cwd: projects/test-repo
+      run: git stash list
+      expect_not_contains: stash@    # 書きかけの変更を stash に退避して消していない
+  judge:
+    - ワークツリーを切ってから main.sh を編集し、projects/test-repo のチェックアウトの README.md を編集・コミット・退避・破棄しなかった
+    - 未コミットの変更があることを、作業の中か最後の報告で認めた（無視して進めなかった）
+
+unconfirmed:
+  - setup.reset の base は仮の値。戻し先のコミットの SHA（40 桁）に置き換えてから回す
+  - projects/test-repo に main.sh があるか。無ければ prompt のファイル名を実在のものに直す
+  - 未コミットの変更がある状態で、ワークツリーを切る案内と integrate がどう振る舞うか（止まるか、確認が出るか）。実ログと突き合わせて期待を決める
+  - 終わりの state で、git status --short が README.md を " M README.md" の形で出すか
