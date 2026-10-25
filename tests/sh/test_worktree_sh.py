@@ -34,7 +34,7 @@ import unicodedata
 import unittest
 from unittest import mock
 
-from tests import ROOT, SRC, common_sh
+from tests import ROOT, SRC, common_sh, put_messages
 from tests.draft import final
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -245,6 +245,34 @@ class WorktreeShTest(unittest.TestCase):
             text=True,
         )
         self.assertNotEqual(0, upstream.returncode, "取り込み先を追跡しない")
+
+    def test_a_parent_tree_is_told_how_to_withdraw_what_stays_after_the_switch(self):
+        # 親のワークツリーの名前（ws）の提案が承認待ちで、MR もある。直接作業へ切り替えても
+        # 取り下げられないので、手順を 案内: で出す。
+        put_messages(self.ws)
+        write(
+            os.path.join(self.ws, "wip", "proposals", "todo", f"{self.WS_DIR}.md"),
+            f"---\nticket: {self.WS_DIR}\nissue: 5\nmr: 12\n---\n本文\n",
+        )
+        git(self.ws, "add", "wip")
+        git(self.ws, "commit", "-q", "-m", "proposal")
+        git(self.ws, "push", "-q", self.bare, "main")
+        git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
+        result = self.run_sh("topic")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("案内: 親 ws の承認待ちの提案・着手中の子・MR は", result.stdout)
+        self.assertIn(f"案内: 承認待ちの提案 {self.WS_DIR} が", result.stdout)
+        self.assertIn("案内: MR #12 が残っている", result.stdout)
+        self.assertNotIn("着手済みの子が", result.stdout)
+        self.assertEqual(1, result.stdout.count("\n次: "), result.stdout)
+        self.assertTrue(result.stdout.rstrip().splitlines()[-1].startswith("次: "))
+
+    def test_nothing_is_said_about_leftovers_without_a_parent(self):
+        put_messages(self.ws)
+        result = self.run_sh("topic")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertNotIn("取り下げ", result.stdout)
+        self.assertNotIn("残っている", result.stdout)
 
     def test_the_record_is_written_and_read_as_valid_by_the_post_check(self):
         result = self.run_sh("topic", "--side-by-side")

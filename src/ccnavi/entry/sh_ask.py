@@ -22,6 +22,11 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   （`ccnavi-git.sh integrate` が断る条件。Stop の促しと同じ判定）。`bound yes|no` に続けて、
   結び付くなら `why <理由>`。判定は `ops_stop_integrate.bound_reason`。
 
+- `ccnavi tree leftover <ツリー> <名前>`: そのツリーが親のワークツリーで、承認待ちの提案・着手中の
+  子・MR が残っているか（`ccnavi-worktree.sh` が、直接作業へ切り替えたあとに取り下げの手順を
+  案内するか決めるために聞く）。`leftover yes|no`、`proposal yes|no`（`todo/`・`review/` の提案）、
+  `doing <件数>`（`doing/` の子）、`mr <番号>|-`（親の `mr:`）。親でなければ `leftover no`。
+
 - `ccnavi tree base-bound <ユーザのチェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが、
   チケットに結び付くか（`ccnavi-worktree.sh` が切る前に断る条件）。`bound yes|no|unknown` に続けて、
   yes なら `why <理由>`。識別子の衝突はワークスペース全体、結び付きは取り込み先のリポジトリだけを
@@ -170,6 +175,68 @@ def bound_tree(
     if why:
         stdout.write(f"why {why}\n")
     return 0
+
+
+def leftover_tree(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, path: str, name: str
+) -> int:
+    """`ccnavi tree leftover <ツリー> <名前>`。
+
+    頭に `tree 1`、続けて `leftover yes|no`、`proposal yes|no`、`doing <件数>`、`mr <番号>|-`。
+
+    直接作業へ切り替えても、承認待ちの提案・着手中の子・MR は取り下げられずに残る。
+    `ccnavi-worktree.sh` が、その取り下げの手順を案内するかどうかを決めるために聞く。
+    親のワークツリーでなければ（親が読めないときも）`no`。案内を出さない向きに倒す。
+    """
+    if not _ident_ok(stderr, "tree leftover", "名前", name):
+        return 1
+    if not path or not os.path.isdir(path):
+        stderr.write(f"ccnavi: tree leftover のツリー {path!r} が見つかりません。\n")
+        return 1
+    work = _tree_of(root, conf, path, name)
+    approved = settings.approved_dir(conf, work.root)
+    proposals = os.path.join(work.root, conf.tickets.replace("/", os.sep))
+    proposal = NO
+    mr = ""
+    for held, directory in (
+        (False, os.path.join(approved, ticket_model.DOING)),
+        (True, os.path.join(proposals, ticket_model.TODO)),
+        (True, os.path.join(proposals, ticket_model.REVIEW)),
+    ):
+        front = _front(fsio.read_text(os.path.join(directory, f"{name}.md")))
+        if front is None or str(front.get("ticket") or "").strip() != name or front.get("parent"):
+            continue
+        proposal = YES if held or proposal == YES else NO
+        mr = mr or _mr_of(front)
+    doing = 0
+    if proposal == YES or mr or _holds_parent(conf, work) == YES:
+        doing = _children_in_doing(approved, name)
+    is_parent = proposal == YES or bool(mr) or doing > 0
+    stdout.write(TREE_HEAD + "\n")
+    stdout.write(f"leftover {YES if is_parent else NO}\n")
+    stdout.write(f"proposal {proposal}\n")
+    stdout.write(f"doing {doing}\n")
+    stdout.write(f"mr {mr or '-'}\n")
+    return 0
+
+
+def _children_in_doing(approved: str, parent: str) -> int:
+    """`doing/` にある、この親の子（`parent:` が親の識別子）の数。読めないファイルは数えない。"""
+    directory = os.path.join(approved, ticket_model.DOING)
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        return 0
+    count = 0
+    for entry in names:
+        if not entry.endswith(".md"):
+            continue
+        front = _front(fsio.read_text(os.path.join(directory, entry)))
+        if front is not None and pathcase.fold(str(front.get("parent") or "").strip()) == (
+            pathcase.fold(parent)
+        ):
+            count += 1
+    return count
 
 
 def base_bound_tree(
