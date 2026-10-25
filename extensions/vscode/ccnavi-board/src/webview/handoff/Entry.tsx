@@ -132,7 +132,7 @@ function TerminalGuide({
   return (
     <div className="terminal-guide" data-role="terminal-guide">
       <p>
-        この対象（{kindLabel(entry.kind)}）はボードから取り込めません。差分を読んだうえで、ターミナルで次のコマンドを打って取り込みます。
+        この対象はボードから取り込めません。差分を読んだうえで、ターミナルで次のコマンドを打って取り込みます。
       </p>
       {entry.kind === "defense" && <p className="hint">{DEFENSE_NOTE}</p>}
       {terminal === undefined ? (
