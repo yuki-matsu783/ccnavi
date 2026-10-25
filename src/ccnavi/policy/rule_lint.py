@@ -14,27 +14,6 @@ from ..infra import hookio
 from . import ctxfile, rules, subjects
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
-# `.ccnavi/scripts/` のヒット。直前の `./` と `../` の連なりは、相対の書き方なので手前にたどる。
-_SCRIPTS = re.compile(r"(?:\.{1,2}/)*\.ccnavi/scripts/")
-# その手前の 1 文字がこれなら、ヒットはパスの途中（絶対パス・`$VAR/`・`{root}/`・`~/`・
-# ディレクトリ名の続き）。空白・引用符・括弧・`=`・`:` や語頭は、パスの始まりとして相対に数える。
-_PATH_MID = frozenset("/\\}~$._-")
-
-
-def _has_relative_scripts(text: str) -> bool:
-    """文面に、cwd に左右される相対パスの `.ccnavi/scripts/` があるか。
-
-    ヒットの直前（`./` と `../` の連なりを除いた位置）の 1 文字を見る。`/` `\\` `}` `~` `$`
-    `.` 英数字 `_` `-` ならパスの途中（絶対パス、`{root}/`、`$VAR/`、`~/` など）なので言わない。
-    語頭や、空白・引用符・括弧・`=`・`:` の直後なら相対パスの始まりとして言う。
-    """
-    for hit in _SCRIPTS.finditer(text):
-        before = text[hit.start() - 1] if hit.start() > 0 else ""
-        if before and (before.isascii() and before.isalnum() or before in _PATH_MID):
-            continue
-        return True
-    return False
-
 
 def file_problems(
     path: str, root: str, home: str = "", layer: bool = False, project: bool = False
@@ -121,7 +100,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     1. `_inert` で、match のツールのうち対象を取り出せないものを warn にする
     2. `_stop_problems` で `match: Stop` の書き方を見る
     3. `message` を `deny` 以外に書いていれば error（届かない欄）
-    4. `message` と `additionalContext` と `additionalContextOnce` の文面を、`_has_relative_scripts`
+    4. `message` と `additionalContext` と `additionalContextOnce` の文面を、`rules.has_relative_scripts`
        と `rules.SCRIPT_PLACEHOLDER` で見る（相対の sh、`{script:<名前>}` の名前と有無）
     5. `additionalContextFile` と `additionalContextOnceFile` の場所を `ctxfile` で見る
        （ワークスペースの外、無い、上限超え）
@@ -166,7 +145,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
         ("additionalContext", rule.additional_context),
         ("additionalContextOnce", rule.additional_context_once),
     ):
-        if _has_relative_scripts(text):
+        if rules.has_relative_scripts(text):
             problems.append(
                 Problem(
                     SEVERITY_WARN,
