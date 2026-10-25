@@ -8,7 +8,8 @@
 - ポートは `CCNAVI_GITLAB_PORT`（既定 8929）の 1 か所で決める。compose の external_url と
   公開ポート、probe_gitlab.py の既定の接続先（`CCNAVI_PROBE_GITLAB`）は、この値から作られる。
 - `up`: イメージが無いときは取得せず止まる（`--pull` を付けたときだけ取得する）。動いていれば
-  起動しない。健康になり、`/api/v4/version` が応答するまで待つ（上限 15 分。初回は 5〜10 分）。
+  起動しない。健康になり、`/api/v4/version` が応答するまで待つ
+  （上限 15 分。実測の再起動は約 2 分）。
   Docker のメモリが `MEMORY_MIN_BYTES` 未満なら `次:` で警告する。
 - トークンは有効なら作り直さない。`--rotate` のときだけ作り直す（既存は失効する）。0600 のファイルに
   書き、端末には出さない。使うときは `set -a; . <status が出すパス>; set +a` で読み込む。
@@ -282,7 +283,7 @@ def cmd_up(args: argparse.Namespace) -> int:
             print("次: コンテナを起動できなかった", file=sys.stderr)
             print(done.stderr.strip(), file=sys.stderr)
             return 1
-    print("起動を待っている。初回は 5〜10 分かかる")
+    print("起動を待っている。再起動は約 2 分かかる（実測）")
     client = gitlab_api.Client(BASE)
     tokens, body = wait_ready(client, args.rotate)
     if tokens is None:

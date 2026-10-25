@@ -30,7 +30,7 @@ uv run python tests/manual/gitlab/docker_gitlab.py down --purge  # ボリュー�
 ```
 
 - `up` は、イメージが無いとき取得せずに止まる。取得は `--pull` を付けたときだけ。
-- `up` は、動いていれば起動しない。健康になり、`/api/v4/version` が応答するまで待つ（上限 15 分。初回は 5〜10 分かかる）。
+- `up` は、動いていれば起動しない。健康になり、`/api/v4/version` が応答するまで待つ（上限 15 分。実測（GitLab 19.4.1、イメージ取得済み）は、停止後の再起動で約 2 分、`up --pull` の全体で約 1 分）。イメージを初めて取る時間は、この実測には含まない。
 - CE は 4GB のメモリが要る。コンテナの上限は余裕をとって 6g（`MEM_LIMIT`）。Docker に割り当てたメモリが 6GB 未満なら、`up` が `次:` で警告する。足りないと engine ごと落ちる。
 - 公開ポートは `127.0.0.1` の `CCNAVI_GITLAB_PORT`（既定 8929）だけ。LAN には出さない。`probe_gitlab.py` の既定の接続先と `external_url` も、この値から作る。`external_url` と公開ポートは同じ値にする（ずれると clone URL と `web_url` が壊れる）。
 - `restart: "no"`。Docker Desktop の起動で勝手に上がらないようにしている。
@@ -64,7 +64,7 @@ uv run python tests/manual/gitlab/probe_gitlab.py
 ## CE の限界
 
 - 変更要求（`request_changes`）は GitLab EE の機能。CE では 404 になる。probe はその段だけ失敗を許す。
-  この 404 は、実機の CE で probe を 1 周させて確かめたものだけをここに書く（未確認）。
+  この 404 は、実機の CE（19.4.1）で probe を回して確かめた（`request_changes` が `status=404`）。ほかの版では未確認。
 
 ## 手動の通し確認
 
