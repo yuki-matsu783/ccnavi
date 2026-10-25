@@ -2,7 +2,7 @@
  * 模擬の GitLab（`MockGitLab`）が内部の状態から答える応答を、本物の GitLab から録った形（tests/contract/gitlab/recorded.json）と、
  * `reads` のキーで比べる契約テスト。Python の `tests/contract` の TypeScript 版で、規則は同じ（test/helpers/shape.ts）。
  *
- * - 規則の表（normalize-cases.json）を Python と同じに読む。同じ生の入力を Python と TS で正規化して一致させる（uv が無ければ飛ばす）
+ * - 規則の表（normalize-cases.json）を Python と同じように読む。同じ生の入力を Python と TS で正規化し、結果が一致することを確かめる（uv が無ければ飛ばす）
  * - 比べるのは、`used_by` に `chrome` を持つ要求だけ（`MockGitLab` が 200/201 で答えるもの。見本由来の応答は比べない）
  * - 変異テスト: 模擬の応答を 1 か所変えると、どのキーがどう違うかが出て落ちる
  */
@@ -118,7 +118,7 @@ test("CX-T388 契約: MockGitLab が内部の状態から答える応答は、�
   assert.deepEqual(problems(send()), []);
 });
 
-test("CX-T389 契約の変異: 応答を 1 か所変えると、キーと違いの種類が出て落ちる（キー削除・型変更・ステータス変更・空配列）", () => {
+test("CX-T389 契約の変異: 応答を 1 か所変えると、キーと違いの種類が出て落ちる（キーの削除・型の変更・ステータスの変更・空の配列）", () => {
   const mutate = (f: (a: Answers) => void): string[] => {
     const a = send();
     f(a);

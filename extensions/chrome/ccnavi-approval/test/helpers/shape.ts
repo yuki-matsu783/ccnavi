@@ -42,7 +42,7 @@ export interface Req {
 
 export const MAX_DEPTH = 5;
 export const DROPPED_KEYS = new Set(["avatar_url", "web_url", "username", "email", "public_email", "commit_email", "token"]);
-// Python の `\d` は Unicode の数字にも、`$` は末尾の改行の前にも当たる。こちらは ASCII だけで厳格（既知の差）
+// Python の `\d` は Unicode の数字にも、`$` は末尾の改行の前にも当たる。こちらは ASCII の数字だけを受け付ける厳しい判定（既知の差）
 const DATETIME = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)$/;
 export const KINDS = ["missing", "extra", "type", "presence", "status"];
 
@@ -230,7 +230,7 @@ export function applyAllow(found: Record<string, Diff[]>, entries: Entry[]): [Re
   return [left, problems];
 }
 
-// 空の配列は形を持たず比較から外れるので、場面が配列を返していることを確かめる
+// 空の配列は形を持たないので比較から外れる。そのため、場面が配列を返していることを確かめる
 export const NON_EMPTY = ["mrs_merged", "closes_issues", "issue_related_mrs", "discussions", "reviewers", "notes_get", "issue_notes_get"];
 
 export function answerProblems(requests: Req[], answers: Record<string, [status: number, body: unknown]>): string[] {

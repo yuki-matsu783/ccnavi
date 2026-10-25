@@ -78,7 +78,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 
 ## reads（比べるキー）
 
-本物の応答は 30〜100 のキーを返すが、sh が読むのはその一部（拡張は project の権限の検査と既定の枝だけ。拡張だけが使う要求は載せていない）。模擬は読まれるキーだけ返せばよい。そこで要求ごとに `reads`（読むキーの一覧）を持ち、比べるキーを絞る。
+本物の応答は 30〜100 のキーを返すが、sh が読むのはその一部（拡張は project の権限の検査と既定のブランチ（default_branch）だけ。拡張だけが使う要求は載せていない）。模擬は読まれるキーだけ返せばよい。そこで要求ごとに `reads`（読むキーの一覧）を持ち、比べるキーを絞る。
 
 - **導き方**: `.ccnavi/scripts/` の `jq` の式（`ccnavi-start.sh`・`ccnavi-branches.sh`・`ccnavi-review.sh`・`ccnavi-common-review.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-common-host.sh`）と、拡張の `extensions/chrome/ccnavi-approval/src/core/gitlab.ts` の読み方から導く。sh が `// ""` で受ける省略できるキーでも、本物が返すものは載せる。本物が返さないキー（`closes_issues` の `references`、`reviewers` の `updated_at`、非差分のスレッドの `position`）は、存在の検査に通らないので載せない
 - **書き方**: 比較器の差のキーと同じ。`author.id`、`[].iid`（応答が配列のとき）、`notes[].system`（配列の中）
@@ -173,8 +173,8 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 `extensions/chrome/ccnavi-approval/test/gitlab-contract.test.ts`（`pnpm test`。`--e2e` には入れない）が、`MockGitLab` の `handle` を直接呼び、`used_by` に `chrome` を持つ要求だけを `recorded.json` と `reads` で比べる。比較器 `test/helpers/shape.ts` は `shape.py` の写しで、名前も規則も同じ。正本は Python で、規則を変えたいときは Python を直し、`normalize-cases.json` を直してから TS を合わせる。
 
 - 比べる要求（`MockGitLab` が内部の状態から 200/201 で答えるもの）: `user`・`project`・`mrs_merged`・`mr_create`・`error_401`・`error_404`。`MockGitLab` が 404 か形の違う応答を返す要求（`member` など）は `chrome` を付けず、比べない
-- `mrs_opened` は比べない。`source_branch` を付けると `MockGitLab` は `pulls`（番号とレビューだけ。title なし）から `iid` と `source_project_id` だけを返し、場面を付けると見本から返すため、`reads` と同じ形で答える経路がない
-- 見本（`test/fixtures/host/gitlab/*`）から返す応答は比べない。手作りで本物の形ではない
+- `mrs_opened` は比べない。`source_branch` を付けると `MockGitLab` は `pulls`（番号とレビューだけ。title なし）から `iid` と `source_project_id` だけを返し、場面を付けると見本から返すため、`reads` の範囲で答える経路がない
+- 見本（`test/fixtures/host/gitlab/*`）から返す応答は比べない。手で組んだもので、本物の形を写していない
 - 許可リストは `chrome_entries`（`entries` に混ぜない。`apply_allow` が当たらない項目を古い許可として落とす）
 - 同じ生の入力を Python と TS で正規化して一致することも確かめる。`uv` が無ければ、その試験は skip と出る
 - `shape.py`・`normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`pnpm test` も回す。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない
@@ -190,7 +190,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 - レート制限、競合、実時間の遅延（非同期の判定は録る前に待って確定させる）
 - 値（ID・時刻・SHA）の一致。`state`・`source_branch` の絞り込みが効くか、`order_by`・`sort` の並び、日時の書式は、型が同じなら緑になる
 - `web_url` は sh が読むが、環境で変わる欄として形から落とすので、模擬が返さなくなっても検出できない
-- TS の比較器との既知の差。`1.0` のような整数値の小数は、Python では `number`、JS の `JSON.parse` では `integer`。`DATETIME` の正規表現は、Python の `\d` が Unicode の数字にも当たり `$` が末尾の改行の前にも当たるのに対し、JS は ASCII のみで厳格
+- TS の比較器との既知の差。`1.0` のように小数点以下が 0 の値は、Python では `number`、JS の `JSON.parse` では `integer` になる。`DATETIME` の正規表現は、Python の `\d` が Unicode の数字にも、`$` が末尾の改行の前にも当たるのに対し、JS は ASCII の数字だけに当たり、`$` は末尾だけに当たる（JS の方が厳しい）
 - Chrome 拡張の比較は `reads` の範囲と、`MockGitLab` が内部の状態から答える要求だけ。見本由来の応答と、拡張だけが使う要求（branches・tree・commits・compare など）は対象外
 - 空の配列の要素の形（録るときに、`NON_EMPTY` の要求が空でないことを確かめる）
 - 録った場面の外（差分への指摘のスレッド、複数ページ、フォークからの MR、グループ配下のプロジェクトで `group_access` が整数になる形など）
