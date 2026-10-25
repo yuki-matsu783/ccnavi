@@ -359,7 +359,7 @@ export interface CanvasProps {
   /**
    * 開いた直後に、文字が読める倍率（`PLAN_FIT_MIN_ZOOM`）より縮めず、下限で止まったら開始の点が見える位置から始める。
    * 既定は偽（全体を枠に収める `fitView`。ツアーの見本と読むだけの図はこちら）。合わせるのは開いた直後の 1 回だけで、
-   * 点が増えても自動では合わせ直さない（見ている位置を動かさない）。「全体を表示」は今までどおり全体を出す
+   * 点が増えても自動では合わせ直さない（見ている位置を動かさない）。「全体を表示」は、今までどおり全体を出す
    */
   readonly readableFit?: boolean;
   /** ドラッグを放した点。位置は React Flow の決まり（グループの中のノードはグループからの位置） */
@@ -415,7 +415,7 @@ function TourSettle(): null {
  * `readableFit` のときの開いた直後の見え方（`webview/shared/PlanGraph.tsx` の `FitOnOpen` と同じ方式）。
  * 点がすべて測れたら 1 回だけ、下限の倍率までで全体を収める。下限で止まって収まらないときは、種類が start の点を
  * 左端に寄せる。`fitView` の属性は使わない（下限で止めたあとに寄せる段を挟めないため）。
- * `useNodesInitialized` は使わない（点を読むだけで返さない図では、実際の Chromium で偽のままになる）
+ * `useNodesInitialized` は使わない（点の読み込みが終わったことを返さない図では、実際の Chromium で偽のままになる）
  */
 function ReadableFit(): null {
   const measured = useStore((s) => s.nodeLookup.size > 0 && [...s.nodeLookup.values()].every((node) => (node.measured?.width ?? 0) > 0 && (node.measured?.height ?? 0) > 0));

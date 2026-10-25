@@ -777,7 +777,7 @@ courses:
         scene: {doc: main}
       - target: preview
         title: 確認中の表示
-        body: 編集が止まると、ccnavi に確認させます。確認している間は、最後に確認が済んだときの手順を出したまま、「確認中です」と表示します。
+        body: 編集が止まったら、ccnavi に確認させます。確認している間は、最後に確認が済んだときの手順を出したまま、「確認中です」と表示します。
         scene: {doc: main, checking: true}
 
   - id: save-review

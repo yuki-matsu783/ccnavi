@@ -440,7 +440,7 @@ test("CB-D133 サブエージェントの種類とスキルの名前は候補か
   }
 });
 
-test("CB-D134 確認を頼んで答えを待つ間に直したら、届いた古い答えは使わず再確認している（のまま）と言う", async () => {
+test("CB-D134 確認を頼んで答えを待つ間に直したら、届いた古い答えは使わず確認中のまま、最後に確認が済んだ結果を出す", async () => {
   const dom = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"] } });
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
@@ -480,7 +480,7 @@ test("CB-T1223 右ペインは見出しの下に説明を出し、確認中は�
   } finally {
     await none.close();
   }
-  // 結果あり: 確認中は、最後に確認が済んだ結果を残して言う。済めば消える
+  // 結果あり: 確認中は、最後に確認が済んだ結果を残したまま表示する。確認が済めば消える
   const some = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"] } });
   try {
     assert.equal(some.all("#flow-preview-checking").length, 0);
