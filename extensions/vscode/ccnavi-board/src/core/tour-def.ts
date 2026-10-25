@@ -77,7 +77,7 @@ export interface TourDef {
 export const INTRO_ID = "intro";
 
 /** 見本の目印。画面は見本を出している間、この文を帯で出す */
-export const SAMPLE_NOTE = "案内のための見本を表示しています。実際のチケット・プロジェクト・設定ではなく、案内を閉じると消えます。";
+export const SAMPLE_NOTE = "案内のための見本を表示しています。実際のチケット・プロジェクト・設定ではなく、案内を閉じる（× か Esc）と消えます。";
 
 const ID = /^[a-z][a-z0-9-]*$/;
 /** 指す先（`data-tour` の値）。選択子に埋めるので、引用符や括弧を入れない */
