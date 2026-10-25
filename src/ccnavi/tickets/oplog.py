@@ -11,7 +11,8 @@ decide・close-early・request・comment・ready は、ホストへの返信・�
 記録に持つのは構造化した中身だけで、送る本文は持たない（`shown`・`choices` から送るたびに作り直す。
 改ざんしにくくするため）。保存できなければ呼び手は何もしない（返信・解決にも進まない）。
 
-ネットワークにも git にも触れない。ロックは、同じ PC の並行実行を防ぐだけ（別の PC は照合で防ぐ）。
+ネットワークにも git にも触れない。ロックは記録の読み書きの間だけ持つ短いもの（`_rmw`）で、
+同じ PC の並行する更新を防ぐだけ（別の PC は照合で防ぐ）。
 """
 
 from __future__ import annotations
@@ -52,9 +53,6 @@ STAGE_PUSH = "push"
 STAGE_DRAFT = "draft"
 STAGE_KINDS = (STAGE_REPLY, STAGE_ISSUE, STAGE_COMMENT, STAGE_MR, STAGE_PUSH, STAGE_DRAFT)
 
-# 同じ PC の並行実行を防ぐロックの古さの上限（秒）。これより古いロックは、
-# 落ちたプロセスの残りとして取り直す。
-LOCK_STALE_SECONDS = 120.0
 # 記録の読み書きの短いロック（`_rmw`）を待つ長さと、古いとみなす長さ（秒）。
 RMW_WAIT_SECONDS = 5.0
 RMW_STALE_SECONDS = 30.0
@@ -210,42 +208,10 @@ def load(state: str, op_id: str) -> dict[str, Any] | None:
 
 
 @contextlib.contextmanager
-def locked(state: str, op_id: str):
-    """操作ID ごとのロック。同じ PC の並行実行を、待たずに断る（取れなければ OpError）。"""
-    if not valid_id(op_id):
-        raise OpError(f"操作IDの形が不正: {op_id!r}")
-    os.makedirs(ops_dir(state), exist_ok=True)
-    path = os.path.join(ops_dir(state), f"{op_id}.lock")
-    fd = -1
-    for _ in range(2):
-        try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            break
-        except FileExistsError:
-            try:
-                age = time.time() - os.path.getmtime(path)
-            except OSError:
-                continue
-            if age < LOCK_STALE_SECONDS:
-                raise OpError("同じ操作が実行中です。待ってから打ち直してください") from None
-            with contextlib.suppress(OSError):
-                os.remove(path)
-    if fd < 0:
-        raise OpError("操作のロックを取れない")
-    try:
-        os.write(fd, str(os.getpid()).encode("ascii"))
-        yield
-    finally:
-        os.close(fd)
-        with contextlib.suppress(OSError):
-            os.remove(path)
-
-
-@contextlib.contextmanager
 def _rmw(state: str, op_id: str):
     """記録の読み書きの間だけ持つ短いロック。並行する更新が互いの書き込みを失わせないため。
 
-    `locked`（操作の実行中を断るロック）とは別で、数秒待つ。取れなければ OpError。
+    数秒待つ。取れなければ OpError。
     """
     if not valid_id(op_id):
         raise OpError(f"操作IDの形が不正: {op_id!r}")

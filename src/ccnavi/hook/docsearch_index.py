@@ -97,10 +97,6 @@ class GitFailed(Exception):
     """git への問い合わせに失敗した（git が無い・期限切れ・破損したリポジトリ）。"""
 
 
-class _TimeUp(Exception):
-    pass
-
-
 def _norm(text: str) -> str:
     return unicodedata.normalize("NFC", text)
 
