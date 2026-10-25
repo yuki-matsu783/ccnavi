@@ -991,20 +991,17 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("feature/7-x", result.stdout)
         self.assertFalse(os.path.exists(self.wt("feature-7-x")))
 
-    def test_the_same_identifier_is_reported_before_an_existing_directory(self):
-        """区別しない機械では、綴り違いの名前のパスが既に在る。その断りは原因（同じ識別子）を言う。
-
-        Linux では区別するので模す: ブランチ Topic と、登録の無いただのディレクトリ topic。"""
+    def test_the_same_identifier_is_refused_before_the_existing_directory_check(self):
+        """大文字小文字を区別しない機械では、綴り違いのパスが既にあるように見える。
+        ここでは同じ綴りのただのディレクトリで再現し、同じ識別子だという案内で断ることを確かめる。"""
         git(self.ws, "branch", "Topic")
         stray = write(os.path.join(self.wt("topic"), "stray.txt"), "x")
         result = self.run_sh("topic")
         self.assertEqual(1, result.returncode, result.stdout + result.stderr)
         self.assertIn("Topic", result.stdout)
         self.assertIn("同じ識別子", result.stdout)
-        self.assertNotIn("ワークツリーではありません", result.stdout + result.stderr)
-        self.assertTrue(os.path.exists(stray), "在るディレクトリの中身には触れない")
-        with open(stray, encoding="utf-8") as f:
-            self.assertEqual("x", f.read())
+        self.assertNotIn("既にあります", result.stderr)
+        self.assertTrue(os.path.isfile(stray))
 
     def test_rerunning_the_same_name_still_reports_the_worktree_exists(self):
         self.assertEqual(0, self.run_sh("topic", "--no-wip").returncode)

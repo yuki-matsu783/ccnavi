@@ -35,6 +35,14 @@ EXPECT_KEYS = {
 }
 
 
+def setUpModule():
+    # dry-run のセッションからテストを回しても、mode_check が実行を拒まないようにする
+    patcher = mock.patch.dict(os.environ)
+    patcher.start()
+    unittest.addModuleCleanup(patcher.stop)
+    os.environ.pop("CCNAVI_MODE", None)
+
+
 class IssueCommandTest(unittest.TestCase):
     ISSUE = {"title": "題", "body": "本文", "repo": "projects/test-repo"}
 

@@ -148,7 +148,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 | `PreToolUse` で `permissionDecision` と `additionalContext` を 1 つの応答に入れたとき、両方がモデルに届くか | 届く（Claude Code 2.1.235）。deny と ask では `permissionDecisionReason` と一緒に届く |
 | ask の `permissionDecisionReason` が誰に見えるか | ユーザの確認ダイアログに出る。Yes を押した後もモデルには届かない。No のときは拒否の定型文だけがモデルに届いてターンが終わる。allow の文面はどこにも出ない |
 | `/compact` の後に `SessionStart` が来るか | `source: compact` の `SessionStart` が同じ `session_id` で届く |
-| サブエージェントの `PostToolUse`・`SubagentStart`・`SubagentStop` の `session_id` は親と同じか | 同じ（フォアグラウンド・バックグラウンドとも）。`agent_id`（と `agent_type`）が付き、`cwd` は起動した側のまま。親（メイン）の呼び出しには `agent_id` が付かない |
+| サブエージェントの `PostToolUse`・`SubagentStart`・`SubagentStop` の `session_id` は親と同じか | 同じ（フォアグラウンド・バックグラウンドとも）。`agent_id`（と `agent_type`）が付き、`cwd` は起動した側のまま（`isolation: worktree` を除く。下の行）。親（メイン）の呼び出しには `agent_id` が付かない |
 | サブエージェントの `PostToolUse` の `tool_input` のパスは絶対か相対か | 絶対パスで来た（`Write`・`Edit` の `file_path`）。相対で来ても `cwd` から解く実装にしてある |
 | フォアグラウンドとバックグラウンドのサブエージェントで payload の形は違うか | 違わない。バックグラウンドは `PostToolUse` が親の `Agent` 呼び出しより後に来ることがある |
 | 入れ子のサブエージェント（サブエージェントがさらに起動する体）の payload | 実測できない。この版ではサブエージェントが `Agent` ツールを持たなかった（`ToolSearch` でも見つからない） |
@@ -166,9 +166,9 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 | `shlex` は行継続を知っているか | 知らない。`\` と改行をトークンの中に残す |
 | `$( )` の中の `case` は bash 3.2 と zsh で同じに読まれるか | 読みが分かれる。`case` が現れたら縮退させている（許容した誤検知） |
 | 複合コマンドの 1 つの区間が読めないとき | 全体が縮退する。安全側なのでそのまま |
-| `SubagentStart` の `additionalContext` がサブエージェントに届くか | 未実測。届かなければ、サブエージェント内の最初の `PreToolUse` で渡す形に変える |
-| `SubagentStart` の payload に `tools` が来るか | 未実測。来れば編集するサブエージェントかの見分けに使い、来なければ `.claude/agents` の定義と組み込みの一覧で見分ける（`hook/agentkind.py`）。同じワークツリーの案内（9.12）も、上の行のとおり `additionalContext` が届くことを前提にする |
-| `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd` | 未実測。`isolation` は値にも cwd にもよらず起動の PreToolUse で止める（`DENY_AGENT_ISOLATION`）ので、この実測は止める判定に影響しない |
+| `SubagentStart` の `additionalContext` がサブエージェントに届くか | 届く（実測）。hook が返した指示が、親の依頼文に無くてもサブエージェントの最終報告に現れる |
+| `SubagentStart` の payload に `tools` が来るか | 来ない（実測）。キーは `agent_id`・`agent_type`・`cwd`・`hook_event_name`・`prompt_id`・`scratchpad_dir`・`session_id`・`transcript_path`。編集するサブエージェントかは `.claude/agents` の定義と組み込みの一覧で見分ける（`hook/agentkind.py`）。同じワークツリーの案内（9.12）は、`additionalContext` が届く前提で書いてある |
+| `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd` | 隔離したワークツリーのパス（実測）。親の `PreToolUse`（`Agent`）の `cwd` はリポジトリのルートで、`SubagentStart` とサブエージェント内の `PreToolUse`（`Bash`・`Read`）の `cwd` は `<ルート>/.claude/worktrees/agent-<id>`。`agent_id`・`agent_type` も付く。`isolation` は値にも cwd にもよらず起動の PreToolUse で止める（`DENY_AGENT_ISOLATION`）ので、この実測は止める判定に影響しない |
 
 `shlex` は引用・`#`・改行・行継続・`<<` の扱いがシェルと違う。`shellread.py` は先に原文を走査してから語の分割だけを
 shlex に任せる。走査か shlex のどちらかに手を入れたら `tests/core/test_shellread.py` の `SHELL_CASES`（bash 3.2 と zsh で実測）を回す。
@@ -202,7 +202,7 @@ shlex に任せる。走査か shlex のどちらかに手を入れたら `tests
 | 深さ 1 のサブエージェントに `agent_id` が届くか | 届く（実測。`logs/state/subagent-<セッション>-<agent_id>.running` のファイル名で確かめた） |
 | `SubagentStart` / `SubagentStop` は孫でも来るか | 子・孫それぞれで来る（実測） |
 | `logs/decisions.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`decisions.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/subagent-<セッション>-<agent_id>.running` |
-| サブエージェントの `cwd` | 文書: メインの `cwd`（`cd` は持ち越さない）。孫の `cwd` も親のワークツリーになる |
+| サブエージェントの `cwd` | 文書: メインの `cwd`（`cd` は持ち越さない。`isolation: worktree` のときは隔離したワークツリー）。孫の `cwd` も親のワークツリーになる |
 | 親の `agent_id` や深さは hook の入力にあるか | 文書: 無い |
 | 起動側は子の終了を待つか | 文書: 非対話では待つ（待ち上限の既定は連続 10 分の idle）。ただし下のバックグラウンドのサブエージェントの計測では、待たれなかった（計測時の環境変数は下の行を参照） |
 | AskUserQuestion をサブエージェントに渡せるか | 文書: `tools` に書いても全部のサブエージェントから外される |

@@ -134,8 +134,8 @@ KINDS: tuple[Kind, ...] = (
     ),
     Kind(
         KIND_MESSAGES,
-        (".ccnavi/config/common/messages/<名前>.yml",),
-        (rf"\.ccnavi/config/common/messages/{_NAME}\.yml",),
+        (".ccnavi/messages/<名前>.yml",),
+        (rf"\.ccnavi/messages/{_NAME}\.yml",),
         new=True,
         board=False,
     ),
@@ -569,7 +569,8 @@ def _inside(root: str, path: str) -> bool:
 
 def _locate_layer(conf: settings.Settings, root: str, entry: Entry) -> None:
     """テンプレートとレイヤーの設定の、レイヤーを決める。読まれない置き場なら断る。"""
-    if entry.kind.id not in (KIND_TEMPLATE, KIND_LAYER_CONFIG, KIND_MESSAGES):
+    # 文面ファイルはレイヤーを持たない（`projects/<名前>/.ccnavi/messages/` は KINDS が許さない）。
+    if entry.kind.id not in (KIND_TEMPLATE, KIND_LAYER_CONFIG):
         return
     parts = entry.key.split("/")
     if parts[0] == "projects":

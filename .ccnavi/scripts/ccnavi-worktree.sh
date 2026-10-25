@@ -208,10 +208,8 @@ print_next() {
 }
 
 # 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。
-# 大文字小文字を区別しない機械では、綴りだけ違う名前のパスが既にあるワークツリーと同じものになる。
-# その断りが dest-exists の文面（原因を言わない）にならないよう、同じ識別子の検査を先に置く。
-# 同じ名前そのものの再実行は ccnavi_id_clash が飛ばすので、下の「既にある」の分岐に進む。
 # <一覧のファイル> <どこ（手元・origin）>
+# dest-exists・既にあるワークツリーの分岐・branch-exists の検査より前に置く。大文字小文字を区別しない機械では、綴り違いの名前のパスが既にあるように見えるため。
 heads_list="$root/logs/state/worktree-heads-$$"
 cand_index="$root/logs/state/worktree-index-$$"
 mkdir -p "$root/logs/state" 2>/dev/null || :
