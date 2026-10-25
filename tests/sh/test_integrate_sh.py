@@ -1563,7 +1563,6 @@ class PullOnTargetTest(Fixture):
             ("origin", "refs/heads/main"),
             ("origin", "--", "feat"),
             ("origin", "Main"),
-            ("origin", "main", "feat"),
             ("upstream", "main"),
             ("../other.git", "main"),
             ("--ff-only", "origin", "feat"),
@@ -1612,6 +1611,26 @@ class PullOnTargetTest(Fixture):
         git(self.ws, "worktree", "remove", "--force", side)
         git(self.ws, "reset", "-q", "--hard", "origin/main")
         self.assertPullRefused("origin", "ahead")
+
+    def test_an_upstream_pointing_at_another_branch_is_refused(self):
+        # 引数なしの pull は上流（branch.main.merge）を merge する。上流が別ブランチなら、取り込む形と同じ。
+        git(self.ws, "fetch", "-q", "origin", "feat")
+        git(self.ws, "config", "branch.main.merge", "refs/heads/feat")
+        for args in ((), ("origin",)):
+            with self.subTest(args=args):
+                r = self.assertPullRefused(*args)
+                self.assertIn("上流 feat", r.stderr)
+
+    def test_a_remote_other_than_origin_is_matched_by_the_branch_config(self):
+        git(self.ws, "remote", "rename", "origin", "up")
+        git(self.ws, "config", "branch.main.remote", "up")
+        git(self.ws, "reset", "-q", "--hard", "up/main~1")
+        self.assertOk(self.run_git_sh("pull", "--ff-only", "up", "main"))
+        self.assertTrue(os.path.exists(os.path.join(self.ws, "next.txt")))
+
+    def test_detached_head_passes(self):
+        git(self.ws, "checkout", "-q", "--detach")
+        self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "feat"))
 
     def test_undecidable_target_passes(self):
         # origin/HEAD も origin/main も無いと、どれが統合先か言えない（merge と同じく止めない）。

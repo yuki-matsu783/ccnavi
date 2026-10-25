@@ -2233,6 +2233,16 @@ fetch | pull)
 	# 統合先が決まらないときは止めない）。通すのは、位置引数が無い形（上流の更新）と、現在のブランチのリモート +
 	# 現在のブランチと同じ名前だけ（--ff-only の pull origin <統合先> を含む）。ワークツリーの中の
 	# pull origin <親のブランチ> と、統合先でないブランチのチェックアウトの pull は対象外。
+	# 位置引数が 0〜1 個の形（引数なし・pull <リモート>）は、git が現在のブランチの上流（branch.<名>.merge）を
+	# merge する。上流が統合先自身でなければ、別のブランチを取り込む形と同じなので止める。上流が無い（未設定）ときは
+	# git が失敗するだけなので通す。
+	if [ "$sub" = pull ] && [ "$fp_other" = no ] && [ "$fp_n" -le 1 ] && merge_target_is_here; then
+		fp_up=$(git config --get "branch.$mg_cur.merge" 2>/dev/null || :)
+		[ -z "$fp_up" ] || [ "$fp_up" = "refs/heads/$mg_cur" ] || {
+			fp_other=yes
+			fp_refs="$fp_refs （上流 ${fp_up#refs/heads/}）"
+		}
+	fi
 	if [ "$sub" = pull ] && [ "$fp_other" = yes ] && merge_target_is_here; then
 		reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは、pull <リモート> <ブランチ>（${fp_refs# }）で別のブランチ・リモートを取り込めません（merge できないのと同じです）。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
 $(merge_on_target_next)
