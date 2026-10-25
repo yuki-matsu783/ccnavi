@@ -243,8 +243,13 @@ class Found:
     drel: str = ""
 
 
-def walk(tree_root: str) -> tuple[list[Found], int, str]:
-    """置き場の下書き（ふつうのファイルとリンク）と、表にヒットしない数と、置き場そのものの苦情。
+# 対象外にした理由。拡張の「取り込み待ち」画面に名前と並べて出す。
+WHY_NOT_ALLOWED = "not-allowed"
+WHY_LINKED_DIR = "linked-dir"
+
+
+def walk(tree_root: str) -> tuple[list[Found], list[tuple[str, str]], str]:
+    """置き場の下書き（ふつうのファイルとリンク）と、対象外の（置き場からの相対パス, 理由）と、置き場そのものの苦情。
 
     リンクのディレクトリの中へは降りない（降りないので、その中の下書きは取り込まれない）。
     `.orig`（コピーした時点の元）と、途中を見せない書き方の残した一時ファイルは下書きに数えない。
@@ -252,11 +257,11 @@ def walk(tree_root: str) -> tuple[list[Found], int, str]:
     """
     base = handoff_dir(tree_root)
     if not os.path.lexists(base):
-        return [], 0, ""
+        return [], [], ""
     if pathsafe.has_link(tree_root, base) or not os.path.isdir(base):
-        return [], 0, f"{HANDOFF_REL}/ がリンクか、ディレクトリではないので読めない"
+        return [], [], f"{HANDOFF_REL}/ がリンクか、ディレクトリではないので読めない"
     found: list[Found] = []
-    ignored = 0
+    ignored: list[tuple[str, str]] = []
     for parent, dirs, files in os.walk(base, followlinks=False):
         dirs.sort()
         for name in sorted(files):
@@ -267,14 +272,14 @@ def walk(tree_root: str) -> tuple[list[Found], int, str]:
             rel = handoff_names.from_draft(drel)
             key = key_of(rel)
             if kind_of(key) is None:
-                ignored += 1
+                ignored.append((drel, WHY_NOT_ALLOWED))
                 continue
             found.append(Found(rel, key, full, drel))
         # リンクのディレクトリ（`os.walk` は降りない）は、中を読まない代わりに対象外として数える。
         for name in dirs:
             full = os.path.join(parent, name)
             if os.path.islink(full):
-                ignored += 1
+                ignored.append((os.path.relpath(full, base).replace(os.sep, "/"), WHY_LINKED_DIR))
     found.sort(key=lambda f: (f.key, f.rel))
     return found, ignored, ""
 
@@ -397,6 +402,7 @@ class Plan:
     tree: str
     entries: list[Entry] = field(default_factory=list)
     ignored: int = 0
+    ignored_paths: list[tuple[str, str]] = field(default_factory=list)
     # 全体を止める誤り（置き場がリンク、引数のパスが読めないなど）。
     error: str = ""
 
@@ -448,7 +454,8 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
     5. `_check_contents` で中身を検査し、`_make_diff` で取り込み先との差分を作る。
     """
     plan = Plan(tree=root)
-    found, plan.ignored, refused = walk(root)
+    found, plan.ignored_paths, refused = walk(root)
+    plan.ignored = len(plan.ignored_paths)
     if refused:
         plan.error = refused
         return plan
@@ -1163,6 +1170,7 @@ def plan_json(plan: Plan) -> dict:
         "version": JSON_VERSION,
         "tree": plan.tree,
         "ignored": plan.ignored,
+        "ignored_paths": [{"path": path, "why": why} for path, why in plan.ignored_paths],
         "entries": [entry_json(e) for e in plan.entries],
         "expect": plan.expect,
         "ok": plan.ok,

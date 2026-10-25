@@ -40,7 +40,7 @@ export function sampleEntries(): HandoffEntry[] {
 }
 
 export function list(entries: readonly HandoffEntry[] = sampleEntries(), overrides: Partial<HandoffList> = {}): HandoffList {
-  return { version: 1, tree: "/ws", ignored: 2, entries, expect: "x".repeat(64), ok: true, ...overrides };
+  return { version: 1, tree: "/ws", ignored: 2, ignored_paths: [{ path: "repro.sh", why: "not-allowed" }, { path: "linked", why: "linked-dir" }], entries, expect: "x".repeat(64), ok: true, ...overrides };
 }
 
 /** 見本の中身。差し替えたいところだけ渡す */

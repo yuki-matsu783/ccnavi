@@ -65,7 +65,7 @@ src/
     template-edit.ts  テンプレートの編集の手元のコピー（EditTemplate）と編集の関数（ステップの追加・削除・並べ替え・線・フロー。先行が小さい添字になるよう振り直す）、書き出しと見比べ。vscode も DOM も node も入れない
     handoff-entry.ts  各画面の「取り込み待ちを開く」の契約（開けるか HandoffEntry・メッセージ openHandoff・開くツリーのキー）。VS Code にも node にも触れない
     handoff-view.ts   取り込み待ちの拡張ホストと画面の契約（答えの形 HandoffList / HandoffEntry / HandoffResult、見せる形 HandoffPage / HandoffData、押した操作 HandoffMessage）
-    handoffmodel.ts   user handoff --json の答え（見るだけ・取り込み）の読み取りと、画面の判断（取り込めるか・取り込めない理由・作業中の錠の掛かり方（template と layer-config）・ターミナルのコマンド・読み直しのあとの選択・見るツリー）。VS Code にも node にも触れない
+    handoffmodel.ts   user handoff --json の答え（見るだけ・取り込み。対象外の名前と理由 `ignored_paths` は形が正しいときだけ読み、無ければ件数だけ）の読み取りと、画面の判断（取り込めるか・取り込めない理由・作業中の錠の掛かり方（template と layer-config）・ターミナルのコマンド・読み直しのあとの選択・見るツリー）。VS Code にも node にも触れない
     handoff-import.ts 取り込みの手順（錠を取り直す → 選んだパスを指して見るだけをもう一度呼び expect を取る → entry_sha を見せたものと比べる → 取り込む）と defense のターミナルの案内。実行ファイルの呼び出しは HandoffDeps として受け取る（試験で差し替える）
     handoff-render.ts 取り込み待ちの入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を失わない）、雛形、入れ子の段の数え方と注意。正しいかは決めない（描けないときだけ断る）

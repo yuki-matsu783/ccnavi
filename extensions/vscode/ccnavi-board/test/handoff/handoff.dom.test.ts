@@ -47,6 +47,19 @@ test("CB-D366 一覧は対象ごとに 1 行。パス・種類・状態の札と
     assert.match(text(dom.one(row(DOCS))), /warn 1/);
     // 要約: 対象 7 件、取り込める 3 件（template・layer-config の changed・docs）、選択 0 件、対象外 2 件
     assert.equal(text(dom.one("#counts")), "対象 7 件・取り込める 3 件・選択 0 件・対象外 2 件");
+    const ignored = text(dom.one("#ignored-paths"));
+    assert.match(ignored, /repro\.sh: 取り込める種類の表に無い/);
+    assert.match(ignored, /linked: リンクのディレクトリ/);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1229 古い実行ファイル（ignored_paths が無い）は、件数だけで折りたたみを出さない", async () => {
+  const dom = await openHandoff({ list: list(undefined, { ignored_paths: undefined }) });
+  try {
+    assert.match(text(dom.one("#counts")), /対象外 2 件/);
+    assert.equal(dom.all("#ignored-paths").length, 0);
   } finally {
     await dom.close();
   }
