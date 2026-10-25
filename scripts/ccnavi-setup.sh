@@ -2030,6 +2030,9 @@ for name in $DEPLOY_SCRIPTS; do
 		ccnavi-common-*.sh)
 			why="代わりに通る sh が起動して最初に読む共通部の部品"
 			;;
+		ccnavi-handoff-names.txt)
+			why="ccnavi-stage.sh が読む、下書きの階層名の読み替え表"
+			;;
 		*)
 			why="止めている間に代わりに通る sh"
 			;;

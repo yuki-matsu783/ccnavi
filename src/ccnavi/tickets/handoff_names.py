@@ -44,14 +44,18 @@ NAMES_FILE = "ccnavi-handoff-names.txt"
 def _names_path() -> str:
     """表のファイルの場所。
 
-    組み立てた実行ファイルでは同梱の写し、ソースではリポジトリの `.ccnavi/scripts/`。
+    組み立てた実行ファイルでは同梱の写し（PyInstaller の展開先）、Chrome 拡張の Python では
+    パッケージの直下の写し（`python.js` が入れる）、ソースではリポジトリの `.ccnavi/scripts/`。
     """
-    bundled = getattr(sys, "_MEIPASS", "")
-    if bundled:
-        return os.path.join(bundled, NAMES_FILE)
     here = os.path.dirname(os.path.abspath(__file__))
-    repo = os.path.dirname(os.path.dirname(os.path.dirname(here)))
-    return os.path.join(repo, ".ccnavi", "scripts", NAMES_FILE)
+    package = os.path.dirname(here)
+    repo = os.path.dirname(os.path.dirname(package))
+    candidates = [
+        os.path.join(getattr(sys, "_MEIPASS", ""), NAMES_FILE),
+        os.path.join(package, NAMES_FILE),
+        os.path.join(repo, ".ccnavi", "scripts", NAMES_FILE),
+    ]
+    return next((c for c in candidates if os.path.isfile(c)), candidates[-1])
 
 
 def parse(text: str) -> dict[str, str]:
