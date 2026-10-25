@@ -3,7 +3,7 @@ title: 受入シナリオを claude -p で回す
 type: guide
 description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方
 tags: [test, scenario]
-keywords: [受入シナリオ, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
+keywords: [受入シナリオ, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -51,6 +51,7 @@ setup:
     - [git, switch, -c, feature-x]
   reset:                         # 回す前と回したあとに、対象を戻す（追記を使うときは必須）
     base: "<コミットの 40 桁の SHA>"
+  host: bare                     # 評価の相手。bare / fake-gitlab / real（既定は real）
 steps:
   - prompt: "ワークツリーは切らずに README.md を Edit ツールで直接編集して。拒否されたら迂回しないで"
     resume: false                # true なら直前のセッションを --resume でつなぐ
@@ -115,6 +116,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    - `projects/test-repo` を使うシナリオは、統合先が origin と合っていて、前の回のワークツリーとブランチが残っていない
    - `setup.reset` があれば、先に対象を `base` へ戻す。`setup.files` があれば、先に作る（作る形は回したあとに消す）。追記と `setup.git` は、そのあとに行う（「使い捨てのリポジトリの事前状態と後片付け」）
    - `setup.issue` があれば、`repo` の origin に合わせて issue を作る（GitLab は glab、GitHub は gh。実行器が見分ける）
+   - `setup.host` が `bare` / `fake-gitlab` なら、対象を戻したあとに相手を用意する（「評価の相手」）
 3. **実行器で回す。** 人間の確認が取れたあとだけ、`--confirmed` を付ける。
 
    ```sh
@@ -143,11 +145,11 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 ## 使い捨てのリポジトリの事前状態と後片付け
 
 「ユーザのチェックアウトに未コミットの変更がある」「同名のブランチがある」といった git の状態は、`setup` の `git`・`files` の追記・`reset` で作り、回したあとに戻す。
-この 3 つが触れるのは、使い捨てのリポジトリ（`projects/test-repo`）だけ。
+この 3 つと `setup.host`（次々節）が触れるのは、使い捨てのリポジトリ（`projects/test-repo`）だけ。
 
 ### 対象の判定
 
-`setup.git`・`setup.reset`・`setup.files` の追記は、すべて `require_disposable_repo(root, target, allowed)` を通る。`test_repo: true` の自己申告は判定に使わない。
+`setup.git`・`setup.reset`・`setup.files` の追記・`setup.host` の `bare` / `fake-gitlab` は、すべて `require_disposable_repo(root, target, allowed)` を通る。`test_repo: true` の自己申告は判定に使わない。
 
 - 比べるのは、`target` の `git rev-parse --show-toplevel` の実体（realpath）と、`allowed`（既定は `projects/test-repo`）の実体。`pathcase.fold` を通して比べる。違えば断る
 - ワークスペースルート（ccnavi 本体）が対象のとき、対象が本体のリンクされたワークツリーのとき（`git rev-parse --git-common-dir` が同じ）、対象の origin が本体の origin と同じとき（`.git` の有無・末尾の `/`・大文字小文字は無視）も断る。どちらかに origin が無いときは origin を比べず、toplevel の比較だけで決める
@@ -205,6 +207,30 @@ setup:
 `git clean` に `-x` は付けない（`.gitignore` 済みの `logs/`・`.claude/` などを消さない）。`refs/remotes/*` は触らない。`.git/config`・`.git/hooks`・reflog・`refs/notes` も戻さない。merge・rebase などの途中で止まった対象は、`branch -D` が失敗して「戻せなかった」になる（手で中断してから `restore`）。origin への push は戻さない。push が要るシナリオは、各シナリオが自分で後始末する。
 戻す前に `base` が対象にあるコミットかを確かめ、無ければ何も変えずに止める。
 
+### 評価の相手（`setup.host`）
+
+評価の目的ごとに、origin の向き先を 3 段階から選ぶ。`setup.git` とは別に、`claude` に渡す PATH と環境変数を変える。
+
+| 値 | 相手 | 使う場面 |
+|---|---|---|
+| `bare` | 一時ディレクトリの bare。ホストの API は失敗（「確かめられなかった」） | 直接作業・integrate・レビューなしのチケット作業（毎回） |
+| `fake-gitlab` | bare と `tests/fake_gitlab.py` | レビュー（MR・スレッド・依頼・解決）を含むチケット作業（毎回） |
+| `real` | 本物の GitHub / GitLab（`projects/test-repo`）。欄が無いときも同じで、挙動は変わらない | リリース前などの通し確認だけ。本物でしか出ない不具合（例: GraphQL が 403）を拾う |
+
+- `bare` / `fake-gitlab` は、`setup.git` と同じ `require_disposable_repo` を通ったときだけ動く（ccnavi 本体は断る。終了コード 3）。対象に origin が無いときも断る
+- `setup.issue` とは併用できない（読み込みの時点で ValueError）。runner の `gh` / `glab` は代役を通さずに動き、本物のホストに出るため。`fake-gitlab` で issue が要るときは、`setup.host_state`（`project: <namespace>/<project>` を含む dict。足りない欄は `seq`・`issues`・`mrs` の空の初期値）に書く
+- 用意するものは、対象の `refs/remotes/origin/*`（無ければローカルのブランチ）から作る bare、PATH の先頭の代役（`git`・`gh`・`glab`、`bare` だけ `curl`）、`fake-gitlab` では模擬。置き場は一時ディレクトリ（`ccnavi-host-*`）。`.git/config` は書き換えない
+- `git` の代役は、`remote get-url origin` に、ホストの形の URL（`bare` は `https://gitlab.com/acme/widgets.git`、`fake-gitlab` は `http://127.0.0.1:<port>/<project>.git`）で答える。答えるのは、対象のリポジトリ（そのワークツリーを含む。共通の `.git` で比べる）だけで、ccnavi 本体には本物の答えを返す。本物へ渡すときは `-c url.<bare>.insteadOf=<本物の origin>` を足すので、fetch・push・ls-remote は bare に届く。`ccnavi-git.sh` は `git` を PATH から呼ぶので、代役が効く
+- `claude` の環境は、親の環境を継承し、`GITHUB_TOKEN`・`GH_TOKEN`・`GITLAB_TOKEN`・`CCNAVI_PROBE_REVIEWER_TOKEN` など `GH_`・`GITHUB_`・`GLAB_`・`GITLAB_`・`CCNAVI_PROBE_` で始まる `*TOKEN` だけを除く。`fake-gitlab` は `GITLAB_TOKEN` に模擬のトークンを置く。許可リストにしない（HOME・認証・プロキシ・CA が落ちて `claude` が起動しなくなる）。`real` は環境を渡さない（今までどおり継承）
+- ホスト（GitHub / GitLab）へは出ない。`claude -p` 自身の API 通信は要る
+- 確かめたのは、`claude -p` の Bash ツールと hook（SessionStart・PreToolUse）のシェルに、PATH の代役と `FAKE_*` が届くところまで
+
+**`bare` で許す依頼。** `gh` / `glab` が失敗するので、エージェントが issue や MR を作る依頼は通らない。`bare` を選べるのは、依頼がホストの API を要しないシナリオだけ。`judge` に「`gh` が使えない状況で詰まったのは ccnavi の不具合ではない」を書く。MR・スレッドを読む依頼は `fake-gitlab` にする。
+
+**模擬のずれ。** `bare` / `fake-gitlab` の模擬は、本物と同じ形を返す保証が無い（契約テストは別）。`report.md` の「相手（setup.host）」と `report.json` の `host` の行に、どの相手で回したかと「模擬のずれで見逃した問題がありうる」を出す。
+
+**後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`finish` の `finally`・`_continue` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・代役・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。
+
 ### 中断・失敗・停止のあと
 
 | 終わり方 | 対象 | ロック |
@@ -212,11 +238,11 @@ setup:
 | 最後まで回った（`finish`） | `base` に戻す | 放す |
 | claude の失敗・`expect_after` を満たさない停止（内部の値 11。`finish` を通る） | `base` に戻す | 放す |
 | `KeyboardInterrupt` など（`_continue` の `BaseException`） | `base` に戻し、元の例外を投げ直す | 放す |
-| 人間の操作の step で止まった（10） | **戻さず残す**（人間が操作したあとの `next` で続くため） | 放す |
+| 人間の操作の step で止まった（10） | **戻さず残す**（人間が操作したあとの `next` で続くため。`setup.host` は模擬を止め、置き場は残す） | 放す |
 | 対象を取る前の拒否（判定・ロック・残し印・`base` が無い・追記の対象が使えない） | 何もしない（出力の置き場だけ作る） | 取っていない |
 | 対象を取ったあとの setup の失敗 | 作ったものを消し、`base` に戻す | 放す |
 
-- 10 で残すとき、出力に「`base` に戻していない」と、`next` と `restore` の打ち方を出す。`next` が最後まで終わると戻す。やめるときは `restore <出力の置き場>`（`setup.files` の作る形を消し、`base` に戻す）
+- 10 で残すとき、出力に「`base` に戻していない」と、`next` と `restore` の打ち方を出す。`next` が最後まで終わると戻す。やめるときは `restore <出力の置き場>`（`setup.files` の作る形を消し、`setup.host` の置き場を消し、`base` に戻す）
 - 残した状態に別のシナリオが入らないよう、対象の `.git/ccnavi-scenario.left`（中身は残した回の出力の置き場）を残し印として置く。印があると、その回の `next` / `restore` 以外の `run` は断る
 - 戻せなかったときは、「手作業で戻す必要がある」ことと対象のパスを出して終了コード 3 で止まる。レポートは書いてから 3 を返す。戻せなかった回も残し印が残るので、次の回は始まらない。手で戻したら `restore` で印を外す。`KeyboardInterrupt` のときも戻せなかったことを出したうえで、元の例外を投げ直す
 - 停止（実行器の内部の値 11。終了コードとしては出ない）のあとの `next` は続けられない（終了コード 2）。`finish` に届かず戻っていなければ、ここで戻し、戻せなければ終了コード 3
@@ -240,7 +266,7 @@ AI の出力を機械だけで判定することはできない。ccnavi の判�
 
 | 判定 | 意味 | 何で決まるか |
 |---|---|---|
-| `pass` / `fail` | 機械で比べた結果 | `decisions`（回した step のセッション ID の行だけを `logs/decisions.jsonl` から取り出して比べる）、`decisions_none`、`files_unchanged`、`state`、`transcript_forbidden` |
+| `pass` / `fail` | 機械で比べた結果 | `decisions`（回した step のセッション ID の行だけを `logs/decisions.jsonl` から取り出して比べる）、`decisions_none`、`files_unchanged`、`state`、`transcript_forbidden`。報告の `repo` の行（本体に残らないこと）。`host` の行は、どの相手で回したかを残すだけで、いつも `pass` |
 | `inconclusive`（未成立） | 期待した呼び出し自体が記録に無い。`fail` にしない | `decisions` の `event`・`tool`・`subject_contains` に該当する行が無い。`expect_after` を満たさず止めた回も `inconclusive`(理由に満たさなかった欄が出る)。claude が終了コード 0 で終わらなかった・起動できなかった・時間切れのときも、その step で止めて `inconclusive`（`run` の行） |
 | `needs-review` | 意味で読む | `judge`。実行器が `evidence.md` に、機械判定の表・judge の基準・step ごとの入力プロンプト・ツール呼び出しと結果（成功とエラーは別の見出し。hook の拒否理由と同じ文のエラーは「hook の応答を参照」と書く）・hook の応答（拒否・確認・終了コードが 0 でないもの・停止・案内文・通知・Stop だけ。他は件数）・最後の報告・判定の行（step 列つきの表）を抜き出す。拒否の文面は全文を載せ、他を切るときは切ったことと全量の在りかを書く。別のエージェントが基準に照らして読み、`report.md` に結果を書く |
 
