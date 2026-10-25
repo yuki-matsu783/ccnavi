@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -62,6 +63,7 @@ THIS_MACHINE = _load_build().build_target()
 ANOTHER_MACHINE = "haiku-riscv64"
 SHELL = shutil.which("sh") or shutil.which("bash")
 HAS_JQ = shutil.which("jq") is not None
+REAL_UNAME = shutil.which("uname")
 
 # 登録されていることを確かめる 8 つ。
 # docs/41_guide/settings.md「hook の 8 つのイベント」の表と対になる。
@@ -1909,29 +1911,73 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             p for p in os.environ.get("PATH", "").split(os.pathsep) if ".local/bin" not in p
         )
 
+    def fake_uname(self, system):
+        """`uname -s` だけを system と答える代役のフォルダ。PATH の先頭に置く。
+
+        ほかの引数（`-m` など）は本物の uname に任せる。
+        """
+        shim = tempfile.mkdtemp(prefix="ccnavi-uname-")
+        self.addCleanup(shutil.rmtree, shim, ignore_errors=True)
+        uname = os.path.join(shim, "uname")
+        with open(uname, "w", encoding="utf-8", newline="\n") as f:
+            f.write(
+                f'#!/bin/sh\ncase "$1" in -s) echo {system} ;; *) exec {REAL_UNAME} "$@" ;; esac\n'
+            )
+        os.chmod(uname, 0o755)
+        return shim
+
+    def run_user_bin_as(self, system, shell):
+        """`uname -s` が system を答える機械で、shell を使っている人向けに `--bin user` を回す。"""
+        # 導入スクリプトは配布元の目印をこの機械の名前と比べるので、目印も system に合わせる。
+        target = f"{system.lower()}-{THIS_MACHINE.split('-', 1)[1]}"
+        src = self.make_source(target=target)
+        self.dir = tempfile.mkdtemp(prefix="ccnavi-setup-")
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+        self.make_git()
+        path = os.pathsep.join([self.fake_uname(system), self.path_without()])
+        result = self.run_user_bin(
+            self.user_home(), "--deploy", src, "--bin", "user", answer="y", SHELL=shell, PATH=path
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("PATH に入っていません", result.stdout)
+        self.assertIn("export PATH=", result.stdout)
+        return result
+
     @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
+    @unittest.skipUnless(REAL_UNAME, "uname が見つからない")
     def test_bin_user_names_the_rc_file_of_the_shell_in_use(self):
-        src = self.make_source()
-        for shell, rc in (("/bin/bash", "~/.bashrc"), ("/usr/bin/zsh", "~/.zshrc")):
-            with self.subTest(shell=shell):
-                self.dir = tempfile.mkdtemp(prefix="ccnavi-setup-")
-                self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
-                self.make_git()
-                home = self.user_home()
-                result = self.run_user_bin(
-                    home,
-                    "--deploy",
-                    src,
-                    "--bin",
-                    "user",
-                    answer="y",
-                    SHELL=shell,
-                    PATH=self.path_without(),
-                )
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("PATH に入っていません", result.stdout)
+        """macOS の bash は ~/.bash_profile、Linux の bash は ~/.bashrc、zsh はどちらも ~/.zshrc。
+
+        どの OS で回しても 4 通りを確かめるため、uname を差し替えて分岐を通す。
+        """
+        for system, shell, rc in (
+            ("Linux", "/bin/bash", "~/.bashrc"),
+            ("Linux", "/usr/bin/zsh", "~/.zshrc"),
+            ("Darwin", "/bin/bash", "~/.bash_profile"),
+            ("Darwin", "/usr/bin/zsh", "~/.zshrc"),
+        ):
+            with self.subTest(system=system, shell=shell):
+                result = self.run_user_bin_as(system, shell)
                 self.assertIn(f">> {rc}", result.stdout)
-                self.assertIn("export PATH=", result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
+    def test_bin_user_names_the_rc_file_that_fits_the_real_os(self):
+        """差し替えなしで、いま動いている OS の期待どおりに案内する。"""
+        rc = "~/.bash_profile" if sys.platform == "darwin" else "~/.bashrc"
+        src = self.make_source()
+        self.make_git()
+        result = self.run_user_bin(
+            self.user_home(),
+            "--deploy",
+            src,
+            "--bin",
+            "user",
+            answer="y",
+            SHELL="/bin/bash",
+            PATH=self.path_without(),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f">> {rc}", result.stdout)
 
     @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_names_fish_add_path_for_fish(self):
@@ -1992,7 +2038,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         # Windows の環境変数 Path に、実体のフォルダを追加する手順を言う。rc には触れない。
         self.assertIn("SetEnvironmentVariable", result.stdout)
         self.assertIn(share, result.stdout)
-        self.assertNotIn(">> ~/.bashrc", result.stdout)
+        self.assertNotIn(">> ~/", result.stdout)
         self.assertNotIn("まだ無いもの", result.stdout)
 
     @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")

@@ -51,7 +51,12 @@ class TreeCaseTest(unittest.TestCase):
         self.assertEqual(tree.lookup(index, "i0001-01-01"), "B")
 
     def test_parts_under_はルートが_の時も使える(self) -> None:
-        self.assertEqual(tree.parts_under(os.sep, os.path.join(os.sep, "etc", "x")), ["etc", "x"])
+        # parts_under は実体化してから分ける（infra/tree.py の _resolved）。macOS の /etc は
+        # /private/etc へのリンクなので、無いパスを使い、ルート直下の分割だけを見る。
+        name = "ccnavi-no-such-top-level-dir"
+        path = os.path.join(os.sep, name, "x")
+        self.assertFalse(os.path.lexists(os.path.join(os.sep, name)))
+        self.assertEqual(tree.parts_under(os.sep, path), [name, "x"])
 
     def test_owner_は大文字を含むルートでも所有ツリーを返す(self) -> None:
         from ccnavi.tickets import core_base
