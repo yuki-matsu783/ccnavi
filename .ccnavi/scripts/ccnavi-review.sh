@@ -84,7 +84,10 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|
                                                   1 枚の HTML（.html / .htm）。このワークツリーの wip/eli5/ の下（既定の名前は
                                                   wip/eli5/phase-<N>.html）に置いてコミットし、push しておく（マージリクエストの
                                                   差分に載せる）。相対パスは実行した場所から。投稿が済むと、ユーザが実行する
-                                                  crit review <パス> と crit push <番号> を出す
+                                                  crit review <パス> と crit push <番号> を出す。--body-file が
+                                                  ワークスペースルート直下の scratchpad/ の中のファイルなら、成功のあとに
+                                                  request 自身が消す（待ち中は rm を打てないため。それ以外の場所のファイルは
+                                                  消さない。消せなければ警告だけで、終了コードは変えない）
   confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（未解決のスレッドは依頼の時刻に関わらずすべて数える。手で done/ に動かして共有した子は、移動の前の指摘を台帳 accepted.json に版つきで受け入れて確定する）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> --preview                      未解決（Unresolved）の指摘と、選べる対応方針の一覧を JSON で見るだけ。何も置かない
@@ -785,6 +788,38 @@ ${eli5_how}"
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
 	wap_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
+	# 段 3.5: 依頼文の後始末。依頼文は request の入力で、依頼した後は要らない。ここからはレビュー待ちで、
+	# 単独の ccnavi-*.sh 以外のシェルは止まり、エージェントは rm で消せない。だから request 自身が消す。
+	# 消すのは、--body-file がワークスペースルート直下の scratchpad/ の中のファイルのときだけ（利用者のファイルは消さない）。
+	# 消せなくても依頼は済んでいるので、警告だけで終了コードは変えない。
+	request_body=""
+	request_prev=""
+	for request_a in "$@"; do
+		[ "$request_prev" = --body-file ] && request_body="$request_a"
+		case "$request_a" in --body-file=*) request_body="${request_a#--body-file=}" ;; esac
+		request_prev="$request_a"
+	done
+	if [ -n "$request_body" ]; then
+		case "$request_body" in
+		/* | [A-Za-z]:[\\/]*) request_body_path="$request_body" ;;
+		*) request_body_path="$here/$request_body" ;;
+		esac
+		# `.` と `..` を解いてから、大文字小文字を区別せずに scratchpad/ の中かを見る（ASCII の範囲）。
+		request_body_abs=$(ccnavi_abs "$request_body_path" | tr '\\' '/' | LC_ALL=C tr 'A-Z' 'a-z') || request_body_abs=""
+		request_scratch=$(printf '%s/scratchpad/' "$root" | tr '\\' '/' | LC_ALL=C tr 'A-Z' 'a-z')
+		case "$request_body_abs" in
+		"$request_scratch"?*)
+			if [ -f "$request_body_path" ] || [ -L "$request_body_path" ]; then
+				if rm -f "$request_body_path" 2>/dev/null; then
+					printf '案内: 依頼文 %s を消した（scratchpad/ の下書き。依頼したあとは不要）\n' "$request_body"
+				else
+					printf '%s: 依頼文 %s を消せなかった。依頼は済んでいる。次の依頼の --body-file と取り違えないよう、ユーザに消してもらってください。\n' \
+						"$review_label" "$request_body" >&2
+				fi
+			fi
+			;;
+		esac
+	fi
 	# 段 4: crit の案内。crit はユーザの手元で打つ道具。
 	# crit push は crit の作業場所（打った場所）からの相対で行を送るので、ワークツリーのルートで打たせる。
 	# crit・gh・glab が PATH に無くても止めない。案内だけ出す。
