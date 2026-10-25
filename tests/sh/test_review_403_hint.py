@@ -1,17 +1,20 @@
-"""GraphQL が制限されている環境での別の方法を、止まったその場で案内する。
+"""GraphQL が制限されている環境で、REST にも失敗したときの案内。
 
-GitHub ではスレッドの解決状態（`threads`）と Draft 外し（`undraft`）が GraphQL でしか
-扱えない。GraphQL を制限する実行環境があり（Claude Code のセッションは REST だけ通す）、
-そこでは `confirm` / `fetch` / `ready` だけが 403 で止まる。curl の経路は `-f` が本文を
-破棄するので、画面に残るのは番号だけになり、認証の失敗と見分けが付かない。
+GitHub ではスレッドの解決状態（`threads`）と Draft 外し（`undraft`）が GraphQL の道を持つ。
+GraphQL を制限する実行環境（Claude Code のクラウドは REST だけ通す）では、
+GraphQL が 403 になる。ccnavi は GraphQL を先に試し、403 のときだけ
+REST（`/ccr/` の道）に替える（`test_review_rest_fallback.py`）。
 
-案内そのものは `api_failed` の `graphql` の枝が出す。実際の GitHub の GraphQL を
-失敗させる環境は作れない（`remote_kind` はホスト名で github と読むので、127.0.0.1 に
-立てた偽物は gitlab として読まれる）。そこで 2 本に分ける。
+この試験が見るのは、REST にも失敗したときの案内（`rest_fallback_failed`）。
 
-- 枝が在ることと、案内が次の一手を名指ししていること: スクリプトの文面を読む
-  （`test_sh_portability.py` と同じやり方）
-- GraphQL 以外の失敗では案内を出さないこと: 閉じたポートへ実際に打つ
+- 案内は、ユーザに JSON を作らせて `ccnavi review confirm --result` を打たせる手順を書かない。
+  その手順は write-and-push の検査で止まる（`--record-tree` が付かないため）。
+  書くと、拒否される手順を案内してしまう
+- 案内に、止まってユーザに接続の確認を頼むことを書く
+- GraphQL 以外の失敗では案内を出さない: 閉じたポートへ実際に打つ
+
+実際の GitHub の GraphQL を失敗させる環境は作れない。`remote_kind` はホスト名で github と読むため、
+127.0.0.1 に立てた偽物は gitlab として読まれる。GraphQL の 403 は `github_host.py` の代役で作る。
 """
 
 from __future__ import annotations
@@ -33,15 +36,18 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
 CURL = shutil.which("curl")
 
-# 案内が名指しするもの。どれが欠けても、読んだユーザは次に何をすればよいか分からない。
+# 案内が名指しするもの。どれが欠けても、読んだ人は次に何をすればよいか分からない。
 MUST_NAME = (
+    "REST の代わりの道",
+    "ユーザに",
+    "止まって",
+)
+# 案内に書かない手順。JSON を実行ファイルに直接渡す手順は、ユーザが打っても止まる。
+MUST_NOT_NAME = (
     "ccnavi review confirm",
     "--result",
     "MCP",
     "fetch_all",
-    # JSON を実行ファイルへ直接渡せるのはユーザだけ。宛先はユーザで、エージェントには打たせない。
-    "ユーザだけ",
-    "エージェントは JSON を作らず",
 )
 
 
@@ -50,29 +56,44 @@ def script_text():
         return f.read()
 
 
-def api_failed_body(text):
-    """`api_failed()` の本体だけを切り出す。次の関数の定義までを見る。"""
-    start = text.index("api_failed() {")
+def function_body(text, name):
+    """`name() {` の行から、次の `}` だけの行までを切り出す。"""
+    start = text.index(f"{name}() {{")
     rest = text[start:]
     end = rest.index("\n}\n")
     return rest[: end + 3]
 
 
 class TheHintIsInTheFailurePathTest(unittest.TestCase):
-    """案内は `api_failed` に置く。"""
+    """案内は、REST にも失敗したときの文面に置く。"""
 
-    def test_api_failed_has_a_graphql_branch(self):
-        """`confirm` の側ではなく `api_failed`。`fetch` と `ready` も同じ経路で止まる。"""
-        body = api_failed_body(script_text())
-        self.assertIn('case "$2" in', body, "GraphQL のときだけ足す枝が無い")
-        self.assertIn("graphql)", body)
+    def test_api_failed_has_no_graphql_only_branch(self):
+        """GraphQL の失敗は `gql` が分ける。`api_failed` は共通の文面だけを持つ。"""
+        body = function_body(script_text(), "api_failed")
+        self.assertNotIn("graphql)", body)
+        for word in MUST_NOT_NAME:
+            with self.subTest(word=word):
+                self.assertNotIn(word, body)
 
     def test_the_hint_names_the_next_move(self):
-        """番号だけでは次に何をすればよいか分からない。取得した結果の作り方まで名指しする。"""
-        body = api_failed_body(script_text())
+        body = function_body(script_text(), "rest_fallback_failed")
         for word in MUST_NAME:
             with self.subTest(word=word):
                 self.assertIn(word, body)
+
+    def test_the_hint_does_not_ask_for_a_refused_procedure(self):
+        body = function_body(script_text(), "rest_fallback_failed")
+        for word in MUST_NOT_NAME:
+            with self.subTest(word=word):
+                self.assertNotIn(word, body)
+
+    def test_the_no_transport_message_does_not_ask_for_a_json_either(self):
+        text = script_text()
+        start = text.index("fail no-transport ")
+        line = text[start : text.index("\n", start)]
+        for word in MUST_NOT_NAME:
+            with self.subTest(word=word):
+                self.assertNotIn(word, line)
 
 
 @unittest.skipUnless(SHELL and JQ and CURL, "sh / jq / curl のどれかが無い")

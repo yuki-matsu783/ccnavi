@@ -1483,6 +1483,51 @@ class StartShTest(unittest.TestCase):
                 # 理由が空（「?」）にならない
                 self.assertIn("紐づく issue を読めなかった", done.stdout)
 
+    def graphql_blocked_with_body(self, body, status=403):
+        """GraphQL が断られる環境。MR の本文（`GET pulls/5`）に body を置く。"""
+        self.mr_branch(
+            **{
+                GRAPHQL: [status, {"message": "refused"}],
+                f"GET {GITHUB}/pulls/5": [200, pr(5, "fix-152-other", body=body)],
+            }
+        )
+
+    def test_a_blocked_graphql_falls_back_to_the_closing_keyword_in_the_mr_body(self):
+        self.graphql_blocked_with_body("機能を足す。\n\nCloses #12")
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("issue: 12 と mr: 5", done.stdout)
+
+    def test_the_body_keywords_ignore_case_and_read_other_repositories(self):
+        self.graphql_blocked_with_body("fixes: other/repo#3\nRESOLVES #12\nrefs #99\nrefix #98")
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
+        self.assertIn("other/repo#3", done.stdout)
+        self.assertIn("acme/widgets#12", done.stdout)
+        self.assertNotIn("#99", done.stdout)
+        self.assertNotIn("#98", done.stdout)
+
+    def test_body_keywords_inside_code_comments_quotes_and_words_are_not_read(self):
+        self.graphql_blocked_with_body(
+            "Closes #12\n```\nFixes #9\n```\n> Closes #7\n<!-- Closes #100 -->\n"
+            "例: `Closes #50`\nDoes not close #8 bug-fix #13 Closes #14abc"
+        )
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("issue: 12 と mr: 5", done.stdout)
+
+    def test_a_blocked_graphql_with_no_keyword_in_the_body_is_zero_linked_issues(self):
+        self.graphql_blocked_with_body("Refs #12")
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("Closes #<番号>", done.stderr)
+
+    def test_a_401_from_graphql_does_not_fall_back_to_the_body(self):
+        self.graphql_blocked_with_body("Closes #12", status=401)
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertNotIn("issue: 12", done.stdout)
+
     def test_the_guided_rerun_after_an_unreadable_closing_link_succeeds(self):
         # 閉じる issue だけ読めない（GraphQL が errors）。案内の 3 引数で打ち直せば確定する
         self.mr_branch(
