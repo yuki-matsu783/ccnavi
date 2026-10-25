@@ -577,14 +577,23 @@ sync_present() {
 # P がリモートにあっても、MR がマージ済みなら閉じている。ホストはマージの後もブランチを残すことがあり
 # （GitHub の既定）、ready が親のワークツリーを片付けられなかった（未コミットの変更など）ときは、
 # ブランチが残る限り片付けの機会が無くなる。親チケットの mr 欄の MR の番号で聞き、マージ済みなら片付ける。
-# 番号が無ければ推定せず 1 行言う。マージされていなければ何も言わない。確かめられなければ 1 行言うが、
+# 番号が無ければ推定せず 1 行言う（親が承認待ちのときは、承認済みのチケットだけを読む決まりで番号を読めないので、言わない）。
+# マージされていなければ何も言わない。確かめられなければ 1 行言うが、
 # 取り込みそのものは済んでいるので失敗にはしない（次の取り込みでまた聞く）。
 merged_present() {
 	merged=$(ask_merged "$tree" "$fam_mr")
 	merged_rc="${merged%%:*}"
 	merged="${merged#*:}"
 	case "$merged_rc:$merged" in
-	nomr:*) no_mr_note "（親のブランチはリモートにある）" ;;
+	nomr:*)
+		# 親が承認待ち（todo/ の提案）のときは、mr 欄を読めないのが正常。判定は承認済みのチケットだけを読み、
+		# 承認前の親は閉じてもいない。承認後に、mr 欄で聞く
+		if [ "$ccnavi_pi_parent" = yes ] && [ "$ccnavi_pi_approved" = no ]; then
+			log_debug 承認待ちの親なので mr 欄の警告を出さない -- "parent=$P"
+		else
+			no_mr_note "（親のブランチはリモートにある）"
+		fi
+		;;
 	*:'merged '*)
 		split_merged "${merged#merged }"
 		if [ -n "$merged_branch" ] && [ "$merged_branch" != "$B" ]; then

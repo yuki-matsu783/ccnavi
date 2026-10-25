@@ -54,7 +54,9 @@
 # それ以外は今のまま。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。ready だけは `--parent <親>` で
-# 外（ワークスペースルートなど）からも打てる。外から打てば、Draft を外したあとに親のワークツリーも消える。
+# 外（ワークスペースルートなど）からも打てる（ほかのサブコマンドに --parent を渡すと拒否する）。
+# request・confirm を統合先のブランチの上（ワークスペースルートなど）で打つと、親を決められないので
+# 「親のワークツリーの中で打ってください」と止める。外から打てば、Draft を外したあとに親のワークツリーも消える。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り /
 #             3 merged だけ: MR がマージ済みかを確かめられなかった（"unknown" を出す。推定せずに止める）
 #
@@ -74,7 +76,7 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>] [--eli5 <html>] [--parent <親>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>] [--eli5 <html>]
 
   request      --phase <N> --body-file <依頼文> --eli5 <HTML>
                                                   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。
@@ -125,6 +127,17 @@ request | confirm | comment | decide | ready | fetch | origin | merged | mr-stat
 	fail unknown-sub "$sub は指定できません。指定できるのは request / confirm / comment / decide / ready / fetch / origin / merged / mr-state です。" 2
 	;;
 esac
+
+# ---- --parent は ready だけ。ほかのサブコマンドでは親を cwd から引くので、渡されても効かない。黙って読み飛ばさず断る。
+if [ "$sub" != ready ]; then
+	for parent_arg in "$@"; do
+		case "$parent_arg" in
+		--parent | --parent=*)
+			fail parent-only-ready "--parent は ready だけです。$sub は親のワークツリーの中で打ってください（どの親かは cwd から引きます）。" 2
+			;;
+		esac
+	done
+fi
 
 # ---- decide は、見るだけの --preview だけを受ける。選んだものを置くのはユーザ専用の ccnavi-user-decide.sh。
 if [ "$sub" = decide ]; then
@@ -400,6 +413,21 @@ default_branch() {
 	printf '%s' "$db_name"
 }
 
+# 親のワークツリーの外で、親を cwd から引くサブコマンド（request・confirm）を打ったとき、止めて案内する。
+#
+# 親のワークツリーの外で居るブランチを親の識別子と読むと、統合先（main など）を親と読んでしまい、
+# 「親のワークツリーを切り直せ」という見当違いの案内になる。原因は、親のワークツリーの中で打っていないこと。
+# 居るブランチが統合先のときだけ止める。統合先が決まらないときは、前どおり進める。
+need_parent_tree() {
+	[ "$review_in_tree" = yes ] && return 0
+	np_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
+	np_name=$(ccnavi_integration "${np_tree:-.}" 2>/dev/null) || np_name=""
+	[ -n "$np_name" ] && [ "$np_name" = "$branch" ] || return 0
+	np_hint=""
+	[ "$sub" != ready ] || np_hint="外から打つなら --parent <親の識別子> を付けます。"
+	fail not-in-parent-tree "$sub は親のワークツリー（$root/.claude/worktrees/<親の識別子>）の中で打ってください。いまは統合先のブランチ（${branch}）の上で、親を決められません。親のワークツリーは 'sh $script_dir/ccnavi-git.sh worktree list' で探せます。${np_hint}" 2
+}
+
 # ---- 目印で始まる投稿を探す。{url, created_at} を返す（無ければ空）。<番号> <URL> <目印>
 
 find_posted() {
@@ -591,6 +619,7 @@ confirm)
 		esac
 		confirm_prev="$a"
 	done
+	need_parent_tree
 	wap_start "$family"
 	fetch_all >"$result"
 	wap_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
@@ -704,6 +733,7 @@ request)
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
 	# 段 0: 取り込み済みの親子のチケットなら write-and-push の前半（ロック・取り込み）を先に済ませる。
+	need_parent_tree
 	wap_start "$family"
 	# 段 1: 前提。exe が依頼の本文を書き出す。
 	tell_skew
@@ -813,6 +843,7 @@ ready)
 	# 閉じた親子のチケット（done/ の親子・phases/<親>/・flows/）を手元の logs/archive/ へ
 	# 退避する（git の上では削除）。write-and-push の中なら、その削除をコミットして push してから、ここが外して
 	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
+	[ -n "$ready_parent" ] || need_parent_tree
 	wap_start "$family"
 	fetch_all >"$result"
 	# 打ち直しの判断（Draft を外し損ねたか）に、MR がまだ Draft かを結果に足す。

@@ -142,6 +142,7 @@ review_host() {
 	# の / を - に置き換えたもの（ブランチ名とは違うことがある）。マージリクエストは居るブランチ（branch）で探して作り、
 	# write-and-push の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
 	family="$branch"
+	review_in_tree=no
 	review_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	if [ -n "$review_top" ]; then
 		review_top_p=$(ccnavi_phys "$review_top")
@@ -150,6 +151,7 @@ review_host() {
 		"$review_root_p"/.claude/worktrees/*)
 			family="${review_top_p#"$review_root_p"/.claude/worktrees/}"
 			family="${family%%/*}"
+			review_in_tree=yes
 			;;
 		esac
 	fi

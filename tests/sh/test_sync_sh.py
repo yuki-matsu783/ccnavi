@@ -569,6 +569,19 @@ class SyncTest(SyncHarness):
         self.assertNotIn("クローズ済みの親子のチケット", done.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
+    def test_a_parent_waiting_for_approval_does_not_warn_about_the_mr_field(self):
+        # 承認待ち（todo/ の提案）の親は、承認済みのチケットだけを読む決まりで mr 欄を読めない。
+        # 提案に mr: があっても「mr 欄に番号が無い」とは言わない（言えば事実と合わない警告になる）。
+        os.makedirs(os.path.join(self.tree, "wip", "proposals", "todo"))
+        git(self.tree, "mv", "--", COPY, f"wip/proposals/todo/{PARENT}.md")
+        git(self.tree, "commit", "-q", "-m", "back to todo")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        log = self.review_log("none")
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn("mr 欄に MR の番号が無い", done.stdout + done.stderr)
+        self.assertFalse(os.path.exists(log))
+
     def test_a_parent_missing_in_the_parent_tree_is_not_closed(self):
         # 承認前の提案だけが残る親のワークツリー（この親子のチケットは閉じようがない）。
         os.makedirs(os.path.join(self.tree, "wip", "proposals", "todo"))
