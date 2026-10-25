@@ -42,6 +42,10 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
   `gitdir:`の後ろは半角空白1個。`ccnavi_project`（sh）と`tree.py`がこれを前提にしている
 - **Docker Desktopを起動すると`restart=unless-stopped`のGitLabが勝手に上がり、2GBのVMではengineごと異常終了する。**
   GitLab CEには4GB要る
+- **macOSの`/etc`・`/tmp`・`/var`は`/private`へのリンク。** `os.path.realpath`で実体化すると先頭に`private`が付く。
+  実体化する関数（`tree.parts_under()`など）のテストに実在のリンクを渡さない。存在しないパスか、`realpath`を通した一時ディレクトリで組む
+- **macOSのbashは`~/.bash_profile`、Linuxのbashは`~/.bashrc`を読む。** 導入スクリプトの案内は、bashだけ`uname -s`で分ける（zshは`~/.zshrc`）。
+  テストは`uname`の代役をPATHの先頭に置き、どのOSで回しても両方の分岐を通す（`tests/sh/test_setup.py`の`fake_uname`）
 - `dist/`、`build/`、`logs/`はgit管理外。記録には絶対パスとコマンド全文が入るのでコミットしない
 
 ## パスと名前の大文字小文字
@@ -55,6 +59,8 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
   比べて残りの名前を取り出すときは`tree.parts_under()`を使う（小文字にしたパスから切り出さない）
 - ワークツリーの名前は`tree.worktree_path()`で引く。在るディレクトリの実際の表記で返る。
   大文字小文字だけ違う別のワークツリー・識別子・ブランチを作らない。作ろうとしたら拒否または警告する
+- テストで「大文字小文字だけ違うブランチ」をリモートに置くときは、`refs/heads/`の下のファイル（loose ref）にしない。
+  区別しないFSでは同じファイルになって置けない。bareの`packed-refs`に2行並べる（`tests/sh/test_sync_sh.py`の`add_ref_differing_only_in_case`）
 - 「表記まで同じであること」を求める判定を新しく足さない
 - sh の`case`でパスを比べるときも、同じ場所の別の綴りを通すつもりで書く。ccnavi が自分で組んだ
   `<root>/.claude/worktrees/*`のようなパスは、綴りが決まっているので`case`のままでよい

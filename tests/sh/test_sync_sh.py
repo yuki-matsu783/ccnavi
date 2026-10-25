@@ -171,6 +171,30 @@ class SyncHarness(unittest.TestCase):
             git(tree, "push", "-q", "-u", "origin", name)
         return tree
 
+    def add_ref_differing_only_in_case(self, existing, added):
+        """bare のリモートに、existing と綴りの大文字小文字だけが違うブランチ added を足す。
+
+        loose ref（refs/heads/ の下のファイル）にすると、大文字小文字を区別しない FS（macOS の
+        既定）では existing と同じファイルになって足せない。packed-refs に 2 行を並べて置けば、
+        FS に関わらず別の ref として読まれる。existing も packed-refs に移す。
+        """
+        git(self._tmp.name, "--git-dir", self.remote, "pack-refs", "--all", "--prune")
+        packed = os.path.join(self.remote, "packed-refs")
+        with open(packed, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        sha = next(ln.split()[0] for ln in lines if ln.endswith(f" refs/heads/{existing}"))
+        header = [ln for ln in lines if ln.startswith("#")]
+        refs = [ln for ln in lines if not ln.startswith(("#", "^"))]
+        refs.append(f"{sha} refs/heads/{added}")
+        refs.sort(key=lambda ln: ln.split(" ", 1)[1])  # packed-refs は ref 名のバイト順に並ぶ
+        with open(packed, "w", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join([*header, *refs]) + "\n")
+        names = git(
+            self._tmp.name, "--git-dir", self.remote, "for-each-ref", "--format=%(refname)"
+        ).stdout.split()
+        self.assertIn(f"refs/heads/{existing}", names)
+        self.assertIn(f"refs/heads/{added}", names)
+
     def pusher(self):
         """他の機械の代わり。bare のリモートの clone。"""
         path = os.path.join(self._tmp.name, "pusher")
@@ -1029,7 +1053,7 @@ class SyncTest(SyncHarness):
 
     def test_a_host_default_that_differs_only_in_case_does_not_move_the_origin_head(self):
         # ホストが Main と答え、手元は main。綴り違いだけなので同じ名前として、向け直さない。
-        git(self.pusher(), "push", "-q", "origin", "origin/main:refs/heads/Main")
+        self.add_ref_differing_only_in_case("main", "Main")
         git(self._tmp.name, "--git-dir", self.remote, "symbolic-ref", "HEAD", "refs/heads/Main")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
