@@ -119,7 +119,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   通信      fetch  pull  (--force / --prune は不可。取ってくるのは <リモート> <ブランチ> だけで、
                    : や + を含む引数(refspec・URL)は不可。手元の ref は ccnavi-sync.sh が進める。
                    統合先のユーザのチェックアウトの pull は、引数なしと現在のブランチと同じ名前
-                   (pull --ff-only <リモート> <統合先>) だけ。別のブランチは merge と同じく不可)
+                   (pull [--ff-only] <リモート> <統合先>) だけ。別のブランチは merge と同じく不可)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release と統合先 (そのリポジトリの origin/HEAD、無ければ
                    origin/main・origin/master) へ直接は送れない。
@@ -2236,7 +2236,7 @@ fetch | pull)
 	if [ "$sub" = pull ] && [ "$fp_other" = yes ] && merge_target_is_here; then
 		reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは、pull <リモート> <ブランチ>（${fp_refs# }）で別のブランチ・リモートを取り込めません（merge できないのと同じです）。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
 $(merge_on_target_next)
-案内: 統合先の更新（引数なしの pull と pull --ff-only <リモート> ${mg_integ}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも打てます。"
+案内: 統合先の更新（引数なしの pull と pull [--ff-only] <リモート> ${mg_integ}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも打てます。"
 	fi
 	;;
 
