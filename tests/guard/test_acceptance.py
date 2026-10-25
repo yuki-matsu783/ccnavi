@@ -294,7 +294,7 @@ class ReadingTest(unittest.TestCase):
             "読めた拒否に読めなかったと書かれている",
         )
 
-    def test_括弧でグループ化した述語は読めなかったと書かない(self):
+    def test_括弧でグループ化した述語を読めなかったと書かない(self):
         # find の `\\( … \\)` は読める形。書き込みの述語が後ろに続く形だけが読めない。
         for command in ("find . \\( -name x -o -name y \\) -print", "grep -e '(' -n main.sh"):
             with self.subTest(command=command):
