@@ -36,7 +36,7 @@ export interface HandoffEntry {
   readonly entry_sha: string;
 }
 
-/** 対象外にした 1 件。`why` は `not-allowed`（種類の表に無い）か `linked-dir`（リンクのディレクトリ）。ほかの値も読む */
+/** 対象外にした 1 件。`why` は `not-allowed`（種類の表に無い）か `linked-dir`（リンクのディレクトリ）。ほかの値はそのまま扱う */
 export interface HandoffIgnored {
   readonly path: string;
   readonly why: string;

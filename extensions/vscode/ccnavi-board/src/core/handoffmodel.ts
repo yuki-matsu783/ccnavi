@@ -86,7 +86,7 @@ export function parseHandoffList(text: string): HandoffListParse {
   };
 }
 
-/** 対象外の名前と理由。欄が無い（古い実行ファイル）・配列でない・欠けた欄があるときは、件数だけ出すために無いものとして扱う */
+/** 対象外の名前と理由。欄が無い（古い実行ファイル）・配列でない・欠けた欄があるときは、無いものとして扱い、件数だけ出す */
 function ignoredPathsOf(value: unknown): HandoffIgnored[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
