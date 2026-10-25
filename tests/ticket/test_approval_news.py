@@ -49,7 +49,7 @@ class ApprovalToldTest(PhaseHarness):
             self.event("PreToolUse", session=session, tool="Write", file_path=target, **kw)
         )
 
-    def approve_yes(self, tickets):
+    def approve_body(self, tickets):
         # ボードと同じく、見せたダイジェスト（承認画面の本文・判定が読んだ中身・書き込む中身）
         # を渡す。
         # 渡さない `--yes` は承認しない。
@@ -59,7 +59,15 @@ class ApprovalToldTest(PhaseHarness):
             "user", "agree", "--yes", ",".join(tickets), "--digest", digest, "--json"
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        return json.loads(result.stdout)["prompt"]
+        return json.loads(result.stdout)
+
+    def approve_yes(self, tickets):
+        return self.approve_body(tickets)["prompt"]
+
+    def leave_change_in_parent(self, name="keep.py"):
+        """承認の前に、親のワークツリーへ提案以外の変更を入れる（追跡中のファイルを書き換える）。"""
+        with open(os.path.join(self.parent_tree, "src", name), "a", encoding="utf-8") as f:
+            f.write("print(2)\n")
 
     def parent_only(self):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
@@ -100,6 +108,90 @@ class ApprovalToldTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
         self.commit_parent()
         self.assertIn("改版", self.approve_yes(["i0001"]))
+
+    # ---- 1b. 親のワークツリーに残る、提案以外の変更
+
+    def test_the_prompt_tells_about_a_change_left_in_the_parent_worktree(self):
+        """承認の前に親のワークツリーへ入れた変更は、承認の時点で知らせる（承認は止めない）。
+
+        承認の後は、同じ変更を戻す編集が DENY_TICKET_PARENT で断られ、子の finish も止まる。
+        戻し方（restore）まで `案内:` の行に載せる。
+        """
+        self.parent_only()
+        self.leave_change_in_parent()
+        body = self.approve_body(["i0001"])
+        self.assertEqual(body["approved"], ["i0001"])
+        notices = [x for x in body["prompt"].splitlines() if x.startswith("案内:")]
+        self.assertEqual(len(notices), 1, body["prompt"])
+        self.assertIn("src/keep.py", notices[0])
+        self.assertIn("ccnavi-git.sh", notices[0])
+        self.assertIn("restore --staged --worktree -- src/keep.py", notices[0])
+        self.assertIn("子のワークツリー", notices[0])
+        self.assertIn("ユーザへ確かめる", notices[0])
+        self.assertEqual(body["dirty_parent"], [{"ticket": "i0001", "paths": ["src/keep.py"]}])
+
+    def test_the_prompt_is_silent_when_the_parent_worktree_is_clean(self):
+        """親のワークツリーが提案とチケットの置き場しか変えていなければ、知らせない。"""
+        self.parent_only()
+        body = self.approve_body(["i0001"])
+        self.assertNotIn("案内:", body["prompt"])
+        self.assertEqual(body["dirty_parent"], [])
+
+    def test_a_child_approval_names_the_parent_worktree(self):
+        """子の承認でも、変更が残っているのは親のワークツリー。親の識別子で名指しする。"""
+        self.parent_only()
+        self.approve_yes(["i0001"])
+        self.commit_parent("approve parent")
+        self.next_child()
+        self.leave_change_in_parent()
+        body = self.approve_body(["i0001-01-01"])
+        self.assertEqual(body["dirty_parent"], [{"ticket": "i0001", "paths": ["src/keep.py"]}])
+
+    def test_terminal_agree_reports_a_change_left_in_the_parent_worktree(self):
+        """ターミナルの承認は、標準エラーと `--placed-out` の JSON の両方に出す。承認は通る。"""
+        self.parent_only()
+        self.leave_change_in_parent()
+        report = os.path.join(self.root, "placed.json")
+        result = self.ccnavi("user", "agree", "--placed-out", report, stdin="y\n")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("src/keep.py", result.stderr)
+        self.assertIn("restore --staged --worktree -- src/keep.py", result.stderr)
+        with open(report, encoding="utf-8") as f:
+            body = json.load(f)
+        self.assertEqual(body["dirty_parent"], [{"ticket": "i0001", "paths": ["src/keep.py"]}])
+        self.assertEqual(len(body["placed"]), 1)
+
+    def test_a_missing_parent_worktree_does_not_stop_the_approval(self):
+        """親のワークツリーが無いときは黙って空にする。承認は止めない。"""
+        from types import SimpleNamespace
+
+        from ccnavi.infra import settings
+        from ccnavi.tickets import core_approve
+
+        self.parent_only()
+        conf, _ = settings.load(self.root)
+        ticket = SimpleNamespace(ticket="i9999", parent="", is_child=False, project="")
+        self.assertEqual(core_approve.dirty_parents(conf, self.root, [ticket]), [])
+
+    def test_the_parent_denial_tells_how_to_put_a_change_back(self):
+        """承認の後、親のワークツリーの変更を Edit で戻そうとして断られたとき、戻し方を案内する。"""
+        self.parent_only()
+        self.leave_change_in_parent()
+        self.approve_yes(["i0001"])
+        result = self.event(
+            "PreToolUse",
+            tool="Edit",
+            file_path=os.path.join(self.parent_tree, "src", "keep.py"),
+            old_string="print(2)",
+            new_string="",
+        )
+        out = json.loads(result.stdout)["hookSpecificOutput"]
+        reason = out.get("permissionDecisionReason", "")
+        self.assertEqual(out.get("permissionDecision"), "deny")
+        self.assertIn("DENY_TICKET_PARENT", reason)
+        self.assertIn("ccnavi-git.sh", reason)
+        self.assertIn("restore --staged --worktree -- <path>", reason)
+        self.assertIn("do not work around", reason)
 
     # ---- 2. hook は伝えない
 
