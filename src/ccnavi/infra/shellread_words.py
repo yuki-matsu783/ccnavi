@@ -57,6 +57,11 @@ _READONLY_RUNNEE = frozenset(
     }
 )
 
+# find の述語のうち、書き込みや実行をするもの（GNU find / BSD find）。
+_FIND_ACTIONS = frozenset(
+    {"-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls"}
+)
+
 # `xargs` のオプションで、次の語を値に取るもの。一覧に無いオプションは値を取らないものとして読む。
 _XARGS_VALUE_OPTIONS = frozenset(
     {
@@ -221,10 +226,14 @@ def _classify(commands: list[list[str]]) -> str:
         if command and _base(command[0]) in _RUNS_A_STRING and not _xargs_readonly(command):
             return REASON_TAKEN_AS_CODE
 
-        # `-` で始まる語が頭に来るのは、`find -exec … \;` のあとに続く述語
-        # （`-delete` `-exec` など）。
-        # 別のコマンドとして読むと find の書き込みの述語を見逃すので、読めない形に戻す。
-        if command and command[0].startswith("-"):
+        # `-` で始まる語が頭に来るのは、`find -exec … \;` のあとに続く述語か、
+        # 引用された `(` `;` で切れた後ろの断片。書き込み・実行の述語を含むものだけ、
+        # find の続きを見逃さないよう読めない形に戻す。
+        if (
+            command
+            and command[0].startswith("-")
+            and any(token in _FIND_ACTIONS for token in command)
+        ):
             return REASON_TAKEN_AS_CODE
 
         # フラグを付けて初めて文字列を実行するものは、先頭でなくてもよい。

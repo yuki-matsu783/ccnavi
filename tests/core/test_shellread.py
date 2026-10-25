@@ -49,6 +49,19 @@ class ReadTest(_Readable, unittest.TestCase):
             with self.subTest(src=src):
                 self.readable(src)
 
+    def test_引用や括弧で切れた後ろが書き込みの述語を含まなければ読める(self):
+        cases = [
+            "find . \\( -name x -o -name y \\) -print",
+            'find . -type f \\( -name "*.sh" -o -name "*.md" \\) -not -path "./.git/*"',
+            "find . '(' -name x ')' -print",
+            "grep -e '(' -n main.sh",
+            "grep -rn ';' -n main.sh",
+            "find . -name x -exec grep -n foo {} \\; -print",
+        ]
+        for src in cases:
+            with self.subTest(src=src):
+                self.readable(src)
+
     def test_xargsとfind_execは後ろが一覧に無いか決まらなければ縮退する(self):
         cases = [
             "xargs rm",
@@ -61,6 +74,13 @@ class ReadTest(_Readable, unittest.TestCase):
             "find . -exec wc {} \\; -exec rm {} \\;",
             "find . -exec wc {} \\; -delete",
             "find . -exec wc {} \\; -type f -exec rm {} \\;",
+            "find . -name x -exec rm {} \\; -print",
+            "find . -exec grep foo {} \\; -delete",
+            "find . \\( -name x -exec rm {} \\; \\) -print",
+            "find . -name x -exec grep foo {} \\; -fprint /tmp/out",
+            "find . -exec sh -c y {} \\; -delete",
+            "find . -exec wc {} \\; -ok rm {} \\;",
+            "find . -exec wc {} \\; -fprintf /tmp/out x",
             "xargs --arg-file grep rm",
             "xargs --process-slot-var grep rm",
             "xargs",
