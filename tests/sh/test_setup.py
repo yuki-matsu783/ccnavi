@@ -283,7 +283,7 @@ BIN_PATH = "/".join(LAUNCHER_PARTS)
 REGION_BEGIN = "# ---ccnavi begin--- (scripts/ccnavi-setup.sh が管理する範囲)"
 REGION_END = "# ---ccnavi end---"
 BIN_COMMENT = "# 実行ファイル"
-# `--docs` の索引の 1 行。docsearch は git がそこの ccnavi-index.jsonl を無視しているときだけ書く
+# `--docs` の索引の 1 行。docsearch は、git が ccnavi-index.jsonl を無視しているときだけ書く
 # （docs/21_design/diagnostics.md の 10.1「ドキュメントの索引」）。
 INDEX_LINE = "**/ccnavi-index.jsonl"
 INDEX_COMMENT = "# --docs の索引"
@@ -2705,7 +2705,7 @@ class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
             return f.read()
 
     def settle(self, text):
-        """配布を済ませたうえで、.gitignore を text にする。"""
+        """配布を済ませたあと、.gitignore の中身を text に置き換える。"""
         self.make_git()
         src = self.make_source()
         self.run_setup("--deploy", src)
