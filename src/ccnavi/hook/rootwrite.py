@@ -30,11 +30,11 @@ SOURCE_RULE_ID = "workspace-root"
 
 def check(
     rule_set: rules.RuleSet, cwd: str, subject: str, layers: list[str]
-) -> tuple[str, str, rules.Rule | None]:
+) -> tuple[str, str, rules.Rule | None, str]:
     """書き込み先がルート直下の決まりにヒットすれば
-    （書いたとおりの語, 解いたパス, 適用したルール）。
+    （書いたとおりの語, 解いたパス, 適用したルール, 語を取り出した元のコマンド）。
 
-    ヒットしなければ空と None。適用するルールは id が `workspace-root` のもの。
+    ヒットしなければ空と None と空。適用するルールは id が `workspace-root` のもの。
     共通レイヤー以外のレイヤーのルールは、id に `<レイヤー名>:` が付くので、
     その形も同じ決まりとして扱う。
     """
@@ -42,8 +42,8 @@ def check(
         r for r in rule_set.deny if r.id == SOURCE_RULE_ID or r.id.endswith(f":{SOURCE_RULE_ID}")
     ]
     if not found:
-        return "", "", None
-    for target, base in parentwrite.write_targets(cwd, subject, layers):
+        return "", "", None, ""
+    for target, base, origin in parentwrite.write_targets(cwd, subject, layers):
         path = parentwrite.resolve_word(target, base)
         if not path:
             continue
@@ -52,15 +52,15 @@ def check(
         spelled = [path, path.rstrip(os.sep) + os.sep] if os.path.isdir(path) else [path]
         for rule in found:
             if any(rule.matches("Write", p) for p in spelled):
-                return target, path, rule
-    return "", "", None
+                return target, path, rule, origin
+    return "", "", None, ""
 
 
-def message(root: str, target: str, path: str) -> str:
+def message(root: str, target: str, path: str, origin: str = "") -> str:
     worktree_sh = settings.script_command(root, "ccnavi-worktree.sh")
     return (
         f"シェルでチェックアウトしたブランチ直下（{path}）へ書き込む形です"
-        f"（書き込み先: {target}）。"
+        f"（書き込み先: {target}" + (f"。読んだ箇所: {origin}" if origin else "") + "）。"
         "Write / Edit と同じく、ここには書きません。"
         "ユーザに渡すものはワークスペースルート直下の wip/handoff/、"
         "一時的なもの・コミットしたくないものは同じく直下の scratchpad/ に書いてください"

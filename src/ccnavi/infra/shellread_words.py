@@ -328,9 +328,13 @@ def _redirect_width(command: list[str], i: int) -> int:
     shlex は `>/dev/null` を `>` `/dev/null` に、`2>&1` を `2` `>&` `1` に割る。区切りの演算子は
     _split_commands が切り出してあるので、コマンドの中に残る演算子の塊はリダイレクト。
     演算子の前には、fd の番号か、bash 4.1 以降の名前付き fd（`{fd}>/dev/null`）が付く。
+    演算子の後ろに行き先の語が無いもの（`echo x >` のようにコマンドの最後の語が演算子）は、
+    リダイレクトとして数えない。bash では構文エラーで何も書かれないので、ふつうの語として残す。
     """
     fd = command[i].isdigit() or _NAMED_FD.fullmatch(command[i])
     k = i + 1 if fd and i + 1 < len(command) else i
+    if k + 1 >= len(command):
+        return 0
     return k - i + 2 if _is_operator(command[k]) else 0
 
 
