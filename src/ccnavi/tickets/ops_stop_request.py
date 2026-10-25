@@ -24,7 +24,7 @@ cwd のツリーが、承認済みの親（`doing/`、着手済み、信頼で�
 
 実行中のサブエージェントが居る間（委任して待つ回）も止めない。これは呼び出し側（`events._request_nudge`）が
 `subagent.running` で先に見て、ここへ来ない。そのため「1 回だけ」の記録も進まない。記録は
-SubagentStart / SubagentStop が残す（`docs/design/tickets/subagents.md`）。
+SubagentStart / SubagentStop が残す（`docs/21_design/tickets/subagents.md`）。
 
 ## 1 回だけ
 

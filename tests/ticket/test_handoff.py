@@ -33,7 +33,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import handoff, review
+from ccnavi.tickets import handoff, handoff_names, review
 from tests import ROOT, can_case_sensitive, common_path, config_path, requires_symlink
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import git, write
@@ -85,7 +85,7 @@ class HandoffCase(unittest.TestCase):
         return os.path.join(self.root, *rel.split("/"))
 
     def draft_path(self, rel: str) -> str:
-        return os.path.join(self.root, "wip", "handoff", *rel.split("/"))
+        return os.path.join(self.root, "wip", "handoff", *handoff_names.to_draft(rel).split("/"))
 
     def stage(self, rel: str, data: bytes | None = None) -> str:
         """`ccnavi-stage.sh` と同じく、元を下書きと `.orig` にコピーし、下書きを `data` にする。"""
@@ -206,7 +206,7 @@ class AllowListTest(HandoffCase):
     def test_the_table_and_the_design_document_agree(self):
         # 表を直したら、設計の文書の表も直す。文書に無い行を表に足さない。
         with open(
-            os.path.join(ROOT, "docs", "design", "tickets", "handoff.md"), encoding="utf-8"
+            os.path.join(ROOT, "docs", "21_design", "tickets", "handoff.md"), encoding="utf-8"
         ) as f:
             text = f.read()
         for kind in handoff.KINDS:
@@ -688,6 +688,7 @@ class RouteTest(HandoffCase):
             sorted(
                 [
                     "path",
+                    "draft",
                     "kind",
                     "state",
                     "board",

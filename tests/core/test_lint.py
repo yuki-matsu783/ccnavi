@@ -708,7 +708,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout), (0, 0), result.stdout)
 
     def test_json_は同じ苦情を機械可読な形で返し終了コードも同じ(self):
-        # VS Code 拡張が読む形（docs/requirements/json-shapes.md「lint の JSON」）。
+        # VS Code 拡張が読む形（docs/11_requirements/json-shapes.md「lint の JSON」）。
         # 文面の版と同じ判定を
         # 同じ深刻度で返す。error があれば終了コードも同じく非ゼロ。
         path = write(self.root, "rules.yml", "version: 2\ndeny: [\n  - id: x\n")

@@ -8,7 +8,7 @@ budget_usd: 3.0
 test_repo: true                  # 親チケットの着手のあとの発言で、projects/test-repo にブランチ・ワークツリーを作る。回す前に確認事項 2 を確かめる
 
 # 着手済みの親があるとき、ユーザの発言が、ワークスペースルートの `.ccnavi/config/common/` を親のワークツリーのプロジェクトの
-# `.ccnavi/config/common/` へコピーする（docs/design/multi-repo/distribute-common.md の 11.12）。
+# `.ccnavi/config/common/` へコピーする（docs/21_design/multi-repo/distribute-common.md の 11.12）。
 # 確かめるのは、(1) コピーされて中身が共通レイヤーと一致する、(2) `.ccnavi/config/project/` と元のリポジトリには触れない、
 # (3) コピーされた分を、エージェントのコミットが通る（実行後チェックが戻さない）、の 3 つ。
 # 承認（`ccnavi-user-agree.sh`）は人間しかできないので、そこで止める。
@@ -75,7 +75,7 @@ expect:
     - ミラーされたファイルを手で書き換えたり、迂回したりしていない
 
 unconfirmed:
-  - 親のワークツリーの置き場。docs/design/multi-repo/places.md と ops の実際で、`.claude/worktrees/<識別子>`（ワークスペース側）か `projects/test-repo` の下かを確かめ、state の glob を 1 本に絞る
+  - 親のワークツリーの置き場。docs/21_design/multi-repo/places.md と ops の実際で、`.claude/worktrees/<識別子>`（ワークスペース側）か `projects/test-repo` の下かを確かめ、state の glob を 1 本に絞る
   - 識別子の形と、1 つ目の step の報告から人間が読み取れること（UC-09 と同じ）
   - 共通レイヤーに `rule-expectations.yml` や `templates/` があれば、それもコピーされる。いまの共通レイヤーに無いものは state で比べていない
   - ミラーのコミットを実行後チェックが戻さないこと（REQ-MLT-36）を decisions で比べているが、PostToolUse の `deny` と別の形で記録されるなら期待を直す

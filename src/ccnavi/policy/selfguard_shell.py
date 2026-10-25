@@ -971,15 +971,18 @@ _GIT_SED_WRITE = (
 # 選択肢（`-H` `-L` `-P`）のあとの、`-` `!` `(` で始まらない語の並び。`find . -path ./.git
 # -prune -o … -delete` の `./.git` は述語の値なのでヒットしない。最初の `.git` の開始点で
 # 決め打ちする。それより後ろの述語の並びは、最初のものの後ろに含まれる。
-# `-exec` を持つ形は読み切れない形（command-taken-as-code）になり、生の文字列で適用するので、
-# 切れ目は生の `|` `;` `&` 改行も数え、`.git` の前後の引用符も許す。
+# `-exec` を持つ形は、後ろが読むだけの許可リストに無ければ読み切れない形
+# （command-taken-as-code）になり、生の文字列で適用する。
+# 許可リストの形でも `-exec` 自体にヒットする。
+# 生の文字列で適用するときの切れ目は生の `|` `;` `&` 改行も数え、`.git` の前後の引用符も許す。
 _GIT_FIND_WRITE = (
     r"(?:^|[\x00|;&\n]) *find(?: -[HLP])*"
     r"(?>(?: [^-!( \x00][^ \x00]*)*? (?:[^ \x00]*[\\/'\"])?\.git\.*(?:[\\/][^ \x00]*)?['\"]? )"
     r"(?:[^\x00]*[ \x01])?(?:-delete|-exec|-execdir|-ok|-okdir)\b"
 )
 # 前のコマンドが `.git` を名指しし、その出力を `xargs` が書き込む動詞に渡す形。`xargs` を含む
-# コマンドは読み切れない形（shellread の command-taken-as-code）になり、生の文字列で適用するので、
+# コマンドは、後ろが許可リストに無ければ読み切れない形
+# （shellread の command-taken-as-code）になり、生の文字列で適用するので、
 # 切れ目は `\x00` のほかに生の `|` `;` 改行も数え、`.git` の前後には引用符も数える。
 # コマンドの頭から最初の `.git` で決め打ちし、`.git` の数だけ尾を読み直さない。
 _GIT_XARGS_WRITE = (
@@ -1314,6 +1317,15 @@ def _stage_hint(root: str) -> str:
     )
 
 
+# .claude 配下の保護対象の案内に添える一文。Claude Code 本体は .claude の階層を機密パスとして扱い、
+# 非対話では編集を許可できないので、下書きの置き場では handoff-.claude に読み替える。
+_CLAUDE_COPY_HINT = (
+    "下書きの置き場では .claude の階層を handoff-.claude に読み替えます"
+    "（.claude/settings.json は wip/handoff/handoff-.claude/settings.json）。"
+    "wip/handoff/.claude/ に自分で作らないでください。"
+)
+
+
 def _home_regex(project_home: str) -> str:
     """ccnavi ディレクトリの名前を、区切りを `[\\/]` にした regex の部品にする。"""
     parts = [re.escape(p) for p in _home_name(project_home).split("/") if p]
@@ -1355,7 +1367,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
             "glob": "*/.claude/hooks/*",
             "message": (
                 "hook 本体です。エージェントの判断で書き換えず、理由を伝えてユーザに変更を"
-                f"依頼してください。{stage}"
+                f"依頼してください。{stage}{_CLAUDE_COPY_HINT}"
             ),
         },
         {
@@ -1364,7 +1376,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
             "message": (
                 "hook の登録そのものです。ワークツリー側の設定も統合すると統合先の設定になります。"
                 "エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。"
-                f"{stage}"
+                f"{stage}{_CLAUDE_COPY_HINT}"
             ),
         },
     ]

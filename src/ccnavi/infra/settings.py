@@ -90,7 +90,7 @@ BIN_SUFFIXES = (".exe",)
 # チケットまで使うかはプロジェクトが決めるので、その宣言をここに置く。
 # 置き場のパス（承認済みチケットの置き場）とは分けてある。パスが在ることと機能を切ることは別の話。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
-# LEARNING_ENV は、学びの蓄積（learning-wiki。docs/design/tickets/learning-wiki.md）を使うか。
+# LEARNING_ENV は、学びの蓄積（learning-wiki。docs/21_design/tickets/learning-wiki.md）を使うか。
 # enable / disable の 2 値。既定は enable（何も設定しなくても気づきが溜まるように）。
 # 読めない値は enable として扱う（`--lint` が warn で言う）。
 LEARNING_ENV = "CCNAVI_LEARNING"

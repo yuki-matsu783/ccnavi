@@ -1,4 +1,4 @@
-"""受入シナリオを claude -p で回す実行器。手順と決まりは docs/claude/acceptance-scenarios.md。
+"""受入シナリオを claude -p で回す実行器。手順と決まりは docs/42_claude/acceptance-scenarios.md。
 
 普段のテストには含めない。人間に確認を取ってから、明確な指示があったときだけ回す。
 

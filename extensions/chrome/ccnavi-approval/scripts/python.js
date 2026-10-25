@@ -4,7 +4,8 @@
 //
 //   yaml/            PyYAML の純 Python 版。版と取ってくる先とハッシュはリポジトリの uv.lock から読む
 //                    （手元の ccnavi と同じ版に揃う）。C 拡張は入れない（Pyodide では読めない）
-//   ccnavi/          リポジトリの src/ccnavi パッケージの .py をそのまま（サブパッケージの階層ごと）
+//   ccnavi/          リポジトリの src/ccnavi パッケージの .py をそのまま（サブパッケージの階層ごと）と、
+//                    下書きの階層名の読み替え表（.ccnavi/scripts/ccnavi-handoff-names.txt）の写し
 //   ccnavi_chrome.py 拡張の入口（py/）
 //
 // 組むのは Node の上の Pyodide（同梱するのと同じ版）で、.pyc を unchecked-hash で作って一緒に入れる
@@ -22,6 +23,8 @@ import zlib from "node:zlib";
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const REPO = path.resolve(HERE, "..", "..", "..");
 const CACHE = path.join(HERE, ".cache");
+// 下書きの階層名の読み替え表。sh と実行ファイルと同じファイル（src/ccnavi/tickets/handoff_names.py が読む）
+const HANDOFF_NAMES = path.join(REPO, ".ccnavi", "scripts", "ccnavi-handoff-names.txt");
 
 /** uv.lock の `[[package]] name = "pyyaml"` の sdist の url と sha256 */
 export function pyyamlPin(lockText) {
@@ -126,6 +129,7 @@ export async function buildPythonZip(outFile) {
     if (slash >= 0) py.FS.mkdirTree(`/app/ccnavi/${n.slice(0, slash)}`);
     py.FS.writeFile(`/app/ccnavi/${n}`, b);
   }
+  py.FS.writeFile("/app/ccnavi/ccnavi-handoff-names.txt", fs.readFileSync(HANDOFF_NAMES));
   py.FS.writeFile("/app/ccnavi_chrome.py", entry);
   py.runPython(`
 import compileall, py_compile, sys, zipfile, os
@@ -148,5 +152,5 @@ with zipfile.ZipFile("/tmp/ccnavi-py.zip", "w", zipfile.ZIP_DEFLATED) as z:
   const zip = py.FS.readFile("/tmp/ccnavi-py.zip");
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, zip);
-  return { pyyaml: pin.version, python: py.runPython("import sys; sys.version.split()[0]"), files: yaml.size + ccnavi.size + 1, bytes: zip.length };
+  return { pyyaml: pin.version, python: py.runPython("import sys; sys.version.split()[0]"), files: yaml.size + ccnavi.size + 2, bytes: zip.length };
 }
