@@ -177,5 +177,5 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `.ccnavi/config/common/rules.yml` / `phases.yml` / `risks.yml` | このリポジトリ自身の共通レイヤーの設定（`phases.yml` はどのプロジェクトでも使える定義） |
 | `.ccnavi/config/project/phases.yml` | このリポジトリ自身のレイヤーのフェーズ定義（このリポジトリのレイアウトに依存する定義） |
 | `.ccnavi/config/common/rule-expectations.yml` | ルールが何を止めて何を通すかの期待する判定 |
-| `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
+| `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面。VS Code なしで画面を描く開発用スクリプトがある（[使い方](../extensions/vscode/ccnavi-board/docs/design/development.md)） |
 | `docs/30_adr/<主題>/` | 設計判断の記録。主題の分け方は [30_adr.md](30_adr.md) にある |
