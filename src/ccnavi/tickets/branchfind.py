@@ -434,8 +434,15 @@ def read_host(path: str) -> Host:
 
 
 def names_number(name: str, number: int) -> bool:
-    """ブランチ名が番号を含むか。番号の前後が数字でないこと（`feature-152-x`・`152-x`・`fix/152`・`issue-152`）。"""
-    return re.search(rf"(?<![0-9]){number}(?![0-9])", name) is not None
+    """ブランチ名が番号を含むか。番号の前後が区切り（`-` `/` `_` `.`）か文字列の端であること。
+
+    通る: `feature-152-x`・`152-x`・`fix/152`・`x-152`・`issue-152`・`feature_152_x`。
+    区切り以外の文字（英字・数字など）が隣にあるものは通さない（`feature-1520-x`・`v15-2`・`i152`・`152a`）。
+    Claude の web セッションが作る `claude/<形容詞>-<名前>-<6 文字の乱数>` の乱数
+    （`claude/tender-volta-qmy99q`）に番号と同じ数字が入っても、無関係なブランチを候補にしない。
+    `i152` のように英字が直に付くものは、番号を含む別の語の一部かもしれず、番号を指すとは言えないので通さない。
+    """
+    return re.search(rf"(?<![^-/_.]){number}(?![^-/_.])", name) is not None
 
 
 def _refs(repo_root: str) -> tuple[set[str], set[str], str]:
@@ -647,6 +654,16 @@ def render(data: dict) -> str:
         state = "承認済み" if t["approved"] else "提案（承認前）"
         lines.append(f"チケット {t['ticket']}  {state}  状態={t['state']}  題={t['title'] or '-'}")
     count = len(data["candidates"])
+    weak = [
+        c["branch"] for c in data["candidates"] if c["sources"] == ["name"] and not c["tickets"]
+    ]
+    if weak:
+        lines.append(
+            "案内: "
+            + "・".join(weak)
+            + " は由来が「名前に番号」だけで、MR にもチケットにも結び付いていない。"
+            "名前の一致は弱い根拠なので、無関係なブランチでないかを確かめてからユーザに見せる"
+        )
     if count:
         lines.append(
             f"候補 {count} 件。ユーザに見せ、既存のブランチで続けるか・新しく切るか・"

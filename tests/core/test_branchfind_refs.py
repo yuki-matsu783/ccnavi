@@ -117,13 +117,27 @@ class PromptRefsTest(unittest.TestCase):
 
 
 class NamesNumberTest(unittest.TestCase):
-    def test_the_number_must_not_touch_other_digits(self):
-        for name in ("feature-152-login", "152-login", "fix/152-typo", "x-152", "issue-152"):
+    def test_the_number_is_set_off_by_separators_or_the_ends(self):
+        for name in (
+            "feature-152-login",
+            "152-login",
+            "fix/152-typo",
+            "x-152",
+            "issue-152",
+            "feature_152_x",
+            "v1.152.x",
+        ):
             with self.subTest(name=name):
                 self.assertTrue(branchfind.names_number(name, 152))
-        for name in ("feature-1520-x", "feature-2152-x", "v15-2", "main"):
+
+    def test_a_letter_or_digit_next_to_the_number_does_not_match(self):
+        for name in ("feature-1520-x", "feature-2152-x", "v15-2", "main", "i152", "152a"):
             with self.subTest(name=name):
                 self.assertFalse(branchfind.names_number(name, 152))
+
+    def test_random_suffixes_of_web_session_branches_do_not_match(self):
+        self.assertFalse(branchfind.names_number("claude/tender-volta-qmy99q", 99))
+        self.assertFalse(branchfind.names_number("claude/zesty-a5b-x5y7z9", 5))
 
 
 if __name__ == "__main__":
