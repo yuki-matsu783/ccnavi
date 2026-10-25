@@ -80,3 +80,21 @@ test("CX-T383 render-scene: --out が --repo の下なら 2 で止まり、何�
   assert.ok(!fs.existsSync(inside));
   assert.equal(render(["--out", path.join(tmp, "o")]).code, 2);
 });
+
+test("CX-T384 render-scene: git のリポジトリでない --repo は 1 で止まり、前回の出力は残らない。同名のタグがあるブランチも載せられる", () => {
+  const out = path.join(tmp, "out-stale");
+  fs.mkdirSync(out);
+  for (const name of ["board.png", "board.txt", "board.dom.json", "board.log"]) fs.writeFileSync(path.join(out, name), "古い出力");
+  const plain = path.join(tmp, "not-a-repo");
+  fs.mkdirSync(plain);
+  const r = render(["--repo", plain, "--out", out]);
+  assert.equal(r.code, 1, `${r.stdout}\n${r.stderr}`);
+  assert.deepEqual(fs.readdirSync(out), []);
+
+  // ブランチと同名のタグ（`%(refname:short)` だと heads/main に短縮されて読めなくなる）
+  const tagged = realisticRepo("repo-tagged");
+  spawnSync("git", ["-C", tagged, "tag", "main"]);
+  spawnSync("git", ["-C", tagged, "tag", "i0001"]);
+  const r2 = render(["--repo", tagged, "--out", path.join(tmp, "out-tagged")]);
+  assert.equal(r2.code, 0, `${r2.stdout}\n${r2.stderr}`);
+});

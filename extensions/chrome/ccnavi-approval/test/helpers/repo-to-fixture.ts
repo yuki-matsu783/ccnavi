@@ -93,7 +93,7 @@ function defaultBranchOf(repo: string, names: readonly string[]): string {
 }
 
 export function repoToFixture(repo: string): RepoFixture {
-  const refs = (git(repo, ["for-each-ref", "--format=%(refname:short)%09%(committerdate:iso-strict)", "refs/heads"]) as string)
+  const refs = (git(repo, ["for-each-ref", "--format=%(refname:lstrip=2)%09%(committerdate:iso-strict)", "refs/heads"]) as string)
     .split("\n")
     .filter((l) => l !== "")
     .map((l) => {

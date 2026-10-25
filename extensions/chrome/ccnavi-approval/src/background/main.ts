@@ -83,7 +83,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.action.onClicked.addListener(() => {
-  void chrome.tabs.create({ url: chrome.runtime.getURL("board.html") });
+  chrome.tabs.create({ url: chrome.runtime.getURL("board.html") }).catch((err: unknown) => console.error(`ccnavi: ボードを開けなかった: ${describe(err)}`));
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {

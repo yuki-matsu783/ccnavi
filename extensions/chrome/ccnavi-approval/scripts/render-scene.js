@@ -50,7 +50,7 @@ function portFree(port) {
 
 /**
  * service worker のコンソールと例外を、DevTools の WebSocket で直接拾う（playwright-core 1.56 の context には service worker の
- * console が来ないため）。`Runtime.enable` は、つなぐ前の console も送り直す。記録は `push` へ渡す。止める関数を返す。
+ * console が来ないため）。`Runtime.enable` は、つなぐ前の console も送り直す。記録は `push` へ渡す。つないだ数と止める関数を返す。
  */
 async function watchServiceWorkers(profile, push) {
   const portFile = path.join(profile, "DevToolsActivePort");
@@ -83,10 +83,13 @@ async function watchServiceWorkers(profile, push) {
   };
   const timer = setInterval(poll, 200);
   await poll();
-  return () => {
-    stopped = true;
-    clearInterval(timer);
-    for (const ws of sockets.values()) ws.close();
+  return {
+    attached: () => sockets.size,
+    stop: () => {
+      stopped = true;
+      clearInterval(timer);
+      for (const ws of sockets.values()) ws.close();
+    },
   };
 }
 
@@ -106,6 +109,10 @@ async function main(argv) {
     if (!fs.existsSync(options.repo) || !fs.statSync(options.repo).isDirectory()) throw new ToolError(EXIT.USAGE, `--repo がありません: ${options.repo}`);
     if (fs.existsSync(options.out) && !fs.statSync(options.out).isDirectory()) throw new ToolError(EXIT.USAGE, `--out がディレクトリではありません: ${options.out}`);
     if (isInside(options.out, options.repo)) throw new ToolError(EXIT.USAGE, `--out が --repo の下です（リポジトリを汚さないため、外のパスを指定する）: ${options.out}`);
+
+    // 前回の出力を先に消す。環境や入力で途中で止まっても、古い PNG が残って成功と取り違えられないように
+    fs.mkdirSync(options.out, { recursive: true });
+    for (const name of OUTPUT_NAMES) fs.rmSync(path.join(options.out, name), { force: true });
 
     if (!fs.existsSync(path.join(DIST, "manifest.json"))) {
       throw new ToolError(EXIT.NOT_READY, "dist-e2e/ がありません。node scripts/test.js --e2e で組み立てる（このスクリプトからはビルドしない）");
@@ -139,10 +146,6 @@ async function main(argv) {
     const skipped = Object.entries(fixture.skipped).map(([why, paths]) => `${why} ${paths.length} 件`);
     if (skipped.length > 0) console.log(`載せなかったもの: ${skipped.join("、")}`);
 
-    // 前回の出力を先に消す。失敗したのに古い PNG が残ると、成功と取り違えるため
-    fs.mkdirSync(options.out, { recursive: true });
-    for (const name of OUTPUT_NAMES) fs.rmSync(path.join(options.out, name), { force: true });
-
     const mock = new mocks[options.host](fixture.branches, fixture.defaultBranch, fixture.now);
     mock.apiBase = options.host === "github" ? `http://127.0.0.1:${port}` : `http://127.0.0.1:${port}/api/v4`;
     const closeServer = await mock.serve(port);
@@ -150,7 +153,7 @@ async function main(argv) {
     const entries = [];
     const secrets = [mocks.token];
     let ctx;
-    let stopWorkers = () => {};
+    let workers = { attached: () => 0, stop: () => {} };
     let timedOut = false;
     let leaked = "";
     try {
@@ -164,7 +167,7 @@ async function main(argv) {
       } catch (error) {
         throw new ToolError(EXIT.NOT_READY, `Chromium を起動できません: ${String(error.message).split("\n")[0]}`);
       }
-      stopWorkers = await watchServiceWorkers(profile, (entry) => entries.push(entry));
+      workers = await watchServiceWorkers(profile, (entry) => entries.push(entry));
       const watch = (page) => {
         page.on("console", (m) => entries.push({ kind: "console", type: m.type(), text: m.text(), url: m.location().url }));
         page.on("pageerror", (e) => entries.push({ kind: "pageerror", text: e.message }));
@@ -203,10 +206,16 @@ async function main(argv) {
       fs.writeFileSync(path.join(options.out, "board.dom.json"), dom);
       // PAT が画面の文字や要約に出ていないか（出ていたら失敗。PNG は文字を読めないので対象外）
       leaked = [text, dom].some((t) => secrets.some((s) => t.includes(s))) ? "PAT が board.txt か board.dom.json に出ている" : "";
-      const state = JSON.parse(dom).state;
-      if (!timedOut && state !== "done") entries.push({ kind: "pageerror", text: `画面の状態が ${state}（done ではない）。${redact(JSON.parse(dom).status, secrets)}` });
+      // service worker のエラーを拾えていないのに成功にしない（監視が黙って無効になる穴を塞ぐ）
+      if (workers.attached() === 0) entries.push({ kind: "worker-error", text: "service worker を監視できなかった（DevTools に接続できていない）" });
+      const summarized = JSON.parse(dom);
+      // 画面に通知（読み込みの失敗など）が出ていたら 1 行で知らせる。終了コードは変えない（失敗の画面を描くのもこのツールの用途）
+      const notices = [...summarized.repoNotices.map((n) => n.text), ...summarized.families.flatMap((f) => f.notices.map((t) => `${f.name}: ${t}`))];
+      if (notices.length > 0) console.log(`画面に通知があります（${notices.length} 件）: ${redact(notices[0], secrets).slice(0, 120)}`);
+      const state = summarized.state;
+      if (!timedOut && state !== "done") entries.push({ kind: "pageerror", text: `画面の状態が ${state}（done ではない）。${redact(summarized.status, secrets)}` });
     } finally {
-      stopWorkers();
+      workers.stop();
       await ctx?.close();
       await closeServer();
       fs.rmSync(profile, { recursive: true, force: true });
