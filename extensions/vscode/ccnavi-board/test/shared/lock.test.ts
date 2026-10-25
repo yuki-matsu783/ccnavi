@@ -43,6 +43,7 @@ test("CB-T392 プロジェクトを渡したときは、そのプロジェクト
   const board = fixture();
   const tickets = board.tickets.map((t) => ({ ...t, project: t.ticket === "i0001-02-02" ? "lib" : "" }));
   assert.equal(lockFromBoard({ ...board, tickets }, "lib").locked, true);
+  assert.match(lockFromBoard({ ...board, tickets }, "lib").reason, /^プロジェクト lib に作業中のチケットがあります（i0001-02-02）。いま保存すると/);
   assert.equal(lockFromBoard({ ...board, tickets }, "other").locked, false);
 });
 
