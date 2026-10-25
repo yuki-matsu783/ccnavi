@@ -1,4 +1,4 @@
-"""`infra/pathsafe` の入出力表。リンクの判定はここを通す。"""
+"""`infra/pathsafe` の入出力を確かめるテスト。リンクの判定は `pathsafe` を通す。"""
 
 from __future__ import annotations
 
@@ -87,11 +87,12 @@ class PathsafeTest(unittest.TestCase):
         self.assertEqual(pathsafe.scan(self.root, ["a", "b"]), (pathsafe.CLEAN, ""))
 
     def test_case_difference(self):
-        # 大文字小文字だけ違う綴りは、どの機械でも同じ場所として数える（pathcase.fold）
+        # 大文字小文字だけが違う綴りも、どの機械でも同じ場所として扱う（pathcase.fold）
         self.assertFalse(pathsafe.has_link(self.root, os.path.join(self.root.upper(), "a")))
 
     def test_fold_makes_spelling_equal(self):
-        # 区別しない機械（Windows・macOS 既定）でも、Linux でも、root 自身の綴り違いは外に出ない
+        # 大文字小文字を区別しない機械（Windows・macOS の既定）でも、Linux でも、
+        # root 自身の綴りの違いは外に出たことにならない
         self.assertFalse(pathsafe.escapes(self.root, self.root))
 
     def test_is_link(self):

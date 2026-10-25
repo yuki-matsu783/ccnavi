@@ -69,7 +69,10 @@ def base_dir(root: str, project: str) -> str:
 
 
 def _linked(root: str, parts: tuple[str, ...]) -> bool | None:
-    """ルートの下の parts にリンクがあれば True。途中で無ければ None。無ければ False。"""
+    """ルートの下の parts にリンクがあれば真を返す。
+
+    途中で存在しなければ None を返す。どちらも無ければ偽を返す。
+    """
     state, _ = pathsafe.scan(root, parts)
     return None if state == pathsafe.MISSING else state == pathsafe.LINK
 
