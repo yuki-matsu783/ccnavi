@@ -103,7 +103,7 @@ class FakeGitlabTest(unittest.TestCase):
         self.addCleanup(conn.close)
         conn.request("GET", "/api/v4/version", headers={"Connection": "keep-alive"})
         conn.getresponse().read()
-        # 接続は閉じない。2 本目の要求を待つスレッドがサーバに残っている
+        # 接続は閉じない。サーバ側には、次の要求を待つスレッドが残っている。
         done = threading.Event()
         threading.Thread(target=lambda: (server.stop(), done.set()), daemon=True).start()
         self.assertTrue(done.wait(5), "stop() が keep-alive の接続を待って返らない")
@@ -198,7 +198,7 @@ class ReviewShReadsTheFakeTest(unittest.TestCase):
         subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "seed"], check=True)
         origin = f"http://127.0.0.1:{self.server.port}/{PROJECT}.git"
         subprocess.run([*git, "remote", "add", "origin", origin], check=True)
-        # 前に置く glab は失敗する。通れば glab の経路に入ってしまうので、通れないようにしておく
+        # 前に置く glab は必ず失敗させる。成功すると glab の経路に入ってしまうため。
         glab = write(os.path.join(tmp, "bin", "glab"), "#!/bin/sh\nexit 1\n")
         os.chmod(glab, 0o755)
         self.bin = os.path.dirname(glab)
