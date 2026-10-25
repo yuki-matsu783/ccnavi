@@ -50,10 +50,21 @@ export function lockFromBoard(board: BoardJson, project?: string): Lock {
   const where = project === undefined ? "" : `プロジェクト ${project} に`;
   return {
     locked: true,
-    reason: `${where}作業中のチケットがあります（${doing.join(", ")}）。変更すると整合性が失われるため保存はできません。先に現在の作業をすべて完了させてください。`,
+    reason: `${where}作業中のチケットがあります（${doing.join(", ")}）。いま保存すると、進行中の作業の判定が途中で変わるため、作業が終わってから保存してください。`,
     doing,
     turns,
   };
+}
+
+/**
+ * 帯のクラス。作業中のチケットがあって止めているとき（`doing` が空でない）だけ情報色にする。
+ * 読めなかった・確認中（`lockFromError`）は異常なので赤のまま
+ */
+export function lockClass(lock: Lock): string {
+  if (!lock.locked) {
+    return "lock hidden";
+  }
+  return lock.doing.length > 0 ? "lock info" : "lock";
 }
 
 /** ボードが読めなかったとき。確かめられないなら保存できない扱いにする */

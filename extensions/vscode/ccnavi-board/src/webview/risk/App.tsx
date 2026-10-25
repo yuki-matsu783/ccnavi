@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
-import type { Lock } from "../../core/lock.js";
+import { lockClass, type Lock } from "../../core/lock.js";
 import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskMessage, type RiskPage, type ToRisk } from "../../core/risk-view.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { TargetSelect } from "../TargetSelect.js";
@@ -340,7 +340,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           </button>
         </div>
       </ScreenHeader>
-      <p id="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
+      <p id="lock" className={lockClass(shownLock)}>
         {shownLock.reason}
       </p>
       {!touring && page !== undefined && page.model.problems.length > 0 && (

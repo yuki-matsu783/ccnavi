@@ -19,7 +19,7 @@
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
-import type { Lock } from "../../core/lock.js";
+import { lockClass, type Lock } from "../../core/lock.js";
 import type { CommonPhase, PhaseForm, PhasesData, PhasesMessage, PhasesPage, ToPhases } from "../../core/phases-view.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { Phase } from "./Phase.js";
@@ -293,7 +293,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const sampleLocked = touring && scene.locked === true;
   const shownLock: Lock = touring
     ? sampleLocked
-      ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [] }
+      ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [sampleLib ? "2026-10-05-lib-parser" : "2026-10-03-search-api"] }
       : { locked: false, reason: "", doing: [] }
     : lock;
   const sceneOpen = sceneList(scene.open);
@@ -387,7 +387,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           </button>
         </div>
       </ScreenHeader>
-      <p id="lock" data-tour="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
+      <p id="lock" data-tour="lock" className={lockClass(shownLock)}>
         {shownLock.reason}
       </p>
       {!touring && page !== undefined && page.model.problems.length > 0 && (

@@ -204,6 +204,7 @@ test("CB-D63 定義がないファイルは、保存する前に追加すると�
     assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルは ccnavi で読み込めません/);
     assert.match(dom.one(".problems").textContent, /phases がマップ（キーと値の組の集まり）ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
+    assert.ok(dom.one("#lock").classList.contains("info"), "作業中は情報色");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
   } finally {
     await dom.close();
