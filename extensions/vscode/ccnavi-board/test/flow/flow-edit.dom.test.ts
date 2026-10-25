@@ -440,7 +440,7 @@ test("CB-D133 サブエージェントの種類とスキルの名前は候補か
   }
 });
 
-test("CB-D134 確認を頼んで答えを待つ間に直したら、届いた古い答えは使わず再確認している（のまま）と言う", async () => {
+test("CB-D134 確認を頼んで答えを待つ間に直したら、届いた古い答えは使わず確認中のまま、最後に確認が済んだ結果を出す", async () => {
   const dom = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"] } });
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
@@ -465,6 +465,37 @@ test("CB-D134 確認を頼んで答えを待つ間に直したら、届いた古
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 新しい");
   } finally {
     await dom.close();
+  }
+});
+
+test("CB-T1223 右ペインは見出しの下に説明を出し、確認中は結果があるときだけ「最後に確認が済んだときのもの」と言う", async () => {
+  // 結果なし: 前の答えが無いので「確認中です」は出さない（編集した直後でも）
+  const none = await openFlow({ doc: three() });
+  try {
+    assert.match(none.one("#flow-preview-lead").textContent ?? "", /サブエージェントに渡る手順/);
+    none.click(none.one('[data-action="add-node"][data-type="skill"]'));
+    await none.settle();
+    assert.equal(none.all("#flow-preview-checking").length, 0);
+    assert.match(none.one("#flow-preview").textContent ?? "", /まだ実行ファイルで確認していません/);
+  } finally {
+    await none.close();
+  }
+  // 結果あり: 確認中は、最後に確認が済んだ結果を残したまま表示する。確認が済めば消える
+  const some = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"] } });
+  try {
+    assert.equal(some.all("#flow-preview-checking").length, 0);
+    some.click(some.one('[data-action="add-node"][data-type="skill"]'));
+    await some.settle();
+    assert.match(some.one("#flow-preview-checking").textContent ?? "", /確認中です。下の手順は、最後に確認が済んだときのものです/);
+    assert.equal(some.one("#flow-preview pre.flow-rendered").textContent, "1. 最初");
+    await waitCheck(some);
+    const asked = checksAsked(some);
+    // error: 確認中の文は消え、error を出す
+    await some.send({ type: "checked", seq: asked[asked.length - 1].seq, error: "読み込めないと返しました" });
+    assert.equal(some.all("#flow-preview-checking").length, 0);
+    assert.match(some.one("#flow-preview-error").textContent ?? "", /読み込めないと返しました/);
+  } finally {
+    await some.close();
   }
 });
 
