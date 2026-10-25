@@ -64,12 +64,13 @@ dup=""
 for f in "$adr"/*/"$num"-*.md; do
 	[ -e "$f" ] || continue
 	[ "$f" = "$file" ] && continue
-	dup="$dup $f"
+	dup="$dup
+  $f"
 done
 
 if [ -n "$dup" ]; then
 	echo "ADR の番号 $num は、すでに別の ADR が使っています:" >&2
-	for f in $dup; do echo "  $f" >&2; done
+	printf '%s\n' "$dup" | sed '/^$/d' >&2
 	echo "主題をまたいだ通し番号なので、全ディレクトリの最大の番号の次を採ります。次の空き番号は $(next) です。" >&2
 	echo "（探し方は docs/30_adr.md の「最後尾は、主題のディレクトリを横断して探す」）" >&2
 	exit 2
