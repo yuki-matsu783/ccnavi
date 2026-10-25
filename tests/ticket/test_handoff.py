@@ -206,7 +206,7 @@ class AllowListTest(HandoffCase):
     def test_the_table_and_the_design_document_agree(self):
         # 表を直したら、設計の文書の表も直す。文書に無い行を表に足さない。
         with open(
-            os.path.join(ROOT, "docs", "design", "tickets", "handoff.md"), encoding="utf-8"
+            os.path.join(ROOT, "docs", "21_design", "tickets", "handoff.md"), encoding="utf-8"
         ) as f:
             text = f.read()
         for kind in handoff.KINDS:

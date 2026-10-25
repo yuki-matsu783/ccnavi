@@ -1206,7 +1206,7 @@ class ExplainTest(ConfigUnionHarness):
         """`--explain --json` にレイヤーごとの rules 全件と phases / risk
         の定義と出どころが出る。
 
-        形は docs/requirements/json-shapes.md「ボードの JSON」に足す。
+        形は docs/11_requirements/json-shapes.md「ボードの JSON」に足す。
         ここでは `layers` のリストに `name`（common / self /
         プロジェクト名）と `rules` / `phases` / `risk` が在ることまでを固定する。
         """

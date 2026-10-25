@@ -31,7 +31,7 @@ Bash($LAUNCHER stop-review record:*)"
 allow_json=$(printf '%s\n' "$ALLOW_RULES" | jq -R -s 'split("\n") | map(select(length > 0))')
 # 実測（haiku・sonnet で最大 23 秒）の 2 倍以上にする。固まった判定役を長く居座らせないため。
 TIMEOUT=60
-# 判定役の既定のモデル。比較（docs/design/stop-review.md）で、haiku が sonnet とほぼ同じ精度（18/20 と 19/20）で、費用が約 16 分の 1 だった。
+# 判定役の既定のモデル。比較（docs/21_design/stop-review.md）で、haiku が sonnet とほぼ同じ精度（18/20 と 19/20）で、費用が約 16 分の 1 だった。
 DEFAULT_MODEL=haiku
 
 usage() {

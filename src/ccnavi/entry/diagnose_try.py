@@ -100,7 +100,7 @@ def try_one(
     文字で出す `test` と JSON で出す `test_json` の両方がここを読む。読み手ごとに
     判定を呼び直すと、ターミナルで見た答えと画面で見た答えが違うものになりうる。
 
-    キーは docs/requirements/json-shapes.md「試験の JSON」に書いてある。
+    キーは docs/11_requirements/json-shapes.md「試験の JSON」に書いてある。
     `known` が偽なら、そのツールは
     判定が対象を取り出せないもので、他のキーは空のまま。
 

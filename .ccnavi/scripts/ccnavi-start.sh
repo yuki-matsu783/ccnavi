@@ -104,7 +104,8 @@ sh .ccnavi/scripts/ccnavi-start.sh --list-open
   --mr          フォークから出た MR は元ブランチがこのリポジトリにないので、理由を出して止める。--issue と一緒に渡せる
                 （順番は問わない）。<値> は <番号> か <owner/repo>#<番号>
   --slug <語>   ブランチ名の slug（小文字・数字・ハイフン）。省くと issue の題から作る（Chrome 拡張の「始める」と同じ
-                作り方。ccnavi の実行ファイルに聞く）
+                作り方。ccnavi の実行ファイルに聞く）。題が長くて slug が途中で切れるときは、何も作らずに止めて、
+                短い --slug を付けて打ち直すよう案内する（短い語は、題の要点からエージェントが考える）
   --prefix <語> 先頭の語（既定 feature）
   --title <題>  MR の題。省くと issue の題、読めなければ「#<番号> <slug>」
   --repo <owner/repo>
@@ -567,14 +568,18 @@ issue_title_get() {
 }
 
 # issue の番号と題から、新しい親のブランチ名（= 識別子）を実行ファイルに作らせる（`worktree issue-id`）。
-# Chrome 拡張の「始める」と同じ関数（`ticket_ids.issue_identifier`）なので、同じ issue なら同じ名前になる。
+# Chrome 拡張の「始める」と同じ関数（`ticket_ids.issue_identifier`）なので、題が短ければ同じ名前になる。
+# 題が長くて slug が途中で切れるときは、実行ファイルが `long yes` を返す（issue_branch_long）。拡張は切った名前で
+# 進めるが、ここでは短い --slug を付けさせて止める（エージェントが題から短い語を考える）。
 # プロジェクト（projects/<名前>）のリポジトリなら、その名前を渡す（slug の頭に付く）。
 # 名前を issue_branch に入れる。実行ファイルが無い・答えないなら 1、作れないと言われたら 2（理由は issue_branch_why）
 issue_branch=""
 issue_branch_why=""
+issue_branch_long=""
 issue_branch_make() {
 	issue_branch=""
 	issue_branch_why=""
+	issue_branch_long=""
 	ib_project=$(ccnavi_project "$top" "$root")
 	if ib_bin=$(ccnavi_bin "$root"); then
 		ib_rc=0
@@ -588,6 +593,7 @@ issue_branch_make() {
 	issue_branch_why=$(tr -d '\r' <"$state/start-issue-id-$$" 2>/dev/null | head -n 1 | sed 's/^ccnavi: //')
 	rm -f "$state/start-issue-id-$$"
 	issue_branch=$(printf '%s\n' "$ib_out" | tr -d '\r' | sed -n 's/^id //p' | head -n 1)
+	issue_branch_long=$(printf '%s\n' "$ib_out" | tr -d '\r' | sed -n 's/^long //p' | head -n 1)
 	[ -n "$issue_branch" ] && return 0
 	[ "$ib_rc" -ne 0 ] && return 2
 	return 1
@@ -1569,6 +1575,17 @@ if [ "$total" -eq 0 ]; then
 		2) fail no-slug "issue #${number} からブランチ名を作れませんでした（${issue_branch_why}）。--slug <語> を付けて再実行してください。" 2 ;;
 		*) fail id-unchecked "issue #${number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行するか、--slug <語> を付けて再実行してください。" ;;
 		esac
+		if [ "$issue_branch_long" = yes ]; then
+			# 題が長く、機械で切ると語の途中や意味の欠けた名前になる。何も作らずに、短い語を付けて打ち直させる
+			printf 'ccnavi-start: issue #%s の題が長く、題から作る名前 %s は途中で切れます。ブランチは作らずに止めました（--new-issue から来たときの issue は作成済み）。\n' "$number" "$issue_branch" >&2
+			printf '案内: 名前はワークツリーのパス・子の識別子・ログのパスに何度も出るので、短く保つ。--slug は小文字・数字・ハイフンだけ（日本語は使えない）\n' >&2
+			if [ -n "$ib_project" ]; then
+				printf '案内: プロジェクト %s の issue なので、--slug の語は %s- から始める（issue の番号はリポジトリごとなので、名前を分ける）。長さは 48 文字に収める\n' "$ib_project" "$ib_project" >&2
+			fi
+			printf '次: 題の要点を表す短い英語の語を決め（30 文字ほどまで。例: text-formatter-cli）、<語> に入れて打ち直す: sh %s/ccnavi-start.sh %s --slug <語>\n' "$scripts" "$real_args" >&2
+			log_info 止めた -- "exit=2" "reason=long-title"
+			exit 2
+		fi
 		new_branch="$issue_branch"
 		slug="${new_branch#"${opt_prefix}-${number}-"}"
 	fi

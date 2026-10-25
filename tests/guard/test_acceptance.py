@@ -214,7 +214,7 @@ class ReasonTest(unittest.TestCase):
         for i, part in enumerate(got):
             with self.subTest(reason=i):
                 self.assertIn("PARSE_UNCERTAIN", part)
-                self.assertIn("raw text", part, "読めたときと同じ文面になっている")
+                self.assertIn("生の文字列", part, "読めたときと同じ文面になっている")
 
     def test_理由は他の判定の結果に言及しない(self):
         # 「上の」「下の」で他の件を指した時点で、1 件だけ読んだユーザには
@@ -285,11 +285,13 @@ class ReadingTest(unittest.TestCase):
             self, run(payload=pre_tool_use("Bash", "command", 'bash -c "git push origin main"'))
         )
         self.assertEqual(unread.get("permissionDecision"), "deny", "読めない呼び出しを通した")
-        self.assertIn("raw text", unread["permissionDecisionReason"])
+        self.assertIn("生の文字列", unread["permissionDecisionReason"])
 
         plain = verdict(self, run(payload=pre_tool_use("Bash", "command", "git push origin main")))
         self.assertNotIn(
-            "raw text", plain["permissionDecisionReason"], "読めた拒否に読めなかったと書かれている"
+            "生の文字列",
+            plain["permissionDecisionReason"],
+            "読めた拒否に読めなかったと書かれている",
         )
 
 
@@ -343,7 +345,7 @@ class HeredocTest(unittest.TestCase):
         # 止まる側になるだけでなく、本来の禁止と区別できる文面であること。
         # 誤検知を許容できるのは、返る文面が読み手に次の一手を残すからで、
         # そこが成り立たないと許容の前提が無くなる。
-        self.assertIn("raw text", out["permissionDecisionReason"])
+        self.assertIn("生の文字列", out["permissionDecisionReason"])
 
 
 class PathTest(unittest.TestCase):

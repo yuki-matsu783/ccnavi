@@ -14,7 +14,7 @@
 #
 # 「A か B」「A かつ B」は glob / regex の代わりに when: で組み合わせ条件として書く。ノードは
 # `glob: '...'` / `regex: '...'`（個別条件）・`all: [...]`・`any: [...]`・`not: {...}` のどれか 1 つ。
-# 書き方の例は docs/design/rules.md を見る。
+# 書き方の例は docs/21_design/rules.md を見る。
 # 除くだけなら except のほうが読みやすいので、workspace-root は except のままにしてある。
 version: 1
 

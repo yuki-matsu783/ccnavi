@@ -1,6 +1,6 @@
 """気づきの記録の読み取り（共有）と、処理すべきものの判定。
 
-設計は docs/design/tickets/learning-wiki.md。収集・親の `finish`・`ticket consolidate`・
+設計は docs/21_design/tickets/learning-wiki.md。収集・親の `finish`・`ticket consolidate`・
 `--learnings` が同じ読み方をする。読むのはワークツリーの HEAD にある通常のファイルで、
 未コミットの変更は見ない（届くのはコミットしたものだけ）。
 
