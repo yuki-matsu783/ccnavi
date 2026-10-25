@@ -48,9 +48,9 @@ import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
 import type { RiskTarget } from "./core/screens.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
-import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
-import * as diaglog from "./log.js";
+import { assertRetained, watchPattern } from "./panel-common.js";
+import { settingsPanel, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -85,36 +85,7 @@ interface Loaded {
   readonly sums: readonly RiskSum[];
 }
 
-interface PanelState {
-  /** いま見せている対象。別の対象を開くと入れ替わる（タブは 1 枚） */
-  target: RiskTarget;
-  readonly panel: vscode.WebviewPanel;
-  readonly folder: vscode.WorkspaceFolder;
-  readonly tmpDir: string;
-  readonly host: ScreenHost<RiskData>;
-  /** 編集対象と設定ファイルの監視。対象のパスが変わるので、再読み込みのたびに張り直す */
-  fileWatchers: vscode.FileSystemWatcher[];
-  /** チケットの置き場の監視。開いている間ずっと同じ */
-  watchers: vscode.FileSystemWatcher[];
-  timer?: NodeJS.Timeout;
-  lockTimer?: NodeJS.Timeout;
-  loaded?: Loaded;
-  /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
-  error?: string;
-  lock: Lock;
-  /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。再表示されたときに送り直す */
-  changedPending: boolean;
-  wroteAt: number;
-  /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
-  dirty: boolean;
-  /**
-   * 読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら破棄する。
-   * 設定ファイルの場所を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
-   */
-  seq: number;
-  /** 「破棄して切り替える？」を出している間は真。重ねて開かれても 2 枚目の問いを出さない */
-  asking: boolean;
-}
+type PanelState = SettingsState<RiskData, RiskTarget, Loaded>;
 
 /** 開いているパネル。種類ごとに 1 枚 */
 let state: PanelState | undefined;
@@ -220,51 +191,6 @@ export async function openRisk(target: RiskTarget = { kind: "workspace" }): Prom
   await reload(current);
 }
 
-/**
- * 開いているタブの対象を入れ替える。未保存の変更があれば、破棄して切り替えるかを先に聞く。
- * やめたらタブは前面に出たまま、前の対象と編集が残る。
- *
- * 読み終えるまでは前の対象の中身を消して「読み込み中」を見せ、操作も受けない（`loaded` を空にする）。
- * 前の対象の保存が往復の途中なら、`stale` が破棄する。
- */
-async function switchTarget(current: PanelState, target: RiskTarget): Promise<void> {
-  if (current.dirty) {
-    // 問いを出している間に別の対象を開かれたら、前面に出すだけにする（問いは先に出したものに答えてもらう）
-    if (current.asking) {
-      return;
-    }
-    current.asking = true;
-    const choice = await vscode.window.showWarningMessage(
-      `未保存の変更があります。破棄して「${targetLabelOf(target)}」に切り替えますか？`,
-      { modal: true },
-      "切り替える",
-    );
-    current.asking = false;
-    // 問いを出している間にパネルを閉じられる。切り替え先が同じになっていることもある（2 度押した）
-    if (choice !== "切り替える" || !alive(current) || sameTarget(current.target, target)) {
-      return;
-    }
-  }
-  current.target = target;
-  current.loaded = undefined;
-  current.error = undefined;
-  current.dirty = false;
-  current.changedPending = false;
-  current.lock = lockFromError("確認中…");
-  // 前の対象のファイルの監視は外す。切り替え先が読めたら `reload` が張り直す。読めずにエラーのままなら、
-  // 前の対象の変化を「ファイルの変更を検知しました」と拾い続けない
-  if (current.timer !== undefined) {
-    clearTimeout(current.timer);
-    current.timer = undefined;
-  }
-  for (const watcher of current.fileWatchers) {
-    watcher.dispose();
-  }
-  current.fileWatchers = [];
-  current.host.send({ kind: "loading", text: loadingText(whatOf(target)) });
-  await reload(current);
-}
-
 async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   const notices: string[] = [];
   // 切り替えの一覧と統合結果のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧と統合結果が縮むだけ
@@ -338,63 +264,6 @@ function resolveIn(root: string, filePath: string): string {
   return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
 }
 
-function registerPanelHandlers(current: PanelState): void {
-  const { panel, folder } = current;
-
-  panel.webview.onDidReceiveMessage((message: unknown) => {
-    void handleMessage(current, asMessage(message));
-  });
-
-  // 保持する画面は非表示でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
-  // 記述が一致していない（`retainContextWhenHidden` の側は「非表示の画面には送れない」と言う）。
-  // どちらが正しくても困らないよう、再表示されたところで、いま出すべき知らせを送り直す。
-  // 中身（`data`）は送らない。送ると、非表示の間に打っていた編集がここで消える。
-  // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、非表示の間の切り替えが届いていなかったらここでしか気づけない。
-  panel.onDidChangeViewState(() => {
-    if (!panel.visible || !alive(current)) {
-      return;
-    }
-    current.host.post({ type: "lock", lock: current.lock } satisfies ToRisk);
-    postAppearance(current.host);
-    if (current.changedPending) {
-      current.host.post({ type: "changed" } satisfies ToRisk);
-    }
-  });
-
-  panel.onDidDispose(() => {
-    for (const timer of [current.timer, current.lockTimer]) {
-      if (timer !== undefined) {
-        clearTimeout(timer);
-      }
-    }
-    for (const watcher of [...current.fileWatchers, ...current.watchers]) {
-      watcher.dispose();
-    }
-    current.fileWatchers = [];
-    current.watchers = [];
-    try {
-      fs.rmSync(current.tmpDir, { recursive: true, force: true });
-    } catch {
-      // 一時ファイルの片付けに失敗しても画面の仕事には関係ない
-    }
-    if (state === current) {
-      state = undefined;
-    }
-  });
-
-  watchFiles(current);
-  // チケットが動いたら、保存できるかを取り直す。
-  for (const pattern of WATCH_PATTERNS) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    const moved = () => scheduleLock(current);
-    watcher.onDidCreate(moved);
-    watcher.onDidChange(moved);
-    watcher.onDidDelete(moved);
-    current.watchers.push(watcher);
-  }
-}
-
 /**
  * 配点のファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
  * 対象のパスは設定で変わるので、再読み込みのたびに張り直す。絶対パスはワークスペース相対の glob に
@@ -411,14 +280,7 @@ function watchFiles(current: PanelState): void {
     new vscode.RelativePattern(current.folder, ".claude/settings.json"),
     new vscode.RelativePattern(current.folder, ".claude/settings.local.json"),
   ];
-  for (const pattern of patterns) {
-    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-    const changed = () => scheduleChanged(current);
-    watcher.onDidCreate(changed);
-    watcher.onDidChange(changed);
-    watcher.onDidDelete(changed);
-    current.fileWatchers.push(watcher);
-  }
+  current.fileWatchers.push(...patterns.map((pattern) => watchPattern(pattern, () => scheduleChanged(current))));
 }
 
 function patternFor(folder: vscode.WorkspaceFolder, filePath: string): vscode.RelativePattern {
@@ -436,33 +298,25 @@ function alive(current: PanelState): boolean {
   return state === current;
 }
 
-function scheduleChanged(current: PanelState): void {
-  if (Date.now() - current.wroteAt < OWN_WRITE_GRACE_MS) {
-    return;
-  }
-  if (current.timer !== undefined) {
-    clearTimeout(current.timer);
-  }
-  current.timer = setTimeout(() => {
-    current.timer = undefined;
-    if (alive(current)) {
-      current.changedPending = true;
-      current.host.post({ type: "changed" } satisfies ToRisk);
+/** この画面の仕事を、3 画面で共通の段取り（`settings-panel.ts`）に渡す */
+const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget } = settingsPanel<RiskData, RiskTarget, Loaded, ToRisk>({
+  accepts: true,
+  alive,
+  release: (current) => {
+    if (state === current) {
+      state = undefined;
     }
-  }, WATCH_DEBOUNCE_MS);
-}
-
-function scheduleLock(current: PanelState): void {
-  if (current.lockTimer !== undefined) {
-    clearTimeout(current.lockTimer);
-  }
-  current.lockTimer = setTimeout(() => {
-    current.lockTimer = undefined;
-    if (alive(current)) {
-      void refreshLock(current);
-    }
-  }, WATCH_DEBOUNCE_MS);
-}
+  },
+  handleMessage: (current, message) => void handleMessage(current, asMessage(message)),
+  read: readPage,
+  show,
+  showError,
+  watchFiles,
+  refreshLock,
+  loading: (current) => ({ kind: "loading", text: loadingText(whatOf(current.target)) }),
+  sameTarget,
+  targetLabel: targetLabelOf,
+});
 
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
@@ -517,45 +371,6 @@ function showError(current: PanelState, error: string): void {
   current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "workspace", target) });
 }
 
-async function reload(current: PanelState): Promise<void> {
-  current.seq += 1;
-  const seq = current.seq;
-  let loaded: Loaded;
-  try {
-    loaded = await readPage(current.folder.uri.fsPath, current.target);
-  } catch (error) {
-    if (alive(current) && current.seq === seq) {
-      showError(current, (error as Error).message);
-    }
-    return;
-  }
-  // 読んでいる間に別の対象へ切り替わった（または読み直しが重なった）なら、後から来たほうに任せる
-  if (!alive(current) || current.seq !== seq) {
-    return;
-  }
-  current.loaded = loaded;
-  show(current);
-  watchFiles(current);
-  void refreshLock(current);
-}
-
-/**
- * いまの状態で渡し直す。1 枚目を読み込んでいる間に見送られたもの（`deferred`）は、画面が
- * 組み上がった（`ready`）ところでここから渡る。
- */
-function redraw(current: PanelState): void {
-  if (current.loaded !== undefined) {
-    show(current);
-    return;
-  }
-  if (current.error !== undefined) {
-    showError(current, current.error);
-    return;
-  }
-  // 切り替え先を読んでいる最中
-  current.host.send({ kind: "loading", text: loadingText(whatOf(current.target)) });
-}
-
 /**
  * リスク管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
  * 入れ物は 1 度しか入らないので、表示の有無は渡さない（保持する画面は非表示でも生きている）。
@@ -563,11 +378,7 @@ function redraw(current: PanelState): void {
  * 型では止まらないので、ここで見て言う。
  */
 function riskHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RiskData> {
-  if (panel.options.retainContextWhenHidden !== true) {
-    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
-    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/42_claude/logging.md）
-    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "risk", retainContextWhenHidden: false });
-  }
+  assertRetained(panel, root, "risk");
   return retainedHost<RiskData>(
     {
       html(text: string): void {

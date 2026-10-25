@@ -33,10 +33,8 @@ import * as path from "node:path";
 import {
   parseApprovePreview,
   parseApproveResult,
-  type ApproveMismatch,
   type ApproveOutcome,
   type ApprovePreview,
-  type ApproveResult,
   type ApproveWorktree,
   failureReason,
 } from "./core/approvemodel.js";

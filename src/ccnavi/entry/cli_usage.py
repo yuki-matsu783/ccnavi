@@ -386,6 +386,8 @@ _TICKET = """\
          allow の項が計画のどのフェーズの範囲とも重ならないときは、停止せず
          「承認しても書けない」と警告します
          （scope: inherit のタイプが計画にあれば警告しません）。
+         子の提案は雛形にならないので手で書きます（<id>-<フェーズ番号 2 桁>-<連番 2 桁>）。
+         ccnavi-ticket.sh propose は親の識別子で打ち、子も同じ承認で通します。
          ccnavi を直接実行します（sh のラッパーは使いません））
     ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
                            [--with-feedback] --issue <N|owner/repo#N> --mr <N>

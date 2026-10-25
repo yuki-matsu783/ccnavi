@@ -204,8 +204,8 @@ def decide_before(
     # 名前で書くツールの 4 本（`add_named_rules`）は既定を使っている間も足す。組み込みの既定は
     # 持っていないので、二重にならない。読めない間も共通の設定への Write / Edit は止まる。
     # 組み込みの保護（設定ファイル・チケットの置き場・シェルの形）をルールに足す。
-    core_on = modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
-    if record.fallback != builtin.FALLBACK and core_on:
+    core_files_on = modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
+    if record.fallback != builtin.FALLBACK and core_files_on:
         selfguard_shell.add_rules(
             rule_set,
             conf.bin,
@@ -216,7 +216,7 @@ def decide_before(
             tool=payload.tool_name,
             cwd=payload.cwd,
         )
-    if core_on:
+    if core_files_on:
         # `add_rules` の後に呼ぶ。先頭に挿すので、専用の文面が
         # `guard-project-home` / `guard-common-layer` より先に並ぶ。
         selfguard_shell.add_named_rules(rule_set, conf.project_home, root)
@@ -271,7 +271,6 @@ def decide_before(
     # `cd` を追うには区切りの残った形が要る。
     # 環境変数の指定の止めは補助の保護（AUX）で、`CCNAVI_GUARD_CORE_FILES` では切れない
     # （切れるのは自己防衛だけ）。dry-run でも止める。
-    core_files_on = modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     if payload.tool_name == "Bash":
         script, names = wrapguard.check_env(record.subject, record.degraded)
         if names:
@@ -328,10 +327,7 @@ def decide_before(
     # （phase_forms.prune_form）。実行ファイルのターミナル要求は擬似ターミナルを使えば通れる。
     # 記録と state の
     # 置き場をシェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
-    if (
-        payload.tool_name in phase_forms.SHELL_TOOLS
-        and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
-    ):
+    if payload.tool_name in phase_forms.SHELL_TOOLS and core_files_on:
         found = phase_forms.prune_form(record.subject, conf.bin) or phase_forms.user_prune_form(
             record.subject, conf.bin
         )
@@ -958,16 +954,25 @@ def decide_before(
         record.code = ticket_code or reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and not ticket_reason:
         texts = [
-            reasons.reason_for(
-                rule,
-                payload.tool_name,
-                display_subject,
-                source,
-                record.degraded,
-                runner,
-                layer,
-                quoted,
-                git=settings.git_wrapper_command(root),
+            "\n".join(
+                [
+                    reasons.reason_for(
+                        rule,
+                        payload.tool_name,
+                        display_subject,
+                        source,
+                        record.degraded,
+                        runner,
+                        layer,
+                        quoted,
+                        git=settings.git_wrapper_command(root),
+                    ),
+                    *(
+                        reasons.ask_hint(rule.bare_id, display_subject)
+                        if rule.decision == rules.ASK
+                        else ()
+                    ),
+                ]
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
@@ -1441,6 +1446,16 @@ def ticket_verdict(
                     "start it, and do the work in the child's worktree; the child's finish merges "
                     "it into the parent. If the parent has no child for this phase yet, "
                     "create one first.",
+                    # 承認の前に親へ入った変更を、承認の後に戻す手順。迂回しない旨も添える。
+                    "If this edit is meant to undo a change that is already uncommitted in the "
+                    "parent worktree (for example work done before the ticket was agreed), "
+                    "do not rewrite it here and do not work around this denial. Discard it with "
+                    f"(for example: cd {settings.shell_path(t.root)} && "
+                    f"{settings.script_command(root, 'ccnavi-git.sh')} "
+                    "restore --staged --worktree -- <path>; one file at a time), "
+                    "or move it into the child's worktree and commit it there. "
+                    "If you did not write the change yourself, ask the user "
+                    "before discarding it.",
                 ]
             ),
             "",

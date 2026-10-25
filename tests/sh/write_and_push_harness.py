@@ -52,8 +52,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_path, config_path
-from tests.sh import host_stub
+from tests import ROOT, common_path, config_path, host_stub
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")

@@ -31,7 +31,7 @@
 #   ccnavi_host_encoded_path    プロジェクトのパスを URL に入れる表記（GitLab の projects/<ここ>）
 #   ccnavi_host_encode <文字列> クエリの値に入れる文字列（ブランチ名など）のパーセントエンコード
 #   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
-#   ccnavi_run_timed <秒> <stdin> <stdout> <stderr> <コマンド>...  時間を区切って実行する（timeout コマンドに頼らない）
+#   ccnavi_run_timed <秒> <stdin> <stdout> <stderr> <コマンド>...  時間を区切って実行する（timeout コマンドは使わない。時間切れのときは 124 を返す。stdout に `-` を渡すと、呼ぶ側の標準出力を引き継ぐ）
 #   ccnavi_host_fail_status <ホストの返事の文>  curl・gh・glab の失敗の文から HTTP の番号を取り出す
 #   ccnavi_host_graphql_blocked <ホストの返事の文>  GraphQL を使えない環境（Claude Code のクラウド）の 403 かを判定する（0 なら該当）
 #   ccnavi_host_probe           プロジェクトを 1 回読む。結果は ccnavi_h_probe と ccnavi_h_project_json
@@ -48,40 +48,63 @@ ccnavi_h_tmp=""
 ccnavi_h_max_time=120
 
 # 時間を区切って実行する。<秒> <stdin のファイル> <stdout のファイル> <stderr のファイル> <コマンド>...
-# ccnavi_git_timed と同じやり方（バックグラウンドで動かし、上限を過ぎたら止める）。上限を過ぎたら 124 を返す。
+# バックグラウンドで動かし、上限を過ぎたら止めて 124 を返す。時間切れは印のファイルで判定する。
+# <stdout のファイル> に `-` を渡すと、標準出力は呼ぶ側のものを引き継ぐ。ccnavi_git_timed がこの形で使う。
+# 印のファイルは `<stdout のファイル>.timeout`。stdout が `-` か /dev/null のときは `<stderr のファイル>.timeout` に置く。
+# stderr も /dev/null なら、TMPDIR の一時名に置く（特殊ファイルに `.timeout` を付けないため）。
+# 監視の出力は破棄する。つないだままだと、監視の sleep が終わるまで呼ぶ側の `$( )` が閉じないため。
+# 変数は ccnavi_tm_ で始める（呼ぶ側の名前と重ねない）。
 ccnavi_run_timed() {
-	ccnavi_rt_limit="$1"
-	ccnavi_rt_in="$2"
-	ccnavi_rt_out="$3"
-	ccnavi_rt_err="$4"
+	ccnavi_tm_limit="$1"
+	ccnavi_tm_in="$2"
+	ccnavi_tm_out="$3"
+	ccnavi_tm_err="$4"
 	shift 4
-	ccnavi_rt_flag="$ccnavi_rt_out.timeout"
-	rm -f "$ccnavi_rt_flag" || :
-	"$@" <"$ccnavi_rt_in" >"$ccnavi_rt_out" 2>"$ccnavi_rt_err" &
-	ccnavi_rt_pid=$!
+	case "$ccnavi_tm_out" in
+	- | /dev/null) ccnavi_tm_base="$ccnavi_tm_err" ;;
+	*) ccnavi_tm_base="$ccnavi_tm_out" ;;
+	esac
+	case "$ccnavi_tm_base" in
+	/dev/null) ccnavi_tm_base="${TMPDIR:-/tmp}/ccnavi-timed-$$" ;;
+	esac
+	ccnavi_tm_flag="$ccnavi_tm_base.timeout"
+	rm -f "$ccnavi_tm_flag" || :
+	if [ "$ccnavi_tm_out" = - ]; then
+		"$@" <"$ccnavi_tm_in" 2>"$ccnavi_tm_err" &
+	else
+		"$@" <"$ccnavi_tm_in" >"$ccnavi_tm_out" 2>"$ccnavi_tm_err" &
+	fi
+	ccnavi_tm_pid=$!
+	# sleep はバックグラウンドで起動して wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
 	(
 		exec </dev/null >/dev/null 2>&1
-		ccnavi_rt_sleep=""
-		ccnavi_rt_stop=""
-		trap 'ccnavi_rt_stop=1; test -z "$ccnavi_rt_sleep" || kill "$ccnavi_rt_sleep"' TERM
-		sleep "$ccnavi_rt_limit" &
-		ccnavi_rt_sleep=$!
-		test -z "$ccnavi_rt_stop" || { kill "$ccnavi_rt_sleep"; exit 0; }
-		wait "$ccnavi_rt_sleep"
-		test -z "$ccnavi_rt_stop" || exit 0
-		: >"$ccnavi_rt_flag"
-		kill "$ccnavi_rt_pid"
+		ccnavi_tm_sleep=""
+		ccnavi_tm_stop=""
+		# trap は印を立てるだけにし、分かっていれば sleep も止める。抜けるのは本流で、sleep の pid を控えた後に印を見る
+		# （sleep を起動した直後に TERM が来ても、sleep を残さないため）。
+		trap 'ccnavi_tm_stop=1; test -z "$ccnavi_tm_sleep" || kill "$ccnavi_tm_sleep"' TERM
+		sleep "$ccnavi_tm_limit" &
+		ccnavi_tm_sleep=$!
+		test -z "$ccnavi_tm_stop" || { kill "$ccnavi_tm_sleep"; exit 0; }
+		wait "$ccnavi_tm_sleep"
+		test -z "$ccnavi_tm_stop" || exit 0
+		: >"$ccnavi_tm_flag"
+		kill "$ccnavi_tm_pid"
 	) &
-	ccnavi_rt_dog=$!
-	ccnavi_rt_rc=0
-	wait "$ccnavi_rt_pid" 2>/dev/null || ccnavi_rt_rc=$?
-	kill "$ccnavi_rt_dog" 2>/dev/null || :
-	wait "$ccnavi_rt_dog" 2>/dev/null || :
-	if [ -e "$ccnavi_rt_flag" ]; then
-		rm -f "$ccnavi_rt_flag" || :
+	ccnavi_tm_dog=$!
+	ccnavi_tm_rc=0
+	wait "$ccnavi_tm_pid" 2>/dev/null || ccnavi_tm_rc=$?
+	kill "$ccnavi_tm_dog" 2>/dev/null || :
+	# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
+	wait "$ccnavi_tm_dog" 2>/dev/null || :
+	# 終わった印。呼ぶ側の後始末が動いている最中かどうかを、これで見分ける。
+	ccnavi_tm_dog=""
+	ccnavi_tm_pid=""
+	if [ -e "$ccnavi_tm_flag" ]; then
+		rm -f "$ccnavi_tm_flag" || :
 		return 124
 	fi
-	return "$ccnavi_rt_rc"
+	return "$ccnavi_tm_rc"
 }
 
 ccnavi_host_parse() {

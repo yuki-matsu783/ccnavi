@@ -324,6 +324,37 @@ def reason_for(
     return "\n".join(lines)
 
 
+# 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルールの一覧です（bare_id → 1 行）。
+# ask のルールには message を書けず、additionalContext は自動拒否のときに届かないため、ここに置きます。
+_ASK_ALTERNATIVE = {
+    "prefer-webfetch": (
+        "代わりの手: 調べものが一度きりなら WebFetch ツールを、"
+        "何度も呼び出すなら .ccnavi/scripts/ の sh にまとめてから実行してください。"
+    ),
+}
+
+
+def ask_hint(bare_id: str, subject: str) -> list[str]:
+    """確認（ask）の理由に足す説明です。非対話のときだけ返し、対話のときは空にします。
+
+    非対話のセッションでは確認に答える人がいないため、ask は自動で拒否されます。
+    ルール名と対象だけでは、「確認待ち」なのか「止められた」のかが分からないため、
+    確認が要ることと次の行動を言います。確認として返す回（ASK）にだけ足します。
+    上限で止める拒否など、実際には確認が出ない回に足すと、打ち直しても通らない案内になります。
+    """
+    if not ccnavimd.unattended():
+        return []
+    shown = _shorten(subject)
+    lines = [
+        "この操作はユーザの確認が要りますが、このセッションでは確認に答えられません。"
+        f"ユーザに「{shown}」の了承を頼み、了承されたら打ち直してもらってください。"
+    ]
+    alternative = _ASK_ALTERNATIVE.get(bare_id)
+    if alternative:
+        lines.append(alternative)
+    return lines
+
+
 def ran_by(runner: str, inner: str) -> str:
     """実行役のコマンドが中で実行するコマンドにヒットしたことを言う 1 行。
 

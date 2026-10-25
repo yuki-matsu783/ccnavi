@@ -50,7 +50,7 @@ import { showLoading } from "./loading.js";
 import type { MirrorData, ProjectsData, ProjectsMessage, ToProjects } from "./core/projects-view.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { readOrigin } from "./git.js";
-import * as diaglog from "./log.js";
+import { assertRetained, debounce, watchGlobs } from "./panel-common.js";
 import { runInTerminal } from "./terminal.js";
 import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { confirmIfTurn } from "./turn-confirm.js";
@@ -139,10 +139,7 @@ export async function openProjects(): Promise<void> {
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
-  if (panel.options.retainContextWhenHidden !== false) {
-    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、非表示になっても画面が破棄されず、表示の有無の読み直しが働かない。診断ログにだけ残す（docs/42_claude/logging.md）
-    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: true });
-  }
+  assertRetained(panel, folder.uri.fsPath, SCREEN, false);
   showLoading(panel, TITLE, SCREEN, "プロジェクト");
   const current: PanelState = {
     panel,
@@ -322,13 +319,7 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
     ".gitignore",
     ".claude/settings.json",
   ];
-  for (const pattern of patterns) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    watcher.onDidCreate(scheduleUpdate);
-    watcher.onDidChange(scheduleUpdate);
-    watcher.onDidDelete(scheduleUpdate);
-    current.watchers.push(watcher);
-  }
+  current.watchers.push(...watchGlobs(folder, patterns, scheduleUpdate));
 }
 
 function scheduleUpdate(): void {
@@ -336,11 +327,7 @@ function scheduleUpdate(): void {
   if (current === undefined) {
     return;
   }
-  if (current.timer !== undefined) {
-    clearTimeout(current.timer);
-  }
-  current.timer = setTimeout(() => {
-    current.timer = undefined;
+  debounce(current, "timer", () => {
     if (state === current) {
       void update();
     }

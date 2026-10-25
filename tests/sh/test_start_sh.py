@@ -344,6 +344,10 @@ class StartShTest(unittest.TestCase):
             "--plan quick-work --scope '<触るファイルの glob>' --issue 152 --mr 7", nexts[0]
         )
         self.assertIn("直接実装に切り替えず、ユーザに報告して止まる", done.stdout)
+        # 切った直後は、親チケットも提案も無いのが正常。失敗に見える「取り込まなかった」を出さない
+        self.assertIn("ワークツリーを切った直後なので、取り込むものはありません", done.stdout)
+        self.assertNotIn("取り込まなかった", done.stdout)
+        self.assertNotIn("終了コード", done.stdout)
 
     # ---- 1b. issue がまだ無いとき（--new-issue）
 

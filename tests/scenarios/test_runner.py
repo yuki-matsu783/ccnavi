@@ -17,8 +17,10 @@ from unittest import mock
 
 import yaml
 
+from ccnavi.entry import version
+from tests import ROOT, common_sh, fake_gitlab, host_stub
 from tests import __main__ as full_run
-from tests.scenarios import runner
+from tests.scenarios import hostenv, runner
 
 SCENARIOS = sorted(Path(__file__).parent.glob("UC-*.yml"))
 EXPECT_KEYS = {
@@ -358,7 +360,7 @@ class ExpectAfterTest(unittest.TestCase):
             rc = runner.finish(scn, out, st, root)
             report = json.loads((out / "report.json").read_text(encoding="utf-8"))
         self.assertEqual(rc, 2)
-        self.assertEqual([r["kind"] for r in report], ["expect_after", "repo"])
+        self.assertEqual([r["kind"] for r in report], ["expect_after", "repo", "host"])
         self.assertEqual(report[0]["verdict"], runner.INCONCLUSIVE)
 
     def load_yml(self, text):
@@ -2388,6 +2390,656 @@ class LifecycleTest(unittest.TestCase):
             self.assertIn(ws.base, text)
             body = runner.confirmation_text(scn, ws.target, "MODE OK")
             self.assertIn("対象のリポジトリを使えない", body)
+
+
+# ---- setup.host（評価の相手: bare / fake-gitlab / real） ----
+
+# 別のグループ（tests/sh）の部品は import できないので、読むのに要るぶんだけここに持つ
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+REVIEW_SH = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")
+FAKE_PROJECT = "ns/proj"
+# 実行ファイルの代役。版の問い合わせにだけ答える
+EXE_STUB = """#!/bin/sh
+case " $* " in
+*" --version --json "*)
+  printf '{{"compat": {compat}, "flags": ["--accept-unresolved", "--actor", "--via"]}}\\n'
+  exit 0 ;;
+*" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
+esac
+exit 0
+"""
+
+
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    return path
+
+
+def seeded():
+    """未解決のスレッドを 1 つ持つ MR が 1 件ある、模擬の初期状態。"""
+    note = {
+        "id": 101,
+        "body": "ここを直してください",
+        "resolvable": True,
+        "resolved": False,
+        "created_at": "2026-10-25T00:00:00Z",
+        "author": {"id": 2, "username": "reviewer"},
+        "position": {"new_path": "a.txt", "new_line": 3},
+    }
+    mr = {
+        "iid": 1,
+        "state": "opened",
+        "source_branch": "i0001",
+        "target_branch": "main",
+        "title": "i0001",
+        "web_url": f"http://127.0.0.1/{FAKE_PROJECT}/-/merge_requests/1",
+        "discussions": [{"id": "d101", "individual_note": False, "notes": [note]}],
+        "reviewers": [],
+        "notes": [],
+        "created_at": "2026-10-25T00:00:00Z",
+    }
+    return {"project": FAKE_PROJECT, "seq": 100, "issues": [], "mrs": [mr]}
+
+
+REAL_ORIGIN = "https://github.com/acme/real.git"
+BODY_ORIGIN = "https://github.com/acme/body.git"
+HAS_TOOLS = all(shutil.which(t) for t in ("sh", "git", "jq", "curl"))
+
+
+def host_workspace(tmp):
+    return Workspace(tmp, origin_root=BODY_ORIGIN, origin_target=REAL_ORIGIN)
+
+
+def private_tempdir(test, root):
+    """ccnavi-host-* の置き場を、このテストだけのディレクトリにする（並列の他の回と混ざらない）。"""
+    place = Path(root) / "tmp"
+    place.mkdir()
+    patcher = mock.patch.object(tempfile, "tempdir", str(place))
+    patcher.start()
+    test.addCleanup(patcher.stop)
+    return place
+
+
+def tokens_dropped_env():
+    return {k: v for k, v in os.environ.items() if not hostenv.TOKEN_VAR.match(k)}
+
+
+class HostFieldTest(unittest.TestCase):
+    def load(self, setup):
+        with tempfile.TemporaryDirectory() as d:
+            return runner.load_scenario(write_scenario(d, setup))
+
+    def test_values_are_checked_and_the_default_is_real(self):
+        for host in ("bare", "fake-gitlab", "real"):
+            with self.subTest(host=host):
+                self.assertEqual(runner.scenario_host(self.load({"host": host})), host)
+        self.assertEqual(runner.scenario_host(self.load({"files": {}})), "real")
+        for bad in ("mock", "", None, True, "Bare"):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                self.load({"host": bad})
+
+    def test_it_is_not_combined_with_issue(self):
+        issue = {"repo": "projects/test-repo", "title": "t"}
+        for host in ("bare", "fake-gitlab"):
+            with self.subTest(host=host), self.assertRaises(ValueError) as cm:
+                self.load({"host": host, "issue": issue})
+            self.assertIn("setup.issue", str(cm.exception))
+        self.load({"host": "real", "issue": issue})
+
+    def test_host_state_is_only_for_fake_gitlab_and_needs_a_project_path(self):
+        self.load({"host": "fake-gitlab", "host_state": {"project": "a/b", "issues": []}})
+        for setup in (
+            {"host": "bare", "host_state": {}},
+            {"host_state": {}},
+            {"host": "fake-gitlab", "host_state": []},
+            {"host": "fake-gitlab", "host_state": {"project": "proj"}},
+        ):
+            with self.subTest(setup=setup), self.assertRaises(ValueError):
+                self.load(setup)
+
+    def test_a_fake_host_uses_the_disposable_target(self):
+        self.assertTrue(runner.uses_target({"setup": {"host": "bare"}}))
+        self.assertTrue(runner.uses_target({"setup": {"host": "fake-gitlab"}}))
+        self.assertFalse(runner.uses_target({"setup": {"host": "real"}}))
+        self.assertFalse(runner.uses_target({}))
+
+    def test_a_target_that_is_ccnavi_itself_is_refused_before_anything_is_made(self):
+        with tempfile.TemporaryDirectory() as d:
+            scratch = private_tempdir(self, d)
+            ws = Workspace(d, origin_root=REAL_ORIGIN, origin_target=REAL_ORIGIN)
+            path = ws.scenario_file({"host": "bare"})
+            args = ["run", str(path), "--confirmed", "--root", str(ws.root), "--out", str(ws.out)]
+            with (
+                mock.patch.object(runner, "_ENTRY", True),
+                mock.patch.object(runner, "run_step") as step,
+                mock.patch("builtins.print") as shown,
+            ):
+                rc = runner.main(args)
+            text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
+            self.assertEqual(rc, 3)
+            self.assertIn("origin が ccnavi 本体の origin と同じ", text)
+            self.assertIn("次: ", text)
+            step.assert_not_called()
+            self.assertEqual(list(scratch.glob("ccnavi-host-*")), [])
+
+
+class StepEnvTest(unittest.TestCase):
+    def host(self, kind, **extra):
+        return {
+            "kind": kind,
+            "bin": "/stub/bin",
+            "routes": "/stub/routes.json",
+            "log": "/stub/log",
+            "target_common": "/t/.git",
+            "bare": "/stub/origin.git",
+            "real_origin": REAL_ORIGIN,
+            "project": "ns/proj",
+            "port": 4321,
+            **extra,
+        }
+
+    def test_real_tokens_are_dropped_and_everything_else_is_inherited(self):
+        base = {
+            "PATH": "/usr/bin",
+            "HOME": "/home/u",
+            "HTTPS_PROXY": "http://p",
+            "NODE_EXTRA_CA_CERTS": "/ca",
+            "GITHUB_TOKEN": "real-gh",
+            "GH_TOKEN": "real-gh2",
+            "GITLAB_TOKEN": "real-gl",
+            "CCNAVI_PROBE_REVIEWER_TOKEN": "real-probe",
+            "github_token": "lower",
+        }
+        env = hostenv.step_env(self.host("bare"), base)
+        for name in ("HOME", "HTTPS_PROXY", "NODE_EXTRA_CA_CERTS"):
+            self.assertEqual(env[name], base[name])
+        for name in ("GITHUB_TOKEN", "GH_TOKEN", "GITLAB_TOKEN", "CCNAVI_PROBE_REVIEWER_TOKEN"):
+            self.assertNotIn(name, env)
+        self.assertNotIn("github_token", env)
+        self.assertEqual(env["PATH"], os.pathsep.join(["/stub/bin", "/usr/bin"]))
+        self.assertEqual(env["FAKE_ORIGIN_URL"], host_stub.ORIGIN_URL)
+        self.assertEqual(env["FAKE_BARE"], "/stub/origin.git")
+        self.assertEqual(env["FAKE_REAL_ORIGIN"], REAL_ORIGIN)
+        self.assertEqual(env["FAKE_TARGET_COMMON"], "/t/.git")
+
+    def test_fake_gitlab_gets_only_the_fake_token_and_a_local_origin(self):
+        base = {"PATH": "/usr/bin", "GITLAB_TOKEN": "real-gl", "GITHUB_TOKEN": "real-gh"}
+        env = hostenv.step_env(self.host("fake-gitlab", token="fake-token"), base)
+        self.assertEqual(env["GITLAB_TOKEN"], "fake-token")
+        self.assertNotIn("GITHUB_TOKEN", env)
+        self.assertEqual(env["FAKE_ORIGIN_URL"], "http://127.0.0.1:4321/ns/proj.git")
+
+    def test_a_scenario_without_host_passes_no_env(self):
+        self.assertIsNone(runner._host_env({}))
+        self.assertIsNone(runner._host_env({"host": {"down": True}}))
+
+    def test_run_step_inherits_the_environment_when_env_is_none(self):
+        done = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+        scn = {"model": "haiku", "budget_usd": 1.0, "_prompt_steps": 1, "permission_mode": "auto"}
+        with (
+            tempfile.TemporaryDirectory() as d,
+            mock.patch.object(runner, "_ENTRY", True),
+            mock.patch.object(runner.subprocess, "run", return_value=done) as call,
+        ):
+            runner.run_step(scn, {"prompt": "a"}, Path(d), 1, "sid", None, False, d)
+            self.assertIsNone(call.call_args.kwargs["env"])
+            runner.run_step(scn, {"prompt": "a"}, Path(d), 1, "sid", None, False, d, env={"A": "1"})
+            self.assertEqual(call.call_args.kwargs["env"], {"A": "1"})
+
+
+@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
+class BareHostTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.scratch = private_tempdir(self, self._tmp.name)
+        self.ws = host_workspace(self._tmp.name)
+        self.top = str(self.ws.target.resolve())
+        self.root = str(self.ws.root.resolve())
+
+    def prepare(self, kind="bare", **setup):
+        host = hostenv.prepare(self.ws.root, self.top, {"host": kind, **setup}, runner._git)
+        self.addCleanup(hostenv.teardown, self.ws.root, host, runner._git)
+        return host, hostenv.step_env(host, tokens_dropped_env())
+
+    def git(self, env, cwd, *args):
+        return subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=True, text=True)
+
+    def test_the_stub_answers_a_host_shaped_origin_for_the_target_only(self):
+        git(self.ws.target, "worktree", "add", "-q", str(self.ws.root.parent / "wt"), "-b", "w")
+        host, env = self.prepare()
+        for cwd in (self.top, str(self.ws.root.parent / "wt")):
+            got = self.git(env, cwd, "remote", "get-url", "origin")
+            self.assertEqual(got.stdout.strip(), host_stub.ORIGIN_URL, cwd)
+        self.assertEqual(
+            self.git(env, self.top, "-C", self.top, "remote", "get-url", "origin").stdout.strip(),
+            host_stub.ORIGIN_URL,
+        )
+        # ccnavi 本体のリポジトリには、本物の答えを返す
+        body = self.git(env, self.root, "remote", "get-url", "origin")
+        self.assertEqual(body.stdout.strip(), BODY_ORIGIN)
+        body = self.git(env, self.top, "-C", self.root, "remote", "get-url", "origin")
+        self.assertEqual(body.stdout.strip(), BODY_ORIGIN)
+
+    def test_a_users_insteadof_does_not_send_the_traffic_to_the_real_origin(self):
+        config = Path(self._tmp.name) / "global.gitconfig"
+        config.write_text(
+            '[url "git@example.invalid:"]\n\tinsteadOf = https://github.com/\n', encoding="utf-8"
+        )
+        with mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(config)}):
+            self.assertTrue(
+                git(self.ws.target, "remote", "get-url", "origin").startswith("git@example.invalid")
+            )
+            host, env = self.prepare()
+            self.assertEqual(host["real_origin"], REAL_ORIGIN)
+            git(self.ws.target, "switch", "-q", "-c", "feat")
+            git(self.ws.target, "commit", "-q", "--allow-empty", "-m", "e")
+            pushed = self.git(env, self.top, "push", "-q", "origin", "feat")
+        self.assertEqual(pushed.returncode, 0, pushed.stderr)
+        sha = git(self.ws.target, "rev-parse", "feat")
+        self.assertEqual(git(host["bare"], "rev-parse", "refs/heads/feat"), sha)
+
+    def test_push_and_fetch_reach_the_bare_and_not_the_real_origin(self):
+        host, env = self.prepare()
+        git(self.ws.target, "switch", "-q", "-c", "feat")
+        (self.ws.target / "new.txt").write_text("x\n", encoding="utf-8")
+        git(self.ws.target, "add", "new.txt")
+        git(self.ws.target, "commit", "-q", "-m", "new")
+        pushed = self.git(env, self.top, "push", "-q", "origin", "feat")
+        self.assertEqual(pushed.returncode, 0, pushed.stderr)
+        sha = git(self.ws.target, "rev-parse", "feat")
+        self.assertEqual(git(host["bare"], "rev-parse", "refs/heads/feat"), sha)
+        self.assertEqual(self.git(env, self.top, "fetch", "-q", "origin").returncode, 0)
+        listed = self.git(env, self.top, "ls-remote", "origin")
+        self.assertIn(f"{sha}\trefs/heads/feat", listed.stdout)
+        # .git/config の origin は書き換えない
+        self.assertEqual(git(self.ws.target, "config", "remote.origin.url"), REAL_ORIGIN)
+
+    def test_ccnavi_git_sh_goes_through_the_stub_too(self):
+        host, env = self.prepare()
+        scripts = Path(self.top) / ".ccnavi" / "scripts"
+        scripts.mkdir(parents=True)
+        for name in os.listdir(SH_DIR):
+            if name.startswith("ccnavi-") and name.endswith(".sh"):
+                shutil.copy(os.path.join(SH_DIR, name), scripts)
+        git(self.ws.target, "switch", "-q", "-c", "feat")
+        done = subprocess.run(
+            ["sh", str(scripts / "ccnavi-git.sh"), "fetch", "origin"],
+            cwd=self.top,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_bare_is_made_from_the_origin_remote_refs(self):
+        git(self.ws.target, "update-ref", "refs/remotes/origin/main", self.ws.base)
+        git(self.ws.target, "update-ref", "refs/remotes/origin/side", self.ws.base)
+        host, _ = self.prepare()
+        heads = git(host["bare"], "for-each-ref", "--format=%(refname)", "refs/heads").split()
+        self.assertEqual(sorted(heads), ["refs/heads/main", "refs/heads/side"])
+        self.assertEqual(git(host["bare"], "symbolic-ref", "HEAD"), "refs/heads/main")
+
+    def test_the_api_stubs_fail_and_curl_is_stubbed_for_bare(self):
+        host, env = self.prepare()
+        for tool in ("gh", "glab"):
+            done = subprocess.run([tool, "x"], env=env, capture_output=True)
+            self.assertEqual(done.returncode, 1, tool)
+        self.assertTrue(os.path.isfile(os.path.join(host["bin"], "curl")))
+        done = subprocess.run(
+            ["curl", "-s", "https://api.github.com/x"], env=env, capture_output=True
+        )
+        self.assertEqual(done.returncode, 22)
+
+    def test_teardown_removes_the_place_and_puts_the_remote_refs_back(self):
+        git(self.ws.target, "update-ref", "refs/remotes/origin/main", self.ws.base)
+        host, env = self.prepare()
+        git(self.ws.target, "switch", "-q", "-c", "feat")
+        git(self.ws.target, "commit", "-q", "--allow-empty", "-m", "e")
+        self.assertEqual(self.git(env, self.top, "push", "-q", "origin", "feat").returncode, 0)
+        self.assertIn("refs/remotes/origin/feat", git(self.ws.target, "for-each-ref"))
+        hostenv.teardown(self.ws.root, host, runner._git)
+        self.assertFalse(os.path.exists(host["dir"]))
+        self.assertNotIn("refs/remotes/origin/feat", git(self.ws.target, "for-each-ref"))
+        self.assertEqual(git(self.ws.target, "rev-parse", "refs/remotes/origin/main"), self.ws.base)
+        hostenv.teardown(self.ws.root, host, runner._git)  # 2 回目は何もしない
+
+    def test_a_target_without_origin_is_refused_and_leaves_nothing(self):
+        git(self.ws.target, "remote", "remove", "origin")
+        with self.assertRaises(RuntimeError):
+            hostenv.prepare(self.ws.root, self.top, {"host": "bare"}, runner._git)
+        self.assertEqual(list(self.scratch.glob("ccnavi-host-*")), [])
+
+
+@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
+class FakeGitlabHostTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.ws = host_workspace(self._tmp.name)
+        self.top = str(self.ws.target.resolve())
+
+    def prepare(self, **setup):
+        host = hostenv.prepare(
+            self.ws.root, self.top, {"host": "fake-gitlab", **setup}, runner._git
+        )
+        self.addCleanup(hostenv.teardown, self.ws.root, host, runner._git)
+        return host
+
+    def test_review_sh_reads_the_fake_mr_and_thread_through_the_stubs(self):
+        host = self.prepare(host_state=seeded())
+        env = hostenv.step_env(host, tokens_dropped_env())
+        self.assertNotIn("curl", os.listdir(host["bin"]))
+        scripts = Path(self.top) / ".ccnavi" / "scripts"
+        for name in (*REVIEW_SH, *common_sh(SH_DIR)):
+            os.makedirs(scripts, exist_ok=True)
+            shutil.copy(os.path.join(SH_DIR, name), scripts)
+        git(self.ws.target, "switch", "-q", "-c", "i0001")
+        exe = write(
+            os.path.join(self._tmp.name, "exe", "ccnavi"),
+            EXE_STUB.format(compat=version.COMPAT, log=os.path.join(self._tmp.name, "args.txt")),
+        )
+        os.chmod(exe, 0o755)
+        env.update({"CCNAVI_ENTRY_PATH": exe, "CCNAVI_LEARNING": "disable"})
+        done = subprocess.run(
+            ["sh", str(scripts / "ccnavi-review.sh"), "fetch"],
+            cwd=self.top,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        got = json.loads(done.stdout)
+        self.assertEqual(got["host"], "gitlab")
+        self.assertEqual(got["mr"]["number"], 1)
+        self.assertIn("ここを直してください", got["threads"][0]["body"])
+        server = hostenv._SERVERS[host["dir"]]
+        self.assertIn(f"GET /api/v4/projects/{FAKE_PROJECT.replace('/', '%2F')}", server.requests)
+
+    def test_hold_stops_the_server_and_resume_keeps_the_state(self):
+        host = self.prepare(host_state=seeded())
+        port = host["port"]
+        hostenv.hold(self.ws.root, host)
+        self.assertTrue(os.path.isfile(host["state_path"]))
+        with self.assertRaises(OSError):
+            socket_connect(port)
+        # 止めている間に模擬の状態を直接変える。作った MR が残ったときの代わり
+        state = fake_gitlab.load(host["state_path"])
+        state["seq"] = 777
+        fake_gitlab.save(host["state_path"], state)
+        self.assertEqual(hostenv.resume(self.ws.root, host), [])
+        self.assertEqual(host["port"], port)
+        self.assertEqual(fake_gitlab.load(host["state_path"])["seq"], 777)
+        self.assertEqual(len(fake_gitlab.load(host["state_path"])["mrs"]), 1)
+        socket_connect(port)
+
+    def test_resume_on_another_port_says_so(self):
+        host = self.prepare()
+        hostenv.hold(self.ws.root, host)
+        taken = socket_listen(host["port"])
+        self.addCleanup(taken.close)
+        notes = hostenv.resume(self.ws.root, host)
+        self.assertNotEqual(host["port"], taken.getsockname()[1])
+        self.assertEqual(len(notes), 1)
+        self.assertIn("ポートが", notes[0])
+
+    def test_teardown_stops_the_server(self):
+        host = self.prepare()
+        port = host["port"]
+        hostenv.teardown(self.ws.root, host, runner._git)
+        with self.assertRaises(OSError):
+            socket_connect(port)
+        self.assertFalse(os.path.exists(host["dir"]))
+
+
+def socket_connect(port):
+    import socket
+
+    socket.create_connection(("127.0.0.1", port), timeout=2).close()
+
+
+def socket_listen(port):
+    import socket
+
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", port))
+    sock.listen()
+    return sock
+
+
+@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
+class HostLifecycleTest(unittest.TestCase):
+    """cmd_run から finish / 中断 / 人間の操作の step までを、claude を呼ばずに回す。"""
+
+    STEP_OUT = {"cost_usd": 0.0, "session_ids": []}
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.scratch = private_tempdir(self, self._tmp.name)
+        self.ws = host_workspace(self._tmp.name)
+
+    def scenario(self, host, steps=None, **extra):
+        setup = {"host": host, "reset": {"base": self.ws.base}, **extra}
+        return self.ws.scenario_file(setup, steps)
+
+    def run_cmd(self, path):
+        args = ["run", str(path), "--confirmed", "--root", str(self.ws.root)]
+        args += ["--out", str(self.ws.out)]
+        with mock.patch.object(runner, "_ENTRY", True), mock.patch("builtins.print"):
+            return runner.main(args)
+
+    def places(self):
+        return set(self.scratch.glob("ccnavi-host-*"))
+
+    def host_in_state(self):
+        return json.loads((self.ws.out / "state.json").read_text(encoding="utf-8"))["host"]
+
+    def test_the_steps_get_the_stub_env_and_everything_is_gone_after_finish(self):
+        seen = {}
+
+        def run_step(*a, **k):
+            seen["env"] = k["env"]
+            seen["place"] = Path(k["env"]["PATH"].split(os.pathsep)[0]).parent
+            seen["exists"] = seen["place"].is_dir()
+            return self.STEP_OUT
+
+        before = self.places()
+        with mock.patch.object(runner, "run_step", side_effect=run_step):
+            rc = self.run_cmd(self.scenario("bare"))
+        self.assertIn(rc, (0, 2))
+        self.assertTrue(seen["exists"])
+        self.assertEqual(seen["env"]["FAKE_ORIGIN_URL"], host_stub.ORIGIN_URL)
+        self.assertEqual(self.places(), before)
+        report = (self.ws.out / "report.md").read_text(encoding="utf-8")
+        self.assertIn("相手（setup.host）: bare", report)
+        self.assertIn("模擬のずれで見逃した問題がありうる", report)
+        rows = json.loads((self.ws.out / "report.json").read_text(encoding="utf-8"))
+        host_row = next(r for r in rows if r["kind"] == "host")
+        self.assertEqual(host_row["expect"], "setup.host")
+        self.assertIn("bare", host_row["why"])
+        self.assertIn("模擬のずれ", host_row["why"])
+
+    def test_real_leaves_the_run_unchanged(self):
+        seen = {}
+
+        def run_step(*a, **k):
+            seen["env"] = k.get("env", "missing")
+            return self.STEP_OUT
+
+        before = self.places()
+        with mock.patch.object(runner, "run_step", side_effect=run_step):
+            self.run_cmd(self.scenario("real"))
+        self.assertIsNone(seen["env"])
+        self.assertEqual(self.places(), before)
+        report = (self.ws.out / "report.md").read_text(encoding="utf-8")
+        self.assertIn("相手（setup.host）: real: 本物", report)
+        self.assertNotIn("模擬のずれ", report)
+
+    def test_keyboard_interrupt_stops_the_server_and_leaves_no_place(self):
+        before = self.places()
+        ports = []
+
+        def run_step(*a, **k):
+            ports.append(self.host_in_state()["port"])
+            raise KeyboardInterrupt
+
+        with (
+            mock.patch.object(runner, "run_step", side_effect=run_step),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            self.run_cmd(self.scenario("fake-gitlab"))
+        with self.assertRaises(OSError):
+            socket_connect(ports[0])
+        self.assertEqual(self.places(), before)
+
+    def test_setup_git_push_reaches_the_bare_and_not_the_real_origin(self):
+        git_setup = [["git", "push", "-q", "origin", "main:refs/heads/feat"]]
+        seen = {}
+
+        def run_step(*a, **k):
+            bare = self.host_in_state()["bare"]
+            seen["bare"] = git(bare, "rev-parse", "--verify", "-q", "refs/heads/feat")
+            return self.STEP_OUT
+
+        with mock.patch.object(runner, "run_step", side_effect=run_step):
+            self.run_cmd(self.scenario("bare", git=git_setup))
+        self.assertTrue(seen["bare"])
+
+    def test_a_failed_step_leaves_no_place(self):
+        before = self.places()
+        with mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")):
+            self.assertEqual(self.run_cmd(self.scenario("fake-gitlab")), 2)
+        self.assertEqual(self.places(), before)
+
+    def test_a_setup_failure_after_the_host_is_made_removes_it(self):
+        before = self.places()
+        with (
+            mock.patch.object(runner, "_setup", side_effect=RuntimeError("壊れた")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.run_cmd(self.scenario("fake-gitlab"))
+        self.assertEqual(self.places(), before)
+
+    def test_a_target_without_origin_is_refused_with_next(self):
+        git(self.ws.target, "remote", "remove", "origin")
+        before = self.places()
+        with (
+            mock.patch.object(runner, "run_step") as step,
+            mock.patch("builtins.print") as shown,
+        ):
+            args = ["run", str(self.scenario("bare")), "--confirmed", "--root", str(self.ws.root)]
+            with mock.patch.object(runner, "_ENTRY", True):
+                rc = runner.main([*args, "--out", str(self.ws.out)])
+        text = "\n".join(str(c.args[0]) for c in shown.call_args_list if c.args)
+        self.assertEqual(rc, 3)
+        self.assertIn("origin が無い", text)
+        self.assertIn("次: ", text)
+        step.assert_not_called()
+        self.assertEqual(self.places(), before)
+
+    def test_a_human_step_stops_the_server_and_keeps_the_place_until_next_ends(self):
+        steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}, {"prompt": "b"}]
+        made = {}
+
+        def first(*a, **k):
+            made["port"] = self.host_in_state()["port"]
+            state_path = self.host_in_state()["state_path"]
+            made["state_path"] = state_path
+            state = fake_gitlab.load(state_path)
+            state["seq"] = 555  # この step で模擬の状態が動いたものとして扱う
+            fake_gitlab.save(state_path, state)
+            return self.STEP_OUT
+
+        before = self.places()
+        with mock.patch.object(runner, "run_step", side_effect=first):
+            self.assertEqual(self.run_cmd(self.scenario("fake-gitlab", steps)), 10)
+        host = self.host_in_state()
+        self.assertTrue(os.path.isdir(host["dir"]), "置き場は残す")
+        with self.assertRaises(OSError):
+            socket_connect(made["port"])
+        self.assertEqual(len(self.places() - before), 1)
+
+        seen = {}
+
+        def second(*a, **k):
+            seen["seq"] = fake_gitlab.load(made["state_path"])["seq"]
+            seen["port"] = self.host_in_state()["port"]
+            socket_connect(seen["port"])
+            seen["url"] = k["env"]["FAKE_ORIGIN_URL"]
+            return self.STEP_OUT
+
+        with (
+            mock.patch.object(runner, "run_step", side_effect=second),
+            mock.patch("builtins.print"),
+            mock.patch.object(runner, "mode_check", return_value=(True, "")),
+        ):
+            rc = runner.main(["next", str(self.ws.out)])
+        self.assertIn(rc, (0, 2))
+        self.assertEqual(seen["seq"], 555, "next は状態を初期値で上書きしない")
+        self.assertEqual(seen["url"], f"http://127.0.0.1:{seen['port']}/ns/proj.git")
+        self.assertEqual(self.places(), before)
+        with self.assertRaises(OSError):
+            socket_connect(seen["port"])
+
+    def test_next_after_a_halt_records_that_the_place_is_gone(self):
+        before = self.places()
+        with (
+            mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")),
+            mock.patch.object(runner, "finish", return_value=2),
+        ):
+            self.run_cmd(self.scenario("bare"))
+        fail = runner.Refusal("失敗", "手で戻す")
+        with (
+            mock.patch.object(runner, "reset_repo", side_effect=fail),
+            mock.patch("builtins.print"),
+        ):
+            self.assertEqual(runner.main(["next", str(self.ws.out)]), 3)
+        self.assertTrue(self.host_in_state()["down"])
+        self.assertEqual(self.places(), before)
+
+    def test_next_after_restore_does_not_run_the_steps(self):
+        steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}, {"prompt": "b"}]
+        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as step:
+            self.assertEqual(self.run_cmd(self.scenario("bare", steps)), 10)
+            with mock.patch("builtins.print"):
+                self.assertEqual(runner.main(["restore", str(self.ws.out)]), 0)
+                self.assertEqual(runner.main(["next", str(self.ws.out)]), 2)
+        self.assertEqual(step.call_count, 1)
+
+    def test_restore_removes_the_held_place(self):
+        steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]
+        before = self.places()
+        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT):
+            self.assertEqual(self.run_cmd(self.scenario("bare", steps)), 10)
+        self.assertEqual(len(self.places() - before), 1)
+        with mock.patch("builtins.print"):
+            self.assertEqual(runner.main(["restore", str(self.ws.out)]), 0)
+        self.assertEqual(self.places(), before)
+
+    def test_next_after_a_halt_that_never_reached_finish_removes_the_place(self):
+        before = self.places()
+        with (
+            mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")),
+            mock.patch.object(runner, "finish", return_value=2),
+        ):
+            self.assertEqual(self.run_cmd(self.scenario("bare")), 2)
+        self.assertEqual(len(self.places() - before), 1)
+        with mock.patch("builtins.print"):
+            self.assertEqual(runner.main(["next", str(self.ws.out)]), 2)
+        self.assertEqual(self.places(), before)
+
+    def test_the_summary_says_who_the_other_side_is(self):
+        scn = {"id": "U", "title": "t", "steps": [{"prompt": "a"}], "setup": {"host": "bare"}}
+        text = runner.scenario_summary(scn)
+        self.assertIn("相手（setup.host）: bare", text)
+        self.assertIn("本物のトークンは claude に渡さない", text)
+        scn["setup"] = {}
+        self.assertNotIn("setup.host", runner.scenario_summary(scn))
 
 
 if __name__ == "__main__":

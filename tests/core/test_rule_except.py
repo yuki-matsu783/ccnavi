@@ -397,6 +397,42 @@ class LintTest(unittest.TestCase):
         found = self.details(self.lint([WORKSPACE_ROOT], [allow]), rules.SEVERITY_WARN)
         self.assertFalse(any("コマンド列の全体" in d for d in found), found)
 
+    def test_コマンド名からつないだ_except_は言わない(self):
+        # コマンド名のあとを `[^\x00]*` でつなぐ式は、同じコマンドの中の語にだけヒットする
+        rule = {
+            "id": "push",
+            "match": "Bash",
+            "regex": r"git\s+push\b",
+            "except": [{"regex": r"git\s+push\b[^\x00]*\s--dry-run(\s|$)"}],
+            "message": "m",
+        }
+        found = self.details(self.lint([rule]), rules.SEVERITY_WARN)
+        self.assertFalse(any("コマンド列の全体" in d for d in found), found)
+
+    def test_コマンドの切れ目を越える_except_は言う(self):
+        base = {"id": "push", "match": "Bash", "regex": r"git\s+push\b", "message": "m"}
+        for pattern in (
+            r"\s--dry-run(\s|$)",  # コマンド名が無い
+            r"git\s+push\b.*--dry-run",  # `.` は切れ目も読む
+            r"git\s+push\b\S*\s--dry-run",  # `\S` は切れ目も読む
+            r"git\s+push\b[^\n]*--dry-run",  # 切れ目を除かない否定のクラス
+            r"[^\x00]*\s--dry-run",  # 頭にコマンド名が無い
+        ):
+            with self.subTest(pattern=pattern):
+                rule = {**base, "except": [{"regex": pattern}]}
+                found = self.details(self.lint([rule]), rules.SEVERITY_WARN)
+                self.assertTrue(any("コマンド列の全体" in d for d in found), found)
+        # 1 件でも切れ目を越える式があれば言う
+        rule = {
+            **base,
+            "except": [
+                {"regex": r"git\s+push\b[^\x00]*\s--dry-run(\s|$)"},
+                {"regex": r"--force"},
+            ],
+        }
+        found = self.details(self.lint([rule]), rules.SEVERITY_WARN)
+        self.assertTrue(any("コマンド列の全体" in d for d in found), found)
+
     def test_stop_を除くと何も起きない(self):
         stop = {
             "id": "nudge",

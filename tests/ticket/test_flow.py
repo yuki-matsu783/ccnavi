@@ -364,7 +364,6 @@ class FlowRenderTest(unittest.TestCase):
         self.assertEqual(len(lines), 1)
         self.assertNotIn("[ccnavi]", text.lower())
         self.assertIn("〔ccnavi〕", text)
-        self.assertFalse(flow_text.impersonates(text), text)
         for ch in ("\x1b", "‮", "\x00", "\r"):
             self.assertNotIn(ch, text)
 

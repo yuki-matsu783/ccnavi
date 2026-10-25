@@ -2733,7 +2733,13 @@ class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
                 self.assertNotIn(WORKTREES_COMMENT, written)
 
     def test_a_negation_of_the_worktrees_is_not_undone(self):
-        for negation in ("!/.claude/worktrees", "!.claude/worktrees/", "!/.claude/worktrees/"):
+        for negation in (
+            "!/.claude/worktrees",
+            "!.claude/worktrees/",
+            "!/.claude/worktrees/",
+            "!.claude/worktrees/keep",
+            "!/.claude/worktrees/keep/",
+        ):
             with self.subTest(negation=negation):
                 self.make_git()
                 self.write_gitignore(f"{negation}\n")
@@ -2827,7 +2833,14 @@ class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
                 written = self.read_raw()
                 self.assertNotIn(SCRATCH_COMMENT, written)
                 self.assertEqual(written.count("scratchpad"), 1, written)
-        for negation in ("!/scratchpad/", "!scratchpad/", "!/scratchpad", "!scratchpad"):
+        for negation in (
+            "!/scratchpad/",
+            "!scratchpad/",
+            "!/scratchpad",
+            "!scratchpad",
+            "!scratchpad/keep.md",
+            "!/scratchpad/keep/",
+        ):
             with self.subTest(negation=negation):
                 self.make_git()
                 self.write_gitignore(f"{negation}\n")

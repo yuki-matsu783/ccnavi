@@ -49,6 +49,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   依頼文にissue・MRの指定があると、ccnaviがUserPromptSubmitで同じ指示を足す
 - 識別子はブランチ名の`/`を`-`に置き換えたもの（`feature/123-login`は`feature-123-login`）。ワークツリーは`.claude/worktrees/<識別子>`に、
   `worktree add .claude/worktrees/<識別子> <ブランチ>`でそのブランチを直接チェックアウトする。識別子の名前のブランチは作らない。
+  直接作業の名前のブランチ（`ccnavi-worktree.sh <名前>`の名前）を手で出したときは、続けて`ccnavi-worktree.sh <名前> --adopt --base <統合先>`で引き取ります（ユーザの確認が要ります）。引き取らないと`integrate`できません
 - 既存のMRを採用するときの確認（引っかかったら何も作らずに止まる）
   - MRがopenである。閉じた・マージ済みのMRのブランチでは続けない
   - フォークのMRでない（元ブランチがこのリポジトリに無い）
@@ -64,6 +65,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
 - MRの番号とissueは手元に保存しない。出力の「必須」の行にある`issue: <値>`と`mr: <番号>`を、親の提案のfrontmatterに必ず書く（`ccnavi ticket new ... --issue <値> --mr <番号>`が書く。どちらかが無いと`ticket new`・承認・`--lint`が止める）。雛形の空欄の目印（`（ここに〜を書く）`）が残っていると止まるので、書き換える。
   `ccnavi-sync.sh`などが閉じたかを聞くときは、この`mr:`の番号を使う
 - issue・MRを指定された作業は、直接作業にせずチケット作業で進める（ユーザがホストで作ったものを途中から頼まれた場合も同じ）。
+  ただし、ユーザが「直接作業で」「承認は要らない」のように直接作業を明示したときは、その指示に従って直接作業で進める。指定しただけで明示が無いときは、チケット作業のまま。承認待ちの提案や MR が残る場合の取り下げは[ticket-work.md](ticket-work.md)の「ユーザが直接作業を明示したとき」。
   親チケットも提案も無いワークツリーでは、出力に「次:」の行が出る。識別子・題・`--issue`・`--mr`を埋めた`ccnavi ticket new`なので、
   `--scope`の`<触るファイルの glob>`だけを実際のパスに直して、ワークツリーの中で打つ。設計判断が要らない作業は、範囲が複数のディレクトリや文書・設定にまたがっても`--plan quick-work`で足りる。
   大きい作業は`--plan`を`design,implement`のように変える（型と範囲は`.ccnavi/config/common/phases.yml`）。

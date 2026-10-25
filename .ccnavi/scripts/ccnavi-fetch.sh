@@ -229,10 +229,10 @@ ccnavi_fetch_retarget() {
 	ccnavi_git_timed "$ccnavi_rt_limit" "$scratch/rt-err" "$1" ls-remote --symref origin HEAD \
 		>"$scratch/rt-out" || {
 		ccnavi_rt_rc=$?
-		# 時間切れ（TERM で切られた = 143、KILL = 137）のときだけ覚える。すぐ失敗した origin
-		# （認証の失敗・オフライン）は待っていないので、第 2 周で今までどおり取りに行って理由を言う。
+		# 時間切れ（ccnavi_git_timed は 124 を返す）のときだけ覚える。
+		# すぐ失敗した origin（認証の失敗・オフライン）は待っていないので、第 2 周で今までどおり取りに行って理由を言う。
 		case "$ccnavi_rt_rc" in
-		143 | 137) printf '%s\n' "$ccnavi_rt_url" >>"$scratch/rt-failed" ;;
+		124) printf '%s\n' "$ccnavi_rt_url" >>"$scratch/rt-failed" ;;
 		esac
 		return 0
 	}

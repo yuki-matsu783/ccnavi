@@ -317,22 +317,22 @@ top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 repo_of_url() {
 	printf '%s' "$1" | sed -E -e 's#^[A-Za-z][A-Za-z0-9+.-]*://##' -e 's#^[^/@]*@##' -e 's#^[^/:]*[:/]##' -e 's#/+$##' -e 's#\.git$##' | tr -d '\r' | awk -F/ 'NF>=2{print $(NF-1) "/" $NF}'
 }
-fold_repo() {
+lower() {
 	printf '%s' "$1" | tr 'A-Z' 'a-z'
 }
 if [ -n "$opt_repo" ]; then
 	here_origin=$(git remote get-url origin 2>/dev/null || :)
 	here_repo=$(repo_of_url "$here_origin")
-	if [ -n "$here_repo" ] && [ "$(fold_repo "$here_repo")" != "$(fold_repo "$opt_repo")" ]; then
+	if [ -n "$here_repo" ] && [ "$(lower "$here_repo")" != "$(lower "$opt_repo")" ]; then
 		found_dir=""
 		scripts_abs="$root/.ccnavi/scripts"
-		if [ "$(fold_repo "$(repo_of_url "$(git -C "$root" remote get-url origin 2>/dev/null || :)")")" = "$(fold_repo "$opt_repo")" ]; then
+		if [ "$(lower "$(repo_of_url "$(git -C "$root" remote get-url origin 2>/dev/null || :)")")" = "$(lower "$opt_repo")" ]; then
 			fail wrong-repo "依頼のリポジトリ（${opt_repo}）と、実行した場所のリポジトリ（${here_repo}）が違います。ホストには問い合わせていません。ワークスペースルートに移動して実行し直してください: cd $(ccnavi_sh_quote "$root") && sh $(ccnavi_sh_quote "$scripts_abs/ccnavi-start.sh") ${orig_args}" 1
 		fi
 		for cand in "$root"/projects/*/; do
 			[ -e "${cand}.git" ] || continue
 			cand_repo=$(repo_of_url "$(git -C "$cand" remote get-url origin 2>/dev/null || :)")
-			if [ -n "$cand_repo" ] && [ "$(fold_repo "$cand_repo")" = "$(fold_repo "$opt_repo")" ]; then
+			if [ -n "$cand_repo" ] && [ "$(lower "$cand_repo")" = "$(lower "$opt_repo")" ]; then
 				found_dir="projects/$(basename "$cand")"
 				break
 			fi
@@ -359,9 +359,6 @@ own_url=$(git remote get-url origin 2>/dev/null || :)
 if [ -n "$own_url" ] && ccnavi_host_parse "$own_url" >/dev/null 2>&1; then
 	own_path="$ccnavi_h_path"
 fi
-lower() {
-	printf '%s' "$1" | tr 'A-Z' 'a-z'
-}
 # issue の正規化した形 <owner/repo>#<番号>（小文字。比べる用）。<リポジトリか空> <番号>
 issue_key() {
 	printf '%s#%s' "$(lower "${1:-$own_path}")" "$2"
@@ -853,8 +850,6 @@ stop_branch=""
 stop_target=""
 stop_title=""
 stop_wt=""
-stop_pushed=""
-stop_local=""
 stop_mr=""
 stop_host() {
 	sh_stage="$1"
@@ -908,7 +903,6 @@ stop_host() {
 		else
 			printf '  なし（ブランチもワークツリーも作っていない）\n'
 		fi
-		[ -z "$stop_local" ] || printf '  手元の候補: %s\n' "$stop_local"
 		printf 'MCP で行う手順:\n'
 		case "$sh_stage" in
 		issue-link)
@@ -967,7 +961,6 @@ stop_host() {
 		else
 			printf '  なし（ブランチもワークツリーも作っていない）\n'
 		fi
-		[ -z "$stop_local" ] || printf '  手元の候補: %s\n' "$stop_local"
 		printf '手で行う手順（GitLab には MCP の案内がありません）:\n'
 		case "$sh_why" in
 		*"。HTTP "[0-9][0-9][0-9]:*)
@@ -1197,15 +1190,17 @@ run_sync() {
 		printf '%s\n' "$rs_out" | sed 's/^/  /'
 		sync_ok=1
 	else
-		printf 'ccnavi-sync.sh %s は取り込まなかった（終了コード %s）:\n' "$rs_id" "$rs_rc"
-		printf '%s\n' "$rs_out" | sed 's/^/  /'
 		# 「親チケットも提案もありません」は ccnavi-sync.sh の文言。変えるときはここと test_start_sh.py も直す
 		case "$rs_out" in
 		*親チケットも提案もありません*)
+			# ワークツリーを切った直後は、親チケットも提案もまだ無いのが正常。失敗に見える見出しにしない
+			printf 'ccnavi-sync.sh %s: ワークツリーを切った直後なので、取り込むものはありません（親チケットも提案も、まだ無い）\n' "$rs_id"
 			sync_no_ticket=1
 			sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
 			;;
 		*)
+			printf 'ccnavi-sync.sh %s は取り込まなかった（終了コード %s）:\n' "$rs_id" "$rs_rc"
+			printf '%s\n' "$rs_out" | sed 's/^/  /'
 			sync_next="取り込めなかった理由は上の出力のとおり。直したら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す（直せないときはユーザに伝える）"
 			;;
 		esac

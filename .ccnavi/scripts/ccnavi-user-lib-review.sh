@@ -345,7 +345,88 @@ post_staged() {
 
 # 投稿の段階をすべて進める（issue → 続きのコメント → 決めた内容のコメント）。
 # 置いたあとの投稿なので、失敗しても決めたことは戻さない。post_warning に言い、記録を残す。
+#
+# 操作 ID のロック（`locks/ops/<操作ID>`。staged_send と同じ置き場・待ち方）を、段階の進行全体で持つ。
+# 2 つの --resume・打ち直しが同じ段階を同時に「未送信」と見て、二重に送るのを防ぐ。
+# --resume は返信・解決の前から持つ（decide.sh が op_lock_take を打つ）。すでに同じロックを持っていれば（入れ子）何もしない。
+# ロックの取得はグローバル変数 1 組を使うので、write-and-push などほかのロックの状態は退避して戻す。
+op_lk_dir=""
+op_lk_mark=""
+op_lk_prev=""
+op_lk_prev_set=""
+
+# 取れたら（入れ子・ロックが使えない構成を含む）0、取れなければ 1（post_warning に言う）。<操作ID>
+# 入れ子の判定は ccnavi_lock_take が持ち主の情報を照合して行う（偽の CCNAVI_LOCK_HELD では進まない）。
+# root が無い・ロックの部品が無い構成では、取らずに進む（staged_send と同じ。root は絶対パスで返るので通常は通らない）。
+# 取ったかどうかは op_lk_dir で分かる（入れ子・取らずに進んだときは空のまま）。
+op_lock_take() {
+	[ -z "$op_lk_dir" ] || return 0
+	[ -n "${root:-}" ] && command -v ccnavi_lock_take >/dev/null 2>&1 || return 0
+	ol_sv_dir="$ccnavi_lock_dir"
+	ol_sv_mark="$ccnavi_lock_mark"
+	ol_sv_set="$ccnavi_lock_set_held"
+	ol_sv_prev="$ccnavi_lock_prev_held"
+	ol_sv_prev_set="$ccnavi_lock_prev_set"
+	# 入れ子で何も取らなかったとき、ほかのロック（write-and-push）の置き場を取ったものと読まないよう、先に空にする。
+	ccnavi_lock_dir=""
+	ol_rc=0
+	ccnavi_lock_take "$root" ops "$1" 30 || ol_rc=$?
+	if [ "$ol_rc" -eq 0 ] && [ -n "$ccnavi_lock_dir" ]; then
+		op_lk_dir="$ccnavi_lock_dir"
+		op_lk_mark="$ccnavi_lock_mark"
+		op_lk_prev="$ccnavi_lock_prev_held"
+		op_lk_prev_set="$ccnavi_lock_prev_set"
+	fi
+	ccnavi_lock_dir="$ol_sv_dir"
+	ccnavi_lock_mark="$ol_sv_mark"
+	ccnavi_lock_set_held="$ol_sv_set"
+	ccnavi_lock_prev_held="$ol_sv_prev"
+	ccnavi_lock_prev_set="$ol_sv_prev_set"
+	[ "$ol_rc" -eq 0 ] && return 0
+	if [ "$ol_rc" -eq 2 ]; then
+		post_warning="操作 $1 のロックが古いまま残っていて、片付けられなかった。何も送らず止めた。ロックの置き場（locks/ops/$1）をユーザが見て片付けてから 'sh .ccnavi/scripts/ccnavi-user-decide.sh --resume $1' で続きを送れる"
+	else
+		post_warning="同じ判断の投稿が別のプロセスで実行中（操作 $1）。待っても取れなかったので何も送らず止めた。終わってから 'sh .ccnavi/scripts/ccnavi-user-decide.sh --resume $1' で続きを送れる"
+	fi
+	return 1
+}
+
+# 取ったロックを外す（取っていなければ何もしない）。
+op_lock_release() {
+	[ -n "$op_lk_dir" ] || return 0
+	ol_sv_dir="$ccnavi_lock_dir"
+	ol_sv_mark="$ccnavi_lock_mark"
+	ol_sv_set="$ccnavi_lock_set_held"
+	ol_sv_prev="$ccnavi_lock_prev_held"
+	ol_sv_prev_set="$ccnavi_lock_prev_set"
+	ccnavi_lock_dir="$op_lk_dir"
+	ccnavi_lock_mark="$op_lk_mark"
+	ccnavi_lock_set_held=yes
+	ccnavi_lock_prev_held="$op_lk_prev"
+	ccnavi_lock_prev_set="$op_lk_prev_set"
+	ccnavi_lock_drop
+	ccnavi_lock_dir="$ol_sv_dir"
+	ccnavi_lock_mark="$ol_sv_mark"
+	ccnavi_lock_set_held="$ol_sv_set"
+	ccnavi_lock_prev_held="$ol_sv_prev"
+	ccnavi_lock_prev_set="$ol_sv_prev_set"
+	op_lk_dir=""
+	op_lk_mark=""
+}
+
 post_decision_staged() {
+	issue_url=""
+	post_warning=""
+	# すでに持っている（--resume が先に取った）ときは、ここで取らず外さない。外すのは自分が取ったときだけ。
+	pl_had="$op_lk_dir"
+	op_lock_take "$op_id" || return 1
+	post_decision_staged_locked
+	pl_rc=$?
+	[ -n "$pl_had" ] || op_lock_release
+	return "$pl_rc"
+}
+
+post_decision_staged_locked() {
 	issue_url=""
 	post_warning=""
 	pd_mr=$("$JQ" '.mr.number' "$result")
