@@ -1125,7 +1125,7 @@ def survey(tree_root: str, start: str) -> tuple[list[str], list[str]] | None:
     foreign: list[str] = []
     notes: list[str] = []
     for rel in _draft_files(tree_root):
-        shown = draft_rel(rel)
+        shown = f"{HANDOFF_REL}/{rel}"
         raw, _ = flow.read_bytes(os.path.join(handoff_dir(tree_root), *rel.split("/")), tree_root)
         own = origins.get(key_of(shown))
         if own and _holds(tree_root, start, own, raw):

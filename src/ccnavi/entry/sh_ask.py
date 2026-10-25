@@ -229,7 +229,9 @@ def guarded_tree(
     return 0
 
 
-def handoff_pending_tree(stdout: TextIO, stderr: TextIO, path: str, start: str = "") -> int:
+def handoff_pending_tree(
+    stdout: TextIO, stderr: TextIO, path: str, start: str | None = None
+) -> int:
     """`ccnavi tree handoff-pending <ツリー> [<起点>]`。
 
     頭に `tree 1`、続けて `pending <件数>` と、取り込んでいない下書きごとに `path <パス>`。
@@ -242,7 +244,7 @@ def handoff_pending_tree(stdout: TextIO, stderr: TextIO, path: str, start: str =
         return 1
     root = os.path.abspath(path)
     left = handoff.pending(root)
-    surveyed = handoff.survey(root, start) if start else ([], [])
+    surveyed = ([], []) if start is None else handoff.survey(root, start)
     if surveyed is None:
         stderr.write(f"ccnavi: tree handoff-pending の起点 {start!r} の木を読めません。\n")
         return 1
