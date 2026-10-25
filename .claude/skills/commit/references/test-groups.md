@@ -19,7 +19,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, contra
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク | 約 140 秒 |
 | `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean・レビューの sh・write-and-push。write-and-push は重いため、`test_write_and_push_*.py` の 6 本に分けてある）。配布する sh を起動するテストはここに置く | 約 80 秒 |
-| `contract` | 録画した GitLab の応答の形（JSON）と、Python の模擬（`tests/fake_gitlab.py`）の応答の形の比較。sh を起動しないので `sh` に混ぜない（`sh` は約 80 秒の群） | 約 6 秒 |
+| `contract` | 本物の GitLab から録った応答の形（`recorded.json`）と、Python の模擬（`tests/fake_gitlab.py`）の応答の形を、`reads` のキーで比べる。比較器・変異・機密・置く分岐の試験を含む。録り直しは手動（Docker。`docs/42_claude/gitlab-contract.md`）。sh を起動しないので `sh` に混ぜない（`sh` は約 80 秒の群） | 約 15 秒 |
 | `e2e` | 本物のワークスペースを組み立てて sh を外から実行する。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
 
 ```sh

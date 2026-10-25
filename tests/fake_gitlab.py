@@ -48,6 +48,11 @@ def mr_of(state: dict, iid: int) -> dict | None:
     return None
 
 
+def issue_view(issue: dict) -> dict:
+    """応答に出す issue。状態が内部に持つメモ（`notes`）は、実物の issue には無いので出さない。"""
+    return {k: v for k, v in issue.items() if k != "notes"}
+
+
 def page(items: list, query: dict) -> list:
     per = int(query.get("per_page", ["20"])[0])
     num = int(query.get("page", ["1"])[0])
@@ -201,7 +206,17 @@ class Handler(BaseHTTPRequestHandler):
             }
 
         if name == "project":
-            return 200, {"id": 1, "path_with_namespace": state["project"]}
+            return 200, {
+                "id": 1,
+                "path_with_namespace": state["project"],
+                "archived": False,
+                "issues_enabled": True,
+                "issues_access_level": "enabled",
+                "permissions": {
+                    "project_access": {"access_level": 40, "notification_level": 3},
+                    "group_access": None,
+                },
+            }
 
         if name == "mrs" and method == "GET":
             found = [
@@ -256,6 +271,7 @@ class Handler(BaseHTTPRequestHandler):
                 "resolvable": True,
                 "resolved": False,
                 "created_at": self.now(),
+                "type": "DiscussionNote",
                 "author": {"id": 2, "username": data.get("author", "reviewer")},
             }
             if data.get("path"):
@@ -302,6 +318,7 @@ class Handler(BaseHTTPRequestHandler):
                 "id": next_id(state),
                 "body": self.body().get("body", ""),
                 "created_at": self.now(),
+                "author": {"id": 2, "username": "reviewer"},
             }
             mr["notes"].append(note)
             return 201, note
@@ -316,7 +333,7 @@ class Handler(BaseHTTPRequestHandler):
             return 200, self.mr_view(mr)
 
         if name == "issues" and method == "GET":
-            return 200, page(state.setdefault("issues", []), query)
+            return 200, page([issue_view(i) for i in state.setdefault("issues", [])], query)
 
         if name == "issues" and method == "POST":
             data = self.body()
@@ -326,6 +343,7 @@ class Handler(BaseHTTPRequestHandler):
                 "description": data.get("description", ""),
                 "state": "opened",
                 "created_at": self.now(),
+                "author": {"id": 2, "username": "reviewer"},
             }
             host = self.headers.get("Host")
             issue["web_url"] = f"http://{host}/{state['project']}/-/issues/{issue['iid']}"
@@ -336,10 +354,9 @@ class Handler(BaseHTTPRequestHandler):
             wanted = {int(n) for n in CLOSING.findall(mr_of(state, iid).get("description") or "")}
             found = []
             for issue in state.setdefault("issues", []):
+                # 実物の closes_issues は references を返さない（sh は代替で受ける）
                 if int(issue["iid"]) in wanted:
-                    short = f"#{issue['iid']}"
-                    refs = {"short": short, "relative": short, "full": state["project"] + short}
-                    found.append({**issue, "references": refs})
+                    found.append(issue_view(issue))
             return 200, page(found, query)
 
         if name.startswith("issue") and method in ("GET", "PUT", "POST"):
@@ -347,7 +364,7 @@ class Handler(BaseHTTPRequestHandler):
             if issue is None:
                 raise KeyError(iid)
             if name == "issue" and method == "GET":
-                return 200, issue
+                return 200, issue_view(issue)
             if name == "issue_mrs" and method == "GET":
                 # 本文で `#N` と参照した MR（実物の related_merge_requests は参照した MR を含む）
                 ref = re.compile(rf"#{iid}(?!\d)")
@@ -364,6 +381,7 @@ class Handler(BaseHTTPRequestHandler):
                     "id": next_id(state),
                     "body": self.body().get("body", ""),
                     "created_at": self.now(),
+                    "author": {"id": 2, "username": "reviewer"},
                 }
                 issue.setdefault("notes", []).append(note)
                 return 201, note
@@ -375,7 +393,11 @@ class Handler(BaseHTTPRequestHandler):
                     note = {
                         "id": next_id(state),
                         "body": self.body().get("body", ""),
+                        "system": False,
+                        "resolvable": True,
+                        "resolved": False,
                         "created_at": self.now(),
+                        "type": "DiscussionNote",
                         "author": {"id": 2, "username": "reviewer"},
                     }
                     d["notes"].append(note)
@@ -388,7 +410,7 @@ class Handler(BaseHTTPRequestHandler):
                     if self.body().get("state_event") == "close":
                         issue["state"] = "closed"
                         issue["closed_at"] = self.now()
-                    return 200, issue
+                    return 200, issue_view(issue)
             raise KeyError(iid)
 
         return 405, {"message": f"405 {method} {name}"}
@@ -405,11 +427,17 @@ class Handler(BaseHTTPRequestHandler):
             "source_branch",
             "target_branch",
             "title",
+            "description",
             "web_url",
             "created_at",
             "merged_at",
         )
         view = {k: mr[k] for k in keep if k in mr}
+        # 実物の MR も持つ項目。sh は `.draft // .work_in_progress` で Draft かを読み、
+        # マージ済みの MR の探索は `.sha` を読む
+        title = (mr.get("title") or "").lower()
+        view["draft"] = title.startswith(("draft:", "wip:", "[draft]"))
+        view["sha"] = mr.get("sha", "0" * 40)
         # 実物の MR も持つ項目。sh（ccnavi-common-review.sh の find_mr など）が、jq でこれを見て
         # 「このプロジェクトから出た MR か」を絞り込む。
         # 代役のプロジェクトの id は 1（`project` の答え）

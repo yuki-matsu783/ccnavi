@@ -38,7 +38,8 @@ def scene_state() -> dict:
                 "state": "opened",
                 "created_at": ISO,
                 "web_url": "http://x/issues/1",
-                "notes": [{"id": 90, "body": "scene note", "created_at": ISO}],
+                "author": user,
+                "notes": [{"id": 90, "body": "scene note", "created_at": ISO, "author": user}],
             }
         ],
         "mrs": [
@@ -52,6 +53,22 @@ def scene_state() -> dict:
                 "web_url": "http://x/merge_requests/1",
                 "created_at": ISO,
                 "discussions": [
+                    # 実物のスレッド一覧には、システムのメモ（レビュアーの割り当てなど）も混じる
+                    {
+                        "id": "d40",
+                        "individual_note": True,
+                        "notes": [
+                            {
+                                "id": 40,
+                                "body": "assigned",
+                                "system": True,
+                                "resolvable": False,
+                                "type": None,
+                                "created_at": ISO,
+                                "author": user,
+                            }
+                        ],
+                    },
                     {
                         "id": "d50",
                         "individual_note": False,
@@ -59,20 +76,20 @@ def scene_state() -> dict:
                             {
                                 "id": 50,
                                 "body": "thread",
+                                "system": False,
                                 "resolvable": True,
                                 "resolved": False,
+                                "type": "DiscussionNote",
                                 "created_at": ISO,
                                 "author": user,
                             }
                         ],
-                    }
+                    },
                 ],
-                "reviewers": [
-                    {"user": user, "state": "unreviewed", "created_at": ISO, "updated_at": ISO}
-                ],
+                "reviewers": [{"user": user, "state": "unreviewed", "created_at": ISO}],
                 "notes": [
-                    {"id": 60, "body": "one", "created_at": ISO},
-                    {"id": 61, "body": "two", "created_at": ISO},
+                    {"id": 60, "body": "one", "created_at": ISO, "author": user},
+                    {"id": 61, "body": "two", "created_at": ISO, "author": user},
                 ],
             },
             {
@@ -156,6 +173,7 @@ def sample_document(shapes: dict) -> dict:
         "version": 1,
         "source": "sample",
         "gitlab_image": None,
+        "gitlab_version": None,
         "recorded_at": None,
         "not_recorded": [n["what"] for n in shape.load_data("allow.json")["not_recorded"]],
         "requests": shapes,

@@ -1,9 +1,18 @@
 {
-  "note": "意図して許す違い。粒度は 要求名＋キー＋違いの種類。reason が空なら失敗し、差が出ていない項目も失敗する",
+  "note": "意図して許す違い（要求名＋キー＋違いの種類）。比べるのは requests.json の reads のキーだけ。reason が空なら失敗し、差が出ていない項目も失敗する",
   "entries": [],
   "not_recorded": [
-    {"what": "headers", "reason": "Link・X-Next-Page・X-Total は録らない。Client が捨てており、fake も出さない"},
-    {"what": "page2", "reason": "2 ページ目の要求は録らない（100 件超が要る）"},
-    {"what": "error_403", "reason": "fake が 403 を出せないので録らない"}
+    {
+      "what": "headers",
+      "reason": "Link・X-Next-Page・X-Total は録らない。Client が捨てており、fake も出さない"
+    },
+    {
+      "what": "page2",
+      "reason": "2 ページ目の要求は録らない（100 件超が要る）"
+    },
+    {
+      "what": "error_403",
+      "reason": "fake が 403 を出せないので録らない"
+    }
   ]
 }
