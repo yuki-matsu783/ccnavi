@@ -48,7 +48,9 @@ import time
 import gitlab_api
 
 # 提案の書式（計画・config の phases）は、ticket のテストと同じ補助で作る
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+)
 from tests.ticketsample import plain_parent, write_plain_phases  # noqa: E402
 
 ROOT_OF_CCNAVI = os.path.dirname(
