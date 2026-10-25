@@ -136,6 +136,8 @@ DEPLOY_SCRIPTS = (
     "ccnavi-branches.sh",
     "ccnavi-start.sh",
     "ccnavi-stage.sh",
+    # ccnavi-stage.sh が読む、下書きの置き場で読み替える階層名の表
+    "ccnavi-handoff-names.txt",
     "ccnavi-worktree.sh",
     "ccnavi-idle.sh",
 )
@@ -183,6 +185,7 @@ NO_TEMPLATES_FILES = [
             "ccnavi-dirs.sh",
             "ccnavi-fetch.sh",
             "ccnavi-git.sh",
+            "ccnavi-handoff-names.txt",
             "ccnavi-idle.sh",
             "ccnavi-launcher.sh",
             "ccnavi-review.sh",
@@ -270,6 +273,7 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-branches.sh
   .ccnavi/scripts/ccnavi-start.sh
   .ccnavi/scripts/ccnavi-stage.sh
+  .ccnavi/scripts/ccnavi-handoff-names.txt
   .ccnavi/scripts/ccnavi-worktree.sh
   .ccnavi/scripts/ccnavi-idle.sh
   .ccnavi/scripts/ccnavi-launcher.sh
@@ -2020,7 +2024,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         here = {
             name
             for name in os.listdir(os.path.join(ROOT, ".ccnavi", "scripts"))
-            if name.endswith((".sh", ".js"))
+            if name.endswith((".sh", ".js", ".txt"))
         }
         self.assertEqual(set(found.group(1).split()), here)
         self.assertEqual(set(found.group(1).split()), {*DEPLOY_SCRIPTS, LAUNCHER_NAME})

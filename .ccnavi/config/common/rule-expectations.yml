@@ -289,9 +289,11 @@ ask:
       builtin:guard-scripts と builtin:guard-project-home が除く。止めないが allow にも無いので、
       権限モードに渡る
   - tool: Edit
-    subject: "/repo/wip/handoff/.claude/settings.json"
+    subject: "/repo/wip/handoff/handoff-.claude/settings.json"
     why: >-
-      hook の登録のコピー。builtin:guard-settings が除く。ユーザが ccnavi-user-handoff.sh で取り込むまで
+      hook の登録のコピー。ccnavi-stage.sh は .claude の階層を handoff-.claude に読み替えて置く
+      （Claude Code 本体が .claude の階層の編集を非対話で許可しないため）。
+      builtin:guard-settings が除く。ユーザが ccnavi-user-handoff.sh で取り込むまで
       何も変わらない。権限モードに渡る
   - tool: Write
     subject: "/repo/wip/handoff/.ccnavi/config/common/rules.yml"

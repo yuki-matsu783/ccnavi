@@ -1314,6 +1314,15 @@ def _stage_hint(root: str) -> str:
     )
 
 
+# .claude 配下の保護対象の案内に添える一文。Claude Code 本体は .claude の階層を機密パスとして扱い、
+# 非対話では編集を許可できないので、下書きの置き場では handoff-.claude に読み替える。
+_CLAUDE_COPY_HINT = (
+    ".claude の階層はコピー先で handoff-.claude に読み替えられます"
+    "（.claude/settings.json は wip/handoff/handoff-.claude/settings.json）。"
+    "wip/handoff/.claude/ に自分で作らないでください。"
+)
+
+
 def _home_regex(project_home: str) -> str:
     """ccnavi ディレクトリの名前を、区切りを `[\\/]` にした regex の部品にする。"""
     parts = [re.escape(p) for p in _home_name(project_home).split("/") if p]
@@ -1355,7 +1364,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
             "glob": "*/.claude/hooks/*",
             "message": (
                 "hook 本体です。エージェントの判断で書き換えず、理由を伝えてユーザに変更を"
-                f"依頼してください。{stage}"
+                f"依頼してください。{stage}{_CLAUDE_COPY_HINT}"
             ),
         },
         {
@@ -1364,7 +1373,7 @@ def add_named_rules(rule_set: rules.RuleSet, project_home: str = "", root: str =
             "message": (
                 "hook の登録そのものです。ワークツリー側の設定も統合すると統合先の設定になります。"
                 "エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。"
-                f"{stage}"
+                f"{stage}{_CLAUDE_COPY_HINT}"
             ),
         },
     ]

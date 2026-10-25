@@ -41,6 +41,8 @@ TARGET = os.path.join(DIST, NAME + ".target")
 # 振り分けの sh が起動する実行ファイルの置き場（ワークスペースルートからの相対）。
 # <os>-<arch>/ はこの下に並ぶ。
 BIN_ROOT = os.path.join(".ccnavi", "bin")
+# 下書きの置き場で読み替える階層名の表（sh と実行ファイルが読む唯一の元）。
+HANDOFF_NAMES = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-handoff-names.txt")
 
 
 def executable() -> str:
@@ -146,6 +148,10 @@ def build() -> int:
         # 戻る。PyInstaller はいまも拾うが、拾い方が変わっても失敗しないよう名指しする。
         "--hidden-import",
         "yaml._yaml",
+        # 下書きの置き場で読み替える階層名の表。sh（ccnavi-stage.sh）と同じファイルを同梱する
+        # （src/ccnavi/tickets/handoff_names.py が読む）。
+        "--add-data",
+        f"{HANDOFF_NAMES}{os.pathsep}.",
         os.path.join(ROOT, "main.py"),
     ]
     result = subprocess.run(command, cwd=ROOT)
