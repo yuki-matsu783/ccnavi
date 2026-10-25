@@ -190,8 +190,8 @@ class ApprovalToldTest(PhaseHarness):
         self.assertEqual(out.get("permissionDecision"), "deny")
         self.assertIn("DENY_TICKET_PARENT", reason)
         self.assertIn("ccnavi-git.sh", reason)
-        self.assertIn("restore --staged --worktree -- <path>", reason)
-        self.assertIn("do not work around", reason)
+        self.assertIn("restore --staged --worktree -- <パス>", reason)
+        self.assertIn("迂回して書き直しません", reason)
 
     # ---- 2. hook は伝えない
 
