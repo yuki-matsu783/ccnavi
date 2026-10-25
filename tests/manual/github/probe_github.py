@@ -10,6 +10,7 @@
 tests/ticket/test_ticket.py と同じ形で一時リポジトリを作り、`ccnavi-ticket.sh` / `ccnavi-git.sh` /
 `ccnavi-review.sh` を実物に通す。人間役（レビュアー）の操作は、sh と別の道具（urllib で REST と
 GraphQL を直に呼ぶ）で行う。sh と同じ道具を使わないほうが、片方の不具合がもう片方に隠れない。
+ただし decide の受け入れだけは、ユーザ専用で書く側の sh（`ccnavi-user-decide.sh`）を人間役として打つ。
 
 ## 用意するもの
 
