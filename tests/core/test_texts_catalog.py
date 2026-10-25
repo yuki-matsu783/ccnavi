@@ -6,6 +6,7 @@ ccnavi のリポジトリのソースがあるときだけ確かめられる点�
 - 文面ファイルの識別子は、どこかから引かれている
 - 呼ぶ側が渡す値の名前は、文面ファイルの `values` と一致する
 - 共通レイヤーの文面ファイルは検査を通る
+- 同梱の `rules.yml` の文面（message・additionalContext・additionalContextOnce）に ADR 番号が無い
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import os
 import re
 import unittest
 
-from ccnavi.policy import texts
+from ccnavi.policy import rules, texts
 from tests import ROOT
 
 SRC = os.path.join(ROOT, "src", "ccnavi")
@@ -123,6 +124,25 @@ class CatalogTest(unittest.TestCase):
             with self.subTest(ident=ident):
                 used = ident in body or any(ident.startswith(h) for h in heads)
                 self.assertTrue(used, f"{ident} をどこも引かない")
+
+
+class SharedRulesWordingTest(unittest.TestCase):
+    """同梱の rules.yml の文面。ユーザとエージェントに見える文に ADR 番号を書かない。
+
+    配布先のプロジェクトの rules.yml は、その利用者の ADR を書いてよいので、検査しない。
+    """
+
+    def test_no_adr_number_in_shared_rule_wording(self):
+        path = os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml")
+        rule_set, problems = rules.load(path, ROOT)
+        self.assertEqual([], [p for p in problems if p.severity == "error"])
+        every = [*rule_set.deny, *rule_set.ask, *rule_set.allow]
+        self.assertGreater(len(every), 10)
+        adr = re.compile(r"ADR[-\s]?\d", re.IGNORECASE)
+        for rule in every:
+            for field in ("message", "additional_context", "additional_context_once"):
+                with self.subTest(rule=rule.id, field=field):
+                    self.assertIsNone(adr.search(getattr(rule, field) or ""))
 
 
 if __name__ == "__main__":

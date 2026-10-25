@@ -1329,12 +1329,17 @@ def project_mismatch(
         [
             f"[ccnavi] {reasons.CODE_TICKET_PROJECT} (source: {source})",
             f"subject: {full}",
-            f"ticket: {ticket.ticket} ({ticket.title}) was approved for project "
-            f"'{owner or '(workspace)'}', but worktree {t.name} was cut from "
-            f"'{t.project or '(workspace)'}'",
-            "Do not write here. The worktree must be created from the repository the ticket "
-            "names (projects/<project>), or the ticket must be proposed again for this "
-            "repository and approved by the user.",
+            texts.say(
+                root,
+                "DENY_TICKET_PROJECT_MISMATCH",
+                {
+                    "ticket": ticket.ticket,
+                    "title": ticket.title,
+                    "owner": owner or "(workspace)",
+                    "cut_from": t.project or "(workspace)",
+                    "worktree": t.name,
+                },
+            ),
         ]
     )
 
@@ -1510,11 +1515,11 @@ def ticket_verdict(
                     f"subject: {full}",
                     f"ticket: {ticket.ticket} ({ticket.title}), worktree {t.name}",
                     f"problem: {ticket.blocked}",
-                    "The approved ticket for this worktree does not hold together, so its work "
-                    "area is not in effect and every write here is blocked. Nothing you write "
-                    "can fix this: the user has to repair the approved ticket or where it sits. "
-                    "Tell them the problem line above and ask them to run 'ccnavi --lint', "
-                    "which names every ticket in this state.",
+                    texts.say(
+                        root,
+                        "DENY_TICKET_BLOCKED",
+                        {"ticket": ticket.ticket, "title": ticket.title, "worktree": t.name},
+                    ),
                 ]
             ),
             notice,
@@ -1558,44 +1563,27 @@ def ticket_verdict(
         )
     # 上限ごとに次にすることが違う。子の範囲の外なら提案し直し、親や定義の上限の外なら、
     # 範囲を広げても通らない（承認で超過を見せたうえで止めている）。
+    case, limit = "area", ""
     if found.limit == phase_scope.LIMIT_TYPE and found.type is not None:
         pt = found.type
         head.append(f"limit: phase type {pt.title} ({pt.id}): {', '.join(pt.scope_globs)}")
-        body = (
-            "This path is inside the ticket's work area but outside what phase type "
-            f"{pt.title} ({pt.id}) allows. The ticket was approved with that overflow shown as "
-            "a warning; writes there stay blocked. Do the work in a later phase whose type "
-            "covers this path, or ask the user to change the definition fixed in the parent's "
-            "approved ticket (its `phases:`); editing phases.yml does not reach a parent that "
-            "is already approved."
-        )
+        case, limit = "type", f"{pt.title}（{pt.id}）"
     elif found.limit == phase_scope.LIMIT_PARENT and parent is not None:
         parent_area = ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK)) or "(空)"
         head.append(f"limit: parent {parent.ticket}: {parent_area}")
-        body = (
-            "This path is inside the ticket's work area but outside its parent "
-            f"{parent.ticket}. The ticket was approved with that overflow shown as a warning; "
-            "writes there stay blocked. Widening this child's own scope does not help: the child's "
-            "scope cannot exceed its parent's, so re-proposing the child alone is rejected "
-            "again. Tell the parent (main session), which picks one of: (1) the change "
-            "can be split off as separate work: propose a new parent ticket that covers this "
-            "path; (2) the change is essential to finish this work: consult the user about "
-            "revising the parent's scope, with the path and the reason. A scope revision is "
-            "accepted only when no child is in progress, so every child in progress (doing/) is "
-            "cancelled first (ccnavi-ticket.sh cancel) and re-proposed after the revision; "
-            "(3) the path "
-            "is a protected file: use the draft and user-swap route (ccnavi-stage.sh), which is "
-            "separate from scope approval."
-        )
-    else:
-        body = (
-            "This path is outside the work area the ticket for this worktree declares. Do the "
-            "work inside that area, or, if the task genuinely needs this path, tell the parent "
-            "so it can propose a ticket that covers it and ask the user to agree to it (from the "
-            "ccnavi board in VS Code or Chrome, with 'ccnavi-user-agree.sh' in a terminal, or by "
-            "moving the proposal file from todo/ to doing/). "
-            "Editing a proposal alone changes nothing."
-        )
+        case, limit = "parent", parent.ticket
+    body = texts.say(
+        root,
+        "DENY_TICKET_SCOPE",
+        {
+            "ticket": ticket.ticket,
+            "title": ticket.title,
+            "worktree": t.name,
+            "path": full,
+            "limit": limit,
+        },
+        {"what": case, "why": case, "next": case},
+    )
     return (
         rules.DENY,
         "\n".join([f"[ccnavi] {reasons.CODE_TICKET_SCOPE} (source: {source})", *head, body]),
