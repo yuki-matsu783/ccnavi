@@ -122,6 +122,43 @@ class TreeBoundTest(Harness):
         )
 
 
+class TreeLeftoverTest(Harness):
+    """`ccnavi tree leftover`。直接作業へ切り替えたあとに残る提案・子・MR（取り下げ案内の条件）。"""
+
+    def left(self):
+        return self.answer("tree 1", "tree", "leftover", self.tree, "p0001")
+
+    def put(self, rel, **fields):
+        write(os.path.join(self.tree, *rel.split("/")), front(**fields))
+
+    def test_a_tree_without_a_parent_has_nothing_left(self):
+        self.assertEqual({"leftover": "no", "proposal": "no", "doing": "0", "mr": "-"}, self.left())
+
+    def test_a_proposal_waiting_for_approval_is_left(self):
+        for place in ("todo", "review"):
+            path = os.path.join(self.tree, *f"{PROPOSALS}/{place}/p0001.md".split("/"))
+            write(path, front(ticket="p0001", issue=5, mr=12))
+            self.assertEqual(
+                {"leftover": "yes", "proposal": "yes", "doing": "0", "mr": "12"}, self.left()
+            )
+            os.remove(path)
+
+    def test_children_in_doing_are_counted(self):
+        self.put(f"{APPROVED}/doing/p0001.md", ticket="p0001", mr=12)
+        self.put(f"{APPROVED}/doing/p0001-01.md", ticket="p0001-01", parent="p0001")
+        self.put(f"{APPROVED}/doing/p0002-01.md", ticket="p0002-01", parent="p0002")
+        self.assertEqual(
+            {"leftover": "yes", "proposal": "no", "doing": "1", "mr": "12"}, self.left()
+        )
+
+    def test_a_closed_parent_leaves_nothing(self):
+        self.put(f"{APPROVED}/done/p0001.md", ticket="p0001", mr=12)
+        self.assertEqual("no", self.left()["leftover"])
+
+    def test_a_bad_name_is_refused(self):
+        self.assertEqual(1, self.ask("tree", "leftover", self.tree, "../x").returncode)
+
+
 class TreeParentTest(Harness):
     def parent(self, name="p0001", tree=None):
         return self.answer("tree 1", "tree", "parent", tree or self.tree, name)["parent"]
