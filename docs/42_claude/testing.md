@@ -29,7 +29,7 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 変えたファイルから回すグループを決める。表と時間の目安は`.claude/skills/commit/references/test-groups.md`にある。
 表に該当しない変更や、統合先に取り込む前・MRに出す前は、全件を回す。
 
-`tests/fake_gitlab.py`（GitLab の模擬）の応答を変えたら、`contract`（`uv run python -m tests tests/contract`。約 15 秒）を必ず回す。本物から録った応答の形と比べる試験で、模擬が本物とずれると落ちる。落ちたら本物に合わせて模擬を直す。仕様と録り直しは [gitlab-contract.md](gitlab-contract.md)。
+`tests/fake_gitlab.py`（GitLab の模擬）、`tests/sh/gitlab_host.py` とその見本（`extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/`）の応答を変えたら、`contract`（`uv run python -m tests tests/contract`。約 15 秒）を必ず回す。本物から録った応答の形と比べる試験で、模擬が本物とずれると落ちる。落ちたら本物に合わせて模擬を直す。仕様と録り直しは [gitlab-contract.md](gitlab-contract.md)。
 
 ## 待つとき
 
