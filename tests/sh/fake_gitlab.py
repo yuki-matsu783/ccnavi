@@ -48,6 +48,14 @@ def mr_of(state: dict, iid: int) -> dict | None:
     return None
 
 
+def need_mr(state: dict, iid: int) -> dict:
+    """MR を返す。無ければ KeyError（`dispatch` が 404 にする。実物も 404 を返す）。"""
+    mr = mr_of(state, iid)
+    if mr is None:
+        raise KeyError(f"merge_request {iid}")
+    return mr
+
+
 def page(items: list, query: dict) -> list:
     per = int(query.get("per_page", ["20"])[0])
     num = int(query.get("page", ["1"])[0])
@@ -104,14 +112,22 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    def read_raw(self) -> None:
+        """要求の本文を、使うかどうかによらず先に読み切る。
+
+        401・404 などで本文を読まずに返すと、keep-alive の同じ接続の次の要求の頭に本文が
+        残り、次の要求が 400 になる。
+        """
+        length = int(self.headers.get("Content-Length") or 0)
+        self._raw = self.rfile.read(length) if length else b""
+
     def body(self) -> dict:
         if self._body is not None:
             return self._body
-        length = int(self.headers.get("Content-Length") or 0)
-        if not length:
+        raw = self._raw
+        if not raw:
             self._body = {}
             return self._body
-        raw = self.rfile.read(length)
         try:
             self._body = json.loads(raw.decode("utf-8"))
         except (ValueError, UnicodeDecodeError) as exc:
@@ -146,6 +162,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def dispatch(self, method: str):
         self._body = None
+        self.read_raw()
         name, args, query = self.route()
         if name == "version":
             return self.send_json(200, {"version": "18.5.4-fake", "revision": "fake"})
@@ -199,11 +216,11 @@ class Handler(BaseHTTPRequestHandler):
             return 201, self.mr_view(mr)
 
         if name == "mr" and method == "GET":
-            return 200, self.mr_view(mr_of(state, iid) or {})
+            return 200, self.mr_view(need_mr(state, iid))
 
         if name == "mr" and method == "PUT":
             # 題の書き換え（Draft を外す）だけを受ける。
-            mr = mr_of(state, iid)
+            mr = need_mr(state, iid)
             data = self.body()
             if "title" in data:
                 mr["title"] = data["title"]
@@ -212,10 +229,10 @@ class Handler(BaseHTTPRequestHandler):
             return 200, self.mr_view(mr)
 
         if name == "discussions" and method == "GET":
-            return 200, page(mr_of(state, iid)["discussions"], query)
+            return 200, page(need_mr(state, iid)["discussions"], query)
 
         if name == "discussions" and method == "POST":
-            mr = mr_of(state, iid)
+            mr = need_mr(state, iid)
             data = self.body()
             note = {
                 "id": next_id(state),
@@ -233,7 +250,7 @@ class Handler(BaseHTTPRequestHandler):
             return 201, discussion
 
         if name == "discussion" and method == "PUT":
-            mr = mr_of(state, iid)
+            mr = need_mr(state, iid)
             resolved = query.get("resolved", ["true"])[0] == "true"
             for d in mr["discussions"]:
                 if d["id"] == args["did"]:
@@ -244,10 +261,10 @@ class Handler(BaseHTTPRequestHandler):
             raise KeyError(args["did"])
 
         if name == "reviewers" and method == "GET":
-            return 200, page(mr_of(state, iid)["reviewers"], query)
+            return 200, page(need_mr(state, iid)["reviewers"], query)
 
         if name == "reviewer" and method == "PUT":
-            mr = mr_of(state, iid)
+            mr = need_mr(state, iid)
             uid = int(args["uid"])
             wanted = query.get("state", ["reviewed"])[0]
             for r in mr["reviewers"]:
@@ -265,7 +282,7 @@ class Handler(BaseHTTPRequestHandler):
             return 201, entry
 
         if name == "notes" and method == "POST":
-            mr = mr_of(state, iid)
+            mr = need_mr(state, iid)
             note = {
                 "id": next_id(state),
                 "body": self.body().get("body", ""),
@@ -275,10 +292,10 @@ class Handler(BaseHTTPRequestHandler):
             return 201, note
 
         if name == "notes" and method == "GET":
-            return 200, page(mr_of(state, iid)["notes"], query)
+            return 200, page(need_mr(state, iid)["notes"], query)
 
         if name == "merge" and method == "PUT":
-            mr = mr_of(state, iid)
+            mr = need_mr(state, iid)
             mr["state"] = "merged"
             mr["merged_at"] = self.now()
             return 200, self.mr_view(mr)
