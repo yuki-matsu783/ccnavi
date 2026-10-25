@@ -39,6 +39,11 @@ body {
 .column.sized { flex: 0 0 auto; }
 .resizer { position: absolute; top: 0; bottom: 0; right: -7px; width: 12px; cursor: col-resize; z-index: var(--z-inline); }
 .column:last-child .resizer { right: 0; }
+/* 4 列 × 220px + 隙間 + 余白が収まらない幅（約 940px 以下）では、横スクロールをやめて列を縦に積む */
+@media (max-width: 940px) {
+  .board { flex-direction: column; align-items: stretch; }
+  .column { min-width: 0; }
+}
 .resizer::after {
   content: ""; position: absolute; top: 8px; bottom: 8px; left: 5px; width: 2px;
   border-radius: var(--radius-sm); background: var(--vscode-focusBorder); opacity: 0;
