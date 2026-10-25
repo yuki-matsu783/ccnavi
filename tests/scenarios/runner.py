@@ -5,9 +5,18 @@
     uv run python -m tests.scenarios.runner preflight <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ> --confirmed
+    uv run python -m tests.scenarios.runner run-all <ディレクトリ or glob> --max-total-usd <USD>
+    uv run python -m tests.scenarios.runner run-all <...> --max-total-usd <USD> --confirmed <目印>
     uv run python -m tests.scenarios.runner next <出力の置き場>
     uv run python -m tests.scenarios.runner restore <出力の置き場>
     uv run python -m tests.scenarios.runner judge <出力の置き場> <判定の表のファイル> [--accept]
+
+run-all は、使い捨てのリポジトリのシナリオ（人間の操作が無く、setup.reset を持つもの）だけを、
+1 回の確認で直列に回す。--confirmed を付けずに打つと、回す ID の一覧・概要・base・費用の上限と
+目印を出して止まる（終了コード 3）。目印は ID の集合・base・費用の上限・概要から作る。
+実行の直前に作り直し、合わなければ止まる。実費の累計が --max-total-usd を超えそうなら、
+次のシナリオは回さずに止まる。終了コードは 0 全部 pass / 1 fail がある・回せるシナリオが無い /
+2 未成立か意味の判定待ちがある・上限が不正 / 3 確認が要る・止まった。
 
 next は、人間の操作で止まったあと、人間が「次へ」と言ってから打つ。
 restore は、人間の操作で止まった回を続けずにやめるとき、setup のファイルを消し、
@@ -34,11 +43,14 @@ inconclusive（未成立。fail にしない）。意味で読むもの（judge�
 
 import argparse
 import contextlib
+import glob
 import hashlib
 import json
+import math
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -733,9 +745,39 @@ def run_setup_git(root, target, commands, allowed=None, host=None):
             )
 
 
+CCNAVI_STATE_DIRS = ("ccnavi-direct", "ccnavi-integrate", "ccnavi-integrate-done")
+CCNAVI_REF_PREFIX = "refs/ccnavi"
+
+
+def _git_common_path(top):
+    """対象の git の共通ディレクトリ（リンクされたワークツリーでも本体の .git）の実体。"""
+    r = _git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=top)
+    if r.returncode != 0 or not r.stdout.strip():
+        raise RuntimeError(f"git の共通ディレクトリを取れない: {top}: {r.stderr.strip()}")
+    return Path(os.path.realpath(r.stdout.strip()))
+
+
+def _clear_ccnavi_state(root, top, run):
+    """ccnavi 自身が対象の git に書く状態（直接作業の記録・取り込みの marker・専用の ref）を消す。
+    top は require_disposable_repo を通したものだけ。消すのは共通ディレクトリ直下の名指しの 3 つと
+    refs/ccnavi の下だけで、logs/ など .gitignore 済みのものは触らない。"""
+    common = _git_common_path(top)
+    for name in CCNAVI_STATE_DIRS:
+        path = common / name
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        elif path.is_dir():
+            shutil.rmtree(path)
+    for ref in run("for-each-ref", "--format=%(refname)", CCNAVI_REF_PREFIX).split():
+        run("update-ref", "-d", ref)
+
+
 def reset_repo(root, target, base, allowed=None):
-    """対象を base へ戻す。順序: ワークツリーを消す → prune → main を base に合わせて切り替える →
-    main 以外のローカルブランチを消す → タグを消す → stash を空にする → reset --hard → clean -fd。
+    """対象を base へ戻す。順序: ワークツリーを消す → prune → ccnavi の記録・marker・ref を消す →
+    main を base に合わせて切り替える → main 以外のローカルブランチを消す → タグを消す →
+    stash を空にする → reset --hard → clean -fd。
+    ccnavi の状態は、ワークツリーを消して prune したあとに消す。記録は一時ワークツリーや
+    ブランチを指すので、ワークツリーが消せずに止まった回で、記録だけ先に消さない。
     clean に -x は付けない（.gitignore 済みを消さない）。refs/remotes は触らない。"""
     top = require_disposable_repo(root, target, allowed)
 
@@ -761,6 +803,7 @@ def reset_repo(root, target, base, allowed=None):
         if pathcase.fold(os.path.realpath(p)) not in keep:
             run("worktree", "remove", "--force", p)
     run("worktree", "prune")
+    _clear_ccnavi_state(root, top, run)
     run("checkout", "-f", "-B", "main", base)
     for name in run("for-each-ref", "--format=%(refname:short)", "refs/heads").split():
         if name != "main":
@@ -1122,6 +1165,18 @@ def _start_host(scn, st, out, root, top):
     _write_state(out, st)
 
 
+def _failed_step_cost(scn, out, num, exc):
+    """正常に終わらなかった step の実費の見積もり。累計の上限が過小に見えないようにする。
+    出力が残っていれば（終了コードが 0 でない）その result の費用、時間切れで出力が無ければ
+    step の上限（--max-budget-usd に渡す値。実費より多めの保守側）。それ以外は 0。"""
+    path = out / f"step-{num}.jsonl"
+    if path.exists():
+        return parse_stream(path.read_text(encoding="utf-8"))["cost_usd"]
+    if isinstance(exc, subprocess.TimeoutExpired):
+        return round(scn["budget_usd"] / max(1, scn["_prompt_steps"]), 2)
+    return 0.0
+
+
 def drive(scn, out, st, root):
     """st['next_step'] から、人間の操作の step か末尾まで進める。
     人間の操作で止まったら 10、末尾まで進んだら None を返す。
@@ -1159,6 +1214,7 @@ def drive(scn, out, st, root):
                 env=_host_env(st),
             )
         except Exception as e:  # 起動できない・時間切れ・終了コードが 0 でない
+            st["cost_usd"] += _failed_step_cost(scn, out, idx + 1, e)
             # 後続は回さず止める。finish に回して、後片付けを通す
             st["halt"] = {
                 "step": idx + 1,
@@ -1616,18 +1672,62 @@ def bypass_suspects(rows, streams, step_sessions):
     return found
 
 
+# 次の手を示す語。hook の拒否文は、次の手をマーカーのない行頭の文で書くことが多いので、
+# マーカーの行（GUIDE_HEADS）に加えて、依頼・指示の言い回しも見る（#570）。
+# 「使う」「確かめ」のように、禁止の説明にも出る語は入れない。
+GUIDE_PHRASES = (
+    "ください",
+    "頼んで",
+    "依頼",
+    "使って",
+    "使います",
+    "従って",
+    "してから",
+    "書き直",
+    "打ち直",
+    "伝えて",
+    "報告して",
+)
+EMPTY_REASON = "(理由文が空)"
+GUIDE_COMMAND = re.compile(r"`[^`\n]+`")  # 打つ形をコード片で示す文（取り込みの案内など）
+
+
 def has_guide(text):
-    """理由文のどれかの行が、案内の行頭（次:・案内:・必須:）で始まるか。"""
-    return any(line.strip().startswith(GUIDE_HEADS) for line in text.splitlines())
+    """理由文が次の手を示しているか。次のどれかなら True。
+    - 行頭（前の空白を除く）が `次:`・`案内:`・`必須:`
+    - 依頼・指示の語（GUIDE_PHRASES）がある
+    - 打つ形を、バッククォートで囲んだコード片で示している
+    語の有無で見るので、誤検知と見逃しがある（限界は acceptance-scenarios.md）。"""
+    if any(line.strip().startswith(GUIDE_HEADS) for line in text.splitlines()):
+        return True
+    return any(p in text for p in GUIDE_PHRASES) or bool(GUIDE_COMMAND.search(text))
+
+
+def _empty_denials(hook_events):
+    """理由文が空の拒否（deny・block）の hook 名。hook_items は文面があるものだけなので別に拾う。"""
+    labels = []
+    for ev in hook_events:
+        if ev.get("subtype") != "hook_response":
+            continue
+        data = _hook_payload(ev)
+        spec = data.get("hookSpecificOutput")
+        spec = spec if isinstance(spec, dict) else {}
+        decision = spec.get("permissionDecision") or data.get("decision")
+        reason = spec.get("permissionDecisionReason") or data.get("reason")
+        if decision in ("deny", "block") and not (reason and str(reason).strip()):
+            labels.append(ev.get("hook_name") or _hook_name(ev))
+    return labels
 
 
 def unguided_denials(streams):
-    """案内の行頭を 1 つも持たない拒否の理由文。(step 番号, hook 名, 理由文) の列。"""
+    """次の手を示していない拒否の理由文（has_guide が偽、または理由文が空）。
+    (step 番号, hook 名, 理由文) の列。理由文が空のものは EMPTY_REASON を入れる。"""
     found = []
     for num, parsed in streams.items():
         for i in hook_items(parsed["hook_events"]):
             if i["kind"] == "拒否" and not has_guide(i["text"]):
                 found.append((num, i["label"], i["text"]))
+        found += [(num, label, EMPTY_REASON) for label in _empty_denials(parsed["hook_events"])]
     return found
 
 
@@ -1666,7 +1766,7 @@ def trend_lines(out, rows):
     ] or ["- なし"]
     _shown(lines, len(bypass) - TREND_SHOWN)
     bare = unguided_denials(streams)
-    lines += ["", "### 案内の無い拒否（理由文に `次:`・`案内:`・`必須:` の行が無い）"]
+    lines += ["", "### 案内の無い拒否（理由文に次の手を示す語・コード片・`次:` などの行が無い）"]
     lines += [
         f"- step {n} [{label}]: {_one_line(text, 120)}" for n, label, text in bare[:TREND_SHOWN]
     ]
@@ -1783,7 +1883,16 @@ def write_report(scn, out, st, results, rows, raw):
     (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (out / "report.json").write_text(
         json.dumps(
-            [{"kind": k, "expect": c, "verdict": v, "why": w} for k, c, v, w in results],
+            [{"kind": k, "expect": c, "verdict": v, "why": w} for k, c, v, w in results]
+            + [
+                {
+                    "kind": "cost",
+                    "expect": "total_cost_usd",
+                    "verdict": PASS,
+                    "why": f"{st['cost_usd']:.4f} USD",
+                    "cost_usd": st["cost_usd"],
+                }
+            ],
             ensure_ascii=False,
             indent=1,
         ),
@@ -2122,12 +2231,18 @@ def cmd_run(args):
     out = Path(
         args.out or ROOT / "logs" / "scenarios" / f"{scn['id']}-{datetime.now():%Y%m%d-%H%M%S}"
     ).resolve()  # cwd が変わっても next / restore が同じ回と分かるように
+    return start_scenario(scn, args.scenario, root, top, out)
+
+
+def start_scenario(scn, scenario_path, root, top, out):
+    """確認と回す前の検査が済んだシナリオを回す（setup → step → 判定 → 後片付け）。終了コード。
+    run と run-all が使う。top は使い捨てのリポジトリの実体（対象を触らないシナリオは None）。"""
     out.mkdir(parents=True, exist_ok=True)
     pre = {rel: file_digest(root / rel) for rel in scn["expect"].get("files_unchanged", [])}
     setup = scn.get("setup") or {}
     base = (setup.get("reset") or {}).get("base")
     st = {
-        "scenario": str(Path(args.scenario).resolve()),
+        "scenario": str(Path(scenario_path).resolve()),
         "root": str(root),
         "out": str(out),
         "next_step": 0,
@@ -2273,6 +2388,340 @@ def cmd_restore(args):
     return 0
 
 
+# ---- run-all（使い捨てのリポジトリのシナリオを、1 回の確認で直列に回す） ----
+
+
+def expand_scenario_paths(patterns):
+    """run-all の引数（ディレクトリ・glob・ファイル）をシナリオのパスの列にする。重複は除く。"""
+    found = []
+    for pattern in patterns:
+        p = Path(pattern)
+        if p.is_dir():
+            found += sorted(p.glob("*.yml"))
+        elif p.is_file():
+            found.append(p)
+        else:
+            found += [Path(m) for m in sorted(glob.glob(pattern))]
+    seen, paths = set(), []
+    for p in found:
+        key = str(p.resolve())
+        if key not in seen:
+            seen.add(key)
+            paths.append(p)
+    return paths
+
+
+def run_all_reason(scn, root, top, top_why):
+    """run-all の対象にしない理由。対象にできるなら None。#546 の判定（使い捨てのリポジトリ）に、
+    続けて回すのに必要な条件（人間の操作が無い・前の回の状態を残さない）を足す。"""
+    setup = scn.get("setup") or {}
+    if any(step.get("human") for step in scn["steps"]):
+        return "人間の操作の step がある（続けて回せない。1 本ずつ確認して回す）"
+    if not uses_target(scn):
+        return (
+            f"使い捨てのリポジトリ（{DISPOSABLE_REL}）に作用する setup が無い"
+            "（ccnavi 本体に作用しうる。1 本ずつ確認して回す）"
+        )
+    if not (setup.get("reset") or {}).get("base"):
+        return "setup.reset が無い（前の回の状態が次の回に残る）"
+    clash = setup_clashes(scn, root)
+    if clash:
+        return "setup.files のパスが合わない（作る形は既にある・追記の形は無い）: " + ", ".join(
+            clash
+        )
+    if top is None:
+        return f"対象のリポジトリを使えない: {top_why}"
+    try:
+        check_before_run(scn, root, top)
+    except Refusal as exc:
+        return f"回す前の確認で断られる: {exc.what}"
+    return None
+
+
+def run_all_plan(paths, root):
+    """(対象, 対象にしない) を返す。対象は [(パス, シナリオ)] を ID 順に、対象にしないものは
+    [(パスか ID, 理由)] を、読んだ順に並べる。"""
+    root = Path(root)
+    top, top_why = None, ""
+    try:
+        top = require_disposable_repo(root, root / DISPOSABLE_REL)
+    except Refusal as exc:
+        top_why = exc.what
+    eligible, skipped, ids = [], [], {}
+    for path in paths:
+        try:
+            scn = load_scenario(path)
+        except (OSError, TypeError, ValueError, yaml.YAMLError) as exc:
+            skipped.append((str(path), f"読み込めない: {exc}"))
+            continue
+        sid = str(scn["id"])
+        if sid in ids:
+            skipped.append((sid, f"ID が重複している（{ids[sid]} と同じ）"))
+            continue
+        ids[sid] = str(path)
+        scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
+        why = run_all_reason(scn, root, top, top_why)
+        if why:
+            skipped.append((sid, why))
+        else:
+            eligible.append((path, scn))
+    eligible.sort(key=lambda e: str(e[1]["id"]))
+    return eligible, skipped
+
+
+def run_all_digest(eligible, cap):
+    """確認した内容の目印。ID の集合・base・シナリオごとの費用の上限・累計の上限・
+    人が読んだ概要から作る。どれか一つでも変われば目印も変わる。
+    実行の直前に作り直して、確認したときの値と比べる。"""
+    body = {
+        "max_total_usd": cap,
+        "scenarios": [
+            {
+                "id": str(scn["id"]),
+                "base": scn["setup"]["reset"]["base"],
+                "budget_usd": scn["budget_usd"],
+                "summary": scenario_summary(scn),
+                # 概要に出ない欄（prompt の全文・permission_mode・model・expect・setup の中身）も
+                # 含める。書き換えがあれば目印が変わり、確認を取り直す（安全側）
+                "scenario": {k: v for k, v in scn.items() if k != "_prompt_steps"},
+            }
+            for _, scn in eligible
+        ],
+    }
+    text = json.dumps(body, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def skipped_lines(skipped):
+    return [f"- {who}: {why}" for who, why in skipped] or ["- なし"]
+
+
+def run_all_confirmation(eligible, skipped, cap, digest, mode_text, root, scenario_args):
+    """run-all の確認文。全シナリオに対する 1 回の確認で、回す ID の一覧・概要・作るもの・
+    対象の状態・base・費用の上限を見せる。"""
+    budget = sum(float(scn["budget_usd"]) for _, scn in eligible)
+    table = ["| ID | 題 | base | モデル | 1 本の上限 (USD) |", "|---|---|---|---|---|"]
+    table += [
+        f"| {scn['id']} | {_cell(scn['title'])} | {scn['setup']['reset']['base'][:12]} | "
+        f"{scn['model']} | {scn['budget_usd']} |"
+        for _, scn in eligible
+    ]
+    questions = [
+        "確認事項 1: ワークツリーに未コミットの変更がなく、origin と同期しているか"
+        "（他のセッションが作業中の変更を含まないか）",
+        f"確認事項 2: {DISPOSABLE_REL} の未コミットの変更・main 以外のブランチ・ワークツリー・"
+        "タグ・stash を、各シナリオの前と後に消してよいか（setup.reset。base は上の表）",
+    ]
+    if any(scn.get("test_repo") or (scn.get("setup") or {}).get("issue") for _, scn in eligible):
+        questions.append(
+            f"確認事項 3: {DISPOSABLE_REL} にブランチや MR ができてよいか"
+            "（setup.issue のシナリオは、本物のホストに issue も作る）"
+        )
+    questions.append(
+        f"確認事項 4: 実費の累計 {cap} USD までを使ってよいか"
+        f"（1 本の上限の合計は {budget:.2f} USD。"
+        "累計の残りを 1 本の上限が超えるシナリオは回さない）"
+    )
+    command = (
+        f"{RUNNER} run-all {' '.join(shlex.quote(a) for a in scenario_args)} "
+        f"--max-total-usd {cap} --confirmed {digest}"
+    )
+    lines = [
+        "回す前に、人間に次を 1 回だけ確認する（シナリオごとには取り直さない）。"
+        "確認が取れたら、最後の打ち方で回す。",
+        "",
+        "この確認が有効なのは、下の ID の集合・base・費用の上限・概要に限る。"
+        "実行の直前に作り直した目印が違えば、回さずに止まる（増減・書き換えがあれば取り直す）。",
+        "",
+        f"# 1. 回す一覧（{len(eligible)} 本。直列。ID 順）",
+        "",
+        *table,
+        "",
+        "# 2. 概要と作るもの",
+        "",
+        *[scenario_summary(scn) + "\n" for _, scn in eligible],
+        f"# 3. 対象にしないもの（{len(skipped)} 件。回さない）",
+        "",
+        *skipped_lines(skipped),
+        "",
+        "# 4. 事実",
+        "",
+        mode_text,
+        "",
+        f"対象のリポジトリ: {Path(root) / DISPOSABLE_REL}（使い捨てと確かめた）",
+        "",
+        preflight_facts(root),
+        "# 5. ユーザ確認事項",
+        "",
+        *questions,
+        "",
+        "# 6. 回す打ち方（確認の目印つき）",
+        "",
+        command,
+    ]
+    return "\n".join(lines)
+
+
+def scenario_row(scn, out, root, rc):
+    """run-all の表の 1 行（ID・判定・実費・ツール呼び出し数・拒否数・ask 数・出力の置き場）。"""
+    row = {
+        "id": str(scn["id"]),
+        "rc": rc,
+        "verdict": "not-run",
+        "cost_usd": 0.0,
+        "tool_calls": 0,
+        "denies": 0,
+        "asks": 0,
+        "out": str(out),
+    }
+    try:
+        st = json.loads((out / "state.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return row
+    row["cost_usd"] = float(st.get("cost_usd") or 0.0)
+    row["tool_calls"] = sum(len(p["tool_calls"]) for p in step_streams(out).values())
+    decided = read_decisions(Path(root) / "logs/decisions.jsonl", st.get("session_ids") or [])
+    row["denies"] = sum(1 for r in decided if r.get("decision") == "deny")
+    row["asks"] = sum(1 for r in decided if r.get("decision") == "ask")
+    try:
+        recorded = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return row
+    row["verdict"] = overall([(r["kind"], r["expect"], r["verdict"], r["why"]) for r in recorded])
+    return row
+
+
+def run_all_table(rows):
+    lines = [
+        "| ID | 判定 | 実費 (USD) | ツール呼び出し | 拒否 | ask | 出力 |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    lines += [
+        f"| {r['id']} | {r['verdict']} | {r['cost_usd']:.3f} | {r['tool_calls']} | "
+        f"{r['denies']} | {r['asks']} | {r['out']} |"
+        for r in rows
+    ]
+    return lines
+
+
+def write_run_all_summary(batch, rows, skipped, cap, remaining_ids, stopped):
+    total = sum(r["cost_usd"] for r in rows)
+    lines = [
+        "# run-all の結果",
+        "",
+        f"回した本数: {len(rows)}  実費の累計: {total:.3f} USD（上限 {cap} USD）",
+        "",
+        *run_all_table(rows),
+    ]
+    if stopped:
+        lines += [
+            "",
+            f"## 止まった: {stopped}",
+            f"回した本数 {len(rows)}。残りの ID: {', '.join(remaining_ids) or 'なし'}",
+        ]
+    lines += ["", "## 対象にしなかったもの", *skipped_lines(skipped)]
+    (batch / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (batch / "summary.json").write_text(
+        json.dumps(
+            {
+                "max_total_usd": cap,
+                "total_cost_usd": total,
+                "stopped": stopped,
+                "remaining": remaining_ids,
+                "scenarios": rows,
+                "skipped": [{"who": w, "why": y} for w, y in skipped],
+            },
+            ensure_ascii=False,
+            indent=1,
+        ),
+        encoding="utf-8",
+    )
+    return lines
+
+
+def _run_all_loop(eligible, root, cap, batch, rows):
+    """順に回す。止まった理由（なければ空）を返す。rows に、回した順に行を足す。"""
+    spent = 0.0
+    for path, scn in eligible:
+        sid = str(scn["id"])
+        remaining = cap - spent
+        if float(scn["budget_usd"]) > remaining + 1e-9:
+            return (
+                f"{sid} の費用の上限 {scn['budget_usd']} USD が、累計の残り "
+                f"{max(remaining, 0):.3f} USD（上限 {cap} USD - 実費 {spent:.3f} USD）を超える"
+            )
+        mode_ok, mode_text = mode_check(root)
+        if not mode_ok:
+            return f"{sid} の前に、判定のモードが enable でなくなった\n{mode_text}"
+        out = batch / sid
+        try:
+            top = require_disposable_repo(root, root / DISPOSABLE_REL)
+            check_before_run(scn, root, top)
+        except Refusal as exc:
+            return f"{sid} を回す前に断られた\n{exc}"
+        rc = start_scenario(scn, path, root, top, out)
+        row = scenario_row(scn, out, root, rc)
+        rows.append(row)
+        spent += row["cost_usd"]
+        print(f"-- {sid}: {row['verdict']}（実費 {row['cost_usd']:.3f} USD、累計 {spent:.3f} USD）")
+        if rc in (3, 10):
+            return f"{sid} が終了コード {rc} で止まった（対象の状態を手で確かめる）"
+    return ""
+
+
+def cmd_run_all(args):
+    _require_entry()
+    root = Path(args.root).resolve()
+    cap = round(float(args.max_total_usd), 4)
+    if not math.isfinite(cap) or cap <= 0:
+        print("--max-total-usd は 0 より大きい有限の値にする")
+        print("次: 実費の累計の上限を USD で渡して打ち直す")
+        return 2
+    mode_ok, mode_text = mode_check(root)
+    if not mode_ok:
+        print(mode_text)
+        return 3
+    eligible, skipped = run_all_plan(expand_scenario_paths(args.scenarios), root)
+    if not eligible:
+        print("run-all で回せるシナリオが無い\n対象にしないもの:")
+        print("\n".join(skipped_lines(skipped)))
+        print("次: 対象にしなかった理由を直すか、1 本ずつ `run` で確認して回す")
+        return 1
+    digest = run_all_digest(eligible, cap)
+    if args.confirmed is None:
+        print(run_all_confirmation(eligible, skipped, cap, digest, mode_text, root, args.scenarios))
+        return 3
+    if args.confirmed != digest:
+        print(
+            "確認した内容と今回の対象が違う（ID の集合・base・費用の上限・概要のどれかが"
+            "増えたか減ったか、書き換わった）。回さない"
+        )
+        print(f"今の対象: {', '.join(str(s['id']) for _, s in eligible)}（目印 {digest}）")
+        print(f"案内: 確認した目印は {args.confirmed}")
+        print("次: --confirmed を付けずに打ち直して確認を取り直す")
+        return 3
+    batch = Path(
+        args.out or ROOT / "logs" / "scenarios" / f"run-all-{datetime.now():%Y%m%d-%H%M%S}"
+    ).resolve()
+    batch.mkdir(parents=True, exist_ok=True)
+    rows, stopped = [], ""
+    try:
+        stopped = _run_all_loop(eligible, root, cap, batch, rows)
+    finally:
+        done = {r["id"] for r in rows}
+        remaining = [str(s["id"]) for _, s in eligible if str(s["id"]) not in done]
+        lines = write_run_all_summary(batch, rows, skipped, cap, remaining, stopped or "")
+        print("\n".join(["", *lines]))
+        print(f"\n要約: {batch}/summary.md")
+    if stopped:
+        print(f"次: 残りを回すなら、{RUNNER} run-all を --confirmed なしで打って確認を取り直す")
+        return 3
+    verdicts = {r["verdict"] for r in rows}
+    if FAIL in verdicts:
+        return 1
+    return 0 if verdicts <= {PASS} else 2
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -2284,6 +2733,13 @@ def main(argv=None):
     r.add_argument("--root", default=str(ROOT))
     r.add_argument("--out")
     r.set_defaults(fn=cmd_run)
+    ra = sub.add_parser("run-all")
+    ra.add_argument("scenarios", nargs="+", help="ディレクトリ・glob・シナリオのファイル")
+    ra.add_argument("--max-total-usd", type=float, required=True, help="実費の累計の上限")
+    ra.add_argument("--confirmed", help="確認文が出した目印（ID の集合・base・費用の上限・概要）")
+    ra.add_argument("--root", default=str(ROOT))
+    ra.add_argument("--out", help="要約（summary.md / summary.json）の置き場")
+    ra.set_defaults(fn=cmd_run_all)
     p = sub.add_parser("preflight")
     p.add_argument("scenario")
     p.add_argument("--root", default=str(ROOT))
