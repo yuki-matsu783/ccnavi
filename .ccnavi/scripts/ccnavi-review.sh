@@ -425,7 +425,7 @@ need_parent_tree() {
 	[ -n "$np_name" ] && [ "$np_name" = "$branch" ] || return 0
 	np_hint=""
 	[ "$sub" != ready ] || np_hint="外から打つなら --parent <親の識別子> を付けます。"
-	fail not-in-parent-tree "$sub は親のワークツリー（$root/.claude/worktrees/<親の識別子>）の中で打ってください。いまは統合先のブランチ（$branch）の上で、親を決められません。親のワークツリーは 'sh $script_dir/ccnavi-git.sh worktree list' で探せます。${np_hint}" 2
+	fail not-in-parent-tree "$sub は親のワークツリー（$root/.claude/worktrees/<親の識別子>）の中で打ってください。いまは統合先のブランチ（${branch}）の上で、親を決められません。親のワークツリーは 'sh $script_dir/ccnavi-git.sh worktree list' で探せます。${np_hint}" 2
 }
 
 # ---- 目印で始まる投稿を探す。{url, created_at} を返す（無ければ空）。<番号> <URL> <目印>
