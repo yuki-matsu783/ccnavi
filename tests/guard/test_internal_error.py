@@ -67,7 +67,7 @@ class InternalErrorTest(unittest.TestCase):
         self.assertIn("[ccnavi] internal-error", result.stderr)
         self.assertIn("RuntimeError", result.stderr)
         self.assertIn(os.path.join("logs", "diag", "ccnavi.log"), result.stderr)
-        self.assertIn("Tell the user", result.stderr)
+        self.assertIn("ユーザに", result.stderr)
         # 例外の文はどこにも出さない。
         self.assertNotIn("想定外", result.stderr)
         self.assertEqual(row["decision"], "skip")
@@ -103,7 +103,7 @@ class InternalErrorTest(unittest.TestCase):
         with mock.patch.object(events, "decide_after", side_effect=boom):
             result, row = run(self.root, payload)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("were not checked", result.stderr)
+        self.assertIn("検査は行われていません", result.stderr)
         self.assertEqual(row["reason"], "internal-error")
 
     def test_other_events_do_not_stop_the_work(self):
@@ -113,7 +113,7 @@ class InternalErrorTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         said = json.loads(result.stdout)["systemMessage"]
         self.assertIn("internal-error", said)
-        self.assertIn("Nothing was stopped", said)
+        self.assertIn("止めたものはありません", said)
         self.assertEqual(row["reason"], "internal-error")
 
     def test_lone_surrogate_in_the_command_is_judged_and_recorded(self):

@@ -288,7 +288,7 @@ class SideBySideTest(unittest.TestCase):
 
         result = self.hook(self.wt)
 
-        self.assertIn("Do not undo it", result.stderr)
+        self.assertIn("自分で戻さず", result.stderr)
         self.assertNotIn("undo:", result.stderr)
 
     def test_dry_runでは本番で戻す集合に横で作業する変更を入れない(self):

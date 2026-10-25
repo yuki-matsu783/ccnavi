@@ -505,22 +505,22 @@ def internal_error(code: str, event: str, kind: str, log_path: str, *, passed: b
     """
     if event == hookio.POST_TOOL_USE:
         what = (
-            "ccnavi hit an internal error while checking what this call changed, so the "
-            "protected areas were not checked after it ran."
+            "ccnavi の内部の不具合で、この呼び出しが何を変えたかを確かめられませんでした。"
+            "実行後の保護対象の検査は行われていません。"
         )
     elif passed:
         what = (
-            "ccnavi hit an internal error before it could judge this call. This call is a plain "
-            "read that ccnavi can check without its rules, so it went through."
+            "ccnavi の内部の不具合で、この呼び出しを判定できませんでした。"
+            "この呼び出しは、ルールなしで確かめられる読み取りだけなので、通しました。"
         )
     else:
-        what = "ccnavi hit an internal error before it could judge this call, so it stopped it."
+        what = "ccnavi の内部の不具合で判定できなかったため、この呼び出しを止めました。"
     return "\n".join(
         [
             f"[ccnavi] {code}",
-            f"{what} The cause is in ccnavi, not in the call ({kind}); the details are in the "
-            f"diagnostic log {log_path}. Do not retry the same call to get around it. Tell the "
-            "user that ccnavi failed here and where the log is, and let them decide how to go on.",
+            f"{what}原因は呼び出しではなく ccnavi にあります（{kind}）。詳細は診断ログ "
+            f"{log_path} にあります。同じ呼び出しを打ち直して回避しないでください。"
+            "ユーザに、ここで ccnavi が失敗したことと診断ログの場所を伝え、続け方を任せてください。",
         ]
     )
 
@@ -529,9 +529,8 @@ def internal_error_notice(code: str, event: str, kind: str, log_path: str) -> st
     """ccnavi 自身の例外で、ツールの呼び出しを持たないイベントの処理を終えられなかったときに、
     ユーザへ見せる文。止めていないことと、診断ログの場所を言う。"""
     return (
-        f"[ccnavi] {code}: ccnavi hit an internal error while handling {event} ({kind}) and "
-        f"skipped what it does there. Nothing was stopped. The details are in the diagnostic "
-        f"log {log_path}."
+        f"[ccnavi] {code}: {event} の処理中に ccnavi の内部の不具合が起き（{kind}）、"
+        f"そこでの処理を飛ばしました。止めたものはありません。詳細は診断ログ {log_path} にあります。"
     )
 
 

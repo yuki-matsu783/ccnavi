@@ -122,11 +122,11 @@ class LintOpsTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["design"], copy=self.phases_text))
         self.commit_parent()
         self.worktree("rename-x", "main")
-        lines = self.lint_lines("直接作業のワークツリー rename-x")
+        lines = self.lint_lines("直接作業のワークツリー名 rename-x")
         self.assertTrue(
             any(
-                "`<先頭の語>-<番号>-<slug>` の形でない" in line
-                and "ccnavi-worktree.sh <名前>` で切る" in line
+                "`<先頭の語>-<番号>-<slug>` の形ではありません" in line
+                and "ccnavi-worktree.sh <名前>` で切ってください" in line
                 and "既にある名前は変えなくてよい" in line
                 for line in lines
             ),
@@ -138,12 +138,12 @@ class LintOpsTest(PhaseHarness):
         self.commit_parent()
         self.worktree("feature-12-direct", "main")
         lint = self.ccnavi("--lint", "--mode", "enable", env={"CCNAVI_BRANCH_PREFIXES": "wip"})
-        self.assertIn("feature-12-direct の名前が", lint.stdout)
+        self.assertIn("feature-12-direct が", lint.stdout)
 
     def test_worktree_name_says_the_form_only_when_it_is_off(self):
         off = self.ccnavi("worktree", "name", "rename-x")
         self.assertEqual(off.returncode, 0)
-        self.assertIn("warn: 直接作業のワークツリー rename-x の名前が", off.stdout)
+        self.assertIn("warn: 直接作業のワークツリー名 rename-x が", off.stdout)
         on = self.ccnavi("worktree", "name", "feature-12-x")
         self.assertEqual((on.returncode, on.stdout), (0, ""))
 

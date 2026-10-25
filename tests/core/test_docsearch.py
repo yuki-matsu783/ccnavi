@@ -859,7 +859,7 @@ class FrontmatterHintTest(Repo):
     """Write で新しく作った md に frontmatter か type が無ければ、PostToolUse で 1 度だけ案内する。
 
     既にある md の Edit・上書きでは出さない。対象は索引に入る md（書いた先のツリーの git で決める）
-    から、決まりの文書が「付けない・付けなくてよい」とするもの（README.md・CLAUDE.md・下書きの
+    から、決まりの文書で「付けない・付けなくてよい」とされているもの（README.md・CLAUDE.md・下書きの
     置き場・チケットの置き場）を除いたもの。
     """
 
@@ -886,7 +886,7 @@ class FrontmatterHintTest(Repo):
 
     def test_a_missing_type_is_told_too(self):
         said = self.hint("docs/new.md", doc(title="t"))
-        self.assertIn("type がありません。", said)
+        self.assertIn("frontmatter に type が無い", said)
         self.assertEqual(self.hint("docs/ok.md", doc(type="guide")), "")
 
     def test_edits_and_overwrites_are_not_told(self):
@@ -899,6 +899,7 @@ class FrontmatterHintTest(Repo):
             "README.md",
             "extensions/x/README.md",
             "CLAUDE.md",
+            "CHANGELOG.md",
             "wip/handoff/draft.md",
             "wip/proposals/todo/i0001.md",
             ".ccnavi/notes.md",
@@ -911,6 +912,13 @@ class FrontmatterHintTest(Repo):
         # 表に無い置き場には出す。
         self.assertNotEqual(self.hint("wip/design/notes.md", "# 見出し\n"), "")
         self.assertNotEqual(self.hint(".claude/skills/x/references/a.md", "# 見出し\n"), "")
+
+    def test_a_skill_without_type_is_told_to_add_type_skill(self):
+        said = self.hint(
+            ".claude/skills/x/SKILL.md", "---\nname: x\ndescription: y\n---\n# x\n"
+        )
+        self.assertIn("type: skill を足してください", said)
+        self.assertNotIn("ありません。ので", said)
 
     def test_exempt_places_match_the_convention_table(self):
         """案内を出さない置き場は、決まりの文書の「対象外」の表で付けない・付けなくてよいとするもの。"""
