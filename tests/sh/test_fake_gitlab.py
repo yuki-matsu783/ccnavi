@@ -1,6 +1,6 @@
 """GitLab の代役（`tests/fake_gitlab.py`）を関数で起こして止める。
 
-見るのは次の 5 つ。
+見るのは次の観点。
 
 1. 起動して要求が通り、止めたあとはつながらない
 2. keep-alive の接続を開いたままでも `stop()` が返る
@@ -8,6 +8,10 @@
 4. `skew` を変えると、返す時刻が変わる
 5. 実物の `ccnavi-review.sh fetch` が、`GITLAB_TOKEN` と代役の origin から、
    curl 経路で模擬の MR とスレッドを読める（`glab` は失敗する代役を前に置く）
+6. 401・404 を返したあとも、同じ keep-alive 接続の次の要求が通る（要求の本文を読み捨てている）
+7. 存在しない MR への要求は、MR を引く全ルートで 404 になり、接続が切れない
+8. 手で使う入口 `python tests/manual/gitlab/fake_gitlab.py <state.json> <port>` が、
+   別プロセスで起動して 1 往復できる
 """
 
 from __future__ import annotations
@@ -16,6 +20,7 @@ import http.client
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -51,7 +56,7 @@ def call(server, method, path, body=None, token=None):
         conn.close()
 
 
-class FakeGitlabTest(unittest.TestCase):
+class ServerCase(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
@@ -63,6 +68,8 @@ class FakeGitlabTest(unittest.TestCase):
         self.addCleanup(server.stop)
         return server
 
+
+class FakeGitlabTest(ServerCase):
     def test_it_serves_and_stops(self):
         server = self.start()
         self.assertGreater(server.port, 0)
@@ -179,6 +186,164 @@ class FakeGitlabTest(unittest.TestCase):
         self.assertAlmostEqual(behind, -600, delta=30)
         zero = self.created_offset(self.start("z.json", skew=0))
         self.assertAlmostEqual(zero, 0, delta=30)
+
+
+TESTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MANUAL = os.path.join(TESTS_DIR, "manual", "gitlab", "fake_gitlab.py")
+
+# act で MR を引くすべての要求（method, path の MR 以降, 本文）
+MR_REQUESTS = [
+    ("GET", "", None),
+    ("PUT", "", {"title": "x"}),
+    ("GET", "/discussions", None),
+    ("POST", "/discussions", {"body": "b"}),
+    ("PUT", "/discussions/d1?resolved=true", None),
+    ("GET", "/reviewers", None),
+    ("PUT", "/reviewers/5?state=reviewed", None),
+    ("GET", "/notes", None),
+    ("POST", "/notes", {"body": "b"}),
+    ("PUT", "/merge", None),
+]
+
+
+class KeepAliveTest(ServerCase):
+    """同じ接続で続けて要求する。1 件目の応答の読み残しが、2 件目の失敗として現れる。"""
+
+    def keep_alive(self, server):
+        conn = http.client.HTTPConnection("127.0.0.1", server.port, timeout=5)
+        self.addCleanup(conn.close)
+        return conn
+
+    def send(self, conn, server, method, path, body=None, token=None):
+        headers = {"PRIVATE-TOKEN": server.token if token is None else token}
+        raw = json.dumps(body) if body is not None else None
+        conn.request(method, path, body=raw, headers=headers)
+        res = conn.getresponse()
+        return res.status, json.loads(res.read() or b"null")
+
+    def assert_same_connection(self, conn, first):
+        # http.client は、サーバが接続を切ると次の要求で黙って張り直す。張り直されていないことを見る
+        self.assertIsNotNone(first, "1 件目の応答のあとで接続が閉じられた")
+        self.assertIs(conn.sock, first, "2 件目の要求で接続が張り直された")
+
+    def test_a_next_request_works_after_a_401_or_404_that_carried_a_body(self):
+        server = self.start()
+        cases = {
+            "401": (f"/api/v4/projects/{ENC}/merge_requests", "wrong"),
+            "別のプロジェクト": ("/api/v4/projects/x%2Fy/merge_requests", None),
+            "知らないルート": ("/api/v4/nothing", None),
+        }
+        expected = {"401": 401, "別のプロジェクト": 404, "知らないルート": 404}
+        for label, (path, token) in cases.items():
+            with self.subTest(label):
+                conn = self.keep_alive(server)
+                code, _ = self.send(conn, server, "POST", path, {"title": "t" * 50}, token)
+                self.assertEqual(code, expected[label])
+                first = conn.sock
+                code, got = self.send(conn, server, "GET", f"/api/v4/projects/{ENC}")
+                self.assertEqual((code, got.get("path_with_namespace")), (200, PROJECT))
+                self.assert_same_connection(conn, first)
+
+    def test_a_missing_merge_request_is_a_404_on_every_route(self):
+        server = self.start()
+        for method, tail, body in MR_REQUESTS:
+            with self.subTest(f"{method} {tail}"):
+                conn = self.keep_alive(server)
+                path = f"/api/v4/projects/{ENC}/merge_requests/99{tail}"
+                code, got = self.send(conn, server, method, path, body)
+                self.assertEqual(code, 404, got)
+                # プロジェクトや経路の 404 ではなく、MR が無い 404 であること
+                self.assertIn("99", got["message"])
+                first = conn.sock
+                # 接続は切れず、同じ接続で次の要求が通る
+                code, _ = self.send(conn, server, "GET", f"/api/v4/projects/{ENC}")
+                self.assertEqual(code, 200)
+                self.assert_same_connection(conn, first)
+        with open(os.path.join(self.tmp, "state.json"), encoding="utf-8") as f:
+            saved = json.load(f)
+        self.assertEqual((saved["mrs"], saved["seq"]), ([], 100))
+
+    def test_an_existing_merge_request_next_to_a_missing_one_still_answers(self):
+        server = self.start(initial_state=seeded())
+        base = f"/api/v4/projects/{ENC}/merge_requests"
+        conn = self.keep_alive(server)
+        self.assertEqual(self.send(conn, server, "GET", f"{base}/1")[0], 200)
+        first = conn.sock
+        self.assertEqual(self.send(conn, server, "GET", f"{base}/2")[0], 404)
+        self.assertEqual(self.send(conn, server, "GET", f"{base}/1")[0], 200)
+        self.assert_same_connection(conn, first)
+
+
+class ManualEntryTest(unittest.TestCase):
+    """`python tests/manual/gitlab/fake_gitlab.py <state.json> <port>` を別プロセスで起こす。
+
+    `load_body`（本体を読む）と `main`（引数を読んで起こし、待つ）をここで通す。
+    ポートは 0 を渡して OS に決めさせ、標準エラーの案内の行から読む。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.state = os.path.join(self._tmp.name, "state.json")
+        with open(self.state, "w", encoding="utf-8") as f:
+            json.dump(state(), f)
+
+    def launch(self):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["CCNAVI_LOG_LEVEL"] = "ERROR"
+        proc = subprocess.Popen(
+            [sys.executable, "-I", MANUAL, self.state, "0"],
+            cwd=self._tmp.name,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+        )
+        self.addCleanup(proc.stderr.close)
+        self.addCleanup(self.stop, proc)
+        return proc
+
+    def stop(self, proc):
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+
+    def listening_port(self, proc) -> int:
+        found: list[str] = []
+        reader = threading.Thread(target=lambda: found.append(proc.stderr.readline()), daemon=True)
+        reader.start()
+        reader.join(15)
+        line = found[0] if found else ""
+        self.assertIn("fake-gitlab listening on 127.0.0.1:", line, f"起動の案内が出ない: {line!r}")
+        return int(line.split("127.0.0.1:")[1].split()[0])
+
+    def test_the_hand_entry_starts_serves_a_round_trip_and_stops(self):
+        proc = self.launch()
+        port = self.listening_port(proc)
+        self.assertGreater(port, 0)
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        self.addCleanup(conn.close)
+        headers = {"PRIVATE-TOKEN": fake_gitlab.TOKEN}
+        raw = json.dumps({"title": "by-hand"})
+        conn.request("POST", f"/api/v4/projects/{ENC}/merge_requests", body=raw, headers=headers)
+        res = conn.getresponse()
+        self.assertEqual(res.status, 201)
+        self.assertEqual(json.loads(res.read())["title"], "by-hand")
+        conn.request("GET", f"/api/v4/projects/{ENC}/merge_requests", headers=headers)
+        res = conn.getresponse()
+        self.assertEqual([m["title"] for m in json.loads(res.read())], ["by-hand"])
+        with open(self.state, encoding="utf-8") as f:
+            self.assertEqual(len(json.load(f)["mrs"]), 1)
+        # 止めたあとは、同じポートへつながらない
+        self.stop(proc)
+        with self.assertRaises(OSError):
+            socket.create_connection(("127.0.0.1", port), timeout=2).close()
 
 
 def seeded() -> dict:
