@@ -18,6 +18,8 @@ allow:
     glob: "tests/sh/gitlab_host.py"
 started_at: "2026-10-25T19:44:41+0900"
 base_sha: "e3fe96dcdb0e6a1d5a251435591a75b997422fdc"
+cancelled_at: "2026-10-26T01:30:49+0900"
+cancel_reason: "allow に ROUTES の本体 tests/fake_gitlab.py が無く実装できない。範囲を直して -01-02 で出し直す"
 ---
 ## 目的
 
