@@ -56,6 +56,10 @@ export function CardItem({
     if (target instanceof Element && target.closest(NOT_OPENING) !== null) {
       return;
     }
+    // ID をドラッグして選んだあとの click は、共通の祖先（カード）に飛ぶ。選択中は開かない
+    if ((window.getSelection?.()?.toString() ?? "") !== "") {
+      return;
+    }
     if (card.openPath !== "") {
       post({ type: "open", filePath: card.openPath });
     }
@@ -83,7 +87,7 @@ export function CardItem({
       }}
     >
       <div className="card-head">
-        <span className="num">{card.id}</span>
+        <span className="num" title={card.id}>{card.id}</span>
         <span className="title">{card.title}</span>
         <StatusMark status={card.status} />
       </div>
