@@ -96,6 +96,17 @@ class TextsTest(unittest.TestCase):
                 self.assertTrue([p for p in cat.problems if p.severity == "error"])
                 self.assertIn("打ち直す:", texts.say(self.root, "NEXT_SAMPLE", {"args_q": "x"}))
 
+    def test_a_non_string_kind_or_a_line_separator_is_an_error_not_a_crash(self):
+        bad = [
+            "  DENY_X:\n    kind: [deny]\n",
+            '  NEXT_X:\n    kind: next\n    values: []\n    next: "a\\u2028b"\n',
+        ]
+        for body in bad:
+            with self.subTest(body=body):
+                put(self.root, "common", "c.yml", "version: 1\nmessages:\n" + body)
+                cat = texts.load(self.root)
+                self.assertTrue([p for p in cat.problems if p.severity == "error"])
+
     def test_the_cli_prints_the_text_or_fails_with_nothing_on_stdout(self):
         import io
 

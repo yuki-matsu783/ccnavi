@@ -226,7 +226,7 @@ def _check_field(
         items: list[str] = []
         for item in raw:
             text = _text_of(item)
-            if not text or "\n" in text:
+            if not text or len(text.splitlines()) > 1:
                 err("`items` の 1 件は 1 行の文字列")
                 return None
             if _check_text("items", text, err, used, sizes, single=True):
@@ -272,7 +272,7 @@ def _check_text(
 ) -> bool:
     """文 1 つの検査。誤りがあれば True。"""
     bad = False
-    if single and "\n" in text:
+    if single and len(text.splitlines()) > 1:
         err(f"`{label}` は 1 行で書く")
         bad = True
     if text.startswith(("次:", "次の手:")):
@@ -321,7 +321,7 @@ def check_entry(
         return None, problems
     if base is None:
         kind = raw.get("kind")
-        if kind not in FIELDS:
+        if not isinstance(kind, str) or kind not in FIELDS:
             err(f"`kind` は {' '.join(FIELDS)} のどれか")
             return None, problems
         if kind != expect:
