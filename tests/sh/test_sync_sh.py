@@ -1103,8 +1103,9 @@ class SyncTest(SyncHarness):
         self.assertFalse(os.path.exists(lock), "取ったロックが残っている")
         self.assertFalse(os.path.exists(lock + ".steal"))
 
-    def test_a_dead_pid_on_another_host_is_judged_by_time_only(self):
-        # 別のホストの pid は通じない（コンテナの入れ替わりなど）。ホスト名が違えば時刻だけで見る。
+    def test_a_fresh_lock_of_another_host_is_kept_even_with_a_dead_pid(self):
+        # 別のホストの pid は、この機械では確かめられない（コンテナの入れ替わりなど）。
+        # ホスト名が違えば時刻だけで見る。
         lock = self.own_lock(self.dead_pid(), int(time.time()), host="other-host")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
