@@ -324,7 +324,7 @@ ccnavi --entry board user mirror [<プロジェクト名>…] --json            
 ccnavi --entry board user mirror [<プロジェクト名>…] --yes --expect <値> --via board --json   # 揃える
 ```
 
-ワークスペースの共通レイヤーと、各プロジェクトのメインのチェックアウトにあるミラー
+ワークスペースの共通レイヤーと、各プロジェクトのユーザのチェックアウトにあるミラー
 （`.ccnavi/config/common/`）のずれを調べる（見るだけ）形と、ずれを揃える形。揃える形はワークツリーに書き、
 コミットはしない。読み手は VS Code 拡張のプロジェクト管理画面。
 

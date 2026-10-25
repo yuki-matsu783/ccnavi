@@ -1,6 +1,6 @@
 """`--lint` のうち、直接作業（`ccnavi-worktree.sh` で切るワークツリー）の記録の検査。
 
-見るのは、ワークスペース自身と各プロジェクトのメインのチェックアウトのgitの共通ディレクトリ
+見るのは、ワークスペース自身と各プロジェクトのユーザのチェックアウトのgitの共通ディレクトリ
 （`ccnavi-direct/`・`ccnavi-integrate/`・`ccnavi-integrate-done/`）と、`refs/ccnavi/direct/`、
 一時ワークツリーの置き場（`logs/direct-tmp/`）。gitを起こすのはrefの一覧と、ブランチの有無だけ。
 

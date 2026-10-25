@@ -203,6 +203,9 @@ ssh host rm -f .ccnavi/config/common/rules.yml         # 外さない。ssh は�
   `.ccnavi/scripts/ccnavi-user-agree.sh`の両方に適用する。外す深さは 4 まで（元の形は数えない）
 - シェルや`.` / `source`に渡したファイルの先は外さない（スクリプトの引数）。
   `command -v` / `-V`（探すだけ）と`sh -s`（標準入力を読む）も外さない
+- `find . \( -name x -o -name y \) -print`や`grep -e '(' -n main.sh`のように、`\(` `\)`・引用された`'('` `';'`で切れて`-`で始まる断片が
+  できても、`-delete` `-exec` `-execdir` `-ok` `-okdir` `-fprint` `-fprint0` `-fprintf` `-fls`を含まなければ縮退しない。
+  含む形（`find . -exec wc {} \; -delete`）は縮退する。引用された演算子と本物の演算子の区別はまだしていない
 - 読み切れない形（`sh -c`・`eval`・`xargs`・`find -exec`・`source`・`.`）でも、語に分けられる限り外す。
   閉じない引用と閉じないヒアドキュメントでは外さない
 - 一覧はccnaviの組み込みで、`rules.yml`からは足せない。一覧に無いもの（`ssh host <cmd>`・`python -c`・`perl -e`・`script -c`・`watch`・

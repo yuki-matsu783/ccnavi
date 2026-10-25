@@ -818,6 +818,9 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ('cat "$(ls -t logs/git-*.log | head -1)"', "ask", "", "UNDECLARED"),
                 ("grep -n foo f\ngrep -n bar g", "ask", "", "UNDECLARED"),
                 ('echo "$(xargs rm < f)"', "ask", "", "PARSE_UNCERTAIN"),
+                ("find . \\( -name x -o -name y \\) -print", "ask", "", "UNDECLARED"),
+                ("grep -e '(' -n main.sh", "ask", "", "UNDECLARED"),
+                ("find . -exec wc {} \\; -delete", "deny", "find-writes", "PARSE_UNCERTAIN"),
             ]
         )
 
