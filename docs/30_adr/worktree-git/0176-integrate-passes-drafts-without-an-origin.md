@@ -6,7 +6,7 @@ tags: [worktree, git, handoff]
 keywords: [integrate, 下書き, wip/handoff, 取り込まない下書き, handoff-pending, 元のパス, 写し, 大文字小文字, 直接作業, integrate-done]
 ---
 
-# ADR-0174: integrate は、元の無い wip/handoff/ の下書きを止めずに一覧へ出し、元との突き合わせは実行ファイルがする
+# ADR-0176: integrate は、元の無い wip/handoff/ の下書きを止めずに一覧へ出し、元との突き合わせは実行ファイルがする
 
 状態: 採用
 
