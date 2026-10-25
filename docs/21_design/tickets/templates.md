@@ -210,6 +210,8 @@ warn（`TODO` の残りなど）、次の手（rationale・固有名を直す、
 
 #### 案内と配布
 
+**`ccnavi-start.sh` の案内。** 親チケットも提案も無いワークツリーでは、提案を作る `次:` の案内の末尾に、使えるテンプレートがあるときだけ `案内:` を 1 行足す（`--plan` の代わりに `--template <名前>`、一覧は `ccnavi-launcher.sh --templates`）。層は `ticket new --template` が引く層（`projects/<名前>/` ならそのプロジェクト）に合わせる。件数は `ccnavi --templates --json` の `usable` が true のものの数で、sh が実行ファイルを 1 回だけ（5 秒で打ち切る）呼んで数える。0 本、実行ファイルや jq が無い・時間切れ・読めないときは何も出さず、診断ログに残す。言及が無いと、エージェントは手書きの `--plan` に進み、テンプレートを見つけなかった。`ccnavi ticket new` が `--plan` も `--template` も無く断る文は、この `次:` を読まずに `ticket new` を打った場合にだけ出るので、足さない。
+
 **親の `finish` の案内。** 親が閉じる出力（`ops._close_parent`。子の `finish` には出さない）の最後に、テンプレート化の案内を 1 行足す。
 `ready` は閉じた親の `done/`・`flows/` を手元の `logs/archive/` へ退避し、退避した親から下書きは作れないので、材料が残っている `ready` の前に出す。
 
