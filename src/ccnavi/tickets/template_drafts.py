@@ -38,7 +38,16 @@ from dataclasses import dataclass, field
 from ..infra import fsio, pathsafe, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from . import approval, archive, flow, handoff, plan_templates, ticket_ids, ticket_model
+from . import (
+    approval,
+    archive,
+    flow,
+    handoff,
+    plan_templates,
+    ticket_ids,
+    ticket_model,
+    ticket_places,
+)
 
 TO_COMMON = "common"
 TO_PROJECT = "project"
@@ -519,13 +528,16 @@ def _shape(template: plan_templates.Template) -> tuple[list, list]:
     return [i.as_data() for i in template.plan], [i.as_data() for i in template.feedback]
 
 
-def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
+def close_notice(conf: settings.Settings, root: str, parent: str, mr: bool = True) -> str:
     """親が閉じたときに出す、テンプレート化の案内 1 行（末尾の改行つき）。出さないときは空文字。
 
     出すのは、完了した親（`done/`）が計画を持ち、その識別子の下書き（親のツリーの
     `wip/handoff/` の `<識別子>.yml`）がまだ無く、同じ計画の形のテンプレートが取り込まれて
     いないときだけ。`ready` で閉じると材料（`done/` と `flows/`）は退避されて拾えなくなるので、
     `ready` の前に出す。読めなければ出さない。
+
+    `mr` が偽なら、マージリクエストを作らない親の文面にする（`ready` は無い）。この親の材料は
+    `wip/` を削除して統合先に取り込むまで残り、取り込むと拾えなくなる。
     """
     found, children, _ = _find_parent(conf, root, parent)
     if found is None:
@@ -542,6 +554,13 @@ def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
         for entry in view.entries:
             if entry.template is not None and _shape(entry.template) == _shape(template):
                 return ""
+    if not mr:
+        return (
+            f"テンプレートにするなら、`ccnavi --templates --draft {parent}` で下書きを作る。"
+            f"`{ticket_places.WIP_ROOT}/` を削除して統合先に取り込む前に打つ"
+            "（取り込んだあとは下書きの材料が残らず拾えない）。"
+            "下書きはユーザが `ccnavi-user-handoff.sh` で取り込む\n"
+        )
     return (
         "テンプレートにするなら、`ready` の前に "
         f"`ccnavi --templates --draft {parent}` で下書きを作る"

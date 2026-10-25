@@ -332,8 +332,13 @@ def _close_parent(
             f"`{wip}/` で消えるのは追跡済みのファイルだけで、削除する前のコミットから戻せる。"
             f"{worktrees.classifier_note(root, f'{git_sh} rm -r {wip}')}\n"
         )
+        # 材料（`done/`）は取り込みまで残る。`wip/` を消す前の今なら下書きが作れる。
+        stdout.write(template_drafts.close_notice(conf, root, found.ticket, mr=False))
         return
     if approval_marks.read_parent_mark(where, found.ticket, approval_marks.PARENT_MARK_READY):
+        # テンプレート化の案内は足さない。ready は印を置いたあとに `done/` を `logs/archive/` へ
+        # 退避するので、下書きの材料は拾えず、`close_notice` も空を返す。ここに来るのは、
+        # ready の印が残ったまま作業中の親を finish したときだけ（印は退避と一緒に消える）。
         stdout.write("Draft は外してある。マージはユーザが行う\n")
         return
     stdout.write(
