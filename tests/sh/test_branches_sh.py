@@ -234,6 +234,8 @@ class BranchesShTest(unittest.TestCase):
             pr(16, "claude/tender-volta-qmy152q"),
             pr(17, "topic/i152"),
             pr(18, "feature_152_x"),
+            pr(19, "feature-1520-x"),
+            pr(20, "topic/152a"),
         ]
         self.route({f"GET {GITHUB}/pulls?state=open&per_page=100&page=1": [200, pulls]})
         text = self.ok("--issue", "152", GITHUB_TOKEN="t0k")

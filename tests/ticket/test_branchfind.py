@@ -217,6 +217,10 @@ class BranchesCommandTest(PhaseHarness):
         self.assertIn("案内: ", text)
         self.assertIn("弱い根拠", text)
         self.assertNotIn("\n次:", text)
+        # `issue:` を持たない親でも、識別子と一致するブランチはチケットが付くので言わない
+        git(self.root, "branch", "feature-300-other", "main")
+        self.propose("feature-300-other", parent_text("feature-300-other", ["research"], issue=9))
+        self.assertNotIn("feature-300-other は", self.branches("issue", 300).stdout)
         # チケットに結び付く候補だけなら言わない
         self.propose("feature-153-slash", parent_text("feature-153-slash", ["research"], issue=153))
         self.assertNotIn("弱い根拠", self.branches("issue", 153).stdout)
