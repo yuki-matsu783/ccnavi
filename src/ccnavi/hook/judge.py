@@ -1450,10 +1450,11 @@ def ticket_verdict(
                     "If this edit is meant to undo a change that is already uncommitted in the "
                     "parent worktree (for example work done before the ticket was agreed), "
                     "do not rewrite it here and do not work around this denial. Discard it with "
-                    f"'cd {settings.shell_path(t.root)} && "
-                    f"{settings.script_command(root, 'ccnavi-git.sh')} restore -- <path>' "
-                    "(one file at a time), or move it into the child's worktree and commit "
-                    "it there. If you did not write the change yourself, ask the user "
+                    f"(for example: cd {settings.shell_path(t.root)} && "
+                    f"{settings.script_command(root, 'ccnavi-git.sh')} "
+                    "restore --staged --worktree -- <path>; one file at a time), "
+                    "or move it into the child's worktree and commit it there. "
+                    "If you did not write the change yourself, ask the user "
                     "before discarding it.",
                 ]
             ),

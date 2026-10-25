@@ -227,8 +227,8 @@ def _tree_problem(
             [
                 "親のワークツリー（メインの作業場）には、状態の置き場以外の変更を残さない。"
                 "子のワークツリーへ移してコミットするか、親のワークツリーで "
-                "ccnavi-git.sh restore -- <パス>（1 つずつ名指し）で取り除いてから、"
-                "finish をやり直す"
+                "ccnavi-git.sh restore --staged --worktree -- <パス>（1 つずつ名指し）で"
+                "取り除いてから、finish をやり直す"
             ],
         )
     if not os.path.isdir(child_tree):

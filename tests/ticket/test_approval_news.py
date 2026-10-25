@@ -125,8 +125,9 @@ class ApprovalToldTest(PhaseHarness):
         self.assertEqual(len(notices), 1, body["prompt"])
         self.assertIn("src/keep.py", notices[0])
         self.assertIn("ccnavi-git.sh", notices[0])
-        self.assertIn("restore -- src/keep.py", notices[0])
+        self.assertIn("restore --staged --worktree -- src/keep.py", notices[0])
         self.assertIn("子のワークツリー", notices[0])
+        self.assertIn("ユーザへ確かめる", notices[0])
         self.assertEqual(body["dirty_parent"], [{"ticket": "i0001", "paths": ["src/keep.py"]}])
 
     def test_the_prompt_is_silent_when_the_parent_worktree_is_clean(self):
@@ -154,7 +155,7 @@ class ApprovalToldTest(PhaseHarness):
         result = self.ccnavi("user", "agree", "--placed-out", report, stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("src/keep.py", result.stderr)
-        self.assertIn("restore -- src/keep.py", result.stderr)
+        self.assertIn("restore --staged --worktree -- src/keep.py", result.stderr)
         with open(report, encoding="utf-8") as f:
             body = json.load(f)
         self.assertEqual(body["dirty_parent"], [{"ticket": "i0001", "paths": ["src/keep.py"]}])
@@ -189,7 +190,7 @@ class ApprovalToldTest(PhaseHarness):
         self.assertEqual(out.get("permissionDecision"), "deny")
         self.assertIn("DENY_TICKET_PARENT", reason)
         self.assertIn("ccnavi-git.sh", reason)
-        self.assertIn("restore -- <path>", reason)
+        self.assertIn("restore --staged --worktree -- <path>", reason)
         self.assertIn("do not work around", reason)
 
     # ---- 2. hook は伝えない

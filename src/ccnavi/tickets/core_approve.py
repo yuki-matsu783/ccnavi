@@ -249,13 +249,14 @@ def dirty_parent_text(root: str, found: dict) -> str:
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     restore = (
         f"cd {settings.shell_path(found['worktree'])} && "
-        f"{git_sh} restore -- {settings.shell_path(found['paths'][0])}"
+        f"{git_sh} restore --staged --worktree -- {settings.shell_path(found['paths'][0])}"
     )
     return (
         f"親 {found['ticket']} のワークツリーに、提案以外の未コミットの変更がある（{shown}）。"
         "承認の後は、親のワークツリーへの書き込みは断られ、子の finish もこの変更で止まる。"
-        f"要らない変更は、パスを 1 つずつ名指しして戻す（'{restore}'）。"
+        "自分が書いた変更でなければ、戻す前にユーザへ確かめる（戻すと取り消せない）。"
         "残す変更は、子のワークツリーへ移してコミットする。"
+        f"要らない変更は、パスを 1 つずつ名指しして戻す。例: {restore}"
     )
 
 
