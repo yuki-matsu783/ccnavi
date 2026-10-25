@@ -36,7 +36,7 @@ EXPECT_KEYS = {
 
 
 def setUpModule():
-    # dry-run のセッションから回しても、mode_check に断られないようにする
+    # dry-run のセッションからテストを回しても、mode_check が実行を拒まないようにする
     patcher = mock.patch.dict(os.environ)
     patcher.start()
     unittest.addModuleCleanup(patcher.stop)
