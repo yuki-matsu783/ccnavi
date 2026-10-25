@@ -3,7 +3,7 @@ title: GitLab の応答の形の契約テスト
 type: guide
 description: 本物の GitLab の応答の形を録った JSON と、Python の模擬（fake_gitlab.py）の応答の形を比べる契約テスト。要求の列・reads・場面・正規化・記録の形・許可リスト・限界・録り直し
 tags: [testing]
-keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.json, requests.json, reads, expect_status, 正規化, 許可リスト, 模擬, fake_gitlab, 形]
+keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab, recorded.json, recorded.sample.json, requests.json, reads, expect_status, 正規化, 許可リスト, 模擬, fake_gitlab, 形]
 ---
 
 # GitLab の応答の形の契約テスト
@@ -25,7 +25,8 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 | `recorded.json` | 本物から録った形。**本物だけ**。`uv run python tests/manual/gitlab/record_contract.py` で作る |
 | `recorded.sample.json` | 模擬から作ったサンプル（`"source": "sample"`）。`uv run python -m tests.contract.fakeside` で作り直す |
 | `normalize-cases.json` | 正規化の入力と期待の対の表。Python のテストが読む。#553 の TypeScript も同じ表を読む |
-| `allow.json` | `fake_gitlab.py` の許可リスト（`entries`）と、録らないものの一覧（`not_recorded`） |
+| `allow.json` | `fake_gitlab.py` の許可リスト（`entries`）、見本の許可リスト（`host_entries`）、録らないものの一覧（`not_recorded`） |
+| `tests/contract/test_host_sample.py` | 見本（`tests/sh/gitlab_host.py` とフィクスチャ）の比較。下の「見本」 |
 | `forbidden.json` | 記録に入れない文字列の正規表現 |
 
 比較器と正規化は `tests/contract/shape.py` の 1 本。模擬の側の場面と送り手は `tests/contract/fakeside.py`。本物の側の場面を組むのは `tests/manual/gitlab/record_contract.py`（contract のテストは manual に依存しない。置くか置かないかの判定と `os.replace` は `shape.py` に置き、Docker 無しで試験する）。
@@ -184,22 +185,22 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 | 要求名 | 見本の答え | 扱い |
 |---|---|---|
 | `user` `mrs_opened` `discussions` `reviewers` | `user.json`・`mrs.json`・`discussions.1.json`・`reviewers.1.json` | 場面ごとに比べる |
-| `notes_post` `notes_get` | 状態ファイル（`FAKE_GITLAB_STATE`） | 場面に依らないので 1 場面で 1 回。先に `notes_post` を打ち、`notes_get` が空にならないようにする |
+| `notes_post` `notes_get` | 状態ファイル（`FAKE_GITLAB_STATE`） | 場面によらないので 1 場面で 1 回。先に `notes_post` を打ち、`notes_get` が空にならないようにする |
 | `mrs_merged` | 全場面で `[]` | 除く。`state=merged` の枝が無く、比べても配列が空で何も比べない |
 | `project` | 固定値 `{"id":42,"default_branch":"main"}` | 除く。読むキー（`archived` `permissions` など）がほとんど無い |
-| 上以外 | 404 | 見本が答えない（読み取り専用の代役） |
+| 上以外 | 404 | 見本が答えない（見本は読み取りだけの代役） |
 
 ### 比べ方と許可
 
 - 比べるキーは `reads`。要求ごと・場面ごとに、`reads` のうち見本にも記録にも存在するキーが 0 件なら失敗する。`reads` の全キーが見本にあることも確かめる
-- 差は場面をまたいで集め、`allow.json` の `host_entries`（項目の形は `entries` と同じ）に 1 回通す。`entries` は fake 側が読むので共用しない
+- 差は場面をまたいで集め、`allow.json` の `host_entries`（項目の形は `entries` と同じ）に 1 回だけ通す。`entries` は fake 側が読むので共用しない
 - 失敗には場面名・要求名・キー・違いの種類が出る
 
 | 要求・キー・種類 | 扱い | 理由 |
 |---|---|---|
 | `mrs_opened` `[].description` | 見本を直した | `mrs.json` に足した |
 | `discussions` `[].notes[].type` が `null` | 見本を直した | system のメモの `type` を `null` にした（`nested`・`resolved`） |
-| `discussions` `[].notes[].position` の `extra` | `host_entries` | 本物の場面に DiffNote が無い。sh が読む |
+| `discussions` `[].notes[].position` の `extra` | `host_entries` | 本物の記録に DiffNote が無い。sh が読む |
 | `discussions` `[].notes[].type` の `type` | `host_entries` | system のメモが無い場面（`paged`・`requested-changes`）は文字列だけ。足すと `expected.json` が変わる |
 | `discussions` `[].notes[].resolved` の `presence` | `host_entries` | 本物は system のメモに `resolved` が無い。system のメモが無い場面は全ノートが持つ。足すと `expected.json` が変わる |
 
@@ -209,7 +210,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 
 ## 限界
 
-比べられない・比べないもの。
+比べられない・比べないもの。見本の比べない範囲は「見本」の節の表。
 
 - `reads` に無いキー。本物だけのキーは比べないので、sh や拡張が新しいキーを読むようになったら、`requests.json` の `reads` に足す（足し忘れは検出できない）
 - ヘッダ（`Link`・`X-Next-Page`・`X-Total`）と 2 ページ目。`Client` がヘッダを捨てる。模擬も出さない
@@ -223,7 +224,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 
 ## 模擬を直したとき
 
-`tests/fake_gitlab.py` の応答を変えたら、**必ず** `uv run python -m tests tests/contract` を回す（`tests/fake_gitlab.py` を変えるコミットの前）。落ちたら、本物に合わせて模擬を直す（基本）。版差・EE など直せない差だけ、意図した差として許可リストに理由つきで足す。サンプルが古くなって落ちたら `uv run python -m tests.contract.fakeside` で作り直す（本物の記録 `recorded.json` は作り直さない）。
+`tests/fake_gitlab.py` の応答、または見本（`tests/sh/gitlab_host.py`・`extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/`）を変えたら、**必ず** `uv run python -m tests tests/contract` を回す（`tests/fake_gitlab.py` を変えるコミットの前）。落ちたら、本物に合わせて模擬を直す（基本）。版差・EE など直せない差だけ、意図した差として許可リストに理由つきで足す。サンプルが古くなって落ちたら `uv run python -m tests.contract.fakeside` で作り直す（本物の記録 `recorded.json` は作り直さない）。
 
 ## 録り直し（本物の GitLab）
 

@@ -20,19 +20,19 @@
       "request": "discussions",
       "key": "[].notes[].position",
       "kind": "extra",
-      "reason": "本物の記録の場面に DiffNote が無く、position を持つノートが無い。sh が読むので見本から消せない"
+      "reason": "本物の記録には DiffNote が無く、position を持つノートも無い。sh が読むので、見本から消せない"
     },
     {
       "request": "discussions",
       "key": "[].notes[].type",
       "kind": "type",
-      "reason": "本物は system のメモで null、それ以外で文字列を取る。system のメモが無い場面（paged・requested-changes）は文字列だけ。足すと expected.json が変わる"
+      "reason": "本物は system のメモだけ null で、それ以外は文字列を取る。system のメモが無い場面（paged・requested-changes）は文字列だけ。足すと expected.json が変わる"
     },
     {
       "request": "discussions",
       "key": "[].notes[].resolved",
       "kind": "presence",
-      "reason": "本物は system のメモに resolved が無い（任意）。system のメモが無い場面（paged・replies・replies-accepted・requested-changes）は全ノートが持つ。足すと expected.json が変わる"
+      "reason": "本物は system のメモに resolved が無い（任意の欄）。system のメモが無い場面（paged・replies・replies-accepted・requested-changes）は全ノートが持つ。足すと expected.json が変わる"
     }
   ]
 }

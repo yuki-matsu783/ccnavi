@@ -5,10 +5,10 @@
 
 見る観点:
 
-1. 比べる場面・除く場面・要求名が、見本の実体と合っている（一覧に漏れ・実在しない名前が無い）
+1. 比べる場面・除く場面・要求名が、見本の実体と合っている（一覧に漏れや、実在しない名前が無い）
 2. 見本の応答が、`recorded.json` と `reads` の範囲で一致する（差は許可リストの `host_entries`）
-3. 空で通らない: 要求ごとに、比べたキーの数が 0 でない
-4. 変異: 見本の応答を加工すると、場面名・要求名・キー・違いの種類が出て落ちる
+3. 空のまま通らない: 要求ごとに、比べたキーの数が 0 件でない
+4. 改変: 見本の応答を書き換えると、場面名・要求名・キー・違いの種類が出て落ちる
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ EXCLUDED_SCENES = ("hostile", "odd-types", "impostor")
 
 # 場面ごとに答えを取る要求（見本が実際に答えるもの）
 SCENE_REQUESTS = ("user", "mrs_opened", "discussions", "reviewers")
-# 場面に依らない要求。状態ファイルに溜める（場面は 1 つだけ使う）
+# 場面によらない要求。状態ファイルに溜める（場面は 1 つだけ使う）
 STATE_REQUESTS = ("notes_post", "notes_get")
 # 見本が答えるが比べない要求（理由は文書の表）
 EXCLUDED_REQUESTS = ("mrs_merged", "project")
@@ -96,7 +96,7 @@ def ask(host, scene: str, req: dict, context: dict[str, str], state: str):
 def run(host, tamper=None) -> dict[str, dict]:
     """`{場面: {名前: {"status", "shape"}}}`。`tamper(名前, 本文)` は形にする前に本文を書き換える。
 
-    `notes_post`・`notes_get` は場面に依らないので、比べる場面の最初の 1 つで 1 回だけ打つ。
+    `notes_post`・`notes_get` は場面によらないので、比べる場面の最初の 1 つで 1 回だけ打つ。
     """
     scene_reqs = requests_by_name(SCENE_REQUESTS)
     state_reqs = requests_by_name(STATE_REQUESTS)
