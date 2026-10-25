@@ -231,7 +231,7 @@ class PendingIntegrateTest(TicketTest):
         self.assertIn("使われなかった書きかけの候補", self.notice())
 
     def test_many_records_are_told_as_one_line_of_names(self):
-        """5 件以上は名前を全件 1 行に並べる。件数が増えても、1 件ごとに増えるのは名前と区切りだけ。"""
+        """5 件以上は名前を全件 1 行に並べる。1 件ごとに増えるのは名前と区切りだけ。"""
         os.environ["CCNAVI_MODE"] = "dry-run"
         self.addCleanup(os.environ.pop, "CCNAVI_MODE", None)
         sizes = {}

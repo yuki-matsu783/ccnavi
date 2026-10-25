@@ -247,7 +247,7 @@ def pending_notice(root: str, conf: settings.Settings, deadline: float) -> str:
 
 
 def _notice(root: str, conf: settings.Settings, deadline: float) -> str:
-    """取り込みの途中の跡を、見出しの後ろに並べる。多いときは名前の一覧 1 行にする。無ければ空。例外は呼び元が受ける。
+    """取り込みの途中の跡を、見出しの後ろに並べる。無ければ空。例外は呼び元が受ける。
 
     処理フロー:
     1. 本体と各プロジェクトのツリーを順に見る。期限が過ぎたら打ち切り、`CUT_LINE` を足す。
