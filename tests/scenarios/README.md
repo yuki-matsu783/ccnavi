@@ -78,8 +78,8 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
   `git`・`reset`・追記は、対象が `projects/test-repo` の実体で、ccnavi 本体でも本体と同じ origin でもないと確かめられたときだけ動く（違えば回す前に終了コード 3）。同じ対象を使う回は直列で、`.git/` のロックで弾く
 - `setup` の `issue`（`repo`・`title`・`body`・`close`）は、回すたびに `repo` へ issue を新しく作り（origin が GitLab なら glab、GitHub なら gh。番号は作成の出力の URL の行から取る）、prompt の `{issue}` を番号に置き換える。`close: true` なら回したあとに閉じる。
   作った番号は `state.json` の `issue_no` に残る。report の入力プロンプトには `{issue}` のまま出る
-- `setup` の `host` は評価の相手を選ぶ（`bare` / `fake-gitlab` / `real`。既定は `real`）。`bare` は origin への通信をローカルの bare に向け、ホストの API は失敗させる（origin の URL は git の代役がホストの形で答える）。`fake-gitlab` は bare に加えて `fake_gitlab.py` を使い、`real` は本物を相手にする。
-  `bare` / `fake-gitlab` は対象の判定を通ったときだけ動き、`setup.issue` とは併用できない。`fake-gitlab` の模擬の初期状態は、`setup` の `host_state`（`project: <namespace>/<project>` を含む dict）に書く。使い分けと `bare` で許す依頼は、docs/42_claude/acceptance-scenarios.md を見る。
+- `setup` の `host` は評価の相手を選ぶ（`bare` / `fake-gitlab` / `docker-gitlab` / `real`。既定は `real`）。`bare` は origin への通信をローカルの bare に向け、ホストの API は失敗させる（origin の URL は git の代役がホストの形で答える）。`fake-gitlab` は bare に加えて `fake_gitlab.py` を使い、`docker-gitlab` は Docker の本物の GitLab CE（[立て方](../../docs/42_claude/gitlab-manual.md)）に使い捨てのプロジェクトを作って回し、回したあとに消す。`real` は本物を相手にする。
+  `bare` / `fake-gitlab` / `docker-gitlab` は対象の判定を通ったときだけ動き、`setup.issue` とは併用できない。`fake-gitlab` の模擬の初期状態は、`setup` の `host_state`（`project: <namespace>/<project>` を含む dict）に書く。使い分けと `bare` で許す依頼は、docs/42_claude/acceptance-scenarios.md を見る。
 - `state` は、全 step が終わったあとに打つコマンドと、出力に含まれるべき文字列
 - step の欄 `expect_after`（`decisions`・`state` を `expect` と同じ書き方で書く。満たさなければ後続の step に進まず止める）
 - `judge` は、意味で読む基準（自然文）。実行器が `evidence.md` に証拠を抜き出し、別のエージェントが読んで判定する
