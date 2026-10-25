@@ -3574,7 +3574,7 @@ class HostLifecycleTest(unittest.TestCase):
         self.assertNotIn("setup.host", runner.scenario_summary(scn))
 
 
-# ---- setup.host: docker-gitlab（Docker 不要。GitLab の API は Client の偽物で受ける） ----
+# ---- setup.host: docker-gitlab（Docker 不要。GitLab の API は偽の Client で受ける） ----
 
 ROOT_PAT = "glpat-root-agent-secret"
 REVIEWER_TOKEN = "glpat-human-reviewer-secret"

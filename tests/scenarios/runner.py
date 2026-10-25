@@ -1004,7 +1004,7 @@ def scenario_host(scn):
 
 
 def uses_target(scn):
-    """使い捨てのリポジトリを触る setup（git・reset・追記・bare / fake-gitlab / docker-gitlab の相手）があるか。"""
+    """使い捨てのリポジトリを触る setup（git・reset・追記・代役を使う相手）があるか。"""
     setup = scn.get("setup") or {}
     appends = any(file_spec(v)[1] for v in (setup.get("files") or {}).values())
     return bool(
@@ -2358,7 +2358,7 @@ def _continue(scn, out, st, root):
         if st["host"].get("project_id"):
             print(
                 f"案内: docker-gitlab のプロジェクトを残している: {st['host']['url']}"
-                f"（ID {st['host']['project_id']}）。消えるのは next の終了か restore のとき"
+                f"（ID {st['host']['project_id']}）。next が最後まで終わるか restore で消える"
             )
     if rc == 10 and st.get("target"):
         # 人間が操作したあとの next で続くので、対象は base に戻さず残す（ロックだけ放す）

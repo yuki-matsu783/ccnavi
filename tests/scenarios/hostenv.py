@@ -88,7 +88,7 @@ def check_docker_gitlab():
 
 
 def project_name(scenario_id, now=None, rand=None):
-    """GitLab のプロジェクト名。大文字小文字違いを別物にしないよう、ID は fold した綴りにする。
+    """GitLab のプロジェクト名。大文字小文字で名前を分けないよう、ID は fold した綴りにする。
     接頭辞 `sc-<ID>-` で、残ったものを一覧して消せる。"""
     now = now or datetime.now()
     rand = rand or os.urandom(2).hex()
@@ -110,7 +110,7 @@ def validate(path, setup):
             f"{path}: setup.issue と setup.host: {host} は併用できません"
             "（issue は runner が gh / glab で作るので、代役の PATH では作れない）。"
             "fake-gitlab で issue が要るときは setup.host_state に書く。"
-            "docker-gitlab は issue を API で作る"
+            "docker-gitlab で issue が要るときは、操作者が API で作る"
         )
     if "host_state" in setup:
         state = setup["host_state"]
