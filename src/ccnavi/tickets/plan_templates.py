@@ -76,7 +76,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import settings, tree
+from ..infra import pathsafe, settings, tree
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from . import (
@@ -878,7 +878,7 @@ def read_layer(layer: str, root: str, directory: str, writable: bool = True) -> 
     except OSError as exc:
         read.unreadable = f"読めない ({_line(exc.strerror or type(exc).__name__)})"
     else:
-        if stat.S_ISLNK(before.st_mode) or flow.linked(root, directory):
+        if stat.S_ISLNK(before.st_mode) or pathsafe.has_link(root, directory):
             read.unreadable = "置き場がシンボリックリンクなので読まない"
         elif not stat.S_ISDIR(before.st_mode):
             read.unreadable = "置き場がディレクトリではない"
