@@ -2,6 +2,7 @@
  "version": 1,
  "source": "sample",
  "gitlab_image": null,
+ "gitlab_version": null,
  "recorded_at": null,
  "not_recorded": [
   "headers",
@@ -41,15 +42,59 @@
      "object"
     ],
     "keys": {
+     "archived": {
+      "t": [
+       "boolean"
+      ]
+     },
      "id": {
       "t": [
        "integer"
+      ]
+     },
+     "issues_access_level": {
+      "t": [
+       "string"
+      ]
+     },
+     "issues_enabled": {
+      "t": [
+       "boolean"
       ]
      },
      "path_with_namespace": {
       "t": [
        "string"
       ]
+     },
+     "permissions": {
+      "t": [
+       "object"
+      ],
+      "keys": {
+       "group_access": {
+        "t": [
+         "null"
+        ]
+       },
+       "project_access": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "access_level": {
+          "t": [
+           "integer"
+          ]
+         },
+         "notification_level": {
+          "t": [
+           "integer"
+          ]
+         }
+        }
+       }
+      }
      }
     }
    }
@@ -95,9 +140,24 @@
         "datetime"
        ]
       },
+      "description": {
+       "t": [
+        "string"
+       ]
+      },
+      "draft": {
+       "t": [
+        "boolean"
+       ]
+      },
       "iid": {
        "t": [
         "integer"
+       ]
+      },
+      "sha": {
+       "t": [
+        "string"
        ]
       },
       "source_branch": {
@@ -145,6 +205,16 @@
         "datetime"
        ]
       },
+      "description": {
+       "t": [
+        "string"
+       ]
+      },
+      "draft": {
+       "t": [
+        "boolean"
+       ]
+      },
       "iid": {
        "t": [
         "integer"
@@ -153,6 +223,11 @@
       "merged_at": {
        "t": [
         "datetime"
+       ]
+      },
+      "sha": {
+       "t": [
+        "string"
        ]
       },
       "source_branch": {
@@ -196,9 +271,24 @@
        "datetime"
       ]
      },
+     "description": {
+      "t": [
+       "string"
+      ]
+     },
+     "draft": {
+      "t": [
+       "boolean"
+      ]
+     },
      "iid": {
       "t": [
        "integer"
+      ]
+     },
+     "sha": {
+      "t": [
+       "string"
       ]
      },
      "source_branch": {
@@ -295,8 +385,22 @@
           "t": [
            "boolean"
           ]
+         },
+         "system": {
+          "t": [
+           "boolean"
+          ]
+         },
+         "type": {
+          "t": [
+           "null",
+           "string"
+          ]
          }
-        }
+        },
+        "opt": [
+         "resolved"
+        ]
        }
       }
      }
@@ -322,11 +426,6 @@
       "state": {
        "t": [
         "string"
-       ]
-      },
-      "updated_at": {
-       "t": [
-        "datetime"
        ]
       },
       "user": {
@@ -356,6 +455,18 @@
       "object"
      ],
      "keys": {
+      "author": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "id": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
       "body": {
        "t": [
         "string"
@@ -386,6 +497,18 @@
       "object"
      ],
      "keys": {
+      "author": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "id": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
       "created_at": {
        "t": [
         "datetime"
@@ -400,55 +523,6 @@
        "t": [
         "integer"
        ]
-      },
-      "notes": {
-       "t": [
-        "array"
-       ],
-       "items": {
-        "t": [
-         "object"
-        ],
-        "keys": {
-         "body": {
-          "t": [
-           "string"
-          ]
-         },
-         "created_at": {
-          "t": [
-           "datetime"
-          ]
-         },
-         "id": {
-          "t": [
-           "integer"
-          ]
-         }
-        }
-       }
-      },
-      "references": {
-       "t": [
-        "object"
-       ],
-       "keys": {
-        "full": {
-         "t": [
-          "string"
-         ]
-        },
-        "relative": {
-         "t": [
-          "string"
-         ]
-        },
-        "short": {
-         "t": [
-          "string"
-         ]
-        }
-       }
       },
       "state": {
        "t": [
@@ -475,6 +549,18 @@
       "object"
      ],
      "keys": {
+      "author": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "id": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
       "created_at": {
        "t": [
         "datetime"
@@ -489,33 +575,6 @@
        "t": [
         "integer"
        ]
-      },
-      "notes": {
-       "t": [
-        "array"
-       ],
-       "items": {
-        "t": [
-         "object"
-        ],
-        "keys": {
-         "body": {
-          "t": [
-           "string"
-          ]
-         },
-         "created_at": {
-          "t": [
-           "datetime"
-          ]
-         },
-         "id": {
-          "t": [
-           "integer"
-          ]
-         }
-        }
-       }
       },
       "state": {
        "t": [
@@ -538,6 +597,18 @@
      "object"
     ],
     "keys": {
+     "author": {
+      "t": [
+       "object"
+      ],
+      "keys": {
+       "id": {
+        "t": [
+         "integer"
+        ]
+       }
+      }
+     },
      "created_at": {
       "t": [
        "datetime"
@@ -552,33 +623,6 @@
       "t": [
        "integer"
       ]
-     },
-     "notes": {
-      "t": [
-       "array"
-      ],
-      "items": {
-       "t": [
-        "object"
-       ],
-       "keys": {
-        "body": {
-         "t": [
-          "string"
-         ]
-        },
-        "created_at": {
-         "t": [
-          "datetime"
-         ]
-        },
-        "id": {
-         "t": [
-          "integer"
-         ]
-        }
-       }
-      }
      },
      "state": {
       "t": [
@@ -604,6 +648,18 @@
       "object"
      ],
      "keys": {
+      "author": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "id": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
       "body": {
        "t": [
         "string"
@@ -639,9 +695,24 @@
         "datetime"
        ]
       },
+      "description": {
+       "t": [
+        "string"
+       ]
+      },
+      "draft": {
+       "t": [
+        "boolean"
+       ]
+      },
       "iid": {
        "t": [
         "integer"
+       ]
+      },
+      "sha": {
+       "t": [
+        "string"
        ]
       },
       "source_branch": {
@@ -715,9 +786,24 @@
        "datetime"
       ]
      },
+     "description": {
+      "t": [
+       "string"
+      ]
+     },
+     "draft": {
+      "t": [
+       "boolean"
+      ]
+     },
      "iid": {
       "t": [
        "integer"
+      ]
+     },
+     "sha": {
+      "t": [
+       "string"
       ]
      },
      "source_branch": {
@@ -780,6 +866,26 @@
      "id": {
       "t": [
        "integer"
+      ]
+     },
+     "resolvable": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "resolved": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "system": {
+      "t": [
+       "boolean"
+      ]
+     },
+     "type": {
+      "t": [
+       "string"
       ]
      }
     }
@@ -847,12 +953,18 @@
          "t": [
           "boolean"
          ]
+        },
+        "system": {
+         "t": [
+          "boolean"
+         ]
+        },
+        "type": {
+         "t": [
+          "string"
+         ]
         }
-       },
-       "opt": [
-        "resolvable",
-        "resolved"
-       ]
+       }
       }
      }
     }
@@ -865,6 +977,18 @@
      "object"
     ],
     "keys": {
+     "author": {
+      "t": [
+       "object"
+      ],
+      "keys": {
+       "id": {
+        "t": [
+         "integer"
+        ]
+       }
+      }
+     },
      "body": {
       "t": [
        "string"
@@ -890,6 +1014,18 @@
      "object"
     ],
     "keys": {
+     "author": {
+      "t": [
+       "object"
+      ],
+      "keys": {
+       "id": {
+        "t": [
+         "integer"
+        ]
+       }
+      }
+     },
      "created_at": {
       "t": [
        "datetime"
@@ -925,6 +1061,18 @@
      "object"
     ],
     "keys": {
+     "author": {
+      "t": [
+       "object"
+      ],
+      "keys": {
+       "id": {
+        "t": [
+         "integer"
+        ]
+       }
+      }
+     },
      "body": {
       "t": [
        "string"
@@ -955,9 +1103,24 @@
        "datetime"
       ]
      },
+     "description": {
+      "t": [
+       "string"
+      ]
+     },
+     "draft": {
+      "t": [
+       "boolean"
+      ]
+     },
      "iid": {
       "t": [
        "integer"
+      ]
+     },
+     "sha": {
+      "t": [
+       "string"
       ]
      },
      "source_branch": {

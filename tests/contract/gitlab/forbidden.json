@@ -7,5 +7,6 @@
   {"name": "Bearer", "regex": "Bearer "},
   {"name": "メールの形", "regex": "[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\\.[A-Za-z0-9.-]+"},
   {"name": "root", "regex": "\\broot\\b"},
-  {"name": "ccnavi-reviewer", "regex": "\\bccnavi-reviewer\\b"}
+  {"name": "ccnavi-reviewer", "regex": "\\bccnavi-reviewer\\b"},
+  {"name": "p551-", "regex": "p551-"}
 ]
