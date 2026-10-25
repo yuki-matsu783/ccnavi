@@ -263,6 +263,13 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     // 文は文字として出す。<b> がタグにならない
     assert.equal(text(page, "pre.approval-text"), "i0001-02-03 を承認した <b>");
     assert.equal(page.all("pre.approval-text b").length, 0);
+    // 案内は畳んで初期は閉じ、コピーが上に主役で並ぶ。コピーは画面に 1 個
+    const more = page.one("details.approval-more");
+    assert.equal(more.hasAttribute("open"), false);
+    assert.equal(text(page, "details.approval-more > summary"), "次に打つコマンドを含む案内");
+    assert.ok(more.contains(page.one("pre.approval-text")));
+    assert.equal(page.all('button[data-action="prompt-copy"]').length, 1);
+    assert.equal(page.all('details.approval-more button[data-action="prompt-copy"]').length, 0);
     // 文は Webview から送らせない。拡張が持っている文を使うので、押したことだけを伝える
     page.click(page.one('button[data-action="prompt-copy"]'));
     await page.settle();
