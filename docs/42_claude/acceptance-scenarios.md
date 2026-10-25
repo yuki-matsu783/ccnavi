@@ -3,7 +3,7 @@ title: 受入シナリオを claude -p で回す
 type: guide
 description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方
 tags: [test, scenario]
-keywords: [受入シナリオ, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, append, 使い捨てのリポジトリ, ロック, restore]
+keywords: [受入シナリオ, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -126,7 +126,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    実行器は step を 1 つずつ `claude -p` で回す（`--model`・`--max-budget-usd`・`--permission-mode`・`--include-hook-events`・
    `--output-format stream-json` を付ける）。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す。
    続きの step が `resume` でなければ `--no-session-persistence` を付ける。出力は `logs/scenarios/<ID>-<日時>/` に置く
-   （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`）
+   （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`、`context-N.md`、`messages.md`。後ろの 2 つは下の「証拠の読み方」）
 4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。
    人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
    続けずにやめるときは `uv run python -m tests.scenarios.runner restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
@@ -246,6 +246,45 @@ AI の出力を機械だけで判定することはできない。ccnavi の判�
 
 全体の判定は `fail` > `inconclusive` > `needs-review` > `pass` の順で重い方を採る。`inconclusive` が出たら、
 prompt を変えて呼び出しを打たせるか、期待を直すかを決める（シナリオを緩めて通さない）。
+
+## 証拠の読み方
+
+`judge` を読む別のエージェントと、結果を確かめる人は、`evidence.md` の機械判定とツール呼び出しに加えて、次の 3 つを読む。
+どれも人が読む材料で、pass / fail を決めない。観測できたものだけを出し、観測できないものは「取れない」と書く。
+
+### 渡った文脈（`evidence.md` の「渡った文脈」の節と `context-N.md`）
+
+step ごとに、エージェントへ渡った文面を文字数つきで出す。
+
+| 出るもの | 出どころ |
+|---|---|
+| SessionStart・UserPromptSubmit・PreToolUse の案内（`additionalContext`） | hook の応答 |
+| 拒否・確認の理由 | hook の応答（`permissionDecision` が deny・ask、または `decision` が block） |
+| サブエージェントを使った step: 親が `Agent` ツールに渡した prompt、その Agent 呼び出しの中のツール呼び出し（`parent_tool_use_id` が Agent 呼び出しの `id` と一致するもの）、SubagentStart の案内 | assistant の行の `tool_use`、hook の応答 |
+
+- `evidence.md` には先頭だけを出す（案内は `CONTEXT_LIMIT`、理由と prompt は `EVIDENCE_LIMIT`）。切ったときは、全文が `context-N.md`（出力ディレクトリ）にあると書く。全文は `context-N.md` に必ず残る
+- サブエージェントの部分は、親の部分と見出しを分ける。SubagentStart の応答は、どの Agent 呼び出しのものかが stream-json から分からないので、Agent 呼び出しの下には置かない
+- 取れないもの: サブエージェントが受け取った SessionStart の文脈・スキル・CLAUDE.md。ここに出ていないことは「渡っていない」を意味しない。出るのは、渡ったと観測できた分だけ。期待（`.ccnavi/CCNAVI.md` の見出しなど）との差は、`judge` の基準に書いて読ませる
+- 平文の stdout（`additionalContext` を持たない hook の出力）と、SessionStart 以外の PostToolUse などの案内は、この節に出さない。前者は件数だけ、後者は「hook の応答」の節にある
+
+### 拒否の傾向（`report.md`）
+
+`decisions.jsonl` の行（回したセッションのもの）と stream-json から拾う目印。step は、記録の `session` を step のセッション ID から引いて決める。
+
+| 目印 | 定義 | 限界 |
+|---|---|---|
+| 反復拒否 | 同じ step で、同じ `code` の `deny` が、間に `allow` を挟まず 3 回以上続いた箇所 | `allow` は Stop など別の事象の行も数えるので、ターンの境目で途切れる。`allow` 以外の行（`skip`・`handover`）は途切れにしない。別の `code` の `deny` が入ると数え直す |
+| 迂回の疑い | `PreToolUse` で deny された `Edit` / `Write` の対象パスと、同じ step の `Edit` / `Write` の `file_path` が、`pathcase.fold` を通して一致し、`file_path` の呼び出し数が deny の数を超えたもの | Bash の中身（`sed -i`・`tee`・リダイレクト）からはパスを取らないので、そちらの迂回は見逃す。deny と呼び出しは数だけで突き合わせるので、deny より前に通った同じパスの呼び出しも疑いになる。deny された呼び出しをもう一度打っただけ（呼び出し数が deny の数と同じ）なら疑わない。記録の `subject` が上限で切られた行（末尾が `…(+N)`）、相対パスで打たれた呼び出し（記録の `subject` と形が合わない）は比べない |
+| 案内の無い拒否 | 理由文のどの行も、行頭（前の空白を除く）が `次:`・`案内:`・`必須:` で始まらない拒否（deny・block） | 行頭の語だけを見る。`次の手:` や文中の案内は数えないので、案内があっても出ることがある。確認（ask）は対象にしない |
+
+出た目印は、人が元の記録を読んで確かめる。出なかったことは、拒否に問題が無いことを意味しない。
+
+### 文面の一覧（`messages.md`）
+
+hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 つにまとめる。SessionStart の案内（`CCNAVI.md` の全文）は含めない。ユーザやエージェントに見える日本語が不自然でないかを、人が読んで確かめる材料で、機械の判定はしない。
+
+- 重複は、正規化した文面で判定する。置き換えは、コミットの ID（16 進の 7〜40 桁）→ パス（`/` か `\` を含む語）→ 数字の順に行い、`<SHA>`・`<PATH>`・`<N>` にする（数字を先にすると ID が壊れる）。パスの語は ASCII の文字だけで切るので、`deny/ask` のような語も `<PATH>` になる。1 件にまとめた文面は、最初に出たものを載せ、回数を添える
+- 出どころ（`code`・`rules`）は、hook の応答には無いので `decisions.jsonl` の行から引く。拒否・確認の理由は、`PreToolUse` の deny・ask の行（`enforced` が `false` のものを除く）と、案内は `hinted` が true の行と、出た順に突き合わせる。数が合わないとき（記録が欠けた、dry-run で止まらなかったなど）は「不明」と書く
 
 ## 全量テストに入らない仕組み
 

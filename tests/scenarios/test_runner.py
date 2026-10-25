@@ -753,6 +753,12 @@ class IssueSetupTest(unittest.TestCase):
         self.assertNotIn("#34", scn["steps"][0]["prompt"])
 
 
+def hook_section(text):
+    """evidence.md の「hook の応答」の見出しの節だけを取り出す（渡った文脈の節と分けて読む）。"""
+    head = text.split("### hook の応答", 1)[1]
+    return head.split("\n###", 1)[0]
+
+
 class EvidenceTest(unittest.TestCase):
     def _hook(self, event, name, stdout="", stderr=""):
         return {
@@ -796,7 +802,7 @@ class EvidenceTest(unittest.TestCase):
                 self._hook("PostToolUse", "empty"),
             ]
         )
-        self.assertNotIn("長い前置き", text)
+        self.assertNotIn("長い前置き", hook_section(text))
         self.assertIn("PostToolUse 1 件", text)
         self.assertIn("SessionStart 2 件", text)
 
@@ -918,7 +924,8 @@ class EvidenceTest(unittest.TestCase):
         ]
         text = self._write(events)
         self.assertIn("hook の応答を参照", text)
-        self.assertEqual(text.count("DENY_PATH 本文"), 1)
+        self.assertEqual(hook_section(text).count("DENY_PATH 本文"), 1)
+        self.assertEqual(text.split("### hook の応答", 1)[0].count("DENY_PATH 本文"), 0)
 
     def test_short_error_contained_in_hook_reason_is_not_collapsed(self):
         payload = {
@@ -1056,6 +1063,353 @@ class ResultsTableTest(unittest.TestCase):
         full = "\n".join(runner._results_table(results))
         self.assertIn("c" * 300, full)
         self.assertIn("w" * 300, full)
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def fixture_text(name):
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+def fixture_rows(name):
+    return [json.loads(x) for x in fixture_text(name).splitlines() if x.strip()]
+
+
+def make_out(step_texts):
+    """step-N.jsonl を並べた出力ディレクトリを作って返す（後始末は呼ぶ側の addCleanup）。"""
+    tmp = tempfile.TemporaryDirectory()
+    out = Path(tmp.name)
+    for n, text in enumerate(step_texts, 1):
+        (out / f"step-{n}.jsonl").write_text(text, encoding="utf-8")
+    return tmp, out
+
+
+def hook_line(event, name, payload):
+    return json.dumps(
+        {
+            "type": "system",
+            "subtype": "hook_response",
+            "hook_event": event,
+            "hook_name": name,
+            "output": json.dumps(payload, ensure_ascii=False),
+            "session_id": "s1",
+        },
+        ensure_ascii=False,
+    )
+
+
+def deny_line(reason, name="PreToolUse:Edit"):
+    spec = {"permissionDecision": "deny", "permissionDecisionReason": reason}
+    return hook_line("PreToolUse", name, {"hookSpecificOutput": spec})
+
+
+def call_line(name, tool_input, call_id="t1", parent=None):
+    block = {"type": "tool_use", "id": call_id, "name": name, "input": tool_input}
+    return json.dumps(
+        {
+            "type": "assistant",
+            "session_id": "s1",
+            "parent_tool_use_id": parent,
+            "message": {"content": [block]},
+        }
+    )
+
+
+def write_all(scn, out, rows):
+    runner.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
+    return {
+        name: (out / name).read_text(encoding="utf-8")
+        for name in ("report.md", "evidence.md", "messages.md")
+    }
+
+
+class ParseStreamIdsTest(unittest.TestCase):
+    def test_tool_calls_and_results_keep_ids_and_parent(self):
+        got = runner.parse_stream(fixture_text("subagent-edit-denied.jsonl"))
+        by_id = {c["id"]: c for c in got["tool_calls"]}
+        agent = next(c for c in got["tool_calls"] if c["name"] == "Agent")
+        self.assertIsNone(agent["parent"])
+        read = next(c for c in got["tool_calls"] if c["name"] == "Read")
+        self.assertEqual(read["parent"], agent["id"])
+        for r in got["tool_results"]:
+            self.assertIn(r["tool_use_id"], by_id)
+            self.assertEqual(r["parent"], by_id[r["tool_use_id"]]["parent"])
+
+    def test_existing_fields_are_unchanged(self):
+        got = runner.parse_stream(fixture_text("subagent-edit-denied.jsonl"))
+        self.assertEqual(got["session_ids"], ["sess-main"])
+        self.assertEqual([c["name"] for c in got["tool_calls"]], ["Agent", "Read", "Edit"])
+        edit = got["tool_calls"][2]["input"]
+        self.assertEqual(edit["file_path"], "/work/test-repo/README.md")
+        self.assertTrue(got["final_text"])
+        self.assertEqual([r["is_error"] for r in got["tool_results"]], [False, False, True])
+
+    def test_missing_ids_are_none(self):
+        events = [
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "tool_use", "name": "Edit", "input": {}}]},
+            },
+            {"type": "user", "message": {"content": [{"type": "tool_result", "content": "x"}]}},
+        ]
+        got = runner.parse_stream("\n".join(json.dumps(e) for e in events))
+        self.assertEqual(
+            got["tool_calls"][0], {"name": "Edit", "input": {}, "id": None, "parent": None}
+        )
+        self.assertIsNone(got["tool_results"][0]["tool_use_id"])
+        self.assertIsNone(got["tool_results"][0]["parent"])
+
+
+class ContextSectionTest(unittest.TestCase):
+    def _out(self, lines):
+        tmp, out = make_out(["\n".join(lines) + "\n"])
+        self.addCleanup(tmp.cleanup)
+        return out
+
+    def test_counts_characters_and_clips_the_head_only(self):
+        ctx = "あ" * (runner.CONTEXT_LIMIT + 500)
+        out = self._out(
+            [
+                hook_line(
+                    "SessionStart",
+                    "SessionStart:startup",
+                    {"hookSpecificOutput": {"additionalContext": ctx}},
+                )
+            ]
+        )
+        files = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])
+        ev = files["evidence.md"]
+        self.assertIn(f"SessionStart [SessionStart:startup] 案内（{len(ctx)} 文字）", ev)
+        self.assertIn("あ" * runner.CONTEXT_LIMIT + "…", ev)
+        self.assertNotIn("あ" * (runner.CONTEXT_LIMIT + 1), ev)
+        self.assertIn(
+            f"全 {len(ctx)} 文字のうち先頭 {runner.CONTEXT_LIMIT} 文字。全量は context-1.md", ev
+        )
+        self.assertIn(ctx, (out / "context-1.md").read_text(encoding="utf-8"))
+
+    def test_denial_reason_uses_evidence_limit(self):
+        reason = "拒" * (runner.EVIDENCE_LIMIT + 10)
+        out = self._out([deny_line(reason)])
+        ev = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["evidence.md"]
+        self.assertIn(f"PreToolUse [PreToolUse:Edit] 拒否（{len(reason)} 文字）", ev)
+        self.assertNotIn("拒" * (runner.EVIDENCE_LIMIT + 1), ev.split("### 渡った文脈")[1])
+        self.assertIn(reason, (out / "context-1.md").read_text(encoding="utf-8"))
+
+    def test_no_context_means_no_section_and_no_file(self):
+        out = self._out([call_line("Read", {"file_path": "a"})])
+        ev = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["evidence.md"]
+        self.assertNotIn("渡った文脈", ev)
+        self.assertFalse((out / "context-1.md").exists())
+
+    def test_hook_event_name_key_is_accepted(self):
+        line = json.loads(
+            hook_line("x", "n", {"hookSpecificOutput": {"additionalContext": "文脈"}})
+        )
+        del line["hook_event"]
+        line["hook_event_name"] = "UserPromptSubmit"
+        out = self._out([json.dumps(line, ensure_ascii=False)])
+        ev = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["evidence.md"]
+        self.assertIn("UserPromptSubmit [n] 案内（2 文字）", ev)
+
+    def test_subagent_part_is_kept_apart_from_the_parent(self):
+        tmp, out = make_out([fixture_text("subagent-edit-denied.jsonl")])
+        self.addCleanup(tmp.cleanup)
+        ev = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["evidence.md"]
+        main, sub = ev.split("### 渡った文脈", 1)[1].split("#### サブエージェント", 1)
+        self.assertIn("SessionStart [SessionStart:startup] 案内", main)
+        self.assertIn("PreToolUse [PreToolUse:Edit] 拒否", main)
+        self.assertNotIn("SubagentStart", main)
+        self.assertIn("に親が渡した prompt", sub)
+        self.assertIn("この Agent 呼び出しの中のツール呼び出し: 1 件", sub)
+        self.assertIn("  - Read:", sub)
+        self.assertIn("SubagentStart [SubagentStart:Explore] 案内", sub)
+        self.assertIn("取れない: サブエージェントが受け取った SessionStart の文脈", sub)
+        self.assertNotIn("Edit:", sub)
+        full = (out / "context-1.md").read_text(encoding="utf-8")
+        self.assertIn("スキル候補", full)
+
+    def test_no_agent_call_means_no_subagent_part(self):
+        out = self._out([deny_line("拒否")])
+        ev = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["evidence.md"]
+        self.assertNotIn("サブエージェント", ev)
+
+
+class DenialTrendTest(unittest.TestCase):
+    SESSIONS = {1: ["s1"], 2: ["s2"]}
+
+    def test_three_denials_in_a_row_are_flagged(self):
+        rows = [rec(decision="deny", code="DENY_PATH", subject=f"f{i}") for i in range(3)]
+        got = runner.repeated_denials(rows, self.SESSIONS)
+        self.assertEqual([(g["step"], g["code"], g["count"]) for g in got], [("1", "DENY_PATH", 3)])
+
+    def test_two_denials_are_not_flagged(self):
+        rows = [rec(decision="deny", code="DENY_PATH") for _ in range(2)]
+        self.assertEqual(runner.repeated_denials(rows, self.SESSIONS), [])
+
+    def test_allow_between_denials_resets_the_count(self):
+        seq = ["deny", "deny", "allow", "deny", "deny"]
+        rows = [rec(decision=d, code="DENY_PATH") for d in seq]
+        self.assertEqual(runner.repeated_denials(rows, self.SESSIONS), [])
+
+    def test_other_rows_between_denials_do_not_reset_but_other_code_does(self):
+        rows = [
+            rec(decision="deny", code="A"),
+            rec(decision="skip", code=""),
+            rec(decision="deny", code="A"),
+            rec(decision="deny", code="A"),
+            rec(decision="deny", code="B"),
+        ]
+        got = runner.repeated_denials(rows, self.SESSIONS)
+        self.assertEqual([(g["code"], g["count"]) for g in got], [("A", 3)])
+
+    def test_steps_are_counted_apart(self):
+        rows = [rec(decision="deny", code="A", session="s1") for _ in range(2)]
+        rows += [rec(decision="deny", code="A", session="s2") for _ in range(2)]
+        self.assertEqual(runner.repeated_denials(rows, self.SESSIONS), [])
+
+    def _streams(self, calls):
+        return {1: {"tool_calls": calls}}
+
+    def _call(self, path, name="Edit"):
+        return {"name": name, "input": {"file_path": path}, "id": None, "parent": None}
+
+    def test_same_path_after_a_denial_is_flagged_through_pathcase(self):
+        rows = [rec(decision="deny", tool="Edit", subject="/work/Repo/README.md")]
+        streams = self._streams(
+            [self._call("/work/Repo/README.md"), self._call("/work/repo/readme.md", "Write")]
+        )
+        got = runner.bypass_suspects(rows, streams, self.SESSIONS)
+        self.assertEqual([(g["step"], g["denied"], g["calls"]) for g in got], [("1", 1, 2)])
+
+    def test_retry_that_was_denied_again_is_not_a_bypass(self):
+        rows = [rec(decision="deny", tool="Edit", subject="/work/a.md") for _ in range(2)]
+        streams = self._streams([self._call("/work/a.md"), self._call("/work/a.md")])
+        self.assertEqual(runner.bypass_suspects(rows, streams, self.SESSIONS), [])
+
+    def test_other_path_bash_and_cut_subjects_are_not_compared(self):
+        streams = self._streams([self._call("/work/b.md")])
+        rows = [rec(decision="deny", tool="Edit", subject="/work/a.md")]
+        self.assertEqual(runner.bypass_suspects(rows, streams, self.SESSIONS), [])
+        bash_rows = [rec(decision="deny", tool="Bash", subject="sed -i s/a/b/ /work/b.md")]
+        self.assertEqual(runner.bypass_suspects(bash_rows, streams, self.SESSIONS), [])
+        cut = [rec(decision="deny", tool="Edit", subject="/work/b.md…(+30)")]
+        self.assertEqual(runner.bypass_suspects(cut, streams, self.SESSIONS), [])
+
+    def test_denial_without_guide_line_is_flagged(self):
+        tmp, out = make_out(
+            [
+                "\n".join(
+                    [
+                        deny_line("[ccnavi] DENY_PATH\n編集しません。"),
+                        deny_line("[ccnavi] DENY_PATH\n理由\n  次: sh x.sh を打つ"),
+                        deny_line("理由\n案内: 補足"),
+                        deny_line("理由\n必須: 項目"),
+                        deny_line("本文の途中に 次: と書いても行頭ではない"),
+                    ]
+                )
+            ]
+        )
+        self.addCleanup(tmp.cleanup)
+        got = runner.unguided_denials(runner.step_streams(out))
+        self.assertEqual(
+            [text for _, _, text in got],
+            ["[ccnavi] DENY_PATH\n編集しません。", "本文の途中に 次: と書いても行頭ではない"],
+        )
+
+    def test_report_shows_the_marks(self):
+        deny = deny_line("[ccnavi] DENY_PATH\n編集しません。")
+        tmp, out = make_out(["\n".join([deny, deny, deny]) + "\n"])
+        self.addCleanup(tmp.cleanup)
+        rows = [
+            rec(decision="deny", code="DENY_PATH", tool="Edit", subject=f"/w/{i}") for i in range(3)
+        ]
+        report = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, rows)["report.md"]
+        self.assertIn("## 拒否の傾向（目印。判定ではない）", report)
+        self.assertIn("- step 1: DENY_PATH が 3 回連続", report)
+        self.assertIn("- step 1 [PreToolUse:Edit]: [ccnavi] DENY_PATH 編集しません。", report)
+
+    def test_report_without_marks_says_none(self):
+        tmp, out = make_out([call_line("Read", {"file_path": "a"}) + "\n"])
+        self.addCleanup(tmp.cleanup)
+        report = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["report.md"]
+        self.assertEqual(report.count("- なし"), 3)
+
+
+class MessagesTest(unittest.TestCase):
+    def test_normalize_order_keeps_commit_ids_intact(self):
+        text = "commit 0123abc の 3 件を /home/u/a/b.sh と C:\\w\\x で見る"
+        self.assertEqual(
+            runner.normalize_message(text),
+            "commit <SHA> の <N> 件を <PATH> と <PATH> で見る",
+        )
+        self.assertEqual(runner.normalize_message("12345678"), "<SHA>")
+
+    def test_paths_with_japanese_punctuation_around_them(self):
+        self.assertEqual(
+            runner.normalize_message("（.ccnavi/docs/a.md「節」）を読む"), "（<PATH>「節」）を読む"
+        )
+
+    def test_texts_differing_only_in_path_become_one_entry(self):
+        a = deny_line("[ccnavi] DENY_PATH\nsubject: /w/one/README.md\n編集しません。 3 回目")
+        b = deny_line("[ccnavi] DENY_PATH\nsubject: /w/two/main.sh\n編集しません。 4 回目")
+        c = deny_line("別の文面")
+        tmp, out = make_out(["\n".join([a, b, c]) + "\n"])
+        self.addCleanup(tmp.cleanup)
+        rows = [
+            rec(
+                decision="deny",
+                code="DENY_PATH",
+                rules=["r:workspace-root"],
+                subject="/w/one/README.md",
+            ),
+            rec(
+                decision="deny",
+                code="DENY_PATH",
+                rules=["r:workspace-root"],
+                subject="/w/two/main.sh",
+            ),
+            rec(decision="deny", code="DENY_X", rules=[], subject="x"),
+        ]
+        msgs = runner.collect_messages(runner.step_streams(out), rows)
+        self.assertEqual([m["count"] for m in msgs], [2, 1])
+        self.assertEqual(msgs[0]["src"], ["DENY_PATH / r:workspace-root"])
+        self.assertEqual(msgs[1]["src"], ["DENY_X / -"])
+        text = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, rows)["messages.md"]
+        self.assertEqual(text.count("編集しません。"), 1)
+        self.assertIn("## 1. 拒否（2 回）", text)
+        self.assertIn("出どころ（code / rules）: DENY_PATH / r:workspace-root", text)
+
+    def test_source_is_unknown_when_counts_differ(self):
+        out_tmp, out = make_out([deny_line("拒否") + "\n"])
+        self.addCleanup(out_tmp.cleanup)
+        msgs = runner.collect_messages(runner.step_streams(out), [])
+        self.assertEqual(msgs[0]["src"], [])
+
+    def test_session_start_context_is_left_out(self):
+        start = hook_line(
+            "SessionStart", "s", {"hookSpecificOutput": {"additionalContext": "決まり"}}
+        )
+        guide = hook_line(
+            "PostToolUse", "p", {"hookSpecificOutput": {"additionalContext": "案内文"}}
+        )
+        tmp, out = make_out([start + "\n" + guide + "\n"])
+        self.addCleanup(tmp.cleanup)
+        msgs = runner.collect_messages(runner.step_streams(out), [])
+        self.assertEqual([(m["kind"], m["text"]) for m in msgs], [("案内", "案内文")])
+
+    def test_real_stream_fixture_with_its_decisions(self):
+        tmp, out = make_out([fixture_text("subagent-edit-denied.jsonl")])
+        self.addCleanup(tmp.cleanup)
+        rows = fixture_rows("subagent-edit-denied.decisions.jsonl")
+        msgs = runner.collect_messages(runner.step_streams(out), rows)
+        kinds = [(m["kind"], m["events"]) for m in msgs]
+        self.assertIn(("拒否", ["PreToolUse"]), kinds)
+        self.assertIn(("案内", ["SubagentStart"]), kinds)
+        deny = next(m for m in msgs if m["kind"] == "拒否")
+        self.assertEqual(
+            deny["src"], ["DENY_PATH / .ccnavi/config/common/rules.yml:workspace-root"]
+        )
 
 
 # ---- 使い捨てのリポジトリの事前状態と後片付け（setup.git・setup.reset・append・ロック） ----

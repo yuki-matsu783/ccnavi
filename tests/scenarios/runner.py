@@ -230,12 +230,24 @@ def parse_stream(text):
         if kind == "assistant":
             for b in _blocks(ev.get("message")):
                 if b.get("type") == "tool_use":
-                    out["tool_calls"].append({"name": b.get("name"), "input": b.get("input")})
+                    out["tool_calls"].append(
+                        {
+                            "name": b.get("name"),
+                            "input": b.get("input"),
+                            "id": b.get("id"),
+                            "parent": ev.get("parent_tool_use_id"),
+                        }
+                    )
         elif kind == "user":
             for b in _blocks(ev.get("message")):
                 if b.get("type") == "tool_result":
                     out["tool_results"].append(
-                        {"is_error": bool(b.get("is_error")), "content": b.get("content")}
+                        {
+                            "is_error": bool(b.get("is_error")),
+                            "content": b.get("content"),
+                            "tool_use_id": b.get("tool_use_id"),
+                            "parent": ev.get("parent_tool_use_id"),
+                        }
                     )
         elif kind == "result":
             out["final_text"] = ev.get("result") or ""
@@ -1346,6 +1358,347 @@ def step_answer_lines(scn, out):
     return lines
 
 
+# ---- 渡った文脈・拒否の傾向・文面の一覧（evidence.md・report.md・messages.md） ----
+
+CONTEXT_EVENTS = ("SessionStart", "UserPromptSubmit", "PreToolUse")
+GUIDE_HEADS = ("次:", "案内:", "必須:")
+REPEAT_MIN = 3
+AGENT_TOOL = "Agent"
+WRITE_TOOLS = ("Edit", "Write")
+# decisions.jsonl の subject が上限で切られた目印（src/ccnavi/records/audit.py の _limited）
+CUT_MARK = "…(+"
+TREND_SHOWN = 10
+
+
+def _hook_name(ev):
+    return ev.get("hook_event") or ev.get("hook_event_name") or "?"
+
+
+def hook_items(hook_events):
+    """hook の応答から、エージェントかユーザに渡る文面を取り出す。
+    kind は 拒否（deny・block）・確認（ask）・案内（additionalContext）。
+    1 つの応答が理由と案内の両方を持てば 2 件になる。"""
+    items = []
+    for ev in hook_events:
+        if ev.get("subtype") != "hook_response":
+            continue
+        data = _hook_payload(ev)
+        spec = data.get("hookSpecificOutput")
+        spec = spec if isinstance(spec, dict) else {}
+        decision = spec.get("permissionDecision") or data.get("decision")
+        reason = spec.get("permissionDecisionReason") or data.get("reason")
+        base = {"event": _hook_name(ev), "label": ev.get("hook_name") or _hook_name(ev)}
+        if decision in ("deny", "ask", "block") and reason:
+            kind = "確認" if decision == "ask" else "拒否"
+            items.append({**base, "kind": kind, "text": str(reason).strip()})
+        context = spec.get("additionalContext")
+        if context:
+            items.append({**base, "kind": "案内", "text": str(context).strip()})
+    return items
+
+
+def _fence(text):
+    """text を囲むコードフェンスの行。text の中のバッククォートの列より長くする。"""
+    bar = "`" * (max([len(m) for m in re.findall(r"`+", text)] + [2]) + 1)
+    return [f"{bar}text", text, bar]
+
+
+def step_streams(out):
+    """出力ディレクトリの step-N.jsonl を parse_stream して {N: 結果} にする（N の昇順）。"""
+    streams = {}
+    for p in sorted(out.glob("step-*.jsonl"), key=lambda q: int(q.stem.split("-")[1])):
+        streams[int(p.stem.split("-")[1])] = parse_stream(p.read_text(encoding="utf-8"))
+    return streams
+
+
+def context_lines(parsed, num, out):
+    """step に渡った文脈の節（evidence.md）の行を返し、全文を context-<num>.md に書く。
+    親とサブエージェントは分ける。何も無ければ [] を返し、ファイルも書かない。"""
+    where = f"context-{num}.md"
+    items = hook_items(parsed["hook_events"])
+    main = [i for i in items if i["kind"] != "案内" or i["event"] in CONTEXT_EVENTS]
+    sub_ctx = [i for i in items if i["kind"] == "案内" and i["event"] == "SubagentStart"]
+    calls = parsed["tool_calls"]
+    agents = [c for c in calls if c["name"] == AGENT_TOOL and c.get("id")]
+    if not (main or agents or sub_ctx):
+        return []
+    lines = [
+        "",
+        f"### 渡った文脈（全文は {where}）",
+        "SessionStart・UserPromptSubmit・PreToolUse の案内（additionalContext）と、"
+        "拒否・確認の理由。先頭だけを出す。",
+    ]
+    full = [f"# step {num} に渡った文脈（全文）"]
+
+    def add(heading, text, limit):
+        n = len(text)
+        lines.append(f"- {heading}（{n} 文字）")
+        lines.extend(_fence(_clip(text, limit, where)))
+        full.extend(["", f"## {heading}（{n} 文字）", *_fence(text)])
+
+    for i in main:
+        limit = CONTEXT_LIMIT if i["kind"] == "案内" else EVIDENCE_LIMIT
+        add(f"{i['event']} [{i['label']}] {i['kind']}", i["text"], limit)
+    if not main:
+        lines.append("- なし")
+    if agents or sub_ctx:
+        lines += ["", "#### サブエージェント（親の呼び出しと分けて出す）"]
+        full += ["", "# サブエージェント"]
+    for a in agents:
+        spec = a["input"] if isinstance(a["input"], dict) else {}
+        add(
+            f"Agent 呼び出し {a['id']}（subagent_type: {spec.get('subagent_type', '?')}）"
+            "に親が渡した prompt",
+            str(spec.get("prompt") or ""),
+            EVIDENCE_LIMIT,
+        )
+        kids = [c for c in calls if c.get("parent") == a["id"]]
+        lines.append(f"- この Agent 呼び出しの中のツール呼び出し: {len(kids)} 件")
+        lines += [
+            f"  - {c['name']}: {_clip(json.dumps(c['input'], ensure_ascii=False), 500, where)}"
+            for c in kids
+        ]
+        full += ["", f"## Agent 呼び出し {a['id']} の中のツール呼び出し（{len(kids)} 件）"]
+        full += [f"- {c['name']}: {json.dumps(c['input'], ensure_ascii=False)}" for c in kids]
+    for i in sub_ctx:
+        add(
+            f"SubagentStart [{i['label']}] 案内（どの Agent 呼び出しのものかは取れない）",
+            i["text"],
+            CONTEXT_LIMIT,
+        )
+    if agents or sub_ctx:
+        lines.append(
+            "- 取れない: サブエージェントが受け取った SessionStart の文脈・スキル・CLAUDE.md。"
+            "stream-json に出るのは上の分だけで、渡っていないものは推測しない"
+        )
+    (out / where).write_text("\n".join(full) + "\n", encoding="utf-8")
+    return lines
+
+
+def _step_label(row, step_sessions):
+    steps = sorted(n for n, sids in step_sessions.items() if row.get("session") in sids)
+    return ",".join(str(n) for n in steps) or "?"
+
+
+def repeated_denials(rows, step_sessions):
+    """同じ step で、同じ code の deny が、間に allow を挟まず REPEAT_MIN 回以上続いた箇所。
+    間にある deny 以外の行（skip・handover など）は数えず、途切れにもしない。"""
+    found, cur = [], {}
+
+    def flush(step):
+        run = cur.pop(step, None)
+        if run and run["count"] >= REPEAT_MIN:
+            found.append(run)
+
+    for r in rows:
+        step = _step_label(r, step_sessions)
+        decision = r.get("decision")
+        if decision == "allow":
+            flush(step)
+        elif decision == "deny":
+            code = r.get("code") or ""
+            run = cur.get(step)
+            if run and run["code"] == code:
+                run["count"] += 1
+                run["subjects"].append(r.get("subject") or "")
+            else:
+                flush(step)
+                cur[step] = {
+                    "step": step,
+                    "code": code,
+                    "count": 1,
+                    "subjects": [r.get("subject") or ""],
+                }
+    for step in list(cur):
+        flush(step)
+    return found
+
+
+def _write_path(call):
+    spec = call["input"] if isinstance(call["input"], dict) else {}
+    path = spec.get("file_path")
+    return path if call["name"] in WRITE_TOOLS and isinstance(path, str) and path else None
+
+
+def bypass_suspects(rows, streams, step_sessions):
+    """Edit / Write が deny されたあと、同じ step で同じパス（pathcase.fold で比べる）への
+    Edit / Write がまだ打たれている箇所。deny の数より呼び出しの数が多いものを疑う。
+    Bash の中身からはパスを取らない。切れた subject は比べない。"""
+    denied = {}
+    for r in rows:
+        subject = r.get("subject") or ""
+        if (
+            r.get("decision") == "deny"
+            and r.get("event") == "PreToolUse"
+            and r.get("tool") in WRITE_TOOLS
+            and subject
+            and CUT_MARK not in subject
+        ):
+            key = (_step_label(r, step_sessions), pathcase.fold(subject))
+            denied.setdefault(key, []).append(subject)
+    found = []
+    for (step, folded), subjects in denied.items():
+        paths = []
+        for n in (int(x) for x in step.split(",") if x.isdigit()):
+            paths += [p for p in map(_write_path, streams.get(n, {}).get("tool_calls", [])) if p]
+        later = [p for p in paths if pathcase.fold(p) == folded]
+        if len(later) > len(subjects):
+            found.append(
+                {"step": step, "path": subjects[0], "denied": len(subjects), "calls": len(later)}
+            )
+    return found
+
+
+def has_guide(text):
+    """理由文のどれかの行が、案内の行頭（次:・案内:・必須:）で始まるか。"""
+    return any(line.strip().startswith(GUIDE_HEADS) for line in text.splitlines())
+
+
+def unguided_denials(streams):
+    """案内の行頭を 1 つも持たない拒否の理由文。(step 番号, hook 名, 理由文) の列。"""
+    found = []
+    for num, parsed in streams.items():
+        for i in hook_items(parsed["hook_events"]):
+            if i["kind"] == "拒否" and not has_guide(i["text"]):
+                found.append((num, i["label"], i["text"]))
+    return found
+
+
+def _shown(lines, more):
+    if more > 0:
+        lines.append(f"- ほか {more} 件")
+    return lines
+
+
+def trend_lines(out, rows):
+    """拒否の傾向の節（report.md）。人が読む目印で、判定ではない。"""
+    streams = step_streams(out)
+    step_sessions = {n: p["session_ids"] for n, p in streams.items()}
+    lines = [
+        "",
+        "## 拒否の傾向（目印。判定ではない）",
+        "誤検知と見逃しがある。定義と限界は acceptance-scenarios.md の「証拠の読み方」。",
+    ]
+    repeats = repeated_denials(rows, step_sessions)
+    lines += ["", f"### 反復拒否（同じ code の deny が間に allow なしで {REPEAT_MIN} 回以上）"]
+    lines += [
+        f"- step {r['step']}: {r['code'] or '(code なし)'} が {r['count']} 回連続。"
+        f"対象: {_one_line(', '.join(r['subjects'][:3]), 200)}"
+        for r in repeats[:TREND_SHOWN]
+    ] or ["- なし"]
+    _shown(lines, len(repeats) - TREND_SHOWN)
+    bypass = bypass_suspects(rows, streams, step_sessions)
+    lines += [
+        "",
+        "### 迂回の疑い（deny された Edit / Write と同じパスへの、その後の Edit / Write）",
+    ]
+    lines += [
+        f"- step {b['step']}: {b['path']} が {b['denied']} 回拒否されたあと、"
+        f"同じパスへの Edit / Write が全 {b['calls']} 回"
+        for b in bypass[:TREND_SHOWN]
+    ] or ["- なし"]
+    _shown(lines, len(bypass) - TREND_SHOWN)
+    bare = unguided_denials(streams)
+    lines += ["", "### 案内の無い拒否（理由文に `次:`・`案内:`・`必須:` の行が無い）"]
+    lines += [
+        f"- step {n} [{label}]: {_one_line(text, 120)}" for n, label, text in bare[:TREND_SHOWN]
+    ]
+    lines += [] if bare else ["- なし"]
+    _shown(lines, len(bare) - TREND_SHOWN)
+    return lines
+
+
+def normalize_message(text):
+    """文面を、パスと数字の違いを除いた形にする。置き換えの順は、コミットの ID → パス → 数字
+    （数字を先にすると ID が壊れる）。"""
+    text = re.sub(r"\b[0-9a-f]{7,40}\b", "<SHA>", text)
+    path = r"(?:[A-Za-z0-9_.\-~:@%+=/\\]|<SHA>)*[/\\](?:[A-Za-z0-9_.\-~:@%+=/\\]|<SHA>)*"
+    text = re.sub(path, "<PATH>", text)
+    return re.sub(r"\d+", "<N>", text)
+
+
+def _sources(items, rows):
+    """hook の応答に出どころ（code・rules）を付ける。応答には無いので、decisions.jsonl の行と
+    順に突き合わせる。数が合わなければ付けない。items は (step, item) の列。"""
+
+    def pre(i):
+        return i["event"] == "PreToolUse"
+
+    row_sets = {
+        "reason": [
+            r
+            for r in rows
+            if r.get("event") == "PreToolUse"
+            and r.get("decision") in ("deny", "ask")
+            and r.get("enforced") is not False
+        ],
+        "hint": [r for r in rows if r.get("event") == "PreToolUse" and r.get("hinted")],
+    }
+    item_sets = {
+        "reason": [x for x in items if x[1]["kind"] != "案内" and pre(x[1])],
+        "hint": [x for x in items if x[1]["kind"] == "案内" and pre(x[1])],
+    }
+    found = {}
+    for key, its in item_sets.items():
+        if len(its) != len(row_sets[key]):
+            continue
+        for (_, item), row in zip(its, row_sets[key], strict=True):
+            rules = row.get("rules") or []
+            rules = ",".join(map(str, rules)) if isinstance(rules, list) else str(rules)
+            found[id(item)] = f"{row.get('code') or '-'} / {rules or '-'}"
+    return found
+
+
+def collect_messages(streams, rows):
+    """hook の応答（拒否・確認・案内）の文面を、正規化した文面で重複を除いて集める。
+    案内は SessionStart のものを除く（CCNAVI.md の全文なので、文脈の節で見る）。"""
+    items = []
+    for num, parsed in streams.items():
+        for i in hook_items(parsed["hook_events"]):
+            if i["kind"] != "案内" or i["event"] != "SessionStart":
+                items.append((num, i))
+    sources = _sources(items, rows)
+    merged = {}
+    for num, i in items:
+        key = (i["kind"], normalize_message(i["text"]))
+        m = merged.setdefault(
+            key,
+            {
+                "kind": i["kind"],
+                "text": i["text"],
+                "count": 0,
+                "events": [],
+                "steps": [],
+                "src": [],
+            },
+        )
+        m["count"] += 1
+        for field, value in (("events", i["event"]), ("steps", num), ("src", sources.get(id(i)))):
+            if value is not None and value not in m[field]:
+                m[field].append(value)
+    return list(merged.values())
+
+
+def write_messages(out, rows):
+    """messages.md を書く。日本語の不自然さを人が読む材料で、機械の判定はしない。"""
+    msgs = collect_messages(step_streams(out), rows)
+    lines = [
+        "# 文面の一覧（hook の応答）",
+        "",
+        "拒否・確認・案内の文面。パスと数字だけが違うものは 1 件にまとめた"
+        "（コミットの ID は `<SHA>`、パスは `<PATH>`、数字は `<N>` に置き換えて比べる）。"
+        "出どころは decisions.jsonl の行と順に突き合わせたもので、数が合わないときは出さない。",
+    ]
+    for n, m in enumerate(msgs, 1):
+        lines += ["", f"## {n}. {m['kind']}（{m['count']} 回）"]
+        lines.append(f"- 事象: {', '.join(m['events'])} / step: {', '.join(map(str, m['steps']))}")
+        lines.append(f"- 出どころ（code / rules）: {'; '.join(m['src']) or '不明'}")
+        lines += _fence(m["text"])
+    if not msgs:
+        lines += ["", "なし"]
+    (out / "messages.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def write_report(scn, out, st, results, rows, raw):
     lines = [
         f"# {scn['id']} {scn['title']}",
@@ -1357,6 +1710,7 @@ def write_report(scn, out, st, results, rows, raw):
     lines += ["", "## ステップごとの入力プロンプトと最終出力", *step_answer_lines(scn, out)]
     if scn.get("unconfirmed"):
         lines += ["", "## 確かめる点（unconfirmed）"] + [f"- {u}" for u in scn["unconfirmed"]]
+    lines += trend_lines(out, rows)
     (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (out / "report.json").write_text(
         json.dumps(
@@ -1410,6 +1764,7 @@ def write_report(scn, out, st, results, rows, raw):
             counts = "、".join(f"{k} {v} 件" for k, v in sorted(omitted.items()))
             ev.append(f"- 省いた応答: {counts}（全量は {p.name}）")
         ev += ["### 最後の報告", _clip(parsed["final_text"], 3000, p.name)]
+        ev += context_lines(parsed, num, out)
     ev += [
         "",
         "## ccnavi の判定の記録（このセッションの行）",
@@ -1422,6 +1777,7 @@ def write_report(scn, out, st, results, rows, raw):
         *_step_decisions_table(rows, step_sessions),
     ]
     (out / "evidence.md").write_text("\n".join(ev) + "\n", encoding="utf-8")
+    write_messages(out, rows)
 
 
 def _one_line(text, limit=120):
