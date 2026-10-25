@@ -1,9 +1,10 @@
 """下書きの置き場での階層名の読み替え（src/ccnavi/tickets/handoff_names.py）。
 
-見るのは次のとおり。見本は tests/handoff_names_samples.py の表に 1 行足すだけで増える。
+見るのは次のとおり。名前を増やすときは、見本（tests/handoff_names_samples.py）に
+1 行足すだけでよい。
 
 1. 変換: 元のパス → 下書きのパスを表で読み替える（深さを問わず、大文字小文字を区別しない）。
-   戻す向きも同じ
+   戻す向きも同じ規則で行う
 2. 予約名: 元のパスに下書きでの階層名があれば断る
 3. 往復: stage → 編集 → `user handoff` で、`.claude/settings.json` が元の場所に戻る
 4. 拡張: 表に仮の 1 行を足しても、同じ往復が通る
@@ -129,7 +130,7 @@ class RoundTripTest(HandoffCase):
 
 
 class ExtensionTest(HandoffCase):
-    """表に仮の 1 行を足すだけで、ほかの名前にも同じ往復が通る。"""
+    """表に仮の 1 行を足すだけで、ほかの名前でも同じ往復が通る。"""
 
     ROWS = [
         (".ccnavi", "handoff-.ccnavi", DOCS),

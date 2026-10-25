@@ -2,10 +2,10 @@
 #
 # 1 行に「元の階層名」と「下書きでの階層名」を空白 1 つ以上で区切って書く。# で始まる行と空行は読まない。
 # 元の階層名は、Claude Code 本体が機密パスとして書き込みを断る名前。そのまま下書きの置き場に置くと、
-# 非対話（claude -p）で下書きを編集できない。下書きでは下書きでの階層名に読み替えて置き、取り込むときに戻す。
+# 非対話（claude -p）で編集できない。下書きの置き場では下書きでの階層名に読み替えて置き、取り込むときに戻す。
 # 階層ごと、深さを問わず読み替える（projects/<名前>/.claude/settings.json → projects/<名前>/handoff-.claude/settings.json）。
 #
 # 下書きでの階層名は予約した名前。元のパスにその名前の階層がある保護対象は、stage が断る。
 # 名前は ASCII だけで書く（比べるときは大文字小文字を区別しない）。
-# 足すときはこの表に 1 行足し、tests/ticket/test_handoff_names.py の見本にも 1 行足す。
+# 足すときはこの表に 1 行足し、tests/handoff_names_samples.py の見本（SAMPLES）にも 1 行足す。
 .claude handoff-.claude

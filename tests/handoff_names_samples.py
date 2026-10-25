@@ -1,4 +1,4 @@
-"""下書きの階層名の読み替えの見本（tests/ticket と tests/sh が同じ表を使う）。
+"""下書きの階層名の読み替えの見本（tests/ticket と tests/sh が同じ見本を使う）。
 
 表（`.ccnavi/scripts/ccnavi-handoff-names.txt`）に名前を足したときは、`SAMPLES` に 1 行足す。
 """

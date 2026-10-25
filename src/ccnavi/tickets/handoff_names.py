@@ -12,14 +12,15 @@ Claude Code 本体は、`.claude` という名前の階層（深さを問わな�
 
 表は `.ccnavi/scripts/ccnavi-handoff-names.txt` の 1 か所だけにある。`ccnavi-stage.sh`（sh）がそれを
 読み、この実行ファイル（Python）も同じファイルを読む。`ccnavi-stage.sh` は実行ファイルが無くても動く
-作りなので、sh が実行ファイルに聞く形は採らなかった。実行ファイルには、`build.py` が組み立てのときに
-同じファイルを入れる。
+作りなので、sh が実行ファイルに聞く形は採らなかった。実行ファイルには、`build.py` が組み立てるときに
+同じファイルを同梱する。
 
 ## 比べ方
 
 表の名前は ASCII だけで書き、要素ごとに大文字小文字を区別せずに比べる（`.CLAUDE` は `.claude`、
 `Handoff-.Claude` は `handoff-.claude`）。非 ASCII を含む要素は、`fold` で一致しても表に当てない。
-sh は ASCII の大文字小文字しか畳めないので、両方が同じ答えを返すために、Python もここで止める。
+sh は ASCII の大文字小文字しか畳めない。両方が同じ答えを返すよう、
+Python も非 ASCII の要素には表を当てない。
 
 ## 断る形
 
@@ -61,8 +62,8 @@ def _names_path() -> str:
 def parse(text: str) -> dict[str, str]:
     """表のファイルの中身を、元の階層名 → 下書きでの階層名の辞書にする。
 
-    `#` で始まる行と空行は読まない。1 行は空白で区切った 2 語だけ。読めない行は例外にする
-    （黙って捨てると、読み替えられない名前が下書きの置き場に並ぶ）。
+    `#` で始まる行と空行は読まない。1 行は空白で区切った 2 語だけ。読めない行は例外にする。
+    黙って捨てると、読み替えられない名前のまま下書きが置かれる。
     """
     table: dict[str, str] = {}
     for number, raw in enumerate(text.splitlines(), 1):
@@ -81,7 +82,8 @@ def load(path: str | None = None) -> dict[str, str]:
         return parse(f.read())
 
 
-# 元の階層名 → 下書きでの階層名。呼ぶたびにこの辞書を読むので、テストは中身を差し替えられる。
+# 元の階層名 → 下書きでの階層名。関数は呼ぶたびにこの辞書を参照するので、
+# テストは中身を差し替えられる。
 ALIASES: dict[str, str] = load()
 
 

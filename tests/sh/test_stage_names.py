@@ -2,9 +2,9 @@
 
 見るのは次のとおり。見本は tests/handoff_names_samples.py の表（`SAMPLES`）を使う。
 
-1. sh と Python が同じ変換結果を返す（同じ見本を両方に通す）。表に仮の 1 行を足した場合も
+1. 表に仮の 1 行を足した場合も含め、sh と Python が同じ変換結果を返す（同じ見本を両方に通す）
 2. 元のパスに予約名（`handoff-.claude`）の階層があれば、stage が断る
-3. stage → 編集 → `--commands` で、差し替えの mv が読み替えた下書きから元の場所を指す
+3. stage → 編集 → `--commands` で、差し替えの mv が、読み替えた下書きを元の場所へ戻す
 4. 表のファイルが無い・読めない行があれば、stage は何も作らずに断る
 """
 
@@ -45,7 +45,8 @@ class StageNamesTest(unittest.TestCase):
         self.count = 0
 
     def workspace(self, extra=""):
-        """使い捨てのワークスペース。表のファイルは配布元の写しに `extra`（1 行以上）を足せる。"""
+        """使い捨てのワークスペース。表のファイルは、配布元の写しに `extra`（1 行以上）を
+        足したものにする。"""
         self.count += 1
         ws = os.path.join(self._tmp.name, f"ws{self.count}")
         scripts = os.path.join(ws, ".ccnavi", "scripts")

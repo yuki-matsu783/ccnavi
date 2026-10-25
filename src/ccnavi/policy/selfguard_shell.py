@@ -1320,7 +1320,7 @@ def _stage_hint(root: str) -> str:
 # .claude 配下の保護対象の案内に添える一文。Claude Code 本体は .claude の階層を機密パスとして扱い、
 # 非対話では編集を許可できないので、下書きの置き場では handoff-.claude に読み替える。
 _CLAUDE_COPY_HINT = (
-    ".claude の階層はコピー先で handoff-.claude に読み替えられます"
+    "下書きの置き場では .claude の階層を handoff-.claude に読み替えます"
     "（.claude/settings.json は wip/handoff/handoff-.claude/settings.json）。"
     "wip/handoff/.claude/ に自分で作らないでください。"
 )
