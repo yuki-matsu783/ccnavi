@@ -46,6 +46,7 @@ from . import (
     cli_plan,
     cli_stopreview,
     cli_templates,
+    cli_text,
     cli_usage,
     diagnose,
     lint,
@@ -983,6 +984,9 @@ def _parsed(
         repo = args.command[3] if len(args.command) == 4 else None
         code = cli_ops.sync_check(stdout, stderr, root, conf, args.command[2], repo)
         return EXIT_OK if code == 0 else EXIT_ERROR
+    # sh が文面ファイルの文を引く。読むだけで、チケット制御の有無に依らない。
+    if args.command and args.command[0] == "text":
+        return cli_text.run(stdout, stderr, root, list(args.command[1:]))
     # sh がチケットについて聞くこと。
     # 答えはチケット制御の有無に依らない（sh の前の見方がそうだった）。
     if len(args.command) == 4 and list(args.command[:2]) == ["tree", "parent"]:

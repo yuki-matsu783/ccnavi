@@ -66,6 +66,7 @@ import time
 from dataclasses import dataclass
 
 from ..infra import directrec, fsio, gitcmd, pathcase, settings, tree
+from ..policy import texts
 from . import archive, direct_candidates, ops_close, ops_stop, ticket_ids, ticket_model
 
 # Stop で直接作業の `integrate` を促すときの理由コード。止めるのは 1 回だけの促しで、
@@ -772,103 +773,47 @@ def _left(found: Direct) -> str:
     return "と".join(parts)
 
 
-def _origin_warning(found: Direct) -> str:
-    if not found.origin_ahead:
-        return ""
-    return (
-        f"注意: origin/{found.base} が手元の {found.base} より"
-        f" {found.origin_ahead} 件先に進んでいます。"
-        "取り込んだあとの push の前に、ユーザに手元を合わせてもらってください。"
-    )
-
-
 def integrate_nudge(root: str, found: Direct) -> str:
     """Stopを止めて渡す文。`integrate` の打ち方と、確認してもらう手順を言う。
 
-    コマンドは 1 行で完結させ、別のツリーで打つものは `cd <引用したパス> && …` で始める
-    （Bash の cwd が次の呼び出しに残るとは限らない）。ラッパーを通らない `git` は書かない。
+    文は文面ファイルが持つ（`NUDGE_INTEGRATE__*`。状態ごとに 1 件）。ここは、どの状態かを決めて、
+    条件つきの補足（`NOTE_INTEGRATE_*`）を足す。コマンドは文面ファイルが 1 行で完結させ、別のツリーで
+    打つものは `cd <引用したパス> && …` で始める（Bash の cwd が次の呼び出しに残るとは限らない）。
+    ラッパーを通らない `git` は書かない。
     """
     n = found.name
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
-    work = settings.shell_path(found.worktree)
-    integ = settings.shell_path(found.integ_tree)
-    lines = [f"[ccnavi] {CODE_INTEGRATE_NUDGE} (worktree: {n})"]
+    head = f"[ccnavi] {CODE_INTEGRATE_NUDGE} (worktree: {n})"
+    values = {"name": n, "integ_tree": found.integ_tree}
+
+    def origin_ahead() -> list[str]:
+        if not found.origin_ahead:
+            return []
+        note = {"base": found.base, "count": str(found.origin_ahead)}
+        return [texts.say(root, "NOTE_INTEGRATE_ORIGIN_AHEAD", note)]
+
     # 版を知らない記録は、操作させず、ユーザに片付けを頼んで終える
     if found.marker == "unknown":
-        return "\n".join(
-            [
-                *lines,
-                f"ワークツリー .claude/worktrees/{n} の取り込みの記録"
-                f"（{integ} の ccnavi-integrate/{n}/marker）の版を知りません。"
-                "版 4 でない記録は ccnavi が読めません。操作せず、ユーザが統合先の staged を"
-                "git status で確かめ、不要なら git reset --merge で戻してから、記録のディレクトリを"
-                "手で消します。",
-            ]
-        )
+        return "\n".join([head, texts.say(root, "NUDGE_INTEGRATE__UNKNOWN_MARKER", values)])
     # 取り込みが確定を待っている
     if found.marker:
-        lines += [
-            f"ワークツリー .claude/worktrees/{n} の取り込み（integrate {n}）が、"
-            "確定を待っています。",
-            "差分と変わるファイルの一覧をユーザに見せ、返事を待ってこのターンを終えます。"
-            "確定はユーザの次の発言のあとです。この同じターンでは integrate-done を打てません"
-            "（この案内で続けたターンは、ユーザの発言に数えません）。",
-            f"ユーザの発言のあと、了承を得ていれば "
-            f"`cd {integ} && {git_sh} integrate-done {n} -m '<メッセージ>'`"
-            " で取り込んで片付けます。"
-            f"やめるなら `cd {integ} && {git_sh} integrate --abort {n}`。",
-            "ファイルをエディタで開いて保存していない編集がないか、ユーザに確かめてから確定します。",
-        ]
-        warn = _origin_warning(found)
-        if warn:
-            lines.append(warn)
-        return "\n".join(lines)
+        return "\n".join(
+            [head, texts.say(root, "NUDGE_INTEGRATE__CONFIRM", values), *origin_ahead()]
+        )
     # 直接作業（チケットに結び付かない）。記録の有無で案内を分ける
-    lines.append(
-        f"ワークツリー .claude/worktrees/{n} はチケットに結び付かない直接作業で、"
-        f"{_left(found)}があり、"
-        + (
-            "取り込みの記録（ccnavi-direct）がありません。"
-            if found.no_record
-            else f"integrate {n} をまだ打っていません。"
-        )
-    )
+    values["left"] = _left(found)
+    lines = [head]
+    extra: list[str] = []
     if found.dirty:
-        lines.append(
-            "integrate が取り込むのはコミットした分だけです。先にコミットしてください: "
-            f"`cd {work} && {git_sh} add -- <パス>` と "
-            f"`cd {work} && {git_sh} commit -m '<メッセージ>'`。"
+        extra.append(
+            texts.say(root, "NOTE_INTEGRATE_COMMIT_FIRST", {"work_tree": found.worktree})
         )
+    keep_going = texts.say(root, "NOTE_INTEGRATE_KEEP_GOING")
     if found.no_record:
-        wt_sh = settings.script_command(root, "ccnavi-worktree.sh")
-        base = tree.branch_of(found.integ_tree) or "<取り込み先のブランチ>"
-        lines += [
-            "記録の無いワークツリー（更新前に切った・手で切った）は、integrate が断ります。"
-            "ユーザに取り込み先を確かめてから、引き取ります: "
-            f"`cd {integ} && {wt_sh} {n} --adopt --base {base}`。"
-            "出力の範囲と差分をユーザに見せ、了承を得て確認コードを付けて打ち直します。",
-            "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
-            "この案内は同じ状態では 1 回だけです。",
-        ]
-        return "\n".join(lines)
-    lines += [
-        f"作業が終わったなら `cd {integ} && {git_sh} integrate {n}` を実行して止めてください。"
-        "取り込み結果は一時ワークツリーに用意され、ユーザのチェックアウトは変わりません。"
-        "hook は integrate を実行しません。",
-        "続き: 出力の差分と変わるファイルの一覧をユーザに見せ、返事を待ってターンを終えます。"
-        "確定はユーザの次の発言のあとで、同じターンでは integrate-done を打てません。"
-        f"ユーザの発言のあと、了承を得ていれば "
-        f"`cd {integ} && {git_sh} integrate-done {n} -m '<メッセージ>'` で取り込んで片付けます。"
-        f"やめるなら `cd {integ} && {git_sh} integrate --abort {n}`。",
-    ]
-    warn = _origin_warning(found)
-    if warn:
-        lines.append(warn)
-    lines.append(
-        "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
-        "この案内は同じ状態では 1 回だけです。"
-    )
-    return "\n".join(lines)
+        values["base"] = tree.branch_of(found.integ_tree) or "<取り込み先のブランチ>"
+        lines.append(texts.say(root, "NUDGE_INTEGRATE__ADOPT", values))
+        return "\n".join([*lines, *extra, keep_going])
+    lines.append(texts.say(root, "NUDGE_INTEGRATE__RUN", values))
+    return "\n".join([*lines, *extra, *origin_ahead(), keep_going])
 
 
 def blocked_notice(found: Direct) -> str:

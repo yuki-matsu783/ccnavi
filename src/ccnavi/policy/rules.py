@@ -334,6 +334,28 @@ SCRIPT_PLACEHOLDER = re.compile(r"\{script:([^{}]*)\}")
 SCRIPT_NAME = re.compile(r"[A-Za-z0-9._-]+")
 
 
+# `.ccnavi/scripts/` のヒット。直前の `./` と `../` の連なりは、相対の書き方なので手前にたどる。
+_RELATIVE_SCRIPTS = re.compile(r"(?:\.{1,2}/)*\.ccnavi/scripts/")
+# その手前の 1 文字がこれなら、ヒットはパスの途中（絶対パス・`$VAR/`・`{root}/`・`~/`・
+# ディレクトリ名の続き）。空白・引用符・括弧・`=`・`:` や語頭は、パスの始まりとして相対に数える。
+_PATH_MID = frozenset("/\\}~$._-")
+
+
+def has_relative_scripts(text: str) -> bool:
+    """文面に、cwd に左右される相対パスの `.ccnavi/scripts/` があるか。
+
+    ヒットの直前（`./` と `../` の連なりを除いた位置）の 1 文字を見る。`/` `\\` `}` `~` `$`
+    `.` 英数字 `_` `-` ならパスの途中（絶対パス、`{root}/`、`$VAR/`、`~/` など）なので言わない。
+    語頭や、空白・引用符・括弧・`=`・`:` の直後なら相対パスの始まりとして言う。
+    """
+    for hit in _RELATIVE_SCRIPTS.finditer(text):
+        before = text[hit.start() - 1] if hit.start() > 0 else ""
+        if before and (before.isascii() and before.isalnum() or before in _PATH_MID):
+            continue
+        return True
+    return False
+
+
 def fill_text(text: str, root: str) -> str:
     """モデルへ渡す文の差し込みを置き換える。
 

@@ -47,6 +47,7 @@ from . import (
     lint_places,
     lint_project,
     lint_templates,
+    lint_texts,
     lint_ticket,
     lint_wiki,
     version,
@@ -476,6 +477,7 @@ def check(
     problems.extend(config_check.layer_rules(io.StringIO(), conf, root))
     problems.extend(config_check.layer_configs(conf, root))
     problems.extend(lint_templates._templates(conf, root))
+    problems.extend(lint_texts._messages(root))
     problems.extend(lint_layers._worktree_layers(conf, root))
     problems.extend(lint_places._ticket_places(conf, root))
     problems.extend(lint_places._projectless_worktrees(conf, root))

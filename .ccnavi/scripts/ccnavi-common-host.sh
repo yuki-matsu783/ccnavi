@@ -798,7 +798,7 @@ ccnavi_preflight() {
 # ---- 事前確認の文面（ccnavi-start.sh --check と ccnavi-ticket.sh が共有する。変数に入れるだけで、何も出さない）
 #
 #   ccnavi_pf_line <項目>  1 行の文面を ccnavi_pf_line_text に入れる（`<項目>: OK|NG|未確認|省略|注意 (<理由>)`）
-#   ccnavi_pf_next         ccnavi_pf_fix から `次:` の本文を ccnavi_pf_next_text に入れる（無ければ空）
+#   ccnavi_pf_next         ccnavi_pf_fix から `次:` の行（文は文面ファイル。NEXT_PF_*）を ccnavi_pf_next_text に入れる（無ければ空）
 ccnavi_pf_line() {
 	eval "ccnavi_pl_kind=\$ccnavi_pf_$1 ccnavi_pl_why=\$ccnavi_pf_$1_why"
 	case "$ccnavi_pl_kind" in
@@ -821,32 +821,20 @@ ccnavi_pf_line() {
 ccnavi_pf_next() {
 	ccnavi_pf_next_text=""
 	ccnavi_pn_host="${ccnavi_h_host:-?}"
+	ccnavi_pn_path="${ccnavi_h_path:-?}"
+	ccnavi_pn_root="${root:-.}"
+	ccnavi_pn_kind=GITLAB
+	if [ "${ccnavi_h_kind:-}" = github ]; then
+		ccnavi_pn_kind=GITHUB
+	fi
 	case "$ccnavi_pf_fix" in
-	tool) ccnavi_pf_next_text="ユーザに、足りない道具（git・jq。API には gh か glab か curl のどれか）を入れてもらう" ;;
-	origin) ccnavi_pf_next_text="ユーザに、origin をホストの URL（https://…）で設定してもらう。チケット作業はホストが要る" ;;
-	integration) ccnavi_pf_next_text="$(ccnavi_integration_hint "${ccnavi_pf_top:-.}")" ;;
-	auth)
-		if [ "${ccnavi_h_kind:-}" = github ]; then
-			ccnavi_pf_next_text="ユーザに、gh auth login --hostname $ccnavi_pn_host を打つか、環境変数 GITHUB_TOKEN を置くよう頼む"
-		else
-			ccnavi_pf_next_text="ユーザに、glab auth login --hostname $ccnavi_pn_host を打つか、環境変数 GITLAB_TOKEN を置くよう頼む（glab は GITLAB_TOKEN を読む）"
-		fi
-		;;
-	notfound) ccnavi_pf_next_text="ユーザに、origin のパス（${ccnavi_h_path:-?}）が正しいか、このアカウントでそのリポジトリが見えるかを確かめてもらう" ;;
-	access) ccnavi_pf_next_text="ユーザに、${ccnavi_h_path:-?} への書き込みの権限（GitLab は Developer 以上、GitHub は write 以上）の付与を頼む" ;;
-	git-auth)
-		if [ "${ccnavi_h_kind:-}" = github ]; then
-			ccnavi_pf_next_text="ユーザに、git の資格情報を整えてもらう（gh auth login --hostname $ccnavi_pn_host は git の認証も兼ねる）"
-		else
-			ccnavi_pf_next_text="ユーザに、git の資格情報を整えてもらう（glab auth login --hostname $ccnavi_pn_host は git の認証も兼ねる）"
-		fi
-		;;
-	network)
-		if [ "${ccnavi_h_kind:-}" = github ]; then
-			ccnavi_pf_next_text="ホストにつながる状態になってから打ち直す。GitHub は MCP（mcp__github__のツール）で代行できる"
-		else
-			ccnavi_pf_next_text="ホストにつながる状態になってから打ち直す"
-		fi
-		;;
+	tool) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_TOOL) ;;
+	origin) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_ORIGIN) ;;
+	integration) ccnavi_pf_next_text="次: $(ccnavi_integration_hint "${ccnavi_pf_top:-.}")" ;;
+	auth) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" "NEXT_PF_AUTH__$ccnavi_pn_kind" "host=$ccnavi_pn_host") ;;
+	notfound) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_NOTFOUND "path=$ccnavi_pn_path") ;;
+	access) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_ACCESS "path=$ccnavi_pn_path") ;;
+	git-auth) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" "NEXT_PF_GIT_AUTH__$ccnavi_pn_kind" "host=$ccnavi_pn_host") ;;
+	network) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" "NEXT_PF_NETWORK__$ccnavi_pn_kind") ;;
 	esac
 }

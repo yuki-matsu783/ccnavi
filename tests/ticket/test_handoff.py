@@ -181,11 +181,23 @@ class AllowListTest(HandoffCase):
     def test_only_the_board_refuses_defense(self):
         self.assertEqual(
             {k.id: k.board for k in handoff.KINDS},
-            {"template": True, "layer-config": True, "docs": True, "defense": False},
+            {
+                "template": True,
+                "messages": False,
+                "layer-config": True,
+                "docs": True,
+                "defense": False,
+            },
         )
         self.assertEqual(
             {k.id: k.new for k in handoff.KINDS},
-            {"template": True, "layer-config": False, "docs": False, "defense": False},
+            {
+                "template": True,
+                "messages": True,
+                "layer-config": False,
+                "docs": False,
+                "defense": False,
+            },
         )
 
     def test_drafts_off_the_table_are_counted_and_not_errors(self):
