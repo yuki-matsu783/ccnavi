@@ -363,7 +363,7 @@ class WorktreeShTest(unittest.TestCase):
     def test_a_free_name_is_warned_after_the_cut_and_still_cut(self):
         result = self.run_sh("topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertIn("warn: 直接作業のワークツリー topic の名前が", result.stdout)
+        self.assertIn("warn: 直接作業のワークツリー名 topic が", result.stdout)
         self.assertEqual("topic", git(self.wt("topic"), "branch", "--show-current"))
 
     def test_a_name_in_the_form_is_not_warned(self):

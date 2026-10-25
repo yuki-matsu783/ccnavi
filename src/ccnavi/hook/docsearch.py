@@ -423,7 +423,7 @@ CODE_MISSING_FRONTMATTER = "NOTICE_DOC_FRONTMATTER"
 # frontmatter を付けない決まりの md の名前。中身がそのまま使われる（README はホストや
 # エディタが頭から表示し、CLAUDE.md は毎回モデルの文脈に入る）ので、頭の YAML がそのまま
 # 人にもモデルにも見える。決まりの文書（CONVENTION_DOC）の「付けていない」と揃える。
-NO_FRONTMATTER_NAMES = ("README.md", "CLAUDE.md")
+NO_FRONTMATTER_NAMES = ("README.md", "CLAUDE.md", "CHANGELOG.md")
 # 決まりの文書（CONVENTION_DOC）の「対象外」の表で、付けない・付けなくてよいとする置き場
 # （ツリーのルートからの glob）。表を直したらここも直す
 # （tests/core/test_docsearch.py が表と比べる）。
@@ -449,14 +449,14 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
     判定は変えない。案内を出すのは次をすべて満たすときだけ。
 
     - Write で新しく作った（`tool_response.type` が `create`）。既にある md の Edit・上書きでは
-      出さない。意図して frontmatter を持たない md（README.md・CLAUDE.md、取り込んだ資料）を
+      出さない。意図して frontmatter を持たない md（README.md・CLAUDE.md・CHANGELOG.md、取り込んだ資料）を
       直すたびに促すと、付けに行かせることになる。作るのは 1 本につき 1 度なので、セッションを
       またいで覚える必要も無い
     - 索引の対象に入る md。書いた先のツリー（ワークスペース・プロジェクト・ワークツリー）の
       git で決める。ワークツリーはワークスペースの `.gitignore` では無視されるが、統合した後は
       統合先の索引に入るので、そのワークツリー自身の git に聞く。ccnavi ディレクトリの下と、
       git が無視するものは索引に載らないので出さない
-    - 決まりの文書が「付けない・付けなくてよい」とする md でない。README.md・CLAUDE.md と、
+    - 決まりの文書で「付けない・付けなくてよい」とされている md ではない。README.md・CLAUDE.md・CHANGELOG.md と、
       対象外の表の置き場（NO_FRONTMATTER_PLACES。チケットとチケットの下書き・下書きの置き場・
       外から取り込んだスキル）。下書きは索引には載るが、frontmatter を求めない
     """
@@ -498,8 +498,12 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
 def _frontmatter_hint(conf: settings.Settings, root: str, shown: str, has_front: bool) -> str:
     command = _command(conf, root)
     if has_front:
-        lack = "frontmatter に type がありません。"
-        todo = "既にあるキーの値と順序は変えず、type を追加してください。"
+        lack = "frontmatter に type が無い"
+        todo = (
+            "既にあるキーの値と順序は変えず、type: skill を足してください。"
+            if shown.replace("\\", "/").rsplit("/", 1)[-1] == "SKILL.md"
+            else "既にあるキーの値と順序は変えず、type を足してください。"
+        )
     else:
         lack = "frontmatter が無いか読めない"
         todo = (
@@ -507,8 +511,8 @@ def _frontmatter_hint(conf: settings.Settings, root: str, shown: str, has_front:
             "keywords を書いてください。"
         )
     line = (
-        f"[ccnavi] {CODE_MISSING_FRONTMATTER} ({shown}) {lack}ので、'{command} --docs' の"
-        f" --type・--tag・--keyword では見つかりません。{todo}"
+        f"[ccnavi] {CODE_MISSING_FRONTMATTER} ({shown}) "
+        f"{lack}と、'{command} --docs' の --type・--tag・--keyword で見つかりません。{todo}"
     )
     if _has_convention(root):
         line += (

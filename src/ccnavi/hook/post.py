@@ -324,11 +324,11 @@ def check(
     shown, dropped = blocks[:REPORT_LIMIT], len(blocks) - REPORT_LIMIT
     if dropped > 0:
         shown.append(
-            f"[ccnavi] {dropped} more changed paths in protected areas are not listed here. "
+            f"[ccnavi] 保護対象の変更のうち、あと {dropped} 件のパスはここに載せていません。"
             + (
-                f"Run '{git} status' to see the rest before you undo anything."
+                f"戻す前に '{git} status' で残りを確かめてください。"
                 if git
-                else "Ask the user to check the rest with git status before you undo anything."
+                else "戻す前に、git status で残りを確かめるようユーザに頼んでください。"
             )
         )
     return "\n\n".join(shown), tried
@@ -498,10 +498,14 @@ def at_stop(
     # 先に入っていることがある。
     _add_detail(record, post_findings.codes_note(found))
 
-    lines = [
-        f"[ccnavi] 守ると宣言した場所が、この{phase_forms.TURN_DEFINED}で"
-        f" {len(found)} 件変わりました。"
-    ]
+    # 見出しの主語は、何が変わったかにする。1 件なら、そのパスと変わり方を示す。
+    first = found[0].change
+    subject = (
+        f"保護対象の {first.path}（{gitstate.KIND_LABELS.get(first.kind, first.kind)}）"
+        if len(found) == 1
+        else f"保護対象の {len(found)} 件"
+    )
+    lines = [f"[ccnavi] {subject}が、この{phase_forms.TURN_DEFINED}で変わりました。"]
     for finding in found[:REPORT_LIMIT]:
         rule = finding.group[0]
         where = f"{finding.tree_name}: " if finding.tree_name else ""

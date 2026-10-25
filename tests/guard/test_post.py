@@ -314,7 +314,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 0, "直前の実行の結果ではないので差し戻さない")
         text = self.context(result)
         self.assertIn("POST_PREEXISTING", text)
-        self.assertIn("Do not undo it", text)
+        self.assertIn("戻さず、これを土台にもせず", text)
         self.assertNotIn("POST_VIOLATION", text)
         # この呼び出しは何も汚していない。判定は呼び出しについてのもの。
         self.assertEqual(self.records()[-1]["decision"], "allow")
@@ -403,7 +403,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("protected/keep.txt", result.stderr)
-        self.assertIn("already held a change the user made", result.stderr)
+        self.assertIn("既にユーザの変更があり", result.stderr)
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "overwritten by the agent\n", "ユーザの編集まで消さない")
 
@@ -730,7 +730,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         )
         # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由をつける。
         self.assertIn("not-restored:", result.stderr)
-        self.assertIn("`ask`, not `deny`", result.stderr)
+        self.assertIn("`deny` ではなく `ask` と宣言", result.stderr)
 
     def test_askと宣言した場所は予行でも戻すはずだったと言わない(self):
         # 本番で戻さないものについて「enable なら戻していた」と言うと、
@@ -1143,8 +1143,8 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         result = self.ran_script()
 
         self.assertEqual(result.returncode, 2)
-        self.assertIn("ccnavi itself most likely wrote this", result.stderr)
-        self.assertIn("Do not run undo:", result.stderr)
+        self.assertIn("書いたのはおそらく ccnavi 自身", result.stderr)
+        self.assertIn("undo: は打たないでください", result.stderr)
         # 判定は変えない。報告も undo も出る。
         self.assertIn("undo:", result.stderr)
 

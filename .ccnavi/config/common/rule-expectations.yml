@@ -20,7 +20,7 @@
 deny:
   - tool: Write
     subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/a.md"
-    why: セッションのスクラッチパッドは置き場にしない。ユーザに渡す物は wip/handoff/、使い捨ては scratchpad/ に置く（session-scratchpad）
+    why: セッションのスクラッチパッドは置き場にしない。使い捨ては scratchpad/、ユーザに渡す物は wip/handoff/ に置く（session-scratchpad）
   - tool: Edit
     subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/sub/b.md"
     why: 下の階層も同じ。スクラッチパッドの中ならどこでも止める（session-scratchpad）
@@ -108,7 +108,7 @@ deny:
     why: 読むだけに見えて任意コマンドを実行する形
   - tool: Bash
     subject: "rm -rf /tmp/x"
-    why: 再帰的な強制削除は戻せない
+    why: 再帰的な強制削除は取り消せない
   - tool: Bash
     subject: "find /repo -name *.log -delete"
     why: >-

@@ -42,7 +42,7 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 
 表に無い種類の文書を足すときは、この表に行を足してから使う。
 
-表で「付けていない」とした文書（`CLAUDE.md`・`README.md`類・`SKILL.md`）の理由と探し方は、[.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)の「typeの値」と「対象外」にある。
+表で「付けていない」とした文書（`CLAUDE.md`・`README.md`・`CHANGELOG.md`・`SKILL.md`）の理由と探し方は、[.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)の「typeの値」と「対象外」にある。
 
 ## 対象外の表と実行ファイル
 

@@ -145,11 +145,10 @@ def direct_name_warning(
         else "`ccnavi-worktree.sh <名前>`"
     )
     return (
-        f"直接作業のワークツリー {name} の名前が `<先頭の語>-<番号>-<slug>` の形でない。"
-        "新しく切るときは、先頭の語（CCNAVI_BRANCH_PREFIXES）と番号（issue の番号、"
+        f"直接作業のワークツリー名 {name} が `<先頭の語>-<番号>-<slug>` の形ではありません。"
+        "次から、先頭の語（CCNAVI_BRANCH_PREFIXES）と番号（issue の番号、"
         "無ければ `ccnavi-ticket.sh next-id` の通し番号）を付けて "
-        f"{cut} で切る。"
-        "既にある名前は変えなくてよい"
+        f"{cut} で切ってください。既にある名前は変えなくてよい"
     )
 
 
