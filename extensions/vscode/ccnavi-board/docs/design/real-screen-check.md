@@ -60,8 +60,8 @@ cd "$UC" && git remote remove origin        # 承認の操作が push するの�
 sh "$CCNAVI/scripts/ccnavi-setup.sh" "$UC" --mode enable --force
 ```
 
-コピーなので `--force` を付けてよい。`--force` は配布先の `rules.yml`・`risks.yml` も配布元の既定で置き換える。
-test-repo 本体に反映するときは `--force` を付けない（付けると検証用の設定が消える）。付けて消してしまったら `git checkout -- .ccnavi/config/common/rules.yml .ccnavi/config/common/risks.yml` で戻す。
+コピーなので `--force` を付けてよい。`--force` は、配布先にある配布物（設定 3 本の `rules.yml`・`risks.yml`・共通の `phases.yml`、`.ccnavi/` の文書・スクリプト・テンプレート、スキル、`settings.json` の env）を、配布元の内容で置き換える。
+test-repo 本体に反映するときは `--force` を付けない（付けると検証用の設定が消える）。付けて置き換えてしまったら、`git diff --stat -- .ccnavi .claude` で差分を見て、残したいものだけ `git checkout -- <ファイル>` で戻す（今回は `rules.yml` と `risks.yml` を戻した）。
 
 ### 1.3 チケットを並べる（親 2・子 4）
 
@@ -239,7 +239,7 @@ node "$W/shoot.js" "$UC" board 1280 760 チケット管理      # 最初の 1 �
 | 症状 | 原因 | 対処 |
 |---|---|---|
 | `pnpm -v` が `Cannot find module '…/corepack/v1/pnpm/12.15.0/bin/pnpm.cjs'` で落ちる | `/opt/node22/bin/pnpm` が corepack の shim で、指す先の pnpm（12.15.0）がキャッシュに無く、ネットワーク制限で取れない | `npm i -g pnpm@10`。入れたあと `hash -r; pnpm -v` が 10.x を返す |
-| `ccnavi-setup.sh --force` のあと、test-repo の `rules.yml`・`risks.yml` が配布元の既定に変わっていた | `--force` は配布先にあるものを置き換える。test-repo の検証用の設定も対象 | 作業は検証用コピーで行う（1.2）。本体は `--force` なしで反映する。上書きしたら `git checkout -- <2 ファイル>` で戻す |
+| `ccnavi-setup.sh --force` のあと、test-repo の `rules.yml`・`risks.yml` が配布元の既定に変わっていた | `--force` は配布先にあるものを置き換える。test-repo の検証用の設定も対象 | 作業は検証用コピーで行う（1.2）。本体は `--force` なしで反映する。上書きしたら差分を見て、必要なものを `git checkout -- <ファイル>` で戻す |
 | 検証用コピーで承認の操作をしたら、コピーの `origin`（test-repo の実物）に親のブランチが push された | 承認のあとにボードが送るコミット・push の sh が、コピーの `origin` へ push する | コピーを作った直後に `git remote remove origin`（1.2）。本体へ push してしまったときは、そのブランチを削除する（ユーザに確かめてから） |
 | 最初に開いた画面が「案内のための見本」で、実際のチケットが出ない | 初回起動（その画面の案内をまだ閉じていない）は、案内ツアーが見本のデータで始まる | 案内の × を 1 回押す（`[data-action="tour-skip"]`）。閉じたあとに実データへ替わる。撮るたびに閉じる処理を入れる（`shoot.js` の `skipTour`）。表示が出ない画面もあるので、あれば閉じる、の形にする |
 | `npm install code-server` が `sh ./postinstall.sh` で失敗する（root では `--unsafe-perm` を要求される） | postinstall がネイティブモジュールをビルドする。`--unsafe-perm` を付けても `kerberos` の node-gyp が失敗する | `--ignore-scripts` で入れる。ネイティブモジュールが無くても、画面の確認には足りた |
@@ -277,7 +277,7 @@ node "$W/shoot.js" "$UC" uc 1280 760 チケット管理 ルール管理 リス�
 | フェーズ管理 | 一覧から | 同上。共通の定義の一覧 |
 | テンプレート管理 | 一覧から | 空の状態 |
 | プロジェクト管理 | 一覧から | 空の状態（`projects/` が無い警告を含む） |
-| 取り込み待ち | ルール管理・リスク管理の「取り込み待ちを開く」（一覧には無い） | 下書きがある状態と、無い状態（1.3 の下書き） |
+| 取り込み待ち | ルール・リスク・フェーズ・テンプレートの各管理画面の「取り込み待ちを開く」（一覧には無い） | 下書きがある状態と、無い状態（1.3 の下書き） |
 | 計画編集 | チケット管理の、承認待ちの親のカードの計画を編集するボタン | 計画の図 |
 | フロー編集 | チケット管理のカードのフローのボタン | 図と右のペイン。図の文字が既定の倍率で読めるか |
 
@@ -334,7 +334,7 @@ ccnavi 本体が返す文言（エラーの文、判定の結果）は `$CCNAVI/
 | VS Code 本体の日本語表示 | 日本語言語パックを入れられなかった（Open VSX に出られない） | ネットワークの制限が無い環境で `ms-ceintl.vscode-language-pack-ja` を `--install-extension` する。入れてから `locale` を `ja` にして撮り直す。その環境で、メニューや通知が日本語のとき、拡張の英語混じりの表記がどう見えるかも見る |
 | ライトテーマ・見た目の切り替え（◐ ボタン） | 設定に `Default Dark Modern` を書いた撮影は暗く、あとから `Default Light Modern` に書き換えても暗いままだった（原因は未調査）。設定に何も書かない 1.5 の手順では、明るい配色で撮れた。◐ ボタンは押していない | ユーザー設定の `workbench.colorTheme` で明るい・暗いを明示し、ブラウザ側の保存（`--user-data-dir` を作り直す）も消してから再読み込みし、左上の ◐（見た目を切り替えるコマンド）で `claude-light`・`claude-dark`・`vscode` を順に撮る。ハイコントラストも見る |
 | 取り込み待ちの差分の展開 | 行の ▶ を押す操作が開かなかった（セレクタの特定に失敗した） | 開発者ツールで行の要素を調べてから押す。差分の見出し、追加行・削除行の色、長いファイルの扱いを撮る |
-| レビュー待ちチケットの「レビュー完了」操作 | レビュー待ちの子（`wip/proposals/review/` に置かれた状態）を作っていない | `ccnavi-ticket.sh finish` で子を閉じる流れ（`manual-checks.md` の 5・5b）で状態を作る。指摘の対応方針を選ぶ画面と、指摘が無いときの画面を撮る |
+| レビュー待ちチケットの「レビュー完了」操作 | レビュー待ちの子（`wip/proposals/review/` に置かれた状態）を作っていない | `ccnavi-ticket.sh finish` で子を閉じる流れ（[manual-checks.md](manual-checks.md) の 5・5b）で状態を作る。指摘の対応方針を選ぶ画面と、指摘が無いときの画面を撮る |
 | 実機の等幅フォント・ターミナル | code-server のため | 実機の VS Code で同じ画面を開き、「¥」とターミナルの崩れが出るか確かめる |
 
 ## 6. 画像の置き場
