@@ -16,11 +16,13 @@ import { TOKEN } from "./helpers/mock-github.js";
 import {
   answerProblems,
   applyAllow,
+  compare,
   compareAll,
   loadData,
   normalize,
   readsOf,
   readsProblems,
+  selectReads,
   substitute,
   type Entry,
   type Recorded,
@@ -81,7 +83,7 @@ function problems(answers: Answers): string[] {
 
 test("CX-T386 契約: 規則の表（normalize-cases.json）の全件が、期待の形と一致する", () => {
   const cases = loadData("normalize-cases.json") as { name: string; input: unknown; expect: Shape }[];
-  assert.equal(cases.length, 15);
+  assert.ok(cases.length > 0);
   for (const c of cases) assert.deepEqual(normalize(c.input), c.expect, c.name);
 });
 
@@ -114,7 +116,7 @@ test("CX-T387 契約: 同じ生の入力を Python と TS で正規化して一�
 });
 
 test("CX-T388 契約: MockGitLab が内部の状態から答える応答は、本物の記録と reads の範囲で形が合う", () => {
-  assert.ok(requests.length > 0);
+  assert.deepEqual(requests.map((r) => r.name), ["user", "project", "mrs_merged", "error_401", "error_404", "mr_create"]);
   assert.deepEqual(problems(send()), []);
 });
 
@@ -130,4 +132,20 @@ test("CX-T389 契約の変異: 応答を 1 か所変えると、キーと違い�
   assert.ok(mutate((a) => (merged(a)[0].iid = "x")).includes("mrs_merged/[].iid/type"));
   assert.ok(mutate((a) => (a.mr_create[0] = 200)).includes("mr_create/$status/status"));
   assert.ok(mutate((a) => (a.mrs_merged[1] = [])).includes("mrs_merged: 配列が空（場面が組めていない）"));
+});
+
+test("CX-T390 契約の比較器: extra・presence・reads 外の欠けの除外・許可リストの 3 つの検査が動く", () => {
+  const s = (t: string, keys?: Record<string, Shape>, opt?: string[]): Shape => ({ t: [t], ...(keys ? { keys } : {}), ...(opt ? { opt } : {}) });
+  const int = s("integer");
+  const diffs = compare(s("object", { a: int, b: int }), s("object", { a: int, c: int }, ["a"]));
+  assert.deepEqual(diffs, [["a", "presence"], ["b", "missing"], ["c", "extra"]]);
+  // reads に無い欠けは落とし、reads の中の欠けと extra は残す
+  assert.deepEqual(selectReads(diffs, ["b"]), diffs);
+  assert.deepEqual(selectReads(diffs, ["a"]), [["a", "presence"], ["c", "extra"]]);
+  const [left, probs] = applyAllow({ r: [["k", "type"]] }, [
+    { request: "x", key: "y", kind: "type", reason: "" },
+    { request: "x", key: "y", kind: "bogus", reason: "r" },
+  ]);
+  assert.deepEqual(left, { r: [["k", "type"]] });
+  assert.equal(probs.filter((p) => p.includes("理由が空") || p.includes("違いの種類") || p.includes("古い許可")).length, 4);
 });

@@ -44,7 +44,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 
 - `path` は `/api/v4` より後ろ。`query`・`body` は省略できる
 - `token` は `main`（認証あり）か `none`（認証なし）
-- `used_by` はその要求を使うもの（`sh`、`chrome`）。`chrome` は、Chrome 拡張の `MockGitLab` が内部の状態から 200/201 で答え、TS の契約の試験が比べる要求だけに付ける。録る側と `fakeside` は `used_by` を見ずに全要求を送る
+- `used_by` は、その要求を比べる側（`sh`、`chrome`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張の `MockGitLab` が内部の状態から 200/201 で答え、TS の契約の試験が比べる要求だけに付ける。録る側と `fakeside` は `used_by` を見ずに全要求を送る
 - `expect_status` は録るときに本物が返すべきステータス。`error_401` は 401、`error_404` は 404、ほかは 200 か 201。**1 本でも違えば `recorded.json` を置かない**
 - `reads` は、その要求の応答のうち、sh と拡張が実際に読むキー（下の「reads」）
 - `save` は、応答の本文のキーを後ろの要求の `${…}` に使う（`user` が `user.id` を置く）
@@ -78,7 +78,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 
 ## reads（比べるキー）
 
-本物の応答は 30〜100 のキーを返すが、sh が読むのはその一部（拡張は project の権限の検査と既定のブランチ（default_branch）だけ。拡張だけが使う要求は載せていない）。模擬は読まれるキーだけ返せばよい。そこで要求ごとに `reads`（読むキーの一覧）を持ち、比べるキーを絞る。
+本物の応答は 30〜100 のキーを返すが、sh が読むのはその一部（拡張は project の権限の検査（`project_access` と `group_access`）と既定のブランチ（default_branch）だけ。拡張だけが使う要求は載せていない）。模擬は読まれるキーだけ返せばよい。そこで要求ごとに `reads`（読むキーの一覧）を持ち、比べるキーを絞る。
 
 - **導き方**: `.ccnavi/scripts/` の `jq` の式（`ccnavi-start.sh`・`ccnavi-branches.sh`・`ccnavi-review.sh`・`ccnavi-common-review.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-common-host.sh`）と、拡張の `extensions/chrome/ccnavi-approval/src/core/gitlab.ts` の読み方から導く。sh が `// ""` で受ける省略できるキーでも、本物が返すものは載せる。本物が返さないキー（`closes_issues` の `references`、`reviewers` の `updated_at`、非差分のスレッドの `position`）は、存在の検査に通らないので載せない
 - **書き方**: 比較器の差のキーと同じ。`author.id`、`[].iid`（応答が配列のとき）、`notes[].system`（配列の中）
@@ -173,7 +173,7 @@ keywords: [契約テスト, contract, GitLab, recorded.json, recorded.sample.jso
 `extensions/chrome/ccnavi-approval/test/gitlab-contract.test.ts`（`pnpm test`。`--e2e` には入れない）が、`MockGitLab` の `handle` を直接呼び、`used_by` に `chrome` を持つ要求だけを `recorded.json` と `reads` で比べる。比較器 `test/helpers/shape.ts` は `shape.py` の写しで、名前も規則も同じ。正本は Python で、規則を変えたいときは Python を直し、`normalize-cases.json` を直してから TS を合わせる。
 
 - 比べる要求（`MockGitLab` が内部の状態から 200/201 で答えるもの）: `user`・`project`・`mrs_merged`・`mr_create`・`error_401`・`error_404`。`MockGitLab` が 404 か形の違う応答を返す要求（`member` など）は `chrome` を付けず、比べない
-- `mrs_opened` は比べない。`source_branch` を付けると `MockGitLab` は `pulls`（番号とレビューだけ。title なし）から `iid` と `source_project_id` だけを返し、場面を付けると見本から返すため、`reads` の範囲で答える経路がない
+- `mrs_opened` は比べない。`source_branch` を付けると `MockGitLab` は `pulls` から `iid`・`source_project_id`・`web_url` だけを返し、場面を付けると見本から返すため、`reads` の範囲で答える経路がない
 - 見本（`test/fixtures/host/gitlab/*`）から返す応答は比べない。手で組んだもので、本物の形を写していない
 - 許可リストは `chrome_entries`（`entries` に混ぜない。`apply_allow` が当たらない項目を古い許可として落とす）
 - 同じ生の入力を Python と TS で正規化して一致することも確かめる。`uv` が無ければ、その試験は skip と出る
