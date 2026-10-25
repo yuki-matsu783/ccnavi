@@ -48,7 +48,7 @@ CONTAINER = "gitlab"
 # compose の project 名（compose.yml の name）と、そのボリューム名
 DATA_VOLUME = "ccnavi-gitlab_gitlab_data"
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.normpath(os.path.join(HERE, os.pardir, os.pardir))
+ROOT = os.path.normpath(os.path.join(HERE, os.pardir, os.pardir, os.pardir))
 COMPOSE_FILE = os.path.join(HERE, "compose.yml")
 TOKEN_SCRIPT = os.path.join(HERE, "make_gitlab_tokens.rb")
 TOKEN_KEYS = ("GITLAB_TOKEN", "CCNAVI_PROBE_REVIEWER_TOKEN")
@@ -165,7 +165,7 @@ def compose(args: list[str], password: str):
     env["GITLAB_PORT"] = str(PORT)
     env["GITLAB_MEM_LIMIT"] = MEM_LIMIT
     env["GITLAB_ROOT_PASSWORD"] = password or "unused"
-    # 起動と停止は長い。時間切れで止めない
+    # 起動と停止は時間がかかるので、時間切れで打ち切らない
     return run(["docker", "compose", "-f", COMPOSE_FILE, *args], env=env, timeout=None)
 
 
@@ -177,10 +177,14 @@ def rails_ok() -> bool:
 
 
 def ensure_tokens(client: gitlab_api.Client, rotate: bool) -> dict[str, str] | None:
-    """有効なトークンが既にあれば、そのまま返す。無いときか --rotate のときだけ作る。"""
+    """有効なトークンが既にあれば、そのまま返す。無いときか --rotate のときだけ作る。
+
+    401（失効）のときだけ無効とみなす。0・5xx は一時的な不通かもしれず、
+    作り直すと有効な既存を失効させる。
+    """
     current = read_env_file(tokens_path())
     present = all(current.get(k) for k in TOKEN_KEYS)
-    if not rotate and present and all(client.user(current[k])[0] == 200 for k in TOKEN_KEYS):
+    if not rotate and present and all(client.user(current[k])[0] != 401 for k in TOKEN_KEYS):
         log.info("トークンを再利用した")
         return current
     # 有効でない（無い・失効した）か --rotate のときだけ作る。作ると既存は失効する
@@ -309,7 +313,7 @@ def cmd_status(_args: argparse.Namespace) -> int:
     version = body.get("version") if isinstance(body, dict) else body
     print(f"API: HTTP {status}、GitLab {version}")
     valid = all(client.user(tokens[k])[0] == 200 for k in TOKEN_KEYS)
-    print(f"トークンの有効性: {'有効' if valid else '無効（up --rotate で作り直す）'}")
+    print(f"トークンの有効性: {'有効' if valid else '無効（up で作り直す）'}")
     return 0
 
 

@@ -1,5 +1,5 @@
 # 手動の確認用の GitLab CE。起動・停止・確認は docker_gitlab.py が行う（直接 compose を打たない）。
-# 環境変数は docker_gitlab.py が渡す。ポート・版・メモリ上限は docker_gitlab.py の定数が 1 か所の正本。
+# 環境変数は docker_gitlab.py が渡す。ポート・版・メモリ上限は docker_gitlab.py の定数で 1 か所に決める。
 name: ccnavi-gitlab
 
 services:
@@ -15,7 +15,7 @@ services:
     mem_limit: ${GITLAB_MEM_LIMIT:?docker_gitlab.py の GITLAB_MEM_LIMIT で渡す}
     environment:
       GITLAB_ROOT_PASSWORD: ${GITLAB_ROOT_PASSWORD:?docker_gitlab.py の GITLAB_ROOT_PASSWORD で渡す}
-      # external_url と公開ポートは同じ値にする。崩れると clone URL と web_url が壊れる
+      # external_url と公開ポートは同じ値にする。ずれると clone URL と web_url が壊れる
       GITLAB_OMNIBUS_CONFIG: |
         external_url 'http://127.0.0.1:${GITLAB_PORT}'
         nginx['listen_port'] = ${GITLAB_PORT}

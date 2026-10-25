@@ -2,20 +2,21 @@
 
 環境変数を読まない・ファイルや一時ディレクトリを作らない・`sys.exit` しない。接続先は
 `Client(base)` の引数、トークンは各メソッドの引数で受ける。`probe_gitlab.py` と、本物の GitLab の
-応答を録る道具、受入シナリオの相手の準備が使う。
+応答を記録する道具、受入シナリオの相手の準備が使う。
 
 sh と同じ道具（curl・glab）を使わないのは、片方の不具合がもう片方に隠れないようにするため。
 
 ## 公開するもの
 
     Client(base, *, recorder=None, sleep=time.sleep)
-        base は GitLab の根（`http://localhost:8929`）。`/api/v4` は付けない。
+        base は GitLab の根（`http://127.0.0.1:8929`）。`/api/v4` は付けない。
         recorder は `recorder(event: dict)` で、呼び出しごとに 1 回呼ばれる（応答を残す用）。
         event のキー: kind（"result" か "retry"）、method、path、payload、status、body、tag、error
         トークンは event に入れない。
     Client.call(method, path, token, payload=None, tag="") -> (status, body)
         path は `/api/v4` より後ろ（`/projects/1`）。接続の失敗は 10 秒おいて 3 回まで試し、
-        それでも駄目なら status は 0、body は `{"error": ...}`。HTTP の 4xx / 5xx は例外にしない。
+        それでも失敗するなら status は 0、body は `{"error": ...}`。
+        HTTP の 4xx / 5xx は例外にしない。
     Client.version(token), Client.user(token)
     Client.create_project(token, path, *, visibility="private") -> (status, body)
     Client.delete_project(token, project_id)
@@ -68,7 +69,7 @@ class Client:
     def call(
         self, method: str, path: str, token: str, payload: dict | None = None, tag: str = ""
     ) -> tuple[int, object]:
-        """起動直後の GitLab は遅いので、120 秒の待ちを 3 回まで試す。"""
+        """起動直後の GitLab は応答が遅いので、1 回の待ちは 120 秒まで、失敗したら 3 回まで試す。"""
         data = json.dumps(payload).encode("utf-8") if payload is not None else None
         req = urllib.request.Request(
             self.api + path,

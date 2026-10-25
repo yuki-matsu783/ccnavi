@@ -4,11 +4,11 @@
 tests/ticket/test_ticket.py と同じ形で一時リポジトリを作り、使い捨てのプロジェクトを
 GitLab に作って、`ccnavi-ticket.sh` / `ccnavi-git.sh` / `ccnavi-review.sh` を実物に通す。
 人間役（レビュアー）は別ユーザのトークンで API を直に呼ぶ。
-sh と同じ道具を使わないほうが、片方の不具合がもう片方に隠れない。
+sh と同じ道具を使わないのは、片方の不具合がもう片方に隠れないようにするため。
 
 ## 用意するもの
 
-- 動いている GitLab（既定 `http://localhost:8929`。`CCNAVI_PROBE_GITLAB` で変える）。
+- 動いている GitLab（既定 `http://127.0.0.1:8929`。`CCNAVI_PROBE_GITLAB` で変える）。
   `tests/manual/gitlab/docker_gitlab.py up` で立てる（手順は docs/42_claude/gitlab-manual.md）
 - トークン 2 本（`GITLAB_TOKEN`（root、エージェント役）と
   `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役））。
@@ -105,7 +105,7 @@ def setup() -> None:
     OUT = os.path.join(OUT, "glrun-" + STAMP)
     ROOT = os.path.join(OUT, "repo")
     os.makedirs(OUT, exist_ok=True)
-    # 走っている間ずっと書くので、閉じるのは finish()。
+    # 実行中ずっと書き続けるので、閉じるのは finish() で行う。
     LOG = open(os.path.join(OUT, "steps.log"), "w", encoding="utf-8")  # noqa: SIM115
     ENV = env_for()
 
