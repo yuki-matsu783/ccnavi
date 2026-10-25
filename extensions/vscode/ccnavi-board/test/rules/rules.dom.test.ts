@@ -48,6 +48,21 @@ function judged(rules: readonly RuleHitJson[]): { type: string; result: TestJson
   return { type: "judged", result, hooks: [] };
 }
 
+test("CB-D1227 判定結果は一時パスを出さず、項目名は日本語に英語を添える", async () => {
+  const dom = await openRules();
+  try {
+    const sent = judged([{ id: "../../tmp/ccnavi-rules-aB3dE9/rules.yml:no-rm", section: "deny", source: "file", kind: "", written: "", pattern: "" } as RuleHitJson]);
+    await dom.send({ ...sent, result: { ...sent.result, response: "[ccnavi] X (rule: ../../tmp/ccnavi-rules-aB3dE9/rules.yml:no-rm)" } });
+    await dom.settle();
+    const shown = dom.one("#judge-result").textContent ?? "";
+    assert.ok(!shown.includes("ccnavi-rules-"), shown);
+    assert.match(shown, /ツール（tool）/);
+    assert.match(shown, /rules\.yml:no-rm/);
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D01 既定は全部畳む。行の見出しを押すと開き、開いた行の id が state に入る。もう一度押すと畳む", async () => {
   const dom = await openRules();
   try {

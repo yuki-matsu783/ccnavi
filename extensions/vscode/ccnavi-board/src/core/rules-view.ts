@@ -259,3 +259,17 @@ export function modeBanner(mode: string): string {
   }
   return "";
 }
+
+/** 編集中の内容を判定に渡すための一時ディレクトリの接頭辞（`rules-panel.ts` の `mkdtemp` と共有する） */
+export const TMP_RULES_PREFIX = "ccnavi-rules-";
+
+const TMP_RULES = new RegExp(`(?:[A-Za-z]:)?(?:\\.\\.[\\\\/])*[^\\s:()]*${TMP_RULES_PREFIX}[A-Za-z0-9]{6}[\\\\/]rules\\.yml:`, "g");
+
+/**
+ * 判定結果の文字列から、編集中の内容を置いた一時ファイルのパスを消す。
+ * 実行ファイルはルール id を「ワークスペースからの相対のファイル:id」で言うので、一時ファイルのルールは
+ * `../../../tmp/ccnavi-rules-XXXXXX/rules.yml:<id>`（ドライブが違う Windows では絶対パス）になる。`rules.yml:<id>` に縮める。
+ */
+export function tmpName(text: string): string {
+  return text.replace(TMP_RULES, "rules.yml:");
+}

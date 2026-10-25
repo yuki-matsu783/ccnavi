@@ -36,7 +36,7 @@ import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
-import { isToolName, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
+import { isToolName, TMP_RULES_PREFIX, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { rulesSums, type RulesSum } from "./core/sums.js";
 import { showLoading } from "./loading.js";
@@ -167,7 +167,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     target,
     panel,
     folder,
-    tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-rules-")),
+    tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), TMP_RULES_PREFIX)),
     host: rulesHost(panel, folder.uri.fsPath),
     fileWatchers: [],
     watchers: [],

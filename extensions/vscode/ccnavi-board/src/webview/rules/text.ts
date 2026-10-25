@@ -77,3 +77,13 @@ export function countText(query: string, shown: number, total: number, kept: num
   }
   return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目: ${kept} 件）` : ""}`;
 }
+
+/** 判定結果の項目名。日本語を主に、英語（実行ファイルの JSON の名前）を括弧に添える */
+export const JUDGE_LABELS = {
+  tool: "ツール（tool）",
+  subject: "対象（subject）",
+  resolved: "実際に見た対象（resolved）",
+  reason: "理由（reason）",
+  degraded: "縮退（degraded）",
+  fallback: "組み込みの既定（fallback）",
+} as const;
