@@ -12,6 +12,7 @@ import tempfile
 import unittest
 
 from ccnavi.hook import post_report, reasons
+from tests import ROOT
 
 ENGLISH_SENTENCE = re.compile(r"\b[A-Za-z]{2,}(?:\s+[A-Za-z']{2,}){3,}")
 
@@ -35,7 +36,7 @@ class MessageLanguageTest(unittest.TestCase):
 
         for event in (hookio.PRE_TOOL_USE, hookio.POST_TOOL_USE):
             for passed in (False, True):
-                text = reasons.internal_error("X", event, "IndexError", "/log", passed=passed)
+                text = reasons.internal_error(ROOT, "X", event, "IndexError", "/log", passed=passed)
                 self.assertEqual(english_in(text), [], text)
         self.assertEqual(english_in(reasons.internal_error_notice("X", "Stop", "E", "/log")), [])
 

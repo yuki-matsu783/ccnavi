@@ -500,7 +500,7 @@ def decide_before(
             mode,
             record,
             rules.DENY,
-            notices + [reasons.subagent_forbidden(display_subject, runner, layer)],
+            notices + [reasons.subagent_forbidden(root, display_subject, runner, layer)],
             conf=conf,
             root=root,
             kind=GATE,
@@ -692,6 +692,7 @@ def decide_before(
         record.rules = [reasons.rewrite_rule(form) for form in forms]
         parts = [
             reasons.rewrite(
+                root,
                 record.subject,
                 form,
                 [text for f, text in rewrites if f == form],
@@ -764,6 +765,7 @@ def decide_before(
                 )
                 stderr.write(
                     reasons.deadline_exceeded(
+                        root,
                         audit.REASON_DEADLINE_EXCEEDED,
                         DEADLINE_SECONDS,
                         passed=code == EXIT_OK,
@@ -955,6 +957,7 @@ def decide_before(
                     runner,
                     layer,
                     quoted,
+                    root=root,
                     git=settings.git_wrapper_command(root),
                 )
                 for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
@@ -978,6 +981,7 @@ def decide_before(
                 runner,
                 layer,
                 quoted,
+                root=root,
                 git=settings.git_wrapper_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
@@ -1006,10 +1010,11 @@ def decide_before(
                         runner,
                         layer,
                         quoted,
+                        root=root,
                         git=settings.git_wrapper_command(root),
                     ),
                     *(
-                        reasons.ask_hint(rule.bare_id, display_subject)
+                        reasons.ask_hint(root, rule.bare_id, display_subject)
                         if rule.decision == rules.ASK
                         else ()
                     ),
@@ -1041,6 +1046,7 @@ def decide_before(
                     record.degraded,
                     verdict=verdict,
                     fell_back=record.fallback == builtin.FALLBACK,
+                    root=root,
                 )
             ]
         )

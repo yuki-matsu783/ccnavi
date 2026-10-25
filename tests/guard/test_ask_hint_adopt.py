@@ -57,7 +57,7 @@ class AskHintAdoptTest(unittest.TestCase):
         self.assertIn("了承", said)
         self.assertIn("チケットに結び付く", said)
         self.assertIn("了承されても通りません", said)
-        self.assertIn("マージリクエストで出します", said)
+        self.assertIn("マージリクエストで出す", said)
 
     def test_ほかの指定は従来どおり_adopt_の断りを足さない(self):
         decision, said = self.reason(f"{WT} feature-1 --base main")

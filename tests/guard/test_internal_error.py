@@ -240,17 +240,17 @@ class InternalErrorTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("[ccnavi] payload-unusable", result.stderr)
         # イベント名すら読めない回は、何を止めたかを言わず、直す側だけを名指しする。
-        self.assertIn("The user needs to check", result.stderr)
-        self.assertNotIn("this call", result.stderr)
+        self.assertIn("exit code 2 で止まりました", result.stderr)
+        self.assertNotIn("この呼び出し", result.stderr)
 
     def test_unusable_payload_text_follows_the_event(self):
         """exit 2 が何を止め、文が誰に届くかはイベントで違う。文をそれに合わせる。"""
         cases = {
-            "PreToolUse": ("stopped it", "Tell the user"),
-            "PostToolUse": ("has already run", "Tell the user"),
-            "UserPromptSubmit": ("held this message back", "Sending it again"),
-            "Stop": ("kept it from ending", "end the turn"),
-            "SubagentStop": ("kept it from ending", "final report"),
+            "PreToolUse": ("判定できないので止めました", "確かめてもらい"),
+            "PostToolUse": ("すでに実行済み", "確かめてもらい"),
+            "UserPromptSubmit": ("Claude に渡す前に止めました", "送り直しても通らない"),
+            "Stop": ("終わらせませんでした", "ターンを終える"),
+            "SubagentStop": ("終わらせませんでした", "最終報告"),
         }
         for event, (what, then) in cases.items():
             with self.subTest(event=event):
@@ -260,7 +260,7 @@ class InternalErrorTest(unittest.TestCase):
                 self.assertIn(what, result.stderr)
                 self.assertIn(then, result.stderr)
                 if event != "PreToolUse":
-                    self.assertNotIn("judge this call", result.stderr)
+                    self.assertNotIn("この呼び出しを判定できない", result.stderr)
                 row = rows(self.root)[-1]
                 self.assertEqual(row["reason"], "payload-unusable")
                 self.assertEqual(row["event"], event)
@@ -276,9 +276,8 @@ class InternalErrorTest(unittest.TestCase):
                 result = run_raw(self.root, json.dumps(payload), mode="dry-run")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("[ccnavi] payload-unusable", result.stderr)
-                self.assertIn("nothing was stopped", result.stderr)
-                self.assertNotIn("stopped it", result.stderr)
-                self.assertNotIn("held this message back", result.stderr)
+                self.assertIn("何も止めていません", result.stderr)
+                self.assertNotIn("止めました", result.stderr)
 
     def test_unusable_payload_before_a_tool_call_stops_even_in_dry_run(self):
         """ツールが分からない呼び出しの前は、dry-run でも止める。"""
@@ -288,7 +287,7 @@ class InternalErrorTest(unittest.TestCase):
                 result = run_raw(self.root, json.dumps(payload), mode="dry-run")
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("[ccnavi] payload-unusable", result.stderr)
-                self.assertNotIn("nothing was stopped", result.stderr)
+                self.assertNotIn("何も止めていません", result.stderr)
 
 
 class FailClosedByToolTest(unittest.TestCase):
@@ -478,16 +477,16 @@ class DeadlineTextTest(unittest.TestCase):
         result, row = self.run_late("enable")
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
-        self.assertIn("so it stopped it", result.stderr)
-        self.assertIn("split the command", result.stderr)
+        self.assertIn("止めました", result.stderr)
+        self.assertIn("短く分けて", result.stderr)
         self.assertEqual(row["reason"], "deadline-exceeded")
 
     def test_dry_run_lets_it_through_and_does_not_say_stopped(self):
         result, row = self.run_late("dry-run", "ls")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
-        self.assertIn("went through", result.stderr)
-        self.assertNotIn("so it stopped it", result.stderr)
+        self.assertIn("通しました", result.stderr)
+        self.assertNotIn("止めました", result.stderr)
         self.assertEqual(row["reason"], "deadline-exceeded")
 
     def test_the_deadline_follows_the_tool_kind(self):
