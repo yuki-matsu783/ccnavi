@@ -3,7 +3,7 @@ type: skill-reference
 title: テストのグループと回すグループの決め方
 description: ccnavi のテストを複数のグループに分けて管理する方法と、変更時にどのグループを実行すべきか決める基準
 tags: [process-test, skills]
-keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, discover]
+keywords: [テストグループ, tests, core, guard, config, ticket, sh, contract, e2e, discover]
 ---
 
 # テストのグループと、回すグループの決め方
@@ -19,6 +19,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, d
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク | 約 140 秒 |
 | `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean・レビューの sh・write-and-push。write-and-push は重いため、`test_write_and_push_*.py` の 6 本に分けてある）。配布する sh を起動するテストはここに置く | 約 80 秒 |
+| `contract` | 録画した GitLab の応答の形（JSON）と、Python の模擬（`tests/fake_gitlab.py`）の応答の形の比較。sh を起動しないので `sh` に混ぜない（`sh` は約 80 秒の群） | 約 6 秒 |
 | `e2e` | 本物のワークスペースを組み立てて sh を外から実行する。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
 
 ```sh
@@ -55,7 +56,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/ticketsample.py` | `ticket` `sh` |
-| `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` | `scenarios` `sh`（どちらのグループも、この 2 つの代役と模擬を import して使う） |
+| `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` | `scenarios` `sh` `contract`（どちらのグループも、この 2 つの代役と模擬を import して使う） |
 | `tests/fixtures/` | `guard` `ticket` |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `extensions/chrome/ccnavi-approval/`（`py/`・`test/fixtures/`） | `ticket` `sh`（Chrome の入口を手元のコアと突き合わせる） |
