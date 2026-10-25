@@ -350,7 +350,8 @@ def _deny(root: str) -> list[dict]:
                 if wrapper
                 else "再帰的な強制削除は取り消せません。削除するものを 1 つずつ名指しするか、"
                 "ユーザに削除を頼んでください。"
-                "ただし scratchpad/ の一時物は、名指しの rm -f と rmdir（空のディレクトリ）で消せます。"
+                "ただし scratchpad/ の一時物は、名指しの rm -f と rmdir"
+                "（空のディレクトリ）で消せます。"
             ),
         },
         {

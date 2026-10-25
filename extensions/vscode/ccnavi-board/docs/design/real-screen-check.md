@@ -75,6 +75,7 @@ test-repo 本体に反映するときは `--force` を付けない（付ける�
 ```python
 # seed.py: python3 seed.py <検証用コピー> <ccnavi のリポジトリ>
 import os, subprocess, sys
+
 root, ccnavi = sys.argv[1], sys.argv[2]
 sys.path.insert(0, ccnavi)
 from tests.ticketsample import parent_text, child_text  # noqa: E402
@@ -82,21 +83,28 @@ from tests.ticketsample import parent_text, child_text  # noqa: E402
 phases = open(f"{root}/.ccnavi/config/common/phases.yml", encoding="utf-8").read()
 A, B = "feature-101-ログイン画面", "fix-102-日本語の文字化け"
 
+
 def git(*args, cwd=root):
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=cwd, check=True)
 
+
 def put(rel, text):
-    fam = A if A in rel else B   # チケットは親のワークツリーに置く
+    fam = A if A in rel else B  # チケットは親のワークツリーに置く
     path = os.path.join(root, ".claude/worktrees", fam, rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     open(path, "w", encoding="utf-8", newline="").write(text)
+
 
 def parent(name, title, plan, issue):
     text = parent_text(name, plan, issue=issue, copy=phases).replace("title: 親", f"title: {title}")
     return text.replace("reason: t", "reason: 画面の見た目が変わるため")
 
+
 def child(name, par, phase, title, scope, review=True):
-    return child_text(name, par, phase, scope, review).replace(f"title: 子 {name}", f"title: {title}")
+    return child_text(name, par, phase, scope, review).replace(
+        f"title: 子 {name}", f"title: {title}"
+    )
+
 
 for fam in (A, B):  # 親ごとにブランチとワークツリー（無いと承認も着手もできない）
     git("branch", fam)
@@ -107,12 +115,24 @@ done = 'completed_at: "2026-10-20T11:00:00+09:00"'
 a = parent(A, "ログイン画面を追加する", ["research", "design", "implement"], 101)
 put(f".ccnavi/approved/doing/{A}.md", a.replace('started_at: ""', started))
 c1 = child(f"{A}-01-01", A, 1, "ログイン方式の調査", ("wip/research/*",), False)
-put(f".ccnavi/approved/done/{A}-01-01.md", c1.replace('started_at: ""', started).replace('completed_at: ""', done))
+put(
+    f".ccnavi/approved/done/{A}-01-01.md",
+    c1.replace('started_at: ""', started).replace('completed_at: ""', done),
+)
 c2 = child(f"{A}-02-01", A, 2, "ログイン画面の設計", ("wip/design/*",))
 put(f".ccnavi/approved/doing/{A}-02-01.md", c2.replace('started_at: ""', started))
-put(f"wip/proposals/todo/{A}-03-01.md", child(f"{A}-03-01", A, 3, "ログイン画面の実装", ("src/*", "tests/*")))
-put(f"wip/proposals/todo/{B}.md", parent(B, "CSV 出力の日本語が文字化けする不具合を直す", ["quick-work"], 102))
-put(f"wip/proposals/todo/{B}-01-01.md", child(f"{B}-01-01", B, 1, "文字コードを UTF-8（BOM 付き）にそろえる", ("src/*", "tests/*")))
+put(
+    f"wip/proposals/todo/{A}-03-01.md",
+    child(f"{A}-03-01", A, 3, "ログイン画面の実装", ("src/*", "tests/*")),
+)
+put(
+    f"wip/proposals/todo/{B}.md",
+    parent(B, "CSV 出力の日本語が文字化けする不具合を直す", ["quick-work"], 102),
+)
+put(
+    f"wip/proposals/todo/{B}-01-01.md",
+    child(f"{B}-01-01", B, 1, "文字コードを UTF-8（BOM 付き）にそろえる", ("src/*", "tests/*")),
+)
 
 for fam in (A, B):
     wt = f"{root}/.claude/worktrees/{fam}"

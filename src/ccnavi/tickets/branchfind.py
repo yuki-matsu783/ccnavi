@@ -11,8 +11,9 @@
   ブランチ・ワークツリー・`issue:` を持つチケット）を集め、sh がホストから取ってきた結果
   （`--result`）と合わせて 1 候補 1 行か JSON で出す
 
-実行ファイルはネットワークに出ない（docs/42_claude/exe-boundary.md）。ホスト（MR の元ブランチ、issue を
-参照している MR）は sh が読み、ここはその JSON を読むだけ。ホストを見ていないときは、そう言う。
+実行ファイルはネットワークに出ない（docs/42_claude/exe-boundary.md）。ホスト（MR の元ブランチ、
+issue を参照している MR）は sh が読み、ここはその JSON を読むだけ。
+ホストを見ていないときは、そう言う。
 """
 
 from __future__ import annotations
@@ -440,7 +441,8 @@ def names_number(name: str, number: int) -> bool:
     区切り以外の文字（英字・数字など）が隣にあるものは通さない（`feature-1520-x`・`v15-2`・`i152`・`152a`）。
     Claude の web セッションが作る `claude/<形容詞>-<名前>-<6 文字の乱数>` の乱数
     （`claude/tender-volta-qmy99q`）に番号と同じ数字が入っても、無関係なブランチを候補にしない。
-    `i152` のように英字が直に付くものは、番号を含む別の語の一部かもしれず、番号を指すとは言えないので通さない。
+    `i152` のように英字が直に付くものは、番号を含む別の語の一部かもしれず、
+    番号を指すとは言えないので通さない。
     """
     return re.search(rf"(?<![^-/_.]){number}(?![^-/_.])", name) is not None
 

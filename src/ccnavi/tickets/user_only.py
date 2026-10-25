@@ -557,8 +557,9 @@ def user_entry_forms(excluding: str = "") -> str:
     （実行ファイルは断るが、止める側に倒す）。`excluding` は、別の deny が止める操作の名前
     （`prune` は、チケット制御ではなくコアのファイルの保護の設定に従う）。
 
-    オプションの値は付けなくても読む。`--root ''` のように空の引用符で値を空にした形は、hook が読む前に
-    引用符ごと消えて `--root user agree` に見えるので、`user` を値と読んで入口を見逃さないため。
+    オプションの値は付けなくても読む。`--root ''` のように空の引用符で値を空にした形は、
+    hook が読む前に引用符ごと消えて `--root user agree` に見えるので、
+    `user` を値と読んで入口を見逃さないため。
     """
     value = _quoted_or_word()
     options = "|".join(re.escape(o) for o in WRAPPER_OPTIONS)

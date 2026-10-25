@@ -252,8 +252,9 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
 
     `--no-merges` はマージが持ち込むコミットしか外せない。`pull --ff-only`・`checkout <上流>`・
     `reset --hard <上流>` は fast-forward なので、上流の通常コミットがそのまま first-parent に入る。
-    そこで `--not --remotes` を足し、リモート追跡ブランチに入っているコミット（上流から取り込んだもの）
-    を外す。未 push のコミット（このツリーで作ったもの）だけが残る。リモートが無ければ何も外れない。
+    そこで `--not --remotes` を足し、リモート追跡ブランチに入っているコミット
+    （上流から取り込んだもの）を外す。未 push のコミット（このツリーで作ったもの）だけが残る。
+    リモートが無ければ何も外れない。
     reflog は読まない（git の呼び出しと分類が増えるため）。残る穴は docs/21_design/post-check.md。
 
     `--no-renames` と `--ignore-submodules=none` は phase_scope.scope_findings と同じ理由。

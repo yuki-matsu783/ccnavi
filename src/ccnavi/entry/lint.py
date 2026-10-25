@@ -319,8 +319,8 @@ def report(
         }
         if flow_path:
             # 実行ファイルが読んだ中身。拡張のフロー編集画面は自分の読みとこれを見比べる
-            # （docs/11_requirements/json-shapes.md「lint の JSON」）。`rendered` は SubagentStart で
-            # 渡る手順の行（読めなければ null）、
+            # （docs/11_requirements/json-shapes.md「lint の JSON」）。`rendered` は
+            # SubagentStart で渡る手順の行（読めなければ null）、
             # `candidates` はフローで選べるサブエージェントとスキルの名前
             payload["flow"] = {
                 "path": flow_path,

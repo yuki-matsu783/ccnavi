@@ -17,7 +17,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 # 開発時だけの道具。配布物には入らない。
-dev = ["pyinstaller>=6.10", "ruff>=0.6"]
+dev = ["pyinstaller>=6.10", "ruff>=0.16.0,<0.17"]
 
 [tool.uv]
 # キャッシュから venv へは**複製**で置く。既定のハードリンクだと、ワークツリーを

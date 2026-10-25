@@ -281,7 +281,8 @@ def board_form_message(found: str) -> str:
         "共通レイヤーのミラーの同期（`ccnavi-user-mirror.sh`）は、ユーザがボードかターミナルで"
         "ミラーの差分を読んでから決めます。"
         if "mirror" in lowered
-        else "保護対象の下書きの取り込み（`ccnavi-user-handoff.sh`）は、ユーザがボードかターミナルで"
+        else "保護対象の下書きの取り込み（`ccnavi-user-handoff.sh`）は、"
+        "ユーザがボードかターミナルで"
         "下書きの差分を読んでから決めます。"
         if "handoff" in lowered
         else "`--via board` は、ボードの画面から押した操作を拡張が実行するときだけ付ける印です。"

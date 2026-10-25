@@ -1191,7 +1191,9 @@ class StartShTest(unittest.TestCase):
         self.assertFalse(os.path.isdir(self.wt("fix-152-other-05")))
 
     def templates_note(self, templates_out):
-        """`--templates --json` に決まった答えを返す実行ファイルで、新規作成の出力から案内の行を取る。"""
+        """`--templates --json` に決まった答えを返す実行ファイルで、
+        新規作成の出力から案内の行を取る。
+        """
         self.github_new()
         fake = write(
             os.path.join(self._tmp.name, "tpl", "ccnavi"),
@@ -1207,9 +1209,14 @@ class StartShTest(unittest.TestCase):
         return lines
 
     def test_start_hints_templates_only_when_some_are_usable(self):
-        """使えるテンプレートがあれば 1 行足す。error のみ・0 本・実行ファイルが読めないときは出さない。"""
+        """使えるテンプレートがあれば 1 行足す。
+        error のみ・0 本・実行ファイルが読めないときは出さない。
+        """
         for out, count in (
-            ("""printf '{"templates":[{"usable":true},{"usable":false},{"usable":true}]}'; exit 0 ;;""", 2),
+            (
+                """printf '{"templates":[{"usable":true},{"usable":false},{"usable":true}]}'; exit 0 ;;""",  # noqa: E501
+                2,
+            ),
             ("""printf '{"templates":[{"usable":false}]}'; exit 0 ;;""", 0),
             ("""printf '{"templates":[]}'; exit 0 ;;""", 0),
             ("""echo 'unknown option' >&2; exit 2 ;;""", 0),
