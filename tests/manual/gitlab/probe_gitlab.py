@@ -53,7 +53,10 @@ REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh
 CLOSE_EARLY_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-close-early.sh")
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
-GITLAB = os.environ.get("CCNAVI_PROBE_GITLAB", "http://localhost:8929").rstrip("/")
+GITLAB = os.environ.get(
+    "CCNAVI_PROBE_GITLAB",
+    f"http://127.0.0.1:{os.environ.get('CCNAVI_GITLAB_PORT', '8929')}",
+).rstrip("/")
 
 # import では何も起こさない。トークン・exe・一時ディレクトリ・ログは setup() が main() の中で作る。
 ROOT_TOKEN = ""
@@ -135,6 +138,8 @@ def env_for() -> dict[str, str]:
         {
             "GITLAB_TOKEN": ROOT_TOKEN,
             "CCNAVI_ENTRY_PATH": EXE,
+            # sh の ticket 系は、cwd の一時リポジトリからではワークスペースを見つけられない
+            "CCNAVI_WORKSPACE": ROOT_OF_CCNAVI,
             "CCNAVI_GUARD_TICKET_APPROVAL": "disable",
             "CCNAVI_MODE": "enable",
             "CCNAVI_GUARD_CORE_FILES": "disable",

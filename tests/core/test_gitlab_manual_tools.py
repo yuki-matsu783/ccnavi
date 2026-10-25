@@ -43,6 +43,11 @@ class FakeClient:
         return 200, {"version": "19.4.1"}
 
 
+def read_text(path: str) -> str:
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
 def completed(stdout: str = "", returncode: int = 0):
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr="")
 
@@ -115,10 +120,14 @@ class DockerGitlabTest(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         # 状態のファイルは一時ディレクトリへ。up・down の表示はテストの出力に出さない
+        # docker の情報・ボリューム・診断ログは実物に触れさせない（既定は十分なメモリで、ボリュームは無し）
         for patcher in (
             mock.patch.dict(os.environ, {"XDG_CACHE_HOME": self._tmp.name}),
             mock.patch("sys.stdout", new_callable=io.StringIO),
             mock.patch("sys.stderr", new_callable=io.StringIO),
+            mock.patch.object(docker_gitlab, "docker_memory_bytes", return_value=10 * 1024**3),
+            mock.patch.object(docker_gitlab, "volume_exists", return_value=False),
+            mock.patch.object(docker_gitlab, "log"),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -234,6 +243,82 @@ class DockerGitlabTest(unittest.TestCase):
             "keep-me",
             docker_gitlab.read_env_file(docker_gitlab.password_path())["GITLAB_ROOT_PASSWORD"],
         )
+
+    def test_up_after_down_keeps_the_password_when_the_volume_exists(self):
+        """down のあと（コンテナが無い・ボリュームは残る）の up は、パスワードを作り直さない。"""
+        docker_gitlab.write_env_file(
+            docker_gitlab.password_path(), {"GITLAB_ROOT_PASSWORD": "first"}
+        )
+        before = read_text(docker_gitlab.password_path())
+        with (
+            mock.patch.object(docker_gitlab, "docker_ok", return_value=True),
+            mock.patch.object(docker_gitlab, "image_present", return_value=True),
+            mock.patch.object(docker_gitlab, "container_state", return_value=("", "")),
+            mock.patch.object(docker_gitlab, "volume_exists", return_value=True),
+            mock.patch.object(docker_gitlab, "compose", return_value=completed()) as compose,
+            mock.patch.object(docker_gitlab, "wait_ready", return_value=(None, None)),
+        ):
+            docker_gitlab.cmd_up(self.args())
+        self.assertEqual("first", compose.call_args.args[1])
+        self.assertEqual(before, read_text(docker_gitlab.password_path()))
+
+    def test_one_port_setting_drives_the_tool_and_the_probe(self):
+        code = (
+            f"import sys; sys.path.insert(0, {GITLAB_DIR!r}); "
+            "import docker_gitlab as d, probe_gitlab as p; print(d.PORT, p.GITLAB)"
+        )
+        done = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env={
+                **{k: v for k, v in os.environ.items() if k != "CCNAVI_PROBE_GITLAB"},
+                "CCNAVI_GITLAB_PORT": "9123",
+            },
+        )
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("9123 http://127.0.0.1:9123", done.stdout.strip())
+
+    def test_compose_takes_the_port_and_memory_from_the_tool(self):
+        with open(os.path.join(GITLAB_DIR, "compose.yml"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("${GITLAB_PORT}", text)
+        self.assertIn("${GITLAB_MEM_LIMIT:?", text)
+        self.assertNotIn("8929", text)
+
+    def test_up_without_a_volume_makes_a_new_password_and_stores_it(self):
+        with (
+            mock.patch.object(docker_gitlab, "docker_ok", return_value=True),
+            mock.patch.object(docker_gitlab, "image_present", return_value=True),
+            mock.patch.object(docker_gitlab, "container_state", return_value=("", "")),
+            mock.patch.object(docker_gitlab, "compose", return_value=completed()) as compose,
+            mock.patch.object(docker_gitlab, "wait_ready", return_value=(None, None)),
+        ):
+            docker_gitlab.cmd_up(self.args())
+        stored = docker_gitlab.read_env_file(docker_gitlab.password_path())["GITLAB_ROOT_PASSWORD"]
+        self.assertEqual(stored, compose.call_args.args[1])
+        self.assertEqual(48, len(stored))
+
+    def test_low_docker_memory_prints_a_next_line_warning(self):
+        with (
+            mock.patch.object(docker_gitlab, "docker_ok", return_value=True),
+            mock.patch.object(docker_gitlab, "docker_memory_bytes", return_value=4 * 1024**3),
+            mock.patch.object(docker_gitlab, "image_present", return_value=False),
+            contextlib.redirect_stdout(io.StringIO()) as out,
+        ):
+            rc = docker_gitlab.cmd_up(self.args())
+        self.assertIn("次: Docker に割り当てたメモリが 4.0GB", out.getvalue())
+        self.assertEqual(2, rc)  # 警告のあとも、イメージが無ければ止まる
+
+    def test_enough_docker_memory_prints_no_warning(self):
+        with (
+            mock.patch.object(docker_gitlab, "docker_ok", return_value=True),
+            mock.patch.object(docker_gitlab, "image_present", return_value=False),
+            contextlib.redirect_stdout(io.StringIO()) as out,
+        ):
+            docker_gitlab.cmd_up(self.args())
+        self.assertNotIn("メモリ", out.getvalue())
 
     def test_down_purge_removes_state_files(self):
         docker_gitlab.write_env_file(docker_gitlab.password_path(), {"GITLAB_ROOT_PASSWORD": "x"})
