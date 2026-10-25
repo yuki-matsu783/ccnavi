@@ -1153,8 +1153,12 @@ fi
 # `ccnavi-index.jsonl` を否定する行（`!**/ccnavi-index.jsonl`、`!docs/ccnavi-index.jsonl` など）があれば、ユーザは
 # 索引を追跡すると決めている。後ろに足すと git は後の行を優先するので、その否定を無効にして
 # しまう。この場合は足さずに、その旨を伝える（「揃っていない」には数えない）。
-IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
-INDEX_IGNORE_HEADER="# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
+# ccnavi が足した行は、目印の行で囲んだ 1 つの領域にまとめる。領域の中の各エントリは、コメント 1 行と、
+# その下の足す行のセット。領域を使い始める前の古い見出しブロックは、そのまま残す（移さない）。
+IGNORE_REGION_BEGIN="# ---ccnavi begin--- (scripts/ccnavi-setup.sh が管理する範囲)"
+IGNORE_REGION_END="# ---ccnavi end---"
+IGNORE_BIN_COMMENT="# 実行ファイル"
+INDEX_IGNORE_COMMENT="# --docs の索引"
 INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
 # ワークスペースルート直下の scratchpad/ は、直接作業で一時的にユーザへ見せる物とコミットしたくない物の
 # 置き場（.ccnavi/docs/scratchpad.md）。追跡されると意味が無いので、実行ファイルと同じ回に足す。
@@ -1162,7 +1166,7 @@ INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
 # または同等以上の `/scratchpad/`・`scratchpad`・`scratchpad/` があるときは足さない。
 # 末尾に `/` を付けないのは、scratchpad が symlink でもヒットするようにするため（`/scratchpad/` はディレクトリにしかヒットしない）。
 # `!/scratchpad` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
-SCRATCH_IGNORE_HEADER="# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
+SCRATCH_IGNORE_COMMENT="# 使い捨ての置き場"
 SCRATCH_IGNORE_LINE="/scratchpad"
 # ワークスペースルート直下の logs/ は、判定の記録・state・診断ログ（logs/diag/）の置き場。実行時に
 # 書かれる絶対パスとコマンド全文が入るので追跡しない。無視する行が無い配布先では、ターンの終わりの
@@ -1170,14 +1174,26 @@ SCRATCH_IGNORE_LINE="/scratchpad"
 # ルートに固定した `/logs/` が既にあるとき、または同等以上の `/logs`・`logs/`・`logs` があるときは足さない。
 # `!/logs`・`!/logs/diag` のようにユーザが logs の中身を否定している行があれば、追跡すると決めているので足さずに伝える
 # （除外したディレクトリの中は再包含できず、末尾に足すとその否定を無効にする）。
-LOGS_IGNORE_HEADER="# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）"
+LOGS_IGNORE_COMMENT="# 実行時の記録"
 LOGS_IGNORE_LINE="/logs/"
+# .claude/worktrees/ は、ccnavi がワークツリーを切る置き場。無視する行が無い配布先では、最初のワークツリーを切った
+# あと未追跡のまま main のチェックアウトに残り、ワークツリーを切るスクリプトが「書きかけ」と数えてしまう。
+# ルートに固定した `/.claude/worktrees/` が既にあるとき、または同等以上の `/.claude/worktrees`・
+# `.claude/worktrees/`・`.claude/worktrees` があるときは足さない。`!/.claude/worktrees` のようにユーザが
+# 否定している行があれば、追跡すると決めているので足さずに伝える。実行ファイルの置き場（--bin user）とは関係なく足す。
+WORKTREES_IGNORE_COMMENT="# ワークツリーの置き場"
+WORKTREES_IGNORE_LINE="/.claude/worktrees/"
 # ignore_todo は、表示と「揃っているか」の判定に使う全体。書き込むときは塊ごとに分けて持つ。
 ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
 ignore_scratch_todo=""
 ignore_logs_todo=""
+ignore_worktrees_todo=""
+# ユーザが .claude/worktrees を否定している行（改行で終わる）。あれば /.claude/worktrees/ は足さない。
+ignore_worktrees_negated=""
+# 目印の領域が壊れているときの知らせ（改行で終わる）。空でなければ .gitignore には何も足さない。
+ignore_region_broken=""
 # ユーザが logs を否定している行（改行で終わる）。あれば /logs/ は足さない。
 ignore_logs_negated=""
 # ユーザが scratchpad を否定している行（改行で終わる）。あれば /scratchpad は足さない。
@@ -1229,7 +1245,43 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_logs_todo="$LOGS_IGNORE_LINE
 "
 	fi
-	ignore_todo="$ignore_bin_todo$ignore_index_todo$ignore_scratch_todo$ignore_logs_todo"
+	worktrees_negated=$(gitignore_lines | grep -E '^!/?\.claude/worktrees/?$' || true)
+	if [ -n "$worktrees_negated" ]; then
+		ignore_worktrees_negated="$worktrees_negated
+"
+	elif ! ignored_already "$WORKTREES_IGNORE_LINE" "/.claude/worktrees" ".claude/worktrees/" ".claude/worktrees"; then
+		ignore_worktrees_todo="$WORKTREES_IGNORE_LINE
+"
+	fi
+	ignore_todo="$ignore_bin_todo$ignore_index_todo$ignore_scratch_todo$ignore_logs_todo$ignore_worktrees_todo"
+
+	# 目印の領域の位置を調べる。begin と end が 1 つずつで、begin が先のときだけ正常。
+	# 壊れた領域には触らず、何行目がどう壊れているかを知らせる（直すのは人）。
+	count_words() { echo $#; }
+	line_numbers() { gitignore_lines | grep -nxF "$1" | cut -d: -f1 | tr '\n' ' ' | sed 's/ $//'; }
+	region_begins=$(line_numbers "$IGNORE_REGION_BEGIN")
+	region_ends=$(line_numbers "$IGNORE_REGION_END")
+	region_begin_count=$(count_words $region_begins)
+	region_end_count=$(count_words $region_ends)
+	region_begin_line=""
+	region_end_line=""
+	if [ "$region_begin_count" -gt 0 ] || [ "$region_end_count" -gt 0 ]; then
+		if [ "$region_begin_count" -eq 1 ] && [ "$region_end_count" -eq 1 ] && [ "$region_begins" -lt "$region_ends" ]; then
+			region_begin_line=$region_begins
+			region_end_line=$region_ends
+		else
+			ignore_region_broken="目印の行 ($IGNORE_REGION_BEGIN … $IGNORE_REGION_END) が壊れています。.gitignore には何も足していません。
+  begin: ${region_begins:-なし}行目、end: ${region_ends:-なし}行目
+  begin と end が 1 つずつ、begin が先になるよう直して、もう一度実行してください（領域ごと消してから実行すると、setup が作り直します）。
+"
+			ignore_todo=""
+			ignore_bin_todo=""
+			ignore_index_todo=""
+			ignore_scratch_todo=""
+			ignore_logs_todo=""
+			ignore_worktrees_todo=""
+		fi
+	fi
 fi
 
 copy_tree() {
@@ -1414,6 +1466,13 @@ report_deploy() {
 		printf '.gitignore に logs を否定する行があり、ユーザが追跡しているので %s は足していません:\n' "$LOGS_IGNORE_LINE"
 		printf '%s' "$ignore_logs_negated" | sed 's/^/  /'
 	fi
+	if [ -n "$ignore_worktrees_negated" ]; then
+		printf '.gitignore に .claude/worktrees を否定する行があり、ユーザが追跡しているので %s は足していません:\n' "$WORKTREES_IGNORE_LINE"
+		printf '%s' "$ignore_worktrees_negated" | sed 's/^/  /'
+	fi
+	if [ -n "$ignore_region_broken" ]; then
+		printf '%s' "$ignore_region_broken" | sed 's/^/案内: /'
+	fi
 	if [ -n "$launcher_mode_todo" ]; then
 		printf '%s:\n' "$4"
 		printf '%s' "$launcher_mode_todo" | sed 's/^/  /'
@@ -1491,7 +1550,7 @@ fi
 # .gitignore の不足も数える。足りないまま通すと、次のコミットで実行ファイルが
 # 履歴に入る。
 if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$deploy_absent" ] ||
-	[ -n "$ignore_todo" ] || [ -n "$launcher_mode_todo" ]; then
+	[ -n "$ignore_todo" ] || [ -n "$ignore_region_broken" ] || [ -n "$launcher_mode_todo" ]; then
 	settled=no
 fi
 # 既定でないパスも「揃っていない」に数える。
@@ -1916,32 +1975,69 @@ if [ "$deploy_work" = yes ]; then
 "
 		fi
 	fi
-	# .gitignore には足すだけ。既にある行は書かず、ccnavi と関係のない行にも
-	# 触らない。見出しは、その塊が何なのかを、あとで開いたユーザに伝えるためだけの
-	# もの。既に同じ見出しがあれば重ねない。
-	append_ignore() {
-		# $1 見出し、$2 足す行（改行で終わる）。空なら何もしない。
-		[ -n "$2" ] || return 0
+	# .gitignore には足すだけ。既にある行は書かず、ccnavi と関係のない行にも触らない。
+	# ccnavi が足す行は、目印の行で囲んだ 1 つの領域に入れる。
+	# - 領域が無ければ、末尾に領域ごと足す（直前に空行 1 つ。末尾に改行が無いファイルは先に改行を足す）。
+	#   末尾に改行が無いまま足すと、最後の行とつながって、意図しない 1 行になる。
+	# - 領域があれば、end の行の直前に足す。領域の中の既存の行は書き換えない。
+	#   同じコメントが領域の中に既にあれば、コメントは重ねず行だけ足す。
+	# 壊れた領域のときは、ignore_todo を空にしてあるので、ここでは何もしない。
+	# 領域の中への挿入は awk で一時ファイルに書いてから、元のファイルへ流し込む（mv で置き換えない。
+	# 実行ビットや symlink を壊さないため）。足す行は ENVIRON で渡した一時ファイルから読む
+	# （awk -v に改行を入れると、環境で動きが違う）。
+	if [ -n "$ignore_todo" ]; then
+		ignore_ins=$(mktemp "${TMPDIR:-/tmp}/ccnavi-ignore-ins.XXXXXX") || die ".gitignore に足す行の一時ファイルを作れませんでした。"
+		ignore_out=$(mktemp "${TMPDIR:-/tmp}/ccnavi-ignore-out.XXXXXX") || die ".gitignore の一時ファイルを作れませんでした。"
+		# 元のファイルが CRLF なら、足す行も CRLF にそろえる。
+		ignore_eol=""
+		ignore_cr=$(printf '\r')
+		if [ -s "$root/.gitignore" ] && grep -q "${ignore_cr}\$" "$root/.gitignore"; then
+			ignore_eol=$ignore_cr
+		fi
+		ignore_region_text=""
+		if [ -n "$region_begin_line" ]; then
+			ignore_region_text=$(gitignore_lines | sed -n "${region_begin_line},${region_end_line}p")
+		fi
+		emit_ignore_entry() {
+			# $1 コメント、$2 足す行（改行で終わる）。空なら何もしない。
+			[ -n "$2" ] || return 0
+			if ! printf '%s\n' "$ignore_region_text" | grep -qxF "$1"; then
+				printf '%s%s\n' "$1" "$ignore_eol"
+			fi
+			printf '%s' "$2" | while IFS= read -r ignore_one; do
+				printf '%s%s\n' "$ignore_one" "$ignore_eol"
+			done
+		}
 		{
-			if [ -s "$root/.gitignore" ]; then
-				# 末尾に改行が無いファイルへ足すと、最後の行とつながって別の
-				# 文字列になる。無視させるつもりの行が、誰も意図しない 1 行になってしまう。
-				if [ -n "$(tail -c 1 "$root/.gitignore")" ]; then
-					printf '\n'
+			emit_ignore_entry "$IGNORE_BIN_COMMENT" "$ignore_bin_todo"
+			emit_ignore_entry "$INDEX_IGNORE_COMMENT" "$ignore_index_todo"
+			emit_ignore_entry "$SCRATCH_IGNORE_COMMENT" "$ignore_scratch_todo"
+			emit_ignore_entry "$LOGS_IGNORE_COMMENT" "$ignore_logs_todo"
+			emit_ignore_entry "$WORKTREES_IGNORE_COMMENT" "$ignore_worktrees_todo"
+		} >"$ignore_ins"
+		if [ -n "$region_end_line" ]; then
+			IGNORE_INS="$ignore_ins" awk -v n="$region_end_line" '
+				BEGIN { f = ENVIRON["IGNORE_INS"] }
+				NR == n { while ((getline l < f) > 0) print l; close(f) }
+				{ print }
+			' "$root/.gitignore" >"$ignore_out"
+			cat "$ignore_out" >"$root/.gitignore"
+		else
+			{
+				if [ -s "$root/.gitignore" ]; then
+					if [ -n "$(tail -c 1 "$root/.gitignore")" ]; then
+						printf '%s\n' "$ignore_eol"
+					fi
+					# もとからある行と、ここで足す領域を、空行 1 つで分ける。
+					printf '%s\n' "$ignore_eol"
 				fi
-				# もとからある行と、ここで足す塊を、空行 1 つで分ける。
-				printf '\n'
-			fi
-			if ! gitignore_lines | grep -qxF "$1"; then
-				printf '%s\n' "$1"
-			fi
-			printf '%s' "$2"
-		} >>"$root/.gitignore"
-	}
-	append_ignore "$IGNORE_HEADER" "$ignore_bin_todo"
-	append_ignore "$INDEX_IGNORE_HEADER" "$ignore_index_todo"
-	append_ignore "$SCRATCH_IGNORE_HEADER" "$ignore_scratch_todo"
-	append_ignore "$LOGS_IGNORE_HEADER" "$ignore_logs_todo"
+				printf '%s%s\n' "$IGNORE_REGION_BEGIN" "$ignore_eol"
+				cat "$ignore_ins"
+				printf '%s%s\n' "$IGNORE_REGION_END" "$ignore_eol"
+			} >>"$root/.gitignore"
+		fi
+		rm -f "$ignore_ins" "$ignore_out"
+	fi
 fi
 
 report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'
