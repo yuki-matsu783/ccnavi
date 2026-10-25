@@ -63,9 +63,9 @@ def _violation(
     ]
     if side_by_side and moved is None:
         lines.append(
-            f"side-by-side: {SIDE_BY_SIDE_LABEL}. The user declared they work in this checkout "
-            "while this worktree exists, so ccnavi left the change as it is. Do not undo it "
-            "yourself: say what you ran, and let the user decide whose change it is."
+            f"side-by-side: {SIDE_BY_SIDE_LABEL}。ユーザは、このワークツリーがある間、"
+            "このチェックアウトでも作業すると宣言しているので、ccnavi は変更をそのままにしました。"
+            "自分で戻さず、何を実行したかを伝えて、誰の変更かをユーザに決めてもらってください。"
         )
     if moved is None:
         if not side_by_side:
@@ -77,18 +77,17 @@ def _violation(
             lines.append(
                 "not-restored: "
                 + (
-                    "this path already held a change the user made, and the call above "
-                    "changed it again. The committed content is older than the user's edit, "
-                    "so putting it back would erase that edit"
+                    "このパスには既にユーザの変更があり、上の呼び出しがさらに変えました。"
+                    "コミット済みの内容はユーザの編集より古いので、戻すとその編集まで消えます"
                     if shadowed
                     else (
-                        "the ticket's work area is not a rule-file `deny`"
+                        "チケットの作業範囲は、ルールファイルの `deny` ではありません"
                         if finding.code == post_findings.CODE_TICKET_SCOPE
-                        else "this place is declared `ask`, not `deny`"
+                        else "この場所は `deny` ではなく `ask` と宣言されています"
                     )
                 )
-                + ", so ccnavi left the change as it is. A person decides whether it stays: "
-                "say what wrote it instead of undoing it yourself."
+                + "。そのため ccnavi は変更をそのままにしました。残すかどうかは人が決めます。"
+                "自分で戻さず、何が書いたかを伝えてください。"
             )
         if would_restore:
             lines.append(
@@ -117,9 +116,10 @@ SIDE_BY_SIDE_LABEL = "出所不明の変更（ユーザか別のセッション�
 # 前に書いた未コミットの変更は、後のどのコマンドの後でも同じ形で報告され、
 # 受け取った側が自分の違反と読んで undo を打つ（打つと手順が進まなくなる）。
 APPROVED_HINT = (
-    "note: this is the approved area. If ccnavi-ticket.sh / ccnavi-review.sh ran earlier in this "
-    "session (start, finish, confirm, ...), ccnavi itself most likely wrote this and the call "
-    "shown after: did not. Do not run undo:. Tell the user only if you do not know what wrote it."
+    "note: ここは承認済みの置き場です。このセッションで先に ccnavi-ticket.sh か ccnavi-review.sh を"
+    "打っていた（start・finish・confirm など）なら、書いたのはおそらく ccnavi 自身で、"
+    "after: の呼び出しではありません。undo: は打たないでください。"
+    "何が書いたか分からないときだけ、ユーザに伝えてください。"
 )
 
 
@@ -139,9 +139,8 @@ def _preexisting(finding: post_findings.Finding) -> str:
         [
             f"[ccnavi] {CODE_PREEXISTING} ({_source(finding.source, group)})",
             f"path: {change.path} ({change.status.strip()} / {change.kind})",
-            "note: this was already in the working tree when ccnavi started watching this "
-            "session, so the call that just ran did not cause it. Do not undo it and do not "
-            "build on it: say what you found and let the user decide whose change it is.",
+            "note: セッションの開始前から作業ツリーにあった変更です。直前の操作が起こしたものではありません。"
+            "戻さず、これを土台にもせず、見つけたことをユーザに伝えて判断を任せてください。",
             _messages(group),
         ]
     )

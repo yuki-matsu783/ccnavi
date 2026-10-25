@@ -461,6 +461,16 @@ common_dir=$(ccnavi_phys "$common_dir")
 ref_pending="refs/ccnavi/direct/$name/pending"
 ref_s="refs/ccnavi/direct/$name/s"
 
+# 直接作業の名前の形は実行ファイルに聞く。取れなければ案内は出さない。
+# 名前が形に合わないことは、切る前に（--dry-run でも）言う。
+print_name_note() {
+	name_note=""
+	if name_bin=$(ccnavi_bin "$root"); then
+		name_note=$("$name_bin" --root "$root" worktree name "$name" 2>/dev/null </dev/null) || name_note=""
+	fi
+	[ -z "$name_note" ] || printf '%s\n' "$name_note"
+}
+
 if [ -n "$dry" ]; then
 	printf 'dry-run: 何も作らない。調べた結果と予定は次のとおり（fetch はしていないので、origin との関係は見ていない）。\n'
 	printf '取り込み先: %s（%s。リモートのデフォルトは %s）\n' "$target" "$main_tree" "$integ"
@@ -469,8 +479,10 @@ if [ -n "$dry" ]; then
 	[ "$c7" = no ] || printf '状態: 書きかけ 変更 %s・新規 %s（staged %s）。実行するには --accept と、--copy-wip か --no-wip が要る\n' "$wip_changed" "$wip_new" "$wip_staged"
 	printf 'ブランチ: %s（起点 %s）\n' "$name" "$(git -C "$main_tree" rev-parse --short "$head_sha")"
 	printf 'ワークツリー: %s\n' "$dest"
+	print_name_note
 	exit 0
 fi
+print_name_note
 
 # ---- fetch。取り込み先だけ。届かなくても止めず、リモート未確認として確認を求める。
 remote_state=even
@@ -724,11 +736,5 @@ if [ "$top_cmp" = "$root_cmp" ]; then
 		fi
 	done
 fi
-# 直接作業の名前の形は実行ファイルに聞く。取れなければ案内は出さない。
-name_note=""
-if name_bin=$(ccnavi_bin "$root"); then
-	name_note=$("$name_bin" --root "$root" worktree name "$name" 2>/dev/null </dev/null) || name_note=""
-fi
-[ -z "$name_note" ] || printf '%s\n' "$name_note"
 print_next
 log_info 完了 -- "name=$name" "target=$target" "snap=$s_sha" "wip=$s_wip" "side=$side_word"
