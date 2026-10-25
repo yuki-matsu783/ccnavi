@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import shutil
 import subprocess
 import tempfile
 import unittest
 
+from ccnavi.hook import parentwrite
+from ccnavi.infra import shellread
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -143,6 +146,81 @@ class RootShellWriteTest(unittest.TestCase):
         for command in ('echo x > "$FILE"', "echo x > ~/a.txt", "echo x > `pwd`/a"):
             with self.subTest(command=command):
                 self.assertFalse(self.stopped(command))
+
+    GIT = "sh .ccnavi/scripts/ccnavi-git.sh"
+
+    def test_引用符の中の山括弧は書き込みではない(self):
+        for command in (
+            f"{self.GIT} log -n 2 --format='%H%n%an <%ae>%n%B---'",
+            f'{self.GIT} commit -m "feat: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n'
+            'Claude-Session: https://claude.ai/code/session_x"',
+            f"{self.GIT} log --format='%an <%ae>'",
+            f'{self.GIT} commit -m "a" -m "Co-Authored-By: C <n@a.com>"',
+            f'cd .claude/worktrees/wt && {self.GIT} commit -m "x <a@b>\nClaude-Session: s"',
+            f"cd docs && {self.GIT} log --format='<%an>'",
+            "echo '<a' 'b>' 'c<d>e' \"x>\" \"<y\"",
+            "echo \"a > b\" 'c >> d'",
+            f"{self.GIT} commit -m \"$(echo 'x <y@z>')\"",
+            "echo \"$(echo '<a>' > scratchpad/o.txt)\"",
+        ):
+            with self.subTest(command=command):
+                self.assertFalse(self.stopped(command))
+
+    def test_引用符の外の本物のリダイレクトの判定は変わらない(self):
+        for command, expected in (
+            ("echo x > f", True),
+            ("echo x >> f", True),
+            ('echo "a <b>" > f', True),
+            (f"{self.GIT} log --format='<%an>' > f", True),
+            ("cd docs && echo '<a>' >> f", True),
+            ("echo x 2>&1", False),
+            ("echo x > /dev/null 2>&1", False),
+            ("echo x > scratchpad/f", False),
+            ("echo '<a>' > scratchpad/f", False),
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(self.stopped(command), expected)
+
+    def test_演算子が末尾の語でも落ちず書き込み先に数えない(self):
+        for command in ("echo x >", "echo x >>", "echo x 2>", "echo x <", "cd docs && echo x >"):
+            with self.subTest(command=command):
+                self.assertFalse(self.stopped(command))
+                self.assertNotIn("internal", self.decide(command)[1].lower())
+
+    def test_拒否の文面は書き込み先を取り出した元のコマンドを添える(self):
+        _, reason = self.decide("cd docs && echo x > README.md")
+        self.assertIn("書き込み先: README.md", reason)
+        self.assertIn("読んだ箇所: echo x > README.md", reason)
+
+    def test_引用符と演算子の乱れた組み合わせで例外を出さない(self):
+        rng = random.Random(554)
+        pieces = [
+            "'",
+            '"',
+            "<",
+            ">",
+            ">>",
+            "2>&1",
+            " ",
+            " ",
+            "a",
+            "b c",
+            "&&",
+            ";",
+            "(",
+            ")",
+            "cd x",
+            "echo",
+            "$(",
+            "`",
+        ]
+        for _ in range(400):
+            command = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 14)))
+            with self.subTest(command=command):
+                reading = shellread.read(command)
+                layers = [reading.unwrapped, reading.moved]
+                parentwrite.write_targets(self.repo, command, layers)
+                self.decide(command)
 
 
 if __name__ == "__main__":

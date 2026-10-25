@@ -202,15 +202,20 @@ def read(src: str) -> Reading:
     return reading
 
 
-def placed(src: str) -> list[tuple[list[str], str | None]]:
+def placed(src: str, rendered: bool = False) -> list[tuple[list[str], str | None]]:
     """外側のコマンド 1 本ずつの（語のリスト, そのコマンドが居る場所）。
 
     居る場所は `cd` を追った先で、読みの起点（打たれた場所）から見たパス。起点そのものは
     空文字、読めなくなったら None。置換の中身は並べない。
     読み切れない形（走査か shlex が止まる）なら空のリストを返す。呼び手は read() の
     degraded を先に見て、そちらで扱う。
+
+    rendered は、src が `Reading` の層（unwrapped・moved）のとき True。層では、引用の中の
+    `<` `>` が WORD_SEP で挟まれて単独の語に見えるので、読み直す前に身代わりの文字へ戻し、
+    演算子として読ませない。打たれたコマンドには使わない
+    （入力の WORD_SEP は取り除く決まりで、戻すと演算子を隠せてしまう）。
     """
-    src = _prepare(src)
+    src = _prepare(src, rendered)
     try:
         outer, _, _, _, _ = shellread_scan._scan(src)
         tokens = shellread_scan._tokenize(outer)
@@ -221,7 +226,7 @@ def placed(src: str) -> list[tuple[list[str], str | None]]:
     return places
 
 
-def _prepare(src: str) -> str:
+def _prepare(src: str, rendered: bool = False) -> str:
     """走査の前の下ごしらえ。目印の文字を空白に戻し、行継続を消す。
 
     改行の前のバックスラッシュはシェルの行継続で、2 文字とも消える。
@@ -230,9 +235,13 @@ def _prepare(src: str) -> str:
     シングルクォートの中では 2 文字とも文字通りなのでそこでは取りこぼすが、
     誰も書かない表記だし、変わるのは引数の文字列であってどのコマンドが走るかではない。
     """
-    src = src.replace(SEP, " ").replace(WORD_SEP, " ")
     for stand_in in shellread_words.QUOTED_BACK:
         src = src.replace(stand_in, " ")
+    if rendered:
+        # 層の中の `\x01<\x01` は、_join が引用の中の文字を挟んだ形で、演算子ではない。
+        for stand_in, char in shellread_words.QUOTED_BACK.items():
+            src = src.replace(WORD_SEP + char + WORD_SEP, stand_in)
+    src = src.replace(SEP, " ").replace(WORD_SEP, " ")
     return src.replace("\\\r\n", "").replace("\\\n", "")
 
 

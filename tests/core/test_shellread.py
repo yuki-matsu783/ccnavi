@@ -2,7 +2,7 @@ import re
 import time
 import unittest
 
-from ccnavi.infra import shellread, shellread_cd, shellread_scan
+from ccnavi.infra import shellread, shellread_cd, shellread_scan, shellread_words
 from ccnavi.infra.shellread import SEP, read
 from ccnavi.infra.shellread_scan import REASON_UNTERMINATED
 from ccnavi.infra.shellread_words import REASON_TAKEN_AS_CODE
@@ -614,6 +614,43 @@ def marked(text):
 @unittest.skipUnless(
     hasattr(shellread_scan, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち"
 )
+class RenderedLayerTest(unittest.TestCase):
+    """層（unwrapped・moved）を読み直しても、引用の中の `<` `>` は演算子にならない。"""
+
+    def operators(self, src, layer):
+        reading = read(src)
+        text = getattr(reading, layer).replace(SEP, "\n")
+        return [w for words, _ in shellread.placed(text, rendered=True) for w in words if w in "<>"]
+
+    def test_山括弧は語の先頭と途中と末尾でも層に演算子として残らない(self):
+        for src in (
+            "sh x.sh log --format='%an <%ae>'",
+            'sh x.sh commit -m "<a@b>"',
+            "echo '<' '>' 'a<' '>b' 'a>b'",
+            "echo \"$(echo '<x>')\"",
+        ):
+            for layer in ("unwrapped", "moved"):
+                with self.subTest(src=src, layer=layer):
+                    self.assertEqual(self.operators(src, layer), [])
+
+    def test_cd_の後ろでも同じ(self):
+        reading = read('cd /w && sh x.sh commit -m "a <b@c.d>"')
+        for text in (reading.unwrapped, reading.moved):
+            for words, _ in shellread.placed(text.replace(SEP, "\n"), rendered=True):
+                self.assertNotIn(">", words)
+
+    def test_打たれたコマンドの目印の文字では演算子を隠せない(self):
+        # 入力の WORD_SEP は取り除く決まり。rendered でない読みでは戻さない。
+        words = [w for ws, _ in shellread.placed("echo x \x01>\x01 f") for w in ws]
+        self.assertIn(">", words)
+
+    def test_演算子が末尾の語ならリダイレクトに数えない(self):
+        for src in ("echo x >", "echo x 2>", "echo x >>"):
+            with self.subTest(src=src):
+                words = shellread.placed(src)[0][0]
+                self.assertEqual(shellread_words._redirect_width(words, len(words) - 1), 0)
+
+
 class MovedTest(unittest.TestCase):
     """`cd` で移った先から見たパス（issue #61）。
 
