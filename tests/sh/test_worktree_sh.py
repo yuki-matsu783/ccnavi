@@ -1003,6 +1003,12 @@ class WorktreeShTest(unittest.TestCase):
         self.assertNotIn("既にあります", result.stderr)
         self.assertTrue(os.path.isfile(stray))
 
+    def test_rerunning_the_same_name_still_reports_the_worktree_exists(self):
+        self.assertEqual(0, self.run_sh("topic", "--no-wip").returncode)
+        result = self.run_sh("topic", "--no-wip")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("ワークツリーは既にある", result.stdout)
+
     def test_names_the_executable_refuses_are_not_cut(self):
         """全角の字・NFD・65 文字以上の名前は、実行ファイルの検査で断る（sh の検査は通る）。"""
         nfd = unicodedata.normalize("NFD", "feature-が")
