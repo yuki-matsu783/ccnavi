@@ -45,6 +45,8 @@ import {
   type NodeProps,
   type NodeTypes,
   useNodesInitialized,
+  useReactFlow,
+  useStore,
   type OnSelectionChangeParams,
 } from "@xyflow/react";
 
@@ -74,6 +76,7 @@ import {
   type FlowSize,
   type PortInfo,
 } from "../../core/flow-doc.js";
+import { fitStalled, PLAN_FIT_MAX_ZOOM, PLAN_FIT_MIN_ZOOM, viewportAtStart } from "../../core/plan-graph.js";
 import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "../shared/Maximize.js";
 import { badgeOf, summaryOf, type Badge } from "./text.js";
 
@@ -353,6 +356,12 @@ export interface CanvasProps {
    * 真の間は、図が組み上がって収まったあとに `resize` を流し、案内が指す先の位置を測り直させる
    */
   readonly marks?: boolean;
+  /**
+   * 開いた直後に、文字が読める倍率（`PLAN_FIT_MIN_ZOOM`）より縮めず、下限で止まったら開始の点が見える位置から始める。
+   * 既定は偽（全体を枠に収める `fitView`。ツアーの見本と読むだけの図はこちら）。合わせるのは開いた直後の 1 回だけで、
+   * 点が増えても自動では合わせ直さない（見ている位置を動かさない）。「全体を表示」は今までどおり全体を出す
+   */
+  readonly readableFit?: boolean;
   /** ドラッグを放した点。位置は React Flow の決まり（グループの中のノードはグループからの位置） */
   readonly onMove: (moves: readonly { readonly id: string; readonly position: FlowPoint }[]) => void;
   readonly onConnect: (from: string, fromPort: string, to: string, toPort: string) => void;
@@ -402,7 +411,37 @@ function TourSettle(): null {
   return null;
 }
 
-export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks = false, onSelect, onPick, onMove, onConnect, onRemoveNode, onRemoveEdge, onResizeGroup }: CanvasProps): JSX.Element {
+/**
+ * `readableFit` のときの開いた直後の見え方（`webview/shared/PlanGraph.tsx` の `FitOnOpen` と同じ方式）。
+ * 点がすべて測れたら 1 回だけ、下限の倍率までで全体を収める。下限で止まって収まらないときは、種類が start の点を
+ * 左端に寄せる。`fitView` の属性は使わない（下限で止めたあとに寄せる段を挟めないため）。
+ * `useNodesInitialized` は使わない（点を読むだけで返さない図では、実際の Chromium で偽のままになる）
+ */
+function ReadableFit(): null {
+  const measured = useStore((s) => s.nodeLookup.size > 0 && [...s.nodeLookup.values()].every((node) => (node.measured?.width ?? 0) > 0 && (node.measured?.height ?? 0) > 0));
+  const frameHeight = useStore((s) => s.height);
+  const flow = useReactFlow<FlowNodeView, FlowEdge>();
+  const done = useRef(false);
+  useEffect(() => {
+    if (!measured || done.current) {
+      return;
+    }
+    done.current = true;
+    void Promise.resolve(flow.fitView({ minZoom: PLAN_FIT_MIN_ZOOM, maxZoom: PLAN_FIT_MAX_ZOOM, padding: 0.1 })).then(() => {
+      const view = flow.getViewport();
+      const start = flow.getNodes().find((node) => node.type === "step" && node.data.type === "start");
+      const internal = start === undefined ? undefined : flow.getInternalNode(start.id);
+      if (!fitStalled(view.zoom) || internal === undefined) {
+        return;
+      }
+      const at = internal.internals.positionAbsolute;
+      void flow.setViewport(viewportAtStart(view.zoom, { x: at.x, y: at.y, width: internal.measured.width ?? 0, height: internal.measured.height ?? 0 }, frameHeight));
+    });
+  }, [measured, flow, frameHeight]);
+  return null;
+}
+
+export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks = false, readableFit = false, onSelect, onPick, onMove, onConnect, onRemoveNode, onRemoveEdge, onResizeGroup }: CanvasProps): JSX.Element {
   const base = useMemo(() => stepsOf(doc, readOnly, marks), [doc, readOnly, marks]);
   const edges = useMemo(() => edgesOf(doc, selected, readOnly, marks), [doc, selected, readOnly, marks]);
   // 作り直したとき（案内の見本へ替える・戻す）は、呼び手が図の外から選ぶと言ったノード（`focus`）を選んだ状態で始める
@@ -478,7 +517,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks 
           isValidConnection={isValidConnection}
           nodesDraggable={!readOnly}
           nodesConnectable={!readOnly}
-          fitView
+          fitView={!readableFit}
           ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
           minZoom={0.2}
           maxZoom={1.8}
@@ -491,6 +530,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks 
           <Background />
           <Controls showInteractive={false} />
           <RefitOnChange value={maximized} />
+          {readableFit && <ReadableFit />}
           {marks && <TourSettle />}
           {minimap && <MiniMap<FlowNodeView> id="flow-minimap" pannable zoomable ariaLabel="ミニマップ" nodeColor={minimapColor} nodeStrokeWidth={2} />}
         </ReactFlow>

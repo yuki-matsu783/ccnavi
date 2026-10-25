@@ -808,6 +808,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           focus={touring ? tourFocus : focus}
           minimap={shownMinimap}
           marks={touring}
+          readableFit={!touring}
           onPick={touring ? NOOP : pick}
           onMove={(moves) => {
             // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じものを返す）

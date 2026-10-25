@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ApprovePlan } from "../../src/core/approvemodel.js";
-import { canConnect, canDisconnect, COLUMN, layoutOf, planGraphOf, withLayout, type PlanGraph } from "../../src/core/plan-graph.js";
+import { canConnect, canDisconnect, COLUMN, FIT_START_PAD, fitStalled, layoutOf, PLAN_FIT_MIN_ZOOM, planGraphOf, viewportAtStart, withLayout, type PlanGraph } from "../../src/core/plan-graph.js";
 import { plansOf, reorderCases, type RawItem } from "../helpers/plan-reorder.js";
 
 function plan(items: readonly RawItem[], extra: Partial<ApprovePlan> = {}, feedback?: readonly RawItem[]): ApprovePlan {
@@ -212,4 +212,16 @@ test("CB-T364 点は振り直す前の番号（from）を持つ。置き場所�
   );
   // start と end は from を持たない
   assert.equal(planGraphOf(before).nodes[0].from, null);
+});
+
+test("CB-T1224 下限の倍率で止まったら、開始の点を枠の左端に、縦は開始の中心を枠の中心に置く。下限に届かなければ寄せない", () => {
+  assert.ok(fitStalled(PLAN_FIT_MIN_ZOOM));
+  assert.ok(fitStalled(PLAN_FIT_MIN_ZOOM + 1e-9));
+  assert.ok(!fitStalled(PLAN_FIT_MIN_ZOOM + 0.01));
+  // 開始が左端でなくても（並べ替えで x=300）、その点が画面の x=16 に来る。縦は中心が枠の中心（300）に来る
+  const start = { x: 300, y: 100, width: 160, height: 60 };
+  const view = viewportAtStart(PLAN_FIT_MIN_ZOOM, start, 600);
+  assert.equal(view.zoom, PLAN_FIT_MIN_ZOOM);
+  assert.ok(Math.abs(start.x * view.zoom + view.x - FIT_START_PAD) < 1e-9);
+  assert.ok(Math.abs((start.y + start.height / 2) * view.zoom + view.y - 300) < 1e-9);
 });

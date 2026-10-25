@@ -89,6 +89,31 @@ export const PLAN_FIT_MIN_ZOOM = 0.7;
 /** 開いたときに図を合わせる倍率の上限。小さな計画を等倍より大きくしない */
 export const PLAN_FIT_MAX_ZOOM = 1;
 
+/** 下限で止まったとき、開始の点を枠の左端から離す余白（px）。`webview/shared/PlanGraph.tsx` の `START_PAD` と同じ */
+export const FIT_START_PAD = 16;
+
+/** 画面上の点の箱（図の座標。左上の位置と大きさ） */
+export interface FitBox {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** 全体を収めた結果が下限の倍率で止まったか（浮動小数の誤差を見込む）。止まったときだけ、開始へ寄せる */
+export function fitStalled(zoom: number): boolean {
+  return zoom <= PLAN_FIT_MIN_ZOOM + 1e-6;
+}
+
+/**
+ * 下限で止まったときの見え方。開始の点を枠の左端（`pad` だけ内側）に、縦は開始の中心を枠の中心に置く
+ * （分岐で縦に広がっても開始が見える。最小 x の点ではなく、開始の点そのものに合わせる）。
+ * `frameHeight` は図の枠の高さ。座標は React Flow の `setViewport` の値（図の座標 × zoom + 平行移動）
+ */
+export function viewportAtStart(zoom: number, start: FitBox, frameHeight: number, pad: number = FIT_START_PAD): { readonly x: number; readonly y: number; readonly zoom: number } {
+  return { x: pad - start.x * zoom, y: frameHeight / 2 - (start.y + start.height / 2) * zoom, zoom };
+}
+
 /** 列の間隔と行の間隔。CSS の `.react-flow__node-planItem` の大きさと合わせる */
 export const COLUMN = 210;
 export const ROW = 96;
