@@ -31,8 +31,11 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   `guarded yes|no` に続けて、ヒットするパスごとに `path <パス>`。`ccnavi-git.sh integrate` が、
   確定をターミナルから打つよう案内するかどうかを決めるために聞く。
 
-- `ccnavi tree handoff-pending <ツリー>`: 取り込んでいない下書き（`wip/handoff/`）の件数。
-  `pending <件数>` に続けて、1 件ごとに `path <パス>`。
+- `ccnavi tree handoff-pending <ツリー> [<起点>]`: 取り込んでいない下書き（`wip/handoff/`）の件数。
+  `pending <件数>` に続けて、1 件ごとに `path <パス>`。`<起点>`（コミット）を渡すと、置き場の
+  ファイルを起点の木の元のパス（置き場を除いた相対パス。大文字小文字・NFC/NFD の違いは同じもの）と
+  突き合わせ、元があって中身が違う写しごとに `foreign <パス>`、元が無い下書き（新規のメモ）ごとに
+  `note <パス>` を足す。起点の木を読めなければ `tree 1` を出さずに失敗する。
 
 git はローカルの読み取りだけ。ネットワークには出ない。
 """
@@ -226,20 +229,31 @@ def guarded_tree(
     return 0
 
 
-def handoff_pending_tree(stdout: TextIO, stderr: TextIO, path: str) -> int:
-    """`ccnavi tree handoff-pending <ツリー>`。
+def handoff_pending_tree(stdout: TextIO, stderr: TextIO, path: str, start: str = "") -> int:
+    """`ccnavi tree handoff-pending <ツリー> [<起点>]`。
 
     頭に `tree 1`、続けて `pending <件数>` と、取り込んでいない下書きごとに `path <パス>`。
-    `ccnavi-git.sh integrate` が、下書き（`wip/handoff/`）の取り込み漏れを断る条件に使う。
+    `<起点>` があれば、続けて `foreign <パス>`（元があり中身が違う写し）と `note <パス>`
+    （元の無い下書き）。`ccnavi-git.sh integrate` が、下書き（`wip/handoff/`）の取り込み漏れと、
+    取り込み結果に含まれない下書きを見分ける条件に使う。
     """
     if not path or not os.path.isdir(path):
         stderr.write(f"ccnavi: tree handoff-pending のツリー {path!r} が見つかりません。\n")
         return 1
-    left = handoff.pending(os.path.abspath(path))
+    root = os.path.abspath(path)
+    left = handoff.pending(root)
+    surveyed = handoff.survey(root, start) if start else ([], [])
+    if surveyed is None:
+        stderr.write(f"ccnavi: tree handoff-pending の起点 {start!r} の木を読めません。\n")
+        return 1
     stdout.write(TREE_HEAD + "\n")
     stdout.write(f"pending {len(left)}\n")
     for rel in left:
         stdout.write(f"path {rel}\n")
+    for rel in surveyed[0]:
+        stdout.write(f"foreign {rel}\n")
+    for rel in surveyed[1]:
+        stdout.write(f"note {rel}\n")
     return 0
 
 

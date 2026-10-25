@@ -941,11 +941,16 @@ d4_refs_drop() {
 # 下書きの条件（6.2）を作業ワークツリーについて確かめる。満たさなければ理由をd4_draft_whyに入れて 1。<S>
 #
 # - 許可リストにヒットする下書きは、取り込み済み（実行ファイルのtree handoff-pendingが 0 件）
-# - wip/handoff/ に今あるファイルのうち、Sに無いもの・中身が違うものが無い（消えた下書きは数えない）
+# - wip/handoff/ に今あるファイルのうち、元（wip/handoff/ を除いたパスのSの版）があって中身が違うものが無い
+#   （消えた下書きは数えない）。元の無い下書き（新規のメモ・報告）は通し、d4_draft_notesに貯める。
+#   元との突き合わせは実行ファイルがする（大文字小文字・NFC/NFDの違いは同じパスとして扱う）
+# - 元の無い下書きでも、まだコミットしていないものは通さない（ワークツリーを消すと失うため）
 d4_draft_why=""
+d4_draft_notes=""
 d4_draft_check() {
 	d4_draft_why=""
-	d4_dp_out=$(ccnavi_ask "$WS" tree handoff-pending "$ig_wt") || d4_dp_out=""
+	d4_draft_notes=""
+	d4_dp_out=$(ccnavi_ask "$WS" tree handoff-pending "$ig_wt" "$1") || d4_dp_out=""
 	if [ "$(printf '%s\n' "$d4_dp_out" | head -n 1)" != "tree 1" ]; then
 		d4_draft_why="下書きの取り込み漏れを実行ファイルに確かめられない"
 		return 1
@@ -955,27 +960,22 @@ d4_draft_check() {
 		d4_draft_why="取り込んでいない下書きがある（$(printf '%s\n' "$d4_dp_out" | sed -n 's/^path //p' | tr '\n' ' ')）"
 		return 1
 	fi
-	if [ -d "$ig_wt/wip/handoff" ]; then
-		# 数に上限を付けない（上限の先を検査せずに通さない）。リンクなど通常のファイルでないものは、
-		# 起点と同じと確かめられないので、違うものとして扱う。
-		d4_df=$(cd "$ig_wt" && find wip/handoff ! -type d 2>/dev/null)
-		d4_dr=""
-		while IFS= read -r d4_f; do
-			[ -n "$d4_f" ] || continue
-			if [ -L "$ig_wt/$d4_f" ] || [ ! -f "$ig_wt/$d4_f" ]; then
-				d4_dr="$d4_dr $d4_f"
-				continue
-			fi
-			d4_h=$(git -C "$ig_wt" hash-object -- "$d4_f" 2>/dev/null || :)
-			d4_sb=$(git rev-parse --verify --quiet "$1:$d4_f" 2>/dev/null || :)
-			[ "$d4_h" = "$d4_sb" ] || d4_dr="$d4_dr $d4_f"
-		done <<EOF
-$d4_df
-EOF
-		if [ -n "$d4_dr" ]; then
-			d4_draft_why="wip/handoff/ に、起点に無いか中身の違うファイルがある（${d4_dr# }）"
-			return 1
+	d4_dr=$(printf '%s\n' "$d4_dp_out" | sed -n 's/^foreign //p')
+	d4_dn=$(printf '%s\n' "$d4_dp_out" | sed -n 's/^note //p')
+	while IFS= read -r d4_f; do
+		[ -n "$d4_f" ] || continue
+		if GIT_LITERAL_PATHSPECS=1 git -C "$ig_wt" ls-files --error-unmatch -- "$d4_f" >/dev/null 2>&1; then
+			d4_draft_notes="${d4_draft_notes:+$d4_draft_notes }$d4_f"
+		else
+			d4_dr="${d4_dr:+$d4_dr
+}$d4_f"
 		fi
+	done <<EOF
+$d4_dn
+EOF
+	if [ -n "$d4_dr" ]; then
+		d4_draft_why="wip/handoff/ に、元と違う写しか、まだコミットしていないファイルがある（$(printf '%s\n' "$d4_dr" | tr '\n' ' ' | sed 's/ $//')）"
+		return 1
 	fi
 	return 0
 }
@@ -1247,6 +1247,8 @@ EOF
 	printf '案内: 取り込み結果は一時ワークツリーで検証できる: cd %s && <テストやビルド>。ここは編集しない。プロジェクトのレイヤーのルールが通常どおりヒットする場所ではない\n' "$(ccnavi_sh_quote "$d4_tmp")"
 	[ -z "$d4_overlap" ] ||
 		printf '案内: 取り込みで増えるパスが、メインのチェックアウトの ignored のファイルと重なっている（%s）。integrate-done の fast-forward は上書きせずに止まる。ユーザに退避を頼む\n' "${d4_overlap# }"
+	[ -z "$d4_draft_notes" ] ||
+		printf '案内: 取り込まない下書き: %s（取り込み結果には含まれず、作業ブランチに残る。内容をユーザに伝え、必要なら先に別の場所へ写してもらう）\n' "$d4_draft_notes"
 	if [ "$d4_guard" != no ]; then
 		printf '案内: 自己防衛の対象（%s）を含む。integrate-done はユーザがターミナルで、エージェントのターンが終わってから打つ\n' "${d4_guard_paths:-対象を確かめられなかった}"
 	fi

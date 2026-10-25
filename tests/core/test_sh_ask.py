@@ -519,3 +519,56 @@ class TreeHandoffPendingTest(Harness):
     def test_a_missing_tree_is_refused(self):
         result = self.ask("tree", "handoff-pending", os.path.join(self.ws, "nope"))
         self.assertNotEqual(0, result.returncode)
+
+
+class TreeHandoffPendingStartTest(Harness):
+    """`tree handoff-pending <ツリー> <起点>`: 下書きを、起点の木の元のパスと突き合わせる。"""
+
+    def setUp(self):
+        super().setUp()
+        git(self.ws, "init", "-q", "-b", "main")
+        for rel, text in (("docs/guide.md", "old\n"), ("docs/caf\u00e9.md", "old\n")):
+            path = os.path.join(self.ws, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(text)
+        git(self.ws, "add", ".")
+        git(self.ws, "commit", "-q", "-m", "seed")
+
+    def draft(self, rel, text):
+        path = os.path.join(self.ws, "wip", "handoff", rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+
+    def lines(self):
+        result = self.ask("tree", "handoff-pending", self.ws, "HEAD")
+        self.assertEqual(0, result.returncode, result.stderr)
+        return result.stdout.splitlines()
+
+    def test_a_draft_without_an_original_is_a_note(self):
+        self.draft("notes.md", "memo\n")
+        self.assertIn("note wip/handoff/notes.md", self.lines())
+
+    def test_an_unedited_copy_is_neither(self):
+        self.draft("docs/guide.md", "old\n")
+        lines = self.lines()
+        self.assertEqual(["tree 1", "pending 0"], lines)
+
+    def test_an_edited_copy_is_foreign(self):
+        self.draft("docs/guide.md", "new\n")
+        self.assertIn("foreign wip/handoff/docs/guide.md", self.lines())
+
+    def test_case_differences_find_the_original(self):
+        self.draft("Docs/GUIDE.MD", "new\n")
+        self.assertIn("foreign wip/handoff/Docs/GUIDE.MD", self.lines())
+
+    def test_non_ascii_case_differences_find_the_original(self):
+        self.draft("DOCS/CAF\u00c9.md", "new\n")
+        self.assertIn("foreign wip/handoff/DOCS/CAF\u00c9.md", self.lines())
+
+    def test_a_start_that_cannot_be_read_is_refused(self):
+        self.draft("notes.md", "memo\n")
+        result = self.ask("tree", "handoff-pending", self.ws, "nope")
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual("", result.stdout)

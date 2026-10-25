@@ -295,15 +295,90 @@ class IntegrateTest(Fixture):
         self.assertOk(r, 2)
         self.assertIn("未コミットの変更", r.stderr)
 
-    def test_a_draft_that_is_not_in_the_start_point_is_refused(self):
+    def commit_draft(self, rel, text, wt=None):
+        wt = wt or self.wt
+        write(os.path.join(wt, rel), text)
+        git(wt, "add", "-f", rel)
+        git(wt, "commit", "-q", "-m", "draft")
+
+    def cut_with_original(self, rel="docs/guide.md", text="original\n"):
+        """起点（S）に元のファイルを持つワークツリー wt2 を切る。"""
+        write(os.path.join(self.ws, rel), text)
+        git(self.ws, "add", "-f", rel)
+        git(self.ws, "commit", "-q", "-m", "original")
+        git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
+        return self.cut("wt2")
+
+    def test_a_draft_without_an_original_is_listed_and_does_not_stop_integrate(self):
         self.work_in_branch()
-        write(os.path.join(self.wt, "wip/handoff/extra.md"), "new draft\n")
-        git(self.wt, "add", ".")
-        git(self.wt, "commit", "-q", "-m", "draft")
+        self.commit_draft("wip/handoff/notes.md", "memo\n")
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r)
+        self.assertIn("案内: 取り込まない下書き: wip/handoff/notes.md（", r.stdout)
+        names = git(self.ws, "ls-tree", "-r", "--name-only", self.marker_value("c_tree", "wt"))
+        self.assertNotIn("wip/handoff/notes.md", names.splitlines())
+        self.assertFalse(os.path.exists(os.path.join(self.tmp_wt(), "wip/handoff/notes.md")))
+        self.assertIn("new.txt", names.splitlines())
+
+    def test_a_draft_kept_as_in_the_start_point_is_not_listed(self):
+        self.work_in_branch()
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r)
+        self.assertNotIn("取り込まない下書き", r.stdout)
+
+    def test_an_unedited_copy_passes_and_is_not_listed(self):
+        wt = self.cut_with_original()
+        self.commit_draft("wip/handoff/docs/guide.md", "original\n", wt)
+        r = self.run_git_sh("integrate", "wt2")
+        self.assertOk(r, 0)
+        self.assertNotIn("取り込まない下書き", r.stdout)
+
+    def test_an_edited_copy_outside_the_kinds_is_refused_as_before(self):
+        wt = self.cut_with_original("tools/clean.js", "old\n")
+        self.commit_draft("wip/handoff/tools/clean.js", "edited\n", wt)
+        r = self.run_git_sh("integrate", "wt2")
+        self.assertOk(r, 2)
+        self.assertIn("wip/handoff/tools/clean.js", r.stderr)
+        self.assertIn("ccnavi-user-handoff.sh", r.stderr)
+        self.assertFalse(os.path.exists(self.tmp_wt("wt2")))
+
+    def test_a_copy_is_matched_to_its_original_ignoring_case(self):
+        wt = self.cut_with_original("docs/guide.md", "old\n")
+        self.commit_draft("wip/handoff/Docs/GUIDE.MD", "edited\n", wt)
+        r = self.run_git_sh("integrate", "wt2")
+        self.assertOk(r, 2)
+        self.assertIn("wip/handoff/Docs/GUIDE.MD", r.stderr)
+
+    def test_a_non_ascii_original_is_matched_ignoring_case(self):
+        wt = self.cut_with_original("docs/caf\u00e9.md", "old\n")
+        self.commit_draft("wip/handoff/DOCS/CAF\u00c9.md", "edited\n", wt)
+        r = self.run_git_sh("integrate", "wt2")
+        self.assertOk(r, 2)
+        self.assertIn("ccnavi-user-handoff.sh", r.stderr)
+
+    def test_a_pending_draft_of_a_kind_is_refused_by_the_kind_check(self):
+        wt = self.cut_with_original(".ccnavi/config/project/rules.yml", "rules: []\n")
+        self.commit_draft("wip/handoff/.ccnavi/config/project/rules.yml", "rules: [x]\n", wt)
+        r = self.run_git_sh("integrate", "wt2")
+        self.assertOk(r, 2)
+        self.assertIn("取り込んでいない下書き", r.stderr)
+
+    def test_an_untracked_new_draft_is_still_refused(self):
+        self.work_in_branch()
+        write(os.path.join(self.wt, "wip/handoff/note.local"), "ignored\n")
         r = self.run_git_sh("integrate", "wt")
         self.assertOk(r, 2)
-        self.assertIn("handoff", r.stderr)
-        self.assertFalse(os.path.exists(self.tmp_wt()))
+        self.assertIn("wip/handoff/note.local", r.stderr)
+
+    def test_integrate_done_and_cleanup_pass_with_a_listed_draft(self):
+        self.work_in_branch()
+        self.commit_draft("wip/handoff/notes.md", "memo\n")
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
+        self.assertOk(r)
+        self.assertNotIn("取り込まない下書き", r.stdout)
+        self.assertFalse(os.path.exists(self.wt))
+        self.assertFalse(self.has_branch())
 
     def test_a_deleted_draft_is_left_alone_in_the_result(self):
         self.work_in_branch()
@@ -951,7 +1026,7 @@ class IntegrateReviewTest(Fixture):
         write(os.path.join(self.wt, "wip/handoff/note.local"), "not in the start point\n")
         r = self.run_git_sh("integrate-done", "wt")
         self.assertOk(r, 1)
-        self.assertIn("起点に無いか中身の違うファイル", r.stdout)
+        self.assertIn("まだコミットしていないファイル", r.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.wt, "wip/handoff/note.local")))
 
     def test_cleanup_stops_before_deleting_the_worktree_when_the_branch_moved(self):
