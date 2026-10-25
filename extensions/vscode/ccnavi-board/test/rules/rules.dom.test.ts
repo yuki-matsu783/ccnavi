@@ -48,6 +48,21 @@ function judged(rules: readonly RuleHitJson[]): { type: string; result: TestJson
   return { type: "judged", result, hooks: [] };
 }
 
+test("CB-D1227 判定結果は一時パスを出さず、項目名は日本語に英語を添える", async () => {
+  const dom = await openRules();
+  try {
+    const sent = judged([{ id: "../../tmp/ccnavi-rules-aB3dE9/rules.yml:no-rm", section: "deny", source: "file", kind: "", written: "", pattern: "" } as RuleHitJson]);
+    await dom.send({ ...sent, result: { ...sent.result, response: "[ccnavi] X (rule: ../../tmp/ccnavi-rules-aB3dE9/rules.yml:no-rm)" } });
+    await dom.settle();
+    const shown = dom.one("#judge-result").textContent ?? "";
+    assert.ok(!shown.includes("ccnavi-rules-"), shown);
+    assert.match(shown, /ツール（tool）/);
+    assert.match(shown, /rules\.yml:no-rm/);
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D01 既定は全部畳む。行の見出しを押すと開き、開いた行の id が state に入る。もう一度押すと畳む", async () => {
   const dom = await openRules();
   try {
@@ -438,6 +453,19 @@ test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の�
     await dom.send({ type: "failed", message: "--lint が error を報告した" });
     assert.equal(dom.one("#status").textContent, "--lint が error を報告した");
     assert.ok(dom.one("#status").closest(".foot")?.classList.contains("error"));
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1223 notice は赤にせずに一言を出す（期待する判定のファイルが無いときの案内）", async () => {
+  const dom = await openRules();
+  try {
+    await dom.send({ type: "notice", message: "期待する判定のファイルがまだありません: x.yml。" });
+    assert.equal(dom.one("#status").textContent, "期待する判定のファイルがまだありません: x.yml。");
+    const foot = dom.one("#status").closest(".foot");
+    assert.ok(foot, "足元の枠がある");
+    assert.ok(!foot.classList.contains("error"));
   } finally {
     await dom.close();
   }
