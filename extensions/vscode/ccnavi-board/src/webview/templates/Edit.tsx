@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHistory } from "../../core/flow-history.js";
 import { templateFlow, type FlowDoc } from "../../core/flow-doc.js";
 import type { Lock } from "../../core/lock.js";
-import { blankTemplate, fromData, removeFlow, setFlow, setMeta, toData, type EditTemplate } from "../../core/template-edit.js";
+import { blankTemplate, fromData, removeFlow, setFlow, setMeta, toData, untouched, type EditTemplate } from "../../core/template-edit.js";
 import type { EditOpened, TemplateCheck, ToTemplates } from "../../core/templates-view.js";
 import { FlowEdit } from "./FlowEdit.js";
 import { PlanEdit } from "./PlanEdit.js";
@@ -74,6 +74,8 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   const [created, setCreated] = useState(opened.created);
   const [baseSha, setBaseSha] = useState(opened.sha);
   const [savedKey, setSavedKey] = useState(() => (opened.created ? "" : keyOf(start ?? blankTemplate(opened.name, "implement"))));
+  /** 作った直後の空の雛形に error の苦情を出さないための印。一度触ったら、空に戻しても出す */
+  const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
   /** 畳んだフローのステップの番号。フローは図を最初から見せるので、畳んだものだけを覚える */
@@ -84,6 +86,11 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   const sent = useRef("");
 
   const key = tpl === undefined ? "" : keyOf(tpl);
+  useEffect(() => {
+    if (start !== undefined && tpl !== undefined && !touched && !untouched(tpl, blankTemplate(start.name, firstType(opened.check)))) {
+      setTouched(true);
+    }
+  }, [tpl, touched]);
   const dirty = created || key !== savedKey;
   const fresh = checked.key === key;
 
@@ -179,6 +186,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   };
 
   const save = (): void => {
+    setTouched(true);
     setBusy(true);
     setStatus(undefined);
     sent.current = key;
@@ -252,7 +260,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
         <span className="dim">使う場面（when。選ぶ手がかり。省略できます）</span>
         <input type="text" className="f-when" value={tpl.when} onChange={(event) => update(setMeta(tpl, { when: event.target.value }), "meta:when")} onBlur={() => setHistory(seal)} />
       </label>
-      <Problems problems={checked.check.problems} />
+      <Problems problems={created && !touched ? checked.check.problems.filter((p) => p.severity !== "error") : checked.check.problems} />
       <PlanEdit part="plan" template={tpl} plan={planOf("plan")} fresh={fresh} types={checked.check.types} onChange={updatePlan} />
       <PlanEdit part="feedback" template={tpl} plan={planOf("feedback")} fresh={fresh} types={checked.check.types} onChange={updatePlan} />
       <section className="tpl-edit-flows" data-role="flows">

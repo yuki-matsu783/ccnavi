@@ -115,6 +115,11 @@ export function blankTemplate(name: string, type: string): EditTemplate {
   return { name, description: "", when: "", plan: [{ type, review: "", after: [] }], feedback: [], flows: {}, extra: {} };
 }
 
+/** まだ何も入力していないか。`blank` は `blankTemplate` で作った開いた直後の中身。書き出す形で比べる */
+export function untouched(template: EditTemplate, blank: EditTemplate): boolean {
+  return JSON.stringify(toData(template)) === JSON.stringify(toData(blank));
+}
+
 function itemData(item: EditItem): unknown {
   const type = item.type.trim();
   const review = item.review.trim();
