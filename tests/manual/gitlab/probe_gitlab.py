@@ -15,8 +15,11 @@ sh と同じ道具を使わないほうが、片方の不具合がもう片方�
 - 組み立て済みの exe（`dist/ccnavi/ccnavi`）。`CCNAVI_ENTRY_PATH` で差し替えられる
 - jq と curl（sh が使う）
 
-    GITLAB_TOKEN=... CCNAVI_PROBE_REVIEWER_TOKEN=... \
+    GITLAB_TOKEN=... CCNAVI_PROBE_REVIEWER_TOKEN=... \\
         uv run python tests/manual/gitlab/probe_gitlab.py
+
+GitLab API を人間役のトークンで呼ぶ部分は `gitlab_api.py` にある（import しても副作用が無い）。
+`--help` は、この説明を出して終わる（トークンも exe も要らない）。
 
 ## 認証画面を出さない
 
@@ -40,8 +43,8 @@ import subprocess
 import sys
 import tempfile
 import time
-import urllib.error
-import urllib.request
+
+import gitlab_api
 
 ROOT_OF_CCNAVI = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -51,7 +54,10 @@ CLOSE_EARLY_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
 GITLAB = os.environ.get("CCNAVI_PROBE_GITLAB", "http://localhost:8929").rstrip("/")
-API = GITLAB + "/api/v4"
+
+if any(arg in ("-h", "--help") for arg in sys.argv[1:]):
+    print((__doc__ or "").strip())
+    sys.exit(0)
 
 ROOT_TOKEN = os.environ.get("GITLAB_TOKEN", "")
 REVIEWER_TOKEN = os.environ.get("CCNAVI_PROBE_REVIEWER_TOKEN", "")
@@ -193,50 +199,39 @@ def sh(script: str, cwd: str, *args: str, stdin: str = "") -> subprocess.Complet
     return run(["sh", script, *args], cwd, stdin=stdin)
 
 
-def api(
-    method: str, path: str, token: str, payload: dict | None = None, tag: str = ""
-) -> tuple[int, object]:
-    """人間役の API。生の応答を OUT に残す。起動直後の GitLab は遅いので 120 秒を 3 回まで待つ。"""
+def record_api(event: dict) -> None:
+    """人間役の API の生の応答を OUT に残す。"""
     global API_SEQ
+    if event["kind"] == "retry":
+        LOG.write(
+            f"\nAPI {event['method']} {event['path']} 失敗 ({event['error']}) "
+            f"{event['attempt']} 回目\n"
+        )
+        LOG.flush()
+        return
     API_SEQ += 1
-    data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    req = urllib.request.Request(
-        API + path,
-        data=data,
-        method=method,
-        headers={"PRIVATE-TOKEN": token, "Content-Type": "application/json"},
-    )
-    status, raw = 0, ""
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=120) as res:
-                status, raw = res.status, res.read().decode("utf-8")
-            break
-        except urllib.error.HTTPError as exc:
-            status, raw = exc.code, exc.read().decode("utf-8", "replace")
-            break
-        except (TimeoutError, OSError) as exc:
-            LOG.write(f"\nAPI {method} {path} 失敗 ({exc}) {attempt + 1} 回目\n")
-            LOG.flush()
-            status, raw = 0, json.dumps({"error": str(exc)})
-            time.sleep(10)
-    try:
-        body = json.loads(raw) if raw else {}
-    except ValueError:
-        body = raw
-    slug = tag or path.strip("/").replace("/", "_")[:60]
+    method, path, status = event["method"], event["path"], event["status"]
+    slug = event["tag"] or path.strip("/").replace("/", "_")[:60]
     with open(
         os.path.join(OUT, f"api-{API_SEQ:02d}-{method}-{slug}.json"), "w", encoding="utf-8"
     ) as f:
         json.dump(
-            {"status": status, "path": path, "payload": payload, "body": body},
+            {"status": status, "path": path, "payload": event["payload"], "body": event["body"]},
             f,
             ensure_ascii=False,
             indent=1,
         )
     LOG.write(f"\nAPI {method} {path} -> {status}\n")
     LOG.flush()
-    return status, body
+
+
+CLIENT = gitlab_api.Client(GITLAB, recorder=record_api)
+
+
+def api(
+    method: str, path: str, token: str, payload: dict | None = None, tag: str = ""
+) -> tuple[int, object]:
+    return CLIENT.call(method, path, token, payload, tag)
 
 
 def write(path: str, text: str) -> str:
@@ -294,27 +289,14 @@ def commit_all(tree: str, msg: str) -> None:
 
 
 def mr_of(project_id: int, branch: str) -> dict | None:
-    _, found = api(
-        "GET",
-        f"/projects/{project_id}/merge_requests?state=all&source_branch={branch}",
-        ROOT_TOKEN,
-        tag=f"mr-list-{branch}",
-    )
-    return found[0] if isinstance(found, list) and found else None
+    return CLIENT.find_mr(ROOT_TOKEN, project_id, branch)
 
 
 def notes_of(project_id: int, iid: int) -> list[dict]:
-    _, found = api(
-        "GET",
-        f"/projects/{project_id}/merge_requests/{iid}/notes?per_page=100&sort=asc&order_by=created_at",
-        ROOT_TOKEN,
-        tag=f"notes-{iid}",
-    )
-    return found if isinstance(found, list) else []
+    return CLIENT.notes(ROOT_TOKEN, project_id, iid)
 
 
-def has_marker(notes: list[dict], marker: str) -> bool:
-    return any(n.get("body", "").startswith(marker) for n in notes)
+has_marker = gitlab_api.has_marker
 
 
 def main() -> int:
