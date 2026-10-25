@@ -23,7 +23,7 @@ function plan(...paths: string[]): { groups: string[]; compile: boolean; webview
 
 test("CB-T394 shared の CSS を直すと、@ccnavi/shared を @import する画面のグループとコンパイル・画面の型の検査が回る。どの画面も読まないもの（browser-theme.css）は shared グループだけ", () => {
   const page = plan(path.join(SHARED, "page.css"));
-  assert.deepEqual(page.groups, ["board", "flow", "handoff", "phases", "projects", "risk", "rules", "shared", "templates", "workflow"]);
+  assert.deepEqual(page.groups, ["board", "devtools", "flow", "handoff", "phases", "projects", "risk", "rules", "shared", "templates", "workflow"]);
   assert.ok(page.compile && page.webview);
   // 区切りがバックスラッシュで来る形（Windows）も同じ
   assert.deepEqual(plan(path.join(SHARED, "page.css").replace(/\//g, "\\")), page);
@@ -44,4 +44,11 @@ test("CB-T395 パスの祖先に extensions/shared/ が含まれていても、V
   // 拡張の目印が無いときだけ shared。目印が複数あるときは最後の出現を採る
   assert.deepEqual(plan(path.join(SHARED, "browser-theme.css")), { groups: ["shared"], compile: true, webview: true });
   assert.deepEqual(plan(`/home/u/extensions/vscode/ccnavi-board/.claude/worktrees/w/${inside}`), plain);
+});
+
+test("CB-T1219 開発用の画面確認ツール（scripts/render-board.js と scripts/lib/）を直すと devtools グループだけが回り、他の scripts/ は全グループで回る", () => {
+  assert.deepEqual(plan("scripts/render-board.js"), { groups: ["devtools"], compile: true, webview: true });
+  assert.deepEqual(plan("scripts/lib/vscode-stub.js"), { groups: ["devtools"], compile: true, webview: true });
+  assert.ok(plan("scripts/test-groups.js").groups.length > 1);
+  assert.ok(plan("scripts/test-groups.js").groups.includes("devtools"));
 });

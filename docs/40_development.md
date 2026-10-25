@@ -170,12 +170,12 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `extensions/` | VS Code 拡張（`vscode/ccnavi-board`）と Chrome 拡張（`chrome/ccnavi-approval`）、共有の設定（`shared/`） |
 | `docs/` | 設計・要件・ADR・手引き・ccnavi の開発の決まり。置き場は番号順に `10_requirements.md`・`11_requirements/`（要件）、`20_design.md`・`21_design/`（設計）、`30_adr.md`・`30_adr/`（ADR）、`40_development.md`・`41_guide/`（手引き）・`42_claude/`（開発の決まり）。`wiki/` と `CONTEXT.md` は実行時に読むため、番号を付けない |
 | `wip/` | 作業中の下書き（`design/`・`handoff/`・`proposals/`） |
-| `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
+| `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る（例外は `tests/scenarios/test_runner.py`。受入シナリオの実行器の内部を呼ぶ単体テストで、`claude` は呼ばない） |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |
 | `tests/manual/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを適用して 1 周する、ユーザが手で回す道具。自動テストは呼ばない |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
 | `.ccnavi/config/common/rules.yml` / `phases.yml` / `risks.yml` | このリポジトリ自身の共通レイヤーの設定（`phases.yml` はどのプロジェクトでも使える定義） |
 | `.ccnavi/config/project/phases.yml` | このリポジトリ自身のレイヤーのフェーズ定義（このリポジトリのレイアウトに依存する定義） |
 | `.ccnavi/config/common/rule-expectations.yml` | ルールが何を止めて何を通すかの期待する判定 |
-| `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
+| `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面。VS Code なしで画面を描く開発用スクリプトがある（[使い方](../extensions/vscode/ccnavi-board/docs/design/development.md)） |
 | `docs/30_adr/<主題>/` | 設計判断の記録。主題の分け方は [30_adr.md](30_adr.md) にある |
