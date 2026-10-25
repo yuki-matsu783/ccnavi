@@ -53,7 +53,7 @@
 | 提案を書く、承認・レビュー済みをユーザに頼む、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `decisions.md` |
 | 親の提案を始める、完了した親の計画とフローを使い回す、閉じるときにテンプレートの案内が出た | `templates.md` |
 | 用語（ワークスペースルート・統合先ブランチなど）を引く、`.ccnavi/CCNAVI.md` の条件・差し込みを書く、md に frontmatter を付ける・直す、索引で引く | `terms.md`、`ccnavi-md.md`、`frontmatter.md` |
-| フィードバックが届いた、`.claude/skills/` を直す、スキルを新しく作る、スキルの振り返りで知識を溜める・読む、工程スキル（process-*）の reference を引く・足す | `skill-review.md`、`skill-wiki.md`、`skill-processes.md` |
+| フィードバックが届いた、`.claude/skills/` を直す、スキルを新しく作る、スキルの振り返りで知識を溜める・読む、工程スキル（process-*）の reference を引く・足す | `skill-review.md`、`skill-review-propose.md`、`skill-wiki.md`、`skill-processes.md` |
 | ルール・フェーズ・リスク・計画テンプレート・工程スキルが育つ流れを確かめる | `grow.md` |
 
 <!-- ccnavi:if tickets -->
