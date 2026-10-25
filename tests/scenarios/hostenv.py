@@ -163,6 +163,11 @@ def origin_url(host):
     return host_stub.ORIGIN_URL
 
 
+def git_via(host):
+    """setup.git（runner が対象で打つ git）にも、本物の origin への通信を bare へ向けさせる -c。"""
+    return ["-c", f"url.{host['bare']}.insteadOf={host['real_origin']}"]
+
+
 def step_env(host, base=None):
     """claude に渡す環境。親の環境を継承し、本物のトークン系だけ除いて、代役を足す。"""
     out = {k: v for k, v in (base or os.environ).items() if not TOKEN_VAR.match(k)}

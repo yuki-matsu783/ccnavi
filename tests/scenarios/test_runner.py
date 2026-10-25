@@ -2823,6 +2823,19 @@ class HostLifecycleTest(unittest.TestCase):
             socket_connect(ports[0])
         self.assertEqual(self.places(), before)
 
+    def test_setup_git_push_reaches_the_bare_and_not_the_real_origin(self):
+        git_setup = [["git", "push", "-q", "origin", "main:refs/heads/feat"]]
+        seen = {}
+
+        def run_step(*a, **k):
+            bare = self.host_in_state()["bare"]
+            seen["bare"] = git(bare, "rev-parse", "--verify", "-q", "refs/heads/feat")
+            return self.STEP_OUT
+
+        with mock.patch.object(runner, "run_step", side_effect=run_step):
+            self.run_cmd(self.scenario("bare", git=git_setup))
+        self.assertTrue(seen["bare"])
+
     def test_a_failed_step_leaves_no_place(self):
         before = self.places()
         with mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")):
@@ -2898,6 +2911,22 @@ class HostLifecycleTest(unittest.TestCase):
         self.assertEqual(self.places(), before)
         with self.assertRaises(OSError):
             socket_connect(seen["port"])
+
+    def test_next_after_a_halt_records_that_the_place_is_gone(self):
+        before = self.places()
+        with (
+            mock.patch.object(runner, "run_step", side_effect=RuntimeError("起動できない")),
+            mock.patch.object(runner, "finish", return_value=2),
+        ):
+            self.run_cmd(self.scenario("bare"))
+        fail = runner.Refusal("失敗", "手で戻す")
+        with (
+            mock.patch.object(runner, "reset_repo", side_effect=fail),
+            mock.patch("builtins.print"),
+        ):
+            self.assertEqual(runner.main(["next", str(self.ws.out)]), 3)
+        self.assertTrue(self.host_in_state()["down"])
+        self.assertEqual(self.places(), before)
 
     def test_restore_removes_the_held_place(self):
         steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]

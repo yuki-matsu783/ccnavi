@@ -704,17 +704,19 @@ def _target_git(root, top, args, level="info"):
     return r
 
 
-def run_setup_git(root, target, commands, allowed=None):
+def run_setup_git(root, target, commands, allowed=None, host=None):
     """setup.git のコマンドを、対象の toplevel を cwd にして順に実行する（shell=False）。
-    各コマンドのあと ccnavi 本体の repo_snapshot が変わっていたら止める。"""
+    各コマンドのあと ccnavi 本体の repo_snapshot が変わっていたら止める。
+    host（setup.host の辞書）があれば、本物の origin への通信を bare へ向ける -c を足す。"""
     top = require_disposable_repo(root, target, allowed)
     before = repo_snapshot(root)
+    via = hostenv.git_via(host) if host else []
     for argv in commands:
         try:
             check_git_argv(argv)
         except ValueError as exc:
             raise Refusal(f"setup.git を実行しない: {exc}", "シナリオの setup.git を直す") from None
-        r = _target_git(root, top, argv[1:])
+        r = _target_git(root, top, [*via, *argv[1:]])
         if r.returncode != 0:
             raise Refusal(
                 f"setup.git が失敗した: {shlex.join(argv)}（終了コード {r.returncode}）",
@@ -2152,7 +2154,7 @@ def cmd_run(args):
             st["issue_no"] = make_issue(setup["issue"], root)
         st["setup_made"], st["setup_dirs"] = _setup(scn, root, top)
         if setup.get("git"):
-            run_setup_git(root, top, setup["git"])
+            run_setup_git(root, top, setup["git"], host=st.get("host"))
     except Refusal as exc:
         _abort(scn, out, st, root)
         return _refuse(exc)
@@ -2218,10 +2220,9 @@ def cmd_next(args):
         # halt は finish で戻してある。届かなかった場合に備え、戻し直す（戻し済みなら何もしない）
         print(f"step {st['halt']['step']} で止めた回。続きは回せない")
         _teardown_host(st, st["root"])
-        if release_target(st, st["root"]):
-            return 3
+        failed = release_target(st, st["root"])
         _write_state(out, st)
-        return 2
+        return 3 if failed else 2
     # 人間の操作の間にモードが変わることがあるので、続けるたびに確かめる
     mode_ok, mode_text = mode_check(Path(st["root"]))
     if not mode_ok:
