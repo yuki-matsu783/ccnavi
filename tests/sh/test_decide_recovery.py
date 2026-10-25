@@ -233,16 +233,14 @@ class DecideRecoveryShTest(unittest.TestCase):
         now = int(time.time())
         with open(os.path.join(lock, "owner"), "w", encoding="utf-8") as f:
             f.write(f"{host} {os.getpid()} {now} {os.getpid()}-{now}\n")
+        # 最初の判断で issue 以外の段階（note）は送り済み。--resume が増やさないことを確かめる
+        notes_before = len(STORE["notes"])
+        calls_before = len(self.calls())
         result = self.run_decide("--resume", stdin="y\n")
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertEqual(len(STORE["issues"]), 0, "ロック中なのに issue を作った")
-        self.assertEqual(len(STORE["notes"]), 0)
-
-    # decide の --resume は操作IDのロック（ccnavi_lock_take）を取らない（post_staged は
-    # staged_send を通らない）。ロック中でも投稿する
-    test_two_resumes_of_the_same_operation_do_not_post_twice = unittest.expectedFailure(
-        test_two_resumes_of_the_same_operation_do_not_post_twice
-    )
+        self.assertEqual(len(STORE["notes"]), notes_before, "ロック中なのに投稿した")
+        self.assertEqual(self.calls()[calls_before:], [], "ロック中なのに ccnavi を呼んだ")
 
 
 if __name__ == "__main__":
