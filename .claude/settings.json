@@ -2,9 +2,9 @@
   "env": {
     "PYTHONUTF8": "1",
     "ARCHIFY_UPDATE_CHECK_DISABLED": "1",
-    "CCNAVI_GUARD_CORE_FILES": "dry-run",
-    "CCNAVI_MODE": "dry-run",
-    "CCNAVI_RESTORE_IF_DENY": "dry-run",
+    "CCNAVI_GUARD_CORE_FILES": "enable",
+    "CCNAVI_MODE": "enable",
+    "CCNAVI_RESTORE_IF_DENY": "enable",
     "CCNAVI_ENTRY_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
     "CCNAVI_TICKET_CONTROL": "enable",
     "CLAUDE_CODE_BG_TASKS_REPORT_RUNNING": "1",
