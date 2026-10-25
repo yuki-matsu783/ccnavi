@@ -51,7 +51,7 @@ import unicodedata
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, pathsafe, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy.rules import SEVERITY_ERROR
 from . import (
@@ -532,7 +532,7 @@ def _flow_clash(conf: settings.Settings, top: str, used: _Used) -> str:
     if not used.drafts:
         return ""
     directory = os.path.dirname(flow.draft_file(conf, top, used.drafts[0][0]))
-    if flow.linked(top, directory):
+    if pathsafe.has_link(top, directory):
         place = f"{flow.tickets_rel(conf)}/{flow.FLOWS_DIR}"
         return f"フロー下書きの置き場（{place}/）の途中にリンクがあるので反映しません"
     for child, _, _ in used.drafts:

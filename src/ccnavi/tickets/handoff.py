@@ -58,7 +58,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, pathcase, settings, yamlread
+from ..infra import fsio, gitcmd, pathcase, pathsafe, settings, yamlread
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import config_check, flow, handoff_names, plan_templates, ticket_places
@@ -253,7 +253,7 @@ def walk(tree_root: str) -> tuple[list[Found], int, str]:
     base = handoff_dir(tree_root)
     if not os.path.lexists(base):
         return [], 0, ""
-    if flow.linked(tree_root, base) or not os.path.isdir(base):
+    if pathsafe.has_link(tree_root, base) or not os.path.isdir(base):
         return [], 0, f"{HANDOFF_REL}/ がリンクか、ディレクトリではないので読めない"
     found: list[Found] = []
     ignored = 0
@@ -520,7 +520,7 @@ def _read(conf: settings.Settings, root: str, entry: Entry) -> None:
         entry.errors.append(why)
         return
     entry.target = target
-    if not _inside(root, target) or flow.linked(root, target):
+    if not _inside(root, target) or pathsafe.has_link(root, target):
         entry.errors.append("取り込み先の途中にリンクがあるか、ツリーの外を指すので書かない")
         return
     if os.path.lexists(target):
@@ -968,7 +968,7 @@ def apply(plan: Plan, expect: str, via_board: bool = False) -> Applied:
 
 def _write_one(root: str, entry: Entry) -> str:
     """1 本を書く。書く直前にリンクと取り込み先のハッシュを確かめ直す。失敗なら理由。"""
-    if flow.linked(root, entry.target) or not _inside(root, entry.target):
+    if pathsafe.has_link(root, entry.target) or not _inside(root, entry.target):
         return f"{entry.rel}: 取り込み先の途中がリンクに変わった"
     if os.path.lexists(entry.target):
         now, why = flow.read_bytes(entry.target, root)
@@ -1072,6 +1072,72 @@ def pending(tree_root: str) -> list[str]:
         if raw is None or why or current != raw:
             out.append(f"{HANDOFF_REL}/{item.drel}")
     return out
+
+
+def _draft_files(tree_root: str) -> list[str]:
+    """置き場の下にあるファイル（リンクを含む。ディレクトリでないもの）を、置き場からの相対パスで返す。"""
+    base = handoff_dir(tree_root)
+    out: list[str] = []
+    for parent, dirs, files in os.walk(base, followlinks=False):
+        dirs.sort()
+        for name in sorted(files) + sorted(
+            n for n in dirs if os.path.islink(os.path.join(parent, n))
+        ):
+            out.append(os.path.relpath(os.path.join(parent, name), base).replace(os.sep, "/"))
+    return out
+
+
+def _holds(tree_root: str, start: str, sources: list[str], raw: bytes | None) -> bool | None:
+    """起点の木のいずれかのパスの中身が、この中身と同じかを返す。起点から読めなければ None。"""
+    same = False
+    for source in sources:
+        held, readable = gitcmd.blob(tree_root, start, source, timeout=30.0)
+        if not readable:
+            return None
+        same = same or (raw is not None and held == raw)
+    return same
+
+
+def survey(tree_root: str, start: str) -> tuple[list[str], list[str]] | None:
+    """置き場の下書きを、`<起点>` の木の元のパスと突き合わせる。
+
+    結果は `(元と違う写し, 元の無い下書き)`。`ccnavi-git.sh integrate` が、
+    取り込み結果に含まれない下書きを見分けるのに使う。
+    置き場を除いた下書きの相対パス（階層名の読み替えを戻したもの）を、`<起点>` の木のパスと
+    `key_of` で比べる（大文字小文字・NFC/NFD の違いは同じものとして扱う）。比べるのは見つける
+    ためだけで、元を読むときは起点の木の表記を使う。
+
+    - 起点の木に同じ下書きがあり中身も同じ: ブランチが持ち込んだものではない。
+      どちらの一覧にも入れない
+    - 元が起点の木に無い: 元の無い下書き（新規のメモ・報告）
+    - 元があり中身が同じ: 編集していない写し。どちらの一覧にも入れない
+    - 元があり中身が違う、または読めない（リンクなど）: 元と違う写し（取り込んでいない）
+
+    起点の木を読めなければ None（呼ぶ側は止める）。パスは置き場つきで、置き場の表記のまま。
+    """
+    if not os.path.isdir(handoff_dir(tree_root)):
+        return [], []
+    listed = gitcmd.run(tree_root, ["ls-tree", "-r", "-z", "--name-only", start], timeout=30.0)
+    if not listed.ok:
+        return None
+    origins: dict[str, list[str]] = {}
+    for name in listed.out.split("\0"):
+        if name:
+            origins.setdefault(key_of(name), []).append(name)
+    foreign: list[str] = []
+    notes: list[str] = []
+    for rel in _draft_files(tree_root):
+        shown = f"{HANDOFF_REL}/{rel}"
+        raw, _ = flow.read_bytes(os.path.join(handoff_dir(tree_root), *rel.split("/")), tree_root)
+        own = origins.get(key_of(shown))
+        if own and _holds(tree_root, start, own, raw):
+            continue
+        sources = origins.get(key_of(handoff_names.from_draft(rel)))
+        if not sources:
+            notes.append(shown)
+        elif not _holds(tree_root, start, sources, raw):
+            foreign.append(shown)
+    return foreign, notes
 
 
 # ---- JSON

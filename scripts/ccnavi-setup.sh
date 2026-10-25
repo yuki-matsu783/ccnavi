@@ -1177,7 +1177,7 @@ SCRATCH_IGNORE_LINE="/scratchpad"
 LOGS_IGNORE_COMMENT="# 実行時の記録"
 LOGS_IGNORE_LINE="/logs/"
 # .claude/worktrees/ は、ccnavi がワークツリーを切る置き場。無視する行が無い配布先では、最初のワークツリーを切った
-# あと未追跡のまま main のチェックアウトに残り、ワークツリーを切るスクリプトが「書きかけ」と数えてしまう。
+# あと未追跡のまま ユーザのチェックアウトに残り、ワークツリーを切るスクリプトが「書きかけ」と数えてしまう。
 # ルートに固定した `/.claude/worktrees/` が既にあるとき、または同等以上の `/.claude/worktrees`・
 # `.claude/worktrees/`・`.claude/worktrees` があるときは足さない。`!/.claude/worktrees` のようにユーザが
 # 否定している行があれば、追跡すると決めているので足さずに伝える。実行ファイルの置き場（--bin user）とは関係なく足す。

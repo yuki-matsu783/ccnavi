@@ -100,6 +100,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.globmatch",
                 "infra.hookio",
                 "infra.pathcase",
+                "infra.pathsafe",
                 "infra.platformtag",
                 "infra.settings",
                 "infra.shellread_scan",
