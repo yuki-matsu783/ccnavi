@@ -559,7 +559,7 @@ def close_notice(conf: settings.Settings, root: str, parent: str, mr: bool = Tru
             f"テンプレートにするなら、`ccnavi --templates --draft {parent}` で下書きを作る。"
             f"`{ticket_places.WIP_ROOT}/` を削除して統合先に取り込む前に打つ"
             "（取り込んだあとは材料が残らず拾えない）。"
-            "下書きはユーザが `ccnavi-user-handoff.sh` で取り込む\n"
+            "下書きは `wip/` を削除する前に、ユーザが `ccnavi-user-handoff.sh` で取り込む\n"
         )
     return (
         "テンプレートにするなら、`ready` の前に "

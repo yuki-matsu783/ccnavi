@@ -338,7 +338,8 @@ def _close_parent(
     if approval_marks.read_parent_mark(where, found.ticket, approval_marks.PARENT_MARK_READY):
         # ready は印を置いたあとに `done/` を `logs/archive/` へ退避するので、材料は拾えず、
         # `close_notice` も空を返す。案内を足さないのはそのため。この分岐に来るのは、ready の印が
-        # 残ったまま作業中の親を finish したときだけで、印は退避と一緒に消える。
+        # 残ったまま作業中の親を finish したときだけ。印は正常なら退避と一緒に消え、退避が途中で
+        # 止まったときだけ残る。
         stdout.write("Draft は外してある。マージはユーザが行う\n")
         return
     stdout.write(
