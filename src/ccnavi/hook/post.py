@@ -589,7 +589,7 @@ class Watched:
     tree: tree.Tree
     rule_set: rules.RuleSet
     source: str
-    # 横で作業する指定が有効なメインのチェックアウト（`infra.directrec`）。ここで新しく見つかった
+    # 横で作業する指定が有効なユーザのチェックアウト（`infra.directrec`）。ここで新しく見つかった
     # 変更は、ユーザか別のセッションのものかもしれないので、戻さず報告だけにする。
     side_by_side: bool = False
 

@@ -8,7 +8,7 @@
 #                                        [--copy-wip | --no-wip] [--side-by-side] [--dry-run]
 #   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> --adopt --base <ブランチ> [--accept <確認コード>] [--side-by-side]
 #
-# 取り込み先は、切った時点でメインのチェックアウト（`git worktree list` の先頭）が開いているブランチ。
+# 取り込み先は、切った時点でユーザのチェックアウト（`git worktree list` の先頭）が開いているブランチ。
 # 起点Sは、書きかけをコピーするとき（--copy-wip）は確認した時点の書きかけを含むスナップショット、それ以外は
 # 取り込み先のHEAD。ルートのindexとワークツリーには書かない（スナップショットは一時的なindexで作る）。
 # 手元の取り込み先は進めない（進めるのはセッション開始時のccnavi-fetch.shだけ）。originからも切らない。
@@ -18,12 +18,12 @@
 #   C4 cwdのブランチと取り込み先が違う（--base <取り込み先> が要る）
 #   C5 取り込み先が統合先（origin/HEAD）でない
 #   C6 origin/<取り込み先> より遅れている・進んでいる・分岐している・originに無い・リモート未確認
-#   C7 メインのチェックアウトに書きかけ（追跡済みの変更・新規ファイル）がある（--copy-wipか --no-wipが要る）
+#   C7 ユーザのチェックアウトに書きかけ（追跡済みの変更・新規ファイル）がある（--copy-wipか --no-wipが要る）
 #   C5〜C7 のどれかにヒットするときは --accept <確認コード> も要る。確認コードは今の状態から決まるので、
 #   状態が動けば報告からやり直しになる。
 # ヒットしないときは確認なしでS = 取り込み先のHEADから切る。--side-by-sideだけはaskルールがユーザの確認を取る。
 #
-# 先に断るもの: メインのチェックアウトがdetached HEAD（C1）、取り込み先がチケットに結び付く・結び付くかを
+# 先に断るもの: ユーザのチェックアウトがdetached HEAD（C1）、取り込み先がチケットに結び付く・結び付くかを
 # 確かめられない（C2。実行ファイルの `tree base-bound`）、gitが 2.40 未満（C3）。
 #
 # 手で打つgitではなくccnavi-git.shを通す。fetchはorigin <取り込み先> だけ。
@@ -47,7 +47,7 @@
 
 set -eu
 
-# メインのチェックアウトの状態を読むだけの git が、index を書き直さない（確認している間、ルートの index に
+# ユーザのチェックアウトの状態を読むだけの git が、index を書き直さない（確認している間、ルートの index に
 # 書かない）。ユーザの git add / commit と index.lock を取り合わない。
 GIT_OPTIONAL_LOCKS=0
 export GIT_OPTIONAL_LOCKS
@@ -71,12 +71,12 @@ sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--base <ブランチ>] [--accept
   <名前>          ワークツリーの名前。ブランチ名も同じ名前で切る（/ を含められない）。行き先は
                   <ワークスペースルート>/.claude/worktrees/<名前>
   --base <ブランチ>
-                  確認した取り込み先（メインのチェックアウトが開いているブランチ）
+                  確認した取り込み先（ユーザのチェックアウトが開いているブランチ）
   --accept <確認コード>
                   報告したずれ（取り込み先・origin との関係・書きかけ）を、ユーザが了承して進める
   --copy-wip / --no-wip
                   書きかけをコピーして切るか、コピーせず HEAD から切るか（書きかけがあるときはどちらかが要る）
-  --side-by-side  このワークツリーが残っている間、メインのチェックアウトで見つかった変更を自動で戻さず報告にする
+  --side-by-side  このワークツリーが残っている間、ユーザのチェックアウトで見つかった変更を自動で戻さず報告にする
                   （ccnavi の設定ファイルは戻す）
   --adopt         記録の無い既存の直接作業のワークツリー（.claude/worktrees/<名前>）を引き取る。--base <取り込み先> が要る。
                   1 回目は推定した起点・取り込む範囲・差分を見せて確認コードを出し（終了コード 3）、
@@ -238,17 +238,17 @@ same_id_guard() {
 [ -n "$adopt" ] || same_id_guard "$heads_list" 手元
 
 # ---- C1〜C3。先に断るもの。
-# 取り込み先は、メインのチェックアウト（git worktree listの先頭）が開いているブランチ。
+# 取り込み先は、ユーザのチェックアウト（git worktree listの先頭）が開いているブランチ。
 main_tree=$(git -C "$top" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p' | tr -d '\r')
 [ -n "$main_tree" ] ||
-	fail no-main-tree "このリポジトリのメインのチェックアウトを git worktree list から読めません。"
+	fail no-main-tree "このリポジトリのユーザのチェックアウトを git worktree list から読めません。"
 main_tree=$(ccnavi_phys "$main_tree")
 target=$(git -C "$main_tree" symbolic-ref --quiet --short HEAD 2>/dev/null || :)
 [ -n "$target" ] ||
-	fail detached "メインのチェックアウト（${main_tree}）がブランチを開いていません（detached HEAD）。取り込み先を決められないので切りません。ユーザにブランチへ戻してもらってから再実行してください。"
+	fail detached "ユーザのチェックアウト（${main_tree}）がブランチを開いていません（detached HEAD）。取り込み先を決められないので切りません。ユーザにブランチへ戻してもらってから再実行してください。"
 head_sha=$(git -C "$main_tree" rev-parse HEAD 2>/dev/null || :)
 [ -n "$head_sha" ] ||
-	fail no-head "メインのチェックアウト（${main_tree}）の HEAD を読めません。"
+	fail no-head "ユーザのチェックアウト（${main_tree}）の HEAD を読めません。"
 
 git_ver=$(git version 2>/dev/null | sed -n 's/^git version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')
 git_major=${git_ver% *}
@@ -283,7 +283,7 @@ if [ -n "$mk_dir" ] && [ -f "$mk_dir/$name/marker" ]; then
 fi
 
 if [ -n "$base_arg" ] && [ "$base_arg" != "$target" ]; then
-	fail base-mismatch "--base ${base_arg} は、今の取り込み先（${target}。メインのチェックアウト ${main_tree}）と違います。取り込み先が切り替わっていれば、ユーザに確かめて、報告からやり直してください（引数なしで打ち直す）。"
+	fail base-mismatch "--base ${base_arg} は、今の取り込み先（${target}。ユーザのチェックアウト ${main_tree}）と違います。取り込み先が切り替わっていれば、ユーザに確かめて、報告からやり直してください（引数なしで打ち直す）。"
 fi
 
 # ---- 引き取り（--adopt）。記録の無い既存の直接作業のワークツリーをv4 の形式に引き取る。
@@ -291,7 +291,7 @@ fi
 # 2 回目は --accept <確認コード> が一致したときだけ、記録（snap_wip no・confirm adopt）とsのrefを書く。
 if [ -n "$adopt" ]; then
 	[ -n "$base_arg" ] ||
-		fail adopt-no-base "--adopt には --base <取り込み先> が要ります（今のメインのチェックアウトのブランチは ${target}）。ユーザに取り込み先を確かめてから付けてください。" 2
+		fail adopt-no-base "--adopt には --base <取り込み先> が要ります（今のユーザのチェックアウトのブランチは ${target}）。ユーザに取り込み先を確かめてから付けてください。" 2
 	[ -z "$wip_mode" ] ||
 		fail adopt-wip "--adopt では --copy-wip / --no-wip は指定できません（書きかけはコピーしない。起点は merge-base から決める）。" 2
 	ad_common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
@@ -578,7 +578,7 @@ report_and_stop() {
 	esac
 	[ "$c5" = no ] || rs_risks="${rs_risks}  - 最後は ${target} に 1 コミットで載る。${integ} に届くのは ${target} の MR がマージされたとき
 "
-	[ "$c4" = no ] || rs_risks="${rs_risks}  - cwd のブランチ（${top_branch:-ブランチの外}）ではなく、メインのチェックアウトの ${target} へ取り込む
+	[ "$c4" = no ] || rs_risks="${rs_risks}  - cwd のブランチ（${top_branch:-ブランチの外}）ではなく、ユーザのチェックアウトの ${target} へ取り込む
 "
 	if [ -n "$rs_risks" ]; then
 		printf '合わせない場合のリスク:\n'

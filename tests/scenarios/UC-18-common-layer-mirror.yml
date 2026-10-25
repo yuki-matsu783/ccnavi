@@ -62,7 +62,7 @@ expect:
         sh -c 'for d in .claude/worktrees/*/.ccnavi/config/common projects/test-repo/.claude/worktrees/*/.ccnavi/config/common;
         do [ -d "$d" ] && for f in rules.yml phases.yml risks.yml; do cmp -s ".ccnavi/config/common/$f" "$d/$f" && echo "same:$f"; done; done'
       expect_contains: same:rules.yml
-    # 元のリポジトリ（projects/test-repo のメインのワークツリー）にミラーは出ない（親のブランチに乗って届く）
+    # 元のリポジトリ（projects/test-repo のユーザのチェックアウト）にミラーは出ない（親のブランチに乗って届く）
     - run: git -C projects/test-repo status --short
       expect_not_contains: .ccnavi/config/common
     # プロジェクトの config/project/ は触れられていない
