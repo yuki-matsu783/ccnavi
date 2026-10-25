@@ -84,7 +84,7 @@ class TextsTest(unittest.TestCase):
                 self.assertEqual([], cat.problems)
                 out = texts.say(self.root, "NEXT_SAMPLE", {"args_q": "x"})
                 self.assertNotIn("別の文", out)
-                self.assertNotIn("打ち直す:", out)
+                self.assertIn("ccnavi-start.sh", out)  # 共通レイヤーの文のまま
 
     def test_a_non_string_kind_or_a_line_separator_is_an_error_not_a_crash(self):
         bad = [
