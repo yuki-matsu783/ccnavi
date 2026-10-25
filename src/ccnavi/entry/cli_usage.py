@@ -533,8 +533,7 @@ _SCRIPTS = """\
          突き合わせ、元があり中身が違う写しごとに "foreign <パス>"、元の無い下書きごとに
          "note <パス>" を足します）
     ccnavi text <id> [name=value]... [@field=case]...
-        （スクリプト用。文面ファイル（.ccnavi/config/common/messages/ と
-         .ccnavi/config/project/messages/）の識別子 <id> の文を組み立てて出力します。
+        （スクリプト用。文面ファイル（.ccnavi/config/common/messages/）の識別子 <id> の文を組み立てて出力します。
          name=value は文面の {name} に入る値、@field=case は欄の場合分けの選択です。
          引けないとき（識別子が無い・値の不足・文面ファイルの不備）は何も出力せず、
          理由を標準エラーに出して終了コード1になります）

@@ -3,11 +3,9 @@
 条件（いつ出すか）はルールとコードと sh に残り、文（何を出すか）は文面ファイルが持つ。呼ぶ側は識別子と
 差し込む値を渡すだけで、組み立てた文を受け取る。止める・止めないの判定には関わらない。
 
-置き場は共通レイヤー（`.ccnavi/config/common/messages/*.yml`）と自身のレイヤー
-（`.ccnavi/config/project/messages/*.yml`）。同じ識別子を自身のレイヤーに書くと、その 1 件の文が替わる。
-替えられるのは文の欄だけで、種類（`kind`）と差し込みの名前（`values`）は共通レイヤーが決める。
-検査（欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script 呼び出し）を通らない上書きは採らず、
-共通レイヤーの文を使う。形式と欄の表は設計書の「文面ファイル」の章にある。
+置き場は共通レイヤー（`.ccnavi/config/common/messages/*.yml`）だけ。自身のレイヤーに `messages/` が
+あっても読まない（文だけを替える口は持たない）。検査（欄・差し込みの名前・`次:` の数・長さ・ADR 番号・
+相対の script 呼び出し）を通らない 1 件は採らない。形式と欄の表は設計書の「文面ファイル」の章にある。
 
 失敗の向き: `say` は例外を投げない。文面ファイルが無い・壊れている・識別子や値が合わないときは、
 種類ごとの短い既定の文（`fallback`）を返す。判定は呼ぶ側が決めたままで、文だけが落ちる。
@@ -26,14 +24,11 @@ import yaml
 
 from ..infra import fsio, settings, yamlread
 from . import rules
-from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+from .rules import SEVERITY_ERROR, Problem
 
 VERSION = 1
 MESSAGES_DIR = "messages"
 SUFFIX = ".yml"
-
-LAYER_COMMON = settings.LAYER_COMMON
-LAYER_SELF = settings.LAYER_SELF
 
 DENY = "deny"
 NUDGE = "nudge"
@@ -94,16 +89,14 @@ class Entry:
     kind: str
     values: tuple[str, ...]
     fields: dict[str, object]
-    layer: str
     path: str
 
 
 @dataclass
 class Catalog:
-    """読み込んだ文面。`entries` は上書きを重ねたもの、`common` は共通レイヤーだけ。"""
+    """読み込んだ文面（共通レイヤーの全件）。"""
 
     entries: dict[str, Entry] = field(default_factory=dict)
-    common: dict[str, Entry] = field(default_factory=dict)
     problems: list[Problem] = field(default_factory=list)
 
 
@@ -120,13 +113,10 @@ def code_of_id(text_id: str) -> str:
     return text_id.split("__", 1)[0]
 
 
-def dirs(root: str) -> tuple[str, str]:
-    """（共通レイヤーの置き場, 自身のレイヤーの置き場）。絶対パス。"""
+def dirs(root: str) -> str:
+    """共通レイヤーの置き場。絶対パス。"""
     home = settings.DEFAULT_PROJECT_HOME.replace("/", os.sep)
-    return (
-        os.path.join(root, home, settings.COMMON_DIR, MESSAGES_DIR),
-        os.path.join(root, home, settings.LAYER_CONFIG_DIR, MESSAGES_DIR),
-    )
+    return os.path.join(root, home, settings.COMMON_DIR, MESSAGES_DIR)
 
 
 # ---- 差し込み
@@ -213,7 +203,6 @@ def _text_of(raw: object) -> str:
 def _check_field(
     name: str,
     raw: object,
-    base_value: object,
     err,
     used: set[str],
     sizes: list[int],
@@ -237,12 +226,6 @@ def _check_field(
         if len(raw) < 2 or not all(isinstance(k, str) and NAME.fullmatch(k) for k in raw):
             err(f"`{name}` の場合分けは、2 つ以上の場合の名前（小文字・数字・`_`）で書く")
             return None
-        if not isinstance(base_value, dict) and base_value is not None:
-            err(f"`{name}` の場合分けは共通レイヤーに無い")
-            return None
-        if isinstance(base_value, dict) and set(raw) != set(base_value):
-            err(f"`{name}` の場合の名前が共通レイヤーと違う")
-            return None
         picked: dict[str, str] = {}
         failed = False
         for case, value in raw.items():
@@ -255,9 +238,6 @@ def _check_field(
                 failed = True
             picked[case] = text
         return None if failed else picked
-    if isinstance(base_value, dict):
-        err(f"`{name}` は共通レイヤーが場合分けしている。場合の名前で書く")
-        return None
     text = _text_of(raw)
     if not text:
         err(f"`{name}` が文字列でない、または空")
@@ -296,13 +276,8 @@ def _check_text(
     return bad
 
 
-def check_entry(
-    text_id: str, raw: object, layer: str, path: str, base: Entry | None = None
-) -> tuple[Entry | None, list[Problem]]:
-    """1 件を検査して組む。`base` は上書きされる共通レイヤーの 1 件（共通レイヤー自身なら None）。
-
-    誤りがあれば（Entry は None）、呼び手はその 1 件を採らない。
-    """
+def check_entry(text_id: str, raw: object, path: str) -> tuple[Entry | None, list[Problem]]:
+    """1 件を検査して組む。誤りがあれば（Entry は None）、呼び手はその 1 件を採らない。"""
     problems: list[Problem] = []
     where = os.path.basename(path) or path
 
@@ -319,38 +294,26 @@ def check_entry(
     if not isinstance(raw, dict):
         err("1 件は欄の表で書く")
         return None, problems
-    if base is None:
-        kind = raw.get("kind")
-        if not isinstance(kind, str) or kind not in FIELDS:
-            err(f"`kind` は {' '.join(FIELDS)} のどれか")
-            return None, problems
-        if kind != expect:
-            err(f"識別子の頭が {expect} の種類を言っているが、`kind` は {kind}")
-            return None, problems
-        declared = raw.get("values")
-        if declared is None:
-            declared = []
-        if (
-            not isinstance(declared, list)
-            or not all(isinstance(v, str) and NAME.fullmatch(v) for v in declared)
-            or len(set(declared)) != len(declared)
-        ):
-            err("`values` は重ならない名前（小文字・数字・`_`）の並び")
-            return None, problems
-        values = tuple(declared)
-        allowed_extra = {"kind", "values"}
-    else:
-        for key in ("kind", "values"):
-            if key in raw:
-                err(f"`{key}` は上書きに書けない（共通レイヤーが決める）")
-        kind = base.kind
-        values = base.values
-        allowed_extra = set()
+    kind = raw.get("kind")
+    if not isinstance(kind, str) or kind not in FIELDS:
+        err(f"`kind` は {' '.join(FIELDS)} のどれか")
+        return None, problems
+    if kind != expect:
+        err(f"識別子の頭が {expect} の種類を言っているが、`kind` は {kind}")
+        return None, problems
+    declared = raw.get("values")
+    if declared is None:
+        declared = []
+    if (
+        not isinstance(declared, list)
+        or not all(isinstance(v, str) and NAME.fullmatch(v) for v in declared)
+        or len(set(declared)) != len(declared)
+    ):
+        err("`values` は重ならない名前（小文字・数字・`_`）の並び")
+        return None, problems
+    values = tuple(declared)
     required, optional = FIELDS[kind]
-    unknown = sorted(
-        str(k)
-        for k in set(raw) - set(required) - set(optional) - allowed_extra - {"kind", "values"}
-    )
+    unknown = sorted(str(k) for k in set(raw) - set(required) - set(optional) - {"kind", "values"})
     if unknown:
         err(f"{kind} の欄に無い: {', '.join(unknown)}")
     for name in required:
@@ -363,9 +326,7 @@ def check_entry(
         if name not in raw:
             continue
         before = len(problems)
-        got = _check_field(
-            name, raw[name], base.fields.get(name) if base else None, err, used, sizes
-        )
+        got = _check_field(name, raw[name], err, used, sizes)
         if got is None and len(problems) == before:
             err(f"`{name}` を読めない")
         if got is not None:
@@ -383,7 +344,7 @@ def check_entry(
         err(f"1 件の文の長さの合計が {LIMIT_ENTRY} 字を超える（{sum(sizes)} 字）")
     if problems:
         return None, problems
-    return Entry(text_id, kind, values, out, layer, path), problems
+    return Entry(text_id, kind, values, out, path), problems
 
 
 def _parse(text: str, path: str) -> tuple[dict | None, list[Problem]]:
@@ -403,41 +364,24 @@ def _parse(text: str, path: str) -> tuple[dict | None, list[Problem]]:
     return body, []
 
 
-def check_text(
-    text: str, layer: str, path: str, common: dict[str, Entry] | None = None
-) -> tuple[dict[str, Entry], list[Problem]]:
-    """文面ファイル 1 本の中身を検査する。下書きの取り込み前の検査も使う。
+def check_text(text: str, path: str) -> tuple[dict[str, Entry], list[Problem]]:
+    """文面ファイル 1 本の中身を 1 件ずつ単独で検査する。下書きの取り込み前の検査も使う。
 
-    `layer` が共通レイヤーなら 1 件ずつ単独で、自身のレイヤーなら `common`（共通レイヤーの全件）の
-    同じ識別子に重ねて検査する。誤りのある 1 件は結果に入らない。
+    誤りのある 1 件は結果に入らない。
     """
     body, problems = _parse(text, path)
     entries: dict[str, Entry] = {}
     if body is None:
         return entries, problems
     for text_id, raw in body.items():
-        base = None
-        if layer != LAYER_COMMON:
-            base = (common or {}).get(str(text_id))
-            if base is None:
-                problems.append(
-                    Problem(
-                        SEVERITY_WARN,
-                        str(text_id),
-                        f"{os.path.basename(path)}: 共通レイヤーに無い識別子。どの呼び出しも引かない",
-                    )
-                )
-                continue
-        entry, found = check_entry(str(text_id), raw, layer, path, base)
+        entry, found = check_entry(str(text_id), raw, path)
         problems.extend(found)
         if entry is not None:
             entries[entry.id] = entry
     return entries, problems
 
 
-def _read_layer(
-    directory: str, layer: str, common: dict[str, Entry] | None
-) -> tuple[dict[str, Entry], list[Problem]]:
+def _read_dir(directory: str) -> tuple[dict[str, Entry], list[Problem]]:
     entries: dict[str, Entry] = {}
     problems: list[Problem] = []
     try:
@@ -450,7 +394,7 @@ def _read_layer(
         if text is None:
             problems.append(Problem(SEVERITY_ERROR, "(messages)", f"{name}: 読めない"))
             continue
-        found, notes = check_text(text, layer, path, common)
+        found, notes = check_text(text, path)
         problems.extend(notes)
         for text_id, entry in found.items():
             if text_id in entries:
@@ -458,7 +402,7 @@ def _read_layer(
                     Problem(
                         SEVERITY_ERROR,
                         text_id,
-                        f"{name}: 同じレイヤーの別のファイルにも同じ識別子がある。後ろは採らない",
+                        f"{name}: 別のファイルにも同じ識別子がある。後ろは採らない",
                     )
                 )
                 continue
@@ -467,13 +411,9 @@ def _read_layer(
 
 
 def load(root: str) -> Catalog:
-    """共通レイヤーに自身のレイヤーを重ねて読む。例外を投げない（問題は `problems`）。"""
-    common_dir, self_dir = dirs(root)
-    common, problems = _read_layer(common_dir, LAYER_COMMON, None)
-    over, more = _read_layer(self_dir, LAYER_SELF, common)
-    merged = dict(common)
-    merged.update(over)
-    return Catalog(merged, common, problems + more)
+    """共通レイヤーの文面を読む。例外を投げない（問題は `problems`）。"""
+    entries, problems = _read_dir(dirs(root))
+    return Catalog(entries, problems)
 
 
 # ---- 組み立て

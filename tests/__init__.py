@@ -329,11 +329,11 @@ def _use_repo_messages_when_absent() -> None:
 
     real = _texts.dirs
 
-    def dirs(root: str) -> tuple[str, str]:
-        common, own = real(root)
+    def dirs(root: str) -> str:
+        common = real(root)
         if not os.path.isdir(common):
             common = os.path.join(ROOT, ".ccnavi", "config", "common", "messages")
-        return common, own
+        return common
 
     _texts.dirs = dirs
 
