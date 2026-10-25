@@ -2,7 +2,7 @@
 
 確かめるのは 4 つ。元ファイルが wip/handoff/ の同じ階層へ cp されること。既にある下書きを
 上書きしないこと。ワークスペースの外や下書きの置き場の中を断ること。--commands が、元と違う
-下書きにだけ、種類で分けて出すこと（取り込める種類は ccnavi-user-handoff.sh の手順、defense は
+下書きだけを、種類ごとに分けて出すこと（取り込める種類は ccnavi-user-handoff.sh の手順、defense は
 フルパスの mv）。
 """
 
@@ -85,7 +85,7 @@ class StageShTest(unittest.TestCase):
         write(draft, "version: 2\n")
         r = self.stage("--commands", self.rules, cwd=wt)
         self.assertEqual(0, r.returncode, r.stderr)
-        # 取り込める種類は mv でなく、ワークツリーを --root に指した取り込みの手順
+        # 取り込める種類は mv ではなく、--root にワークツリーを指した取り込みの手順
         self.assertNotIn("mv ", r.stdout)
         self.assertIn(
             f"--root '{wt}' '.ccnavi/config/common/rules.yml'", r.stdout.replace(os.sep, "/")
@@ -244,7 +244,7 @@ class StageShTest(unittest.TestCase):
         self.assertIn("取り込みの手順 と mv", nexts[0])
 
     def test_importable_classification_matches_the_python_kinds(self):
-        """sh の is_importable が、実行ファイルの KINDS と同じ答えを返す（表の食い違いの検出）。"""
+        """sh の is_importable が、実行ファイルの KINDS と同じ答えを返すことを確かめる（表のずれを見つける）。"""
         from ccnavi.tickets import handoff
 
         paths = [

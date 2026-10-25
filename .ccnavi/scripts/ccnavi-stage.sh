@@ -9,7 +9,7 @@
 # cwd が .claude/worktrees/<名前> の中なら、そのワークツリーの wip/handoff/（ブランチに載るので、
 # 非対話セッションで push でき、直接作業なら integrate が取り込みのときに外す）。それ以外はワークスペースルートの
 # wip/handoff/。
-# 差し替えの mv は、フルパスを手で組むと書き間違えやすいので、このスクリプトが組む。
+# defense の差し替えの mv は、フルパスを手で組むと書き間違えやすいので、このスクリプトが組む。
 #
 # <パス> は元のファイル。cwd からの相対でも絶対でもよく、ワークスペースルートの下の実在するファイルだけを受け付ける
 # （リンクと、途中のリンクでワークスペースの外に出るものは断る）。
@@ -21,10 +21,10 @@
 # 表の下書きでの名前（handoff-.claude）は予約した名前で、元のパスにその名前の階層があるファイルは断る。
 # 下書きが既にあれば上書きしない（編集中のものを消さないため）。
 #
-# --commands は、編集が済んだあとに打つ。下書きが元と違うものだけ、種類で分けて出す。
+# --commands は、編集が済んだあとに打つ。元と違う下書きだけを、種類ごとに分けて出す。
 #   取り込める種類（template・layer-config・docs。表は handoff.KINDS）: ユーザが ccnavi-user-handoff.sh で
-#     下見（検査・差分・ハッシュ）してから --yes --expect で取り込む手順。mv は出さない（検査も差分も通らない）
-#   defense（.ccnavi/scripts の sh・.claude の hook・settings・skills）: 差し替えの mv をフルパスで 1 行ずつ
+#     下見（検査・差分・ハッシュ）をしてから --yes --expect で取り込む。mv は出さない（検査も差分も通らないため）
+#   defense（.ccnavi/scripts の sh・.claude の hook・settings・skills）: 差し替えの mv を、フルパスで 1 行ずつ出す
 # 元と同じ（まだ編集していない）もの、下書きがまだ無いもの、下書きを作ったあとに元が変わったもの
 # （作ったときの <下書き>.orig と比べる。mv すると他の人の変更を上書きする）は、その旨を標準エラーに出し、mv は出さない。
 # 複数ファイルを直すときは、すべての下書きを作ってから --commands を打つ。
@@ -46,8 +46,8 @@ sh .ccnavi/scripts/ccnavi-stage.sh <パス>...
 sh .ccnavi/scripts/ccnavi-stage.sh --commands <パス>...
 
   <パス>      直したい元のファイル（ワークスペースルートの下）。cwd からの相対でも絶対でもよい
-  --commands  編集が済んだあとに実行します。下書きが元と違うものだけ、種類で分けて出す
-              （template・layer-config・docs は ccnavi-user-handoff.sh の手順、defense は差し替えの mv をフルパスで）
+  --commands  編集が済んだあとに実行します。元と違う下書きだけを、種類ごとに分けて出します
+              （template・layer-config・docs は ccnavi-user-handoff.sh の手順。defense は差し替えの mv を、フルパスで出します）
 
 下書きは <cwd のワークツリー（無ければワークスペースルート）>/wip/handoff/<ワークスペースルートからの相対パス> に cp する
 （既にあれば上書きしない）。.claude の階層は handoff-.claude に読み替えて置く
@@ -212,7 +212,7 @@ relative_of() {
 
 # 元の相対パス <$1> が、ccnavi-user-handoff.sh で取り込める種類（template・layer-config・docs）なら 0。
 # 表は src/ccnavi/tickets/handoff.py の KINDS（defense と対象外は 1 を返し、mv の道に残す）。
-# 比べ方は ASCII の大文字小文字を区別しない（Python 側は NFC と fold）。表を変えたら、test_stage_sh の見本も直す。
+# 比べ方は ASCII の大文字小文字を区別しない（Python 側は NFC と fold）。表を変えたら、test_stage_sh の例も直す。
 is_importable() {
 	im_k=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
 	im_b=$im_k
@@ -292,7 +292,7 @@ done
 [ "$bad" -eq 0 ] || exit 2
 
 if [ -z "$commands" ]; then
-	[ -z "$staged" ] || printf '次: 下書きを編集する。すべて直し終えたら、下書きを作ったのと同じツリーの中で sh %s/.ccnavi/scripts/ccnavi-stage.sh --commands %s を打つ（種類ごとに、取り込みの手順か差し替えの mv が出る）\n' "$root" "$staged"
+	[ -z "$staged" ] || printf '次: 下書きを編集する。すべて直したら、下書きを作ったのと同じツリーの中で sh %s/.ccnavi/scripts/ccnavi-stage.sh --commands %s を打つ（種類ごとに、取り込みの手順か差し替えの mv が出る）\n' "$root" "$staged"
 	exit 0
 fi
 
