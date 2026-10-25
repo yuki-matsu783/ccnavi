@@ -3,7 +3,7 @@ type: skill-reference
 title: 確かめる
 description: 設定ファイルが意図どおりに動作するか検証する手順。lint、期待する判定のテスト、運用ルール確認
 tags: [rules, process-test, config]
-keywords: [lint, 期待する判定, テスト, deny, allow, ask, 検証, check_rules.py]
+keywords: [lint, 期待する判定, テスト, deny, allow, ask, 検証]
 ---
 
 # 確かめる
@@ -33,7 +33,6 @@ ccnavi --lint --log "" --state ""
 ## 2. rules: 期待する判定を回す
 
 ```sh
-uv run python scripts/check_rules.py            # このリポジトリ。承認済みチケットと記録を外して回す
 ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --log "" --state "" --approved ""
 ```
 

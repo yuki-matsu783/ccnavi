@@ -592,7 +592,7 @@ main() {
 		printf '案内: 実行ファイル・sh・拡張機能はそろえて更新する決まりがある。片方だけ更新しない\n'
 	fi
 	if [ "$li_rc" -eq 1 ]; then
-		printf '案内: lint に error がある。ccnavi-config スキル（配布元の .claude/skills/ccnavi-config）で直す。配布先に無ければ ~/.claude/skills/ にコピーするか、配布元で Claude Code を起動して使う\n'
+		printf '案内: lint に error がある。ccnavi-config スキル（配布先の .claude/skills/ccnavi-config。ccnavi-setup.sh が配る）で直す。無ければ ccnavi-setup.sh を --force 付きでやり直す\n'
 		inext "lint の error を直す（ccnavi-config スキル）"
 		return 5
 	fi

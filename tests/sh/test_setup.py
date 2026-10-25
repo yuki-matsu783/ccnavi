@@ -1566,6 +1566,64 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         )
         self.assertNotIn("まだ無いもの", result.stdout)
 
+    DISTRIBUTE = "---\nname: tool\ndistribute: true\ndescription: 配るだけ\n---\n# tool\n"
+
+    def test_deploys_a_distribute_skill_but_not_what_sits_directly_under_references(self):
+        """`distribute: true` のスキルも、SKILL.md と references/common/ の下の .md だけを配る。"""
+        src = self.make_source(
+            skills={
+                "tool/SKILL.md": self.DISTRIBUTE,
+                "tool/references/common/add.md": "足す\n",
+                "tool/references/direct.md": "直下は配らない\n",
+                "tool/references/project/own.md": "配布元固有\n",
+            }
+        )
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        base = self.deployed(".claude", "skills", "tool")
+        found = sorted(
+            os.path.relpath(os.path.join(d, f), base).replace(os.sep, "/")
+            for d, _, files in os.walk(base)
+            for f in files
+        )
+        self.assertEqual(found, ["SKILL.md", "references/common/add.md"])
+
+    def test_reads_the_distribute_flag_as_carefully_as_the_process_flag(self):
+        cases = {
+            "lf": ("---\nname: x\ndistribute: true\n---\n", True),
+            "crlf": ("---\r\nname: x\r\ndistribute: true\r\n---\r\n", True),
+            "trailing comment": ("---\ndistribute: true # 配る\n---\n", True),
+            "no closing fence": ("---\ndistribute: true\n", False),
+            "bom": ("\ufeff---\ndistribute: true\n---\n", False),
+            "string": ('---\ndistribute: "true"\n---\n', False),
+            "false": ("---\ndistribute: false\n---\n", False),
+            "in the body": ("---\nname: x\n---\ndistribute: true\n", False),
+        }
+        for label, (text, expected) in cases.items():
+            with self.subTest(label=label):
+                src = self.make_source(skills={"probe/SKILL.md": text.encode("utf-8")})
+                target = tempfile.mkdtemp(prefix="ccnavi-setup-")
+                self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+                result = self.run_raw(target, "--mode", "enable", "--deploy", src)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIs(
+                    os.path.exists(os.path.join(target, ".claude", "skills", "probe", "SKILL.md")),
+                    expected,
+                )
+
+    def test_a_distribute_skill_is_not_copied_into_the_projects_by_the_prompt_sync(self):
+        """配るだけのスキルは工程スキルではない。ユーザの発言のときの同期の対象に入らない。"""
+        from ccnavi.tickets import skillsync
+
+        root = tempfile.mkdtemp(prefix="ccnavi-skills-")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        for name, text in (("tool", self.DISTRIBUTE), ("process-test", self.PROCESS)):
+            path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
+            os.makedirs(os.path.dirname(path))
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+        self.assertEqual(skillsync.processes(root), ["process-test"])
+
     def test_keeps_a_process_skill_the_project_already_has_unless_forced(self):
         src = self.make_source(skills=self.skill_files())
         path = self.deployed(".claude", "skills", "process-test", "SKILL.md")
@@ -1611,6 +1669,87 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                     os.path.exists(os.path.join(target, ".claude", "skills", "probe", "SKILL.md")),
                     expected,
                 )
+
+    def deploy_the_real_tree(self):
+        """本物の skills・docs・CCNAVI.md を配布元に置いて配り、配布先の根を返す。"""
+        src = self.make_source(docs=False)
+        shutil.rmtree(os.path.join(src, ".claude", "skills"), ignore_errors=True)
+        shutil.copytree(
+            os.path.join(ROOT, ".claude", "skills"), os.path.join(src, ".claude", "skills")
+        )
+        shutil.copytree(os.path.join(ROOT, *DOCS_PARTS), os.path.join(src, *DOCS_PARTS))
+        shutil.copy(os.path.join(ROOT, *CCNAVI_MD_PARTS), os.path.join(src, *CCNAVI_MD_PARTS))
+        result = self.run_setup("--mode", "enable", "--force", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return self.dir
+
+    def test_the_real_ccnavi_config_skill_reaches_the_project(self):
+        root = self.deploy_the_real_tree()
+        base = os.path.join(root, ".claude", "skills", "ccnavi-config")
+        for rel in ("SKILL.md", "references/common/add.md", "references/common/check.md"):
+            self.assertTrue(os.path.isfile(os.path.join(base, *rel.split("/"))), rel)
+        # 配布元固有のスキルは配らない。
+        for name in ("commit", "yomiyasu", "eli5", "ccnavi-install"):
+            self.assertFalse(os.path.exists(os.path.join(root, ".claude", "skills", name)), name)
+
+    def test_the_deployed_docs_point_only_at_what_the_project_has(self):
+        """配布先の文書が案内する `/<スキル名>` と `.claude/skills/...` が、配布先に実在する。"""
+        root = self.deploy_the_real_tree()
+        skills_dir = os.path.join(root, ".claude", "skills")
+        deployed_skills = set(os.listdir(skills_dir))
+        docs = [os.path.join(root, *CCNAVI_MD_PARTS)]
+        docs_dir = os.path.join(root, *DOCS_PARTS)
+        docs += [
+            os.path.join(docs_dir, n) for n in sorted(os.listdir(docs_dir)) if n.endswith(".md")
+        ]
+        # 配布元の .claude/skills にあるスキル名を、配布先にも無ければならない名前として拾う
+        # （組み込みのコマンド `/compact` などは、配布元にスキルが無いので拾わない）。
+        source_skills = set(os.listdir(os.path.join(ROOT, ".claude", "skills")))
+        problems = []
+        for path in docs:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            rel = os.path.relpath(path, root).replace(os.sep, "/")
+            for m in re.finditer(r"`/([a-z][a-z0-9-]*)(?:\s[^`]*)?`", text):
+                name = m.group(1)
+                if name in source_skills and name not in deployed_skills:
+                    problems.append(f"{rel}: /{name} は配布先に無い")
+            for m in re.finditer(r"\.claude/skills/[A-Za-z0-9._/\-]+", text):
+                ref = m.group(0).rstrip("./-")
+                if text[m.end() : m.end() + 1] == "*":
+                    continue  # glob（範囲の例）は場所の案内ではない
+                if not os.path.exists(os.path.join(root, *ref.split("/"))):
+                    problems.append(f"{rel}: {ref} は配布先に無い")
+        self.assertEqual(problems, [])
+
+    def test_the_deployed_skills_do_not_mention_what_only_the_source_has(self):
+        """配るスキルの本文が、配布元にしか無いパスや `uv run` を指さない。"""
+        root = self.deploy_the_real_tree()
+        forbidden = {
+            "uv run": r"\buv run\b",
+            "scripts/check_rules.py": r"scripts/check_rules\.py",
+            "配布元の docs/": r"(?<![\w.])docs/(?:\d\d_|41_guide|42_claude)",
+            "配布元の src/ccnavi": r"src/ccnavi/",
+            "親ディレクトリをさかのぼる": r"\]\((?:\.\./)+",
+        }
+        problems = []
+        skills_dir = os.path.join(root, ".claude", "skills")
+        for d, _, files in os.walk(skills_dir):
+            for name in files:
+                path = os.path.join(d, name)
+                with open(path, encoding="utf-8") as f:
+                    text = f.read()
+                rel = os.path.relpath(path, root).replace(os.sep, "/")
+                for label, pattern in forbidden.items():
+                    if re.search(pattern, text):
+                        problems.append(f"{rel}: {label}")
+                # 同じスキルの中を指すリンクは、配布先で辿れる。
+                for m in re.finditer(r"\]\(((?:references/)[^)#]+)\)", text):
+                    if name == "SKILL.md" and not os.path.isfile(
+                        os.path.join(d, *m.group(1).split("/"))
+                    ):
+                        problems.append(f"{rel}: {m.group(1)} は配布先に無い")
+        self.assertEqual(problems, [])
 
     def test_deploys_only_markdown_under_references_common(self):
         """ccnavi-index.jsonl や .DS_Store のような生成物は配らない

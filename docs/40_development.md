@@ -166,7 +166,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 | `scripts/ccnavi-package.sh` | 配る側が ccnavi の配布用の zip を作る。ソースのリポジトリで打つ |
 | `scripts/ccnavi-build-install.sh` | ccnavi・VS Code 拡張・Chrome 拡張をビルドし、ccnavi と VS Code 拡張をこの機械に入れる |
 | `scripts/ccnavi-stop-review.sh` | Stop の AI 判定の agent 型 Stop hook を `.claude/settings.json` に登録・解除・点検する |
-| `scripts/check_rules.py` | このリポジトリの共通レイヤーの `rules.yml` と `rule-expectations.yml` で `ccnavi --test-expectations` を呼ぶだけの薄いラッパースクリプト。引数でルールファイル（下書き）を差し替えられる。`CCNAVI_*` を外した環境で、承認済みチケット・state・記録を使わずに回し、終了コードは実行ファイルのまま返す（食い違いがあれば 1）。判定は実行ファイル側で行い、ここでは作らない。全件テスト（`tests/core/test_check_rules.py`）も同じ引数を使う。配布先には無く、そこでは `ccnavi --test-expectations` を直接打つ。`/ccnavi-config` スキルが呼ぶ |
+| `scripts/check_rules.py` | このリポジトリの共通レイヤーの `rules.yml` と `rule-expectations.yml` で `ccnavi --test-expectations` を呼ぶだけの薄いラッパースクリプト。引数でルールファイル（下書き）を差し替えられる。`CCNAVI_*` を外した環境で、承認済みチケット・state・記録を使わずに回し、終了コードは実行ファイルのまま返す（食い違いがあれば 1）。判定は実行ファイル側で行い、ここでは作らない。全件テスト（`tests/core/test_check_rules.py`）も同じ引数を使う。配布先には無く、そこでは `ccnavi --test-expectations` を直接打つ（`/ccnavi-config` スキルもそう打つ） |
 | `extensions/` | VS Code 拡張（`vscode/ccnavi-board`）と Chrome 拡張（`chrome/ccnavi-approval`）、共有の設定（`shared/`） |
 | `docs/` | 設計・要件・ADR・手引き・ccnavi の開発の決まり。置き場は番号順に `10_requirements.md`・`11_requirements/`（要件）、`20_design.md`・`21_design/`（設計）、`30_adr.md`・`30_adr/`（ADR）、`40_development.md`・`41_guide/`（手引き）・`42_claude/`（開発の決まり）。`wiki/` と `CONTEXT.md` は実行時に読むため、番号を付けない |
 | `wip/` | 作業中の下書き（`design/`・`handoff/`・`proposals/`） |

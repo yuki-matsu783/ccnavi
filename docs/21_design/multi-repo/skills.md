@@ -45,6 +45,8 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 ワークスペースの `.claude/skills/<工程>/SKILL.md` の頭の frontmatter に `process: true` があるスキルを、工程スキルと呼ぶ。プロジェクトだけを clone した人の手元にも入口と reference が入るよう、
 ユーザの発言（`tickets/promptsync.py`。コピーの仕方は `tickets/skillsync.py`）が、着手済みの親のワークツリーにあるプロジェクトの `skills/<工程>/` へ `SKILL.md` と `references/common/` の下の `.md` をコピーする。`references/` の最上段は `common/`（共通。コピーする）と `project/`（そのリポジトリ固有。コピーしない）に分ける。
 
+`distribute: true` を持つスキル（`ccnavi-config`）は、配布先へ配るだけで、このコピーの対象にしない。
+
 単体 clone では、コピーした reference は `ccnavi --docs`（`--type skill-reference`）で引ける。入口の `SKILL.md` を読ませるのは目録だけで、単体 clone では出ないので、入口は渡っていない（未解決）。
 
 - `common/` は共通のコピーなので、共通レイヤーのミラー（11.12）と同じく、共通側から無くなった `.md` はコピー先からも消し、空になったディレクトリも `common/` の下から片付ける。消す対象は `common/` の `.md` だけで、`SKILL.md` は消さない。`project/` はコピーせず触れないので、プロジェクト固有の reference は上書きも削除もされない。`common/` の `.md` 以外のファイルにも触れない
