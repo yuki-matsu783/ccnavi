@@ -241,6 +241,7 @@
     "test:flow": "node scripts/test-groups.js flow",
     "test:workflow": "node scripts/test-groups.js workflow",
     "test:shared": "node scripts/test-groups.js shared",
+    "test:devtools": "node scripts/test-groups.js devtools",
     "test:dom": "node scripts/test-groups.js --dom --all",
     "test:for": "node scripts/test-groups.js --for",
     "test:plan": "node scripts/test-groups.js --plan --for",
@@ -262,6 +263,7 @@
     "esbuild": "^0.25.0",
     "happy-dom": "^20.14.5",
     "jsdom": "^30.1.0",
+    "playwright-core": "1.56.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "typescript": "^5.9.0"

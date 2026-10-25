@@ -45,3 +45,10 @@ test("CB-T395 パスの祖先に extensions/shared/ が含まれていても、V
   assert.deepEqual(plan(path.join(SHARED, "browser-theme.css")), { groups: ["shared"], compile: true, webview: true });
   assert.deepEqual(plan(`/home/u/extensions/vscode/ccnavi-board/.claude/worktrees/w/${inside}`), plain);
 });
+
+test("CB-T1219 開発用の画面確認ツール（scripts/render-board.js と scripts/lib/）を直すと devtools グループだけが回り、他の scripts/ は全部が回る", () => {
+  assert.deepEqual(plan("scripts/render-board.js"), { groups: ["devtools"], compile: true, webview: false });
+  assert.deepEqual(plan("scripts/lib/vscode-stub.js"), { groups: ["devtools"], compile: true, webview: false });
+  assert.ok(plan("scripts/test-groups.js").groups.length > 1);
+  assert.ok(plan("scripts/test-groups.js").groups.includes("devtools"));
+});
