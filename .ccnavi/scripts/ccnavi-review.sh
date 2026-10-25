@@ -74,7 +74,7 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>] [--eli5 <html>] [--parent <親>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>] [--eli5 <html>]
 
   request      --phase <N> --body-file <依頼文> --eli5 <HTML>
                                                   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。
@@ -125,6 +125,17 @@ request | confirm | comment | decide | ready | fetch | origin | merged | mr-stat
 	fail unknown-sub "$sub は指定できません。指定できるのは request / confirm / comment / decide / ready / fetch / origin / merged / mr-state です。" 2
 	;;
 esac
+
+# ---- --parent は ready だけが受ける。ほかのサブコマンドは親を cwd から引くので、黙って無視せず断る。
+if [ "$sub" != ready ]; then
+	for parent_arg in "$@"; do
+		case "$parent_arg" in
+		--parent | --parent=*)
+			fail parent-only-ready "--parent は ready だけです。${sub} は親のワークツリーの中で打ってください。" 2
+			;;
+		esac
+	done
+fi
 
 # ---- decide は、見るだけの --preview だけを受ける。選んだものを置くのはユーザ専用の ccnavi-user-decide.sh。
 if [ "$sub" = decide ]; then

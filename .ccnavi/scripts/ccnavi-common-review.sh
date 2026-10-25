@@ -678,6 +678,20 @@ review_wap() {
 
 # write-and-push を始める（1〜5）。<識別子>。対象でなければ何もしない（今の手元の動き）。止める理由があれば抜ける。
 wap_start() {
+	# 親のワークツリーの外でブランチ名を親と読んだとき、それが統合先なら、親ではない。
+	# 親のワークツリーを切り直す案内（ccnavi_wap_refuse）に進ませず、打つ場所を直させる。
+	if [ "$1" = "$branch" ]; then
+		ws_integration=$(ccnavi_integration "${review_top:-.}") || ws_integration=""
+		if [ -n "$ws_integration" ] && [ "$branch" = "$ws_integration" ]; then
+			ws_trees=$(ls -1 "$root/.claude/worktrees" 2>/dev/null || :)
+			case "$ws_trees" in
+			'' | *"
+"*) ws_where="$root/.claude/worktrees/<親の識別子>" ;;
+			*) ws_where="$root/.claude/worktrees/$ws_trees" ;;
+			esac
+			fail not-in-parent-tree "${sub:-この操作} は親のワークツリー（${ws_where}）の中で打ってください。今いる場所はブランチ ${branch}（統合先）で、親ではありません。" 1
+		fi
+	fi
 	ccnavi_wap_family "$1"
 	case "$ccnavi_wap_target" in
 	stop)
