@@ -471,7 +471,7 @@ class SubagentParentTreeTest(unittest.TestCase):
         child = self.trees["i0001-01-01"]
         reason = self.hook(child, 'cd "$X" && ' + " ".join(GIT + ["commit -m x"]))
         self.assertTrue(self.denied(reason), reason)
-        self.assertIn("読めません", reason)
+        self.assertIn("読めない", reason)
         reason = self.hook(child, "echo a | xargs sh .ccnavi/scripts/ccnavi-git.sh commit")
         self.assertTrue(self.denied(reason), reason)
 
@@ -516,7 +516,7 @@ class SubagentParentTreeTest(unittest.TestCase):
         # 居場所の読めない cd の後の相対の書き込みは、どのツリーか決まらないので止める。
         reason = self.hook(child, 'cd "$X" && echo hi > out.txt')
         self.assertTrue(self.denied(reason), reason)
-        self.assertIn("読めません", reason)
+        self.assertIn("読めない", reason)
 
     def test_shell_writes_that_stay_out_of_the_parent_tree_pass(self):
         # 誤って止めないこと: 子のワークツリーへの書き込み、fd の複製と /dev/null、下書きの置き場、
@@ -554,7 +554,7 @@ class SubagentParentTreeTest(unittest.TestCase):
         self.assertTrue(self.denied(reason), reason)
         # 文面はファイルの書き込みとして言う（ラッパーのサブコマンドと取り違えない）。
         self.assertNotIn("ccnavi-git.sh write", reason)
-        self.assertIn("書き込みません（Write）", reason)
+        self.assertIn("書き込もうとしたため、止めました（Write）", reason)
         reason = self.hook(child, "", tool="Write", path=os.path.join(child, "src", "x.py"))
         self.assertFalse(self.denied(reason), reason)
         # 提案・下書きの置き場は、置き場ごとの保護に任せる（フローの下書きを書く経路）。

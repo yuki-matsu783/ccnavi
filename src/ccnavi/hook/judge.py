@@ -288,7 +288,7 @@ def decide_before(
                         wrapguard.CODE_ENV,
                         wrapguard.ENV_RULE_ID,
                         display_subject,
-                        wrapguard.env_message(script, names),
+                        wrapguard.env_message(root, script, names),
                     )
                 ],
                 conf=conf,
@@ -347,7 +347,7 @@ def decide_before(
                         phase_forms.CODE_RECORDS_PRUNE,
                         phase_forms.RECORDS_PRUNE_RULE_ID,
                         display_subject,
-                        phase_forms.prune_message(),
+                        phase_forms.prune_message(root),
                     )
                 ],
                 conf=conf,
@@ -379,13 +379,13 @@ def decide_before(
                         phase_forms.CODE_TICKET_APPROVAL,
                         phase_forms.TICKET_APPROVAL_RULE_ID,
                         display_subject,
-                        phase_forms.guard_off_message(found)
+                        phase_forms.guard_off_message(root, found)
                         if kind == "guard-off"
-                        else phase_forms.user_script_message(found)
+                        else phase_forms.user_script_message(root, found)
                         if kind == "user-script"
-                        else phase_forms.expanded_option_message(found)
+                        else phase_forms.expanded_option_message(root, found)
                         if kind == "expanded"
-                        else phase_forms.board_form_message(found),
+                        else phase_forms.board_form_message(root, found),
                     )
                 ],
                 conf=conf,
@@ -412,7 +412,7 @@ def decide_before(
                         phase_forms.CODE_TICKET_APPROVAL,
                         phase_forms.TICKET_APPROVAL_RULE_ID,
                         display_subject,
-                        phase_forms.hidden_entry_message(entry, found),
+                        phase_forms.hidden_entry_message(root, entry, found),
                     )
                 ],
                 conf=conf,
@@ -439,7 +439,7 @@ def decide_before(
                         wrapguard.CODE_CHILD_PUSH,
                         wrapguard.CHILD_PUSH_RULE_ID,
                         display_subject,
-                        wrapguard.child_push_message(name, parent),
+                        wrapguard.child_push_message(root, name, parent),
                     )
                 ],
                 conf=conf,
@@ -517,7 +517,7 @@ def decide_before(
                 conf, root, payload.cwd, record.subject, record.degraded
             )
             if where:
-                message = wrapguard.parent_tree_message(sub, where)
+                message = wrapguard.parent_tree_message(root, sub, where)
             else:
                 # シェルからの書き込み（リダイレクト・tee・sed -i・cp / mv の行き先、
                 # インタプリタに渡したコード）。読み方と限界は parentwrite に書いてある。
@@ -530,7 +530,7 @@ def decide_before(
                     [layer.replace(shellread.SEP, "\n") for _, layer, _ in inner],
                 )
                 if where:
-                    message = wrapguard.parent_write_message(what, where, kind)
+                    message = wrapguard.parent_write_message(root, what, where, kind)
         elif payload.tool_name in SCOPE_TOOLS:
             # 書き込み先のパスが `.claude/worktrees/<名前>` の中で、その名前が親のチケットか
             # （ワークツリーが git に登録されているかは問わない。sh の検査と同じ広さ）。
@@ -543,7 +543,7 @@ def decide_before(
                 rel = os.path.relpath(os.path.abspath(record.subject), base).replace(os.sep, "/")
                 if not ticket_places.is_unscoped(rel, conf.tickets, conf.approved):
                     where = name
-                    message = wrapguard.parent_write_message(payload.tool_name, name)
+                    message = wrapguard.parent_write_message(root, payload.tool_name, name)
         if where:
             record.code = wrapguard.CODE_PARENT_TREE
             record.rules = [wrapguard.PARENT_TREE_RULE_ID]
@@ -1382,7 +1382,7 @@ def flow_lock(
             copies, _ = approval.scan(conf, root)
         child = flow.lock_hit(copies, found[1], found[0])
         if child is not None:
-            return flow.locked_message(conf, child, path), copies
+            return flow.locked_message(root, conf, child, path), copies
     # ハードリンクはパスに置き場が出ないので `locate` ではヒットしない。書き込み先が在って
     # 名前が 2 つ以上あるときだけ、着手中の子のフローと同じ中身（inode）かを見る。
     target = full or spelled
@@ -1391,7 +1391,7 @@ def flow_lock(
             copies, _ = approval.scan(conf, root)
         child = flow.inode_hit(conf, root, copies, target)
         if child is not None:
-            return flow.locked_message(conf, child, target), copies
+            return flow.locked_message(root, conf, child, target), copies
     return "", copies
 
 

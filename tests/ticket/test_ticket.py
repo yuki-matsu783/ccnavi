@@ -2602,7 +2602,7 @@ class TicketTest(unittest.TestCase):
             guard_ticket_approval="enable",
         )
         self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
-        self.assertIn("そのまま書いて", self.reason(result))
+        self.assertIn("そのまま書く", self.reason(result))
         # 放棄した親の記録を消す操作を組み立てうる形は、その操作を名指しして止める。
         result = self.hook(
             "PreToolUse",
