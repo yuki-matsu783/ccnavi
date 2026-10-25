@@ -20,6 +20,9 @@ allow:
     glob: "tests/sh/gitlab_host.py"
 started_at: "2026-10-26T01:34:13+0900"
 base_sha: "9f95f4566efc73c2bc0c3c06604ade46173c74ac"
+completed_at: "2026-10-26T01:43:59+0900"
+merged_sha: "cdaed900f26436c82e15b69da8f9f9edd71cd7a3"
+finished_to: "review"
 ---
 ## 目的
 
