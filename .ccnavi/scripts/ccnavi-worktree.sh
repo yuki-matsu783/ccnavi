@@ -736,5 +736,16 @@ if [ "$top_cmp" = "$root_cmp" ]; then
 		fi
 	done
 fi
+# 親のワークツリーから切り替えたとき、承認待ちの提案・着手中の子・MR は取り下げられずに残る。
+# 何が残っているかは実行ファイルに聞く（sh はチケットの置き場を読まない）。聞けないときは何も出さない。
+lo_name=$(basename "$top")
+lo_out=$(ccnavi_ask "$root" tree leftover "$top" "$lo_name") || lo_out=""
+lo_get() { printf '%s\n' "$lo_out" | sed -n "s/^$1 //p" | head -n 1; }
+if [ "$(printf '%s\n' "$lo_out" | head -n 1)" = "tree 1" ] && [ "$(lo_get leftover)" = yes ]; then
+	ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER "parent=$lo_name"
+	[ "$(lo_get proposal)" != yes ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_PROPOSAL "parent=$lo_name"
+	[ "$(lo_get doing)" = 0 ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_DOING "count=$(lo_get doing)"
+	[ "$(lo_get mr)" = - ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_MR "mr=#$(lo_get mr)"
+fi
 print_next
 log_info 完了 -- "name=$name" "target=$target" "snap=$s_sha" "wip=$s_wip" "side=$side_word"
