@@ -1455,6 +1455,20 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 self.assertEqual(f.read(), g.read(), name)
         self.assertTrue(names(section(result.stdout, "配った"), ".ccnavi/docs/worktree.md"))
 
+    def test_deploys_the_proposal_format_doc_from_the_real_source_tree(self):
+        """実際の .ccnavi/docs を載せた配布元で、提案の書式の文書が配布先に出ることを見る。"""
+        src = self.make_source()
+        shutil.rmtree(os.path.join(src, *DOCS_PARTS))
+        shutil.copytree(os.path.join(ROOT, *DOCS_PARTS), os.path.join(src, *DOCS_PARTS))
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        with (
+            open(self.deployed(*DOCS_PARTS, "proposal-format.md"), encoding="utf-8") as f,
+            open(os.path.join(ROOT, *DOCS_PARTS, "proposal-format.md"), encoding="utf-8") as g,
+        ):
+            self.assertEqual(f.read(), g.read())
+        self.assertTrue(names(section(result.stdout, "配った"), ".ccnavi/docs/proposal-format.md"))
+
     def test_keeps_a_usage_doc_the_project_already_has_unless_forced(self):
         """配布先に既にある文書は入れ替えない。入れ替えるのは --force のときだけ。"""
         src = self.make_source()
