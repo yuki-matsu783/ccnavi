@@ -232,8 +232,6 @@ class PendingIntegrateTest(TicketTest):
 
     def test_many_records_are_told_as_one_line_of_names(self):
         """5 件以上は名前を全件 1 行に並べる。1 件ごとに増えるのは名前と区切りだけ。"""
-        os.environ["CCNAVI_MODE"] = "dry-run"
-        self.addCleanup(os.environ.pop, "CCNAVI_MODE", None)
         sizes = {}
         for count in (4, 5, 8, 12):
             shutil.rmtree(os.path.join(self.root, ".git", "ccnavi-integrate"), ignore_errors=True)
@@ -248,8 +246,8 @@ class PendingIntegrateTest(TicketTest):
             self.assertNotIn("を知りません", text)
             self.assertIn(HEAD, text)
             self.assertIn("、".join(names), text)
-            self.assertIn("ccnavi-git.sh", text)
-            self.assertIn("status", text)
+            self.assertIn("ccnavi-git.sh status", text)
+            self.assertIn(f"cd {settings.shell_path(self.root)} &&", text)
         per_line = sizes[4] // 4
         for small, big in ((5, 8), (8, 12)):
             per_name = (sizes[big] - sizes[small]) / (big - small)

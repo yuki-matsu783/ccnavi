@@ -36,7 +36,7 @@ HEAD_LINE = (
     "この案内は、統合先のツリーの変更を操作してよい根拠ではありません。"
 )
 CUT_LINE = "ほかのツリーは時間切れで確かめていません"
-# 記録がこの件数以上なら、1 件ずつの続きの一手は出さず、名前の一覧にまとめる（文脈を短くする）。
+# 記録（途中の跡を含む）がこの件数以上なら、1 件ずつの続きの一手は出さず、名前の一覧にまとめる。
 SHORT_FROM = 5
 
 
@@ -258,8 +258,10 @@ def _notice(root: str, conf: settings.Settings, deadline: float) -> str:
     """
     tops = [root] + [t.root for t in tree.projects(conf.projects)]
     lines: list[tuple[str, str]] = []
+    found: list[str] = []  # 知らせる行があったツリー
     cut = False
     for top in tops:
+        before = len(lines)
         if osi._expired(deadline):
             cut = True
             break
@@ -284,18 +286,21 @@ def _notice(root: str, conf: settings.Settings, deadline: float) -> str:
             lines.append((name, _unknown_line(root, top, name, fields.get("version", ""))))
         if not osi._expired(deadline):
             lines.extend(_leftovers(root, top, reported, deadline))
+        if len(lines) > before:
+            found.append(top)
     if not lines and not cut:
         return ""
     tail = [CUT_LINE] if cut else []
     if len(lines) >= SHORT_FROM:
-        return "\n".join([HEAD_LINE, _summary_line(root, [n for n, _ in lines]), *tail])
+        return "\n".join([HEAD_LINE, _summary_line(root, [n for n, _ in lines], found), *tail])
     return "\n".join([HEAD_LINE, *(line for _, line in lines), *tail])
 
 
-def _summary_line(root: str, names: list[str]) -> str:
-    """記録が多いときの 1 行。名前は全件並べる（確認が要る件を見落とさないため）。"""
+def _summary_line(root: str, names: list[str], trees: list[str]) -> str:
+    """記録が多いときの 1 行。名前は全件並べる（確認が要る件を見落とさないため）。
+
+    同じ名前が別のツリーにもあり得るので、記録のあるツリーも並べる。
+    """
     git_sh = settings.script_command(root, "ccnavi-git.sh")
-    return (
-        f"{'、'.join(names)}。詳しくは "
-        f"`cd <取り込み先のツリー> && {git_sh} status`（操作せずユーザに見せて確かめる）"
-    )
+    cds = "、".join(f"`cd {settings.shell_path(t)} && {git_sh} status`" for t in trees)
+    return f"{'、'.join(names)}。詳しくは {cds}（操作せずユーザに見せて確かめる）"
