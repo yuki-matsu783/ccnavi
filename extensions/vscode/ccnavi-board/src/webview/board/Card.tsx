@@ -56,10 +56,6 @@ export function CardItem({
     if (target instanceof Element && target.closest(NOT_OPENING) !== null) {
       return;
     }
-    // ID をドラッグして文字を選んだあとの click は、共通の親（カード）まで届く。文字を選択中は開かない
-    if ((window.getSelection?.()?.toString() ?? "") !== "") {
-      return;
-    }
     if (card.openPath !== "") {
       post({ type: "open", filePath: card.openPath });
     }
@@ -78,7 +74,12 @@ export function CardItem({
       data-status={card.status.label}
       data-moved={moved === undefined ? undefined : `${moved.from ?? "none"}-${moved.to}`}
       tabIndex={0}
-      onClick={(event) => open(event.target)}
+      onClick={(event) => {
+        // ID をドラッグして文字を選んだあとの click は、共通の親（カード）まで届く。文字を選択中は開かない（Enter では見ない）
+        if ((window.getSelection?.()?.toString() ?? "") === "") {
+          open(event.target);
+        }
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter" && !(event.target instanceof Element && event.target.closest(NOT_OPENING) !== null)) {
           event.preventDefault();

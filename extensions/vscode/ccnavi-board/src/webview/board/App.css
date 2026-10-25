@@ -43,6 +43,9 @@ body {
 @media (max-width: 940px) {
   .board { flex-direction: column; align-items: stretch; }
   .column { min-width: 0; }
+  /* 縦積みでは幅の固定も取っ手も意味がない（固定幅が残ると全幅にならず、取っ手が右へはみ出して横スクロールが戻る） */
+  .column.sized { width: auto !important; }
+  .resizer { display: none; }
 }
 .resizer::after {
   content: ""; position: absolute; top: 8px; bottom: 8px; left: 5px; width: 2px;

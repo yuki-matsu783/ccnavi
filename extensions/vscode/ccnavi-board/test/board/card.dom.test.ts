@@ -320,6 +320,22 @@ test("CB-D707 注意の行は例外のときだけ短い言葉で出す（不備
   }
 });
 
+test("CB-D707a 承認待ち（ワークツリー未作成）は警告色にせず、作業中でワークツリーが無いものだけ警告色の「見つからない」", async () => {
+  const gone = { exists: false, path: "/ws/.claude/worktrees/x", project: "" };
+  const json = boardOf([proposalJson("wait", { worktree: gone }), ticketJson("busy", { worktree: gone })], []);
+  const page = await openBoard(json);
+  try {
+    const badge = (id: string): { text: string; warn: boolean } => {
+      const b = page.one(`${card(page, id)} .notes .badge.worktree`);
+      return { text: b.textContent.trim(), warn: b.classList.contains("none") };
+    };
+    assert.deepEqual(badge("wait"), { text: "ワークツリー未作成", warn: false });
+    assert.deepEqual(badge("busy"), { text: "ワークツリーが見つからない", warn: true });
+  } finally {
+    await page.close();
+  }
+});
+
 test("CB-D708 消すもの: base / 合流の sha・マーカー名・「承認済み」「着手済み」「未着手」の常時表示・旧い言葉は、どのカードにも出ない（詳細を開いても）", async () => {
   const everything = scene().tickets.map((t) => `${detailsKey(t.project, t.ticket)}`);
   const page = await openBoard(scene(), { state: { details: everything } });
