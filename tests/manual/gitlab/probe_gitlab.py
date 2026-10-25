@@ -8,15 +8,15 @@ sh と同じ道具を使わないほうが、片方の不具合がもう片方�
 
 ## 用意するもの
 
-- 動いている GitLab（既定 `http://localhost:8929`。`CCNAVI_PROBE_GITLAB` で変える）
-- トークン 2 本。
-  `docker exec -i gitlab gitlab-rails runner - < tests/manual/gitlab/make_gitlab_tokens.rb` が
-  `GITLAB_TOKEN`（root、エージェント役）と `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役）を出す
+- 動いている GitLab（既定 `http://localhost:8929`。`CCNAVI_PROBE_GITLAB` で変える）。
+  `tests/manual/gitlab/docker_gitlab.py up` で立てる（手順は docs/42_claude/gitlab-manual.md）
+- トークン 2 本（`GITLAB_TOKEN`（root、エージェント役）と
+  `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役））。
+  `docker_gitlab.py up` が作り、0600 のファイルに書く。`set -a; . <そのパス>; set +a` で読む
 - 組み立て済みの exe（`dist/ccnavi/ccnavi`）。`CCNAVI_ENTRY_PATH` で差し替えられる
 - jq と curl（sh が使う）
 
-    GITLAB_TOKEN=... CCNAVI_PROBE_REVIEWER_TOKEN=... \\
-        uv run python tests/manual/gitlab/probe_gitlab.py
+    uv run python tests/manual/gitlab/probe_gitlab.py
 
 GitLab API を人間役のトークンで呼ぶ部分は `gitlab_api.py` にある（import しても副作用が無い）。
 `--help` は、この説明を出して終わる（トークンも exe も要らない）。
@@ -55,17 +55,17 @@ GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
 GITLAB = os.environ.get("CCNAVI_PROBE_GITLAB", "http://localhost:8929").rstrip("/")
 
-if any(arg in ("-h", "--help") for arg in sys.argv[1:]):
-    print((__doc__ or "").strip())
-    sys.exit(0)
-
-ROOT_TOKEN = os.environ.get("GITLAB_TOKEN", "")
-REVIEWER_TOKEN = os.environ.get("CCNAVI_PROBE_REVIEWER_TOKEN", "")
-if not ROOT_TOKEN or not REVIEWER_TOKEN:
-    sys.exit(
-        "GITLAB_TOKEN と CCNAVI_PROBE_REVIEWER_TOKEN が要る。"
-        "tests/manual/gitlab/make_gitlab_tokens.rb で作る"
-    )
+# import では何も起こさない。トークン・exe・一時ディレクトリ・ログは setup() が main() の中で作る。
+ROOT_TOKEN = ""
+REVIEWER_TOKEN = ""
+EXE = ""
+OUT = ""
+ROOT = ""
+ENV: dict[str, str] = {}
+STAMP = ""
+LOG = None
+RESULTS: list[tuple[str, bool, str]] = []
+API_SEQ = 0
 
 
 def _exe() -> str:
@@ -79,16 +79,26 @@ def _exe() -> str:
     sys.exit(f"exe が無い ({base})。build.py で組み立てる")
 
 
-EXE = _exe()
-STAMP = time.strftime("%m%d-%H%M%S")
-OUT = os.environ.get("CCNAVI_PROBE_OUT") or tempfile.mkdtemp(prefix="ccnavi-probe-")
-OUT = os.path.join(OUT, "glrun-" + STAMP)
-ROOT = os.path.join(OUT, "repo")
-os.makedirs(OUT, exist_ok=True)
-# 走っている間ずっと書くので、閉じるのは finish()。
-LOG = open(os.path.join(OUT, "steps.log"), "w", encoding="utf-8")  # noqa: SIM115
-RESULTS: list[tuple[str, bool, str]] = []
-API_SEQ = 0
+def setup() -> None:
+    """トークン・exe・実測の置き場を作る。main() の最初に 1 回だけ呼ぶ。"""
+    global ROOT_TOKEN, REVIEWER_TOKEN, EXE, OUT, ROOT, LOG, ENV, STAMP
+    ROOT_TOKEN = os.environ.get("GITLAB_TOKEN", "")
+    REVIEWER_TOKEN = os.environ.get("CCNAVI_PROBE_REVIEWER_TOKEN", "")
+    if not ROOT_TOKEN or not REVIEWER_TOKEN:
+        sys.exit(
+            "GITLAB_TOKEN と CCNAVI_PROBE_REVIEWER_TOKEN が要る。"
+            "tests/manual/gitlab/make_gitlab_tokens.rb で作る"
+        )
+    EXE = _exe()
+    STAMP = time.strftime("%m%d-%H%M%S")
+    OUT = os.environ.get("CCNAVI_PROBE_OUT") or tempfile.mkdtemp(prefix="ccnavi-probe-")
+    OUT = os.path.join(OUT, "glrun-" + STAMP)
+    ROOT = os.path.join(OUT, "repo")
+    os.makedirs(OUT, exist_ok=True)
+    # 走っている間ずっと書くので、閉じるのは finish()。
+    LOG = open(os.path.join(OUT, "steps.log"), "w", encoding="utf-8")  # noqa: SIM115
+    ENV = env_for()
+
 
 RULES = {
     "version": 1,
@@ -228,12 +238,6 @@ def record_api(event: dict) -> None:
 CLIENT = gitlab_api.Client(GITLAB, recorder=record_api)
 
 
-def api(
-    method: str, path: str, token: str, payload: dict | None = None, tag: str = ""
-) -> tuple[int, object]:
-    return CLIENT.call(method, path, token, payload, tag)
-
-
 def write(path: str, text: str) -> str:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -300,14 +304,18 @@ has_marker = gitlab_api.has_marker
 
 
 def main() -> int:
+    if any(arg in ("-h", "--help") for arg in sys.argv[1:]):
+        print((__doc__ or "").strip())
+        return 0
+    setup()
     say(f"== 実測の置き場: {OUT}")
-    status, version = api("GET", "/version", ROOT_TOKEN, tag="version")
+    status, version = CLIENT.version(ROOT_TOKEN)
     record(
         "API に root トークンで入れる",
         status == 200,
         f"GitLab {version.get('version') if isinstance(version, dict) else version}",
     )
-    status, me = api("GET", "/user", REVIEWER_TOKEN, tag="reviewer-user")
+    status, me = CLIENT.user(REVIEWER_TOKEN)
     record(
         "レビュアーのトークンで入れる",
         status == 200,
@@ -319,18 +327,7 @@ def main() -> int:
 
     # ---- 0. ユーザが用意するもの: プロジェクト、メンバー、課題、main
     project_path = f"ccnavi-probe-{STAMP}"
-    status, project = api(
-        "POST",
-        "/projects",
-        ROOT_TOKEN,
-        {
-            "name": project_path,
-            "path": project_path,
-            "visibility": "private",
-            "initialize_with_readme": False,
-        },
-        tag="project-create",
-    )
+    status, project = CLIENT.create_project(ROOT_TOKEN, project_path)
     record(
         "プロジェクトを作る",
         status == 201,
@@ -339,20 +336,10 @@ def main() -> int:
     if status != 201:
         return finish()
     pid = project["id"]
-    status, _ = api(
-        "POST",
-        f"/projects/{pid}/members",
-        ROOT_TOKEN,
-        {"user_id": reviewer_id, "access_level": 40},
-        tag="member-add",
-    )
+    status, _ = CLIENT.add_member(ROOT_TOKEN, pid, reviewer_id, 40)
     record("レビュアーをメンバーにする", status == 201)
-    status, issue = api(
-        "POST",
-        f"/projects/{pid}/issues",
-        ROOT_TOKEN,
-        {"title": "greeter に挨拶を足す", "description": "実測の元になる課題"},
-        tag="issue-create",
+    status, issue = CLIENT.create_issue(
+        ROOT_TOKEN, pid, "greeter に挨拶を足す", "実測の元になる課題"
     )
     record(
         "課題を立てる", status == 201, f"#{issue.get('iid') if isinstance(issue, dict) else '?'}"
@@ -462,9 +449,7 @@ def main() -> int:
         pushed.returncode == 0,
         redact(pushed.stdout + pushed.stderr).strip()[:120],
     )
-    status, _ = api(
-        "GET", f"/projects/{pid}/repository/branches/i0001", ROOT_TOKEN, tag="branch-i0001"
-    )
+    status, _ = CLIENT.get_branch(ROOT_TOKEN, pid, "i0001")
     record("GitLab に i0001 ブランチがある", status == 200)
 
     # ---- 2. origin の読み方と request
@@ -509,13 +494,7 @@ def main() -> int:
     )
 
     # ---- 3. レビュアーが指摘 → confirm → 変更要求（EE だけ）→ 解決と approve → confirm
-    status, disc = api(
-        "POST",
-        f"/projects/{pid}/merge_requests/{iid}/discussions",
-        REVIEWER_TOKEN,
-        {"body": "ここは名前を変えてほしい"},
-        tag="discussion-create",
-    )
+    status, disc = CLIENT.create_discussion(REVIEWER_TOKEN, pid, iid, "ここは名前を変えてほしい")
     record(
         "レビュアーがスレッドを立てる（位置なし、resolvable）",
         status == 201 and bool(disc.get("notes", [{}])[0].get("resolvable")),
@@ -534,32 +513,15 @@ def main() -> int:
         "DENY_PHASE_REVIEW" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 
-    api(
-        "PUT",
-        f"/projects/{pid}/merge_requests/{iid}",
-        ROOT_TOKEN,
-        {"reviewer_ids": [reviewer_id]},
-        tag="mr-set-reviewer",
-    )
-    status, rc_body = api(
-        "POST",
-        f"/projects/{pid}/merge_requests/{iid}/request_changes",
-        REVIEWER_TOKEN,
-        tag="request-changes",
-    )
+    CLIENT.set_reviewers(ROOT_TOKEN, pid, iid, [reviewer_id])
+    status, rc_body = CLIENT.request_changes(REVIEWER_TOKEN, pid, iid)
     ee = status in (200, 201)
     record(
         "レビュアーが変更要求を出す（EE の機能。CE では 404）",
         ee or status == 404,
         f"status={status}",
     )
-    status, _ = api(
-        "PUT",
-        f"/projects/{pid}/merge_requests/{iid}/discussions/{disc_id}",
-        REVIEWER_TOKEN,
-        {"resolved": True},
-        tag="discussion-resolve",
-    )
+    status, _ = CLIENT.resolve_discussion(REVIEWER_TOKEN, pid, iid, disc_id)
     record("レビュアーがスレッドを解決する", status == 200)
     if ee:
         fetched = sh(REVIEW_SH, parent_tree, "fetch")
@@ -575,16 +537,9 @@ def main() -> int:
             "変更要求は decide でも通らない",
             accepted.returncode != 0 and "変更要求" in (accepted.stderr + accepted.stdout),
         )
-    status, ap = api(
-        "POST", f"/projects/{pid}/merge_requests/{iid}/approve", REVIEWER_TOKEN, tag="approve"
-    )
+    status, ap = CLIENT.approve(REVIEWER_TOKEN, pid, iid)
     record("レビュアーが approve する", status in (200, 201), f"status={status}")
-    _, reviewers = api(
-        "GET",
-        f"/projects/{pid}/merge_requests/{iid}/reviewers",
-        ROOT_TOKEN,
-        tag="reviewers-after-approve",
-    )
+    _, reviewers = CLIENT.reviewers(ROOT_TOKEN, pid, iid)
     say("approve 後の reviewers: " + json.dumps(reviewers, ensure_ascii=False)[:300])
     fetched = sh(REVIEW_SH, parent_tree, "fetch")
     write(os.path.join(OUT, "fetch-4-approved.json"), fetched.stdout)
@@ -611,12 +566,8 @@ def main() -> int:
         has_marker(notes_of(pid, iid), "<!-- ccnavi:comment -->"),
     )
 
-    status, disc2 = api(
-        "POST",
-        f"/projects/{pid}/merge_requests/{iid}/discussions",
-        REVIEWER_TOKEN,
-        {"body": "typo。次でよい"},
-        tag="discussion-create-2",
+    status, disc2 = CLIENT.create_discussion(
+        REVIEWER_TOKEN, pid, iid, "typo。次でよい", tag="discussion-create-2"
     )
     disc2_note = disc2.get("notes", [{}])[0].get("id", "")
     accepted = sh(REVIEW_SH, parent_tree, "decide", "1", stdin="y\n")
@@ -683,31 +634,16 @@ def main() -> int:
     approved = exe("user", "agree", stdin="y\n")
     record("--agree（i0002）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
     record("i0002 の push", sh(GIT_SH, parent2, "push", "-u", "origin", "i0002").returncode == 0)
-    status, mr2 = api(
-        "POST",
-        f"/projects/{pid}/merge_requests",
-        ROOT_TOKEN,
-        {"source_branch": "i0002", "target_branch": "main", "title": "Draft: 途中で早めに閉じる親"},
-        tag="mr-create-i0002",
-    )
+    status, mr2 = CLIENT.create_mr(ROOT_TOKEN, pid, "i0002", "main", "Draft: 途中で早めに閉じる親")
     record("ユーザが i0002 の MR を作る", status == 201)
     if status == 201:
-        api(
-            "POST",
-            f"/projects/{pid}/merge_requests/{mr2['iid']}/discussions",
-            REVIEWER_TOKEN,
-            {"body": "残る指摘"},
-            tag="discussion-create-3",
+        CLIENT.create_discussion(
+            REVIEWER_TOKEN, pid, mr2["iid"], "残る指摘", tag="discussion-create-3"
         )
         wrapped = sh(CLOSE_EARLY_SH, parent2, "--reason", "実測はここまで", stdin="y\n")
         say("close-early:\n" + redact(wrapped.stdout + wrapped.stderr))
         record("close-early が通る", wrapped.returncode == 0)
-        _, issues = api(
-            "GET",
-            f"/projects/{pid}/issues?state=opened&order_by=created_at&sort=desc",
-            ROOT_TOKEN,
-            tag="issues-after-close-early",
-        )
+        _, issues = CLIENT.list_issues(ROOT_TOKEN, pid)
         made = [
             i for i in (issues if isinstance(issues, list) else []) if "残り" in i.get("title", "")
         ]

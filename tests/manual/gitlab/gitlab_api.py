@@ -166,6 +166,14 @@ class Client:
             tag=f"mr-create-{source_branch}",
         )
 
+    def get_branch(self, token: str, project_id: int, branch: str):
+        return self.call(
+            "GET",
+            f"/projects/{project_id}/repository/branches/{branch}",
+            token,
+            tag=f"branch-{branch}",
+        )
+
     def find_mr(self, token: str, project_id: int, branch: str) -> dict | None:
         _, found = self.call(
             "GET",
