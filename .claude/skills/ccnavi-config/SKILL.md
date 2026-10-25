@@ -82,4 +82,4 @@ ccnavi --explain --log "" --state ""
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
 `--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `builtin:guard-raw-git` にヒットする）。
-単発で試したいものも期待のファイルを `wip/handoff/` に書いて `--test-expectations` で回す。その形は `.ccnavi/config/common/rule-expectations.yml` の先頭のコメントにある。
+単発で試したいものも期待のファイルを `wip/handoff/` に書いて `--test-expectations` で回す。その形は [references/common/add.md](references/common/add.md) の rules.yml の節にある（`.ccnavi/config/common/rule-expectations.yml` が既にあればそれも見る）。

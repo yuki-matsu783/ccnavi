@@ -816,7 +816,7 @@ if [ -n "$deploy" ]; then
 		done
 	fi
 
-	# 共通の工程スキル。置き場が無いか、該当するスキルが無ければ、何も配らず何も言わない。
+	# 配布先へ配るスキル。置き場が無いか、該当するスキルが無ければ、何も配らず何も言わない。
 	if [ -d "$source_root/$DEPLOY_SKILLS_DIR" ]; then
 		for skill_path in "$source_root/$DEPLOY_SKILLS_DIR"/*; do
 			skill_name=$(basename "$skill_path")
@@ -1444,11 +1444,11 @@ report_deploy() {
 		printf '%s' "$templates_skipped" | sed 's/^/  /'
 	fi
 	if [ -n "$skills_blocked" ]; then
-		printf '配布先の道にディレクトリでないものがある、または配り先がディレクトリなので配っていない共通の工程スキル:\n'
+		printf '配布先の道にディレクトリでないものがある、または配り先がディレクトリなので配っていないスキル:\n'
 		printf '%s' "$skills_blocked" | sed 's/^/  /'
 	fi
 	if [ -n "$skills_skipped" ]; then
-		printf '名前に使えない文字があるので配っていない共通の工程スキル（英数字と . _ - だけ。ファイルは / も可）:\n'
+		printf '名前に使えない文字があるので配っていないスキル（英数字と . _ - だけ。ファイルは / も可）:\n'
 		printf '%s' "$skills_skipped" | sed 's/^/  /'
 	fi
 	if [ -n "$ignore_todo" ]; then

@@ -141,7 +141,18 @@ Bash は実行される部分にヒットする。`$( )` の中や `&&` の先�
 期待とヒットしてほしくない期待を両方足す。期待は
 `tool` `subject` `why` の 3 つで、置いたタイプが期待する判定。`subject` の `/repo` は
 ワークスペースルートに読み替わる。その下書きも `wip/handoff/` に置き、`--test-expectations` で
-本物と一緒に回す。
+本物と一緒に回す。配布先にこのファイルが無いときは、次の形で新しく作る（置くのはユーザ）。
+
+```yaml
+deny:                          # タイプ（deny / ask / allow）が期待する判定
+  - tool: Bash
+    subject: "git push --force origin main"
+    why: 強制 push は止める（理由を一言）
+allow:
+  - tool: Bash
+    subject: "git status"
+    why: 読むだけの操作は通す
+```
 
 ## phases.yml
 

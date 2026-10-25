@@ -33,7 +33,7 @@ ccnavi --lint --log "" --state ""
 ## 2. rules: 期待する判定を回す
 
 ```sh
-ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --log "" --state "" --approved ""
+ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --log "" --state "" --approved ""   # ファイルが無ければ add.md の形で下書きを作って渡す
 ```
 
 出力は 3 つに分かれる。
