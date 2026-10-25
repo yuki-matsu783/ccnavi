@@ -24,18 +24,22 @@ def has_link(root: str, path: str) -> bool:
 
     path から上へさかのぼり、root に着いたところで止める。root と違う綴りで渡された path
     （`/tmp` と `/private/tmp` など）でも、実体が root に着けば止まる。root の外を指す path
-    （着けないまま最上位に達する）と、調べる途中の失敗は、リンクありとして扱う。
+    （着けないまま最上位に達する）と、realpath を解けない失敗は、リンクありとして扱う。
     """
     try:
         top = pathcase.fold(os.path.abspath(root))
         base = pathcase.fold(os.path.realpath(root))
         current = os.path.abspath(path)
         while True:
-            if pathcase.fold(current) == top:
+            key = pathcase.fold(current)
+            if key == top:
                 return False
             if is_link(current):
                 return True
-            if pathcase.fold(os.path.realpath(current)) == base:
+            # root と違う綴りのときだけ、実体が root に着けば止まる。root の下の綴りなら
+            # root まで 1 段ずつ調べる（途中のリンクが root の中へ戻っても見逃さない）。
+            outside_spelling = not key.startswith(top.rstrip(os.sep) + os.sep)
+            if outside_spelling and pathcase.fold(os.path.realpath(current)) == base:
                 return False
             parent = os.path.dirname(current)
             if parent == current:

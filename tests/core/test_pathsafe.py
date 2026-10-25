@@ -122,6 +122,12 @@ class PathsafeTest(unittest.TestCase):
         via = os.path.join(self.tmp, "viaparent", "ws", "a", "b")
         self.assertFalse(pathsafe.has_link(root, via))
 
+    def test_a_link_to_the_parent_that_comes_back_into_root_is_a_link(self):
+        os.symlink(self.tmp, os.path.join(self.root, "up"))
+        path = os.path.join(self.root, "up", "root", "real", "file.txt")
+        self.assertTrue(pathsafe.has_link(self.root, path))
+        self.assertTrue(pathsafe.first_link(self.root, ("up", "root", "real", "file.txt")))
+
     def test_a_path_outside_root_is_a_link(self):
         self.assertTrue(pathsafe.has_link(self.root, os.path.join(self.tmp, "outside", "x")))
         self.assertTrue(pathsafe.has_link(self.root, self.tmp))
@@ -131,7 +137,9 @@ class PathsafeTest(unittest.TestCase):
         with mock.patch.object(os.path, "realpath", side_effect=OSError("boom")):
             self.assertTrue(pathsafe.has_link(self.root, plain))
             self.assertTrue(pathsafe.escapes(self.root, plain))
-        self.assertTrue(pathsafe.has_link(self.root, plain + "\0"))
+        outside = os.path.join(self.tmp, "outside", "x")
+        with mock.patch.object(os.path, "realpath", side_effect=ValueError("nul")):
+            self.assertTrue(pathsafe.has_link(self.root, outside))
 
     def test_escapes(self):
         self.assertFalse(pathsafe.escapes(self.root, os.path.join(self.root, "plain")))
