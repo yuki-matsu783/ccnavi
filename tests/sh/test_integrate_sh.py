@@ -1442,6 +1442,16 @@ class MergeOnTargetTest(Fixture):
             with self.subTest(args=args):
                 self.assertMergeRefused(*args)
 
+    def test_a_subdirectory_and_an_option_after_the_separator_are_still_refused(self):
+        self.make_branch("fa")
+        os.makedirs(os.path.join(self.ws, "sub"))
+        r = self.run_git_sh("merge", "fa", cwd=os.path.join(self.ws, "sub"))
+        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
+        # `--` の後ろの --abort は枝の名前で、途中の merge を終わらせる操作ではない。
+        r = self.run_git_sh("merge", "--no-ff", "fa", "--", "--abort")
+        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
+        self.assertIn("merge できません", r.stderr)
+
     def test_merge_main_inside_a_worktree_passes(self):
         self.advance_main()
         r = self.run_git_sh("merge", "main", "--no-edit", cwd=self.wt)
