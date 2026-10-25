@@ -46,6 +46,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `NUDGE_STOP_RULE` | メインエージェントの `Stop` で、`match: Stop` の `allow` のルールが渡す回になった（`every` の刻み）。止めて、ルールの文を渡す。`finish` の促しと重なった回は出ない（6.6）。記録の `decision` は `nudge` |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントが、役割の表（`user_only.SUBAGENT_ROLES`）で許されていない操作（チケットの状態・レビュー・push・開始や片付けの sh）を打とうとした |
 | `DENY_SUBAGENT_PARENT_TREE` | サブエージェントが、親のワークツリーへの merge・commit・書き込みをしようとした。子のワークツリーでのコミットと、衝突を解くための親のブランチの merge は通す。親のワークツリーかは、そのワークツリー自身のチケットで決める（9.12） |
+| `DENY_NEEDS_USER_TURN` | ターン分離の関門。A（`ccnavi-git.sh integrate <名前>`）を打ったあと、ユーザの発言をはさまずに B（`ccnavi-git.sh integrate-done <名前>`）を打った。同じコマンドに A と B を連結した形、記録を読み書きできない場合も。ルールより先に止め、`dry-run` でも止める。どの宣言かは記録の `rules` と文面が言う（6.7） |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ。補助の保護で、`CCNAVI_GUARD_CORE_FILES` では切れず、`dry-run` でも止める（8.2） |
 | `DENY_WRAPPER_CORE_PATH` | `ccnavi-git.sh` の `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象か承認済みチケットの置き場かレビュー待ちの置き場（`wip/proposals/review/`。置き場に何かがある間はその親も）を消す・別のコミットの中身に戻そうとした。対象を読み切れない形（変数・置換・居場所の読めない `cd` / `pushd` の後の相対パス）、サブコマンドが文字どおりの語でない形、標準入力から読むシェルに流す文字列の中の呼び出し、走査が読み切れず名前の直後に文字どおりのサブコマンドが無い形と、索引の中身に戻す `checkout -- <パス>` も（8.2） |
@@ -54,7 +55,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `CORE_CONFIRM_MOVED` / `CORE_CONFIRM_RESULT_MISMATCH` / `CORE_CONFIRM_REVIEW_OPEN` | レビュー済みが通らなかった。依頼の後にユーザが見るものが動いた / 取得した結果が依頼したマージリクエストと照合できない / 変更要求のレビューか未解決のスレッドが残っている |
 | `CORE_DECIDE_NO_DIGEST` / `CORE_DECIDE_MISMATCH` / `CORE_DECIDE_CHOICES` / `CORE_DECIDE_THREAD_ID` / `CORE_DECIDE_FOLLOWUP` / `CORE_DECIDE_STOPPED` | Chrome 拡張の decide（入口の `decide`）が通らなかった。親・フェーズ・依頼の記録・変更要求などは `CORE_CONFIRM_*` と同じコードで返す。見せた指摘のダイジェストが無い・読めない / 見せた指摘と今の指摘が違う（`mismatch` に内訳。何も積まない）/ 選択か受け入れ済みのキーが見せた指摘と合わない / 返信と解決をするスレッドの id が無い / 続きの子を起こせない / 書くものを並べる途中で止まった。通らなければ書くものもホストへの書き込みの計画も返さない |
 | `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi user agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた提案ファイルのバイト列が今と違う（この2つは「内容が更新されました」で、最新を表示し直す） / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認と同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`core_approve.refusal_code` で 1 か所で決める） |
-| `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書が付けないとする md（`README.md`・`CLAUDE.md` と、`.ccnavi/docs/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/handoff/`・`.claude/skills/yomiyasu/**`）には出さない。案内しても記録（`decisions.jsonl`）の `code` には残らない |
+| `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書で付けないとされている md（`README.md`・`CLAUDE.md`・`CHANGELOG.md` と、`.ccnavi/docs/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/handoff/`・`.claude/skills/yomiyasu/**`）には出さない。案内しても記録（`decisions.jsonl`）の `code` には残らない |
 | `NOTICE_PROPOSAL_PARENT_KEY` / `NOTICE_PROPOSAL_PARENT_FIELDS` | `PostToolUse`。Write で新しく作った提案（`wip/proposals/todo/` の直下の md）の書式の誤り。識別子が子の形でないのに `parent:` がある（`parent:` と `phase:` を消すよう言う）/ `parent:` の無い親に `mr:`・`plan:`・`phases:` が欠けている（欠けた欄を名指しし、`ccnavi ticket new` の雛形を勧める）。止めずに `additionalContext` で案内する。Edit・上書きでは出さない。案内しても記録の `code` には残らない |
 
 記録の `skip` の理由: `mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、
@@ -92,6 +93,7 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `builtin:phase-review` | `DENY_PHASE_REVIEW` |
 | `builtin:agent-isolation` / `builtin:agent-no-child` / `builtin:agent-multi-target` / `builtin:agent-parent-tree` / `builtin:agent-child-unavailable` / `builtin:agent-target-invalid` / `builtin:agent-cwd-conflict` | `DENY_AGENT_ISOLATION` / `DENY_AGENT_NO_CHILD` / `DENY_AGENT_MULTI_TARGET` / `DENY_AGENT_PARENT_TREE` / `DENY_AGENT_CHILD_UNAVAILABLE` / `DENY_AGENT_TARGET_INVALID` / `DENY_AGENT_CWD_CONFLICT`（`hook.agentlaunch`） |
 | `builtin:subagent-ticket-op` | `DENY_SUBAGENT_TICKET_OP` |
+| `builtin:turn-gate:<宣言 id>` | `DENY_NEEDS_USER_TURN`。宣言ごとに名前を分ける（組み込みは `integrate-user-turn`。6.7） |
 | `builtin:redirect-limit` | `DENY_REDIRECT_LIMIT` |
 | `<ルールファイルのパス>:workspace-root` | `DENY_SHELL_WORKSPACE_ROOT`（Bash の書き込み先にヒットしたとき。Write / Edit にヒットしたときは `DENY_PATH`） |
 

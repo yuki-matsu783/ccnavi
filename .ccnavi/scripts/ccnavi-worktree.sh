@@ -330,15 +330,14 @@ if [ -n "$adopt" ]; then
 	[ -n "$ad_tip" ] || fail adopt-no-branch "ブランチ ${name} を読めません。"
 	# 取り込み先の判定（上の base-bound）とは別に、名前のほうもチケットに結び付かないことを確かめる。
 	# チケットに結び付くワークツリーは、MR を経ずに取り込み先へ載せる直接作業に変えない。
-	ad_nb=$(ccnavi_ask "$root" tree bound "$dest" "$name") || ad_nb=""
-	[ "$(printf '%s\n' "$ad_nb" | head -n 1)" = "tree 1" ] ||
-		fail adopt-ticket "${name} がチケットに結び付くかを、実行ファイルに確かめられません。引き取りません。"
-	case "$(printf '%s\n' "$ad_nb" | sed -n 's/^bound //p' | head -n 1)" in
+	ccnavi_tree_bound "$root" "$dest" "$name" || :
+	case "$ccnavi_tb_state" in
 	no) ;;
 	yes)
-		fail adopt-ticket "${name} はチケットに結び付くワークツリーです（$(printf '%s\n' "$ad_nb" | sed -n 's/^why //p' | head -n 1)）。チケットの作業は直接作業に引き取らず、マージリクエストで出します。"
+		fail adopt-ticket "${name} はチケットに結び付くワークツリーです（${ccnavi_tb_why}）。チケットの作業は直接作業に引き取らず、マージリクエストで出します。"
 		;;
-	*) fail adopt-ticket "${name} がチケットに結び付くかを決められないので、引き取りません。" ;;
+	undecided) fail adopt-ticket "${name} がチケットに結び付くかを決められないので、引き取りません。" ;;
+	*) fail adopt-ticket "${name} がチケットに結び付くかを、実行ファイルに確かめられません。引き取りません。" ;;
 	esac
 	ad_bases=$(git merge-base --all "$name" "$target" 2>/dev/null || :)
 	ad_count=$(printf '%s\n' "$ad_bases" | grep -c . || :)
@@ -461,6 +460,16 @@ common_dir=$(ccnavi_phys "$common_dir")
 ref_pending="refs/ccnavi/direct/$name/pending"
 ref_s="refs/ccnavi/direct/$name/s"
 
+# 直接作業の名前の形は実行ファイルに聞く。取れなければ案内は出さない。
+# 名前が形に合わないことは、切る前に（--dry-run でも）言う。
+print_name_note() {
+	name_note=""
+	if name_bin=$(ccnavi_bin "$root"); then
+		name_note=$("$name_bin" --root "$root" worktree name "$name" 2>/dev/null </dev/null) || name_note=""
+	fi
+	[ -z "$name_note" ] || printf '%s\n' "$name_note"
+}
+
 if [ -n "$dry" ]; then
 	printf 'dry-run: 何も作らない。調べた結果と予定は次のとおり（fetch はしていないので、origin との関係は見ていない）。\n'
 	printf '取り込み先: %s（%s。リモートのデフォルトは %s）\n' "$target" "$main_tree" "$integ"
@@ -469,8 +478,10 @@ if [ -n "$dry" ]; then
 	[ "$c7" = no ] || printf '状態: 書きかけ 変更 %s・新規 %s（staged %s）。実行するには --accept と、--copy-wip か --no-wip が要る\n' "$wip_changed" "$wip_new" "$wip_staged"
 	printf 'ブランチ: %s（起点 %s）\n' "$name" "$(git -C "$main_tree" rev-parse --short "$head_sha")"
 	printf 'ワークツリー: %s\n' "$dest"
+	print_name_note
 	exit 0
 fi
+print_name_note
 
 # ---- fetch。取り込み先だけ。届かなくても止めず、リモート未確認として確認を求める。
 remote_state=even
@@ -724,11 +735,5 @@ if [ "$top_cmp" = "$root_cmp" ]; then
 		fi
 	done
 fi
-# 直接作業の名前の形は実行ファイルに聞く。取れなければ案内は出さない。
-name_note=""
-if name_bin=$(ccnavi_bin "$root"); then
-	name_note=$("$name_bin" --root "$root" worktree name "$name" 2>/dev/null </dev/null) || name_note=""
-fi
-[ -z "$name_note" ] || printf '%s\n' "$name_note"
 print_next
 log_info 完了 -- "name=$name" "target=$target" "snap=$s_sha" "wip=$s_wip" "side=$side_word"

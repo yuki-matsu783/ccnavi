@@ -54,7 +54,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 ## 前提
 
 - **回し始める前に、人間に確認する。** 状態がきれいで最新か。`test_repo: true` のシナリオは、加えて `projects/test-repo` にブランチや MR ができてよいか。ccnavi 本体に何も残らないことは、実行器が回す前後で比べる（`repo` の判定）。
-  確認の手順は [回し方](../../docs/42_claude/acceptance-scenarios.md) の 1。回すたびに取り直す
+  確認の手順は [回し方](../../docs/42_claude/acceptance-scenarios.md) の 1。回すたびに取り直す（例外は `run-all` の 1 回の確認）
 - ccnavi 本体を対象にするシナリオ（UC-01〜07）は、拒否されること（何も変わらないこと）の確認に限る。
   ブランチ・コミット・MR を作る作業（UC-08・09）は `projects/test-repo` で行う
 
@@ -85,7 +85,8 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 - `judge` は、意味で読む基準（自然文）。実行器が `evidence.md` に証拠を抜き出し、別のエージェントが読んで判定する
 - 出力ディレクトリ（`logs/scenarios/<ID>-<日時>/`）のファイル: `step-N.jsonl`（stream-json）・`report.md`（判定と、拒否の傾向の目印）・`report.json`・`evidence.md`（`judge` 用の証拠。渡った文脈の先頭を含む）・`context-N.md`（step N に渡った文脈の全文）・`messages.md`（hook の応答の文面の一覧）。
   読み方は [証拠の読み方](../../docs/42_claude/acceptance-scenarios.md)
-- 回すのは [runner.py](runner.py)（`uv run python -m tests.scenarios.runner run <シナリオ>`。ほかに `preflight`・`next`・`restore`・`judge`。使い方と終了コード（10 を含む）は [回し方](../../docs/42_claude/acceptance-scenarios.md)）。判定は pass / fail / inconclusive（未成立）/ needs-review。
+- 回すのは [runner.py](runner.py)（`uv run python -m tests.scenarios.runner run <シナリオ>`。ほかに `preflight`・`run-all`・`next`・`restore`・`judge`。使い方と終了コード（10 を含む）は [回し方](../../docs/42_claude/acceptance-scenarios.md)）。判定は pass / fail / inconclusive（未成立）/ needs-review。
+  `run-all <ディレクトリ or glob> --max-total-usd <USD>` は、使い捨てのリポジトリのシナリオ（人間の操作が無く、`setup.reset` を持つもの）を、1 回の確認で直列に回す。最後に全体の表（ID・判定・実費・ツール呼び出し数・拒否数・ask 数・出力の置き場）を出し、`summary.md` / `summary.json` に書く。確認が有効なのは ID の集合・`base`・費用の上限・概要に限る（[続けて回す](../../docs/42_claude/acceptance-scenarios.md)）。
   全量テスト（`python -m tests`）には入らない。拾われるのは [test_runner.py](test_runner.py)（実行器の単体テスト）だけ
 
 ## 期待の確かめ方の約束

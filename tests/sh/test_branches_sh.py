@@ -231,11 +231,18 @@ class BranchesShTest(unittest.TestCase):
                 full_name="o/w",
             ),
             pr(15, "topic/d", body="&#152; は文字参照"),
+            pr(16, "claude/tender-volta-qmy152q"),
+            pr(17, "topic/i152"),
+            pr(18, "feature_152_x"),
+            pr(19, "feature-1520-x"),
+            pr(20, "topic/152a"),
         ]
         self.route({f"GET {GITHUB}/pulls?state=open&per_page=100&page=1": [200, pulls]})
         text = self.ok("--issue", "152", GITHUB_TOKEN="t0k")
         found = self.candidates(text)
-        self.assertEqual(sorted(found), ["feature-152-login", "fix-152-x", "topic/a", "topic/c"])
+        self.assertEqual(
+            sorted(found), ["feature-152-login", "feature_152_x", "fix-152-x", "topic/a", "topic/c"]
+        )
         self.assertIn("由来=MR  MR=!11(open)", found["topic/a"])
         self.assertIn("MR=!14(open,フォーク)", found["topic/c"])
         self.assertIn("在りか=手元  由来=名前に番号", found["feature-152-login"])

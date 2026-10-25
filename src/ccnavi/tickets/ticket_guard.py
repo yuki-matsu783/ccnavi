@@ -238,7 +238,9 @@ def raw_git_rule(root: str) -> rules.Rule:
         message = (
             "生の git は実行しません。"
             f"'{settings.script_command(root, 'ccnavi-git.sh')} <サブコマンド> ...'"
-            " を使ってください。通る形は同じスクリプトの --help にあります。"
+            " を使ってください。読む系は status・log・diff・show・blame で、"
+            f"例は '{settings.script_command(root, 'ccnavi-git.sh')} log -5' です。"
+            "書く系の通る形は同じスクリプトの --help にあります。"
             "チケット制御の可否（承認済みチケットの置き場を戻さない・取り込み・push の条件）は"
             "このスクリプトが確かめるので、生の git では外れます。"
         )

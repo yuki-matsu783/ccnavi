@@ -25,7 +25,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 
 | sh の呼び方 | 実行ファイルの段 |
 |---|---|
-| `request --phase <N> --body-file <文> --eli5 <HTML>` | sh が `--eli5` を確かめる → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
+| `request --phase <N> --body-file <文> --eli5 <HTML>`（成功後、`--body-file` が workspace 直下の `scratchpad/` の中なら sh が消す。外のファイルは消さない。消せなければ警告のみで終了コードは変えない） | sh が `--eli5` を確かめる → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
 | `confirm --phase <N>` | sh がスレッドとレビューを取ってくる → `review confirm` |
 | `decide <N> --preview` | 一覧とダイジェストを見るだけ（`--reviewed N --accept-unresolved --preview`）。書く側は `ccnavi-user-decide.sh <N>`（下の行） |
 | `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |

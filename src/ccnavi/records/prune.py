@@ -86,6 +86,7 @@ _SESSION_ONLY = (
     re.compile(r"^(?P<s>.+)\.accepted\.json$"),  # post._accepted_path
     re.compile(r"^busy-(?P<s>.+)\.json$"),  # busy._path
     re.compile(r"^turn-(?P<s>.+)\.json$"),  # turn._path
+    re.compile(r"^userprompt-(?P<s>.+)\.json$"),  # userprompt._path
     re.compile(r"^stopturn-(?P<s>.+)\.json$"),  # stopops._turn_path
     re.compile(r"^stoprefs-(?P<s>.+)\.json$"),  # stopops._refs_path
     re.compile(r"^stoptaint-(?P<s>.+)\.json$"),  # stopjudge._taint_path
@@ -116,6 +117,7 @@ _SESSION_AND_KEY = (
     ("subagent-", ".running"),  # subagent._running_path
     ("stopwrite-", ".json"),  # stopops._write_path
     ("subagent-", ".outcome"),  # subagent_outcome.path
+    ("turngate-", ".json"),  # turngate._entry_name（1 件 1 ファイル）
 )
 # `<セッション>.reported.json`（post._reported_path）。Claude Code のセッションは UUID なので、
 # その形に限る。`.+` で読むと、同じ置き場にある別のファイル（`package.json`、レビューの結果の

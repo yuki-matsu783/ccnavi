@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import re
+
 from ..infra import hookio, settings, shellread, shellread_scan, shellread_words
 from ..infra.modes import DRY_RUN
 from ..policy import rules
@@ -324,12 +326,26 @@ def reason_for(
     return "\n".join(lines)
 
 
-# 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルールの一覧です（bare_id → 1 行）。
+# 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルールの一覧です（bare_id → (対象に
+# 含まれる語の式, 1 行)）。式が空なら、そのルールにヒットした回に必ず出します。
 # ask のルールには message を書けず、additionalContext は自動拒否のときに届かないため、ここに置きます。
+#
+# direct-worktree-confirm の 1 行は、あとのスクリプト側の拒否を確認が隠さないための説明です。
+# `--adopt` は、確認が通ってもスクリプトが「チケットに結び付くワークツリーです」と断るので、
+# 「了承されたら打ち直す」だけを言うと、打ち直しても通らない案内になります。
 _ASK_ALTERNATIVE = {
     "prefer-webfetch": (
+        "",
         "代わりの手: 調べものが一度きりなら WebFetch ツールを、"
-        "何度も呼び出すなら .ccnavi/scripts/ の sh にまとめてから実行してください。"
+        "何度も呼び出すなら .ccnavi/scripts/ の sh にまとめてから実行してください。",
+    ),
+    "direct-worktree-confirm": (
+        r"\s--adopt(?:\s|=|$)",
+        "ただし --adopt は、チケットに結び付く名前（承認済みチケット・提案・親のブランチの識別子。"
+        "ccnavi-ticket.sh status に出る）のワークツリーには、了承されても通りません。"
+        "ccnavi-worktree.sh が断ります。その場合は了承を頼まず、"
+        "チケットの作業はマージリクエストで出します（ccnavi-ticket.sh status の次の操作に従う）。"
+        "了承を頼むのは、チケットに結び付かない直接作業のワークツリーだけです。",
     ),
 }
 
@@ -349,8 +365,8 @@ def ask_hint(bare_id: str, subject: str) -> list[str]:
         "この操作はユーザの確認が要りますが、このセッションでは確認に答えられません。"
         f"ユーザに「{shown}」の了承を頼み、了承されたら打ち直してもらってください。"
     ]
-    alternative = _ASK_ALTERNATIVE.get(bare_id)
-    if alternative:
+    needle, alternative = _ASK_ALTERNATIVE.get(bare_id, ("", ""))
+    if alternative and (not needle or re.search(needle, subject, re.IGNORECASE)):
         lines.append(alternative)
     return lines
 
@@ -505,22 +521,22 @@ def internal_error(code: str, event: str, kind: str, log_path: str, *, passed: b
     """
     if event == hookio.POST_TOOL_USE:
         what = (
-            "ccnavi hit an internal error while checking what this call changed, so the "
-            "protected areas were not checked after it ran."
+            "ccnavi の内部の不具合で、この呼び出しが何を変えたかを確かめられませんでした。"
+            "実行後の保護対象の検査は行われていません。"
         )
     elif passed:
         what = (
-            "ccnavi hit an internal error before it could judge this call. This call is a plain "
-            "read that ccnavi can check without its rules, so it went through."
+            "ccnavi の内部の不具合で、この呼び出しを判定できませんでした。"
+            "この呼び出しは、ルールなしで確かめられる読み取りだけなので、通しました。"
         )
     else:
-        what = "ccnavi hit an internal error before it could judge this call, so it stopped it."
+        what = "ccnavi の内部の不具合で判定できなかったため、この呼び出しを止めました。"
     return "\n".join(
         [
             f"[ccnavi] {code}",
-            f"{what} The cause is in ccnavi, not in the call ({kind}); the details are in the "
-            f"diagnostic log {log_path}. Do not retry the same call to get around it. Tell the "
-            "user that ccnavi failed here and where the log is, and let them decide how to go on.",
+            f"{what}原因は呼び出しではなく ccnavi にあります（{kind}）。詳細は診断ログ "
+            f"{log_path} にあります。同じ呼び出しを打ち直して回避しないでください。"
+            "ユーザに、ここで ccnavi が失敗したことと診断ログの場所を伝え、続け方を任せてください。",
         ]
     )
 
@@ -529,9 +545,8 @@ def internal_error_notice(code: str, event: str, kind: str, log_path: str) -> st
     """ccnavi 自身の例外で、ツールの呼び出しを持たないイベントの処理を終えられなかったときに、
     ユーザへ見せる文。止めていないことと、診断ログの場所を言う。"""
     return (
-        f"[ccnavi] {code}: ccnavi hit an internal error while handling {event} ({kind}) and "
-        f"skipped what it does there. Nothing was stopped. The details are in the diagnostic "
-        f"log {log_path}."
+        f"[ccnavi] {code}: {event} の処理中に ccnavi の内部の不具合が起き（{kind}）、"
+        f"そこでの処理を飛ばしました。止めたものはありません。詳細は診断ログ {log_path} にあります。"
     )
 
 

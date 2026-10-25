@@ -120,6 +120,8 @@ shで`redact`を再現すると、正規表現の解釈が環境ごとに違う�
 
 - **独自のログの仕組みを作らない。** `printf … >>logs/…`や`print`や`console.log`で診断を書かず、loggerを使う。
   loggerに書いた出来事を、`console.error`などにも重ねて出さない。拡張の4つの画面もそうしている
+- Chrome拡張（`extensions/chrome/ccnavi-approval`）にはloggerが無い。service workerは、想定していない失敗だけを`console.error`に出す
+  （画面に出す想定の`HostError`は出さない）。開発用スクリプトと実機の試験がここを拾う。PATの値は文面に入れない
 - 1行に1つの出来事を書く。何をどうしたかを本文に、判断に必要な値を`key=value`に書く
 - レベルは次のように使い分ける
   - `INFO` 受け付けた操作、判定の結果、拒否の理由、最終結果（終了コード）

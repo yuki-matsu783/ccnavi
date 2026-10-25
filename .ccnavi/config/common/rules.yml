@@ -47,16 +47,16 @@ deny:
       （行き先は同じ {root}/.claude/worktrees/<名前>）。
 
   # セッションが示すスクラッチパッド（/tmp/claude-*/ の下の scratchpad）は置き場にしない。
-  # ユーザに渡す物は wip/handoff/、使い捨てはワークスペースルート直下の scratchpad/ に置く
+  # 使い捨てはワークスペースルート直下の scratchpad/、ユーザに渡す物は wip/handoff/ に置く
   # （.ccnavi/docs/scratchpad.md）。シェルのリダイレクトなどによる書き込みは止めない。
   - id: session-scratchpad
     match: Write|Edit|NotebookEdit
     regex: '^(?:/private)?/tmp/claude-[^\\/]+[\\/](?:[^\\/]+[\\/])*scratchpad(?:[\\/]|$)'
     message: >-
-      セッションのスクラッチパッドには書けません。ユーザに渡す物（保護対象を直したコピーなど）は
-      wip/handoff/（ワークツリーの中ならそのワークツリーの、無ければワークスペースルート直下の）、
-      直接作業で一時的に見せる物・コミットしたくない物はワークスペースルート直下の scratchpad/ に置いてください。
-      置いたファイルのパスも伝えてください（.ccnavi/docs/scratchpad.md）。
+      セッションのスクラッチパッドには書けません。一時ファイル・コミットしたくない物・直接作業で
+      一時的に見せる物はワークスペースルート直下の scratchpad/ に、ユーザに渡す物（保護対象を直した
+      コピーなど）は wip/handoff/（ワークツリーの中ならそのワークツリーの、無ければワークスペース
+      ルート直下の）に置いてください。置いたファイルのパスも伝えてください（.ccnavi/docs/scratchpad.md）。
 
   # PowerShell はまとめて止め、Bash に寄せる。
   - id: no-powershell
@@ -90,6 +90,8 @@ ask:
   # 直接作業の取り込み先・状態の了承・横で作業する指定・引き取りは、ユーザの確認ダイアログに出す。
   # ダイアログのコマンドに、取り込み先のブランチ名と選んだ指定が見える。
   # --side-by-side は自動復元を緩めるので、ほかにずれが無くても必ずダイアログに出す。
+  # 非対話では確認が拒否になり、理由の文（reasons.ask_hint）がエージェントに返る。--adopt は、
+  # チケットに結び付く名前には了承されても通らない（スクリプトが断る）ので、その旨も理由に足している。
   - id: direct-worktree-confirm
     match: Bash
     regex: 'ccnavi-worktree\.sh\b[^\x00]*\s--(base|accept|side-by-side|adopt)(\s|=|$)'

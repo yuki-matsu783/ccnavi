@@ -35,14 +35,14 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 | `requirements` | 外から観測できる約束。`docs/10_requirements.md`・`docs/11_requirements/**` | 付いている |
 | `glossary` | 用語集。`docs/CONTEXT.md` | 付いている |
 | `adr` | 設計判断の記録。`docs/30_adr/<主題>/NNNN-*.md` | 付いている |
-| `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`skills/*/SKILL.md` | 付けていない（理由は表の下）。`name`・`description`を持つ。共通の工程スキルは`process: true`（真偽値）も持つ（`.ccnavi/docs/skill-processes.md`）。`--type skill`では何も出ない |
+| `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`skills/*/SKILL.md` | 付けていない（理由は表の下）。新しく作る`SKILL.md`には`type: skill`を足す案内が出る。`name`・`description`を持つ。共通の工程スキルは`process: true`（真偽値）も持つ（`.ccnavi/docs/skill-processes.md`）。`--type skill`では何も出ない |
 | `skill-reference` | スキルから切り出した資料。`.claude/skills/*/references/**/*.md`、プロジェクトの`skills/*/references/**/*.md`。工程スキルの`references/`は最上段を`common/`と`project/`に分け、中のディレクトリ構造は任意。工程スキルの reference は`tags`にスキル名を入れる（`.ccnavi/docs/skill-processes.md`） | 付いている |
 | `learning-wiki` | 気づきを統合した知識（パターン・採否の記録）と受信箱。`docs/wiki/**`、`projects/<名前>/docs/wiki/**`（`.ccnavi/docs/skill-wiki.md`） | 書いたときに付ける。`ccnavi --docs` は `--type learning-wiki` を明示したときだけ出す（作業のセッションに渡さないため） |
 | `report` | 調査結果や作業報告。`wip/`の下など、置き場はその都度決める | 書いたときに付ける |
 
 表に無い種類の文書を足すときは、この表に行を足してから使う。
 
-表で「付けていない」とした文書（`CLAUDE.md`・`README.md`類・`SKILL.md`）の理由と探し方は、[.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)の「typeの値」と「対象外」にある。
+表で「付けていない」とした文書（`CLAUDE.md`・`README.md`・`CHANGELOG.md`・`SKILL.md`）の理由と探し方は、[.ccnavi/docs/frontmatter.md](../../.ccnavi/docs/frontmatter.md)の「typeの値」と「対象外」にある。
 
 ## 対象外の表と実行ファイル
 

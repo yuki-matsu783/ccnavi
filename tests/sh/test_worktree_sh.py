@@ -360,10 +360,16 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertNotIn(self.PROJECTS_HINT, result.stdout)
 
-    def test_a_free_name_is_warned_after_the_cut_and_still_cut(self):
+    def test_a_free_name_is_warned_by_dry_run_too(self):
+        result = self.run_sh("topic", "--dry-run")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("warn: 直接作業のワークツリー名 topic が", result.stdout)
+        self.assertFalse(os.path.exists(self.wt("topic")))
+
+    def test_a_free_name_is_warned_before_the_cut_and_still_cut(self):
         result = self.run_sh("topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertIn("warn: 直接作業のワークツリー topic の名前が", result.stdout)
+        self.assertIn("warn: 直接作業のワークツリー名 topic が", result.stdout)
         self.assertEqual("topic", git(self.wt("topic"), "branch", "--show-current"))
 
     def test_a_name_in_the_form_is_not_warned(self):
