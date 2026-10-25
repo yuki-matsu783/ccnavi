@@ -1,0 +1,81 @@
+# 拒否の文。条件（いつ止めるか）はコード側にある。ここは何を言うかだけを持つ。
+# 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
+version: 1
+messages:
+  DENY_TICKET_PARENT:
+    kind: deny
+    values: [ticket, title, worktree, path, worktree_path]
+    what: |-
+      親チケット {ticket}（{title}）のワークツリー {worktree} に {path} を書こうとしたため、止めました。
+    why: |-
+      親のワークツリーは作業の場ではありません。書けるのは下書きと提案の置き場（wip/proposals/・wip/handoff/・wip/eli5/）だけで、親の範囲を広げても通りません。
+    next: |-
+      フェーズごとの子チケットを `{script:ccnavi-ticket.sh} propose` で提案し、ユーザに承認を頼んで返事を待つ。承認されたら start して、子のワークツリーで作業する（子の finish が親へ合流させる。そのフェーズの子がまだ無ければ先に作る）
+    no_bypass: |-
+      親の範囲を広げる、別の経路で書く、言い換えるなどをしても、同じ関門に当たります。
+    note: |-
+      承認の前に親のワークツリーへ入った未コミットの変更を戻す編集でも、ここを迂回して書き直しません。`cd {worktree_path:path} && {script:ccnavi-git.sh} restore --staged --worktree -- <パス>`（1 ファイルずつ）で捨てるか、子のワークツリーへ移してコミットします。自分で書いた変更でなければ、捨てる前にユーザに確かめます。
+
+  DENY_PHASE_REVIEW__WAITING:
+    kind: deny
+    values: [parent, phase, label, review_label, blocked, risk_line]
+    what: |-
+      {parent} のフェーズ {label} は{review_label}です。レビュー済みのマーカーが置かれるまで、{blocked}を止めます。
+    why:
+      child: |-
+        フェーズは終わっていて、人間レビューが必要な子を含みます。レビューの依頼は出してあり、動くのはユーザです。
+      plain: |-
+        フェーズは終わっていて、レビューが必要なフェーズです。レビューの依頼は出してあり、動くのはユーザです。
+      risk: |-
+        フェーズは終わっていて、実績のリスクが高い（{risk_line}）ので、宣言に関わらずレビューが要ります。レビューの依頼は出してあり、動くのはユーザです。
+    next: |-
+      ユーザのレビューを待つ。終わったら `{script:ccnavi-review.sh} confirm --phase {phase}` で確かめる。指摘が付いていたら、同じフェーズに子を追加してやり直せる。次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めてよい
+    no_bypass: |-
+      子の作業や別の経路で先へ進めても、レビュー済みのマーカーが置かれるまで同じ関門に当たります。待ちます。
+
+  DENY_PHASE_REVIEW__REQUEST:
+    kind: deny
+    values: [parent, phase, label, review_label, blocked, risk_line, turn_defined]
+    what: |-
+      {parent} のフェーズ {label} は{review_label}です。レビュー済みのマーカーが置かれるまで、{blocked}を止めます。
+    why:
+      child: |-
+        フェーズは終わっていて、人間レビューが必要な子を含みます。
+      plain: |-
+        フェーズは終わっていて、レビューが必要なフェーズです。
+      risk: |-
+        フェーズは終わっていて、実績のリスクが高い（{risk_line}）ので、宣言に関わらずレビューが要ります。
+    next: |-
+      子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を wip/eli5/phase-{phase}.html に書いてコミットして push し、`{script:ccnavi-review.sh} request --phase {phase} --body-file <依頼文> --eli5 wip/eli5/phase-{phase}.html` でレビューを頼み、{turn_defined}を終えてユーザを待つ。ユーザがレビューを終えたら `{script:ccnavi-review.sh} confirm --phase {phase}` で確かめる。次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めてよい
+    no_bypass: |-
+      子の作業や別の経路で先へ進めても、レビュー済みのマーカーが置かれるまで同じ関門に当たります。依頼を出して待ちます。
+
+  DENY_NEEDS_USER_TURN__INTEGRATE:
+    kind: deny
+    values: [first_name, second_name, where, key]
+    what:
+      same_command: |-
+        {first_name} と {second_name} を 1 つのコマンドにまとめて打とうとしました{where}。
+      no_user_turn: |-
+        {first_name} を打ったあと、ユーザの発言が 1 回も無いまま {second_name} を打とうとしました{where}。
+    why: |-
+      取り込む差分と変わるファイルをユーザに見せ、返事を待つためです。ターンが終わってユーザが 1 回発言するまで、確定しません。バックグラウンド作業の完了通知と、Stop の促しで同じターンを続けた分は、ユーザの発言に数えません。
+    next: |-
+      integrate の出力の差分と変わるファイルをユーザに見せ、返事を待ってターンを終える。ユーザの返事のあとで {script:ccnavi-git.sh} integrate-done {key} -m '<メッセージ>' を打ち直す
+    no_bypass: |-
+      コマンドを分けても、別のセッションやサブエージェントから打っても、同じ関門に当たります。ユーザの発言を待ちます。
+
+  DENY_NEEDS_USER_TURN__STATE:
+    kind: deny
+    values: [first_name, second_name, where, detail]
+    what:
+      unreadable: |-
+        {second_name} の前に、{first_name} を打ったかを調べる記録を読めません{where}。（{detail}）
+      unwritable: |-
+        {first_name} を打った記録を残せないので、通しません{where}。（{detail}）
+    why: |-
+      関門の記録を読み書きできないと、ユーザの発言をはさんだかを確かめられないためです。
+    next: |-
+      ユーザに、ccnavi の state の置き場（logs/state）が読み書きできるかを確かめてもらい、返事を待つ
+    no_bypass: |-
+      コマンドを分けても、別のセッションやサブエージェントから打っても、同じ関門に当たります。ユーザの発言を待ちます。

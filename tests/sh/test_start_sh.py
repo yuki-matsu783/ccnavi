@@ -34,7 +34,7 @@ import tempfile
 import unittest
 from urllib.parse import quote
 
-from tests import ROOT, SRC, common_sh
+from tests import ROOT, SRC, common_sh, put_messages
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 REAL_GIT = shutil.which("git")
@@ -194,6 +194,7 @@ class StartShTest(unittest.TestCase):
             *common_sh(SH_DIR),
         ):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
+        put_messages(self.ws)
         self.exe = write(
             os.path.join(base, "exe", "ccnavi"), EXE.format(src=SRC, python=sys.executable)
         )

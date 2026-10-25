@@ -36,7 +36,7 @@ from dataclasses import dataclass, field, replace
 from typing import TextIO
 
 from ..infra import modes, settings, tree
-from ..policy import rules
+from ..policy import rules, texts
 from . import (
     approval,
     approval_checks,
@@ -415,42 +415,36 @@ PARALLEL_REQUEST_NOTE = (
 def hold_reason(phase: Phase, tool: str, root: str) -> str:
     """止めたときに返す文。いまどの段にいて、次に何をすればよいかを言う。
 
-    段の名前（レビュー準備中／レビュー待ち）を見出しに置く。止まっている事実だけを
-    言っても次に何をすればよいかが分からないので、段ごとにやることを書き分ける。
+    文は文面ファイルの `DENY_PHASE_REVIEW__WAITING`（依頼は出してあり、ユーザを待つ段）か
+    `DENY_PHASE_REVIEW__REQUEST`（子の合流を確かめて依頼を出す段）。段の名前（レビュー準備中／
+    レビュー待ち）を1行目の見出しに置く。止まっている事実だけを言っても次に何をすればよいかが
+    分からないので、段ごとにやることを書き分ける。レビュー待ちの間の並行の依頼の断りと、止めている間に
+    通る形の案内は、ほかの出力と共有するのでここで足す。
     """
-    review_sh = settings.script_command(root, "ccnavi-review.sh")
-    what = "サブエージェントの起動" if tool in modes.AGENT_TOOLS else "このシェル実行"
-    n = phase.number
-    why = (
-        "人間レビューが必要な子を含みます" if not phase.planned else "レビューが必要なフェーズです"
-    )
+    values = {
+        "parent": phase.parent,
+        "phase": str(phase.number),
+        "label": phase.label,
+        "review_label": phase.review_label,
+        "blocked": "サブエージェントの起動" if tool in modes.AGENT_TOOLS else "このシェル実行",
+        "risk_line": phase.risk_line or "",
+    }
     if phase.risk_escalates:
-        why = f"実績のリスクが高い（{phase.risk_line}）ので、宣言に関わらずレビューが要ります"
-    later = "次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めて構いません。"
-    if phase.review_waiting:
-        # 依頼は出してある。ここで動くのはユーザで、エージェントは待つほうに回る。
-        todo = (
-            "やること: ユーザのレビューを待ってください。レビューが終わったら "
-            f"'{review_sh} confirm --phase {n}' で確かめます。指摘が付いていたら、"
-            f"同じフェーズに子を追加してやり直せます。{later}"
-        )
+        why = "risk"
+    elif phase.planned:
+        why = "plain"
     else:
-        todo = (
-            "やること: 子が合流済み（finish 済み）であることを確かめ、ELI5 の HTML を "
-            f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
-            f"'{review_sh} request --phase {n} --body-file <依頼文> "
-            f"--eli5 wip/eli5/phase-{n}.html' "
-            f"でレビューを頼み、{phase_forms.TURN_DEFINED}を終えてユーザを待ってください。"
-            f"ユーザがレビューを終えたら '{review_sh} confirm --phase {n}' "
-            f"で確かめます。{later}"
-        )
+        why = "child"
+    if phase.review_waiting:
+        said = texts.say(root, "DENY_PHASE_REVIEW__WAITING", values, {"why": why})
+    else:
+        values["turn_defined"] = phase_forms.TURN_DEFINED
+        said = texts.say(root, "DENY_PHASE_REVIEW__REQUEST", values, {"why": why})
     return "\n".join(
         [
-            f"[ccnavi] {CODE_REVIEW} (parent: {phase.parent}, phase: {n}, {phase.review_label})",
-            f"{phase.parent} のフェーズ {phase.label} は{phase.review_label}です。"
-            f"フェーズは終わっていて、{why}。"
-            f"レビュー済みのマーカーが置かれるまで、{what}を止めます。",
-            todo,
+            f"[ccnavi] {CODE_REVIEW} (parent: {phase.parent}, phase: {phase.number}, "
+            f"{phase.review_label})",
+            said,
             PARALLEL_REQUEST_NOTE,
             *([] if tool in modes.AGENT_TOOLS else [phase_forms.EXEMPT_NOTE]),
         ]
