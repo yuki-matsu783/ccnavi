@@ -3,7 +3,7 @@ title: 受入シナリオを claude -p で回す
 type: guide
 description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方
 tags: [test, scenario]
-keywords: [受入シナリオ, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
+keywords: [受入シナリオ, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -51,6 +51,7 @@ setup:
     - [git, switch, -c, feature-x]
   reset:                         # 回す前と回したあとに、対象を戻す（追記を使うときは必須）
     base: "<コミットの 40 桁の SHA>"
+  host: bare                     # 評価の相手。bare / fake-gitlab / real（既定は real）
 steps:
   - prompt: "ワークツリーは切らずに README.md を Edit ツールで直接編集して。拒否されたら迂回しないで"
     resume: false                # true なら直前のセッションを --resume でつなぐ
@@ -115,6 +116,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    - `projects/test-repo` を使うシナリオは、統合先が origin と合っていて、前の回のワークツリーとブランチが残っていない
    - `setup.reset` があれば、先に対象を `base` へ戻す。`setup.files` があれば、先に作る（作る形は回したあとに消す）。追記と `setup.git` は、そのあとに行う（「使い捨てのリポジトリの事前状態と後片付け」）
    - `setup.issue` があれば、`repo` の origin に合わせて issue を作る（GitLab は glab、GitHub は gh。実行器が見分ける）
+   - `setup.host` が `bare` / `fake-gitlab` なら、対象を戻したあとに相手を用意する（「評価の相手」）
 3. **実行器で回す。** 人間の確認が取れたあとだけ、`--confirmed` を付ける。
 
    ```sh
@@ -204,6 +206,30 @@ setup:
 
 `git clean` に `-x` は付けない（`.gitignore` 済みの `logs/`・`.claude/` などを消さない）。`refs/remotes/*` は触らない。`.git/config`・`.git/hooks`・reflog・`refs/notes` も戻さない。merge・rebase などの途中で止まった対象は、`branch -D` が失敗して「戻せなかった」になる（手で中断してから `restore`）。origin への push は戻さない。push が要るシナリオは、各シナリオが自分で後始末する。
 戻す前に `base` が対象にあるコミットかを確かめ、無ければ何も変えずに止める。
+
+### 評価の相手（`setup.host`）
+
+評価の目的ごとに、origin の向き先を 3 段階から選ぶ。`setup.git` とは別の処理で、`claude` に渡す PATH と環境変数を変える。
+
+| 値 | 相手 | 使う場面 |
+|---|---|---|
+| `bare` | 一時ディレクトリの bare。ホストの API は失敗（「確かめられなかった」） | 直接作業・integrate・レビューなしのチケット作業（毎回） |
+| `fake-gitlab` | bare と `tests/sh/fake_gitlab.py` | レビュー（MR・スレッド・依頼・解決）を含むチケット作業（毎回） |
+| `real` | 本物の GitHub / GitLab（`projects/test-repo`）。欄が無いときも同じで、挙動は変わらない | リリース前などの通し確認だけ。本物でしか出ない不具合（例: GraphQL が 403）を拾う |
+
+- `bare` / `fake-gitlab` は、`setup.git` と同じ `require_disposable_repo` を通ったときだけ動く（ccnavi 本体は断る。終了コード 3）。対象に origin が無いときも断る
+- `setup.issue` とは併用できない（読み込みの時点で ValueError）。runner の `gh` / `glab` は代役の外で動き、本物のホストに出るため。`fake-gitlab` で issue が要るときは、`setup.host_state`（`project: <namespace>/<project>` を含む dict。足りない欄は `seq`・`issues`・`mrs` の空の初期値）に書く
+- 用意するもの: 対象の `refs/remotes/origin/*`（無ければローカルのブランチ）から作る bare、PATH の先頭の代役（`git`・`gh`・`glab`、`bare` だけ `curl`）、`fake-gitlab` では模擬。置き場は一時ディレクトリ（`ccnavi-host-*`）。`.git/config` は書き換えない
+- `git` の代役は、`remote get-url origin` に、ホストの形の URL（`bare` は `https://gitlab.com/acme/widgets.git`、`fake-gitlab` は `http://127.0.0.1:<port>/<project>.git`）で答える。答えるのは、対象のリポジトリ（そのワークツリーを含む。共通の `.git` で比べる）だけで、ccnavi 本体には本物の答えを返す。本物へ渡すときは `-c url.<bare>.insteadOf=<本物の origin>` を足すので、fetch・push・ls-remote は bare に届く。`ccnavi-git.sh` は `git` を PATH から呼ぶので、代役が効く
+- `claude` の環境は、親の環境を継承し、`GITHUB_TOKEN`・`GH_TOKEN`・`GITLAB_TOKEN`・`CCNAVI_PROBE_REVIEWER_TOKEN` など `GH_`・`GITHUB_`・`GLAB_`・`GITLAB_`・`CCNAVI_PROBE_` で始まる `*TOKEN` だけを除く。`fake-gitlab` は `GITLAB_TOKEN` に模擬のトークンを置く。許可リストにしない（HOME・認証・プロキシ・CA が落ちて `claude` が起動しなくなる）。`real` は環境を渡さない（今までどおり継承）
+- ホスト（GitHub / GitLab）へは出ない。`claude -p` 自身の API 通信は要る
+- 確かめた範囲: `claude -p` の Bash ツールと hook（SessionStart・PreToolUse）のシェルに、PATH の代役と `FAKE_*` が届く
+
+**`bare` で許す依頼。** `gh` / `glab` が失敗するので、エージェントが issue や MR を作る依頼は通らない。`bare` を選べるのは、依頼がホストの API を要しないシナリオだけ。`judge` に「`gh` が使えない状況で詰まったのは ccnavi の不具合ではない」を書く。MR・スレッドを読む依頼は `fake-gitlab` にする。
+
+**模擬のずれ。** `bare` / `fake-gitlab` の模擬は、本物と同じ形を返す保証が無い（契約テストは別）。`report.md` の「相手（setup.host）」と `report.json` の `host` の行に、どの相手で回したかと「模擬のずれで見逃した問題がありうる」を出す。
+
+**後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`finish` の `finally`・`_continue` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・代役・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。
 
 ### 中断・失敗・停止のあと
 
