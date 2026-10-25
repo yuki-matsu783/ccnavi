@@ -199,7 +199,7 @@ def write_recorded(
 def dirty_parents(conf: settings.Settings, root: str, tickets: list) -> list[dict]:
     """承認した親のワークツリーにある、提案とチケットの置き場以外の未コミットの変更。
 
-    承認の前は、親のワークツリーへの書き込みは判定に当たらず通る（承認済みの索引に無い）。
+    承認の前は、親のワークツリーへの書き込みは判定の対象外で通る（承認済みの索引に無いため）。
     承認の後に同じ変更を戻そうとしても、親のワークツリーへの書き込みとして断られ、子の
     `finish` も止まる（`write_and_push_merge._tree_problem`）。止まる前に知らせるため、承認の
     時点で同じ条件（追跡中のファイルの変更のうち、置き場の外のもの）を数える。
@@ -242,7 +242,7 @@ def dirty_parents(conf: settings.Settings, root: str, tickets: list) -> list[dic
 
 
 def dirty_parent_text(root: str, found: dict) -> str:
-    """`dirty_parents` の 1 件を知らせる文（行頭の語は呼び手が付ける）。戻し方まで言う。"""
+    """`dirty_parents` の 1 件を知らせる文（行頭の語は呼び手が付ける）。戻し方まで書く。"""
     shown = ", ".join(found["paths"][:_SHOWN_PATHS])
     if len(found["paths"]) > _SHOWN_PATHS:
         shown += f" ほか {len(found['paths']) - _SHOWN_PATHS} 件"
@@ -253,7 +253,7 @@ def dirty_parent_text(root: str, found: dict) -> str:
     )
     return (
         f"親 {found['ticket']} のワークツリーに、提案以外の未コミットの変更がある（{shown}）。"
-        "承認の後は、親のワークツリーへの書き込みは断られ、子の finish もこの変更で止まる。"
+        "承認の後は、親のワークツリーへの書き込みが断られ、この変更があると子の finish も止まる。"
         "自分が書いた変更でなければ、戻す前にユーザへ確かめる（戻すと取り消せない）。"
         "残す変更は、子のワークツリーへ移してコミットする。"
         f"要らない変更は、パスを 1 つずつ名指しして戻す。例: {restore}"
@@ -298,7 +298,7 @@ def placed_report(
     - `unwritten`: 止まったために書かなかった提案の識別子
     - `rejected`: 検査で承認の対象にしなかった提案（識別子と理由）
     - `dirty_parent`: 承認した親のワークツリーに残る、提案以外の未コミットの変更
-      （親の識別子とパス。`dirty_parents`）。無ければ空
+      （親の識別子とパス。`dirty_parents`）。無いときは空
     """
     ids = [c.ticket.ticket for c in gathered.batch]
     failed = (

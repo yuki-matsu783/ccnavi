@@ -65,7 +65,7 @@ class ApprovalToldTest(PhaseHarness):
         return self.approve_body(tickets)["prompt"]
 
     def leave_change_in_parent(self, name="keep.py"):
-        """承認の前に、親のワークツリーへ提案以外の変更を入れる（追跡中のファイルの書き換え）。"""
+        """承認の前に、親のワークツリーへ提案以外の変更を入れる（追跡中のファイルを書き換える）。"""
         with open(os.path.join(self.parent_tree, "src", name), "a", encoding="utf-8") as f:
             f.write("print(2)\n")
 

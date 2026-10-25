@@ -924,7 +924,7 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("dirty_parent=", result.stderr)
         self.assertIn("index.html", result.stderr)
-        # ユーザが打つ sh には `次:` を足さない（案内は拡張の prompt と status が受け持つ）。
+        # ユーザが打つ sh には `次:` を足さない（案内は拡張の prompt と status が担う）。
         self.assertNotIn("次:", result.stdout + result.stderr)
 
     def test_partial_approval_whose_push_fails_names_the_unsent_paths(self):
