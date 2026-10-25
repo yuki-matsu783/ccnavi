@@ -148,7 +148,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 | `PreToolUse` で `permissionDecision` と `additionalContext` を 1 つの応答に入れたとき、両方がモデルに届くか | 届く（Claude Code 2.1.235）。deny と ask では `permissionDecisionReason` と一緒に届く |
 | ask の `permissionDecisionReason` が誰に見えるか | ユーザの確認ダイアログに出る。Yes を押した後もモデルには届かない。No のときは拒否の定型文だけがモデルに届いてターンが終わる。allow の文面はどこにも出ない |
 | `/compact` の後に `SessionStart` が来るか | `source: compact` の `SessionStart` が同じ `session_id` で届く |
-| サブエージェントの `PostToolUse`・`SubagentStart`・`SubagentStop` の `session_id` は親と同じか | 同じ（フォアグラウンド・バックグラウンドとも）。`agent_id`（と `agent_type`）が付き、`cwd` は起動した側のまま。親（メイン）の呼び出しには `agent_id` が付かない |
+| サブエージェントの `PostToolUse`・`SubagentStart`・`SubagentStop` の `session_id` は親と同じか | 同じ（フォアグラウンド・バックグラウンドとも）。`agent_id`（と `agent_type`）が付き、`cwd` は起動した側のまま（`isolation: worktree` を除く。下の行）。親（メイン）の呼び出しには `agent_id` が付かない |
 | サブエージェントの `PostToolUse` の `tool_input` のパスは絶対か相対か | 絶対パスで来た（`Write`・`Edit` の `file_path`）。相対で来ても `cwd` から解く実装にしてある |
 | フォアグラウンドとバックグラウンドのサブエージェントで payload の形は違うか | 違わない。バックグラウンドは `PostToolUse` が親の `Agent` 呼び出しより後に来ることがある |
 | 入れ子のサブエージェント（サブエージェントがさらに起動する体）の payload | 実測できない。この版ではサブエージェントが `Agent` ツールを持たなかった（`ToolSearch` でも見つからない） |
@@ -202,7 +202,7 @@ shlex に任せる。走査か shlex のどちらかに手を入れたら `tests
 | 深さ 1 のサブエージェントに `agent_id` が届くか | 届く（実測。`logs/state/subagent-<セッション>-<agent_id>.running` のファイル名で確かめた） |
 | `SubagentStart` / `SubagentStop` は孫でも来るか | 子・孫それぞれで来る（実測） |
 | `logs/decisions.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`decisions.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/subagent-<セッション>-<agent_id>.running` |
-| サブエージェントの `cwd` | 文書: メインの `cwd`（`cd` は持ち越さない）。孫の `cwd` も親のワークツリーになる |
+| サブエージェントの `cwd` | 文書: メインの `cwd`（`cd` は持ち越さない。`isolation: worktree` は隔離したワークツリー）。孫の `cwd` も親のワークツリーになる |
 | 親の `agent_id` や深さは hook の入力にあるか | 文書: 無い |
 | 起動側は子の終了を待つか | 文書: 非対話では待つ（待ち上限の既定は連続 10 分の idle）。ただし下のバックグラウンドのサブエージェントの計測では、待たれなかった（計測時の環境変数は下の行を参照） |
 | AskUserQuestion をサブエージェントに渡せるか | 文書: `tools` に書いても全部のサブエージェントから外される |
