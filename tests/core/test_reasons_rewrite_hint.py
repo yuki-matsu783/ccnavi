@@ -41,10 +41,6 @@ class RewriteHintTest(unittest.TestCase):
         self.assertEqual("", self.hint("no-such-reason", "0"))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class AskHintTest(unittest.TestCase):
     """確認（ask）の理由に足す説明です。非対話のときだけ足します。"""
 
@@ -70,3 +66,7 @@ class AskHintTest(unittest.TestCase):
         self.assertIn("WebFetch", self.hint("prefer-webfetch", "0"))
         self.assertNotIn("WebFetch", self.hint("dependencies", "0"))
         self.assertEqual("", self.hint("prefer-webfetch", ""))
+
+
+if __name__ == "__main__":
+    unittest.main()

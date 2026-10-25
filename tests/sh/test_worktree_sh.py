@@ -145,6 +145,8 @@ class WorktreeShTest(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
+        # 実行側が非対話（claude -p）でも、対話の出力を見る。非対話は extra で渡す。
+        env.pop("CLAUDE_CODE_SESSION_ATTENDED", None)
         env.update(
             {
                 "PATH": os.pathsep.join([self.bin, os.environ.get("PATH", "")]),

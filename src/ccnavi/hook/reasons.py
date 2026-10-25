@@ -319,8 +319,6 @@ def reason_for(
         lines.append(unreadable(degraded))
         lines.extend(rewrite_hint(degraded))
     lines.append(rule.spoken_message())
-    if rule.decision == rules.ASK:
-        lines.extend(ask_hint(rule.bare_id, shown))
     if quoted:
         lines.append(inside_quotes(git))
     return "\n".join(lines)
@@ -336,15 +334,17 @@ _ASK_ALTERNATIVE = {
 }
 
 
-def ask_hint(bare_id: str, shown: str) -> list[str]:
+def ask_hint(bare_id: str, subject: str) -> list[str]:
     """確認（ask）の理由に足す説明です。非対話のときだけ返し、対話のときは空にします。
 
     非対話のセッションでは確認に答える人がいないため、ask は自動で拒否されます。
     ルール名と対象だけでは、「確認待ち」なのか「止められた」のかが分からないため、
-    確認が要ることと次の行動を言います。
+    確認が要ることと次の行動を言います。確認として返す回（ASK）にだけ足します。
+    上限で止める拒否など、実際には確認が出ない回に足すと、打ち直しても通らない案内になります。
     """
     if not ccnavimd.unattended():
         return []
+    shown = _shorten(subject)
     lines = [
         "この操作はユーザの確認が要りますが、このセッションでは確認に答えられません。"
         f"ユーザに「{shown}」の了承を頼み、了承されたら打ち直してもらってください。"

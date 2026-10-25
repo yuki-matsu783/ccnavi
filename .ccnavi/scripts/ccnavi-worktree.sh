@@ -221,7 +221,7 @@ if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
 		printf '案内: 取り込みの記録は、ある（ccnavi-direct/%s）。integrate に進めます\n' "$name"
 		ex_record=yes
 	else
-		printf '案内: 取り込みの記録は、無い（ccnavi-direct/%s）。integrate に進むには、ユーザの確認を経て sh %s %s --adopt --base <取り込み先> で引き取ります。%s\n' \
+		printf '案内: 取り込みの記録は、無い（ccnavi-direct/%s）。integrate に進むには、ユーザの確認を経て sh %s %s --adopt --base <取り込み先> で引き取ります（チケットに結び付く名前は引き取れません）。%s\n' \
 			"$name" "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$(ccnavi_sh_quote "$name")" "$(unattended_line)"
 		ex_record=no
 	fi

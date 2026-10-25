@@ -958,16 +958,25 @@ def decide_before(
         record.code = ticket_code or reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and not ticket_reason:
         texts = [
-            reasons.reason_for(
-                rule,
-                payload.tool_name,
-                display_subject,
-                source,
-                record.degraded,
-                runner,
-                layer,
-                quoted,
-                git=settings.git_wrapper_command(root),
+            "\n".join(
+                [
+                    reasons.reason_for(
+                        rule,
+                        payload.tool_name,
+                        display_subject,
+                        source,
+                        record.degraded,
+                        runner,
+                        layer,
+                        quoted,
+                        git=settings.git_wrapper_command(root),
+                    ),
+                    *(
+                        reasons.ask_hint(rule.bare_id, display_subject)
+                        if rule.decision == rules.ASK
+                        else ()
+                    ),
+                ]
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]

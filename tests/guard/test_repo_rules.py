@@ -157,6 +157,18 @@ class RepoRulesTest(unittest.TestCase):
                     if rule_id == "prefer-webfetch":
                         self.assertEqual(shown, "代わりの手:" in said, said)
 
+    def test_リダイレクトの上限で止めた拒否には確認の固定文を足さない(self):
+        from unittest import mock
+
+        # ask のルールにもヒットするが、返すのは deny。打ち直しても通らないので、了承を頼ませない。
+        # 閉じない引用で縮退させ、生の文字列の `>` を上限（50）より多く並べる。
+        subject = 'curl -s https://example.com/a "' + ">a" * 51
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ATTENDED": "0"}):
+            body = judge("Bash", subject)
+        self.assertEqual("deny", body["verdict"], body["response"])
+        self.assertIn("prefer-webfetch", hit(body))
+        self.assertNotIn("確認に答えられません", json.dumps(body["response"], ensure_ascii=False))
+
     def test_別のコマンドの_dry_run_では確認の対象から外れない(self):
         script = "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh"
         for subject in (
