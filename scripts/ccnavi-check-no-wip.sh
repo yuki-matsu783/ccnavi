@@ -14,7 +14,7 @@ set -eu
 base=${1:?統合先の ref を渡す}
 head=${2:-HEAD}
 
-found=$(git diff --name-only --diff-filter=AMR "$base...$head" -- ':(icase)wip/' ':(icase,exclude)wip/handoff/' || :)
+found=$(git -c core.quotepath=off diff --name-only --diff-filter=AMRT "$base...$head" -- ':(icase)wip/' ':(icase,exclude)wip/handoff/')
 if [ -n "$found" ]; then
 	printf '次の wip/ の追跡済みファイルが差分に入っています。統合先には入れない決まりです。\n' >&2
 	printf '%s\n' "$found" | sed 's/^/  /' >&2

@@ -37,6 +37,13 @@ class CheckNoWip(unittest.TestCase):
     def test_no_wip_passes(self) -> None:
         self.assertEqual(self.run_check(["src/a.py"]).returncode, 0)
 
+    def test_bad_ref_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            git(d, "init", "-q", "-b", "main")
+            git(d, "commit", "-q", "--allow-empty", "-m", "base")
+            r = subprocess.run(["sh", os.path.abspath(SH), "nosuch"], cwd=d, capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+
     def test_uppercase_wip_fails(self) -> None:
         self.assertEqual(self.run_check(["WIP/proposals/x.md"]).returncode, 1)
 
