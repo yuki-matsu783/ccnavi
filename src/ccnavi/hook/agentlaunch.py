@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass, field
 
 from ..infra import modes, pathcase, pathsafe, settings, tree
+from ..policy import texts
 from ..tickets import approval, approval_checks, flow, ticket_model
 from . import agentkind, childnote
 
@@ -193,7 +194,7 @@ def decide(
     # （.claude/worktrees/agent-<id>）にはチケットの範囲がヒットしない。
     # チケット制御の有無によらない。
     if "isolation" in tool_input:
-        return Result(stop=_isolation())
+        return Result(stop=_isolation(root))
 
     prompt = payload.field_value("prompt")
     book = Book(conf, root, raw) if conf.tickets_enabled else None
@@ -203,7 +204,7 @@ def decide(
     # 1. 無効なパスが 1 つでもあれば止める。
     bad = [m for m in found if m.kind == "path" and m.invalid]
     if bad:
-        return Result(stop=_target_invalid(bad))
+        return Result(stop=_target_invalid(root, bad))
 
     targets = _targets(conf, root, found, book)
     caller = _caller_child(book, here) if payload.agent_id and book is not None else None
@@ -216,13 +217,13 @@ def decide(
     # 2. 違うワークツリーが 2 つ以上。
     if len(groups) >= 2:
         gate = book is not None
-        return Result(stop=_multi_target(list(groups.values()), gate))
+        return Result(stop=_multi_target(root, list(groups.values()), gate))
 
     if len(groups) == 1:
         target = next(iter(groups.values()))
         # 3. 親のワークツリー。
         if target.role == KIND_PARENT and book is not None:
-            return Result(stop=_parent_tree(target, book))
+            return Result(stop=_parent_tree(root, target, book))
         # 4. 子で、担当にできない。
         if target.role == KIND_CHILD and book is not None:
             why = unavailable(conf, root, target)
@@ -236,7 +237,7 @@ def decide(
                 or pathcase.fold(_real(given)) == pathcase.fold(_real(target.worktree.root))
             )
             if not same:
-                return Result(stop=_cwd_conflict(str(given)[:MAX_SHOWN_CHARS], target))
+                return Result(stop=_cwd_conflict(root, str(given)[:MAX_SHOWN_CHARS], target))
         return Result(plan=_plan(conf, root, prompt, target, book))
 
     # 6. 言及が 0 件。親のワークツリーから、編集する種類を起こす（呼び手が子の体なら決まっている）。
@@ -251,7 +252,7 @@ def decide(
                 None,
             )
             if working and kind == agentkind.EDIT:
-                return Result(stop=_no_child(parent, working))
+                return Result(stop=_no_child(root, parent, working))
     return Result()
 
 
@@ -436,71 +437,50 @@ def _working_children(book: Book, parent: ticket_model.Ticket) -> list[ticket_mo
     )
 
 
-# ---- 止める理由の文面
+# ---- 止める理由の文面（文は .ccnavi/messages/deny-agent.yml）
 
 
-def _stop(code: str, rule: str, lines: list[str], kind: str) -> Stop:
-    return Stop(code, rule, "\n".join(lines), kind)
+def _isolation(root: str) -> Stop:
+    return Stop(CODE_ISOLATION, RULE_ISOLATION, texts.say(root, "DENY_AGENT_ISOLATION"), modes.AUX)
 
 
-def _isolation() -> Stop:
-    return _stop(
-        CODE_ISOLATION,
-        RULE_ISOLATION,
-        [
-            "isolation は使いません。チケットの子の作業なら、その子の識別子をプロンプトに書いて"
-            "起動し直してください（ccnavi がその子の範囲とフローの案内を書き足します）。"
-            "直接作業なら、ccnavi-worktree.sh で切ったワークツリーのパス"
-            "（.claude/worktrees/<名前>）をプロンプトに書いて起動し直してください。"
-            "担当以外の子の識別子やワークツリーのパスは、プロンプトに書かないでください。"
-        ],
-        modes.AUX,
-    )
-
-
-def _target_invalid(bad: list[Mention]) -> Stop:
-    lines = ["プロンプトに書かれたワークツリーのパスは利用できません。"]
+def _target_invalid(root: str, bad: list[Mention]) -> Stop:
+    items = []
     for m in bad[:MAX_SHOWN]:
         shown = m.text if len(m.text) <= MAX_SHOWN_CHARS else m.text[:MAX_SHOWN_CHARS] + "…"
-        lines.append(f"  {shown}: {m.invalid}")
-    if len(bad) > MAX_SHOWN:
-        lines.append(f"  ほか {len(bad) - MAX_SHOWN} 件")
-    lines.append("パスの前後は空白で区切って書いてください（日本語や記号に続けて書かない）。")
-    lines.append(
-        "チケットの子の作業なら、パスではなく子の識別子を 1 つ書いて起動し直してください。"
-        "直接作業なら、ccnavi-worktree.sh で切ったワークツリーのパスを書いてください。"
+        items.append(f"{shown}: {m.invalid}")
+    rest = len(bad) - MAX_SHOWN
+    text = texts.say(
+        root,
+        "DENY_AGENT_TARGET_INVALID",
+        {"listed": " / ".join(items), "rest": str(max(rest, 0))},
+        {"what": "many" if rest > 0 else "few"},
     )
-    return _stop(CODE_TARGET_INVALID, RULE_TARGET_INVALID, lines, modes.AUX)
+    return Stop(CODE_TARGET_INVALID, RULE_TARGET_INVALID, text, modes.AUX)
 
 
-def _multi_target(targets: list[Target], gate: bool) -> Stop:
-    names = ", ".join(t.name for t in targets)
-    return _stop(
-        CODE_MULTI_TARGET,
-        RULE_MULTI_TARGET,
-        [
-            f"プロンプトが違うワークツリーを {len(targets)} つ指しています（{names}）。",
-            "1 体に 1 つを割り当てて別々に起動してください。"
-            "担当以外の子の識別子やパスは書かないでください"
-            "（「触れない」と書いた子も言及として数えます）。",
-        ],
-        modes.GATE if gate else modes.AUX,
+def _multi_target(root: str, targets: list[Target], gate: bool) -> Stop:
+    text = texts.say(
+        root,
+        "DENY_AGENT_MULTI_TARGET",
+        {"count": str(len(targets)), "names": ", ".join(t.name for t in targets)},
     )
+    return Stop(CODE_MULTI_TARGET, RULE_MULTI_TARGET, text, modes.GATE if gate else modes.AUX)
 
 
-def _parent_tree(target: Target, book: Book) -> Stop:
+def _parent_tree(root: str, target: Target, book: Book) -> Stop:
     children = _working_children(book, target.ticket) if target.ticket is not None else []
     listed = "、".join(c.ticket for c in children[:5])
-    lines = [
-        f"{target.name} は親のワークツリーです。親のワークツリーでは作業しません。",
-        "子の識別子をプロンプトに 1 つ書いて起動し直してください。"
-        + (f"作業中の子: {listed}" if listed else ""),
-    ]
-    return _stop(CODE_PARENT_TREE, RULE_PARENT_TREE, lines, modes.GATE)
+    text = texts.say(
+        root,
+        "DENY_AGENT_PARENT_TREE",
+        {"name": target.name, "listed": listed},
+        {"next": "working" if listed else "none"},
+    )
+    return Stop(CODE_PARENT_TREE, RULE_PARENT_TREE, text, modes.GATE)
 
 
 def _child_unavailable(root: str, target: Target, why: str) -> Stop:
-    lines = [f"子 {target.name} は担当にできません: {why}。"]
     t = target.ticket
     startable = (
         t is not None
@@ -509,46 +489,41 @@ def _child_unavailable(root: str, target: Target, why: str) -> Stop:
         and not t.completed_at
         and (not t.started_at or target.worktree is None)
     )
-    if startable:
-        start = f"{settings.script_command(root, 'ccnavi-ticket.sh')} start {target.name}"
-        lines.append(f"着手してから起動し直してください: {start}")
-        return _stop(CODE_CHILD_UNAVAILABLE, RULE_CHILD_UNAVAILABLE, lines, modes.GATE)
-    lines.append(
-        "子の状態を動かすのはユーザの判断です。ユーザに状態を伝えて、指示を待ってください。"
+    text = texts.say(
+        root,
+        "DENY_AGENT_CHILD_UNAVAILABLE",
+        {"name": target.name, "reason": why},
+        {"next": "start" if startable else "wait"},
     )
-    return _stop(CODE_CHILD_UNAVAILABLE, RULE_CHILD_UNAVAILABLE, lines, modes.GATE)
+    return Stop(CODE_CHILD_UNAVAILABLE, RULE_CHILD_UNAVAILABLE, text, modes.GATE)
 
 
-def _cwd_conflict(given: str, target: Target) -> Stop:
-    return _stop(
-        CODE_CWD_CONFLICT,
-        RULE_CWD_CONFLICT,
-        [
-            f"tool_input の cwd（{given}）が、プロンプトで決まった担当先"
-            f"（{target.name}: {target.worktree.root if target.worktree else ''}）と違います。",
-            "cwd は付けずに、担当の子の識別子かワークツリーのパスをプロンプトに 1 つ書いて"
-            "起動し直してください。",
-        ],
-        modes.AUX,
+def _cwd_conflict(root: str, given: str, target: Target) -> Stop:
+    text = texts.say(
+        root,
+        "DENY_AGENT_CWD_CONFLICT",
+        {
+            "given": given,
+            "name": target.name,
+            "path": target.worktree.root if target.worktree else "",
+        },
     )
+    return Stop(CODE_CWD_CONFLICT, RULE_CWD_CONFLICT, text, modes.AUX)
 
 
-def _no_child(parent: ticket_model.Ticket, working: list[ticket_model.Ticket]) -> Stop:
-    listed = "、".join(c.ticket for c in working[:5])
-    more = f"（ほか {len(working) - 5} 件）" if len(working) > 5 else ""
-    return _stop(
-        CODE_NO_CHILD,
-        RULE_NO_CHILD,
-        [
-            f"親 {parent.ticket} のワークツリーから、担当の子を指さずに編集するサブエージェントを"
-            "起動することはできません。",
-            f"作業中の子: {listed}{more}",
-            "担当の子の識別子を 1 つ、プロンプトに書いて起動し直してください"
-            "（ccnavi がその子のワークツリーで案内します）。調べるだけなら、読み取り専用の種類"
-            "（Explore など）で起動してください。",
-        ],
-        modes.GATE,
+def _no_child(root: str, parent: ticket_model.Ticket, working: list[ticket_model.Ticket]) -> Stop:
+    rest = len(working) - 5
+    text = texts.say(
+        root,
+        "DENY_AGENT_NO_CHILD",
+        {
+            "parent": parent.ticket,
+            "listed": "、".join(c.ticket for c in working[:5]),
+            "rest": str(max(rest, 0)),
+        },
+        {"what": "many" if rest > 0 else "few"},
     )
+    return Stop(CODE_NO_CHILD, RULE_NO_CHILD, text, modes.GATE)
 
 
 # ---- 更新の計画と、プロンプトに書き足す案内

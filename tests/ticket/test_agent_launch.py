@@ -288,7 +288,7 @@ class IsolationTest(LaunchHarness):
                     )
                     self.assert_stopped(out, "DENY_AGENT_ISOLATION")
                     text = out["permissionDecisionReason"]
-                    self.assertIn("isolation は使いません", text)
+                    self.assertIn("isolation が指定された", text)
                     self.assertIn("ccnavi-worktree.sh", text)
 
     def test_isolation_is_refused_without_ticket_control_and_in_dry_run(self):
