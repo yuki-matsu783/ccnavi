@@ -991,6 +991,18 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("feature/7-x", result.stdout)
         self.assertFalse(os.path.exists(self.wt("feature-7-x")))
 
+    def test_the_same_identifier_is_refused_before_the_existing_directory_check(self):
+        """大文字小文字を区別しない機械では、綴り違いのパスが既にあるように見える。
+        ここでは同じ綴りのただのディレクトリで再現し、同じ識別子だという案内で断ることを確かめる。"""
+        git(self.ws, "branch", "Topic")
+        stray = write(os.path.join(self.wt("topic"), "stray.txt"), "x")
+        result = self.run_sh("topic")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("Topic", result.stdout)
+        self.assertIn("同じ識別子", result.stdout)
+        self.assertNotIn("既にあります", result.stderr)
+        self.assertTrue(os.path.isfile(stray))
+
     def test_names_the_executable_refuses_are_not_cut(self):
         """全角の字・NFD・65 文字以上の名前は、実行ファイルの検査で断る（sh の検査は通る）。"""
         nfd = unicodedata.normalize("NFD", "feature-が")
