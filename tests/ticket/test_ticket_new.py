@@ -128,17 +128,6 @@ class TicketNewTest(TicketNewTestBase):
         self.assertIn("目印", nexts[0])
         self.assertIn("承認で止まる", nexts[0])
 
-    def test_the_plan_scaffold_tells_to_write_the_child_proposals_before_propose(self):
-        result = self.new("--mr", "5")
-        nexts = [x for x in result.stdout.splitlines() if x.startswith("次: ")]
-        self.assertEqual(len(nexts), 1, result.stdout)
-        self.assertIn(f"{IDENT}-01-01", nexts[0])
-        self.assertIn("同じ承認", nexts[0])
-        notes = [x for x in result.stdout.splitlines() if "親の識別子" in x]
-        self.assertEqual(len(notes), 1, result.stdout)
-        self.assertTrue(notes[0].startswith("案内: "), notes[0])
-        self.assertIn(f"propose は親の識別子 {IDENT} で打つ", notes[0])
-
     def test_the_mr_comes_from_the_flag_only(self):
         self.assertEqual(self.new("--mr", "5").returncode, 0)
         self.assertEqual(front_of(self.written())["mr"], 5)
@@ -314,6 +303,11 @@ class TicketNewScopeTest(TicketNewTestBase):
         self.assertIn("--agree --preview --verify", nexts[0])
         self.assertIn("承認が済むまで実装はしない", nexts[0])
         self.assertIn("直接実装に切り替えず", result.stdout)
+        # 子の提案も同じ承認で通すため先に書く。propose は親の識別子で打つ
+        self.assertIn("子の提案", nexts[0])
+        self.assertIn("-01-01", nexts[0])
+        self.assertIn("同じ承認で通す", nexts[0])
+        self.assertIn("親の識別子で打つ。子の識別子では打たない", nexts[0])
 
     def test_scope_is_added_after_the_collected_scope_without_duplicates(self):
         result = self.new("--scope", "docs/a.md,SRC/*", "--scope", "docs/a.md", plan="implement")

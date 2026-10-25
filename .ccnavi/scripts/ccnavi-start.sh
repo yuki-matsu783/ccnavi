@@ -1198,11 +1198,10 @@ run_sync() {
 		sync_ok=1
 	else
 		# 「親チケットも提案もありません」は ccnavi-sync.sh の文言。変えるときはここと test_start_sh.py も直す
-		# ワークツリーを切った直後は親チケットも提案も無いのが正常なので、見出しは失敗と区別できる言い方にする
 		case "$rs_out" in
 		*親チケットも提案もありません*)
-			printf 'ccnavi-sync.sh %s: ワークツリーを切った直後なので、取り込むものはまだありません（失敗ではありません）:\n' "$rs_id"
-			printf '%s\n' "$rs_out" | sed 's/^/  /'
+			# ワークツリーを切った直後は、親チケットも提案もまだ無いのが正常。失敗に見える見出しにしない
+			printf 'ccnavi-sync.sh %s: ワークツリーを切った直後なので、取り込むものはありません（親チケットも提案も、まだ無い）\n' "$rs_id"
 			sync_no_ticket=1
 			sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
 			;;

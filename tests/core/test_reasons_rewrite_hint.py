@@ -10,6 +10,7 @@ from ccnavi.hook import ccnavimd, reasons
 from ccnavi.infra import shellread_scan, shellread_words
 
 ANSWER_LINE = "確認に答えられない"
+ASK_LINE = "確認に答えられません"
 
 
 class RewriteHintTest(unittest.TestCase):
@@ -38,6 +39,33 @@ class RewriteHintTest(unittest.TestCase):
 
     def test_例の無い理由は何も足さない(self):
         self.assertEqual("", self.hint("no-such-reason", "0"))
+
+
+class AskHintTest(unittest.TestCase):
+    """確認（ask）の理由に足す説明です。非対話のときだけ足します。"""
+
+    SHOWN = "sh x/ccnavi-worktree.sh a --base main"
+
+    def hint(self, bare_id, attended):
+        env = {ccnavimd.ATTENDED_ENV: attended} if attended else {}
+        with mock.patch.dict(os.environ, env, clear=False):
+            if not attended:
+                os.environ.pop(ccnavimd.ATTENDED_ENV, None)
+            return "\n".join(reasons.ask_hint(bare_id, self.SHOWN))
+
+    def test_非対話のときだけ確認が要ることと次の行動を言う(self):
+        said = self.hint("direct-worktree-confirm", "0")
+        self.assertIn(ASK_LINE, said)
+        self.assertIn(self.SHOWN, said)
+        self.assertIn("了承", said)
+        for attended in ("1", ""):
+            with self.subTest(attended=attended):
+                self.assertEqual("", self.hint("direct-worktree-confirm", attended))
+
+    def test_prefer_webfetch_は代わりの手も言う(self):
+        self.assertIn("WebFetch", self.hint("prefer-webfetch", "0"))
+        self.assertNotIn("WebFetch", self.hint("dependencies", "0"))
+        self.assertEqual("", self.hint("prefer-webfetch", ""))
 
 
 if __name__ == "__main__":

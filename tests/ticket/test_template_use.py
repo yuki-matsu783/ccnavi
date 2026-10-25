@@ -213,13 +213,6 @@ class ProposalTest(Use):
             front_of(self.written())["plan"], ["design", {"type": "implement", "after": [1]}]
         )
 
-    def test_a_template_does_not_tell_to_hand_write_the_child_proposals(self):
-        self.put("small", SMALL)
-        result = self.new(template="small")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("子の提案（", result.stdout)
-        self.assertNotIn("propose は親の識別子", result.stdout)
-
     def test_with_feedback_on_a_template_without_one_writes_nothing_extra(self):
         self.put("small", SMALL)
         result = self.new("--with-feedback", template="small")

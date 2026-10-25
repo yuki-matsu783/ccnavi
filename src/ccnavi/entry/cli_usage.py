@@ -377,8 +377,6 @@ _TICKET = """\
          phases: を補完します。本文の見出しは、目的・範囲・対象外・完了の確かめ方・計画の理由
          の順で、rationale と各見出しの下に空欄の目印「（ここに〜を書く）」が入ります。目印が
          残った新規の提案は、承認と --lint が止めるので書き換えてください。
-         子の提案（<id>-<フェーズ 2 桁>-<連番 2 桁>）は手で書き、親と同じ承認で通します。
-         propose は親の識別子で打ちます（子の識別子では打ちません）。
          quick-work のような scope: inherit のタイプは、それ自体では
          何も集めないため、--scope を指定してください。--issue と --mr は必須で、
          ccnavi-start.sh が「必須」の行で出す値（issue は番号か owner/repo#番号。MR は親のブランチの
@@ -388,6 +386,8 @@ _TICKET = """\
          allow の項が計画のどのフェーズの範囲とも重ならないときは、停止せず
          「承認しても書けない」と警告します
          （scope: inherit のタイプが計画にあれば警告しません）。
+         子の提案は雛形にならないので手で書きます（<id>-<フェーズ番号 2 桁>-<連番 2 桁>）。
+         ccnavi-ticket.sh propose は親の識別子で打ち、子も同じ承認で通します。
          ccnavi を直接実行します（sh のラッパーは使いません））
     ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
                            [--with-feedback] --issue <N|owner/repo#N> --mr <N>
