@@ -448,11 +448,11 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
 
     判定は変えない。案内を出すのは次をすべて満たすときだけ。
 
-    - Write で新しく作った（`tool_response.type` が `create`）。既にある md の Edit・上書きでは
-      出さない。意図して frontmatter を持たない md（README.md・CLAUDE.md・CHANGELOG.md、
-      取り込んだ資料）を直すたびに促すと、付けに行かせることになる。
-      作るのは 1 本につき 1 度なので、セッションを
-      またいで覚える必要も無い
+    - Write で新しく作った（`tool_response.type` が `create`）。
+      既にある md の Edit・上書きでは出さない。意図して frontmatter を持たない md
+      （README.md・CLAUDE.md・CHANGELOG.md、取り込んだ資料）を直すたびに促すと、
+      付けに行かせることになる。作るのは 1 本につき 1 度なので、
+      セッションをまたいで覚える必要も無い
     - 索引の対象に入る md。書いた先のツリー（ワークスペース・プロジェクト・ワークツリー）の
       git で決める。ワークツリーはワークスペースの `.gitignore` では無視されるが、統合した後は
       統合先の索引に入るので、そのワークツリー自身の git に聞く。ccnavi ディレクトリの下と、

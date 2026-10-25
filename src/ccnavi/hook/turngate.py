@@ -108,8 +108,8 @@ class Gate:
     """宣言 1 件。「`first` を打ったら、ユーザの発言が 1 回はさまるまで `second` を打てない」。
 
     文面は文面ファイルの `message`（識別子）が持つ。
-    4 つの段（何が起きたか・なぜ・次の一手・迂回しない）の
-    うち、段 1 は `what` の場合分け（`same_command`・`no_user_turn`）で、
+    4 つの段（何が起きたか・なぜ・次の一手・迂回しない）のうち、
+    段 1 は `what` の場合分け（`same_command`・`no_user_turn`）で、
     `first_name` と `second_name`、宣言の id とキー（`where`）、`key` を埋める。
     別の組を足すときは、文面ファイルにも 1 件足す。
     """

@@ -91,8 +91,7 @@ UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # チケット制御を使うか（settings.py の TICKET_CONTROL_ENV）。プロジェクトが導入のときに決める。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # hook に登録される 1 行。docs/41_guide/settings.md「settings.json の例」と対になる。
-# 表記が変わると、
-# ccnavi 自身が守る対象（CCNAVI_ENTRY_PATH）と実際に起動するものが食い違う。
+# 表記が変わると、ccnavi 自身が守る対象（CCNAVI_ENTRY_PATH）と実際に起動するものが食い違う。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_ENTRY_PATH}"'
 # セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する。
 # デフォルトブランチを ff で進め、ワークツリーの起点を新しくする。
