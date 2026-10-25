@@ -1232,7 +1232,7 @@ ig_integrate() {
 			created "$(date +%s)" ||
 			reject integrate-marker "取り込みの記録（${ig_mark}）を書けません。ユーザに伝えてください。"
 		printf 'ok  git integrate  %s に取り込む差分は無かった（作業ブランチの中身は %s に入っている）\n' "$ig_n" "$d4_base"
-		printf '次: %s integrate-done %s で片付けだけを行う\n' "$SELF_Q" "$ig_n"
+		printf '次: ユーザに伝えて返事を待ってターンを終える。片付けはユーザの発言のあとで %s integrate-done %s を打つ\n' "$SELF_Q" "$ig_n"
 		log_info 取り込む差分が無かった -- "name=$ig_n"
 		exit 0
 	fi
@@ -1282,7 +1282,7 @@ EOF
 		printf '案内: origin/%s が手元より進んでいる。先に合わせると、古い上に載せずに済む（cd %s && git pull --ff-only origin %s）\n' \
 			"$d4_base" "$(ccnavi_sh_quote "$ig_top")" "$d4_base"
 	fi
-	printf '次: 差分（%s diff %s %s）をユーザに見せ、了承を得たら %s integrate-done %s -m '"'"'<メッセージ>'"'"'。やめるなら %s integrate --abort %s\n' \
+	printf '次: 差分（%s diff %s %s）をユーザに見せ、返事を待ってターンを終える。確定はユーザの発言のあとで、了承を得ていれば %s integrate-done %s -m '"'"'<メッセージ>'"'"'。やめるなら %s integrate --abort %s\n' \
 		"$SELF_Q" "$d4_head" "$d4_c" "$SELF_Q" "$ig_n" "$SELF_Q" "$ig_n"
 	log_info 取り込み結果を用意した -- "name=$ig_n" "files=$d4_count"
 	exit 0

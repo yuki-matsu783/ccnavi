@@ -44,6 +44,7 @@ from . import (
     projskills,
     reasons,
     rootwrite,
+    turngate,
     wrapguard,
 )
 
@@ -163,7 +164,7 @@ def decide_before(
     6. 組み込みの止めを、順に適用する。ヒットすれば `refuse` で返す。順に、環境変数の指定
        （`wrapguard.check_env`）・自己防衛のパス（`wrapguard.check_core_paths`）・記録の削除
        （`phase_forms.prune_form`）・ユーザの判断の経路（`phase_forms`）・子の push
-       （`wrapguard.check_child_push`）・サブエージェントの禁止（`phase_forms.forbidden`）・
+       （`wrapguard.check_child_push`）・ユーザの発言をまたぐ関門（`turngate`）・サブエージェントの禁止（`phase_forms.forbidden`）・
        親のワークツリーへの書き込み（`wrapguard.check_parent_tree_git`・`parentwrite.check`）・
        レビュー待ちの止め（`phase.held_phase`）・サブエージェントの起動（`agentlaunch.decide`）・
        プロジェクトの食い違い（`project_mismatch`）・着手中の子のロック（`flow_lock`）。
@@ -438,6 +439,38 @@ def decide_before(
                         wrapguard.CHILD_PUSH_RULE_ID,
                         display_subject,
                         wrapguard.child_push_message(name, parent),
+                    )
+                ],
+                conf=conf,
+                root=root,
+                kind=GATE,
+            )
+
+    # ユーザの発言をまたぐ関門。「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」
+    # （`turngate.BUILTIN`）。ルールより先に見る。ルールが allow と書いていても、ユーザの返事を
+    # 待つ手順は外さない。B は止め、通した A は記録する（記録は拒否・失敗で消す。`events.decide`、
+    # `decide_after_failure`）。サブエージェントの呼び出しも、同じセッションの記録で見る。
+    if payload.tool_name in phase_forms.SHELL_TOOLS:
+        gate_texts = [subject, *(layer for runner, layer, _ in inner if runner != shellread.MOVED)]
+        stop = turngate.check(
+            turngate.BUILTIN, gate_texts, conf.state, payload.session_id
+        ) or turngate.note(
+            turngate.BUILTIN, gate_texts, conf.state, payload.session_id, payload.tool_use_id
+        )
+        if stop is not None:
+            record.code, record.rules = turngate.CODE, [turngate.rule_id(stop.gate)]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        turngate.CODE,
+                        turngate.rule_id(stop.gate),
+                        display_subject,
+                        turngate.message(stop, root),
                     )
                 ],
                 conf=conf,
