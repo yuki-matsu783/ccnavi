@@ -226,8 +226,9 @@ is_importable() {
 		;;
 	esac
 	case "$im_b" in
+	*/.yml | */.md) return 1 ;;
 	.ccnavi/config/common/templates/*.yml | .ccnavi/config/project/templates/*.yml)
-		case "${im_b##*/templates/}" in */*) return 1 ;; esac
+		case "${im_b#*/templates/}" in */*) return 1 ;; esac
 		return 0
 		;;
 	.ccnavi/config/common/rules.yml | .ccnavi/config/common/phases.yml | .ccnavi/config/common/risks.yml) return 0 ;;

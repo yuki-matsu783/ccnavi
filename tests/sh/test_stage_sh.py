@@ -251,6 +251,8 @@ class StageShTest(unittest.TestCase):
             ".ccnavi/config/common/templates/a.yml",
             ".ccnavi/config/project/templates/a.yml",
             ".ccnavi/config/project/templates/sub/a.yml",
+            ".ccnavi/config/common/templates/x/templates/a.yml",
+            ".ccnavi/docs/.md",
             "projects/p/.ccnavi/config/project/templates/a.yml",
             ".ccnavi/config/common/rules.yml",
             ".ccnavi/config/project/risks.yml",

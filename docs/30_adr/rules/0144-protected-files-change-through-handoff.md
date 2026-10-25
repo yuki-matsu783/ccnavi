@@ -14,7 +14,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 
 エージェントが書けない保護対象（`rules.yml`・hook・ラッパースクリプト・テンプレートなど）を直す手順が、2 本ある。
 
-- 一般の保護対象: `ccnavi-stage.sh <パス>` が元のファイルを `wip/handoff/<ルートからの相対パス>` にコピーする。エージェントはそれを編集する。ユーザは `ccnavi-stage.sh --commands` が出す `mv` をターミナルで打って差し替える（のちに、取り込める種類は `mv` でなく `ccnavi user handoff` の手順を出す形に変わった。`mv` は `defense` だけ）
+- 一般の保護対象: `ccnavi-stage.sh <パス>` が元のファイルを `wip/handoff/<ルートからの相対パス>` にコピーする。エージェントはそれを編集する。ユーザは `ccnavi-stage.sh --commands` が出す `mv` をターミナルで打って差し替える
 - テンプレート（`.ccnavi/config/{common,project}/templates/`）だけは別の手順: 下書きを `wip/proposals/templates/` に作り、ユーザ専用の `--templates --import` / `--save-draft` / `--delete-draft` / `--rename-template` / `--move-template` / `--delete-template` で取り込み・編集する。差分の表示・ハッシュの照合・検査・ターミナル要求・ボードの画面を、テンプレートのためだけに実装している（約 1,900 行）
 
 同じ「保護対象への書き込みをユーザが決める」処理が 2 つあり、ボードの画面もテンプレートにしか無い。
