@@ -1,9 +1,9 @@
 ---
 type: guide
 title: スキルの振り返り
-description: ccnaviが振り返りを求めたときに拾うもの・拾わないもの・スキルのどこに足すか
+description: ccnaviが振り返りを求めたときに拾うもの・拾わないもの・スキルのどこに足すか・候補の渡し先
 tags: [skills, feedback]
-keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, references, 候補, 提案, フィードバック, 訂正, wiki, パターン, impact, 知識, 蓄積]
+keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, references, 候補, 提案, フィードバック, 訂正, wiki]
 ---
 
 # スキルの振り返り
@@ -34,31 +34,20 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
 
 ## 拾わないもの
 
-- コマンドが無い、認証が無い、入れ忘れのような、環境が原因の失敗。直し方が分かったなら、その手順だけは拾う
+- コマンドが無い、認証が無い、入れ忘れのような、環境が原因の失敗（直し方が分かったなら、その手順だけは拾う）
 - 「X は使えない」のような、道具や機能を否定する主張
-- 途中で解消した一時的なエラーや、1回きりの作業の経緯
-- 解決しないまま終わった試行錯誤
+- 途中で解消した一時的なエラーや、1回きりの作業の経緯、解決しないまま終わった試行錯誤
 - CLAUDE.md・`.ccnavi/docs/`・ADRなど、プロジェクトの文書にすでに書いてあること
-
-## wiki 層
-
-候補を書く前に、`ccnavi --learnings` の一覧と `docs/wiki/impact/`（採否の記録。却下された提案も残る）を読む。
-置き場、ファイルの中身、読む場面、書き換える場面は `.ccnavi/docs/skill-wiki.md`。
 
 ## どこに足すか
 
-上にあるものほど優先する。
+候補を書く前に、`ccnavi --learnings` の一覧と `docs/wiki/impact/`（採否の記録）を読む。wiki は `.ccnavi/docs/skill-wiki.md`。
+足す先は、上の項目ほど優先する。
 
 1. このセッションで読んだスキルを直す
-2. 工程スキル（`process-design` `process-research` `process-implement` `process-test` `process-debug` `process-review` `process-release`）にヒットする作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `.ccnavi/docs/skill-processes.md`。SKILL.md は直さない
-3. 工程スキルの対象外の既存スキルに、節・落とし穴・使う場面を足して直す。そのスキルに `references/<話題>.md` を足すか広げ、SKILL.md に1行の案内を足してもよい
+2. 工程スキル（`process-design` `process-research` `process-implement` `process-test` `process-debug` `process-review` `process-release`）にヒットする作業なら、その `references/` に足すか広げる。他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`。SKILL.md は直さない（`.ccnavi/docs/skill-processes.md`）
+3. 工程スキルの対象外の既存スキルに、節・落とし穴・使う場面を足して直す
 4. どれにもヒットしない作業が繰り返し出たときだけ、新しいスキルの入口を提案する。今日の作業名・チケット番号・エラー文を名前にしない。ユーザの承認を取る
-
-- 直す前に、対象の SKILL.md と、手を入れる references/ を読み直す。会話中の引用で済ませない
-- 1つの事実は1か所に書く。同じ規則がすでにあるなら、新しく足さずにその文を強めるか言い直す
-- 手順の流れに沿って書き、落とし穴は該当する手順に「規則 + なぜ（1 句）」で添える。日付・番号・ユーザの言葉の引用を中身にしない
-- yomiyasuスキルを `.ccnavi/docs/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `skills/`・`rules.yml` の `message` に適用するのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
-- 誤りを見つけたら、間違った文そのものを直す
 
 ## 対象のスキル
 
@@ -74,7 +63,7 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
 | 今の作業 | すること |
 |---|---|
 | 計画のある親チケットの下で、フィードバック計画をまだ出していない | 親のワークツリーの `wip/handoff/skill-candidates.md` に候補を足し、フィードバック計画に載せる（下の「親チケットの下で候補を足す」） |
-| それ以外（計画の無いチケット、フィードバック計画が承認済み、親の範囲に置き場が無い、チケットの外） | 提案チケットを書く（下） |
+| それ以外（計画の無いチケット、フィードバック計画が承認済み、親の範囲に置き場が無い、チケットの外） | 提案チケットを書く（`.ccnavi/docs/skill-review-propose.md`） |
 | サブエージェント | 自分では書かない。最後の報告に「スキル候補」の節を足して、メインセッションに返す |
 
 ### 親チケットの下で候補を足す
@@ -90,49 +79,4 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
    定義は `ccnavi --plan-order <親> --fill-phases` で親の `phases:` にコピーする
 3. フィードバック計画が承認されたら、`skill-improve` のフェーズに子チケットを提案して承認を受け、その子でスキルを直してMRで見てもらう
 
-## 提案チケット
-
-提案は、その提案の識別子と同名のワークツリーに書く。提案ごとに専用のツリーなので、作業中のMRに提案のファイルは混ざらない。`skill-proposals` のような別名のツリーにまとめて書かない。承認済みチケットは提案を書いたツリーに置かれるので、別名のツリーで承認すると親が取り込み済みにならず、`ready` で止まる。承認の画面と `start`・`finish` が先に止めるが、止まってからでは承認のやり直しになる（`.ccnavi/docs/worktree.md`「直接作業からチケット作業に移るとき」）。
-
-識別子は `chore-<issueの番号>-skill-<スキル名>-<要点>` の形にする。末尾を `-<2桁の数>` にしない（子の識別子`<親>-<2桁>-<2桁>`と紛れる）。
-
-親の提案には、その仕事を載せるMRの番号（`mr:`）が要る。ワークツリーは`ccnavi-worktree.sh`（直接作業用）では切らず、
-issueを立ててから`ccnavi-start.sh`で切る。ブランチ・ワークツリー・Draft MRを作り、`mr:`に書く番号を出す
-（`.ccnavi/docs/worktree-start.md`）。
-
-| 対象 | 切り方 |
-|---|---|
-| ワークスペースのスキル | ワークスペースルートで `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue <番号> --prefix chore --slug skill-<スキル名>-<要点>` |
-| プロジェクトのスキル | `cd projects/<プロジェクト>` して、同じ `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue <番号> --prefix chore --slug skill-<スキル名>-<要点>`（そのプロジェクトのissue） |
-
-そのツリーの `wip/proposals/todo/<識別子>.md` に、出力の「必須」の行の `mr: <番号>` を入れて書き、`sh <ワークスペースルートの絶対パス>/.ccnavi/scripts/ccnavi-ticket.sh propose <識別子>` で親のブランチへ送り、パスをユーザに伝えて承認を頼む。複数の提案は、1本ずつ同名のワークツリーに書く。
-
-```yaml
----
-version: 1
-ticket: chore-72-skill-commit-push-retry
-issue: 72
-mr: 75           # ccnavi-start.sh の出力の「必須」の行の番号
-human_review:
-  required: true
-  reason: エージェントの手順を変えるため
-phases:
-  quick-work: {kind: work, title: 小さい作業, review: mr, scope: inherit}
-plan:
-  - quick-work
-feedback: []
-title: commit スキルに push の打ち直しを足す
-rationale: |
-  直す（新しく作るなら「作る」）。拾った信号と、次のセッションで何が変わるか。
-allow:
-  - match: Write|Edit
-    glob: ".claude/skills/commit/*"
----
-対象の SKILL.md（と references/）の差分か、新しく作るなら全文の下書き。動機になった wiki のパターンと、採否の記録（`impact/<提案>.md`、`承認待ち`）も同じチケットに入れる。
-`allow` には `docs/wiki/*` も足す。
-```
-
-この提案は親として書いている。親は `plan:` が無いと `start` が止まるので、上のように `plan:` と、そのステップが使うフェーズ定義のコピー `phases:` を持つ。`phases:` は手で書かず、`ccnavi --plan-order <親> --fill-phases` でコピーしてよい。`quick-work` の範囲は `scope: inherit` で、親の `allow`（ここでは `.claude/skills/commit/*` と `docs/wiki/*`）がそのまま作業の上限になる。`allow` を空のまま出すと、範囲が集まらず子を起こせない。
-
-プロジェクトのスキルについての提案は、そのプロジェクトの提案として書き、`allow` に `skills/<スキル>/*` を書く。
-パスはプロジェクトのルートからの相対で書く。
+提案チケットの書き方と、候補を書くときの注意は `.ccnavi/docs/skill-review-propose.md`（`ccnavi --docs --keyword 提案チケット`）。

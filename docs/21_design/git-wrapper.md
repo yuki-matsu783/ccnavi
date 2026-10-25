@@ -21,7 +21,7 @@ keywords: [ccnavi-git.sh, git, ラッパースクリプト, push, fetch, pull, r
   別の名前へ送る refspec（`HEAD:main` など）は通さない。`main` `master` `develop` `release` `release/*` と、そのリポジトリの統合先
   （手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`。プロジェクトは、そのプロジェクト自身の `origin/HEAD` で決まる。
   `develop-v1.0.0` のような名前でもよい）へ直接は送れない。統合先が決まらなければ固定のリストだけで判定する。マージはユーザの側に残す。送り先が origin で、親のワークツリーのブランチなら、前の「push の関門」も通す
-- `fetch`・`pull` は**リモート名とブランチ名だけ**を通す。`:` か `+` を含む引数（refspec と URL）は通さない。
+- `fetch`・`pull` は**リモート名とブランチ名だけ**を通す。`:` か `+` を含む引数（refspec と URL）は通さない。統合先のユーザのチェックアウト（`git worktree list` の先頭のツリーで、現在のブランチが統合先のもの）の `pull` は、`merge` と同じ判定（`merge_target_is_here`）を使う。引数なしと、現在のブランチのリモート + 現在のブランチと同名（完全一致）の形だけを通す。それ以外は `merge-on-target` で止める。ワークツリーの中、統合先でないブランチ、統合先が決まらないとき（origin/HEAD が無いなど）は止めない。`fetch` のあとの `merge FETCH_HEAD` は `merge` の拒否で止まる。
   `branch` の `-M`（強制の改名）と `-C`（強制の複製）も通さない。親のブランチを別のコミットへ移すと、親のブランチ上の承認済みチケットが差し替わるため
 - 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）にヒットするパスには、
   `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、

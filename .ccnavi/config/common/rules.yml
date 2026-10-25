@@ -150,7 +150,7 @@ allow:
       最後のステップにほかの全部が after で先行する形にする（後ろに足すだけだと承認で落ちる）ので、
       最後のステップの after に skill-improve の番号も足すか、skill-improve を最後に置いてほかの全部を
       待たせる。定義は ccnavi --plan-order <親> --fill-phases で親の phases: にコピーする。
-      手順は .ccnavi/docs/skill-review.md。
+      手順は .ccnavi/docs/skill-review-propose.md。
 
   # git の入口。サブコマンドの選別はラッパースクリプトの中で行うので、ここでは区別しない。
   - id: ccnavi-git

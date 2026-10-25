@@ -19,7 +19,7 @@
   - 編集する前に {{worktree_sh}} <名前> でワークツリー（{{worktrees}}/<名前>）を切り、その中で編集する。直接作業の名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md）。
   - ワークツリーを切るスクリプトが「確認が要る」と言ったら、報告をユーザに伝え、了承を得るまで `--base`・`--accept`・`--side-by-side` を付けない。
   - 取り込み先のブランチを切り替えない。integrate-doneの前に、変わるファイルをユーザに伝え、未保存の編集は保存してもらう。
-  - 統合先のユーザのチェックアウトでは `merge <ブランチ>` を打たない（ワークツリーで行う）。
+  - 統合先のユーザのチェックアウトでは `merge <ブランチ>` と、別のブランチを取ってくる `pull <リモート> <ブランチ>` を打たない（ワークツリーで行う）。統合先の更新（上流が統合先自身のときの引数なしの `pull`、`pull [--ff-only] <リモート> <統合先>`）は打てる。統合先が決まらないとき（origin/HEAD が無いなど）は止めない。
 <!-- ccnavi:endif -->
 <!-- ccnavi:if git_wrapper -->
   - git は直接呼ばず {{git_sh}} を通す。止められたら迂回せず、出力の案内に従う。
@@ -53,7 +53,7 @@
 | 提案を書く、承認・レビュー済みをユーザに頼む、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `decisions.md` |
 | 親の提案を始める、完了した親の計画とフローを使い回す、閉じるときにテンプレートの案内が出た | `templates.md` |
 | 用語（ワークスペースルート・統合先ブランチなど）を引く、`.ccnavi/CCNAVI.md` の条件・差し込みを書く、md に frontmatter を付ける・直す、索引で引く | `terms.md`、`ccnavi-md.md`、`frontmatter.md` |
-| フィードバックが届いた、`.claude/skills/` を直す、スキルを新しく作る、スキルの振り返りで知識を溜める・読む、工程スキル（process-*）の reference を引く・足す | `skill-review.md`、`skill-wiki.md`、`skill-processes.md` |
+| フィードバックが届いた、`.claude/skills/` を直す、スキルを新しく作る、スキルの振り返りで知識を溜める・読む、工程スキル（process-*）の reference を引く・足す | `skill-review.md`、`skill-review-propose.md`、`skill-wiki.md`、`skill-processes.md` |
 | ルール・フェーズ・リスク・計画テンプレート・工程スキルが育つ流れを確かめる | `grow.md` |
 
 <!-- ccnavi:if tickets -->

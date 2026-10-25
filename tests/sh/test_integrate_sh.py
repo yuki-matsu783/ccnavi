@@ -1513,5 +1513,135 @@ class MergeOnTargetTest(Fixture):
         self.assertNotIn("$SELF merge --ff-only では", text)
 
 
+class PullOnTargetTest(Fixture):
+    """統合先のユーザのチェックアウトでは、pull でも別のブランチを merge できない。"""
+
+    def setUp(self):
+        super().setUp()
+        self.origin = os.path.join(self._tmp.name, "origin.git")
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", self.origin], check=True)
+        git(self.ws, "remote", "add", "origin", self.origin)
+        git(self.ws, "push", "-q", "origin", "main")
+        git(self.ws, "fetch", "-q", "origin")
+        git(self.ws, "branch", "--set-upstream-to=origin/main", "main")
+        # origin に feat（main と分岐）と、先へ進んだ main を置く。
+        side = os.path.join(self._tmp.name, "side-origin")
+        git(self.ws, "worktree", "add", "-q", side, "-b", "feat", "main")
+        write(os.path.join(side, "feat.txt"), "feat\n")
+        git(side, "add", ".")
+        git(side, "commit", "-q", "-m", "feat")
+        git(side, "push", "-q", "origin", "feat")
+        git(side, "checkout", "-q", "--detach", "main")
+        write(os.path.join(side, "next.txt"), "next\n")
+        git(side, "add", ".")
+        git(side, "commit", "-q", "-m", "next")
+        git(side, "push", "-q", "origin", "HEAD:main")
+        git(self.ws, "worktree", "remove", "--force", side)
+        git(self.ws, "branch", "-D", "feat")
+
+    def assertPullRefused(self, *args):
+        before = git(self.ws, "rev-parse", "HEAD").strip()
+        r = self.run_git_sh("pull", *args)
+        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
+        self.assertIn("統合先 main のユーザのチェックアウトでは", r.stderr)
+        self.assertIn("別のブランチ・リモートを取り込めません", r.stderr)
+        self.assertIn("次: ", r.stderr)
+        self.assertIn("ccnavi-worktree.sh", r.stderr)
+        self.assertIn("integrate <名前>", r.stderr)
+        self.assertEqual(before, git(self.ws, "rev-parse", "HEAD").strip())
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "feat.txt")))
+        return r
+
+    def test_pulling_another_branch_on_the_target_is_refused(self):
+        for args in (
+            ("origin", "feat"),
+            ("--no-ff", "origin", "feat"),
+            ("--ff-only", "origin", "feat"),
+            ("--no-commit", "origin", "feat"),
+            ("origin", "main", "feat"),
+            ("origin", "HEAD"),
+            ("origin", "refs/heads/main"),
+            ("origin", "--", "feat"),
+            ("origin", "Main"),
+            ("upstream", "main"),
+            ("../other.git", "main"),
+            ("--ff-only", "origin", "feat"),
+            ("--ff-only", "origin", "main", "next"),
+        ):
+            with self.subTest(args=args):
+                self.assertPullRefused(*args)
+
+    def test_updating_the_target_itself_passes(self):
+        for args in (("--ff-only",), ("origin",), ("--ff-only", "origin", "main")):
+            with self.subTest(args=args):
+                git(self.ws, "reset", "-q", "--hard", "origin/main~1")
+                self.assertOk(self.run_git_sh("pull", *args))
+                self.assertTrue(os.path.exists(os.path.join(self.ws, "next.txt")))
+
+    def test_pull_with_no_arguments_passes(self):
+        self.assertOk(self.run_git_sh("pull", "--ff-only"))
+        self.assertEqual("next\n", read(os.path.join(self.ws, "next.txt")))
+
+    def test_pulling_a_parent_branch_inside_a_worktree_passes(self):
+        self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "main", cwd=self.wt))
+        self.assertEqual("next\n", read(os.path.join(self.wt, "next.txt")))
+
+    def test_another_branch_on_a_non_target_checkout_passes(self):
+        git(self.ws, "checkout", "-q", "-b", "scratch")
+        self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "feat"))
+        self.assertTrue(os.path.exists(os.path.join(self.ws, "feat.txt")))
+
+    def test_fetch_then_merge_fetch_head_is_refused(self):
+        self.assertOk(self.run_git_sh("fetch", "origin", "feat"))
+        before = git(self.ws, "rev-parse", "HEAD").strip()
+        r = self.run_git_sh("merge", "FETCH_HEAD")
+        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
+        self.assertIn("統合先 main のユーザのチェックアウトでは merge できません", r.stderr)
+        self.assertEqual(before, git(self.ws, "rev-parse", "HEAD").strip())
+
+    def test_a_branch_ahead_of_the_target_is_refused_too(self):
+        # 分岐せず main より進んだだけの feat も、素の pull なら fast-forward で取り込まれる。
+        git(self.ws, "fetch", "-q", "origin", "main")
+        side = os.path.join(self._tmp.name, "side-ahead")
+        git(self.ws, "worktree", "add", "-q", side, "-b", "ahead", "origin/main")
+        write(os.path.join(side, "feat.txt"), "ahead\n")
+        git(side, "add", ".")
+        git(side, "commit", "-q", "-m", "ahead")
+        git(side, "push", "-q", "origin", "ahead")
+        git(self.ws, "worktree", "remove", "--force", side)
+        git(self.ws, "reset", "-q", "--hard", "origin/main")
+        self.assertPullRefused("origin", "ahead")
+
+    def test_an_upstream_pointing_at_another_branch_is_refused(self):
+        # 引数なしの pull は上流を merge する。上流が別ブランチなら、取り込む形と同じ。
+        git(self.ws, "fetch", "-q", "origin", "feat")
+        git(self.ws, "config", "branch.main.merge", "refs/heads/feat")
+        for args in ((), ("origin",)):
+            with self.subTest(args=args):
+                r = self.assertPullRefused(*args)
+                self.assertIn("上流 feat", r.stderr)
+
+    def test_a_remote_other_than_origin_is_matched_by_the_branch_config(self):
+        git(self.ws, "remote", "rename", "origin", "up")
+        git(self.ws, "config", "branch.main.remote", "up")
+        git(self.ws, "reset", "-q", "--hard", "up/main~1")
+        self.assertOk(self.run_git_sh("pull", "--ff-only", "up", "main"))
+        self.assertTrue(os.path.exists(os.path.join(self.ws, "next.txt")))
+
+    def test_detached_head_passes(self):
+        git(self.ws, "checkout", "-q", "--detach")
+        self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "feat"))
+
+    def test_undecidable_target_passes(self):
+        # origin/HEAD も origin/main も無いと、どれが統合先か言えない（merge と同じく止めない）。
+        git(self.ws, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+        git(self.ws, "update-ref", "-d", "refs/remotes/origin/main")
+        self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "feat"))
+        self.assertTrue(os.path.exists(os.path.join(self.ws, "feat.txt")))
+
+    def test_fetch_itself_is_not_blocked(self):
+        self.assertOk(self.run_git_sh("fetch", "origin", "feat"))
+
+
 if __name__ == "__main__":
     unittest.main()
