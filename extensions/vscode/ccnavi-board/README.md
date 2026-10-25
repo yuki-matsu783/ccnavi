@@ -39,7 +39,8 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 pnpm install --frozen-lockfile
 pnpm run compile   # tsc -p .（拡張ホスト）と tsc -p tsconfig.webview.json（画面）で型を見て、esbuild で out/webview/<名前>.js と out/extension.js にバンドルする
 pnpm test          # 全部
-pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / templates / handoff / flow / workflow / shared
+pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / templates / handoff / flow / workflow / shared / devtools
+pnpm test:devtools  # 画面確認ツール（render-board.js）だけ。Chromium が無いと終了コード 3
 pnpm test:templates # テンプレート管理だけ（templates）
 pnpm test:handoff   # 取り込み待ちだけ（handoff）
 pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
@@ -63,3 +64,4 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 ## 拡張開発ホストでの動かし方と手動確認
 
 拡張開発ホストで動かす手順と、単体テストの対象外の部分を手で確かめる項目は [docs/design/manual-checks.md](docs/design/manual-checks.md) に書いてある。
+画面だけなら VS Code を使わず Chromium で描いて確かめられる。使い方は [画面を VS Code なしで描く](docs/design/development.md#画面を-vs-code-なしで描くrender-boardjs) にある。

@@ -86,15 +86,17 @@ def check(
     if not parents:
         return "", "", ""
     texts = [subject, *(layers or [])]
-    for text in texts:
-        places = shellread.placed(text)
+    for n, text in enumerate(texts):
+        places = shellread.placed(text, rendered=n > 0)
         if not places:
             continue
         for words, here in places:
             found = _check_command(conf, root, cwd, parents, words, here)
             if found[0]:
                 return found
-    if degraded or any(not shellread.placed(t) for t in texts if t.strip()):
+    if degraded or any(
+        not shellread.placed(t, rendered=n > 0) for n, t in enumerate(texts) if t.strip()
+    ):
         # 走査が読み切れない。文字列に親のワークツリーのパスと書き込みを疑う語が並べば止める。
         for text in texts:
             name = _mentioned_parent(root, parents, text)
@@ -189,9 +191,7 @@ def _scan_command(
             code = _code_of(args)
             if code is not None:
                 # 引用の中の `>` `<` は目印の文字に置き換わっている。コードとして読むので戻す。
-                for stand_in, back in shellread_words.QUOTED_BACK.items():
-                    code = code.replace(stand_in, back)
-                codes.append((base, code))
+                codes.append((base, _restore(code)))
             if name.startswith("perl") and _in_place(name, args):
                 files = _positionals(name, args)
                 targets.extend(files[1:] if code is None else files)
@@ -220,19 +220,29 @@ def _scan_command(
 
 def write_targets(
     cwd: str, subject: str, layers: list[str] | None = None
-) -> list[tuple[str, str | None]]:
-    """シェルの書き込み先を（書いたとおりの語, 語を解く起点）で並べる。
+) -> list[tuple[str, str | None, str]]:
+    """シェルの書き込み先を（書いたとおりの語, 語を解く起点, 取り出した元のコマンド）で並べる。
 
     読み方と限界はこのモジュールの説明のとおり。インタプリタに渡したコードの中は読まない。
     """
-    out: list[tuple[str, str | None]] = []
-    for text in [subject, *(layers or [])]:
-        for words, here in shellread.placed(text):
+    out: list[tuple[str, str | None, str]] = []
+    for n, text in enumerate([subject, *(layers or [])]):
+        for words, here in shellread.placed(text, rendered=n > 0):
             targets, base, _ = _scan_command(cwd, words, here)
+            origin = _short(_restore(" ".join(words)))
             # `cd` の行き先を読めなかったときは、読めない `cd` を無かったことにして打たれた場所から
             # 解く。起点が無いまま相対パスを破棄すると、`cd "$PWD" &&` を足すだけで見えなくなる。
-            out.extend((t, base if base is not None else (cwd or None)) for t in targets)
+            out.extend(
+                (_restore(t), base if base is not None else (cwd or None), origin) for t in targets
+            )
     return out
+
+
+def _restore(text: str) -> str:
+    """引用の中の `>` `<` の身代わりの文字を、書かれた文字に戻す。"""
+    for stand_in, back in shellread_words.QUOTED_BACK.items():
+        text = text.replace(stand_in, back)
+    return text
 
 
 def resolve_word(word: str, base: str | None) -> str:
