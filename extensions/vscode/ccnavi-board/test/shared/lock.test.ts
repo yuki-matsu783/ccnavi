@@ -88,7 +88,7 @@ test("CB-T589 ボードの JSON の turns を読む。形の違う行は欠け�
   }
 });
 
-test("CB-T1220 作業中の理由は「整合性」を使わず、チケットの ID を含む。帯は作業中だけ情報色、読めないときは赤のまま", () => {
+test("CB-T1222 作業中の理由は「整合性」を使わず、チケットの ID を含む。帯は作業中だけ情報色、読めないときは赤のまま", () => {
   const locked = lockFromBoard(fixture());
   assert.doesNotMatch(locked.reason, /整合性/);
   assert.match(locked.reason, /i0001-02-02/);
