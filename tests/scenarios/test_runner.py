@@ -1106,6 +1106,10 @@ def deny_line(reason, name="PreToolUse:Edit"):
     return hook_line("PreToolUse", name, {"hookSpecificOutput": spec})
 
 
+def stop_block(reason):
+    return hook_line("Stop", "Stop", {"decision": "block", "reason": reason})
+
+
 def call_line(name, tool_input, call_id="t1", parent=None):
     block = {"type": "tool_use", "id": call_id, "name": name, "input": tool_input}
     return json.dumps(
@@ -1298,26 +1302,99 @@ class DenialTrendTest(unittest.TestCase):
         cut = [rec(decision="deny", tool="Edit", subject="/work/b.md…(+30)")]
         self.assertEqual(runner.bypass_suspects(cut, streams, self.SESSIONS), [])
 
-    def test_denial_without_guide_line_is_flagged(self):
-        tmp, out = make_out(
-            [
-                "\n".join(
-                    [
-                        deny_line("[ccnavi] DENY_PATH\n編集しません。"),
-                        deny_line("[ccnavi] DENY_PATH\n理由\n  次: sh x.sh を打つ"),
-                        deny_line("理由\n案内: 補足"),
-                        deny_line("理由\n必須: 項目"),
-                        deny_line("本文の途中に 次: と書いても行頭ではない"),
-                    ]
-                )
-            ]
-        )
+    def flagged(self, *lines):
+        tmp, out = make_out(["\n".join(lines) + "\n"])
         self.addCleanup(tmp.cleanup)
-        got = runner.unguided_denials(runner.step_streams(out))
-        self.assertEqual(
-            [text for _, _, text in got],
-            ["[ccnavi] DENY_PATH\n編集しません。", "本文の途中に 次: と書いても行頭ではない"],
+        return [text for _, _, text in runner.unguided_denials(runner.step_streams(out))]
+
+    def test_denial_without_next_step_is_flagged(self):
+        got = self.flagged(
+            deny_line("[ccnavi] DENY_PATH\n編集しません。"),
+            deny_line("[ccnavi] DENY_PATH\n理由\n  次: sh x.sh を打つ"),
+            deny_line("理由\n案内: 補足"),
+            deny_line("理由\n必須: 項目"),
+            deny_line("本文の途中に 次: と書いても行頭ではない"),
+            deny_line("[ccnavi] DENY_PATH"),
         )
+        self.assertEqual(
+            got,
+            [
+                "[ccnavi] DENY_PATH\n編集しません。",
+                "本文の途中に 次: と書いても行頭ではない",
+                "[ccnavi] DENY_PATH",
+            ],
+        )
+
+    def test_denial_with_empty_reason_is_flagged(self):
+        empty = hook_line(
+            "PreToolUse",
+            "PreToolUse:Bash",
+            {"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": ""}},
+        )
+        block = hook_line("Stop", "Stop", {"decision": "block"})
+        self.assertEqual(self.flagged(empty, block), [runner.EMPTY_REASON] * 2)
+
+    def test_ask_is_not_a_denial(self):
+        ask = hook_line(
+            "PreToolUse",
+            "PreToolUse:Bash",
+            {"hookSpecificOutput": {"permissionDecision": "ask", "permissionDecisionReason": "x"}},
+        )
+        self.assertEqual(self.flagged(ask), [])
+
+    def test_real_denials_with_a_next_step_are_not_flagged(self):
+        # issue #570 の実データ 4 件。文面は実コードから取る（文面が変わっても追従する）
+        from ccnavi.policy import builtin
+        from ccnavi.tickets import ops_stop_integrate as stop
+        from ccnavi.tickets import ticket_guard
+
+        root = str(ROOT)
+        raw_git = ticket_guard.raw_git_rule(root).message
+        by_id = {r["id"]: r["message"] for r in builtin._deny(root)}
+        heredoc = next(
+            r["message"]
+            for r in yaml.safe_load(
+                (Path(ROOT) / ".ccnavi/config/common/rules.yml").read_text("utf-8")
+            )["deny"]
+            if r["id"] == "heredoc"
+        )
+        found = stop.Direct(
+            name="work1",
+            worktree=f"{root}/.claude/worktrees/work1",
+            head="work1",
+            dirty=False,
+            ahead=1,
+            integration="main",
+            integ_tree=root,
+            base="main",
+        )
+        nudge = stop.integrate_nudge(root, found)
+        waiting = stop.integrate_nudge(root, stop.Direct(**{**found.__dict__, "marker": "v4"}))
+        texts = [raw_git, by_id["builtin:recursive-delete"], heredoc, nudge, waiting]
+        self.assertTrue(all(texts))
+        self.assertEqual(
+            self.flagged(*[deny_line(t) for t in texts[:3]], *[stop_block(t) for t in texts[3:]]),
+            [],
+        )
+
+    def test_every_shipped_deny_message_has_a_next_step(self):
+        from ccnavi.policy import builtin
+
+        rules = yaml.safe_load((Path(ROOT) / ".ccnavi/config/common/rules.yml").read_text("utf-8"))
+        texts = [r["message"] for r in rules["deny"]]
+        texts += [r["message"] for r in builtin._deny(str(ROOT))]
+        with tempfile.TemporaryDirectory() as d:  # git の入口が無いワークスペースの文面
+            texts += [r["message"] for r in builtin._deny(d)]
+        self.assertGreater(len(texts), 10)
+        self.assertEqual([t for t in texts if not runner.has_guide(t)], [])
+
+    def test_report_names_the_empty_and_unguided(self):
+        deny = deny_line("[ccnavi] DENY_PATH\n編集しません。")
+        tmp, out = make_out([deny + "\n"])
+        self.addCleanup(tmp.cleanup)
+        report = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["report.md"]
+        self.assertIn("### 案内の無い拒否（理由文に次の手を示す語", report)
+        self.assertIn("- step 1 [PreToolUse:Edit]: [ccnavi] DENY_PATH 編集しません。", report)
 
     def test_report_shows_the_marks(self):
         deny = deny_line("[ccnavi] DENY_PATH\n編集しません。")

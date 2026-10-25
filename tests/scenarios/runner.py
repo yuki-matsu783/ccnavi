@@ -1648,18 +1648,62 @@ def bypass_suspects(rows, streams, step_sessions):
     return found
 
 
+# 次の手を示す語。hook の拒否文は、次の手を行頭のマーカーなしの文で書くものがほとんどなので、
+# マーカーの行（GUIDE_HEADS）に加えて、依頼・指示の言い回しを見る（#570）。
+# 「使う」「確かめ」のような、禁止の説明にも出る語は入れない。
+GUIDE_PHRASES = (
+    "ください",
+    "頼んで",
+    "依頼",
+    "使って",
+    "使います",
+    "従って",
+    "してから",
+    "書き直",
+    "打ち直",
+    "伝えて",
+    "報告して",
+)
+EMPTY_REASON = "(理由文が空)"
+GUIDE_COMMAND = re.compile(r"`[^`\n]+`")  # 打つ形をコード片で示す文（取り込みの案内など）
+
+
 def has_guide(text):
-    """理由文のどれかの行が、案内の行頭（次:・案内:・必須:）で始まるか。"""
-    return any(line.strip().startswith(GUIDE_HEADS) for line in text.splitlines())
+    """理由文が次の手を示しているか。次のどれかなら True。
+    - 行頭（前の空白を除く）が `次:`・`案内:`・`必須:`
+    - 依頼・指示の語（GUIDE_PHRASES）がある
+    - 打つ形を、バッククォートで囲んだコード片で示している
+    語の有無で見るので、誤検知と見逃しがある（限界は acceptance-scenarios.md）。"""
+    if any(line.strip().startswith(GUIDE_HEADS) for line in text.splitlines()):
+        return True
+    return any(p in text for p in GUIDE_PHRASES) or bool(GUIDE_COMMAND.search(text))
+
+
+def _empty_denials(hook_events):
+    """理由文が空の拒否（deny・block）の hook 名。hook_items は文面があるものだけなので別に拾う。"""
+    labels = []
+    for ev in hook_events:
+        if ev.get("subtype") != "hook_response":
+            continue
+        data = _hook_payload(ev)
+        spec = data.get("hookSpecificOutput")
+        spec = spec if isinstance(spec, dict) else {}
+        decision = spec.get("permissionDecision") or data.get("decision")
+        reason = spec.get("permissionDecisionReason") or data.get("reason")
+        if decision in ("deny", "block") and not (reason and str(reason).strip()):
+            labels.append(ev.get("hook_name") or _hook_name(ev))
+    return labels
 
 
 def unguided_denials(streams):
-    """案内の行頭を 1 つも持たない拒否の理由文。(step 番号, hook 名, 理由文) の列。"""
+    """次の手を示していない拒否の理由文（has_guide が偽、または理由文が空）。
+    (step 番号, hook 名, 理由文) の列。理由文が空のものは EMPTY_REASON を入れる。"""
     found = []
     for num, parsed in streams.items():
         for i in hook_items(parsed["hook_events"]):
             if i["kind"] == "拒否" and not has_guide(i["text"]):
                 found.append((num, i["label"], i["text"]))
+        found += [(num, label, EMPTY_REASON) for label in _empty_denials(parsed["hook_events"])]
     return found
 
 
@@ -1698,7 +1742,7 @@ def trend_lines(out, rows):
     ] or ["- なし"]
     _shown(lines, len(bypass) - TREND_SHOWN)
     bare = unguided_denials(streams)
-    lines += ["", "### 案内の無い拒否（理由文に `次:`・`案内:`・`必須:` の行が無い）"]
+    lines += ["", "### 案内の無い拒否（理由文に次の手を示す語・コード片・`次:` などの行が無い）"]
     lines += [
         f"- step {n} [{label}]: {_one_line(text, 120)}" for n, label, text in bare[:TREND_SHOWN]
     ]
