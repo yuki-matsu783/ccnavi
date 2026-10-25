@@ -44,7 +44,7 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
   GitLab CEには4GB要る
 - **macOSの`/etc`・`/tmp`・`/var`は`/private`へのリンク。** `os.path.realpath`で実体化すると先頭に`private`が付く。
   実体化する関数（`tree.parts_under()`など）のテストに実在のリンクを渡さない。存在しないパスか、`realpath`を通した一時ディレクトリで組む
-- **macOSのbashは`~/.bash_profile`、Linuxのbashは`~/.bashrc`を読む。** 導入スクリプトの案内はどちらも`uname -s`で分ける。
+- **macOSのbashは`~/.bash_profile`、Linuxのbashは`~/.bashrc`を読む。** 導入スクリプトの案内は、bashだけ`uname -s`で分ける（zshは`~/.zshrc`）。
   テストは`uname`の代役をPATHの先頭に置き、どのOSで回しても両方の分岐を通す（`tests/sh/test_setup.py`の`fake_uname`）
 - `dist/`、`build/`、`logs/`はgit管理外。記録には絶対パスとコマンド全文が入るのでコミットしない
 
