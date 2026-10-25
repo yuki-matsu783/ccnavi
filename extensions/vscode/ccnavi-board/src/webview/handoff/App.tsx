@@ -10,7 +10,7 @@ import { useRef, useState, type JSX } from "react";
 
 import type { HandoffData, HandoffMessage, HandoffOutcome, HandoffPage, ToHandoff } from "../../core/handoff-view.js";
 import { LOCKED_KINDS, blockReason, reconcileSelection, selectablePaths } from "../../core/handoffmodel.js";
-import type { Lock } from "../../core/lock.js";
+import { lockClass, type Lock } from "../../core/lock.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { Entry, type TerminalState } from "./Entry.js";
 import { post } from "./post.js";
@@ -197,7 +197,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
           </button>
         </div>
       </header>
-      <p id="lock" data-banner="lock" className={lockedPresent ? "lock" : "lock hidden"}>
+      <p id="lock" data-banner="lock" className={lockedPresent ? lockClass(lock) : "lock hidden"}>
         {lockedPresent ? `テンプレートと設定の取り込みは止めています: ${lock.reason}` : ""}
       </p>
       <p className="count" id="counts">

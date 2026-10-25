@@ -334,7 +334,7 @@ test("CB-D389 ステップのフローは最初から図を開いていて、部
 test("CB-D390 作業中のチケットがある間は編集はできるが保存できない。錠は開いたときの答えと、あとから届く editLock で替わり、錠が解けると保存できる", async () => {
   const dom = await openList();
   try {
-    const locked = { locked: true, reason: "作業中のチケットがあります（i0001-1）。先に現在の作業をすべて完了させてください。", doing: ["i0001-1"] };
+    const locked = { locked: true, reason: "作業中のチケットがあります（i0001-1）。いま保存すると、進行中の作業の判定が途中で変わるため、作業が終わってから保存してください。", doing: ["i0001-1"] };
     const { session } = await startEdit(dom, openedOf(fixtureCheck(), { lock: locked }));
     assert.match(text(dom.one('[data-role="edit-lock"]')), /作業中のチケットがあります/);
     dom.type(dom.one(".f-description"), "錠の間も直せる");

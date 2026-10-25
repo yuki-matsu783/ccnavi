@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
-import type { Lock } from "../../core/lock.js";
+import { lockClass, type Lock } from "../../core/lock.js";
 import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
@@ -524,7 +524,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </button>
         </div>
       </ScreenHeader>
-      <p id="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
+      <p id="lock" className={lockClass(shownLock)}>
         {shownLock.reason}
       </p>
       {!touring && page !== undefined && page.model.problems.length > 0 && (
