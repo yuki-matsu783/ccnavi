@@ -584,7 +584,11 @@ merged_present() {
 	merged_rc="${merged%%:*}"
 	merged="${merged#*:}"
 	case "$merged_rc:$merged" in
-	nomr:*) no_mr_note "（親のブランチはリモートにある）" ;;
+	nomr:*)
+		# 親が承認待ち（todo/ の提案だけ）のときは、mr 欄を持つ承認済みの親チケットがまだ無いので、
+		# 無いのが正常。unknown・unreadable では黙らない（読めていないだけかもしれない）
+		[ "$ccnavi_pi_approved" = no ] || no_mr_note "（親のブランチはリモートにある）"
+		;;
 	*:'merged '*)
 		split_merged "${merged#merged }"
 		if [ -n "$merged_branch" ] && [ "$merged_branch" != "$B" ]; then

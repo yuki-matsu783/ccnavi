@@ -580,6 +580,21 @@ class SyncTest(SyncHarness):
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertNotIn("クローズ済みの親子のチケット", done.stdout)
 
+    def test_a_pending_parent_does_not_warn_about_the_missing_mr_number(self):
+        # 承認待ちの親（propose の時点）には、mr 欄を持つ承認済みの親チケットがまだ無い。
+        # 提案に mr: があっても、承認済みだけを読むので空になる。毎回の警告はノイズ。
+        os.makedirs(os.path.join(self.tree, "wip", "proposals", "todo"))
+        git(self.tree, "mv", "--", COPY, f"wip/proposals/todo/{PARENT}.md")
+        git(self.tree, "commit", "-q", "-m", "back to todo")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        done = self.sync(PARENT)
+        self.assertNotIn("MR の番号が無い", done.stdout + done.stderr)
+
+    def test_an_approved_parent_without_an_mr_number_still_warns(self):
+        self.mine(copy_text(mr=""))
+        done = self.sync(PARENT)
+        self.assertIn(NO_MR, done.stdout)
+
     def test_a_branch_gone_without_a_closed_record_stops_the_family(self):
         self.review_says("none")
         self.delete_remote_branch(PARENT)
