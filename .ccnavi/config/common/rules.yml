@@ -93,6 +93,11 @@ ask:
   - id: direct-worktree-confirm
     match: Bash
     regex: 'ccnavi-worktree\.sh\b[^\x00]*\s--(base|accept|side-by-side|adopt)(\s|=|$)'
+    # --dry-run は何も書かずに予定だけ出します（--adopt を含む）。そのため、確認の対象から外します。
+    # 先読みは使えないので except で除きます。[^\x00] はコマンドの境界を越えないため、複合コマンドの
+    # 別のコマンドの --dry-run では除かれません。
+    except:
+      - regex: 'ccnavi-worktree\.sh\b[^\x00]*\s--dry-run(\s|$)'
     additionalContext: >-
       ユーザが取り込み先と状態を了承した。出力の「取り込み先:」「起点:」の行を報告に含め、作業後は integrate の案内に従う。
 
@@ -163,7 +168,10 @@ allow:
     regex: 'ccnavi-git\.sh\s+worktree\s+add(\s|$)'
     additionalContextOnce: >-
       直接作業のワークツリーは {script:ccnavi-worktree.sh} <名前> で切ります。取り込み先の確認・リモートとのずれの確認・
-      書きかけの扱いをまとめて行い、手で worktree add を打つ必要はありません。
+      書きかけの扱いをまとめて行うので、新しく切るときに手で worktree add を打つ必要はありません。
+      ブランチが既にあるときの worktree add（ccnavi-worktree.sh が案内する 1 段目）のあとは、
+      {script:ccnavi-worktree.sh} <名前> --adopt --base <統合先> で引き取ります。引き取りにはユーザの確認が要ります。
+      引き取らないと integrate できません。
       worktree add が断られたら、出力の案内どおりに打ち直してください。手元の取り込み先は進めません。
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
