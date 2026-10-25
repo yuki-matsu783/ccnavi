@@ -46,6 +46,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 | UC-16 | `ccnavi --lint`・`--test`・`--explain` で、設定の誤りと判定の理由をユーザが確かめる | 5 | 未作成 | — |
 | UC-17 | ワークスペースの下の複数プロジェクトを、プロジェクトごとのルールで扱う（ネストの検知を含む） | 5 | 未作成 | — |
 | UC-18 | 親チケットの着手で、共通レイヤーがプロジェクトの `.ccnavi/config/common/` にミラーされる（`config/project/` と元のリポジトリは触れない） | 5 | [UC-18](UC-18-common-layer-mirror.yml) | draft |
+| UC-19 | ユーザのチェックアウトに未コミットの変更があるとき、別の作業を頼まれても、その変更に触れずに進める（事前状態は `setup.files` の追記と `setup.reset` で作る） | 2 | [UC-19](UC-19-dirty-checkout.yml) | draft |
 
 「状態」は、`draft` が書いただけで一度も回していないもの、`verified` が実ログと突き合わせて期待を確定したもの。
 最初に回したあと、期待が実ログと食い違えば、[見つけたものの扱い](../../docs/42_claude/acceptance-scenarios.md)に従って issue にする。
@@ -68,7 +69,12 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
   - `hinted`: その呼び出しで `additionalContextOnce` の案内を渡したとき true（付かない行は false 扱い）。シナリオでは `hinted: true` / `hinted: false` で比べる
   - `subject`: 対象のパスかコマンド。シナリオでは `subject_contains` で「含む」を比べる
 - シナリオは普段のワークスペースルートで回す。ccnavi 本体にはブランチ・コミット・MR・issue を作らず、そういう作業は `projects/test-repo` で行う
-- `setup` の `files` は、回す前に作り、回したあとに消すファイル（ワークスペースルートからのパス → 中身）
+- `setup` の `files` は、回す前に作り、回したあとに消すファイル（ワークスペースルートからのパス → 中身）。
+  値を辞書 `{content, append: true}` にすると、`projects/test-repo` にある管理下のファイルへの追記になる（消さない。戻すのは `reset`。`reset` が無いと使えない）
+- `setup` の `git` は、回す前に対象（`projects/test-repo`）で打つ git。argv の配列で、先頭は `git`。`-C`・`--git-dir`・`--work-tree` は書けない
+- `setup` の `reset`（`base: <40 桁の SHA>`）は、回す前と回したあとに対象を `base` へ戻す（ワークツリー・`main` 以外のブランチ・タグ・stash・未コミットの変更を消す。`.gitignore` 済みと `refs/remotes` は残す）。
+  人間の操作で止めた回は戻さず残し、`next` が終わると戻す。やめるときは `restore`。
+  `git`・`reset`・追記は、対象が `projects/test-repo` の実体で、ccnavi 本体でも本体と同じ origin でもないと確かめられたときだけ動く（違えば回す前に終了コード 3）。同じ対象を使う回は直列で、`.git/` のロックで弾く
 - `setup` の `issue`（`repo`・`title`・`body`・`close`）は、回すたびに `repo` へ issue を新しく作り（origin が GitLab なら glab、GitHub なら gh。番号は作成の出力の URL の行から取る）、prompt の `{issue}` を番号に置き換える。`close: true` なら回したあとに閉じる。
   作った番号は `state.json` の `issue_no` に残る。report の入力プロンプトには `{issue}` のまま出る
 - `state` は、全 step が終わったあとに打つコマンドと、出力に含まれるべき文字列

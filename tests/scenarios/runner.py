@@ -6,9 +6,12 @@
     uv run python -m tests.scenarios.runner run <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ> --confirmed
     uv run python -m tests.scenarios.runner next <出力の置き場>
+    uv run python -m tests.scenarios.runner restore <出力の置き場>
     uv run python -m tests.scenarios.runner judge <出力の置き場> <判定の表のファイル> [--accept]
 
 next は、人間の操作で止まったあと、人間が「次へ」と言ってから打つ。
+restore は、人間の操作で止まった回を続けずにやめるとき、setup のファイルを消し、
+使い捨てのリポジトリを setup.reset の base へ戻して、残し印を外す。
 
 --confirmed を付けるのは、人間が「状態がきれいで最新か」（と、test_repo のシナリオでは
 「test-repo にブランチや MR ができてよいか」）に答えたあとだけ。
@@ -17,7 +20,8 @@ ccnavi 本体にブランチ・コミット・ワークツリーが残らない�
 回す前後の状態を比べて確かめる（repo）。
 
 終了コード: 0 全部通った / 1 不合格がある / 2 未成立か意味の判定待ちがある /
-3 人間の確認が要る / 10 人間の操作で止まった（「次へ」のあと next で続ける）。
+3 人間の確認が要る・回す前の拒否・使い捨てのリポジトリを戻せなかった（手作業が要る） /
+10 人間の操作で止まった（「次へ」のあと next で続ける。setup.reset の対象は base に戻さず残す）。
 
 判定は 3 つ。機械で比べられるもの（ccnavi の判定の記録、ファイルの最終状態、
 コマンドの出力）は pass / fail。期待した呼び出しをエージェントが打たなかったものは
@@ -30,6 +34,8 @@ import contextlib
 import hashlib
 import json
 import os
+import re
+import shlex
 import subprocess
 import sys
 import time
@@ -39,11 +45,25 @@ from pathlib import Path
 
 import yaml
 
+from ccnavi.infra import pathcase
+from ccnavi.records import diaglog
 from ccnavi.tickets import review_host
 
 ROOT = Path(__file__).resolve().parents[2]
 GIT_SH = "{root}/.ccnavi/scripts/ccnavi-git.sh"
 STEP_TIMEOUT_SEC = 900
+# setup.git / setup.reset / setup.files の追記が触れてよい唯一のリポジトリ（ルートからの相対）
+DISPOSABLE_REL = "projects/test-repo"
+LOG_NAME = "scenario-runner"
+RUNNER = "uv run python -m tests.scenarios.runner"
+LOCK_NAME = "ccnavi-scenario.lock"  # 対象の .git/ の中。git clean で消えず、status も汚さない
+LEFT_NAME = "ccnavi-scenario.left"  # 戻さずに残した回の印（中身は出力の置き場）
+SETUP_KEYS = {"files", "issue", "git", "reset"}
+SHA40 = re.compile(r"[0-9a-fA-F]{40}")
+# setup.git で、対象の外へ出られる git の指定
+GIT_ESCAPES = ("-C", "--git-dir", "--work-tree")
+# git の先頭（サブコマンドより前）に置くと、設定や実行ファイルを差し替えられる指定
+GIT_GLOBAL_ESCAPES = ("-c", "--config-env", "--exec-path")
 
 PASS, FAIL, INCONCLUSIVE, REVIEW = "pass", "fail", "inconclusive", "needs-review"
 
@@ -74,6 +94,7 @@ def load_scenario(path):
     data.setdefault("budget_usd", 1.0)
     data.setdefault("permission_mode", "auto")
     data.setdefault("expect", {})
+    _check_setup(path, data.get("setup"))
     for n, step in enumerate(data["steps"], 1):
         after = step.get("expect_after")
         if after is None:
@@ -93,6 +114,87 @@ def load_scenario(path):
                 + ", ".join(sorted(extra))
             )
     return data
+
+
+def file_spec(value):
+    """setup.files の値を (中身, 追記か) にする。文字列は従来どおり作って消す形。"""
+    if isinstance(value, dict):
+        return value["content"], bool(value.get("append"))
+    return value, False
+
+
+def check_git_argv(argv):
+    """setup.git の 1 コマンドを検べる。問題があれば ValueError。"""
+    if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a for a in argv):
+        raise ValueError("argv は空でない文字列の配列にする（シェルを介さない）")
+    if argv[0] != "git":
+        raise ValueError(f"先頭は git に限る: {argv[0]}")
+    for a in argv[1:]:
+        if a.startswith(GIT_ESCAPES):  # -C<パス>、--git-dir=<パス> も含む
+            raise ValueError(f"{a} は対象の外へ出られるので書けない（-C・--git-dir・--work-tree）")
+    for a in argv[1:]:
+        if not a.startswith("-"):
+            break  # サブコマンド。これより後ろの -c は、サブコマンドの引数（switch -c など）
+        if a.startswith(GIT_GLOBAL_ESCAPES):
+            raise ValueError(f"{a} は git の設定や実行ファイルを差し替えられるので書けない")
+
+
+def _check_setup(path, setup):
+    if setup is None:
+        return
+    if not isinstance(setup, dict):
+        raise ValueError(f"{path}: setup は dict です")
+    extra = set(setup) - SETUP_KEYS
+    if extra:
+        raise ValueError(
+            f"{path}: setup に書けるのは {', '.join(sorted(SETUP_KEYS))} です: "
+            + ", ".join(sorted(map(str, extra)))
+        )
+    appends = []
+    files = setup.get("files") or {}
+    if not isinstance(files, dict):
+        raise ValueError(f"{path}: setup.files は パス: 中身 の dict です")
+    for rel, value in files.items():
+        if isinstance(value, dict):
+            bad = set(value) - {"content", "append"}
+            if bad:
+                raise ValueError(
+                    f"{path}: setup.files[{rel}] に書けるのは content と append だけです: "
+                    + ", ".join(sorted(map(str, bad)))
+                )
+            if not isinstance(value.get("content"), str):
+                raise ValueError(f"{path}: setup.files[{rel}] の content は文字列で必須です")
+            if "append" in value and not isinstance(value["append"], bool):
+                raise ValueError(f"{path}: setup.files[{rel}] の append は true / false です")
+            if value.get("append"):
+                appends.append(rel)
+        elif not isinstance(value, str):
+            raise ValueError(f"{path}: setup.files[{rel}] は文字列か {{content, append}} です")
+    git = setup.get("git")
+    if git is not None:
+        if not isinstance(git, list) or not git:
+            raise ValueError(f"{path}: setup.git は argv の配列の配列です")
+        for argv in git:
+            try:
+                check_git_argv(argv)
+            except ValueError as exc:
+                raise ValueError(f"{path}: setup.git {argv!r}: {exc}") from None
+    reset = setup.get("reset")
+    if reset is not None:
+        if not isinstance(reset, dict) or set(reset) != {"base"}:
+            raise ValueError(f"{path}: setup.reset は base だけを持つ dict です")
+        base = reset["base"]
+        if not isinstance(base, str) or not SHA40.fullmatch(base):
+            raise ValueError(
+                f"{path}: setup.reset.base は 40 桁の 16 進のコミット SHA にする"
+                "（短縮 SHA・ブランチ名・タグ名は受けない）"
+            )
+        reset["base"] = base.lower()
+    if appends and reset is None:
+        raise ValueError(
+            f"{path}: setup.files の追記（{', '.join(appends)}）は、戻す setup.reset が無いと"
+            "使えない"
+        )
 
 
 # ---- claude -p の出力（stream-json）を読む ----
@@ -437,17 +539,374 @@ def _write_state(out, st):
     (out / "state.json").write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
+class Refusal(Exception):
+    """回す前の拒否・停止。str() は、理由の行・`案内:` の行・最後に `次:` の 1 行。
+    行頭の語は docs/42_claude/script-output.md。"""
+
+    def __init__(self, what, next_line, *notes):
+        super().__init__(what)
+        self.what, self.next_line, self.notes = what, next_line, notes
+
+    def __str__(self):
+        return "\n".join([self.what, *[f"案内: {n}" for n in self.notes], f"次: {self.next_line}"])
+
+
+# ---- 使い捨てのリポジトリ（setup.git / setup.reset / setup.files の追記が触れる唯一の対象） ----
+
+
+def _git_env():
+    """cwd で対象を決めさせるため、git の向き先を変える環境変数を外す。"""
+    drop = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
+    return {k: v for k, v in os.environ.items() if k not in drop}
+
+
+def _git(args, cwd):
+    return subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=_git_env(),
+        stdin=subprocess.DEVNULL,
+    )
+
+
+def _toplevel(path):
+    """path が属するリポジトリの toplevel の実体。リポジトリでない・path が無いときは None。"""
+    try:
+        r = _git(["rev-parse", "--show-toplevel"], cwd=path)
+    except OSError:
+        return None
+    return os.path.realpath(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else None
+
+
+def _origin(top):
+    r = _git(["remote", "get-url", "origin"], cwd=top)
+    if r.returncode != 0 or not r.stdout.strip():
+        return None
+    return pathcase.fold(r.stdout.strip().rstrip("/").removesuffix(".git"))
+
+
+def _inside(path, top):
+    top = pathcase.fold(top).rstrip(os.sep)
+    return pathcase.fold(path).startswith(top + os.sep)
+
+
+def require_disposable_repo(root, target, allowed=None):
+    """target が使い捨てのリポジトリだと確かめ、その toplevel（実体）を返す。違えば Refusal。
+
+    setup.git・setup.reset・setup.files の追記は、すべてこれを通る。比べるのは toplevel の実体で、
+    ccnavi 本体（root）と同じ・origin が本体と同じものは断る。許可されるのは allowed
+    （既定は root/projects/test-repo）の実体だけ。どちらかに origin が無いときは origin を比べない。
+    """
+    allowed = Path(allowed) if allowed is not None else Path(root) / DISPOSABLE_REL
+    use = "setup.git・setup.reset・setup.files の追記は、使い捨てのリポジトリにだけ使える"
+    top = _toplevel(target)
+    if top is None:
+        raise Refusal(
+            f"対象 {target} は git のリポジトリではない（または無い）",
+            f"{DISPOSABLE_REL} を用意してから打ち直す",
+            use,
+        )
+    body = os.path.realpath(root)
+    if pathcase.fold(top) == pathcase.fold(body):
+        raise Refusal(
+            f"対象が ccnavi 本体（ワークスペースルート）になっている: {top}",
+            f"対象を使い捨てのリポジトリ（{DISPOSABLE_REL}）にして打ち直す",
+            use,
+        )
+    mine, theirs = _origin(top), _origin(body)
+    if mine is not None and mine == theirs:
+        raise Refusal(
+            f"対象の origin が ccnavi 本体の origin と同じ: {top}",
+            f"本体とは別のリポジトリを {DISPOSABLE_REL} に置いて打ち直す",
+            use,
+        )
+    want = os.path.realpath(allowed)
+    if pathcase.fold(top) != pathcase.fold(want):
+        raise Refusal(
+            f"対象の実体 {top} が、許可された {want} と違う",
+            f"対象を {DISPOSABLE_REL} にして打ち直す",
+            use,
+        )
+    return top
+
+
+def _git_dir(top):
+    r = _git(["rev-parse", "--absolute-git-dir"], cwd=top)
+    if r.returncode != 0:
+        raise RuntimeError(f".git の場所を取れない: {top}: {r.stderr.strip()}")
+    return Path(os.path.realpath(r.stdout.strip()))
+
+
+def _log(root):
+    return diaglog.get(LOG_NAME, str(root))
+
+
+def _first_line(text):
+    lines = text.strip().splitlines()
+    return lines[0] if lines else ""
+
+
+def _target_git(root, top, args, level="info"):
+    """対象で git を実行する（cwd は判定を通した toplevel）。コマンドと結果を診断ログに残す。
+    level は、reset のように何度も呼ぶときだけ debug にする（ループの中で INFO を書かない）。"""
+    r = _git(args, cwd=top)
+    getattr(_log(root), level)(
+        "対象の git を実行した",
+        cmd=shlex.join(["git", *args]),
+        rc=r.returncode,
+        out_len=len(r.stdout),
+        err=_first_line(r.stderr) if r.returncode else "",
+    )
+    return r
+
+
+def run_setup_git(root, target, commands, allowed=None):
+    """setup.git のコマンドを、対象の toplevel を cwd にして順に実行する（shell=False）。
+    各コマンドのあと ccnavi 本体の repo_snapshot が変わっていたら止める。"""
+    top = require_disposable_repo(root, target, allowed)
+    before = repo_snapshot(root)
+    for argv in commands:
+        try:
+            check_git_argv(argv)
+        except ValueError as exc:
+            raise Refusal(f"setup.git を実行しない: {exc}", "シナリオの setup.git を直す") from None
+        r = _target_git(root, top, argv[1:])
+        if r.returncode != 0:
+            raise Refusal(
+                f"setup.git が失敗した: {shlex.join(argv)}（終了コード {r.returncode}）",
+                "原因を直して打ち直す",
+                f"git の出力: {_first_line(r.stderr)}",
+                "対象は後始末で戻す（setup.reset があるとき）",
+            )
+        if repo_snapshot(root) != before:
+            raise Refusal(
+                f"setup.git の実行で ccnavi 本体の HEAD・ブランチ・ワークツリーが変わった: "
+                f"{shlex.join(argv)}",
+                "ccnavi 本体の状態を手で確かめて戻し、シナリオの setup.git を直す",
+                "回し続けない",
+            )
+
+
+def reset_repo(root, target, base, allowed=None):
+    """対象を base へ戻す。順序: ワークツリーを消す → prune → main を base に合わせて切り替える →
+    main 以外のローカルブランチを消す → タグを消す → stash を空にする → reset --hard → clean -fd。
+    clean に -x は付けない（.gitignore 済みを消さない）。refs/remotes は触らない。"""
+    top = require_disposable_repo(root, target, allowed)
+
+    def run(*args):
+        r = _target_git(root, top, list(args), level="debug")
+        if r.returncode != 0:
+            _log(root).error("対象を戻せなかった", target=top, base=base, cmd=" ".join(args[:3]))
+            raise Refusal(
+                f"対象を戻す途中で失敗した: git {' '.join(args[:3])}（終了コード {r.returncode}）",
+                f"{top} を手で {base} に戻す",
+                f"git の出力: {_first_line(r.stderr)}",
+            )
+        return r.stdout
+
+    run("cat-file", "-e", f"{base}^{{commit}}")
+    paths = [
+        line[len("worktree ") :]
+        for line in run("worktree", "list", "--porcelain").splitlines()
+        if line.startswith("worktree ")
+    ]
+    keep = {pathcase.fold(os.path.realpath(p)) for p in (paths[:1] + [top])}
+    for p in paths:
+        if pathcase.fold(os.path.realpath(p)) not in keep:
+            run("worktree", "remove", "--force", p)
+    run("worktree", "prune")
+    run("checkout", "-f", "-B", "main", base)
+    for name in run("for-each-ref", "--format=%(refname:short)", "refs/heads").split():
+        if name != "main":
+            run("branch", "-D", name)
+    tags = run("tag", "-l").split()
+    for i in range(0, len(tags), 100):
+        run("tag", "-d", *tags[i : i + 100])
+    run("stash", "clear")
+    run("reset", "--hard", base)
+    run("clean", "-fd")
+    _log(root).info("対象を base に戻した", target=top, base=base)
+
+
+def _pid_alive(pid):
+    """その PID のプロセスが生きているか。判定できない（権限など）ときは生きていると見なす。
+    Windows の os.kill はプロセスを終わらせてしまうので、OpenProcess で見る。"""
+    if os.name == "nt":
+        import ctypes
+
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        handle = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if handle:
+            k32.CloseHandle(handle)
+            return True
+        return ctypes.get_last_error() != 87  # ERROR_INVALID_PARAMETER: その PID は無い
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def _lock_pid(lock):
+    try:
+        pid = int(lock.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+    return pid if pid > 0 else None
+
+
+def acquire_target(top, out, resuming=False):
+    """対象を排他で使い始める。ロックのパスを返す。使えなければ Refusal。
+
+    ロックは対象の .git/ の中（O_CREAT|O_EXCL。中身は PID）。あれば PID が生きているかを見て、
+    生きている・判定できないなら断り、死んでいれば奪う。戻さずに残した回の印があれば、
+    その回を続けるとき（resuming で出力の置き場が同じ）以外は断る。"""
+    git_dir = _git_dir(top)
+    left = git_dir / LEFT_NAME
+    if left.exists():
+        who = left.read_text(encoding="utf-8").strip()
+        if not (resuming and pathcase.fold(who) == pathcase.fold(str(out))):
+            raise Refusal(
+                f"前の回が対象を戻さずに残している: {who}",
+                f"続けるなら `{RUNNER} next {who}`、やめるなら `{RUNNER} restore {who}`",
+                "戻せなくて残した回も同じ（restore が戻し直す）",
+            )
+    lock = git_dir / LOCK_NAME
+    for _ in range(2):
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            pid = _lock_pid(lock)
+            if pid is None or _pid_alive(pid):
+                raise Refusal(
+                    f"同じ対象を別の回が使っている（PID {pid or '読めない'}）: {lock}",
+                    "その回が終わってから打ち直す",
+                    "ロックの中身が PID として読めないときは、使っている回が無いことを"
+                    "確かめてからファイルを消す",
+                ) from None
+            with contextlib.suppress(FileNotFoundError):
+                lock.unlink()  # 持ち主が死んでいる。奪う
+            continue
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
+        return str(lock)
+    raise Refusal(f"ロックを奪えなかった: {lock}", "少し待って打ち直す")
+
+
+def release_target(st, root, hold=False):
+    """対象を放す。例外は出さない。戻せなかったときは文面を出し、その文面を返す。
+
+    hold: 人間の操作で止めた回。base へ戻さず、ロックだけ放して残し印を書く（続きは next）。
+    それ以外: base へ戻し、ロックと残し印を放す。戻せなければ残し印を書き、次の回を断らせる。"""
+    tgt = st.get("target")
+    if not tgt or st.get("released"):
+        return None
+    top, base, out = tgt["path"], tgt.get("base"), st.get("out", "")
+    err = None
+    try:
+        git_dir = _git_dir(top)
+        left = git_dir / LEFT_NAME
+        if not hold and base:
+            try:
+                reset_repo(root, top, base)
+            except Exception as exc:  # 戻せない原因は何でも、手作業の案内にする
+                err = str(exc) or repr(exc)
+        if hold or err:
+            left.write_text(out, encoding="utf-8")
+        else:
+            with contextlib.suppress(FileNotFoundError):
+                left.unlink()
+        with contextlib.suppress(FileNotFoundError):
+            (git_dir / LOCK_NAME).unlink()
+    except Exception as exc:
+        err = err or repr(exc)
+    if hold:
+        st["held"] = True
+        return None
+    if err:
+        text = str(
+            Refusal(
+                f"対象 {top} を {base} に戻せなかった。手作業で戻す必要がある",
+                f"{top} を手で {base} に戻し、`{RUNNER} restore {out}` で印を外す",
+                f"原因: {_first_line(err)}",
+                "戻すまで、次の回は始められない",
+            )
+        )
+        print(text)
+        return text
+    st["released"] = True
+    return None
+
+
+def resolve_append(rel, root, toplevel):
+    """追記の対象（ワークスペースルートからの相対）を実体にして返す。
+    toplevel の中にある、git 管理下のファイルだけ。.. ・絶対パス・外へ出るリンクは断る。"""
+    p = Path(rel)
+    if p.is_absolute() or ".." in p.parts:
+        raise Refusal(
+            f"追記のパスは、ワークスペースルートからの相対で .. を含まない形にする: {rel}",
+            "setup.files のパスを直す",
+        )
+    real = os.path.realpath(Path(root) / p)
+    if not _inside(real, toplevel):
+        raise Refusal(
+            f"追記のパスが対象 {toplevel} の外にある（外へ出るリンクを含む）: {rel}",
+            "setup.files のパスを、対象の中のファイルにする",
+        )
+    if not os.path.isfile(real):
+        raise Refusal(
+            f"追記の対象のファイルが無い: {rel}",
+            "追記は対象にすでにあるファイルにだけ使える。パスを直すか、作って消す形（文字列）にする",
+        )
+    r = _git(["ls-files", "--error-unmatch", "--", os.path.relpath(real, toplevel)], cwd=toplevel)
+    if r.returncode != 0:
+        raise Refusal(
+            f"追記の対象が git 管理下にない: {rel}",
+            "追記は git 管理下のファイルにだけ使える。パスを直す",
+        )
+    return real
+
+
 def setup_clashes(scn, root):
-    """setup のファイルのうち、もう有るもの。有れば回さない（後片付けで消してしまうため）。"""
-    return [rel for rel in (scn.get("setup") or {}).get("files", {}) if (Path(root) / rel).exists()]
+    """setup.files のパスのうち、回せない原因になるもの。
+    作る形（文字列）は、もう有るもの（後片付けで消してしまうため）。
+    追記の形（append: true）は、まだ無いもの（追記は対象にある管理下のファイルにだけ使う）。"""
+    files = (scn.get("setup") or {}).get("files") or {}
+    return [rel for rel, v in files.items() if (Path(root) / rel).exists() != file_spec(v)[1]]
 
 
-def _setup(scn, root):
-    """setup のファイルを作る。(作ったファイル, 作ったディレクトリ) を返す。
-    既にあるパスには触らない（setup_clashes で先に確かめてある）。
-    ディレクトリは、この関数が新しく作ったものだけ。"""
-    files, dirs = [], []
-    for rel, body in (scn.get("setup") or {}).get("files", {}).items():
+def uses_target(scn):
+    """使い捨てのリポジトリを触る setup（git・reset・追記）があるか。"""
+    setup = scn.get("setup") or {}
+    appends = any(file_spec(v)[1] for v in (setup.get("files") or {}).values())
+    return bool(setup.get("git") or setup.get("reset") or appends)
+
+
+def _setup(scn, root, toplevel=None):
+    """setup のファイルを作り、追記する。(作ったファイル, 作ったディレクトリ) を返す。
+    作る形は、既にあるパスには触らない（setup_clashes で先に確かめてある）。
+    ディレクトリは、この関数が新しく作ったものだけ。追記は作ったものに数えない
+    （戻すのは setup.reset。消すと管理下のファイルを削除してしまう）。
+    追記の対象は、先に全部確かめてから（toplevel は判定を通した対象）、書き始める。"""
+    files, dirs, appends = [], [], {}
+    entries = {
+        rel: file_spec(v) for rel, v in ((scn.get("setup") or {}).get("files") or {}).items()
+    }
+    for rel, (body, append) in entries.items():
+        if append:
+            if toplevel is None:
+                raise Refusal(
+                    "追記の対象を決められない（対象の判定を通っていない）", "setup を直す"
+                )
+            appends[resolve_append(rel, root, toplevel)] = body
+    for rel, (body, append) in entries.items():
+        if append:
+            continue
         p = Path(root) / rel
         missing = []
         d = p.parent
@@ -459,6 +918,9 @@ def _setup(scn, root):
             dirs.append(str(d.relative_to(root)))
         p.write_text(body, encoding="utf-8")
         files.append(rel)
+    for real, body in appends.items():
+        with open(real, "a", encoding="utf-8", newline="") as f:
+            f.write(body)
     return files, dirs
 
 
@@ -637,9 +1099,15 @@ def finish(scn, out, st, root):
         issue = (scn.get("setup") or {}).get("issue")
         if issue and issue.get("close") and st.get("issue_no"):
             close_issue(issue, st["issue_no"], root)
+        not_restored = release_target(st, root)
+        _write_state(out, st)
+    if not_restored:
+        results.append(("reset", st["target"]["path"], FAIL, "base に戻せなかった。手作業が要る"))
     write_report(scn, out, st, results, rows, raw)
     final = overall(results)
     print(f"\n結果: {final}（レポート: {out}/report.md）")
+    if not_restored:
+        return 3  # レポートは書いた。次の回を始めさせない
     return {PASS: 0, FAIL: 1, INCONCLUSIVE: 2, REVIEW: 2}[final]
 
 
@@ -933,9 +1401,25 @@ def scenario_summary(scn):
         lines.append(
             "作るもの: なし。ccnavi 本体に何か残らないことは、回したあと repo の判定で確かめる"
         )
-    setup = (scn.get("setup") or {}).get("files", {})
-    if setup:
-        lines.append("回す前に作り、回したあとに消すファイル: " + ", ".join(setup))
+    files = {rel: file_spec(v) for rel, v in ((scn.get("setup") or {}).get("files") or {}).items()}
+    made = [rel for rel, (_, append) in files.items() if not append]
+    appended = [rel for rel, (_, append) in files.items() if append]
+    if made:
+        lines.append("回す前に作り、回したあとに消すファイル: " + ", ".join(made))
+    if appended:
+        lines.append(
+            "回す前に追記する、対象にある管理下のファイル（消さない。戻すのは setup.reset）: "
+            + ", ".join(appended)
+        )
+    for argv in (scn.get("setup") or {}).get("git") or []:
+        lines.append("回す前に対象で打つ git: " + shlex.join(argv))
+    reset = (scn.get("setup") or {}).get("reset")
+    if reset:
+        lines.append(
+            f"回す前と回したあとに、{DISPOSABLE_REL} を {reset['base']} へ戻す"
+            "（未コミットの変更・main 以外のブランチ・ワークツリー・タグ・stash が消える）。"
+            "人間の操作で止めた回は、戻さずに残す（続きは next、やめるのは restore）"
+        )
     issue = (scn.get("setup") or {}).get("issue")
     if issue:
         close = "（回したあとに閉じる）" if issue.get("close") else "（閉じない）"
@@ -981,13 +1465,28 @@ def confirmation_text(scn, root, mode_text):
     facts = [scenario_summary(scn), "", mode_text]
     clash = setup_clashes(scn, root)
     if clash:
-        facts += ["", f"注意: setup のパスが既にある（run は回さない）: {', '.join(clash)}"]
+        facts += [
+            "",
+            "注意: setup.files のパスが合わない"
+            f"（作る形は既にある・追記の形は無い。run は回さない）: {', '.join(clash)}",
+        ]
+    if uses_target(scn):
+        try:
+            top = require_disposable_repo(root, Path(root) / DISPOSABLE_REL)
+            facts += ["", f"対象のリポジトリ: {top}（使い捨てと確かめた）"]
+        except Refusal as exc:
+            facts += ["", f"注意: 対象のリポジトリを使えない（run は回さない）\n{exc}"]
     questions = [
         "確認事項 1: ワークツリーに未コミットの変更がなく、origin と同期しているか"
         "（他のセッションが作業中の変更を含まないか）"
     ]
     if scn.get("test_repo"):
         questions.append("確認事項 2: projects/test-repo にブランチや MR ができてよいか")
+    if (scn.get("setup") or {}).get("reset"):
+        questions.append(
+            f"確認事項 3: {DISPOSABLE_REL} の未コミットの変更・main 以外のブランチ・"
+            "ワークツリー・タグ・stash を、回す前と回したあとに消してよいか（setup.reset）"
+        )
     return "\n".join(
         [
             "回す前に、人間に次を確認する。確認が取れたら --confirmed を付けて打ち直す。",
@@ -1118,9 +1617,20 @@ def cmd_run(args):
         return 3
     clash = setup_clashes(scn, root)
     if clash:
-        # 有るものを後片付けで消さないよう、回す前に止める
-        print(f"setup のパスが既にある（消されてしまうので回さない）: {', '.join(clash)}")
+        # 有るものを後片付けで消さないよう、追記の対象が無いまま書き始めないよう、回す前に止める
+        print(
+            "setup.files のパスが合わない（作る形は既にある・追記の形は無い）: "
+            + ", ".join(clash)
+            + "\n案内: 作る形のパスは、回したあとに消すので、既にあると回さない"
+            + "\n次: パスを直すか、既にあるファイルを退けて打ち直す"
+        )
         return 1
+    top = None
+    if uses_target(scn):
+        try:
+            top = require_disposable_repo(root, root / DISPOSABLE_REL)
+        except Refusal as exc:
+            return _refuse(exc)
     if not args.confirmed:
         print(confirmation_text(scn, root, mode_text))
         return 3
@@ -1129,33 +1639,84 @@ def cmd_run(args):
     )
     out.mkdir(parents=True, exist_ok=True)
     pre = {rel: file_digest(root / rel) for rel in scn["expect"].get("files_unchanged", [])}
-    issue = (scn.get("setup") or {}).get("issue")
-    # issue は回すたびに新しく作る。番号は state に残し、続きの step の prompt にも入れる
-    issue_no = make_issue(issue, root) if issue else None
-    setup_files, setup_dirs = _setup(scn, root)
+    setup = scn.get("setup") or {}
+    base = (setup.get("reset") or {}).get("base")
     st = {
         "scenario": str(Path(args.scenario).resolve()),
         "root": str(root),
+        "out": str(out),
         "next_step": 0,
         "session_ids": [],
         "cost_usd": 0.0,
         "pre_digests": pre,
         "pre_repo": repo_snapshot(root),
-        "setup_made": setup_files,
-        "setup_dirs": setup_dirs,
-        "issue_no": issue_no,
+        "setup_made": [],
+        "setup_dirs": [],
+        "issue_no": None,
+        "target": None,
     }
     _write_state(out, st)
+    try:
+        if top:
+            lock = acquire_target(top, out)
+            st["target"] = {"path": top, "base": base, "lock": lock}
+            _write_state(out, st)
+            if base:
+                reset_repo(root, top, base)
+        # issue は回すたびに新しく作る。番号は state に残し、続きの step の prompt にも入れる
+        if setup.get("issue"):
+            st["issue_no"] = make_issue(setup["issue"], root)
+        st["setup_made"], st["setup_dirs"] = _setup(scn, root, top)
+        if setup.get("git"):
+            run_setup_git(root, top, setup["git"])
+    except Refusal as exc:
+        _abort(scn, out, st, root)
+        return _refuse(exc)
+    except BaseException:
+        _abort(scn, out, st, root)
+        raise
+    _write_state(out, st)
     return _continue(scn, out, st, root)
+
+
+def _refuse(exc):
+    """回す前の拒否・停止の文面（理由・案内:・次:）を出して、終了コード 3 を返す。"""
+    print(exc)
+    return 3
+
+
+def _abort(scn, out, st, root):
+    """回し始める前に止めたとき、作ったものを消し、対象を戻して放す（戻せなければ文面が出る）。"""
+    st["setup_made"] = st.get("setup_made") or []
+    _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
+    issue = (scn.get("setup") or {}).get("issue")
+    if issue and issue.get("close") and st.get("issue_no"):
+        close_issue(issue, st["issue_no"], root)
+    release_target(st, root)
+    _write_state(out, st)
 
 
 def _continue(scn, out, st, root):
     try:
         rc = drive(scn, out, st, Path(root))
     except BaseException:
-        # 割り込みなど、drive を抜けて finish に届かないときも、setup のファイルを残さない
+        # 割り込みなど、drive を抜けて finish に届かないときも、setup のファイルを残さず、
+        # 対象を base へ戻す（戻せなければ文面を出す。元の例外はそのまま投げ直す）
         _cleanup(st["setup_made"], st.get("setup_dirs", []), root)
+        release_target(st, root)
+        _write_state(out, st)
         raise
+    if rc == 10 and st.get("target"):
+        # 人間が操作したあとの next で続くので、対象は base に戻さず残す（ロックだけ放す）
+        release_target(st, root, hold=True)
+        _write_state(out, st)
+        tgt = st["target"]
+        if tgt.get("base"):
+            print(
+                f"案内: {tgt['path']} を {tgt['base']} に戻していない"
+                "（setup のファイルも残している）。戻すのは next が最後まで終わったとき"
+            )
+            print(f"次: 続けるなら `{RUNNER} next {out}`、やめるなら `{RUNNER} restore {out}`")
     return finish(scn, out, st, Path(root)) if rc is None or rc == 11 else rc
 
 
@@ -1163,16 +1724,51 @@ def cmd_next(args):
     out = Path(args.out)
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
     if st.get("halt"):
+        # halt は finish で戻してある。届かなかった場合に備え、戻し直す（戻し済みなら何もしない）
         print(f"step {st['halt']['step']} で止めた回。続きは回せない")
+        if release_target(st, st["root"]):
+            return 3
+        _write_state(out, st)
         return 2
     # 人間の操作の間にモードが変わることがあるので、続けるたびに確かめる
     mode_ok, mode_text = mode_check(Path(st["root"]))
     if not mode_ok:
         print(mode_text)
         return 3
+    if st.get("target") and st.get("held"):
+        try:
+            st["target"]["lock"] = acquire_target(st["target"]["path"], out, resuming=True)
+        except Refusal as exc:
+            return _refuse(exc)
+        st["held"] = False
     scn = load_scenario(st["scenario"])
     scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
     return _continue(scn, out, st, st["root"])
+
+
+def cmd_restore(args):
+    """人間の操作で止めた回を続けずにやめる。setup のファイルを消し、対象を base へ戻して放す。
+    戻せなかった回の戻し直しにも使う。"""
+    out = Path(args.out)
+    st = json.loads((out / "state.json").read_text(encoding="utf-8"))
+    scn = load_scenario(st["scenario"])
+    tgt = st.get("target")
+    if tgt and not st.get("released"):
+        try:
+            tgt["lock"] = acquire_target(tgt["path"], out, resuming=True)
+        except Refusal as exc:
+            return _refuse(exc)
+    _cleanup(st["setup_made"], st.get("setup_dirs", []), st["root"])
+    st["setup_made"] = []
+    issue = (scn.get("setup") or {}).get("issue")
+    if issue and issue.get("close") and st.get("issue_no"):
+        close_issue(issue, st["issue_no"], st["root"])
+    failed = release_target(st, st["root"])
+    _write_state(out, st)
+    if failed:
+        return 3
+    print(f"{out} の回を片付けた（setup のファイルを消し、対象を戻して放した）")
+    return 0
 
 
 def main(argv=None):
@@ -1202,6 +1798,9 @@ def main(argv=None):
     n = sub.add_parser("next")
     n.add_argument("out")
     n.set_defaults(fn=cmd_next)
+    rs = sub.add_parser("restore")
+    rs.add_argument("out")
+    rs.set_defaults(fn=cmd_restore)
     args = ap.parse_args(argv)
     return args.fn(args)
 
