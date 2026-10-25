@@ -841,7 +841,7 @@ ready)
 	fi
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
-	still=$(undraft "$number")
+	still=$(undraft "$number") || still=""
 	[ "$still" = "false" ] || fail undraft-failed "Draft を解除できませんでした（${url}）。ホストの返事は上に出ている。"
 	if [ -n "$noted" ] && [ -f "$noted" ]; then
 		comment_staged ready ready "$number" "$url" "$noted" >/dev/null ||

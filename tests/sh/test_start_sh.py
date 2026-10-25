@@ -1477,6 +1477,15 @@ class StartShTest(unittest.TestCase):
         self.assertNotIn("#99", done.stdout)
         self.assertNotIn("#98", done.stdout)
 
+    def test_body_keywords_inside_code_comments_quotes_and_words_are_not_read(self):
+        self.graphql_blocked_with_body(
+            "Closes #12\n```\nFixes #9\n```\n> Closes #7\n<!-- Closes #100 -->\n"
+            "例: `Closes #50`\nDoes not close #8 bug-fix #13 Closes #14abc"
+        )
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("issue: 12 と mr: 5", done.stdout)
+
     def test_a_blocked_graphql_with_no_keyword_in_the_body_is_zero_linked_issues(self):
         self.graphql_blocked_with_body("Refs #12")
         done = self.run_sh("--mr", "5")

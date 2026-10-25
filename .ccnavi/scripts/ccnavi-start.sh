@@ -722,11 +722,13 @@ new_issue_post() {
 # GraphQL を使えない環境で、MR の本文の閉じるキーワード（close・fix・resolve の各形。大文字小文字不問）に続く
 # `#n` と `<owner>/<repo>#n` を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ出す。<MR の番号>
 # GitHub の closingIssuesReferences の代わり。本文だけを読む（コミットメッセージのキーワードや、手で付けたリンクは拾わない）。
+# コードブロック・インラインコード・HTML コメント・引用行は読まない。`not close #n` と、語の途中の `fix`（`bug-fix #n`）も拾わない。
 # 戻り値: 0 読めた / 1 API の失敗
 mr_linked_issues_body() {
 	mb_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$1") || return 1
 	printf '%s' "$mb_got" | "$ccnavi_h_jq" -r --arg p "$ccnavi_h_path" \
-		'(.body // "") | scan("\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+((?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)"; "i") | .[0] | if startswith("#") then $p + . else . end' || return 1
+		'(.body // "") | gsub("(?s)```.*?```"; "") | gsub("(?s)<!--.*?-->"; "") | gsub("`[^`\n]*`"; "") | gsub("(?m)^[ \t]*>[^\n]*"; "")
+		| scan("(?<![A-Za-z0-9_-])(?<!not )(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+((?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)(?![A-Za-z0-9_])"; "i") | .[0] | if startswith("#") then $p + . else . end' || return 1
 }
 
 # その MR が閉じる issue を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>

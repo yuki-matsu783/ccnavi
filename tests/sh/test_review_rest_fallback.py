@@ -285,6 +285,27 @@ class RestFallbackTest(unittest.TestCase):
         # 最初のコメントは変わらない（url・本文・作成の時刻）
         self.assertEqual(thread["created_at"], "2026-10-01T00:00:00Z")
 
+    def test_a_large_comment_list_does_not_hit_the_argument_limit(self):
+        """diff_hunk を含むコメントが多い MR でも、組み立てが引数の上限（128KB）で落ちない。"""
+        big = [
+            comment(1000 + i, "reviewer", "2026-10-02T00:00:00Z", "x" * 500, diff_hunk="y" * 2000)
+            for i in range(120)
+        ]
+        write(
+            self.rest,
+            json.dumps({"review_threads": THREADS, "comments": [*COMMENTS, *big]}),
+        )
+        done = self.review("fetch", graphql="blocked")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)["threads"], EXPECTED)
+
+    def test_a_response_that_is_not_an_array_stops_with_the_hint(self):
+        write(self.rest, json.dumps({"review_threads": {"threads": []}, "comments": COMMENTS}))
+        done = self.review("fetch", graphql="blocked")
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("配列でない", done.stderr)
+        self.assertIn("REST の代わりの道", done.stderr)
+
     # ---- confirm
 
     def result_copy(self):
@@ -337,6 +358,15 @@ class RestFallbackTest(unittest.TestCase):
                 self.assertIn("が失敗した", done.stderr)
                 for word in ("--result", "JSON", "MCP"):
                     self.assertNotIn(word, done.stderr)
+
+    def test_the_original_graphql_reply_is_shown_when_rest_fails_too(self):
+        done = self.review("fetch", graphql="blocked", transport="gh", FAKE_GITHUB_NO_CCR="1")
+        self.assertIn("GraphQL の返事:", done.stderr)
+        self.assertIn("GraphQL is not available", done.stderr)
+        # curl は本文を捨てるので、番号だけが残る
+        done = self.review("fetch", graphql="blocked", FAKE_GITHUB_NO_CCR="1")
+        self.assertIn("GraphQL の返事:", done.stderr)
+        self.assertIn("403", done.stderr)
 
     # ---- undraft
 

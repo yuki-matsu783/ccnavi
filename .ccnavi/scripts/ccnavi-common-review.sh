@@ -192,6 +192,8 @@ gql() {
 	fi
 	rm -f "$gql_file" || :
 	if ccnavi_host_graphql_blocked "$gql_text"; then
+		# 元の返事を覚えておく。REST の代わりの道も失敗したとき、rest_fallback_failed が併記する（$( ) の中でも渡る）
+		ccnavi_host_fail_body "$gql_text" >"${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" 2>/dev/null || :
 		return 3
 	fi
 	api_failed POST graphql "$gql_text"
@@ -201,6 +203,10 @@ gql() {
 # GraphQL が 403 で、REST（/ccr/）の代わりの道も失敗したときの案内。REST の失敗の返事は、api_failed が先に出している。
 # 打てる手が無いので、エージェントは続きを試さず、ユーザに環境の確認を頼んで止まる。
 rest_fallback_failed() {
+	gql_why_file="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$"
+	gql_why=$(cat "$gql_why_file" 2>/dev/null || :)
+	rm -f "$gql_why_file" || :
+	[ -z "$gql_why" ] || printf '%s: GraphQL の返事: %s\n' "$review_label" "$gql_why" >&2
 	printf '%s: %s\n' "$review_label" \
 		"この環境は GraphQL を使えず（HTTP 403）、REST の代わりの道（pulls/<N>/ccr/ と pulls/<N>/comments）も失敗しました（$1）。ホストの返事は上に出ています。認証の失敗かこの環境でのトークンの権限不足の可能性があります。エージェントは別の手で迂回せず（直接実装にも切り替えず）、ユーザに $host への接続（認証と pull request への権限）の確認を頼んで返事を待ち、報告して止まってください。" >&2
 }
@@ -315,13 +321,26 @@ threads_rest() {
 		rest_fallback_failed "スレッドの取得"
 		return 1
 	fi
-	"$JQ" -n --argjson rt "$tr_threads" --argjson cs "$tr_comments" '
-		($cs | map({key: (.id | tostring), value: .}) | from_entries) as $m |
-		[$rt[] | ((.comment_ids // []) | map(tostring)) as $ids | (($ids[0]) // "") as $first | (($ids | last) // "") as $final |
+	# コメントの一覧は大きい（diff_hunk を含む）ので、引数ではなくファイルで渡す（引数 1 個の上限を超える）
+	tr_file="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-threads-$$"
+	printf '%s' "$tr_threads" >"$tr_file.rt"
+	printf '%s' "$tr_comments" >"$tr_file.cs"
+	if ! "$JQ" -e -s '.[0] | type == "array"' "$tr_file.rt" >/dev/null 2>&1 || ! "$JQ" -e -s '.[0] | type == "array"' "$tr_file.cs" >/dev/null 2>&1; then
+		rm -f "$tr_file.rt" "$tr_file.cs" || :
+		printf '%s: %s\n' "$review_label" "ccr/review_threads かコメントの一覧の応答が配列でない。" >&2
+		rest_fallback_failed "スレッドの取得"
+		return 1
+	fi
+	tr_rc=0
+	"$JQ" -n --slurpfile rt "$tr_file.rt" --slurpfile cs "$tr_file.cs" '
+		($cs[0] | map({key: (.id | tostring), value: .}) | from_entries) as $m |
+		[$rt[0][] | ((.comment_ids // []) | map(tostring)) as $ids | (($ids[0]) // "") as $first | (($ids | last) // "") as $final |
 			($m[$first] // {}) as $f | ($m[$final] // {}) as $l |
 			{id: $first, resolved: (.resolved // false), url: ($f.html_url // ""), path: (.path // $f.path // ""), line: (.line // $f.line // 0),
 			 body: ($f.body // ""), created_at: ($f.created_at // ""),
-			 last_id: (($l.id // "") | tostring), last_at: ($l.created_at // ""), last_author: ($l.user.login // "")}]'
+			 last_id: (($l.id // "") | tostring), last_at: ($l.created_at // ""), last_author: ($l.user.login // "")}]' || tr_rc=$?
+	rm -f "$tr_file.rt" "$tr_file.cs" || :
+	return "$tr_rc"
 }
 
 # ---- レビュー。変更要求の状態を CHANGES_REQUESTED にそろえる。
