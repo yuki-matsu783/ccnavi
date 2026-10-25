@@ -147,8 +147,8 @@ def _fold(path: str) -> str:
 
 
 def _same_name(a: str, b: str) -> bool:
-    """名前が大文字小文字を除いて同じか。`_fold` と `casefold` のどちらかで同じなら同じ。"""
-    return _fold(a) == _fold(b) or a.casefold() == b.casefold()
+    """名前が大文字小文字を除いて同じか。比べるのは `<識別子>.yml` で、区切りは入らない。"""
+    return a.casefold() == b.casefold()
 
 
 def _is_absolute(rel: str) -> bool:
