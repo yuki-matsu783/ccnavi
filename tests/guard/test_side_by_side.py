@@ -254,7 +254,7 @@ class SideBySideTest(unittest.TestCase):
 
     def test_同名の別ツリーが混ざっても報告と戻す判定が食い違わない(self):
         # q の下に p と同じ名前のワークツリーを切る。
-        # 名前で突き合わせると、戻していない p のメインを戻したと言う。
+        # 名前で突き合わせると、戻していない p のユーザのチェックアウトを戻したと言う。
         self.record()
         twin = os.path.join(self.ws, ".claude", "worktrees", "p")
         git(self.q, "worktree", "add", "--quiet", twin, "-b", "p")
@@ -264,7 +264,7 @@ class SideBySideTest(unittest.TestCase):
 
         result = self.hook(twin)
 
-        self.assertEqual(self.text(p_path), "-- changed\n", "p のメインは戻さない")
+        self.assertEqual(self.text(p_path), "-- changed\n", "p のユーザのチェックアウトは戻さない")
         self.assertIn("出所不明の変更", result.stderr)
 
     def test_報告したあとに中身が変わったら言い直す(self):

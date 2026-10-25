@@ -738,7 +738,7 @@ ig_done_args() {
 #                         そのあとワークツリー・一時ワークツリー・ブランチ・ref・記録を片付ける。何度打ち直してもよい
 #   integrate --abort     一時ワークツリーとrefとmarkerを消す。作業ワークツリーとユーザのチェックアウトには触らない
 #
-# markerは <メインのgitディレクトリ>/ccnavi-integrate/<名前>/marker。
+# markerは <ユーザのチェックアウトのgitディレクトリ>/ccnavi-integrate/<名前>/marker。
 
 d4_lower() {
 	printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'
@@ -790,7 +790,7 @@ d4_unknown_marker() {
 # 共通部。名前・場所・記録の置き場を決める（ロックは取らない）。<名前>
 #
 # ユーザのチェックアウト（git worktree listの先頭）で打たれていることを求める。markerは
-# メインのgitディレクトリに置く。
+# ユーザのチェックアウトのgitディレクトリに置く。
 d4_begin() {
 	ig_name "$1"
 	# ユーザのチェックアウトを読むだけの git が index を書き直さない（確認している間、ルートの index に書かない）。
