@@ -1617,7 +1617,6 @@ if [ "$total" -eq 0 ]; then
 		3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 		esac
 	fi
-	issue_state_gate
 	if [ -n "$opt_slug" ]; then
 		slug="$opt_slug"
 		new_branch="${opt_prefix}-${number}-${slug}"
@@ -1658,6 +1657,8 @@ if [ "$total" -eq 0 ]; then
 	id_check "$new_branch" "--prefix・--slug を見直して再実行してください。" 2
 	clash_check "$new_branch" strict
 	merged_check "$new_branch"
+	# マージ済みの MR の関門（終了コード 1）が先。そのあとで、閉じた issue かを見る
+	issue_state_gate
 	new_title=$(make_title "$slug")
 	new_wt="$root/.claude/worktrees/$new_branch"
 	final_issue=$(issue_show "" "$number")
@@ -1802,8 +1803,8 @@ if [ -n "$resume" ]; then
 	2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。何も作成せずに中断しました。ユーザに確かめてください。issue が無ければ、--new-issue <題> で作るか、ユーザに作ってもらい、その番号で打ち直します。" 2 ;;
 	3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 	esac
-	issue_state_gate
 	merged_check "$cb"
+	issue_state_gate
 	fetch_branch "$cb"
 	ensure_worktree "$cb"
 	fast_forward "$cb"

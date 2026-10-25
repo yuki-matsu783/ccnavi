@@ -776,6 +776,17 @@ class StartShTest(unittest.TestCase):
         self.assertIn(BRANCH, self.remote_branches())
         self.assertEqual(self.posts()[0]["title"], "Add login")
 
+    def test_a_merged_mr_gate_comes_before_the_closed_issue_stop(self):
+        merged = {**pr(2, BRANCH), "merged_at": "2026-01-01T00:00:00Z", "state": "closed"}
+        self.closed_issue()
+        with open(self.routes, encoding="utf-8") as f:
+            routes = json.load(f)
+        self.route({**routes, **closed_pulls(BRANCH, [merged])})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("マージ済み MR（!2）", done.stderr)
+        self.assertNotIn("は closed", done.stdout)
+
     def test_an_open_issue_is_not_stopped(self):
         self.closed_issue(state="open")
         done = self.run_sh("--issue", "152")
