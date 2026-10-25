@@ -67,7 +67,9 @@ def _log(root):
 
 
 def _real_origin(top, git):
-    r = git(["remote", "get-url", "origin"], cwd=top)
+    # `remote get-url` は利用者の url.*.insteadOf で書き換えた後を返す。insteadOf は連鎖しないので、
+    # bare へ向ける -c には設定の生の値を使う。
+    r = git(["config", "--get", "remote.origin.url"], cwd=top)
     url = r.stdout.strip() if r.returncode == 0 else ""
     if not url:
         raise RuntimeError(f"対象 {top} に origin が無い。bare の相手を作れない")
@@ -216,7 +218,8 @@ def resume(root, host):
 
 
 def teardown(root, host, git):
-    """模擬を止め、refs/remotes/origin/* を戻し、置き場を消す。何度呼んでもよい。例外は出さない。"""
+    """模擬を止め、refs/remotes/origin/* を戻し、置き場を消す。何度呼んでもよい。
+    refs の戻しの失敗は案内を出すだけで、置き場の削除は続ける。"""
     if not host or host.get("down"):
         return
     server = _SERVERS.pop(host["dir"], None)

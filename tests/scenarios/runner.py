@@ -2216,6 +2216,10 @@ def _continue(scn, out, st, root):
 def cmd_next(args):
     out = Path(args.out)
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
+    if st.get("released"):
+        print("対象を戻して放した回（restore 済みか終了済み）。続きは回せない")
+        print(f"次: やり直すなら `{RUNNER} run <シナリオ> --confirmed`")
+        return 2
     if st.get("halt"):
         # halt は finish で戻してある。届かなかった場合に備え、戻し直す（戻し済みなら何もしない）
         print(f"step {st['halt']['step']} で止めた回。続きは回せない")

@@ -2407,6 +2407,16 @@ def host_workspace(tmp):
     return Workspace(tmp, origin_root=BODY_ORIGIN, origin_target=REAL_ORIGIN)
 
 
+def private_tempdir(test, root):
+    """ccnavi-host-* の置き場を、このテストだけのディレクトリにする（並列の他の回と混ざらない）。"""
+    place = Path(root) / "tmp"
+    place.mkdir()
+    patcher = mock.patch.object(tempfile, "tempdir", str(place))
+    patcher.start()
+    test.addCleanup(patcher.stop)
+    return place
+
+
 def tokens_dropped_env():
     return {k: v for k, v in os.environ.items() if not hostenv.TOKEN_VAR.match(k)}
 
@@ -2452,9 +2462,9 @@ class HostFieldTest(unittest.TestCase):
 
     def test_a_target_that_is_ccnavi_itself_is_refused_before_anything_is_made(self):
         with tempfile.TemporaryDirectory() as d:
+            scratch = private_tempdir(self, d)
             ws = Workspace(d, origin_root=REAL_ORIGIN, origin_target=REAL_ORIGIN)
             path = ws.scenario_file({"host": "bare"})
-            before = set(Path(tempfile.gettempdir()).glob("ccnavi-host-*"))
             args = ["run", str(path), "--confirmed", "--root", str(ws.root), "--out", str(ws.out)]
             with (
                 mock.patch.object(runner, "_ENTRY", True),
@@ -2467,7 +2477,7 @@ class HostFieldTest(unittest.TestCase):
             self.assertIn("origin が ccnavi 本体の origin と同じ", text)
             self.assertIn("次: ", text)
             step.assert_not_called()
-            self.assertEqual(set(Path(tempfile.gettempdir()).glob("ccnavi-host-*")), before)
+            self.assertEqual(list(scratch.glob("ccnavi-host-*")), [])
 
 
 class StepEnvTest(unittest.TestCase):
@@ -2539,6 +2549,7 @@ class BareHostTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
+        self.scratch = private_tempdir(self, self._tmp.name)
         self.ws = host_workspace(self._tmp.name)
         self.top = str(self.ws.target.resolve())
         self.root = str(self.ws.root.resolve())
@@ -2566,6 +2577,24 @@ class BareHostTest(unittest.TestCase):
         self.assertEqual(body.stdout.strip(), BODY_ORIGIN)
         body = self.git(env, self.top, "-C", self.root, "remote", "get-url", "origin")
         self.assertEqual(body.stdout.strip(), BODY_ORIGIN)
+
+    def test_a_users_insteadof_does_not_send_the_traffic_to_the_real_origin(self):
+        config = Path(self._tmp.name) / "global.gitconfig"
+        config.write_text(
+            '[url "git@example.invalid:"]\n\tinsteadOf = https://github.com/\n', encoding="utf-8"
+        )
+        with mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(config)}):
+            self.assertTrue(
+                git(self.ws.target, "remote", "get-url", "origin").startswith("git@example.invalid")
+            )
+            host, env = self.prepare()
+            self.assertEqual(host["real_origin"], REAL_ORIGIN)
+            git(self.ws.target, "switch", "-q", "-c", "feat")
+            git(self.ws.target, "commit", "-q", "--allow-empty", "-m", "e")
+            pushed = self.git(env, self.top, "push", "-q", "origin", "feat")
+        self.assertEqual(pushed.returncode, 0, pushed.stderr)
+        sha = git(self.ws.target, "rev-parse", "feat")
+        self.assertEqual(git(host["bare"], "rev-parse", "refs/heads/feat"), sha)
 
     def test_push_and_fetch_reach_the_bare_and_not_the_real_origin(self):
         host, env = self.prepare()
@@ -2634,10 +2663,9 @@ class BareHostTest(unittest.TestCase):
 
     def test_a_target_without_origin_is_refused_and_leaves_nothing(self):
         git(self.ws.target, "remote", "remove", "origin")
-        before = set(Path(tempfile.gettempdir()).glob("ccnavi-host-*"))
         with self.assertRaises(RuntimeError):
             hostenv.prepare(self.ws.root, self.top, {"host": "bare"}, runner._git)
-        self.assertEqual(set(Path(tempfile.gettempdir()).glob("ccnavi-host-*")), before)
+        self.assertEqual(list(self.scratch.glob("ccnavi-host-*")), [])
 
 
 @unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
@@ -2747,6 +2775,7 @@ class HostLifecycleTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
+        self.scratch = private_tempdir(self, self._tmp.name)
         self.ws = host_workspace(self._tmp.name)
 
     def scenario(self, host, steps=None, **extra):
@@ -2760,7 +2789,7 @@ class HostLifecycleTest(unittest.TestCase):
             return runner.main(args)
 
     def places(self):
-        return set(Path(tempfile.gettempdir()).glob("ccnavi-host-*"))
+        return set(self.scratch.glob("ccnavi-host-*"))
 
     def host_in_state(self):
         return json.loads((self.ws.out / "state.json").read_text(encoding="utf-8"))["host"]
@@ -2927,6 +2956,15 @@ class HostLifecycleTest(unittest.TestCase):
             self.assertEqual(runner.main(["next", str(self.ws.out)]), 3)
         self.assertTrue(self.host_in_state()["down"])
         self.assertEqual(self.places(), before)
+
+    def test_next_after_restore_does_not_run_the_steps(self):
+        steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}, {"prompt": "b"}]
+        with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as step:
+            self.assertEqual(self.run_cmd(self.scenario("bare", steps)), 10)
+            with mock.patch("builtins.print"):
+                self.assertEqual(runner.main(["restore", str(self.ws.out)]), 0)
+                self.assertEqual(runner.main(["next", str(self.ws.out)]), 2)
+        self.assertEqual(step.call_count, 1)
 
     def test_restore_removes_the_held_place(self):
         steps = [{"prompt": "a"}, {"human": True, "instruction": "打つ"}]
