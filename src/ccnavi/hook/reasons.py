@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import re
+
 from ..infra import hookio, settings, shellread, shellread_scan, shellread_words
 from ..infra.modes import DRY_RUN
 from ..policy import rules
@@ -324,12 +326,26 @@ def reason_for(
     return "\n".join(lines)
 
 
-# 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルールの一覧です（bare_id → 1 行）。
+# 非対話で確認が自動で拒否になるとき、代わりの手を reason に出すルールの一覧です（bare_id → (対象に
+# 含まれる語の式, 1 行)）。式が空なら、そのルールにヒットした回に必ず出します。
 # ask のルールには message を書けず、additionalContext は自動拒否のときに届かないため、ここに置きます。
+#
+# direct-worktree-confirm の 1 行は、あとのスクリプト側の拒否を確認が隠さないための説明です。
+# `--adopt` は、確認が通ってもスクリプトが「チケットに結び付くワークツリーです」と断るので、
+# 「了承されたら打ち直す」だけを言うと、打ち直しても通らない案内になります。
 _ASK_ALTERNATIVE = {
     "prefer-webfetch": (
+        "",
         "代わりの手: 調べものが一度きりなら WebFetch ツールを、"
-        "何度も呼び出すなら .ccnavi/scripts/ の sh にまとめてから実行してください。"
+        "何度も呼び出すなら .ccnavi/scripts/ の sh にまとめてから実行してください。",
+    ),
+    "direct-worktree-confirm": (
+        r"\s--adopt(?:\s|=|$)",
+        "ただし --adopt は、チケットに結び付く名前（承認済みチケット・提案・親のブランチの識別子。"
+        "ccnavi-ticket.sh status に出る）のワークツリーには、了承されても通りません。"
+        "ccnavi-worktree.sh が断ります。その場合は了承を頼まず、"
+        "チケットの作業はマージリクエストで出します（ccnavi-ticket.sh status の次の操作に従う）。"
+        "了承を頼むのは、チケットに結び付かない直接作業のワークツリーだけです。",
     ),
 }
 
@@ -349,8 +365,8 @@ def ask_hint(bare_id: str, subject: str) -> list[str]:
         "この操作はユーザの確認が要りますが、このセッションでは確認に答えられません。"
         f"ユーザに「{shown}」の了承を頼み、了承されたら打ち直してもらってください。"
     ]
-    alternative = _ASK_ALTERNATIVE.get(bare_id)
-    if alternative:
+    needle, alternative = _ASK_ALTERNATIVE.get(bare_id, ("", ""))
+    if alternative and (not needle or re.search(needle, subject, re.IGNORECASE)):
         lines.append(alternative)
     return lines
 
