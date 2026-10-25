@@ -249,9 +249,10 @@ class StageShTest(unittest.TestCase):
 
         paths = [
             ".ccnavi/config/common/templates/a.yml",
-            ".ccnavi/config/common/messages/deny.yml",
-            ".ccnavi/config/project/messages/a.yml",  # 読まれない置き場。取り込めない（mv の道）
-            ".ccnavi/config/project/messages/sub/a.yml",
+            ".ccnavi/messages/a.yml",
+            ".ccnavi/messages/sub/a.yml",
+            "projects/p/.ccnavi/messages/a.yml",
+            ".ccnavi/config/common/messages/deny.yml",  # 旧い置き場。取り込めない
             ".ccnavi/config/project/templates/a.yml",
             ".ccnavi/config/project/templates/sub/a.yml",
             ".ccnavi/config/common/templates/x/templates/a.yml",
@@ -270,6 +271,10 @@ class StageShTest(unittest.TestCase):
             "README.md",
         ]
         script = os.path.join(SH_DIR, "ccnavi-stage.sh")
+        # 保護対象の下書き（取り込み前）があれば、取り込んだ後の姿として下書きを読む。
+        draft = os.path.join(ROOT, "wip", "handoff", ".ccnavi", "scripts", "ccnavi-stage.sh")
+        if os.path.isfile(draft):
+            script = draft
         with open(script, encoding="utf-8") as f:
             text = f.read()
         start = text.index("is_importable() {")
