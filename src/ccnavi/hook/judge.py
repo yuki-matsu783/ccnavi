@@ -777,7 +777,7 @@ def decide_before(
     # その文面で止まる。ここでは
     # deny にヒットしなかった呼び出しだけを見る。
     if payload.tool_name == "Bash" and verdict != rules.DENY:
-        written, place, root_rule = rootwrite.check(
+        written, place, root_rule, origin = rootwrite.check(
             rule_set,
             payload.cwd,
             record.subject,
@@ -799,7 +799,7 @@ def decide_before(
                         rootwrite.CODE,
                         rootwrite.RULE_ID,
                         display_subject,
-                        rootwrite.message(root, written, place),
+                        rootwrite.message(root, written, place, origin),
                     )
                 ],
                 conf=conf,

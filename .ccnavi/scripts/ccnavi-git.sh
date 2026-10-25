@@ -112,7 +112,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                   ccnavi-git.sh) には rm と restore --source と checkout <ref> <パス> を利用できない
                   (衝突の解決の restore --ours / --theirs は利用できる。変更が必要ならユーザに依頼する)
             stash (list show push pop apply)
-            merge (-X ours / -s ours / --no-verify は不可)
+            merge (-X ours / -s ours / --no-verify は不可。統合先のユーザのチェックアウトでは --abort / --continue / --quit 以外は不可)
             merge-file -p (標準出力に出す形だけ。ファイルへは書かない)
                   両方取り込むときは merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス>
                   (現在・祖先・相手の順) で出力し、それを読んで Edit で書く
@@ -608,7 +608,7 @@ wt_fresh() {
 	fi
 
 	if [ "$wt_f_behind" -ne 0 ] && [ "$wt_f_ahead" -ne 0 ]; then
-		reject worktree-base-diverged "ワークツリーの基点 $wt_f_integ が origin/$wt_f_integ と分岐しています（先行 ${wt_f_ahead} 件・遅れ ${wt_f_behind} 件）。$SELF merge --ff-only では進められません。基点を origin/${wt_f_integ} にして切ると、手元にだけある先行 ${wt_f_ahead} 件を知らないブランチになり、統合で詰まります。ユーザに頼んで、先行分を push するか別のブランチに退避してから、手元の ${wt_f_integ} を origin/${wt_f_integ} に揃えてください。揃えたら再実行します。"
+		reject worktree-base-diverged "ワークツリーの基点 $wt_f_integ が origin/$wt_f_integ と分岐しています（先行 ${wt_f_ahead} 件・遅れ ${wt_f_behind} 件）。ワークツリーの基点は merge では進められません。基点を origin/${wt_f_integ} にして切ると、手元にだけある先行 ${wt_f_ahead} 件を知らないブランチになり、統合で詰まります。ユーザに頼んで、先行分を push するか別のブランチに退避してから、手元の ${wt_f_integ} を origin/${wt_f_integ} に揃えてください。揃えたら再実行します。"
 	fi
 	if [ "$wt_f_behind" -ne 0 ]; then
 		wt_q_integ=$(ccnavi_sh_quote "$wt_f_integ")
@@ -787,6 +787,14 @@ d4_unknown_marker() {
 	reject integrate-marker "取り込みの記録（${d4_g0}/${1}/marker）の版（${d4_pv}）を知りません。版 4 でない記録は ccnavi が読めません。ユーザが git status で統合先の staged を確かめ、不要なら git reset --merge で戻してから、${d4_g0}/${1} を手で消してください。エージェントは操作しません。"
 }
 
+# 引数のパス（git のトップ）が、ユーザのチェックアウト（git worktree list の先頭）か調べる。
+#
+# 先頭の場所は d4_main に残す（見つからなければ空）。d4_begin（integrate 系）と merge) が同じ判定を使う。
+user_checkout_is() {
+	d4_main=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
+	[ -n "$d4_main" ] && [ "$(ccnavi_phys "$1")" = "$(ccnavi_phys "$d4_main")" ]
+}
+
 # 共通部。名前・場所・記録の置き場を決める（ロックは取らない）。<名前>
 #
 # ユーザのチェックアウト（git worktree listの先頭）で打たれていることを求める。markerは
@@ -802,8 +810,7 @@ d4_begin() {
 	d4_common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
 	[ -n "$d4_common" ] || reject integrate-no-gitdir "git の共通ディレクトリの場所が読めません。ユーザに伝えてください。"
 	d4_common=$(ccnavi_phys "$d4_common")
-	d4_main=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
-	if [ -z "$d4_main" ] || [ "$(ccnavi_phys "$ig_top")" != "$(ccnavi_phys "$d4_main")" ]; then
+	if ! user_checkout_is "$ig_top"; then
 		reject integrate-not-main "$sub はユーザのチェックアウト（${d4_main:-見つかりません}）でだけ実行します。ここ（${ig_top}）は違います。cd してから、同じコマンドを再実行してください。"
 	fi
 	ig_gdir=$(git rev-parse --git-path ccnavi-integrate 2>/dev/null || :)
@@ -1942,8 +1949,12 @@ merge)
 	# オプションは許可リストで読む（略した --strategy-o=ours・まとめた -sours も同じに読む）。
 	ow_spec "ff no-ff ff-only edit no-edit commit no-commit stat no-stat no-log squash no-squash quiet verbose progress no-progress abort continue quit signoff no-signoff allow-unrelated-histories summary no-summary verify no-verify autostash no-autostash overwrite-ignore no-overwrite-ignore" \
 		"message file strategy strategy-option" "log" "qvne" "mFsX"
+	mg_finish=no
 	merge_cb() {
 		[ "$1" = opt ] || return 0
+		case "$2" in
+		--abort | --continue | --quit) mg_finish=yes ;;
+		esac
 		case "$2:${3:-}" in
 		--strategy:ours | --strategy:theirs | -s:ours | -s:theirs | --strategy-option:ours | --strategy-option:theirs | -X:ours | -X:theirs)
 			reject merge-discard-side "$2 $3 を使うと、衝突の片側が気づかないうちに破棄されます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
@@ -1954,6 +1965,26 @@ merge)
 		esac
 	}
 	opt_walk merge_cb ${1+"$@"}
+	# ユーザの手元で統合先をチェックアウトしている場合は、merge のすべての形（--ff-only・--squash・
+	# --no-commit を含む）を止める。統合先への取り込みは integrate が行う決まりなので、直接 merge すると事後の通知でしか気づけない。
+	# 通すのは次の 3 つ。
+	#  - --abort / --continue / --quit: 途中の merge を終わらせる操作で、新しく取り込まない。--continue は、
+	#    ユーザが衝突を解いたあとに統合先で打つ形があり得るので、エージェントの入口としても止めない。
+	#  - ワークツリーの中の merge（main を取り込む形を含む）。
+	#  - 統合先でないブランチのチェックアウトの merge。detached HEAD も、統合先のブランチを動かさないので通す。
+	# 統合先が決まらないとき（origin が無いなど）は、どれが統合先か言えないので止めない。
+	if [ "$mg_finish" = no ]; then
+		mg_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
+		if [ -n "$mg_top" ] && user_checkout_is "$mg_top"; then
+			mg_integ=$(ccnavi_integration "$mg_top" || :)
+			mg_cur=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :)
+			if [ -n "$mg_integ" ] && [ "$mg_cur" = "$mg_integ" ]; then
+				reject merge-on-target "統合先 $mg_integ のユーザのチェックアウトでは merge できません。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。
+次: $WT_SH_Q <名前> でワークツリーを切り、その中で $SELF_Q merge $(ccnavi_sh_quote "$mg_integ") を打って衝突を解いてコミットし、$SELF_Q integrate <名前> で取り込む
+案内: 途中の merge を終わらせる --abort / --continue / --quit と、統合先でないブランチでの merge は、ここでも打てます。"
+			fi
+		fi
+	fi
 	;;
 
 merge-file)
