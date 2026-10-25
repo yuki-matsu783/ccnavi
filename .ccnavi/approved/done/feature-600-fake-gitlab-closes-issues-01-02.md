@@ -18,6 +18,8 @@ allow:
     glob: "tests/sh/test_fake_gitlab.py"
   - match: Write|Edit
     glob: "tests/sh/gitlab_host.py"
+cancelled_at: "2026-10-26T01:32:41+0900"
+cancel_reason: "親の範囲を超えて書けない。親を改版してから出し直す"
 ---
 ## 目的
 
