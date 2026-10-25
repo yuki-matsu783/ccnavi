@@ -5,7 +5,7 @@
  * レビュー待ちの欄（`section.review[data-phase]`）、承認対象外（`section.rejected`）、利用できる操作を取り出す。
  * 取るのは画面にある属性とクラスだけで、承認待ちかレビュー待ちかは `data-waiting` から読む（判定はここでしない）。
  *
- * 呼び先のページへ `fn.toString()` で渡して動かすので、この関数は import も外の値も使わず、1 つで完結させる。
+ * 実行先のページへ `fn.toString()` で渡して動かすので、この関数は import も外の値も使わず、それだけで完結させる。
  * 返す形（`schema: 1`）は VS Code 側の同じ要約と揃える（Chrome の `family` は VS Code 側では `parent`）。
  */
 

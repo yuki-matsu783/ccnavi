@@ -44,8 +44,8 @@ export function parseArgs(argv: readonly string[]): { ok: true; options: Options
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     const key = valued[flag];
-    if (key === undefined) return { ok: false, error: `知らない引数: ${flag}` };
-    if (key in got) return { ok: false, error: `${flag} が 2 度ある` };
+    if (key === undefined) return { ok: false, error: `不明な引数: ${flag}` };
+    if (key in got) return { ok: false, error: `${flag} が 2 度指定されている` };
     const value = argv[i + 1];
     if (value === undefined || value === "" || value.startsWith("--")) return { ok: false, error: `${flag} に値が要る` };
     got[key] = value;
@@ -97,7 +97,7 @@ export function isInside(child: string, parent: string): boolean {
   return c === p || c.startsWith(`${p}/`);
 }
 
-/** ページの記録。`kind` は出どころ */
+/** ページの記録。`kind` で出どころを示す */
 export interface Entry {
   readonly kind: "console" | "pageerror" | "worker-console" | "worker-error";
   readonly type?: string;

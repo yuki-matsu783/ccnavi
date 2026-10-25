@@ -2,7 +2,7 @@
  * 実リポジトリの状態を模擬ホストに載せて Chromium に描かせる開発用スクリプト（scripts/render-scene.js）の実機の試験。
  * ブラウザと組み立て（dist-e2e/）が無いときは終了コード 3 で止まり、成功に数えない（この試験は失敗になる）。
  *
- * `node scripts/test.js --e2e` で回す（拡張の実機の試験が通信先のポートを手放した後に回る。ファイル名の順）。
+ * `node scripts/test.js --e2e` で回す（拡張の実機の試験が通信先のポートを解放した後に回る。ファイル名の順）。
  */
 import { after, test } from "node:test";
 import assert from "node:assert/strict";

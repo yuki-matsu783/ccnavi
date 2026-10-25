@@ -37,12 +37,12 @@ pnpm test:e2e   # 拡張を読み込んだ Chromium（Playwright、PLAYWRIGHT_BR
 ### 実リポジトリの状態を描く（開発用）
 
 ```sh
-node scripts/test.js --e2e              # dist-e2e/ と out/ を組む（下の render-scene.js からはビルドしない）
+node scripts/test.js --e2e              # dist-e2e/ と out/ を組む（render-scene.js はビルドしない）
 node scripts/render-scene.js --repo <ccnavi を配布済みのリポジトリ> --out <リポジトリの外のディレクトリ> [--host github|gitlab] [--width 1400]
 ```
 
 ローカルブランチの許可リストのファイルを模擬のホストに載せ、ボードを描いて `board.png`・`board.txt`・`board.dom.json`・`board.log` を出す。
-配布物には入らない。使い方・前提・確かめられること・られないことは [VERIFY.md](VERIFY.md) の 4.0。
+配布物には入らない。使い方・前提・確かめられること・確かめられないことは [VERIFY.md](VERIFY.md) の 4.0。
 
 ### ホストの応答の見本（レビュー済み）
 

@@ -30,7 +30,7 @@ export function makeRepo(dir: string, branches: Record<string, RepoBranch>): voi
   for (const [name, b] of Object.entries(branches)) {
     if (first) {
       first = false;
-      if (name !== "main") throw new Error("最初のブランチは main");
+      if (name !== "main") throw new Error("最初のブランチは main でなければならない");
     } else {
       run(dir, ["checkout", "-q", "-b", name, "main"]);
       run(dir, ["rm", "-rq", "--ignore-unmatch", "."]);
