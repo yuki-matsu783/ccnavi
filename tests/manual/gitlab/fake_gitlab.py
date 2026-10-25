@@ -47,7 +47,8 @@ curl で直に呼ぶ。sh と同じ道具を使わないほうが、片方の不
     server.requests # 受けた要求の記録（"GET /api/v4/..."）
     server.stop()
 
-- ポートは OS に決めさせる。接続を受けられるのを確かめてから返る（上限 5 秒。超えたら `TimeoutError`）
+- ポートは OS に決めさせる。接続を受けられるのを確かめてから返る
+  （上限 5 秒。超えたら `TimeoutError`）
 - `initial_state` を渡すと `state_path` に書いてから起こす。
   渡さなければ `state_path` がすでにあること
 - `skew` は `timedelta` か秒数。0 も負も渡せる
