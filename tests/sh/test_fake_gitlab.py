@@ -203,7 +203,74 @@ MR_REQUESTS = [
     ("GET", "/notes", None),
     ("POST", "/notes", {"body": "b"}),
     ("PUT", "/merge", None),
+    ("GET", "/closes_issues", None),
+    ("POST", "/discussions/d1/notes", {"body": "b"}),
 ]
+
+
+class ScriptRoutesTest(ServerCase):
+    """.ccnavi/scripts/ が打つ GitLab のルートが、模擬にある。"""
+
+    def make(self, description="", **extra):
+        mr = {
+            "iid": 1,
+            "state": "opened",
+            "source_branch": "b",
+            "target_branch": "main",
+            "title": "t",
+            "description": description,
+            "discussions": [],
+            "reviewers": [],
+            "notes": [],
+        }
+        issues = [{"iid": n, "title": f"i{n}", "state": "opened"} for n in (1, 2, 3)]
+        return self.start(initial_state=state(mrs=[mr], issues=issues, **extra))
+
+    def test_closes_issues_returns_the_issues_named_by_a_closing_word(self):
+        server = self.make("説明\n\nCloses #2\nfixes: #3 and Resolved #9")
+        code, got = call(server, "GET", f"/api/v4/projects/{ENC}/merge_requests/1/closes_issues")
+        self.assertEqual(code, 200)
+        self.assertEqual([i["iid"] for i in got], [2, 3])
+        self.assertEqual(got[0]["references"]["full"], "ns/proj#2")
+
+    def test_closes_issues_is_empty_without_a_closing_word(self):
+        server = self.make("Related to #2")
+        code, got = call(server, "GET", f"/api/v4/projects/{ENC}/merge_requests/1/closes_issues")
+        self.assertEqual((code, got), (200, []))
+
+    def test_user_and_member(self):
+        server = self.make()
+        code, got = call(server, "GET", "/api/v4/user")
+        self.assertEqual((code, got["id"]), (200, 1))
+        code, got = call(server, "GET", f"/api/v4/projects/{ENC}/members/all/1")
+        self.assertEqual((code, got["access_level"]), (200, 40))
+
+    def test_issue_get_notes_and_related_merge_requests(self):
+        server = self.make("Closes #2")
+        base = f"/api/v4/projects/{ENC}/issues"
+        code, got = call(server, "GET", f"{base}/2")
+        self.assertEqual((code, got["iid"]), (200, 2))
+        code, got = call(server, "GET", f"{base}/2/related_merge_requests")
+        self.assertEqual((code, [m["iid"] for m in got]), (200, [1]))
+        code, got = call(server, "GET", f"{base}/1/related_merge_requests")
+        self.assertEqual((code, got), (200, []))
+        code, got = call(server, "POST", f"{base}/2/notes", {"body": "hi"})
+        self.assertEqual((code, got["body"]), (201, "hi"))
+        code, got = call(server, "GET", f"{base}/2/notes")
+        self.assertEqual((code, [n["body"] for n in got]), (200, ["hi"]))
+        code, _ = call(server, "GET", f"{base}/99")
+        self.assertEqual(code, 404)
+
+    def test_a_note_can_be_added_to_a_discussion(self):
+        server = self.make()
+        mr = f"/api/v4/projects/{ENC}/merge_requests/1"
+        _, disc = call(server, "POST", f"{mr}/discussions", {"body": "first"})
+        code, got = call(server, "POST", f"{mr}/discussions/{disc['id']}/notes", {"body": "reply"})
+        self.assertEqual((code, got["body"]), (201, "reply"))
+        _, discs = call(server, "GET", f"{mr}/discussions")
+        self.assertEqual(len(discs[0]["notes"]), 2)
+        code, _ = call(server, "POST", f"{mr}/discussions/nope/notes", {"body": "x"})
+        self.assertEqual(code, 404)
 
 
 class KeepAliveTest(ServerCase):
