@@ -931,12 +931,19 @@ def decide_before(
     # チケットが強かった回はチケットの文面になる（ticket_reason があるのはその回だけ）。
     if verdict == rules.DENY and capped:
         # `>` の上限で止めた。ヒットした ask のルールがあれば、その文も後ろに並べる。
-        texts = [
+        parts = [
             reasons.builtin_refusal(
                 reasons.CODE_REDIRECT_LIMIT_DENY,
                 reasons.REDIRECT_LIMIT_RULE,
                 display_subject,
-                selfguard_shell.REDIRECT_LIMIT_MESSAGE,
+                texts.say(
+                    root,
+                    "DENY_REDIRECT_LIMIT",
+                    {
+                        "limit": str(selfguard_shell.REDIRECT_LIMIT),
+                        "length": str(selfguard_shell.RAW_LENGTH_LIMIT),
+                    },
+                ),
             ),
             *(
                 reasons.reason_for(
@@ -961,7 +968,7 @@ def decide_before(
     elif verdict == rules.DENY and not ticket_reason:
         # ルールの deny。ヒットした理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
-        texts = [
+        parts = [
             reasons.reason_for(
                 rule,
                 payload.tool_name,
@@ -984,10 +991,10 @@ def decide_before(
     elif verdict == rules.DENY:
         # チケットが止めた。範囲の外かチケットの deny で、ルールは何も言わないか、
         # allow / ask にヒットしている（そのときは文面がルールの id を名指しする）。
-        texts = [ticket_reason]
+        parts = [ticket_reason]
         record.code = ticket_code or reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and not ticket_reason:
-        texts = [
+        parts = [
             "\n".join(
                 [
                     reasons.reason_for(
@@ -1014,7 +1021,7 @@ def decide_before(
     elif verdict == rules.ASK:
         # チケットが ask と書いた場所。ユーザが 1 度見る場所として宣言されている。
         # ルールは何も言わないか、allow にヒットしている。
-        texts = [ticket_reason]
+        parts = [ticket_reason]
         record.code = reasons.CODE_TICKET_ASK
     else:
         # どのタイプも言及しなかった。ccnavi はこの呼び出しの判定を持たない。
@@ -1023,7 +1030,7 @@ def decide_before(
         verdict = undeclared_verdict(payload.permission_mode, record.degraded, conf.guard_unwatched)
         # 渡した回（HANDOVER）は文を返さないので組まない。出所は判定の出所（退避した回は
         # 組み込みの既定）で、読めなかったルールファイルを名指ししない。
-        texts = (
+        parts = (
             []
             if verdict == HANDOVER
             else [
@@ -1059,7 +1066,7 @@ def decide_before(
         mode,
         record,
         verdict,
-        notices + texts,
+        notices + parts,
         context,
         conf=conf,
         root=root,
