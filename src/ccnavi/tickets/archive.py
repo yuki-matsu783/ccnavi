@@ -69,10 +69,12 @@ def base_dir(root: str, project: str) -> str:
 
 
 def _linked(root: str, parts: tuple[str, ...]) -> bool | None:
-    """parts にリンクか junction があれば True。無ければ、道が在るとき False、無いとき None。"""
-    if pathsafe.first_link(root, parts):
-        return True
-    return False if os.path.lexists(os.path.join(root, *parts)) else None
+    """ルートの下の parts にリンクがあれば真を返す。
+
+    途中で存在しなければ None を返す。どちらも無ければ偽を返す。
+    """
+    state, _ = pathsafe.scan(root, parts)
+    return None if state == pathsafe.MISSING else state == pathsafe.LINK
 
 
 def _repo_names(root: str) -> list[str]:

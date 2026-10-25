@@ -47,7 +47,7 @@ import shutil
 import time
 from dataclasses import dataclass, field
 
-from ..infra import fsio, pathsafe
+from ..infra import fsio, pathcase, pathsafe
 from . import diaglog
 
 # しきい値の環境変数と既定値。
@@ -219,12 +219,12 @@ def run(
         # 試行のイベントの記録も、決定の記録と同じ形でローテートする。ローテートは保持日数と独立で、
         # 保持（材料と同じ長さ）が 0 のときは消さないだけ。
         events = os.path.join(os.path.dirname(log_path), STOP_REVIEW_EVENTS)
-        if rotate_mb > 0 and not pathsafe.has_link(root, os.path.dirname(events)):
+        if rotate_mb > 0 and _linkless(root, os.path.dirname(events)):
             _rotate(report, root, events, int(rotate_mb * 1024 * 1024), dry_run, now)
         if keep > 0:
             material = os.path.join(os.path.dirname(log_path), STOP_REVIEW_MATERIAL)
             _prune_directory(report, root, material, now - keep * 86400, dry_run)
-            if not pathsafe.has_link(root, os.path.dirname(events)):
+            if _linkless(root, os.path.dirname(events)):
                 _prune_logs(report, root, events, now - keep * 86400, dry_run)
     report.kept_ops = _count_ops(state_dir)
     return report
@@ -247,6 +247,22 @@ def _stop_review_keep_days(report: Report) -> float:
     return value
 
 
+def _linkless(root: str, path: str) -> bool:
+    """`root` の下の `path` までの道に、リンクが 1 つも無いか。`path` が `root` の外なら偽。
+
+    外かどうかは書かれたパスのまま比べる（root がリンク経由で、path が実体の表記のときも外）。
+    比べられない（別ドライブ、絶対と相対の混在）ときも偽。
+    """
+    top = pathcase.fold(os.path.abspath(root))
+    here = pathcase.fold(os.path.abspath(path))
+    try:
+        if os.path.commonpath([top, here]) != top:
+            return False
+    except ValueError:
+        return False
+    return not pathsafe.has_link(root, path)
+
+
 def _prune_directory(
     report: Report, root: str, directory: str, cutoff: float, dry_run: bool
 ) -> None:
@@ -255,7 +271,7 @@ def _prune_directory(
     ワークスペースルートからの道のどこかがリンクなら、何も消さない（リンクの先は ccnavi の置き場とは
     限らない）。
     """
-    if pathsafe.has_link(root, directory) or not os.path.isdir(directory):
+    if not _linkless(root, directory) or not os.path.isdir(directory):
         return
     try:
         names = sorted(os.listdir(directory))

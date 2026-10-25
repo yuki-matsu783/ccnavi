@@ -85,9 +85,9 @@ def unsafe_path(tree_root: str, rel: str) -> str:
     parts = [p for p in rel.split("/") if p]
     if not parts:
         return ""
-    linked = pathsafe.first_link(tree_root, parts)
-    if linked:
-        return linked
+    link = pathsafe.first_link(tree_root, parts)
+    if link:
+        return link
     cur = os.path.join(tree_root, *parts)
     if os.path.exists(cur) and pathsafe.escapes(tree_root, cur):
         return cur

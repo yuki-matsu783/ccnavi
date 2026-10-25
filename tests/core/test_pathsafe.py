@@ -1,176 +1,154 @@
-"""途中のリンク・junction の判定（`infra/pathsafe`）の受入テスト。
-
-同じ表（リンクなし・途中がリンク・最後の名前がリンク・root を指す子のリンク・root の外・
-root 自身・存在しない・root 自身がリンク・大文字小文字違い・junction）を、判定を使う側の入口
-（`learning.unsafe_path`・`archive._linked`）にも当てて、どこも同じ答えを返すことを確かめる。
-junction は Linux では作れないので `os.path.isjunction` を差し替えて見る（Windows では本物も作る）。
-"""
+"""`infra/pathsafe` の入出力を確かめるテスト。リンクの判定は `pathsafe` を通す。"""
 
 from __future__ import annotations
 
 import os
 import tempfile
 import unittest
-from unittest import mock
 
 from ccnavi.infra import pathsafe
-from ccnavi.tickets import archive, learning
 
 
-def _touch(path: str) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("x")
-
-
-# (名前, root の種類, root からの相対, 道（最後を含む）にリンクがあるか, 最後を除いた道にあるか)
-ROWS = (
-    ("リンクなし", "root", "plain/sub/file.txt", False, False),
-    ("途中のディレクトリがリンク", "root", "dirlink/file.txt", True, True),
-    ("最後の名前がリンク", "root", "real/filelink", True, False),
-    ("root を指す子のリンク", "root", "selfdir/plain", True, True),
-    ("root の外を指すリンク", "root", "outer/x", True, True),
-    ("root 自身", "root", "", False, False),
-    ("存在しない", "root", "plain/nope/x", False, False),
-    ("root 自身がリンク", "rootlink", "plain/sub/file.txt", False, False),
-    ("大文字小文字違いの root", "upper", "plain/sub/file.txt", False, False),
-    ("途中が junction", "root", "junc/inner/f", True, True),
-)
+def _symlink(target: str, link: str) -> bool:
+    try:
+        os.symlink(target, link, target_is_directory=os.path.isdir(target))
+    except (OSError, NotImplementedError):
+        return False
+    return True
 
 
 class PathsafeTest(unittest.TestCase):
-    def setUp(self) -> None:
+    def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        self.tmp = os.path.realpath(tmp.name)
-        self.root = os.path.join(self.tmp, "root")
-        _touch(os.path.join(self.root, "real", "file.txt"))
-        _touch(os.path.join(self.root, "plain", "sub", "file.txt"))
-        _touch(os.path.join(self.root, "junc", "inner", "f"))
-        os.makedirs(os.path.join(self.tmp, "outside"))
-        try:
-            os.symlink(os.path.join(self.root, "real"), os.path.join(self.root, "dirlink"))
-            os.symlink(os.path.join(self.tmp, "outside"), os.path.join(self.root, "outer"))
-            os.symlink("file.txt", os.path.join(self.root, "real", "filelink"))
-            os.symlink(self.root, os.path.join(self.root, "selfdir"))
-            os.symlink(self.root, os.path.join(self.tmp, "rootlink"))
-        except (OSError, NotImplementedError):
-            self.skipTest("シンボリックリンクを作れない環境")
-        self.junction = os.path.join(self.root, "junc")
-        self.roots = {
-            "root": self.root,
-            "rootlink": os.path.join(self.tmp, "rootlink"),
-            "upper": os.path.join(self.tmp, "ROOT"),
-        }
-        patcher = mock.patch.object(os.path, "isjunction", lambda p: p == self.junction)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        self.base = os.path.realpath(tmp.name)
+        self.root = os.path.join(self.base, "root")
+        self.out = os.path.join(self.base, "out")
+        os.makedirs(os.path.join(self.root, "a", "b"))
+        os.makedirs(self.out)
+        with open(os.path.join(self.root, "a", "b", "f.txt"), "w") as f:
+            f.write("x")
 
-    def _rows(self):
-        for name, kind, rel, linked, mid in ROWS:
-            parts = tuple(p for p in rel.split("/") if p)
-            root = self.roots[kind]
-            yield name, root, parts, os.path.join(root, *parts), linked, mid
+    def link(self, target: str, name: str) -> str:
+        path = os.path.join(self.root, name)
+        if not _symlink(target, path):
+            self.skipTest("シンボリックリンクを作れない")
+        return path
 
-    def test_has_link(self):
-        for name, root, _parts, path, linked, _mid in self._rows():
-            with self.subTest(name):
-                self.assertEqual(pathsafe.has_link(root, path), linked)
+    def test_no_link(self):
+        p = os.path.join(self.root, "a", "b", "f.txt")
+        self.assertFalse(pathsafe.has_link(self.root, p))
+        self.assertFalse(pathsafe.has_link(self.root, self.root))
+        self.assertIsNone(pathsafe.first_link(self.root, ["a", "b", "f.txt"]))
+        self.assertFalse(pathsafe.escapes(self.root, p))
 
-    def test_first_link(self):
-        for name, root, parts, _path, linked, mid in self._rows():
-            with self.subTest(name):
-                self.assertEqual(pathsafe.first_link(root, parts) is not None, linked)
-                self.assertEqual(
-                    pathsafe.first_link(root, parts, include_last=False) is not None, mid
-                )
+    def test_middle_link(self):
+        self.link(self.out, "m")
+        p = os.path.join(self.root, "m", "x")
+        self.assertTrue(pathsafe.has_link(self.root, p))
+        self.assertEqual(pathsafe.first_link(self.root, ["m", "x"]), os.path.join(self.root, "m"))
 
-    def test_first_link_returns_the_link_path(self):
-        found = pathsafe.first_link(self.root, ("real", "filelink"))
-        self.assertEqual(found, os.path.join(self.root, "real", "filelink"))
-        found = pathsafe.first_link(self.root, ("dirlink", "file.txt"))
-        self.assertEqual(found, os.path.join(self.root, "dirlink"))
+    def test_last_link(self):
+        self.link(self.out, "last")
+        p = os.path.join(self.root, "last")
+        self.assertTrue(pathsafe.has_link(self.root, p))
+        self.assertIsNone(pathsafe.first_link(self.root, ["last"], include_last=False))
+        self.assertTrue(pathsafe.first_link(self.root, ["last"]))
 
-    def test_learning_unsafe_path(self):
-        for name, root, parts, _path, linked, _mid in self._rows():
-            with self.subTest(name):
-                self.assertEqual(bool(learning.unsafe_path(root, "/".join(parts))), linked)
+    def test_child_pointing_at_root(self):
+        self.link(self.root, "loop")
+        self.assertTrue(pathsafe.has_link(self.root, os.path.join(self.root, "loop")))
 
-    def test_learning_unsafe_path_names_the_link(self):
-        got = learning.unsafe_path(self.root, "dirlink/file.txt")
-        self.assertEqual(got, os.path.join(self.root, "dirlink"))
+    def test_outside_root(self):
+        self.assertTrue(pathsafe.has_link(self.root, self.out))
+        self.assertTrue(pathsafe.escapes(self.root, self.out))
 
-    def test_archive_linked_keeps_three_values(self):
-        for name, root, parts, _path, linked, _mid in self._rows():
-            if not parts:
-                continue
-            with self.subTest(name):
-                got = archive._linked(root, parts)
-                if linked:
-                    self.assertIs(got, True)
-                elif os.path.lexists(os.path.join(root, *parts)):
-                    self.assertIs(got, False)
-                else:
-                    self.assertIsNone(got)
+    def test_escapes_through_link(self):
+        link = self.link(self.out, "m")
+        self.assertTrue(pathsafe.escapes(self.root, link))
 
-    def test_a_spelling_of_root_that_lands_on_it_is_not_a_link(self):
-        # /tmp と /private/tmp のように、root より上のリンクを通った綴り
-        parent = os.path.join(self.tmp, "parent")
-        root = os.path.join(parent, "ws")
-        _touch(os.path.join(root, "a", "b"))
-        os.symlink(parent, os.path.join(self.tmp, "viaparent"))
-        via = os.path.join(self.tmp, "viaparent", "ws", "a", "b")
-        self.assertFalse(pathsafe.has_link(root, via))
+    def test_root_itself_link_is_not_counted(self):
+        alias = os.path.join(self.base, "alias")
+        if not _symlink(self.root, alias):
+            self.skipTest("シンボリックリンクを作れない")
+        self.assertFalse(pathsafe.has_link(alias, alias))
+        self.assertFalse(pathsafe.has_link(alias, os.path.join(alias, "a")))
 
-    def test_a_link_to_the_parent_that_comes_back_into_root_is_a_link(self):
-        os.symlink(self.tmp, os.path.join(self.root, "up"))
-        path = os.path.join(self.root, "up", "root", "real", "file.txt")
-        self.assertTrue(pathsafe.has_link(self.root, path))
-        self.assertTrue(pathsafe.first_link(self.root, ("up", "root", "real", "file.txt")))
+    def test_spelled_through_link_to_root_is_a_link(self):
+        alias = os.path.join(self.base, "alias")
+        if not _symlink(self.root, alias):
+            self.skipTest("シンボリックリンクを作れない")
+        self.assertTrue(pathsafe.has_link(self.root, os.path.join(alias, "a")))
 
-    def test_a_path_outside_root_is_a_link(self):
-        self.assertTrue(pathsafe.has_link(self.root, os.path.join(self.tmp, "outside", "x")))
-        self.assertTrue(pathsafe.has_link(self.root, self.tmp))
+    def test_missing(self):
+        p = os.path.join(self.root, "nope", "x")
+        self.assertFalse(pathsafe.has_link(self.root, p))
+        self.assertEqual(pathsafe.scan(self.root, ["nope", "x"]), (pathsafe.MISSING, ""))
+        self.assertEqual(pathsafe.scan(self.root, ["a", "b"]), (pathsafe.CLEAN, ""))
 
-    def test_a_failure_while_checking_is_a_link(self):
-        plain = os.path.join(self.root, "plain")
-        with mock.patch.object(os.path, "realpath", side_effect=OSError("boom")):
-            self.assertTrue(pathsafe.has_link(self.root, plain))
-            self.assertTrue(pathsafe.escapes(self.root, plain))
-        outside = os.path.join(self.tmp, "outside", "x")
-        with mock.patch.object(os.path, "realpath", side_effect=ValueError("nul")):
-            self.assertTrue(pathsafe.has_link(self.root, outside))
+    def test_case_difference(self):
+        # 大文字小文字だけが違う綴りも、どの機械でも同じ場所として扱う（pathcase.fold）
+        self.assertFalse(pathsafe.has_link(self.root, os.path.join(self.root.upper(), "a")))
 
-    def test_escapes(self):
-        self.assertFalse(pathsafe.escapes(self.root, os.path.join(self.root, "plain")))
+    def test_fold_makes_spelling_equal(self):
+        # 大文字小文字を区別しない機械（Windows・macOS の既定）でも、Linux でも、
+        # root 自身の綴りの違いは外に出たことにならない
         self.assertFalse(pathsafe.escapes(self.root, self.root))
-        self.assertFalse(pathsafe.escapes(self.root, os.path.join(self.root, "dirlink")))
-        self.assertTrue(pathsafe.escapes(self.root, os.path.join(self.root, "outer")))
-        self.assertTrue(pathsafe.escapes(self.root, os.path.join(self.tmp, "outside")))
-        self.assertFalse(pathsafe.escapes(self.roots["upper"], os.path.join(self.root, "plain")))
 
     def test_is_link(self):
-        self.assertTrue(pathsafe.is_link(os.path.join(self.root, "dirlink")))
-        self.assertTrue(pathsafe.is_link(self.junction))
-        self.assertFalse(pathsafe.is_link(os.path.join(self.root, "plain")))
-        self.assertFalse(pathsafe.is_link(os.path.join(self.root, "missing")))
+        link = self.link(self.out, "m")
+        self.assertTrue(pathsafe.is_link(link))
+        self.assertFalse(pathsafe.is_link(os.path.join(self.root, "a")))
+        self.assertFalse(pathsafe.is_link(os.path.join(self.root, "nope")))
 
+    def test_first_link_stops_at_missing(self):
+        self.link(self.out, "m")
+        self.assertIsNone(pathsafe.first_link(self.root, ["nope", "m"]))
 
-@unittest.skipUnless(os.name == "nt", "本物の junction は Windows だけ")
-class RealJunctionTest(unittest.TestCase):
-    def test_a_real_junction_is_a_link(self):
-        import _winapi
+    def test_junction_counts_as_link(self):
+        from unittest import mock
 
-        with tempfile.TemporaryDirectory() as tmp:
-            root = os.path.realpath(tmp)
-            target = os.path.join(root, "target")
-            os.makedirs(os.path.join(target, "in"))
-            junction = os.path.join(root, "junction")
-            _winapi.CreateJunction(target, junction)
-            self.assertTrue(pathsafe.is_link(junction))
-            self.assertTrue(pathsafe.has_link(root, os.path.join(junction, "in")))
-            self.assertIsNotNone(pathsafe.first_link(root, ("junction", "in")))
-            self.assertFalse(pathsafe.has_link(root, os.path.join(target, "in")))
+        target = os.path.join(self.root, "a")
+        with mock.patch("os.path.isjunction", lambda p: p == target):
+            self.assertTrue(pathsafe.is_link(target))
+            self.assertTrue(pathsafe.has_link(self.root, os.path.join(target, "b")))
+            self.assertEqual(pathsafe.scan(self.root, ["a", "b"]), (pathsafe.LINK, target))
+
+    def test_callers_keep_their_meaning(self):
+        from ccnavi.records import prune
+        from ccnavi.tickets import archive, learning, review
+
+        link = self.link(self.out, "m")
+        self.assertEqual(learning.unsafe_path(self.root, "m/x.md"), link)
+        self.assertEqual(learning.unsafe_path(self.root, "a/b/f.txt"), "")
+        self.assertTrue(review._escapes(self.root, "m/x"))
+        self.assertFalse(review._escapes(self.root, "a/b/f.txt"))
+        # 最後の名前がリンクなのは構わない
+        self.assertFalse(review._escapes(self.root, "m"))
+        self.assertFalse(prune._linkless(self.root, link))
+        self.assertTrue(prune._linkless(self.root, os.path.join(self.root, "a", "b")))
+        self.assertFalse(prune._linkless(self.root, self.out))
+        self.assertIs(archive._linked(self.root, ("m",)), True)
+        self.assertIs(archive._linked(self.root, ("a", "b")), False)
+        self.assertIsNone(archive._linked(self.root, ("a", "nope")))
+
+    def test_prune_keeps_outside_by_spelling(self):
+        from ccnavi.records import prune
+
+        alias = os.path.join(self.base, "alias")
+        if not _symlink(self.root, alias):
+            self.skipTest("シンボリックリンクを作れない")
+        # root が別綴り（リンク経由）で、path が実体の表記のときは、今までどおり範囲外で何も消さない
+        self.assertFalse(prune._linkless(alias, os.path.join(self.root, "a")))
+        self.assertTrue(prune._linkless(alias, os.path.join(alias, "a")))
+        self.assertFalse(prune._linkless("relative-root", self.root))
+
+    def test_has_link_lands_when_root_spelled_differently(self):
+        # path が root と違う綴り（root より上のリンク経由）でも、実体が root に着けば止まる
+        up = os.path.join(self.base, "up")
+        if not _symlink(self.base, up):
+            self.skipTest("シンボリックリンクを作れない")
+        self.assertFalse(pathsafe.has_link(self.root, os.path.join(up, "root", "a", "b")))
 
 
 if __name__ == "__main__":

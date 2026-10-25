@@ -157,8 +157,9 @@ def read_bytes(path: str) -> bytes | None:
 # もう片方が開くことがある。Windows はそれを ERROR_DELETE_PENDING や共有違反で返し、
 # Python はそれぞれ EINVAL（表に無い Win32 エラーの既定）と EACCES にして投げる。
 # どちらも待てば通る失敗なので、数回だけ打ち直す。表に無い理由（ENOSPC など）は
-# 待っても変わらないので、すぐ返す。
-_TRANSIENT_ERRNO = (errno.EINVAL, errno.EACCES, errno.EPERM)
+# 待っても変わらないので、すぐ返す。EPERM は本物の権限エラーでも出て、待っても直らない
+# ので入れない。
+_TRANSIENT_ERRNO = (errno.EINVAL, errno.EACCES)
 _WRITE_RETRIES = 3
 _WRITE_RETRY_WAIT_SECONDS = 0.02
 # 読みの打ち直し。差し替えの一瞬に重なっただけなら、すぐ開けるようになる。

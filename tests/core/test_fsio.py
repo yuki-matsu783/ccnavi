@@ -74,6 +74,13 @@ class WriteRetryTest(unittest.TestCase):
         self.assertNotEqual(failed, "")
         self.assertEqual(flaky.calls, 1)
 
+    def test_eperm_is_not_retried(self):
+        flaky = _FlakyOpen(failures=99, code=errno.EPERM)
+        with mock.patch("builtins.open", flaky):
+            failed = fsio.write_bytes(self.path, b"abc")
+        self.assertNotEqual(failed, "")
+        self.assertEqual(flaky.calls, 1)
+
 
 class ReadRetryTest(unittest.TestCase):
     """読みの打ち直しの受入テスト。
@@ -104,6 +111,13 @@ class ReadRetryTest(unittest.TestCase):
             _, failed = fsio.read_json(self.path)
         self.assertIsInstance(failed, OSError)
         self.assertEqual(flaky.calls, fsio._READ_RETRIES + 1)
+
+    def test_eperm_is_not_retried(self):
+        flaky = _FlakyOpen(failures=99, code=errno.EPERM)
+        with mock.patch("builtins.open", flaky):
+            _, failed = fsio.read_json(self.path)
+        self.assertIsInstance(failed, OSError)
+        self.assertEqual(flaky.calls, 1)
 
     def test_missing_file_is_not_retried(self):
         """無いのは普通の状態。待っても現れないので、すぐ返す。"""

@@ -49,7 +49,7 @@ import stat
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import gitcmd, pathcase, pathsafe, settings, tree
+from ..infra import gitcmd, pathcase, settings, tree
 from . import approval, approval_checks, phase, ticket_ids, ticket_model
 from . import ticket as ticket_mod
 
@@ -127,7 +127,7 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
         )
     if not os.path.lexists(path):
         return Dropped(name, ABSENT, path)
-    if pathsafe.is_link(path):
+    if os.path.islink(path) or os.path.isjunction(path):
         return Dropped(name, REFUSED, path, "リンクなので、リンクの先は削除しません。")
     if not os.path.isdir(path):
         return Dropped(name, REFUSED, path, "ディレクトリでない")
@@ -513,7 +513,7 @@ def generated(top: str) -> list[str]:
         has_package = any(e.name == "package.json" and _plain_file(e) for e in entries)
         for e in entries:
             full = os.path.join(here, e.name)
-            linked = pathsafe.is_link(full)
+            linked = e.is_symlink() or os.path.isjunction(full)
             if e.name in ALWAYS or (has_package and e.name in BESIDE_PACKAGE_JSON):
                 if linked or e.is_dir(follow_symlinks=False):
                     found.append(os.path.relpath(full, top).replace(os.sep, "/"))

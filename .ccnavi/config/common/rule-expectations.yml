@@ -29,16 +29,16 @@ deny:
     why: ノートブックの編集も同じ（session-scratchpad）
   - tool: Write
     subject: "/repo/README.md"
-    why: main のチェックアウトでは編集しない。作業はワークツリーの中で
+    why: ユーザのチェックアウトでは編集しない。作業はワークツリーの中で
   - tool: Edit
     subject: "/repo/src/ccnavi/cli.py"
-    why: 同上。ソースも main では触らない
+    why: 同上。ソースもユーザのチェックアウトでは触らない
   - tool: Write
     subject: "/repo/.gitignore"
     why: 隠しファイルも同じ
   - tool: Write
     subject: "/repo/.claude/skills/commit/SKILL.md"
-    why: .claude/ の下も worktrees/ 以外は main では触らない
+    why: .claude/ の下も worktrees/ 以外はユーザのチェックアウトでは触らない
   - tool: Write
     subject: "/repo/projects/lib/skills/deploy/SKILL.md"
     why: プロジェクトのスキル（skills/ に置く）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
@@ -75,7 +75,7 @@ deny:
     why: .c で始まる隠しファイルも、.claude/worktrees/ の外なので止まる
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/settings.json"
-    why: ワークツリーの中でも hook の登録は触らない（builtin:guard-settings）。統合で main の登録になる
+    why: ワークツリーの中でも hook の登録は触らない（builtin:guard-settings）。統合すると取り込み先の登録になる
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.claude/settings.local.json"
     why: 個人の上書きも同じ。permissions を足せる
@@ -170,7 +170,7 @@ deny:
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.ccnavi/config/common/rules.yml"
     why: >-
-      ワークツリー側の設定も止める（builtin:guard-ccnavi-config）。統合すればそのまま main の
+      ワークツリー側の設定も止める（builtin:guard-ccnavi-config）。統合すればそのまま取り込み先の
       ルールになる。直したい形は下書きを検証してユーザに渡す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.ccnavi/config/common/phases.yml"
@@ -307,7 +307,7 @@ ask:
       権限モードに渡る（ターミナルからの試験では ask）
   - tool: Write
     subject: "/repo/.claude/worktrees/x/pyproject.toml"
-    why: 実行時の依存が変わる。main の側は deny なのでワークツリーで見る
+    why: 実行時の依存が変わる。ユーザのチェックアウトの側は deny なのでワークツリーで見る
   - tool: Bash
     subject: "jq -r '.hooks.PostToolUse[0].hooks[0].command, .env.CCNAVI_ENTRY_PATH' .claude/settings.json"
     why: >-
@@ -436,13 +436,13 @@ allow:
     why: コメントだけの行は何も走らない
   - tool: Write
     subject: "/repo/.claude/worktrees/x/src/ccnavi/cli.py"
-    why: ワークツリーの中のソース。main の側は deny
+    why: ワークツリーの中のソース。ユーザのチェックアウトの側は deny
   - tool: Write
     subject: "/repo/.claude/worktrees/x/tests/test_glob.py"
     why: 同上
   - tool: Write
     subject: "/repo/.claude/worktrees/x/README.md"
-    why: 同上。文書もワークツリーで直して main に戻す
+    why: 同上。文書もワークツリーで直して取り込み先に戻す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.vscode/settings.json"
     why: builtin:guard-settings が止めるのは .claude/ の下の settings だけ。エディタの設定はワークツリーで直せる

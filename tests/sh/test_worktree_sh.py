@@ -46,6 +46,7 @@ PYTHONPATH='{src}' exec '{python}' -m ccnavi "$@"
 # fetch のときだけ、origin の URL を bare リポジトリへ向ける git の代役。
 # FAKE_FETCH_FAIL があれば失敗させる。FAKE_LS_REMOTE_FAIL があれば ls-remote だけ失敗させる。
 # FAKE_GIT_VERSION があれば `git version` をその版で答える。
+# FAKE_READ_TREE_FAIL があれば read-tree だけ失敗させる。
 GIT = """#!/bin/sh
 if [ "${{1:-}}" = version ] && [ -n "${{FAKE_GIT_VERSION:-}}" ]; then
   echo "git version $FAKE_GIT_VERSION"
@@ -53,6 +54,11 @@ if [ "${{1:-}}" = version ] && [ -n "${{FAKE_GIT_VERSION:-}}" ]; then
 fi
 for a in "$@"; do
   case "$a" in
+  read-tree)
+    if [ -n "${{FAKE_READ_TREE_FAIL:-}}" ]; then
+      echo "fatal: failed to read tree" >&2
+      exit 128
+    fi ;;
   ls-remote)
     if [ -n "${{FAKE_LS_REMOTE_FAIL:-}}" ]; then
       echo "fatal: unable to access 'https://example.invalid/': timed out" >&2
@@ -664,6 +670,91 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("notes.txt", tree)
         self.assertNotIn(".claude/worktrees", tree)
         self.assertNotIn("160000", tree)
+
+    # ---- 置き場が .gitignore 済みでも、書きかけを含むスナップショットを作れる
+
+    def leave_worktrees_ignored(self, line="/.claude/worktrees/"):
+        """置き場の行を .gitignore に入れてから、最初のワークツリーを切る。"""
+        write(os.path.join(self.ws, ".gitignore"), f"logs/\n.ccnavi/\n{line}\n")
+        write(os.path.join(self.ws, "README.md"), "# readme\n")
+        git(self.ws, "add", ".gitignore", "README.md")
+        git(self.ws, "commit", "-q", "-m", "ignore worktrees")
+        git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
+        git(self.ws, "push", "-q", self.bare, "main")
+        first = self.run_sh("first")
+        self.assertEqual(0, first.returncode, first.stdout + first.stderr)
+        self.assertTrue(os.path.isdir(self.wt("first")), "前提: 他のワークツリーが 1 本ある")
+        self.assertNotIn(
+            ".claude/worktrees",
+            git(self.ws, "status", "--porcelain", "--untracked-files=all"),
+            "前提: 置き場は無視されている",
+        )
+
+    def assert_snapshot_tree_clean(self, name):
+        tree = git(self.wt(name), "ls-tree", "-r", "HEAD")
+        self.assertNotIn(".claude/worktrees", tree)
+        self.assertNotIn("160000", tree)
+
+    def test_ignored_worktrees_dir_and_a_new_file_copy_wip(self):
+        self.leave_worktrees_ignored()
+        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
+        code = self.code_of(self.run_sh("second"))
+        done = self.run_sh("second", "--accept", code, "--copy-wip")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertNotIn("作れませんでした", done.stdout + done.stderr)
+        with open(os.path.join(self.wt("second"), "notes.txt"), encoding="utf-8") as f:
+            self.assertEqual("メモ\n", f.read())
+        self.assert_snapshot_tree_clean("second")
+
+    def test_ignored_worktrees_dir_and_a_new_file_no_wip(self):
+        self.leave_worktrees_ignored()
+        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
+        code = self.code_of(self.run_sh("second"))
+        done = self.run_sh("second", "--accept", code, "--no-wip")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertTrue(os.path.isdir(self.wt("second")))
+        self.assertFalse(os.path.exists(os.path.join(self.wt("second"), "notes.txt")))
+        self.assert_snapshot_tree_clean("second")
+
+    def test_ignored_worktrees_dir_and_a_new_file_asks_for_confirmation(self):
+        self.leave_worktrees_ignored()
+        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
+        result = self.run_sh("second")
+        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
+        self.assertNotIn("作れませんでした", result.stdout + result.stderr)
+        self.assertIn("書きかけ: 変更 0・新規 1", result.stdout)
+        self.code_of(result)
+        self.assertFalse(os.path.exists(self.wt("second")))
+
+    def test_ignored_worktrees_dir_and_a_tracked_change_asks_for_confirmation(self):
+        self.leave_worktrees_ignored()
+        write(os.path.join(self.ws, "README.md"), "# readme 書きかけ\n")
+        result = self.run_sh("second")
+        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
+        self.assertNotIn("作れませんでした", result.stdout + result.stderr)
+        self.assertIn("書きかけ: 変更 1・新規 0", result.stdout)
+        code = self.code_of(result)
+        done = self.run_sh("second", "--accept", code, "--copy-wip")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        with open(os.path.join(self.wt("second"), "README.md"), encoding="utf-8") as f:
+            self.assertEqual("# readme 書きかけ\n", f.read())
+        self.assert_snapshot_tree_clean("second")
+
+    def test_untracked_worktrees_dir_keeps_gitlinks_out_of_the_snapshot(self):
+        self.leave_worktrees_untracked()
+        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
+        code = self.code_of(self.run_sh("second"))
+        done = self.run_sh("second", "--accept", code, "--copy-wip")
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assert_snapshot_tree_clean("second")
+
+    def test_a_failing_read_tree_still_stops_with_snapshot_failed(self):
+        self.leave_worktrees_ignored()
+        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
+        code = self.code_of(self.run_sh("second"))
+        result = self.run_sh("second", "--accept", code, "--copy-wip", FAKE_READ_TREE_FAIL="1")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("スナップショットを作れませんでした", result.stdout + result.stderr)
 
     # ---- 確認コードが縛るもの（外すと落ちる）
 
