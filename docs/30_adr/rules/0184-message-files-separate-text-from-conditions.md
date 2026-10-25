@@ -5,7 +5,7 @@ description: コードと sh に埋まっていた文を、識別子で引く YA
 tags: [hook, config, sh-scripts]
 keywords: [文面, 文面ファイル, messages, ccnavi text, 識別子, 差し込み, 上書き, 拒否, 促し, 次の一手, 標準化]
 ---
-# ADR-0183: 拒否・促し・次の一手の文を、条件から分けた文面ファイルに置く
+# ADR-0184: 拒否・促し・次の一手の文を、条件から分けた文面ファイルに置く
 
 状態: 採用（移行は段階的。移した範囲は `docs/42_claude/message-migration.md` の一覧表が持つ）
 

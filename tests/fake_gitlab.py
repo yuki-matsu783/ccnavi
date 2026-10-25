@@ -57,6 +57,13 @@ def page(items: list, query: dict) -> list:
 
 _PROJ = r"^/api/v4/projects/(?P<proj>[^/]+)"
 _MR = _PROJ + r"/merge_requests/(?P<iid>\d+)"
+_ISSUE = _PROJ + r"/issues/(?P<iid>\d+)"
+
+# 本文の `Closes #N`（Closes/Fixes/Resolves の活用形。`:` は任意）。実物の閉じる語に合わせる
+CLOSING = re.compile(
+    r"\b(?:clos(?:e[sd]?|ing)|fix(?:e[sd]|ing)?|resolv(?:e[sd]?|ing))\b:?\s+#(\d+)",
+    re.IGNORECASE,
+)
 
 ROUTES: list[tuple[str, re.Pattern]] = [
     ("project", re.compile(_PROJ + r"$")),
@@ -69,7 +76,13 @@ ROUTES: list[tuple[str, re.Pattern]] = [
     ("notes", re.compile(_MR + r"/notes$")),
     ("merge", re.compile(_MR + r"/merge$")),
     ("issues", re.compile(_PROJ + r"/issues$")),
-    ("issue", re.compile(_PROJ + r"/issues/(?P<iid>\d+)$")),
+    ("issue", re.compile(_ISSUE + r"$")),
+    ("issue_mrs", re.compile(_ISSUE + r"/related_merge_requests$")),
+    ("issue_notes", re.compile(_ISSUE + r"/notes$")),
+    ("closes_issues", re.compile(_MR + r"/closes_issues$")),
+    ("discussion_notes", re.compile(_MR + r"/discussions/(?P<did>[^/]+)/notes$")),
+    ("member", re.compile(_PROJ + r"/members/all/(?P<uid>\d+)$")),
+    ("user", re.compile(r"^/api/v4/user$")),
     ("version", re.compile(r"^/api/v4/version$")),
 ]
 
@@ -159,7 +172,8 @@ class Handler(BaseHTTPRequestHandler):
         with self.server.lock:
             state = load(self.server.state_path)
             proj = urllib.parse.unquote(args.get("proj", ""))
-            if proj != state.get("project"):
+            # /user はプロジェクトに属さない
+            if name != "user" and proj != state.get("project"):
                 return self.send_json(404, {"message": f"404 Project Not Found: {proj}"})
             try:
                 code, payload = self.act(method, name, args, query, state)
@@ -170,9 +184,21 @@ class Handler(BaseHTTPRequestHandler):
 
     def act(self, method, name, args, query, state):
         iid = int(args["iid"]) if "iid" in args else 0
-        # 無い MR は 404（実物と同じ）。issue の iid とは別の番号なので、issue は除く
-        if "iid" in args and name != "issue" and mr_of(state, iid) is None:
+        # 無い MR は 404（実物と同じ）。issue の iid とは別の番号なので、issue_* の経路は除く。
+        # issue_* でない経路の iid は、すべて MR のもの
+        if "iid" in args and not name.startswith("issue") and mr_of(state, iid) is None:
             raise KeyError(iid)
+
+        if name == "user":
+            return 200, {"id": 1, "username": "fake-user", "name": "Fake User", "state": "active"}
+
+        if name == "member":
+            return 200, {
+                "id": int(args["uid"]),
+                "username": "fake-user",
+                "state": "active",
+                "access_level": 40,
+            }
 
         if name == "project":
             return 200, {"id": 1, "path_with_namespace": state["project"]}
@@ -305,6 +331,56 @@ class Handler(BaseHTTPRequestHandler):
             issue["web_url"] = f"http://{host}/{state['project']}/-/issues/{issue['iid']}"
             state["issues"].append(issue)
             return 201, issue
+
+        if name == "closes_issues" and method == "GET":
+            wanted = {int(n) for n in CLOSING.findall(mr_of(state, iid).get("description") or "")}
+            found = []
+            for issue in state.setdefault("issues", []):
+                if int(issue["iid"]) in wanted:
+                    short = f"#{issue['iid']}"
+                    refs = {"short": short, "relative": short, "full": state["project"] + short}
+                    found.append({**issue, "references": refs})
+            return 200, page(found, query)
+
+        if name.startswith("issue") and method in ("GET", "PUT", "POST"):
+            issue = next((i for i in state.setdefault("issues", []) if int(i["iid"]) == iid), None)
+            if issue is None:
+                raise KeyError(iid)
+            if name == "issue" and method == "GET":
+                return 200, issue
+            if name == "issue_mrs" and method == "GET":
+                # 本文で `#N` と参照した MR（実物の related_merge_requests は参照した MR を含む）
+                ref = re.compile(rf"#{iid}(?!\d)")
+                found = [
+                    self.mr_view(mr)
+                    for mr in state["mrs"]
+                    if ref.search(mr.get("description") or "")
+                ]
+                return 200, page(found, query)
+            if name == "issue_notes" and method == "GET":
+                return 200, page(issue.setdefault("notes", []), query)
+            if name == "issue_notes" and method == "POST":
+                note = {
+                    "id": next_id(state),
+                    "body": self.body().get("body", ""),
+                    "created_at": self.now(),
+                }
+                issue.setdefault("notes", []).append(note)
+                return 201, note
+
+        if name == "discussion_notes" and method == "POST":
+            mr = mr_of(state, iid)
+            for d in mr["discussions"]:
+                if d["id"] == args["did"]:
+                    note = {
+                        "id": next_id(state),
+                        "body": self.body().get("body", ""),
+                        "created_at": self.now(),
+                        "author": {"id": 2, "username": "reviewer"},
+                    }
+                    d["notes"].append(note)
+                    return 201, note
+            raise KeyError(args["did"])
 
         if name == "issue" and method == "PUT":
             for issue in state.setdefault("issues", []):

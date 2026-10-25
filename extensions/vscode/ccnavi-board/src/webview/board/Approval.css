@@ -19,6 +19,12 @@
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
+/* 要約と、本文の語の凡例 */
+.approval-summary { margin: 4px 0 8px; }
+.approval-summary p { margin: 2px 0; overflow-wrap: anywhere; }
+.approval-legend { display: grid; grid-template-columns: max-content 1fr; gap: var(--gap-4) 12px; margin: 8px 0 4px; font-size: var(--font-sm); }
+.approval-legend dt { font-family: var(--vscode-editor-font-family); }
+.approval-legend dd { margin: 0; color: var(--vscode-descriptionForeground); }
 .approval-rejected, .approval-problems { margin: 0; padding-left: 18px; font-size: var(--font-sm); color: var(--board-warn-text); }
 .approval-rejected li, .approval-problems li { overflow-wrap: anywhere; }
 .approval-note { margin: 4px 0 8px; }

@@ -52,11 +52,11 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 
 保護対象のファイル（`rules.yml`・hook・ラッパースクリプト・テンプレートなど）や、チェックアウトしたブランチ直下のように書き込みを止められている場所を直したいときは、`wip/handoff/`（cwdがワークツリーの中ならそのワークツリーの、それ以外はワークスペースルートの）に元ファイルを`cp`して、そちらを編集する。手順は1本で、取り込むのはユーザ。
 `cp`と案内は`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-stage.sh <元のパス>...`が行う。下書きは、cwdがワークツリー（`.claude/worktrees/<名前>`）の中ならそのワークツリーの`wip/handoff/`に、それ以外はワークスペースルートの`wip/handoff/`に置かれる。置き場の下では、ワークスペースルートからの相対パスと同じ階層（`wip/handoff/.ccnavi/config/common/rules.yml`など）を保つ。ただし`.claude`という名前の階層は、深さを問わず`handoff-.claude`に読み替えて置く（`.claude/settings.json`は`wip/handoff/handoff-.claude/settings.json`、`projects/<名前>/.claude/hooks/x.sh`は`wip/handoff/projects/<名前>/handoff-.claude/hooks/x.sh`）。Claude Code本体は`.claude`の階層を機密パスとして扱い、`--allowedTools Edit`を渡しても非対話（`claude -p`）では編集を許可できないため。大文字小文字は区別しない（`.CLAUDE`も同じ）。取り込み（`ccnavi-user-handoff.sh`）が読み替えを戻す。読み替える名前の表は`.ccnavi/scripts/ccnavi-handoff-names.txt`の1か所で、`handoff-.claude`は予約した名前（元のパスにこの名前の階層があるファイルは`ccnavi-stage.sh`が断る）。既にある下書きは上書きしない。ワークツリーの下書きはそのブランチに載るので、非対話セッションでpushできる。ワークツリーの`wip/handoff/`へ手で`cp`すると、行き先のパスに守る名前が含まれるときは止められる（例外はワークスペースルートの`wip/handoff/`への`cp`だけ）。`ccnavi-stage.sh`を使う。`--commands`も、下書きを作ったのと同じツリーの中で打つ。
-編集が済んだら、全部の下書きがそろってから`ccnavi-stage.sh --commands <元のパス>...`で下書きの状態を確かめる。取り込むのはユーザの手で、スクリプトは元のファイルを動かさない。そのあとはセッションの種類で分かれる。
+編集が済んだら、全部の下書きがそろってから`ccnavi-stage.sh --commands <元のパス>...`を打つ。編集済みの下書きを種類で分け、取り込める種類（`template`・`layer-config`・`docs`）には`ccnavi-user-handoff.sh`の手順（下見→`--yes --expect <ハッシュ>`）を、`defense`には差し替えの`mv`を出す。取り込むのはユーザの手で、スクリプトは元のファイルを動かさない。そのあとはセッションの種類で分かれる。
 
 1. `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-stage.sh <元のパス>...`で、元のファイルを`wip/handoff/`にコピーする。下書きは元と同じ相対パス（`wip/handoff/.ccnavi/config/common/rules.yml`など。`.claude`の階層だけ`handoff-.claude`に読み替える）に置かれ、既にある下書きは上書きしない。新規のテンプレートはコピーする元が無いので、`ccnavi --templates --draft <親>`で作る（[templates.md](templates.md)）
 2. `wip/handoff/`の下書きを編集する。複数のファイルを同時に直すときは、すべてそろえてからターンを終える
-3. ユーザが`ccnavi-user-handoff.sh [<相対パス>...]`で差分を見て、`--yes --expect <ハッシュ>`で取り込む。`ccnavi-user-handoff.sh`はユーザ専用で、見るだけの形もエージェントは打てない。状態を見るときは`ccnavi-stage.sh --commands <元のパス>...`を使う
+3. ユーザが`ccnavi-user-handoff.sh [<相対パス>...]`で差分を見て、`--yes --expect <ハッシュ>`で取り込む。`ccnavi-user-handoff.sh`はユーザ専用で、見るだけの形もエージェントは打てない。`defense`の種類はボードからも取り込めないので、`--commands`が出す`mv`をターミナルのユーザが打つ
 
 コピー先は、下書きがあるツリーの同じ相対パス。取り込める保護対象は次の表の5種類で、表にヒットしない下書き（`learnings/`・`inbox/`・再現用のスクリプトなど）は対象外になる。
 
@@ -70,7 +70,7 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 
 `wip/handoff/`の下書きは`ccnavi-stage.sh`でコピーして作る。`ln`でリンクを作ったり、ハードリンクでつながった下書きを書いたりする形は止まる。
 
-コピーしたあとに反映する先が変わった下書き（conflict）や、検査に通らない下書きが1つでもあると、そのときは何も取り込まれない。取り込むと下書きは消える。ターミナルの前のユーザは、`ccnavi-stage.sh --commands`が出す`mv`の代わりに`ccnavi-user-handoff.sh`を使える。
+コピーしたあとに反映する先が変わった下書き（conflict）や、検査に通らない下書きが1つでもあると、そのときは何も取り込まれない。取り込むと下書きは消える。`--commands`は取り込める種類に`mv`を出さない（`mv`は検査も差分もハッシュ確認も通らない）。`defense`だけが`mv`で、ユーザが端末で打つ。
 
 - 対話セッション: 下書きの相対パスを挙げて、`ccnavi-user-handoff.sh`での取り込みをユーザに案内し、ターンを終える。直接作業のワークツリーの下書きなら、作業ワークツリーで打つよう案内する（`cd <ワークスペースルート>/.claude/worktrees/<名前> && ccnavi-user-handoff.sh`）。取り込んだ変更は作業ワークツリーでコミットしてから`integrate`を打つ。要らない下書きは消してコミットする。`integrate`は、取り込み待ちの下書きが残っていると断る
 - 非対話セッション: `wip/handoff/`の編集済みファイルをpushして、ユーザに確認と取り込みを頼み、ターンを終える

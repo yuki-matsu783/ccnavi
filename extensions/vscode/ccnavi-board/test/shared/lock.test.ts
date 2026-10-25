@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { lockFromBoard, lockFromError, turnWarning } from "../../src/core/lock.js";
+import { lockClass, lockFromBoard, lockFromError, turnWarning } from "../../src/core/lock.js";
 import { parseBoardJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
 
@@ -43,6 +43,7 @@ test("CB-T392 プロジェクトを渡したときは、そのプロジェクト
   const board = fixture();
   const tickets = board.tickets.map((t) => ({ ...t, project: t.ticket === "i0001-02-02" ? "lib" : "" }));
   assert.equal(lockFromBoard({ ...board, tickets }, "lib").locked, true);
+  assert.match(lockFromBoard({ ...board, tickets }, "lib").reason, /^プロジェクト lib に作業中のチケットがあります（i0001-02-02）。いま保存すると/);
   assert.equal(lockFromBoard({ ...board, tickets }, "other").locked, false);
 });
 
@@ -85,4 +86,13 @@ test("CB-T589 ボードの JSON の turns を読む。形の違う行は欠け�
       { session: "b", since: 0, seen: 0 },
     ]);
   }
+});
+
+test("CB-T1222 作業中の理由は「整合性」を使わず、チケットの ID を含む。帯は作業中だけ情報色、読めないときは赤のまま", () => {
+  const locked = lockFromBoard(fixture());
+  assert.doesNotMatch(locked.reason, /整合性/);
+  assert.match(locked.reason, /i0001-02-02/);
+  assert.equal(lockClass(locked), "lock info");
+  assert.equal(lockClass(lockFromError("読めない")), "lock");
+  assert.equal(lockClass({ locked: false, reason: "", doing: [] }), "lock hidden");
 });

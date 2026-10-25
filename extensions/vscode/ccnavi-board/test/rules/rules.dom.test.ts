@@ -490,6 +490,7 @@ test("CB-T51 保存できない理由と読み込みの苦情を出す", async (
   const locked = await openRules({ lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] } });
   try {
     assert.equal(locked.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
+    assert.ok(locked.one("#lock").classList.contains("info"), "作業中は情報色");
     assert.ok(!locked.one("#lock").classList.contains("hidden"));
   } finally {
     await locked.close();
@@ -497,6 +498,7 @@ test("CB-T51 保存できない理由と読み込みの苦情を出す", async (
   const open = await openRules();
   try {
     assert.ok(open.one("#lock").classList.contains("hidden"));
+    assert.ok(!open.one("#lock").classList.contains("info"));
     assert.equal(open.all(".problems").length, 0);
   } finally {
     await open.close();

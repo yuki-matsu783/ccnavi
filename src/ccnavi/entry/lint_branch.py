@@ -316,7 +316,8 @@ def _place_problems(
                     "(ticket)",
                     f"{t.ticket}: 親 {t.ticket} に plan がありません。"
                     "plan の無い親は `ticket start` が止まる（子や子の提案があっても同じ）。"
-                    "`ccnavi-launcher.sh --docs` で proposal-format と phases を引き、"
+                    "`ccnavi-launcher.sh --docs --keyword 提案書式` と `--keyword phases` で"
+                    "書式と型の決め方を引き、"
                     "phases.yml の定義を使う plan を追加します。",
                 )
             )

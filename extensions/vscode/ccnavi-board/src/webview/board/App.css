@@ -26,7 +26,7 @@ body {
 .filter.attention { gap: var(--gap-2); cursor: pointer; }
 .filter.attention input { margin: 0; cursor: pointer; }
 .board-empty { padding: 4px; color: var(--vscode-descriptionForeground); }
-/* 列は空きに合わせて伸び縮みする。1 列 220px を割るところまで狭まったら横スクロールにする。
+/* 列は空きに合わせて伸び縮みする。4 列が 220px ずつ収まらない幅（940px 以下）では、横スクロールをやめて列を縦に積む。
    右端の取っ手をドラッグした列は幅が px で固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
    畳んだ列は見出し 1 行ぶんの幅に縮む。縦書きにはしない。
    取っ手は列の右の隙間にはみ出して置くが、最後の列だけは内側に置く（外に出すとボードが常に数 px 横に流れる） */
@@ -39,6 +39,14 @@ body {
 .column.sized { flex: 0 0 auto; }
 .resizer { position: absolute; top: 0; bottom: 0; right: -7px; width: 12px; cursor: col-resize; z-index: var(--z-inline); }
 .column:last-child .resizer { right: 0; }
+/* 4 列 × 220px + 隙間 + 余白が収まらない幅（約 940px 以下）では、横スクロールをやめて列を縦に積む */
+@media (max-width: 940px) {
+  .board { flex-direction: column; align-items: stretch; }
+  .column { min-width: 0; }
+  /* 縦積みでは幅の固定も取っ手も意味がない（固定幅が残ると全幅にならず、取っ手が右へはみ出して横スクロールが戻る） */
+  .column.sized { width: auto !important; }
+  .resizer { display: none; }
+}
 .resizer::after {
   content: ""; position: absolute; top: 8px; bottom: 8px; left: 5px; width: 2px;
   border-radius: var(--radius-sm); background: var(--vscode-focusBorder); opacity: 0;

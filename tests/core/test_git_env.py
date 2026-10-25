@@ -55,7 +55,33 @@ class BlocksTheHostConfigTest(unittest.TestCase):
         """
         listed = git_out(self.dir, "config", "--global", "--list")
         keys = {line.split("=", 1)[0] for line in listed.splitlines() if line}
-        self.assertEqual({"init.defaultbranch"}, keys, f"ホストの設定が見えている: {listed}")
+        self.assertEqual(
+            {"init.defaultbranch", "core.excludesfile"}, keys, f"ホストの設定が見えている: {listed}"
+        )
+
+    def test_the_host_global_ignore_file_is_not_read(self):
+        """`$XDG_CONFIG_HOME/git/ignore` の無視が、テストのリポジトリに効かない。
+
+        Claude Code は `**/.claude/settings.local.json` をここへ書く。効くと、テストが
+        `git add -A` で作るリポジトリにその設定ファイルが入らない（#607）。
+        """
+        xdg = os.path.join(self.dir, "xdg")
+        os.makedirs(os.path.join(xdg, "git"))
+        with open(os.path.join(xdg, "git", "ignore"), "w", encoding="utf-8") as f:
+            f.write("**/.claude/settings.local.json\n")
+        repo = os.path.join(self.dir, "repo")
+        os.makedirs(os.path.join(repo, ".claude"))
+        with open(os.path.join(repo, ".claude", "settings.local.json"), "w", encoding="utf-8") as f:
+            f.write("{}\n")
+        env = {**os.environ, "XDG_CONFIG_HOME": xdg}
+        subprocess.run(
+            ["git", "init", "--quiet"], cwd=repo, check=True, capture_output=True, env=env
+        )
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True, env=env)
+        listed = subprocess.run(
+            ["git", "ls-files"], cwd=repo, capture_output=True, text=True, encoding="utf-8", env=env
+        ).stdout.split()
+        self.assertEqual([".claude/settings.local.json"], listed)
 
     def test_init_makes_the_same_branch_on_every_machine(self):
         """`-b` を渡さない `git init` の既定が、機械にも git の版にも依らない。

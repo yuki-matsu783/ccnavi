@@ -9,7 +9,7 @@ import type { Moved } from "../../core/board-moved.js";
 /** ツールバーの絞り込みのチェックボックスの言葉 */
 export const FILTER_LABELS = {
   attention: "要対応のみ",
-  attentionTitle: "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
+  attentionTitle: "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーが見つからない・HIGH 以上のリスク・不備）",
   archived: "アーカイブ済みチケットを表示",
   archivedTitle: "Draft を解除したとき（ccnavi-review.sh ready）にローカルの logs/archive/ に移動した、完了・取り消しのチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
 } as const;
@@ -28,7 +28,7 @@ export function movedLabel(moved: Moved): string {
 
 /**
  * カードの注意の行。例外のときだけ短い言葉で出す（理由の全文は詳細）。
- * 不備・書き込み停止・先行待ち・リスク HIGH 以上・複数の場所にある・ワークツリーなし（閉じていないものだけ）・未送信。
+ * 不備・書き込み停止・先行待ち・リスク HIGH 以上・複数の場所にある・ワークツリー未作成（承認待ち）・ワークツリーが見つからない（作業中・レビュー中）・未送信。
  * ユーザが動く必要がある状態だけで、普通のことは出さない。先行待ちは識別子の途中で折り返さないよう、`PredecessorNote` で別に出す
  */
 export interface Note {
@@ -47,7 +47,9 @@ export function notesOf(card: Card): Note[] {
     notes.push({ key: "blocked", text: "書き込み停止中", kind: "blocked" });
   }
   if (!card.worktreeExists && card.copyStatus !== "closed" && card.copyStatus !== "archived") {
-    notes.push({ key: "worktree", text: "ワークツリーなし", kind: "worktree none" });
+    // 承認待ち（none）はまだ作っていないだけ。作業中・レビュー中に無いのは異常（warn の見た目）
+    const pending = card.copyStatus === "none";
+    notes.push({ key: "worktree", text: pending ? "ワークツリー未作成" : "ワークツリーが見つからない", kind: pending ? "worktree" : "worktree none" });
   }
   if (isHighRisk(card.riskLevel)) {
     notes.push({ key: "risk", text: riskText(card), kind: `risk risk-${card.riskLevel.toLowerCase()}` });

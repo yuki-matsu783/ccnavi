@@ -29,7 +29,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 
 - `--yes` が無い形は見るだけで、何も書かない。パスを省くと、種類の表に該当する下書き全部が対象になる
 - 見るだけの形を含めて、すべてユーザ専用（`user` の入口の中。外では断る）。エージェントは `ccnavi-stage.sh --commands` で状態を見る
-- ターミナルの前のユーザは、`ccnavi-stage.sh --commands` が出す `mv` の代わりにこのコマンドを使える
+- `ccnavi-stage.sh --commands` は、取り込める種類の下書きにこのコマンドの手順を出し、`mv` は `defense` にだけ出す（`mv` は検査・差分・ハッシュ確認を通らないため）。取り込めるかの判定は sh の `is_importable` が `KINDS` と同じ表を持つ（ずれはテストで見つかる）
 
 **ツリー。** `--root` で指した 1 本のツリーだけを見る。ほかのツリーの `wip/handoff/` は読まない。`ccnavi-stage.sh` と `user handoff` は
 同じツリーの決め方（`ccnavi_workspace` と同じ規則）を使う。取り込み先は、下書きがあるツリーの、階層名の読み替えを戻した相対パス。

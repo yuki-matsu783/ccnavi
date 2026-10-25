@@ -40,4 +40,4 @@ keywords: [リスク, risks.yml, 配点, 育つ, 全体像, risk.json, 実績, l
 
 | 読むとき | 開くファイル |
 |---|---|
-| 書き方・確かめ方 | `.claude/skills/ccnavi-config/references/add.md` と `check.md` |
+| 書き方・確かめ方 | `.claude/skills/ccnavi-config/references/common/add.md` と `check.md` |

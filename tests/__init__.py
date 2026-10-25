@@ -95,6 +95,14 @@ def _block_host_git_config() -> dict[str, str]:
     書いておかないと git を上げた日にテストの前提が気づかないうちに変わる。値は、今の
     テストが前提にしている `master` に固定する。
 
+    もう 1 つ、グローバルの無視ファイル（`$XDG_CONFIG_HOME/git/ignore`、既定は
+    `~/.config/git/ignore`）も機械ごとに違う。これは `GIT_CONFIG_GLOBAL` では塞がらず、
+    `core.excludesFile` を書かないかぎり git が読む。Claude Code は
+    `**/.claude/settings.local.json` をここへ書くので、入っている機械ではテストのリポジトリの
+    `git add -A` がその設定ファイルを拾わず、追跡されない（Linux の CI には無いので、
+    #607 まで macOS の開発機でだけ `tests.guard.test_named_guards_post` が 27 件落ちていた）。
+    空のファイルを指して塞ぐ。
+
     `/dev/null` を指さないのは Windows に無いため。実際の空ファイルなら 4 環境で同じ。
     `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_SYSTEM` は git 2.32 以降。読めているかは
     `tests/core/test_git_env.py` が確かめるので、古い git では
@@ -103,8 +111,13 @@ def _block_host_git_config() -> dict[str, str]:
     home = _tempfile.mkdtemp(prefix="ccnavi-gitconfig-")
     _atexit.register(_shutil.rmtree, home, ignore_errors=True)
     path = os.path.join(home, "config")
+    excludes = os.path.join(home, "excludes")
+    open(excludes, "w", encoding="utf-8").close()
     with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write("[init]\n\tdefaultBranch = master\n")
+        f.write(
+            "[init]\n\tdefaultBranch = master\n"
+            f"[core]\n\texcludesFile = {excludes.replace(os.sep, '/')}\n"
+        )
     return {
         "GIT_CONFIG_GLOBAL": path,
         "GIT_CONFIG_SYSTEM": path,

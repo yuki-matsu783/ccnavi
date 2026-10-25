@@ -203,6 +203,13 @@ test("CB-D73 説明の付く見出しは次の行をツールチップに畳み�
     // 折りたたんだ説明は目には出さないが、読み上げに渡すので DOM には残る。
     const hints = texts(page, ".approval-hint").join(" ");
     assert.ok(hints.includes("allow は確認なしで編集できる場所"), hints);
+    // 要約は表の上、凡例は本文の外に出る。本文の語は置き換えない
+    assert.match(text(page, "[data-approval-summary]"), /^承認するチケット 3 件/);
+    assert.match(text(page, "[data-approval-summary-plan]"), /全体計画 2 ステップ（調査・設計）/);
+    const legend = text(page, "[data-approval-legend]");
+    for (const word of ["allow", "ask", "deny", "after", "scope", "review"]) {
+      assert.ok(legend.includes(word), legend);
+    }
     // 本文そのものは削らない。理由の中身は見出しの下にそのまま出る。
     const body = text(page, "pre.approval-text");
     assert.ok(body.includes("■ エージェントが記載した理由"), body);
@@ -473,7 +480,7 @@ test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要�
     const label = page.one("label.filter.attention");
     assert.equal(
       label.getAttribute("title"),
-      "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
+      "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーが見つからない・HIGH 以上のリスク・不備）",
     );
     assert.equal(label.textContent.trim(), "要対応のみ");
     assert.equal(page.one('.card[data-id="i0001-02-03"]').getAttribute("data-attention"), "1");

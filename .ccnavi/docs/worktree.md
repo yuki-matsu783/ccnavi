@@ -21,6 +21,7 @@ keywords: [ワークツリー, worktree, git, 正本, ccnavi-git.sh, ccnavi-work
   | ワークツリーや`projects/<名前>`の中 | `sh <ワークスペースルートの絶対パス>/.ccnavi/scripts/ccnavi-git.sh ...` |
 
   ワークツリーや`projects/<名前>`の中では、相対パス（`../../../`・`../../`）を使わない。cwdがその最上段のときしか届かず、サブディレクトリへ`cd`した後や別のツリーから打つと外れるため。
+  `ccnavi-git.sh`は cwd のリポジトリに対して動くため、ワークツリーで操作するときは、そのツリーへ`cd`してから打つ。
   コマンド名やパスを変数に入れない（`DENY_COMMAND_NAME_EXPANSION`で止まる）。
   gitを直接呼んで拒否されたときの案内も、実際の絶対パスに展開した同じ形で出るので、そのまま使える
 

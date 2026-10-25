@@ -14,7 +14,7 @@ keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, te
 |---|---|---|
 | きっかけ | 通したくなかった操作が通った、止めすぎた、`UNDECLARED` が多い、記録で同じ呼び出しが何度も止まった | `ccnavi --suggest`、`--explain`、記録（`decisions.jsonl`） |
 | 下書き | ルールを 1 件足す。期待する判定も 1 行足す（止めたくないものも一緒に） | `/ccnavi-config` |
-| 検証 | 防御を消す記述が無いか、期待する判定と合うか | `ccnavi --lint`、`--test-expectations`、`scripts/check_rules.py` |
+| 検証 | 防御を消す記述が無いか、期待する判定と合うか | `ccnavi --lint`、`--test-expectations` |
 | 効く | 次の判定から効く。`dry-run` の間、一般の保護は止めず「enable なら止めていた」を伝えるだけ（チケットの関門と補助の保護は止める） | `CCNAVI_MODE` |
 
 ## 規則
@@ -29,6 +29,6 @@ keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, te
 
 | 読むとき | 開くファイル |
 |---|---|
-| 書式・記法の細部 | `.claude/skills/ccnavi-config/references/add.md` |
-| 確かめ方 | `.claude/skills/ccnavi-config/references/check.md` |
+| 書式・記法の細部 | `.claude/skills/ccnavi-config/references/common/add.md` |
+| 確かめ方 | `.claude/skills/ccnavi-config/references/common/check.md` |
 | 共通レイヤーの配り方 | [grow.md](grow.md)（「配る」の行） |

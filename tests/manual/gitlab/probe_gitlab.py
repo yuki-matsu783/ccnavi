@@ -1,27 +1,31 @@
-"""実物の GitLab に sh 3 本と exe を適用して 1 周する。ユーザが手で走らせる道具で、
+"""実物の GitLab に sh 5 本と exe を適用して 1 周する。ユーザが手で走らせる道具で、
 自動テストは呼ばない。
 
 tests/ticket/test_ticket.py と同じ形で一時リポジトリを作り、使い捨てのプロジェクトを
-GitLab に作って、`ccnavi-ticket.sh` / `ccnavi-git.sh` / `ccnavi-review.sh` を実物に通す。
+GitLab に作って、`ccnavi-ticket.sh` / `ccnavi-git.sh` / `ccnavi-review.sh` /
+`ccnavi-user-push-approved.sh` / `ccnavi-user-close-early.sh` を実物に通す。
 人間役（レビュアー）は別ユーザのトークンで API を直に呼ぶ。
-sh と同じ道具を使わないほうが、片方の不具合がもう片方に隠れない。
+sh と同じ道具を使わないのは、片方の不具合がもう片方に隠れないようにするため。
 
 ## 用意するもの
 
-- 動いている GitLab（既定 `http://localhost:8929`。`CCNAVI_PROBE_GITLAB` で変える）
-- トークン 2 本。
-  `docker exec -i gitlab gitlab-rails runner - < tests/manual/gitlab/make_gitlab_tokens.rb` が
-  `GITLAB_TOKEN`（root、エージェント役）と `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役）を出す
+- 動いている GitLab（既定 `http://127.0.0.1:8929`。`CCNAVI_PROBE_GITLAB` で変える）。
+  `tests/manual/gitlab/docker_gitlab.py up` で立てる（手順は docs/42_claude/gitlab-manual.md）
+- トークン 2 本（`GITLAB_TOKEN`（root、エージェント役）と
+  `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役））。
+  `docker_gitlab.py up` が作り、0600 のファイルに書く。`set -a; . <そのパス>; set +a` で読む
 - 組み立て済みの exe（`dist/ccnavi/ccnavi`）。`CCNAVI_ENTRY_PATH` で差し替えられる
 - jq と curl（sh が使う）
 
-    GITLAB_TOKEN=... CCNAVI_PROBE_REVIEWER_TOKEN=... \
-        uv run python tests/manual/gitlab/probe_gitlab.py
+    uv run python tests/manual/gitlab/probe_gitlab.py
+
+GitLab API を人間役のトークンで呼ぶ部分は `gitlab_api.py` にある（import しても副作用が無い）。
+`--help` は、この説明を出して終わる（トークンも exe も要らない）。
 
 ## 認証画面を出さない
 
 push は URL にトークンを埋めない（埋めると origin の URL に混ざる）。git のラッパースクリプトは
-`GIT_CONFIG_COUNT` を除くので環境変数でも差し替えられない。一時リポジトリの
+`GIT_CONFIG_COUNT` を取り除くため、環境変数では差し替えられない。一時リポジトリの
 `credential.helper` を空文字で一度リセットしてから（system / global の GCM を外す）、
 トークンを返す helper を足す。
 
@@ -29,37 +33,60 @@ push は URL にトークンを埋めない（埋めると origin の URL に混
 
 sh の HTTP 経路（curl・jq・ページング・投稿・認証）と、GitLab が返す JSON の形が sh の読み方と
 合っているか。結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
-変更要求（request_changes）は GitLab EE の機能で、CE では 404 になる。CE ではその段だけ失敗する。
+変更要求（request_changes）は GitLab EE の機能で、CE では 404 になる。
+CE ではその段を SKIP とする（確かめていないものを PASS に数えない）。まとめは
+`PASS n / SKIP m / FAIL k`。FAIL があれば終了コードは 1。
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
-import urllib.error
-import urllib.request
+
+import gitlab_api
+
+# 提案の書式（計画・config の phases）は、ticket のテストと同じ補助で作る
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+)
+from tests.ticketsample import plain_parent, write_plain_phases  # noqa: E402
 
 ROOT_OF_CCNAVI = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh")
 CLOSE_EARLY_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-close-early.sh")
+PUSH_APPROVED_SH = os.path.join(
+    ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-push-approved.sh"
+)
+DECIDE_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-user-decide.sh")
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
-GITLAB = os.environ.get("CCNAVI_PROBE_GITLAB", "http://localhost:8929").rstrip("/")
-API = GITLAB + "/api/v4"
+GITLAB = os.environ.get(
+    "CCNAVI_PROBE_GITLAB",
+    f"http://127.0.0.1:{os.environ.get('CCNAVI_GITLAB_PORT', '8929')}",
+).rstrip("/")
 
-ROOT_TOKEN = os.environ.get("GITLAB_TOKEN", "")
-REVIEWER_TOKEN = os.environ.get("CCNAVI_PROBE_REVIEWER_TOKEN", "")
-if not ROOT_TOKEN or not REVIEWER_TOKEN:
-    sys.exit(
-        "GITLAB_TOKEN と CCNAVI_PROBE_REVIEWER_TOKEN が要る。"
-        "tests/manual/gitlab/make_gitlab_tokens.rb で作る"
-    )
+# import では何も起こさない。トークン・exe・一時ディレクトリ・ログは setup() が main() の中で作る。
+ROOT_TOKEN = ""
+REVIEWER_TOKEN = ""
+EXE = ""
+OUT = ""
+ROOT = ""
+ENV: dict[str, str] = {}
+STAMP = ""
+LOG = None
+# (段名, "PASS" | "SKIP" | "FAIL", 詳細)
+RESULTS: list[tuple[str, str, str]] = []
+API_SEQ = 0
+# この実行が作ったプロジェクトの id。終わりに、これだけを消す
+PROJECT_IDS: list[int] = []
 
 
 def _exe() -> str:
@@ -73,16 +100,26 @@ def _exe() -> str:
     sys.exit(f"exe が無い ({base})。build.py で組み立てる")
 
 
-EXE = _exe()
-STAMP = time.strftime("%m%d-%H%M%S")
-OUT = os.environ.get("CCNAVI_PROBE_OUT") or tempfile.mkdtemp(prefix="ccnavi-probe-")
-OUT = os.path.join(OUT, "glrun-" + STAMP)
-ROOT = os.path.join(OUT, "repo")
-os.makedirs(OUT, exist_ok=True)
-# 走っている間ずっと書くので、閉じるのは finish()。
-LOG = open(os.path.join(OUT, "steps.log"), "w", encoding="utf-8")  # noqa: SIM115
-RESULTS: list[tuple[str, bool, str]] = []
-API_SEQ = 0
+def setup() -> None:
+    """トークン・exe・実測の置き場を作る。main() の最初に 1 回だけ呼ぶ。"""
+    global ROOT_TOKEN, REVIEWER_TOKEN, EXE, OUT, ROOT, LOG, ENV, STAMP
+    ROOT_TOKEN = os.environ.get("GITLAB_TOKEN", "")
+    REVIEWER_TOKEN = os.environ.get("CCNAVI_PROBE_REVIEWER_TOKEN", "")
+    if not ROOT_TOKEN or not REVIEWER_TOKEN:
+        sys.exit(
+            "GITLAB_TOKEN と CCNAVI_PROBE_REVIEWER_TOKEN が要る。"
+            "tests/manual/gitlab/make_gitlab_tokens.rb で作る"
+        )
+    EXE = _exe()
+    STAMP = time.strftime("%m%d-%H%M%S")
+    OUT = os.environ.get("CCNAVI_PROBE_OUT") or tempfile.mkdtemp(prefix="ccnavi-probe-")
+    OUT = os.path.join(OUT, "glrun-" + STAMP)
+    ROOT = os.path.join(OUT, "repo")
+    os.makedirs(OUT, exist_ok=True)
+    # 実行中ずっと書き続けるので、閉じるのは finish() で行う。
+    LOG = open(os.path.join(OUT, "steps.log"), "w", encoding="utf-8")  # noqa: SIM115
+    ENV = env_for()
+
 
 RULES = {
     "version": 1,
@@ -97,15 +134,27 @@ RULES = {
 }
 
 
+def project_name(prefix: str, stamp: str) -> str:
+    """プロジェクト名。他の作業と区別したいときは CCNAVI_PROBE_PREFIX で前置きを変える。"""
+    return f"{prefix}-{stamp}"
+
+
+def summary_line(results: list[tuple[str, str, str]]) -> str:
+    count = {s: sum(1 for r in results if r[1] == s) for s in ("PASS", "SKIP", "FAIL")}
+    return f"PASS {count['PASS']} / SKIP {count['SKIP']} / FAIL {count['FAIL']}"
+
+
 def say(text: str) -> None:
     print(text, flush=True)
     LOG.write(text + "\n")
     LOG.flush()
 
 
-def record(name: str, ok: bool, detail: str = "") -> None:
-    RESULTS.append((name, ok, detail))
-    say(f"{'PASS' if ok else 'FAIL'}  {name}  {detail}")
+def record(name: str, ok: bool, detail: str = "", *, skip: bool = False) -> None:
+    """段の結果を残す。skip は「確かめられなかった」（CE の変更要求など）。PASS には数えない。"""
+    state = "SKIP" if skip else ("PASS" if ok else "FAIL")
+    RESULTS.append((name, state, detail))
+    say(f"{state}  {name}  {detail}")
 
 
 def redact(text: str) -> str:
@@ -119,6 +168,8 @@ def env_for() -> dict[str, str]:
         {
             "GITLAB_TOKEN": ROOT_TOKEN,
             "CCNAVI_ENTRY_PATH": EXE,
+            # 一時リポジトリをワークスペースにする（sh の ticket 系は cwd からこの根を使う）
+            "CCNAVI_WORKSPACE": ROOT,
             "CCNAVI_GUARD_TICKET_APPROVAL": "disable",
             "CCNAVI_MODE": "enable",
             "CCNAVI_GUARD_CORE_FILES": "disable",
@@ -193,50 +244,33 @@ def sh(script: str, cwd: str, *args: str, stdin: str = "") -> subprocess.Complet
     return run(["sh", script, *args], cwd, stdin=stdin)
 
 
-def api(
-    method: str, path: str, token: str, payload: dict | None = None, tag: str = ""
-) -> tuple[int, object]:
-    """人間役の API。生の応答を OUT に残す。起動直後の GitLab は遅いので 120 秒を 3 回まで待つ。"""
+def record_api(event: dict) -> None:
+    """人間役の API の生の応答を OUT に残す。"""
     global API_SEQ
+    if event["kind"] == "retry":
+        LOG.write(
+            f"\nAPI {event['method']} {event['path']} 失敗 ({event['error']}) "
+            f"{event['attempt']} 回目\n"
+        )
+        LOG.flush()
+        return
     API_SEQ += 1
-    data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    req = urllib.request.Request(
-        API + path,
-        data=data,
-        method=method,
-        headers={"PRIVATE-TOKEN": token, "Content-Type": "application/json"},
-    )
-    status, raw = 0, ""
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=120) as res:
-                status, raw = res.status, res.read().decode("utf-8")
-            break
-        except urllib.error.HTTPError as exc:
-            status, raw = exc.code, exc.read().decode("utf-8", "replace")
-            break
-        except (TimeoutError, OSError) as exc:
-            LOG.write(f"\nAPI {method} {path} 失敗 ({exc}) {attempt + 1} 回目\n")
-            LOG.flush()
-            status, raw = 0, json.dumps({"error": str(exc)})
-            time.sleep(10)
-    try:
-        body = json.loads(raw) if raw else {}
-    except ValueError:
-        body = raw
-    slug = tag or path.strip("/").replace("/", "_")[:60]
+    method, path, status = event["method"], event["path"], event["status"]
+    slug = event["tag"] or path.strip("/").replace("/", "_")[:60]
     with open(
         os.path.join(OUT, f"api-{API_SEQ:02d}-{method}-{slug}.json"), "w", encoding="utf-8"
     ) as f:
         json.dump(
-            {"status": status, "path": path, "payload": payload, "body": body},
+            {"status": status, "path": path, "payload": event["payload"], "body": event["body"]},
             f,
             ensure_ascii=False,
             indent=1,
         )
     LOG.write(f"\nAPI {method} {path} -> {status}\n")
     LOG.flush()
-    return status, body
+
+
+CLIENT = gitlab_api.Client(GITLAB, recorder=record_api)
 
 
 def write(path: str, text: str) -> str:
@@ -246,10 +280,27 @@ def write(path: str, text: str) -> str:
     return path
 
 
-def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="作業", issue=None):
+EXPLAINER = "wip/eli5/phase-1.html"
+
+
+def write_explainer(tree: str) -> str:
+    # request は --eli5 の HTML を要る。外部の読み込みは無し（ccnavi-review の規則）
+    return write(
+        os.path.join(tree, "wip", "eli5", "phase-1.html"),
+        '<!doctype html><meta charset="utf-8"><title>実測</title>'
+        "<p>挨拶を足す変更の確認。危険は無い（実測用）。</p>\n",
+    )
+
+
+def ticket_text(
+    name, *, parent="", phase=None, allow=(), review=True, title="作業", issue=None, mr=1
+):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if parent:
         lines += [f"parent: {parent}", f"phase: {phase}"]
+    if not parent:
+        # 親は MR の番号を持つ（ccnavi の親チケットは issue と MR のセット）
+        lines.append(f"mr: {mr}")
     if issue:
         lines.append(f"issue: {issue}")
     lines += [
@@ -273,7 +324,56 @@ def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="�
         "本文（ユーザが読む説明）",
         "",
     ]
+    # 親には計画（1 フェーズ）を足す。子は plain_parent が何もしない
+    return plain_parent("\n".join(lines), plan=1)
+
+
+# 承認のあとに ccnavi が書く欄。改版の提案では空にする（approval の検査が求める）
+APPROVAL_FIELDS = (
+    "started_at",
+    "completed_at",
+    "base_sha",
+    "merged_sha",
+    "cancelled_at",
+    "cancel_reason",
+    "finished_to",
+    "settled_by",
+)
+
+
+def approved_copy_path(tree: str, state: str, ticket: str) -> str:
+    """承認済みチケットの置き場（`.ccnavi/approved/<doing|done>/<チケット>.md`）。
+    取り消しは置き場でなく欄なので、取り消した子も `done/` に在る（ticket_model.CANCELLED）。"""
+    return os.path.join(tree, ".ccnavi", "approved", state, ticket + ".md")
+
+
+def feedback_revision(approved_text: str) -> str:
+    """承認済みの親の全文に `feedback: []` を足した改版の本文。
+
+    ゼロから作り直さない（plan・phases・範囲は承認済みのまま）。`plan_differs` が改版と検出する。
+    承認のあとに ccnavi が書いた欄（`APPROVAL_FIELDS`）は、提案には書かない決まりなので空にする。
+    """
+    lines = approved_text.split("\n")
+    if any(line.startswith("feedback:") for line in lines):
+        raise ValueError("feedback が既にある")
+    end = lines.index("---", 1)  # frontmatter の終わり。本文の行は触らない
+    for i in range(1, end):
+        key = lines[i].split(":", 1)[0]
+        if key in APPROVAL_FIELDS and lines[i].startswith(key + ":"):
+            lines[i] = f'{key}: ""'
+    at = next(i for i, line in enumerate(lines) if line.startswith("human_review:"))
+    lines[at:at] = ["feedback: []"]
     return "\n".join(lines)
+
+
+def is_cancelled_copy(text: str) -> bool:
+    """承認済みのコピーの `cancelled_at` が空でない（取り消した印）。"""
+    return re.search(r'^cancelled_at:\s*"?[^\s"]', text, re.M) is not None
+
+
+def read_text(path: str) -> str:
+    with open(path, encoding="utf-8") as f:
+        return f.read()
 
 
 def worktree(name: str, base: str) -> str:
@@ -290,87 +390,64 @@ def propose(tree: str, name: str, **kw) -> str:
 
 def commit_all(tree: str, msg: str) -> None:
     git(tree, "add", "-A")
-    git(tree, "commit", "--quiet", "-m", msg)
+    # 変更が無い段（start など）でも止まらない
+    git(tree, "commit", "--quiet", "--allow-empty", "-m", msg)
 
 
 def mr_of(project_id: int, branch: str) -> dict | None:
-    _, found = api(
-        "GET",
-        f"/projects/{project_id}/merge_requests?state=all&source_branch={branch}",
-        ROOT_TOKEN,
-        tag=f"mr-list-{branch}",
-    )
-    return found[0] if isinstance(found, list) and found else None
+    return CLIENT.find_mr(ROOT_TOKEN, project_id, branch)
 
 
 def notes_of(project_id: int, iid: int) -> list[dict]:
-    _, found = api(
-        "GET",
-        f"/projects/{project_id}/merge_requests/{iid}/notes?per_page=100&sort=asc&order_by=created_at",
-        ROOT_TOKEN,
-        tag=f"notes-{iid}",
+    return CLIENT.notes(ROOT_TOKEN, project_id, iid)
+
+
+has_marker = gitlab_api.has_marker
+# 依頼の目印は製品の形のまま照合する（review_host.MARKER_REQUEST に key=<16 桁の 16 進> が続く）
+REQUEST_MARKER = re.compile(r"<!-- ccnavi:request i0001:1 key=[0-9a-f]{16} -->")
+
+
+def request_marked(project_id: int, iid: int) -> bool:
+    return any(
+        REQUEST_MARKER.fullmatch(note.get("body", "").split("\n", 1)[0].strip())
+        for note in notes_of(project_id, iid)
     )
-    return found if isinstance(found, list) else []
 
 
-def has_marker(notes: list[dict], marker: str) -> bool:
-    return any(n.get("body", "").startswith(marker) for n in notes)
-
-
-def main() -> int:
+def run_probe() -> None:
     say(f"== 実測の置き場: {OUT}")
-    status, version = api("GET", "/version", ROOT_TOKEN, tag="version")
+    status, version = CLIENT.version(ROOT_TOKEN)
     record(
         "API に root トークンで入れる",
         status == 200,
         f"GitLab {version.get('version') if isinstance(version, dict) else version}",
     )
-    status, me = api("GET", "/user", REVIEWER_TOKEN, tag="reviewer-user")
+    status, me = CLIENT.user(REVIEWER_TOKEN)
     record(
         "レビュアーのトークンで入れる",
         status == 200,
         str(me.get("username") if isinstance(me, dict) else me),
     )
     if status != 200:
-        return finish()
+        return
     reviewer_id = int(me["id"])
 
     # ---- 0. ユーザが用意するもの: プロジェクト、メンバー、課題、main
-    project_path = f"ccnavi-probe-{STAMP}"
-    status, project = api(
-        "POST",
-        "/projects",
-        ROOT_TOKEN,
-        {
-            "name": project_path,
-            "path": project_path,
-            "visibility": "private",
-            "initialize_with_readme": False,
-        },
-        tag="project-create",
-    )
+    project_path = project_name(os.environ.get("CCNAVI_PROBE_PREFIX", "ccnavi-probe"), STAMP)
+    status, project = CLIENT.create_project(ROOT_TOKEN, project_path)
     record(
         "プロジェクトを作る",
         status == 201,
         str(project.get("web_url") if isinstance(project, dict) else project),
     )
     if status != 201:
-        return finish()
+        return
     pid = project["id"]
-    status, _ = api(
-        "POST",
-        f"/projects/{pid}/members",
-        ROOT_TOKEN,
-        {"user_id": reviewer_id, "access_level": 40},
-        tag="member-add",
-    )
+    PROJECT_IDS.append(pid)
+    status, _ = CLIENT.add_member(ROOT_TOKEN, pid, reviewer_id, 40)
     record("レビュアーをメンバーにする", status == 201)
-    status, issue = api(
-        "POST",
-        f"/projects/{pid}/issues",
-        ROOT_TOKEN,
-        {"title": "greeter に挨拶を足す", "description": "実測の元になる課題"},
-        tag="issue-create",
+    status, issue = CLIENT.create_issue(
+        ROOT_TOKEN, pid, "greeter に挨拶を足す", "実測の元になる課題"
     )
     record(
         "課題を立てる", status == 201, f"#{issue.get('iid') if isinstance(issue, dict) else '?'}"
@@ -379,8 +456,18 @@ def main() -> int:
 
     os.makedirs(os.path.join(ROOT, ".claude"), exist_ok=True)
     git(ROOT, "init", "--quiet", "-b", "main")
+    # 一時リポジトリをワークスペースにする。sh の道具（scripts と config）を写す
+    shutil.copytree(
+        os.path.join(ROOT_OF_CCNAVI, ".ccnavi"),
+        os.path.join(ROOT, ".ccnavi"),
+        ignore=shutil.ignore_patterns("bin", "docs", "__pycache__"),
+    )
     write(os.path.join(ROOT, "src", "keep.py"), "print(1)\n")
-    write(os.path.join(ROOT, ".gitignore"), ".claude/\nwip/tmp/\n")
+    # 実物と同じく、.ccnavi/bin だけ無視する。承認済みチケットは .ccnavi の下で git が追跡する
+    write(os.path.join(ROOT, ".gitignore"), ".claude/\n.ccnavi/bin/\nwip/tmp/\n")
+    # 設定は init の commit に入れる（後から書くと、main と手元の config が食い違う）
+    write(os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), json.dumps(RULES))
+    write_plain_phases(ROOT)
     commit_all(ROOT, "init")
     origin = f"{GITLAB}/root/{project_path}.git"
     git(ROOT, "remote", "add", "origin", origin)
@@ -400,7 +487,6 @@ def main() -> int:
     record(
         "main を push（認証画面なし）", pushed.returncode == 0, redact(pushed.stderr.strip())[:200]
     )
-    write(os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), json.dumps(RULES))
 
     # ---- 1. 親 1 本と子 2 本、フェーズ 1
     parent_tree = worktree("i0001", "main")
@@ -423,15 +509,62 @@ def main() -> int:
         review=False,
         title="b を書く",
     )
+    write_explainer(parent_tree)
     commit_all(parent_tree, "tickets")
+    # 子の start は、親のブランチがリモートにあることを前提とする（ccnavi-start 経由の親）
+    pushed_parent = sh(GIT_SH, parent_tree, "push", "-u", "origin", "i0001")
+    record(
+        "親 i0001 を push",
+        pushed_parent.returncode == 0,
+        redact(pushed_parent.stderr.strip())[:200],
+    )
+    # 親の mr 欄（ticket_text の "mr: 1"）は、親の Draft MR が既にある前提。
+    # ccnavi-start が作る MR を、probe は通らずに API で作る。説明に Closes を入れる
+    status, parent_mr = CLIENT.call(
+        "POST",
+        f"/projects/{pid}/merge_requests",
+        ROOT_TOKEN,
+        {
+            "source_branch": "i0001",
+            "target_branch": "main",
+            "title": "Draft: 挨拶を足す",
+            "description": f"Closes #{issue_no}",
+        },
+        tag="mr-create-parent",
+    )
+    record(
+        "親の Draft MR を作る（mr: 1 と一致）",
+        status == 201 and isinstance(parent_mr, dict) and parent_mr.get("iid") == 1,
+        f"status={status}",
+    )
     approved = exe("user", "agree", stdin="y\n")
     record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
+    # 承認の push はユーザが打つ（ccnavi-user-push-approved.sh）。probe はユーザの役を務める
+    pushed_approval = sh(PUSH_APPROVED_SH, parent_tree, "i0001")
+    record(
+        "承認を push（ユーザの役）",
+        pushed_approval.returncode == 0,
+        redact(pushed_approval.stdout + pushed_approval.stderr).strip()[:200],
+    )
+    parent_started = sh(TICKET_SH, parent_tree, "start", "i0001")
+    say("親 i0001 の start（全文）:\n" + redact(parent_started.stdout + parent_started.stderr))
+    record("親 i0001 の start", parent_started.returncode == 0, parent_started.stderr.strip()[:200])
 
     for child in ("i0001-01-01", "i0001-01-02"):
         tree = worktree(child, "i0001")
         started = sh(TICKET_SH, parent_tree, "start", child)
         record(f"ticket start {child}", started.returncode == 0, started.stderr.strip()[:200])
-        write(os.path.join(tree, "src", child[-1], "work.py"), f"# {child}\n")
+        # 子の allow（propose の src/a/*・src/b/*）の範囲に入るパスに書く
+        write(
+            os.path.join(tree, "src", {"i0001-01-01": "a", "i0001-01-02": "b"}[child], "work.py"),
+            f"# {child}\n",
+        )
+        # finish では学びの記録が必須（learning.py の record_missing）。learn で雛形を書いてから
+        # 同じコミットに入れる（learnings: none のまま）
+        learned = sh(TICKET_SH, tree, "learn")
+        record(
+            f"learn が雛形を書く（{child}）", learned.returncode == 0, learned.stderr.strip()[:200]
+        )
         commit_all(tree, f"{child}: work")
     commit_all(parent_tree, "start")
 
@@ -458,7 +591,8 @@ def main() -> int:
     said = hook("PostToolUse", "Bash", parent_tree, command="ls")
     record(
         "フェーズ 1 の終わりの告知",
-        "フェーズ 1 が終わりました" in said,
+        # フェーズの名前（番号（タイトル））ごと照合する（製品の文言どおり）
+        "フェーズ 1（作業） が終わりました" in said,
         said[:120].replace("\n", " "),
     )
     record(
@@ -467,7 +601,12 @@ def main() -> int:
     )
 
     body = write(os.path.join(OUT, "request-1.md"), "見てほしい点\n\n- src/a と src/b を足した\n")
-    early = sh(REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body)
+    # 未 push の src の変更を 1 つ足してから request する（ccnavi の置き場の差分だけでは止まらない）
+    write(os.path.join(parent_tree, "src", "a", "unpushed.py"), "# 未 push\n")
+    commit_all(parent_tree, "未 push の変更")
+    early = sh(
+        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+    )
     record(
         "push 前の request は前提で止まる",
         early.returncode != 0 and "push" in early.stderr,
@@ -480,9 +619,7 @@ def main() -> int:
         pushed.returncode == 0,
         redact(pushed.stdout + pushed.stderr).strip()[:120],
     )
-    status, _ = api(
-        "GET", f"/projects/{pid}/repository/branches/i0001", ROOT_TOKEN, tag="branch-i0001"
-    )
+    status, _ = CLIENT.get_branch(ROOT_TOKEN, pid, "i0001")
     record("GitLab に i0001 ブランチがある", status == 200)
 
     # ---- 2. origin の読み方と request
@@ -494,7 +631,9 @@ def main() -> int:
         and "api_base=" + GITLAB + "/api/v4" in origin_seen.stdout,
     )
 
-    requested = sh(REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body)
+    requested = sh(
+        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+    )
     say("request:\n" + redact(requested.stdout + requested.stderr))
     record("request が通る（MR を作って投稿してマーカー）", requested.returncode == 0)
     mr = mr_of(pid, "i0001")
@@ -508,13 +647,15 @@ def main() -> int:
         bool(mr) and f"Closes #{issue_no}" in (mr.get("description") or ""),
     )
     if not mr:
-        return finish()
+        return
     iid = mr["iid"]
     record(
         "依頼の note に ccnavi:request のマーカーがある",
-        has_marker(notes_of(pid, iid), "<!-- ccnavi:request i0001:1 -->"),
+        request_marked(pid, iid),
     )
-    again = sh(REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body)
+    again = sh(
+        REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+    )
     record(
         "2 度目の request は依頼済みで止まる", again.returncode != 0 and "依頼済み" in again.stderr
     )
@@ -527,13 +668,7 @@ def main() -> int:
     )
 
     # ---- 3. レビュアーが指摘 → confirm → 変更要求（EE だけ）→ 解決と approve → confirm
-    status, disc = api(
-        "POST",
-        f"/projects/{pid}/merge_requests/{iid}/discussions",
-        REVIEWER_TOKEN,
-        {"body": "ここは名前を変えてほしい"},
-        tag="discussion-create",
-    )
+    status, disc = CLIENT.create_discussion(REVIEWER_TOKEN, pid, iid, "ここは名前を変えてほしい")
     record(
         "レビュアーがスレッドを立てる（位置なし、resolvable）",
         status == 201 and bool(disc.get("notes", [{}])[0].get("resolvable")),
@@ -552,32 +687,16 @@ def main() -> int:
         "DENY_PHASE_REVIEW" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 
-    api(
-        "PUT",
-        f"/projects/{pid}/merge_requests/{iid}",
-        ROOT_TOKEN,
-        {"reviewer_ids": [reviewer_id]},
-        tag="mr-set-reviewer",
-    )
-    status, rc_body = api(
-        "POST",
-        f"/projects/{pid}/merge_requests/{iid}/request_changes",
-        REVIEWER_TOKEN,
-        tag="request-changes",
-    )
+    CLIENT.set_reviewers(ROOT_TOKEN, pid, iid, [reviewer_id])
+    status, rc_body = CLIENT.request_changes(REVIEWER_TOKEN, pid, iid)
     ee = status in (200, 201)
     record(
         "レビュアーが変更要求を出す（EE の機能。CE では 404）",
         ee or status == 404,
         f"status={status}",
+        skip=not ee and status == 404,  # CE は確かめていないので PASS に数えない
     )
-    status, _ = api(
-        "PUT",
-        f"/projects/{pid}/merge_requests/{iid}/discussions/{disc_id}",
-        REVIEWER_TOKEN,
-        {"resolved": True},
-        tag="discussion-resolve",
-    )
+    status, _ = CLIENT.resolve_discussion(REVIEWER_TOKEN, pid, iid, disc_id)
     record("レビュアーがスレッドを解決する", status == 200)
     if ee:
         fetched = sh(REVIEW_SH, parent_tree, "fetch")
@@ -588,21 +707,9 @@ def main() -> int:
             checked.returncode != 0 and "変更要求" in checked.stderr,
             checked.stderr.strip()[:200],
         )
-        accepted = sh(REVIEW_SH, parent_tree, "decide", "1", stdin="y\n")
-        record(
-            "変更要求は decide でも通らない",
-            accepted.returncode != 0 and "変更要求" in (accepted.stderr + accepted.stdout),
-        )
-    status, ap = api(
-        "POST", f"/projects/{pid}/merge_requests/{iid}/approve", REVIEWER_TOKEN, tag="approve"
-    )
+    status, ap = CLIENT.approve(REVIEWER_TOKEN, pid, iid)
     record("レビュアーが approve する", status in (200, 201), f"status={status}")
-    _, reviewers = api(
-        "GET",
-        f"/projects/{pid}/merge_requests/{iid}/reviewers",
-        ROOT_TOKEN,
-        tag="reviewers-after-approve",
-    )
+    _, reviewers = CLIENT.reviewers(ROOT_TOKEN, pid, iid)
     say("approve 後の reviewers: " + json.dumps(reviewers, ensure_ascii=False)[:300])
     fetched = sh(REVIEW_SH, parent_tree, "fetch")
     write(os.path.join(OUT, "fetch-4-approved.json"), fetched.stdout)
@@ -629,50 +736,52 @@ def main() -> int:
         has_marker(notes_of(pid, iid), "<!-- ccnavi:comment -->"),
     )
 
-    status, disc2 = api(
-        "POST",
-        f"/projects/{pid}/merge_requests/{iid}/discussions",
-        REVIEWER_TOKEN,
-        {"body": "typo。次でよい"},
-        tag="discussion-create-2",
+    status, disc2 = CLIENT.create_discussion(
+        REVIEWER_TOKEN, pid, iid, "typo。次でよい", tag="discussion-create-2"
     )
-    disc2_note = disc2.get("notes", [{}])[0].get("id", "")
-    accepted = sh(REVIEW_SH, parent_tree, "decide", "1", stdin="y\n")
-    say("decide:\n" + redact(accepted.stdout + accepted.stderr))
+    # 受け入れ（ユーザの decide）は別の親で通す（手順 6）
+
+    # ---- 3b. フィードバック計画の改版（親の done の前提。全体計画の最後がレビュー済みになった後）
+    current = approved_copy_path(parent_tree, "doing", "i0001")
+    revised = write(
+        os.path.join(parent_tree, "wip", "proposals", "todo", "i0001.md"),
+        feedback_revision(read_text(current)),
+    )
+    commit_all(parent_tree, "フィードバック計画の改版")
+    agreed = exe("user", "agree", stdin="y\n")
     record(
-        "decide で未解決を受け入れる", accepted.returncode == 0 and "受け入れた" in accepted.stdout
+        "--agree（フィードバック計画の改版）", agreed.returncode == 0, redact(agreed.stderr)[-200:]
     )
-    acc = [n for n in notes_of(pid, iid) if n.get("body", "").startswith("<!-- ccnavi:decide -->")]
+    revised_push = sh(PUSH_APPROVED_SH, parent_tree, "i0001")
+    record("改版の承認を push（ユーザの役）", revised_push.returncode == 0)
     record(
-        "受け入れの note が MR に書き込まれる",
-        bool(acc) and f"#note_{disc2_note}" in acc[-1].get("body", ""),
+        "承認済みのコピーの feedback 欄が空の計画になる",
+        re.search(r"^feedback: \[\]\s*$", read_text(current), re.M) is not None,
     )
-    checked = sh(REVIEW_SH, parent_tree, "confirm", "--phase", "1")
-    record(
-        "受け入れ済みのスレッドは confirm で数えない",
-        checked.returncode == 0,
-        checked.stderr.strip()[:200],
-    )
+    del revised
 
     # ---- 4. 親を閉じて ready（Draft を外す）
-    refused = sh(REVIEW_SH, parent_tree, "ready")
-    record(
-        "wip/ が追跡されたままなら ready は止まる",
-        refused.returncode != 0 and "wip" in refused.stderr,
-        refused.stderr.strip()[:200],
-    )
-    record("親の start", sh(TICKET_SH, parent_tree, "start", "i0001").returncode == 0)
+    # 親の start は冒頭（子の start より前）で済ませている。ここでは呼び直さない
+    # 追跡済みの wip/ は ready が消すので、手で消さない（ready の動きを probe でそのまま通す）
     closed = sh(TICKET_SH, parent_tree, "finish", "i0001")
     record("親の done", closed.returncode == 0, (closed.stdout + closed.stderr).strip()[:200])
     commit_all(parent_tree, "状態の移動")
-    git(parent_tree, "rm", "-r", "-q", "wip")
-    git(parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
     pushed = sh(GIT_SH, parent_tree, "push")
     record(
         "親の push（引数なし）",
         pushed.returncode == 0,
         redact(pushed.stdout + pushed.stderr).strip()[:120],
     )
+    stray = write(os.path.join(parent_tree, "wip", "stray.txt"), "未追跡\n")
+    blocked = sh(REVIEW_SH, parent_tree, "ready")
+    record(
+        "wip/ に未追跡ファイルがあると ready が止まる",
+        blocked.returncode != 0,
+        redact(blocked.stderr).strip()[:160],
+    )
+    held = mr_of(pid, "i0001")
+    record("止まったとき MR は Draft のまま", bool(held) and bool(held.get("draft")))
+    os.remove(stray)
     ready = sh(REVIEW_SH, parent_tree, "ready")
     say("ready:\n" + redact(ready.stdout + ready.stderr))
     record("ready が通る", ready.returncode == 0)
@@ -684,10 +793,35 @@ def main() -> int:
         f"squash={mr and mr.get('squash')}",
     )
     record("ready の note が MR にある", has_marker(notes_of(pid, iid), "<!-- ccnavi:ready -->"))
+    top = CLIENT.tree(ROOT_TOKEN, pid, "i0001")
+    record("ready のあと GitLab の i0001 に wip/ が無い", bool(top) and "wip" not in top, str(top))
+    # logs/archive/ は git の外（ワークスペースの下）。git 上は削除される（ticket-flow.md の 13）
+    archive = os.path.join(ROOT, "logs", "archive")
+    archived = [
+        os.path.relpath(os.path.join(d, f), archive)
+        for d, _, files in os.walk(archive)
+        for f in files
+        if f.startswith("i0001")
+    ]
+    record(
+        "閉じた親子が logs/archive/ へ移った（ローカル）",
+        any(a.endswith(os.path.join("done", "i0001.md")) for a in archived)
+        and any(a.endswith(os.path.join("ready", "i0001.json")) for a in archived),
+        str(sorted(archived))[:160],
+    )
 
     # ---- 5. 別の親をユーザが早めに閉じる（close-early）
     parent2 = worktree("i0002", "main")
-    propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で早めに閉じる親")
+    # 親の提案には issue が要る（agree は issue が無いと承認しない）
+    status, issue2 = CLIENT.create_issue(ROOT_TOKEN, pid, "途中で早めに閉じる親", "実測の 2 本目")
+    record("課題 2 を立てる", status == 201)
+    propose(
+        parent2,
+        "i0002",
+        allow=("src/*", "wip/*"),
+        title="途中で早めに閉じる親",
+        issue=issue2["iid"],
+    )
     propose(
         parent2,
         "i0002-01-01",
@@ -701,31 +835,21 @@ def main() -> int:
     approved = exe("user", "agree", stdin="y\n")
     record("--agree（i0002）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
     record("i0002 の push", sh(GIT_SH, parent2, "push", "-u", "origin", "i0002").returncode == 0)
-    status, mr2 = api(
-        "POST",
-        f"/projects/{pid}/merge_requests",
-        ROOT_TOKEN,
-        {"source_branch": "i0002", "target_branch": "main", "title": "Draft: 途中で早めに閉じる親"},
-        tag="mr-create-i0002",
-    )
+    # push 直後はブランチが API に見えないことがある（400 source_branch does not exist）
+    for _ in range(10):
+        if CLIENT.get_branch(ROOT_TOKEN, pid, "i0002")[0] == 200:
+            break
+        time.sleep(1)
+    status, mr2 = CLIENT.create_mr(ROOT_TOKEN, pid, "i0002", "main", "Draft: 途中で早めに閉じる親")
     record("ユーザが i0002 の MR を作る", status == 201)
     if status == 201:
-        api(
-            "POST",
-            f"/projects/{pid}/merge_requests/{mr2['iid']}/discussions",
-            REVIEWER_TOKEN,
-            {"body": "残る指摘"},
-            tag="discussion-create-3",
+        CLIENT.create_discussion(
+            REVIEWER_TOKEN, pid, mr2["iid"], "残る指摘", tag="discussion-create-3"
         )
         wrapped = sh(CLOSE_EARLY_SH, parent2, "--reason", "実測はここまで", stdin="y\n")
         say("close-early:\n" + redact(wrapped.stdout + wrapped.stderr))
         record("close-early が通る", wrapped.returncode == 0)
-        _, issues = api(
-            "GET",
-            f"/projects/{pid}/issues?state=opened&order_by=created_at&sort=desc",
-            ROOT_TOKEN,
-            tag="issues-after-close-early",
-        )
+        _, issues = CLIENT.list_issues(ROOT_TOKEN, pid)
         made = [
             i for i in (issues if isinstance(issues, list) else []) if "残り" in i.get("title", "")
         ]
@@ -734,16 +858,18 @@ def main() -> int:
             bool(made),
             f"{made[0].get('web_url') if made else '無し'}",
         )
+        moved = approved_copy_path(parent2, "done", "i0002-01-01")
         record(
-            "未着手の子が cancelled/ へ動く",
-            os.path.exists(
-                os.path.join(parent2, "wip", "proposals", "cancelled", "i0002-01-01.md")
-            ),
+            "未着手の子が done/ へ動き、cancelled_at が入る",
+            os.path.isfile(moved) and is_cancelled_copy(read_text(moved)),
+            moved,
         )
         record(
             "close-early のコメントが MR にある",
             has_marker(notes_of(pid, mr2["iid"]), "<!-- ccnavi:close-early -->"),
         )
+
+    decide_section(pid, reviewer_id)
 
     # ---- 6. URL にトークンを埋めた origin でも読めて、出力に漏れない
     scheme, _, hostpath = origin.partition("://")
@@ -758,15 +884,167 @@ def main() -> int:
         "トークン入り URL のトークンが出力に漏れない", ROOT_TOKEN not in seen.stdout + seen.stderr
     )
     git(parent2, "remote", "set-url", "origin", origin)
+    return
+
+
+def decide_section(pid: int, reviewer_id: int) -> None:
+    """ユーザの受け入れ（decide）を、別の親 i0003 で通す。
+
+    未解決の指摘が残る → confirm は止まる → decide で受け入れる（reviewed が置かれる）→
+    同じフェーズへの confirm は「レビュー済み」で拒まれる。
+    """
+    del reviewer_id
+    status, issue3 = CLIENT.create_issue(ROOT_TOKEN, pid, "受け入れを通す親", "実測の 3 本目")
+    record("課題 3 を立てる", status == 201)
+    tree = worktree("i0003", "main")
+    propose(
+        tree, "i0003", allow=("src/*", "wip/*"), title="受け入れを通す親", issue=issue3["iid"], mr=3
+    )
+    propose(
+        tree,
+        "i0003-01-01",
+        parent="i0003",
+        phase=1,
+        allow=("src/d/*",),
+        review=True,
+        title="d を書く",
+    )
+    write_explainer(tree)
+    commit_all(tree, "tickets")
+    record("i0003 の push", sh(GIT_SH, tree, "push", "-u", "origin", "i0003").returncode == 0)
+    for _ in range(10):
+        if CLIENT.get_branch(ROOT_TOKEN, pid, "i0003")[0] == 200:
+            break
+        time.sleep(1)
+    status, mr3 = CLIENT.create_mr(ROOT_TOKEN, pid, "i0003", "main", "Draft: 受け入れを通す親")
+    record(
+        "i0003 の Draft MR（mr: 3 と一致）",
+        status == 201 and isinstance(mr3, dict) and mr3.get("iid") == 3,
+        f"status={status}",
+    )
+    if status != 201:
+        return
+    mr_no = mr3["iid"]
+    agreed = exe("user", "agree", stdin="y\n")
+    record("--agree（i0003）", agreed.returncode == 0, redact(agreed.stderr)[-200:])
+    pushed = sh(PUSH_APPROVED_SH, tree, "i0003")
+    record("i0003 の承認を push（ユーザの役）", pushed.returncode == 0)
+    record("親 i0003 の start", sh(TICKET_SH, tree, "start", "i0003").returncode == 0)
+    child = "i0003-01-01"
+    child_tree = worktree(child, "i0003")
+    record(f"ticket start {child}", sh(TICKET_SH, tree, "start", child).returncode == 0)
+    write(os.path.join(child_tree, "src", "d", "work.py"), f"# {child}\n")
+    sh(TICKET_SH, child_tree, "learn")
+    commit_all(child_tree, f"{child}: work")
+    commit_all(tree, "start")
+    record(f"ticket finish {child}", sh(TICKET_SH, tree, "finish", child).returncode == 0)
+    commit_all(tree, "finish")
+    git(tree, "merge", "--quiet", "--no-edit", child)
+    record(
+        "i0003 の push（request の前提）",
+        sh(GIT_SH, tree, "push", "-u", "origin", "i0003").returncode == 0,
+    )
+    body = write(os.path.join(OUT, "request-3.md"), "見てほしい点\n\n- src/d を足した\n")
+    requested = sh(
+        REVIEW_SH, tree, "request", "--phase", "1", "--body-file", body, "--eli5", EXPLAINER
+    )
+    record("i0003 の request が通る", requested.returncode == 0, redact(requested.stderr)[-200:])
+    status, disc = CLIENT.create_discussion(
+        REVIEWER_TOKEN,
+        pid,
+        mr_no,
+        "名前は今は直さない（decide で受け入れる）",
+        tag="discussion-create-4",
+    )
+    record("レビュアーがスレッドを立てる（i0003）", status == 201)
+    disc_id = disc.get("id", "") if isinstance(disc, dict) else ""
+    stopped = sh(REVIEW_SH, tree, "confirm", "--phase", "1")
+    record(
+        "未解決の指摘が残ると confirm が止まる（i0003）",
+        stopped.returncode != 0 and "未解決" in stopped.stderr,
+    )
+
+    preview = sh(REVIEW_SH, tree, "decide", "1", "--preview")
+    write(os.path.join(OUT, "decide-preview.json"), preview.stdout)
+    try:
+        shown = json.loads(preview.stdout)
+    except ValueError:
+        shown = {}
+    threads = shown.get("threads") if isinstance(shown, dict) else None
+    record(
+        "decide --preview が threads と digest を JSON で返す",
+        preview.returncode == 0 and bool(threads) and bool(shown.get("digest")),
+        redact(preview.stderr)[-160:],
+    )
+    bare = sh(REVIEW_SH, tree, "decide", "1")
+    record(
+        "--preview なしの decide は rc 2 で断られる",
+        bare.returncode == 2,
+        f"rc={bare.returncode} " + redact(bare.stderr).strip()[-120:],
+    )
+    if not threads:
+        return
+    choices = json.dumps(
+        {t["key"]: "keep" for t in threads if isinstance(t, dict) and "key" in t},
+        ensure_ascii=False,
+    )
+    decided = sh(DECIDE_SH, tree, "1", "--choices", choices, "--digest", shown["digest"])
+    say("decide:\n" + redact(decided.stdout + decided.stderr))
+    record(
+        "decide（対応しないを選ぶ）が通る", decided.returncode == 0, redact(decided.stderr)[-200:]
+    )
+
+    # 判定は副作用の状態で見る
+    found = [d for d in CLIENT.discussions(ROOT_TOKEN, pid, mr_no) if d.get("id") == disc_id]
+    notes = found[0].get("notes", []) if found else []
+    record("スレッドが解決済みになる", bool(notes) and bool(notes[0].get("resolved")))
+    record("スレッドに返信の note が付く", len(notes) >= 2, f"notes={len(notes)}")
+    marker_dir = os.path.join(tree, ".ccnavi", "approved", "phases", "i0003")
+    placed = sorted(os.listdir(marker_dir)) if os.path.isdir(marker_dir) else []
+    record("reviewed が置かれる", any(n.endswith("reviewed") for n in placed), str(placed))
+    again = sh(REVIEW_SH, tree, "confirm", "--phase", "1")
+    record(
+        "同じフェーズの confirm は「レビュー済み」で拒まれる",
+        again.returncode != 0 and "レビュー済み" in again.stderr,
+        redact(again.stderr).strip()[-120:],
+    )
+
+
+def cleanup_projects() -> None:
+    """この実行が作ったプロジェクトだけを消す。GitLab の削除は非同期（応答は 202）。
+    CCNAVI_PROBE_KEEP が空でなければ消さない（調べるために残したいとき）。"""
+    if os.environ.get("CCNAVI_PROBE_KEEP"):
+        say(f"プロジェクト {PROJECT_IDS} は消さない（CCNAVI_PROBE_KEEP）")
+        return
+    for project_id in PROJECT_IDS:
+        status, _ = CLIENT.delete_project(ROOT_TOKEN, project_id)
+        after, seen = CLIENT.call("GET", f"/projects/{project_id}", ROOT_TOKEN, tag="project-after")
+        marked = seen.get("marked_for_deletion_on") if isinstance(seen, dict) else None
+        record(
+            f"自分が作ったプロジェクト {project_id} を消す",
+            status in (200, 202, 204),
+            f"DELETE status={status} 直後の GET status={after} marked_for_deletion_on={marked}",
+        )
+
+
+def main() -> int:
+    if any(arg in ("-h", "--help") for arg in sys.argv[1:]):
+        print((__doc__ or "").strip())
+        return 0
+    setup()
+    try:
+        run_probe()
+    finally:
+        cleanup_projects()
     return finish()
 
 
 def finish() -> int:
     say("\n==== まとめ ====")
-    for name, ok, _ in RESULTS:
-        say(f"{'PASS' if ok else 'FAIL'}  {name}")
-    failed = [r for r in RESULTS if not r[1]]
-    say(f"\n{len(RESULTS) - len(failed)} / {len(RESULTS)} PASS。置き場: {OUT}")
+    for name, state, _ in RESULTS:
+        say(f"{state}  {name}")
+    failed = [r for r in RESULTS if r[1] == "FAIL"]
+    say(f"\n{summary_line(RESULTS)}。置き場: {OUT}")
     LOG.close()
     return 1 if failed else 0
 
