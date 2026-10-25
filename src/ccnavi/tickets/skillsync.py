@@ -25,7 +25,7 @@ import os
 
 import yaml
 
-from ..infra import yamlread
+from ..infra import pathsafe, yamlread
 from . import configsync, flow
 
 PROCESS_KEY = "process"
@@ -131,7 +131,7 @@ def plan(root: str, tree_root: str) -> tuple[list[configsync.Change], str]:
     base = os.path.join(tree_root, *SKILLS_DIR.split("/"))
     for rel in sorted(wanted):
         target = os.path.join(base, rel.replace("/", os.sep))
-        if configsync._linked(tree_root, target):
+        if pathsafe.has_link(tree_root, target):
             shown = configsync._rel_plain(tree_root, target)
             return [], f"{shown} がシンボリックリンクか、その下にある。コピーしない"
         before, why = configsync._read_strict(target)
@@ -157,7 +157,7 @@ def _stale(
         common = os.path.join(base, name, *COMMON_REFS)
         if not os.path.lexists(common):
             continue
-        if configsync._linked(tree_root, common):
+        if pathsafe.has_link(tree_root, common):
             shown = configsync._rel_plain(tree_root, common)
             return [], f"{shown} がシンボリックリンクか、その下にある。コピーしない"
         present, why = configsync._scan(common)

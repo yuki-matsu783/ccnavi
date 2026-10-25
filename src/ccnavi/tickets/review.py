@@ -50,7 +50,7 @@ import re
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, pathcase, settings, tree
+from ..infra import fsio, gitcmd, pathcase, pathsafe, settings, tree
 from . import (
     approval,
     approval_checks,
@@ -766,19 +766,9 @@ def _escapes(tree_root: str, rel: str) -> bool:
     最後の名前そのものがリンクなのは構わない（`os.remove` はリンクだけを消す）。
     """
     parts = rel.split("/")
-    here = tree_root
-    for part in parts[:-1]:
-        here = os.path.join(here, part)
-        if os.path.islink(here) or _junction(here):
-            return True
-    top = pathcase.fold(os.path.realpath(tree_root))
-    parent = pathcase.fold(os.path.realpath(os.path.dirname(os.path.join(tree_root, *parts))))
-    return parent != top and not parent.startswith(top + os.sep)
-
-
-def _junction(path: str) -> bool:
-    check = getattr(os.path, "isjunction", None)
-    return bool(check and check(path))
+    if pathsafe.first_link(tree_root, parts, include_last=False):
+        return True
+    return pathsafe.escapes(tree_root, os.path.dirname(os.path.join(tree_root, *parts)))
 
 
 def _prune_empty(directory: str) -> None:

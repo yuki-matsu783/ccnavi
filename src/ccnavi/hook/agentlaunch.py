@@ -21,7 +21,7 @@ import os
 import re
 from dataclasses import dataclass, field
 
-from ..infra import modes, pathcase, settings, tree
+from ..infra import modes, pathcase, pathsafe, settings, tree
 from ..tickets import approval, approval_checks, flow, ticket_model
 from . import agentkind, childnote
 
@@ -355,12 +355,10 @@ def _check_path(root: str, mention: Mention, trees: list[tree.Tree]) -> None:
         mention.invalid = "ワークツリーの名前がありません"
         return
     # 途中にシンボリックリンクが無いこと。書かれたパスを辿り、実在する分だけ見る。
-    walk = root
-    for part in rest:
-        walk = os.path.join(walk, part)
-        if os.path.islink(walk):
-            mention.invalid = f"途中にシンボリックリンクがあります（{part}）"
-            return
+    link = pathsafe.first_link(root, rest)
+    if link:
+        mention.invalid = f"途中にシンボリックリンクがあります（{os.path.basename(link)}）"
+        return
     name = tree.nfc(rest[2])
     for candidate in trees:
         if pathcase.fold(candidate.name) == pathcase.fold(name):

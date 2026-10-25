@@ -127,7 +127,7 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
         )
     if not os.path.lexists(path):
         return Dropped(name, ABSENT, path)
-    if os.path.islink(path) or _is_junction(path):
+    if os.path.islink(path) or os.path.isjunction(path):
         return Dropped(name, REFUSED, path, "リンクなので、リンクの先は削除しません。")
     if not os.path.isdir(path):
         return Dropped(name, REFUSED, path, "ディレクトリでない")
@@ -487,11 +487,6 @@ def _canonical(path: str) -> str:
     return pathcase.fold(os.path.normpath(resolved))
 
 
-def _is_junction(path: str) -> bool:
-    check = getattr(os.path, "isjunction", None)
-    return bool(check and check(path))
-
-
 def _long(path: str) -> str:
     """Windows では 260 文字を超えるパスを扱える表記にする。ほかはそのまま。"""
     if os.name != "nt":
@@ -518,7 +513,7 @@ def generated(top: str) -> list[str]:
         has_package = any(e.name == "package.json" and _plain_file(e) for e in entries)
         for e in entries:
             full = os.path.join(here, e.name)
-            linked = e.is_symlink() or _is_junction(full)
+            linked = e.is_symlink() or os.path.isjunction(full)
             if e.name in ALWAYS or (has_package and e.name in BESIDE_PACKAGE_JSON):
                 if linked or e.is_dir(follow_symlinks=False):
                     found.append(os.path.relpath(full, top).replace(os.sep, "/"))
@@ -557,7 +552,7 @@ def _clean_generated(top: str) -> str:
         try:
             if os.path.islink(full):
                 os.unlink(full)
-            elif _is_junction(full):
+            elif os.path.isjunction(full):
                 os.rmdir(full)
             else:
                 shutil.rmtree(_long(full), onexc=_writable_and_retry)
