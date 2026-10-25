@@ -69,7 +69,7 @@ def base_dir(root: str, project: str) -> str:
 
 
 def _linked(root: str, parts: tuple[str, ...]) -> bool | None:
-    """ルートの下の parts にリンクか junction があれば True。無ければ None、在れば False。"""
+    """ルートの下の parts にリンクか junction があれば True。無ければ、道が在るとき False、無いとき None。"""
     if pathsafe.first_link(root, parts):
         return True
     return False if os.path.lexists(os.path.join(root, *parts)) else None

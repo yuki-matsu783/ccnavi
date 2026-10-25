@@ -2,7 +2,7 @@
 
 同じ表（リンクなし・途中がリンク・最後の名前がリンク・root を指す子のリンク・root の外・
 root 自身・存在しない・root 自身がリンク・大文字小文字違い・junction）を、判定を使う側の入口
-（`learning.unsafe_path`・`archive._linked`）にも通して、どこも同じ答えを返すことを確かめる。
+（`learning.unsafe_path`・`archive._linked`）にも当てて、どこも同じ答えを返すことを確かめる。
 junction は Linux では作れないので `os.path.isjunction` を差し替えて見る（Windows では本物も作る）。
 """
 

@@ -3,7 +3,7 @@
 シンボリックリンクと junction を同じに扱う。道を辿ってリンクを調べる処理は、必ずここを通す
 （呼び出し側ごとに書かない。読み方が食い違う）。パスの比較は `pathcase.fold` を通す。
 root は信頼する起点で、root 自身と、root より上のリンク（macOS の `/tmp` など）は数えない。
-調べる途中で失敗したときは、拒否する側（リンクあり・外）に倒す。
+調べる途中で失敗したときは、拒否する側（リンクあり・外）として扱う。
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ def has_link(root: str, path: str) -> bool:
 
     path から上へさかのぼり、root に着いたところで止める。root と違う綴りで渡された path
     （`/tmp` と `/private/tmp` など）でも、実体が root に着けば止まる。root の外を指す path
-    （着けないまま最上位に達する）と、調べる途中の失敗は、リンクありに倒す。
+    （着けないまま最上位に達する）と、調べる途中の失敗は、リンクありとして扱う。
     """
     try:
         top = pathcase.fold(os.path.abspath(root))

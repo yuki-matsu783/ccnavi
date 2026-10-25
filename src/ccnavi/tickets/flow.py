@@ -231,7 +231,7 @@ def info(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> dict
     閉じた子は欄を返す（ユーザが見返せる）。
 
     `tree` はファイルを持つツリーのルート。ボードはそこからファイルまでの途中にリンクが
-    あれば書かない。`linked` はその途中にリンクがあるか（在るときだけ見る）。
+    あれば書かない。欄の `linked` はその途中にリンクがあるか（在るときだけ見る）。
 
     `draft` はエージェントが書く下書きの `{path, rel, exists, linked}`。置くツリーは
     フローと同じ（`tree`）。ボードはパスを組まずにここを読む。
