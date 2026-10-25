@@ -16,6 +16,12 @@ import { Entry, type TerminalState } from "./Entry.js";
 import { post } from "./post.js";
 import { Result } from "./Result.js";
 
+/** 対象外の理由。知らない値はそのまま出す */
+const IGNORED_WHY: Readonly<Record<string, string>> = {
+  "not-allowed": "取り込める種類の表に無い",
+  "linked-dir": "リンクのディレクトリ（中は読まない）",
+};
+
 /** 中身が無いときの錠。止めていない扱いにする */
 const NO_LOCK: Lock = { locked: false, reason: "", doing: [] };
 
@@ -203,6 +209,18 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
       <p className="count" id="counts">
         <span>対象 {entries.length} 件</span>・<span>取り込める {selectable.length} 件</span>・<span>選択 {chosen.length} 件</span>・<span>対象外 {page.list.ignored} 件</span>
       </p>
+      {(page.list.ignored_paths?.length ?? 0) > 0 && (
+        <details id="ignored-paths">
+          <summary>対象外の名前と理由（{page.list.ignored_paths?.length} 件）</summary>
+          <ul>
+            {page.list.ignored_paths?.map((item) => (
+              <li key={item.path}>
+                <code>{item.path}</code>: {Object.prototype.hasOwnProperty.call(IGNORED_WHY, item.why) ? IGNORED_WHY[item.why] : item.why}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {outcome !== undefined && <Result outcome={outcome} />}
       <section className="entries">
         <h2>
