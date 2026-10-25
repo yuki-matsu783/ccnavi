@@ -282,17 +282,45 @@ env の値は、セッションを開き直すまで反映されません。
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_ENTRY_PATH に書くパス。固定。
 BIN_PATH = "/".join(LAUNCHER_PARTS)
-# 配布先の .gitignore に足す `--docs` の索引の 1 行と見出し。docsearch は git がそこの
-# ccnavi-index.jsonl を無視しているときだけ書く
+# 配布先の .gitignore に足す行は、目印の行で囲んだ 1 つの領域に入る。
+# 各エントリはコメント 1 行と足す行。
+REGION_BEGIN = "# ---ccnavi begin--- (scripts/ccnavi-setup.sh が管理する範囲)"
+REGION_END = "# ---ccnavi end---"
+BIN_COMMENT = "# 実行ファイル"
+# `--docs` の索引の 1 行。docsearch は、git が ccnavi-index.jsonl を無視しているときだけ書く
 # （docs/21_design/diagnostics.md の 10.1「ドキュメントの索引」）。
 INDEX_LINE = "**/ccnavi-index.jsonl"
-INDEX_HEADER = "# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
-# 使い捨ての置き場（ワークスペースルート直下の scratchpad/）を追跡から外す 1 行と見出し。
+INDEX_COMMENT = "# --docs の索引"
+# 使い捨ての置き場（ワークスペースルート直下の scratchpad/）を追跡から外す 1 行。
 SCRATCH_LINE = "/scratchpad"
-SCRATCH_HEADER = "# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
-# 実行時の記録（ワークスペースルート直下の logs/）を追跡から外す 1 行と見出し。
+SCRATCH_COMMENT = "# 使い捨ての置き場"
+# 実行時の記録（ワークスペースルート直下の logs/）を追跡から外す 1 行。
 LOGS_LINE = "/logs/"
-LOGS_HEADER = "# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）"
+LOGS_COMMENT = "# 実行時の記録"
+# ワークツリーの置き場（.claude/worktrees/）を追跡から外す 1 行。
+WORKTREES_LINE = "/.claude/worktrees/"
+WORKTREES_COMMENT = "# ワークツリーの置き場"
+
+
+def region_text(*entries, eol="\n"):
+    """領域の全文（begin から end まで）。entries は (コメント, 行) の並び。"""
+    out = [REGION_BEGIN]
+    for comment, line in entries:
+        out += [comment, line]
+    out.append(REGION_END)
+    return "".join(f"{x}{eol}" for x in out)
+
+
+def full_region(machine=None, eol="\n"):
+    """何も無い .gitignore に足される領域の全文。"""
+    return region_text(
+        (BIN_COMMENT, f"/.ccnavi/bin/{machine or THIS_MACHINE}/"),
+        (INDEX_COMMENT, INDEX_LINE),
+        (SCRATCH_COMMENT, SCRATCH_LINE),
+        (LOGS_COMMENT, LOGS_LINE),
+        (WORKTREES_COMMENT, WORKTREES_LINE),
+        eol=eol,
+    )
 
 
 def section(stdout, heading):
@@ -2399,15 +2427,23 @@ class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
 
 
 class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
-    """配った実行ファイルを .gitignore に足す。
+    """配った実行ファイルなどを .gitignore に足す。足す行は目印の行で囲んだ 1 つの領域に入る。
 
     配布先は git で持ち回るのが普通なので、書かないと次のコミットで実行ファイルと
     _internal がまるごと履歴に入る。入ってしまうと、消すには履歴を書き換えるしか
     ない。
     """
 
+    def write_gitignore(self, text):
+        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+
+    def read_raw(self):
+        with open(os.path.join(self.dir, ".gitignore"), encoding="utf-8", newline="") as f:
+            return f.read()
+
     def test_adds_only_the_place_of_the_build(self):
-        """足すのは /.ccnavi/bin/<built>/ の 1 行だけ（S5）。
+        """実行ファイルの行は /.ccnavi/bin/<built>/ の 1 行だけ（S5）。
 
         振り分けの sh は代わりに通る sh と同じく追跡する側に置く。無視すると、clone した先に
         sh が届かず hook が起動しない。置き場ごと（.ccnavi/ や .ccnavi/bin/）も無視しない。
@@ -2421,10 +2457,9 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
 
         written = self.gitignore()
         lines = [line for line in written.splitlines() if line.strip() and not line.startswith("#")]
-        # 実行ファイルの置き場のほかは、`--docs` の索引の 1 行（KeepsTheIndexOutOfGit）と、
-        # 使い捨ての置き場の 1 行（KeepsTheScratchpadOutOfGit）だけ。
         self.assertEqual(
-            lines, [f"/.ccnavi/bin/{THIS_MACHINE}/", INDEX_LINE, SCRATCH_LINE, LOGS_LINE]
+            lines,
+            [f"/.ccnavi/bin/{THIS_MACHINE}/", INDEX_LINE, SCRATCH_LINE, LOGS_LINE, WORKTREES_LINE],
         )
         for wide in (
             "/.ccnavi/",
@@ -2437,46 +2472,186 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         self.assertNotIn("rules.yml", written)
         self.assertIn(".gitignore に足した", result.stdout)
 
+    def test_adds_the_whole_region_to_a_missing_file(self):
+        self.make_git()
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_raw(), full_region())
+        out = section(result.stdout, ".gitignore に足した")
+        for line in (INDEX_LINE, SCRATCH_LINE, LOGS_LINE, WORKTREES_LINE):
+            self.assertIn(line, out)
+
+    def test_adds_the_whole_region_to_an_empty_file(self):
+        self.make_git()
+        self.write_gitignore("")
+        self.run_setup("--deploy", self.make_source())
+        self.assertEqual(self.read_raw(), full_region())
+
+    def test_adds_the_region_after_one_blank_line(self):
+        self.make_git()
+        self.write_gitignore("node_modules/\n")
+        self.run_setup("--deploy", self.make_source())
+        self.assertEqual(self.read_raw(), "node_modules/\n\n" + full_region())
+
+    def test_does_not_join_the_last_line_without_a_newline(self):
+        """末尾に改行が無いファイルへ足しても、最後の行と繋がらない。"""
+        self.make_git()
+        self.write_gitignore("*.log")
+        self.run_setup("--deploy", self.make_source())
+        self.assertEqual(self.read_raw(), "*.log\n\n" + full_region())
+
+    def test_adds_the_region_to_a_crlf_file_with_crlf(self):
+        self.make_git()
+        self.write_gitignore("node_modules/\r\n*.log\r\n")
+        self.run_setup("--deploy", self.make_source())
+        self.assertEqual(
+            self.read_raw(), "node_modules/\r\n*.log\r\n\r\n" + full_region(eol="\r\n")
+        )
+
     def test_adds_the_place_of_each_machine_that_was_deployed(self):
-        """別の機械の組み立てを配れば、その置き場も足す。"""
+        """別の機械の組み立てを配れば、その置き場も足す。領域は 1 つのまま、コメントも重ねない。"""
         self.make_git()
         self.run_setup("--deploy", self.make_source())
         self.run_setup("--deploy", self.make_source(target=ANOTHER_MACHINE))
         written = self.gitignore()
         self.assertEqual(written.count(f"/.ccnavi/bin/{THIS_MACHINE}/\n"), 1)
         self.assertEqual(written.count(f"/.ccnavi/bin/{ANOTHER_MACHINE}/\n"), 1)
+        self.assertEqual(written.count(REGION_BEGIN), 1)
+        self.assertEqual(written.count(REGION_END), 1)
+        self.assertEqual(written.count(BIN_COMMENT + "\n"), 1)
+        self.assertLess(
+            written.index(f"/.ccnavi/bin/{ANOTHER_MACHINE}/"), written.index(REGION_END)
+        )
 
     def test_keeps_the_lines_that_were_already_there(self):
         src = self.make_source()
         self.make_git()
-        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8") as f:
-            f.write("node_modules/\n")
+        self.write_gitignore("node_modules/\n")
 
         self.run_setup("--deploy", src)
         written = self.gitignore()
         self.assertIn("node_modules/\n", written)
         self.assertIn(f"/.ccnavi/bin/{THIS_MACHINE}/\n", written)
 
-    def test_does_not_lose_the_last_line_without_a_newline(self):
-        """末尾に改行が無いファイルへ足しても、最後の行と繋がらない。"""
+    def test_running_twice_does_not_change_anything(self):
         src = self.make_source()
         self.make_git()
-        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8") as f:
-            f.write("*.log")
-
+        self.write_gitignore("node_modules/\n*.log\n")
         self.run_setup("--deploy", src)
-        self.assertIn("*.log\n", self.gitignore())
-
-    def test_running_twice_does_not_write_the_same_line_again(self):
-        src = self.make_source()
-        self.make_git()
-        self.run_setup("--deploy", src)
-        first = self.gitignore()
+        first = self.read_raw()
 
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.gitignore(), first)
+        self.assertEqual(self.read_raw(), first)
         self.assertNotIn(".gitignore に足した", result.stdout)
+
+    def test_keeps_the_lines_of_the_user_in_order(self):
+        """ccnavi と関係のない行は、順序も含めて変わらない（領域の外も中も）。"""
+        src = self.make_source()
+        self.make_git()
+        before = "# mine\nnode_modules/\n\n*.log\n  indented\n!keep.log\nbuild/\n"
+        self.write_gitignore(before)
+        self.run_setup("--deploy", src)
+        written = self.read_raw()
+        self.assertTrue(written.startswith(before), written)
+        self.run_setup("--deploy", src)
+        self.assertEqual(self.read_raw(), written)
+
+    def test_adds_only_the_missing_lines_just_before_the_end(self):
+        """領域があって一部の行が足りないとき、end の直前にだけ足す。領域の中のユーザの行は残る。"""
+        src = self.make_source()
+        self.make_git()
+        before = (
+            "node_modules/\n\n"
+            + region_text(
+                (BIN_COMMENT, f"/.ccnavi/bin/{THIS_MACHINE}/"),
+                ("# my own", "my-cache/"),
+                (INDEX_COMMENT, INDEX_LINE),
+            )
+            + "tail-line\n"
+        )
+        self.write_gitignore(before)
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        expected = (
+            "node_modules/\n\n"
+            + region_text(
+                (BIN_COMMENT, f"/.ccnavi/bin/{THIS_MACHINE}/"),
+                ("# my own", "my-cache/"),
+                (INDEX_COMMENT, INDEX_LINE),
+                (SCRATCH_COMMENT, SCRATCH_LINE),
+                (LOGS_COMMENT, LOGS_LINE),
+                (WORKTREES_COMMENT, WORKTREES_LINE),
+            )
+            + "tail-line\n"
+        )
+        self.assertEqual(self.read_raw(), expected)
+
+    def test_does_not_repeat_a_comment_that_is_already_in_the_region(self):
+        src = self.make_source()
+        self.make_git()
+        self.write_gitignore(
+            region_text(
+                (BIN_COMMENT, f"/.ccnavi/bin/{THIS_MACHINE}/"),
+                (INDEX_COMMENT, INDEX_LINE),
+                (SCRATCH_COMMENT, SCRATCH_LINE),
+                (LOGS_COMMENT, LOGS_LINE),
+                (WORKTREES_COMMENT, "# dummy"),
+            )
+        )
+        # 領域の中のコメントだけある（行が無い）状態: ワークツリーの行だけ足りない。
+        text = self.read_raw().replace("# dummy\n", "")
+        self.write_gitignore(text)
+        self.run_setup("--deploy", src)
+        written = self.read_raw()
+        self.assertEqual(written.count(WORKTREES_COMMENT + "\n"), 1)
+        self.assertEqual(written.count(WORKTREES_LINE + "\n"), 1)
+
+    def test_adds_to_a_region_in_a_crlf_file_with_crlf(self):
+        src = self.make_source()
+        self.make_git()
+        before = region_text((BIN_COMMENT, f"/.ccnavi/bin/{THIS_MACHINE}/"), eol="\r\n")
+        self.write_gitignore("a\r\n" + before)
+        self.run_setup("--deploy", src)
+        written = self.read_raw()
+        self.assertNotIn("\n", written.replace("\r\n", ""))
+        self.assertTrue(written.endswith(REGION_END + "\r\n"))
+        self.assertIn(WORKTREES_LINE + "\r\n", written)
+
+    def test_keeps_the_executable_bit_and_symlink_of_the_file(self):
+        if os.name == "nt":
+            self.skipTest("実行ビットは Windows では見ない")
+        self.make_git()
+        path = os.path.join(self.dir, ".gitignore")
+        self.write_gitignore(region_text((BIN_COMMENT, f"/.ccnavi/bin/{THIS_MACHINE}/")))
+        os.chmod(path, 0o755)
+        self.run_setup("--deploy", self.make_source())
+        self.assertEqual(os.stat(path).st_mode & 0o777, 0o755)
+        self.assertIn(WORKTREES_LINE, self.gitignore())
+
+    def test_leaves_an_old_header_block_alone(self):
+        """領域を使い始める前の古い見出しブロックは、そのまま残す。領域へ移さない。"""
+        self.make_git()
+        old = (
+            "node_modules/\n\n"
+            "# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）\n"
+            f"/.ccnavi/bin/{THIS_MACHINE}/\n\n"
+            "# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）\n/scratchpad\n"
+        )
+        self.write_gitignore(old)
+        self.run_setup("--deploy", self.make_source())
+        written = self.read_raw()
+        self.assertTrue(written.startswith(old), written)
+        self.assertEqual(
+            written[len(old) :],
+            "\n"
+            + region_text(
+                (INDEX_COMMENT, INDEX_LINE),
+                (LOGS_COMMENT, LOGS_LINE),
+                (WORKTREES_COMMENT, WORKTREES_LINE),
+            ),
+        )
 
     def test_writes_nothing_when_the_target_is_not_a_git_repository(self):
         """git で持っていない配布先に .gitignore を置いても、誰も読まない。"""
@@ -2502,176 +2677,124 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         src = self.make_source()
         self.make_git()
         self.run_setup("--deploy", src)
-        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8") as f:
-            f.write("node_modules/\n")
+        self.write_gitignore("node_modules/\n")
 
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1)
         self.assertIn(".gitignore に足す", result.stdout)
 
+    def test_check_passes_after_a_run(self):
+        src = self.make_source()
+        self.make_git()
+        self.run_setup("--deploy", src)
+        result = self.run_setup("--deploy", src, "--check")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-class KeepsTheScratchpadOutOfGit(DeploysWhatTheProjectNeeds):
-    """使い捨ての置き場（ワークスペースルート直下の `scratchpad/`）を .gitignore に足す。
+    def test_adds_the_worktrees_line_even_when_the_binary_goes_to_the_home(self):
+        """実行ファイルの置き場（--bin user）とは関係なく、ワークツリーの置き場は足す。"""
+        self.make_git()
+        result = self.run_setup("--deploy", self.make_source(), "--check", "--bin", "user")
+        self.assertIn(WORKTREES_LINE, section(result.stdout, ".gitignore に足す"))
 
-    追跡されると、コミットしたくない物や一時的に見せる物が履歴に入る。
-    """
+
+class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
+    """領域の壊れ方と、同等の綴り・否定の行の扱い。"""
 
     def write_gitignore(self, text):
         with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8", newline="") as f:
             f.write(text)
 
-    def test_adds_the_line_under_its_own_header(self):
-        self.make_git()
-        result = self.run_setup("--deploy", self.make_source())
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        written = self.gitignore()
-        self.assertIn(f"{SCRATCH_HEADER}\n{SCRATCH_LINE}\n", written)
-        self.assertEqual(written.count(SCRATCH_LINE + "\n"), 1)
-        self.assertIn(SCRATCH_LINE, section(result.stdout, ".gitignore に足した"))
+    def read_raw(self):
+        with open(os.path.join(self.dir, ".gitignore"), encoding="utf-8", newline="") as f:
+            return f.read()
 
-    def test_check_names_the_line_without_writing(self):
-        self.make_git()
-        result = self.run_setup("--deploy", self.make_source(), "--check")
-        self.assertIn(SCRATCH_LINE, section(result.stdout, ".gitignore に足す"))
-        self.assertNotIn(
-            SCRATCH_LINE,
-            self.gitignore() if os.path.exists(os.path.join(self.dir, ".gitignore")) else "",
-        )
-
-    def test_does_not_add_it_twice(self):
+    def settle(self, text):
+        """配布を済ませたあと、.gitignore の中身を text に置き換える。"""
         self.make_git()
         src = self.make_source()
         self.run_setup("--deploy", src)
-        first = self.gitignore()
-        self.run_setup("--deploy", src)
-        self.assertEqual(self.gitignore(), first)
-        self.assertEqual(first.count(SCRATCH_HEADER), 1)
+        self.write_gitignore(text)
+        return src
 
-    def test_does_not_add_it_when_an_equivalent_line_is_already_there(self):
-        for existing in (SCRATCH_LINE, "/scratchpad/", "scratchpad/", "scratchpad"):
+    def test_an_equivalent_line_outside_the_region_is_not_added(self):
+        """領域の外のユーザの行も、同等の綴りなら足さない（worktrees の 4 つの綴り）。"""
+        for existing in (
+            "/.claude/worktrees/",
+            "/.claude/worktrees",
+            ".claude/worktrees/",
+            ".claude/worktrees",
+        ):
             with self.subTest(existing=existing):
+                self.make_git()
                 self.write_gitignore(f"node_modules/\n{existing}\n")
-                self.make_git()
                 self.run_setup("--deploy", self.make_source())
-                written = self.gitignore()
-                self.assertNotIn(SCRATCH_HEADER, written)
-                self.assertEqual(written.count("scratchpad"), 1, written)
+                written = self.read_raw()
+                self.assertEqual(written.count(".claude/worktrees"), 1, written)
+                self.assertNotIn(WORKTREES_COMMENT, written)
 
-    def test_does_not_undo_a_negation_of_the_user(self):
-        for negation in ("!/scratchpad/", "!scratchpad/", "!/scratchpad", "!scratchpad"):
+    def test_a_negation_of_the_worktrees_is_not_undone(self):
+        for negation in ("!/.claude/worktrees", "!.claude/worktrees/", "!/.claude/worktrees/"):
             with self.subTest(negation=negation):
-                self.write_gitignore(f"{negation}\n")
                 self.make_git()
+                self.write_gitignore(f"{negation}\n")
                 result = self.run_setup("--deploy", self.make_source())
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                written = self.gitignore()
-                self.assertNotIn(SCRATCH_HEADER, written)
-                self.assertNotIn(f"\n{SCRATCH_LINE}\n", written)
-                self.assertIn("scratchpad を否定する行があり", result.stdout)
+                written = self.read_raw()
+                self.assertNotIn(f"\n{WORKTREES_LINE}\n", written)
+                self.assertNotIn(WORKTREES_COMMENT, written)
+                self.assertIn(".claude/worktrees を否定する行があり", result.stdout)
                 self.assertIn(negation, result.stdout)
 
-    def test_a_look_alike_line_does_not_count(self):
-        for other in ("wip/scratchpad/", "scratchpadx/", "/scratchpad/x"):
+    def test_a_look_alike_worktrees_line_does_not_count(self):
+        for other in ("wip/.claude/worktrees/", ".claude/worktrees-old/", "/.claude/worktrees/x"):
             with self.subTest(other=other):
+                self.make_git()
                 self.write_gitignore(f"{other}\n")
-                self.make_git()
                 self.run_setup("--deploy", self.make_source())
-                self.assertIn(f"{SCRATCH_HEADER}\n{SCRATCH_LINE}\n", self.gitignore())
+                self.assertIn(f"{WORKTREES_COMMENT}\n{WORKTREES_LINE}\n", self.read_raw())
 
+    def test_a_broken_region_is_left_alone_and_named(self):
+        """壊れた領域は触らず、行番号つきで知らせる。--check は 1 を返す。"""
+        broken = {
+            "end が無い": f"a\n{REGION_BEGIN}\n{BIN_COMMENT}\n/x/\n",
+            "順序が逆": f"a\n{REGION_END}\n{REGION_BEGIN}\n",
+            "begin が複数": f"{REGION_BEGIN}\n{REGION_END}\n{REGION_BEGIN}\n",
+            "begin が無い": f"a\n{REGION_END}\n",
+        }
+        for label, text in broken.items():
+            with self.subTest(label=label):
+                src = self.settle(text)
+                checked = self.run_setup("--deploy", src, "--check")
+                self.assertEqual(checked.returncode, 1, checked.stdout)
+                self.assertIn("壊れています", checked.stdout)
+                self.assertEqual(self.read_raw(), text)
 
-class KeepsTheLogsOutOfGit(DeploysWhatTheProjectNeeds):
-    """実行時の記録（ワークスペースルート直下の `logs/`）を .gitignore に足す。
-
-    無いと、logs/diag/ の診断ログが新規ファイルとして git に見え、実行後チェックが毎ターン報告する。
-    """
-
-    def write_gitignore(self, text):
-        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8", newline="") as f:
-            f.write(text)
-
-    def test_adds_the_line_under_its_own_header(self):
-        self.make_git()
-        result = self.run_setup("--deploy", self.make_source())
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        written = self.gitignore()
-        self.assertIn(f"{LOGS_HEADER}\n{LOGS_LINE}\n", written)
-        self.assertIn(LOGS_LINE, section(result.stdout, ".gitignore に足した"))
-
-    def test_does_not_add_it_twice(self):
-        self.make_git()
-        src = self.make_source()
-        self.run_setup("--deploy", src)
-        first = self.gitignore()
-        self.run_setup("--deploy", src)
-        self.assertEqual(self.gitignore(), first)
-        self.assertEqual(first.count(LOGS_HEADER), 1)
-
-    def test_does_not_add_it_when_an_equivalent_line_is_already_there(self):
-        for existing in (LOGS_LINE, "/logs", "logs/", "logs"):
-            with self.subTest(existing=existing):
-                self.write_gitignore(f"node_modules/\n{existing}\n")
-                self.make_git()
-                self.run_setup("--deploy", self.make_source())
-                written = self.gitignore()
-                self.assertNotIn(LOGS_HEADER, written)
-                self.assertEqual(written.count("logs"), 1, written)
-
-    def test_does_not_undo_a_negation_of_the_user(self):
-        for negation in ("!/logs/", "!logs/", "!/logs", "!logs", "!/logs/diag", "!logs/diag/"):
-            with self.subTest(negation=negation):
-                self.write_gitignore(f"{negation}\n")
-                self.make_git()
-                result = self.run_setup("--deploy", self.make_source())
+                result = self.run_setup("--deploy", src)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                written = self.gitignore()
-                self.assertNotIn(LOGS_HEADER, written)
-                self.assertIn("logs を否定する行があり", result.stdout)
-                self.assertIn(negation, result.stdout)
+                self.assertIn("壊れています", result.stdout)
+                self.assertIn("行目", result.stdout)
+                self.assertEqual(self.read_raw(), text)
 
+    def test_the_broken_region_names_the_line_numbers(self):
+        src = self.settle(f"a\nb\n{REGION_BEGIN}\nx\n{REGION_BEGIN}\n")
+        result = self.run_setup("--deploy", src, "--check")
+        self.assertIn("begin: 3 5行目", result.stdout)
+        self.assertIn("end: なし行目", result.stdout)
 
-class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
-    """`--docs` の索引（`**/ccnavi-index.jsonl`）を .gitignore に足す。
-
-    docsearch は git がそこの ccnavi-index.jsonl を無視しているときだけ書く。無視の 1 行が無い
-    配布先では、配った実行ファイルの `--docs` が索引を作らない。
-    """
-
-    def write_gitignore(self, text):
-        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8", newline="") as f:
-            f.write(text)
-
-    def test_adds_the_line_under_its_own_header(self):
-        self.make_git()
-        result = self.run_setup("--deploy", self.make_source())
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        written = self.gitignore()
-        self.assertIn(f"{INDEX_HEADER}\n{INDEX_LINE}\n", written)
-        self.assertEqual(written.count(INDEX_LINE + "\n"), 1)
-        self.assertIn(INDEX_LINE, section(result.stdout, ".gitignore に足した"))
-
-    def test_running_twice_does_not_write_it_again(self):
-        src = self.make_source()
-        self.make_git()
-        self.run_setup("--deploy", src)
-        first = self.gitignore()
-
+    def test_a_region_with_trailing_spaces_and_cr_still_counts(self):
+        """目印の行末の空白と CR は取り除いて比べる。"""
+        src = self.settle(
+            f"{REGION_BEGIN}  \r\n{BIN_COMMENT}\r\n"
+            f"/.ccnavi/bin/{THIS_MACHINE}/\r\n{REGION_END}\t\r\n"
+        )
         result = self.run_setup("--deploy", src)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.gitignore(), first)
-        self.assertEqual(first.count(INDEX_HEADER), 1)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("壊れています", result.stdout)
+        written = self.read_raw()
+        self.assertEqual(written.count("ccnavi begin"), 1)
+        self.assertIn(WORKTREES_LINE, written)
 
-    def test_does_not_add_it_when_the_line_is_already_there(self):
-        for existing in (INDEX_LINE, "ccnavi-index.jsonl"):
-            with self.subTest(existing=existing):
-                self.write_gitignore(f"node_modules/\n{existing}\n")
-                self.make_git()
-                self.run_setup("--deploy", self.make_source())
-                written = self.gitignore()
-                self.assertTrue(written.startswith(f"node_modules/\n{existing}\n"), written)
-                self.assertEqual(written.count("ccnavi-index.jsonl"), 1, written)
-                self.assertNotIn(INDEX_HEADER, written)
-
-    def test_does_not_undo_a_negation_of_the_user(self):
+    def test_index_negation_keeps_the_user_tracking_the_index(self):
         """ユーザが ccnavi-index.jsonl を否定していれば足さず、そう言う（--check でも）。"""
         for negation in (
             "!**/ccnavi-index.jsonl",
@@ -2682,24 +2805,67 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
             with self.subTest(negation=negation):
                 before = (
                     f"*.log\n{negation}\n/.ccnavi/bin/{THIS_MACHINE}/\n"
-                    f"{SCRATCH_LINE}\n{LOGS_LINE}\n"
+                    f"{SCRATCH_LINE}\n{LOGS_LINE}\n{WORKTREES_LINE}\n"
                 )
-                self.write_gitignore(before)
-                self.make_git()
-                src = self.make_source()
-                self.run_setup("--deploy", src)  # 配布だけを済ませる
-                self.write_gitignore(before)
-
+                src = self.settle(before)
                 checked = self.run_setup("--deploy", src, "--check")
                 self.assertIn("ユーザが索引を追跡しているので", checked.stdout)
                 self.assertIn(negation, checked.stdout)
                 self.assertNotIn(INDEX_LINE, section(checked.stdout, ".gitignore に足す"))
-                self.assertEqual(self.gitignore(), before)
+                self.assertEqual(self.read_raw(), before)
 
                 result = self.run_setup("--deploy", src)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("ユーザが索引を追跡しているので", result.stdout)
-                self.assertEqual(self.gitignore(), before)
+                self.assertEqual(self.read_raw(), before)
+
+    def test_scratchpad_and_logs_equivalents_and_negations(self):
+        for existing in (SCRATCH_LINE, "/scratchpad/", "scratchpad/", "scratchpad"):
+            with self.subTest(existing=existing):
+                self.make_git()
+                self.write_gitignore(f"node_modules/\n{existing}\n")
+                self.run_setup("--deploy", self.make_source())
+                written = self.read_raw()
+                self.assertNotIn(SCRATCH_COMMENT, written)
+                self.assertEqual(written.count("scratchpad"), 1, written)
+        for negation in ("!/scratchpad/", "!scratchpad/", "!/scratchpad", "!scratchpad"):
+            with self.subTest(negation=negation):
+                self.make_git()
+                self.write_gitignore(f"{negation}\n")
+                result = self.run_setup("--deploy", self.make_source())
+                self.assertNotIn(f"\n{SCRATCH_LINE}\n", self.read_raw())
+                self.assertIn("scratchpad を否定する行があり", result.stdout)
+        for existing in (LOGS_LINE, "/logs", "logs/", "logs"):
+            with self.subTest(existing=existing):
+                self.make_git()
+                self.write_gitignore(f"node_modules/\n{existing}\n")
+                self.run_setup("--deploy", self.make_source())
+                written = self.read_raw()
+                self.assertNotIn(LOGS_COMMENT, written)
+                self.assertEqual(written.count("logs"), 1, written)
+        for negation in ("!/logs/", "!logs/", "!/logs", "!logs", "!/logs/diag", "!logs/diag/"):
+            with self.subTest(negation=negation):
+                self.make_git()
+                self.write_gitignore(f"{negation}\n")
+                result = self.run_setup("--deploy", self.make_source())
+                self.assertNotIn(LOGS_COMMENT, self.read_raw())
+                self.assertIn("logs を否定する行があり", result.stdout)
+
+    def test_index_equivalents_and_look_alikes(self):
+        for existing in (INDEX_LINE, "ccnavi-index.jsonl"):
+            with self.subTest(existing=existing):
+                self.make_git()
+                self.write_gitignore(f"node_modules/\n{existing}\n")
+                self.run_setup("--deploy", self.make_source())
+                written = self.read_raw()
+                self.assertTrue(written.startswith(f"node_modules/\n{existing}\n"), written)
+                self.assertEqual(written.count("ccnavi-index.jsonl"), 1, written)
+                self.assertNotIn(INDEX_COMMENT, written)
+        for other in ("wip/scratchpad/", "scratchpadx/", "/scratchpad/x"):
+            with self.subTest(other=other):
+                self.make_git()
+                self.write_gitignore(f"{other}\n")
+                self.run_setup("--deploy", self.make_source())
+                self.assertIn(f"{SCRATCH_COMMENT}\n{SCRATCH_LINE}\n", self.read_raw())
 
     def test_compares_lines_without_cr_and_trailing_spaces(self):
         """CRLF の .gitignore や行末に空白のある行も、同じ行として数える。"""
@@ -2707,56 +2873,21 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
             with self.subTest(line=line):
                 before = (
                     f"node_modules/\r\n{line}\n/.ccnavi/bin/{THIS_MACHINE}/\r\n"
-                    f"{SCRATCH_LINE}\r\n{LOGS_LINE}\r\n"
+                    f"{SCRATCH_LINE}\r\n{LOGS_LINE}\r\n{WORKTREES_LINE}\r\n"
                 )
                 self.write_gitignore(before)
                 self.make_git()
                 self.run_setup("--deploy", self.make_source())
-                path = os.path.join(self.dir, ".gitignore")
-                with open(path, encoding="utf-8", newline="") as f:
-                    written = f.read()
-                self.assertEqual(written, before)
-                self.assertNotIn(INDEX_HEADER, written)
-                self.assertNotIn("# ccnavi が配る実行ファイル", written)
+                self.assertEqual(self.read_raw(), before)
 
-    def test_adds_only_the_index_when_the_build_is_already_ignored(self):
-        """実行ファイルの塊だけがある配布先（前の版で入れたもの）には、索引の塊だけを足す。"""
-        self.make_git()
-        before = (
-            "node_modules/\n\n"
-            "# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）\n"
-            f"/.ccnavi/bin/{THIS_MACHINE}/\n"
-        )
-        self.write_gitignore(before)
-
-        result = self.run_setup("--deploy", self.make_source())
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(
-            self.gitignore(),
-            f"{before}\n{INDEX_HEADER}\n{INDEX_LINE}\n\n{SCRATCH_HEADER}\n{SCRATCH_LINE}\n\n{LOGS_HEADER}\n{LOGS_LINE}\n",
-        )
-
-    def test_does_not_join_the_last_line_without_a_newline(self):
-        self.make_git()
-        self.write_gitignore(f"*.log\n/.ccnavi/bin/{THIS_MACHINE}/")
-
-        self.run_setup("--deploy", self.make_source())
-        written = self.gitignore()
-        self.assertTrue(written.startswith(f"*.log\n/.ccnavi/bin/{THIS_MACHINE}/\n"), written)
-        self.assertIn(f"\n{INDEX_LINE}\n", written)
-        self.assertEqual(written.count(f"/.ccnavi/bin/{THIS_MACHINE}/"), 1)
-
-    def test_check_names_it_without_writing(self):
-        """配布が済み、実行ファイルの行もあっても、索引の行が欠けていれば揃っていない。"""
-        self.make_git()
-        src = self.make_source()
-        self.run_setup("--deploy", src)
-        self.write_gitignore(f"/.ccnavi/bin/{THIS_MACHINE}/\n")
-
+    def test_check_names_a_missing_worktrees_line_without_writing(self):
+        """配布が済み、ほかの行があっても、ワークツリーの行が欠けていれば揃っていない。"""
+        before = f"/.ccnavi/bin/{THIS_MACHINE}/\n{INDEX_LINE}\n{SCRATCH_LINE}\n{LOGS_LINE}\n"
+        src = self.settle(before)
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1)
-        self.assertIn(INDEX_LINE, section(result.stdout, ".gitignore に足す"))
-        self.assertEqual(self.gitignore(), f"/.ccnavi/bin/{THIS_MACHINE}/\n")
+        self.assertIn(WORKTREES_LINE, section(result.stdout, ".gitignore に足す"))
+        self.assertEqual(self.read_raw(), before)
 
     def test_writes_nothing_without_deploying(self):
         """`--no-deploy` は settings.json だけを書く。"""
