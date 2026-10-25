@@ -41,7 +41,10 @@ def has_link(root: str, path: str) -> bool:
         while pathcase.fold(current) != top:
             if is_link(current):
                 return True
-            if pathcase.fold(os.path.realpath(current)) == base:
+            # root と違う綴りのときだけ、実体が root に着けば止まる。root の下の綴りなら
+            # root まで 1 段ずつ調べる（途中のリンクが root の中へ戻っても見逃さない）。
+            outside_spelling = not pathcase.fold(current).startswith(top.rstrip(os.sep) + os.sep)
+            if outside_spelling and pathcase.fold(os.path.realpath(current)) == base:
                 return False
             parent = os.path.dirname(current)
             if parent == current:

@@ -231,7 +231,7 @@ def info(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> dict
     閉じた子は欄を返す（ユーザが見返せる）。
 
     `tree` はファイルを持つツリーのルート。ボードはそこからファイルまでの途中にリンクが
-    あれば書かない。`linked` はその途中にリンクがあるか（在るときだけ見る）。
+    あれば書かない。欄の `linked` はその途中にリンクがあるか（在るときだけ見る）。
 
     `draft` はエージェントが書く下書きの `{path, rel, exists, linked}`。置くツリーは
     フローと同じ（`tree`）。ボードはパスを組まずにここを読む。
@@ -654,7 +654,7 @@ def _entries(path: str, root: str) -> list[os.DirEntry]:
     """ディレクトリの中身（名前の順、`CATALOG_LIMIT` 件まで）。
 
     `root` からそのディレクトリまでの途中（`.claude` 自体を含む）にリンクがあれば読まない
-    （`linked` と同じ考え方）。
+    （`pathsafe.has_link` と同じ考え方）。
     """
     try:
         if pathsafe.has_link(root, path) or not os.path.isdir(path):
