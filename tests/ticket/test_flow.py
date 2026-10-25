@@ -144,11 +144,11 @@ class FlowPlaceTest(unittest.TestCase):
         self.assertIsNone(flow.lock_hit([idle], "", "i0001-01-01.yml"))
         self.assertIsNone(flow.lock_hit([running], None, "i0001-01-01.yml"))
         self.assertIsNone(flow.lock_hit([running], "", "i0001-01-02.yml"))
+        self.assertIs(flow.lock_hit([running], flow.ANY_PROJECT, "i0001-01-01.yml"), running)
 
     def test_lock_ignores_case_of_the_name(self):
         running = child_ticket(started=True)
         self.assertIs(flow.lock_hit([running], "", "I0001-01-01.YML"), running)
-        self.assertIs(flow.lock_hit([running], flow.ANY_PROJECT, "i0001-01-01.yml"), running)
 
 
 class FlowRenderTest(unittest.TestCase):
