@@ -416,7 +416,7 @@ class WriteAndPushReviewTest(WriteAndPushHarness):
     def test_decide_preview_takes_no_lock_and_writes_nothing(self):
         head = self.sha(self.tree, "HEAD")
         os.makedirs(self.lock_dir())
-        write(os.path.join(self.lock_dir(), "owner"), "other 1 1 1-1 Other\n")
+        write(os.path.join(self.lock_dir(), "owner"), "other 1 1 1-1\n")
         shown = self.sh(
             "ccnavi-review.sh",
             "decide",

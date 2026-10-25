@@ -230,10 +230,9 @@ class DecideRecoveryShTest(unittest.TestCase):
         lock = os.path.join(self.state, "locks", "ops", record["id"])
         os.makedirs(lock)
         host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
-        osname = subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
         now = int(time.time())
         with open(os.path.join(lock, "owner"), "w", encoding="utf-8") as f:
-            f.write(f"{host} {os.getpid()} {now} {os.getpid()}-{now} {osname}\n")
+            f.write(f"{host} {os.getpid()} {now} {os.getpid()}-{now}\n")
         result = self.run_decide("--resume", stdin="y\n")
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertEqual(len(STORE["issues"]), 0, "ロック中なのに issue を作った")
