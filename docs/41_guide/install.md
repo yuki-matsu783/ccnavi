@@ -260,25 +260,27 @@ PATH に通すフォルダ（macOS・Linux・WSL は `~/.local/bin`、Windows �
 ### .gitignore
 
 配布先が git のリポジトリなら、配った組み立ての置き場を `.gitignore` にも足す（入れると履歴から消すのが難しい）。
-置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/ccnavi-index.jsonl` も足す（[ドキュメントの索引](docs-search.md)）。あわせて、使い捨ての置き場 `/scratchpad` と、実行時の記録の置き場 `/logs/` も足す。
+置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/ccnavi-index.jsonl` も足す（[ドキュメントの索引](docs-search.md)）。あわせて、使い捨ての置き場 `/scratchpad`、実行時の記録の置き場 `/logs/`、ワークツリーの置き場 `/.claude/worktrees/` も足す。
+ccnavi が足した行は、目印の行（`# ---ccnavi begin---` と `# ---ccnavi end---`）で囲んだ 1 つの領域にまとまる。足りない行は end の直前に足し、領域の中のほかの行は書き換えない。目印の行が壊れているときは何も足さず、行番号と直し方を知らせる。
 
 ```
-# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
+# ---ccnavi begin--- (scripts/ccnavi-setup.sh が管理する範囲)
+# 実行ファイル
 /.ccnavi/bin/darwin-arm64/
-
-# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）
+# --docs の索引
 **/ccnavi-index.jsonl
-
-# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）
+# 使い捨ての置き場
 /scratchpad
-
-# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）
+# 実行時の記録
 /logs/
+# ワークツリーの置き場
+/.claude/worktrees/
+# ---ccnavi end---
 ```
 
 足すのはワークスペースの `.gitignore` だけ。`projects/<名前>/` の各プロジェクトには触らない。
 `.ccnavi/` を丸ごと無視すると sh と `rules.yml` が git から消えるため、足すのは `/.ccnavi/bin/<os>-<arch>/` だけにしてある。
-同等の行が既にあるとき、索引・`scratchpad`・`logs` を `!` で否定する行があるとき（ユーザが追跡すると決めているとみなす）は足さない。細部は[導入と配布の設計](../21_design/startup-config.md)にある。
+同等の行が既にあるとき、索引・`scratchpad`・`logs`・`.claude/worktrees` を `!` で否定する行があるとき（ユーザが追跡すると決めているとみなす）は足さない。細部は[導入と配布の設計](../21_design/startup-config.md)にある。
 
 ### 失敗したとき
 
