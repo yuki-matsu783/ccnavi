@@ -113,6 +113,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.oplog",
                 "hook.subagent_outcome",
                 "tickets.direct_candidates",
+                "tickets.handoff_names",
             }
         ),
     ),

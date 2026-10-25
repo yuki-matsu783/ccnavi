@@ -125,6 +125,7 @@ class SetupTest(unittest.TestCase):
             "ccnavi-branches.sh",
             "ccnavi-start.sh",
             "ccnavi-stage.sh",
+            "ccnavi-handoff-names.txt",
             "ccnavi-worktree.sh",
             "ccnavi-idle.sh",
         ):

@@ -17,6 +17,15 @@ Chrome と手元の sh が同じ見本から同じ JSON を組むことを見る
   だけ答える
 - 依頼の投稿（`GET`/`POST /repos/<o>/<r>/issues/<番号>/comments`）は、状態のファイル
   （環境変数 `FAKE_GITHUB_STATE`）に溜めて返す（write-and-push のハーネスで request を通すため）
+- `FAKE_GITHUB_GRAPHQL` が `blocked` なら、`POST /graphql` はすべて 403
+  （Claude Code のクラウドと同じ本文。`gh` は本文を返し、`curl` では番号だけが残る）。
+  `forbidden` なら別の理由の 403、`unauthorized` なら 401。
+  `blocked` のときだけ、REST の代わりの道（`.../pulls/<番号>/ccr/...`）が答える。
+  通常の GitHub では 404（`FAKE_GITHUB_NO_CCR` を付けると、`blocked` でも 404）
+- REST の見本は、環境変数 `FAKE_GITHUB_REST` が指すファイルに置く
+  （`review_threads`・`comments` の配列と、`body`・`draft`）。
+  返信・解決・Draft 外しの書き込みは、`FAKE_GITHUB_MUTATIONS` に
+  `{"rest": "<M> <path>", "body": ...}` で残す
 - ほかは 404
 
 sh の試験は PATH の先頭に `curl` の代役を置き、このファイルを
@@ -104,11 +113,96 @@ def _mutation(q: str, variables: dict) -> tuple[int, object]:
         if fail == "reply":
             return 200, {"errors": [{"message": "Could not resolve to a node"}]}
         return 200, {"data": {"addPullRequestReviewThreadReply": {"comment": {"id": "PRRC_1"}}}}
+    if "markPullRequestReadyForReview" in q:
+        _set_draft(False)
+        return 200, {
+            "data": {
+                "markPullRequestReadyForReview": {"pullRequest": {"number": 42, "isDraft": False}}
+            }
+        }
     if "resolveReviewThread" in q:
         if fail == "resolve":
             return 200, {"errors": [{"message": "Could not resolve to a node"}]}
         return 200, {"data": {"resolveReviewThread": {"thread": {"isResolved": True}}}}
     return 200, {"errors": [{"message": "知らない mutation"}]}
+
+
+def _rest() -> dict:
+    path = os.environ.get("FAKE_GITHUB_REST", "")
+    if not path or not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _draft() -> bool:
+    path = os.environ.get("FAKE_GITHUB_DRAFT_STATE", "")
+    if path and os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return bool(_rest().get("draft", True))
+
+
+def _set_draft(value: bool) -> None:
+    path = os.environ.get("FAKE_GITHUB_DRAFT_STATE", "")
+    if path:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(value, f)
+
+
+def _note(entry: dict) -> None:
+    log = os.environ.get("FAKE_GITHUB_MUTATIONS", "")
+    if log:
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _graphql_refusal() -> tuple[int, object] | None:
+    """`FAKE_GITHUB_GRAPHQL` が GraphQL を断るときの答え。"""
+    mode = os.environ.get("FAKE_GITHUB_GRAPHQL", "")
+    if mode == "blocked":
+        message = "GitHub GraphQL is not available from Claude Code sessions"
+        return 403, {"message": message}
+    if mode == "forbidden":
+        return 403, {"message": "Resource not accessible by personal access token"}
+    if mode == "unauthorized":
+        return 401, {"message": "Bad credentials"}
+    return None
+
+
+def _rest_answer(method: str, pieces: list[str], query: dict, body: str, number: str):
+    """REST の代わりの道の答え。コメントの一覧と返信も含む。pieces は `pulls/<番号>/...`。"""
+    if pieces[:1] != ["pulls"] or len(pieces) < 2 or pieces[1] != number:
+        return None
+    rest = pieces[2:]
+    rest_data = _rest()
+    served = os.environ.get("FAKE_GITHUB_GRAPHQL", "") == "blocked"
+    served = served and not os.environ.get("FAKE_GITHUB_NO_CCR")
+    if method == "GET" and not rest:
+        return 200, {
+            "number": int(number),
+            "node_id": "PR_kwDOAbCdEs5ABCD",
+            "title": "Draft: 機能を足す",
+            "body": rest_data.get("body", ""),
+            "draft": _draft(),
+        }
+    if method == "GET" and rest == ["comments"]:
+        return 200, rest_data.get("comments", []) if query.get("page", "1") == "1" else []
+    if method == "POST" and len(rest) == 3 and rest[0] == "comments" and rest[2] == "replies":
+        _note({"rest": f"POST {'/'.join(pieces)}", "body": json.loads(body or "{}")})
+        return 201, {"id": 9001, "in_reply_to_id": int(rest[1])}
+    if not served or rest[:1] != ["ccr"]:
+        return None
+    if method == "GET" and rest == ["ccr", "review_threads"]:
+        return 200, rest_data.get("review_threads", [])
+    if method == "POST" and len(rest) == 4 and rest[1] == "comments" and rest[3] == "resolve":
+        _note({"rest": f"POST {'/'.join(pieces)}", "body": json.loads(body or "{}")})
+        return 200, {}
+    if method == "POST" and rest == ["ccr", "ready_for_review"]:
+        _note({"rest": f"POST {'/'.join(pieces)}", "body": json.loads(body or "{}")})
+        _set_draft(False)
+        return 200, {}
+    return None
 
 
 def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tuple[int, object]:
@@ -129,6 +223,11 @@ def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tup
         return 200, []
     pieces = path[len(base) + 1 :].split("/") if path.startswith(base + "/") else []
     number = str(((_load(scene, "pulls.json") or [{}])[0] or {}).get("number", ""))
+    found = _rest_answer(method, pieces, query, body, number)
+    if found is not None:
+        return found
+    if method == "PATCH" and pieces[:1] == ["pulls"]:
+        return 200, {"number": int(number)}
     if method == "GET" and pieces[:1] == ["pulls"] and pieces[2:] == ["reviews"]:
         if pieces[1] != number:
             return 200, []
@@ -152,6 +251,9 @@ def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tup
                 json.dump([*posted, note], f)
             return 201, note
     if method == "POST" and path == "/graphql":
+        refused = _graphql_refusal()
+        if refused is not None:
+            return refused
         req = json.loads(body or "{}")
         q, variables = req.get("query", ""), req.get("variables") or {}
         if q.lstrip().startswith("mutation"):
@@ -254,7 +356,13 @@ def gh(argv: list[str]) -> int:
     status, data = answer(
         os.environ["FAKE_GITHUB_SCENE"], method, path, body, os.environ.get("FAKE_GITHUB_STATE", "")
     )
+    with open(os.environ.get("FAKE_GITHUB_LOG", os.devnull), "a", encoding="utf-8") as log:
+        log.write(f"{method} {path}\n")
     sys.stdout.write(json.dumps(data, ensure_ascii=False))
+    if status >= 400:
+        # 本物の gh は 4xx でも本文を標準出力へ書き、標準エラーには「gh: <message> (HTTP N)」を出す
+        message = data.get("message", "") if isinstance(data, dict) else ""
+        sys.stderr.write(f"gh: {message} (HTTP {status})\n")
     return 0 if status < 400 else 1
 
 

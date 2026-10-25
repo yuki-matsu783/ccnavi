@@ -37,7 +37,7 @@ class StageShTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-stage.sh", *common_sh(SH_DIR)):
+        for name in ("ccnavi-stage.sh", "ccnavi-handoff-names.txt", *common_sh(SH_DIR)):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         write(os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"), "version: 1\n")
         write(os.path.join(self.ws, ".claude", "hooks", "lint-py.sh"), "echo lint\n")
@@ -46,7 +46,9 @@ class StageShTest(unittest.TestCase):
         self.draft_rules = os.path.join(
             self.ws, "wip", "handoff", ".ccnavi", "config", "common", "rules.yml"
         )
-        self.draft_hook = os.path.join(self.ws, "wip", "handoff", ".claude", "hooks", "lint-py.sh")
+        self.draft_hook = os.path.join(
+            self.ws, "wip", "handoff", "handoff-.claude", "hooks", "lint-py.sh"
+        )
 
     def stage(self, *args, cwd=None):
         env = dict(os.environ)

@@ -188,7 +188,7 @@ Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止�
 | `.claude/settings.json` の `hooks` | 8 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true` と `git.repositoryScanMaxDepth: 2`。足りないキーだけを足す。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,fetch,dirs,idle,session-start,sync,clean,branches,start,stage,worktree,launcher}.sh`、ユーザ専用の `ccnavi-user-{agree,push-approved,close-early,decide,clean-branch,lib-review}.sh`、共通部の部品 `ccnavi-common-{state,lock,write-and-push,host,log,review}.sh` と `ccnavi-clean.js`。入口（`ccnavi-session-start.sh`。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない）。使い方の文書は配布元の `.ccnavi/docs/*.md` を全部 `.ccnavi/docs/` へ配る（`--docs` の索引はここだけ `.ccnavi/` の下でも載せる。配布先の既にあるものは `--force` のときだけ入れ替える）。配布元に `.ccnavi/docs/` が無ければ「配布元に無くて配れないもの」に挙げる。共通の作業・レビュー計画のテンプレートは配布元の `.ccnavi/config/common/templates/*.yml` を 1 本ずつ同じ場所へ配る（既にあるものは `--force` のときだけ入れ替える。配布元に置き場や `*.yml` が無ければ何もせず、何も言わない）。共通の工程スキルは、配布元の `.claude/skills/<名前>/SKILL.md` の frontmatter に `process: true` を持つものについて、`SKILL.md` と `references/common/` の下の `.md` を同じ場所へ 1 ファイルずつ配る（`.DS_Store` や `ccnavi-index.jsonl` のような生成物は配らない。`process: true` の読み方はユーザの発言のときの同期がコピーする判定に寄せ、CRLF の改行と、行末の `# コメント`は許し、閉じの `---` が無いものは配らない。配布先の道にディレクトリでないものがあるときは、そのファイルだけ配らずに挙げる）（既にあるものは `--force` のときだけ入れ替える。ユーザの発言のときの同期がプロジェクトへコピーする元になる。`.ccnavi/docs/skill-processes.md`）。配布元に該当するスキルが無ければ何もせず、何も言わない |
-| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/ccnavi-index.jsonl` の 1 行と、使い捨ての置き場 `/scratchpad` の 1 行と、実行時の記録の置き場 `/logs/` の 1 行。索引・`/scratchpad`・`/logs/` の行はそれぞれ別の見出しの下に入り、`/scratchpad` は同等以上の `/scratchpad/`・`scratchpad/`・`scratchpad` が既にあれば足さない。`scratchpad` を否定する行（`!/scratchpad` など）があればユーザの除外として足さない。`/logs/` は同等以上の `/logs`・`logs/`・`logs` が既にあれば足さず、`logs` の中身を否定する行（`!/logs`・`!/logs/diag` など）があればユーザの除外として足さない。`ccnavi-index.jsonl` の行が既にあれば足さない。`ccnavi-index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトの `.gitignore` には、`--docs` が索引を書く前に足す（10） |
+| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/ccnavi-index.jsonl` の 1 行と、使い捨ての置き場 `/scratchpad` の 1 行と、実行時の記録の置き場 `/logs/` の 1 行と、ワークツリーの置き場 `/.claude/worktrees/` の 1 行（`--bin user` でも足す）。これらの行は、目印の行（`# ---ccnavi begin---` と `# ---ccnavi end---`）で囲んだ 1 つの領域に入り、`/.claude/worktrees/` は同等以上の `/.claude/worktrees`・`.claude/worktrees/`・`.claude/worktrees` が既にあれば足さず、`!/.claude/worktrees` などの否定があればユーザの除外として足さない。`/scratchpad` は同等以上の `/scratchpad/`・`scratchpad/`・`scratchpad` が既にあれば足さない。`scratchpad` を否定する行（`!/scratchpad` など）があればユーザの除外として足さない。`/logs/` は同等以上の `/logs`・`logs/`・`logs` が既にあれば足さず、`logs` の中身を否定する行（`!/logs`・`!/logs/diag` など）があればユーザの除外として足さない。`ccnavi-index.jsonl` の行が既にあれば足さない。`ccnavi-index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトの `.gitignore` には、`--docs` が索引を書く前に足す（10） |
 
 置き場は 2 つに分けて固定する。
 
@@ -267,7 +267,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
 | `.ccnavi/scripts/ccnavi-worktree.sh` | 直接作業のワークツリーを、取り込み先（メインのチェックアウトが開いているブランチ）から切る。ずれが無ければ確認なしで取り込み先のHEADから切る。cwdのブランチ違い・取り込み先が統合先でない・`origin/<取り込み先>` とのずれ（遅れ・進み・分岐・無い・リモート未確認）・書きかけがあるときは、切らずに終了コード 3 で状態・勧め・リスク・確認コードを出す。ユーザの了承を得て `--base`・`--accept`・`--copy-wip`/`--no-wip` を付けて打ち直す。`--side-by-side` で、横で作業する間の自動復元を緩める（`ask` ルールで確認が出る）。記録は共通のgitディレクトリの `ccnavi-direct/<名前>`。`--offline`・`--from-origin` は廃止 |
-| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層。cwd が `.claude/worktrees/<名前>` の中ならそのワークツリーの `wip/handoff/`）へ `cp` する。`--commands` は編集済みの下書きの状態を出す（ターミナルの前のユーザは `mv` の代わりに `ccnavi user handoff` で取り込める）。取り込むのはユーザ |
+| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層。ただし `.claude` の階層は `handoff-.claude` に読み替える。cwd が `.claude/worktrees/<名前>` の中ならそのワークツリーの `wip/handoff/`）へ `cp` する。読み替える名前の表は `.ccnavi/scripts/ccnavi-handoff-names.txt`。`--commands` は編集済みの下書きの状態を出す（ターミナルの前のユーザは `mv` の代わりに `ccnavi user handoff` で取り込める）。取り込むのはユーザ |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。子のブランチを消す `--branch` は `ccnavi-user-clean-branch.sh` に分かれている。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 
 #### 配布物の条件
@@ -332,23 +332,25 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 `--lint` は error として報告する（10 章）。
 
 **`.gitignore`。** 配った組み立ての置き場は、配布先が git のリポジトリなら `.gitignore` にも足す（入れると履歴から消すのが難しい）。
-置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/ccnavi-index.jsonl` も別の見出しで足す（10 章）。
+置き場は配った機械のぶんだけ足す。同じ回に、配った実行ファイルの `--docs` が索引を書けるよう `**/ccnavi-index.jsonl` も足す（10 章）。足す行は、目印の行（`# ---ccnavi begin---` と `# ---ccnavi end---`）で囲んだ 1 つの領域に入れる。
 `**/ccnavi-index.jsonl` か `ccnavi-index.jsonl` の行が既にあれば足さない。行は CRLF の `\r` と行末の空白を除いて比べる。
 `!**/ccnavi-index.jsonl` や `!docs/ccnavi-index.jsonl` のように `ccnavi-index.jsonl` を否定する行があれば、ユーザが除外しているとみなして足さず、`--check` でもそう言う。
-`/scratchpad`（同等以上の `/scratchpad/`・`scratchpad/`・`scratchpad` があれば足さない。`!/scratchpad` などの否定があれば足さずに伝える）と、`/logs/`（同等以上の `/logs`・`logs/`・`logs` があれば足さない。`!/logs` や `!/logs/diag` などの否定があれば足さずに伝える）も同じ回に別の見出しで足す。
+`/scratchpad`（同等以上の `/scratchpad/`・`scratchpad/`・`scratchpad` があれば足さない。`!/scratchpad` などの否定があれば足さずに伝える）と、`/logs/`（同等以上の `/logs`・`logs/`・`logs` があれば足さない。`!/logs` や `!/logs/diag` などの否定があれば足さずに伝える）も同じ回に足す。ワークツリーの置き場 `/.claude/worktrees/` も足す（同等以上の `/.claude/worktrees`・`.claude/worktrees/`・`.claude/worktrees` があれば足さない。`!/.claude/worktrees` などの否定があれば足さずに伝える。`--bin user` でも足す）。
+領域の扱い: 領域が無ければ末尾に領域ごと足す（直前に空行 1 つ。末尾に改行が無ければ先に足す。CRLF のファイルには CRLF で足す）。領域があって行が足りなければ、end の直前に、コメント 1 行と足す行のセットで足す（領域の中に同じコメントがあれば重ねない）。領域の中の既存の行は書き換えない。行が領域の外にあっても足さない。begin と end が 1 つずつ、begin が先になっていない壊れた領域には触らず、行番号と直し方を知らせる（`--check` は「揃っていない」に数える）。領域を使い始める前の古い見出しブロックは、そのまま残す。
 
 ```
-# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
+# ---ccnavi begin--- (scripts/ccnavi-setup.sh が管理する範囲)
+# 実行ファイル
 /.ccnavi/bin/darwin-arm64/
-
-# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）
+# --docs の索引
 **/ccnavi-index.jsonl
-
-# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）
+# 使い捨ての置き場
 /scratchpad
-
-# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）
+# 実行時の記録
 /logs/
+# ワークツリーの置き場
+/.claude/worktrees/
+# ---ccnavi end---
 ```
 
 足すのはワークスペースの `.gitignore` だけ。`projects/<名前>/` の各プロジェクトには触らない（そのプロジェクトのチケットの範囲で足す）。

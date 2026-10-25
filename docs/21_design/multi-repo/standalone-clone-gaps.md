@@ -33,7 +33,7 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 | A4 | sh の `*/projects` 判定が大文字小文字を区別する | minor | 読み（Linux では再現できない） |
 | C1 | 単体 clone の直後は `.ccnavi/bin/` が無く、案内が合わない | 初回は blocker（単体 clone 固有ではない） | 実行 |
 | C2 | プロジェクトのスキルの目録が、単体 clone で出ない | major | 実行 |
-| C3 | setup が `/.claude/worktrees/` を `.gitignore` に足さない | minor から中 | 実行 |
+| C3 | setup が `projects/` の各プロジェクトの `.gitignore` に `/.claude/worktrees/` を足さない | minor から中 | 実行 |
 | C4 | `.git` がファイルの clone で、ワークツリーが認識されない | 中 | 実行 |
 | D1 | ワークスペースの発言のときの同期が、プロジェクトのミラーとコピーを上書きする | minor から中（設計上の緊張） | 実行 |
 | D2 | ワークスペースの SessionStart が、プロジェクトの `.gitignore` に追記する | minor | 実行 |
@@ -104,13 +104,13 @@ keywords: [単体 clone, ワークスペース内 clone, 不都合, 洗い出し
 - 確認: 実行で確認
 - 直し方の案: MAIN のツリー（`project == ""`）でも `root/skills` があれば目録を出す。工程スキルがワークスペース内 clone で目録と `--docs` に二重に出る例外（`--docs` は 2 件に該当する）との整理も要る。未決
 
-#### C3 setup が `/.claude/worktrees/` を `.gitignore` に足さない（minor から中）
+#### C3 setup が `projects/` の各プロジェクトの `.gitignore` に `/.claude/worktrees/` を足さない（minor から中）
 
-- 処理と場所: `scripts/ccnavi-setup.sh:960-1060,1627-1652` が `.gitignore` に足すのは `.ccnavi/bin/<os-arch>/`、`**/ccnavi-index.jsonl`、`/scratchpad`、`/logs/`。`/.claude/worktrees/` は足さない。ccnavi 自身のリポジトリは `.gitignore` に `/.claude/worktrees/` と `/projects/` を手で書いている
-- ワークスペース内 clone: ワークスペース側にも `/.claude/worktrees/` を足さない。ワークスペースの `.gitignore` に `/projects/` も足されず、警告だけが出る（setup の 1274 行以降）。重さは minor
+- 処理と場所: `scripts/ccnavi-setup.sh` が配布先のワークスペースの `.gitignore` に足すのは、目印の領域の中の `.ccnavi/bin/<os-arch>/`、`**/ccnavi-index.jsonl`、`/scratchpad`、`/logs/`、`/.claude/worktrees/`。足すのはワークスペースだけで、`projects/<名前>/` の各プロジェクトには足さない。ccnavi 自身のリポジトリは `.gitignore` に `/projects/` を手で書いている
+- ワークスペース内 clone: ワークスペースの `.gitignore` に `/projects/` も足されず、警告だけが出る（setup の 1274 行以降）。重さは minor
 - 単体 clone: ワークツリーがプロジェクト自身の `.claude/worktrees/` に切られ、`git status` に `?? .claude/worktrees/` が出る。`ccnavi-git.sh add .` が `adding embedded git repository` の警告を出し、gitlink を staged する。重さは中
 - 確認: 実行で確認。単体 clone 固有ではない
-- 直し方の案: setup が `/.claude/worktrees/` を足す（ワークスペース側には `/projects/` も）。未決
+- 直し方の案: ワークスペース側の `/.claude/worktrees/` は足すようにした。プロジェクト側に足すかは未決（ワークスペース側の `/projects/` も未決）
 
 #### C4 `.git` がファイルの clone で、ワークツリーが認識されない（中）
 

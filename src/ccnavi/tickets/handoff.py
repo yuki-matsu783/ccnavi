@@ -2,13 +2,15 @@
 
 エージェントが書けない保護対象（テンプレート・レイヤーの設定・docs・hook とラッパーの sh など）は、
 `wip/handoff/<ツリーからの相対パス>` に下書きを置き、ユーザがこの取り込みで元の場所へ書く。
+相対パスの中の `.claude` の階層は、Claude Code 本体が編集を断るので `handoff-.claude` に読み替えて
+置き、取り込むときに戻す（表と規則は `handoff_names`）。
 下書きを作るのは `ccnavi-stage.sh`（元のファイルをコピーし、
 `<下書き>.orig` にコピーした時点の元を残す）か、
 テンプレートなら `ccnavi --templates --draft`。
 
 ## 取り込み先（許可リスト）
 
-取り込み先は、下書きがあるツリー（`--root`）の同じ相対パス。取り込めるのは種類の表（`KINDS`）に
+取り込み先は、下書きがあるツリー（`--root`）の、読み替えを戻した相対パス。取り込めるのは種類の表（`KINDS`）に
 ヒットするものだけで、パスは全要素を NFC と `pathcase.fold` にそろえてから適用する。表にヒットしない
 下書きは対象外として件数だけを数え、error にはしない（`wip/handoff/` には学びの雛形や再現用の
 スクリプトも置かれる）。表を直すときは、行を足し、docs の表も直す（テストが食い違いを見る）。
@@ -59,7 +61,7 @@ import yaml
 from ..infra import fsio, gitcmd, pathcase, settings, yamlread
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from . import config_check, flow, plan_templates, ticket_places
+from . import config_check, flow, handoff_names, plan_templates, ticket_places
 
 JSON_VERSION = 1
 
@@ -68,6 +70,9 @@ HANDOFF_PARTS = (ticket_places.WIP_ROOT, "handoff")
 HANDOFF_REL = "/".join(HANDOFF_PARTS)
 # `ccnavi-stage.sh` がコピーした時点の元を残す名前の後ろ。
 ORIG_SUFFIX = ".orig"
+# 下書きの置き場で読み替える階層名の表（元の階層名 → 下書きでの階層名）。中身は `handoff_names` が
+# `.ccnavi/scripts/ccnavi-handoff-names.txt` から読む。sh（`ccnavi-stage.sh`）と同じファイル。
+HANDOFF_ALIASES = handoff_names.ALIASES
 
 KIND_TEMPLATE = "template"
 KIND_LAYER_CONFIG = "layer-config"
@@ -206,8 +211,8 @@ def handoff_dir(tree_root: str) -> str:
 
 
 def draft_rel(target_rel: str) -> str:
-    """取り込み先の相対パスに対応する、下書きのツリーからの相対パス。"""
-    return f"{HANDOFF_REL}/{target_rel}"
+    """取り込み先の相対パスに対応する、下書きのツリーからの相対パス（階層名は読み替える）。"""
+    return f"{HANDOFF_REL}/{handoff_names.to_draft(target_rel)}"
 
 
 def _sha(raw: bytes | None) -> str:
@@ -230,9 +235,12 @@ def _line(text: object) -> str:
 class Found:
     """置き場で見つけた下書き 1 本（まだ読んでいない）。"""
 
+    # 取り込み先の相対パス（読み替えを戻した形）。
     rel: str
     key: str
     path: str
+    # 置き場の中の相対パス（置いてある綴りのまま）。
+    drel: str = ""
 
 
 def walk(tree_root: str) -> tuple[list[Found], int, str]:
@@ -240,6 +248,7 @@ def walk(tree_root: str) -> tuple[list[Found], int, str]:
 
     リンクのディレクトリの中へは降りない（降りないので、その中の下書きは取り込まれない）。
     `.orig`（コピーした時点の元）と、途中を見せない書き方の残した一時ファイルは下書きに数えない。
+    `rel` と `key` は、読み替えを戻した取り込み先のパス。
     """
     base = handoff_dir(tree_root)
     if not os.path.lexists(base):
@@ -252,14 +261,15 @@ def walk(tree_root: str) -> tuple[list[Found], int, str]:
         dirs.sort()
         for name in sorted(files):
             full = os.path.join(parent, name)
-            rel = os.path.relpath(full, base).replace(os.sep, "/")
+            drel = os.path.relpath(full, base).replace(os.sep, "/")
             if fold_part(name).endswith(ORIG_SUFFIX) or fsio.is_temp_name(name):
                 continue
+            rel = handoff_names.from_draft(drel)
             key = key_of(rel)
             if kind_of(key) is None:
                 ignored += 1
                 continue
-            found.append(Found(rel, key, full))
+            found.append(Found(rel, key, full, drel))
         # リンクのディレクトリ（`os.walk` は降りない）は、中を読まない代わりに対象外として数える。
         for name in dirs:
             full = os.path.join(parent, name)
@@ -309,6 +319,8 @@ class Entry:
     key: str
     kind: Kind
     draft: str
+    # 置き場の中の相対パス（置いてある綴りのまま。`.orig` はこの隣）。
+    drel: str = ""
     target: str = ""
     raw: bytes | None = None
     current: bytes | None = None
@@ -338,7 +350,8 @@ class Entry:
 
     @property
     def draft_rel(self) -> str:
-        return draft_rel(self.rel)
+        """下書きのツリーからの相対パス。置いてある綴りのまま（無ければ表から組む）。"""
+        return f"{HANDOFF_REL}/{self.drel}" if self.drel else draft_rel(self.rel)
 
     @property
     def state(self) -> str:
@@ -415,7 +428,8 @@ def wanted_key(arg: str) -> tuple[str, str]:
     key = key_of("/".join(parts))
     prefix = key_of(HANDOFF_REL) + "/"
     if key.startswith(prefix):
-        key = key[len(prefix) :]
+        # 置き場の中のパス（下書きの綴り）は、読み替えを戻して取り込み先のパスにする。
+        key = key_of(handoff_names.from_draft(key[len(prefix) :]))
     return key, ""
 
 
@@ -442,7 +456,7 @@ def prepare(conf: settings.Settings, root: str, wanted: list[str] | None = None)
     for item in found:
         keys[item.key] = keys.get(item.key, 0) + 1
     for item in found:
-        entry = Entry(item.rel, item.key, kind_of(item.key) or KINDS[0], item.path)
+        entry = Entry(item.rel, item.key, kind_of(item.key) or KINDS[0], item.path, item.drel)
         if keys[item.key] > 1:
             entry.errors.append(
                 "同じ取り込み先に落ちる下書きが複数ある（大文字小文字か NFC/NFD だけが違う）。"
@@ -1056,7 +1070,7 @@ def pending(tree_root: str) -> list[str]:
         if not why and os.path.lexists(target):
             current, _ = flow.read_bytes(target, tree_root)
         if raw is None or why or current != raw:
-            out.append(draft_rel(item.rel))
+            out.append(f"{HANDOFF_REL}/{item.drel}")
     return out
 
 
@@ -1130,6 +1144,7 @@ def survey(tree_root: str, start: str) -> tuple[list[str], list[str]] | None:
 def entry_json(entry: Entry) -> dict:
     return {
         "path": entry.rel,
+        "draft": entry.draft_rel,
         "kind": entry.kind.id,
         "state": entry.state,
         "board": entry.board,
