@@ -1613,7 +1613,7 @@ class PullOnTargetTest(Fixture):
         self.assertPullRefused("origin", "ahead")
 
     def test_an_upstream_pointing_at_another_branch_is_refused(self):
-        # 引数なしの pull は上流（branch.main.merge）を merge する。上流が別ブランチなら、取り込む形と同じ。
+        # 引数なしの pull は上流を merge する。上流が別ブランチなら、取り込む形と同じ。
         git(self.ws, "fetch", "-q", "origin", "feat")
         git(self.ws, "config", "branch.main.merge", "refs/heads/feat")
         for args in ((), ("origin",)):
