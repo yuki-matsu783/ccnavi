@@ -1446,6 +1446,16 @@ def ticket_verdict(
                     "start it, and do the work in the child's worktree; the child's finish merges "
                     "it into the parent. If the parent has no child for this phase yet, "
                     "create one first.",
+                    # 承認の前に親へ入った変更を、承認の後に戻す手順。迂回しない旨も添える。
+                    "If this edit is meant to undo a change that is already uncommitted in the "
+                    "parent worktree (for example work done before the ticket was agreed), "
+                    "do not rewrite it here and do not work around this denial. Discard it with "
+                    f"(for example: cd {settings.shell_path(t.root)} && "
+                    f"{settings.script_command(root, 'ccnavi-git.sh')} "
+                    "restore --staged --worktree -- <path>; one file at a time), "
+                    "or move it into the child's worktree and commit it there. "
+                    "If you did not write the change yourself, ask the user "
+                    "before discarding it.",
                 ]
             ),
             "",
