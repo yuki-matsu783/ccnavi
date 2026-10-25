@@ -1,7 +1,7 @@
-"""`gitstate.committed` が、上流から取り込んだコミットを自分の変更として数えないことのテスト。
+"""`gitstate.committed` が、上流から取り込んだコミットを自分の変更として数えないことを確かめる。
 
-fast-forward（`pull --ff-only`・`checkout <上流>`・`reset --hard <上流>`）は上流の通常コミットを
-first-parent の列に入れる。リモート追跡ブランチに入っているコミットは外し、未 push のものだけ数える。
+fast-forward（`pull --ff-only`・`checkout <上流>`・`reset --hard <上流>`）では、上流の通常コミットが
+first-parent の列に入る。リモート追跡ブランチに入っているコミットは除き、未 push のものだけ数える。
 """
 
 import os
