@@ -56,7 +56,7 @@ export function CardItem({
     if (target instanceof Element && target.closest(NOT_OPENING) !== null) {
       return;
     }
-    // ID をドラッグして選んだあとの click は、共通の祖先（カード）に飛ぶ。選択中は開かない
+    // ID をドラッグして文字を選んだあとの click は、共通の親（カード）まで届く。文字を選択中は開かない
     if ((window.getSelection?.()?.toString() ?? "") !== "") {
       return;
     }

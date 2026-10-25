@@ -44,7 +44,7 @@
 }
 .card-head .title { order: 0; font-weight: 600; }
 .card-head .status { order: 2; }
-/* 題が空のカードは ID が唯一の識別なので、省略せず折り返し、主の見た目にする */
+/* 題が空のカードは ID が唯一の識別なので、省略せず折り返し、目立つ見た目にする */
 .card-head:has(.title:empty) .num {
   order: 0; flex: 1 1 8em; font-size: inherit; font-weight: 600; color: inherit;
   white-space: normal; overflow: visible; overflow-wrap: anywhere;
